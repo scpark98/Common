@@ -2113,9 +2113,25 @@ void CVtListCtrlEx::OnDropFiles(HDROP hDropInfo)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	CPoint pt;
 	DragQueryPoint(hDropInfo, &pt);
-	TRACE(_T("%d, %d\n"), pt.x, pt.y);
+	TRACE(_T("dropped point = %d, %d (index = %d)\n"), pt.x, pt.y, index_from_point(pt.x, pt.y));
 
 	CListCtrl::OnDropFiles(hDropInfo);
 
 	::PostMessage(GetParent()->GetSafeHwnd(), WM_DROPFILES, (WPARAM)hDropInfo, (LPARAM)0);
+}
+
+int CVtListCtrlEx::index_from_point(int x, int y)
+{
+	int first = GetTopIndex();
+	int last = first + GetCountPerPage();
+	CRect rItem;
+
+	for (; first < last; first++)
+	{
+		GetSubItemRect(first, 0, LVIR_BOUNDS, rItem);
+		if (rItem.PtInRect(CPoint(x, y)))
+			return first;
+	}
+
+	return -1;
 }

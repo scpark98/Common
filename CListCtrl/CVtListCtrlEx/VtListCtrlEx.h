@@ -228,6 +228,8 @@ public:
 
 	void random();
 
+	int index_from_point(int x, int y);
+
 protected:
 //메인 데이터
 	std::deque<CListCtrlData> m_list_db;

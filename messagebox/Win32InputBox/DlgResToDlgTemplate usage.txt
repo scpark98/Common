@@ -1,0 +1,2 @@
+- DlgResToDlgTemplate.exe notepad.exe 14 sample.h
+- 

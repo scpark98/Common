@@ -1,0 +1,37 @@
+{\rtf1\ansi\deff0 {\fonttbl {\f0 Courier;}}
+ {\colortbl;\red0\green0\blue0;\red255\green0\blue0;}
+ \landscape
+ \paperw15840\paperh12240\margl720\margr720\margt720\margb720
+ \tx720\tx1440\tx2880\tx5760
+ This line is the default color\line
+ \tab this line has 1 tab\line
+ \tab\tab this line has 2 tabs\line
+ \tab\tab\tab this line has 3 tabs\line
+ \tab\tab\tab\tab this line has 4 tabs\line
+ \cf2
+ \tab This line is red and has a tab before it\line
+ \cf1
+ \page
+ \par\pard\tx1440\tx2880
+ This line is the default color and the first line on page 2\line
+ \tab\tab This is the second tab on the second line on the second page\line
+ \page
+ \par\pard
+ This is the third page with formatting examples\line
+ \fs30 First line with 15 point text\line
+ \fs20 Second line with 10 point test\line
+ \i Italics on \i0 Italics off\line
+ \b Bold on \b0 Bold off\line
+ \scaps Small Caps On \scaps0 Small Caps Off\line
+ \strike Stike through on \strike0 Strike Off\line
+ \caps All Capitals On \caps0 All Capitals Off\line
+ \outl Outline on \outl0 Outline Off\line
+ \ul Underline on \ul0 Underline Off\line
+ \uldb Double Underline on \ul0 Double Underline Off\line
+ \ulth Thick Underline on \ul0 Thick Underline Off\line
+ \ulw Underline words only on \ul0 Underline words only off\line
+ \ulwave Wave Underline on \ul0 Wave underline off\line
+ \uld Dotted Underline on \ul0 Dotted underline off\line
+ \uldash Dash Underline on \ul0 Dash underline off\line
+ \uldashd Dot Dash Underline on \ul0 Dot Dash underline off\line
+ }

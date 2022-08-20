@@ -1,0 +1,59 @@
+[프로젝트 세팅]
+C/C++ -> 전처리기 에서 다음 항목 정의
+SOCKHANDLE_USE_OVERLAPPED
+
+
+[dlg.h]
+
+#include <atlbase.h>
+#pragma warning(disable:4995)
+#include <list>
+#include "CritSection.h"
+#include "SocketHandle.h"
+#include "SocketServerImpl.h"
+#if defined(SOCKHANDLE_USE_OVERLAPPED)
+#include "AsyncSocketServerImpl.h"
+#endif
+
+
+클래스 멤버로 다음과 같이 선언.
+
+#if defined(SOCKHANDLE_USE_OVERLAPPED)
+	typedef ASocketServerImpl<ISocketServerHandler> CSocketServer;
+#else
+	typedef SocketServerImpl<ISocketServerHandler> CSocketServer;
+#endif
+
+	friend CSocketServer;
+
+CSocketServer	m_SocketServer;
+void		GetAddress(const SockAddrIn& addrIn, CString& rString) const;
+
+5개의 virtual 함수 선언
+	// ISocketServerHandler
+	virtual void OnThreadBegin(CSocketHandle* pSH);
+	virtual void OnThreadExit(CSocketHandle* pSH);
+	virtual void OnAddConnection(CSocketHandle* pSH, SOCKET newSocket);
+	virtual void OnDataReceived(CSocketHandle* pSH, const BYTE* pbData, DWORD dwCount, SOCKET sock, const SockAddrIn& addr);
+	virtual void OnConnectionFailure(CSocketHandle* pSH, SOCKET newSocket);
+	virtual void OnConnectionDropped(CSocketHandle* pSH);
+	virtual void OnConnectionError(CSocketHandle* pSH, DWORD dwError);
+
+
+[dlg.cpp]
+#include <comdef.h>		//for _com_error
+#include <strsafe.h>	//for StringCchCopyN
+
+생성자에서
+	m_SocketServer.SetInterface(this);
+소멸자에서
+	CSocketHandle::ReleaseLibrary();
+
+OnInitDialog에서
+	CSocketHandle::InitLibrary( MAKEWORD(2,2) );
+
+	if ( !m_SocketServer.StartServer(NULL, "8008", AF_INET, 1 ) )
+	{
+		MessageBox(_T("Failed to start server."), NULL, MB_ICONSTOP);
+	}
+

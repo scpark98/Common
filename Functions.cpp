@@ -3704,6 +3704,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	}
 }
 
+#if (__cplusplus >= _std_cpp17)
 std::deque<CString> find_all_files(CString path, CString name_filter, CString ext_filters, CString except_str, bool recursive, bool auto_sort)
 {
 	int i;
@@ -3950,6 +3951,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 
 	return list;
 }
+#endif
 
 static BOOL wildcmp(const wchar_t* pat, const wchar_t* str)
 {
@@ -7568,7 +7570,7 @@ ULONG ProcIDFromWnd(HWND hwnd)
 }
 
 // 프로세스 아이디로 윈도우 핸들 얻기   
-HWND GetWindowHandle(ULONG pid)
+HWND GetHWNDbyPID(ULONG pid)
 {   
 	HWND tempHwnd = ::FindWindow(NULL,NULL); // 최상위 윈도우 핸들 찾기   
 
@@ -7604,7 +7606,6 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd,LPARAM lParam)
 	return TRUE;
 }
 
-
 //default : bCaseSensitive = false, bExceptThis = true
 HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThis)
 {
@@ -7636,7 +7637,7 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThi
 				{
 					if (OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID) != NULL)
 					{
-						hWnd = GetWindowHandle(pe.th32ProcessID); 
+						hWnd = GetHWNDbyPID(pe.th32ProcessID);
 						hWnd = GetWindowHandleFromProcessID(pe.th32ProcessID);
 						break;
 					}

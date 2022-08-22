@@ -1,5 +1,11 @@
 #pragma once
 
+#include <afxwin.h>
+#include <vector>
+#include <gdiplus.h>
+
+using namespace Gdiplus;
+
 /* scpark
 - gdi+를 이용한 png 투명 버튼 클래스
 - 단색 또는 배경 이미지 선택 가능.
@@ -35,6 +41,10 @@
 	from resource jpg	:	m_Button_GDI.AddImage( AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDB_RED_CAR), _T("JPG"), NULL, ::GetSysColor(COLOR_3DFACE));
 	from resource bmp	:	m_Button_GDI.AddImage( AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDB_HOUSE), _T("Bitmap"), NULL, ::GetSysColor(COLOR_3DFACE));
 
+- push button
+	normal, over, down, disabled
+- check or radio button
+	checked, unchecked
 */
 
 //버튼 자동 정렬 정의이며 특정 좌표값 기준이 아닌
@@ -48,8 +58,21 @@
 #define ANCHOR_VCENTER		0x00100000
 #define ANCHOR_CENTER		ANCHOR_HCENTER | ANCHOR_VCENTER
 
-#define MAX_BUTTON_IMAGE	10
+class CButtonImage
+{
+public:
+	CButtonImage()
+	{
+		normal = over = down = disabled = NULL;
+	}
 
+	//~CButtonImage();
+
+	Bitmap* normal;
+	Bitmap* over;
+	Bitmap* down;
+	Bitmap* disabled;
+};
 
 // CGdiButton
 
@@ -73,24 +96,26 @@ public:
 	//GetParent()->UpdateWindow()를 이용하여 뿌려주는 방식은 배경 데이터를 명시하지 않아도 투명하게 뿌려지는 장점은 있으나
 	//UpdateWindow로 인해 이미지를 변경하는 이벤트가 발생하면 깜빡이는 단점이 존재한다.
 
-	//ex. ANCHOR_RIGHT 옵션을 주면 dx 좌표값과는 무관하게 부모창의 오른쪽에 버튼이 위치하게 된다.
+	//id값이 -1이면 normal을 이용하여 자동 생성, 0이면 생성하지 않음, 0보다 크면 리소스를 로딩.
+	//checkbox나 radiobutton일 경우는 0번에 비선택 이미지, 1번에 선택 이미지를 차례로 넣어야 한다.
+	bool		add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	bool		add_images(HINSTANCE hInst, LPCTSTR lpType, UINT img_id, ...);
+	void		fit_to_image(bool fit = true);
+	Bitmap*		gen_over_image(Bitmap* img);
+	Bitmap*		gen_down_image(Bitmap* img);
+	Bitmap*		gen_disabled_image(Bitmap* img);
 
-	//한 버튼은 최대 10장의 이미지를 담을 수 있으며 0번이 normal상태 이미지, 그리고 checked 상태로 시작된다.
-	bool		AddImage( CString sfile, Bitmap* pBack = NULL, COLORREF crBack = 0, bool bFitToImage = true, int dx = -1, int dy = -1, UINT nAnchor = ANCHOR_NONE, bool bAsStatic = false, bool bShowError = true );
-	bool		AddImage( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType, Bitmap* pBack = NULL, COLORREF crBack = 0, bool bFitToImage = true, int dx = -1, int dy = -1, UINT nAnchor = ANCHOR_NONE, bool bAsStatic = false, bool bShowError = true );
-	bool		AddImage( Bitmap* bmpImage, Bitmap* pBack = NULL, COLORREF crBack = 0, bool bFitToImage = true, int dx = -1, int dy = -1, UINT nAnchor = ANCHOR_NONE, bool bAsStatic = false, bool bShowError = true );
+	void		select(int index);
 
-	void		SelectImage( int nIndex );
 
-	//gray 이미지를 자동 생성해서 추가해준다. (어떤 이미지를 선택인 경우는 컬러로, 비선택인 경우는 흑백으로 표시하는 용도로 유용하다)
-	//여러장의 이미지를 표현하는 경우에는 사용하지 않으며 보통 1장의 이미지 버튼인 경우 disable 또는 unchecked를 표현하기 위해 사용된다.
-	//따라서 normal(checked)는 0번, gray(unchecked)는 1번 인덱스를 갖는다.
-	bool		AddGrayImage( bool bSelectGray = false );
+	Bitmap*		Load(CString sfile);
+	Bitmap*		get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, bool show_error = false);
 
-	Bitmap*		Load( CString sfile );
+	static void	SafeRelease(Bitmap** pBitmap);
+	//static void draw_image(CDC* pDC, Bitmap* pBitmap, int x, int y);
 	//Bitmap*		Load( UINT nResourceID );
-	Bitmap*		GetImageFromResource( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType);
-	Bitmap*		GdiplusImageToBitmap(Image* img, Color bkgd = Color::Transparent);
+	static Bitmap* GetImageFromResource( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType);
+	static Bitmap* GdiplusImageToBitmap(Image* img, Color bkgd = Color::Transparent);
 
 	void		ReleaseAll();
 
@@ -106,10 +131,7 @@ public:
 	virtual CGdiButton&		SetFontSize( int nSize );
 	virtual CGdiButton&		SetFontBold( bool bBold = true );
 
-	//1번 이미지는 true, 0번 이미지는 false (checkbox나 radiobutton과 같은 용도로 사용할 수 있다)
 	bool		GetCheck();
-	//true이면 1번 이미지를 표시해준다. 만약 1번이 없다면 normal 이미지만 가진 경우이므로
-	//AddGrayImage로 회색 이미지를 1번에 추가해주고 0번과 1번을 바꿔준다.
 	void		SetCheck( bool bCkeck );
 	void		Toggle();
 
@@ -118,6 +140,8 @@ public:
 
 
 	//버튼의 크기, 위치 변경
+	int			width() { return m_width; }
+	int			height() { return m_height; }
 	void		SetAnchor( UINT nAnchor ) { m_nAnchor = nAnchor; }	//정렬 방식 설정
 	void		SetAnchorMargin( int x, int y ) { m_nAnchorMarginX = x; m_nAnchorMarginY = y; }
 	void		ReAlign();	//parent의 크기가 변하면 설정된 align값에 따라 위치를 재조정해준다.
@@ -131,6 +155,9 @@ public:
 	void		SetFocusRectWidth( int nWidth ) { m_nFocusRectWidth = nWidth; Invalidate(); }
 
 	void		use_hover(bool use);
+	void		set_hover_rect(int thick = 2, COLORREF cr = RGB(128, 128, 255));
+	void		set_hover_rect_thick(int thick);
+	void		set_hover_rect_color(COLORREF cr);
 	void		down_offset(CPoint offset) { m_down_offset = offset; Invalidate(); }
 	void		down_offset(int offset) { m_down_offset = CPoint(offset, offset); Invalidate(); }
 
@@ -142,11 +169,11 @@ public:
 	void		SetBlink( BOOL bBlink = TRUE );
 
 protected:
-	UINT		m_button_style;					//pushbutton(default) or checkbox or radiobutton
+	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton
 
-	Bitmap*		m_pImage[MAX_BUTTON_IMAGE];		//한 버튼에 추가된 이미지들
-	int			m_nImages;						//담고 있는 이미지의 수
-	int			m_nIndex;						//현재 표시하고자 하는 이미지 인덱스
+	std::vector<CButtonImage> m_image;
+	int			m_idx = 0;					//현재 선택된 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
+	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 컨트롤 크기로 이미지 사이즈 변경
 
 	Bitmap*		m_pBack;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
 	Bitmap*		m_pBackOrigin;
@@ -163,7 +190,10 @@ protected:
 
 	bool		m_bToggleButton;		//기본 이미지를 표시할지, 부가 이미지를 표시할지
 	bool		m_bAsStatic;			//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
-	bool		m_use_hover;			//default = true;
+	bool		m_use_hover = true;		//default = true;
+	bool		m_hover_rect = false;	//hover 테두리 사각형 표시 여부
+	int			m_hover_rect_thick = 2;
+	COLORREF	m_hover_rect_color = RGB(128, 128, 255);
 	bool		m_bHover;
 	bool		m_bIsTracking;
 	bool		m_bPushed;
@@ -172,17 +202,15 @@ protected:
 	COLORREF	m_crFocusRect;			//색상
 	int			m_nFocusRectWidth;		//두께
 	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
-	bool		m_bFitToImage;			//true이면 이미지 크기대로 컨트롤 크기 변경, false이면 컨트롤 크기로 이미지 사이즈 변경. 기본값=true
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
 
 	BOOL		m_bBlink;
 	BOOL		m_bBlinkStatus;
-	int			m_nBlinkTime0;		//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
+	int			m_nBlinkTime0;			//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
 	int			m_nBlinkTime1;
 
 
-	void		ResizeControl( int& dx, int& dy );
-	void		SafeRelease( Bitmap** pBitmap );
+	void		resize_control();		//멤버인 m_width, m_height에 따라 컨트롤의 크기를 변경한다.
 
 	LOGFONT		m_lf;
 	CFont		m_font;
@@ -207,6 +235,8 @@ public:
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };
 
 

@@ -39,6 +39,11 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 #include "../Common/colors.h"
 
+#define _std_cpp11 201103L
+#define _std_cpp14 201402L
+#define _std_cpp17 201703L
+#define _std_cpp20 202002L
+
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
 #else
@@ -349,7 +354,7 @@ CString		GetExeFileTitle();
 CString		GetCurrentDirectory();
 ULONG		GetPID( CString processname );
 ULONG		ProcIDFromWnd(HWND hwnd);
-HWND		GetWindowHandle(ULONG pid);
+HWND		GetHWNDbyPID(ULONG pid);
 bool		IsRunning(CString processname);
 int			ProcessKill(CString processname);
 HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
@@ -625,7 +630,9 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//32,105개의 파일 : 1,773,564ms VS 3,337ms
 	//release mode에서는
 	//9,715ms VS 21ms.
+#if (__cplusplus >= _std_cpp17)
 	std::deque<CString>	find_all_files(CString path, CString name_filter = _T(""), CString ext_filters = _T(""), CString except_str = _T(""), bool recursive = true, bool auto_sort = true);
+#endif
 	void save_dqlist(std::deque<CString>* dqlist, CString path);
 
 	//위의 FindAllFiles에서는 "파일명*"과 같이 찾게 되는데 이럴 경우 시리즈 이름의 다른 파일들도 모두 찾아진다.

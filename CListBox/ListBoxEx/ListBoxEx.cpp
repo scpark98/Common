@@ -127,6 +127,8 @@ void CListBoxEx::OnPaint()
 		}
 		else
 		{
+			dc.FillSolidRect(rect, m_list[i].crBack);
+
 			if (m_list[i].crText == list_unused_color)
 				dc.SetTextColor(m_crText);
 			else

@@ -344,4 +344,5 @@ COLORREF	gray_color(COLORREF cr);
 double		color_similarity_distance(COLORREF c1, COLORREF c2);
 COLORREF	get_default_color(int index);
 COLORREF	get_random_color();
+extern COLORREF g_default_color[16];
 #endif

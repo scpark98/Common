@@ -11,12 +11,7 @@ gdi color	: 0x000000ff = red
 즉, html color는 RGB순으로 표기되고
 gdi의 COLORREF는 0xaabbggrr의 순으로 저장됨에 주의해야 한다.
 */
-
-
-COLORREF get_default_color(int index)
-{
-	COLORREF default_color[16] =
-	{
+COLORREF g_default_color[16] = {
 		black,
 		dimgray,
 		gray,
@@ -35,8 +30,11 @@ COLORREF get_default_color(int index)
 		blanchedalmond,
 	};
 
+
+COLORREF get_default_color(int index)
+{
 	index %= 16;
-	return default_color[index];
+	return g_default_color[index];
 }
 
 COLORREF get_random_color()

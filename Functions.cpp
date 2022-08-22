@@ -3934,7 +3934,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				list.push_back(file);
 		}
 	}
-
+	/*
 	std::deque<CString> list1;
 	list1.assign(list.begin(), list.end());
 
@@ -3948,7 +3948,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 		;
 	if (std::equal(list.begin(), list.end(), list1.begin(), list1.end()))
 		;
-
+	*/
 	return list;
 }
 #endif
@@ -6824,9 +6824,9 @@ CString URLEncode(CString sIn)
 {
 	CString sOut;
 	const int nLen = sIn.GetLength() + 1;
-	register LPBYTE pOutTmp = NULL;
+	LPBYTE pOutTmp = NULL;
 	LPBYTE pOutBuf = NULL;
-	register LPBYTE pInTmp = NULL;
+	LPBYTE pInTmp = NULL;
 	LPBYTE pInBuf =(LPBYTE)sIn.GetBuffer(nLen);
 	BYTE b = 0;
 	//alloc out buffer
@@ -9186,8 +9186,8 @@ int	GetPrinterList(CStringArray *arPrinters)
 	BYTE*	pPrinterInfo = NULL;
 	DWORD	dwOptions = PRINTER_ENUM_CONNECTIONS | PRINTER_ENUM_LOCAL;
 	DWORD	dwNeeds = 0;
-	register	DWORD dwRet = 0;
-	register	DWORD nIndex = 0;
+	DWORD dwRet = 0;
+	DWORD nIndex = 0;
 	bool	fRet = FALSE;
 
 	arPrinters->RemoveAll();
@@ -10025,10 +10025,10 @@ void resize_image(uint8_t *source_ptr,
 void scaleImage(uint8_t*src, uint8_t*dest, int srcWidth, int srcHeight, int destWidth, int destHeight)
 {
 	//these are internal counters
-	register int srcx = 0;
-	register int srcy = 0;
-	register int skipx;
-	register int skipy;
+	int srcx = 0;
+	int srcy = 0;
+	int skipx;
+	int skipy;
 
 	skipx = (destWidth>>8)/srcWidth;
 	skipy = (destHeight>>8)/srcHeight;
@@ -10036,12 +10036,12 @@ void scaleImage(uint8_t*src, uint8_t*dest, int srcWidth, int srcHeight, int dest
 	for(int y=0; y<destHeight; y++)
 	{
 		//calc from which y coord we need to copy pixel
-		register uint8_t*src2 = src + ((srcy>>8)*srcWidth*3);
+		uint8_t*src2 = src + ((srcy>>8)*srcWidth*3);
 
 		for(int x=0; x<destWidth; x++)
 		{
 			//calc from which x coord we need to copy pixel
-			register uint8_t*src3 = src2 + ((srcx>>8)*3);
+			uint8_t*src3 = src2 + ((srcx>>8)*3);
 
 			//copy rgb
 			*dest++ = *src3++;
@@ -11188,8 +11188,8 @@ bool yuv444_to_yuv420(BYTE* u, BYTE* v, BYTE *U, BYTE *V, int w, int h)
 {
 	int i, j;
 	int value;
-	register int addr;
-	register int pos0, pos1, pos2, pos3;
+	int addr;
+	int pos0, pos1, pos2, pos3;
 
 	addr = 0;
 

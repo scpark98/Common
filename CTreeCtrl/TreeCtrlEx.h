@@ -145,7 +145,7 @@ protected:
 	BOOL			RegisterWindowClass();
 
 	//텍스트 파일을 읽어왔을때 유니코드 여부에 따라 저장도 동일하게 하자. default = true
-	bool			m_unicode_file;
+	//bool			m_unicode_file;
 
 	//방향키 등 키보드 입력을 처리할 지 아니면 parent에게 그냥 넘길지. default = true;
 	bool			m_use_keyboard;

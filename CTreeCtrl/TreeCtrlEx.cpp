@@ -20,7 +20,7 @@ CTreeCtrlEx::CTreeCtrlEx()
 	if( !RegisterWindowClass() )
 		return;
 
-	m_unicode_file = true;
+	//m_unicode_file = true;
 
 	m_use_keyboard = true;
 
@@ -222,6 +222,7 @@ bool CTreeCtrlEx::load_from_file(bool load, CString sfile)
 		//encording 방식을 읽어온다.
 		int	text_encoding = get_text_encoding(sfile);
 
+		/*
 		if (text_encoding <= text_ansi)
 		{
 			fp = _tfopen(sfile, _T("rt"));
@@ -229,9 +230,10 @@ bool CTreeCtrlEx::load_from_file(bool load, CString sfile)
 		}
 		else
 		{
-			fp = _tfopen(sfile, _T("rt, ccs=UNICODE"));
-			m_unicode_file = true;
-		}
+		*/
+			fp = _tfopen(sfile, _T("rt")CHARSET);
+			//m_unicode_file = true;
+		//}
 
 		if (fp == NULL)
 			return false;
@@ -316,10 +318,10 @@ bool CTreeCtrlEx::load_from_file(bool load, CString sfile)
 	//텍스트 파일로 저장할 경우
 	else 
 	{
-		if (m_unicode_file)
-			fp = _tfopen(sfile, _T("wt, ccs=UNICODE"));
-		else
-			fp = _tfopen(sfile, _T("wt"));
+		//if (m_unicode_file)
+			fp = _tfopen(sfile, _T("wt")CHARSET);
+		//else
+			//fp = _tfopen(sfile, _T("wt"));
 
 		if (!fp)
 			return false;

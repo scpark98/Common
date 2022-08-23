@@ -115,13 +115,13 @@ END_MESSAGE_MAP()
 //기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 {
-	DWORD dwStyle = ::GetWindowLong(m_hWnd, GWL_STYLE);
+	DWORD dwStyle = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
 
 	CButton::SetButtonStyle(nStyle, bRedraw);
 
 	// BS_OWNERDRAW 속성을 설정한다.
 	//주의 : dwStyle은 반드시 CButton::SetButtonStyle() 함수 호출 전에 구한 값을 사용해야 한다.
-	::SetWindowLong(m_hWnd, GWL_STYLE, dwStyle | BS_OWNERDRAW);
+	::SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle | BS_OWNERDRAW);
 	m_button_style = nStyle;
 }
 
@@ -160,23 +160,6 @@ bool CGdiButton::add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT ov
 	m_image.push_back(btn);
 
 	fit_to_image(m_fit2image);
-
-	return true;
-}
-
-bool CGdiButton::add_images(HINSTANCE hInst, LPCTSTR lpType, UINT img_num, ...)
-{
-	va_list ap;
-	va_start(ap, img_num);
-
-	UINT arg;
-	for (int i = 0; i < img_num; i++)
-	{
-		arg = va_arg(ap, UINT);
-		if (!add_image(hInst, lpType, arg))
-			return false;
-	}
-	va_end(ap);
 
 	return true;
 }
@@ -232,8 +215,8 @@ void CGdiButton::fit_to_image(bool fit)
 
 	if (m_fit2image)
 	{
-		m_width = m_image[m_idx].normal->GetWidth();
-		m_height = m_image[m_idx].normal->GetHeight();
+		m_width = m_image[0].normal->GetWidth();
+		m_height = m_image[0].normal->GetHeight();
 	}
 	else
 	{
@@ -778,6 +761,18 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	Graphics	g(dc.m_hDC, rc);
 
 	bool down_state = lpDIS->itemState & ODS_SELECTED;
+	int idx = MIN(m_idx, m_image.size()-1);
+	if (idx < 0)
+		return;
+
+	//check or radio인데 m_image.size()가 1뿐이라면
+	//checked = normal을, unchecked = disabled를 표시한다.
+	bool use_disabled_image = false;
+	if (m_button_style != BS_PUSHBUTTON && m_image.size() == 1 && m_idx == 0)
+	{
+		use_disabled_image = true;
+	}
+
 
 	//이미지가 없다면 기본 모양으로 그려줘야 하지만
 	//push or radio를 일일이 그려주기는 코드가 더 필요하다.
@@ -785,7 +780,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//2020 09 26 21
 	//radio나 checkbox의 기본 이미지를 로딩하여 사용하는 것도 가능하나
 	//응용 범위를 넓히기 위해 일단 직접 그려준다.
-	if (m_image.size() == 0 || m_image[m_idx].normal == NULL)
+	if (m_image.size() == 0 || m_image[idx].normal == NULL)
 	{
 		GetWindowText(str);
 
@@ -929,20 +924,20 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	if (m_bAsStatic)
 	{
-		pImage = m_image[m_idx].normal;
+		pImage = m_image[idx].normal;
 	}
 	else
 	{
-		if (!IsWindowEnabled())
+		if (use_disabled_image || !IsWindowEnabled())
 		{
 			TRACE(_T("disabled\n"));
-			pImage = m_image[m_idx].disabled;
+			pImage = m_image[idx].disabled;
 		}
 		//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
 		else if (down_state)
 		{
 			TRACE(_T("down\n"));
-			pImage = m_image[m_idx].down;
+			pImage = m_image[idx].down;
 			pt = m_down_offset;
 			//g.DrawImage(m_down, pt.x + m_down_offset.x, pt.y + m_down_offset.y, m_width, m_height);
 		}
@@ -950,7 +945,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else if (m_use_hover && m_bHover)
 		{
 			TRACE(_T("over\n"));
-			pImage = m_image[m_idx].over;
+			pImage = m_image[idx].over;
 			/*
 			ia.SetColorMatrices(&HotMat, &GrayMat, ColorMatrixFlagsDefault);
 
@@ -967,12 +962,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else
 		{
 			TRACE(_T("normal\n"));
-			pImage = m_image[m_idx].normal;
+			pImage = m_image[idx].normal;
 		}
 	}
 
 	if (pImage == NULL)
-		pImage = m_image[m_idx].normal;
+		pImage = m_image[idx].normal;
 
 	g.DrawImage(pImage, pt.x, pt.y, m_width - pt.x*2, m_height - pt.y*2);
 

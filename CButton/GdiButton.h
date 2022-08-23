@@ -96,10 +96,24 @@ public:
 	//GetParent()->UpdateWindow()를 이용하여 뿌려주는 방식은 배경 데이터를 명시하지 않아도 투명하게 뿌려지는 장점은 있으나
 	//UpdateWindow로 인해 이미지를 변경하는 이벤트가 발생하면 깜빡이는 단점이 존재한다.
 
-	//id값이 -1이면 normal을 이용하여 자동 생성, 0이면 생성하지 않음, 0보다 크면 리소스를 로딩.
-	//checkbox나 radiobutton일 경우는 0번에 비선택 이미지, 1번에 선택 이미지를 차례로 넣어야 한다.
+	//add_images는 하나의 버튼에 여러개의 이미지를 추가할 때 사용한다.
+	//즉, add_image를 이미지 개수만큼 호출한다.
+	//특히 check, radio처럼 checked, unchecked image를 별도로 세팅할 때 사용할 수 있고
+	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
+	//on/off, play/pause...
+	template <typename ... Types>
+	void add_images(HINSTANCE hInst, LPCTSTR lpType, Types... args)
+	{
+		int n = sizeof...(args);
+		int arg[] = { args... };
+
+		for (auto id : arg)
+			add_image(hInst, lpType, id);
+	}
+
+	//버튼에 4개의 상태 이미지들을 세팅한다. UINT가 0이면 자동 생성해준다.
+	//한 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.
 	bool		add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
-	bool		add_images(HINSTANCE hInst, LPCTSTR lpType, UINT img_id, ...);
 	void		fit_to_image(bool fit = true);
 	Bitmap*		gen_over_image(Bitmap* img);
 	Bitmap*		gen_down_image(Bitmap* img);

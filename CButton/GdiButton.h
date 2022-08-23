@@ -172,8 +172,9 @@ protected:
 	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton
 
 	std::vector<CButtonImage> m_image;
-	int			m_idx = 0;					//현재 선택된 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
-	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 컨트롤 크기로 이미지 사이즈 변경
+	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
+	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
+	CRect		m_rwOrigin = 0;				//컨트롤의 원래 크기 정보
 
 	Bitmap*		m_pBack;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
 	Bitmap*		m_pBackOrigin;
@@ -188,7 +189,6 @@ protected:
 	int			m_nAnchorMarginX;
 	int			m_nAnchorMarginY;
 
-	bool		m_bToggleButton;		//기본 이미지를 표시할지, 부가 이미지를 표시할지
 	bool		m_bAsStatic;			//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
 	bool		m_use_hover = true;		//default = true;
 	bool		m_hover_rect = false;	//hover 테두리 사각형 표시 여부
@@ -210,7 +210,7 @@ protected:
 	int			m_nBlinkTime1;
 
 
-	void		resize_control();		//멤버인 m_width, m_height에 따라 컨트롤의 크기를 변경한다.
+	void		resize_control(int cx, int cy);
 
 	LOGFONT		m_lf;
 	CFont		m_font;

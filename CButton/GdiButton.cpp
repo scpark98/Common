@@ -40,7 +40,6 @@ CGdiButton::CGdiButton()
 	m_nAnchorMarginX	= 0;
 	m_nAnchorMarginY	= 0;
 
-	m_bToggleButton		= false;
 	m_bPushed			= false;
 	m_use_hover			= true;
 	m_bHover			= false;
@@ -160,7 +159,8 @@ bool CGdiButton::add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT ov
 
 	m_image.push_back(btn);
 
-	//fit_to_image(m_fit2image);
+	fit_to_image(m_fit2image);
+
 	return true;
 }
 
@@ -234,16 +234,14 @@ void CGdiButton::fit_to_image(bool fit)
 	{
 		m_width = m_image[m_idx].normal->GetWidth();
 		m_height = m_image[m_idx].normal->GetHeight();
-		resize_control();
 	}
 	else
 	{
-		CRect r;
-		GetWindowRect(r);
-
-		m_width = r.Width();
-		m_height = r.Height();
+		m_width = m_rwOrigin.Width();
+		m_height = m_rwOrigin.Height();
 	}
+
+	resize_control(m_width, m_height);
 
 	Invalidate();
 }
@@ -592,7 +590,7 @@ void CGdiButton::SetBrightnessHoverEffect(float fScale)	//1.0f = no effect.
 }
 
 //그림의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.
-void CGdiButton::resize_control()
+void CGdiButton::resize_control(int cx, int cy)
 {
 	CRect	rc, rParentRect;
 
@@ -675,14 +673,16 @@ void CGdiButton::PreSubclassWindow()
 	// Set control to owner draw
 	m_button_style = getButtonStyle(m_hWnd);
 	
-	CString str;
-	GetWindowText(str);
+	CString text;
+	GetWindowText(text);
 	//TRACE(_T("%s = %d\n"), str, m_button_style);
 	
 	ModifyStyle(0, BS_OWNERDRAW, SWP_FRAMECHANGED);
 	//ModifyStyle(0, WS_TABSTOP, WS_TABSTOP);
 
-
+	GetWindowRect(m_rwOrigin);
+	GetParent()->ScreenToClient(m_rwOrigin);
+	TRACE(_T("%s : %s\n"), text, GetRectInfoString(m_rwOrigin, 0));
 
 	CFont* font = GetFont();
 
@@ -776,6 +776,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//배경을 그려주고 이미지를 그리므로 여기서는 CMemoryDC를 이용하여 더블버퍼링을 해줘야 안깜빡인다.
 	CMemoryDC	dc(pDC1, &rc);//, true);
 	Graphics	g(dc.m_hDC, rc);
+
+	bool down_state = lpDIS->itemState & ODS_SELECTED;
 
 	//이미지가 없다면 기본 모양으로 그려줘야 하지만
 	//push or radio를 일일이 그려주기는 코드가 더 필요하다.
@@ -883,9 +885,13 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			if (m_b3DRect)
 			{
-				dc.Draw3dRect(rc, m_bPushed ? GetSysColor(COLOR_3DSHADOW) : GetSysColor(COLOR_3DLIGHT),
-					m_bPushed ? GetSysColor(COLOR_3DLIGHT) : GetSysColor(COLOR_3DSHADOW));
-				if (m_bPushed)
+				dc.Draw3dRect(rc,
+					down_state ? GRAY(128) : white,
+					down_state ? white : GRAY(128)
+					//down_state ? GetSysColor(COLOR_3DSHADOW) : GetSysColor(COLOR_3DLIGHT),
+					//down_state ? GetSysColor(COLOR_3DLIGHT) : GetSysColor(COLOR_3DSHADOW)
+					);
+				if (down_state)
 					r.OffsetRect(-1, -1);
 			}
 
@@ -933,7 +939,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			pImage = m_image[m_idx].disabled;
 		}
 		//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
-		else if (lpDIS->itemState & ODS_SELECTED)
+		else if (down_state)
 		{
 			TRACE(_T("down\n"));
 			pImage = m_image[m_idx].down;
@@ -1359,6 +1365,6 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 	{
 		m_width = cx;
 		m_height = cy;
-		resize_control();
+		resize_control(cx, cy);
 	}
 }

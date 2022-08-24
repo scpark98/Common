@@ -100,7 +100,7 @@ public:
 	//즉, add_image를 이미지 개수만큼 호출한다.
 	//특히 check, radio처럼 checked, unchecked image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
-	//on/off, play/pause...
+	//on/off, play/pause, img0/img1/img2...
 	template <typename ... Types>
 	void add_images(HINSTANCE hInst, LPCTSTR lpType, Types... args)
 	{
@@ -114,9 +114,15 @@ public:
 	//버튼에 4개의 상태 이미지들을 세팅한다. UINT가 0이면 자동 생성해준다.
 	//한 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.
 	bool		add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+
+	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
+
+	//over 이미지를 자동 생성한다.
 	Bitmap*		gen_over_image(Bitmap* img);
+	//down 이미지를 자동 생성한다.
 	Bitmap*		gen_down_image(Bitmap* img);
+	//disabled 이미지를 자동 생성한다.
 	Bitmap*		gen_disabled_image(Bitmap* img);
 
 	void		select(int index);
@@ -125,13 +131,12 @@ public:
 	Bitmap*		Load(CString sfile);
 	Bitmap*		get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, bool show_error = false);
 
-	static void	SafeRelease(Bitmap** pBitmap);
-	//static void draw_image(CDC* pDC, Bitmap* pBitmap, int x, int y);
-	//Bitmap*		Load( UINT nResourceID );
+	static void	safe_release(Bitmap** pBitmap);
+
 	static Bitmap* GetImageFromResource( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType);
 	static Bitmap* GdiplusImageToBitmap(Image* img, Color bkgd = Color::Transparent);
 
-	void		ReleaseAll();
+	void		release_all();
 
 	void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		SetBackColor(COLORREF crBack);	//배경색을 설정, 변경할 경우 사용, 기존 배경 그림이 있었을 경우는 배경 그림은 해제됨.

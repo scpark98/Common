@@ -68,10 +68,10 @@ CGdiButton::CGdiButton()
 
 CGdiButton::~CGdiButton()
 {
-	ReleaseAll();
+	release_all();
 }
 
-void CGdiButton::SafeRelease(Bitmap** pBitmap)
+void CGdiButton::safe_release(Bitmap** pBitmap)
 {
 	if (*pBitmap == NULL)
 		return;
@@ -80,17 +80,17 @@ void CGdiButton::SafeRelease(Bitmap** pBitmap)
 	*pBitmap = NULL;
 }
 
-void CGdiButton::ReleaseAll()
+void CGdiButton::release_all()
 {
-	SafeRelease(&m_pBack);
-	SafeRelease(&m_pBackOrigin);
+	safe_release(&m_pBack);
+	safe_release(&m_pBackOrigin);
 
 	for (int i = 0; i < m_image.size(); i++)
 	{
-		SafeRelease(&m_image[i].normal);
-		SafeRelease(&m_image[i].over);
-		SafeRelease(&m_image[i].down);
-		SafeRelease(&m_image[i].disabled);
+		safe_release(&m_image[i].normal);
+		safe_release(&m_image[i].over);
+		safe_release(&m_image[i].down);
+		safe_release(&m_image[i].disabled);
 	}
 }
 
@@ -535,7 +535,7 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 		return;
 
 	if (m_pBack)
-		SafeRelease(&m_pBack);
+		safe_release(&m_pBack);
 
 	CRect	rc;
 	CPoint	pt;
@@ -553,7 +553,7 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 void CGdiButton::SetBackColor(COLORREF crBack)
 {
 	if (m_pBack)
-		SafeRelease(&m_pBack);
+		safe_release(&m_pBack);
 
 	m_crBack = crBack;
 	Invalidate();
@@ -799,12 +799,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		TRACE(_T("%s = %d, %d\n"), str, m_button_style, dwStyle);
 
 #if 1
-		if (dwStyle & BS_LEFT)
-			dwText |= DT_LEFT;
-		else if (dwStyle & BS_RIGHT)
+		if (dwStyle & BS_RIGHT)
 			dwText |= DT_RIGHT;
-		else// if (dwStyle & BS_CENTER)
+		else if (dwStyle & BS_CENTER)
 			dwText |= DT_CENTER;
+		else //if (dwStyle & BS_LEFT)
+			dwText |= DT_LEFT;
 #else		
 		MAP_STYLE(BS_LEFT,	 DT_LEFT);
 		MAP_STYLE(BS_RIGHT,	 DT_RIGHT);
@@ -1175,7 +1175,7 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	//배경 그림이 존재했다면 배경 또한 새로 따와야 한다.
 	if (m_pBack && m_pBackOrigin)
 	{
-		SafeRelease(&m_pBack);
+		safe_release(&m_pBack);
 
 		Rect cutRect(rc.left, rc.top, rc.Width(), rc.Height());
 		m_pBack = m_pBackOrigin->Clone(cutRect, m_pBackOrigin->GetPixelFormat());

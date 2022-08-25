@@ -37,6 +37,8 @@ CGraphCtrl::CGraphCtrl()
 	if( !RegisterWindowClass() )
 		return;
 
+	this;
+
 	int	i;
 
 	m_nGraphStyle		= GRAPH_STYLE_LINE;

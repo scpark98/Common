@@ -7583,7 +7583,7 @@ HWND GetHWNDbyPID(ULONG pid)
 		tempHwnd = ::GetWindow(tempHwnd, GW_HWNDNEXT); // 다음 윈도우 핸들 찾기   
 	}   
 	return NULL;   
-} 
+}
 
 HWND hWndToFind = NULL;
 
@@ -7638,7 +7638,7 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThi
 					if (OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID) != NULL)
 					{
 						hWnd = GetHWNDbyPID(pe.th32ProcessID);
-						hWnd = GetWindowHandleFromProcessID(pe.th32ProcessID);
+						//hWnd = GetWindowHandleFromProcessID(pe.th32ProcessID);
 						break;
 					}
 					

@@ -139,13 +139,10 @@ public:
 	void		release_all();
 
 	void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
-	void		SetBackColor(COLORREF crBack);	//배경색을 설정, 변경할 경우 사용, 기존 배경 그림이 있었을 경우는 배경 그림은 해제됨.
-	void		SetBackHoverColor(COLORREF crBackHover);
+	void		set_back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
 	void		SetBrightnessHoverEffect(float fScale);	//1.0f = no effect.
 
 
-	virtual CGdiButton&		SetTextColor(COLORREF crText); // This Function is to set the Color for the Text.
-	virtual CGdiButton&		SetTextHoverColor(COLORREF crTextHover); // This Function is to set the Color for hovering.
 	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		SetFontSize( int nSize );
 	virtual CGdiButton&		SetFontBold( bool bBold = true );
@@ -197,9 +194,9 @@ protected:
 
 	Bitmap*		m_pBack;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
 	Bitmap*		m_pBackOrigin;
-	COLORREF	m_crBack;					//버튼의 배경색
-	COLORREF	m_crBackHover;				//버튼의 배경색
 
+	COLORREF	m_cr_text[4];
+	COLORREF	m_cr_back[4];
 
 	int			m_width;
 	int			m_height;
@@ -221,6 +218,7 @@ protected:
 	COLORREF	m_crFocusRect;			//색상
 	int			m_nFocusRectWidth;		//두께
 	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
+	bool		m_is_down = false;
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
 
 	BOOL		m_bBlink;
@@ -233,8 +231,6 @@ protected:
 
 	LOGFONT		m_lf;
 	CFont		m_font;
-	COLORREF	m_crText;
-	COLORREF	m_crTextHover;
 
 	void		ReconstructFont();
 
@@ -256,6 +252,7 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 };
 
 

@@ -30,6 +30,8 @@ IMPLEMENT_DYNAMIC(CGdiButton, CButton)
 
 CGdiButton::CGdiButton()
 {
+	int i;
+
 	m_button_style		= BS_PUSHBUTTON;
 
 	m_pBack				= NULL;
@@ -46,10 +48,11 @@ CGdiButton::CGdiButton()
 	m_bIsTracking		= false;
 	m_down_offset		= CPoint(1, 1);
 
-	m_crText			= ::GetSysColor(COLOR_BTNTEXT);
-	m_crTextHover		= ::GetSysColor(COLOR_HOTLIGHT);
-	m_crBack			= ::GetSysColor(COLOR_3DFACE);
-	m_crBackHover		= ::GetSysColor(COLOR_3DSHADOW);
+	for (i = 0; i < 4; i++)
+	{
+		m_cr_text[i] = ::GetSysColor(COLOR_BTNTEXT);
+		m_cr_back[i] = ::GetSysColor(COLOR_3DFACE);
+	}
 
 	m_bHasFocus			= false;
 	m_bShowFocusRect	= false;
@@ -106,6 +109,7 @@ BEGIN_MESSAGE_MAP(CGdiButton, CButton)
 	ON_WM_LBUTTONUP()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_SIZE()
+	ON_WM_LBUTTONDOWN()
 END_MESSAGE_MAP()
 
 
@@ -550,18 +554,16 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 	Invalidate();
 }
 
-void CGdiButton::SetBackColor(COLORREF crBack)
+void CGdiButton::set_back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
 	if (m_pBack)
 		safe_release(&m_pBack);
 
-	m_crBack = crBack;
-	Invalidate();
-}
+	m_cr_back[0] = normal;
+	m_cr_back[1] = over;
+	m_cr_back[2] = down;
+	m_cr_back[3] = disabled;
 
-void CGdiButton::SetBackHoverColor(COLORREF crBackHover)
-{
-	m_crBackHover = crBackHover;
 	Invalidate();
 }
 
@@ -753,6 +755,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CPoint		pt(0, 0);
 	Bitmap*		pImage = NULL;
 	CString		str;
+	COLORREF	cr_back = m_cr_back[0];
 
 	GetClientRect(rc);
 
@@ -760,7 +763,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CMemoryDC	dc(pDC1, &rc);//, true);
 	Graphics	g(dc.m_hDC, rc);
 
-	bool down_state = lpDIS->itemState & ODS_SELECTED;
+	bool down_state = (m_is_down || lpDIS->itemState & ODS_SELECTED);
+
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
 		return;
@@ -798,6 +802,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		GetWindowText(str);
 		TRACE(_T("%s = %d, %d\n"), str, m_button_style, dwStyle);
 
+		//align 수정 필요
 #if 1
 		if (dwStyle & BS_RIGHT)
 			dwText |= DT_RIGHT;
@@ -814,21 +819,21 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (m_use_hover && m_bHover)
 		{
-			dc.SetTextColor(m_crTextHover);
-			color.SetFromCOLORREF(m_crTextHover);
-			dc.FillSolidRect(rc, m_crBackHover);
+			dc.SetTextColor(m_cr_text[2]);
+			color.SetFromCOLORREF(m_cr_text[2]);
+			dc.FillSolidRect(rc, m_cr_back[2]);
 		}
 		else if (IsWindowEnabled())
 		{
-			dc.SetTextColor(m_crText);
-			color.SetFromCOLORREF(m_crText);
-			dc.FillSolidRect(rc, m_crBack);
+			dc.SetTextColor(m_cr_text[0]);
+			color.SetFromCOLORREF(m_cr_text[0]);
+			dc.FillSolidRect(rc, m_cr_back[0]);
 		}
 		else
 		{
-			dc.SetTextColor(GRAY(128));
-			color.SetFromCOLORREF(GRAY(128));
-			dc.FillSolidRect(rc, m_crBack);
+			dc.SetTextColor(m_cr_text[3]);
+			color.SetFromCOLORREF(m_cr_text[3]);
+			dc.FillSolidRect(rc, m_cr_back[3]);
 		}
 
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
@@ -841,7 +846,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + size * 2 + 1;
 			r.top = r.CenterPoint().y - size;
 			r.bottom = r.top + size * 2 + 1;
-			DrawRectangle(&dc, r, (m_use_hover && m_bHover) ? m_crTextHover : m_crText, RGB(255,255,255));
+			DrawRectangle(&dc, r, (m_use_hover && m_bHover) ? m_cr_text[2] : m_cr_text[0], RGB(255, 255, 255));
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
 
@@ -907,20 +912,14 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	RectF			grect;
 	ImageAttributes ia;
 
-	//우선 배경 이미지를 뿌려주고
-	if (m_pBack)
-		g.DrawImage(m_pBack, 0, 0);
-	else
-		dc.FillSolidRect(rc, m_crBack);
-
 	//원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//g.SetInterpolationMode(InterpolationModeNearestNeighbor);
 
 	//부드럽게 resize되지만 약간 뿌옇게 변함
-	//g.SetInterpolationMode(InterpolationModeHighQualityBilinear);
+	g.SetInterpolationMode(InterpolationModeHighQualityBilinear);
 
 	//중간 느낌
-	g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+	//g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
 
 	if (m_bAsStatic)
 	{
@@ -928,48 +927,61 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 	else
 	{
-		if (use_disabled_image || !IsWindowEnabled())
+		if (!IsWindowEnabled())
 		{
-			TRACE(_T("disabled\n"));
 			pImage = m_image[idx].disabled;
+			cr_back = m_cr_back[3];
 		}
 		//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
 		else if (down_state)
 		{
-			TRACE(_T("down\n"));
-			pImage = m_image[idx].down;
+			if (use_disabled_image)
+			{
+				pImage = m_image[idx].disabled;
+			}
+			else
+			{
+				pImage = m_image[idx].down;
+			}
+
+			cr_back = m_cr_back[2];
 			pt = m_down_offset;
-			//g.DrawImage(m_down, pt.x + m_down_offset.x, pt.y + m_down_offset.y, m_width, m_height);
 		}
 		//
 		else if (m_use_hover && m_bHover)
 		{
-			TRACE(_T("over\n"));
-			pImage = m_image[idx].over;
-			/*
-			ia.SetColorMatrices(&HotMat, &GrayMat, ColorMatrixFlagsDefault);
-
-			grect.X = pt.x;
-			grect.Y = pt.y;
-			grect.Width = (REAL)m_width;
-			grect.Height = (REAL)m_height;
-
-			g.DrawImage(pImage, grect, 0, 0, pImage->GetWidth(), pImage->GetHeight(), UnitPixel, &ia);
-			//g.DrawImage(pImage, pt.x, pt.y, m_width, m_height);// , UnitPixel, & ia);
-			TRACE(_T("w = %d, h = %d\n"), m_width, m_height);
-			*/
+			if (use_disabled_image)
+			{
+				pImage = m_image[idx].disabled;
+			}
+			else
+			{
+				pImage = m_image[idx].over;
+			}
+			cr_back = m_cr_back[1];
 		}
 		else
 		{
-			TRACE(_T("normal\n"));
-			pImage = m_image[idx].normal;
+			if (use_disabled_image)
+			{
+				pImage = m_image[idx].disabled;
+			}
+			else
+			{
+				pImage = m_image[idx].normal;
+			}
+			cr_back = m_cr_back[0];
 		}
 	}
 
 	if (pImage == NULL)
 		pImage = m_image[idx].normal;
 
-	g.DrawImage(pImage, pt.x, pt.y, m_width - pt.x*2, m_height - pt.y*2);
+	//배경을 그리고
+	if (m_pBack)
+		g.DrawImage(m_pBack, 0, 0);
+	else
+		dc.FillSolidRect(rc, cr_back);
 
 	if (m_use_hover && m_bHover && m_hover_rect)
 	{
@@ -979,9 +991,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
 	}
 
+	//TRACE(_T("pt : %d, %d\n"), pt.x, pt.y);
+	g.DrawImage(pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+
 	if (m_bShowFocusRect)//&& m_bHasFocus)
 	{
-		TRACE("draw focus rect\n");
+		//TRACE(_T("draw focus rect\n"));
 		//pDC->DrawFocusRect(rc);
 		Color	color;
 
@@ -1256,22 +1271,6 @@ void CGdiButton::SetBlink(BOOL bBlink /*= TRUE*/)
 	}
 }
 
-CGdiButton& CGdiButton::SetTextColor(COLORREF crColor)
-{
-	m_crText = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
-	RedrawWindow();
-
-	return *this;
-}
-
-CGdiButton& CGdiButton::SetTextHoverColor(COLORREF crTextHover)
-{
-	m_crTextHover = crTextHover; // Passing the value passed by the dialog to the member varaible for Text Color
-	RedrawWindow();
-
-	return *this;
-}
-
 CGdiButton& CGdiButton::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
@@ -1297,10 +1296,23 @@ CGdiButton& CGdiButton::SetFontBold(bool bBold)
 	return *this;
 }
 
+void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	m_is_down = IsWindowEnabled();
+	Invalidate();
+	CButton::OnLButtonDown(nFlags, point);
+}
+
 
 void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
+	if (!m_is_down)
+		return;
+
+	m_is_down = false;
+
 	if (m_button_style == BS_CHECKBOX)
 	{
 		Toggle();
@@ -1308,6 +1320,10 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 	else if (m_button_style == BS_RADIOBUTTON)
 	{
 		SetCheck((m_idx = 1));
+	}
+	else
+	{
+		Invalidate();
 	}
 
 	CButton::OnLButtonUp(nFlags, point);
@@ -1363,3 +1379,4 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 		resize_control(cx, cy);
 	}
 }
+

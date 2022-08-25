@@ -39,6 +39,11 @@
 //complementary color
 #define		color_complementary(c) (~(c)&0x00ffffff)
 
+#define		GRAY_FACE	::GetSysColor(COLOR_3DFACE)
+#define		GRAY32		GRAY(32)
+#define		GRAY64		GRAY(64)
+#define		GRAY128		GRAY(128)
+#define		GRAY192		GRAY(192)
 #define		GRAY(x)		RGB((x), (x), (x))
 
 enum Colors

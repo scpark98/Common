@@ -7582,7 +7582,7 @@ HWND GetHWNDbyPID(ULONG pid)
 				return tempHwnd;   
 		tempHwnd = ::GetWindow(tempHwnd, GW_HWNDNEXT); // 다음 윈도우 핸들 찾기   
 	}   
-	return NULL;   
+	return NULL;
 }
 
 HWND hWndToFind = NULL;

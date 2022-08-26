@@ -133,19 +133,23 @@ public:
 
 	static void	safe_release(Bitmap** pBitmap);
 
-	static Bitmap* GetImageFromResource( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType);
+	static Bitmap* GetImageFromResource( HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName);
 	static Bitmap* GdiplusImageToBitmap(Image* img, Color bkgd = Color::Transparent);
 
 	void		release_all();
 
 	void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
-	void		set_back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	virtual	CGdiButton& text(CString text);
+	virtual	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	virtual	CGdiButton& back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
 	void		SetBrightnessHoverEffect(float fScale);	//1.0f = no effect.
 
 
 	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		SetFontSize( int nSize );
 	virtual CGdiButton&		SetFontBold( bool bBold = true );
+
+	void		UpdateSurface();
 
 	bool		GetCheck();
 	void		SetCheck( bool bCkeck );
@@ -195,6 +199,7 @@ protected:
 	Bitmap*		m_pBack;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
 	Bitmap*		m_pBackOrigin;
 
+	CString		m_text = _T("");
 	COLORREF	m_cr_text[4];
 	COLORREF	m_cr_back[4];
 
@@ -207,7 +212,7 @@ protected:
 
 	bool		m_bAsStatic;			//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
 	bool		m_use_hover = true;		//default = true;
-	bool		m_hover_rect = false;	//hover 테두리 사각형 표시 여부
+	bool		m_hover_rect = true;	//hover 테두리 사각형 표시 여부
 	int			m_hover_rect_thick = 2;
 	COLORREF	m_hover_rect_color = RGB(128, 128, 255);
 	bool		m_bHover;

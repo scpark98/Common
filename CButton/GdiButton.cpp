@@ -230,7 +230,7 @@ void CGdiButton::fit_to_image(bool fit)
 
 	resize_control(m_width, m_height);
 
-	Invalidate();
+	UpdateSurface();
 }
 
 void CGdiButton::select(int index)
@@ -239,7 +239,7 @@ void CGdiButton::select(int index)
 		return;
 
 	m_idx = index;
-	Invalidate();
+	UpdateSurface();
 }
 
 Bitmap* CGdiButton::get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, bool show_error)
@@ -251,35 +251,8 @@ Bitmap* CGdiButton::get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, 
 
 	if (type == "png" || type == "jpg")
 	{
-		bitmap = GetImageFromResource(hInst, lpName, lpType);
+		bitmap = GetImageFromResource(hInst, lpType, lpName);
 	}
-	/*
-	else if (type == "jpg")
-	{
-		HRSRC hResource = FindResource(hInst, lpName, TEXT("JPG"));
-
-		if (!hResource)
-			return false;
-
-		DWORD imageSize = SizeofResource(hInst, hResource);
-		HGLOBAL hGlobal = LoadResource(hInst, hResource);
-		LPVOID pData = LockResource(hGlobal);
-		HGLOBAL hBuffer = GlobalAlloc(GMEM_MOVEABLE, imageSize);
-		LPVOID pBuffer = GlobalLock(hBuffer);
-
-		CopyMemory(pBuffer, pData, imageSize);
-		GlobalUnlock(hBuffer);
-
-		IStream *pStream;
-		HRESULT hr = CreateStreamOnHGlobal(hBuffer, TRUE, &pStream);
-		Gdiplus::Image image(pStream);
-		pStream->Release();
-
-		if (image.GetLastStatus() != Gdiplus::Ok)
-			return false;
-		bitmap = GdiplusImageToBitmap(&image);
-	}
-	*/
 	else
 	{
 		bitmap = Bitmap::FromResource(hInst, (WCHAR*)lpName);
@@ -335,7 +308,7 @@ bool CGdiButton::AddImage( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType, Bitm
 	CString str = lpType;
 
 	if (str == "PNG")
-		bitmap = GetImageFromResource(hInst, lpName, lpType);
+		bitmap = GetImageFromResource(hInst, lpType, lpName);
 	else if (str == "JPG")
 	{
 		HRSRC hResource = FindResource(hInst, lpName, TEXT("JPG"));
@@ -437,7 +410,7 @@ void CGdiButton::SelectImage(int nIndex)
 		return;
 
 	m_nIndex = nIndex;
-	Invalidate();
+	UpdateSurface();
 }
 #endif
 
@@ -451,8 +424,6 @@ void CGdiButton::SelectImage(int nIndex)
 void CGdiButton::SetCheck(bool bCheck)
 {
 	m_idx = bCheck;
-
-	Invalidate();
 
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
@@ -478,7 +449,7 @@ void CGdiButton::SetCheck(bool bCheck)
 				{
 					//((CGdiButton*)pWnd)->SetCheck(BST_UNCHECKED); 
 					((CGdiButton*)pWnd)->m_idx = 0;
-					pWnd->Invalidate(); 
+					((CGdiButton*)pWnd)->UpdateSurface();
 				}
 			} 
 
@@ -504,7 +475,7 @@ Bitmap* CGdiButton::Load(CString sfile)
 	return NULL;
 }
 
-Bitmap*	CGdiButton::GetImageFromResource(HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType)
+Bitmap*	CGdiButton::GetImageFromResource(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName)
 {
 	HRSRC hResource = FindResource(hInst, lpName, lpType);
 
@@ -551,10 +522,30 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 	Rect cutRect(pt.x, pt.y, rc.Width(), rc.Height());
 	m_pBack = pBack->Clone(cutRect, pBack->GetPixelFormat());
 
-	Invalidate();
+	UpdateSurface();
 }
 
-void CGdiButton::set_back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
+CGdiButton& CGdiButton::text(CString text)
+{
+	m_text = text;
+	UpdateSurface();
+
+	return *this;
+}
+
+CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
+{
+	m_cr_text[0] = normal;
+	m_cr_text[1] = over;
+	m_cr_text[2] = down;
+	m_cr_text[3] = disabled;
+
+	UpdateSurface();
+
+	return *this;
+}
+
+CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
 	if (m_pBack)
 		safe_release(&m_pBack);
@@ -564,7 +555,9 @@ void CGdiButton::set_back_color(COLORREF normal, COLORREF over, COLORREF down, C
 	m_cr_back[2] = down;
 	m_cr_back[3] = disabled;
 
-	Invalidate();
+	UpdateSurface();
+
+	return *this;
 }
 
 void CGdiButton::SetBrightnessHoverEffect(float fScale)	//1.0f = no effect.
@@ -710,7 +703,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 
 									m_bPushed = true;
 
-									Invalidate();
+									UpdateSurface();
 									return false;
 
 		case WM_LBUTTONUP		:	if (m_bAsStatic)
@@ -734,7 +727,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 												SetCheck(true);
 										}
 
-										Invalidate();
+										UpdateSurface();
 									}
 
 									return false;
@@ -752,18 +745,26 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	CDC*		pDC1 = CDC::FromHandle(lpDIS->hDC);
 	CRect		rc;
+	CRect		rText;
 	CPoint		pt(0, 0);
 	Bitmap*		pImage = NULL;
-	CString		str;
+	CString		text;
+	COLORREF	cr_text = m_cr_text[0];
 	COLORREF	cr_back = m_cr_back[0];
+	DWORD		dwStyle = GetStyle();
+	DWORD		dwText = 0;
 
 	GetClientRect(rc);
+	GetWindowText(text);
+
+	rText = rc;
 
 	//배경을 그려주고 이미지를 그리므로 여기서는 CMemoryDC를 이용하여 더블버퍼링을 해줘야 안깜빡인다.
 	CMemoryDC	dc(pDC1, &rc);//, true);
 	Graphics	g(dc.m_hDC, rc);
 
-	bool down_state = (m_is_down || lpDIS->itemState & ODS_SELECTED);
+	bool is_down = (m_is_down || lpDIS->itemState & ODS_SELECTED);
+	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
@@ -777,68 +778,140 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		use_disabled_image = true;
 	}
 
-
-	//이미지가 없다면 기본 모양으로 그려줘야 하지만
-	//push or radio를 일일이 그려주기는 코드가 더 필요하다.
-	//우선 checkbox만 심플하게 구현한다. 2018 09 04 12
-	//2020 09 26 21
-	//radio나 checkbox의 기본 이미지를 로딩하여 사용하는 것도 가능하나
-	//응용 범위를 넓히기 위해 일단 직접 그려준다.
-	if (m_image.size() == 0 || m_image[idx].normal == NULL)
+	if (is_disabled)
 	{
-		GetWindowText(str);
+		cr_text = m_cr_text[3];
+		cr_back = m_cr_back[3];
+	}
+	//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
+	else if (is_down)
+	{
+		cr_text = m_cr_text[2];
+		cr_back = m_cr_back[2];
+	}
+	//
+	else if (m_use_hover && m_bHover)
+	{
+		cr_text = m_cr_text[1];
+		cr_back = m_cr_back[1];
+	}
+	else
+	{
+		cr_text = m_cr_text[0];
+		cr_back = m_cr_back[0];
+	}
 
-		int		size = 6;
-		CRect	r = rc;
-		CRect	rCaption;
-		Color	color;
-		//DWORD	dwText = DT_SINGLELINE | DT_VCENTER;// | DT_END_ELLIPSIS;
-		//DWORD	dwStyle = ::GetWindowLong(m_hWnd, GWL_STYLE);
-		//DWORD	dwText;
-		DWORD dwStyle = GetStyle();
-		DWORD dwText = 0;
+	//만약 parent에 배경색이나 배경 그림이 있고
+	//그려지는 이미지가 배경이 투명한 PNG라면 배경과는 무관하게
+	CRect Rect;
+	GetWindowRect(&Rect);
+	CWnd* pParent = GetParent();
+	ASSERT(pParent);
+	pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
+	//copy what's on the parents at this point
+	CDC* pDC = pParent->GetDC();
+	CDC MemDC;
+	CBitmap bmp;
+	MemDC.CreateCompatibleDC(pDC);
+	bmp.CreateCompatibleBitmap(pDC, Rect.Width(), Rect.Height());
+	CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+	MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pDC, Rect.left, Rect.top, SRCCOPY);
+	dc.BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+	MemDC.SelectObject(pOldBmp);
+	pParent->ReleaseDC(pDC);
+	MemDC.DeleteDC();
 
-		CString str;
-		GetWindowText(str);
-		TRACE(_T("%s = %d, %d\n"), str, m_button_style, dwStyle);
+	//이미지가 있다면 이미지를 먼저 그려주고
+	if (m_image.size() > 0 && m_image[idx].normal != NULL)
+	{
+		RectF			grect;
+		ImageAttributes ia;
 
-		//align 수정 필요
-#if 1
-		if (dwStyle & BS_RIGHT)
-			dwText |= DT_RIGHT;
-		else if (dwStyle & BS_CENTER)
-			dwText |= DT_CENTER;
-		else //if (dwStyle & BS_LEFT)
-			dwText |= DT_LEFT;
-#else		
-		MAP_STYLE(BS_LEFT,	 DT_LEFT);
-		MAP_STYLE(BS_RIGHT,	 DT_RIGHT);
-		MAP_STYLE(BS_CENTER, DT_CENTER);
-#endif
-		dwText |= (DT_SINGLELINE | DT_VCENTER);
+		//원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
+		//g.SetInterpolationMode(InterpolationModeNearestNeighbor);
 
-		if (m_use_hover && m_bHover)
+		//부드럽게 resize되지만 약간 뿌옇게 변함
+		g.SetInterpolationMode(InterpolationModeHighQualityBilinear);
+
+		//중간 느낌
+		//g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+
+		if (m_bAsStatic)
 		{
-			dc.SetTextColor(m_cr_text[2]);
-			color.SetFromCOLORREF(m_cr_text[2]);
-			dc.FillSolidRect(rc, m_cr_back[2]);
-		}
-		else if (IsWindowEnabled())
-		{
-			dc.SetTextColor(m_cr_text[0]);
-			color.SetFromCOLORREF(m_cr_text[0]);
-			dc.FillSolidRect(rc, m_cr_back[0]);
+			pImage = m_image[idx].normal;
 		}
 		else
 		{
-			dc.SetTextColor(m_cr_text[3]);
-			color.SetFromCOLORREF(m_cr_text[3]);
-			dc.FillSolidRect(rc, m_cr_back[3]);
+			if (is_disabled)
+			{
+				pImage = m_image[idx].disabled;
+			}
+			//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
+			else if (is_down)
+			{
+				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].down);
+				pt = m_down_offset;
+			}
+			//
+			else if (m_use_hover && m_bHover)
+			{
+				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].over);
+			}
+			else
+			{
+				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].normal);
+			}
 		}
 
-		g.SetSmoothingMode(SmoothingModeAntiAlias);
-		CFont *pOldFont = dc.SelectObject(&m_font);
-		dc.SetBkMode(TRANSPARENT);
+		if (pImage == NULL)
+			pImage = m_image[idx].normal;
+
+		//배경을 그리고
+		if (m_pBack)
+			g.DrawImage(m_pBack, 0, 0);
+		//else
+			//dc.FillSolidRect(rc, cr_back);
+
+		if (m_use_hover && m_bHover && m_hover_rect)
+		{
+			Color color;
+			color.SetFromCOLORREF(m_hover_rect_color);
+			Pen pen(color, m_hover_rect_thick);
+			g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
+		}
+
+		g.DrawImage(pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+
+		if (m_bShowFocusRect)//&& m_bHasFocus)
+		{
+			//TRACE(_T("draw focus rect\n"));
+			//pDC->DrawFocusRect(rc);
+			Color	color;
+
+			color.SetFromCOLORREF(m_crFocusRect);
+			Pen	pen(color, m_nFocusRectWidth);
+			pen.SetDashStyle(DashStyleDot);
+			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
+		}
+	}
+	//설정된 이미지가 없는 경우 버튼의 이미지를 그려준다.
+	else
+	{
+		if (is_disabled)
+		{
+			dc.FillSolidRect(rc, m_cr_back[3]);
+		}
+		else if (m_use_hover && m_bHover)
+		{
+			dc.FillSolidRect(rc, m_cr_back[2]);
+		}
+		else
+		{
+			dc.FillSolidRect(rc, m_cr_back[0]);
+		}
+
+		int		size = 6;
+		CRect	r = rc;
 
 		if (m_button_style == BS_CHECKBOX)
 		{
@@ -846,7 +919,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + size * 2 + 1;
 			r.top = r.CenterPoint().y - size;
 			r.bottom = r.top + size * 2 + 1;
-			DrawRectangle(&dc, r, (m_use_hover && m_bHover) ? m_cr_text[2] : m_cr_text[0], RGB(255, 255, 255));
+			DrawRectangle(&dc, r, cr_text, RGB(255, 255, 255));
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
 
@@ -856,10 +929,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				g.DrawLine(&pen, r.left + 4, r.CenterPoint().y + 3, r.right - 3, r.top + 3);
 			}
 
-			rCaption = r;
+			rText = r;
 
-			rCaption.left = rCaption.right + 4;
-			rCaption.right = rc.right;
+			rText.left = rText.right + 4;
+			rText.right = rc.right;
 		}
 		else if (m_button_style == BS_RADIOBUTTON)
 		{
@@ -868,6 +941,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.top = r.CenterPoint().y - size;
 			r.bottom = r.top + size * 2 + 1;
 
+			Color color;
+			color.SetFromCOLORREF(cr_text);
 			Pen pen(color, 0.8);
 			SolidBrush br(color);
 			g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
@@ -877,134 +952,59 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				g.FillEllipse(&br, r.left + r.Width() / 4, r.top + r.Height() / 4, r.Width() / 1.7, r.Height() / 1.7);
 			}
 
-			rCaption = r;
-			rCaption.left = rCaption.right + 4;
-			rCaption.right = rc.right;
+			rText = r;
+			rText.left = rText.right + 4;
+			rText.right = rc.right;
 		}
 		else
 		{
 			if (m_b3DRect)
 			{
 				dc.Draw3dRect(rc,
-					down_state ? GRAY(128) : white,
-					down_state ? white : GRAY(128)
+					is_down ? GRAY128 : white,
+					is_down ? white : GRAY128
 					//down_state ? GetSysColor(COLOR_3DSHADOW) : GetSysColor(COLOR_3DLIGHT),
 					//down_state ? GetSysColor(COLOR_3DLIGHT) : GetSysColor(COLOR_3DSHADOW)
-					);
-				if (down_state)
+				);
+				if (is_down)
 					r.OffsetRect(-1, -1);
 			}
 
-			rCaption = r;
-			//rCaption.left += 2;
+			rText = r;
 		}
+	}
 
-		dc.DrawText(str, rCaption, dwText);
-
-		dc.SelectObject(pOldFont);
-		
+	if (m_text.IsEmpty())
 		return;
-	}
 
-	//pt.x = (rc.Width() - m_width) / 2.0;
-	//pt.y = (rc.Height() - m_height) / 2.0;
-
-	RectF			grect;
-	ImageAttributes ia;
-
-	//원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
-	//g.SetInterpolationMode(InterpolationModeNearestNeighbor);
-
-	//부드럽게 resize되지만 약간 뿌옇게 변함
-	g.SetInterpolationMode(InterpolationModeHighQualityBilinear);
-
-	//중간 느낌
-	//g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-
-	if (m_bAsStatic)
+	//뭔가 제대로 검사되지 않는다. 우선 푸시버튼만 대상으로 한다.
+#if 1
+	if (m_button_style == BS_PUSHBUTTON)
 	{
-		pImage = m_image[idx].normal;
+		if ((dwStyle & BS_RIGHT) == BS_RIGHT)
+			dwText |= DT_RIGHT;
+		else if ((dwStyle & BS_LEFT) == BS_LEFT)
+			dwText |= DT_LEFT;
+		else//if (dwStyle & BS_CENTER)
+			dwText |= DT_CENTER;
 	}
-	else
-	{
-		if (!IsWindowEnabled())
-		{
-			pImage = m_image[idx].disabled;
-			cr_back = m_cr_back[3];
-		}
-		//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
-		else if (down_state)
-		{
-			if (use_disabled_image)
-			{
-				pImage = m_image[idx].disabled;
-			}
-			else
-			{
-				pImage = m_image[idx].down;
-			}
+#else		
+	MAP_STYLE(BS_LEFT,	 DT_LEFT);
+	MAP_STYLE(BS_RIGHT,	 DT_RIGHT);
+	MAP_STYLE(BS_CENTER, DT_CENTER);
+#endif
+	dwText |= (DT_SINGLELINE | DT_VCENTER);
 
-			cr_back = m_cr_back[2];
-			pt = m_down_offset;
-		}
-		//
-		else if (m_use_hover && m_bHover)
-		{
-			if (use_disabled_image)
-			{
-				pImage = m_image[idx].disabled;
-			}
-			else
-			{
-				pImage = m_image[idx].over;
-			}
-			cr_back = m_cr_back[1];
-		}
-		else
-		{
-			if (use_disabled_image)
-			{
-				pImage = m_image[idx].disabled;
-			}
-			else
-			{
-				pImage = m_image[idx].normal;
-			}
-			cr_back = m_cr_back[0];
-		}
-	}
+	g.SetSmoothingMode(SmoothingModeAntiAlias);
+	CFont *pOldFont = dc.SelectObject(&m_font);
 
-	if (pImage == NULL)
-		pImage = m_image[idx].normal;
+	dc.SetBkMode(TRANSPARENT);
 
-	//배경을 그리고
-	if (m_pBack)
-		g.DrawImage(m_pBack, 0, 0);
-	else
-		dc.FillSolidRect(rc, cr_back);
+	dc.SetTextColor(cr_text);
 
-	if (m_use_hover && m_bHover && m_hover_rect)
-	{
-		Color color;
-		color.SetFromCOLORREF(m_hover_rect_color);
-		Pen pen(color, m_hover_rect_thick);
-		g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
-	}
+	dc.DrawText(m_text, rText, dwText);
 
-	//TRACE(_T("pt : %d, %d\n"), pt.x, pt.y);
-	g.DrawImage(pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
-
-	if (m_bShowFocusRect)//&& m_bHasFocus)
-	{
-		//TRACE(_T("draw focus rect\n"));
-		//pDC->DrawFocusRect(rc);
-		Color	color;
-
-		color.SetFromCOLORREF(m_crFocusRect);
-		Pen	pen(color, m_nFocusRectWidth);
-		pen.SetDashStyle(DashStyleDot);
-		g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
-	}
+	dc.SelectObject(pOldFont);
 }
 
 
@@ -1012,9 +1012,9 @@ BOOL CGdiButton::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_pBack)
-		return false;
+		return FALSE;
 	else
-		return true;
+		return TRUE;
 
 	return CButton::OnEraseBkgnd(pDC);
 }
@@ -1058,7 +1058,7 @@ void CGdiButton::OnMouseLeave()
 
 	m_bIsTracking = false;
 	m_bHover = false;
-	Invalidate();
+	UpdateSurface();
 
 	CButton::OnMouseLeave();
 }
@@ -1090,7 +1090,7 @@ void CGdiButton::OnSetFocus(CWnd* pOldWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//TRACE("set focus\n");
 	m_bHasFocus = true;
-	Invalidate();
+	UpdateSurface();
 }
 
 
@@ -1101,7 +1101,7 @@ void CGdiButton::OnKillFocus(CWnd* pNewWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//TRACE("kill focus\n");
 	m_bHasFocus = false;
-	Invalidate();
+	UpdateSurface();
 }
 
 
@@ -1198,7 +1198,7 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 
 
 	SetWindowPos(&wndNoTopMost, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);	
-	Invalidate();
+	UpdateSurface();
 }
 
 bool CGdiButton::GetCheck()
@@ -1206,10 +1206,21 @@ bool CGdiButton::GetCheck()
 	return m_idx;
 }
 
+void CGdiButton::UpdateSurface()
+{
+	CRect rc;
+
+	GetWindowRect(&rc);
+	//RedrawWindow();
+
+	GetParent()->ScreenToClient(&rc);
+	GetParent()->InvalidateRect(rc, false);
+	GetParent()->UpdateWindow();
+}
+
 void CGdiButton::Toggle()
 {
 	m_idx = !m_idx;
-	//SetCheck(m_checked ? false : true);
 }
 
 LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
@@ -1282,7 +1293,7 @@ CGdiButton& CGdiButton::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
 
 CGdiButton& CGdiButton::SetFontSize(int nSize)
 {
-	m_lf.lfHeight = nSize;
+	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 	ReconstructFont();
 
 	return *this;
@@ -1308,8 +1319,15 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
-	if (!m_is_down)
+	CRect rc;
+
+	GetClientRect(rc);
+
+	if (!m_is_down || !rc.PtInRect(point))
+	{
+		CButton::OnLButtonUp(nFlags, point);
 		return;
+	}
 
 	m_is_down = false;
 
@@ -1321,10 +1339,8 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 	{
 		SetCheck((m_idx = 1));
 	}
-	else
-	{
-		Invalidate();
-	}
+
+	UpdateSurface();
 
 	CButton::OnLButtonUp(nFlags, point);
 }

@@ -2113,14 +2113,19 @@ void CVtListCtrlEx::OnDropFiles(HDROP hDropInfo)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	CPoint pt;
 	DragQueryPoint(hDropInfo, &pt);
-	TRACE(_T("dropped point = %d, %d (index = %d)\n"), pt.x, pt.y, index_from_point(pt.x, pt.y));
+
+	DWORD dropped_point = index_from_point(pt.x, pt.y);
+	int dropped_index = HIWORD(dropped_point);
+	int dropped_column = LOWORD(dropped_point);
+
+	TRACE(_T("dropped point = %d, %d (index = %d, column = %d)\n"), pt.x, pt.y, dropped_index, dropped_column);
 
 	CListCtrl::OnDropFiles(hDropInfo);
 
 	::PostMessage(GetParent()->GetSafeHwnd(), WM_DROPFILES, (WPARAM)hDropInfo, (LPARAM)0);
 }
 
-int CVtListCtrlEx::index_from_point(int x, int y)
+DWORD CVtListCtrlEx::index_from_point(int x, int y)
 {
 	int first = GetTopIndex();
 	int last = first + GetCountPerPage();
@@ -2128,10 +2133,20 @@ int CVtListCtrlEx::index_from_point(int x, int y)
 
 	for (; first < last; first++)
 	{
-		GetSubItemRect(first, 0, LVIR_BOUNDS, rItem);
-		if (rItem.PtInRect(CPoint(x, y)))
-			return first;
+		for (int j = 0; j < get_column_count(); j++)
+		{
+			GetSubItemRect(first, j, LVIR_BOUNDS, rItem);
+			if (j == 0)
+			{
+				rItem.right = rItem.left + GetColumnWidth(0);
+			}
+
+			if (rItem.PtInRect(CPoint(x, y)))
+			{
+				return MAKELONG(j, first);
+			}
+		}
 	}
 
-	return -1;
+	return MAKELONG(-1, -1);
 }

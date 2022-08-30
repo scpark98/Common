@@ -164,7 +164,7 @@ BOOL CResizeCtrl::Create( HWND hWndParent, BOOL enable, int maxPart )
 		m_minTracking.cy  =
 		m_maxTracking.cx  =
 		m_maxTracking.cy  = -1;
-	m_hasResizingBorder = ((::GetWindowLong(hWndParent, GWL_STYLE) & WS_THICKFRAME) == WS_THICKFRAME);
+	m_hasResizingBorder = ((::GetWindowLongPtr(hWndParent, GWL_STYLE) & WS_THICKFRAME) == WS_THICKFRAME);
 	if( enable )
 		SetEnabled( TRUE );
 	else
@@ -190,7 +190,7 @@ BOOL CResizeCtrl::SetEnabled( BOOL enable )
 		if( FALSE == enable )
 		{
 			ASSERT( m_prevWndProc );
-			::SetWindowLongPtr( m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG>( m_prevWndProc ) );
+			::SetWindowLongPtr( m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( m_prevWndProc ) );
 			m_prevWndProc = NULL;
 			::RemoveProp( m_hWndParent, m_szResizeProperty );
 			if( m_hasResizingBorder == FALSE )
@@ -216,8 +216,8 @@ BOOL CResizeCtrl::SetEnabled( BOOL enable )
 			m_size.cy = rect.Height();
 
 			::SetProp( m_hWndParent, m_szResizeProperty, reinterpret_cast<HANDLE>(this) );
-			m_prevWndProc = reinterpret_cast<WNDPROC>( ::GetWindowLong( m_hWndParent, GWLP_WNDPROC ) );
-			::SetWindowLongPtr( m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG>( wndProc ) );
+			m_prevWndProc = reinterpret_cast<WNDPROC>( ::GetWindowLongPtr( m_hWndParent, GWLP_WNDPROC ) );
+			::SetWindowLongPtr( m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( wndProc ) );
 		}
 		m_enabled = enable;
 		if( m_gripEnabled )
@@ -515,7 +515,7 @@ void CResizeCtrl::ChangeStyle(BOOL enable)
 	rect.top    += ( newClientRect.top    - oldClientRect.top   );
 	rect.bottom += ( newClientRect.bottom - oldClientRect.bottom );
 
-	::SetWindowLong( m_hWndParent, GWL_STYLE, style );
+	::SetWindowLongPtr( m_hWndParent, GWL_STYLE, style );
 	::SetWindowPos ( m_hWndParent, HWND_DESKTOP, rect.left, rect.top, rect.Width(), rect.Height(),
 		SWP_NOZORDER | SWP_NOACTIVATE  );
 

@@ -21,7 +21,7 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 제작.
 
 - mainDlg에 Custom Control을 추가하고 클래스 이름은 CWebView2Ctrl로 입력.
 - 위 컨트롤에 CWebView2Ctrl타입의 제어 변수(m_web)를 선언.
-- #include "../../Common/webView2Ctrl/WebView2Ctrl.h" 확인
+- #include "../../Common/webView2Ctrl/WebView2Ctrl.h" 자동 추가되지 않았다면 수동 입력.
 - 사용 : m_web.navigate(url);
 - navigate이외의 다른 함수를 사용하고자 한다면 m_web.GetWebView()->Navigate(...)처럼 접근하여 호출.
 - mainDlg의 크기가 바뀌면 m_web.MoveWindow(...)로 크기 조정

@@ -355,6 +355,7 @@ CString		GetCurrentDirectory();
 ULONG		GetPID( CString processname );
 ULONG		ProcIDFromWnd(HWND hwnd);
 HWND		GetHWNDbyPID(ULONG pid);
+CString		GetProcessNameByPID(const DWORD pid);
 bool		IsRunning(CString processname);
 int			ProcessKill(CString processname);
 HWND		GetWindowHandleFromProcessID(DWORD dwProcId);

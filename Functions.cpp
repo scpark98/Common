@@ -7585,6 +7585,25 @@ HWND GetHWNDbyPID(ULONG pid)
 	return NULL;
 }
 
+//출처: https://smok95.tistory.com/300?category=28201 [Only YOUng:티스토리]
+CString GetProcessNameByPID(const DWORD pid)
+{
+	CString name = _T("unknown");
+
+	DWORD error = 0;
+
+	if (HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid))
+	{
+		TCHAR buf[512] = { 0, };
+		DWORD bufLen = sizeof(buf);
+		QueryFullProcessImageName(hProc, 0, buf, &bufLen);
+		CloseHandle(hProc);
+		name = buf;
+	}
+
+	return name;
+}
+
 HWND hWndToFind = NULL;
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd,LPARAM lParam)
@@ -10794,7 +10813,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	CString sSection = _T("screen");
 
 	//resize window인지 자동 체크하는 코드가 안먹히는듯하다.
-	//bool is_resizable_window = ((::GetWindowLong(pWnd->m_hWnd, GWL_STYLE) & WS_THICKFRAME) == WS_THICKFRAME);
+	//bool is_resizable_window = ((::GetWindowLongPtr(pWnd->m_hWnd, GWL_STYLE) & WS_THICKFRAME) == WS_THICKFRAME);
 
 	if (sSubSection != "")
 		sSection = sSubSection + "\\screen";	//슬래시가 아닌 역슬래시를 써야 한다.
@@ -10813,11 +10832,11 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	//사각형 정보가 유효하고 그 크기도 10x10을 넘는다면 그 크기로 복원시키고
 	if (rc.IsRectEmpty() == false && rc.Width() > 10 && rc.Height() > 10)
 	{
-		UINT flag = SWP_NOZORDER;
+		UINT_PTR flag = SWP_NOZORDER;
 		if (!resize_window)
 			flag |= SWP_NOSIZE;
 
-		SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), flag);
+		SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), 0);
 		//pWnd->MoveWindow(rc);
 	}
 	else
@@ -10837,7 +10856,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 //sSubSection이 존재하면 그 이름에 "\\screen"을 붙여서 저장한다.
 void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
-	if (IsWindowVisible(pWnd->GetSafeHwnd()) == false)
+	if (pWnd->IsWindowVisible() == false ||	pWnd->IsIconic())
 		return;
 
 	CRect	rc;
@@ -11597,7 +11616,7 @@ UINT		getButtonStyle(HWND hWnd)
 {
 	UINT button_style = BS_PUSHBUTTON;
 
-	DWORD dwStyle = ::GetWindowLong(hWnd, GWL_STYLE); 
+	DWORD dwStyle = ::GetWindowLongPtr(hWnd, GWL_STYLE); 
 
 	// Check Box 컨트롤인 경우, 3STATE 설정을 확인함. 
 	if (((dwStyle & BS_AUTO3STATE) == BS_AUTO3STATE) || 
@@ -11630,7 +11649,7 @@ UINT		getButtonStyle(HWND hWnd)
 		dwNewStyle = dwStyle | BS_OWNERDRAW; 
 	}
 
-	::SetWindowLong(hWnd, GWL_STYLE, dwNewStyle); 
+	::SetWindowLongPtr(hWnd, GWL_STYLE, dwNewStyle); 
 	*/
 	return button_style;
 }

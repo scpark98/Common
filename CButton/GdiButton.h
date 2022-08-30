@@ -200,8 +200,8 @@ protected:
 	Bitmap*		m_pBackOrigin;
 
 	CString		m_text = _T("");
-	COLORREF	m_cr_text[4];
-	COLORREF	m_cr_back[4];
+	std::vector <COLORREF>	m_cr_text;
+	std::vector <COLORREF>	m_cr_back;
 
 	int			m_width;
 	int			m_height;
@@ -212,7 +212,7 @@ protected:
 
 	bool		m_bAsStatic;			//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
 	bool		m_use_hover = true;		//default = true;
-	bool		m_hover_rect = true;	//hover 테두리 사각형 표시 여부
+	bool		m_hover_rect = false;	//hover 테두리 사각형 표시 여부
 	int			m_hover_rect_thick = 2;
 	COLORREF	m_hover_rect_color = RGB(128, 128, 255);
 	bool		m_bHover;
@@ -223,7 +223,6 @@ protected:
 	COLORREF	m_crFocusRect;			//색상
 	int			m_nFocusRectWidth;		//두께
 	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
-	bool		m_is_down = false;
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
 
 	BOOL		m_bBlink;

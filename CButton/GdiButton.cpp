@@ -48,12 +48,6 @@ CGdiButton::CGdiButton()
 	m_bIsTracking		= false;
 	m_down_offset		= CPoint(1, 1);
 
-	for (i = 0; i < 4; i++)
-	{
-		m_cr_text[i] = ::GetSysColor(COLOR_BTNTEXT);
-		m_cr_back[i] = ::GetSysColor(COLOR_3DFACE);
-	}
-
 	m_bHasFocus			= false;
 	m_bShowFocusRect	= false;
 	m_crFocusRect		= RGB(6, 205, 255);
@@ -424,6 +418,7 @@ void CGdiButton::SelectImage(int nIndex)
 void CGdiButton::SetCheck(bool bCheck)
 {
 	m_idx = bCheck;
+	UpdateSurface();
 
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
@@ -535,10 +530,12 @@ CGdiButton& CGdiButton::text(CString text)
 
 CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
-	m_cr_text[0] = normal;
-	m_cr_text[1] = over;
-	m_cr_text[2] = down;
-	m_cr_text[3] = disabled;
+	m_cr_text.clear();
+
+	m_cr_text.push_back(normal);
+	m_cr_text.push_back(over);
+	m_cr_text.push_back(down);
+	m_cr_text.push_back(disabled);
 
 	UpdateSurface();
 
@@ -550,10 +547,11 @@ CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down
 	if (m_pBack)
 		safe_release(&m_pBack);
 
-	m_cr_back[0] = normal;
-	m_cr_back[1] = over;
-	m_cr_back[2] = down;
-	m_cr_back[3] = disabled;
+	m_cr_back.clear();
+	m_cr_back.push_back(normal);
+	m_cr_back.push_back(over);
+	m_cr_back.push_back(down);
+	m_cr_back.push_back(disabled);
 
 	UpdateSurface();
 
@@ -740,7 +738,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 
 void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 {
-	if (IsWindowVisible() == false)
+	if (!IsWindowVisible())
 		return;
 
 	CDC*		pDC1 = CDC::FromHandle(lpDIS->hDC);
@@ -749,8 +747,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CPoint		pt(0, 0);
 	Bitmap*		pImage = NULL;
 	CString		text;
-	COLORREF	cr_text = m_cr_text[0];
-	COLORREF	cr_back = m_cr_back[0];
+	COLORREF	cr_text = ::GetSysColor(COLOR_BTNTEXT);
+	COLORREF	cr_back = ::GetSysColor(COLOR_3DFACE);
 	DWORD		dwStyle = GetStyle();
 	DWORD		dwText = 0;
 
@@ -763,46 +761,18 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CMemoryDC	dc(pDC1, &rc);//, true);
 	Graphics	g(dc.m_hDC, rc);
 
-	bool is_down = (m_is_down || lpDIS->itemState & ODS_SELECTED);
+	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
+
+	TRACE(_T("is_down = %d\n"), is_down);
 
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
 		return;
 
-	//check or radio인데 m_image.size()가 1뿐이라면
-	//checked = normal을, unchecked = disabled를 표시한다.
-	bool use_disabled_image = false;
-	if (m_button_style != BS_PUSHBUTTON && m_image.size() == 1 && m_idx == 0)
-	{
-		use_disabled_image = true;
-	}
-
-	if (is_disabled)
-	{
-		cr_text = m_cr_text[3];
-		cr_back = m_cr_back[3];
-	}
-	//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
-	else if (is_down)
-	{
-		cr_text = m_cr_text[2];
-		cr_back = m_cr_back[2];
-	}
-	//
-	else if (m_use_hover && m_bHover)
-	{
-		cr_text = m_cr_text[1];
-		cr_back = m_cr_back[1];
-	}
-	else
-	{
-		cr_text = m_cr_text[0];
-		cr_back = m_cr_back[0];
-	}
 
 	//만약 parent에 배경색이나 배경 그림이 있고
-	//그려지는 이미지가 배경이 투명한 PNG라면 배경과는 무관하게
+	//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
 	CRect Rect;
 	GetWindowRect(&Rect);
 	CWnd* pParent = GetParent();
@@ -820,6 +790,39 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	MemDC.SelectObject(pOldBmp);
 	pParent->ReleaseDC(pDC);
 	MemDC.DeleteDC();
+
+	//check or radio인데 m_image.size()가 1뿐이라면
+	//checked = normal을, unchecked = disabled를 표시한다.
+	bool use_disabled_image = false;
+	if (m_button_style != BS_PUSHBUTTON && m_image.size() == 1 && m_idx == 0)
+		use_disabled_image = true;
+
+	if (m_cr_text.size() == 4)
+	{
+		if (is_disabled)
+			cr_text = m_cr_text[3];
+		else if (is_down)
+			cr_text = m_cr_text[2];
+		else if (m_use_hover && m_bHover)
+			cr_text = m_cr_text[1];
+		else
+			cr_text = m_cr_text[0];
+	}
+	//글자색과는 달리 배경색은 세팅되면 그리지만
+	//세팅되지 않으면 그리지 않는다.
+	if (m_cr_back.size() == 4)
+	{
+		if (is_disabled)
+			cr_back = m_cr_back[3];
+		else if (is_down)
+			cr_back = m_cr_back[2];
+		else if (m_use_hover && m_bHover)
+			cr_back = m_cr_back[1];
+		else
+			cr_back = m_cr_back[0];
+
+		dc.FillSolidRect(rc, cr_back);
+	}
 
 	//이미지가 있다면 이미지를 먼저 그려주고
 	if (m_image.size() > 0 && m_image[idx].normal != NULL)
@@ -897,19 +900,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//설정된 이미지가 없는 경우 버튼의 이미지를 그려준다.
 	else
 	{
-		if (is_disabled)
-		{
-			dc.FillSolidRect(rc, m_cr_back[3]);
-		}
-		else if (m_use_hover && m_bHover)
-		{
-			dc.FillSolidRect(rc, m_cr_back[2]);
-		}
-		else
-		{
-			dc.FillSolidRect(rc, m_cr_back[0]);
-		}
-
 		int		size = 6;
 		CRect	r = rc;
 
@@ -1011,9 +1001,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 BOOL CGdiButton::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_pBack)
+	//if (m_pBack)
 		return FALSE;
-	else
+	//else
 		return TRUE;
 
 	return CButton::OnEraseBkgnd(pDC);
@@ -1023,14 +1013,16 @@ BOOL CGdiButton::OnEraseBkgnd(CDC* pDC)
 void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_bIsTracking)
+	if (!m_bHover)//m_bIsTracking)
 	{
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
 		tme.hwndTrack = m_hWnd;
-		tme.dwFlags = TME_LEAVE|TME_HOVER;
+		tme.dwFlags = TME_LEAVE;// | TME_HOVER;
 		tme.dwHoverTime = 1;
+		m_bHover = true;
 		m_bIsTracking = _TrackMouseEvent(&tme);
+		RedrawWindow();
 	}
 
 	CButton::OnMouseMove(nFlags, point);
@@ -1053,7 +1045,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 void CGdiButton::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_use_hover)
+	if (!m_use_hover)// || !m_bHover)
 		return;
 
 	m_bIsTracking = false;
@@ -1215,12 +1207,13 @@ void CGdiButton::UpdateSurface()
 
 	GetParent()->ScreenToClient(&rc);
 	GetParent()->InvalidateRect(rc, false);
-	GetParent()->UpdateWindow();
+	//GetParent()->UpdateWindow();
 }
 
 void CGdiButton::Toggle()
 {
 	m_idx = !m_idx;
+	UpdateSurface();
 }
 
 LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
@@ -1307,11 +1300,13 @@ CGdiButton& CGdiButton::SetFontBold(bool bBold)
 	return *this;
 }
 
+//m_bDown과 같은 플래그를 둬서 다운 상태를 판단하게 하는것은
+//불편하거나 위험한 코드가 될 수 있다.
+//다운 상태에서 마우스가 나가는 경우 등등 체크할 것이 많을수도 있다.
 void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	m_is_down = IsWindowEnabled();
-	Invalidate();
+	UpdateSurface();
 	CButton::OnLButtonDown(nFlags, point);
 }
 
@@ -1319,18 +1314,6 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
-	CRect rc;
-
-	GetClientRect(rc);
-
-	if (!m_is_down || !rc.PtInRect(point))
-	{
-		CButton::OnLButtonUp(nFlags, point);
-		return;
-	}
-
-	m_is_down = false;
-
 	if (m_button_style == BS_CHECKBOX)
 	{
 		Toggle();
@@ -1339,8 +1322,6 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 	{
 		SetCheck((m_idx = 1));
 	}
-
-	UpdateSurface();
 
 	CButton::OnLButtonUp(nFlags, point);
 }
@@ -1375,7 +1356,7 @@ void CGdiButton::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CButton::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	Invalidate();
+	UpdateSurface();
 }
 
 

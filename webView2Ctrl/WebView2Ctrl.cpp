@@ -70,9 +70,9 @@ void CWebView2Ctrl::InitializeWebView()
 
 
 	HRESULT hr = CreateCoreWebView2EnvironmentWithOptions
-	(subFolder, nullptr, options.Get(),
-		Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>
-		(this, &CWebView2Ctrl::OnCreateEnvironmentCompleted).Get());
+				(subFolder, nullptr, options.Get(),
+				Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>
+				(this, &CWebView2Ctrl::OnCreateEnvironmentCompleted).Get());
 
 
 	if (!SUCCEEDED(hr))
@@ -153,6 +153,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		HRESULT hresult;
 
 		m_webView->get_BrowserProcessId(&pid);
+		CString str = GetProcessNameByPID(pid);
 		//HWND hwnd = GetHWNDbyPID(pid);
 		//TRACE(_T("pid = %u, hwnd = 0x%08X\n"), pid, hwnd);
 

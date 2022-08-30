@@ -139,11 +139,12 @@ public:
 	void		release_all();
 
 	void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
-	virtual	CGdiButton& text(CString text);
-	virtual	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
-	virtual	CGdiButton& back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	void		text(CString text);
+	void		text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	void		back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	void		text_color() { m_cr_text.clear(); }
+	void		back_color() { m_cr_back.clear(); }
 	void		SetBrightnessHoverEffect(float fScale);	//1.0f = no effect.
-
 
 	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		SetFontSize( int nSize );
@@ -196,12 +197,16 @@ protected:
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
 	CRect		m_rwOrigin = 0;				//컨트롤의 원래 크기 정보
 
+	//배경이 단색이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
+	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
+	bool		m_transparent = false;
+
 	Bitmap*		m_pBack;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
 	Bitmap*		m_pBackOrigin;
 
 	CString		m_text = _T("");
 	std::vector <COLORREF>	m_cr_text;
-	std::vector <COLORREF>	m_cr_back;
+	std::vector <COLORREF>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
 
 	int			m_width;
 	int			m_height;

@@ -2133,6 +2133,58 @@ bool	DownloadFile(LPCTSTR pUrl, CString strFileName, bool bOverwrite /*= TRUE*/,
 	return TRUE; 
 } 
 
+CString DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd/*=NULL*/)
+{
+	if (!IsNetwork(_T("www.naver.com"), 80))
+		return _T("네트워크에 접속할 수 없습니다.");
+
+#define HTTPBUFLEN    1024 * 1024 // Size of HTTP Buffer...
+	TCHAR		*httpbuff;
+	TCHAR		szCause[255];
+	CString		Cause;
+
+	Cause.Format(_T("TRUE"));
+
+	TRY
+	{
+		CInternetSession mysession;
+	CHttpFile *remotefile = (CHttpFile*)mysession.OpenURL(sUrl,1,INTERNET_FLAG_TRANSFER_BINARY | INTERNET_FLAG_RELOAD);
+
+	ULONGLONG dwSize = remotefile->GetLength();
+	if (hWnd != NULL)
+	{
+		::SendMessage(hWnd, MESSAGE_DOWNLOAD_DATA, (WPARAM)0, (LPARAM)dwSize);
+		return _T("");
+	}
+
+	CFile myfile(sLocalFileName, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary);
+	int numbytes;
+
+	httpbuff = new TCHAR[HTTPBUFLEN];
+
+	while (numbytes = remotefile->Read(httpbuff, HTTPBUFLEN))
+		//while (numbytes = remotefile->ReadHuge(httpbuff, HTTPBUFLEN))
+	{
+		myfile.Write(httpbuff, numbytes);
+		//myfile.WriteHuge(httpbuff, numbytes);
+
+		if (hWnd != NULL)
+			::SendMessage(hWnd, MESSAGE_DOWNLOAD_DATA, 1, numbytes);
+	}
+
+	delete[] httpbuff;
+	}
+
+		CATCH_ALL(error)
+	{
+		error->GetErrorMessage(szCause, 254, NULL);
+		Cause.Format(_T("%s"), szCause);
+	}
+	END_CATCH_ALL;
+
+	return (Cause);
+}
+
 CString GetDefaultBrowserPath()
 {
 	TCHAR szPath[_MAX_PATH];
@@ -2648,57 +2700,6 @@ void	SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMi
 	SetLocalTime(&lpSysTime);
 }
 
-CString DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd/*=NULL*/)
-{
-	if (!IsNetwork(_T("www.naver.com"), 80))
-		return _T("네트워크에 접속할 수 없습니다.");
-	
-	#define HTTPBUFLEN    1024 * 1024 // Size of HTTP Buffer...
-	TCHAR		*httpbuff;
-	TCHAR		szCause[255];
-	CString		Cause;
-	
-	Cause.Format(_T("TRUE"));
-	
-	TRY
-	{
-		CInternetSession mysession;
-		CHttpFile *remotefile = (CHttpFile*)mysession.OpenURL(sUrl,1,INTERNET_FLAG_TRANSFER_BINARY|INTERNET_FLAG_RELOAD);
-		
-		ULONGLONG dwSize = remotefile->GetLength();
-		if (hWnd != NULL)
-		{
-			::SendMessage(hWnd, MESSAGE_DOWNLOAD_DATA, (WPARAM)0, (LPARAM)dwSize);
-			return _T("");
-		}
-		
-		CFile myfile(sLocalFileName, CFile::modeCreate|CFile::modeWrite|CFile::typeBinary);
-		int numbytes;
-		
-		httpbuff = new TCHAR[HTTPBUFLEN];
-
-		while (numbytes = remotefile->Read(httpbuff, HTTPBUFLEN))
-		//while (numbytes = remotefile->ReadHuge(httpbuff, HTTPBUFLEN))
-		{
-			myfile.Write(httpbuff, numbytes);
-			//myfile.WriteHuge(httpbuff, numbytes);
-			
-			if (hWnd != NULL)
-				::SendMessage(hWnd, MESSAGE_DOWNLOAD_DATA, 1, numbytes);
-		}
-
-		delete[] httpbuff;
-	}
-	
-	CATCH_ALL(error)
-	{
-		error->GetErrorMessage(szCause,254,NULL);
-		Cause.Format(_T("%s"),szCause);
-	}
-	END_CATCH_ALL;
-	
-	return (Cause);
-}
 
 
 //다음 파일의 인덱스 리턴

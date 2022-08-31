@@ -1,34 +1,38 @@
 // ColorComboBox.cpp : 구현 파일입니다.
 //
 
-#include "stdafx.h"
-#include "ColorComboBox.h"
+//#include "stdafx.h"
+#include "ComboBoxExt.h"
 
 
 // CColorComboBox
 
-IMPLEMENT_DYNAMIC(CColorComboBox, CComboBox)
+IMPLEMENT_DYNAMIC(CComboBoxExt, CComboBox)
 
-CColorComboBox::CColorComboBox()
+CComboBoxExt::CComboBoxExt()
 {
 	m_crText = ::GetSysColor( COLOR_WINDOWTEXT );
 	m_crBack = ::GetSysColor( COLOR_WINDOW );
 	m_crHighlightText = ::GetSysColor(COLOR_HIGHLIGHT);
 	m_crHighlightTextBack = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
-CColorComboBox::~CColorComboBox()
+CComboBoxExt::~CComboBoxExt()
 {
+	m_font.DeleteObject();
 }
 
 
-BEGIN_MESSAGE_MAP(CColorComboBox, CComboBox)
+BEGIN_MESSAGE_MAP(CComboBoxExt, CComboBox)
 	//ON_WM_NCPAINT()
 	//ON_WM_DRAWITEM()
 	//ON_WM_PAINT()
 	//ON_CONTROL_REFLECT(CBN_EDITUPDATE, OnEditUpdate)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
+	ON_CONTROL_REFLECT(CBN_DROPDOWN, &CComboBoxExt::OnCbnDropdown)
 END_MESSAGE_MAP()
 
 
@@ -69,7 +73,7 @@ HBRUSH CColorComboBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 }
 */
 
-void CColorComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
+void CComboBoxExt::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 {
 	ASSERT(lpDrawItemStruct->CtlType == ODT_COMBOBOX);
 
@@ -97,7 +101,7 @@ void CColorComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 		dc.FillSolidRect( &lpDrawItemStruct->rcItem, m_crBack );
 	}
 
-	dc.DrawText( strData.GetBuffer(1), strData.GetLength(), &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
+	dc.DrawText(strData, &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
 
 	dc.SetTextColor(crOldTextColor);
 	dc.SetBkColor(crOldBkColor);
@@ -107,13 +111,13 @@ void CColorComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 }
 
 
-void CColorComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct )
+void CComboBoxExt::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct )
 {
 	ASSERT(lpMeasureItemStruct->CtlType == ODT_COMBOBOX);
 }
 
 
-int CColorComboBox::CompareItem(LPCOMPAREITEMSTRUCT lpCompareItemStruct )
+int CComboBoxExt::CompareItem(LPCOMPAREITEMSTRUCT lpCompareItemStruct )
 {
 
 	ASSERT(lpCompareItemStruct->CtlType == ODT_COMBOBOX);
@@ -122,7 +126,7 @@ int CColorComboBox::CompareItem(LPCOMPAREITEMSTRUCT lpCompareItemStruct )
 	LPCTSTR lpszText2 = (LPCTSTR) lpCompareItemStruct->itemData2;
 	ASSERT(lpszText2 != NULL);
 
-	return strcmp( lpszText1, lpszText2 );
+	return _tcscmp( lpszText1, lpszText2 );
 
 	return 0;
 }
@@ -241,7 +245,7 @@ void CColorComboBox::OnEditUpdate()
 }
 */
 
-void CColorComboBox::OnSetFocus(CWnd* pOldWnd)
+void CComboBoxExt::OnSetFocus(CWnd* pOldWnd)
 {
 	CComboBox::OnSetFocus(pOldWnd);
 
@@ -250,10 +254,107 @@ void CColorComboBox::OnSetFocus(CWnd* pOldWnd)
 }
 
 
-void CColorComboBox::OnKillFocus(CWnd* pNewWnd)
+void CComboBoxExt::OnKillFocus(CWnd* pNewWnd)
 {
 	CComboBox::OnKillFocus(pNewWnd);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	UpdateWindow();
+}
+
+
+void CComboBoxExt::OnCbnDropdown()
+{
+	// Reset the dropped width
+	int nNumEntries = GetCount();
+	int nWidth = 0;
+	CString str;
+
+	CClientDC dc(this);
+	int nSave = dc.SaveDC();
+	dc.SelectObject(GetFont());
+
+	int nScrollWidth = ::GetSystemMetrics(SM_CXVSCROLL);
+	for (int i = 0; i < nNumEntries; i++)
+	{
+		GetLBText(i, str);
+		int nLength = dc.GetTextExtent(str).cx + nScrollWidth;
+		nWidth = max(nWidth, nLength);
+	}
+
+	// Add margin space to the calculations
+	nWidth += dc.GetTextExtent(_T("m")).cx;
+
+	dc.RestoreDC(nSave);
+	SetDroppedWidth(nWidth);
+}
+
+void CComboBoxExt::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+{
+	if (sFontname == _T(""))
+		return;
+	m_lf.lfCharSet = byCharSet;
+	_tcscpy(m_lf.lfFaceName, sFontname);
+	reconstruct_font();
+}
+
+//-1 : reduce, +1 : enlarge
+void CComboBoxExt::set_font_size(int font_size)
+{
+	if (font_size == 0)
+		return;
+
+	if (font_size == -1)
+		m_font_size--;
+	else if (font_size == 1)
+		m_font_size++;
+	else
+		m_font_size = font_size;
+
+	//For the MM_TEXT mapping mode,
+	//you can use the following formula to specify 
+	//a height for a font with a specified point size:
+	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	reconstruct_font();
+}
+
+//이 함수에서는 m_lf 정보를 이용해서 폰트를 재생성한다.
+//즉, m_lf.lfHeight 값을 이용해서 폰트가 만들어지므로
+//m_font_size 멤버 변수의 값이 변경되었다면
+//공식을 이용해 이를 m_lf.lfHeight 값으로 변경한 후 이 함수가 호출되어야 한다.
+//m_lf.lfHeight값의 절대값이 MM_TEXT모드의 현재 DC에서의 실제 픽셀크기가 된다.
+//따라서 스크롤 크기 등을 계산할때는 m_font_size를 이용하는게 아니라
+//m_lf.lfHeight값을 이용해야 정확한 스크롤 크기가 계산된다.
+//m_font_size는 단지 사용자에게 일반적인 폰트 크기 설정 수치로 쓰이는 직관적인 수치이다.
+void CComboBoxExt::reconstruct_font()
+{
+	m_font.DeleteObject();
+	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+	SetFont(&m_font, true);
+
+	//m_font_size = get_font_size();
+
+	//set_line_height(4 - m_lf.lfHeight);
+	//if (m_auto_line_height)
+	//recalculate_line_height();
+
+	ASSERT(bCreated);
+}
+
+
+void CComboBoxExt::PreSubclassWindow()
+{
+	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
+	//dlg의 parent의 font를 얻어와야 한다.
+	CFont* font = GetParent()->GetFont();
+
+	if (font != NULL)
+		font->GetObject(sizeof(m_lf), &m_lf);
+	else
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+
+	reconstruct_font();
+
+	CComboBox::PreSubclassWindow();
 }

@@ -35,6 +35,7 @@ CVtListCtrlEx::CVtListCtrlEx()
 
 CVtListCtrlEx::~CVtListCtrlEx()
 {
+	m_font.DeleteObject();
 }
 
 

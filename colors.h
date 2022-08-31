@@ -44,6 +44,7 @@
 #define		GRAY64		GRAY(64)
 #define		GRAY128		GRAY(128)
 #define		GRAY192		GRAY(192)
+#define		GRAY224		GRAY(224)
 #define		GRAY(x)		RGB((x), (x), (x))
 
 enum Colors

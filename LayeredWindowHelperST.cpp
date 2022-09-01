@@ -37,7 +37,7 @@ CLayeredWindowHelperST::~CLayeredWindowHelperST()
 LONG CLayeredWindowHelperST::AddLayeredStyle(HWND hWnd)
 {
 
-	return ::SetWindowLong(hWnd, GWL_EXSTYLE, ::GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+	return ::SetWindowLongPtr(hWnd, GWL_EXSTYLE, ::GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
 } // End of AddLayeredStyle
 
 // This function sets the opacity and transparency color key of a layered window.

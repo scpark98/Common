@@ -1870,7 +1870,7 @@ void saveRawImage( CString sfile, uint8_t *data, int width, int height, int ch )
 
 void save2Raw( cv::Mat mat, CString sRawFilename, int dst_ch )
 {
-	FILE	*fp = _tfopen( sRawFilename, _T("wb") );
+	FILE	*fp = _tfopen(sRawFilename, _T("wb") );
 	if ( fp == NULL )
 		return;
 
@@ -2954,6 +2954,8 @@ cv::Scalar	cvGetDefaultColor( int idx, int alpha )
 		case 8 : return cv::Scalar( 199,  99,  99, alpha );
 		case 9 : return cv::Scalar(   0, 115, 153, alpha );
 	}
+
+	return cv::Scalar(0, 0, 0, 255);
 }
 
 //출처: http://devmonster.tistory.com/22 [Dev.Monster]

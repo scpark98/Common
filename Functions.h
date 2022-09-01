@@ -46,8 +46,30 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
+#define __function__ __FUNCTIONW__
 #else
 #define CHARSET _T("")
+#define __function__ __FUNCTION__
+#endif
+
+
+#ifdef _MSC_VER
+#define __class_func__ __function__
+#endif
+
+#ifdef __GNUG__
+#include <cxxabi.h>
+#include <execinfo.h>
+char *class_func(const char *c, const char *f)
+{
+	int status;
+	static char buff[100];
+	char *demangled = abi::__cxa_demangle(c, NULL, NULL, &status);
+	snprintf(buff, sizeof(buff), "%s::%s", demangled, f);
+	free(demangled);
+	return buff;
+}
+#define __class_func__ class_func(typeid(*this).name(), __func__)
 #endif
 
 using namespace::std;

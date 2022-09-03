@@ -4065,19 +4065,19 @@ bool delete_file(CString fullpath, bool bTrashCan)
 
 int	get_text_encoding(CString sfile)
 {
-	int text_encoding = text_ansi;
+	int text_encoding = text_encoding_ansi;
 
 	unsigned char buf[16];
 
 	FILE* fp = _tfopen(sfile, _T("rb"));
 	if (fp == NULL)
-		return text_unknown;
+		return text_encoding_unknown;
 
 	fread(buf, 1, 16, fp);
 	if (buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf)
-		text_encoding = text_utf8bom;
+		text_encoding = text_encoding_utf8bom;
 	else if (buf[0] == 0xff && buf[1] == 0xfe)
-		text_encoding = text_unicode;
+		text_encoding = text_encoding_unicode;
 
 	fclose(fp);
 

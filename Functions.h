@@ -130,10 +130,10 @@ enum FILE_TYPE
 
 enum TEXT_ENCODING
 {
-	text_unknown = -1,
-	text_ansi,
-	text_utf8bom,
-	text_unicode,
+	text_encoding_unknown = -1,
+	text_encoding_ansi,
+	text_encoding_utf8bom,
+	text_encoding_unicode,
 };
 
 enum RATIO_RECT_ATTACH

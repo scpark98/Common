@@ -219,9 +219,13 @@ bool CTreeCtrlEx::load_from_file(bool load, CString sfile)
 		TCHAR	chLine[1000];
 		CString sline;
 
-		//encording 방식을 읽어온다.
+		//encoding 방식을 읽어온다.
 		int	text_encoding = get_text_encoding(sfile);
+		if (text_encoding < 0)
+			return false;
 
+		//encoding 방식을 판별하여 read/write했으나
+		//utf8만 다루도록 통일한다.
 		/*
 		if (text_encoding <= text_ansi)
 		{

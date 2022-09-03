@@ -621,7 +621,7 @@ void CGdiButton::PreSubclassWindow()
 
 	GetWindowRect(m_rwOrigin);
 	GetParent()->ScreenToClient(m_rwOrigin);
-	TRACE(_T("%s : %s\n"), text, GetRectInfoString(m_rwOrigin, 0));
+	//TRACE(_T("%s : %s\n"), text, GetRectInfoString(m_rwOrigin, 0));
 
 	CFont* font = GetFont();
 

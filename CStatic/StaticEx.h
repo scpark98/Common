@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <afxwin.h>
 #include <deque>
 /*
 //scpark

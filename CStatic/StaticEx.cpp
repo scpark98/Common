@@ -1,7 +1,6 @@
 // TransparentStatic.cpp : implementation file
 //
 
-#include "stdafx.h"
 #include "StaticEx.h"
 
 #include "../Functions.h"

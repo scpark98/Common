@@ -42,7 +42,7 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "GifEx.h"
 #include <math.h>
 #include <process.h>

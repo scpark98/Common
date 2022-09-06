@@ -20,7 +20,7 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "ExtWndShadow.h"
 #include <math.h>
 

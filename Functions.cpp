@@ -8208,7 +8208,7 @@ void WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename)
 	// Allocate memory for the BITMAPINFO structure.
 	if (cClrBits != 24) 
 		pbmi = (PBITMAPINFO) LocalAlloc(LPTR, 
-		sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * (1<< cClrBits)); 
+			sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * (static_cast<unsigned long long>(1) << cClrBits));
 	else 
 		pbmi = (PBITMAPINFO) LocalAlloc(LPTR, sizeof(BITMAPINFOHEADER)); 
 

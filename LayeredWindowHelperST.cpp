@@ -1,4 +1,4 @@
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "LayeredWindowHelperST.h"
 
 #ifdef _DEBUG

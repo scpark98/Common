@@ -49,6 +49,8 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
+#include <afxwin.h>
+
 #ifndef WS_EX_LAYERED
 #define WS_EX_LAYERED           0x00080000
 #define LWA_COLORKEY            0x00000001

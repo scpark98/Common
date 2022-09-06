@@ -1,7 +1,7 @@
 // ColorDialogEx.cpp : implementation file
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "ColorDialogEx.h"
 
 #include "../../colors.h"

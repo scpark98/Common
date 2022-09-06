@@ -17,6 +17,9 @@ dc.SelectObject( pOldFont );
 #ifndef AUTOFONT
 #define AUTOFONT
 
+#include <afxwin.h>
+#include <afxdlgs.h>
+
 class CAutoFont : public CFont
 {
 private:

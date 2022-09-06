@@ -1,7 +1,7 @@
 // SliderCtrlEx.cpp : implementation file
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "SliderCtrlEx.h"
 
 #include "../Functions.h"

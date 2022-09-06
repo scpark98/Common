@@ -1,6 +1,7 @@
 #pragma once
 
-//#include "
+#include <afxwin.h>
+#include <afxdlgs.h>
 // CColorDialogEx
 
 class CColorDialogEx : public CColorDialog

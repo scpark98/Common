@@ -1,7 +1,7 @@
 //CAutoFont class implementation
 
 //CAutoFont class implementation
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "AutoFont.h"
 
 CAutoFont::CAutoFont()

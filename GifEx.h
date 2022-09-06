@@ -57,6 +57,7 @@ loading, PrepareDC, animate_draw_thread 모두 수행하는 클래스인데
 #pragma once
 #endif // _MSC_VER > 1000
 
+#include <afxwin.h>
 #include <deque>
 
 //#define GIF_TRACING  // uncomment it if you want detailed TRACEs

@@ -7,6 +7,11 @@
 // SliderCtrlEx.h : header file
 //
 
+#include <afxwin.h>
+#include <Afxdisp.h>
+#include <afxext.h>         // MFC 확장입니다.
+#include <afxcmn.h>             // Windows 공용 컨트롤에 대한 MFC 지원입니다.
+
 #include <deque>
 #include <algorithm>
 

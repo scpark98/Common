@@ -629,8 +629,10 @@ CString		GetCurrentDirectory()
 
 CString		GetFileNameFromFullPath(CString sFullPath)
 {
-	if (sFullPath.Find(_T("\\")) > 0)
-		return sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('\\') - 1);
+	sFullPath.Replace(_T("\\"), _T("/"));
+
+	if (sFullPath.Find(_T("/")) > 0)
+		return sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('/') - 1);
 	
 	return sFullPath;
 }
@@ -641,11 +643,13 @@ CString		GetFolderNameFromFullPath(CString sFullPath)
 	if (PathIsDirectory(sFullPath))
 		return sFullPath;
 
-	if (sFullPath.Find(_T("\\")) > 0)
+	sFullPath.Replace(_T("\\"), _T("/"));
+
+	if (sFullPath.Find(_T("/")) > 0)
 	{
-		sFullPath = sFullPath.Left(sFullPath.ReverseFind('\\'));
+		sFullPath = sFullPath.Left(sFullPath.ReverseFind('/'));
 		if (sFullPath.GetLength() == 2)	//ex. C:
-			sFullPath += _T("\\");
+			sFullPath += _T("/");
 
 		return sFullPath;
 	}
@@ -936,7 +940,6 @@ bool isFolder(char *sfile)
 	return false;
 }
 
-//파일명이나 폴더명에 '\\', '/' 혼용일 경우가 있으므로 CString의 '==' 연산자로 비교해선 안된다. 
 bool IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive)
 {
 	if (bCaseSensitive)
@@ -945,8 +948,8 @@ bool IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive)
 		file1.MakeLower();
 	}
 
-	file0.Replace(_T('/'), _T('\\'));
-	file1.Replace (_T('/'), _T('\\'));
+	file0.Replace(_T('\\'), _T('/'));
+	file1.Replace (_T('\\'), _T('/'));
 	return (file0 == file1);
 }
 

@@ -618,11 +618,11 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	bool		DownloadFile( LPCTSTR pUrl, CString strFileName, bool bOverwrite = TRUE, HWND hWnd = NULL );
 	CString		DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd = NULL );
 	bool		CheckFileIsURL( CString sURL );
+	bool		is_valid_url(CString url);
 	void		GetURLFileInfo( CString sURL, bool &bInURL, bool &bFileType );
 	bool		ReadURLFile( LPCTSTR pUrl, CString &strBuffer );
 	void		ReadURLFileString( CString sURL, CString &sString );
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
-
 
 
 //////////////////////////////////////////////////////////////////////////

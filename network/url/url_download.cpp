@@ -14,12 +14,13 @@ void CURLDownload::download(HWND hWnd, CString url, CString local_file)
 	m_url = url;
 	m_local_file = local_file;
 
+	USES_CONVERSION;
 	if (url.IsEmpty() ||
 		::IsValidURL(NULL, T2CW(url), 0) != S_OK)
 	{
+		::PostMessage(m_hParent, WM_USER_URL_DOWNLOAD_COMPLETED, 0, (LPARAM)INET_E_DOWNLOAD_FAILURE);
 		return;
 	}
-
 
 	std::thread t(&CURLDownload::thread_download, this);
 	t.detach();
@@ -30,25 +31,27 @@ void CURLDownload::thread_download()
 	m_eventStop.ResetEvent();
 	CBSCallbackImpl bsc(m_hParent, m_eventStop);
 
-	if (true)
+	HRESULT hr = S_OK;
+
+	if (m_use_cache)
 	{
-		const HRESULT hr = ::URLDownloadToFile(NULL,
-			m_url,
-			m_local_file,
-			0,
-			&bsc);
-	}
-	else
-	{
-		const HRESULT hr = ::URLDownloadToCacheFile(NULL,
+		hr = ::URLDownloadToCacheFile(NULL,
 			m_url,
 			m_local_file.GetBuffer(MAX_PATH),
 			URLOSTRM_GETNEWESTVERSION,
 			0,
 			&bsc);
 	}
-	
-	::PostMessage(m_hParent, WM_USER_URL_DOWNLOAD_COMPLETED, 0, 0);
+	else
+	{
+		hr = ::URLDownloadToFile(NULL,
+			m_url,
+			m_local_file,
+			0,
+			&bsc);
+	}
+
+	::PostMessage(m_hParent, WM_USER_URL_DOWNLOAD_COMPLETED, 0, (LPARAM)hr);
 }
 
 

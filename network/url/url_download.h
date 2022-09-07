@@ -49,13 +49,18 @@ public:
 		LPCWSTR szStatusText;
 	};
 
+	void use_cache(bool use) { m_use_cache = use; }
 	void download(HWND hWnd, CString url, CString local_file);
 	void thread_download();
 
+	CString get_url() { return m_url; }
+	CString get_local_file() { return m_local_file; }
+
 protected:
 	HWND m_hParent = NULL;
-	CString m_url;
-	CString m_local_file;
+	bool m_use_cache = true;	//인터넷 캐시 폴더에 받을지, 다운받는 파일을 지정할 지
+	CString m_url;				//다운받을 url 주소
+	CString m_local_file;		//다운받은 로컬 파일 fullpath. m_use_cache가 false이면 fullpath가 반드시 주어져야 한다.
 	CEvent m_eventStop;
 };
 

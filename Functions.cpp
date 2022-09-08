@@ -201,8 +201,8 @@ CString GetTimeStringFromTime(__timeb32 t, CString sMark /*=":"*/)
 	return GetTimeStringFromTime(ct, sMark);
 }
 
-//type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. blank는 날짜와 시간 사이 공백 여부
-CString GetCurrentDateTimeString(int nType, bool bSeparator /*= true*/, bool blank /*= true*/)
+//type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid_char는 날짜와 시간 사이 문자
+CString GetCurrentDateTimeString(int nType, bool bSeparator /*= true*/, TCHAR mid_char /*= ' '*/)
 {
 	CString str = _T("");
 	CTime	t = CTime::GetCurrentTime();
@@ -213,10 +213,8 @@ CString GetCurrentDateTimeString(int nType, bool bSeparator /*= true*/, bool bla
 		return sDate;
 	else if (nType == 1)
 		return sTime;
-	else if (blank)
-		return sDate + _T(" ") + sTime;
-	else
-		return sDate + sTime;
+	
+	return sDate + mid_char + sTime;
 }
 
 CString	GetTimeString(CTime t, bool bSeparator /*= true*/)
@@ -3708,7 +3706,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	}
 }
 
-#if (__cplusplus >= _std_cpp17)
+#if (_MSVC_LANG >= _std_cpp17)
 std::deque<CString> find_all_files(CString path, CString name_filter, CString ext_filters, CString except_str, bool recursive, bool auto_sort)
 {
 	int i;
@@ -8043,6 +8041,32 @@ bool CheckProcessUsingProcessName(LPCTSTR processName) // unsigned long = DWORD
 	return false;
 }
 
+
+CImage* capture_window(CRect r, CString filename)
+{
+	HDC hDC = CreateDC(_T("DISPLAY"), NULL, NULL, NULL);
+	CImage *imgCapture = new ATL::CImage();
+	imgCapture->Create(r.Width(), r.Height(), GetDeviceCaps(hDC, BITSPIXEL), 0);
+
+	::BitBlt(imgCapture->GetDC(), 0, 0, r.Width(), r.Height(), hDC, r.left, r.top, SRCCOPY);
+	/*
+	CTime t = CTime::GetCurrentTime();
+	CString tName;
+	tName.Format(_T("%04d-%02d-%02d_%02d%02d%02d"),
+		t.GetYear(), t.GetMonth(), t.GetDay(),
+		t.GetHour(), t.GetMinute(), t.GetSecond());
+	*/
+	CString ext = GetFileExtension(filename).MakeLower();
+	GUID format = Gdiplus::ImageFormatJPEG;
+
+	if (ext == _T("bmp"))
+		format = Gdiplus::ImageFormatBMP;
+	else if (ext == _T("png"))
+		format = Gdiplus::ImageFormatPNG;
+
+	imgCapture->Save(filename, format);
+	return imgCapture;
+}
 
 // Capture screen and create GDI bitmap
 // (full-screen when pRect is NULL)

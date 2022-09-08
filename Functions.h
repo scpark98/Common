@@ -653,7 +653,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//32,105개의 파일 : 1,773,564ms VS 3,337ms
 	//release mode에서는
 	//9,715ms VS 21ms.
-#if (__cplusplus >= _std_cpp17)
+#if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
 	std::deque<CString>	find_all_files(CString path, CString name_filter = _T(""), CString ext_filters = _T(""), CString except_str = _T(""), bool recursive = true, bool auto_sort = true);
 #endif
 	void save_dqlist(std::deque<CString>* dqlist, CString path);
@@ -823,7 +823,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	int			GetMilliSecondsFromTimeString(CString timeString);
 	void		GetTimeFromSeconds( int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds );
 	//type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. blank는 날짜와 시간 사이 공백 여부
-	CString		GetCurrentDateTimeString( int nType = 2, bool bSeparator = true, bool blank = true );
+	CString		GetCurrentDateTimeString( int nType = 2, bool bSeparator = true, TCHAR mid_char = ' ');
 	void		SetSystemTimeClock( WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond );
 	double		GetElapsedTime( __timeb32 pOldTime );	//pOldTime과 현재 시간의 차이 계산
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
@@ -1075,6 +1075,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	HRGN		CreateRgnFromBitmap(HBITMAP hBmp, COLORREF color);
 
 //캡쳐 기능
+	//r은 윈도우 좌표계.
+	CImage*		capture_window(CRect r, CString filename);
 	HBITMAP		CaptureScreenToBitmap(LPRECT pRect);
 	HBITMAP		CaptureWindowToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	HBITMAP		CaptureClientToBitmap(HWND hWnd, LPRECT pRect = NULL);

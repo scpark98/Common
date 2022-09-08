@@ -128,7 +128,7 @@ public:
 	void		select(int index);
 
 
-	Bitmap*		Load(CString sfile);
+	static Bitmap* Load(CString sfile);
 	Bitmap*		get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, bool show_error = false);
 
 	static void	safe_release(Bitmap** pBitmap);
@@ -188,6 +188,9 @@ public:
 	//blink
 	void		SetBlinkTime( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
 	void		SetBlink( BOOL bBlink = TRUE );
+
+	static void	rotate(Bitmap* bitmap, Gdiplus::RotateFlipType type);
+	static void	rotate(Bitmap** bitmap, float angle);
 
 protected:
 	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton

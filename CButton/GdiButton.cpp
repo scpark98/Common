@@ -1,4 +1,4 @@
-// GdiButton.cpp : ±¸Çö ÆÄÀÏÀÔ´Ï´Ù.
+ï»¿// GdiButton.cpp : êµ¬í˜„ íŒŒì¼ì…ë‹ˆë‹¤.
 //
 
 //#include "stdafx.h"
@@ -108,17 +108,17 @@ END_MESSAGE_MAP()
 
 
 
-// CGdiButton ¸Ş½ÃÁö Ã³¸®±âÀÔ´Ï´Ù.
+// CGdiButton ë©”ì‹œì§€ ì²˜ë¦¬ê¸°ì…ë‹ˆë‹¤.
 
-//±âÁ¸ CButton::SetButtonStyle ÇÔ¼ö¸¦ overridingÇÏ¿© OWNER_DRAW¸¦ Ãß°¡½ÃÄÑÁà¾ß ÇÑ´Ù.
+//ê¸°ì¡´ CButton::SetButtonStyle í•¨ìˆ˜ë¥¼ overridingí•˜ì—¬ OWNER_DRAWë¥¼ ì¶”ê°€ì‹œì¼œì¤˜ì•¼ í•œë‹¤.
 void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 {
 	DWORD dwStyle = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
 
 	CButton::SetButtonStyle(nStyle, bRedraw);
 
-	// BS_OWNERDRAW ¼Ó¼ºÀ» ¼³Á¤ÇÑ´Ù.
-	//ÁÖÀÇ : dwStyleÀº ¹İµå½Ã CButton::SetButtonStyle() ÇÔ¼ö È£Ãâ Àü¿¡ ±¸ÇÑ °ªÀ» »ç¿ëÇØ¾ß ÇÑ´Ù.
+	// BS_OWNERDRAW ì†ì„±ì„ ì„¤ì •í•œë‹¤.
+	//ì£¼ì˜ : dwStyleì€ ë°˜ë“œì‹œ CButton::SetButtonStyle() í•¨ìˆ˜ í˜¸ì¶œ ì „ì— êµ¬í•œ ê°’ì„ ì‚¬ìš©í•´ì•¼ í•œë‹¤.
 	::SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle | BS_OWNERDRAW);
 	m_button_style = nStyle;
 }
@@ -129,7 +129,7 @@ bool CGdiButton::add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT ov
 {
 	CButtonImage btn;
 
-	//normalÀº 0ÀÌ¾î¼­´Â ¾ÈµÈ´Ù.
+	//normalì€ 0ì´ì–´ì„œëŠ” ì•ˆëœë‹¤.
 	if (normal == 0)
 		return false;
 
@@ -282,7 +282,7 @@ Bitmap* CGdiButton::GdiplusImageToBitmap(Image* img, Color bkgd)
 }
 
 #if 0
-//ÇÑ ¹öÆ°Àº ÃÖ´ë 10ÀåÀÇ ÀÌ¹ÌÁö¸¦ ´ãÀ» ¼ö ÀÖÀ¸¸ç 0¹øÀÌ normal»óÅÂ ÀÌ¹ÌÁö, ±×¸®°í checked »óÅÂ·Î ½ÃÀÛµÈ´Ù.
+//í•œ ë²„íŠ¼ì€ ìµœëŒ€ 10ì¥ì˜ ì´ë¯¸ì§€ë¥¼ ë‹´ì„ ìˆ˜ ìˆìœ¼ë©° 0ë²ˆì´ normalìƒíƒœ ì´ë¯¸ì§€, ê·¸ë¦¬ê³  checked ìƒíƒœë¡œ ì‹œì‘ëœë‹¤.
 bool CGdiButton::AddImage(CString sfile, Bitmap* pBack, COLORREF crBack, bool bFitToImage, int dx, int dy, UINT nAnchor, bool bAsStatic, bool bShowError)
 {
 	Bitmap	*bitmap = Load(sfile);
@@ -290,7 +290,7 @@ bool CGdiButton::AddImage(CString sfile, Bitmap* pBack, COLORREF crBack, bool bF
 	if (bitmap == NULL)
 	{
 		if (bShowError)
-			AfxMessageBox(sfile + "\n\nÀ§ ÆÄÀÏÀÌ Á¸ÀçÇÏÁö ¾Ê°Å³ª ¿­ ¼ö ¾ø½À´Ï´Ù.");
+			AfxMessageBox(sfile + "\n\nìœ„ íŒŒì¼ì´ ì¡´ì¬í•˜ì§€ ì•Šê±°ë‚˜ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
 		return false;
 	}
 
@@ -392,7 +392,7 @@ bool CGdiButton::AddImage(Bitmap *bitmap, Bitmap* pBack, COLORREF crBack, bool b
 	}
 	else
 	{
-		//Ãß°¡µÇ´Â ÀÌ¹ÌÁöµéÀº ¸ğµÎ 0¹ø ÀÌ¹ÌÁö¿Í µ¿ÀÏÇÑ Å©±â¿©¾ß ÇÑ´Ù.
+		//ì¶”ê°€ë˜ëŠ” ì´ë¯¸ì§€ë“¤ì€ ëª¨ë‘ 0ë²ˆ ì´ë¯¸ì§€ì™€ ë™ì¼í•œ í¬ê¸°ì—¬ì•¼ í•œë‹¤.
 		//m_pImage[m_nImages] = (Bitmap*)(m_pImage[m_nImages]->GetThumbnailImage(m_width, m_height));
 	}
 
@@ -408,29 +408,29 @@ void CGdiButton::SelectImage(int nIndex)
 }
 #endif
 
-//trueÀÌ¸é 1¹ø ÀÌ¹ÌÁö¸¦ Ç¥½ÃÇØÁØ´Ù. falseÀÏ °æ¿ì´Â 0¹øÀ» Ç¥½ÃÇÏ´Âµ¥ ¸¸¾à ¾øÀ¸¸é AddGrayImage·Î È¸»ö ÀÌ¹ÌÁö¸¦ ÀÚµ¿ Ãß°¡ÇÑ ÈÄ ¼±ÅÃÇØÁØ´Ù.
-//±âÁ¸¿¡´Â AddImage¿¡¼­ checkbox³ª radiobuttonÀÌ¸é ¾Ë¾Æ¼­ grayimage¸¦ Ãß°¡ÇØÁáÀ¸³ª ¾Æ·¡¿Í °°Àº ¹®Á¦°¡ ÀÖ¾î¼­
-//ÀÚµ¿ Ãß°¡´Â »èÁ¦µÇ¾ú´Ù.
-//¹®Á¦1. AddImage´Ü°è¿¡¼­´Â Ãß°¡ÀûÀÎ AddImage°¡ ÀÖÀ»Áö ¾øÀ»Áö ¾Ë ¼ö ¾øÀ¸¹Ç·Î ÀÌ ´Ü°è¿¡¼­ gray image¸¦ ³Ö´Â °ÍÀº ¹®Á¦°¡ µÈ´Ù.
-//¹®Á¦2. GetButtonStyle()·Î ¹öÆ° Å¸ÀÔÀÌ Àß ±¸ºĞµÇÁö ¾Ê´Â´Ù. ¹º°¡ ¸íÈ®ÇÑ ¹æ¹ıÀ» Ã£¾Æ¾ß ÇÑ´Ù.
-//check³ª radioÀÇ on, off¸¦ ÇÏ³ªÀÇ ÀÌ¹ÌÁö·Î¸¸ °£´ÜÈ÷ »ç¿ëÇÑ´Ù¸é
-//onÀÌ¹ÌÁö¸¦ Ãß°¡ÇÑ ÈÄ AddGrayImage()¸¦ Ãß°¡·Î È£ÃâÇÏ¿© »ç¿ëÇÏÀÚ.
+//trueì´ë©´ 1ë²ˆ ì´ë¯¸ì§€ë¥¼ í‘œì‹œí•´ì¤€ë‹¤. falseì¼ ê²½ìš°ëŠ” 0ë²ˆì„ í‘œì‹œí•˜ëŠ”ë° ë§Œì•½ ì—†ìœ¼ë©´ AddGrayImageë¡œ íšŒìƒ‰ ì´ë¯¸ì§€ë¥¼ ìë™ ì¶”ê°€í•œ í›„ ì„ íƒí•´ì¤€ë‹¤.
+//ê¸°ì¡´ì—ëŠ” AddImageì—ì„œ checkboxë‚˜ radiobuttonì´ë©´ ì•Œì•„ì„œ grayimageë¥¼ ì¶”ê°€í•´ì¤¬ìœ¼ë‚˜ ì•„ë˜ì™€ ê°™ì€ ë¬¸ì œê°€ ìˆì–´ì„œ
+//ìë™ ì¶”ê°€ëŠ” ì‚­ì œë˜ì—ˆë‹¤.
+//ë¬¸ì œ1. AddImageë‹¨ê³„ì—ì„œëŠ” ì¶”ê°€ì ì¸ AddImageê°€ ìˆì„ì§€ ì—†ì„ì§€ ì•Œ ìˆ˜ ì—†ìœ¼ë¯€ë¡œ ì´ ë‹¨ê³„ì—ì„œ gray imageë¥¼ ë„£ëŠ” ê²ƒì€ ë¬¸ì œê°€ ëœë‹¤.
+//ë¬¸ì œ2. GetButtonStyle()ë¡œ ë²„íŠ¼ íƒ€ì…ì´ ì˜ êµ¬ë¶„ë˜ì§€ ì•ŠëŠ”ë‹¤. ë­”ê°€ ëª…í™•í•œ ë°©ë²•ì„ ì°¾ì•„ì•¼ í•œë‹¤.
+//checkë‚˜ radioì˜ on, offë¥¼ í•˜ë‚˜ì˜ ì´ë¯¸ì§€ë¡œë§Œ ê°„ë‹¨íˆ ì‚¬ìš©í•œë‹¤ë©´
+//onì´ë¯¸ì§€ë¥¼ ì¶”ê°€í•œ í›„ AddGrayImage()ë¥¼ ì¶”ê°€ë¡œ í˜¸ì¶œí•˜ì—¬ ì‚¬ìš©í•˜ì.
 void CGdiButton::SetCheck(bool bCheck)
 {
 	m_idx = bCheck;
 	UpdateSurface();
 
-	//radio ¹öÆ°ÀÌ ´­·ÁÁö°Å³ª SetCheck(true)°¡ È£ÃâµÇ¸é
-	//°°Àº group ³»ÀÇ ´Ù¸¥ ¹öÆ°µéÀº unchecked·Î ¸¸µé¾î Áà¾ßÇÑ´Ù.
-	//owner draw ¼Ó¼º¶§¹®¿¡ WindowProcÀÇ À©µµ¿ì ±âº» ¸Ş½ÃÁö¸¦ ¹Ş¾Æ¼­ Ã³¸®ÇÒ ¼ö ¾ø´Ù.
+	//radio ë²„íŠ¼ì´ ëˆŒë ¤ì§€ê±°ë‚˜ SetCheck(true)ê°€ í˜¸ì¶œë˜ë©´
+	//ê°™ì€ group ë‚´ì˜ ë‹¤ë¥¸ ë²„íŠ¼ë“¤ì€ uncheckedë¡œ ë§Œë“¤ì–´ ì¤˜ì•¼í•œë‹¤.
+	//owner draw ì†ì„±ë•Œë¬¸ì— WindowProcì˜ ìœˆë„ìš° ê¸°ë³¸ ë©”ì‹œì§€ë¥¼ ë°›ì•„ì„œ ì²˜ë¦¬í•  ìˆ˜ ì—†ë‹¤.
 	if ((m_button_style == BS_RADIOBUTTON) && bCheck)
 	{
 		CWnd *pWndParent = GetParent(); 
 		CWnd *pWnd = pWndParent->GetNextDlgGroupItem(this); 
 		CWnd* pWndFirstCheck = NULL;
 
-		//¸¸¾à ¹öÆ°ÀÌ visibleÀÌ falseÀÌ¸é ¾Æ·¡ while¹®Àº ¹«ÇÑ·çÇÁ¸¦ µ·´Ù.
-		//ÀÌ¸¦ ¹æÁöÇÏ±â À§ÇØ ÇÑ¹ø °Ë»çÇÑ À©µµ¿ì¸¦ ±â¾ïÇß´Ù°¡ ±× À©µµ¿ì¸¦ ¸¸³ª¸é Á¾·á½ÃÅ²´Ù.
+		//ë§Œì•½ ë²„íŠ¼ì´ visibleì´ falseì´ë©´ ì•„ë˜ whileë¬¸ì€ ë¬´í•œë£¨í”„ë¥¼ ëˆë‹¤.
+		//ì´ë¥¼ ë°©ì§€í•˜ê¸° ìœ„í•´ í•œë²ˆ ê²€ì‚¬í•œ ìœˆë„ìš°ë¥¼ ê¸°ì–µí–ˆë‹¤ê°€ ê·¸ ìœˆë„ìš°ë¥¼ ë§Œë‚˜ë©´ ì¢…ë£Œì‹œí‚¨ë‹¤.
 		while (pWnd && (pWnd != this) && (pWnd != pWndFirstCheck)) 
 		{ 
 			if (pWnd->GetStyle() & WS_GROUP)
@@ -559,15 +559,15 @@ void CGdiButton::SetBrightnessHoverEffect(float fScale)	//1.0f = no effect.
 	HotMat.m[2][2] = fScale;
 }
 
-//±×¸²ÀÇ Å©±â¿¡ ¸Â°Ô ÄÁÆ®·ÑÀ» resizeÇÏ°í dx, dy, nAnchor¿¡ µû¶ó moveÇØÁØ´Ù.
+//ê·¸ë¦¼ì˜ í¬ê¸°ì— ë§ê²Œ ì»¨íŠ¸ë¡¤ì„ resizeí•˜ê³  dx, dy, nAnchorì— ë”°ë¼ moveí•´ì¤€ë‹¤.
 void CGdiButton::resize_control(int cx, int cy)
 {
 	CRect	rc, rParentRect;
 
 	GetParent()->GetClientRect(&rParentRect);
 
-	//parentÀÇ Å¬¶óÀÌ¾ğÆ® ¿µ¿ª ³»¿¡¼­ ÀÌ ÄÁÆ®·ÑÀÇ ÁÂÇ¥¸¦ ±¸ÇÑ´Ù.
-	//ScreenToClient(rc);¿Í ::ScreenToClient(GetParent()->m_hWnd, &pt);ÀÇ rc.topleft¿Í pt´Â ´Ù¸¥ °á°ú¸¦ º¸ÀÎ´Ù.
+	//parentì˜ í´ë¼ì´ì–¸íŠ¸ ì˜ì—­ ë‚´ì—ì„œ ì´ ì»¨íŠ¸ë¡¤ì˜ ì¢Œí‘œë¥¼ êµ¬í•œë‹¤.
+	//ScreenToClient(rc);ì™€ ::ScreenToClient(GetParent()->m_hWnd, &pt);ì˜ rc.topleftì™€ ptëŠ” ë‹¤ë¥¸ ê²°ê³¼ë¥¼ ë³´ì¸ë‹¤.
 	GetWindowRect(rc);
 	//ScreenToClient(rc);
 	CPoint	pt = rc.TopLeft();
@@ -600,15 +600,15 @@ void CGdiButton::resize_control(int cx, int cy)
 			dy = rParentRect.CenterPoint().y - m_height / 2;
 	}
 	*/
-	//w, h¿¡ +1À» ÇØ ÁØ ÀÌÀ¯´Â ¹öÆ°ÀÇ Å©±â°¡ fitÇÏ¸é ´­·ÈÀ» ¶§ (x+1), (y+1)¿¡ ±×·ÁÁö¹Ç·Î
-	//¿À¸¥ÂÊ°ú ÇÏ´ÜÀÇ 1ÇÈ¼¿¾¿ ¾Èº¸ÀÌ°Ô µÈ´Ù. µû¶ó¼­ ¹öÆ°ÀÇ Å©±â´Â ½ÇÁ¦ ÀÌ¹ÌÁöÀÇ w, hº¸´Ù 1ÀÌ ´õ Ä¿¾ß ÇÑ´Ù.
+	//w, hì— +1ì„ í•´ ì¤€ ì´ìœ ëŠ” ë²„íŠ¼ì˜ í¬ê¸°ê°€ fití•˜ë©´ ëˆŒë ¸ì„ ë•Œ (x+1), (y+1)ì— ê·¸ë ¤ì§€ë¯€ë¡œ
+	//ì˜¤ë¥¸ìª½ê³¼ í•˜ë‹¨ì˜ 1í”½ì…€ì”© ì•ˆë³´ì´ê²Œ ëœë‹¤. ë”°ë¼ì„œ ë²„íŠ¼ì˜ í¬ê¸°ëŠ” ì‹¤ì œ ì´ë¯¸ì§€ì˜ w, hë³´ë‹¤ 1ì´ ë” ì»¤ì•¼ í•œë‹¤.
 	SetWindowPos(NULL, 0, 0, m_width, m_height, SWP_NOMOVE | SWP_NOZORDER);
 }
 
 
 void CGdiButton::PreSubclassWindow()
 {
-	// TODO: ¿©±â¿¡ Æ¯¼öÈ­µÈ ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº» Å¬·¡½º¸¦ È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— íŠ¹ìˆ˜í™”ëœ ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ í´ë˜ìŠ¤ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	// Set control to owner draw
 	m_button_style = getButtonStyle(m_hWnd);
 	
@@ -648,7 +648,7 @@ void CGdiButton::ReconstructFont()
 
 BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 {
-	// TODO: ¿©±â¿¡ Æ¯¼öÈ­µÈ ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº» Å¬·¡½º¸¦ È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— íŠ¹ìˆ˜í™”ëœ ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ í´ë˜ìŠ¤ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	return CButton::PreTranslateMessage(pMsg);
 }
 
@@ -687,8 +687,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (idx < 0)
 		return;
 
-	//¸¸¾à parent¿¡ ¹è°æ»öÀÌ³ª ¹è°æ ±×¸²ÀÌ ÀÖ°í
-	//±×·ÁÁö´Â ÀÌ¹ÌÁö°¡ ¹è°æÀÌ Åõ¸íÇÑ PNG¶ó¸é Åõ¸íÇÏ°Ô ±×¸®±â À§ÇØ.
+	//ë§Œì•½ parentì— ë°°ê²½ìƒ‰ì´ë‚˜ ë°°ê²½ ê·¸ë¦¼ì´ ìˆê³ 
+	//ê·¸ë ¤ì§€ëŠ” ì´ë¯¸ì§€ê°€ ë°°ê²½ì´ íˆ¬ëª…í•œ PNGë¼ë©´ íˆ¬ëª…í•˜ê²Œ ê·¸ë¦¬ê¸° ìœ„í•´.
 	if (m_transparent)
 	{
 		CRect Rect;
@@ -710,8 +710,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		MemDC.DeleteDC();
 	}
 
-	//check or radioÀÎµ¥ m_image.size()°¡ 1»ÓÀÌ¶ó¸é
-	//checked = normalÀ», unchecked = disabled¸¦ Ç¥½ÃÇÑ´Ù.
+	//check or radioì¸ë° m_image.size()ê°€ 1ë¿ì´ë¼ë©´
+	//checked = normalì„, unchecked = disabledë¥¼ í‘œì‹œí•œë‹¤.
 	bool use_disabled_image = false;
 	if (m_button_style != BS_PUSHBUTTON && m_image.size() == 1 && m_idx == 0)
 		use_disabled_image = true;
@@ -727,8 +727,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else
 			cr_text = m_cr_text[0];
 	}
-	//±ÛÀÚ»ö°ú´Â ´Ş¸® ¹è°æ»öÀº ¼¼ÆÃµÇ¸é ±×¸®Áö¸¸
-	//¼¼ÆÃµÇÁö ¾ÊÀ¸¸é ±×¸®Áö ¾Ê´Â´Ù.
+	//ê¸€ììƒ‰ê³¼ëŠ” ë‹¬ë¦¬ ë°°ê²½ìƒ‰ì€ ì„¸íŒ…ë˜ë©´ ê·¸ë¦¬ì§€ë§Œ
+	//ì„¸íŒ…ë˜ì§€ ì•Šìœ¼ë©´ ê·¸ë¦¬ì§€ ì•ŠëŠ”ë‹¤.
 	if (m_cr_back.size() == 4)
 	{
 		if (is_disabled)
@@ -743,19 +743,19 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		dc.FillSolidRect(rc, cr_back);
 	}
 
-	//ÀÌ¹ÌÁö°¡ ÀÖ´Ù¸é ÀÌ¹ÌÁö¸¦ ¸ÕÀú ±×·ÁÁÖ°í
+	//ì´ë¯¸ì§€ê°€ ìˆë‹¤ë©´ ì´ë¯¸ì§€ë¥¼ ë¨¼ì € ê·¸ë ¤ì£¼ê³ 
 	if (m_image.size() > 0 && m_image[idx].normal != NULL)
 	{
 		RectF			grect;
 		ImageAttributes ia;
 
-		//¿øº» È­¼Ò¸¦ °ÅÀÇ À¯ÁöÇÏÁö¸¸ ÀÏºÎ È­¼Ò´Â »ç¶óÁü. ±×·¡¼­ ´õ °ÅÄ£ ´À³¦
+		//ì›ë³¸ í™”ì†Œë¥¼ ê±°ì˜ ìœ ì§€í•˜ì§€ë§Œ ì¼ë¶€ í™”ì†ŒëŠ” ì‚¬ë¼ì§. ê·¸ë˜ì„œ ë” ê±°ì¹œ ëŠë‚Œ
 		//g.SetInterpolationMode(InterpolationModeNearestNeighbor);
 
-		//ºÎµå·´°Ô resizeµÇÁö¸¸ ¾à°£ »Ñ¿¸°Ô º¯ÇÔ
+		//ë¶€ë“œëŸ½ê²Œ resizeë˜ì§€ë§Œ ì•½ê°„ ë¿Œì˜‡ê²Œ ë³€í•¨
 		g.SetInterpolationMode(InterpolationModeHighQualityBilinear);
 
-		//Áß°£ ´À³¦
+		//ì¤‘ê°„ ëŠë‚Œ
 		//g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
 
 		if (m_bAsStatic)
@@ -768,7 +768,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				pImage = m_image[idx].disabled;
 			}
-			//´Ù¿î ÀÌ¹ÌÁö. ¹İµå½Ã hoveringº¸´Ù ¸ÕÀú Ã¼Å©µÇ¾î¾ß ÇÑ´Ù.
+			//ë‹¤ìš´ ì´ë¯¸ì§€. ë°˜ë“œì‹œ hoveringë³´ë‹¤ ë¨¼ì € ì²´í¬ë˜ì–´ì•¼ í•œë‹¤.
 			else if (is_down)
 			{
 				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].down);
@@ -788,7 +788,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (pImage == NULL)
 			pImage = m_image[idx].normal;
 
-		//¹è°æÀ» ±×¸®°í
+		//ë°°ê²½ì„ ê·¸ë¦¬ê³ 
 		if (m_pBack)
 			g.DrawImage(m_pBack, 0, 0);
 		//else
@@ -816,8 +816,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 		}
 	}
-	//¼³Á¤µÈ ÀÌ¹ÌÁö°¡ ¾ø´Â °æ¿ì ¹öÆ°ÀÇ ÀÌ¹ÌÁö¸¦ ±×·ÁÁÖ°í
-	//±âº» ÅØ½ºÆ®µµ Ãâ·ÂÇÑ´Ù.
+	//ì„¤ì •ëœ ì´ë¯¸ì§€ê°€ ì—†ëŠ” ê²½ìš° ë²„íŠ¼ì˜ ì´ë¯¸ì§€ë¥¼ ê·¸ë ¤ì£¼ê³ 
+	//ê¸°ë³¸ í…ìŠ¤íŠ¸ë„ ì¶œë ¥í•œë‹¤.
 	else
 	{
 		int		size = 6;
@@ -889,7 +889,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (m_text.IsEmpty())
 		return;
 
-	//¹º°¡ Á¦´ë·Î °Ë»çµÇÁö ¾Ê´Â´Ù. ¿ì¼± Çª½Ã¹öÆ°¸¸ ´ë»óÀ¸·Î ÇÑ´Ù.
+	//ë­”ê°€ ì œëŒ€ë¡œ ê²€ì‚¬ë˜ì§€ ì•ŠëŠ”ë‹¤. ìš°ì„  í‘¸ì‹œë²„íŠ¼ë§Œ ëŒ€ìƒìœ¼ë¡œ í•œë‹¤.
 #if 1
 	if (m_button_style == BS_PUSHBUTTON)
 	{
@@ -928,7 +928,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 BOOL CGdiButton::OnEraseBkgnd(CDC* pDC)
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	//if (m_pBack)
 		return FALSE;
 	//else
@@ -940,7 +940,7 @@ BOOL CGdiButton::OnEraseBkgnd(CDC* pDC)
 
 void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	if (!m_bHover)//m_bIsTracking)
 	{
 		TRACKMOUSEEVENT tme;
@@ -959,7 +959,7 @@ void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 
 void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	//if (!m_use_hover)
 	//	return;
 
@@ -972,7 +972,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 
 void CGdiButton::OnMouseLeave()
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	//if (!m_use_hover)// || !m_bHover)
 	//	return;
 
@@ -985,7 +985,7 @@ void CGdiButton::OnMouseLeave()
 
 void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	if (nIDEvent == TIMER_BLINK)
 	{
 		m_bBlinkStatus = !m_bBlinkStatus;
@@ -1007,7 +1007,7 @@ void CGdiButton::OnSetFocus(CWnd* pOldWnd)
 {
 	CButton::OnSetFocus(pOldWnd);
 
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
 	//TRACE("set focus\n");
 	m_bHasFocus = true;
 	UpdateSurface();
@@ -1018,7 +1018,7 @@ void CGdiButton::OnKillFocus(CWnd* pNewWnd)
 {
 	CButton::OnKillFocus(pNewWnd);
 
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
 	//TRACE("kill focus\n");
 	m_bHasFocus = false;
 	UpdateSurface();
@@ -1027,7 +1027,7 @@ void CGdiButton::OnKillFocus(CWnd* pNewWnd)
 
 BOOL CGdiButton::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 
 	return CButton::OnSetCursor(pWnd, nHitTest, message);
 }
@@ -1064,12 +1064,12 @@ void CGdiButton::ReAlign()
 	}
 }
 
-//¹öÆ°ÀÇ À§Ä¡ º¯°æ
+//ë²„íŠ¼ì˜ ìœ„ì¹˜ ë³€ê²½
 void CGdiButton::Offset(int x, int y)
 {
 	CRect	rc;
 
-	//parentÀÇ Å¬¶óÀÌ¾ğÆ® ¿µ¿ª ³»¿¡¼­ ÀÌ ÄÁÆ®·ÑÀÇ ÁÂÇ¥¸¦ ±¸ÇÑ´Ù.
+	//parentì˜ í´ë¼ì´ì–¸íŠ¸ ì˜ì—­ ë‚´ì—ì„œ ì´ ì»¨íŠ¸ë¡¤ì˜ ì¢Œí‘œë¥¼ êµ¬í•œë‹¤.
 	GetWindowRect(rc);
 	CPoint	pt = rc.TopLeft();
 	::ScreenToClient(GetParent()->m_hWnd, &pt);
@@ -1093,13 +1093,13 @@ void CGdiButton::Inflate(int cx, int cy)
 	Inflate(cx, cy, cx, cy);
 }
 
-//¹öÆ° Å©±â¸¦ ´Ã¸®°Å³ª ÁÙÀÎ´Ù.
-//¹öÆ° ÀÌ¹ÌÁö´Â Ç×»ó ¹öÆ° ¿µ¿ªÀÇ Áß¾Ó¿¡ ±×·ÁÁØ´Ù.
+//ë²„íŠ¼ í¬ê¸°ë¥¼ ëŠ˜ë¦¬ê±°ë‚˜ ì¤„ì¸ë‹¤.
+//ë²„íŠ¼ ì´ë¯¸ì§€ëŠ” í•­ìƒ ë²„íŠ¼ ì˜ì—­ì˜ ì¤‘ì•™ì— ê·¸ë ¤ì¤€ë‹¤.
 void CGdiButton::Inflate(int l, int t, int r, int b)
 {
 	CRect	rc;
 
-	//parentÀÇ Å¬¶óÀÌ¾ğÆ® ¿µ¿ª ³»¿¡¼­ ÀÌ ÄÁÆ®·ÑÀÇ ÁÂÇ¥¸¦ ±¸ÇÑ´Ù.
+	//parentì˜ í´ë¼ì´ì–¸íŠ¸ ì˜ì—­ ë‚´ì—ì„œ ì´ ì»¨íŠ¸ë¡¤ì˜ ì¢Œí‘œë¥¼ êµ¬í•œë‹¤.
 	GetWindowRect(rc);
 	CPoint	pt = rc.TopLeft();
 	::ScreenToClient(GetParent()->m_hWnd, &pt);
@@ -1107,7 +1107,7 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	rc.MoveToXY(pt.x, pt.y);
 	rc.InflateRect(l, t, r, b);
 
-	//¹è°æ ±×¸²ÀÌ Á¸ÀçÇß´Ù¸é ¹è°æ ¶ÇÇÑ »õ·Î µû¿Í¾ß ÇÑ´Ù.
+	//ë°°ê²½ ê·¸ë¦¼ì´ ì¡´ì¬í–ˆë‹¤ë©´ ë°°ê²½ ë˜í•œ ìƒˆë¡œ ë”°ì™€ì•¼ í•œë‹¤.
 	if (m_pBack && m_pBackOrigin)
 	{
 		safe_release(&m_pBack);
@@ -1155,7 +1155,7 @@ void CGdiButton::Toggle()
 
 LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
-	// TODO: ¿©±â¿¡ Æ¯¼öÈ­µÈ ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº» Å¬·¡½º¸¦ È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— íŠ¹ìˆ˜í™”ëœ ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ í´ë˜ìŠ¤ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
 
 // 	CString str;
 // 	GetWindowText(str);
@@ -1237,12 +1237,12 @@ CGdiButton& CGdiButton::SetFontBold(bool bBold)
 	return *this;
 }
 
-//m_bDown°ú °°Àº ÇÃ·¡±×¸¦ µÖ¼­ ´Ù¿î »óÅÂ¸¦ ÆÇ´ÜÇÏ°Ô ÇÏ´Â°ÍÀº
-//ºÒÆíÇÏ°Å³ª À§ÇèÇÑ ÄÚµå°¡ µÉ ¼ö ÀÖ´Ù.
-//´Ù¿î »óÅÂ¿¡¼­ ¸¶¿ì½º°¡ ³ª°¡´Â °æ¿ì µîµî Ã¼Å©ÇÒ °ÍÀÌ ¸¹À»¼öµµ ÀÖ´Ù.
+//m_bDownê³¼ ê°™ì€ í”Œë˜ê·¸ë¥¼ ë‘¬ì„œ ë‹¤ìš´ ìƒíƒœë¥¼ íŒë‹¨í•˜ê²Œ í•˜ëŠ”ê²ƒì€
+//ë¶ˆí¸í•˜ê±°ë‚˜ ìœ„í—˜í•œ ì½”ë“œê°€ ë  ìˆ˜ ìˆë‹¤.
+//ë‹¤ìš´ ìƒíƒœì—ì„œ ë§ˆìš°ìŠ¤ê°€ ë‚˜ê°€ëŠ” ê²½ìš° ë“±ë“± ì²´í¬í•  ê²ƒì´ ë§ì„ìˆ˜ë„ ìˆë‹¤.
 void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ ¹×/¶Ç´Â ±âº»°ªÀ» È£ÃâÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€ ë°/ë˜ëŠ” ê¸°ë³¸ê°’ì„ í˜¸ì¶œí•©ë‹ˆë‹¤.
 	UpdateSurface();
 	CButton::OnLButtonDown(nFlags, point);
 }
@@ -1254,9 +1254,9 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 	CRect rc;
 	GetClientRect(rc);
 
-	//downµÇ¸é SetCapture°¡ ÀÚµ¿À¸·Î µé¾î°¡¼­ ¹öÆ° ¹Û¿¡¼­ upµÇ¾úÀ»¶§µµ
-	//ÀÌ ÇÔ¼ö°¡ È£ÃâµÈ´Ù.
-	//¹Û¿¡¼­ upµÇ´Â °æ¿ì´Â ½ºÅµ½ÃÅ²´Ù.
+	//downë˜ë©´ SetCaptureê°€ ìë™ìœ¼ë¡œ ë“¤ì–´ê°€ì„œ ë²„íŠ¼ ë°–ì—ì„œ upë˜ì—ˆì„ë•Œë„
+	//ì´ í•¨ìˆ˜ê°€ í˜¸ì¶œëœë‹¤.
+	//ë°–ì—ì„œ upë˜ëŠ” ê²½ìš°ëŠ” ìŠ¤í‚µì‹œí‚¨ë‹¤.
 	if (rc.PtInRect(point))
 	{
 		if (m_button_style == BS_CHECKBOX)
@@ -1301,7 +1301,7 @@ void CGdiButton::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CButton::OnWindowPosChanged(lpwndpos);
 
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
 	UpdateSurface();
 }
 
@@ -1310,7 +1310,7 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 {
 	CButton::OnSize(nType, cx, cy);
 
-	// TODO: ¿©±â¿¡ ¸Ş½ÃÁö Ã³¸®±â ÄÚµå¸¦ Ãß°¡ÇÕ´Ï´Ù.
+	// TODO: ì—¬ê¸°ì— ë©”ì‹œì§€ ì²˜ë¦¬ê¸° ì½”ë“œë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
 	if (m_fit2image)
 	{
 
@@ -1323,3 +1323,30 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 	}
 }
 
+void CGdiButton::rotate(Bitmap* bitmap, Gdiplus::RotateFlipType type)
+{
+	bitmap->RotateFlip(type);
+}
+
+void CGdiButton::rotate(Bitmap** bitmap, float angle)
+{
+	UINT w = (* bitmap)->GetWidth();
+	UINT h = (* bitmap)->GetHeight();
+
+	//create a new empty bitmap to hold rotated imageÂ 
+	Bitmap *result = new Bitmap(w, h);
+	//make a graphics object from the empty bitmap
+	Graphics g(result);
+	//move rotation point to center of image
+	g.TranslateTransform((float)w / 2, (float)h / 2);
+	//rotate
+	g.RotateTransform(angle);
+	//move image back
+	g.TranslateTransform(-(float)w / 2, -(float)h / 2);
+	//draw passed in image onto graphics object
+	g.DrawImage(*bitmap, 0, 0);
+
+	delete *bitmap;
+
+	*bitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+}

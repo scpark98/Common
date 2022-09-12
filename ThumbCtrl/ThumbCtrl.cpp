@@ -311,6 +311,17 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	m_loading_complete.assign(m_loading_files.size(), false);
 	m_loading_completed = false;
 
+	//외부에서 m_thumb.add_files(...)를 호출하면
+	//멀티쓰레드로 이미지들을 읽어서 썸네일 리스트를 만드는데
+	//외부에서 이 로딩 쓰레드가 끝나기 전에 이미지를 접근하면 안된다.
+	//아래와 끝나기를 기다려줘야 한다.
+	//while (!m_thumb.is_loading_completed())
+	//{
+	//	Wait(10);
+	//}
+	//....
+	//로딩이 끝나면 m_thumb[0].mat과 같은 형식으로 이미지에 접근 가능하다.
+
 	//timer method
 #if (!ADD_USING_THREAD)
 	m_loading_index = 0;

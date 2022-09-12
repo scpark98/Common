@@ -1,5 +1,11 @@
 #pragma once
 
+#include <afxwin.h>
+#include <gdiplus.h>
+
+using namespace Gdiplus;
+
+
 class CGdiPlusBitmap
 {
 public:
@@ -7,6 +13,7 @@ public:
 
 public:
 	CGdiPlusBitmap()							{ m_pBitmap = NULL; }
+	CGdiPlusBitmap(Bitmap* src)					{ m_pBitmap = src; }
 	CGdiPlusBitmap(LPCWSTR pFile)				{ m_pBitmap = NULL; Load(pFile); }
 	virtual ~CGdiPlusBitmap()					{ Empty(); }
 
@@ -20,6 +27,16 @@ public:
 	}
 
 	operator Gdiplus::Bitmap*() const			{ return m_pBitmap; }
+
+	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
+	void clone(CGdiPlusBitmap* dst);
+	void deep_copy(CGdiPlusBitmap* dst);
+	void rotate(Gdiplus::RotateFlipType type);
+	void rotate(float degree);
+	void set_colorkey(Color low, Color high);
+	void set_transparent(float transparent);
+	int width() { return m_pBitmap->GetWidth(); }
+	int height() { return m_pBitmap->GetHeight(); }
 };
 
 

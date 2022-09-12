@@ -627,10 +627,8 @@ CString		GetCurrentDirectory()
 
 CString		GetFileNameFromFullPath(CString sFullPath)
 {
-	sFullPath.Replace(_T("\\"), _T("/"));
-
-	if (sFullPath.Find(_T("/")) > 0)
-		return sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('/') - 1);
+	if (sFullPath.Find(_T("\\")) > 0)
+		return sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('\\') - 1);
 	
 	return sFullPath;
 }
@@ -641,13 +639,11 @@ CString		GetFolderNameFromFullPath(CString sFullPath)
 	if (PathIsDirectory(sFullPath))
 		return sFullPath;
 
-	sFullPath.Replace(_T("\\"), _T("/"));
-
-	if (sFullPath.Find(_T("/")) > 0)
+	if (sFullPath.Find(_T("\\")) > 0)
 	{
-		sFullPath = sFullPath.Left(sFullPath.ReverseFind('/'));
+		sFullPath = sFullPath.Left(sFullPath.ReverseFind('\\'));
 		if (sFullPath.GetLength() == 2)	//ex. C:
-			sFullPath += _T("/");
+			sFullPath += _T("\\");
 
 		return sFullPath;
 	}
@@ -979,7 +975,7 @@ int	get_char_count(CString sStr, TCHAR ch)
 		return nCount;
 }
 
-int			Find_Divide_Position_By_Punctuation(CString str)
+int	Find_Divide_Position_By_Punctuation(CString str)
 {
 	if (str == "")
 		return 0;
@@ -4478,12 +4474,13 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-void DrawLine(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
-{
-	DrawLine(pDC, pt1.x, pt1.y, pt2.x, pt2.y, crColor, nWidth, nPenStyle, nDrawMode);
-}
 
-void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, DWORD crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
+//void DrawLine(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
+//{
+//	DrawLine(pDC, pt1.x, pt1.y, pt2.x, pt2.y, crColor, nWidth, nPenStyle, nDrawMode);
+//}
+
+void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
 {
 	LOGBRUSH lb;
 

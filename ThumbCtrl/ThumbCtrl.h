@@ -203,6 +203,7 @@ public:
 
 	int				m_nDataIndex;				//처리될 데이터 그룹의 시작 인덱스
 	void			loading_function( int idx );
+	bool			is_loading_completed() { return m_loading_completed; }
 
 //타이틀 편집 관련
 	void			edit_begin(int index);

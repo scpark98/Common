@@ -32,21 +32,26 @@ void CGdiPlusBitmap::rotate(Gdiplus::RotateFlipType type)
 	m_pBitmap->RotateFlip(type);
 }
 
-void CGdiPlusBitmap::rotate(float degree)
+void CGdiPlusBitmap::rotate(float degree, bool auto_enlarge)
 {
-	UINT w = m_pBitmap->GetWidth();
-	UINT h = m_pBitmap->GetHeight();
-	CRect rotated(0, 0, w, h);
-	std::vector<CPoint> m_pts = get_rotated(w / 2, h / 2, &rotated, degree);
+	int originw = m_pBitmap->GetWidth();
+	int originh = m_pBitmap->GetHeight();
+	CRect rotated(0, 0, originw, originh);
 
-	w = rotated.Width();
-	h = rotated.Height();
+	if (auto_enlarge)
+		std::vector<CPoint> m_pts = get_rotated(originw / 2, originh / 2, &rotated, degree);
+
+	int w = rotated.Width();
+	int h = rotated.Height();
 
 	//create a new empty bitmap to hold rotated image 
 	Bitmap* result = new Bitmap(w, h);
 	//make a graphics object from the empty bitmap
 	Graphics g(result);
 
+	//첫번째 방식이 정상 동작한다.
+	//두번째 방식이 동작하려면 뭔가 보정해줘야하는데 일단 보류한다.
+	//현재 알고리즘으로는 회전시 계단현상이 발생한다. 옵션을 줘야한다.
 	if (true)
 	{
 		//move rotation point to center of image
@@ -66,13 +71,11 @@ void CGdiPlusBitmap::rotate(float degree)
 		g.SetTransform(&matrix); //ScreenG를 위에 규칙대로 돌려버렸습니다.
 	}
 
-	g.DrawImage(m_pBitmap, 0, 0, w, h);
-	//g.DrawImage(m_pBitmap, -rotated.left, -rotated.top, w, h);
+	//회전에 의해 캔버스는 커지지만 원래 이미지는 원래 크기대로 그려줘야 한다.
+	g.DrawImage(m_pBitmap, -rotated.left, -rotated.top, originw, originh);
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
-
-
 }
 
 void CGdiPlusBitmap::set_transparent(float transparent)

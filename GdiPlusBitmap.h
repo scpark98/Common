@@ -32,7 +32,8 @@ public:
 	void clone(CGdiPlusBitmap* dst);
 	void deep_copy(CGdiPlusBitmap* dst);
 	void rotate(Gdiplus::RotateFlipType type);
-	void rotate(float degree);
+	//회전시키면 이미지가 원래의 w, h를 벗어나므로 캔버스를 자동으로 키워줘야 잘리지 않는다.
+	void rotate(float degree, bool auto_enlarge = false);
 	void set_colorkey(Color low, Color high);
 	void set_transparent(float transparent);
 	int width() { return m_pBitmap->GetWidth(); }

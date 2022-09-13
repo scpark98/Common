@@ -3,11 +3,14 @@
 
 void CGdiPlusBitmap::clone(CGdiPlusBitmap* dst)
 {
+	dst->Empty();
 	dst->m_pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
 }
 
 void CGdiPlusBitmap::deep_copy(CGdiPlusBitmap* dst)
 {
+	dst->Empty();
+
 	/*https://still.tistory.com/211
 	* 이 코드 블록은 그리기로 복사하는 방식인데 속도가 느리므로
 	* 아래 블록과 같이 메모리 복사 방식으로 복사한다.

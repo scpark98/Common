@@ -4582,6 +4582,33 @@ void DrawEllipse(CDC* pDC, int cx, int cy, int rx, int ry, COLORREF crLine, COLO
 	pDC->SetROP2(nOldDrawMode);
 }
 
+void draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed, COLORREF crLine, int nWidth, int nPenStyle, int nDrawMode)
+{
+	LOGBRUSH lb;
+
+	lb.lbStyle = BS_SOLID;
+	lb.lbColor = crLine;
+
+	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
+	CPen* pOldPen = (CPen*)pDC->SelectObject(&Pen);
+	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
+
+	pDC->MoveTo(pts[0]);
+
+	for (int i = 1; i < pts.size(); i++)
+	{
+		pDC->LineTo(pts[i]);
+	}
+
+	if (closed)
+		pDC->LineTo(pts[0]);
+
+	pDC->SelectObject(pOldPen);
+	Pen.DeleteObject();
+
+	pDC->SetROP2(nOldDrawMode);
+}
+
 /*
 void Clamp(int& nValue, int nMin, int nMax)
 {
@@ -6124,6 +6151,45 @@ CPoint GetRotatedPoint(CPoint ptCenter, double dAngle, double dDist)
 	pt.Offset(ptCenter);
 
 	return pt;
+}
+
+//cx, cy를 중심으로 tx, ty점이 degree를 회전할 경우 tx, ty점의 변경 좌표
+void get_rotated(int cx, int cy, int* tx, int* ty, double degree)
+{
+	double radian = RADIAN(degree);
+	int tx1 = ((double)(*tx - cx) * cos(radian) - (double)(*ty - cy) * sin(radian)) + cx;
+	int ty1 = ((double)(*tx - cx) * sin(radian) + (double)(*ty - cy) * cos(radian)) + cy;
+	*tx = tx1;
+	*ty = ty1;
+}
+
+std::vector<CPoint> get_rotated(int cx, int cy, CRect* r, double degree)
+{
+	int x, y;
+	std::vector<CPoint> pts;
+	
+	x = r->left;
+	y = r->top;
+	get_rotated(cx, cy, &x, &y, degree);
+	pts.push_back(CPoint(x, y));
+
+	x = r->right;
+	y = r->top;
+	get_rotated(cx, cy, &x, &y, degree);
+	pts.push_back(CPoint(x, y));
+
+	x = r->right;
+	y = r->bottom;
+	get_rotated(cx, cy, &x, &y, degree);
+	pts.push_back(CPoint(x, y));
+
+	x = r->left;
+	y = r->bottom;
+	get_rotated(cx, cy, &x, &y, degree);
+	pts.push_back(CPoint(x, y));
+
+	*r = get_max_rect(pts);
+	return pts;
 }
 
 CString GetToken(CString& str, LPCTSTR c)
@@ -8844,16 +8910,16 @@ CRect GetRatioRect(CRect rTarget, double dRatio, int attach)
 }
 
 //주어진 점들을 포함하는 최대 사각형을 구한다.
-CRect GetMaxRect(CPoint	*pt, int nPoints)
+CRect get_max_rect(CPoint	*pt, int nPoints)
 {
 	std::vector<CPoint> pts;
 	for (int i = 0; i < nPoints; i++)
 		pts.push_back(pt[i]);
-	return getMaxRect(pts);
+	return get_max_rect(pts);
 }
 
 //pt_max
-CRect getMaxRect(std::vector<CPoint> pts, int pt_max /*= -1*/)
+CRect get_max_rect(std::vector<CPoint> pts, int pt_max /*= -1*/)
 {
 	int max_pt = pts.size();
 	CRect	rMax(INT_MAX, INT_MAX, -1, -1);
@@ -8875,6 +8941,7 @@ CRect getMaxRect(std::vector<CPoint> pts, int pt_max /*= -1*/)
 
 	return rMax;
 }
+
 
 //다각형의 넓이를 구한다. 단, 변이 하나라도 교차되면 성립하지 않는다.
 double		GetPolygonAreaSize(CPoint *pt, int nPoints)

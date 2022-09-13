@@ -911,6 +911,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		DrawSunkenRect( CDC* pDC, CRect Rect, bool bSunken = TRUE, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int nWidth = 1 );
 	void		DrawEllipse(CDC* pDC, int cx, int cy, int rx, int ry, COLORREF crLine, COLORREF crFill, int nPenStyle = PS_SOLID, int nWidth = 1, int nDrawMode = R2_COPYPEN);
 	void		drawCircle( CDC* pDC, int xMidPoint,  int yMidPoint,  int radius);
+	void		draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed = true, COLORREF crLine = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		drawArc( CDC *pDC, double cx, double cy,double r1, double r2, double start, double end, int width = 1, int style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN );
 	bool		LoadBitmapFromFile( CBitmap &bmp, CString strFile );
 	bool		SaveBitmapToTile( CBitmap* bmp, CString strFile, CWnd* pWnd );
@@ -1063,10 +1064,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	//다각형의 넓이를 구한다. 단, 변이 하나라도 교차되면 성립하지 않는다.
 	double		GetPolygonAreaSize( CPoint *pt, int nPoints );
 	//주어진 다각형 점들을 포함하는 최대 사각형을 구한다.
-	CRect		GetMaxRect( CPoint	*pt, int nPoints );
-	CRect		getMaxRect( std::vector<CPoint> pt, int pt_max = -1 );
-
-
+	CRect		get_max_rect(CPoint	*pt, int nPoints);
+	CRect		get_max_rect(std::vector<CPoint> pt, int pt_max = -1);
 
 
 //region 관련
@@ -1268,6 +1267,9 @@ double		getLinePointY( double x1, double y1, double x2, double y2, double x3 );
 double		GetManhattanDistance( double x1, double y1, double x2, double y2 );
 //ptCenter를 기준으로 dAngle 만큼 회전된 dDist거리의 점의 좌표를 구한다.
 CPoint		GetRotatedPoint( CPoint ptCenter, double dAngle, double dDist );
+//cx, cy를 중심으로 tx, ty점이 degree를 회전할 경우 tx, ty점의 변경 좌표
+void		get_rotated(int cx, int cy, int* tx, int* ty, double degree);
+std::vector<CPoint>	get_rotated(int cx, int cy, CRect* r, double degree);
 
 //지도 좌표 <-> 도분초 변환
 double		convert_gps_coord(int d, int m, double s);

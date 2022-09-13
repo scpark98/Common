@@ -37,6 +37,9 @@ public:
 	void set_transparent(float transparent);
 	int width() { return m_pBitmap->GetWidth(); }
 	int height() { return m_pBitmap->GetHeight(); }
+
+	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
+	bool save(CString filename);// , ULONG quality/* = 100*/);
 };
 
 

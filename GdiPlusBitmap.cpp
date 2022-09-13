@@ -1,4 +1,5 @@
 ﻿#include "GdiPlusBitmap.h"
+#include "../Common/Functions.h"
 
 void CGdiPlusBitmap::clone(CGdiPlusBitmap* dst)
 {
@@ -35,6 +36,11 @@ void CGdiPlusBitmap::rotate(float degree)
 {
 	UINT w = m_pBitmap->GetWidth();
 	UINT h = m_pBitmap->GetHeight();
+	CRect rotated(0, 0, w, h);
+	std::vector<CPoint> m_pts = get_rotated(w / 2, h / 2, &rotated, degree);
+
+	w = rotated.Width();
+	h = rotated.Height();
 
 	//create a new empty bitmap to hold rotated image 
 	Bitmap* result = new Bitmap(w, h);
@@ -54,16 +60,19 @@ void CGdiPlusBitmap::rotate(float degree)
 	else
 	{
 		Gdiplus::Matrix matrix;
-		matrix.RotateAt(degree, Gdiplus::PointF((float)(m_pBitmap->GetWidth() / 2), (float)(m_pBitmap->GetHeight() / 2)));
+		matrix.RotateAt(degree, Gdiplus::PointF((float)(rotated.CenterPoint().x), (float)(rotated.CenterPoint().y)));
 		//해당 이미지의 정중앙을 기준으로 235.7도 돌리라는 얘기입니다. 
 		//참고로 가운데를 기준으로 돌리기 위해서는 이미지의 가로세로 사이즈가 홀수여야 깔끔하게 돌아갈겁니다.
 		g.SetTransform(&matrix); //ScreenG를 위에 규칙대로 돌려버렸습니다.
 	}
 
-	g.DrawImage(m_pBitmap, 0, 0);
-	delete m_pBitmap;
+	g.DrawImage(m_pBitmap, 0, 0, w, h);
+	//g.DrawImage(m_pBitmap, -rotated.left, -rotated.top, w, h);
 
+	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+
+
 }
 
 void CGdiPlusBitmap::set_transparent(float transparent)
@@ -86,8 +95,8 @@ void CGdiPlusBitmap::set_transparent(float transparent)
 
 	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
 	g.DrawImage(m_pBitmap, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &ia);
-	delete m_pBitmap;
 
+	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
 }
 
@@ -96,9 +105,7 @@ void CGdiPlusBitmap::set_colorkey(Color low, Color high)
 	int w = width();
 	int h = height();
 
-	//create a new empty bitmap to hold rotated image 
 	Bitmap* result = new Bitmap(w, h);
-	//make a graphics object from the empty bitmap
 	Graphics g(result);
 
 	ImageAttributes imageAttr;
@@ -108,4 +115,66 @@ void CGdiPlusBitmap::set_colorkey(Color low, Color high)
 	delete m_pBitmap;
 
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+}
+
+int CGdiPlusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+{
+	UINT  num = 0;          // number of image encoders
+	UINT  size = 0;         // size of the image encoder array in bytes
+
+	ImageCodecInfo* pImageCodecInfo = NULL;
+
+	GetImageEncodersSize(&num, &size);
+	if (size == 0)
+		return -1;  // Failure
+
+	pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
+	if (pImageCodecInfo == NULL)
+		return -1;  // Failure
+
+	GetImageEncoders(num, size, pImageCodecInfo);
+
+	for (UINT j = 0; j < num; ++j)
+	{
+		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
+		{
+			*pClsid = pImageCodecInfo[j].Clsid;
+			free(pImageCodecInfo);
+			return j;  // Success
+		}
+	}
+
+	free(pImageCodecInfo);
+	return -1;  // Failure
+}
+
+bool CGdiPlusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
+{
+	CLSID				encoderClsid;
+	EncoderParameters	encoderParameters;
+	WCHAR				wFile[MAX_PATH];
+
+	CString ext = GetFileExtension(filename).MakeLower();
+
+	if (ext == _T("jpg") || ext == _T("jpeg"))
+		GetEncoderClsid(L"image/jpeg", &encoderClsid);
+	else if (ext == _T("png"))
+		GetEncoderClsid(L"image/png", &encoderClsid);
+	/*
+	encoderParameters.Count = 1;
+	encoderParameters.Parameter[0].Guid = EncoderQuality;
+	encoderParameters.Parameter[0].Type = EncoderParameterValueTypeLong;
+	encoderParameters.Parameter[0].NumberOfValues = 1;
+
+	// Save the image as a JPEG with quality level 0.
+	encoderParameters.Parameter[0].Value = &quality;
+	*/
+	Status s;
+
+	s = m_pBitmap->Save(filename, &encoderClsid);// , & encoderParameters);
+
+	if (s == Ok)
+		return TRUE;
+	else
+		return FALSE;
 }

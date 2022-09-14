@@ -723,14 +723,13 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE );
 	HINSTANCE	FindExecutableEx( LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult );
 
-	//항목이 있으면 true를 리턴하고 value값에 넣어준다.
-	//항목이 없으면 false를 리턴한다.
-	bool		GetRegistryValue( HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value);
-	CString		GetRegistryString( HKEY hKeyRoot, CString sSubKey, CString sEntry );
-	bool		SetRegistryValue( HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD nValue );
-	bool		SetRegistryString( HKEY hKeyRoot, CString sSubKey, CString sEntry, CString sValue );
-	double		GetProfileDouble( CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double dDefault );
-	void		WriteProfileDouble( CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double dValue );
+	LONG		IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey);
+	LONG		GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value);
+	LONG		GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
+	LONG		SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int value);
+	LONG		SetRegistryString( HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
+	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
+	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 
 	void		SystemShutdown( int nMode );		// 0:logoff  1:reboot  2:shutdown
 	void		SystemShutdownNT( int nMode = 2 );	// 1:reboot  2:shutdown

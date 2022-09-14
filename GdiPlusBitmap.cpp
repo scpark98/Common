@@ -84,6 +84,58 @@ void CGdiPlusBitmap::rotate(float degree, bool auto_enlarge)
 	delete result;
 }
 
+void CGdiPlusBitmap::gray()
+{
+	ColorMatrix colorMatrix = { 0.299f, 0.299f, 0.299f, 0.0f, 0.0f,
+								0.587f, 0.587f, 0.587f, 0.0f, 0.0f,
+								0.114f, 0.114f, 0.114f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0, 0.0f,
+								0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+
+	int w = width();
+	int h = height();
+
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiPlusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &ia);
+}
+
+void CGdiPlusBitmap::negative()
+{
+	ColorMatrix colorMatrix = { -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0, 0.0f,
+								1.0f, 1.0f, 1.0f, 0.0f, 1.0f };
+
+	int w = width();
+	int h = height();
+
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiPlusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &ia);
+}
+
 void CGdiPlusBitmap::set_transparent(float transparent)
 {
 	ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -95,9 +147,8 @@ void CGdiPlusBitmap::set_transparent(float transparent)
 	int w = width();
 	int h = height();
 
-	//create a new empty bitmap to hold rotated image 
+#if 0
 	Bitmap* result = new Bitmap(w, h);
-	//make a graphics object from the empty bitmap
 	Graphics g(result);
 
 	ImageAttributes ia;
@@ -108,6 +159,21 @@ void CGdiPlusBitmap::set_transparent(float transparent)
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
 	delete result;
+#else
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiPlusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &ia);
+#endif
 }
 
 void CGdiPlusBitmap::set_colorkey(Color low, Color high)
@@ -115,17 +181,19 @@ void CGdiPlusBitmap::set_colorkey(Color low, Color high)
 	int w = width();
 	int h = height();
 
-	Bitmap* result = new Bitmap(w, h);
-	Graphics g(result);
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiPlusBitmap temp;
+	clone(&temp);
 
-	ImageAttributes imageAttr;
-	imageAttr.SetColorKey(low, high);
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
 
-	g.DrawImage(m_pBitmap, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &imageAttr);
+	ImageAttributes ia;
+	ia.SetColorKey(low, high);
 
-	delete m_pBitmap;
-	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
-	delete result;
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(m_pBitmap, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &ia);
 }
 
 int CGdiPlusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)

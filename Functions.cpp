@@ -2195,7 +2195,16 @@ CString GetDefaultBrowserPath()
 	return szPath;
 }
 
-bool GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value)
+LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
+{
+	HKEY hkey = NULL;
+	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
+	RegCloseKey(hkey);
+
+	return nError;
+}
+
+LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value)
 {
 	HKEY	hkey = NULL;
 	DWORD	dwType;
@@ -2245,15 +2254,10 @@ bool GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value
 	
 	RegCloseKey(hkey);
 	
-	if (nError != ERROR_SUCCESS)
-	{
-		return false;
-	}
-
-	return true;
+	return nError;
 }
 
-CString GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sValueName)
+LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
 {
 	HKEY	hkey = NULL;
 	DWORD	dwType;
@@ -2267,7 +2271,7 @@ CString GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sValueName)
 	{
 		if (hkey)
 		{
-			nError = RegQueryValueEx(hkey, sValueName, NULL, &dwType, buffer, &dwBytes);
+			nError = RegQueryValueEx(hkey, entry, NULL, &dwType, buffer, &dwBytes);
 			
 			if (nError != ERROR_SUCCESS)
 			{
@@ -2300,15 +2304,15 @@ CString GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sValueName)
 	
 	RegCloseKey(hkey);
 	
-	return CString(buffer);
+	*str = CString(buffer);
+	return nError;
 }
 
-bool SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sValueName, DWORD nValue)
+LONG SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString entry, int value)
 {
 	HKEY	hkey;
-	LONG	lResult;
 	DWORD	dwDesc;
-	DWORD	dwReturn = 0;
+	DWORD	lResult = 0;
 
 	RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_WRITE, &hkey);
 
@@ -2316,17 +2320,14 @@ bool SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sValueName, DWORD 
 		NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
 
 	if (lResult == ERROR_SUCCESS)
-		dwReturn = RegSetValueEx(hkey, sValueName, NULL, REG_DWORD, (LPBYTE)&nValue, sizeof(DWORD));
+		lResult = RegSetValueEx(hkey, entry, NULL, REG_DWORD, (LPBYTE)&value, sizeof(int));
 
 	RegCloseKey(hkey);
 
-	if (dwReturn != ERROR_SUCCESS)
-		return false;
-
-	return true;
+	return lResult;
 }
 
-bool SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sValueName, CString sBufferData)
+LONG SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
 {
 	HKEY	hkey;
 	LONG	lResult;
@@ -2334,7 +2335,7 @@ bool SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sValueName, CStri
 	TCHAR	buffer[1000];
 	DWORD	dwReturn;
 	
-	_tprintf(buffer, "%s\0", sBufferData);
+	_tprintf(buffer, "%s\0", str);
 	
 	RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_WRITE, &hkey);
 	
@@ -2342,7 +2343,7 @@ bool SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sValueName, CStri
 		buffer, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
 	
 	if (lResult == ERROR_SUCCESS)
-		dwReturn = RegSetValueEx(hkey, sValueName, NULL, REG_SZ, (BYTE*)buffer, _tcslen(buffer) + 1);
+		dwReturn = RegSetValueEx(hkey, entry, NULL, REG_SZ, (BYTE*)buffer, _tcslen(buffer) + 1);
 	
 	RegCloseKey(hkey);
 
@@ -8562,23 +8563,23 @@ void RGB2HSL(int R, int G, int B, int& h, int& s, int& l)
 */
 }
 
-double GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double dDefault)
+double GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default)
 {
 	CString sDefault;
 	CString sValue;
 
-	sDefault.Format(_T("%f"), dDefault);
+	sDefault.Format(_T("%f"), default);
 	sValue = pApp->GetProfileString(lpszSection, lpszEntry, sDefault);
 
 	return _tstof(sValue);
 }
 
-void WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double dValue)
+bool WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value)
 {
 	CString sValue;
 
-	sValue.Format(_T("%f"), dValue);
-	pApp->WriteProfileString(lpszSection, lpszEntry, sValue);
+	sValue.Format(_T("%f"), value);
+	return pApp->WriteProfileString(lpszSection, lpszEntry, sValue);
 }
 
 

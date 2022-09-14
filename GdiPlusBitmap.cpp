@@ -1,6 +1,8 @@
 ﻿#include "GdiPlusBitmap.h"
 #include "../Common/Functions.h"
 
+//Clone은 shallow copy라 하여 아래 deep_copy 함수도 추가했으나
+//좀 더 확인이 필요하다.
 void CGdiPlusBitmap::clone(CGdiPlusBitmap* dst)
 {
 	dst->Empty();
@@ -79,6 +81,7 @@ void CGdiPlusBitmap::rotate(float degree, bool auto_enlarge)
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+	delete result;
 }
 
 void CGdiPlusBitmap::set_transparent(float transparent)
@@ -104,6 +107,7 @@ void CGdiPlusBitmap::set_transparent(float transparent)
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+	delete result;
 }
 
 void CGdiPlusBitmap::set_colorkey(Color low, Color high)
@@ -118,9 +122,10 @@ void CGdiPlusBitmap::set_colorkey(Color low, Color high)
 	imageAttr.SetColorKey(low, high);
 
 	g.DrawImage(m_pBitmap, Rect(0, 0, w, h), 0, 0, w, h, UnitPixel, &imageAttr);
-	delete m_pBitmap;
 
+	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+	delete result;
 }
 
 int CGdiPlusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)

@@ -2198,7 +2198,7 @@ CString GetDefaultBrowserPath()
 LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
 {
 	HKEY hkey = NULL;
-	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
+	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_READ, &hkey);
 	RegCloseKey(hkey);
 
 	return nError;

@@ -65,12 +65,16 @@ void CWebView2Ctrl::InitializeWebView()
 	m_wincompCompositor = nullptr;
 #endif
 	LPCWSTR subFolder = nullptr;
+	std::wstring m_userDataFolder;
+	m_userDataFolder = get_special_folder(CSIDL_COOKIES);
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
 
-
+	//m_userDataFolder를 주지 않고 nullptr로 할 경우
+	//이 webview2 컴포넌트를 사용하는 프로그램을
+	//Program Files 폴더에서 실행하면 웹페이지가 표시되지 않게 된다.
 	HRESULT hr = CreateCoreWebView2EnvironmentWithOptions
-				(subFolder, nullptr, options.Get(),
+				(subFolder, m_userDataFolder.c_str(), options.Get(),
 				Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>
 				(this, &CWebView2Ctrl::OnCreateEnvironmentCompleted).Get());
 
@@ -212,7 +216,7 @@ void CWebView2Ctrl::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	HRESULT hresult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-	SetWindowLongPtr(this->GetSafeHwnd(), GWLP_USERDATA, (LONG_PTR)this);
+	//SetWindowLongPtr(this->GetSafeHwnd(), GWLP_USERDATA, (LONG_PTR)this);
 	InitializeWebView();
 
 	CWnd::PreSubclassWindow();

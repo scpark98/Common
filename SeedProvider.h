@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <afxwin.h>
 #include <string>
 #include <WTypes.h>
 

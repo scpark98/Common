@@ -1,4 +1,4 @@
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "SeedProvider.h"
 
 SeedProvider::SeedProvider()
@@ -123,7 +123,7 @@ int	SeedProvider::EncryptFileWithHeader( CString sFile, bool bOverwrite, CString
 		if ( m_bShowError )
 		{
 			AfxMessageBox( GetLastErrorString() );
-			AfxMessageBox( "If bOverwrite option is set to false, sDestFile must not be empty string!" );
+			AfxMessageBox(_T("If bOverwrite option is set to false, sDestFile must not be empty string!"));
 		}
 		return m_nLastError;
 	}
@@ -206,7 +206,7 @@ int SeedProvider::DecryptFileWithHeader( CString sFile, bool bOverwrite, CString
 
 	if ( !bOverwrite && sDestFile == "" )
 	{
-		AfxMessageBox( "If bOverwrite option is set to false, sDestFile must not be empty string!" );
+		AfxMessageBox(_T("If bOverwrite option is set to false, sDestFile must not be empty string!"));
 		m_nLastError = SP_ERROR_INVALID_PARAM;
 		if ( m_bShowError )
 			AfxMessageBox( GetLastErrorString() );

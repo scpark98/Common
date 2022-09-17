@@ -13,12 +13,13 @@
 
 #pragma once
 
-#include <afxwin.h>
 #include <sys/timeb.h>
 #include <deque>
 #include <algorithm>
-#include "../Picture.h"
+#include "../GdiPlusBitmap.h"
 #include "../ui/ExtWndShadow.h"
+
+using namespace std;
 
 #define ADD_USING_THREAD	true
 
@@ -62,7 +63,7 @@ public:
 class CThumbImage 
 {
 public:
-	CPicture	img;
+	CGdiPlusBitmap	*img;
 	CString		title;
 	bool		key_thumb;	//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
 	CString		info[4];	//info text 표시용. 0(lt info) ~ 3(rb info)
@@ -76,6 +77,7 @@ public:
 
 	CThumbImage()
 	{
+		img = NULL;
 		key_thumb = false;
 	}
 
@@ -117,7 +119,7 @@ public:
 	std::deque<CThumbImage*> m_dqThumb;
 	void release(int index);
 
-	CPicture	get_img(int index);
+	CGdiPlusBitmap*	get_img(int index);
 
 	//정해진 개수를 넘어가면 맨 뒤부터(?) 지워준다.
 	void	set_max_count( int limit_count ) { m_max_thumbs = limit_count; }

@@ -9,24 +9,37 @@ using namespace Gdiplus;
 class CGdiPlusBitmap
 {
 public:
-	Gdiplus::Bitmap* m_pBitmap;
+	Gdiplus::Bitmap* m_pBitmap = NULL;
 
 public:
-	CGdiPlusBitmap()							{ m_pBitmap = NULL; }
-	CGdiPlusBitmap(Bitmap* src)					{ m_pBitmap = src; }
-	CGdiPlusBitmap(LPCWSTR pFile)				{ m_pBitmap = NULL; Load(pFile); }
-	virtual ~CGdiPlusBitmap()					{ Empty(); }
+	CGdiPlusBitmap();
+	CGdiPlusBitmap(Bitmap* src);
+	CGdiPlusBitmap(LPCWSTR pFile);
+	virtual ~CGdiPlusBitmap();
 
-	void Empty()								{ delete m_pBitmap; m_pBitmap = NULL; }
+	void release();
 
 	bool Load(LPCWSTR pFile)
 	{
-		Empty();
+		release();
 		m_pBitmap = Gdiplus::Bitmap::FromFile(pFile);
-		return m_pBitmap->GetLastStatus() == Gdiplus::Ok;
+		if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+		{
+			resolution();
+			return true;
+		}
+
+		return false;
 	}
 
 	operator Gdiplus::Bitmap*() const			{ return m_pBitmap; }
+
+	bool empty() { return (m_pBitmap == NULL); }
+	int channels();
+	CSize size() { return CSize(width, height); }
+
+	CRect draw_image(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect draw_image(CDC* pDC, int x, int y, int w, int h, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void clone(CGdiPlusBitmap* dst);
@@ -39,11 +52,16 @@ public:
 	void set_transparent(float transparent);
 	void gray();
 	void negative();
-	int width() { return m_pBitmap->GetWidth(); }
-	int height() { return m_pBitmap->GetHeight(); }
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool save(CString filename);// , ULONG quality/* = 100*/);
+
+	int width = 0;
+	int height = 0;
+	int channel = 0;
+
+protected:
+	void resolution();
 };
 
 
@@ -60,9 +78,9 @@ public:
 												{ m_hBuffer = NULL; Load(id, pType, hInst); }
 	CGdiPlusBitmapResource(UINT id, UINT type, HMODULE hInst = NULL)
 												{ m_hBuffer = NULL; Load(id, type, hInst); }
-	virtual ~CGdiPlusBitmapResource()			{ Empty(); }
+	virtual ~CGdiPlusBitmapResource()			{ release(); }
 
-	void Empty();
+	void release();
 
 	bool Load(LPCTSTR pName, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL);
 	bool Load(UINT id, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
@@ -72,9 +90,9 @@ public:
 };
 
 inline
-void CGdiPlusBitmapResource::Empty()
+void CGdiPlusBitmapResource::release()
 {
-	CGdiPlusBitmap::Empty();
+	CGdiPlusBitmap::release();
 	if (m_hBuffer)
 	{
 		::GlobalUnlock(m_hBuffer);
@@ -86,7 +104,7 @@ void CGdiPlusBitmapResource::Empty()
 inline
 bool CGdiPlusBitmapResource::Load(LPCTSTR pName, LPCTSTR pType, HMODULE hInst)
 {
-	Empty();
+	release();
 
 	HRSRC hResource = ::FindResource(hInst, pName, pType);
 	if (!hResource)
@@ -116,7 +134,10 @@ bool CGdiPlusBitmapResource::Load(LPCTSTR pName, LPCTSTR pType, HMODULE hInst)
 				if (m_pBitmap)
 				{ 
 					if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+					{
+						resolution();
 						return true;
+					}
 
 					delete m_pBitmap;
 					m_pBitmap = NULL;

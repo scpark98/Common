@@ -72,7 +72,6 @@ char *class_func(const char *c, const char *f)
 #define __class_func__ class_func(typeid(*this).name(), __func__)
 #endif
 
-using namespace::std;
 
 #ifndef uint8_t
 typedef unsigned char uint8_t;
@@ -1385,7 +1384,7 @@ bool		SavePlateInfoFile( char* sfile, char* sPlate, RECT* rect = NULL );
 
 void		printMessage(std::string msg, uint8_t bNewLine = true);
 
-int readFilenames(std::vector<string> &filenames, const string &directory);
+int readFilenames(std::vector<std::string> &filenames, const std::string &directory);
 
 class CPlateCode
 {

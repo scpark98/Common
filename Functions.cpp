@@ -38,7 +38,6 @@ bool		initialized_YUV_lookup_table = false;
 
 std::deque<CRect> g_dqMonitors;
 
-//using namespace std;
 #pragma comment(lib, "imm32.lib")
 #pragma comment(lib, "version.lib")		//for VerQueryValue
 #pragma comment(lib, "comsuppw.lib ")	//for _bstr_t
@@ -5591,9 +5590,9 @@ HRGN BitmapToRegion (HBITMAP hBmp, COLORREF cTransparentColor/* = 0*/, COLORREF 
 					BYTE lr = GetRValue(cTransparentColor);
 					BYTE lg = GetGValue(cTransparentColor);
 					BYTE lb = GetBValue(cTransparentColor);
-					BYTE hr = min(0xff, lr + GetRValue(cTolerance));
-					BYTE hg = min(0xff, lg + GetGValue(cTolerance));
-					BYTE hb = min(0xff, lb + GetBValue(cTolerance));
+					BYTE hr = std::min(0xff, lr + GetRValue(cTolerance));
+					BYTE hg = std::min(0xff, lg + GetGValue(cTolerance));
+					BYTE hb = std::min(0xff, lb + GetBValue(cTolerance));
 
 					// Scan each bitmap row from bottom to top (the bitmap is inverted vertically)
 					BYTE *p32 = (BYTE *)bm32.bmBits + (bm32.bmHeight - 1) * bm32.bmWidthBytes;
@@ -8448,10 +8447,10 @@ void RGB2HSL(int R, int G, int B, int& h, int& s, int& l)
 	S = 0;
 	L = 0;
 
-	v = max(r,g);
-	v = max(v,b);
-	m = min(r,g);
-	m = min(m,b);
+	v = std::max(r,g);
+	v = std::max(v,b);
+	m = std::min(r,g);
+	m = std::min(m,b);
 
 	L = (m + v) / 2.0;
 
@@ -9032,7 +9031,7 @@ int minimum(int a, int b, int c)
 }
 
 int cost;
-int LevenshteinDistance(string s, int len_s, string t, int len_t)
+int LevenshteinDistance(std::string s, int len_s, std::string t, int len_t)
 {
 	/* base case: empty strings */
 	if (len_s == 0) return len_t;
@@ -9447,8 +9446,8 @@ bool IsIntersect2LineSegment(vector2 a, vector2 b, vector2 c, vector2 d)
     //두 선분이 한 직선에 위에 있거나 끝점이 겹치는 경우
     if (ab == 0 && cd == 0)
 	{
-        if(b < a) swap(a, b);
-        if(d < c) swap(c, d);
+        if(b < a) std::swap(a, b);
+        if(d < c) std::swap(c, d);
         return !(b< c || d <a);
     }
 
@@ -9470,8 +9469,8 @@ bool IsIntersect2LineSegment(CPoint* pt, bool bCheckCrossOver)
 
 //점 a, b와 점 c, d가 평행한 두 선분 일 때 이들이 한 점에서 겹치는지 확인한다.
 bool paralleSegments(vector2 a, vector2 b, vector2 c, vector2 d, vector2& p){
-    if(b < a) swap(a,b);
-    if(d < c) swap(c,d);
+    if(b < a) std::swap(a,b);
+    if(d < c) std::swap(c,d);
 
     //한 직선위에 없거나 두 선분이 겹치지 않는 경우를 우선 걸러낸다. 본문의 1번 관계인 경우이다.
     if(ccw(a, b, c) != 0 || b < c || d < a) return false;
@@ -9486,7 +9485,7 @@ bool paralleSegments(vector2 a, vector2 b, vector2 c, vector2 d, vector2& p){
 // - p가 두 점 a, b를 감싸면서 각 변이 x, y축에 평행한 최소사각형 내부에 있는지 확인한다.
 // a, b, p는 일직선 상에 있다고 가정한다.
 bool inBoundingRectangle(vector2 p, vector2 a, vector2 b){
-    if(b < a) swap(a, b);
+    if(b < a) std::swap(a, b);
     return p == a || p == b || (a <p && p < b);
 }
 
@@ -10706,7 +10705,7 @@ void drawArc(CDC *pDC, double cx, double cy,double r1, double r2, double start, 
 	double dx, dy;
 
 	if (start > end)
-		swap(start, end);
+		std::swap(start, end);
 
 	// set up loop to draw arc
 	for (int i = start; i < end - 1; i++)

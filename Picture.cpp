@@ -155,7 +155,8 @@ BOOL CPicture::Load(UINT ResourceName, LPCTSTR ResourceType)
 	LPVOID		lpVoid  = NULL;
 	int			nSize   = 0;
 
-	if(m_IPicture != NULL) FreePictureData(); // Important - Avoid Leaks...
+	if(m_IPicture != NULL)
+		FreePictureData(); // Important - Avoid Leaks...
 
 	hSource = FindResource(AfxGetResourceHandle(), MAKEINTRESOURCE(ResourceName), ResourceType);
 
@@ -199,6 +200,9 @@ BOOL CPicture::Load(UINT ResourceName, LPCTSTR ResourceType)
 	    // Calculate Its Size On a "Standard" (96 DPI) Device Context
 	    m_Height = MulDiv(m_Height, 96, HIMETRIC_INCH);
 	    m_Width  = MulDiv(m_Width,  96, HIMETRIC_INCH);
+		//int nWidth = int(MulDiv(hmWidth, pDC->GetDeviceCaps(LOGPIXELSX), HIMETRIC_INCH) * nSizeRatio);
+		//int nHeight = int(MulDiv(hmHeight, pDC->GetDeviceCaps(LOGPIXELSY), HIMETRIC_INCH) * nSizeRatio);
+
 		}
 	else // Picture Data Is Not a Known Picture Type
 		{
@@ -209,7 +213,7 @@ BOOL CPicture::Load(UINT ResourceName, LPCTSTR ResourceType)
 
 	return(bResult);
 }
-#include <locale.h>
+
 //-----------------------------------------------------------------------------
 // Does:   Open a File And Load It Into IPicture (Interface)
 // ~~~~    (.BMP .DIB .EMF .GIF .ICO .JPG .WMF)
@@ -231,8 +235,8 @@ BOOL CPicture::Load(CString sFilePathName)
 	if ( m_IPicture != NULL )
 		FreePictureData(); // Important - Avoid Leaks...
 
-	//CFile::modeRead로 하니 한글 파일명은 열기 실패.
-	if(PictureFile.Open(sFilePathName, CFile::shareDenyNone | CFile::typeBinary | CFile::typeUnicode, &e))
+	//CFile::modeRead로 하니 한글 파일명은 열기 실패라서 CFile::shareDenyNone로 변경.
+	if(PictureFile.Open(sFilePathName, CFile::shareDenyNone | CFile::typeBinary, &e))
 		{
 		nSize = PictureFile.GetLength();
 		BYTE* pBuffer = new BYTE[nSize];
@@ -357,6 +361,9 @@ BOOL CPicture::Draw(CDC *pDC, CRect DrawRect, bool bAspectRatio /*= true*/ )
     m_IPicture->get_Width(&Width);
     m_IPicture->get_Height(&Height);
 
+	Width = int(MulDiv(Width, pDC->GetDeviceCaps(LOGPIXELSX), HIMETRIC_INCH));
+	Height = int(MulDiv(Height, pDC->GetDeviceCaps(LOGPIXELSY), HIMETRIC_INCH));
+
 	if ( DrawRect == NULL )
 		DrawRect = CRect( 0, 0, Width, Height );
 
@@ -383,8 +390,34 @@ BOOL CPicture::Draw(CDC *pDC, CRect DrawRect, bool bAspectRatio /*= true*/ )
 		}
 	}
 
+#if 1
+	PBITMAPINFO	bi;
+	OLE_HANDLE* hB;
+	m_IPicture->get_Handle((unsigned int*)&hB);
+	HBITMAP hBitmap = (HBITMAP)CopyImage(hB, IMAGE_BITMAP, 0, 0, LR_COPYRETURNORG);
+	HDC hdcCompatible = CreateCompatibleDC(pDC->m_hDC);
+	HGDIOBJ hOldBmp = SelectObject(hdcCompatible, hBitmap);
 
-    HRESULT hrP = NULL;
+	pDC->SetStretchBltMode(HALFTONE);
+	//pDC->SetStretchBltMode(COLORONCOLOR);
+
+	StretchBlt(pDC->m_hDC, 
+		newRect.left, newRect.top,
+		newRect.Width(), newRect.Height(),
+		hdcCompatible,
+		0, 0,
+		Width, Height,
+		SRCCOPY);
+
+	pDC->FillSolidRect(CRect(10, 10, 30, 30), RGB(255, 0, 0));
+	SelectObject(hdcCompatible, hOldBmp);
+	DeleteDC(hdcCompatible);
+	DeleteObject(hBitmap);
+#else
+	m_IPicture->get_Width(&Width);
+	m_IPicture->get_Height(&Height);
+
+	HRESULT hrP = NULL;
 	//pDC->SetStretchBltMode(HALFTONE);
     hrP = m_IPicture->Render(pDC->m_hDC,
                       newRect.left,                  // Left
@@ -402,6 +435,7 @@ BOOL CPicture::Draw(CDC *pDC, CRect DrawRect, bool bAspectRatio /*= true*/ )
 	HWND hWnd = AfxGetApp()->GetMainWnd()->m_hWnd;
 	MessageBoxEx(hWnd, _T("Can not allocate enough memory\t"), ERROR_TITLE, MB_OK | MB_ICONSTOP, LANG_ENGLISH);
     return(FALSE);
+#endif
 }
 
 //-----------------------------------------------------------------------------

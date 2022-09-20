@@ -19,18 +19,7 @@ public:
 
 	void release();
 
-	bool Load(LPCWSTR pFile)
-	{
-		release();
-		m_pBitmap = Gdiplus::Bitmap::FromFile(pFile);
-		if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
-		{
-			resolution();
-			return true;
-		}
-
-		return false;
-	}
+	bool Load(LPCWSTR pFile);
 
 	operator Gdiplus::Bitmap*() const			{ return m_pBitmap; }
 
@@ -38,8 +27,8 @@ public:
 	int channels();
 	CSize size() { return CSize(width, height); }
 
-	CRect draw_image(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
-	CRect draw_image(CDC* pDC, int x, int y, int w, int h, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect draw(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect draw(CDC* pDC, int x, int y, int w, int h, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void clone(CGdiPlusBitmap* dst);

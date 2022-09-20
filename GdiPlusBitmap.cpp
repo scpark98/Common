@@ -19,6 +19,27 @@ CGdiPlusBitmap::CGdiPlusBitmap(LPCWSTR pFile)
 	Load(pFile);
 }
 
+bool CGdiPlusBitmap::Load(LPCWSTR pFile)
+{
+	release();
+
+	CGdiPlusBitmap temp;
+	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(pFile);
+
+	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+	{
+		//temp로 읽어서 deep_copy해주지 않으면
+		//열린 파일은 lock걸린 상태가 되어 접근할 수 없게 된다.
+		temp.deep_copy(this);
+		//temp.clone(this);
+		//m_pBitmap = pBitmap->Clone(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight(), pBitmap->GetPixelFormat());
+		resolution();
+		return true;
+	}
+
+	return false;
+}
+
 CGdiPlusBitmap::~CGdiPlusBitmap()
 {
 	release();
@@ -61,12 +82,12 @@ int CGdiPlusBitmap::channels()
 	return 3;
 }
 
-CRect CGdiPlusBitmap::draw_image(CDC* pDC, CRect r, CRect* targetRect, Color crBack)
+CRect CGdiPlusBitmap::draw(CDC* pDC, CRect r, CRect* targetRect, Color crBack)
 {
-	return draw_image(pDC, r.left, r.top, r.Width(), r.Height(), targetRect, crBack);
+	return draw(pDC, r.left, r.top, r.Width(), r.Height(), targetRect, crBack);
 }
 
-CRect CGdiPlusBitmap::draw_image(CDC* pDC, int x, int y, int w, int h, CRect* targetRect, Color crBack)
+CRect CGdiPlusBitmap::draw(CDC* pDC, int x, int y, int w, int h, CRect* targetRect, Color crBack)
 {
 	Graphics g(pDC->m_hDC);
 	g.DrawImage(m_pBitmap, x, y, w, h);
@@ -75,6 +96,8 @@ CRect CGdiPlusBitmap::draw_image(CDC* pDC, int x, int y, int w, int h, CRect* ta
 
 //Clone은 shallow copy라 하여 아래 deep_copy 함수도 추가했으나
 //좀 더 확인이 필요하다.
+//파일을 그냥 열면 탐색기 등에서 해당 파일을 지우거나 변경할 수 없는데
+//temp로 열고 deep_copy를 하니 그런 문제가 사라짐.
 void CGdiPlusBitmap::clone(CGdiPlusBitmap* dst)
 {
 	dst->release();

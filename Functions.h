@@ -481,6 +481,8 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//src문자열에서 지정된 구간의 문자열을 제거한다.
 
 	inline BYTE toHex(const BYTE &x);
+	void		hex2byte(const char *in, int len, byte *out);
+
 	unsigned int dec2bcd(unsigned int num);
 	CString		URLEncode( CString sIn );
 	CString		Utf8ToStringT(LPSTR str);

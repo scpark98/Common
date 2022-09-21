@@ -6873,6 +6873,20 @@ inline BYTE toHex(const BYTE &x)
 	return x > 9 ? x + 55: x + 48;
 }
 
+void hex2byte(const char *in, int len, byte *out)
+{
+	for (int i = 0; i < len; i += 2)
+	{
+		char c0 = in[i + 0];
+		char c1 = in[i + 1];
+		byte c = (
+			((c0 & 0x40 ? (c0 & 0x20 ? c0 - 0x57 : c0 - 0x37) : c0 - 0x30) << 4) |
+			((c1 & 0x40 ? (c1 & 0x20 ? c1 - 0x57 : c1 - 0x37) : c1 - 0x30))
+			);
+		out[i / 2] = c;
+	}
+}
+
 unsigned int dec2bcd(unsigned int num)
 {
 	unsigned int ones = 0;
@@ -7641,7 +7655,7 @@ HWND GetHWNDbyPID(ULONG pid)
 
 	while(tempHwnd != NULL)   
 	{   
-		TRACE("tempHwnd = %p\n", tempHwnd);
+		//TRACE("tempHwnd = %p\n", tempHwnd);
 		if(::GetParent(tempHwnd) == NULL) // 최상위 핸들인지 체크, 버튼 등도 핸들을 가질 수 있으므로 무시하기 위해   
 			if(pid == ProcIDFromWnd(tempHwnd))   
 				return tempHwnd;   

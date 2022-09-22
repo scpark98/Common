@@ -358,3 +358,37 @@ void CComboBoxExt::PreSubclassWindow()
 
 	CComboBox::PreSubclassWindow();
 }
+
+void CComboBoxExt::load_history(CWinApp* app, CString section)
+{
+	ResetContent();
+
+	int count = app->GetProfileInt(section, _T("history count"), 0);
+
+	CString key;
+	CString text;
+
+	for (int i = 0; i < count; i++)
+	{
+		key.Format(_T("%03d"), i);
+		text = app->GetProfileString(section, key, _T(""));
+
+		if (!text.IsEmpty())
+			AddString(text);
+	}
+}
+
+void CComboBoxExt::save_history(CWinApp* app, CString section)
+{
+	app->WriteProfileInt(section, _T("history count"), GetCount());
+
+	CString key;
+	CString text;
+
+	for (int i = 0; i < GetCount(); i++)
+	{
+		GetLBText(i, text);
+		key.Format(_T("%03d"), i);
+		app->WriteProfileString(section, key, text);
+	}
+}

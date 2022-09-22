@@ -36,6 +36,9 @@ public:
 	//LOGFONT	get_log_font() { return m_lf; }
 	//void	set_log_font(LOGFONT lf);
 
+	void			load_history(CWinApp* app, CString section);
+	void			save_history(CWinApp* app, CString section);
+
 protected:
 
 	//폰트 관련

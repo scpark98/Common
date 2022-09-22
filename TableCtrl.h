@@ -1,13 +1,17 @@
 #pragma once
 
 /*
-* m_table[m][n]
-* 1000000100100
-* 1001000100100
+* m.w = {100, 200, 50};
+* m[0][0] = table(str)
+* m[1][0] = table(str);
+* m[1][1] = table(str);
 * 
-* m_text[0].x = 1;
-* m_text[0].y = 2;
-* m_text[0].text = "sample text;
+* m[i]에 대해...
+* m[i][j]를 그리는데
+* m[i][0]의 텍스트 출력, rect는 r(sx, sy, sx + m.w[0], sy + line_height);
+* sx += m.w[0];
+* m[i][0]과 m[i][1] 사이의 세로선을 그리고
+* 
 */
 
 #include <afxwin.h>
@@ -16,9 +20,18 @@
 #include <map>
 // CTableCtrl
 
-class CTable
+class CItem
 {
+public:
+	CItem();
+	CItem(CString t, bool b = false)
+	{
+		text = t;
+		bold = b;
+	}
 
+	CString text;
+	bool bold;
 };
 
 class CCellText
@@ -36,15 +49,11 @@ class CTableCtrl : public CWnd
 public:
 	CTableCtrl();
 	virtual ~CTableCtrl();
-	std::vector<std::vector<int>> m_tb;
-	void set_size(int cx, int cy);
+	std::vector<int> m_width;
+	int m_line_height = 40;
 
-	struct CELL
-	{
-		int x;
-		int y;
-	};
-	std::map<CELL, CCellText> m_text;
+	std::vector<std::vector<CItem>> m;
+	void set_size(int cx, int cy);
 
 protected:
 	BOOL			RegisterWindowClass();

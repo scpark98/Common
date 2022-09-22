@@ -16,6 +16,30 @@ CTableCtrl::CTableCtrl()
 	if (!RegisterWindowClass())
 		return;
 
+	m_width.push_back(150);
+	m_width.push_back(200);
+	m_width.push_back(150);
+	m_width.push_back(200);
+
+	std::vector<CItem> t;
+
+	t.push_back(CItem(_T("0-0")));
+	m.push_back(t);
+
+	t.clear();
+	t.push_back(CItem(_T("1-0")));
+	t.push_back(CItem(_T("1-1")));
+	m.push_back(t);
+
+	t.clear();
+	t.push_back(CItem(_T("2-0")));
+	t.push_back(CItem(_T("2-1")));
+	t.push_back(CItem(_T("2-2")));
+	t.push_back(CItem(_T("2-3")));
+	m.push_back(t);
+
+	m[2][0].text = _T("한글 텍스트 출력 긴 테스트 항목");
+
 }
 
 CTableCtrl::~CTableCtrl()
@@ -102,15 +126,44 @@ void CTableCtrl::OnPaint()
 	CMemoryDC dc(&dc1, &rc);
 	Graphics g(dc);
 
-	DrawLine(&dc, 50, 10, rc.right, rc.bottom, red, 2);
-
 	g.SetSmoothingMode(SmoothingModeAntiAlias);
 	g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
 
 	Color m_cr_text(255, 32, 32, 32);
 	Color m_cr_grid(128, 128, 128, 128);
-	Pen pen_grid(m_cr_grid, 6.0f);
-	g.DrawLine(&pen_grid, rc.right - 20, rc.top + 30, rc.left, rc.bottom);
+	Pen pen_grid(m_cr_grid, 1.0f);
+
+	Gdiplus::Font font_title(_T("Arial"), 14, FontStyleBold, UnitPixel);
+	Gdiplus::Font font_content(_T("Arial"), 14, FontStyleRegular, UnitPixel);
+	Gdiplus::SolidBrush br_text(m_cr_text);
+	StringFormat format;
+	format.SetAlignment(StringAlignmentNear);
+	format.SetLineAlignment(StringAlignmentCenter);
+
+	int i, j;
+	int margin = 8;
+	int sx = rc.left + margin;
+	int sy = rc.top + margin;
+
+	for (i = 0; i < m.size(); i++)
+	{
+		for (j = 0; j < m[i].size(); j++)
+		{
+			RectF rtext = RectF(sx + margin, sy, m_width[j] - margin*2, m_line_height);
+			g.DrawString(m[i][j].text, -1, &font_title, rtext, &format, &br_text);
+
+			//세로 구분선
+			if (j > 0)
+				g.DrawLine(&pen_grid, sx, sy, sx, sy + m_line_height);
+
+			sx += m_width[j];
+		}
+
+		sx = rc.left + 8;
+		sy += m_line_height;
+		//다음 라인과의 구분선
+		g.DrawLine(&pen_grid, margin, sy, rc.right - margin, sy);
+	}
 }
 
 
@@ -132,10 +185,5 @@ void CTableCtrl::OnSize(UINT nType, int cx, int cy)
 
 void CTableCtrl::set_size(int cx, int cy)
 {
-	m_tb.resize(cy);
-
-	for (int i = 0; i < m_tb.size(); i++)
-		m_tb[i].resize(cx);
-
 	Invalidate();
 }

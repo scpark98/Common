@@ -447,7 +447,7 @@ LRESULT CALLBACK CWin32InputBox::DlgProc(HWND hDlg, UINT message, WPARAM wParam,
 			TCHAR str[128];
 			param->m_nTimeout--;
 
-			_stprintf( str, _T("%s - %d\0"), param->szTitle, param->m_nTimeout );
+			_stprintf_s(str, _countof(str), _T("%s - %d\0"), param->szTitle, param->m_nTimeout);
 			::SetWindowText( _this->_param->hDlg, str );
 
 			if ( param->m_nTimeout <= 0 )

@@ -6,16 +6,17 @@
 using namespace Gdiplus;
 
 
-class CGdiPlusBitmap
+class CGdiplusBitmap
 {
 public:
 	Gdiplus::Bitmap* m_pBitmap = NULL;
 
 public:
-	CGdiPlusBitmap();
-	CGdiPlusBitmap(Bitmap* src);
-	CGdiPlusBitmap(LPCWSTR pFile);
-	virtual ~CGdiPlusBitmap();
+	CGdiplusBitmap();
+	CGdiplusBitmap(Bitmap* src);
+	CGdiplusBitmap(HBITMAP hBitmap);
+	CGdiplusBitmap(LPCWSTR pFile);
+	virtual ~CGdiplusBitmap();
 
 	void release();
 
@@ -23,16 +24,18 @@ public:
 
 	operator Gdiplus::Bitmap*() const			{ return m_pBitmap; }
 
+	bool get_raw_data();
+
 	bool empty() { return (m_pBitmap == NULL); }
 	int channels();
-	CSize size() { return CSize(width, height); }
+	CSize size() { return CSize(cols, rows); }
 
 	CRect draw(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
-	CRect draw(CDC* pDC, int x, int y, int w, int h, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect draw(CDC* pDC, int x = 0, int y = 0, int w = 0, int h = 0, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
-	void clone(CGdiPlusBitmap* dst);
-	void deep_copy(CGdiPlusBitmap* dst);
+	void clone(CGdiplusBitmap* dst);
+	void deep_copy(CGdiplusBitmap* dst);
 	void rotate(Gdiplus::RotateFlipType type);
 	//회전시키면 이미지가 원래의 w, h를 벗어나므로 캔버스를 자동으로 키워줘야 잘리지 않는다.
 	void rotate(float degree, bool auto_enlarge = false);
@@ -41,20 +44,23 @@ public:
 	void set_transparent(float transparent);
 	void gray();
 	void negative();
+	void convert2gray();
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool save(CString filename);// , ULONG quality/* = 100*/);
 
-	int width = 0;
-	int height = 0;
+	int cols = 0;
+	int rows = 0;
 	int channel = 0;
+	int stride = 0;
+	uint8_t* data = NULL;
 
 protected:
 	void resolution();
 };
 
 
-class CGdiPlusBitmapResource : public CGdiPlusBitmap
+class CGdiPlusBitmapResource : public CGdiplusBitmap
 {
 protected:
 	HGLOBAL m_hBuffer;
@@ -81,7 +87,7 @@ public:
 inline
 void CGdiPlusBitmapResource::release()
 {
-	CGdiPlusBitmap::release();
+	CGdiplusBitmap::release();
 	if (m_hBuffer)
 	{
 		::GlobalUnlock(m_hBuffer);

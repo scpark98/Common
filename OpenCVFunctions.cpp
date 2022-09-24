@@ -2,14 +2,14 @@
 #include "Functions.h"
 
 
-CRect scvDrawImage(CDC* pDC, Mat &src, CRect zoom_rect, CRect *target_rect, COLORREF crBack, double zoom)
+CRect cv_draw(CDC* pDC, Mat &src, CRect zoom_rect, CRect *target_rect, COLORREF crBack, double zoom)
 {
-	return scvDrawImage(pDC, src, zoom_rect.left, zoom_rect.top, zoom_rect.Width(), zoom_rect.Height(), target_rect, crBack, zoom);
+	return cv_draw(pDC, src, zoom_rect.left, zoom_rect.top, zoom_rect.Width(), zoom_rect.Height(), target_rect, crBack, zoom);
 }
 
-CRect scvDrawImage(CDC* pDC, Mat &src, CRect *target_rect, COLORREF crBack, double zoom)
+CRect cv_draw(CDC* pDC, Mat &src, CRect *target_rect, COLORREF crBack, double zoom)
 {
-	return scvDrawImage(pDC, src, 0, 0, 0, 0, target_rect, crBack, zoom);
+	return cv_draw(pDC, src, 0, 0, 0, 0, target_rect, crBack, zoom);
 }
 
 //StretchDIBits 방식으로 뿌릴때 이미지의 width가 4의 배수가 아니면
@@ -21,7 +21,7 @@ CRect scvDrawImage(CDC* pDC, Mat &src, CRect *target_rect, COLORREF crBack, doub
 //실제로 그려진 영역 좌표값을 리턴한다.
 //주의! src를 받을 때 어떤 mat의 sub, 즉 mat(cv::Rect(...))와 같이 넘겨주면
 //mat의 stride가 이용되므로 밀려 그려지는 경우가 있다. copyTo로 복사한 후 넘겨줘야 한다.
-CRect scvDrawImage(CDC* pDC, Mat &src, int dx, int dy, int dw, int dh, CRect *target_rect, COLORREF crBack, double zoom)
+CRect cv_draw(CDC* pDC, Mat &src, int dx, int dy, int dw, int dh, CRect *target_rect, COLORREF crBack, double zoom)
 {
 	int sx, sy, sw, sh;
 	int padding = 0;
@@ -1870,7 +1870,9 @@ void saveRawImage( CString sfile, uint8_t *data, int width, int height, int ch )
 
 void save2Raw( cv::Mat mat, CString sRawFilename, int dst_ch )
 {
-	FILE	*fp = _tfopen(sRawFilename, _T("wb") );
+	FILE* fp;
+	_tfopen_s(&fp, sRawFilename, _T("wb"));
+
 	if ( fp == NULL )
 		return;
 
@@ -2266,7 +2268,7 @@ void printMat( Mat img, CString sPrinterName, CString sDocName, int x, int y, in
 	//x=25, y=15에서 시작하면 위의 용지에 정확히 중앙 인쇄된다.
 	//즉, 프린터의 공장출고 설정을 그대로 사용하면 되며 관리자는 프린터의 어떠한 추가 설정이 필요치 않다.
 
-	scvDrawImage(&PrinterDC, img, (double)x * dx, (double)y * dy, (double)(x + dw) * dx, (double)(y + dh) * dy);
+	cv_draw(&PrinterDC, img, (double)x * dx, (double)y * dy, (double)(x + dw) * dx, (double)(y + dh) * dy);
 
 	PrinterDC.EndPage();
 	PrinterDC.EndDoc();
@@ -2400,7 +2402,7 @@ void printMat( Mat &img, CString sPrinterName, CString sDocName, int marginX, in
 	//	img(cv::Rect( szCut.cx, szCut.cy, img.cols - szCut.cx * 2, img.rows - szCut.cy * 2)).copyTo(img);
 	//}
 
-	scvDrawImage( &PrinterDC, img, (double)marginX * dx, (double)marginY * dy,
+	cv_draw( &PrinterDC, img, (double)marginX * dx, (double)marginY * dy,
 				(double)(nPaperWidth - marginX) * dx, (double)(nPaperHeight - marginY) * dy);
 
 	PrinterDC.EndPage();

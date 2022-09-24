@@ -17,8 +17,16 @@
 #include <sys/timeb.h>
 #include <deque>
 #include <algorithm>
-#include "../GdiPlusBitmap.h"
 #include "../ui/ExtWndShadow.h"
+
+#define USE_OPENCV			false
+
+#if USE_OPENCV
+#include "../../Common/OpenCVFunctions.h"
+#else
+#include "../GdiPlusBitmap.h"
+#endif
+
 
 #define ADD_USING_THREAD	true
 
@@ -41,6 +49,7 @@ public:
 	enum ThumbCtrlMsgs
 	{
 		message_thumb_insert = 0,
+		message_thumb_loading_completed,
 		message_thumb_lbutton_dbclicked,
 		message_thumb_rename,
 		message_thumb_keydown,
@@ -62,7 +71,11 @@ public:
 class CThumbImage 
 {
 public:
-	CGdiPlusBitmap	img;
+#if USE_OPENCV
+	cv::Mat		img;
+#else
+	CGdiplusBitmap	img;
+#endif
 	CString		title;
 	bool		key_thumb;	//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
 	CString		info[4];	//info text 표시용. 0(lt info) ~ 3(rb info)
@@ -73,6 +86,8 @@ public:
 	CRect		rect;		//thumb+text가 실제 그려진 좌표값을 저장해둔다.
 	int			thumb_bottom;//thumb image의 하단 좌표, 타이틀 편집시 사용
 	int			line_index;	//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
+	double		score;
+	float*		features;
 
 	CThumbImage()
 	{
@@ -115,9 +130,14 @@ public:
 	};
 
 	std::deque<CThumbImage*> m_dqThumb;
+	int size() { return m_dqThumb.size(); }
 	void release(int index);
 
-	CGdiPlusBitmap	get_img(int index);
+#if USE_OPENCV
+	cv::Mat			get_img(int index);
+#else
+	CGdiplusBitmap	get_img(int index);
+#endif
 
 	//정해진 개수를 넘어가면 맨 뒤부터(?) 지워준다.
 	void	set_max_count( int limit_count ) { m_max_thumbs = limit_count; }
@@ -195,7 +215,6 @@ public:
 	bool			m_show_info_text[4];
 	COLORREF		m_crInfoText[4];
 	void			set_info_text(int thumb_index, int idx, CString sInfo, bool refresh );
-	void			sort_by_info( int idx );	//info text를 기준으로 리스트를 정렬시킨다.
 
 
 //폰트 관련
@@ -213,10 +232,14 @@ public:
 	bool			is_editing() { return m_in_editing; }
 	CString			get_old_title() { return m_old_title; }
 	void			set_title(int index, CString title);
-	void			sort_by_title();
 	int				find_by_title(CString title, bool bWholeWord = false);
 
 	void			on_menu_delete();
+
+//정렬 관련
+	void			sort_by_title();
+	void			sort_by_info(int idx);	//info text를 기준으로 리스트를 정렬시킨다.
+	void			sort_by_score();
 
 protected:
 	BOOL			RegisterWindowClass();

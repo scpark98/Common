@@ -139,12 +139,12 @@ scvDrawImage(pDC, src, target_rect, COLORREF crBack)
 //처음 그릴때 4의 배수로 맞춰준 이미지를 메모리상에 유지하면 확대, 축소, 스크롤 등에 의해
 //다시 그려질때는 매우 빠르게 그려진다.
 //단, src의 cols가 달라지므로 cols를 UI상에 표시해야 하는 경우 이 값을 로딩시에 기억하고 있다가 표시해줘야 한다.
-CRect		scvDrawImage(CDC* pDC, Mat &src, int dx = 0, int dy = 0, int dw = 0, int dh = 0,
+CRect		cv_draw(CDC* pDC, Mat &src, int dx = 0, int dy = 0, int dw = 0, int dh = 0,
 						 CRect *target_rect = NULL, COLORREF crBack = 0, double zoom = 1.0);
 
-CRect		scvDrawImage(CDC* pDC, Mat &src, CRect *target_rect, COLORREF crBack = 0, double zoom = 1.0);
+CRect		cv_draw(CDC* pDC, Mat &src, CRect *target_rect, COLORREF crBack = 0, double zoom = 1.0);
 //zoom_rect 크기로 늘리거나 줄인 후 target_rect에 그린다. 이때는 fit이 의미가 없다.
-CRect		scvDrawImage(CDC* pDC, Mat &src, CRect zoom_rect, CRect *target_rect, COLORREF crBack = 0, double zoom = 1.0);
+CRect		cv_draw(CDC* pDC, Mat &src, CRect zoom_rect, CRect *target_rect, COLORREF crBack = 0, double zoom = 1.0);
 //src_rect도 있으면 좋지만 이 함수가 많아지게 된다. 만약 소스의 부분 이미지만 뿌리는 거라면 src에 이미지의 일부분만 넣어주자.
 
 double		getSharpness(Mat mat);

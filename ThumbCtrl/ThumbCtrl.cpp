@@ -203,7 +203,7 @@ void CThumbCtrl::OnPaint()
 	CMemoryDC	dc(&dc1, &rc, true);
 	dc.FillSolidRect(rc, m_crBack);
 
-	if (!m_loading_completed)
+	if (m_loading_files.size() > 0 && !m_loading_completed)
 	{
 		CRect r = makeCenterRect(rc.CenterPoint().x, rc.CenterPoint().y, rc.Width() / 2, 16);
 		DrawSunkenRect(&dc, r);
@@ -220,7 +220,11 @@ void CThumbCtrl::OnPaint()
 	}
 	else if (m_dqThumb.size() == 0)
 	{
-		DrawTextShadow(&dc, _T("No images to display."), rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+		str = _T("No images to display.");
+		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+		//DrawTextShadow(&dc, str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, GRAY64, red);
+		//DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), rc,
+		//	DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, 0, red, 2, 4);
 		return;
 	}
 
@@ -240,7 +244,7 @@ void CThumbCtrl::ReconstructFont()
 	m_lf.lfQuality = CLEARTYPE_NATURAL_QUALITY;
 	m_lf.lfHeight = -16;
 	m_lf.lfWeight = 500;
-	_tcscpy(m_lf.lfFaceName, _T("맑은 고딕"));
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), _T("맑은 고딕"));
 
 	m_font.DeleteObject();
 	m_font.CreateFontIndirect(&m_lf);
@@ -251,7 +255,7 @@ void CThumbCtrl::ReconstructFont()
 void CThumbCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
-	_tcscpy(m_lf.lfFaceName, sFontname);
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	ReconstructFont();
 }
 
@@ -317,6 +321,8 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	if (files.size() == 0)
 	{
 		m_loading_completed = true;
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 		return;
 	}
 
@@ -506,7 +512,6 @@ int CThumbCtrl::CheckAllThreadEnding()
 
 	m_loading_completed = true;
 
-
 	if (false)
 	{
 		CString str;
@@ -527,12 +532,18 @@ int CThumbCtrl::CheckAllThreadEnding()
 int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thumb, bool invalidate)
 {
 	CThumbImage *thumb = new CThumbImage;
+#if USE_OPENCV
+	thumb->img = loadMat(full_path);
+#else
 	thumb->img.Load(full_path);
-	thumb->width = thumb->img.width;
-	thumb->height = thumb->img.height;
+#endif
+	thumb->width = thumb->img.cols;
+	thumb->height = thumb->img.rows;
 	thumb->channel = 3;
 	thumb->title = title;
 	thumb->full_path = full_path;
+	thumb->score = 0.0;
+	thumb->features = NULL;
 
 	if (index < 0)
 	{
@@ -1245,7 +1256,7 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 		TCHAR buf[200] = { 0 };
 		TCHAR msg[200] = { 0 };
 
-		_stprintf(msg, _T("표시할 썸네일의 최대 개수를 입력하세요(0:제한없음).\n현재 설정값 = %d"), m_max_thumbs);
+		_stprintf_s(msg, _countof(msg), _T("표시할 썸네일의 최대 개수를 입력하세요(0:제한없음).\n현재 설정값 = %d"), m_max_thumbs);
 		int res = CWin32InputBox::InputBox(_T("썸네일 최대 개수"), msg, buf, 200, false);
 
 		if (res == IDCANCEL)
@@ -1345,6 +1356,9 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 		{
 			recalculate_scroll_size();
 			Invalidate();
+
+			::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 		}
 		else
 		{
@@ -1374,6 +1388,9 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 			m_loading_completed = true;
 			recalculate_scroll_size();
 			Invalidate();
+
+			::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 		}
 	}
 	else if (nIDEvent == timer_select_after_loading)
@@ -1585,7 +1602,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		{
 			//scvDrawImage(&dc, m_dqThumb[i]->mat, rect.left, rect.top, 0, 0, NULL, m_crBackThumb, -1.0);
 			//scvDrawImage(&dc, m_dqThumb[i]->mat, rect, m_crBackThumb, -1.0);
-			fit = GetRatioRect(rect, (double)m_dqThumb[i]->img.width / (double)m_dqThumb[i]->img.height);
+			fit = GetRatioRect(rect, (double)m_dqThumb[i]->img.cols / (double)m_dqThumb[i]->img.rows);
 			if (draw && !skip)
 			{
 				//입체감있는 프레임을 그려주는 코드인데 배경이 짙은 회색 계열이면 잘 표시가 안나서 일단 스킵.
@@ -1602,8 +1619,11 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 					false
 				);
 				*/
-
+#if USE_OPENCV
+				cv_draw(pDC, m_dqThumb[i]->img, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
+#else
 				m_dqThumb[i]->img.draw(pDC, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
+#endif
 			}
 			//DrawSunkenRect(&dc, rect, true, get_color(m_crBack, -16), get_color(m_crBack, +16));
 		}
@@ -1898,7 +1918,7 @@ std::deque<int> CThumbCtrl::find_text(bool show_inputbox, CString text, bool sel
 
 	if (show_inputbox)
 	{
-		_stprintf(msg, _T("검색어를 입력하세요."));
+		_stprintf_s(msg, _countof(msg), _T("검색어를 입력하세요."));
 		int res = CWin32InputBox::InputBox(_T("검색어 입력"), msg, buf, 200, false);
 
 		if (res == IDCANCEL)
@@ -2242,6 +2262,20 @@ void CThumbCtrl::sort_by_title()
 	Invalidate();
 }
 
+void CThumbCtrl::sort_by_score()
+{
+	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
+		[](const CThumbImage* a, const CThumbImage* b)
+		{
+			//문자열인지 숫자인지에 따라 수정되야 한다.
+			return (a->score > b->score);
+		}
+	);
+
+	m_modified = true;
+	Invalidate();
+}
+
 int	 CThumbCtrl::find_by_title(CString title, bool bWholeWord)
 {
 	if (title.IsEmpty())
@@ -2264,10 +2298,20 @@ int	 CThumbCtrl::find_by_title(CString title, bool bWholeWord)
 	return -1;
 }
 
-CGdiPlusBitmap CThumbCtrl::get_img(int index)
+#if USE_OPENCV
+cv::Mat CThumbCtrl::get_img(int index)
 {
 	if (index < 0 || index >= m_dqThumb.size())
-		return CGdiPlusBitmap();
+		return cv::Mat();
 
 	return m_dqThumb[index]->img;
 }
+#else
+CGdiplusBitmap CThumbCtrl::get_img(int index)
+{
+	if (index < 0 || index >= m_dqThumb.size())
+		return CGdiplusBitmap();
+
+	return m_dqThumb[index]->img;
+}
+#endif

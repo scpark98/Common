@@ -3,7 +3,6 @@
 
 CGdiplusBitmap::CGdiplusBitmap()
 {
-	m_pBitmap = NULL;
 	release();
 }
 
@@ -16,7 +15,6 @@ CGdiplusBitmap::CGdiplusBitmap(Bitmap* src)
 CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 {
 	release();
-	
 	m_pBitmap = Bitmap::FromHBITMAP(hBitmap, NULL);
 
 	/*
@@ -51,12 +49,11 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 	*/
 
 	resolution();
-	get_raw_data();
+	//get_raw_data();
 }
 
 CGdiplusBitmap::CGdiplusBitmap(LPCWSTR pFile)
 {
-	m_pBitmap = NULL;
 	Load(pFile);
 }
 
@@ -89,20 +86,9 @@ CGdiplusBitmap::~CGdiplusBitmap()
 
 void CGdiplusBitmap::release()
 {
-	if (m_pBitmap)
-	{
-		delete m_pBitmap;
-		m_pBitmap = NULL;
-	}
-	
-	if (data)
-	{
-		delete[] data;
-		data = NULL;
-	}
-	
-
-	cols = rows = channel = 0;
+	SAFE_DELETE(m_pBitmap);
+	SAFE_DELETE_ARRAY(data);
+	cols = rows = channel = stride = 0;
 }
 
 void CGdiplusBitmap::resolution()
@@ -121,15 +107,21 @@ void CGdiplusBitmap::resolution()
 
 bool CGdiplusBitmap::get_raw_data()
 {
-	if (data)
-		delete[] data;
+	SAFE_DELETE_ARRAY(data);
 
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
+	PixelFormat format = PixelFormat24bppRGB;
+	format = m_pBitmap->GetPixelFormat();
+	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+		format = PixelFormat8bppIndexed;
+	else
+		format = PixelFormat24bppRGB;
+
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,
-		PixelFormat24bppRGB/*m_pBitmap->GetPixelFormat()*/, &bmpData) == Gdiplus::Ok) { //픽셀포맷형식에따라 이미지접근권한 취득
+		format/*m_pBitmap->GetPixelFormat()*/, &bmpData) == Gdiplus::Ok) { //픽셀포맷형식에따라 이미지접근권한 취득
 
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
@@ -148,7 +140,7 @@ int CGdiplusBitmap::channels()
 
 	if (pf == PixelFormat8bppIndexed)
 		return 1;
-	else if (pf == PixelFormat32bppARGB)
+	else if (pf == PixelFormat32bppARGB || pf == PixelFormat32bppRGB)
 		return 4;
 
 	return 3;
@@ -201,10 +193,11 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 	Gdiplus::BitmapData bmpData;
 	dst->m_pBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, dst->m_pBitmap->GetPixelFormat(), &bmpData);
 	m_pBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeUserInputBuf, dst->m_pBitmap->GetPixelFormat(), &bmpData);
+
 	m_pBitmap->UnlockBits(&bmpData);
 	dst->m_pBitmap->UnlockBits(&bmpData);
+
 	dst->resolution();
-	dst->get_raw_data();
 }
 
 void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
@@ -262,6 +255,21 @@ void CGdiplusBitmap::rotate(float degree, bool auto_enlarge)
 	rows = newh;
 }
 
+void CGdiplusBitmap::resize(int cx, int cy)
+{
+	Bitmap* result = new Bitmap(cx, cy);
+	Graphics g(result);
+
+	g.DrawImage(m_pBitmap, Rect(0, 0, cx, cy), 0, 0, cols, rows, UnitPixel);
+
+	delete m_pBitmap;
+	m_pBitmap = result->Clone(0, 0, cx, cy, PixelFormatDontCare);
+	delete result;
+
+	resolution();
+}
+
+//회색톤으로 변경만 할 뿐 실제 픽셀포맷은 변경되지 않는다.
 void CGdiplusBitmap::gray()
 {
 	ColorMatrix colorMatrix = { 0.299f, 0.299f, 0.299f, 0.0f, 0.0f,
@@ -308,6 +316,7 @@ void CGdiplusBitmap::negative()
 	g.DrawImage(temp, Rect(0, 0, cols, rows), 0, 0, cols, rows, UnitPixel, &ia);
 }
 
+//실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {
 	Bitmap* bitmap = new Bitmap(cols, rows, PixelFormat8bppIndexed);
@@ -334,7 +343,7 @@ void CGdiplusBitmap::convert2gray()
 
 	m_pBitmap->LockBits(&rect,
 		ImageLockModeRead,
-		PixelFormat24bppRGB,//m_pBitmap->GetPixelFormat(),
+		/*PixelFormat24bppRGB,//*/m_pBitmap->GetPixelFormat(),
 		&bmData_src);
 
 	bitmap->LockBits(&rect,
@@ -363,15 +372,15 @@ void CGdiplusBitmap::convert2gray()
 	m_pBitmap->UnlockBits(&bmData_src);
 	bitmap->UnlockBits(&bmData_dst);
 
-	delete m_pBitmap;
-	delete[] data;
+	SAFE_DELETE(m_pBitmap);
+	SAFE_DELETE_ARRAY(data);
 
 	m_pBitmap = bitmap;
-	data = dst;
+	//data = dst;
 	channel = 1;
 	stride = cols * channel;
 
-	save(_T("d:\\temp\\temp.jpg"));
+	save(_T("d:\\temp\\gray.bmp"));
 }
 
 void CGdiplusBitmap::set_transparent(float transparent)
@@ -473,6 +482,11 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 		GetEncoderClsid(L"image/png", &encoderClsid);
 	else if (ext == _T("bmp"))
 		GetEncoderClsid(L"image/bmp", &encoderClsid);
+	else
+	{
+		AfxMessageBox(_T("처리 코드가 추가되지 않은 포맷. 코드 수정 필요"));
+		return false;
+	}
 	/*
 	encoderParameters.Count = 1;
 	encoderParameters.Parameter[0].Guid = EncoderQuality;
@@ -487,7 +501,7 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 	s = m_pBitmap->Save(filename, &encoderClsid);// , & encoderParameters);
 
 	if (s == Ok)
-		return TRUE;
-	else
-		return FALSE;
+		return true;
+
+	return false;
 }

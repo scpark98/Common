@@ -21,10 +21,10 @@ IMPLEMENT_DYNAMIC(CRichEditCtrlEx, CRichEditCtrl)
 
 CRichEditCtrlEx::CRichEditCtrlEx()
 {
-	m_crText			= ::GetSysColor( COLOR_BTNTEXT );
+	m_crText			= ::GetSysColor(COLOR_GRAYTEXT);
 	m_crBack			= RGB( 255, 255, 255 );
 	m_bShowLog			= true;
-	m_bShowTime			= false;
+	m_bShowTime			= true;
 	m_nClearLogInterval	= 0;
 	m_nMaxCharLimit		= 0;
 	m_nScrollSize		= 2;
@@ -110,7 +110,6 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	if ( bAddNewLine && ( str.Right( 1 ) != "\n" ) )
 		str += "\n";
 
-
 	int			nOldLines = 0, nNewLines = 0, nScroll = 0;
 	long		nInsertionPoint = 0;
 	CHARFORMAT	cf;
@@ -120,8 +119,6 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 
 	if ( m_hWnd == NULL )
 		return 0;
-
-
 
 	SetSel(nInsertionPoint, nInsertionPoint);
 
@@ -140,9 +137,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 		SetSelectionCharFormat(cf);
 
 		ReplaceSel( sTime );
-		
 	}
-
 
 	// Save number of lines before insertion of new text
 	nOldLines		= GetLineCount();
@@ -177,12 +172,15 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	// Replace selection. Because we have nothing selected, this will simply insert
 	// the string at the current caret position.
 	ReplaceSel(str);
-
+#ifdef _DEBUG
+	TRACE(str);
+#endif
 
 	SCROLLINFO	scrollInfo;
-	scrollInfo.cbSize = sizeof( SCROLLINFO );
-	GetScrollInfo( SB_VERT, &scrollInfo );
-
+	scrollInfo.cbSize = sizeof(SCROLLINFO);
+	GetScrollInfo(SB_VERT, &scrollInfo);
+	if (scrollInfo.nPos < scrollInfo.nMax)
+		return 0;
 /*
 	TRACE( "pos = %d, trackpos = %d, max = %d\n",
 			scrollInfo.nPos,
@@ -209,7 +207,7 @@ void CRichEditCtrlEx::Append( LPCTSTR lpszFormat, ... )
 	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
 	va_end(args);
 
-	AppendToLog( szBuffer, m_crText, false );
+	AppendToLog(szBuffer, m_crText, false);
 }
 
 void CRichEditCtrlEx::Append( COLORREF cr, LPCTSTR lpszFormat, ... )
@@ -222,7 +220,7 @@ void CRichEditCtrlEx::Append( COLORREF cr, LPCTSTR lpszFormat, ... )
 	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
 	va_end(args);
 
-	AppendToLog( szBuffer, cr, false );
+	AppendToLog(szBuffer, cr, false);
 }
 
 //-----------------------------------------------------------------------------

@@ -20,21 +20,27 @@
 #include <map>
 // CTableCtrl
 
-class CItem
+class CTableItem
 {
 public:
-	CItem();
-	CItem(CString t, bool b = false)
+	CTableItem() {};
+	CTableItem(CString _text, COLORREF _text_color = ::GetSysColor(COLOR_BTNTEXT), bool _bold = false, float _line_thick = 1.0, COLORREF _line_color = RGB(192,192,192))
 	{
-		text = t;
-		bold = b;
+		text = _text;
+		text_color = _text_color;
+		text_bold = _bold;
+		line_thick = _line_thick;
+		line_color = _line_color;
 	}
 
-	CString text;
-	bool bold;
+	CString text = _T("");
+	COLORREF text_color = ::GetSysColor(COLOR_BTNTEXT);
+	bool text_bold;
+	float line_thick = 1.0;
+	COLORREF line_color = RGB(255, 192, 192);
 };
 
-class CCellText
+class CTableItemText
 {
 public:
 	CString text;
@@ -52,8 +58,10 @@ public:
 	std::vector<int> m_width;
 	int m_line_height = 40;
 
-	std::vector<std::vector<CItem>> m;
-	void set_size(int cx, int cy);
+	std::vector<std::vector<CTableItem>> m;
+
+	//table의 크기를 설정 또는 재조정한다.
+	void resize(int cx, int cy, bool invalidate);
 
 protected:
 	BOOL			RegisterWindowClass();

@@ -2,9 +2,9 @@
 
 #include <afxwin.h>
 #include <gdiplus.h>
+#include <stdint.h>	//for uint8_t in vs2015
 
 using namespace Gdiplus;
-
 
 class CGdiplusBitmap
 {

@@ -16,30 +16,37 @@ CTableCtrl::CTableCtrl()
 	if (!RegisterWindowClass())
 		return;
 
-	m_width.push_back(150);
-	m_width.push_back(200);
-	m_width.push_back(150);
-	m_width.push_back(200);
+	resize(4, 8, false);
+	m_width.resize(4);
 
-	std::vector<CItem> t;
+	m_width[0] = (150);
+	m_width[1] = (200);
+	m_width[2] = (150);
+	m_width[3] = (200);
 
-	t.push_back(CItem(_T("0-0")));
+	std::vector<CTableItem> t;
+
+	//t.push_back(CTableItem(_T("0-0")));
+	//m.push_back(t);
+	m[0][0] = CTableItem(_T("0-0"));
+	/*
+	t.clear();
+	t.push_back(CTableItem(_T("1-0")));
+	t.push_back(CTableItem(_T("1-1")));
 	m.push_back(t);
 
 	t.clear();
-	t.push_back(CItem(_T("1-0")));
-	t.push_back(CItem(_T("1-1")));
+	t.push_back(CTableItem(_T("2-0")));
+	t.push_back(CTableItem(_T("2-1")));
+	t.push_back(CTableItem(_T("2-2")));
+	t.push_back(CTableItem(_T("2-3")));
 	m.push_back(t);
 
-	t.clear();
-	t.push_back(CItem(_T("2-0")));
-	t.push_back(CItem(_T("2-1")));
-	t.push_back(CItem(_T("2-2")));
-	t.push_back(CItem(_T("2-3")));
-	m.push_back(t);
+	int n = m.size();
+
 
 	m[2][0].text = _T("한글 텍스트 출력 긴 테스트 항목");
-
+	*/
 }
 
 CTableCtrl::~CTableCtrl()
@@ -130,11 +137,9 @@ void CTableCtrl::OnPaint()
 	g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
 
 	Color m_cr_text(255, 32, 32, 32);
-	Color m_cr_grid(128, 128, 128, 128);
-	Pen pen_grid(m_cr_grid, 1.0f);
 
-	Gdiplus::Font font_title(_T("Arial"), 14, FontStyleBold, UnitPixel);
-	Gdiplus::Font font_content(_T("Arial"), 14, FontStyleRegular, UnitPixel);
+	Gdiplus::Font font_bold(_T("Arial"), 14, FontStyleBold, UnitPixel);
+	Gdiplus::Font font_normal(_T("Arial"), 14, FontStyleRegular, UnitPixel);
 	Gdiplus::SolidBrush br_text(m_cr_text);
 	StringFormat format;
 	format.SetAlignment(StringAlignmentNear);
@@ -147,23 +152,31 @@ void CTableCtrl::OnPaint()
 
 	for (i = 0; i < m.size(); i++)
 	{
+		Color cr_grid(m[i][0].line_color);
+		Pen pen_gridY(cr_grid, m[i][0].line_thick);
+		Pen pen_gridX(cr_grid, 1.0);
+
+		g.DrawLine(&pen_gridY, margin, sy, rc.right - margin, sy);
+
 		for (j = 0; j < m[i].size(); j++)
 		{
 			RectF rtext = RectF(sx + margin, sy, m_width[j] - margin*2, m_line_height);
-			g.DrawString(m[i][j].text, -1, &font_title, rtext, &format, &br_text);
+			if (!m[i][j].text.IsEmpty())
+				g.DrawString(m[i][j].text, -1, m[i][j].text_bold ? &font_bold : &font_normal, rtext, &format, &br_text);
 
 			//세로 구분선
 			if (j > 0)
-				g.DrawLine(&pen_grid, sx, sy, sx, sy + m_line_height);
+				g.DrawLine(&pen_gridX, sx, sy, sx, sy + m_line_height);
 
 			sx += m_width[j];
 		}
 
 		sx = rc.left + 8;
 		sy += m_line_height;
-		//다음 라인과의 구분선
-		g.DrawLine(&pen_grid, margin, sy, rc.right - margin, sy);
 	}
+
+	//마지막 라인
+	//g.DrawLine(&pen_grid, margin, sy, rc.right - margin, sy);
 }
 
 
@@ -183,7 +196,16 @@ void CTableCtrl::OnSize(UINT nType, int cx, int cy)
 	Invalidate();
 }
 
-void CTableCtrl::set_size(int cx, int cy)
+void CTableCtrl::resize(int cx, int cy, bool invalidate)
 {
-	Invalidate();
+	if (m.size() == 0)
+		m.resize(cy);
+
+	for (int i = 0; i < cy; i++)
+	{
+		m[i].resize(cx);
+	}
+
+	if (invalidate)
+		Invalidate();
 }

@@ -114,6 +114,11 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	long		nInsertionPoint = 0;
 	CHARFORMAT	cf;
 
+	CPoint pt = GetCaretPos();
+	TRACE(_T("%d, %d\n"), pt.x, pt.y);
+	if (pt.x > 1)
+		m_auto_scroll = false;
+
 	nOldLines = GetLineCount();
 	nInsertionPoint = GetWindowTextLength();
 
@@ -176,17 +181,19 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	TRACE(str);
 #endif
 
-	SCROLLINFO	scrollInfo;
-	scrollInfo.cbSize = sizeof(SCROLLINFO);
-	GetScrollInfo(SB_VERT, &scrollInfo);
-	if (scrollInfo.nPos < scrollInfo.nMax)
+	SCROLLINFO	si;
+	si.cbSize = sizeof(SCROLLINFO);
+	GetScrollInfo(SB_VERT, &si);
+
+	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, max = %d\n"),
+		m_auto_scroll,
+		si.nPos,
+		si.nTrackPos,
+		si.nMax );
+
+	if (!m_auto_scroll)
 		return 0;
-/*
-	TRACE( "pos = %d, trackpos = %d, max = %d\n",
-			scrollInfo.nPos,
-			scrollInfo.nTrackPos,
-			scrollInfo.nMax );
-*/
+
 	// Get new line count
 	nNewLines = GetLineCount();
 

@@ -296,7 +296,7 @@ void CThumbCtrl::PreSubclassWindow()
 
 UINT ThreadStart(LPVOID pParam)
 {
-	CThumbCtrl*	pMain = (CThumbCtrl*)pParam;
+	CThumbCtrl* pMain = (CThumbCtrl*)pParam;
 
 	//m_nDataIndex를 메인에서 증가시키면서 쓰레드를 구동하려 했으나
 	//sync가 맞지 않으면 인덱스를 제대로 전달시키지 못하는 현상이 발생한다.
@@ -531,7 +531,7 @@ int CThumbCtrl::CheckAllThreadEnding()
 
 int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thumb, bool invalidate)
 {
-	CThumbImage *thumb = new CThumbImage;
+	CThumbImage* thumb = new CThumbImage;
 #if USE_OPENCV
 	thumb->img = loadMat(full_path);
 #else
@@ -898,7 +898,7 @@ void CThumbCtrl::OnSize(UINT nType, int cx, int cy)
 		return;
 }
 
-void CThumbCtrl::set_show_title(int show)
+void CThumbCtrl::show_title(int show)
 {
 	if (show == -1)
 		m_show_title = !m_show_title;
@@ -908,7 +908,7 @@ void CThumbCtrl::set_show_title(int show)
 	Invalidate();
 }
 
-void CThumbCtrl::set_show_resolution(int show)
+void CThumbCtrl::show_resolution(int show)
 {
 	if (show == -1)
 		m_show_resolution = !m_show_resolution;
@@ -918,7 +918,7 @@ void CThumbCtrl::set_show_resolution(int show)
 	Invalidate();
 }
 
-void CThumbCtrl::set_show_index(int show)
+void CThumbCtrl::show_index(int show)
 {
 	if (show == -1)
 		m_show_index = !m_show_index;
@@ -1240,14 +1240,14 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 		Invalidate();
 		break;
 
-	case idFind :
+	case idFind:
 	{
 		find_text(true, true);
 
 		break;
 	}
 
-	case idDeleteThumb :
+	case idDeleteThumb:
 		on_menu_delete();
 		break;
 
@@ -1284,7 +1284,7 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 	}
 }
 
-void CThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool refresh)
+void CThumbCtrl::info_text(int thumb_index, int idx, CString info, bool refresh)
 {
 	if (thumb_index < 0 || thumb_index >= m_dqThumb.size())
 		return;
@@ -1292,6 +1292,7 @@ void CThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool refr
 	if (idx < 0 || idx >= 4)
 		return;
 
+	m_show_info_text[idx] = true;
 	m_dqThumb[thumb_index]->info[idx] = info;
 
 	if (refresh)
@@ -1456,7 +1457,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 	//DrawRectangle(pDC, rc, red, 5UL, 2);
 
-	CFont*		pOldfont;
+	CFont* pOldfont;
 
 	pOldfont = (CFont*)pDC->SelectObject(&m_font);
 
@@ -1697,9 +1698,9 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			*/
 			if (draw && !skip)
 				pDC->DrawText(m_dqThumb[i]->title, rTitle, DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
-				//DrawTextShadow(&dc, thumb.title, rTitle, DT_CENTER | DT_WORDBREAK|DT_EDITCONTROL);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
-				//DrawTextShadow( &dc, rTitle, CString(thumb.title), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP );
-				//pDC->FillSolidRect( rTitle, RGB(255,0,0) );
+			//DrawTextShadow(&dc, thumb.title, rTitle, DT_CENTER | DT_WORDBREAK|DT_EDITCONTROL);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
+			//DrawTextShadow( &dc, rTitle, CString(thumb.title), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP );
+			//pDC->FillSolidRect( rTitle, RGB(255,0,0) );
 
 			height = height + text_max_height;
 		}
@@ -1719,51 +1720,51 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		}
 
 		dqOneLineHeight.push_back(height);
-		/*
+
 		//정보 문자열을 표시한다.
 		int w = m_szTile.cx / 2;
 		int h = 20;
 		int margin = 3;
 		UINT nFormat = 0;
-		UINT nFormatOld = pDC->SetTextAlign( nFormat );
+		UINT nFormatOld = pDC->SetTextAlign(nFormat);
 		CPoint cpText;
 
-		for ( j = 0; j < 4; j++ )
+		for (int j = 0; j < 4; j++)
 		{
-		if ( m_show_info_text[j] == false || m_dqThumb[i]->info[j]->GetLength() == 0 )
-		continue;
+			if (m_show_info_text[j] == false || m_dqThumb[i]->info[j].GetLength() == 0)
+				continue;
 
-		nFormat = 0;
-		if ( j % 2 == 0 )
-		{
-		nFormat |= TA_LEFT;
-		cpText.x = rect.left + margin;
-		}
-		else
-		{
-		nFormat |= TA_RIGHT;
-		cpText.x = rect.left + m_szTile.cx - margin;
+			nFormat = 0;
+			if (j % 2 == 0)
+			{
+				nFormat |= TA_LEFT;
+				cpText.x = rect.left + margin;
+			}
+			else
+			{
+				nFormat |= TA_RIGHT;
+				cpText.x = rect.left + m_szTile.cx - margin;
+			}
+
+			if (j / 2 < 1)
+			{
+				nFormat |= TA_TOP;
+				cpText.y = rect.top + margin;
+			}
+			else
+			{
+				nFormat |= TA_BOTTOM;
+				cpText.y = rect.top + m_szTile.cy - margin;
+			}
+
+			pDC->SetTextAlign(nFormat);
+			TextOutShadow(pDC, cpText.x, cpText.y, CString(m_dqThumb[i]->info[j]), m_crInfoText[j]);
+			//DrawTextShadow( &dc, m_rInfoText[j], CString(m_dqThumb[i]->info[j]), DT_CENTER | DT_TOP | DT_NOCLIP, (m_crInfoText[i] == -1 ? RGB(255, 255, 255) : m_crInfoText[i]) );
+			//DrawShadowText(pDC->GetSafeHdc(), CString2PCWSTR(m_dqThumb[i]->info[j]), _tcslen(m_dqThumb[i]->info[j]),
+			//				CRect(cpText.x, cpText.y, cpText.x + m_szTile.cx, cpText.y - m_lf.lfHeight),
+			//				DT_CENTER | DT_VCENTER, m_crInfoText[j], RGB(255, 0, 0), 2, 1);
 		}
 
-		if ( j / 2 < 1 )
-		{
-		nFormat |= TA_TOP;
-		cpText.y = rect.top + margin;
-		}
-		else
-		{
-		nFormat |= TA_BOTTOM;
-		cpText.y = rect.top + m_szTile.cy - margin;
-		}
-
-		pDC->SetTextAlign( nFormat );
-		TextOutShadow( &dc, cpText.x, cpText.y, CString(m_dqThumb[i]->info[j]), m_crInfoText[j] );
-		//DrawTextShadow( &dc, m_rInfoText[j], CString(m_dqThumb[i]->info[j]), DT_CENTER | DT_TOP | DT_NOCLIP, (m_crInfoText[i] == -1 ? RGB(255, 255, 255) : m_crInfoText[i]) );
-		//DrawShadowText(pDC->GetSafeHdc(), CString2PCWSTR(m_dqThumb[i]->info[j]), _tcslen(m_dqThumb[i]->info[j]),
-		//				CRect(cpText.x, cpText.y, cpText.x + m_szTile.cx, cpText.y - m_lf.lfHeight),
-		//				DT_CENTER | DT_VCENTER, m_crInfoText[j], RGB(255, 0, 0), 2, 1);
-		}
-		*/
 		//이전 text align값을 기억했다가 복원해줘야 한다.
 		//그렇지 않으면 DrawText에도 영향을 준다.
 		//pDC->SetTextAlign( nFormatOld );
@@ -1825,7 +1826,7 @@ int CThumbCtrl::get_selected_item()
 }
 
 //dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
-int CThumbCtrl::get_selected_items(std::deque<int> *dqSelected)
+int CThumbCtrl::get_selected_items(std::deque<int>* dqSelected)
 {
 	if (dqSelected)
 	{
@@ -1960,7 +1961,7 @@ void CThumbCtrl::ensure_visible(int index)
 	//TRACE(_T("thumb rect = %s\n"), GetRectInfoString(m_dqThumb[index]->rect, 1));
 	//if (RectInRect(rc, m_dqThumb[index]->rect) == false)
 	{
-		set_scroll_pos(-(m_dqThumb[index]->thumb_bottom - m_dqThumb[0]->thumb_bottom - rc.Height() / 2 + m_dqThumb[index]->rect.Height()/2));
+		set_scroll_pos(-(m_dqThumb[index]->thumb_bottom - m_dqThumb[0]->thumb_bottom - rc.Height() / 2 + m_dqThumb[index]->rect.Height() / 2));
 	}
 }
 
@@ -2092,7 +2093,7 @@ BOOL CThumbCtrl::PreTranslateMessage(MSG* pMsg)
 				return true;
 			}
 			break;
-		case VK_DELETE :
+		case VK_DELETE:
 			if (!m_in_editing)
 				on_menu_delete();
 			break;
@@ -2158,7 +2159,7 @@ void CThumbCtrl::edit_begin(int index)
 		m_pEdit->SetMargins(0, 0);
 	}
 
-	CDC *pDC = m_pEdit->GetDC();
+	CDC* pDC = m_pEdit->GetDC();
 	CRect textRect = r;
 
 	pDC->DrawText(m_dqThumb[index]->title, textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
@@ -2232,7 +2233,7 @@ void CThumbCtrl::set_title(int index, CString title)
 void CThumbCtrl::sort_by_info(int idx)
 {
 	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
-		[idx](const CThumbImage *a, const CThumbImage *b)
+		[idx](const CThumbImage* a, const CThumbImage* b)
 		{
 			//문자열인지 숫자인지에 따라 수정되야 한다.
 			return (a->info[idx] > b->info[idx]);
@@ -2246,12 +2247,12 @@ void CThumbCtrl::sort_by_info(int idx)
 void CThumbCtrl::sort_by_title()
 {
 	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
-		[](CThumbImage *a, CThumbImage *b)
-	{
-		CString str0 = a->title;
-		CString str1 = b->title;
-		return !is_greater_with_numeric(str0, str1);
-	}
+		[](CThumbImage* a, CThumbImage* b)
+		{
+			CString str0 = a->title;
+			CString str1 = b->title;
+			return !is_greater_with_numeric(str0, str1);
+		}
 	);
 
 	//순서가 변경되면 해당 썸네일의 rect정보도 변경된다.

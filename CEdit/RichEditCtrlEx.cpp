@@ -99,6 +99,11 @@ END_MESSAGE_MAP()
 ///
 /// \sa AppendToLogAndScroll()
 //-----------------------------------------------------------------------------
+/*
+* vs처럼 내용을 보기 위해 스크롤하면 그 자리에서 멈춰있고
+* 맨 마지막 라인으로 캐럿을 옮겨놓으면 자동 스크롤되도록 처리했으나
+* 뭔가 깜빡임이 발생한다.
+*/
 int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/ )
 {
 	if ( m_hWnd == NULL )
@@ -106,6 +111,11 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 
 	if ( !m_bShowLog )
 		return 0;
+
+	//SetRedraw(FALSE);
+	int nOldFirstVisibleLine = GetFirstVisibleLine();
+	long lMinSel, lMaxSel;
+	GetSel(lMinSel, lMaxSel);
 
 	if ( bAddNewLine && ( str.Right( 1 ) != "\n" ) )
 		str += "\n";
@@ -115,9 +125,24 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	CHARFORMAT	cf;
 
 	CPoint pt = GetCaretPos();
-	TRACE(_T("%d, %d\n"), pt.x, pt.y);
+	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
 	if (pt.x > 1)
 		m_auto_scroll = false;
+
+	SCROLLINFO	si;
+	si.cbSize = sizeof(SCROLLINFO);
+	GetScrollInfo(SB_VERT, &si);
+
+	/*
+	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, max = %d, sel = %d, %d\n"),
+		m_auto_scroll,
+		si.nPos,
+		si.nTrackPos,
+		si.nMax,
+		lMinSel, lMaxSel);
+	if (si.nPos != si.nTrackPos)
+		m_auto_scroll = false;
+	*/
 
 	nOldLines = GetLineCount();
 	nInsertionPoint = GetWindowTextLength();
@@ -181,25 +206,37 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	TRACE(str);
 #endif
 
-	SCROLLINFO	si;
-	si.cbSize = sizeof(SCROLLINFO);
-	GetScrollInfo(SB_VERT, &si);
 
-	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, max = %d\n"),
-		m_auto_scroll,
-		si.nPos,
-		si.nTrackPos,
-		si.nMax );
+	//if (!m_auto_scroll)
+	//	return 0;
 
-	if (!m_auto_scroll)
-		return 0;
 
+	CRect rc;
+	GetClientRect(rc);
 	// Get new line count
-	nNewLines = GetLineCount();
+	if ((si.nMax - si.nTrackPos) < rc.Height())
+	{
+		nNewLines = GetLineCount();
 
-	// Scroll by the number of lines just inserted
-   	nScroll	= nNewLines - nOldLines;
-   	LineScroll(nScroll);
+		// Scroll by the number of lines just inserted
+		nScroll = nNewLines - nOldLines;
+		LineScroll(nScroll);
+	}
+	else// if (false)
+	{
+		SetSel(lMinSel, lMaxSel);
+
+		int nNewFirstVisibleLine = GetFirstVisibleLine();
+
+		if (nOldFirstVisibleLine != nNewFirstVisibleLine)
+		{
+			SetRedraw(TRUE);
+			LineScroll(nOldFirstVisibleLine - nNewFirstVisibleLine);
+		}
+
+		SetRedraw(TRUE);
+	}
+
 
 	return 0;
 }

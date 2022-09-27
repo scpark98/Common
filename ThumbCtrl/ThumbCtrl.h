@@ -193,17 +193,17 @@ public:
 	void			remove_selected(bool bRepaint = false);
 	
 //부가 기능
-	int				get_thumb_count() { return m_dqThumb.size(); }
+	int				thumb_count() { return m_dqThumb.size(); }
 
-	void			set_show_title(int show);
-	bool			get_show_title() { return m_show_title; }
+	void			show_title(int show);
+	bool			show_title() { return m_show_title; }
 
-	void			set_show_resolution(int show);
-	bool			get_show_resolution() { return m_show_resolution; }
+	void			show_resolution(int show);
+	bool			show_resolution() { return m_show_resolution; }
 
 	//show : 1(show), 0(hide), -1(toggle)
-	void			set_show_index(int show);
-	bool			get_show_index() { return m_show_index; }
+	void			show_index(int show);
+	bool			show_index() { return m_show_index; }
 
 	bool			isModified() { return m_modified; }
 
@@ -214,7 +214,7 @@ public:
 //정보 텍스트 표시
 	bool			m_show_info_text[4];
 	COLORREF		m_crInfoText[4];
-	void			set_info_text(int thumb_index, int idx, CString sInfo, bool refresh );
+	void			info_text(int thumb_index, int idx, CString sInfo, bool refresh );
 
 
 //폰트 관련

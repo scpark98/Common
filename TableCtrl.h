@@ -24,7 +24,7 @@ class CTableItem
 {
 public:
 	CTableItem() {};
-	CTableItem(CString _text, COLORREF _text_color = ::GetSysColor(COLOR_BTNTEXT), bool _bold = false, float _line_thick = 1.0, COLORREF _line_color = RGB(192,192,192))
+	CTableItem(CString _text, COLORREF _text_color = ::GetSysColor(COLOR_BTNTEXT), bool _bold = false, float _line_thick = 1.0, COLORREF _line_color = RGB(255,192,192))
 	{
 		text = _text;
 		text_color = _text_color;

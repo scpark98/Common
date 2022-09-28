@@ -469,7 +469,11 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	PCWSTR		CString2PCWSTR(CString str);
 	char*		CString2char(CString str);
 	TCHAR*		CString2TCHAR(CString str);
-	CString		char2CString(char *str);
+	LPCSTR		CString2LPCSTR(CString str);
+
+	//chStr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
+	//그렇지 않을 경우 chStr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.
+	CString		char2CString(char *chStr, int length = -1);
 	CString		TCHAR2CString(TCHAR *str);
 	VARIANT		CString2VARIANT( CString str );
 

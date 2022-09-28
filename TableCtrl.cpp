@@ -153,10 +153,11 @@ void CTableCtrl::OnPaint()
 	for (i = 0; i < m.size(); i++)
 	{
 		Color cr_grid(m[i][0].line_color);
-		Pen pen_gridY(cr_grid, m[i][0].line_thick);
-		Pen pen_gridX(cr_grid, 1.0);
+		Pen pen_gridH(cr_grid, m[i][0].line_thick);
+		Pen pen_gridV(cr_grid, 1.0);
 
-		g.DrawLine(&pen_gridY, margin, sy, rc.right - margin, sy);
+		g.DrawLine(&pen_gridH, margin, sy, rc.right - margin, sy);
+		g.DrawLine(&pen_gridH, 0, 0, 100, 100);
 
 		for (j = 0; j < m[i].size(); j++)
 		{
@@ -166,7 +167,7 @@ void CTableCtrl::OnPaint()
 
 			//세로 구분선
 			if (j > 0)
-				g.DrawLine(&pen_gridX, sx, sy, sx, sy + m_line_height);
+				g.DrawLine(&pen_gridV, sx, sy, sx, sy + m_line_height);
 
 			sx += m_width[j];
 		}

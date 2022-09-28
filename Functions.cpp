@@ -6663,30 +6663,25 @@ std::wstring CString2wstring(const char* str)
 
 char* CString2char(CString str)
 {
-	char* szStr = NULL;
+	char *char_str = NULL;
+
 #if defined(UNICODE) || defined(_UNICODE)
-	int nLen = str.GetLength() + 1;
-	TCHAR* tszTemp = NULL;
-	tszTemp = new TCHAR[nLen];
-	memset(tszTemp, 0x00, nLen * sizeof(TCHAR));
-	_tcscpy_s(tszTemp, nLen, str);
-	// Get size (실제사용되는바이트사이즈)
-	int nSize = WideCharToMultiByte(CP_ACP, 0, tszTemp, -1, NULL, NULL, NULL, NULL);
-	szStr = new char[nSize];
-	memset(szStr, 0x00, nSize);
-	WideCharToMultiByte(CP_ACP, 0, tszTemp, -1, szStr, nSize, NULL, NULL);
-	if (tszTemp)
-	{
-		delete[] tszTemp;
-		tszTemp = NULL;
-	}
+	wchar_t *wchar_str;
+	int char_str_len;
+
+	wchar_str = str.GetBuffer(str.GetLength());
+	char_str_len = WideCharToMultiByte(CP_ACP, 0, wchar_str, -1, NULL, 0, NULL, NULL);
+	char_str = new char[char_str_len];
+	memset(char_str, 0, char_str_len);
+
+	WideCharToMultiByte(CP_ACP, 0, wchar_str, -1, char_str, char_str_len, 0, 0);
 #else
 	int nLen = str.GetLength() + 1;
-	szStr = new char[nLen];
-	memset(szStr, 0x00, nLen);
-	strcpy(szStr, str);
+	char_str = new char[nLen];
+	memset(char_str, 0, nLen);
+	strcpy(char_str, str);
 #endif
-	return szStr;
+	return char_str;
 }
 
 //
@@ -6701,6 +6696,22 @@ TCHAR* CString2TCHAR(CString str)
 	_tcscpy_s(tszStr, nLen, str);
 
 	return tszStr;
+}
+
+//https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=ikariksj&logNo=140186998237
+LPCSTR		CString2LPCSTR(CString str)
+{
+#if defined(UNICODE) || defined(_UNICODE)
+	//unicode 환경에서 Casting은 가능하지만
+	//실제 LPCSTR 인자로 넘겨서 사용 하니 문제 발생.
+	CStringA strA(str);
+	LPCSTR lpcstr = strA;
+	return lpcstr;
+#else
+	//Multibyte 환경에서는 캐스팅으로 문제 없이 사용 가능
+	LPCSTR lpcstr = (LPSTR)(LPCTSTR)str;
+	return lpcstr;
+#endif
 }
 
 //
@@ -6722,25 +6733,27 @@ std::string CString2string(CString str)
 //
 // Char → CString
 //
-CString char2CString(char* str)
+CString char2CString(char* chStr, int length)
 {
-	CString cStr;
+	CString str;
+
 #if defined(UNICODE) || defined(_UNICODE)
-	int nLen = strlen(str) + 1;
-	TCHAR* tszTemp = NULL;
-	tszTemp = new TCHAR[nLen];
-	memset(tszTemp, 0x00, nLen * sizeof(TCHAR));
-	MultiByteToWideChar(CP_ACP, 0, str, -1, tszTemp, nLen * sizeof(TCHAR));
-	cStr.Format(_T("%s"), tszTemp);
-	if (tszTemp)
-	{
-		delete[] tszTemp;
-		tszTemp = NULL;
-	}
+	int len;
+	BSTR buf;
+
+	if (length < 0)
+		len = MultiByteToWideChar(CP_ACP, 0, chStr, strlen(chStr), NULL, NULL);
+	else
+		len = length;
+
+	buf = SysAllocStringLen(NULL, len);
+	MultiByteToWideChar(CP_ACP, 0, chStr, len, buf, len);
+
+	str.Format(_T("%s"), buf);
 #else
-	cStr.Format("%s", str);
+	str.Format("%s", chStr);
 #endif
-	return cStr;
+	return str;
 }
 
 //

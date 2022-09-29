@@ -28,7 +28,7 @@
 #ifndef HAPPYHTTP_H
 #define HAPPYHTTP_H
 
-
+#include <afxwin.h>
 #include <string>
 #include <map>
 #include <vector>

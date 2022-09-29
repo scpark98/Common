@@ -16,15 +16,25 @@
 
 #include <afxwin.h>
 #include <gdiplus.h>
-#include <vector>
+#include <deque>
 #include <map>
 // CTableCtrl
+
+using namespace Gdiplus;
+
+#define DEFAULT_TEXT_COLOR Color(255, 32, 32, 32)
+#define DEFAULT_LINE_COLOR Color(255, 192, 192, 192)
 
 class CTableItem
 {
 public:
 	CTableItem() {};
-	CTableItem(CString _text, COLORREF _text_color = ::GetSysColor(COLOR_BTNTEXT), bool _bold = false, float _line_thick = 1.0, COLORREF _line_color = RGB(255,192,192))
+
+	CTableItem(CString _text,
+		bool _bold = false,
+		float _line_thick = 1.0,
+		Color _text_color = DEFAULT_TEXT_COLOR,
+		Color _line_color = DEFAULT_LINE_COLOR)
 	{
 		text = _text;
 		text_color = _text_color;
@@ -34,10 +44,10 @@ public:
 	}
 
 	CString text = _T("");
-	COLORREF text_color = ::GetSysColor(COLOR_BTNTEXT);
-	bool text_bold;
+	Color text_color = DEFAULT_TEXT_COLOR;
+	bool text_bold = false;
 	float line_thick = 1.0;
-	COLORREF line_color = RGB(255, 192, 192);
+	Color line_color = DEFAULT_LINE_COLOR;
 };
 
 class CTableItemText
@@ -55,20 +65,29 @@ class CTableCtrl : public CWnd
 public:
 	CTableCtrl();
 	virtual ~CTableCtrl();
-	std::vector<int> m_width;
-	int m_line_height = 40;
 
-	std::vector<std::vector<CTableItem>> m;
+	std::deque<std::deque<CTableItem>> m;
 
 	//table의 크기를 설정 또는 재조정한다.
 	void resize(int cx, int cy, bool invalidate);
+	void draw_end_line(bool draw) { m_draw_end_line = draw; }
+
+	CPoint find_string(CString src);
+
+protected:
+	int m_line_height = 28;
+	std::deque<int> m_width;
+	bool m_draw_end_line = true;
+
+	Color m_cr_text = DEFAULT_TEXT_COLOR;
+	Color m_cr_line = DEFAULT_LINE_COLOR;
 
 protected:
 	BOOL			RegisterWindowClass();
 
 protected:
 	DECLARE_MESSAGE_MAP()
-		virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	virtual void PreSubclassWindow();
 public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);

@@ -16,7 +16,7 @@ CTableCtrl::CTableCtrl()
 	if (!RegisterWindowClass())
 		return;
 
-	resize(4, 8, false);
+	//resize(4, 8, false);
 	m_width.resize(4);
 
 	m_width[0] = (150);
@@ -24,29 +24,54 @@ CTableCtrl::CTableCtrl()
 	m_width[2] = (150);
 	m_width[3] = (200);
 
-	std::vector<CTableItem> t;
+	std::deque<CTableItem> t;
 
-	//t.push_back(CTableItem(_T("0-0")));
-	//m.push_back(t);
-	m[0][0] = CTableItem(_T("0-0"));
-	/*
 	t.clear();
-	t.push_back(CTableItem(_T("1-0")));
-	t.push_back(CTableItem(_T("1-1")));
+	t.push_back(CTableItem(_T("티켓 정보"), true, 1.5));
+	m.push_back(t);
+	
+	t.clear();
+	t.push_back(CTableItem(_T("티켓 아이디")));
+	t.push_back(CTableItem());
 	m.push_back(t);
 
 	t.clear();
-	t.push_back(CTableItem(_T("2-0")));
-	t.push_back(CTableItem(_T("2-1")));
-	t.push_back(CTableItem(_T("2-2")));
-	t.push_back(CTableItem(_T("2-3")));
+	t.push_back(CTableItem(_T("고객 정보"), true, 1.5));
 	m.push_back(t);
 
-	int n = m.size();
+	t.clear();
+	t.push_back(CTableItem(_T("신청 번호")));
+	t.push_back(CTableItem());
+	t.push_back(CTableItem(_T("고객 이름")));
+	t.push_back(CTableItem());
+	m.push_back(t);
 
+	t.clear();
+	t.push_back(CTableItem(_T("주민등록번호")));
+	t.push_back(CTableItem());
+	t.push_back(CTableItem(_T("고객 연락처")));
+	t.push_back(CTableItem());
+	m.push_back(t);
 
-	m[2][0].text = _T("한글 텍스트 출력 긴 테스트 항목");
-	*/
+	t.clear();
+	t.push_back(CTableItem(_T("주소")));
+	t.push_back(CTableItem());
+	m.push_back(t);
+
+	t.clear();
+	t.push_back(CTableItem(_T("신청 서비스 목록")));
+	t.push_back(CTableItem());
+	m.push_back(t);
+
+	t.clear();
+	t.push_back(CTableItem(_T("신분증 진위확인 특이사항")));
+	t.push_back(CTableItem());
+	t.push_back(CTableItem(_T("화면캡쳐여부")));
+	t.push_back(CTableItem());
+	m.push_back(t);
+
+	CPoint pos = find_string(_T("주민등록번호"));
+	m[pos.y][pos.x + 1].text = _T("한글123456-1234567");
 }
 
 CTableCtrl::~CTableCtrl()
@@ -91,12 +116,7 @@ BEGIN_MESSAGE_MAP(CTableCtrl, CWnd)
 	ON_WM_SIZE()
 END_MESSAGE_MAP()
 
-
-
 // CTableCtrl 메시지 처리기
-
-
-
 
 BOOL CTableCtrl::PreCreateWindow(CREATESTRUCT& cs)
 {
@@ -150,14 +170,17 @@ void CTableCtrl::OnPaint()
 	int sx = rc.left + margin;
 	int sy = rc.top + margin;
 
+	if (m.size() == 0)
+		return;
+
+	Color cr_grid(m[0][0].line_color);
+
 	for (i = 0; i < m.size(); i++)
 	{
-		Color cr_grid(m[i][0].line_color);
 		Pen pen_gridH(cr_grid, m[i][0].line_thick);
 		Pen pen_gridV(cr_grid, 1.0);
 
 		g.DrawLine(&pen_gridH, margin, sy, rc.right - margin, sy);
-		g.DrawLine(&pen_gridH, 0, 0, 100, 100);
 
 		for (j = 0; j < m[i].size(); j++)
 		{
@@ -177,7 +200,8 @@ void CTableCtrl::OnPaint()
 	}
 
 	//마지막 라인
-	//g.DrawLine(&pen_grid, margin, sy, rc.right - margin, sy);
+	if (m_draw_end_line)
+		g.DrawLine(&Pen(cr_grid, m[0][0].line_thick), margin, sy, rc.right - margin, sy);
 }
 
 
@@ -209,4 +233,22 @@ void CTableCtrl::resize(int cx, int cy, bool invalidate)
 
 	if (invalidate)
 		Invalidate();
+}
+
+CPoint CTableCtrl::find_string(CString src)
+{
+	int x, y;
+
+	for (y = 0; y < m.size(); y++)
+	{
+		for (x = 0; x < m[y].size(); x++)
+		{
+			if (m[y][x].text == src)
+			{
+				return CPoint(x, y);
+			}
+		}
+	}
+
+	return CPoint(-1, -1);
 }

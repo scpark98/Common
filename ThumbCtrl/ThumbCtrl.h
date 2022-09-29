@@ -161,11 +161,11 @@ public:
 	//썸네일 타일 배경색
 	COLORREF		m_crBackThumb;
 
-	void			set_color_theme(int theme, bool invalidate = true);
-	void			set_back_color(COLORREF cr) { m_crBack = cr; Invalidate(); }
-	void			set_thumb_back_color(COLORREF cr) { m_crBackThumb = cr; Invalidate(); }
-	void			set_text_color(COLORREF cr) { m_crTitle = cr; Invalidate(); }
-	void			set_resolution_color(COLORREF cr) { m_crResolution = cr; Invalidate(); }
+	void			color_theme(int theme, bool invalidate = true);
+	void			back_color(COLORREF cr) { m_crBack = cr; Invalidate(); }
+	void			thumb_back_color(COLORREF cr) { m_crBackThumb = cr; Invalidate(); }
+	void			text_color(COLORREF cr) { m_crTitle = cr; Invalidate(); }
+	void			resolution_color(COLORREF cr) { m_crResolution = cr; Invalidate(); }
 
 //선택 관련
 	std::deque<int> m_selected;

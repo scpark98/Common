@@ -27,7 +27,7 @@ CThumbCtrl::CThumbCtrl()
 	m_modified = false;
 	m_last_clicked = 0;
 
-	set_color_theme(color_theme_default, false);
+	color_theme(color_theme_default, false);
 
 	m_index = 0;
 	m_loading_index = -1;
@@ -1411,7 +1411,7 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 	CWnd::OnTimer(nIDEvent);
 }
 
-void CThumbCtrl::set_color_theme(int theme, bool invalidate)
+void CThumbCtrl::color_theme(int theme, bool invalidate)
 {
 	switch (theme)
 	{

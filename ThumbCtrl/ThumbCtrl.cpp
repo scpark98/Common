@@ -74,6 +74,11 @@ void CThumbCtrl::release(int index)
 {
 	for (int i = 0; i < m_dqThumb.size(); i++)
 	{
+		//if (m_dqThumb[i]->features)
+		{
+			//SAFE_DELETE_ARRAY(m_dqThumb[i]->features);
+		}
+
 		delete m_dqThumb[i];
 	}
 
@@ -2265,6 +2270,9 @@ void CThumbCtrl::sort_by_title()
 
 void CThumbCtrl::sort_by_score()
 {
+	if (m_dqThumb.size() == 0)
+		return;
+
 	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
 		[](const CThumbImage* a, const CThumbImage* b)
 		{

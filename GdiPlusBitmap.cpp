@@ -57,6 +57,12 @@ CGdiplusBitmap::CGdiplusBitmap(LPCWSTR pFile)
 	Load(pFile);
 }
 
+CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
+{
+	src->deep_copy(this);
+	resolution();
+}
+
 bool CGdiplusBitmap::Load(LPCWSTR pFile)
 {
 	release();
@@ -264,6 +270,25 @@ void CGdiplusBitmap::resize(int cx, int cy)
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, cx, cy, PixelFormatDontCare);
+	delete result;
+
+	resolution();
+}
+
+void CGdiplusBitmap::sub_image(CRect r)
+{
+	sub_image(r.left, r.top, r.Width(), r.Height());
+}
+
+void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
+{
+	Bitmap* result = new Bitmap(w, h);
+	Graphics g(result);
+
+	g.DrawImage(m_pBitmap, Rect(0, 0, w, h), x, y, w, h, UnitPixel);
+
+	delete m_pBitmap;
+	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
 	delete result;
 
 	resolution();

@@ -717,8 +717,8 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		case 'V'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
 							{
 								//PasteInsertFromClipboard();
-								MessageBeep(MB_ICONINFORMATION);
-								return true;
+								//MessageBeep(MB_ICONINFORMATION);
+								return false;
 							}
 							break;
 		case VK_F2		:	if ( m_in_editing )

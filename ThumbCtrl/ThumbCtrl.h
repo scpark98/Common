@@ -87,11 +87,19 @@ public:
 	int			thumb_bottom;//thumb image의 하단 좌표, 타이틀 편집시 사용
 	int			line_index;	//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
 	double		score;
-	float*		features;
+	float*		features = NULL;
 
 	CThumbImage()
 	{
 		key_thumb = false;
+	}
+	~CThumbImage()
+	{
+		if (features)
+		{
+			delete[] features;
+			features = NULL;
+		}
 	}
 
 	//절대로 소멸자에서 data라는 메모리 주소의 공간을 delete해서는 안된다.

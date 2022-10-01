@@ -41,12 +41,14 @@ public:
 	void clone(CGdiplusBitmap* dst);
 	void deep_copy(CGdiplusBitmap* dst);
 	void rotate(Gdiplus::RotateFlipType type);
-	//회전시키면 이미지가 원래의 w, h를 벗어나므로 캔버스를 자동으로 키워줘야 잘리지 않는다.
-	void rotate(float degree, bool auto_enlarge = false);
+	//회전시키면 w, h가 달라지므로 늘리거나 줄여줘야 한다.
+	void rotate(float degree, bool auto_resize = false, Color remove_back_color = Color(0,0,0,0));
 	void resize(int cx, int cy);
 	void sub_image(int x, int y, int w, int h);
 	void sub_image(CRect r);
+	void fit_to_image(Color remove_back_color = Color(0, 0, 0, 0));
 	void set_colorkey(Color low, Color high);
+	bool is_equal(Color cr0, Color cr1, int channel = 3);
 
 	void set_transparent(float transparent);
 	void gray();
@@ -55,6 +57,7 @@ public:
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool save(CString filename);// , ULONG quality/* = 100*/);
+	bool copy_to_clipbard();
 
 	int cols = 0;
 	int rows = 0;

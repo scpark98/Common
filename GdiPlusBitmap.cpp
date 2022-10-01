@@ -211,13 +211,13 @@ void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 	m_pBitmap->RotateFlip(type);
 }
 
-void CGdiplusBitmap::rotate(float degree, bool auto_enlarge)
+void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_color)
 {
 	int originw = cols;
 	int originh = rows;
 	CRect rotated(0, 0, originw, originh);
 
-	if (auto_enlarge)
+	if (auto_resize)
 		std::vector<CPoint> m_pts = get_rotated(originw / 2, originh / 2, &rotated, degree);
 
 	int neww = rotated.Width();
@@ -259,6 +259,145 @@ void CGdiplusBitmap::rotate(float degree, bool auto_enlarge)
 
 	cols = neww;
 	rows = newh;
+
+	save(_T("d:\\temp\\rotated.png"));
+
+	//회전시키면 캔버스의 크기가 커지거나 작아지는데
+	//작아졌을 경우 불필요한 여백이 유지되므로 이를 제거한다.
+	if (auto_resize)
+	{
+		fit_to_image(remove_back_color);
+	}
+
+	save(_T("d:\\temp\\rotated_fit.png"));
+}
+
+bool is_equal(Color cr0, Color cr1, int channel)
+{
+	bool equal = true;
+	//if (cr0.)
+	return equal;
+}
+
+void CGdiplusBitmap::fit_to_image(Color remove_back_color)
+{
+	int x, y;
+	CRect r(0, 0, cols, rows);
+
+	Color pixel;
+	bool found = false;
+
+	long t0 = clock();
+
+	/* 전체 검사는 100~200ms 소요
+	bool upperleftfound = false;
+	for (y = 0; y < rows; y++)
+	{
+		for (x = 0; x < cols; x++)
+		{
+			m_pBitmap->GetPixel(x, y, &pixel);
+			if (pixel.GetValue() != remove_back_color.GetValue())
+			{
+				if (!upperleftfound)
+				{
+					r.left = r.right = x;
+					r.top = r.bottom = y;
+					upperleftfound = true;
+				}
+				else
+				{
+					if (x > r.right)
+						r.right = x;
+					else if (x < r.left)
+						r.left = x;
+					if (y > r.bottom)
+						r.bottom = y;
+				}
+			}
+		}
+	}
+	*/
+
+	// in debug mode : 50~100ms	
+	//left
+	found = false;
+	for (x = 0; x < cols; x++)
+	{
+		for (y = 0; y < rows; y++)
+		{
+			m_pBitmap->GetPixel(x, y, &pixel);
+			if (pixel.GetValue() != remove_back_color.GetValue())
+			{
+				r.left = x;
+				found = true;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	//top
+	found = false;
+	for (y = 0; y < rows; y++)
+	{
+		for (x = 0; x < cols; x++)
+		{
+			m_pBitmap->GetPixel(x, y, &pixel);
+			if (pixel.GetValue() != remove_back_color.GetValue())
+			{
+				r.top = y;
+				found = true;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	//right
+	found = false;
+	for (x = cols - 1; x >= 0; x--)
+	{
+		for (y = 0; y < rows; y++)
+		{
+			m_pBitmap->GetPixel(x, y, &pixel);
+			if (pixel.GetValue() != remove_back_color.GetValue())
+			{
+				r.right = x;
+				found = true;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	//bottom
+	found = false;
+	for (y = rows - 1; y >= 0; y--)
+	{
+		for (x = 0; x < cols; x++)
+		{
+			m_pBitmap->GetPixel(x, y, &pixel);
+			if (pixel.GetValue() != remove_back_color.GetValue())
+			{
+				r.bottom = y;
+				found = true;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	TRACE(_T("fit to image = %ld ms\n"), clock() - t0);
+
+	sub_image(r);
 }
 
 void CGdiplusBitmap::resize(int cx, int cy)
@@ -529,4 +668,42 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 		return true;
 
 	return false;
+}
+
+bool CGdiplusBitmap::copy_to_clipbard()
+{
+	bool res = false;
+	HBITMAP hbitmap;
+	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
+	if (status != Gdiplus::Ok)
+		return false;
+	BITMAP bm;
+	GetObject(hbitmap, sizeof bm, &bm);
+
+	BITMAPINFOHEADER bi =
+	{ sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
+
+	std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
+	auto hdc = GetDC(NULL);
+	GetDIBits(hdc, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
+	ReleaseDC(NULL, hdc);
+
+	auto hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof bi + vec.size());
+	auto buffer = (BYTE*)GlobalLock(hmem);
+	memcpy(buffer, &bi, sizeof bi);
+	memcpy(buffer + sizeof bi, vec.data(), vec.size());
+	GlobalUnlock(hmem);
+
+	if (OpenClipboard(NULL))
+	{
+		EmptyClipboard();
+		SetClipboardData(CF_DIB, hmem);
+		CloseClipboard();
+		MessageBeep(0);
+		res = true;
+	}
+
+	DeleteObject(hbitmap);
+
+	return res;
 }

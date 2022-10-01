@@ -1181,14 +1181,23 @@ void CThumbCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 	CMenu	menu;
 
 	menu.CreatePopupMenu();
-	menu.AppendMenu(MF_STRING, idToggleIndex, _T("Display thumbnail index(&I)"));
-	menu.AppendMenu(MF_STRING, idToggleResolution, _T("Display image resolution"));
-	menu.AppendMenu(MF_STRING, idFind, _T("Find...(&F)"));
-	menu.AppendMenu(MF_STRING, idPromptMaxThumb, _T("Set max thumbnails(&A)(0 : no limits)..."));
+
+	menu.AppendMenu(MF_STRING, idTotalCount, _T("총 ") + i2S(m_dqThumb.size()) + _T("개의 썸네일"));
+	menu.EnableMenuItem(idToggleIndex, MF_DISABLED);
 	menu.AppendMenu(MF_SEPARATOR);
-	menu.AppendMenu(MF_STRING, idDeleteThumb, _T("Delete selected thumbnails(&D)"));
+
+	menu.AppendMenu(MF_STRING, idFind, _T("찾기...(&F)"));
+	menu.AppendMenu(MF_STRING, idReload, _T("새로 고침(&R)"));
 	menu.AppendMenu(MF_SEPARATOR);
-	menu.AppendMenu(MF_STRING, idRemoveAll, _T("Remove all thumbnails...(&R)"));
+
+	menu.AppendMenu(MF_STRING, idToggleIndex, _T("인덱스 표시"));
+	menu.AppendMenu(MF_STRING, idToggleResolution, _T("해상도 정보 표시"));
+	//menu.AppendMenu(MF_STRING, idPromptMaxThumb, _T("Set max thumbnails(&A)(0 : no limits)..."));
+	menu.AppendMenu(MF_SEPARATOR);
+
+	menu.AppendMenu(MF_STRING, idDeleteThumb, _T("선택 항목을 리스트에서 삭제"));
+	//menu.AppendMenu(MF_SEPARATOR);
+	//menu.AppendMenu(MF_STRING, idRemoveAll, _T("모든 썸네일 삭제...(&R)"));
 
 	menu.CheckMenuItem(idToggleIndex, m_show_index ? MF_CHECKED : MF_UNCHECKED);
 
@@ -1248,9 +1257,13 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 	case idFind:
 	{
 		find_text(true, true);
-
 		break;
 	}
+
+	case idReload :
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload, 0), 0);
+		break;
 
 	case idDeleteThumb:
 		on_menu_delete();

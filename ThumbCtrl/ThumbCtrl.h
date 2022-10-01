@@ -50,6 +50,7 @@ public:
 	{
 		message_thumb_insert = 0,
 		message_thumb_loading_completed,
+		message_thumb_reload,
 		message_thumb_lbutton_dbclicked,
 		message_thumb_rename,
 		message_thumb_keydown,
@@ -130,8 +131,10 @@ public:
 	enum CONTEXT_MENU
 	{
 		idToggleIndex = WM_USER + 1234,
+		idTotalCount,
 		idToggleResolution,
 		idFind,
+		idReload,
 		idPromptMaxThumb,
 		idDeleteThumb,
 		idRemoveAll,

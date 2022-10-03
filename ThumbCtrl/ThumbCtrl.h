@@ -40,11 +40,7 @@ class CThumbCtrlMsg
 {
 public:
 	CThumbCtrlMsg(int _ctrl_id, int _msg, int _index)
-	{
-		ctrl_id = _ctrl_id;
-		msg = _msg;
-		index = _index;
-	}
+		: ctrl_id(_ctrl_id), msg(_msg), index(_index) {}
 
 	enum ThumbCtrlMsgs
 	{
@@ -75,7 +71,7 @@ public:
 #if USE_OPENCV
 	cv::Mat		img;
 #else
-	CGdiplusBitmap	img;
+	CGdiplusBitmap*	img = NULL;
 #endif
 	CString		title;
 	bool		key_thumb;	//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
@@ -92,15 +88,12 @@ public:
 
 	CThumbImage()
 	{
+		img = NULL;
 		key_thumb = false;
+		features = NULL;
 	}
 	~CThumbImage()
 	{
-		if (features)
-		{
-			delete[] features;
-			features = NULL;
-		}
 	}
 
 	//절대로 소멸자에서 data라는 메모리 주소의 공간을 delete해서는 안된다.
@@ -130,17 +123,18 @@ public:
 
 	enum CONTEXT_MENU
 	{
-		idToggleIndex = WM_USER + 1234,
-		idTotalCount,
-		idToggleResolution,
+		idTotalCount = WM_USER + 1234,
 		idFind,
 		idReload,
+		idCopyToClipboard,
+		idToggleIndex,
+		idToggleResolution,
 		idPromptMaxThumb,
 		idDeleteThumb,
 		idRemoveAll,
 	};
 
-	std::deque<CThumbImage*> m_dqThumb;
+	std::deque<CThumbImage> m_dqThumb;
 	int size() { return m_dqThumb.size(); }
 	void release(int index);
 
@@ -184,6 +178,7 @@ public:
 	//bool			m_use_multi_selection;	//default = false, if true, m_bUseSelection will be set to true
 	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
 	int				get_selected_item();
+	int				get_index_from_point(CPoint pt);
 	//dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
 	int				get_selected_items(std::deque<int> *dqSelected = NULL);
 	//index = -1 : 전체선택
@@ -196,6 +191,7 @@ public:
 	std::deque<int> find_text(bool show_inputbox, bool select);
 
 //추가, 삭제 관련
+	bool			is_loading_completed() { return m_loading_completed; }
 	void			add_files(std::deque<CString> files, bool reset = true);
 	int				insert(int index, uint8_t* pData, int width, int height, int format, CString sTitle = _T(""), bool bKeyThumb = false, bool bModifiedFlag = true );
 	int				insert(int index, CString full_path, CString sTitle = _T("\0"), bool bKeyThumb = false, bool invalidate = true );
@@ -233,9 +229,6 @@ public:
 	void			set_font_size(int nSize);
 	void			set_font_bold(bool bBold = true);
 
-	int				m_nDataIndex;				//처리될 데이터 그룹의 시작 인덱스
-	void			loading_function( int idx );
-	bool			is_loading_completed() { return m_loading_completed; }
 
 //타이틀 편집 관련
 	void			edit_begin(int index);
@@ -276,6 +269,7 @@ protected:
 	CSize			m_szMargin;		//썸네일의 시작 여백
 	CSize			m_szGap;		//썸네일 간격
 	CSize			get_tile_size() { return m_szTile; }
+	void			enlarge_size(bool enlarge);
 
 //스크롤 기능 관련
 	int				m_scroll_pos;
@@ -310,11 +304,14 @@ protected:
 	int				m_index_select_after_loading;
 	long			m_clock_start;
 
-	CWinThread*		m_pThreadConvert;
+	//CWinThread*		m_pThreadConvert;
 	int				m_nThread;					//총 쓰레드 개수
-	bool			m_bThreadConvert[MAX_THREAD];
 	int				m_nStartIndex[MAX_THREAD];	//한 쓰레드에서 처리할 데이터 시작 인덱스
 	int				m_nEndIndex[MAX_THREAD];	//한 쓰레드에서 처리할 데이터 끝 인덱스
+
+	int				m_nDataIndex;				//처리될 데이터 그룹의 시작 인덱스
+	void			loading_function(int idx);
+
 	std::deque<bool> m_loading_complete;		//완료된 데이터 수
 	bool			m_loading_completed;
 	int				CheckAllThreadEnding();

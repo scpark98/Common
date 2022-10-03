@@ -4866,6 +4866,16 @@ CRect makeCenterRect(int cx, int cy, int w, int h)
 	return result;
 }
 
+Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h)
+{
+	Gdiplus::Rect result;
+	result.X = cx - w / 2;
+	result.Y = cy - h / 2;
+	result.Width = w;
+	result.Height = h;
+	return result;
+}
+
 CRect getCenterRect(int cx, int cy, int w, int h)
 {
 	CRect r;
@@ -8799,10 +8809,11 @@ void adjustRectRange(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t min
 	}
 }
 
-void AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize)
+void AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize, bool includeBR)
 {
 	rect.NormalizeRect();
 	rLimit.NormalizeRect();
+
 	if (rect.left < rLimit.left)
 	{
 		if (bRetainSize)
@@ -8830,6 +8841,14 @@ void AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize)
 			rect.MoveToY(rLimit.bottom - rect.Height());
 		else
 			rect.bottom = rLimit.bottom;
+	}
+
+	if (!includeBR)
+	{
+		if (rect.right == rLimit.right)
+			rect.right--;
+		if (rect.bottom == rLimit.bottom)
+			rect.bottom--;
 	}
 
 	//AdjustRectRange(rect, rLimit.left, rLimit.top, rLimit.right, rLimit.bottom, bRetainSize);

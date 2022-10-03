@@ -78,7 +78,7 @@ bool CGdiplusBitmap::Load(LPCWSTR pFile)
 		//temp.clone(this);
 		//m_pBitmap = pBitmap->Clone(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight(), pBitmap->GetPixelFormat());
 		resolution();
-		get_raw_data();
+		//get_raw_data();
 		return true;
 	}
 
@@ -400,10 +400,12 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 	sub_image(r);
 }
 
-void CGdiplusBitmap::resize(int cx, int cy)
+void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
 {
 	Bitmap* result = new Bitmap(cx, cy);
 	Graphics g(result);
+
+	g.SetInterpolationMode(mode);
 
 	g.DrawImage(m_pBitmap, Rect(0, 0, cx, cy), 0, 0, cols, rows, UnitPixel);
 

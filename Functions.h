@@ -1009,6 +1009,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		makeRect(CRect &Rect, int x, int y, int w, int h );
 	CRect		make_rect(int x, int y, int w, int h);
 	CRect		makeCenterRect(int cx, int cy, int w, int h );
+	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
 	CRect		getCenterRect( int cx, int cy, int w, int h );
 	CRect		get_zoom_rect(CRect rect, double zoom);
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.
@@ -1016,7 +1017,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 
 	//주어진 사각형 범위를 벗어나지 않도록 보정해준다.
 	void		adjustRectRange( int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize );
-	void		AdjustRectRange( CRect& rect, CRect rLimit, bool bRetainSize = true );
+	//이미지의 경우 includeBR은 false로 해야 끝점 좌표가 유효하다.
+	void		AdjustRectRange( CRect& rect, CRect rLimit, bool bRetainSize = true, bool includeBR = false );
 	void		AdjustRectRange( CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true );
 
 	//모니터의 한쪽에 붙은 사각형을 새로운 크기로 변경할 경우 붙은 상태를 유지하고 변경할 필요가 있을 경우 사용.

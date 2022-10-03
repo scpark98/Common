@@ -43,7 +43,10 @@ public:
 	void rotate(Gdiplus::RotateFlipType type);
 	//회전시키면 w, h가 달라지므로 늘리거나 줄여줘야 한다.
 	void rotate(float degree, bool auto_resize = false, Color remove_back_color = Color(0,0,0,0));
-	void resize(int cx, int cy);
+	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
+	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
+	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
+	void resize(int cx, int cy, Gdiplus::InterpolationMode = Gdiplus::InterpolationModeHighQualityBicubic);
 	void sub_image(int x, int y, int w, int h);
 	void sub_image(CRect r);
 	void fit_to_image(Color remove_back_color = Color(0, 0, 0, 0));

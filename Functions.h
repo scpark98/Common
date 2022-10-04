@@ -756,6 +756,8 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 
 	//메모리, memory
 	SIZE_T		GetCurrentMemUsage();
+	INT			IsAvailableMemory(LPVOID pMemoryAddr);
+
 
 /*
 src		: 소스 데이터

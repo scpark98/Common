@@ -13035,6 +13035,44 @@ void resize_bilinear_c4(const unsigned char* src, int srcw, int srch, unsigned c
 	delete[] rows1;
 }
 
+/*
+IsAvailableMemory : 1. 주어진 메모리 주소의 상태가 물리 주소로 확정되었는지 검사 (실제 사용을 위해 필요)
+					2. 주어진 메모리의 보호 속성이 읽기나 쓰기가 가능한지 검사
+	Param :
+		LPVOID  pMemoryAddr : 검사하고자 하는 메모리의 주소
+	Return Value :
+		ERROR_SUCCESS : System Error Code, 모든 것이 성공할 경우의 에러코드
+		기타 값 : Read/Write 가능한 메모리가 아니면 해당 주소의 Protect Mode 를
+					나타내는 0이 아닌 값을 리턴함.
+	Reference :
+		1. https://docs.microsoft.com/en-us/previous-versions/aa915370(v=msdn.10)/
+		2. https://docs.microsoft.com/en-us/windows/desktop/debug/system-error-codes--0-499-/
+*/
+INT IsAvailableMemory(LPVOID pMemoryAddr)
+{
+	MEMORY_BASIC_INFORMATION    MemInfo = { 0, };
+	SIZE_T  nResult = 0;
+
+	nResult = VirtualQuery(pMemoryAddr, &MemInfo, sizeof(MemInfo));
+
+	if (nResult == 0) // 커널 영역인 경우 VirtualQuery 자체가 Fail함.  
+	{
+		return -1;
+	}
+	else if (!(MemInfo.State & MEM_COMMIT))
+	{
+		return MemInfo.State;
+	}
+	else if ((MemInfo.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE)))
+	{
+		return  ERROR_SUCCESS; // System Error Code 성공 : Reference 참조
+	}
+	else
+	{
+		return  MemInfo.Protect;
+	}
+}
+
 #if 0
 void resize11(int* input, int* output, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight)
 {

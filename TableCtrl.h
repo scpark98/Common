@@ -22,8 +22,7 @@
 
 using namespace Gdiplus;
 
-#define DEFAULT_TEXT_COLOR Color(255, 32, 32, 32)
-#define DEFAULT_LINE_COLOR Color(255, 192, 192, 192)
+#define GRAY_COLOR(i) ((i) == 8 ? Color(255, 255, 255, 255) : Color(255, 32 * i, 32 * i, 32 * i))
 
 class CTableItem
 {
@@ -33,21 +32,24 @@ public:
 	CTableItem(CString _text,
 		bool _bold = false,
 		float _line_thick = 1.0,
-		Color _text_color = DEFAULT_TEXT_COLOR,
-		Color _line_color = DEFAULT_LINE_COLOR)
+		Color _text_color = GRAY_COLOR(1),
+		Color _line_color = GRAY_COLOR(7),
+		int _y_margin = 0)
 	{
 		text = _text;
 		text_color = _text_color;
 		text_bold = _bold;
 		line_thick = _line_thick;
 		line_color = _line_color;
+		y_margin = _y_margin;
 	}
 
 	CString text = _T("");
-	Color text_color = DEFAULT_TEXT_COLOR;
+	Color text_color = GRAY_COLOR(1);
 	bool text_bold = false;
 	float line_thick = 1.0;
-	Color line_color = DEFAULT_LINE_COLOR;
+	Color line_color = GRAY_COLOR(7);
+	int y_margin = 0;
 };
 
 class CTableItemText
@@ -70,6 +72,14 @@ public:
 
 	//table의 크기를 설정 또는 재조정한다.
 	void resize(int cx, int cy, bool invalidate);
+
+	void add_line(int num, ...);
+	//void add_line(CString text, ...);
+
+	void set_width(int num, ...);
+	void line_height(int height) { m_line_height = height; Invalidate(); }
+	
+	void draw_first_line(bool draw) { m_draw_first_line = draw; }
 	void draw_end_line(bool draw) { m_draw_end_line = draw; }
 
 	CPoint find_string(CString src);
@@ -77,10 +87,11 @@ public:
 protected:
 	int m_line_height = 28;
 	std::deque<int> m_width;
+	bool m_draw_first_line = true;
 	bool m_draw_end_line = true;
 
-	Color m_cr_text = DEFAULT_TEXT_COLOR;
-	Color m_cr_line = DEFAULT_LINE_COLOR;
+	Color m_cr_text = GRAY_COLOR(1);
+	Color m_cr_line = GRAY_COLOR(7);
 
 protected:
 	BOOL			RegisterWindowClass();

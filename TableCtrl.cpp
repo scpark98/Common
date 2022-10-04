@@ -15,63 +15,6 @@ CTableCtrl::CTableCtrl()
 {
 	if (!RegisterWindowClass())
 		return;
-
-	//resize(4, 8, false);
-	m_width.resize(4);
-
-	m_width[0] = (150);
-	m_width[1] = (200);
-	m_width[2] = (150);
-	m_width[3] = (200);
-
-	std::deque<CTableItem> t;
-
-	t.clear();
-	t.push_back(CTableItem(_T("티켓 정보"), true, 1.5));
-	m.push_back(t);
-	
-	t.clear();
-	t.push_back(CTableItem(_T("티켓 아이디")));
-	t.push_back(CTableItem());
-	m.push_back(t);
-
-	t.clear();
-	t.push_back(CTableItem(_T("고객 정보"), true, 1.5));
-	m.push_back(t);
-
-	t.clear();
-	t.push_back(CTableItem(_T("신청 번호")));
-	t.push_back(CTableItem());
-	t.push_back(CTableItem(_T("고객 이름")));
-	t.push_back(CTableItem());
-	m.push_back(t);
-
-	t.clear();
-	t.push_back(CTableItem(_T("주민등록번호")));
-	t.push_back(CTableItem());
-	t.push_back(CTableItem(_T("고객 연락처")));
-	t.push_back(CTableItem());
-	m.push_back(t);
-
-	t.clear();
-	t.push_back(CTableItem(_T("주소")));
-	t.push_back(CTableItem());
-	m.push_back(t);
-
-	t.clear();
-	t.push_back(CTableItem(_T("신청 서비스 목록")));
-	t.push_back(CTableItem());
-	m.push_back(t);
-
-	t.clear();
-	t.push_back(CTableItem(_T("신분증 진위확인 특이사항")));
-	t.push_back(CTableItem());
-	t.push_back(CTableItem(_T("화면캡쳐여부")));
-	t.push_back(CTableItem());
-	m.push_back(t);
-
-	CPoint pos = find_string(_T("주민등록번호"));
-	m[pos.y][pos.x + 1].text = _T("한글123456-1234567");
 }
 
 CTableCtrl::~CTableCtrl()
@@ -173,14 +116,12 @@ void CTableCtrl::OnPaint()
 	if (m.size() == 0)
 		return;
 
-	Color cr_grid(m[0][0].line_color);
+	Color cr_grid(GRAY_COLOR(7));
 
 	for (i = 0; i < m.size(); i++)
 	{
-		Pen pen_gridH(cr_grid, m[i][0].line_thick);
+		Pen pen_gridH(m[i][0].line_color, m[i][0].line_thick);
 		Pen pen_gridV(cr_grid, 1.0);
-
-		g.DrawLine(&pen_gridH, margin, sy, rc.right - margin, sy);
 
 		for (j = 0; j < m[i].size(); j++)
 		{
@@ -197,6 +138,9 @@ void CTableCtrl::OnPaint()
 
 		sx = rc.left + 8;
 		sy += m_line_height;
+		g.DrawLine(&pen_gridH, margin, sy, rc.right - margin, sy);
+
+		sy += m[i][0].y_margin;
 	}
 
 	//마지막 라인
@@ -219,6 +163,45 @@ void CTableCtrl::OnSize(UINT nType, int cx, int cy)
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	Invalidate();
+}
+
+void CTableCtrl::set_width(int num, ...)
+{
+	m_width.clear();
+
+	va_list list;
+	va_start(list, num);
+
+	for (int i = 0; i < num; i++)
+	{
+		m_width.push_back(va_arg(list, int));
+	}
+
+	va_end(list);
+}
+
+void CTableCtrl::add_line(int num, ...)
+{
+	int count = 1;
+
+	va_list list;
+	va_start(list, num);
+
+	std::deque<CTableItem> t;
+	CTableItem *item = NULL;
+
+	for (int i = 0; i < num; i++)
+	{
+		item = va_arg(list, CTableItem*);
+		if (IsAvailableMemory((LPVOID)item) == ERROR_SUCCESS)
+			t.push_back(*item);
+		else
+			t.push_back(CTableItem());
+	}
+
+	m.push_back(t);
+
+	va_end(list);
 }
 
 void CTableCtrl::resize(int cx, int cy, bool invalidate)

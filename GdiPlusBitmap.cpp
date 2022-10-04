@@ -208,7 +208,10 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 
 void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 {
+	SAFE_DELETE_ARRAY(data);
+
 	m_pBitmap->RotateFlip(type);
+	resolution();
 }
 
 void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_color)
@@ -260,7 +263,7 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 	cols = neww;
 	rows = newh;
 
-	save(_T("d:\\temp\\rotated.png"));
+	//save(_T("d:\\temp\\rotated.png"));
 
 	//회전시키면 캔버스의 크기가 커지거나 작아지는데
 	//작아졌을 경우 불필요한 여백이 유지되므로 이를 제거한다.
@@ -269,7 +272,9 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 		fit_to_image(remove_back_color);
 	}
 
-	save(_T("d:\\temp\\rotated_fit.png"));
+	resolution();
+
+	//save(_T("d:\\temp\\rotated_fit.png"));
 }
 
 bool is_equal(Color cr0, Color cr1, int channel)
@@ -398,6 +403,7 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 	TRACE(_T("fit to image = %ld ms\n"), clock() - t0);
 
 	sub_image(r);
+	resolution();
 }
 
 void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
@@ -546,7 +552,7 @@ void CGdiplusBitmap::convert2gray()
 	channel = 1;
 	stride = cols * channel;
 
-	save(_T("d:\\temp\\gray.bmp"));
+	//save(_T("d:\\temp\\gray.bmp"));
 }
 
 void CGdiplusBitmap::set_transparent(float transparent)

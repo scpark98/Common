@@ -76,7 +76,7 @@ void CThumbCtrl::release(int index)
 	for (int i = 0; i < m_dqThumb.size(); i++)
 	{
 		SAFE_DELETE(m_dqThumb[i].img);
-		SAFE_DELETE_ARRAY(m_dqThumb[i].features);
+		SAFE_DELETE_ARRAY(m_dqThumb[i].feature);
 	}
 
 	m_dqThumb.clear();
@@ -525,7 +525,7 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 	thumb.title = title;
 	thumb.full_path = full_path;
 	thumb.score = 0.0;
-	thumb.features = NULL;
+	thumb.feature = NULL;
 
 	if (index < 0)
 	{

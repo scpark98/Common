@@ -193,7 +193,11 @@ enum RATIO_RECT_ATTACH
 #ifndef WIDTHSTEP4
 #define		WIDTHSTEP4(bits)	( ((bits) + 31) / 32 * 4 )	//bits is not width, but (width * bitCount)
 #endif
-#define		MAKE4WIDTH(width)		( (width + 3) & ~3 )		//width를 4의 배수로 만들어준다.
+
+//width보다 큰 4의 배수로 만들어준다.
+#define		MAKE4WIDTH_U(width)		(((width) + 3) & ~3)
+//width보다 작은 4의 배수로 만들어준다.
+#define		MAKE4WIDTH_D(width)		(((width) - 3) & ~3 | 4)
 
 extern		int			g_nDaysOfMonth[12];
 

@@ -646,7 +646,7 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 	EncoderParameters	encoderParameters;
 	WCHAR				wFile[MAX_PATH];
 
-	CString ext = GetFileExtension(filename).MakeLower();
+	CString ext = filename.Right(3).MakeLower();//GetFileExtension(filename).MakeLower();
 
 	if (ext == _T("jpg") || ext == _T("jpeg"))
 		GetEncoderClsid(L"image/jpeg", &encoderClsid);

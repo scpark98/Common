@@ -2520,7 +2520,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 	bmpInfo.bmiHeader.biClrImportant  = 0;
 
 	// Set a default window size.
-	bmpInfo.bmiHeader.biWidth			= MAKE4WIDTH(w);
+	bmpInfo.bmiHeader.biWidth			= MAKE4WIDTH_U(w);
 	bmpInfo.bmiHeader.biHeight			= -h;
 	bmpInfo.bmiHeader.biBitCount		= 8 * ch;
 	bmpInfo.bmiHeader.biSizeImage		= sizeof(BYTE) * w * h * ch;

@@ -364,6 +364,7 @@ void CComboBoxExt::load_history(CWinApp* app, CString section)
 	ResetContent();
 
 	int count = app->GetProfileInt(section, _T("history count"), 0);
+	int index = app->GetProfileInt(section, _T("current index"), -1);
 
 	CString key;
 	CString text;
@@ -376,11 +377,17 @@ void CComboBoxExt::load_history(CWinApp* app, CString section)
 		if (!text.IsEmpty())
 			AddString(text);
 	}
+
+	if (index >= 0)
+	{
+		SetCurSel(index);
+	}
 }
 
 void CComboBoxExt::save_history(CWinApp* app, CString section)
 {
 	app->WriteProfileInt(section, _T("history count"), GetCount());
+	app->WriteProfileInt(section, _T("current index"), GetCurSel());
 
 	CString key;
 	CString text;

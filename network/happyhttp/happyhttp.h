@@ -46,8 +46,10 @@ namespace happyhttp
 
 class Response;
 
+extern char happyhttp_error[256];
+
 // Helper Functions
-void BailOnSocketError( const char* context );
+int BailOnSocketError( const char* context );
 struct in_addr *atoaddr( const char* address);
 
 
@@ -166,7 +168,7 @@ public:
 	// call it automatically if needed.
 	// But it could block (for name lookup etc), so you might prefer to
 	// call it in advance.
-	void connect();
+	int connect();
 
 	// close connection, discarding any pending requests.
 	void close();
@@ -187,7 +189,7 @@ public:
 	// url is only path part: eg  "/index.html"
 	// headers is array of name/value pairs, terminated by a null-ptr
 	// body & bodysize specify body data of request (eg values for a form)
-	void request( const char* method, const char* url, const char* headers[]=0,
+	int request( const char* method, const char* url, const char* headers[]=0,
 		const unsigned char* body=0, int bodysize=0 );
 
 	// ---------------------------
@@ -204,11 +206,11 @@ public:
 	void putheader( const char* header, int numericvalue );	// alternate version
 
 	// Finished adding headers, issue the request.
-	void endheaders();
+	int endheaders();
 
 	// send body data if any.
 	// To be called after endheaders()
-	void send( const unsigned char* buf, int numbytes );
+	int send( const unsigned char* buf, int numbytes );
 
 protected:
 	// some bits of implementation exposed to Response class

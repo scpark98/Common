@@ -49,6 +49,8 @@
 #include <string>
 #include <algorithm>
 
+#include <openssl/applink.c>
+
 #ifdef __APPLE__
 	#define _stricmp strcasecmp
 #endif
@@ -59,6 +61,7 @@ using namespace std;
 
 namespace happyhttp
 {
+	char happyhttp_error[256] = { 0, };
 
 #ifdef WIN32
 const char* GetWinsockErrorString( int err );
@@ -71,16 +74,17 @@ const char* GetWinsockErrorString( int err );
 
 
 
-void BailOnSocketError( const char* context )
+int BailOnSocketError( const char* context )
 {
 #ifdef WIN32
 
 	int e = WSAGetLastError();
-	const char* msg = GetWinsockErrorString( e );
+	strcpy(happyhttp_error, GetWinsockErrorString(e));
 #else
 	const char* msg = strerror( errno );
 #endif
-	throw Wobbly( "%s: %s", context, msg );
+//	throw Wobbly( "%s: %s", context, msg );
+	return e;
 }
 
 
@@ -250,11 +254,14 @@ void Connection::setcallbacks(
 }
 
 
-void Connection::connect()
+int Connection::connect()
 {
 	in_addr* addr = atoaddr( m_Host.c_str() );
-	if( !addr )
-		throw Wobbly( "Invalid network address" );
+	if (!addr)
+	{
+		strcpy(happyhttp_error, "Invalid network address");
+		return -1;
+	}
 
 	sockaddr_in address;
 	memset( (char*)&address, 0, sizeof(address) );
@@ -263,13 +270,21 @@ void Connection::connect()
 	address.sin_addr.s_addr = addr->s_addr;
 
 	m_Sock = socket( AF_INET, SOCK_STREAM, 0 );
-	if( m_Sock < 0 )
-		BailOnSocketError( "socket()" );
+	if (m_Sock < 0)
+	{
+		BailOnSocketError("socket()");
+		return -1;
+	}
 
 //	printf("Connecting to %s on port %d.\n",inet_ntoa(*addr), port);
 
-	if( ::connect( m_Sock, (sockaddr const*)&address, sizeof(address) ) < 0 )
-		BailOnSocketError( "connect()" );
+	if (::connect(m_Sock, (sockaddr const*)&address, sizeof(address)) < 0)
+	{
+		BailOnSocketError("connect()");
+		return -1;
+	}
+
+	return 0;
 }
 
 
@@ -298,7 +313,7 @@ Connection::~Connection()
 	close();
 }
 
-void Connection::request( const char* method,
+int Connection::request( const char* method,
 	const char* url,
 	const char* headers[],
 	const unsigned char* body,
@@ -339,14 +354,16 @@ void Connection::request( const char* method,
 			putheader( name, value );
 		}
 	}
-	endheaders();
+	int res = endheaders();
+	
+	if (res != 0)
+		return res;
 
-	if( body )
-		send( body, bodysize );
+	if (body)
+		res = send(body, bodysize);
 
+	return res;
 }
-
-
 
 
 void Connection::putrequest( const char* method, const char* url )
@@ -385,10 +402,10 @@ void Connection::putheader( const char* header, int numericvalue )
 	putheader( header, buf );
 }
 
-void Connection::endheaders()
+int Connection::endheaders()
 {
-	if( m_State != REQ_STARTED )
-		throw Wobbly( "Cannot send header" );
+	if (m_State != REQ_STARTED)
+		return -1;// throw Wobbly("Cannot send header");
 	m_State = IDLE;
 
 	m_Buffer.push_back( "" );
@@ -401,12 +418,12 @@ void Connection::endheaders()
 	m_Buffer.clear();
 
 //	printf( "%s", msg.c_str() );
-	send( (const unsigned char*)msg.c_str(), msg.size() );
+	return send( (const unsigned char*)msg.c_str(), msg.size() );
 }
 
 
 
-void Connection::send( const unsigned char* buf, int numbytes )
+int Connection::send( const unsigned char* buf, int numbytes )
 {
 //	fwrite( buf, 1,numbytes, stdout );
 	
@@ -420,11 +437,17 @@ void Connection::send( const unsigned char* buf, int numbytes )
 #else
 		int n = ::send( m_Sock, buf, numbytes, 0 );
 #endif
-		if( n<0 )
-			BailOnSocketError( "send()" );
+		if (n < 0)
+		{
+			BailOnSocketError("send()");
+			return -1;
+		}
+
 		numbytes -= n;
 		buf += n;
 	}
+
+	return 0;
 }
 
 

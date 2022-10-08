@@ -202,7 +202,7 @@ void CThumbCtrl::OnPaint()
 
 	GetClientRect(rc);
 
-	CMemoryDC	dc(&dc1, &rc, true);
+	CMemoryDC	dc(&dc1, &rc);
 	dc.FillSolidRect(rc, m_crBack);
 
 	if (m_loading_files.size() > 0 && !m_loading_completed)
@@ -211,13 +211,14 @@ void CThumbCtrl::OnPaint()
 		DrawSunkenRect(&dc, r);
 		r.DeflateRect(1, 1);
 		double width = r.Width();
+		/*
 #if (ADD_USING_THREAD)
 		r.right = r.left + width * ((double)CheckAllThreadEnding() / (double)m_loading_files.size());
 #else
 		r.right = r.left + width * ((double)m_loading_index / (double)m_loading_files.size());
 #endif
+*/
 		dc.FillSolidRect(r, green);
-		//DrawTextShadow(&dc, i2S(m_loading_complete), rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 		return;
 	}
 	else if (m_dqThumb.size() == 0)
@@ -296,8 +297,10 @@ void CThumbCtrl::PreSubclassWindow()
 	m_szTile.cy = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("tile size cy"), 128);
 }
 
+CThumbCtrl* pWnd;
 void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 {
+	pWnd = this;
 	KillTimer(timer_load_files);
 
 	if (reset)
@@ -325,134 +328,36 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	Invalidate();
 
 	m_loading_files = files;
-	m_clock_start = getClock();
-
-	m_loading_complete.resize(m_loading_files.size());
-	m_loading_complete.assign(m_loading_files.size(), false);
 	m_loading_completed = false;
 
-	//외부에서 m_thumb.add_files(...)를 호출하면
-	//멀티쓰레드로 이미지들을 읽어서 썸네일 리스트를 만드는데
-	//외부에서 이 로딩 쓰레드가 끝나기 전에 이미지를 접근하면 안된다.
-	//아래와 끝나기를 기다려줘야 한다.
-	//while (!m_thumb.is_loading_completed())
-	//{
-	//	Wait(10);
-	//}
-	//....
-	//로딩이 끝나면 m_thumb[0].mat과 같은 형식으로 이미지에 접근 가능하다.
+	m_clock_start = getClock();
 
 	//timer method
 #if (!ADD_USING_THREAD)
 	m_loading_index = 0;
 	SetTimer(timer_load_files, 10, NULL);
 #else
-	int i;
-	/*
-	[158 images]
-	th=10, 10s
-	th=20, 10s
-	th=40, 9s
-	th=100,
-	* 모두 읽어들인 후 invalidate하는 방식으로 하면
-	th=10, 3.0s
-	th=16, 3.0s ~ 3.6s
-	th=20, 2.5s
-	th=32, 3.0s ~ 3.5s
-
-	th=100, 2.5s ~ 3.5s
-	*/
-
-	if (m_loading_files.size() <= 10)
-		m_nThread = 5;
-	else if (m_loading_files.size() <= 100)
-		m_nThread = 10;
-	else
-		m_nThread = m_loading_files.size() / 20;
-
-
-	//for (i = 0; i < MAX_THREAD; i++)
-	//	m_bThreadConvert[i] = false;
-
-
-	if (m_nThread > MAX_THREAD)
-		m_nThread = MAX_THREAD;
-
-	int each_num = m_loading_files.size() / m_nThread;
-
-	//데이터의 개수가 MAX_THREAD 미만이면 한 쓰레드에서 하나의 데이터를 처리하고
-	if (each_num == 0)
-	{
-		m_nThread = m_loading_files.size();
-
-		for (i = 0; i < m_nThread; i++)
-		{
-			m_nStartIndex[i] = i;
-			m_nEndIndex[i] = i + 1;
-		}
-
-		m_nStartIndex[i] = each_num * i;
-		m_nEndIndex[i] = each_num * (i + 1);
-	}
-	//MAX_THREAD보다 많으면 data_num / MAX_THREAD하고 남은 개수를 각 쓰레드가 나눠가진 후 처리한다.
-	else
-	{
-		int remain = m_loading_files.size() - each_num * m_nThread;
-
-		for (i = 0; i < m_nThread; i++)
-		{
-			if (i == 0)
-				m_nStartIndex[i] = 0;
-			else
-				m_nStartIndex[i] = m_nEndIndex[i - 1];
-
-			if (remain > 0)
-			{
-				m_nEndIndex[i] = m_nStartIndex[i] + each_num + 1;
-				remain--;
-			}
-			else
-			{
-				m_nEndIndex[i] = m_nStartIndex[i] + each_num;
-			}
-		}
-	}
-
-	CString str;
-	TRACE(_T("%d images loading started with %d threads...\n\n"), m_loading_files.size(), m_nThread);
-	//AfxMessageBox(str);
-
-	m_nDataIndex = 0;
-	//thread에서 호출하는 loading_function에서 CheckAllThreadEnding을 호출하여
-	//모든 loading이 끝났는지 검사했으나
-	//thread에서 호출하는 loading_function에서 CheckAllThreadEnding을 호출하는 것은 문제가 있다.
-	//이러한 방식은 위험하므로 독립된 타이머에서 CheckAllThreadEnding을 호출하여 완료 여부를 검사하도록 하니 정상 동작한다.
-	SetTimer(timer_check_thread_end, 500, NULL);
-	for (i = 0; i < m_nThread; i++)
-	{
-		std::thread t(&CThumbCtrl::loading_function, this, m_nDataIndex++);
-		t.detach();
-	}
+	m_thread.job(files.size(), loading_function, loading_completed_callback);
 #endif
 }
 
 #include <mutex>
 std::mutex mtx;
 
-void CThumbCtrl::loading_function(int idx)
+void CThumbCtrl::loading_function(int idx, int start, int end)
 {
 	int i;
 	CString str;
 
-	if ((m_nEndIndex[idx] - m_nStartIndex[idx]) == 1)
-		str.Format(_T("%d job started..."), m_nStartIndex[idx]);
+	if (end - start == 1)
+		str.Format(_T("%d job started..."), start);
 	else
-		str.Format(_T("%d ~ %d job started..."), m_nStartIndex[idx], m_nEndIndex[idx] - 1);
+		str.Format(_T("%d ~ %d job started..."), start, end - 1);
 	TRACE(_T("%s\n"), str);
 
-	for (i = m_nStartIndex[idx]; i < m_nEndIndex[idx]; i++)
+	for (i = start; i < end; i++)
 	{
-		if (m_loading_files[i].Right(3).MakeLower() == _T("gif"))
+		if (pWnd->m_loading_files[i].Right(3).MakeLower() == _T("gif"))
 		{
 			//CGifEx gif;
 			//gif.Load(m_loading_files[i], m_hWnd, true);
@@ -463,51 +368,40 @@ void CThumbCtrl::loading_function(int idx)
 			//img->Load(m_loading_files[i]);
 		}
 
-		insert(i, m_loading_files[i], GetFileTitle(m_loading_files[i]), false, false);
-
-		m_loading_complete[i] = true;
+		pWnd->insert(i, pWnd->m_loading_files[i], GetFileTitle(pWnd->m_loading_files[i]), false, false);
 	}
 
-	if ((m_nEndIndex[idx] - m_nStartIndex[idx]) == 1)
-		str.Format(_T("job completed : %d"), m_nStartIndex[idx]);
+	if ((end - start) == 1)
+		str.Format(_T("job completed : %d"), start);
 	else
-		str.Format(_T("job completed : %d ~ %d"), m_nStartIndex[idx], m_nEndIndex[idx] - 1);
+		str.Format(_T("job completed : %d ~ %d"), start, end - 1);
 	TRACE(_T("%s\n"), str);
+
+	mtx.lock();
+	pWnd->m_thread.thread_ended.push_back(idx);
+	mtx.unlock();
 }
 
-int CThumbCtrl::CheckAllThreadEnding()
+void CThumbCtrl::loading_completed_callback()
 {
-	int completed = 0;
-	for (int i = 0; i < m_loading_files.size(); i++)
-	{
-		if (m_loading_complete[i])
-			completed++;
-	}
+	pWnd->on_loading_completed();
+	//pWnd->m_loading_completed = true;
+	//if (pWnd->m_index_select_after_loading >= 0)
+	//	pWnd->m_selected.push_back(pWnd->m_index_select_after_loading);
 
-	if (completed < m_loading_files.size())
-	{
-		m_loading_completed = false;
-		Invalidate();
-		return completed;
-	}
+	//pWnd->recalculate_scroll_size();
+}
 
+void CThumbCtrl::on_loading_completed()
+{
 	m_loading_completed = true;
-
-	if (false)
-	{
-		CString str;
-		str.Format(_T("%d thread loading ellapsed = %s ms\n"), m_nThread, i2S(getClock() - m_clock_start));
-		AfxMessageBox(str);
-	}
-
 	if (m_index_select_after_loading >= 0)
 		m_selected.push_back(m_index_select_after_loading);
 
 	recalculate_scroll_size();
-	//Invalidate();
 
-
-	return m_loading_files.size();
+	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+		(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 }
 
 int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thumb, bool invalidate)
@@ -646,20 +540,21 @@ void CThumbCtrl::set_scroll_pos(int pos)
 	ScreenToClient(&pt);
 
 	//커서가 스크롤바 영역 밖이라면 스크롤바를 숨겨준다.
-	if (/*(rc.PtInRect(pt) == false) ||*/ !m_rScroll.PtInRect(pt))
-		SetTimer(timer_scroll_bar_disappear, 500, NULL);
+	//if (/*(rc.PtInRect(pt) == false) ||*/ !m_rScroll.PtInRect(pt))
+		//SetTimer(timer_scroll_bar_disappear, 500, NULL);
 }
 
 void CThumbCtrl::recalculate_scroll_size()
 {
+	CRect	rc;
+	GetClientRect(rc);
+
 	draw_function(NULL, false);
 
 	if (m_dqThumb.size() == 0)
 		return;
 
-	CRect	rc;
 	GetClientRect(rc);
-	//::GetSystemMetrics(SM_CXVSCROLL);
 	m_rScroll = CRect(rc.right - ::GetSystemMetrics(SM_CXVSCROLL), rc.top, rc.right + 1, rc.bottom);
 
 	//맨 아래로 스크롤한 후 썸네일 크기를 줄이면 스크롤바가 잘못 표시되는 버그 있음!!
@@ -1373,23 +1268,6 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 
 		InvalidateRect(m_rScroll, false);
 	}
-	else if (nIDEvent == timer_check_thread_end)
-	{
-		KillTimer(timer_check_thread_end);
-		CheckAllThreadEnding();
-		if (m_loading_completed)
-		{
-			recalculate_scroll_size();
-			Invalidate();
-
-			::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
-				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
-		}
-		else
-		{
-			SetTimer(timer_check_thread_end, 500, NULL);
-		}
-	}
 	else if (nIDEvent == timer_load_files)
 	{
 		KillTimer(timer_load_files);
@@ -1900,6 +1778,7 @@ void CThumbCtrl::select_item(int index, bool select, bool make_ensure_visible)
 		else
 		{
 			m_selected.clear();
+			make_ensure_visible = false;
 			make_ensure_visible = false;
 		}
 	}

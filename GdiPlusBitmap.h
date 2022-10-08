@@ -68,6 +68,8 @@ public:
 	int channel = 0;
 	int stride = 0;
 
+
+
 protected:
 	void resolution();
 };

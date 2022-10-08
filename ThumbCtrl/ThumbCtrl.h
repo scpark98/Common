@@ -1,7 +1,6 @@
 //2019 09 11 09
 //현재는 멀티라인으로 세로 스크롤만 지원된다.
 //최대 라인을 선택할 수 있고 가로 스크롤을 지원해야 한다.
-//멀티 선택도 필요
 
 /* 구현 예정인 스크롤 관련 내용
 - 최대 썸네일 라인수 설정 : set_max_line()
@@ -18,6 +17,7 @@
 #include <deque>
 #include <algorithm>
 #include "../ui/ExtWndShadow.h"
+#include "../thread/thread_manager.h"
 
 #define USE_OPENCV			false
 
@@ -116,7 +116,6 @@ public:
 	enum CThumbCtrl_TIMER
 	{
 		timer_load_files = 0,
-		timer_check_thread_end,
 		timer_select_after_loading,
 		timer_scroll_bar_disappear,
 	};
@@ -133,6 +132,9 @@ public:
 		idDeleteThumb,
 		idRemoveAll,
 	};
+
+	CThreadManager m_thread;
+
 
 	std::deque<CThumbImage> m_dqThumb;
 	int size() { return m_dqThumb.size(); }
@@ -304,17 +306,10 @@ protected:
 	int				m_index_select_after_loading;
 	long			m_clock_start;
 
-	//CWinThread*		m_pThreadConvert;
-	int				m_nThread;					//총 쓰레드 개수
-	int				m_nStartIndex[MAX_THREAD];	//한 쓰레드에서 처리할 데이터 시작 인덱스
-	int				m_nEndIndex[MAX_THREAD];	//한 쓰레드에서 처리할 데이터 끝 인덱스
-
-	int				m_nDataIndex;				//처리될 데이터 그룹의 시작 인덱스
-	void			loading_function(int idx);
-
-	std::deque<bool> m_loading_complete;		//완료된 데이터 수
+	static void		loading_function(int idx, int start, int end);
+	static void		loading_completed_callback();
+	void			on_loading_completed();
 	bool			m_loading_completed;
-	int				CheckAllThreadEnding();
 
 	void			draw_function(CDC* pDC, bool draw);
 

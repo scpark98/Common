@@ -36,6 +36,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <gdiplus.h>
 
 #include "../Common/colors.h"
 
@@ -1016,6 +1017,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CRect		make_rect(int x, int y, int w, int h);
 	CRect		makeCenterRect(int cx, int cy, int w, int h );
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
+	CRect		GpRect2CRect(Gdiplus::Rect);
 	CRect		getCenterRect( int cx, int cy, int w, int h );
 	CRect		get_zoom_rect(CRect rect, double zoom);
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.

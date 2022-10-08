@@ -4887,6 +4887,11 @@ CRect getCenterRect(int cx, int cy, int w, int h)
 	return r;
 }
 
+CRect GpRect2CRect(Gdiplus::Rect r)
+{
+	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+}
+
 CRect get_zoom_rect(CRect rect, double zoom)
 {
 	double l, t, r, b;

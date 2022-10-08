@@ -49,7 +49,6 @@
 #include <string>
 #include <algorithm>
 
-#include <openssl/applink.c>
 
 #ifdef __APPLE__
 	#define _stricmp strcasecmp

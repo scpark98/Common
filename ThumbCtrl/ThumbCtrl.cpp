@@ -411,10 +411,10 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 	thumb.img = loadMat(full_path);
 #else
 	thumb.img = new CGdiplusBitmap();
-	thumb.img->Load(full_path);
+	thumb.img->load(full_path);
 #endif
-	thumb.width = thumb.img->cols;
-	thumb.height = thumb.img->rows;
+	thumb.width = thumb.img->width;
+	thumb.height = thumb.img->height;
 	thumb.channel = 3;
 	thumb.title = title;
 	thumb.full_path = full_path;
@@ -1505,7 +1505,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		{
 			//scvDrawImage(&dc, m_dqThumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_crBackThumb, -1.0);
 			//scvDrawImage(&dc, m_dqThumb[i].mat, rect, m_crBackThumb, -1.0);
-			fit = GetRatioRect(rect, (double)m_dqThumb[i].img->cols / (double)m_dqThumb[i].img->rows);
+			fit = GetRatioRect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
 			if (draw && !skip)
 			{
 				//입체감있는 프레임을 그려주는 코드인데 배경이 짙은 회색 계열이면 잘 표시가 안나서 일단 스킵.

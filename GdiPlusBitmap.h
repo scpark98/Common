@@ -19,41 +19,55 @@ public:
 	CGdiplusBitmap(HBITMAP hBitmap);
 	CGdiplusBitmap(LPCWSTR pFile);
 	CGdiplusBitmap(CGdiplusBitmap* src);
+	CGdiplusBitmap(UINT id, LPCTSTR lpType);
+
 	virtual ~CGdiplusBitmap();
 
-	void release();
+	void	release();
 
-	bool Load(LPCWSTR pFile);
+	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
+	bool	load(LPCWSTR pFile);
+	void	load(UINT id, LPCTSTR lpType);
+
+	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
+
 
 	operator Gdiplus::Bitmap*() const { return m_pBitmap; }
 
 	//기본적으로는 이미지 raw data를 가지고 있지 않으나
 	//cv::Mat의 data처럼 raw data가 필요한 경우 이 함수를 호출하면 사용 가능하다.
-	bool get_raw_data();
+	bool	get_raw_data();
 
-	bool empty() { return (m_pBitmap == NULL); }
-	int channels();
-	CSize size() { return CSize(cols, rows); }
+	bool	empty() { return (m_pBitmap == NULL); }
+	bool	valid() { return (m_pBitmap != NULL); }
+	int		channels();
+	CSize	size() { return CSize(width, height); }
 
-	CRect draw(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
-	CRect draw(CDC* pDC, int x = 0, int y = 0, int w = 0, int h = 0, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect	draw(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect	draw(CDC* pDC, int x = 0, int y = 0, int w = 0, int h = 0, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
-	void clone(CGdiplusBitmap* dst);
-	void deep_copy(CGdiplusBitmap* dst);
-	void rotate(Gdiplus::RotateFlipType type);
-	//회전시키면 w, h가 달라지므로 늘리거나 줄여줘야 한다.
+	void	clone(CGdiplusBitmap* dst);
+	void	deep_copy(CGdiplusBitmap* dst);
+	void	rotate(Gdiplus::RotateFlipType type);
+
+	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
+	//그럴 경우는 auto_resize를 true로 주고 불필요한 배경이 생겼을 경우는
+	//불필요한 배경의 색상을 지정하여 이미지 크기를 fit하게 줄일수도 있다.
 	void rotate(float degree, bool auto_resize = false, Color remove_back_color = Color(0,0,0,0));
+
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
 	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
 	void resize(int cx, int cy, Gdiplus::InterpolationMode = Gdiplus::InterpolationModeHighQualityBicubic);
 	void sub_image(int x, int y, int w, int h);
 	void sub_image(CRect r);
+	void sub_image(Gdiplus::Rect r);
 	void fit_to_image(Color remove_back_color = Color(0, 0, 0, 0));
 	void set_colorkey(Color low, Color high);
 	bool is_equal(Color cr0, Color cr1, int channel = 3);
 
+	void set_matrix(ColorMatrix *colorMatrix, ColorMatrix *grayMatrix = NULL);
 	void set_transparent(float transparent);
 	void gray();
 	void negative();
@@ -63,8 +77,8 @@ public:
 	bool save(CString filename);// , ULONG quality/* = 100*/);
 	bool copy_to_clipbard();
 
-	int cols = 0;
-	int rows = 0;
+	int width = 0;
+	int height = 0;
 	int channel = 0;
 	int stride = 0;
 
@@ -72,23 +86,24 @@ public:
 
 protected:
 	void resolution();
+	Bitmap* GetImageFromResource(LPCTSTR lpType, UINT id);
 };
 
-
-class CGdiPlusBitmapResource : public CGdiplusBitmap
+#if 0
+class CGdiplusBitmapResource : public CGdiplusBitmap
 {
 protected:
 	HGLOBAL m_hBuffer;
 
 public:
-	CGdiPlusBitmapResource()					{ m_hBuffer = NULL; }
-	CGdiPlusBitmapResource(LPCTSTR pName, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
+	CGdiplusBitmapResource()					{ m_hBuffer = NULL; }
+	CGdiplusBitmapResource(LPCTSTR pName, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
 												{ m_hBuffer = NULL; Load(pName, pType, hInst); }
-	CGdiPlusBitmapResource(UINT id, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
+	CGdiplusBitmapResource(UINT id, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
 												{ m_hBuffer = NULL; Load(id, pType, hInst); }
-	CGdiPlusBitmapResource(UINT id, UINT type, HMODULE hInst = NULL)
+	CGdiplusBitmapResource(UINT id, UINT type, HMODULE hInst = NULL)
 												{ m_hBuffer = NULL; Load(id, type, hInst); }
-	virtual ~CGdiPlusBitmapResource()			{ release(); }
+	virtual ~CGdiplusBitmapResource()			{ release(); }
 
 	void release();
 
@@ -100,7 +115,7 @@ public:
 };
 
 inline
-void CGdiPlusBitmapResource::release()
+void CGdiplusBitmapResource::release()
 {
 	CGdiplusBitmap::release();
 	if (m_hBuffer)
@@ -112,7 +127,7 @@ void CGdiPlusBitmapResource::release()
 }
 
 inline
-bool CGdiPlusBitmapResource::Load(LPCTSTR pName, LPCTSTR pType, HMODULE hInst)
+bool CGdiplusBitmapResource::Load(LPCTSTR pName, LPCTSTR pType, HMODULE hInst)
 {
 	release();
 
@@ -160,3 +175,4 @@ bool CGdiPlusBitmapResource::Load(LPCTSTR pName, LPCTSTR pType, HMODULE hInst)
 	}
 	return false;
 }
+#endif

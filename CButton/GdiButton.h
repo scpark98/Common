@@ -1,8 +1,10 @@
 #pragma once
 
 #include <afxwin.h>
-#include <vector>
+#include <deque>
 #include <gdiplus.h>
+
+#include "../GdiplusBitmap.h"
 
 using namespace Gdiplus;
 
@@ -36,10 +38,7 @@ using namespace Gdiplus;
 
 
 - load button image
-	from external file	:	m_Button_GDI.AddImage( _T("f:\\test_images\\etc\\red_checked.png"), NULL, ::GetSysColor(COLOR_3DFACE) );
-	from resource png	:	m_Button_GDI.AddImage( AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDB_RED_CAR), _T("PNG"), NULL, ::GetSysColor(COLOR_3DFACE));
-	from resource jpg	:	m_Button_GDI.AddImage( AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDB_RED_CAR), _T("JPG"), NULL, ::GetSysColor(COLOR_3DFACE));
-	from resource bmp	:	m_Button_GDI.AddImage( AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDB_HOUSE), _T("Bitmap"), NULL, ::GetSysColor(COLOR_3DFACE));
+	...
 
 - push button
 	normal, over, down, disabled
@@ -61,17 +60,12 @@ using namespace Gdiplus;
 class CButtonImage
 {
 public:
-	CButtonImage()
-	{
-		normal = over = down = disabled = NULL;
-	}
+	CButtonImage() {};
 
-	//~CButtonImage();
-
-	Bitmap* normal;
-	Bitmap* over;
-	Bitmap* down;
-	Bitmap* disabled;
+	CGdiplusBitmap normal;
+	CGdiplusBitmap over;
+	CGdiplusBitmap down;
+	CGdiplusBitmap disabled;
 };
 
 // CGdiButton
@@ -102,43 +96,27 @@ public:
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
 	//on/off, play/pause, img0/img1/img2...
 	template <typename ... Types>
-	void add_images(HINSTANCE hInst, LPCTSTR lpType, Types... args)
+	void add_images(LPCTSTR lpType, Types... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
 
 		for (auto id : arg)
-			add_image(hInst, lpType, id);
+			add_image(lpType, id);
 	}
 
 	//버튼에 4개의 상태 이미지들을 세팅한다. UINT가 0이면 자동 생성해준다.
 	//한 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.
-	bool		add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	bool		add_image(LPCTSTR lpType, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
 
-	//over 이미지를 자동 생성한다.
-	Bitmap*		gen_over_image(Bitmap* img);
-	//down 이미지를 자동 생성한다.
-	Bitmap*		gen_down_image(Bitmap* img);
-	//disabled 이미지를 자동 생성한다.
-	Bitmap*		gen_disabled_image(Bitmap* img);
-
 	void		select(int index);
-
-
-	static Bitmap* Load(CString sfile);
-	Bitmap*		get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, bool show_error = false);
-
-	static void	safe_release(Bitmap** pBitmap);
-
-	static Bitmap* GetImageFromResource( HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName);
-	static Bitmap* GdiplusImageToBitmap(Image* img, Color bkgd = Color::Transparent);
 
 	void		release_all();
 
-	void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
+	//void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		text(CString text);
 	void		text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
 	void		back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
@@ -189,27 +167,27 @@ public:
 	void		SetBlinkTime( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
 	void		SetBlink( BOOL bBlink = TRUE );
 
-	static void	rotate(Bitmap* bitmap, Gdiplus::RotateFlipType type);
-	static void	rotate(Bitmap** bitmap, float angle);
+	//static void	rotate(Bitmap* bitmap, Gdiplus::RotateFlipType type);
+	//static void	rotate(Bitmap** bitmap, float angle);
 
 protected:
 	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton
 
-	std::vector<CButtonImage> m_image;
+	std::deque<CButtonImage*> m_image;
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
-	CRect		m_rwOrigin = 0;				//컨트롤의 원래 크기 정보
+	CRect		m_rOrigin = 0;				//컨트롤의 원래 크기 정보
 
 	//배경이 단색이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
 	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
-	bool		m_transparent = false;
+	bool		m_transparent = true;
 
-	Bitmap*		m_pBack;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
-	Bitmap*		m_pBackOrigin;
+	CGdiplusBitmap	m_back;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
+	CGdiplusBitmap	m_back_origin;
 
 	CString		m_text = _T("");
-	std::vector <COLORREF>	m_cr_text;
-	std::vector <COLORREF>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
+	std::deque <COLORREF>	m_cr_text;
+	std::deque <COLORREF>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
 
 	int			m_width;
 	int			m_height;

@@ -38,6 +38,13 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <gdiplus.h>
 
+#ifdef GDIPVER
+#undef GDIPVER
+#endif
+
+#define GDIPVER 0x0110
+
+
 #include "../Common/colors.h"
 
 #define _std_cpp11 201103L
@@ -1018,6 +1025,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CRect		makeCenterRect(int cx, int cy, int w, int h );
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
 	CRect		GpRect2CRect(Gdiplus::Rect);
+	Gdiplus::Rect CRect2GpRect(CRect r);
 	CRect		getCenterRect( int cx, int cy, int w, int h );
 	CRect		get_zoom_rect(CRect rect, double zoom);
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.

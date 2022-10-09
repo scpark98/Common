@@ -1,4 +1,4 @@
-﻿#include "GdiPlusBitmap.h"
+﻿#include "GdiplusBitmap.h"
 #include "../Common/Functions.h"
 
 CGdiplusBitmap::CGdiplusBitmap()
@@ -15,7 +15,16 @@ CGdiplusBitmap::CGdiplusBitmap(Bitmap* src)
 CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 {
 	release();
-	m_pBitmap = Bitmap::FromHBITMAP(hBitmap, NULL);
+
+	DIBSECTION dib = {};
+	if (::GetObject(hBitmap, sizeof(dib), &dib) == sizeof(DIBSECTION) && dib.dsBm.bmBitsPixel == 32)
+	{
+		m_pBitmap = CreateARGBBitmapFromDIB(dib);
+	}
+	else
+	{
+		m_pBitmap = Bitmap::FromHBITMAP(hBitmap, NULL);
+	}
 
 	/*
 	BITMAP source_info = { 0 };
@@ -49,12 +58,11 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 	*/
 
 	resolution();
-	//get_raw_data();
 }
 
 CGdiplusBitmap::CGdiplusBitmap(LPCWSTR pFile)
 {
-	Load(pFile);
+	load(pFile);
 }
 
 CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
@@ -63,7 +71,65 @@ CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
 	resolution();
 }
 
-bool CGdiplusBitmap::Load(LPCWSTR pFile)
+CGdiplusBitmap::CGdiplusBitmap(UINT id, LPCTSTR lpType)
+{
+	load(id, lpType);
+}
+
+
+void CGdiplusBitmap::load(UINT id, LPCTSTR lpType)
+{
+	release();
+
+	CString type = lpType;
+
+	type.MakeLower();
+
+	if (type == "png" || type == "jpg")
+	{
+		m_pBitmap = GetImageFromResource(lpType, id);
+	}
+	else
+	{
+		m_pBitmap = Bitmap::FromResource(NULL, MAKEINTRESOURCE(id));
+	}
+
+	if (m_pBitmap)
+	{
+		resolution();
+	}
+}
+
+Bitmap* CGdiplusBitmap::GetImageFromResource(LPCTSTR lpType, UINT id)
+{
+	HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(id), lpType);
+
+	if (!hResource)
+		return NULL;
+
+	DWORD imageSize = SizeofResource(AfxGetApp()->m_hInstance, hResource);
+	HGLOBAL hGlobal = LoadResource(AfxGetApp()->m_hInstance, hResource);
+	LPVOID pData = LockResource(hGlobal);
+	HGLOBAL hBuffer = GlobalAlloc(GMEM_MOVEABLE, imageSize);
+	LPVOID pBuffer = GlobalLock(hBuffer);
+
+	CopyMemory(pBuffer, pData, imageSize);
+	GlobalUnlock(hBuffer);
+
+	IStream* pStream;
+	HRESULT hr = CreateStreamOnHGlobal(hBuffer, TRUE, &pStream);
+	Image image(pStream);
+	pStream->Release();
+
+	if (image.GetLastStatus() != Ok)
+		return NULL;
+
+	Bitmap* pBitmap = static_cast<Bitmap*>(image.Clone());
+
+	return pBitmap;
+}
+
+bool CGdiplusBitmap::load(LPCWSTR pFile)
 {
 	release();
 
@@ -94,20 +160,49 @@ void CGdiplusBitmap::release()
 {
 	SAFE_DELETE(m_pBitmap);
 	SAFE_DELETE_ARRAY(data);
-	cols = rows = channel = stride = 0;
+	width = height = channel = stride = 0;
+}
+
+//---------------------------------------------------------------
+// Create a 32bpp ARGB Gdiplus::Bitmap from a DIBSECTION
+//---------------------------------------------------------------
+Gdiplus::Bitmap* CGdiplusBitmap::CreateARGBBitmapFromDIB(const DIBSECTION& dib)
+{
+	int width = dib.dsBmih.biWidth;
+	int pitch = dib.dsBm.bmWidthBytes;
+	int height = dib.dsBmih.biHeight;
+	BYTE* pBits = static_cast<BYTE*>(dib.dsBm.bmBits);
+
+	if (height < 0)
+	{
+		// Top-down DIB
+		height = -height;
+	}
+	else
+	{
+		// Bottom-up. Adjust the Scan0 to the start of the last row
+		pBits += (height - 1) * pitch;
+		// and set the pitch to a -ve value
+		pitch = -pitch;
+	}
+
+#pragma push_macro("new")
+#undef new
+	return new Gdiplus::Bitmap(width, height, pitch, PixelFormat32bppARGB, pBits);
+#pragma pop_macro("new")
 }
 
 void CGdiplusBitmap::resolution()
 {
-	cols = 0;
-	rows = 0;
+	width = 0;
+	height = 0;
 	channel = 0;
 
 	if (!m_pBitmap)
 		return;
 
-	cols = m_pBitmap->GetWidth();
-	rows = m_pBitmap->GetHeight();
+	width = m_pBitmap->GetWidth();
+	height = m_pBitmap->GetHeight();
 	channel = channels();
 }
 
@@ -160,9 +255,9 @@ CRect CGdiplusBitmap::draw(CDC* pDC, CRect r, CRect* targetRect, Color crBack)
 CRect CGdiplusBitmap::draw(CDC* pDC, int x, int y, int w, int h, CRect* targetRect, Color crBack)
 {
 	if (w <= 0)
-		w = cols;
+		w = width;
 	if (h <= 0)
-		h = rows;
+		h = height;
 
 	Graphics g(pDC->m_hDC);
 	g.DrawImage(m_pBitmap, x, y, w, h);
@@ -216,8 +311,8 @@ void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 
 void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_color)
 {
-	int originw = cols;
-	int originh = rows;
+	int originw = width;
+	int originh = height;
 	CRect rotated(0, 0, originw, originh);
 
 	if (auto_resize)
@@ -260,8 +355,8 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 	m_pBitmap = result->Clone(0, 0, neww, newh, PixelFormatDontCare);
 	delete result;
 
-	cols = neww;
-	rows = newh;
+	width = neww;
+	height = newh;
 
 	//save(_T("d:\\temp\\rotated.png"));
 
@@ -269,7 +364,7 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 	//작아졌을 경우 불필요한 여백이 유지되므로 이를 제거한다.
 	if (auto_resize)
 	{
-		fit_to_image(remove_back_color);
+		//fit_to_image(remove_back_color);
 	}
 
 	resolution();
@@ -287,7 +382,7 @@ bool is_equal(Color cr0, Color cr1, int channel)
 void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 {
 	int x, y;
-	CRect r(0, 0, cols, rows);
+	CRect r(0, 0, width, height);
 
 	Color pixel;
 	bool found = false;
@@ -296,9 +391,9 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 
 	/* 전체 검사는 100~200ms 소요
 	bool upperleftfound = false;
-	for (y = 0; y < rows; y++)
+	for (y = 0; y < height; y++)
 	{
-		for (x = 0; x < cols; x++)
+		for (x = 0; x < width; x++)
 		{
 			m_pBitmap->GetPixel(x, y, &pixel);
 			if (pixel.GetValue() != remove_back_color.GetValue())
@@ -326,9 +421,9 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 	// in debug mode : 50~100ms	
 	//left
 	found = false;
-	for (x = 0; x < cols; x++)
+	for (x = 0; x < width; x++)
 	{
-		for (y = 0; y < rows; y++)
+		for (y = 0; y < height; y++)
 		{
 			m_pBitmap->GetPixel(x, y, &pixel);
 			if (pixel.GetValue() != remove_back_color.GetValue())
@@ -345,9 +440,9 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 
 	//top
 	found = false;
-	for (y = 0; y < rows; y++)
+	for (y = 0; y < height; y++)
 	{
-		for (x = 0; x < cols; x++)
+		for (x = 0; x < width; x++)
 		{
 			m_pBitmap->GetPixel(x, y, &pixel);
 			if (pixel.GetValue() != remove_back_color.GetValue())
@@ -364,9 +459,9 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 
 	//right
 	found = false;
-	for (x = cols - 1; x >= 0; x--)
+	for (x = width - 1; x >= 0; x--)
 	{
-		for (y = 0; y < rows; y++)
+		for (y = 0; y < height; y++)
 		{
 			m_pBitmap->GetPixel(x, y, &pixel);
 			if (pixel.GetValue() != remove_back_color.GetValue())
@@ -383,9 +478,9 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 
 	//bottom
 	found = false;
-	for (y = rows - 1; y >= 0; y--)
+	for (y = height - 1; y >= 0; y--)
 	{
-		for (x = 0; x < cols; x++)
+		for (x = 0; x < width; x++)
 		{
 			m_pBitmap->GetPixel(x, y, &pixel);
 			if (pixel.GetValue() != remove_back_color.GetValue())
@@ -403,7 +498,6 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 	TRACE(_T("fit to image = %ld ms\n"), clock() - t0);
 
 	sub_image(r);
-	resolution();
 }
 
 void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
@@ -413,7 +507,7 @@ void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
 
 	g.SetInterpolationMode(mode);
 
-	g.DrawImage(m_pBitmap, Rect(0, 0, cx, cy), 0, 0, cols, rows, UnitPixel);
+	g.DrawImage(m_pBitmap, Rect(0, 0, cx, cy), 0, 0, width, height, UnitPixel);
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, cx, cy, PixelFormatDontCare);
@@ -425,6 +519,11 @@ void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
 void CGdiplusBitmap::sub_image(CRect r)
 {
 	sub_image(r.left, r.top, r.Width(), r.Height());
+}
+
+void CGdiplusBitmap::sub_image(Gdiplus::Rect r)
+{
+	sub_image(r.X, r.Y, r.Width, r.Height);
 }
 
 void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
@@ -462,7 +561,7 @@ void CGdiplusBitmap::gray()
 	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, cols, rows), 0, 0, cols, rows, UnitPixel, &ia);
+	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
 void CGdiplusBitmap::negative()
@@ -485,14 +584,14 @@ void CGdiplusBitmap::negative()
 	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, cols, rows), 0, 0, cols, rows, UnitPixel, &ia);
+	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {
-	Bitmap* bitmap = new Bitmap(cols, rows, PixelFormat8bppIndexed);
-	//Bitmap* bitmap = new Bitmap(cols, rows, PixelFormat24bppRGB);
+	Bitmap* bitmap = new Bitmap(width, height, PixelFormat8bppIndexed);
+	//Bitmap* bitmap = new Bitmap(width, height, PixelFormat24bppRGB);
 	int palSize = bitmap->GetPaletteSize();
 	
 	ColorPalette *palette = (ColorPalette*)malloc(palSize);
@@ -509,7 +608,7 @@ void CGdiplusBitmap::convert2gray()
 
 	BitmapData bmData_src;
 	BitmapData bmData_dst;
-	Rect rect(0, 0, cols, rows);
+	Rect rect(0, 0, width, height);
 
 	gray();
 
@@ -526,18 +625,18 @@ void CGdiplusBitmap::convert2gray()
 	uint8_t* src = (uint8_t*)bmData_src.Scan0;
 	uint8_t* dst = (uint8_t*)bmData_dst.Scan0;
 
-	for (int y = 0; y < rows; y++)
+	for (int y = 0; y < height; y++)
 	{
-		for (int x = 0; x < cols; x++)
+		for (int x = 0; x < width; x++)
 		{
-			//uint8_t r = src[y * cols * channel + x * channel + 0];
-			//uint8_t g = src[y * cols * channel + x * channel + 1];
-			//uint8_t b = src[y * cols * channel + x * channel + 2];
+			//uint8_t r = src[y * width * channel + x * channel + 0];
+			//uint8_t g = src[y * width * channel + x * channel + 1];
+			//uint8_t b = src[y * width * channel + x * channel + 2];
 			//TRACE(_T("[%d][%d] = (%d, %d, %d)\n"), y, x, r, g, b);
-			//dst[y * cols * channel + x * channel + 0] = src[y * cols * channel + x * channel + 2];
-			//dst[y * cols * channel + x * channel + 1] = src[y * cols * channel + x * channel + 1];
-			//dst[y * cols * channel + x * channel + 2] = src[y * cols * channel + x * channel + 0];
-			dst[y * cols + x] = src[y * cols * channel + x * channel + 0];
+			//dst[y * width * channel + x * channel + 0] = src[y * width * channel + x * channel + 2];
+			//dst[y * width * channel + x * channel + 1] = src[y * width * channel + x * channel + 1];
+			//dst[y * width * channel + x * channel + 2] = src[y * width * channel + x * channel + 0];
+			dst[y * width + x] = src[y * width * channel + x * channel + 0];
 		}
 	}
 
@@ -550,9 +649,30 @@ void CGdiplusBitmap::convert2gray()
 	m_pBitmap = bitmap;
 	//data = dst;
 	channel = 1;
-	stride = cols * channel;
+	stride = width * channel;
 
 	//save(_T("d:\\temp\\gray.bmp"));
+}
+
+void CGdiplusBitmap::set_matrix(ColorMatrix* colorMatrix, ColorMatrix* grayMatrix)
+{
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiplusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	ImageAttributes ia;
+
+	if (grayMatrix)
+		ia.SetColorMatrices(colorMatrix, grayMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+	else
+		ia.SetColorMatrix(colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
 void CGdiplusBitmap::set_transparent(float transparent)
@@ -563,32 +683,43 @@ void CGdiplusBitmap::set_transparent(float transparent)
 								0.0f, 0.0f, 0.0f, transparent, 0.0f,
 								0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
-#if 0
-	Bitmap* result = new Bitmap(cols, rows);
+	//new를 사용하지 않는 아래 방식으로 할 경우
+	//기존 32비트 또는 24비트 YUV의 png, jpg는 투명하게 되나
+	//RGB24였던 이미지는 투명하게 안된다.
+	//우선 new 방식으로 한다.
+#if 1
+
+#if	(GDIPVER >= 0x0110)
+	//m_pBitmap->ConvertFormat();
+#endif
+
+	Bitmap* result = new Bitmap(width, height, PixelFormat32bppARGB);
 	Graphics g(result);
 
 	ImageAttributes ia;
 
 	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
-	g.DrawImage(m_pBitmap, Rect(0, 0, cols, rows), 0, 0, cols, rows, UnitPixel, &ia);
+	g.DrawImage(m_pBitmap, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 
 	delete m_pBitmap;
-	m_pBitmap = result->Clone(0, 0, cols, rows, PixelFormatDontCare);
+	m_pBitmap = result->Clone(0, 0, width, height, PixelFormatDontCare);
 	delete result;
 #else
 	//원본을 복사해 둘 이미지를 준비하고
 	CGdiplusBitmap temp;
-	clone(&temp);
+	deep_copy(&temp);
+
+	//m_pBitmap->ConvertFormat();
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
 	Graphics g(m_pBitmap);
 	g.Clear(Color(0, 0, 0, 0));
 
 	ImageAttributes ia;
-	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+	ia.SetColorMatrix(&colorMatrix);// , ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, cols, rows), 0, 0, cols, rows, UnitPixel, &ia);
+	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 #endif
 }
 
@@ -606,7 +737,7 @@ void CGdiplusBitmap::set_colorkey(Color low, Color high)
 	ia.SetColorKey(low, high);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(m_pBitmap, Rect(0, 0, cols, rows), 0, 0, cols, rows, UnitPixel, &ia);
+	g.DrawImage(m_pBitmap, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
 int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
@@ -642,6 +773,9 @@ int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
 bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 {
+	if (empty())
+		return false;
+
 	CLSID				encoderClsid;
 	EncoderParameters	encoderParameters;
 	WCHAR				wFile[MAX_PATH];

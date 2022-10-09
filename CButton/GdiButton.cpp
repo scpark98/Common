@@ -34,8 +34,6 @@ CGdiButton::CGdiButton()
 
 	m_button_style		= BS_PUSHBUTTON;
 
-	m_pBack				= NULL;
-	m_pBackOrigin		= NULL;
 	m_bAsStatic			= false;
 
 	m_nAnchor			= ANCHOR_NONE;
@@ -68,26 +66,18 @@ CGdiButton::~CGdiButton()
 	release_all();
 }
 
-void CGdiButton::safe_release(Bitmap** pBitmap)
-{
-	if (*pBitmap == NULL)
-		return;
-
-	delete *pBitmap;
-	*pBitmap = NULL;
-}
-
 void CGdiButton::release_all()
 {
-	safe_release(&m_pBack);
-	safe_release(&m_pBackOrigin);
+	m_back.release();
+	m_back_origin.release();
 
 	for (int i = 0; i < m_image.size(); i++)
 	{
-		safe_release(&m_image[i].normal);
-		safe_release(&m_image[i].over);
-		safe_release(&m_image[i].down);
-		safe_release(&m_image[i].disabled);
+		delete m_image[i];
+		//m_image[i]->normal.release();
+		//m_image[i]->over.release();
+		//m_image[i]->down.release();
+		//m_image[i]->disabled.release();
 	}
 }
 
@@ -123,85 +113,60 @@ void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 	m_button_style = nStyle;
 }
 
-
-
-bool CGdiButton::add_image(HINSTANCE hInst, LPCTSTR lpType, UINT normal, UINT over, UINT down, UINT disabled)
+bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UINT disabled)
 {
-	CButtonImage btn;
+	//m_image라는 list에 push_back하여 유지시키기 위해서는
+	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
+	//그렇지 않으면 어느 시점에서 소멸되어 잘못된 참조가 된다.
+	CButtonImage* btn = new CButtonImage();
 
 	//normal은 0이어서는 안된다.
 	if (normal == 0)
 		return false;
 
-	btn.normal = get_bitmap(hInst, lpType, MAKEINTRESOURCE(normal));
-	if (!btn.normal)
+	btn->normal.load(normal, lpType);
+	if (btn->normal.empty())
 		return false;
 
-	m_width = btn.normal->GetWidth();
-	m_height = btn.normal->GetHeight();
+	m_width = btn->normal.width;
+	m_height = btn->normal.height;
 
-	if (over == 0)
-		btn.over = gen_over_image(btn.normal);
-	else if (over > 0)
-		btn.over = get_bitmap(hInst, lpType, MAKEINTRESOURCE(over));
+	if (over > 0)
+	{
+		btn->over.load(over, lpType);
+	}
+	else
+	{
+		btn->normal.deep_copy(&btn->over);
+		btn->over.set_matrix(&HotMat);
+	}
 
-	if (down == 0)
-		btn.down = gen_down_image(btn.normal);
-	else if (down > 0)
-		btn.down = get_bitmap(hInst, lpType, MAKEINTRESOURCE(down));
+	if (down > 0)
+	{
+		btn->down.load(down, lpType);
+	}
+	else
+	{
+		btn->normal.deep_copy(&btn->down);
+		btn->down.set_matrix(&HotMat);
+	}
 
-	if (disabled == 0)
-		btn.disabled = gen_disabled_image(btn.normal);
-	else if (disabled > 0)
-		btn.disabled = get_bitmap(hInst, lpType, MAKEINTRESOURCE(disabled));
+	if (disabled > 0)
+	{
+		btn->disabled.load(disabled, lpType);
+	}
+	else
+	{
+		btn->normal.deep_copy(&btn->disabled);
+		btn->disabled.set_matrix(&GrayMat);
+	}
+
 
 	m_image.push_back(btn);
 
 	fit_to_image(m_fit2image);
 
 	return true;
-}
-
-Bitmap* CGdiButton::gen_over_image(Bitmap* img)
-{
-	Rect r(0, 0, img->GetWidth(), img->GetHeight());
-	Bitmap* over = img->Clone(r, PixelFormatDontCare);
-
-	Graphics g(over);
-	ImageAttributes ia;
-
-	ia.SetColorMatrices(&HotMat, &GrayMat, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
-	g.DrawImage(over, r, 0, 0, r.Width, r.Height, UnitPixel, &ia);
-
-	return over;
-}
-
-Bitmap* CGdiButton::gen_down_image(Bitmap* img)
-{
-	Rect r(0, 0, img->GetWidth(), img->GetHeight());
-	Bitmap* down = img->Clone(r, PixelFormatDontCare);
-
-	Graphics g(down);
-	ImageAttributes ia;
-
-	ia.SetColorMatrices(&HotMat, &GrayMat, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
-	g.DrawImage(down, r, 0, 0, r.Width, r.Height, UnitPixel, &ia);
-
-	return down;
-}
-
-Bitmap* CGdiButton::gen_disabled_image(Bitmap* img)
-{
-	Rect r(0, 0, img->GetWidth(), img->GetHeight());
-	Bitmap* disabled = img->Clone(r, PixelFormatDontCare);
-
-	Graphics g(disabled);
-	ImageAttributes ia;
-
-	ia.SetColorMatrix(&GrayMat, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
-	g.DrawImage(disabled, r, 0, 0, r.Width, r.Height, UnitPixel, &ia);
-
-	return disabled;
 }
 
 void CGdiButton::fit_to_image(bool fit)
@@ -213,13 +178,13 @@ void CGdiButton::fit_to_image(bool fit)
 
 	if (m_fit2image)
 	{
-		m_width = m_image[0].normal->GetWidth();
-		m_height = m_image[0].normal->GetHeight();
+		m_width = m_image[0]->normal.width;
+		m_height = m_image[0]->normal.height;
 	}
 	else
 	{
-		m_width = m_rwOrigin.Width();
-		m_height = m_rwOrigin.Height();
+		m_width = m_rOrigin.Width();
+		m_height = m_rOrigin.Height();
 	}
 
 	resize_control(m_width, m_height);
@@ -235,178 +200,6 @@ void CGdiButton::select(int index)
 	m_idx = index;
 	UpdateSurface();
 }
-
-Bitmap* CGdiButton::get_bitmap(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName, bool show_error)
-{
-	Bitmap	*bitmap = NULL;
-	CString type = lpType;
-
-	type.MakeLower();
-
-	if (type == "png" || type == "jpg")
-	{
-		bitmap = GetImageFromResource(hInst, lpType, lpName);
-	}
-	else
-	{
-		bitmap = Bitmap::FromResource(hInst, (WCHAR*)lpName);
-	}
-
-	if (bitmap == NULL && show_error)
-	{
-		CString str;
-		str.Format(_T("Fail to read resource image.\nCheck the image resource(file path) or Gdiplus initialization."));
-		AfxMessageBox(str);
-	}
-
-	return bitmap;
-}
-
-Bitmap* CGdiButton::GdiplusImageToBitmap(Image* img, Color bkgd)
-{
-	Bitmap* bmp = nullptr;
-	try {
-		int wd = img->GetWidth();
-		int hgt = img->GetHeight();
-		auto format = img->GetPixelFormat();
-		bmp = new Bitmap(wd, hgt, format);
-		auto g = std::unique_ptr<Graphics>(Graphics::FromImage(bmp));
-		g->Clear(bkgd);
-		g->DrawImage(img, 0, 0, wd, hgt);
-	}
-	catch (...) {
-		// this might happen if img->GetPixelFormat() is something exotic
-		// ... not sure
-	}
-	return bmp;
-}
-
-#if 0
-//한 버튼은 최대 10장의 이미지를 담을 수 있으며 0번이 normal상태 이미지, 그리고 checked 상태로 시작된다.
-bool CGdiButton::AddImage(CString sfile, Bitmap* pBack, COLORREF crBack, bool bFitToImage, int dx, int dy, UINT nAnchor, bool bAsStatic, bool bShowError)
-{
-	Bitmap	*bitmap = Load(sfile);
-
-	if (bitmap == NULL)
-	{
-		if (bShowError)
-			AfxMessageBox(sfile + "\n\n위 파일이 존재하지 않거나 열 수 없습니다.");
-		return false;
-	}
-
-	return AddImage(bitmap, pBack, crBack, bFitToImage, dx, dy, nAnchor, bAsStatic, bShowError);
-}
-bool CGdiButton::AddImage( HINSTANCE hInst, LPCTSTR lpName, LPCTSTR lpType, Bitmap* pBack, COLORREF crBack, bool bFitToImage, int dx, int dy, UINT nAnchor, bool bAsStatic, bool bShowError)
-{
-	Bitmap	*bitmap = NULL;
-	CString str = lpType;
-
-	if (str == "PNG")
-		bitmap = GetImageFromResource(hInst, lpType, lpName);
-	else if (str == "JPG")
-	{
-		HRSRC hResource = FindResource(hInst, lpName, TEXT("JPG"));
-
-		if (!hResource) 
-			return false;
-
-		DWORD imageSize = SizeofResource(hInst, hResource);
-		HGLOBAL hGlobal = LoadResource(hInst, hResource);
-		LPVOID pData = LockResource(hGlobal);
-		HGLOBAL hBuffer = GlobalAlloc(GMEM_MOVEABLE,imageSize);
-		LPVOID pBuffer = GlobalLock(hBuffer);
-
-		CopyMemory(pBuffer,pData,imageSize);
-		GlobalUnlock(hBuffer);
-		IStream *pStream;
-
-		HRESULT hr=CreateStreamOnHGlobal(hBuffer,TRUE,&pStream);
-		Gdiplus::Image I(pStream);
-		pStream->Release();
-
-		if (I.GetLastStatus() != Gdiplus::Ok)
-			return false;
-		bitmap = GdiplusImageToBitmap(&I);
-	}
-	else
-	{
-		bitmap = Bitmap::FromResource(hInst, (WCHAR*)lpName);
-	}
-
-	if (bitmap == NULL)
-	{
-		if (bShowError)
-		{
-			str.Format(_T("Fail to read resource image.\nCheck the image resource(file path) or Gdiplus initialization."));
-			AfxMessageBox(str);
-		}
-		return false;
-	}
-
-	return AddImage(bitmap, pBack, crBack, bFitToImage, dx, dy, nAnchor, bAsStatic, bShowError);
-
-}
-bool CGdiButton::AddImage(Bitmap *bitmap, Bitmap* pBack, COLORREF crBack, bool bFitToImage, int dx, int dy, UINT nAnchor, bool bAsStatic, bool bShowError)
-{
-	//m_pImage[m_nImages] = new Bitmap(bitmap->GetWidth(), bitmap->GetHeight(), PixelFormat32bppARGB);
-	Rect sourceRect(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
-	m_pImage.push_back(bitmap->Clone(sourceRect, PixelFormatDontCare));
-	delete bitmap;
-
-	m_nAnchor = nAnchor;
-
-	CRect	rc;
-	GetWindowRect(rc);
-
-	m_crBack = crBack;
-	m_bFitToImage = bFitToImage;
-
-	if (m_pImage.size() == 0)
-	{
-		if (m_bFitToImage)
-		{
-			m_width	= m_pImage[0]->GetWidth();
-			m_height = m_pImage[0]->GetHeight();
-
-			ResizeControl(dx, dy);
-		}
-		else
-		{
-			//m_pImage[m_nImages] = (Bitmap*)(m_pImage[m_nImages]->GetThumbnailImage(rc.Width(), rc.Height()));
-			m_width = rc.Width();// m_pImage[0]->GetWidth();
-			m_height = rc.Height();// m_pImage[0]->GetHeight();
-		}
-
-		SafeRelease(&m_pBack);
-		SafeRelease(&m_pBackOrigin);
-
-		if (pBack)
-		{
-			Rect rc(0, 0, pBack->GetWidth(), pBack->GetHeight());
-			m_pBackOrigin = pBack->Clone(rc, PixelFormatDontCare);
-			SetBackImage(pBack);
-		}
-
-		m_nIndex = 0;
-		m_bAsStatic = bAsStatic;
-	}
-	else
-	{
-		//추가되는 이미지들은 모두 0번 이미지와 동일한 크기여야 한다.
-		//m_pImage[m_nImages] = (Bitmap*)(m_pImage[m_nImages]->GetThumbnailImage(m_width, m_height));
-	}
-
-	return true;
-}
-void CGdiButton::SelectImage(int nIndex)
-{
-	if (nIndex < 0 || nIndex >= m_pImage.size())
-		return;
-
-	m_nIndex = nIndex;
-	UpdateSurface();
-}
-#endif
 
 //true이면 1번 이미지를 표시해준다. false일 경우는 0번을 표시하는데 만약 없으면 AddGrayImage로 회색 이미지를 자동 추가한 후 선택해준다.
 //기존에는 AddImage에서 checkbox나 radiobutton이면 알아서 grayimage를 추가해줬으나 아래와 같은 문제가 있어서
@@ -455,50 +248,7 @@ void CGdiButton::SetCheck(bool bCheck)
 		}
 	}
 }
-
-Bitmap* CGdiButton::Load(CString sfile)
-{
-	Bitmap*	bitmap = NULL;
-
-	BSTR bstrFilename = sfile.AllocSysString();;
-	bitmap = Bitmap::FromFile(bstrFilename);
-	::SysFreeString(bstrFilename);
-
-	if (bitmap->GetLastStatus() == Gdiplus::Ok)
-		return bitmap;
-
-	return NULL;
-}
-
-Bitmap*	CGdiButton::GetImageFromResource(HINSTANCE hInst, LPCTSTR lpType, LPCTSTR lpName)
-{
-	HRSRC hResource = FindResource(hInst, lpName, lpType);
-
-	if (!hResource)
-		return NULL;
-
-	DWORD imageSize = SizeofResource(AfxGetApp()->m_hInstance, hResource);
-	HGLOBAL hGlobal = LoadResource(AfxGetApp()->m_hInstance, hResource);
-	LPVOID pData = LockResource(hGlobal);
-	HGLOBAL hBuffer = GlobalAlloc(GMEM_MOVEABLE, imageSize);
-	LPVOID pBuffer = GlobalLock(hBuffer);
-
-	CopyMemory(pBuffer,pData,imageSize);
-	GlobalUnlock(hBuffer);
-
-	IStream *pStream;
-	HRESULT hr = CreateStreamOnHGlobal(hBuffer, TRUE, &pStream);
-	Image image(pStream);
-	pStream->Release();
-
-	if (image.GetLastStatus() != Ok)
-		return NULL;
-
-	Bitmap* pBitmap = static_cast<Bitmap*>(image.Clone());
-
-	return pBitmap;
-}
-
+/*
 void CGdiButton::SetBackImage(Bitmap* pBack)
 {
 	if (pBack == NULL)
@@ -519,7 +269,7 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 
 	UpdateSurface();
 }
-
+*/
 void CGdiButton::text(CString text)
 {
 	m_text = text;
@@ -540,8 +290,9 @@ void CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLOR
 
 void CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
-	if (m_pBack)
-		safe_release(&m_pBack);
+	//배경색을 설정하면 배경 이미지는 해제시킨다.
+	m_back.release();
+	m_back_origin.release();
 
 	m_cr_back.clear();
 	m_cr_back.push_back(normal);
@@ -619,9 +370,9 @@ void CGdiButton::PreSubclassWindow()
 	ModifyStyle(0, BS_OWNERDRAW, SWP_FRAMECHANGED);
 	//ModifyStyle(0, WS_TABSTOP, WS_TABSTOP);
 
-	GetWindowRect(m_rwOrigin);
-	GetParent()->ScreenToClient(m_rwOrigin);
-	//TRACE(_T("%s : %s\n"), text, GetRectInfoString(m_rwOrigin, 0));
+	GetWindowRect(m_rOrigin);
+	GetParent()->ScreenToClient(m_rOrigin);
+	//TRACE(_T("%s : %s\n"), text, GetRectInfoString(m_rOrigin, 0));
 
 	CFont* font = GetFont();
 
@@ -663,7 +414,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CRect		rc;
 	CRect		rText;
 	CPoint		pt(0, 0);
-	Bitmap*		pImage = NULL;
+	CGdiplusBitmap*	pImage = NULL;
 	CString		text;
 	COLORREF	cr_text = ::GetSysColor(COLOR_BTNTEXT);
 	COLORREF	cr_back = ::GetSysColor(COLOR_3DFACE);
@@ -744,7 +495,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//이미지가 있다면 이미지를 먼저 그려주고
-	if (m_image.size() > 0 && m_image[idx].normal != NULL)
+	if (m_image.size() > 0 && m_image[idx]->normal != NULL)
 	{
 		RectF			grect;
 		ImageAttributes ia;
@@ -760,37 +511,37 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (m_bAsStatic)
 		{
-			pImage = m_image[idx].normal;
+			pImage = &m_image[idx]->normal;
 		}
 		else
 		{
 			if (is_disabled)
 			{
-				pImage = m_image[idx].disabled;
+				pImage = &m_image[idx]->disabled;
 			}
 			//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
 			else if (is_down)
 			{
-				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].down);
+				pImage = (use_disabled_image ? &m_image[idx]->disabled : &m_image[idx]->down);
 				pt = m_down_offset;
 			}
 			//
 			else if (m_use_hover && m_bHover)
 			{
-				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].over);
+				pImage = (use_disabled_image ? &m_image[idx]->disabled : &m_image[idx]->over);
 			}
 			else
 			{
-				pImage = (use_disabled_image ? m_image[idx].disabled : m_image[idx].normal);
+				pImage = (use_disabled_image ? &m_image[idx]->disabled : &m_image[idx]->normal);
 			}
 		}
 
 		if (pImage == NULL)
-			pImage = m_image[idx].normal;
+			pImage = &m_image[idx]->normal;
 
 		//배경을 그리고
-		if (m_pBack)
-			g.DrawImage(m_pBack, 0, 0);
+		if (!m_back.empty())
+			g.DrawImage(m_back, 0, 0);
 		//else
 			//dc.FillSolidRect(rc, cr_back);
 
@@ -802,7 +553,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
 		}
 
-		g.DrawImage(pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+		g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
 
 		if (m_bShowFocusRect)//&& m_bHasFocus)
 		{
@@ -1060,7 +811,7 @@ void CGdiButton::ReAlign()
 			dy = rParentRect.CenterPoint().y - m_height / 2;
 	
 		SetWindowPos(NULL, dx, dy, m_width, m_height, SWP_NOZORDER | SWP_NOSIZE);
-		SetBackImage(m_pBackOrigin);
+		//SetBackImage(m_pBackOrigin);
 	}
 }
 
@@ -1085,7 +836,7 @@ void CGdiButton::Offset(int x, int y)
 
 	SetWindowPos(&wndNoTopMost, pt.x, pt.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);	
 
-	SetBackImage(m_pBackOrigin);
+	//SetBackImage(m_pBackOrigin);
 }
 
 void CGdiButton::Inflate(int cx, int cy)
@@ -1108,14 +859,11 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	rc.InflateRect(l, t, r, b);
 
 	//배경 그림이 존재했다면 배경 또한 새로 따와야 한다.
-	if (m_pBack && m_pBackOrigin)
+	if (m_back.valid() && m_back_origin.valid())
 	{
-		safe_release(&m_pBack);
-
-		Rect cutRect(rc.left, rc.top, rc.Width(), rc.Height());
-		m_pBack = m_pBackOrigin->Clone(cutRect, m_pBackOrigin->GetPixelFormat());
+		m_back_origin.deep_copy(&m_back);
+		m_back.sub_image(rc);
 	}
-
 
 	SetWindowPos(&wndNoTopMost, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);	
 	UpdateSurface();
@@ -1321,32 +1069,4 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 		m_height = cy;
 		resize_control(cx, cy);
 	}
-}
-
-void CGdiButton::rotate(Bitmap* bitmap, Gdiplus::RotateFlipType type)
-{
-	bitmap->RotateFlip(type);
-}
-
-void CGdiButton::rotate(Bitmap** bitmap, float angle)
-{
-	UINT w = (* bitmap)->GetWidth();
-	UINT h = (* bitmap)->GetHeight();
-
-	//create a new empty bitmap to hold rotated image 
-	Bitmap *result = new Bitmap(w, h);
-	//make a graphics object from the empty bitmap
-	Graphics g(result);
-	//move rotation point to center of image
-	g.TranslateTransform((float)w / 2, (float)h / 2);
-	//rotate
-	g.RotateTransform(angle);
-	//move image back
-	g.TranslateTransform(-(float)w / 2, -(float)h / 2);
-	//draw passed in image onto graphics object
-	g.DrawImage(*bitmap, 0, 0);
-
-	delete *bitmap;
-
-	*bitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
 }

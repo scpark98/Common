@@ -4892,6 +4892,11 @@ CRect GpRect2CRect(Gdiplus::Rect r)
 	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
 }
 
+Gdiplus::Rect CRect2GpRect(CRect r)
+{
+	return Gdiplus::Rect(r.left, r.top, r.Width(), r.Height());
+}
+
 CRect get_zoom_rect(CRect rect, double zoom)
 {
 	double l, t, r, b;

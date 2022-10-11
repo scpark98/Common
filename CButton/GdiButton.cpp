@@ -124,7 +124,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	if (normal == 0)
 		return false;
 
-	btn->normal.load(normal, lpType);
+	btn->normal.load(lpType, normal);
 	if (btn->normal.empty())
 		return false;
 
@@ -133,7 +133,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 
 	if (over > 0)
 	{
-		btn->over.load(over, lpType);
+		btn->over.load(lpType, over);
 	}
 	else
 	{
@@ -143,7 +143,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 
 	if (down > 0)
 	{
-		btn->down.load(down, lpType);
+		btn->down.load(lpType, down);
 	}
 	else
 	{
@@ -153,7 +153,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 
 	if (disabled > 0)
 	{
-		btn->disabled.load(disabled, lpType);
+		btn->disabled.load(lpType, disabled);
 	}
 	else
 	{

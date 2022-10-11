@@ -71,13 +71,13 @@ CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(UINT id, LPCTSTR lpType)
+CGdiplusBitmap::CGdiplusBitmap(LPCTSTR lpType, UINT id)
 {
-	load(id, lpType);
+	load(lpType, id);
 }
 
 
-void CGdiplusBitmap::load(UINT id, LPCTSTR lpType)
+void CGdiplusBitmap::load(LPCTSTR lpType, UINT id)
 {
 	release();
 

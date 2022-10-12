@@ -6,13 +6,6 @@
 
 #include <strsafe.h>	//for StringCchCopyN
 
-#define ID_MENU_RICHEDIT_TOGGLE_LOG		9900
-#define ID_MENU_RICHEDIT_CLEARL_LOG		9901
-#define ID_MENU_RICHEDIT_LINE_SPACE10	9902
-#define ID_MENU_RICHEDIT_LINE_SPACE15	9903
-#define ID_MENU_RICHEDIT_LINE_SPACE20	9904
-#define ID_MENU_RICHEDIT_TOGGLE_TIME	9905
-
 #define TIMER_CLEAR_LOG					0
 
 // CRichEditCtrlEx
@@ -42,10 +35,7 @@ BEGIN_MESSAGE_MAP(CRichEditCtrlEx, CRichEditCtrl)
 	ON_WM_RBUTTONUP()
 	ON_WM_RBUTTONDBLCLK()
 	ON_WM_TIMER()
-	ON_COMMAND( ID_MENU_RICHEDIT_TOGGLE_LOG, ToggleShowLog )
-	ON_COMMAND( ID_MENU_RICHEDIT_CLEARL_LOG, ClearAll )
-	ON_COMMAND( ID_MENU_RICHEDIT_TOGGLE_TIME, ToggleShowTime )
-	ON_COMMAND_RANGE( ID_MENU_RICHEDIT_LINE_SPACE10, ID_MENU_RICHEDIT_LINE_SPACE20, OnCommandLineSpacing )
+	ON_COMMAND_RANGE(id_menu_richedit_toggle_log, id_menu_richedit_toggle_time, OnPopupMenu)
 	ON_WM_MOUSEHWHEEL()
 END_MESSAGE_MAP()
 
@@ -117,7 +107,10 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	long lMinSel, lMaxSel;
 	GetSel(lMinSel, lMaxSel);
 
-	if ( bAddNewLine && ( str.Right( 1 ) != "\n" ) )
+	//str의 끝에 \n이 있던 없던 옵션대로 추가할 건 추가한다.
+	//str의 끝에 \n이 이미 있으면 스킵하려 했으나 의도적인 경우도 존재하므로
+	//코드는 명시된 규칙 그대로 수행하는게 맞다.
+	if (bAddNewLine)// && (str.Right(1) != "\n") )
 		str += "\n";
 
 	int			nOldLines = 0, nNewLines = 0, nScroll = 0;
@@ -437,14 +430,14 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 
 	menu.CreatePopupMenu();
 
-	menu.AppendMenu( MF_STRING, ID_MENU_RICHEDIT_CLEARL_LOG, _T("Clear all logs(&C)") );
+	menu.AppendMenu( MF_STRING, id_menu_richedit_clearl_log, _T("Clear all logs(&C)") );
 	menu.AppendMenu( MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, ID_MENU_RICHEDIT_TOGGLE_LOG, _T("Display logs(&S)") );
-	menu.AppendMenu( MF_STRING, ID_MENU_RICHEDIT_TOGGLE_TIME, _T("Display time info(&D)") );
+	menu.AppendMenu( MF_STRING, id_menu_richedit_toggle_log, _T("Display logs(&S)") );
+	menu.AppendMenu( MF_STRING, id_menu_richedit_toggle_time, _T("Display time info(&D)") );
 	menu.AppendMenu( MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, ID_MENU_RICHEDIT_LINE_SPACE10, _T("1.0 line space(&1)") );
-	menu.AppendMenu( MF_STRING, ID_MENU_RICHEDIT_LINE_SPACE15, _T("1.5 line space(&2)") );
-	menu.AppendMenu( MF_STRING, ID_MENU_RICHEDIT_LINE_SPACE20, _T("2.0 line space(&3)") );
+	menu.AppendMenu( MF_STRING, id_menu_richedit_line_space10, _T("1.0 line space(&1)") );
+	menu.AppendMenu( MF_STRING, id_menu_richedit_line_space15, _T("1.5 line space(&2)") );
+	menu.AppendMenu( MF_STRING, id_menu_richedit_line_space20, _T("2.0 line space(&3)") );
 
 	//현재 라인간격값을 얻어온다.
 	PARAFORMAT2	paraFormat;
@@ -452,16 +445,16 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 	paraFormat.dwMask = PFM_LINESPACING;
 	BYTE nLineSpacing = paraFormat.bLineSpacingRule;	//줄간격을 1.5배로 한다. 0=1.0, 1=1.5, 2=2.0
 
-	menu.CheckMenuItem( ID_MENU_RICHEDIT_TOGGLE_LOG, m_bShowLog ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( ID_MENU_RICHEDIT_TOGGLE_TIME, m_bShowTime ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( ID_MENU_RICHEDIT_LINE_SPACE10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( ID_MENU_RICHEDIT_LINE_SPACE15, nLineSpacing == 1 ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( ID_MENU_RICHEDIT_LINE_SPACE20, nLineSpacing == 2 ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_toggle_log, m_bShowLog ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_toggle_time, m_bShowTime ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_line_space10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_line_space15, nLineSpacing == 1 ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_line_space20, nLineSpacing == 2 ? MF_CHECKED : MF_UNCHECKED );
 
-	menu.EnableMenuItem( ID_MENU_RICHEDIT_TOGGLE_TIME, m_bShowLog ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( ID_MENU_RICHEDIT_LINE_SPACE10, m_bShowLog ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( ID_MENU_RICHEDIT_LINE_SPACE15, m_bShowLog ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( ID_MENU_RICHEDIT_LINE_SPACE20, m_bShowLog ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_toggle_time, m_bShowLog ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_line_space10, m_bShowLog ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_line_space15, m_bShowLog ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_line_space20, m_bShowLog ? MF_ENABLED : MF_DISABLED );
 
 	SetMenu( &menu );
 
@@ -511,9 +504,25 @@ void CRichEditCtrlEx::ToggleShowTime()
 	m_bShowTime = !m_bShowTime;
 }
 
-void CRichEditCtrlEx::OnCommandLineSpacing( UINT nLineSpace )
+void CRichEditCtrlEx::OnPopupMenu(UINT menuID)
 {
-	SetLineSpacing( nLineSpace - ID_MENU_RICHEDIT_LINE_SPACE10 );
+	switch (menuID)
+	{
+		case id_menu_richedit_toggle_log :
+			ToggleShowLog();
+			break;
+		case id_menu_richedit_clearl_log:
+			ClearAll();
+			break;
+		case id_menu_richedit_toggle_time:
+			ToggleShowTime();
+			break;
+		case id_menu_richedit_line_space10 :
+		case id_menu_richedit_line_space15 :
+		case id_menu_richedit_line_space20 :
+			SetLineSpacing(menuID - id_menu_richedit_line_space10);
+			break;
+	}
 }
 
 void CRichEditCtrlEx::SetLineSpacing( UINT nLineSpace )

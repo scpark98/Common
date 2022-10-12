@@ -16,6 +16,16 @@ public:
 	CRichEditCtrlEx();
 	virtual ~CRichEditCtrlEx();
 
+	enum CRichEditCtrlExMenu
+	{
+		id_menu_richedit_toggle_log = 9900,
+		id_menu_richedit_clearl_log,
+		id_menu_richedit_line_space10,
+		id_menu_richedit_line_space15,
+		id_menu_richedit_line_space20,
+		id_menu_richedit_toggle_time,
+	};
+
 	void		SetDefaultTextColor( COLORREF crText ) { m_crText = crText; }
 	void		SetBackColor( bool bSysColor, COLORREF crBack );
 	void		SetClearLogInterval( int nInterval );
@@ -58,7 +68,7 @@ protected:
 	int			m_nScrollSize;
 	bool		m_auto_scroll = true;
 
-	void		OnCommandLineSpacing( UINT nLineSpace );
+	void		OnPopupMenu(UINT menuID);
 
 	LOGFONT		m_lf;
 	CFont		m_font;

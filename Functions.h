@@ -520,6 +520,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	CString		ExtractSubString( CString src, CString sPrev, CString sPost );	//sPrev(필드 앞에 오는 문자열), sPost(필드 뒤에 오는 문자열)
 	//std::string string_format(const std::string fmt, ...);
 	std::string string_format(const std::string fmt_str, ...);	//A safer and more efficient(http://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf)
+	/*
 	//format에 줄때는 %s가 아닌 %S??
 	template<typename ... Args> std::string string_format(const std::string& format, Args ... args)
 	{
@@ -530,6 +531,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 		std::snprintf(buf.get(), size, format.c_str(), args ...);
 		return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
 	}
+	*/
 	CString		loadResString(UINT nID);
 
 

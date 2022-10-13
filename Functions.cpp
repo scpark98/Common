@@ -6836,13 +6836,6 @@ std::string CString2string(CString str)
 }
 */
 
-CString	string2CString(std::string s)
-{
-	CString cs(s.c_str());
-	return cs;
-}
-
-
 PCWSTR CString2PCWSTR(CString str)
 {
 #ifdef _UNICODE

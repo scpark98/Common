@@ -17,7 +17,7 @@ CRichEditCtrlEx::CRichEditCtrlEx()
 	m_crText			= ::GetSysColor(COLOR_GRAYTEXT);
 	m_crBack			= RGB( 255, 255, 255 );
 	m_bShowLog			= true;
-	m_bShowTime			= true;
+	m_bShowTime			= AfxGetApp()->GetProfileInt(_T("setting\\rich_edit"), _T("show time"), true);
 	m_nClearLogInterval	= 0;
 	m_nMaxCharLimit		= 0;
 	m_nScrollSize		= 2;
@@ -502,6 +502,7 @@ void CRichEditCtrlEx::ToggleShowLog()
 void CRichEditCtrlEx::ToggleShowTime()
 {
 	m_bShowTime = !m_bShowTime;
+	AfxGetApp()->WriteProfileInt(_T("setting\\rich_edit"), _T("show time"), m_bShowTime);
 }
 
 void CRichEditCtrlEx::OnPopupMenu(UINT menuID)

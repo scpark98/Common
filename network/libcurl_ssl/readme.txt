@@ -1,3 +1,6 @@
+* libcurl을 사용하는 앱이 "정적 라이브러리에서 MFC 사용"이라는 옵션을 사용하는 경우
+  libcurl 또한 "정적 라이브러리에서 MFC 사용"으로 빌드된 lib이어야 한다.
+  
 - include 경로에 libcurl_ssl/include 추가
 
 - lib 경로에 libcurl_ssl/lib 추가

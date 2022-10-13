@@ -1,21 +1,20 @@
-* libcurl을 사용하는 앱이 "정적 라이브러리에서 MFC 사용"이라는 옵션을 사용하는 경우
-  libcurl 또한 "정적 라이브러리에서 MFC 사용"으로 빌드된 lib이어야 한다.
-  
+https://cinrueom.tistory.com/10
+
 - include 경로에 libcurl_ssl/include 추가
+  (libcurl_ssl/include 폴더에는 curl 폴더만 존재하며 ssl은 필요없음)
 
 - lib 경로에 libcurl_ssl/lib 추가
-  (libcurl.lib은 release용, libcurld.lib는 debug용이며 다른 2개의 lib는 ssl에서 사용된다)
+  (libcurl.lib은 release용, libcurld.lib는 debug용이며
+  libcrypto.lib와 libssl.lib는 openssl에 있던것인데 추가 종속성에 넣지 않아도 빌드된다)
 
 - lib 입력에 다음 lib 입력
 	libcurl.lib
-	libeay32.lib
-	ssleay32.lib
 	wldap32.lib
 	ws2_32.lib
-	crypt32.lib
+	//crypt32.lib
 
 - 프로젝트 exe와 동일한 폴더에
-  libcurl_ssl/bin에 있는 2개의 dll 복사.
+  libcurl_ssl/bin에 있는 libcurl.dll, libcrypto-1_1.dll, libssl-1_1.dll 복사.
   
 [in .h]
 #include "curl/curl.h"

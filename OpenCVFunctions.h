@@ -36,9 +36,9 @@ cv::resize interpolation method
 #include <atlimage.h>
 
 #include "opencv2/opencv.hpp"
-#include "opencv2/core/core.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include "opencv2/highgui/highgui.hpp"
+//#include "opencv2/core/core.hpp"
+//#include "opencv2/imgproc/imgproc.hpp"
+//#include "opencv2/highgui/highgui.hpp"
 //#include "opencv2/video/tracking.hpp"
 //#include "opencv2/features2d/features2d.hpp"
 //#include "opencv2/objdetect/objdetect.hpp"
@@ -51,6 +51,8 @@ cv::resize interpolation method
 #else
 #define LIB_SUFFIX ".lib"
 #endif
+
+#define CV_WORLD
 
 #ifdef CV_WORLD
 #include "opencv2/videoio/videoio.hpp"
@@ -127,10 +129,10 @@ using namespace cv;
 int			matMake4Width( Mat &src );
 
 /*
-scvDrawImage(pDC, src, 10, 20)
+cv_draw(pDC, src, 10, 20)
 => 10, 20에 이미지를 원본 크기로 표시한다.
 
-scvDrawImage(pDC, src, target_rect, COLORREF crBack)
+cv_draw(pDC, src, target_rect, COLORREF crBack)
 => target_rect에 비율을 확대, 축소하여 이미지를 표시하고 여백은 crBack으로 채워준다.
 */
 

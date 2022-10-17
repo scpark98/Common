@@ -1350,7 +1350,7 @@ Mat	GetHistogram( Mat src )
 	return histogram;
 }
 
-//width가 4의 배수가 아니면 scvDrawImage함수에서 제대로 그려지지 않는다.
+//width가 4의 배수가 아니면 cv_draw함수에서 제대로 그려지지 않는다.
 //read, cut, resize 등으로 width의 변경이 있을 경우는 이 함수로 보정해주자.
 int matMake4Width( Mat &src )
 {

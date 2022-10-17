@@ -16,6 +16,7 @@
 - copy, paste 기능 추가.
 */
 
+#include <afxwin.h>
 #include "Functions.h"
 #include "OpenCVFunctions.h"
 

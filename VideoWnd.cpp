@@ -1,7 +1,6 @@
 // VideoWnd.cpp : implementation file
 //
 
-#include "stdafx.h"
 #include "VideoWnd.h"
 
 #include "MemoryDC.h"
@@ -30,7 +29,7 @@ CVideoWnd::CVideoWnd()
 
 	m_bUsePopupMenu			= true;
 	m_bPopupMenu			= false;
-	m_bSaveRecentFrame		= AfxGetApp()->GetProfileInt( _T("setting"), _T("save recent frame"), 0 );;
+	m_bSaveRecentFrame		= AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("save recent frame"), 0 );;
 	m_nSaveIndex			= 0;
 	m_bImageFromClipboard	= false;
 
@@ -54,20 +53,20 @@ CVideoWnd::CVideoWnd()
 	}
 	else
 	{
-		m_bStereoBin		= AfxGetApp()->GetProfileInt( _T("setting"), _T("is stereo bin"), false );
-		m_nBinWidth			= AfxGetApp()->GetProfileInt( _T("setting"), _T("bin width"), 1920 );
-		m_nBinHeight		= AfxGetApp()->GetProfileInt( _T("setting"), _T("bin height"), 1080 );
+		m_bStereoBin		= AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("is stereo bin"), false );
+		m_nBinWidth			= AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("bin width"), 1920 );
+		m_nBinHeight		= AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("bin height"), 1080 );
 	}
 
 	imgYUV					= NULL;
 	m_yuv_origin			= NULL;
-	m_yuv_format			= AfxGetApp()->GetProfileInt( _T("setting"), _T("yuv format"), yuv422_uyvy );
+	m_yuv_format			= AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("yuv format"), yuv422_uyvy );
 
 	//현재 stereo bin은 uyvy만 지원된다.
 	if ( m_bStereoBin )
 	{
 		m_yuv_format = yuv422_uyvy;
-		AfxGetApp()->WriteProfileInt( _T("setting"), _T("yuv format"), m_yuv_format );
+		AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("yuv format"), m_yuv_format );
 	}
 
 
@@ -82,7 +81,6 @@ CVideoWnd::CVideoWnd()
 	//부드럽게 조정할 것인지(사진용) 선택해야 한다.
 	//http://tanbakuchi.com/posts/comparison-of-openv-interpolation-algorithms/
 	m_nInterpolation		= INTER_LINEAR;
-	m_capture				= NULL;
 	//m_mat.data				= NULL;
 
 	m_VideoFPS				= 0.0;
@@ -95,7 +93,8 @@ CVideoWnd::CVideoWnd()
 
 	m_bSendPlayWndInfo		= false;
 
-	m_bRepeat				= false;
+	m_bRepeat				= AfxGetApp()->GetProfileInt(_T("setting\\video"), _T("repeat"), false);
+;
 	m_nPlayState			= STOP;
 	m_bReverse				= false;
 
@@ -117,7 +116,7 @@ CVideoWnd::CVideoWnd()
 	m_crTextColor			= RGB( 64, 255, 64 );
 	m_crTextBkColor			= RGB( 32, 32, 32 );
 
-	m_bDrawFocusRect		= true;
+	m_bDrawFocusRect		= false;
 	m_bTrackBarDown			= false;
 
 	for ( int i = 0; i < 4; i++ )
@@ -127,7 +126,7 @@ CVideoWnd::CVideoWnd()
 	}
 
 	m_bUsePatternBackground	= false;
-	m_crBackground			= RGB( 32, 32, 32 );
+	m_crBackground			= GRAY(64);
 	m_crBorder				= -1;	//-1 : no border
 
 	for ( int i = 0; i < BMPX; i++ )
@@ -151,7 +150,7 @@ CVideoWnd::CVideoWnd()
 
 	m_bUseImageArray = false;
 
-	m_auto_next_video = AfxGetApp()->GetProfileInt( _T("setting"), _T("auto next video"), false );
+	m_auto_next_video = AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("auto next video"), false );
 }
 
 CVideoWnd::~CVideoWnd()
@@ -267,13 +266,13 @@ void CVideoWnd::OnPaint()
 		if (m_mat.data)
 		{
 			m_rDisplayedImageRect = GetRatioRect(rc, m_mat.cols, m_mat.rows);
-			scvDrawImage(&dc, m_mat, m_rDisplayedImageRect);
+			cv_draw(&dc, m_mat, &m_rDisplayedImageRect, GRAY32, -1.0);
 		}
 		else if ( m_sVideoFileName != _T("") )
 		{
 			dc.SetBkMode(TRANSPARENT);
 			dc.SetTextColor( RGB(242, 231, 202) );
-			drawCenterText( &dc, _T("File not found or corrupted image file.\n\nOr check the size and format of raw, yuv image."), rc );
+			draw_center_text( &dc, _T("File not found or corrupted image file.\n\nOr check the size and format of raw, yuv image."), rc );
 			return;
 		}
 	}
@@ -286,13 +285,13 @@ void CVideoWnd::OnPaint()
 			for ( i = 0; i < m_nVanishingPointCount; i++ )
 			{
 				if ( i == 1 )
-					DrawLine( &dc, m_ptVanishingPointClicked[0], m_ptVanishingPointClicked[1], ORANGE, 2 );
+					DrawLinePt( &dc, m_ptVanishingPointClicked[0], m_ptVanishingPointClicked[1], orange, 2 );
 				else if ( i == 3 )
-					DrawLine( &dc, m_ptVanishingPointClicked[2], m_ptVanishingPointClicked[3], ORANGE, 2 );
+					DrawLinePt( &dc, m_ptVanishingPointClicked[2], m_ptVanishingPointClicked[3], orange, 2 );
 
 				CRect	r(m_ptVanishingPointClicked[i], m_ptVanishingPointClicked[i]);
 				r.InflateRect( 4, 4 );
-				DrawRectangle( &dc, r, RED, NULL_BRUSH );
+				DrawRectangle( &dc, r, red, NULL_BRUSH );
 			}
 
 			if ( m_nVanishingPointCount % 2 == 1 )
@@ -300,7 +299,7 @@ void CVideoWnd::OnPaint()
 				CPoint ptCur;
 				GetCursorPos( &ptCur );
 				ScreenToClient( &ptCur );
-				DrawLine( &dc, m_ptVanishingPointClicked[m_nVanishingPointCount - 1], ptCur, ORANGE, 1 );
+				DrawLinePt( &dc, m_ptVanishingPointClicked[m_nVanishingPointCount - 1], ptCur, orange, 1 );
 			}
 		}
 
@@ -308,12 +307,12 @@ void CVideoWnd::OnPaint()
 		{
 			CPoint pt = m_ptVanishingPoint;
 			GetScreenPosFromRealPos( m_rDisplayedImageRect, m_mat.cols, &pt );
-			DrawLine( &dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, YELLOW, 1, PS_DASH );
-			DrawLine( &dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, YELLOW, 1, PS_DASH );
+			DrawLine( &dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, yellow, 1, PS_DASH );
+			DrawLine( &dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, yellow, 1, PS_DASH );
 		}
 
 		//설정중인 ROI 사각형 표시
-		DrawRectangle( &dc, m_rScreenROI, RED, NULL_BRUSH, 2 );
+		DrawRectangle( &dc, m_rScreenROI, red, NULL_BRUSH, 2 );
 
 		dc.SetBkMode( TRANSPARENT );
 
@@ -345,7 +344,7 @@ void CVideoWnd::OnPaint()
 
 			dc.SetTextAlign( uOldFormat );
 			str.Format(_T("%.1f (%d x %d)"), GetDistance( r.TopLeft(), r.BottomRight() ), r.Width(), r.Height() );
-			DrawTextOutline( &dc, m_rSizeInfo, str, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP, crText2, crShadow);
+			DrawTextOutline( &dc, str, m_rSizeInfo, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP, crText2, crShadow);
 		}
 
 		CAutoFont	Font( _T("FixedSys") );
@@ -419,7 +418,7 @@ void CVideoWnd::OnPaint()
 					m_rDisplayedImageRect.bottom - yoffset + i,
 					m_rDisplayedImageRect.left + x,
 					m_rDisplayedImageRect.bottom - yoffset + i,
-					(i % 4 == 0 ? (i == 0 ? GRAY128 : GRAY212) : RGB(0, 121, 212)) );
+					(i % 4 == 0 ? (i == 0 ? GRAY128 : GRAY(212)) : RGB(0, 121, 212)) );
 	DrawLine( &dc, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset + 4, GRAY128 );
 	//for resize area test
 	/*CRect	side[8];
@@ -943,7 +942,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		}
 	}
 
-	sExt = GetFileExtensionFromFullPath( sfile ).MakeLower();
+	sExt = GetFileExtension(sfile).MakeLower();
 
 	if ( sfile != "" )
 		m_nFileType = GetFileTypeFromExtension( sExt );
@@ -965,7 +964,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		{
 			m_sVideoFileName = sfile;
 
-			m_matOrigin = loadImage( sfile, CV_LOAD_IMAGE_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
+			m_matOrigin = loadImage( sfile, IMREAD_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
 
 			if (m_matOrigin.data == NULL)
 			{
@@ -1017,10 +1016,10 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 
 		if ( m_bSaveRecentFrame )
 		{
-			CString sRecentFile = AfxGetApp()->GetProfileString(_T("setting"), _T("recent file"), _T("") );
+			CString sRecentFile = AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("") );
 			if ( GetFileNameFromFullPath(sRecentFile).MakeLower() == GetFileNameFromFullPath(sfile).MakeLower() )
 			{
-				m_nCurrentFrame = AfxGetApp()->GetProfileInt( _T("setting"), _T("recent frame"), 0 );
+				m_nCurrentFrame = AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("recent frame"), 0 );
 				DEFAULT_RANGE( m_nCurrentFrame, 0, m_nTotalFrame - 1, 0 );
 			}
 		}
@@ -1060,9 +1059,9 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 			}
 		}
 
-		m_szImageSizeOrigin.cx = m_capture.get( CV_CAP_PROP_FRAME_WIDTH );
-		m_szImageSizeOrigin.cy = m_capture.get( CV_CAP_PROP_FRAME_HEIGHT );
-		m_VideoFPS = m_capture.get( CV_CAP_PROP_FPS );
+		m_szImageSizeOrigin.cx = m_capture.get(CAP_PROP_FRAME_WIDTH);
+		m_szImageSizeOrigin.cy = m_capture.get(CAP_PROP_FRAME_HEIGHT);
+		m_VideoFPS = m_capture.get(CAP_PROP_FPS);
 		//AfxMessageBox( i2S( fps ) );
 
 		m_szImageSize.cx = ROUND( (double)( m_szImageSizeOrigin.cx ) * m_dResizeRatio, 0 );
@@ -1074,19 +1073,19 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		//}
 		m_szImageSize.cy = ROUND( (double)( m_szImageSizeOrigin.cy ) * m_dResizeRatio, 0 );
 
-		m_nTotalFrame = m_capture.get( CV_CAP_PROP_FRAME_COUNT );
+		m_nTotalFrame = m_capture.get(CAP_PROP_FRAME_COUNT);
 
 		if ( m_bSaveRecentFrame )
 		{
-			CString sRecentFile = AfxGetApp()->GetProfileString(_T("setting"), _T("recent file"), _T("") );
+			CString sRecentFile = AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("") );
 			if ( GetFileNameFromFullPath(sRecentFile).MakeLower() == GetFileNameFromFullPath(sfile).MakeLower() )
 			{
-				m_nCurrentFrame = AfxGetApp()->GetProfileInt( _T("setting"), _T("recent frame"), 0 );
+				m_nCurrentFrame = AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("recent frame"), 0 );
 				DEFAULT_RANGE( m_nCurrentFrame, 0, m_nTotalFrame - 1, 0 );
 			}
 		}
 
-		m_capture.set( CV_CAP_PROP_POS_FRAMES, m_nCurrentFrame );
+		m_capture.set(CAP_PROP_POS_FRAMES, m_nCurrentFrame );
 		m_capture.retrieve( m_matOrigin );
 		//m_capture >> m_matOrigin;
 
@@ -1097,6 +1096,12 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		}
 
 		m_sVideoFileName = sfile;
+	}
+
+	if (m_matOrigin.empty())
+	{
+		AfxMessageBox(sfile + _T("\nFail to open."));
+		return false;
 	}
 
 	SetWindowText( m_sVideoFileName );
@@ -1112,12 +1117,12 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		m_mat( cv::Rect(m_rImageROI.left, m_rImageROI.top, m_rImageROI.Width(), m_rImageROI.Height()) ).copyTo( m_mat );
 
 
-	AfxGetApp()->WriteProfileString(_T("setting"), _T("recent file"), m_sVideoFileName );
+	AfxGetApp()->WriteProfileString(_T("setting\\video"), _T("recent file"), m_sVideoFileName );
 
-	if ( m_hParentWnd && m_bSendPlayWndInfo )
+	if (GetParent()->m_hWnd && m_bSendPlayWndInfo)
 	{
-		::SendMessage( m_hParentWnd, message_video_wnd_video_opened, m_nVideoWndID, 0 );
-		::SendMessage( m_hParentWnd, message_video_wnd_play_state_changed, m_nVideoWndID, m_nPlayState );
+		::SendMessage(GetParent()->m_hWnd, message_video_wnd_video_opened, m_nVideoWndID, 0);
+		::SendMessage(GetParent()->m_hWnd, message_video_wnd_play_state_changed, m_nVideoWndID, m_nPlayState );
 	}
 	//else
 	{
@@ -1150,14 +1155,14 @@ void CVideoWnd::CloseVideoFile()
 	{
 		::SendMessage(m_hParentWnd, message_video_wnd_track_changing, m_nVideoWndID, m_nCurrentFrame);
 
-		WriteProfileDouble( AfxGetApp(), _T("setting"), _T("resize ratio"), GetResizeRatio() );
+		WriteProfileDouble( AfxGetApp(), _T("setting\\video"), _T("resize ratio"), GetResizeRatio() );
 
 		::SendMessage(m_hParentWnd, message_video_wnd_video_closing, m_nVideoWndID, 0);
 	}
 
 	if ( m_nFileType == FILE_TYPE_VIDEO || m_nFileType == FILE_TYPE_VIDEO_BIN )
 	{
-		AfxGetApp()->WriteProfileInt( _T("setting"), _T("recent frame"), m_bSaveRecentFrame ? m_nCurrentFrame : 0 );
+		AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("recent frame"), m_bSaveRecentFrame ? m_nCurrentFrame : 0 );
 	}
 
 	if ( m_capture.isOpened() )
@@ -1347,7 +1352,7 @@ void CVideoWnd::OnTimer(UINT_PTR nIDEvent)
 
 			if ( m_bReverse )
 			{
-				m_capture.set( CV_CAP_PROP_POS_FRAMES, m_nCurrentFrame );
+				m_capture.set(CAP_PROP_POS_FRAMES, m_nCurrentFrame );
 				m_capture.retrieve( m_matOrigin );
 			}
 			else
@@ -1392,7 +1397,7 @@ void CVideoWnd::OnTimer(UINT_PTR nIDEvent)
 			SendTrackChanged();
 
 		if ( m_bSaveRecentFrame )
-			AfxGetApp()->WriteProfileInt( _T("setting"), _T("recent frame"), GetCurrentFrame() );
+			AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("recent frame"), GetCurrentFrame() );
 
 		CString str;
 
@@ -1447,8 +1452,8 @@ void CVideoWnd::GotoFrame(int nFrame)
 		//play상태가 아닌 경우에만 해당 프레임의 영상으로 갱신해주자.
 		if (m_nFileType == FILE_TYPE_VIDEO)
 		{
-			bool b = m_capture.set(CV_CAP_PROP_POS_FRAMES, (double)m_nCurrentFrame);
-			m_nCurrentFrame = m_capture.get(CV_CAP_PROP_POS_FRAMES);
+			bool b = m_capture.set(CAP_PROP_POS_FRAMES, (double)m_nCurrentFrame);
+			m_nCurrentFrame = m_capture.get(CAP_PROP_POS_FRAMES);
 		}
 
 		if ( m_nPlayState != PLAY || m_nCurrentFrame == m_nTotalFrame - 1 )
@@ -1521,7 +1526,7 @@ void CVideoWnd::GotoNextFrame(bool bNext, int nStep, int newState)
 	{
 		if (m_nFileType == FILE_TYPE_VIDEO)
 		{
-			m_capture.set(CV_CAP_PROP_POS_FRAMES, m_nCurrentFrame);
+			m_capture.set(CAP_PROP_POS_FRAMES, m_nCurrentFrame);
 			m_capture >> m_matOrigin;
 		}
 		else if (m_nFileType == FILE_TYPE_VIDEO_BIN)
@@ -2432,11 +2437,11 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 	switch ( nID )
 	{
 		case id_menu_file_open :
-				OpenVideoFile(NULL, true, m_sVideoFileName);
+				OpenVideoFile(m_sVideoFileName, true);
 				break;
 		case id_menu_file_open_sequence :
 				{
-					CString			sfile = AfxGetApp()->GetProfileString( _T("setting"), _T("recent sequence image"), _T("") );
+					CString			sfile = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent sequence image"), _T("") );
 					TCHAR			szFilter[] = _T("Media (*.mp4,*.wmv,*.avi,*.bin,*.yuv,*.bmp,*.jpg,*.png)|*.mp4;*.wmv;*.avi;*.bin;*.yuv;*.bmp;*.jpg,*.png|All Filess(*.*)|*.*||");
 					CFileDialog		dlg(true, _T("*.*"), sfile, OFN_FILEMUSTEXIST, szFilter, this);
 
@@ -2455,13 +2460,13 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 				int oldState = GetPlayState();
 				Play(PAUSE);
 				m_bStereoBin = !m_bStereoBin;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("is stereo bin"), m_bStereoBin );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("is stereo bin"), m_bStereoBin );
 
 				//현재 stereo bin은 uyvy만 지원된다.
 				if ( m_bStereoBin )
 				{
 					m_yuv_format = yuv422_uyvy;
-					AfxGetApp()->WriteProfileInt( _T("setting"), _T("yuv format"), m_yuv_format );
+					AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("yuv format"), m_yuv_format );
 				}
 
 				delete [] imgYUV;
@@ -2483,7 +2488,7 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 					str.Replace( _T(","), _T(" ") );
 					str.Trim();
 
-					if ( GetCharCount( str, ' ' ) == 0 )
+					if ( get_char_count( str, ' ' ) == 0 )
 					{
 						AfxMessageBox( _T("Invalid video size."), MB_ICONEXCLAMATION );
 						return;
@@ -2515,8 +2520,8 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 						m_rImageROI = CRect(0, 0, m_mat.cols, m_mat.rows);
 					}
 
-					AfxGetApp()->WriteProfileInt( _T("setting"), _T("bin width"), m_nBinWidth );
-					AfxGetApp()->WriteProfileInt( _T("setting"), _T("bin height"), m_nBinHeight );
+					AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("bin width"), m_nBinWidth );
+					AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("bin height"), m_nBinHeight );
 
 					if ( m_nFileType == FILE_TYPE_VIDEO_BIN )
 					{
@@ -2526,7 +2531,7 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 					}
 					else
 					{
-						m_matOrigin = loadImage( m_sVideoFileName, CV_LOAD_IMAGE_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
+						m_matOrigin = loadImage( m_sVideoFileName, IMREAD_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
 						updateMainMat( NULL, true );
 					}
 				}
@@ -2535,26 +2540,26 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 		}
 		case id_menu_yuv422_uyvy :
 				m_yuv_format = yuv422_uyvy;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("yuv format"), m_yuv_format );
-				m_matOrigin = loadImage( m_sVideoFileName, CV_LOAD_IMAGE_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("yuv format"), m_yuv_format );
+				m_matOrigin = loadImage( m_sVideoFileName, IMREAD_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
 				updateMainMat( NULL, true );
 				break;
 		case id_menu_yuv422_yuyv :
 				m_yuv_format = yuv422_yuyv;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("yuv format"), m_yuv_format );
-				m_matOrigin = loadImage( m_sVideoFileName, CV_LOAD_IMAGE_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("yuv format"), m_yuv_format );
+				m_matOrigin = loadImage( m_sVideoFileName, IMREAD_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
 				updateMainMat( NULL, true );
 				break;
 		case id_menu_yuv420_nv12 :
 				m_yuv_format = yuv420_nv12;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("yuv format"), m_yuv_format );
-				m_matOrigin = loadImage( m_sVideoFileName, CV_LOAD_IMAGE_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("yuv format"), m_yuv_format );
+				m_matOrigin = loadImage( m_sVideoFileName, IMREAD_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
 				updateMainMat( NULL, true );
 				break;
 		case id_menu_yuv420_yv12 :
 				m_yuv_format = yuv420_yv12;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("yuv format"), m_yuv_format );
-				m_matOrigin = loadImage( m_sVideoFileName, CV_LOAD_IMAGE_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("yuv format"), m_yuv_format );
+				m_matOrigin = loadImage( m_sVideoFileName, IMREAD_UNCHANGED, false, m_nBinWidth, m_nBinHeight, m_yuv_format );
 				updateMainMat( NULL, true );
 				break;
 
@@ -2583,21 +2588,21 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 				break;
 		case id_menu_repeat :
 				m_bRepeat = !m_bRepeat;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("repeat"), m_bRepeat );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("repeat"), m_bRepeat );
 				break;
 		case id_menu_auto_next_video :
 				m_auto_next_video = !m_auto_next_video;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("auto next video"), m_auto_next_video );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("auto next video"), m_auto_next_video );
 				break;
 		case id_menu_save_recent_frame :
 				m_bSaveRecentFrame = !m_bSaveRecentFrame;
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("save recent frame"), m_bSaveRecentFrame );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("save recent frame"), m_bSaveRecentFrame );
 				break;
 
 		case id_menu_show_vanishing_point :
 				m_bShowVanishingPoint = !m_bShowVanishingPoint;
 				Invalidate();
-				AfxGetApp()->WriteProfileInt( _T("setting"), _T("show vanishing point"), m_bShowVanishingPoint );
+				AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("show vanishing point"), m_bShowVanishingPoint );
 				break;
 		case id_menu_get_vanishing_point :
 				Play(PAUSE);
@@ -2613,7 +2618,7 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 					CString str = buf;
 					str.Trim();
 					str.Replace( _T(","), _T(" ") );
-					if (GetCharCount(str, ' ') != 1)
+					if (get_char_count(str, ' ') != 1)
 					{
 						AfxMessageBox(_T("소실점 x y의 좌표를 123 456과 같이 입력해야 합니다."), MB_ICONEXCLAMATION);
 						return;
@@ -2643,8 +2648,8 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 //sfile 파일이 존재하는 폴더내의 동일 타입 그림파일 시퀀스를 열어준다.
 void CVideoWnd::OpenSequenceImages( CString sfile )
 {
-	AfxGetApp()->WriteProfileString( _T("setting"), _T("recent sequence image"), sfile );
-	BuildImageArray( sfile, GetFileExtensionFromFullPath( sfile ) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent sequence image"), sfile );
+	BuildImageArray( sfile, GetFileExtension(sfile) );
 }
 
 void CVideoWnd::OnMenuROIReset()
@@ -2692,7 +2697,7 @@ void CVideoWnd::CopyToClipboard()
 	//일그러진 이미지가 클립보드로 복사된다.
 	//일단 CImage로 변경하여 이 문제를 해결했다.
 	CImage img;
-	MatToCImage( m_mat, img );
+	matToCImage( m_mat, img );
 
 	CDC memDC;
 	memDC.CreateCompatibleDC(NULL);
@@ -2702,7 +2707,14 @@ void CVideoWnd::CopyToClipboard()
 	memDC.SelectObject(&bitmap);
 	img.BitBlt(memDC.GetSafeHdc(), 0, 0, img.GetWidth(), img.GetHeight(), 0, 0, SRCCOPY);
 
-	PasteBMPToClipboard( bitmap.GetSafeHandle() );
+	//PasteBMPToClipboard( bitmap.GetSafeHandle() );
+	if (OpenClipboard())
+	{
+		EmptyClipboard();
+		SetClipboardData(CF_DIB, bitmap.GetSafeHandle());
+		CloseClipboard();
+	}
+
 	memDC.DeleteDC();
 	bitmap.Detach();
 }
@@ -2815,8 +2827,8 @@ void CVideoWnd::SaveAsDisplayedSize()
 	else// if (m_bImageFromClipboard)
 		sMediaFilename = _T("snapshot");
 
-	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting"), _T("recent saved folder"), GetExeDirectory() );
-	CString sRecentSavedFormat = AfxGetApp()->GetProfileString( _T("setting"), _T("recent saved format"), _T("*.jpg") );
+	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved folder"), GetExeDirectory() );
+	CString sRecentSavedFormat = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved format"), _T("*.jpg") );
 	sImageFile.Format(_T("%s\\%s_%08d.jpg"), sRecentSavedFolder, sMediaFilename, nIndex);
 	CFileDialog fileDlg( false, sRecentSavedFormat, sImageFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, _T("JPG file|*.jpg|BMP file|*.bmp|All files|*.*||") );
 
@@ -2836,9 +2848,9 @@ void CVideoWnd::SaveAsDisplayedSize()
 	if ( bShiftKeyPressed || IsShiftPressed() )
 		ShellExecute( m_hWnd, _T("open"), fileDlg.GetPathName(), NULL, NULL, SW_SHOWNORMAL );
 
-	sRecentSavedFormat.Format( _T("*.%s"), GetFileExtensionFromFullPath(fileDlg.GetPathName()) );
-	AfxGetApp()->WriteProfileString( _T("setting"), _T("recent saved folder"), GetFolderNameFromFullPath(fileDlg.GetPathName()) );
-	AfxGetApp()->WriteProfileString( _T("setting"), _T("recent saved format"), sRecentSavedFormat );
+	sRecentSavedFormat.Format( _T("*.%s"), GetFileExtension(fileDlg.GetPathName()) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved folder"), GetFolderNameFromFullPath(fileDlg.GetPathName()) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved format"), sRecentSavedFormat );
 }
 
 void CVideoWnd::SaveAsOriginalSize()
@@ -2858,8 +2870,8 @@ void CVideoWnd::SaveAsOriginalSize()
 	else// if (m_bImageFromClipboard)
 		sMediaFilename = _T("snapshot");
 
-	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting"), _T("recent saved folder"), GetExeDirectory() );
-	CString sRecentSavedFormat = AfxGetApp()->GetProfileString( _T("setting"), _T("recent saved format"), _T("*.jpg") );
+	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved folder"), GetExeDirectory() );
+	CString sRecentSavedFormat = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved format"), _T("*.jpg") );
 	sImageFile.Format( _T("%s\\%s_%08d.jpg"), sRecentSavedFolder, sMediaFilename, nIndex );
 	CFileDialog fileDlg( false, sRecentSavedFormat, sImageFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, _T("JPG file|*.jpg|BMP file|*.bmp|All files|*.*||") );
 
@@ -2875,9 +2887,9 @@ void CVideoWnd::SaveAsOriginalSize()
 	if ( bShiftKeyPressed || IsShiftPressed() )
 		ShellExecute( m_hWnd, _T("open"), fileDlg.GetPathName(), NULL, NULL, SW_SHOWNORMAL );
 
-	sRecentSavedFormat.Format( _T("*.%s"), GetFileExtensionFromFullPath(fileDlg.GetPathName()) );
-	AfxGetApp()->WriteProfileString( _T("setting"), _T("recent saved folder"), GetFolderNameFromFullPath(fileDlg.GetPathName()) );
-	AfxGetApp()->WriteProfileString( _T("setting"), _T("recent saved format"), sRecentSavedFormat );
+	sRecentSavedFormat.Format( _T("*.%s"), GetFileExtension(fileDlg.GetPathName()) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved folder"), GetFolderNameFromFullPath(fileDlg.GetPathName()) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved format"), sRecentSavedFormat );
 }
 
 
@@ -3001,7 +3013,7 @@ void CVideoWnd::BuildImageArray(CString sfile, CString sExts)
 
 	FindAllFiles(sfolder, &m_dqImageFiles, _T("*"), sExts);
 	m_nTotalFrame = m_dqImageFiles.size();
-	m_nCurrentFrame = FindIndexFromStringArray(m_dqImageFiles, sfile);
+	m_nCurrentFrame = find_index(&m_dqImageFiles, sfile);
 
 	m_nFileType = FILE_TYPE_IMAGE;
 	GotoFrame(m_nCurrentFrame);
@@ -3090,7 +3102,7 @@ void CVideoWnd::build_file_list()
 		return;
 
 	m_dqFileList.clear();
-	FindAllFiles( GetFolderNameFromFullPath(m_sVideoFileName), &m_dqFileList, _T("*"), GetFileExtensionFromFullPath(m_sVideoFileName) );
+	FindAllFiles( GetFolderNameFromFullPath(m_sVideoFileName), &m_dqFileList, _T("*"), GetFileExtension(m_sVideoFileName) );
 	std::sort( m_dqFileList.begin(), m_dqFileList.end() );
 }
 
@@ -3102,7 +3114,7 @@ void CVideoWnd::open_next_video( bool next )
 	if ( m_dqFileList.size() == 0 )
 		build_file_list();
 
-	int idx = FindStringFromDeque( m_dqFileList, m_sVideoFileName, true, true );
+	int idx = find_index(&m_dqFileList, m_sVideoFileName);// , true, true );
 
 	if ( next )
 		idx++;
@@ -3111,7 +3123,7 @@ void CVideoWnd::open_next_video( bool next )
 
 	if ( idx >= 0 && idx < m_dqFileList.size() )
 	{
-		AfxGetApp()->WriteProfileInt( _T("setting"), _T("recent frame"), 0 );
+		AfxGetApp()->WriteProfileInt( _T("setting\\video"), _T("recent frame"), 0 );
 		OpenVideoFile( m_dqFileList[idx] );
 	}
 }

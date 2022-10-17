@@ -1118,6 +1118,11 @@ void		HideIMM( HWND hwnd );
 
 bool		IsLeapYear( int nYear );	//윤년인지 판단
 
+//CRichEditCtrlEx를 사용하여 AppendToLog함수를 이용하는 앱은 로그를 UI에 표시하기가 좋으나
+//CRichEditCtrlEx을 이용하지 못하는 상황의 앱으로 관련 코드들을 재이용하려면 코드 수정이 필요하다.
+//따라서 아래 함수를 이용한다.
+//void		AppendToLog(CWnd* pWnd, )
+
 
 
 //UI control 관련

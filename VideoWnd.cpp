@@ -1085,9 +1085,9 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 			}
 		}
 
-		m_capture.set(CAP_PROP_POS_FRAMES, m_nCurrentFrame );
-		m_capture.retrieve( m_matOrigin );
-		//m_capture >> m_matOrigin;
+		bool set_res = m_capture.set(CAP_PROP_POS_FRAMES, m_nCurrentFrame );
+		//m_capture.retrieve( m_matOrigin );	//cam 일 경우 이미지를 못가져옴
+		m_capture >> m_matOrigin;
 
 		if ( sfile == "cam" && m_matOrigin.empty() )
 		{

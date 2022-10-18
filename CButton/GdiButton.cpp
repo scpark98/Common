@@ -432,11 +432,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
-	TRACE(_T("is_down = %d\n"), is_down);
+	//TRACE(_T("is_down = %d\n"), is_down);
 
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
 		return;
+
 
 	//만약 parent에 배경색이나 배경 그림이 있고
 	//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.

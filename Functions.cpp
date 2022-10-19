@@ -474,9 +474,9 @@ bool copy_to_clipboard(HWND hWnd, CString str)
 		return false;
 
 	char	*pString = NULL;
-	int len = WideCharToMultiByte(CP_ACP, 0, str, -1, NULL, 0, NULL, NULL);
+	int len = WideCharToMultiByte(CP_ACP, 0, (CStringW)str, -1, NULL, 0, NULL, NULL);
 	pString = (char*)new char[len];
-	WideCharToMultiByte(CP_ACP, 0, str, -1, pString, len, NULL, NULL);
+	WideCharToMultiByte(CP_ACP, 0, (CStringW)str, -1, pString, len, NULL, NULL);
 
 	// 저장할 문자열의 길이를 구한다. ('\0'까지 포함한 크기)
 	int string_length = strlen(pString) + 1;
@@ -6420,7 +6420,7 @@ int get_int(CString& buff, CString sep)
 		: _T("%d");
 
 	int ret;
-	if(swscanf(str, fmtstr, &ret) != 1) throw 1;
+	if(_stscanf(str, fmtstr, &ret) != 1) throw 1;
 
 	return(ret);
 }
@@ -6433,7 +6433,7 @@ double get_double(CString& buff, CString sep)
 	str.MakeLower();
 
 	float ret;
-	if(swscanf(str, _T("%f"), &ret) != 1) throw 1;
+	if(_stscanf(str, _T("%f"), &ret) != 1) throw 1;
 
 	return((double)ret);
 }

@@ -18,11 +18,19 @@ ColorMatrix GrayMat = {	0.30f, 0.30f, 0.30f, 0.00f, 0.00f,
 						0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 						0.00f, 0.00f, 0.00f, 0.00f, 1.00f	};
 
-ColorMatrix HotMat = {	1.10f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
+ColorMatrix HotMat_lighter
+					= {	1.10f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
 						0.00f, 1.10f, 0.00f, 0.00f, 0.00f,		// green scaling factor 
 						0.00f, 0.00f, 1.10f, 0.00f, 0.00f,		// blue scaling factor 
 						0.00f, 0.00f, 0.00f, 0.80f, 0.00f,		// alpha scaling factor 
 						0.00f, 0.00f, 0.00f, 0.00f, 1.00f	};	// three translations 
+
+ColorMatrix HotMat_darker
+					= {	0.60f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
+						0.00f, 0.60f, 0.00f, 0.00f, 0.00f,		// green scaling factor 
+						0.00f, 0.00f, 0.60f, 0.00f, 0.00f,		// blue scaling factor 
+						0.00f, 0.00f, 0.00f, 1.00f, 0.00f,		// alpha scaling factor 
+						0.00f, 0.00f, 0.00f, 0.00f, 0.50f	};	// three translations 
 
 // CGdiButton
 
@@ -138,7 +146,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	else
 	{
 		btn->normal.deep_copy(&btn->over);
-		btn->over.set_matrix(&HotMat);
+		btn->over.set_matrix(&HotMat_darker);
 	}
 
 	if (down > 0)
@@ -148,7 +156,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	else
 	{
 		btn->normal.deep_copy(&btn->down);
-		btn->down.set_matrix(&HotMat);
+		btn->down.set_matrix(&HotMat_darker);
 	}
 
 	if (disabled > 0)
@@ -305,9 +313,9 @@ void CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLOR
 
 void CGdiButton::SetBrightnessHoverEffect(float fScale)	//1.0f = no effect.
 {
-	HotMat.m[0][0] = fScale;
-	HotMat.m[1][1] = fScale;
-	HotMat.m[2][2] = fScale;
+	HotMat_lighter.m[0][0] = fScale;
+	HotMat_lighter.m[1][1] = fScale;
+	HotMat_lighter.m[2][2] = fScale;
 }
 
 //그림의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.

@@ -218,15 +218,23 @@ void CTableCtrl::resize(int cx, int cy, bool invalidate)
 		Invalidate();
 }
 
-CPoint CTableCtrl::find_string(CString src)
+CPoint CTableCtrl::find_string(CString str, bool discard_blank)
 {
 	int x, y;
+
+	if (discard_blank)
+		str.Remove(' ');
 
 	for (y = 0; y < m.size(); y++)
 	{
 		for (x = 0; x < m[y].size(); x++)
 		{
-			if (m[y][x].text == src)
+			CString text = m[y][x].text;
+
+			if (discard_blank)
+				text.Remove(' ');
+
+			if (text == str)
 			{
 				return CPoint(x, y);
 			}
@@ -234,4 +242,17 @@ CPoint CTableCtrl::find_string(CString src)
 	}
 
 	return CPoint(-1, -1);
+}
+
+//item_text를 입력받아 그 오른쪽 필드에 항목값(str)을 변경시킨다.
+void CTableCtrl::set_text(CString item_text, CString str)
+{
+	CPoint pos;
+
+	pos = find_string(item_text);
+	if (pos.x >= 0 && pos.y >= 0)
+	{
+		m[pos.y][pos.x + 1].text = str;
+		Invalidate();
+	}
 }

@@ -82,7 +82,8 @@ public:
 	void draw_first_line(bool draw) { m_draw_first_line = draw; }
 	void draw_end_line(bool draw) { m_draw_end_line = draw; }
 
-	CPoint find_string(CString src);
+	CPoint find_string(CString str, bool discard_blank = true);
+	void set_text(CString item_text, CString str);
 
 protected:
 	int m_line_height = 28;

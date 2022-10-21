@@ -1,5 +1,11 @@
 #pragma once
 
+/*
+scpark.
+기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CGdiplusBitmap이라는 하나의 클래스로 합치고
+Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
+*/
+
 #include <afxwin.h>
 #include <gdiplus.h>
 #include <stdint.h>	//for uint8_t in vs2015
@@ -34,8 +40,8 @@ public:
 
 	operator Gdiplus::Bitmap*() const { return m_pBitmap; }
 
-	//기본적으로는 이미지 raw data를 가지고 있지 않으나
-	//cv::Mat의 data처럼 raw data가 필요한 경우 이 함수를 호출하면 사용 가능하다.
+	//기본적으로는 이미지 raw data를 추출하진 않는다.
+	//cv::Mat의 data처럼 raw data가 필요한 경우에 이 함수를 호출하면 사용이 가능해진다.
 	bool	get_raw_data();
 
 	bool	empty() { return (m_pBitmap == NULL); }
@@ -71,6 +77,9 @@ public:
 	void set_transparent(float transparent);
 	void gray();
 	void negative();
+
+	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
+	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.
 	void convert2gray();
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
@@ -81,8 +90,6 @@ public:
 	int height = 0;
 	int channel = 0;
 	int stride = 0;
-
-
 
 protected:
 	void resolution();

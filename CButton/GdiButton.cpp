@@ -12,26 +12,6 @@
 
 #define	TIMER_BLINK		0
 
-ColorMatrix GrayMat = {	0.30f, 0.30f, 0.30f, 0.00f, 0.00f,
-						0.59f, 0.59f, 0.59f, 0.00f, 0.00f,
-						0.11f, 0.11f, 0.11f, 0.00f, 0.00f,
-						0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-						0.00f, 0.00f, 0.00f, 0.00f, 1.00f	};
-
-ColorMatrix HotMat_lighter
-					= {	1.10f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
-						0.00f, 1.10f, 0.00f, 0.00f, 0.00f,		// green scaling factor 
-						0.00f, 0.00f, 1.10f, 0.00f, 0.00f,		// blue scaling factor 
-						0.00f, 0.00f, 0.00f, 0.80f, 0.00f,		// alpha scaling factor 
-						0.00f, 0.00f, 0.00f, 0.00f, 1.00f	};	// three translations 
-
-ColorMatrix HotMat_darker
-					= {	0.60f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
-						0.00f, 0.60f, 0.00f, 0.00f, 0.00f,		// green scaling factor 
-						0.00f, 0.00f, 0.60f, 0.00f, 0.00f,		// blue scaling factor 
-						0.00f, 0.00f, 0.00f, 1.00f, 0.00f,		// alpha scaling factor 
-						0.00f, 0.00f, 0.00f, 0.00f, 0.50f	};	// three translations 
-
 // CGdiButton
 
 IMPLEMENT_DYNAMIC(CGdiButton, CButton)
@@ -67,6 +47,30 @@ CGdiButton::CGdiButton()
 	m_nBlinkTime1		= 1200;
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
+
+	m_grayMatrix = {
+		0.30f, 0.30f, 0.30f, 0.00f, 0.00f,
+		0.59f, 0.59f, 0.59f, 0.00f, 0.00f,
+		0.11f, 0.11f, 0.11f, 0.00f, 0.00f,
+		0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+		0.00f, 0.00f, 0.00f, 0.00f, 1.00f
+	};
+
+	m_hoverMatrix = {
+		1.15f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
+		0.00f, 1.15f, 0.00f, 0.00f, 0.00f,		// green scaling factor 
+		0.00f, 0.00f, 1.15f, 0.00f, 0.00f,		// blue scaling factor 
+		0.00f, 0.00f, 0.00f, 1.00f, 0.00f,		// alpha scaling factor 
+		0.00f, 0.00f, 0.00f, 0.00f, 1.00f
+	};	// three translations 
+
+	m_downMatrix = {
+		0.80f, 0.00f, 0.00f, 0.00f, 0.00f,		// red scaling factor
+		0.00f, 0.80f, 0.00f, 0.00f, 0.00f,		// green scaling factor 
+		0.00f, 0.00f, 0.80f, 0.00f, 0.00f,		// blue scaling factor 
+		0.00f, 0.00f, 0.00f, 1.00f, 0.00f,		// alpha scaling factor 
+		0.00f, 0.00f, 0.00f, 0.00f, 1.00f
+	};	// three translations 
 }
 
 CGdiButton::~CGdiButton()
@@ -146,7 +150,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	else
 	{
 		btn->normal.deep_copy(&btn->over);
-		btn->over.set_matrix(&HotMat_darker);
+		btn->over.set_matrix(&m_hoverMatrix);
 	}
 
 	if (down > 0)
@@ -156,7 +160,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	else
 	{
 		btn->normal.deep_copy(&btn->down);
-		btn->down.set_matrix(&HotMat_darker);
+		btn->down.set_matrix(&m_downMatrix);
 	}
 
 	if (disabled > 0)
@@ -166,7 +170,7 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	else
 	{
 		btn->normal.deep_copy(&btn->disabled);
-		btn->disabled.set_matrix(&GrayMat);
+		btn->disabled.set_matrix(&m_grayMatrix);
 	}
 
 
@@ -278,13 +282,14 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 	UpdateSurface();
 }
 */
-void CGdiButton::text(CString text)
+CGdiButton& CGdiButton::text(CString text)
 {
 	m_text = text;
 	UpdateSurface();
+	return *this;
 }
 
-void CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
+CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
 	m_cr_text.clear();
 
@@ -294,9 +299,10 @@ void CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLOR
 	m_cr_text.push_back(disabled);
 
 	UpdateSurface();
+	return *this;
 }
 
-void CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
+CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
 	//배경색을 설정하면 배경 이미지는 해제시킨다.
 	m_back.release();
@@ -309,13 +315,29 @@ void CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLOR
 	m_cr_back.push_back(disabled);
 
 	UpdateSurface();
+	return *this;
 }
 
-void CGdiButton::SetBrightnessHoverEffect(float fScale)	//1.0f = no effect.
+CGdiButton& CGdiButton::set_hover_color_matrix(float fScale)	//1.0f = no effect.
 {
-	HotMat_lighter.m[0][0] = fScale;
-	HotMat_lighter.m[1][1] = fScale;
-	HotMat_lighter.m[2][2] = fScale;
+	m_hoverMatrix.m[0][0] = fScale;
+	m_hoverMatrix.m[1][1] = fScale;
+	m_hoverMatrix.m[2][2] = fScale;
+
+	if (m_image.size())
+		m_image[0]->over.set_matrix(&m_hoverMatrix);
+	return *this;
+}
+
+CGdiButton& CGdiButton::set_down_color_matrix(float fScale)	//1.0f = no effect.
+{
+	m_downMatrix.m[0][0] = fScale;
+	m_downMatrix.m[1][1] = fScale;
+	m_downMatrix.m[2][2] = fScale;
+
+	if (m_image.size())
+		m_image[0]->down.set_matrix(&m_downMatrix);
+	return *this;
 }
 
 //그림의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.

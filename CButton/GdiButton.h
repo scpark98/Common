@@ -117,12 +117,15 @@ public:
 	void		release_all();
 
 	//void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
-	void		text(CString text);
-	void		text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
-	void		back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
-	void		text_color() { m_cr_text.clear(); }
-	void		back_color() { m_cr_back.clear(); }
-	void		SetBrightnessHoverEffect(float fScale);	//1.0f = no effect.
+	CGdiButton& text(CString text);
+	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	CGdiButton& back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	CGdiButton& text_color() { m_cr_text.clear(); }
+	CGdiButton& back_color() { m_cr_back.clear(); }
+	//reassign [0,0] [1,1] [2,2]
+	//hover, down일 경우 색상 변화를 주고자 할 경우 사용.(fScale을 1.0보다 크게주면 밝게, 작게주면 어둡게 변경된다.
+	CGdiButton& set_hover_color_matrix(float fScale);	//1.0f = no effect.
+	CGdiButton& set_down_color_matrix(float fScale);	//1.0f = no effect.
 
 	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		SetFontSize( int nSize );
@@ -216,6 +219,9 @@ protected:
 	int			m_nBlinkTime0;			//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
 	int			m_nBlinkTime1;
 
+	ColorMatrix m_grayMatrix;
+	ColorMatrix m_hoverMatrix;			//hover이미지에 적용할 매트릭스
+	ColorMatrix m_downMatrix;			//down이미지에 적용할 매트릭스
 
 	void		resize_control(int cx, int cy);
 

@@ -218,23 +218,23 @@ void CTableCtrl::resize(int cx, int cy, bool invalidate)
 		Invalidate();
 }
 
-CPoint CTableCtrl::find_string(CString str, bool discard_blank)
+CPoint CTableCtrl::find_string(CString find_str, bool discard_blank)
 {
 	int x, y;
 
 	if (discard_blank)
-		str.Remove(' ');
+		find_str.Remove(' ');
 
 	for (y = 0; y < m.size(); y++)
 	{
 		for (x = 0; x < m[y].size(); x++)
 		{
-			CString text = m[y][x].text;
+			CString item_text = m[y][x].text;
 
 			if (discard_blank)
-				text.Remove(' ');
+				item_text.Remove(' ');
 
-			if (text == str)
+			if (item_text == find_str)
 			{
 				return CPoint(x, y);
 			}
@@ -244,15 +244,17 @@ CPoint CTableCtrl::find_string(CString str, bool discard_blank)
 	return CPoint(-1, -1);
 }
 
-//item_text를 입력받아 그 오른쪽 필드에 항목값(str)을 변경시킨다.
-void CTableCtrl::set_text(CString item_text, CString str)
+void CTableCtrl::set_text(CString find_str, CString new_text, bool on_right_cell, bool discard_blank)
 {
 	CPoint pos;
 
-	pos = find_string(item_text);
+	pos = find_string(find_str, discard_blank);
 	if (pos.x >= 0 && pos.y >= 0)
 	{
-		m[pos.y][pos.x + 1].text = str;
+		if (on_right_cell)
+			m[pos.y][pos.x + 1].text = new_text;
+		else
+			m[pos.y][pos.x].text = new_text;
 		Invalidate();
 	}
 }

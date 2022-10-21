@@ -82,8 +82,12 @@ public:
 	void draw_first_line(bool draw) { m_draw_first_line = draw; }
 	void draw_end_line(bool draw) { m_draw_end_line = draw; }
 
-	CPoint find_string(CString str, bool discard_blank = true);
-	void set_text(CString item_text, CString str);
+	//item_text에 해당하는 항목의 셀 인덱스를 얻어온다.
+	CPoint find_string(CString find_str, bool discard_blank = true);
+
+	//item_text에 해당하는 셀을 찾아 현재 셀 또는 그 오른쪽의 셀에 new_text를 입력한다.
+	//표 항목의 이름을 주고 그 오른쪽에 실제 데이터를 넣는 용도로 사용할 수 있다.
+	void set_text(CString find_str, CString new_text, bool on_right_cell = true, bool discard_blank = true);
 
 protected:
 	int m_line_height = 28;

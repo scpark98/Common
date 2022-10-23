@@ -3718,7 +3718,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 	CString sToken = ext_filters;
 	CString file;
 	CString filetitle;
-	CString name_field = name_filter;
+	CString name_field = name_filter.MakeLower();
 
 	//name_filter에서 wildcard를 제거한 부분
 	name_field.Replace(_T("*"), _T(""));
@@ -3816,6 +3816,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			if (!found)
 				continue;
 
+			found = false;
 			if (dq_ext.size() > 0)
 			{
 				for (i = 0; i < dq_ext.size(); i++)
@@ -3898,6 +3899,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			if (!found)
 				continue;
 
+			found = false;
 			if (dq_ext.size() > 0)
 			{
 				for (i = 0; i < dq_ext.size(); i++)

@@ -830,6 +830,8 @@ Mat	loadMat(LPCTSTR sfile, int flag /*= IMREAD_UNCHANGED*/, bool bDisplayError /
 		return cv::Mat();
 	}
 
+	return cv::imread(CString2string(sfile), flag);
+	/*
 	// Open the file with Unicode name
 	ifstream f(sfile, iostream::binary);
 
@@ -847,6 +849,7 @@ Mat	loadMat(LPCTSTR sfile, int flag /*= IMREAD_UNCHANGED*/, bool bDisplayError /
 
 	// Decode the vector
 	return imdecode(buffer, flag);
+	*/
 }
 
 //raw, yuv도 구분하여 읽는다.

@@ -49,8 +49,8 @@ public:
 	int		channels();
 	CSize	size() { return CSize(width, height); }
 
-	CRect	draw(CDC* pDC, CRect r, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
-	CRect	draw(CDC* pDC, int x = 0, int y = 0, int w = 0, int h = 0, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect	draw(CDC* pDC, CRect dstr, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect	draw(CDC* pDC, int dx = 0, int dy = 0, int dw = 0, int dh = 0, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void	clone(CGdiplusBitmap* dst);

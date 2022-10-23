@@ -252,16 +252,16 @@ CRect CGdiplusBitmap::draw(CDC* pDC, CRect r, CRect* targetRect, Color crBack)
 	return draw(pDC, r.left, r.top, r.Width(), r.Height(), targetRect, crBack);
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, int x, int y, int w, int h, CRect* targetRect, Color crBack)
+CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh, CRect* targetRect, Color crBack)
 {
-	if (w <= 0)
-		w = width;
-	if (h <= 0)
-		h = height;
+	if (dw <= 0)
+		dw = width;
+	if (dh <= 0)
+		dh = height;
 
 	Graphics g(pDC->m_hDC);
-	g.DrawImage(m_pBitmap, x, y, w, h);
-	return CRect(x, y, x + w, y + h);
+	g.DrawImage(m_pBitmap, dx, dy, dw, dh);
+	return CRect(dx, dy, dx + dw, dy + dh);
 }
 
 //Clone은 shallow copy라 하여 아래 deep_copy 함수도 추가했으나
@@ -777,8 +777,6 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 		return false;
 
 	CLSID				encoderClsid;
-	EncoderParameters	encoderParameters;
-	WCHAR				wFile[MAX_PATH];
 
 	CString ext = filename.Right(3).MakeLower();//GetFileExtension(filename).MakeLower();
 

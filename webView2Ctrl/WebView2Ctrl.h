@@ -76,7 +76,7 @@ public:
 	void navigate(CString url);
 
 	//WebView2
-	HWND m_hWebHwnd = NULL;
+	HWND m_webHwnd = NULL;
 	void InitializeWebView();
 	void CloseWebView(bool cleanupUserDataFolder = false);
 	HRESULT OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView2Environment* environment);

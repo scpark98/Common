@@ -155,6 +155,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 		UINT32 pid = 0;
 		HRESULT hresult;
+		HANDLE hHandle;
 
 		m_webView->get_BrowserProcessId(&pid);
 		CString str = GetProcessNameByPID(pid);
@@ -192,6 +193,7 @@ void CWebView2Ctrl::ResizeControls()
 	if (auto view = GetComponent<ViewComponent>())
 	{
 		view->SetBounds(CRect(rc));
+		//m_webHwnd = view->get_web_HWND();
 	}
 }
 void CWebView2Ctrl::navigate(CString url)

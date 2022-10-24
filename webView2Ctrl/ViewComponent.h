@@ -45,6 +45,8 @@ public:
 
     ~ViewComponent() override;
 
+	HWND get_web_HWND() { return m_webHwnd; }
+
 private:
     enum class TransformType
     {
@@ -64,6 +66,7 @@ private:
 
     //Browser* m_appWindow = nullptr;
 	CWebView2Ctrl* m_appWindow = nullptr;
+	HWND m_webHwnd = NULL;
     Microsoft::WRL::ComPtr<ICoreWebView2Controller> m_controller;
     Microsoft::WRL::ComPtr<ICoreWebView2> m_webView;
     

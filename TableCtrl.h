@@ -74,7 +74,9 @@ public:
 	void resize(int cx, int cy, bool invalidate);
 
 	void add_line(int num, ...);
-	//void add_line(CString text, ...);
+	//template으로 가변인자 함수를 만들때는 선언, 정의를 모두 .h에서 해야한다. 우선 보류.
+	//template <typename ... Types>
+	//void add_line(CString... args);
 
 	void set_width(int num, ...);
 	void line_height(int height) { m_line_height = height; Invalidate(); }

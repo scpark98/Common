@@ -106,6 +106,7 @@ void ViewComponent::SetBounds(RECT bounds)
 {
     m_webViewBounds = bounds;
     ResizeWebView();
+	m_webHwnd = m_appWindow->GetMainWindow();
 }
 
 //! [SetBoundsAndZoomFactor]

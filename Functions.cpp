@@ -3934,9 +3934,9 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				list.push_back(file);
 		}
 	}
-	/*
-	std::deque<CString> list1;
-	list1.assign(list.begin(), list.end());
+
+	//std::deque<CString> list1;
+	//list1.assign(list.begin(), list.end());
 
 	//sort looks like windows10 explorer
 	if (list.size() && auto_sort)
@@ -3944,11 +3944,11 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 		sort_like_explorer(&list);
 	}
 
-	if (list == list1)
-		;
-	if (std::equal(list.begin(), list.end(), list1.begin(), list1.end()))
-		;
-	*/
+	//if (list == list1)
+	//	;
+	//if (std::equal(list.begin(), list.end(), list1.begin(), list1.end()))
+	//	;
+
 	return list;
 }
 #endif

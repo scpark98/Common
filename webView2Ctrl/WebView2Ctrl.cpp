@@ -142,9 +142,10 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 	if (result == S_OK)
 	{
 		m_controller = controller;
-		Microsoft::WRL::ComPtr<ICoreWebView2> coreWebView2;
+		Microsoft::WRL::ComPtr<ICoreWebView2_15> coreWebView2;
 		m_controller->get_CoreWebView2(&coreWebView2);
 		m_webView = coreWebView2.Get();
+
 
 		NewComponent<ViewComponent>
 			(this, m_dcompDevice.Get(),
@@ -196,6 +197,12 @@ void CWebView2Ctrl::ResizeControls()
 		//m_webHwnd = view->get_web_HWND();
 	}
 }
+
+void CWebView2Ctrl::hide_download_dialog()
+{
+	m_webView->CloseDefaultDownloadDialog();
+}
+
 void CWebView2Ctrl::navigate(CString url)
 {
 	//mainDlg의 OnInitDialog에서 navigate()을 호출하면

@@ -15,6 +15,7 @@ https://cinrueom.tistory.com/10
 
 - 프로젝트 exe와 동일한 폴더에
   libcurl_ssl/bin에 있는 libcurl.dll, libcrypto-1_1.dll, libssl-1_1.dll 복사.
+  이 dll들이 없으면 표시되는 메시지창도 없고 exe파일도 아예 시작조차 되지 않는다.
   
 [in .h]
 #include "curl/curl.h"

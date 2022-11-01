@@ -7,7 +7,7 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 제작.
 [사용 방법]
 - 이 컨트롤을 사용하고자 하는 프로젝트에서 NuGet 패키지 관리자를 열고
   다음 2개의 패키지를 설치.
-  WebView2 (VS2015에서 최신 버전 추가시 에러가 발생하여 1.0.622.22로 설치, VS2022에서는 최신 버전 문제없음)
+  Microsoft.Web.WebView2 (VS2015에서 최신 버전 추가시 에러가 발생하여 1.0.622.22로 설치, VS2022에서는 최신 버전 문제없음)
   Microsoft.Windows.ImplementationLibrary (최신 버전 설치해도 문제 없음)
 
 - 프로젝트에 다음 5개의 파일 추가.(복사가 아님)
@@ -74,6 +74,7 @@ public:
 	//main의 m_web 인스턴스에서 CWebView2Ctrl의 m_webView의 다른 기능을 이용하고자 한다면
 	//m_web.GetWebView()->Navigate(...)과 같이 접근하여 이용하면 된다.
 	void navigate(CString url);
+	void hide_download_dialog();
 
 	//WebView2
 	HWND m_webHwnd = NULL;
@@ -89,7 +90,7 @@ public:
 	{
 		return m_controller.Get();
 	}
-	ICoreWebView2* GetWebView()
+	ICoreWebView2_15* GetWebView()
 	{
 		return m_webView.Get();
 	}
@@ -110,8 +111,9 @@ protected:
 	DWORD m_creationModeId = 0;
 	Microsoft::WRL::ComPtr<ICoreWebView2Environment> m_webViewEnvironment;
 	Microsoft::WRL::ComPtr<ICoreWebView2Controller> m_controller;
-	Microsoft::WRL::ComPtr<ICoreWebView2> m_webView;
+	Microsoft::WRL::ComPtr<ICoreWebView2_15> m_webView;
 	Microsoft::WRL::ComPtr<IDCompositionDevice> m_dcompDevice;
+	Microsoft::WRL::ComPtr<ICoreWebView2DownloadStartingEventArgs> m_downloadStartingEvent;
 	std::vector<std::unique_ptr<ComponentBase>> m_components;
 	HWND m_mainWindow = nullptr;
 	HINSTANCE g_hInstance;

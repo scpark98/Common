@@ -1901,7 +1901,7 @@ void CVtListCtrlEx::reconstruct_font()
 	
 	set_line_height(4-m_lf.lfHeight);
 	//if (m_auto_line_height)
-		//recalculate_line_height();
+		//recalculate_line_height();k
 	
 	ASSERT(bCreated);
 }

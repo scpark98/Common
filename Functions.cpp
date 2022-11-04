@@ -4349,7 +4349,7 @@ void DeleteFilesBySubString(CString sFolder, CString filenameSubStr, bool bMatch
 //usage : sFolder include folder names only except file name.
 //c:\test\00\1.bmp	(x)	=> 1.bmp folder will be created.(not intended)
 //c:\test\00		(o)
-bool MakeFullDirectory(LPCTSTR sFolder)
+bool recursive_make_full_directory(LPCTSTR sFolder)
 {
 	if (PathFileExists(sFolder) && ::PathIsDirectory(sFolder))
 		return true;
@@ -4359,11 +4359,16 @@ bool MakeFullDirectory(LPCTSTR sFolder)
 	_tcscpy(parent, sFolder);
 	::PathRemoveFileSpec(parent);
 	
-	if (MakeFullDirectory(parent))
+	if (recursive_make_full_directory(parent))
 		return (::CreateDirectory(sFolder, NULL) != false);
 
 	return false;
 } 
+
+bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
+{
+	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, lpPathName, lpsa));
+}
 
 //이 함수를 사용하려면 반드시 SetBkMode(TRANSPARENT);로 설정해야 효과가 나타남.
 void TextOutShadow(CDC* pDC, int x, int y, CString sText, COLORREF crText, COLORREF crShadow, UINT nFlag)

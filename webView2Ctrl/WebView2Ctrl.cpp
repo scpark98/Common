@@ -163,6 +163,21 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		//HWND hwnd = GetHWNDbyPID(pid);
 		//TRACE(_T("pid = %u, hwnd = 0x%08X\n"), pid, hwnd);
 
+		// Register a handler for the DocumentTitleChanged event.
+	// This handler just announces the new title on the window's title bar.
+		/*
+		m_webView->add_DocumentTitleChanged(
+			Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
+				[this](ICoreWebView2* sender, IUnknown* args) -> HRESULT {
+					wil::unique_cotaskmem_string title;
+					CHECK_FAILURE(sender->get_DocumentTitle(&title));
+					m_appWindow->SetDocumentTitle(title.get());
+					return S_OK;
+				})
+			.Get(),
+					&m_documentTitleChangedToken);
+		*/
+
 		if (m_url_reserved.IsEmpty() == false)
 		{
 			hresult = m_webView->Navigate(m_url_reserved);

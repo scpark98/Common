@@ -688,8 +688,10 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	bool		DeleteFolder( LPCTSTR lpFolder );
 	bool		SHDeleteFolder( CString sFolder );
 
+
 	//풀패스를 주면 폴더를 자동으로 만들어준다.
-	bool		MakeFullDirectory( LPCTSTR sFolder );
+	bool		recursive_make_full_directory(LPCTSTR sFolder);
+	bool		make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa = NULL);
 
 	//폴더내의 특정 문자열이 들어간 파일들을 지운다. 하위폴더 지원안함.
 	void		DeleteFilesBySubString( CString sFolder, CString filenameSubStr, bool bMatchWholeWordOnly = FALSE, bool bMatchCase = FALSE );

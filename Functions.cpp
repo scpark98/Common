@@ -576,16 +576,13 @@ COLORREF	GetComplementaryColor(COLORREF crColor, COLORREF crBack)
 }
 #endif
 
-CString	GetExeDirectory()
+CString	GetExeDirectory(bool includeSlash)
 {
 	TCHAR	sFilePath[1024];
-	CString sExeFolder;
 	
 	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
 	
-	sExeFolder = sFilePath;
-	
-	return sExeFolder.Left(sExeFolder.ReverseFind('\\'));
+	return GetFolderNameFromFullPath(sFilePath, includeSlash);
 }
 
 CString GetExeRootDirectory()
@@ -632,7 +629,7 @@ CString		GetFileNameFromFullPath(CString sFullPath)
 	return sFullPath;
 }
 
-CString		GetFolderNameFromFullPath(CString sFullPath)
+CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash)
 {
 	//sFullPath가 폴더라면 그냥 그 값을 리턴한다.
 	if (PathIsDirectory(sFullPath))
@@ -640,7 +637,8 @@ CString		GetFolderNameFromFullPath(CString sFullPath)
 
 	if (sFullPath.Find(_T("\\")) > 0)
 	{
-		sFullPath = sFullPath.Left(sFullPath.ReverseFind('\\'));
+		sFullPath = sFullPath.Left(sFullPath.ReverseFind('\\') + (includeSlash ? 1 : 0));
+
 		if (sFullPath.GetLength() == 2)	//ex. C:
 			sFullPath += _T("\\");
 
@@ -3698,7 +3696,9 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	//sort looks like windows10 explorer
 	if (dqFiles->size() && auto_sort)
 	{
+#ifdef _UNICODE
 		sort_like_explorer(dqFiles);
+#endif
 	}
 }
 
@@ -4902,6 +4902,11 @@ CRect GpRect2CRect(Gdiplus::Rect r)
 Gdiplus::Rect CRect2GpRect(CRect r)
 {
 	return Gdiplus::Rect(r.left, r.top, r.Width(), r.Height());
+}
+
+Gdiplus::RectF CRect2GpRectF(CRect r)
+{
+	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
 }
 
 CRect get_zoom_rect(CRect rect, double zoom)
@@ -7367,7 +7372,7 @@ bool IsAM(CTime t /*= 0*/)
 	return false;
 }
 
-CString	GetDayOfWeekString(CTime t /*= NULL*/)
+CString	GetDayOfWeekString(CTime t, bool short_str)
 {
 	if (t == NULL)
 		t = CTime::GetCurrentTime();
@@ -7390,6 +7395,15 @@ CString	GetDayOfWeekString(CTime t /*= NULL*/)
 						break;
 			case 7	:	sWeek = "토요일";
 						break;
+	}
+
+	if (short_str)
+	{
+#ifdef _UNICODE
+		return sWeek.Left(1);
+#else
+		return sWeek.Left(2);
+#endif
 	}
 
 	return sWeek;
@@ -7820,16 +7834,17 @@ bool IsRunning(CString processname)
 	return false; //실행중이 아니면 False를 반환
 } 
 
+#if 0
 //프로세스 강제 종료.
 //return value : 1 : killed, 0 : fail to kill, -1 : not found
-int ProcessKill(CString szProcessName)
+bool ProcessKill(CString szProcessName)
 {
 	HANDLE hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
 	HANDLE hProcess = 0; 
 	PROCESSENTRY32 pEntry;
 	pEntry.dwSize = sizeof (pEntry);
-	BOOL bRes = Process32First(hSnapShot, &pEntry);
-	int result;
+	bool bRes = Process32First(hSnapShot, &pEntry);
+	bool result;
 
 	while (bRes)
 	{
@@ -7845,48 +7860,14 @@ int ProcessKill(CString szProcessName)
 		bRes = Process32Next(hSnapShot, &pEntry);
 	}
 
-	result = -1;
+	result = false;
 end:
 	CloseHandle(hProcess);
 	CloseHandle(hSnapShot);
 
 	return result;
-	/*
-	HANDLE hndl = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
-	DWORD dwsma = GetLastError();
-	HANDLE hHandle; 
-
-	DWORD dwExitCode = 0;
-
-	PROCESSENTRY32  procEntry={0};
-	procEntry.dwSize = sizeof(PROCESSENTRY32);
-	Process32First(hndl,&procEntry);
-
-	while(1)
-	{
-		if(!strcmp(procEntry.szExeFile,szProcessName))
-		{
-			hHandle = ::OpenProcess(PROCESS_ALL_ACCESS,0,procEntry.th32ProcessID);
-
-			if(::GetExitCodeProcess(hHandle,&dwExitCode))
-			{
-				if(!::TerminateProcess(hHandle,dwExitCode))
-				{
-					return 0;
-				}
-				else
-					return 1;
-			}   
-		}
-		if(!Process32Next(hndl,&procEntry))
-		{
-			return -1;
-		}
-	}
-
-	return 1;
-	*/
 }
+#endif
 
 static HWND shWndCurWnd;
 

@@ -1,7 +1,7 @@
 #pragma once
 
 /*
-* - 프로젝트 속성에서 Common/webView2/include, lib 관련 설정 추가.
+* - 프로젝트 속성에서 Common/webView2/include, lib 경로 및 lib 파일 설정.
 * 
 * - framework.h (or stdafx.h or app.h)에 아래 define 추가.
 *	
@@ -32,6 +32,11 @@
 		GetClientRect(rc);
 		m_static_web.MoveWindow(rc);
 		m_Web.SetBounds(rc.Width(), rc.Height());
+
+  * 현재 이 라이브러리는 프로젝트 속성->매니페스트 도구->입력 및 출력에서
+    DPI 인식 항목의 기본 세팅값인 "높은 DPI 인식" 이외의 설정으로 변경하면 충돌이 발생한다.
+	이 라이브러리를 사용하는 2개 이상의 앱이 서로 다른 세팅일 경우 충돌이 발생하여
+	경고 메시지와 함께 WebView2의 Initialize가 실패한다.
 */
 
 class CWebView2Obj;

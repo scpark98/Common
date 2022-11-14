@@ -380,7 +380,7 @@ void		Trace(char* szFormat, ...);
 //////////////////////////////////////////////////////////////////////////
 //프로세스 관련
 CString		GetFileVersionInformation(CString strFileName, CString strFlag);
-CString		GetExeDirectory();
+CString		GetExeDirectory(bool includeSlash = false);
 CString		GetExeRootDirectory();
 CString		GetExeFilename( bool bFullPath = FALSE );
 CString		GetExeFileTitle();
@@ -390,7 +390,7 @@ ULONG		ProcIDFromWnd(HWND hwnd);
 HWND		GetHWNDbyPID(ULONG pid);
 CString		GetProcessNameByPID(const DWORD pid);
 bool		IsRunning(CString processname);
-int			ProcessKill(CString processname);
+//bool		ProcessKill(CString processname);
 HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 bool		IsDuplicatedRun();
 
@@ -593,7 +593,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
 	CString		GetFileNameFromFullPath(CString sFullPath);
-	CString		GetFolderNameFromFullPath(CString sFullPath);	//= PathRemoveFileSpec
+	CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash = false);	//= PathRemoveFileSpec
 	CString		GetFileTitle(CString sFullPath);
 	CString		GetFileExtension(CString filename, bool dot = false);
 	int			GetFileTypeFromFilename( CString filename );
@@ -854,7 +854,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CString		GetDayTimeCountString( COleDateTimeSpan ts, bool bShowZero, bool bIncludeSec );
 	time_t		_mkgmtime(const struct tm *tm) ;
 	bool		IsAM( CTime t = 0 );	//t=0이면 현재시각기준, 0보다 크면 그 시간값 기준
-	CString		GetDayOfWeekString( CTime t = NULL );
+	CString		GetDayOfWeekString(CTime t = NULL, bool short_str = false);
 	int			GetDaysOfMonth( int nYear, int nMonth );	//해당 달의 날짜수 리턴
 	//날짜 관련
 	int			GetSeasonIndex();	//봄=0, 여름=1...
@@ -1029,7 +1029,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CRect		makeCenterRect(int cx, int cy, int w, int h );
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
 	CRect		GpRect2CRect(Gdiplus::Rect);
-	Gdiplus::Rect CRect2GpRect(CRect r);
+	Gdiplus::Rect	CRect2GpRect(CRect r);
+	Gdiplus::RectF	CRect2GpRectF(CRect r);
 	CRect		getCenterRect( int cx, int cy, int w, int h );
 	CRect		get_zoom_rect(CRect rect, double zoom);
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.

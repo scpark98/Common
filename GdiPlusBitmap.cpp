@@ -85,13 +85,13 @@ void CGdiplusBitmap::load(LPCTSTR lpType, UINT id)
 
 	type.MakeLower();
 
-	if (type == "png" || type == "jpg")
+	if (type == _T("png") || type == _T("jpg"))
 	{
 		m_pBitmap = GetImageFromResource(lpType, id);
 	}
 	else
 	{
-		m_pBitmap = Bitmap::FromResource(NULL, MAKEINTRESOURCE(id));
+		m_pBitmap = Bitmap::FromResource(NULL, (WCHAR*)MAKEINTRESOURCE(id));
 	}
 
 	if (m_pBitmap)
@@ -802,7 +802,9 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 	*/
 	Status s;
 
-	s = m_pBitmap->Save(filename, &encoderClsid);// , & encoderParameters);
+	USES_CONVERSION;
+	wchar_t* wstr = T2W(filename.GetBuffer(0));
+	s = m_pBitmap->Save(wstr, &encoderClsid);// , & encoderParameters);
 
 	if (s == Ok)
 		return true;

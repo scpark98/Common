@@ -1024,7 +1024,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	//2 : "l = 1, t = 2, r = 3, b = 4"
 	CString		GetRectInfoString( CRect r, int nFormat );
 
-	void		makeRect(CRect &Rect, int x, int y, int w, int h );
+	void		make_rect(CRect &Rect, int x, int y, int w, int h );
 	CRect		make_rect(int x, int y, int w, int h);
 	CRect		makeCenterRect(int cx, int cy, int w, int h );
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);

@@ -16,6 +16,12 @@
 #ifndef XMESSAGEBOX_H
 #define XMESSAGEBOX_H
 
+#include <afxwin.h>
+//#include <windows.h>
+#include <stdio.h>
+#include <crtdbg.h>
+#include <tchar.h>
+
 // MessageBox() Flags
 /*
 #define MB_OK                       0x00000000L

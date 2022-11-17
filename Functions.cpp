@@ -4850,7 +4850,7 @@ void set_bit(int& number, int n, int x)
 	number ^= (-x ^ number) & (1 << n);
 }
 
-void makeRect(CRect &Rect, int x, int y, int w, int h)
+void make_rect(CRect &Rect, int x, int y, int w, int h)
 {
 	Rect.left	= x;
 	Rect.top	= y;

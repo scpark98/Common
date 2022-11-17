@@ -104,15 +104,11 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // include the following line if compiling an MFC app
-#include "stdafx.h"
+//#include "stdafx.h"
 ///////////////////////////////////////////////////////////////////////////////
 
 
 #ifndef _MFC_VER
-#include <windows.h>
-#include <stdio.h>
-#include <crtdbg.h>
-#include <tchar.h>
 #pragma message("    compiling for Win32")
 #else
 #pragma message("    compiling for MFC")

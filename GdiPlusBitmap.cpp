@@ -60,7 +60,7 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(LPCWSTR pFile)
+CGdiplusBitmap::CGdiplusBitmap(LPCTSTR pFile, bool show_error)
 {
 	load(pFile);
 }
@@ -71,13 +71,43 @@ CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(LPCTSTR lpType, UINT id)
+CGdiplusBitmap::CGdiplusBitmap(LPCTSTR lpType, UINT id, bool show_error)
 {
 	load(lpType, id);
 }
 
+bool CGdiplusBitmap::load(LPCTSTR pFile, bool show_error)
+{
+	release();
 
-void CGdiplusBitmap::load(LPCTSTR lpType, UINT id)
+	USES_CONVERSION;
+
+	LPCWSTR pwFile = A2W(pFile);
+	CGdiplusBitmap temp;
+	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(pwFile);
+
+	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+	{
+		//temp로 읽어서 deep_copy해주지 않으면
+		//열린 파일은 lock걸린 상태가 되어 접근할 수 없게 된다.
+		temp.deep_copy(this);
+		//temp.clone(this);
+		//m_pBitmap = pBitmap->Clone(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight(), pBitmap->GetPixelFormat());
+		resolution();
+		//get_raw_data();
+		return true;
+	}
+
+	if (show_error)
+	{
+		CString str;
+		str.Format(_T("%s\nFile open failed."), pFile);
+		AfxMessageBox(str);
+	}
+	return false;
+}
+
+void CGdiplusBitmap::load(LPCTSTR lpType, UINT id, bool show_error)
 {
 	release();
 
@@ -127,28 +157,6 @@ Bitmap* CGdiplusBitmap::GetImageFromResource(LPCTSTR lpType, UINT id)
 	Bitmap* pBitmap = static_cast<Bitmap*>(image.Clone());
 
 	return pBitmap;
-}
-
-bool CGdiplusBitmap::load(LPCWSTR pFile)
-{
-	release();
-
-	CGdiplusBitmap temp;
-	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(pFile);
-
-	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
-	{
-		//temp로 읽어서 deep_copy해주지 않으면
-		//열린 파일은 lock걸린 상태가 되어 접근할 수 없게 된다.
-		temp.deep_copy(this);
-		//temp.clone(this);
-		//m_pBitmap = pBitmap->Clone(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight(), pBitmap->GetPixelFormat());
-		resolution();
-		//get_raw_data();
-		return true;
-	}
-
-	return false;
 }
 
 CGdiplusBitmap::~CGdiplusBitmap()

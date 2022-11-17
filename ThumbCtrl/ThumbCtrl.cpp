@@ -1542,9 +1542,9 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			CRect rIndex = rect;
 			rIndex.top += 2;
 			if (draw && !skip)
-				//DrawTextShadow(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP );
-				DrawShadowText(pDC->GetSafeHdc(), str, str.GetLength(), rIndex,
-					DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
+				DrawTextShadow(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP );
+				//DrawShadowText(pDC->GetSafeHdc(), str, str.GetLength(), rIndex,
+				//	DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
 		}
 
 		//resolution과 title을 표시한다.

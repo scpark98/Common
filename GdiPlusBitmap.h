@@ -32,7 +32,7 @@ public:
 	void	release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
-	bool	load(LPCTSTR pFile, bool show_error = false);
+	bool	load(LPCTSTR sFile, bool show_error = false);
 	void	load(LPCTSTR lpType, UINT id, bool show_error = false);
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
@@ -44,8 +44,8 @@ public:
 	//cv::Mat의 data처럼 raw data가 필요한 경우에 이 함수를 호출하면 사용이 가능해진다.
 	bool	get_raw_data();
 
-	bool	empty() { return (m_pBitmap == NULL); }
-	bool	valid() { return (m_pBitmap != NULL); }
+	bool	empty();
+	bool	valid();
 	int		channels();
 	CSize	size() { return CSize(width, height); }
 

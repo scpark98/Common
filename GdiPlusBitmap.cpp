@@ -76,15 +76,19 @@ CGdiplusBitmap::CGdiplusBitmap(LPCTSTR lpType, UINT id, bool show_error)
 	load(lpType, id);
 }
 
-bool CGdiplusBitmap::load(LPCTSTR pFile, bool show_error)
+bool CGdiplusBitmap::load(LPCTSTR sFile, bool show_error)
 {
 	release();
 
-	USES_CONVERSION;
-
-	LPCWSTR pwFile = A2W(pFile);
 	CGdiplusBitmap temp;
-	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(pwFile);
+	
+#ifdef UNICODE
+	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(sFile);
+#else
+	USES_CONVERSION;
+	LPCWSTR wFile = CA2W(sFile);;
+	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
+#endif
 
 	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
 	{
@@ -101,7 +105,7 @@ bool CGdiplusBitmap::load(LPCTSTR pFile, bool show_error)
 	if (show_error)
 	{
 		CString str;
-		str.Format(_T("%s\nFile open failed."), pFile);
+		str.Format(_T("%s\nFile open failed."), sFile);
 		AfxMessageBox(str);
 	}
 	return false;
@@ -241,6 +245,16 @@ bool CGdiplusBitmap::get_raw_data()
 	}
 
 	return false;
+}
+
+bool CGdiplusBitmap::empty()
+{
+	return (m_pBitmap == NULL);
+}
+
+bool CGdiplusBitmap::valid()
+{
+	return !empty();
 }
 
 int CGdiplusBitmap::channels()

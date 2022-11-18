@@ -264,7 +264,10 @@ void CThumbCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 
 void CThumbCtrl::set_font_size(int nSize)
 {
-	m_lf.lfHeight = nSize;
+	//For the MM_TEXT mapping mode,
+	//you can use the following formula to specify 
+	//a height for a font with a specified point size:
+	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 	ReconstructFont();
 }
 

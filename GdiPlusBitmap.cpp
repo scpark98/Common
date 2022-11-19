@@ -82,13 +82,19 @@ bool CGdiplusBitmap::load(LPCTSTR sFile, bool show_error)
 
 	CGdiplusBitmap temp;
 	
+	LPCWSTR wFile = LPCTSTR2LPCWSTR(sFile);
+	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
+	/*
 #ifdef UNICODE
 	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(sFile);
 #else
 	USES_CONVERSION;
-	LPCWSTR wFile = CA2W(sFile);;
+	//만약 sFile이 CString 타입이면 CT2W(sFile.GetBuffer()) ?? 확인 필요
+	//LPCWSTR wFile = A2W(sFile);
+	LPCWSTR wFile = A2W_CP(sFile, CP_UTF8);
 	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 #endif
+*/
 
 	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
 	{

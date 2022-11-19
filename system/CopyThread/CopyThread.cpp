@@ -110,14 +110,14 @@ int CCopyThread::do_copy(CString src, CString dst, bool is_copy_mode)
 		{
 			delete_file(src, true);
 			dst = dst + _T("\\") + GetFileNameFromFullPath(src);
-			MakeFullDirectory(dst);
+			make_full_directory(dst);
 			return ERROR_SUCCESS;
 		}
 		else
 		{
 			//파일들을 이동할 경우 대상 폴더가 없는 경우는 직접 생성해줘야 한다.
 			if (PathFileExists(dst) == false)
-				MakeFullDirectory(dst);
+				make_full_directory(dst);
 
 			m_is_copying = true;
 			m_mutex.Lock();
@@ -137,7 +137,7 @@ int CCopyThread::do_copy(CString src, CString dst, bool is_copy_mode)
 	//파일들을 이동할 경우 대상 폴더가 없는 경우는 직접 생성해줘야 한다.
 	CString dstFolder = GetFolderNameFromFullPath(dst);
 	if (PathFileExists(dstFolder) == false)
-		MakeFullDirectory(dstFolder);
+		make_full_directory(dstFolder);
 
 	m_mutex.Lock();
 	CCopyInfo info(src, dst, is_copy_mode);

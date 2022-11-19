@@ -245,9 +245,6 @@ BOOL CThumbCtrl::OnEraseBkgnd(CDC* pDC)
 void CThumbCtrl::ReconstructFont()
 {
 	m_lf.lfQuality = CLEARTYPE_NATURAL_QUALITY;
-	m_lf.lfHeight = -16;
-	m_lf.lfWeight = 500;
-	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), _T("¸¼Àº °íµñ"));
 
 	m_font.DeleteObject();
 	m_font.CreateFontIndirect(&m_lf);

@@ -475,13 +475,17 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//str의 from 위치 이후에 있는 숫자 영역값을 num에 넣어주고 숫자 시작위치를 return한다.
 	int			extract_digit_number( char *str, int from, double *num );
 
+	//http://yeobi27.tistory.com/280
+	//A2W, A2T 및 그 반대 매크로들은 스택을 사용하므로 문제 소지가 있고 크기 제한도 있으므로
+	//가급적 CA2W, CA2T등을 사용한다. 단 이 매크로들은 encoding을 변경할 수 없다.
 	std::wstring CString2wstring( const char* str );
 	std::string CString2string( CString cs );
 	CString		string2CString( std::string s );
-	PCWSTR		CString2PCWSTR(CString str);
+	LPCWSTR		CString2LPCWSTR(CString str);
 	char*		CString2char(CString str);
 	TCHAR*		CString2TCHAR(CString str);
 	LPCSTR		CString2LPCSTR(CString str);
+	LPCWSTR		LPCTSTR2LPCWSTR(LPCTSTR str, UINT codePage = CP_UTF8);
 
 	//chStr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
 	//그렇지 않을 경우 chStr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.

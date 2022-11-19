@@ -1780,7 +1780,7 @@ bool is_greater_with_numeric(CString str0, CString str1)
 			return (num0 > num1);
 	}
 	*/
-	return (StrCmpLogicalW(CString2PCWSTR(str0), CString2PCWSTR(str1)) == 1);
+	return (StrCmpLogicalW(CString2LPCWSTR(str0), CString2LPCWSTR(str1)) == 1);
 }
 
 
@@ -6746,6 +6746,18 @@ LPCSTR		CString2LPCSTR(CString str)
 #endif
 }
 
+LPCWSTR	LPCTSTR2LPCWSTR(LPCTSTR str, UINT codePage)
+{
+#ifdef UNICODE
+	return str;
+#else
+	USES_CONVERSION;
+	//만약 sFile이 CString 타입이면 CT2W(sFile.GetBuffer()) ?? 확인 필요
+	//return A2W(str);
+	return A2W_CP(str, codePage);
+#endif
+}
+
 //
 // CString → std::string
 //
@@ -6848,13 +6860,13 @@ std::string CString2string(CString str)
 }
 */
 
-PCWSTR CString2PCWSTR(CString str)
+LPCWSTR CString2LPCWSTR(CString str)
 {
 #ifdef _UNICODE
 	PCWSTR p = LPCTSTR(str);
 #else
 	USES_CONVERSION;
-	PCWSTR p = A2CW(LPCTSTR(str));
+	LPCWSTR p = A2CW(LPCTSTR(str));
 #endif
 	return p;
 }

@@ -1534,17 +1534,23 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		//썸네일 인덱스를 표시한다.
 		if (draw && m_show_index)
 		{
-			if (draw && !skip)
-				pDC->SetTextColor(RGB(255, 255, 255));
-
 			str.Format(_T("%d"), i + 1);
 
 			CRect rIndex = rect;
 			rIndex.top += 2;
 			if (draw && !skip)
-				DrawTextShadow(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP );
-				//DrawShadowText(pDC->GetSafeHdc(), str, str.GetLength(), rIndex,
-				//	DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
+			{
+				pDC->SetTextColor(RGB(255, 255, 255));
+
+				//멀티바이트 환경에서는 DrawShadowText를 쓰기위해서는 manifest를 추가해야 하는 등
+				//번거로워 일단 DrawTextShadow로 대체한다.
+#ifdef _UNICODE
+				DrawShadowText(pDC->GetSafeHdc(), str, str.GetLength(), rIndex,
+					DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
+#else
+				DrawTextShadow(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP);
+#endif
+			}
 		}
 
 		//resolution과 title을 표시한다.

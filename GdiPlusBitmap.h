@@ -23,17 +23,17 @@ public:
 	CGdiplusBitmap();
 	CGdiplusBitmap(Bitmap* src);
 	CGdiplusBitmap(HBITMAP hBitmap);
-	CGdiplusBitmap(LPCTSTR pFile, bool show_error = false);
+	CGdiplusBitmap(CString pFile, bool show_error = false);
 	CGdiplusBitmap(CGdiplusBitmap* src);
-	CGdiplusBitmap(LPCTSTR lpType, UINT id, bool show_error = false);
+	CGdiplusBitmap(CString lpType, UINT id, bool show_error = false);
 
 	virtual ~CGdiplusBitmap();
 
 	void	release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
-	bool	load(LPCTSTR sFile, bool show_error = false);
-	void	load(LPCTSTR lpType, UINT id, bool show_error = false);
+	bool	load(CString sFile, bool show_error = false);
+	void	load(CString sType, UINT id, bool show_error = false);
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 
@@ -93,7 +93,7 @@ public:
 
 protected:
 	void resolution();
-	Bitmap* GetImageFromResource(LPCTSTR lpType, UINT id);
+	Bitmap* GetImageFromResource(CString lpType, UINT id);
 };
 
 #if 0

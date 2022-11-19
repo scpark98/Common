@@ -60,9 +60,9 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(LPCTSTR pFile, bool show_error)
+CGdiplusBitmap::CGdiplusBitmap(CString sFile, bool show_error)
 {
-	load(pFile);
+	load(sFile);
 }
 
 CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
@@ -71,30 +71,31 @@ CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(LPCTSTR lpType, UINT id, bool show_error)
+CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id, bool show_error)
 {
 	load(lpType, id);
 }
 
-bool CGdiplusBitmap::load(LPCTSTR sFile, bool show_error)
+bool CGdiplusBitmap::load(CString sFile, bool show_error)
 {
 	release();
 
 	CGdiplusBitmap temp;
 	
-	LPCWSTR wFile = LPCTSTR2LPCWSTR(sFile);
-	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
-	/*
+	//멀티바이트 환경에서 CString2LPCWSTR()를 써서
+	//LPCWSTR로 바꿨으나 일부 파일 열기 실패하는 현상 발생.
+	//위 함수를 호출하지 않고 해당 코드를 그대로 쓰면 문제 없음.
+	//LPCWSTR wFile = CString2LPCWSTR(sFile);
+	//temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
+
 #ifdef UNICODE
 	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(sFile);
 #else
 	USES_CONVERSION;
-	//만약 sFile이 CString 타입이면 CT2W(sFile.GetBuffer()) ?? 확인 필요
-	//LPCWSTR wFile = A2W(sFile);
-	LPCWSTR wFile = A2W_CP(sFile, CP_UTF8);
+	LPCWSTR wFile = A2W(sFile);
 	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 #endif
-*/
+
 
 	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
 	{
@@ -117,17 +118,15 @@ bool CGdiplusBitmap::load(LPCTSTR sFile, bool show_error)
 	return false;
 }
 
-void CGdiplusBitmap::load(LPCTSTR lpType, UINT id, bool show_error)
+void CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 {
 	release();
 
-	CString type = lpType;
+	sType.MakeLower();
 
-	type.MakeLower();
-
-	if (type == _T("png") || type == _T("jpg"))
+	if (sType == _T("png") || sType == _T("jpg"))
 	{
-		m_pBitmap = GetImageFromResource(lpType, id);
+		m_pBitmap = GetImageFromResource(sType, id);
 	}
 	else
 	{
@@ -140,9 +139,9 @@ void CGdiplusBitmap::load(LPCTSTR lpType, UINT id, bool show_error)
 	}
 }
 
-Bitmap* CGdiplusBitmap::GetImageFromResource(LPCTSTR lpType, UINT id)
+Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 {
-	HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(id), lpType);
+	HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(id), sType);
 
 	if (!hResource)
 		return NULL;

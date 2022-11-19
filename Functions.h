@@ -481,6 +481,9 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	std::wstring CString2wstring( const char* str );
 	std::string CString2string( CString cs );
 	CString		string2CString( std::string s );
+	//멀티바이트 환경에서 이 함수를 호출해서 사용하면 간혹 비정상적으로 동작한다.
+	//아마도 함수내에서 메모리가 할당된 후 호출한 곳에서 사용하려니 문제가 될 수 있다.
+	//이 함수의 바디를 그대로 쓰면 문제가 없으므로 일단 바디 코드를 그대로 복사해서 사용한다.
 	LPCWSTR		CString2LPCWSTR(CString str);
 	char*		CString2char(CString str);
 	TCHAR*		CString2TCHAR(CString str);

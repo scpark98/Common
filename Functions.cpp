@@ -1780,7 +1780,18 @@ bool is_greater_with_numeric(CString str0, CString str1)
 			return (num0 > num1);
 	}
 	*/
-	return (StrCmpLogicalW(CString2LPCWSTR(str0), CString2LPCWSTR(str1)) == 1);
+
+	LPCWSTR s0, s1;
+#ifdef UNICODE
+	s0 = str0;
+	s1 = str1;
+#else
+	USES_CONVERSION;
+	s0 = A2W(str0);
+	s1 = A2W(str1);
+#endif
+
+	return (StrCmpLogicalW(s0, s1) == 1);
 }
 
 
@@ -3696,9 +3707,9 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	//sort looks like windows10 explorer
 	if (dqFiles->size() && auto_sort)
 	{
-#ifdef _UNICODE
+//#ifdef _UNICODE
 		sort_like_explorer(dqFiles);
-#endif
+//#endif
 	}
 }
 
@@ -6862,11 +6873,13 @@ std::string CString2string(CString str)
 
 LPCWSTR CString2LPCWSTR(CString str)
 {
+	LPCWSTR p = NULL;
+
 #ifdef _UNICODE
-	PCWSTR p = LPCTSTR(str);
+	p = str;
 #else
 	USES_CONVERSION;
-	LPCWSTR p = A2CW(LPCTSTR(str));
+	p = A2W(str);
 #endif
 	return p;
 }

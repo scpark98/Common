@@ -34,7 +34,7 @@ CThumbCtrl::CThumbCtrl()
 	m_loading_index = -1;
 	m_max_thumbs = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), 0);
 	m_szTile = CSize(128, 128);
-	m_szMargin = CSize(10, 10);
+	m_szMargin = CSize(20, 20);
 	m_szGap = CSize(10, 20);
 
 	m_show_title = true;
@@ -238,7 +238,7 @@ void CThumbCtrl::OnPaint()
 BOOL CThumbCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return false;
+	return FALSE;
 	//return CWnd::OnEraseBkgnd(pDC);
 }
 
@@ -540,8 +540,8 @@ void CThumbCtrl::set_scroll_pos(int pos)
 	ScreenToClient(&pt);
 
 	//커서가 스크롤바 영역 밖이라면 스크롤바를 숨겨준다.
-	//if (/*(rc.PtInRect(pt) == false) ||*/ !m_rScroll.PtInRect(pt))
-		//SetTimer(timer_scroll_bar_disappear, 500, NULL);
+	if ((rc.PtInRect(pt) == false) || !m_rScroll.PtInRect(pt))
+		SetTimer(timer_scroll_bar_disappear, 2000, NULL);
 }
 
 void CThumbCtrl::recalculate_scroll_size()
@@ -997,9 +997,11 @@ void CThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		InvalidateRect(m_rScroll);
 	}
 	//나타날때는 바로, 사라질때는 fade out된다.
-	else if (m_scroll_trans == 0.0)
+	else// if (m_scroll_trans == 0.0)
 	{
-		SetTimer(timer_scroll_bar_disappear, 10, NULL);
+		m_scroll_trans = 1.0;
+		InvalidateRect(m_rScroll);
+		//SetTimer(timer_scroll_bar_disappear, 1, NULL);
 	}
 
 	CWnd::OnMouseMove(nFlags, point);
@@ -1248,14 +1250,16 @@ void CThumbCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: Add your message handler code here and/or call default
+	//스크롤바를 감출때 fadeout으로 했으나 InvalidateRect가 일부 영역이 아닌
+	//전체 영역에 적용되고 있어서 일단 이 타이머는 사용하지 않는다.
 	if (nIDEvent == timer_scroll_bar_disappear)
 	{
 		KillTimer(timer_scroll_bar_disappear);
 
-		m_crScroll = get_color(m_crTitle, m_crBack, m_scroll_trans);
+		//m_crScroll = get_color(m_crTitle, m_crBack, m_scroll_trans);
 
-		m_scroll_trans += 0.01;
-		if (m_scroll_trans >= 1.0)
+		m_scroll_trans = 1.0;
+		if (true)//m_scroll_trans >= 1.0)
 		{
 			KillTimer(timer_scroll_bar_disappear);
 			m_scroll_trans = 1.0;
@@ -1263,7 +1267,7 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 		}
 		else
 		{
-			SetTimer(timer_scroll_bar_disappear, 10, NULL);
+			SetTimer(timer_scroll_bar_disappear, 1, NULL);
 		}
 
 		InvalidateRect(m_rScroll, false);

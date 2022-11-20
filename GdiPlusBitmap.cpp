@@ -102,10 +102,19 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 		//temp로 읽어서 deep_copy해주지 않으면
 		//열린 파일은 lock걸린 상태가 되어 접근할 수 없게 된다.
 		temp.deep_copy(this);
-		//temp.clone(this);
-		//m_pBitmap = pBitmap->Clone(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight(), pBitmap->GetPixelFormat());
 		resolution();
-		//get_raw_data();
+
+		if (width == 0 || height == 0)
+		{
+			if (show_error)
+			{
+				CString str;
+				str.Format(_T("%s\nImage width or height is 0."));
+				AfxMessageBox(str);
+			}
+			return false;
+		}
+
 		return true;
 	}
 

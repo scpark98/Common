@@ -9041,6 +9041,40 @@ void Trim(char* src)
 	delete [] temp;
 }
 
+//공백, '\t', '\r', '\n', '\0' 모두 제거
+void trim(std::string& str)
+{
+	trim_left(str);
+	trim_right(str);
+}
+
+//공백, '\t', '\r', '\n' 모두 제거
+void trim_left(std::string& str)
+{
+	int none_trim_char_pos = 0;
+	std::string trim_char = " \r\n\t";
+
+	for (int i = 0; i < str.length(); i++)
+	{
+		if (trim_char.find(str[i]) == std::string::npos)
+		{
+			none_trim_char_pos = i;
+			break;
+		}
+	}
+
+	if (none_trim_char_pos < str.length() - 1)
+	{
+		str.erase(str.begin(), str.begin() + none_trim_char_pos);
+	}
+}
+
+void trim_right(std::string& str)
+{
+	str.erase(str.find_last_not_of(" \r\n\t") + 1);
+}
+
+
 void Trim(std::deque<CString>* dq)
 {
 	for (int i = 0; i < dq->size(); i++)
@@ -9052,6 +9086,32 @@ void remove_chars(CString &src, CString chars)
 {
 	for (int i = 0; i < chars.GetLength(); i++)
 		src.Remove(chars[i]);
+}
+
+void make_lower(std::string& str)
+{
+	std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+}
+
+void make_upper(std::string& str)
+{
+	std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+}
+
+std::string lower(std::string str)
+{
+	std::string dst;
+	dst.resize(str.size());
+	std::transform(str.begin(), str.end(), dst.begin(), ::tolower);
+	return dst;
+}
+
+std::string upper(std::string str)
+{
+	std::string dst;
+	dst.resize(str.size());
+	std::transform(str.begin(), str.end(), dst.begin(), ::toupper);
+	return dst;
 }
 
 float Similarity(char *str1, char *str2)

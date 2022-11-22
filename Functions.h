@@ -496,12 +496,20 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	CString		TCHAR2CString(TCHAR *str);
 	VARIANT		CString2VARIANT( CString str );
 
-	//공백, '\t', '\r', '\n' 모두 제거
-	void		Trim(char* src);
-	void		Trim(std::deque<CString>* dq);
+	//공백, '\t', '\r', '\n', '\0' 모두 제거
+	void		trim(char* src);
+	void		trim(std::string &str);
+	void		trim_left(std::string& str);
+	void		trim_right(std::string& str);
+	void		trim(std::deque<CString>* dq);
 	//src문자열에서 chars를 모두 제거한다.
 	void		remove_chars(CString &src, CString chars);
 	//src문자열에서 지정된 구간의 문자열을 제거한다.
+
+	void		make_lower(std::string& str);
+	void		make_upper(std::string& str);
+	std::string lower(std::string str);
+	std::string upper(std::string str);
 
 	inline BYTE toHex(const BYTE &x);
 	void		hex2byte(const char *in, int len, uint8_t *out);

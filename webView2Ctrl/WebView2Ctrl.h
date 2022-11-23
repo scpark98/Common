@@ -30,16 +30,21 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
 #include <afxwin.h>
 #include <wrl.h>
+#include <wrl/event.h>
+#include <wil/com.h>
+
 #include "WebView2EnvironmentOptions.h"
 #include "WebView2.h"
 
 #include "ComponentBase.h"
 #include <dcomp.h>
+#include <EventToken.h>
 #include <functional>
 #include <memory>
 #include <ole2.h>
 #include <string>
 #include <vector>
+#include <map>
 #include <winnt.h>
 
 #ifdef __windows__
@@ -57,7 +62,15 @@ namespace winrtComp = winrt::Windows::UI::Composition;
 #define IDM_GET_BROWSER_VERSION_BEFORE_CREATION 171
 #define IDM_CREATION_MODE_TARGET_DCOMP 195
 
-class CWebView2Ctrl : public CWnd
+enum WEBVIEW2_MESSAGE
+{
+	webview2_message_navigation_start = WM_APP + 123,
+	webview2_message_navigation_completed,
+	webview2_message_document_title_changed,
+	webview2_message_
+};
+
+class CWebView2Ctrl : public CWnd//, public ICoreWebView2PermissionRequestedEventHandler
 {
 	DECLARE_DYNAMIC(CWebView2Ctrl)
 
@@ -68,6 +81,10 @@ public:
 	enum TIMER_ID
 	{
 	};
+
+	void on_navigation_start();
+	void on_navigation_completed();
+	void on_document_title_changed();
 
 	CWebView2Ctrl();
 
@@ -83,9 +100,14 @@ public:
 	void CloseWebView(bool cleanupUserDataFolder = false);
 	HRESULT OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView2Environment* environment);
 	HRESULT OnCreateCoreWebView2ControllerCompleted(HRESULT result, ICoreWebView2Controller* controller);
-	void RunAsync(std::function<void(void)> callback);
 	void ResizeControls();
 	HRESULT DCompositionCreateDevice2(IUnknown* renderingDevice, REFIID riid, void** ppv);
+
+	EventRegistrationToken m_permissionRequestedToken = {};
+	EventRegistrationToken m_navigationCompletedToken = {};
+	EventRegistrationToken m_navigationStartingToken = {};
+	EventRegistrationToken m_documentTitleChangedToken = {};
+	void RegisterEventHandlers();
 
 	ICoreWebView2Controller* GetWebViewController()
 	{
@@ -103,10 +125,34 @@ public:
 	{
 		return this->GetSafeHwnd();
 	}
+
+	//html에서 카메라 사용시 접근 권한을 매번 물어보는 문제때문에
+	//이를 항상 허용으로 해주기 위해 추가한 코드
+	/*
+	HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2* sender, ICoreWebView2PermissionRequestedEventArgs* args)
+	{
+		COREWEBVIEW2_PERMISSION_KIND kind;
+		args->get_PermissionKind(&kind);
+		if (kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
+		{
+			args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+		}
+		return S_OK;
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef() { return 1; }
+	ULONG STDMETHODCALLTYPE Release() { return 1; }
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, LPVOID* ppv)
+	{
+		return S_OK;
+	}
+	*/
+
 	//WebView2
 
 protected:
 	CString m_url_reserved = _T("");
+	CString m_document_title = _T("");
 
 	//WebView2
 	DWORD m_creationModeId = 0;
@@ -116,6 +162,7 @@ protected:
 	Microsoft::WRL::ComPtr<IDCompositionDevice> m_dcompDevice;
 	Microsoft::WRL::ComPtr<ICoreWebView2DownloadStartingEventArgs> m_downloadStartingEvent;
 	Microsoft::WRL::ComPtr<ICoreWebView2DocumentTitleChangedEventHandler> m_titleChangedEvent;
+	//ICoreWebView2PermissionRequestedEventHandler* m_permissionRequestedEvent;
 	std::vector<std::unique_ptr<ComponentBase>> m_components;
 	HWND m_mainWindow = nullptr;
 	HINSTANCE g_hInstance;
@@ -136,6 +183,7 @@ protected:
 		}
 		return nullptr;
 	}
+
 	//WebView2
 
 public:

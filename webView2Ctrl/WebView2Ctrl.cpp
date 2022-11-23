@@ -4,6 +4,10 @@
 
 #include "../Functions.h"
 
+#define CHECK_FAILURE_STRINGIFY(arg)         #arg
+#define CHECK_FAILURE_FILE_LINE(file, line)  ([](HRESULT hr){ CheckFailure(hr, "Failure at " CHECK_FAILURE_STRINGIFY(file) "(" CHECK_FAILURE_STRINGIFY(line) ")"); })
+#define CHECK_FAILURE                        CHECK_FAILURE_FILE_LINE(__FILE__, __LINE__)
+#define CHECK_FAILURE_BOOL(value)            CHECK_FAILURE((value) ? S_OK : E_UNEXPECTED)
 
 #define CWEBVIEW2CTRL_CLASSNAME _T("CWebView2Ctrl")
 
@@ -154,6 +158,11 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 #endif
 				m_creationModeId == IDM_CREATION_MODE_TARGET_DCOMP);
 
+		//EventRegistrationToken token;
+		//m_webView->add_PermissionRequested(this, &token);
+
+		RegisterEventHandlers();
+
 		UINT32 pid = 0;
 		HRESULT hresult;
 		HANDLE hHandle;
@@ -194,6 +203,125 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		TRACE("Failed to create webview");
 	}
 	return S_OK;
+}
+
+void ShowFailure(HRESULT hr, CString const& message)
+{
+	CString text;
+	text.Format(_T("%s (0x%08X)"), (LPCTSTR)message, hr);
+
+	::MessageBox(nullptr, static_cast<LPCTSTR>(text), _T("Failure"), MB_OK);
+}
+
+void CheckFailure(HRESULT hr, CString const& message)
+{
+	if (FAILED(hr))
+	{
+		CString text;
+		text.Format(_T("%s : 0x%08X"), (LPCTSTR)message, hr);
+
+		// TODO: log text
+
+		std::exit(hr);
+	}
+}
+
+void CWebView2Ctrl::RegisterEventHandlers()
+{
+	CHECK_FAILURE(m_webView->add_PermissionRequested(
+		Microsoft::WRL::Callback<ICoreWebView2PermissionRequestedEventHandler>(
+			[this](ICoreWebView2*, ICoreWebView2PermissionRequestedEventArgs* args) -> HRESULT
+			{
+				COREWEBVIEW2_PERMISSION_KIND kind;
+				args->get_PermissionKind(&kind);
+				if (kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
+				{
+					args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+				}
+				return S_OK;
+			}).Get(), &m_permissionRequestedToken));
+
+
+	// NavigationStarting handler
+	CHECK_FAILURE(m_webView->add_NavigationStarting(
+		Microsoft::WRL::Callback<ICoreWebView2NavigationStartingEventHandler>(
+			[this](
+				ICoreWebView2*,
+				ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT
+			{
+				wil::unique_cotaskmem_string uri;
+				CHECK_FAILURE(args->get_Uri(&uri));
+
+				//m_isNavigating = true;
+				m_document_title.Empty();
+
+				return S_OK;
+			}).Get(), &m_navigationStartingToken));
+
+
+	// NavigationCompleted handler
+	CHECK_FAILURE(m_webView->add_NavigationCompleted(
+		Microsoft::WRL::Callback<ICoreWebView2NavigationCompletedEventHandler>(
+			[this](
+				ICoreWebView2*,
+				ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT
+			{
+				//m_isNavigating = false;
+
+				BOOL success;
+				CHECK_FAILURE(args->get_IsSuccess(&success));
+
+				if (!success)
+				{
+					COREWEBVIEW2_WEB_ERROR_STATUS webErrorStatus{};
+					CHECK_FAILURE(args->get_WebErrorStatus(&webErrorStatus));
+					if (webErrorStatus == COREWEBVIEW2_WEB_ERROR_STATUS_DISCONNECTED)
+					{
+						// Do something here if you want to handle a specific error case.
+						// In most cases this isn't necessary, because the WebView will
+						// display its own error page automatically.
+					}
+				}
+
+				wil::unique_cotaskmem_string uri;
+				m_webView->get_Source(&uri);
+
+				if (wcscmp(uri.get(), L"about:blank") == 0)
+				{
+					uri = wil::make_cotaskmem_string(L"");
+				}
+
+				OnNavigationCompleted();
+
+				return S_OK;
+			})
+		.Get(),
+				&m_navigationCompletedToken));
+
+
+	// DocumentTitleChanged handler
+	CHECK_FAILURE(m_webView->add_DocumentTitleChanged(
+		Microsoft::WRL::Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
+			[this](ICoreWebView2* sender, IUnknown* args) -> HRESULT {
+				wil::unique_cotaskmem_string title;
+				CHECK_FAILURE(sender->get_DocumentTitle(&title));
+
+				OnDocumentTitleChanged();
+
+				return S_OK;
+			})
+		.Get(), &m_documentTitleChangedToken));
+}
+
+void CWebView2Ctrl::OnNavigationCompleted()
+{
+}
+
+void CWebView2Ctrl::OnDocumentTitleChanged()
+{
+	wil::unique_cotaskmem_string title;
+	m_webView->get_DocumentTitle(&title);
+	m_document_title = title.get();
 }
 
 void CWebView2Ctrl::ResizeControls()

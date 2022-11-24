@@ -86,6 +86,10 @@ public:
 	void on_navigation_completed();
 	void on_document_title_changed();
 
+	//카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
+	//mode = 0(default), 1(allow), 2(deny)
+	void set_permission_request_mode(int mode);
+
 	CWebView2Ctrl();
 
 	//가장 많이 사용하는 함수라서 추가했으나
@@ -153,6 +157,7 @@ public:
 protected:
 	CString m_url_reserved = _T("");
 	CString m_document_title = _T("");
+	COREWEBVIEW2_PERMISSION_STATE m_permission_request_mode = COREWEBVIEW2_PERMISSION_STATE_DEFAULT;
 
 	//WebView2
 	DWORD m_creationModeId = 0;

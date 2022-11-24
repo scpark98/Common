@@ -226,6 +226,21 @@ void CheckFailure(HRESULT hr, CString const& message)
 	}
 }
 
+////카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
+//mode = 0(default), 1(allow), 2(deny)
+void CWebView2Ctrl::set_permission_request_mode(int mode)
+{
+	switch (mode)
+	{
+		case 1: m_permission_request_mode = COREWEBVIEW2_PERMISSION_STATE_ALLOW;
+				break;
+		case 2: m_permission_request_mode = COREWEBVIEW2_PERMISSION_STATE_DENY;
+				break;
+		default:
+				m_permission_request_mode = COREWEBVIEW2_PERMISSION_STATE_DEFAULT;
+	}
+};
+
 void CWebView2Ctrl::RegisterEventHandlers()
 {
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
@@ -236,7 +251,8 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				args->get_PermissionKind(&kind);
 				if (kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
 				{
-					args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+					//args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+					args->put_State(m_permission_request_mode);
 				}
 				return S_OK;
 			}).Get(), &m_permissionRequestedToken));
@@ -291,7 +307,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 					uri = wil::make_cotaskmem_string(L"");
 				}
 
-				OnNavigationCompleted();
+				on_navigation_completed();
 
 				return S_OK;
 			})
@@ -306,18 +322,18 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				wil::unique_cotaskmem_string title;
 				CHECK_FAILURE(sender->get_DocumentTitle(&title));
 
-				OnDocumentTitleChanged();
+				on_document_title_changed();
 
 				return S_OK;
 			})
 		.Get(), &m_documentTitleChangedToken));
 }
 
-void CWebView2Ctrl::OnNavigationCompleted()
+void CWebView2Ctrl::on_navigation_completed()
 {
 }
 
-void CWebView2Ctrl::OnDocumentTitleChanged()
+void CWebView2Ctrl::on_document_title_changed()
 {
 	wil::unique_cotaskmem_string title;
 	m_webView->get_DocumentTitle(&title);
@@ -341,6 +357,9 @@ void CWebView2Ctrl::ResizeControls()
 	}
 }
 
+//이 컨트롤을 사용한 앱에서 다운로드시에 표시되는 팝업창을 감추기 위해
+//이 함수를 계속 호출하여 다운로드 팝업창을 닫는 방법으로 개발했으나 이는 좋은 방법이 아니다.
+//정석은 다운로드 창 표시 여부를 세팅하는 인터페이스 함수를 호출하는 것이다.
 void CWebView2Ctrl::hide_download_dialog()
 {
 	m_webView->CloseDefaultDownloadDialog();

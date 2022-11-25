@@ -7964,11 +7964,14 @@ void fill_except_rect(CDC* pDC, CRect r, CRect except, COLORREF cr)
 
 //side 배열의 인덱스는 resize하는 영역 인덱스로서
 //DefWindowProc의 두번째 파라미터에 (SC_SIZE + m_nSideIndex)로 쓰이므로 그 차례를 따른다.
+//단, top의 경우, 테두리가 없는 dialog인 경우는 상단을 타이틀바 영역처럼 쓰므로
+//margin의 크기를 그대로 잡으면 타이틀바가 좁아지는 불편이 있다.
+//따라서 top의 경우는 4픽셀로 고정하는 것이 적절하다.
 void GetSideRect(CRect src, CRect *side, int margin)
 {
 	side[corner_left] = CRect(src.left, src.top + margin, src.left + margin, src.bottom - margin);
 	side[corner_right] = CRect(src.right - margin, src.top + margin, src.right, src.bottom - margin);
-	side[corner_top] = CRect(src.left + margin, src.top, src.right - margin, src.top + margin);
+	side[corner_top] = CRect(src.left + margin, src.top, src.right - margin, src.top + 4);
 	side[corner_topleft] = CRect(src.left, src.top, src.left + margin, src.top + margin);
 	side[corner_topright] = CRect(src.right - margin, src.top, src.right, src.top + margin);
 	side[corner_bottom] = CRect(src.left + margin, src.bottom - margin, src.right - margin, src.bottom);

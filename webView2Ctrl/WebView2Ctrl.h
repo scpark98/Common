@@ -70,7 +70,7 @@ enum WEBVIEW2_MESSAGE
 	webview2_message_
 };
 
-class CWebView2Ctrl : public CWnd//, public ICoreWebView2PermissionRequestedEventHandler
+class CWebView2Ctrl : public CWnd
 {
 	DECLARE_DYNAMIC(CWebView2Ctrl)
 
@@ -110,13 +110,6 @@ public:
 	void	GoBack();
 	void	GoForward();
 	void	DisablePopup();
-
-
-
-
-
-
-
 
 	CString get_url();
 	CString normalize_url(CString url);
@@ -187,6 +180,9 @@ public:
 protected:
 	CString m_url_reserved = _T("");
 	CString m_document_title = _T("");
+
+	//카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
+	//mode = 0(default), 1(allow), 2(deny)
 	COREWEBVIEW2_PERMISSION_STATE m_permission_request_mode = COREWEBVIEW2_PERMISSION_STATE_DEFAULT;
 
 	//WebView2

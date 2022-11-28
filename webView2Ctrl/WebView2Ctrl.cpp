@@ -95,7 +95,7 @@ void CWebView2Ctrl::InitializeWebView()
 	HRESULT hr2 = DCompositionCreateDevice2(nullptr, IID_PPV_ARGS(&m_dcompDevice));
 	if (!SUCCEEDED(hr2))
 	{
-		AfxMessageBox(L"Attempting to create WebView using DComp Visual is not supported.\r\n"
+		AfxMessageBox(_T("Attempting to create WebView using DComp Visual is not supported.\r\n")
 			"DComp device creation failed.\r\n"
 			"Current OS may not support DComp.\r\n"
 			"Create with Windowless DComp Visual Failed", MB_OK);
@@ -105,9 +105,10 @@ void CWebView2Ctrl::InitializeWebView()
 #ifdef USE_WEBVIEW2_WIN10
 	m_wincompCompositor = nullptr;
 #endif
+	USES_CONVERSION;
 	LPCWSTR subFolder = nullptr;
 	std::wstring m_userDataFolder;
-	m_userDataFolder = get_special_folder(CSIDL_COOKIES);
+	m_userDataFolder = CStringW(get_special_folder(CSIDL_COOKIES));
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
 
@@ -124,11 +125,11 @@ void CWebView2Ctrl::InitializeWebView()
 	{
 		if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
 		{
-			AfxMessageBox(L"Couldn't find Edge installation. Microsoft Edge WebView2 Runtime is required.");
+			AfxMessageBox(_T("Couldn't find Edge installation. Microsoft Edge WebView2 Runtime is required."));
 		}
 		else
 		{
-			AfxMessageBox(L"Failed to create webview environment");
+			AfxMessageBox(_T("Failed to create webview environment"));
 		}
 	}
 }
@@ -163,7 +164,7 @@ HRESULT CWebView2Ctrl::DCompositionCreateDevice2(IUnknown* renderingDevice, REFI
 	static decltype(::DCompositionCreateDevice2)* fnCreateDCompDevice2 = nullptr;
 	if (fnCreateDCompDevice2 == nullptr)
 	{
-		HMODULE hmod = ::LoadLibraryEx(L"dcomp.dll", nullptr, 0);
+		HMODULE hmod = ::LoadLibraryEx(_T("dcomp.dll"), nullptr, 0);
 		if (hmod != nullptr)
 		{
 			fnCreateDCompDevice2 = reinterpret_cast<decltype(::DCompositionCreateDevice2)*>(
@@ -203,6 +204,8 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		//m_webView = coreWebView2.get();
 
 		m_webView->get_Profile(&m_profile);
+
+		m_webView->put_IsMuted(FALSE);
 
 		//기본 다운로드 경로를 얻어오거나 변경.
 		m_profile->get_DefaultDownloadFolderPath(&m_default_download_path);
@@ -252,7 +255,8 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 		if (m_url_reserved.IsEmpty() == false)
 		{
-			//for test
+			/*
+			//for message test
 			TCHAR path[FILENAME_MAX];
 			GetModuleFileName(NULL, path, FILENAME_MAX);
 			// Remove the file name
@@ -260,15 +264,15 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 			CString szResult = s.Left(s.ReverseFind('\\') + 1);
 
 			m_url_reserved = szResult + _T("\\SampleWebMessage.html");
-			//for test end.
+			//for message test end.
+			*/
 
-
-			hresult = m_webView->Navigate(m_url_reserved);
+			hresult = m_webView->Navigate(CStringW(m_url_reserved));
 			m_url_reserved.Empty();
 		}
 		else
 		{
-			hresult = m_webView->Navigate(_T("about:blank"));
+			hresult = m_webView->Navigate(CStringW("about:blank"));
 		}
 		resize();
 	}
@@ -291,7 +295,7 @@ HRESULT CWebView2Ctrl::WebMessageReceived(ICoreWebView2* sender, ICoreWebView2We
 	return S_OK;
 }
 
-////카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
+//카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
 //mode = 0(default), 1(allow), 2(deny)
 void CWebView2Ctrl::set_permission_request_mode(int mode)
 {
@@ -326,6 +330,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 
 				return S_OK;
 			}).Get(), &m_downloadStartingToken));
+
 
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
 		Microsoft::WRL::Callback<ICoreWebView2PermissionRequestedEventHandler>(
@@ -472,7 +477,8 @@ void CWebView2Ctrl::navigate(CString url)
 		return;
 	}
 
-	m_webView->Navigate(normalize_url(url));
+	url = normalize_url(url);
+	m_webView->Navigate(CStringW(url));
 }
 
 CString CWebView2Ctrl::get_url()
@@ -537,7 +543,7 @@ HRESULT CWebView2Ctrl::execute_jscript(CString jscript)
 	HRESULT hr;
 
 	if (m_webView != nullptr)
-		hr = m_webView->ExecuteScript(jscript, nullptr);
+		hr = m_webView->ExecuteScript(CStringW(jscript), nullptr);
 
 	return hr;
 }
@@ -547,7 +553,7 @@ HRESULT CWebView2Ctrl::post_web_message_as_json(CString json)
 	HRESULT hr;
 
 	if (m_webView != nullptr)
-		hr = m_webView->PostWebMessageAsJson(json);
+		hr = m_webView->PostWebMessageAsJson(CStringW(json));
 
 	return hr;
 }
@@ -567,11 +573,9 @@ void CWebView2Ctrl::navigate_post(CString const& url, CString const& content, CS
 		content.GetLength() + 1);
 
 	CHECK_FAILURE(m_webViewEnvironment2->CreateWebResourceRequest(
-		//CT2W(normalizedUrl),
 		CStringW(normalizedUrl),
 		L"POST",
 		postDataStream.get(),
-		//CT2W(headers),
 		CStringW(headers),
 		&webResourceRequest));
 

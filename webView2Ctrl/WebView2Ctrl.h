@@ -89,13 +89,37 @@ public:
 	//카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
 	//mode = 0(default), 1(allow), 2(deny)
 	void set_permission_request_mode(int mode);
+	//아직 webview2가 완전히 생성되지 않은 상태에서 호출하면 ""이 리턴됨에 주의.
+	CString get_default_download_path() { return CString(m_default_download_path); }
+
+	HRESULT execute_jscript(CString jscript);
+	HRESULT post_web_message_as_json(CString json);
 
 	CWebView2Ctrl();
+	~CWebView2Ctrl();
 
 	//가장 많이 사용하는 함수라서 추가했으나
 	//main의 m_web 인스턴스에서 CWebView2Ctrl의 m_webView의 다른 기능을 이용하고자 한다면
 	//m_web.GetWebView()->Navigate(...)과 같이 접근하여 이용하면 된다.
-	void navigate(CString url);
+	void	navigate(CString url);
+	// The raw request header string delimited by CRLF(optional in last header).
+	void	navigate_post(CString const& url, CString const& content, CString const& headers, std::function<void()> onComplete);
+	void	print_document();
+	void	Stop();
+	void	Reload();
+	void	GoBack();
+	void	GoForward();
+	void	DisablePopup();
+
+
+
+
+
+
+
+
+	CString get_url();
+	CString normalize_url(CString url);
 	void hide_download_dialog();
 
 	//WebView2
@@ -104,26 +128,32 @@ public:
 	void CloseWebView(bool cleanupUserDataFolder = false);
 	HRESULT OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView2Environment* environment);
 	HRESULT OnCreateCoreWebView2ControllerCompleted(HRESULT result, ICoreWebView2Controller* controller);
-	void ResizeControls();
 	HRESULT DCompositionCreateDevice2(IUnknown* renderingDevice, REFIID riid, void** ppv);
+	HRESULT WebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args);
+	HRESULT ExecuteScriptResponse(HRESULT errorCode, LPCWSTR result);
+
+	void	resize();
+	RECT	get_rect();
+
 
 	EventRegistrationToken m_permissionRequestedToken = {};
 	EventRegistrationToken m_navigationCompletedToken = {};
 	EventRegistrationToken m_navigationStartingToken = {};
 	EventRegistrationToken m_documentTitleChangedToken = {};
+	EventRegistrationToken m_downloadStartingToken = {};
 	void RegisterEventHandlers();
 
 	ICoreWebView2Controller* GetWebViewController()
 	{
-		return m_controller.Get();
+		return m_controller.get();
 	}
 	ICoreWebView2_15* GetWebView()
 	{
-		return m_webView.Get();
+		return m_webView.get();
 	}
 	ICoreWebView2Environment* GetWebViewEnvironment()
 	{
-		return m_webViewEnvironment.Get();
+		return m_webViewEnvironment.get();
 	}
 	HWND GetMainWindow()
 	{
@@ -161,12 +191,16 @@ protected:
 
 	//WebView2
 	DWORD m_creationModeId = 0;
-	Microsoft::WRL::ComPtr<ICoreWebView2Environment> m_webViewEnvironment;
-	Microsoft::WRL::ComPtr<ICoreWebView2Controller> m_controller;
-	Microsoft::WRL::ComPtr<ICoreWebView2_15> m_webView;
-	Microsoft::WRL::ComPtr<IDCompositionDevice> m_dcompDevice;
-	Microsoft::WRL::ComPtr<ICoreWebView2DownloadStartingEventArgs> m_downloadStartingEvent;
-	Microsoft::WRL::ComPtr<ICoreWebView2DocumentTitleChangedEventHandler> m_titleChangedEvent;
+	wil::com_ptr<ICoreWebView2Environment> m_webViewEnvironment;
+	wil::com_ptr<ICoreWebView2Environment2> m_webViewEnvironment2;	//for CreateWebResourceRequest()
+	wil::com_ptr<ICoreWebView2Settings> m_webSettings;
+	wil::com_ptr<ICoreWebView2Controller> m_controller;
+	wil::com_ptr<ICoreWebView2_15> m_webView;
+	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
+	wil::com_ptr<ICoreWebView2Profile> m_profile;
+
+	LPWSTR m_default_download_path;
+	//ICoreWebView2Profile* m_profile;
 	//ICoreWebView2PermissionRequestedEventHandler* m_permissionRequestedEvent;
 	std::vector<std::unique_ptr<ComponentBase>> m_components;
 	HWND m_mainWindow = nullptr;

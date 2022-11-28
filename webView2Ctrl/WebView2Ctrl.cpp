@@ -1,6 +1,15 @@
 //#include "stdafx.h"
 #include "webView2Ctrl.h"
 #include "ViewComponent.h"
+#include <ShObjIdl_core.h>
+#include <Shellapi.h>
+#include <ShlObj_core.h>
+
+#ifdef __windows__
+#undef __windows__
+#endif
+using Microsoft::WRL::Callback;
+static constexpr UINT s_runAsyncWindowMessage = WM_APP;
 
 #include "../Functions.h"
 
@@ -11,12 +20,40 @@
 
 #define CWEBVIEW2CTRL_CLASSNAME _T("CWebView2Ctrl")
 
+
+void ShowFailure(HRESULT hr, CString const& message)
+{
+	CString text;
+	text.Format(_T("%s (0x%08X)"), (LPCTSTR)message, hr);
+
+	::MessageBox(nullptr, static_cast<LPCTSTR>(text), _T("Failure"), MB_OK);
+}
+
+void CheckFailure(HRESULT hr, CString const& message)
+{
+	if (FAILED(hr))
+	{
+		CString text;
+		text.Format(_T("%s : 0x%08X"), (LPCTSTR)message, hr);
+
+		// TODO: log text
+
+		std::exit(hr);
+	}
+}
+
 IMPLEMENT_DYNAMIC(CWebView2Ctrl, CWnd)
 
 CWebView2Ctrl::CWebView2Ctrl()
 {
 	if (!RegisterWindowClass())
 		return;
+}
+
+CWebView2Ctrl::~CWebView2Ctrl()
+{
+	SetWindowLongPtr(m_hWnd, GWLP_USERDATA, 0);
+	CloseWebView();
 }
 
 BOOL CWebView2Ctrl::RegisterWindowClass()
@@ -87,7 +124,7 @@ void CWebView2Ctrl::InitializeWebView()
 	{
 		if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
 		{
-			TRACE("Couldn't find Edge installation. Do you have a version installed that is compatible with this ");
+			AfxMessageBox(L"Couldn't find Edge installation. Microsoft Edge WebView2 Runtime is required.");
 		}
 		else
 		{
@@ -98,17 +135,26 @@ void CWebView2Ctrl::InitializeWebView()
 
 void CWebView2Ctrl::CloseWebView(bool cleanupUserDataFolder)
 {
+	if (m_webView)
+	{
+		m_webView->remove_NavigationCompleted(m_navigationCompletedToken);
+		m_webView->remove_NavigationStarting(m_navigationStartingToken);
+		m_webView->remove_DocumentTitleChanged(m_documentTitleChangedToken);
+		m_webView->remove_PermissionRequested(m_permissionRequestedToken);
+		m_webView->remove_DownloadStarting(m_downloadStartingToken);
+
+		m_webView = nullptr;
+		m_webSettings = nullptr;
+	}
+
 	if (m_controller)
 	{
 		m_controller->Close();
 		m_controller = nullptr;
-		m_webView = nullptr;
 	}
+
 	m_webViewEnvironment = nullptr;
-	if (cleanupUserDataFolder)
-	{
-		//Clean user data        
-	}
+	m_webViewEnvironment2 = nullptr;
 }
 
 HRESULT CWebView2Ctrl::DCompositionCreateDevice2(IUnknown* renderingDevice, REFIID riid, void** ppv)
@@ -133,7 +179,12 @@ HRESULT CWebView2Ctrl::DCompositionCreateDevice2(IUnknown* renderingDevice, REFI
 
 HRESULT CWebView2Ctrl::OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView2Environment* environment)
 {
-	m_webViewEnvironment = environment;
+	CHECK_FAILURE(environment->QueryInterface(IID_PPV_ARGS(&m_webViewEnvironment)));
+	CHECK_FAILURE(environment->QueryInterface(IID_PPV_ARGS(&m_webViewEnvironment2)));
+
+	//m_webViewEnvironment = environment;
+
+
 	m_webViewEnvironment->CreateCoreWebView2Controller
 	(this->GetSafeHwnd(), Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>
 		(this, &CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted).Get());
@@ -146,13 +197,23 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 	if (result == S_OK)
 	{
 		m_controller = controller;
-		Microsoft::WRL::ComPtr<ICoreWebView2_15> coreWebView2;
+		wil::com_ptr<ICoreWebView2_15> coreWebView2;
 		m_controller->get_CoreWebView2(&coreWebView2);
-		m_webView = coreWebView2.Get();
+		coreWebView2.query_to(&m_webView);
+		//m_webView = coreWebView2.get();
 
+		m_webView->get_Profile(&m_profile);
+
+		//기본 다운로드 경로를 얻어오거나 변경.
+		m_profile->get_DefaultDownloadFolderPath(&m_default_download_path);
+		//m_profile->put_DefaultDownloadFolderPath();
+
+		CHECK_FAILURE(m_webView->get_Settings(&m_webSettings));
+		m_webSettings->put_IsScriptEnabled(TRUE);
+		m_webSettings->put_IsWebMessageEnabled(TRUE);
 
 		NewComponent<ViewComponent>
-			(this, m_dcompDevice.Get(),
+			(this, m_dcompDevice.get(),
 #ifdef USE_WEBVIEW2_WIN10
 				m_wincompCompositor,
 #endif
@@ -160,6 +221,8 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 		//EventRegistrationToken token;
 		//m_webView->add_PermissionRequested(this, &token);
+		EventRegistrationToken token;
+		m_webView->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(this, &CWebView2Ctrl::WebMessageReceived).Get(), &token);
 
 		RegisterEventHandlers();
 
@@ -189,6 +252,17 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 		if (m_url_reserved.IsEmpty() == false)
 		{
+			//for test
+			TCHAR path[FILENAME_MAX];
+			GetModuleFileName(NULL, path, FILENAME_MAX);
+			// Remove the file name
+			CString s = path;
+			CString szResult = s.Left(s.ReverseFind('\\') + 1);
+
+			m_url_reserved = szResult + _T("\\SampleWebMessage.html");
+			//for test end.
+
+
 			hresult = m_webView->Navigate(m_url_reserved);
 			m_url_reserved.Empty();
 		}
@@ -196,7 +270,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		{
 			hresult = m_webView->Navigate(_T("about:blank"));
 		}
-		ResizeControls();
+		resize();
 	}
 	else
 	{
@@ -205,25 +279,16 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 	return S_OK;
 }
 
-void ShowFailure(HRESULT hr, CString const& message)
+HRESULT CWebView2Ctrl::WebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args)
 {
-	CString text;
-	text.Format(_T("%s (0x%08X)"), (LPCTSTR)message, hr);
-
-	::MessageBox(nullptr, static_cast<LPCTSTR>(text), _T("Failure"), MB_OK);
-}
-
-void CheckFailure(HRESULT hr, CString const& message)
-{
-	if (FAILED(hr))
+	LPWSTR pwStr;
+	args->TryGetWebMessageAsString(&pwStr);
+	CString receivedMessage = pwStr;
+	if (!receivedMessage.IsEmpty())
 	{
-		CString text;
-		text.Format(_T("%s : 0x%08X"), (LPCTSTR)message, hr);
-
-		// TODO: log text
-
-		std::exit(hr);
+		AfxMessageBox("This message came from Javascript : " + receivedMessage);
 	}
+	return S_OK;
 }
 
 ////카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
@@ -243,6 +308,25 @@ void CWebView2Ctrl::set_permission_request_mode(int mode)
 
 void CWebView2Ctrl::RegisterEventHandlers()
 {
+	CHECK_FAILURE(m_webView->add_DownloadStarting(
+		Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
+			[this](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT
+			{
+				//TRUE이면 다운로드 팝업창을 표시하지 않는다.
+				args->put_Handled(TRUE);
+
+				//기본 다운로드 경로를 알 수도 있고
+				ICoreWebView2DownloadOperation* downloadOperation;
+				args->get_DownloadOperation(&downloadOperation);
+				LPWSTR path;
+				downloadOperation->get_ResultFilePath(&path);
+
+				//다운받을 경로를 새로 지정할 수도 있다.
+				//args->put_ResultFilePath(L"c:\\scpark\\test.avi");
+
+				return S_OK;
+			}).Get(), &m_downloadStartingToken));
+
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
 		Microsoft::WRL::Callback<ICoreWebView2PermissionRequestedEventHandler>(
 			[this](ICoreWebView2*, ICoreWebView2PermissionRequestedEventArgs* args) -> HRESULT
@@ -340,7 +424,7 @@ void CWebView2Ctrl::on_document_title_changed()
 	m_document_title = title.get();
 }
 
-void CWebView2Ctrl::ResizeControls()
+void CWebView2Ctrl::resize()
 {
 	CRect r;
 	CRect rc;
@@ -355,6 +439,18 @@ void CWebView2Ctrl::ResizeControls()
 		view->SetBounds(CRect(rc));
 		//m_webHwnd = view->get_web_HWND();
 	}
+}
+
+RECT CWebView2Ctrl::get_rect()
+{
+	RECT rc{ 0, 0, 0, 0 };
+
+	if (m_webView)
+	{
+		GetWebViewController()->get_Bounds(&rc);
+	}
+
+	return rc;
 }
 
 //이 컨트롤을 사용한 앱에서 다운로드시에 표시되는 팝업창을 감추기 위해
@@ -372,12 +468,46 @@ void CWebView2Ctrl::navigate(CString url)
 	//OnCreateCoreWebView2ControllerCompleted()에서 생성 완료되면 url을 로딩한다.
 	if (!m_webView)
 	{
-		m_url_reserved = url;
+		m_url_reserved = normalize_url(url);
 		return;
 	}
 
-	m_webView->Navigate(url);
+	m_webView->Navigate(normalize_url(url));
 }
+
+CString CWebView2Ctrl::get_url()
+{
+	CString url;
+
+	if (m_webView)
+	{
+		wil::unique_cotaskmem_string uri;
+		m_webView->get_Source(&uri);
+
+		if (wcscmp(uri.get(), L"about:blank") == 0)
+		{
+			uri = wil::make_cotaskmem_string(L"");
+		}
+
+		url = uri.get();
+	}
+
+	return url;
+}
+
+CString CWebView2Ctrl::normalize_url(CString url)
+{
+	if (url.Find(_T("://")) < 0)
+	{
+		if (url.GetLength() > 1 && url[1] == ':')
+			url = _T("file://") + url;
+		else
+			url = _T("http://") + url;
+	}
+
+	return url;
+}
+
 BEGIN_MESSAGE_MAP(CWebView2Ctrl, CWnd)
 	ON_WM_SIZE()
 END_MESSAGE_MAP()
@@ -399,5 +529,105 @@ void CWebView2Ctrl::OnSize(UINT nType, int cx, int cy)
 	CWnd::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	ResizeControls();
+	resize();
+}
+
+HRESULT CWebView2Ctrl::execute_jscript(CString jscript)
+{
+	HRESULT hr;
+
+	if (m_webView != nullptr)
+		hr = m_webView->ExecuteScript(jscript, nullptr);
+
+	return hr;
+}
+
+HRESULT CWebView2Ctrl::post_web_message_as_json(CString json)
+{
+	HRESULT hr;
+
+	if (m_webView != nullptr)
+		hr = m_webView->PostWebMessageAsJson(json);
+
+	return hr;
+}
+
+// The raw request header string delimited by CRLF(optional in last header).
+void CWebView2Ctrl::navigate_post(CString const& url, CString const& content, CString const& headers, std::function<void()> onComplete)
+{
+	if (!m_webView) return;
+
+	CString normalizedUrl{ normalize_url(url) };
+
+	//m_callbacks[CallbackType::NavigationCompleted] = onComplete;
+
+	wil::com_ptr<ICoreWebView2WebResourceRequest> webResourceRequest;
+	wil::com_ptr<IStream> postDataStream = SHCreateMemStream(
+		reinterpret_cast<const BYTE*>(static_cast<LPCTSTR>(content)),
+		content.GetLength() + 1);
+
+	CHECK_FAILURE(m_webViewEnvironment2->CreateWebResourceRequest(
+		//CT2W(normalizedUrl),
+		CStringW(normalizedUrl),
+		L"POST",
+		postDataStream.get(),
+		//CT2W(headers),
+		CStringW(headers),
+		&webResourceRequest));
+
+	CHECK_FAILURE(m_webView->NavigateWithWebResourceRequest(webResourceRequest.get()));
+}
+
+void CWebView2Ctrl::print_document()
+{
+	if (m_webView)
+	{
+		m_webView->ExecuteScript(L"window.print();", nullptr);
+	}
+}
+
+void CWebView2Ctrl::Stop()
+{
+	if (m_webView)
+	{
+		m_webView->Stop();
+	}
+}
+
+void CWebView2Ctrl::Reload()
+{
+	if (m_webView)
+	{
+		m_webView->Reload();
+	}
+}
+
+void CWebView2Ctrl::GoBack()
+{
+	if (m_webView)
+	{
+		BOOL possible = FALSE;
+		m_webView->get_CanGoBack(&possible);
+		if (possible)
+			m_webView->GoBack();
+	}
+}
+
+void CWebView2Ctrl::GoForward()
+{
+	if (m_webView)
+	{
+		BOOL possible = FALSE;
+		m_webView->get_CanGoForward(&possible);
+		if (possible)
+			m_webView->GoForward();
+	}
+}
+
+void CWebView2Ctrl::DisablePopup()
+{
+	if (m_webSettings)
+	{
+		m_webSettings->put_AreDefaultScriptDialogsEnabled(FALSE);
+	}
 }

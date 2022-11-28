@@ -1,5 +1,7 @@
 #pragma once
 
+//#include <afxwin.h>
+#include "../../Common/GdiPlusBitmap.h"
 
 // CShapeDialog dialog
 

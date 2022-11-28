@@ -321,9 +321,9 @@ void ViewComponent::BuildDCompTreeUsingVisual()
         m_dcompDevice->CreateTargetForHwnd(
             m_appWindow->GetMainWindow(), TRUE, &m_dcompHwndTarget);
         m_dcompDevice->CreateVisual(&m_dcompRootVisual);
-        m_dcompHwndTarget->SetRoot(m_dcompRootVisual.Get());
+        m_dcompHwndTarget->SetRoot(m_dcompRootVisual.get());
         m_dcompDevice->CreateVisual(&m_dcompWebViewVisual);
-        m_dcompRootVisual->AddVisual(m_dcompWebViewVisual.Get(), TRUE, nullptr);
+        m_dcompRootVisual->AddVisual(m_dcompWebViewVisual.get(), TRUE, nullptr);
     }
 }
 //! [BuildDCompTree]
@@ -333,13 +333,13 @@ void ViewComponent::DestroyDCompVisualTree()
     if (m_dcompWebViewVisual)
     {
         m_dcompWebViewVisual->RemoveAllVisuals();
-        m_dcompWebViewVisual.Reset();
+        m_dcompWebViewVisual.reset();
 
         m_dcompRootVisual->RemoveAllVisuals();
-        m_dcompRootVisual.Reset();
+        m_dcompRootVisual.reset();
 
         m_dcompHwndTarget->SetRoot(nullptr);
-        m_dcompHwndTarget.Reset();
+        m_dcompHwndTarget.reset();
 
         m_dcompDevice->Commit();
     }

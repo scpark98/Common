@@ -7,7 +7,7 @@
 //#include "stdafx.h"
 #include <afxwin.h>
 #include "webView2Ctrl.h"
-#include "ComponentBase.h"
+//#include "ComponentBase.h"
 #include <dcomp.h>
 #include <unordered_set>
 #ifdef USE_WEBVIEW2_WIN10
@@ -67,8 +67,8 @@ private:
     //Browser* m_appWindow = nullptr;
 	CWebView2Ctrl* m_appWindow = nullptr;
 	HWND m_webHwnd = NULL;
-    Microsoft::WRL::ComPtr<ICoreWebView2Controller> m_controller;
-    Microsoft::WRL::ComPtr<ICoreWebView2_15> m_webView;
+    wil::com_ptr<ICoreWebView2Controller> m_controller;
+    wil::com_ptr<ICoreWebView2_15> m_webView;
     
     bool m_isDcompTargetMode;
     bool m_isVisible = true;
@@ -89,10 +89,10 @@ private:
     void BuildDCompTreeUsingVisual();
     void DestroyDCompVisualTree();
 
-    Microsoft::WRL::ComPtr<IDCompositionDevice> m_dcompDevice;
-    Microsoft::WRL::ComPtr<IDCompositionTarget> m_dcompHwndTarget;
-    Microsoft::WRL::ComPtr<IDCompositionVisual> m_dcompRootVisual;
-    Microsoft::WRL::ComPtr<IDCompositionVisual> m_dcompWebViewVisual;
+    wil::com_ptr<IDCompositionDevice> m_dcompDevice;
+    wil::com_ptr<IDCompositionTarget> m_dcompHwndTarget;
+    wil::com_ptr<IDCompositionVisual> m_dcompRootVisual;
+    wil::com_ptr<IDCompositionVisual> m_dcompWebViewVisual;
 
 #ifdef USE_WEBVIEW2_WIN10
     void BuildWinCompVisualTree();
@@ -104,6 +104,9 @@ private:
     winrt::Windows::UI::Composition::ContainerVisual m_wincompWebViewVisual{ nullptr };
 #endif
 
+    // This member is used to exercise the put_RootVisualTarget API with an IDCompositionTarget.
+    // Distinct/unrelated to the dcompHwndTarget
+   // wil::com_ptr<DCompTargetImpl> m_dcompTarget;
 
     EventRegistrationToken m_cursorChangedToken = {};
 };

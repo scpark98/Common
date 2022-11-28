@@ -337,6 +337,38 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 	dst->resolution();
 }
 
+//좌우대칭
+void CGdiplusBitmap::mirror()
+{
+	bool has_data = false;
+	if (data)
+	{
+		has_data = true;
+		SAFE_DELETE_ARRAY(data);
+	}
+
+	m_pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
+
+	if (has_data)
+		get_raw_data();
+}
+
+//상하대칭
+void CGdiplusBitmap::flip()
+{
+	bool has_data = false;
+	if (data)
+	{
+		has_data = true;
+		SAFE_DELETE_ARRAY(data);
+	}
+
+	m_pBitmap->RotateFlip(Gdiplus::RotateNoneFlipY);
+
+	if (has_data)
+		get_raw_data();
+}
+
 void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 {
 	SAFE_DELETE_ARRAY(data);
@@ -839,7 +871,7 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 	Status s;
 
 	USES_CONVERSION;
-	wchar_t* wstr = T2W(filename.GetBuffer(0));
+	wchar_t* wstr = T2W(filename);
 	s = m_pBitmap->Save(wstr, &encoderClsid);// , & encoderParameters);
 
 	if (s == Ok)

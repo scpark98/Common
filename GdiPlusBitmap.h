@@ -56,6 +56,10 @@ public:
 	void	clone(CGdiplusBitmap* dst);
 	void	deep_copy(CGdiplusBitmap* dst);
 	void	rotate(Gdiplus::RotateFlipType type);
+	//좌우대칭
+	void	mirror();
+	//상하대칭
+	void	flip();
 
 	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
 	//그럴 경우는 auto_resize를 true로 주고 불필요한 배경이 생겼을 경우는

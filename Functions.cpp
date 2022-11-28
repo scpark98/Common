@@ -6763,8 +6763,6 @@ LPCWSTR	LPCTSTR2LPCWSTR(LPCTSTR str, UINT codePage)
 	return str;
 #else
 	USES_CONVERSION;
-	//만약 sFile이 CString 타입이면 CT2W(sFile.GetBuffer()) ?? 확인 필요
-	//return A2W(str);
 	return A2W_CP(str, codePage);
 #endif
 }

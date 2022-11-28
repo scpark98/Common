@@ -1,7 +1,7 @@
 // ShapeDialog.cpp : implementation file
 //
 
-#include "stdafx.h"
+#include "pch.h"
 #include "ShapeDialog.h"
 
 
@@ -127,15 +127,15 @@ void CShapeDialog::Render(void)
 	if(hbmpMem)   
 	{   
 		HGDIOBJ hbmpOld = ::SelectObject( hdcMemory, hbmpMem); 
-		Graphics graph(hdcMemory);
+		Graphics g(hdcMemory);
 
-		graph.SetPageScale(1.0);
-		graph.SetPageUnit(UnitPixel);
-		graph.SetSmoothingMode(SmoothingModeNone);
+		g.SetPageScale(1.0);
+		g.SetPageUnit(UnitPixel);
+		g.SetSmoothingMode(SmoothingModeNone);
 
 		// Draw the dial
-		graph.DrawImage( m_pImage, 0, 0, width, height);
-		graph.DrawRectangle(&Pen(Color(255,0,0), 2.0f), Rect(20, 20, 50, 50)); 
+		g.DrawImage( m_pImage, 0, 0, width, height);
+		g.DrawRectangle(&Pen(Color(255,0,0), 2.0f), Rect(20, 20, 50, 50)); 
 
 		::UpdateLayeredWindow( m_hWnd
 			, hDC
@@ -148,7 +148,7 @@ void CShapeDialog::Render(void)
 			, ULW_ALPHA
 		);
 
-		graph.ReleaseHDC(hdcMemory);
+		g.ReleaseHDC(hdcMemory);
 		::SelectObject( hdcMemory, hbmpOld);   
 		::DeleteObject(hbmpMem); 
 	}

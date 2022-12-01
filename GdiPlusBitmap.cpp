@@ -870,9 +870,9 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 	*/
 	Status s;
 
-	USES_CONVERSION;
-	wchar_t* wstr = T2W(filename);
-	s = m_pBitmap->Save(wstr, &encoderClsid);// , & encoderParameters);
+	//USES_CONVERSION;
+	//wchar_t* wstr = T2W(filename);
+	s = m_pBitmap->Save(CStringW(filename), &encoderClsid);// , & encoderParameters);
 
 	if (s == Ok)
 		return true;

@@ -22,7 +22,11 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
 - mainDlg에 Custom Control을 추가하고 클래스 이름은 CWebView2Ctrl로 입력.
 - 위 컨트롤에 CWebView2Ctrl타입의 제어 변수(m_web)를 선언.
+
 - #include "../../Common/webView2Ctrl/WebView2Ctrl.h" 자동 추가되지 않았다면 수동 입력.
+  (이 WebView2Ctrl.h를 다른 include보다 뒤에 선언할 경우
+   Microsoft.Windows.ImplementationLibrary의 wil/resource.h에서 컴파일 오류가 발생한다.)
+
 - 사용 : m_web.navigate(url);
 - navigate이외의 다른 함수를 사용하고자 한다면 m_web.GetWebView()->Navigate(...)처럼 접근하여 호출.
 - mainDlg의 크기가 바뀌면 m_web.MoveWindow(...)로 크기 조정
@@ -30,7 +34,6 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
 #include <afxwin.h>
 #include <wrl.h>
-#include <wrl/event.h>
 #include <wil/com.h>
 
 #include "WebView2EnvironmentOptions.h"
@@ -41,11 +44,11 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 #include <EventToken.h>
 #include <functional>
 #include <memory>
-#include <ole2.h>
-#include <string>
+//#include <ole2.h>
+//#include <string>
 #include <vector>
 #include <map>
-#include <winnt.h>
+//#include <winnt.h>
 
 #ifdef __windows__
 #undef __windows__
@@ -114,6 +117,7 @@ public:
 	CString get_url();
 	CString normalize_url(CString url);
 	void hide_download_dialog();
+	void allow_external_drop(bool allow = true) { m_allow_external_drop = allow; };
 
 	//WebView2
 	HWND m_webHwnd = NULL;
@@ -195,6 +199,7 @@ protected:
 	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
 	wil::com_ptr<ICoreWebView2Profile> m_profile;
 
+	bool m_allow_external_drop = false;
 	LPWSTR m_default_download_path;
 	//ICoreWebView2Profile* m_profile;
 	//ICoreWebView2PermissionRequestedEventHandler* m_permissionRequestedEvent;
@@ -225,4 +230,5 @@ public:
 	DECLARE_MESSAGE_MAP()
 	virtual void PreSubclassWindow();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnDropFiles(HDROP hDropInfo);
 };

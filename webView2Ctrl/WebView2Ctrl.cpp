@@ -89,6 +89,8 @@ BOOL CWebView2Ctrl::RegisterWindowClass()
 
 void CWebView2Ctrl::InitializeWebView()
 {
+	DragAcceptFiles();
+
 	CloseWebView();
 	m_dcompDevice = nullptr;
 
@@ -198,7 +200,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 	if (result == S_OK)
 	{
 		m_controller = controller;
-		wil::com_ptr<ICoreWebView2_15> coreWebView2;
+		wil::com_ptr<ICoreWebView2> coreWebView2;
 		m_controller->get_CoreWebView2(&coreWebView2);
 		coreWebView2.query_to(&m_webView);
 		//m_webView = coreWebView2.get();
@@ -354,6 +356,17 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				ICoreWebView2*,
 				ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT
 			{
+				// Disable external drop while navigating.
+				auto controller4 = m_controller.try_query<ICoreWebView2Controller4>();
+				if (controller4)
+				{
+					CHECK_FAILURE(controller4->put_AllowExternalDrop(m_allow_external_drop));
+				}
+
+				//만약 ICoreWebView2로 선언해서 생성한 경우 그 이후에 추가된 API를 사용할 경우는
+				//아래와 같이 얻어온 후 API를 호출할 수 있다.
+				//wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
+
 				wil::unique_cotaskmem_string uri;
 				CHECK_FAILURE(args->get_Uri(&uri));
 
@@ -516,6 +529,7 @@ CString CWebView2Ctrl::normalize_url(CString url)
 
 BEGIN_MESSAGE_MAP(CWebView2Ctrl, CWnd)
 	ON_WM_SIZE()
+	ON_WM_DROPFILES()
 END_MESSAGE_MAP()
 
 
@@ -634,4 +648,18 @@ void CWebView2Ctrl::DisablePopup()
 	{
 		m_webSettings->put_AreDefaultScriptDialogsEnabled(FALSE);
 	}
+}
+
+
+void CWebView2Ctrl::OnDropFiles(HDROP hDropInfo)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TCHAR sfile[MAX_PATH];
+	CString file;
+
+	DragQueryFile(hDropInfo, 0, sfile, MAX_PATH);
+	file = sfile;
+	navigate(file);
+
+	CWnd::OnDropFiles(hDropInfo);
 }

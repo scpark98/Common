@@ -16,6 +16,7 @@ using namespace Gdiplus;
 - 사용 방법에 따라 일반 push button, toggle button(as a checkbox) 등으로 사용할 수 있음.
 
 [usage]
+* Gdiplus 사용을 위한 세팅
 - stdafx.h
 	#include <gdiplus.h>
 	using namespace Gdiplus;
@@ -41,7 +42,10 @@ using namespace Gdiplus;
 	...
 
 - push button
-	normal, over, down, disabled
+	m_btnOk.add_image(_T("PNG"), IDB_BTN72_NORMAL, 0, IDB_BTN72_DOWN, IDB_BTN72_DISABLED); //또는
+	m_btnOk.add_image(_T("PNG"), IDB_BTN72_NORMAL); //over, down, disabled 이미지가 별도 지정되지 않으면 자동 생성해줌.
+	m_btnOk.text(_T("확인")).text_color(black, blue, red, gray).SetFontSize(12).SetFontBold();
+
 - check or radio button
 	checked, unchecked
 */

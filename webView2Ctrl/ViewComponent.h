@@ -68,7 +68,7 @@ private:
 	CWebView2Ctrl* m_appWindow = nullptr;
 	HWND m_webHwnd = NULL;
     wil::com_ptr<ICoreWebView2Controller> m_controller;
-    wil::com_ptr<ICoreWebView2_15> m_webView;
+    wil::com_ptr<ICoreWebView2> m_webView;
     
     bool m_isDcompTargetMode;
     bool m_isVisible = true;

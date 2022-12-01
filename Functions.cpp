@@ -859,6 +859,75 @@ CString		GetUnitSizeString(int64_t size, int unit, int floats, bool unit_string,
 	return size_str;
 }
 
+
+//src¸¦ ÆÄ½ÌÇØ¼­ Æ¯Á¤ ±æÀÌ ÀÌ»óÀÇ ¹®ÀÚ¿­µé·Î ³ª´«´Ù.
+std::deque<CString> parse_divide(CString src, int len)
+{
+	std::deque<CString> result;
+
+	while (src.GetLength() >= len)
+	{
+		int punc_pos = find_punctuation(src, len);
+		if (punc_pos <= 0)
+		{
+			break;
+		}
+		else
+		{
+			result.push_back(src.Left(punc_pos));
+			src = src.Mid(punc_pos);
+		}
+	}
+
+	if (src.GetLength())
+		result.push_back(src);
+
+	return result;
+}
+
+//srcÀÇ pos±ÙÃ³¿¡¼­ ±¸µÎÁ¡À» Ã£¾Æ ±× À§Ä¡¸¦ ¸®ÅÏÇÑ´Ù.(±¸µÎÁ¡À¸·Î ¹®ÀåÀ» ³ª´­¶§ ÀÌ¿ë)
+int	find_punctuation(CString src, int pos)
+{
+	int idx = 0;
+	while (!is_punctuation(src[pos + idx]))
+	{
+		if (idx >= 0)
+		{
+			idx++;
+			idx *= -1;
+			if (pos + idx <= 1)
+				return -1;
+		}
+		else
+		{
+			idx--;
+			idx *= -1;
+			if (pos + idx >= src.GetLength() - 1)
+				return -1;
+		}
+
+		if (abs(idx) >= 20)
+			return -1;
+	}
+
+	return (pos + idx);
+}
+
+
+bool is_punctuation(TCHAR ch)
+{
+	const wchar_t start_ch = L'°¡';
+	const wchar_t end_ch = L'ÆR';
+
+	if ((ch >= '0' && ch <= '9') ||
+		(ch >= 'a' && ch <= 'z') ||
+		(ch >= 'A' && ch <= 'Z') ||
+		(ch <= 0))
+		return false;
+
+	return true;
+}
+
 CTime		GetFileCreationTime(CString sfile)
 {
 	CFileStatus		status;
@@ -9076,7 +9145,7 @@ void trim_right(std::string& str)
 }
 
 
-void Trim(std::deque<CString>* dq)
+void trim(std::deque<CString>* dq)
 {
 	for (int i = 0; i < dq->size(); i++)
 		dq->at(i).Trim();
@@ -13341,3 +13410,4 @@ int getFilelist(char (*sfiles)[NAME_MAX+1], char* folder, char* sfilter, int max
 }
 */
 /* Returns a list of files in a directory (except the ones that begin with a dot) */
+

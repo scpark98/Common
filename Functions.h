@@ -453,6 +453,12 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//floats		: 소수점을 몇 자리까지 표시할지
 	CString		GetUnitSizeString(int64_t size, int unit = 3, int floats = 0, bool unit_string = true, bool comma = false);
 
+	//src를 파싱해서 특정 길이 이상의 문자열들로 나눈다.
+	std::deque<CString> parse_divide(CString src, int len);
+	//src의 pos근처에서 구두점을 찾아 그 위치를 리턴한다.(구두점으로 문장을 나눌때 이용)
+	int			find_punctuation(CString src, int pos);
+	bool		is_punctuation(TCHAR ch);
+
 	//맨 마지막 인자는 반드시 NULL을 넣어줘야 끝을 알 수 있다.
 	bool		isOneOf( LPCTSTR src, ... );
 	//src 문자열에 set_of_keyword에 나열된 단어가 있는지 검사.

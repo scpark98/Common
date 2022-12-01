@@ -381,7 +381,7 @@ void CVtListCtrlEx::set_line_height(int height)
 
 	gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
 
-	SetImageList(&gapImage,LVSIL_SMALL);
+	SetImageList(&gapImage, LVSIL_SMALL);
 }
 
 void CVtListCtrlEx::set_column_width(int nCol, int cx)
@@ -1553,7 +1553,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 		op = '|';
 
 	GetTokenString(find_target, dqTarget, op, false);
-	Trim(&dqTarget);
+	trim(&dqTarget);
 
 	if (dqColumn == NULL || dqColumn->size() == 0)
 	{

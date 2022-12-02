@@ -905,7 +905,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	if (OpenClipboard(NULL))
 	{
 		EmptyClipboard();
-		SetClipboardData(CF_DIB, hmem);
+		SetClipboardData(CF_DIBV5, hmem);
 		CloseClipboard();
 		MessageBeep(0);
 		res = true;
@@ -915,3 +915,38 @@ bool CGdiplusBitmap::copy_to_clipbard()
 
 	return res;
 }
+/*
+bool copyBitmapIntoClipboard(Window& window, const Bitmap& in) {
+	//  this section is my code for creating a png file
+	StreamWrite stream = StreamWrite::asBufferCreate();
+	in.savePng(stream);
+	uint64 bufSize = 0;
+	char* buf = stream._takeBuffer(bufSize, false);
+	// "buf"      <-- contains the PNG payload
+	// "bufSize"  <-- is the size of this payload
+
+	HGLOBAL gift = GlobalAlloc(GMEM_MOVEABLE, bufSize);
+	if (gift == NULL)
+		return false;
+
+	HWND win = window.getWindowHandle();
+	if (!OpenClipboard(win)) {
+		GlobalFree(gift);
+		return false;
+	}
+	EmptyClipboard();
+
+	auto fmt = RegisterClipboardFormat("PNG"); // or `L"PNG", as applicable
+
+	void* giftLocked = GlobalLock(gift);
+	if (giftLocked) {
+		memcpy((char*)giftLocked, buf, bufSize);
+	}
+	GlobalUnlock(gift);
+
+	SetClipboardData(fmt, gift);
+
+	CloseClipboard();
+	return true;
+}
+*/

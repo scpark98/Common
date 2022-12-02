@@ -82,6 +82,7 @@ private:
     bool OnMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
     bool OnPointerMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void TrackMouseEvents(DWORD mouseTrackingFlags);
+
     bool m_isTrackingMouse = false;
     bool m_isCapturingMouse = false;
     std::unordered_set<UINT> m_pointerIdsStartingInWebView;

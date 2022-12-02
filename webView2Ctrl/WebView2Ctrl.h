@@ -101,6 +101,14 @@ public:
 	CWebView2Ctrl();
 	~CWebView2Ctrl();
 
+	//webView_version : get webView version = true, get Edge version = false
+	//CString get_webview2_runtime_version(bool webView_version = true);
+
+	//environment를 통해 간단히 얻어올 수 있다.
+	CString get_webview2_runtime_version() { return m_webview2_runtime_version; }
+	//현재 프로젝트에 설치된 NuGet package의 WebView2 버전을 구한다.
+	CString get_webview2_nuget_version() { return m_webview2_nuget_version; }
+
 	//가장 많이 사용하는 함수라서 추가했으나
 	//main의 m_web 인스턴스에서 CWebView2Ctrl의 m_webView의 다른 기능을 이용하고자 한다면
 	//m_web.GetWebView()->Navigate(...)과 같이 접근하여 이용하면 된다.
@@ -144,7 +152,7 @@ public:
 	{
 		return m_controller.get();
 	}
-	ICoreWebView2_15* GetWebView()
+	ICoreWebView2* GetWebView()
 	{
 		return m_webView.get();
 	}
@@ -184,6 +192,9 @@ public:
 protected:
 	CString m_url_reserved = _T("");
 	CString m_document_title = _T("");
+	CString m_webview2_runtime_version = _T("");					//107.0.1418.62
+	//nuget 버전이 runtime버전보다 높으면 일부 API는 사용 불가하고 앱이 실행되지 않을 수 있다.	
+	CString m_webview2_nuget_version = _T("");
 
 	//카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
 	//mode = 0(default), 1(allow), 2(deny)
@@ -195,9 +206,9 @@ protected:
 	wil::com_ptr<ICoreWebView2Environment2> m_webViewEnvironment2;	//for CreateWebResourceRequest()
 	wil::com_ptr<ICoreWebView2Settings> m_webSettings;
 	wil::com_ptr<ICoreWebView2Controller> m_controller;
-	wil::com_ptr<ICoreWebView2_15> m_webView;
+	wil::com_ptr<ICoreWebView2> m_webView;
 	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
-	wil::com_ptr<ICoreWebView2Profile> m_profile;
+	//wil::com_ptr<ICoreWebView2Profile> m_profile;
 
 	bool m_allow_external_drop = false;
 	LPWSTR m_default_download_path;

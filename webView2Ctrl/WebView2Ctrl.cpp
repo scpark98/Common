@@ -94,15 +94,15 @@ void CWebView2Ctrl::InitializeWebView()
 	CloseWebView();
 	m_dcompDevice = nullptr;
 
-	HRESULT hr2 = DCompositionCreateDevice2(nullptr, IID_PPV_ARGS(&m_dcompDevice));
-	if (!SUCCEEDED(hr2))
-	{
-		AfxMessageBox(_T("Attempting to create WebView using DComp Visual is not supported.\r\n")
-			"DComp device creation failed.\r\n"
-			"Current OS may not support DComp.\r\n"
-			"Create with Windowless DComp Visual Failed", MB_OK);
-		return;
-	}
+	//HRESULT hr2 = DCompositionCreateDevice2(nullptr, IID_PPV_ARGS(&m_dcompDevice));
+	//if (!SUCCEEDED(hr2))
+	//{
+	//	AfxMessageBox(_T("Attempting to create WebView using DComp Visual is not supported.\r\n")
+	//		"DComp device creation failed.\r\n"
+	//		"Current OS may not support DComp.\r\n"
+	//		"Create with Windowless DComp Visual Failed", MB_OK);
+	//	return;
+	//}
 
 #ifdef USE_WEBVIEW2_WIN10
 	m_wincompCompositor = nullptr;
@@ -144,7 +144,7 @@ void CWebView2Ctrl::CloseWebView(bool cleanupUserDataFolder)
 		m_webView->remove_NavigationStarting(m_navigationStartingToken);
 		m_webView->remove_DocumentTitleChanged(m_documentTitleChangedToken);
 		m_webView->remove_PermissionRequested(m_permissionRequestedToken);
-		m_webView->remove_DownloadStarting(m_downloadStartingToken);
+		//m_webView->remove_DownloadStarting(m_downloadStartingToken);
 
 		m_webView = nullptr;
 		m_webSettings = nullptr;
@@ -187,6 +187,10 @@ HRESULT CWebView2Ctrl::OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView
 
 	//m_webViewEnvironment = environment;
 
+	LPWSTR version = nullptr;
+	m_webViewEnvironment->get_BrowserVersionString(&version);
+	m_webview2_runtime_version = version;
+	CoTaskMemFree(version);
 
 	m_webViewEnvironment->CreateCoreWebView2Controller
 	(this->GetSafeHwnd(), Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>
@@ -205,12 +209,17 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		coreWebView2.query_to(&m_webView);
 		//m_webView = coreWebView2.get();
 
-		m_webView->get_Profile(&m_profile);
+		/*
+		* get_Profile을 사용하기 위해서는 NuGet에서 webView2를 1.0.1210.39 이상으로 설치해야 한다.
+		wil::com_ptr<ICoreWebView2_10> wvWnd10 = m_webView.try_query<ICoreWebView2_10>();
+		wvWnd10->get_Profile(&m_profile);
+		*/
 
-		m_webView->put_IsMuted(FALSE);
+		//put_IsMuted는 1.0.1072.54부터 사용 가능
+		//m_webView->put_IsMuted(FALSE);
 
 		//기본 다운로드 경로를 얻어오거나 변경.
-		m_profile->get_DefaultDownloadFolderPath(&m_default_download_path);
+		//m_profile->get_DefaultDownloadFolderPath(&m_default_download_path);
 		//m_profile->put_DefaultDownloadFolderPath();
 
 		CHECK_FAILURE(m_webView->get_Settings(&m_webSettings));
@@ -233,7 +242,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 		UINT32 pid = 0;
 		HRESULT hresult;
-		HANDLE hHandle;
+		//HANDLE hHandle;
 
 		m_webView->get_BrowserProcessId(&pid);
 		CString str = GetProcessNameByPID(pid);
@@ -314,6 +323,7 @@ void CWebView2Ctrl::set_permission_request_mode(int mode)
 
 void CWebView2Ctrl::RegisterEventHandlers()
 {
+	/*
 	CHECK_FAILURE(m_webView->add_DownloadStarting(
 		Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
 			[this](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT
@@ -332,7 +342,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 
 				return S_OK;
 			}).Get(), &m_downloadStartingToken));
-
+	*/
 
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
 		Microsoft::WRL::Callback<ICoreWebView2PermissionRequestedEventHandler>(
@@ -357,11 +367,13 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT
 			{
 				// Disable external drop while navigating.
+				/*
 				auto controller4 = m_controller.try_query<ICoreWebView2Controller4>();
 				if (controller4)
 				{
 					CHECK_FAILURE(controller4->put_AllowExternalDrop(m_allow_external_drop));
 				}
+				*/
 
 				//만약 ICoreWebView2로 선언해서 생성한 경우 그 이후에 추가된 API를 사용할 경우는
 				//아래와 같이 얻어온 후 API를 호출할 수 있다.
@@ -476,9 +488,79 @@ RECT CWebView2Ctrl::get_rect()
 //정석은 다운로드 창 표시 여부를 세팅하는 인터페이스 함수를 호출하는 것이다.
 void CWebView2Ctrl::hide_download_dialog()
 {
-	m_webView->CloseDefaultDownloadDialog();
+	//m_webView->CloseDefaultDownloadDialog();
 }
 
+/*
+//webView version = true, Edge version = false
+CString CWebView2Ctrl::get_webview2_runtime_version(bool webView_version)
+{
+	CString path;
+	CString version = _T("");
+	HKEY handle = nullptr;
+
+	LSTATUS result = ERROR_FILE_NOT_FOUND;
+
+	if (webView_version)
+	{
+		result = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+			R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft EdgeWebView)",
+			0,
+			KEY_READ,
+			&handle);
+
+		if (result != ERROR_SUCCESS)
+			result = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+				R"(SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft EdgeWebView)",
+				0,
+				KEY_READ,
+				&handle);
+	}
+	else
+	{
+		result = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+			R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge)",
+			0,
+			KEY_READ,
+			&handle);
+
+		if (result != ERROR_SUCCESS)
+			result = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+				R"(SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge)",
+				0,
+				KEY_READ,
+				&handle);
+	}
+
+	if (result == ERROR_SUCCESS)
+	{
+		TCHAR buffer[MAX_PATH + 1]{ 0 };
+		DWORD type = REG_SZ;
+		DWORD size = MAX_PATH;
+		result = RegQueryValueEx(handle, "InstallLocation", 0, &type, reinterpret_cast<LPBYTE>(buffer), &size);
+		if (result == ERROR_SUCCESS)
+			path += CString{ buffer };
+
+		TCHAR chVersion[100]{ 0 };
+		size = 100;
+		result = RegQueryValueEx(handle, "Version", 0, &type, reinterpret_cast<LPBYTE>(chVersion), &size);
+		if (result == ERROR_SUCCESS)
+		{
+			version = CString(chVersion);
+
+			if (path.GetAt(path.GetLength() - 1) != L'\\')
+				path += L"\\";
+			path += CString{ chVersion };
+		}
+		else
+			path.Empty();
+
+		RegCloseKey(handle);
+	}
+
+	return version;
+}
+*/
 void CWebView2Ctrl::navigate(CString url)
 {
 	//mainDlg의 OnInitDialog에서 navigate()을 호출하면
@@ -593,7 +675,8 @@ void CWebView2Ctrl::navigate_post(CString const& url, CString const& content, CS
 		CStringW(headers),
 		&webResourceRequest));
 
-	CHECK_FAILURE(m_webView->NavigateWithWebResourceRequest(webResourceRequest.get()));
+	wil::com_ptr<ICoreWebView2_2> wvWnd2 = m_webView.try_query<ICoreWebView2_2>();
+	CHECK_FAILURE(wvWnd2->NavigateWithWebResourceRequest(webResourceRequest.get()));
 }
 
 void CWebView2Ctrl::print_document()

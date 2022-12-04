@@ -229,7 +229,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			gradient_rect(pDC, r, dqColor, false);
 
 			int i;
-			int half = r.Height() / 2.2;
+			int half = (int)((double)(r.Height()) / 2.2);
 			for (i = r.left + half; i < itemRect.right - half; i += (half * 1.5))
 			{
 				pDC->FillSolidRect(i, r.top, half / 2, r.Height(), crBack);
@@ -1958,7 +1958,7 @@ void CVtListCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	if (sFontname == _T(""))
 		return;
 	m_lf.lfCharSet = byCharSet;
-	_tcscpy( m_lf.lfFaceName, sFontname);
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	reconstruct_font();
 }
 

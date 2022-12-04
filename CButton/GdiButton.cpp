@@ -18,8 +18,6 @@ IMPLEMENT_DYNAMIC(CGdiButton, CButton)
 
 CGdiButton::CGdiButton()
 {
-	int i;
-
 	m_button_style		= BS_PUSHBUTTON;
 
 	m_bAsStatic			= false;

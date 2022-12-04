@@ -276,7 +276,7 @@ void CHeaderCtrlEx::set_header_text(int column, CString sText)
 
 	GetItem(column, &hdItem);
 
-	_stprintf(hdItem.pszText, _T("%s"), sText);
+	_stprintf_s(hdItem.pszText, _countof(szText), _T("%s"), sText);
 	SetItem(column, &hdItem);
 }
 

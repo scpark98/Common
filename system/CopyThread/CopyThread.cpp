@@ -239,8 +239,10 @@ void CCopyThread::copy_thread_function(CCopyInfo info)
 		uint64_t transferred = 0;
 		//sprintf(src_file, "%S", info.m_src);
 		//sprintf(dst_file, "%S", info.m_dst);
-		FILE* src = fopen(src_file, "rb");
-		FILE* dst = fopen(dst_file, "wb");
+		FILE* src;
+		FILE* dst;
+		fopen_s(&src, src_file, "rb");
+		fopen_s(&dst, dst_file, "wb");
 
 		//실제 fopen이 에러일 경우는 실험해봐야 한다.
 		if (src == NULL)

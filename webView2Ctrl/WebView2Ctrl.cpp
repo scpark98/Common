@@ -114,6 +114,9 @@ void CWebView2Ctrl::InitializeWebView()
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
 
+	//LPWSTR *args = nullptr;
+	//options->get_AdditionalBrowserArguments(args);
+
 	//m_userDataFolder를 주지 않고 nullptr로 할 경우
 	//이 webview2 컴포넌트를 사용하는 프로그램을
 	//Program Files 폴더에서 실행하면 웹페이지가 표시되지 않게 된다.
@@ -144,7 +147,9 @@ void CWebView2Ctrl::CloseWebView(bool cleanupUserDataFolder)
 		m_webView->remove_NavigationStarting(m_navigationStartingToken);
 		m_webView->remove_DocumentTitleChanged(m_documentTitleChangedToken);
 		m_webView->remove_PermissionRequested(m_permissionRequestedToken);
-		//m_webView->remove_DownloadStarting(m_downloadStartingToken);
+
+		wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
+		wvWnd4->remove_DownloadStarting(m_downloadStartingToken);
 
 		m_webView = nullptr;
 		m_webSettings = nullptr;
@@ -206,6 +211,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		m_controller = controller;
 		wil::com_ptr<ICoreWebView2> coreWebView2;
 		m_controller->get_CoreWebView2(&coreWebView2);
+		m_controller->get_ParentWindow(&m_mainWindow);
 		coreWebView2.query_to(&m_webView);
 		//m_webView = coreWebView2.get();
 
@@ -323,8 +329,8 @@ void CWebView2Ctrl::set_permission_request_mode(int mode)
 
 void CWebView2Ctrl::RegisterEventHandlers()
 {
-	/*
-	CHECK_FAILURE(m_webView->add_DownloadStarting(
+	wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
+	CHECK_FAILURE(wvWnd4->add_DownloadStarting(
 		Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
 			[this](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT
 			{
@@ -342,7 +348,6 @@ void CWebView2Ctrl::RegisterEventHandlers()
 
 				return S_OK;
 			}).Get(), &m_downloadStartingToken));
-	*/
 
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
 		Microsoft::WRL::Callback<ICoreWebView2PermissionRequestedEventHandler>(
@@ -598,6 +603,9 @@ CString CWebView2Ctrl::get_url()
 
 CString CWebView2Ctrl::normalize_url(CString url)
 {
+	if (url == "about:blank")
+		return url;
+
 	if (url.Find(_T("://")) < 0)
 	{
 		if (url.GetLength() > 1 && url[1] == ':')

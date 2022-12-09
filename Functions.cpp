@@ -13411,3 +13411,186 @@ int getFilelist(char (*sfiles)[NAME_MAX+1], char* folder, char* sfilter, int max
 */
 /* Returns a list of files in a directory (except the ones that begin with a dot) */
 
+/**
+ * @ingroup HttpFileUpload
+ * @brief HTTP POST 메소드로 파일을 업로드한다.
+ * @param pszUrl   HTTP URL
+ * @param pszFilePath 업로드 파일 full path
+ * @returns 성공하면 true 를 리턴하고 그렇지 않으면 false 를 리턴한다.
+ * 현재 코드는 chatIdx 필드와 image 필드(파일경로)를 사용하는 코드이므로
+ * 필요에 따라 코드를 수정하여 사용하면 된다.
+ *	if (HttpUploadFile(_T("http://54.180.43.235:4300/rest/saveImage"), _T("c:\\scpark\\media\\test_image\\waiting_status.png"), 6340))
+		AfxMessageBox(_T("Upload success."));
+ */
+bool HttpUploadFile(CString url, CString filepath, int chatIndex)
+{
+	bool bRes = false;
+
+	USES_CONVERSION;
+
+	WCHAR* pszUrl;
+	WCHAR* pszFilePath;
+
+#ifdef _UNICODE
+	pszUrl = T2W(url.GetBuffer());
+	pszFilePath = T2W(filepath.GetBuffer());
+#else
+	pszUrl = T2W(url);
+	pszFilePath = T2W(filepath);
+#endif
+
+	// pszUrl 에서 host, path 를 가져온다.
+	WCHAR* pszHost = NULL;
+	DWORD dwFlag = 0;
+	int iPort = 80;
+
+	if (!_wcsnicmp(pszUrl, L"http://", 7))
+	{
+		pszHost = pszUrl + 7;
+	}
+	else if (!_wcsnicmp(pszUrl, L"https://", 8))
+	{
+		pszHost = pszUrl + 8;
+		dwFlag = INTERNET_FLAG_SECURE;
+		iPort = 443;
+	}
+	else
+	{
+		return false;
+	}
+
+	const WCHAR* pszPath = wcsstr(pszHost, L"/");
+	if (pszPath == NULL)
+	{
+		return false;
+	}
+
+	std::wstring strHost;
+	strHost.append(pszHost, pszPath - pszHost);
+	const WCHAR* pszPort = wcsstr(strHost.c_str(), L":");
+	if (pszPort)
+	{
+		iPort = _wtoi(pszPort + 1);
+		if (iPort <= 0) return false;
+		strHost.erase(pszPort - strHost.c_str());
+	}
+
+	// 파일 경로에서 파일 이름을 가져온다.
+	int iLen = wcslen(pszFilePath);
+	WCHAR* pszFileName = NULL;
+	for (int i = iLen - 1; i >= 0; --i)
+	{
+		if (pszFilePath[i] == L'\\')
+		{
+			pszFileName = pszFilePath + i + 1;
+			break;
+		}
+	}
+
+	// 파일 크기를 가져온다.
+	struct _stat sttStat;
+	if (_wstat(pszFilePath, &sttStat) == -1)
+	{
+		return false;
+	}
+
+	FILE* fd;
+	_wfopen_s(&fd, pszFilePath, L"rb");
+	if (fd == NULL)
+	{
+		return false;
+	}
+	else
+	{
+		char szBuf[8192];
+		CInternetSession clsSession;
+
+		// HTTP 연결하고 파일을 전송한다.
+		CHttpConnection* pclsHttpConn = clsSession.GetHttpConnection(CString(strHost.c_str()), dwFlag, (INTERNET_PORT)iPort, NULL, NULL);
+		if (pclsHttpConn)
+		{
+			CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST, CString(pszPath));
+			if (pclsHttpFile)
+			{
+				USES_CONVERSION;
+				std::string strBoundary = "55CA7C5681214d98912C76366A8042BA";
+
+				// HTTP 요청 header 를 생성한다.
+				std::wstring strContentType = L"Content-Type: multipart/form-data; boundary=";
+				//strContentType.append(A2T(strBoundary.c_str()));
+				strContentType.append(strBoundary.begin(), strBoundary.end());
+				strContentType.append(L"\r\n");
+				pclsHttpFile->AddRequestHeaders(CString(strContentType.c_str()));// .c_str());
+
+				std::string strBody;
+				std::string strChatIndex = std::to_string(chatIndex);
+
+				// body에 chatIdx를 저장한다.
+				strBody.append("--");
+				strBody.append(strBoundary);
+				strBody.append("\r\n");
+				strBody.append("Content-Disposition: form-data; name=\"chatIdx\"\r\n\r\n");
+				strBody.append(strChatIndex);
+				strBody.append("\r\n");
+
+				// body에 파일명을 저장한다.
+				strBody.append("--");
+				strBody.append(strBoundary);
+				strBody.append("\r\n");
+				strBody.append("Content-Disposition: form-data; name=\"image\"; filename=\"");
+				std::wstring filename(pszFilePath);
+				strBody.append(filename.begin(), filename.end());
+				strBody.append("\"\r\nContent-Type: application/octet-stream\r\n\r\n");
+
+				while (1)
+				{
+					iLen = fread(szBuf, 1, sizeof(szBuf), fd);
+					if (iLen <= 0) break;
+					strBody.append(szBuf, iLen);
+				}
+				fclose(fd);
+
+				strBody.append("\r\n");
+				strBody.append("--");
+				strBody.append(strBoundary);
+				strBody.append("--\r\n");
+
+				try
+				{
+					// HTTP 요청 header 를 전송한다.
+					pclsHttpFile->SendRequestEx(strBody.length(), HSR_SYNC | HSR_INITIATE);
+
+					// HTTP 요청 body 를 전송한다.
+					pclsHttpFile->Write(strBody.c_str(), strBody.length());
+					pclsHttpFile->EndRequest(HSR_SYNC);
+
+					// HTTP 응답 body 를 수신한다.
+					std::string strResponse;
+					DWORD dwCode;
+					while (1)
+					{
+						iLen = pclsHttpFile->Read(szBuf, sizeof(szBuf));
+						if (iLen <= 0) break;
+						strResponse.append(szBuf, iLen);
+					}
+
+					// 응답 코드가 200 OK 인지 확인한다.
+					pclsHttpFile->QueryInfoStatusCode(dwCode);
+					if (dwCode == HTTP_STATUS_OK)
+					{
+						bRes = true;
+					}
+				}
+				catch (CInternetException* pclsException)
+				{
+					// 웹서버 연결에 실패하면 CInternetException 이 발생한다.
+				}
+
+				delete pclsHttpFile;
+			}
+			delete pclsHttpConn;
+		}
+		fclose(fd);
+	}
+	return bRes;
+}

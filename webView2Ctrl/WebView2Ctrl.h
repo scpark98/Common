@@ -112,7 +112,7 @@ public:
 	//가장 많이 사용하는 함수라서 추가했으나
 	//main의 m_web 인스턴스에서 CWebView2Ctrl의 m_webView의 다른 기능을 이용하고자 한다면
 	//m_web.GetWebView()->Navigate(...)과 같이 접근하여 이용하면 된다.
-	void	navigate(CString url);
+	void	navigate(CString url = _T("about:blank"));
 	// The raw request header string delimited by CRLF(optional in last header).
 	void	navigate_post(CString const& url, CString const& content, CString const& headers, std::function<void()> onComplete);
 	void	print_document();

@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////
-// PictureEx.cpp: implementation of the CPicture class.
+// PictureEx.cpp: implementation of the CPictureEx class.
 //
 // Picture displaying control with support for the following formats:
 // GIF (including animated GIF87a and GIF89a), JPEG, BMP, WMF, ICO, CUR
@@ -12,39 +12,72 @@
 //   - change its identifier to something else (e.g. IDC_MYPIC)
 //   - associate a CStatic with it using ClassWizard
 //   - in your dialog's header file replace CStatic with CPictureEx
-//     (don't forget to #include "PictureEx.h" and include 
-//     PictureEx.h and PictureEx.cpp into your project)
+//     (don't forget to #include "PictureEx.h" and add 
+//     PictureEx.h and PictureEx.cpp to your project)
 //   - call one of the overloaded CPictureEx::Load() functions somewhere
 //     (OnInitDialog is a good place to start)
 //   - if the preceding Load() succeeded call Draw()
 //  
+// You can also add the control by defining a member variable of type 
+// CPictureEx, calling CPictureEx::Create (derived from CStatic), then 
+// CPictureEx::Load and CPictureEx::Draw.
+//
 // By default, the control initializes its background to COLOR_3DFACE
 // (see CPictureEx::PrepareDC()). You can change the background by
 // calling CPictureEx::SetBkColor(COLORREF) after CPictureEx::Load().
 //
-// I left the functions to write separate frames from animated GIF to disk.
-// If you want to do so, uncomment #define GIF_TRACING and an appropriate
-// section in CPictureEx::Load(HGLOBAL, DWORD). This code won't be compiled
-// and linked to your project unless you uncomment #define GIF_TRACING,
-// so don't worry.
+// I decided to leave in the class the functions to write separate frames from 
+// animated GIF to disk. If you want to use them, uncomment #define GIF_TRACING 
+// and an appropriate section in CPictureEx::Load(HGLOBAL, DWORD). These functions 
+// won't be compiled and linked to your project unless you uncomment #define GIF_TRACING,
+// so you don't have to worry.
 // 
-// When implementing this class I tried to keep MFC-dependance to a 
-// minimum, so it shouldn't be too much of a problem to convert this code
-// to use in pure WinAPI or ATL projects. In fact, the only MFC part in it 
-// is the CStatic derivation (that including its message map and virtual OnDestroy).
-//
 // Warning: this code hasn't been subject to a heavy testing, so
 // use it on your own risk. The author accepts no liability for the 
 // possible damage caused by this code.
 //
-// Version 1.0  Oleg Bykov  7 Aug 2001
+// Version 1.0  7 Aug 2001
 //              Initial release
+//
+// Version 1.1  6 Sept 2001
+//              ATL version of the class
+//
+// Version 1.2  14 Oct 2001
+//              - Fixed a problem with loading GIFs from resources
+//                in MFC-version of the class for multi-modules apps.
+//                Thanks to Ruben Avila-Carretero for finding this out.
+//
+//              - Got rid of waitable timer in ThreadAnimation()
+//                Now CPictureEx[Wnd] works in Win95 too.
+//                Thanks to Alex Egiazarov and Wayne King for the idea.
+//
+//              - Fixed a visual glitch of using SetBkColor.
+//                Thanks to Kwangjin Lee for finding this out.
+//
+// Version 1.3  10 Nov 2001
+//              - Fixed a DC leak. One DC leaked per each UnLoad()
+//                (forgot to put a ReleaseDC() in the end of 
+//                CPictureExWnd::PrepareDC() function).
+//
+//              - Now it is possible to set a clipping rectangle using
+//                CPictureEx[Wnd]::SetPaintRect(const LPRECT) function.
+//                The LPRECT parameter tells the class what portion of
+//                a picture should it display. If the clipping rect is 
+//                not set, the whole picture is shown.
+//                Thanks to Fabrice Rodriguez for the idea.
+//
+//              - Added support for Stop/Draw. Now you can Stop() an
+//                animated GIF, then Draw() it again, it will continue
+//                animation from the frame it was stopped on. You can 
+//                also know if a GIF is currently playing with the 
+//                IsPlaying() function.
+//             
+//              - Got rid of math.h and made m_bExitThread volatile. 
+//                Thanks to Piotr Sawicki for the suggestion.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
 #include "PictureEx.h"
-#include <math.h>
 #include <process.h>
 
 #ifdef _DEBUG
@@ -153,14 +186,22 @@ CPictureEx::CPictureEx()
 	m_hThread		   = NULL;
 	m_hBitmap          = NULL;
 	m_hMemDC		   = NULL;
+
+	m_hDispMemDC       = NULL;
+	m_hDispMemBM       = NULL;
+	m_hDispOldBM       = NULL;
+
 	m_bIsInitialized   = FALSE;
 	m_bExitThread	   = FALSE;
+	m_bIsPlaying       = FALSE;
 	m_bIsGIF		   = FALSE;
 	m_clrBackground    = RGB(255,255,255); // white by default
 	m_nGlobalCTSize    = 0;
 	m_nCurrOffset	   = 0;
+	m_nCurrFrame	   = 0;
 	m_nDataSize		   = 0;
 	m_PictureSize.cx = m_PictureSize.cy = 0;
+	SetRect(&m_PaintRect,0,0,0,0);
 
 	m_hExitEvent = CreateEvent(NULL,TRUE,FALSE,NULL);
 }
@@ -172,13 +213,13 @@ CPictureEx::~CPictureEx()
 }
 
 BEGIN_MESSAGE_MAP(CPictureEx, CStatic)
-	//{{AFX_MSG_MAP(CMyStatic)
+	//{{AFX_MSG_MAP(CPictureEx)
 	ON_WM_DESTROY()
 	ON_WM_PAINT()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
-BOOL CPictureEx::Load(HGLOBAL hGlobal, DWORD dwSize)
+BOOL CPictureEx::Load(HGLOBAL hGlobal, DWORD dwSize, CSize displaySize)
 {
 	IStream *pStream = NULL;
 	UnLoad();
@@ -223,8 +264,18 @@ BOOL CPictureEx::Load(HGLOBAL hGlobal, DWORD dwSize)
 		m_pPicture->get_Height(&hmHeight);
 
 		HDC hDC = ::GetDC(m_hWnd);
-		m_PictureSize.cx = MulDiv(hmWidth, GetDeviceCaps(hDC,LOGPIXELSX), 2540);
-		m_PictureSize.cy = MulDiv(hmHeight, GetDeviceCaps(hDC,LOGPIXELSY), 2540);
+
+		if (displaySize == CSize(0, 0))
+		{
+			m_PictureSize.cx = MulDiv(hmWidth, GetDeviceCaps(hDC, LOGPIXELSX), 2540);
+			m_PictureSize.cy = MulDiv(hmHeight, GetDeviceCaps(hDC, LOGPIXELSY), 2540);
+		}
+		else
+		{
+			m_PictureSize.cx = displaySize.cx;
+			m_PictureSize.cy = displaySize.cy;
+		}
+
 		::ReleaseDC(m_hWnd,hDC);
 	}
 	else
@@ -237,7 +288,7 @@ BOOL CPictureEx::Load(HGLOBAL hGlobal, DWORD dwSize)
 		{
 			// calculate the globat color table size
 			m_nGlobalCTSize = static_cast<int>
-				(3*pow(2,m_pGIFLSDescriptor->GetPackedValue(LSD_PACKED_GLOBALCTSIZE)+1));
+				(3* (1 << (m_pGIFLSDescriptor->GetPackedValue(LSD_PACKED_GLOBALCTSIZE)+1)));
 			// get the background color if GCT is present
 			unsigned char *pBkClr = m_pRawData + sizeof(TGIFHeader) + 
 				sizeof(TGIFLSDescriptor) + 3*m_pGIFLSDescriptor->m_cBkIndex;
@@ -245,8 +296,16 @@ BOOL CPictureEx::Load(HGLOBAL hGlobal, DWORD dwSize)
 		};
 
 		// store the picture's size
-		m_PictureSize.cx = m_pGIFLSDescriptor->m_wWidth;
-		m_PictureSize.cy = m_pGIFLSDescriptor->m_wHeight;
+		if (displaySize == CSize(0, 0))
+		{
+			m_PictureSize.cx = m_pGIFLSDescriptor->m_wWidth;
+			m_PictureSize.cy = m_pGIFLSDescriptor->m_wHeight;
+		}
+		else
+		{
+			m_PictureSize.cx = displaySize.cx;
+			m_PictureSize.cy = displaySize.cy;
+		}
 
 		// determine frame count for this picture
 		UINT nFrameCount=0;
@@ -324,7 +383,7 @@ BOOL CPictureEx::Load(HGLOBAL hGlobal, DWORD dwSize)
 			ResetDataPointer();
 			while (hFrameData = GetNextGraphicBlock(&nBlockLen,
 				&frame.m_nDelay, &frame.m_frameSize,
-				&frame.m_frameOffset, &frame.m_nDisposal) )
+				&frame.m_frameOffset, &frame.m_nDisposal, displaySize) )
 			{
 				#ifdef GIF_TRACING
 				//////////////////////////////////////////////
@@ -394,6 +453,16 @@ void CPictureEx::UnLoad()
 		m_hBitmap = NULL;
 	};
 
+	if (m_hDispMemDC)
+	{
+		SelectObject(m_hDispMemDC,m_hDispOldBM);
+		::DeleteDC(m_hDispMemDC);
+		::DeleteObject(m_hDispMemBM);
+		m_hDispMemDC  = NULL;
+		m_hDispMemBM = NULL;
+	};
+
+	SetRect(&m_PaintRect,0,0,0,0);
 	m_pGIFLSDescriptor = NULL;
 	m_pGIFHeader	   = NULL;
 	m_pRawData		   = NULL;
@@ -404,6 +473,7 @@ void CPictureEx::UnLoad()
 	m_clrBackground    = RGB(255,255,255); // white by default
 	m_nGlobalCTSize	   = 0;
 	m_nCurrOffset	   = 0;
+	m_nCurrFrame	   = 0;
 	m_nDataSize		   = 0;
 }
 
@@ -411,13 +481,13 @@ BOOL CPictureEx::Draw()
 {
 	if (!m_bIsInitialized)
 	{
-		TRACE(_T("Call of one the CPictureEx::Load() member functions before calling Draw()\n"));
+		TRACE(_T("Call one of the CPictureEx::Load() member functions before calling Draw()\n"));
 		return FALSE;
 	};
 
 	if (IsAnimatedGIF())
 	{
-	// the picture needs some animation
+	// the picture needs animation
 	// we'll start the thread that will handle it for us
 	
 		unsigned int nDummy;
@@ -456,7 +526,7 @@ SIZE CPictureEx::GetSize() const
 	return m_PictureSize;
 }
 
-BOOL CPictureEx::Load(LPCTSTR szFileName)
+BOOL CPictureEx::Load(LPCTSTR szFileName, CSize displaySize)
 {
 	ASSERT(szFileName);
 	
@@ -505,24 +575,24 @@ BOOL CPictureEx::Load(LPCTSTR szFileName)
 	GlobalUnlock(hGlobal);
 	file.Close();
 
-	BOOL bRetValue = Load(hGlobal,dwSize);
+	BOOL bRetValue = Load(hGlobal, dwSize, displaySize);
 	GlobalFree(hGlobal);
 	return bRetValue;
 }
 
-BOOL CPictureEx::Load(LPCTSTR szResourceName, LPCTSTR szResourceType)
+BOOL CPictureEx::Load(LPCTSTR szResourceName, LPCTSTR szResourceType, CSize displaySize)
 {
 	ASSERT(szResourceName);
 	ASSERT(szResourceType);
 
-	HRSRC hPicture = FindResource(NULL,szResourceName,szResourceType);
+	HRSRC hPicture = FindResource(AfxGetResourceHandle(),szResourceName,szResourceType);
 	HGLOBAL hResData;
-	if (!hPicture || !(hResData = LoadResource(NULL,hPicture)))
+	if (!hPicture || !(hResData = LoadResource(AfxGetResourceHandle(),hPicture)))
 	{
 		TRACE(_T("Load (resource): Error loading resource %s\n"),szResourceName);
 		return FALSE;
 	};
-	DWORD dwSize = SizeofResource(NULL,hPicture);
+	DWORD dwSize = SizeofResource(AfxGetResourceHandle(),hPicture);
 
 	// hResData is not the real HGLOBAL (we can't lock it)
 	// let's make it real
@@ -530,7 +600,7 @@ BOOL CPictureEx::Load(LPCTSTR szResourceName, LPCTSTR szResourceType)
 	HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_NODISCARD,dwSize);
 	if (!hGlobal)
 	{
-		TRACE("Load (resource): Error allocating memory\n");
+		TRACE(_T("Load (resource): Error allocating memory\n"));
 		FreeResource(hResData);
 		return FALSE;
 	};
@@ -548,7 +618,7 @@ BOOL CPictureEx::Load(LPCTSTR szResourceName, LPCTSTR szResourceType)
 	FreeResource(hResData);
 	GlobalUnlock(hGlobal);
 
-	BOOL bRetValue = Load(hGlobal,dwSize);
+	BOOL bRetValue = Load(hGlobal, dwSize, displaySize);
 	GlobalFree(hGlobal);
 	return bRetValue;
 }
@@ -727,7 +797,7 @@ int CPictureEx::GetNextBlockLen() const
 			reinterpret_cast<TGIFImageDescriptor *> (&m_pRawData[m_nCurrOffset]);
 		int nLCTSize = (int)
 			(pIDescr->GetPackedValue(ID_PACKED_LOCALCT)*3*
-			pow(2,pIDescr->GetPackedValue(ID_PACKED_LOCALCTSIZE)+1));
+			(1 << (pIDescr->GetPackedValue(ID_PACKED_LOCALCTSIZE)+1)));
 
 		int nTmp = GetSubBlocksLen(m_nCurrOffset+
 			sizeof(TGIFImageDescriptor) + nLCTSize + 1);
@@ -743,7 +813,10 @@ UINT WINAPI CPictureEx::_ThreadAnimation(LPVOID pParam)
 {
 	ASSERT(pParam);
 	CPictureEx *pPic = reinterpret_cast<CPictureEx *> (pParam);
+
+	pPic->m_bIsPlaying = TRUE;
 	pPic->ThreadAnimation();
+	pPic->m_bIsPlaying = FALSE;
 
 	// this thread has finished its work so we close the handle
 	CloseHandle(pPic->m_hThread); 
@@ -754,26 +827,48 @@ UINT WINAPI CPictureEx::_ThreadAnimation(LPVOID pParam)
 
 void CPictureEx::ThreadAnimation()
 {
-	HANDLE hTimer = CreateWaitableTimer(NULL,TRUE,NULL);
-	if (!hTimer) 
+	//LARGE_INTEGER li;
+	//const int nUnitsPerSecond = 100000;
+
+	HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
+
+	// first, restore background (for stop/draw support)
+	// disposal method #2
+	if (m_arrFrames[m_nCurrFrame].m_nDisposal == 2)
 	{
-		TRACE(_T("ThreadAnimation: couldn't create a waitable timer\n"));
-		return;
-	};
+		HBRUSH hBrush = CreateSolidBrush(m_clrBackground);
+		if (hBrush)
+		{
+			RECT rect = {
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cx,
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cy,
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cx + m_arrFrames[m_nCurrFrame].m_frameSize.cx,
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cy + m_arrFrames[m_nCurrFrame].m_frameSize.cy };
+			FillRect(m_hMemDC,&rect,hBrush);
+			DeleteObject(hBrush);
+		};
+	} 
+	else
+		// disposal method #3
+		if (m_hDispMemDC && (m_arrFrames[m_nCurrFrame].m_nDisposal == 3) )
+		{
+			// put it back
+			BitBlt(m_hMemDC,
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cx,
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cy,
+				m_arrFrames[m_nCurrFrame].m_frameSize.cx,
+				m_arrFrames[m_nCurrFrame].m_frameSize.cy,
+				m_hDispMemDC,0,0, SRCCOPY);
+			// init variables
+			SelectObject(m_hDispMemDC,m_hDispOldBM);
+			DeleteDC(m_hDispMemDC); m_hDispMemDC = NULL;
+			DeleteObject(m_hDispMemBM); m_hDispMemBM = NULL;
+		};
 
-	LARGE_INTEGER li;
-	const int nUnitsPerSecond = 100000;
-
-	// we're gonna wait for two events, whichever occurs first
-	// this way we won't have lags with lengthy GIF-delays
-	HANDLE arrHandles[2] = {hTimer, m_hExitEvent};
-
-	int nTemp = 0;
 	while (!m_bExitThread)
 	{
-		if (m_arrFrames[nTemp].m_pPicture)
+		if (m_arrFrames[m_nCurrFrame].m_pPicture)
 		{
-			m_pPicture = m_arrFrames[nTemp].m_pPicture;
 		///////////////////////////////////////////////////////
 		// Before rendering a frame we should take care of what's 
 		// behind that frame. TFrame::m_nDisposal will be our guide:
@@ -783,26 +878,23 @@ void CPictureEx::ThreadAnimation()
 		//   3 - restore to previous
 
 			//////// disposal method #3
-			HDC hMemDC = NULL;
-			HBITMAP hMemBM = NULL, hOldBM;
-			TRACE(_T("frame %2d, disposal = %d\n"), nTemp, m_arrFrames[nTemp].m_nDisposal);
-			if (m_arrFrames[nTemp].m_nDisposal == 3)
+			if (m_arrFrames[m_nCurrFrame].m_nDisposal == 3)
 			{
 				// prepare a memory DC and store the background in it
-				hMemDC = CreateCompatibleDC(m_hMemDC);
-				hMemBM = CreateCompatibleBitmap(m_hMemDC,
-							m_arrFrames[nTemp].m_frameSize.cx,
-							m_arrFrames[nTemp].m_frameSize.cy);
+				m_hDispMemDC = CreateCompatibleDC(m_hMemDC);
+				m_hDispMemBM = CreateCompatibleBitmap(m_hMemDC,
+							m_arrFrames[m_nCurrFrame].m_frameSize.cx,
+							m_arrFrames[m_nCurrFrame].m_frameSize.cy);
 				
-				if (hMemDC && hMemBM)
+				if (m_hDispMemDC && m_hDispMemBM)
 				{
-					hOldBM = reinterpret_cast<HBITMAP> (SelectObject(hMemDC,hMemBM));
-					BitBlt(hMemDC,0,0,
-						m_arrFrames[nTemp].m_frameSize.cx,
-						m_arrFrames[nTemp].m_frameSize.cy,
+					m_hDispOldBM = reinterpret_cast<HBITMAP> (SelectObject(m_hDispMemDC,m_hDispMemBM));
+					BitBlt(m_hDispMemDC,0,0,
+						m_arrFrames[m_nCurrFrame].m_frameSize.cx,
+						m_arrFrames[m_nCurrFrame].m_frameSize.cy,
 						m_hMemDC,
-						m_arrFrames[nTemp].m_frameOffset.cx,
-						m_arrFrames[nTemp].m_frameOffset.cy,
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cx,
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cy,
 						SRCCOPY);
 				};
 			};
@@ -810,104 +902,89 @@ void CPictureEx::ThreadAnimation()
 
 			long hmWidth;
 			long hmHeight;
-			m_arrFrames[nTemp].m_pPicture->get_Width(&hmWidth);
-			m_arrFrames[nTemp].m_pPicture->get_Height(&hmHeight);
+			m_arrFrames[m_nCurrFrame].m_pPicture->get_Width(&hmWidth);
+			m_arrFrames[m_nCurrFrame].m_pPicture->get_Height(&hmHeight);
 
-			if (m_arrFrames[nTemp].m_pPicture->Render(m_hMemDC, 
-				m_arrFrames[nTemp].m_frameOffset.cx, 
-				m_arrFrames[nTemp].m_frameOffset.cy, 
-				m_arrFrames[nTemp].m_frameSize.cx, 
-				m_arrFrames[nTemp].m_frameSize.cy, 
+			if (m_arrFrames[m_nCurrFrame].m_pPicture->Render(m_hMemDC, 
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cx, 
+				m_arrFrames[m_nCurrFrame].m_frameOffset.cy, 
+				m_arrFrames[m_nCurrFrame].m_frameSize.cx, 
+				m_arrFrames[m_nCurrFrame].m_frameSize.cy, 
 				0, hmHeight, hmWidth, -hmHeight, NULL) == S_OK)
 			{
 				Invalidate(FALSE);
 			};
 			
-			if (m_bExitThread)
-			{
-				if (hMemDC)
-				{
-					// dispose local variables
-					SelectObject(hMemDC,hOldBM);
-					DeleteDC(hMemDC);
-					DeleteObject(hMemBM);
-				};
-				break;
-			};
+			if (m_bExitThread) break;
 
-			if (m_arrFrames[nTemp].m_nDelay < 5) 
-				li.QuadPart = -static_cast<long>(10*nUnitsPerSecond);
-			else
-				li.QuadPart = -(nUnitsPerSecond*static_cast<long>(m_arrFrames[nTemp].m_nDelay));
-			SetWaitableTimer(hTimer,&li,0,NULL,NULL,FALSE);
+			// if the delay time is too short (like in old GIFs), wait for 100ms
+			
+			//if (m_arrFrames[m_nCurrFrame].m_nDelay < 5) 
+				//WaitForSingleObject(m_hExitEvent, 100);
+			//else
+				WaitForSingleObject(m_hExitEvent, 10*m_arrFrames[m_nCurrFrame].m_nDelay);
+			
+			//li.QuadPart = -(nUnitsPerSecond * static_cast<long>(m_arrFrames[m_nCurrFrame].m_nDelay));
+			//SetWaitableTimer(hTimer, &li, 0, NULL, NULL, FALSE);
 
-			// of course, we could use a casual Sleep()
-			// but then Stop() would take quite some time
-			WaitForMultipleObjects(2,arrHandles,FALSE,10000);
-
-			if (m_bExitThread)
-			{
-				if (hMemDC)
-				{
-					// dispose local variables
-					SelectObject(hMemDC,hOldBM);
-					DeleteDC(hMemDC);
-					DeleteObject(hMemBM);
-				};
-				break;
-			};
+			if (m_bExitThread) break;
 
 			// disposal method #2
-			if (m_arrFrames[nTemp].m_nDisposal == 2)
+			if (m_arrFrames[m_nCurrFrame].m_nDisposal == 2)
 			{
 				HBRUSH hBrush = CreateSolidBrush(m_clrBackground);
 				if (hBrush)
 				{
 					RECT rect = {
-						m_arrFrames[nTemp].m_frameOffset.cx,
-						m_arrFrames[nTemp].m_frameOffset.cy,
-						m_arrFrames[nTemp].m_frameOffset.cx + m_arrFrames[nTemp].m_frameSize.cx,
-						m_arrFrames[nTemp].m_frameOffset.cy + m_arrFrames[nTemp].m_frameSize.cy };
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cx,
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cy,
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cx + m_arrFrames[m_nCurrFrame].m_frameSize.cx,
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cy + m_arrFrames[m_nCurrFrame].m_frameSize.cy };
 					FillRect(m_hMemDC,&rect,hBrush);
 					DeleteObject(hBrush);
 				};
 			} 
 			else
-				if (hMemDC && (m_arrFrames[nTemp].m_nDisposal == 3) )
+				if (m_hDispMemDC && (m_arrFrames[m_nCurrFrame].m_nDisposal == 3) )
 				{
 					// put it back
 					BitBlt(m_hMemDC,
-						m_arrFrames[nTemp].m_frameOffset.cx,
-						m_arrFrames[nTemp].m_frameOffset.cy,
-						m_arrFrames[nTemp].m_frameSize.cx,
-						m_arrFrames[nTemp].m_frameSize.cy,
-						hMemDC,0,0, SRCCOPY);
-					// dispose local variables
-					SelectObject(hMemDC,hOldBM);
-					DeleteDC(hMemDC);
-					DeleteObject(hMemBM);
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cx,
+						m_arrFrames[m_nCurrFrame].m_frameOffset.cy,
+						m_arrFrames[m_nCurrFrame].m_frameSize.cx,
+						m_arrFrames[m_nCurrFrame].m_frameSize.cy,
+						m_hDispMemDC,0,0, SRCCOPY);
+					// init variables
+					SelectObject(m_hDispMemDC,m_hDispOldBM);
+					DeleteDC(m_hDispMemDC); m_hDispMemDC = NULL;
+					DeleteObject(m_hDispMemBM); m_hDispMemBM = NULL;
 				};
 		};
-		nTemp++;
-		if (nTemp == m_arrFrames.size())
+		m_nCurrFrame++;
+		if (m_nCurrFrame == m_arrFrames.size())
 		{
-			nTemp = 0; 
+			m_nCurrFrame
+				= 0; 
 		// init the screen for the first frame,
-			RECT rect = {0,0,m_PictureSize.cx,m_PictureSize.cy};
-			FillRect(m_hMemDC,&rect,(HBRUSH)(COLOR_WINDOW));
+			HBRUSH hBrush = CreateSolidBrush(m_clrBackground);
+			if (hBrush)
+			{
+				RECT rect = {0,0,m_PictureSize.cx,m_PictureSize.cy};
+				FillRect(m_hMemDC,&rect,hBrush);
+				DeleteObject(hBrush);
+			};
 		};
 	};
-	CloseHandle(hTimer);
 }
 
 void CPictureEx::Stop()
 {
+	m_bIsPlaying = FALSE;
 	m_bExitThread = TRUE;
 	SetEvent(m_hExitEvent);
 	if (m_hThread)
 	{
 		// we'll wait for 5 seconds then continue execution
-		// I hate hangups :P
 		WaitForSingleObject(m_hThread,5000);
 		CloseHandle(m_hThread);
 		m_hThread = NULL;
@@ -920,7 +997,7 @@ void CPictureEx::Stop()
 
 HGLOBAL CPictureEx::GetNextGraphicBlock(UINT *pBlockLen, 
 	UINT *pDelay, SIZE *pBlockSize, SIZE *pBlockOffset, 
-	UINT *pDisposal)
+	UINT *pDisposal, CSize displaySize)
 {
 	if (!m_pRawData) return NULL;
 
@@ -993,8 +1070,18 @@ HGLOBAL CPictureEx::GetNextGraphicBlock(UINT *pBlockLen,
 		// store size and offsets
 		TGIFImageDescriptor *pImage = 
 			reinterpret_cast<TGIFImageDescriptor *> (&m_pRawData[m_nCurrOffset]);
-		pBlockSize->cx = pImage->m_wWidth;
-		pBlockSize->cy = pImage->m_wHeight;
+
+		if (displaySize == CSize(0, 0))
+		{
+			pBlockSize->cx = pImage->m_wWidth;
+			pBlockSize->cy = pImage->m_wHeight;
+		}
+		else
+		{
+			pBlockSize->cx = displaySize.cx;
+			pBlockSize->cy = displaySize.cy;
+		}
+
 		pBlockOffset->cx = pImage->m_wLeftPos;
 		pBlockOffset->cy = pImage->m_wTopPos;
 	};
@@ -1040,6 +1127,11 @@ BOOL CPictureEx::IsAnimatedGIF() const
 	return (m_bIsGIF && (m_arrFrames.size() > 1));
 }
 
+BOOL CPictureEx::IsPlaying() const
+{
+	return m_bIsPlaying;
+}
+
 int CPictureEx::GetFrameCount() const
 {
 	if (!IsAnimatedGIF())
@@ -1056,9 +1148,23 @@ COLORREF CPictureEx::GetBkColor() const
 void CPictureEx::OnPaint() 
 {
 	CPaintDC dc(this); // device context for painting
-	
-	::BitBlt(dc.m_hDC,0,0,m_PictureSize.cx,m_PictureSize.cy,
-		m_hMemDC,0,0,SRCCOPY);
+
+	LONG nPaintWidth = m_PaintRect.right-m_PaintRect.left;
+
+	SetStretchBltMode(dc.GetSafeHdc(), BLACKONWHITE);
+
+	if (nPaintWidth > 0)
+	{
+		LONG nPaintHeight = m_PaintRect.bottom - m_PaintRect.top;
+		::BitBlt(dc.m_hDC, 0, 0, nPaintWidth, nPaintHeight,	
+			m_hMemDC, m_PaintRect.left, m_PaintRect.top, SRCCOPY);
+	}
+	else
+	{
+
+		::BitBlt(dc.m_hDC, 0, 0, m_PictureSize.cx, m_PictureSize.cy,
+			m_hMemDC, 0, 0, SRCCOPY);
+	};
 }
 
 BOOL CPictureEx::PrepareDC(int nWidth, int nHeight)
@@ -1091,6 +1197,7 @@ BOOL CPictureEx::PrepareDC(int nWidth, int nHeight)
 	RECT rect = {0,0,nWidth,nHeight};
 	FillRect(m_hMemDC,&rect,(HBRUSH)(COLOR_WINDOW));
 
+	::ReleaseDC(m_hWnd,hWinDC);
 	m_bIsInitialized = TRUE;
 	return TRUE;
 }
@@ -1213,3 +1320,13 @@ void CPictureEx::EnumGIFBlocks()
 	TRACE(_T("\n"));
 }
 #endif // GIF_TRACING
+
+BOOL CPictureEx::SetPaintRect(const RECT *lpRect)
+{
+	return CopyRect(&m_PaintRect, lpRect);
+}
+
+BOOL CPictureEx::GetPaintRect(RECT *lpRect)
+{
+	return CopyRect(lpRect, &m_PaintRect);
+}

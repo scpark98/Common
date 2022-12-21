@@ -114,7 +114,10 @@ EZIni ini(_T("D:\\ServerInfo.ini"), TRUE);
 */
 
 #pragma once
+
+#include <afxwin.h>
 #include <deque>
+#include <ATLComTime.h>
 
 class EZIni
 {

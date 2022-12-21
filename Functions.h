@@ -223,20 +223,15 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 #define MakeArray3(TYPE,VARNAME,C1,C2,C3)  TYPE (*VARNAME)[C2][C3] = (TYPE (*)[C2][C3]) new TYPE[C1*C2*C3]; AutoEraser < TYPE > Auto##VARNAME(VARNAME)
 
 
-//½Ó¿ÚÊÍ·Å
 #define SAFE_RELEASE(pObject) { if (pObject!=NULL) { pObject->Release(); pObject=NULL; } }
 
-//É¾³ýÖ¸Õë
 #define SAFE_DELETE(pData) { try { delete pData; } catch (...) { ASSERT(FALSE); } pData=NULL; } 
 
-//¹Ø±Õ¾ä±ú
 #define SAFE_CLOSE_HANDLE(hHandle) { if (hHandle!=NULL) { CloseHandle(hHandle); hHandle=NULL; } }
 
-//É¾³ýÊý×é
 #define SAFE_DELETE_ARRAY(pData) { try { delete [] pData; } catch (...) { ASSERT(FALSE); } pData=NULL; } 
 
 //////////////////////////////////////////////////////////////////////////////////
-//´ò¿ªÁ´½Ó
 #define SHELL_OPEN(String)	ShellExecute(NULL, TEXT("open"), String, NULL, NULL, SW_SHOWNORMAL);
 
 #define MAP_STYLE(src, dest) if(dwStyle & (src)) dwText |= (dest)
@@ -411,6 +406,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	bool		Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase);
 	int			find_string(CString target, CString find_string, bool case_sensitive = false);
 	//dqSrc¿¡ dqFind°¡ ÀÖ´ÂÁö °Ë»ç. ÇöÀç´Â AND ¿¬»êÀÌ¹Ç·Î dqFindÀÇ ¸ðµç ¿ø¼Ò°¡ dqSrc¿¡ Æ÷ÇÔµÇ¾î ÀÖ¾î¾ß ÇÔ.
+	bool		find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord = false, bool bCaseSensitive = false);
 	bool		find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op = '&', bool bWholeWord = false, bool bCaseSensitive = false);
 	int			Find_Divide_Position_By_Punctuation( CString str );
 	int			FindStringFromArray( CStringArray& ar, CString sTarget, bool bCaseSensitive = false, bool bWholeWord = false );
@@ -479,7 +475,14 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	}
 
 	//strÀÇ from À§Ä¡ ÀÌÈÄ¿¡ ÀÖ´Â ¼ýÀÚ ¿µ¿ª°ªÀ» num¿¡ ³Ö¾îÁÖ°í ¼ýÀÚ ½ÃÀÛÀ§Ä¡¸¦ returnÇÑ´Ù.
-	int			extract_digit_number( char *str, int from, double *num );
+	int	extract_digit_number( char *str, int from, double *num );
+
+	//version string valid check
+	//digits : ÀÚ¸´¼ö(1.0.0.1ÀÏ °æ¿ì´Â ÀÚ¸´¼ö 4)
+	bool valid_version_string(CString versionStr, int digits);
+	//±×³É ¹®ÀÚ¿­·Î ºñ±³ÇÏ¸é 1.0.9.0ÀÌ 1.0.10.0º¸´Ù ´õ Å©´Ù°í ³ª¿À¹Ç·Î .À» ¾ø¾Ø ¼ýÀÚ·Î ºñ±³ÇÑ´Ù.
+	//¸®ÅÏ°ªÀº strcmp¿Í µ¿ÀÏÇÑ ±ÔÄ¢À¸·Î ÆÇ´ÜÇÑ´Ù.(+:ver0°¡ Å­, -:ver1ÀÌ Å­, 0:°°À½)
+	int	compare_version_string(CString ver0, CString ver1, TCHAR separator = '.');
 
 	//http://yeobi27.tistory.com/280
 	//A2W, A2T ¹× ±× ¹Ý´ë ¸ÅÅ©·ÎµéÀº ½ºÅÃÀ» »ç¿ëÇÏ¹Ç·Î ¹®Á¦ ¼ÒÁö°¡ ÀÖ°í Å©±â Á¦ÇÑµµ ÀÖÀ¸¹Ç·Î
@@ -620,6 +623,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	int			GetFileTypeFromFilename( CString filename );
 	int			GetFileTypeFromExtension( CString sExt );
 	bool		ChangeExtension(CString& filepath, CString newExt, bool applyRealFile);
+	CString		normalize_path(CString& filepath);
 
 	//Æú´õ¿¡ ÀÖ´Â ÆÄÀÏµé Áß filetitleÀÌ°í extension¿¡ ÇØ´çÇÏ´Â ÆÄÀÏ¸íÀ» ¸®ÅÏÇÑ´Ù.
 	std::deque<CString>		get_filename_from_filetitle(CString folder, CString filetitle, CString extension);
@@ -666,6 +670,9 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//Content-Type: multipart/form-data Çü½ÄÀ» ÀÌ¿ëÇÑ À¥¼­¹ö·ÎÀÇ ÆÄÀÏ Àü¼Û ÇÔ¼ö
 	bool		HttpUploadFile(CString url, CString filepath, int chatIndex);
 
+//webView2 Runtime
+	bool		is_WebView2Runtime_installed();
+	bool		install_WebView2Runtime(CString runtimeExePath, bool silentInstall);
 
 //////////////////////////////////////////////////////////////////////////
 //Æú´õ °ü·Ã
@@ -715,6 +722,8 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//Ç®ÆÐ½º¸¦ ÁÖ¸é Æú´õ¸¦ ÀÚµ¿À¸·Î ¸¸µé¾îÁØ´Ù.
 	bool		recursive_make_full_directory(LPCTSTR sFolder);
 	bool		make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa = NULL);
+
+	CString		normalized_path(CString& path);
 
 	//Æú´õ³»ÀÇ Æ¯Á¤ ¹®ÀÚ¿­ÀÌ µé¾î°£ ÆÄÀÏµéÀ» Áö¿î´Ù. ÇÏÀ§Æú´õ Áö¿ø¾ÈÇÔ.
 	void		DeleteFilesBySubString( CString sFolder, CString filenameSubStr, bool bMatchWholeWordOnly = FALSE, bool bMatchCase = FALSE );
@@ -954,6 +963,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN );
 	void		DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN );
 	void		DrawRectangle( CDC*	pDC, CRect Rect, COLORREF crColor = RGB(0,0,0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN );
+	void		DrawRectangle(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		DrawSunkenRect( CDC* pDC, CRect Rect, bool bSunken = TRUE, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int nWidth = 1 );
 	void		DrawEllipse(CDC* pDC, int cx, int cy, int rx, int ry, COLORREF crLine, COLORREF crFill, int nPenStyle = PS_SOLID, int nWidth = 1, int nDrawMode = R2_COPYPEN);
 	void		drawCircle( CDC* pDC, int xMidPoint,  int yMidPoint,  int radius);

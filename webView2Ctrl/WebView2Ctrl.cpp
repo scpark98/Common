@@ -221,6 +221,14 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		wvWnd10->get_Profile(&m_profile);
 		*/
 
+		//아래 두 줄을 사용하면 아래 URL과 같이 접근 가능하다.
+		//exe 파일 밑에 html이라는 폴더를 만들고 그 안에 cam_capture.html이 있는 경우의 예제.
+		//m_web.navigate(_T("https://appassets/cam_capture.html"));
+		//wil::com_ptr<ICoreWebView2_3> wvWnd3 = m_webView.try_query<ICoreWebView2_3>();
+		//result = wvWnd3->SetVirtualHostNameToFolderMapping(L"appassets", L"html", COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+
+
+
 		//put_IsMuted는 1.0.1072.54부터 사용 가능
 		//m_webView->put_IsMuted(FALSE);
 
@@ -355,7 +363,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 			{
 				COREWEBVIEW2_PERMISSION_KIND kind;
 				args->get_PermissionKind(&kind);
-				if (kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
+				if (true)//kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
 				{
 					//args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
 					args->put_State(m_permission_request_mode);

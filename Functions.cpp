@@ -405,6 +405,13 @@ int	find_string(CString target, CString find_string, bool case_sensitive)
 	return target.Find(find_string);
 }
 
+bool find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, bool bCaseSensitive)
+{
+	std::deque<CString> dqFind(1);
+	dqFind[0] = strFind;
+	return find_dqstring(dqSrc, dqFind, '&', bWholeWord, bCaseSensitive);
+}
+
 //dqSrc에 dqFind가 있는지 검사. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
 bool find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op, bool bWholeWord, bool bCaseSensitive)
 {
@@ -735,6 +742,26 @@ bool ChangeExtension(CString& filepath, CString newExt, bool applyRealFile)
 
 	filepath = sNewFullPath;
 	return true;
+}
+
+//경로상에 "\\.." 또는 "/.."이 들어있으면 실제 경로로 재구성해준다.
+//c:/abc/def/../../test.txt => c:/abc/def/../../test.txt
+CString	normalize_path(CString& filepath)
+{
+	DWORD  retval = 0;
+	TCHAR buffer[MAX_PATH] = _T("");
+
+	retval = GetFullPathName(filepath, MAX_PATH, buffer, NULL);
+
+	if (retval == 0)
+	{
+		TRACE(_T("GetFullPathName() error"));
+		return filepath;
+	}
+
+	filepath = buffer;
+
+	return filepath;
 }
 
 //폴더에 있는 파일들 중 filetitle이고 extension에 해당하는 파일명을 리턴한다.
@@ -2222,7 +2249,7 @@ CString DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd/*=NULL*/
 	TRY
 	{
 		CInternetSession mysession;
-	CHttpFile *remotefile = (CHttpFile*)mysession.OpenURL(sUrl,1,INTERNET_FLAG_TRANSFER_BINARY | INTERNET_FLAG_RELOAD);
+	CHttpFile* remotefile = (CHttpFile*)mysession.OpenURL(sUrl,1,INTERNET_FLAG_TRANSFER_BINARY | INTERNET_FLAG_RELOAD);
 
 	ULONGLONG dwSize = remotefile->GetLength();
 	if (hWnd != NULL)
@@ -4586,6 +4613,12 @@ void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor /*= 0*/
 
 	pDC->SetROP2(nOldDrawMode);
 }
+
+void DrawRectangle(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill /*= NULL_BRUSH*/, int nWidth/* = 1*/, int nPenStyle/* = PS_SOLID*/, int nDrawMode /* = R2_COPYPEN*/)
+{
+	DrawRectangle(pDC, CRect(x1, y1, x2, y2), crColor, crFill, nWidth, nPenStyle, nDrawMode);
+}
+
 
 void DrawRectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill /*= NULL_BRUSH*/, int nWidth/* = 1*/, int nPenStyle/* = PS_SOLID*/, int nDrawMode /* = R2_COPYPEN*/)
 {
@@ -11895,6 +11928,36 @@ int extract_digit_number(char *str, int from, double *num)
 	return first_pos;
 }
 
+//version string valid check
+//digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
+bool valid_version_string(CString versionStr, int digits)
+{
+	std::deque<CString> token = GetTokenString(versionStr, _T("."));
+	if (token.size() == digits)
+		return true;
+
+	return false;
+}
+
+//그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로 .을 없앤 숫자로 비교한다.
+//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:ver0가 큼, -:ver1이 큼, 0:같음)
+int	compare_version_string(CString ver0, CString ver1, TCHAR separator)
+{
+	ver0.Remove(separator);
+	ver1.Remove(separator);
+
+	int v0 = _ttol(ver0);
+	int v1 = _ttol(ver1);
+
+	if (v0 > v1)
+		return 1;
+	else if (v0 < v1)
+		return -1;
+
+	return 0;
+}
+
+
 //button의 종류를 리턴한다.
 UINT		getButtonStyle(HWND hWnd)
 {
@@ -13593,4 +13656,87 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		fclose(fd);
 	}
 	return bRes;
+}
+
+//webView2 Runtime
+bool is_WebView2Runtime_installed()
+{
+	//VS에서 이 프로젝트를 실행하여 WebView2를 설치하면 HKEY_CURRENT_USER에 기록이 반영되고
+	//urlscheme을 통해서 KoinoAVCSupporter.exe -> WebView2를 설치하면 HKEY_LOCAL_MACHINE에 기록이 남는다.
+	//webview2를 uninstall하면(Microsoft Edge WebView2 런타임) 두 곳 모두 제거된다.
+	LONG result1 = IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+	LONG result2 = IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+
+	if (result1 != ERROR_SUCCESS && result2 != ERROR_SUCCESS)
+		return false;
+	return true;
+}
+
+bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
+{
+	LONG result1 = -1;// IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+	LONG result2 = -1;// IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+
+	if (!PathFileExists(runtimeExePath))
+		return false;
+
+	ShellExecute(NULL, _T("open"), runtimeExePath, (silentInstall ? _T("/silent /install") : NULL), NULL, SW_SHOWNORMAL);
+
+	while (result1 != ERROR_SUCCESS && result2 != ERROR_SUCCESS)
+	{
+		Wait(1000);
+		result1 = IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+		result2 = IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+		TRACE(_T("waiting for installation to complete WebView2 Runtime...\n"));
+	}
+	TRACE(_T("WebView2 Runtime installed successfully.\n"));
+
+	if (silentInstall)
+		return true;
+
+	//logWrite(LOG_LEVEL_RELEASE, _T("WebView2 Runtime installed successfully."));
+	Wait(1000);
+
+	//HANDLE hProcess = NULL;
+	HWND hWnd = NULL;
+	int wait_count = 0;
+	//설치가 완료되면 설치와 관련된 창은 모두 닫아준다.
+	do
+	{
+		hWnd = GetHWndByExeFilename(_T("MicrosoftEdgeWebView2RuntimeInstallerX64.exe"));
+		//hProcess = GetProcessHandleFromHwnd(hWnd);
+		if (hWnd != INVALID_HANDLE_VALUE)
+			TerminateProcess(hWnd, 0);
+		else
+			break;
+
+		Wait(500);
+
+		wait_count++;
+
+		if (wait_count > 10)
+			break;
+	} while (hWnd != INVALID_HANDLE_VALUE);
+	CloseHandle(hWnd);
+
+	wait_count = 0;
+	do
+	{
+		hWnd = GetHWndByExeFilename(_T("MicrosoftEdgeUpdate.exe"));
+		if (hWnd != INVALID_HANDLE_VALUE)
+			TerminateProcess(hWnd, 0);
+		else
+			break;
+		Wait(500);
+
+		wait_count++;
+
+		if (wait_count > 10)
+			break;
+
+	} while (hWnd != INVALID_HANDLE_VALUE);
+
+	CloseHandle(hWnd);
+
+	return true;
 }

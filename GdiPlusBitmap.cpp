@@ -1,5 +1,7 @@
 ﻿#include "GdiplusBitmap.h"
-#include "../Common/Functions.h"
+#include "Functions.h"
+#include "MemoryDC.h"
+#include <thread>
 
 CGdiplusBitmap::CGdiplusBitmap()
 {
@@ -9,7 +11,8 @@ CGdiplusBitmap::CGdiplusBitmap()
 CGdiplusBitmap::CGdiplusBitmap(Bitmap* src)
 {
 	release();
-	m_pBitmap = src;
+	//m_pBitmap = new Gdiplus::Bitmap((src);
+	resolution();
 }
 
 CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
@@ -60,9 +63,32 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 	resolution();
 }
 
+//gif이미지를 각 프레임별로 stream을 구하고 이를 로딩하려 했으나
+//gdiplus에서는 한번에 gif를 로딩하는 api를 제공하므로
+//이 함수를 사용하지 않는다.
+CGdiplusBitmap::CGdiplusBitmap(IStream* pStream)
+{
+	release();
+
+	Gdiplus::Bitmap* temp = Bitmap::FromStream(pStream, TRUE);
+
+	m_pBitmap = new Gdiplus::Bitmap(temp->GetWidth(), temp->GetHeight(), PixelFormat32bppARGB);
+
+	Graphics g(m_pBitmap);
+
+	Gdiplus::SolidBrush brush_tr(Gdiplus::Color(0, 0, 0, 0));
+	g.FillRectangle(&brush_tr, 0, 0, temp->GetWidth(), temp->GetHeight());
+
+	g.DrawImage(temp, 0, 0);
+
+	SAFE_DELETE(temp);
+
+	resolution();
+}
+
 CGdiplusBitmap::CGdiplusBitmap(CString sFile, bool show_error)
 {
-	load(sFile);
+	load(sFile, show_error);
 }
 
 CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
@@ -73,7 +99,7 @@ CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
 
 CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id, bool show_error)
 {
-	load(lpType, id);
+	load(lpType, id, show_error);
 }
 
 bool CGdiplusBitmap::load(CString sFile, bool show_error)
@@ -88,20 +114,39 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 	//LPCWSTR wFile = CString2LPCWSTR(sFile);
 	//temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 
+	//temp로 읽어서 deep_copy해주지 않으면
+	//열린 파일은 lock걸린 상태가 되어 삭제 또는 파일명 변경 등의 수정이 불가능하다.
+	//단점은 animatedGif 파일일 경우 그와 관련된 정보를 얻을 수 없다.
+	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
+	//앱의 용도에 따라 우선 하드코딩한다.
+	bool use_copied_open = false;
+
 #ifdef UNICODE
-	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(sFile);
+	if (use_copied_open)
+		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(sFile);// Gdiplus::Bitmap(sFile);
+	else
+		m_pBitmap = Gdiplus::Bitmap::FromFile(sFile); //new Gdiplus::Bitmap(sFile);
 #else
 	USES_CONVERSION;
 	LPCWSTR wFile = A2W(sFile);
-	temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
+	if (use_copied_open)
+		temp.m_pBitmap = new Gdiplus::Bitmap(wFile);
+	else
+		m_pBitmap = new Gdiplus::Bitmap(wFile);
 #endif
 
+	bool open_success = false;
 
-	if (!temp.empty())// m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+	if (use_copied_open && !temp.empty())
+		open_success = true;
+	else if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+		open_success = true;
+
+	if (open_success)
 	{
-		//temp로 읽어서 deep_copy해주지 않으면
-		//열린 파일은 lock걸린 상태가 되어 접근할 수 없게 된다.
+		if (use_copied_open)
 		temp.deep_copy(this);
+
 		resolution();
 
 		if (width == 0 || height == 0)
@@ -115,6 +160,7 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 			return false;
 		}
 
+		m_filename = sFile;
 		return true;
 	}
 
@@ -133,7 +179,7 @@ void CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 
 	sType.MakeLower();
 
-	if (sType == _T("png") || sType == _T("jpg"))
+	if (sType == _T("png") || sType == _T("jpg") || sType == _T("gif"))
 	{
 		m_pBitmap = GetImageFromResource(sType, id);
 	}
@@ -144,6 +190,7 @@ void CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 
 	if (m_pBitmap)
 	{
+		m_filename = _T("resource_image.") + sType;
 		resolution();
 	}
 }
@@ -184,9 +231,16 @@ CGdiplusBitmap::~CGdiplusBitmap()
 
 void CGdiplusBitmap::release()
 {
+	if (m_run_thread_animation)
+	{
+		m_run_thread_animation = false;
+		Wait(500);
+	}
+
 	SAFE_DELETE(m_pBitmap);
 	SAFE_DELETE_ARRAY(data);
 	width = height = channel = stride = 0;
+	m_filename.Empty();
 }
 
 //---------------------------------------------------------------
@@ -230,6 +284,8 @@ void CGdiplusBitmap::resolution()
 	width = m_pBitmap->GetWidth();
 	height = m_pBitmap->GetHeight();
 	channel = channels();
+
+	check_animate_gif();
 }
 
 bool CGdiplusBitmap::get_raw_data()
@@ -438,13 +494,6 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 	resolution();
 
 	//save(_T("d:\\temp\\rotated_fit.png"));
-}
-
-bool is_equal(Color cr0, Color cr1, int channel)
-{
-	bool equal = true;
-	//if (cr0.)
-	return equal;
 }
 
 void CGdiplusBitmap::fit_to_image(Color remove_back_color)
@@ -808,6 +857,36 @@ void CGdiplusBitmap::set_colorkey(Color low, Color high)
 	g.DrawImage(m_pBitmap, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
+bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel)
+{
+	return (cr0.GetValue() == cr1.GetValue());
+
+	if (channel == 1)
+	{
+
+	}
+	else if (channel == 3)
+	{
+		if (cr0.GetRed() == cr1.GetRed() &&
+			cr0.GetGreen() == cr1.GetGreen() &&
+			cr0.GetBlue() == cr1.GetBlue())
+			return true;
+	}
+	else if (channel == 4)
+	{
+		if (cr0.GetAlpha() == 0 && cr1.GetAlpha() == 0)
+			return true;
+
+		if (cr0.GetRed() == cr1.GetRed() &&
+			cr0.GetGreen() == cr1.GetGreen() &&
+			cr0.GetBlue() == cr1.GetBlue() &&
+			cr0.GetAlpha() == cr1.GetAlpha())
+			return true;
+	}
+
+	return false;
+}
+
 int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 {
 	UINT  num = 0;          // number of image encoders
@@ -841,7 +920,12 @@ int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
 bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 {
-	if (empty())
+	return save(m_pBitmap, filename);
+}
+
+bool CGdiplusBitmap::save(Gdiplus::Bitmap *bitmap, CString filename)
+{
+	if (!bitmap)
 		return false;
 
 	CLSID				encoderClsid;
@@ -852,6 +936,8 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 		GetEncoderClsid(L"image/jpeg", &encoderClsid);
 	else if (ext == _T("png"))
 		GetEncoderClsid(L"image/png", &encoderClsid);
+	else if (ext == _T("gif"))
+		GetEncoderClsid(L"image/gif", &encoderClsid);
 	else if (ext == _T("bmp"))
 		GetEncoderClsid(L"image/bmp", &encoderClsid);
 	else
@@ -870,7 +956,7 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 	*/
 	Status s;
 
-	s = m_pBitmap->Save(CStringW(filename), &encoderClsid);// , & encoderParameters);
+	s = bitmap->Save(CStringW(filename), &encoderClsid);// , & encoderParameters);
 
 	if (s == Ok)
 		return true;
@@ -950,3 +1036,215 @@ bool copyBitmapIntoClipboard(Window& window, const Bitmap& in) {
 	return true;
 }
 */
+//
+void CGdiplusBitmap::check_animate_gif()
+{
+	m_run_thread_animation = false;
+	m_frame_index = 0;
+
+	UINT count = 0;
+	count = m_pBitmap->GetFrameDimensionsCount();
+	GUID* pDimensionIDs = new GUID[count];
+
+	// Get the list of frame dimensions from the Image object.
+	m_pBitmap->GetFrameDimensionsList(pDimensionIDs, count);
+
+	// Get the number of frames in the first dimension.
+	m_total_frame = m_pBitmap->GetFrameCount(&pDimensionIDs[0]);
+	TRACE(_T("m_total_frame = %d\n"), m_total_frame);
+
+	// Assume that the image has a property item of type PropertyItemEquipMake.
+	// Get the size of that property item.
+	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
+
+	// Allocate a buffer to receive the property item.
+	m_pPropertyItem = (PropertyItem*)malloc(nSize);
+
+	m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_pPropertyItem);
+
+	delete pDimensionIDs;
+}
+
+//gif 프레임 이미지들을 저장
+bool CGdiplusBitmap::save_gif_frames(CString folder)
+{
+	//현재 재생중이었다면 재생 정보를 기억해놓는다.
+	bool is_playing = !m_paused;
+	if (is_playing)
+	{
+		m_paused = !m_paused;
+		Wait(100);
+	}
+
+	if (!PathIsDirectory(folder))
+	{
+		folder = GetFolderNameFromFullPath(folder);
+	}
+
+	GUID   pageGuid = FrameDimensionTime;
+
+	CString str;
+
+	for (int i = 0; i < m_total_frame; i++)
+	{
+		m_pBitmap->SelectActiveFrame(&pageGuid, i);
+		str.Format(_T("%s\\%s_%04d.png"), folder, GetFileNameFromFullPath(m_filename), i);
+		save(str);
+	}
+
+	if (is_playing)
+	{
+		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+		m_paused = !m_paused;
+	}
+
+	return true;
+}
+
+void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long>& dqDelay)
+{
+	//현재 재생중이었다면 재생 정보를 기억해놓는다.
+	bool is_playing = !m_paused;
+	if (is_playing)
+	{
+		m_paused = !m_paused;
+		Wait(100);
+	}
+
+	GUID   pageGuid = FrameDimensionTime;
+
+	CString str;
+
+	dqImage.clear();
+	dqDelay.clear();
+
+	for (int i = 0; i < m_total_frame; i++)
+	{
+		m_pBitmap->SelectActiveFrame(&pageGuid, i);
+		CGdiplusBitmap* img = new CGdiplusBitmap();
+		deep_copy(img);
+		dqImage.push_back(img);
+		dqDelay.push_back(((long*)m_pPropertyItem->value)[i] * 10);
+	}
+
+	if (is_playing)
+	{
+		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+		m_paused = !m_paused;
+	}
+}
+
+void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool start)
+{
+	if (m_total_frame < 2)
+		return;
+
+	m_displayHwnd = hWnd;
+	m_aniX = x;
+	m_aniY = y;
+	m_aniWidth = (w == 0 ? width : w);
+	m_aniHeight = (h == 0 ? height : h);
+
+	if (start)
+		start_animation();
+}
+
+void CGdiplusBitmap::start_animation()
+{
+	if (m_total_frame < 2)
+		return;
+
+	m_paused = false;
+	m_run_thread_animation = true;
+
+	GUID   pageGuid = FrameDimensionTime;
+	m_frame_index = 0;
+	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+
+	std::thread t(&CGdiplusBitmap::thread_gif_animation, this);
+	t.detach();
+}
+
+void CGdiplusBitmap::pause_animation()
+{
+	if (m_total_frame < 2)
+		return;
+
+	m_paused = !m_paused;
+}
+
+void CGdiplusBitmap::stop_animation()
+{
+	if (m_total_frame < 2)
+		return;
+
+	m_run_thread_animation = false;
+	Wait(500);
+}
+
+void CGdiplusBitmap::thread_gif_animation()
+{
+	if (m_total_frame < 2)
+		return;
+
+	HDC hDC = GetDC(m_displayHwnd);
+	CDC* pDC = CDC::FromHandle(hDC);
+	CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
+
+	//CRect Rect = r;
+	//CWnd* pParent = CWnd::FromHandle(m_displayHwnd);
+	//ASSERT(pParent);
+	//pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
+	////copy what's on the parents at this point
+	//CDC* pParentDC = pParent->GetDC();
+	//CDC MemDC;
+	//CBitmap bmp;
+	//MemDC.CreateCompatibleDC(pParentDC);
+	//bmp.CreateCompatibleBitmap(pParentDC, Rect.Width(), Rect.Height());
+	//CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+	//MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pParentDC, Rect.left, Rect.top, SRCCOPY);
+	//pParentDC->BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+	//MemDC.SelectObject(pOldBmp);
+	//pParent->ReleaseDC(pParentDC);
+	//MemDC.DeleteDC();
+
+	while (m_run_thread_animation)
+	{
+		if (m_paused)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			continue;
+		}
+
+		GUID   pageGuid = FrameDimensionTime;
+
+		if (hDC)
+		{
+			CMemoryDC dc(pDC, &r);
+			Graphics g(dc.m_hDC, r);
+
+			//Graphics g(hDC, r);
+			//배경색을 투명하게 한다 해도 이미지의 투명 영역이
+			//parent에서도 투명하게 표시되진 않는다.
+			//parent의 영역을 그려준 후 이미지를 그려줘야 한다.
+			if (!is_equal(m_crBack, Gdiplus::Color(0, 0, 0, 0), 4))
+			{
+				Gdiplus::SolidBrush brush_tr(m_crBack);
+				g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+			}
+
+			g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+		}
+
+		m_frame_index++;
+		if (m_frame_index >= m_total_frame)
+			m_frame_index = 0;
+
+		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+
+		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
+		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+	}
+
+	ReleaseDC(m_displayHwnd, hDC);
+}

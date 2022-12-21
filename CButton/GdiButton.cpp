@@ -283,8 +283,14 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 CGdiButton& CGdiButton::text(CString text)
 {
 	m_text = text;
+	SetWindowText(m_text);
 	UpdateSurface();
 	return *this;
+}
+
+CGdiButton& CGdiButton::text_color(COLORREF normal)
+{
+	return text_color(normal, normal, normal, normal);
 }
 
 CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
@@ -298,6 +304,11 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 
 	UpdateSurface();
 	return *this;
+}
+
+CGdiButton& CGdiButton::back_color(COLORREF normal)
+{
+	return back_color(normal, normal, normal, normal);
 }
 
 CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)

@@ -123,7 +123,9 @@ public:
 	//void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	CGdiButton& text(CString text);
 	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	CGdiButton& text_color(COLORREF normal);
 	CGdiButton& back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	CGdiButton& back_color(COLORREF normal);
 	CGdiButton& text_color() { m_cr_text.clear(); }
 	CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]

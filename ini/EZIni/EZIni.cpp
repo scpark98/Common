@@ -1,4 +1,4 @@
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "EZIni.h"
 #include <algorithm>
 #include <Shlwapi.h>

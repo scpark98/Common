@@ -4,12 +4,29 @@
 scpark.
 기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CGdiplusBitmap이라는 하나의 클래스로 합치고
 Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
+
+- 20221217. animatedGif 추가
+	//다른 이미지 포맷과는 달리 내부 쓰레드에서 parent의 DC에 디스플레이 함.
+
+	//외부 파일 로딩 방법
+	m_gif.load(_T("D:\\media\\test_image\\test.gif"));
+
+	//리소스 로딩 방법. 반드시 .gif를 .bin과 같이 다른 이름으로 변경 후 리소스 추가할 것.
+	m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
+
+	//로딩 후 parent의 DC 및 좌표를 넘겨주면 자동 재생됨.
+	m_gif.init_animation(m_hWnd);// , 0, 0, 150, 130, true);
+
+	//save_gif_frames()를 이용하여 각 프레임을 저장 가능.
+
+	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 만드는 것이 좋을듯하다...
 */
 
 #include <afxwin.h>
 #include <gdiplus.h>
 #include <stdint.h>	//for uint8_t in vs2015
 #include <algorithm>
+#include <vector>
 
 using namespace Gdiplus;
 
@@ -23,6 +40,7 @@ public:
 	CGdiplusBitmap();
 	CGdiplusBitmap(Bitmap* src);
 	CGdiplusBitmap(HBITMAP hBitmap);
+	CGdiplusBitmap(IStream* pStream);
 	CGdiplusBitmap(CString pFile, bool show_error = false);
 	CGdiplusBitmap(CGdiplusBitmap* src);
 	CGdiplusBitmap(CString lpType, UINT id, bool show_error = false);
@@ -49,8 +67,8 @@ public:
 	int		channels();
 	CSize	size() { return CSize(width, height); }
 
-	CRect	draw(CDC* pDC, CRect dstr, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
-	CRect	draw(CDC* pDC, int dx = 0, int dy = 0, int dw = 0, int dh = 0, CRect* targetRect = NULL, Color crBack = Color(255, 0, 0, 0));
+	CRect	draw(CDC* pDC, CRect dstr, CRect* targetRect = NULL, Gdiplus::Color crBack = Gdiplus::Color::Transparent);
+	CRect	draw(CDC* pDC, int dx = 0, int dy = 0, int dw = 0, int dh = 0, CRect* targetRect = NULL, Gdiplus::Color crBack = Gdiplus::Color::Transparent);
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void	clone(CGdiplusBitmap* dst);
@@ -64,7 +82,7 @@ public:
 	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
 	//그럴 경우는 auto_resize를 true로 주고 불필요한 배경이 생겼을 경우는
 	//불필요한 배경의 색상을 지정하여 이미지 크기를 fit하게 줄일수도 있다.
-	void rotate(float degree, bool auto_resize = false, Color remove_back_color = Color(0,0,0,0));
+	void rotate(float degree, bool auto_resize = false, Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
 
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
@@ -73,9 +91,9 @@ public:
 	void sub_image(int x, int y, int w, int h);
 	void sub_image(CRect r);
 	void sub_image(Gdiplus::Rect r);
-	void fit_to_image(Color remove_back_color = Color(0, 0, 0, 0));
-	void set_colorkey(Color low, Color high);
-	bool is_equal(Color cr0, Color cr1, int channel = 3);
+	void fit_to_image(Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
+	void set_colorkey(Gdiplus::Color low, Gdiplus::Color high);
+	bool is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
 
 	void set_matrix(ColorMatrix *colorMatrix, ColorMatrix *grayMatrix = NULL);
 	void set_transparent(float transparent);
@@ -87,7 +105,8 @@ public:
 	void convert2gray();
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
-	bool save(CString filename);// , ULONG quality/* = 100*/);
+	bool save(CString filepath);
+	bool save(Gdiplus::Bitmap *bitmap, CString filepath);
 	bool copy_to_clipbard();
 
 	int width = 0;
@@ -95,95 +114,42 @@ public:
 	int channel = 0;
 	int stride = 0;
 
+	//animatedGif
+	void	set_animation(HWND hWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
+	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
+	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }
+	void	start_animation();
+	void	pause_animation();
+	void	stop_animation();
+	//gif 프레임 이미지들을 지정된 폴더에 저장
+	bool	save_gif_frames(CString folder);
+	//gif 프레임 이미지들을 추출해서 직접 display할 수 있다.
+	void	get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long> &dqDelay);
+
+	int		ani_width() { return m_aniWidth; }
+	int		ani_height() { return m_aniHeight; }
+	int		ani_width(int dpwidth) { m_aniWidth = dpwidth; return m_aniWidth; }
+	int		ani_height(int dpheight) { m_aniHeight = dpheight; return m_aniHeight; }
+
 protected:
+	CString			m_filename = _T("untitled");
 	void resolution();
 	Bitmap* GetImageFromResource(CString lpType, UINT id);
+
+	//animatedGif
+	UINT			m_total_frame;
+	UINT			m_frame_index;
+	bool			m_bIsInitialized;
+	bool			m_paused = false;
+	PropertyItem*	m_pPropertyItem;
+	HWND			m_displayHwnd;
+	int				m_aniX;
+	int				m_aniY;
+	int				m_aniWidth;
+	int				m_aniHeight;
+	Gdiplus::Color	m_crBack = Gdiplus::Color::Transparent;
+	bool			m_run_thread_animation = false;
+
+	void check_animate_gif();
+	void thread_gif_animation();
 };
-
-#if 0
-class CGdiplusBitmapResource : public CGdiplusBitmap
-{
-protected:
-	HGLOBAL m_hBuffer;
-
-public:
-	CGdiplusBitmapResource()					{ m_hBuffer = NULL; }
-	CGdiplusBitmapResource(LPCTSTR pName, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
-												{ m_hBuffer = NULL; Load(pName, pType, hInst); }
-	CGdiplusBitmapResource(UINT id, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
-												{ m_hBuffer = NULL; Load(id, pType, hInst); }
-	CGdiplusBitmapResource(UINT id, UINT type, HMODULE hInst = NULL)
-												{ m_hBuffer = NULL; Load(id, type, hInst); }
-	virtual ~CGdiplusBitmapResource()			{ release(); }
-
-	void release();
-
-	bool Load(LPCTSTR pName, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL);
-	bool Load(UINT id, LPCTSTR pType = RT_RCDATA, HMODULE hInst = NULL)
-												{ return Load(MAKEINTRESOURCE(id), pType, hInst); }
-	bool Load(UINT id, UINT type, HMODULE hInst = NULL)
-												{ return Load(MAKEINTRESOURCE(id), MAKEINTRESOURCE(type), hInst); }
-};
-
-inline
-void CGdiplusBitmapResource::release()
-{
-	CGdiplusBitmap::release();
-	if (m_hBuffer)
-	{
-		::GlobalUnlock(m_hBuffer);
-		::GlobalFree(m_hBuffer);
-		m_hBuffer = NULL;
-	} 
-}
-
-inline
-bool CGdiplusBitmapResource::Load(LPCTSTR pName, LPCTSTR pType, HMODULE hInst)
-{
-	release();
-
-	HRSRC hResource = ::FindResource(hInst, pName, pType);
-	if (!hResource)
-		return false;
-	
-	DWORD imageSize = ::SizeofResource(hInst, hResource);
-	if (!imageSize)
-		return false;
-
-	const void* pResourceData = ::LockResource(::LoadResource(hInst, hResource));
-	if (!pResourceData)
-		return false;
-
-	m_hBuffer  = ::GlobalAlloc(GMEM_MOVEABLE, imageSize);
-	if (m_hBuffer)
-	{
-		void* pBuffer = ::GlobalLock(m_hBuffer);
-		if (pBuffer)
-		{
-			CopyMemory(pBuffer, pResourceData, imageSize);
-
-			IStream* pStream = NULL;
-			if (::CreateStreamOnHGlobal(m_hBuffer, FALSE, &pStream) == S_OK)
-			{
-				m_pBitmap = Gdiplus::Bitmap::FromStream(pStream);
-				pStream->Release();
-				if (m_pBitmap)
-				{ 
-					if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
-					{
-						resolution();
-						return true;
-					}
-
-					delete m_pBitmap;
-					m_pBitmap = NULL;
-				}
-			}
-			::GlobalUnlock(m_hBuffer);
-		}
-		::GlobalFree(m_hBuffer);
-		m_hBuffer = NULL;
-	}
-	return false;
-}
-#endif

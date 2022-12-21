@@ -154,7 +154,10 @@ public:
 	}
 	ICoreWebView2* GetWebView()
 	{
-		return m_webView.get();
+		if (m_webView)
+			return m_webView.get();
+
+		return nullptr;
 	}
 	ICoreWebView2Environment* GetWebViewEnvironment()
 	{

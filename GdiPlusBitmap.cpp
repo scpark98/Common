@@ -1103,6 +1103,9 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 
 void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long>& dqDelay)
 {
+	if (m_total_frame < 2)
+		return;
+
 	//현재 재생중이었다면 재생 정보를 기억해놓는다.
 	bool is_playing = !m_paused;
 	if (is_playing)
@@ -1132,6 +1135,22 @@ void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::
 		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
 		m_paused = !m_paused;
 	}
+}
+
+//총 재생시간을 ms단위로 리턴한다.
+int CGdiplusBitmap::get_total_duration()
+{
+	if (m_total_frame < 2)
+		return 0;
+
+	long total_duration = 0;
+
+	for (int i = 0; i < m_total_frame; i++)
+	{
+		total_duration += ((long*)m_pPropertyItem->value)[i] * 10;
+	}
+
+	return (int)total_duration;
 }
 
 void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool start)

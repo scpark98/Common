@@ -30,6 +30,19 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 - 사용 : m_web.navigate(url);
 - navigate이외의 다른 함수를 사용하고자 한다면 m_web.GetWebView()->Navigate(...)처럼 접근하여 호출.
 - mainDlg의 크기가 바뀌면 m_web.MoveWindow(...)로 크기 조정
+
+[하나은행 메모]
+- C://Program Files (x86)/UCTogether 폴더에서 웹뷰가 포함된 앱을 실행시킬때는
+  반드시 InitializeWebView()의 CreateCoreWebView2EnvironmentWithOptions()호출 시	m_userDataFolder를 줘야만 실행된다.
+  그렇지 않으면 앱이 아예 실행조차 안됨.
+
+[NH투자신탁 메모]
+- n개의 cam중에 특정 캠을 선택하여 웹뷰에 표시하는 기능을 수행할 때(cam_capture.html)
+  해당 html을 파일로 열면 카메라 선택 코드가 동작하지 않는다.
+  ATEC에서 localhost로 웹서버를 구동시키고 http://localhost/cam_capture.html로 해야 장치 선택 가능.
+  (물론 웹뷰2에서도 카메라, 마이크 등에 대한 접근 권한을 항상 허용으로 설정한 상태여야 한다.)
+- html상에서 wav 파일을 재생할때도 이와 동일한 문제가 발생했다.
+- 한글 파일명의 gif가 html 에서 표시되지 않는 문제 발생 -> ATEC에서 웹서버의 encoding을 변경하여 해결.
 */
 
 #include <afxwin.h>

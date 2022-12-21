@@ -8,6 +8,11 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 - 20221217. animatedGif 추가
 	//다른 이미지 포맷과는 달리 내부 쓰레드에서 parent의 DC에 디스플레이 함.
 
+	//헤더에 include 및 멤버변수 선언
+	#include "../../Common/GdiplusBitmap.h"
+	...
+	CGdiplusBitmap m_gif;
+
 	//외부 파일 로딩 방법
 	m_gif.load(_T("D:\\media\\test_image\\test.gif"));
 
@@ -19,7 +24,7 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 	//save_gif_frames()를 이용하여 각 프레임을 저장 가능.
 
-	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 만드는 것이 좋을듯하다...
+	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 변경할 예정
 */
 
 #include <afxwin.h>
@@ -125,6 +130,9 @@ public:
 	bool	save_gif_frames(CString folder);
 	//gif 프레임 이미지들을 추출해서 직접 display할 수 있다.
 	void	get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long> &dqDelay);
+
+	//총 재생시간을 ms단위로 리턴한다.
+	int		get_total_duration();
 
 	int		ani_width() { return m_aniWidth; }
 	int		ani_height() { return m_aniHeight; }

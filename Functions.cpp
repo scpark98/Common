@@ -405,18 +405,18 @@ int	find_string(CString target, CString find_string, bool case_sensitive)
 	return target.Find(find_string);
 }
 
-bool find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, bool bCaseSensitive)
+int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, bool bCaseSensitive)
 {
 	std::deque<CString> dqFind(1);
 	dqFind[0] = strFind;
-	return find_dqstring(dqSrc, dqFind, '&', bWholeWord, bCaseSensitive);
+	return find_dqstring(dqSrc, dqFind, '|', bWholeWord, bCaseSensitive);
 }
 
 //dqSrc에 dqFind가 있는지 검사. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
-bool find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op, bool bWholeWord, bool bCaseSensitive)
+int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op, bool bWholeWord, bool bCaseSensitive)
 {
 	int i, j;
-	bool found = false;
+	int found_index = -1;
 
 	if (!bCaseSensitive)
 	{
@@ -438,6 +438,7 @@ bool find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR 
 				{
 					//만약 OR 연산이면 여기서 true 리턴
 					found_count++;
+					found_index = j;
 					if (op == '|')
 						break;
 				}
@@ -448,6 +449,7 @@ bool find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR 
 				{
 					//만약 OR 연산이면 여기서 true 리턴
 					found_count++;
+					found_index = j;
 					if (op == '|')
 						break;
 				}
@@ -462,16 +464,16 @@ bool find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR 
 	if (op == '&')
 	{
 		if (found_count == dqFind.size())
-			return true;
+			return found_index;
 	}
 	//OR이면 하나만 존재해도 true
 	else
 	{
 		if (found_count > 0)
-			return true;
+			return found_index;
 	}
 
-	return false;
+	return found_index;
 }
 
 //클립보드 clipboard

@@ -405,9 +405,9 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 //문자열
 	bool		Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase);
 	int			find_string(CString target, CString find_string, bool case_sensitive = false);
-	//dqSrc에 dqFind가 있는지 검사. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
-	bool		find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord = false, bool bCaseSensitive = false);
-	bool		find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op = '&', bool bWholeWord = false, bool bCaseSensitive = false);
+	//dqSrc에 dqFind가 있는지 검사하여 인덱스를 리턴. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
+	int			find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord = false, bool bCaseSensitive = false);
+	int			find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op = '&', bool bWholeWord = false, bool bCaseSensitive = false);
 	int			Find_Divide_Position_By_Punctuation( CString str );
 	int			FindStringFromArray( CStringArray& ar, CString sTarget, bool bCaseSensitive = false, bool bWholeWord = false );
 	//int			FindStringFromDeque( std::deque<CString> dq, CString sTarget, bool bCaseSensitive = false, bool bWholeWord = false );

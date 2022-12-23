@@ -640,6 +640,8 @@ CString		GetFileNameFromFullPath(CString sFullPath)
 
 CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash)
 {
+	sFullPath.Replace(_T("/"), _T("\\"));
+
 	//sFullPath가 폴더라면 그냥 그 값을 리턴한다.
 	if (PathIsDirectory(sFullPath))
 		return sFullPath;

@@ -118,8 +118,9 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 	//열린 파일은 lock걸린 상태가 되어 삭제 또는 파일명 변경 등의 수정이 불가능하다.
 	//단점은 animatedGif 파일일 경우 그와 관련된 정보를 얻을 수 없다.
 	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
-	//앱의 용도에 따라 우선 하드코딩한다.
-	bool use_copied_open = false;
+	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
+	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
+	bool use_copied_open = (GetFileExtension(sFile).MakeLower() == _T("gif") ? false : true);
 
 #ifdef UNICODE
 	if (use_copied_open)

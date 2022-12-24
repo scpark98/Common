@@ -1568,7 +1568,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
-		if (find_dqstring(dqLine, dqTarget, op))
+		if (find_dqstring(dqLine, dqTarget, op) >= 0)
 		{
 			result->push_back(cur_idx);
 
@@ -1597,7 +1597,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 		std::deque<CString> dqLine = get_line_text_list(i, column_start, column_end);
 
 		//functions에 find_string으로 선언하였으나 인식이 안되서 find_dqstring으로 이름 변경
-		if (find_dqstring(dqLine, dqSrc, bWholeWord, bCaseSensitive))
+		if (find_dqstring(dqLine, dqSrc, bWholeWord, bCaseSensitive) >= 0)
 		{
 			result->push_back(i);
 			if (select)

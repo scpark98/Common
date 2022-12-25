@@ -407,9 +407,25 @@ int	find_string(CString target, CString find_string, bool case_sensitive)
 
 int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, bool bCaseSensitive)
 {
-	std::deque<CString> dqFind(1);
-	dqFind[0] = strFind;
-	return find_dqstring(dqSrc, dqFind, '|', bWholeWord, bCaseSensitive);
+	TCHAR op = '|';
+	std::deque<CString> dqFind;
+
+	if (strFind.Find(_T("&")) >= 0)
+	{
+		op = '&';
+		dqFind = GetTokenString(strFind, _T("&"));
+	}
+	else if (strFind.Find(_T("|")) >= 0)
+	{
+		op = '|';
+		dqFind = GetTokenString(strFind, _T("|"));
+	}
+	else
+	{
+		dqFind.push_back(strFind);
+	}
+
+	return find_dqstring(dqSrc, dqFind, op, bWholeWord, bCaseSensitive);
 }
 
 //dqSrc에 dqFind가 있는지 검사. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
@@ -428,49 +444,57 @@ int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR o
 
 	int found_count = 0;
 
-	for (i = 0; i < dqFind.size(); i++)
+	for (i = 0; i < dqSrc.size(); i++)
 	{
-		for (j = 0; j < dqSrc.size(); j++)
+		found_index = -1;
+		found_count = 0;
+
+		for (j = 0; j < dqFind.size(); j++)
 		{
 			if (bWholeWord)
 			{
-				if (dqFind[i] == dqSrc[j])
+				if (dqFind[j] == dqSrc[i])
 				{
 					//만약 OR 연산이면 여기서 true 리턴
 					found_count++;
-					found_index = j;
+
+					if (found_index < 0)
+						found_index = i;
+
 					if (op == '|')
 						break;
 				}
 			}
 			else
 			{
-				if (dqSrc[j].Find(dqFind[i]) >= 0)
+				if (dqSrc[i].Find(dqFind[j]) >= 0)
 				{
 					//만약 OR 연산이면 여기서 true 리턴
 					found_count++;
-					found_index = j;
+
+					if (found_index < 0)
+						found_index = i;
+
 					if (op == '|')
 						break;
 				}
 			}
 		}
 
-		if (op == '|' && found_count > 0)
-			break;
-	}
+		//AND이면 찾는 문자열이 모두 존재해야 하고
+		if (op == '&')
+		{
+			if (found_count == dqFind.size())
+				return found_index;
+		}
+		//OR이면 하나만 존재해도 true
+		else
+		{
+			if (found_count > 0)
+				return found_index;
+		}
 
-	//AND이면 찾는 문자열이 모두 존재해야 하고
-	if (op == '&')
-	{
-		if (found_count == dqFind.size())
-			return found_index;
-	}
-	//OR이면 하나만 존재해도 true
-	else
-	{
-		if (found_count > 0)
-			return found_index;
+		found_index = -1;
 	}
 
 	return found_index;

@@ -36,6 +36,9 @@ text align과 같이 리스트의 정렬 방식과 header의 정렬 방식을 다르게 설정할 수 있�
 */
 // CVtListCtrlEx
 
+#define LCSB_CLIENTDATA 1
+#define LCSB_NCOVERRIDE 2
+
 #define MESSAGE_VTLISTCTRLEX	WM_USER + 0x7FFF - 0x7464
 
 class CVtListCtrlEx : public CListCtrl
@@ -45,6 +48,12 @@ class CVtListCtrlEx : public CListCtrl
 public:
 	CVtListCtrlEx();
 	virtual ~CVtListCtrlEx();
+
+	BOOL NCOverride;
+	int Who;
+
+	BOOL m_bHorizLine = TRUE;
+	void HideScrollBars(int Type, int Which = SB_BOTH);
 
 	enum VtListCtrlExMsgs
 	{
@@ -170,6 +179,7 @@ public:
 	void	set_progress_color(COLORREF crProgress);
 
 //편집 관련
+	//리소스의 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
 	void	allow_edit(bool allow_edit = true);
 	void	allow_edit_column(int column, bool allow_edit = true);
 	bool	is_in_editing()	{ return m_in_editing; }	//편집중인지

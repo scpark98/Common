@@ -31,6 +31,9 @@ CVtListCtrlEx::CVtListCtrlEx()
 	m_last_clicked = 0;
 
 	memset( &m_lf, 0, sizeof( LOGFONT ) );
+
+	NCOverride = FALSE; //False as default...
+	Who = SB_BOTH; //Default remove both...
 }
 
 CVtListCtrlEx::~CVtListCtrlEx()
@@ -58,6 +61,52 @@ END_MESSAGE_MAP()
 
 
 // CVtListCtrlEx message handlers
+void CVtListCtrlEx::HideScrollBars(int Type, int Which)
+{
+	if (Type == LCSB_CLIENTDATA) //This is the clientrect function
+	{
+		RECT ierect;
+		int cxvs, cyvs;
+		GetClientRect(&ierect); //Get client width and height
+
+		cxvs = GetSystemMetrics(SM_CXVSCROLL); //Get the system metrics - VERT
+		cyvs = GetSystemMetrics(SM_CYVSCROLL); //Get the system metrics - HORZ
+
+		if (Which == SB_HORZ) cxvs = 0; //Set VERT to zero when choosen HORZ
+		if (Which == SB_VERT) cyvs = 0; //Set HORZ to zero when choosen VERT
+
+		//Here we set the position of the window to the clientrect + the size of the scrollbars
+		SetWindowPos(NULL, ierect.left, ierect.top, ierect.right + cxvs, ierect.bottom + cyvs, SWP_NOMOVE | SWP_NOZORDER);
+
+		//Her we modify the rect so the right part is subbed from the rect.
+		if (Which == SB_BOTH || Which == SB_HORZ) ierect.bottom -= ierect.top;
+		if (Which == SB_BOTH || Which == SB_VERT) ierect.right -= ierect.left;
+
+		//Just to be safe that the left/top corner is 0...
+		ierect.top = 0;
+		ierect.left = 0;
+
+		HRGN iehrgn = NULL; //This range is created base on which scrollbar that is going to be removed!
+
+		//The -2 is probably a border of some kind that we also need to remove. I could not find any good
+		//metrics that gave me an 2 as an answer. So insted we makes it static with -2.
+		if (Which == SB_BOTH) iehrgn = CreateRectRgn(ierect.left, ierect.top, ierect.right - 2, ierect.bottom - 2);
+		if (Which == SB_HORZ) iehrgn = CreateRectRgn(ierect.left, ierect.top, ierect.right, ierect.bottom - 2);
+		if (Which == SB_VERT) iehrgn = CreateRectRgn(ierect.left, ierect.top, ierect.right - 2, ierect.bottom);
+
+		//After the range has been made we add it...
+		SetWindowRgn(iehrgn, TRUE);
+
+		//Reset of NCOverride
+		NCOverride = FALSE;
+	}
+
+	if (Type == LCSB_NCOVERRIDE) //This is the NcCalcSize override
+	{
+		NCOverride = TRUE; //Set to true, so we run the code on each OnNcCalcSize.
+		Who = Which; //Selects which scrollbars to get hidden.
+	}
+}
 
 
 
@@ -671,6 +720,12 @@ void CVtListCtrlEx::PreSubclassWindow()
 
 	// voila!
 	m_HeaderCtrlEx.SubclassWindow(pHeader->m_hWnd);
+
+	LONG lStyleOld = GetWindowLong(GetSafeHwnd(), GWL_STYLE);
+	lStyleOld &= ~(LVS_TYPEMASK);
+	lStyleOld |= LVS_REPORT;
+
+	SetWindowLong(GetSafeHwnd(), GWL_STYLE, lStyleOld | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER);
 
 	ASSERT(pHeader->m_hWnd != NULL);
 #endif

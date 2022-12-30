@@ -505,6 +505,12 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	CString		TCHAR2CString(TCHAR *str);
 	VARIANT		CString2VARIANT( CString str );
 
+	CStringA	UTF16toUTF8(const CStringW& utf16);
+	CStringW	UTF8toUTF16(const CStringA& utf8);
+	CString		UTF8toCString(char* pszCode);
+
+
+
 	//공백, '\t', '\r', '\n', '\0' 모두 제거
 	void		trim(char* src);
 	void		trim(std::string &str);
@@ -616,9 +622,9 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
-	CString		GetFileNameFromFullPath(CString sFullPath);
-	CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash = false);	//= PathRemoveFileSpec
-	CString		GetFileTitle(CString sFullPath);
+	CString		GetFileNameFromFullPath(CString fullpath);
+	CString		GetFolderNameFromFullPath(CString fullpath, bool includeSlash = false);	//= PathRemoveFileSpec
+	CString		GetFileTitle(CString fullpath);
 	CString		GetFileExtension(CString filename, bool dot = false);
 	int			GetFileTypeFromFilename( CString filename );
 	int			GetFileTypeFromExtension( CString sExt );
@@ -666,9 +672,18 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	void		GetURLFileInfo( CString sURL, bool &bInURL, bool &bFileType );
 	bool		ReadURLFile( LPCTSTR pUrl, CString &strBuffer );
 	void		ReadURLFileString( CString sURL, CString &sString );
+
+	//url상의 파일의 내용을 읽거나 로컬 파일로 다운로드 한다.
+	//local_path가 지정되어 있으면 파일로 다운받고(이때 리턴값은 "ok", 에러가 있을 경우는 에러 메시지)
+	//없으면 문자열로 리턴받는다.
+	CString		get_uri(CString full_remote_url, CString local_path = _T(""));
+	CString		get_uri(CString ip, int port, CString remote_path, CString local_path = _T(""));
+
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
 	bool		HttpUploadFile(CString url, CString filepath, int chatIndex);
+	bool		HttpDownloadFile(CString url, CString local_path = _T(""));
+
 
 //webView2 Runtime
 	bool		is_WebView2Runtime_installed();

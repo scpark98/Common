@@ -365,7 +365,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				args->get_PermissionKind(&kind);
 				if (true)//kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
 				{
-					//args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+					//args->put_State(COREWEBVIEW2_PERMISSION_STATE_DEFAULT);
 					args->put_State(m_permission_request_mode);
 				}
 				return S_OK;

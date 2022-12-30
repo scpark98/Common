@@ -50,6 +50,7 @@ void CHeaderCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 LRESULT CHeaderCtrlEx::OnLayout(WPARAM, LPARAM lParam)
 {
 	LPHDLAYOUT pHL = reinterpret_cast<LPHDLAYOUT>(lParam);
+	memcpy(&m_HDLayout, pHL, sizeof(HDLAYOUT));
 
 	//*** The table list rectangle
 	RECT* pRect = pHL->prc;
@@ -419,5 +420,6 @@ void CHeaderCtrlEx::set_header_height(int height)
 	//Invalidate();
 	//RedrawWindow();
 	//UpdateWindow();
+	SendMessage(HDM_LAYOUT, 0, (LPARAM)&m_HDLayout);
 }
 

@@ -148,8 +148,8 @@ public:
 
 
 	//버튼의 크기, 위치 변경
-	int			width() { return m_width; }
-	int			height() { return m_height; }
+	int			width();
+	int			height();
 	void		SetAnchor( UINT nAnchor ) { m_nAnchor = nAnchor; }	//정렬 방식 설정
 	void		SetAnchorMargin( int x, int y ) { m_nAnchorMarginX = x; m_nAnchorMarginY = y; }
 	void		ReAlign();	//parent의 크기가 변하면 설정된 align값에 따라 위치를 재조정해준다.

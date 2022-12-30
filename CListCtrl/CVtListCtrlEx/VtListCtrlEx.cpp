@@ -421,7 +421,8 @@ void CVtListCtrlEx::set_column_data_type(int column, int nType, bool invalidate)
 
 void CVtListCtrlEx::set_header_height(int height)
 {
-	m_HeaderCtrlEx.set_header_height(height);
+	if (m_HeaderCtrlEx.m_hWnd != NULL)
+		m_HeaderCtrlEx.set_header_height(height);
 }
 
 void CVtListCtrlEx::set_line_height(int height)
@@ -718,8 +719,11 @@ void CVtListCtrlEx::PreSubclassWindow()
 	ModifyStyle(LVS_TYPEMASK, dwStyle| LVS_OWNERDRAWFIXED| LVS_OWNERDATA);
 	pHeader = GetHeaderCtrl();
 
-	// voila!
-	m_HeaderCtrlEx.SubclassWindow(pHeader->m_hWnd);
+	if (pHeader)
+	{
+		// voila!
+		m_HeaderCtrlEx.SubclassWindow(pHeader->m_hWnd);
+	}
 
 	LONG lStyleOld = GetWindowLong(GetSafeHwnd(), GWL_STYLE);
 	lStyleOld &= ~(LVS_TYPEMASK);
@@ -727,7 +731,7 @@ void CVtListCtrlEx::PreSubclassWindow()
 
 	SetWindowLong(GetSafeHwnd(), GWL_STYLE, lStyleOld | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER);
 
-	ASSERT(pHeader->m_hWnd != NULL);
+	//ASSERT(pHeader->m_hWnd != NULL);
 #endif
 	CListCtrl::PreSubclassWindow();
 }
@@ -1292,11 +1296,14 @@ int CVtListCtrlEx::insert_item(int index, std::deque<CString> dqText, bool ensur
 	return index;
 }
 
-int CVtListCtrlEx::insert_items(int index, LPCTSTR pszText, ...)
+int CVtListCtrlEx::insert_item(int index, LPCTSTR pszText, ...)
 {
+	if (index < 0)
+		index = size();
+
 	index = insert_item(index, pszText);
 
-	if ( get_column_count() == 1 )
+	if (get_column_count() == 1)
 		return index;
 
 	int subItem = 1;

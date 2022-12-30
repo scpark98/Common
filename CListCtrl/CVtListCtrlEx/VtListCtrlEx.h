@@ -100,7 +100,7 @@ public:
 	int			insert_item(int index, CString text = _T(""), bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, bool ensureVisible = true, bool invalidate = true);
 	//가변 파라미터로 전달할 때는 컬럼의 수보다 적은 인수일 경우 반드시 끝 인자는 NULL을 넣어줘야 한다.
-	int			insert_items(int index, LPCTSTR pszText, ...);
+	int			insert_item(int index, LPCTSTR pszText, ...);
 
 	int			size();
 
@@ -179,7 +179,7 @@ public:
 	void	set_progress_color(COLORREF crProgress);
 
 //편집 관련
-	//리소스의 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
+	//리소스의 ListCtrl 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
 	void	allow_edit(bool allow_edit = true);
 	void	allow_edit_column(int column, bool allow_edit = true);
 	bool	is_in_editing()	{ return m_in_editing; }	//편집중인지

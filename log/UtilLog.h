@@ -48,7 +48,7 @@ public:
 	CString GetLogFileFolder();
 
 protected:
-	CString m_logFileName;	
+	CString m_logFileName;
 	CString m_filePath;
 	CString m_processTitle;
 	int m_showLogLevel;

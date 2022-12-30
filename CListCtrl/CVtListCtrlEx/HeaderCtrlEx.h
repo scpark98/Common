@@ -48,6 +48,9 @@ public:
 	int				get_header_height();
 	void			set_header_height(int height);
 
+protected:
+	HDLAYOUT		m_HDLayout;
+
 public:
 
 // Overrides

@@ -654,12 +654,14 @@ CString		GetCurrentDirectory()
 	return sFilePath;
 }
 
-CString		GetFileNameFromFullPath(CString sFullPath)
+CString		GetFileNameFromFullPath(CString fullpath)
 {
-	if (sFullPath.Find(_T("\\")) > 0)
-		return sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('\\') - 1);
+	fullpath.Replace(_T("/"), _T("\\"));
+
+	if (fullpath.Find(_T("\\")) > 0)
+		return fullpath.Right(fullpath.GetLength() - fullpath.ReverseFind('\\') - 1);
 	
-	return sFullPath;
+	return fullpath;
 }
 
 CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash)
@@ -2112,6 +2114,272 @@ bool ReadURLFile(LPCTSTR pUrl, CString &strBuffer)
 		
 		return TRUE; 
 } 
+
+//http://localhost:4300/test_doc_favorite/test.avi
+CString	get_uri(CString full_remote_url, CString local_path)
+{
+	int colon = full_remote_url.Find(_T(":"));
+	bool is_https = true;
+
+	//http 또는 https에 따라 port 추출을 위한 콜론 위치 추출
+	if (full_remote_url.Left(7) == _T("http://"))
+	{
+		colon = full_remote_url.Find(_T(":"), 8);
+		is_https = false;
+	}
+	else if (full_remote_url.Left(8) == _T("https://"))
+	{
+		colon = full_remote_url.Find(_T(":"), 9);
+	}
+	else
+	{
+		return _T("[error] invalid url.");
+	}
+
+	CString ip;
+	CString port;
+	CString remote_path;
+	int slash;
+	
+	if (colon > 0)
+	{
+		ip = full_remote_url.Left(colon);
+		slash = full_remote_url.Find(_T("/"), colon);
+		port = full_remote_url.Mid(colon + 1, slash - colon - 1);
+		remote_path = full_remote_url.Mid(slash);
+	}
+	else
+	{
+		slash = full_remote_url.Find(_T("//"));
+		if (slash > 0)
+		{
+			slash = full_remote_url.Find(_T("/"), slash);
+			ip = full_remote_url.Left(slash);
+			remote_path = full_remote_url.Mid(slash);
+
+			if (is_https)
+				port = _T("443");
+			else
+				port = _T("80");
+		}
+	}
+
+	return get_uri(ip, _ttoi(port), remote_path, local_path);
+}
+
+
+std::wstring multibyteToUnicode(std::string inputtext)
+{
+	int length = MultiByteToWideChar(CP_ACP, 0, &inputtext[0], inputtext.size(), NULL, NULL);
+	std::wstring outputtext(length + 1, 0);
+	MultiByteToWideChar(CP_ACP, 0, &inputtext[0], inputtext.size(), &outputtext[0], length);
+	return outputtext;
+}
+
+std::string unicodeToMultibyte(std::wstring inputtext)
+{
+	int length = WideCharToMultiByte(CP_ACP, 0, &inputtext[0], -1, NULL, 0, NULL, NULL);
+	std::string outputtext(length + 1, 0);
+	WideCharToMultiByte(CP_ACP, 0, &inputtext[0], -1, &outputtext[0], length, NULL, NULL);
+	return outputtext;
+}
+
+std::wstring utf8ToUnicode(std::string inputtext)
+{
+	int length = MultiByteToWideChar(CP_UTF8, 0, &inputtext[0], -1, NULL, NULL);
+	std::wstring outputtext(length + 1, 0);
+	MultiByteToWideChar(CP_UTF8, 0, &inputtext[0], -1, &outputtext[0], length);
+	return outputtext;
+}
+
+std::string unicodeToUtf8(std::wstring inputtext)
+{
+	int length = WideCharToMultiByte(CP_UTF8, 0, &inputtext[0], -1, NULL, 0, NULL, NULL);
+	std::string outputtext(length + 1, 0);
+	WideCharToMultiByte(CP_UTF8, 0, &inputtext[0], -1, &outputtext[0], length, NULL, NULL);
+	return outputtext;
+}
+
+std::string multibyteToUtf8(std::string inputtext)
+{
+	return (unicodeToUtf8(multibyteToUnicode(inputtext)));
+}
+
+CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
+{
+	CString result = _T("ok");
+	CString logStr;
+
+	try
+	{
+		HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+		if (hInternet == NULL)
+		{
+			return _T("[error] InternetOpen Fail");
+		}
+
+		BOOL isHTTPS = FALSE;
+		CString strServerIP = ip;
+
+		if (ip.Find(_T("https://")) >= 0)
+		{
+			isHTTPS = TRUE;
+			strServerIP.Replace(_T("https://"), _T(""));
+		}
+		else if (ip.Find(_T("http://")) >= 0)
+		{
+			isHTTPS = FALSE;
+			strServerIP.Replace(_T("http://"), _T(""));
+		}
+
+		HINTERNET hConnect = InternetConnect(hInternet, strServerIP, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+		if (hConnect == NULL)
+		{
+			::InternetCloseHandle(hInternet);
+			return _T("[error] InternetConnect Fail");
+		}
+
+		int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE; // http
+		if (isHTTPS)
+		{
+			secureFlags = INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
+		}
+
+		USES_CONVERSION;
+		
+		wchar_t strUnicode[256] = { 0, };
+		char    *strMultibyte = CString2char(remote_path);
+		//strcpy_s(strMultibyte, remote_path.GetLength(), remote_path.GetBuffer());
+		int nLen = MultiByteToWideChar(CP_ACP, 0, strMultibyte, strlen(strMultibyte), NULL, NULL);
+		MultiByteToWideChar(CP_ACP, 0, strMultibyte, strlen(strMultibyte), strUnicode, nLen);
+
+		char strUtf8[256] = { 0, };
+		nLen = WideCharToMultiByte(CP_UTF8, 0, strUnicode, lstrlenW(strUnicode), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, strUnicode, lstrlenW(strUnicode), strUtf8, nLen, NULL, NULL);
+		
+		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), unicodeToUtf8(strUnicode).c_str(), NULL, NULL, NULL, secureFlags, 0);
+		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), strUtf8, NULL, NULL, NULL, secureFlags, 0);
+		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), CT2A(remote_path, CP_UTF8), NULL, NULL, NULL, secureFlags, 0);
+		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), remote_path, NULL, NULL, NULL, secureFlags, 0);
+
+		delete[] strMultibyte;
+
+		if (hRequest == NULL)
+		{
+			::InternetCloseHandle(hConnect);
+			hConnect = NULL;
+
+			::InternetCloseHandle(hInternet);
+			hInternet = NULL;
+
+			return _T("[error] HttpOpenRequest Fail");
+		}
+		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/x-www-form-urlencoded\r\n"), -1, HTTP_ADDREQ_FLAG_ADD);
+
+		if (isHTTPS)
+		{
+			DWORD dwFlags;
+			DWORD dwBuffLen = sizeof(dwFlags);
+			InternetQueryOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
+			dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
+			dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
+			InternetSetOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
+		}
+
+		BOOL res = HttpSendRequest(hRequest, NULL, 0, NULL, 0);
+		if (!res)
+		{
+			InternetCloseHandle(hRequest);
+			InternetCloseHandle(hConnect);
+			InternetCloseHandle(hInternet);
+			return _T("[error] HttpSendRequest Fail");
+		}
+
+		HANDLE hFile = NULL;
+
+		//로컬 파일이 저장될 폴더가 존재하지 않으면 생성해준다.
+		if (!local_path.IsEmpty())
+		{
+			if (!PathFileExists(local_path))
+				make_full_directory(local_path);
+
+			hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			if (hFile == INVALID_HANDLE_VALUE)
+			{
+				InternetCloseHandle(hRequest);
+				InternetCloseHandle(hConnect);
+				InternetCloseHandle(hInternet);
+
+				return local_path + _T("\n\nCan't create file.");
+			}
+		}
+
+		int buf_size = 8192;
+		char *chBufAll = new char[buf_size * buf_size];
+		char *chBuf = new char[buf_size];
+		DWORD dwSize = 0;
+		DWORD dwBytesWrite = 0;
+
+		memset(chBuf, 0, buf_size);
+		memset(chBufAll, 0, buf_size);
+
+		int cnt = 0;
+		while (InternetReadFile(hRequest, chBuf, buf_size, &dwSize))
+		{
+			if (dwSize == 0)
+				break;
+
+			if (local_path.IsEmpty())
+			{
+				TRACE(_T("%s"), chBuf);
+
+				for (int i = 0; i < dwSize; i++)
+				{
+					chBufAll[cnt] = chBuf[i];
+					chBuf[i] = 0;
+					cnt++;
+				}
+			}
+			else
+			{
+				if (!WriteFile(hFile, chBuf, dwSize, &dwBytesWrite, NULL))
+				{
+					CloseHandle(hFile);
+
+					InternetCloseHandle(hRequest);
+					InternetCloseHandle(hConnect);
+					InternetCloseHandle(hInternet);
+
+					return local_path + _T("\n\nCan't write file.");
+				}
+				TRACE(_T("%d bytes written.\n"), dwBytesWrite);
+			}
+		}
+
+		if (local_path.IsEmpty())
+		{
+			result = UTF8toCString(chBufAll);
+		}
+		else
+		{
+			CloseHandle(hFile);
+			result = _T("ok");
+		}
+
+		delete[] chBuf;
+		delete[] chBufAll;
+
+		InternetCloseHandle(hRequest);
+		InternetCloseHandle(hConnect);
+		InternetCloseHandle(hInternet);
+
+		return result;
+	}
+	catch (...)
+	{
+		return _T("");
+	}
+}
 
 DWORD	GetURLFileSize(LPCTSTR pUrl)
 {
@@ -4502,7 +4770,12 @@ bool recursive_make_full_directory(LPCTSTR sFolder)
 
 bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
 {
-	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, lpPathName, lpsa));
+	CString folder(lpPathName);
+
+	if (!PathIsDirectory(lpPathName))
+		folder = GetFolderNameFromFullPath(lpPathName);
+
+	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, (LPCTSTR)folder, lpsa));
 }
 
 //이 함수를 사용하려면 반드시 SetBkMode(TRANSPARENT);로 설정해야 효과가 나타남.
@@ -5456,6 +5729,56 @@ char* GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLengt
 
 	fclose(fp);
 	return NULL;
+}
+
+
+CStringA UTF16toUTF8(const CStringW& utf16)
+{
+	CStringA utf8;
+	int len = WideCharToMultiByte(CP_ACP, 0, utf16, -1, NULL, 0, 0, 0);
+	if (len > 1)
+	{
+		char* ptr = utf8.GetBuffer(len - 1);
+		if (ptr) WideCharToMultiByte(CP_ACP, 0, utf16, -1, ptr, len, 0, 0);
+		utf8.ReleaseBuffer();
+	}
+	return utf8;
+}
+
+CStringW UTF8toUTF16(const CStringA& utf8)
+{
+	CStringW utf16;
+	int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+	if (len > 1)
+	{
+		wchar_t* ptr = utf16.GetBuffer(len - 1);
+		if (ptr) MultiByteToWideChar(CP_UTF8, 0, utf8, -1, ptr, len);
+		utf16.ReleaseBuffer();
+	}
+	return utf16;
+}
+
+CString UTF8toCString(char* pszCode)
+{
+	BSTR    bstrWide;
+	char* pszAnsi;
+	int     nLength;
+	// Get nLength of the Wide Char buffer
+	nLength = MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, NULL, NULL);
+	bstrWide = SysAllocStringLen(NULL, nLength);
+	// Change UTF-8 to Unicode (UTF-16)
+	MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, bstrWide, nLength);
+	// Get nLength of the multi byte buffer
+	nLength = WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, NULL, 0, NULL, NULL);
+	pszAnsi = new char[nLength];
+	// Change from unicode to mult byte
+	WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, pszAnsi, nLength, NULL, NULL);
+	SysFreeString(bstrWide);
+
+	CString strResult = (CString)pszAnsi;
+	delete[] pszAnsi;
+
+	return strResult;
 }
 
 /*
@@ -13684,6 +14007,218 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		fclose(fd);
 	}
 	return bRes;
+}
+
+bool HttpDownloadFile(CString url, CString local_path)
+{
+#if 0
+	DWORD dwServiceType = AFX_INET_SERVICE_HTTP;
+	CString szServer, szObject, szInfo;
+
+	INTERNET_PORT nPort;
+	INTERNET_PROXY_INFO m_proxyinfo;
+
+	CInternetSession m_SessionDownload;
+	CHttpConnection* m_pConnection = NULL;
+	CHttpFile* m_pHttpFile = NULL;
+	CFile FileWrite;
+
+	DWORD d_BytesRead = 0;
+	DWORD d_FileSize = 0;
+
+	char szHTTPBuffer[199926];
+
+	ZeroMemory(szHTTPBuffer, sizeof(szHTTPBuffer));
+
+	//start Download Routine
+	::AfxParseURL(url.GetBuffer(url.GetLength()), dwServiceType, szServer, szObject, nPort);
+
+	try
+	{
+		m_pConnection = m_SessionDownload.GetHttpConnection(szServer, INTERNET_FLAG_KEEP_CONNECTION, nPort, NULL, NULL);
+		m_pHttpFile = m_pConnection->OpenRequest("GET", szObject, NULL, 0, NULL, NULL, INTERNET_FLAG_KEEP_CONNECTION);
+	}
+	catch (CInternetException* m_pException)
+	{
+		//exception found
+		//lots of clean up code
+		return false;
+	}
+
+	if (m_pHttpFile)
+	{
+		if (!FileWrite.Open("c:\\scpark\\모듈.pdf", CFile::modeCreate | CFile::modeReadWrite | CFile::shareDenyNone))
+		{
+			//exception found
+			//lots of clean up code
+			return false;
+		}
+
+		try
+		{
+			m_pHttpFile->SendRequest(NULL);
+		}
+		catch (CInternetException* m_pException)
+		{
+			//exception found
+			//lots of clean up code
+			return false;
+		}
+
+		m_pHttpFile->QueryInfo(HTTP_QUERY_CONTENT_LENGTH, d_FileSize);
+		m_pHttpFile->QueryInfo(HTTP_QUERY_MAX, szInfo);
+
+		while (d_BytesRead = m_pHttpFile->Read((void*)szHTTPBuffer, 199926))
+		{
+			FileWrite.Write((void*)szHTTPBuffer, d_BytesRead);
+			memset(szHTTPBuffer, 0, sizeof(szHTTPBuffer));
+		}
+
+		szServer.Empty();
+		szObject.Empty();
+
+		m_SessionDownload.Close();
+		m_pConnection->Close();
+		m_pHttpFile->Close();
+
+		//delete m_SessionDownload;
+		delete m_pConnection;
+		delete m_pHttpFile;
+
+		FileWrite.Close();
+	}
+	return true;
+#endif
+#if 1
+	bool bRes = false;
+
+	USES_CONVERSION;
+
+	WCHAR* pszUrl;
+	WCHAR* pszFilePath;
+
+#ifdef _UNICODE
+	pszUrl = T2W(url.GetBuffer());
+	pszFilePath = T2W(filepath.GetBuffer());
+#else
+	pszUrl = T2W(url);
+	pszFilePath = T2W(local_path);
+#endif
+
+	// pszUrl 에서 host, path 를 가져온다.
+	WCHAR* pszHost = NULL;
+	DWORD dwFlag = INTERNET_FLAG_KEEP_CONNECTION;
+	int iPort = 80;
+
+	if (!_wcsnicmp(pszUrl, L"http://", 7))
+	{
+		pszHost = pszUrl + 7;
+	}
+	else if (!_wcsnicmp(pszUrl, L"https://", 8))
+	{
+		pszHost = pszUrl + 8;
+		dwFlag = INTERNET_FLAG_SECURE;
+		iPort = 443;
+	}
+	else
+	{
+		return false;
+	}
+
+	const WCHAR* pszPath = wcsstr(pszHost, L"/");
+	if (pszPath == NULL)
+	{
+		return false;
+	}
+
+	std::wstring strHost;
+	strHost.append(pszHost, pszPath - pszHost);
+	const WCHAR* pszPort = wcsstr(strHost.c_str(), L":");
+	if (pszPort)
+	{
+		iPort = _wtoi(pszPort + 1);
+		if (iPort <= 0) return false;
+		strHost.erase(pszPort - strHost.c_str());
+	}
+
+	// 파일 경로에서 파일 이름을 가져온다.
+	int iLen = wcslen(pszFilePath);
+	WCHAR* pszFileName = NULL;
+	for (int i = iLen - 1; i >= 0; --i)
+	{
+		if (pszFilePath[i] == L'\\')
+		{
+			pszFileName = pszFilePath + i + 1;
+			break;
+		}
+	}
+
+	// 파일 크기를 가져온다.
+	//struct _stat sttStat;
+	//if (_wstat(pszFilePath, &sttStat) == -1)
+	//{
+	//	return false;
+	//}
+
+	//FILE* fd;
+	//_wfopen_s(&fd, pszFilePath, L"wb");
+
+	//if (fd == NULL)
+	//{
+	//	return false;
+	//}
+	//else
+	{
+		char szBuf[8192];
+		//CString szServer, szObject, szInfo;
+		CInternetSession clsSession;
+		CFile FileWrite;
+		DWORD dBytesRead = 0;
+		DWORD dFileSize = 0;
+		CString szInfo;
+		char szHTTPBuffer[4096];
+
+		//::AfxParseURL(url.GetBuffer(url.GetLength()), AFX_INET_SERVICE_HTTP, 
+
+		// HTTP 연결하고 파일을 전송한다.
+		CHttpConnection* pclsHttpConn = clsSession.GetHttpConnection(CString(strHost.c_str()), dwFlag, (INTERNET_PORT)iPort, NULL, NULL);
+		if (pclsHttpConn)
+		{
+			CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_GET, CString(pszPath));
+			if (pclsHttpFile)
+			{
+				// HTTP 요청 header 를 생성한다.
+				std::wstring strContentType = L"Accept: text";
+				pclsHttpFile->AddRequestHeaders(CString(strContentType.c_str()));// .c_str());
+
+				if (!FileWrite.Open(local_path, CFile::modeCreate | CFile::modeReadWrite | CFile::shareDenyNone))
+				{
+
+				}
+
+				pclsHttpFile->SendRequest(NULL);
+
+				pclsHttpFile->QueryInfo(HTTP_QUERY_CONTENT_LENGTH, dFileSize);
+				pclsHttpFile->QueryInfo(HTTP_QUERY_MAX, szInfo);
+
+				while (dBytesRead = pclsHttpFile->Read((void*)szHTTPBuffer, 4096))
+				{
+					FileWrite.Write((void*)szHTTPBuffer, dBytesRead);
+					memset(szHTTPBuffer, 0, sizeof(szHTTPBuffer));
+					TRACE(_T("%d bytes write.\n"), dBytesRead);
+				}
+
+				FileWrite.Close();
+				pclsHttpFile->Close();
+
+				delete pclsHttpFile;
+			}
+			delete pclsHttpConn;
+		}
+		//fclose(fd);
+	}
+	return bRes;
+#endif
 }
 
 //webView2 Runtime

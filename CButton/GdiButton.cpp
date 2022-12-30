@@ -670,7 +670,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					//down_state ? GetSysColor(COLOR_3DLIGHT) : GetSysColor(COLOR_3DSHADOW)
 				);
 				if (is_down)
-					r.OffsetRect(-1, -1);
+					r.OffsetRect(1, 1);
 			}
 
 			rText = r;
@@ -1101,7 +1101,6 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	if (m_fit2image)
 	{
-
 	}
 	else
 	{
@@ -1109,4 +1108,30 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 		m_height = cy;
 		resize_control(cx, cy);
 	}
+}
+
+int	CGdiButton::width()
+{
+	if (m_image.size() == 0)
+	{
+		CRect rc;
+		GetClientRect(rc);
+		m_width = rc.Width();
+		m_height = rc.Height();
+	}
+
+	return m_width;
+}
+
+int	CGdiButton::height()
+{
+	if (m_image.size() == 0)
+	{
+		CRect rc;
+		GetClientRect(rc);
+		m_width = rc.Width();
+		m_height = rc.Height();
+	}
+
+	return m_height;
 }

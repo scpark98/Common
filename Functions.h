@@ -248,7 +248,8 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
    area = bit;\
 }
 
-void debug_string( const char* psz, ... );
+void printf_string(const char* psz, ... );
+void trace(LPCTSTR format, ...);
 
 template < typename T > class AutoEraser
 {
@@ -682,6 +683,9 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
 	bool		HttpUploadFile(CString url, CString filepath, int chatIndex);
+
+	//서버의 한글명 파일에 대한 처리때문에 get_uri()함수 대신 추가하여 테스트 해봤으나
+	//서버측의 문제인듯하여 우선 이 함수 사용은 보류중...
 	bool		HttpDownloadFile(CString url, CString local_path = _T(""));
 
 

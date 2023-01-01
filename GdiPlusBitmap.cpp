@@ -1052,7 +1052,7 @@ void CGdiplusBitmap::check_animate_gif()
 
 	// Get the number of frames in the first dimension.
 	m_total_frame = m_pBitmap->GetFrameCount(&pDimensionIDs[0]);
-	TRACE(_T("m_total_frame = %d\n"), m_total_frame);
+	//TRACE(_T("m_total_frame = %d\n"), m_total_frame);
 
 	// Assume that the image has a property item of type PropertyItemEquipMake.
 	// Get the size of that property item.

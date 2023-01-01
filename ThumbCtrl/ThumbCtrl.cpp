@@ -997,7 +997,7 @@ void CThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		InvalidateRect(m_rScroll);
 	}
 	//나타날때는 바로, 사라질때는 fade out된다.
-	else// if (m_scroll_trans == 0.0)
+	else if (m_scroll_trans == 0.0)
 	{
 		m_scroll_trans = 1.0;
 		InvalidateRect(m_rScroll);
@@ -1075,6 +1075,7 @@ void CThumbCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 
 	menu.AppendMenu(MF_STRING, idFind, _T("찾기...(&F)"));
 	menu.AppendMenu(MF_STRING, idReload, _T("새로 고침(&R)"));
+	menu.AppendMenu(MF_STRING, idSortByTitle, _T("타이틀로 정렬(&S)"));
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, idCopyToClipboard, _T("복사(&C)"));
@@ -1157,6 +1158,9 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload, 0), 0);
 		break;
 
+	case idSortByTitle :
+		sort_by_title();
+		break;
 	case idCopyToClipboard :
 		if (m_dqThumb.size() == 0)
 			break;
@@ -1404,7 +1408,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			else if (m_per_line == 2)
 				m_szGap.cx = rest / (m_per_line);
 			else
-				m_szGap.cx = rest / (m_per_line - 1);
+				m_szGap.cx += ((double)rest / (double)(m_per_line - 1));
 			break;
 		}
 
@@ -1482,12 +1486,14 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 	for (i = 0; i < m_dqThumb.size(); i++)
 	{
+		trace(_T("draw? = %d (%3d)"), draw, i);
+
 		if (draw && ((rect.top > rc.bottom) || (rect.bottom + 80) < rc.top))
 			skip = true;
 		else
 			skip = false;
 
-		//TRACE(_T("%3d = %d\n"), i, skip);
+		trace(_T(", skip = %d\n"), skip);
 
 		CRect	rTile = rect;
 		CRect	fit;

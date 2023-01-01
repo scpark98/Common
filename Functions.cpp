@@ -2245,6 +2245,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 			secureFlags = INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
 		}
 
+		/*
 		USES_CONVERSION;
 		
 		wchar_t strUnicode[256] = { 0, };
@@ -2260,9 +2261,10 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), unicodeToUtf8(strUnicode).c_str(), NULL, NULL, NULL, secureFlags, 0);
 		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), strUtf8, NULL, NULL, NULL, secureFlags, 0);
 		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), CT2A(remote_path, CP_UTF8), NULL, NULL, NULL, secureFlags, 0);
-		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), remote_path, NULL, NULL, NULL, secureFlags, 0);
+		*/
+		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), remote_path, NULL, NULL, NULL, secureFlags, 0);
 
-		delete[] strMultibyte;
+		//delete[] strMultibyte;
 
 		if (hRequest == NULL)
 		{
@@ -12400,8 +12402,11 @@ bool IsEditCtrlAcceptKeyState(CWnd *pWnd)
 }
 
 
-void debug_string(const char* psz, ...)
+void printf_string(const char* psz, ...)
 {
+#ifndef _DEBUG
+	return;
+#endif
 	char buffer[4096];
 	va_list vaList;
 	va_start(vaList, psz);
@@ -12410,6 +12415,21 @@ void debug_string(const char* psz, ...)
 
 	printf(buffer);
 	TRACE(buffer);
+}
+
+void trace(LPCTSTR format, ...)
+{
+#ifndef _DEBUG
+	return;
+#endif
+	va_list args;
+	va_start(args, format);
+
+	CString str;
+	str.FormatV(format, args);
+	va_end(args);
+
+	OutputDebugString(str);
 }
 
 //not tested
@@ -14009,8 +14029,11 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 	return bRes;
 }
 
+//서버의 한글명 파일에 대한 처리때문에 get_uri()함수 대신 추가하여 테스트 해봤으나
+//서버측의 문제인듯하여 우선 이 함수 사용은 보류중...
 bool HttpDownloadFile(CString url, CString local_path)
 {
+	return false;
 #if 0
 	DWORD dwServiceType = AFX_INET_SERVICE_HTTP;
 	CString szServer, szObject, szInfo;
@@ -14089,7 +14112,7 @@ bool HttpDownloadFile(CString url, CString local_path)
 	}
 	return true;
 #endif
-#if 1
+#if 0
 	bool bRes = false;
 
 	USES_CONVERSION;

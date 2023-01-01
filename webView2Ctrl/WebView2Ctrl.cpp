@@ -239,6 +239,9 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		CHECK_FAILURE(m_webView->get_Settings(&m_webSettings));
 		m_webSettings->put_IsScriptEnabled(TRUE);
 		m_webSettings->put_IsWebMessageEnabled(TRUE);
+		
+		//FALSE로 하지 않으면 statusbar 영역에 링크가 표시됨
+		m_webSettings->put_IsStatusBarEnabled(FALSE);
 
 		NewComponent<ViewComponent>
 			(this, m_dcompDevice.get(),

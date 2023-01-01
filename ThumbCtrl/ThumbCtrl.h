@@ -139,6 +139,7 @@ public:
 		idTotalCount = WM_USER + 1234,
 		idFind,
 		idReload,
+		idSortByTitle,
 		idCopyToClipboard,
 		idToggleIndex,
 		idToggleResolution,

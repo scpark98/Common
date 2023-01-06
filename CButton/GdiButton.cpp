@@ -47,11 +47,11 @@ CGdiButton::CGdiButton()
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	m_grayMatrix = {
-		0.30f, 0.30f, 0.30f, 0.00f, 0.00f,
-		0.59f, 0.59f, 0.59f, 0.00f, 0.00f,
-		0.11f, 0.11f, 0.11f, 0.00f, 0.00f,
+		0.299f, 0.299f, 0.299f, 0.00f, 0.00f,
+		0.587f, 0.587f, 0.587f, 0.00f, 0.00f,
+		0.114f, 0.114f, 0.114f, 0.00f, 0.00f,
 		0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-		0.00f, 0.00f, 0.00f, 0.00f, 1.00f
+		0.50f, 0.50f, 0.50f, 0.00f, 1.00f		//버튼 disable일때 회색조가 좀 어두워서 0.50f로 변경함.
 	};
 
 	m_hoverMatrix = {
@@ -202,7 +202,7 @@ void CGdiButton::fit_to_image(bool fit)
 	UpdateSurface();
 }
 
-void CGdiButton::select(int index)
+void CGdiButton::active_index(int index, bool bErase)
 {
 	if (index < 0 || index >= m_image.size())
 		return;
@@ -290,7 +290,7 @@ CGdiButton& CGdiButton::text(CString text)
 
 CGdiButton& CGdiButton::text_color(COLORREF normal)
 {
-	return text_color(normal, normal, normal, normal);
+	return text_color(normal, normal, normal, gray_color(normal));
 }
 
 CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
@@ -308,12 +308,14 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 
 CGdiButton& CGdiButton::back_color(COLORREF normal)
 {
-	return back_color(normal, normal, normal, normal);
+	return back_color(normal, normal, normal, gray_color(normal));
 }
 
 CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
 	//배경색을 설정하면 배경 이미지는 해제시킨다.
+	m_transparent = false;
+
 	m_back.release();
 	m_back_origin.release();
 
@@ -914,7 +916,7 @@ bool CGdiButton::GetCheck()
 	return m_idx;
 }
 
-void CGdiButton::UpdateSurface()
+void CGdiButton::UpdateSurface(bool bErase)
 {
 	if (m_transparent)
 	{
@@ -924,7 +926,7 @@ void CGdiButton::UpdateSurface()
 		//RedrawWindow();
 
 		GetParent()->ScreenToClient(&rc);
-		GetParent()->InvalidateRect(rc, false);
+		GetParent()->InvalidateRect(rc, bErase);
 		//GetParent()->UpdateWindow();
 	}
 	else

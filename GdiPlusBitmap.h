@@ -48,7 +48,7 @@ public:
 	CGdiplusBitmap(IStream* pStream);
 	CGdiplusBitmap(CString pFile, bool show_error = false);
 	CGdiplusBitmap(CGdiplusBitmap* src);
-	CGdiplusBitmap(CString lpType, UINT id, bool show_error = false);
+	CGdiplusBitmap(CString sType, UINT id, bool show_error = false);
 
 	virtual ~CGdiplusBitmap();
 

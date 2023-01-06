@@ -2205,6 +2205,11 @@ std::string multibyteToUtf8(std::string inputtext)
 	return (unicodeToUtf8(multibyteToUnicode(inputtext)));
 }
 
+std::string utf8ToMultibyte(std::string inputtext)
+{
+	return (unicodeToMultibyte(utf8ToUnicode(inputtext)));
+}
+
 CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 {
 	CString result = _T("ok");
@@ -2276,7 +2281,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 			return _T("[error] HttpOpenRequest Fail");
 		}
-		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/x-www-form-urlencoded\r\n"), -1, HTTP_ADDREQ_FLAG_ADD);
+		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json; charset=utf-8"), -1, HTTP_ADDREQ_FLAG_ADD);
 
 		if (isHTTPS)
 		{
@@ -5781,6 +5786,24 @@ CString UTF8toCString(char* pszCode)
 	delete[] pszAnsi;
 
 	return strResult;
+}
+
+CString utf8ToCString(std::string inputtext)
+{
+#ifdef _UNICODE
+	return CString(utf8ToUnicode(inputtext).c_str());
+#else
+	return CString(utf8ToMultibyte(inputtext).c_str());
+#endif // _UNICODE
+}
+
+std::string CStringToUtf8(CString inputtext)
+{
+#ifdef _UNICODE
+	return unicodeToUtf8(inputtext.operator LPCWSTR());
+#else
+	return multibyteToUtf8(inputtext.operator LPCSTR());
+#endif
 }
 
 /*

@@ -116,7 +116,9 @@ public:
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
 
-	void		select(int index);
+	//간혹 투명PNG의 경우 parent에서 어떤 방식의 그리기냐에 따라 배경 갱신이 제대로 안될때가 있다.
+	void		active_index(int index, bool bErase = false);
+	int			active_index() { return m_idx; }
 
 	void		release_all();
 
@@ -137,7 +139,7 @@ public:
 	virtual CGdiButton&		SetFontSize( int nSize );
 	virtual CGdiButton&		SetFontBold( bool bBold = true );
 
-	void		UpdateSurface();
+	void		UpdateSurface(bool bErase = false);
 
 	bool		GetCheck();
 	void		SetCheck( bool bCkeck );

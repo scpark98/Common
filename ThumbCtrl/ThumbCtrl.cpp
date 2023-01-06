@@ -75,7 +75,12 @@ void CThumbCtrl::release(int index)
 {
 	for (int i = 0; i < m_dqThumb.size(); i++)
 	{
-		SAFE_DELETE(m_dqThumb[i].img);
+		if (m_dqThumb[i].img->valid())
+		{
+			m_dqThumb[i].img->release();
+			delete m_dqThumb[i].img;
+		}
+
 		SAFE_DELETE_ARRAY(m_dqThumb[i].feature);
 	}
 
@@ -83,8 +88,11 @@ void CThumbCtrl::release(int index)
 }
 
 //index == -1이면 전체 삭제
+//이 함수는 파일삭제인듯한데 뭔가 코드 미완성된듯하므로 우선 스킵한다.
 void CThumbCtrl::remove(int index, bool bRepaint /*= false*/)
 {
+	return;
+
 	if (index < 0)
 	{
 		m_dqThumb.clear();
@@ -223,11 +231,13 @@ void CThumbCtrl::OnPaint()
 	}
 	else if (m_dqThumb.size() == 0)
 	{
-		str = _T("No images to display.");
+		str = _T("표시할 이미지가 없습니다.");
 		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 		//DrawTextShadow(&dc, str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, GRAY64, red);
 		//DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), rc,
 		//	DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, 0, red, 2, 4);
+		DrawRectangle(&dc, rc, GRAY192);
+
 		return;
 	}
 
@@ -305,6 +315,7 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 	if (reset)
 	{
+		m_selected.clear();
 		release(-1);
 	}
 
@@ -315,6 +326,7 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 		m_loading_completed = true;
 		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
+		Invalidate();
 		return;
 	}
 
@@ -868,6 +880,8 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 					else
 					{
 						m_selected.erase(m_selected.begin() + selected_index);
+						::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+							(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_unselected, selected_index), 0);
 					}
 				}
 				//선택되지 않은 항목이라면 선택리스트에 추가한다.
@@ -888,11 +902,17 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 						}
 
 						for (j = MIN(i, last_selected); j <= MAX(i, last_selected); j++)
+						{
 							m_selected.push_back(j);
+							::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+								(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
+						}
 					}
 					else
 					{
 						m_selected.push_back(i);
+						::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+							(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
 					}
 				}
 			}
@@ -904,8 +924,21 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 					m_last_clicked = 0;
 
 				//단일 선택이면 기존 선택리스트를 초기화하고 선택리스트에 새로 넣어준다.
+				if (!m_use_multi_selection)
 				m_selected.clear();
-				m_selected.push_back(i);
+
+				if (selected_index >= 0)
+				{
+					m_selected.erase(m_selected.begin() + selected_index);
+					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_unselected, selected_index), 0);
+				}
+				else
+				{
+					m_selected.push_back(i);
+					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
+				}
 			}
 
 			//선택된 항목이 rc안에 다 안들어오고 일부만 보이면 다 보이도록 스크롤 시켜준다.
@@ -916,13 +949,20 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				ensure_visible(i);
 			}
 
+#ifdef _DEBUG
+			for (int j = 0; j < m_selected.size(); j++)
+				trace(_T("%d "), m_selected[j]);
+			trace(_T("\n"));
+#endif
 			Invalidate();
 			return;
 		}
 	}
 
 	//클릭된 곳이 썸네일 영역이 아니면 선택을 해제시켜준다.
-	m_selected.clear();
+	if (!m_use_multi_selection)
+		m_selected.clear();
+
 	Invalidate();
 
 	CWnd::OnLButtonDown(nFlags, point);
@@ -1082,6 +1122,7 @@ void CThumbCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 	menu.AppendMenu(MF_SEPARATOR);	
 
 	menu.AppendMenu(MF_STRING, idToggleIndex, _T("인덱스 표시"));
+	menu.AppendMenu(MF_STRING, idToggleTitle, _T("타이틀 표시"));
 	menu.AppendMenu(MF_STRING, idToggleResolution, _T("해상도 정보 표시"));
 	//menu.AppendMenu(MF_STRING, idPromptMaxThumb, _T("Set max thumbnails(&A)(0 : no limits)..."));
 	menu.AppendMenu(MF_SEPARATOR);
@@ -1091,6 +1132,7 @@ void CThumbCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 	//menu.AppendMenu(MF_STRING, idRemoveAll, _T("모든 썸네일 삭제...(&R)"));
 
 	menu.CheckMenuItem(idToggleIndex, m_show_index ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(idToggleTitle, m_show_title ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(idToggleResolution, m_show_resolution ? MF_CHECKED : MF_UNCHECKED);
 
 	ClientToScreen(&point);
@@ -1137,6 +1179,12 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 	case idToggleIndex:
 		m_show_index = !m_show_index;
 		AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("show index"), m_show_index);
+		Invalidate();
+		break;
+
+	case idToggleTitle:
+		m_show_title = !m_show_title;
+		AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("show title"), m_show_title);
 		Invalidate();
 		break;
 
@@ -1486,14 +1534,14 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 	for (i = 0; i < m_dqThumb.size(); i++)
 	{
-		trace(_T("draw? = %d (%3d)"), draw, i);
+		//trace(_T("draw? = %d (%3d)"), draw, i);
 
 		if (draw && ((rect.top > rc.bottom) || (rect.bottom + 80) < rc.top))
 			skip = true;
 		else
 			skip = false;
 
-		trace(_T(", skip = %d\n"), skip);
+		//trace(_T(", skip = %d\n"), skip);
 
 		CRect	rTile = rect;
 		CRect	fit;
@@ -1723,16 +1771,61 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	if (m_max_line == 1 && (dqOneLineHeight.size() <= m_dqThumb.size()))
 		m_per_line = dqOneLineHeight.size();
 
+	//선택 항목 표시
 	if (draw)
 	{
+		Gdiplus::Graphics g(pDC->GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
+		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+		Color cr_text(128, 255, 24, 16);
+		Gdiplus::Font font(L"Spoqa Han Sans Neo", 32, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+		FontFamily fontFamily(L"맑은 고딕");
+		Gdiplus::SolidBrush br_text(cr_text);
+		Pen pen(Color(64, 0, 0, 255), 8);
+
+		StringFormat format;
+		format.SetAlignment(Gdiplus::StringAlignmentCenter);
+		format.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+
+		GraphicsPath path;
+
 		for (i = 0; i < m_selected.size(); i++)
 		{
 			CRect r = m_dqThumb[m_selected[i]].rect;
 			r.top -= 4;
-			DrawRectangle(pDC, r, RGB(0, 128, 255), NULL_BRUSH, 3);
+
+			if (m_img_selection_mark.valid())
+			{
+				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, m_img_selection_mark.width, m_img_selection_mark.height);
+				m_img_selection_mark.draw(pDC, r.left, r.top);
+			}
+			else if (m_use_circle_number)
+			{
+				//g.DrawString(CStringW(i2S(i)), -1, &font, CRect2GpRectF(r), &format, &br_text);
+
+				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
+
+				g.DrawEllipse(&pen, CRect2GpRectF(r));
+				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect2GpRectF(r), &format);
+				for (int j = 0; j < 4; ++j)
+				{
+					Pen pen(Color(128, 64, 64, 64), j);		//윤곽선
+					pen.SetLineJoin(Gdiplus::LineJoinRound);
+					g.DrawPath(&pen, &path);
+				}
+				SolidBrush brush(Color(128, 255, 128, 255));	//글자색
+				g.FillPath(&brush, &path);
+				path.Reset();
+			}
+			else
+			{
+				DrawRectangle(pDC, r, RGB(0, 128, 255), NULL_BRUSH, 3);
+			}
 		}
 	}
 
+	DrawRectangle(pDC, rc, GRAY192);
 	pDC->SelectObject(pOldfont);
 }
 
@@ -1788,6 +1881,9 @@ void CThumbCtrl::select_item(int index, bool select, bool make_ensure_visible)
 		{
 			if (m_selected.size() < m_dqThumb.size())
 				m_selected.resize(m_dqThumb.size());
+
+			m_selected.clear();
+
 			for (i = 0; i < m_dqThumb.size(); i++)
 				m_selected.push_back(i);
 		}
@@ -2264,3 +2360,22 @@ CGdiplusBitmap CThumbCtrl::get_img(int index)
 	return m_dqThumb[index].img;
 }
 #endif
+void CThumbCtrl::set_selection_mark_image(CString image_path, int w, int h)
+{
+	m_img_selection_mark.load(image_path);
+	if (w > 0 && h > 0)
+	{
+		m_img_selection_mark.resize(w, h);
+		m_img_selection_mark.set_transparent(0.7);
+	}
+}
+
+void CThumbCtrl::set_selection_mark_image(CString sType, UINT id, int w, int h)
+{
+	m_img_selection_mark.load(sType, id);
+	if (w > 0 && h > 0)
+	{
+		m_img_selection_mark.resize(w, h);
+		m_img_selection_mark.set_transparent(0.7);
+	}
+}

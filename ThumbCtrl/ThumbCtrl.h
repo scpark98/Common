@@ -61,6 +61,8 @@ public:
 		message_thumb_insert = 0,
 		message_thumb_loading_completed,
 		message_thumb_reload,
+		message_thumb_lbutton_selected,
+		message_thumb_lbutton_unselected,
 		message_thumb_lbutton_dbclicked,
 		message_thumb_rename,
 		message_thumb_keydown,
@@ -142,6 +144,7 @@ public:
 		idSortByTitle,
 		idCopyToClipboard,
 		idToggleIndex,
+		idToggleTitle,
 		idToggleResolution,
 		idPromptMaxThumb,
 		idDeleteThumb,
@@ -192,9 +195,17 @@ public:
 //선택 관련
 	std::deque<int> m_selected;
 	//bool			m_use_selection;		//default = true
-	//bool			m_use_multi_selection;	//default = false, if true, m_bUseSelection will be set to true
+	bool			m_use_multi_selection = true;	//default = false, if true, m_bUseSelection will be set to true
 	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
 	int				get_selected_item();
+
+	bool			m_use_circle_number = false;
+	void			use_circle_number(bool use) { m_use_circle_number = use; Invalidate(); }
+
+	CGdiplusBitmap	m_img_selection_mark;
+	void			set_selection_mark_image(CString image_path, int w = 0, int h = 0);
+	void			set_selection_mark_image(CString sType, UINT id, int w = 0, int h = 0);
+
 	int				get_index_from_point(CPoint pt);
 	//dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
 	int				get_selected_items(std::deque<int> *dqSelected = NULL);
@@ -216,9 +227,18 @@ public:
 	void			remove(int index, bool bRepaint = false);
 	void			remove_selected(bool bRepaint = false);
 	
-//부가 기능
-	int				thumb_count() { return m_dqThumb.size(); }
+	CSize			tile_size() { return m_szTile; }
+	void			tile_size(CSize szTile) { m_szTile = szTile; }
 
+	CSize			margin_size() { return m_szMargin; }
+	void			margin_size(CSize szMargin) { m_szMargin = szMargin; }
+
+	CSize			gap_size() { return m_szGap; }
+	void			gap_size(CSize szGap) { m_szGap = szGap; }
+
+	void			enlarge_size(bool enlarge);
+
+//부가 기능
 	void			show_title(int show);
 	bool			show_title() { return m_show_title; }
 
@@ -275,18 +295,20 @@ protected:
 									//선택 관련
 
 
+	bool			m_show_index;	//썸네일의 인덱스 번호를 표시할지
 	bool			m_show_title;	//썸네일 아래 타이틀 문자열을 표시할지...
 	bool			m_show_resolution;
-	bool			m_show_index;	//썸네일의 인덱스 번호를 표시할지
 	//int				m_title_height;	//타이틀 텍스트 표시 영역의 높이
 	int				m_max_thumbs;	//아이템이 계속 증가하면 메모리도 계속 증가된다. 제한을 둬야 할 경우도 있다. -1이면 제한없음
 	bool			m_has_focus;
 
-	CSize			m_szTile;		//썸네일이 올려질 타일의 크기
-	CSize			m_szMargin;		//썸네일의 시작 여백
-	CSize			m_szGap;		//썸네일 간격
-	CSize			get_tile_size() { return m_szTile; }
-	void			enlarge_size(bool enlarge);
+	//썸네일이 올려질 타일의 크기
+	CSize			m_szTile;
+	//썸네일의 시작 여백
+	CSize			m_szMargin;
+	//썸네일 간격
+	CSize			m_szGap;
+
 
 //스크롤 기능 관련
 	int				m_scroll_pos;

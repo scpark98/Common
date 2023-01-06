@@ -222,9 +222,9 @@ protected:
 	wil::com_ptr<ICoreWebView2Environment2> m_webViewEnvironment2;	//for CreateWebResourceRequest()
 	wil::com_ptr<ICoreWebView2Settings> m_webSettings;
 	wil::com_ptr<ICoreWebView2Controller> m_controller;
-	wil::com_ptr<ICoreWebView2> m_webView;
+	wil::com_ptr<ICoreWebView2> m_webView = nullptr;
 	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
-	//wil::com_ptr<ICoreWebView2Profile> m_profile;
+	wil::com_ptr<ICoreWebView2Profile> m_profile;
 
 	bool m_allow_external_drop = false;
 	LPWSTR m_default_download_path;

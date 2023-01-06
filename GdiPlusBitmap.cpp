@@ -131,9 +131,9 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 	USES_CONVERSION;
 	LPCWSTR wFile = A2W(sFile);
 	if (use_copied_open)
-		temp.m_pBitmap = new Gdiplus::Bitmap(wFile);
+		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 	else
-		m_pBitmap = new Gdiplus::Bitmap(wFile);
+		m_pBitmap = Gdiplus::Bitmap::FromFile(wFile); //new Gdiplus::Bitmap(wFile);
 #endif
 
 	bool open_success = false;

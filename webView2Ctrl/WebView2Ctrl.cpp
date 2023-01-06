@@ -215,11 +215,32 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		coreWebView2.query_to(&m_webView);
 		//m_webView = coreWebView2.get();
 
-		/*
-		* get_Profile을 사용하기 위해서는 NuGet에서 webView2를 1.0.1210.39 이상으로 설치해야 한다.
-		wil::com_ptr<ICoreWebView2_10> wvWnd10 = m_webView.try_query<ICoreWebView2_10>();
-		wvWnd10->get_Profile(&m_profile);
-		*/
+		//get_Profile을 사용하기 위해서는 NuGet에서 webView2를 1.0.1210.39 이상으로 설치해야 한다.
+		//20230104. NH 1293.44로 변경
+		//간혹 cache문제로 새로 변경된 내용이 표시되지 않는 현상이 있다.
+		//html이 변경되어 불가피하게 캐시를 지울때만 지워주자.
+		static bool cache_cleared = true;
+
+		if (!cache_cleared)
+		{
+			wil::com_ptr<ICoreWebView2_13> wvWnd13 = m_webView.try_query<ICoreWebView2_13>();
+			if (wvWnd13)
+			{
+				wvWnd13->get_Profile(&m_profile);
+				auto webView2Profile2 = m_profile.try_query<ICoreWebView2Profile2>();
+				if (webView2Profile2)
+				{
+					webView2Profile2->ClearBrowsingDataAll(Callback<ICoreWebView2ClearBrowsingDataCompletedHandler>(
+						[this](HRESULT error) -> HRESULT {
+							TRACE(L"Completed", L"Clear Browsing Data\n");
+							cache_cleared = true;
+							return S_OK;
+						})
+						.Get());
+				}
+			}
+		}
+
 
 		//아래 두 줄을 사용하면 아래 URL과 같이 접근 가능하다.
 		//exe 파일 밑에 html이라는 폴더를 만들고 그 안에 cam_capture.html이 있는 경우의 예제.
@@ -252,8 +273,10 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 		//EventRegistrationToken token;
 		//m_webView->add_PermissionRequested(this, &token);
-		EventRegistrationToken token;
-		m_webView->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(this, &CWebView2Ctrl::WebMessageReceived).Get(), &token);
+
+
+		//EventRegistrationToken token;
+		//m_webView->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(this, &CWebView2Ctrl::WebMessageReceived).Get(), &token);
 
 		RegisterEventHandlers();
 
@@ -340,6 +363,7 @@ void CWebView2Ctrl::set_permission_request_mode(int mode)
 
 void CWebView2Ctrl::RegisterEventHandlers()
 {
+	//다운로드 시작 이벤트
 	wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
 	CHECK_FAILURE(wvWnd4->add_DownloadStarting(
 		Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
@@ -360,6 +384,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				return S_OK;
 			}).Get(), &m_downloadStartingToken));
 
+	//카메라, 마이크 등 권한 허용 요청 이벤트
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
 		Microsoft::WRL::Callback<ICoreWebView2PermissionRequestedEventHandler>(
 			[this](ICoreWebView2*, ICoreWebView2PermissionRequestedEventArgs* args) -> HRESULT
@@ -650,6 +675,9 @@ void CWebView2Ctrl::OnSize(UINT nType, int cx, int cy)
 	CWnd::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (m_webView == nullptr)
+		return;
+
 	resize();
 }
 

@@ -48,7 +48,7 @@ CColorEdit::CColorEdit()
 	m_bAutoResizeFont = false;
 	m_auto_resize_ratio = 0.5;
 
-	memset(&m_lf, 0, sizeof( LOGFONT ));
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
 CColorEdit::~CColorEdit()

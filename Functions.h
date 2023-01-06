@@ -509,6 +509,12 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	CStringA	UTF16toUTF8(const CStringW& utf16);
 	CStringW	UTF8toUTF16(const CStringA& utf8);
 	CString		UTF8toCString(char* pszCode);
+	CString		utf8ToCString(std::string inputtext);
+	std::string	multibyteToUtf8(std::string inputtext);
+	std::string	utf8ToMultibyte(std::string inputtext);
+
+
+	std::string	CStringToUtf8(CString inputtext);
 
 
 

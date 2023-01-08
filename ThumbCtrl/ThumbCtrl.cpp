@@ -853,7 +853,7 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		{
 			int selected_index = find_index(&m_selected, i);
 
-			//컨트롤키를 눌렀으면
+			//컨트롤키를 누르면 m_use_multi_selection이 false라고 해도 다중선택이 가능하다.
 			if (IsCtrlPressed())
 			{
 				int last_selected = 0;
@@ -925,9 +925,9 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 
 				//단일 선택이면 기존 선택리스트를 초기화하고 선택리스트에 새로 넣어준다.
 				if (!m_use_multi_selection)
-				m_selected.clear();
+					m_selected.clear();
 
-				if (selected_index >= 0)
+				if (selected_index >= 0 && m_selected.size() && find_index(&m_selected, selected_index) >= 0)
 				{
 					m_selected.erase(m_selected.begin() + selected_index);
 					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,

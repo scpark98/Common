@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include <afxwin.h>
+#include <afxcmn.h>
+
 #include <limits>
 #include <vector>
 

@@ -1,7 +1,7 @@
 // GraphCtrl.cpp : 구현 파일입니다.
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "GraphCtrl.h"
 
 #define TIMER_START_DEMO	0
@@ -2078,7 +2078,7 @@ void CGraphCtrl::OnPopupMenu( UINT nID )
 						return;
 					}
 
-					CMFCColorDialog dlg( GetLineColor(idx), 0, this );
+					CColorDialog dlg( GetLineColor(idx), 0, this );
 					if ( dlg.DoModal() == IDCANCEL )
 						return;
 

@@ -196,8 +196,13 @@ public:
 	std::deque<int> m_selected;
 	//bool			m_use_selection;		//default = true
 	bool			m_use_multi_selection = true;	//default = false, if true, m_bUseSelection will be set to true
+	//m_use_multi_selection이 false라도 Ctrl키를 누르면 다중 선택이 가능하다.
+	//m_use_multi_selection는 그냥 좌클릭만으로도 다중 선택이 가능하게 할 지에 대한 플래그임.
+	void			use_multi_selection(bool multi_select = true) { m_use_multi_selection = multi_select; }
 	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
 	int				get_selected_item();
+	//dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
+	int				get_selected_items(std::deque<int>* dqSelected = NULL);
 
 	bool			m_use_circle_number = false;
 	void			use_circle_number(bool use) { m_use_circle_number = use; Invalidate(); }
@@ -207,8 +212,7 @@ public:
 	void			set_selection_mark_image(CString sType, UINT id, int w = 0, int h = 0);
 
 	int				get_index_from_point(CPoint pt);
-	//dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
-	int				get_selected_items(std::deque<int> *dqSelected = NULL);
+
 	//index = -1 : 전체선택
 	void			select_item(int index, bool select = true, bool make_ensure_visible = true);
 	void			ensure_visible(int index);

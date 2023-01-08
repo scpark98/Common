@@ -20,7 +20,7 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
 
 	//로딩 후 parent의 DC 및 좌표를 넘겨주면 자동 재생됨.
-	m_gif.init_animation(m_hWnd);// , 0, 0, 150, 130, true);
+	m_gif.set_animation(m_hWnd);// , 0, 0, 150, 130, true);
 
 	//save_gif_frames()를 이용하여 각 프레임을 저장 가능.
 
@@ -34,6 +34,11 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 #include <vector>
 
 using namespace Gdiplus;
+
+enum CGdiplusBitmap_Message
+{
+	msg_gif_frame_changed = WM_USER + 761,
+};
 
 class CGdiplusBitmap
 {

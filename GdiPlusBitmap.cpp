@@ -3,6 +3,31 @@
 #include "MemoryDC.h"
 #include <thread>
 
+class GdiplusDummy
+{
+public:
+	GdiplusDummy()
+	{
+		GdiplusStartupInput gdiplusStartupInput;
+
+		if (::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok)
+		{
+			AfxMessageBox(TEXT("ERROR:Falied to initalize GDI+ library"));
+		}
+	}
+
+	~GdiplusDummy()
+	{
+		::GdiplusShutdown(gdiplusToken);
+	}
+
+protected:
+	GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR gdiplusToken;
+};
+
+static GdiplusDummy gdi_dummy;
+
 CGdiplusBitmap::CGdiplusBitmap()
 {
 	release();
@@ -11,7 +36,16 @@ CGdiplusBitmap::CGdiplusBitmap()
 CGdiplusBitmap::CGdiplusBitmap(Bitmap* src)
 {
 	release();
-	//m_pBitmap = new Gdiplus::Bitmap((src);
+
+	m_pBitmap = new Gdiplus::Bitmap(src->GetWidth(), src->GetHeight(), src->GetPixelFormat());
+	Gdiplus::Rect rect(0, 0, src->GetWidth(), src->GetHeight());
+	Gdiplus::BitmapData bmpData;
+	m_pBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, m_pBitmap->GetPixelFormat(), &bmpData);
+	src->LockBits(&rect, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeUserInputBuf, m_pBitmap->GetPixelFormat(), &bmpData);
+
+	src->UnlockBits(&bmpData);
+	m_pBitmap->UnlockBits(&bmpData);
+
 	resolution();
 }
 
@@ -1254,6 +1288,7 @@ void CGdiplusBitmap::thread_gif_animation()
 			}
 
 			g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+			::SendMessage(m_displayHwnd, msg_gif_frame_changed, (WPARAM)m_pBitmap, (LPARAM)m_frame_index);
 		}
 
 		m_frame_index++;

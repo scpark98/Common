@@ -13970,8 +13970,8 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		if (pclsHttpConn)
 		{
 			int m_secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_KEEP_CONNECTION | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID;
+
 			CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST, CString(pszPath), NULL, 0, NULL, NULL, m_secureFlags);
-			//CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST, CString(pszPath));
 
 			if (pclsHttpFile)
 			{
@@ -14057,6 +14057,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 	}
 	return bRes;
 }
+
 
 //서버의 한글명 파일에 대한 처리때문에 get_uri()함수 대신 추가하여 테스트 해봤으나
 //서버측의 문제인듯하여 우선 이 함수 사용은 보류중...

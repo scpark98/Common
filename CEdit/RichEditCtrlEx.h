@@ -51,6 +51,7 @@ public:
 
 	COLORREF	GetComplementaryColor( COLORREF crColor );
 
+	void		auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
 	void		SetScrollSize( int nLines ) { m_nScrollSize = nLines; }
 
 	virtual		CRichEditCtrlEx& SetFontName( TCHAR *sfontname );

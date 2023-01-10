@@ -106,7 +106,7 @@ public:
 	bool is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
 
 	void set_matrix(ColorMatrix *colorMatrix, ColorMatrix *grayMatrix = NULL);
-	void set_transparent(float transparent);
+	void set_alpha(float transparent);
 	void gray();
 	void negative();
 

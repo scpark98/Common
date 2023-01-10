@@ -122,6 +122,8 @@ public:
 
 	void		release_all();
 
+	void		set_alpha(float alpha);
+
 	//void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	CGdiButton& text(CString text);
 	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);

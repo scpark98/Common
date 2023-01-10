@@ -827,7 +827,7 @@ void CGdiplusBitmap::set_matrix(ColorMatrix* colorMatrix, ColorMatrix* grayMatri
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
-void CGdiplusBitmap::set_transparent(float transparent)
+void CGdiplusBitmap::set_alpha(float transparent)
 {
 	ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
@@ -1234,6 +1234,12 @@ void CGdiplusBitmap::stop_animation()
 
 	m_run_thread_animation = false;
 	Wait(500);
+	RECT r;
+	r.left = m_aniX;
+	r.top = m_aniY;
+	r.right = r.left + m_aniWidth;
+	r.bottom = r.top + m_aniHeight;
+	::InvalidateRect(m_displayHwnd, &r, TRUE);
 }
 
 void CGdiplusBitmap::thread_gif_animation()

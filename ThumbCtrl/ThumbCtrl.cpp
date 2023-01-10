@@ -1598,7 +1598,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			rIndex.top += 2;
 			if (draw && !skip)
 			{
-				pDC->SetTextColor(RGB(255, 255, 255));
+				pDC->SetTextColor(m_crIndex);
 
 				//멀티바이트 환경에서는 DrawShadowText를 쓰기위해서는 manifest를 추가해야 하는 등
 				//번거로워 일단 DrawTextShadow로 대체한다.
@@ -1606,7 +1606,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 				DrawShadowText(pDC->GetSafeHdc(), str, str.GetLength(), rIndex,
 					DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
 #else
-				DrawTextShadow(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP);
+				DrawTextOutline(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP, m_crIndex, m_crIndexShadow);
 #endif
 			}
 		}
@@ -2366,7 +2366,7 @@ void CThumbCtrl::set_selection_mark_image(CString image_path, int w, int h)
 	if (w > 0 && h > 0)
 	{
 		m_img_selection_mark.resize(w, h);
-		m_img_selection_mark.set_transparent(0.7);
+		m_img_selection_mark.set_alpha(0.7);
 	}
 }
 
@@ -2376,6 +2376,6 @@ void CThumbCtrl::set_selection_mark_image(CString sType, UINT id, int w, int h)
 	if (w > 0 && h > 0)
 	{
 		m_img_selection_mark.resize(w, h);
-		m_img_selection_mark.set_transparent(0.7);
+		m_img_selection_mark.set_alpha(0.7);
 	}
 }

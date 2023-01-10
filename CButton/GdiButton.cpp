@@ -280,6 +280,18 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 	UpdateSurface();
 }
 */
+
+void CGdiButton::set_alpha(float alpha)
+{
+	for (int i = 0; i < m_image.size(); i++)
+	{
+		m_image[i]->normal.set_alpha(alpha);
+		m_image[i]->over.set_alpha(alpha);
+		m_image[i]->down.set_alpha(alpha);
+		m_image[i]->disabled.set_alpha(alpha);
+	}
+}
+
 CGdiButton& CGdiButton::text(CString text)
 {
 	m_text = text;

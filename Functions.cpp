@@ -2281,15 +2281,20 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 			return _T("[error] HttpOpenRequest Fail");
 		}
-		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json; charset=utf-8"), -1, HTTP_ADDREQ_FLAG_ADD);
+		
+		//HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json; charset=utf-8"), -1, HTTP_ADDREQ_FLAG_ADD);
+		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json"), -1, HTTP_ADDREQ_FLAG_ADD);
 
 		if (isHTTPS)
 		{
 			DWORD dwFlags;
 			DWORD dwBuffLen = sizeof(dwFlags);
 			InternetQueryOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
+			dwFlags |= SECURITY_FLAG_SECURE;
 			dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
 			dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
+			dwFlags |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+			dwFlags |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
 			InternetSetOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 		}
 
@@ -13906,8 +13911,8 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 	else if (!_wcsnicmp(pszUrl, L"https://", 8))
 	{
 		pszHost = pszUrl + 8;
-		dwFlag = INTERNET_FLAG_SECURE;
-		iPort = 443;
+		dwFlag = INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID;
+		iPort = 4300;
 	}
 	else
 	{
@@ -13964,7 +13969,10 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		CHttpConnection* pclsHttpConn = clsSession.GetHttpConnection(CString(strHost.c_str()), dwFlag, (INTERNET_PORT)iPort, NULL, NULL);
 		if (pclsHttpConn)
 		{
-			CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST, CString(pszPath));
+			int m_secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_KEEP_CONNECTION | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID;
+			CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST, CString(pszPath), NULL, 0, NULL, NULL, m_secureFlags);
+			//CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST, CString(pszPath));
+
 			if (pclsHttpFile)
 			{
 				USES_CONVERSION;

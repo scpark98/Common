@@ -175,6 +175,9 @@ public:
 		//color_theme_dark_blue,
 		color_theme_dark_gray,
 	};
+	//인덱스 글자색
+	COLORREF		m_crIndex;
+	COLORREF		m_crIndexShadow;
 	//타이틀 글자색
 	COLORREF		m_crTitle;
 	//해상도 글자색
@@ -190,10 +193,14 @@ public:
 	void			back_color(COLORREF cr) { m_crBack = cr; Invalidate(); }
 	void			thumb_back_color(COLORREF cr) { m_crBackThumb = cr; Invalidate(); }
 	void			text_color(COLORREF cr) { m_crTitle = cr; Invalidate(); }
+	void			index_color(COLORREF cr) { m_crIndex = cr; Invalidate(); }
+	void			index_shadow_color(COLORREF cr) { m_crIndexShadow = cr; Invalidate(); }
 	void			resolution_color(COLORREF cr) { m_crResolution = cr; Invalidate(); }
 
 //선택 관련
 	std::deque<int> m_selected;
+	//bool			m_use_click_selection = true;
+	//void			use_click_selection(bool click_selection) { m_use_click_selection = click_selection; }
 	//bool			m_use_selection;		//default = true
 	bool			m_use_multi_selection = true;	//default = false, if true, m_bUseSelection will be set to true
 	//m_use_multi_selection이 false라도 Ctrl키를 누르면 다중 선택이 가능하다.

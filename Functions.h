@@ -745,8 +745,11 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 
 
 	//풀패스를 주면 폴더를 자동으로 만들어준다.
-	bool		recursive_make_full_directory(LPCTSTR sFolder);
+	//lpPathName은 설령 그 형식이 파일명이라도
+	//무조건 그 이름과 동일한 폴더를 생성하게 되므로
+	//반드시 생성하고자 하는 폴더명을 사용할것.
 	bool		make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa = NULL);
+	bool		recursive_make_full_directory(LPCTSTR sFolder);
 
 	CString		normalized_path(CString& path);
 

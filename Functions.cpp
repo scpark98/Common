@@ -2307,8 +2307,8 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		//로컬 파일이 저장될 폴더가 존재하지 않으면 생성해준다.
 		if (!local_path.IsEmpty())
 		{
-			if (!PathFileExists(local_path))
-				make_full_directory(local_path);
+			CString folder = GetFolderNameFromFullPath(local_path);
+			make_full_directory(folder);
 
 			hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (hFile == INVALID_HANDLE_VALUE)
@@ -4778,10 +4778,6 @@ bool recursive_make_full_directory(LPCTSTR sFolder)
 bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
 {
 	CString folder(lpPathName);
-
-	if (!PathIsDirectory(lpPathName))
-		folder = GetFolderNameFromFullPath(lpPathName);
-
 	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, (LPCTSTR)folder, lpsa));
 }
 
@@ -8658,6 +8654,8 @@ CImage* capture_window(CRect r, CString filename)
 		format = Gdiplus::ImageFormatBMP;
 	else if (ext == _T("png"))
 		format = Gdiplus::ImageFormatPNG;
+	else
+		//jpeg
 
 	imgCapture->Save(filename, format);
 	return imgCapture;

@@ -436,6 +436,7 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 	if (index < 0)
 	{
 		m_dqThumb.push_back(thumb);
+		index = m_dqThumb.size() - 1;
 	}
 	else
 	{
@@ -448,7 +449,7 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 		Invalidate();
 	}
 
-	return 0;
+	return index;
 }
 
 #if 0
@@ -927,7 +928,7 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				if (!m_use_multi_selection)
 					m_selected.clear();
 
-				if (selected_index >= 0 && m_selected.size() && find_index(&m_selected, selected_index) >= 0)
+				if (selected_index >= 0 && m_selected.size() && find_index(&m_selected, m_selected[selected_index]) >= 0)
 				{
 					m_selected.erase(m_selected.begin() + selected_index);
 					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
@@ -935,7 +936,8 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				}
 				else
 				{
-					m_selected.push_back(i);
+					if (find_index(&m_selected, i) < 0)
+						m_selected.push_back(i);
 					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
 						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
 				}

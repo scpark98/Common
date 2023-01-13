@@ -602,18 +602,23 @@ CString CWebView2Ctrl::get_webview2_runtime_version(bool webView_version)
 	return version;
 }
 */
-void CWebView2Ctrl::navigate(CString url)
+void CWebView2Ctrl::navigate(CString url, bool url_normalize)
 {
 	//mainDlg의 OnInitDialog에서 navigate()을 호출하면
 	//아직 m_webView가 생성되기 전이므로 url을 기억했다가
 	//OnCreateCoreWebView2ControllerCompleted()에서 생성 완료되면 url을 로딩한다.
 	if (!m_webView)
 	{
-		m_url_reserved = normalize_url(url);
+		if (url_normalize)
+			m_url_reserved = normalize_url(url);
+		else
+			m_url_reserved = url;
 		return;
 	}
 
-	url = normalize_url(url);
+	if (url_normalize)
+		url = normalize_url(url);
+
 	m_webView->Navigate(CStringW(url));
 }
 

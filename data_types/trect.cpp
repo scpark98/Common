@@ -1,2 +1,2 @@
-#include "trect.h"
+#include "TRect.h"
 #include <string>

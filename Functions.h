@@ -1121,6 +1121,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	double		getOverlappedRatio( CRect r1, CRect r2 );
 	double		getOverlappedRatio( int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2 );
 
+	CRect		subtract(CRect r0, CRect r1);
+
 //side 배열의 인덱스는 resize하는 영역 인덱스로서
 //DefWindowProc의 두번째 파라미터에 (SC_SIZE + m_nSideIndex)로 쓰이므로 그 차례를 따른다.
 	enum CORNER_INDEX

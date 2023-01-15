@@ -9,13 +9,15 @@
 #define		MAX(a,b)  ((a) < (b) ? (b) : (a))
 #endif
 
-template<class T> class trect
+#include <afxwin.h>
+
+template<class T> class TRect
 {
 public:
 	T	l, t, r, b;
 
-	trect() : l(0), t(0), r(0), b(0) {}
-	trect( T l1, T t1, T r1, T b1 )	{ l = l1; t = t1; r = r1; b = b1; }
+	TRect() : l(0), t(0), r(0), b(0) {}
+	TRect( T l1, T t1, T r1, T b1 )	{ l = l1; t = t1; r = r1; b = b1; }
 
 	void	offset( T dx, T dy ) { l += dx; t += dy; r += dx; b += dy; }	
 	T		width() { return (r - l); }
@@ -24,7 +26,7 @@ public:
 	T		centery() { return ((t + b) / 2.0); }
 
 	//두 사각형의 겹치는 영역을 리턴한다.	
-	trect	getIntersectionRect( trect r1 )
+	TRect	getIntersectionRect(TRect r1)
 	{
 		scp_rect	r(0, 0, 0, 0);
 
@@ -63,19 +65,18 @@ public:
 	//1 : "(1,2) x (3,4)"
 	//2 : "l = 1, t = 2, r = 3, b = 4"
 	//template<class T>
-	char* getRectInfoString( int format )
+	CString getRectInfoString(int format)
 	{
-		static char str[128];
+		CString str;
 
-		if ( format == 2 )
-			sprintf( str, "l = %d, t = %d, r = %d, b = %d", l, t, r, b );
+		if (format == 2)
+			str.Format(_T("l = %.1f, t = %.1f, r = %.1f, b = %.1f"), l, t, r, b );
 		else if ( format == 1 )
-			sprintf( str, "(%d,%d) x (%d,%d)", l, t, r, b );
+			str.Format(_T("(%d,%d) x (%d,%d)"), l, t, r, b );
 		else
-			sprintf( str, "%d, %d, %d, %d", l, t, r, b );
+			str.Format(_T("%d, %d, %d, %d"), l, t, r, b );
 		return str;
 	}
-	
 };
 
 #endif

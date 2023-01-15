@@ -11087,6 +11087,16 @@ double getOverlappedRatio(int x1, int y1, int w1, int h1, int x2, int y2, int w2
 	return ((double)(w * h) / (double)(w1 * h1));
 }
 
+CRect subtract(CRect r0, CRect r1)
+{
+	CRect r;
+	r.left = r0.left - r1.left;
+	r.top = r0.top - r1.top;
+	r.right = r0.right - r1.right;
+	r.bottom = r0.bottom - r1.bottom;
+	return r;
+}
+
 CRect getIntersectionRect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
 {
 	CRect r;

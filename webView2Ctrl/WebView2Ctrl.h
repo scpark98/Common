@@ -31,6 +31,12 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 - navigate이외의 다른 함수를 사용하고자 한다면 m_web.GetWebView()->Navigate(...)처럼 접근하여 호출.
 - mainDlg의 크기가 바뀌면 m_web.MoveWindow(...)로 크기 조정
 
+* WebView2Loader.dll이 없어도 실행되게 하려면(Static build로 변경)
+  $(ProjectDir)\packages\Microsoft.Web.WebView2.1.0.xxxx.xx\build 폴더내에
+  Common.targets 파일이 있고 그 파일에서 WebView2LoaderPreference 태그를 찾아 "Static"으로 변경한다.
+  (버전에 따라 해당 태그의 위치와 구분은 약간씩 다를 수 있음)
+
+
 [하나은행 메모]
 - C://Program Files (x86)/UCTogether 폴더에서 웹뷰가 포함된 앱을 실행시킬때는
   반드시 InitializeWebView()의 CreateCoreWebView2EnvironmentWithOptions()호출 시	m_userDataFolder를 줘야만 실행된다.
@@ -224,7 +230,7 @@ protected:
 	wil::com_ptr<ICoreWebView2Controller> m_controller;
 	wil::com_ptr<ICoreWebView2> m_webView = nullptr;
 	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
-	wil::com_ptr<ICoreWebView2Profile> m_profile;
+	wil::com_ptr<ICoreWebView2Profile> m_profile;		//Applies to 1.0.1245.22
 
 	bool m_allow_external_drop = false;
 	LPWSTR m_default_download_path;

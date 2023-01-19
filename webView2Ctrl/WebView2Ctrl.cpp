@@ -495,9 +495,9 @@ void CWebView2Ctrl::on_document_title_changed()
 	m_document_title = title.get();
 }
 
-void CWebView2Ctrl::resize()
+void CWebView2Ctrl::resize(int cx, int cy)
 {
-	CRect r;
+	RECT r;
 	CRect rc;
 
 	if (!m_hWnd)
@@ -505,9 +505,22 @@ void CWebView2Ctrl::resize()
 
 	GetClientRect(&rc);
 
+	r.left = 0;
+	r.top = 0;
+
+	if (cx <= 0)
+		r.right = r.left + rc.Width();
+	else
+		r.right = r.left + cx;
+
+	if (cy <= 0)
+		r.bottom = r.top + rc.Height();
+	else
+		r.bottom = r.top + cy;
+
 	if (auto view = GetComponent<ViewComponent>())
 	{
-		view->SetBounds(CRect(rc));
+		view->SetBounds(r);
 		//m_webHwnd = view->get_web_HWND();
 	}
 }

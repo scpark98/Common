@@ -121,6 +121,8 @@ public:
 	}	//콜백함수 콜 방식으로 이벤트를 전달할 경우 사용.
 
 	int		GetStyle() { return m_nStyle; }
+
+	//slider_thumb,	slider_value, slider_progress, slider_track,
 	void	SetStyle( int nStyle );
 	void	SetTrackHeight( int height ) { m_nTrackHeight = height; }
 	void	SetPos( int nPos );
@@ -181,7 +183,9 @@ public:
 
 protected:
 	// Attributes
-	int			m_nStyle;	//slider or progress. default = slider_thumb
+
+	//slider_thumb,	slider_value, slider_progress, slider_track,
+	int			m_nStyle;
 
 	int			m_nEventMsgStyle;
 

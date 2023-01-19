@@ -49,6 +49,12 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
   (물론 웹뷰2에서도 카메라, 마이크 등에 대한 접근 권한을 항상 허용으로 설정한 상태여야 한다.)
 - html상에서 wav 파일을 재생할때도 이와 동일한 문제가 발생했다.
 - 한글 파일명의 gif가 html 에서 표시되지 않는 문제 발생 -> ATEC에서 웹서버의 encoding을 변경하여 해결.
+
+[주의!]
+- 이 컨트롤을 포함하는 dlg 또는 이 컨트롤이 hide상태로 시작되면
+  나중에 show해도, 윈도우 크기를 키워도, CWebView2Ctrl의 resize()를 호출해도
+  웹뷰 영역이 전혀 나타나지 않는다.
+  불가피한 경우 hide시키지는 말고 MoveWindow(0, 0, 0, 0)로 해서 시작 후 원래 크기로 복원시키는 방법을 사용한다.
 */
 
 #include <afxwin.h>
@@ -156,7 +162,8 @@ public:
 	HRESULT WebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args);
 	HRESULT ExecuteScriptResponse(HRESULT errorCode, LPCWSTR result);
 
-	void	resize();
+	//cx 또는 cy가 0이면 parent의 크기에 맞춤
+	void	resize(int cx = 0, int cy = 0);
 	RECT	get_rect();
 
 

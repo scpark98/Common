@@ -178,15 +178,24 @@ CString GetDateStringFromTime(__timeb32 t, CString sMark /*= _T("-")*/)
 	return GetDateStringFromTime(ct, sMark);
 }
 
-CString GetTimeStringFromTime(CTime t, CString sMark /*=":"*/)
+CString GetTimeStringFromTime(CTime t, CString sMark/*=":"*/, bool h24/*= true*/)
 {
 	CString str;
 	
-	str.Format(_T("%02d%s%02d%s%02d"), t.GetHour(), sMark, t.GetMinute(), sMark, t.GetSecond());
+	int h = t.GetHour();
+	int m = t.GetMinute();
+	int s = t.GetSecond();
+	bool am = (h < 12);
+
+	if (h24)
+		str.Format(_T("%02d%s%02d%s%02d"), h, sMark, m, sMark, s);
+	else
+		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), h - 12, sMark, m, sMark, s);
+
 	return str;
 }
 
-CString GetTimeStringFromTime(COleDateTime t, CString sMark /*= _T("-")*/)
+CString GetTimeStringFromTime(COleDateTime t, CString sMark /*= _T(":")*/)
 {
 	CString str;
 
@@ -201,12 +210,12 @@ CString GetTimeStringFromTime(__timeb32 t, CString sMark /*=":"*/)
 }
 
 //type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid_char는 날짜와 시간 사이 문자
-CString GetCurrentDateTimeString(int nType, bool bSeparator /*= true*/, TCHAR mid_char /*= ' '*/)
+CString GetCurrentDateTimeString(int nType, bool bSeparator /*= true*/, TCHAR mid_char /*= ' '*/, bool h24 /*= true*/)
 {
 	CString str = _T("");
 	CTime	t = CTime::GetCurrentTime();
 	CString sDate = (bSeparator ? GetDateStringFromTime(t) : GetDateStringFromTime(t, _T("")));
-	CString sTime = (bSeparator ? GetTimeStringFromTime(t) : GetTimeStringFromTime(t, _T("")));
+	CString sTime = (bSeparator ? GetTimeStringFromTime(t, _T(":"), h24) : GetTimeStringFromTime(t, _T(""), h24));
 
 	if (nType == 0)
 		return sDate;
@@ -8253,7 +8262,48 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd,LPARAM lParam)
 	return TRUE;
 }
 
+HANDLE GetProcessHandleByName(LPCTSTR szFilename)
+{
+	HANDLE hProcessSnapshot;
+	HANDLE hProcess;
+	PROCESSENTRY32 pe32;
+	DWORD sessionID;
+	DWORD sessionIDTemp;
+
+	sessionID = WTSGetActiveConsoleSessionId();
+	hProcessSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, 0);
+
+	if (hProcessSnapshot == INVALID_HANDLE_VALUE)
+	{
+		return INVALID_HANDLE_VALUE;
+	}
+
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+	Process32First(hProcessSnapshot, &pe32);
+
+	do
+	{
+		hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+		if (hProcess != NULL)
+		{
+			if (_tcscmp(pe32.szExeFile, szFilename) == 0)
+			{
+				if (ProcessIdToSessionId(pe32.th32ProcessID, &sessionIDTemp) && sessionIDTemp == sessionID)
+				{
+					CloseHandle(hProcessSnapshot);
+					return hProcess;
+				}
+			}
+		}
+		CloseHandle(hProcess);
+	} while (Process32Next(hProcessSnapshot, &pe32));
+
+	CloseHandle(hProcessSnapshot);
+	return INVALID_HANDLE_VALUE;
+}
+
 //default : bCaseSensitive = false, bExceptThis = true
+//뭔가 오류가 있다. 다시 테스트해야 함.
 HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThis)
 {
 	bool			bFlag = false;
@@ -8275,6 +8325,7 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThi
 	{
 		do 
 		{
+			TRACE(_T("pe.szExeFile = %s\n"), pe.szExeFile);
 			//대소문자 구분하지 않고 실행프로그램 이름이 같은지 확인..
 			if ((bCaseSensitive && _tcsicmp(pe.szExeFile, sExeFile) == 0) ||
 				(!bCaseSensitive && _tcscmp(pe.szExeFile, sExeFile) == 0))
@@ -8335,6 +8386,16 @@ bool IsRunning(CString processname)
 
 	return false; //실행중이 아니면 False를 반환
 } 
+
+void KillProcess(LPCTSTR szFilename)
+{
+	HANDLE hProcess = GetProcessHandleByName(szFilename);
+	if (hProcess != INVALID_HANDLE_VALUE)
+	{
+		TerminateProcess(hProcess, 0);
+		CloseHandle(hProcess);
+	}
+}
 
 #if 0
 //프로세스 강제 종료.

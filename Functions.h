@@ -386,7 +386,7 @@ ULONG		ProcIDFromWnd(HWND hwnd);
 HWND		GetHWNDbyPID(ULONG pid);
 CString		GetProcessNameByPID(const DWORD pid);
 bool		IsRunning(CString processname);
-//bool		ProcessKill(CString processname);
+bool		KillProcess(CString processname);
 HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 bool		IsDuplicatedRun();
 
@@ -800,7 +800,10 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 //////////////////////////////////////////////////////////////////////////
 //쉘, 윈도우, 레지스트리, 시스템
 	CString		GetComputerNameString();
+	//좀 더 테스트 필요!
 	HWND		GetHWndByExeFilename( CString sExeFile, bool bCaseSensitive = false, bool bExceptThis = true );
+	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
+
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE );
 	HINSTANCE	FindExecutableEx( LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult );
 
@@ -884,12 +887,12 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 
 //////////////////////////////////////////////////////////////////////////
 //시간
-	CString		GetDateStringFromTime( CTime t, CString sMark = _T("-") );
-	CString		GetDateStringFromTime( COleDateTime t, CString sMark = _T("-") );
-	CString		GetDateStringFromTime( __timeb32 t, CString sMark = _T("-") );
-	CString		GetTimeStringFromTime( CTime t, CString sMark = _T(":") );
-	CString		GetTimeStringFromTime( COleDateTime t, CString sMark = _T(":") );
-	CString		GetTimeStringFromTime( __timeb32 t, CString sMark = _T(":") );
+	CString		GetDateStringFromTime(CTime t, CString sMark = _T("-") );
+	CString		GetDateStringFromTime(COleDateTime t, CString sMark = _T("-") );
+	CString		GetDateStringFromTime(__timeb32 t, CString sMark = _T("-") );
+	CString		GetTimeStringFromTime(CTime t, CString sMark = _T(":"), bool h24 = true);
+	CString		GetTimeStringFromTime(COleDateTime t, CString sMark = _T(":") );
+	CString		GetTimeStringFromTime(__timeb32 t, CString sMark = _T(":") );
 	CString		GetTimeString( CTime t, bool bSeparator = true );
 	CString		GetTimeString( COleDateTime t, bool bSeparator = true );
 	CString		GetTimeString( __timeb32 t, bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true );	//2003-04-16 18:01:00.120
@@ -904,8 +907,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	int			GetSecondsFromTimeString(CString timeString);
 	int			GetMilliSecondsFromTimeString(CString timeString);
 	void		GetTimeFromSeconds( int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds );
-	//type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. blank는 날짜와 시간 사이 공백 여부
-	CString		GetCurrentDateTimeString( int nType = 2, bool bSeparator = true, TCHAR mid_char = ' ');
+	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. blank는 날짜와 시간 사이 공백 여부
+	CString		GetCurrentDateTimeString( int nType = 2, bool bSeparator = true, TCHAR mid_char = ' ', bool h24 = true);
 	void		SetSystemTimeClock( WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond );
 	double		GetElapsedTime( __timeb32 pOldTime );	//pOldTime과 현재 시간의 차이 계산
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시

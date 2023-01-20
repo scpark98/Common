@@ -149,8 +149,11 @@ public:
 
 	CString get_url();
 	CString normalize_url(CString url);
-	void hide_download_dialog();
-	void allow_external_drop(bool allow = true) { m_allow_external_drop = allow; };
+	void	hide_download_dialog();
+	void	allow_external_drop(bool allow = true) { m_allow_external_drop = allow; };
+
+	static bool m_clear_cache_on_created;
+	//static void	clear_cache_on_created(bool clear) { CWebView2Ctrl::m_clear_cache_on_created = clear; }
 
 	//WebView2
 	HWND m_webHwnd = NULL;

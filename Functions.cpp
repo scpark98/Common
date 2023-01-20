@@ -190,7 +190,7 @@ CString GetTimeStringFromTime(CTime t, CString sMark/*=":"*/, bool h24/*= true*/
 	if (h24)
 		str.Format(_T("%02d%s%02d%s%02d"), h, sMark, m, sMark, s);
 	else
-		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), h - 12, sMark, m, sMark, s);
+		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sMark, m, sMark, s);
 
 	return str;
 }

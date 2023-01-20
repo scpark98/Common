@@ -44,6 +44,8 @@ void CheckFailure(HRESULT hr, CString const& message)
 
 IMPLEMENT_DYNAMIC(CWebView2Ctrl, CWnd)
 
+bool CWebView2Ctrl::m_clear_cache_on_created = false;
+
 CWebView2Ctrl::CWebView2Ctrl()
 {
 	if (!RegisterWindowClass())
@@ -109,8 +111,10 @@ void CWebView2Ctrl::InitializeWebView()
 #endif
 	USES_CONVERSION;
 	LPCWSTR subFolder = nullptr;
-	std::wstring m_userDataFolder;
-	m_userDataFolder = CStringW(get_special_folder(CSIDL_COOKIES));
+	std::wstring userDataFolder;
+	//userDataFolder를 CSIDL_INTERNET_CACHE 폴더로 설정하면 NH투자증권 프로젝트에서 카메라 영상이 표시되지 않는 현상이 있다.
+	//userDataFolder = CStringW(get_special_folder(CSIDL_INTERNET_CACHE));
+	userDataFolder = CStringW(get_special_folder(CSIDL_COOKIES));
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
 
@@ -121,7 +125,7 @@ void CWebView2Ctrl::InitializeWebView()
 	//이 webview2 컴포넌트를 사용하는 프로그램을
 	//Program Files 폴더에서 실행하면 웹페이지가 표시되지 않게 된다.
 	HRESULT hr = CreateCoreWebView2EnvironmentWithOptions
-				(subFolder, m_userDataFolder.c_str(), options.Get(),
+				(subFolder, userDataFolder.c_str(), options.Get(),
 				Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>
 				(this, &CWebView2Ctrl::OnCreateEnvironmentCompleted).Get());
 
@@ -219,9 +223,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		//20230104. NH 1293.44로 변경
 		//간혹 cache문제로 새로 변경된 내용이 표시되지 않는 현상이 있다.
 		//html이 변경되어 불가피하게 캐시를 지울때만 지워주자.
-		static bool cache_cleared = true;
-
-		if (!cache_cleared)
+		if (CWebView2Ctrl::m_clear_cache_on_created)
 		{
 			wil::com_ptr<ICoreWebView2_13> wvWnd13 = m_webView.try_query<ICoreWebView2_13>();
 			if (wvWnd13)
@@ -233,7 +235,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 					webView2Profile2->ClearBrowsingDataAll(Callback<ICoreWebView2ClearBrowsingDataCompletedHandler>(
 						[this](HRESULT error) -> HRESULT {
 							TRACE(L"Completed", L"Clear Browsing Data\n");
-							cache_cleared = true;
+							CWebView2Ctrl::m_clear_cache_on_created = false;
 							return S_OK;
 						})
 						.Get());
@@ -318,8 +320,17 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 			//for message test end.
 			*/
 
+			if (!IsWindowVisible())
+			{
+				ShowWindow(SW_SHOW);
+				CRect r;
+				GetClientRect(r);
+				Wait(1000);
+			}
+
 			hresult = m_webView->Navigate(CStringW(m_url_reserved));
 			m_url_reserved.Empty();
+			//ShowWindow(SW_HIDE);
 		}
 		else
 		{
@@ -632,6 +643,9 @@ void CWebView2Ctrl::navigate(CString url, bool url_normalize)
 	if (url_normalize)
 		url = normalize_url(url);
 
+	//if (!IsWindowVisible())
+	//	ShowWindow(SW_SHOW);
+
 	m_webView->Navigate(CStringW(url));
 }
 
@@ -701,7 +715,7 @@ void CWebView2Ctrl::OnSize(UINT nType, int cx, int cy)
 
 HRESULT CWebView2Ctrl::execute_jscript(CString jscript)
 {
-	HRESULT hr;
+	HRESULT hr = S_FALSE;
 
 	if (m_webView != nullptr)
 		hr = m_webView->ExecuteScript(CStringW(jscript), nullptr);

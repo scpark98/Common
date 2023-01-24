@@ -112,18 +112,20 @@ void CWebView2Ctrl::InitializeWebView()
 	USES_CONVERSION;
 	LPCWSTR subFolder = nullptr;
 	std::wstring userDataFolder;
-	//userDataFolder를 CSIDL_INTERNET_CACHE 폴더로 설정하면 NH투자증권 프로젝트에서 카메라 영상이 표시되지 않는 현상이 있다.
-	//userDataFolder = CStringW(get_special_folder(CSIDL_INTERNET_CACHE));
-	userDataFolder = CStringW(get_special_folder(CSIDL_COOKIES));
+	//userDataFolder를 FOLDERID_InternetCache 폴더로 설정하면
+	//NH투자증권 프로젝트에서 카메라 영상이 표시되지 않는 현상이 있다.
+	//다른 프로젝트에서는 카메라 영상이 잘 표시된다.
+	//userDataFolder = CStringW(get_known_folder(FOLDERID_InternetCache));
+	userDataFolder = CStringW(get_known_folder(FOLDERID_Cookies));
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
 
 	//LPWSTR *args = nullptr;
 	//options->get_AdditionalBrowserArguments(args);
 
-	//m_userDataFolder를 주지 않고 nullptr로 할 경우
+	//userDataFolder를 주지 않고 nullptr로 할 경우
 	//이 webview2 컴포넌트를 사용하는 프로그램을
-	//Program Files 폴더에서 실행하면 웹페이지가 표시되지 않게 된다.
+	//Program Files* 폴더에서 실행하면 웹페이지가 표시되지 않게 된다.
 	HRESULT hr = CreateCoreWebView2EnvironmentWithOptions
 				(subFolder, userDataFolder.c_str(), options.Get(),
 				Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>
@@ -147,13 +149,13 @@ void CWebView2Ctrl::CloseWebView(bool cleanupUserDataFolder)
 {
 	if (m_webView)
 	{
-		m_webView->remove_NavigationCompleted(m_navigationCompletedToken);
 		m_webView->remove_NavigationStarting(m_navigationStartingToken);
+		m_webView->remove_NavigationCompleted(m_navigationCompletedToken);
 		m_webView->remove_DocumentTitleChanged(m_documentTitleChangedToken);
 		m_webView->remove_PermissionRequested(m_permissionRequestedToken);
 
-		wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
-		wvWnd4->remove_DownloadStarting(m_downloadStartingToken);
+		wil::com_ptr<ICoreWebView2_14> wvWnd14 = m_webView.try_query<ICoreWebView2_14>();
+		wvWnd14->remove_DownloadStarting(m_downloadStartingToken);
 
 		m_webView = nullptr;
 		m_webSettings = nullptr;
@@ -253,7 +255,8 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 
 		//put_IsMuted는 1.0.1072.54부터 사용 가능
-		//m_webView->put_IsMuted(FALSE);
+		wil::com_ptr<ICoreWebView2_8> wvWnd8 = m_webView.try_query<ICoreWebView2_8>();
+		wvWnd8->put_IsMuted(FALSE);
 
 		//기본 다운로드 경로를 얻어오거나 변경.
 		//m_profile->get_DefaultDownloadFolderPath(&m_default_download_path);
@@ -320,17 +323,14 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 			//for message test end.
 			*/
 
-			if (!IsWindowVisible())
-			{
-				ShowWindow(SW_SHOW);
-				CRect r;
-				GetClientRect(r);
-				Wait(1000);
-			}
+			//CWebView2Ctrl이 hide일때 navigate이 되지 않는 문제를 해결하기 위해
+			//여기서 ShowWindow를 해봤으나 소용없었다.
+			//m_controller->put_IsVisible()을 사용해야 한다.
+			//hide일때도 navigate은 잘 된다.
+			m_controller->put_IsVisible(TRUE);
 
 			hresult = m_webView->Navigate(CStringW(m_url_reserved));
 			m_url_reserved.Empty();
-			//ShowWindow(SW_HIDE);
 		}
 		else
 		{
@@ -350,9 +350,10 @@ HRESULT CWebView2Ctrl::WebMessageReceived(ICoreWebView2* sender, ICoreWebView2We
 	LPWSTR pwStr;
 	args->TryGetWebMessageAsString(&pwStr);
 	CString receivedMessage = pwStr;
-	if (!receivedMessage.IsEmpty())
+	//if (!receivedMessage.IsEmpty())
 	{
-		AfxMessageBox("This message came from Javascript : " + receivedMessage);
+		//AfxMessageBox("This message came from Javascript : " + receivedMessage);
+		::SendMessage(GetParent()->m_hWnd, webview2_message_web_message_received, (WPARAM)this, (LPARAM)&receivedMessage);
 	}
 	return S_OK;
 }
@@ -372,28 +373,104 @@ void CWebView2Ctrl::set_permission_request_mode(int mode)
 	}
 };
 
+void CWebView2Ctrl::UpdateProgress(ICoreWebView2DownloadOperation* download)
+{
+	/*
+	// Register a handler for the `DownloadProgressSizeInBytesChanged` event.
+	CHECK_FAILURE(download->add_DownloadProgressSizeInBytesChanged(
+		Callback<ICoreWebView2DownloadProgressSizeInBytesChangedEventHandler>(
+			[this](ICoreWebView2Download* download, IUnknown* args) -> HRESULT {
+				// Here developer can update UI to show progress of a download using
+				// `download->get_DownloadProgressSizeInBytes` and
+				// `download->get_ExpectedDownloadSizeInBytes`.
+				return S_OK;
+			})
+		.Get(),
+				&m_downloadProgressSizeInBytesChangedToken));
+	*/
+
+	// Register a handler for the `DownloadStateChanged` event.
+	CHECK_FAILURE(download->add_StateChanged(
+		Callback<ICoreWebView2StateChangedEventHandler>(
+			[this](ICoreWebView2DownloadOperation* download,
+				IUnknown* args) -> HRESULT {
+					COREWEBVIEW2_DOWNLOAD_STATE downloadState;
+					CHECK_FAILURE(download->get_State(&downloadState));
+					switch (downloadState)
+					{
+					case COREWEBVIEW2_DOWNLOAD_STATE_IN_PROGRESS:
+						INT64 bytesReceived;
+						download->get_BytesReceived(&bytesReceived);
+						TRACE(_T("bytesReceived = %d\n"), bytesReceived);
+						break;
+					case COREWEBVIEW2_DOWNLOAD_STATE_INTERRUPTED:
+						// Here developer can take different actions based on `args->InterruptReason`.
+						// For example, show an error message to the end user.
+						//CompleteDownload(download);
+						break;
+					case COREWEBVIEW2_DOWNLOAD_STATE_COMPLETED:
+						//CompleteDownload(download);
+						LPWSTR resultPath;
+						download->get_ResultFilePath(&resultPath);
+						//TRACE(_T("%s : download completed.\n"), resultPath);
+						CString sResultPath = resultPath;
+						::SendMessage(GetParent()->m_hWnd, webview2_message_download_completed, (WPARAM)this, (WPARAM)&sResultPath);
+						break;
+					}
+					return S_OK;
+			})
+		.Get(),
+				&m_stateChangedToken));
+}
+
 void CWebView2Ctrl::RegisterEventHandlers()
 {
 	//다운로드 시작 이벤트
-	wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
-	CHECK_FAILURE(wvWnd4->add_DownloadStarting(
+	//현재는 기본 기능만 구현했으나
+	//다운로드와 관련된 세부적인 기능까지 구현하려면 다음 사이트를 참조하여 추가해야 한다.
+	//https://github.com/MicrosoftEdge/WebView2Feedback/blob/main/specs/CustomDownload.md
+	wil::com_ptr<ICoreWebView2_15> wvWnd15 = m_webView.try_query<ICoreWebView2_15>();
+	CHECK_FAILURE(wvWnd15->add_DownloadStarting(
 		Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
 			[this](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT
 			{
+				wil::com_ptr<ICoreWebView2DownloadOperation> download;
+				CHECK_FAILURE(args->get_DownloadOperation(&download));
 				//TRUE이면 다운로드 팝업창을 표시하지 않는다.
 				args->put_Handled(TRUE);
 
+				//INT64 expectedDownloadSizeInBytes = 0;
+				//CHECK_FAILURE(download->get_ExpectedDownloadSizeInBytes(
+				//	&expectedDownloadSizeInBytes));
+
+				wil::unique_cotaskmem_string uri;
+				CHECK_FAILURE(download->get_Uri(&uri));
+
+				wil::unique_cotaskmem_string mimeType;
+				CHECK_FAILURE(download->get_MimeType(&mimeType));
+
+				wil::unique_cotaskmem_string contentDisposition;
+				CHECK_FAILURE(download->get_ContentDisposition(&contentDisposition));
+
+				// Get the suggested path from the event args.
+				//wil::unique_cotaskmem_string resultFilePath;
+				LPWSTR resultFilePath;
+				CHECK_FAILURE(args->get_ResultFilePath(&resultFilePath));
+
+				CHECK_FAILURE(args->put_ResultFilePath(resultFilePath));
+				UpdateProgress(download.get());
 				//기본 다운로드 경로를 알 수도 있고
-				ICoreWebView2DownloadOperation* downloadOperation;
-				args->get_DownloadOperation(&downloadOperation);
-				LPWSTR path;
-				downloadOperation->get_ResultFilePath(&path);
+				//ICoreWebView2DownloadOperation* downloadOperation;
+				//args->get_DownloadOperation(&m_download);
+				//LPWSTR path;
+				//m_download->get_ResultFilePath(&path);
 
 				//다운받을 경로를 새로 지정할 수도 있다.
 				//args->put_ResultFilePath(L"c:\\scpark\\test.avi");
 
 				return S_OK;
 			}).Get(), &m_downloadStartingToken));
+
 
 	//카메라, 마이크 등 권한 허용 요청 이벤트
 	CHECK_FAILURE(m_webView->add_PermissionRequested(
@@ -465,15 +542,19 @@ void CWebView2Ctrl::RegisterEventHandlers()
 					}
 				}
 
-				wil::unique_cotaskmem_string uri;
+				//wil::unique_cotaskmem_string uri;
+				LPWSTR uri;
 				m_webView->get_Source(&uri);
-
-				if (wcscmp(uri.get(), L"about:blank") == 0)
+				CString sURI = uri;
+				if (sURI == _T("about:blank"))
 				{
-					uri = wil::make_cotaskmem_string(L"");
+					//uri = wil::make_cotaskmem_string(L"");
+					//wcscpy_s(uri, _countof(uri), L"");
+					sURI.Empty();
 				}
 
 				on_navigation_completed();
+				::SendMessage(GetParent()->m_hWnd, webview2_message_navigation_completed, (WPARAM)this, (LPARAM)&sURI);
 
 				return S_OK;
 			})
@@ -643,9 +724,9 @@ void CWebView2Ctrl::navigate(CString url, bool url_normalize)
 	if (url_normalize)
 		url = normalize_url(url);
 
-	//if (!IsWindowVisible())
-	//	ShowWindow(SW_SHOW);
-
+	//WebView2Ctrl이 hide상태에서는 웹페이지가 제대로 load되지 않거나 navigate되지 않는 현상이 있다.
+	//m_controller->put_IsVisible()을 호출해야 hide상태에서도 navigate된다.
+	m_controller->put_IsVisible(TRUE);
 	m_webView->Navigate(CStringW(url));
 }
 

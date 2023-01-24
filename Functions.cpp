@@ -1769,7 +1769,7 @@ bool IsAlphaNumeric(CString str, CString excepts)
 }
 
 //한글로만 구성된 문자열인지
-bool IsHangul(CString str)
+bool is_hangul(CString str)
 {
 	int len = str.GetLength();
 	const wchar_t start_ch = L'가';
@@ -4510,88 +4510,18 @@ int	get_text_encoding(CString sfile)
 
 //시작폴더 및 하위 폴더들은 여전히 남아있다.
 //폴더 통째로 다 지우려면 코드의 수정이 필요하다.
-int DeleteAllFiles(CString sFolder, CString sFilter, bool bRecursive/*=TRUE*/, bool bResetCount /*= TRUE*/)
+int	delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive /*= true*/, bool trash_can /*= false*/)
 {
-	static int	nDeleteCount = 0;
-	CString		sfile, str1, str2;
-	CFileFind	finder;
+	std::deque<CString> files;
+	FindAllFiles(folder, &files, name_filter, ext_filter, recursive);
 
-	if (bResetCount)
-		nDeleteCount = 0;
+	if (files.size() == 0)
+		return 0;
 
-	bool bWorking = finder.FindFile(sFolder + "\\*");
+	for (int i = 0; i < files.size(); i++)
+		delete_file(files[i], trash_can);
 
-	sFilter.MakeLower();
-
-	while (bWorking)
-	{
-		bWorking = finder.FindNextFile();
-		sfile = finder.GetFilePath();
-		sfile.MakeLower();
-		
-		if (finder.IsDots())
-			continue;
-		else if (finder.IsDirectory())
-		{
-			if (bRecursive)
-				DeleteAllFiles(sfile, sFilter, bRecursive, FALSE);
-		}
-		else
-		{
-			if (sFilter == "*" || sFilter == "*.*")
-			{
-				if (delete_file(sfile, true))
-				{
-					TRACE("delete ok : %s\n", sfile);
-					nDeleteCount++;
-				}
-				else
-				{
-					TRACE("delete fail : %s\n", sfile);
-				}
-			}
-			else
-			{
-				//특정 확장자 파일들을 지우는 경우
-				if (sFilter.Left(2) == "*.")
-				{
-					str1 = GetFileExtension(sfile);
-					str2 = sFilter.Right(sFilter.GetLength() - sFilter.ReverseFind('.') - 1);
-				}
-				//특정 파일명 파일들을 지우는 경우
-				else if (sFilter.Right(2) == ".*")
-				{
-					str1 = GetFileTitle(sfile);
-					str2 = sFilter.Left(sFilter.ReverseFind('.'));
-				}
-				else
-				{
-					str1 = GetFileNameFromFullPath(sfile);
-					str2 = sFilter;
-				}
-
-				str1.MakeLower();
-				str2.MakeLower();
-
-				if (str1 == str2)
-				{
-					if (delete_file(sfile, true))
-					{
-						TRACE("delete ok : %s\n", sfile);
-						nDeleteCount++;
-					}
-					else
-					{
-						TRACE("delete fail : %s\n", sfile);
-					}
-				}
-			}
-		}
-	}
-
-	//RemoveDirectory(sFolder);
-	//TRACE("%s\n", sFolder);
-	return nDeleteCount;
+	return files.size();
 }
 
 bool RecursiveCreateDirectory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
@@ -5124,20 +5054,12 @@ bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFold
 	return bSuccess;
 }
 
-//윈도우 운영체제에서 특정 폴더의 실제 경로를 리턴한다.
-//nFolder = https://docs.microsoft.com/ko-kr/windows/win32/shell/csidl
-//http://blog.naver.com/PostView.nhn?blogId=sobakmt&logNo=60058711792&widgetTypeCall=true
-CString get_special_folder(int nFolder)
+CString get_known_folder(KNOWNFOLDERID folderID)
 {
-	LPITEMIDLIST itemList = nullptr;
-	wchar_t szPath[MAX_PATH] = {0, };
+	PWSTR path = NULL;
+	SHGetKnownFolderPath(folderID, 0, NULL, &path);
 
-	SHGetSpecialFolderLocation(nullptr, nFolder, &itemList);
-	SHGetPathFromIDListW(itemList, szPath);
-
-	CoTaskMemFree(itemList);
-
-	return szPath;
+	return path;
 }
 
 void ParseCommandString(CString sParam, CStringArray& ar)

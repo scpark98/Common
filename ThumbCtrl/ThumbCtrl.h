@@ -202,7 +202,7 @@ public:
 	//bool			m_use_click_selection = true;
 	//void			use_click_selection(bool click_selection) { m_use_click_selection = click_selection; }
 	//bool			m_use_selection;		//default = true
-	bool			m_use_multi_selection = true;	//default = false, if true, m_bUseSelection will be set to true
+	bool			m_use_multi_selection = false;	//default = false
 	//m_use_multi_selection이 false라도 Ctrl키를 누르면 다중 선택이 가능하다.
 	//m_use_multi_selection는 그냥 좌클릭만으로도 다중 선택이 가능하게 할 지에 대한 플래그임.
 	void			use_multi_selection(bool multi_select = true) { m_use_multi_selection = multi_select; }

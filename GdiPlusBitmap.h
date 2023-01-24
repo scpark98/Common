@@ -27,6 +27,10 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 변경할 예정
 */
 
+//gdiplus 1.1을 사용하기 위해 pch.h, framework.h등에 이 define을 추가했으나 적용되지 않았다.
+//결국 여기에 추가하니 해결됨.
+#define GDIPVER 0x0110
+
 #include <afxwin.h>
 #include <gdiplus.h>
 #include <stdint.h>	//for uint8_t in vs2015
@@ -106,12 +110,13 @@ public:
 	bool is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
 
 	void set_matrix(ColorMatrix *colorMatrix, ColorMatrix *grayMatrix = NULL);
-	void set_alpha(float transparent);
+	void set_alpha(float alpha);
 	void gray();
 	void negative();
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.
+	//현재 resource에서 읽어들인 이미지는 제대로 변환되지 않는 문제 있음(1/3만 로딩되는 현상)
 	void convert2gray();
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
@@ -154,7 +159,7 @@ protected:
 	UINT			m_frame_index;
 	bool			m_bIsInitialized;
 	bool			m_paused = false;
-	PropertyItem*	m_pPropertyItem;
+	PropertyItem*	m_pPropertyItem = NULL;
 	HWND			m_displayHwnd;
 	int				m_aniX;
 	int				m_aniY;

@@ -38,13 +38,6 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <gdiplus.h>
 
-#ifdef GDIPVER
-#undef GDIPVER
-#endif
-
-#define GDIPVER 0x0110
-
-
 #include "../Common/colors.h"
 
 #define _std_cpp11 201103L
@@ -225,11 +218,12 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 
 #define SAFE_RELEASE(pObject) { if (pObject!=NULL) { pObject->Release(); pObject=NULL; } }
 
-#define SAFE_DELETE(pData) { try { delete pData; } catch (...) { ASSERT(FALSE); } pData=NULL; } 
+#define SAFE_DELETE(pData) { try { delete pData; } catch (...) { ASSERT(FALSE); } pData = NULL; } 
+#define SAFE_FREE(pData) { try { free(pData); } catch (...) { ASSERT(FALSE); } pData = NULL; } 
 
-#define SAFE_CLOSE_HANDLE(hHandle) { if (hHandle!=NULL) { CloseHandle(hHandle); hHandle=NULL; } }
+#define SAFE_CLOSE_HANDLE(hHandle) { if (hHandle!=NULL) { CloseHandle(hHandle); hHandle = NULL; } }
 
-#define SAFE_DELETE_ARRAY(pData) { try { delete [] pData; } catch (...) { ASSERT(FALSE); } pData=NULL; } 
+#define SAFE_DELETE_ARRAY(pData) { try { delete [] pData; } catch (...) { ASSERT(FALSE); } pData = NULL; } 
 
 //////////////////////////////////////////////////////////////////////////////////
 #define SHELL_OPEN(String)	ShellExecute(NULL, TEXT("open"), String, NULL, NULL, SW_SHOWNORMAL);
@@ -430,7 +424,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	//검사하기 전에 미리 삭제한 후 검사한다.
 	bool		IsAlphaNumeric(CString str, CString excepts = _T(""));
 	//한글로만 구성된 문자열인지
-	bool		IsHangul(CString str);
+	bool		is_hangul(CString str);
 	CString		ConvertInt2AZ( int n );	//n을 26진수 엑셀 컬럼 인덱스로 변환한 문자열을 리턴
 	CString		GetToken( CString& str, LPCTSTR c );
 	CString		GetToken( CString src, CString separator, int n );
@@ -739,7 +733,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	std::deque<CString>		FindFilesWithExtensions(CString folder, CString fileTitle, CString extensions);
 
 	// 폴더의 모든 파일을 지운다.
-	int			DeleteAllFiles( CString sFolder, CString sFilter, bool bRecursive = TRUE, bool bResetCount = TRUE );
+	int			delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive = true, bool trash_can = false);
 	bool		DeleteFolder( LPCTSTR lpFolder );
 	bool		SHDeleteFolder( CString sFolder );
 
@@ -771,9 +765,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 	static int CALLBACK BrowseCallbackProc(HWND hwnd,UINT uMsg, LPARAM lParam, LPARAM lpData);
 
 	//윈도우 운영체제에서 특정 폴더의 실제 경로를 리턴한다.
-	//nFolder = https://docs.microsoft.com/ko-kr/windows/win32/shell/csidl
-	//http://blog.naver.com/PostView.nhn?blogId=sobakmt&logNo=60058711792&widgetTypeCall=true
-	CString get_special_folder(int nFolder);
+	CString get_known_folder(KNOWNFOLDERID folderID);
 
 //////////////////////////////////////////////////////////////////////////
 //네트워크, 인터넷
@@ -929,7 +921,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	bool		is_valid_time(CString str);
 
 //타이머 관련
-	void		Wait( DWORD dwMillisecond );	//WM_TIMER 메시지 핸들러 내에서는 사용할 수 없음.
+	void		Wait(DWORD dwMillisecond);		//예전에는 OnTimer() 내에서는 동작되지 않았었는데 현재는 가능하다.
 	//void		usleep(int microSec);
 	void		ProcessWindowMessage();			//반복문에 의해 process가 응답없음이 되지 않도록 반복문안에서 호출하여 메시지큐의 내용을 바로 처리시킨다.
 	int			ptimer_start(int instance);		//reset high resolution time lcounter 

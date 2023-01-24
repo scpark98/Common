@@ -2181,10 +2181,21 @@ void CThumbCtrl::edit_begin(int index)
 		return;
 
 	if (index < 0)
-		index = get_selected_item();
-
-	if (index == -1)
-		index = 1;
+	{
+		if (m_selected.size() > 0)
+		{
+			//멀티선택사용일 경우는 맨 마지막 선택된 항목을
+			if (m_use_multi_selection)
+				index = m_selected[m_selected.size() - 1];
+			//그렇지 않으면 선택된 항목을 편집모드로 한다.
+			else
+				index = get_selected_item();
+		}
+		else
+		{
+			return;
+		}
+	}
 
 	DWORD dwStyle = ES_CENTER | WS_BORDER | WS_CHILD | WS_VISIBLE /*| ES_AUTOHSCROLL */ | ES_AUTOVSCROLL | ES_MULTILINE;
 	CRect r = m_dqThumb[index].rect;

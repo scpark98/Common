@@ -24,7 +24,7 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 - 위 컨트롤에 CWebView2Ctrl타입의 제어 변수(m_web)를 선언.
 
 - #include "../../Common/webView2Ctrl/WebView2Ctrl.h" 자동 추가되지 않았다면 수동 입력.
-  (이 WebView2Ctrl.h를 다른 include보다 뒤에 선언할 경우
+  (주의! 이 WebView2Ctrl.h를 다른 include보다 뒤에 선언할 경우
    Microsoft.Windows.ImplementationLibrary의 wil/resource.h에서 컴파일 오류가 발생한다.)
 
 - 사용 : m_web.navigate(url);
@@ -44,17 +44,17 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
 [NH투자신탁 메모]
 - n개의 cam중에 특정 캠을 선택하여 웹뷰에 표시하는 기능을 수행할 때(cam_capture.html)
-  해당 html을 파일로 열면 카메라 선택 코드가 동작하지 않는다.
+  해당 html을 파일로 열면 카메라 선택 코드가 동작하지 않는 경우가 있다.
   ATEC에서 localhost로 웹서버를 구동시키고 http://localhost/..../cam_capture.html로 해야 장치 선택 가능.
   (물론 웹뷰2에서도 카메라, 마이크 등에 대한 접근 권한을 항상 허용으로 설정한 상태여야 한다.)
-- html상에서 wav 파일을 재생할때도 이와 동일한 문제가 발생했다.
+- html상에서 wav 파일을 재생할때도 이와 동일한 문제가 발생하여 가상 웹서버에서 loading하도록 하여 해결.
 - 한글 파일명의 gif가 html 에서 표시되지 않는 문제 발생 -> ATEC에서 웹서버의 encoding을 변경하여 해결.
 
-[주의!]
-- 이 컨트롤을 포함하는 dlg 또는 이 컨트롤이 hide상태로 시작되면
-  나중에 show해도, 윈도우 크기를 키워도, CWebView2Ctrl의 resize()를 호출해도
-  웹뷰 영역이 전혀 나타나지 않는다.
-  불가피한 경우 hide시키지는 말고 MoveWindow(0, 0, 0, 0)로 해서 시작 후 원래 크기로 복원시키는 방법을 사용한다.
+[수정사항]
+*20230122
+	- 이 컨트롤을 포함하는 dlg 또는 이 컨트롤이 hide상태로 시작되면
+	  html이 제대로 로딩되지 않는 문제점 수정.
+	- navigate_completed, download_completed등의 이벤트 발생시에 해당 메시지를 main으로 보내 처리하도록 수정.
 */
 
 #include <afxwin.h>
@@ -90,14 +90,6 @@ namespace winrtComp = winrt::Windows::UI::Composition;
 #define IDM_GET_BROWSER_VERSION_BEFORE_CREATION 171
 #define IDM_CREATION_MODE_TARGET_DCOMP 195
 
-enum WEBVIEW2_MESSAGE
-{
-	webview2_message_navigation_start = WM_APP + 123,
-	webview2_message_navigation_completed,
-	webview2_message_document_title_changed,
-	webview2_message_
-};
-
 class CWebView2Ctrl : public CWnd
 {
 	DECLARE_DYNAMIC(CWebView2Ctrl)
@@ -106,8 +98,17 @@ protected:
 	BOOL RegisterWindowClass();
 
 public:
-	enum TIMER_ID
+	enum TIMER
 	{
+	};
+
+	enum WEBVIEW2_MESSAGE
+	{
+		webview2_message_navigation_start = WM_USER + 562,
+		webview2_message_navigation_completed,
+		webview2_message_document_title_changed,
+		webview2_message_download_completed,
+		webview2_message_web_message_received,
 	};
 
 	void on_navigation_start();
@@ -170,12 +171,15 @@ public:
 	RECT	get_rect();
 
 
-	EventRegistrationToken m_permissionRequestedToken = {};
-	EventRegistrationToken m_navigationCompletedToken = {};
 	EventRegistrationToken m_navigationStartingToken = {};
+	EventRegistrationToken m_navigationCompletedToken = {};
 	EventRegistrationToken m_documentTitleChangedToken = {};
+	EventRegistrationToken m_permissionRequestedToken = {};
 	EventRegistrationToken m_downloadStartingToken = {};
+	EventRegistrationToken m_stateChangedToken = {};
 	void RegisterEventHandlers();
+	void UpdateProgress(ICoreWebView2DownloadOperation* download);
+
 
 	ICoreWebView2Controller* GetWebViewController()
 	{
@@ -241,6 +245,7 @@ protected:
 	wil::com_ptr<ICoreWebView2> m_webView = nullptr;
 	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
 	wil::com_ptr<ICoreWebView2Profile> m_profile;		//Applies to 1.0.1245.22
+	//wil::com_ptr< ICoreWebView2DownloadOperation> m_download;
 
 	bool m_allow_external_drop = false;
 	LPWSTR m_default_download_path;

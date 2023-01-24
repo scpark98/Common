@@ -162,12 +162,11 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 	else
 		m_pBitmap = Gdiplus::Bitmap::FromFile(sFile); //new Gdiplus::Bitmap(sFile);
 #else
-	USES_CONVERSION;
-	LPCWSTR wFile = A2W(sFile);
+	CA2W wFile(sFile);
 	if (use_copied_open)
 		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 	else
-		m_pBitmap = Gdiplus::Bitmap::FromFile(wFile); //new Gdiplus::Bitmap(wFile);
+		m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 #endif
 
 	bool open_success = false;
@@ -272,7 +271,18 @@ void CGdiplusBitmap::release()
 		Wait(500);
 	}
 
+	//int palSize = m_pBitmap->GetPaletteSize();
+	//ColorPalette* palette = (ColorPalette*)malloc(palSize);
+	//bitmap->GetPalette(palette, palSize);
+
 	SAFE_DELETE(m_pBitmap);
+
+	if (m_pPropertyItem != NULL)
+	{
+		free(m_pPropertyItem);
+		m_pPropertyItem = NULL;
+	}
+
 	SAFE_DELETE_ARRAY(data);
 	width = height = channel = stride = 0;
 	m_filename.Empty();
@@ -386,9 +396,58 @@ CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh, CRect* targ
 	if (dh <= 0)
 		dh = height;
 
-	Graphics g(pDC->m_hDC);
-	g.DrawImage(m_pBitmap, dx, dy, dw, dh);
+	//long t0 = clock();
+
+	//두 그리기 방식은 Graphics가 더 빠르다.
+	//Graphics를 이용하여 그리기
+	//if (true)
+	{
+		Graphics g(pDC->m_hDC);
+
+		//256 gray scale이미지가 올바르게 표시되지 않는다.
+		if (channel == 1)
+		{
+			/*
+			m_pBitmap->ConvertFormat(
+				PixelFormat24bppRGB,
+				Gdiplus::DitherTypeSolid,
+				Gdiplus::PaletteTypeOptimal,
+				NULL,
+				0);
+			
+			//save(_T("d:\\temp\\converted.bmp"));
+			*/
+			g.DrawImage(m_pBitmap, dx, dy, dw, dh);
+		}
+		else
+		{
+			g.DrawImage(m_pBitmap, dx, dy, dw, dh);
+		}
+	}
+	//StretchBlt를 이용하여 그리기
+	/*
+	else
+	{
+		pDC->SetStretchBltMode(HALFTONE);
+		HDC MemoryDC = CreateCompatibleDC(pDC->GetSafeHdc()); //상용가능한 DC얻기 
+		HBITMAP hBit;
+		m_pBitmap->GetHBITMAP(Gdiplus::Color(0, 0, 0, 0), &hBit); //hBitmap얻기
+		HGDIOBJ obj = SelectObject(MemoryDC, hBit); //오브젝트 정하기
+		BITMAP bm;
+		GetObject(hBit, sizeof BITMAP, &bm); //비트맵의 크기구하기
+
+		//출력하기
+		StretchBlt(pDC->GetSafeHdc(), dx, dy, dw, dh, MemoryDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
+
+		SelectObject(MemoryDC, obj); //메모리누수방지
+		DeleteObject(hBit);
+		DeleteDC(MemoryDC);
+	}
+	*/
+
+	//TRACE(_T("clock = %d\n"), clock() - t0);
 	return CRect(dx, dy, dx + dw, dy + dh);
+
 }
 
 //Clone은 shallow copy라 하여 아래 deep_copy 함수도 추가했으나
@@ -424,6 +483,12 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 
 	m_pBitmap->UnlockBits(&bmpData);
 	dst->m_pBitmap->UnlockBits(&bmpData);
+
+	if (data)
+	{
+		dst->data = new uint8_t[width * height * channel];
+		memcpy(dst->data, data, width * height * channel);
+	}
 
 	dst->resolution();
 }
@@ -742,8 +807,41 @@ void CGdiplusBitmap::negative()
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {
+	/*
+	//Gdiplus::Bitmap* pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), PixelFormat8bppIndexed);// m_pBitmap->GetPixelFormat());
+	Gdiplus::ColorPalette* pal = (Gdiplus::ColorPalette*)malloc(sizeof(Gdiplus::ColorPalette) + 255 * sizeof(Gdiplus::ARGB));
+
+	pal->Count = 256;
+	pal->Flags = Gdiplus::PaletteFlagsGrayScale;
+	for (int i = 0; i < 256; i++)
+	{
+		pal->Entries[i] = Gdiplus::Color::MakeARGB((BYTE)255, i, i, i);
+	}
+	m_pBitmap->SetPalette(pal);
+
+	Gdiplus::Status status;// = Gdiplus::Bitmap::InitializePalette(pal, Gdiplus::PaletteTypeFixedHalftone256, 256, FALSE, pBitmap);
+
+	status = m_pBitmap->ConvertFormat(
+		PixelFormat8bppIndexed,
+		Gdiplus::DitherTypeOrdered4x4,
+		Gdiplus::PaletteTypeCustom,
+		pal,
+		0);
+	//save(pBitmap, _T("d:\\temp\\converted.bmp"));
+
+	release();
+	//SAFE_DELETE_ARRAY(data);
+
+	//m_pBitmap = pBitmap;
+	resolution();
+
+	//data = dst;
+	stride = width * channel;
+
+	free(pal);
+	*/
+
 	Bitmap* bitmap = new Bitmap(width, height, PixelFormat8bppIndexed);
-	//Bitmap* bitmap = new Bitmap(width, height, PixelFormat24bppRGB);
 	int palSize = bitmap->GetPaletteSize();
 	
 	ColorPalette *palette = (ColorPalette*)malloc(palSize);
@@ -756,7 +854,6 @@ void CGdiplusBitmap::convert2gray()
 		palette->Entries[i] = Gdiplus::Color::MakeARGB((BYTE)255, i, i, i);
 	}
 	bitmap->SetPalette(palette);
-	//*/
 
 	BitmapData bmData_src;
 	BitmapData bmData_dst;
@@ -766,7 +863,7 @@ void CGdiplusBitmap::convert2gray()
 
 	m_pBitmap->LockBits(&rect,
 		ImageLockModeRead,
-		/*PixelFormat24bppRGB,//*/m_pBitmap->GetPixelFormat(),
+		m_pBitmap->GetPixelFormat(),
 		&bmData_src);
 
 	bitmap->LockBits(&rect,
@@ -795,14 +892,17 @@ void CGdiplusBitmap::convert2gray()
 	m_pBitmap->UnlockBits(&bmData_src);
 	bitmap->UnlockBits(&bmData_dst);
 
-	SAFE_DELETE(m_pBitmap);
-	SAFE_DELETE_ARRAY(data);
+	//SAFE_DELETE(m_pBitmap);
+	release();
+	//SAFE_DELETE_ARRAY(data);
 
 	m_pBitmap = bitmap;
+	resolution();
+
 	//data = dst;
-	channel = 1;
 	stride = width * channel;
 
+	free(palette);
 	//save(_T("d:\\temp\\gray.bmp"));
 }
 
@@ -827,12 +927,12 @@ void CGdiplusBitmap::set_matrix(ColorMatrix* colorMatrix, ColorMatrix* grayMatri
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
-void CGdiplusBitmap::set_alpha(float transparent)
+void CGdiplusBitmap::set_alpha(float alpha)
 {
 	ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-								0.0f, 0.0f, 0.0f, transparent, 0.0f,
+								0.0f, 0.0f, 0.0f, alpha, 0.0f,
 								0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
 	//new를 사용하지 않는 아래 방식으로 할 경우
@@ -1097,7 +1197,7 @@ void CGdiplusBitmap::check_animate_gif()
 
 	m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_pPropertyItem);
 
-	delete pDimensionIDs;
+	delete []pDimensionIDs;
 }
 
 //gif 프레임 이미지들을 저장

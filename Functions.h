@@ -1076,8 +1076,9 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 //사각형
 	//사각형 정보를 문자열로 리턴한다.
 	//0 : "1 2 3 4"
-	//1 : "(1,2) x (3,4)"
-	//2 : "l = 1, t = 2, r = 3, b = 4"
+	//1 : "(1,2) ~ (4,8)"
+	//2 : "(1,2) ~ (4,8) (2x6)"
+	//3 : "l = 1, t = 2, r = 3, b = 4"
 	CString		GetRectInfoString( CRect r, int nFormat );
 
 	void		make_rect(CRect &Rect, int x, int y, int w, int h );

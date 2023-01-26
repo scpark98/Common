@@ -74,6 +74,9 @@ public:
 		id_menu_image_info = 1,
 		id_menu_file_open,
 		id_menu_file_open_sequence,
+
+		id_menu_do_not_image_processing,
+
 		id_menu_yuv_stereo,
 		id_menu_yuv_size,
 		id_menu_yuv422_uyvy,
@@ -152,6 +155,7 @@ public:
 
 //비디오 파일 및 메인 영상 관련
 	int				m_nFileType;
+	int				m_cam_index;
 	int				GetFileType() { return m_nFileType; }
 	CString			m_sVideoFileName;
 	CString			GetVideoFileName() { return m_sVideoFileName; }
@@ -175,6 +179,7 @@ public:
 
 	//sfile = "" 일때 bRunFileDialog = true이면 파일열기 창을 띠워서 입력받는다. 이때 기본 폴더는 sRecentFile이 있는 폴더가 된다.
 	bool			OpenVideoFile( CString sfile, bool bRunFileDialog = true, CString sRecentFile = _T(""), bool bPlay = true );
+	bool			open_cam(int index, bool auto_start = true);
 	void			CloseVideoFile();
 	//정상적으로 열린 동영상 파일일 경우에 파일명 변수에 저장되므로 이를 이용해 동영상 파일이 열린 상태인지 체크한다.
 	bool			IsVideoFileOpened() { return (m_sVideoFileName != ""); }
@@ -202,6 +207,7 @@ public:
 	void			Clear() { m_mat.release(); Invalidate(); }	//현재 영상 이미지인 m_mat을 release하고 화면 갱신.
 
 	//재생 관련
+	bool			m_do_not_image_processing = false;
 	bool			m_bRepeat;									//반복 재생 여부. 기본값 false.
 	void			Repeat( bool bRepeat = true ) { m_bRepeat = bRepeat; }
 	void			Play( int nState );

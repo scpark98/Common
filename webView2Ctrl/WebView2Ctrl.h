@@ -49,6 +49,8 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
   (물론 웹뷰2에서도 카메라, 마이크 등에 대한 접근 권한을 항상 허용으로 설정한 상태여야 한다.)
 - html상에서 wav 파일을 재생할때도 이와 동일한 문제가 발생하여 가상 웹서버에서 loading하도록 하여 해결.
 - 한글 파일명의 gif가 html 에서 표시되지 않는 문제 발생 -> ATEC에서 웹서버의 encoding을 변경하여 해결.
+- 1.0.1293.44를 사용했으나 문서공유창을 닫을 때 dlg가 죽는 현상이 발생하여
+  기기에 설치된 웹뷰런타임 버전인 1.0.1185.36보다 낮은 1150.38로 낮춤
 
 [수정사항]
 *20230122
@@ -177,6 +179,7 @@ public:
 	EventRegistrationToken m_permissionRequestedToken = {};
 	EventRegistrationToken m_downloadStartingToken = {};
 	EventRegistrationToken m_stateChangedToken = {};
+	EventRegistrationToken m_processFailedToken = {};
 	void RegisterEventHandlers();
 	void UpdateProgress(ICoreWebView2DownloadOperation* download);
 
@@ -244,7 +247,7 @@ protected:
 	wil::com_ptr<ICoreWebView2Controller> m_controller;
 	wil::com_ptr<ICoreWebView2> m_webView = nullptr;
 	wil::com_ptr<IDCompositionDevice> m_dcompDevice;
-	wil::com_ptr<ICoreWebView2Profile> m_profile;		//Applies to 1.0.1245.22
+	//wil::com_ptr<ICoreWebView2Profile> m_profile;		//Applies to 1.0.1245.22
 	//wil::com_ptr< ICoreWebView2DownloadOperation> m_download;
 
 	bool m_allow_external_drop = false;

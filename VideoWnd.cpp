@@ -207,7 +207,7 @@ BEGIN_MESSAGE_MAP(CVideoWnd, CWnd)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_DROPFILES()
 
-	ON_COMMAND_RANGE(id_menu_image_info + 1, id_menu_save_as_displayed_size, OnPopupMenu)
+	ON_COMMAND_RANGE(id_menu_image_info, id_menu_save_as_displayed_size, OnPopupMenu)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	ON_WM_ACTIVATE()
@@ -357,10 +357,10 @@ void CVideoWnd::OnPaint()
 		int w = rc.Width() / 2, h = 20;
 		UINT nFormat;
 		CRect rText;
-		makeRect( m_rInfoText[0], rc.left + gap, rc.top + gap, w, h );
-		makeRect( m_rInfoText[1], rc.right - gap - w, gap, w, h );
-		makeRect( m_rInfoText[2], rc.left + gap, rc.bottom - gap - h, w, h );
-		makeRect( m_rInfoText[3], rc.right - gap - w, rc.bottom - gap - h, w, h );
+		make_rect( m_rInfoText[0], rc.left + gap, rc.top + gap, w, h );
+		make_rect( m_rInfoText[1], rc.right - gap - w, gap, w, h );
+		make_rect( m_rInfoText[2], rc.left + gap, rc.bottom - gap - h, w, h );
+		make_rect( m_rInfoText[3], rc.right - gap - w, rc.bottom - gap - h, w, h );
 
 		for ( i = 0; i < 4; i++ )
 		{
@@ -900,6 +900,11 @@ void CVideoWnd::SetResizeRatio( double dRatio )
 	//Invalidate();
 }
 
+bool CVideoWnd::open_cam(int index, bool auto_start)
+{
+	m_cam_index = index;
+	return OpenVideoFile(_T("cam"), false, _T(""), auto_start);
+}
 
 bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRecentFile, bool bPlay )
 {
@@ -925,7 +930,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 			if ( sRecentFile == "" )
 				sRecentFile = GetExeDirectory() + _T("\\*.*");
 
-			TCHAR			szFilter[] = _T("Media (*.mp4,*.wmv,*.avi,*.bin,*.yuv,*.bmp,*.jpg,*.png)|*.mp4;*.wmv;*.avi;*.bin;*.yuv;*.bmp;*.jpg,*.png|All Filess(*.*)|*.*||");
+			TCHAR			szFilter[] = _T("Media (*.mp4,*.wmv,*.avi,*.bin,*.yuv,*.bmp,*.jpg,*.png)|*.mp4;*.wmv;*.avi;*.bin;*.yuv;*.bmp;*.jpg,*.png|All Files(*.*)|*.*||");
 			CFileDialog		dlg(true, _T("*.*"), sRecentFile, OFN_FILEMUSTEXIST, szFilter, this);
 
 			if ( dlg.DoModal() == IDCANCEL )
@@ -1042,9 +1047,12 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 			//필요한 곳에서 예외인 액션만 별도 처리하자.
 			m_nFileType = FILE_TYPE_VIDEO;
 
-			if ( m_capture.open(0) == false )
+			if (m_cam_index < 0)
+				m_cam_index = 0;
+
+			if ( m_capture.open(m_cam_index) == false )
 			{
-				str.Format(_T("%s\nCan't open cam device."), sfile);
+				str.Format(_T("Can't open cam%d device."), m_cam_index);
 				AfxMessageBox(str, MB_ICONSTOP);
 				return false;
 			}
@@ -1897,6 +1905,9 @@ void CVideoWnd::OnRButtonUp(UINT nFlags, CPoint point)
 	menu.AppendMenu(MF_STRING, id_menu_file_open, _T("Open(&O)..."));
 	menu.AppendMenu(MF_STRING, id_menu_file_open_sequence, _T("Open sequence images..."));
 	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, id_menu_do_not_image_processing, _T("Do not image processing"));
+	menu.CheckMenuItem(id_menu_do_not_image_processing, m_do_not_image_processing ? MF_CHECKED : MF_UNCHECKED);
+	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu( MF_POPUP, (UINT_PTR)menuYUV.m_hMenu, _T("YUV format") );
 	menu.AppendMenu( MF_SEPARATOR );
@@ -1989,26 +2000,8 @@ BOOL CVideoWnd::PreTranslateMessage(MSG* pMsg)
 	{
 		case WM_KEYDOWN :
 		{
-			//TRACE( "%d wnd key down = %d\n", m_nVideoWndID, pMsg->wParam );
-			/*
-			switch ( pMsg->wParam )
-			{
-				case 'C'	:	if ( IsCtrlPressed() )
-								{
-									CopyToClipboard();
-									return true;
-								}
-								else
-									break;
-				case 'V'	:	if ( IsCtrlPressed() )
-								{
-									PasteFromClipboard();
-									return true;
-								}
-								else
-									break;
-			}
-			*/
+			//OnKeyDown()함수에서 처리하기 위해 false를 리턴한다.
+			return false;
 		}
 		case WM_LBUTTONDOWN :
 		{
@@ -2437,7 +2430,7 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 	switch ( nID )
 	{
 		case id_menu_file_open :
-				OpenVideoFile(m_sVideoFileName, true);
+				OpenVideoFile(_T(""), true, m_sVideoFileName);
 				break;
 		case id_menu_file_open_sequence :
 				{
@@ -2455,6 +2448,9 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 					OpenSequenceImages( sfile );
 				}
 				break;
+		case id_menu_do_not_image_processing :
+			m_do_not_image_processing = !m_do_not_image_processing;
+			break;
 		case id_menu_yuv_stereo :
 			{
 				int oldState = GetPlayState();
@@ -3036,8 +3032,11 @@ void CVideoWnd::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 			if (IsVideoFileOpened())
 				Play(PLAY_TOGGLE);
 			else
-				OpenVideoFile(_T(""));
+				OpenVideoFile(AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("")));
 			break;
+		case VK_BACK :
+			GotoFrame(0);
+			return;
 		case 'C':
 			if (IsCtrlPressed())
 			{
@@ -3055,6 +3054,12 @@ void CVideoWnd::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 				return;
 			}
 			break;
+		case 'F' :
+			GotoNextFrame(true, 1, PAUSE);
+			return;
+		case 'D':
+			GotoNextFrame(false, 1, PAUSE);
+			return;
 		case VK_ESCAPE :
 			if ( m_bGetVanishingPoint )
 			{

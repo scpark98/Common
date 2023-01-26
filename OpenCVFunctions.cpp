@@ -3074,7 +3074,7 @@ CRect getCRect(cv::Rect r)
 
 cv::Point	CenterPoint(cv::Rect r)
 {
-	return cv::Point((r.x + r.width) / 2.0, (r.y + r.height) / 2.0);
+	return cv::Point(r.x + r.width / 2.0, r.y + r.height / 2.0);
 }
 
 void sobel(const unsigned char* src, unsigned char* dst, int w, int h)

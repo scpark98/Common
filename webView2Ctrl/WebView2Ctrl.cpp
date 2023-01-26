@@ -154,8 +154,8 @@ void CWebView2Ctrl::CloseWebView(bool cleanupUserDataFolder)
 		m_webView->remove_DocumentTitleChanged(m_documentTitleChangedToken);
 		m_webView->remove_PermissionRequested(m_permissionRequestedToken);
 
-		wil::com_ptr<ICoreWebView2_14> wvWnd14 = m_webView.try_query<ICoreWebView2_14>();
-		wvWnd14->remove_DownloadStarting(m_downloadStartingToken);
+		wil::com_ptr<ICoreWebView2_8> wvWnd = m_webView.try_query<ICoreWebView2_8>();
+		wvWnd->remove_DownloadStarting(m_downloadStartingToken);
 
 		m_webView = nullptr;
 		m_webSettings = nullptr;
@@ -225,6 +225,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 		//20230104. NH 1293.44로 변경
 		//간혹 cache문제로 새로 변경된 내용이 표시되지 않는 현상이 있다.
 		//html이 변경되어 불가피하게 캐시를 지울때만 지워주자.
+		/*
 		if (CWebView2Ctrl::m_clear_cache_on_created)
 		{
 			wil::com_ptr<ICoreWebView2_13> wvWnd13 = m_webView.try_query<ICoreWebView2_13>();
@@ -244,6 +245,7 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 				}
 			}
 		}
+		*/
 
 
 		//아래 두 줄을 사용하면 아래 URL과 같이 접근 가능하다.
@@ -425,24 +427,46 @@ void CWebView2Ctrl::UpdateProgress(ICoreWebView2DownloadOperation* download)
 
 void CWebView2Ctrl::RegisterEventHandlers()
 {
+	/*
+	CHECK_FAILURE(m_webView->add_ProcessFailed(
+		Microsoft::WRL::Callback<ICoreWebView2ProcessFailedEventHandler>(
+			[this](ICoreWebView2*, ICoreWebView2ProcessFailedEventArgs2* args)->HRESULT
+			{
+				HRESULT hr;
+				int exitCode;
+				ICoreWebView2FrameInfoCollection* frames;
+				LPWSTR processDescription;
+				COREWEBVIEW2_PROCESS_FAILED_REASON reason;
+
+				hr = args->get_ExitCode(&exitCode);
+				hr = args->get_FrameInfosForFailedProcess(&frames);
+				hr = args->get_ProcessDescription(&processDescription);
+				hr = args->get_Reason(&reason);
+				CString msg;
+				msg.Format(_T("exitCode = %d, processDescription = %s, reason = %d"), exitCode, processDescription, reason);
+				AfxMessageBox(msg);
+
+			}).Get(), &m_processFailedToken));
+	*/
+
 	//다운로드 시작 이벤트
 	//현재는 기본 기능만 구현했으나
 	//다운로드와 관련된 세부적인 기능까지 구현하려면 다음 사이트를 참조하여 추가해야 한다.
 	//https://github.com/MicrosoftEdge/WebView2Feedback/blob/main/specs/CustomDownload.md
-	wil::com_ptr<ICoreWebView2_15> wvWnd15 = m_webView.try_query<ICoreWebView2_15>();
-	CHECK_FAILURE(wvWnd15->add_DownloadStarting(
+	wil::com_ptr<ICoreWebView2_4> wvWnd4 = m_webView.try_query<ICoreWebView2_4>();
+	CHECK_FAILURE(wvWnd4->add_DownloadStarting(
 		Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
 			[this](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT
 			{
+				//AfxMessageBox(_T("ICoreWebView2DownloadStartingEventHandler"));
 				wil::com_ptr<ICoreWebView2DownloadOperation> download;
 				CHECK_FAILURE(args->get_DownloadOperation(&download));
 				//TRUE이면 다운로드 팝업창을 표시하지 않는다.
 				args->put_Handled(TRUE);
-
 				//INT64 expectedDownloadSizeInBytes = 0;
 				//CHECK_FAILURE(download->get_ExpectedDownloadSizeInBytes(
 				//	&expectedDownloadSizeInBytes));
-
+				/*
 				wil::unique_cotaskmem_string uri;
 				CHECK_FAILURE(download->get_Uri(&uri));
 
@@ -451,13 +475,13 @@ void CWebView2Ctrl::RegisterEventHandlers()
 
 				wil::unique_cotaskmem_string contentDisposition;
 				CHECK_FAILURE(download->get_ContentDisposition(&contentDisposition));
+				*/
 
 				// Get the suggested path from the event args.
 				//wil::unique_cotaskmem_string resultFilePath;
-				LPWSTR resultFilePath;
-				CHECK_FAILURE(args->get_ResultFilePath(&resultFilePath));
-
-				CHECK_FAILURE(args->put_ResultFilePath(resultFilePath));
+				//LPWSTR resultFilePath;
+				//CHECK_FAILURE(args->get_ResultFilePath(&resultFilePath));
+				//CHECK_FAILURE(args->put_ResultFilePath(resultFilePath));
 				UpdateProgress(download.get());
 				//기본 다운로드 경로를 알 수도 있고
 				//ICoreWebView2DownloadOperation* downloadOperation;

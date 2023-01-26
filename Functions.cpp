@@ -9221,19 +9221,20 @@ void safe_release_gradient_rect_handle()
 }
 
 //format
-//0 : "1, 2, 3, 4"
-//1 : "(1,2) x (3,4)"
-//2 : "l = 1, t = 2, r = 3, b = 4"
+//0 : "1 2 3 4"
+//1 : "(1,2)~(4,8)"
+//2 : "(1,2)~(4,8) (2x6)"
+//3 : "l = 1, t = 2, r = 3, b = 4"
 CString GetRectInfoString(CRect r, int nFormat)
 {
 	CString str;
 
-	if (nFormat == 2)
-		str.Format(_T("l = %d, t = %d, r = %d, b = %d"), r.left, r.top, r.right, r.bottom);
-	else if (nFormat == 1)
-		str.Format(_T("(%d,%d) x (%d,%d)"), r.left, r.top, r.right, r.bottom);
+	if (nFormat == 1)
+		str.Format(_T("(%d,%d)~(%d,%d)"), r.left, r.top, r.right, r.bottom);
+	else if (nFormat == 2)
+		str.Format(_T("(%d,%d)~(%d,%d) (%dx%d)"), r.left, r.top, r.right, r.bottom, r.Width(), r.Height());
 	else if (nFormat == 3)
-		str.Format(_T("(%d,%d) (%d x %d)"), r.left, r.top, r.Width(), r.Height());
+		str.Format(_T("l = %d, t = %d, r = %d, b = %d"), r.left, r.top, r.right, r.bottom);
 	else
 		str.Format(_T("%d, %d, %d, %d"), r.left, r.top, r.right, r.bottom);
 

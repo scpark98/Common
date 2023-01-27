@@ -24,6 +24,7 @@
 \*|*/
 //#include "stdafx.h"
 #include "DimEditCtrl.h"
+#include "../Functions.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -47,6 +48,7 @@ CDimEditCtrl::CDimEditCtrl() :
 	m_caDimText[ 0 ] = _T( '\0' );							// Terminate The Buffer
 	SetDimOffset( -0x40, -0x40, -0x40 );					// Set The Dim Offset
 
+	m_dwStyle = 0;
 	return;													// Done!
 }
 
@@ -60,14 +62,15 @@ CDimEditCtrl::~CDimEditCtrl()
 BEGIN_MESSAGE_MAP(CDimEditCtrl, CEdit)
 	//{{AFX_MSG_MAP(CDimEditCtrl)
 	ON_CONTROL_REFLECT_EX(EN_CHANGE, OnChange)
-	ON_CONTROL_REFLECT(EN_SETFOCUS, OnSetfocus)
+	//ON_CONTROL_REFLECT(EN_SETFOCUS, OnSetfocus)
+	ON_CONTROL_REFLECT_EX(EN_SETFOCUS, OnSetfocus)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_WM_SETTINGCHANGE()
 	//}}AFX_MSG_MAP
 //	ON_WM_LBUTTONDOWN()
 //	ON_WM_LBUTTONDBLCLK()
-ON_CONTROL_REFLECT(EN_KILLFOCUS, &CDimEditCtrl::OnEnKillfocus)
+	ON_CONTROL_REFLECT_EX(EN_KILLFOCUS, &CDimEditCtrl::OnEnKillfocus)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -161,15 +164,18 @@ BOOL CDimEditCtrl::OnChange()
 }
 
 
-void CDimEditCtrl::OnSetfocus() 
+BOOL CDimEditCtrl::OnSetfocus() 
 {
 	Invalidate();
+
+	return FALSE;
 }
 
 
-void CDimEditCtrl::OnEnKillfocus()
+BOOL CDimEditCtrl::OnEnKillfocus()
 {
 	DrawDimText();										// Draw The Dim Text
+	return FALSE;
 }
 
 void CDimEditCtrl::OnPaint() 
@@ -181,7 +187,7 @@ void CDimEditCtrl::OnPaint()
 
 void	CDimEditCtrl::DrawDimText()
 {
-	if ( GetFocus() == this )
+	if (GetFocus() == this || !IsWindowEnabled())
 		return;
 
 	if( !m_bShowDimText || !m_iDimTextLen )				// If No Dim Text
@@ -200,9 +206,24 @@ void	CDimEditCtrl::DrawDimText()
 	dc.SelectObject( (*GetFont()) );					// Use The Control's Current Font
 	dc.SetTextColor( m_crDimTextColor );				// Set The Text Color
 	//pDC->SetBkColor( GetSysColor( COLOR_WINDOW ) );	// Set The Bk Color
-	dc.DrawText( m_caDimText, m_iDimTextLen, &rRect, 
-			( DT_CENTER | DT_VCENTER | DT_SINGLELINE ) );// Draw The Dim Text
-	
+	dc.SetBkMode(TRANSPARENT);
+
+	DWORD dwStyle = GetStyle();
+	DWORD dwText = 0;
+
+	if (m_dwStyle == 0)
+	{
+		MAP_STYLE(ES_LEFT, DT_LEFT);
+		MAP_STYLE(ES_RIGHT, DT_RIGHT);
+		MAP_STYLE(ES_CENTER, DT_CENTER);
+		//MAP_STYLE(ES_CENTERIMAGE, DT_VCENTER | DT_SINGLELINE);
+		//MAP_STYLE(ES_NOPREFIX, DT_NOPREFIX);
+		//MAP_STYLE(ES_WORDELLIPSIS, DT_WORD_ELLIPSIS);
+		//MAP_STYLE(ES_ENDELLIPSIS, DT_END_ELLIPSIS);
+		//MAP_STYLE(ES_PATHELLIPSIS, DT_PATH_ELLIPSIS);
+	}
+
+	dc.DrawText(m_caDimText, m_iDimTextLen, &rRect, dwText | DT_SINGLELINE | DT_VCENTER);
 	dc.RestoreDC( iState );								// Restore The DC State
 
 	return;												// Done!

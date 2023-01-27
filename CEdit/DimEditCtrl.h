@@ -87,7 +87,7 @@ private:
 protected:
 	//{{AFX_MSG(CDimEditCtrl)
 	afx_msg BOOL OnChange();
-	afx_msg void OnSetfocus();
+	afx_msg BOOL OnSetfocus();
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnSettingChange(UINT uFlags, LPCTSTR lpszSection);
@@ -108,8 +108,9 @@ protected:
 	char		m_cGreenOS;									// Green Color Dim Offset
 	char		m_cBlueOS;									// Blue Color Dim Offset
 	int			m_iDimTextLen;								// Length Of Dim Text
+	DWORD		m_dwStyle;
 public:
-	afx_msg void OnEnKillfocus();
+	afx_msg BOOL OnEnKillfocus();
 };
 
 /////////////////////////////////////////////////////////////////////////////

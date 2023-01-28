@@ -384,12 +384,14 @@ int CGdiplusBitmap::channels()
 	return 3;
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, CRect r, CRect* targetRect, Color crBack)
+CRect CGdiplusBitmap::draw(CDC* pDC, CRect targetRect)
 {
-	return draw(pDC, r.left, r.top, r.Width(), r.Height(), targetRect, crBack);
+	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
+	draw(pDC, r.left, r.top, r.Width(), r.Height());
+	return r;
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh, CRect* targetRect, Color crBack)
+CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
 {
 	if (dw <= 0)
 		dw = width;

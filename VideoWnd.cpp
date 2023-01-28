@@ -1996,38 +1996,99 @@ void CVideoWnd::OnRButtonUp(UINT nFlags, CPoint point)
 BOOL CVideoWnd::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: Add your specialized code here and/or call the base class
-	switch ( pMsg->message )
+	if (pMsg->message == WM_KEYDOWN)
 	{
-		case WM_KEYDOWN :
+		switch (pMsg->wParam)
 		{
-			//OnKeyDown()함수에서 처리하기 위해 false를 리턴한다.
-			return false;
-		}
-		case WM_LBUTTONDOWN :
-		{
-			//TRACE(_T("%s\n"), _T("CVideoWnd::WM_LBUTTONDOWN") );
-			if ( m_bROI_Set || m_bROI_Move || m_bMeasureSize || m_bGetVanishingPoint)
+		case VK_SPACE:
+			m_bROI_Set = m_bROI_Move = m_bMeasureSize = m_bGetVanishingPoint = false;
+			m_nVanishingPointCount = 0;
+
+			if (IsVideoFileOpened())
+				Play(PLAY_TOGGLE);
+			else
+				OpenVideoFile(AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("")));
+			break;
+		case VK_BACK:
+			GotoFrame(0);
+			return true;
+		case VK_LEFT:
+		case VK_RIGHT:
+			if (IsShiftPressed())
+				GotoNextFrame(pMsg->wParam == VK_RIGHT, 33);
+			else if (IsCtrlPressed())
+				GotoNextFrame(pMsg->wParam == VK_RIGHT, 330);
+			else
+				GotoNextFrame(pMsg->wParam == VK_RIGHT, 33 * 5);
+			break;
+		case 'C':
+			if (IsCtrlPressed())
 			{
-				SendMessage( pMsg->message, pMsg->wParam, pMsg->lParam );
-				return true;
-			}
-			return false;
-		}
-		case WM_LBUTTONUP :
-		{
-			//SendMessage( pMsg->message, pMsg->wParam, pMsg->lParam );
-			return false;
-		}
-		case WM_RBUTTONUP :
-		{
-			if ( m_bUsePopupMenu )
-			{
-				SendMessage( pMsg->message, pMsg->wParam, pMsg->lParam );
+				if (IsShiftPressed())
+					CopyVideonameAndFrameToClipboard();
+				else
+					CopyToClipboard();
 				return true;
 			}
 			break;
+		case 'V':
+			if (IsCtrlPressed())
+			{
+				PasteFromClipboard();
+				return true;
+			}
+			break;
+		case 'F':
+			GotoNextFrame(true, 1, PAUSE);
+			return true;
+		case 'D':
+			GotoNextFrame(false, 1, PAUSE);
+			return true;
+		case VK_ESCAPE:
+			if (m_bGetVanishingPoint)
+			{
+				if (m_nVanishingPointCount > 0)
+					m_nVanishingPointCount = 0;
+				else
+					m_bGetVanishingPoint = false;
+			}
+			else
+			{
+				m_bROI_Set = m_bROI_Move = m_bMeasureSize = false;
+			}
+
+			Invalidate();
+			break;
+		//default:
+			//AfxGetMainWnd()->SendMessage(WM_KEYDOWN, pMsg->wParam, pMsg->lParam);
+			//return true;
 		}
 	}
+	else if (pMsg->message == WM_LBUTTONDOWN)
+	{
+		//TRACE(_T("%s\n"), _T("CVideoWnd::WM_LBUTTONDOWN") );
+		if ( m_bROI_Set || m_bROI_Move || m_bMeasureSize || m_bGetVanishingPoint)
+		{
+			SendMessage( pMsg->message, pMsg->wParam, pMsg->lParam );
+			return true;
+		}
+		return false;
+	}
+	else if (pMsg->message == WM_LBUTTONUP)
+	{
+		//SendMessage( pMsg->message, pMsg->wParam, pMsg->lParam );
+		return false;
+	}
+	/*
+	else if (pMsg->message == WM_RBUTTONUP)
+	{
+		if ( m_bUsePopupMenu )
+		{
+			SendMessage( pMsg->message, pMsg->wParam, pMsg->lParam );
+			return true;
+		}
+	}
+	*/
 
 	return CWnd::PreTranslateMessage(pMsg);
 }
@@ -3023,59 +3084,6 @@ void CVideoWnd::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	//핫키가 눌려지면 mainDlg의 PreTranslateMessage() 함수에서 먼저 처리하므로
 	//그 함수에서 처리하거나 child로 넘길 경우는 return false;해주면 된다.
 	//TRACE(_T("CVideoWnd::OnKeyDown = %d\n"), nChar);
-	switch (nChar)
-	{
-		case VK_SPACE :
-			m_bROI_Set = m_bROI_Move = m_bMeasureSize = m_bGetVanishingPoint = false;
-			m_nVanishingPointCount = 0;
-
-			if (IsVideoFileOpened())
-				Play(PLAY_TOGGLE);
-			else
-				OpenVideoFile(AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("")));
-			break;
-		case VK_BACK :
-			GotoFrame(0);
-			return;
-		case 'C':
-			if (IsCtrlPressed())
-			{
-				if ( IsShiftPressed() )
-					CopyVideonameAndFrameToClipboard();
-				else
-					CopyToClipboard();
-				return;
-			}
-			break;
-		case 'V' :
-			if (IsCtrlPressed())
-			{
-				PasteFromClipboard();
-				return;
-			}
-			break;
-		case 'F' :
-			GotoNextFrame(true, 1, PAUSE);
-			return;
-		case 'D':
-			GotoNextFrame(false, 1, PAUSE);
-			return;
-		case VK_ESCAPE :
-			if ( m_bGetVanishingPoint )
-			{
-				if ( m_nVanishingPointCount > 0 )
-					m_nVanishingPointCount = 0;
-				else
-					m_bGetVanishingPoint = false;
-			}
-			else
-			{
-				m_bROI_Set = m_bROI_Move = m_bMeasureSize = false;
-			}
-
-			Invalidate();
-			break;
-	}
 
 	CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
 }

@@ -384,8 +384,64 @@ int CGdiplusBitmap::channels()
 	return 3;
 }
 
+CRect CGdiplusBitmap::draw(CDC* pDC, CGdiplusBitmap mask1, CRect targetRect)
+{
+	CGdiplusBitmap temp;
+	temp.load(_T("d:\\temp\\mask.bmp"));
+	temp.convert2gray();
+
+	/*
+	temp.get_raw_data();
+
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			Gdiplus::Color cr;
+			m_pBitmap->GetPixel(x, y, &cr);
+			m_pBitmap->SetPixel(x, y, cr);
+		}
+	}
+	*/
+
+	BitmapData bmData_dst;
+	Rect rect(0, 0, width, height);
+
+	temp.m_pBitmap->LockBits(&rect,
+		ImageLockModeRead,
+		temp.m_pBitmap->GetPixelFormat(),
+		&bmData_dst);
+
+	uint8_t* src = (uint8_t*)bmData_dst.Scan0;
+
+	Gdiplus::Bitmap mask(temp.width, temp.height, temp.width, PixelFormat8bppIndexed, src);
+	int palSize = m_pBitmap->GetPaletteSize();
+
+	ColorPalette* palette = (ColorPalette*)malloc(palSize);
+	m_pBitmap->GetPalette(palette, palSize);
+	// invert - only shows the transparent  
+	for (int i = 0; i < 256; i++)
+		palette->Entries[i] = Gdiplus::Color::MakeARGB(255 - i, 0, 0, i);
+
+	mask.SetPalette(palette);
+	//temp.m_pBitmap->UnlockBits(&bmData_dst);
+	//save(&mask, _T("d:\\temp\\mask.bmp"));
+
+	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
+	Graphics g(pDC->m_hDC);
+
+	g.DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
+	g.DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
+	
+	//CRect r = GetRatioRect(targetRect, (double)width / (double)height);
+	//Graphics g(pDC->m_hDC);
+	//g.DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
+
+	return r;
+}
 CRect CGdiplusBitmap::draw(CDC* pDC, CRect targetRect)
 {
+	
 	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
 	draw(pDC, r.left, r.top, r.Width(), r.Height());
 	return r;

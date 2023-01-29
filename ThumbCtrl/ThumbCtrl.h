@@ -61,6 +61,7 @@ public:
 		message_thumb_insert = 0,
 		message_thumb_loading_completed,
 		message_thumb_reload,
+		message_thumb_reload_selected,
 		message_thumb_lbutton_selected,
 		message_thumb_lbutton_unselected,
 		message_thumb_lbutton_dbclicked,
@@ -141,6 +142,7 @@ public:
 		idTotalCount = WM_USER + 1234,
 		idFind,
 		idReload,
+		idReloadSelected,
 		idSortByTitle,
 		idCopyToClipboard,
 		idToggleIndex,
@@ -206,9 +208,9 @@ public:
 	//m_use_multi_selection이 false라도 Ctrl키를 누르면 다중 선택이 가능하다.
 	//m_use_multi_selection는 그냥 좌클릭만으로도 다중 선택이 가능하게 할 지에 대한 플래그임.
 	void			use_multi_selection(bool multi_select = true) { m_use_multi_selection = multi_select; }
-	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
+	//선택된 첫번째 항목의 인덱스를 리턴.
 	int				get_selected_item();
-	//dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
+	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
 	int				get_selected_items(std::deque<int>* dqSelected = NULL);
 
 	bool			m_use_circle_number = false;

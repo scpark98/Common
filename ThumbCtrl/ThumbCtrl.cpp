@@ -1117,6 +1117,7 @@ void CThumbCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 
 	menu.AppendMenu(MF_STRING, idFind, _T("찾기...(&F)"));
 	menu.AppendMenu(MF_STRING, idReload, _T("새로 고침(&R)"));
+	menu.AppendMenu(MF_STRING, idReloadSelected, _T("선택 항목만 새로 고침"));
 	menu.AppendMenu(MF_STRING, idSortByTitle, _T("타이틀로 정렬(&S)"));
 	menu.AppendMenu(MF_SEPARATOR);
 
@@ -1206,6 +1207,10 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 	case idReload :
 		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload, 0), 0);
+		break;
+	case idReloadSelected:
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
 		break;
 
 	case idSortByTitle :

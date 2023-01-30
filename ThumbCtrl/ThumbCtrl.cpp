@@ -1082,6 +1082,8 @@ void CThumbCtrl::OnKillFocus(CWnd* pNewWnd)
 	CWnd::OnKillFocus(pNewWnd);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//edit_end(true);
+
 	m_has_focus = false;
 	//printf( "kill focus" );
 	Invalidate();
@@ -2252,6 +2254,9 @@ void CThumbCtrl::edit_begin(int index)
 
 void CThumbCtrl::edit_end(bool valid)
 {
+	if (!m_in_editing)
+		return;
+
 	m_in_editing = false;
 	m_pEdit->ShowWindow(SW_HIDE);
 

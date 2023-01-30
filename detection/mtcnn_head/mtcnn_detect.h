@@ -19,6 +19,8 @@
 * 
 * init_mtcnn(w, h, path_root)에서는 w, h를 640x360, 320x240 등을 줘도 크게 차이는 없었다.
 * (어떠한 w, h를 줘도 얼굴의 크기가 10px ~ 90px 범위일 때 검출율 높음)
+* NH프로젝트의 ITM기기에 앉은 고객 유무를 판별하기 위해
+  좀 더 큰 얼굴 크기도 검출 가능하도록 min_objsize, max_objsize를 (24.0f, 70.0f)에서 (50.0f, 150.0f)로 키움.
 */
 
 #ifndef MTCNN_DETECT_H
@@ -30,16 +32,16 @@
 #include <opencv2/dnn.hpp>
 #include <vector>
 
-static const float pnet_th = 0.7f;
-static const float rnet_th = 0.7f;
-static const float onet_th = 0.2f;
-static const float min_objsize = 24.0f;
-static const float pyramid_factor = 0.666f;
-static const float max_objsize = 70.0f;
-static const int max_pnet_bbox_num = 100; // 100
-static const int max_rnet_bbox_num = 50; // 50
-static const float pnet_merge_th = 0.6f;
-static const float rnet_merge_th = 0.5f;
+static float pnet_th = 0.7f;
+static float rnet_th = 0.7f;
+static float onet_th = 0.2f;
+static float min_objsize = 50.0f;
+static float pyramid_factor = 0.666f;
+static float max_objsize = 150.0f;
+static int max_pnet_bbox_num = 100; // 100
+static int max_rnet_bbox_num = 50; // 50
+static float pnet_merge_th = 0.6f;
+static float rnet_merge_th = 0.5f;
 
 typedef struct
     {

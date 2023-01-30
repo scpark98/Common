@@ -106,7 +106,8 @@ public:
 
 	enum WEBVIEW2_MESSAGE
 	{
-		webview2_message_navigation_start = WM_USER + 562,
+		webview2_message_create_completed = WM_USER + 562,
+		webview2_message_navigation_start,
 		webview2_message_navigation_completed,
 		webview2_message_document_title_changed,
 		webview2_message_download_completed,

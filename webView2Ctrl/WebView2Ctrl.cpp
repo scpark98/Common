@@ -339,6 +339,8 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 			hresult = m_webView->Navigate(CStringW("about:blank"));
 		}
 		resize();
+
+		::SendMessage(GetParent()->m_hWnd, webview2_message_create_completed, (WPARAM)this, 0);
 	}
 	else
 	{

@@ -508,7 +508,10 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				if (true)//kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE)
 				{
 					//args->put_State(COREWEBVIEW2_PERMISSION_STATE_DEFAULT);
-					args->put_State(m_permission_request_mode);
+					if (args->put_State(m_permission_request_mode) == S_OK)
+						AfxMessageBox(_T("permission allowed"));
+					else
+						AfxMessageBox(_T("permission not allowed"));					
 				}
 				return S_OK;
 			}).Get(), &m_permissionRequestedToken));

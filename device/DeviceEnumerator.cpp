@@ -1,5 +1,8 @@
 #include "DeviceEnumerator.h"
 
+#include <dshow.h>
+#pragma comment(lib, "strmiids")
+
 std::map<int, Device> DeviceEnumerator::getVideoDevicesMap() {
 	return getDevicesMap(CLSID_VideoInputDeviceCategory);
 }

@@ -860,6 +860,7 @@ void CVideoWnd::SetResizeRatio( double dRatio )
 	double dRatioOld = m_dResizeRatio;
 
 	m_dResizeRatio = dRatio;
+	WriteProfileDouble(AfxGetApp(), _T("setting\\video"), _T("resize ratio"), m_dResizeRatio);
 
 	m_szImageSize.cx = ROUND( (double)m_szImageSizeOrigin.cx * m_dResizeRatio, 0 );
 	m_szImageSize.cy = ROUND( (double)m_szImageSizeOrigin.cy * m_dResizeRatio, 0 );
@@ -1050,7 +1051,8 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 			if (m_cam_index < 0)
 				m_cam_index = 0;
 
-			if ( m_capture.open(m_cam_index) == false )
+			//윈도우에서 CAP_DSHOW를 주지 않고 기본값인 0이면 다른 방식으로 캠을 열기 위한 시간이 많이 소모된다.
+			if ( m_capture.open(m_cam_index, CAP_DSHOW) == false )
 			{
 				str.Format(_T("Can't open cam%d device."), m_cam_index);
 				AfxMessageBox(str, MB_ICONSTOP);
@@ -1124,15 +1126,22 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 	if ( IsROIExist() )
 		m_mat( cv::Rect(m_rImageROI.left, m_rImageROI.top, m_rImageROI.Width(), m_rImageROI.Height()) ).copyTo( m_mat );
 
-
+	CString recentFile = AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T(""));
 	AfxGetApp()->WriteProfileString(_T("setting\\video"), _T("recent file"), m_sVideoFileName );
 
 	if (GetParent()->m_hWnd && m_bSendPlayWndInfo)
-	{
 		::SendMessage(GetParent()->m_hWnd, message_video_wnd_video_opened, m_nVideoWndID, 0);
+
+	if (recentFile == m_sVideoFileName)
+		SetResizeRatio(GetProfileDouble(AfxGetApp(), _T("setting\\video"), _T("resize ratio"), 1.0));
+
+	GotoFrame(AfxGetApp()->GetProfileInt(_T("setting\\video"), _T("recent frame"), 0) - 60);
+
+	if (GetParent()->m_hWnd && m_bSendPlayWndInfo)
+	{
 		::SendMessage(GetParent()->m_hWnd, message_video_wnd_play_state_changed, m_nVideoWndID, m_nPlayState );
 	}
-	//else
+	else
 	{
 		//위의 message_video_wnd_video_opened에 의해서 만약 m_Video.SetResizeRatio()를 호출하면
 		//updateMainMat이 수행되므로 중복 수행이 된다.
@@ -1912,9 +1921,10 @@ void CVideoWnd::OnRButtonUp(UINT nFlags, CPoint point)
 	menu.AppendMenu( MF_POPUP, (UINT_PTR)menuYUV.m_hMenu, _T("YUV format") );
 	menu.AppendMenu( MF_SEPARATOR );
 
+	m_dResizeRatio = GetProfileDouble(AfxGetApp(), _T("setting\\video"), _T("resize ratio"), 1.0);
 	str.Format(_T("Resize ratio : %f"), m_dResizeRatio);
 	menu.AppendMenu(MF_STRING, id_menu_resize_ratio, str);
-	menu.EnableMenuItem(id_menu_resize_ratio, IsVideoFileOpened() ? MF_ENABLED : MF_DISABLED);
+	//menu.EnableMenuItem(id_menu_resize_ratio, IsVideoFileOpened() ? MF_ENABLED : MF_DISABLED);
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu( MF_STRING, id_menu_roi_set, _T("Set ROI(&R)") );

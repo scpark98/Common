@@ -1,10 +1,10 @@
 #pragma once
 
-#include <Windows.h>
-#include <dshow.h>
+#ifndef DEVICE_ENUMERATOR
+#define DEVICE_ENUMERATOR
+//#include <Windows.h>
 
-#pragma comment(lib, "strmiids")
-
+#include <afxwin.h>
 #include <map>
 #include <string>
 
@@ -29,3 +29,5 @@ private:
 	std::string ConvertWCSToMBS(const wchar_t* pstr, long wslen);
 
 };
+
+#endif

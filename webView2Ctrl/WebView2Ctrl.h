@@ -101,12 +101,37 @@ class CWebView2Ctrl : public CWnd
 {
 	DECLARE_DYNAMIC(CWebView2Ctrl)
 
+	BOOL CreateHostWindow(
+		LPCTSTR lpszClassName,
+		LPCTSTR lpszWindowName,
+		DWORD dwStyle,
+		const RECT& rect,
+		CWnd* pParentWnd,
+		UINT nID);
+
+	BOOL CWebView2Ctrl::Create(
+		LPCTSTR lpszClassName,
+		LPCTSTR lpszWindowName,
+		DWORD dwStyle,
+		const RECT& rect,
+		CWnd* pParentWnd,
+		UINT nID,
+		CCreateContext*);
+
+	BOOL CWebView2Ctrl::CreateAsync(
+		DWORD dwStyle,
+		const RECT& rect,
+		CWnd* pParentWnd,
+		UINT nID);
+
+
 protected:
 	BOOL RegisterWindowClass();
 
 public:
 	enum TIMER
 	{
+		timer_reload_due_to_process_exited = 0,
 	};
 
 	enum WEBVIEW2_MESSAGE
@@ -117,6 +142,7 @@ public:
 		webview2_message_document_title_changed,
 		webview2_message_download_completed,
 		webview2_message_web_message_received,
+		webview2_message_reload_due_to_process_exited,
 	};
 
 	void on_navigation_start();
@@ -165,6 +191,7 @@ public:
 	//static void	clear_cache_on_created(bool clear) { CWebView2Ctrl::m_clear_cache_on_created = clear; }
 
 	//WebView2
+	bool	m_create_static = true;
 	HWND m_webHwnd = NULL;
 	void InitializeWebView();
 	void CloseWebView(bool cleanupUserDataFolder = false);
@@ -288,4 +315,5 @@ public:
 	virtual void PreSubclassWindow();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnDropFiles(HDROP hDropInfo);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

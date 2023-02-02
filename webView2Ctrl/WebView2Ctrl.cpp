@@ -48,6 +48,8 @@ bool CWebView2Ctrl::m_clear_cache_on_created = false;
 
 CWebView2Ctrl::CWebView2Ctrl()
 {
+	HRESULT hresult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
 	if (!RegisterWindowClass())
 		return;
 }
@@ -89,6 +91,58 @@ BOOL CWebView2Ctrl::RegisterWindowClass()
 	return TRUE;
 }
 
+BOOL CWebView2Ctrl::CreateHostWindow(
+	LPCTSTR lpszClassName,
+	LPCTSTR lpszWindowName,
+	DWORD dwStyle,
+	const RECT& rect,
+	CWnd* pParentWnd,
+	UINT nID)
+{
+	if (lpszClassName == nullptr)
+		lpszClassName = CWEBVIEW2CTRL_CLASSNAME;
+
+	if (!CWnd::Create(lpszClassName, lpszWindowName, dwStyle, rect, pParentWnd, nID))
+		return FALSE;
+
+	::SetWindowLongPtr(m_hWnd, GWLP_USERDATA, (LONG_PTR)this);
+
+	return TRUE;
+}
+
+BOOL CWebView2Ctrl::Create(
+	LPCTSTR lpszClassName,
+	LPCTSTR lpszWindowName,
+	DWORD dwStyle,
+	const RECT& rect,
+	CWnd* pParentWnd,
+	UINT nID,
+	CCreateContext*)
+{
+	if (!CreateHostWindow(lpszClassName, lpszWindowName, dwStyle, rect, pParentWnd, nID))
+		return FALSE;
+
+	InitializeWebView();
+
+	return TRUE;
+}
+
+BOOL CWebView2Ctrl::CreateAsync(
+	DWORD dwStyle,
+	const RECT& rect,
+	CWnd* pParentWnd,
+	UINT nID)
+{
+	if (!CreateHostWindow(CWEBVIEW2CTRL_CLASSNAME, CWEBVIEW2CTRL_CLASSNAME, dwStyle, rect, pParentWnd, nID))
+		return FALSE;
+
+	//m_callbacks[CallbackType::CreationCompleted] = onCreated;
+
+	InitializeWebView();
+
+	return TRUE;
+}
+
 void CWebView2Ctrl::InitializeWebView()
 {
 	DragAcceptFiles();
@@ -116,6 +170,7 @@ void CWebView2Ctrl::InitializeWebView()
 	//NH투자증권 프로젝트에서 카메라 영상이 표시되지 않는 현상이 있다.
 	//다른 프로젝트에서는 카메라 영상이 잘 표시된다.
 	//userDataFolder = CStringW(get_known_folder(FOLDERID_InternetCache));
+
 	userDataFolder = CStringW(get_known_folder(FOLDERID_Cookies));
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
@@ -429,27 +484,115 @@ void CWebView2Ctrl::UpdateProgress(ICoreWebView2DownloadOperation* download)
 
 void CWebView2Ctrl::RegisterEventHandlers()
 {
-	/*
+	// Register a handler for the ProcessFailed event.
+	// This handler checks the failure kind and tries to:
+	//   * Recreate the webview for browser failure and render unresponsive.
+	//   * Reload the webview for render failure.
+	//   * Reload the webview for frame-only render failure impacting app content.
+	//   * Log information about the failure for other failures.
 	CHECK_FAILURE(m_webView->add_ProcessFailed(
-		Microsoft::WRL::Callback<ICoreWebView2ProcessFailedEventHandler>(
-			[this](ICoreWebView2*, ICoreWebView2ProcessFailedEventArgs2* args)->HRESULT
-			{
-				HRESULT hr;
-				int exitCode;
-				ICoreWebView2FrameInfoCollection* frames;
-				LPWSTR processDescription;
-				COREWEBVIEW2_PROCESS_FAILED_REASON reason;
+		Callback<ICoreWebView2ProcessFailedEventHandler>(
+			[this](ICoreWebView2* sender, ICoreWebView2ProcessFailedEventArgs* argsRaw)
+			-> HRESULT {
+				wil::com_ptr<ICoreWebView2ProcessFailedEventArgs> args = argsRaw;
+				COREWEBVIEW2_PROCESS_FAILED_KIND kind;
+				CHECK_FAILURE(args->get_ProcessFailedKind(&kind));
+				if (kind == COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED)
+				{
+					// Do not run a message loop from within the event handler
+					// as that could lead to reentrancy and leave the event
+					// handler in stack indefinitely. Instead, schedule the
+					// appropriate work to take place after completion of the
+					// event handler.
+					//AfxMessageBox(_T("Browser process exited unexpectedly."));
+					SetTimer(timer_reload_due_to_process_exited, 1000, NULL);
+				}
+				else if (kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE)
+				{
+					//AfxMessageBox(_T("Browser render process has stopped responding."));
+					SetTimer(timer_reload_due_to_process_exited, 1000, NULL);
+				}
+				else if (kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED)
+				{
+					// Reloading the page will start a new render process if
+					// needed.
+					//AfxMessageBox(_T("Browser render process exited unexpectedly."));
+					SetTimer(timer_reload_due_to_process_exited, 1000, NULL);
+				}
+				// Check the runtime event args implements the newer interface.
+				auto args2 = args.try_query<ICoreWebView2ProcessFailedEventArgs2>();
+				if (!args2)
+				{
+					return S_OK;
+				}
+				if (kind == COREWEBVIEW2_PROCESS_FAILED_KIND_FRAME_RENDER_PROCESS_EXITED)
+				{
+					// A frame-only renderer has exited unexpectedly. Check if
+					// reload is needed.
+					wil::com_ptr<ICoreWebView2FrameInfoCollection> frameInfos;
+					wil::com_ptr<ICoreWebView2FrameInfoCollectionIterator> iterator;
+					CHECK_FAILURE(args2->get_FrameInfosForFailedProcess(&frameInfos));
+					CHECK_FAILURE(frameInfos->GetIterator(&iterator));
 
-				hr = args->get_ExitCode(&exitCode);
-				hr = args->get_FrameInfosForFailedProcess(&frames);
-				hr = args->get_ProcessDescription(&processDescription);
-				hr = args->get_Reason(&reason);
-				CString msg;
-				msg.Format(_T("exitCode = %d, processDescription = %s, reason = %d"), exitCode, processDescription, reason);
-				AfxMessageBox(msg);
+					BOOL hasCurrent = FALSE;
+					while (SUCCEEDED(iterator->get_HasCurrent(&hasCurrent)) && hasCurrent)
+					{
+						wil::com_ptr<ICoreWebView2FrameInfo> frameInfo;
+						CHECK_FAILURE(iterator->GetCurrent(&frameInfo));
 
-			}).Get(), &m_processFailedToken));
-	*/
+						wil::unique_cotaskmem_string nameRaw;
+						wil::unique_cotaskmem_string sourceRaw;
+						CHECK_FAILURE(frameInfo->get_Name(&nameRaw));
+						CHECK_FAILURE(frameInfo->get_Source(&sourceRaw));
+						//AfxMessageBox(_T("Browser render process for app frame exited unexpectedly."));
+						/*
+						if (IsAppContentUri(sourceRaw.get()))
+						{
+							ScheduleReloadIfSelectedByUser(
+								L"Browser render process for app frame exited unexpectedly. "
+								L"Reload page?",
+								L"App content frame unresponsive");
+							break;
+						}
+						*/
+
+						BOOL hasNext = FALSE;
+						CHECK_FAILURE(iterator->MoveNext(&hasNext));
+					}
+				}
+				else
+				{
+					// Show the process failure details. Apps can collect info for their logging
+					// purposes.
+					COREWEBVIEW2_PROCESS_FAILED_REASON reason;
+					wil::unique_cotaskmem_string processDescription;
+					int exitCode;
+
+					CHECK_FAILURE(args2->get_Reason(&reason));
+					CHECK_FAILURE(args2->get_ProcessDescription(&processDescription));
+					CHECK_FAILURE(args2->get_ExitCode(&exitCode));
+
+					CString msg;
+					msg.Format(_T("kind = %d\nReason = %d\nExit code = %d\nProcess description = %s"),
+						kind,
+						reason,
+						exitCode,
+						CString(processDescription.get()));
+					//AfxMessageBox(msg);
+					/*
+					std::wstringstream message;
+					message << L"Kind: " << ProcessFailedKindToString(kind) << L"\n"
+						<< L"Reason: " << ProcessFailedReasonToString(reason) << L"\n"
+						<< L"Exit code: " << std::to_wstring(exitCode) << L"\n"
+						<< L"Process description: " << processDescription.get() << std::endl;
+					m_appWindow->AsyncMessageBox(std::move(message.str()), L"Child process failed");
+					*/
+					
+				}
+				return S_OK;
+			})
+		.Get(),
+				&m_processFailedToken));
 
 	//다운로드 시작 이벤트
 	//현재는 기본 기능만 구현했으나
@@ -799,15 +942,17 @@ CString CWebView2Ctrl::normalize_url(CString url)
 BEGIN_MESSAGE_MAP(CWebView2Ctrl, CWnd)
 	ON_WM_SIZE()
 	ON_WM_DROPFILES()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
 void CWebView2Ctrl::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	HRESULT hresult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	//SetWindowLongPtr(this->GetSafeHwnd(), GWLP_USERDATA, (LONG_PTR)this);
-	InitializeWebView();
+	if (m_create_static)
+		InitializeWebView();
+	//m_hWnd;
 
 	CWnd::PreSubclassWindow();
 }
@@ -935,4 +1080,18 @@ void CWebView2Ctrl::OnDropFiles(HDROP hDropInfo)
 	navigate(file);
 
 	CWnd::OnDropFiles(hDropInfo);
+}
+
+
+void CWebView2Ctrl::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (nIDEvent == timer_reload_due_to_process_exited)
+	{
+		KillTimer(timer_reload_due_to_process_exited);
+		//AfxMessageBox(_T("timer_reload_due_to_process_exited. Reload!"));
+		::SendMessage(GetParent()->m_hWnd, webview2_message_reload_due_to_process_exited, (WPARAM)this, 0);
+	}
+
+	CWnd::OnTimer(nIDEvent);
 }

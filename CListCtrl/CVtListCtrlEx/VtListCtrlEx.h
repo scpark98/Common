@@ -100,7 +100,29 @@ public:
 	int			insert_item(int index, CString text = _T(""), bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, bool ensureVisible = true, bool invalidate = true);
 	//가변 파라미터로 전달할 때는 컬럼의 수보다 적은 인수일 경우 반드시 끝 인자는 NULL을 넣어줘야 한다.
-	int			insert_item(int index, LPCTSTR pszText, ...);
+	//int			insert_item(int index, LPCTSTR pszText, ...);
+	//int			insert_item(int index, CString, ...);
+	template <typename ... Types>
+	int				insert_item(int index, Types... args)
+	{
+		int n = sizeof...(args);
+		CString arg[] = { args... };
+
+		int subItem = 0;
+		if (index < 0)
+			index = size();
+
+		for (auto item : arg)
+		{
+			if (subItem == 0)
+				index = insert_item(index, item);
+			else
+				set_text(index, subItem, item);
+			subItem++;
+		}
+
+		return index;
+	}
 
 	int			size();
 

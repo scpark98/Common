@@ -1295,7 +1295,7 @@ int CVtListCtrlEx::insert_item(int index, std::deque<CString> dqText, bool ensur
 
 	return index;
 }
-
+/*
 int CVtListCtrlEx::insert_item(int index, LPCTSTR pszText, ...)
 {
 	if (index < 0)
@@ -1331,7 +1331,7 @@ int CVtListCtrlEx::insert_item(int index, LPCTSTR pszText, ...)
 
 	return index;
 }
-
+*/
 
 int CVtListCtrlEx::size()
 {

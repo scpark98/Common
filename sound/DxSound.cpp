@@ -1,6 +1,6 @@
 //Sound.cpp ÆÄÀÏ 
 
-#include "StdAfx.h"
+//#include "StdAfx.h"
 #include "DxSound.h"
 #include "../Functions.h"
 #include <MATH.H>

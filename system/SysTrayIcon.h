@@ -33,6 +33,7 @@ Compiler with version number : Visual C++ 6.0/7.0 (.NET)
 #pragma once
 #endif // _MSC_VER > 1000
 
+#include <afxwin.h>
 #include <afxtempl.h>
 #include <shellapi.h>
 

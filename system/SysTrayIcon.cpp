@@ -11,7 +11,7 @@ e-mail:  kaulpr@yahoo.com
 Compiler with version number : Visual C++ 6.0/7.0 (.NET)
 ********************************************************************************/
 
-#include "StdAfx.h"
+//#include "StdAfx.h"
 #include "SysTrayIcon.h"
 
 #pragma warning(disable:4996)

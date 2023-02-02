@@ -3,7 +3,8 @@
 #if !defined(_DXSOUND_H__INCLUDED_)
 #define _DXSOUND_H__INCLUDED_
 
-#include <windows.h>
+#include <afxwin.h>
+//#include <windows.h>
 #include <mmsystem.h>	// 이 헤더파일은 windows.h에 정의한 매크로영향을 받기 
 						// 때문에 반드시 windows.h를 포함된 다음에 인클루드 해 줘야 한다.
 #include <dsound.h>

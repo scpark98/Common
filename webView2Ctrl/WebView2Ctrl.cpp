@@ -267,7 +267,7 @@ HRESULT CWebView2Ctrl::OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView
 
 HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, ICoreWebView2Controller* controller)
 {
-	if (result == S_OK)
+	if (result == S_OK && controller)
 	{
 		m_controller = controller;
 		wil::com_ptr<ICoreWebView2> coreWebView2;
@@ -366,6 +366,14 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 					&m_documentTitleChangedToken);
 		*/
 
+		//CWebView2Ctrl이 hide일때 navigate이 되지 않는 문제를 해결하기 위해
+		//여기서 ShowWindow를 해봤으나 소용없었다.
+		//m_controller->put_IsVisible()을 사용해야 한다.
+		//hide일때도 navigate은 잘 된다.
+		m_controller->put_IsVisible(TRUE);
+
+		::PostMessage(GetParent()->m_hWnd, webview2_message_create_completed, (WPARAM)this, S_OK);
+
 		if (m_url_reserved.IsEmpty() == false)
 		{
 			/*
@@ -380,11 +388,6 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 			//for message test end.
 			*/
 
-			//CWebView2Ctrl이 hide일때 navigate이 되지 않는 문제를 해결하기 위해
-			//여기서 ShowWindow를 해봤으나 소용없었다.
-			//m_controller->put_IsVisible()을 사용해야 한다.
-			//hide일때도 navigate은 잘 된다.
-			m_controller->put_IsVisible(TRUE);
 
 			hresult = m_webView->Navigate(CStringW(m_url_reserved));
 			m_url_reserved.Empty();
@@ -394,12 +397,12 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 			hresult = m_webView->Navigate(CStringW("about:blank"));
 		}
 		resize();
-
-		::SendMessage(GetParent()->m_hWnd, webview2_message_create_completed, (WPARAM)this, 0);
 	}
 	else
 	{
+		::PostMessage(GetParent()->m_hWnd, webview2_message_create_completed, (WPARAM)this, S_FALSE);
 		TRACE("Failed to create webview");
+		return S_FALSE;
 	}
 	return S_OK;
 }
@@ -412,7 +415,7 @@ HRESULT CWebView2Ctrl::WebMessageReceived(ICoreWebView2* sender, ICoreWebView2We
 	//if (!receivedMessage.IsEmpty())
 	{
 		//AfxMessageBox("This message came from Javascript : " + receivedMessage);
-		::SendMessage(GetParent()->m_hWnd, webview2_message_web_message_received, (WPARAM)this, (LPARAM)&receivedMessage);
+		::PostMessage(GetParent()->m_hWnd, webview2_message_web_message_received, (WPARAM)this, (LPARAM)&receivedMessage);
 	}
 	return S_OK;
 }
@@ -473,7 +476,7 @@ void CWebView2Ctrl::UpdateProgress(ICoreWebView2DownloadOperation* download)
 						download->get_ResultFilePath(&resultPath);
 						//TRACE(_T("%s : download completed.\n"), resultPath);
 						CString sResultPath = resultPath;
-						::SendMessage(GetParent()->m_hWnd, webview2_message_download_completed, (WPARAM)this, (WPARAM)&sResultPath);
+						::PostMessage(GetParent()->m_hWnd, webview2_message_download_completed, (WPARAM)this, (WPARAM)&sResultPath);
 						break;
 					}
 					return S_OK;
@@ -727,7 +730,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				}
 
 				on_navigation_completed();
-				::SendMessage(GetParent()->m_hWnd, webview2_message_navigation_completed, (WPARAM)this, (LPARAM)&sURI);
+				::PostMessage(GetParent()->m_hWnd, webview2_message_navigation_completed, (WPARAM)this, (LPARAM)&sURI);
 
 				return S_OK;
 			})
@@ -1090,7 +1093,7 @@ void CWebView2Ctrl::OnTimer(UINT_PTR nIDEvent)
 	{
 		KillTimer(timer_reload_due_to_process_exited);
 		//AfxMessageBox(_T("timer_reload_due_to_process_exited. Reload!"));
-		::SendMessage(GetParent()->m_hWnd, webview2_message_reload_due_to_process_exited, (WPARAM)this, 0);
+		::PostMessage(GetParent()->m_hWnd, webview2_message_reload_due_to_process_exited, (WPARAM)this, 0);
 	}
 
 	CWnd::OnTimer(nIDEvent);

@@ -191,6 +191,11 @@ public:
 	//static void	clear_cache_on_created(bool clear) { CWebView2Ctrl::m_clear_cache_on_created = clear; }
 
 	//WebView2
+	//일반적으로는 리소스 뷰의 dlg editor에서 custom control로 정적 생성해서 사용하게 되는데
+	//부득이하게 동적 생성이 필요한 경우는 m_create_static을 false로 하여 생성하면 된다.
+	//이 값을 false로 하지 않으면 PreCreateWindow와 CWebView2Ctrl::Create~함수에서
+	//InitializeWebView()가 중복호출되는데 Create~함수에서 이를 제거하여 한번만 호출되게 해도 안되어
+	//우선 이 변수로 동적, 정적 생성을 구분하여 사용한다.
 	bool	m_create_static = true;
 	HWND m_webHwnd = NULL;
 	void InitializeWebView();

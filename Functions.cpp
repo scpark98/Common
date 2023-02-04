@@ -2124,59 +2124,6 @@ bool ReadURLFile(LPCTSTR pUrl, CString &strBuffer)
 		return TRUE; 
 } 
 
-//http://localhost:4300/test_doc_favorite/test.avi
-CString	get_uri(CString full_remote_url, CString local_path)
-{
-	int colon = full_remote_url.Find(_T(":"));
-	bool is_https = true;
-
-	//http 또는 https에 따라 port 추출을 위한 콜론 위치 추출
-	if (full_remote_url.Left(7) == _T("http://"))
-	{
-		colon = full_remote_url.Find(_T(":"), 8);
-		is_https = false;
-	}
-	else if (full_remote_url.Left(8) == _T("https://"))
-	{
-		colon = full_remote_url.Find(_T(":"), 9);
-	}
-	else
-	{
-		return _T("[error] invalid url.");
-	}
-
-	CString ip;
-	CString port;
-	CString remote_path;
-	int slash;
-	
-	if (colon > 0)
-	{
-		ip = full_remote_url.Left(colon);
-		slash = full_remote_url.Find(_T("/"), colon);
-		port = full_remote_url.Mid(colon + 1, slash - colon - 1);
-		remote_path = full_remote_url.Mid(slash);
-	}
-	else
-	{
-		slash = full_remote_url.Find(_T("//"));
-		if (slash > 0)
-		{
-			slash = full_remote_url.Find(_T("/"), slash);
-			ip = full_remote_url.Left(slash);
-			remote_path = full_remote_url.Mid(slash);
-
-			if (is_https)
-				port = _T("443");
-			else
-				port = _T("80");
-		}
-	}
-
-	return get_uri(ip, _ttoi(port), remote_path, local_path);
-}
-
-
 std::wstring multibyteToUnicode(std::string inputtext)
 {
 	int length = MultiByteToWideChar(CP_ACP, 0, &inputtext[0], inputtext.size(), NULL, NULL);
@@ -2219,11 +2166,243 @@ std::string utf8ToMultibyte(std::string inputtext)
 	return (unicodeToMultibyte(utf8ToUnicode(inputtext)));
 }
 
+//http://localhost:4300/test_doc_favorite/test.avi
+CString	get_uri(CString full_remote_url, CString local_path)
+{
+	/*
+	int colon = full_remote_url.Find(_T(":"));
+	bool is_https = true;
+
+	//http 또는 https에 따라 port 추출을 위한 콜론 위치 추출
+	if (full_remote_url.Left(7) == _T("http://"))
+	{
+		colon = full_remote_url.Find(_T(":"), 8);
+		is_https = false;
+	}
+	else if (full_remote_url.Left(8) == _T("https://"))
+	{
+		colon = full_remote_url.Find(_T(":"), 9);
+	}
+	else
+	{
+		return _T("[error] invalid url.");
+	}
+
+	CString ip;
+	CString port;
+	CString remote_path;
+	int slash;
+
+	if (colon > 0)
+	{
+		ip = full_remote_url.Left(colon);
+		slash = full_remote_url.Find(_T("/"), colon);
+		port = full_remote_url.Mid(colon + 1, slash - colon - 1);
+		remote_path = full_remote_url.Mid(slash);
+	}
+	else
+	{
+		slash = full_remote_url.Find(_T("//"));
+		if (slash > 0)
+		{
+			slash = full_remote_url.Find(_T("/"), slash);
+			ip = full_remote_url.Left(slash);
+			remote_path = full_remote_url.Mid(slash);
+
+			if (is_https)
+				port = _T("443");
+			else
+				port = _T("80");
+		}
+	}
+	*/
+
+	DWORD dwServiceType;
+	CString strServer;
+	CString strObject;
+	INTERNET_PORT nPort;
+	AfxParseURL(full_remote_url, dwServiceType, strServer, strObject, nPort);
+
+	return get_uri(strServer, nPort, strObject, local_path);
+}
+
 CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 {
 	CString result = _T("ok");
-	CString logStr;
+	CString str;
+	CString remoteURL;
+	bool is_https = (ip.Find(_T("https://")) >= 0);
 
+	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_TRANSFER_BINARY; // http
+	if (is_https)
+	{
+		secureFlags |= INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
+	}
+
+	HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+	if (hInternet == NULL)
+		return _T("error=InternetOpen failed.");
+
+	remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
+	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, NULL, 0, secureFlags, 0);
+	if (hURL == NULL) {
+		InternetCloseHandle(hInternet);
+		return _T("error=InternetOpenUrl failed.");
+	}
+
+	DWORD buffer_size = 1024 * 1024;
+	DWORD dwSize, dwRead, dwWritten, dwTotalSize;
+	char* buffer = new char[buffer_size];
+	char* total_buffer = NULL;
+	TCHAR size_buffer[32];
+	
+	memset(buffer, 0, buffer_size);
+
+	if (local_path.IsEmpty())
+	{
+		total_buffer = new char[buffer_size * 10];
+		memset(total_buffer, 0, buffer_size * 10);
+	}
+	
+	//size_buffer가 char면 파일크기를 못얻어온다.
+	//파일이 존재하지 않아도 에러 내용이 포함된 html이 넘어오므로 항상 그 값이 0보다 크다.
+	// 연결정보 확인
+
+	TCHAR szStatusCode[1024] = { 0, };
+	DWORD dwCodeSize;
+	HttpQueryInfo(hURL, HTTP_QUERY_STATUS_CODE, szStatusCode, &dwCodeSize, NULL);
+	long nStatusCode = _ttol(szStatusCode);
+
+	if (nStatusCode == HTTP_STATUS_NOT_FOUND || nStatusCode != HTTP_STATUS_OK)
+	{
+		SAFE_DELETE_ARRAY(buffer);
+		SAFE_DELETE_ARRAY(total_buffer);
+		InternetCloseHandle(hURL);
+		InternetCloseHandle(hInternet);
+
+		if (nStatusCode == HTTP_STATUS_NOT_FOUND)
+			str.Format(_T("error=%s\n\nremote file does not exist."), remote_path);
+		else
+			str.Format(_T("error=%s\n\nstatus code = %d"), remote_path, nStatusCode);
+
+		return str;
+	}
+
+	HANDLE hFile = NULL;
+
+	if (!local_path.IsEmpty())
+	{
+		CString folder = GetFolderNameFromFullPath(local_path);
+		make_full_directory(folder);
+	}
+
+	//0바이트의 파일은 다운받지 않아도 될 듯 하지만
+	//서버의 파일과 다운받은 로컬의 파일의 수가 같은지 등을 비교할 수도 있으므로 생성하자.
+	bool bOK = HttpQueryInfo(hURL, HTTP_QUERY_CONTENT_LENGTH, size_buffer, &dwRead, NULL);
+	dwTotalSize = _ttoi(size_buffer);
+	if (dwTotalSize == 0)
+	{
+		if (local_path.IsEmpty())
+		{
+			result.Empty();
+		}
+		else
+		{
+			hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			if (hFile == INVALID_HANDLE_VALUE)
+			{
+				SAFE_DELETE_ARRAY(buffer);
+				SAFE_DELETE_ARRAY(total_buffer);
+				InternetCloseHandle(hURL);
+				InternetCloseHandle(hInternet);
+
+				return _T("error=") + local_path + _T("\n\nfail to CreateFile().");
+			}
+
+			CloseHandle(hFile);
+			result = _T("ok");
+		}		
+
+		SAFE_DELETE_ARRAY(buffer);
+		SAFE_DELETE_ARRAY(total_buffer);
+		InternetCloseHandle(hURL);
+		InternetCloseHandle(hInternet);
+
+		return result;
+	}
+
+	do
+	{
+		InternetQueryDataAvailable(hURL, &dwSize, 0, 0);
+		InternetReadFile(hURL, buffer, dwSize, &dwRead);
+		
+		if (dwRead == 0)
+			break;
+
+		if (local_path.IsEmpty())
+		{
+			//_tcsncat(total_buffer, buffer, dwSize);
+			strncat(total_buffer, buffer, dwSize);
+		}
+		else
+		{
+			CString check_404 = UTF8toCString(buffer).MakeLower();
+			if (check_404.Find(_T("file not found")) >= 0 || check_404.Find(_T("error code: 404")) >= 0)
+			{
+				SAFE_DELETE_ARRAY(buffer);
+				SAFE_DELETE_ARRAY(total_buffer);
+				InternetCloseHandle(hURL);
+				InternetCloseHandle(hInternet);
+
+				return _T("error=") + remote_path + _T("\n\nremote file does not exist.");
+			}
+
+			//remote file이 존재하지 않을 경우 로컬에 파일을 만들지 않기 위해 여기서 체크.
+			if (hFile == NULL)
+			{
+				if (PathFileExists(local_path) && DeleteFile(local_path) == FALSE)
+				{
+					SAFE_DELETE_ARRAY(buffer);
+					SAFE_DELETE_ARRAY(total_buffer);
+					InternetCloseHandle(hURL);
+					InternetCloseHandle(hInternet);
+
+					return _T("error=") + local_path + _T("\n\nfail to DeleteFile().");
+				}
+
+				hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+				if (hFile == INVALID_HANDLE_VALUE)
+				{
+					SAFE_DELETE_ARRAY(buffer);
+					SAFE_DELETE_ARRAY(total_buffer);
+					InternetCloseHandle(hURL);
+					InternetCloseHandle(hInternet);
+
+					return _T("error=") + local_path + _T("\n\nfail to CreateFile().");
+				}
+			}
+
+			WriteFile(hFile, buffer, dwRead, &dwWritten, NULL);
+		}
+	} while (dwRead != 0);
+
+	if (local_path.IsEmpty())
+	{
+		result = UTF8toCString(total_buffer);
+	}
+	else
+	{
+		CloseHandle(hFile);
+		result = _T("ok");
+	}
+
+	SAFE_DELETE_ARRAY(buffer);
+	SAFE_DELETE_ARRAY(total_buffer);
+	InternetCloseHandle(hURL);
+	InternetCloseHandle(hInternet);
+
+	return result;
+	/*
 	try
 	{
 		HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
@@ -2259,23 +2438,6 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 			secureFlags = INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
 		}
 
-		/*
-		USES_CONVERSION;
-		
-		wchar_t strUnicode[256] = { 0, };
-		char    *strMultibyte = CString2char(remote_path);
-		//strcpy_s(strMultibyte, remote_path.GetLength(), remote_path.GetBuffer());
-		int nLen = MultiByteToWideChar(CP_ACP, 0, strMultibyte, strlen(strMultibyte), NULL, NULL);
-		MultiByteToWideChar(CP_ACP, 0, strMultibyte, strlen(strMultibyte), strUnicode, nLen);
-
-		char strUtf8[256] = { 0, };
-		nLen = WideCharToMultiByte(CP_UTF8, 0, strUnicode, lstrlenW(strUnicode), NULL, 0, NULL, NULL);
-		WideCharToMultiByte(CP_UTF8, 0, strUnicode, lstrlenW(strUnicode), strUtf8, nLen, NULL, NULL);
-		
-		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), unicodeToUtf8(strUnicode).c_str(), NULL, NULL, NULL, secureFlags, 0);
-		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), strUtf8, NULL, NULL, NULL, secureFlags, 0);
-		//HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), CT2A(remote_path, CP_UTF8), NULL, NULL, NULL, secureFlags, 0);
-		*/
 		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), remote_path, NULL, NULL, NULL, secureFlags, 0);
 
 		//delete[] strMultibyte;
@@ -2314,6 +2476,20 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 			InternetCloseHandle(hConnect);
 			InternetCloseHandle(hInternet);
 			return _T("[error] HttpSendRequest Fail");
+		}
+		else
+		{
+			//See if HttpQueryInfo can get the file size.
+			DWORD status_code = 0;
+			DWORD status_code_size = sizeof(status_code);
+			if (FALSE == HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status_code,	&status_code_size, nullptr))
+			{
+				InternetCloseHandle(hRequest);
+				InternetCloseHandle(hConnect);
+				InternetCloseHandle(hInternet);
+
+				return _T("error=404");
+			}
 		}
 
 		HANDLE hFile = NULL;
@@ -2400,6 +2576,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	{
 		return _T("");
 	}
+	*/
 }
 
 DWORD	GetURLFileSize(LPCTSTR pUrl)
@@ -4721,6 +4898,8 @@ bool recursive_make_full_directory(LPCTSTR sFolder)
 
 bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
 {
+	if (PathFileExists(lpPathName))
+		return true;
 	CString folder(lpPathName);
 	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, (LPCTSTR)folder, lpsa));
 }

@@ -739,6 +739,7 @@ BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMon
 
 
 	//풀패스를 주면 폴더를 자동으로 만들어준다.
+	//폴더가 이미 존재해도 true를 리턴함.
 	//lpPathName은 설령 그 형식이 파일명이라도
 	//무조건 그 이름과 동일한 폴더를 생성하게 되므로
 	//반드시 생성하고자 하는 폴더명을 사용할것.

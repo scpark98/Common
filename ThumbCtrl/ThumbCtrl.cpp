@@ -1211,8 +1211,15 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload, 0), 0);
 		break;
 	case idReloadSelected:
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
-			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
+		{
+			int index = get_selected_item();
+			if (index < 0 || index >= m_dqThumb.size())
+				return;
+			m_dqThumb[index].reload();
+			InvalidateRect(m_dqThumb[index].rect);
+			::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
+		}
 		break;
 
 	case idSortByTitle :

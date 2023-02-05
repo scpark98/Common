@@ -2231,6 +2231,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	CString result = _T("ok");
 	CString str;
 	CString remoteURL;
+	TCHAR szHead[] = _T("Accept: */*\r\n\r\n");
 	bool is_https = (ip.Find(_T("https://")) >= 0);
 
 	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_TRANSFER_BINARY; // http
@@ -2244,17 +2245,18 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		return _T("error=InternetOpen failed.");
 
 	remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
-	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, NULL, 0, secureFlags, 0);
+	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, szHead, -1L, secureFlags, 0);
 	if (hURL == NULL) {
 		InternetCloseHandle(hInternet);
 		return _T("error=InternetOpenUrl failed.");
 	}
 
 	DWORD buffer_size = 1024 * 1024;
-	DWORD dwSize, dwRead, dwWritten, dwTotalSize;
+	DWORD dwSize, dwRead, dwWritten, dwTotalSize = 0;
 	char* buffer = new char[buffer_size];
 	char* total_buffer = NULL;
-	TCHAR size_buffer[32];
+	TCHAR query_buffer[32] = { 0, };
+	DWORD query_buffer_size = sizeof(query_buffer);
 	
 	memset(buffer, 0, buffer_size);
 
@@ -2268,12 +2270,21 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	//파일이 존재하지 않아도 에러 내용이 포함된 html이 넘어오므로 항상 그 값이 0보다 크다.
 	// 연결정보 확인
 
-	TCHAR szStatusCode[1024] = { 0, };
-	DWORD dwCodeSize;
-	HttpQueryInfo(hURL, HTTP_QUERY_STATUS_CODE, szStatusCode, &dwCodeSize, NULL);
-	long nStatusCode = _ttol(szStatusCode);
+	bool ret = HttpQueryInfo(hURL, HTTP_QUERY_STATUS_CODE, (LPVOID)&query_buffer, &query_buffer_size, NULL);
+	long nStatusCode = _ttol(query_buffer);
 
-	if (nStatusCode == HTTP_STATUS_NOT_FOUND || nStatusCode != HTTP_STATUS_OK)
+	if (!ret)
+	{
+		AfxMessageBox(get_error_message(GetLastError(), true));
+		SAFE_DELETE_ARRAY(buffer);
+		SAFE_DELETE_ARRAY(total_buffer);
+		InternetCloseHandle(hURL);
+		InternetCloseHandle(hInternet);
+		return _T("error=") + get_error_message(GetLastError(), true);
+	}
+
+	if (nStatusCode == HTTP_STATUS_NOT_FOUND ||
+		(nStatusCode != 0 && nStatusCode != HTTP_STATUS_OK))
 	{
 		SAFE_DELETE_ARRAY(buffer);
 		SAFE_DELETE_ARRAY(total_buffer);
@@ -2298,8 +2309,21 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 	//0바이트의 파일은 다운받지 않아도 될 듯 하지만
 	//서버의 파일과 다운받은 로컬의 파일의 수가 같은지 등을 비교할 수도 있으므로 생성하자.
-	bool bOK = HttpQueryInfo(hURL, HTTP_QUERY_CONTENT_LENGTH, size_buffer, &dwRead, NULL);
-	dwTotalSize = _ttoi(size_buffer);
+	//HTTP_QUERY_FLAG_NUMBER을 넣지 않으면 HttpQueryInfo()에서 오류가 발생한다.
+	DWORD dwBufLen = sizeof(dwTotalSize);
+	ret = HttpQueryInfo(hURL, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
+	if (!ret)
+	{
+		AfxMessageBox(get_error_message(GetLastError(), true));
+
+		SAFE_DELETE_ARRAY(buffer);
+		SAFE_DELETE_ARRAY(total_buffer);
+		InternetCloseHandle(hURL);
+		InternetCloseHandle(hInternet);
+
+		return _T("error=") + get_error_message(GetLastError(), true);
+	}
+
 	if (dwTotalSize == 0)
 	{
 		if (local_path.IsEmpty())
@@ -2341,11 +2365,11 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 		if (local_path.IsEmpty())
 		{
-			//_tcsncat(total_buffer, buffer, dwSize);
 			strncat(total_buffer, buffer, dwSize);
 		}
 		else
 		{
+			/*
 			CString check_404 = UTF8toCString(buffer).MakeLower();
 			if (check_404.Find(_T("file not found")) >= 0 || check_404.Find(_T("error code: 404")) >= 0)
 			{
@@ -2356,6 +2380,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 				return _T("error=") + remote_path + _T("\n\nremote file does not exist.");
 			}
+			*/
 
 			//remote file이 존재하지 않을 경우 로컬에 파일을 만들지 않기 위해 여기서 체크.
 			if (hFile == NULL)

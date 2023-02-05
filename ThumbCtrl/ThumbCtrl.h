@@ -120,6 +120,11 @@ public:
 	//위의 img라는 로컬 변수가 자동 소멸되는 시점이 되면
 	//m_dqThumb는 시작 포인터만 가지고 있을 뿐 실제 데이터 영역은 delete되기 때문이다.
 	//remove_all 또는 프로그램이 종료되는 시점에서 수동으로 delete시켜줘야 한다.
+	void		reload()
+	{
+		img->release();
+		img->load(full_path);
+	}
 };
 
 class CThumbCtrl : public CWnd

@@ -29,7 +29,10 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 //gdiplus 1.1을 사용하기 위해 pch.h, framework.h등에 이 define을 추가했으나 적용되지 않았다.
 //결국 여기에 추가하니 해결됨.
+#ifdef GDIPVER
+#undef GDIPVER
 #define GDIPVER 0x0110
+#endif
 
 #include <afxwin.h>
 #include <gdiplus.h>

@@ -109,7 +109,7 @@ enum Colors
 	teal = 0x00808000,
 	darkslategray = 0x004f4f2f,
 	darkgreen = 0x00006400,
-	green = 0x00008000,
+	green = 0x0000ff00,
 	forestgreen = 0x00228b22,
 	seagreen = 0x00578b2e,
 	mediumseagreen = 0x0071b33c,

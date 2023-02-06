@@ -2242,13 +2242,13 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 	HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
 	if (hInternet == NULL)
-		return _T("error=InternetOpen failed.");
+		return _T("error=InternetOpen() failed.");
 
 	remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
 	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, szHead, -1L, secureFlags, 0);
 	if (hURL == NULL) {
 		InternetCloseHandle(hInternet);
-		return _T("error=InternetOpenUrl failed.");
+		return _T("error=InternetOpenUrl() failed.");
 	}
 
 	DWORD buffer_size = 1024 * 1024;

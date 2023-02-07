@@ -23,6 +23,7 @@ CVtListCtrlEx::CVtListCtrlEx()
 	m_use_sort = true;
 
 	m_allow_edit					= false;
+	m_allow_one_click_edit			= false;
 	m_modified						= false;
 	m_in_editing					= false;
 	m_old_text						= "";
@@ -2068,10 +2069,12 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 			(abs(t1 - m_last_clicked) < 1600))
 		*/
 		//선택된 항목을 다시 원클릭하면 편집모드로 전환한다.
-		if ((m_edit_item == pNMItemActivate->iItem) &&
+		if (m_allow_one_click_edit &&
+			(m_edit_item == pNMItemActivate->iItem) &&
 			(m_edit_subItem == pNMItemActivate->iSubItem) &&
 			(get_selected_items() == 1) &&
-			(clock() - m_last_clicked < 3000))
+			(clock() - m_last_clicked > 800) &&	//이 값이 작으면 더블클릭에도 편집되고
+			(clock() - m_last_clicked < 1600))
 		{
 			edit_item(m_edit_item, m_edit_subItem);
 		}

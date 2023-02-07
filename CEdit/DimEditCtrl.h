@@ -60,8 +60,18 @@ public:
 	void	SetDimOffset( char cRedOS, char cGreenOS, 
 					char cBlueOS );							// Set The Dim Color Offset
 
-	void	SetAutoFontSize( bool bAuto );				//EditBox의 높이만큼 폰트크기가 자동 변경됨
-	virtual CDimEditCtrl& SetFontBold( bool bBold = true );
+	void	SetAutoFontSize(bool bAuto = true);				//EditBox의 높이만큼 폰트크기가 자동 변경됨
+	virtual CDimEditCtrl& SetFontBold(bool bBold = true);
+
+	int		get_font_size();
+	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	//-1 : reduce, +1 : enlarge
+	void	set_font_size(int font_size);
+	void	enlarge_font_size(bool enlarge);
+	void	set_font_bold(bool bold = true);
+	void	set_font_italic(bool italic = true);
+	LOGFONT	get_log_font() { return m_lf; }
+	void	set_log_font(LOGFONT lf);
 
 // Overrides
 	// ClassWizard generated virtual function overrides
@@ -79,9 +89,11 @@ public:
 private:
 	LOGFONT		m_lf;
 	CFont		m_font;
+	int			m_font_size;
 	int			m_nDefaultHeight;
+
 	void		UpdateSurface();
-	void		ReconstructFont();
+	void		reconstruct_font();
 
 	// Generated message map functions
 protected:

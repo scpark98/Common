@@ -49,6 +49,9 @@ CDimEditCtrl::CDimEditCtrl() :
 	SetDimOffset( -0x40, -0x40, -0x40 );					// Set The Dim Offset
 
 	m_dwStyle = 0;
+
+	memset(&m_lf, 0, sizeof(LOGFONT));
+
 	return;													// Done!
 }
 
@@ -81,33 +84,110 @@ void CDimEditCtrl::PreSubclassWindow()
 	CEdit::PreSubclassWindow();								// Do Default...
 
 	// Get Defalut Font 
-	CFont* cf = GetFont();
+	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
+	//dlg의 parent의 font를 얻어와야 한다.
+	CFont* font = GetParent()->GetFont();
 
-	if ( cf != NULL )
-		cf->GetObject(sizeof(m_lf),&m_lf);
+	if (font != NULL)
+		font->GetObject(sizeof(m_lf), &m_lf);
 	else
-		GetObject(GetStockObject(SYSTEM_FONT),sizeof(m_lf),&m_lf);
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
 	m_nDefaultHeight = m_lf.lfHeight;
-	ReconstructFont();
+	reconstruct_font();
 
 	SetShowDimControl( true );								// Default To Show The Dim Control
 		
 	return;													// Done!
 }
 
-void CDimEditCtrl::ReconstructFont()
+void CDimEditCtrl::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+	SetFont(&m_font, true);
 
-	SetFont( &m_font, true );
+	m_font_size = get_font_size();
 
 	ASSERT(bCreated);
 }
 
+int CDimEditCtrl::get_font_size()
+{
+	m_font_size = -MulDiv(m_lf.lfHeight, 72, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY));
+	return m_font_size;
+}
 
-void	CDimEditCtrl::SetDimText( LPCTSTR cpDimText )
+//-1 : reduce, +1 : enlarge
+void CDimEditCtrl::set_font_size(int font_size)
+{
+	if (font_size == 0)
+		return;
+
+	if (font_size == -1)
+	{
+		enlarge_font_size(false);
+		return;
+	}
+	else if (font_size == 1)
+	{
+		enlarge_font_size(true);
+		return;
+	}
+
+	m_font_size = font_size;
+	AfxGetApp()->WriteProfileInt(_T("dim edit"), _T("font size"), m_font_size);
+	//For the MM_TEXT mapping mode,
+	//you can use the following formula to specify 
+	//a height for a font with a specified point size:
+	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	reconstruct_font();
+}
+
+void CDimEditCtrl::enlarge_font_size(bool enlarge)
+{
+	m_font_size = get_font_size();
+	enlarge ? m_font_size++ : m_font_size--;
+
+	if (m_font_size < 4)
+		m_font_size = 4;
+	if (m_font_size > 40)
+		m_font_size = 40;
+
+	AfxGetApp()->WriteProfileInt(_T("file list"), _T("font size"), m_font_size);
+	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	reconstruct_font();
+}
+
+void CDimEditCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+{
+	if (sFontname == _T(""))
+		return;
+	m_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
+	reconstruct_font();
+}
+
+void CDimEditCtrl::set_font_bold(bool bBold)
+{
+	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
+	reconstruct_font();
+}
+
+void CDimEditCtrl::set_font_italic(bool italic)
+{
+	m_lf.lfItalic = italic;
+	reconstruct_font();
+}
+
+void CDimEditCtrl::set_log_font(LOGFONT lf)
+{
+	memcpy(&m_lf, &lf, sizeof(LOGFONT));
+	reconstruct_font();
+	Invalidate();
+}
+
+void CDimEditCtrl::SetDimText( LPCTSTR cpDimText )
 {
 	if( cpDimText )											// If Dim Text Specified
 	{
@@ -126,7 +206,6 @@ void	CDimEditCtrl::SetDimText( LPCTSTR cpDimText )
 	return;													// Done!
 }
 
-
 void	CDimEditCtrl::SetShowDimControl( bool bShow )
 {
 	m_bShowDimText = bShow;									// Set The Dim Flag
@@ -134,7 +213,6 @@ void	CDimEditCtrl::SetShowDimControl( bool bShow )
 
 	return;													// Done!
 }
-
 
 BOOL	CDimEditCtrl::Create( LPCTSTR lpszClassName, LPCTSTR lpszWindowName, 
 				DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, 
@@ -295,13 +373,13 @@ void CDimEditCtrl::SetAutoFontSize( bool bAuto )
 	else
 		m_lf.lfHeight = m_nDefaultHeight;
 
-	ReconstructFont();
+	reconstruct_font();
 }
 
 CDimEditCtrl& CDimEditCtrl::SetFontBold( bool bBold /*= true*/ )
 {
 	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }

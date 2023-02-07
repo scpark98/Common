@@ -203,6 +203,7 @@ public:
 //편집 관련
 	//리소스의 ListCtrl 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
 	void	allow_edit(bool allow_edit = true);
+	void	allow_one_click_edit(bool allow_one_click_edit) { m_allow_one_click_edit = allow_one_click_edit; }
 	void	allow_edit_column(int column, bool allow_edit = true);
 	bool	is_in_editing()	{ return m_in_editing; }	//편집중인지
 	void	set_flag_in_editing( bool in_editing ) { m_in_editing = in_editing; }
@@ -289,6 +290,7 @@ protected:
 
 //편집기능 관련
 	bool			m_allow_edit;			//항목 편집이 가능한지... 기본 false
+	bool			m_allow_one_click_edit;	//항목을 클릭한 후 정해진 시간내에 다시 클릭될 때 편집모드로 할지
 	std::deque<bool> m_allow_edit_column;	//각 컬럼마다 편집가능 여부를 설정할 수 있다. 단, m_allow_edit이 변경되면 모두 그 값으로 변경됨에 주의.
 	bool			m_modified;				//항목의 차례 또는 내용이 수정된 경우 true
 	bool			m_in_editing;			//편집중인지

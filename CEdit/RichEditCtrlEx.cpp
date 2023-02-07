@@ -22,7 +22,7 @@ CRichEditCtrlEx::CRichEditCtrlEx()
 	m_nMaxCharLimit		= 0;
 	m_nScrollSize		= 2;
 
-	memset( &m_lf, 0, sizeof( LOGFONT ) );
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
 CRichEditCtrlEx::~CRichEditCtrlEx()

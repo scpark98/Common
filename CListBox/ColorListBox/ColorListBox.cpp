@@ -11,10 +11,10 @@
 //
 //-------------------------------------------------------------------
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "ColorListBox.h"
 
-#include "../../Common/MemoryDC.h"
+#include "../../../Common/MemoryDC.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -124,7 +124,7 @@ void CColorListBox::ReconstructFont()
 	ASSERT(bCreated);
 }
 
-CColorListBox& CColorListBox::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
+CColorListBox& CColorListBox::set_font_name(CString sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy(m_lf.lfFaceName, sFontname);
@@ -133,7 +133,7 @@ CColorListBox& CColorListBox::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
 	return *this;
 }
 
-CColorListBox& CColorListBox::SetFontSize(int nSize)
+CColorListBox& CColorListBox::set_font_size(int nSize)
 {
 	HDC hDC = GetDC()->GetSafeHdc();
 	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(hDC, LOGPIXELSY), 72);
@@ -143,7 +143,7 @@ CColorListBox& CColorListBox::SetFontSize(int nSize)
 	return *this;
 }
 
-CColorListBox& CColorListBox::SetFontBold(bool bBold)
+CColorListBox& CColorListBox::set_font_bold(bool bBold)
 {
 	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
 	ReconstructFont();
@@ -246,7 +246,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (m_bUseColor)		
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
-			crText = dc.SetTextColor(GetComplementaryColor(m_crBackSelected));
+			crText = dc.SetTextColor(color_complementary(m_crBackSelected));
 		else if (lpDIS->itemState & ODS_DISABLED)
 			crText = dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 		else
@@ -293,7 +293,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::AddString(LPCTSTR lpszItem)
+int CColorListBox::add_string(CString lpszItem, COLORREF crText, COLORREF crBack)
 //
 // Return Value:	The zero-based index to the string in the list box. 
 //						The return value is LB_ERR if an error occurs; the 
@@ -308,15 +308,16 @@ int CColorListBox::AddString(LPCTSTR lpszItem)
 //						a virtual function.
 //
 {
-	int nIndex = ((CListBox*)this)->AddString(lpszItem);
+	int index = ((CListBox*)this)->AddString(lpszItem);
+	set_item_color(index, crText);
 	SetTopIndex( GetCount() - 1 );
 
-	return nIndex;
+	return index;
 }	// AddString
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::AddString(LPCTSTR lpszItem, COLORREF rgb)
+int CColorListBox::add_string(CString lpszItem, COLORREF rgb)
 //
 // Return Value:	The zero-based index to the string in the list box. 
 //						The return value is LB_ERR if an error occurs; the 
@@ -343,7 +344,7 @@ int CColorListBox::AddString(LPCTSTR lpszItem, COLORREF rgb)
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::InsertString(int nIndex, LPCTSTR lpszItem)
+int CColorListBox::insert_string(int nIndex, CString lpszItem)
 //
 // Return Value:	The zero-based index of the position at which the 
 //						string was inserted. The return value is LB_ERR if 
@@ -361,7 +362,7 @@ int CColorListBox::InsertString(int nIndex, LPCTSTR lpszItem)
 //
 {
 	int nItem = ((CListBox*)this)->InsertString(nIndex, lpszItem);
-	SetTopIndex( GetCount() - 1 );
+	SetTopIndex(GetCount() - 1);
 	
 	return nItem;
 
@@ -369,7 +370,7 @@ int CColorListBox::InsertString(int nIndex, LPCTSTR lpszItem)
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::InsertString(int nIndex, LPCTSTR lpszItem, COLORREF rgb)
+int CColorListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 //
 // Return Value:	The zero-based index of the position at which the 
 //						string was inserted. The return value is LB_ERR if 
@@ -386,19 +387,19 @@ int CColorListBox::InsertString(int nIndex, LPCTSTR lpszItem, COLORREF rgb)
 // Remarks		:	Inserts a colored string into the list box.
 //
 {
-	int nItem = ((CListBox*)this)->InsertString(nIndex,lpszItem);
-	if (nItem >= 0)
+	int index = ((CListBox*)this)->InsertString(nIndex,lpszItem);
+	if (index >= 0)
 	{
-		SetItemData(nItem, rgb);
+		SetItemData(index, rgb);
 		RedrawWindow();
 	}
 
-	return nItem;
+	return index;
 }	// InsertString
 
 //-------------------------------------------------------------------
 //
-void CColorListBox::SetItemColor(int nIndex, COLORREF rgb)
+void CColorListBox::set_item_color(int nIndex, COLORREF rgb)
 //
 // Return Value:	None.
 //
@@ -413,7 +414,7 @@ void CColorListBox::SetItemColor(int nIndex, COLORREF rgb)
 	RedrawWindow();
 }
 
-COLORREF CColorListBox::GetItemColor( int nIndex )
+COLORREF CColorListBox::get_item_color( int nIndex )
 {
 	return (COLORREF)GetItemData( nIndex );
 }
@@ -446,7 +447,7 @@ BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
-CSize CColorListBox::ResizeToFit(bool bHori, bool bVert)
+CSize CColorListBox::resizeToFit(bool bHori, bool bVert)
 {
 	CRect	r;
 	GetWindowRect(r);

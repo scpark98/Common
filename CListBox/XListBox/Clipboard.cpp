@@ -16,7 +16,7 @@
 // Modified by Hans Dietrich  hdietrich@gmail.com
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "Clipboard.h"
 
 #pragma warning(disable : 4996)	// disable bogus deprecation warning

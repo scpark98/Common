@@ -1023,10 +1023,10 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crTextSelected		= RGB(  65, 102, 146 );
 		m_crTextSelectedInactive= RGB(  65, 102, 146 );
 		m_crBack				= RGB( 193, 219, 252 );
-		m_crBackSelected		= get_color( m_crBack, -32 );
-		m_crBackSelectedInactive= RGB( 193, 219, 252 );
-		m_crHeaderBack			= get_color( m_crBack, -32 );
-		m_crHeaderText			= get_color( m_crText, -32 );
+		m_crBackSelected		= get_color(m_crBack, -48);
+		m_crBackSelectedInactive= get_color(m_crBack, -48);
+		m_crHeaderBack			= get_color(m_crBack, -32);
+		m_crHeaderText			= get_color(m_crText, -32);
 		m_crProgress = m_crText;
 		break;
 	case color_theme_navy_blue :
@@ -1265,6 +1265,12 @@ int CVtListCtrlEx::add_item(CString text, bool ensureVisible, bool invalidate)
 //index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
 int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool invalidate)
 {
+	if (get_column_count() <= 0)
+	{
+		TRACE(_T("column count is 0. use set_headings(...) first.\n"));
+		return -1;
+	}
+
 	if (index < 0)
 		index = size();
 
@@ -1376,6 +1382,9 @@ CString CVtListCtrlEx::get_text(int item, int subItem)
 
 void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidate)
 {
+	if (item < 0)
+		return;
+
 	m_list_db[item].text[subItem] = text;
 	if (invalidate)
 		InvalidateRect(get_item_rect(item, subItem), false);

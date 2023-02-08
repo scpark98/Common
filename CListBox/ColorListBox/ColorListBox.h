@@ -5,7 +5,8 @@
 #pragma once
 #endif // _MSC_VER >= 1000
 
-#include "../Functions.h"
+#include <afxwin.h>
+#include "../../Functions.h"
 
 // ColorListBox.h : header file
 
@@ -33,15 +34,15 @@ public:
 
 // Operations
 public:
-	int			AddString(LPCTSTR lpszItem);								// Adds a string to the list box
-	int			AddString(LPCTSTR lpszItem, COLORREF rgb);					// Adds a colored string to the list box
-	int			InsertString(int nIndex, LPCTSTR lpszItem);					// Inserts a string to the list box
-	int			InsertString(int nIndex, LPCTSTR lpszItem, COLORREF rgb);	// Inserts a colored string to the list box
-	void		SetItemColor(int nIndex, COLORREF rgb);						// Sets the color of an item in the list box
-	COLORREF	GetItemColor(int nIndex);
+	int			add_string(CString text, COLORREF crText = GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = COLOR_WINDOW);
+	int			add_string(CString lpszItem, COLORREF rgb);					// Adds a colored string to the list box
+	int			insert_string(int nIndex, CString lpszItem);					// Inserts a string to the list box
+	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb);	// Inserts a colored string to the list box
+	void		set_item_color(int nIndex, COLORREF rgb);						// Sets the color of an item in the list box
+	COLORREF	get_item_color(int nIndex);
 
-	CSize		ResizeToFit(bool bHori = true, bool bVert = true);			//변경된 크기를 리턴한다.
-	void		SetMinimumLines(int lines) { m_nMinimumLines = lines; }
+	CSize		resizeToFit(bool bHori = true, bool bVert = true);			//변경된 크기를 리턴한다.
+	void		set_minimum_lines(int lines) { m_nMinimumLines = lines; }
 
 	void		UseColor(bool bUse = true) { m_bUseColor = bUse; }
 	void		UseHover(bool bUse = true) { m_bUseHover = bUse; }
@@ -52,9 +53,9 @@ public:
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
 
-	virtual		CColorListBox&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual		CColorListBox&		SetFontSize(int nSize);
-	virtual		CColorListBox&		SetFontBold(bool bBold = true);
+	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	virtual		CColorListBox&	set_font_size(int nSize);
+	virtual		CColorListBox&	set_font_bold(bool bBold = true);
 
 protected:
 	bool		m_bUseColor;		//default = false;

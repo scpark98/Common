@@ -19,6 +19,8 @@
 #ifndef CCLIPBOARD_H
 #define CCLIPBOARD_H
 
+#include <afxwin.h>
+
 class CClipboard
 {
 public:

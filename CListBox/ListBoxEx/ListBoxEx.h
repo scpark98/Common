@@ -29,7 +29,7 @@ public:
 	std::deque<CListBoxData>	m_list;
 
 //추가, 삭제
-	int				add_string(CString text, COLORREF crText = list_unused_color, COLORREF crBack = list_unused_color);
+	int				add_string(CString text, COLORREF crText = GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = COLOR_WINDOW);
 	void			set_alt_text(int index, CString alt_text);
 	int				size() { return m_list.size(); }
 	void			delete_all_items();

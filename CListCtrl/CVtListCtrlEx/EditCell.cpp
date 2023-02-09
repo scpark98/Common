@@ -263,8 +263,7 @@ void gxEditCell::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
     }
 }
 
-int 
-gxEditCell::OnCreate (LPCREATESTRUCT lpCreateStruct) 
+int gxEditCell::OnCreate(LPCREATESTRUCT lpCreateStruct) 
 {
     if (CEdit::OnCreate (lpCreateStruct) == -1)
 		return -1;

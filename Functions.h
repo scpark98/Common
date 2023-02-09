@@ -1144,13 +1144,14 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		getSquareEndPoint(int sx, int sy, int& ex, int& ey);
 
 //다각형 polygon 관련
-	//임의 점이 폴리곤 내에 존재하는지 판별
-	bool PtInPolygon( CPoint* ptPolygons, CPoint pt, int nCorners );
-	bool PtInPolygon1( CPoint* ptPolygons, CPoint pt, int nCorners );
-	bool PtInPolygon2( CPoint* ptPolygons, CPoint pt, int nCorners );
-	bool PtInPolygon3( CPoint *ptPolygons, CPoint pt, int nCorners );
+	//임의 점이 다각형 내에 존재하는지 판별.
+	bool PtInPolygon(CPoint* ptPolygons, CPoint pt, int nCorners );
+	bool PtInPolygon0(CPoint* ptPolygons, CPoint pt, int nCorners );
+	bool PtInPolygon1(CPoint* ptPolygons, CPoint pt, int nCorners );
+	bool PtInPolygon2(CPoint *ptPolygons, CPoint pt, int nCorners );
+
 	//다각형의 넓이를 구한다. 단, 변이 하나라도 교차되면 성립하지 않는다.
-	double		GetPolygonAreaSize( CPoint *pt, int nPoints );
+	double		GetPolygonAreaSize(CPoint *pt, int nPoints);
 	//주어진 다각형 점들을 포함하는 최대 사각형을 구한다.
 	CRect		get_max_rect(CPoint	*pt, int nPoints);
 	CRect		get_max_rect(std::vector<CPoint> pt, int pt_max = -1);

@@ -395,8 +395,12 @@ void CVtListCtrlEx::set_header_text_align(int column, int format)
 {
 	if (column < 0)
 	{
-		for (int i = 0; i < m_HeaderCtrlEx.GetItemCount(); i++)
+		for (int i = 0; i < get_column_count(); i++)
 			m_HeaderCtrlEx.set_header_text_align( i, format );
+	}
+	else if (column >= get_column_count())
+	{
+		return;
 	}
 	else
 	{
@@ -406,6 +410,11 @@ void CVtListCtrlEx::set_header_text_align(int column, int format)
 
 int	CVtListCtrlEx::get_column_data_type( int column )
 {
+	if (column >= get_column_count())
+	{
+		return -1;
+	}
+
 	return m_column_data_type[column];
 }
 
@@ -930,7 +939,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	if (subItem >= nColumnCount || GetColumnWidth(subItem) < 5)
 		return NULL;
 
-	CRect Rect = get_item_rect(item, subItem);
+	CRect r = get_item_rect(item, subItem);
 	CRect rc;
 
 	GetClientRect(rc);
@@ -952,16 +961,17 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 
 	DWORD dwExStyle = ListView_GetExtendedListViewStyle( GetSafeHwnd() );
 	if ( (subItem == 0) && (dwExStyle & LVS_EX_CHECKBOXES) )
-		Rect.left += 18;
+		r.left += 18;
 
-	if (Rect.right > rc.right)
-		Rect.right = rc.right;
+	if (r.right > rc.right)
+		r.right = rc.right;
 
 	m_old_text = GetItemText(item, subItem);
 
 	dwStyle |= WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
 	CEdit *pEdit = new gxEditCell(this, item, subItem, GetItemText(item, subItem));
-	pEdit->Create(dwStyle, Rect, this, IDC_EDIT_CELL);
+	pEdit->Create(dwStyle, r, this, IDC_EDIT_CELL);
+	pEdit->SetFont(&m_font, true);
 	m_pEdit = pEdit;
 
 	CString ext = GetFileExtension(m_old_text);
@@ -1969,6 +1979,9 @@ void CVtListCtrlEx::reconstruct_font()
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	SetFont( &m_font, true );
 
+	if (m_HeaderCtrlEx)
+		m_HeaderCtrlEx.SetFont(&m_font, true);
+
 	m_font_size = get_font_size();
 	
 	set_line_height(4-m_lf.lfHeight);
@@ -2105,6 +2118,7 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_in_editing = false;
 	m_last_clicked = 0;
 	m_pEdit->ShowWindow(SW_HIDE);
+	Invalidate();
 
 	/*
 	CString sText;

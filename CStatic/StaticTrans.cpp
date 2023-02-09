@@ -6,7 +6,7 @@
 ====                                                                     ====
 ===========================================================================*/
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "StaticTrans.h"
 
 #ifdef _DEBUG

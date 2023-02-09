@@ -36,7 +36,7 @@ BEGIN_MESSAGE_MAP(CHeaderCtrlEx, CHeaderCtrl)
 	//}}AFX_MSG_MAP
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
-	ON_MESSAGE(HDM_LAYOUT, OnLayout)
+	ON_MESSAGE(HDM_LAYOUT, &CHeaderCtrlEx::OnLayout)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -248,7 +248,7 @@ void CHeaderCtrlEx::OnPaint()
 
 BOOL CHeaderCtrlEx::OnEraseBkgnd(CDC* pDC) 
 {
-	return false;	
+	return FALSE;	
 	//return CHeaderCtrl::OnEraseBkgnd(pDC);
 }
 

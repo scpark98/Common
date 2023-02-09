@@ -862,6 +862,27 @@ void CGdiplusBitmap::negative()
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
+void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
+{
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiplusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	ImageAttributes ia;
+
+	Gdiplus::ColorMap crMap;
+	crMap.oldColor = src;
+	crMap.newColor = dst;
+	ia.SetRemapTable(1, &crMap);
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+}
+
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {

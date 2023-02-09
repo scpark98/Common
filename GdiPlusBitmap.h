@@ -119,6 +119,7 @@ public:
 	void set_alpha(float alpha);
 	void gray();
 	void negative();
+	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.

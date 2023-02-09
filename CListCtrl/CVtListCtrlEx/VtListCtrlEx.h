@@ -206,7 +206,7 @@ public:
 	void	allow_one_click_edit(bool allow_one_click_edit) { m_allow_one_click_edit = allow_one_click_edit; }
 	void	allow_edit_column(int column, bool allow_edit = true);
 	bool	is_in_editing()	{ return m_in_editing; }	//편집중인지
-	void	set_flag_in_editing( bool in_editing ) { m_in_editing = in_editing; }
+	void	set_flag_in_editing(bool in_editing) { edit_end(); m_in_editing = in_editing; }
 	int		get_recent_edit_item() { return m_edit_item; }
 	int		get_recent_edit_subitem() { return m_edit_subItem; }
 	void	set_recent_edit_subitem(int subItem) { m_edit_subItem = subItem; }
@@ -236,6 +236,9 @@ public:
 	//void	paste_from_clipboard();
 
 //기타 레이아웃 관련
+	//header_height는 헤더클래스에서 HDM_LAYOUT 메시지가 발생해야 적용되는데
+	//그렇게 되기 위해서는 SetFont / MoveWindow / SetWindowPos 등이 필요하므로
+	//VtListCtrlEx에게 set_font_name() 호출시에 헤더도 SetFont를 적용하여 해결함.
 	void	set_header_height(int height);
 	void	set_line_height(int height);
 	void	set_column_width(int nCol, int cx);

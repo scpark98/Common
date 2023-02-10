@@ -99,19 +99,21 @@ public:
 	//특히 check, radio처럼 checked, unchecked image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
 	//on/off, play/pause, img0/img1/img2...
-	template <typename ... Types>
-	void add_images(LPCTSTR lpType, Types... args)
+	template <typename ... Types> void add_images(CString type, Types... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
 
 		for (auto id : arg)
-			add_image(lpType, id);
+			add_image(type, id);
 	}
 
-	//버튼에 4개의 상태 이미지들을 세팅한다. UINT가 0이면 자동 생성해준다.
 	//한 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.
-	bool		add_image(LPCTSTR lpType, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	//UINT가 0이면 자동 생성해준다.
+	//타입이 없으면 기본 _T("PNG")로 처리한다.
+	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	void		use_normal_image_on_disabled(bool use = true);
 
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
@@ -123,6 +125,7 @@ public:
 	void		release_all();
 
 	void		set_alpha(float alpha);
+	void		add_rgb(int red, int green, int blue, COLORREF crExcept);
 
 	//void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	CGdiButton& text(CString text);
@@ -136,6 +139,9 @@ public:
 	//hover, down일 경우 색상 변화를 주고자 할 경우 사용.(fScale을 1.0보다 크게주면 밝게, 작게주면 어둡게 변경된다.
 	CGdiButton& set_hover_color_matrix(float fScale);	//1.0f = no effect.
 	CGdiButton& set_down_color_matrix(float fScale);	//1.0f = no effect.
+
+	//n번째 이미지의 m번째 상태 이미지의 x, y 픽셀 컬러를 변경한다. 단, disable은 제외된다.
+	void		replace_color(int index, int state_index, int x, int y, Gdiplus::Color newColor);
 
 	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		SetFontSize( int nSize );
@@ -180,13 +186,11 @@ public:
 	void		SetBlinkTime( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
 	void		SetBlink( BOOL bBlink = TRUE );
 
-	//static void	rotate(Bitmap* bitmap, Gdiplus::RotateFlipType type);
-	//static void	rotate(Bitmap** bitmap, float angle);
+	std::deque<CButtonImage*> m_image;
 
 protected:
 	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton
 
-	std::deque<CButtonImage*> m_image;
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
 	CRect		m_rOrigin = 0;				//컨트롤의 원래 크기 정보
@@ -223,6 +227,7 @@ protected:
 	int			m_nFocusRectWidth;		//두께
 	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
+	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
 	BOOL		m_bBlink;
 	BOOL		m_bBlinkStatus;

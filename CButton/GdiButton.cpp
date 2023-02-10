@@ -123,7 +123,12 @@ void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 	m_button_style = nStyle;
 }
 
-bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UINT disabled)
+bool CGdiButton::add_image(UINT normal, UINT over, UINT down, UINT disabled)
+{
+	return add_image(_T("PNG"), normal, over, down, disabled);
+}
+
+bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UINT disabled)
 {
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
@@ -168,7 +173,8 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	else
 	{
 		btn->normal.deep_copy(&btn->disabled);
-		btn->disabled.set_matrix(&m_grayMatrix);
+		if (!m_use_normal_image_on_disabled)
+			btn->disabled.set_matrix(&m_grayMatrix);
 	}
 
 
@@ -177,6 +183,22 @@ bool CGdiButton::add_image(LPCTSTR lpType, UINT normal, UINT over, UINT down, UI
 	fit_to_image(m_fit2image);
 
 	return true;
+}
+
+void CGdiButton::use_normal_image_on_disabled(bool use)
+{
+	m_use_normal_image_on_disabled = use;
+
+	for (int i = 0; i < m_image.size(); i++)
+	{
+		if (m_image[i]->normal)
+		{
+			m_image[i]->normal.deep_copy(&m_image[i]->disabled);
+
+			if (!m_use_normal_image_on_disabled)
+				m_image[i]->disabled.set_matrix(&m_grayMatrix);
+		}
+	}
 }
 
 void CGdiButton::fit_to_image(bool fit)
@@ -290,6 +312,19 @@ void CGdiButton::set_alpha(float alpha)
 		m_image[i]->down.set_alpha(alpha);
 		m_image[i]->disabled.set_alpha(alpha);
 	}
+}
+
+void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
+{
+	for (int i = 0; i < m_image.size(); i++)
+	{
+		m_image[i]->normal.add_rgb(red, green, blue, GRAY(50));
+		//m_image[i]->over.set_alpha(alpha);
+		//m_image[i]->down.set_alpha(alpha);
+		//m_image[i]->disabled.set_alpha(alpha);
+	}
+	//Invalidate();
+	UpdateSurface();
 }
 
 CGdiButton& CGdiButton::text(CString text)
@@ -1148,4 +1183,46 @@ int	CGdiButton::height()
 	}
 
 	return m_height;
+}
+
+void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus::Color newColor)
+{
+	if (m_image.size() == 0)
+		return;
+
+	int end_index = 0;
+	Gdiplus::Color oldColor;
+
+	if (index < 0)
+		end_index = m_image.size();
+
+	for (int i = 0; i < end_index; i++)
+	{
+		if (state_index < 0)
+		{
+			m_image[i]->normal.m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->normal.replace_color(oldColor, newColor);
+			m_image[i]->over.m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->over.replace_color(oldColor, newColor);
+			m_image[i]->down.m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->down.replace_color(oldColor, newColor);
+		}
+		else if (state_index == 0)
+		{
+			m_image[i]->normal.m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->normal.replace_color(oldColor, newColor);
+		}
+		else if (state_index == 1)
+		{
+			m_image[i]->over.m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->over.replace_color(oldColor, newColor);
+		}
+		else if (state_index == 2)
+		{
+			m_image[i]->down.m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->down.replace_color(oldColor, newColor);
+		}
+	}
+
+	UpdateSurface();
 }

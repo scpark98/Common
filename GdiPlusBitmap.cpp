@@ -340,12 +340,11 @@ bool CGdiplusBitmap::get_raw_data()
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
-	PixelFormat format = PixelFormat24bppRGB;
-	format = m_pBitmap->GetPixelFormat();
-	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
-		format = PixelFormat8bppIndexed;
-	else
-		format = PixelFormat24bppRGB;
+	PixelFormat format = m_pBitmap->GetPixelFormat();
+	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+	//	format = PixelFormat8bppIndexed;
+	//else
+	//	format = PixelFormat24bppRGB;
 
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,
@@ -355,6 +354,26 @@ bool CGdiplusBitmap::get_raw_data()
 		data = new BYTE[len]; //할당
 		memcpy(data, bmpData.Scan0, len); //복사
 		stride = bmpData.Stride;
+		m_pBitmap->UnlockBits(&bmpData); //락 풀기
+		return true;
+	}
+
+	return false;
+}
+
+bool CGdiplusBitmap::set_raw_data()
+{
+	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
+	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
+
+	PixelFormat format = m_pBitmap->GetPixelFormat();
+
+	if (m_pBitmap->LockBits(&rect,
+		Gdiplus::ImageLockModeRead,
+		format/*m_pBitmap->GetPixelFormat()*/, &bmpData) == Gdiplus::Ok) { //픽셀포맷형식에따라 이미지접근권한 취득
+
+		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
+		memcpy(bmpData.Scan0, data, len); //복사
 		m_pBitmap->UnlockBits(&bmpData); //락 풀기
 		return true;
 	}
@@ -883,6 +902,139 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
+void CGdiplusBitmap::add_rgb(int red, int green, int blue, COLORREF crExcept)
+{
+	int x, y;
+	int a, r, g, b;
+
+	Gdiplus::BitmapData bmData;
+	Rect rect(0, 0, width, height);
+
+	m_pBitmap->LockBits(&rect,
+		ImageLockModeRead | ImageLockModeWrite,
+		m_pBitmap->GetPixelFormat(),
+		&bmData);
+
+	byte* p = (byte*)(void*)bmData.Scan0;
+	int padding = bmData.Stride - width * channel;
+
+	for (y = 0; y < height; y++)
+	{
+		for (x = 0; x < width; x++)
+		{
+			b = (byte)p[0];
+			g = (byte)p[1];
+			r = (byte)p[2];
+			if (channel == 4)
+				a = (byte)p[3];
+			else
+				a = 255;
+
+			if (a != 0 && RGB(r, g, b) != crExcept)
+			{
+				r += red;
+				Clamp(r, 0, 255);
+
+				g += green;
+				Clamp(g, 0, 255);
+
+				b += blue;
+				Clamp(b, 0, 255);
+
+				p[0] = b;
+				p[1] = g;
+				p[2] = r;
+				if (channel == 4)
+					p[3] = a;
+			}
+
+			p += channel;
+		}
+		p += padding;
+	}
+
+	m_pBitmap->UnlockBits(&bmData);
+	/*
+	HBITMAP hbitmap;
+	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
+	if (status != Gdiplus::Ok)
+		return;
+
+	BITMAP bm;
+	GetObject(hbitmap, sizeof bm, &bm);
+
+	BITMAPINFO bi;
+	BOOL bRes;
+	char* buf;
+
+	// Bitmap header
+	bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+	bi.bmiHeader.biWidth = width;
+	bi.bmiHeader.biHeight = height;
+	bi.bmiHeader.biPlanes = 1;
+	bi.bmiHeader.biBitCount = 32;
+	bi.bmiHeader.biCompression = BI_RGB;
+	bi.bmiHeader.biSizeImage = width * 4 * height;
+	bi.bmiHeader.biClrUsed = 0;
+	bi.bmiHeader.biClrImportant = 0;
+
+	// Buffer
+	buf = (char*)malloc(width * 4 * height);
+	// Don't use getPixel and SetPixel.It's very slow.
+	// Get the all scanline.
+	bRes = GetDIBits(GetDC(NULL), hbitmap, 0, height, buf, &bi,
+		DIB_RGB_COLORS);
+	long nCount = 0;
+
+	for (int i = 0; i < height; ++i)
+	{
+		for (int j = 0; j < width; ++j)
+		{
+			long lVal = 0;
+			CString str;
+			str.Format(_T("%x"), lVal);
+			memcpy(&lVal, &buf[nCount], 4);
+			// Get the reverse order
+			int b = GetRValue(lVal);
+			int g = GetGValue(lVal);
+			int r = GetBValue(lVal);
+
+			if (lVal != 0 && RGB(r, g, b) != crExcept)
+			{
+				r += red;
+				Clamp(r, 0, 255);
+
+				g += green;
+				Clamp(g, 0, 255);
+
+				b += blue;
+				Clamp(b, 0, 255);
+
+				// Store reverse order
+				lVal = RGB(b, g, r);
+				memcpy(&buf[nCount], &lVal, 4);
+			}
+
+			// Increment with 4. RGB color take 4 bytes. 
+			// The high-order byte must be zero
+			// See in MSDN COLORREF
+			nCount += 4;
+		}
+	}
+
+	// Set again
+	SetDIBits(GetDC(NULL), hbitmap, 0, bRes, buf, &bi, DIB_RGB_COLORS);
+
+	SAFE_DELETE(m_pBitmap);
+	m_pBitmap = Bitmap::FromHBITMAP(hbitmap, NULL);
+
+	if (data)
+		get_raw_data();
+
+	free(buf);
+	*/
+}
+
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {
@@ -1393,6 +1545,7 @@ void CGdiplusBitmap::start_animation()
 	GUID   pageGuid = FrameDimensionTime;
 	m_frame_index = 0;
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+	replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
 	std::thread t(&CGdiplusBitmap::thread_gif_animation, this);
 	t.detach();
@@ -1481,6 +1634,7 @@ void CGdiplusBitmap::thread_gif_animation()
 			m_frame_index = 0;
 
 		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+		replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
 		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));

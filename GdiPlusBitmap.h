@@ -78,6 +78,8 @@ public:
 	//기본적으로는 이미지 raw data를 추출하진 않는다.
 	//cv::Mat의 data처럼 raw data가 필요한 경우에 이 함수를 호출하면 사용이 가능해진다.
 	bool	get_raw_data();
+	//data 값을 변경한 후 다시 이미지에 적용
+	bool	set_raw_data();
 
 	bool	empty();
 	bool	valid();
@@ -120,6 +122,7 @@ public:
 	void gray();
 	void negative();
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
+	void add_rgb(int red, int green, int blue, COLORREF crExcept);
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.

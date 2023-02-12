@@ -340,11 +340,15 @@ bool CGdiplusBitmap::get_raw_data()
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
+	//붙여넣기한 이미지가 24비트인데도 32비트로 입력되는 오류가 있다.
+	//8비트는 8비트지만 32비트도 24비트로 처리해야
+	//우선은 SeetaFace가 동작한다.
+	//수정 필요한 부분임.
 	PixelFormat format = m_pBitmap->GetPixelFormat();
-	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
-	//	format = PixelFormat8bppIndexed;
-	//else
-	//	format = PixelFormat24bppRGB;
+	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+		format = PixelFormat8bppIndexed;
+	else
+		format = PixelFormat24bppRGB;
 
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,
@@ -395,9 +399,11 @@ int CGdiplusBitmap::channels()
 {
 	PixelFormat pf = m_pBitmap->GetPixelFormat();
 
-	if (pf == PixelFormat8bppIndexed)
+	if (pf == PixelFormat8bppIndexed)		//198659
 		return 1;
-	else if (pf == PixelFormat32bppARGB || pf == PixelFormat32bppRGB)
+	else if (pf == PixelFormat32bppARGB)	//2498570
+		return 4;
+	else if (pf == PixelFormat32bppRGB)		//139273
 		return 4;
 
 	return 3;

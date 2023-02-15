@@ -1,6 +1,7 @@
 #pragma once
 
 #include <afxwin.h>
+#include <afxcmn.h>
 #include <deque>
 #include <gdiplus.h>
 
@@ -113,6 +114,7 @@ public:
 	//타입이 없으면 기본 _T("PNG")로 처리한다.
 	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	bool		add_image(CGdiplusBitmap img);
 	void		use_normal_image_on_disabled(bool use = true);
 
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
@@ -186,6 +188,9 @@ public:
 	void		SetBlinkTime( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
 	void		SetBlink( BOOL bBlink = TRUE );
 
+	void		use_tooltip(bool use) { m_use_tooltip = use; }
+	void		set_tooltip_text(CString text);
+
 	std::deque<CButtonImage*> m_image;
 
 protected:
@@ -244,6 +249,10 @@ protected:
 	CFont		m_font;
 
 	void		ReconstructFont();
+
+	CToolTipCtrl	m_tooltip;
+	bool		m_use_tooltip = false;
+	CString		m_tooltip_text = _T("");
 
 protected:
 	DECLARE_MESSAGE_MAP()

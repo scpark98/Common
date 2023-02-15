@@ -175,6 +175,22 @@ void CWebView2Ctrl::InitializeWebView()
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
 	options->put_AllowSingleSignOnUsingOSPrimaryAccount(FALSE);
 
+	CString args;
+
+	//이 정책을 설정하지 않으니 NH프로젝트에서 한비전의 페이지가
+	//STM은 자동 재생안되고 ITM은 자동 재생되던 문제가 있었다.
+	//같은 client_session_itm.html인데 웹개발자가 디버깅해보니
+	//뭔가 수행되는 차례가 달라지는 현상이 있다고 한다.
+	//그래서 이 옵션을 주니 영상, 음성 모두 정상으로 표시됨.
+	//https://stackoverflow.com/questions/68709227/how-to-enable-media-autoplay-in-microsoft-webview2
+	//https://d0gf00t.tistory.com/36
+	args = _T("--autoplay-policy=no-user-gesture-required");
+
+	if (m_display_console)
+		args = args + _T(" ") + _T("--enable-logging --");
+	if (!m_log_file.IsEmpty())
+		args = args + _T(" ") + m_log_file;
+	options->put_AdditionalBrowserArguments(CStringW(args));
 	//LPWSTR *args = nullptr;
 	//options->get_AdditionalBrowserArguments(args);
 
@@ -252,7 +268,6 @@ HRESULT CWebView2Ctrl::OnCreateEnvironmentCompleted(HRESULT result, ICoreWebView
 	CHECK_FAILURE(environment->QueryInterface(IID_PPV_ARGS(&m_webViewEnvironment2)));
 
 	//m_webViewEnvironment = environment;
-
 	LPWSTR version = nullptr;
 	m_webViewEnvironment->get_BrowserVersionString(&version);
 	m_webview2_runtime_version = version;
@@ -611,6 +626,7 @@ void CWebView2Ctrl::RegisterEventHandlers()
 				CHECK_FAILURE(args->get_DownloadOperation(&download));
 				//TRUE이면 다운로드 팝업창을 표시하지 않는다.
 				args->put_Handled(TRUE);
+
 				//INT64 expectedDownloadSizeInBytes = 0;
 				//CHECK_FAILURE(download->get_ExpectedDownloadSizeInBytes(
 				//	&expectedDownloadSizeInBytes));

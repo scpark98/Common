@@ -5040,6 +5040,37 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
+void draw_outline_text(CDC *pDC, int x, int y, CString text, int font_size, int thick, Gdiplus::Color crOutline, Gdiplus::Color crFill)
+{
+	// GDI draw text
+	//SetTextColor(dc, RGB(0, 0, 255));
+	//TextOut(dc, x, y, text, text.GetLength());
+
+	// GDI+ draw text
+	Gdiplus::Graphics   g(pDC->m_hDC);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	Gdiplus::FontFamily   ffami(L"±Ã¼­");
+	Gdiplus::StringFormat fmt;
+
+	Gdiplus::GraphicsPath   str_path;
+	str_path.AddString(CStringW(text), -1, &ffami,
+		Gdiplus::FontStyleBold, 48, Gdiplus::Point(x, y), &fmt);
+
+	Gdiplus::Pen   gp(crOutline, thick);
+	gp.SetLineJoin(Gdiplus::LineJoinRound);
+
+	Gdiplus::Rect    rc(x, y, 30, 60);
+	//Gdiplus::Color   cStart(255, 128, 0);
+	//Gdiplus::Color   cEnd(0, 128, 255);
+	//Gdiplus::LinearGradientBrush  gb(rc, cStart, cEnd,
+	//	Gdiplus::LinearGradientModeVertical);
+	Gdiplus::SolidBrush gb(crFill);
+
+	g.DrawPath(&gp, &str_path);
+	g.FillPath(&gb, &str_path);
+}
 
 void DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
 {
@@ -14554,3 +14585,40 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 
 	return true;
 }
+/*
+BOOL PlayResource(LPTSTR lpName)
+{
+	BOOL bRtn;
+	LPTSTR lpRes;
+	HRSRC hResInfo;
+	HGLOBAL hRes;
+
+	// Find the WAVE resource. 
+
+	hResInfo = FindResource(NULL, lpName, _T("WAVE"));
+	if (hResInfo == NULL)
+		return FALSE;
+
+	// Load the WAVE resource. 
+
+	hRes = LoadResource(NULL, hResInfo);
+	if (hRes == NULL)
+		return FALSE;
+
+	// Lock the WAVE resource and play it. 
+
+	lpRes = (LPTSTR)LockResource(hRes);
+	if (lpRes != NULL) {
+		bRtn = sndPlaySound(lpRes, SND_MEMORY | SND_SYNC |
+			SND_NODEFAULT);
+		UnlockResource(hRes);
+	}
+	else
+		bRtn = 0;
+
+	// Free the WAVE resource and return success or failure. 
+
+	FreeResource(hRes);
+	return bRtn;
+}
+*/

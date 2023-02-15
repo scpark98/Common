@@ -53,10 +53,13 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 {
 	release();
 
-	DIBSECTION dib = {};
-	if (::GetObject(hBitmap, sizeof(dib), &dib) == sizeof(DIBSECTION) && dib.dsBm.bmBitsPixel == 32)
+	DIBSECTION ds = {};
+	if (!::GetObject(hBitmap, sizeof(ds), &ds))
+		return;
+
+	if (ds.dsBm.bmBits && (ds.dsBm.bmBitsPixel == 32) && (ds.dsBmih.biCompression == BI_RGB))
 	{
-		m_pBitmap = CreateARGBBitmapFromDIB(dib);
+		m_pBitmap = CreateARGBBitmapFromDIB(ds);
 	}
 	else
 	{
@@ -205,6 +208,12 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 		AfxMessageBox(str);
 	}
 	return false;
+}
+
+//png일 경우는 sType을 생략할 수 있다.
+void CGdiplusBitmap::load(UINT id, bool show_error)
+{
+	load(_T("PNG"), id, show_error);
 }
 
 void CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
@@ -1341,13 +1350,15 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	bool res = false;
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
+
 	if (status != Gdiplus::Ok)
 		return false;
+
 	BITMAP bm;
+
 	GetObject(hbitmap, sizeof bm, &bm);
 
-	BITMAPINFOHEADER bi =
-	{ sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
+	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
 
 	std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
 	auto hdc = GetDC(NULL);
@@ -1551,7 +1562,7 @@ void CGdiplusBitmap::start_animation()
 	GUID   pageGuid = FrameDimensionTime;
 	m_frame_index = 0;
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-	replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
+	//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
 	std::thread t(&CGdiplusBitmap::thread_gif_animation, this);
 	t.detach();
@@ -1640,7 +1651,7 @@ void CGdiplusBitmap::thread_gif_animation()
 			m_frame_index = 0;
 
 		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-		replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
+		//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
 		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));

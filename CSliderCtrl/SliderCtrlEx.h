@@ -85,7 +85,8 @@ public:
 
 	enum SliderCtrlStyle
 	{
-		slider_thumb = 0,
+		slider_normal = 0,
+		slider_thumb,
 		slider_value,
 		slider_progress,
 		slider_track,

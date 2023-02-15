@@ -185,6 +185,41 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	return true;
 }
 
+bool CGdiButton::add_image(CGdiplusBitmap img)
+{
+	//m_image라는 list에 push_back하여 유지시키기 위해서는
+	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
+	//그렇지 않으면 어느 시점에서 소멸되어 잘못된 참조가 된다.
+	CButtonImage* btn = new CButtonImage();
+
+	//normal은 0이어서는 안된다.
+	if (img.empty())
+		return false;
+
+	img.deep_copy(&btn->normal);
+	if (btn->normal.empty())
+		return false;
+
+	m_width = btn->normal.width;
+	m_height = btn->normal.height;
+
+	btn->normal.deep_copy(&btn->over);
+	btn->over.set_matrix(&m_hoverMatrix);
+
+	btn->normal.deep_copy(&btn->down);
+	btn->down.set_matrix(&m_downMatrix);
+
+	btn->normal.deep_copy(&btn->disabled);
+	if (!m_use_normal_image_on_disabled)
+		btn->disabled.set_matrix(&m_grayMatrix);
+
+	m_image.push_back(btn);
+
+	fit_to_image(m_fit2image);
+
+	return true;
+}
+
 void CGdiButton::use_normal_image_on_disabled(bool use)
 {
 	m_use_normal_image_on_disabled = use;
@@ -471,8 +506,27 @@ void CGdiButton::PreSubclassWindow()
 
 	ReconstructFont();
 
+	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
+	m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
+	m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
+	m_tooltip.SetMaxTipWidth(400);
+	m_tooltip.AddTool(this, _T(""));
+	m_tooltip.Activate(TRUE);
+
 	CButton::PreSubclassWindow();
 }
+
+void CGdiButton::set_tooltip_text(CString text)
+{
+	m_tooltip_text = text;
+
+	if (!text.IsEmpty())
+		m_use_tooltip = true;
+
+	m_tooltip.UpdateTipText(m_tooltip_text, this);
+}
+
 
 void CGdiButton::ReconstructFont()
 {
@@ -488,6 +542,9 @@ void CGdiButton::ReconstructFont()
 BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	if (m_use_tooltip)
+		m_tooltip.RelayEvent(pMsg);
+
 	return CButton::PreTranslateMessage(pMsg);
 }
 
@@ -1190,13 +1247,18 @@ void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus
 	if (m_image.size() == 0)
 		return;
 
-	int end_index = 0;
+	int start_index = index;
+	int end_index = start_index + 1;
+
 	Gdiplus::Color oldColor;
 
 	if (index < 0)
+	{
+		start_index = 0;
 		end_index = m_image.size();
+	}
 
-	for (int i = 0; i < end_index; i++)
+	for (int i = start_index; i < end_index; i++)
 	{
 		if (state_index < 0)
 		{

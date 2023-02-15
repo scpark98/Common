@@ -187,6 +187,12 @@ void CSliderCtrlEx::OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CSliderCtrlEx::OnPaint() 
 {
+	if (m_nStyle == slider_normal)
+	{
+		CSliderCtrl::OnPaint();
+		return;
+	}
+
 	CPaintDC	dc1(this); // device context for painting
 	CPen*		pOldPen = NULL;
 	CBrush*		pOldBrush = NULL;
@@ -206,9 +212,9 @@ void CSliderCtrlEx::OnPaint()
 	int			pos = Pos2Pixel( m_nPos );
 	int i;
 	
-	CAutoFont font( _T("Arial") );
-	font.SetHeight(get_logical_size_from_font_size(dc.GetSafeHdc(), m_rc.Height()) / 3.0);
-	font.SetBold( true );
+	CAutoFont font( _T("±¼¸²") );
+	font.SetHeight((double)get_logical_size_from_font_size(dc.GetSafeHdc(), m_rc.Height()) / 2.2);
+	font.SetBold(true);
 	CFont* pOldFont = (CFont*)dc.SelectObject(&font);
 
 	//background
@@ -416,7 +422,7 @@ void CSliderCtrlEx::OnPaint()
 				dc.SetBkMode(TRANSPARENT);
 
 				if ( m_nValueStyle == value )
-					str.Format(_T("%ld/%ld"), m_nPos, (m_nMax > 0 ? m_nMax : 0));
+					str.Format(_T("%ld / %ld"), m_nPos, (m_nMax > 0 ? m_nMax : 0));
 				else if ( m_nMax == m_nMin )
 					str = _T("0.0%");
 				else

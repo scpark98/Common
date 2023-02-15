@@ -69,6 +69,8 @@ public:
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
 	bool	load(CString sFile, bool show_error = false);
 	void	load(CString sType, UINT id, bool show_error = false);
+	//png일 경우는 sType을 생략할 수 있다.
+	void	load(UINT id, bool show_error = false);
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 
@@ -161,6 +163,7 @@ public:
 
 protected:
 	CString			m_filename = _T("untitled");
+
 	void resolution();
 	Bitmap* GetImageFromResource(CString lpType, UINT id);
 

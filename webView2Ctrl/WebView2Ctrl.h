@@ -57,6 +57,11 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
   이 API가 지원되는 1185.39로 다시 올려서 테스트 시작. 역시 카메라 안나옴.
   한비전에서 카메라 등 장치 권한허용이 누락되어 수정 후 다시 영상 나옴.
 
+  //2023021514
+  간혹 카메라 영상이 자동 재생되지 않는 문제 수정
+  (WebView2에서 "--autoplay-policy=no-user-gesture-required" 옵션 추가)
+
+
 [수정사항]
 *20230122
 	- 이 컨트롤을 포함하는 dlg 또는 이 컨트롤이 hide상태로 시작되면
@@ -187,6 +192,10 @@ public:
 	void	hide_download_dialog();
 	void	allow_external_drop(bool allow = true) { m_allow_external_drop = allow; };
 
+	void	display_console(bool display = true) { m_display_console = display; }
+	void	log_file(CString log_path) { m_log_file = log_path; }
+
+
 	static bool m_clear_cache_on_created;
 	//static void	clear_cache_on_created(bool clear) { CWebView2Ctrl::m_clear_cache_on_created = clear; }
 
@@ -196,6 +205,8 @@ public:
 	//이 값을 false로 하지 않으면 PreCreateWindow와 CWebView2Ctrl::Create~함수에서
 	//InitializeWebView()가 중복호출되는데 Create~함수에서 이를 제거하여 한번만 호출되게 해도 안되어
 	//우선 이 변수로 동적, 정적 생성을 구분하여 사용한다.
+	//단, 현재는 동적으로 생성할 경우는 dlg에 정적으로 웹뷰를 하나 만들어놓아야 동적 생성도 가능하다.
+	//정적으로 만들어놓은 웹뷰는 hide시키고 사용하지 않으면 된다.
 	bool	m_create_static = true;
 	HWND m_webHwnd = NULL;
 	void InitializeWebView();
@@ -272,6 +283,9 @@ protected:
 	CString m_webview2_runtime_version = _T("");					//107.0.1418.62
 	//nuget 버전이 runtime버전보다 높으면 일부 API는 사용 불가하고 앱이 실행되지 않을 수 있다.	
 	CString m_webview2_nuget_version = _T("");
+
+	bool	m_display_console = false;
+	CString m_log_file = _T("");
 
 	//카메라와 마이크에 대한 허용을 묻는 팝업에 대한 설정 변경
 	//mode = 0(default), 1(allow), 2(deny)

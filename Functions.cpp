@@ -2244,6 +2244,19 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	if (hInternet == NULL)
 		return _T("error=InternetOpen() failed.");
 
+	if (is_https)
+	{
+		DWORD dwFlags;
+		DWORD dwBuffLen = sizeof(dwFlags);
+		InternetQueryOption(hInternet, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
+		dwFlags |= SECURITY_FLAG_SECURE;
+		dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
+		dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
+		dwFlags |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+		dwFlags |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+		InternetSetOption(hInternet, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
+	}
+
 	remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
 	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, szHead, -1L, secureFlags, 0);
 	if (hURL == NULL) {
@@ -2312,6 +2325,8 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	//HTTP_QUERY_FLAG_NUMBER을 넣지 않으면 HttpQueryInfo()에서 오류가 발생한다.
 	DWORD dwBufLen = sizeof(dwTotalSize);
 	ret = HttpQueryInfo(hURL, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
+	//정상적인 파일임에도 크기를 얻어오는데 false가 리턴된다. 우선 막아두자.
+	/*
 	if (!ret)
 	{
 		AfxMessageBox(get_error_message(GetLastError(), true));
@@ -2354,7 +2369,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 		return result;
 	}
-
+	*/
 	do
 	{
 		InternetQueryDataAvailable(hURL, &dwSize, 0, 0);

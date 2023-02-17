@@ -139,8 +139,14 @@ CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id, bool show_error)
 	load(lpType, id, show_error);
 }
 
-bool CGdiplusBitmap::load(CString sFile, bool show_error)
+bool CGdiplusBitmap::load(CString file, bool show_error)
 {
+	if (!PathFileExists(file))
+	{
+		AfxMessageBox(file + _T("\n\nFile not found."));
+		return false;
+	}
+
 	release();
 
 	CGdiplusBitmap temp;
@@ -157,15 +163,15 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
 	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
 	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
-	bool use_copied_open = (GetFileExtension(sFile).MakeLower() == _T("gif") ? false : true);
+	bool use_copied_open = (GetFileExtension(file).MakeLower() == _T("gif") ? false : true);
 
 #ifdef UNICODE
 	if (use_copied_open)
-		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(sFile);// Gdiplus::Bitmap(sFile);
+		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(file);// Gdiplus::Bitmap(sFile);
 	else
-		m_pBitmap = Gdiplus::Bitmap::FromFile(sFile); //new Gdiplus::Bitmap(sFile);
+		m_pBitmap = Gdiplus::Bitmap::FromFile(file); //new Gdiplus::Bitmap(sFile);
 #else
-	CA2W wFile(sFile);
+	CA2W wFile(file);
 	if (use_copied_open)
 		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(wFile);
 	else
@@ -197,26 +203,26 @@ bool CGdiplusBitmap::load(CString sFile, bool show_error)
 			return false;
 		}
 
-		m_filename = sFile;
+		m_filename = file;
 		return true;
 	}
 
 	if (show_error)
 	{
 		CString str;
-		str.Format(_T("%s\nFile open failed."), sFile);
+		str.Format(_T("%s\nFile open failed."), file);
 		AfxMessageBox(str);
 	}
 	return false;
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-void CGdiplusBitmap::load(UINT id, bool show_error)
+bool CGdiplusBitmap::load(UINT id, bool show_error)
 {
-	load(_T("PNG"), id, show_error);
+	return load(_T("PNG"), id, show_error);
 }
 
-void CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
+bool CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 {
 	release();
 
@@ -235,7 +241,10 @@ void CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 	{
 		m_filename = _T("resource_image.") + sType;
 		resolution();
+		return true;
 	}
+
+	return false;
 }
 
 Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
@@ -896,6 +905,13 @@ void CGdiplusBitmap::negative()
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
+void CGdiplusBitmap::replace_color(int tx, int ty, Gdiplus::Color dst)
+{
+	Gdiplus::Color cr;
+	m_pBitmap->GetPixel(tx, ty, &cr);
+	replace_color(cr, dst);
+}
+
 void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 {
 	//원본을 복사해 둘 이미지를 준비하고
@@ -1150,6 +1166,41 @@ void CGdiplusBitmap::convert2gray()
 
 	free(palette);
 	//save(_T("d:\\temp\\gray.bmp"));
+}
+
+void CGdiplusBitmap::cvtColor(PixelFormat old_format, PixelFormat new_format)
+{
+
+}
+
+void CGdiplusBitmap::cvtColor32ARGB()
+{
+	/*
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiplusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, 0, 0, width, height);
+	resolution();
+	*/
+	
+	Bitmap* result = new Bitmap(width, height, PixelFormat32bppARGB);
+	Graphics g(result);
+
+	ImageAttributes ia;
+
+	g.DrawImage(m_pBitmap, 0, 0, width, height);
+
+	delete m_pBitmap;
+	m_pBitmap = result->Clone(0, 0, width, height, PixelFormatDontCare);
+	delete result;
+
+	resolution();
 }
 
 void CGdiplusBitmap::set_matrix(ColorMatrix* colorMatrix, ColorMatrix* grayMatrix)

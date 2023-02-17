@@ -185,7 +185,6 @@ BOOL CThumbCtrl::RegisterWindowClass()
 			AfxThrowResourceException();
 			return FALSE;
 		}
-
 	}
 
 	return TRUE;

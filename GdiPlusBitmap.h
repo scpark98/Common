@@ -68,9 +68,9 @@ public:
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
 	bool	load(CString sFile, bool show_error = false);
-	void	load(CString sType, UINT id, bool show_error = false);
+	bool	load(CString sType, UINT id, bool show_error = false);
 	//png일 경우는 sType을 생략할 수 있다.
-	void	load(UINT id, bool show_error = false);
+	bool	load(UINT id, bool show_error = false);
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 
@@ -123,6 +123,8 @@ public:
 	void set_alpha(float alpha);
 	void gray();
 	void negative();
+	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
+	void replace_color(int tx, int ty, Gdiplus::Color dst);
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
 	void add_rgb(int red, int green, int blue, COLORREF crExcept);
 
@@ -130,6 +132,10 @@ public:
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.
 	//현재 resource에서 읽어들인 이미지는 제대로 변환되지 않는 문제 있음(1/3만 로딩되는 현상)
 	void convert2gray();
+	//미구현
+	void cvtColor(PixelFormat old_format, PixelFormat new_format);
+	//현재 이미지를 32bit로 변경한다.
+	void cvtColor32ARGB();
 
 	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool save(CString filepath);
@@ -142,6 +148,7 @@ public:
 	int stride = 0;
 
 	//animatedGif
+	bool	is_animated_gif() { return (m_total_frame > 1); }
 	void	set_animation(HWND hWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
 	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
 	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }

@@ -8559,14 +8559,17 @@ bool IsRunning(CString processname)
 	return false; //실행중이 아니면 False를 반환
 } 
 
-void KillProcess(LPCTSTR szFilename)
+bool KillProcess(CString szFilename)
 {
 	HANDLE hProcess = GetProcessHandleByName(szFilename);
 	if (hProcess != INVALID_HANDLE_VALUE)
 	{
-		TerminateProcess(hProcess, 0);
+		bool res = TerminateProcess(hProcess, 0);
 		CloseHandle(hProcess);
+		return res;
 	}
+
+	return false;
 }
 
 #if 0

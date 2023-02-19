@@ -1,7 +1,7 @@
 // EditCell.cpp : implementation file
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "EditCell.h"
 
 #ifdef _DEBUG

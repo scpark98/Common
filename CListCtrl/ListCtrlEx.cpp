@@ -1,7 +1,7 @@
 // ListCtrlEx.cpp : implementation file
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "ListCtrlEx.h"
 
 #include <algorithm>
@@ -2259,9 +2259,9 @@ void CListCtrlEx::PasteInsertFromClipboard()
 
 			int idx;
 			int nSepCount = get_char_count(str, '|');
-			CStringArray ar;
+			std::deque<CString> dq;
 
-			GetToken(str, _T("|"), ar);
+			dq = GetTokenString(str, _T("|"));
 
 			if (bDifferWarning && (GetColumnCount() != (nSepCount+1)))
 			{
@@ -2274,23 +2274,23 @@ void CListCtrlEx::PasteInsertFromClipboard()
 				bDifferWarning = false;
 			}
 
-			for (i = 0; i < MIN(GetColumnCount(), ar.GetSize()); i++)
+			for (i = 0; i < MIN(GetColumnCount(), dq.size()); i++)
 			{
 				if (i == 0)
 				{
 					if (iItem < GetItemCount())
 					{
 						idx = iItem;
-						SetItemText(idx, 0, ar.GetAt(i));
+						SetItemText(idx, 0, dq[i]);
 					}
 					else
 					{
-						idx = AddItem(ar.GetAt(i), NULL);
+						idx = AddItem(dq[i], NULL);
 					}
 				}
 				else
 				{
-					SetItemText(idx, i, ar.GetAt(i));
+					SetItemText(idx, i, dq[i]);
 				}
 			}
 

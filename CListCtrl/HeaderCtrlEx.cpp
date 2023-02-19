@@ -1,7 +1,7 @@
 // SkinHeaderCtrl.cpp : implementation file
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "HeaderCtrlEx.h"
 #include "ListCtrlEx.h"
 #include "../Functions.h"
@@ -246,8 +246,8 @@ void CHeaderCtrlEx::SetColumnText( int nColumn, CString sText )
 
 	GetItem( nColumn, &hdItem );
 
-	_stprintf( hdItem.pszText, _T("%s"), sText );
-	SetItem( nColumn, &hdItem );
+	sprintf_s(hdItem.pszText, countof(hdItem.pszText), _T("%s"), sText);
+	SetItem(nColumn, &hdItem);
 }
 
 int	CHeaderCtrlEx::GetColumnTextAlign( int nColumn )

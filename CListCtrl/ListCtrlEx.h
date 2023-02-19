@@ -6,6 +6,8 @@
 #endif // _MSC_VER > 1000
 // ListCtrlEx.h : header file
 //
+
+#include <afxwin.h>
 #include <vector>
 #include <deque>
 #include "HeaderCtrlEx.h"

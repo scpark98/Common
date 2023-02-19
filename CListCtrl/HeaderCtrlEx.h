@@ -7,6 +7,8 @@
 // SkinHeaderCtrl.h : header file
 //
 
+#include <afxwin.h>
+#include <afxheaderctrl.h>
 
 /////////////////////////////////////////////////////////////////////////////
 // CHeaderCtrlEx window

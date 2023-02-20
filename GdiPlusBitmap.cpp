@@ -1066,6 +1066,38 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue, COLORREF crExcept)
 	*/
 }
 
+void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
+{
+	HueSaturationLightness hsl;
+	HueSaturationLightnessParams hslParam;
+
+	hslParam.hueLevel = hue;// random19937(-180, 180);
+	hslParam.saturationLevel = sat;
+	hslParam.lightnessLevel = light;
+
+	hsl.SetParameters(&hslParam);
+
+	Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &hsl, NULL, NULL, &m_pBitmap);
+}
+
+void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
+{
+	ColorMatrix cm = {	r, 0.0f, 0.0f, 0.0f, 0.0f,
+						0.0f, g, 0.0f, 0.0f, 0.0f,
+						0.0f, 0.0f, b, 0.0f, 0.0f,
+						0.0f, 0.0f, 0.0f, a, 0.0f,
+						0.0f, 0.0f, 0.0f, 0.0f, 1.0f
+					 };
+
+	ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+
+	//CGdiplusBitmap* temp;
+	//deep_copy(temp);
+	
+	Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &cmEffect, NULL, NULL, &m_pBitmap);
+}
+
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {

@@ -350,5 +350,11 @@ COLORREF	gray_color(COLORREF cr);
 double		color_similarity_distance(COLORREF c1, COLORREF c2);
 COLORREF	get_default_color(int index);
 COLORREF	get_random_color();
+
+//r,g,b : 0 ~ 255, h : 0 ~ 360, s, v : 0 ~ 1
+void		rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
+//r,g,b : 0 ~ 255, h : 0 ~ 360, s, v : 0 ~ 1
+void		hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
+
 extern COLORREF g_default_color[16];
 #endif

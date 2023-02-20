@@ -145,6 +145,10 @@ public:
 	//n번째 이미지의 m번째 상태 이미지의 x, y 픽셀 컬러를 변경한다. 단, disable은 제외된다.
 	void		replace_color(int index, int state_index, int x, int y, Gdiplus::Color newColor);
 
+	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
+	void		apply_effect_hsl(int hue, int sat = 0, int light = 0);
+
+
 	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		SetFontSize( int nSize );
 	virtual CGdiButton&		SetFontBold( bool bBold = true );

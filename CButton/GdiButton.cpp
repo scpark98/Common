@@ -89,6 +89,8 @@ void CGdiButton::release_all()
 		//m_image[i]->down.release();
 		//m_image[i]->disabled.release();
 	}
+
+	m_image.clear();
 }
 
 BEGIN_MESSAGE_MAP(CGdiButton, CButton)
@@ -1283,6 +1285,48 @@ void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus
 		{
 			m_image[i]->down.m_pBitmap->GetPixel(x, y, &oldColor);
 			m_image[i]->down.replace_color(oldColor, newColor);
+		}
+	}
+
+	UpdateSurface();
+}
+
+void CGdiButton::apply_effect_hsl(int hue, int sat, int light)
+{
+	if (m_image.size() == 0)
+		return;
+
+	int start_index = 0;
+	int end_index = start_index + 1;
+	int state_index = 0;
+
+	Gdiplus::Color oldColor;
+
+	if (true)//index < 0)
+	{
+		start_index = 0;
+		end_index = m_image.size();
+	}
+
+	for (int i = start_index; i < end_index; i++)
+	{
+		if (state_index < 0)
+		{
+			m_image[i]->normal.apply_effect_hsl(hue, sat, light);
+			m_image[i]->over.apply_effect_hsl(hue, sat, light);
+			m_image[i]->down.apply_effect_hsl(hue, sat, light);
+		}
+		else if (state_index == 0)
+		{
+			m_image[i]->normal.apply_effect_hsl(hue, sat, light);
+		}
+		else if (state_index == 1)
+		{
+			m_image[i]->over.apply_effect_hsl(hue, sat, light);
+		}
+		else if (state_index == 2)
+		{
+			m_image[i]->down.apply_effect_hsl(hue, sat, light);
 		}
 	}
 

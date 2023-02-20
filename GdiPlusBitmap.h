@@ -31,8 +31,9 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 //결국 여기에 추가하니 해결됨.
 #ifdef GDIPVER
 #undef GDIPVER
-#define GDIPVER 0x0110
 #endif
+
+#define GDIPVER 0x0110
 
 #include <afxwin.h>
 #include <gdiplus.h>
@@ -127,6 +128,10 @@ public:
 	void replace_color(int tx, int ty, Gdiplus::Color dst);
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
 	void add_rgb(int red, int green, int blue, COLORREF crExcept);
+
+	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
+	void apply_effect_hsl(int hue, int sat = 0, int light = 0);
+	void apply_effect_rgba(float r, float g, float b, float a = 1.0);
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.

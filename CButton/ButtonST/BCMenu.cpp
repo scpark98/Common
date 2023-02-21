@@ -23,7 +23,7 @@
 // like to play with new stuff.
 //*************************************************************************
 
-#include "stdafx.h"        // Standard windows header file
+//#include "stdafx.h"        // Standard windows header file
 #include "BCMenu.h"        // BCMenu class declaration
 #include <afxpriv.h>       //SK: makes A2W and other spiffy AFX macros work
 
@@ -68,10 +68,12 @@ enum Win32Type{
 
 Win32Type IsShellType()
 {
-	Win32Type  ShellType;
+	Win32Type  ShellType = WinXP;
 	DWORD winVer;
 	OSVERSIONINFO *osvi;
 	
+	return ShellType;
+#if 0
 	winVer=GetVersion();
 	if(winVer<0x80000000){/*NT */
 		ShellType=WinNT3;
@@ -101,6 +103,7 @@ Win32Type IsShellType()
 		}
 	}
 	return ShellType;
+#endif
 }
 
 static Win32Type g_Shell=IsShellType();

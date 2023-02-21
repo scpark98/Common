@@ -75,7 +75,7 @@ public:
 
 // CGdiButton
 
-class CGdiButton : public CButton
+class CGdiButton : public CButton, CGdiplusBitmap
 {
 	DECLARE_DYNAMIC(CGdiButton)
 
@@ -114,6 +114,7 @@ public:
 	//타입이 없으면 기본 _T("PNG")로 처리한다.
 	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	bool		add_image(CString normal, CString over = _T(""), CString down = _T(""), CString disabled = _T(""));
 	bool		add_image(CGdiplusBitmap img);
 	void		use_normal_image_on_disabled(bool use = true);
 
@@ -255,7 +256,7 @@ protected:
 	void		ReconstructFont();
 
 	CToolTipCtrl	m_tooltip;
-	bool		m_use_tooltip = false;
+	bool		m_use_tooltip = true;
 	CString		m_tooltip_text = _T("");
 
 protected:
@@ -277,6 +278,7 @@ public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg BOOL OnToolTipNotify(UINT id, NMHDR* pNMHDR, LRESULT* pResult);
 };
 
 

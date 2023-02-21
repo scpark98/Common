@@ -25,7 +25,7 @@
 // damage or loss of business that this software may cause. 
 ///////////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"			// PCH
+//#include "stdafx.h"			// PCH
 #include "XInfoTip.h"		// Class interface
 
 #ifdef _DEBUG

@@ -3,6 +3,7 @@
 
 //#include "stdafx.h"
 #include "GraphCtrl.h"
+#include "colors.h"
 
 #define TIMER_START_DEMO	0
 

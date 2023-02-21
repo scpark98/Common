@@ -92,7 +92,7 @@ public:
 		column_data_type_percentage_grid,
 	};
 	int			get_column_data_type(int column);
-	void		set_column_data_type(int column, int nType, bool invalidate = false);
+	void		set_column_data_type(int column, int nType = column_data_type_text, bool invalidate = false);
 
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
@@ -173,7 +173,7 @@ public:
 		sort_descending,
 		sort_ascending,
 	};
-	void		use_sort(bool use) { m_use_sort = use; }
+	void		allow_sort(bool allow) { m_allow_sort = allow; }
 	void		sort(int column, int ascending);
 	void		sort_by_text_color(int column, int ascending);
 	int			last_sorted_column_index() { return m_last_sorted_column; }
@@ -276,7 +276,7 @@ protected:
 	std::deque<int> m_column_text_align;
 
 //정렬 관련
-	bool			m_use_sort;					//default = true
+	bool			m_allow_sort;				//default = true
 	std::deque<int> m_column_sort_type;			//asceding or descending
 	int				m_last_sorted_column;		//마지막 정렬된 컬럼 인덱스(색상 정렬은 제외)
 

@@ -43,6 +43,9 @@
 #ifndef _BTNST_H
 #define _BTNST_H
 
+#include <afxwin.h>
+#include <afxtooltipctrl.h>
+
 // Uncomment the following 2 lines to enable support for BCMenu class
 #define	BTNST_USE_BCMENU
 #include "BCMenu.h"

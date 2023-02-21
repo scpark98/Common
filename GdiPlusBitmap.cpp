@@ -340,6 +340,7 @@ void CGdiplusBitmap::resolution()
 	width = 0;
 	height = 0;
 	channel = 0;
+	stride = 0;
 
 	if (!m_pBitmap)
 		return;
@@ -347,6 +348,7 @@ void CGdiplusBitmap::resolution()
 	width = m_pBitmap->GetWidth();
 	height = m_pBitmap->GetHeight();
 	channel = channels();
+	stride = width * channel;
 
 	check_animate_gif();
 }
@@ -861,6 +863,12 @@ void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
 //회색톤으로 변경만 할 뿐 실제 픽셀포맷은 변경되지 않는다.
 void CGdiplusBitmap::gray()
 {
+	//ColorMatrix colorMatrix = { 0.333f, 0.333f, 0.333f, 0.0f, 0.0f,
+	//							0.333f, 0.333f, 0.333f, 0.0f, 0.0f,
+	//							0.333f, 0.333f, 0.333f, 0.0f, 0.0f,
+	//							0.0f, 0.0f, 0.0f, 1.0, 0.0f,
+	//							0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+
 	ColorMatrix colorMatrix = { 0.299f, 0.299f, 0.299f, 0.0f, 0.0f,
 								0.587f, 0.587f, 0.587f, 0.0f, 0.0f,
 								0.114f, 0.114f, 0.114f, 0.0f, 0.0f,
@@ -1077,7 +1085,8 @@ void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
 
 	hsl.SetParameters(&hslParam);
 
-	Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &hsl, NULL, NULL, &m_pBitmap);
+	//Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &hsl, NULL, NULL, &m_pBitmap);
+	m_pBitmap->ApplyEffect(&hsl, NULL);
 }
 
 void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
@@ -1095,14 +1104,15 @@ void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 	//CGdiplusBitmap* temp;
 	//deep_copy(temp);
 	
-	Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &cmEffect, NULL, NULL, &m_pBitmap);
+	//Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &cmEffect, NULL, NULL, &m_pBitmap);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {
 	/*
-	//Gdiplus::Bitmap* pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), PixelFormat8bppIndexed);// m_pBitmap->GetPixelFormat());
+	Gdiplus::Bitmap* pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), PixelFormat8bppIndexed);// m_pBitmap->GetPixelFormat());
 	Gdiplus::ColorPalette* pal = (Gdiplus::ColorPalette*)malloc(sizeof(Gdiplus::ColorPalette) + 255 * sizeof(Gdiplus::ARGB));
 
 	pal->Count = 256;
@@ -1111,30 +1121,26 @@ void CGdiplusBitmap::convert2gray()
 	{
 		pal->Entries[i] = Gdiplus::Color::MakeARGB((BYTE)255, i, i, i);
 	}
-	m_pBitmap->SetPalette(pal);
+	pBitmap->SetPalette(pal);
 
-	Gdiplus::Status status;// = Gdiplus::Bitmap::InitializePalette(pal, Gdiplus::PaletteTypeFixedHalftone256, 256, FALSE, pBitmap);
+	Gdiplus::Status status = Gdiplus::Bitmap::InitializePalette(pal, Gdiplus::PaletteTypeOptimal, 256, FALSE, pBitmap);
 
-	status = m_pBitmap->ConvertFormat(
+	status = pBitmap->ConvertFormat(
 		PixelFormat8bppIndexed,
-		Gdiplus::DitherTypeOrdered4x4,
+		Gdiplus::DitherTypeNone,
 		Gdiplus::PaletteTypeCustom,
 		pal,
 		0);
-	//save(pBitmap, _T("d:\\temp\\converted.bmp"));
 
-	release();
-	//SAFE_DELETE_ARRAY(data);
+	save(pBitmap, _T("d:\\temp\\gray.bmp"));
+	//release();
+	
 
-	//m_pBitmap = pBitmap;
 	resolution();
-
-	//data = dst;
-	stride = width * channel;
 
 	free(pal);
 	*/
-
+	
 	Bitmap* bitmap = new Bitmap(width, height, PixelFormat8bppIndexed);
 	int palSize = bitmap->GetPaletteSize();
 	
@@ -1165,39 +1171,32 @@ void CGdiplusBitmap::convert2gray()
 		bitmap->GetPixelFormat(),
 		&bmData_dst);
 
+	int x, y;
 	uint8_t* src = (uint8_t*)bmData_src.Scan0;
 	uint8_t* dst = (uint8_t*)bmData_dst.Scan0;
+	int padding = bmData_src.Stride - width * channel;
 
-	for (int y = 0; y < height; y++)
+	for (y = 0; y < height; y++)
 	{
-		for (int x = 0; x < width; x++)
+		for (x = 0; x < width; x++)
 		{
-			//uint8_t r = src[y * width * channel + x * channel + 0];
-			//uint8_t g = src[y * width * channel + x * channel + 1];
-			//uint8_t b = src[y * width * channel + x * channel + 2];
-			//TRACE(_T("[%d][%d] = (%d, %d, %d)\n"), y, x, r, g, b);
-			//dst[y * width * channel + x * channel + 0] = src[y * width * channel + x * channel + 2];
-			//dst[y * width * channel + x * channel + 1] = src[y * width * channel + x * channel + 1];
-			//dst[y * width * channel + x * channel + 2] = src[y * width * channel + x * channel + 0];
-			dst[y * width + x] = src[y * width * channel + x * channel + 0];
+			dst[y * width + x] = src[0];
+			src += channel;
 		}
+		//padding을 더해주면 결과가 어긋나게 나온다.
+		//src += padding;
 	}
 
 	m_pBitmap->UnlockBits(&bmData_src);
 	bitmap->UnlockBits(&bmData_dst);
 
-	//SAFE_DELETE(m_pBitmap);
 	release();
-	//SAFE_DELETE_ARRAY(data);
 
 	m_pBitmap = bitmap;
 	resolution();
 
-	//data = dst;
-	stride = width * channel;
-
 	free(palette);
-	//save(_T("d:\\temp\\gray.bmp"));
+	save(_T("d:\\temp\\gray.bmp"));
 }
 
 void CGdiplusBitmap::cvtColor(PixelFormat old_format, PixelFormat new_format)

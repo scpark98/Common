@@ -48,6 +48,10 @@
 // RichToolTipCtrl.h : header file
 //
 
+#include <afxwin.h>
+#include <afxdisp.h>
+#include <afxtooltipctrl.h>
+#include <Richedit.h>
 #include <richole.h>  // for IRichEditOleCallback
 
 #ifndef _UXTHEME_H_

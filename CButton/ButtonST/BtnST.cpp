@@ -1,4 +1,4 @@
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "BtnST.h"
 
 #ifdef	BTNST_USE_SOUND

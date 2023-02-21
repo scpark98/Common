@@ -46,12 +46,16 @@ CGdiButton::CGdiButton()
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
+	EnableToolTips(true);
+	EnableTrackingToolTips(true);
+
 	m_grayMatrix = {
 		0.299f, 0.299f, 0.299f, 0.00f, 0.00f,
 		0.587f, 0.587f, 0.587f, 0.00f, 0.00f,
 		0.114f, 0.114f, 0.114f, 0.00f, 0.00f,
 		0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-		0.50f, 0.50f, 0.50f, 0.00f, 1.00f		//버튼 disable일때 회색조가 좀 어두워서 0.50f로 변경함.
+		0.01f, 0.01f, 0.01f, 0.00f, 1.00f
+		//버튼 disable일때 회색조가 좀 어두워서 0.50f로 변경했으나 다른 이미지일 경우는 너무 밝아져서 0.01f로 변경
 	};
 
 	m_hoverMatrix = {
@@ -106,6 +110,7 @@ BEGIN_MESSAGE_MAP(CGdiButton, CButton)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
+	//ON_NOTIFY_EX(TTN_NEEDTEXT, 0, &CGdiButton::OnToolTipNotify)
 END_MESSAGE_MAP()
 
 
@@ -515,6 +520,25 @@ void CGdiButton::PreSubclassWindow()
 	m_tooltip.SetMaxTipWidth(400);
 	m_tooltip.AddTool(this, _T(""));
 	m_tooltip.Activate(TRUE);
+	EnableToolTips(TRUE);
+	EnableTrackingToolTips(TRUE);
+
+	/*
+	TOOLINFO ti;
+	ti.cbSize = TTTOOLINFOW_V2_SIZE;// sizeof(TOOLINFO);
+	ti.uFlags = TTF_IDISHWND | TTF_TRACK | TTF_ABSOLUTE;
+	ti.rect.left = ti.rect.top = ti.rect.bottom = ti.rect.right = 0;
+	ti.hwnd = GetParent()->GetSafeHwnd();
+	ti.uId = (UINT)GetSafeHwnd();
+	ti.hinst = AfxGetInstanceHandle();
+	ti.lpszText = (LPTSTR)_T("skldfjkl");
+
+	SendMessage(TTM_ADDTOOL, 0, (LPARAM)&ti);
+	SendMessage(TTM_TRACKACTIVATE, TRUE, (LPARAM)&ti);
+
+	EnableTrackingToolTips(TRUE);
+	m_tooltip.Activate(true);
+	*/
 
 	CButton::PreSubclassWindow();
 }
@@ -527,6 +551,7 @@ void CGdiButton::set_tooltip_text(CString text)
 		m_use_tooltip = true;
 
 	m_tooltip.UpdateTipText(m_tooltip_text, this);
+	m_tooltip.AddTool(this, m_tooltip_text);
 }
 
 
@@ -544,8 +569,30 @@ void CGdiButton::ReconstructFont()
 BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	if (m_use_tooltip)
-		m_tooltip.RelayEvent(pMsg);
+	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
+	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
+	//이 코드는 main에 있어야 한다.
+	/*
+	if (m_use_tooltip && m_tooltip.m_hWnd)
+	{
+		//m_tooltip.RelayEvent(pMsg);
+		
+		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
+		MSG msg = *pMsg;
+		msg.hwnd = (HWND)m_tooltip.SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
+
+		CPoint pt = msg.pt;
+
+		if (msg.message >= WM_MOUSEFIRST && msg.message <= WM_MOUSELAST)
+			::ScreenToClient(msg.hwnd, &pt);
+
+		msg.lParam = MAKELONG(pt.x, pt.y);
+
+		// relay mouse event before deleting old tool 
+		m_tooltip.SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
+		
+	}
+	*/
 
 	return CButton::PreTranslateMessage(pMsg);
 }
@@ -840,6 +887,8 @@ BOOL CGdiButton::OnEraseBkgnd(CDC* pDC)
 void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//SendMessage(TTM_TRACKPOSITION, 0, (LPARAM)MAKELPARAM(point.x, point.y));
+
 	if (!m_bHover)//m_bIsTracking)
 	{
 		TRACKMOUSEEVENT tme;
@@ -1331,4 +1380,95 @@ void CGdiButton::apply_effect_hsl(int hue, int sat, int light)
 	}
 
 	UpdateSurface();
+}
+
+BOOL CGdiButton::OnToolTipNotify(UINT /*id*/, NMHDR* pNMHDR, LRESULT* /*pResult*/)
+{
+	TOOLTIPTEXT* pTTT = (TOOLTIPTEXT*)pNMHDR;
+	TOOLTIPTEXTA* pTTTA = (TOOLTIPTEXTA*)pNMHDR;
+	TOOLTIPTEXTW* pTTTW = (TOOLTIPTEXTW*)pNMHDR;
+	CString strTipText = "";
+	CString rString = "";
+	UINT nID = pNMHDR->idFrom;
+
+	ASSERT(pNMHDR->code == TTN_NEEDTEXTA || pNMHDR->code == TTN_NEEDTEXTW);
+
+	// if there is a top level routing frame then let it handle the message
+	if (GetRoutingFrame() != NULL) return FALSE;
+
+
+	// to be through we will need to handle UNICODE versions of the message also !!
+	if (pNMHDR->code == TTN_NEEDTEXTA && (pTTTA->uFlags & TTF_IDISHWND) ||
+		pNMHDR->code == TTN_NEEDTEXTW && (pTTTW->uFlags & TTF_IDISHWND))
+	{
+		// idFrom is actually the HWND of the tool
+		UINT nIdentifier = ::GetDlgCtrlID((HWND)pNMHDR->idFrom);
+
+		pTTT->lpszText = NULL;
+
+		//set tooltips for buttons
+		/*
+		switch (nIdentifier)
+		{
+		case IDC_STARTALL: // use the resource ID's of control that need text
+			pTTT->lpszText = "Start all messages";
+			break;
+
+		case IDC_STOPALL:
+			pTTT->lpszText = "Stop all messages";
+			break;
+
+		case IDC_STARTSELECTED:
+			pTTT->lpszText = "Start selected messages";
+			break;
+
+		case IDC_STOPSELECTED:
+			pTTT->lpszText = "Stop selected messages";
+			break;
+
+		case IDC_EDITITEM:
+			pTTT->lpszText = "Edit selected item";
+			break;
+
+		case IDC_APPLY_ADD:
+			GetDlgItem(IDC_APPLY_ADD)->GetWindowText(rString);
+			if (rString == "Add Message") pTTT->lpszText = "Add message to list";
+			else if (rString == "Apply Changes") pTTT->lpszText = "Apply changes";
+			break;
+		}
+		*/
+		if (pTTT->lpszText != NULL)
+			return TRUE; // there is text to display
+	}
+
+	//set tooltips for toolbar
+	if (nID != 0) // will be zero on a separator
+	{
+		strTipText.LoadString(nID);
+
+#ifndef _UNICODE
+		if (pNMHDR->code == TTN_NEEDTEXTA)
+		{
+			lstrcpyn(pTTTA->szText, strTipText, sizeof(pTTTA->szText));
+		}
+		else
+		{
+			_mbstowcsz(pTTTW->szText, strTipText, sizeof(pTTTW->szText));
+		}
+#else
+		if (pNMHDR->code == TTN_NEEDTEXTA)
+		{
+			_wcstombsz(pTTTA->szText, strTipText, sizeof(pTTTA->szText));
+		}
+		else
+		{
+			lstrcpyn(pTTTW->szText, strTipText, sizeof(pTTTW->szText));
+		}
+#endif
+
+		// bring the tooltip window above other popup windows
+		::SetWindowPos(pNMHDR->hwndFrom, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE |
+			SWP_NOSIZE | SWP_NOMOVE | SWP_NOOWNERZORDER); return TRUE;
+	}
+	return FALSE;
 }

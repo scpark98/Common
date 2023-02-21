@@ -20,7 +20,7 @@ CVtListCtrlEx::CVtListCtrlEx()
 {
 	set_color_theme(color_theme_default, false);
 
-	m_use_sort = true;
+	m_allow_sort = true;
 
 	m_allow_edit					= false;
 	m_allow_one_click_edit			= false;
@@ -516,7 +516,7 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 //0번 컬럼이 아닌 다른 컬럼으로 정렬할 때 두 값이 같으면 0번 컬럼으로 한번 더 검사한다.
 void CVtListCtrlEx::sort(int subItem, int ascending)
 {
-	if (!m_use_sort)
+	if (!m_allow_sort)
 		return;
 
 	m_last_sorted_column = subItem;
@@ -611,7 +611,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 
 void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
 {
-	if (!m_use_sort)
+	if (!m_allow_sort)
 		return;
 
 	if (ascending == -1)

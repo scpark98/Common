@@ -39,7 +39,7 @@
 // PLEASE LEAVE THIS HEADER INTACT
 ////////////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "RichToolTipCtrl.h"
 
 #ifdef _DEBUG
@@ -139,7 +139,7 @@ DWORD _RichToolTipCtrlCookie::Read(LPBYTE lpBuffer, DWORD dwCount)
 	//2014 01 08 scpark
 	//위의 strncpy의 경우 맨 마지막 한 문자가 잘리는 현상이 생긴다.
 	//왜 strcpy를 안쓰고 strncpy를 사용한 것일까.. 우선 strcpy로 변경해서 사용한다.
-	strcpy( (LPSTR)lpBuffer, lpszText );
+	strcpy_s((char*)lpBuffer, m_sText.GetLength(), (char*)lpszText);
 
 	// keep where we got to
 	m_dwCount += dwCount;

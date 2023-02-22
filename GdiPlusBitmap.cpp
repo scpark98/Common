@@ -1515,8 +1515,8 @@ void CGdiplusBitmap::check_animate_gif()
 	m_pBitmap->GetFrameDimensionsList(pDimensionIDs, count);
 
 	// Get the number of frames in the first dimension.
-	m_total_frame = m_pBitmap->GetFrameCount(&pDimensionIDs[0]);
-	//TRACE(_T("m_total_frame = %d\n"), m_total_frame);
+	m_frame_count = m_pBitmap->GetFrameCount(&pDimensionIDs[0]);
+	//TRACE(_T("m_frame_count = %d\n"), m_frame_count);
 
 	// Assume that the image has a property item of type PropertyItemEquipMake.
 	// Get the size of that property item.
@@ -1550,7 +1550,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 
 	CString str;
 
-	for (int i = 0; i < m_total_frame; i++)
+	for (int i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
 		str.Format(_T("%s\\%s_%04d.png"), folder, GetFileNameFromFullPath(m_filename), i);
@@ -1568,7 +1568,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 
 void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long>& dqDelay)
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return;
 
 	//현재 재생중이었다면 재생 정보를 기억해놓는다.
@@ -1586,7 +1586,7 @@ void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::
 	dqImage.clear();
 	dqDelay.clear();
 
-	for (int i = 0; i < m_total_frame; i++)
+	for (int i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
 		CGdiplusBitmap* img = new CGdiplusBitmap();
@@ -1605,12 +1605,12 @@ void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::
 //총 재생시간을 ms단위로 리턴한다.
 int CGdiplusBitmap::get_total_duration()
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return 0;
 
 	long total_duration = 0;
 
-	for (int i = 0; i < m_total_frame; i++)
+	for (int i = 0; i < m_frame_count; i++)
 	{
 		total_duration += ((long*)m_pPropertyItem->value)[i] * 10;
 	}
@@ -1620,7 +1620,7 @@ int CGdiplusBitmap::get_total_duration()
 
 void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool start)
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return;
 
 	m_displayHwnd = hWnd;
@@ -1635,7 +1635,7 @@ void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool s
 
 void CGdiplusBitmap::start_animation()
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return;
 
 	m_paused = false;
@@ -1652,7 +1652,7 @@ void CGdiplusBitmap::start_animation()
 
 void CGdiplusBitmap::pause_animation()
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return;
 
 	m_paused = !m_paused;
@@ -1660,7 +1660,7 @@ void CGdiplusBitmap::pause_animation()
 
 void CGdiplusBitmap::stop_animation()
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return;
 
 	m_run_thread_animation = false;
@@ -1675,7 +1675,7 @@ void CGdiplusBitmap::stop_animation()
 
 void CGdiplusBitmap::thread_gif_animation()
 {
-	if (m_total_frame < 2)
+	if (m_frame_count < 2)
 		return;
 
 	HDC hDC = GetDC(m_displayHwnd);
@@ -1729,7 +1729,7 @@ void CGdiplusBitmap::thread_gif_animation()
 		}
 
 		m_frame_index++;
-		if (m_frame_index >= m_total_frame)
+		if (m_frame_index >= m_frame_count)
 			m_frame_index = 0;
 
 		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);

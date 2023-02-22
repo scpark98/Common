@@ -43,6 +43,7 @@
 #define		GRAY32		GRAY(32)
 #define		GRAY64		GRAY(64)
 #define		GRAY128		GRAY(128)
+#define		GRAY160		GRAY(160)
 #define		GRAY192		GRAY(192)
 #define		GRAY224		GRAY(224)
 #define		GRAY(x)		RGB((x), (x), (x))

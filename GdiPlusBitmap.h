@@ -153,7 +153,10 @@ public:
 	int stride = 0;
 
 	//animatedGif
-	bool	is_animated_gif() { return (m_total_frame > 1); }
+	UINT			m_frame_count;
+	UINT			m_frame_index;
+	PropertyItem* m_pPropertyItem = NULL;
+	int		get_frame_count() { return m_frame_count; }
 	void	set_animation(HWND hWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
 	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
 	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }
@@ -163,6 +166,7 @@ public:
 	//gif 프레임 이미지들을 지정된 폴더에 저장
 	bool	save_gif_frames(CString folder);
 	//gif 프레임 이미지들을 추출해서 직접 display할 수 있다.
+	//단, 모든 이미지를 추출하여 메모리에 로드하므로 메모리 사용량이 문제될 수 있다.
 	void	get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long> &dqDelay);
 
 	//총 재생시간을 ms단위로 리턴한다.
@@ -176,15 +180,12 @@ public:
 protected:
 	CString			m_filename = _T("untitled");
 
-	void resolution();
+	void	resolution();
 	Bitmap* GetImageFromResource(CString lpType, UINT id);
 
 	//animatedGif
-	UINT			m_total_frame;
-	UINT			m_frame_index;
 	bool			m_bIsInitialized;
 	bool			m_paused = false;
-	PropertyItem*	m_pPropertyItem = NULL;
 	HWND			m_displayHwnd;
 	int				m_aniX;
 	int				m_aniY;

@@ -514,14 +514,14 @@ void CGdiButton::PreSubclassWindow()
 	ReconstructFont();
 
 	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
-	m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
-	m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
-	m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
-	m_tooltip.SetMaxTipWidth(400);
-	m_tooltip.AddTool(this, _T(""));
-	m_tooltip.Activate(TRUE);
-	EnableToolTips(TRUE);
-	EnableTrackingToolTips(TRUE);
+	//m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
+	//m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
+	//m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
+	//m_tooltip.SetMaxTipWidth(400);
+	//m_tooltip.AddTool(this, _T(""));
+	//m_tooltip.Activate(TRUE);
+	//EnableToolTips(TRUE);
+	//EnableTrackingToolTips(TRUE);
 
 	/*
 	TOOLINFO ti;
@@ -572,7 +572,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
 	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
 	//이 코드는 main에 있어야 한다.
-	/*
+	//disabled가 아닌 경우는 잘 표시된다.
 	if (m_use_tooltip && m_tooltip.m_hWnd)
 	{
 		//m_tooltip.RelayEvent(pMsg);
@@ -592,7 +592,6 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		m_tooltip.SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
 		
 	}
-	*/
 
 	return CButton::PreTranslateMessage(pMsg);
 }
@@ -819,7 +818,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (m_b3DRect)
 			{
 				dc.Draw3dRect(rc,
-					is_down ? GRAY128 : white,
+					is_down ? GRAY160 : white,
 					is_down ? white : GRAY128
 					//down_state ? GetSysColor(COLOR_3DSHADOW) : GetSysColor(COLOR_3DLIGHT),
 					//down_state ? GetSysColor(COLOR_3DLIGHT) : GetSysColor(COLOR_3DSHADOW)

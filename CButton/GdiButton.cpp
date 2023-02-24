@@ -360,7 +360,7 @@ void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
 {
 	for (int i = 0; i < m_image.size(); i++)
 	{
-		m_image[i]->normal.add_rgb(red, green, blue, GRAY(50));
+		m_image[i]->normal.add_rgb_loop(red, green, blue, GRAY(50));
 		//m_image[i]->over.set_alpha(alpha);
 		//m_image[i]->down.set_alpha(alpha);
 		//m_image[i]->disabled.set_alpha(alpha);

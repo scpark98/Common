@@ -638,6 +638,11 @@ void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 
 void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_color)
 {
+	Graphics* gp = Graphics::FromImage(m_pBitmap);
+	gp->Clear(Color(255, 135, 227, 158));
+	delete gp;
+	return;
+
 	int originw = width;
 	int originh = height;
 	CRect rotated(0, 0, originw, originh);
@@ -836,6 +841,13 @@ void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
 	resolution();
 }
 
+void CGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
+{
+	int nw = (float)width * fx;
+	int nh = (float)height * fy;
+	resize(nw, nh, mode);
+}
+
 void CGdiplusBitmap::sub_image(CRect r)
 {
 	sub_image(r.left, r.top, r.Width(), r.Height());
@@ -941,7 +953,39 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
 }
 
-void CGdiplusBitmap::add_rgb(int red, int green, int blue, COLORREF crExcept)
+//현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
+//즉, red를 +255늘린 후 다시 -255해도 원본이 될 수 없다.
+//원본에 적용하는 것이 정석이나 구조 수정이 필요하다.
+void CGdiplusBitmap::add_rgb(int red, int green, int blue)
+{
+	float fr = (float)red / 255.0f;
+	float fg = (float)green / 255.0f;
+	float fb = (float)blue / 255.0f;
+
+	ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								  fr,   fg,   fb, 0.0f, 1.0f };
+
+	//원본을 복사해 둘 이미지를 준비하고
+	CGdiplusBitmap temp;
+	clone(&temp);
+
+	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+	Graphics g(m_pBitmap);
+	g.Clear(Color(0, 0, 0, 0));
+
+	ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+	//ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsSkipGray, ColorAdjustTypeBitmap);
+	//ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsAltGray, ColorAdjustTypeBitmap);
+
+	//사본을 ia처리하여 캔버스에 그려준다.
+	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+}
+
+void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcept)
 {
 	int x, y;
 	int a, r, g, b;
@@ -993,6 +1037,7 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue, COLORREF crExcept)
 	}
 
 	m_pBitmap->UnlockBits(&bmData);
+
 	/*
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
@@ -1108,9 +1153,133 @@ void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
+void CGdiplusBitmap::round_corner(float radius, float factor, float position)
+{
+	GraphicsPath gp;
+	gp.AddArc(0.0, 0.0, radius, radius, 180.0, 90.0);
+	gp.AddArc(width - radius, 0.0, radius, radius, 270.0, 90.0);
+	gp.AddArc(width - radius, height - radius, radius, radius, 0.0, 90.0);
+	gp.AddArc(0.0, height - radius, radius, radius, 90.0, 90.0);
+	gp.CloseFigure();
+
+	if (factor <= 0.0f || position <= 0.0f)
+	{
+		//원본을 복사해 둘 이미지를 준비하고
+		CGdiplusBitmap temp;
+		clone(&temp);
+
+		//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
+		Graphics g(m_pBitmap);
+		g.Clear(Color(0, 0, 0, 0));
+
+		g.SetSmoothingMode(SmoothingMode::SmoothingModeAntiAlias);
+		//Brush* brush = new TextureBrush(temp);
+		TextureBrush brush(temp);
+		g.FillPath(&brush, &gp);
+		return;
+	}
+
+	int in_out_count = 1;	//3으로 해선 안된다.
+	float blendFactor[] = {
+		0.0f,
+		factor,		//중점부터 밖으로 까매지는 정도
+		1.0f,
+	};
+	float blendPosition[] = {
+		0.0f,
+		position,	//바깥에서 중점으로 밝아지는 정도
+		1.0f,
+	};
+
+	PathGradientBrush pgb(&gp);
+
+	//중점 세팅
+	pgb.SetCenterPoint(Gdiplus::Point(width / 2, height / 2));
+
+	//블렌드 수준값 세팅
+	pgb.SetBlend(blendFactor, blendPosition, 3);	//blendFactor, blendPosition의 갯수
+
+	pgb.SetCenterColor(Color::Black);
+	Gdiplus::Color colors[] = { Color(Color::Transparent) };
+	pgb.SetSurroundColors(colors, &in_out_count);
+
+	//mask를 CGdiplusBitmap 타입으로 정적 생성하니 오류발생하여 동적 생성함.
+	Gdiplus::Bitmap *mask = new Gdiplus::Bitmap(width, height);
+	Graphics gMask(mask);
+	gMask.FillRectangle(&SolidBrush(Color::Transparent), Rect(0, 0, width, height));
+	gMask.SetSmoothingMode(SmoothingMode::SmoothingModeHighQuality);
+	gMask.FillPath(&pgb, &gp);
+
+	CString str;
+	str.Format(_T("s:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
+	save(mask, str);
+	replace_channel(mask, m_pBitmap, 3, 3);
+
+	delete mask;
+}
+
+void CGdiplusBitmap::replace_channel(CString type, UINT srcID, int src_bgra_index, int dst_bgra_index)
+{
+	CGdiplusBitmap src(type, srcID);
+	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
+}
+
+void CGdiplusBitmap::replace_channel(CString src_file, int src_bgra_index, int dst_bgra_index)
+{
+	CGdiplusBitmap src(src_file);
+	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
+}
+
+void CGdiplusBitmap::replace_channel(Bitmap* src, int src_bgra_index, int dst_bgra_index)
+{
+	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
+}
+
+void CGdiplusBitmap::replace_channel(Bitmap* src, Bitmap* dst, int src_bgra_index, int dst_bgra_index)
+{
+	//이미지 크기는 동일해야 한다.
+	if ((src->GetWidth() != dst->GetWidth()) || (src->GetHeight() != dst->GetHeight()))
+	{
+		return;
+	};
+
+	Rect r(0, 0, src->GetWidth(), src->GetHeight());
+
+	BitmapData* bdSrc = new BitmapData;
+	src->LockBits(&r, ImageLockMode::ImageLockModeRead, PixelFormat32bppARGB, bdSrc); //PixelFormat(Format32bppArgb)  
+	BitmapData* bdDst = new BitmapData;
+	dst->LockBits(&r, ImageLockMode::ImageLockModeRead, PixelFormat32bppARGB, bdDst);
+
+	int src_ch = 4;
+	int dst_ch = 4;
+
+	try
+	{
+		byte* bpSrc = (byte*)bdSrc->Scan0;
+		byte* bpDst = (byte*)bdDst->Scan0;
+		bpSrc += (int)src_bgra_index;
+		bpDst += (int)dst_bgra_index;
+
+		for (int i = r.Height * r.Width; i > 0; i--)
+		{
+			*bpDst = *bpSrc;
+			bpSrc += src_ch;
+			bpDst += dst_ch;
+		}
+	}
+	catch (const std::exception&)
+	{
+
+	}
+
+	src->UnlockBits(bdSrc);
+	dst->UnlockBits(bdDst);
+}
+
 //실제 8bit(256color) gray이미지로 변경해준다.
 void CGdiplusBitmap::convert2gray()
 {
+	//뭔가 이 방식은 문제가 있어서 일단 보류
 	/*
 	Gdiplus::Bitmap* pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), PixelFormat8bppIndexed);// m_pBitmap->GetPixelFormat());
 	Gdiplus::ColorPalette* pal = (Gdiplus::ColorPalette*)malloc(sizeof(Gdiplus::ColorPalette) + 255 * sizeof(Gdiplus::ARGB));

@@ -112,7 +112,8 @@ public:
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
 	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
-	void resize(int cx, int cy, Gdiplus::InterpolationMode = Gdiplus::InterpolationModeHighQualityBicubic);
+	void resize(int cx, int cy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
+	void resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 	void sub_image(int x, int y, int w, int h);
 	void sub_image(CRect r);
 	void sub_image(Gdiplus::Rect r);
@@ -127,11 +128,33 @@ public:
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
 	void replace_color(int tx, int ty, Gdiplus::Color dst);
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
-	void add_rgb(int red, int green, int blue, COLORREF crExcept);
+
+	//현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
+	//원본에 적용하는 것이 정석이나 구조 수정이 필요하다.
+	void add_rgb(int red, int green, int blue);
+	void add_rgb_loop(int red, int green, int blue, COLORREF crExcept);
 
 	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
 	void apply_effect_hsl(int hue, int sat = 0, int light = 0);
 	void apply_effect_rgba(float r, float g, float b, float a = 1.0);
+
+	//factor(0.01~0.99)		: 중점부터 밖으로 까매지는 정도. 0.0이면 blur 없음.
+	//position(0.01~0.99)	: 바깥에서 중점으로 밝아지는 정도. 0.0이면 blur 없음.
+	//일반적인 테두리 블러 효과는 0.95f, 0.10f로 줄것
+	void round_corner(float radius, float factor = 0.0f, float position = 0.0f);
+
+	//src의 src_bgra_index에 해당하는 채널값을(bgra중의 n번 채널 인덱스)
+	//dst의 dst_bgra_index에 해당하는 채널값으로 변경
+	//ex. src에 마스크 이미지를, dst에 원본 이미지를 지정하고 index를 3, 3으로 하면
+	//src의 alpha값을 dst의 alpha값으로 변경한다.
+	//이를 이용하여 mask overlay로 활용할 수 있다.
+	void replace_channel(Bitmap* src, Bitmap* dst, int src_bgra_index, int dst_bgra_index);
+	void replace_channel(Bitmap* src, int src_bgra_index, int dst_bgra_index);
+	void replace_channel(CString type, UINT srcID, int src_bgra_index, int dst_bgra_index);
+	void replace_channel(CString src_file, int src_bgra_index, int dst_bgra_index);
+	PathGradientBrush* createFluffyBrush(GraphicsPath* gp, float* blendFactors, float* blendPositions, INT count, INT* in_out_count);
+
+
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.

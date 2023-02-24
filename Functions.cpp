@@ -7239,14 +7239,10 @@ CString	GetParentDirectory(CString sFolder)
 //대소문자를 명확히 하여 비교하는 것이 좋다.
 CString GetComputerNameString()
 {
-// 	char	sComputerName[MAX_COMPUTERNAME_LENGTH + 1];
-// 	DWORD	nSize = MAX_COMPUTERNAME_LENGTH + 1;
-// 	GetComputerName(sComputerName, &nSize);
-// 
-// 	return sComputerName;
-	TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
-	DWORD size = sizeof(computerName) / sizeof(computerName[0]);
-	GetComputerName(computerName, &size);
+	//TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
+	TCHAR computerName[255] = { 0, };
+	DWORD size = 255;// sizeof(computerName) / sizeof(computerName[0]);
+	GetComputerNameEx(ComputerNamePhysicalDnsHostname, computerName, &size);
 	return computerName;
 }
 /*

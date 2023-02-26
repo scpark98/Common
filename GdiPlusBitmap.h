@@ -179,6 +179,7 @@ public:
 	UINT			m_frame_count;
 	UINT			m_frame_index;
 	PropertyItem* m_pPropertyItem = NULL;
+	bool	is_animated_gif() { return (m_frame_count > 1); }
 	int		get_frame_count() { return m_frame_count; }
 	void	set_animation(HWND hWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
 	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }

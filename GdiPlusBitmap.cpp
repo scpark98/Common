@@ -638,11 +638,6 @@ void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 
 void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_color)
 {
-	Graphics* gp = Graphics::FromImage(m_pBitmap);
-	gp->Clear(Color(255, 135, 227, 158));
-	delete gp;
-	return;
-
 	int originw = width;
 	int originh = height;
 	CRect rotated(0, 0, originw, originh);
@@ -1155,6 +1150,9 @@ void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 
 void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 {
+	if (channel != 4)
+		cvtColor32ARGB();
+
 	GraphicsPath gp;
 	gp.AddArc(0.0, 0.0, radius, radius, 180.0, 90.0);
 	gp.AddArc(width - radius, 0.0, radius, radius, 270.0, 90.0);

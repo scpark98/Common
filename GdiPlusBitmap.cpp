@@ -276,6 +276,148 @@ Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 	return pBitmap;
 }
 
+IStream* CGdiplusBitmap::CreateStreamOnFile(LPCTSTR pszPathName)
+{
+	HANDLE hFile = ::CreateFile(pszPathName,
+		FILE_READ_DATA,
+		FILE_SHARE_READ,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL);
+	if (!hFile)
+		return NULL;
+
+	DWORD len = ::GetFileSize(hFile, NULL); // only 32-bit of the actual file size is retained
+	if (len == 0)
+		return NULL;
+
+	HGLOBAL hGlobal = ::GlobalAlloc(GMEM_MOVEABLE, len);
+	if (!hGlobal)
+	{
+		::CloseHandle(hFile);
+		return NULL;
+	}
+
+	char* lpBuffer = reinterpret_cast<char*> (::GlobalLock(hGlobal));
+	DWORD dwBytesRead = 0;
+
+	while (::ReadFile(hFile, lpBuffer, 4096, &dwBytesRead, NULL))
+	{
+		lpBuffer += dwBytesRead;
+		if (dwBytesRead == 0)
+			break;
+		dwBytesRead = 0;
+	}
+
+	::CloseHandle(hFile);
+
+
+	::GlobalUnlock(hGlobal);
+
+	// don't delete memory on object's release
+	IStream* pStream = NULL;
+	if (::CreateStreamOnHGlobal(hGlobal, FALSE, &pStream) != S_OK)
+	{
+		::GlobalFree(hGlobal);
+		return NULL;
+	}
+
+	return pStream;
+}
+
+IStream* CGdiplusBitmap::CreateStreamOnResource(LPCTSTR lpName, LPCTSTR lpType)
+{
+	// initialize return value
+	IStream* ipStream = NULL;
+
+	// find the resource
+	HRSRC hrsrc = FindResource(NULL, lpName, lpType);
+	if (hrsrc == NULL)
+		return NULL;
+
+	// load the resource
+	DWORD dwResourceSize = SizeofResource(NULL, hrsrc);
+	HGLOBAL hglbImage = LoadResource(NULL, hrsrc);
+	if (hglbImage == NULL)
+		return NULL;
+
+	// lock the resource, getting a pointer to its data
+	LPVOID pvSourceResourceData = LockResource(hglbImage);
+	if (pvSourceResourceData == NULL)
+		return NULL;
+
+	// allocate memory to hold the resource data
+	HGLOBAL hgblResourceData = GlobalAlloc(GMEM_MOVEABLE, dwResourceSize);
+	if (hgblResourceData == NULL)
+		return NULL;
+
+	// get a pointer to the allocated memory
+	LPVOID pvResourceData = GlobalLock(hgblResourceData);
+	if (pvResourceData == NULL)
+	{
+		GlobalFree(hgblResourceData);
+		return NULL;
+	}
+
+	// copy the data from the resource to the new memory block
+	CopyMemory(pvResourceData, pvSourceResourceData, dwResourceSize);
+	GlobalUnlock(hgblResourceData);
+
+	// create a stream on the HGLOBAL containing the data
+	if (SUCCEEDED(CreateStreamOnHGlobal(hgblResourceData, TRUE, &ipStream)))
+		return ipStream;
+
+	// couldn't create stream; free the memory
+	GlobalFree(hgblResourceData);
+
+	// no need to unlock or free the resource
+	return ipStream;
+}
+
+IWICBitmapSource* CGdiplusBitmap::LoadBitmapFromStream(IStream* ipImageStream)
+{
+	// initialize return value
+	IWICBitmapSource* ipBitmap = NULL;
+
+	// load WIC's PNG decoder
+	IWICBitmapDecoder* ipDecoder = NULL;
+	if (FAILED(CoCreateInstance(CLSID_WICPngDecoder, NULL, CLSCTX_INPROC_SERVER, __uuidof(ipDecoder), reinterpret_cast<void**>(&ipDecoder))))
+		return NULL;
+
+	// load the PNG
+	if (FAILED(ipDecoder->Initialize(ipImageStream, WICDecodeMetadataCacheOnLoad)))
+	{
+		ipDecoder->Release();
+		return NULL;
+	}
+
+	// check for the presence of the first frame in the bitmap
+	UINT nFrameCount = 0;
+	if (FAILED(ipDecoder->GetFrameCount(&nFrameCount)) || nFrameCount != 1)
+	{
+		ipDecoder->Release();
+		return NULL;
+	}
+
+	// load the first frame (i.e., the image)
+	IWICBitmapFrameDecode* ipFrame = NULL;
+	if (FAILED(ipDecoder->GetFrame(0, &ipFrame)))
+	{
+		ipDecoder->Release();
+		return NULL;
+	}
+
+	// convert the image to 32bpp BGRA format with pre-multiplied alpha
+	//   (it may not be stored in that format natively in the PNG resource,
+	//   but we need this format to create the DIB to use on-screen)
+	WICConvertBitmapSource(GUID_WICPixelFormat32bppPBGRA, ipFrame, &ipBitmap);
+	ipFrame->Release();
+
+	ipDecoder->Release();
+	return ipBitmap;
+}
+
 CGdiplusBitmap::~CGdiplusBitmap()
 {
 	release();
@@ -1154,6 +1296,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 		cvtColor32ARGB();
 
 	GraphicsPath gp;
+
 	gp.AddArc(0.0, 0.0, radius, radius, 180.0, 90.0);
 	gp.AddArc(width - radius, 0.0, radius, radius, 270.0, 90.0);
 	gp.AddArc(width - radius, height - radius, radius, radius, 0.0, 90.0);
@@ -1519,6 +1662,20 @@ bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channe
 
 int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 {
+	UINT num, size;
+	Gdiplus::GetImageEncodersSize(&num, &size);
+	Gdiplus::ImageCodecInfo* pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+	Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
+	bool found = false;
+	for (UINT ix = 0; !found && ix < num; ++ix) {
+		if (0 == _wcsicmp(pImageCodecInfo[ix].MimeType, format) == 0) {
+			*pClsid = pImageCodecInfo[ix].Clsid;
+			found = true;
+		}
+	}
+	free(pImageCodecInfo);
+	return found;
+	/*
 	UINT  num = 0;          // number of image encoders
 	UINT  size = 0;         // size of the image encoder array in bytes
 
@@ -1546,6 +1703,7 @@ int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
 	free(pImageCodecInfo);
 	return -1;  // Failure
+	*/
 }
 
 bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
@@ -1733,12 +1891,12 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 	return true;
 }
 
-void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long>& dqDelay)
+void CGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std::vector<long>& dqDelay)
 {
 	if (m_frame_count < 2)
 		return;
 
-	//현재 재생중이었다면 재생 정보를 기억해놓는다.
+	//현재 재생중이었다면 재생 정보를 기억해놓고 일시정지시키고
 	bool is_playing = !m_paused;
 	if (is_playing)
 	{
@@ -1750,18 +1908,20 @@ void CGdiplusBitmap::get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::
 
 	CString str;
 
-	dqImage.clear();
+	dqBitmap.clear();
 	dqDelay.clear();
 
 	for (int i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
-		CGdiplusBitmap* img = new CGdiplusBitmap();
-		deep_copy(img);
-		dqImage.push_back(img);
+		Gdiplus::Bitmap* img = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
+		Graphics g(img);
+		g.DrawImage(m_pBitmap, 0, 0, width, height);
+		dqBitmap.push_back(img);
 		dqDelay.push_back(((long*)m_pPropertyItem->value)[i] * 10);
 	}
 
+	//일시정지된 재생을 다시 재개시킨다.
 	if (is_playing)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
@@ -1907,4 +2067,80 @@ void CGdiplusBitmap::thread_gif_animation()
 	}
 
 	ReleaseDC(m_displayHwnd, hDC);
+}
+
+void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap)
+{
+	std::vector<Gdiplus::Bitmap*> dq;
+	std::vector<long> delay;
+	get_gif_frames(dq, delay);
+
+	CString str;
+
+	EncoderParameters	encoderParameters;
+	ULONG				parameterValue;
+	Status				stat;
+
+	// An EncoderParameters object has an array of
+   // EncoderParameter objects. In this case, there is only
+   // one EncoderParameter object in the array.
+	encoderParameters.Count = 1;
+
+	// Initialize the one EncoderParameter object.
+	encoderParameters.Parameter[0].Guid = EncoderSaveFlag;// FrameDimensionTime;// Gdiplus::ImageFormatGIF;// EncoderSaveFlag;
+	encoderParameters.Parameter[0].Type = Gdiplus::EncoderParameterValueType::EncoderParameterValueTypeLong;
+	encoderParameters.Parameter[0].NumberOfValues = 1;
+	encoderParameters.Parameter[0].Value = &parameterValue;
+
+	// Get the CLSID of the TIFF encoder.
+	CLSID encoderClsid;
+	GetEncoderClsid(L"image/gif", &encoderClsid);
+
+	// Set the loop count.
+	PropertyItem* propItemLoopCount = new PropertyItem;
+	SHORT loopCount = 0; //A value of 0 specifies that the animation should be displayed infinitely.
+
+	propItemLoopCount->id = PropertyTagLoopCount;
+	propItemLoopCount->length = sizeof(loopCount);
+	propItemLoopCount->type = PropertyTagTypeShort;
+	propItemLoopCount->value = &loopCount;
+
+	for (int i = 0; i < dq.size(); i++)
+	{
+		if (i == 0)
+		{
+			dq[0]->SetPropertyItem(propItemLoopCount);
+
+			// Save the first page (frame).
+			parameterValue = Gdiplus::EncoderValue::EncoderValueMultiFrame;
+			stat = dq[0]->Save(L"d:\\temp\\MultiFrame.gif", &encoderClsid, NULL);// &encoderParameters);
+			if (stat == Ok)
+				TRACE(_T("Page %d saved successfully.\n"), i);
+		}
+		else
+		{
+			//뭘 줘도 Win32Error가 리턴된다...
+			// Save the second page (frame).
+			//parameterValue = Gdiplus::EncoderValue::EncoderValueMultiFrame;
+			//stat = dq[0]->SaveAdd(dq[i], &encoderParameters);
+			//parameterValue = Gdiplus::EncoderValue::EncoderValueVersionGif89;
+			//stat = dq[0]->SaveAdd(dq[i], &encoderParameters);
+			//parameterValue = Gdiplus::EncoderValue::EncoderValueFrameDimensionTime;
+			//stat = dq[0]->SaveAdd(dq[i], &encoderParameters);
+			parameterValue = Gdiplus::EncoderValue::EncoderValueFrameDimensionTime;
+			stat = dq[0]->SaveAdd(dq[i], &encoderParameters);
+
+			if (stat == Ok)
+				TRACE(_T("Page %d saved successfully.\n"), i);
+		}
+	}
+
+	// Close the multiframe file.
+	parameterValue = Gdiplus::EncoderValue::EncoderValueFlush;
+	stat = dq[0]->SaveAdd(&encoderParameters);
+	if (stat == Ok)
+		printf("File closed successfully.\n");
+
+	//str.Format(_T("s:\\내 드라이브\\media\\test_image\\temp\\multi.tif"));
+	//save(dq[0], str);
 }

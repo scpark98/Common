@@ -63,6 +63,13 @@ public:
 	CGdiplusBitmap(CGdiplusBitmap* src);
 	CGdiplusBitmap(CString sType, UINT id, bool show_error = false);
 
+	//not tested.
+	IStream* CreateStreamOnFile(LPCTSTR pszPathName);
+	IStream* CreateStreamOnResource(LPCTSTR lpName, LPCTSTR lpType);
+	IWICBitmapSource* LoadBitmapFromStream(IStream* ipImageStream);
+
+
+
 	virtual ~CGdiplusBitmap();
 
 	void	release();
@@ -99,15 +106,15 @@ public:
 	void	clone(CGdiplusBitmap* dst);
 	void	deep_copy(CGdiplusBitmap* dst);
 	void	rotate(Gdiplus::RotateFlipType type);
+	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
+	//그럴 경우는 auto_resize를 true로 주고 불필요한 배경이 생겼을 경우는
+	//불필요한 배경의 색상을 지정하여 이미지 크기를 fit하게 줄일수도 있다.
+	void	rotate(float degree, bool auto_resize = false, Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
 	//좌우대칭
 	void	mirror();
 	//상하대칭
 	void	flip();
 
-	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
-	//그럴 경우는 auto_resize를 true로 주고 불필요한 배경이 생겼을 경우는
-	//불필요한 배경의 색상을 지정하여 이미지 크기를 fit하게 줄일수도 있다.
-	void rotate(float degree, bool auto_resize = false, Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
 
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
@@ -176,12 +183,14 @@ public:
 	int stride = 0;
 
 	//animatedGif
-	UINT			m_frame_count;
-	UINT			m_frame_index;
+	UINT	m_frame_count;
+	UINT	m_frame_index;
 	PropertyItem* m_pPropertyItem = NULL;
 	bool	is_animated_gif() { return (m_frame_count > 1); }
 	int		get_frame_count() { return m_frame_count; }
-	void	set_animation(HWND hWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
+	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
+	//parent에 관계없이 투명하게 표시할 경우는 CImageShapeWnd를 사용.
+	void	set_animation(HWND parenthWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
 	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
 	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }
 	void	start_animation();
@@ -191,7 +200,7 @@ public:
 	bool	save_gif_frames(CString folder);
 	//gif 프레임 이미지들을 추출해서 직접 display할 수 있다.
 	//단, 모든 이미지를 추출하여 메모리에 로드하므로 메모리 사용량이 문제될 수 있다.
-	void	get_gif_frames(std::vector<CGdiplusBitmap*>& dqImage, std::vector<long> &dqDelay);
+	void	get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std::vector<long> &dqDelay);
 
 	//총 재생시간을 ms단위로 리턴한다.
 	int		get_total_duration();
@@ -200,6 +209,8 @@ public:
 	int		ani_height() { return m_aniHeight; }
 	int		ani_width(int dpwidth) { m_aniWidth = dpwidth; return m_aniWidth; }
 	int		ani_height(int dpheight) { m_aniHeight = dpheight; return m_aniHeight; }
+
+	void	save_multi_image();// std::vector<Gdiplus::Bitmap*>& dqBitmap);
 
 protected:
 	CString			m_filename = _T("untitled");

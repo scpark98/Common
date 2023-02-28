@@ -10633,6 +10633,27 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	return TRUE;
 }
 
+//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
+int	get_monitor_index(CRect r, bool entire_included)
+{
+	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
+
+	for (int i = 0; i < g_dqMonitors.size(); i++)
+	{
+		if (entire_included)
+		{
+			if (RectInRect(g_dqMonitors[i], r))
+				return i;
+		}
+		else if (r.IntersectRect(r, g_dqMonitors[i]))
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 //2D 단일 영상에서 이미 알려진 설정값을 기준으로 영상내의 한 점과 렌즈와의 거리를 계산(by sucwon)
 //단, 차량에 장착된 카메라에서 촬영된 영상이므로 피사체와 렌즈와의 거리가 아닌 차체와의 거리가 더 정확한 값이며
 //따라서 렌즈의 위치인 영상 하단 센터가 아닌 영상의 하단과 피사체의 수직 거리가

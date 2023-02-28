@@ -255,6 +255,8 @@ protected:
 
 	void		ReconstructFont();
 
+	//enable상태일때는 잘 표시되나 disable일때는 표시되지 않는다.
+	//이를 해결하려면 parent의 PreTranslateMessage()에서 처리해야 한다.
 	CToolTipCtrl	m_tooltip;
 	bool		m_use_tooltip = true;
 	CString		m_tooltip_text = _T("");

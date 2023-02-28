@@ -49,12 +49,13 @@ CGdiButton::CGdiButton()
 	EnableToolTips(true);
 	EnableTrackingToolTips(true);
 
+	//매트릭스는 CGdiplusBitmap으로 이동할것!
 	m_grayMatrix = {
 		0.299f, 0.299f, 0.299f, 0.00f, 0.00f,
 		0.587f, 0.587f, 0.587f, 0.00f, 0.00f,
 		0.114f, 0.114f, 0.114f, 0.00f, 0.00f,
 		0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-		0.01f, 0.01f, 0.01f, 0.00f, 1.00f
+		0.101f, 0.101f, 0.101f, 0.00f, 1.00f
 		//버튼 disable일때 회색조가 좀 어두워서 0.50f로 변경했으나 다른 이미지일 경우는 너무 밝아져서 0.01f로 변경
 	};
 

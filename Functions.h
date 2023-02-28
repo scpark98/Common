@@ -390,8 +390,13 @@ bool		CheckProcessUsingWindowName(LPCTSTR className, LPCTSTR titleName);
 bool		CheckProcessUsingProcessName(LPCTSTR processName);
 
 //모니터 정보
+//main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
+//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
 extern std::deque<CRect> g_dqMonitors;
 BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);
+//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
+//entire_included가 true이면 어떤 모니터에 완전히 속해있는 경우에만 해당 인덱스를 리턴.
+int			get_monitor_index(CRect r, bool entire_included = false);
 
 //클립보드 clipboard
 	bool		copy_to_clipboard(HWND hWnd, CString str);

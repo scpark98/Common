@@ -1097,6 +1097,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CRect		GpRect2CRect(Gdiplus::Rect);
 	Gdiplus::Rect	CRect2GpRect(CRect r);
 	Gdiplus::RectF	CRect2GpRectF(CRect r);
+	void		get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
 	CRect		getCenterRect( int cx, int cy, int w, int h );
 	CRect		get_zoom_rect(CRect rect, double zoom);
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.

@@ -115,7 +115,8 @@ public:
 	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(CString normal, CString over = _T(""), CString down = _T(""), CString disabled = _T(""));
-	bool		add_image(CGdiplusBitmap img);
+	bool		add_image(CGdiplusBitmap *img);
+	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
 
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
@@ -135,7 +136,10 @@ public:
 	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
 	CGdiButton& text_color(COLORREF normal);
 	CGdiButton& back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
-	CGdiButton& back_color(COLORREF normal);
+	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
+	//(NH프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
+	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
+	CGdiButton& back_color(COLORREF normal, bool auto_set_color = false);
 	CGdiButton& text_color() { m_cr_text.clear(); }
 	CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]
@@ -173,6 +177,7 @@ public:
 	void		Offset( int x, int y );
 	void		Inflate( int cx, int cy );
 	void		Inflate( int l, int t, int r, int b );
+	virtual CGdiButton& set_round(int round);
 
 	//포커스 사각형 관련
 	void		ShowFocusRect( bool bShow = true ) { m_bShowFocusRect = bShow; Invalidate(); }
@@ -218,6 +223,8 @@ protected:
 
 	int			m_width;
 	int			m_height;
+
+	int			m_round = 0;				//round rect
 
 	UINT		m_nAnchor;
 	int			m_nAnchorMarginX;

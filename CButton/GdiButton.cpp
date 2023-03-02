@@ -193,7 +193,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	return true;
 }
 
-bool CGdiButton::add_image(CGdiplusBitmap img)
+bool CGdiButton::add_image(CGdiplusBitmap *img)
 {
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
@@ -201,10 +201,10 @@ bool CGdiButton::add_image(CGdiplusBitmap img)
 	CButtonImage* btn = new CButtonImage();
 
 	//normal은 0이어서는 안된다.
-	if (img.empty())
+	if (img->empty())
 		return false;
 
-	img.deep_copy(&btn->normal);
+	img->deep_copy(&btn->normal);
 	if (btn->normal.empty())
 		return false;
 
@@ -396,14 +396,18 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 	return *this;
 }
 
-CGdiButton& CGdiButton::back_color(COLORREF normal)
+CGdiButton& CGdiButton::back_color(COLORREF normal, bool auto_set_color)
 {
+	if (auto_set_color)
+		return back_color(normal, get_color(normal, 64), get_color(normal, -64), gray_color(normal));
+
 	return back_color(normal, normal, normal, gray_color(normal));
 }
 
 CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
 {
 	//배경색을 설정하면 배경 이미지는 해제시킨다.
+	//단, round가 들어간다면 투명처리해야 한다.
 	m_transparent = false;
 
 	m_back.release();
@@ -622,6 +626,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	CMemoryDC	dc(pDC1, &rc, false);
 	Graphics	g(dc.m_hDC, rc);
+	GraphicsPath	roundPath;
+
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	get_round_path(&roundPath, CRect2GpRect(rc), m_round);
 
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
@@ -686,8 +696,21 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else
 			cr_back = m_cr_back[0];
 
-		dc.FillSolidRect(rc, cr_back);
+		if (m_round == 0)
+		{
+			dc.FillSolidRect(rc, cr_back);
+		}
+		else
+		{
+			Color color;
+			color.SetFromCOLORREF(cr_back);
+
+			SolidBrush brush(color);
+			g.FillPath(&brush, &roundPath);
+		}
 	}
+
+	//return;
 
 	//이미지가 있다면 이미지를 먼저 그려주고
 	if (m_image.size() > 0 && m_image[idx]->normal != NULL)
@@ -816,7 +839,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			if (m_b3DRect)
+			if (m_round == 0 && m_b3DRect)
 			{
 				dc.Draw3dRect(rc,
 					is_down ? GRAY160 : white,
@@ -824,8 +847,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					//down_state ? GetSysColor(COLOR_3DSHADOW) : GetSysColor(COLOR_3DLIGHT),
 					//down_state ? GetSysColor(COLOR_3DLIGHT) : GetSysColor(COLOR_3DSHADOW)
 				);
-				if (is_down)
-					r.OffsetRect(1, 1);
+				//if (is_down)
+				//	r.OffsetRect(1, 1);
 			}
 
 			rText = r;
@@ -863,11 +886,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CFont *pOldFont = dc.SelectObject(&m_font);
 
 	dc.SetBkMode(TRANSPARENT);
-
 	dc.SetTextColor(cr_text);
-
 	dc.DrawText(m_text, rText, dwText);
-
 	dc.SelectObject(pOldFont);
 }
 
@@ -1064,6 +1084,18 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 
 	SetWindowPos(&wndNoTopMost, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);	
 	UpdateSurface();
+}
+
+CGdiButton& CGdiButton::set_round(int round)
+{
+	if (round < 0)
+		round = 0;
+
+	m_round = round;
+	m_transparent = (m_round > 0);
+
+	UpdateSurface();
+	return *this;
 }
 
 bool CGdiButton::GetCheck()

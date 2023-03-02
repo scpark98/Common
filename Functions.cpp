@@ -5512,6 +5512,37 @@ Gdiplus::RectF CRect2GpRectF(CRect r)
 	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
 }
 
+void get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
+{
+	//path->SetFillMode(Gdiplus::FillModeWinding);
+
+	if (radius <= 0)
+	{
+		path->AddRectangle(r);
+		path->CloseFigure();
+		return;
+	}
+
+	radius = MIN(radius, MIN(r.Width, r.Height) / 2.0);
+
+	float diameter = radius;// *2.0F;
+
+	Gdiplus::RectF arc(r.X, r.Y, diameter, diameter);
+
+	path->AddArc(arc, 180.0, 90.0);
+
+	arc.X = r.GetRight() - diameter - 1;
+	path->AddArc(arc, 270.0, 90.0);
+
+	arc.Y = r.GetBottom() - diameter - 1;
+	path->AddArc(arc, 0.0, 90.0);
+
+	arc.X = r.GetLeft();
+	path->AddArc(arc, 90.0, 90.0);
+
+	path->CloseFigure();
+}
+
 CRect get_zoom_rect(CRect rect, double zoom)
 {
 	double l, t, r, b;

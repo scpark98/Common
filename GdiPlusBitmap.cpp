@@ -1295,13 +1295,13 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 	if (channel != 4)
 		cvtColor32ARGB();
 
-	GraphicsPath gp;
+	GraphicsPath path;
 
-	gp.AddArc(0.0, 0.0, radius, radius, 180.0, 90.0);
-	gp.AddArc(width - radius, 0.0, radius, radius, 270.0, 90.0);
-	gp.AddArc(width - radius, height - radius, radius, radius, 0.0, 90.0);
-	gp.AddArc(0.0, height - radius, radius, radius, 90.0, 90.0);
-	gp.CloseFigure();
+	path.AddArc(0.0, 0.0, radius, radius, 180.0, 90.0);
+	path.AddArc(width - radius, 0.0, radius, radius, 270.0, 90.0);
+	path.AddArc(width - radius, height - radius, radius, radius, 0.0, 90.0);
+	path.AddArc(0.0, height - radius, radius, radius, 90.0, 90.0);
+	path.CloseFigure();
 
 	if (factor <= 0.0f || position <= 0.0f)
 	{
@@ -1316,7 +1316,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 		g.SetSmoothingMode(SmoothingMode::SmoothingModeAntiAlias);
 		//Brush* brush = new TextureBrush(temp);
 		TextureBrush brush(temp);
-		g.FillPath(&brush, &gp);
+		g.FillPath(&brush, &path);
 		return;
 	}
 
@@ -1332,7 +1332,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 		1.0f,
 	};
 
-	PathGradientBrush pgb(&gp);
+	PathGradientBrush pgb(&path);
 
 	//중점 세팅
 	pgb.SetCenterPoint(Gdiplus::Point(width / 2, height / 2));
@@ -1349,7 +1349,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 	Graphics gMask(mask);
 	gMask.FillRectangle(&SolidBrush(Color::Transparent), Rect(0, 0, width, height));
 	gMask.SetSmoothingMode(SmoothingMode::SmoothingModeHighQuality);
-	gMask.FillPath(&pgb, &gp);
+	gMask.FillPath(&pgb, &path);
 
 	CString str;
 	str.Format(_T("s:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);

@@ -5055,7 +5055,8 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-void draw_outline_text(CDC *pDC, int x, int y, CString text, int font_size, int thick, Gdiplus::Color crOutline, Gdiplus::Color crFill)
+void draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int thick,
+						CString font_name, Gdiplus::Color crOutline, Gdiplus::Color crFill)
 {
 	// GDI draw text
 	//SetTextColor(dc, RGB(0, 0, 255));
@@ -5065,13 +5066,14 @@ void draw_outline_text(CDC *pDC, int x, int y, CString text, int font_size, int 
 	Gdiplus::Graphics   g(pDC->m_hDC);
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	Gdiplus::FontFamily   ffami(L"궁서");
+	Gdiplus::FontFamily   ffami(font_name);
 	Gdiplus::StringFormat fmt;
 
 	Gdiplus::GraphicsPath   str_path;
 	str_path.AddString(CStringW(text), -1, &ffami,
-		Gdiplus::FontStyleBold, 48, Gdiplus::Point(x, y), &fmt);
+		Gdiplus::FontStyleBold, font_size, Gdiplus::Point(x, y), &fmt);
 
 	Gdiplus::Pen   gp(crOutline, thick);
 	gp.SetLineJoin(Gdiplus::LineJoinRound);
@@ -5085,6 +5087,56 @@ void draw_outline_text(CDC *pDC, int x, int y, CString text, int font_size, int 
 
 	g.DrawPath(&gp, &str_path);
 	g.FillPath(&gb, &str_path);
+}
+
+//출력할 글자를 작게 출력한 후 이를 다시 원래 크기로 늘려
+//blur가 생기게 하고 이를 shadow로 사용하는 방식인데 뭔가 어색하다.
+//ApplyEffect의 blur를 적용해서 구현하는 것이 나을 듯 하다.
+void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int depth,
+						CString font_name,
+						Gdiplus::Color crShadow)
+{
+	Gdiplus::Graphics   g(pDC->m_hDC);
+
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+	Gdiplus::RectF boundRect;
+	int logPixelsY = ::GetDeviceCaps(pDC->m_hDC, LOGPIXELSY);
+	Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
+
+	Gdiplus::FontFamily fontFamily(font_name);
+	Gdiplus::Font font(&fontFamily, emSize, Gdiplus::FontStyleBold);
+
+	Gdiplus::SolidBrush shadow_brush(Gdiplus::Color(255, 0, 0, 0));
+	Gdiplus::SolidBrush brush2(Gdiplus::Color(255, 255, 0, 0));
+
+	g.MeasureString(text, -1, &font, Gdiplus::PointF(x, y), &boundRect);
+
+	Gdiplus::Bitmap bm(boundRect.Width, boundRect.Height);
+	Gdiplus::Graphics g_shadow(&bm);
+	g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	/*
+	Gdiplus::Blur blur;
+	BlurParams blurParam;
+
+	blur.SetParameters(&blurParam);
+
+	//Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &hsl, NULL, NULL, &m_pBitmap);
+	bm.ApplyEffect(&hsl, NULL);
+	*/
+	
+	float ratio = 0.4f;
+	Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
+	g_shadow.SetTransform(&mx);
+	g_shadow.DrawString(text, wcslen(text), &font, Gdiplus::PointF(0, 0), &shadow_brush);
+	//save(&bm, _T("s:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
+
+	g.DrawImage(&bm, boundRect, 0, 0, bm.GetWidth() * ratio, bm.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
+
+	Gdiplus::StringFormat sf;
+	g.DrawString(text, wcslen(text), &font, Gdiplus::PointF(x-3, y-3), &brush2);
 }
 
 void DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
@@ -14688,3 +14740,90 @@ BOOL PlayResource(LPTSTR lpName)
 	return bRtn;
 }
 */
+
+int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+{
+	UINT num, size;
+	Gdiplus::GetImageEncodersSize(&num, &size);
+	Gdiplus::ImageCodecInfo* pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+	Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
+	bool found = false;
+	for (UINT ix = 0; !found && ix < num; ++ix) {
+		if (0 == _wcsicmp(pImageCodecInfo[ix].MimeType, format) == 0) {
+			*pClsid = pImageCodecInfo[ix].Clsid;
+			found = true;
+		}
+	}
+	free(pImageCodecInfo);
+	return found;
+	/*
+	UINT  num = 0;          // number of image encoders
+	UINT  size = 0;         // size of the image encoder array in bytes
+
+	ImageCodecInfo* pImageCodecInfo = NULL;
+
+	GetImageEncodersSize(&num, &size);
+	if (size == 0)
+		return -1;  // Failure
+
+	pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
+	if (pImageCodecInfo == NULL)
+		return -1;  // Failure
+
+	GetImageEncoders(num, size, pImageCodecInfo);
+
+	for (UINT j = 0; j < num; ++j)
+	{
+		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
+		{
+			*pClsid = pImageCodecInfo[j].Clsid;
+			free(pImageCodecInfo);
+			return j;  // Success
+		}
+	}
+
+	free(pImageCodecInfo);
+	return -1;  // Failure
+	*/
+}
+
+bool save(Gdiplus::Bitmap* bitmap, CString filename)
+{
+	if (!bitmap)
+		return false;
+
+	CLSID				encoderClsid;
+
+	CString ext = filename.Right(3).MakeLower();//GetFileExtension(filename).MakeLower();
+
+	if (ext == _T("jpg") || ext == _T("jpeg"))
+		GetEncoderClsid(L"image/jpeg", &encoderClsid);
+	else if (ext == _T("png"))
+		GetEncoderClsid(L"image/png", &encoderClsid);
+	else if (ext == _T("gif"))
+		GetEncoderClsid(L"image/gif", &encoderClsid);
+	else if (ext == _T("bmp"))
+		GetEncoderClsid(L"image/bmp", &encoderClsid);
+	else
+	{
+		AfxMessageBox(_T("처리 코드가 추가되지 않은 포맷. 코드 수정 필요"));
+		return false;
+	}
+	/*
+	encoderParameters.Count = 1;
+	encoderParameters.Parameter[0].Guid = EncoderQuality;
+	encoderParameters.Parameter[0].Type = EncoderParameterValueTypeLong;
+	encoderParameters.Parameter[0].NumberOfValues = 1;
+
+	// Save the image as a JPEG with quality level 0.
+	encoderParameters.Parameter[0].Value = &quality;
+	*/
+	Gdiplus::Status s;
+
+	s = bitmap->Save(CStringW(filename), &encoderClsid);// , & encoderParameters);
+
+	if (s == Gdiplus::Ok)
+		return true;
+
+	return false;
+}

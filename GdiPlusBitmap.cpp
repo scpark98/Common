@@ -1290,6 +1290,16 @@ void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
+void CGdiplusBitmap::apply_effect_blur(float radius, BOOL expandEdge)
+{
+	Blur blur;
+	BlurParams param;
+	param.radius = radius;
+	param.expandEdge = expandEdge;
+	blur.SetParameters(&param);
+	m_pBitmap->ApplyEffect(&blur, NULL);
+}
+
 void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 {
 	if (channel != 4)
@@ -1353,7 +1363,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 
 	CString str;
 	str.Format(_T("s:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
-	save(mask, str);
+	::save(mask, str);
 	replace_channel(mask, m_pBitmap, 3, 3);
 
 	delete mask;
@@ -1660,96 +1670,10 @@ bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channe
 	return false;
 }
 
-int CGdiplusBitmap::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
-{
-	UINT num, size;
-	Gdiplus::GetImageEncodersSize(&num, &size);
-	Gdiplus::ImageCodecInfo* pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
-	Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
-	bool found = false;
-	for (UINT ix = 0; !found && ix < num; ++ix) {
-		if (0 == _wcsicmp(pImageCodecInfo[ix].MimeType, format) == 0) {
-			*pClsid = pImageCodecInfo[ix].Clsid;
-			found = true;
-		}
-	}
-	free(pImageCodecInfo);
-	return found;
-	/*
-	UINT  num = 0;          // number of image encoders
-	UINT  size = 0;         // size of the image encoder array in bytes
-
-	ImageCodecInfo* pImageCodecInfo = NULL;
-
-	GetImageEncodersSize(&num, &size);
-	if (size == 0)
-		return -1;  // Failure
-
-	pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
-	if (pImageCodecInfo == NULL)
-		return -1;  // Failure
-
-	GetImageEncoders(num, size, pImageCodecInfo);
-
-	for (UINT j = 0; j < num; ++j)
-	{
-		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
-		{
-			*pClsid = pImageCodecInfo[j].Clsid;
-			free(pImageCodecInfo);
-			return j;  // Success
-		}
-	}
-
-	free(pImageCodecInfo);
-	return -1;  // Failure
-	*/
-}
 
 bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 {
-	return save(m_pBitmap, filename);
-}
-
-bool CGdiplusBitmap::save(Gdiplus::Bitmap *bitmap, CString filename)
-{
-	if (!bitmap)
-		return false;
-
-	CLSID				encoderClsid;
-
-	CString ext = filename.Right(3).MakeLower();//GetFileExtension(filename).MakeLower();
-
-	if (ext == _T("jpg") || ext == _T("jpeg"))
-		GetEncoderClsid(L"image/jpeg", &encoderClsid);
-	else if (ext == _T("png"))
-		GetEncoderClsid(L"image/png", &encoderClsid);
-	else if (ext == _T("gif"))
-		GetEncoderClsid(L"image/gif", &encoderClsid);
-	else if (ext == _T("bmp"))
-		GetEncoderClsid(L"image/bmp", &encoderClsid);
-	else
-	{
-		AfxMessageBox(_T("처리 코드가 추가되지 않은 포맷. 코드 수정 필요"));
-		return false;
-	}
-	/*
-	encoderParameters.Count = 1;
-	encoderParameters.Parameter[0].Guid = EncoderQuality;
-	encoderParameters.Parameter[0].Type = EncoderParameterValueTypeLong;
-	encoderParameters.Parameter[0].NumberOfValues = 1;
-
-	// Save the image as a JPEG with quality level 0.
-	encoderParameters.Parameter[0].Value = &quality;
-	*/
-	Status s;
-
-	s = bitmap->Save(CStringW(filename), &encoderClsid);// , & encoderParameters);
-
-	if (s == Ok)
-		return true;
-
-	return false;
+	return ::save(m_pBitmap, filename);
 }
 
 bool CGdiplusBitmap::copy_to_clipbard()

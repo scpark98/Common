@@ -144,6 +144,7 @@ public:
 	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
 	void apply_effect_hsl(int hue, int sat = 0, int light = 0);
 	void apply_effect_rgba(float r, float g, float b, float a = 1.0);
+	void apply_effect_blur(float radius, BOOL expandEdge);
 
 	//factor(0.01~0.99)		: 중점부터 밖으로 까매지는 정도. 0.0이면 blur 없음.
 	//position(0.01~0.99)	: 바깥에서 중점으로 밝아지는 정도. 0.0이면 blur 없음.
@@ -172,9 +173,7 @@ public:
 	//현재 이미지를 32bit로 변경한다.
 	void cvtColor32ARGB();
 
-	int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool save(CString filepath);
-	bool save(Gdiplus::Bitmap *bitmap, CString filepath);
 	bool copy_to_clipbard();
 
 	int width = 0;

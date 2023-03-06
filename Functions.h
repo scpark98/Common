@@ -95,6 +95,12 @@ t1 a, b; // a is 'int*' and b is 'int*'
 t2 c, d; // c is 'int*' and d is 'int'
 */
 
+#ifdef GDIPVER
+#undef GDIPVER
+#endif
+
+#define GDIPVER 0x0110
+
 #define		TO_STRING(a) #a
 #define		ID2String(ID, sID) sID.Format( "%s", #ID )	
 
@@ -988,8 +994,15 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		TextOutOutline(CDC* pDC, int x, int y, CString sText, COLORREF crText = RGB(0,0,0), COLORREF crBorder = RGB(255,255,255), UINT nFlag = TA_LEFT | TA_TOP );
 	void		DrawTextOutline(CDC* pDC, CString sText, CRect r, UINT format, COLORREF crText = RGB(255, 255, 255), COLORREF crShadow = GRAY(64));
 	void		draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect);
-	//
-	void		draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int thick, Gdiplus::Color crOutline, Gdiplus::Color crFill);
+
+	//Gdiplus
+	void		draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int thick,
+								CString font_name = _T("맑은 고딕"),
+								Gdiplus::Color crOutline = Gdiplus::Color::White,
+								Gdiplus::Color crFill = Gdiplus::Color::Black);
+	void		draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int depth,
+								CString font_name = _T("맑은 고딕"),
+								Gdiplus::Color crShadow = Gdiplus::Color::Red);
 
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
 	void		DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN );
@@ -1011,6 +1024,9 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	LONG		get_logical_size_from_font_size(HDC hDC, int font_size);
 	//LOGFONT::lfHeight to font size
 	LONG		get_font_size_from_logical_size(HDC hDC, int logical_size);
+
+	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
+	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);
 
 
 //gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면

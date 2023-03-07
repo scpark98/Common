@@ -504,6 +504,7 @@ int			get_monitor_index(CRect r, bool entire_included = false);
 	TCHAR*		CString2TCHAR(CString str);
 	LPCSTR		CString2LPCSTR(CString str);
 	LPCWSTR		LPCTSTR2LPCWSTR(LPCTSTR str, UINT codePage = CP_UTF8);
+	WCHAR*		CString2WCHAR(CString str); //{ return (WCHAR*)(const WCHAR*)CStringW(str); }
 
 	//chStr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
 	//그렇지 않을 경우 chStr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.

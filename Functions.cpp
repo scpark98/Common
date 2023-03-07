@@ -5068,7 +5068,8 @@ void draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int 
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	Gdiplus::FontFamily   ffami(font_name);
+	//Gdiplus::FontFamily   ffami(CStringW(font_name));
+	Gdiplus::FontFamily   ffami((WCHAR*)(const WCHAR*)CStringW(font_name));
 	Gdiplus::StringFormat fmt;
 
 	Gdiplus::GraphicsPath   str_path;
@@ -5106,13 +5107,13 @@ void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int d
 	int logPixelsY = ::GetDeviceCaps(pDC->m_hDC, LOGPIXELSY);
 	Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
 
-	Gdiplus::FontFamily fontFamily(font_name);
+	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
 	Gdiplus::Font font(&fontFamily, emSize, Gdiplus::FontStyleBold);
 
 	Gdiplus::SolidBrush shadow_brush(Gdiplus::Color(255, 0, 0, 0));
 	Gdiplus::SolidBrush brush2(Gdiplus::Color(255, 255, 0, 0));
 
-	g.MeasureString(text, -1, &font, Gdiplus::PointF(x, y), &boundRect);
+	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
 
 	Gdiplus::Bitmap bm(boundRect.Width, boundRect.Height);
 	Gdiplus::Graphics g_shadow(&bm);
@@ -5130,13 +5131,13 @@ void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int d
 	float ratio = 0.4f;
 	Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 	g_shadow.SetTransform(&mx);
-	g_shadow.DrawString(text, wcslen(text), &font, Gdiplus::PointF(0, 0), &shadow_brush);
-	//save(&bm, _T("s:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
+	g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &shadow_brush);
+	//save(&bm, _T("z:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
 
 	g.DrawImage(&bm, boundRect, 0, 0, bm.GetWidth() * ratio, bm.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
 
 	Gdiplus::StringFormat sf;
-	g.DrawString(text, wcslen(text), &font, Gdiplus::PointF(x-3, y-3), &brush2);
+	g.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x-3, y-3), &brush2);
 }
 
 void DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
@@ -7504,6 +7505,11 @@ LPCWSTR	LPCTSTR2LPCWSTR(LPCTSTR str, UINT codePage)
 	USES_CONVERSION;
 	return A2W_CP(str, codePage);
 #endif
+}
+
+WCHAR* CString2WCHAR(CString str)
+{
+	return (WCHAR*)(const WCHAR*)CStringW(str);
 }
 
 //

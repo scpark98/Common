@@ -1362,7 +1362,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 	gMask.FillPath(&pgb, &path);
 
 	CString str;
-	str.Format(_T("s:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
+	str.Format(_T("z:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
 	::save(mask, str);
 	replace_channel(mask, m_pBitmap, 3, 3);
 
@@ -2065,6 +2065,6 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 	if (stat == Ok)
 		printf("File closed successfully.\n");
 
-	//str.Format(_T("s:\\내 드라이브\\media\\test_image\\temp\\multi.tif"));
+	//str.Format(_T("z:\\내 드라이브\\media\\test_image\\temp\\multi.tif"));
 	//save(dq[0], str);
 }

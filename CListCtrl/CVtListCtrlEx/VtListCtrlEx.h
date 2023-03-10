@@ -115,9 +115,9 @@ public:
 		for (auto item : arg)
 		{
 			if (subItem == 0)
-				index = insert_item(index, item);
+				index = insert_item(index, item, false, false);
 			else
-				set_text(index, subItem, item);
+				set_text(index, subItem, item, false);
 			subItem++;
 		}
 

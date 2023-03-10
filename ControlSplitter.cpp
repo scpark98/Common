@@ -1,8 +1,6 @@
 // ControlSplitter.cpp : インプリメンテ?ション フ?イル
 //
 
-#include "stdafx.h"
-
 #include "ControlSplitter.h"
 
 #ifdef _DEBUG

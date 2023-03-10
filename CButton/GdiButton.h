@@ -84,7 +84,7 @@ public:
 	virtual ~CGdiButton();
 
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
-	void		SetButtonStyle( UINT nStyle, BOOL bRedraw = 1 );
+	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
 	//enum 
 
 	//pBack은 버튼의 배경이 되는 그림으로 parent 창의 배경이미지에 사용된 Bitmap*이다.

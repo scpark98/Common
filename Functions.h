@@ -389,6 +389,7 @@ bool		IsRunning(CString processname);
 bool		KillProcess(CString processname);
 HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 bool		IsDuplicatedRun();
+CString		run_process(CString exePath, bool wait_process_exit);
 
 //PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
 bool		CheckProcessUsingPID(unsigned long pid);
@@ -1394,6 +1395,9 @@ std::vector<CPoint>	get_rotated(int cx, int cy, CRect* r, double degree);
 //지도 좌표 <-> 도분초 변환
 double		convert_gps_coord(int d, int m, double s);
 void		convert_gps_coord(double gps, int &d, int &m, double &s);
+
+//src내의 모든 문자에 대해 digits자릿수의 조합 생성
+void		combination(std::vector<TCHAR> src, CString temp, std::vector<CString>& result, int depth);
 
 //http://www.gamedevforever.com/114 (2012년 포스트)
 //기존 rand()에 비해 분포가 고르고 속도도 빠르다고 소개되었으나

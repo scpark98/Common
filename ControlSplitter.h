@@ -11,6 +11,7 @@
 #endif // _MSC_VER > 1000
 // ControlSplitter.h : ヘッ?? フ?イル
 //
+#include <afxwin.h>
 #include <vector>
 /////////////////////////////////////////////////////////////////////////////
 // CControlSplitter ウィンドウ

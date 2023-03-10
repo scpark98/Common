@@ -706,37 +706,15 @@ CString		GetFileTitle(CString sFullPath)
 		return filename;
 }
 
-CString		GetFileExtension(CString sFullPath, bool dot)
+CString	GetFileExtension(CString sFullPath, bool dot)
 {
-	// mms://211.106.66.140/H_1TV
-	// 위와 같은 웹주소의 경우에는 ""을 리턴한다.
-	// http://babobus.com/Html/content/0828_1.asf
-	CString sString;
-	
-	if (CheckFileIsURL(sFullPath))
-	{
-		sString = GetFileNameFromFullPath(sFullPath);
-		// 확장명이 있는 경우와 없는 경우를 구분한다.
-		if (sString.Find('.') > 0)
-		{
-			if (dot)
-				sString = sString.Right(sString.GetLength() - sString.ReverseFind('.'));
-			else
-				sString = sString.Right(sString.GetLength() - sString.ReverseFind('.') - 1);
-			return sString;
-		}
-		else
-			return _T("");
-	}
+	CString sString = GetFileNameFromFullPath(sFullPath);
+
+	// 확장명이 있는 경우와 없는 경우를 구분한다.
+	if (sString.Find('.') > 0)
+		return sString.Mid(sString.ReverseFind('.') + (dot ? 0 : 1));
 	else
-	{
-		if (dot && sString.Find('.') > 0)
-			sString = sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('.'));
-		else
-			sString = sFullPath.Right(sFullPath.GetLength() - sFullPath.ReverseFind('.') - 1);
-	}
-	
-	return sString;
+		return _T("");
 }
 
 int	GetFileTypeFromFilename(CString filename)
@@ -2221,6 +2199,12 @@ CString	get_uri(CString full_remote_url, CString local_path)
 	CString strServer;
 	CString strObject;
 	INTERNET_PORT nPort;
+
+	//url은 반드시 http:// 또는 https:// 등과 같은 서비스 종류가 표시되어야 한다.
+	if (full_remote_url.Left(7) != _T("http://") &&
+		full_remote_url.Left(8) != _T("https://"))
+		full_remote_url = _T("http://") + full_remote_url;
+
 	AfxParseURL(full_remote_url, dwServiceType, strServer, strObject, nPort);
 
 	return get_uri(strServer, nPort, strObject, local_path);
@@ -2234,7 +2218,15 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	TCHAR szHead[] = _T("Accept: */*\r\n\r\n");
 	bool is_https = (ip.Find(_T("https://")) >= 0);
 
-	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_TRANSFER_BINARY; // http
+	if (port <= 0)
+	{
+		if (is_https)
+			port = 443;
+		else
+			port = 80;
+	}
+
+	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE;// | INTERNET_FLAG_TRANSFER_BINARY; // http
 	if (is_https)
 	{
 		secureFlags |= INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
@@ -8407,6 +8399,23 @@ double Rounding(double x, int digit)
     return (floor((x) * pow(float(10), digit) + 0.5f) / pow(float(10), digit));
 }
 
+//src내의 모든 문자에 대해 digits자릿수의 조합 생성
+void combination(std::vector<TCHAR> src, CString temp, std::vector<CString> &result, int depth)
+{
+	if (depth == 0)//result.size())  // depth == n // 계속 안뽑다가 r 개를 채우지 못한 경우는 이 곳에 걸려야 한다.
+	{
+		result.push_back(temp);
+		trace(_T("%s\n"), temp);
+		return;
+	}
+
+	for (int i = 0; i < src.size(); i++)
+	{
+		temp.SetAt(depth-1, src[i]);
+		combination(src, temp, result, depth - 1);
+	}
+}
+
 //대각 각도로 수평, 수직 화각을 수학적으로 계산한다.
 //실제 렌즈 스펙과 반드시 일치하진 않는다.
 void get_HV_angle_from_diagonal(int diagonal, int *h, int *v, int width, int height)
@@ -8730,6 +8739,86 @@ bool IsDuplicatedRun()
 		return true;
 
 	return false;
+}
+
+CString run_process(CString exePath, bool wait_process_exit)
+{
+	CString result(_T(""));
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	HANDLE hChildStdoutRd;
+	HANDLE hChildStdoutWr;
+
+	// Create security attributes to create pipe.
+	SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES) };
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = NULL;
+
+	// Create a pipe to get results from child's stdout.
+	if (!CreatePipe(&hChildStdoutRd, &hChildStdoutWr, &saAttr, 0))
+	{
+		return result;
+	}
+
+	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+	si.hStdOutput = hChildStdoutWr;
+	si.hStdError = hChildStdoutWr;
+	si.wShowWindow = SW_HIDE;
+
+
+	// Start the child process. 
+	if (!CreateProcess(NULL,   // No module name (use command line)
+		(TCHAR*)(const TCHAR*)(exePath),        // Command line
+		NULL,           // Process handle not inheritable
+		NULL,           // Thread handle not inheritable
+		TRUE,          // Set handle inheritance to FALSE
+		CREATE_NEW_CONSOLE,              // No creation flags
+		NULL,           // Use parent's environment block
+		NULL,           // Use parent's starting directory 
+		&si,            // Pointer to STARTUPINFO structure
+		&pi)           // Pointer to PROCESS_INFORMATION structure
+		)
+	{
+		return result;
+	}
+
+	if (wait_process_exit)
+	{
+		// Wait until child process exits.
+		WaitForSingleObject(pi.hProcess, INFINITE);
+	}
+	else
+	{
+		DWORD dwWait = ::WaitForInputIdle(pi.hProcess, INFINITE);
+	}
+
+	if (!CloseHandle(hChildStdoutWr))
+		return result;
+
+	for (;;)
+	{
+		DWORD dwRead;
+		char chBuf[4096] = { 0, };
+
+		bool done = !ReadFile(hChildStdoutRd, chBuf, 4096, &dwRead, NULL) || dwRead == 0;
+
+		if (done)
+			break;
+
+		result += chBuf;
+	}
+
+	// Close process and thread handles. 
+	CloseHandle(hChildStdoutRd);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	return result;
 }
 
 bool RectInRect(CRect rMain, CRect rSub)
@@ -14749,6 +14838,7 @@ BOOL PlayResource(LPTSTR lpName)
 
 int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 {
+	/*
 	UINT num, size;
 	Gdiplus::GetImageEncodersSize(&num, &size);
 	Gdiplus::ImageCodecInfo* pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
@@ -14762,17 +14852,17 @@ int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 	}
 	free(pImageCodecInfo);
 	return found;
-	/*
+	*/
 	UINT  num = 0;          // number of image encoders
 	UINT  size = 0;         // size of the image encoder array in bytes
 
-	ImageCodecInfo* pImageCodecInfo = NULL;
+	Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
 
-	GetImageEncodersSize(&num, &size);
+	Gdiplus::GetImageEncodersSize(&num, &size);
 	if (size == 0)
 		return -1;  // Failure
 
-	pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
+	pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
 	if (pImageCodecInfo == NULL)
 		return -1;  // Failure
 
@@ -14790,7 +14880,6 @@ int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
 	free(pImageCodecInfo);
 	return -1;  // Failure
-	*/
 }
 
 bool save(Gdiplus::Bitmap* bitmap, CString filename)

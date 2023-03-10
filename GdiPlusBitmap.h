@@ -62,6 +62,7 @@ public:
 	CGdiplusBitmap(CString pFile, bool show_error = false);
 	CGdiplusBitmap(CGdiplusBitmap* src);
 	CGdiplusBitmap(CString sType, UINT id, bool show_error = false);
+	CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr);
 
 	//not tested.
 	IStream* CreateStreamOnFile(LPCTSTR pszPathName);
@@ -145,6 +146,8 @@ public:
 	void apply_effect_hsl(int hue, int sat = 0, int light = 0);
 	void apply_effect_rgba(float r, float g, float b, float a = 1.0);
 	void apply_effect_blur(float radius, BOOL expandEdge);
+
+	void round_shadow_rect(int w, int h, float radius);
 
 	//factor(0.01~0.99)		: 중점부터 밖으로 까매지는 정도. 0.0이면 blur 없음.
 	//position(0.01~0.99)	: 바깥에서 중점으로 밝아지는 정도. 0.0이면 blur 없음.

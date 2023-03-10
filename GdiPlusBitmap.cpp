@@ -139,6 +139,14 @@ CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id, bool show_error)
 	load(lpType, id, show_error);
 }
 
+CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
+{
+	m_pBitmap = new Gdiplus::Bitmap(cx, cy, format);
+	Graphics g(m_pBitmap);
+	g.Clear(cr);
+	resolution();
+}
+
 bool CGdiplusBitmap::load(CString file, bool show_error)
 {
 	if (!PathFileExists(file))
@@ -1300,17 +1308,72 @@ void CGdiplusBitmap::apply_effect_blur(float radius, BOOL expandEdge)
 	m_pBitmap->ApplyEffect(&blur, NULL);
 }
 
+void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
+{
+	release();
+
+	m_pBitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
+	resolution();
+
+	Graphics g(m_pBitmap);
+	g.Clear(Color::Transparent);
+	//g.Clear(Color::Blue);
+
+
+	//SolidBrush brush(Color(255, 255, 0, 0));
+	//g.FillRectangle(&brush, 4, 4, w - 8, h - 8);
+	//apply_effect_blur(20.0f, FALSE);
+	
+	Gdiplus::Matrix matrix(1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+	CGdiplusBitmap shadow(w - 20, h - 20, PixelFormat32bppARGB, Gdiplus::Color(255, 64, 64, 64));
+	//shadow.save(_T("d:\\temp\\shadow.png"));
+	shadow.round_corner(radius);// , 0.90f, 0.1f);
+	//shadow.apply_effect_blur(40.0f, FALSE);
+	//shadow.save(_T("d:\\temp\\shadow_blur.png"));
+
+	g.DrawImage(shadow, 10, 10, shadow.width, shadow.height);
+	//save(_T("d:\\temp\\shadow.png"));
+	apply_effect_blur(14.0f, FALSE);
+	//save(_T("d:\\temp\\shadow_blur.png"));
+	/*
+	Gdiplus::BlurParams myBlurParams;
+	myBlurParams.expandEdge = true;
+	myBlurParams.radius = 49.0f;
+	Gdiplus::Blur myBlur;
+	myBlur.SetParameters(&myBlurParams);
+
+	Gdiplus::RectF r(0, 0, w, h);
+	g.DrawImage(m_pBitmap, &r, &matrix, &myBlur, NULL, Gdiplus::UnitPixel);
+	*/
+
+	/*
+	GraphicsPath path;
+
+	float depth = 4.0f;
+	path.AddArc(depth, depth, radius, radius, 180.0, 90.0);
+	path.AddArc(width - depth - radius, depth, radius, radius, 270.0, 90.0);
+	path.AddArc(width - depth - radius, height - depth - radius, radius, radius, 0.0, 90.0);
+	path.AddArc(depth, height - depth - radius, radius, radius, 90.0, 90.0);
+	path.CloseFigure();
+
+	g.SetSmoothingMode(SmoothingMode::SmoothingModeAntiAlias);
+
+	SolidBrush brush(Color::White);
+	g.FillPath(&brush, &path);
+	*/
+}
+
 void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 {
 	if (channel != 4)
 		cvtColor32ARGB();
 
 	GraphicsPath path;
-
-	path.AddArc(0.0, 0.0, radius, radius, 180.0, 90.0);
-	path.AddArc(width - radius, 0.0, radius, radius, 270.0, 90.0);
-	path.AddArc(width - radius, height - radius, radius, radius, 0.0, 90.0);
-	path.AddArc(0.0, height - radius, radius, radius, 90.0, 90.0);
+	float ratio = 0.0f;// ((float)width / (float)height);
+	path.AddArc(0.0, ratio, radius, radius, 180.0, 90.0);
+	path.AddArc(width - radius, ratio, radius, radius, 270.0, 90.0);
+	path.AddArc(width - radius, height - ratio - radius, radius, radius, 0.0, 90.0);
+	path.AddArc(0.0, height - ratio - radius, radius, radius, 90.0, 90.0);
 	path.CloseFigure();
 
 	if (factor <= 0.0f || position <= 0.0f)
@@ -1321,7 +1384,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 
 		//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
 		Graphics g(m_pBitmap);
-		g.Clear(Color(0, 0, 0, 0));
+		g.Clear(Color::Transparent);
 
 		g.SetSmoothingMode(SmoothingMode::SmoothingModeAntiAlias);
 		//Brush* brush = new TextureBrush(temp);
@@ -1330,6 +1393,8 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 		return;
 	}
 
+	//width, height가 다르면 blur의 두께가 다른 문제가 있다.
+	//이를 어디선가는 보정해줘야 한다.
 	int in_out_count = 1;	//3으로 해선 안된다.
 	float blendFactor[] = {
 		0.0f,
@@ -1355,15 +1420,18 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position)
 	pgb.SetSurroundColors(colors, &in_out_count);
 
 	//mask를 CGdiplusBitmap 타입으로 정적 생성하니 오류발생하여 동적 생성함.
-	Gdiplus::Bitmap *mask = new Gdiplus::Bitmap(width, height);
+	Gdiplus::Bitmap *mask = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 	Graphics gMask(mask);
 	gMask.FillRectangle(&SolidBrush(Color::Transparent), Rect(0, 0, width, height));
 	gMask.SetSmoothingMode(SmoothingMode::SmoothingModeHighQuality);
 	gMask.FillPath(&pgb, &path);
 
+#ifdef _DEBUG
 	CString str;
 	str.Format(_T("z:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
 	::save(mask, str);
+#endif
+
 	replace_channel(mask, m_pBitmap, 3, 3);
 
 	delete mask;

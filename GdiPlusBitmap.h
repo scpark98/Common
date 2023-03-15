@@ -62,7 +62,7 @@ public:
 	CGdiplusBitmap(CString pFile, bool show_error = false);
 	CGdiplusBitmap(CGdiplusBitmap* src);
 	CGdiplusBitmap(CString sType, UINT id, bool show_error = false);
-	CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr);
+	CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//not tested.
 	IStream* CreateStreamOnFile(LPCTSTR pszPathName);
@@ -73,6 +73,7 @@ public:
 
 	virtual ~CGdiplusBitmap();
 
+	void	create(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 	void	release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.

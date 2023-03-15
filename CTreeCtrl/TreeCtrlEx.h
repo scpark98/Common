@@ -18,6 +18,8 @@ full customize를 위해 직접 제작.
 -라인 표시 모드라면 확장축소버튼에서 세로로 그리기 시작한다.
 */
 
+#include <afxwin.h>
+#include <afxcmn.h>
 #include "../data_structure/tree_node.h"
 
 // CTreeCtrlEx
@@ -51,7 +53,7 @@ public:
 	void	toggle_checked() { checked = !checked; }
 };
 
-class CTreeCtrlEx : public CWnd
+class CTreeCtrlEx : public CTreeCtrl
 {
 	DECLARE_DYNAMIC(CTreeCtrlEx)
 
@@ -134,6 +136,7 @@ public:
 	void			use_scrollbar(bool use = true);
 	void			set_scroll_unit(int unit) { m_scroll_unit = unit; }
 
+	void			create_image_list(int image_size);
 	void			use_image_list(bool use) { m_use_image_list = use; }
 	bool			use_image_list() { return m_use_image_list; }
 	int				get_image_list_size() { return m_image_list_size; }

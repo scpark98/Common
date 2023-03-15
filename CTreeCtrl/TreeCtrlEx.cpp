@@ -1,7 +1,7 @@
 // TreeCtrlEx.cpp : implementation file
 //
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "TreeCtrlEx.h"
 
 #include "../Functions.h"
@@ -1725,6 +1725,22 @@ void CTreeCtrlEx::set_image_list_size(int image_size)
 
 	Invalidate();
 }
+
+void CTreeCtrlEx::create_image_list(int image_size)
+{
+	if (m_image_list)
+		m_image_list.DeleteImageList();
+
+	m_image_list.Create(image_size, image_size, ILC_COLOR32 | ILC_MASK, 5, 1);
+	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_FLOPPY));
+	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_FIXEDDISK));
+	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_HARDDISK));
+	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_CDROM));
+	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_NETWORKPLACE));
+
+	Invalidate();
+}
+
 
 //image_list를 테스트하기 위해 각 노드에 랜덤으로 이미지 인덱스를 부여한다.
 void CTreeCtrlEx::set_image_random()

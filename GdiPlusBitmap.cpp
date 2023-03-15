@@ -147,6 +147,14 @@ CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdip
 	resolution();
 }
 
+void CGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
+{
+	m_pBitmap = new Gdiplus::Bitmap(cx, cy, format);
+	Graphics g(m_pBitmap);
+	g.Clear(cr);
+	resolution();
+}
+
 bool CGdiplusBitmap::load(CString file, bool show_error)
 {
 	if (!PathFileExists(file))
@@ -1954,6 +1962,17 @@ void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool s
 
 void CGdiplusBitmap::start_animation()
 {
+	if (m_run_thread_animation)
+	{
+		if (m_paused)
+		{
+			m_paused = false;
+			return;
+		}
+
+		return;
+	}
+
 	if (m_frame_count < 2)
 		return;
 

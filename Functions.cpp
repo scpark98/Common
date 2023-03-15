@@ -10832,6 +10832,30 @@ int	get_monitor_index(CRect r, bool entire_included)
 	return -1;
 }
 
+void SetForegroundWindowForce(HWND hWnd)
+{
+	HWND hWndForeground = ::GetForegroundWindow();
+	if (hWndForeground == hWnd)
+		return;
+
+	DWORD Strange = ::GetWindowThreadProcessId(hWndForeground, NULL);
+	DWORD My = ::GetWindowThreadProcessId(hWnd, NULL);
+
+	if (!::AttachThreadInput(Strange, My, TRUE))
+	{
+		ASSERT(0);
+	}
+
+	::SetForegroundWindow(hWnd);
+	::BringWindowToTop(hWnd);
+	::SetFocus(hWnd);
+
+	if (!::AttachThreadInput(Strange, My, FALSE))
+	{
+		ASSERT(0);
+	}
+}
+
 //2D 단일 영상에서 이미 알려진 설정값을 기준으로 영상내의 한 점과 렌즈와의 거리를 계산(by sucwon)
 //단, 차량에 장착된 카메라에서 촬영된 영상이므로 피사체와 렌즈와의 거리가 아닌 차체와의 거리가 더 정확한 값이며
 //따라서 렌즈의 위치인 영상 하단 센터가 아닌 영상의 하단과 피사체의 수직 거리가

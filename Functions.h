@@ -375,35 +375,37 @@ void		Trace(char* szFormat, ...);
 
 //////////////////////////////////////////////////////////////////////////
 //프로세스 관련
-CString		GetFileVersionInformation(CString strFileName, CString strFlag);
-CString		GetExeDirectory(bool includeSlash = false);
-CString		GetExeRootDirectory();
-CString		GetExeFilename( bool bFullPath = FALSE );
-CString		GetExeFileTitle();
-CString		GetCurrentDirectory();
-ULONG		GetPID( CString processname );
-ULONG		ProcIDFromWnd(HWND hwnd);
-HWND		GetHWNDbyPID(ULONG pid);
-CString		GetProcessNameByPID(const DWORD pid);
-bool		IsRunning(CString processname);
-bool		KillProcess(CString processname);
-HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
-bool		IsDuplicatedRun();
-CString		run_process(CString exePath, bool wait_process_exit);
+	CString		GetFileVersionInformation(CString strFileName, CString strFlag);
+	CString		GetExeDirectory(bool includeSlash = false);
+	CString		GetExeRootDirectory();
+	CString		GetExeFilename( bool bFullPath = FALSE );
+	CString		GetExeFileTitle();
+	CString		GetCurrentDirectory();
+	ULONG		GetPID( CString processname );
+	ULONG		ProcIDFromWnd(HWND hwnd);
+	HWND		GetHWNDbyPID(ULONG pid);
+	CString		GetProcessNameByPID(const DWORD pid);
+	bool		IsRunning(CString processname);
+	bool		KillProcess(CString processname);
+	HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
+	bool		IsDuplicatedRun();
+	CString		run_process(CString exePath, bool wait_process_exit);
 
-//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
-bool		CheckProcessUsingPID(unsigned long pid);
-bool		CheckProcessUsingWindowName(LPCTSTR className, LPCTSTR titleName);
-bool		CheckProcessUsingProcessName(LPCTSTR processName);
+	//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
+	bool		CheckProcessUsingPID(unsigned long pid);
+	bool		CheckProcessUsingWindowName(LPCTSTR className, LPCTSTR titleName);
+	bool		CheckProcessUsingProcessName(LPCTSTR processName);
 
-//모니터 정보
-//main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
-//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
-extern std::deque<CRect> g_dqMonitors;
-BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);
-//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
-//entire_included가 true이면 어떤 모니터에 완전히 속해있는 경우에만 해당 인덱스를 리턴.
-int			get_monitor_index(CRect r, bool entire_included = false);
+	//모니터 정보
+	//main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
+	//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
+	extern std::deque<CRect> g_dqMonitors;
+	BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);
+	//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
+	//entire_included가 true이면 어떤 모니터에 완전히 속해있는 경우에만 해당 인덱스를 리턴.
+	int			get_monitor_index(CRect r, bool entire_included = false);
+
+	void		SetForegroundWindowForce(HWND hWnd);
 
 //클립보드 clipboard
 	bool		copy_to_clipboard(HWND hWnd, CString str);

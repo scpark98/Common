@@ -9,6 +9,7 @@
 */
 
 #pragma warning(disable:4091)
+#include <afxwin.h>
 #include <dbghelp.h>
 
 class CCrashHandler

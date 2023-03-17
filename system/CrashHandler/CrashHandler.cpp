@@ -1,7 +1,8 @@
-#include "stdafx.h"
+//#include "stdafx.h"
 
 #include "CrashHandler.h"
 #pragma warning(disable:4312)
+#pragma warning(disable:4996)
 
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "Version.lib")

@@ -38,6 +38,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <gdiplus.h>
 
+#include <LM.h>
+#pragma comment(lib, "netapi32.lib")
+
 #include "../Common/colors.h"
 
 #define _std_cpp11 201103L
@@ -808,6 +811,10 @@ void		Trace(char* szFormat, ...);
 //////////////////////////////////////////////////////////////////////////
 //쉘, 윈도우, 레지스트리, 시스템
 	CString		GetComputerNameString();
+	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor);
+	//bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwServicePack);
+	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform);
+
 	//좀 더 테스트 필요!
 	HWND		GetHWndByExeFilename( CString sExeFile, bool bCaseSensitive = false, bool bExceptThis = true );
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);

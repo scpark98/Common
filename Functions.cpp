@@ -7321,6 +7321,95 @@ CString GetComputerNameString()
 	GetComputerNameEx(ComputerNamePhysicalDnsHostname, computerName, &size);
 	return computerName;
 }
+
+bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform)
+{
+	static DWORD dwMajCache = 0;
+	static DWORD dwMinCache = 0;
+	static DWORD dwPlaCache = 0;
+
+	if (0 != dwMajCache)
+	{
+		dwMajor = dwMajCache;
+		dwMinor = dwMinCache;
+		dwPlatform = dwPlaCache;
+	}
+	else
+	{
+		LPWKSTA_INFO_100 pwi = NULL;
+
+		if (NERR_Success != NetWkstaGetInfo(NULL, 100, (LPBYTE*)&pwi))
+		{
+			return false;
+		}
+
+		dwMajor = dwMajCache = pwi->wki100_ver_major;
+		dwMinor = dwMinCache = pwi->wki100_ver_minor;
+		dwPlatform = dwPlaCache = pwi->wki100_platform_id;
+
+		NetApiBufferFree(pwi);
+	}
+
+	return true;
+}
+
+
+bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor)
+{
+	static DWORD dwMajorCache = 0, dwMinorCache = 0;
+	if (0 != dwMajorCache)
+	{
+		dwMajor = dwMajorCache;
+		dwMinor = dwMinorCache;
+		return true;
+	}
+
+	LPWKSTA_INFO_100 pBuf = NULL;
+	if (NERR_Success != NetWkstaGetInfo(NULL, 100, (LPBYTE*)&pBuf))
+		return false;
+
+	dwMajor = dwMajorCache = pBuf->wki100_ver_major;
+	dwMinor = dwMinorCache = pBuf->wki100_ver_minor;
+	NetApiBufferFree(pBuf);
+
+	return true;
+}
+
+/*
+bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwServicePack)
+{
+	if (!GetWindowsVersion(dwMajor, dwMinor))
+		return false;
+
+	static DWORD dwServicePackCache = ULONG_MAX;
+	if (ULONG_MAX != dwServicePackCache)
+	{
+		dwServicePack = dwServicePackCache;
+		return true;
+	}
+
+	const int nServicePackMax = 10;
+	OSVERSIONINFOEX osvi;
+	DWORDLONG dwlConditionMask = 0;
+
+	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+	VER_SET_CONDITION(dwlConditionMask, VER_SERVICEPACKMAJOR, VER_EQUAL);
+
+	for (int i = 0; i < nServicePackMax; ++i)
+	{
+		osvi.wServicePackMajor = i;
+		if (VerifyVersionInfo(&osvi, VER_SERVICEPACKMAJOR, dwlConditionMask))
+		{
+			dwServicePack = dwServicePackCache = i;
+			return true;
+		}
+	}
+	return false;
+}
+*/
+
+
 /*
 //여러곳에 자주 사용하는 Functions.h에 아래 함수때문에 매번 WQL.h를 포함시키기가 그래서
 //이 기능은 거의 사용하지 않으므로 주석처리하고 필요한 경우에만 사용하자.

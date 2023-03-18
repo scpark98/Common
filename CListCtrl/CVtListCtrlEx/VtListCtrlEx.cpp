@@ -903,10 +903,12 @@ BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 	return FALSE;
 }
 
-void CVtListCtrlEx::allow_edit(bool allow_edit)
+void CVtListCtrlEx::allow_edit(bool allow_edit, bool one_click_edit)
 {
 	m_allow_edit = allow_edit;
 	m_allow_edit_column.assign(get_column_count(), m_allow_edit);
+
+	m_allow_one_click_edit = one_click_edit;
 }
 
 void CVtListCtrlEx::allow_edit_column(int column, bool allow_edit)

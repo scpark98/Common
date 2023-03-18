@@ -192,7 +192,7 @@ public:
 	COLORREF get_text_color(int item, int subItem);
 	COLORREF get_back_color(int item, int subItem);
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
-	void	set_text_color(int item, int subItem, COLORREF crText, bool erase = false, bool invalidate = false);
+	void	set_text_color(int item, int subItem, COLORREF crText, bool erase = false, bool invalidate = true);
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	void	set_back_color(int item, int subItem, COLORREF crBack, bool erase = false);
 	void	set_item_color(int item, int subItem, COLORREF crText, COLORREF crBack);
@@ -202,7 +202,7 @@ public:
 
 //편집 관련
 	//리소스의 ListCtrl 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
-	void	allow_edit(bool allow_edit = true);
+	void	allow_edit(bool allow_edit = true, bool one_click_edit = true);
 	void	allow_one_click_edit(bool allow_one_click_edit) { m_allow_one_click_edit = allow_one_click_edit; }
 	void	allow_edit_column(int column, bool allow_edit = true);
 	bool	is_in_editing()	{ return m_in_editing; }	//편집중인지

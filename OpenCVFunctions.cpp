@@ -1504,14 +1504,14 @@ cv::Rect	drawText(	cv::Mat& img,
 	baseline += thickness;
 	//TRACE( "baseline = %d\n", baseline );
 
-	if ( format & SCV_DT_CENTER )
+	if (format & DT_CENTER )
 		x = org.x + width / 2.0 - textSize.width / 2.0;
-	else if ( format & SCV_DT_RIGHT )
+	else if ( format & DT_RIGHT )
 		x = org.x + width - textSize.width - margin;
 
-	if ( format & SCV_DT_VCENTER )
+	if ( format & DT_VCENTER )
 		y = org.y + height / 2.0 + textSize.height / 2.0;
-	else if ( format & SCV_DT_BOTTOM )
+	else if ( format & DT_BOTTOM )
 		y = org.y + height - margin;
 
 	putText( img, text, cv::Point(x, y), fontFace,

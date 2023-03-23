@@ -59,8 +59,8 @@ CTreeCtrlEx::CTreeCtrlEx()
 	m_image_list_size = 16;
 
 	m_auto_line_height = true;
-	m_line_gap = 6;
-	m_line_height = 16 + m_line_gap;
+	m_line_gap = 0;
+	m_line_height = m_image_list_size + m_line_gap;
 }
 
 CTreeCtrlEx::~CTreeCtrlEx()
@@ -1106,6 +1106,39 @@ int CTreeCtrlEx::get_visible_item_count()
 	return item_count;
 }
 
+/*
+HTREEITEM CTreeCtrlEx::find_item(CString text, HTREEITEM hItem)
+{
+	if (hItem == NULL)
+		hItem = GetRootItem();
+
+	HTREEITEM hFindItem = NULL;
+	HTREEITEM hChildItem = NULL;
+	HTREEITEM hSiblingItem = NULL;
+
+	if (GetItemText(hItem) == text)
+	{
+		hFindItem = hItem;
+	}
+	else
+	{
+		//find child node
+		if (ItemHasChildren(hItem))
+		{
+			hChildItem = GetChildItem(hItem);
+			if (hFindItem == NULL && hChildItem != NULL)
+				hFindItem = find_item(text, hChildItem);
+		}
+
+		//find slbiling node
+		hSiblingItem = GetNextSiblingItem(hItem);
+		if (hFindItem == NULL && hSiblingItem != NULL)
+			hFindItem = find_item(text, hSiblingItem);
+	}
+
+	return hFindItem;
+}
+*/
 
 //findText가 ""이면 모든 노드를 순회해서 check가 0또는 1이라면 체크 변경.
 //findText가 ""이 아니면 해당 아이템만 찾아서 check.
@@ -1720,6 +1753,13 @@ void CTreeCtrlEx::set_image_list_size(int image_size)
 {
 	m_image_list_size = image_size;
 
+	create_image_list(image_size);
+
+	for (int i = 0; i < m_dq_image_ID.size(); i++)
+	{
+		m_image_list.Add(AfxGetApp()->LoadIcon(m_dq_image_ID[i]));
+	}
+
 	if (m_auto_line_height)
 		recalculate_line_height();
 
@@ -1731,12 +1771,30 @@ void CTreeCtrlEx::create_image_list(int image_size)
 	if (m_image_list)
 		m_image_list.DeleteImageList();
 
-	m_image_list.Create(image_size, image_size, ILC_COLOR32 | ILC_MASK, 5, 1);
-	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_FLOPPY));
-	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_FIXEDDISK));
-	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_HARDDISK));
-	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_CDROM));
-	m_image_list.Add(AfxGetApp()->LoadIcon(IDI_NETWORKPLACE));
+	m_image_list.Create(image_size, image_size, ILC_COLOR32 | ILC_MASK, 0, 1);
+
+	for (int i = 0; i < m_dq_image_ID.size(); i++)
+	{
+		m_image_list.Add(AfxGetApp()->LoadIcon(m_dq_image_ID[i]));
+	}
+
+	if (m_auto_line_height)
+		recalculate_line_height();
+
+	Invalidate();
+}
+
+void CTreeCtrlEx::set_image_list_ID(std::deque<UINT>& dq_image_ID)
+{
+	create_image_list(m_image_list_size);
+
+	m_dq_image_ID.clear();
+	m_dq_image_ID.assign(dq_image_ID.begin(), dq_image_ID.end());
+
+	for (int i = 0; i < dq_image_ID.size(); i++)
+	{
+		m_image_list.Add(AfxGetApp()->LoadIcon(m_dq_image_ID[i]));
+	}
 
 	Invalidate();
 }
@@ -1748,7 +1806,7 @@ void CTreeCtrlEx::set_image_random()
 	tree<CTreeItem>::pre_order_iterator it = m_tr.begin();
 	tree<CTreeItem>::pre_order_iterator end = m_tr.end();
 
-	if (!m_tr.is_valid(it))
+	if (!m_tr.is_valid(it) || !m_image_list.m_hImageList || m_image_list.GetImageCount() == 0)
 		return;
 
 	while (it != end)

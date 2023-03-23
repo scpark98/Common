@@ -3,6 +3,10 @@
 /*
 scpark 2020_03_30_13
 full customize를 위해 직접 제작.
+(tree_node : Kasper Peeters)
+CTreeCtrl을 상속받아 만들었지만 실제 HTREEITEM을 사용하는 방식이 아니고
+tree_node를 사용하므로 CTreeCtrl의 멤버를 사용할 순 없다.
+
 
 [수정될 내용]
 -rename
@@ -77,6 +81,8 @@ public:
 
 	void			always_show_selection(bool show = true);
 
+	//HTREEITEM		find_item(CString text, HTREEITEM hItem);
+
 	//findText가 ""이면 모든 노드를 순회해서 check가 0또는 1이라면 체크 변경.
 	//findText가 ""이 아니면 해당 아이템만 찾아서 check.
 	//단, check가 0또는 1이 아니라면 단순히 findText의 노드를 찾고자 하는 목적으로 이용된다.
@@ -137,7 +143,9 @@ public:
 	void			set_scroll_unit(int unit) { m_scroll_unit = unit; }
 
 	void			create_image_list(int image_size);
-	void			use_image_list(bool use) { m_use_image_list = use; }
+	void			set_image_list_ID(std::deque<UINT> &dq_image_ID);
+
+	void			use_image_list(bool use) { m_use_image_list = use; Invalidate(); }
 	bool			use_image_list() { return m_use_image_list; }
 	int				get_image_list_size() { return m_image_list_size; }
 	void			set_image_list_size(int image_size);
@@ -226,7 +234,7 @@ protected:
 	void			on_mouse_event(int mouse_event, CPoint point);
 
 	CImageList		m_image_list;
-
+	std::deque<UINT> m_dq_image_ID;
 
 
 protected:

@@ -38,9 +38,6 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <gdiplus.h>
 
-#include <LM.h>
-#pragma comment(lib, "netapi32.lib")
-
 #include "../Common/colors.h"
 
 #define _std_cpp11 201103L
@@ -811,6 +808,7 @@ void		Trace(char* szFormat, ...);
 //////////////////////////////////////////////////////////////////////////
 //½©, À©µµ¿ì, ·¹Áö½ºÆ®¸®, ½Ã½ºÅÛ
 	CString		GetComputerNameString();
+	bool		GetWindowsVersion(OSVERSIONINFO& osversioninfo);
 	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor);
 	//bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwServicePack);
 	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform);
@@ -1010,7 +1008,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int thick,
 								CString font_name = _T("¸¼Àº °íµñ"),
 								Gdiplus::Color crOutline = Gdiplus::Color::White,
-								Gdiplus::Color crFill = Gdiplus::Color::Black);
+								Gdiplus::Color crFill = Gdiplus::Color::Black,
+								UINT align = DT_LEFT | DT_TOP);
 	void		draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int depth,
 								CString font_name = _T("¸¼Àº °íµñ"),
 								Gdiplus::Color crShadow = Gdiplus::Color::Red);

@@ -8,6 +8,14 @@
 
 #include "Functions.h"
 
+//아래 두 라인은 GetWindowsVersion()함수를 위해 포함되었는데
+//Functions.h에 include할 경우
+//NH의 LiveWebClient에서 사용하는 opencv와 뭔가 충돌이 생긴다.
+//가능하면 .h에 include를 최소화 할 필요가 있다.
+#include <LM.h>
+#pragma comment(lib, "netapi32.lib")
+
+
 #include <limits>
 //#include "SystemInfo.h"
 #pragma comment(lib, "Psapi.lib")
@@ -4454,7 +4462,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			{
 				for (i = 0; i < dq_ext.size(); i++)
 				{
-					if (GetFileExtension(file, true).MakeLower() == dq_ext[i])
+					if (GetFileExtension(file).MakeLower() == dq_ext[i])
 					{
 						found = true;
 						break;
@@ -4537,7 +4545,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			{
 				for (i = 0; i < dq_ext.size(); i++)
 				{
-					if (GetFileExtension(file, true).MakeLower() == dq_ext[i])
+					if (GetFileExtension(file).MakeLower() == dq_ext[i])
 					{
 						found = true;
 						break;
@@ -5047,8 +5055,9 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-void draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int thick,
-						CString font_name, Gdiplus::Color crOutline, Gdiplus::Color crFill)
+void draw_outline_text(CDC* pDC, int x, int y, CString text,
+						int font_size, int thick, CString font_name,
+						Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
 {
 	// GDI draw text
 	//SetTextColor(dc, RGB(0, 0, 255));
@@ -5061,12 +5070,26 @@ void draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int 
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	//Gdiplus::FontFamily   ffami(CStringW(font_name));
-	Gdiplus::FontFamily   ffami((WCHAR*)(const WCHAR*)CStringW(font_name));
+	Gdiplus::FontFamily   ff((WCHAR*)(const WCHAR*)CStringW(font_name));
+	Gdiplus::Font font(&ff, font_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 	Gdiplus::StringFormat fmt;
+	//DT_TOP
+	Gdiplus::RectF boundingBox;
+	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &boundingBox);
+
+	if (align & DT_CENTER)
+		x = x - boundingBox.Width / 2;
+	else if (align & DT_RIGHT)
+		x = x - boundingBox.Width;
+
+	if (align & DT_VCENTER)
+		y = y - boundingBox.Height / 2;
+	else if (align & DT_BOTTOM)
+		y = y - boundingBox.Height;
 
 	Gdiplus::GraphicsPath   str_path;
-	str_path.AddString(CStringW(text), -1, &ffami,
-		Gdiplus::FontStyleBold, font_size, Gdiplus::Point(x, y), &fmt);
+	str_path.AddString(CStringW(text), -1, &ff,
+		Gdiplus::FontStyleRegular, font_size, Gdiplus::Point(x, y), &fmt);
 
 	Gdiplus::Pen   gp(crOutline, thick);
 	gp.SetLineJoin(Gdiplus::LineJoinRound);
@@ -7322,6 +7345,12 @@ CString GetComputerNameString()
 	return computerName;
 }
 
+
+bool GetWindowsVersion(OSVERSIONINFO& osversioninfo)
+{
+	return GetWindowsVersion(osversioninfo.dwMajorVersion, osversioninfo.dwMinorVersion, osversioninfo.dwPlatformId);
+}
+
 bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform)
 {
 	static DWORD dwMajCache = 0;
@@ -7352,7 +7381,6 @@ bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform)
 
 	return true;
 }
-
 
 bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor)
 {

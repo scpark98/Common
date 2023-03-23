@@ -86,12 +86,12 @@ typedef unsigned long long uint64_t;
 #endif
 
 
-#define SCV_DT_TOP		0x00000000
-#define SCV_DT_LEFT		0x00000000
-#define SCV_DT_CENTER	0x00000001
-#define SCV_DT_RIGHT	0x00000002
-#define SCV_DT_VCENTER	0x00000004
-#define SCV_DT_BOTTOM	0x00000008
+//#define SCV_DT_TOP		0x00000000
+//#define SCV_DT_LEFT		0x00000000
+//#define SCV_DT_CENTER	0x00000001
+//#define SCV_DT_RIGHT	0x00000002
+//#define SCV_DT_VCENTER	0x00000004
+//#define SCV_DT_BOTTOM	0x00000008
 
 //#define		PI	3.141592
 #ifndef		COLOR_RANGE
@@ -263,7 +263,7 @@ int			drawArrowLine(  Mat& img, cv::Point2f p, cv::Point2f q, cv::Scalar line_co
 cv::Rect	drawText(	cv::Mat& img,
 						const std::string &text,
 						cv::Point org = cv::Point(-1, -1),
-						int format = SCV_DT_LEFT | SCV_DT_TOP,
+						int format = DT_LEFT | DT_TOP,
 						int margin = 10,
 						int fontFace = FONT_HERSHEY_DUPLEX,
 						double fontScale = 1.0,

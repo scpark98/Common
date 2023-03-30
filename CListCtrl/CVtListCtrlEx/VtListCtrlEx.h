@@ -33,6 +33,14 @@ text align과 같이 리스트의 정렬 방식과 header의 정렬 방식을 다르게 설정할 수 있�
 [편집 완료 시]
 -멀티 선택 상태에서 편집 완료될 때 shift가 눌린채로 완료되면 멀티 항목 모두 수정된 내용으로 변경된다.
 
+<사용법 예시>
+m_list.SetExtendedStyle(LVS_EX_GRIDLINES | LVS_EX_FLATSB | LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_INFOTIP);
+m_list.UsePopupMenu(false);
+m_list.AllowSort();
+m_list.set_color_theme(CVtListCtrlEx::color_theme_dark_gray);
+m_list.set_progress_color(RGB(128, 255, 128));
+m_list.set_headings(_T("파일,200;스냅샷,60;분류,60;평점,60;크기,200;메모,100;경로,300;날짜,100"));
+m_list.set_header_height(24);
 */
 // CVtListCtrlEx
 

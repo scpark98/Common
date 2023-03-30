@@ -1,5 +1,6 @@
 #include "ListBoxEx.h"
 
+#include "../../colors.h"
 #include "../../MemoryDC.h"
 
 CListBoxEx::CListBoxEx()

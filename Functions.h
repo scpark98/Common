@@ -405,7 +405,8 @@ void		Trace(char* szFormat, ...);
 	//entire_included가 true이면 어떤 모니터에 완전히 속해있는 경우에만 해당 인덱스를 리턴.
 	int			get_monitor_index(CRect r, bool entire_included = false);
 
-	void		SetForegroundWindowForce(HWND hWnd);
+	//::SetForegroundWindow()가 Win98이후부터는 지원되지 않아 수정된 코드.
+	void		SetForegroundWindowForce(HWND hWnd, bool makeTopMost = false);
 
 //클립보드 clipboard
 	bool		copy_to_clipboard(HWND hWnd, CString str);
@@ -671,6 +672,7 @@ void		Trace(char* szFormat, ...);
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
 	bool		delete_file(CString fullpath, bool bTrashCan = false);
 	int			get_text_encoding(CString sfile);
+	bool		save(CString filepath, CString text);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
 	//MOBIS 프로젝트 저장 MP4는 mdat 필드의 0x40번지부터 28 bytes가
@@ -739,7 +741,10 @@ void		Trace(char* szFormat, ...);
 #if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
 	std::deque<CString>	find_all_files(CString path, CString name_filter = _T(""), CString ext_filters = _T(""), CString except_str = _T(""), bool recursive = true, bool auto_sort = true);
 #endif
-	void save_dqlist(std::deque<CString>* dqlist, CString path);
+	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
+	int	get_sub_folders(CString root, std::deque<CString>* list = NULL);
+
+	void save_dqlist(std::deque<CString>* dqlist, CString output_text_file_path);
 
 	//위의 FindAllFiles에서는 "파일명*"과 같이 찾게 되는데 이럴 경우 시리즈 이름의 다른 파일들도 모두 찾아진다.
 	//따라서 파일명은 확정되고 확장자만 여러가지인 경우는 아래 함수를 이용해야 한다.
@@ -1031,9 +1036,9 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	HICON		LoadIconEx(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
 
 	//font size to LOGFONT::lfHeight
-	LONG		get_logical_size_from_font_size(HDC hDC, int font_size);
+	LONG		get_logical_size_from_font_size(HWND hWnd, int font_size);
 	//LOGFONT::lfHeight to font size
-	LONG		get_font_size_from_logical_size(HDC hDC, int logical_size);
+	LONG		get_font_size_from_logical_size(HWND hWnd, int logical_size);
 
 	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);

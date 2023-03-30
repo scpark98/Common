@@ -6,6 +6,7 @@
 #endif // _MSC_VER >= 1000
 
 #include <afxwin.h>
+#include <deque>
 #include "../../Functions.h"
 
 // ColorListBox.h : header file
@@ -34,11 +35,13 @@ public:
 
 // Operations
 public:
-	int			add_string(CString text, COLORREF crText = GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = COLOR_WINDOW);
-	int			add_string(CString lpszItem, COLORREF rgb);					// Adds a colored string to the list box
-	int			insert_string(int nIndex, CString lpszItem);					// Inserts a string to the list box
+	int			AddString(CString text, COLORREF crText = ::GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = ::GetSysColor(COLOR_WINDOW), bool invalidate = false);
+	int			add_string(CString text, COLORREF crText = ::GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = ::GetSysColor(COLOR_WINDOW), bool invalidate = false);
+	int			add_string(CString lpszItem, COLORREF rgb, bool invalidate = true);					// Adds a colored string to the list box
+	int			add_string(std::deque<CString> *lists, bool invalidate = false);
+	int			insert_string(int nIndex, CString lpszItem);				// Inserts a string to the list box
 	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb);	// Inserts a colored string to the list box
-	void		set_item_color(int nIndex, COLORREF rgb);						// Sets the color of an item in the list box
+	void		set_item_color(int nIndex, COLORREF rgb, bool invalidate = true);	// Sets the color of an item in the list box
 	COLORREF	get_item_color(int nIndex);
 
 	CSize		resizeToFit(bool bHori = true, bool bVert = true);			//변경된 크기를 리턴한다.
@@ -46,29 +49,53 @@ public:
 
 	void		UseColor(bool bUse = true) { m_bUseColor = bUse; }
 	void		UseHover(bool bUse = true) { m_bUseHover = bUse; }
-	int			get_hover_item() { return (m_bUseHover ? m_nHoverItem : -1); }
+	int			get_hover_item() { return (m_bUseHover ? m_nOverItem : -1); }
 
 	void		set_back_color(COLORREF cr) { m_crBack = cr; Invalidate(); }
 
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
 
+	virtual		CColorListBox&	set_font(LOGFONT& lf);
 	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual		CColorListBox&	set_font_size(int nSize);
 	virtual		CColorListBox&	set_font_bold(bool bBold = true);
+
+	//color setting
+	enum listctrlex_color_theme
+	{
+		color_theme_default = 0,
+		color_theme_explorer,
+		//color_theme_light_blue,
+		//color_theme_navy_blue,
+		//color_theme_dark_blue,
+		//color_theme_dark_gray,
+	};
+
+	void	set_color_theme(int theme, bool apply_now = true);
 
 protected:
 	bool		m_bUseColor;		//default = false;
 	bool		m_bUseHover;		//default = false;
 	BOOL		m_bOutside;
-	int			m_nHoverItem;
+	int			m_nOverItem;
 
-	COLORREF	m_crBack;
+	COLORREF	m_crText;					//기본 글자색
+	COLORREF	m_crTextSelected;			//선택 항목의 활성화(active) 글자색
+	COLORREF	m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
+	COLORREF	m_crTextOver;
+	COLORREF	m_crBack;					//기본 배경색
 	COLORREF	m_crBackSelected;
+	COLORREF	m_crBackSelectedInactive;
+	COLORREF	m_crBackOver;
+
 
 	LOGFONT		m_lf;
 	CFont		m_font;
 	void		ReconstructFont();
+
+	CImageList	m_Small; // Imagelist for small icons
+	int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
 
 	//vert fit에서 최소 표시 라인수를 정해놓는다.default = -1(정하지 않을 경우)
 	int			m_nMinimumLines;

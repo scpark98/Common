@@ -14,7 +14,8 @@
 //#include "stdafx.h"
 #include "ColorListBox.h"
 
-#include "../../../Common/MemoryDC.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -38,14 +39,15 @@ CColorListBox::CColorListBox()
 {
 	m_bUseColor = true;
 	m_bUseHover = true;
-	m_nHoverItem = -1;
-
-	m_crBack = ::GetSysColor(COLOR_WINDOW);
-	m_crBackSelected = ::GetSysColor(COLOR_HIGHLIGHT);
+	m_nOverItem = -1;
 
 	m_nGutterCharNumber = 0;
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
+
+	set_color_theme(color_theme_default, false);
+
+	CoInitialize(NULL);
 }	// CColorListBox
 
 //-------------------------------------------------------------------
@@ -59,6 +61,7 @@ CColorListBox::~CColorListBox()
 // Remarks		:	Destructor.
 //
 {
+	m_Small.Detach();
 }	// ~CColorListBox()
 
 
@@ -99,15 +102,25 @@ void CColorListBox::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
 	// Get Defalut Font 
-	//CListBox::PreSubclassWindow();
+	CListBox::PreSubclassWindow();
+
 	CFont* font = GetFont();
 	if (font == NULL)
-		font = GetParent()->GetFont();
+	{
+		if (GetParent() == NULL)
+			font = GetDesktopWindow()->GetFont();
+		else
+			font = GetParent()->GetFont();
+	}
 
 	if (font != NULL)
 		font->GetObject(sizeof(m_lf), &m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+
+	SHFILEINFO shInfo;
+	m_Small.Attach((HIMAGELIST)::SHGetFileInfo(_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
+	CoUninitialize();
 
 	ReconstructFont();
 }
@@ -119,15 +132,23 @@ void CColorListBox::ReconstructFont()
 
 	SetFont(&m_font, true);
 
-	SetItemHeight(0, -m_lf.lfHeight + 4);
+	SetItemHeight(0, -m_lf.lfHeight + 10);
 
 	ASSERT(bCreated);
+}
+
+CColorListBox& CColorListBox::set_font(LOGFONT& lf)
+{
+	memcpy(&m_lf, &lf, sizeof(LOGFONT));
+	ReconstructFont();
+
+	return *this;
 }
 
 CColorListBox& CColorListBox::set_font_name(CString sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
-	_tcscpy(m_lf.lfFaceName, sFontname);
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	ReconstructFont();
 
 	return *this;
@@ -221,9 +242,9 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if ((lpDIS->itemAction & ODA_FOCUS) &&	!(lpDIS->itemState & ODS_FOCUS))
 		dc.DrawFocusRect(&rect);
 
-	if (lpDIS->itemID == m_nHoverItem)
+	if (lpDIS->itemID == m_nOverItem)
 	{
-		CBrush brush(RGB(255,128,128));
+		CBrush brush(m_crBackOver);
 		dc.FillRect(&rect, &brush);
 	}
 	else
@@ -246,19 +267,15 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (m_bUseColor)		
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
-			crText = dc.SetTextColor(color_complementary(m_crBackSelected));
+			crText = dc.SetTextColor(m_crTextSelected);
 		else if (lpDIS->itemState & ODS_DISABLED)
 			crText = dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 		else
 		{
-			if (lpDIS->itemID == m_nHoverItem)
-			{
-				crNorm = RGB(0, 0, 255);
-				//dc.DrawFocusRect(&lpDIS->rcItem);
-				//crHilite = RGB(255 - GetRValue(crNorm), 255 - GetGValue(crNorm), 255 - GetBValue(crNorm));
-				//CBrush brush(RGB(255,0,0));
-				//dc.FillRect(&lpDIS->rcItem, &brush);
-			}
+			if (lpDIS->itemID == m_nOverItem)
+				crNorm = m_crTextOver;
+			else
+				crNorm = m_crText;
 
 			crText = dc.SetTextColor(crNorm);
 		}
@@ -268,14 +285,12 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	else
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
-			crText = dc.SetTextColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+			crText = dc.SetTextColor(m_crTextSelected);
 		else if (lpDIS->itemState & ODS_DISABLED)
 			crText = dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 		else
-			crText = dc.SetTextColor(::GetSysColor(COLOR_WINDOWTEXT));
+			crText = dc.SetTextColor(m_crText);
 	}
-
-
 
 	// Get and display item text.
 	GetText(lpDIS->itemID, sText);
@@ -285,15 +300,29 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (GetStyle() & LBS_USETABSTOPS)
 		nFormat |= DT_EXPANDTABS;
 
+	if (m_Small.GetImageCount() > 0)
+	{
+		//m_Small.Draw(&dc, GetSystemImageListIcon(sText, false), CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		if (lpDIS->itemID == 0)
+			m_Small.Draw(&dc, GetSystemImageListIcon(_T("D:\\1.Projects_C++\\0.backup\\MiniMini"), false), CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		else
+			m_Small.Draw(&dc, GetSystemImageListIcon(sText, false), CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		rect.left += 20;
+	}
 	dc.DrawText(sText, rect, nFormat);
 
 	dc.SetTextColor(crText);
 	dc.SetBkMode(nBkMode);
 }	// DrawItem
 
+int CColorListBox::AddString(CString text, COLORREF crText, COLORREF crBack, bool invalidate)
+{
+	return add_string(text, crText, crBack, invalidate);
+}
+
 //-------------------------------------------------------------------
 //
-int CColorListBox::add_string(CString lpszItem, COLORREF crText, COLORREF crBack)
+int CColorListBox::add_string(CString lpszItem, COLORREF crText, COLORREF crBack, bool invalidate)
 //
 // Return Value:	The zero-based index to the string in the list box. 
 //						The return value is LB_ERR if an error occurs; the 
@@ -309,15 +338,15 @@ int CColorListBox::add_string(CString lpszItem, COLORREF crText, COLORREF crBack
 //
 {
 	int index = ((CListBox*)this)->AddString(lpszItem);
-	set_item_color(index, crText);
-	SetTopIndex( GetCount() - 1 );
+	set_item_color(index, crText, invalidate);
+	//SetTopIndex(GetCount() - 1);
 
 	return index;
 }	// AddString
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::add_string(CString lpszItem, COLORREF rgb)
+int CColorListBox::add_string(CString lpszItem, COLORREF rgb, bool invalidate)
 //
 // Return Value:	The zero-based index to the string in the list box. 
 //						The return value is LB_ERR if an error occurs; the 
@@ -332,15 +361,24 @@ int CColorListBox::add_string(CString lpszItem, COLORREF rgb)
 //						box with a custom color.
 //
 {
-	int nItem = AddString(lpszItem);
+	int nItem = ((CListBox*)this)->AddString(lpszItem);
 	if (nItem >= 0)
 	{
 		SetItemData(nItem, rgb);
-		RedrawWindow();
+		if (invalidate)
+			RedrawWindow();
 	}
 
 	return nItem;
 }	// AddString
+
+int CColorListBox::add_string(std::deque<CString> *lists, bool invalidate)
+{
+	for (int i = 0; i < lists->size(); i++)
+		add_string(lists->at(i), GetSysColor(COLOR_WINDOWTEXT), ::GetSysColor(COLOR_WINDOW), invalidate);
+
+	return 0;
+}
 
 //-------------------------------------------------------------------
 //
@@ -399,7 +437,7 @@ int CColorListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 
 //-------------------------------------------------------------------
 //
-void CColorListBox::set_item_color(int nIndex, COLORREF rgb)
+void CColorListBox::set_item_color(int nIndex, COLORREF rgb, bool invalidate)
 //
 // Return Value:	None.
 //
@@ -410,8 +448,9 @@ void CColorListBox::set_item_color(int nIndex, COLORREF rgb)
 //						item in the list box.
 //
 {
-	SetItemData(nIndex, rgb);	
-	RedrawWindow();
+	SetItemData(nIndex, rgb);
+	if (invalidate)
+		RedrawWindow();
 }
 
 COLORREF CColorListBox::get_item_color( int nIndex )
@@ -426,9 +465,9 @@ void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 	if (m_bUseHover)
 	{
 		UINT nHover = ItemFromPoint(point, m_bOutside);
-		if (nHover != m_nHoverItem)
+		if (nHover != m_nOverItem)
 		{
-			m_nHoverItem = nHover;
+			m_nOverItem = nHover;
 			Invalidate(false);
 		}
 	}
@@ -523,4 +562,76 @@ void CColorListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 BOOL CColorListBox::OnLbnSelchange()
 {
 	return FALSE;
+}
+
+
+int CColorListBox::GetSystemImageListIcon(CString szFile, BOOL bDrive)
+{
+	SHFILEINFO shFileInfo;
+
+	if (false)//szFile == GetStringById(NFTD_IDS_COMPUTER))
+	{
+		LPITEMIDLIST pidl_Computer = NULL;
+		SHGetFolderLocation(NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer); // 컴퓨터
+		SHGetFileInfo((wchar_t*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	}
+	else if (false)//szFile == GetStringById(NFTD_IDS_DOCUMENT))
+	{
+		LPITEMIDLIST pidl_Document = NULL;
+		SHGetFolderLocation(NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document); // 내문서
+		SHGetFileInfo((wchar_t*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	}
+	else if (false)//szFile == GetStringById(NFTD_IDS_DESKTOP))
+	{
+		LPITEMIDLIST pidl_Desktop = NULL;
+		SHGetFolderLocation(NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop); // 바탕화면
+		SHGetFileInfo((wchar_t*)pidl_Desktop, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	}
+	else
+	{
+		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		if (shFileInfo.iIcon < 0)
+			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//else
+		//{
+		//	if (PathIsDirectory(szFile))
+		//		SHGetFileInfo(szFile, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//	else
+		//		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//}
+	}
+
+	return shFileInfo.iIcon;
+}
+
+void CColorListBox::set_color_theme(int theme, bool apply_now)
+{
+	switch (theme)
+	{
+	case color_theme_default:
+		m_crText = ::GetSysColor(COLOR_BTNTEXT);
+		m_crTextSelected = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_crTextSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_crTextOver = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+
+		m_crBack = ::GetSysColor(COLOR_WINDOW);
+		m_crBackSelected = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackOver = ::GetSysColor(COLOR_HIGHLIGHT);
+		break;
+	case color_theme_explorer:
+		m_crText = ::GetSysColor(COLOR_BTNTEXT);
+		m_crTextSelected = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_crTextSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_crTextOver = m_crText;
+
+		m_crBack = ::GetSysColor(COLOR_WINDOW);
+		m_crBackSelected = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackOver = RGB(195, 222, 245);
+		break;
+	}
+
+	if (apply_now)
+		Invalidate();
 }

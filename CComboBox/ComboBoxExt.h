@@ -2,7 +2,7 @@
 
 /*
 - CComboBoxEx라는 클래스를 MFC에서 기본 제공하므로 CComboBoxExt로 파생.
-
+- 리소스 속성에서 Has String, Owner Draw Fixed를 true로 변경.
 */
 
 #include <afxwin.h>
@@ -39,6 +39,9 @@ public:
 	void			load_history(CWinApp* app, CString section);
 	void			save_history(CWinApp* app, CString section);
 
+	//src내에 존재하는 콤보박스 아이템의 인덱스를 리턴.
+	int				find_string(CString src);
+
 protected:
 
 	//폰트 관련
@@ -59,6 +62,8 @@ public:
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg void OnCbnDropdown();
 	virtual void PreSubclassWindow();
+	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 };
 
 

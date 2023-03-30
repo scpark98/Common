@@ -2053,7 +2053,7 @@ INT_PTR CALLBACK CXDialogTemplate::MsgBoxDlgProc(HWND hwnd,
 
 				TCHAR szTimeoutCaption[512];
 
-				_stprintf( szTimeoutCaption, _T("%s (closed after %d seconds)"), Me->m_lpszCaption, Me->m_nTimeoutSeconds );
+				_stprintf( szTimeoutCaption, _T("%s (%dÃÊ ÈÄ ´ÝÈû)"), Me->m_lpszCaption, Me->m_nTimeoutSeconds );
 				::SetWindowText( hwnd, szTimeoutCaption );
 
 				Me->m_nTimeoutSeconds--;

@@ -13,8 +13,8 @@ CComboBoxExt::CComboBoxExt()
 {
 	m_crText = ::GetSysColor( COLOR_WINDOWTEXT );
 	m_crBack = ::GetSysColor( COLOR_WINDOW );
-	m_crHighlightText = ::GetSysColor(COLOR_HIGHLIGHT);
-	m_crHighlightTextBack = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+	m_crHighlightText = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+	m_crHighlightTextBack = ::GetSysColor(COLOR_HIGHLIGHT);
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
@@ -33,6 +33,8 @@ BEGIN_MESSAGE_MAP(CComboBoxExt, CComboBox)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	ON_CONTROL_REFLECT(CBN_DROPDOWN, &CComboBoxExt::OnCbnDropdown)
+	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
 END_MESSAGE_MAP()
 
 
@@ -101,13 +103,13 @@ void CComboBoxExt::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 		dc.FillSolidRect( &lpDrawItemStruct->rcItem, m_crBack );
 	}
 
+	TRACE(_T("%s\n"), strData);
 	dc.DrawText(strData, &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
 
 	dc.SetTextColor(crOldTextColor);
 	dc.SetBkColor(crOldBkColor);
 
 	dc.Detach();
-
 }
 
 
@@ -294,7 +296,7 @@ void CComboBoxExt::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	if (sFontname == _T(""))
 		return;
 	m_lf.lfCharSet = byCharSet;
-	_tcscpy(m_lf.lfFaceName, sFontname);
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	reconstruct_font();
 }
 
@@ -332,11 +334,10 @@ void CComboBoxExt::reconstruct_font()
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	SetFont(&m_font, true);
 
-	//m_font_size = get_font_size();
-
-	//set_line_height(4 - m_lf.lfHeight);
-	//if (m_auto_line_height)
-	//recalculate_line_height();
+	//-1을 주면 입력박스의 높이가 변경된다.
+	SetItemHeight(-1, -m_lf.lfHeight + 10);
+	//0을 주면 리스트박스의 모든 아이템의 높이가 변경된다.
+	SetItemHeight(0, -m_lf.lfHeight + 10);
 
 	ASSERT(bCreated);
 }
@@ -378,10 +379,11 @@ void CComboBoxExt::load_history(CWinApp* app, CString section)
 			AddString(text);
 	}
 
-	if (index >= 0)
-	{
+	if (index < 0)
+		index = 0;
+
+	if (count > 0)
 		SetCurSel(index);
-	}
 }
 
 void CComboBoxExt::save_history(CWinApp* app, CString section)
@@ -398,4 +400,39 @@ void CComboBoxExt::save_history(CWinApp* app, CString section)
 		key.Format(_T("%03d"), i);
 		app->WriteProfileString(section, key, text);
 	}
+}
+
+//src내에 존재하는 콤보박스 아이템의 인덱스를 리턴.
+int CComboBoxExt::find_string(CString src)
+{
+	CString text;
+
+	for (int i = 0; i < GetCount(); i++)
+	{
+		GetLBText(i, text);
+		if (src.Find(text) >= 0)
+			return i;
+	}
+
+	return -1;
+}
+
+
+void CComboBoxExt::OnPaint()
+{
+	CPaintDC dc(this); // device context for painting
+					   // TODO: 여기에 메시지 처리기 코드를 추가합니다.
+					   // 그리기 메시지에 대해서는 CComboBox::OnPaint()을(를) 호출하지 마십시오.
+	CRect rc;
+	GetClientRect(rc);
+
+	dc.FillSolidRect(rc, RGB(255, 0, 0));
+}
+
+
+BOOL CComboBoxExt::OnEraseBkgnd(CDC* pDC)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	return TRUE;
+	return CComboBox::OnEraseBkgnd(pDC);
 }

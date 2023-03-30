@@ -10,7 +10,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 /*Usage :
-	XMessageBox( m_hWnd, "message", "Title", 5 );
+	XMessageBox(m_hWnd, "message", "Title", 5);
 */
 
 #ifndef XMESSAGEBOX_H

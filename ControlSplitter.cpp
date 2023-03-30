@@ -96,7 +96,8 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 		if(m_nType == CS_HORZ)
 		{							
 			rect.OffsetRect(0, sizeDiff.cy);
-		}else{
+		}else
+		{
 			rect.OffsetRect(sizeDiff.cx,0);
 		}
 		std::vector<DWORD>::iterator it;
@@ -135,7 +136,9 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.top += sizeDiff.cy;
 				}
 
-			}else{
+			}
+			else
+			{
 				if((nFlag&SPF_RIGHT))
 				{
 					rectCtrl.right +=  sizeMove.cx;

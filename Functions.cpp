@@ -2257,7 +2257,8 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		InternetSetOption(hInternet, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 	}
 
-	remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
+	//remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
+	remoteURL.Format(_T("%s://%s:%d%s"), is_https ? _T("https") : _T("http"), ip, port, remote_path);
 	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, szHead, -1L, secureFlags, 0);
 	if (hURL == NULL) {
 		InternetCloseHandle(hInternet);
@@ -4343,6 +4344,42 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	}
 }
 
+int get_sub_folders(CString root, std::deque<CString>* list)
+{
+	std::deque<CString> folders;
+
+	CString file;
+	CFileFind finder;
+
+	if (PathIsDirectory(root))
+	{
+		if (root.Right(1) == _T("\\"))
+			root += _T("*");
+		else
+			root += _T("\\*");
+	}
+
+	bool bWorking = finder.FindFile(root);
+
+	while (bWorking)
+	{
+		bWorking = finder.FindNextFile();
+		file = finder.GetFilePath();
+
+		if (finder.IsDots())
+			continue;
+		if (finder.IsDirectory())
+			folders.push_back(file);
+	}
+
+	sort_like_explorer(&folders);
+
+	if (list)
+		list->assign(folders.begin(), folders.end());
+
+	return folders.size();
+}
+
 #if (_MSVC_LANG >= _std_cpp17)
 std::deque<CString> find_all_files(CString path, CString name_filter, CString ext_filters, CString except_str, bool recursive, bool auto_sort)
 {
@@ -4628,12 +4665,12 @@ starCheck:
 	goto loopStart;
 }
 
-void save_dqlist(std::deque<CString>* dqlist, CString path)
+void save_dqlist(std::deque<CString>* dqlist, CString output_text_file_path)
 {
 	int i;
 	FILE* fp;
 
-	if ((fp = _tfopen(path, _T("wt")CHARSET)) == NULL)
+	if ((fp = _tfopen(output_text_file_path, _T("wt")CHARSET)) == NULL)
 		return;
 
 	//  UniCode BOM 기록
@@ -4724,6 +4761,24 @@ int	get_text_encoding(CString sfile)
 	return text_encoding;
 }
 
+bool save(CString filepath, CString text)
+{
+	FILE* fp = NULL;
+
+	_tfopen_s(&fp, filepath, _T("wt")CHARSET);
+
+	if (fp == NULL)
+	{
+		//AfxMessageBox(filepath + _T("\n위 파일을 열 수 없습니다."), MB_ICONEXCLAMATION);
+		return false;
+	}
+
+	_ftprintf(fp, _T("%s\n"), text);
+
+	fclose(fp);
+
+	return true;
+}
 
 //시작폴더 및 하위 폴더들은 여전히 남아있다.
 //폴더 통째로 다 지우려면 코드의 수정이 필요하다.
@@ -10949,10 +11004,18 @@ int	get_monitor_index(CRect r, bool entire_included)
 	return -1;
 }
 
-void SetForegroundWindowForce(HWND hWnd)
+void SetForegroundWindowForce(HWND hWnd, bool makeTopMost)
 {
+	//최상위로 올리는 코드가 이 함수의 맨 처음 부분에서 실행되지 않으면
+	//다른 최상위로 실행된 창의 위로 항상 올라오지 않는 현상이 있다.
+	if (makeTopMost)
+		::SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+
+	if (IsIconic(hWnd))
+		::ShowWindow(hWnd, SW_RESTORE);
+
 	HWND hWndForeground = ::GetForegroundWindow();
-	if (hWndForeground == hWnd)
+	if (!hWndForeground || hWndForeground == hWnd)
 		return;
 
 	DWORD Strange = ::GetWindowThreadProcessId(hWndForeground, NULL);
@@ -10960,16 +11023,18 @@ void SetForegroundWindowForce(HWND hWnd)
 
 	if (!::AttachThreadInput(Strange, My, TRUE))
 	{
-		ASSERT(0);
+		//ASSERT(0);
+		OutputDebugString(_T("AttachThreadInput(Strange, My, TRUE) failed.\n"));
 	}
 
 	::SetForegroundWindow(hWnd);
-	::BringWindowToTop(hWnd);
-	::SetFocus(hWnd);
+	//::BringWindowToTop(hWnd);
+	//::SetFocus(hWnd);
 
 	if (!::AttachThreadInput(Strange, My, FALSE))
 	{
-		ASSERT(0);
+		//ASSERT(0);
+		OutputDebugString(_T("AttachThreadInput(Strange, My, FALSE) failed.\n"));
 	}
 }
 
@@ -11914,15 +11979,15 @@ void drawArc(CDC *pDC, double cx, double cy,double r1, double r2, double start, 
 }
 
 //font size to LOGFONT::lfHeight
-LONG get_logical_size_from_font_size(HDC hDC, int font_size)
+LONG get_logical_size_from_font_size(HWND hWnd, int font_size)
 {
-	return -MulDiv(font_size, GetDeviceCaps(hDC, LOGPIXELSY), 72);
+	return -MulDiv(font_size, GetDeviceCaps(::GetDC(hWnd), LOGPIXELSY), 72);
 }
 
 //LOGFONT::lfHeight to font size
-LONG get_font_size_from_logical_size(HDC hDC, int logical_size)
+LONG get_font_size_from_logical_size(HWND hWnd, int logical_size)
 {
-	return -MulDiv(logical_size, 72, GetDeviceCaps(hDC, LOGPIXELSY));
+	return -MulDiv(logical_size, 72, GetDeviceCaps(::GetDC(hWnd), LOGPIXELSY));
 }
 
 //메모리 일부 복사 함수

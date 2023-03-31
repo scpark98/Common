@@ -9,6 +9,7 @@
 #include <deque>
 #include "../../Functions.h"
 
+#define WM_USER_COLORLISTBOX_SELCHANGE	WM_USER + 2724
 // ColorListBox.h : header file
 
 //-------------------------------------------------------------------
@@ -56,6 +57,10 @@ public:
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
 
+	//folder list로 동작시킨다.
+	void		set_parent(HWND hWnd) { m_hParentWnd = hWnd; }
+	int			set_path(CString root);
+
 	virtual		CColorListBox&	set_font(LOGFONT& lf);
 	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual		CColorListBox&	set_font_size(int nSize);
@@ -75,10 +80,16 @@ public:
 	void	set_color_theme(int theme, bool apply_now = true);
 
 protected:
+	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
+	HWND		m_hParentWnd = NULL;
+
 	bool		m_bUseColor;		//default = false;
 	bool		m_bUseHover;		//default = false;
 	BOOL		m_bOutside;
 	int			m_nOverItem;
+	bool		m_as_popup;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
+	bool		m_as_folder_list;	//폴더목록을 표시하는 목적으로 동작하는 경우
+	std::deque<CString> m_folder_list;
 
 	COLORREF	m_crText;					//기본 글자색
 	COLORREF	m_crTextSelected;			//선택 항목의 활성화(active) 글자색
@@ -133,6 +144,7 @@ public:
 	//afx_msg void OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg BOOL OnLbnSelchange();
 };
 

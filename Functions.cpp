@@ -770,7 +770,7 @@ bool ChangeExtension(CString& filepath, CString newExt, bool applyRealFile)
 }
 
 //경로상에 "\\.." 또는 "/.."이 들어있으면 실제 경로로 재구성해준다.
-//c:/abc/def/../../test.txt => c:/abc/def/../../test.txt
+//c:/abc/def/../../test.txt => c://test.txt
 CString	normalize_path(CString& filepath)
 {
 	DWORD  retval = 0;
@@ -4346,6 +4346,9 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 
 int get_sub_folders(CString root, std::deque<CString>* list)
 {
+	if (list)
+		list->clear();
+
 	std::deque<CString> folders;
 
 	CString file;
@@ -4359,20 +4362,35 @@ int get_sub_folders(CString root, std::deque<CString>* list)
 			root += _T("\\*");
 	}
 
-	bool bWorking = finder.FindFile(root);
-
-	while (bWorking)
+	if (root == _T("내 PC"))
 	{
-		bWorking = finder.FindNextFile();
-		file = finder.GetFilePath();
+		folders = get_drive_list(true);
+	}
+	else if (PathFileExists(root))
+	{
+		bool bWorking = finder.FindFile(root);
 
-		if (finder.IsDots())
-			continue;
-		if (finder.IsDirectory())
-			folders.push_back(file);
+		while (bWorking)
+		{
+			bWorking = finder.FindNextFile();
+			file = finder.GetFilePath();
+
+			if (finder.IsDots())
+				continue;
+			if (finder.IsDirectory() && !finder.IsHidden())
+				folders.push_back(file);
+		}
+	}
+	else
+	{
+		if (list)
+			list->clear();
+
+		return 0;
 	}
 
-	sort_like_explorer(&folders);
+	if (root != _T("내 PC"))
+		sort_like_explorer(&folders);
 
 	if (list)
 		list->assign(folders.begin(), folders.end());
@@ -7589,6 +7607,62 @@ CString GetHDDVolumeNumber(CString sDrive)
 	GetVolumeInformation(sDrive, NULL, 0, &dwSerialNumber, NULL, NULL, NULL, 0);
 	str.Format(_T("%u"), dwSerialNumber);
 	return str;
+}
+
+std::deque<CString> get_drive_list(bool with_volume_name)
+{
+	std::deque<CString> drive_list;
+
+	DWORD dwError = 0;
+	TCHAR Label[MAX_PATH] = { 0, };
+	TCHAR tzDriveString[MAX_PATH] = { 0, };
+	CString sLabel;
+
+	// 반환 예 : "C:\\\0D:\\\0E:\\\0\0"
+	// 구분 : "\0", 끝 : "\0\0"
+	DWORD dwStringsLen = ::GetLogicalDriveStrings(MAX_PATH, tzDriveString); // 로컬 디스크 목록 얻기
+	if (dwStringsLen != 0 && dwStringsLen <= MAX_PATH)
+	{
+		CString strTrace;
+		strTrace.Format(_T("Length : %lu"), dwStringsLen);
+		TRACE(_T("%s\n"), strTrace);
+
+		DWORD dwIndex = 0;
+		while (0 < _tcslen(&tzDriveString[dwIndex]))
+		{
+			strTrace.Format(_T("Drive : %s"), &tzDriveString[dwIndex]);
+			TRACE(_T("%s\n"), strTrace);
+			if (with_volume_name)
+			{
+				memset(Label, 0, sizeof(Label));
+				GetVolumeInformation(&tzDriveString[dwIndex], Label, sizeof(Label), NULL, NULL, NULL, NULL, 0);
+				sLabel = Label;
+
+				if (sLabel.IsEmpty())
+					sLabel.Format(_T("로컬 디스크 (%c:)"), tzDriveString[dwIndex]);
+				else
+					sLabel.Format(_T("%s (%c:)"), sLabel, tzDriveString[dwIndex]);
+				drive_list.push_back(sLabel);
+			}
+			else
+			{
+				drive_list.push_back(&tzDriveString[dwIndex]);
+			}
+
+			dwIndex += _tcslen(&tzDriveString[dwIndex]) + 1;
+		}
+	}
+	else
+	{
+		dwError = ::GetLastError();
+	}
+
+	if (dwError != 0)
+	{
+		// 에러 처리
+	}
+
+	return drive_list;
 }
 
 void ClickMouse(int x, int y)

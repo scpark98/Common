@@ -882,6 +882,7 @@ LONGLONG	GetDiskTotalSize( CString sDrive );
 CString		GetDiskSizeString( CString sDrive );	// "1.25G / 380.00G"
 //CString		GetHDDSerialNumber( int nPhysicalDrive );
 CString		GetHDDVolumeNumber( CString sDrive );
+std::deque<CString> get_drive_list(bool with_volume_name);
 
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)

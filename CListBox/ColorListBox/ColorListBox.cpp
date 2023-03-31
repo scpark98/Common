@@ -73,7 +73,8 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	//ON_MESSAGE(WM_SETFONT, OnSetFont)
 	//ON_WM_DRAWITEM_REFLECT()
 	ON_WM_KEYDOWN()
-	//ON_NOTIFY_REFLECT_EX(LBN_SELCHANGE, &CColorListBox::OnLbnSelchange)
+	ON_WM_KILLFOCUS()
+	ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CColorListBox::OnLbnSelchange)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -103,6 +104,8 @@ void CColorListBox::PreSubclassWindow()
 	// TODO: Add your specialized code here and/or call the base class
 	// Get Defalut Font 
 	CListBox::PreSubclassWindow();
+
+	//CWnd* pWnd = GetParent();
 
 	CFont* font = GetFont();
 	if (font == NULL)
@@ -300,14 +303,13 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (GetStyle() & LBS_USETABSTOPS)
 		nFormat |= DT_EXPANDTABS;
 
-	if (m_Small.GetImageCount() > 0)
+	if (m_as_folder_list && m_Small.GetImageCount() > 0)
 	{
-		//m_Small.Draw(&dc, GetSystemImageListIcon(sText, false), CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
-		if (lpDIS->itemID == 0)
-			m_Small.Draw(&dc, GetSystemImageListIcon(_T("D:\\1.Projects_C++\\0.backup\\MiniMini"), false), CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
-		else
-			m_Small.Draw(&dc, GetSystemImageListIcon(sText, false), CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
-		rect.left += 20;
+		rect.left += 6;
+		m_Small.Draw(&dc, GetSystemImageListIcon(m_folder_list[lpDIS->itemID], false),
+					CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		rect.left += 16;
+		rect.left += 14;
 	}
 	dc.DrawText(sText, rect, nFormat);
 
@@ -558,13 +560,6 @@ void CColorListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	CListBox::OnKeyDown(nChar, nRepCnt, nFlags);
 }
 
-
-BOOL CColorListBox::OnLbnSelchange()
-{
-	return FALSE;
-}
-
-
 int CColorListBox::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 {
 	SHFILEINFO shFileInfo;
@@ -621,12 +616,12 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 		break;
 	case color_theme_explorer:
 		m_crText = ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_crTextSelected = m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
 		m_crTextSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_crTextOver = m_crText;
 
 		m_crBack = ::GetSysColor(COLOR_WINDOW);
-		m_crBackSelected = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackOver = RGB(195, 222, 245);
 		break;
@@ -634,4 +629,59 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 
 	if (apply_now)
 		Invalidate();
+}
+
+
+void CColorListBox::OnKillFocus(CWnd* pNewWnd)
+{
+	CListBox::OnKillFocus(pNewWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (m_as_popup)
+		ShowWindow(SW_HIDE);
+}
+
+int CColorListBox::set_path(CString root)
+{
+	HWND hParent;
+
+	//hParent = ::GetWindow(m_hWnd, GW_OWNER);
+	hParent = ::GetAncestor(m_hWnd, GA_PARENT);
+	hParent = ::GetAncestor(m_hWnd, GA_ROOT);
+	hParent = ::GetAncestor(m_hWnd, GA_ROOTOWNER);
+
+	ResetContent();
+
+	m_as_folder_list = true;
+	m_as_popup = true;
+	get_sub_folders(root, &m_folder_list);
+
+	for (int i = 0; i < m_folder_list.size(); i++)
+		add_string(GetFileNameFromFullPath(m_folder_list[i]));
+
+	return m_folder_list.size();
+}
+
+BOOL CColorListBox::OnLbnSelchange()
+{
+	int index = GetCurSel();
+
+	if (index < 0 || index >= GetCount())
+		return FALSE;
+
+	CString text;
+
+	if (m_as_folder_list)
+		text = m_folder_list[index];
+	else
+		GetText(index, text);
+
+	//TRACE(_T("selected = %s\n"), text);
+	if (m_as_folder_list && m_hParentWnd)
+	{
+		::SendMessage(m_hParentWnd, WM_USER_COLORLISTBOX_SELCHANGE, 0, (LPARAM)&text);
+		ShowWindow(SW_HIDE);
+	}
+
+	return FALSE;
 }

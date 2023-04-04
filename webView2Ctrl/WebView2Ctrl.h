@@ -170,6 +170,7 @@ public:
 	//CString get_webview2_runtime_version(bool webView_version = true);
 
 	//environment를 통해 간단히 얻어올 수 있다.
+	//nuget package의 webview2 버전이 아니라 시스템에 설치되어 있는 webview2 runtime의 버전임.
 	CString get_webview2_runtime_version() { return m_webview2_runtime_version; }
 	//현재 프로젝트에 설치된 NuGet package의 WebView2 버전을 구한다.
 	CString get_webview2_nuget_version() { return m_webview2_nuget_version; }

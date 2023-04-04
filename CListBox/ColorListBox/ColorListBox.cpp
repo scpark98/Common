@@ -61,7 +61,8 @@ CColorListBox::~CColorListBox()
 // Remarks		:	Destructor.
 //
 {
-	m_Small.Detach();
+	m_imagelist_small.Detach();
+	CoUninitialize();
 }	// ~CColorListBox()
 
 
@@ -122,8 +123,7 @@ void CColorListBox::PreSubclassWindow()
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
 	SHFILEINFO shInfo;
-	m_Small.Attach((HIMAGELIST)::SHGetFileInfo(_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
-	CoUninitialize();
+	m_imagelist_small.Attach((HIMAGELIST)::SHGetFileInfo(_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
 
 	ReconstructFont();
 }
@@ -135,6 +135,7 @@ void CColorListBox::ReconstructFont()
 
 	SetFont(&m_font, true);
 
+	m_line_height = -m_lf.lfHeight + 10;
 	SetItemHeight(0, -m_lf.lfHeight + 10);
 
 	ASSERT(bCreated);
@@ -220,7 +221,6 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	//다른 컨트롤에서는 ReconstructFont()안에서 SetFont( &m_font, true );와 같이 글꼴을 적용시키지만
 	//custom draw도 마찬가지.
 	//owner draw fixed 속성인 컨트롤의 drawitem에서는 dc.SelectObject(&m_font)를 호출해줘야 사용자 설정 글꼴이 적용된다.
-	dc.SelectObject(&m_font);
 
 	// If item has been selected, draw the highlight rectangle using the item's color.
 	//if ((lpDIS->itemState & ODS_SELECTED) &&
@@ -252,14 +252,14 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 	else
 	{
-		if (lpDIS->itemState & ODS_SELECTED)
+		/*if (lpDIS->itemState & ODS_SELECTED)
 		{
-			CBrush brush(m_crBackSelected);//RGB(0, 0, 255));
+			CBrush brush(m_crBackSelected);
 			dc.FillRect(&rect, &brush);
 		}
-		else
+		else*/
 		{
-			CBrush brush(m_crBack);//::GetSysColor(COLOR_WINDOW));
+			CBrush brush(m_crBack);
 			dc.FillRect(&rect, &brush);
 		}
 
@@ -303,18 +303,39 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (GetStyle() & LBS_USETABSTOPS)
 		nFormat |= DT_EXPANDTABS;
 
-	if (m_as_folder_list && m_Small.GetImageCount() > 0)
+	if (m_as_folder_list && m_imagelist_small.GetImageCount() > 0)
 	{
 		rect.left += 6;
-		m_Small.Draw(&dc, GetSystemImageListIcon(m_folder_list[lpDIS->itemID], false),
-					CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		CString real_path = convert_volume_to_real_path(m_folder_list[lpDIS->itemID]);
+		m_imagelist_small.Draw(&dc, GetSystemImageListIcon(real_path, false),
+								CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		rect.left += 16;
 		rect.left += 14;
 	}
+
+
+	CFont* pOldFont = NULL;
+	CFont font_selected;
+	LOGFONT lf;
+
+	if (lpDIS->itemState & ODS_SELECTED)
+	{
+		memcpy(&lf, &m_lf, sizeof(LOGFONT));
+		lf.lfWeight = FW_SEMIBOLD;
+		BOOL bCreated = font_selected.CreateFontIndirect(&lf);
+		pOldFont = dc.SelectObject(&font_selected);
+	}
+	else
+	{
+		pOldFont = dc.SelectObject(&m_font);
+	}
+
 	dc.DrawText(sText, rect, nFormat);
 
 	dc.SetTextColor(crText);
 	dc.SetBkMode(nBkMode);
+	dc.SelectObject(pOldFont);
+	font_selected.DeleteObject();
 }	// DrawItem
 
 int CColorListBox::AddString(CString text, COLORREF crText, COLORREF crBack, bool invalidate)
@@ -341,7 +362,6 @@ int CColorListBox::add_string(CString lpszItem, COLORREF crText, COLORREF crBack
 {
 	int index = ((CListBox*)this)->AddString(lpszItem);
 	set_item_color(index, crText, invalidate);
-	//SetTopIndex(GetCount() - 1);
 
 	return index;
 }	// AddString
@@ -470,6 +490,8 @@ void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 		if (nHover != m_nOverItem)
 		{
 			m_nOverItem = nHover;
+			//over일때 해당 아이템을 selected로 하면 편하지만
+			//over와 selected를 별도로 처리하고자 함.
 			Invalidate(false);
 		}
 	}
@@ -560,45 +582,6 @@ void CColorListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	CListBox::OnKeyDown(nChar, nRepCnt, nFlags);
 }
 
-int CColorListBox::GetSystemImageListIcon(CString szFile, BOOL bDrive)
-{
-	SHFILEINFO shFileInfo;
-
-	if (false)//szFile == GetStringById(NFTD_IDS_COMPUTER))
-	{
-		LPITEMIDLIST pidl_Computer = NULL;
-		SHGetFolderLocation(NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer); // 컴퓨터
-		SHGetFileInfo((wchar_t*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
-	}
-	else if (false)//szFile == GetStringById(NFTD_IDS_DOCUMENT))
-	{
-		LPITEMIDLIST pidl_Document = NULL;
-		SHGetFolderLocation(NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document); // 내문서
-		SHGetFileInfo((wchar_t*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
-	}
-	else if (false)//szFile == GetStringById(NFTD_IDS_DESKTOP))
-	{
-		LPITEMIDLIST pidl_Desktop = NULL;
-		SHGetFolderLocation(NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop); // 바탕화면
-		SHGetFileInfo((wchar_t*)pidl_Desktop, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
-	}
-	else
-	{
-		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-		if (shFileInfo.iIcon < 0)
-			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-		//else
-		//{
-		//	if (PathIsDirectory(szFile))
-		//		SHGetFileInfo(szFile, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-		//	else
-		//		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-		//}
-	}
-
-	return shFileInfo.iIcon;
-}
-
 void CColorListBox::set_color_theme(int theme, bool apply_now)
 {
 	switch (theme)
@@ -620,7 +603,7 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 		m_crTextSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_crTextOver = m_crText;
 
-		m_crBack = ::GetSysColor(COLOR_WINDOW);
+		m_crBack = RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
 		m_crBackSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackOver = RGB(195, 222, 245);
@@ -641,7 +624,7 @@ void CColorListBox::OnKillFocus(CWnd* pNewWnd)
 		ShowWindow(SW_HIDE);
 }
 
-int CColorListBox::set_path(CString root)
+int CColorListBox::set_path(CString root, CString selected_text)
 {
 	HWND hParent;
 
@@ -652,12 +635,29 @@ int CColorListBox::set_path(CString root)
 
 	ResetContent();
 
+	m_nOverItem = -1;
 	m_as_folder_list = true;
 	m_as_popup = true;
-	get_sub_folders(root, &m_folder_list);
+
+	if (root == ROOT_LABEL)
+	{
+		m_folder_list.clear();
+		m_folder_list.push_back(_T("바탕 화면"));
+		m_folder_list.push_back(_T("내 PC"));
+	}
+	else
+	{
+		get_sub_folders(root, &m_folder_list, true);
+	}
 
 	for (int i = 0; i < m_folder_list.size(); i++)
+	{
 		add_string(GetFileNameFromFullPath(m_folder_list[i]));
+	}
+
+	SelectString(-1, selected_text);
+
+	Invalidate();
 
 	return m_folder_list.size();
 }

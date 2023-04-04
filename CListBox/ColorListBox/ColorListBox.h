@@ -9,6 +9,9 @@
 #include <deque>
 #include "../../Functions.h"
 
+//ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
+#define ROOT_LABEL _T("_r")
+
 #define WM_USER_COLORLISTBOX_SELCHANGE	WM_USER + 2724
 // ColorListBox.h : header file
 
@@ -47,6 +50,7 @@ public:
 
 	CSize		resizeToFit(bool bHori = true, bool bVert = true);			//변경된 크기를 리턴한다.
 	void		set_minimum_lines(int lines) { m_nMinimumLines = lines; }
+	int			get_line_height() { return m_line_height; }
 
 	void		UseColor(bool bUse = true) { m_bUseColor = bUse; }
 	void		UseHover(bool bUse = true) { m_bUseHover = bUse; }
@@ -59,7 +63,9 @@ public:
 
 	//folder list로 동작시킨다.
 	void		set_parent(HWND hWnd) { m_hParentWnd = hWnd; }
-	int			set_path(CString root);
+	//root라는 폴더의 하위 폴더들을 리스트에 표시한다.
+	int			set_path(CString root, CString selected_text = _T(""));
+	CImageList	m_imagelist_small;
 
 	virtual		CColorListBox&	set_font(LOGFONT& lf);
 	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
@@ -105,8 +111,8 @@ protected:
 	CFont		m_font;
 	void		ReconstructFont();
 
-	CImageList	m_Small; // Imagelist for small icons
-	int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
+	int			m_line_height;
+
 
 	//vert fit에서 최소 표시 라인수를 정해놓는다.default = -1(정하지 않을 경우)
 	int			m_nMinimumLines;

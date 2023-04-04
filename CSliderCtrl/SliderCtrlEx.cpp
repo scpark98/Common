@@ -213,7 +213,7 @@ void CSliderCtrlEx::OnPaint()
 	int i;
 	
 	CAutoFont font( _T("±¼¸²") );
-	font.SetHeight((double)get_logical_size_from_font_size(dc.GetSafeHdc(), m_rc.Height()) / 2.2);
+	font.SetHeight((double)get_logical_size_from_font_size(m_hWnd, m_rc.Height()) / 2.2);
 	font.SetBold(true);
 	CFont* pOldFont = (CFont*)dc.SelectObject(&font);
 

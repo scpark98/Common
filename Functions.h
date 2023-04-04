@@ -742,7 +742,8 @@ void		Trace(char* szFormat, ...);
 	std::deque<CString>	find_all_files(CString path, CString name_filter = _T(""), CString ext_filters = _T(""), CString except_str = _T(""), bool recursive = true, bool auto_sort = true);
 #endif
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
-	int	get_sub_folders(CString root, std::deque<CString>* list = NULL);
+	//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
+	int	get_sub_folders(CString root, std::deque<CString>* list = NULL, bool special_folders = false);
 
 	void save_dqlist(std::deque<CString>* dqlist, CString output_text_file_path);
 
@@ -833,6 +834,8 @@ void		Trace(char* szFormat, ...);
 	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
 	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 
+	int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
+
 	void		SystemShutdown( int nMode );		// 0:logoff  1:reboot  2:shutdown
 	void		SystemShutdownNT( int nMode = 2 );	// 1:reboot  2:shutdown
 
@@ -883,6 +886,10 @@ CString		GetDiskSizeString( CString sDrive );	// "1.25G / 380.00G"
 //CString		GetHDDSerialNumber( int nPhysicalDrive );
 CString		GetHDDVolumeNumber( CString sDrive );
 std::deque<CString> get_drive_list(bool with_volume_name);
+CString		get_drive_volume(TCHAR cDrive);
+//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
+CString		convert_volume_to_real_path(CString volume_path);
+CString		convert_real_to_volume_path(CString real_path);
 
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
@@ -1019,6 +1026,9 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	void		draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int depth,
 								CString font_name = _T("맑은 고딕"),
 								Gdiplus::Color crShadow = Gdiplus::Color::Red);
+
+	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
+	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);
 
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
 	void		DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN );

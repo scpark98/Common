@@ -2224,7 +2224,22 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	CString str;
 	CString remoteURL;
 	TCHAR szHead[] = _T("Accept: */*\r\n\r\n");
-	bool is_https = (ip.Find(_T("https://")) >= 0);
+	bool is_https = false;
+
+	if (ip.GetLength() < 7)
+		return _T("Invalid IP address = ") + ip;
+
+	if (ip.Left(7) == _T("http://"))
+	{
+		is_https = false;
+		ip = ip.Mid(7);
+	}
+	else if (ip.Left(8) == _T("https://"))
+	{
+		is_https = true;
+		ip = ip.Mid(8);
+	}
+
 
 	if (port <= 0)
 	{
@@ -4344,7 +4359,9 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	}
 }
 
-int get_sub_folders(CString root, std::deque<CString>* list)
+//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
+//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
+int get_sub_folders(CString root, std::deque<CString>* list, bool special_folders)
 {
 	if (list)
 		list->clear();
@@ -4353,6 +4370,9 @@ int get_sub_folders(CString root, std::deque<CString>* list)
 
 	CString file;
 	CFileFind finder;
+
+	//"로컬 디스크 (C:)"
+	root = convert_volume_to_real_path(root);
 
 	if (PathIsDirectory(root))
 	{
@@ -4365,8 +4385,14 @@ int get_sub_folders(CString root, std::deque<CString>* list)
 	if (root == _T("내 PC"))
 	{
 		folders = get_drive_list(true);
+		if (special_folders)
+		{
+			folders.push_front(_T("바탕 화면"));
+			folders.push_front(_T("문서"));
+			folders.push_front(_T("다운로드"));
+		}
 	}
-	else if (PathFileExists(root))
+	else
 	{
 		bool bWorking = finder.FindFile(root);
 
@@ -4380,13 +4406,6 @@ int get_sub_folders(CString root, std::deque<CString>* list)
 			if (finder.IsDirectory() && !finder.IsHidden())
 				folders.push_back(file);
 		}
-	}
-	else
-	{
-		if (list)
-			list->clear();
-
-		return 0;
 	}
 
 	if (root != _T("내 PC"))
@@ -5228,6 +5247,34 @@ void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int d
 	g.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x-3, y-3), &brush2);
 }
 
+//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
+int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
+{
+	CRect rt;
+	int dot_width;
+	bool dot = false;
+	CString sub_str;
+
+	pDC->DrawText(_T("..."), &rt, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+	dot_width = rt.Width();
+
+	for (int i = text.GetLength(); i >= 1; i--)
+	{
+		sub_str = text.Left(i);
+		TRACE(_T("sub_str = %s\n"), sub_str);
+
+		pDC->DrawText(sub_str, &rt, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+		if (rt.Width() + (dot ? dot_width : 0) >= max_width)
+		{
+			dot = true;
+		}
+		else
+		{
+			return i;
+		}
+	}
+}
+
 void DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
 {
 	DrawLine(pDC, pt1.x, pt1.y, pt2.x, pt2.y, crColor, nWidth, nPenStyle, nDrawMode);
@@ -5240,7 +5287,7 @@ void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor /*= 0*/
 	lb.lbStyle = BS_SOLID;
 	lb.lbColor = crColor;
 
-	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
+	CPen	Pen(PS_GEOMETRIC | PS_ENDCAP_SQUARE | nPenStyle, nWidth, &lb);
 	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
 	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
 
@@ -7609,12 +7656,33 @@ CString GetHDDVolumeNumber(CString sDrive)
 	return str;
 }
 
+CString	get_drive_volume(TCHAR cDrive)
+{
+	TCHAR Label[MAX_PATH] = { 0, };
+	memset(Label, 0, sizeof(Label));
+	CString drive_root;
+
+	if (cDrive >= 'a' && cDrive <= 'z')
+		cDrive = toupper(cDrive);
+
+	drive_root.Format(_T("%c:\\"), cDrive);
+	GetVolumeInformation(drive_root, Label, sizeof(Label), NULL, NULL, NULL, NULL, 0);
+
+	CString sLabel = Label;
+
+	if (sLabel.IsEmpty())
+		sLabel.Format(_T("로컬 디스크 (%c:)"), cDrive);
+	else
+		sLabel.Format(_T("%s (%c:)"), sLabel, cDrive);
+
+	return sLabel;
+}
+
 std::deque<CString> get_drive_list(bool with_volume_name)
 {
 	std::deque<CString> drive_list;
 
 	DWORD dwError = 0;
-	TCHAR Label[MAX_PATH] = { 0, };
 	TCHAR tzDriveString[MAX_PATH] = { 0, };
 	CString sLabel;
 
@@ -7634,14 +7702,7 @@ std::deque<CString> get_drive_list(bool with_volume_name)
 			TRACE(_T("%s\n"), strTrace);
 			if (with_volume_name)
 			{
-				memset(Label, 0, sizeof(Label));
-				GetVolumeInformation(&tzDriveString[dwIndex], Label, sizeof(Label), NULL, NULL, NULL, NULL, 0);
-				sLabel = Label;
-
-				if (sLabel.IsEmpty())
-					sLabel.Format(_T("로컬 디스크 (%c:)"), tzDriveString[dwIndex]);
-				else
-					sLabel.Format(_T("%s (%c:)"), sLabel, tzDriveString[dwIndex]);
+				sLabel = get_drive_volume(tzDriveString[dwIndex]);
 				drive_list.push_back(sLabel);
 			}
 			else
@@ -7663,6 +7724,37 @@ std::deque<CString> get_drive_list(bool with_volume_name)
 	}
 
 	return drive_list;
+}
+
+//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
+CString	convert_volume_to_real_path(CString volume_path)
+{
+	if (volume_path == _T("바탕 화면"))
+		volume_path = get_known_folder(FOLDERID_Desktop);
+	else if (volume_path == _T("내 문서"))
+		volume_path = get_known_folder(FOLDERID_Documents);
+	else if (volume_path == _T("다운로드"))
+		volume_path = get_known_folder(FOLDERID_Downloads);
+
+	CString real_path = volume_path;
+
+	real_path.Replace(_T("내 PC\\"), _T(""));
+
+	int pos = real_path.Find(_T(":)"));
+	if (pos < 0)
+		return volume_path;
+
+	CString rest = real_path.Mid(pos + 2);
+	CString drive_letter = real_path.Mid(pos - 1, 1);
+
+	real_path.Format(_T("%s:\\%s"), drive_letter, rest);
+	return real_path;
+}
+
+CString	convert_real_to_volume_path(CString real_path)
+{
+	CString volume_path;
+	return volume_path;
 }
 
 void ClickMouse(int x, int y)
@@ -9772,6 +9864,44 @@ bool WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, d
 	return pApp->WriteProfileString(lpszSection, lpszEntry, sValue);
 }
 
+int GetSystemImageListIcon(CString szFile, BOOL bDrive)
+{
+	SHFILEINFO shFileInfo;
+
+	if (szFile == _T("내 PC"))//GetStringById(NFTD_IDS_COMPUTER))
+	{
+		LPITEMIDLIST pidl_Computer = NULL;
+		SHGetFolderLocation(NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer); // 컴퓨터
+		SHGetFileInfo((TCHAR*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	}
+	else if (szFile == _T("내 문서"))//GetStringById(NFTD_IDS_DOCUMENT))
+	{
+		LPITEMIDLIST pidl_Document = NULL;
+		SHGetFolderLocation(NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document); // 내문서
+		SHGetFileInfo((TCHAR*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	}
+	else if (szFile == _T("바탕 화면"))//GetStringById(NFTD_IDS_DESKTOP))
+	{
+		LPITEMIDLIST pidl_Desktop = NULL;
+		SHGetFolderLocation(NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop); // 바탕화면
+		SHGetFileInfo((TCHAR*)pidl_Desktop, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	}
+	else
+	{
+		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		if (shFileInfo.iIcon < 0)
+			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//else
+		//{
+		//	if (PathIsDirectory(szFile))
+		//		SHGetFileInfo(szFile, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//	else
+		//		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//}
+	}
+
+	return shFileInfo.iIcon;
+}
 
 HICON LoadIconEx(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
 {

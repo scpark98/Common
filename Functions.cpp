@@ -2229,15 +2229,13 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	if (ip.GetLength() < 7)
 		return _T("Invalid IP address = ") + ip;
 
-	if (ip.Left(7) == _T("http://"))
-	{
-		is_https = false;
-		ip = ip.Mid(7);
-	}
-	else if (ip.Left(8) == _T("https://"))
+	if (ip.Left(8) == _T("https://"))
 	{
 		is_https = true;
-		ip = ip.Mid(8);
+	}
+	else if (ip.Left(7) != _T("http://"))
+	{
+		ip = _T("http://") + ip;
 	}
 
 
@@ -2272,8 +2270,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		InternetSetOption(hInternet, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 	}
 
-	//remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
-	remoteURL.Format(_T("%s://%s:%d%s"), is_https ? _T("https") : _T("http"), ip, port, remote_path);
+	remoteURL.Format(_T("%s:%d%s"), ip, port, remote_path);
 	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, szHead, -1L, secureFlags, 0);
 	if (hURL == NULL) {
 		InternetCloseHandle(hInternet);

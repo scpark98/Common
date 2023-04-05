@@ -195,7 +195,6 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 	CMemoryDC dc(pDC, NULL, true);
 
-
 	COLORREF	crText;
 	CString		sText;
 	COLORREF	crNorm = (COLORREF)lpDIS->itemData;		// Color information is in item data.
@@ -299,7 +298,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	GetText(lpDIS->itemID, sText);
 
 	// Setup the text format.
-	UINT nFormat = DT_LEFT | DT_SINGLELINE | DT_VCENTER;
+	UINT nFormat = DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS;
 	if (GetStyle() & LBS_USETABSTOPS)
 		nFormat |= DT_EXPANDTABS;
 
@@ -506,7 +505,7 @@ BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 	CRect rc;
 	GetClientRect(rc);
 	pDC->FillSolidRect(rc, m_crBack);
-	return false;
+	return FALSE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
@@ -626,12 +625,14 @@ void CColorListBox::OnKillFocus(CWnd* pNewWnd)
 
 int CColorListBox::set_path(CString root, CString selected_text)
 {
+	TRACE(_T("%s, root = %s\n"), __function__, root);
+
 	HWND hParent;
 
 	//hParent = ::GetWindow(m_hWnd, GW_OWNER);
-	hParent = ::GetAncestor(m_hWnd, GA_PARENT);
-	hParent = ::GetAncestor(m_hWnd, GA_ROOT);
-	hParent = ::GetAncestor(m_hWnd, GA_ROOTOWNER);
+	//hParent = ::GetAncestor(m_hWnd, GA_PARENT);
+	//hParent = ::GetAncestor(m_hWnd, GA_ROOT);
+	//hParent = ::GetAncestor(m_hWnd, GA_ROOTOWNER);
 
 	ResetContent();
 

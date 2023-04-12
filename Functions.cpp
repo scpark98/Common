@@ -858,36 +858,22 @@ uint64_t get_folder_size(CString path)
 //unit_string	: 단위를 표시할 지 (default = true)
 CString		GetFileSizeString(CString sfile, int unit_limit, int floats, bool unit_string)
 {
-	return GetUnitSizeString(GetFileSize(sfile), unit_limit, floats, unit_string);
+	return get_size_string(GetFileSize(sfile), unit_limit, floats, unit_string);
 }
 
-//unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
-//floats		: 소수점을 몇 자리까지 표시할지 (default = 0)
-//unit_string	: 단위를 표시할 지 (default = true)
-//comma			: 정수 부분에 자리수 콤마를 표시할 지 (default = false)
-CString		GetUnitSizeString(int64_t size, int unit, int floats, bool unit_string, bool comma)
+//unit			: 0:bytes, 1:KB, 2:MB, 3:GB
+//floats		: 소수점을 몇 자리까지 표시할지
+//unit_string	: 단위를 표시할 지
+//comma			: 정수 부분에 자리수 콤마를 표시할 지
+CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, bool comma)
 {
 	double dsize = (double)size;
 	CString size_str;
-	CString unit_str;
+	CString unit_str[9] = { _T("Bytes"), _T("KB"), _T("MB"), _T("GB"), _T("TB"), _T("PB"), _T("EB"), _T("ZB"), _T("YB") };
 
-	if (/*(dsize > 1024.0) && */(unit > 0))
-	{
+	for (int i = 0; i <unit; i++)
 		dsize /= 1024.0;
-		unit_str = _T("KB");
-	}
 
-	if (/*(dsize > 1024.0) && */(unit > 1))
-	{
-		dsize /= 1024.0;
-		unit_str = _T("MB");
-	}
-
-	if (/*(dsize > 1024.0) && */(unit > 2))
-	{
-		dsize /= 1024.0;
-		unit_str = _T("GB");
-	}
 
 	//dsize = 0.01234;
 	//floats = 2;
@@ -906,7 +892,7 @@ CString		GetUnitSizeString(int64_t size, int unit, int floats, bool unit_string,
 	//dsize = ROUND(dsize, floats + 1);
 	size_str = d2S(dsize, comma, floats);
 	if (unit_string)
-		size_str += unit_str;
+		size_str += unit_str[unit];
 
 	return size_str;
 }
@@ -4379,9 +4365,19 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 			root += _T("\\*");
 	}
 
-	if (root == _T("내 PC"))
+	if (root == _T(""))
 	{
-		folders = get_drive_list(true);
+		folders.push_front(_T("바탕 화면"));
+		folders.push_front(_T("문서"));
+		folders.push_front(_T("다운로드"));
+	}
+	else if (root == _T("내 PC"))
+	{
+		std::map<TCHAR, CString> drive_map;
+		get_drive_map(&drive_map);
+		for (std::map<TCHAR, CString>::iterator it = drive_map.begin(); it != drive_map.end(); it++)
+			folders.push_back(it->second);
+
 		if (special_folders)
 		{
 			folders.push_front(_T("바탕 화면"));
@@ -7499,6 +7495,15 @@ bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform)
 	return true;
 }
 
+DWORD GetWindowsVersion()
+{
+	DWORD dwMajor = 0;
+	DWORD dwMinor = 0;
+
+	GetWindowsVersion(dwMajor, dwMinor);
+	return dwMajor;
+}
+
 bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor)
 {
 	static DWORD dwMajorCache = 0, dwMinorCache = 0;
@@ -7653,35 +7658,35 @@ CString GetHDDVolumeNumber(CString sDrive)
 	return str;
 }
 
-CString	get_drive_volume(TCHAR cDrive)
+CString	get_drive_volume(TCHAR drive_letter)
 {
 	TCHAR Label[MAX_PATH] = { 0, };
 	memset(Label, 0, sizeof(Label));
 	CString drive_root;
 
-	if (cDrive >= 'a' && cDrive <= 'z')
-		cDrive = toupper(cDrive);
+	if (drive_letter >= 'a' && drive_letter <= 'z')
+		drive_letter = toupper(drive_letter);
 
-	drive_root.Format(_T("%c:\\"), cDrive);
+	drive_root.Format(_T("%c:\\"), drive_letter);
 	GetVolumeInformation(drive_root, Label, sizeof(Label), NULL, NULL, NULL, NULL, 0);
 
 	CString sLabel = Label;
 
 	if (sLabel.IsEmpty())
-		sLabel.Format(_T("로컬 디스크 (%c:)"), cDrive);
+		sLabel.Format(_T("로컬 디스크 (%c:)"), drive_letter);
 	else
-		sLabel.Format(_T("%s (%c:)"), sLabel, cDrive);
+		sLabel.Format(_T("%s (%c:)"), sLabel, drive_letter);
 
 	return sLabel;
 }
 
-std::deque<CString> get_drive_list(bool with_volume_name)
+void get_drive_map(std::map<TCHAR, CString> *drive_map)
 {
-	std::deque<CString> drive_list;
-
 	DWORD dwError = 0;
 	TCHAR tzDriveString[MAX_PATH] = { 0, };
 	CString sLabel;
+
+	drive_map->clear();
 
 	// 반환 예 : "C:\\\0D:\\\0E:\\\0\0"
 	// 구분 : "\0", 끝 : "\0\0"
@@ -7690,22 +7695,15 @@ std::deque<CString> get_drive_list(bool with_volume_name)
 	{
 		CString strTrace;
 		strTrace.Format(_T("Length : %lu"), dwStringsLen);
-		TRACE(_T("%s\n"), strTrace);
+		//TRACE(_T("%s\n"), strTrace);
 
 		DWORD dwIndex = 0;
 		while (0 < _tcslen(&tzDriveString[dwIndex]))
 		{
 			strTrace.Format(_T("Drive : %s"), &tzDriveString[dwIndex]);
-			TRACE(_T("%s\n"), strTrace);
-			if (with_volume_name)
-			{
-				sLabel = get_drive_volume(tzDriveString[dwIndex]);
-				drive_list.push_back(sLabel);
-			}
-			else
-			{
-				drive_list.push_back(&tzDriveString[dwIndex]);
-			}
+			//TRACE(_T("%s\n"), strTrace);
+
+			drive_map->insert(std::pair<TCHAR, CString>(tzDriveString[dwIndex], get_drive_volume(tzDriveString[dwIndex])));
 
 			dwIndex += _tcslen(&tzDriveString[dwIndex]) + 1;
 		}
@@ -7719,8 +7717,6 @@ std::deque<CString> get_drive_list(bool with_volume_name)
 	{
 		// 에러 처리
 	}
-
-	return drive_list;
 }
 
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환

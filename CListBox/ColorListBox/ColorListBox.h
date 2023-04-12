@@ -10,9 +10,8 @@
 #include "../../Functions.h"
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
-#define ROOT_LABEL _T("_r")
+//#define ROOT_LABEL _T("_r")
 
-#define WM_USER_COLORLISTBOX_SELCHANGE	WM_USER + 2724
 // ColorListBox.h : header file
 
 //-------------------------------------------------------------------
@@ -36,6 +35,10 @@ public:
 	CColorListBox();
 
 // Attributes
+	enum USER_MESSAGE
+	{
+		wm_message_colorlistbox_selchange = WM_USER + 2724,
+	};
 
 // Operations
 public:
@@ -65,6 +68,8 @@ public:
 	void		set_parent(HWND hWnd) { m_hParentWnd = hWnd; }
 	//root라는 폴더의 하위 폴더들을 리스트에 표시한다.
 	int			set_path(CString root, CString selected_text = _T(""));
+	//lists를 NULL하여 호출하면 멤버변수인 m_folder_list의 내용을 표시한다.
+	int			set_folder_list(std::deque<CString>* lists = NULL, CString selected_text = _T(""));
 	CImageList	m_imagelist_small;
 
 	virtual		CColorListBox&	set_font(LOGFONT& lf);

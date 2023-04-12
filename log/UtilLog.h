@@ -5,7 +5,7 @@
 * (#define logWrite...를 사용하므로 멀티쓰레드가 가능할지는 아직 확인 못함)
 * 
 * app.h에서
-	#include "../../Common/log/logh"
+	#include "../../Common/log/UtilLog.h"
 	...
 	전역변수로 아래 변수 선언.
 	extern UtilLog gLog;
@@ -32,6 +32,7 @@
 #define __function__ __FUNCTION__
 #endif
 
+//#define logWrite(fmt, ...) logWrite(LOG_LEVEL_RELEASE, __function__, __LINE__, fmt, ##__VA_ARGS__)
 #define logWrite(level, fmt, ...) pLog->Write(level, __function__, __LINE__, fmt, ##__VA_ARGS__)
 
 class UtilLog
@@ -40,17 +41,22 @@ public:
 	UtilLog();
 	virtual ~UtilLog();
 
-	//로그파일 이름을 주지 않으면 실행파일명을 이용.
-	BOOL Init(CString filename = _T(""), int showLogLevel = LOG_LEVEL_RELEASE);
+	//폴더 및 로그파일 타이틀을 주지 않으면 실행파일 하위의 "Log" 폴더에 실행파일명[YYYYMMDD].log 파일이 자동 생성됨.
+	//위와 같이 기본 위치와 파일명을 사용할 경우는 Init()을 호출하지 않아도 자동 생성되며
+	//특정 위치에 로그파일을 저장하고자 하는 경우는 폴더를 지정해주면 됨.
+	//예)특정 폴더 지정 : "d:\\test\\Log"
+	//예)상대 경로 지정 : "..\\..\\Log" (실행파일이 있는 상위의 상위 폴더에 Log라는 폴더를 생성하여 로그파일 저장)
+	//gLog.Init(_T("../../custom log folder"));와 같이 호출
+	BOOL Init(CString logFolder = _T(""), CString filetitle = _T(""), int showLogLevel = LOG_LEVEL_RELEASE);
 	CString Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
 	BOOL Release();
-	CString GetLogFilePath();
-	CString GetLogFileFolder();
+	CString get_log_full_path() { return m_fullpath; }
 
 protected:
-	CString m_logFileName;
-	CString m_filePath;
-	CString m_processTitle;
+	CString m_filetitle;
+	CString m_filename;
+	CString m_folder;
+	CString m_fullpath;
 	int m_showLogLevel;
 	FILE* m_fp;
 

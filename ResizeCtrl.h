@@ -42,6 +42,21 @@
 // 	m_resize.Add( IDC_STATIC_FINAL, 666, 0, 333, 1000 );
 
 주의! : m_resize에서 어떤 컨트롤을 동적으로 변경할 경우에는 반드시 제거한 후 다시 넣어줘야 제대로 동작한다.
+
+* scpark 2023041010
+https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with-resizable-border-and-without-bogus-6px-whit
+윈도우10에서는 DWM정책에 따라 언제부터인가 타이틀바가 없는 resizable dialog를 만들면 상단에 흰색 영역이 표시된다.
+이는 버그라고 할 수 없고 DWM정책에 따라 생겨난 부작용이라 한다.
+
+이를 보정하는 방법은 2가지가 있는데
+
+1.위 블로그처럼 해결하는 방법
+	- 장점 : 그나마 정석적인 처리 방법
+	- 단점 : 윈도우10과 7 & Vista는 처리코드가 약간 달라진다.
+
+2.border를 none이나 thin으로 하고 SetCursor와 OnMouseMove, OnLButtonDown을 이용하여 구현
+	- 장점 : resizable 영역의 크기를 원하는 만큼 줄 수 있다.
+	- 단점 : CResizeCtrl을 쓰면 Dialog에 자동으로 WM_THICKFRAME 속성이 부여되므로 이 방법을 쓸 수 없다.
 */
 //////////////////////////////////////////////////////////////////////////
 

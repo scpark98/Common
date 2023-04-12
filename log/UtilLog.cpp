@@ -9,9 +9,9 @@ UtilLog* pLog = NULL;
 UtilLog::UtilLog()
 {
 	pLog = this;
-	m_logFileName = _T("");
-	m_filePath = _T("");
+
 	m_showLogLevel = LOG_LEVEL_RELEASE;
+
 	m_fp = NULL;
 }
 
@@ -27,7 +27,7 @@ UtilLog::~UtilLog()
 	}
 }
 
-BOOL UtilLog::Init(CString filename, int showLogLevel)
+BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 {
 	try
 	{
@@ -36,37 +36,64 @@ BOOL UtilLog::Init(CString filename, int showLogLevel)
 			return FALSE;
 		}
 
-		m_showLogLevel = showLogLevel;
-		m_logFileName = filename;
+		TCHAR	tExeFullPath[1024];
+		CString sExeFolder;
 
-		if (m_filePath == _T(""))
+		GetModuleFileName(AfxGetInstanceHandle(), tExeFullPath, MAX_PATH);
+		sExeFolder = tExeFullPath;
+		sExeFolder = sExeFolder.Left(sExeFolder.ReverseFind('\\'));
+
+		m_filetitle = PathFindFileName(tExeFullPath);
+
+		if (m_filetitle.Find(_T(".")) > 0)
+			m_filetitle = m_filetitle.Left(m_filetitle.ReverseFind('.'));
+
+		m_folder = sExeFolder + _T("\\Log");
+
+
+		m_showLogLevel = showLogLevel;
+
+		if (!logFolder.IsEmpty())
 		{
-			m_filePath = GetLogFilePath();
-			if (m_filePath == _T(""))
+			logFolder.Replace(_T("/"), _T("\\"));
+
+			//절대경로로 설정한 경우
+			if (logFolder.Find(_T(":\\")) > 0)
+				m_folder = logFolder;
+			//상대경로로 설정한 경우
+			else
+				m_folder.Format(_T("%s\\%s"), sExeFolder, logFolder);
+
+			DWORD  retval = 0;
+			TCHAR buffer[MAX_PATH] = _T("");
+
+			retval = GetFullPathName(m_folder, MAX_PATH, buffer, NULL);
+
+			if (retval == 0)
 			{
-				return FALSE;
+				TRACE(_T("GetFullPathName() error"));
+			}
+			else
+			{
+				m_folder = buffer;
 			}
 		}
 
-		if (m_logFileName.IsEmpty())
-			m_logFileName = m_processTitle;
+		if (!filetitle.IsEmpty())
+			m_filetitle = filetitle;
 
-		//m_fp = _fsopen(UtilPublic::unicodeToMultibyte((LPCTSTR)m_filePath).c_str(), "a+", _SH_DENYNO);
-		_tfopen_s(&m_fp, m_filePath, _T("a+")CHARSET);
+		CTime t = CTime::GetCurrentTime();
+		m_filename.Format(_T("%s[%d%02d%02d].log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
+		m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
+
+		CreateDirectory(m_folder, NULL);
+
+		_tfopen_s(&m_fp, m_fullpath, _T("a+")CHARSET);
 
 		if (m_fp == NULL)
-		{
 			return FALSE;
-		}
+
 		return TRUE;
-		/*
-		errno_t err = fopen_s(&m_fp, UtilPublic::unicodeToMultibyte((LPCTSTR)GetLogFilePath()).c_str(), "a+");
-		if (err != 0)
-		{
-		return TRUE;
-		}
-		return FALSE;
-		*/
 	}
 	catch (...)
 	{
@@ -121,7 +148,8 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		CString str;
 		str.FormatV(format, args);
 
-		CTime t = CTime::GetCurrentTime();
+		SYSTEMTIME t = { 0 };
+		GetLocalTime(&t);
 
 		CString funcName(func);
 
@@ -133,8 +161,8 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 			}
 			else
 			{
-				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d][%s(%d)] %s"),
-					t.GetYear(), t.GetMonth(), t.GetDay(), t.GetHour(), t.GetMinute(), t.GetSecond(),
+				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d(%03d)][%s(%d)] %s"),
+					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
 					funcName, line, str);
 				_ftprintf(m_fp, _T("%s\n"), result);
 			}
@@ -151,54 +179,4 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 	}
 
 	return result;
-}
-
-CString UtilLog::GetLogFilePath()
-{
-	try
-	{
-		CString strFolderPath = GetLogFileFolder();
-		if (strFolderPath == _T(""))
-		{
-			return _T("");
-		}
-
-		SYSTEMTIME current_time = { 0, };
-		GetLocalTime(&current_time);
-
-		if (m_logFileName.IsEmpty())
-			m_logFileName = m_processTitle;
-
-		CString filePath = _T("");
-		filePath.Format(_T("%s%s[%.4ld%.2ld%.2ld].log"), strFolderPath, m_logFileName, current_time.wYear, current_time.wMonth, current_time.wDay);
-		return filePath;
-	}
-	catch (...)
-	{
-		return _T("");
-	}
-}
-
-CString UtilLog::GetLogFileFolder()
-{
-	try
-	{
-		TCHAR	sFilePath[1024];
-
-		GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
-
-		m_processTitle = PathFindFileName(sFilePath);
-
-		if (m_processTitle.Find(_T(".")) > 0)
-			m_processTitle = m_processTitle.Left(m_processTitle.ReverseFind('.'));
-
-		CString folder = sFilePath;
-		folder.Format(_T("%s\\Log\\"), folder.Left(folder.ReverseFind('\\')));
-		CreateDirectory(folder, NULL);
-		return folder;
-	}
-	catch (...)
-	{
-		return _T("");
-	}
 }

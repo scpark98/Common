@@ -1,0 +1,109 @@
+[titlebar가 없는 dlg에 CResizeCtrl을 사용할 때 상단 흰색 여백 없애는 방법]
+
+* scpark 2023041010
+https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with-resizable-border-and-without-bogus-6px-whit
+윈도우10에서는 DWM정책에 따라 언제부터인가 타이틀바가 없는 resizable dialog를 만들면 상단에 흰색 영역이 표시된다.
+이는 버그라고 할 수 없고 DWM정책에 따라 생겨난 부작용이라 한다.
+
+이를 보정하는 방법은 2가지가 있는데
+
+1.위 블로그처럼 해결하는 방법
+	- 장점 : 그나마 정석적인 처리 방법
+	- 단점 : 윈도우10과 Vista~는 처리코드가 약간 달라진다.
+
+2.border를 none이나 thin으로 하고 SetCursor와 OnMouseMove, OnLButtonDown을 이용하여 구현
+	- 장점 : resizable 영역의 크기를 원하는 만큼 줄 수 있다.
+	- 단점 : CResizeCtrl을 쓰면 Dialog에 자동으로 WM_THICKFRAME 속성이 부여되므로 이 방법을 쓸 수 없다.
+
+
+[1번 방법을 사용한 예]
+
+- dlg.h에 멤버변수 추가
+	CRect		m_border_thickness;
+
+
+- OnInitDialog()
+
+	//find border thickness
+	if (GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME)
+	{
+		AdjustWindowRectEx(&m_border_thickness, GetWindowLongPtr(m_hWnd, GWL_STYLE) & ~WS_CAPTION, FALSE, NULL);
+		m_border_thickness.left *= -1;
+		m_border_thickness.top *= -1;
+	}
+	else if (GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_BORDER)
+	{
+		SetRect(&m_border_thickness, 1, 1, 1, 1);
+	}
+
+	MARGINS margins = { 0 };
+	DwmExtendFrameIntoClientArea(m_hWnd, &margins);
+
+	m_resize.Create(this);
+	m_resize.Add(IDOK, 100, 100, 0, 0);
+	m_resize.Add(IDCANCEL, 100, 100, 0, 0);
+
+	RestoreWindowPosition(&theApp, this);
+
+
+- OnPaint()
+
+	//확인용 회색 사각형으로 채움
+	CPaintDC dc(this);
+	CRect rc;
+	GetClientRect(rc);
+	dc.FillSolidRect(rc, RGB(64, 64, 64));
+
+
+- OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
+
+	//resizing 상태를 감지하기 위한 마진 설정
+	if (lpncsp)
+	{
+		lpncsp->rgrc[0].left += m_border_thickness.left;
+		lpncsp->rgrc[0].right -= m_border_thickness.right;
+		lpncsp->rgrc[0].bottom -= m_border_thickness.bottom;
+		return;
+	}
+
+	CDialogEx::OnNcCalcSize(bCalcValidRects, lpncsp);
+
+
+- OnNcHitTest(CPoint point)
+
+	LRESULT result = CDialogEx::OnNcHitTest(point);
+
+	if (result == HTCLIENT)
+	{
+		ScreenToClient(&point);
+		if (point.y < m_border_thickness.top)
+			return HTTOP;
+	}
+
+	return result;
+	
+	/* window VISTA ~
+		enum {left=1, top=2, right=4, bottom=8};
+        int hit = 0;
+        if (pt.x < border_thickness.left) hit |= left;
+        if (pt.x > rc.right - border_thickness.right) hit |= right;
+        if (pt.y < border_thickness.top) hit |= top;
+        if (pt.y > rc.bottom - border_thickness.bottom) hit |= bottom;
+
+        if (hit & top && hit & left) return HTTOPLEFT;
+        if (hit & top && hit & right) return HTTOPRIGHT;
+        if (hit & bottom && hit & left) return HTBOTTOMLEFT;
+        if (hit & bottom && hit & right) return HTBOTTOMRIGHT;
+        if (hit & left) return HTLEFT;
+        if (hit & top) return HTTOP;
+        if (hit & right) return HTRIGHT;
+        if (hit & bottom) return HTBOTTOM;
+
+        return HTCLIENT;
+	*/
+	
+
+- OnNcActivate(BOOL bActive)
+	//이 처리를 해주지 않으면 activate 상태 변화가 생길때 흰색선이 보여진다.
+	return FALSE;
+	//return CDialogEx::OnNcActivate(bActive);

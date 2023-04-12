@@ -35,6 +35,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <random>
 #include <vector>
 #include <deque>
+#include <map>
 #include <algorithm>
 #include <gdiplus.h>
 
@@ -454,10 +455,10 @@ void		Trace(char* szFormat, ...);
 	int			get_int(CString& buff, CString sep = _T("|"));
 	double		get_double(CString& buff, CString sep = _T("|"));
 	//unit			: 0:bytes, 1:KB, 2:MB, 3:GB
+	//floats		: 소수점을 몇 자리까지 표시할지
 	//unit_string	: 단위를 표시할 지
 	//comma			: 정수 부분에 자리수 콤마를 표시할 지
-	//floats		: 소수점을 몇 자리까지 표시할지
-	CString		GetUnitSizeString(int64_t size, int unit = 3, int floats = 0, bool unit_string = true, bool comma = false);
+	CString		get_size_string(int64_t size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = false);
 
 	//src를 파싱해서 특정 길이 이상의 문자열들로 나눈다.
 	std::deque<CString> parse_divide(CString src, int len);
@@ -815,6 +816,7 @@ void		Trace(char* szFormat, ...);
 //쉘, 윈도우, 레지스트리, 시스템
 	CString		GetComputerNameString();
 	bool		GetWindowsVersion(OSVERSIONINFO& osversioninfo);
+	DWORD		GetWindowsVersion();
 	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor);
 	//bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwServicePack);
 	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform);
@@ -885,8 +887,8 @@ LONGLONG	GetDiskTotalSize( CString sDrive );
 CString		GetDiskSizeString( CString sDrive );	// "1.25G / 380.00G"
 //CString		GetHDDSerialNumber( int nPhysicalDrive );
 CString		GetHDDVolumeNumber( CString sDrive );
-std::deque<CString> get_drive_list(bool with_volume_name);
-CString		get_drive_volume(TCHAR cDrive);
+void		get_drive_map(std::map<TCHAR, CString> *drive_map);
+CString		get_drive_volume(TCHAR drive_letter);
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
 CString		convert_volume_to_real_path(CString volume_path);
 CString		convert_real_to_volume_path(CString real_path);

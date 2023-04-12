@@ -329,6 +329,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		pOldFont = dc.SelectObject(&m_font);
 	}
 
+	rect.right -= 10;
 	dc.DrawText(sText, rect, nFormat);
 
 	dc.SetTextColor(crText);
@@ -398,7 +399,7 @@ int CColorListBox::add_string(std::deque<CString> *lists, bool invalidate)
 	for (int i = 0; i < lists->size(); i++)
 		add_string(lists->at(i), GetSysColor(COLOR_WINDOWTEXT), ::GetSysColor(COLOR_WINDOW), invalidate);
 
-	return 0;
+	return lists->size();
 }
 
 //-------------------------------------------------------------------
@@ -625,31 +626,34 @@ void CColorListBox::OnKillFocus(CWnd* pNewWnd)
 
 int CColorListBox::set_path(CString root, CString selected_text)
 {
-	TRACE(_T("%s, root = %s\n"), __function__, root);
-
-	HWND hParent;
-
-	//hParent = ::GetWindow(m_hWnd, GW_OWNER);
-	//hParent = ::GetAncestor(m_hWnd, GA_PARENT);
-	//hParent = ::GetAncestor(m_hWnd, GA_ROOT);
-	//hParent = ::GetAncestor(m_hWnd, GA_ROOTOWNER);
-
-	ResetContent();
-
-	m_nOverItem = -1;
-	m_as_folder_list = true;
-	m_as_popup = true;
-
-	if (root == ROOT_LABEL)
+	if (root.IsEmpty())
 	{
 		m_folder_list.clear();
-		m_folder_list.push_back(_T("바탕 화면"));
 		m_folder_list.push_back(_T("내 PC"));
+		m_folder_list.push_back(_T("문서"));
+		m_folder_list.push_back(_T("바탕 화면"));
 	}
 	else
 	{
 		get_sub_folders(root, &m_folder_list, true);
 	}
+
+	return set_folder_list(NULL, selected_text);
+}
+
+int CColorListBox::set_folder_list(std::deque<CString>* lists, CString selected_text)
+{
+	ResetContent();
+
+	if (lists != NULL)
+	{
+		m_folder_list.clear();
+		m_folder_list.assign(lists->begin(), lists->end());
+	}
+
+	m_nOverItem = -1;
+	m_as_folder_list = true;
+	m_as_popup = true;
 
 	for (int i = 0; i < m_folder_list.size(); i++)
 	{
@@ -680,7 +684,7 @@ BOOL CColorListBox::OnLbnSelchange()
 	//TRACE(_T("selected = %s\n"), text);
 	if (m_as_folder_list && m_hParentWnd)
 	{
-		::SendMessage(m_hParentWnd, WM_USER_COLORLISTBOX_SELCHANGE, 0, (LPARAM)&text);
+		::SendMessage(m_hParentWnd, wm_message_colorlistbox_selchange, 0, (LPARAM)&text);
 		ShowWindow(SW_HIDE);
 	}
 

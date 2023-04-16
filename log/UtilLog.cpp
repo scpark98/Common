@@ -88,10 +88,13 @@ BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 
 		CreateDirectory(m_folder, NULL);
 
-		_tfopen_s(&m_fp, m_fullpath, _T("a+")CHARSET);
+		_tfopen_s(&m_fp, m_fullpath, _T("a")CHARSET);
 
 		if (m_fp == NULL)
+		{
+			AfxMessageBox(m_fullpath + _T("\nfopen failed. m_fp is null"));
 			return FALSE;
+		}
 
 		return TRUE;
 	}
@@ -129,7 +132,7 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 
 		if (m_fp == NULL)
 		{
-			if (!Init())
+			if (!Init(m_folder))
 			{
 				theCSLog.Unlock();
 				return result;

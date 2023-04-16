@@ -283,6 +283,8 @@ protected:
 	std::deque<int> m_column_data_type;
 	std::deque<int> m_column_text_align;
 
+	int				m_line_height = 16;
+
 //정렬 관련
 	bool			m_allow_sort;				//default = true
 	std::deque<int> m_column_sort_type;			//asceding or descending
@@ -317,6 +319,7 @@ protected:
 	int				m_font_size;
 	void			reconstruct_font();
 
+
 protected:
 	DECLARE_MESSAGE_MAP()
 public:
@@ -338,6 +341,7 @@ public:
 	//afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 //	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnDropFiles(HDROP hDropInfo);
+	afx_msg void MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 };
 
 

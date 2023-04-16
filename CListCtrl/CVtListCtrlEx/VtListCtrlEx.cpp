@@ -55,8 +55,8 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT_EX(LVN_ENDLABELEDIT, &CVtListCtrlEx::OnLvnEndlabeledit)
 	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CVtListCtrlEx::OnNMDblclk)
 	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CVtListCtrlEx::OnNMClickList)
-//	ON_WM_HSCROLL()
-ON_WM_DROPFILES()
+	ON_WM_DROPFILES()
+	ON_WM_MEASUREITEM_REFLECT()
 END_MESSAGE_MAP()
 
 
@@ -435,13 +435,19 @@ void CVtListCtrlEx::set_header_height(int height)
 		m_HeaderCtrlEx.set_header_height(height);
 }
 
+//line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과
+//MeasureItem을 이용하는 방법(OwnerDrawFixed only)이 있다.(강제 갱신 방법 아직 미해결)
 void CVtListCtrlEx::set_line_height(int height)
 {
-	CImageList gapImage;
+	m_line_height = height;
+	//reconstruct_font();
+	//RedrawItems(0, -1);
+	//UpdateWindow();
+	//RedrawWindow();
 
-	gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
-
-	SetImageList(&gapImage, LVSIL_SMALL);
+	//CImageList gapImage;
+	//gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
+	//SetImageList(&gapImage, LVSIL_SMALL);
 }
 
 void CVtListCtrlEx::set_column_width(int nCol, int cx)
@@ -1986,7 +1992,7 @@ void CVtListCtrlEx::reconstruct_font()
 
 	m_font_size = get_font_size();
 	
-	set_line_height(4-m_lf.lfHeight);
+	//set_line_height(4-m_lf.lfHeight);
 	//if (m_auto_line_height)
 		//recalculate_line_height();k
 	
@@ -2242,4 +2248,12 @@ DWORD CVtListCtrlEx::index_from_point(int x, int y)
 	}
 
 	return MAKELONG(-1, -1);
+}
+
+
+void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	lpMeasureItemStruct->itemHeight = m_line_height;
+	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }

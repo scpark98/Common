@@ -4158,8 +4158,8 @@ void IME_Convert_To_NativeCode(HWND hWnd, bool bNative)
 	
 	ImmReleaseContext(hWnd, hIMC);
 	*/
-	 HIMC himc=ImmGetContext(hWnd);
-    ImmSetConversionStatus(himc, (bNative ? IME_CMODE_NATIVE : IME_CMODE_ALPHANUMERIC),IME_SMODE_CONVERSATION);
+	HIMC himc=ImmGetContext(hWnd);
+    ImmSetConversionStatus(himc, (bNative ? IME_CMODE_NATIVE : IME_CMODE_ALPHANUMERIC), IME_SMODE_CONVERSATION);
     ImmReleaseContext(hWnd,himc);    
 	
 }

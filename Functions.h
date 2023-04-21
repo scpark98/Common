@@ -449,6 +449,20 @@ void		Trace(char* szFormat, ...);
 	int			GetTokenString(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty = true, int nMaxToken = -1);
 	int			getTokenString( TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken );
 	int			getTokenString( char *src, char *separator, char **sToken, int nMaxToken );
+
+	//[2023/1/1 22:1:29] [DBMS][NMS_LS_TERMINATE_SESSION_DATA][ID : tmax25][update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400']
+	//[]로 묶여진 토큰을 분리한다.
+	//괄호가 쌍이 안맞으면 false를 리턴한다.
+	bool		get_bracket_token(CString src, std::deque<CString>* token, TCHAR sep);
+
+	//update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400'
+	//위와 같은 sql에서 field와 value를 추출한다.
+	void		get_sql_token_from_assign_form(CString src, std::map<CString, CString> *map);
+	//insert into neturo_server_info(userid, com_name, s_pub_ip, s_pri_ip) values('14533821', 'DESKTOP-0CN9VAK', '220.85.215.243', 'publicIP')
+	//위와 같은 sql에서 field와 value를 추출한다.
+	void		get_sql_token_from_bracket_form(CString src, std::map<CString, CString>* map);
+	CString		get_sql_cmd(CString src, CString* sql_cmd = NULL, CString *table_name = NULL);
+
 	//deque에 있는 원소들을 구분자로 하는 하나의 문자열로 리턴
 	CString		get_tokenized(std::deque<CString> dq, TCHAR separator = ';');
 	CString		get_str(CString& buff, CString sep = _T("|"));
@@ -674,6 +688,7 @@ void		Trace(char* szFormat, ...);
 	bool		delete_file(CString fullpath, bool bTrashCan = false);
 	int			get_text_encoding(CString sfile);
 	bool		save(CString filepath, CString text);
+	bool		file_open(FILE** fp, CString mode, CString file);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
 	//MOBIS 프로젝트 저장 MP4는 mdat 필드의 0x40번지부터 28 bytes가
@@ -955,6 +970,9 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	bool		is_valid_date(CString str);
 	//시간 표시 형식에 맞는지 검사
 	bool		is_valid_time(CString str);
+
+	//날짜시각 형식을 yyyy/mm/dd hh:mm:ss 포맷으로 맞춘다.
+	void		normalize_datetime(CString &src);
 
 //타이머 관련
 	void		Wait(DWORD dwMillisecond);		//예전에는 OnTimer() 내에서는 동작되지 않았었는데 현재는 가능하다.

@@ -70,6 +70,8 @@ public:
 					m_bShowPercent = bShow;
 					Invalidate( FALSE );
 				}
+
+	void		show_text(bool show = true) { m_show_text = show; m_bShowPercent = false; Invalidate(); }
 	
 	COLORREF	GetColor( COLORREF crOrigin, int nOffset );
 	void		SetRange(int min, int max);
@@ -100,6 +102,7 @@ private:
 	bool		m_bUseSlider;		//true이면 슬라이드 컨트롤과 같이 조정할 수 있고 콜백함수를 호출한다.
 	bool		m_bDrawOutline;
 	BOOL		m_bShowPercent;
+	bool		m_show_text;
 	CString		m_sText;
 	COLORREF	m_cTextColor;
 	BOOL		m_bGradient;		//default = false

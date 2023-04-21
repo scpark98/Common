@@ -92,7 +92,7 @@ BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 
 		if (m_fp == NULL)
 		{
-			AfxMessageBox(m_fullpath + _T("\nfopen failed. m_fp is null"));
+			//AfxMessageBox(m_fullpath + _T("\nfopen failed. m_fp is null"));
 			return FALSE;
 		}
 

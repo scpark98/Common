@@ -1280,6 +1280,12 @@ int CVtListCtrlEx::add_item(CString text, bool ensureVisible, bool invalidate)
 	return insert_item(-1, text, ensureVisible, invalidate);
 }
 
+int CVtListCtrlEx::add_line_string_item(CString line_string, CString separator, bool ensureVisible, bool invalidate)
+{
+	std::deque<CString> dq = GetTokenString(line_string, separator);
+	return insert_item(-1, dq, ensureVisible, invalidate);
+}
+
 //index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
 int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool invalidate)
 {
@@ -1494,7 +1500,7 @@ int CVtListCtrlEx::get_selected_index(int start)
 
 int CVtListCtrlEx::get_last_selected_item()
 {
-	for ( int i = GetItemCount() - 1; i >= 0; i-- )
+	for ( int i = size() - 1; i >= 0; i-- )
 	{
 		if (GetItemState(i, LVIS_SELECTED))
 			return i;
@@ -1806,6 +1812,7 @@ bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString
 
 	return TRUE;
 }
+
 #if 0
 void CVtListCtrlEx::paste_from_clipboard()
 {
@@ -1890,23 +1897,25 @@ void CVtListCtrlEx::paste_from_clipboard()
 
 	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), 0);
 }
+#endif
 
 //파일에서 불러와서 리스트를 채웝芩. 컬럼의 수가 동일해야 한다.
 //컬럼 구성이 다른 데이터 파일들을 알아서 불러오햨E않는다.
 //이미 컬럼의 구성이 픽스되푳E있컖E그 구성으로 저장된 파일만 불러오도록 되푳E있다.
-bool CVtListCtrlEx::load_from_file( CString sfile, CString separator /*= _T("|")*/, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/ )
+bool CVtListCtrlEx::load( CString sfile, CString separator /*= _T("|")*/, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/ )
 {
-	if ( GetColumnCount() == 0 )
+	if (get_column_count() == 0)
 		return false;
 
-	if ( reset_before_load )
-		DeleteAllItems();
+	if (reset_before_load)
+		delete_all_items();
 
 	int		i, j;
 	TCHAR	sLine[512];
 	CString str;
 
-	FILE	*fp = _tfopen( sfile, _T("rt") );
+	FILE* fp;
+	file_open(&fp, _T("rt"), sfile);
 
 	if ( fp == NULL )
 		return false;
@@ -1914,12 +1923,12 @@ bool CVtListCtrlEx::load_from_file( CString sfile, CString separator /*= _T("|")
 
 	while (_fgetts( sLine, 512, fp ))
 	{
-		if ( match_column_count && (get_char_count(sLine, separator[0])) >= GetColumnCount() )
+		if ( match_column_count && (get_char_count(sLine, separator[0])) >= get_column_count() )
 		{
 			fclose(fp);
 			return false;
 		}
-		AddLineStringItem( CString(sLine), separator );
+		add_line_string_item(CString(sLine), separator);
 	}
 
 	fclose(fp);
@@ -1927,51 +1936,55 @@ bool CVtListCtrlEx::load_from_file( CString sfile, CString separator /*= _T("|")
 }
 
 //리스트의 내퓖E?파일로 저장한다.
-bool CVtListCtrlEx::save_to_file( CString sfile, CString separator /*= _T("|")*/, bool includeHeader /*= false*/ )
+bool CVtListCtrlEx::save(CString sfile, CString separator /*= _T("|")*/, bool selected_only /*= false*/ )
 {
 	int		i, j;
 	CString str = _T("");
 
-	if ( GetItemCount() == 0 )
+	if (size() == 0)
 		return false;
 
-	FILE	*fp = _tfopen( sfile, _T("wt") );
+	FILE* fp;
+	
+	_tfopen_s(&fp, sfile, _T("wt")CHARSET);
 
-	if ( fp == NULL )
+	if (fp == NULL)
 		return false;
 
-	if ( includeHeader )
+	if (true)//includeHeader)
 	{
-		for ( i = 0; i < GetColumnCount(); i++ )
+		for (i = 0; i < get_column_count(); i++)
 		{
-			if ( i < GetColumnCount() - 1 )
-				str = str + GetColumnText(i) + separator;
+			if (i < get_column_count() - 1)
+				str = str + get_header_text(i) + separator;
 			else
-				str += GetColumnText(i);
+				str += get_header_text(i);
 		}
 
-		_ftprintf( fp, _T("%s\n"), str );
+		_ftprintf(fp, _T("%s\n"), str);
 	}
 
-	for ( i = 0; i < GetItemCount(); i++ )
+	for (i = 0; i < size(); i++)
 	{
 		str = _T("");
 
-		for ( j = 0; j < GetColumnCount(); j++ )
+		if (selected_only && GetItemState(i, LVIS_SELECTED) != LVIS_SELECTED)
+			continue;
+
+		for (j = 0; j < get_column_count(); j++)
 		{
-			if ( j < GetColumnCount() - 1 )
-				str = str + GetItemText(i, j) + separator;
+			if (j < get_column_count() - 1)
+				str = str + get_text(i, j) + separator;
 			else
-				str += GetItemText(i, j);
+				str += get_text(i, j);
 		}
 
-		_ftprintf( fp, _T("%s\n"), str );
+		_ftprintf(fp, _T("%s\n"), str);
 	}
 
-	fclose( fp );
+	fclose(fp);
 	return true;
 }
-#endif
 
 //이 함수에서는 m_lf 정보를 이용해서 폰트를 재생성한다.
 //즉, m_lf.lfHeight 값을 이용해서 폰트가 만들어지므로

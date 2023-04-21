@@ -122,20 +122,22 @@ void CMacProgressCtrl::OnPaint()
 	CBrush brBack( m_crBackColor );
 	//TRACE(_T("%ld : %S\n"), GetTickCount(), __FUNCTION__);
 
+	int pos = GetPos();
+
 	//우선 투명은 패스하자.
 	if ( m_bTransparent )
 	{
 		if (bVertical)
 		{
 			if (!m_bIndeterminate)
-				rect.top = rect.bottom - int(((float)rect.Height() * float(GetPos() - m_lower)) / float(m_upper - m_lower));
+				rect.top = rect.bottom - int(((float)rect.Height() * float(pos - m_lower)) / float(m_upper - m_lower));
 			dc.FillRect(rect, &brLightest);
 			DrawVerticalBar(&dc, rect);
 		}
 		else
 		{
 			if (!m_bIndeterminate)
-				rect.right = int(((float)rect.Width() * float(GetPos() - m_lower)) / float(m_upper - m_lower));
+				rect.right = int(((float)rect.Width() * float(pos - m_lower)) / float(m_upper - m_lower));
 
 			//CBrush brTrans;
 			//brTrans.FromHandle( (HBRUSH)GetStockObject(NULL_BRUSH) );
@@ -145,7 +147,7 @@ void CMacProgressCtrl::OnPaint()
 		}
 /*
 		if ( m_bShowPercent )
-			m_sText.Format( "%.0f %%", (double)(GetPos() - m_lower) / (double)(m_upper - m_lower) * 100.0 );
+			m_sText.Format( "%.0f %%", (double)(pos - m_lower) / (double)(m_upper - m_lower) * 100.0 );
 
 		if ( m_sText != "" )
 		{
@@ -184,7 +186,7 @@ void CMacProgressCtrl::OnPaint()
 		if (bVertical)
 		{
 			if (!m_bIndeterminate)
-				rect.top = rect.bottom - int(((float)rect.Height() * float(GetPos() - m_lower)) / float(m_upper - m_lower));
+				rect.top = rect.bottom - int(((float)rect.Height() * float(pos - m_lower)) / float(m_upper - m_lower));
 
 			if ( m_bGradient )
 			{
@@ -200,8 +202,7 @@ void CMacProgressCtrl::OnPaint()
   		{
 			if ( !m_bIndeterminate )
 			{
-				int pos = GetPos();
-				rect.right = int(((float)rect.Width() * float(GetPos() - m_lower)) / float(m_upper - m_lower));
+				rect.right = int(((float)rect.Width() * float(pos - m_lower)) / float(m_upper - m_lower));
 				//TRACE( _T("pos = %d, right = %d\n"), pos, rect.right );
 
 				if ( m_bGradient )
@@ -214,13 +215,16 @@ void CMacProgressCtrl::OnPaint()
 		}
 
 
-		if ( m_bShowPercent )
+		if (m_bShowPercent)
 		{
-			//CString str;
-			//str.Format(_T("%ld / %ld"), m_nPos, (m_nMax > 0 ? m_nMax : 0));
-			//dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-			m_sText.Format( _T("%.1f %%"), (double)(GetPos() + 0) / (double)(m_upper - m_lower) * 100.0 );
+			if (m_upper - m_lower == 0)
+				m_sText.Format(_T("%0.0 %%"));
+			else
+				m_sText.Format( _T("%.1f %%"), (double)(pos + 0) / (double)(m_upper - m_lower) * 100.0 );
+		}
+		else if (m_show_text)
+		{
+			m_sText.Format(_T("%ld / %ld"), pos, m_upper - m_lower);
 		}
 
 		if ( m_sText != _T("") )
@@ -229,13 +233,16 @@ void CMacProgressCtrl::OnPaint()
 
 			dc.SetBkMode( TRANSPARENT );
 
-			rect1.OffsetRect( 1, 0 );
-			dc.SetTextColor( RGB(0,0,0) );
-			dc.DrawText( m_sText, rect1, DT_SINGLELINE | DT_CENTER | DT_VCENTER );
+			if (m_bTextShadow)
+			{
+				rect1.OffsetRect(1, 0);
+				dc.SetTextColor(m_crShadow);
+				dc.DrawText(m_sText, rect1, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+				rect1.OffsetRect(-1, -1);
+			}
 
-			rect1.OffsetRect( -1, -1 );
-			dc.SetTextColor( m_cTextColor );
-			dc.DrawText( m_sText, rect1, DT_SINGLELINE | DT_CENTER | DT_VCENTER );
+			dc.SetTextColor(m_cTextColor);
+			dc.DrawText(m_sText, rect1, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 		}
 
 		//dcPaint.BitBlt(rectClient.left, rectClient.top, rectClient.Width(), rectClient.Height(), 
@@ -821,6 +828,8 @@ void CMacProgressCtrl::SetRange(int lower, int upper)
 void CMacProgressCtrl::SetPos(int pos)
 {
 	CProgressCtrl::SetPos(pos);
+	Invalidate();
+
 	if (m_auto_hide && (pos >= m_upper || pos < 0))
 		ShowWindow(SW_HIDE);
 }

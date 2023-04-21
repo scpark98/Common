@@ -1,5 +1,6 @@
 #include <afxinet.h>	// for Internet
 #include <string>
+#include <utility>
 #include <filesystem>
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
@@ -4810,6 +4811,19 @@ bool save(CString filepath, CString text)
 	return true;
 }
 
+bool file_open(FILE** fp, CString mode, CString file)
+{
+	//encording 방식을 읽어온다.
+	int	text_encoding = get_text_encoding(file);
+
+	if (text_encoding <= text_encoding_ansi)
+		_tfopen_s(fp, file, mode);
+	else
+		_tfopen_s(fp, file, mode + CHARSET);
+
+	return (fp == NULL ? false : true);
+}
+
 //시작폴더 및 하위 폴더들은 여전히 남아있다.
 //폴더 통째로 다 지우려면 코드의 수정이 필요하다.
 int	delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive /*= true*/, bool trash_can /*= false*/)
@@ -5000,6 +5014,7 @@ void DeleteFilesBySubString(CString sFolder, CString filenameSubStr, bool bMatch
 }
 
 #include "Shlwapi.h"
+#include <regex>
 #pragma comment(lib, "shlwapi") 
 
 //usage : sFolder include folder names only except file name.
@@ -7283,6 +7298,148 @@ CString	get_tokenized(std::deque<CString> dq, TCHAR separator)
 		res = res + dq[i] + separator;
 
 	return res;
+}
+
+bool get_bracket_token(CString src, std::deque<CString>* token, TCHAR bracket)
+{
+	CString sub;
+	TCHAR end_bracket;
+	int start = src.Find(bracket);
+	int end;
+
+	if (token)
+		token->clear();
+
+	if (bracket == '[')
+		end_bracket = ']';
+	else if (bracket == '(')
+		end_bracket = ')';
+	else if (bracket == '{')
+		end_bracket = '}';
+	else
+		return false;
+
+	if (start < 0)
+		return false;
+
+	while (true)
+	{
+		end = src.Find(end_bracket, start);
+		//시작 괄호는 있는데 끝 괄호가 없다면 정상이 아니다.
+		//정상인 데이터만 사용할지, 에러라면 무조건 버릴지는 사용하는 곳에서 판단한다.
+		if (end < 0)
+			return false;
+
+		sub = src.Mid(start + 1, end - start - 1);
+		token->push_back(sub);
+		start = src.Find(bracket, end + 1);
+
+		//더 이상 시작 괄호가 없다면 종료.
+		if (start < 0)
+			break;
+	}
+
+	return true;
+}
+
+//update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400'
+//위와 같은 형식에서 필드명과 값을 추출한다.
+//fields에는 추출할 필드명을 넘겨준다. "endtime", "env_type"...
+void get_sql_token_from_assign_form(CString src, std::map<CString, CString> *map)
+{
+	std::string sql;
+	std::regex pattern("(\\w+)\\s*=\\s*'([^']*)'");
+
+	sql = CString2string(src);
+	map->clear();
+
+	std::sregex_iterator iter(sql.begin(), sql.end(), pattern);
+	std::sregex_iterator end;
+
+
+	while (iter != end)
+	{
+		map->insert(std::make_pair(CString((*iter)[1].str().c_str()), CString((*iter)[2].str().c_str())));
+		//fieldNames.push_back((*iter)[1].str());
+		//values.push_back((*iter)[2].str());
+		++iter;
+	}
+}
+
+//insert into neturo_server_info(userid, com_name, s_pub_ip, s_pri_ip) values('14533821', 'DESKTOP-0CN9VAK', '220.85.215.243', 'publicIP')
+//위와 같은 sql에서 field와 value를 추출한다.
+void get_sql_token_from_bracket_form(CString src, std::map<CString, CString>* map)
+{
+	std::string sql;
+	std::regex pattern("\\((.*)\\)\\s*values\\s*\\((.*)\\)");
+
+	sql = CString2string(src);
+	map->clear();
+
+	std::vector<std::string> fieldNames;
+	std::vector<std::string> values;
+
+	std::smatch matches;
+	if (std::regex_search(sql, matches, pattern))
+	{
+		std::string fieldNamesStr = matches[1].str();
+		std::string valuesStr = matches[2].str();
+
+		// Split the field names and values
+		std::regex fieldPattern("(\\w+)(,\\s*|$)");
+		std::sregex_iterator fieldIter(fieldNamesStr.begin(), fieldNamesStr.end(), fieldPattern);
+		std::sregex_iterator fieldEnd;
+		while (fieldIter != fieldEnd) {
+			fieldNames.push_back((*fieldIter)[1].str());
+			++fieldIter;
+		}
+
+		std::regex valuePattern("'(.*?)'(,\\s*|$)");
+		std::sregex_iterator valueIter(valuesStr.begin(), valuesStr.end(), valuePattern);
+		std::sregex_iterator valueEnd;
+		while (valueIter != valueEnd) {
+			values.push_back((*valueIter)[1].str());
+			++valueIter;
+		}
+
+		for (int i = 0; i < std::min(fieldNames.size(), values.size()); i++)
+			map->insert(std::make_pair(CString(fieldNames[i].c_str()), CString(values[i].c_str())));
+	}
+}
+
+CString get_sql_cmd(CString sql, CString* sql_cmd, CString *table_name)
+{
+	sql.Trim();
+	sql.MakeLower();
+
+	std::deque<CString> sql_cmd_list = { "select", "insert into", "update", "delete", };
+										 //"create", "alter", "drop", "rename", "truncate",
+										 //"commit", "rollback", "savepoint",
+										 //"grant", "revoke",};
+	CString cmd = _T("");
+
+	//src가 sql_cmd로 시작되는 문장이면 true
+	for (int i = 0; i < sql_cmd_list.size(); i++)
+	{
+		if (sql.Find(sql_cmd_list[i]) == 0)
+		{
+			cmd = sql_cmd_list[i];
+			break;
+		}
+	}
+
+	if (sql_cmd)
+		*sql_cmd = cmd;
+
+	if (table_name)
+	{
+		sql = sql.Mid(cmd.GetLength() + 1);
+		//table_name 다음에는 공백 또는 '('가 오므로 그 위치를 찾는다.
+		int pos = sql.FindOneOf(_T(" ("));
+		*table_name = sql.Left(pos);
+	}
+
+	return cmd;
 }
 
 CString get_str(CString& buff, CString sep)
@@ -13411,6 +13568,52 @@ bool is_valid_time(CString str)
 	return true;
 }
 
+//날짜시각 형식을 yyyy/mm/dd hh:mm:ss 포맷으로 맞춘다.
+//230303192736			//최소한의 길이는 12
+//23/3/3 9:7:6			//최소한의 길이는 12
+//2023/3/3 9:7:6
+//=>2023/03/14 19:27:36.123	//최대길이는 23
+void normalize_datetime(CString &src)
+{
+	CString result;
+
+	if (src.GetLength() < 12)
+		return;
+
+	std::deque<CString> token;
+
+	if (src[2] == '-')
+		src.Replace('-', '/');
+	if (src[2] == '/')
+		src = _T("20") + src;
+
+	if (src.Find(' ') < 0)
+		return;
+
+	CString sub = src.Left(src.Find(' '));
+	GetTokenString(sub, token, '/');
+	if (token.size() != 3)
+		return;
+
+	int y = _ttoi(token[0]);
+	int M = _ttoi(token[1]);
+	int d = _ttoi(token[2]);
+
+	result.Format(_T("%d/%02d/%02d "), y, M, d);
+
+
+	sub = src.Mid(src.Find(' ') + 1);
+	GetTokenString(sub, token, ':');
+	if (token.size() != 3)
+		return;
+
+	int h = _ttoi(token[0]);
+	int m = _ttoi(token[1]);
+	int s = _ttoi(token[2]);
+
+	result.Format(_T("%s%02d:%02d:%02d"), result, h, m, s);
+	src = result;
+}
 
 //수행시간을 측정하는데
 //고정밀 측정은 QueryPerformanceFrequency와 QueryPerformanceCounter를 이용한다.

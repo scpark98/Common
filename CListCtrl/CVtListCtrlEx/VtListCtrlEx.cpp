@@ -1910,7 +1910,7 @@ bool CVtListCtrlEx::load( CString sfile, CString separator /*= _T("|")*/, bool m
 	if (reset_before_load)
 		delete_all_items();
 
-	int		i, j;
+	//int		i, j;
 	TCHAR	sLine[512];
 	CString str;
 

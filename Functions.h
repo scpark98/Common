@@ -439,8 +439,19 @@ void		Trace(char* szFormat, ...);
 	//excepts¿¡´Â Æ÷ÇÔµÇµµ µÇ´Â ¹®ÀÚ¿­µéÀÌ µé¾îÀÖ´Âµ¥ ÀÌµéÀº ;À¸·Î ±¸ºĞµÇ¾î ÀÖ°í
 	//°Ë»çÇÏ±â Àü¿¡ ¹Ì¸® »èÁ¦ÇÑ ÈÄ °Ë»çÇÑ´Ù.
 	bool		IsAlphaNumeric(CString str, CString excepts = _T(""));
-	//ÇÑ±Û·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö
+
+	//ASCII ÄÚµåÀÇ #33(0x21)(' ') ~ #126(0x7E)('~') ¹üÀ§ÀÎÁö(ÀĞÀ» ¼ö ÀÖ´Â ¹®ÀÚ¿­ÀÎÁö)
+	bool		is_readable_char(CString src);
+
+	//'°¡'~'ÆR'¹üÀ§ÀÇ ÇÑ±Û·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö °Ë»çÇÑ´Ù.
 	bool		is_hangul(CString str);
+
+	//¹®ÀÚ¿­ÀÌ ¿ÂÀüÇÑÁö ±úÁø ¹®ÀÚÀÎÁö¸¦ ÆÇº°(Æ¯È÷ ÇÑ±Û ÀÎÄÚµù ±úÁü ÆÇº°)
+	bool		is_valid_string(CString src, bool include_hangul);
+
+	//¿Ï¼ºÇü ÇÑ±ÛÀÇ ÇÑ ±ÛÀÚ¸¦ ÃÊ¼º, Áß¼º, Á¾¼ºÀ¸·Î ºĞ¸®ÇÑ´Ù.
+	bool		get_consonant(CString src, wchar_t* cho = 0, wchar_t* jung = 0, wchar_t* jong = 0);
+
 	CString		ConvertInt2AZ( int n );	//nÀ» 26Áø¼ö ¿¢¼¿ ÄÃ·³ ÀÎµ¦½º·Î º¯È¯ÇÑ ¹®ÀÚ¿­À» ¸®ÅÏ
 	CString		GetToken( CString& str, LPCTSTR c );
 	CString		GetToken( CString src, CString separator, int n );
@@ -1048,6 +1059,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 								Gdiplus::Color crShadow = Gdiplus::Color::Red);
 
 	//textÀÇ Ãâ·ÂÇÈ¼¿ ³Êºñ°¡ max_width¸¦ ³ÑÀ» °æ¿ì ...¿Í ÇÔ²² Ç¥½ÃµÉ ¹®ÀÚÀ§Ä¡¸¦ ¸®ÅÏ.
+	//ÀÌ ÇÔ¼ö´Â DrawText½Ã¿¡ DT_END_ELLIPSIS¸¦ Áà¼­ »ç¿ëÇÏ¹Ç·Î ¿ì¼± »ç¿ë º¸·ù!
 	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);
 
 	//20220914 DrawLine°ú DrawLinePt¸¦ °°Àº ÀÌ¸§À¸·Î ÇÏ´Ï ¸ğÈ£ÇÏ´Ù´Â ¿¡·¯°¡ ¹ß»ıÇÏ¿© DrawLinePt·Î º¯°æ.

@@ -119,7 +119,7 @@ void CStaticEx::OnPaint()
 
 	GetClientRect(rc);
 
-	CMemoryDC	dc( &dc1, &rc, true );
+	CMemoryDC	dc(&dc1, &rc);
 
 	if ( m_ImageBack.m_hImageList != NULL )
 	{

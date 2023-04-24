@@ -1741,10 +1741,21 @@ bool IsAlphaNumeric(CString str, CString excepts)
 	return true;
 }
 
-//ÇÑ±Û·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö
+//ASCII ÄÚµåÀÇ #33(0x21)(' ') ~ #126(0x7E)('~') ¹üÀ§ÀÎÁö(ÀÐÀ» ¼ö ÀÖ´Â ¹®ÀÚ¿­ÀÎÁö)
+bool is_readable_char(CString src)
+{
+	for (int i = 0; i < src.GetLength(); i++)
+	{
+		if (src[i] < 33 || src[i] > '~')
+			return false;
+	}
+
+	return true;
+}
+
+//'°¡'~'ÆR'¹üÀ§ÀÇ ÇÑ±Û·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö °Ë»çÇÑ´Ù.
 bool is_hangul(CString str)
 {
-	int len = str.GetLength();
 	const wchar_t start_ch = L'°¡';
 	const wchar_t end_ch = L'ÆR';
 
@@ -1756,6 +1767,55 @@ bool is_hangul(CString str)
 
 	return true;
 }
+
+static const char* const initial_array[] = {
+	"¤¡", "¤¢", "¤¤", "¤§", "¤¨", "¤©", "¤±", "¤²", "¤³", "¤µ",
+	"¤¶", "¤·", "¤¸", "¤¹", "¤º", "¤»", "¤¼", "¤½", "¤¾"
+};
+static const char* const medial_array[] = {
+	"¤¿", "¤À", "¤Á", "¤Â", "¤Ã", "¤Ä", "¤Å", "¤Æ", "¤Ç", "¤È",
+	"¤É", "¤Ê", "¤Ë", "¤Ì", "¤Í", "¤Î", "¤Ï", "¤Ð", "¤Ñ", "¤Ò",
+	"¤Ó"
+};
+static const char* const final_array[] = {
+	  "", "¤¡", "¤¢", "¤£", "¤¤", "¤¥", "¤¦", "¤§", "¤©", "¤ª",
+	"¤«", "¤¬", "¤­", "¤®", "¤¯", "¤°", "¤±", "¤²", "¤´", "¤µ",
+	"¤¶", "¤·", "¤¸", "¤º", "¤»", "¤¼", "¤½", "¤¾"
+};
+
+//¹®ÀÚ¿­ÀÌ ¿ÂÀüÇÑÁö ±úÁø ¹®ÀÚÀÎÁö¸¦ ÆÇº°(Æ¯È÷ ÇÑ±Û ÀÎÄÚµù ±úÁü ÆÇº°)
+//"ÇÑ±Û'??œí†µ??¬ì—°ì»×Ý¨íŠ¸?´ìž¬??"
+bool is_valid_string(CString src, bool include_hangul)
+{
+	int i;
+	TCHAR ch;
+
+	for (i = 0; i < src.GetLength(); i++)
+	{
+		ch = src[i];
+		if ((ch < ' ' || ch > '~') && (!include_hangul || !is_hangul(ch)))
+			return false;
+	}
+
+	return true;
+}
+
+//¿Ï¼ºÇü ÇÑ±ÛÀÇ ÇÑ ±ÛÀÚ¸¦ ÃÊ¼º, Áß¼º, Á¾¼ºÀ¸·Î ºÐ¸®ÇÑ´Ù.
+bool get_consonant(CString src, wchar_t* cho, wchar_t* jung, wchar_t* jong)
+{
+	const wchar_t *tsrc = src;
+	//wchar_t *asdf = L"ÇÑ";
+	wchar_t uniValue = *tsrc - 0xAC00;
+	*jong = uniValue % 28;
+	*jung = ((uniValue - *jong) / 28) % 21;
+	*cho = ((uniValue - *jong) / 28) / 21;
+
+	//CString c(initial_array[cho]);
+	//CString j(jung + 0x1161);
+	//CString o(jong + 0x11a7);
+	return true;
+}
+
 
 bool IsNatural(LPCTSTR lpszValue)
 {
@@ -5256,6 +5316,7 @@ void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int d
 }
 
 //textÀÇ Ãâ·ÂÇÈ¼¿ ³Êºñ°¡ max_width¸¦ ³ÑÀ» °æ¿ì ...¿Í ÇÔ²² Ç¥½ÃµÉ ¹®ÀÚÀ§Ä¡¸¦ ¸®ÅÏ.
+//ÀÌ ÇÔ¼ö´Â DrawText½Ã¿¡ DT_END_ELLIPSIS¸¦ Áà¼­ »ç¿ëÇÏ¹Ç·Î ¿ì¼± »ç¿ë º¸·ù!
 int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 {
 	CRect rt;
@@ -5281,6 +5342,8 @@ int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 			return i;
 		}
 	}
+
+	return 0;
 }
 
 void DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)

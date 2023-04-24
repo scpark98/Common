@@ -18,9 +18,12 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
 
 [1번 방법을 사용한 예]
 
-- dlg.h에 멤버변수 추가
+* dlg.h에 멤버변수 추가
 	CRect		m_border_thickness;
 
+
+* dlg.cpp에
+	#pragma comment(lib, "Dwmapi.lib")
 
 - OnInitDialog()
 
@@ -54,6 +57,13 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
 	GetClientRect(rc);
 	dc.FillSolidRect(rc, RGB(64, 64, 64));
 
+
+//WM_NCACTIVATE, WM_NCCALCSIZE, WM_NCHITTEST 를 추가
+
+- OnNcActivate(BOOL bActive)
+	//이 처리를 해주지 않으면 activate 상태 변화가 생길때 흰색선이 보여진다.
+	return FALSE;
+	//return CDialogEx::OnNcActivate(bActive);
 
 - OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
@@ -103,7 +113,3 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
 	*/
 	
 
-- OnNcActivate(BOOL bActive)
-	//이 처리를 해주지 않으면 activate 상태 변화가 생길때 흰색선이 보여진다.
-	return FALSE;
-	//return CDialogEx::OnNcActivate(bActive);

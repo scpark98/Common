@@ -246,7 +246,7 @@ void CHeaderCtrlEx::SetColumnText( int nColumn, CString sText )
 
 	GetItem( nColumn, &hdItem );
 
-	sprintf_s(hdItem.pszText, countof(hdItem.pszText), _T("%s"), sText);
+	//_stprintf_s(hdItem.pszText, _countof(hdItem.pszText), _T("%s"), sText);
 	SetItem(nColumn, &hdItem);
 }
 

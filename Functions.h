@@ -387,7 +387,12 @@ void		Trace(char* szFormat, ...);
 	HWND		GetHWNDbyPID(ULONG pid);
 	CString		GetProcessNameByPID(const DWORD pid);
 	bool		IsRunning(CString processname);
+	
 	bool		KillProcess(CString processname);
+	//프로세스 강제 종료.
+	//return value : 1 : killed, 0 : fail to kill, -1 : not found
+	bool		ProcessKill(CString szProcessName);
+
 	HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 	bool		IsDuplicatedRun();
 	CString		run_process(CString exePath, bool wait_process_exit);

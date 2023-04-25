@@ -9217,7 +9217,6 @@ bool KillProcess(CString szFilename)
 	return false;
 }
 
-#if 0
 //프로세스 강제 종료.
 //return value : 1 : killed, 0 : fail to kill, -1 : not found
 bool ProcessKill(CString szProcessName)
@@ -9250,7 +9249,6 @@ end:
 
 	return result;
 }
-#endif
 
 static HWND shWndCurWnd;
 

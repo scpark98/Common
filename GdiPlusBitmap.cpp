@@ -587,7 +587,7 @@ int CGdiplusBitmap::channels()
 	return 3;
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, CGdiplusBitmap mask1, CRect targetRect)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect targetRect)
 {
 	CGdiplusBitmap temp;
 	temp.load(_T("d:\\temp\\mask.bmp"));
@@ -631,10 +631,9 @@ CRect CGdiplusBitmap::draw(CDC* pDC, CGdiplusBitmap mask1, CRect targetRect)
 	//save(&mask, _T("d:\\temp\\mask.bmp"));
 
 	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
-	Graphics g(pDC->m_hDC);
 
-	g.DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
-	g.DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
+	g->DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
+	g->DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
 	
 	//CRect r = GetRatioRect(targetRect, (double)width / (double)height);
 	//Graphics g(pDC->m_hDC);
@@ -642,15 +641,14 @@ CRect CGdiplusBitmap::draw(CDC* pDC, CGdiplusBitmap mask1, CRect targetRect)
 
 	return r;
 }
-CRect CGdiplusBitmap::draw(CDC* pDC, CRect targetRect)
+
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics *g, CRect targetRect)
 {
-	
 	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
-	draw(pDC, r.left, r.top, r.Width(), r.Height());
-	return r;
+	return draw(g, r.left, r.top, r.Width(), r.Height());
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, int dx, int dy, int dw, int dh)
 {
 	if (dw <= 0)
 		dw = width;
@@ -663,8 +661,6 @@ CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
 	//Graphics를 이용하여 그리기
 	//if (true)
 	{
-		Graphics g(pDC->m_hDC);
-
 		//256 gray scale이미지가 올바르게 표시되지 않는다.
 		if (channel == 1)
 		{
@@ -678,11 +674,11 @@ CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
 			
 			//save(_T("d:\\temp\\converted.bmp"));
 			*/
-			g.DrawImage(m_pBitmap, dx, dy, dw, dh);
+			g->DrawImage(m_pBitmap, dx, dy, dw, dh);
 		}
 		else
 		{
-			g.DrawImage(m_pBitmap, dx, dy, dw, dh);
+			g->DrawImage(m_pBitmap, dx, dy, dw, dh);
 		}
 	}
 	//StretchBlt를 이용하여 그리기

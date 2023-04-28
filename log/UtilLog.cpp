@@ -2,6 +2,8 @@
 #include "UtilLog.h"
 #include <afxmt.h>
 
+#include "../Functions.h"
+
 CCriticalSection theCSLog;
 
 UtilLog* pLog = NULL;
@@ -86,7 +88,8 @@ BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 		m_filename.Format(_T("%s[%d%02d%02d].log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
 		m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
 
-		CreateDirectory(m_folder, NULL);
+		//CreateDirectory(m_folder, NULL);
+		make_full_directory(m_folder);
 
 		_tfopen_s(&m_fp, m_fullpath, _T("a")CHARSET);
 

@@ -102,7 +102,8 @@ t2 c, d; // c is 'int*' and d is 'int'
 
 #define GDIPVER 0x0110
 
-#define		TO_STRING(a) #a
+#define		ENUM_TO_STRING(a) #a
+#define		ENUM_TO_CSTRING(a) CString(#a)
 #define		ID2String(ID, sID) sID.Format( "%s", #ID )	
 
 #define		Swap32BE(x) ((((x) & 0xff000000) >> 24) | (((x) & 0xff0000) >> 8) | (((x) & 0xff00) << 8) | (((x) & 0xff) << 24))

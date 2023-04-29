@@ -797,9 +797,14 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 							}
 							break;
 		case VK_F2		:	if ( m_in_editing )
+							{
 								return true;
+							}
 							else
+							{
 								edit_item(get_selected_index(), m_edit_subItem );
+								return true;
+							}
 							break;
 		/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.

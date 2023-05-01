@@ -857,9 +857,9 @@ uint64_t get_folder_size(CString path)
 
 //unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
 //unit_string	: 단위를 표시할 지 (default = true)
-CString		GetFileSizeString(CString sfile, int unit_limit, int floats, bool unit_string)
+CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_string)
 {
-	return get_size_string(GetFileSize(sfile), unit_limit, floats, unit_string);
+	return get_size_string(GetFileSize(sfile), unit, floats, unit_string);
 }
 
 //unit			: 0:bytes, 1:KB, 2:MB, 3:GB

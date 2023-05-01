@@ -436,7 +436,11 @@ void CVtListCtrlEx::set_header_height(int height)
 }
 
 //line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과
-//MeasureItem을 이용하는 방법(OwnerDrawFixed only)이 있다.(강제 갱신 방법 아직 미해결)
+//(실제 사용할 이미지리스트가 있는 경우는 위 방법을 사용할 수 없다)
+//MeasureItem을 이용하는 방법(OwnerDrawFixed only)이 있다.
+//(강제 갱신 방법 아직 미해결이며 resize를 하면 자동 적용되므로
+//우선은 mainDlg에서 이 함수 호출후에 RestoreWindowPosition()등과 같이
+//WM_SIZE가 발생하는 함수를 사용하면 된다)
 void CVtListCtrlEx::set_line_height(int height)
 {
 	m_line_height = height;

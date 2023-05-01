@@ -489,7 +489,7 @@ void		Trace(char* szFormat, ...);
 	//floats		: 소수점을 몇 자리까지 표시할지
 	//unit_string	: 단위를 표시할 지
 	//comma			: 정수 부분에 자리수 콤마를 표시할 지
-	CString		get_size_string(int64_t size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = false);
+	CString		get_size_string(int64_t size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = true);
 
 	//src를 파싱해서 특정 길이 이상의 문자열들로 나눈다.
 	std::deque<CString> parse_divide(CString src, int len);
@@ -688,7 +688,7 @@ void		Trace(char* szFormat, ...);
 	uint64_t	get_folder_size(CString path);
 	//unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
 	//unit_string	: 단위를 표시할 지 (default = true)
-	CString		GetFileSizeString(CString sfile, int unit_limit = 3, int floats = 0, bool unit_string = true);
+	CString		get_file_size_string(CString sfile, int unit = 1, int floats = 0, bool unit_string = true);
 	CTime		GetFileCreationTime( CString sfile );
 	CTime		GetFileLastModifiedTime( CString sfile );
 	CTime		GetFileLastAccessTime( CString sfile );
@@ -956,7 +956,8 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CString		GetTimeString( CTime t, bool bSeparator = true );
 	CString		GetTimeString( COleDateTime t, bool bSeparator = true );
 	CString		GetTimeString( __timeb32 t, bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true );	//2003-04-16 18:01:00.120
-	CString		GetCurrentTimeString( bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true );	//2003-04-16 18:01:00.120
+	//2003-04-16 18:01:00.120
+	CString		GetCurrentTimeString( bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true );
 	CTime		GetTimeFromTimeString( CString sDate, CString sTime );
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
 	CString		GetDateTimeStringFromTime( CTime t, bool bSeparator = true );

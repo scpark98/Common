@@ -1428,6 +1428,11 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	if (draw)
 		pDC->FillSolidRect(rc, m_crBack);
 
+	Gdiplus::Graphics g(pDC->GetSafeHdc());
+	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
 	//DrawRectangle(pDC, rc, red, 5UL, 2);
 
 	CFont* pOldfont;
@@ -1598,7 +1603,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 #if USE_OPENCV
 				cv_draw(pDC, m_dqThumb[i].img, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #else
-				m_dqThumb[i].img->draw(pDC, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
+				m_dqThumb[i].img->draw(&g, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #endif
 			}
 			//DrawSunkenRect(&dc, rect, true, get_color(m_crBack, -16), get_color(m_crBack, +16));
@@ -1789,10 +1794,6 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	//¼±ÅÃ Ç×¸ñ Ç¥½Ã
 	if (draw)
 	{
-		Gdiplus::Graphics g(pDC->GetSafeHdc());
-		g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
-		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-		g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 		Color cr_text(128, 255, 24, 16);
 		Gdiplus::Font font(L"Spoqa Han Sans Neo", 32, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 		FontFamily fontFamily(L"¸¼Àº °íµñ");
@@ -1813,7 +1814,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			if (m_img_selection_mark.valid())
 			{
 				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, m_img_selection_mark.width, m_img_selection_mark.height);
-				m_img_selection_mark.draw(pDC, r.left, r.top);
+				m_img_selection_mark.draw(&g, r.left, r.top);
 			}
 			else if (m_use_circle_number)
 			{

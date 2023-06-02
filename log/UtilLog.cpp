@@ -167,7 +167,7 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 			}
 			else
 			{
-				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d(%03d)][%s(%d)] %s"),
+				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%d] %s"),
 					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
 					funcName, line, str);
 				_ftprintf(m_fp, _T("%s\n"), result);

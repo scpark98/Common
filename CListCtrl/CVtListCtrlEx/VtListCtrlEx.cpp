@@ -435,12 +435,6 @@ void CVtListCtrlEx::set_header_height(int height)
 		m_HeaderCtrlEx.set_header_height(height);
 }
 
-//line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과
-//(실제 사용할 이미지리스트가 있는 경우는 위 방법을 사용할 수 없다)
-//MeasureItem을 이용하는 방법(OwnerDrawFixed only)이 있다.
-//(강제 갱신 방법 아직 미해결이며 resize를 하면 자동 적용되므로
-//우선은 mainDlg에서 이 함수 호출후에 RestoreWindowPosition()등과 같이
-//WM_SIZE가 발생하는 함수를 사용하면 된다)
 void CVtListCtrlEx::set_line_height(int height)
 {
 	m_line_height = height;
@@ -449,9 +443,14 @@ void CVtListCtrlEx::set_line_height(int height)
 	//UpdateWindow();
 	//RedrawWindow();
 
-	//CImageList gapImage;
-	//gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
-	//SetImageList(&gapImage, LVSIL_SMALL);
+	//자체적으로 imagelist를 사용하지 않는 경우는 아래 코드만으로도
+	//height가 적용된다.
+	if (!use_own_imagelist)
+	{
+		CImageList gapImage;
+		gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
+		SetImageList(&gapImage, LVSIL_SMALL);
+	}
 }
 
 void CVtListCtrlEx::set_column_width(int nCol, int cx)

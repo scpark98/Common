@@ -1803,7 +1803,7 @@ bool is_valid_string(CString src, bool include_hangul)
 //완성형 한글의 한 글자를 초성, 중성, 종성으로 분리한다.
 bool get_consonant(CString src, wchar_t* cho, wchar_t* jung, wchar_t* jong)
 {
-	const wchar_t *tsrc = src;
+	const wchar_t *tsrc = (wchar_t*)(src.GetBuffer());
 	//wchar_t *asdf = L"한";
 	wchar_t uniValue = *tsrc - 0xAC00;
 	*jong = uniValue % 28;

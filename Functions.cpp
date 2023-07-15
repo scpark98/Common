@@ -218,20 +218,23 @@ CString GetTimeStringFromTime(__timeb32 t, CString sMark /*=":"*/)
 	return GetTimeStringFromTime(ct, sMark);
 }
 
-//type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid_char는 날짜와 시간 사이 문자
-CString GetCurrentDateTimeString(int nType, bool bSeparator /*= true*/, TCHAR mid_char /*= ' '*/, bool h24 /*= true*/)
+CString	GetDateTimeString(CTime t, int type, bool separator, CString mid /*= _T(" ")*/, bool h24 /*= true*/)
 {
-	CString str = _T("");
-	CTime	t = CTime::GetCurrentTime();
-	CString sDate = (bSeparator ? GetDateStringFromTime(t) : GetDateStringFromTime(t, _T("")));
-	CString sTime = (bSeparator ? GetTimeStringFromTime(t, _T(":"), h24) : GetTimeStringFromTime(t, _T(""), h24));
+	CString sDate = (separator ? GetDateStringFromTime(t) : GetDateStringFromTime(t, _T("")));
+	CString sTime = (separator ? GetTimeStringFromTime(t, _T(":"), h24) : GetTimeStringFromTime(t, _T(""), h24));
 
-	if (nType == 0)
+	if (type == 0)
 		return sDate;
-	else if (nType == 1)
+	else if (type == 1)
 		return sTime;
 	
-	return sDate + mid_char + sTime;
+	return sDate + mid + sTime;
+}
+
+//type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid_char는 날짜와 시간 사이 문자
+CString GetCurrentDateTimeString(int type, bool separator /*= true*/, CString mid /*= _T(" ")*/, bool h24 /*= true*/)
+{
+	return GetDateTimeString(CTime::GetCurrentTime(), type, separator, mid, h24);
 }
 
 CString	GetTimeString(CTime t, bool bSeparator /*= true*/)
@@ -1803,7 +1806,7 @@ bool is_valid_string(CString src, bool include_hangul)
 //완성형 한글의 한 글자를 초성, 중성, 종성으로 분리한다.
 bool get_consonant(CString src, wchar_t* cho, wchar_t* jung, wchar_t* jong)
 {
-	const wchar_t *tsrc = (wchar_t*)(src.GetBuffer());
+	const wchar_t *tsrc = src;
 	//wchar_t *asdf = L"한";
 	wchar_t uniValue = *tsrc - 0xAC00;
 	*jong = uniValue % 28;

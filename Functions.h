@@ -947,42 +947,44 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 
 //////////////////////////////////////////////////////////////////////////
 //시간
+	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
+	CString		GetCurrentDateTimeString(int nType = 2, bool bSeparator = true, CString mid = _T(" "), bool h24 = true);
+	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
+	CString		GetDateTimeString(CTime t, int type = 2, bool separator = true, CString mid = _T(" "), bool h24 = true);
 	CString		GetDateStringFromTime(CTime t, CString sMark = _T("-") );
 	CString		GetDateStringFromTime(COleDateTime t, CString sMark = _T("-") );
 	CString		GetDateStringFromTime(__timeb32 t, CString sMark = _T("-") );
 	CString		GetTimeStringFromTime(CTime t, CString sMark = _T(":"), bool h24 = true);
 	CString		GetTimeStringFromTime(COleDateTime t, CString sMark = _T(":") );
 	CString		GetTimeStringFromTime(__timeb32 t, CString sMark = _T(":") );
-	CString		GetTimeString( CTime t, bool bSeparator = true );
-	CString		GetTimeString( COleDateTime t, bool bSeparator = true );
-	CString		GetTimeString( __timeb32 t, bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true );	//2003-04-16 18:01:00.120
+	CString		GetTimeString(CTime t, bool bSeparator = true);
+	CString		GetTimeString(COleDateTime t, bool bSeparator = true);
+	CString		GetTimeString(__timeb32 t, bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true);	//2003-04-16 18:01:00.120
 	//2003-04-16 18:01:00.120
-	CString		GetCurrentTimeString( bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true );
-	CTime		GetTimeFromTimeString( CString sDate, CString sTime );
+	CString		GetCurrentTimeString(bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true);
+	CTime		GetTimeFromTimeString(CString sDate, CString sTime);
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
-	CString		GetDateTimeStringFromTime( CTime t, bool bSeparator = true );
-	CString		GetDateTimeStringFromTime( COleDateTime t, bool bSeparator = true );
-	CTime		GetTimeFromDateTimeString( CString sDateTime);
-	CString		GetTimeStringFromSeconds( double dSecond, bool bHasHour = true, bool bHasMilliSec = false );
+	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true);
+	CString		GetDateTimeStringFromTime(COleDateTime t, bool bSeparator = true);
+	CTime		GetTimeFromDateTimeString(CString sDateTime);
+	CString		GetTimeStringFromSeconds(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
 	CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour = true, bool bHasMilliSec = true);
 	int			GetSecondsFromTimeString(CString timeString);
 	int			GetMilliSecondsFromTimeString(CString timeString);
-	void		GetTimeFromSeconds( int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds );
-	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. blank는 날짜와 시간 사이 공백 여부
-	CString		GetCurrentDateTimeString( int nType = 2, bool bSeparator = true, TCHAR mid_char = ' ', bool h24 = true);
-	void		SetSystemTimeClock( WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond );
-	double		GetElapsedTime( __timeb32 pOldTime );	//pOldTime과 현재 시간의 차이 계산
+	void		GetTimeFromSeconds(int nTotalSeconds, int& nHours, int& nMinutes, int& nSeconds);
+	void		SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond);
+	double		GetElapsedTime(__timeb32 pOldTime);	//pOldTime과 현재 시간의 차이 계산
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
-	CString		GetDayTimeCountString( CTimeSpan ts, bool bShowZero, bool bIncludeSec );
+	CString		GetDayTimeCountString(CTimeSpan ts, bool bShowZero, bool bIncludeSec);
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
-	CString		GetDayTimeCountString( COleDateTimeSpan ts, bool bShowZero, bool bIncludeSec );
-	time_t		_mkgmtime(const struct tm *tm) ;
-	bool		IsAM( CTime t = 0 );	//t=0이면 현재시각기준, 0보다 크면 그 시간값 기준
+	CString		GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bIncludeSec);
+	time_t		_mkgmtime(const struct tm* tm);
+	bool		IsAM(CTime t = 0);	//t=0이면 현재시각기준, 0보다 크면 그 시간값 기준
 	CString		GetDayOfWeekString(CTime t = NULL, bool short_str = false);
-	int			GetDaysOfMonth( int nYear, int nMonth );	//해당 달의 날짜수 리턴
+	int			GetDaysOfMonth(int nYear, int nMonth);	//해당 달의 날짜수 리턴
 	//날짜 관련
 	int			GetSeasonIndex();	//봄=0, 여름=1...
-	int			gettimeofday(struct timeval *tv, struct timezone *tz);
+	int			gettimeofday(struct timeval* tv, struct timezone* tz);
 
 	//날짜 표시 형식에 맞는지 검사
 	bool		is_valid_date(CString str);
@@ -990,7 +992,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	bool		is_valid_time(CString str);
 
 	//날짜시각 형식을 yyyy/mm/dd hh:mm:ss 포맷으로 맞춘다.
-	void		normalize_datetime(CString &src);
+	void		normalize_datetime(CString & src);
 
 //타이머 관련
 	void		Wait(DWORD dwMillisecond);		//예전에는 OnTimer() 내에서는 동작되지 않았었는데 현재는 가능하다.

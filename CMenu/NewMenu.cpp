@@ -2713,14 +2713,14 @@ void CNewMenu::set_color_theme(int theme)
 	{
 		m_color_theme		= color_theme_default;
 
-		m_cr_back			= RGB(68, 68, 68);
-		m_cr_back_hilight	= DarkenColor(32, m_cr_back);
+		m_cr_back			= ::GetSysColor(COLOR_BTNFACE);
+		m_cr_back_hilight	= ::GetSysColor(COLOR_HIGHLIGHT);
 
-		m_cr_text			= RGB(187, 187, 187);
-		m_cr_text_gray		= DarkenColor(32, m_cr_text);;
-		m_cr_text_hilight	= RGB(250, 255, 0);
+		m_cr_text			= ::GetSysColor(COLOR_BTNTEXT);
+		m_cr_text_gray		= ::GetSysColor(COLOR_GRAYTEXT);
+		m_cr_text_hilight	= ::GetSysColor(COLOR_HIGHLIGHTTEXT);
 
-		m_cr_separator		= RGB(39, 40, 47);
+		m_cr_separator		= RGB(192, 192, 192);
 		m_cr_border			= 0;
 		m_cr_check			= m_cr_text;
 	}
@@ -3676,9 +3676,8 @@ void CNewMenu::DrawItem_WinXP(LPDRAWITEMSTRUCT lpDIS, BOOL bIsMenuBar)
 		pDC = &memDC;
 	}
 
-	COLORREF colorWindow = RGB(255, 0, 0);//GetSysColor(COLOR_WINDOW);
-	//  COLORREF colorMenuBar = bIsMenuBar?GetMenuBarColor(m_hMenu):GetMenuColor();
-	COLORREF colorMenuBar = GetMenuBarColor(m_hMenu);
+	COLORREF colorWindow = m_cr_back;
+	COLORREF colorMenuBar = bIsMenuBar ? GetMenuBarColor(m_hMenu) : m_cr_back;;
 	COLORREF colorMenu = MixedColor(colorWindow, colorMenuBar);
 	COLORREF colorBitmap = MixedColor(GetMenuBarColor(m_hMenu), colorWindow);
 	COLORREF colorSel = GetXpHighlightColor();
@@ -3918,10 +3917,12 @@ void CNewMenu::DrawItem_WinXP(LPDRAWITEMSTRUCT lpDIS, BOOL bIsMenuBar)
 	{
 		if ((lpDIS->itemState & ODS_SELECTED) && !(lpDIS->itemState&ODS_INACTIVE))
 		{
-			pDC->FillSolidRect(RectSel, colorSel);
+			//pDC->FillSolidRect(RectSel, colorSel);
 			// Draw the selection
 			CPen* pOldPen = pDC->SelectObject(&Pen);
 			CBrush* pOldBrush = (CBrush*)pDC->SelectStockObject(HOLLOW_BRUSH);
+
+			//커서위치 항목의 테두리
 			pDC->Rectangle(RectSel);
 			pDC->SelectObject(pOldBrush);
 			pDC->SelectObject(pOldPen);

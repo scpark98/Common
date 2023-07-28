@@ -243,7 +243,7 @@ CString RandomText::GetSlogan()
 	else if(r==7)
 	{
 		moto = _T("Seeing a");
-		AddWord(moto, Animal(false) );
+		AddWord(moto, Animal(false));
 		AddWord(moto, _T("eating"));
 
 		if(rand()%2==0)

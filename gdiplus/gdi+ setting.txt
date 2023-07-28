@@ -1,0 +1,28 @@
+[usage]
+- stdafx.h
+	#include <gdiplus.h>
+	using namespace Gdiplus;
+
+- App.h
+	ULONG_PTR	m_gdiplusToken;
+	and add ExitInstance() virtual function using class wizard.
+
+- in App.cpp
+
+	in InitInstance() function, add below lines before calling main dlg.
+
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
+
+
+	in ExitInstance() function, add below.
+	
+	Gdiplus::GdiplusShutdown(m_gdiplusToken);
+
+[윈도우7 또는 gdiplus가 포함 배포되지 않은 환경에서 직접 사용하는 방법]
+- gdiplus 폴더내의 *.dll을 c:\windows\system32에 복사
+- *.h를 VC 설치 폴더\include에 복사
+- *.lib를 VC 설치 폴더\lib에 복사
+- stdafx.h 파일에 다음 코드 삽입
+	#define ULONG_PTR DWORD
+- 프로젝트 세팅에서 라이브러리 Input에서 gdiplus.lib 추가

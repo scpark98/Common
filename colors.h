@@ -7,31 +7,31 @@
 #include <deque>
 
 // RGB -> YUV(YCbCr)
-#define		RGB2Y(R, G, B) CLIP(( (  66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
-#define		RGB2U(R, G, B) CLIP(( ( -38 * (R) -  74 * (G) + 112 * (B) + 128) >> 8) + 128)
-#define		RGB2V(R, G, B) CLIP(( ( 112 * (R) -  94 * (G) -  18 * (B) + 128) >> 8) + 128)
-#define		RGB_2Y(color) CLIP(( (  66 * GetRValue(color) + 129 * GetGValue(color) +  25 * GetBValue(color) + 128) >> 8) +  16)
-#define		RGB_2U(color) CLIP(( ( -38 * GetRValue(color) -  74 * GetGValue(color) + 112 * GetBValue(color) + 128) >> 8) + 128)
-#define		RGB_2V(color) CLIP(( ( 112 * GetRValue(color) -  94 * GetGValue(color) -  18 * GetBValue(color) + 128) >> 8) + 128)
+#define		RGB2Y(R, G, B) CLIP((( 66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
+#define		RGB2U(R, G, B) CLIP(((-38 * (R) -  74 * (G) + 112 * (B) + 128) >> 8) + 128)
+#define		RGB2V(R, G, B) CLIP(((112 * (R) -  94 * (G) -  18 * (B) + 128) >> 8) + 128)
+#define		RGB_2Y(color) CLIP((( 66 * GetRValue(color) + 129 * GetGValue(color) +  25 * GetBValue(color) + 128) >> 8) +  16)
+#define		RGB_2U(color) CLIP(((-38 * GetRValue(color) -  74 * GetGValue(color) + 112 * GetBValue(color) + 128) >> 8) + 128)
+#define		RGB_2V(color) CLIP(((112 * GetRValue(color) -  94 * GetGValue(color) -  18 * GetBValue(color) + 128) >> 8) + 128)
 
 // YUV -> RGB
-#define		C(Y) ( (Y) - 16  )
-#define		D(U) ( (U) - 128 )
-#define		E(V) ( (V) - 128 )
+#define		C(Y) ((Y) - 16 )
+#define		D(U) ((U) - 128)
+#define		E(V) ((V) - 128)
 
-#define		YUV2R(Y, U, V) CLIP(( 298 * C(Y)              + 409 * E(V) + 128) >> 8)
-#define		YUV2G(Y, U, V) CLIP(( 298 * C(Y) - 100 * D(U) - 208 * E(V) + 128) >> 8)
-#define		YUV2B(Y, U, V) CLIP(( 298 * C(Y) + 516 * D(U)              + 128) >> 8)
+#define		YUV2R(Y, U, V) CLIP((298 * C(Y)              + 409 * E(V) + 128) >> 8)
+#define		YUV2G(Y, U, V) CLIP((298 * C(Y) - 100 * D(U) - 208 * E(V) + 128) >> 8)
+#define		YUV2B(Y, U, V) CLIP((298 * C(Y) + 516 * D(U)              + 128) >> 8)
 
 // RGB -> YCbCr
-#define		CRGB2Y(R, G, B) CLIP((19595 * R + 38470 * G + 7471 * B ) >> 16)
-#define		CRGB2Cb(R, G, B) CLIP((36962 * (B - CLIP((19595 * R + 38470 * G + 7471 * B ) >> 16) ) >> 16) + 128)
-#define		CRGB2Cr(R, G, B) CLIP((46727 * (R - CLIP((19595 * R + 38470 * G + 7471 * B ) >> 16) ) >> 16) + 128)
+#define		CRGB2Y(R, G, B) CLIP((19595 * R + 38470 * G + 7471 * B) >> 16)
+#define		CRGB2Cb(R, G, B) CLIP((36962 * (B - CLIP((19595 * R + 38470 * G + 7471 * B) >> 16)) >> 16) + 128)
+#define		CRGB2Cr(R, G, B) CLIP((46727 * (R - CLIP((19595 * R + 38470 * G + 7471 * B) >> 16)) >> 16) + 128)
 
 // YCbCr -> RGB
-#define		CYCbCr2R(Y, Cb, Cr) CLIP( Y + ( 91881 * Cr >> 16 ) - 179 )
-#define		CYCbCr2G(Y, Cb, Cr) CLIP( Y - (( 22544 * Cb + 46793 * Cr ) >> 16) + 135)
-#define		CYCbCr2B(Y, Cb, Cr) CLIP( Y + (116129 * Cb >> 16 ) - 226 )
+#define		CYCbCr2R(Y, Cb, Cr) CLIP(Y + (91881 * Cr >> 16) - 179)
+#define		CYCbCr2G(Y, Cb, Cr) CLIP(Y - ((22544 * Cb + 46793 * Cr) >> 16) + 135)
+#define		CYCbCr2B(Y, Cb, Cr) CLIP(Y + (116129 * Cb >> 16) - 226)
 
 //rgb<->bgr
 #define		rgb_bgr(c) (((c & 0x00ff0000) >> 16) + (c & 0x0000ff00) + ((c & 0x000000ff) << 16))

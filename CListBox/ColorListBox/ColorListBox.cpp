@@ -304,12 +304,12 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (m_as_folder_list && m_imagelist_small.GetImageCount() > 0)
 	{
-		rect.left += 6;
+		rect.left += 6;		//left margin
 		CString real_path = convert_volume_to_real_path(m_folder_list[lpDIS->itemID]);
 		m_imagelist_small.Draw(&dc, GetSystemImageListIcon(real_path, false),
 								CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
-		rect.left += 16;
-		rect.left += 14;
+		rect.left += 16;	//small icon width
+		rect.left += 14;	//margin between icon and text
 	}
 
 

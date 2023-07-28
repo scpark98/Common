@@ -17,8 +17,8 @@ static char THIS_FILE[] = __FILE__;
 
 CHeaderCtrlEx::CHeaderCtrlEx()
 {
-	m_crBack = ::GetSysColor( COLOR_3DFACE );
-	m_crText = ::GetSysColor( COLOR_BTNTEXT );
+	m_crBack = ::GetSysColor(COLOR_3DFACE);
+	m_crText = ::GetSysColor(COLOR_BTNTEXT);
 	m_header_is_clicked = false;
 	m_header_clicked_index = -1;
 	m_header_height = 16;
@@ -50,6 +50,10 @@ void CHeaderCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 LRESULT CHeaderCtrlEx::OnLayout(WPARAM, LPARAM lParam)
 {
 	LPHDLAYOUT pHL = reinterpret_cast<LPHDLAYOUT>(lParam);
+	if (pHL->prc == INVALID_HANDLE_VALUE ||
+		pHL->pwpos == INVALID_HANDLE_VALUE)
+		return 0;
+
 	memcpy(&m_HDLayout, pHL, sizeof(HDLAYOUT));
 
 	//*** The table list rectangle
@@ -81,44 +85,44 @@ void CHeaderCtrlEx::OnPaint()
 	CPaintDC dc(this);
 	CRect rc, rItem;
 
-	dc.SelectObject ( GetFont() );
+	dc.SelectObject (GetFont());
 
-	GetClientRect( rc );
-	dc.FillSolidRect( rc, GetParent()->IsWindowEnabled() ? m_crBack : GRAY(164) );
+	GetClientRect(rc);
+	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_crBack : GRAY(164));
 
-	dc.SetBkMode( TRANSPARENT );
-	dc.SetTextColor( GetParent()->IsWindowEnabled() ? m_crText : ::GetSysColor(COLOR_GRAYTEXT) );
+	dc.SetBkMode(TRANSPARENT);
+	dc.SetTextColor(GetParent()->IsWindowEnabled() ? m_crText : ::GetSysColor(COLOR_GRAYTEXT));
 
-	COLORREF crSunkenLight = get_color( m_crBack, 48 );
-	COLORREF crSunkenDark  = get_color( m_crBack, -48 );
+	COLORREF crSunkenLight = get_color(m_crBack, 48);
+	COLORREF crSunkenDark  = get_color(m_crBack, -48);
 
-	for ( int i = 0; i < GetItemCount(); i++ )
+	for (int i = 0; i < GetItemCount(); i++)
 	{
-		GetItemRect( i, rItem );
+		GetItemRect(i, rItem);
 		//rItem.top -= 1;
 		rItem.bottom -= 1;
 
-		if ( i == m_header_clicked_index )
+		if (i == m_header_clicked_index)
 		{
-			DrawSunkenRect( &dc, rItem, true, crSunkenDark, crSunkenLight );
-			rItem.OffsetRect( 1, 1 );
+			DrawSunkenRect(&dc, rItem, true, crSunkenDark, crSunkenLight);
+			rItem.OffsetRect(1, 1);
 		}
 		else
 		{
-			DrawSunkenRect( &dc, rItem, false, crSunkenDark, crSunkenLight );
+			DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
 		}
 
 		DWORD dwAlign = m_header_text_align[i];
 		DWORD dwFormat = DT_VCENTER | DT_SINGLELINE;
-		if ( dwAlign == HDF_LEFT )
+		if (dwAlign == HDF_LEFT)
 			dwFormat |= DT_LEFT;
-		else if ( dwAlign == HDF_CENTER )
+		else if (dwAlign == HDF_CENTER)
 			dwFormat |= DT_CENTER;
-		else//if ( dwAlign == HDF_LEFT )
+		else//if (dwAlign == HDF_LEFT)
 			dwFormat |= DT_RIGHT;
 
-		rItem.DeflateRect( 6, 0 );
-		dc.DrawText(get_header_text( i ), rItem, dwFormat );
+		rItem.DeflateRect(6, 0);
+		dc.DrawText(get_header_text(i), rItem, dwFormat);
 	}
 
 	/*
@@ -161,7 +165,7 @@ void CHeaderCtrlEx::OnPaint()
 		hditem1.mask = HDI_TEXT | HDI_FORMAT | HDI_ORDER;
 		hditem1.pszText = buf1;
 		hditem1.cchTextMax = 255;
-		GetItem( i, &hditem1 );
+		GetItem(i, &hditem1);
 		
 		GetItemRect(i, &rect);
 		
@@ -237,7 +241,7 @@ void CHeaderCtrlEx::OnPaint()
 		hditem.mask = HDI_TEXT | HDI_FORMAT | HDI_ORDER;
 		hditem.pszText = buf;
 		hditem.cchTextMax = 255;
-		GetItem( DrawItemStruct.itemID, &hditem );
+		GetItem(DrawItemStruct.itemID, &hditem);
 
 		memDC.DrawText(buf, &rectItem, uFormat);
 		memDC.SelectObject(def_font);
@@ -285,7 +289,7 @@ int	CHeaderCtrlEx::get_header_text_align(int column)
 {
 	return m_header_text_align[column];
 	/*
-	if ( GetItemCount() <= 0 )
+	if (GetItemCount() <= 0)
 		return HDF_LEFT;
 
 	HDITEM	hdItem;
@@ -307,7 +311,7 @@ int	CHeaderCtrlEx::get_header_text_align(int column)
 
 void CHeaderCtrlEx::set_header_text_align(int column, int format)
 {
-	if ( GetItemCount() <= 0 )
+	if (GetItemCount() <= 0)
 		return;
 
 	HDITEM	hdItem;
@@ -328,13 +332,13 @@ int CHeaderCtrlEx::get_clicked_header(CPoint point)
 {
 	CRect	rItem;
 
-	for ( int i = 0; i < GetItemCount(); i++ )
+	for (int i = 0; i < GetItemCount(); i++)
 	{
-		GetItemRect( i, rItem );
+		GetItemRect(i, rItem);
 		//separator와 구분하기 위해 줄여서 체크.
 
-		rItem.DeflateRect( 6, 0 );
-		if ( rItem.PtInRect( point ) )
+		rItem.DeflateRect(6, 0);
+		if (rItem.PtInRect(point))
 		{
 			m_header_clicked_index = i;
 			return m_header_clicked_index;
@@ -350,11 +354,11 @@ void CHeaderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 	// TODO: Add your message handler code here and/or call default
 	CVtListCtrlEx*	pListCtrl = (CVtListCtrlEx*)GetParent();
 
-	//if ( pListCtrl->m_bAllowSort == false )
+	//if (pListCtrl->m_bAllowSort == false)
 	//	return;
 
 	m_header_is_clicked = true;
-	m_header_clicked_index = get_clicked_header( point );
+	m_header_clicked_index = get_clicked_header(point);
 	Invalidate();
 	CHeaderCtrl::OnLButtonDown(nFlags, point);
 }
@@ -364,7 +368,7 @@ void CHeaderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	CVtListCtrlEx*	pListCtrl = (CVtListCtrlEx*)GetParent();
 
-	//if ( pListCtrl->m_bAllowSort == false )
+	//if (pListCtrl->m_bAllowSort == false)
 	//	return;
 
 	// TODO: Add your message handler code here and/or call default

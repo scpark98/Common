@@ -145,7 +145,17 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 
 	SetSel(nInsertionPoint, nInsertionPoint);
 
-	if ( m_bShowTime )
+	TRACE(_T("nOldLines = %d\n"), nOldLines);
+	
+	PARAFORMAT2 pf;
+	GetParaFormat(pf);
+	pf.dwMask = PFM_ALIGNMENT;
+	pf.wAlignment = m_align;
+	SetParaFormat(pf);
+	SendMessage(EM_SETMODIFY, (WPARAM)TRUE, 0L);
+	
+
+	if (m_bShowTime)
 	{
 		SYSTEMTIME	t;
 		CString sTime;
@@ -188,6 +198,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 
 	nInsertionPoint = -1;
 	SetSel(nInsertionPoint, -1);
+
 
     //  Set the character format
     SetSelectionCharFormat(cf);
@@ -426,6 +437,9 @@ void CRichEditCtrlEx::OnRButtonDown(UINT nFlags, CPoint point)
 void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (!m_use_popup_menu)
+		return;
+
 	CMenu	menu;
 
 	menu.CreatePopupMenu();
@@ -667,4 +681,9 @@ CRichEditCtrlEx& CRichEditCtrlEx::SetFontBold( bool bBold )
 	ReconstructFont();
 
 	return *this;
+}
+
+void CRichEditCtrlEx::set_align(int align)
+{
+	m_align = align;
 }

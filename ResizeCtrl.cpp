@@ -67,56 +67,56 @@ static const TCHAR m_szResizeProperty[] = _T("___CResizeCtrl___Class___");
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-CResizeCtrl::CResizeCtrl( )
-	: m_array       ( NULL  )
-	, m_hWndParent  ( NULL  )
-	, m_maxPart     ( 100   )
-	, m_inResize    ( FALSE )
-	, m_prevWndProc ( NULL  )
-	, m_enabled     ( FALSE )
-	, m_minTracking ( CSize( -1, -1 ) )
-	, m_maxTracking ( CSize( -1, -1 ) )
-	, m_hitCode     ( 0 )
-	, m_inMouseMove ( FALSE )
-	, m_delta       ( CSize( 0, 0 ) )
-	, m_windowRect  ( CRect( 0, 0, 0, 0 ) )
-	, m_gripEnabled ( FALSE )
+CResizeCtrl::CResizeCtrl()
+	: m_array       (NULL )
+	, m_hWndParent  (NULL )
+	, m_maxPart     (100  )
+	, m_inResize    (FALSE)
+	, m_prevWndProc (NULL )
+	, m_enabled     (FALSE)
+	, m_minTracking (CSize(-1, -1))
+	, m_maxTracking (CSize(-1, -1))
+	, m_hitCode     (0)
+	, m_inMouseMove (FALSE)
+	, m_delta       (CSize(0, 0))
+	, m_windowRect  (CRect(0, 0, 0, 0))
+	, m_gripEnabled (FALSE)
 {
 }
 
-CResizeCtrl::CResizeCtrl( HWND hWndParent, BOOL enable, int maxPart )
-	: m_array( NULL )
-	, m_hWndParent  ( NULL  )
-	, m_maxPart     ( 100   )
-	, m_inResize    ( FALSE )
-	, m_prevWndProc ( NULL  )
-	, m_enabled     ( FALSE )
-	, m_minTracking ( CSize( -1, -1 ) )
-	, m_maxTracking ( CSize( -1, -1 ) )
-	, m_hitCode     ( 0 )
-	, m_inMouseMove ( FALSE )
-	, m_delta       ( CSize( 0, 0 ) )
-	, m_gripEnabled ( FALSE )
+CResizeCtrl::CResizeCtrl(HWND hWndParent, BOOL enable, int maxPart)
+	: m_array(NULL)
+	, m_hWndParent  (NULL )
+	, m_maxPart     (100  )
+	, m_inResize    (FALSE)
+	, m_prevWndProc (NULL )
+	, m_enabled     (FALSE)
+	, m_minTracking (CSize(-1, -1))
+	, m_maxTracking (CSize(-1, -1))
+	, m_hitCode     (0)
+	, m_inMouseMove (FALSE)
+	, m_delta       (CSize(0, 0))
+	, m_gripEnabled (FALSE)
 {
-	Create( hWndParent, enable, maxPart );
+	Create(hWndParent, enable, maxPart);
 
 }
 
-CResizeCtrl::CResizeCtrl( CWnd * wndParent, BOOL enable, int maxPart )
-	: m_array       ( NULL  )
-	, m_hWndParent  ( NULL  )
-	, m_maxPart     ( 100   )
-	, m_inResize    ( FALSE )
-	, m_prevWndProc ( NULL  )
-	, m_enabled     ( FALSE )
-	, m_minTracking ( CSize( -1, -1 ) )
-	, m_maxTracking ( CSize( -1, -1 ) )
-	, m_hitCode     ( 0 )
-	, m_inMouseMove ( FALSE )
-	, m_delta       ( CSize( 0, 0 ) )
-	, m_gripEnabled ( FALSE )
+CResizeCtrl::CResizeCtrl(CWnd * wndParent, BOOL enable, int maxPart)
+	: m_array       (NULL )
+	, m_hWndParent  (NULL )
+	, m_maxPart     (100  )
+	, m_inResize    (FALSE)
+	, m_prevWndProc (NULL )
+	, m_enabled     (FALSE)
+	, m_minTracking (CSize(-1, -1))
+	, m_maxTracking (CSize(-1, -1))
+	, m_hitCode     (0)
+	, m_inMouseMove (FALSE)
+	, m_delta       (CSize(0, 0))
+	, m_gripEnabled (FALSE)
 {
-	Create( wndParent, enable, maxPart );
+	Create(wndParent, enable, maxPart);
 }
 
 CResizeCtrl::~CResizeCtrl()
@@ -126,9 +126,9 @@ CResizeCtrl::~CResizeCtrl()
 
 BOOL CResizeCtrl::RemoveAll()
 {
-	SetEnabled( FALSE );
+	SetEnabled(FALSE);
 
-	if ( m_array )
+	if (m_array)
 	{
 		m_array->RemoveAll();
 		delete m_array;
@@ -137,24 +137,24 @@ BOOL CResizeCtrl::RemoveAll()
 	return true;
 }
 
-BOOL CResizeCtrl::Create( CWnd * wndParent, BOOL enable, int maxPart )
+BOOL CResizeCtrl::Create(CWnd * wndParent, BOOL enable, int maxPart)
 {
-	ASSERT( wndParent );
-	if( wndParent )
-		return Create( wndParent->GetSafeHwnd(), enable, maxPart );
+	ASSERT(wndParent);
+	if(wndParent)
+		return Create(wndParent->GetSafeHwnd(), enable, maxPart);
 	return FALSE;
 }
 
-BOOL CResizeCtrl::Create( HWND hWndParent, BOOL enable, int maxPart )
+BOOL CResizeCtrl::Create(HWND hWndParent, BOOL enable, int maxPart)
 {
-	ASSERT( !m_array );
-	if( m_array )
+	ASSERT(!m_array);
+	if(m_array)
 		return FALSE;
 
 	m_array = new CResizeArray;
-	ASSERT( m_array );
-	ASSERT( hWndParent );
-	ASSERT( maxPart > 0 );
+	ASSERT(m_array);
+	ASSERT(hWndParent);
+	ASSERT(maxPart > 0);
 	m_hWndParent  = hWndParent;
 	m_maxPart     = maxPart;
 	m_inResize    = FALSE;
@@ -165,10 +165,10 @@ BOOL CResizeCtrl::Create( HWND hWndParent, BOOL enable, int maxPart )
 		m_maxTracking.cx  =
 		m_maxTracking.cy  = -1;
 	m_hasResizingBorder = ((::GetWindowLongPtr(hWndParent, GWL_STYLE) & WS_THICKFRAME) == WS_THICKFRAME);
-	if( enable )
-		SetEnabled( TRUE );
+	if(enable)
+		SetEnabled(TRUE);
 	else
-		::GetWindowRect( hWndParent , &m_windowRect );
+		::GetWindowRect(hWndParent , &m_windowRect);
 	return TRUE;
 }
 
@@ -178,23 +178,23 @@ BOOL CResizeCtrl::Create( HWND hWndParent, BOOL enable, int maxPart )
 // Enabled Property
 //
 
-BOOL CResizeCtrl::SetEnabled( BOOL enable )
+BOOL CResizeCtrl::SetEnabled(BOOL enable)
 {
-	//ASSERT ( m_array );
+	//ASSERT (m_array);
 
-	if( m_enabled != enable )
+	if(m_enabled != enable)
 	{
-		ASSERT( m_hWndParent  );
-		::GetWindowRect( m_hWndParent, &m_windowRect );
+		ASSERT(m_hWndParent );
+		::GetWindowRect(m_hWndParent, &m_windowRect);
 		// remove subclassing
-		if( FALSE == enable )
+		if(FALSE == enable)
 		{
-			ASSERT( m_prevWndProc );
-			::SetWindowLongPtr( m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( m_prevWndProc ) );
+			ASSERT(m_prevWndProc);
+			::SetWindowLongPtr(m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(m_prevWndProc));
 			m_prevWndProc = NULL;
-			::RemoveProp( m_hWndParent, m_szResizeProperty );
-			if( m_hasResizingBorder == FALSE )
-				ChangeStyle( enable );  
+			::RemoveProp(m_hWndParent, m_szResizeProperty);
+			if(m_hasResizingBorder == FALSE)
+				ChangeStyle(enable);  
 		}
 		else
 		{
@@ -206,21 +206,21 @@ BOOL CResizeCtrl::SetEnabled( BOOL enable )
 			//m_hWndFocus     = NULL;
 
 			WNDPROC wndProc = CResizeCtrl::WndProc;
-			if( m_hasResizingBorder == FALSE )
+			if(m_hasResizingBorder == FALSE)
 			{
-				ChangeStyle( enable );  
+				ChangeStyle(enable);  
 			}
 			CRect   rect;
-			::GetClientRect( m_hWndParent, &rect );
+			::GetClientRect(m_hWndParent, &rect);
 			m_size.cx = rect.Width();
 			m_size.cy = rect.Height();
 
-			::SetProp( m_hWndParent, m_szResizeProperty, reinterpret_cast<HANDLE>(this) );
-			m_prevWndProc = reinterpret_cast<WNDPROC>( ::GetWindowLongPtr( m_hWndParent, GWLP_WNDPROC ) );
-			::SetWindowLongPtr( m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( wndProc ) );
+			::SetProp(m_hWndParent, m_szResizeProperty, reinterpret_cast<HANDLE>(this));
+			m_prevWndProc = reinterpret_cast<WNDPROC>(::GetWindowLongPtr(m_hWndParent, GWLP_WNDPROC));
+			::SetWindowLongPtr(m_hWndParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(wndProc));
 		}
 		m_enabled = enable;
-		if( m_gripEnabled )
+		if(m_gripEnabled)
 		{
 
 		}
@@ -237,13 +237,13 @@ BOOL CResizeCtrl::GetEnabled() const
 // GripEnabled Property
 //
 
-BOOL CResizeCtrl::SetGripEnabled( BOOL showGrip )
+BOOL CResizeCtrl::SetGripEnabled(BOOL showGrip)
 {
-	if( m_gripEnabled != showGrip )
+	if(m_gripEnabled != showGrip)
 	{
 		m_gripEnabled = showGrip;
-		if( m_enabled )
-			GetGripRect( m_gripRect, TRUE );
+		if(m_enabled)
+			GetGripRect(m_gripRect, TRUE);
 	}
 	return FALSE;
 }
@@ -254,77 +254,77 @@ BOOL CResizeCtrl::GetGripEnabled() const
 
 // resizeInfo is a null terminated array of CResizeInfo
 
-BOOL CResizeCtrl::Add( const CResizeInfo * resizeInfo )
+BOOL CResizeCtrl::Add(const CResizeInfo * resizeInfo)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
 	BOOL result = TRUE;
-	while( result == TRUE && resizeInfo->ctlID > 0 )
+	while(result == TRUE && resizeInfo->ctlID > 0)
 	{
-		result &= Add( resizeInfo->ctlID,
+		result &= Add(resizeInfo->ctlID,
 			resizeInfo->left,
 			resizeInfo->top,
 			resizeInfo->width,
-			resizeInfo->height );
+			resizeInfo->height);
 		resizeInfo++;               
 	}
 	return result;
 }
 
-BOOL CResizeCtrl::Add( int ctrlID,  int left, int top, int width, int height )
+BOOL CResizeCtrl::Add(int ctrlID,  int left, int top, int width, int height)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
-	return Add( ::GetDlgItem(m_hWndParent, ctrlID), ctrlID, left, top, width, height );
+	return Add(::GetDlgItem(m_hWndParent, ctrlID), ctrlID, left, top, width, height);
 }
 
-BOOL CResizeCtrl::Add( CWnd * wndCtrl, int ctrlID, int left, int top, int width, int height )
+BOOL CResizeCtrl::Add(CWnd * wndCtrl, int ctrlID, int left, int top, int width, int height)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
-	if( wndCtrl )
-		return Add( wndCtrl->GetSafeHwnd(), wndCtrl->GetDlgCtrlID(), left, top, width, height );
+	if(wndCtrl)
+		return Add(wndCtrl->GetSafeHwnd(), wndCtrl->GetDlgCtrlID(), left, top, width, height);
 	return FALSE;
 
 }
 
 BOOL CResizeCtrl::Add(HWND hWndCtl, int ctrlID, int left, int top, int width, int height)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 	CString str = _T("");
 
-	if( left < 0 || left > m_maxPart )
+	if(left < 0 || left > m_maxPart)
 	{
-		str.Format(_T("CtrlID(%d) : left < 0 || left > m_maxPart"), ctrlID );
+		str.Format(_T("CtrlID(%d) : left < 0 || left > m_maxPart"), ctrlID);
 	}
-	if( top < 0 || top > m_maxPart )
+	if(top < 0 || top > m_maxPart)
 	{
-		str.Format(_T("CtrlID(%d) : top < 0 || top > m_maxPart"), ctrlID );
+		str.Format(_T("CtrlID(%d) : top < 0 || top > m_maxPart"), ctrlID);
 	}
-	if( width < 0 || width > m_maxPart )
+	if(width < 0 || width > m_maxPart)
 	{
-		str.Format(_T("CtrlID(%d) : width < 0 || width > m_maxPart"), ctrlID );
+		str.Format(_T("CtrlID(%d) : width < 0 || width > m_maxPart"), ctrlID);
 	}
-	if( height < 0 || height > m_maxPart )
+	if(height < 0 || height > m_maxPart)
 	{
-		str.Format(_T("CtrlID(%d) : height < 0 || height > m_maxPart"), ctrlID );
-	}
-
-	if( ( left + width ) > m_maxPart )
-	{
-		str.Format(_T("CtrlID(%d) : ( left + width ) > m_maxPart"), ctrlID );
-	}
-	if( ( top + height) > m_maxPart )
-	{
-		str.Format(_T("CtrlID(%d) : top + height) > m_maxPart"), ctrlID );
+		str.Format(_T("CtrlID(%d) : height < 0 || height > m_maxPart"), ctrlID);
 	}
 
-	if( !::IsWindow(hWndCtl) )
-		str.Format(_T("CtrlID(%d) : invalid control's ID"), ctrlID );
-
-	if ( str != "" )
+	if((left + width) > m_maxPart)
 	{
-		AfxMessageBox( str );
+		str.Format(_T("CtrlID(%d) : (left + width) > m_maxPart"), ctrlID);
+	}
+	if((top + height) > m_maxPart)
+	{
+		str.Format(_T("CtrlID(%d) : top + height) > m_maxPart"), ctrlID);
+	}
+
+	if(!::IsWindow(hWndCtl))
+		str.Format(_T("CtrlID(%d) : invalid control's ID"), ctrlID);
+
+	if (str != "")
+	{
+		AfxMessageBox(str);
 		return false;
 	}
 
@@ -340,47 +340,47 @@ BOOL CResizeCtrl::Add(HWND hWndCtl, int ctrlID, int left, int top, int width, in
 		item.pending.height = 0;
 	item.handle         = hWndCtl;
 
-	return m_array->Add( item ) >= 0 ;
+	return m_array->Add(item) >= 0 ;
 }
 
-BOOL CResizeCtrl::Remove( int ctlID )
+BOOL CResizeCtrl::Remove(int ctlID)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
-	return Remove( ::GetDlgItem( m_hWndParent, ctlID ) );
+	return Remove(::GetDlgItem(m_hWndParent, ctlID));
 }
 
-BOOL CResizeCtrl::Remove( CWnd * wndCtl )
+BOOL CResizeCtrl::Remove(CWnd * wndCtl)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
-	if( wndCtl )
-		return Remove( wndCtl->GetSafeHwnd () );
+	if(wndCtl)
+		return Remove(wndCtl->GetSafeHwnd ());
 	return FALSE;  
 }
 
 BOOL CResizeCtrl::Remove(HWND hWndCtl)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
-	if( !::IsWindow( hWndCtl))
+	if(!::IsWindow(hWndCtl))
 		return FALSE;
 
 	int upperBound = m_array->GetUpperBound ();
-	for( int current = 0; current <= upperBound; current++ )
+	for(int current = 0; current <= upperBound; current++)
 	{
-		if( m_array->GetAt( current ).handle == hWndCtl )
+		if(m_array->GetAt(current).handle == hWndCtl)
 		{
-			m_array->RemoveAt( current );
+			m_array->RemoveAt(current);
 			return TRUE;
 		}
 	}
 	return FALSE;
 }
 
-BOOL CResizeCtrl::GetWindowRect( RECT * rect )
+BOOL CResizeCtrl::GetWindowRect(RECT * rect)
 {
-	if( rect )
+	if(rect)
 	{
 		*rect = m_windowRect;
 		return TRUE;
@@ -390,20 +390,20 @@ BOOL CResizeCtrl::GetWindowRect( RECT * rect )
 }
 BOOL CResizeCtrl::CalcValue(int delta, int part, int & pending, long &position, BOOL isSize)
 {
-	if( part > 0 )
+	if(part > 0)
 	{
-		if ( abs( delta * part ) == abs( pending ) )
+		if (abs(delta * part) == abs(pending))
 			pending++;
 
-		int toAdd = ( delta * part ) + pending;
-		if( toAdd != 0 )
+		int toAdd = (delta * part) + pending;
+		if(toAdd != 0)
 		{
-			position  += ( toAdd / m_maxPart );
+			position  += (toAdd / m_maxPart);
 			pending    =   toAdd % m_maxPart ;
 			// avoid negative width or height
-			if( TRUE == isSize && position < 0 )
+			if(TRUE == isSize && position < 0)
 			{
-				pending += ( position * m_maxPart );
+				pending += (position * m_maxPart);
 				position = 0;
 			}
 			return TRUE;
@@ -414,47 +414,47 @@ BOOL CResizeCtrl::CalcValue(int delta, int part, int & pending, long &position, 
 
 void CResizeCtrl::Resize(int cx, int cy)
 {
-	ASSERT ( m_array );
+	ASSERT (m_array);
 
-	if( FALSE == m_inResize )
+	if(FALSE == m_inResize)
 	{
 		m_inResize     = TRUE;
 		int upperBound = m_array->GetUpperBound();
-		if( upperBound >= 0 )
+		if(upperBound >= 0)
 		{
 			int deltaX = cx - m_size.cx;
 			int deltaY = cy - m_size.cy;
 
-			if( deltaX != 0 || deltaY != 0 )
+			if(deltaX != 0 || deltaY != 0)
 			{
 				CRPItemState * items = m_array->GetData();
-				HDWP  hdwp = ::BeginDeferWindowPos( 0 );
-				for( int current = 0; current <= upperBound; current++, items++ )
+				HDWP  hdwp = ::BeginDeferWindowPos(0);
+				for(int current = 0; current <= upperBound; current++, items++)
 				{
 					RECT rcItem;
 
 
-					::GetWindowRect( items->handle, & rcItem );
-					::MapWindowPoints( HWND_DESKTOP, m_hWndParent, (LPPOINT)(RECT*)&rcItem, 2 );
+					::GetWindowRect(items->handle, & rcItem);
+					::MapWindowPoints(HWND_DESKTOP, m_hWndParent, (LPPOINT)(RECT*)&rcItem, 2);
 					rcItem.right  -= rcItem.left;
 					rcItem.bottom -= rcItem.top;
 
 					BOOL changed = FALSE;
 
-					changed |= CalcValue( deltaX, items->part.left,   items->pending.left,   rcItem.left,   FALSE );
-					changed |= CalcValue( deltaX, items->part.width,  items->pending.width,  rcItem.right,  TRUE );
-					changed |= CalcValue( deltaY, items->part.top,    items->pending.top,    rcItem.top,    FALSE );
-					changed |= CalcValue( deltaY, items->part.height, items->pending.height, rcItem.bottom, TRUE );
+					changed |= CalcValue(deltaX, items->part.left,   items->pending.left,   rcItem.left,   FALSE);
+					changed |= CalcValue(deltaX, items->part.width,  items->pending.width,  rcItem.right,  TRUE);
+					changed |= CalcValue(deltaY, items->part.top,    items->pending.top,    rcItem.top,    FALSE);
+					changed |= CalcValue(deltaY, items->part.height, items->pending.height, rcItem.bottom, TRUE);
 
-					if( changed )
+					if(changed)
 					{
-						hdwp = ::DeferWindowPos( hdwp, items->handle, NULL,
+						hdwp = ::DeferWindowPos(hdwp, items->handle, NULL,
 							rcItem.left, rcItem.top,
 							rcItem.right, rcItem.bottom, SWP_NOZORDER	);
 					}
 
 				}
-				::EndDeferWindowPos( hdwp );
+				::EndDeferWindowPos(hdwp);
 				m_size.cx = cx;
 				m_size.cy = cy;
 			}
@@ -467,12 +467,12 @@ void CResizeCtrl::Resize(int cx, int cy)
 LRESULT CALLBACK CResizeCtrl::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	LRESULT result = 0;
-	CResizeCtrl * This = reinterpret_cast<CResizeCtrl *>(::GetProp( hWnd, m_szResizeProperty ));
-	if( This )
+	CResizeCtrl * This = reinterpret_cast<CResizeCtrl *>(::GetProp(hWnd, m_szResizeProperty));
+	if(This)
 	{
 		WNDPROC prevWndProc = This->m_prevWndProc;
-		if( FALSE == This->ProcessMessage( msg, wParam, lParam, result ) )
-			result =  ::CallWindowProc( prevWndProc, hWnd, msg, wParam, lParam );
+		if(FALSE == This->ProcessMessage(msg, wParam, lParam, result))
+			result =  ::CallWindowProc(prevWndProc, hWnd, msg, wParam, lParam);
 	}
 	return result;
 }
@@ -481,23 +481,23 @@ LRESULT CALLBACK CResizeCtrl::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
 void CResizeCtrl::ChangeStyle(BOOL enable)
 {
-	ASSERT( m_hWndParent );
-	ASSERT( m_hasResizingBorder == FALSE );
+	ASSERT(m_hWndParent);
+	ASSERT(m_hasResizingBorder == FALSE);
 	CRect rect;
 
-	BOOL hasMenu = ::GetMenu( m_hWndParent ) != NULL;
-	LONG_PTR style   = ::GetWindowLongPtr( m_hWndParent, GWL_STYLE );
-	::GetWindowRect( m_hWndParent, &rect );
+	BOOL hasMenu = ::GetMenu(m_hWndParent) != NULL;
+	LONG_PTR style   = ::GetWindowLongPtr(m_hWndParent, GWL_STYLE);
+	::GetWindowRect(m_hWndParent, &rect);
 
 	// retrieve client Rectangle
 	RECT oldClientRect;
-	::GetClientRect( m_hWndParent, &oldClientRect );
+	::GetClientRect(m_hWndParent, &oldClientRect);
 	RECT newClientRect = oldClientRect;
 
 	// adjust rect with current style
-	::AdjustWindowRect( &oldClientRect, style, hasMenu );
+	::AdjustWindowRect(&oldClientRect, style, hasMenu);
 
-	if( enable )
+	if(enable)
 	{
 		style |= WS_THICKFRAME;
 	}
@@ -507,77 +507,77 @@ void CResizeCtrl::ChangeStyle(BOOL enable)
 	}
 
 	// adjust rect with new style
-	::AdjustWindowRect( &newClientRect, style, hasMenu );
+	::AdjustWindowRect(&newClientRect, style, hasMenu);
 
 	// and adjust the windowrect, so that the clientrect remains equal
-	rect.left   += ( newClientRect.left   - oldClientRect.left );
-	rect.right  += ( newClientRect.right  - oldClientRect.right );
-	rect.top    += ( newClientRect.top    - oldClientRect.top   );
-	rect.bottom += ( newClientRect.bottom - oldClientRect.bottom );
+	rect.left   += (newClientRect.left   - oldClientRect.left);
+	rect.right  += (newClientRect.right  - oldClientRect.right);
+	rect.top    += (newClientRect.top    - oldClientRect.top  );
+	rect.bottom += (newClientRect.bottom - oldClientRect.bottom);
 
-	::SetWindowLongPtr( m_hWndParent, GWL_STYLE, style );
-	::SetWindowPos ( m_hWndParent, HWND_DESKTOP, rect.left, rect.top, rect.Width(), rect.Height(),
-		SWP_NOZORDER | SWP_NOACTIVATE  );
+	::SetWindowLongPtr(m_hWndParent, GWL_STYLE, style);
+	::SetWindowPos (m_hWndParent, HWND_DESKTOP, rect.left, rect.top, rect.Width(), rect.Height(),
+		SWP_NOZORDER | SWP_NOACTIVATE );
 
 }
 
 BOOL CResizeCtrl::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam, LRESULT & result)
 {
 	BOOL handled = FALSE;
-	if( m_gripEnabled && WM_NCHITTEST == message )
+	if(m_gripEnabled && WM_NCHITTEST == message)
 	{
 		POINT pt = { (int)LOWORD(lParam), (int)HIWORD(lParam) };
-		::ScreenToClient( m_hWndParent, &pt);
-		if( ::PtInRect ( m_gripRect, pt ) )
+		::ScreenToClient(m_hWndParent, &pt);
+		if(::PtInRect (m_gripRect, pt))
 		{
 			result  = HTBOTTOMRIGHT;
 			handled = TRUE;
 		}
 	}
-	else if( m_gripEnabled && WM_PAINT == message )
+	else if(m_gripEnabled && WM_PAINT == message)
 	{
 		// First let the previous windowproc handle the WM_SIZE message
-		result = ::CallWindowProc( m_prevWndProc, m_hWndParent, message, wParam, lParam );
-		HDC hDC = ::GetDC( m_hWndParent );
+		result = ::CallWindowProc(m_prevWndProc, m_hWndParent, message, wParam, lParam);
+		HDC hDC = ::GetDC(m_hWndParent);
 		DrawFrameControl(hDC, &m_gripRect, DFC_SCROLL, DFCS_SCROLLSIZEGRIP);
-		::ReleaseDC( m_hWndParent, hDC ); 
+		::ReleaseDC(m_hWndParent, hDC); 
 		// flag message handled
 		handled = TRUE;
 	}
-	else if( WM_DESTROY == message )
+	else if(WM_DESTROY == message)
 	{
 		// Remove subclassing
-		SetEnabled( FALSE );
+		SetEnabled(FALSE);
 	}
-	else if( WM_SIZE == message )
+	else if(WM_SIZE == message)
 	{
 		// First let the previous windowproc handle the WM_SIZE message
-		result = ::CallWindowProc( m_prevWndProc, m_hWndParent, message, wParam, lParam );
+		result = ::CallWindowProc(m_prevWndProc, m_hWndParent, message, wParam, lParam);
 		// resize all registered controls
-		Resize( (int)LOWORD(lParam) , (int)HIWORD(lParam) );
-		if( m_gripEnabled )
+		Resize((int)LOWORD(lParam) , (int)HIWORD(lParam));
+		if(m_gripEnabled)
 		{
-			::InvalidateRect( m_hWndParent, m_gripRect, TRUE );
-			GetGripRect( m_gripRect, TRUE );
+			::InvalidateRect(m_hWndParent, m_gripRect, TRUE);
+			GetGripRect(m_gripRect, TRUE);
 		}
 		// flag message handled
 		handled = TRUE;
 	}
-	else if( WM_GETMINMAXINFO == message )
+	else if(WM_GETMINMAXINFO == message)
 	{
 		// First let the previous windowproc handle the WM_GETMINMAXINFO message
-		result = ::CallWindowProc( m_prevWndProc, m_hWndParent, message, wParam, lParam );
-		MINMAXINFO * lpMMI = (MINMAXINFO * )lParam;
-		if( m_minTracking.cx == -1 )
+		result = ::CallWindowProc(m_prevWndProc, m_hWndParent, message, wParam, lParam);
+		MINMAXINFO * lpMMI = (MINMAXINFO *)lParam;
+		if(m_minTracking.cx == -1)
 			m_minTracking.cx = lpMMI->ptMinTrackSize.x;
 
-		if( m_minTracking.cy == -1 )
+		if(m_minTracking.cy == -1)
 			m_minTracking.cy = lpMMI->ptMinTrackSize.y;
 
-		if( m_maxTracking.cx == -1 )
+		if(m_maxTracking.cx == -1)
 			m_maxTracking.cx = lpMMI->ptMaxTrackSize.x;
 
-		if( m_maxTracking.cy == -1 )
+		if(m_maxTracking.cy == -1)
 			m_maxTracking.cy = lpMMI->ptMaxTrackSize.y;
 
 		lpMMI->ptMinTrackSize.x = m_minTracking.cx;
@@ -597,22 +597,22 @@ BOOL CResizeCtrl::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam, LRE
 			POINT mousePostion;
 			RECT  currentRect;
 
-			if( WM_MOUSEMOVE == message )
+			if(WM_MOUSEMOVE == message)
 			{
-				if (m_hitCode && !m_inMouseMove )
+				if (m_hitCode && !m_inMouseMove)
 				{
 					m_inMouseMove = TRUE;
 
-					::GetCursorPos( &mousePostion );
+					::GetCursorPos(&mousePostion);
 					mousePostion.x += m_delta.cx;
 					mousePostion.y += m_delta.cy;
 
 					RECT  m_previsionRect;
 
-					::GetWindowRect( m_hWndParent, &currentRect );
+					::GetWindowRect(m_hWndParent, &currentRect);
 					m_previsionRect = currentRect;
 
-					switch( m_hitCode )
+					switch(m_hitCode)
 					{
 					case HTTOPLEFT     : currentRect.left   = mousePostion.x; // fall through
 					case HTTOP         : currentRect.top    = mousePostion.y;	break;
@@ -626,27 +626,27 @@ BOOL CResizeCtrl::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam, LRE
 					case HTTOPRIGHT    : currentRect.top    = mousePostion.y; // fall through
 					case HTRIGHT       : currentRect.right  = mousePostion.x;	break;
 					}
-					if (!::EqualRect( &currentRect, &m_previsionRect ))
+					if (!::EqualRect(&currentRect, &m_previsionRect))
 					{
 						int width  = currentRect.right - currentRect.left;
 						int height = currentRect.bottom - currentRect.top;
 
-						::SetWindowPos( m_hWndParent, HWND_DESKTOP, currentRect.left, currentRect.top,	
-							width, height, SWP_NOZORDER | SWP_NOACTIVATE );
+						::SetWindowPos(m_hWndParent, HWND_DESKTOP, currentRect.left, currentRect.top,	
+							width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 					}
 					m_inMouseMove = FALSE;
 				}
 			}
-			else if( WM_NCLBUTTONDOWN == message )
+			else if(WM_NCLBUTTONDOWN == message)
 			{
-				::GetCursorPos( &mousePostion );
-				::GetWindowRect( m_hWndParent, &currentRect );
+				::GetCursorPos(&mousePostion);
+				::GetWindowRect(m_hWndParent, &currentRect);
 
 				m_hitCode  = wParam;
 				m_delta.cx = 
 					m_delta.cy = 0;
 
-				switch( m_hitCode )
+				switch(m_hitCode)
 				{
 				case HTTOPLEFT     : m_delta.cx = currentRect.left   - mousePostion.x; // fall through
 				case HTTOP         : m_delta.cy = currentRect.top    - mousePostion.y; break;
@@ -665,11 +665,11 @@ BOOL CResizeCtrl::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam, LRE
 
 				if (m_hitCode)
 				{
-					::SetCapture( m_hWndParent );
+					::SetCapture(m_hWndParent);
 				}
 
 			}
-			else if( WM_LBUTTONUP == message )
+			else if(WM_LBUTTONUP == message)
 			{
 				if (m_hitCode != 0)
 				{
@@ -684,7 +684,7 @@ BOOL CResizeCtrl::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam, LRE
 ///////////////////////////////////////////////////////////////////////
 // MinMaxInfo Support
 
-BOOL  CResizeCtrl::SetMinimumTrackingSize( const CSize & size )
+BOOL  CResizeCtrl::SetMinimumTrackingSize(const CSize & size)
 {
 	m_minTracking = size;
 	return TRUE;
@@ -692,20 +692,20 @@ BOOL  CResizeCtrl::SetMinimumTrackingSize( const CSize & size )
 BOOL  CResizeCtrl::SetMinimumTrackingSize()
 {
 	RECT  rect;
-	::GetWindowRect( m_hWndParent, &rect );
-	return SetMinimumTrackingSize( CSize( rect.right - rect.left, rect.bottom - rect.top ) );
+	::GetWindowRect(m_hWndParent, &rect);
+	return SetMinimumTrackingSize(CSize(rect.right - rect.left, rect.bottom - rect.top));
 }
-CSize CResizeCtrl::GetMinimumTrackingSize( )
+CSize CResizeCtrl::GetMinimumTrackingSize()
 {
 	return m_minTracking;
 }
 
-BOOL  CResizeCtrl::SetMaximumTrackingSize( const CSize & size )
+BOOL  CResizeCtrl::SetMaximumTrackingSize(const CSize & size)
 {
 	m_maxTracking = size;
 	return TRUE;
 }
-CSize CResizeCtrl::GetMaximumTrackingSize( )
+CSize CResizeCtrl::GetMaximumTrackingSize()
 {
 	return m_maxTracking;
 }
@@ -713,9 +713,9 @@ CSize CResizeCtrl::GetMaximumTrackingSize( )
 
 void CResizeCtrl::GetGripRect(RECT & rect, BOOL redraw)
 {
-	GetClientRect( m_hWndParent, &rect );
+	GetClientRect(m_hWndParent, &rect);
 	rect.left = rect.right  - ::GetSystemMetrics(SM_CXVSCROLL) ;
 	rect.top  = rect.bottom - ::GetSystemMetrics(SM_CYHSCROLL) ;
-	if( redraw )
-		::InvalidateRect( m_hWndParent, &rect, TRUE );
+	if(redraw)
+		::InvalidateRect(m_hWndParent, &rect, TRUE);
 }

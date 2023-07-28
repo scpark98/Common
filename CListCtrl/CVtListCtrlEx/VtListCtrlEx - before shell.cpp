@@ -31,20 +31,15 @@ CVtListCtrlEx::CVtListCtrlEx()
 
 	m_last_clicked = 0;
 
-	memset(&m_lf, 0, sizeof(LOGFONT));
+	memset( &m_lf, 0, sizeof( LOGFONT ) );
 
 	NCOverride = FALSE; //False as default...
 	Who = SB_BOTH; //Default remove both...
-
-	CoInitialize(NULL);
 }
 
 CVtListCtrlEx::~CVtListCtrlEx()
 {
 	m_font.DeleteObject();
-
-	m_imagelist_small.Detach();
-	CoUninitialize();
 }
 
 
@@ -142,7 +137,7 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 	/*
 	//Do the list need image information?
-	if(pItem->mask & LVIF_IMAGE) 
+	if( pItem->mask & LVIF_IMAGE) 
 	{
 		//Set which image to use
 		pItem->iImage=*m_list_db[itemid].m_image;
@@ -198,20 +193,20 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	COLORREF	crBack = m_crBack;
 	//COLORREF	crProgress = m_crProgress;
 
-	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
+	for ( iSubItem = 0; iSubItem < get_column_count(); iSubItem++ )
 	{
 		//먼저 선택 여부, focus여부 등에 따라 셀이 그려질 글자색, 배경색을 골라주고...
 
 		//LVIR_BOUNDS로 구할 경우 0번 컬럼은 한 라인의 사각형 영역을 리턴한다.
 		//0번 컬럼 이후부터는 해당 셀의 사각형 영역만을 리턴한다.
-		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, itemRect);
+		GetSubItemRect( iItem, iSubItem, LVIR_BOUNDS, itemRect );
 		if (iSubItem == 0)
 		{
 			itemRect.right = itemRect.left + GetColumnWidth(0);
 		}
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
-		if (GetItemState(iItem, LVIS_SELECTED)) //ok
+		if ( GetItemState( iItem, LVIS_SELECTED) ) //ok
 		{
 			if (GetFocus() == this)
 			{
@@ -337,32 +332,19 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else
 		{
 			pDC->SetTextColor(crText);
-			pDC->FillSolidRect(itemRect, crBack);
+			pDC->FillSolidRect( itemRect, crBack );
 			//텍스트가 그려질 때 itemRect에 그리면 좌우 여백이 없어서 양쪽이 꽉차보인다.
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
-
-			if (iSubItem == 0 && m_shell_list && m_imagelist_small.GetImageCount() > 0)
-			{
-				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
-				CString text = get_text(iItem, iSubItem);
-				m_imagelist_small.Draw(pDC, GetSystemImageListIcon(m_path + _T("\\") + get_text(iItem, iSubItem), false),
-					CPoint(textRect.left + 3, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
-				textRect.left += 16;	//small icon width
-				textRect.left += 3;		//margin between icon and text
-			}
-			else
-			{
-				textRect.DeflateRect(4, 0);
-			}
+			textRect.DeflateRect(4, 0);
 
 			UINT format = 0;
 
-			if (get_column_text_align(iSubItem) == LVCFMT_LEFT)
+			if ( get_column_text_align(iSubItem) == LVCFMT_LEFT )
 				format = DT_LEFT;
-			else if (get_column_text_align(iSubItem) == LVCFMT_CENTER)
+			else if ( get_column_text_align(iSubItem) == LVCFMT_CENTER )
 				format = DT_CENTER;
-			else if (get_column_text_align(iSubItem) == LVCFMT_RIGHT)
+			else if ( get_column_text_align(iSubItem) == LVCFMT_RIGHT )
 				format = DT_RIGHT;
 
 			format = format | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS;
@@ -377,23 +359,23 @@ bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 	int iStart = 0;
 	int	column = 0;
 
-	for(;;)
+	for( ;; )
 	{
-		const int iComma = strHeadings.Find(_T(','), iStart);
+		const int iComma = strHeadings.Find( _T(','), iStart );
 
-		if(iComma == -1)
+		if( iComma == -1 )
 			break;
 
-		const CString strHeading = strHeadings.Mid(iStart, iComma - iStart);
+		const CString strHeading = strHeadings.Mid( iStart, iComma - iStart );
 
 		iStart = iComma + 1;
 
-		int iSemiColon = strHeadings.Find(_T(';'), iStart);
+		int iSemiColon = strHeadings.Find( _T(';'), iStart );
 
-		if(iSemiColon == -1)
+		if( iSemiColon == -1 )
 			iSemiColon = strHeadings.GetLength();
 
-		const int iWidth = _tstoi((TCHAR*)(LPCTSTR)strHeadings.Mid(iStart, iSemiColon - iStart));
+		const int iWidth = _tstoi((TCHAR*)(LPCTSTR)strHeadings.Mid( iStart, iSemiColon - iStart ));
 
 		iStart = iSemiColon + 1;
 
@@ -421,12 +403,12 @@ bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 
 CString	CVtListCtrlEx::get_header_text(int column)
 {
-	return m_HeaderCtrlEx.get_header_text(column);
+	return m_HeaderCtrlEx.get_header_text( column );
 }
 
-void CVtListCtrlEx::set_header_text(int column, CString sText)
+void CVtListCtrlEx::set_header_text( int column, CString sText )
 {
-	m_HeaderCtrlEx.set_header_text(column, sText);
+	m_HeaderCtrlEx.set_header_text( column, sText );
 }
 
 int CVtListCtrlEx::get_column_count()
@@ -457,7 +439,7 @@ void CVtListCtrlEx::set_header_text_align(int column, int format)
 	if (column < 0)
 	{
 		for (int i = 0; i < get_column_count(); i++)
-			m_HeaderCtrlEx.set_header_text_align(i, format);
+			m_HeaderCtrlEx.set_header_text_align( i, format );
 	}
 	else if (column >= get_column_count())
 	{
@@ -465,11 +447,11 @@ void CVtListCtrlEx::set_header_text_align(int column, int format)
 	}
 	else
 	{
-		m_HeaderCtrlEx.set_header_text_align(column, format);
+		m_HeaderCtrlEx.set_header_text_align( column, format );
 	}
 }
 
-int	CVtListCtrlEx::get_column_data_type(int column)
+int	CVtListCtrlEx::get_column_data_type( int column )
 {
 	if (column >= get_column_count())
 	{
@@ -506,7 +488,7 @@ void CVtListCtrlEx::set_line_height(int height)
 
 	//자체적으로 imagelist를 사용하지 않는 경우는 아래 코드만으로도
 	//height가 적용된다.
-	if (!m_use_own_imagelist)
+	if (!use_own_imagelist)
 	{
 		CImageList gapImage;
 		gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
@@ -769,7 +751,7 @@ void CVtListCtrlEx::PreSubclassWindow()
 	//dlg의 parent의 font를 얻어와야 한다.
 	CFont* font = GetParent()->GetFont();
 
-	if (font != NULL)
+	if ( font != NULL )
 		font->GetObject(sizeof(m_lf), &m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
@@ -821,7 +803,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: Add your specialized code here and/or call the base class
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	if (pMsg->message == WM_MOUSEWHEEL && m_in_editing)
+	if ( pMsg->message == WM_MOUSEWHEEL && m_in_editing )
 	{
 		return true;
 
@@ -830,38 +812,26 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		//edit을 그 좌표로 이동시켜줘야 한다. client영역을 벗엉廐툈E화면에서 보여지툈E안된다.
 		CRect	r;
 
-		GetSubItemRect(m_nEditItem, m_nEditSubItem, LVIR_BOUNDS, r);
-		m_pEdit->MoveWindow(r);
+		GetSubItemRect( m_nEditItem, m_nEditSubItem, LVIR_BOUNDS, r );
+		m_pEdit->MoveWindow( r );
 		Invalidate();
 		*/
 	}
-	else if (pMsg->message == WM_KEYDOWN)
+	else if ( pMsg->message == WM_KEYDOWN )
 	{
 		//TRACE(_T("listctrl key = %d\n"), pMsg->wParam);
 		switch (pMsg->wParam)
 		{
-		case VK_BACK	:
-		{
-			if (m_shell_list)
-			{
-				m_path = GetParentDirectory(m_path);
-				set_path(m_path);
-				return TRUE;
-			}
-				
-			break;
-		}
-
 		case 220		:	return true;	//'\'키를 누르면 리스트 맨 처음으로 이동되는 현상 방지.
 		case 'A'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
 							{
 								select_item(-1);
 							}
 							break;
-		case 'C'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
+		case 'C'		:	if ( GetKeyState( VK_CONTROL ) & 0x8000 )
 							{
-								//CopyToClipboard(_T("|"));
-								MessageBeep(MB_ICONINFORMATION);
+								//CopyToClipboard(_T("|") );
+								MessageBeep( MB_ICONINFORMATION );
 								return true;
 							}
 							break;
@@ -872,19 +842,19 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 								return false;
 							}
 							break;
-		case VK_F2		:	if (m_in_editing)
+		case VK_F2		:	if ( m_in_editing )
 							{
 								return true;
 							}
 							else
 							{
-								edit_item(get_selected_index(), m_edit_subItem);
+								edit_item(get_selected_index(), m_edit_subItem );
 								return true;
 							}
 							break;
 		/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
-		case VK_DELETE	:	if (m_bInEditing)
+		case VK_DELETE	:	if ( m_bInEditing )
 								return false;
 							else
 								DeleteSelectedItems();
@@ -959,7 +929,7 @@ BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 	LV_DISPINFO *plvDispInfo = (LV_DISPINFO *)pNMHDR;
 	LV_ITEM	*plvItem = &plvDispInfo->item;
 
-	if (plvItem->pszText != NULL && plvItem->pszText != m_old_text)
+	if (plvItem->pszText != NULL && plvItem->pszText != m_old_text )
 	{
 		m_modified = true;
 
@@ -1015,7 +985,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	// Make sure that the item is visible
 	if (!EnsureVisible(item, false)) 
 	{
-		//InsertItem()
+		//InsertItem( )
 		if (!EnsureVisible(item, TRUE)) 
 			return NULL;
 	}
@@ -1048,8 +1018,8 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	else
 		dwStyle = ES_CENTER;
 
-	DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
-	if ((subItem == 0) && (dwExStyle & LVS_EX_CHECKBOXES))
+	DWORD dwExStyle = ListView_GetExtendedListViewStyle( GetSafeHwnd() );
+	if ( (subItem == 0) && (dwExStyle & LVS_EX_CHECKBOXES) )
 		r.left += 18;
 
 	if (r.right > rc.right)
@@ -1104,25 +1074,25 @@ void CVtListCtrlEx::undo_edit_label()
 
 void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 {
-	switch (theme)
+	switch ( theme )
 	{
 	case color_theme_default :
-		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected		= ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_crTextSelectedInactive= ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_crBack				= ::GetSysColor(COLOR_WINDOW);
-		m_crBackSelected		= ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBackSelectedInactive= ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crHeaderBack			= ::GetSysColor(COLOR_3DFACE);
-		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
+		m_crText				= ::GetSysColor( COLOR_BTNTEXT );
+		m_crTextSelected		= ::GetSysColor( COLOR_HIGHLIGHTTEXT );
+		m_crTextSelectedInactive= ::GetSysColor( COLOR_INACTIVECAPTIONTEXT );
+		m_crBack				= ::GetSysColor( COLOR_WINDOW );
+		m_crBackSelected		= ::GetSysColor( COLOR_HIGHLIGHT );
+		m_crBackSelectedInactive= ::GetSysColor( COLOR_HIGHLIGHT );
+		m_crHeaderBack			= ::GetSysColor( COLOR_3DFACE );
+		m_crHeaderText			= ::GetSysColor( COLOR_BTNTEXT );
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(49, 108, 244);
 		break;
 	case color_theme_light_blue :
-		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected		= RGB( 65, 102, 146);
-		m_crTextSelectedInactive= RGB( 65, 102, 146);
-		m_crBack				= RGB(193, 219, 252);
+		m_crText				= ::GetSysColor( COLOR_BTNTEXT );
+		m_crTextSelected		= RGB(  65, 102, 146 );
+		m_crTextSelectedInactive= RGB(  65, 102, 146 );
+		m_crBack				= RGB( 193, 219, 252 );
 		m_crBackSelected		= get_color(m_crBack, -48);
 		m_crBackSelectedInactive= get_color(m_crBack, -48);
 		m_crHeaderBack			= get_color(m_crBack, -32);
@@ -1131,34 +1101,34 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crProgress			= RGB(32, 32, 255);
 		break;
 	case color_theme_navy_blue :
-		m_crText				= RGB(204, 216, 225);
-		m_crTextSelected		= RGB(234, 246, 255);
-		m_crTextSelectedInactive= RGB(105, 142, 186);
-		m_crBack				= RGB( 74,  94, 127);
-		m_crBackSelected		= RGB( 15,  36,  41);
-		m_crBackSelectedInactive= RGB( 15,  36,  41);
-		m_crHeaderBack			= get_color(m_crBack, -32);
-		m_crHeaderText			= get_color(m_crText, -32);
+		m_crText				= RGB( 204, 216, 225 );
+		m_crTextSelected		= RGB( 234, 246, 255 );
+		m_crTextSelectedInactive= RGB( 105, 142, 186 );
+		m_crBack				= RGB(  74,  94, 127 );
+		m_crBackSelected		= RGB(  15,  36,  41 );
+		m_crBackSelectedInactive= RGB(  15,  36,  41 );
+		m_crHeaderBack			= get_color( m_crBack, -32 );
+		m_crHeaderText			= get_color( m_crText, -32 );
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
 		break; 
 	case color_theme_dark_blue :
-		m_crText				= RGB( 16, 177, 224);
-		m_crTextSelected		= RGB(224, 180,  59);
-		m_crTextSelectedInactive= RGB(105, 142, 186);
-		m_crBack				= RGB(  2,  21,  36);
-		m_crBackSelected		= RGB(  3,  42,  59);
-		m_crBackSelectedInactive= RGB( 15,  36,  41);
-		m_crHeaderBack			= RGB(  0,  13,  22);
-		m_crHeaderText			= RGB(  0, 180, 228);
+		m_crText				= RGB(  16, 177, 224 );
+		m_crTextSelected		= RGB( 224, 180,  59 );
+		m_crTextSelectedInactive= RGB( 105, 142, 186 );
+		m_crBack				= RGB(   2,  21,  36 );
+		m_crBackSelected		= RGB(   3,  42,  59 );
+		m_crBackSelectedInactive= RGB(  15,  36,  41 );
+		m_crHeaderBack			= RGB(   0,  13,  22 );
+		m_crHeaderText			= RGB(   0, 180, 228 );
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
 		break; 
 	case color_theme_dark_gray :
-		m_crText				= RGB(164, 164, 164);
-		m_crTextSelected		= RGB(241, 241, 241);
+		m_crText				= RGB( 164, 164, 164);
+		m_crTextSelected		= RGB( 241, 241, 241 );
 		m_crTextSelectedInactive= get_color(m_crTextSelected, -36);
-		m_crBack				= RGB( 64,  64,  64);
+		m_crBack				= RGB(  64,  64,  64 );
 		m_crBackSelected		= get_color(m_crBack, -32);
 		m_crBackSelectedInactive= get_color(m_crBack, -32);
 		m_crHeaderBack			= get_color(m_crBack, -16);
@@ -1459,11 +1429,11 @@ int CVtListCtrlEx::size()
 void CVtListCtrlEx::delete_selected_items()
 {
 	//뒤에서부터 지움에 주목.
-	for (int i = GetItemCount() - 1; i >= 0; i--)
+	for ( int i = GetItemCount() - 1; i >= 0; i-- )
 	{
-		if (GetItemState(i, LVIS_SELECTED))
+		if ( GetItemState( i, LVIS_SELECTED ) )
 		{
-			CListCtrl::DeleteItem(i);
+			CListCtrl::DeleteItem( i );
 			m_list_db.erase(m_list_db.begin() + i);
 		}
 	}
@@ -1586,7 +1556,7 @@ int CVtListCtrlEx::get_selected_index(int start)
 
 int CVtListCtrlEx::get_last_selected_item()
 {
-	for (int i = size() - 1; i >= 0; i--)
+	for ( int i = size() - 1; i >= 0; i-- )
 	{
 		if (GetItemState(i, LVIS_SELECTED))
 			return i;
@@ -1654,10 +1624,10 @@ int CVtListCtrlEx::find_string(CString str, int start, bool bWholeWord, bool bCa
 	int i;
 	CString sText;
 
-	if (start < 0)
+	if (start < 0 )
 		start = 0;
 
-	for (i = start; i < GetItemCount(); i++)
+	for ( i = start; i < GetItemCount(); i++ )
 	{
 		sText = get_text(i, 0);
 
@@ -1795,22 +1765,6 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: Add your control notification handler code here
-	int iItem = pNMItemActivate->iItem;
-	int iSubItem = pNMItemActivate->iSubItem;
-
-	if (m_shell_list)
-	{
-		if (iItem < 0 || iItem >= size() || iSubItem < 0 || iSubItem >= get_column_count())
-			return TRUE;
-
-		if (!PathIsDirectory(m_path + _T("\\") + get_text(iItem, col_filename)))
-			return TRUE;
-
-		m_path = m_path + _T("\\") + get_text(iItem, col_filename);
-		set_path(m_path);
-		return TRUE;
-	}
-
 	*pResult = 0;
 	
 	//dbclick을 편집으로 사용하거나 어떤 액션으로 사용하는 것은
@@ -1818,15 +1772,17 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	return FALSE;
 
 	/*
-	if (m_allow_edit == false)
+	if ( m_allow_edit == false )
 		return FALSE;
 
+	int iItem = pNMItemActivate->iItem;
+	int iSubItem = pNMItemActivate->iSubItem;
 
 	if (m_allow_edit_column[iSubItem] == false)
 		return FALSE;
 
-	if (iItem >= 0 && iItem < GetItemCount() &&
-		iSubItem >= 0 && iSubItem < get_column_count())
+	if ( iItem >= 0 && iItem < GetItemCount() &&
+		iSubItem >= 0 && iSubItem < get_column_count() )
 	{
 		edit_item(iItem, iSubItem);
 		return TRUE;
@@ -1839,10 +1795,10 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		CString str;
 
 		str.Format(_T("%d"), GetItemCount());
-		iItem = AddItem(str, NULL);
-		SelectItem(iItem);
-		EnsureVisible(iItem, false);
-		EditSubItem(iItem, 0);
+		iItem = AddItem( str, NULL );
+		SelectItem( iItem );
+		EnsureVisible( iItem, false );
+		EditSubItem( iItem, 0 );
 		return TRUE;
 	}
 	*/
@@ -1852,7 +1808,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString sSeparator /*= _T("|")*/, bool bHead /*= false*/)
 {
-	ASSERT(::IsWindow(GetSafeHwnd()));
+	ASSERT( ::IsWindow( GetSafeHwnd() ) );
 
 	int		i;
 	CString sResult = _T("");
@@ -1864,7 +1820,7 @@ bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString
 	int		nColumn = 1;
 	CWaitCursor wait;
 
-	if ((GetStyle() & LVS_TYPEMASK) == LVS_REPORT &&
+	if ((GetStyle() & LVS_TYPEMASK ) == LVS_REPORT &&
 		(GetExtendedStyle() & LVS_EX_FULLROWSELECT))
 	{
 		CHeaderCtrl* pHeader = GetHeaderCtrl();
@@ -1891,7 +1847,7 @@ bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString
 		if (0 != nCount)
 			sResult += _T("\n");
 
-		for (i = 0; i < nColumn; ++i)
+		for ( i = 0; i < nColumn; ++i )
 		{
 			sResult += GetItemText(nItem, i);
 			if (i != nColumn - 1)
@@ -1946,7 +1902,7 @@ void CVtListCtrlEx::paste_from_clipboard()
 			if (pos == -1)
 				str = sText;
 			else
-				str = sText.Left(pos);
+				str = sText.Left( pos );
 
 			int idx;
 			int nSepCount = get_char_count(str, '|');
@@ -2002,7 +1958,7 @@ void CVtListCtrlEx::paste_from_clipboard()
 //파일에서 불러와서 리스트를 채웝芩. 컬럼의 수가 동일해야 한다.
 //컬럼 구성이 다른 데이터 파일들을 알아서 불러오햨E않는다.
 //이미 컬럼의 구성이 픽스되푳E있컖E그 구성으로 저장된 파일만 불러오도록 되푳E있다.
-bool CVtListCtrlEx::load(CString sfile, CString separator /*= _T("|")*/, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/)
+bool CVtListCtrlEx::load( CString sfile, CString separator /*= _T("|")*/, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/ )
 {
 	if (get_column_count() == 0)
 		return false;
@@ -2017,13 +1973,13 @@ bool CVtListCtrlEx::load(CString sfile, CString separator /*= _T("|")*/, bool ma
 	FILE* fp;
 	file_open(&fp, _T("rt"), sfile);
 
-	if (fp == NULL)
+	if ( fp == NULL )
 		return false;
 
 
-	while (_fgetts(sLine, 512, fp))
+	while (_fgetts( sLine, 512, fp ))
 	{
-		if (match_column_count && (get_char_count(sLine, separator[0])) >= get_column_count())
+		if ( match_column_count && (get_char_count(sLine, separator[0])) >= get_column_count() )
 		{
 			fclose(fp);
 			return false;
@@ -2036,7 +1992,7 @@ bool CVtListCtrlEx::load(CString sfile, CString separator /*= _T("|")*/, bool ma
 }
 
 //리스트의 내퓖E?파일로 저장한다.
-bool CVtListCtrlEx::save(CString sfile, CString separator /*= _T("|")*/, bool selected_only /*= false*/)
+bool CVtListCtrlEx::save(CString sfile, CString separator /*= _T("|")*/, bool selected_only /*= false*/ )
 {
 	int		i, j;
 	CString str = _T("");
@@ -2098,7 +2054,7 @@ void CVtListCtrlEx::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
-	SetFont(&m_font, true);
+	SetFont( &m_font, true );
 
 	if (m_HeaderCtrlEx)
 		m_HeaderCtrlEx.SetFont(&m_font, true);
@@ -2168,9 +2124,9 @@ void CVtListCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	reconstruct_font();
 }
 
-void CVtListCtrlEx::set_font_bold(bool bBold)
+void CVtListCtrlEx::set_font_bold( bool bBold )
 {
-	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
+	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
 	reconstruct_font();
 }
 
@@ -2369,79 +2325,4 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	lpMeasureItemStruct->itemHeight = m_line_height;
 	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
-}
-
-void CVtListCtrlEx::set_shell_list()
-{
-	m_shell_list = true;
-	m_use_own_imagelist = true;
-
-	set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
-	set_font_size(AfxGetApp()->GetProfileInt(_T("file list"), _T("font size"), 9));
-	set_font_name(AfxGetApp()->GetProfileString(_T("file list"), _T("font name"), _T("맑은 고딕")));
-	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면
-	//CHeaderCtrlEx::OnLayout()에서 에러가 발생한다.
-	set_header_height(24);
-	set_line_height(21);
-
-	set_column_text_align(col_filesize, HDF_RIGHT, false);
-
-	SHFILEINFO shInfo;
-	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
-	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
-}
-
-void CVtListCtrlEx::set_path(CString path)
-{
-	m_path = path;
-	if (m_path.Right(1) == '\\')
-		m_path = m_path.Left(m_path.GetLength() - 1);
-
-	refresh();
-}
-
-void CVtListCtrlEx::refresh()
-{
-	int i;
-	CFileFind	finder;
-	CString		sfile;
-
-	delete_all_items();
-	m_cur_folders.clear();
-	m_cur_files.clear();
-
-	bool bWorking = finder.FindFile(m_path + _T("\\*"));
-
-	while (bWorking)
-	{
-		bWorking = finder.FindNextFile();
-		sfile = finder.GetFilePath();
-
-		if (finder.IsDots())
-			continue;
-
-		if (finder.IsDirectory())
-		{
-			m_cur_folders.push_back(CFileList(sfile));
-			continue;
-		}
-
-		m_cur_files.push_back(CFileList(sfile));
-	}
-
-	int index;
-
-	for (i = 0; i < m_cur_folders.size(); i++)
-	{
-		index = add_item(GetFileNameFromFullPath(m_cur_folders[i].name), false, false);
-		set_text(index, col_filesize, get_size_string(m_cur_folders[i].size));
-		set_text(index, col_filedate, m_cur_folders[i].date);
-	}
-
-	for (i = 0; i < m_cur_files.size(); i++)
-	{
-		index = add_item(GetFileNameFromFullPath(m_cur_files[i].name), false, false);
-		set_text(index, col_filesize, get_size_string(m_cur_files[i].size));
-		set_text(index, col_filedate, m_cur_files[i].date);
-	}
 }

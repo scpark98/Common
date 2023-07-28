@@ -29,17 +29,17 @@
 	CResizeCtrl		m_resize;
 
 2.	in cpp...
-	m_resize.Create( this );
-	m_resize.Add( IDC_EDIT1,   0,   0, 100,  50 );
+	m_resize.Create(this);
+	m_resize.Add(IDC_EDIT1,   0,   0, 100,  50);
 	m_resize.SetMinimumTrackingSize();
 
 //	*파라미터가 l, t, r, b이 아닌 l, t, w, h임에 주의하자. 또한 각 값은 resize되는 크기에 대한 비율이다.
 
 //  divided into 3 parts with the horizontal
-// 	m_resize.Create( this, true, 1000 );
-// 	m_resize.Add( IDC_STATIC_IMAGE, 0, 0, 333, 1000 );
-// 	m_resize.Add( IDC_STATIC_RESULT, 333, 0, 333, 1000 );
-// 	m_resize.Add( IDC_STATIC_FINAL, 666, 0, 333, 1000 );
+// 	m_resize.Create(this, true, 1000);
+// 	m_resize.Add(IDC_STATIC_IMAGE, 0, 0, 333, 1000);
+// 	m_resize.Add(IDC_STATIC_RESULT, 333, 0, 333, 1000);
+// 	m_resize.Add(IDC_STATIC_FINAL, 666, 0, 333, 1000);
 
 주의! : m_resize에서 어떤 컨트롤을 동적으로 변경할 경우에는 반드시 제거한 후 다시 넣어줘야 제대로 동작한다.
 
@@ -100,7 +100,7 @@ public:
 
 	// In general, the formula is	
 	//
-	//    newValue = oldValue + (( deltaValueParent * partValue) / maxPart );
+	//    newValue = oldValue + ((deltaValueParent * partValue) / maxPart);
 	//
 	// newValue          - new left or top position or new width or height
 	// oldValue          - old left or top position or old width or height 

@@ -103,7 +103,7 @@ public:
 		}
 
 		// Fill background 
-		if( bBg )
+		if(bBg)
 			BitBlt(m_rect.left, m_rect.top, m_rect.Width(), m_rect.Height(),
 				m_pDC, m_rect.left, m_rect.top, SRCCOPY);
 		else

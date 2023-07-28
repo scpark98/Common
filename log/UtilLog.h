@@ -51,6 +51,7 @@ public:
 	CString Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
 	BOOL Release();
 	CString get_log_full_path() { return m_fullpath; }
+	bool	recursive_make_full_directory(LPCTSTR sFolder);
 
 protected:
 	CString m_filetitle;

@@ -49,32 +49,6 @@ m_list.set_header_height(24);
 
 #define MESSAGE_VTLISTCTRLEX	WM_USER + 0x7FFF - 0x7464
 
-class CFileList
-{
-public:
-	CFileList(CString _name, uint64_t _size = 0, CString _date = _T(""))
-	{
-		if (_size == 0)
-		{
-			_size = GetFileSize(_name);
-		}
-
-		if (_date.IsEmpty())
-		{
-			_date = GetDateTimeStringFromTime(GetFileLastModifiedTime(_name), true, false);
-		}
-
-		name = _name;
-		size = _size;
-		date = _date;
-	}
-
-	CString		name;
-	uint64_t	size;
-	CString		date;
-};
-
-
 class CVtListCtrlEx : public CListCtrl
 {
 	DECLARE_DYNAMIC(CVtListCtrlEx)
@@ -93,40 +67,6 @@ public:
 	{
 		message_progress_pos = 0,
 	};
-
-
-//ShellList로 동작시키기
-	bool		m_shell_list = false;
-	bool		is_shell_list() { return m_shell_list; }
-	//맨 처음 이 명령을 주면 모든 세팅과 동작이 ShellListCtrl로 동작된다.
-	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
-	void		set_shell_list();
-	void		set_path(CString path);
-	void		refresh();
-
-	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
-	std::deque<CFileList> m_cur_folders;
-	std::deque<CFileList> m_cur_files;
-
-
-	enum SHELL_LIST_COLUMN
-	{
-		col_filename = 0,
-		col_filesize,
-		col_filedate,
-	};
-
-	CString		m_path;
-	CImageList	m_imagelist_small;
-	CImageList	m_imagelist_large;
-
-
-
-
-
-
-
-
 
 
 //컬럼 관련
@@ -320,8 +260,8 @@ public:
 	//CVtListCtrlEx에 WM_SIZE가 발생하도록 하는 함수를 사용하면 된다)
 	//CVtListCtrlEx가 아닌 그냥 mainDlg만 resize한다고 해서 되지 않는다.
 	//자체 imagelist를 사용하지 않는 컨트롤이라면 쉽게 lineheight를 조절할 수 있다.
-	bool	m_use_own_imagelist = true;
-	void	set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
+	bool	use_own_imagelist = true;
+	void	set_use_own_imagelist(bool use) { use_own_imagelist = use; }
 	void	set_line_height(int height);
 
 	void	set_column_width(int nCol, int cx);

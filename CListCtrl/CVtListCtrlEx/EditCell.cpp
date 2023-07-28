@@ -50,7 +50,7 @@ void gxEditCell::SetListText()
 	//이 함수가 두번 이상 호출된다.
 	//두 번째는 이미 이 EditCell이 종료되는 시점에서 호출되어
 	//윈도우 핸들이 유효하지 않다.
-	if ( !IsWindow( m_hWnd ))
+	if (!IsWindow(m_hWnd))
 		return;
 
     CString Text;
@@ -86,7 +86,7 @@ BOOL gxEditCell::PreTranslateMessage (MSG* pMsg)
 			pMsg->wParam == VK_LEFT || pMsg->wParam == VK_RIGHT ||
 			GetKeyState (VK_CONTROL)
 			*/
-			true )
+			true)
 			{
 				::TranslateMessage (pMsg);
 				::DispatchMessage (pMsg);
@@ -185,7 +185,7 @@ void gxEditCell::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 		{
 			if (nChar == VK_ESCAPE)
 				bEscape = TRUE;
-			if ( ::IsWindow( m_hWnd ) )
+			if (::IsWindow(m_hWnd))
 				DestroyWindow();
 			return;
 		}
@@ -194,7 +194,7 @@ void gxEditCell::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 		{
 			//return키를 치면 편집을 마치고 edit box를 종료시킨다.
 			SetListText();
-			if ( ::IsWindow( m_hWnd ) )
+			if (::IsWindow(m_hWnd))
 				DestroyWindow();
 			//m_pListCtrl->EditSubItem (Item + 1, 0);
 			return;
@@ -207,18 +207,18 @@ void gxEditCell::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 		//다음 또는 이전 항목 편집
 		case VK_TAB :
 		{
-			if ( Shift )
+			if (Shift)
 			{
 				if (SubItem > 0)
 					m_pListCtrl->edit_item (Item, SubItem - 1);
 				else if (Item > 0)
-					m_pListCtrl->edit_item (Item - 1, m_pListCtrl->get_column_count() - 1 );
+					m_pListCtrl->edit_item (Item - 1, m_pListCtrl->get_column_count() - 1);
 			}
 			else
 			{
-				if ( SubItem < m_pListCtrl->get_column_count() - 1 )
+				if (SubItem < m_pListCtrl->get_column_count() - 1)
 					m_pListCtrl->edit_item (Item, SubItem + 1);
-				else if ( Item < m_pListCtrl->GetItemCount() - 1 )
+				else if (Item < m_pListCtrl->GetItemCount() - 1)
 					m_pListCtrl->edit_item (Item + 1, 0);
 				else
 					m_pListCtrl->edit_item (0, 0);
@@ -255,7 +255,7 @@ void gxEditCell::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
     // Check whether control needs to be resized and whether there is space to grow
     if (Size.cx > Rect.Width())
     {
-		if (Size.cx + Rect.left < ParentRect.right )
+		if (Size.cx + Rect.left < ParentRect.right)
 			Rect.right = Rect.left + Size.cx;
 		else
 			Rect.right = ParentRect.right;

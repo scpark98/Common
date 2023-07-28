@@ -348,11 +348,11 @@ CTimeSpan GetTimeSpanFromTimeString(CString sTime)
 	return CTimeSpan(0, _ttoi(sTime.Left(2)), _ttoi(sTime.Mid(2,2)), _ttoi(sTime.Right(2)));
 }
 
-CString GetDateTimeStringFromTime(CTime t, bool bSeparator /*= true*/)
+CString GetDateTimeStringFromTime(CTime t, bool bSeparator /*= true*/, bool h24 /*= true*/)
 {
 	CString str;
 
-	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t));
+	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t, _T(":"), h24));
 
 	if (!bSeparator)
 	{
@@ -598,14 +598,14 @@ COLORREF	GetDefaultColor(int idx)
 	switch (idx)
 	{
 		case 0 : return RGB(237, 125,  49);
-		case 1 : return RGB( 91, 155, 213);
+		case 1 : return RGB(91, 155, 213);
 		case 2 : return RGB(165, 255, 165);
 		case 3 : return RGB(255, 192,   0);
-		case 4 : return RGB( 68, 114, 196);
+		case 4 : return RGB(68, 114, 196);
 		case 5 : return RGB(112, 173,  71);
-		case 6 : return RGB( 37,  94, 255);
+		case 6 : return RGB(37,  94, 255);
 		case 7 : return RGB(158,  72,  14);
-		case 8 : return RGB( 99,  99, 199);
+		case 8 : return RGB(99,  99, 199);
 		case 9 : return RGB(153, 115,   0);
 	}
 }
@@ -1509,7 +1509,7 @@ COLORREF get_color(CString sColor)
 	else if (sColor ==	"purple")				return RGB(0xa0,0x20,0xf0);
 	else if (sColor ==	"mediumpurple")		return RGB(0x93,0x70,0xdb);
 	else if (sColor ==	"thistle")				return RGB(0xd8,0xbf,0xd8);
-	else if (sColor ==	"aqua")				return RGB(  0, 255, 255);
+	else if (sColor ==	"aqua")				return RGB( 0, 255, 255);
 	else return -1;
 }
 #endif
@@ -2905,6 +2905,7 @@ LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
 	return nError;
 }
 
+#ifndef _USING_V110_SDK71_
 LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value)
 {
 	HKEY	hkey = NULL;
@@ -2923,7 +2924,7 @@ LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value
 			if (nError != ERROR_SUCCESS)
 			{
 				/*
-				FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+				FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 								FORMAT_MESSAGE_IGNORE_INSERTS,
 								NULL,
 								nError,
@@ -2940,7 +2941,7 @@ LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value
 	else
 	{
 		/*
-		FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 						FORMAT_MESSAGE_IGNORE_INSERTS,
 						NULL,
 						nError,
@@ -2976,7 +2977,7 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 			
 			if (nError != ERROR_SUCCESS)
 			{
-				FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+				FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 								FORMAT_MESSAGE_IGNORE_INSERTS,
 								NULL,
 								nError,
@@ -2991,7 +2992,7 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 	}
 	else
 	{
-		FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 						FORMAT_MESSAGE_IGNORE_INSERTS,
 						NULL,
 						nError,
@@ -3053,7 +3054,7 @@ LONG SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString st
 
 	return true;
 }
-
+#endif
 
 bool	LoadBitmapFromFile(CBitmap &bmp, CString strFile)
 {
@@ -5566,10 +5567,17 @@ bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFold
 	return bSuccess;
 }
 
+//윈도우 운영체제에서 특정 폴더(다운로드, 내 문서 등)의 실제 경로를 리턴한다.
+//FOLDERID_Downloads, FOLDERID_Documents, ...
 CString get_known_folder(KNOWNFOLDERID folderID)
 {
 	PWSTR path = NULL;
+
+#ifndef _USING_V110_SDK71_
 	SHGetKnownFolderPath(folderID, 0, NULL, &path);
+#else
+
+#endif
 
 	return path;
 }
@@ -7018,6 +7026,7 @@ double ptimer_get_time(int instance)
 	return (double)((i64_end - i64_start[instance])/(double)i64_freq[instance])*1000.0;
 }
 
+#ifndef _USING_V110_SDK71_
 void SetWallPaper(CString sfile)
 {
 	::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -7060,6 +7069,7 @@ void SetWallPaper(CString sfile)
 
 	::CoUninitialize();
 }
+#endif
 
 //두 점의 각도를 구한다.
 //원하는 결과값은 0~360도인데
@@ -7614,11 +7624,11 @@ bool is_exist_keyword(CString src, CString set_of_keyword, bool case_sensitive, 
 	return false;
 }
 
-
+#ifndef _USING_V110_SDK71_
 SIZE_T GetCurrentMemUsage()
 {
 	DWORD dwpid = GetCurrentProcessId();
-	HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |	PROCESS_VM_READ, FALSE, dwpid);
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION |	PROCESS_VM_READ, FALSE, dwpid);
 	PROCESS_MEMORY_COUNTERS_EX mc;
 
 	if (NULL == hProcess)
@@ -7632,6 +7642,7 @@ SIZE_T GetCurrentMemUsage()
 
 	return 0;
 }
+#endif
 
 //경로에 '\\' 또는 '/'가 혼용되어 사용되는 경우가 있으므로 이를 감안해야 한다.
 //c:\\folder1\\folder2\\	=> c:\\folder1
@@ -7801,7 +7812,7 @@ CString GetHDDSerialNumber(int nPhysicalDrive)
 
 	CWQL::RowSet rs;
 
-	if (!myWQL.getClassProperties( L"Win32_DiskDrive", rs))
+	if (!myWQL.getClassProperties(L"Win32_DiskDrive", rs))
 	{
 		AfxMessageBox("WQL Execute failed! ");
 		return "";
@@ -7945,12 +7956,35 @@ void get_drive_map(std::map<TCHAR, CString> *drive_map)
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
 CString	convert_volume_to_real_path(CString volume_path)
 {
+	TCHAR buf[MAX_PATH];
+
 	if (volume_path == _T("바탕 화면"))
+	{
+#ifndef _USING_V110_SDK71_
 		volume_path = get_known_folder(FOLDERID_Desktop);
+#else
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_DESKTOP, FALSE);
+		volume_path = buf;
+#endif
+	}
 	else if (volume_path == _T("내 문서"))
+	{
+#ifndef _USING_V110_SDK71_
 		volume_path = get_known_folder(FOLDERID_Documents);
+#else
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_PERSONAL, FALSE);
+		volume_path = buf;
+#endif
+	}
 	else if (volume_path == _T("다운로드"))
+	{
+#ifndef _USING_V110_SDK71_
 		volume_path = get_known_folder(FOLDERID_Downloads);
+#else
+		//SHGetSpecialFolderPath(NULL, buf, CSIDL_DOWNLOADS, FALSE);
+		//volume_path = buf;
+#endif
+	}
 
 	CString real_path = volume_path;
 
@@ -8082,6 +8116,10 @@ CString char2CString(char* chStr, int length)
 	CString str;
 
 #if defined(UNICODE) || defined(_UNICODE)
+	//length가 -1인 경우, 즉 길이를 특별히 지정하지 않았고
+	//chStr이 '\0'문자로 끝나는 온전한 값이라면
+	//unicode에서 str = (CString)chStr; 로도 정상 동작한다. 예외가 있는지 확인 필요!
+
 	int len;
 	BSTR buf;
 
@@ -9043,6 +9081,7 @@ HWND GetHWNDbyPID(ULONG pid)
 }
 
 //출처: https://smok95.tistory.com/300?category=28201 [Only YOUng:티스토리]
+#ifndef _USING_V110_SDK71_
 CString GetProcessNameByPID(const DWORD pid)
 {
 	CString name = _T("unknown");
@@ -9060,6 +9099,7 @@ CString GetProcessNameByPID(const DWORD pid)
 
 	return name;
 }
+#endif
 
 HWND hWndToFind = NULL;
 
@@ -9255,7 +9295,7 @@ end:
 
 static HWND shWndCurWnd;
 
-BOOL CALLBACK cbfEnumWindowsProc( HWND hWnd, LPARAM lParam)
+BOOL CALLBACK cbfEnumWindowsProc(HWND hWnd, LPARAM lParam)
 {
 	shWndCurWnd =0;
 	DWORD PID=0, TID=0;
@@ -10649,7 +10689,7 @@ int LevenshteinDistance(std::string s, int len_s, std::string t, int len_t)
 		cost = 1;
 
 	/* return minimum of delete char from s, delete char from t, and delete char from both */
-	return minimum(LevenshteinDistance(s, len_s - 1, t, len_t   ) + 1,
+	return minimum(LevenshteinDistance(s, len_s - 1, t, len_t  ) + 1,
 		LevenshteinDistance(s, len_s    , t, len_t - 1) + 1,
 		LevenshteinDistance(s, len_s - 1, t, len_t - 1) + cost);
 }
@@ -14872,17 +14912,17 @@ void resize11(int* input, int* output, int sourceWidth, int sourceHeight, int ta
 			}else{
 				leftOutput =
 					// blue element
-					((( ((a&0xFF)*tm
+					(((((a&0xFF)*tm
 						+ (c&0xFF)*bm)*lm
 						) & 0xFF0000) >> 8)
 
 					// green element
-					| ((( (((a>>8)&0xFF)*tm
+					| ((((((a>>8)&0xFF)*tm
 						+ ((c>>8)&0xFF)*bm)*lm
 						) & 0xFF0000)) // no need to shift
 
 										// red element
-					| ((( (((a>>16)&0xFF)*tm
+					| ((((((a>>16)&0xFF)*tm
 						+ ((c>>16)&0xFF)*bm)*lm
 						) & 0xFF0000) << 8)
 					;
@@ -14890,17 +14930,17 @@ void resize11(int* input, int* output, int sourceWidth, int sourceHeight, int ta
 
 			rightOutput =
 				// blue element
-				((( ((b&0xFF)*tm
+				(((((b&0xFF)*tm
 					+ (d&0xFF)*bm)*lm
 					) & 0xFF0000) >> 8)
 
 				// green element
-				| ((( (((b>>8)&0xFF)*tm
+				| ((((((b>>8)&0xFF)*tm
 					+ ((d>>8)&0xFF)*bm)*lm
 					) & 0xFF0000)) // no need to shift
 
 									// red element
-				| ((( (((b>>16)&0xFF)*tm
+				| ((((((b>>16)&0xFF)*tm
 					+ ((d>>16)&0xFF)*bm)*lm
 					) & 0xFF0000) << 8)
 				;

@@ -41,17 +41,17 @@ CListCtrlEx::CListCtrlEx()
 
 	m_nEditItem	= m_nEditSubItem	= 0;
 
-	m_crText				= ::GetSysColor( COLOR_BTNTEXT );
-	m_crTextSelected		= ::GetSysColor( COLOR_HIGHLIGHTTEXT );//RGB( 193, 219, 252 );
-	m_crTextSelectedInactive= ::GetSysColor( COLOR_INACTIVECAPTIONTEXT );
-	m_crBack				= ::GetSysColor( COLOR_WINDOW );//RGB( 255, 255, 255 );
-	m_crBackSelected		= ::GetSysColor( COLOR_HIGHLIGHT );//RGB( 193, 219, 252 );
-	m_crBackSelectedInactive= ::GetSysColor( COLOR_HIGHLIGHT );//RGB( 193, 219, 252 );
+	m_crText				= ::GetSysColor(COLOR_BTNTEXT);
+	m_crTextSelected		= ::GetSysColor(COLOR_HIGHLIGHTTEXT);//RGB(193, 219, 252);
+	m_crTextSelectedInactive= ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+	m_crBack				= ::GetSysColor(COLOR_WINDOW);//RGB(255, 255, 255);
+	m_crBackSelected		= ::GetSysColor(COLOR_HIGHLIGHT);//RGB(193, 219, 252);
+	m_crBackSelectedInactive= ::GetSysColor(COLOR_HIGHLIGHT);//RGB(193, 219, 252);
 
 	m_nSorted = SORT_NONE;
 
 	m_font_size = 10;
-	memset( &m_lf, 0, sizeof( LOGFONT ) );
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
 CListCtrlEx::~CListCtrlEx()
@@ -66,9 +66,9 @@ void CListCtrlEx::OnDestroy()
 	m_cImageListLarge.Detach();
 	m_cImageListSmall.Detach();
 
-	if ( m_use_item_color )
+	if (m_use_item_color)
 	{
-		for ( int i = 0; i < GetItemCount(); i++ )
+		for (int i = 0; i < GetItemCount(); i++)
 		{
 			CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(i);
 			if (dq)
@@ -95,7 +95,7 @@ BEGIN_MESSAGE_MAP(CListCtrlEx, CListCtrl)
 	ON_WM_NCHITTEST()
 	ON_WM_PAINT()
 	//ON_MESSAGE(WM_SETFONT, OnSetFont)
-	ON_WM_MEASUREITEM_REFLECT( )
+	ON_WM_MEASUREITEM_REFLECT()
 	ON_WM_DESTROY()
 	ON_WM_ERASEBKGND()
 	//ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CListCtrlEx::OnLvnItemchanged)	//너무 많은 다양한 이벤트가 섞여 발생하므로 공흟E낯?獨値灌?적합하햨E않다.
@@ -107,19 +107,19 @@ BEGIN_MESSAGE_MAP(CListCtrlEx, CListCtrl)
 	ON_WM_DRAWITEM()
 #endif
 	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CListCtrlEx::OnNMDblclk)
-	//ON_WM_MEASUREITEM()
+	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CListCtrlEx message handlers
-void CListCtrlEx::SetBitmapImageList( UINT nBitmapIDLarge, UINT nBitmapIDSmall, COLORREF cTransparent, int nInitial, int nGrow /* = 1  */ )
+void CListCtrlEx::SetBitmapImageList(UINT nBitmapIDLarge, UINT nBitmapIDSmall, COLORREF cTransparent, int nInitial, int nGrow /* = 1  */)
 {
 	// Create 256 color image lists
-	HIMAGELIST hList = ImageList_Create( 32,32, ILC_COLOR8 |ILC_MASK , nInitial, nGrow );
-	m_cImageListLarge.Attach( hList );
+	HIMAGELIST hList = ImageList_Create(32,32, ILC_COLOR8 |ILC_MASK , nInitial, nGrow);
+	m_cImageListLarge.Attach(hList);
 
-	hList = ImageList_Create( 16, 16, ILC_COLOR8 | ILC_MASK, nInitial, nGrow );
-	m_cImageListSmall.Attach( hList );
+	hList = ImageList_Create(16, 16, ILC_COLOR8 | ILC_MASK, nInitial, nGrow);
+	m_cImageListSmall.Attach(hList);
 
 
 	// Load the large icons
@@ -146,7 +146,7 @@ void CListCtrlEx::OnColumnClickFunction(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
 	// TODO: Add your control notification handler code here
-	if ( m_bAllowSort == false )
+	if (m_bAllowSort == false)
 		return;
 
 	static int	nSortColumn = -1;
@@ -154,31 +154,31 @@ void CListCtrlEx::OnColumnClickFunction(NMHDR* pNMHDR, LRESULT* pResult)
 	int			iColumn = pNMListView -> iSubItem;
 
 	// Reverse sort order if column was just previously clicked.
-	if ( iColumn == nSortColumn )
+	if (iColumn == nSortColumn)
 		bSortAscending = !bSortAscending;
 	else
 		bSortAscending = TRUE;
 
 	nSortColumn = iColumn;
 
-	if (m_vtDataType[pNMListView->iSubItem] == COLUMN_DATA_TYPE_NUMERIC )
-		SortNumericItems( pNMListView->iSubItem, bSortAscending );
+	if (m_vtDataType[pNMListView->iSubItem] == COLUMN_DATA_TYPE_NUMERIC)
+		SortNumericItems(pNMListView->iSubItem, bSortAscending);
 	else
-		SortTextItems( pNMListView->iSubItem, bSortAscending );
+		SortTextItems(pNMListView->iSubItem, bSortAscending);
 	/*	
 	CWnd* pWnd = GetParent();
 
-	if ( pWnd )
-	pWnd->SendMessage( MSG_COLUMN_CLICKED, GetDlgCtrlID(), 0 );
+	if (pWnd)
+	pWnd->SendMessage(MSG_COLUMN_CLICKED, GetDlgCtrlID(), 0);
 	*/
 	*pResult = 0;
 }
 
 /*
-int CALLBACK CListCtrlEx::CompareFunction( LPARAM lParam1, LPARAM lParam2, LPARAM lParamData )
+int CALLBACK CListCtrlEx::CompareFunction(LPARAM lParam1, LPARAM lParam2, LPARAM lParamData)
 {
-CListCtrlEx* pListCtrl = reinterpret_cast<CListCtrlEx*>( lParamData );
-ASSERT( pListCtrl->IsKindOf( RUNTIME_CLASS( CListCtrl ) ) );
+CListCtrlEx* pListCtrl = reinterpret_cast<CListCtrlEx*>(lParamData);
+ASSERT(pListCtrl->IsKindOf(RUNTIME_CLASS(CListCtrl)));
 return 0;
 }
 */
@@ -193,22 +193,22 @@ bool CListCtrlEx::IsSorted()
 	CString str1, str2;
 	bool	bSorted = true;
 
-	for ( i = 0; i < GetItemCount() - 2; i++ )
+	for (i = 0; i < GetItemCount() - 2; i++)
 	{
-	str1 = GetItemText( i, nColumn );
-	str2 = GetItemText( i + 1, nColumn );
+	str1 = GetItemText(i, nColumn);
+	str2 = GetItemText(i + 1, nColumn);
 
-	if ( m_arDataType.GetAt( nColumn ) == "number" )
+	if (m_arDataType.GetAt(nColumn) == "number")
 	{
-	n1 = atoi( str1 );
-	n2 = atoi( str2 );
+	n1 = atoi(str1);
+	n2 = atoi(str2);
 
-	if ( n1 > n2 )
+	if (n1 > n2)
 	return false;
 	}
 	else
 	{
-	if ( str1 > str2 )
+	if (str1 > str2)
 	return false;
 	}
 	}
@@ -224,60 +224,60 @@ bool CListCtrlEx::IsSorted()
 // bAscending		- indicate sort order
 // low			- row to start scanning from - default row is 0
 // high			- row to end scan. -1 indicates last row
-bool CListCtrlEx::SortTextItems( int nCol, bool bAscending, int low /*= 0*/, int high /*= -1*/ )
+bool CListCtrlEx::SortTextItems(int nCol, bool bAscending, int low /*= 0*/, int high /*= -1*/)
 {
-	if ( nCol >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount() )
+	if (nCol >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount())
 		return FALSE;
 
-	if ( high == -1 )
+	if (high == -1)
 		high = GetItemCount() - 1;
 
 	int lo = low;
 	int hi = high;
 	CString midItem;
 
-	if ( hi <= lo ) return FALSE;
+	if (hi <= lo) return FALSE;
 
-	midItem = GetItemText( (lo+hi)/2, nCol );
+	midItem = GetItemText((lo+hi)/2, nCol);
 
 	// loop through the list until indices cross
-	while( lo <= hi )
+	while(lo <= hi)
 	{
 		// rowText will hold all column text for one row
 		CStringArray rowText;
 
 		// find the first element that is greater than or equal to 
 		// the partition element starting from the left Index.
-		if( bAscending )
-			while( ( lo < high ) && ( GetItemText(lo, nCol) < midItem ) )
+		if(bAscending)
+			while((lo < high) && (GetItemText(lo, nCol) < midItem))
 				++lo;
 		else
-			while( ( lo < high ) && ( GetItemText(lo, nCol) > midItem ) )
+			while((lo < high) && (GetItemText(lo, nCol) > midItem))
 				++lo;
 
 		// find an element that is smaller than or equal to 
 		// the partition element starting from the right Index.
-		if( bAscending )
-			while( ( hi > low ) && ( GetItemText(hi, nCol) > midItem ) )
+		if(bAscending)
+			while((hi > low) && (GetItemText(hi, nCol) > midItem))
 				--hi;
 		else
-			while( ( hi > low ) && ( GetItemText(hi, nCol) < midItem ) )
+			while((hi > low) && (GetItemText(hi, nCol) < midItem))
 				--hi;
 
 		// if the indexes have not crossed, swap
 		// and if the items are not equal
-		if( lo <= hi )
+		if(lo <= hi)
 		{
 			// swap only if the items are not equal
-			if( GetItemText(lo, nCol) != GetItemText(hi, nCol))
+			if(GetItemText(lo, nCol) != GetItemText(hi, nCol))
 			{
 				// swap the rows
 				LV_ITEM lvitemlo, lvitemhi;
 				int nColCount = 
 					((CHeaderCtrl*)GetDlgItem(0))->GetItemCount();
-				rowText.SetSize( nColCount );
+				rowText.SetSize(nColCount);
 				int i;
-				for( i=0; i<nColCount; i++)
+				for(i=0; i<nColCount; i++)
 					rowText[i] = GetItemText(lo, i);
 				lvitemlo.mask = LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
 				lvitemlo.iItem = lo;
@@ -289,20 +289,20 @@ bool CListCtrlEx::SortTextItems( int nCol, bool bAscending, int low /*= 0*/, int
 				lvitemhi = lvitemlo;
 				lvitemhi.iItem = hi;
 
-				GetItem( &lvitemlo );
-				GetItem( &lvitemhi );
+				GetItem(&lvitemlo);
+				GetItem(&lvitemhi);
 
-				for( i=0; i<nColCount; i++)
+				for(i=0; i<nColCount; i++)
 					SetItemText(lo, i, GetItemText(hi, i));
 
 				lvitemhi.iItem = lo;
-				SetItem( &lvitemhi );
+				SetItem(&lvitemhi);
 
-				for( i=0; i<nColCount; i++)
+				for(i=0; i<nColCount; i++)
 					SetItemText(hi, i, rowText[i]);
 
 				lvitemlo.iItem = hi;
-				SetItem( &lvitemlo );
+				SetItem(&lvitemlo);
 			}
 
 			++lo;
@@ -312,72 +312,72 @@ bool CListCtrlEx::SortTextItems( int nCol, bool bAscending, int low /*= 0*/, int
 
 	// If the right index has not reached the left side of array
 	// must now sort the left partition.
-	if( low < hi )
-		SortTextItems( nCol, bAscending , low, hi);
+	if(low < hi)
+		SortTextItems(nCol, bAscending , low, hi);
 
 	// If the left index has not reached the right side of array
 	// must now sort the right partition.
-	if( lo < high )
-		SortTextItems( nCol, bAscending , lo, high );
+	if(lo < high)
+		SortTextItems(nCol, bAscending , lo, high);
 
 	return TRUE;
 }
 
-bool CListCtrlEx::SortNumericItems( int nCol, bool bAscending,int low/*=0*/, int high/*=-1*/ )
+bool CListCtrlEx::SortNumericItems(int nCol, bool bAscending,int low/*=0*/, int high/*=-1*/)
 {
-	if( nCol >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount() )
+	if(nCol >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount())
 		return FALSE;
 
-	if( high == -1 ) high = GetItemCount() - 1;
+	if(high == -1) high = GetItemCount() - 1;
 	int lo = low;
 	int hi = high;
 
 	double midItem;
 
-	if( hi <= lo ) return FALSE;
+	if(hi <= lo) return FALSE;
 
-	midItem = _ttof( GetItemText( (lo+hi)/2, nCol ) );
+	midItem = _ttof(GetItemText((lo+hi)/2, nCol));
 
 	// loop through the list until indices cross
-	while( lo <= hi )
+	while(lo <= hi)
 	{
 		// rowText will hold all column text for one row
 		CStringArray rowText;
 
 		// find the first element that is greater than or equal to 
 		// the partition element starting from the left Index.
-		if( bAscending )
-			while( ( lo < high ) && (_ttof(GetItemText(lo, nCol)) < midItem ) )
+		if(bAscending)
+			while((lo < high) && (_ttof(GetItemText(lo, nCol)) < midItem))
 				++lo;
 		else
-			while( ( lo < high ) && (_ttof(GetItemText(lo, nCol)) > midItem ) )
+			while((lo < high) && (_ttof(GetItemText(lo, nCol)) > midItem))
 				++lo;
 
 		// find an element that is smaller than or equal to 
 		// the partition element starting from the right Index.
-		if( bAscending )
-			while( ( hi > low ) && (_ttof(GetItemText(hi, nCol)) > midItem ) )
+		if(bAscending)
+			while((hi > low) && (_ttof(GetItemText(hi, nCol)) > midItem))
 				--hi;
 		else
-			while( ( hi > low ) && (_ttof(GetItemText(hi, nCol)) < midItem ) )
+			while((hi > low) && (_ttof(GetItemText(hi, nCol)) < midItem))
 				--hi;
 
 		// if the indexes have not crossed, swap                
 		// and if the items are not equal
-		if( lo <= hi )
+		if(lo <= hi)
 		{
 			// swap only if the items are not equal
-			if(_ttof(GetItemText(lo, nCol)) != _ttof(GetItemText(hi, nCol)) )
+			if(_ttof(GetItemText(lo, nCol)) != _ttof(GetItemText(hi, nCol)))
 			{
 				// swap the rows
 				LV_ITEM lvitemlo, lvitemhi;
 
 				int nColCount =
 					((CHeaderCtrl*)GetDlgItem(0))->GetItemCount();
-				rowText.SetSize( nColCount );
+				rowText.SetSize(nColCount);
 
 				int i;
-				for( i=0; i < nColCount; i++)
+				for(i=0; i < nColCount; i++)
 					rowText[i] = GetItemText(lo, i);
 
 				lvitemlo.mask = LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
@@ -389,20 +389,20 @@ bool CListCtrlEx::SortNumericItems( int nCol, bool bAscending,int low/*=0*/, int
 				lvitemhi = lvitemlo;
 				lvitemhi.iItem = hi;
 
-				GetItem( &lvitemlo );
-				GetItem( &lvitemhi );
+				GetItem(&lvitemlo);
+				GetItem(&lvitemhi);
 
-				for( i=0; i< nColCount; i++)
-					SetItemText(lo, i, GetItemText(hi, i) );
+				for(i=0; i< nColCount; i++)
+					SetItemText(lo, i, GetItemText(hi, i));
 
 				lvitemhi.iItem = lo;
-				SetItem( &lvitemhi );
+				SetItem(&lvitemhi);
 
-				for( i=0; i< nColCount; i++)
+				for(i=0; i< nColCount; i++)
 					SetItemText(hi, i, rowText[i]);
 
 				lvitemlo.iItem = hi;
-				SetItem( &lvitemlo );
+				SetItem(&lvitemlo);
 			}
 
 			++lo;
@@ -412,13 +412,13 @@ bool CListCtrlEx::SortNumericItems( int nCol, bool bAscending,int low/*=0*/, int
 
 	// If the right index has not reached the left side of array
 	// must now sort the left partition.
-	if( low < hi )
-		SortNumericItems( nCol, bAscending , low, hi);
+	if(low < hi)
+		SortNumericItems(nCol, bAscending , low, hi);
 
 	// If the left index has not reached the right side of array
 	// must now sort the right partition.
-	if( lo < high )
-		SortNumericItems( nCol, bAscending , lo, high );
+	if(lo < high)
+		SortNumericItems(nCol, bAscending , lo, high);
 
 	return TRUE;
 }
@@ -436,9 +436,9 @@ void CListCtrlEx::Sort(int nColumn)
 	Sort(nColumn, m_nSorted == SORT_ASCENDING);
 }
 
-void CListCtrlEx::Sort( int nColumn, bool bAscending )
+void CListCtrlEx::Sort(int nColumn, bool bAscending)
 {
-	if ( m_bAllowSort == false )
+	if (m_bAllowSort == false)
 		return;
 
 	if (m_vtDataType.size() <= nColumn)
@@ -447,15 +447,15 @@ void CListCtrlEx::Sort( int nColumn, bool bAscending )
 		m_vtDataType[nColumn] = COLUMN_DATA_TYPE_TEXT;
 	}
 
-	m_nSorted = ( bAscending ? SORT_ASCENDING : SORT_DESCENDING );
+	m_nSorted = (bAscending ? SORT_ASCENDING : SORT_DESCENDING);
 
 	//for (int i = 0; i < m_arDataType.GetCount(); i++)
-	//	TRACE( _T("%d type = %d\n"), i, m_arDataType.GetAt(i) );
+	//	TRACE(_T("%d type = %d\n"), i, m_arDataType.GetAt(i));
 
-	if (m_vtDataType[nColumn] == COLUMN_DATA_TYPE_NUMERIC )
-		SortNumericItems( nColumn, bAscending );
+	if (m_vtDataType[nColumn] == COLUMN_DATA_TYPE_NUMERIC)
+		SortNumericItems(nColumn, bAscending);
 	else
-		SortTextItems( nColumn, bAscending );
+		SortTextItems(nColumn, bAscending);
 }
 
 //////////////////////////////////////////////////////////
@@ -469,7 +469,7 @@ int CListCtrlEx::GetItemImageIndex(int nRow, int nCol/*=0*/)
 	lv.iItem = nRow;
 	lv.iSubItem = nCol;
 
-	GetItem( &lv );
+	GetItem(&lv);
 
 	return lv.iImage;
 }
@@ -491,50 +491,50 @@ bool CListCtrlEx::SortInImageOrder(int nCol, bool bAscending, int nLow/*=0*/, in
 {
 	bool bRet = FALSE;
 
-	if( nCol >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount() )
+	if(nCol >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount())
 		return FALSE;
 
-	if( nHigh == -1 ) nHigh = GetItemCount() - 1;
+	if(nHigh == -1) nHigh = GetItemCount() - 1;
 	int nLo = nLow;
 	int nHi = nHigh;
 
 	int nMidItem;
 
-	if( nHi <= nLo )
+	if(nHi <= nLo)
 		return FALSE;
 
-	nMidItem = GetItemImageIndex( (nLo+nHi)/2, nCol );
+	nMidItem = GetItemImageIndex((nLo+nHi)/2, nCol);
 
 	// loop through the list until indices cross
-	while( nLo <= nHi )
+	while(nLo <= nHi)
 	{
 		// arrsRowText will hold all column text for one row
 		CStringArray arrsRowText;
 
 		// find the first element that is greater than or equal to 
 		// the partition element starting from the left Index.
-		if( bAscending )
-			while( ( nLo < nHigh ) && (GetItemImageIndex(nLo, nCol) < nMidItem ) )
+		if(bAscending)
+			while((nLo < nHigh) && (GetItemImageIndex(nLo, nCol) < nMidItem))
 				++nLo;
 		else
-			while( ( nLo < nHigh ) && (GetItemImageIndex(nLo, nCol) > nMidItem ) )
+			while((nLo < nHigh) && (GetItemImageIndex(nLo, nCol) > nMidItem))
 				++nLo;
 
 		// find an element that is smaller than or equal to 
 		// the partition element starting from the right Index.
-		if( bAscending )
-			while( ( nHi > nLow ) && (GetItemImageIndex(nHi, nCol) > nMidItem ) )
+		if(bAscending)
+			while((nHi > nLow) && (GetItemImageIndex(nHi, nCol) > nMidItem))
 				--nHi;
 		else
-			while( ( nHi > nLow ) && (GetItemImageIndex(nHi, nCol) < nMidItem ) )
+			while((nHi > nLow) && (GetItemImageIndex(nHi, nCol) < nMidItem))
 				--nHi;
 
 		// if the indexes have not crossed, swap                
 		// and if the items are not equal
-		if( nLo <= nHi )
+		if(nLo <= nHi)
 		{
 			// swap only if the items are not equal
-			if(GetItemImageIndex(nLo, nCol) != GetItemImageIndex(nHi, nCol) )
+			if(GetItemImageIndex(nLo, nCol) != GetItemImageIndex(nHi, nCol))
 			{
 				// swap the rows
 				LV_ITEM lvitemlo = {0};
@@ -543,11 +543,11 @@ bool CListCtrlEx::SortInImageOrder(int nCol, bool bAscending, int nLow/*=0*/, in
 				// Get the column count
 				int nColCount =
 					((CHeaderCtrl*)GetDlgItem(0))->GetItemCount();
-				arrsRowText.SetSize( nColCount );
+				arrsRowText.SetSize(nColCount);
 
 				// Load string array with text items of Lo row
 				int i;
-				for( i=0; i < nColCount; i++)
+				for(i=0; i < nColCount; i++)
 					arrsRowText[i] = GetItemText(nLo, i);
 
 				// Setup Lo item structure
@@ -571,26 +571,26 @@ bool CListCtrlEx::SortInImageOrder(int nCol, bool bAscending, int nLow/*=0*/, in
 
 
 				// get the current lo and hi items
-				GetItem( &lvitemlo );
-				GetItem( &lvitemhi );
+				GetItem(&lvitemlo);
+				GetItem(&lvitemhi);
 
 				// set item text of lo to item text of hi
-				for( i=0; i< nColCount; i++)
-					SetItemText(nLo, i, GetItemText(nHi, i) );
+				for(i=0; i< nColCount; i++)
+					SetItemText(nLo, i, GetItemText(nHi, i));
 
 				// save hi item
 				lvitemhi.iItem = nLo;
-				bRet = SetItem( &lvitemhi );
+				bRet = SetItem(&lvitemhi);
 				_ASSERTE(bRet);
 
 				// set item text of hi to item text of lo
-				for( i=0; i< nColCount; i++)
+				for(i=0; i< nColCount; i++)
 					SetItemText(nHi, i, arrsRowText[i]);
 
 				// save lo item
 				lvitemlo.iItem = nHi;
 				lvitemhi.iSubItem = nCol; // 10/29/97
-				bRet = SetItem( &lvitemlo );
+				bRet = SetItem(&lvitemlo);
 				_ASSERTE(bRet);
 			}
 
@@ -601,13 +601,13 @@ bool CListCtrlEx::SortInImageOrder(int nCol, bool bAscending, int nLow/*=0*/, in
 
 	// If the right index has not reached the left side of array
 	// must now sort the left partition.
-	if( nLow < nHi )
-		SortInImageOrder( nCol, bAscending , nLow, nHi);
+	if(nLow < nHi)
+		SortInImageOrder(nCol, bAscending , nLow, nHi);
 
 	// If the left index has not reached the right side of array
 	// must now sort the right partition.
-	if( nLo < nHigh )
-		SortInImageOrder( nCol, bAscending , nLo, nHigh );
+	if(nLo < nHigh)
+		SortInImageOrder(nCol, bAscending , nLo, nHigh);
 
 	return TRUE;
 }
@@ -616,10 +616,10 @@ bool CListCtrlEx::sort_in_text_color(int nSubItem, bool bAscending, int nLow, in
 {
 	bool bRet = false;
 
-	if( nSubItem >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount() )
+	if(nSubItem >= ((CHeaderCtrl*)GetDlgItem(0))->GetItemCount())
 		return FALSE;
 
-	if( nHigh == -1 )
+	if(nHigh == -1)
 		nHigh = GetItemCount() - 1;
 
 	int nLo = nLow;
@@ -627,41 +627,41 @@ bool CListCtrlEx::sort_in_text_color(int nSubItem, bool bAscending, int nLow, in
 
 	COLORREF crMidItem;
 
-	if( nHi <= nLo )
+	if(nHi <= nLo)
 		return false;
 
 	crMidItem = get_text_color((nLo+nHi)/2, nSubItem);
 
 	// loop through the list until indices cross
-	while( nLo <= nHi )
+	while(nLo <= nHi)
 	{
 		// arrsRowText will hold all column text for one row
 		CStringArray arrsRowText;
 
 		// find the first element that is greater than or equal to 
 		// the partition element starting from the left Index.
-		if( bAscending )
-			while( ( nLo < nHigh ) && (get_text_color(nLo, nSubItem) < crMidItem ) )
+		if(bAscending)
+			while((nLo < nHigh) && (get_text_color(nLo, nSubItem) < crMidItem))
 				++nLo;
 		else
-			while( ( nLo < nHigh ) && (get_text_color(nLo, nSubItem) > crMidItem ) )
+			while((nLo < nHigh) && (get_text_color(nLo, nSubItem) > crMidItem))
 				++nLo;
 
 		// find an element that is smaller than or equal to 
 		// the partition element starting from the right Index.
-		if( bAscending )
-			while( ( nHi > nLow ) && (get_text_color(nHi, nSubItem) > crMidItem ) )
+		if(bAscending)
+			while((nHi > nLow) && (get_text_color(nHi, nSubItem) > crMidItem))
 				--nHi;
 		else
-			while( ( nHi > nLow ) && (get_text_color(nHi, nSubItem) < crMidItem ) )
+			while((nHi > nLow) && (get_text_color(nHi, nSubItem) < crMidItem))
 				--nHi;
 
 		// if the indexes have not crossed, swap                
 		// and if the items are not equal
-		if( nLo <= nHi )
+		if(nLo <= nHi)
 		{
 			// swap only if the items are not equal
-			if(get_text_color(nLo, nSubItem) != get_text_color(nHi, nSubItem) )
+			if(get_text_color(nLo, nSubItem) != get_text_color(nHi, nSubItem))
 			{
 				// swap the rows
 				LV_ITEM lvitemlo = {0};
@@ -670,11 +670,11 @@ bool CListCtrlEx::sort_in_text_color(int nSubItem, bool bAscending, int nLow, in
 				// Get the column count
 				int nColCount =
 					((CHeaderCtrl*)GetDlgItem(0))->GetItemCount();
-				arrsRowText.SetSize( nColCount );
+				arrsRowText.SetSize(nColCount);
 
 				// Load string array with text items of Lo row
 				int i;
-				for( i=0; i < nColCount; i++)
+				for(i=0; i < nColCount; i++)
 					arrsRowText[i] = GetItemText(nLo, i);
 
 				// Setup Lo item structure
@@ -698,26 +698,26 @@ bool CListCtrlEx::sort_in_text_color(int nSubItem, bool bAscending, int nLow, in
 
 
 										  // get the current lo and hi items
-				GetItem( &lvitemlo );
-				GetItem( &lvitemhi );
+				GetItem(&lvitemlo);
+				GetItem(&lvitemhi);
 
 				// set item text of lo to item text of hi
-				for( i=0; i< nColCount; i++)
-					SetItemText(nLo, i, GetItemText(nHi, i) );
+				for(i=0; i< nColCount; i++)
+					SetItemText(nLo, i, GetItemText(nHi, i));
 
 				// save hi item
 				lvitemhi.iItem = nLo;
-				bRet = SetItem( &lvitemhi );
+				bRet = SetItem(&lvitemhi);
 				_ASSERTE(bRet);
 
 				// set item text of hi to item text of lo
-				for( i=0; i< nColCount; i++)
+				for(i=0; i< nColCount; i++)
 					SetItemText(nHi, i, arrsRowText[i]);
 
 				// save lo item
 				lvitemlo.iItem = nHi;
 				lvitemhi.iSubItem = nSubItem; // 10/29/97
-				bRet = SetItem( &lvitemlo );
+				bRet = SetItem(&lvitemlo);
 				_ASSERTE(bRet);
 			}
 
@@ -741,26 +741,26 @@ bool CListCtrlEx::sort_in_text_color(int nSubItem, bool bAscending, int nLow, in
 
 void CListCtrlEx::DeleteSelectedItems()	// 지퓖E갋픸E확인창은 호출루틴에서 처리해야 함
 {
-	for ( int i = GetItemCount() - 1; i >= 0; i-- )
+	for (int i = GetItemCount() - 1; i >= 0; i--)
 	{
-		if ( GetItemState( i, LVIS_SELECTED ) )
+		if (GetItemState(i, LVIS_SELECTED))
 		{
-			// 			CListCtrlExItemColor	*pData = (CListCtrlExItemColor*)GetItemData( i );
+			// 			CListCtrlExItemColor	*pData = (CListCtrlExItemColor*)GetItemData(i);
 			// 			
-			// 			if ( pData )
+			// 			if (pData)
 			// 				delete pData;
 
-			DeleteItem( i );
+			DeleteItem(i);
 		}
 	}
 }
 
 //컬럼의 수보다 적은 개수의 항목을 추가할때는 반드시 끝 인자는 NULL을 넣엉丕야 한다.
-int CListCtrlEx::AddItem( LPCTSTR pszText, ... )
+int CListCtrlEx::AddItem(LPCTSTR pszText, ...)
 {
-	int iIndex = InsertItem( GetItemCount(), pszText );
+	int iIndex = InsertItem(GetItemCount(), pszText);
 
-	if ( GetColumnCount() == 1 )
+	if (GetColumnCount() == 1)
 		return iIndex;
 
 	int nSubItem = 1;
@@ -826,7 +826,7 @@ int CListCtrlEx::AddItem(int nIndex, LPCTSTR pszText, ...)
 }
 
 //컬럼의 수와 같거나 그 이하인 항목들이 separator로 구분되푳E있다툈E자동 파싱하여 리스트에 넣엉彿다.
-int CListCtrlEx::AddLineStringItem( CString sText, TCHAR separator)
+int CListCtrlEx::AddLineStringItem(CString sText, TCHAR separator)
 {
 	int i;
 	int index;
@@ -834,12 +834,12 @@ int CListCtrlEx::AddLineStringItem( CString sText, TCHAR separator)
 	std::deque<CString> dqToken;
 	GetTokenString(sText, dqToken, separator, GetColumnCount());
 
-	for ( i = 0; i < MIN(GetColumnCount(), dqToken.size()); i++ )
+	for (i = 0; i < MIN(GetColumnCount(), dqToken.size()); i++)
 	{
-		if ( i == 0 )
-			index = AddItem( dqToken[i], NULL );
+		if (i == 0)
+			index = AddItem(dqToken[i], NULL);
 		else
-			SetItemText( index, i, dqToken[i] );
+			SetItemText(index, i, dqToken[i]);
 	}
 
 	return index;
@@ -848,27 +848,27 @@ int CListCtrlEx::AddLineStringItem( CString sText, TCHAR separator)
 //컬럼의 이름 그큱E?한 라인을 추가한다.
 int CListCtrlEx::AddItemWithColumnText()
 {
-	return AddItemWithColumnText( GetItemCount() );
+	return AddItemWithColumnText(GetItemCount());
 }
 
-int CListCtrlEx::AddItemWithColumnText( int iItem )
+int CListCtrlEx::AddItemWithColumnText(int iItem)
 {
 	int nIndex;
 
-	for ( int i = 0; i < GetColumnCount(); i++ )
+	for (int i = 0; i < GetColumnCount(); i++)
 	{
-		if ( i == 0 )
-			nIndex = AddItem( iItem, GetColumnText( i ), NULL );
+		if (i == 0)
+			nIndex = AddItem(iItem, GetColumnText(i), NULL);
 		else
-			SetItemText( nIndex, i, GetColumnText( i ) );
+			SetItemText(nIndex, i, GetColumnText(i));
 	}
 
 	return nIndex;
 }
 
-bool CListCtrlEx::DeleteItem( int nItem )
+bool CListCtrlEx::DeleteItem(int nItem)
 {
-	if ( m_use_item_color )
+	if (m_use_item_color)
 	{
 		CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(nItem);
 		if (dq)
@@ -878,14 +878,14 @@ bool CListCtrlEx::DeleteItem( int nItem )
 		}
 	}
 
-	return CListCtrl::DeleteItem( nItem );
+	return CListCtrl::DeleteItem(nItem);
 }
 
 bool CListCtrlEx::DeleteAllItems()
 {
-	if ( m_use_item_color )
+	if (m_use_item_color)
 	{
-		for ( int i = 0; i < GetItemCount(); i++ )
+		for (int i = 0; i < GetItemCount(); i++)
 		{
 			CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(i);
 			if (dq)
@@ -900,7 +900,7 @@ bool CListCtrlEx::DeleteAllItems()
 }
 
 /*
-int CListCtrlEx::InsertItemString( CString sString, CString sDelimeter )
+int CListCtrlEx::InsertItemString(CString sString, CString sDelimeter)
 {
 sString.Tokenize 를 이퓖E漫?수정 필퓖E!
 
@@ -908,14 +908,14 @@ int		nIndex = -1;
 int		nSubItem = 0;
 CString sItem;
 
-while ( Token.MoreTokens() )
+while (Token.MoreTokens())
 {
 sItem = Token.GetNextToken();
 
-if ( nSubItem == 0 )
-nIndex = InsertItem( GetItemCount(), sItem );
+if (nSubItem == 0)
+nIndex = InsertItem(GetItemCount(), sItem);
 else
-SetItemText( nIndex, nSubItem, sItem );
+SetItemText(nIndex, nSubItem, sItem);
 
 nSubItem++;
 }
@@ -924,12 +924,12 @@ return nIndex;
 }
 */
 
-int	CListCtrlEx::GetColumnDataType( int nColumn )
+int	CListCtrlEx::GetColumnDataType(int nColumn)
 {
 	return m_vtDataType[nColumn];
 }
 
-void CListCtrlEx::SetColumnDataType( int nColumn, int nType )
+void CListCtrlEx::SetColumnDataType(int nColumn, int nType)
 {
 	if (nColumn >= m_vtDataType.size())
 		m_vtDataType.resize(nColumn + 1);
@@ -937,56 +937,56 @@ void CListCtrlEx::SetColumnDataType( int nColumn, int nType )
 	m_vtDataType[nColumn] = nType;
 }
 
-bool CListCtrlEx::SetHeadings( UINT uiStringID )
+bool CListCtrlEx::SetHeadings(UINT uiStringID)
 {
 	CString strHeadings;
-	VERIFY( strHeadings.LoadString( uiStringID ) );
-	return SetHeadings( strHeadings );
+	VERIFY(strHeadings.LoadString(uiStringID));
+	return SetHeadings(strHeadings);
 }
 
 
 // the heading text is in the format column 1 text,column 1 width;column 2 text,column 3 width;etc.
-bool CListCtrlEx::SetHeadings( const CString& strHeadings )
+bool CListCtrlEx::SetHeadings(const CString& strHeadings)
 {
 	int iStart = 0;
 	int	nColumn = 0;
 
-	for( ;; )
+	for(;;)
 	{
-		const int iComma = strHeadings.Find( _T(','), iStart );
+		const int iComma = strHeadings.Find(_T(','), iStart);
 
-		if( iComma == -1 )
+		if(iComma == -1)
 			break;
 
-		const CString strHeading = strHeadings.Mid( iStart, iComma - iStart );
+		const CString strHeading = strHeadings.Mid(iStart, iComma - iStart);
 
 		iStart = iComma + 1;
 
-		int iSemiColon = strHeadings.Find( _T(';'), iStart );
+		int iSemiColon = strHeadings.Find(_T(';'), iStart);
 
-		if( iSemiColon == -1 )
+		if(iSemiColon == -1)
 			iSemiColon = strHeadings.GetLength();
 
-		const int iWidth = _tstoi( (TCHAR*)(LPCTSTR)strHeadings.Mid( iStart, iSemiColon - iStart ) );
+		const int iWidth = _tstoi((TCHAR*)(LPCTSTR)strHeadings.Mid(iStart, iSemiColon - iStart));
 
 		iStart = iSemiColon + 1;
 
-		if( InsertColumn( nColumn++, strHeading, LVCFMT_LEFT, iWidth ) == -1 )
+		if(InsertColumn(nColumn++, strHeading, LVCFMT_LEFT, iWidth) == -1)
 			return FALSE;
 
 		//for test
 		LVCOLUMN col;
 		col.mask = LVCF_FMT;
-		GetColumn( (nColumn-1), &col );
+		GetColumn((nColumn-1), &col);
 		col.fmt = col.fmt;
 	}
 
 	return TRUE;
 }
 
-int	CListCtrlEx::GetColumnTextAlign( int nColumn )
+int	CListCtrlEx::GetColumnTextAlign(int nColumn)
 {
-	return m_HeaderCtrlEx.GetColumnTextAlign( nColumn );
+	return m_HeaderCtrlEx.GetColumnTextAlign(nColumn);
 }
 
 void CListCtrlEx::SetColumnTextAlign(int nColumn, int format)
@@ -994,17 +994,17 @@ void CListCtrlEx::SetColumnTextAlign(int nColumn, int format)
 	if (nColumn < 0)
 	{
 		for (int i = 0; i < GetColumnCount(); i++)
-			m_HeaderCtrlEx.SetColumnTextAlign( i, format );
+			m_HeaderCtrlEx.SetColumnTextAlign(i, format);
 	}
 	else
 	{
-		m_HeaderCtrlEx.SetColumnTextAlign( nColumn, format );
+		m_HeaderCtrlEx.SetColumnTextAlign(nColumn, format);
 	}
 }
 
-void CListCtrlEx::SelectItem( int nIndex, bool bSelect /*= true*/ )	//nIndex = -1 : 픸E세궈?
+void CListCtrlEx::SelectItem(int nIndex, bool bSelect /*= true*/)	//nIndex = -1 : 픸E세궈?
 {
-	SetItemState( nIndex, bSelect ? LVIS_SELECTED : 0, LVIS_SELECTED );
+	SetItemState(nIndex, bSelect ? LVIS_SELECTED : 0, LVIS_SELECTED);
 }
 
 void CListCtrlEx::SetItemDataReset(int index, DWORD data)
@@ -1020,14 +1020,14 @@ void CListCtrlEx::SetItemDataReset(int index, DWORD data)
 	}
 }
 
-CString	CListCtrlEx::GetColumnText( int nColumn )
+CString	CListCtrlEx::GetColumnText(int nColumn)
 {
-	return m_HeaderCtrlEx.GetColumnText( nColumn );
+	return m_HeaderCtrlEx.GetColumnText(nColumn);
 }
 
-void CListCtrlEx::SetColumnText( int nColumn, CString sText )
+void CListCtrlEx::SetColumnText(int nColumn, CString sText)
 {
-	m_HeaderCtrlEx.SetColumnText( nColumn, sText );
+	m_HeaderCtrlEx.SetColumnText(nColumn, sText);
 }
 
 int CListCtrlEx::GetColumnCount()
@@ -1069,13 +1069,13 @@ int CListCtrlEx::FindString(CString str, int indexFrom, bool bWholeWord)
 //단 결과 result에는 컬럼번호는 저장되지 않고 라인번호만 저장되므로
 //한 라인에서 이미 찾았다면 그 라인의 다른 컬럼에서는 찾지 않고 그냥 break해야 한다.
 //그렇지 않으면 동일한 라인 번호가 result에 모두 저장된다.
-void CListCtrlEx::FindString( CString str, int indexFrom, std::vector<int> *column, std::vector<int> &result, bool bWholeWord/* = TRUE*/, bool bCaseSensitive /*= FALSE*/ )
+void CListCtrlEx::FindString(CString str, int indexFrom, std::vector<int> *column, std::vector<int> &result, bool bWholeWord/* = TRUE*/, bool bCaseSensitive /*= FALSE*/)
 {
 	int		i, j;
 	CString sText;
 	std::vector<int> targetColumn;
 
-	if ( indexFrom < 0 )
+	if (indexFrom < 0)
 		indexFrom = 0;
 
 	if (column == NULL)
@@ -1089,22 +1089,22 @@ void CListCtrlEx::FindString( CString str, int indexFrom, std::vector<int> *colu
 
 	result.clear();
 
-	for ( i = indexFrom; i < GetItemCount(); i++ )
+	for (i = indexFrom; i < GetItemCount(); i++)
 	{
-		for ( j = 0; j < column->size(); j++ )
+		for (j = 0; j < column->size(); j++)
 		{
-			sText = GetItemText( i, column->at(j) );
+			sText = GetItemText(i, column->at(j));
 
 			//큱E拈??구분없이 검색하는 경퓖E?둘 다 소문자로 변컖E후 비교한다.
-			if ( !bCaseSensitive )
+			if (!bCaseSensitive)
 			{
 				sText.MakeLower();
 				str.MakeLower();
 			}
 
-			if ( bWholeWord )
+			if (bWholeWord)
 			{
-				if ( sText == str )
+				if (sText == str)
 				{
 					result.push_back(i);
 					break;
@@ -1116,7 +1116,7 @@ void CListCtrlEx::FindString( CString str, int indexFrom, std::vector<int> *colu
 				//또한 그렇게 찾으툈E오동작 예외의 경퓖E?존재할수도 있으므로
 				//그렇게 검색해서도 안된다.
 				//항퍊EFindString을 호출할때는 콅E문자열에서 sub string을 검색하도록 한다.
-				if ( sText.Find( str ) >= 0 )
+				if (sText.Find(str) >= 0)
 				{
 					result.push_back(i);
 					break;
@@ -1126,11 +1126,11 @@ void CListCtrlEx::FindString( CString str, int indexFrom, std::vector<int> *colu
 	}
 }
 
-int CListCtrlEx::GetSelectedItem( int nStart /*= 0*/ )
+int CListCtrlEx::GetSelectedItem(int nStart /*= 0*/)
 {
-	for ( int i = nStart; i < GetItemCount(); i++ )
+	for (int i = nStart; i < GetItemCount(); i++)
 	{
-		if ( GetItemState( i, LVIS_SELECTED ) )
+		if (GetItemState(i, LVIS_SELECTED))
 			return i;
 	}
 
@@ -1139,9 +1139,9 @@ int CListCtrlEx::GetSelectedItem( int nStart /*= 0*/ )
 
 int CListCtrlEx::GetLastSelectedItem()
 {
-	for ( int i = GetItemCount() - 1; i >= 0; i-- )
+	for (int i = GetItemCount() - 1; i >= 0; i--)
 	{
-		if ( GetItemState( i, LVIS_SELECTED ) )
+		if (GetItemState(i, LVIS_SELECTED))
 			return i;
 	}
 
@@ -1162,18 +1162,18 @@ std::deque<int>	CListCtrlEx::GetSelectedItems(int nStart)
 }
 
 //ItemData를 컬러로 사용할 경우에 대한 처리가 필요하다. 우선 보류.
-void CListCtrlEx::DeleteColumn( int nColumn )
+void CListCtrlEx::DeleteColumn(int nColumn)
 {
 	int		i;
 
-	if ( nColumn == -1 )//SELECT_ALL )
+	if (nColumn == -1)//SELECT_ALL)
 	{
-		for ( i = GetColumnCount() - 1; i >= 0 ; i-- )
-			CListCtrl::DeleteColumn( i );
+		for (i = GetColumnCount() - 1; i >= 0 ; i--)
+			CListCtrl::DeleteColumn(i);
 	}
 	else
 	{
-		CListCtrl::DeleteColumn( nColumn );
+		CListCtrl::DeleteColumn(nColumn);
 	}
 }
 
@@ -1183,8 +1183,8 @@ void CListCtrlEx::AutoAdjustColumnWidth()
 	CClientDC	dc(this);
 	CString		str;
 
-	for ( i = 0; i < GetColumnCount(); i++ )
-		SetColumnWidth( i, LVSCW_AUTOSIZE_USEHEADER );
+	for (i = 0; i < GetColumnCount(); i++)
+		SetColumnWidth(i, LVSCW_AUTOSIZE_USEHEADER);
 }
 
 void CListCtrlEx::LoadColumnWidth(CWinApp* pApp, CString sSection)
@@ -1230,43 +1230,43 @@ void CListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CRect		r, rItem;
 	CListCtrlExItemColor		*pData = NULL;
 
-	for ( int i = 0; i < GetColumnCount(); i++ )
+	for (int i = 0; i < GetColumnCount(); i++)
 	{
-		if ( m_use_item_color )
+		if (m_use_item_color)
 		{
-			pData = (CListCtrlExItemColor*)GetItemData( nItem );
+			pData = (CListCtrlExItemColor*)GetItemData(nItem);
 
 			//만푳E현픸E아이템에 특정 색이 할당되푳E있햨E않다툈E기본 글자색컖E배경색을 사퓖E蠻娩?
-			if ( pData == NULL )
+			if (pData == NULL)
 			{
 				crText = m_crText;
 				crBack = m_crBack;
 			}
 			else
 			{
-				if ( i == 0 && !m_bApplyTextColorToFirstColumn )
+				if (i == 0 && !m_bApplyTextColorToFirstColumn)
 					crText = m_crText;
 				else
-					crText = pData->crText;//RGB565ToRGB24( HIWORD( dwData ) );
+					crText = pData->crText;//RGB565ToRGB24(HIWORD(dwData));
 
-				crBack = pData->crBack;//RGB565ToRGB24( LOWORD( dwData ) );
+				crBack = pData->crBack;//RGB565ToRGB24(LOWORD(dwData));
 			}
 		}
 
-		GetSubItemRect( nItem, i, LVIR_BOUNDS, r );
+		GetSubItemRect(nItem, i, LVIR_BOUNDS, r);
 
-		if ( i == 0 )
-			r.right = r.left + GetColumnWidth( i );
+		if (i == 0)
+			r.right = r.left + GetColumnWidth(i);
 
 		//enabled, selected, focused 상태에 따른 색상값을 결정한다.
-		if ( IsWindowEnabled() )
+		if (IsWindowEnabled())
 		{
 			crText = m_crText;
 			crBack = m_crBack;
 
-			if ( GetItemState( nItem, LVIS_SELECTED) )
+			if (GetItemState(nItem, LVIS_SELECTED))
 			{
-				if ( GetFocus() == this )
+				if (GetFocus() == this)
 				{
 					crText = m_crTextSelected;
 					crBack = m_crBackSelected;
@@ -1280,40 +1280,40 @@ void CListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		}
 		else
 		{
-			crBack = ::GetSysColor( COLOR_INACTIVECAPTION );
+			crBack = ::GetSysColor(COLOR_INACTIVECAPTION);
 		}
 
 		m_crSelectedOutline = m_crBack;
 
 
 
-		//if ( GetItemState( nItem, LVIS_SELECTED) )
+		//if (GetItemState(nItem, LVIS_SELECTED))
 		//{
 
-		//	if ( GetFocus() == this )
+		//	if (GetFocus() == this)
 		//		crBack = m_crSelected;
-		//	else if ( GetStyle() & LVS_SHOWSELALWAYS )
-		//		crBack = ::GetSysColor( COLOR_3DFACE );
+		//	else if (GetStyle() & LVS_SHOWSELALWAYS)
+		//		crBack = ::GetSysColor(COLOR_3DFACE);
 
-		//	if ( IsWindowEnabled() )
-		pDC->FillSolidRect( r, crBack );
+		//	if (IsWindowEnabled())
+		pDC->FillSolidRect(r, crBack);
 
-		if ( (i == GetColumnCount() - 1) )//&& (GetFocus() == this) )
+		if ((i == GetColumnCount() - 1))//&& (GetFocus() == this))
 		{
-			GetSubItemRect( nItem, 0, LVIR_BOUNDS, rItem );
+			GetSubItemRect(nItem, 0, LVIR_BOUNDS, rItem);
 			rItem.right -= 1;
 			rItem.bottom -= 1;
 
-			CPen	Pen( PS_SOLID, 1, m_crSelectedOutline );
-			CPen*	pOldPen = (CPen*)pDC->SelectObject( &Pen );
+			CPen	Pen(PS_SOLID, 1, m_crSelectedOutline);
+			CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
 
-			pDC->MoveTo( rItem.left, rItem.top );
-			pDC->LineTo( rItem.right, rItem.top );
-			pDC->LineTo( rItem.right, rItem.bottom - 1 );
-			pDC->LineTo( rItem.left, rItem.bottom - 1 );
-			pDC->LineTo( rItem.left, rItem.top );
+			pDC->MoveTo(rItem.left, rItem.top);
+			pDC->LineTo(rItem.right, rItem.top);
+			pDC->LineTo(rItem.right, rItem.bottom - 1);
+			pDC->LineTo(rItem.left, rItem.bottom - 1);
+			pDC->LineTo(rItem.left, rItem.top);
 
-			pDC->SelectObject( pOldPen );
+			pDC->SelectObject(pOldPen);
 
 			Pen.DeleteObject();
 		}
@@ -1321,32 +1321,32 @@ void CListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 		r.left	+= 2;
 		r.top	+= 1;
-		sItemText = GetItemText( nItem, i );
+		sItemText = GetItemText(nItem, i);
 
 		UINT nFmt;
 
-		if ( GetColumnTextAlign( i ) == LVCFMT_LEFT )
+		if (GetColumnTextAlign(i) == LVCFMT_LEFT)
 			nFmt = DT_LEFT;
-		else if ( GetColumnTextAlign( i ) == LVCFMT_CENTER )
+		else if (GetColumnTextAlign(i) == LVCFMT_CENTER)
 			nFmt = DT_CENTER;
-		else if ( GetColumnTextAlign( i ) == LVCFMT_RIGHT )
+		else if (GetColumnTextAlign(i) == LVCFMT_RIGHT)
 			nFmt = DT_RIGHT;
 
 		nFmt = nFmt | DT_SINGLELINE | DT_VCENTER;
 
-		if ( GetItemState( nItem, LVIS_SELECTED) )
+		if (GetItemState(nItem, LVIS_SELECTED))
 		{
-			if ( GetFocus() == this )
-				pDC->SetTextColor( crTextSelected );
+			if (GetFocus() == this)
+				pDC->SetTextColor(crTextSelected);
 			else
-				pDC->SetTextColor( crTextSelectedInactive );
+				pDC->SetTextColor(crTextSelectedInactive);
 		}
 		else
 		{
-			pDC->SetTextColor( crText );
+			pDC->SetTextColor(crText);
 		}
 
-		pDC->DrawText( sItemText, r, nFmt );
+		pDC->DrawText(sItemText, r, nFmt);
 	}
 }
 #endif
@@ -1376,7 +1376,7 @@ bool CListCtrlEx::GetCellRect(int nRow, int nCol, CRect& rect)
 
 void CListCtrlEx::InvalidateItem(int nIndex, bool bErase /*= TRUE*/)
 {
-	if ( nIndex < 0 || nIndex >= GetItemCount() )
+	if (nIndex < 0 || nIndex >= GetItemCount())
 		return;
 
 	RECT rcItem;
@@ -1457,7 +1457,7 @@ void CListCtrlEx::MoveItem(int nFrom, int nTo)
 
 bool CListCtrlEx::MoveUp(int nIndex)
 {
-	if ( nIndex < 0 || nIndex >= GetItemCount() )
+	if (nIndex < 0 || nIndex >= GetItemCount())
 		return false;
 
 	if (nIndex - 1 < 0)
@@ -1470,7 +1470,7 @@ bool CListCtrlEx::MoveUp(int nIndex)
 
 bool CListCtrlEx::MoveDown(int nIndex)
 {
-	if ( nIndex < 0 || nIndex >= GetItemCount() )
+	if (nIndex < 0 || nIndex >= GetItemCount())
 		return false;
 
 	if (nIndex + 1 >= GetItemCount())
@@ -1483,7 +1483,7 @@ bool CListCtrlEx::MoveDown(int nIndex)
 
 bool CListCtrlEx::MoveTop(int nIndex)
 {
-	if ( nIndex < 0 || nIndex >= GetItemCount() )
+	if (nIndex < 0 || nIndex >= GetItemCount())
 		return false;
 
 	if (0 == nIndex)
@@ -1496,7 +1496,7 @@ bool CListCtrlEx::MoveTop(int nIndex)
 
 bool CListCtrlEx::MoveBottom(int nIndex)
 {
-	if ( nIndex < 0 || nIndex >= GetItemCount() )
+	if (nIndex < 0 || nIndex >= GetItemCount())
 		return false;
 
 	int nCount = GetItemCount();
@@ -1510,7 +1510,7 @@ bool CListCtrlEx::MoveBottom(int nIndex)
 
 void CListCtrlEx::SetTopIndex(int nIndex)
 {
-	if ( nIndex < 0 || nIndex >= GetItemCount() )
+	if (nIndex < 0 || nIndex >= GetItemCount())
 		return;
 
 	if (GetItemCount() > 0)
@@ -1524,9 +1524,9 @@ void CListCtrlEx::SetTopIndex(int nIndex)
 
 void CListCtrlEx::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 {
-	if ( m_bAllowSort && (GetStyle() & LVS_OWNERDATA) == 1 )
+	if (m_bAllowSort && (GetStyle() & LVS_OWNERDATA) == 1)
 	{
-		AfxMessageBox( _T("Sort is not supported with LVS_OWNERDATA style.") );
+		AfxMessageBox(_T("Sort is not supported with LVS_OWNERDATA style."));
 		m_bAllowSort = false;
 		return;
 	}
@@ -1534,9 +1534,9 @@ void CListCtrlEx::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리콅E코드를 추가합니다.
 	*pResult = 0;
-	Sort( pNMLV->iSubItem );
+	Sort(pNMLV->iSubItem);
 
-	//TRACE( _T("%d\n"), pNMLV->iSubItem );
+	//TRACE(_T("%d\n"), pNMLV->iSubItem);
 }
 
 BOOL CListCtrlEx::OnNMRClick(NMHDR *pNMHDR, LRESULT *pResult)
@@ -1545,20 +1545,20 @@ BOOL CListCtrlEx::OnNMRClick(NMHDR *pNMHDR, LRESULT *pResult)
 	// TODO: 여기에 컨트롤 알림 처리콅E코드를 추가합니다.
 
 	//기본 팝업메뉴를 이용하지 않는다면 메인에서 RClick 메시지를 처리할 수 있도록 해야한다.
-	if ( !m_bUsePopupMenu )
+	if (!m_bUsePopupMenu)
 		return FALSE;
 
-	if ( pNMItemActivate->iItem < 0 || pNMItemActivate->iItem >= GetItemCount() )
+	if (pNMItemActivate->iItem < 0 || pNMItemActivate->iItem >= GetItemCount())
 		return TRUE;
 
-	DWORD style = ListView_GetExtendedListViewStyle( GetSafeHwnd() );
-	bool bCheckListBox = ( style & LVS_EX_CHECKBOXES );
+	DWORD style = ListView_GetExtendedListViewStyle(GetSafeHwnd());
+	bool bCheckListBox = (style & LVS_EX_CHECKBOXES);
 	CMenu	menu;
 
 	menu.CreatePopupMenu();
 
-	menu.AppendMenu( MF_STRING, listctrlex_menu_add_prior, _T("선택된 항목 위에 새 항목 추가(&W)") );
-	menu.AppendMenu( MF_STRING, listctrlex_menu_add_next, _T("선택된 항목 아래 새 항목 추가(&S)") );
+	menu.AppendMenu(MF_STRING, listctrlex_menu_add_prior, _T("선택된 항목 위에 새 항목 추가(&W)"));
+	menu.AppendMenu(MF_STRING, listctrlex_menu_add_next, _T("선택된 항목 아래 새 항목 추가(&S)"));
 	if (GetKeyState(VK_SHIFT) & 0x8000)
 	{
 		menu.AppendMenu(MF_SEPARATOR);
@@ -1567,38 +1567,38 @@ BOOL CListCtrlEx::OnNMRClick(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	menu.AppendMenu(MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, listctrlex_menu_move_up, _T("선택된 항목을 위로 이동(&U)") );
-	menu.AppendMenu( MF_STRING, listctrlex_menu_move_down, _T("선택된 항목을 아래로 이동(&D)") );
-	menu.AppendMenu( MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, listctrlex_menu_copy_clipboard, _T("복사(&C)\tCtrl+C") );
-	menu.AppendMenu( MF_STRING, listctrlex_menu_copy_clipboard_head, _T("복사(헤더 포함)\tCtrl+Shift+C") );
+	menu.AppendMenu(MF_STRING, listctrlex_menu_move_up, _T("선택된 항목을 위로 이동(&U)"));
+	menu.AppendMenu(MF_STRING, listctrlex_menu_move_down, _T("선택된 항목을 아래로 이동(&D)"));
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, listctrlex_menu_copy_clipboard, _T("복사(&C)\tCtrl+C"));
+	menu.AppendMenu(MF_STRING, listctrlex_menu_copy_clipboard_head, _T("복사(헤더 포함)\tCtrl+Shift+C"));
 	menu.AppendMenu(MF_STRING, listctrlex_menu_paste_insert, _T("붙여넣기(&V)\tCtrl+V"));
 
-	if ( bCheckListBox )
+	if (bCheckListBox)
 	{
-		menu.AppendMenu( MF_SEPARATOR);
-		menu.AppendMenu( MF_STRING, listctrlex_menu_checkall, _T("모든 항목 체크(&A)") );
+		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING, listctrlex_menu_checkall, _T("모든 항목 체크(&A)"));
 	}
 
-	menu.AppendMenu( MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, listctrlex_menu_delete, _T("선택된 항목 삭제(&X)") );
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, listctrlex_menu_delete, _T("선택된 항목 삭제(&X)"));
 
-	if ( pNMItemActivate->iItem == 0 )
-		menu.EnableMenuItem( listctrlex_menu_move_up, MF_DISABLED );
+	if (pNMItemActivate->iItem == 0)
+		menu.EnableMenuItem(listctrlex_menu_move_up, MF_DISABLED);
 
-	if ( pNMItemActivate->iItem == GetItemCount() - 1 )
-		menu.EnableMenuItem( listctrlex_menu_move_down, MF_DISABLED );
+	if (pNMItemActivate->iItem == GetItemCount() - 1)
+		menu.EnableMenuItem(listctrlex_menu_move_down, MF_DISABLED);
 
-	menu.CheckMenuItem( listctrlex_menu_checkall, m_bCheckAll ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem(listctrlex_menu_checkall, m_bCheckAll ? MF_CHECKED : MF_UNCHECKED);
 
-	SetMenu( &menu );
+	SetMenu(&menu);
 
 	CPoint	pt = pNMItemActivate->ptAction;
 
-	ClientToScreen( &pt );
+	ClientToScreen(&pt);
 
 	m_bPopupMenuDisplayed = true;
-	menu.TrackPopupMenu( TPM_LEFTALIGN, pt.x, pt.y, this );
+	menu.TrackPopupMenu(TPM_LEFTALIGN, pt.x, pt.y, this);
 	m_bPopupMenuDisplayed = false;
 
 	menu.DestroyMenu();
@@ -1611,7 +1611,7 @@ BOOL CListCtrlEx::OnNMRClick(NMHDR *pNMHDR, LRESULT *pResult)
 BOOL CListCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	if ( pMsg->message == WM_MOUSEWHEEL && m_bInEditing )
+	if (pMsg->message == WM_MOUSEWHEEL && m_bInEditing)
 	{
 		return true;
 
@@ -1620,19 +1620,19 @@ BOOL CListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		//edit을 그 좌표로 이동시켜줘야 한다. client영역을 벗엉廐툈E화면에서 보여지툈E안된다.
 		CRect	r;
 
-		GetSubItemRect( m_nEditItem, m_nEditSubItem, LVIR_BOUNDS, r );
-		m_pEditCtrl->MoveWindow( r );
+		GetSubItemRect(m_nEditItem, m_nEditSubItem, LVIR_BOUNDS, r);
+		m_pEditCtrl->MoveWindow(r);
 		Invalidate();
 		*/
 	}
-	else if ( pMsg->message == WM_KEYDOWN )
+	else if (pMsg->message == WM_KEYDOWN)
 	{
-		switch ( pMsg->wParam )
+		switch (pMsg->wParam)
 		{
-		case 'C'		:	if ( GetKeyState( VK_CONTROL ) & 0x8000 )
+		case 'C'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
 							{
-								CopyToClipboard(_T("|") );
-								MessageBeep( MB_ICONINFORMATION );
+								CopyToClipboard(_T("|"));
+								MessageBeep(MB_ICONINFORMATION);
 								return true;
 							}
 							break;
@@ -1643,14 +1643,14 @@ BOOL CListCtrlEx::PreTranslateMessage(MSG* pMsg)
 								return true;
 							}
 							break;
-		case VK_F2		:	if ( m_bInEditing )
+		case VK_F2		:	if (m_bInEditing)
 								return true;
 							else
-								EditSubItem( GetSelectedItem(), m_nEditSubItem );
+								EditSubItem(GetSelectedItem(), m_nEditSubItem);
 							break;
 		/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
-		case VK_DELETE	:	if ( m_bInEditing )
+		case VK_DELETE	:	if (m_bInEditing)
 								return false;
 							else
 								DeleteSelectedItems();
@@ -1662,15 +1662,15 @@ BOOL CListCtrlEx::PreTranslateMessage(MSG* pMsg)
 	return CListCtrl::PreTranslateMessage(pMsg);
 }
 
-void CListCtrlEx::OnPopupMenu( UINT nMenuID )
+void CListCtrlEx::OnPopupMenu(UINT nMenuID)
 {
-	switch ( nMenuID )
+	switch (nMenuID)
 	{
 	case listctrlex_menu_add_prior :
-		AddItem( GetSelectedItem(), _T("") );
+		AddItem(GetSelectedItem(), _T(""));
 		break;
 	case listctrlex_menu_add_next :
-		AddItem( GetSelectedItem() + 1, _T("") );
+		AddItem(GetSelectedItem() + 1, _T(""));
 		break;
 	case listctrlex_menu_copy_prior :
 	{
@@ -1696,51 +1696,51 @@ void CListCtrlEx::OnPopupMenu( UINT nMenuID )
 	}
 	break;
 	case listctrlex_menu_move_up :
-		if ( GetItemState( 0, LVIS_SELECTED ) )
+		if (GetItemState(0, LVIS_SELECTED))
 			break;
 
-		for ( int i = 1; i < GetItemCount(); i++ )
+		for (int i = 1; i < GetItemCount(); i++)
 		{
-			if ( GetItemState( i, LVIS_SELECTED ) )
-				SwapItem( i - 1, i );
+			if (GetItemState(i, LVIS_SELECTED))
+				SwapItem(i - 1, i);
 		}
 		break;
 	case listctrlex_menu_move_down :
-		if ( GetItemState( GetItemCount() - 1, LVIS_SELECTED ) )
+		if (GetItemState(GetItemCount() - 1, LVIS_SELECTED))
 			break;
 
-		for ( int i = GetItemCount() - 2; i >= 0; i-- )
+		for (int i = GetItemCount() - 2; i >= 0; i--)
 		{
-			if ( GetItemState( i, LVIS_SELECTED ) )
-				SwapItem( i, i + 1 );
+			if (GetItemState(i, LVIS_SELECTED))
+				SwapItem(i, i + 1);
 		}
 		break;
 /*
 	case ID_MENU_MOVE_UP_STEP :
 		BeginWaitCursor();
-		while ( GetSelectedCount() >= 1 )
+		while (GetSelectedCount() >= 1)
 		{
 			//선택된 항목들을 위로 이동시키컖E
-			for ( int i = 1; i < GetItemCount(); i++ )
+			for (int i = 1; i < GetItemCount(); i++)
 			{
-				if ( GetItemState( i, LVIS_SELECTED ) )
-					SwapItem( i - 1, i );
+				if (GetItemState(i, LVIS_SELECTED))
+					SwapItem(i - 1, i);
 			}
 
 			//맨 마지막 선택 항목은 선택 해제한 후 다시 이동을 반복한다.
 			//최종적으로 선택된 항목이 1개 남을때깩?E반복한다.
-			SetItemState( GetLastSelectedItem(), 0, LVIS_SELECTED );
+			SetItemState(GetLastSelectedItem(), 0, LVIS_SELECTED);
 		}
 		EndWaitCursor();
 		break;
 	case ID_MENU_ADD_PRIOR_X :
 		{
-			int	n = AddItem( GetSelectedItem(), _T("") );
-			SetItemText( n, 0, GetItemText( n + 1, 0 ) );
-			SetItemText( n, 1, GetItemText( n + 1, 1 ) );
-			SetItemText( n, 2, _T("X") );
-			SetItemText( n, 4, _T("5") );
-			SetItemText( n, 6, _T("X") );
+			int	n = AddItem(GetSelectedItem(), _T(""));
+			SetItemText(n, 0, GetItemText(n + 1, 0));
+			SetItemText(n, 1, GetItemText(n + 1, 1));
+			SetItemText(n, 2, _T("X"));
+			SetItemText(n, 4, _T("5"));
+			SetItemText(n, 6, _T("X"));
 		}
 		break;
 */
@@ -1751,14 +1751,14 @@ void CListCtrlEx::OnPopupMenu( UINT nMenuID )
 		CopyToClipboard();
 		break;
 	case listctrlex_menu_copy_clipboard_head :
-		CopyToClipboard(_T("|"), true );
+		CopyToClipboard(_T("|"), true);
 		break;
 	case listctrlex_menu_paste_insert :
 		PasteInsertFromClipboard();
 		break;
 	case listctrlex_menu_checkall :
 		m_bCheckAll = !m_bCheckAll;
-		CheckAll( m_bCheckAll );
+		CheckAll(m_bCheckAll);
 		break;
 	}
 }
@@ -1767,7 +1767,7 @@ void CListCtrlEx::OnPopupMenu( UINT nMenuID )
 // Returns	- the row index or -1 if point is not over a row
 // point	- point to be tested.
 // col		- to hold the column index
-int CListCtrlEx::HitTestEx( CPoint &point, int *pColumn )
+int CListCtrlEx::HitTestEx(CPoint &point, int *pColumn)
 {
 	int ColumnNum = 0;
 	int Row = HitTest (point, NULL);
@@ -1816,14 +1816,14 @@ int CListCtrlEx::HitTestEx( CPoint &point, int *pColumn )
 
 CEdit* CListCtrlEx::EditSubItem (int Item, int Column)
 {
-	if ( !m_bAllowEdit )
+	if (!m_bAllowEdit)
 		return NULL;
 	// The returned pointer should not be saved
 
 	// Make sure that the item is visible
 	if (!EnsureVisible (Item, TRUE)) 
 	{
-		//InsertItem( )
+		//InsertItem()
 		if (!EnsureVisible (Item, TRUE)) 
 			return NULL;
 	}
@@ -1846,7 +1846,7 @@ CEdit* CListCtrlEx::EditSubItem (int Item, int Column)
 	CRect ClientRect;
 	GetClientRect (&ClientRect);
 
-	if ( Offset + Rect.left < 0 || Offset + Rect.left > ClientRect.right )
+	if (Offset + Rect.left < 0 || Offset + Rect.left > ClientRect.right)
 	{
 		CSize Size;
 		if (Offset + Rect.left > 0)
@@ -1879,8 +1879,8 @@ CEdit* CListCtrlEx::EditSubItem (int Item, int Column)
 	Rect.top += 1;
 	Rect.bottom -= 1;
 
-	DWORD dwExStyle = ListView_GetExtendedListViewStyle( GetSafeHwnd() );
-	if ( (Column == 0) && (dwExStyle & LVS_EX_CHECKBOXES) )
+	DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
+	if ((Column == 0) && (dwExStyle & LVS_EX_CHECKBOXES))
 		Rect.left += 18;
 
 	if (Rect.right > ClientRect.right)
@@ -1925,7 +1925,7 @@ BOOL CListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 	LV_DISPINFO *plvDispInfo = (LV_DISPINFO *)pNMHDR;
 	LV_ITEM	*plvItem = &plvDispInfo->item;
 
-	if (plvItem->pszText != NULL && plvItem->pszText != m_sOldText )
+	if (plvItem->pszText != NULL && plvItem->pszText != m_sOldText)
 	{
 		m_bModified = true;
 		SetItemText (plvItem->iItem, plvItem->iSubItem, plvItem->pszText);
@@ -1952,14 +1952,14 @@ BOOL CListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	// TODO: Add your control notification handler code here
 	*pResult = 0;
 
-	if ( m_bAllowEdit == false )
+	if (m_bAllowEdit == false)
 		return FALSE;
 
 	int iItem = pNMItemActivate->iItem;
 	int iSubItem = pNMItemActivate->iSubItem;
 
-	if ( iItem >= 0 && iItem < GetItemCount() &&
-		iSubItem >= 0 && iSubItem < GetColumnCount() )
+	if (iItem >= 0 && iItem < GetItemCount() &&
+		iSubItem >= 0 && iSubItem < GetColumnCount())
 	{
 		EditSubItem (iItem, iSubItem);
 		return TRUE;
@@ -1969,10 +1969,10 @@ BOOL CListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		CString str;
 
 		str.Format(_T("%d"), GetItemCount());
-		iItem = AddItem( str, NULL );
-		SelectItem( iItem );
-		EnsureVisible( iItem, false );
-		EditSubItem( iItem, 0 );
+		iItem = AddItem(str, NULL);
+		SelectItem(iItem);
+		EnsureVisible(iItem, false);
+		EditSubItem(iItem, 0);
 		return TRUE;
 	}
 	return FALSE;
@@ -2014,8 +2014,8 @@ void CListCtrlEx::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	/*
 	CRect	r;
 	MessageBeep(0);
-	GetSubItemRect( m_nEditItem, m_nEditSubItem, LVIR_BOUNDS, r );
-	m_pEditCtrl->MoveWindow( r );
+	GetSubItemRect(m_nEditItem, m_nEditSubItem, LVIR_BOUNDS, r);
+	m_pEditCtrl->MoveWindow(r);
 	Invalidate();
 	*/
 
@@ -2049,20 +2049,20 @@ void CListCtrlEx::OnPaint()
 	//항목이 없을 경퓖E화면에 메시지를 중앙에 표시해준다.
 	//단, 띄엉梶기가 되엉復햨E않은 영문장은 자동 개행이 안됨.
 	//출처 : http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNO=20&no=8674&page=2
-	if ( GetItemCount() == 0 )
+	if (GetItemCount() == 0)
 	{
 		CPaintDC	dc1(this); // device context for painting
 		CRect rc;
-		GetClientRect( &rc );
+		GetClientRect(&rc);
 
-		CMemoryDC	dc( &dc1, &rc, false );
+		CMemoryDC	dc(&dc1, &rc, false);
 		//폰트를 잡아줘야 큱E?瓚悶?동일한 폰트로 표시된다.
 		//그렇햨E않으툈E기본 폰트와 크기로 표시된다.
-		//CFont* pPrevFont = dc.SelectObject ( GetFont() );
+		//CFont* pPrevFont = dc.SelectObject (GetFont());
 
 		//CString str = "표시할 항목이 없습니다.";
 		CString str = _T("No data.");
-		//GetWindowText( str );
+		//GetWindowText(str);
 
 
 		if ((GetStyle() & LVS_TYPEMASK) == LVS_REPORT)
@@ -2070,19 +2070,19 @@ void CListCtrlEx::OnPaint()
 			CRect rcHeader;
 			CHeaderCtrl* pHeaderCtrl = GetHeaderCtrl();
 			pHeaderCtrl->GetClientRect(&rcHeader);
-			rc.SubtractRect( &rc, &rcHeader);
+			rc.SubtractRect(&rc, &rcHeader);
 		}
 
 		CRect rcText = rc;
 
-		dc.FillSolidRect( rc, m_crBack );
+		dc.FillSolidRect(rc, m_crBack);
 		return;
-		dc.SetBkMode( TRANSPARENT );
-		dc.DrawText( str, &rcText, DT_CENTER | DT_WORDBREAK | DT_CALCRECT  );
-		rcText.OffsetRect( ((rc.Width()-rcText.Width())/2) , ((rc.Height()-rcText.Height())/2) );
-		dc.DrawText( str, &rcText, DT_CENTER | DT_WORDBREAK );
+		dc.SetBkMode(TRANSPARENT);
+		dc.DrawText(str, &rcText, DT_CENTER | DT_WORDBREAK | DT_CALCRECT );
+		rcText.OffsetRect(((rc.Width()-rcText.Width())/2) , ((rc.Height()-rcText.Height())/2));
+		dc.DrawText(str, &rcText, DT_CENTER | DT_WORDBREAK);
 
-		//dc.SelectObject( pPrevFont );
+		//dc.SelectObject(pPrevFont);
 
 		//CListCtrl::OnPaint();
 	}
@@ -2095,11 +2095,11 @@ void CListCtrlEx::OnPaint()
 		//약간 속도가 느림이 느껴진다.
 		CPaintDC dc1(this); // device context for painting
 		CRect rc;
-		GetClientRect( rc );
+		GetClientRect(rc);
 
 		//CMemoryDC에 rc를 넘겨줄 때 그냥 넘겨주툈EHeaderCtrl이 제큱E?repaint가 안된다.
 		rc.top += rcHeader.Height();
-		CMemoryDC	dc( &dc1, &rc, true );
+		CMemoryDC	dc(&dc1, &rc, true);
 
 		CRect headerRect;
 		GetDlgItem(0)->GetWindowRect(&headerRect);
@@ -2109,40 +2109,40 @@ void CListCtrlEx::OnPaint()
 		CRect clip;
 		dc.GetClipBox(&clip);
 		clip.top -= 5;
-		dc.FillSolidRect( clip, IsWindowEnabled() ? m_crBack : RGB(192,192,192) );
-		DefWindowProc(WM_PAINT, (WPARAM)dc.m_hDC, (LPARAM)0);
+		dc.FillSolidRect(clip, IsWindowEnabled() ? m_crBack : RGB(192,192,192));
+		//DefWindowProc(WM_PAINT, (WPARAM)dc.m_hDC, (LPARAM)0);
 #endif
 	}
 }
 
-bool CListCtrlEx::CopyToClipboard( LPCTSTR lpszSeparator /*= _T("|")*/, bool bHead /*= false*/ )
+bool CListCtrlEx::CopyToClipboard(LPCTSTR lpszSeparator /*= _T("|")*/, bool bHead /*= false*/)
 {
-	ASSERT( ::IsWindow( GetSafeHwnd() ) );
+	ASSERT(::IsWindow(GetSafeHwnd()));
 
 	int		i;
 	CString sResult = _T("");
 	POSITION pos = GetFirstSelectedItemPosition();
 
-	if ( !pos )
+	if (!pos)
 		return TRUE;
 
 	int		nItem, nCount = 0;
 	int		nColumn = 1;
 	CWaitCursor wait;
 
-	if ( ( GetStyle() & LVS_TYPEMASK ) == LVS_REPORT &&
-		( GetExtendedStyle() & LVS_EX_FULLROWSELECT ) )
+	if ((GetStyle() & LVS_TYPEMASK) == LVS_REPORT &&
+		(GetExtendedStyle() & LVS_EX_FULLROWSELECT))
 	{
 		CHeaderCtrl* pHeader = GetHeaderCtrl();
 		nColumn = pHeader ? pHeader->GetItemCount() : 1;
 
 		//shift키깩?E조합되툈E?E超蝴갋복사한다.
-		if ( ( bHead || (GetKeyState( VK_SHIFT ) < 0) ) && pHeader )
+		if ((bHead || (GetKeyState(VK_SHIFT) < 0)) && pHeader)
 		{
-			for ( i = 0; i < nColumn; ++i )
+			for (i = 0; i < nColumn; ++i)
 			{
-				sResult += GetColumnText( i );
-				if ( i != nColumn - 1 )
+				sResult += GetColumnText(i);
+				if (i != nColumn - 1)
 					sResult += lpszSeparator;
 			}
 
@@ -2156,7 +2156,7 @@ bool CListCtrlEx::CopyToClipboard( LPCTSTR lpszSeparator /*= _T("|")*/, bool bHe
 		if (0 != nCount)
 			sResult += _T("\n");
 
-		for ( i = 0; i < nColumn; ++i )
+		for (i = 0; i < nColumn; ++i)
 		{
 			sResult += GetItemText(nItem, i);
 			if (i != nColumn - 1)
@@ -2178,16 +2178,16 @@ bool CListCtrlEx::CopyToClipboard( LPCTSTR lpszSeparator /*= _T("|")*/, bool bHe
 	char szAssert[256];
 	char *pMem;
 
-	sprintf( szAssert, "Put assert info here" );
-	hMem = GlobalAlloc( GHND|GMEM_DDESHARE, strlen( szAssert ) + 1 );
+	sprintf(szAssert, "Put assert info here");
+	hMem = GlobalAlloc(GHND|GMEM_DDESHARE, strlen(szAssert) + 1);
 
-	if( hMem )
+	if(hMem)
 	{
-	pMem = (char*)GlobalLock( hMem );
-	strcpy( pMem, sResult );
-	GlobalUnlock( hMem );
+	pMem = (char*)GlobalLock(hMem);
+	strcpy(pMem, sResult);
+	GlobalUnlock(hMem);
 	EmptyClipboard();
-	SetClipboardData( CF_TEXT, hMem );
+	SetClipboardData(CF_TEXT, hMem);
 	}
 
 	CloseClipboard();
@@ -2198,11 +2198,11 @@ bool CListCtrlEx::CopyToClipboard( LPCTSTR lpszSeparator /*= _T("|")*/, bool bHe
 	EmptyClipboard();
 
 	int nLen = sResult.GetLength() * sizeof(TCHAR) + 2;
-	HGLOBAL hGlobal = GlobalAlloc( GMEM_MOVEABLE | GMEM_DDESHARE, nLen );
+	HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, nLen);
 	LPSTR pGlobalData = (LPSTR)GlobalLock(hGlobal);
 
 	USES_CONVERSION_EX;
-	CopyMemory( pGlobalData, T2CW_EX(sResult, _ATL_SAFE_ALLOCA_DEF_THRESHOLD), nLen);
+	CopyMemory(pGlobalData, T2CW_EX(sResult, _ATL_SAFE_ALLOCA_DEF_THRESHOLD), nLen);
 	//strncpy(pGlobalData, T2CW_EX(sResult.GetBuffer(0)), nLen);
 	SetClipboardData(CF_UNICODETEXT, hGlobal);
 
@@ -2255,7 +2255,7 @@ void CListCtrlEx::PasteInsertFromClipboard()
 			if (pos == -1)
 				str = sText;
 			else
-				str = sText.Left( pos );
+				str = sText.Left(pos);
 
 			int idx;
 			int nSepCount = get_char_count(str, '|');
@@ -2310,31 +2310,31 @@ void CListCtrlEx::PasteInsertFromClipboard()
 //파일에서 불러와서 리스트를 채웝芩. 컬럼의 수가 동일해야 한다.
 //컬럼 구성이 다른 데이터 파일들을 알아서 불러오햨E않는다.
 //이미 컬럼의 구성이 픽스되푳E있컖E그 구성으로 저장된 파일만 불러오도록 되푳E있다.
-bool CListCtrlEx::load_from_file( CString sfile, TCHAR separator, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/ )
+bool CListCtrlEx::load_from_file(CString sfile, TCHAR separator, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/)
 {
-	if ( GetColumnCount() == 0 )
+	if (GetColumnCount() == 0)
 		return false;
 
-	if ( reset_before_load )
+	if (reset_before_load)
 		DeleteAllItems();
 
 	TCHAR	sLine[512];
 	CString str;
 
-	FILE	*fp = _tfopen( sfile, _T("rt") );
+	FILE	*fp = _tfopen(sfile, _T("rt"));
 
-	if ( fp == NULL )
+	if (fp == NULL)
 		return false;
 
 
-	while (_fgetts( sLine, 512, fp ))
+	while (_fgetts(sLine, 512, fp))
 	{
-		if ( match_column_count && (get_char_count(sLine, separator)) >= GetColumnCount() )
+		if (match_column_count && (get_char_count(sLine, separator)) >= GetColumnCount())
 		{
 			fclose(fp);
 			return false;
 		}
-		AddLineStringItem( CString(sLine), separator );
+		AddLineStringItem(CString(sLine), separator);
 	}
 
 	fclose(fp);
@@ -2342,59 +2342,59 @@ bool CListCtrlEx::load_from_file( CString sfile, TCHAR separator, bool match_col
 }
 
 //리스트의 내퓖E?파일로 저장한다.
-bool CListCtrlEx::save_to_file( CString sfile, TCHAR separator, bool includeHeader /*= false*/ )
+bool CListCtrlEx::save_to_file(CString sfile, TCHAR separator, bool includeHeader /*= false*/)
 {
 	int		i, j;
 	CString str = _T("");
 
-	if ( GetItemCount() == 0 )
+	if (GetItemCount() == 0)
 		return false;
 
-	FILE	*fp = _tfopen( sfile, _T("wt") );
+	FILE	*fp = _tfopen(sfile, _T("wt"));
 	
-	if ( fp == NULL )
+	if (fp == NULL)
 		return false;
 
-	if ( includeHeader )
+	if (includeHeader)
 	{
-		for ( i = 0; i < GetColumnCount(); i++ )
+		for (i = 0; i < GetColumnCount(); i++)
 		{
-			if ( i < GetColumnCount() - 1 )
+			if (i < GetColumnCount() - 1)
 				str = str + GetColumnText(i) + separator;
 			else
 				str += GetColumnText(i);
 		}
 
-		_ftprintf( fp, _T("%s\n"), str );
+		_ftprintf(fp, _T("%s\n"), str);
 	}
 
-	for ( i = 0; i < GetItemCount(); i++ )
+	for (i = 0; i < GetItemCount(); i++)
 	{
 		str = _T("");
 
-		for ( j = 0; j < GetColumnCount(); j++ )
+		for (j = 0; j < GetColumnCount(); j++)
 		{
-			if ( j < GetColumnCount() - 1 )
+			if (j < GetColumnCount() - 1)
 				str = str + GetItemText(i, j) + separator;
 			else
 				str += GetItemText(i, j);
 		}
 
-		_ftprintf( fp, _T("%s\n"), str );
+		_ftprintf(fp, _T("%s\n"), str);
 	}
 
-	fclose( fp );
+	fclose(fp);
 	return true;
 }
 
 /*
 LRESULT CListCtrlEx::OnSetFont(WPARAM wParam, LPARAM)
 {
-	TRACE( "%s\n" __FUNCTION__ );
+	TRACE("%s\n" __FUNCTION__);
 	LRESULT res =  Default();
 
 	CRect rc;
-	GetWindowRect( &rc );
+	GetWindowRect(&rc);
 
 	WINDOWPOS wp;
 	wp.hwnd = m_hWnd;
@@ -2402,7 +2402,7 @@ LRESULT CListCtrlEx::OnSetFont(WPARAM wParam, LPARAM)
 	wp.cy = rc.Height();
 	wp.flags = SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER;
 
-	SendMessage( WM_WINDOWPOSCHANGED, 0, (LPARAM)&wp );
+	SendMessage(WM_WINDOWPOSCHANGED, 0, (LPARAM)&wp);
 
 	return res;
 }
@@ -2410,16 +2410,16 @@ LRESULT CListCtrlEx::OnSetFont(WPARAM wParam, LPARAM)
 
 //MeasureItem()에서도 라인 간격을 조정할 수 있는데 현재 설정에서는 실행되지 않는다.
 //가상 ImageList를 이용해서 라인 간격을 조정하자.
-void CListCtrlEx::MeasureItem( LPMEASUREITEMSTRUCT lpMeasureItemStruct )
+void CListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 {
-	TRACE( "%s\n" __FUNCTION__ );
+	TRACE("%s\n" __FUNCTION__);
 	LOGFONT lf;
-	GetFont()->GetLogFont( &lf );
+	GetFont()->GetLogFont(&lf);
 
-	if( lf.lfHeight < 0 )
-		lpMeasureItemStruct->itemHeight = -lf.lfHeight + 18; 
+	if(lf.lfHeight < 0)
+		lpMeasureItemStruct->itemHeight = -lf.lfHeight + 48; 
 	else
-		lpMeasureItemStruct->itemHeight = lf.lfHeight + 18; 
+		lpMeasureItemStruct->itemHeight = lf.lfHeight + 48; 
 
 }
 /*
@@ -2429,58 +2429,58 @@ void CListCtrlEx::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStr
 }
 */
 //기본 글자퍊E 배경색을 설정한다.
-void CListCtrlEx::SetDefaultItemColor( COLORREF crText, COLORREF crBack )
+void CListCtrlEx::SetDefaultItemColor(COLORREF crText, COLORREF crBack)
 {
 	m_crText = crText;
 	m_crBack = crBack;
 }
 
 //32비트인 dw에 들엉復는 R, G, B를 추출하여 16비트(5+6+5) 컬러로 리턴한다.
-WORD CListCtrlEx::RGB24ToRGB565( DWORD dw )
+WORD CListCtrlEx::RGB24ToRGB565(DWORD dw)
 {
 	BYTE	bt;
 	WORD	wd = 0;
 
-	bt = GetRValue( dw ) >> 3;
+	bt = GetRValue(dw) >> 3;
 	wd = bt;
 	wd <<= 6;
 
-	bt = GetGValue( dw ) >> 2;
+	bt = GetGValue(dw) >> 2;
 	wd |= bt;
 	wd <<= 5;
 
-	bt = GetBValue( dw ) >> 3;
+	bt = GetBValue(dw) >> 3;
 	wd |= bt;
 
 	return wd;
 }
 
 //두 DWORD를 WORD로 변환하여 하나의 DWORD로 변환한다.
-DWORD CListCtrlEx::RGB24ToRGB565( DWORD dw1, DWORD dw2 )
+DWORD CListCtrlEx::RGB24ToRGB565(DWORD dw1, DWORD dw2)
 {
-	DWORD dw = RGB24ToRGB565( dw1 );
+	DWORD dw = RGB24ToRGB565(dw1);
 	dw <<= 16;
 
-	dw |= RGB24ToRGB565( dw2 );
+	dw |= RGB24ToRGB565(dw2);
 	return dw;
 }
 
 //RGB565로 축약된 WORD를 다시 24비트 RGB(DWORD)로 복원시킨다.
-DWORD CListCtrlEx::RGB565ToRGB24( WORD wd )
+DWORD CListCtrlEx::RGB565ToRGB24(WORD wd)
 {
 	//565로 만들엉?Ewd에서 다시 rgb로 복원시켜보자.
-	BYTE	r = ( wd & 0xf800 ) >> 11 << 3;
-	BYTE	g = ( wd & 0x07e0 ) >> 5 << 2;
-	BYTE	b = ( wd & 0x001f ) << 3;
+	BYTE	r = (wd & 0xf800) >> 11 << 3;
+	BYTE	g = (wd & 0x07e0) >> 5 << 2;
+	BYTE	b = (wd & 0x001f) << 3;
 
-	return RGB( r, g, b );
+	return RGB(r, g, b);
 }
 
 COLORREF CListCtrlEx::get_text_color(int iItem, int iSubItem)
 {
 	if ((iItem >= 0) && m_use_item_color)
 	{
-		CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData( iItem );
+		CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(iItem);
 
 		if ((dq == NULL) ||
 			(dq->dqColor.size() <= iSubItem) ||
@@ -2498,7 +2498,7 @@ void CListCtrlEx::set_text_color(int iItem, int iSubItem, COLORREF text)
 {
 	m_use_item_color = true;
 
-	CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData( iItem );
+	CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(iItem);
 
 	if (dq == NULL)
 	{
@@ -2517,7 +2517,7 @@ void CListCtrlEx::set_back_color(int iItem, int iSubItem, COLORREF back)
 {
 	m_use_item_color = true;
 
-	CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData( iItem );
+	CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(iItem);
 
 	if (dq == NULL)
 	{
@@ -2536,7 +2536,7 @@ void CListCtrlEx::set_item_color(int iItem, int iSubItem, COLORREF crText, COLOR
 {
 	m_use_item_color = true;
 
-	CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData( iItem );
+	CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(iItem);
 
 	if (dq == NULL)
 	{
@@ -2632,13 +2632,13 @@ for(int i = 0; i < GetHeaderCtrl()->GetItemCount(); ++i)
 {
 HDITEM hditem = {0};
 hditem.mask = HDI_FORMAT;
-VERIFY( GetHeaderCtrl()->GetItem( i, &hditem ) );
+VERIFY(GetHeaderCtrl()->GetItem(i, &hditem));
 hditem.fmt &= ~(HDF_SORTDOWN|HDF_SORTUP);
 if (i == colIndex)
 {
 hditem.fmt |= ascending ? HDF_SORTDOWN : HDF_SORTUP;
 }
-VERIFY( CListCtrl::GetHeaderCtrl()->SetItem( i, &hditem ) );
+VERIFY(CListCtrl::GetHeaderCtrl()->SetItem(i, &hditem));
 }
 #endif
 }
@@ -2649,7 +2649,7 @@ for(int i = 0; i < GetHeaderCtrl()->GetItemCount(); ++i)
 {
 HDITEM hditem = {0};
 hditem.mask = HDI_BITMAP | HDI_FORMAT;
-VERIFY( GetHeaderCtrl()->GetItem( i, &hditem ) );
+VERIFY(GetHeaderCtrl()->GetItem(i, &hditem));
 if (hditem.fmt & HDF_BITMAP && hditem.fmt & HDF_BITMAP_ON_RIGHT)
 {
 if (hditem.hbm)
@@ -2658,14 +2658,14 @@ DeleteObject(hditem.hbm);
 hditem.hbm = NULL;
 }
 hditem.fmt &= ~(HDF_BITMAP|HDF_BITMAP_ON_RIGHT);
-VERIFY( CListCtrl::GetHeaderCtrl()->SetItem( i, &hditem ) );
+VERIFY(CListCtrl::GetHeaderCtrl()->SetItem(i, &hditem));
 }
 if (i == colIndex)
 {
 hditem.fmt |= HDF_BITMAP|HDF_BITMAP_ON_RIGHT;
 hditem.hbm = (HBITMAP)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(bitmapID), IMAGE_BITMAP, 0,0, LR_LOADMAP3DCOLORS); 
-VERIFY( hditem.hbm!=NULL );
-VERIFY( CListCtrl::GetHeaderCtrl()->SetItem( i, &hditem ) );
+VERIFY(hditem.hbm!=NULL);
+VERIFY(CListCtrl::GetHeaderCtrl()->SetItem(i, &hditem));
 }
 }
 }
@@ -2680,12 +2680,12 @@ void CListCtrlEx::reconstruct_font()
 
 	m_font_size = -MulDiv(m_lf.lfHeight, 72, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY));
 
-	SetFont( &m_font, true );
+	SetFont(&m_font, true);
 
 	ASSERT(bCreated);
 }
 
-void CListCtrlEx::SetFontSize( int font_size )
+void CListCtrlEx::SetFontSize(int font_size)
 {
 	if (font_size == 0)
 		return;
@@ -2704,26 +2704,29 @@ void CListCtrlEx::EnlargeFontSize(bool enlarge)
 	reconstruct_font();
 }
 
-void CListCtrlEx::SetFontName(LPCTSTR sFontname, BYTE byCharSet )
+void CListCtrlEx::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
-	_tcscpy( m_lf.lfFaceName, sFontname);
+	_tcscpy(m_lf.lfFaceName, sFontname);
 	reconstruct_font();
 }
 
-void CListCtrlEx::SetFontBold( bool bBold )
+void CListCtrlEx::SetFontBold(bool bBold)
 {
-	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
+	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
 	reconstruct_font();
 }
 
 void CListCtrlEx::SetLineHeight(int height)
 {
+	//이미지리스트를 사용하지 않는 경우는 아래와 같이 가상 이미지리스트로 쉽게 조절 가능.
+	/*
 	CImageList gapImage;
 
 	gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
 
 	SetImageList(&gapImage,LVSIL_SMALL);
+	*/
 }
 
 void CListCtrlEx::PreSubclassWindow()
@@ -2733,7 +2736,7 @@ void CListCtrlEx::PreSubclassWindow()
 
 	CFont* font = GetParent()->GetFont();
 
-	if ( font != NULL )
+	if (font != NULL)
 		font->GetObject(sizeof(m_lf),&m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT),sizeof(m_lf),&m_lf);
@@ -2769,57 +2772,57 @@ void CListCtrlEx::PreSubclassWindow()
 	//두 ListCtrl의 속성은 동일한데 왜 이러한 현상이 발생하는햨E모르겠다.
 	//HWND hWnd = ::GetWindow(m_hWnd, GW_CHILD);
 	//if (hWnd)
-	//	m_HeaderCtrlEx.SubclassWindow( hWnd );
+	//	m_HeaderCtrlEx.SubclassWindow(hWnd);
 
 }
 
-void CListCtrlEx::SetColorTheme( int nTheme )
+void CListCtrlEx::SetColorTheme(int nTheme)
 {
-	switch ( nTheme )
+	switch (nTheme)
 	{
 	case color_theme_default :
-		m_crBack				= ::GetSysColor( COLOR_WINDOW );
-		m_crBackSelected		= ::GetSysColor( COLOR_HIGHLIGHT );
-		m_crBackSelectedInactive= ::GetSysColor( COLOR_HIGHLIGHT );
-		m_crText				= ::GetSysColor( COLOR_BTNTEXT );
-		m_crTextSelected		= ::GetSysColor( COLOR_HIGHLIGHTTEXT );
-		m_crTextSelectedInactive= ::GetSysColor( COLOR_INACTIVECAPTIONTEXT );
-		m_crHeaderBack			= ::GetSysColor( COLOR_3DFACE );
-		m_crHeaderText			= ::GetSysColor( COLOR_BTNTEXT );
+		m_crBack				= ::GetSysColor(COLOR_WINDOW);
+		m_crBackSelected		= ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelectedInactive= ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
+		m_crTextSelected		= ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_crTextSelectedInactive= ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_crHeaderBack			= ::GetSysColor(COLOR_3DFACE);
+		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
 		break;
 	case color_theme_blue :
-		m_crBack				= RGB( 193, 219, 252 );
-		m_crBackSelected		= get_color( m_crBack, -32 );
-		m_crBackSelectedInactive= RGB( 193, 219, 252 );
-		m_crText				= ::GetSysColor( COLOR_BTNTEXT );
-		m_crTextSelected		= RGB(  65, 102, 146 );
-		m_crTextSelectedInactive= RGB(  65, 102, 146 );
-		m_crHeaderBack			= get_color( m_crBack, -32 );
-		m_crHeaderText			= get_color( m_crText, -32 );
+		m_crBack				= RGB(193, 219, 252);
+		m_crBackSelected		= get_color(m_crBack, -32);
+		m_crBackSelectedInactive= RGB(193, 219, 252);
+		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
+		m_crTextSelected		= RGB( 65, 102, 146);
+		m_crTextSelectedInactive= RGB( 65, 102, 146);
+		m_crHeaderBack			= get_color(m_crBack, -32);
+		m_crHeaderText			= get_color(m_crText, -32);
 		break;
 	case color_theme_dark_blue :
-		m_crBack				= RGB(  74,  94, 127 );
-		m_crBackSelected		= RGB(  15,  36,  41 );
-		m_crBackSelectedInactive= RGB(  15,  36,  41 );
-		m_crText				= RGB( 204, 216, 225 );
-		m_crTextSelected		= RGB( 234, 246, 255 );
-		m_crTextSelectedInactive= RGB( 105, 142, 186 );
-		m_crHeaderBack			= get_color( m_crBack, -32 );
-		m_crHeaderText			= get_color( m_crText, -32 );
+		m_crBack				= RGB( 74,  94, 127);
+		m_crBackSelected		= RGB( 15,  36,  41);
+		m_crBackSelectedInactive= RGB( 15,  36,  41);
+		m_crText				= RGB(204, 216, 225);
+		m_crTextSelected		= RGB(234, 246, 255);
+		m_crTextSelectedInactive= RGB(105, 142, 186);
+		m_crHeaderBack			= get_color(m_crBack, -32);
+		m_crHeaderText			= get_color(m_crText, -32);
 		break; 
 	case color_theme_dark_gray :
-		m_crText				= RGB( 164, 164, 164);
-		m_crTextSelected		= RGB( 241, 241, 241 );
-		m_crTextSelectedInactive= RGB( 241, 241, 241 );
-		m_crBack				= RGB(  64,  64,  64 );
-		m_crBackSelected		= RGB(  32,  32,  32 );
-		m_crBackSelectedInactive= RGB(  32,  32,  32 );
-		m_crHeaderBack			= get_color( m_crBack, -16 );
-		m_crHeaderText			= get_color( m_crText, -16 );
+		m_crText				= RGB(164, 164, 164);
+		m_crTextSelected		= RGB(241, 241, 241);
+		m_crTextSelectedInactive= RGB(241, 241, 241);
+		m_crBack				= RGB( 64,  64,  64);
+		m_crBackSelected		= RGB( 32,  32,  32);
+		m_crBackSelectedInactive= RGB( 32,  32,  32);
+		m_crHeaderBack			= get_color(m_crBack, -16);
+		m_crHeaderText			= get_color(m_crText, -16);
 		break;
 	}
 
-	m_HeaderCtrlEx.SetColor( m_crHeaderText, m_crHeaderBack );
+	m_HeaderCtrlEx.SetColor(m_crHeaderText, m_crHeaderBack);
 	Invalidate();
 }
 
@@ -2842,44 +2845,44 @@ BOOL CListCtrlEx::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 	bool bTrace = false;
 
-	if ( pNMLV->uChanged == LVIF_TEXT )
+	if (pNMLV->uChanged == LVIF_TEXT)
 		return true;
 
 #if 0
-	if ( bTrace )
-		TRACE( "old = %d, new = %d, uChanged = %d\n", pNMLV->uOldState, pNMLV->uNewState, pNMLV->uChanged );
+	if (bTrace)
+		TRACE("old = %d, new = %d, uChanged = %d\n", pNMLV->uOldState, pNMLV->uNewState, pNMLV->uChanged);
 
 	if (pNMLV->uOldState == pNMLV->uNewState)
 		return true;	// No change
 
-	if ( pNMLV->uOldState & LVIS_FOCUSED )
+	if (pNMLV->uOldState & LVIS_FOCUSED)
 	{
-		if ( bTrace )
-			TRACE( "%d : old item unfocused\n", GetTickCount() );
+		if (bTrace)
+			TRACE("%d : old item unfocused\n", GetTickCount());
 		return true;
 	}
-	else if ( pNMLV->uOldState & LVIS_SELECTED )
+	else if (pNMLV->uOldState & LVIS_SELECTED)
 	{
-		if ( bTrace )
-			TRACE( "%d : old item unselect\n", GetTickCount() );
+		if (bTrace)
+			TRACE("%d : old item unselect\n", GetTickCount());
 		return true;
 	}
-	else if ( /*!(pNMLV->uChanged == LVIF_STATE && */pNMLV->uNewState & LVIS_SELECTED )// | LVIS_FOCUSED))
-	//if ( (pNMLV->uChanged & LVIF_STATE) && (pNMLV->uNewState & LVIS_SELECTED ) )
-	//if ( /*pNMLV->uOldState == (!LVIS_SELECTED | LVIS_FOCUSED) && */pNMLV->uNewState == (LVIS_SELECTED | LVIS_FOCUSED) )
+	else if (/*!(pNMLV->uChanged == LVIF_STATE && */pNMLV->uNewState & LVIS_SELECTED)// | LVIS_FOCUSED))
+	//if ((pNMLV->uChanged & LVIF_STATE) && (pNMLV->uNewState & LVIS_SELECTED))
+	//if (/*pNMLV->uOldState == (!LVIS_SELECTED | LVIS_FOCUSED) && */pNMLV->uNewState == (LVIS_SELECTED | LVIS_FOCUSED))
 	{
-		if ( bTrace )
-			TRACE( "%d : uchanged = %d, oldstate = %d, newstate = %d, lparam = %d\n",
-					GetTickCount(), pNMLV->uChanged, pNMLV->uOldState, pNMLV->uNewState, pNMLV->lParam );
-		CListItemState state( pNMLV->iItem, pNMLV->iSubItem, ITEM_SELECTED );
-		::SendMessage( GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), (LPARAM)&state );
+		if (bTrace)
+			TRACE("%d : uchanged = %d, oldstate = %d, newstate = %d, lparam = %d\n",
+					GetTickCount(), pNMLV->uChanged, pNMLV->uOldState, pNMLV->uNewState, pNMLV->lParam);
+		CListItemState state(pNMLV->iItem, pNMLV->iSubItem, ITEM_SELECTED);
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), (LPARAM)&state);
 		return true;
 	}
 	else
 #endif
 	{
 		DWORD dwExStyle = GetExtendedStyle();
-		if ( (dwExStyle & LVS_EX_CHECKBOXES) == false )
+		if ((dwExStyle & LVS_EX_CHECKBOXES) == false)
 			return true;
 		
 		BOOL bPrevState = (BOOL)(((pNMLV->uOldState & 
@@ -2895,10 +2898,10 @@ BOOL CListCtrlEx::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 		if (bPrevState == bChecked) // No change in check box
 			return true;
 		
-		//TRACE( "%d : check changed. %d -> %d\n", GetTickCount(), bPrevState, bChecked );
+		//TRACE("%d : check changed. %d -> %d\n", GetTickCount(), bPrevState, bChecked);
 		
-		CListItemState state( pNMLV->iItem, pNMLV->iSubItem, (bChecked ? ITEM_CHECKED : ITEM_UNCHECKED) );
-		::SendMessage( GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), (LPARAM)&state );
+		CListItemState state(pNMLV->iItem, pNMLV->iSubItem, (bChecked ? ITEM_CHECKED : ITEM_UNCHECKED));
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), (LPARAM)&state);
 	}
 
 	return true;//FALSE;
@@ -2908,21 +2911,21 @@ int CListCtrlEx::GetCheckedItemCount()
 {
 	int nCheckedCount = 0;
 
-	for ( int i = 0; i < GetItemCount(); i++ )
+	for (int i = 0; i < GetItemCount(); i++)
 	{
-		if ( GetCheck(i) )
+		if (GetCheck(i))
 			nCheckedCount++;
 	}
 
 	return nCheckedCount;
 }
 
-void CListCtrlEx::CheckAll( bool bCheck )
+void CListCtrlEx::CheckAll(bool bCheck)
 {
 	m_bCheckAll = bCheck;
 
-	for ( int i = 0; i < GetItemCount(); i++ )
-		SetCheck( i, bCheck );
+	for (int i = 0; i < GetItemCount(); i++)
+		SetCheck(i, bCheck);
 }
 
 
@@ -3080,19 +3083,19 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 #if 1
 void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 {
-	//TRACE( "%d, %s\n", GetTickCount(), __FUNCTION__ );
+	//TRACE("%d, %s\n", GetTickCount(), __FUNCTION__);
 	//LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
 	//// TODO: Add your control notification handler code here
 	//*pResult = 0;
 	//return;
-	NMLVCUSTOMDRAW* pLVCD = reinterpret_cast<NMLVCUSTOMDRAW*>( pNMHDR );
+	NMLVCUSTOMDRAW* pLVCD = reinterpret_cast<NMLVCUSTOMDRAW*>(pNMHDR);
 	LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
 	static bool bHighlighted = false;
 
-	//*pResult = CDRF_DODEFAULT;
+	*pResult = CDRF_DODEFAULT;
 
 	/*
-	if ( CDDS_PREPAINT == pLVCD->nmcd.dwDrawStage )
+	if (CDDS_PREPAINT == pLVCD->nmcd.dwDrawStage)
 	{
 		*pResult = CDRF_NOTIFYITEMDRAW;
 	}
@@ -3102,7 +3105,7 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 		*pResult = (LRESULT)CDRF_NOTIFYITEMDRAW; 
 		//return; // 여기서 함수를 빠져 나가야 *pResult 값이 유지된다.
 	}
-	else if ( CDDS_ITEMPREPAINT == pLVCD->nmcd.dwDrawStage )
+	else if (CDDS_ITEMPREPAINT == pLVCD->nmcd.dwDrawStage)
 	{
 		/*
 		int iRow = (int)pLVCD->nmcd.dwItemSpec;
@@ -3110,9 +3113,9 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 	
 		if (bHighlighted)
 		{
-			if ( IsWindowEnabled() == false )
+			if (IsWindowEnabled() == false)
 			{
-				pLVCD->clrText   = ::GetSysColor( COLOR_GRAYTEXT );
+				pLVCD->clrText   = ::GetSysColor(COLOR_GRAYTEXT);
 				pLVCD->clrTextBk = GRAY(164);
 			}
 			else
@@ -3121,13 +3124,13 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 				pLVCD->clrTextBk = m_crBackSelected;
 			}
 
-			ListView_SetItemState( m_hWnd, iRow, 0, LVIS_SELECTED);
+			ListView_SetItemState(m_hWnd, iRow, 0, LVIS_SELECTED);
 		}
 		else
 		{
-			if ( IsWindowEnabled() == false )
+			if (IsWindowEnabled() == false)
 			{
-				pLVCD->clrText   = ::GetSysColor( COLOR_GRAYTEXT );
+				pLVCD->clrText   = ::GetSysColor(COLOR_GRAYTEXT);
 				pLVCD->clrTextBk = GRAY(192);
 			}
 			else
@@ -3161,13 +3164,19 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 		*/
 
 		//*pResult = /*CDRF_DODEFAULT | */CDRF_NOTIFYPOSTPAINT;
-		*pResult = (LRESULT)CDRF_NOTIFYSUBITEMDRAW;//sub-item 을 변경하기 위해서. 
+		//*pResult = (LRESULT)CDRF_NOTIFYSUBITEMDRAW;//sub-item 을 변경하기 위해서. 
 		//return;//여기서 중단해야 *pResult 값이 유지된다.
+
+		pLVCD->nmcd.rc.bottom = pLVCD->nmcd.rc.top + 60;
+		//pLVCD->nmcd.rc.top += 60;
+		*pResult = CDRF_NOTIFYSUBITEMDRAW;
 	}
 	else if(pLVCD->nmcd.dwDrawStage == (CDDS_SUBITEM | CDDS_ITEMPREPAINT))
 	{
 		NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR); 
 		bHighlighted = ListView_GetItemState(m_hWnd, pLVCD->nmcd.dwItemSpec, LVIS_SELECTED);
+
+		pLVCD->nmcd.rc.bottom = pLVCD->nmcd.rc.top + 60;
 
 		CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(pLVCD->nmcd.dwItemSpec);
 
@@ -3195,9 +3204,9 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 
 		if (bHighlighted)
 		{
-			if ( IsWindowEnabled() == false )
+			if (IsWindowEnabled() == false)
 			{
-				pDraw->clrText   = ::GetSysColor( COLOR_GRAYTEXT );
+				pDraw->clrText   = ::GetSysColor(COLOR_GRAYTEXT);
 				pDraw->clrTextBk = GRAY(164);
 			}
 			else
@@ -3206,13 +3215,13 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 				pDraw->clrTextBk = m_crBackSelected;
 			}
 
-			ListView_SetItemState( m_hWnd, iRow, 0, LVIS_SELECTED);
+			ListView_SetItemState(m_hWnd, iRow, 0, LVIS_SELECTED);
 		}
 		else
 		{
-			if ( IsWindowEnabled() == false )
+			if (IsWindowEnabled() == false)
 			{
-				pDraw->clrText   = ::GetSysColor( COLOR_GRAYTEXT );
+				pDraw->clrText   = ::GetSysColor(COLOR_GRAYTEXT);
 				pDraw->clrTextBk = GRAY(192);
 			}
 			else
@@ -3237,7 +3246,7 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 		{
 			int  iRow = (int)pLVCD->nmcd.dwItemSpec;
 
-			ListView_SetItemState( m_hWnd, iRow, 0xff, LVIS_SELECTED);
+			ListView_SetItemState(m_hWnd, iRow, 0xff, LVIS_SELECTED);
 		}
 
 		*pResult = CDRF_DODEFAULT;
@@ -3246,11 +3255,11 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 #endif
 #endif
 
-void CListCtrlEx::ModifyExtendedStyle( DWORD dwExStyle, bool bAdd )
+void CListCtrlEx::ModifyExtendedStyle(DWORD dwExStyle, bool bAdd)
 {
-	DWORD dwExistStyle = ListView_GetExtendedListViewStyle( GetSafeHwnd() );
-	if ( bAdd )
-		ListView_SetExtendedListViewStyle( GetSafeHwnd(), dwExistStyle | dwExStyle );
+	DWORD dwExistStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
+	if (bAdd)
+		ListView_SetExtendedListViewStyle(GetSafeHwnd(), dwExistStyle | dwExStyle);
 	else
 		(DWORD)SNDMSG((GetSafeHwnd()), LVM_SETEXTENDEDLISTVIEWSTYLE, dwExStyle, 0);
 }
@@ -3261,9 +3270,9 @@ void CListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: Add your control notification handler code here
 
-	//TRACE( "%d : %s\n", GetTickCount(), __FUNCTION__ );
-	CListItemState state( pNMItemActivate->iItem, pNMItemActivate->iSubItem, ITEM_SELECTED );
-	::SendMessage( GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), (LPARAM)&state );
+	//TRACE("%d : %s\n", GetTickCount(), __FUNCTION__);
+	CListItemState state(pNMItemActivate->iItem, pNMItemActivate->iSubItem, ITEM_SELECTED);
+	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_LISTCTRLEX_ITEM_CHANGED, GetDlgCtrlID(), (LPARAM)&state);
 
 	*pResult = 0;
 }

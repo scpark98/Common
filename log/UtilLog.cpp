@@ -2,7 +2,7 @@
 #include "UtilLog.h"
 #include <afxmt.h>
 
-#include "../Functions.h"
+//#include "../Functions.h"
 
 CCriticalSection theCSLog;
 
@@ -89,7 +89,7 @@ BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 		m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
 
 		//CreateDirectory(m_folder, NULL);
-		make_full_directory(m_folder);
+		recursive_make_full_directory(m_folder);
 
 		_tfopen_s(&m_fp, m_fullpath, _T("a")CHARSET);
 
@@ -185,4 +185,23 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 	}
 
 	return result;
+}
+
+//usage : sFolder include folder names only except file name.
+//c:\test\00\1.bmp	(x)	=> 1.bmp folder will be created.(not intended)
+//c:\test\00		(o)
+bool UtilLog::recursive_make_full_directory(LPCTSTR sFolder)
+{
+	if (PathFileExists(sFolder) && ::PathIsDirectory(sFolder))
+		return true;
+
+	TCHAR parent[MAX_PATH] = _T("");
+
+	_tcscpy(parent, sFolder);
+	::PathRemoveFileSpec(parent);
+
+	if (recursive_make_full_directory(parent))
+		return (::CreateDirectory(sFolder, NULL) != false);
+
+	return false;
 }

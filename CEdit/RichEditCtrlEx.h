@@ -41,6 +41,8 @@ public:
 	void		ShowTimeInfo( bool bShow = true ) { m_bShowTime = bShow; }
 	bool		IsShowTime() { return m_bShowTime; }
 
+	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
+
 	UINT		GetLineSpacing();
 	void		SetLineSpacing( UINT nLineSpace );
 	int			AppendToLog( CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
@@ -54,6 +56,10 @@ public:
 	void		auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
 	void		SetScrollSize( int nLines ) { m_nScrollSize = nLines; }
 
+	int			get_align() { return m_align; }
+	//PFA_LEFT(1), PFA_RIGHT(2), PFA_CENTER(3)
+	void		set_align(int align);
+
 	virtual		CRichEditCtrlEx& SetFontName( TCHAR *sfontname );
 	virtual		CRichEditCtrlEx& SetFontSize( int nSize );
 	virtual		CRichEditCtrlEx& SetFontBold( bool bBold = true );
@@ -63,11 +69,14 @@ protected:
 	COLORREF	m_crBack;
 	bool		m_bShowLog;
 	bool		m_bShowTime;
+	bool		m_use_popup_menu = true;
 
 	int			m_nClearLogInterval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
 	int			m_nMaxCharLimit;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
 	int			m_nScrollSize;
 	bool		m_auto_scroll = true;
+
+	int			m_align = PFA_LEFT;
 
 	void		OnPopupMenu(UINT menuID);
 

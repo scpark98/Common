@@ -31,7 +31,7 @@ enum STATE_LISTCTRLEX
 class CListItemState
 {
 public:
-	CListItemState( int nItem, int nSubItem, int state )
+	CListItemState(int nItem, int nSubItem, int state)
 	{
 		iItem = nItem;
 		iSubItem = nSubItem;
@@ -70,7 +70,7 @@ public:
 	//5번 컬럼의 색상을 지정하려면 dqColor는 5개의 크기로 확장되어야 하고
 	//이 때 크기 확장을 위해 채워진 0~4는 그 색생값을 지정한게 아니므로 스킵되어야 한다.
 	//
-	CListCtrlExItemColor(COLORREF _text = LISTCTRLEX_UNUSED_COLOR, COLORREF _back = LISTCTRLEX_UNUSED_COLOR )
+	CListCtrlExItemColor(COLORREF _text = LISTCTRLEX_UNUSED_COLOR, COLORREF _back = LISTCTRLEX_UNUSED_COLOR)
 	{
 		text = _text;
 		back = _back;
@@ -115,20 +115,20 @@ in resource editor에서 ListCtrl의 속성 :
 
 
 	int		i;
-	//m_List.SetFontName( "Consolas" );
-	//m_List.SetFontSize( 14 );
+	//m_List.SetFontName("Consolas");
+	//m_List.SetFontSize(14);
 
-	m_List.SetHeadings( "항목,50;상태,50;" );
+	m_List.SetHeadings("항목,50;상태,50;");
 
-	for ( i = 0; i < m_List.GetColumnCount(); i++ )
-		m_List.SetColumnTextAlign( i, LVCFMT_CENTER );
+	for (i = 0; i < m_List.GetColumnCount(); i++)
+		m_List.SetColumnTextAlign(i, LVCFMT_CENTER);
 
-	//m_List.SetColumnWidth( 0, 91 );
-	//m_List.SetColumnWidth( 1, 142 );
+	//m_List.SetColumnWidth(0, 91);
+	//m_List.SetColumnWidth(1, 142);
 	m_List.LoadColumnWidth(&theApp);
-	m_List.SetExtendedStyle( LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT | LVS_EX_FLATSB );
+	m_List.SetExtendedStyle(LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT | LVS_EX_FLATSB);
 
-	int index = m_List.AddItem( "Item0", NULL );
+	int index = m_List.AddItem("Item0", NULL);
 	m_List.SetItemText(index, 1, "1st column text");
 	....
 
@@ -146,7 +146,7 @@ public:
 	CListCtrlEx();
 
 	CHeaderCtrlEx	m_HeaderCtrlEx;
-	void			ModifyExtendedStyle( DWORD dwExStyle, bool bAdd );
+	void			ModifyExtendedStyle(DWORD dwExStyle, bool bAdd);
 
 // Attributes
 public:
@@ -157,15 +157,15 @@ public:
 //item
 
 	//컬럼의 수보다 적은 개수의 항목을 추가할때는 반드시 끝 인자는 NULL을 넣어줘야 한다.
-	int		AddItem( LPCTSTR pszText, ... );
+	int		AddItem(LPCTSTR pszText, ...);
 	//컬럼의 수보다 적은 개수의 항목을 추가할때는 반드시 끝 인자는 NULL을 넣어줘야 한다.
-	int		AddItem( int nIndex, LPCTSTR pszText, ... );
+	int		AddItem(int nIndex, LPCTSTR pszText, ...);
 	//컬럼의 수와 같거나 그 이하인 항목들이 separator로 구분되어 있다면 자동 파싱하여 리스트에 넣어준다.
 	int		AddLineStringItem(CString sLine, TCHAR separator = '|');
 
 	//컬럼의 이름 그대로 한 라인을 추가한다. 리스트 중간에 컬럼을 다시 표시하고자 할 때 유용하다.
 	int		AddItemWithColumnText();
-	int		AddItemWithColumnText( int iItem );
+	int		AddItemWithColumnText(int iItem);
 
 	//보통 0번 컬럼은 순번을 표시하는 용도로 많이 사용된다.
 	//그런데 데이터가 추가 삭제되면서 그 번호가 뒤섞이게 된다.
@@ -187,16 +187,16 @@ public:
 		listctrlex_menu_checkall,
 	};
 
-	void	OnPopupMenu( UINT nMenuID );
+	void	OnPopupMenu(UINT nMenuID);
 	// 지우기 전 확인창은 호출루틴에서 처리해야 함
 	void	DeleteSelectedItems();
 
-	int		GetSelectedItem( int nStart = 0 );
+	int		GetSelectedItem(int nStart = 0);
 	int		GetLastSelectedItem();
 	std::deque<int>	GetSelectedItems(int nStart = 0);
 
 	//nIndex = -1 : 전체선택
-	void	SelectItem( int nIndex, bool bSelect = true );
+	void	SelectItem(int nIndex, bool bSelect = true);
 
 	void	SetItemDataReset(int start = -1, DWORD data = 0);
 
@@ -207,32 +207,32 @@ public:
 	int		FindString(CString str, int indexFrom = -1, bool bWholeWord = true);
 	//column에 저장된 컬럼들에서 해당 문자열을 찾는다.
 	//column을 NULL로해서 호출하면 모든 컬럼을 모두 검색한다.
-	void	FindString(CString str, int indexFrom, std::vector<int> *column, std::vector<int> &result, bool bWholeWord = TRUE, bool bCaseSensitive = FALSE );
+	void	FindString(CString str, int indexFrom, std::vector<int> *column, std::vector<int> &result, bool bWholeWord = TRUE, bool bCaseSensitive = FALSE);
 
-	bool	DeleteItem( int nItem );
+	bool	DeleteItem(int nItem);
 	bool	DeleteAllItems();
 
 	bool	m_bCheckAll;
-	void	CheckAll( bool bCheck = true );
+	void	CheckAll(bool bCheck = true);
 	int		GetCheckedItemCount();
 
 //column
 
-	bool	SetHeadings( UINT uiStringID );
+	bool	SetHeadings(UINT uiStringID);
 
 	// ex. "No,20;Item1,50;Item2,50"
-	bool	SetHeadings( const CString& strHeadings );	
+	bool	SetHeadings(const CString& strHeadings);	
 	
-	int		GetColumnDataType( int nColumn );
-	void	SetColumnDataType( int nColumn, int nType );	
+	int		GetColumnDataType(int nColumn);
+	void	SetColumnDataType(int nColumn, int nType);	
 
-	int		GetColumnTextAlign( int nColumn );
+	int		GetColumnTextAlign(int nColumn);
 	//format : HDF_LEFT ~ HDF_RIGHT
-	void	SetColumnTextAlign( int nColumn, int format );
-	void	SetColumnText( int nColumn, CString sText );
-	CString	GetColumnText( int nColumn );
+	void	SetColumnTextAlign(int nColumn, int format);
+	void	SetColumnText(int nColumn, CString sText);
+	CString	GetColumnText(int nColumn);
 	int		GetColumnCount();
-	void	DeleteColumn( int nColumn );				// -1 = delete all columns
+	void	DeleteColumn(int nColumn);				// -1 = delete all columns
 	void	OnColumnClickFunction(NMHDR* pNMHDR, LRESULT* pResult);
 	void	AutoAdjustColumnWidth();					// 데이터의 길이에 따라 컬럼너비 자동 조정
 	void	LoadColumnWidth(CWinApp* pApp, CString sSection = _T("listctrl column width"));
@@ -242,42 +242,42 @@ public:
 //sort
 	//0:no sort, 1:ascending, -1:descending
 	bool	m_bAllowSort;			//default false
-	void	AllowSort( bool bAllow = true) { m_bAllowSort = bAllow; }
+	void	AllowSort(bool bAllow = true) { m_bAllowSort = bAllow; }
 	int		m_nSorted;
 	bool	IsSorted();
-	void	SetBitmapImageList( UINT nBitmapIDLarge, UINT nBitmapIDSmall, COLORREF cTransparent, int nInitial, int nGrow = 1 );
-	bool	SortTextItems( int nCol, bool bAscending, int low = 0, int high = -1 );
-	bool	SortNumericItems( int nCol, bool bAscending,int low = 0, int high = -1 );
-	int		GetItemImageIndex(int nRow, int nCol = 0 );
-	bool	SortInImageOrder(int nCol, bool bAscending, int nLow = 0, int nHigh = -1 );
-	bool	sort_in_text_color(int nSubItem, bool bAscending, int nLow = 0, int nHigh = -1 );
+	void	SetBitmapImageList(UINT nBitmapIDLarge, UINT nBitmapIDSmall, COLORREF cTransparent, int nInitial, int nGrow = 1);
+	bool	SortTextItems(int nCol, bool bAscending, int low = 0, int high = -1);
+	bool	SortNumericItems(int nCol, bool bAscending,int low = 0, int high = -1);
+	int		GetItemImageIndex(int nRow, int nCol = 0);
+	bool	SortInImageOrder(int nCol, bool bAscending, int nLow = 0, int nHigh = -1);
+	bool	sort_in_text_color(int nSubItem, bool bAscending, int nLow = 0, int nHigh = -1);
 	//void	SetSortArrow(int colIndex, bool ascending);
 
 	//정렬방식 직접 지정
-	void	Sort( int nColumn, bool bAscending );
+	void	Sort(int nColumn, bool bAscending);
 	//현재 정렬방식 토글
-	void	Sort( int nColumn );
+	void	Sort(int nColumn);
 
 
 
-	void	UsePopupMenu( bool bUse = true ) { m_bUsePopupMenu = bUse; }
+	void	UsePopupMenu(bool bUse = true) { m_bUsePopupMenu = bUse; }
 	bool	IsPopupMenuDisplayed() { return m_bPopupMenuDisplayed; }
 
 //편집 관련
-	void	AllowEdit( bool bAllowEdit = true ) { m_bAllowEdit = bAllowEdit; }
+	void	AllowEdit(bool bAllowEdit = true) { m_bAllowEdit = bAllowEdit; }
 	bool	IsInEditing()	{ return m_bInEditing; }	//편집중인지
-	void	SetFlagInEditing( bool bInEditing ) { m_bInEditing = bInEditing; }
+	void	SetFlagInEditing(bool bInEditing) { m_bInEditing = bInEditing; }
 	int		GetRecentEditItem() { return m_nEditItem; }
 	int		GetRecentEditSubItem() { return m_nEditSubItem; }
 	CString GetOldText() { return m_sOldText; }
-	CEdit*	EditSubItem( int Item, int Column );
+	CEdit*	EditSubItem(int Item, int Column);
 	void	UndoEditLabel();		//편집 전의 텍스트로 되돌린다.(편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 	bool	IsModified() { return m_bModified; }
 	void	ResetModifiedFlag() { m_bModified = false; }
 
 
-	void	InvalidateItem( int nIndex, bool bErase = TRUE );	//특정 항목만 다시 그려주고자 할 때.
-	void	SwapItem( int nIndex1, int nIndex2 );
+	void	InvalidateItem(int nIndex, bool bErase = TRUE);	//특정 항목만 다시 그려주고자 할 때.
+	void	SwapItem(int nIndex1, int nIndex2);
 	void	MoveItem(int nFrom, int nTo);
 	bool	MoveUp(int nIndex);
 	bool	MoveDown(int nIndex);
@@ -285,14 +285,14 @@ public:
 	bool	MoveBottom(int nIndex);
 	void	SetTopIndex(int nIndex);	//원하는 항목을 맨 위에 위치하도록 스크롤
 
-	bool	CopyToClipboard( LPCTSTR lpszSeparator = _T("|"), bool bHead = false );	//Ctrl+C키로 선택된 항목을 클립보드로 복사할 수 있다. shift를 조합하면 헤더까지 포함된다.
+	bool	CopyToClipboard(LPCTSTR lpszSeparator = _T("|"), bool bHead = false);	//Ctrl+C키로 선택된 항목을 클립보드로 복사할 수 있다. shift를 조합하면 헤더까지 포함된다.
 	void	PasteInsertFromClipboard();
 
 	//파일에서 불러와서 리스트를 채운다. 컬럼의 수가 동일해야 한다.
 	//또한 데이터의 첫번째 컬럼이 이미 인덱스 정보를 포함한 경우에는 add_index를 false로 해야 한다.
-	bool	load_from_file( CString sfile, TCHAR separator = '|', bool match_column_count = true, bool reset_before_load = true, bool add_index = false);
+	bool	load_from_file(CString sfile, TCHAR separator = '|', bool match_column_count = true, bool reset_before_load = true, bool add_index = false);
 	//리스트의 내용을 파일로 저장한다.
-	bool	save_to_file( CString sfile, TCHAR separator = '|', bool includeHeader = false);
+	bool	save_to_file(CString sfile, TCHAR separator = '|', bool includeHeader = false);
 
 	enum COLOR_THEME
 	{
@@ -301,31 +301,31 @@ public:
 		color_theme_dark_blue,
 		color_theme_dark_gray,
 	};
-	void	SetColorTheme( int nTheme );
+	void	SetColorTheme(int nTheme);
 
 	//아이템 텍스트 및 배경색 설정 관련
 	COLORREF get_text_color(int iItem, int iSubItem);
-	void	set_text_color( int iItem, int iSubItem, COLORREF crText );					//특정 항목의 글자색 설정
-	void	set_back_color( int iItem, int iSubItem, COLORREF crBack );					//특정 항목의 배경색 설정
+	void	set_text_color(int iItem, int iSubItem, COLORREF crText);					//특정 항목의 글자색 설정
+	void	set_back_color(int iItem, int iSubItem, COLORREF crBack);					//특정 항목의 배경색 설정
 	void	set_item_color(int iItem, int iSubItem, COLORREF crText, COLORREF crBack);
-	void	SetDefaultItemColor( COLORREF crText, COLORREF crBack );	//기본 글자색, 배경색을 설정한다.
-	void	use_data_item_color( bool bUse ) { m_use_item_color = bUse; Invalidate(); }
+	void	SetDefaultItemColor(COLORREF crText, COLORREF crBack);	//기본 글자색, 배경색을 설정한다.
+	void	use_data_item_color(bool bUse) { m_use_item_color = bUse; Invalidate(); }
 
 	//32비트인 dw에 들어있는 R, G, B를 추출하여 16비트(5+6+5) 컬러로 리턴한다.
-	WORD	RGB24ToRGB565( DWORD dw );
+	WORD	RGB24ToRGB565(DWORD dw);
 	//두 DWORD를 WORD로 변환하여 하나의 DWORD로 합쳐준다.
-	DWORD	RGB24ToRGB565( DWORD rgb1, DWORD rgb2 );
+	DWORD	RGB24ToRGB565(DWORD rgb1, DWORD rgb2);
 	//565로 변환된 WORD를 다시 24비트 RGB로 사용하기 위해 DWORD로 복원시킨다.
-	DWORD	RGB565ToRGB24( WORD wd );
+	DWORD	RGB565ToRGB24(WORD wd);
 
-	int		HitTestEx( CPoint &point, int *pColumn );
+	int		HitTestEx(CPoint &point, int *pColumn);
 
 	//폰트 관련
 	int		GetFontSize() { return m_font_size; }
-	void	SetFontSize( int font_size );
+	void	SetFontSize(int font_size);
 	void	EnlargeFontSize(bool enlarge);
-	void	SetFontName( LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET );
-	void	SetFontBold( bool bBold = true );
+	void	SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void	SetFontBold(bool bBold = true);
 	void	SetLineHeight(int height);
 
 	bool	IsRowHighlighted(int row);
@@ -411,12 +411,13 @@ protected:
 	//NMCLICK을 이용하면 이런 중복된 호출 문제는 없으나 
 
 
-	//static int CALLBACK CompareFunction( LPARAM lParam1, LPARAM lParam2, LPARAM lParamData );
+	//static int CALLBACK CompareFunction(LPARAM lParam1, LPARAM lParam2, LPARAM lParamData);
 	//{{AFX_MSG(CListCtrlEx)
 	//}}AFX_MSG
 	//afx_msg LRESULT OnSetFont(WPARAM wParam, LPARAM);
-	afx_msg void MeasureItem( LPMEASUREITEMSTRUCT lpMeasureItemStruct );
+	afx_msg void MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 	//afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
+	afx_msg void OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult);
 	DECLARE_MESSAGE_MAP()
 
 public:

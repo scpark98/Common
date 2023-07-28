@@ -966,12 +966,6 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CString		GetCurrentDateTimeString(int nType = 2, bool bSeparator = true, CString mid = _T(" "), bool h24 = true);
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
 	CString		GetDateTimeString(CTime t, int type = 2, bool separator = true, CString mid = _T(" "), bool h24 = true);
-	CString		GetDateStringFromTime(CTime t, CString sMark = _T("-") );
-	CString		GetDateStringFromTime(COleDateTime t, CString sMark = _T("-") );
-	CString		GetDateStringFromTime(__timeb32 t, CString sMark = _T("-") );
-	CString		GetTimeStringFromTime(CTime t, CString sMark = _T(":"), bool h24 = true);
-	CString		GetTimeStringFromTime(COleDateTime t, CString sMark = _T(":") );
-	CString		GetTimeStringFromTime(__timeb32 t, CString sMark = _T(":") );
 	CString		GetTimeString(CTime t, bool bSeparator = true);
 	CString		GetTimeString(COleDateTime t, bool bSeparator = true);
 	CString		GetTimeString(__timeb32 t, bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true);	//2003-04-16 18:01:00.120

@@ -20,17 +20,6 @@ CVtListCtrlEx::CVtListCtrlEx()
 {
 	set_color_theme(color_theme_default, false);
 
-	m_allow_sort = true;
-
-	m_allow_edit					= false;
-	m_allow_one_click_edit			= false;
-	m_modified						= false;
-	m_in_editing					= false;
-	m_old_text						= "";
-	m_edit_item	= m_edit_subItem	= 0;
-
-	m_last_clicked = 0;
-
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	NCOverride = FALSE; //False as default...
@@ -192,6 +181,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	int			iItem		= (int)lpDIS->itemID;
 	int			iSubItem;
 	CDC			*pDC		= CDC::FromHandle(lpDIS->hDC);
+	CRect		rowRect;
 	CRect		itemRect;
 	CRect		textRect;
 	COLORREF	crText = m_crText;
@@ -204,7 +194,9 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//LVIR_BOUNDS로 구할 경우 0번 컬럼은 한 라인의 사각형 영역을 리턴한다.
 		//0번 컬럼 이후부터는 해당 셀의 사각형 영역만을 리턴한다.
-		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, itemRect);
+		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, rowRect);
+		itemRect = rowRect;
+
 		if (iSubItem == 0)
 		{
 			itemRect.right = itemRect.left + GetColumnWidth(0);
@@ -338,6 +330,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			pDC->SetTextColor(crText);
 			pDC->FillSolidRect(itemRect, crBack);
+
 			//텍스트가 그려질 때 itemRect에 그리면 좌우 여백이 없어서 양쪽이 꽉차보인다.
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
@@ -345,9 +338,10 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (iSubItem == 0 && m_shell_list && m_imagelist_small.GetImageCount() > 0)
 			{
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
+				textRect.left += 3;
 				CString text = get_text(iItem, iSubItem);
 				m_imagelist_small.Draw(pDC, GetSystemImageListIcon(m_path + _T("\\") + get_text(iItem, iSubItem), false),
-					CPoint(textRect.left + 3, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+					CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
 				textRect.left += 16;	//small icon width
 				textRect.left += 3;		//margin between icon and text
 			}
@@ -367,6 +361,19 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			format = format | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS;
 			pDC->DrawText(m_list_db[iItem].text[iSubItem], textRect, format);
+		}
+	}
+
+	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
+	if (m_shell_list && GetFocus() && !m_in_editing)
+	{
+		for (int i = 0; i < size(); i++)
+		{
+			if (GetItemState(i, LVIS_SELECTED))
+			{
+				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
+				DrawRectangle(pDC, rowRect, RGB(153, 209, 255));
+			}
 		}
 	}
 }
@@ -553,8 +560,8 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 	for (int iColumn = 0; iColumn < subItem; iColumn++)
 		Offset += GetColumnWidth(iColumn);
 
-	CRect Rect;
 	CRect rc;
+	CRect Rect;
 
 	GetItemRect(item, &Rect, LVIR_BOUNDS);
 
@@ -582,6 +589,47 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 	return Rect;
 }
 
+//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
+bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem)
+{
+	CRect rc;
+	CRect itemRect;
+	
+	item = subItem = -1;
+
+	// Now scroll if we need to expose the column
+	GetClientRect(&rc);
+
+	if (!rc.PtInRect(pt))
+		return false;
+
+	int first = GetTopIndex();
+	int last = MIN(size(), first + GetCountPerPage());
+	for (int i = first; i < last; i++)
+	{
+		//라인을 먼저 찾고
+		GetItemRect(i, &itemRect, LVIR_BOUNDS);
+
+		if (itemRect.PtInRect(pt))
+		{
+			item = i;
+
+			//어느 컬럼인지도 찾는다.
+			for (int j = get_column_count() - 1; j >= 0; j--)
+			{
+				GetSubItemRect(i, j, LVIR_BOUNDS, itemRect);
+				if (itemRect.PtInRect(pt))
+				{
+					subItem = j;
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 //debug모드에서는 매우 느리다. lambda때문인지 모르겠다.
 //0번 컬럼이 아닌 다른 컬럼으로 정렬할 때 두 값이 같으면 0번 컬럼으로 한번 더 검사한다.
 void CVtListCtrlEx::sort(int subItem, int ascending)
@@ -589,7 +637,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	if (!m_allow_sort)
 		return;
 
-	m_last_sorted_column = subItem;
+	m_cur_sorted_column = subItem;
 
 	if (ascending == -1)
 	{
@@ -603,9 +651,33 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 		m_column_sort_type[subItem] = ascending;
 	}
 
+
 	int iSub = subItem;
 	bool sort_asc = m_column_sort_type[subItem];
 	int data_type = get_column_data_type(subItem);
+
+	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한 후 보여줘야 하므로 아래 람다를 사용할 수 없다.
+	if (m_shell_list)
+	{
+		if (iSub == col_filedate)
+		{
+			std::sort(m_cur_folders.begin(), m_cur_folders.end(),
+				[sort_asc, iSub, data_type](CFileList a, CFileList b)
+				{
+					return (a.text[iSub] > b.text[iSub]);
+				});
+
+			std::sort(m_cur_files.begin(), m_cur_files.end(),
+				[sort_asc, iSub, data_type](CFileList a, CFileList b)
+				{
+					return (a.text[iSub] > b.text[iSub]);
+				});
+		}
+
+		refresh(false);
+		return;
+	}
+
 	
 	std::sort(m_list_db.begin(), m_list_db.end(),
 		[sort_asc, iSub, data_type](CListCtrlData a, CListCtrlData b)
@@ -1049,8 +1121,17 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		dwStyle = ES_CENTER;
 
 	DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
-	if ((subItem == 0) && (dwExStyle & LVS_EX_CHECKBOXES))
-		r.left += 18;
+	if (subItem == 0)
+	{
+		if (dwExStyle & LVS_EX_CHECKBOXES)
+			r.left += 18;
+
+		if (m_shell_list)
+		{
+			r.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
+			r.OffsetRect(0, -1);
+		}
+	}
 
 	if (r.right > rc.right)
 		r.right = rc.right;
@@ -1106,13 +1187,14 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 {
 	switch (theme)
 	{
+		//최근 윈도우 탐색기의 색상을 보면 텍스트 색상은 선택여부, inactive에 무관하게 동일하다.
 	case color_theme_default :
 		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected		= ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_crTextSelectedInactive= ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_crTextSelected		= m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_crTextSelectedInactive= m_crText;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_crBack				= ::GetSysColor(COLOR_WINDOW);
-		m_crBackSelected		= ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBackSelectedInactive= ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelected		= RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crHeaderBack			= ::GetSysColor(COLOR_3DFACE);
 		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
 		m_crPercentage			= m_crText;
@@ -1456,6 +1538,9 @@ int CVtListCtrlEx::size()
 }
 
 //지우기 전 확인창은 호출루틴에서 처리해야 함
+//shell일 경우는 실제 폴더 또는 파일을 삭제한 후에 목록에서도 지워야한다.
+//local 파일이라면 여기서 처리해도 관계없으나 remote의 파일일수도 있으니 메인에서 처리하자.
+//실제 파일을 삭제하는 코드는 메인에서 처리한 후 삭제가 성공하면 리스트에서도 지운다.
 void CVtListCtrlEx::delete_selected_items()
 {
 	//뒤에서부터 지움에 주목.
@@ -1463,6 +1548,8 @@ void CVtListCtrlEx::delete_selected_items()
 	{
 		if (GetItemState(i, LVIS_SELECTED))
 		{
+			bool deleted = true;
+
 			CListCtrl::DeleteItem(i);
 			m_list_db.erase(m_list_db.begin() + i);
 		}
@@ -1795,18 +1882,24 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: Add your control notification handler code here
-	int iItem = pNMItemActivate->iItem;
-	int iSubItem = pNMItemActivate->iSubItem;
+	int item;// = pNMItemActivate->iItem;
+	int subItem;// = pNMItemActivate->iSubItem;
+
+	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem) ||
+		item < 0 || subItem < 0)
+		return TRUE;
+
+	TRACE(_T("%d, %d\n"), item, subItem);
 
 	if (m_shell_list)
 	{
-		if (iItem < 0 || iItem >= size() || iSubItem < 0 || iSubItem >= get_column_count())
+		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
 
-		if (!PathIsDirectory(m_path + _T("\\") + get_text(iItem, col_filename)))
+		if (!PathIsDirectory(m_path + _T("\\") + get_text(item, col_filename)))
 			return TRUE;
 
-		m_path = m_path + _T("\\") + get_text(iItem, col_filename);
+		m_path = m_path + _T("\\") + get_text(item, col_filename);
 		set_path(m_path);
 		return TRUE;
 	}
@@ -2192,6 +2285,15 @@ void CVtListCtrlEx::set_log_font(LOGFONT lf)
 BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	int item = -1;// = pNMItemActivate->iItem;
+	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
+
+	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem) ||
+		item < 0 || subItem < 0)
+		return TRUE;
+
+	TRACE(_T("%d, %d\n"), item, subItem);
+
 	// TODO: Add your control notification handler code here
 	if (m_in_editing)
 	{
@@ -2200,21 +2302,21 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	if (m_allow_edit &&
-		(pNMItemActivate->iSubItem >= 0) &&
-		(pNMItemActivate->iSubItem < get_column_count()) &&
-		m_allow_edit_column[pNMItemActivate->iSubItem])
+		(subItem >= 0) &&
+		(subItem < get_column_count()) &&
+		m_allow_edit_column[subItem])
 	{
 		//name영역을 클릭한 후 1~2초 사이에 다시 클릭하면 name 편집모드로 전환된다.
 		/*
-		if ((m_edit_item == pNMItemActivate->iItem) &&
-			(m_edit_subItem == pNMItemActivate->iSubItem) &&
+		if ((m_edit_item == item) &&
+			(m_edit_subItem == subItem) &&
 			(abs(t1 - m_last_clicked) >= 800) &&
 			(abs(t1 - m_last_clicked) < 1600))
 		*/
 		//선택된 항목을 다시 원클릭하면 편집모드로 전환한다.
 		if (m_allow_one_click_edit &&
-			(m_edit_item == pNMItemActivate->iItem) &&
-			(m_edit_subItem == pNMItemActivate->iSubItem) &&
+			(m_edit_item == item) &&
+			(m_edit_subItem == subItem) &&
 			(get_selected_items() == 1) &&
 			(clock() - m_last_clicked > 800) &&	//이 값이 작으면 더블클릭에도 편집되고
 			(clock() - m_last_clicked < 1600))
@@ -2226,8 +2328,8 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 			m_last_clicked = clock();
 		}
 
-		m_edit_item = pNMItemActivate->iItem;
-		m_edit_subItem = pNMItemActivate->iSubItem;
+		m_edit_item = item;
+		m_edit_subItem = subItem;
 	}
 
 	return FALSE;
@@ -2371,9 +2473,10 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }
 
-void CVtListCtrlEx::set_shell_list()
+void CVtListCtrlEx::set_shell_list(bool is_local)
 {
 	m_shell_list = true;
+	m_shell_list_local = is_local;
 	m_use_own_imagelist = true;
 
 	set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
@@ -2384,7 +2487,13 @@ void CVtListCtrlEx::set_shell_list()
 	set_header_height(24);
 	set_line_height(21);
 
+	set_column_data_type(col_filesize, column_data_type_numeric);
+
 	set_column_text_align(col_filesize, HDF_RIGHT, false);
+
+	allow_edit();
+	allow_edit_column(col_filesize, false);
+	allow_edit_column(col_filedate, false);
 
 	SHFILEINFO shInfo;
 	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
@@ -2393,55 +2502,86 @@ void CVtListCtrlEx::set_shell_list()
 
 void CVtListCtrlEx::set_path(CString path)
 {
+	if (!m_shell_list_local)
+		return;
+
 	m_path = path;
 	if (m_path.Right(1) == '\\')
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	refresh();
+	refresh(true);
 }
 
-void CVtListCtrlEx::refresh()
+void CVtListCtrlEx::set_filelist(std::deque<CFileList>* pFolderList, std::deque<CFileList>* pFileList)
 {
-	int i;
-	CFileFind	finder;
-	CString		sfile;
-
-	delete_all_items();
 	m_cur_folders.clear();
 	m_cur_files.clear();
 
-	bool bWorking = finder.FindFile(m_path + _T("\\*"));
+	m_cur_folders.assign(pFolderList->begin(), pFolderList->end());
+	m_cur_files.assign(pFileList->begin(), pFileList->end());
 
-	while (bWorking)
+	refresh(false);
+}
+
+void CVtListCtrlEx::refresh(bool reload)
+{
+	if (!m_shell_list)
+		return;
+
+	int i;
+	CString		sfile;
+
+	delete_all_items();
+
+	//local일 경우는 파일목록을 다시 읽어서 표시한다.
+	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
+	if (m_shell_list_local && reload)
 	{
-		bWorking = finder.FindNextFile();
-		sfile = finder.GetFilePath();
+		m_cur_folders.clear();
+		m_cur_files.clear();
 
-		if (finder.IsDots())
-			continue;
+		CFileFind	finder;
 
-		if (finder.IsDirectory())
+		bool bWorking = finder.FindFile(m_path + _T("\\*"));
+
+		while (bWorking)
 		{
-			m_cur_folders.push_back(CFileList(sfile));
-			continue;
-		}
+			bWorking = finder.FindNextFile();
+			sfile = finder.GetFilePath();
 
-		m_cur_files.push_back(CFileList(sfile));
+			if (finder.IsDots())
+				continue;
+
+			if (finder.IsDirectory())
+			{
+				m_cur_folders.push_back(CFileList(sfile));
+				continue;
+			}
+
+			m_cur_files.push_back(CFileList(sfile));
+		}
 	}
 
 	int index;
+	int insert_index = -1;
 
+	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
+		insert_index = 0;
+
+	//asce는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		index = add_item(GetFileNameFromFullPath(m_cur_folders[i].name), false, false);
-		set_text(index, col_filesize, get_size_string(m_cur_folders[i].size));
-		set_text(index, col_filedate, m_cur_folders[i].date);
+		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_folders[i].text[0]), false, false);
+		set_text(index, col_filedate, m_cur_folders[i].text[2]);
+		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		index = add_item(GetFileNameFromFullPath(m_cur_files[i].name), false, false);
-		set_text(index, col_filesize, get_size_string(m_cur_files[i].size));
-		set_text(index, col_filedate, m_cur_files[i].date);
+		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_files[i].text[0]), false, false);
+		set_text(index, col_filesize, m_cur_files[i].text[1]);
+		set_text(index, col_filedate, m_cur_files[i].text[2]);
+		set_text_color(index, col_filesize, RGB(109, 109, 109));
+		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
 }

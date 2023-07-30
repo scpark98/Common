@@ -187,7 +187,7 @@ CString GetDateStringFromTime(__timeb32 t, CString sMark /*= _T("-")*/)
 	return GetDateStringFromTime(ct, sMark);
 }
 
-CString GetTimeStringFromTime(CTime t, CString sMark/*=":"*/, bool h24/*= true*/)
+CString GetTimeStringFromTime(CTime t, CString sMark/*=":"*/, bool h24/*= true*/, bool include_seconds /*= true*/)
 {
 	CString str;
 	
@@ -200,6 +200,9 @@ CString GetTimeStringFromTime(CTime t, CString sMark/*=":"*/, bool h24/*= true*/
 		str.Format(_T("%02d%s%02d%s%02d"), h, sMark, m, sMark, s);
 	else
 		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sMark, m, sMark, s);
+
+	if (!include_seconds)
+		str = str.Left(str.GetLength() - 2 - sMark.GetLength());
 
 	return str;
 }
@@ -348,11 +351,11 @@ CTimeSpan GetTimeSpanFromTimeString(CString sTime)
 	return CTimeSpan(0, _ttoi(sTime.Left(2)), _ttoi(sTime.Mid(2,2)), _ttoi(sTime.Right(2)));
 }
 
-CString GetDateTimeStringFromTime(CTime t, bool bSeparator /*= true*/, bool h24 /*= true*/)
+CString GetDateTimeStringFromTime(CTime t, bool bSeparator /*= true*/, bool h24 /*= true*/, bool include_seconds /*= true*/)
 {
 	CString str;
 
-	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t, _T(":"), h24));
+	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t, _T(":"), h24, include_seconds));
 
 	if (!bSeparator)
 	{
@@ -804,7 +807,7 @@ std::deque<CString> get_filename_from_filetitle(CString filename, CString extens
 	return get_filename_from_filetitle(GetFolderNameFromFullPath(filename), GetFileTitle(filename), extension);
 }
 
-uint64_t	GetFileSize(CString sfile)
+uint64_t	get_file_size(CString sfile)
 {
 	CFileStatus		status;
 	
@@ -862,7 +865,9 @@ uint64_t get_folder_size(CString path)
 //unit_string	: 단위를 표시할 지 (default = true)
 CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_string)
 {
-	return get_size_string(GetFileSize(sfile), unit, floats, unit_string);
+	if (PathIsDirectory(sfile))
+		return _T("");
+	return get_size_string(get_file_size(sfile), unit, floats, unit_string);
 }
 
 //unit			: 0:bytes, 1:KB, 2:MB, 3:GB

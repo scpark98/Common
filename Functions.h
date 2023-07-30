@@ -686,10 +686,11 @@ void		Trace(char* szFormat, ...);
 	std::deque<CString>		get_filename_from_filetitle(CString folder, CString filetitle, CString extension);
 	std::deque<CString>		get_filename_from_filetitle(CString filename, CString extension);
 
-	uint64_t	GetFileSize(CString sfile);
+	uint64_t	get_file_size(CString sfile);
 	uint64_t	get_folder_size(CString path);
 	//unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
 	//unit_string	: 단위를 표시할 지 (default = true)
+	//폴더인 경우는 ""를 리턴함.
 	CString		get_file_size_string(CString sfile, int unit = 1, int floats = 0, bool unit_string = true);
 	CTime		GetFileCreationTime(CString sfile);
 	CTime		GetFileLastModifiedTime(CString sfile);
@@ -959,7 +960,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CString		GetDateStringFromTime(CTime t, CString sMark = _T("-"));
 	CString		GetDateStringFromTime(COleDateTime t, CString sMark = _T("-"));
 	CString		GetDateStringFromTime(__timeb32 t, CString sMark = _T("-"));
-	CString		GetTimeStringFromTime(CTime t, CString sMark = _T(":"), bool h24 = true);
+	CString		GetTimeStringFromTime(CTime t, CString sMark = _T(":"), bool h24 = true, bool include_seconds = true);
 	CString		GetTimeStringFromTime(COleDateTime t, CString sMark = _T(":"));
 	CString		GetTimeStringFromTime(__timeb32 t, CString sMark = _T(":"));
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
@@ -973,7 +974,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CString		GetCurrentTimeString(bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true);
 	CTime		GetTimeFromTimeString(CString sDate, CString sTime);
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
-	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true);
+	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true);
 	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true);
 	CString		GetDateTimeStringFromTime(COleDateTime t, bool bSeparator = true);
 	CTime		GetTimeFromDateTimeString(CString sDateTime);
@@ -982,9 +983,6 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	int			GetSecondsFromTimeString(CString timeString);
 	int			GetMilliSecondsFromTimeString(CString timeString);
 	void		GetTimeFromSeconds(int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds);
-	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. blank는 날짜와 시간 사이 공백 여부
-	CString		GetCurrentDateTimeString(int nType = 2, bool bSeparator = true, TCHAR mid_char = ' ', bool h24 = true);
-	void		GetTimeFromSeconds(int nTotalSeconds, int& nHours, int& nMinutes, int& nSeconds);
 	void		SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond);
 	double		GetElapsedTime(__timeb32 pOldTime);	//pOldTime과 현재 시간의 차이 계산
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시

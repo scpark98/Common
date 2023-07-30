@@ -52,26 +52,25 @@ m_list.set_header_height(24);
 class CFileList
 {
 public:
-	CFileList(CString _name, uint64_t _size = 0, CString _date = _T(""))
+	CFileList(CString _name, CString _size = _T(""), CString _date = _T(""))
 	{
-		if (_size == 0)
+		if (_size.IsEmpty())
 		{
-			_size = GetFileSize(_name);
+			_size = get_file_size_string(_name);
 		}
 
 		if (_date.IsEmpty())
 		{
-			_date = GetDateTimeStringFromTime(GetFileLastModifiedTime(_name), true, false);
+			_date = GetDateTimeStringFromTime(GetFileLastModifiedTime(_name), true, false, false);
 		}
 
-		name = _name;
-		size = _size;
-		date = _date;
+		text[0] = _name;
+		text[1] = _size;
+		text[2] = _date;
 	}
 
-	CString		name;
-	uint64_t	size;
-	CString		date;
+	//name, size, date으로 멤버를 선언했으나 sort의 lamda등에서도 인덱스로 접근하도록 하기 위해 배열로 변경함.
+	CString		text[3];
 };
 
 
@@ -97,12 +96,21 @@ public:
 
 //ShellList로 동작시키기
 	bool		m_shell_list = false;
+	bool		m_shell_list_local = true;
 	bool		is_shell_list() { return m_shell_list; }
 	//맨 처음 이 명령을 주면 모든 세팅과 동작이 ShellListCtrl로 동작된다.
 	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
-	void		set_shell_list();
+	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
+	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
+	void		set_shell_list(bool is_local = true);
+	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
 	void		set_path(CString path);
-	void		refresh();
+	//local이 아닐 경우는 파일목록을 받아서 표시한다.
+	void		set_filelist(std::deque<CFileList>* pFolderList, std::deque<CFileList>* pFileList);
+
+	//reload가 true라면 local의 파일목록을 다시 불러오지만 false라면 목록을 다시 리스트에 표시한다
+	//(sort의 경우 폴더/파일 목록을 sort하여 보여줄 뿐 파일목록을 reload하진 않는다)
+	void		refresh(bool reload = true);
 
 	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
 	std::deque<CFileList> m_cur_folders;
@@ -119,14 +127,6 @@ public:
 	CString		m_path;
 	CImageList	m_imagelist_small;
 	CImageList	m_imagelist_large;
-
-
-
-
-
-
-
-
 
 
 //컬럼 관련
@@ -245,7 +245,7 @@ public:
 	void		allow_sort(bool allow) { m_allow_sort = allow; }
 	void		sort(int column, int ascending);
 	void		sort_by_text_color(int column, int ascending);
-	int			last_sorted_column_index() { return m_last_sorted_column; }
+	int			cur_sorted_column_index() { return m_cur_sorted_column; }
 
 //컬러 관련
 	enum listctrlex_color_theme
@@ -328,6 +328,8 @@ public:
 	void	load_column_width(CWinApp* pApp, CString sSection);
 	void	save_column_width(CWinApp* pApp, CString sSection);
 	CRect	get_item_rect(int item, int subItem);
+	//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
+	bool	get_index_from_point(CPoint pt, int& item, int& subItem);
 
 	void	show_progress_text(bool show) { m_show_progress_text = show; Invalidate(); }
 
@@ -363,9 +365,9 @@ protected:
 	int				m_line_height = 16;
 
 //정렬 관련
-	bool			m_allow_sort;				//default = true
+	bool			m_allow_sort = true;
 	std::deque<int> m_column_sort_type;			//asceding or descending
-	int				m_last_sorted_column;		//마지막 정렬된 컬럼 인덱스(색상 정렬은 제외)
+	int				m_cur_sorted_column = 0;	//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
 	COLORREF		m_crText;					//기본 글자색
@@ -380,16 +382,16 @@ protected:
 	COLORREF		m_crProgress;				//progress bar
 
 //편집기능 관련
-	bool			m_allow_edit;			//항목 편집이 가능한지... 기본 false
-	bool			m_allow_one_click_edit;	//항목을 클릭한 후 정해진 시간내에 다시 클릭될 때 편집모드로 할지
-	std::deque<bool> m_allow_edit_column;	//각 컬럼마다 편집가능 여부를 설정할 수 있다. 단, m_allow_edit이 변경되면 모두 그 값으로 변경됨에 주의.
-	bool			m_modified;				//항목의 차례 또는 내용이 수정된 경우 true
-	bool			m_in_editing;			//편집중인지
-	int				m_edit_item;			//편집중인 아이템 인덱스
-	int				m_edit_subItem;			//편집중인 아이템 서브인덱스
-	CString			m_old_text;				//편집 전 텍스트
-	CEdit*			m_pEdit;			//
-	long			m_last_clicked;
+	bool			m_allow_edit = false;			//항목 편집이 가능한지...
+	bool			m_allow_one_click_edit = false;	//항목을 클릭한 후 정해진 시간내에 다시 클릭될 때 편집모드로 할지
+	std::deque<bool> m_allow_edit_column;			//각 컬럼마다 편집가능 여부를 설정할 수 있다. 단, m_allow_edit이 변경되면 모두 그 값으로 변경됨에 주의.
+	bool			m_modified = false;				//항목의 차례 또는 내용이 수정된 경우 true
+	bool			m_in_editing = false;			//편집중인지
+	int				m_edit_item = -1;				//편집중인 아이템 인덱스
+	int				m_edit_subItem = -1;			//편집중인 아이템 서브인덱스
+	CString			m_old_text = _T("");			//편집 전 텍스트
+	CEdit*			m_pEdit = NULL;
+	long			m_last_clicked = 0;
 
 //폰트 관련
 	LOGFONT			m_lf;

@@ -367,20 +367,10 @@ CString GetDateTimeStringFromTime(CTime t, bool bSeparator /*= true*/, bool h24 
 	return str;
 }
 
-CString GetDateTimeStringFromTime(COleDateTime t, bool bSeparator /*= true*/)
+CString GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator /*= true*/, bool h24 /*= true*/, bool include_seconds /*= true*/)
 {
-	CString str;
-
-	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t));
-
-	if (!bSeparator)
-	{
-		str.Remove('-');
-		str.Remove('/');
-		str.Remove(':');
-	}
-
-	return str;
+	CTime tTime(t);
+	return GetDateTimeStringFromTime(tTime, bSeparator, h24, include_seconds);
 }
 
 void GetTimeFromSeconds(int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds)
@@ -807,10 +797,16 @@ std::deque<CString> get_filename_from_filetitle(CString filename, CString extens
 	return get_filename_from_filetitle(GetFolderNameFromFullPath(filename), GetFileTitle(filename), extension);
 }
 
-uint64_t	get_file_size(CString sfile)
+uint64_t get_file_size(CString sfile)
 {
 	CFileStatus		status;
 	
+	//디스크 드라이브인 경우
+	if (sfile.Mid(1) == _T(":") || sfile.Mid(2) == _T(":\\"))
+	{
+		return GetDiskFreeSize(sfile);
+	}
+
 	if(CFile::GetStatus(sfile, status))
 	{
 		return status.m_size;
@@ -865,8 +861,6 @@ uint64_t get_folder_size(CString path)
 //unit_string	: 단위를 표시할 지 (default = true)
 CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_string)
 {
-	if (PathIsDirectory(sfile))
-		return _T("");
 	return get_size_string(get_file_size(sfile), unit, floats, unit_string);
 }
 
@@ -882,7 +876,6 @@ CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, b
 
 	for (int i = 0; i <unit; i++)
 		dsize /= 1024.0;
-
 
 	//dsize = 0.01234;
 	//floats = 2;
@@ -1811,7 +1804,7 @@ bool is_valid_string(CString src, bool include_hangul)
 //완성형 한글의 한 글자를 초성, 중성, 종성으로 분리한다.
 bool get_consonant(CString src, wchar_t* cho, wchar_t* jung, wchar_t* jong)
 {
-	const wchar_t *tsrc = src;
+	const wchar_t *tsrc = CString2WCHAR(src);
 	//wchar_t *asdf = L"한";
 	wchar_t uniValue = *tsrc - 0xAC00;
 	*jong = uniValue % 28;
@@ -2356,12 +2349,12 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 	if (!ret)
 	{
-		AfxMessageBox(get_error_message(GetLastError(), true));
+		AfxMessageBox(get_last_error_message(GetLastError(), true));
 		SAFE_DELETE_ARRAY(buffer);
 		SAFE_DELETE_ARRAY(total_buffer);
 		InternetCloseHandle(hURL);
 		InternetCloseHandle(hInternet);
-		return _T("error=") + get_error_message(GetLastError(), true);
+		return _T("error=") + get_last_error_message(GetLastError(), true);
 	}
 
 	if (nStatusCode == HTTP_STATUS_NOT_FOUND ||
@@ -2397,14 +2390,14 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	/*
 	if (!ret)
 	{
-		AfxMessageBox(get_error_message(GetLastError(), true));
+		AfxMessageBox(get_last_error_message(GetLastError(), true));
 
 		SAFE_DELETE_ARRAY(buffer);
 		SAFE_DELETE_ARRAY(total_buffer);
 		InternetCloseHandle(hURL);
 		InternetCloseHandle(hInternet);
 
-		return _T("error=") + get_error_message(GetLastError(), true);
+		return _T("error=") + get_last_error_message(GetLastError(), true);
 	}
 
 	if (dwTotalSize == 0)
@@ -3854,7 +3847,7 @@ HINSTANCE FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDirectory, LPTSTR lpResult)
     return hinstance;   
 }   
 */
-LONGLONG GetDiskFreeSize(CString sDrive)
+uint64_t GetDiskFreeSize(CString sDrive)
 {
 	TCHAR Drive[10];
 	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
@@ -3865,16 +3858,19 @@ LONGLONG GetDiskFreeSize(CString sDrive)
 		_stprintf(Drive, _T("%s:\\"), sDrive);
 	else
 		_stprintf(Drive, _T("%s"), sDrive);
+
+	if (GetDriveType(Drive) == DRIVE_CDROM)
+		return 0;
 	
 	int res =  GetDiskFreeSpaceEx(Drive, 
 		&m_lFreeBytesAvailableToCaller, 
 		&m_lTotalNumberOfBytes, 
 		&m_lTotalNumberOfFreeBytes);
 
-	return (LONGLONG)(m_lTotalNumberOfFreeBytes.QuadPart);
+	return (uint64_t)(m_lTotalNumberOfFreeBytes.QuadPart);
 }
 
-LONGLONG GetDiskTotalSize(CString sDrive)
+uint64_t GetDiskTotalSize(CString sDrive)
 {
 	TCHAR			Drive[10];
 	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
@@ -3886,12 +3882,15 @@ LONGLONG GetDiskTotalSize(CString sDrive)
 	else
 		_stprintf(Drive, _T("%s"), sDrive);
 	
+	if (GetDriveType(Drive) == DRIVE_CDROM)
+		return 0;
+
 	int res =  GetDiskFreeSpaceEx(Drive, 
 		&m_lFreeBytesAvailableToCaller, 
 		&m_lTotalNumberOfBytes, 
 		&m_lTotalNumberOfFreeBytes);
 
-	return (LONGLONG)(m_lTotalNumberOfBytes.QuadPart);
+	return (uint64_t)(m_lTotalNumberOfBytes.QuadPart);
 }
 
 CString	GetDiskSizeString(CString sDrive)
@@ -4425,7 +4424,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	CFileFind finder;
 
 	//"로컬 디스크 (C:)"
-	root = convert_volume_to_real_path(root);
+	root = convert_special_folder_to_real_path(root);
 
 	if (PathIsDirectory(root))
 	{
@@ -6154,7 +6153,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 			if (bSuccess)
 				success++;
 			else
-				get_error_message(GetLastError(), true);
+				get_last_error_message(GetLastError(), true);
 		}
 	}
 
@@ -7959,45 +7958,59 @@ void get_drive_map(std::map<TCHAR, CString> *drive_map)
 }
 
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
-CString	convert_volume_to_real_path(CString volume_path)
+CString	convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map)
 {
 	TCHAR buf[MAX_PATH];
+	int csidl = -1;
+	CString real_path = special_folder;
 
-	if (volume_path == _T("바탕 화면"))
+	if (csidl_map)
+	{
+		int count = csidl_map->size();
+		for (auto it = csidl_map->begin(); it != csidl_map->end(); ++it)
+		{
+			if (it->second == special_folder)
+			{
+				csidl = it->first;
+				break;
+			}
+		}
+	}
+
+	if (csidl == CSIDL_DESKTOP)
 	{
 #ifndef _USING_V110_SDK71_
-		volume_path = get_known_folder(FOLDERID_Desktop);
+		real_path = get_known_folder(FOLDERID_Desktop);
 #else
 		SHGetSpecialFolderPath(NULL, buf, CSIDL_DESKTOP, FALSE);
-		volume_path = buf;
+		real_path = buf;
 #endif
 	}
-	else if (volume_path == _T("내 문서"))
+	else if (csidl == CSIDL_PERSONAL)
 	{
 #ifndef _USING_V110_SDK71_
-		volume_path = get_known_folder(FOLDERID_Documents);
+		real_path = get_known_folder(FOLDERID_Documents);
 #else
 		SHGetSpecialFolderPath(NULL, buf, CSIDL_PERSONAL, FALSE);
-		volume_path = buf;
+		real_path = buf;
 #endif
 	}
-	else if (volume_path == _T("다운로드"))
-	{
+	//else if (csidl == _T("다운로드"))
+	//{
 #ifndef _USING_V110_SDK71_
-		volume_path = get_known_folder(FOLDERID_Downloads);
+		real_path = get_known_folder(FOLDERID_Downloads);
 #else
 		//SHGetSpecialFolderPath(NULL, buf, CSIDL_DOWNLOADS, FALSE);
-		//volume_path = buf;
+		//real_path = buf;
 #endif
-	}
+	//}
 
-	CString real_path = volume_path;
 
 	real_path.Replace(_T("내 PC\\"), _T(""));
 
 	int pos = real_path.Find(_T(":)"));
 	if (pos < 0)
-		return volume_path;
+		return real_path;
 
 	CString rest = real_path.Mid(pos + 2);
 	CString drive_letter = real_path.Mid(pos - 1, 1);
@@ -8006,7 +8019,7 @@ CString	convert_volume_to_real_path(CString volume_path)
 	return real_path;
 }
 
-CString	convert_real_to_volume_path(CString real_path)
+CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CString>* csidl_map)
 {
 	CString volume_path;
 	return volume_path;
@@ -10123,6 +10136,7 @@ bool WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, d
 	return pApp->WriteProfileString(lpszSection, lpszEntry, sValue);
 }
 
+/*
 int GetSystemImageListIcon(CString szFile, BOOL bDrive)
 {
 	SHFILEINFO shFileInfo;
@@ -10147,9 +10161,14 @@ int GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	}
 	else
 	{
-		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-		if (shFileInfo.iIcon < 0)
+		if (bDrive)
+			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		else
 			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+
+		//SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		//if (shFileInfo.iIcon < 0)
+		//	SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
 		//else
 		//{
 		//	if (PathIsDirectory(szFile))
@@ -10161,7 +10180,7 @@ int GetSystemImageListIcon(CString szFile, BOOL bDrive)
 
 	return shFileInfo.iIcon;
 }
-
+*/
 HICON LoadIconEx(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
 {
 	if (cy == 0)
@@ -11020,7 +11039,12 @@ CSize GetPrinterPaperSize(CString sPrinterName)
 	return CSize(nPaperWidth, nPaperHeight);
 }
 
-CString	get_error_message(DWORD errorId, bool show_msgBox)
+CString	get_last_error_message(bool show_msgBox)
+{
+	return get_last_error_message(GetLastError(), show_msgBox);
+}
+
+CString	get_last_error_message(DWORD errorId, bool show_msgBox)
 {
 	TCHAR* message = nullptr;
 	CString result;
@@ -13556,9 +13580,9 @@ void printf_string(const char* psz, ...)
 
 void trace(LPCTSTR format, ...)
 {
-#ifndef _DEBUG
-	return;
-#endif
+//#ifndef _DEBUG
+//	return;
+//#endif
 	va_list args;
 	va_start(args, format);
 

@@ -218,7 +218,7 @@ void CMacProgressCtrl::OnPaint()
 		if (m_bShowPercent)
 		{
 			if (m_upper - m_lower == 0)
-				m_sText.Format(_T("%0.0 %%"));
+				m_sText = _T("0.0 %%");
 			else
 				m_sText.Format( _T("%.1f %%"), (double)(pos + 0) / (double)(m_upper - m_lower) * 100.0 );
 		}

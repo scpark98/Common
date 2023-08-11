@@ -874,7 +874,7 @@ void		Trace(char* szFormat, ...);
 	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
 	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 
-	int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
+	//int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
 
 	void		SystemShutdown(int nMode);		// 0:logoff  1:reboot  2:shutdown
 	void		SystemShutdownNT(int nMode = 2);	// 1:reboot  2:shutdown
@@ -922,16 +922,17 @@ bool		memcpy_block(uint8_t *src, int src_width, int src_height, int x_roi, int y
 bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
 
 //HDD
-LONGLONG	GetDiskFreeSize(CString sDrive);
-LONGLONG	GetDiskTotalSize(CString sDrive);
+uint64_t	GetDiskFreeSize(CString sDrive);
+uint64_t	GetDiskTotalSize(CString sDrive);
 CString		GetDiskSizeString(CString sDrive);	// "1.25G / 380.00G"
 //CString		GetHDDSerialNumber(int nPhysicalDrive);
 CString		GetHDDVolumeNumber(CString sDrive);
 void		get_drive_map(std::map<TCHAR, CString> *drive_map);
 CString		get_drive_volume(TCHAR drive_letter);
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
-CString		convert_volume_to_real_path(CString volume_path);
-CString		convert_real_to_volume_path(CString real_path);
+//문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.
+CString		convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map = NULL);
+CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*csidl_map = NULL);
 
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
@@ -953,7 +954,8 @@ int			GetPrinterList(CStringArray *arPrinter);
 CString		GetDefaultPrinterName();
 CSize		GetPrinterPaperSize(CString sPrinterName);
 
-CString		get_error_message(DWORD errorId, bool show_msgBox);
+CString		get_last_error_message(bool show_msgBox);
+CString		get_last_error_message(DWORD errorId, bool show_msgBox);
 
 //////////////////////////////////////////////////////////////////////////
 //시간
@@ -975,7 +977,7 @@ CString		get_error_message(DWORD errorId, bool show_msgBox);
 	CTime		GetTimeFromTimeString(CString sDate, CString sTime);
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
 	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true);
-	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true);
+	CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true);
 	CString		GetDateTimeStringFromTime(COleDateTime t, bool bSeparator = true);
 	CTime		GetTimeFromDateTimeString(CString sDateTime);
 	CString		GetTimeStringFromSeconds(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);

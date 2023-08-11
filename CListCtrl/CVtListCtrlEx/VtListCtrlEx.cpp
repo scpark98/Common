@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "../../MemoryDC.h"
+#include "../../GdiPlusBitmap.h"
 #include "EditCell.h"
 #include <afxvslistbox.h>
 
@@ -25,14 +26,14 @@ CVtListCtrlEx::CVtListCtrlEx()
 	NCOverride = FALSE; //False as default...
 	Who = SB_BOTH; //Default remove both...
 
-	CoInitialize(NULL);
+	m_hcArrow = AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW));
+	m_hcNo = AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO));
 }
 
 CVtListCtrlEx::~CVtListCtrlEx()
 {
 	m_font.DeleteObject();
 
-	m_imagelist_small.Detach();
 	CoUninitialize();
 }
 
@@ -51,6 +52,10 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CVtListCtrlEx::OnNMClickList)
 	ON_WM_DROPFILES()
 	ON_WM_MEASUREITEM_REFLECT()
+	ON_WM_TIMER()
+	ON_NOTIFY_REFLECT(LVN_BEGINDRAG, &CVtListCtrlEx::OnLvnBeginDrag)
+	ON_WM_MOUSEMOVE()
+	ON_WM_LBUTTONUP()
 END_MESSAGE_MAP()
 
 
@@ -187,6 +192,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	COLORREF	crText = m_crText;
 	COLORREF	crBack = m_crBack;
 	//COLORREF	crProgress = m_crProgress;
+	bool		is_show_selection_always = (GetStyle() & LVS_SHOWSELALWAYS);
+	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
@@ -203,7 +210,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
-		if (GetItemState(iItem, LVIS_SELECTED)) //ok
+		//포커스를 가졌거나 Always Show Selection이라면 선택 항목의 색상을 표시해주고
+		if (((GetFocus() == this) || is_show_selection_always) && GetItemState(iItem, LVIS_SELECTED)) //ok
 		{
 			if (GetFocus() == this)
 			{
@@ -221,6 +229,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//글자의 배경색은 그냥 컬러 스킴을 따른다.
 			if (m_list_db[iItem].crText[iSubItem] != listctrlex_unused_color)
 				crText = m_list_db[iItem].crText[iSubItem];
+		}
+		//drophilited라면 active에 관계없이 drop hilited 색상으로 표시한다.
+		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
+		else if (GetItemState(iItem, LVIS_DROPHILITED)) //ok
+		{
+			crText = m_crTextSelected;
+			crBack = m_crBackSelected;
 		}
 		else
 		{
@@ -335,13 +350,42 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
 
-			if (iSubItem == 0 && m_shell_list && m_imagelist_small.GetImageCount() > 0)
+			if (iSubItem == 0 && m_is_shell_list)
 			{
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
 				textRect.left += 3;
 				CString text = get_text(iItem, iSubItem);
-				m_imagelist_small.Draw(pDC, GetSystemImageListIcon(m_path + _T("\\") + get_text(iItem, iSubItem), false),
-					CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+				CString real_path = convert_special_folder_to_real_path(m_path + _T("\\") + get_text(iItem, iSubItem));
+				int icon_index;
+
+				if (m_is_shell_list)
+				{
+					if (get_text(iItem, col_filesize).IsEmpty())
+					{
+						real_path = _T("c:\\Windows");
+						icon_index = m_pShellImageList->GetSystemImageListIcon(real_path, true);
+					}
+					else
+					{
+						icon_index = m_pShellImageList->GetSystemImageListIcon(real_path, false);
+					}
+
+					m_pShellImageList->m_imagelist_small.Draw(pDC, icon_index,
+						CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+					/*
+					if (m_shell_list_local)
+					{
+						m_imagelist_small.Draw(pDC, icon_index, false),
+							CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+					}
+					else
+					{
+						m_imagelist_small.Draw(pDC, icon_index,
+							CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+					}
+					*/
+				}
+
 				textRect.left += 16;	//small icon width
 				textRect.left += 3;		//margin between icon and text
 			}
@@ -365,7 +409,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_shell_list && GetFocus() && !m_in_editing)
+	if (m_is_shell_list && !m_in_editing && (GetFocus() == this))
 	{
 		for (int i = 0; i < size(); i++)
 		{
@@ -379,8 +423,17 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 }
 
 // ex. "No,20;Item1,50;Item2,50"
+//scpark 20230801
+//어느 프로젝트에서 이 함수가 2번 호출되어 실제 컬럼은 3개인데
+//6개로 세팅되어 오류가 발생함.
+//매번 호출시 리셋하고 처리해도 되고 다른 처리 방법도 있으나
+//정확히 한번만 호출하여 사용하는 것이 정석이므로 우선 별도의 처리는 하지 않음.
 bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 {
+	TRACE(_T("strHeadings = %s\n"), strHeadings);
+
+	modify_style();
+
 	int iStart = 0;
 	int	column = 0;
 
@@ -590,7 +643,7 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 }
 
 //클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
-bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem)
+bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon)
 {
 	CRect rc;
 	CRect itemRect;
@@ -618,6 +671,17 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem)
 			for (int j = get_column_count() - 1; j >= 0; j--)
 			{
 				GetSubItemRect(i, j, LVIR_BOUNDS, itemRect);
+
+				//0번 컬럼은 한 라인 전체의 영역을 리턴하므로
+				if (j == 0)
+				{
+					//0번 컬럼의 width로 보정해주고
+					itemRect.right = itemRect.left + GetColumnWidth(0);
+					//imagelist를 사용한다면 이미지 영역만큼 다시 보정해줘야 한다.
+					if (!include_icon && m_use_own_imagelist)
+						itemRect.left += 22;
+				}
+
 				if (itemRect.PtInRect(pt))
 				{
 					subItem = j;
@@ -655,32 +719,33 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	int iSub = subItem;
 	bool sort_asc = m_column_sort_type[subItem];
 	int data_type = get_column_data_type(subItem);
+	bool include_null = false;
 
 	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한 후 보여줘야 하므로 아래 람다를 사용할 수 없다.
-	if (m_shell_list)
+	if (m_is_shell_list)
 	{
 		if (iSub == col_filedate)
 		{
 			std::sort(m_cur_folders.begin(), m_cur_folders.end(),
-				[sort_asc, iSub, data_type](CFileList a, CFileList b)
+				[sort_asc, iSub, data_type, include_null](CVtFileInfo a, CVtFileInfo b)
 				{
 					return (a.text[iSub] > b.text[iSub]);
 				});
 
 			std::sort(m_cur_files.begin(), m_cur_files.end(),
-				[sort_asc, iSub, data_type](CFileList a, CFileList b)
+				[sort_asc, iSub, data_type](CVtFileInfo a, CVtFileInfo b)
 				{
 					return (a.text[iSub] > b.text[iSub]);
 				});
 		}
 
-		refresh(false);
+		refresh_list(false);
 		return;
 	}
 
 	
 	std::sort(m_list_db.begin(), m_list_db.end(),
-		[sort_asc, iSub, data_type](CListCtrlData a, CListCtrlData b)
+		[sort_asc, iSub, data_type, include_null](CListCtrlData a, CListCtrlData b)
 		{
 			if (sort_asc)
 			{
@@ -688,6 +753,16 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 				{
 					if (iSub != 0)
 					{
+						if (!include_null)
+						{
+							if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								return true;
+							else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+								return false;
+							else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								return true;
+						}
+
 						if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
 							return false;
 						else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
@@ -720,6 +795,16 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 				{
 					if (iSub != 0)
 					{
+						if (!include_null)
+						{
+							if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								return true;
+							else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+								return false;
+							else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								return true;
+						}
+
 						if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
 							return true;
 						else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
@@ -745,6 +830,8 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					return (_ttof(a.text[iSub]) > _ttof(b.text[iSub]));
 				}
 			}
+
+			return true;
 		}
 	);
 
@@ -837,6 +924,30 @@ void CVtListCtrlEx::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 void CVtListCtrlEx::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
+	//동적으로 생성할 경우 PreSubclassWindow()함수내에서
+	//GetHeaderCtrl()은 항상 NULL을 리턴한다.
+	//이를 보완하기 위해
+	//CHeaderCtrl* pHeader = GetHeaderCtrl();
+	//modify_style();
+	CListCtrl::PreSubclassWindow();
+	//ModifyStyle(0, LVS_SHAREIMAGELISTS);
+	//PostMessage(MESSAGE_VTLISTCTRLEX, message_modify_style, 0);
+	//SetTimer(0, 10, NULL);
+}
+
+LRESULT	CVtListCtrlEx::on_message_modify_style(WPARAM wParam, LPARAM lParam)
+{
+	if ((int)wParam == message_modify_style)
+	{
+		CHeaderCtrl* pHeader = GetHeaderCtrl();
+		modify_style();
+	}
+
+	return 0;
+}
+
+void CVtListCtrlEx::modify_style()
+{
 	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
 	//dlg의 parent의 font를 얻어와야 한다.
 	CFont* font = GetParent()->GetFont();
@@ -851,25 +962,13 @@ void CVtListCtrlEx::PreSubclassWindow()
 
 	//헤더컨트롤을 제어할 일이 있는지 확인 필요.
 #if 1
+	// get original view style
+	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
+	ModifyStyle(LVS_TYPEMASK, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA);
+
 	// if view style is other than LVS_REPORT 
 	// returned pointer will be NULL
 	CHeaderCtrl* pHeader = GetHeaderCtrl();
-
-	// get original view style
-	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
-
-	// modify to force header creation
-	// now pointer is not NULL
-	// and handle is valid
-	ModifyStyle(LVS_TYPEMASK, LVS_REPORT);
-	//ModifyStyle(LVS_TYPEMASK, LVS_OWNERDRAWFIXED);
-	//ModifyStyle(LVS_TYPEMASK, LVS_OWNERDATA);
-	pHeader = GetHeaderCtrl();
-
-	// reset a style to original
-	// check a pointer ... still there
-	ModifyStyle(LVS_TYPEMASK, dwStyle| LVS_OWNERDRAWFIXED| LVS_OWNERDATA);
-	pHeader = GetHeaderCtrl();
 
 	if (pHeader)
 	{
@@ -879,13 +978,11 @@ void CVtListCtrlEx::PreSubclassWindow()
 
 	LONG lStyleOld = GetWindowLong(GetSafeHwnd(), GWL_STYLE);
 	lStyleOld &= ~(LVS_TYPEMASK);
-	lStyleOld |= LVS_REPORT;
+	lStyleOld |= (LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA);
 
-	SetWindowLong(GetSafeHwnd(), GWL_STYLE, lStyleOld | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER);
-
+	SetWindowLongPtr(GetSafeHwnd(), GWL_STYLE, lStyleOld | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER);
 	//ASSERT(pHeader->m_hWnd != NULL);
 #endif
-	CListCtrl::PreSubclassWindow();
 }
 
 
@@ -914,11 +1011,22 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		{
 		case VK_BACK	:
 		{
-			if (m_shell_list)
+			//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
+			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
+			if (m_is_shell_list && m_is_shell_list_local)
 			{
-				m_path = GetParentDirectory(m_path);
+				if (m_path == _T("내 PC"))
+					return true;
+
+				//드라이브면 내 PC로 가고
+				if (m_path.Mid(1) == _T(":"))
+					m_path = _T("내 PC");
+				//그렇지 않으면 상위 디렉토리로 이동
+				else
+					m_path = GetParentDirectory(m_path);
+
 				set_path(m_path);
-				return TRUE;
+				//return true;
 			}
 				
 			break;
@@ -954,6 +1062,22 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 								return true;
 							}
 							break;
+		case VK_F5		:	
+							//editing일 경우는 F5키 이벤트가 발생하지 않는다.
+							//if (m_in_editing)
+							//{
+							//	edit_end();
+							//	return true;
+							//}
+							if (m_is_shell_list && m_is_shell_list_local)
+							{
+								refresh_list();
+								return true;
+							}
+							else
+							{
+								break;
+							}
 		/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
 		case VK_DELETE	:	if (m_bInEditing)
@@ -1126,7 +1250,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		if (dwExStyle & LVS_EX_CHECKBOXES)
 			r.left += 18;
 
-		if (m_shell_list)
+		if (m_is_shell_list)
 		{
 			r.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
 			r.OffsetRect(0, -1);
@@ -1543,16 +1667,31 @@ int CVtListCtrlEx::size()
 //실제 파일을 삭제하는 코드는 메인에서 처리한 후 삭제가 성공하면 리스트에서도 지운다.
 void CVtListCtrlEx::delete_selected_items()
 {
-	//뒤에서부터 지움에 주목.
-	for (int i = GetItemCount() - 1; i >= 0; i--)
-	{
-		if (GetItemState(i, LVIS_SELECTED))
-		{
-			bool deleted = true;
+	int i;
+	int index;
+	std::deque<int> dqSelected;
+	get_selected_items(&dqSelected);
 
-			CListCtrl::DeleteItem(i);
-			m_list_db.erase(m_list_db.begin() + i);
+	//뒤에서부터 지움에 주목.
+	for (i = dqSelected.size() - 1; i >= 0; i--)
+	{
+		index = dqSelected[i];
+
+		bool deleted = true;
+
+		if (m_is_shell_list && m_is_shell_list_local)
+		{
+			CString file;
+			file.Format(_T("%s\\%s"), m_path, get_text(index, col_filename));
+			if (!delete_file(file, true))
+			{
+				get_last_error_message(true);
+				break;
+			}
 		}
+
+		CListCtrl::DeleteItem(index);
+		m_list_db.erase(m_list_db.begin() + index);
 	}
 
 	SetItemCount(m_list_db.size());
@@ -1565,11 +1704,17 @@ void CVtListCtrlEx::delete_item(int index)
 	SetItemCount(m_list_db.size());
 }
 
-void CVtListCtrlEx::delete_all_items()
+void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 {
 	CListCtrl::DeleteAllItems();
 	m_list_db.clear();
 	SetItemCount(0);
+
+	if (delete_file_list)
+	{
+		m_cur_files.clear();
+		m_cur_folders.clear();
+	}
 }
 
 CString CVtListCtrlEx::get_text(int item, int subItem)
@@ -1833,7 +1978,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 	int cur_idx = start_idx;
 	while (true)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)message_progress_pos, (LPARAM)cur_idx);
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
@@ -1843,7 +1988,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 			if (stop_first_found)
 			{
-				::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)message_progress_pos, (LPARAM)-1);
+				::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
 				return 1;
 			}
 		}
@@ -1880,35 +2025,45 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 {
+	*pResult = 0;
+
+	//dbclick을 편집으로 사용하거나 어떤 액션으로 사용하는 것은
+	//이 클래스를 사용하는 메인에서 구현하는 것이 맞다.
+	//여기서 구현하면 편리한 경우도 있으나 범용성이 좁아진다.
+	return FALSE;
+
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: Add your control notification handler code here
 	int item;// = pNMItemActivate->iItem;
 	int subItem;// = pNMItemActivate->iSubItem;
 
-	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem) ||
+	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, true) ||
 		item < 0 || subItem < 0)
 		return TRUE;
 
 	TRACE(_T("%d, %d\n"), item, subItem);
 
-	if (m_shell_list)
+	if (m_is_shell_list && m_is_shell_list_local)
 	{
 		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
 
-		if (!PathIsDirectory(m_path + _T("\\") + get_text(item, col_filename)))
-			return TRUE;
+		if (m_path == _T("내 PC"))
+		{
+			m_path = convert_special_folder_to_real_path(get_text(item, col_filename));
+		}
+		else
+		{
+			if (!PathIsDirectory(m_path + _T("\\") + get_text(item, col_filename)))
+				return TRUE;
 
-		m_path = m_path + _T("\\") + get_text(item, col_filename);
+			m_path = m_path + _T("\\") + get_text(item, col_filename);
+		}
+
 		set_path(m_path);
 		return TRUE;
 	}
 
-	*pResult = 0;
-	
-	//dbclick을 편집으로 사용하거나 어떤 액션으로 사용하는 것은
-	//이 클래스를 사용하는 메인이 정하도록 한다.
-	return FALSE;
 
 	/*
 	if (m_allow_edit == false)
@@ -2288,11 +2443,11 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 	int item = -1;// = pNMItemActivate->iItem;
 	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
 
-	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem) ||
+	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, false) ||
 		item < 0 || subItem < 0)
 		return TRUE;
 
-	TRACE(_T("%d, %d\n"), item, subItem);
+	//TRACE(_T("%d, %d\n"), item, subItem);
 
 	// TODO: Add your control notification handler code here
 	if (m_in_editing)
@@ -2473,10 +2628,10 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }
 
-void CVtListCtrlEx::set_shell_list(bool is_local)
+void CVtListCtrlEx::set_as_shell_list(bool is_local)
 {
-	m_shell_list = true;
-	m_shell_list_local = is_local;
+	m_is_shell_list = true;
+	m_is_shell_list_local = is_local;
 	m_use_own_imagelist = true;
 
 	set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
@@ -2494,25 +2649,23 @@ void CVtListCtrlEx::set_shell_list(bool is_local)
 	allow_edit();
 	allow_edit_column(col_filesize, false);
 	allow_edit_column(col_filedate, false);
-
-	SHFILEINFO shInfo;
-	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
-	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
 }
 
-void CVtListCtrlEx::set_path(CString path)
+void CVtListCtrlEx::set_path(CString path, bool refresh)
 {
-	if (!m_shell_list_local)
-		return;
+	m_last_clicked = 0;
 
 	m_path = path;
+
 	if (m_path.Right(1) == '\\')
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	refresh(true);
+	TRACE(_T("current path = %s\n"), m_path);
+
+	refresh_list(refresh);
 }
 
-void CVtListCtrlEx::set_filelist(std::deque<CFileList>* pFolderList, std::deque<CFileList>* pFileList)
+void CVtListCtrlEx::set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList)
 {
 	m_cur_folders.clear();
 	m_cur_files.clear();
@@ -2520,45 +2673,55 @@ void CVtListCtrlEx::set_filelist(std::deque<CFileList>* pFolderList, std::deque<
 	m_cur_folders.assign(pFolderList->begin(), pFolderList->end());
 	m_cur_files.assign(pFileList->begin(), pFileList->end());
 
-	refresh(false);
+	refresh_list(false);
 }
 
-void CVtListCtrlEx::refresh(bool reload)
+void CVtListCtrlEx::refresh_list(bool reload)
 {
-	if (!m_shell_list)
+	if (!m_is_shell_list)
 		return;
 
 	int i;
 	CString		sfile;
 
-	delete_all_items();
+	//UI의 list의 내용은 모두 clear하지만
+	//remote의 경우는 reload가 false이고 폴더/파일 목록이 채워진채로 이 함수안으로 들어오므로
+	//폴더/파일 목록까지 clear해선 안된다.
+	delete_all_items(reload);
 
 	//local일 경우는 파일목록을 다시 읽어서 표시한다.
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
-	if (m_shell_list_local && reload)
+	if (m_is_shell_list_local && reload)
 	{
-		m_cur_folders.clear();
-		m_cur_files.clear();
-
-		CFileFind	finder;
-
-		bool bWorking = finder.FindFile(m_path + _T("\\*"));
-
-		while (bWorking)
+		if (m_path == _T("내 PC"))
 		{
-			bWorking = finder.FindNextFile();
-			sfile = finder.GetFilePath();
+			std::map<TCHAR, CString> drive_map;
+			get_drive_map(&drive_map);
+			for (std::map<TCHAR, CString>::iterator it = drive_map.begin(); it != drive_map.end(); it++)
+				m_cur_folders.push_back(CVtFileInfo(it->second));
+		}
+		else
+		{
+			CFileFind	finder;
 
-			if (finder.IsDots())
-				continue;
+			bool bWorking = finder.FindFile(m_path + _T("\\*"));
 
-			if (finder.IsDirectory())
+			while (bWorking)
 			{
-				m_cur_folders.push_back(CFileList(sfile));
-				continue;
-			}
+				bWorking = finder.FindNextFile();
+				sfile = finder.GetFilePath();
 
-			m_cur_files.push_back(CFileList(sfile));
+				if (finder.IsDots() || finder.IsHidden() || finder.IsSystem())
+					continue;
+
+				if (finder.IsDirectory())
+				{
+					m_cur_folders.push_back(CVtFileInfo(sfile));
+					continue;
+				}
+
+				m_cur_files.push_back(CVtFileInfo(sfile));
+			}
 		}
 	}
 
@@ -2568,20 +2731,560 @@ void CVtListCtrlEx::refresh(bool reload)
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
 
+	if (m_path == _T("내 PC"))
+	{
+		set_header_text(col_filesize, _T("사용 가능한 공간"));
+		set_header_text(col_filedate, _T("전체 크기"));
+		set_column_text_align(col_filedate, LVCFMT_RIGHT);
+	}
+	else
+	{
+		set_header_text(col_filesize, _T("크기"));
+		set_header_text(col_filedate, _T("수정한 날짜"));
+		set_column_text_align(col_filedate, LVCFMT_LEFT);
+	}
+
 	//asce는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
 		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_folders[i].text[0]), false, false);
-		set_text(index, col_filedate, m_cur_folders[i].text[2]);
-		set_text_color(index, col_filedate, RGB(109, 109, 109));
+
+		if (m_path == _T("내 PC"))
+		{
+			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].text[0]);
+			
+			uint64_t disk_size = GetDiskFreeSize(drive);
+			if (disk_size > 0)
+				set_text(index, col_filesize, get_size_string(disk_size, 3, 1));
+
+			disk_size = GetDiskTotalSize(drive);
+			if (disk_size > 0)
+				set_text(index, col_filedate, get_size_string(GetDiskTotalSize(drive), 3, 1));
+
+			set_text_color(index, col_filesize, RGB(109, 109, 109));
+			set_text_color(index, col_filedate, RGB(109, 109, 109));
+		}
+		else
+		{
+			set_text(index, col_filedate, m_cur_folders[i].text[2]);
+			set_text_color(index, col_filedate, RGB(109, 109, 109));
+		}
 	}
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
 		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_files[i].text[0]), false, false);
+
 		set_text(index, col_filesize, m_cur_files[i].text[1]);
 		set_text(index, col_filedate, m_cur_files[i].text[2]);
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
+}
+
+
+void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (nIDEvent == 0)
+	{
+		KillTimer(nIDEvent);
+		on_message_modify_style(message_modify_style, 0);
+	}
+
+	CListCtrl::OnTimer(nIDEvent);
+}
+
+//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
+//local인 경우 크기와 날짜가 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
+void CVtListCtrlEx::add_file(CString filename, CString filesize, CString filedate, bool is_remote, bool is_folder)
+{
+	bool file_is_folder = is_folder;
+
+	if (!is_remote)
+		file_is_folder = PathIsDirectory(filename);
+
+	if (file_is_folder)
+	{
+		m_cur_folders.push_back(CVtFileInfo(filename, filesize, filedate));
+	}
+	else
+	{
+		m_cur_files.push_back(CVtFileInfo(filename, filesize, filedate));
+	}
+}
+
+void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
+{
+	bool file_is_folder = ((pFindFileData->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY);
+
+	ULARGE_INTEGER ulInt;
+	ulInt.LowPart = pFindFileData->nFileSizeLow;
+	ulInt.HighPart = pFindFileData->nFileSizeHigh;
+
+	// date
+	SYSTEMTIME st;
+	FILETIME ftLocal;
+	CString filedate;
+
+	FileTimeToLocalFileTime(&(pFindFileData->ftLastWriteTime), &ftLocal);
+	FileTimeToSystemTime(&ftLocal, &st);
+
+	//filedate.Format(_T("%d-%02d-%02d %02d:%02d:%02d"), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+	filedate = GetDateTimeStringFromTime(st, true, false, false);
+	//SetItemText(iIndex, 2, GetDateTimeStringFromTime(GetFileLastModifiedTime(pFindFileData->cFileName), true, false, false));
+	add_file(pFindFileData->cFileName, file_is_folder ? _T("-") : get_size_string(ulInt.QuadPart), filedate, true, file_is_folder);
+}
+
+CImageList* CVtListCtrlEx::CreateDragImageEx(LPPOINT lpPoint)
+{
+	CRect	cSingleRect;
+	CRect	cCompleteRect(0, 0, 0, 0);
+	int	nIdx;
+	BOOL	bFirst = TRUE;
+	//
+	// Determine the size of the drag image
+	//
+	POSITION pos = GetFirstSelectedItemPosition();
+	while (pos)
+	{
+		nIdx = GetNextSelectedItem(pos);
+		GetItemRect(nIdx, cSingleRect, LVIR_BOUNDS);
+		if (bFirst)
+		{
+			// Initialize the CompleteRect
+			GetItemRect(nIdx, cCompleteRect, LVIR_BOUNDS);
+			bFirst = FALSE;
+		}
+		cCompleteRect.UnionRect(cCompleteRect, cSingleRect);
+	}
+
+	//
+	// Create bitmap in memory DC
+	//
+	CClientDC	cDc(this);
+	CDC		cMemDC;
+	CBitmap   	cBitmap;
+
+	if (!cMemDC.CreateCompatibleDC(&cDc))
+		return NULL;
+
+	if (!cBitmap.CreateCompatibleBitmap(&cDc, cCompleteRect.Width(), cCompleteRect.Height()))
+		return NULL;
+
+	CBitmap* pOldMemDCBitmap = cMemDC.SelectObject(&cBitmap);
+	// Here green is used as mask color
+	cMemDC.FillSolidRect(0, 0, cCompleteRect.Width(), cCompleteRect.Height(), RGB(0, 255, 0));
+
+	//
+	// Paint each DragImage in the DC
+	//
+	CImageList* pSingleImageList;
+	CPoint		cPt;
+
+	pos = GetFirstSelectedItemPosition();
+	while (pos)
+	{
+		nIdx = GetNextSelectedItem(pos);
+		GetItemRect(nIdx, cSingleRect, LVIR_BOUNDS);
+
+		pSingleImageList = CreateDragImage(nIdx, &cPt);
+		if (pSingleImageList)
+		{
+			pSingleImageList->DrawIndirect(&cMemDC,
+				0,
+				CPoint(cSingleRect.left - cCompleteRect.left,
+					cSingleRect.top - cCompleteRect.top),
+				cSingleRect.Size(),
+				CPoint(0, 0));
+			delete pSingleImageList;
+		}
+	}
+
+	cMemDC.SelectObject(pOldMemDCBitmap);
+	//
+	// Create the imagelist	with the merged drag images
+	//
+	CImageList* pCompleteImageList = new CImageList;
+
+	pCompleteImageList->Create(cCompleteRect.Width(),
+		cCompleteRect.Height(),
+		ILC_COLOR | ILC_MASK, 0, 1);
+	// Here green is used as mask color
+	pCompleteImageList->Add(&cBitmap, RGB(0, 255, 0));
+
+	cBitmap.DeleteObject();
+	//
+	// as an optional service:
+	// Find the offset of the current mouse cursor to the imagelist
+	// this we can use in BeginDrag()
+	//
+	if (lpPoint)
+	{
+		CPoint cCursorPos;
+		GetCursorPos(&cCursorPos);
+		ScreenToClient(&cCursorPos);
+		lpPoint->x = cCursorPos.x - cCompleteRect.left;
+		lpPoint->y = cCursorPos.y - cCompleteRect.top;
+	}
+
+	return(pCompleteImageList);
+}
+
+CImageList* CVtListCtrlEx::CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint)
+{
+	if (pList->GetSelectedCount() <= 0) return NULL; // no row selected
+
+	CFont* pFontDrag = NULL;
+
+	pFontDrag = new CFont();
+	pFontDrag->CreateFont(19, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET
+		, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FF_DONTCARE, _T("맑은 고딕")
+	);
+
+	SendMessageToDescendants(WM_SETFONT, (WPARAM)pFontDrag->GetSafeHandle(), 1, TRUE, FALSE);
+
+
+	CRect rectSingle;
+	CRect rectComplete(0, 0, 0, 0);
+
+	// Determine List Control Client width size
+	pList->GetClientRect(rectSingle);
+	int nWidth = rectSingle.Width();
+
+	// Start and Stop index in view area
+	int nIndex = pList->GetTopIndex() - 1;
+	int nBottomIndex = pList->GetTopIndex() + pList->GetCountPerPage() - 1;
+	if (nBottomIndex > (pList->GetItemCount() - 1))
+		nBottomIndex = pList->GetItemCount() - 1;
+
+	// Determine the size of the drag image (limite for rows visibled and Client width)
+	while ((nIndex = pList->GetNextItem(nIndex, LVNI_SELECTED)) != -1)
+	{
+		if (nIndex > nBottomIndex)
+			break;
+
+		pList->GetItemRect(nIndex, rectSingle, LVIR_BOUNDS);
+
+		if (rectSingle.left < 0)
+			rectSingle.left = 0;
+
+		if (rectSingle.right > nWidth)
+			rectSingle.right = nWidth;
+
+		rectComplete.UnionRect(rectComplete, rectSingle);
+	}
+
+	CClientDC dcClient(this);
+	CDC dcMem;
+	CBitmap Bitmap;
+
+	if (!dcMem.CreateCompatibleDC(&dcClient))
+		return NULL;
+
+	if (!Bitmap.CreateCompatibleBitmap(&dcClient, rectComplete.Width(), rectComplete.Height()))
+		return NULL;
+
+	CBitmap *pOldMemDCBitmap = dcMem.SelectObject(&Bitmap);
+	// Use green as mask color
+	dcMem.FillSolidRect(0, 0, rectComplete.Width(), rectComplete.Height(), RGB(0, 255, 0));
+
+	// Paint each DragImage in the DC
+	nIndex = pList->GetTopIndex() - 1;
+	while ((nIndex = pList->GetNextItem(nIndex, LVNI_SELECTED)) != -1)
+	{
+		if (nIndex > nBottomIndex)
+			break;
+
+		CPoint pt;
+		CImageList* pSingleImageList = pList->CreateDragImage(nIndex, &pt);
+
+		if (pSingleImageList)
+		{
+			pList->GetItemRect(nIndex, rectSingle, LVIR_BOUNDS);
+			pSingleImageList->Draw(&dcMem,
+				0,
+				CPoint(rectSingle.left - rectComplete.left,
+					rectSingle.top - rectComplete.top),
+				ILD_MASK);
+			pSingleImageList->DeleteImageList();
+			delete pSingleImageList;
+		}
+	}
+
+
+	dcMem.SelectObject(pOldMemDCBitmap);
+	CImageList* pCompleteImageList = new CImageList;
+	pCompleteImageList->Create(rectComplete.Width(), rectComplete.Height(), ILC_COLOR | ILC_MASK, 0, 1);
+	pCompleteImageList->Add(&Bitmap, RGB(0, 255, 0)); // Green is used as mask color
+	Bitmap.DeleteObject();
+
+	if (lpPoint)
+	{
+		lpPoint->x = rectComplete.left;
+		lpPoint->y = rectComplete.top;
+	}
+
+	return pCompleteImageList;
+}
+
+void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	if (!m_use_drag_and_drop)
+		return;
+
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	m_nDragIndex = pNMLV->iItem;
+
+	CPoint pt;
+	int nOffset = -10; //offset in pixels for drag image (positive is up and to the left; neg is down and to the right)
+
+	//CFont* pFontDefault = NULL;
+	//pFontDefault = new CFont();
+	//pFontDefault = this->GetFont(); //
+
+	//m_pDragImage = CreateDragImageEx(this, &pt);	<= 이 함수 안된다.
+
+	int sel_count = get_selected_items();
+	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
+	
+	if (m_drag_images_id.size() == 1)
+		bmpRes.load(m_drag_images_id[0]);
+	else if (m_drag_images_id.size() > 1)
+		bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+
+	bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(sel_count), 20, 2,
+					_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+
+	m_pDragImage = new CImageList();
+	m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
+
+	HICON hicon;
+	bmpRes.m_pBitmap->GetHICON(&hicon);
+	m_pDragImage->Add(hicon);
+
+
+//	SendMessageToDescendants(WM_SETFONT, (WPARAM)pFontDefault->GetSafeHandle(), 1, TRUE, FALSE);
+
+	//CreateDragImage(m_nDragIndex, &pt);
+	ASSERT(m_pDragImage); //make sure it was created
+
+	//// Set dragging flag and others
+	m_bDragging = TRUE;	//we are in a drag and drop operation
+	m_nDropIndex = -1;	//we don't have a drop index yet
+	m_pDragWnd = this; //make note of which list we are dragging from
+	m_pDropWnd = this;	//at present the drag list is the drop list
+
+	//// Capture all mouse messages
+	SetCapture();
+
+	//// Change the cursor to the drag image
+	////	(still must perform DragMove() in OnMouseMove() to show it moving)
+	m_pDragImage->BeginDrag(0, CPoint(nOffset, nOffset - 4));
+	m_pDragImage->DragEnter(GetDesktopWindow(), pNMLV->ptAction);
+
+	trace(_T("start drag...\n"));
+
+	*pResult = 0;
+}
+
+
+void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//While the mouse is moving, this routine is called.
+	//This routine will redraw the drag image at the present
+	// mouse location to display the dragging.
+	//Also, while over a CListCtrl, this routine will highlight
+	// the item we are hovering over.
+
+	//// If we are in a drag/drop procedure (m_bDragging is true)
+	if (m_bDragging)
+	{
+		//// Move the drag image
+		CPoint pt(point);	//get our current mouse coordinates
+		ClientToScreen(&pt); //convert to screen coordinates
+		m_pDragImage->DragMove(pt); //move the drag image to those coordinates
+		// Unlock window updates (this allows the dragging image to be shown smoothly)
+		//m_pDragImage->DragShowNolock(false);
+
+		//// Get the CWnd pointer of the window that is under the mouse cursor
+		CWnd* pDropWnd = WindowFromPoint(pt);
+		ASSERT(pDropWnd); //make sure we have a window
+
+		//// If we drag outside current window we need to adjust the highlights displayed
+		if (pDropWnd != m_pDropWnd)
+		{
+			trace(_T("pDropWnd != m_pDropWnd\n"));
+
+			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+			{
+				if (m_nDropIndex != -1) //If we drag over the CListCtrl header, turn off the hover highlight
+				{
+					trace(_T("m_nDropIndex != -1\n"));
+					CListCtrl* pList = (CListCtrl*)m_pDropWnd;
+					VERIFY(pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED));
+					// redraw item
+					VERIFY(pList->RedrawItems(m_nDropIndex, m_nDropIndex));
+					pList->UpdateWindow();
+					m_nDropIndex = -1;
+				}
+				else //If we drag out of the CListCtrl altogether
+				{
+					CListCtrl* pList = (CListCtrl*)m_pDropWnd;
+					int i = 0;
+					int nCount = pList->GetItemCount();
+
+					trace(_T("m_nDropIndex is not -1, nCount = %d\n"), nCount);
+
+					for (i = 0; i < nCount; i++)
+					{
+						pList->SetItemState(i, 0, LVIS_DROPHILITED);
+					}
+					pList->RedrawItems(0, nCount);
+					pList->UpdateWindow();
+				}
+			}
+			else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+			{
+
+			}
+		}
+
+		// Save current window pointer as the CListCtrl we are dropping onto
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+			m_pDropWnd = pDropWnd;
+
+		// Convert from screen coordinates to drop target client coordinates
+		pDropWnd->ScreenToClient(&pt);
+
+		//If we are hovering over a CListCtrl we need to adjust the highlights
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+		{
+			//Note that we can drop here
+			SetCursor(m_hcArrow);
+			UINT uFlags;
+			CListCtrl* pList = (CListCtrl*)pDropWnd;
+
+			// Turn off hilight for previous drop target
+			pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+			// Redraw previous item
+			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
+
+			// Get the item that is below cursor
+			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(pt, &uFlags);
+			// Highlight it (폴더인 경우에만 hilite시킨다)
+			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
+				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
+			// Redraw item
+			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
+			pList->UpdateWindow();
+		}
+		else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+		{
+			SetCursor(m_hcNo);
+			/*
+			//Note that we can drop here
+			SetCursor(m_hcArrow);
+
+			UINT uFlags;
+			CTreeCtrl* pTree = (CTreeCtrl*)pDropWnd;
+
+			// Turn off hilight for previous drop target
+			//pTree->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+
+			// Redraw previous item
+			//pTree->RedrawItems(m_nDropIndex, m_nDropIndex);
+
+			// Get the item that is below cursor
+			m_nDropIndex = ((CVtListCtrlEx*)pDropWnd)->HitTest(pt, &uFlags);
+
+			// Highlight it (폴더인 경우에만 hilite시킨다)
+			//if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
+			//	pTree->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
+			// Redraw item
+			//pTree->RedrawItems(m_nDropIndex, m_nDropIndex);
+			pTree->UpdateWindow();
+			*/
+		}
+		else
+		{
+			//If we are not hovering over a CListCtrl, change the cursor
+			// to note that we cannot drop here
+			SetCursor(m_hcNo);
+		}
+		// Lock window updates
+		m_pDragImage->DragShowNolock(true);
+	}
+
+	CListCtrl::OnMouseMove(nFlags, point);
+}
+
+
+void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//This routine is the end of the drag/drop operation.
+	//When the button is released, we are to drop the item.
+	//There are a few things we need to do to clean up and
+	// finalize the drop:
+	//	1) Release the mouse capture
+	//	2) Set m_bDragging to false to signify we are not dragging
+	//	3) Actually drop the item (we call a separate function to do that)
+
+	//If we are in a drag and drop operation (otherwise we don't do anything)
+	if (m_bDragging)
+	{
+		trace(_T("OnLButtonUp\n"));
+		// Release mouse capture, so that other controls can get control/messages
+		ReleaseCapture();
+
+		// Note that we are NOT in a drag operation
+		m_bDragging = FALSE;
+
+		// End dragging image
+		m_pDragImage->DragLeave(GetDesktopWindow());
+		m_pDragImage->EndDrag();
+		delete m_pDragImage; //must delete it because it was created at the beginning of the drag
+
+		CPoint pt(point); //Get current mouse coordinates
+		ClientToScreen(&pt); //Convert to screen coordinates
+		// Get the CWnd pointer of the window that is under the mouse cursor
+		CWnd* pDropWnd = WindowFromPoint(pt);
+		ASSERT(pDropWnd); //make sure we have a window pointer
+		// If window is CListCtrl, we perform the drop
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
+			pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+		{
+			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
+			DropItemOnList(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
+		}
+	}
+
+	CListCtrl::OnLButtonUp(nFlags, point);
+}
+
+void CVtListCtrlEx::DropItemOnList(CWnd* pDragListCtrl, CWnd* pDropListCtrl)
+{
+	CString droppedItem;
+
+	//우선은 CListCtrl끼리의 drag&drop만 처리한다.
+	CVtListCtrlEx *pDragList = (CVtListCtrlEx *)pDragListCtrl;
+	CVtListCtrlEx *pDropList = (CVtListCtrlEx *)pDropListCtrl;
+
+	if (m_nDropIndex >= 0)
+		droppedItem = pDropList->get_text(m_nDropIndex, col_filename);
+
+	std::deque<int> dq;
+	pDragList->get_selected_items(&dq);
+
+	for (int i = 0; i < dq.size(); i++)
+		TRACE(_T("dropped %d = %s\n"), i, pDragList->get_text(dq[i], col_filename));
+
+	TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+
+	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&(CVtListCtrlExMessage(this, message_list_dropped, pDropListCtrl)), (LPARAM)0);
+
+	pDropList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
 }

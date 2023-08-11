@@ -56,7 +56,7 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
 
 2.border를 none이나 thin으로 하고 SetCursor와 OnMouseMove, OnLButtonDown을 이용하여 구현
 	- 장점 : resizable 영역의 크기를 원하는 만큼 줄 수 있다.
-	- 단점 : CResizeCtrl을 쓰면 Dialog에 자동으로 WM_THICKFRAME 속성이 부여되므로 이 방법을 쓸 수 없다.
+	- 단점 : CResizeCtrl을 쓰면 Dialog에 자동으로 WM_THICKFRAME 속성이 부여되므로 역시 상단에 흰색 영역이 생기므로 이 방법을 쓸 수 없다.
 */
 //////////////////////////////////////////////////////////////////////////
 

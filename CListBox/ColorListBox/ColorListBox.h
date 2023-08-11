@@ -8,6 +8,8 @@
 #include <afxwin.h>
 #include <deque>
 #include "../../Functions.h"
+#include "../../system/ShellImageList/ShellImageList.h"
+
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
 //#define ROOT_LABEL _T("_r")
@@ -70,7 +72,6 @@ public:
 	int			set_path(CString root, CString selected_text = _T(""));
 	//lists를 NULL하여 호출하면 멤버변수인 m_folder_list의 내용을 표시한다.
 	int			set_folder_list(std::deque<CString>* lists = NULL, CString selected_text = _T(""));
-	CImageList	m_imagelist_small;
 
 	virtual		CColorListBox&	set_font(LOGFONT& lf);
 	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
@@ -89,6 +90,9 @@ public:
 	};
 
 	void	set_color_theme(int theme, bool apply_now = true);
+
+	CShellImageList* m_pShellImageList = NULL;
+	void		SetShellImageList(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
 protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.

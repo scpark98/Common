@@ -853,6 +853,54 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 	//save(_T("d:\\temp\\rotated_fit.png"));
 }
 
+void CGdiplusBitmap::draw_text(int x, int y, CString text, int font_size, int thick,
+								CString font_name /*= _T("맑은 고딕")*/,
+								Gdiplus::Color crOutline /*= Gdiplus::Color::White*/,
+								Gdiplus::Color crFill /*= Gdiplus::Color::Black*/,
+								UINT align /*= DT_LEFT | DT_TOP*/)
+{
+	Graphics g(m_pBitmap);
+
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+	//Gdiplus::FontFamily   ffami(CStringW(font_name));
+	Gdiplus::FontFamily   ff((WCHAR*)(const WCHAR*)CStringW(font_name));
+	Gdiplus::Font font(&ff, font_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+	Gdiplus::StringFormat fmt;
+	//DT_TOP
+	Gdiplus::RectF boundingBox;
+	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &boundingBox);
+
+	if (align & DT_CENTER)
+		x = x - boundingBox.Width / 2;
+	else if (align & DT_RIGHT)
+		x = x - boundingBox.Width;
+
+	if (align & DT_VCENTER)
+		y = y - boundingBox.Height / 2;
+	else if (align & DT_BOTTOM)
+		y = y - boundingBox.Height;
+
+	Gdiplus::GraphicsPath   str_path;
+	str_path.AddString(CStringW(text), -1, &ff,
+		Gdiplus::FontStyleRegular, font_size, Gdiplus::Point(x, y), &fmt);
+
+	Gdiplus::Pen   gp(crOutline, thick);
+	gp.SetLineJoin(Gdiplus::LineJoinRound);
+
+	Gdiplus::Rect    rc(x, y, 30, 60);
+	//Gdiplus::Color   cStart(255, 128, 0);
+	//Gdiplus::Color   cEnd(0, 128, 255);
+	//Gdiplus::LinearGradientBrush  gb(rc, cStart, cEnd,
+	//	Gdiplus::LinearGradientModeVertical);
+	Gdiplus::SolidBrush gb(crFill);
+
+	g.DrawPath(&gp, &str_path);
+	g.FillPath(&gb, &str_path);
+}
+
 void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 {
 	int x, y;

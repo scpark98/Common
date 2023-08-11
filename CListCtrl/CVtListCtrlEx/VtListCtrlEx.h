@@ -5,6 +5,7 @@
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
 #include "../../Functions.h"
+#include "../../system/ShellImageList/ShellImageList.h"
 
 /*
 CListCtrl의 각 라인을 CListCtrlData라는 클래스의 인스턴스로 생성하여
@@ -47,16 +48,35 @@ m_list.set_header_height(24);
 #define LCSB_CLIENTDATA 1
 #define LCSB_NCOVERRIDE 2
 
-#define MESSAGE_VTLISTCTRLEX	WM_USER + 0x7FFF - 0x7464
+#define MESSAGE_VTLISTCTRLEX			WM_USER + 0x7FFF - 0x7464
 
-class CFileList
+class CVtListCtrlExMessage
+{
+public :
+	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL)
+	{
+		pThis = _this;
+		message = _message;
+		pTarget = _pTarget;
+	}
+
+	CWnd*	pThis = NULL;
+	CWnd*	pTarget = NULL;
+	int		message;
+};
+
+class CVtFileInfo
 {
 public:
-	CFileList(CString _name, CString _size = _T(""), CString _date = _T(""))
+	CVtFileInfo(CString _name, CString _size = _T(""), CString _date = _T(""))
 	{
 		if (_size.IsEmpty())
 		{
 			_size = get_file_size_string(_name);
+		}
+		else if (_size == _T("-"))
+		{
+			_size.Empty();
 		}
 
 		if (_date.IsEmpty())
@@ -82,6 +102,8 @@ public:
 	CVtListCtrlEx();
 	virtual ~CVtListCtrlEx();
 
+	void		modify_style();
+
 	BOOL NCOverride;
 	int Who;
 
@@ -91,31 +113,40 @@ public:
 	enum VtListCtrlExMsgs
 	{
 		message_progress_pos = 0,
+		message_list_dropped,
 	};
 
 
 //ShellList로 동작시키기
-	bool		m_shell_list = false;
-	bool		m_shell_list_local = true;
-	bool		is_shell_list() { return m_shell_list; }
+	bool		m_is_shell_list = false;
+	bool		m_is_shell_list_local = true;
+	bool		is_shell_list() { return m_is_shell_list; }
+	bool		is_shell_list_local() { return m_is_shell_list_local; }
 	//맨 처음 이 명령을 주면 모든 세팅과 동작이 ShellListCtrl로 동작된다.
 	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
 	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
-	void		set_shell_list(bool is_local = true);
+	void		set_as_shell_list(bool is_local = true);
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
-	void		set_path(CString path);
+	CString		get_path() { return m_path; }
+	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
+	void		set_path(CString path, bool refresh = true);
 	//local이 아닐 경우는 파일목록을 받아서 표시한다.
-	void		set_filelist(std::deque<CFileList>* pFolderList, std::deque<CFileList>* pFileList);
+	void		set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList);
 
 	//reload가 true라면 local의 파일목록을 다시 불러오지만 false라면 목록을 다시 리스트에 표시한다
 	//(sort의 경우 폴더/파일 목록을 sort하여 보여줄 뿐 파일목록을 reload하진 않는다)
-	void		refresh(bool reload = true);
+	//다른 코드에 의해 이미 m_cur_folders/m_cur_files 가 채워졌다면 reload를 false로 호출한다.
+	void		refresh_list(bool reload = true);
 
 	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
-	std::deque<CFileList> m_cur_folders;
-	std::deque<CFileList> m_cur_files;
-
+	std::deque<CVtFileInfo> m_cur_folders;
+	std::deque<CVtFileInfo> m_cur_files;
+	//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
+	//local인 경우 크기와 날짜등이 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
+	void		add_file(CString filename, CString filesize = _T(""), CString filedate = _T(""), bool is_remote = false, bool is_folder = false);
+	//local이 아닌 remote의 경우 넘겨받은 구조체값으로 목록을 추가한다.
+	void		add_file(WIN32_FIND_DATA* pFindFileData);
 
 	enum SHELL_LIST_COLUMN
 	{
@@ -125,9 +156,8 @@ public:
 	};
 
 	CString		m_path;
-	CImageList	m_imagelist_small;
-	CImageList	m_imagelist_large;
-
+	CShellImageList*	m_pShellImageList = NULL;
+	void		SetShellImageList(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
 //컬럼 관련
 	//ex. "No,20;Item1,50;Item2,50"
@@ -199,8 +229,8 @@ public:
 	//지우기 전 확인창은 호출루틴에서 처리해야 함
 	void		delete_selected_items();
 	void		delete_item(int index);
-	void		delete_all_items();
-	void		DeleteAllItems() { AfxMessageBox(_T("use delete_all_items() function in virtual list control.")); }
+	void		delete_all_items(bool delete_file_list = true);
+	void		DeleteAllItems() { delete_all_items(); }
 
 //텍스트 관련
 	CString		get_text(int item, int subItem);
@@ -329,7 +359,7 @@ public:
 	void	save_column_width(CWinApp* pApp, CString sSection);
 	CRect	get_item_rect(int item, int subItem);
 	//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
-	bool	get_index_from_point(CPoint pt, int& item, int& subItem);
+	bool	get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
 
 	void	show_progress_text(bool show) { m_show_progress_text = show; Invalidate(); }
 
@@ -353,7 +383,27 @@ public:
 
 	DWORD index_from_point(int x, int y);
 
+	//Drag&Drop 드래깅 관련
+	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
+	{
+		int n = sizeof...(args);
+		int arg[] = { args... };
+
+		for (auto id : arg)
+			m_drag_images_id.push_back(id);
+	}
+
+	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
+	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
+	int				get_drop_index() { return m_nDropIndex; }
+
 protected:
+	enum VTLISTCTRLEX_SELF_MESSAGE
+	{
+		message_modify_style = 0,
+	};
+	LRESULT			on_message_modify_style(WPARAM wParam, LPARAM lParam);
+
 //메인 데이터
 	std::deque<CListCtrlData> m_list_db;
 
@@ -391,7 +441,7 @@ protected:
 	int				m_edit_subItem = -1;			//편집중인 아이템 서브인덱스
 	CString			m_old_text = _T("");			//편집 전 텍스트
 	CEdit*			m_pEdit = NULL;
-	long			m_last_clicked = 0;
+	long			m_last_clicked = 0;				//one_click으로 편집모드 진입 시 마지막 클릭 시각
 
 //폰트 관련
 	LOGFONT			m_lf;
@@ -400,6 +450,22 @@ protected:
 	void			reconstruct_font();
 
 	bool			m_show_progress_text = true;
+
+//Drag&Drop 드래깅 관련
+	bool			m_use_drag_and_drop = false;
+	CWnd*			m_pDragWnd = NULL;			//Which ListCtrl we are dragging FROM
+	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
+	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
+	bool			m_bDragging = false;		//T during a drag operation
+	int				m_nDragIndex = -1;			//Index of selected item in the List we are dragging FROM
+	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
+	HCURSOR			m_hcArrow;
+	HCURSOR			m_hcNo;
+
+	std::deque<UINT> m_drag_images_id;		//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
+	CImageList* CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint);
+	CImageList* CreateDragImageEx(LPPOINT lpPoint);
+	void		DropItemOnList(CWnd* pDragWnd, CWnd* pDropWnd);
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -423,6 +489,10 @@ public:
 //	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnDropFiles(HDROP hDropInfo);
 	afx_msg void MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 };
 
 

@@ -117,6 +117,11 @@ public:
 	//상하대칭
 	void	flip();
 
+	void	draw_text(int x, int y, CString text, int font_size, int thick,
+						CString font_name = _T("맑은 고딕"),
+						Gdiplus::Color crOutline = Gdiplus::Color::White,
+						Gdiplus::Color crFill = Gdiplus::Color::Black,
+						UINT align = DT_LEFT | DT_TOP);
 
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함

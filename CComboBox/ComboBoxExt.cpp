@@ -3,7 +3,7 @@
 
 //#include "stdafx.h"
 #include "ComboBoxExt.h"
-
+#include "../../Common/Functions.h"
 
 // CColorComboBox
 
@@ -335,9 +335,9 @@ void CComboBoxExt::reconstruct_font()
 	SetFont(&m_font, true);
 
 	//-1을 주면 입력박스의 높이가 변경된다.
-	SetItemHeight(-1, -m_lf.lfHeight + 10);
+	SetItemHeight(-1, -m_lf.lfHeight + 4);
 	//0을 주면 리스트박스의 모든 아이템의 높이가 변경된다.
-	SetItemHeight(0, -m_lf.lfHeight + 10);
+	SetItemHeight(0, -m_lf.lfHeight + 4);
 
 	ASSERT(bCreated);
 }
@@ -426,13 +426,26 @@ void CComboBoxExt::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	//dc.FillSolidRect(rc, RGB(255, 0, 0));
+	//dc.FillSolidRect(rc, RGB(255, 255, 255));
+	DrawRectangle(&dc, rc, GRAY(192), ::GetSysColor(COLOR_WINDOW));
+
+	//owner draw fixed, has string 때문인지 dropdown 버튼이 표시되지 않는다.
+	//우선 수동으로 그려준다.
+	CRect r = rc;
+	r.left = r.right - r.Height() + 2;
+
+	//dc.FillSolidRect(r, RGB(255, 0, 0));
+	CPoint cp = r.CenterPoint();
+	cp.Offset(-1, 2);
+	int sz = 4;
+	DrawLine(&dc, cp.x - sz, cp.y - sz, cp.x, cp.y, GRAY(128));
+	DrawLine(&dc, cp.x, cp.y, cp.x + sz, cp.y - sz, GRAY(128));
 }
 
 
 BOOL CComboBoxExt::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return FALSE;
+	//return FALSE;
 	return CComboBox::OnEraseBkgnd(pDC);
 }

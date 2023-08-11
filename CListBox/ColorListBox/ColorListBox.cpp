@@ -46,8 +46,6 @@ CColorListBox::CColorListBox()
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	set_color_theme(color_theme_default, false);
-
-	CoInitialize(NULL);
 }	// CColorListBox
 
 //-------------------------------------------------------------------
@@ -61,8 +59,6 @@ CColorListBox::~CColorListBox()
 // Remarks		:	Destructor.
 //
 {
-	m_imagelist_small.Detach();
-	CoUninitialize();
 }	// ~CColorListBox()
 
 
@@ -121,9 +117,6 @@ void CColorListBox::PreSubclassWindow()
 		font->GetObject(sizeof(m_lf), &m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-
-	SHFILEINFO shInfo;
-	m_imagelist_small.Attach((HIMAGELIST)::SHGetFileInfo(_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
 
 	ReconstructFont();
 }
@@ -302,11 +295,11 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (GetStyle() & LBS_USETABSTOPS)
 		nFormat |= DT_EXPANDTABS;
 
-	if (m_as_folder_list && m_imagelist_small.GetImageCount() > 0)
+	if (m_as_folder_list)
 	{
 		rect.left += 6;		//left margin
-		CString real_path = convert_volume_to_real_path(m_folder_list[lpDIS->itemID]);
-		m_imagelist_small.Draw(&dc, GetSystemImageListIcon(real_path, false),
+		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID]);
+		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(real_path, true),
 								CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		rect.left += 16;	//small icon width
 		rect.left += 14;	//margin between icon and text

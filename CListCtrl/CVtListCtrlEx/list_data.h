@@ -54,5 +54,4 @@ public:
 		ASSERT(subItem < column);
 		text[subItem] = _text;
 	}
-
 };

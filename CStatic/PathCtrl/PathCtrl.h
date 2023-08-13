@@ -96,10 +96,10 @@ public:
 	void		back_color(COLORREF crBack) { m_crBack = crBack; }
 
 	CShellImageList* m_pShellImageList = NULL;
-	void		SetShellImageList(CShellImageList* pShellImageList)
+	void		set_shell_imagelist(CShellImageList* pShellImageList)
 	{
 		m_pShellImageList = pShellImageList;
-		m_list_folder.SetShellImageList(pShellImageList);
+		m_list_folder.set_shell_imagelist(pShellImageList);
 	}
 
 protected:

@@ -5586,6 +5586,13 @@ CString get_known_folder(KNOWNFOLDERID folderID)
 	return path;
 }
 
+CString get_known_folder(int csidl)
+{
+	TCHAR buf[MAX_PATH];
+	SHGetSpecialFolderPath(NULL, buf, csidl, FALSE);
+	return buf;
+}
+
 void ParseCommandString(CString sParam, CStringArray& ar)
 {
 //	AfxMessageBox("sParam = [" + sParam + "]");
@@ -7995,15 +8002,17 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 		real_path = buf;
 #endif
 	}
-	//else if (csidl == _T("다운로드"))
-	//{
+	/*
+	else if (csidl == _T("다운로드"))
+	{
 #ifndef _USING_V110_SDK71_
 		real_path = get_known_folder(FOLDERID_Downloads);
 #else
-		//SHGetSpecialFolderPath(NULL, buf, CSIDL_DOWNLOADS, FALSE);
-		//real_path = buf;
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_DOWNLOADS, FALSE);
+		real_path = buf;
 #endif
-	//}
+	}
+	*/
 
 
 	real_path.Replace(_T("내 PC\\"), _T(""));
@@ -8014,6 +8023,9 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 
 	CString rest = real_path.Mid(pos + 2);
 	CString drive_letter = real_path.Mid(pos - 1, 1);
+
+	if (rest.Left(1) == _T("\\"))
+		rest = rest.Mid(1);
 
 	real_path.Format(_T("%s:\\%s"), drive_letter, rest);
 	return real_path;

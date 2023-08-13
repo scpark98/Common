@@ -350,7 +350,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
 
-			if (iSubItem == 0 && m_is_shell_list)
+			if (iSubItem == 0 && m_is_shell_listctrl)
 			{
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
 				textRect.left += 3;
@@ -358,7 +358,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				CString real_path = convert_special_folder_to_real_path(m_path + _T("\\") + get_text(iItem, iSubItem));
 				int icon_index;
 
-				if (m_is_shell_list)
+				if (m_is_shell_listctrl)
 				{
 					if (get_text(iItem, col_filesize).IsEmpty())
 					{
@@ -409,7 +409,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_is_shell_list && !m_in_editing && (GetFocus() == this))
+	if (m_is_shell_listctrl && !m_in_editing && (GetFocus() == this))
 	{
 		for (int i = 0; i < size(); i++)
 		{
@@ -722,7 +722,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	bool include_null = false;
 
 	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한 후 보여줘야 하므로 아래 람다를 사용할 수 없다.
-	if (m_is_shell_list)
+	if (m_is_shell_listctrl)
 	{
 		if (iSub == col_filedate)
 		{
@@ -1013,7 +1013,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		{
 			//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
 			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
-			if (m_is_shell_list && m_is_shell_list_local)
+			if (m_is_shell_listctrl && m_is_shell_listctrl_local)
 			{
 				if (m_path == _T("내 PC"))
 					return true;
@@ -1069,7 +1069,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 							//	edit_end();
 							//	return true;
 							//}
-							if (m_is_shell_list && m_is_shell_list_local)
+							if (m_is_shell_listctrl && m_is_shell_listctrl_local)
 							{
 								refresh_list();
 								return true;
@@ -1250,7 +1250,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		if (dwExStyle & LVS_EX_CHECKBOXES)
 			r.left += 18;
 
-		if (m_is_shell_list)
+		if (m_is_shell_listctrl)
 		{
 			r.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
 			r.OffsetRect(0, -1);
@@ -1679,7 +1679,7 @@ void CVtListCtrlEx::delete_selected_items()
 
 		bool deleted = true;
 
-		if (m_is_shell_list && m_is_shell_list_local)
+		if (m_is_shell_listctrl && m_is_shell_listctrl_local)
 		{
 			CString file;
 			file.Format(_T("%s\\%s"), m_path, get_text(index, col_filename));
@@ -2043,7 +2043,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 	TRACE(_T("%d, %d\n"), item, subItem);
 
-	if (m_is_shell_list && m_is_shell_list_local)
+	if (m_is_shell_listctrl && m_is_shell_listctrl_local)
 	{
 		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
@@ -2628,10 +2628,10 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }
 
-void CVtListCtrlEx::set_as_shell_list(bool is_local)
+void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
 {
-	m_is_shell_list = true;
-	m_is_shell_list_local = is_local;
+	m_is_shell_listctrl = true;
+	m_is_shell_listctrl_local = is_local;
 	m_use_own_imagelist = true;
 
 	set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
@@ -2654,6 +2654,8 @@ void CVtListCtrlEx::set_as_shell_list(bool is_local)
 void CVtListCtrlEx::set_path(CString path, bool refresh)
 {
 	m_last_clicked = 0;
+
+	path = convert_special_folder_to_real_path(path);
 
 	m_path = path;
 
@@ -2678,7 +2680,7 @@ void CVtListCtrlEx::set_filelist(std::deque<CVtFileInfo>* pFolderList, std::dequ
 
 void CVtListCtrlEx::refresh_list(bool reload)
 {
-	if (!m_is_shell_list)
+	if (!m_is_shell_listctrl)
 		return;
 
 	int i;
@@ -2691,7 +2693,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	//local일 경우는 파일목록을 다시 읽어서 표시한다.
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
-	if (m_is_shell_list_local && reload)
+	if (m_is_shell_listctrl_local && reload)
 	{
 		if (m_path == _T("내 PC"))
 		{

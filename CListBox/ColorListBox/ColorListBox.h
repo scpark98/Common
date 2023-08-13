@@ -92,7 +92,7 @@ public:
 	void	set_color_theme(int theme, bool apply_now = true);
 
 	CShellImageList* m_pShellImageList = NULL;
-	void		SetShellImageList(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
+	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
 protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.

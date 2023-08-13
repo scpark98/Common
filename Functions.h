@@ -825,6 +825,7 @@ void		Trace(char* szFormat, ...);
 	//윈도우 운영체제에서 특정 폴더(다운로드, 내 문서 등)의 실제 경로를 리턴한다.
 	//FOLDERID_Downloads, FOLDERID_Documents, ...
 	CString get_known_folder(KNOWNFOLDERID folderID);
+	CString get_known_folder(int csidl);
 
 //////////////////////////////////////////////////////////////////////////
 //네트워크, 인터넷

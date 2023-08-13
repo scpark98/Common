@@ -118,15 +118,15 @@ public:
 
 
 //ShellList로 동작시키기
-	bool		m_is_shell_list = false;
-	bool		m_is_shell_list_local = true;
-	bool		is_shell_list() { return m_is_shell_list; }
-	bool		is_shell_list_local() { return m_is_shell_list_local; }
+	bool		m_is_shell_listctrl = false;
+	bool		m_is_shell_listctrl_local = true;
+	bool		is_shell_listctrl() { return m_is_shell_listctrl; }
+	bool		is_shell_listctrl_local() { return m_is_shell_listctrl_local; }
 	//맨 처음 이 명령을 주면 모든 세팅과 동작이 ShellListCtrl로 동작된다.
 	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
 	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
-	void		set_as_shell_list(bool is_local = true);
+	void		set_as_shell_listctrl(bool is_local = true);
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
 	CString		get_path() { return m_path; }
 	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
@@ -157,7 +157,7 @@ public:
 
 	CString		m_path;
 	CShellImageList*	m_pShellImageList = NULL;
-	void		SetShellImageList(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
+	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
 //컬럼 관련
 	//ex. "No,20;Item1,50;Item2,50"

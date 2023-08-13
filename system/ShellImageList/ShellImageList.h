@@ -30,8 +30,8 @@ public:
 	int  GetVirtualImageListIcon(CString szExt);
 
 	int  GetSystemImageListIcon(CString szFile, BOOL bDrive = TRUE);
+	int  GetSystemImageListIcon(int csidl, BOOL bDrive = TRUE);
 
-	
 	//내 PC, 문서, 바탕 화면 등의 정해진 문자열을 저장(다국어 지원시에 특히 필요)
 	//Shlobj.h에 정의된 CSIDL_로 시작되는 값을 동일하게 이용
 	void set_shell_known_string(int csidl, CString str);
@@ -40,12 +40,14 @@ public:
 	int get_csidl_by_shell_known_string(CString str);
 	CString get_shell_known_string_by_csidl(int csidl);
 	std::map<int, CString>* get_csidl_map();
+	std::map<TCHAR, CString>* get_drive_map() { return &m_drive_map; }
 
 private:
 	CStringArray m_ExtArray;
 	CUIntArray   m_IDArray;
 	std::map<int, CString> m_csidl_map;
-
+	std::map<TCHAR, CString> m_drive_map;
+	int m_osType;
 };
 
 #endif // !defined(AFX_SHELLLIST_H__E0B73BFC_2F7C_44D4_BC38_1FA6A74CBD31__INCLUDED_)

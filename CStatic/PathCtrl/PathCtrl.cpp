@@ -696,9 +696,7 @@ LRESULT CPathCtrl::OnMessageColorListBoxSelChanged(WPARAM wParam, LPARAM lParam)
 	m_down = false;
 
 	set_path(path);
-	Wait(10);
-
-	::SendMessage(GetParent()->m_hWnd, message_pathctrl_path_changed, (WPARAM)&path, (LPARAM)&m_remote_sub_folders);
+	::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, path), (LPARAM)0);
 
 	return 0;
 }

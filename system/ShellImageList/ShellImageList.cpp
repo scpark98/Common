@@ -4,6 +4,7 @@
 
 #include "ShellImageList.h"
 #include <ShlObj.h>
+#include "../../Functions.h"
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -19,6 +20,8 @@ CShellImageList::CShellImageList()
 {
 	CoInitialize(NULL);
 
+	::get_drive_map(&m_drive_map);
+
 	SHFILEINFO shInfo;
 	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
 	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
@@ -32,9 +35,16 @@ CShellImageList::~CShellImageList()
 	CoUninitialize();
 }
 
+int CShellImageList::GetSystemImageListIcon(int csidl, BOOL bDrive)
+{
+	return GetSystemImageListIcon(get_shell_known_string_by_csidl(csidl), bDrive);
+}
+
 int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 {   
 	SHFILEINFO shFileInfo;
+
+	szFile = convert_special_folder_to_real_path(szFile);
 	
 	if(szFile == get_shell_known_string_by_csidl(CSIDL_DRIVES))
 	{

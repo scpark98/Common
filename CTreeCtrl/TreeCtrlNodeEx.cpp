@@ -17,11 +17,6 @@ IMPLEMENT_DYNAMIC(CTreeCtrlNodeEx, CTreeCtrl)
 
 CTreeCtrlNodeEx::CTreeCtrlNodeEx()
 {
-	//if( !RegisterWindowClass() )
-	//	return;
-
-	//m_unicode_file = true;
-
 	m_use_keyboard = true;
 
 	m_use_expand_button = true;
@@ -85,41 +80,42 @@ BEGIN_MESSAGE_MAP(CTreeCtrlNodeEx, CTreeCtrl)
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_ACTIVATE()
 	ON_NOTIFY_REFLECT(TVN_SELCHANGED, &CTreeCtrlNodeEx::OnTvnSelchanged)
+	ON_NOTIFY_REFLECT(TVN_BEGINDRAG, &CTreeCtrlNodeEx::OnTvnBegindrag)
 END_MESSAGE_MAP()
 
 
-
-// CTreeCtrlNodeEx message handlers
-BOOL CTreeCtrlNodeEx::RegisterWindowClass()
-{
-	WNDCLASS wndcls;
-	HINSTANCE hInst = AfxGetInstanceHandle();
-
-	if (!(::GetClassInfo(hInst, CTREECTRLEXWND_CLASSNAME, &wndcls)))
-	{
-		// otherwise we need to register a new class
-		CBrush	brush;
-		brush.CreateSolidBrush( ::GetSysColor( COLOR_3DFACE ) );
-
-		wndcls.style            = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW ;
-		wndcls.lpfnWndProc      = ::DefWindowProc;
-		wndcls.cbClsExtra       = wndcls.cbWndExtra = 0;
-		wndcls.hInstance        = hInst;
-		wndcls.hIcon            = NULL;
-		wndcls.hCursor          = AfxGetApp()->LoadStandardCursor(IDC_ARROW);
-		wndcls.hbrBackground    = (HBRUSH) brush.GetSafeHandle();
-		wndcls.lpszMenuName     = NULL;
-		wndcls.lpszClassName    = CTREECTRLEXWND_CLASSNAME;
-
-		if (!AfxRegisterClass(&wndcls))
-		{
-			AfxThrowResourceException();
-			return FALSE;
-		}
-	}
-
-	return TRUE;
-}
+//
+//// CTreeCtrlNodeEx message handlers
+//BOOL CTreeCtrlNodeEx::RegisterWindowClass()
+//{
+//	WNDCLASS wndcls;
+//	HINSTANCE hInst = AfxGetInstanceHandle();
+//
+//	if (!(::GetClassInfo(hInst, CTREECTRLEXWND_CLASSNAME, &wndcls)))
+//	{
+//		// otherwise we need to register a new class
+//		CBrush	brush;
+//		brush.CreateSolidBrush( ::GetSysColor( COLOR_3DFACE ) );
+//
+//		wndcls.style            = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW ;
+//		wndcls.lpfnWndProc      = ::DefWindowProc;
+//		wndcls.cbClsExtra       = wndcls.cbWndExtra = 0;
+//		wndcls.hInstance        = hInst;
+//		wndcls.hIcon            = NULL;
+//		wndcls.hCursor          = AfxGetApp()->LoadStandardCursor(IDC_ARROW);
+//		wndcls.hbrBackground    = (HBRUSH) brush.GetSafeHandle();
+//		wndcls.lpszMenuName     = NULL;
+//		wndcls.lpszClassName    = CTREECTRLEXWND_CLASSNAME;
+//
+//		if (!AfxRegisterClass(&wndcls))
+//		{
+//			AfxThrowResourceException();
+//			return FALSE;
+//		}
+//	}
+//
+//	return TRUE;
+//}
 
 //목록의 갯수가 많지 않을 경우 탭으로 표시된 문자열에서도 로딩이 가능하다.
 void CTreeCtrlNodeEx::load_from_string(CString data)
@@ -400,7 +396,10 @@ void CTreeCtrlNodeEx::OnPaint()
 	
 	
 	if (!m_tr.is_valid(it))
+	{
+		dc.SelectObject(pOldFont);
 		return;
+	}
 
 	int oldBkMode = dc.SetBkMode(TRANSPARENT);
 
@@ -1822,6 +1821,14 @@ void CTreeCtrlNodeEx::set_image_random()
 }
 
 void CTreeCtrlNodeEx::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	*pResult = 0;
+}
+
+
+void CTreeCtrlNodeEx::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.

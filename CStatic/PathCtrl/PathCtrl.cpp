@@ -334,7 +334,7 @@ void CPathCtrl::add_remote_drive_volume(CString remote_drive_volume)
 	//"로컬 디스크 (C:)" (볼륨 레이블까지 포함된 경우)
 	else
 	{
-		CString real_path = convert_special_folder_to_real_path(remote_drive_volume);
+		CString real_path = convert_special_folder_to_real_path(remote_drive_volume, m_pShellImageList->get_csidl_map());
 		//CString drive_volume = remote_drive_volume.Left(remote_drive_volume.Find(real_path.Left(2)) - 2);
 		m_remote_drive_volume.insert(std::pair<TCHAR, CString>(real_path[0], remote_drive_volume));
 	}
@@ -507,7 +507,7 @@ CString CPathCtrl::get_full_path(int index)
 	//special folder들인 경우(바탕 화면 등등)
 	if (m_path[2].label.Find(_T(":\\")) < 0 && m_path[2].label.Find(_T(":)")) < 0)
 	{
-		fullpath = convert_special_folder_to_real_path(m_path[2].label);
+		fullpath = convert_special_folder_to_real_path(m_path[2].label, m_pShellImageList->get_csidl_map());
 		return fullpath;
 	}
 

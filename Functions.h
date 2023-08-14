@@ -756,6 +756,8 @@ void		Trace(char* szFormat, ...);
 
 	//compare_only_filename : fullpath로 정렬할지, 파일명만 추출해서 정렬할지. default = false;
 	void		sort_like_explorer(std::deque<CString> *dq, bool compare_only_filename = false);
+	void		sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString>::iterator _last, bool compare_only_filename = false);
+
 	//지정된 폴더의 파일 목록을 얻어온다.
 	//sNameFilter의 와일드카드는 직접 줘서 검색해야 한다.
 	//프롬프트 명령과 동일하게 물음표나 별표와 같은 와일드카드를 이용할 수 있다.

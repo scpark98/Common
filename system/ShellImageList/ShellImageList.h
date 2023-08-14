@@ -45,7 +45,10 @@ public:
 private:
 	CStringArray m_ExtArray;
 	CUIntArray   m_IDArray;
+
+	//OS언어에 따라, 윈도우 버전에 따라 "내 컴퓨터"는 "내 PC", "내 컴퓨터", "My Computer" 등등 다양하므로 csidl로 구분한다.
 	std::map<int, CString> m_csidl_map;
+
 	std::map<TCHAR, CString> m_drive_map;
 	int m_osType;
 };

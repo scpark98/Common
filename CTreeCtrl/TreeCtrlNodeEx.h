@@ -5,7 +5,7 @@ scpark 2020_03_30_13
 full customize를 위해 직접 제작.
 (tree_node : Kasper Peeters)
 CTreeCtrl을 상속받아 만들었지만 실제 HTREEITEM을 사용하는 방식이 아니고
-tree_node를 사용하므로 CTreeCtrl의 멤버를 사용할 순 없다.
+tree_node를 사용하므로 일부 CTreeCtrl의 멤버를 사용할 순 없다.
 
 
 [수정될 내용]
@@ -153,8 +153,6 @@ public:
 	CImageList*		get_image_list() { return &m_image_list; }
 
 protected:
-	BOOL			RegisterWindowClass();
-
 	//텍스트 파일을 읽어왔을때 유니코드 여부에 따라 저장도 동일하게 하자. default = true
 	//bool			m_unicode_file;
 
@@ -257,4 +255,5 @@ public:
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg void OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult);
 };

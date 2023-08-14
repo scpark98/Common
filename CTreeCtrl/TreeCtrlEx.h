@@ -5,6 +5,7 @@
 #include <afxwin.h>
 #include <afxcmn.h>
 
+#include <deque>
 #include "../system/ShellImageList/ShellImageList.h"
 
 #define MESSAGE_TREECTRLEX			WM_USER + 0x7FFF - 0x7462
@@ -50,18 +51,32 @@ public:
 
 	void		set_as_shell_treectrl(bool is_local = true);
 
+	CString		get_fullpath(HTREEITEM hItem);
+	void		select_item(CString fullpath);
+
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CString driveName);
-	void		insert_folder(WIN32_FIND_DATA* pFindFileData);
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
-	CString		get_fullpath(HTREEITEM hItem);
-	void		add_children_folders(HTREEITEM hParent);
+	void		insert_folder(WIN32_FIND_DATA* pFindFileData);
+
+	HTREEITEM	find_item(const CString& name);
+	HTREEITEM	find_item(const CString& name, HTREEITEM root);
+
+	void		iterate_tree(HTREEITEM hItem = NULL);
+	std::deque<CString>	iterate_tree_with_no_recursion(HTREEITEM hItem = NULL);
 
 private:
 	HTREEITEM	m_expandItem;	// 마지막으로 확장한 아이템
 	HTREEITEM	m_desktopItem;	// 바탕화면 아이템
 	HTREEITEM	m_documentItem;	// 문서 아이템
 	HTREEITEM	m_computerItem;	// 내 PC 아이템
+	std::deque<CString> m_folder_list;
+
+	//폰트 관련
+	LOGFONT			m_lf;
+	CFont			m_font;
+	int				m_font_size;
+	void			reconstruct_font();
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -71,11 +86,12 @@ public:
 	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
-	//afx_msg void OnPaint();
+	afx_msg void OnPaint();
 	afx_msg void OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNMClick(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult);
 };
 
 

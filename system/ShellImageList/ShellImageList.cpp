@@ -44,9 +44,10 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 {   
 	SHFILEINFO shFileInfo;
 
-	szFile = convert_special_folder_to_real_path(szFile);
+	//"내 PC"인 경우는 아래 함수에 의해 ""로 변환된다.
+	//szFile = convert_special_folder_to_real_path(szFile);
 	
-	if(szFile == get_shell_known_string_by_csidl(CSIDL_DRIVES))
+	if(szFile.IsEmpty() || szFile == get_shell_known_string_by_csidl(CSIDL_DRIVES))
 	{
 		LPITEMIDLIST pidl_Computer = NULL;
 		SHGetFolderLocation( NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer ); // 컴퓨터

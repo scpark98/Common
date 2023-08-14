@@ -319,7 +319,6 @@ public:
 	void	reset_modified_flag() { m_modified = false; }
 
 //폰트 관련
-	int		get_font_size();
 	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	//-1 : reduce, +1 : enlarge
 	void	set_font_size(int font_size);
@@ -398,11 +397,6 @@ public:
 	int				get_drop_index() { return m_nDropIndex; }
 
 protected:
-	enum VTLISTCTRLEX_SELF_MESSAGE
-	{
-		message_modify_style = 0,
-	};
-	LRESULT			on_message_modify_style(WPARAM wParam, LPARAM lParam);
 
 //메인 데이터
 	std::deque<CListCtrlData> m_list_db;
@@ -489,7 +483,6 @@ public:
 //	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnDropFiles(HDROP hDropInfo);
 	afx_msg void MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct);
-	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);

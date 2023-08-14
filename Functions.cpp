@@ -4259,10 +4259,15 @@ bool IsLeapYear(int nYear)
 	return FALSE;
 }
 
-void sort_like_explorer(std::deque<CString> *dq, bool compare_only_filename)
+void sort_like_explorer(std::deque<CString>* dq, bool compare_only_filename)
+{
+	sort_like_explorer(dq->begin(), dq->end(), compare_only_filename);
+}
+
+void sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString>::iterator _last, bool compare_only_filename)
 {
 	bool only_filename = compare_only_filename;
-	std::sort(dq->begin(), dq->end(),
+	std::sort(_first, _last,
 		[only_filename](CString a, CString b)
 	{
 		if (only_filename)
@@ -7969,18 +7974,31 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 {
 	TCHAR buf[MAX_PATH];
 	int csidl = -1;
+	std::map<int, CString> csidl_map_temp;
+
+	//"바탕 화면\\"과 같이 넘어오는 경우 잘라낸다.
+	if (special_folder.GetLength() > 2 && special_folder[1] != ':' && special_folder.Right(1) == _T("\\"))
+		special_folder = special_folder.Left(special_folder.GetLength() - 1);
+
 	CString real_path = special_folder;
 
-	if (csidl_map)
+	if (!csidl_map)
 	{
-		int count = csidl_map->size();
-		for (auto it = csidl_map->begin(); it != csidl_map->end(); ++it)
+		csidl_map = &csidl_map_temp;
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_DESKTOP, FALSE);
+		csidl_map->insert(std::pair<int, CString>(CSIDL_DESKTOP, buf));
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_PERSONAL, FALSE);
+		csidl_map->insert(std::pair<int, CString>(CSIDL_PERSONAL, buf));
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_DRIVES, FALSE);
+		csidl_map->insert(std::pair<int, CString>(CSIDL_DRIVES, buf));
+	}
+
+	for (auto it = csidl_map->begin(); it != csidl_map->end(); ++it)
+	{
+		if (it->second == special_folder)
 		{
-			if (it->second == special_folder)
-			{
-				csidl = it->first;
-				break;
-			}
+			csidl = it->first;
+			break;
 		}
 	}
 
@@ -7989,7 +8007,7 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 #ifndef _USING_V110_SDK71_
 		real_path = get_known_folder(FOLDERID_Desktop);
 #else
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_DESKTOP, FALSE);
+		SHGetSpecialFolderPath(NULL, buf, csidl, FALSE);
 		real_path = buf;
 #endif
 	}
@@ -7998,9 +8016,14 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 #ifndef _USING_V110_SDK71_
 		real_path = get_known_folder(FOLDERID_Documents);
 #else
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_PERSONAL, FALSE);
+		SHGetSpecialFolderPath(NULL, buf, csidl, FALSE);
 		real_path = buf;
 #endif
+	}
+	//내 PC일 경우는 real path가 존재하지 않는다.
+	else if (csidl == CSIDL_DRIVES)
+	{
+		;
 	}
 	/*
 	else if (csidl == _T("다운로드"))
@@ -8014,8 +8037,10 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 	}
 	*/
 
+	if (real_path == _T("내 PC"))
+		return real_path;
 
-	real_path.Replace(_T("내 PC\\"), _T(""));
+	real_path.Replace(_T("내 PC"), _T(""));
 
 	int pos = real_path.Find(_T(":)"));
 	if (pos < 0)
@@ -8031,9 +8056,21 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 	return real_path;
 }
 
+//"c:\\abc\\def" => "로컬 디스크 (C:)\\abc\\def"
 CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CString>* csidl_map)
 {
-	CString volume_path;
+	CString volume_path = real_path;
+
+	if (real_path.Mid(1, 2) != _T(":\\"))
+		return real_path;
+
+	std::map<TCHAR, CString> drive_map;
+	get_drive_map(&drive_map);
+
+	CString volume = drive_map[toupper(real_path[0])];
+
+	volume_path.Replace(CString(real_path[0]) + _T(":"), volume);
+
 	return volume_path;
 }
 

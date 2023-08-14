@@ -52,7 +52,6 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CVtListCtrlEx::OnNMClickList)
 	ON_WM_DROPFILES()
 	ON_WM_MEASUREITEM_REFLECT()
-	ON_WM_TIMER()
 	ON_NOTIFY_REFLECT(LVN_BEGINDRAG, &CVtListCtrlEx::OnLvnBeginDrag)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
@@ -355,7 +354,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
 				textRect.left += 3;
 				CString text = get_text(iItem, iSubItem);
-				CString real_path = convert_special_folder_to_real_path(m_path + _T("\\") + get_text(iItem, iSubItem));
+				CString real_path = convert_special_folder_to_real_path(m_path + _T("\\") + get_text(iItem, iSubItem),
+																		m_pShellImageList->get_csidl_map());
 				int icon_index;
 
 				if (m_is_shell_listctrl)
@@ -926,24 +926,8 @@ void CVtListCtrlEx::PreSubclassWindow()
 	// TODO: Add your specialized code here and/or call the base class
 	//동적으로 생성할 경우 PreSubclassWindow()함수내에서
 	//GetHeaderCtrl()은 항상 NULL을 리턴한다.
-	//이를 보완하기 위해
-	//CHeaderCtrl* pHeader = GetHeaderCtrl();
-	//modify_style();
+	//이를 보완하기 위해 타이머, SendMessage등의 방법을 사용해봤으나 쉽지 않다.
 	CListCtrl::PreSubclassWindow();
-	//ModifyStyle(0, LVS_SHAREIMAGELISTS);
-	//PostMessage(MESSAGE_VTLISTCTRLEX, message_modify_style, 0);
-	//SetTimer(0, 10, NULL);
-}
-
-LRESULT	CVtListCtrlEx::on_message_modify_style(WPARAM wParam, LPARAM lParam)
-{
-	if ((int)wParam == message_modify_style)
-	{
-		CHeaderCtrl* pHeader = GetHeaderCtrl();
-		modify_style();
-	}
-
-	return 0;
 }
 
 void CVtListCtrlEx::modify_style()
@@ -2050,7 +2034,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 		if (m_path == _T("내 PC"))
 		{
-			m_path = convert_special_folder_to_real_path(get_text(item, col_filename));
+			m_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList->get_csidl_map());
 		}
 		else
 		{
@@ -2351,19 +2335,13 @@ void CVtListCtrlEx::reconstruct_font()
 	if (m_HeaderCtrlEx)
 		m_HeaderCtrlEx.SetFont(&m_font, true);
 
-	m_font_size = get_font_size();
+	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
 	
 	//set_line_height(4-m_lf.lfHeight);
 	//if (m_auto_line_height)
 		//recalculate_line_height();k
 	
 	ASSERT(bCreated);
-}
-
-int CVtListCtrlEx::get_font_size()
-{
-	m_font_size = -MulDiv(m_lf.lfHeight, 72, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY));
-	return m_font_size;
 }
 
 //-1 : reduce, +1 : enlarge
@@ -2394,7 +2372,7 @@ void CVtListCtrlEx::set_font_size(int font_size)
 
 void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 {
-	m_font_size = get_font_size();
+	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
 	enlarge ? m_font_size++ : m_font_size--;
 
 	if (m_font_size < 4)
@@ -2655,7 +2633,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 {
 	m_last_clicked = 0;
 
-	path = convert_special_folder_to_real_path(path);
+	path = convert_special_folder_to_real_path(path, m_pShellImageList->get_csidl_map());
 
 	m_path = path;
 
@@ -2753,7 +2731,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 		if (m_path == _T("내 PC"))
 		{
-			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].text[0]);
+			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].text[0], m_pShellImageList->get_csidl_map());
 			
 			uint64_t disk_size = GetDiskFreeSize(drive);
 			if (disk_size > 0)
@@ -2782,19 +2760,6 @@ void CVtListCtrlEx::refresh_list(bool reload)
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
-}
-
-
-void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
-{
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (nIDEvent == 0)
-	{
-		KillTimer(nIDEvent);
-		on_message_modify_style(message_modify_style, 0);
-	}
-
-	CListCtrl::OnTimer(nIDEvent);
 }
 
 //파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.

@@ -574,14 +574,13 @@ void CGdiButton::ReconstructFont()
 BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
 	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
 	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
 	//이 코드는 main에 있어야 한다.
 	//disabled가 아닌 경우는 잘 표시된다.
 	if (m_use_tooltip && m_tooltip.m_hWnd)
 	{
-		//m_tooltip.RelayEvent(pMsg);
-		
 		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
 		MSG msg = *pMsg;
 		msg.hwnd = (HWND)m_tooltip.SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
@@ -595,7 +594,6 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 
 		// relay mouse event before deleting old tool 
 		m_tooltip.SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
-		
 	}
 
 	return CButton::PreTranslateMessage(pMsg);

@@ -1556,9 +1556,10 @@ int CVtListCtrlEx::add_item(CString text, bool ensureVisible, bool invalidate)
 	return insert_item(-1, text, ensureVisible, invalidate);
 }
 
-int CVtListCtrlEx::add_line_string_item(CString line_string, CString separator, bool ensureVisible, bool invalidate)
+int CVtListCtrlEx::add_line_string_item(CString line_string, TCHAR separator, bool ensureVisible, bool invalidate)
 {
-	std::deque<CString> dq = GetTokenString(line_string, separator);
+	std::deque<CString> dq;
+	get_token_string(line_string, dq, separator);
 	return insert_item(-1, dq, ensureVisible, invalidate);
 }
 
@@ -1593,7 +1594,7 @@ int CVtListCtrlEx::insert_item(int index, std::deque<CString> dqText, bool ensur
 	if (dqText.size() == 0)
 		return -1;
 
-	int count = MAX(get_column_count(), dqText.size());
+	int count = MIN(get_column_count(), dqText.size());
 	
 	index = insert_item(index, dqText[0], ensureVisible, invalidate);
 
@@ -1950,7 +1951,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 	else
 		op = '|';
 
-	GetTokenString(find_target, dqTarget, op, false);
+	get_token_string(find_target, dqTarget, op, false);
 	trim(&dqTarget);
 
 	if (dqColumn == NULL || dqColumn->size() == 0)
@@ -2082,7 +2083,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 }
 
 
-bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString sSeparator /*= _T("|")*/, bool bHead /*= false*/)
+bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, TCHAR separator, bool bHead /*= false*/)
 {
 	ASSERT(::IsWindow(GetSafeHwnd()));
 
@@ -2109,7 +2110,7 @@ bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString
 			{
 				sResult += get_header_text(i);
 				if (i != nColumn - 1)
-					sResult += sSeparator;
+					sResult += separator;
 			}
 
 			sResult += _T("\n");
@@ -2136,7 +2137,7 @@ bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, CString
 	{
 		if (!onlySelected || (GetItemState(i, LVIS_SELECTED) == LVIS_SELECTED))
 		{
-			sResult = sResult + get_line_text(i, 0, -1, sSeparator) + _T("\n");
+			sResult = sResult + get_line_text(i, 0, -1, separator) + _T("\n");
 		}
 	}
 
@@ -2234,7 +2235,7 @@ void CVtListCtrlEx::paste_from_clipboard()
 //ﾆﾄﾀﾏｿ｡ｼｭ ｺﾒｷｯｿﾍｼｭ ｸｮｽｺﾆｮｸｦ ﾃ､ｿ鋗ﾙ. ﾄﾃｷｳﾀﾇ ｼ｡ ｵｿﾀﾏﾇﾘｾﾟ ﾇﾑｴﾙ.
 //ﾄﾃｷｳ ｱｸｼｺﾀﾌ ｴﾙｸ･ ｵ･ﾀﾌﾅﾍ ﾆﾄﾀﾏｵ鯊ｻ ｾﾋｾﾆｼｭ ｺﾒｷｯｿﾀﾁ・ｾﾊｴﾂｴﾙ.
 //ﾀﾌｹﾌ ﾄﾃｷｳﾀﾇ ｱｸｼｺﾀﾌ ﾇﾈｽｺｵﾇｾ・ﾀﾖｰ・ｱﾗ ｱｸｼｺﾀｸｷﾎ ﾀ惕蠏ﾈ ﾆﾄﾀﾏｸｸ ｺﾒｷｯｿﾀｵｵｷﾏ ｵﾇｾ・ﾀﾖｴﾙ.
-bool CVtListCtrlEx::load(CString sfile, CString separator /*= _T("|")*/, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/)
+bool CVtListCtrlEx::load(CString sfile, TCHAR separator, bool match_column_count /*= true*/, bool reset_before_load /*= true*/, bool add_index /*= false*/)
 {
 	if (get_column_count() == 0)
 		return false;
@@ -2255,7 +2256,7 @@ bool CVtListCtrlEx::load(CString sfile, CString separator /*= _T("|")*/, bool ma
 
 	while (_fgetts(sLine, 512, fp))
 	{
-		if (match_column_count && (get_char_count(sLine, separator[0])) >= get_column_count())
+		if (match_column_count && (get_char_count(sLine, separator)) >= get_column_count())
 		{
 			fclose(fp);
 			return false;
@@ -2268,7 +2269,7 @@ bool CVtListCtrlEx::load(CString sfile, CString separator /*= _T("|")*/, bool ma
 }
 
 //ｸｮｽｺﾆｮﾀﾇ ｳｻｿ・?ﾆﾄﾀﾏｷﾎ ﾀ惕衂ﾑｴﾙ.
-bool CVtListCtrlEx::save(CString sfile, CString separator /*= _T("|")*/, bool selected_only /*= false*/)
+bool CVtListCtrlEx::save(CString sfile, TCHAR separator, bool selected_only /*= false*/)
 {
 	int		i, j;
 	CString str = _T("");

@@ -197,7 +197,7 @@ public:
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
 	int			add_item(CString text = _T(""), bool ensureVisible = true, bool invalidate = true);
-	int			add_line_string_item(CString line_string, CString separator = _T("|"), bool ensureVisible = true, bool invalidate = true);
+	int			add_line_string_item(CString line_string, TCHAR separator = '|', bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, CString text = _T(""), bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, bool ensureVisible = true, bool invalidate = true);
 
@@ -330,10 +330,10 @@ public:
 
 //파일, 클립보드 관련
 	//Ctrl+C키로 선택된 항목을 클립보드로 복사할 수 있다. shift를 조합하면 헤더까지 포함된다.
-	bool	list_copy_to_clipboard(bool selected_only = true, CString sSeparator = _T("|"), bool bHead = false);
+	bool	list_copy_to_clipboard(bool selected_only = true, TCHAR separator = '|', bool bHead = false);
 	//void	paste_from_clipboard();
-	bool	save(CString file, CString separator = _T("|"), bool selected_only = false);
-	bool	load(CString sfile, CString separator = _T("|"), bool add_index = false, bool match_column_count = true, bool reset_before_load = true);
+	bool	save(CString file, TCHAR separator = '|', bool selected_only = false);
+	bool	load(CString sfile, TCHAR separator = '|', bool add_index = false, bool match_column_count = true, bool reset_before_load = true);
 
 //기타 레이아웃 관련
 	//header_height는 헤더클래스에서 HDM_LAYOUT 메시지가 발생해야 적용되는데

@@ -427,12 +427,12 @@ int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, b
 	if (strFind.Find(_T("&")) >= 0)
 	{
 		op = '&';
-		dqFind = GetTokenString(strFind, _T("&"));
+		get_token_string(strFind, dqFind, '&');
 	}
 	else if (strFind.Find(_T("|")) >= 0)
 	{
 		op = '|';
-		dqFind = GetTokenString(strFind, _T("|"));
+		get_token_string(strFind, dqFind, '|');
 	}
 	else
 	{
@@ -1293,7 +1293,7 @@ int	GetSecondsFromTimeString(CString timeString)
 	}
 
 	std::deque<CString> dqToken;
-	GetTokenString(timeString, dqToken, ':');
+	get_token_string(timeString, dqToken, ':');
 	int hour = _ttoi(dqToken[0]);
 	int minute = _ttoi(dqToken[1]);
 	int second = _ttoi(dqToken[2]);
@@ -1723,7 +1723,7 @@ bool IsAlphaNumeric(CString str, CString excepts)
 
 	if (excepts.IsEmpty() == false)
 	{
-		GetTokenString(excepts, dqExcepts, ';');
+		get_token_string(excepts, dqExcepts, ';');
 		for (i = 0; i < dqExcepts.size(); i++)
 			str.Replace(dqExcepts[i], _T(""));
 	}
@@ -4801,7 +4801,7 @@ std::deque<CString>	FindFilesWithExtensions(CString folder, CString fileTitle, C
 	extensions.Replace(_T("*"), _T(""));
 	extensions.Replace(_T("."), _T(""));
 
-	GetTokenString(extensions, dqToken, ';');
+	get_token_string(extensions, dqToken, ';');
 
 	//폴더내의 파일들을 찾아서 비교하는게 아니라
 	//조건에 맞는 파일이 존재하는지로 검사한다.
@@ -7254,7 +7254,10 @@ CString GetToken(CString src, CString separator, int n)
 	return saItems.GetAt(n);
 }
 
-std::deque<CString>	GetTokenString(CString src, CString separator)
+//Tokenize를 이용하면 공백인 토큰은 처리되지 않고 무시되므로 원하는 개수만큼 추출되지 않는다.
+//따라서 아래 함수는 사용하지 않는다.
+/*
+std::deque<CString>	get_token_string(CString src, CString separator)
 {
 	int i = 0;
 	std::deque<CString> dq;
@@ -7263,30 +7266,16 @@ std::deque<CString>	GetTokenString(CString src, CString separator)
 
 	return dq;
 }
-
-int GetTokenString(CString src, std::deque<CString> &dqToken, TCHAR separator, bool allowEmpty, int nMaxToken /*= -1*/)
+*/
+int get_token_string(CString src, std::deque<CString> &dqToken, TCHAR separator, bool allowEmpty, int nMaxToken /*= -1*/)
 {
 	std::deque<TCHAR> dqSeparator;
 	
 	dqSeparator.push_back(separator);
-	return GetTokenString(src, dqToken, dqSeparator, allowEmpty, nMaxToken);
-	/*
-	dqToken.clear();
-
-	int i = 0;
-	for (CString token = src.Tokenize(separator,i); i >= 0; token = src.Tokenize(separator,i))
-	{
-		if (!token.IsEmpty() || allowEmpty)
-			dqToken.push_back(token);
-		if ((nMaxToken > 0) && (dqToken.size() == nMaxToken))
-			dqToken.size();
-	}
-
-	return dqToken.size();
-	*/
+	return get_token_string(src, dqToken, dqSeparator, allowEmpty, nMaxToken);
 }
 
-int GetTokenString(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty, int nMaxToken)
+int get_token_string(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty, int nMaxToken)
 {
 	int i, j;
 	CString token;
@@ -7330,7 +7319,7 @@ int GetTokenString(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> 
 //(seps = " ,\t\n" 과 같이 분리기호들로 이루어진 스트링 데이터)
 //strtok_s 함수는 연속 공백이나 연속 쉼표 등 중복된 분리자는 모두 하나의 구분자로 취급된다.
 //ex. "1,, ,,2" = "1,2"
-int getTokenString(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
+int get_token_string(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
 {
 	int		nToken = 0;
 	TCHAR	*token = NULL;
@@ -7354,7 +7343,7 @@ int getTokenString(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
 	return nToken;
 }
 
-int getTokenString(char *src, char *seps, char **sToken, int nMaxToken)
+int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 {
 	int		i;
 	int		nToken = 0;
@@ -7616,7 +7605,7 @@ bool is_exist_keyword(CString src, CString set_of_keyword, bool case_sensitive, 
 {
 	std::deque<CString> dqKeyword;
 
-	GetTokenString(set_of_keyword, dqKeyword, ';');
+	get_token_string(set_of_keyword, dqKeyword, ';');
 
 	if (!case_sensitive)
 		src.MakeLower();
@@ -13495,7 +13484,8 @@ int extract_digit_number(char *str, int from, double *num)
 //digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
 bool valid_version_string(CString versionStr, int digits)
 {
-	std::deque<CString> token = GetTokenString(versionStr, _T("."));
+	std::deque<CString> token;
+	get_token_string(versionStr, token, '.');
 	if (token.size() == digits)
 		return true;
 
@@ -13773,7 +13763,7 @@ void normalize_datetime(CString &src)
 		return;
 
 	CString sub = src.Left(src.Find(' '));
-	GetTokenString(sub, token, '/');
+	get_token_string(sub, token, '/');
 	if (token.size() != 3)
 		return;
 
@@ -13785,7 +13775,7 @@ void normalize_datetime(CString &src)
 
 
 	sub = src.Mid(src.Find(' ') + 1);
-	GetTokenString(sub, token, ':');
+	get_token_string(sub, token, ':');
 	if (token.size() != 3)
 		return;
 

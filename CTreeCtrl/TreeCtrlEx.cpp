@@ -23,7 +23,7 @@ BEGIN_MESSAGE_MAP(CTreeCtrlEx, CTreeCtrl)
 	ON_WM_ACTIVATE()
 	ON_WM_ERASEBKGND()
 	ON_WM_KEYDOWN()
-	//ON_WM_PAINT()
+	ON_WM_PAINT()
 	ON_NOTIFY_REFLECT(TVN_SELCHANGED, &CTreeCtrlEx::OnTvnSelchanged)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDING, &CTreeCtrlEx::OnTvnItemexpanding)
@@ -93,9 +93,10 @@ void CTreeCtrlEx::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	CTreeCtrl::OnKeyDown(nChar, nRepCnt, nFlags);
 }
 
-//수동으로 직접 그려줄 경우는 BEGIN_MESSAGE_MAP에서 ON_WM_PAINT() 주석을 해제하고
-//여기서 직접 그려준다.
+//수동으로 직접 그려줄 경우는 BEGIN_MESSAGE_MAP에서 ON_WM_PAINT() 주석을 해제하면
+//OnPaint()가 호출되고 여기서 직접 그릴 수 있다.
 //폰트 색상 등의 UI를 자유롭게 변경할 수 있으나 스크롤 처리 등이 복잡해진다.
+//GetItemRect()를 이용해서 그려주니 스크롤도 자동 처리된다.
 void CTreeCtrlEx::OnPaint()
 {
 	CPaintDC dc1(this); // device context for painting
@@ -106,7 +107,7 @@ void CTreeCtrlEx::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, pink);
+	//dc.FillSolidRect(rc, pink);
 
 	CFont font;
 	CFont* pOldFont;
@@ -115,21 +116,73 @@ void CTreeCtrlEx::OnPaint()
 	pOldFont = (CFont*)dc.SelectObject(&font);
 
 
-	HTREEITEM item = GetRootItem();
-	HTREEITEM child = NULL;
-	int x = 10;
-	int y = 10;
-
-	m_folder_list = iterate_tree_with_no_recursion();
+	int indent;
+	int icon_index;
+	UINT flags = 0;
+	CRect r, rRow;
+	long tTotal = 0;
 
 	for (int i = 0; i < m_folder_list.size(); i++)
 	{
+		GetItemRect(m_folder_list[i].item, &r, true);
+		r.right = rc.right;
 
-		dc.TextOut(x, y, m_folder_list[i]);
-		y += 22;
+		//rc와 일부분도 겹치지 않는 아이템은 그리지 않는다.
+		if (getIntersectionRect(rc, r).IsRectEmpty())
+			continue;
+
+		long t0 = getClock();
+
+		indent = get_char_count(m_folder_list[i].fullpath, '\\');
+		
+		if (indent > 0)
+		{
+			if (m_folder_list[i].fullpath.GetLength() > 3)
+				indent++;
+		}
+
+		if (m_folder_list[i].item == m_selectedItem)
+		{
+			trace(_T("selected\n"));
+			GetItemRect(m_folder_list[i].item, &rRow, false);
+			dc.FillSolidRect(rRow, pink);
+		}
+
+		//dc.FillSolidRect(r, pink);
+		
+		dc.DrawText(m_folder_list[i].folder, r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+		//텍스트 왼쪽에 아이콘을 그려주고
+		icon_index = m_pShellImageList->GetSystemImageListIcon(m_folder_list[i].fullpath, true);
+		m_pShellImageList->m_imagelist_small.Draw(&dc, icon_index,
+						CPoint(r.left - 16, r.CenterPoint().y - 8), ILD_TRANSPARENT);
+
+		//그 왼쪽에는 확장/축소 버튼을 그려준다.
+		if (get_sub_folders(m_folder_list[i].fullpath))
+		//if (ItemHasChildren(m_folder_list[i].item))
+		{
+			flags = GetItemState(m_folder_list[i].item, TVIF_STATE);
+			CRect rButton = r;
+			rButton.left = rButton.left - 16 - 16;
+
+			if (flags & TVIS_EXPANDED)
+			{
+				dc.DrawText(_T("^"), rButton, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+			}
+			else
+			{
+				dc.DrawText(_T(">"), rButton, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+			}
+		}
+
+		long t1 = getClock();
+		tTotal += (t1 - t0);
+		//trace(_T("%ld : %s\n"), t1 - t0, m_folder_list[i].folder);
 	}
 
 	dc.SelectObject(pOldFont);
+
+	trace(_T("total %ld\n"), tTotal);
 }
 
 
@@ -141,6 +194,8 @@ void CTreeCtrlEx::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_TREECTRLEX,
 				(WPARAM)&CTreeCtrlExMessage(this, message_selchanged),
 				(LPARAM)&CString(get_fullpath(GetSelectedItem())));
+
+	m_selectedItem = GetSelectedItem();
 
 	*pResult = 0;
 }
@@ -166,6 +221,10 @@ void CTreeCtrlEx::set_as_shell_treectrl(bool is_local /*= true*/)
 
 	for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
 		insert_drive(it->second);
+
+	m_folder_list = iterate_tree_with_no_recursion();
+
+	expand_all();
 }
 
 HTREEITEM CTreeCtrlEx::insert_special_folder(int csidl)
@@ -310,6 +369,7 @@ void CTreeCtrlEx::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	HTREEITEM hItem = HitTest(pt, &nFlags);
 	TRACE(_T("%s, %d, %d, %d\n"), get_fullpath(hItem), pt.x, pt.y, nFlags);
 
+	//확장버튼을 누르면
 	if (nFlags & TVHT_ONITEMBUTTON)
 	{
 		TRACE(_T("button\n"));
@@ -323,6 +383,8 @@ void CTreeCtrlEx::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 			if (GetChildItem(hItem) == NULL)
 				insert_folder(hItem, get_fullpath(hItem));
 		}
+
+		m_folder_list = iterate_tree_with_no_recursion();
 	}
 
 
@@ -354,7 +416,8 @@ void CTreeCtrlEx::select_item(CString fullpath)
 {
 	fullpath = m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath);
 
-	std::deque<CString> dq = GetTokenString(fullpath, _T("\\"));
+	std::deque<CString> dq;
+	get_token_string(fullpath, dq, '\\');
 
 	HTREEITEM item = NULL;
 
@@ -414,11 +477,12 @@ void CTreeCtrlEx::iterate_tree(HTREEITEM hItem)
 //recursion을 사용하지 않고 모든 node를 검색한다.
 //stack을 이용하므로 그 차례가 실제 UI와 다르므로 deque에 넣은 후 sort를 이용한다.
 //탐색기의 트리일 경우에 특화된 코드가 있으므로 범용으로 사용하려면 좀 더 보완이 필요함.
-std::deque<CString> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITEM hItem)
+std::deque<CTreeCtrlFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITEM hItem)
 {
 	std::deque<HTREEITEM> s;
-	std::deque<CString> folders;
+	std::deque<CTreeCtrlFolder> folders;
 	CString fullpath;
+	CString text;
 
 	HTREEITEM item = (hItem ? hItem : GetRootItem());
 	while (item != NULL || s.size())
@@ -432,21 +496,59 @@ std::deque<CString> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITEM hItem)
 		item = s[0];
 		s.pop_front();
 
-		//trace(_T("%s\n"), GetItemText(item));
-		fullpath = get_fullpath(item);
+		text = GetItemText(item);
+		//trace(_T("%s\n"), text);
+		if (text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DESKTOP) ||
+			text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_PERSONAL))
+		{
+			fullpath = GetItemText(item);
+		}
+		else
+		{
+			fullpath = get_fullpath(item);
+		}
 
 		//내 PC일 경우는 ""로 리턴되므로
 		if (fullpath.IsEmpty())
-			folders.push_back(m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES));
+			folders.push_back(CTreeCtrlFolder(item, fullpath, m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES)));
 		else
-			folders.push_back(fullpath);
+			folders.push_back(CTreeCtrlFolder(item, fullpath, GetFileNameFromFullPath(fullpath)));
 		item = GetNextSiblingItem(item);
 	}
 
-	//std::sort(folders.begin() + 3, folders.end());
-	sort_like_explorer(folders.begin() + 3, folders.end());
+	//바탕 화면, 문서, 내 PC 3개 항목을 제외하고 정렬.
+	//기본 정렬과 탐색기의 정렬은 약간 다르므로 탐색기와 같은 정렬이 되도록.
+	std::sort(folders.begin() +3, folders.end(),
+		[](CTreeCtrlFolder a, CTreeCtrlFolder b)
+		{
+			return !is_greater_with_numeric(a.fullpath, b.fullpath);
+		}
+	);
+
 	for (int i = 0; i < folders.size(); i++)
-		trace(_T("%s\n"), folders[i]);
+	{
+		//trace(_T("%s\n"), folders[i]);
+
+		//"C:\\" => "로컬 디스크 (C:)"로 변경해준다.
+		if (folders[i].fullpath.Right(2) == _T(":\\"))
+		{
+			folders[i].folder = get_drive_volume(folders[i].fullpath[0]);
+		}
+	}
 
 	return folders;
+}
+
+void CTreeCtrlEx::expand_all(bool expand)
+{
+	HTREEITEM hItem;
+	HTREEITEM hCurrent;
+
+	hItem = GetFirstVisibleItem();
+
+	while (hItem != NULL)
+	{
+		Expand(hItem, expand ? TVE_EXPAND : TVE_COLLAPSE);
+		hItem = GetNextItem(hItem, TVGN_NEXTVISIBLE);
+	}
 }

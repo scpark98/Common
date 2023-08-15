@@ -10,6 +10,21 @@
 
 #define MESSAGE_TREECTRLEX			WM_USER + 0x7FFF - 0x7462
 
+class CTreeCtrlFolder
+{
+public:
+	CTreeCtrlFolder(HTREEITEM _item, CString _fullpath, CString _folder)
+	{
+		item = _item;
+		fullpath = _fullpath;
+		folder = _folder;
+	}
+
+	HTREEITEM item;
+	CString fullpath;
+	CString folder;
+};
+
 class CTreeCtrlExMessage
 {
 public:
@@ -63,14 +78,17 @@ public:
 	HTREEITEM	find_item(const CString& name, HTREEITEM root);
 
 	void		iterate_tree(HTREEITEM hItem = NULL);
-	std::deque<CString>	iterate_tree_with_no_recursion(HTREEITEM hItem = NULL);
+	std::deque<CTreeCtrlFolder>	iterate_tree_with_no_recursion(HTREEITEM hItem = NULL);
+
+	void		expand_all(bool expand = true);
 
 private:
 	HTREEITEM	m_expandItem;	// 마지막으로 확장한 아이템
+	HTREEITEM	m_selectedItem = NULL;
 	HTREEITEM	m_desktopItem;	// 바탕화면 아이템
 	HTREEITEM	m_documentItem;	// 문서 아이템
 	HTREEITEM	m_computerItem;	// 내 PC 아이템
-	std::deque<CString> m_folder_list;
+	std::deque<CTreeCtrlFolder> m_folder_list;
 
 	//폰트 관련
 	LOGFONT			m_lf;

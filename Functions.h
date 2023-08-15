@@ -463,11 +463,14 @@ void		Trace(char* szFormat, ...);
 	CString		ConvertInt2AZ(int n);	//n을 26진수 엑셀 컬럼 인덱스로 변환한 문자열을 리턴
 	CString		GetToken(CString& str, LPCTSTR c);
 	CString		GetToken(CString src, CString separator, int n);
-	std::deque<CString>	GetTokenString(CString src, CString separator);
-	int			GetTokenString(CString src, std::deque<CString>& dqToken, TCHAR separator = ' ', bool allowEmpty = true, int nMaxToken = -1);
-	int			GetTokenString(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty = true, int nMaxToken = -1);
-	int			getTokenString(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
-	int			getTokenString(char *src, char *separator, char **sToken, int nMaxToken);
+
+	//separator는 기존 CString에서 TCHAR로 통일한다.
+	//2char이상의 문자열이 하나의 separator로 사용될 경우는 거의 없으나
+	//1개 또는 그 이상의 서로 다른 문자를 separator들로 사용할 경우는 있을 것이다.
+	int			get_token_string(CString src, std::deque<CString>& dqToken, TCHAR separator = '|', bool allowEmpty = true, int nMaxToken = -1);
+	int			get_token_string(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty = true, int nMaxToken = -1);
+	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
+	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
 
 	//[2023/1/1 22:1:29] [DBMS][NMS_LS_TERMINATE_SESSION_DATA][ID : tmax25][update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400']
 	//[]로 묶여진 토큰을 분리한다.

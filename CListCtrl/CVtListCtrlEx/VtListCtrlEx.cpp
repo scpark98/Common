@@ -25,9 +25,6 @@ CVtListCtrlEx::CVtListCtrlEx()
 
 	NCOverride = FALSE; //False as default...
 	Who = SB_BOTH; //Default remove both...
-
-	m_hcArrow = AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW));
-	m_hcNo = AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO));
 }
 
 CVtListCtrlEx::~CVtListCtrlEx()
@@ -416,7 +413,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (GetItemState(i, LVIS_SELECTED))
 			{
 				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
-				DrawRectangle(pDC, rowRect, RGB(153, 209, 255));
+				DrawRectangle(pDC, rowRect, m_crSelectedBorder);
 			}
 		}
 	}
@@ -1303,6 +1300,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crBack				= ::GetSysColor(COLOR_WINDOW);
 		m_crBackSelected		= RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= ::GetSysColor(COLOR_3DFACE);
 		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
 		m_crPercentage			= m_crText;
@@ -1315,6 +1313,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crBack				= RGB(193, 219, 252);
 		m_crBackSelected		= get_color(m_crBack, -48);
 		m_crBackSelectedInactive= get_color(m_crBack, -48);
+		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= get_color(m_crBack, -32);
 		m_crHeaderText			= get_color(m_crText, -32);
 		m_crPercentage			= m_crText;
@@ -1327,6 +1326,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crBack				= RGB( 74,  94, 127);
 		m_crBackSelected		= RGB( 15,  36,  41);
 		m_crBackSelectedInactive= RGB( 15,  36,  41);
+		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= get_color(m_crBack, -32);
 		m_crHeaderText			= get_color(m_crText, -32);
 		m_crPercentage			= m_crText;
@@ -1339,6 +1339,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crBack				= RGB(  2,  21,  36);
 		m_crBackSelected		= RGB(  3,  42,  59);
 		m_crBackSelectedInactive= RGB( 15,  36,  41);
+		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= RGB(  0,  13,  22);
 		m_crHeaderText			= RGB(  0, 180, 228);
 		m_crPercentage			= m_crText;
@@ -1351,6 +1352,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crBack				= RGB( 64,  64,  64);
 		m_crBackSelected		= get_color(m_crBack, -32);
 		m_crBackSelectedInactive= get_color(m_crBack, -32);
+		m_crSelectedBorder		= RGB(128, 128, 128);
 		m_crHeaderBack			= get_color(m_crBack, -16);
 		m_crHeaderText			= get_color(m_crText, -16);
 		m_crPercentage			= m_crText;
@@ -3116,12 +3118,23 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 			}
 			else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 			{
+				/*
+				CTreeCtrl* pTree = (CTreeCtrl*)m_pDropWnd;
+				UINT uFlags;
 
+				HTREEITEM hItem = pTree->HitTest(pt, &uFlags);
+
+				if ((hItem != NULL) && (TVHT_ONITEM & uFlags))
+				{
+					pTree->SelectDropTarget(hItem);
+					ASSERT(pTree->GetDropHilightItem() == hItem);
+				}
+				*/
 			}
 		}
 
 		// Save current window pointer as the CListCtrl we are dropping onto
-		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+		//if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 			m_pDropWnd = pDropWnd;
 
 		// Convert from screen coordinates to drop target client coordinates
@@ -3131,7 +3144,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 		{
 			//Note that we can drop here
-			SetCursor(m_hcArrow);
+			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
 			UINT uFlags;
 			CListCtrl* pList = (CListCtrl*)pDropWnd;
 
@@ -3151,36 +3164,21 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 		{
-			SetCursor(m_hcNo);
-			/*
-			//Note that we can drop here
-			SetCursor(m_hcArrow);
-
+			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
 			UINT uFlags;
 			CTreeCtrl* pTree = (CTreeCtrl*)pDropWnd;
 
-			// Turn off hilight for previous drop target
-			//pTree->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
-
-			// Redraw previous item
-			//pTree->RedrawItems(m_nDropIndex, m_nDropIndex);
-
 			// Get the item that is below cursor
-			m_nDropIndex = ((CVtListCtrlEx*)pDropWnd)->HitTest(pt, &uFlags);
-
-			// Highlight it (폴더인 경우에만 hilite시킨다)
-			//if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
-			//	pTree->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
-			// Redraw item
-			//pTree->RedrawItems(m_nDropIndex, m_nDropIndex);
-			pTree->UpdateWindow();
-			*/
+			HTREEITEM hItem = ((CTreeCtrl*)pDropWnd)->HitTest(pt, &uFlags);
+			trace(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
+			pTree->SelectDropTarget(hItem);
+			ASSERT(hItem == pTree->GetDropHilightItem());
 		}
 		else
 		{
 			//If we are not hovering over a CListCtrl, change the cursor
 			// to note that we cannot drop here
-			SetCursor(m_hcNo);
+			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
 		}
 		// Lock window updates
 		m_pDragImage->DragShowNolock(true);
@@ -3226,33 +3224,42 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 			pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 		{
 			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
-			DropItemOnList(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
+			DroppedHandler(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
 		}
 	}
 
 	CListCtrl::OnLButtonUp(nFlags, point);
 }
 
-void CVtListCtrlEx::DropItemOnList(CWnd* pDragListCtrl, CWnd* pDropListCtrl)
+void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 {
+	//drop되면 그 이벤트만 메인에 알리고
+	//메인에서는 drag관련 정보와 drop정보를 이용해서 원하는 처리만 한다.
+	//따라서 맨 아래 ::SendMessage만 필요하며
+	//중간 코드들은
+
 	CString droppedItem;
 
-	//우선은 CListCtrl끼리의 drag&drop만 처리한다.
-	CVtListCtrlEx *pDragList = (CVtListCtrlEx *)pDragListCtrl;
-	CVtListCtrlEx *pDropList = (CVtListCtrlEx *)pDropListCtrl;
+	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+	{
+		CListCtrl* pDropListCtrl = (CListCtrl*)pDragWnd;
 
-	if (m_nDropIndex >= 0)
-		droppedItem = pDropList->get_text(m_nDropIndex, col_filename);
+		if (m_nDropIndex >= 0)
+			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, col_filename);
 
-	std::deque<int> dq;
-	pDragList->get_selected_items(&dq);
+		std::deque<int> dq;
+		get_selected_items(&dq);
 
-	for (int i = 0; i < dq.size(); i++)
-		TRACE(_T("dropped %d = %s\n"), i, pDragList->get_text(dq[i], col_filename));
+		for (int i = 0; i < dq.size(); i++)
+			TRACE(_T("drag %d = %s\n"), i, GetItemText(dq[i], col_filename));
 
-	TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+		TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+	}
+	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+	{
 
-	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&(CVtListCtrlExMessage(this, message_list_dropped, pDropListCtrl)), (LPARAM)0);
+	}
 
-	pDropList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+
+	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_dropped, pDropWnd)), (LPARAM)0);
 }

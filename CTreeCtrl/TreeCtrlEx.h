@@ -4,6 +4,7 @@
 // CTreeCtrlEx
 #include <afxwin.h>
 #include <afxcmn.h>
+//#include <afxole.h>
 
 #include <deque>
 #include "../system/ShellImageList/ShellImageList.h"
@@ -82,19 +83,67 @@ public:
 
 	void		expand_all(bool expand = true);
 
-private:
+	//컬러 관련
+	enum listctrlex_color_theme
+	{
+		color_theme_default = 0,
+		color_theme_light_blue,
+		color_theme_navy_blue,
+		color_theme_dark_blue,
+		color_theme_dark_gray,
+	};
+
+	void	set_color_theme(int theme, bool apply_now = true);
+
+	//Drag&Drop 드래깅 관련
+	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
+	{
+		int n = sizeof...(args);
+		int arg[] = { args... };
+
+		for (auto id : arg)
+			m_drag_images_id.push_back(id);
+	}
+
+	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
+	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
+
+protected:
 	HTREEITEM	m_expandItem;	// 마지막으로 확장한 아이템
-	HTREEITEM	m_selectedItem = NULL;
 	HTREEITEM	m_desktopItem;	// 바탕화면 아이템
 	HTREEITEM	m_documentItem;	// 문서 아이템
 	HTREEITEM	m_computerItem;	// 내 PC 아이템
 	std::deque<CTreeCtrlFolder> m_folder_list;
+
+	void			thread_insert_folders(HTREEITEM hItem);
 
 	//폰트 관련
 	LOGFONT			m_lf;
 	CFont			m_font;
 	int				m_font_size;
 	void			reconstruct_font();
+
+	//컬러 관련
+	COLORREF		m_crText;					//기본 글자색
+	COLORREF		m_crTextSelected;			//선택 항목의 활성화(active) 글자색
+	COLORREF		m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
+	COLORREF		m_crTextDropHilited;
+	COLORREF		m_crBack;					//기본 배경색
+	COLORREF		m_crBackSelected;
+	COLORREF		m_crBackSelectedInactive;
+	COLORREF		m_crBackDropHilited;
+	COLORREF		m_crSelectedBorder;
+
+	//Drag&Drop 드래깅 관련
+	bool			m_use_drag_and_drop = false;
+	CWnd*			m_pDragWnd = NULL;			//Which ListCtrl we are dragging FROM
+	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
+	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
+	bool			m_bDragging = false;		//T during a drag operation
+	HTREEITEM		m_DragItem = NULL;			//Index of selected item in the Tree we are dragging FROM
+	//int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
+	std::deque<UINT> m_drag_images_id;		//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
+	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -110,6 +159,9 @@ public:
 	afx_msg void OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNMClick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 };
 
 

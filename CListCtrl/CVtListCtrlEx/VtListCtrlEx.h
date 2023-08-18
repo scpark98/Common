@@ -113,7 +113,7 @@ public:
 	enum VtListCtrlExMsgs
 	{
 		message_progress_pos = 0,
-		message_list_dropped,
+		message_drag_and_dropped,
 	};
 
 
@@ -417,9 +417,12 @@ protected:
 	COLORREF		m_crText;					//기본 글자색
 	COLORREF		m_crTextSelected;			//선택 항목의 활성화(active) 글자색
 	COLORREF		m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
+	COLORREF		m_crTextDropHilited;
 	COLORREF		m_crBack;					//기본 배경색
 	COLORREF		m_crBackSelected;
 	COLORREF		m_crBackSelectedInactive;
+	COLORREF		m_crBackDropHilited;
+	COLORREF		m_crSelectedBorder;
 	COLORREF		m_crHeaderBack;
 	COLORREF		m_crHeaderText;
 	COLORREF		m_crPercentage;				//percentage bar graph color
@@ -453,13 +456,11 @@ protected:
 	bool			m_bDragging = false;		//T during a drag operation
 	int				m_nDragIndex = -1;			//Index of selected item in the List we are dragging FROM
 	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
-	HCURSOR			m_hcArrow;
-	HCURSOR			m_hcNo;
-
 	std::deque<UINT> m_drag_images_id;		//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
+	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
+
 	CImageList* CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint);
 	CImageList* CreateDragImageEx(LPPOINT lpPoint);
-	void		DropItemOnList(CWnd* pDragWnd, CWnd* pDropWnd);
 
 protected:
 	DECLARE_MESSAGE_MAP()

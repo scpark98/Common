@@ -74,11 +74,12 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	return shFileInfo.iIcon;
 }
 
-void CShellImageList::GetSystemDisplayName(CString szFile, LPSTR szDisplayName)
+void CShellImageList::GetSystemDisplayName(CString szFile, CString &szDisplayName)
 {   
 	SHFILEINFO shFileInfo;
 	SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-	sprintf(szDisplayName, "%s",shFileInfo.szDisplayName);
+	//sprintf(szDisplayName, _T("%s"),shFileInfo.szDisplayName);
+	szDisplayName = shFileInfo.szDisplayName;
 }
 
 void CShellImageList::Initialize()

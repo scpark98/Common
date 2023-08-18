@@ -2,8 +2,10 @@
 //
 
 #include "TreeCtrlEx.h"
+#include <thread>
 #include "../Functions.h"
 #include "../MemoryDC.h"
+#include "../GdiPlusBitmap.h"
 
 // CTreeCtrlEx
 
@@ -11,6 +13,8 @@ IMPLEMENT_DYNAMIC(CTreeCtrlEx, CTreeCtrl)
 
 CTreeCtrlEx::CTreeCtrlEx()
 {
+	set_color_theme(color_theme_default, false);
+
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
@@ -29,6 +33,9 @@ BEGIN_MESSAGE_MAP(CTreeCtrlEx, CTreeCtrl)
 	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDING, &CTreeCtrlEx::OnTvnItemexpanding)
 	ON_NOTIFY_REFLECT(NM_CLICK, &CTreeCtrlEx::OnNMClick)
 	ON_NOTIFY_REFLECT(TVN_BEGINDRAG, &CTreeCtrlEx::OnTvnBegindrag)
+	ON_NOTIFY_REFLECT(NM_DBLCLK, &CTreeCtrlEx::OnNMDblclk)
+	ON_WM_MOUSEMOVE()
+	ON_WM_LBUTTONUP()
 END_MESSAGE_MAP()
 
 
@@ -37,7 +44,7 @@ END_MESSAGE_MAP()
 void CTreeCtrlEx::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	SetItemHeight(20);
+	SetItemHeight(22);
 
 	CFont* font = GetParent()->GetFont();
 
@@ -107,7 +114,10 @@ void CTreeCtrlEx::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	//dc.FillSolidRect(rc, pink);
+	COLORREF	crText = m_crText;
+	COLORREF	crBack = m_crBack;
+
+	dc.FillSolidRect(rc, m_crBack);
 
 	CFont font;
 	CFont* pOldFont;
@@ -115,6 +125,7 @@ void CTreeCtrlEx::OnPaint()
 	font.CreateFontIndirect(&m_lf);
 	pOldFont = (CFont*)dc.SelectObject(&font);
 
+	dc.SetBkMode(TRANSPARENT);
 
 	int indent;
 	int icon_index;
@@ -125,10 +136,12 @@ void CTreeCtrlEx::OnPaint()
 	for (int i = 0; i < m_folder_list.size(); i++)
 	{
 		GetItemRect(m_folder_list[i].item, &r, true);
-		r.right = rc.right;
+		GetItemRect(m_folder_list[i].item, &rRow, false);
+
+		r.right = rc.right - 1;
 
 		//rc와 일부분도 겹치지 않는 아이템은 그리지 않는다.
-		if (getIntersectionRect(rc, r).IsRectEmpty())
+		if (getIntersectionRect(rc, CRect(r.left - 32, r.top, r.right, r.bottom)).IsRectEmpty())
 			continue;
 
 		long t0 = getClock();
@@ -141,16 +154,37 @@ void CTreeCtrlEx::OnPaint()
 				indent++;
 		}
 
-		if (m_folder_list[i].item == m_selectedItem)
+		//선택된 항목은 다른 색상으로 표시한다.
+		//if (GetItemState(m_folder_list[i].item, TVIS_DROPHILITED) & TVIS_DROPHILITED)//m_folder_list[i].item == GetDropHilightItem())
+		if (GetDropHilightItem() == m_folder_list[i].item)
+		{
+			trace(_T("drophilited\n"));
+			//GetItemState(m_folder_list[i].item, TVIS_DROPHILITED))
+			crText = m_crTextDropHilited;
+			dc.FillSolidRect(rRow, m_crBackDropHilited);
+		}
+		else if (GetSelectedItem() == m_folder_list[i].item)
+		//else if (GetItemState(m_folder_list[i].item, TVIS_SELECTED) & TVIS_SELECTED)
 		{
 			trace(_T("selected\n"));
-			GetItemRect(m_folder_list[i].item, &rRow, false);
-			dc.FillSolidRect(rRow, pink);
+
+			//포커스에 따라 다르다.
+			if (GetFocus() == this)
+			{
+				crText = m_crTextSelected;
+				DrawRectangle(&dc, rRow, m_crSelectedBorder, m_crBackSelected);
+			}
+			else if ((GetStyle() & TVS_SHOWSELALWAYS))
+			{
+				crText = m_crTextSelectedInactive;
+				dc.FillSolidRect(rRow, m_crBackSelectedInactive);
+			}
 		}
 
+
 		//dc.FillSolidRect(r, pink);
-		
-		dc.DrawText(m_folder_list[i].folder, r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+		dc.SetTextColor(crText);
+		dc.DrawText(_T(" ") + m_folder_list[i].folder, r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
 		//텍스트 왼쪽에 아이콘을 그려주고
 		icon_index = m_pShellImageList->GetSystemImageListIcon(m_folder_list[i].fullpath, true);
@@ -158,20 +192,27 @@ void CTreeCtrlEx::OnPaint()
 						CPoint(r.left - 16, r.CenterPoint().y - 8), ILD_TRANSPARENT);
 
 		//그 왼쪽에는 확장/축소 버튼을 그려준다.
-		if (get_sub_folders(m_folder_list[i].fullpath))
-		//if (ItemHasChildren(m_folder_list[i].item))
+		if (has_sub_folders(m_folder_list[i].fullpath))
 		{
 			flags = GetItemState(m_folder_list[i].item, TVIF_STATE);
-			CRect rButton = r;
-			rButton.left = rButton.left - 16 - 16;
+			CRect rArrow = r;
+			rArrow.left = rArrow.left - 16 - 16;
+			rArrow.right = rArrow.left + 16;
+			CPoint cp(rArrow.CenterPoint());
 
+			cp.Offset(-6, 0);
+
+			//아래로 향한 화살표 표시
 			if (flags & TVIS_EXPANDED)
 			{
-				dc.DrawText(_T("^"), rButton, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+				DrawLine(&dc, cp.x - 4, cp.y - 2, cp.x + 1, cp.y + 3, GRAY192, 2);
+				DrawLine(&dc, cp.x + 5, cp.y - 2, cp.x - 0, cp.y + 3, GRAY192, 2);
 			}
+			//일반상태의 > 화살표 표시
 			else
 			{
-				dc.DrawText(_T(">"), rButton, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+				DrawLine(&dc, cp.x - 2, cp.y - 4, cp.x + 3, cp.y + 1, GRAY192, 2);
+				DrawLine(&dc, cp.x - 2, cp.y + 4, cp.x + 3, cp.y - 1, GRAY192, 2);
 			}
 		}
 
@@ -195,7 +236,7 @@ void CTreeCtrlEx::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 				(WPARAM)&CTreeCtrlExMessage(this, message_selchanged),
 				(LPARAM)&CString(get_fullpath(GetSelectedItem())));
 
-	m_selectedItem = GetSelectedItem();
+	//m_selectedItem = GetSelectedItem();
 
 	*pResult = 0;
 }
@@ -210,6 +251,9 @@ void CTreeCtrlEx::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 void CTreeCtrlEx::set_as_shell_treectrl(bool is_local /*= true*/)
 {
+	DeleteAllItems();
+	m_folder_list.clear();
+
 	m_is_shell_treectrl = true;
 	m_is_shell_treectrl_local = is_local;
 	m_use_own_imagelist = true;
@@ -222,9 +266,36 @@ void CTreeCtrlEx::set_as_shell_treectrl(bool is_local /*= true*/)
 	for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
 		insert_drive(it->second);
 
+	//std::thread t(&CTreeCtrlEx::thread_insert_folders, this, GetRootItem());
+	//t.detach();
+
 	m_folder_list = iterate_tree_with_no_recursion();
 
+	//for test
 	expand_all();
+}
+
+void CTreeCtrlEx::thread_insert_folders(HTREEITEM hItem)
+{
+	if (hItem)
+	{
+		trace(_T("%s\n"), GetItemText(hItem));
+		hItem = GetNextItem(hItem, TVGN_CHILD);
+		while (hItem)
+		{
+			iterate_tree(hItem);
+			hItem = GetNextItem(hItem, TVGN_NEXT);
+		}
+	}
+	else
+	{
+		HTREEITEM hItem = GetNextItem(NULL, TVGN_ROOT);
+		while (hItem)
+		{
+			iterate_tree(hItem);
+			hItem = GetNextItem(hItem, TVGN_NEXT);
+		}
+	}
 }
 
 HTREEITEM CTreeCtrlEx::insert_special_folder(int csidl)
@@ -386,7 +457,11 @@ void CTreeCtrlEx::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 
 		m_folder_list = iterate_tree_with_no_recursion();
 	}
-
+	//확장버튼의 왼쪽 indent영역이나 아이템의 오른쪽 여백이 눌려도 select로 처리한다.
+	else if ((nFlags & TVHT_ONITEMINDENT) || (nFlags & TVHT_ONITEMRIGHT))
+	{
+		SelectItem(hItem);
+	}
 
 	*pResult = 0;
 }
@@ -427,7 +502,11 @@ void CTreeCtrlEx::select_item(CString fullpath)
 
 		//만약 현재 노드에 아직 child가 추가된 상태가 아니라면 우선 children을 넣어준 후 검색해야 한다.
 		if (GetChildItem(item) == NULL)
+		{
 			insert_folder(item, get_fullpath(item));
+			Expand(item, TVE_EXPAND);
+			m_folder_list = iterate_tree_with_no_recursion();
+		}
 
 		if (item)
 			item = find_item(dq[i], item);
@@ -442,13 +521,6 @@ void CTreeCtrlEx::select_item(CString fullpath)
 
 	if (item)
 		SelectItem(item);
-}
-
-void CTreeCtrlEx::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	*pResult = 0;
 }
 
 void CTreeCtrlEx::iterate_tree(HTREEITEM hItem)
@@ -551,4 +623,217 @@ void CTreeCtrlEx::expand_all(bool expand)
 		Expand(hItem, expand ? TVE_EXPAND : TVE_COLLAPSE);
 		hItem = GetNextItem(hItem, TVGN_NEXTVISIBLE);
 	}
+}
+
+void CTreeCtrlEx::set_color_theme(int theme, bool apply_now)
+{
+	switch (theme)
+	{
+		//최근 윈도우 탐색기의 색상을 보면 텍스트 색상은 선택여부, inactive에 무관하게 동일하다.
+	case color_theme_default:
+		m_crText = ::GetSysColor(COLOR_BTNTEXT);
+		m_crTextSelected = m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_crTextSelectedInactive = m_crText;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_crTextDropHilited = m_crText;
+		m_crBack = ::GetSysColor(COLOR_WINDOW);
+		m_crBackSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackDropHilited = m_crBackSelected;
+		m_crSelectedBorder = RGB(153, 209, 255);
+		break;
+	case color_theme_light_blue:
+		m_crText = ::GetSysColor(COLOR_BTNTEXT);
+		m_crTextSelected = RGB(65, 102, 146);
+		m_crTextSelectedInactive = RGB(65, 102, 146);
+		m_crTextDropHilited = m_crText;
+		m_crBack = RGB(193, 219, 252);
+		m_crBackSelected = get_color(m_crBack, -48);
+		m_crBackSelectedInactive = get_color(m_crBack, -48);
+		m_crBackDropHilited = m_crBackSelected;
+		m_crSelectedBorder = RGB(153, 209, 255);
+		break;
+	case color_theme_navy_blue:
+		m_crText = RGB(204, 216, 225);
+		m_crTextSelected = RGB(234, 246, 255);
+		m_crTextSelectedInactive = RGB(105, 142, 186);
+		m_crBack = RGB(74, 94, 127);
+		m_crBackSelected = RGB(15, 36, 41);
+		m_crBackSelectedInactive = RGB(15, 36, 41);
+		m_crSelectedBorder = RGB(153, 209, 255);
+		break;
+	case color_theme_dark_blue:
+		m_crText = RGB(16, 177, 224);
+		m_crTextSelected = RGB(224, 180, 59);
+		m_crTextSelectedInactive = RGB(105, 142, 186);
+		m_crBack = RGB(2, 21, 36);
+		m_crBackSelected = RGB(3, 42, 59);
+		m_crBackSelectedInactive = RGB(15, 36, 41);
+		m_crSelectedBorder = RGB(153, 209, 255);
+		break;
+	case color_theme_dark_gray:
+		m_crText = RGB(164, 164, 164);
+		m_crTextSelected = RGB(241, 241, 241);
+		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
+		m_crBack = RGB(64, 64, 64);
+		m_crBackSelected = get_color(m_crBack, -32);
+		m_crBackSelectedInactive = get_color(m_crBack, -32);
+		m_crSelectedBorder = RGB(128, 128, 128);
+		break;
+	}
+
+	if (apply_now)
+		Invalidate();
+}
+
+
+void CTreeCtrlEx::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	CPoint pt;
+	UINT nFlags = 0;
+
+	GetCursorPos(&pt);
+	ScreenToClient(&pt);
+
+	HTREEITEM hItem = HitTest(pt, &nFlags);
+	TRACE(_T("%s, %d, %d, %d\n"), get_fullpath(hItem), pt.x, pt.y, nFlags);
+
+	//아이콘+레이블 영역이라면
+	if (nFlags & TVHT_ONITEM)
+	{
+		TRACE(_T("button\n"));
+		nFlags = GetItemState(hItem, TVIF_STATE);
+		TRACE(_T("expanded = %d\n"), nFlags & TVIS_EXPANDED);
+
+		//if (nFlags & TVIS_EXPANDED)
+		{
+			//만약 child가 없다면 아직 로딩되지 않은 노드이므로 검색해서 추가한다.
+			//물론 실제 child가 없는 폴더일수도 있다.
+			if (GetChildItem(hItem) == NULL)
+			{
+				insert_folder(hItem, get_fullpath(hItem));
+				m_folder_list = iterate_tree_with_no_recursion();
+			}
+		}
+	}
+
+	*pResult = 0;
+}
+
+
+void CTreeCtrlEx::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+
+	if (!m_use_drag_and_drop)
+		return;
+
+	CRect	rc;
+	GetClientRect(rc);
+
+	m_DragItem = pNMTreeView->itemNew.hItem;
+	CString path = get_fullpath(m_DragItem);
+	std::deque<CString> dq;
+	FindAllFiles(path, &dq);
+
+	int item_count = dq.size();
+	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
+
+	if (m_drag_images_id.size() == 1)
+		bmpRes.load(m_drag_images_id[0]);
+	else if (m_drag_images_id.size() > 1)
+		bmpRes.load(item_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+
+	bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(item_count), 20, 2,
+		_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+
+	m_pDragImage = new CImageList();
+	m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
+
+	HICON hicon;
+	bmpRes.m_pBitmap->GetHICON(&hicon);
+	m_pDragImage->Add(hicon);
+
+	ASSERT(m_pDragImage); //make sure it was created
+
+	//// Set dragging flag and others
+	m_bDragging = TRUE;	//we are in a drag and drop operation
+	m_pDragWnd = this; //make note of which list we are dragging from
+	m_pDropWnd = this;	//at present the drag list is the drop list
+
+	//// Capture all mouse messages
+	SetCapture();
+
+	//// Change the cursor to the drag image
+	////	(still must perform DragMove() in OnMouseMove() to show it moving)
+	m_pDragImage->BeginDrag(0, CPoint(pNMTreeView->ptDrag.x - rc.left + 16, pNMTreeView->ptDrag.y - rc.top));
+	m_pDragImage->DragEnter(GetDesktopWindow(), pNMTreeView->ptDrag);
+
+	trace(_T("start drag...\n"));
+
+	*pResult = 0;
+}
+
+
+void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_bDragging)
+	{
+		//// Move the drag image
+		CPoint pt(point);	//get our current mouse coordinates
+		ClientToScreen(&pt); //convert to screen coordinates
+		m_pDragImage->DragMove(pt); //move the drag image to those coordinates
+		// Unlock window updates (this allows the dragging image to be shown smoothly)
+		//m_pDragImage->DragShowNolock(false);
+
+		//// Get the CWnd pointer of the window that is under the mouse cursor
+		CWnd* pDropWnd = WindowFromPoint(pt);
+		ASSERT(pDropWnd); //make sure we have a window
+	}
+
+	CTreeCtrl::OnMouseMove(nFlags, point);
+}
+
+
+void CTreeCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CTreeCtrl::OnLButtonUp(nFlags, point);
+}
+
+void CTreeCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
+{
+	//drop되면 그 이벤트만 메인에 알리고
+	//메인에서는 drag관련 정보와 drop정보를 이용해서 원하는 처리만 한다.
+	//따라서 맨 아래 ::SendMessage만 필요하며
+	//중간 코드들은
+
+	CString droppedItem;
+	/*
+	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+	{
+		CListCtrl* pDropListCtrl = (CListCtrl*)pDragWnd;
+
+		if (m_nDropIndex >= 0)
+			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, col_filename);
+
+		std::deque<int> dq;
+		get_selected_items(&dq);
+
+		for (int i = 0; i < dq.size(); i++)
+			TRACE(_T("drag %d = %s\n"), i, GetItemText(dq[i], col_filename));
+
+		TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+	}
+	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+	{
+
+	}
+
+
+	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_dropped, pDropWnd)), (LPARAM)0);
+	*/
 }

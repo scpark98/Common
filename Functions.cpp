@@ -4484,6 +4484,27 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	return folders.size();
 }
 
+bool has_sub_folders(CString path)
+{
+	if (path.Right(1) != _T("\\"))
+		path += _T("\\");
+
+	CString file;
+	CFileFind filefind;
+	bool bWorking = filefind.FindFile(path + _T("\\*"));
+
+	while (bWorking)
+	{
+		bWorking = filefind.FindNextFile();
+		file = filefind.GetFilePath();
+
+		if (!filefind.IsDots() && filefind.IsDirectory() && !filefind.IsHidden())
+			return true;
+	}
+
+	return false;
+}
+
 #if (_MSVC_LANG >= _std_cpp17)
 std::deque<CString> find_all_files(CString path, CString name_filter, CString ext_filters, CString except_str, bool recursive, bool auto_sort)
 {
@@ -5371,7 +5392,7 @@ void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor /*= 0*/
 	lb.lbStyle = BS_SOLID;
 	lb.lbColor = crColor;
 
-	CPen	Pen(PS_GEOMETRIC | PS_ENDCAP_SQUARE | nPenStyle, nWidth, &lb);
+	CPen	Pen(PS_GEOMETRIC | PS_ENDCAP_FLAT | PS_JOIN_MITER | nPenStyle, nWidth, &lb);
 	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
 	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
 
@@ -13617,7 +13638,7 @@ void printf_string(const char* psz, ...)
 	TRACE(buffer);
 }
 
-void trace(LPCTSTR format, ...)
+void trace_output(TCHAR* func, int line, LPCTSTR format, ...)
 {
 //#ifndef _DEBUG
 //	return;
@@ -13629,6 +13650,7 @@ void trace(LPCTSTR format, ...)
 	str.FormatV(format, args);
 	va_end(args);
 
+	str.Format(_T("[%s][%d] %s"), func, line, str);
 	OutputDebugString(str);
 }
 

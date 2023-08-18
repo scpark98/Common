@@ -26,7 +26,7 @@ public:
 	void InsertCache(CString szFileExt, int ID);
 	
 	int  GetImageListIcon(CString szPath, CString szFile);
-	void GetSystemDisplayName(CString szFile, LPSTR szDisplayName);
+	void GetSystemDisplayName(CString szFile, CString &szDisplayName);
 	int  GetVirtualImageListIcon(CString szExt);
 
 	int  GetSystemImageListIcon(CString szFile, BOOL bDrive = TRUE);

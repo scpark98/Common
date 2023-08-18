@@ -3,6 +3,7 @@
 #ifndef _OpenCVFunctions_h_
 #define _OpenCVFunctions_h_
 
+#include <afxwin.h>
 #include <math.h>
 #include <vector>
 #include <stack>
@@ -12,7 +13,6 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
-//#include "opencv2/video/tracking.hpp"
 //#include "opencv2/features2d/features2d.hpp"
 //#include "opencv2/objdetect/objdetect.hpp"
 //#include "opencv2/photo/photo.hpp"
@@ -299,6 +299,7 @@ void		save2Raw( cv::Mat mat, CString sRawFilename, int dst_ch = 1 );
 HBITMAP		ConvertMatToBMP (cv::Mat frame);
 bool		PasteBMPToClipboard(void* bmp);
 Mat			HBITMAP2Mat( HWND hwnd, HBITMAP hbwindow );
+cv::Mat		HBITMAP2Mat(HBITMAP hBitmap);
 
 void		FillGridPattern( Mat &src, int size = 16 );
 
@@ -336,12 +337,14 @@ bool		ptInRect( cv::Rect src, cv::Point pt );
 bool		ptInRect( cv::Rect src, CPoint pt );
 
 //치환 함수
-template<class T> void SWAP( T& x, T& y )
-{
-	T temp	= x;
-	x		= y;
-	y		= temp;
-}
+//#ifndef SWAP
+//template<class T> void SWAP( T& x, T& y )
+//{
+//	T temp	= x;
+//	x		= y;
+//	y		= temp;
+//}
+//#endif
 
 class HarrisDetector {
 

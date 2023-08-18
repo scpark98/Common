@@ -1,5 +1,6 @@
-﻿#include "stdafx.h"
-#include "OpenCVFunctions.h"
+﻿
+#include <afxdlgs.h>
+#include "OpenCVFunctions_2.xx.h"
 #include "Functions.h"
 
 IplImage*	scvCutRect( IplImage* pImage, CRect r )
@@ -1536,13 +1537,13 @@ Mat	loadImage( LPCTSTR sfile, int flags /*= CV_LOAD_IMAGE_UNCHANGED*/, bool bDis
 		AfxMessageBox( str );
 	}
 
-	CString sExt = GetFileExtensionFromFilename(sfile).MakeLower();
+	CString sExt = GetFileExtension(sfile).MakeLower();
 
 	if ( sExt != _T("raw") && sExt != _T("yuv") )
 		return loadMat( sfile, flags, bDisplayError );
 
 	cv::Mat mat;
-	uint64_t file_size = GetFileSize( sfile );
+	uint64_t file_size = get_file_size(sfile);
 
 	//1ch raw image
 	if ( file_size == width * height )
@@ -2671,6 +2672,31 @@ Mat HBITMAP2Mat( HWND hwnd, HBITMAP hbwindow )
 
 	imshow( "mat", mat );
 	return mat;
+}
+
+cv::Mat	HBITMAP2Mat(HBITMAP hBitmap)
+{
+	BITMAP bmp;
+	GetObject(hBitmap, sizeof(BITMAP), &bmp);
+
+	int channel = bmp.bmBitsPixel == 1 ? 1 : bmp.bmBitsPixel / 8;
+	//int depth = bmp.bmBitsPixel == 1 ? IPL_DEPTH_1U : IPL_DEPTH_8U;
+	int size = bmp.bmHeight * bmp.bmWidth * channel;
+
+	BYTE* pBuffer = new BYTE[size];
+	GetBitmapBits(hBitmap, size, pBuffer);
+
+	// copy data to the imagedata  
+	Mat mat4ch(bmp.bmHeight, bmp.bmWidth, CV_8UC4);
+	memcpy(mat4ch.data, pBuffer, size);
+	delete pBuffer;
+
+	Mat mat3ch(bmp.bmHeight, bmp.bmWidth, CV_8UC3);
+
+	// convert color  
+	cvtColor(mat4ch, mat3ch, COLOR_BGRA2BGR);
+
+	return mat3ch;
 }
 
 Mat hwnd2mat(HWND hwnd){

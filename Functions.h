@@ -59,6 +59,8 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define __class_func__ __function__
 #endif
 
+#define trace(fmt, ...) trace_output(__function__, __LINE__, fmt, ##__VA_ARGS__)
+
 #ifdef __GNUG__
 #include <cxxabi.h>
 #include <execinfo.h>
@@ -251,7 +253,7 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 }
 
 void printf_string(const char* psz, ...);
-void trace(LPCTSTR format, ...);
+void trace_output(TCHAR* func, int line, LPCTSTR format, ...);
 
 template < typename T > class AutoEraser
 {
@@ -785,6 +787,9 @@ void		Trace(char* szFormat, ...);
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
 	//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
 	int	get_sub_folders(CString root, std::deque<CString>* list = NULL, bool special_folders = false);
+	//위 함수는 전체 서브 폴더의 목록이나 개수까지 모두 구하기 때문에 특정 폴더일 경우는 속도가 매우 느리다
+	//간단히 서브 폴더 유무만 체크하는 함수를 추가한다.
+	bool has_sub_folders(CString root);
 
 	void save_dqlist(std::deque<CString>* dqlist, CString output_text_file_path);
 
@@ -1402,12 +1407,14 @@ template<class T> void quickSort(T *a, const int& leftarg, const int& rightarg);
 */
 
 //치환 함수
+#ifndef SWAP
 template<class T> void SWAP(T& x, T& y)
 {
 	T temp	= x;
 	x		= y;
 	y		= temp;
 }
+#endif
 
 //클리핑 함수. 클리핑이 일어나면 true를 리턴한다.
 template<class T> bool Clamp(T &n, T min, T max)

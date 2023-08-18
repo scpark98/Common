@@ -212,8 +212,11 @@ void CPathCtrl::OnPaint()
 	CRect rArrow = rc;
 
 	//항상 표시되는 항목
-	m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(get_full_path(m_path.size() - 1), true),
-		CPoint(rc.left + 2, rc.CenterPoint().y - 8), ILD_TRANSPARENT);
+	if (m_pShellImageList)
+	{
+		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(get_full_path(m_path.size() - 1), true),
+			CPoint(rc.left + 2, rc.CenterPoint().y - 8), ILD_TRANSPARENT);
+	}
 
 	//0번은 무조건 표시하고 나머지는 m_start_index 이상부터 표시한다.
 	for (i = 0; i < m_path.size(); i++)
@@ -273,24 +276,27 @@ void CPathCtrl::OnPaint()
 
 		if (i < m_path.size() - 1 || m_has_subfolder)
 		{
+			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)
 			{
-				DrawLine(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY128, 1);
-				DrawLine(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY128, 1);
-				DrawLine(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY128, 1);
-				DrawLine(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY128, 1);
+				DrawLine(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY192, 1);
+				DrawLine(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY192, 1);
+				DrawLine(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY192, 1);
+				DrawLine(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY192, 1);
 			}
 			else
 			{
+				//아래로 향한 화살표 표시
 				if (m_down && i == m_index)
 				{
-					DrawLine(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 1, rArrow.CenterPoint().x, rArrow.CenterPoint().y + 1, GRAY128, arrow_width);
-					DrawLine(&dc, rArrow.CenterPoint().x + 2, rArrow.CenterPoint().y - 1, rArrow.CenterPoint().x, rArrow.CenterPoint().y + 1, GRAY128, arrow_width);
+					DrawLine(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, GRAY192, arrow_width);
+					DrawLine(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, GRAY192, arrow_width);
 				}
+				//일반상태의 > 화살표 표시
 				else
 				{
-					DrawLine(&dc, rArrow.CenterPoint().x - 1, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY128, arrow_width);
-					DrawLine(&dc, rArrow.CenterPoint().x - 1, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY128, arrow_width);
+					DrawLine(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, GRAY192, arrow_width);
+					DrawLine(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, GRAY192, arrow_width);
 				}
 			}
 		}
@@ -589,6 +595,8 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		set_path(full_path);
 		::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, full_path), (LPARAM)0);
 	}
+
+	Invalidate();
 
 	CStatic::OnLButtonDown(nFlags, point);
 }

@@ -81,7 +81,7 @@ public:
 
 		if (_date.IsEmpty())
 		{
-			_date = GetDateTimeStringFromTime(GetFileLastModifiedTime(_name), true, false, false);
+			_date = get_datetime_string(GetFileLastModifiedTime(_name), 2, true, _T(" "), false, false);
 		}
 
 		text[0] = _name;

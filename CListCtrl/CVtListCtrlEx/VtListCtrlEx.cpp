@@ -2801,7 +2801,7 @@ void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
 	FileTimeToSystemTime(&ftLocal, &st);
 
 	//filedate.Format(_T("%d-%02d-%02d %02d:%02d:%02d"), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-	filedate = GetDateTimeStringFromTime(st, true, false, false);
+	filedate = get_datetime_string(st, 2, true, _T(" "), false, false, false);
 	//SetItemText(iIndex, 2, GetDateTimeStringFromTime(GetFileLastModifiedTime(pFindFileData->cFileName), true, false, false));
 	add_file(pFindFileData->cFileName, file_is_folder ? _T("-") : get_size_string(ulInt.QuadPart), filedate, true, file_is_folder);
 }

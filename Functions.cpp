@@ -165,75 +165,120 @@ CString	GetNextIndexFile(CString sCurrentFile, bool bNext /* = TRUE */)
 		return _T("");
 }
 
-CString GetDateStringFromTime(CTime t, CString sMark /*= _T("-")*/)
+
+CString	get_date_string(CTime t, CString sep)
 {
 	CString str;
 
-	str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sMark, t.GetMonth(), sMark, t.GetDay());
+	str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sep, t.GetMonth(), sep, t.GetDay());
 	return str;
 }
 
-CString GetDateStringFromTime(COleDateTime t, CString sMark /*= _T("-")*/)
+CString get_date_string(COleDateTime t, CString sep)
 {
 	CString str;
 
-	str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sMark, t.GetMonth(), sMark, t.GetDay());
+	str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sep, t.GetMonth(), sep, t.GetDay());
 	return str;
 }
 
-CString GetDateStringFromTime(__timeb32 t, CString sMark /*= _T("-")*/)
+CString get_date_string(__timeb32 tb, CString sep)
 {
-	CTime	ct(t.time);
-	return GetDateStringFromTime(ct, sMark);
+	CTime	t(tb.time);
+	return get_date_string(t, sep);
 }
 
-CString GetTimeStringFromTime(CTime t, CString sMark/*=":"*/, bool h24/*= true*/, bool include_seconds /*= true*/)
+CString get_date_string(SYSTEMTIME st, CString sep)
+{
+	CTime	t(st);
+	return get_date_string(t, sep);
+}
+
+CString get_time_string(CTime t, CString sep, bool h24, bool sec)
+{
+	return get_time_string(COleDateTime(t.GetTime()), sep, h24, sec);
+}
+
+CString get_time_string(COleDateTime t, CString sep, bool h24, bool sec)
 {
 	CString str;
-	
+
 	int h = t.GetHour();
 	int m = t.GetMinute();
 	int s = t.GetSecond();
 	bool am = (h < 12);
 
 	if (h24)
-		str.Format(_T("%02d%s%02d%s%02d"), h, sMark, m, sMark, s);
+		str.Format(_T("%02d%s%02d%s%02d"), h, sep, m, sep, s);
 	else
-		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sMark, m, sMark, s);
+		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
 
-	if (!include_seconds)
-		str = str.Left(str.GetLength() - 2 - sMark.GetLength());
+	if (!sec)
+		str = str.Left(str.GetLength() - 2 - sep.GetLength());
 
 	return str;
 }
 
-CString GetTimeStringFromTime(COleDateTime t, CString sMark /*= _T(":")*/)
+CString get_time_string(__timeb32 tb, CString sep, bool h24, bool sec)
+{
+	CTime	t(tb.time);
+	return get_time_string(t, sep, h24, sec);
+}
+
+CString	get_time_string(SYSTEMTIME st, CString sep, bool h24, bool sec, bool msec)
 {
 	CString str;
-
-	str.Format(_T("%02d%s%02d%s%02d"), t.GetHour(), sMark, t.GetMinute(), sMark, t.GetSecond());
+	CTime t(st);
+	str.Format(_T("%s%s%s"), get_time_string(t, sep, h24, sec), (msec ? _T(".") : _T("")), (msec ? i2S(st.wMilliseconds, false, true, 3) : _T("")));
 	return str;
 }
 
-CString GetTimeStringFromTime(__timeb32 t, CString sMark /*=":"*/)
+CString	get_datetime_string(CTime t, int type, bool sep, CString mid, bool h24, bool sec)
 {
-	CTime	ct(t.time);
-	return GetTimeStringFromTime(ct, sMark);
+	return get_datetime_string(COleDateTime(t.GetTime()), type, sep, mid, h24, sec);
 }
 
-CString	GetDateTimeString(CTime t, int type, bool separator, CString mid /*= _T(" ")*/, bool h24 /*= true*/)
+CString	get_datetime_string(COleDateTime t, int type, bool sep, CString mid, bool h24, bool sec)
 {
-	CString sDate = (separator ? GetDateStringFromTime(t) : GetDateStringFromTime(t, _T("")));
-	CString sTime = (separator ? GetTimeStringFromTime(t, _T(":"), h24) : GetTimeStringFromTime(t, _T(""), h24));
+	CString sDate = (sep ? get_date_string(t) : get_date_string(t, _T("")));
+	CString sTime = (sep ? get_time_string(t, _T(":"), h24, sec) : get_time_string(t, _T(""), h24, sec));
 
 	if (type == 0)
 		return sDate;
 	else if (type == 1)
 		return sTime;
-	
+
 	return sDate + mid + sTime;
 }
 
+CString	get_datetime_string(__timeb32 tb, int type, bool sep, CString mid, bool h24, bool sec)
+{
+	CTime	t(tb.time);
+	return get_datetime_string(t, type, sep, mid, h24, sec);
+}
+
+CString	get_datetime_string(SYSTEMTIME st, int type, bool sep, CString mid, bool h24, bool sec, bool msec)
+{
+	CString sDate = (sep ? get_date_string(st) : get_date_string(st, _T("")));
+	CString sTime = (sep ? get_time_string(st, _T(":"), h24, sec, msec) : get_time_string(st, _T(""), h24, sec, msec));
+
+	if (type == 0)
+		return sDate;
+	else if (type == 1)
+		return sTime;
+
+	return sDate + mid + sTime;
+}
+
+
+CString	get_cur_datetime_string(int type, bool sep, CString mid, bool h24, bool sec, bool msec)
+{
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+	return get_datetime_string(st, type, sep, mid, h24, sec, msec);
+}
+
+#if 0
 //type 0(date), 1(time), 2(date+time), 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid_char는 날짜와 시간 사이 문자
 CString GetCurrentDateTimeString(int type, bool separator /*= true*/, CString mid /*= _T(" ")*/, bool h24 /*= true*/)
 {
@@ -255,7 +300,7 @@ CString	GetTimeString(CTime t, bool bSeparator /*= true*/)
 	return str;
 }
 
-CString GetTimeString(COleDateTime t, bool bSeparator /*= true*/)
+CString GetDateTimeString(COleDateTime t, bool bSeparator /*= true*/)
 {
 	if (t.GetStatus() != COleDateTime::valid)
 		return _T("");
@@ -275,7 +320,7 @@ CString GetTimeString(COleDateTime t, bool bSeparator /*= true*/)
 
 //bSeparator = true : 2003-04-16 18:01:00.123
 //bSeparator = false: 20030416 180100.123
-CString	GetTimeString(__timeb32 t, bool bSeparator /*= true*/, bool bUnderline /*= false*/, bool bHasMilliSec /*= true*/)
+CString	GetDateTimeString(__timeb32 t, bool bSeparator /*= true*/, bool bUnderline /*= false*/, bool bHasMilliSec /*= true*/)
 {
 	int		i;
 	CString	str;
@@ -315,13 +360,37 @@ CString	GetTimeString(__timeb32 t, bool bSeparator /*= true*/, bool bUnderline /
 
 //bSeparator = true : 2003-04-16 18:01:00.123
 //bSeparator = false: 20030416 180100.123
-CString	GetCurrentTimeString(bool bSeparator, bool bUnderline /*= false*/, bool bHasMilliSec /*= true*/)
+CString	GetCurrentTimeString(bool bSeparator, bool bHasMilliSec)
 {
 	__timeb32	tCur;
 
 	_ftime32(&tCur);
 	return GetTimeString(tCur, bSeparator, bUnderline, bHasMilliSec);
 }
+
+CString GetDateTimeStringFromTime(CTime t, bool bSeparator, bool h24, bool bHasMilliSec, bool include_seconds)
+{
+	CString str;
+
+	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t, _T(":"), h24, include_seconds));
+
+	if (!bSeparator)
+	{
+		str.Remove('-');
+		str.Remove('/');
+		str.Remove(':');
+	}
+
+	return str;
+}
+
+CString GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator /*= true*/, bool h24 /*= true*/, bool include_seconds /*= true*/)
+{
+	CTime tTime(t);
+	return GetDateTimeStringFromTime(tTime, bSeparator, h24, include_seconds);
+}
+
+#endif
 
 //sDate = "20140403"
 //sTime = "123456"
@@ -349,28 +418,6 @@ CTimeSpan GetTimeSpanFromTimeString(CString sTime)
 	ASSERT(sTime.GetLength() == 6 || sTime.GetLength() == 8);
 	sTime.Remove(':');
 	return CTimeSpan(0, _ttoi(sTime.Left(2)), _ttoi(sTime.Mid(2,2)), _ttoi(sTime.Right(2)));
-}
-
-CString GetDateTimeStringFromTime(CTime t, bool bSeparator /*= true*/, bool h24 /*= true*/, bool include_seconds /*= true*/)
-{
-	CString str;
-
-	str.Format(_T("%s %s"), GetDateStringFromTime(t), GetTimeStringFromTime(t, _T(":"), h24, include_seconds));
-
-	if (!bSeparator)
-	{
-		str.Remove('-');
-		str.Remove('/');
-		str.Remove(':');
-	}
-
-	return str;
-}
-
-CString GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator /*= true*/, bool h24 /*= true*/, bool include_seconds /*= true*/)
-{
-	CTime tTime(t);
-	return GetDateTimeStringFromTime(tTime, bSeparator, h24, include_seconds);
 }
 
 void GetTimeFromSeconds(int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds)
@@ -2903,22 +2950,22 @@ LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
 	return nError;
 }
 
-#ifndef _USING_V110_SDK71_
-LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value)
+//#ifndef _USING_V110_SDK71_
+LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD*value)
 {
 	HKEY	hkey = NULL;
-	DWORD	dwType;
-	DWORD	cbData;
-	//LPVOID	lpMsgBuf;
-	
-	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
+	LONG 	nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
 
 	if (nError == ERROR_SUCCESS)
 	{
 		if (hkey)
 		{
-			nError = RegGetValue(hKeyRoot, sSubKey, sEntry, RRF_RT_DWORD, &dwType, value, &cbData);
-			
+			//WinXP SP3에서 RegGetValue()가 지원되지 않아 RegQueryValueEx()로 변경함.
+			//nError = RegGetValue(hKeyRoot, sSubKey, sEntry, RRF_RT_DWORD, &dwType, value, &cbData);
+
+			DWORD buf_size = sizeof(DWORD);
+			nError = RegQueryValueEx(hkey, sEntry, NULL, NULL, (LPBYTE)value, &buf_size);
+
 			if (nError != ERROR_SUCCESS)
 			{
 				/*
@@ -3008,7 +3055,7 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 	return nError;
 }
 
-LONG SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString entry, int value)
+LONG SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
 {
 	HKEY	hkey;
 	DWORD	dwDesc;
@@ -3020,7 +3067,7 @@ LONG SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString entry, int value)
 		NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
 
 	if (lResult == ERROR_SUCCESS)
-		lResult = RegSetValueEx(hkey, entry, NULL, REG_DWORD, (LPBYTE)&value, sizeof(int));
+		lResult = RegSetValueEx(hkey, entry, NULL, REG_DWORD, (LPBYTE)&value, sizeof(DWORD));
 
 	RegCloseKey(hkey);
 
@@ -3032,10 +3079,12 @@ LONG SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString st
 	HKEY	hkey;
 	LONG	lResult;
 	DWORD	dwDesc;
-	TCHAR	buffer[1000];
+	TCHAR	buffer[1000] = { 0, };
 	DWORD	dwReturn;
 	
-	_tprintf(buffer, "%s\0", str);
+	ZeroMemory(buffer, sizeof(buffer));
+
+	_stprintf(buffer, _T("%s\0"), str);
 	
 	RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_WRITE, &hkey);
 	
@@ -3052,7 +3101,7 @@ LONG SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString st
 
 	return true;
 }
-#endif
+//#endif
 
 bool	LoadBitmapFromFile(CBitmap &bmp, CString strFile)
 {
@@ -13640,9 +13689,6 @@ void printf_string(const char* psz, ...)
 
 void trace_output(TCHAR* func, int line, LPCTSTR format, ...)
 {
-//#ifndef _DEBUG
-//	return;
-//#endif
 	va_list args;
 	va_start(args, format);
 
@@ -13650,7 +13696,7 @@ void trace_output(TCHAR* func, int line, LPCTSTR format, ...)
 	str.FormatV(format, args);
 	va_end(args);
 
-	str.Format(_T("[%s][%d] %s"), func, line, str);
+	str.Format(_T("%s [%s][%d] %s"), get_cur_datetime_string(1), func, line, str);
 	OutputDebugString(str);
 }
 

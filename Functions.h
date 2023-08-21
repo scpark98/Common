@@ -876,12 +876,12 @@ void		Trace(char* szFormat, ...);
 	HINSTANCE	FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult);
 
 	LONG		IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey);
-#ifndef _USING_V110_SDK71_
-	LONG		GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int *value);
+//#ifndef _USING_V110_SDK71_
+	LONG		GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value);
 	LONG		GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
-	LONG		SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, int value);
+	LONG		SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);
 	LONG		SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
-#endif
+//#endif
 	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
 	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 
@@ -926,28 +926,28 @@ dsth	: 타겟 전체 height(pixel)
 w		: 복사할 width 크기(pixel)
 h		: 복사할 height 크기(pixel)
 */
-bool		memcpy_block(uint8_t *src, int srcx, int srcy, int srcw, int srch, uint8_t *dst, int dstx, int dsty, int dstw, int dsth, int w, int h, int ch);
-bool		memcpy_block(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, int ch, uint8_t *dst);
+	bool		memcpy_block(uint8_t *src, int srcx, int srcy, int srcw, int srch, uint8_t *dst, int dstx, int dsty, int dstw, int dsth, int w, int h, int ch);
+	bool		memcpy_block(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, int ch, uint8_t *dst);
 
 //src에서 roi 영역을 잘라서 dst_width * dst_height 크기로 resize 시킨다.
-bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
+	bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
 
 //HDD
-uint64_t	GetDiskFreeSize(CString sDrive);
-uint64_t	GetDiskTotalSize(CString sDrive);
-CString		GetDiskSizeString(CString sDrive);	// "1.25G / 380.00G"
-//CString		GetHDDSerialNumber(int nPhysicalDrive);
-CString		GetHDDVolumeNumber(CString sDrive);
-void		get_drive_map(std::map<TCHAR, CString> *drive_map);
-CString		get_drive_volume(TCHAR drive_letter);
+	uint64_t	GetDiskFreeSize(CString sDrive);
+	uint64_t	GetDiskTotalSize(CString sDrive);
+	CString		GetDiskSizeString(CString sDrive);	// "1.25G / 380.00G"
+	//CString		GetHDDSerialNumber(int nPhysicalDrive);
+	CString		GetHDDVolumeNumber(CString sDrive);
+	void		get_drive_map(std::map<TCHAR, CString> *drive_map);
+	CString		get_drive_volume(TCHAR drive_letter);
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
 //문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.
-CString		convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map = NULL);
-CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*csidl_map = NULL);
+	CString		convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map = NULL);
+	CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*csidl_map = NULL);
 
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
-void		ParseCommandString(CString sParam, CStringArray& ar);
+	void		ParseCommandString(CString sParam, CStringArray& ar);
 
 //지정한 이미지를 바탕화면에 표시한다.
 #ifndef _USING_V110_SDK71_
@@ -955,41 +955,48 @@ void		SetWallPaper(CString sfile);
 #endif
 
 //단축아이콘을 만들어준다.
-HRESULT		MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
-							 LPTSTR pszWorkingDir = NULL, LPTSTR pszArgument = NULL, LPTSTR pszDesc = NULL);
-HRESULT		CreateShortCut(LPCTSTR pszShortcutFile, LPCOLESTR pszLink,
-							LPCTSTR pszWorkingDir = _T(""), LPCTSTR pszArgument = _T(""), LPCTSTR pszDesc = _T(""));
+	HRESULT		MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
+								 LPTSTR pszWorkingDir = NULL, LPTSTR pszArgument = NULL, LPTSTR pszDesc = NULL);
+	HRESULT		CreateShortCut(LPCTSTR pszShortcutFile, LPCOLESTR pszLink,
+								LPCTSTR pszWorkingDir = _T(""), LPCTSTR pszArgument = _T(""), LPCTSTR pszDesc = _T(""));
 
 //printer
-int			GetPrinterList(CStringArray *arPrinter);
-CString		GetDefaultPrinterName();
-CSize		GetPrinterPaperSize(CString sPrinterName);
+	int			GetPrinterList(CStringArray *arPrinter);
+	CString		GetDefaultPrinterName();
+	CSize		GetPrinterPaperSize(CString sPrinterName);
 
-CString		get_last_error_message(bool show_msgBox);
-CString		get_last_error_message(DWORD errorId, bool show_msgBox);
+	CString		get_last_error_message(bool show_msgBox);
+	CString		get_last_error_message(DWORD errorId, bool show_msgBox);
 
 //////////////////////////////////////////////////////////////////////////
-//시간
-	CString		GetDateStringFromTime(CTime t, CString sMark = _T("-"));
-	CString		GetDateStringFromTime(COleDateTime t, CString sMark = _T("-"));
-	CString		GetDateStringFromTime(__timeb32 t, CString sMark = _T("-"));
-	CString		GetTimeStringFromTime(CTime t, CString sMark = _T(":"), bool h24 = true, bool include_seconds = true);
-	CString		GetTimeStringFromTime(COleDateTime t, CString sMark = _T(":"));
-	CString		GetTimeStringFromTime(__timeb32 t, CString sMark = _T(":"));
+//date, time 날짜/시간
+	CString		get_date_string(CTime t, CString sep = _T("-"));
+	CString		get_date_string(COleDateTime t, CString sep = _T("-"));
+	CString		get_date_string(__timeb32 tb, CString sep = _T("-"));
+	CString		get_date_string(SYSTEMTIME st, CString sep = _T("-"));
+
+	CString		get_time_string(CTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_string(COleDateTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_string(__timeb32 tb, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_string(SYSTEMTIME st, CString sep = _T(":"), bool h24 = true, bool sec = true, bool msec = true);
+
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
-	CString		GetCurrentDateTimeString(int nType = 2, bool bSeparator = true, CString mid = _T(" "), bool h24 = true);
+	CString		get_datetime_string(CTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
+	CString		get_datetime_string(COleDateTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
+	CString		get_datetime_string(__timeb32 tb, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
+	CString		get_datetime_string(SYSTEMTIME st, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = true);
+
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
-	CString		GetDateTimeString(CTime t, int type = 2, bool separator = true, CString mid = _T(" "), bool h24 = true);
-	CString		GetTimeString(CTime t, bool bSeparator = true);
-	CString		GetTimeString(COleDateTime t, bool bSeparator = true);
-	CString		GetTimeString(__timeb32 t, bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true);	//2003-04-16 18:01:00.120
+	CString		get_cur_datetime_string(int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = true);
+
+
 	//2003-04-16 18:01:00.120
-	CString		GetCurrentTimeString(bool bSeparator = true, bool bUnderline = false, bool bHasMilliSec = true);
+	CString		GetCurrentTimeString(bool bSeparator = true, bool msec = false);
 	CTime		GetTimeFromTimeString(CString sDate, CString sTime);
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
-	CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true);
-	CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true);
-	CString		GetDateTimeStringFromTime(COleDateTime t, bool bSeparator = true);
+	//CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
+	//CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
+	//CString		GetDateTimeStringFromTime(COleDateTime t, bool bSeparator = true);
 	CTime		GetTimeFromDateTimeString(CString sDateTime);
 	CString		GetTimeStringFromSeconds(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
 	CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour = true, bool bHasMilliSec = true);

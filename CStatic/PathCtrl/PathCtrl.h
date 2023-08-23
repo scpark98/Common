@@ -19,7 +19,7 @@
 #define ROOT_WIDTH	21
 // CPathCtrl
 
-#define MESSAGE_PATHCTRL			WM_USER + 0x7FFF - 0x7463
+static const UINT Message_CPathCtrl = ::RegisterWindowMessage(_T("MessageString_CPathCtrl"));
 
 class CPathCtrlMessage
 {
@@ -149,7 +149,7 @@ protected:
 	void		UpdateSurface();
 	void		ReconstructFont();
 
-	LRESULT		OnMessageColorListBoxSelChanged(WPARAM wParam, LPARAM lParam);
+	LRESULT		OnMessageColorListBox(WPARAM wParam, LPARAM lParam);
 
 protected:
 	DECLARE_MESSAGE_MAP()

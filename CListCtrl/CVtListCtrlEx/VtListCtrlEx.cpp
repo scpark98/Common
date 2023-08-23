@@ -1965,7 +1965,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 	int cur_idx = start_idx;
 	while (true)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
@@ -1975,7 +1975,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 			if (stop_first_found)
 			{
-				::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
 				return 1;
 			}
 		}
@@ -2643,7 +2643,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 	if (m_path.Right(1) == '\\')
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	TRACE(_T("current path = %s\n"), m_path);
+	trace(_T("current path = %s\n"), m_path);
 
 	refresh_list(refresh);
 }
@@ -3135,7 +3135,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 		// Save current window pointer as the CListCtrl we are dropping onto
 		//if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
-			m_pDropWnd = pDropWnd;
+		m_pDropWnd = pDropWnd;
 
 		// Convert from screen coordinates to drop target client coordinates
 		pDropWnd->ScreenToClient(&pt);
@@ -3155,8 +3155,8 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(pt, &uFlags);
-			// Highlight it (폴더인 경우에만 hilite시킨다)
-			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
+			// Highlight it (폴더인 경우에만 hilite시킨다. 폴더는 크기 컬럼이 empty임)
+			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, 1) == _T(""))
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
 			// Redraw item
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
@@ -3236,13 +3236,13 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	//drop되면 그 이벤트만 메인에 알리고
 	//메인에서는 drag관련 정보와 drop정보를 이용해서 원하는 처리만 한다.
 	//따라서 맨 아래 ::SendMessage만 필요하며
-	//중간 코드들은
+	//중간 코드들은 메인에서 활용하는 방법에 대한 예시임.
 
 	CString droppedItem;
 
 	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 	{
-		CListCtrl* pDropListCtrl = (CListCtrl*)pDragWnd;
+		CListCtrl* pDropListCtrl = (CListCtrl*)pDropWnd;
 
 		if (m_nDropIndex >= 0)
 			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, col_filename);
@@ -3251,9 +3251,9 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 		get_selected_items(&dq);
 
 		for (int i = 0; i < dq.size(); i++)
-			TRACE(_T("drag %d = %s\n"), i, GetItemText(dq[i], col_filename));
+			trace(_T("drag item %d of %p = %s\n"), i, pDragWnd, GetItemText(dq[i], col_filename));
 
-		TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+		trace(_T("dropped on %p = %s\n"), pDropWnd, (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
 	}
 	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 	{
@@ -3261,5 +3261,5 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	}
 
 
-	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_dropped, pDropWnd)), (LPARAM)0);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
 }

@@ -120,7 +120,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		SYSTEM_REBOOT			1
 #define		SYSTEM_POWEROFF			2
 
-#define		IsShiftPressed() (0x8000 ==(GetKeyState(VK_SHIFT) & 0x8000  ))
+#define		IsShiftPressed() (0x8000 ==(GetKeyState(VK_SHIFT) & 0x8000 ))
 #define		IsCtrlPressed()  (0x8000 ==(GetKeyState(VK_CONTROL) & 0x8000))
 
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
@@ -756,20 +756,21 @@ void		Trace(char* szFormat, ...);
 	bool		IsFolder(CString sfile);				//폴더인지 파일인지
 	bool		isFolder(char *sfile);
 	//파일명이나 폴더명에 '\\', '/' 혼용일 경우가 있으므로 CString의 '==' 연산자로 비교해선 안된다. 
-	bool IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive = false);
+	bool		IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive = false);
 	CString		GetParentDirectory(CString sFolder);	//현재 폴더의 상위 폴더명을 리턴한다.
 
 	//compare_only_filename : fullpath로 정렬할지, 파일명만 추출해서 정렬할지. default = false;
 	void		sort_like_explorer(std::deque<CString> *dq, bool compare_only_filename = false);
 	void		sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString>::iterator _last, bool compare_only_filename = false);
 
-	//지정된 폴더의 파일 목록을 얻어온다.
+	//지정된 폴더내의 파일 목록을 얻어온다.
 	//sNameFilter의 와일드카드는 직접 줘서 검색해야 한다.
 	//프롬프트 명령과 동일하게 물음표나 별표와 같은 와일드카드를 이용할 수 있다.
 	//sNameFilter = "test*", sExtFilter = "jpg;bmp;" 와 같이 입력하면
 	//test로 시작하고 확장자가 jpg, bmp인 파일 목록을 얻어온다.
 	//sExceptStr = "test;temp;error" 와 같이 세미콜론으로 구분하여 검색 제외할 파일명 지정 가능.
 	//주의! dqFiles는 이 함수에 의해 초기화되지 않으므로 필요한 경우 초기화하여 호출할 것!
+	//bRecursive이면 하위 폴더들 내의 모든 파일들도 검색한다. 폴더 자체는 리스트에 포함되지 않는다.
 	void		FindAllFiles(	CString sFolder, std::deque<CString> *dqFiles,
 								CString sNameFilter = _T("*"), CString sExtFilter = _T("*"),
 								bool bRecursive = false, CString sExceptStr = _T(""),
@@ -786,7 +787,8 @@ void		Trace(char* szFormat, ...);
 #endif
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
 	//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
-	int	get_sub_folders(CString root, std::deque<CString>* list = NULL, bool special_folders = false);
+	//include_files가 true이면 파일도 포함된다.
+	int	get_sub_folders(CString root, std::deque<CString>* list = NULL, bool special_folders = false, bool include_files = false);
 	//위 함수는 전체 서브 폴더의 목록이나 개수까지 모두 구하기 때문에 특정 폴더일 경우는 속도가 매우 느리다
 	//간단히 서브 폴더 유무만 체크하는 함수를 추가한다.
 	bool has_sub_folders(CString root);

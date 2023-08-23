@@ -48,7 +48,7 @@ m_list.set_header_height(24);
 #define LCSB_CLIENTDATA 1
 #define LCSB_NCOVERRIDE 2
 
-#define MESSAGE_VTLISTCTRLEX			WM_USER + 0x7FFF - 0x7464
+static const UINT Message_CVtListCtrlEx = ::RegisterWindowMessage(_T("MessageString_CVtListCtrlEx"));
 
 class CVtListCtrlExMessage
 {
@@ -110,10 +110,10 @@ public:
 	BOOL m_bHorizLine = TRUE;
 	void HideScrollBars(int Type, int Which = SB_BOTH);
 
-	enum VtListCtrlExMsgs
+	enum CVtListCtrlExMsgs
 	{
 		message_progress_pos = 0,
-		message_drag_and_dropped,
+		message_drag_and_drop,
 	};
 
 
@@ -456,7 +456,7 @@ protected:
 	bool			m_bDragging = false;		//T during a drag operation
 	int				m_nDragIndex = -1;			//Index of selected item in the List we are dragging FROM
 	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
-	std::deque<UINT> m_drag_images_id;		//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
+	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
 
 	CImageList* CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint);

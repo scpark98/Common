@@ -30,17 +30,33 @@
 /////////////////////////////////////////////////////////////////////////////
 // CColorListBox window
 
+static const UINT Message_CColorListBox = ::RegisterWindowMessage(_T("MessageString_CColorListBox"));
+
+class CColorListBoxMessage
+{
+public:
+	CColorListBoxMessage(CWnd* _this, int _message)
+	{
+		pThis = _this;
+		message = _message;
+	}
+
+	CWnd*	pThis = NULL;
+	int		message;
+};
+
 class CColorListBox : public CListBox
 {
 // Construction
 public:
 	CColorListBox();
 
-// Attributes
-	enum USER_MESSAGE
+	enum MESSAGES
 	{
-		wm_message_colorlistbox_selchange = WM_USER + 2724,
+		message_colorlistbox_selchange = 0,
 	};
+
+// Attributes
 
 // Operations
 public:

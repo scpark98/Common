@@ -232,11 +232,9 @@ void CTreeCtrlEx::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	HWND hWnd = GetParent()->GetSafeHwnd();
-	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_TREECTRLEX,
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CTreeCtrlEx,
 				(WPARAM)&CTreeCtrlExMessage(this, message_selchanged),
 				(LPARAM)&CString(get_fullpath(GetSelectedItem())));
-
-	//m_selectedItem = GetSelectedItem();
 
 	*pResult = 0;
 }
@@ -438,7 +436,7 @@ void CTreeCtrlEx::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	ScreenToClient(&pt);
 
 	HTREEITEM hItem = HitTest(pt, &nFlags);
-	TRACE(_T("%s, %d, %d, %d\n"), get_fullpath(hItem), pt.x, pt.y, nFlags);
+	trace(_T("%s, %d, %d, %d\n"), get_fullpath(hItem), pt.x, pt.y, nFlags);
 
 	//확장버튼을 누르면
 	if (nFlags & TVHT_ONITEMBUTTON)
@@ -549,10 +547,10 @@ void CTreeCtrlEx::iterate_tree(HTREEITEM hItem)
 //recursion을 사용하지 않고 모든 node를 검색한다.
 //stack을 이용하므로 그 차례가 실제 UI와 다르므로 deque에 넣은 후 sort를 이용한다.
 //탐색기의 트리일 경우에 특화된 코드가 있으므로 범용으로 사용하려면 좀 더 보완이 필요함.
-std::deque<CTreeCtrlFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITEM hItem)
+std::deque<CTreeCtrlExFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITEM hItem)
 {
 	std::deque<HTREEITEM> s;
-	std::deque<CTreeCtrlFolder> folders;
+	std::deque<CTreeCtrlExFolder> folders;
 	CString fullpath;
 	CString text;
 
@@ -582,16 +580,16 @@ std::deque<CTreeCtrlFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITE
 
 		//내 PC일 경우는 ""로 리턴되므로
 		if (fullpath.IsEmpty())
-			folders.push_back(CTreeCtrlFolder(item, fullpath, m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES)));
+			folders.push_back(CTreeCtrlExFolder(item, fullpath, m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES)));
 		else
-			folders.push_back(CTreeCtrlFolder(item, fullpath, GetFileNameFromFullPath(fullpath)));
+			folders.push_back(CTreeCtrlExFolder(item, fullpath, GetFileNameFromFullPath(fullpath)));
 		item = GetNextSiblingItem(item);
 	}
 
 	//바탕 화면, 문서, 내 PC 3개 항목을 제외하고 정렬.
 	//기본 정렬과 탐색기의 정렬은 약간 다르므로 탐색기와 같은 정렬이 되도록.
 	std::sort(folders.begin() +3, folders.end(),
-		[](CTreeCtrlFolder a, CTreeCtrlFolder b)
+		[](CTreeCtrlExFolder a, CTreeCtrlExFolder b)
 		{
 			return !is_greater_with_numeric(a.fullpath, b.fullpath);
 		}
@@ -614,7 +612,6 @@ std::deque<CTreeCtrlFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEITE
 void CTreeCtrlEx::expand_all(bool expand)
 {
 	HTREEITEM hItem;
-	HTREEITEM hCurrent;
 
 	hItem = GetFirstVisibleItem();
 
@@ -733,11 +730,10 @@ void CTreeCtrlEx::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	GetClientRect(rc);
 
 	m_DragItem = pNMTreeView->itemNew.hItem;
-	CString path = get_fullpath(m_DragItem);
-	std::deque<CString> dq;
-	FindAllFiles(path, &dq);
+	CString path = convert_special_folder_to_real_path(get_fullpath(m_DragItem));
+	
 
-	int item_count = dq.size();
+	int item_count = get_sub_folders(path, NULL, false, true);
 	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 
 	if (m_drag_images_id.size() == 1)
@@ -767,7 +763,7 @@ void CTreeCtrlEx::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	//// Change the cursor to the drag image
 	////	(still must perform DragMove() in OnMouseMove() to show it moving)
-	m_pDragImage->BeginDrag(0, CPoint(pNMTreeView->ptDrag.x - rc.left + 16, pNMTreeView->ptDrag.y - rc.top));
+	m_pDragImage->BeginDrag(0, CPoint(-10, -14));	//이 좌표를 주지 않으면 move할때 이미지가 잘못된 위치에 표시된다.
 	m_pDragImage->DragEnter(GetDesktopWindow(), pNMTreeView->ptDrag);
 
 	trace(_T("start drag...\n"));
@@ -781,16 +777,73 @@ void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_bDragging)
 	{
-		//// Move the drag image
-		CPoint pt(point);	//get our current mouse coordinates
-		ClientToScreen(&pt); //convert to screen coordinates
-		m_pDragImage->DragMove(pt); //move the drag image to those coordinates
+		GetCursorPos(&point);
+		trace(_T("cursor = %d, %d\n"), point.x, point.y);
+		m_pDragImage->DragMove(point); //move the drag image to those coordinates
+
 		// Unlock window updates (this allows the dragging image to be shown smoothly)
 		//m_pDragImage->DragShowNolock(false);
 
 		//// Get the CWnd pointer of the window that is under the mouse cursor
-		CWnd* pDropWnd = WindowFromPoint(pt);
+		CWnd* pDropWnd = WindowFromPoint(point);
+		trace(_T("this = %p, pDropWnd = %p\n"), this, pDropWnd);
 		ASSERT(pDropWnd); //make sure we have a window
+
+		m_pDropWnd = pDropWnd;
+
+		pDropWnd->ScreenToClient(&point);
+
+		//If we are hovering over a CListCtrl we need to adjust the highlights
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+		{
+			//Note that we can drop here
+			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
+			UINT uFlags;
+			CListCtrl* pList = (CListCtrl*)pDropWnd;
+
+			//기존 LVIS_DROPHILITED를 해제해주지 않으니 아래 새로 LVIS_DROPHILITED하는 항목이 갱신되지 않는다.
+			if (m_nDropIndex >= 0)
+			{
+				// Turn off hilight for previous drop target
+				pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+				// Redraw previous item
+				pList->RedrawItems(m_nDropIndex, m_nDropIndex);
+			}
+
+			// Get the item that is below cursor
+			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(point, &uFlags);
+			trace(_T("nDropIndex in ListCtrl = %d\n"), m_nDropIndex);
+			// Highlight it (폴더인 경우에만 hilite시킨다. 폴더는 크기 컬럼이 empty임)
+			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, 1) == _T(""))
+			{
+				trace(_T("new LVIS_DROPHILITED\n"), m_nDropIndex);
+				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
+			}
+
+			// Redraw item
+			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
+			pList->UpdateWindow();
+		}
+		else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+		{
+			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
+			UINT uFlags;
+			CTreeCtrl* pTree = (CTreeCtrl*)pDropWnd;
+
+			// Get the item that is below cursor
+			m_DropItem = ((CTreeCtrl*)pDropWnd)->HitTest(point, &uFlags);
+			trace(_T("%d, %d, hItem = %p\n"), point.x, point.y, m_DropItem);
+			pTree->SelectDropTarget(m_DropItem);
+			ASSERT(m_DropItem == pTree->GetDropHilightItem());
+		}
+		else
+		{
+			//If we are not hovering over a CListCtrl, change the cursor
+			// to note that we cannot drop here
+			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
+		}
+		// Lock window updates
+		m_pDragImage->DragShowNolock(true);
 	}
 
 	CTreeCtrl::OnMouseMove(nFlags, point);
@@ -800,6 +853,34 @@ void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 void CTreeCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_bDragging)
+	{
+		trace(_T("OnLButtonUp\n"));
+		// Release mouse capture, so that other controls can get control/messages
+		ReleaseCapture();
+
+		// Note that we are NOT in a drag operation
+		m_bDragging = false;
+
+		// End dragging image
+		m_pDragImage->DragLeave(GetDesktopWindow());
+		m_pDragImage->EndDrag();
+		delete m_pDragImage; //must delete it because it was created at the beginning of the drag
+
+		CPoint pt(point); //Get current mouse coordinates
+		ClientToScreen(&pt); //Convert to screen coordinates
+
+		// Get the CWnd pointer of the window that is under the mouse cursor
+		CWnd* pDropWnd = WindowFromPoint(pt);
+		ASSERT(pDropWnd); //make sure we have a window pointer
+
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
+			pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+		{
+			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
+			DroppedHandler(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
+		}
+	}
 
 	CTreeCtrl::OnLButtonUp(nFlags, point);
 }
@@ -809,31 +890,29 @@ void CTreeCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	//drop되면 그 이벤트만 메인에 알리고
 	//메인에서는 drag관련 정보와 drop정보를 이용해서 원하는 처리만 한다.
 	//따라서 맨 아래 ::SendMessage만 필요하며
-	//중간 코드들은
+	//중간 코드들은 메인에서 활용하는 방법에 대한 예시임.
 
 	CString droppedItem;
-	/*
+
 	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 	{
-		CListCtrl* pDropListCtrl = (CListCtrl*)pDragWnd;
+		CListCtrl* pDropListCtrl = (CListCtrl*)pDropWnd;
 
 		if (m_nDropIndex >= 0)
-			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, col_filename);
+			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, 0);
 
-		std::deque<int> dq;
-		get_selected_items(&dq);
+		TRACE(_T("drag item = %s\n"), GetItemText(m_DragItem));
 
-		for (int i = 0; i < dq.size(); i++)
-			TRACE(_T("drag %d = %s\n"), i, GetItemText(dq[i], col_filename));
-
-		TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+		TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("dropped on ListCtrl") : droppedItem));
 	}
 	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 	{
+		CTreeCtrl* pDropTreeCtrl = (CTreeCtrl*)pDropWnd;
 
+		//dragItem, dropItem 정보는 drag가 시작된 컨트롤이 기억하고 있다.
+		TRACE(_T("drag item = %s\n"), GetItemText(m_DragItem));
+		TRACE(_T("dropped on = %s\n"), pDropTreeCtrl->GetItemText(m_DropItem));
 	}
 
-
-	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_dropped, pDropWnd)), (LPARAM)0);
-	*/
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CTreeCtrlEx, (WPARAM)&(CTreeCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
 }

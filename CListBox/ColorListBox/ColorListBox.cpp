@@ -677,7 +677,7 @@ BOOL CColorListBox::OnLbnSelchange()
 	//TRACE(_T("selected = %s\n"), text);
 	if (m_as_folder_list && m_hParentWnd)
 	{
-		::SendMessage(m_hParentWnd, wm_message_colorlistbox_selchange, 0, (LPARAM)&text);
+		::SendMessage(m_hParentWnd, Message_CColorListBox, (WPARAM)&CColorListBoxMessage(this, message_colorlistbox_selchange), (LPARAM)&text);
 		ShowWindow(SW_HIDE);
 	}
 

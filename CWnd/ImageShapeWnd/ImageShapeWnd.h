@@ -16,7 +16,7 @@
 
 #include <afxwin.h>
 #include <vector>
-#include "../../Common/GdiPlusBitmap.h"
+#include "../../GdiPlusBitmap.h"
 // CImageShapeWnd
 
 class CImageShapeWnd : public CWnd

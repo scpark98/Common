@@ -3,7 +3,7 @@
 
 #include "ImageShapeWnd.h"
 #include <thread>
-#include "../../Common/Functions.h"
+#include "../../Functions.h"
 
 #define CIMAGESHAPEWND_CLASSNAME _T("CImageShapeWnd")
 

@@ -34,7 +34,7 @@ BEGIN_MESSAGE_MAP(CPathCtrl, CStatic)
 	ON_WM_RBUTTONUP()
 	ON_WM_TIMER()
 	//ON_NOTIFY(LBN_SELCHANGE, IDC_LIST_FOLDERS, &CPathCtrl::OnLbnSelchange)
-	ON_MESSAGE(CColorListBox::wm_message_colorlistbox_selchange, &CPathCtrl::OnMessageColorListBoxSelChanged)
+	ON_REGISTERED_MESSAGE(Message_CColorListBox, &CPathCtrl::OnMessageColorListBox)
 	ON_WM_SIZE()
 	ON_WM_KILLFOCUS()
 END_MESSAGE_MAP()
@@ -152,7 +152,7 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 			}
 			else
 			{
-				::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)0);
+				::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)0);
 				//if (!is_exist)
 				//	text = m_old_text;
 			}
@@ -461,7 +461,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 				}
 				else
 				{
-					::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
+					::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
 					total_lines = m_list_folder.set_folder_list(&m_remote_sub_folders, m_path[m_start_index].label);
 				}
 			}
@@ -473,7 +473,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 				}
 				else
 				{
-					::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
+					::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
 					total_lines = m_list_folder.set_folder_list(&m_remote_sub_folders);
 				}
 			}
@@ -570,7 +570,7 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	else
 	{
 		count = m_remote_sub_folders.size();
-		::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
+		::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
 	}
 
 	if (m_index == 0)
@@ -593,7 +593,7 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		//폴더 항목을 누른거라면 해당 폴더로 변경하고 parent에게도 통보한다.
 		set_path(full_path);
-		::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, full_path), (LPARAM)0);
+		::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, full_path), (LPARAM)0);
 	}
 
 	Invalidate();
@@ -697,14 +697,18 @@ void CPathCtrl::OnLbnSelchange(NMHDR* pNMHDR, LRESULT* pResult)
 	return;
 }
 
-LRESULT CPathCtrl::OnMessageColorListBoxSelChanged(WPARAM wParam, LPARAM lParam)
+LRESULT CPathCtrl::OnMessageColorListBox(WPARAM wParam, LPARAM lParam)
 {
+	CColorListBoxMessage* pMsg = (CColorListBoxMessage*)wParam;
 	CString path = *(CString*)lParam;
+
+	if (pMsg->pThis != &m_list_folder)
+		return 0;
 
 	m_down = false;
 
 	set_path(path);
-	::SendMessage(GetParent()->m_hWnd, MESSAGE_PATHCTRL, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, path), (LPARAM)0);
+	::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, path), (LPARAM)0);
 
 	return 0;
 }

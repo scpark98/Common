@@ -11,17 +11,17 @@
 
 SeedProvider	m_sp;
 
-m_sp.SetHeader( "K-RIVER" );
-m_sp.SetKey( "&!^@&#*$^&*!&@#^" );
+m_sp.SetHeader("K-RIVER");
+m_sp.SetKey("&!^@&#*$^&*!&@#^");
 
 //string encryption
 char str[1024] = "void CTest_EncryptDlg::OnSysCommand(UINT nID, LPARAM lParam)\0";
-m_sp.Encrypt( str, true );
-m_sp.Decrypt( str, false );
+m_sp.Encrypt(str, true);
+m_sp.Decrypt(str, false);
 
 //file encryption
-m_sp.EncryptFileWithHeader( "d:\\untitled.png", false, "d:\\untitled_enc.png" );
-m_sp.DecryptFileWithHeader( "d:\\untitled_enc.png", false, "d:\\untitled_dec.png" );
+m_sp.EncryptFileWithHeader("d:\\untitled.png", false, "d:\\untitled_enc.png");
+m_sp.DecryptFileWithHeader("d:\\untitled_enc.png", false, "d:\\untitled_dec.png");
 
 */
 
@@ -39,11 +39,11 @@ public:
 	SeedProvider(void);
 	~SeedProvider(void);
 
-	void	SetShowError( bool bShow ) { m_bShowError = bShow; }
+	void	SetShowError(bool bShow) { m_bShowError = bShow; }
 
-private:
-	char	m_header[MAX_HEADER_SIZE + 1];	//max 8 characters file signature
-	char	m_key[MAX_KEY_SIZE + 1];		//key characters for encryption
+protected:
+	TCHAR	m_header[MAX_HEADER_SIZE + 1];	//max 8 characters file signature
+	TCHAR	m_key[MAX_KEY_SIZE + 1];		//key characters for encryption
 	int		m_nLastError;
 	bool	m_bShowError;					//default = true
 
@@ -64,19 +64,19 @@ public:
 		SP_ERROR_INVALID_PARAM,			//파라미터가 잘못된 경우(bOverwrite = false인 경우 sDestFile = ""이면 안됨)
 	};
 
-	void SetHeader( char *header );
-	void SetKey( char *key );
+	void SetHeader(TCHAR*header);
+	void SetKey(TCHAR*key);
 
-	bool IsEncryptedHeader( char *header );
+	bool IsEncryptedHeader(TCHAR*header);
 
-	//순수 데이터를 암호화, 복호화 함.
-	void Encrypt(char* str, int size, bool bEncrypt);
+	//순수 데이터를 암호화(encrypt = true), 복호화 함(encrypt = false).
+	void Encrypt(TCHAR* str, int size, bool encrypt);
 	void Encrypt(CString &str, bool encrypt);
 
 	//파일을 암호화, 복호화 함.
-	int	EncryptFileWithHeader( CString sFile, bool bOverwrite, CString sDestFile = _T("") );
-	int DecryptFileWithHeader( CString sFile, bool bOverwrite, CString sDestFile = _T("") );
-	int DecryptFileWithHeader(char *sfile);	//해당 파일을 복호화하고 덮어쓴다.
+	int	EncryptFileWithHeader(CString sFile, bool bOverwrite, CString sDestFile = _T(""));
+	int DecryptFileWithHeader(CString sFile, bool bOverwrite, CString sDestFile = _T(""));
+	int DecryptFileWithHeader(TCHAR*sfile);	//해당 파일을 복호화하고 덮어쓴다.
 	CString	GetLastErrorString();
 };
 

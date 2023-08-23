@@ -43,9 +43,19 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 using namespace Gdiplus;
 
-enum CGdiplusBitmap_Message
+static const UINT Message_CGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CGdiplusBitmap"));
+
+class CGdiplusBitmapMessage
 {
-	msg_gif_frame_changed = WM_USER + 761,
+public:
+	CGdiplusBitmapMessage(Gdiplus::Bitmap* _this, int _message)
+	{
+		pThis = _this;
+		message = _message;
+	}
+
+	Gdiplus::Bitmap* pThis = NULL;
+	int		message;
 };
 
 class CGdiplusBitmap
@@ -53,6 +63,11 @@ class CGdiplusBitmap
 public:
 	Gdiplus::Bitmap* m_pBitmap = NULL;
 	uint8_t* data = NULL;
+
+	enum CGdiplusBitmapMsgs
+	{
+		message_gif_frame_changed = 0,
+	};
 
 public:
 	CGdiplusBitmap();

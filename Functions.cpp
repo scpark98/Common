@@ -1554,7 +1554,7 @@ COLORREF get_color(CString sColor)
 	else if (sColor ==	"purple")				return RGB(0xa0,0x20,0xf0);
 	else if (sColor ==	"mediumpurple")		return RGB(0x93,0x70,0xdb);
 	else if (sColor ==	"thistle")				return RGB(0xd8,0xbf,0xd8);
-	else if (sColor ==	"aqua")				return RGB( 0, 255, 255);
+	else if (sColor ==	"aqua")				return RGB(0, 255, 255);
 	else return -1;
 }
 #endif
@@ -4466,8 +4466,9 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 }
 
 //list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
+//recursive는 제공하지 않는다.
 //root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
-int get_sub_folders(CString root, std::deque<CString>* list, bool special_folders)
+int get_sub_folders(CString root, std::deque<CString>* list, bool special_folders, bool include_files)
 {
 	if (list)
 		list->clear();
@@ -4518,13 +4519,17 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 			file = finder.GetFilePath();
 
 			if (finder.IsDots())
+			{
 				continue;
-			if (finder.IsDirectory() && !finder.IsHidden())
+			}
+			else if ((include_files || finder.IsDirectory()) && !finder.IsHidden() && !finder.IsSystem())
+			{
 				folders.push_back(file);
+			}
 		}
 	}
 
-	if (root != _T("내 PC"))
+	if (list && root != _T("내 PC"))
 		sort_like_explorer(&folders);
 
 	if (list)
@@ -10821,7 +10826,7 @@ int LevenshteinDistance(std::string s, int len_s, std::string t, int len_t)
 		cost = 1;
 
 	/* return minimum of delete char from s, delete char from t, and delete char from both */
-	return minimum(LevenshteinDistance(s, len_s - 1, t, len_t  ) + 1,
+	return minimum(LevenshteinDistance(s, len_s - 1, t, len_t ) + 1,
 		LevenshteinDistance(s, len_s    , t, len_t - 1) + 1,
 		LevenshteinDistance(s, len_s - 1, t, len_t - 1) + cost);
 }

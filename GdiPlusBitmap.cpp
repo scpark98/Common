@@ -2107,7 +2107,7 @@ void CGdiplusBitmap::thread_gif_animation()
 			}
 
 			g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
-			::SendMessage(m_displayHwnd, msg_gif_frame_changed, (WPARAM)m_pBitmap, (LPARAM)m_frame_index);
+			::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
 		}
 
 		m_frame_index++;

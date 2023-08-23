@@ -3,8 +3,8 @@
 
 SeedProvider::SeedProvider()
 {
-	memset( m_header, 0, MAX_HEADER_SIZE + 1 );
-	memset( m_key, 0, MAX_KEY_SIZE + 1 );
+	memset(m_header, 0, MAX_HEADER_SIZE + 1);
+	memset(m_key, 0, MAX_KEY_SIZE + 1);
 
 	m_bShowError = true;
 }
@@ -13,58 +13,58 @@ SeedProvider::~SeedProvider()
 {
 }
 
-void SeedProvider::SetHeader( char *header )
+void SeedProvider::SetHeader(TCHAR* header)
 {
-	int len = strlen(header);
-	if ( strlen(header) > MAX_HEADER_SIZE )
+	int len = _tcslen(header);
+	if (_tcslen(header) > MAX_HEADER_SIZE)
 	{
 		TCHAR str[128];
-		_stprintf( str, _T("header(%s) size(%d) is over MAX_HEADER_SIZE(%d)"), header, strlen(header), MAX_HEADER_SIZE );
-		if ( m_bShowError )
-			AfxMessageBox( str, MB_ICONEXCLAMATION );
+		_stprintf(str, _T("header(%s) size(%d) is over MAX_HEADER_SIZE(%d)"), header, _tcslen(header), MAX_HEADER_SIZE);
+		if (m_bShowError)
+			AfxMessageBox(str, MB_ICONEXCLAMATION);
 		return;
 	}
 
-	memcpy( m_header, header, strlen(header) );
+	memcpy(m_header, header, _tcslen(header));
 	m_nLastError = SP_ERROR_NO_ERROR;
 }
 
-void SeedProvider::SetKey( char *key )
+void SeedProvider::SetKey(TCHAR* key)
 {
-	if ( strlen(key) > MAX_KEY_SIZE )
+	if (_tcslen(key) > MAX_KEY_SIZE)
 	{
 		TCHAR str[128];
-		_stprintf(str, _T("key(%s) size(%d) is over MAX_KEY_SIZE(%d)"), key, strlen(key), MAX_KEY_SIZE );
-		if ( m_bShowError )
-			AfxMessageBox( str, MB_ICONEXCLAMATION );
+		_stprintf(str, _T("key(%s) size(%d) is over MAX_KEY_SIZE(%d)"), key, _tcslen(key), MAX_KEY_SIZE);
+		if (m_bShowError)
+			AfxMessageBox(str, MB_ICONEXCLAMATION);
 		return;
 	}
 
-	memcpy( m_key, key, strlen(key) );
+	memcpy(m_key, key, _tcslen(key));
 }
 
-bool SeedProvider::IsEncryptedHeader( char *header )
+bool SeedProvider::IsEncryptedHeader(TCHAR*header)
 {
-	if ( strlen(header) != strlen(m_header) )
+	if (_tcslen(header) != _tcslen(m_header))
 		return false;
 
-	return !strncmp( header, m_header, strlen(m_header) );
+	return !_tcsncmp(header, m_header, _tcslen(m_header));
 }
 
 
 //순수 데이터를 암호화, 복호화 함.
-void SeedProvider::Encrypt( char* str, int size, bool bEncrypt )
+void SeedProvider::Encrypt(TCHAR* str, int size, bool bEncrypt)
 {
 	unsigned int j = 0;
 
-	for ( int i = 0; i < size; i++ )
+	for (int i = 0; i < size; i++)
 	{
-		if ( bEncrypt )
+		if (bEncrypt)
 			str[i] += m_key[j++];
 		else
 			str[i] -= m_key[j++];
 		
-		if ( j == strlen(m_key) )
+		if (j == _tcslen(m_key))
 		{
 			j = 0;
 		}
@@ -75,14 +75,14 @@ void SeedProvider::Encrypt(CString &str, bool encrypt)
 {
 	unsigned int j = 0;
 
-	for ( int i = 0; i < str.GetLength(); i++ )
+	for (int i = 0; i < str.GetLength(); i++)
 	{
-		if ( encrypt )
+		if (encrypt)
 			str.SetAt(i, str[i] + m_key[j++]);
 		else
 			str.SetAt(i, str[i] - m_key[j++]);
 
-		if ( j == strlen(m_key) )
+		if (j == _tcslen(m_key))
 		{
 			j = 0;
 		}
@@ -91,85 +91,85 @@ void SeedProvider::Encrypt(CString &str, bool encrypt)
 }
 
 //파일을 암호화, 복호화 함.
-int	SeedProvider::EncryptFileWithHeader( CString sFile, bool bOverwrite, CString sDestFile )
+int	SeedProvider::EncryptFileWithHeader(CString sFile, bool bOverwrite, CString sDestFile)
 {
-	if ( PathFileExists( sFile ) == false )
+	if (PathFileExists(sFile) == false)
 	{
 		m_nLastError = SP_ERROR_FILE_NOT_FOUND;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
-	if ( strlen(m_header) == 0 )
+	if (_tcslen(m_header) == 0)
 	{
 		m_nLastError = SP_ERROR_INVALID_HEADER;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 	
-	if ( strlen(m_key) == 0 )
+	if (_tcslen(m_key) == 0)
 	{
 		m_nLastError = SP_ERROR_NO_KEY;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
-	if ( !bOverwrite && sDestFile == "" )
+	if (!bOverwrite && sDestFile == "")
 	{
 		m_nLastError = SP_ERROR_INVALID_PARAM;
-		if ( m_bShowError )
+		if (m_bShowError)
 		{
-			AfxMessageBox( GetLastErrorString() );
+			AfxMessageBox(GetLastErrorString());
 			AfxMessageBox(_T("If bOverwrite option is set to false, sDestFile must not be empty string!"));
 		}
 		return m_nLastError;
 	}
 
-	char		header[MAX_HEADER_SIZE];
+	TCHAR		header[MAX_HEADER_SIZE];
 	ULONGLONG	filesize;
 	LPVOID		pdata = NULL;
 
 	//파일이 존재하지 않을 경우 여기에서 시스템 에러 메시지가 출력된다.
 	//따라서 앞에서 미리 존재 유무를 체크하고 메시지 출력도 옵션으로 받아야 한다.
-	CFile inFile( sFile, CFile::modeRead|CFile::typeBinary );
+	CFile inFile(sFile, CFile::modeRead|CFile::typeBinary);
 
 	filesize = inFile.GetLength();
 	pdata	= new byte[ filesize ];
 
-	inFile.Read( pdata, filesize );
+	inFile.Read(pdata, filesize);
 	inFile.Close();
 
-	memcpy( header, pdata, strlen(m_header) );
+	memcpy(header, pdata, _tcslen(m_header));
 
-	if ( IsEncryptedHeader( header) )
+	if (IsEncryptedHeader(header))
 	{
 		delete [] pdata;
 
 		m_nLastError = SP_ERROR_ALREADY_ENCRYPTED;
-		TRACE( "%s\n", GetLastErrorString() );
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		TRACE("%s\n", GetLastErrorString());
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
-	Encrypt( (char *)pdata, filesize, true );
+	Encrypt((TCHAR*)pdata, filesize, true);
 
-	if ( bOverwrite )
+	if (bOverwrite)
 		sDestFile = sFile;
 
-	CFile outFile( sDestFile, CFile::modeCreate|CFile::modeWrite|CFile::typeBinary );
-	outFile.Write( m_header, strlen(m_header) );
-	outFile.Write( pdata, filesize );
+	CFile outFile(sDestFile, CFile::modeCreate|CFile::modeWrite|CFile::typeBinary);
+	outFile.Write(m_header, _tcslen(m_header));
+	outFile.Write(pdata, filesize);
 	outFile.Close();
 
 	/*
-	FILE *fp = fopen( sDestFile, "wb" );
-	fwrite( m_header, 1, strlen(m_header), fp );
-	fwrite( pdata, 1, filesize, fp );
-	fclose( fp );
+	FILE *fp = fopen(sDestFile, "wb");
+	fwrite(m_header, 1, _tcslen(m_header), fp);
+	fwrite(pdata, 1, filesize, fp);
+	fclose(fp);
 	*/
 
 	delete [] pdata;
@@ -178,76 +178,76 @@ int	SeedProvider::EncryptFileWithHeader( CString sFile, bool bOverwrite, CString
 	return m_nLastError;
 }
 
-int SeedProvider::DecryptFileWithHeader( CString sFile, bool bOverwrite, CString sDestFile )
+int SeedProvider::DecryptFileWithHeader(CString sFile, bool bOverwrite, CString sDestFile)
 {
-	if ( PathFileExists( sFile ) == false )
+	if (PathFileExists(sFile) == false)
 	{
 		m_nLastError = SP_ERROR_FILE_NOT_FOUND;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
-	if ( strlen(m_header) == 0 )
+	if (_tcslen(m_header) == 0)
 	{
 		m_nLastError = SP_ERROR_INVALID_HEADER;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 	
-	if ( strlen(m_key) == 0 )
+	if (_tcslen(m_key) == 0)
 	{
 		m_nLastError = SP_ERROR_NO_KEY;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
-	if ( !bOverwrite && sDestFile == "" )
+	if (!bOverwrite && sDestFile == "")
 	{
 		AfxMessageBox(_T("If bOverwrite option is set to false, sDestFile must not be empty string!"));
 		m_nLastError = SP_ERROR_INVALID_PARAM;
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
-	char		header[MAX_HEADER_SIZE+1] = {0,};
-	CFile		inFile( sFile, CFile::modeRead|CFile::typeBinary );
+	TCHAR		header[MAX_HEADER_SIZE+1] = {0,};
+	CFile		inFile(sFile, CFile::modeRead|CFile::typeBinary);
 	ULONGLONG	filesize;
 
 	filesize = inFile.GetLength();
 
-	inFile.Read( header, strlen(m_header) );
+	inFile.Read(header, _tcslen(m_header));
 
-	if ( IsEncryptedHeader( header ) == false )
+	if (IsEncryptedHeader(header) == false)
 	{
 		inFile.Close();
 
 		m_nLastError = SP_ERROR_INVALID_HEADER;
-		TRACE( "%s\n", GetLastErrorString() );
-		if ( m_bShowError )
-			AfxMessageBox( GetLastErrorString() );
+		TRACE("%s\n", GetLastErrorString());
+		if (m_bShowError)
+			AfxMessageBox(GetLastErrorString());
 		return m_nLastError;
 	}
 
 	LPVOID pdata = NULL;
 
-	filesize = filesize - strlen(m_header);
+	filesize = filesize - _tcslen(m_header);
 	pdata = new byte[filesize];
-	inFile.Read( pdata, filesize );
+	inFile.Read(pdata, filesize);
 
 	inFile.Close();
 
-	Encrypt( (char *)pdata, filesize, false );
+	Encrypt((TCHAR*)pdata, filesize, false);
 
 
-	if ( bOverwrite )
+	if (bOverwrite)
 		sDestFile = sFile;
 
-	CFile outFile( sDestFile, CFile::modeCreate|CFile::modeWrite|CFile::typeBinary );
-	outFile.Write( pdata, filesize );
+	CFile outFile(sDestFile, CFile::modeCreate|CFile::modeWrite|CFile::typeBinary);
+	outFile.Write(pdata, filesize);
 	outFile.Close();
 
 	delete [] pdata;
@@ -257,19 +257,17 @@ int SeedProvider::DecryptFileWithHeader( CString sFile, bool bOverwrite, CString
 }
 
 //해당 파일을 복호화하고 덮어쓴다.
-//NeoDAS 전용으로 사용하기 위해 header와 key는 고정값을 사용하고
-//C code로만 작성됨.
-int SeedProvider::DecryptFileWithHeader(char *sfile)
+int SeedProvider::DecryptFileWithHeader(TCHAR*sfile)
 {
-	char header[17] = "verasys_can_info";
-	char key[17] = "베라시스캔에디터";
+	//TCHAR header[17] = _T("verasys_can_info");
+	//TCHAR key[17] = _T("_sample_key_str_");
 
-	char		str[MAX_HEADER_SIZE];
-	FILE		*fp = fopen(sfile, "rb");
+	TCHAR		str[MAX_HEADER_SIZE];
+	FILE		*fp = _tfopen(sfile, _T("rb"));
 	uint32_t	filesize;
 
-	struct stat st;
-	stat(sfile, &st);
+	struct _stat st;
+	_tstat(sfile, &st);
 	filesize = st.st_size;
 
 	fread(str, 1, 16, fp);
@@ -281,10 +279,10 @@ int SeedProvider::DecryptFileWithHeader(char *sfile)
 		return 0;
 	}
 
-	char *pdata = NULL;
+	TCHAR*pdata = NULL;
 
 	filesize = filesize - 16;
-	pdata = new char[filesize];
+	pdata = new TCHAR[filesize];
 	fread(pdata, 1, filesize, fp);
 	fclose(fp);
 
@@ -292,13 +290,13 @@ int SeedProvider::DecryptFileWithHeader(char *sfile)
 
 	for (i = 0; i < filesize; i++)
 	{
-		pdata[i] -= key[j++];
+		pdata[i] -= m_key[j++];
 
-		if (j == strlen(key))
+		if (j == _tcslen(m_key))
 			j = 0;
 	}
 
-	fp = fopen(sfile, "wb");
+	fp = _tfopen(sfile, _T("wb"));
 	fwrite(pdata, 1, filesize, fp);
 	fclose(fp);
 
@@ -308,7 +306,7 @@ int SeedProvider::DecryptFileWithHeader(char *sfile)
 
 CString SeedProvider::GetLastErrorString()
 {
-	switch( m_nLastError )
+	switch(m_nLastError)
 	{
 		case SP_ERROR_NO_ERROR			:	return _T("no error.");
 		case SP_ERROR_FILE_NOT_FOUND	:	return _T("file not found.");

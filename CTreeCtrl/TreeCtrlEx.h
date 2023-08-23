@@ -9,12 +9,13 @@
 #include <deque>
 #include "../system/ShellImageList/ShellImageList.h"
 
-#define MESSAGE_TREECTRLEX			WM_USER + 0x7FFF - 0x7462
+static const UINT Message_CTreeCtrlEx = ::RegisterWindowMessage(_T("MessageString_CTreeCtrlEx"));
 
-class CTreeCtrlFolder
+//tree의 한 항목인 folder 정보 저장 목적
+class CTreeCtrlExFolder
 {
 public:
-	CTreeCtrlFolder(HTREEITEM _item, CString _fullpath, CString _folder)
+	CTreeCtrlExFolder(HTREEITEM _item, CString _fullpath, CString _folder)
 	{
 		item = _item;
 		fullpath = _fullpath;
@@ -52,6 +53,7 @@ public:
 	enum TreeCtrlExMsgs
 	{
 		message_selchanged = 0,
+		message_drag_and_drop,
 	};
 
 	CShellImageList* m_pShellImageList = NULL;
@@ -79,7 +81,7 @@ public:
 	HTREEITEM	find_item(const CString& name, HTREEITEM root);
 
 	void		iterate_tree(HTREEITEM hItem = NULL);
-	std::deque<CTreeCtrlFolder>	iterate_tree_with_no_recursion(HTREEITEM hItem = NULL);
+	std::deque<CTreeCtrlExFolder>	iterate_tree_with_no_recursion(HTREEITEM hItem = NULL);
 
 	void		expand_all(bool expand = true);
 
@@ -107,13 +109,16 @@ public:
 
 	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
+	HTREEITEM		m_DragItem = NULL;			//drag item in the Tree we are dragging FROM
+	HTREEITEM		m_DropItem = NULL;			//dropped item on the Tree we dropped ON
+	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 
 protected:
 	HTREEITEM	m_expandItem;	// 마지막으로 확장한 아이템
 	HTREEITEM	m_desktopItem;	// 바탕화면 아이템
 	HTREEITEM	m_documentItem;	// 문서 아이템
 	HTREEITEM	m_computerItem;	// 내 PC 아이템
-	std::deque<CTreeCtrlFolder> m_folder_list;
+	std::deque<CTreeCtrlExFolder> m_folder_list;
 
 	void			thread_insert_folders(HTREEITEM hItem);
 
@@ -136,12 +141,10 @@ protected:
 
 	//Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;
-	CWnd*			m_pDragWnd = NULL;			//Which ListCtrl we are dragging FROM
-	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
+	CWnd*			m_pDragWnd = NULL;			//Which wnd we are dragging FROM
+	CWnd*			m_pDropWnd = NULL;			//Which wnd we are dropping ON
 	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
 	bool			m_bDragging = false;		//T during a drag operation
-	HTREEITEM		m_DragItem = NULL;			//Index of selected item in the Tree we are dragging FROM
-	//int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	std::deque<UINT> m_drag_images_id;		//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
 

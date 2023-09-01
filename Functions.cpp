@@ -8758,10 +8758,16 @@ double GetElapsedTime(__timeb32 pOldTime)	//pOldTime과 현재 시간의 차이 계산
 	return (double)(t1 - t0) / 1000.0 ;
 }
 
-CString	GetDayTimeCountString(CTimeSpan ts, bool bShowZero, bool bIncludeSec)	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
+CString	GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero, bool bIncludeSec)	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
 {
 	CString str;
 	CString sResult = _T("");
+
+	if (format == 1)
+	{
+		sResult.Format(_T("%02d:%02d:%02d"), ts.GetHours(), ts.GetMinutes(), ts.GetSeconds());
+		return sResult;
+	}
 
 	if (ts.GetDays() || bShowZero)
 	{
@@ -9928,6 +9934,58 @@ HBITMAP CaptureClientToBitmap(HWND hWnd, LPRECT pRect /*= NULL*/)
 	// return handle to the bitmap
 	return hBitmap;
 }
+
+HBITMAP	PrintWindowToBitmap(HWND hTargetWnd)
+{
+	HDC hDC = ::GetDC(hTargetWnd);
+	HDC hdcBitmap = ::CreateCompatibleDC(hDC);
+
+	CRect rct, DsRct;
+	if (hTargetWnd) {
+		::GetWindowRect(hTargetWnd, &rct);
+		::GetWindowRect(::GetDesktopWindow(), &DsRct);
+	}
+	else
+		return FALSE;
+
+	HBITMAP hBitmap = NULL;
+	BOOL bSuccess = FALSE;
+
+	BOOL ckFull = FALSE;
+	RECT a, b;
+	::GetWindowRect(hTargetWnd, &a);
+	::GetWindowRect(::GetDesktopWindow(), &b);
+
+	HDC hMemDC = ::CreateCompatibleDC(hDC);
+	hBitmap = ::CreateCompatibleBitmap(hDC, rct.Width(), rct.Height());
+
+	if (!hBitmap)
+		return FALSE;
+
+	::SelectObject(hMemDC, hBitmap);
+
+	if (!::PrintWindow(hTargetWnd, hMemDC, 0))
+		bSuccess = FALSE;
+	else {
+		if ((rct.left + 8 == DsRct.left || rct.left + 8 == DsRct.left + DsRct.right) && (rct.top + 8 == DsRct.top || rct.top + 8 == DsRct.top + DsRct.bottom) && (rct.right - 8 == DsRct.right || rct.right - 8 == DsRct.right * 2) && (rct.bottom + 32 == DsRct.bottom || rct.bottom + 32 == DsRct.bottom * 2)) {
+			// 전체화면
+
+			StretchBlt(hMemDC, -8, -8, rct.right - rct.left + 8, rct.bottom - rct.top + 8, hMemDC, 0, 0, rct.right - rct.left - 8, rct.bottom - rct.top - 8, SRCCOPY);
+			// 캡쳐 시 여백을 없애기 위해 8픽셀을 가감
+		}
+		else {
+			// 창모드
+
+			StretchBlt(hMemDC, -7, 0, rct.right - rct.left + 7, rct.bottom - rct.top, hMemDC, 0, 0, rct.right - rct.left - 7, rct.bottom - rct.top - 7, SRCCOPY);
+			// 캡쳐 시 여백을 없애기 위해 7픽셀을 가감
+		}
+		bSuccess = TRUE;
+	}
+
+	WriteBMP(hBitmap, hDC, _T("d:\\temp\\test.bmp"));
+	return hBitmap;
+}
+
 
 void WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename)
 {
@@ -13694,6 +13752,11 @@ void printf_string(const char* psz, ...)
 
 void trace_output(TCHAR* func, int line, LPCTSTR format, ...)
 {
+	trace_output_ln(func, line, true, format);
+}
+
+void trace_output_ln(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
+{
 	va_list args;
 	va_start(args, format);
 
@@ -13701,7 +13764,7 @@ void trace_output(TCHAR* func, int line, LPCTSTR format, ...)
 	str.FormatV(format, args);
 	va_end(args);
 
-	str.Format(_T("%s [%s][%d] %s"), get_cur_datetime_string(1), func, line, str);
+	str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1), func, line, str, (linefeed ? '\n' : '\0'));
 	OutputDebugString(str);
 }
 

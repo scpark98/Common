@@ -151,8 +151,22 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		va_list args;
 		va_start(args, format);
 
-		CString str;
-		str.FormatV(format, args);
+		CString log_text;
+		log_text.FormatV(format, args);
+
+		//만약 로그 텍스트의 맨 앞에 \n이 붙어있으면 이전 로그 라인과 라인을 구분하기 위함인데
+		//그냥 기록하면 시간부터 라인번호까지 출력한 후 라인이 변경된다.
+		//log_text의 맨 앞에 \n이 있다면 먼저 처리해준다.
+		int i;
+		int linefeed_count = 0;
+		for (i = 0; i < log_text.GetLength(); i++)
+		{
+			if (log_text[i] == '\n')
+				linefeed_count++;
+		}
+
+		if (linefeed_count > 0)
+			log_text = log_text.Mid(linefeed_count);
 
 		SYSTEMTIME t = { 0 };
 		GetLocalTime(&t);
@@ -161,15 +175,18 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 
 		if (m_fp)
 		{
-			if (str.IsEmpty())
+			if (linefeed_count == 0 && log_text.IsEmpty())
 			{
 				_ftprintf(m_fp, _T("\n"));
 			}
 			else
 			{
+				for (i = 0; i < linefeed_count; i++)
+					_ftprintf(m_fp, _T("\n"));
+
 				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%d] %s"),
 					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
-					funcName, line, str);
+					funcName, line, log_text);
 				_ftprintf(m_fp, _T("%s\n"), result);
 			}
 			fflush(m_fp);
@@ -197,7 +214,7 @@ bool UtilLog::recursive_make_full_directory(LPCTSTR sFolder)
 
 	TCHAR parent[MAX_PATH] = _T("");
 
-	_tcscpy(parent, sFolder);
+	_tcscpy_s(parent, sFolder);
 	::PathRemoveFileSpec(parent);
 
 	if (recursive_make_full_directory(parent))

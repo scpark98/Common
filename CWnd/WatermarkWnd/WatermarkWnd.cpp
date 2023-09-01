@@ -157,13 +157,14 @@ bool CWatermarkWnd::create(HWND parentHwnd, CString text, CRect rw)
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 	_tcscpy_s(m_lf.lfFaceName, _T("맑은 고딕"));
-	m_lf.lfWeight = FW_BOLD;
+	m_lf.lfWeight = FW_MEDIUM;
 	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
 	m_lf.lfEscapement = m_font_angle * 10;
 
 	reconstruct_font();
 
-	SetWindowPos(NULL, rw.left, rw.top, rw.Width(), rw.Height(), SWP_NOZORDER | SWP_SHOWWINDOW);
+	if (!rw.IsRectEmpty())
+		SetWindowPos(NULL, rw.left, rw.top, rw.Width(), rw.Height(), SWP_NOZORDER | SWP_SHOWWINDOW);
 
 	return true;
 }

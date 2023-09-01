@@ -14,9 +14,13 @@
 
   UtilLog gLog;
 
-  //아래와 같이 바로 사용하면 exe파일의 타이틀명으로 로그 파일 자동 생성됨.
+	//만약 로그파일의 위치를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
+	gLog.Init(_T("../../custom log folder/folder1/folder2"));
+
+	//위치를 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
 	logWrite(LOG_LEVEL_RELEASE, _T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
 
+	//도중에 로그파일의 위치를 변경해도 적용되는지 확인 필요함.
 */
 
 #include <afxwin.h>

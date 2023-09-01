@@ -8,27 +8,23 @@
 #include <WTypes.h>
 
 /* usage. ////////////////////////////////////////////////////
-
 SeedProvider	m_sp;
-
-m_sp.SetHeader("K-RIVER");
-m_sp.SetKey("&!^@&#*$^&*!&@#^");
-
+m_sp.SetHeader( "K-RIVER" );
+m_sp.SetKey( "&!^@&#*$^&*!&@#^" );
 //string encryption
 char str[1024] = "void CTest_EncryptDlg::OnSysCommand(UINT nID, LPARAM lParam)\0";
-m_sp.Encrypt(str, true);
-m_sp.Decrypt(str, false);
-
+m_sp.Encrypt( str, true );
+m_sp.Decrypt( str, false );
 //file encryption
-m_sp.EncryptFileWithHeader("d:\\untitled.png", false, "d:\\untitled_enc.png");
-m_sp.DecryptFileWithHeader("d:\\untitled_enc.png", false, "d:\\untitled_dec.png");
-
+m_sp.EncryptFileWithHeader( "d:\\untitled.png", false, "d:\\untitled_enc.png" );
+m_sp.DecryptFileWithHeader( "d:\\untitled_enc.png", false, "d:\\untitled_dec.png" );
 */
 
 //scpark
 //기존 코드에 최대 8바이트의 헤더(file signature)를 추가하여 암호화 된 파일인지 복호화 된 파일인지 검사할 수 있도록 변경함.
 //이미 암호화 된 파일을 다시 암호화하는 오류를 방지함.
 //raw data가 아닌 파일을 직접 암호화, 복호화 하도록 함수 추가
+//1:1 변환이라서 byte수가 중요하므로 char 타입을 절대 TCHAR 타입으로의 시도는 하지말것!!
 #define MAX_HEADER_SIZE		16
 #define MAX_KEY_SIZE		16
 
@@ -41,9 +37,9 @@ public:
 
 	void	SetShowError(bool bShow) { m_bShowError = bShow; }
 
-protected:
-	TCHAR	m_header[MAX_HEADER_SIZE + 1];	//max 8 characters file signature
-	TCHAR	m_key[MAX_KEY_SIZE + 1];		//key characters for encryption
+private:
+	char	m_header[MAX_HEADER_SIZE + 1];	//max 8 characters file signature
+	char	m_key[MAX_KEY_SIZE + 1];		//key characters for encryption
 	int		m_nLastError;
 	bool	m_bShowError;					//default = true
 
@@ -64,21 +60,23 @@ public:
 		SP_ERROR_INVALID_PARAM,			//파라미터가 잘못된 경우(bOverwrite = false인 경우 sDestFile = ""이면 안됨)
 	};
 
-	void SetHeader(TCHAR*header);
-	void SetKey(TCHAR*key);
+	void SetHeader(char* header);
+	void SetKey(char* key);
 
-	bool IsEncryptedHeader(TCHAR*header);
+	bool IsEncryptedHeader(char* header);
 
-	//순수 데이터를 암호화(encrypt = true), 복호화 함(encrypt = false).
-	void Encrypt(TCHAR* str, int size, bool encrypt);
-	void Encrypt(CString &str, bool encrypt);
+	//순수 데이터를 암호화, 복호화 함.
+	void Encrypt(char* str, int size, bool bEncrypt);
+	void Encrypt(CString& str, bool encrypt);
 
-	//파일을 암호화, 복호화 함.
-	int	EncryptFileWithHeader(CString sFile, bool bOverwrite, CString sDestFile = _T(""));
-	int DecryptFileWithHeader(CString sFile, bool bOverwrite, CString sDestFile = _T(""));
-	int DecryptFileWithHeader(TCHAR*sfile);	//해당 파일을 복호화하고 덮어쓴다.
+	//파일을 암호화 함. overwrite = true이면 sDstFile이 무시되고 sSrcFile에 덮어쓴다.
+	int	EncryptFileWithHeader(CString src_file, bool overwrite, CString dst_file = _T(""));
+	//파일을 복호화 함. overwrite = true이면 sDestFile이 무시되고 sSrcFile에 덮어쓴다.
+	int DecryptFileWithHeader(CString src_file, bool overwrite, CString dst_file = _T(""));
+	//해당 파일을 복호화하고 덮어쓴다.
+	int DecryptFileWithHeader(char* sfile);
+
 	CString	GetLastErrorString();
 };
 
 #endif //_CRYPTOPROVIDER_SEEDPROVIDER_H_
-

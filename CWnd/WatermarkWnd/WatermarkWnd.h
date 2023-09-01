@@ -39,7 +39,7 @@ public:
 	CString		m_text = _T("Watermark Test String");
 	int			m_font_size = 20;
 	int			m_font_angle = 20;
-	COLORREF	m_font_color = RGB(132, 132, 132);
+	COLORREF	m_font_color = RGB(192, 192, 192);
 
 protected:
 	BOOL RegisterWindowClass();

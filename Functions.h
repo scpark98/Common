@@ -60,6 +60,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #endif
 
 #define trace(fmt, ...) trace_output(__function__, __LINE__, fmt, ##__VA_ARGS__)
+#define traceln(fmt, ...) trace_output_ln(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
 #ifdef __GNUG__
 #include <cxxabi.h>
@@ -254,6 +255,7 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 
 void printf_string(const char* psz, ...);
 void trace_output(TCHAR* func, int line, LPCTSTR format, ...);
+void trace_output_ln(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
 
 template < typename T > class AutoEraser
 {
@@ -543,6 +545,7 @@ void		Trace(char* szFormat, ...);
 	//아마도 함수내에서 메모리가 할당된 후 호출한 곳에서 사용하려니 문제가 될 수 있다.
 	//이 함수의 바디를 그대로 쓰면 문제가 없으므로 일단 바디 코드를 그대로 복사해서 사용한다.
 	LPCWSTR		CString2LPCWSTR(CString str);
+	//리턴받아 사용한 char* 변수값은 사용 후 반드시 delete [] 해줄것
 	char*		CString2char(CString str);
 	TCHAR*		CString2TCHAR(CString str);
 	LPCSTR		CString2LPCSTR(CString str);
@@ -1007,8 +1010,8 @@ void		SetWallPaper(CString sfile);
 	void		GetTimeFromSeconds(int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds);
 	void		SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond);
 	double		GetElapsedTime(__timeb32 pOldTime);	//pOldTime과 현재 시간의 차이 계산
-	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
-	CString		GetDayTimeCountString(CTimeSpan ts, bool bShowZero, bool bIncludeSec);
+	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시(format 0 = "?일 ?시간 ?분 ?초", 1 = "00:00:00") 
+	CString		GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero = true, bool bIncludeSec = true);
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
 	CString		GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bIncludeSec);
 	time_t		_mkgmtime(const struct tm *tm) ;
@@ -1294,6 +1297,7 @@ void		SetWallPaper(CString sfile);
 	HBITMAP		CaptureScreenToBitmap(LPRECT pRect);
 	HBITMAP		CaptureWindowToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	HBITMAP		CaptureClientToBitmap(HWND hWnd, LPRECT pRect = NULL);
+	HBITMAP		PrintWindowToBitmap(HWND hTargetWnd);
 	void		WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename);
 
 

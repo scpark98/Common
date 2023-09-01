@@ -11,8 +11,8 @@
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/core.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
-#include "opencv2/highgui/highgui.hpp"
+//#include "opencv2/imgproc/imgproc.hpp"
+//#include "opencv2/highgui/highgui.hpp"
 //#include "opencv2/features2d/features2d.hpp"
 //#include "opencv2/objdetect/objdetect.hpp"
 //#include "opencv2/photo/photo.hpp"
@@ -32,13 +32,13 @@
 #else
 #define OPENCV_VERSION CVAUX_STR(CV_VERSION_EPOCH)"" CVAUX_STR(CV_VERSION_MAJOR)"" CVAUX_STR(CV_VERSION_MINOR)
 #pragma comment(lib, "opencv_core" OPENCV_VERSION LIB_SUFFIX)   
-#pragma comment(lib, "opencv_imgproc" OPENCV_VERSION LIB_SUFFIX)
-#pragma comment(lib, "opencv_highgui" OPENCV_VERSION LIB_SUFFIX) 
-#pragma comment(lib, "opencv_video" OPENCV_VERSION LIB_SUFFIX)
-#pragma comment(lib, "opencv_features2d" OPENCV_VERSION LIB_SUFFIX)
-#pragma comment(lib, "opencv_objdetect" OPENCV_VERSION LIB_SUFFIX)
+//#pragma comment(lib, "opencv_imgproc" OPENCV_VERSION LIB_SUFFIX)
+//#pragma comment(lib, "opencv_highgui" OPENCV_VERSION LIB_SUFFIX) 
+//#pragma comment(lib, "opencv_video" OPENCV_VERSION LIB_SUFFIX)
+//#pragma comment(lib, "opencv_features2d" OPENCV_VERSION LIB_SUFFIX)
+//#pragma comment(lib, "opencv_objdetect" OPENCV_VERSION LIB_SUFFIX)
 //#pragma comment(lib, "opencv_photo" OPENCV_VERSION LIB_SUFFIX)
-#pragma comment(lib, "opencv_calib3d" OPENCV_VERSION LIB_SUFFIX)
+//#pragma comment(lib, "opencv_calib3d" OPENCV_VERSION LIB_SUFFIX)
 #endif
 
 #ifndef uint8_t

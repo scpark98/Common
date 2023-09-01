@@ -145,7 +145,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 
 	SetSel(nInsertionPoint, nInsertionPoint);
 
-	TRACE(_T("nOldLines = %d\n"), nOldLines);
+	//TRACE(_T("nOldLines = %d\n"), nOldLines);
 	
 	PARAFORMAT2 pf;
 	GetParaFormat(pf);

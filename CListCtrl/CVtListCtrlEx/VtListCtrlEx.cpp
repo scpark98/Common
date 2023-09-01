@@ -1185,6 +1185,20 @@ void CVtListCtrlEx::allow_edit_column(int column, bool allow_edit)
 
 CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 {
+	// Make sure that nCol is valid
+	CHeaderCtrl* pHeader = (CHeaderCtrl*)GetDlgItem(0);
+	int nColumnCount = pHeader->GetItemCount();
+
+	//맨 처음 subItem이 설정된 적이 없다면 -1이 넘어오는데
+	//그럴 경우는 0번 컬럼의 편집이라고 가정한다.
+	if (subItem < 0)
+		subItem = 0;
+
+	if (subItem >= nColumnCount || GetColumnWidth(subItem) < 5)
+		return NULL;
+
+
+
 	if (!m_allow_edit_column[subItem])
 		return NULL;
 	// The returned pointer should not be saved
@@ -1199,11 +1213,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 
 	m_last_clicked = 0;
 
-	// Make sure that nCol is valid
-	CHeaderCtrl* pHeader = (CHeaderCtrl*) GetDlgItem(0);
-	int nColumnCount = pHeader->GetItemCount();
-	if (subItem >= nColumnCount || GetColumnWidth(subItem) < 5)
-		return NULL;
 
 	CRect r = get_item_rect(item, subItem);
 	CRect rc;
@@ -1965,7 +1974,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 	int cur_idx = start_idx;
 	while (true)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
@@ -1975,7 +1984,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 			if (stop_first_found)
 			{
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
+				::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
 				return 1;
 			}
 		}
@@ -3155,8 +3164,8 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(pt, &uFlags);
-			// Highlight it (폴더인 경우에만 hilite시킨다. 폴더는 크기 컬럼이 empty임)
-			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, 1) == _T(""))
+			// Highlight it (폴더인 경우에만 hilite시킨다)
+			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
 			// Redraw item
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);

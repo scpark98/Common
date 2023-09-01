@@ -62,6 +62,16 @@ typedef void *MP4FileHandle;
 
 #define WMV_VIDEO_FRAME_TYPE_BMP 0
 
+class CMP4RecordParam
+{
+public:
+	LPCTSTR filepath = _T("");
+	int width = 0;
+	int height = 0;
+	int fps = 30;
+	int quality = 100;	//0:low quality, 100:best quality
+};
+
 class CMP4Recorder
 {
 public:
@@ -70,6 +80,7 @@ public:
 	virtual ~CMP4Recorder();
 
 	bool Start(LPCTSTR file, int width, int height);
+	bool Start(CMP4RecordParam* param);
 	void Stop();
 	void Pause();
 	void Resume();

@@ -46,14 +46,31 @@ CMP4Recorder::~CMP4Recorder()
 
 bool CMP4Recorder::Start(LPCTSTR file, int width, int height)
 {
-	bool	bResult = true;
+	CMP4RecordParam param;
+	param.filepath = file;
+	param.width = width;
+	param.height = height;
+	param.fps = 30;
+	param.quality = 100;
 
-	m_nEncWidth			= width;
-	m_nEncHeight		= height;
-	m_unFPS				= 10;
-	m_nQuantizer		= 40;//높을수로 화질저하// 36 - (int)((float)pProfile->nQuality / 10);
+	return Start(&param);
+}
 
-	char* cfilename = WCHARToUTF8(file);
+bool CMP4Recorder::Start(CMP4RecordParam* param)
+{
+	bool bResult = true;
+
+	if (param->quality < 0)
+		param->quality = 0;
+	else if (param->quality > 100)
+		param->quality = 100;
+
+	m_nEncWidth			= param->width;
+	m_nEncHeight		= param->height;
+	m_unFPS				= param->fps;
+	m_nQuantizer		= 36 + (int)((float)(100 - param->quality) / 10); //높을수로 화질저하
+
+	char* cfilename = WCHARToUTF8(param->filepath);
 	m_hMP4File = MP4Create(cfilename);
 	delete [] cfilename;
 

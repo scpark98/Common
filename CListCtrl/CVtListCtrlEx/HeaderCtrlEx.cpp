@@ -96,10 +96,7 @@ void CHeaderCtrlEx::OnPaint()
 	COLORREF crSunkenLight = get_color(m_crBack, 48);
 	COLORREF crSunkenDark  = get_color(m_crBack, -48);
 
-	//scpark for test 왜 6으로 넘어올까...우선 3으로 세팅.
-	int a = GetItemCount();
-
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < GetItemCount(); i++)
 	{
 		GetItemRect(i, rItem);
 		//rItem.top -= 1;

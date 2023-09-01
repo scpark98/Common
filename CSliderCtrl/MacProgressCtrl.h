@@ -101,8 +101,8 @@ private:
 	int			m_upper;
 	bool		m_bUseSlider;		//true이면 슬라이드 컨트롤과 같이 조정할 수 있고 콜백함수를 호출한다.
 	bool		m_bDrawOutline;
-	BOOL		m_bShowPercent;
-	bool		m_show_text;
+	BOOL		m_bShowPercent = false;
+	bool		m_show_text = false;
 	CString		m_sText;
 	COLORREF	m_cTextColor;
 	BOOL		m_bGradient;		//default = false

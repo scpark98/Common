@@ -992,7 +992,7 @@ void		SetWallPaper(CString sfile);
 	CString		get_datetime_string(SYSTEMTIME st, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = true);
 
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
-	CString		get_cur_datetime_string(int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = true);
+	CString		get_cur_datetime_string(int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = false);
 
 
 	//2003-04-16 18:01:00.120

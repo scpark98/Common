@@ -44,7 +44,8 @@
 
 #define ADD_USING_THREAD	true
 
-#define MESSAGE_THUMBCTRL	WM_USER + 0x7FFF - 0x7465
+static const UINT Message_CThumbCtrl = ::RegisterWindowMessage(_T("MessageString_CThumbCtrl"));
+
 #define MAX_THREAD			100
 #define MIN_TILE_SIZE		100
 #define MAX_TILE_SIZE		400

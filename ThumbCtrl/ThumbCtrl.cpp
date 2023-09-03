@@ -115,7 +115,7 @@ void CThumbCtrl::remove(int index, bool bRepaint /*= false*/)
 
 	//실제적인 삭제는 여기서 이루어지지만 삭제를 묻는 질문은 메인에서 해야 한다.
 	//따라서 메시지도 보낼 필요가 없다.
-	//::SendMessage( GetParent()->GetSafeHwnd(),	MESSAGE_THUMBCTRL,
+	//::SendMessage( GetParent()->GetSafeHwnd(),	Message_CThumbCtrl,
 	//	(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_remove, index), 0 );
 }
 
@@ -323,7 +323,7 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	if (files.size() == 0)
 	{
 		m_loading_completed = true;
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 		Invalidate();
 		return;
@@ -411,7 +411,7 @@ void CThumbCtrl::on_loading_completed()
 
 	recalculate_scroll_size();
 
-	::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 		(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 }
 
@@ -880,7 +880,7 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 					else
 					{
 						m_selected.erase(m_selected.begin() + selected_index);
-						::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+						::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 							(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_unselected, selected_index), 0);
 					}
 				}
@@ -904,14 +904,14 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 						for (j = MIN(i, last_selected); j <= MAX(i, last_selected); j++)
 						{
 							m_selected.push_back(j);
-							::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+							::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 								(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
 						}
 					}
 					else
 					{
 						m_selected.push_back(i);
-						::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+						::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 							(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
 					}
 				}
@@ -930,14 +930,14 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				if (selected_index >= 0 && m_selected.size() && find_index(&m_selected, m_selected[selected_index]) >= 0)
 				{
 					m_selected.erase(m_selected.begin() + selected_index);
-					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_unselected, selected_index), 0);
 				}
 				else
 				{
 					if (find_index(&m_selected, i) < 0)
 						m_selected.push_back(i);
-					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
 				}
 			}
@@ -975,7 +975,7 @@ void CThumbCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_selected.size())
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_dbclicked, m_selected[0]), 0);
 	}
 
@@ -1206,7 +1206,7 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 
 	//loading은 main에서 호출하므로 메인에게 메시지만 전달한다.
 	case idReload :
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload, 0), 0);
 		break;
 	case idReloadSelected:
@@ -1216,7 +1216,7 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 				return;
 			m_dqThumb[index].reload();
 			InvalidateRect(m_dqThumb[index].rect);
-			::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
 		}
 		break;
@@ -1363,7 +1363,7 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 			recalculate_scroll_size();
 			Invalidate();
 
-			::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 		}
 	}
@@ -2119,7 +2119,7 @@ BOOL CThumbCtrl::PreTranslateMessage(MSG* pMsg)
 			}
 			else if (m_selected.size() > 0)
 			{
-				::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 					(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_keydown, m_selected[0]), pMsg->wParam);
 				return true;
 			}
@@ -2134,7 +2134,7 @@ BOOL CThumbCtrl::PreTranslateMessage(MSG* pMsg)
 			{
 				if (m_selected.size() > 0)
 				{
-					::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_keydown, m_selected[0]), pMsg->wParam);
 				}
 				else
@@ -2287,7 +2287,7 @@ void CThumbCtrl::edit_end(bool valid)
 
 		//썸네일의 이름을 변경하는 것은 파일명인지 무엇인지를 이 컨트롤에서 처리하면 안된다.
 		//용도에 맞게 메인에서 어떤 변경인지에 따라 처리한다.
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_rename, m_editing_index), 0);
 	}
 }

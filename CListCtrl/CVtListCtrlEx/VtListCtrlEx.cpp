@@ -1974,7 +1974,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 	int cur_idx = start_idx;
 	while (true)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)cur_idx);
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
@@ -1984,7 +1984,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 			if (stop_first_found)
 			{
-				::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_VTLISTCTRLEX, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
 				return 1;
 			}
 		}
@@ -2507,7 +2507,7 @@ void CVtListCtrlEx::edit_end(bool valid)
 		m_dqThumb[m_editing_index].title = sText;
 		Invalidate();
 
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_THUMBCTRL,
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_rename, m_editing_index), 0);
 	}
 	*/

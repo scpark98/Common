@@ -163,6 +163,8 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		{
 			if (log_text[i] == '\n')
 				linefeed_count++;
+			else
+				break;
 		}
 
 		if (linefeed_count > 0)

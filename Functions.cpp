@@ -6,6 +6,8 @@
 #include <comutil.h>	//for _bstr_t
 #include <TlHelp32.h>	//for CreateToolhelp32Snapshot
 #include "Psapi.h"		//for GetCurrentMemUsage()
+#include <wuapi.h>		//for windows update option check
+
 
 #include "Functions.h"
 
@@ -1128,6 +1130,22 @@ int	get_char_count(CString sStr, TCHAR ch)
 		return nCount;
 }
 
+CString	get_mac_address_format(TCHAR* src, TCHAR separator)
+{
+	CString sMac = CString(src);
+	ASSERT(sMac.GetLength() == 12);
+	ASSERT(get_char_count(sMac, separator) == 0);
+
+	if (sMac.GetLength() != 12)
+		return sMac;
+
+	//2 5 8 11 14
+	for (int i = 0; i < 5; i++)
+		sMac.Insert(i * 3 + 2, CString(separator));
+
+	return sMac;
+}
+
 int	Find_Divide_Position_By_Punctuation(CString str)
 {
 	if (str == "")
@@ -2248,59 +2266,11 @@ std::string utf8ToMultibyte(std::string inputtext)
 }
 
 //http://localhost:4300/test_doc_favorite/test.avi
-CString	get_uri(CString full_remote_url, CString local_path)
+CString	get_uri(CString full_remote_url, CString local_file_path)
 {
-	/*
-	int colon = full_remote_url.Find(_T(":"));
-	bool is_https = true;
-
-	//http 또는 https에 따라 port 추출을 위한 콜론 위치 추출
-	if (full_remote_url.Left(7) == _T("http://"))
-	{
-		colon = full_remote_url.Find(_T(":"), 8);
-		is_https = false;
-	}
-	else if (full_remote_url.Left(8) == _T("https://"))
-	{
-		colon = full_remote_url.Find(_T(":"), 9);
-	}
-	else
-	{
-		return _T("[error] invalid url.");
-	}
-
-	CString ip;
-	CString port;
-	CString remote_path;
-	int slash;
-
-	if (colon > 0)
-	{
-		ip = full_remote_url.Left(colon);
-		slash = full_remote_url.Find(_T("/"), colon);
-		port = full_remote_url.Mid(colon + 1, slash - colon - 1);
-		remote_path = full_remote_url.Mid(slash);
-	}
-	else
-	{
-		slash = full_remote_url.Find(_T("//"));
-		if (slash > 0)
-		{
-			slash = full_remote_url.Find(_T("/"), slash);
-			ip = full_remote_url.Left(slash);
-			remote_path = full_remote_url.Mid(slash);
-
-			if (is_https)
-				port = _T("443");
-			else
-				port = _T("80");
-		}
-	}
-	*/
-
 	DWORD dwServiceType;
 	CString strServer;
-	CString strObject;
+	CString sub_url;
 	INTERNET_PORT nPort;
 
 	//url은 반드시 http:// 또는 https:// 등과 같은 서비스 종류가 표시되어야 한다.
@@ -2308,12 +2278,12 @@ CString	get_uri(CString full_remote_url, CString local_path)
 		full_remote_url.Left(8) != _T("https://"))
 		full_remote_url = _T("http://") + full_remote_url;
 
-	AfxParseURL(full_remote_url, dwServiceType, strServer, strObject, nPort);
+	AfxParseURL(full_remote_url, dwServiceType, strServer, sub_url, nPort);
 
-	return get_uri(strServer, nPort, strObject, local_path);
+	return get_uri(strServer, nPort, sub_url, local_file_path);
 }
 
-CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
+CString	get_uri(CString ip, int port, CString remote_path, CString local_file_path)
 {
 	CString result = _T("ok");
 	CString str;
@@ -2352,6 +2322,9 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	if (hInternet == NULL)
 		return _T("error=InternetOpen() failed.");
 
+	DWORD dwTimeout = 10000;
+	InternetSetOption(hInternet, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
+
 	if (is_https)
 	{
 		DWORD dwFlags;
@@ -2381,7 +2354,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 	
 	memset(buffer, 0, buffer_size);
 
-	if (local_path.IsEmpty())
+	if (local_file_path.IsEmpty())
 	{
 		total_buffer = new char[buffer_size * 10];
 		memset(total_buffer, 0, buffer_size * 10);
@@ -2422,9 +2395,9 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 	HANDLE hFile = NULL;
 
-	if (!local_path.IsEmpty())
+	if (!local_file_path.IsEmpty())
 	{
-		CString folder = GetFolderNameFromFullPath(local_path);
+		CString folder = GetFolderNameFromFullPath(local_file_path);
 		make_full_directory(folder);
 	}
 
@@ -2449,13 +2422,13 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 
 	if (dwTotalSize == 0)
 	{
-		if (local_path.IsEmpty())
+		if (local_file_path.IsEmpty())
 		{
 			result.Empty();
 		}
 		else
 		{
-			hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (hFile == INVALID_HANDLE_VALUE)
 			{
 				SAFE_DELETE_ARRAY(buffer);
@@ -2463,7 +2436,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 				InternetCloseHandle(hURL);
 				InternetCloseHandle(hInternet);
 
-				return _T("error=") + local_path + _T("\n\nfail to CreateFile().");
+				return _T("error=") + local_file_path + _T("\n\nfail to CreateFile().");
 			}
 
 			CloseHandle(hFile);
@@ -2486,7 +2459,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		if (dwRead == 0)
 			break;
 
-		if (local_path.IsEmpty())
+		if (local_file_path.IsEmpty())
 		{
 			strncat(total_buffer, buffer, dwSize);
 		}
@@ -2508,17 +2481,17 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 			//remote file이 존재하지 않을 경우 로컬에 파일을 만들지 않기 위해 여기서 체크.
 			if (hFile == NULL)
 			{
-				if (PathFileExists(local_path) && DeleteFile(local_path) == FALSE)
+				if (PathFileExists(local_file_path) && DeleteFile(local_file_path) == FALSE)
 				{
 					SAFE_DELETE_ARRAY(buffer);
 					SAFE_DELETE_ARRAY(total_buffer);
 					InternetCloseHandle(hURL);
 					InternetCloseHandle(hInternet);
 
-					return _T("error=") + local_path + _T("\n\nfail to DeleteFile().");
+					return _T("error=") + local_file_path + _T("\n\nfail to DeleteFile().");
 				}
 
-				hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+				hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 				if (hFile == INVALID_HANDLE_VALUE)
 				{
 					SAFE_DELETE_ARRAY(buffer);
@@ -2526,7 +2499,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 					InternetCloseHandle(hURL);
 					InternetCloseHandle(hInternet);
 
-					return _T("error=") + local_path + _T("\n\nfail to CreateFile().");
+					return _T("error=") + local_file_path + _T("\n\nfail to CreateFile().");
 				}
 			}
 
@@ -2534,7 +2507,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		}
 	} while (dwRead != 0);
 
-	if (local_path.IsEmpty())
+	if (local_file_path.IsEmpty())
 	{
 		result = UTF8toCString(total_buffer);
 	}
@@ -2643,19 +2616,19 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 		HANDLE hFile = NULL;
 
 		//로컬 파일이 저장될 폴더가 존재하지 않으면 생성해준다.
-		if (!local_path.IsEmpty())
+		if (!local_file_path.IsEmpty())
 		{
-			CString folder = GetFolderNameFromFullPath(local_path);
+			CString folder = GetFolderNameFromFullPath(local_file_path);
 			make_full_directory(folder);
 
-			hFile = CreateFile(local_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (hFile == INVALID_HANDLE_VALUE)
 			{
 				InternetCloseHandle(hRequest);
 				InternetCloseHandle(hConnect);
 				InternetCloseHandle(hInternet);
 
-				return local_path + _T("\n\nCan't create file.");
+				return local_file_path + _T("\n\nCan't create file.");
 			}
 		}
 
@@ -2674,7 +2647,7 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 			if (dwSize == 0)
 				break;
 
-			if (local_path.IsEmpty())
+			if (local_file_path.IsEmpty())
 			{
 				TRACE(_T("%s"), chBuf);
 
@@ -2695,13 +2668,13 @@ CString	get_uri(CString ip, int port, CString remote_path, CString local_path)
 					InternetCloseHandle(hConnect);
 					InternetCloseHandle(hInternet);
 
-					return local_path + _T("\n\nCan't write file.");
+					return local_file_path + _T("\n\nCan't write file.");
 				}
 				TRACE(_T("%d bytes written.\n"), dwBytesWrite);
 			}
 		}
 
-		if (local_path.IsEmpty())
+		if (local_file_path.IsEmpty())
 		{
 			result = UTF8toCString(chBufAll);
 		}
@@ -3270,7 +3243,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 	bmpInfo.bmiHeader.biClrImportant  = 0;
 
 	// Set a default window size.
-	bmpInfo.bmiHeader.biWidth			= MAKE4WIDTH_U(w);
+	bmpInfo.bmiHeader.biWidth			= MAKE_MULTIFLY_U(w, 4);
 	bmpInfo.bmiHeader.biHeight			= -h;
 	bmpInfo.bmiHeader.biBitCount		= 8 * ch;
 	bmpInfo.bmiHeader.biSizeImage		= sizeof(BYTE) * w * h * ch;
@@ -3551,42 +3524,64 @@ CString		GetMostRecentDateFile(CString sFolder, CString sWildCard /*= "*.*"*/)	/
 #include <iphlpapi.h>
 #pragma comment(lib, "IPHLPAPI.lib")
 
-void GetNetworkInformation(TCHAR* sFindDescription, NETWORK_INFO* pInfo)
+bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo)
 {
-	bool				bResult = FALSE;
-	IP_ADAPTER_INFO*	p1 = NULL;
-	IP_ADAPTER_INFO*	p = NULL;
-	ULONG				len = 0;
+	bool				result = false;
+	IP_ADAPTER_INFO*	pAdapterInfo = NULL;
+	IP_ADAPTER_INFO*	pAdapter = NULL;
+	ULONG				ulOutBufLen = 0;
 
 	USES_CONVERSION;
 
-	if (GetAdaptersInfo(NULL, &len) == ERROR_BUFFER_OVERFLOW)
+	pAdapterInfo = (IP_ADAPTER_INFO*)malloc(ulOutBufLen);
+	if (pAdapterInfo == NULL)
 	{
-		p1 = new IP_ADAPTER_INFO[ len ];
-		GetAdaptersInfo(p1, &len);
+		TRACE(_T("Error allocating memory needed to call GetAdaptersinfo\n"));
+		return result;
+	}
 
-		//p를 사용하지 않고 직접 p1을 이용하여 아래 strcpy를 수행하면 debug heap에러가 발생한다.
-		p = p1;
+	if (GetAdaptersInfo(NULL, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW)
+	{
+		free(pAdapterInfo);
+		pAdapterInfo = (IP_ADAPTER_INFO*)malloc(ulOutBufLen);
 
- 		while (p)
+		if (pAdapterInfo == NULL)
 		{
-			_tcscpy(pInfo->sDescription, A2T(p->Description));
-
-			if (_tcsstr(pInfo->sDescription, sFindDescription) != NULL)
-			{
-				_tcscpy(pInfo->sIPAddress, A2T(p->IpAddressList.IpAddress.String));
-				_tcscpy(pInfo->sGateway, A2T(p->GatewayList.IpAddress.String));
-				_tcscpy(pInfo->sSubnetMask, A2T(p->IpAddressList.IpMask.String));
-				_tprintf(pInfo->sMacAddress, "%02X-%02X-%02X-%02X-%02X-%02X",
-						p->Address[0], p->Address[1], p->Address[2], p->Address[3], p->Address[4], p->Address[5]);
-				break;
-			}
-
-			p = p->Next;
+			TRACE(_T("Error allocating memory needed to call GetAdaptersinfo\n"));
+			return result;
 		}
 	}
 
-	delete[] p1;
+	if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == NO_ERROR)
+	{
+		pAdapter = pAdapterInfo;
+
+ 		while (pAdapter)
+		{
+			_tcscpy(pInfo->sDescription, A2T(pAdapter->Description));
+
+			if (pAdapter->Type == MIB_IF_TYPE_ETHERNET && CString(pInfo->sDescription).Find(sTargetDeviceDescription) >= 0)
+			{
+				_tcscpy(pInfo->sIPAddress, A2T(pAdapter->IpAddressList.IpAddress.String));
+				_tcscpy(pInfo->sGateway, A2T(pAdapter->GatewayList.IpAddress.String));
+				_tcscpy(pInfo->sSubnetMask, A2T(pAdapter->IpAddressList.IpMask.String));
+
+				//TCHAR sMacAddress[16] 이므로 구분자를 넣어주면 안된다.
+				//main에서 Functions.h의 get_mac_address_format()함수로 구분자를 넣어서 표시할 것.
+				_stprintf(pInfo->sMacAddress, _T("%02X%02X%02X%02X%02X%02X"),
+					pAdapter->Address[0], pAdapter->Address[1], pAdapter->Address[2], pAdapter->Address[3], pAdapter->Address[4], pAdapter->Address[5]);
+				result = true;
+				//break;
+			}
+
+			pAdapter = pAdapter->Next;
+		}
+	}
+
+	if (pAdapterInfo)
+		free(pAdapterInfo);
+
+	return result;
 }
 
 bool GetNICAdapterList(IP_ADAPTER_INFO* pAdapters, int& nTotal, int nMax /*= 10*/)
@@ -7772,151 +7767,160 @@ CString GetComputerNameString()
 	return computerName;
 }
 
-
-bool GetWindowsVersion(OSVERSIONINFO& osversioninfo)
+OSVERSIONINFOEX get_windows_version()
 {
-	return GetWindowsVersion(osversioninfo.dwMajorVersion, osversioninfo.dwMinorVersion, osversioninfo.dwPlatformId);
+	OSVERSIONINFOEX osInfo;
+	NTSTATUS(WINAPI * RtlGetVersion)(LPOSVERSIONINFOEX);
+
+	*(FARPROC*)&RtlGetVersion = GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
+
+	if (NULL != RtlGetVersion)
+	{
+		osInfo.dwOSVersionInfoSize = sizeof(osInfo);
+		RtlGetVersion(&osInfo);
+	}
+
+	return osInfo;
 }
 
-bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform)
+CString	get_windows_version_string(OSVERSIONINFOEX* posInfo)
 {
-	static DWORD dwMajCache = 0;
-	static DWORD dwMinCache = 0;
-	static DWORD dwPlaCache = 0;
-
-	if (0 != dwMajCache)
-	{
-		dwMajor = dwMajCache;
-		dwMinor = dwMinCache;
-		dwPlatform = dwPlaCache;
-	}
+	OSVERSIONINFOEX osInfo;
+	if (posInfo == NULL)
+		osInfo = get_windows_version();
 	else
+		osInfo = *posInfo;
+
+	if (osInfo.dwMajorVersion == 5 && osInfo.dwMinorVersion == 1)
+		return _T("Windows XP");
+	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 0)
+		return _T("Windows Vista");
+	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 1)
+		return _T("Windows 7");
+	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 2)
+		return _T("Windows 8");
+	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 3)
+		return _T("Windows 8.1");
+	else if (osInfo.dwMajorVersion == 10 && osInfo.dwMinorVersion == 0)
 	{
-		LPWKSTA_INFO_100 pwi = NULL;
-
-		if (NERR_Success != NetWkstaGetInfo(NULL, 100, (LPBYTE*)&pwi))
-		{
-			return false;
-		}
-
-		dwMajor = dwMajCache = pwi->wki100_ver_major;
-		dwMinor = dwMinCache = pwi->wki100_ver_minor;
-		dwPlatform = dwPlaCache = pwi->wki100_platform_id;
-
-		NetApiBufferFree(pwi);
+		if (osInfo.dwBuildNumber >= 22000)
+			return _T("Windows 11");
+		else
+			return _T("Windows 10");
 	}
+
+	return _T("Unknown OS version");
+}
+
+bool get_windows_update_setting(bool& auto_update, int& level)
+{
+	auto_update = false;
+	level = -1;
+
+	// CoInitializeEx() 함수를 호출하여 COM 라이브러리를 초기화합니다.
+	if (SUCCEEDED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)))
+	{
+		IAutomaticUpdates* pAutomaticUpdates = NULL;
+		// Automatic Updates 객체 생성
+		HRESULT hr = CoCreateInstance(CLSID_AutomaticUpdates, NULL, CLSCTX_INPROC_SERVER, IID_IAutomaticUpdates, (LPVOID*)&pAutomaticUpdates);
+
+		if (SUCCEEDED(hr))
+		{
+			VARIANT_BOOL isAutoUpdateEnabled = VARIANT_FALSE;
+			// 자동 업데이트 활성화 여부 확인
+			hr = pAutomaticUpdates->get_ServiceEnabled(&isAutoUpdateEnabled);
+			if (SUCCEEDED(hr))
+			{
+				if (isAutoUpdateEnabled == VARIANT_TRUE)
+				{
+					//AfxMessageBox(_T("자동 업데이트가 활성화되었습니다."));
+					auto_update = true;
+				}
+				else
+				{
+					//AfxMessageBox(_T("자동 업데이트가 비활성화되었습니다."));
+					auto_update = true;
+				}
+			}
+			else
+			{
+				//AfxMessageBox(_T("자동 업데이트 상태를 가져오는 데 실패했습니다."));
+				return false;
+			}
+
+			IAutomaticUpdatesSettings* settings = NULL;
+			pAutomaticUpdates->get_Settings(&settings);
+
+			AutomaticUpdatesNotificationLevel notification_level;
+			if (S_OK == settings->get_NotificationLevel(&notification_level))
+			{
+				level = notification_level;
+			}
+
+			//AfxMessageBox(i2S(level));
+
+			pAutomaticUpdates->Release();
+		}
+	}
+
+	// COM 라이브러리 정리
+	CoUninitialize();
 
 	return true;
 }
 
-DWORD GetWindowsVersion()
+#include <WinIoCtl.h>
+CString get_HDD_serial_number(int index)
 {
-	DWORD dwMajor = 0;
-	DWORD dwMinor = 0;
+	CString strDrive;
 
-	GetWindowsVersion(dwMajor, dwMinor);
-	return dwMajor;
+	strDrive.Format(_T("\\\\.\\PhysicalDrive%d"), index);
+
+	//get a handle to the first physical drive
+	HANDLE h = CreateFile(strDrive, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+
+	if (h == INVALID_HANDLE_VALUE)
+		return CString();
+
+	//an std::unique_ptr is used to perform cleanup automatically when returning (i.e. to avoid code duplication)
+	std::unique_ptr<std::remove_pointer<HANDLE>::type, void(*)(HANDLE)> hDevice { h, [](HANDLE handle) {CloseHandle(handle); } };
+
+	//initialize a STORAGE_PROPERTY_QUERY data structure (to be used as input to DeviceIoControl)
+	STORAGE_PROPERTY_QUERY storagePropertyQuery{};
+
+	storagePropertyQuery.PropertyId = StorageDeviceProperty;
+	storagePropertyQuery.QueryType = PropertyStandardQuery;
+
+	//initialize a STORAGE_DESCRIPTOR_HEADER data structure (to be used as output from DeviceIoControl)
+	STORAGE_DESCRIPTOR_HEADER storageDescriptorHeader{};
+
+	//the next call to DeviceIoControl retrieves necessary size (in order to allocate a suitable buffer)
+	//call DeviceIoControl and return an empty std::string on failure
+	DWORD dwBytesReturned = 0;
+	if (!DeviceIoControl(hDevice.get(), IOCTL_STORAGE_QUERY_PROPERTY, &storagePropertyQuery, sizeof(STORAGE_PROPERTY_QUERY),
+		&storageDescriptorHeader, sizeof(STORAGE_DESCRIPTOR_HEADER), &dwBytesReturned, NULL))
+		return CString();
+
+	//allocate a suitable buffer
+	const DWORD dwOutBufferSize = storageDescriptorHeader.Size;
+	std::unique_ptr<BYTE[]> pOutBuffer{ new BYTE[dwOutBufferSize]{} };
+
+	//call DeviceIoControl with the allocated buffer
+	if (!DeviceIoControl(hDevice.get(), IOCTL_STORAGE_QUERY_PROPERTY, &storagePropertyQuery, sizeof(STORAGE_PROPERTY_QUERY),
+		pOutBuffer.get(), dwOutBufferSize, &dwBytesReturned, NULL))
+		return CString();
+
+	//read and return the serial number out of the output buffer
+	STORAGE_DEVICE_DESCRIPTOR* pDeviceDescriptor = reinterpret_cast<STORAGE_DEVICE_DESCRIPTOR*>(pOutBuffer.get());
+	const DWORD dwSerialNumberOffset = pDeviceDescriptor->SerialNumberOffset;
+
+	if (dwSerialNumberOffset == 0)
+		return CString();
+
+	CString serialNumber = CString(pOutBuffer.get() + dwSerialNumberOffset);
+
+	return serialNumber;
 }
-
-bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor)
-{
-	static DWORD dwMajorCache = 0, dwMinorCache = 0;
-	if (0 != dwMajorCache)
-	{
-		dwMajor = dwMajorCache;
-		dwMinor = dwMinorCache;
-		return true;
-	}
-
-	LPWKSTA_INFO_100 pBuf = NULL;
-	if (NERR_Success != NetWkstaGetInfo(NULL, 100, (LPBYTE*)&pBuf))
-		return false;
-
-	dwMajor = dwMajorCache = pBuf->wki100_ver_major;
-	dwMinor = dwMinorCache = pBuf->wki100_ver_minor;
-	NetApiBufferFree(pBuf);
-
-	return true;
-}
-
-/*
-bool GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwServicePack)
-{
-	if (!GetWindowsVersion(dwMajor, dwMinor))
-		return false;
-
-	static DWORD dwServicePackCache = ULONG_MAX;
-	if (ULONG_MAX != dwServicePackCache)
-	{
-		dwServicePack = dwServicePackCache;
-		return true;
-	}
-
-	const int nServicePackMax = 10;
-	OSVERSIONINFOEX osvi;
-	DWORDLONG dwlConditionMask = 0;
-
-	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-	VER_SET_CONDITION(dwlConditionMask, VER_SERVICEPACKMAJOR, VER_EQUAL);
-
-	for (int i = 0; i < nServicePackMax; ++i)
-	{
-		osvi.wServicePackMajor = i;
-		if (VerifyVersionInfo(&osvi, VER_SERVICEPACKMAJOR, dwlConditionMask))
-		{
-			dwServicePack = dwServicePackCache = i;
-			return true;
-		}
-	}
-	return false;
-}
-*/
-
-
-/*
-//여러곳에 자주 사용하는 Functions.h에 아래 함수때문에 매번 WQL.h를 포함시키기가 그래서
-//이 기능은 거의 사용하지 않으므로 주석처리하고 필요한 경우에만 사용하자.
-#include "WQL.h"
-
-CString GetHDDSerialNumber(int nPhysicalDrive)
-{
-	CWQL	myWQL;
-	CString sHDDSerialNumber = "";
-
-	if (!myWQL.connect(WMI_LOCALHOST, WMI_DEFAULTNAME, WMI_DEFAULTPW))
-	{
-		AfxMessageBox("WQL connection failed!");
-		return "";
-	}
-
-	CWQL::RowSet rs;
-
-	if (!myWQL.getClassProperties(L"Win32_DiskDrive", rs))
-	{
-		AfxMessageBox("WQL Execute failed! ");
-		return "";
-	}
-
-	TCHAR szBiosSN[32 + 1];
-	ZeroMemory(szBiosSN, sizeof(szBiosSN));
-
-	sHDDSerialNumber = (rs[nPhysicalDrive][L"SerialNumber"]).c_str();
-	sHDDSerialNumber.Trim();
-
-	TCHAR	cTemp;
-
-	//시리얼넘버가 제품에 부착된(ADATA SSD) 시리얼넘버와는 달리 2자리씩 swap되어 있다.
- 	for (int i = 0; i <= sHDDSerialNumber.GetLength() - 2; i += 2)
- 	{
-		cTemp = sHDDSerialNumber.GetAt(i);
-		sHDDSerialNumber.SetAt(i, sHDDSerialNumber.GetAt(i + 1));
-		sHDDSerialNumber.SetAt(i + 1, cTemp);
-	}
-
-	return sHDDSerialNumber;
-}
-*/
 
 //숫자로 구성된 문자열을 입력받아 정해진 연산을 한 후 뒤섞인 숫자문자열을 리턴한다.
 CString	ShuffleNumericString(CString sSrc, bool bSameLength)
@@ -9836,10 +9840,9 @@ HBITMAP CaptureScreenToBitmap(LPRECT pRect)
 		nY2 = pRect->bottom;
 
 		//make sure bitmap rectangle is visible
-		if (nX < 0) nX = 0;
-		if (nY < 0) nY = 0;
-		//if (nX2 > xScrn) nX2 = xScrn;
-		//if (nY2 > yScrn) nY2 = yScrn;
+		//scpark 모니터 위치 설정에 따라 음수일 수 있다. 아래 보정은 하지 않아야 한다.
+		//if (nX < 0) nX = 0;
+		//if (nY < 0) nY = 0;
 	}
 	else
 	{
@@ -9852,8 +9855,22 @@ HBITMAP CaptureScreenToBitmap(LPRECT pRect)
 	nWidth = nX2 - nX;
 	nHeight = nY2 - nY;
 
+#if 0
+	BITMAPINFO bmi;
+	memset(&bmi, 0, sizeof(BITMAPINFO));
+	bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	bmi.bmiHeader.biWidth = nWidth;
+	bmi.bmiHeader.biHeight = -nHeight; // Negative height to make it top-down
+	bmi.bmiHeader.biPlanes = 1;
+	bmi.bmiHeader.biBitCount = 32; // 24-bit bitmap (RGB)
+	bmi.bmiHeader.biCompression = BI_RGB;
 	// create a bitmap compatible with the screen DC
-	hBitmap = CreateCompatibleBitmap(hScrDC, nWidth, nHeight);
+	void* bits;
+	hBitmap = CreateDIBSection(hScrDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+#else
+	// create a bitmap compatible with the screen DC
+	hBitmap = CreateCompatibleBitmap(hScrDC, nWidth, nHeight);	//32bit로 만들어진다.
+#endif
 
 	// select new bitmap into memory DC
 	hOldBitmap = (HBITMAP)SelectObject(hMemDC, hBitmap);
@@ -9935,45 +9952,79 @@ HBITMAP CaptureClientToBitmap(HWND hWnd, LPRECT pRect /*= NULL*/)
 	return hBitmap;
 }
 
-HBITMAP	PrintWindowToBitmap(HWND hTargetWnd)
+HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 {
 	HDC hDC = ::GetDC(hTargetWnd);
-	HDC hdcBitmap = ::CreateCompatibleDC(hDC);
+	//HDC hdcBitmap = ::CreateCompatibleDC(hDC);
 
 	CRect rct, DsRct;
-	if (hTargetWnd) {
-		::GetWindowRect(hTargetWnd, &rct);
-		::GetWindowRect(::GetDesktopWindow(), &DsRct);
+	if (hTargetWnd)
+	{
+		if (pRect)
+		{
+			rct = CRect(pRect);
+		}
+		else
+		{
+			//::GetWindowRect(hTargetWnd, &rct);
+			::GetWindowRect(::GetDesktopWindow(), &DsRct);
+		}
 	}
 	else
+	{
 		return FALSE;
+	}
+
+	int nw = rct.Width();
+	nw = MAKE_MULTIFLY_U(nw, 4);
+	rct.right = rct.left + nw;
 
 	HBITMAP hBitmap = NULL;
 	BOOL bSuccess = FALSE;
-
-	BOOL ckFull = FALSE;
-	RECT a, b;
-	::GetWindowRect(hTargetWnd, &a);
-	::GetWindowRect(::GetDesktopWindow(), &b);
-
 	HDC hMemDC = ::CreateCompatibleDC(hDC);
+
+#if 0
+	BITMAPINFO bmi;
+	memset(&bmi, 0, sizeof(BITMAPINFO));
+	bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	bmi.bmiHeader.biWidth = rct.Width();
+	bmi.bmiHeader.biHeight = -(rct.Height()); // Negative height to make it top-down
+	bmi.bmiHeader.biPlanes = 1;
+	bmi.bmiHeader.biBitCount = 32; // 24-bit bitmap (RGB)
+	bmi.bmiHeader.biCompression = BI_RGB;
+	// create a bitmap compatible with the screen DC
+	void* bits;
+	hBitmap = CreateDIBSection(hDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+#else
+	// create a bitmap compatible with the screen DC
 	hBitmap = ::CreateCompatibleBitmap(hDC, rct.Width(), rct.Height());
+#endif
+
 
 	if (!hBitmap)
 		return FALSE;
 
 	::SelectObject(hMemDC, hBitmap);
 
-	if (!::PrintWindow(hTargetWnd, hMemDC, 0))
+	if (!::PrintWindow(hTargetWnd, hMemDC, 2))
+	{
 		bSuccess = FALSE;
-	else {
-		if ((rct.left + 8 == DsRct.left || rct.left + 8 == DsRct.left + DsRct.right) && (rct.top + 8 == DsRct.top || rct.top + 8 == DsRct.top + DsRct.bottom) && (rct.right - 8 == DsRct.right || rct.right - 8 == DsRct.right * 2) && (rct.bottom + 32 == DsRct.bottom || rct.bottom + 32 == DsRct.bottom * 2)) {
+	}
+	else
+	{
+		//전체화면일때와 창모드일때 불필요한 여백을 잘라내는 코드들이나
+		//여백을 잘라내면 해당 크기로 mpeg녹화되지 않는 에러가 발생하여
+		//우선 잘라내는 코드는 사용하지 않는다.
+		if (true)//(rct.left + 8 == DsRct.left || rct.left + 8 == DsRct.left + DsRct.right) && (rct.top + 8 == DsRct.top || rct.top + 8 == DsRct.top + DsRct.bottom) && (rct.right - 8 == DsRct.right || rct.right - 8 == DsRct.right * 2) && (rct.bottom + 32 == DsRct.bottom || rct.bottom + 32 == DsRct.bottom * 2))
+		{
 			// 전체화면
 
-			StretchBlt(hMemDC, -8, -8, rct.right - rct.left + 8, rct.bottom - rct.top + 8, hMemDC, 0, 0, rct.right - rct.left - 8, rct.bottom - rct.top - 8, SRCCOPY);
+			//StretchBlt(hMemDC, -8, -8, rct.right - rct.left + 8, rct.bottom - rct.top + 8, hMemDC, 0, 0, rct.right - rct.left - 8, rct.bottom - rct.top - 8, SRCCOPY);
+			StretchBlt(hMemDC, 0, 0, rct.Width(), rct.Height(), hMemDC, 0, 0, rct.Width(), rct.Height(), SRCCOPY);
 			// 캡쳐 시 여백을 없애기 위해 8픽셀을 가감
 		}
-		else {
+		else
+		{
 			// 창모드
 
 			StretchBlt(hMemDC, -7, 0, rct.right - rct.left + 7, rct.bottom - rct.top, hMemDC, 0, 0, rct.right - rct.left - 7, rct.bottom - rct.top - 7, SRCCOPY);
@@ -9982,7 +10033,10 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd)
 		bSuccess = TRUE;
 	}
 
-	WriteBMP(hBitmap, hDC, _T("d:\\temp\\test.bmp"));
+	DeleteDC(hDC);
+	DeleteDC(hMemDC);
+
+	//WriteBMP(hBitmap, hMemDC, _T("d:\\temp\\test_capture.bmp"));
 	return hBitmap;
 }
 
@@ -11611,6 +11665,16 @@ void Trace(char* szFormat, ...)
 
 //main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
 //이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
+//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_dqMonitors.clear()를 해줘야 하므로
+//enum_display_monitors()함수로 대체한다.
+void enum_display_monitors()
+{
+	g_dqMonitors.clear();
+	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
+}
+
+//main에서 enum_display_monitors(); 를 실행하고
+//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
 BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData)
 {
 	// 모니터 정보를 가져올 구조체
@@ -11644,7 +11708,7 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 //r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
 int	get_monitor_index(CRect r, bool entire_included)
 {
-	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
+	enum_display_monitors;
 
 	for (int i = 0; i < g_dqMonitors.size(); i++)
 	{
@@ -11660,6 +11724,23 @@ int	get_monitor_index(CRect r, bool entire_included)
 	}
 
 	return -1;
+}
+
+//멀티모니터 전체 영역 사각형 리턴
+CRect get_entire_monitor_rect()
+{
+	enum_display_monitors();
+	CRect rEntire(0, 0, 0, 0);
+
+	for (int i = 0; i < g_dqMonitors.size(); i++)
+	{
+		rEntire.left = MIN(rEntire.left, g_dqMonitors[i].left);
+		rEntire.top = MIN(rEntire.top, g_dqMonitors[i].top);
+		rEntire.right = MAX(rEntire.right, g_dqMonitors[i].right);
+		rEntire.bottom = MAX(rEntire.bottom, g_dqMonitors[i].bottom);
+	}
+
+	return rEntire;
 }
 
 void SetForegroundWindowForce(HWND hWnd, bool makeTopMost)
@@ -15835,4 +15916,47 @@ bool save(Gdiplus::Bitmap* bitmap, CString filename)
 		return true;
 
 	return false;
+}
+
+CString json_value(CString json, CString key)
+{
+	bool isFindToken = false;
+	CString result;
+	CString temp;
+
+	int i;
+	int index = json.Find(key);
+
+	if (index == -1)
+		return _T("");
+
+	for (i = index; i < json.GetLength(); i++)
+	{
+		wchar_t ch = json.GetAt(i);
+
+		if (isFindToken)
+		{
+			temp += ch;
+		}
+
+		if (ch == ':')
+		{
+			isFindToken = TRUE;
+		}
+
+		if (ch == ',' || ch == '}')
+		{
+			break;
+		}
+	}
+
+	result.Format(_T("%s"), temp);
+
+	result.Replace(_T("]"), _T(""));
+	result.Replace(_T("}"), _T(""));
+	result.Replace(_T("\""), _T(""));
+	result.Replace(_T(","), _T(""));
+	result.Trim();
+
+	return result;
 }

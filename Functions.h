@@ -206,10 +206,10 @@ enum RATIO_RECT_ATTACH
 #define		WIDTHSTEP4(bits)	(((bits) + 31) / 32 * 4)	//bits is not width, but (width * bitCount)
 #endif
 
-//width보다 큰 4의 배수로 만들어준다.
-#define		MAKE4WIDTH_U(width)		(((width) + 3) & ~3)
-//width보다 작은 4의 배수로 만들어준다.
-#define		MAKE4WIDTH_D(width)		(((width) - 3) & ~3 | 4)
+//num보다 큰 n의 배수로 만들어준다.
+#define		MAKE_MULTIFLY_U(num, n)		(((num) + ((n)-1)) & ~((n)-1))
+//num보다 작은 n의 배수로 만들어준다.
+#define		MAKE_MULTIFLY_D(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))
 
 extern		int			g_nDaysOfMonth[12];
 
@@ -412,11 +412,16 @@ void		Trace(char* szFormat, ...);
 	//모니터 정보
 	//main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
 	//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
+	//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_dqMonitors.clear()를 해줘야 하므로
+	//enum_display_monitors()함수로 대체한다.
 	extern std::deque<CRect> g_dqMonitors;
+	void		enum_display_monitors();
 	BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);
 	//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
 	//entire_included가 true이면 어떤 모니터에 완전히 속해있는 경우에만 해당 인덱스를 리턴.
 	int			get_monitor_index(CRect r, bool entire_included = false);
+	//멀티모니터 전체 영역 사각형 리턴
+	CRect		get_entire_monitor_rect();
 
 	//::SetForegroundWindow()가 Win98이후부터는 지원되지 않아 수정된 코드.
 	void		SetForegroundWindowForce(HWND hWnd, bool makeTopMost = false);
@@ -623,7 +628,11 @@ void		Trace(char* szFormat, ...);
 	*/
 	CString		loadResString(UINT nID);
 
+	//simple json parser
+	CString		json_value(CString json, CString key);
 
+	int			get_char_count(CString sStr, TCHAR ch);
+	CString		get_mac_address_format(TCHAR* src, TCHAR separator = ':');
 
 //데이터 변환
 	CString		i2S(int64_t nValue, bool bComma = false, bool fill_zero = false, int digits = 0);
@@ -735,11 +744,12 @@ void		Trace(char* szFormat, ...);
 	bool		ReadURLFile(LPCTSTR pUrl, CString &strBuffer);
 	void		ReadURLFileString(CString sURL, CString &sString);
 
-	//url상의 파일의 내용을 읽거나 로컬 파일로 다운로드 한다.
-	//local_path가 지정되어 있으면 파일로 다운받고(이때 리턴값은 "ok", 에러가 있을 경우는 에러 메시지)
+	//url상의 파일의 내용을 읽어와서 리턴하거나 지정된 로컬 파일로 다운로드 한다.
+	//local_file_path가 지정되어 있으면 파일로 다운받고
+	//(이때 리턴값은 "ok", 에러가 있을 경우는 에러 메시지)
 	//없으면 문자열로 리턴받는다.
-	CString		get_uri(CString full_remote_url, CString local_path = _T(""));
-	CString		get_uri(CString ip, int port, CString remote_path, CString local_path = _T(""));
+	CString		get_uri(CString full_remote_url, CString local_file_path = _T(""));
+	CString		get_uri(CString ip, int port, CString remote_path, CString local_file_path = _T(""));
 
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
@@ -845,11 +855,9 @@ void		Trace(char* szFormat, ...);
 //////////////////////////////////////////////////////////////////////////
 //네트워크, 인터넷
 	bool		GetNICAdapterList(IP_ADAPTER_INFO* pAdapters, int& nTotal, int nMax = 10);
-	void		GetNetworkInformation(TCHAR* sFindDescription, NETWORK_INFO* pInfo);
+	bool		GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo);
 	bool		CheckInternetIsOnline();
-	int			get_char_count(CString sStr, TCHAR ch);
 	bool		IsAvailableEMail(CString sEMail);
-
 
 //////////////////////////////////////////////////////////////////////////
 //암호화
@@ -865,13 +873,17 @@ void		Trace(char* szFormat, ...);
 
 
 //////////////////////////////////////////////////////////////////////////
-//쉘, 윈도우, 레지스트리, 시스템
+//쉘(shell), 윈도우(window), 레지스트리(registry), 시스템(system)
 	CString		GetComputerNameString();
-	bool		GetWindowsVersion(OSVERSIONINFO& osversioninfo);
-	DWORD		GetWindowsVersion();
-	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor);
-	//bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwServicePack);
-	bool		GetWindowsVersion(DWORD& dwMajor, DWORD& dwMinor, DWORD& dwPlatform);
+	OSVERSIONINFOEX	get_windows_version();
+	CString		get_windows_version_string(OSVERSIONINFOEX* posInfo = NULL);
+
+	//윈도우10이상은 auto_update가 항상 true.
+	//(registry에서 특정값을 추가하여 설정할 경우는 false로도 리턴됨)
+	//WinXP에서 자동 업데이트를 사용하지 않음으로 해도 true이며 아래 level=1이 리턴됨.
+	//level은 AutomaticUpdatesNotificationLevel 참조.
+	//(0:aunlNotConfigured, 1:aunlDisabled, 2:aunlNotifyBeforeDownload, 3:aunlNotifyBeforeInstallation, 4:aunlScheduledInstallation)
+	bool		get_windows_update_setting(bool& auto_update, int& level);
 
 	//좀 더 테스트 필요!
 	HWND		GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive = false, bool bExceptThis = true);
@@ -941,8 +953,10 @@ h		: 복사할 height 크기(pixel)
 	uint64_t	GetDiskFreeSize(CString sDrive);
 	uint64_t	GetDiskTotalSize(CString sDrive);
 	CString		GetDiskSizeString(CString sDrive);	// "1.25G / 380.00G"
-	//CString		GetHDDSerialNumber(int nPhysicalDrive);
+	CString		GetHDDSerialNumber(int nPhysicalDrive);
 	CString		GetHDDVolumeNumber(CString sDrive);
+	CString		get_HDD_serial_number(int index);
+
 	void		get_drive_map(std::map<TCHAR, CString> *drive_map);
 	CString		get_drive_volume(TCHAR drive_letter);
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
@@ -1202,7 +1216,7 @@ void		SetWallPaper(CString sfile);
 	double circumRadius(CPoint A, CPoint B, CPoint C);
 
 
-//사각형
+//사각형 Rectangle
 	//사각형 정보를 문자열로 리턴한다.
 	//0 : "1 2 3 4"
 	//1 : "(1,2) ~ (4,8)"
@@ -1297,7 +1311,9 @@ void		SetWallPaper(CString sfile);
 	HBITMAP		CaptureScreenToBitmap(LPRECT pRect);
 	HBITMAP		CaptureWindowToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	HBITMAP		CaptureClientToBitmap(HWND hWnd, LPRECT pRect = NULL);
-	HBITMAP		PrintWindowToBitmap(HWND hTargetWnd);
+	//hwnd만 주면 해당 윈도우 영역을 캡처하지만 윈도우에서는 불필요한 여백까지 영역으로 처리하므로
+	//pRect를 줘서 정해진 영역만 캡처시킨다.
+	HBITMAP		PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect = NULL);
 	void		WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename);
 
 

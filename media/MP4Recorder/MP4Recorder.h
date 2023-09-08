@@ -11,7 +11,8 @@
 
 */
 
-#include <Windows.h>
+//#include <Windows.h>
+#include <afxmt.h>
 #include <tchar.h>
 
 #define inline _inline
@@ -65,7 +66,7 @@ typedef void *MP4FileHandle;
 class CMP4RecorderParam
 {
 public:
-	LPCTSTR filepath = _T("");
+	CString filepath = _T("");
 	int width = 0;
 	int height = 0;
 	int fps = 15;
@@ -79,7 +80,7 @@ public:
 	CMP4Recorder();
 	virtual ~CMP4Recorder();
 
-	bool Start(LPCTSTR file, int width, int height, int fps = 15, int quality = 80);
+	bool Start(CString file, int width, int height, int fps = 15, int quality = 80);
 	bool Start(CMP4RecorderParam* param);
 	void Stop();
 	void Pause();
@@ -103,8 +104,8 @@ private:
 	x264_t*				m_pEncX264;
 	int					m_nBufferSize;
 
-	//CCriticalSection	m_csVideoEncoder;
-	//CCriticalSection	m_csAudioEncoder;
+	CCriticalSection	m_csVideoEncoder;
+	CCriticalSection	m_csAudioEncoder;
 	int					m_nEncWidth;
 	int					m_nEncHeight;
 	int					m_nSAMPLERATE;

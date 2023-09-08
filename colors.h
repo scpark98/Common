@@ -51,6 +51,7 @@
 
 enum Colors
 {
+	//abgr Â÷·Ê
 	black = 0x00000000,
 	dimgray = 0x00696969,
 	gray = 0x00808080,

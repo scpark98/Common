@@ -1,5 +1,6 @@
 #include "MP4Recorder.h"
 #include <mmsystem.h>
+#include "AutoSync.h"
 
 #define MAX_MP4_VIDEO_WIDTH		1920
 #define MAX_MP4_VIDEO_HEIGHT	1080
@@ -44,7 +45,7 @@ CMP4Recorder::~CMP4Recorder()
 	Stop();
 }
 
-bool CMP4Recorder::Start(LPCTSTR file, int width, int height, int fps, int quality)
+bool CMP4Recorder::Start(CString file, int width, int height, int fps, int quality)
 {
 	CMP4RecorderParam param;
 	param.filepath = file;
@@ -65,10 +66,13 @@ bool CMP4Recorder::Start(CMP4RecorderParam* param)
 	else if (param->quality > 100)
 		param->quality = 100;
 
+	if (param->width <= 0 || param->height <= 0)
+		return false;
+
 	m_nEncWidth			= param->width;
 	m_nEncHeight		= param->height;
 	m_unFPS				= param->fps;
-	m_nQuantizer		= 24 + (int)((float)(100 - param->quality) / 10); //높을수로 화질저하
+	m_nQuantizer		= 28 + (int)((float)(100 - param->quality) / 10); //높을수로 화질저하
 
 	char* cfilename = WCHARToUTF8(param->filepath);
 	m_hMP4File = MP4Create(cfilename);
@@ -154,7 +158,7 @@ bool CMP4Recorder::Start(CMP4RecorderParam* param)
 		MP4AddH264PictureParameterSet(m_hMP4File, m_nVTrackId, nal[1].p_payload + 4, nal[1].i_payload - 4);
 
 		m_pAVFrameEnc = av_frame_alloc();
-		m_nBufferSize = avpicture_get_size(AV_PIX_FMT_YUV420P, m_nEncWidth+16, m_nEncHeight+16);
+		m_nBufferSize = avpicture_get_size(AV_PIX_FMT_YUV420P, m_nEncWidth, m_nEncHeight);
 		m_pBufferEnc = new uint8_t[m_nBufferSize];
 		avpicture_fill((AVPicture*)m_pAVFrameEnc, m_pBufferEnc, AV_PIX_FMT_YUV420P, m_nEncWidth, m_nEncHeight);
 		m_pAVPictureEnc = (AVPicture*)m_pAVFrameEnc;
@@ -243,7 +247,7 @@ void CMP4Recorder::WriteVideoSample(BYTE* lpData, int nSize, int nCapWidth, int 
 
 	try
 	{
-		//CAutoSync	autoSync(m_csVideoEncoder);
+		CAutoSync	autoSync(m_csVideoEncoder);
 
 		if (m_nVideoFrameType == WMV_VIDEO_FRAME_TYPE_BMP || nCapWidth != m_nEncWidth || nCapHeight != m_nEncHeight)
 		{
@@ -258,8 +262,10 @@ void CMP4Recorder::WriteVideoSample(BYTE* lpData, int nSize, int nCapWidth, int 
 			//}
 
 			int flags = SWS_FAST_BILINEAR;
-			if (m_nEncHeight <= 720) flags = SWS_BILINEAR;
-			if (nCapWidth == m_nEncWidth && nCapHeight == m_nEncHeight) flags = SWS_FAST_BILINEAR;
+			if (m_nEncHeight <= 720)
+				flags = SWS_BILINEAR;
+			if (nCapWidth == m_nEncWidth && nCapHeight == m_nEncHeight)
+				flags = SWS_FAST_BILINEAR;
 
 			SwsContext *pSwsConvertCtx = sws_getContext(nCapWidth, nCapHeight, 
 				(m_nVideoFrameType == WMV_VIDEO_FRAME_TYPE_BMP) ? AV_PIX_FMT_RGB32 : AV_PIX_FMT_YUV420P,

@@ -996,12 +996,12 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
 			if (m_is_shell_listctrl && m_is_shell_listctrl_local)
 			{
-				if (m_path == _T("내 PC"))
+				if (m_path == get_system_label(CSIDL_DRIVES))
 					return true;
 
 				//드라이브면 내 PC로 가고
 				if (m_path.Mid(1) == _T(":"))
-					m_path = _T("내 PC");
+					m_path = get_system_label(CSIDL_DRIVES);
 				//그렇지 않으면 상위 디렉토리로 이동
 				else
 					m_path = GetParentDirectory(m_path);
@@ -2044,7 +2044,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
 
-		if (m_path == _T("내 PC"))
+		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
 			m_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList->get_csidl_map());
 		}
@@ -2685,7 +2685,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
 	if (m_is_shell_listctrl_local && reload)
 	{
-		if (m_path == _T("내 PC"))
+		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
 			std::map<TCHAR, CString> drive_map;
 			get_drive_map(&drive_map);
@@ -2723,7 +2723,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
 
-	if (m_path == _T("내 PC"))
+	if (m_path == get_system_label(CSIDL_DRIVES))
 	{
 		set_header_text(col_filesize, _T("사용 가능한 공간"));
 		set_header_text(col_filedate, _T("전체 크기"));
@@ -2741,7 +2741,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	{
 		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_folders[i].text[0]), false, false);
 
-		if (m_path == _T("내 PC"))
+		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
 			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].text[0], m_pShellImageList->get_csidl_map());
 			

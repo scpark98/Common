@@ -25,6 +25,10 @@ CShellImageList::CShellImageList()
 	SHFILEINFO shInfo;
 	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
 	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
+
+	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DRIVES, get_system_label(CSIDL_DRIVES)));
+	m_csidl_map.insert(std::pair<int, CString>(CSIDL_PERSONAL, get_system_label(CSIDL_PERSONAL)));
+	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_system_label(CSIDL_DESKTOP)));
 }
 
 CShellImageList::~CShellImageList()
@@ -170,13 +174,6 @@ CString CShellImageList::get_shell_known_string_by_csidl(int csidl)
 		return _T("");
 
 	return it->second;
-}
-
-//내 PC, 문서, 바탕화면 등의 정해진 문자열을 저장(다국어 지원시에 특히 필요)
-//Shlobj.h에 정의된 CSIDL_로 시작되는 값을 동일하게 이용
-void CShellImageList::set_shell_known_string(int csidl, CString str)
-{
-	m_csidl_map.insert(std::pair<int, CString>(csidl, str));
 }
 
 std::map<int, CString>* CShellImageList::get_csidl_map()

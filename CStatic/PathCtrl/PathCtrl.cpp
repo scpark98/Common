@@ -403,9 +403,9 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	}
 
 	//기본 토큰 추가
-	if ((m_path.size() > 0 && m_path[0].label != _T("내 PC")) ||
-		(m_path.size() > 1 && m_path[1].label != _T("내 PC")))
-		m_path.push_front(CPathElement(_T("내 PC")));
+	if ((m_path.size() > 0 && m_path[0].label != get_system_label(CSIDL_DRIVES)) ||
+		(m_path.size() > 1 && m_path[1].label != get_system_label(CSIDL_DRIVES)))
+		m_path.push_front(CPathElement(get_system_label(CSIDL_DRIVES)));
 
 	//항상 표시되는 최상위 항목 추가
 	if (!m_path[0].label.IsEmpty())
@@ -508,7 +508,7 @@ CString CPathCtrl::get_full_path(int index)
 	if (index == 0)
 		return _T("");
 	else if (index == 1)
-		return _T("내 PC");
+		return get_system_label(CSIDL_DRIVES);
 
 	//special folder들인 경우(바탕 화면 등등)
 	if (m_path[2].label.Find(_T(":\\")) < 0 && m_path[2].label.Find(_T(":)")) < 0)

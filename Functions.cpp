@@ -23,6 +23,11 @@
 //#include "SystemInfo.h"
 #pragma comment(lib, "Psapi.lib")
 
+//for GUID
+#pragma comment(lib, "Rpcrt4.lib")
+#include <Rpcdce.h>
+
+
 #pragma warning(disable : 4018)		// '<': signed/unsigned mismatch
 #pragma warning(disable : 4127)		// conditional expression is constant
 #pragma warning(disable : 4244)		// possible loss of data
@@ -3571,7 +3576,7 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 				_stprintf(pInfo->sMacAddress, _T("%02X%02X%02X%02X%02X%02X"),
 					pAdapter->Address[0], pAdapter->Address[1], pAdapter->Address[2], pAdapter->Address[3], pAdapter->Address[4], pAdapter->Address[5]);
 				result = true;
-				//break;
+				break;
 			}
 
 			pAdapter = pAdapter->Next;
@@ -4486,11 +4491,11 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 
 	if (root == _T(""))
 	{
-		folders.push_front(_T("바탕 화면"));
-		folders.push_front(_T("문서"));
-		folders.push_front(_T("다운로드"));
+		folders.push_front(get_system_label(CSIDL_DESKTOP));
+		folders.push_front(get_system_label(CSIDL_PERSONAL));
+		//folders.push_front(get_system_label(CSIDL_DOWNLOAD)_T("다운로드"));
 	}
-	else if (root == _T("내 PC"))
+	else if (root == get_system_label(CSIDL_DRIVES))
 	{
 		std::map<TCHAR, CString> drive_map;
 		get_drive_map(&drive_map);
@@ -4499,9 +4504,9 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 
 		if (special_folders)
 		{
-			folders.push_front(_T("바탕 화면"));
-			folders.push_front(_T("문서"));
-			folders.push_front(_T("다운로드"));
+			folders.push_front(get_system_label(CSIDL_DESKTOP));
+			folders.push_front(get_system_label(CSIDL_PERSONAL));
+			//folders.push_front(_T("다운로드"));
 		}
 	}
 	else
@@ -4524,7 +4529,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 		}
 	}
 
-	if (list && root != _T("내 PC"))
+	if (list && root != get_system_label(CSIDL_DRIVES))
 		sort_like_explorer(&folders);
 
 	if (list)
@@ -5655,6 +5660,11 @@ CString get_known_folder(KNOWNFOLDERID folderID)
 #ifndef _USING_V110_SDK71_
 	SHGetKnownFolderPath(folderID, 0, NULL, &path);
 #else
+	if (folderID == FOLDERID_Downloads)
+	{
+		CString download_folder = get_known_folder(CSIDL_PROFILE) + _T("\\Downloads");
+		return download_folder;
+	}
 
 #endif
 
@@ -7791,25 +7801,99 @@ CString	get_windows_version_string(OSVERSIONINFOEX* posInfo)
 	else
 		osInfo = *posInfo;
 
-	if (osInfo.dwMajorVersion == 5 && osInfo.dwMinorVersion == 1)
-		return _T("Windows XP");
-	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 0)
-		return _T("Windows Vista");
-	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 1)
-		return _T("Windows 7");
-	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 2)
-		return _T("Windows 8");
-	else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 3)
-		return _T("Windows 8.1");
-	else if (osInfo.dwMajorVersion == 10 && osInfo.dwMinorVersion == 0)
+	return get_windows_version_string(osInfo.dwMajorVersion, osInfo.dwMinorVersion, osInfo.dwBuildNumber);
+}
+
+//ex. version = "10.0.12345"
+CString	get_windows_version_string(CString version)
+{
+	std::deque<CString> dq;
+	get_token_string(version, dq, '.');
+
+	DWORD dwMajor = 0;
+	DWORD dwMinor = 0;
+	DWORD dwBuild = 0;
+	
+	if (dq.size() >= 2)
 	{
-		if (osInfo.dwBuildNumber >= 22000)
+		dwMajor = _ttoi(dq[0]);
+		dwMinor = _ttoi(dq[1]);
+	}
+
+	if (dq.size() == 3)
+	{
+		dwBuild = _ttoi(dq[2]);
+	}
+
+	return get_windows_version_string(dwMajor, dwMinor, dwBuild);
+}
+
+CString	get_windows_version_string(DWORD dwMajor, DWORD dwMinor, DWORD dwBuild)
+{
+	if (dwMajor == 5 && dwMinor == 1)
+		return _T("Windows XP");
+	else if (dwMajor == 6 && dwMinor == 0)
+		return _T("Windows Vista");
+	else if (dwMajor == 6 && dwMinor == 1)
+		return _T("Windows 7");
+	else if (dwMajor == 6 && dwMinor == 2)
+		return _T("Windows 8");
+	else if (dwMajor == 6 && dwMinor == 3)
+		return _T("Windows 8.1");
+	else if (dwMajor == 10 && dwMinor == 0)
+	{
+		if (dwBuild >= 22000)
 			return _T("Windows 11");
 		else
 			return _T("Windows 10");
 	}
 
 	return _T("Unknown OS version");
+}
+
+CString	get_system_label(int csidl, int* sysIconIndex)
+{
+	LPMALLOC pMalloc;
+	SHGetMalloc(&pMalloc);
+	SHFILEINFO sfi = { 0 };
+	// 'My Computer' or '내 컴퓨터' text
+	LPITEMIDLIST pidl;
+	SHGetSpecialFolderLocation(NULL, csidl, &pidl);
+	SHGetFileInfo((TCHAR*)pidl, 0, &sfi, sizeof(sfi), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+	pMalloc->Free(pidl);
+	pMalloc->Release();
+
+	if (sysIconIndex != NULL)
+	{
+		*sysIconIndex = sfi.iIcon;
+	}
+
+	return sfi.szDisplayName;
+}
+
+CString	get_GUID()
+{
+	RPC_STATUS Status;
+	UUID uuid;
+	TCHAR* idStr = NULL;
+	CString guid;
+
+	Status = UuidCreate(&uuid);
+
+	if (RPC_S_OK != Status)
+	{
+		uuid = GUID_NULL;
+	}
+	else
+	{
+		if (UuidToString(&uuid, (RPC_WSTR*)&idStr) == RPC_S_OK)
+		{
+			guid = idStr;
+			RpcStringFree((RPC_WSTR*)&idStr);
+		}
+	}
+
+	return guid;
 }
 
 bool get_windows_update_setting(bool& auto_update, int& level)
@@ -7869,8 +7953,18 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 	return true;
 }
 
+
 #include <WinIoCtl.h>
-CString get_HDD_serial_number(int index)
+
+//HDD serial은 HardwareInfo.exe가 알려주는대로 S4EVNM0T230338R 15자리 형태,
+//또는 0025_3852_2190_FE03 같은 형태로 리턴된다.
+//어떤 PC는 툴이 알려주는 값과 이 프로그램에서 구한 값이 같지만(mwj, sdh)
+//어떤 PC는 툴이 알려주는 값과 다른 포맷으로 리턴한다.(scpark)
+//왜 이런 차이가 발생하는지는 아직 알 수 없으나
+//unique한 키값을 사용하고자 함이므로 우선 16자리로 맞춰서 사용한다.
+//unify16 = true이면 16자리로 통일시켜 리턴한다.
+
+CString get_HDD_serial_number(int index, bool unify16)
 {
 	CString strDrive;
 
@@ -7918,6 +8012,17 @@ CString get_HDD_serial_number(int index)
 		return CString();
 
 	CString serialNumber = CString(pOutBuffer.get() + dwSerialNumberOffset);
+
+	if (unify16 && serialNumber.GetLength() != 16)
+	{
+		if (serialNumber.Right(1) == '.')
+			serialNumber = serialNumber.Left(serialNumber.GetLength() - 1);
+
+		serialNumber.Replace(_T("_"), _T(""));
+
+		if (serialNumber.GetLength() == 15)
+			serialNumber += _T("0");
+	}
 
 	return serialNumber;
 }
@@ -7998,43 +8103,32 @@ CString	get_drive_volume(TCHAR drive_letter)
 	return sLabel;
 }
 
-void get_drive_map(std::map<TCHAR, CString> *drive_map)
+void get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy)
 {
 	DWORD dwError = 0;
 	TCHAR tzDriveString[MAX_PATH] = { 0, };
-	CString sLabel;
+	CString strDrive;
 
 	drive_map->clear();
 
-	// 반환 예 : "C:\\\0D:\\\0E:\\\0\0"
-	// 구분 : "\0", 끝 : "\0\0"
-	DWORD dwStringsLen = ::GetLogicalDriveStrings(MAX_PATH, tzDriveString); // 로컬 디스크 목록 얻기
-	if (dwStringsLen != 0 && dwStringsLen <= MAX_PATH)
-	{
-		CString strTrace;
-		strTrace.Format(_T("Length : %lu"), dwStringsLen);
-		//TRACE(_T("%s\n"), strTrace);
+	DWORD logicalDrives = GetLogicalDrives();
+	unsigned int i = 64;
 
-		DWORD dwIndex = 0;
-		while (0 < _tcslen(&tzDriveString[dwIndex]))
+	do
+	{
+		i++;
+		if ((logicalDrives & 1) != 0)
 		{
-			strTrace.Format(_T("Drive : %s"), &tzDriveString[dwIndex]);
-			//TRACE(_T("%s\n"), strTrace);
+			strDrive.Format(_T("%c:\\"), i);
+			UINT driveType = GetDriveType(strDrive);
 
-			drive_map->insert(std::pair<TCHAR, CString>(tzDriveString[dwIndex], get_drive_volume(tzDriveString[dwIndex])));
+			// CD-ROM이나 floppy disk는 하위 폴더를 표시하지 않는다.
+			if (!include_legacy && (driveType == DRIVE_REMOVABLE || driveType == DRIVE_CDROM))
+				continue;
 
-			dwIndex += _tcslen(&tzDriveString[dwIndex]) + 1;
+			drive_map->insert(std::pair<TCHAR, CString>(strDrive[0], get_drive_volume(strDrive[0])));
 		}
-	}
-	else
-	{
-		dwError = ::GetLastError();
-	}
-
-	if (dwError != 0)
-	{
-		// 에러 처리
-	}
+	} while ((logicalDrives >>= 1) != 0);
 }
 
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
@@ -8105,10 +8199,10 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 	}
 	*/
 
-	if (real_path == _T("내 PC"))
+	if (real_path == get_system_label(CSIDL_DRIVES))
 		return real_path;
 
-	real_path.Replace(_T("내 PC"), _T(""));
+	real_path.Replace(get_system_label(CSIDL_DRIVES), _T(""));
 
 	int pos = real_path.Find(_T(":)"));
 	if (pos < 0)
@@ -9551,6 +9645,20 @@ CString run_process(CString exePath, bool wait_process_exit)
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 
+	return result;
+}
+
+#include <array>
+std::string	run_process(const char* cmd)
+{
+	std::array<char, 128> buffer;
+	std::string result;
+	std::shared_ptr<FILE> pipe(_popen(cmd, "r"), _pclose);
+	if (!pipe) throw std::runtime_error("_popen() failed!");
+	while (!feof(pipe.get())) {
+		if (fgets(buffer.data(), 128, pipe.get()) != NULL)
+			result += buffer.data();
+	}
 	return result;
 }
 

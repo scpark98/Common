@@ -622,9 +622,9 @@ int CColorListBox::set_path(CString root, CString selected_text)
 	if (root.IsEmpty())
 	{
 		m_folder_list.clear();
-		m_folder_list.push_back(_T("내 PC"));
-		m_folder_list.push_back(_T("문서"));
-		m_folder_list.push_back(_T("바탕 화면"));
+		m_folder_list.push_back(get_system_label(CSIDL_DRIVES));
+		m_folder_list.push_back(get_system_label(CSIDL_PERSONAL));
+		m_folder_list.push_back(get_system_label(CSIDL_DESKTOP));
 	}
 	else
 	{

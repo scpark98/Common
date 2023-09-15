@@ -402,7 +402,9 @@ void		Trace(char* szFormat, ...);
 
 	HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 	bool		IsDuplicatedRun();
+	//command 명령 실행 후 결과를 문자열로 리턴.
 	CString		run_process(CString exePath, bool wait_process_exit);
+	std::string	run_process(const char* cmd);
 
 	//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
 	bool		CheckProcessUsingPID(unsigned long pid);
@@ -877,6 +879,13 @@ void		Trace(char* szFormat, ...);
 	CString		GetComputerNameString();
 	OSVERSIONINFOEX	get_windows_version();
 	CString		get_windows_version_string(OSVERSIONINFOEX* posInfo = NULL);
+	CString		get_windows_version_string(DWORD dwMajor, DWORD dwMinor, DWORD dwBuild);
+	//ex. version = "10.0.12345"
+	CString		get_windows_version_string(CString version);
+
+	CString		get_system_label(int csidl, int *sysIconIndex = NULL);
+
+	CString		get_GUID();
 
 	//윈도우10이상은 auto_update가 항상 true.
 	//(registry에서 특정값을 추가하여 설정할 경우는 false로도 리턴됨)
@@ -955,9 +964,18 @@ h		: 복사할 height 크기(pixel)
 	CString		GetDiskSizeString(CString sDrive);	// "1.25G / 380.00G"
 	CString		GetHDDSerialNumber(int nPhysicalDrive);
 	CString		GetHDDVolumeNumber(CString sDrive);
-	CString		get_HDD_serial_number(int index);
 
-	void		get_drive_map(std::map<TCHAR, CString> *drive_map);
+	//HDD serial은 HardwareInfo.exe가 알려주는대로 S4EVNM0T230338R 15자리 형태,
+	//또는 0025_3852_2190_FE03 같은 형태로 리턴된다.
+	//어떤 PC는 툴이 알려주는 값과 이 프로그램에서 구한 값이 같지만(mwj, sdh)
+	//어떤 PC는 툴이 알려주는 값과 다른 포맷으로 리턴한다.(scpark)
+	//왜 이런 차이가 발생하는지는 아직 알 수 없으나
+	//unique한 키값을 사용하고자 함이므로 우선 16자리로 맞춰서 사용한다.
+	//unify16 = true이면 16자리로 통일시켜 리턴한다.
+	CString		get_HDD_serial_number(int index, bool unify16 = true);
+
+	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
+	void		get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
 //"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
 //문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.

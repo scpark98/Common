@@ -36,7 +36,7 @@ public:
 	//Shlobj.h에 정의된 CSIDL_로 시작되는 값을 동일하게 이용
 	void set_shell_known_string(int csidl, CString str);
 
-	//OS언어에 따라, 윈도우 버전에 따라 "내 컴퓨터"는 "내 PC", "내 컴퓨터", "My Computer" 등등 다양하므로 csidl로 구분한다.
+	//OS언어에 따라, 윈도우 버전에 따라 "내 컴퓨터"는 "내 PC", "My Computer" 등 다양하므로 csidl로 구분한다.
 	int get_csidl_by_shell_known_string(CString str);
 	CString get_shell_known_string_by_csidl(int csidl);
 	std::map<int, CString>* get_csidl_map();
@@ -46,7 +46,7 @@ private:
 	CStringArray m_ExtArray;
 	CUIntArray   m_IDArray;
 
-	//OS언어에 따라, 윈도우 버전에 따라 "내 컴퓨터"는 "내 PC", "내 컴퓨터", "My Computer" 등등 다양하므로 csidl로 구분한다.
+	//OS언어에 따라, 윈도우 버전에 따라 "내 컴퓨터"는 "내 PC", "My Computer" 등등 다양하므로 csidl로 구분한다.
 	std::map<int, CString> m_csidl_map;
 
 	std::map<TCHAR, CString> m_drive_map;

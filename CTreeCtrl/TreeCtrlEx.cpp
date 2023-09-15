@@ -270,7 +270,7 @@ void CTreeCtrlEx::set_as_shell_treectrl(bool is_local /*= true*/)
 	m_folder_list = iterate_tree_with_no_recursion();
 
 	//for test
-	expand_all();
+	//expand_all();
 }
 
 void CTreeCtrlEx::thread_insert_folders(HTREEITEM hItem)
@@ -431,12 +431,18 @@ void CTreeCtrlEx::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	CPoint pt;
 	UINT nFlags = 0;
+	CString str;
 
 	GetCursorPos(&pt);
 	ScreenToClient(&pt);
 
 	HTREEITEM hItem = HitTest(pt, &nFlags);
-	trace(_T("%s, %d, %d, %d\n"), get_fullpath(hItem), pt.x, pt.y, nFlags);
+	//str.Format(_T("%p"), (hItem == NULL ? NULL : hItem));
+	//AfxMessageBox(str);
+
+	CString fullpath = get_fullpath(hItem);
+	//str.Format(_T("%s, %d, %d, %d\n"), fullpath, pt.x, pt.y, nFlags);
+	//AfxMessageBox(str);
 
 	//확장버튼을 누르면
 	if (nFlags & TVHT_ONITEMBUTTON)
@@ -472,6 +478,7 @@ CString CTreeCtrlEx::get_fullpath(HTREEITEM hItem)
 	while (hItem)
 	{
 		folder = GetItemText(hItem);
+		//AfxMessageBox(folder);
 		fullpath = folder + _T("\\") + fullpath;
 
 		if (folder.Right(2) == _T(":)"))
@@ -488,6 +495,7 @@ CString CTreeCtrlEx::get_fullpath(HTREEITEM hItem)
 void CTreeCtrlEx::select_item(CString fullpath)
 {
 	fullpath = m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath);
+	//AfxMessageBox(fullpath);
 
 	std::deque<CString> dq;
 	get_token_string(fullpath, dq, '\\');

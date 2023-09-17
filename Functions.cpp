@@ -3248,7 +3248,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 	bmpInfo.bmiHeader.biClrImportant  = 0;
 
 	// Set a default window size.
-	bmpInfo.bmiHeader.biWidth			= MAKE_MULTIFLY_U(w, 4);
+	bmpInfo.bmiHeader.biWidth			= MAKE_MULTIPLY_U(w, 4);
 	bmpInfo.bmiHeader.biHeight			= -h;
 	bmpInfo.bmiHeader.biBitCount		= 8 * ch;
 	bmpInfo.bmiHeader.biSizeImage		= sizeof(BYTE) * w * h * ch;
@@ -10084,7 +10084,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	}
 
 	int nw = rct.Width();
-	nw = MAKE_MULTIFLY_U(nw, 4);
+	nw = MAKE_MULTIPLY_U(nw, 4);
 	rct.right = rct.left + nw;
 
 	HBITMAP hBitmap = NULL;
@@ -11816,7 +11816,7 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 //r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
 int	get_monitor_index(CRect r, bool entire_included)
 {
-	enum_display_monitors;
+	enum_display_monitors();
 
 	for (int i = 0; i < g_dqMonitors.size(); i++)
 	{

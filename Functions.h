@@ -207,9 +207,9 @@ enum RATIO_RECT_ATTACH
 #endif
 
 //num보다 큰 n의 배수로 만들어준다.
-#define		MAKE_MULTIFLY_U(num, n)		(((num) + ((n)-1)) & ~((n)-1))
+#define		MAKE_MULTIPLY_U(num, n)		(((num) + ((n)-1)) & ~((n)-1))
 //num보다 작은 n의 배수로 만들어준다.
-#define		MAKE_MULTIFLY_D(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))
+#define		MAKE_MULTIPLY_D(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))
 
 extern		int			g_nDaysOfMonth[12];
 

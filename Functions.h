@@ -513,8 +513,22 @@ void		Trace(char* szFormat, ...);
 	int			find_punctuation(CString src, int pos);
 	bool		is_punctuation(TCHAR ch);
 
-	//맨 마지막 인자는 반드시 NULL을 넣어줘야 끝을 알 수 있다.
-	bool		isOneOf(LPCTSTR src, ...);
+	//isOneOf()는 is_one_of()로 대체함.
+	template <typename ... Types> bool is_one_of(CString src, Types... args)
+	{
+		int n = sizeof...(args);
+		CString arg[] = { args... };
+
+		for (auto element : arg)
+		{
+			if (src == element)
+				return true;
+		}
+
+		return false;
+	}
+
+
 	//src 문자열에 set_of_keyword에 나열된 단어가 있는지 검사.
 	//set_of_keyword는 세미콜론으로 구분해서 여러 문자 또는 문자열을 넣을 수 있다.
 	//ex. src = "abcd1234"일 때 set_of_keyword = "bc;21" => true, set_of_keyword = "212" => false
@@ -746,12 +760,15 @@ void		Trace(char* szFormat, ...);
 	bool		ReadURLFile(LPCTSTR pUrl, CString &strBuffer);
 	void		ReadURLFileString(CString sURL, CString &sString);
 
-	//url상의 파일의 내용을 읽어와서 리턴하거나 지정된 로컬 파일로 다운로드 한다.
-	//local_file_path가 지정되어 있으면 파일로 다운받고
-	//(이때 리턴값은 "ok", 에러가 있을 경우는 에러 메시지)
-	//없으면 문자열로 리턴받는다.
-	CString		get_uri(CString full_remote_url, CString local_file_path = _T(""));
-	CString		get_uri(CString ip, int port, CString remote_path, CString local_file_path = _T(""));
+	bool		parse_url(CString full_url, CString &ip, int &port, CString &sub_url);
+	//누락된 처리가 있어서 사용하지 않음
+	CString		get_uri_old(CString ip, int port, CString sub_url, CString local_file_path = _T(""));
+	//url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
+	//local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
+	//local_file_path가 지정되어 있으면 파일로 다운받는다.
+	//(이때 리턴값은 "")
+	//리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
+	DWORD		get_uri(CString &result_str, CString ip, int port, CString sub_url, CString verb, CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
 
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수

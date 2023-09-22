@@ -4351,7 +4351,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		}
 		else
 		{
-			TRACE(_T("%s\n"), sCaptionString);
+			//TRACE(_T("%s\n"), sCaptionString);
 			if (sCaptionString.Find(sCaption) >= 0)
 				return pWnd;
 		}
@@ -16535,4 +16535,149 @@ CString json_value(CString json, CString key)
 	result.Trim();
 
 	return result;
+}
+
+HRESULT PrintProperty(IPropertyStore* pps, REFPROPERTYKEY key, PCWSTR pszCanonicalName)
+{
+	PROPVARIANT propvarValue = { 0 };
+	HRESULT hr = pps->GetValue(key, &propvarValue);
+	if (SUCCEEDED(hr))
+	{
+		PWSTR pszDisplayValue = NULL;
+		hr = PSFormatForDisplayAlloc(key, propvarValue, PDFF_DEFAULT, &pszDisplayValue);
+		if (SUCCEEDED(hr))
+		{
+			wprintf(L"%s = %s\n", pszCanonicalName, pszDisplayValue);
+			CoTaskMemFree(pszDisplayValue);
+		}
+		PropVariantClear(&propvarValue);
+	}
+	return hr;
+}
+
+
+HRESULT GetPropertyStore(PCWSTR pszFilename, GETPROPERTYSTOREFLAGS gpsFlags, IPropertyStore** ppps)
+{
+	WCHAR szExpanded[MAX_PATH];
+	HRESULT hr = ExpandEnvironmentStrings(pszFilename, szExpanded, ARRAYSIZE(szExpanded)) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+	hr = SHGetPropertyStoreFromParsingName(pszFilename, NULL, gpsFlags, IID_PPV_ARGS(ppps));
+	//if (SUCCEEDED(hr))
+	{
+		//WCHAR szAbsPath[MAX_PATH];
+		//hr = _wfullpath(szAbsPath, szExpanded, ARRAYSIZE(szAbsPath)) ? S_OK : E_FAIL;
+		//if (SUCCEEDED(hr))
+		//{
+			//hr = SHGetPropertyStoreFromParsingName(szAbsPath, NULL, gpsFlags, IID_PPV_ARGS(ppps));
+		//}
+	}
+	return hr;
+}
+
+HRESULT EnumerateProperties(PCWSTR pszFilename)
+{
+	IPropertyStore* pps = NULL;
+
+	// Call the helper to get the property store for the initialized item
+	// Note that as long as you have the property store, you are keeping the file open
+	// So always release it once you are done.
+
+	HRESULT hr = GetPropertyStore(pszFilename, GPS_DEFAULT, &pps);
+	if (SUCCEEDED(hr))
+	{
+		// Retrieve the number of properties stored in the item.
+		DWORD cProperties = 0;
+		hr = pps->GetCount(&cProperties);
+		if (SUCCEEDED(hr))
+		{
+			for (DWORD i = 0; i < cProperties; i++)
+			{
+				// Get the property key at a given index.
+				PROPERTYKEY key;
+				hr = pps->GetAt(i, &key);
+				if (SUCCEEDED(hr))
+				{
+					// Get the canonical name of the property
+					PWSTR pszCanonicalName = NULL;
+					hr = PSGetNameFromPropertyKey(key, &pszCanonicalName);
+					if (SUCCEEDED(hr))
+					{
+						hr = PrintProperty(pps, key, pszCanonicalName);
+						TRACE(_T("%s\n"), pszCanonicalName);
+						CoTaskMemFree(pszCanonicalName);
+					}
+				}
+			}
+		}
+		pps->Release();
+	}
+	else
+	{
+		wprintf(L"Error %x: getting the propertystore for the item.\n", hr);
+	}
+	return hr;
+}
+
+#include <propvarutil.h>
+HRESULT SetPropertyValue(PCWSTR pszFilename, PCWSTR pszCanonicalName, PCWSTR pszValue)
+{
+	// Convert the Canonical name of the property to PROPERTYKEY
+	PROPERTYKEY key;
+	HRESULT hr = PSGetPropertyKeyFromName(pszCanonicalName, &key);
+	if (SUCCEEDED(hr))
+	{
+		IPropertyStore* pps = NULL;
+
+		// Call the helper to get the property store for the
+		// initialized item
+		hr = GetPropertyStore(pszFilename, GPS_READWRITE, &pps);
+		if (SUCCEEDED(hr))
+		{
+			PROPVARIANT propvarValue = { 0 };
+			hr = InitPropVariantFromString(pszValue, &propvarValue);
+			if (SUCCEEDED(hr))
+			{
+				hr = PSCoerceToCanonicalValue(key, &propvarValue);
+				if (SUCCEEDED(hr))
+				{
+					// Set the value to the property store of the item.
+					hr = pps->SetValue(key, propvarValue);
+					if (SUCCEEDED(hr))
+					{
+						// Commit does the actual writing back to the file stream.
+						hr = pps->Commit();
+						if (SUCCEEDED(hr))
+						{
+							wprintf(L"Property %s value %s written successfully \n", pszCanonicalName, pszValue);
+						}
+						else
+						{
+							wprintf(L"Error %x: Commit to the propertystore failed.\n", hr);
+						}
+					}
+					else
+					{
+						wprintf(L"Error %x: Set value to the propertystore failed.\n", hr);
+					}
+				}
+				PropVariantClear(&propvarValue);
+			}
+			pps->Release();
+		}
+		else
+		{
+			wprintf(L"Error %x: getting the propertystore for the item.\n", hr);
+		}
+	}
+	else
+	{
+		wprintf(L"Invalid property specified: %s\n", pszCanonicalName);
+	}
+	return hr;
+}
+
+CString	set_file_property(CString sFilePath, CString sProperty, CString value)
+{
+	//EnumerateProperties(sFilePath);
+	SetPropertyValue(sFilePath, sProperty, value);
+	return CString();
 }

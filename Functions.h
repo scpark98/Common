@@ -735,6 +735,7 @@ void		Trace(char* szFormat, ...);
 	int			GetNumberFromFile(CString sfile);			//파일을 읽어서 한개의 숫자값을 리턴한다. (파일이 없으면 -99999 를 리턴한다.)
 	bool		WriteNumberToFile(CString sfile, int n);	//숫자값을 파일에 기록해준다.
 	CString		GetFileProperty(CString sFilePath, CString sProperty);
+	CString		set_file_property(CString sFilePath, CString sProperty, CString value);
 	size_t		read_raw(CString sfile, uint8_t *dst, size_t size);
 	bool		save2raw(CString sfile, uint8_t *data, size_t size);
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);

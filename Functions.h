@@ -903,7 +903,10 @@ void		Trace(char* szFormat, ...);
 
 	CString		get_system_label(int csidl, int *sysIconIndex = NULL);
 
-	CString		get_GUID();
+	//이 값은 윈도우가 설치될 때 생성되고 재설치되지 않으면 유지된다.
+	//단, HDD 복제시에도 그대로 복사되므로 머신에 따라 unique하다고 볼 수 없다.
+	CString		read_windows_GUID();
+	CString		create_GUID();
 
 	//윈도우10이상은 auto_update가 항상 true.
 	//(registry에서 특정값을 추가하여 설정할 경우는 false로도 리턴됨)

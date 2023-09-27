@@ -96,11 +96,30 @@ END_MESSAGE_MAP()
 */
 int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/ )
 {
-	if ( m_hWnd == NULL )
+	if (m_hWnd == NULL)
 		return 0;
 
-	if ( !m_bShowLog )
+	if (!m_bShowLog)
 		return 0;
+
+
+	//만약 로그 텍스트의 맨 앞에 \n이 붙어있으면 이전 로그 라인과 라인을 구분하기 위함인데
+	//그냥 기록하면 시간부터 라인번호까지 출력한 후 라인이 변경된다.
+	//log_text의 맨 앞에 \n이 있다면 먼저 처리해준다.
+	int i;
+	int linefeed_count = 0;
+	for (i = 0; i < str.GetLength(); i++)
+	{
+		if (str[i] == '\n')
+			linefeed_count++;
+		else
+			break;
+	}
+
+	if (linefeed_count > 0)
+		str = str.Mid(linefeed_count);
+
+
 
 	//SetRedraw(FALSE);
 	int nOldFirstVisibleLine = GetFirstVisibleLine();
@@ -140,7 +159,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	nOldLines = GetLineCount();
 	nInsertionPoint = GetWindowTextLength();
 
-	if ( m_hWnd == NULL )
+	if (m_hWnd == NULL)
 		return 0;
 
 	SetSel(nInsertionPoint, nInsertionPoint);
@@ -187,9 +206,26 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 
 	// Set insertion point to end of text
 	nInsertionPoint = GetWindowTextLength();
+
+	if (linefeed_count == 0 && str.IsEmpty())
+	{
+		SetSel(nInsertionPoint, -1);
+		ReplaceSel(_T("\n"));
+	}
+	else
+	{
+		for (i = 0; i < linefeed_count; i++)
+		{
+			SetSel(nInsertionPoint, -1);
+			ReplaceSel(_T("\n"));
+			nInsertionPoint = GetWindowTextLength();
+		}
+	}
+
+	nInsertionPoint = GetWindowTextLength();
 	
 	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
-	if ( m_nMaxCharLimit > 0 && nInsertionPoint >= m_nMaxCharLimit )
+	if (m_nMaxCharLimit > 0 && nInsertionPoint >= m_nMaxCharLimit)
 	{
 		//clear
 		SetSel(0, -1);
@@ -255,6 +291,12 @@ void CRichEditCtrlEx::Append( LPCTSTR lpszFormat, ... )
 	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
 	va_end(args);
 
+	//시간 표시가 true일 때 라인의 맨 처음 컬럼이 아니면 시간표시를 하지 않는다.
+	if (m_bShowTime)
+	{
+		CPoint pt = GetCaretPos();
+		int ch = CharFromPos(pt);
+	}
 	AppendToLog(szBuffer, m_crText, false);
 }
 

@@ -8339,7 +8339,27 @@ CString	get_system_label(int csidl, int* sysIconIndex)
 	return sfi.szDisplayName;
 }
 
-CString	get_GUID()
+//이 값은 윈도우가 설치될 때 생성되고 재설치되지 않으면 유지된다.
+//단, HDD 복제시에도 유지되므로 머신에 따라 unique하다고 볼 수 없다.
+CString	read_windows_GUID()
+{
+	TCHAR value[1024] = { 0, };
+	DWORD size = _countof(value);
+	DWORD type = REG_SZ;
+	HKEY key;
+	LONG retKey = ::RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Cryptography"), 0, KEY_READ | KEY_WOW64_64KEY, &key);
+	LONG retVal = ::RegQueryValueEx(key, _T("MachineGuid"), nullptr, &type, (LPBYTE)value, &size);
+
+	if (retKey == ERROR_SUCCESS && retVal == ERROR_SUCCESS) {
+		//ret = value;
+	}
+
+	::RegCloseKey(key);
+
+	return value;
+}
+
+CString	create_GUID()
 {
 	RPC_STATUS Status;
 	UUID uuid;

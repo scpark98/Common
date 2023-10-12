@@ -4,6 +4,7 @@
 //#include "stdafx.h"
 #include "RichEditCtrlEx.h"
 
+//#include <stdarg.h>
 #include <strsafe.h>	//for StringCchCopyN
 
 #define TIMER_CLEAR_LOG					0
@@ -16,8 +17,8 @@ CRichEditCtrlEx::CRichEditCtrlEx()
 {
 	m_crText			= ::GetSysColor(COLOR_GRAYTEXT);
 	m_crBack			= RGB( 255, 255, 255 );
-	m_bShowLog			= true;
-	m_bShowTime			= AfxGetApp()->GetProfileInt(_T("setting\\rich_edit"), _T("show time"), true);
+	m_show_log			= true;
+	m_show_time			= AfxGetApp()->GetProfileInt(_T("setting\\rich_edit"), _T("show time"), true);
 	m_nClearLogInterval	= 0;
 	m_nMaxCharLimit		= 0;
 	m_nScrollSize		= 2;
@@ -42,6 +43,221 @@ END_MESSAGE_MAP()
 
 
 // CRichEditCtrlEx 메시지 처리기입니다.
+//void CRichEditCtrlEx::append(COLORREF cr, CString text, bool linefeed)
+//{
+//	append(cr, _T("%s%c"), text, (linefeed ? '\n' : '\0'));
+//}
+
+void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
+{
+	if (m_hWnd == NULL)
+		return;
+
+	if (!m_show_log)
+		return;
+
+	if (cr == -1)
+		cr = m_crText;
+
+	//CString으로 변환
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+
+
+	//만약 텍스트의 맨 앞에 \n이 붙어 있으면 이전 로그 라인과 라인을 구분하기 위함인데
+	//그냥 기록하면 시간정보를 출력한 후 라인이 변경된다.
+	//text의 맨 앞에 \n이 있다면 먼저 처리해준다.
+	int i;
+	int linefeed_count = 0;
+	bool skip_time_info = false;
+
+	for (i = 0; i < new_text.GetLength(); i++)
+	{
+		if (new_text[i] == '\n')
+			linefeed_count++;
+		else
+			break;
+	}
+
+	new_text = new_text.Mid(linefeed_count);
+
+
+	// Set insertion point to end of text
+	int			nOldLines = 0, nNewLines = 0, nScroll = 0;
+	long		nInsertionPoint = 0;
+
+	nInsertionPoint = GetWindowTextLength();
+
+	if (linefeed_count == 0 && new_text.IsEmpty())
+	{
+		SetSel(nInsertionPoint, -1);
+		ReplaceSel(_T("\n"));
+	}
+	else
+	{
+		for (i = 0; i < linefeed_count; i++)
+		{
+			SetSel(nInsertionPoint, -1);
+			ReplaceSel(_T("\n"));
+			nInsertionPoint = GetWindowTextLength();
+		}
+	}
+
+	nInsertionPoint = GetWindowTextLength();
+
+
+
+	if (m_show_time)
+	{
+		//m_show_time = true일때 첫 컬럼이냐 아니냐에 따라 시간값을 찍을지가 결정된다.
+		int total_lines = GetLineCount();
+		int len = LineLength(total_lines - 1);
+		if (len > 0)
+		{
+			TCHAR p[1024] = { 0, };
+			GetLine(total_lines - 1, p, 1024);
+			p[len] = '\0';
+			CString cur_line(p);
+			cur_line.Trim();
+			skip_time_info = (cur_line.GetLength() > 0);
+		}
+	}
+
+
+
+	int nOldFirstVisibleLine = GetFirstVisibleLine();
+	long lMinSel, lMaxSel;
+	GetSel(lMinSel, lMaxSel);
+
+
+	CHARFORMAT	cf;
+
+	CPoint pt = GetCaretPos();
+	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
+	if (pt.x > 1)
+		m_auto_scroll = false;
+
+	SCROLLINFO	si;
+	si.cbSize = sizeof(SCROLLINFO);
+	GetScrollInfo(SB_VERT, &si);
+
+
+
+	nOldLines = GetLineCount();
+	nInsertionPoint = GetWindowTextLength();
+
+	SetSel(nInsertionPoint, nInsertionPoint);
+
+	PARAFORMAT2 pf;
+	GetParaFormat(pf);
+	pf.dwMask = PFM_ALIGNMENT;
+	pf.wAlignment = m_align;
+	SetParaFormat(pf);
+	SendMessage(EM_SETMODIFY, (WPARAM)TRUE, 0L);
+
+
+	/*
+	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, max = %d, sel = %d, %d\n"),
+		m_auto_scroll,
+		si.nPos,
+		si.nTrackPos,
+		si.nMax,
+		lMinSel, lMaxSel);
+	if (si.nPos != si.nTrackPos)
+		m_auto_scroll = false;
+	*/
+
+
+
+	if (m_show_time && !skip_time_info)
+	{
+		SYSTEMTIME	t;
+		CString sTime;
+
+		::GetLocalTime(&t);
+		sTime.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+
+		cf.cbSize = sizeof(CHARFORMAT);
+		cf.dwMask = CFM_COLOR;
+		cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
+		cf.crTextColor = RGB(128, 128, 128);
+		SetSelectionCharFormat(cf);
+
+		ReplaceSel(sTime);
+	}
+
+	// Save number of lines before insertion of new text
+	nOldLines = GetLineCount();
+
+	// Initialize character format structure
+	cf.cbSize = sizeof(CHARFORMAT);
+	cf.dwMask = CFM_COLOR;
+	cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
+
+	if (cr == -1)
+		cf.crTextColor = m_crText;
+	else
+		cf.crTextColor = cr;
+
+
+	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
+	if (m_nMaxCharLimit > 0 && nInsertionPoint >= m_nMaxCharLimit)
+	{
+		//clear
+		SetSel(0, -1);
+		ReplaceSel(_T(""));
+	}
+
+	nInsertionPoint = -1;
+	SetSel(nInsertionPoint, -1);
+
+
+	//  Set the character format
+	SetSelectionCharFormat(cf);
+
+	// Replace selection. Because we have nothing selected, this will simply insert
+	// the string at the current caret position.
+	ReplaceSel(new_text);
+
+#ifdef _DEBUG
+	TRACE(new_text);
+#endif
+
+
+	//if (!m_auto_scroll)
+	//	return 0;
+
+
+	CRect rc;
+	GetClientRect(rc);
+	// Get new line count
+	if ((si.nMax - si.nTrackPos) < rc.Height())
+	{
+		TRACE(_T("true\n"));
+		nNewLines = GetLineCount();
+
+		// Scroll by the number of lines just inserted
+		nScroll = nNewLines - nOldLines;
+		LineScroll(nScroll);
+	}
+	else// if (false)
+	{
+		TRACE(_T("false\n"));
+		//SetSel(lMinSel, lMaxSel);
+
+		int nNewFirstVisibleLine = GetFirstVisibleLine();
+
+		if (nOldFirstVisibleLine != nNewFirstVisibleLine)
+		{
+			SetRedraw(TRUE);
+			LineScroll(nOldFirstVisibleLine - nNewFirstVisibleLine);
+		}
+
+		SetRedraw(TRUE);
+	}
+}
 
 
 
@@ -99,7 +315,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	if (m_hWnd == NULL)
 		return 0;
 
-	if (!m_bShowLog)
+	if (!m_show_log)
 		return 0;
 
 
@@ -108,6 +324,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	//log_text의 맨 앞에 \n이 있다면 먼저 처리해준다.
 	int i;
 	int linefeed_count = 0;
+
 	for (i = 0; i < str.GetLength(); i++)
 	{
 		if (str[i] == '\n')
@@ -174,7 +391,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	SendMessage(EM_SETMODIFY, (WPARAM)TRUE, 0L);
 	
 
-	if (m_bShowTime)
+	if (m_show_time)
 	{
 		SYSTEMTIME	t;
 		CString sTime;
@@ -291,16 +508,32 @@ void CRichEditCtrlEx::Append( LPCTSTR lpszFormat, ... )
 	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
 	va_end(args);
 
-	//시간 표시가 true일 때 라인의 맨 처음 컬럼이 아니면 시간표시를 하지 않는다.
-	if (m_bShowTime)
+	//시간 표시가 true라고 하더라도 라인의 맨 처음 컬럼이 아니면 시간표시를 생략시킨다.
+	if (m_show_time)
 	{
-		CPoint pt = GetCaretPos();
-		int ch = CharFromPos(pt);
+		int total_lines = GetLineCount();
+		int len = LineLength(total_lines);
+		TCHAR sline[1024] = { 0, };
+		GetLine(total_lines - 1, sline, 1024);
+
+		if (len > 0)
+		{
+			m_show_time = false;
+			AppendToLog(szBuffer, m_crText, false);
+			m_show_time = true;
+		}
+		else
+		{
+			AppendToLog(szBuffer, m_crText, false);
+		}
 	}
-	AppendToLog(szBuffer, m_crText, false);
+	else
+	{
+		AppendToLog(szBuffer, m_crText, false);
+	}
 }
 
-void CRichEditCtrlEx::Append( COLORREF cr, LPCTSTR lpszFormat, ... )
+void CRichEditCtrlEx::Append(COLORREF cr, LPCTSTR lpszFormat, ...)
 {
 	TCHAR szBuffer[512];
 
@@ -310,7 +543,29 @@ void CRichEditCtrlEx::Append( COLORREF cr, LPCTSTR lpszFormat, ... )
 	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
 	va_end(args);
 
-	AppendToLog(szBuffer, cr, false);
+	//시간 표시가 true라고 하더라도 라인의 맨 처음 컬럼이 아니면 시간표시를 생략시킨다.
+	if (m_show_time)
+	{
+		int total_lines = GetLineCount();
+		int len = LineLength(total_lines);
+		TCHAR sline[1024] = { 0, };
+		GetLine(total_lines - 1, sline, 1024);
+
+		if (len > 0)
+		{
+			m_show_time = false;
+			AppendToLog(szBuffer, cr, false);
+			m_show_time = true;
+		}
+		else
+		{
+			AppendToLog(szBuffer, cr, false);
+		}
+	}
+	else
+	{
+		AppendToLog(szBuffer, cr, false);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -374,7 +629,7 @@ int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, 
 	if ( m_hWnd == NULL )
 		return 0;
 
-	if ( !m_bShowLog )
+	if ( !m_show_log )
 		return 0;
 
 	long nVisible = 0;
@@ -501,16 +756,16 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 	paraFormat.dwMask = PFM_LINESPACING;
 	BYTE nLineSpacing = paraFormat.bLineSpacingRule;	//줄간격을 1.5배로 한다. 0=1.0, 1=1.5, 2=2.0
 
-	menu.CheckMenuItem( id_menu_richedit_toggle_log, m_bShowLog ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( id_menu_richedit_toggle_time, m_bShowTime ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_toggle_log, m_show_log ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem( id_menu_richedit_toggle_time, m_show_time ? MF_CHECKED : MF_UNCHECKED );
 	menu.CheckMenuItem( id_menu_richedit_line_space10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED );
 	menu.CheckMenuItem( id_menu_richedit_line_space15, nLineSpacing == 1 ? MF_CHECKED : MF_UNCHECKED );
 	menu.CheckMenuItem( id_menu_richedit_line_space20, nLineSpacing == 2 ? MF_CHECKED : MF_UNCHECKED );
 
-	menu.EnableMenuItem( id_menu_richedit_toggle_time, m_bShowLog ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( id_menu_richedit_line_space10, m_bShowLog ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( id_menu_richedit_line_space15, m_bShowLog ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( id_menu_richedit_line_space20, m_bShowLog ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_toggle_time, m_show_log ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_line_space10, m_show_log ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_line_space15, m_show_log ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem( id_menu_richedit_line_space20, m_show_log ? MF_ENABLED : MF_DISABLED );
 
 	SetMenu( &menu );
 
@@ -538,27 +793,27 @@ void CRichEditCtrlEx::ClearAll()
 
 void CRichEditCtrlEx::ToggleShowLog()
 {
-	m_bShowLog = !m_bShowLog;
+	m_show_log = !m_show_log;
 
-	if ( m_bShowLog )
+	if ( m_show_log )
 	{
 		AppendToLog(_T("\n") );
 		AppendToLog(_T("로그를 디스플레이합니다."), GetComplementaryColor( m_crBack ) );
 	}
 	else
 	{
-		m_bShowLog = true;
+		m_show_log = true;
 		AppendToLog(_T("\n") );
 		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), GetComplementaryColor( m_crBack ) );
 		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), GetComplementaryColor( m_crBack ) );
-		m_bShowLog = false;
+		m_show_log = false;
 	}
 }
 
 void CRichEditCtrlEx::ToggleShowTime()
 {
-	m_bShowTime = !m_bShowTime;
-	AfxGetApp()->WriteProfileInt(_T("setting\\rich_edit"), _T("show time"), m_bShowTime);
+	m_show_time = !m_show_time;
+	AfxGetApp()->WriteProfileInt(_T("setting\\rich_edit"), _T("show time"), m_show_time);
 }
 
 void CRichEditCtrlEx::OnPopupMenu(UINT menuID)

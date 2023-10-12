@@ -72,7 +72,7 @@ bool CMP4Recorder::Start(CMP4RecorderParam* param)
 	m_nEncWidth			= param->width;
 	m_nEncHeight		= param->height;
 	m_unFPS				= param->fps;
-	m_nQuantizer		= 28 + (int)((float)(100 - param->quality) / 10); //높을수로 화질저하
+	m_nQuantizer		= 18 + (int)((float)(100 - param->quality) / 4.0); //높을수로 화질저하
 
 	char* cfilename = WCHARToUTF8(param->filepath);
 	m_hMP4File = MP4Create(cfilename);

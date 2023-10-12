@@ -381,7 +381,8 @@ void		Trace(char* szFormat, ...);
 
 //////////////////////////////////////////////////////////////////////////
 //프로세스 관련
-	CString		GetFileVersionInformation(CString strFileName, CString strFlag);
+	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
+	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
 	CString		GetExeDirectory(bool includeSlash = false);
 	CString		GetExeRootDirectory();
 	CString		GetExeFilename(bool bFullPath = FALSE);
@@ -482,6 +483,9 @@ void		Trace(char* szFormat, ...);
 	int			get_token_string(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty = true, int nMaxToken = -1);
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
+
+	//dq항목을 하나의 문자열로 합쳐준다.
+	CString		get_concat_string(std::deque<CString> dq, CString separator = _T("|"));
 
 	//[2023/1/1 22:1:29] [DBMS][NMS_LS_TERMINATE_SESSION_DATA][ID : tmax25][update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400']
 	//[]로 묶여진 토큰을 분리한다.

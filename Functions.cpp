@@ -27,6 +27,10 @@
 #pragma comment(lib, "Rpcrt4.lib")
 #include <Rpcdce.h>
 
+//for file property api
+#include <propvarutil.h>
+#pragma comment(lib, "propsys.lib")
+
 
 #pragma warning(disable : 4018)		// '<': signed/unsigned mismatch
 #pragma warning(disable : 4127)		// conditional expression is constant
@@ -6588,18 +6592,21 @@ void HideTaskBar(bool bHide /*=TRUE*/)
 //rc->Version->VS_VERSION_INFO 항목
 //ex. m_sVersion = GetFileVersionInformation(sExeFile, "FileVersion");
 //아래의 GetFileProperty 함수도 동일한 기능을 수행하는 코드이나 각 항목별로 확인 필요!
-CString GetFileVersionInformation(CString strFileName, CString strFlag)
+CString get_file_property(CString fullpath, CString strFlag)
 {
 	struct LANGANDCODEPAGE {
 		WORD wLanguage;
 		WORD wCodePage;
 	} *lpTranslate;
 
-	DWORD dwSize = GetFileVersionInfoSize(strFileName , 0);
+	if (fullpath.IsEmpty())
+		fullpath = GetExeFilename(true);
+
+	DWORD dwSize = GetFileVersionInfoSize(fullpath, 0);
 	TCHAR * buffer = new TCHAR[dwSize];
 	memset(buffer, 0, dwSize);
 
-	GetFileVersionInfo(strFileName, 0, dwSize, buffer); 
+	GetFileVersionInfo(fullpath, 0, dwSize, buffer);
 
 	UINT cbTranslate;
 	UINT dwBytes;
@@ -7943,6 +7950,23 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 	}
 
 	return nToken;
+}
+
+//dq항목을 하나의 문자열로 합쳐준다.
+CString	get_concat_string(std::deque<CString> dq, CString separator)
+{
+	int i;
+	CString res;
+
+	for (i = 0; i < dq.size(); i++)
+	{
+		if (i == dq.size() - 1)
+			res = res + dq[i];
+		else
+			res = res + dq[i] + separator;
+	}
+
+	return res;
 }
 
 CString	get_tokenized(std::deque<CString> dq, TCHAR separator)
@@ -10568,7 +10592,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	}
 	else
 	{
-		return FALSE;
+		return NULL;
 	}
 
 	int nw = rct.Width();
@@ -10598,7 +10622,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 
 
 	if (!hBitmap)
-		return FALSE;
+		return NULL;
 
 	::SelectObject(hMemDC, hBitmap);
 
@@ -16557,6 +16581,7 @@ CString json_value(CString json, CString key)
 	return result;
 }
 
+
 HRESULT PrintProperty(IPropertyStore* pps, REFPROPERTYKEY key, PCWSTR pszCanonicalName)
 {
 	PROPVARIANT propvarValue = { 0 };
@@ -16637,7 +16662,6 @@ HRESULT EnumerateProperties(PCWSTR pszFilename)
 	return hr;
 }
 
-#include <propvarutil.h>
 HRESULT SetPropertyValue(PCWSTR pszFilename, PCWSTR pszCanonicalName, PCWSTR pszValue)
 {
 	// Convert the Canonical name of the property to PROPERTYKEY

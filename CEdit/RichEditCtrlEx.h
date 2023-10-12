@@ -3,6 +3,13 @@
 #include <Afxwin.h>
 #include <afxcmn.h>
 
+/*
+* 시간표시를 하지 않는 경우는 관계없으나 시간표시를 하는 경우는
+  text의 앞 또는 뒤에 \n이 있을 경우 부가적인 처리가 필요하다.
+
+  - 앞에 있을 경우 
+
+*/
 //scpark.
 //call AfxInitRichEdit2() at App()::InitInstance() for using RECHED20.dll
 
@@ -34,21 +41,29 @@ public:
 	void		ClearAll();
 
 	void		ToggleShowLog();
-	void		ShowLog( bool bShow = true ) { m_bShowLog = bShow; }
-	bool		IsShowLog() { return m_bShowLog; }
+	void		ShowLog( bool bShow = true ) { m_show_log = bShow; }
+	bool		IsShowLog() { return m_show_log; }
 
 	void		ToggleShowTime();
-	void		ShowTimeInfo( bool bShow = true ) { m_bShowTime = bShow; }
-	bool		IsShowTime() { return m_bShowTime; }
+	void		ShowTimeInfo( bool bShow = true ) { m_show_time = bShow; }
+	bool		IsShowTime() { return m_show_time; }
 
 	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
 
 	UINT		GetLineSpacing();
 	void		SetLineSpacing( UINT nLineSpace );
-	int			AppendToLog( CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
-	void		Append( LPCTSTR lpszFormat, ... );
-	void		Append( COLORREF cr, LPCTSTR lpszFormat, ... );
-	int			AppendToLogAndScroll( CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );
+
+	//20231004. Append~로 시작되는 4개의 함수를 2개로 간소화한다.
+	void		append(COLORREF cr, LPCTSTR lpszFormat, ... );
+	//void		append(COLORREF cr, CString text, bool linefeed = true);
+
+	int			AppendToLog(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
+	void		Append(LPCTSTR lpszFormat, ... );
+	void		Append(COLORREF cr, LPCTSTR lpszFormat, ... );
+	int			AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );
+
+
+
 	int			GetNumVisibleLines();
 
 	COLORREF	GetComplementaryColor( COLORREF crColor );
@@ -67,8 +82,8 @@ public:
 protected:
 	COLORREF	m_crText;
 	COLORREF	m_crBack;
-	bool		m_bShowLog;
-	bool		m_bShowTime;
+	bool		m_show_log;
+	bool		m_show_time;
 	bool		m_use_popup_menu = true;
 
 	int			m_nClearLogInterval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)

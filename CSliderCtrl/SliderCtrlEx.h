@@ -114,8 +114,8 @@ public:
 
 // Operations
 public:
-	void	SetEventMsgStyle( int style );
-	void	SetCallbackFunction( void (*p_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos) )
+	void	SetEventMsgStyle(int style);
+	void	SetCallbackFunction(void (*p_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos))
 	{
 		m_pParentWnd = GetParent();
 		m_pCallback_func = p_func;
@@ -124,24 +124,24 @@ public:
 	int		GetStyle() { return m_nStyle; }
 
 	//slider_thumb,	slider_value, slider_progress, slider_track,
-	void	SetStyle( int nStyle );
-	void	SetTrackHeight( int height ) { m_nTrackHeight = height; }
-	void	SetPos( int nPos );
+	void	SetStyle(int nStyle);
+	void	SetTrackHeight(int height) { m_nTrackHeight = height; }
+	void	SetPos(int nPos);
 	int		GetPos();
-	void	EnableSlide( bool enable = true ) { m_bEnableSlide = enable; }
+	void	EnableSlide(bool enable = true) { m_bEnableSlide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
 	int		GetLower() { return m_nMin; }
 	int		GetUpper() { return m_nMax; }
-	void	SetRange( int nMin, int nMax, BOOL bRedraw = FALSE );
-	BOOL	SetBitmapChannel( UINT nChannelID, UINT nActiveID = NULL );
-	BOOL	SetBitmapThumb(	UINT nThumbID, UINT nActiveID = NULL, BOOL bTrans = FALSE, COLORREF crTrans = RGB(0,0,0) );
-	void	DrawFocusRect( BOOL bDraw = TRUE, BOOL bRedraw = FALSE );
-	void	SetValueStyle( int nValueStyle = value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
+	void	SetRange(int nMin, int nMax, BOOL bRedraw = FALSE);
+	BOOL	SetBitmapChannel(UINT nChannelID, UINT nActiveID = NULL);
+	BOOL	SetBitmapThumb(	UINT nThumbID, UINT nActiveID = NULL, BOOL bTrans = FALSE, COLORREF crTrans = RGB(0,0,0));
+	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
+	void	SetValueStyle(int nValueStyle = value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
 
-	void	SetBackColor( COLORREF crBack );
-	void	SetActiveColor( COLORREF crActive );
-	void	SetInActiveColor( COLORREF crInActive );
-	void	SetThumbColor( COLORREF crThumb );
+	void	SetBackColor(COLORREF crBack);
+	void	SetActiveColor(COLORREF crActive);
+	void	SetInActiveColor(COLORREF crInActive);
+	void	SetThumbColor(COLORREF crThumb);
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
@@ -271,10 +271,10 @@ protected:
 
 	double		Pixel2Pos(int nPixel);
 	int			Pos2Pixel(int nPos);
-	void		PrepareMask( CBitmap *pBmpSource, CBitmap *pBmpMask,
-							 COLORREF clrpTransColor );
+	void		PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
+							 COLORREF clrpTransColor);
 	void		DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
-										CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask );
+										CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask);
 
 // Overrides
 	// ClassWizard generated virtual function overrides

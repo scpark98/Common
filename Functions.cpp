@@ -862,7 +862,7 @@ uint64_t get_file_size(CString sfile)
 	//디스크 드라이브인 경우
 	if (sfile.Mid(1) == _T(":") || sfile.Mid(2) == _T(":\\"))
 	{
-		return GetDiskFreeSize(sfile);
+		return (get_disk_total_size(sfile) - get_disk_free_size(sfile));
 	}
 
 	if(CFile::GetStatus(sfile, status))
@@ -2708,6 +2708,18 @@ CString	get_uri_old(CString ip, int port, CString sub_url, CString local_file_pa
 	*/
 }
 
+DWORD get_uri(CString& result_str, CString full_url, CString verb, CString header, CString jsonBody, CString local_file_path)
+{
+	DWORD statusCode = HTTP_STATUS_BAD_REQUEST;
+
+	CString ip, sub_url;
+	int port;
+
+	parse_url(full_url, ip, port, sub_url);
+
+	return get_uri(result_str, ip, port, sub_url, verb, header, jsonBody, local_file_path);
+}
+
 //url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
 //local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
 //local_file_path가 지정되어 있으면 파일로 다운받는다. (이때 result_str은 "")
@@ -2829,12 +2841,22 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 
 	HttpAddRequestHeaders(hOpenRequest, header, -1, HTTP_ADDREQ_FLAG_ADD);
 
+#ifdef _UNICODE
 	wchar_t* wcharMsg = jsonBody.GetBuffer(jsonBody.GetLength());
 	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, wcharMsg, -1, NULL, 0, NULL, NULL);
 	char jsonData[1024] = { 0, };
 	WideCharToMultiByte(CP_UTF8, 0, wcharMsg, -1, jsonData, char_str_len, 0, 0);
 
 	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
+#else
+	//char* charMsg = jsonBody.GetBuffer(jsonBody.GetLength());
+	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, (CStringW)jsonBody, -1, NULL, 0, NULL, NULL);
+	char jsonData[1024] = { 0, };
+	WideCharToMultiByte(CP_UTF8, 0, (CStringW)jsonBody, -1, jsonData, char_str_len, 0, 0);
+
+	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
+#endif
+
 	if (!res)
 	{
 		InternetCloseHandle(hOpenRequest);
@@ -4355,7 +4377,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		}
 		else
 		{
-			//TRACE(_T("%s\n"), sCaptionString);
+			TRACE(_T("%s\n"), sCaptionString);
 			if (sCaptionString.Find(sCaption) >= 0)
 				return pWnd;
 		}
@@ -4394,7 +4416,7 @@ HINSTANCE FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDirectory, LPTSTR lpResult)
     return hinstance;   
 }   
 */
-uint64_t GetDiskFreeSize(CString sDrive)
+uint64_t get_disk_free_size(CString sDrive)
 {
 	TCHAR Drive[10];
 	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
@@ -4417,7 +4439,7 @@ uint64_t GetDiskFreeSize(CString sDrive)
 	return (uint64_t)(m_lTotalNumberOfFreeBytes.QuadPart);
 }
 
-uint64_t GetDiskTotalSize(CString sDrive)
+uint64_t get_disk_total_size(CString sDrive)
 {
 	TCHAR			Drive[10];
 	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
@@ -4440,15 +4462,18 @@ uint64_t GetDiskTotalSize(CString sDrive)
 	return (uint64_t)(m_lTotalNumberOfBytes.QuadPart);
 }
 
-CString	GetDiskSizeString(CString sDrive)
+//
+/*
+CString	GetDiskSizeString(CString sDrive, int nfDigit)
 {
 	CString str;
 
 	str.Format(_T("%.1f GB / %.1f GB"),
-				GetDiskFreeSize(sDrive) / 1024.0 / 1024.0 / 1024.0,
-				GetDiskTotalSize(sDrive) / 1024.0 / 1024.0 / 1024.0);
+				 GetDiskFreeSize(sDrive[0]) / 1024.0 / 1024.0 / 1024.0,
+				GetDiskTotalSize(sDrive[0]) / 1024.0 / 1024.0 / 1024.0);
 	return str;
 }
+*/
 
 CString	GetCommaString(CString sString, CString sComma)
 {
@@ -8398,11 +8423,19 @@ CString	create_GUID()
 	}
 	else
 	{
+#ifdef _UNICODE
 		if (UuidToString(&uuid, (RPC_WSTR*)&idStr) == RPC_S_OK)
 		{
 			guid = idStr;
 			RpcStringFree((RPC_WSTR*)&idStr);
 		}
+#else
+		if (UuidToString(&uuid, (RPC_CSTR*)&idStr) == RPC_S_OK)
+		{
+			guid = idStr;
+			RpcStringFree((RPC_CSTR*)&idStr);
+		}
+#endif
 	}
 
 	return guid;
@@ -9911,7 +9944,7 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 
 //default : bCaseSensitive = false, bExceptThis = true
 //뭔가 오류가 있다. 다시 테스트해야 함.
-HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThis)
+HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSensitive, bool bExceptThis)
 {
 	bool			bFlag = false;
 	HANDLE			hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL); 
@@ -9927,15 +9960,35 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive, bool bExceptThi
 	hWndToFind = NULL;
 
 	pe.dwSize = sizeof(PROCESSENTRY32);
+	CString szExeFile;
+	bool found = false;
 
 	if (Process32First(hSnapShot, &pe)) 
 	{
 		do 
 		{
-			TRACE(_T("pe.szExeFile = %s\n"), pe.szExeFile);
-			//대소문자 구분하지 않고 실행프로그램 이름이 같은지 확인..
-			if ((bCaseSensitive && _tcsicmp(pe.szExeFile, sExeFile) == 0) ||
-				(!bCaseSensitive && _tcscmp(pe.szExeFile, sExeFile) == 0))
+			found = false;
+			szExeFile = pe.szExeFile;
+
+			//TRACE(_T("pe.szExeFile = %s\n"), pe.szExeFile);
+			if (!bCaseSensitive)
+			{
+				szExeFile.MakeLower();
+				sExeFile.MakeLower();
+			}
+
+			if (bWholeWordsOnly)
+			{
+				if (szExeFile == sExeFile)
+					found = true;
+			}
+			else
+			{
+				if (szExeFile.Find(sExeFile) >= 0)
+					found = true;
+			}
+
+			if (found)
 			{
 				//자기 자신은 제외하고...
 				if (pe.th32ProcessID != GetCurrentProcessId())
@@ -11558,7 +11611,7 @@ int LevenshteinDistance(std::string s, int len_s, std::string t, int len_t)
 		cost = 1;
 
 	/* return minimum of delete char from s, delete char from t, and delete char from both */
-	return minimum(LevenshteinDistance(s, len_s - 1, t, len_t ) + 1,
+	return minimum(LevenshteinDistance(s, len_s - 1, t, len_t) + 1,
 		LevenshteinDistance(s, len_s    , t, len_t - 1) + 1,
 		LevenshteinDistance(s, len_s - 1, t, len_t - 1) + cost);
 }
@@ -16601,11 +16654,18 @@ HRESULT PrintProperty(IPropertyStore* pps, REFPROPERTYKEY key, PCWSTR pszCanonic
 }
 
 
-HRESULT GetPropertyStore(PCWSTR pszFilename, GETPROPERTYSTOREFLAGS gpsFlags, IPropertyStore** ppps)
+HRESULT GetPropertyStore(CString pszFilename, GETPROPERTYSTOREFLAGS gpsFlags, IPropertyStore** ppps)
 {
-	WCHAR szExpanded[MAX_PATH];
+	TCHAR szExpanded[MAX_PATH];
 	HRESULT hr = ExpandEnvironmentStrings(pszFilename, szExpanded, ARRAYSIZE(szExpanded)) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+
+	USES_CONVERSION;
+
+#ifdef _UNICODE
 	hr = SHGetPropertyStoreFromParsingName(pszFilename, NULL, gpsFlags, IID_PPV_ARGS(ppps));
+#else
+	hr = SHGetPropertyStoreFromParsingName(A2CW(LPCTSTR(pszFilename)), NULL, gpsFlags, IID_PPV_ARGS(ppps));
+#endif
 	//if (SUCCEEDED(hr))
 	{
 		//WCHAR szAbsPath[MAX_PATH];
@@ -16722,6 +16782,12 @@ HRESULT SetPropertyValue(PCWSTR pszFilename, PCWSTR pszCanonicalName, PCWSTR psz
 CString	set_file_property(CString sFilePath, CString sProperty, CString value)
 {
 	//EnumerateProperties(sFilePath);
+	USES_CONVERSION;
+
+#ifdef _UNICODE
 	SetPropertyValue(sFilePath, sProperty, value);
+#else
+	SetPropertyValue(A2CW(LPCTSTR(sFilePath)), A2CW(LPCTSTR(sProperty)), A2CW(LPCTSTR(value)));
+#endif
 	return CString();
 }

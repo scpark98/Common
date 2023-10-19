@@ -6,12 +6,12 @@
 
 //Usage:
 /*
-CAutoFont Font( "Arial" );
-Font.SetHeight( 30 );
-Font.SetBold( true );
-CFont* pOldFont = (CFont*)dc.SelectObject( &Font );
+CAutoFont Font("Arial");
+Font.SetHeight(30);
+Font.SetBold(true);
+CFont* pOldFont = (CFont*)dc.SelectObject(&Font);
 ...
-dc.SelectObject( pOldFont );
+dc.SelectObject(pOldFont);
 */
 
 #ifndef AUTOFONT

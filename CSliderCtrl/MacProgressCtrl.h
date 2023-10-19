@@ -34,46 +34,50 @@
 
 class CMacProgressCtrl : public CProgressCtrl
 {
-// Construction
+	// Construction
 public:
 	CMacProgressCtrl();
 
-// Attributes
+	// Attributes
 public:
 
-// Operations
+	// Operations
 public:
 
-// Overrides
-	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CMacProgressCtrl)
-	//}}AFX_VIRTUAL
+	// Overrides
+		// ClassWizard generated virtual function overrides
+		//{{AFX_VIRTUAL(CMacProgressCtrl)
+		//}}AFX_VIRTUAL
 
-// Implementation
+	// Implementation
 public:
 	bool		m_bLButtonDown;
 
-	void		SetCtrlID( int nID ) { m_nCtrlID = nID; }
-	void		UseSlider( bool bUseSlider = true ) { m_bUseSlider = bUseSlider; }
+	void		SetCtrlID(int nID) { m_nCtrlID = nID; }
+	void		UseSlider(bool bUseSlider = true) { m_bUseSlider = bUseSlider; }
 	int			GetRangeMin();
 	int			GetRangeMax();
 	BOOL		GetIndeterminate();
 	void		SetIndeterminate(BOOL bIndeterminate = TRUE);
-	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1, BOOL bGradient = TRUE );
-	void		SetTransparent( bool bTransparent = true ) { m_bTransparent = bTransparent; Invalidate(); }
-	void		SetGradient( bool bGradient = true ) { m_bGradient = bGradient; Invalidate(); }
-	void		SetText( CString sText );
-	void		SetTextColor( COLORREF cTextColor );
-	void		SetTextShadow( BOOL bShadow = TRUE );
-	void		ShowPercent( BOOL bShow = TRUE )
-				{
-					m_bShowPercent = bShow;
-					Invalidate( FALSE );
-				}
+	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1, BOOL bGradient = TRUE);
+	void		SetTransparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
+	void		SetGradient(bool bGradient = true) { m_bGradient = bGradient; Invalidate(); }
+	void		SetText(CString sText);
+	void		set_text_color(COLORREF crText0, COLORREF crText1 = -1);
+	void		use_invert_text_color(bool use = true);
+	void		use_text_shadow(bool shadow = true);
+	void		draw_border(bool border = true, int width = 1, COLORREF cr = RGB(188, 188, 188), int pen_style = PS_SOLID);
 
-	void		show_text(bool show = true) { m_show_text = show; m_bShowPercent = false; Invalidate(); }
+	enum MAC_PROGRESS_TEXT_FORMAT
+	{
+		text_format_percent = 0,
+		text_format_value,
+	};
+
+	void		show_text(bool show, int text_format) { m_text_show = show; m_text_format = text_format; }
+	void		set_text_format(int text_format) { m_text_format = text_format; }
 	
-	COLORREF	GetColor( COLORREF crOrigin, int nOffset );
+	COLORREF	GetColor(COLORREF crOrigin, int nOffset);
 	void		SetRange(int min, int max);
 	void		SetRange32(int min, int max);
 	void		SetPos(int pos);
@@ -101,15 +105,23 @@ private:
 	int			m_upper;
 	bool		m_bUseSlider;		//true이면 슬라이드 컨트롤과 같이 조정할 수 있고 콜백함수를 호출한다.
 	bool		m_bDrawOutline;
-	BOOL		m_bShowPercent = false;
-	bool		m_show_text = false;
+	bool		m_text_show = false;
+	int			m_text_format = text_format_percent;
 	CString		m_sText;
-	COLORREF	m_cTextColor;
-	BOOL		m_bGradient;		//default = false
-	BOOL		m_bTransparent;
-	BOOL		m_bTextShadow;
+	COLORREF	m_crText0;
+	COLORREF	m_crText1;
+	bool		m_use_invert_text_color = false;
+	bool		m_text_shadow = false;
+
+	bool		m_draw_border = false;
+	int			m_border_width = 1;
+	int			m_border_pen_style = PS_SOLID;
+	COLORREF	m_border_color = RGB(188, 188, 188);
+
+	bool		m_bGradient;		//default = false
+	bool		m_bTransparent;
 	int			m_nIndOffset;
-	BOOL		m_bIndeterminate;
+	bool		m_bIndeterminate;
 	void		DrawVerticalBar(CDC *pDC, const CRect rect);
 	void		DrawHorizontalBar(CDC *pDC, const CRect rect);
 	void		DeletePens();

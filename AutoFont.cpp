@@ -349,19 +349,19 @@ CString CAutoFont::ContractFont()
 
 void CAutoFont::ExtractFont(CString& str)
 {
-	lf.lfHeight				=	_ttol((LPCTSTR)GetToken(str, TEXT(",") ));
-	lf.lfWidth				=	_ttol((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfEscapement			=	_ttol((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfOrientation		=	_ttol((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfWeight				=	_ttol((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfItalic				=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfUnderline			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfStrikeOut			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfCharSet			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfOutPrecision		=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfClipPrecision		=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfQuality			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
-	lf.lfPitchAndFamily		=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")) );
+	lf.lfHeight				=	_ttol((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfWidth				=	_ttol((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfEscapement			=	_ttol((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfOrientation		=	_ttol((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfWeight				=	_ttol((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfItalic				=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfUnderline			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfStrikeOut			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfCharSet			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfOutPrecision		=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfClipPrecision		=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfQuality			=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
+	lf.lfPitchAndFamily		=	_ttoi((LPCTSTR)GetToken(str, TEXT(",")));
 	_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), (LPCTSTR)str);
 
 	DeleteObject();

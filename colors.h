@@ -7,15 +7,15 @@
 #include <deque>
 
 // RGB -> YUV(YCbCr)
-#define		RGB2Y(R, G, B) CLIP((( 66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
+#define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
 #define		RGB2U(R, G, B) CLIP(((-38 * (R) -  74 * (G) + 112 * (B) + 128) >> 8) + 128)
 #define		RGB2V(R, G, B) CLIP(((112 * (R) -  94 * (G) -  18 * (B) + 128) >> 8) + 128)
-#define		RGB_2Y(color) CLIP((( 66 * GetRValue(color) + 129 * GetGValue(color) +  25 * GetBValue(color) + 128) >> 8) +  16)
+#define		RGB_2Y(color) CLIP(((66 * GetRValue(color) + 129 * GetGValue(color) +  25 * GetBValue(color) + 128) >> 8) +  16)
 #define		RGB_2U(color) CLIP(((-38 * GetRValue(color) -  74 * GetGValue(color) + 112 * GetBValue(color) + 128) >> 8) + 128)
 #define		RGB_2V(color) CLIP(((112 * GetRValue(color) -  94 * GetGValue(color) -  18 * GetBValue(color) + 128) >> 8) + 128)
 
 // YUV -> RGB
-#define		C(Y) ((Y) - 16 )
+#define		C(Y) ((Y) - 16)
 #define		D(U) ((U) - 128)
 #define		E(V) ((V) - 128)
 

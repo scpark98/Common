@@ -121,7 +121,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		SYSTEM_REBOOT			1
 #define		SYSTEM_POWEROFF			2
 
-#define		IsShiftPressed() (0x8000 ==(GetKeyState(VK_SHIFT) & 0x8000 ))
+#define		IsShiftPressed() (0x8000 ==(GetKeyState(VK_SHIFT) & 0x8000))
 #define		IsCtrlPressed()  (0x8000 ==(GetKeyState(VK_CONTROL) & 0x8000))
 
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
@@ -774,6 +774,7 @@ void		Trace(char* szFormat, ...);
 	//(이때 리턴값은 "")
 	//리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
 	DWORD		get_uri(CString &result_str, CString ip, int port, CString sub_url, CString verb, CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
+	DWORD		get_uri(CString& result_str, CString full_url, CString verb = _T("GET"), CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
 
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
@@ -920,7 +921,7 @@ void		Trace(char* szFormat, ...);
 	bool		get_windows_update_setting(bool& auto_update, int& level);
 
 	//좀 더 테스트 필요!
-	HWND		GetHWndByExeFilename(CString sExeFile, bool bCaseSensitive = false, bool bExceptThis = true);
+	HWND		GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly = false, bool bCaseSensitive = false, bool bExceptThis = true);
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
 
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE);
@@ -984,9 +985,10 @@ h		: 복사할 height 크기(pixel)
 	bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
 
 //HDD
-	uint64_t	GetDiskFreeSize(CString sDrive);
-	uint64_t	GetDiskTotalSize(CString sDrive);
-	CString		GetDiskSizeString(CString sDrive);	// "1.25G / 380.00G"
+	uint64_t	get_disk_free_size(CString sDrive);
+	uint64_t	get_disk_total_size(CString sDrive);
+	//위의 함수로 크기를 구한 후 get_size_string()을 이용할 것
+	//CString		GetDiskSizeString(CString sDrive, int unit = 3, int nfDigit = 0);	// "1.25G / 380.00G", nfDigit은 소수점 자리수
 	CString		GetHDDSerialNumber(int nPhysicalDrive);
 	CString		GetHDDVolumeNumber(CString sDrive);
 

@@ -19,8 +19,8 @@ m_static1.SetGradientColor(RED);
 //m_static1.SetGradientColor(4, RED, GREEN, YELLOW, BLUE);
 
 [수정될 내용]
-- 배경이 있는 앱에서는 투명이 잘 적용되지만 기본 스타일의 dlg에서는 화면갱신이 잘 되지 않는다.
-  우선 기본 스타일에서는 배경색을 지정해주자.
+- 배경이 있는 앱에서는 투명이 잘 적용되지만 기본 스타일의 dlg에서는 화면 갱신이 잘 되지 않는다.
+  우선 기본 스타일의 dlg에서는 배경색을 지정해주자.
 - 출력크기보다 rc가 작으면 키워줘야 한다.
 
 [2014-11-27]
@@ -46,8 +46,12 @@ public:
 	CString		GetText() { return m_sText; }
 	void		SetWindowText(CString sText) { SetText(sText); }
 	COLORREF	get_back_color() { return m_crBack; }
+
+	//글자색만 변경할 경우
 	void		SetTextColor(COLORREF crTextColor);
+	//배경색을 지정하면 투명 옵션은 off됨.
 	void		SetBackColor(COLORREF cBackColor) { m_crBack = cBackColor; m_bTransparent = false; Invalidate(); }
+	//SetColor를 사용하면 투명 옵션은 off됨.
 	void		SetColor(COLORREF cTextColor, COLORREF cBackColor = ::GetSysColor(COLOR_3DFACE))
 				{
 					m_crText = cTextColor;

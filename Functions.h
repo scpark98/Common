@@ -773,6 +773,8 @@ void		Trace(char* szFormat, ...);
 	//local_file_path가 지정되어 있으면 파일로 다운받는다.
 	//(이때 리턴값은 "")
 	//리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
+	//port만 가지고 http와 https를 구분하기 애매하므로 명확한 지시자로 접근해야 하는 경우는 주소에 명시해줘야 한다.
+	//(반드시 https로 접근해야 하는 경우, port가 기본값인 443이 아니라면 주소를 https://~로 호출해야 한다)
 	DWORD		get_uri(CString &result_str, CString ip, int port, CString sub_url, CString verb, CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
 	DWORD		get_uri(CString& result_str, CString full_url, CString verb = _T("GET"), CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
 
@@ -929,9 +931,9 @@ void		Trace(char* szFormat, ...);
 
 	LONG		IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey);
 //#ifndef _USING_V110_SDK71_
-	LONG		GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value);
+	LONG		GetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value);
 	LONG		GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
-	LONG		SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);
+	LONG		SetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);
 	LONG		SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 //#endif
 	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);

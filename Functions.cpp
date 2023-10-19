@@ -2740,14 +2740,10 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 		return statusCode;
 	}
 
-	if (ip.Left(8) == _T("https://") || port == 443 || port == 8443)
+	if (ip.Left(8) == _T("https://") || port == 443 || port == 8443 || port == 4433)
 	{
 		is_https = true;
 	}
-	//else if (ip.Left(7) != _T("http://"))
-	//{
-	//	ip = _T("http://") + ip;
-	//}
 
 
 	if (port <= 0)
@@ -2776,7 +2772,14 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 		return statusCode;
 	}
 
+	//ip에 http:// 또는 https:// 가 붙어 있으면 InternetConnect()은 실패한다. 제거하고 호출해줘야 한다.
+	if (ip.Left(7) == _T("http://"))
+		ip = ip.Mid(7);
+	if (ip.Left(8) == _T("https://"))
+		ip = ip.Mid(8);
+
 	remoteURL.Format(_T("%s:%d%s"), ip, port, sub_url);
+
 
 	HINTERNET hInternetConnect = InternetConnect(hInternetRoot,
 		ip,
@@ -2786,6 +2789,12 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 		INTERNET_SERVICE_HTTP,
 		0,
 		0);
+	if (hInternetConnect == NULL)
+	{
+		result_str = _T("hInternetConnect() failed.");
+		return statusCode;
+	}
+
 
 	//HINTERNET hURL = InternetOpenUrl(hInternetRoot, remoteURL, szHead, -1L, secureFlags, 0);
 	//if (hURL == NULL) {
@@ -3449,10 +3458,13 @@ LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
 }
 
 //#ifndef _USING_V110_SDK71_
-LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD*value)
+LONG GetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value)
 {
 	HKEY	hkey = NULL;
 	LONG 	nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
+	DWORD	buf_size = 256;
+	TCHAR	buffer[256] = { 0, };
+	LPVOID lpMsgBuf;
 
 	if (nError == ERROR_SUCCESS)
 	{
@@ -3461,12 +3473,13 @@ LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD*valu
 			//WinXP SP3에서 RegGetValue()가 지원되지 않아 RegQueryValueEx()로 변경함.
 			//nError = RegGetValue(hKeyRoot, sSubKey, sEntry, RRF_RT_DWORD, &dwType, value, &cbData);
 
-			DWORD buf_size = sizeof(DWORD);
-			nError = RegQueryValueEx(hkey, sEntry, NULL, NULL, (LPBYTE)value, &buf_size);
+			nError = RegQueryValueEx(hkey, sEntry, NULL, NULL, reinterpret_cast<LPBYTE>(value), &buf_size);
 
-			if (nError != ERROR_SUCCESS)
+			if (nError == ERROR_SUCCESS)
 			{
-				/*
+			}
+			else
+			{
 				FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 								FORMAT_MESSAGE_IGNORE_INSERTS,
 								NULL,
@@ -3475,15 +3488,13 @@ LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD*valu
 								(LPTSTR) &lpMsgBuf,
 								0,
 								NULL);
-				//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+				AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
 				LocalFree(lpMsgBuf);
-				*/
 			}
 		}
 	}
 	else
 	{
-		/*
 		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 						FORMAT_MESSAGE_IGNORE_INSERTS,
 						NULL,
@@ -3492,9 +3503,8 @@ LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD*valu
 						(LPTSTR) &lpMsgBuf,
 						0,
 						NULL);
-		//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+		AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
 		LocalFree(lpMsgBuf);
-		*/
 	}
 	
 	RegCloseKey(hkey);
@@ -3505,9 +3515,9 @@ LONG GetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD*valu
 LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
 {
 	HKEY	hkey = NULL;
-	DWORD	dwType;
-	DWORD	dwBytes=1000;
-	BYTE	buffer[1000];
+	DWORD	dwType = REG_SZ;
+	DWORD	dwBytes = 1024;
+	TCHAR	buffer[1024] = { 0, };
 	LPVOID	lpMsgBuf;
 	
 	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
@@ -3516,9 +3526,12 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 	{
 		if (hkey)
 		{
-			nError = RegQueryValueEx(hkey, entry, NULL, &dwType, buffer, &dwBytes);
+			nError = RegQueryValueEx(hkey, entry, NULL, &dwType, (LPBYTE)buffer, &dwBytes);
 			
-			if (nError != ERROR_SUCCESS)
+			if (nError == ERROR_SUCCESS)
+			{
+			}
+			else
 			{
 				FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
 								FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -3528,7 +3541,7 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 								(LPTSTR) &lpMsgBuf,
 								0,
 								NULL);
-				//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+				AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
 				LocalFree(lpMsgBuf);
 			}
 		}
@@ -3553,7 +3566,7 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 	return nError;
 }
 
-LONG SetRegistryValue(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
+LONG SetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
 {
 	HKEY	hkey;
 	DWORD	dwDesc;

@@ -158,7 +158,7 @@ void CTreeCtrlEx::OnPaint()
 		//if (GetItemState(m_folder_list[i].item, TVIS_DROPHILITED) & TVIS_DROPHILITED)//m_folder_list[i].item == GetDropHilightItem())
 		if (GetDropHilightItem() == m_folder_list[i].item)
 		{
-			trace(_T("drophilited\n"));
+			Trace(_T("drophilited\n"));
 			//GetItemState(m_folder_list[i].item, TVIS_DROPHILITED))
 			crText = m_crTextDropHilited;
 			dc.FillSolidRect(rRow, m_crBackDropHilited);
@@ -166,7 +166,7 @@ void CTreeCtrlEx::OnPaint()
 		else if (GetSelectedItem() == m_folder_list[i].item)
 		//else if (GetItemState(m_folder_list[i].item, TVIS_SELECTED) & TVIS_SELECTED)
 		{
-			trace(_T("selected\n"));
+			Trace(_T("selected\n"));
 
 			//포커스에 따라 다르다.
 			if (GetFocus() == this)
@@ -223,7 +223,7 @@ void CTreeCtrlEx::OnPaint()
 
 	dc.SelectObject(pOldFont);
 
-	trace(_T("total %ld\n"), tTotal);
+	Trace(_T("total %ld\n"), tTotal);
 }
 
 
@@ -277,7 +277,7 @@ void CTreeCtrlEx::thread_insert_folders(HTREEITEM hItem)
 {
 	if (hItem)
 	{
-		trace(_T("%s\n"), GetItemText(hItem));
+		Trace(_T("%s\n"), GetItemText(hItem));
 		hItem = GetNextItem(hItem, TVGN_CHILD);
 		while (hItem)
 		{
@@ -504,7 +504,7 @@ void CTreeCtrlEx::select_item(CString fullpath)
 
 	for (int i = 0; i < dq.size(); i++)
 	{
-		trace(_T("finding [%s] from [%s] node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
+		Trace(_T("finding [%s] from [%s] node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
 
 		//만약 현재 노드에 아직 child가 추가된 상태가 아니라면 우선 children을 넣어준 후 검색해야 한다.
 		if (GetChildItem(item) == NULL)
@@ -533,7 +533,7 @@ void CTreeCtrlEx::iterate_tree(HTREEITEM hItem)
 {
 	if (hItem)
 	{
-		trace(_T("%s\n"), GetItemText(hItem));
+		Trace(_T("%s\n"), GetItemText(hItem));
 		hItem = GetNextItem(hItem, TVGN_CHILD);
 		while (hItem)
 		{
@@ -774,7 +774,7 @@ void CTreeCtrlEx::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_pDragImage->BeginDrag(0, CPoint(-10, -14));	//이 좌표를 주지 않으면 move할때 이미지가 잘못된 위치에 표시된다.
 	m_pDragImage->DragEnter(GetDesktopWindow(), pNMTreeView->ptDrag);
 
-	trace(_T("start drag...\n"));
+	Trace(_T("start drag...\n"));
 
 	*pResult = 0;
 }
@@ -786,7 +786,7 @@ void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 	if (m_bDragging)
 	{
 		GetCursorPos(&point);
-		trace(_T("cursor = %d, %d\n"), point.x, point.y);
+		Trace(_T("cursor = %d, %d\n"), point.x, point.y);
 		m_pDragImage->DragMove(point); //move the drag image to those coordinates
 
 		// Unlock window updates (this allows the dragging image to be shown smoothly)
@@ -794,7 +794,7 @@ void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 		//// Get the CWnd pointer of the window that is under the mouse cursor
 		CWnd* pDropWnd = WindowFromPoint(point);
-		trace(_T("this = %p, pDropWnd = %p\n"), this, pDropWnd);
+		Trace(_T("this = %p, pDropWnd = %p\n"), this, pDropWnd);
 		ASSERT(pDropWnd); //make sure we have a window
 
 		m_pDropWnd = pDropWnd;
@@ -820,11 +820,11 @@ void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(point, &uFlags);
-			trace(_T("nDropIndex in ListCtrl = %d\n"), m_nDropIndex);
+			Trace(_T("nDropIndex in ListCtrl = %d\n"), m_nDropIndex);
 			// Highlight it (폴더인 경우에만 hilite시킨다. 폴더는 크기 컬럼이 empty임)
 			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, 1) == _T(""))
 			{
-				trace(_T("new LVIS_DROPHILITED\n"), m_nDropIndex);
+				Trace(_T("new LVIS_DROPHILITED\n"), m_nDropIndex);
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
 			}
 
@@ -840,7 +840,7 @@ void CTreeCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			m_DropItem = ((CTreeCtrl*)pDropWnd)->HitTest(point, &uFlags);
-			trace(_T("%d, %d, hItem = %p\n"), point.x, point.y, m_DropItem);
+			Trace(_T("%d, %d, hItem = %p\n"), point.x, point.y, m_DropItem);
 			pTree->SelectDropTarget(m_DropItem);
 			ASSERT(m_DropItem == pTree->GetDropHilightItem());
 		}
@@ -863,7 +863,7 @@ void CTreeCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_bDragging)
 	{
-		trace(_T("OnLButtonUp\n"));
+		Trace(_T("OnLButtonUp\n"));
 		// Release mouse capture, so that other controls can get control/messages
 		ReleaseCapture();
 

@@ -1850,7 +1850,10 @@ public:
     //!@name String
     //@{
 
+    //scpark 20231026 GetString()은 char*로 리턴하므로 TRACE등으로 출력하면 한글이 깨짐. CString()으로 cast하여 사용할것!
     const Ch* GetString() const { RAPIDJSON_ASSERT(IsString()); return DataString(data_); }
+
+    const CString GetCString() const { RAPIDJSON_ASSERT(IsString()); return CString(DataString(data_)); }
 
     //! Get the length of string.
     /*! Since rapidjson permits "\\u0000" in the json string, strlen(v.GetString()) may not equal to v.GetStringLength().

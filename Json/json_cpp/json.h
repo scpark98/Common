@@ -1,3 +1,25 @@
+/*
+* 단 3개의 파일만으로 간단히 사용 가능.
+* 파일로 write시에 멤버들이 알파벳 순으로만 저장된다는 치명적 단점이 있다.
+* Usage :
+    #include "../../Common/Json/json_cpp/json.h"
+    ...
+    CString src = _T("{\"result\":true,\"user_id\":\"user9\",\"int_value\":12345,\"double_value\":3.141592,\"array\":[\"item1\",\"item2\"]}");
+    std::string stdstr = CT2CA(src);
+    ...
+    Json::Value root;
+    Json::Reader reader;
+    reader.parse(stdstr, root, false);
+    bool b = root["result"].asBool();
+    CString s = CString(root["user_id"].asCString());
+    int num = root["int_value"].asInt();
+    double dnum = root["double_value"].asDouble();
+
+    Json::Value ar = root["array"];
+    for (int i = 0; i < ar.size(); i++)
+        TRACE(_T("%d = %s\n"), i, ar[i].asCString());
+*/
+
 /// Json-cpp amalgated header (http://jsoncpp.sourceforge.net/).
 /// It is intended to be used with #include "json/json.h"
 

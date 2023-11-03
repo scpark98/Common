@@ -822,7 +822,7 @@ Mat	loadMat(LPCTSTR sfile, int flag /*= IMREAD_UNCHANGED*/, bool bDisplayError /
 		return cv::Mat();
 	}
 
-	if (GetFileSize(sfile) == 0)
+	if (get_file_size(sfile) == 0)
 	{
 		str.Format(_T("file size is 0 : \n\n%s"), sfile );
 		if (bDisplayError)
@@ -863,13 +863,13 @@ Mat	loadImage( LPCTSTR sfile, int flags /*= CV_LOAD_IMAGE_UNCHANGED*/, bool bDis
 		AfxMessageBox( str );
 	}
 
-	CString sExt = GetFileExtension(sfile).MakeLower();
+	CString sExt = get_part(sfile, 3).MakeLower();
 
 	if ( sExt != _T("raw") && sExt != _T("yuv") )
 		return loadMat( sfile, flags, bDisplayError );
 
 	cv::Mat mat;
-	uint64_t file_size = GetFileSize( sfile );
+	uint64_t file_size = get_file_size(sfile);
 
 	//1ch raw image
 	if ( file_size == width * height )
@@ -1839,13 +1839,13 @@ bool save_mat(CString sfile, cv::Mat mat, int quality)
 	bool result = false;
 	std::vector<int> qualityType;
 
-	if (GetFileExtension(sfile).MakeLower() == _T("jpg"))
+	if (get_part(sfile, 3).MakeLower() == _T("jpg"))
 	{
 		qualityType.push_back(IMWRITE_JPEG_QUALITY);
 		qualityType.push_back(quality);
 		result = imwrite(CString2string(sfile), mat, qualityType);
 	}
-	else if (GetFileExtension(sfile).MakeLower() == _T("png") )
+	else if (get_part(sfile, 3).MakeLower() == _T("png") )
 	{
 		qualityType.push_back(IMWRITE_PNG_COMPRESSION);
 		qualityType.push_back(100 - quality);

@@ -59,8 +59,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define __class_func__ __function__
 #endif
 
-#define trace(fmt, ...) trace_output(__function__, __LINE__, fmt, ##__VA_ARGS__)
-#define traceln(fmt, ...) trace_output_ln(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
+//20231101 opencv에 trace가 이미 정의되어 있어서 trace를 Trace로 변경함.
+#define Trace(fmt, ...) trace_output(__function__, __LINE__, fmt, ##__VA_ARGS__)
+#define Traceln(fmt, ...) trace_output_ln(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
 #ifdef __GNUG__
 #include <cxxabi.h>
@@ -288,6 +289,65 @@ struct timezone
   int  tz_dsttime;     /* type of dst correction */ 
 }; 
 
+class CRequestUrlParams
+{
+public:
+	CRequestUrlParams() {}
+	CRequestUrlParams(CString _ip, int _port, CString _sub_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
+	{
+		ip = _ip;
+		port = _port;
+		sub_url = _sub_url;
+
+		method = _method;
+		is_https = _is_https;
+		body = _body;
+		local_file_path = _local_file_path;
+
+		if (_headers)
+		{
+			for (int i = 0; i < _headers->size(); i++)
+			{
+				if (_headers->at(i).Right(2) != _T("\r\n"))
+					_headers->at(i) += _T("\r\n");
+				headers.push_back(_headers->at(i));
+			}
+		}
+	}
+
+	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
+	{
+		full_url = _full_url;
+		//parse_url(full_url, ip, port, sub_url);
+		CRequestUrlParams(ip, port, sub_url, _method, _is_https, _headers, _body, _local_file_path);
+	}
+
+	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
+	bool		use_thread;
+
+	//m_request_id로 해당 작업이 무엇인지 구분한다.
+	int			request_id;
+
+	//200, 404...와 같은 HTTP_STATUS를 담지만 invalid address 등과 같은 에러코드도 담기 위해 int로 사용한다. 0보다 작을 경우는 result 문자열에 에러 내용이 담겨있다.
+	int			status;
+
+	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
+	CString		ip;
+
+	int			port;
+	CString		sub_url;			//domain을 제외한 나머지 주소
+	CString		method;
+	bool		is_https;
+	CString		body;				//post data(json format)
+	std::vector<CString> headers;	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야 한다.
+	CString		full_url;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
+	CString		result;
+
+	//파일 다운로드 관련
+	CString		local_file_path;	//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
+	uint64_t	file_size;		//url 파일 크기
+	uint64_t	downloaded_size;	//현재까지 받은 크기
+};
 
 class CMouseEvent
 {
@@ -376,8 +436,6 @@ struct	NETWORK_INFO
 	TCHAR		sSubnetMask[16];
 	TCHAR		sMacAddress[16];
 };
-
-void		Trace(char* szFormat, ...);
 
 //////////////////////////////////////////////////////////////////////////
 //프로세스 관련
@@ -474,13 +532,13 @@ void		Trace(char* szFormat, ...);
 
 	CString		ConvertInt2AZ(int n);	//n을 26진수 엑셀 컬럼 인덱스로 변환한 문자열을 리턴
 	CString		GetToken(CString& str, LPCTSTR c);
-	CString		GetToken(CString src, CString separator, int n);
+	CString		GetToken(CString src, CString separator, int index);
 
 	//separator는 기존 CString에서 TCHAR로 통일한다.
 	//2char이상의 문자열이 하나의 separator로 사용될 경우는 거의 없으나
 	//1개 또는 그 이상의 서로 다른 문자를 separator들로 사용할 경우는 있을 것이다.
-	int			get_token_string(CString src, std::deque<CString>& dqToken, TCHAR separator = '|', bool allowEmpty = true, int nMaxToken = -1);
-	int			get_token_string(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty = true, int nMaxToken = -1);
+	int			get_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1);
+	int			get_token_string(CString src, std::deque<CString>& dqToken, std::deque<CString> separator, bool allowEmpty = true, int nMaxToken = -1);
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
 
@@ -505,7 +563,8 @@ void		Trace(char* szFormat, ...);
 	CString		get_str(CString& buff, CString sep = _T("|"));
 	int			get_int(CString& buff, CString sep = _T("|"));
 	double		get_double(CString& buff, CString sep = _T("|"));
-	//unit			: 0:bytes, 1:KB, 2:MB, 3:GB
+	//unit			: -1:auto, 0:bytes, 1:KB, 2:MB, 3:GB ~
+	//auto일 경우는 1000보다 작을떄까지 나누고 소수점은 2자리까지 표시한다.(ex 7.28TB)
 	//floats		: 소수점을 몇 자리까지 표시할지
 	//unit_string	: 단위를 표시할 지
 	//comma			: 정수 부분에 자리수 콤마를 표시할 지
@@ -520,6 +579,9 @@ void		Trace(char* szFormat, ...);
 	//isOneOf()는 is_one_of()로 대체함.
 	template <typename ... Types> bool is_one_of(CString src, Types... args)
 	{
+		if (src.IsEmpty())
+			return false;
+
 		int n = sizeof...(args);
 		CString arg[] = { args... };
 
@@ -564,6 +626,7 @@ void		Trace(char* szFormat, ...);
 	//A2W, A2T 및 그 반대 매크로들은 스택을 사용하므로 문제 소지가 있고 크기 제한도 있으므로
 	//가급적 CA2W, CA2T등을 사용한다. 단 이 매크로들은 encoding을 변경할 수 없다.
 	std::wstring CString2wstring(const char* str);
+	//std::string ss = CT2CA(CString(_T("test")); 과 같이 CT2CA를 사용하면 간단함.
 	std::string CString2string(CString cs);
 	CString		string2CString(std::string s);
 	//멀티바이트 환경에서 이 함수를 호출해서 사용하면 간혹 비정상적으로 동작한다.
@@ -652,7 +715,7 @@ void		Trace(char* szFormat, ...);
 	CString		json_value(CString json, CString key);
 
 	int			get_char_count(CString sStr, TCHAR ch);
-	CString		get_mac_address_format(TCHAR* src, TCHAR separator = ':');
+	CString		get_mac_address_format(CString src, TCHAR separator = ':');
 
 //데이터 변환
 	CString		i2S(int64_t nValue, bool bComma = false, bool fill_zero = false, int digits = 0);
@@ -710,18 +773,27 @@ void		Trace(char* szFormat, ...);
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
+
+	//"c:\\abc/def\\123.txt" 를 호출하면
+	//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
+	//"c:\\", "c:\\abc/def\\", "123", "txt", "123.txt와 같이 보정한다. 폴더는 반드시 '/'나 '\\'로 끝나는 것으로 통일한다.
+	//기존에는 "abc/def"로 폴더명을 리턴했으나 그것만 봐서는 def가 폴더명인지 파일명인지 알 수 없기 때문이다.
+	//part : 0(drive), 1(drive+folder), 2(filetitle), 3(ext), 4(filename)
+	CString		get_part(CString path, int part);
+#if 0
 	CString		GetFileNameFromFullPath(CString fullpath);
 	CString		GetFolderNameFromFullPath(CString fullpath, bool includeSlash = false);	//= PathRemoveFileSpec
 	CString		GetFileTitle(CString fullpath);
 	CString		GetFileExtension(CString filename, bool dot = false);
+#endif
 	int			GetFileTypeFromFilename(CString filename);
 	int			GetFileTypeFromExtension(CString sExt);
 	bool		ChangeExtension(CString& filepath, CString newExt, bool applyRealFile);
 	CString		normalize_path(CString& filepath);
 
 	//폴더에 있는 파일들 중 filetitle이고 extension에 해당하는 파일명을 리턴한다.
-	std::deque<CString>		get_filename_from_filetitle(CString folder, CString filetitle, CString extension);
-	std::deque<CString>		get_filename_from_filetitle(CString filename, CString extension);
+	std::deque<CString>		get_filelist_from_filetitle(CString folder, CString filetitle, CString extension);
+	std::deque<CString>		get_filelist_from_filetitle(CString filename, CString extension);
 
 	uint64_t	get_file_size(CString sfile);
 	uint64_t	get_folder_size(CString path);
@@ -765,24 +837,25 @@ void		Trace(char* szFormat, ...);
 	bool		ReadURLFile(LPCTSTR pUrl, CString &strBuffer);
 	void		ReadURLFileString(CString sURL, CString &sString);
 
-	bool		parse_url(CString full_url, CString &ip, int &port, CString &sub_url);
-	//누락된 처리가 있어서 사용하지 않음
-	CString		get_uri_old(CString ip, int port, CString sub_url, CString local_file_path = _T(""));
+	bool		parse_url(CString full_url, CString &ip, int &port, CString &sub_url, bool is_https = true);
+
 	//url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
 	//local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
 	//local_file_path가 지정되어 있으면 파일로 다운받는다.
 	//(이때 리턴값은 "")
 	//리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
-	//port만 가지고 http와 https를 구분하기 애매하므로 명확한 지시자로 접근해야 하는 경우는 주소에 명시해줘야 한다.
-	//(반드시 https로 접근해야 하는 경우, port가 기본값인 443이 아니라면 주소를 https://~로 호출해야 한다)
-	DWORD		get_uri(CString &result_str, CString ip, int port, CString sub_url, CString verb, CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
-	DWORD		get_uri(CString& result_str, CString full_url, CString verb = _T("GET"), CString header = _T(""), CString jsonBody = _T(""), CString local_file_path = _T(""));
+	//port만 가지고 http와 https를 구분하는 것은 위험하므로 명확한 지시자로 접근해야 한다.
+	//(반드시 https로 접근해야 하는 경우, port가 기본값인 443이 아니라면 주소를 https://~로 명시하여 호출해야 한다)
+	//DWORD		request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb = _T("GET"), std::vector<CString> *headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
+	//DWORD		request_url(CString& result_str, CString full_url, CString verb = _T("GET"), std::vector<CString>* headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
+	void		request_url(CRequestUrlParams* params);
+
 
 	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
 	bool		HttpUploadFile(CString url, CString filepath, int chatIndex);
 
-	//서버의 한글명 파일에 대한 처리때문에 get_uri()함수 대신 추가하여 테스트 해봤으나
+	//서버의 한글명 파일에 대한 처리때문에 request_url()함수 대신 추가하여 테스트 해봤으나
 	//서버측의 문제인듯하여 우선 이 함수 사용은 보류중...
 	bool		HttpDownloadFile(CString url, CString local_path = _T(""));
 
@@ -885,6 +958,7 @@ void		Trace(char* szFormat, ...);
 	bool		GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo);
 	bool		CheckInternetIsOnline();
 	bool		IsAvailableEMail(CString sEMail);
+	CString		get_mac_addres(bool include_colon = true);
 
 //////////////////////////////////////////////////////////////////////////
 //암호화
@@ -922,6 +996,9 @@ void		Trace(char* szFormat, ...);
 	//(0:aunlNotConfigured, 1:aunlDisabled, 2:aunlNotifyBeforeDownload, 3:aunlNotifyBeforeInstallation, 4:aunlScheduledInstallation)
 	bool		get_windows_update_setting(bool& auto_update, int& level);
 
+	//SystemParametersInfo(SPI_GETSCREENSAVEACTIVE...)으로는 제대로 설정값을 얻어오지 못한다.
+	bool		get_screensaver_setting(int *timeout = NULL, int* use_secure = NULL);
+
 	//좀 더 테스트 필요!
 	HWND		GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly = false, bool bCaseSensitive = false, bool bExceptThis = true);
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
@@ -931,6 +1008,8 @@ void		Trace(char* szFormat, ...);
 
 	LONG		IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey);
 //#ifndef _USING_V110_SDK71_
+	//HKEY_LOCAL_MACHINE\\SOFTWARE\\MyCompany 에서 읽어올 경우 x64이면 실제 그 경로에서 읽어오지만
+	//32bit이면 HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\MyCompany 에서 읽어온다.
 	LONG		GetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value);
 	LONG		GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
 	LONG		SetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);

@@ -1,43 +1,61 @@
 #ifndef JSON_H_
 #define JSON_H_
 
+/*
+* Usage :
+	//추가 포함 디렉토리에 "..\..\Common\Json\rapid_json\include" 추가.
+
+	#include "../../Common/Json/rapid_json/json.h"
+	...
+	CString src = _T("{\"result\":true,\"user_id\":\"user9\",\"int_value\":12345,\"double_value\":3.141592,\"array\":[\"item1\",\"item2\"]}");
+	
+	Json json;
+	json.parse(src);
+	bool b = json.doc["result"].GetBool();
+	json.doc["result"] = false;
+*/
+
+/*
+* JsonCPP vs Rapid Json(https://joycecoder.tistory.com/9)
+*/
+
 #define RAPIDJSON_HAS_STDSTRING 1
 
 #include <string>
+#include <afxwin.h>
 #include "string.h"
 #include "document.h"
+#include "rapidjson.h"
 
-
-class Json {
+class Json
+{
 public:
-	using Document = rapidjson::Document;
-	using SizeType = rapidjson::SizeType;
-	using Value = rapidjson::Value;
+	//using Document = rapidjson::Document;
+	//using SizeType = rapidjson::SizeType;
+	//using Value = rapidjson::Value;
 
 	Json() {}
 	~Json() {}
 
-	/**
-	 * Read a json file.
-	 * Read from the file specified in the parameter.
-	 * @param file a json file included full path
-	 * @return If succeeded return true, otherwise false
-	 */
-	bool read(std::string const& file);
+	bool		parse(std::string sstr);
+	bool		parse(CString str);
 
-	/**
-	 * Write a json file.
-	 * Write to the file specified in the parameter.
-	 * @param file a json file included full path
-	 * @return If succeeded return true, otherwise false
-	 */
-	bool write(std::string const& file);
+	bool		read(std::string input_json);
+	bool		read(CString input_json);
 
-	Document& document() { return document_; }
+	bool		write(std::string output_json);
+	bool		write(CString output_json);
 
-private:
-	FILE* fp_ = nullptr;
-	rapidjson::Document document_;
+	//traverse로 구현된 TRACE 출력.
+	void		print();
+
+	//pretty가 true이면 indent가 적용된 형식으로 리턴.
+	CString		get_string(bool pretty);
+
+	rapidjson::Document doc;
+
+protected:
+	void		traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString &result);
 };
 
 #endif

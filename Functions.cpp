@@ -79,7 +79,7 @@ CString	GetNextIndexFile(CString sCurrentFile, bool bNext /* = TRUE */)
 	// 단, 다음 인덱스의 파일이 존재한다는 가정하에서 찾는 함수이다.
 	// 다음 인덱스의 파일이 존재하지 않으면 ""을 리턴한다.
 	CString		sNextFile = _T("");
-	CString		extension = GetFileExtension(sCurrentFile);
+	CString		extension = get_part(sCurrentFile, 3);
 	
 	int			i;
 	int			j;
@@ -103,7 +103,7 @@ CString	GetNextIndexFile(CString sCurrentFile, bool bNext /* = TRUE */)
 		if (!FileFind.IsDots() && !FileFind.IsDirectory())
 		{
 			filename = FileFind.GetFilePath();
-			if (GetFileExtension(filename) == extension)
+			if (get_part(filename, 3) == extension)
 				sFiles[nTotal++] = filename;
 		}
 	}
@@ -687,7 +687,7 @@ CString	GetExeDirectory(bool includeSlash)
 	
 	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
 	
-	return GetFolderNameFromFullPath(sFilePath, includeSlash);
+	return get_part(sFilePath, 1);
 }
 
 CString GetExeRootDirectory()
@@ -706,14 +706,14 @@ CString		GetExeFilename(bool bFullPath /*= FALSE*/)
 	if (bFullPath)
 		sExeFile = sFilePath;
 	else
-		sExeFile = GetFileNameFromFullPath(sFilePath);
+		sExeFile = get_part(sFilePath, 4);
 	
 	return sExeFile;
 }
 
 CString		GetExeFileTitle()
 {
-	return GetFileTitle(GetExeFilename(false));
+	return get_part(GetExeFilename(false), 2);
 }
 
 CString		GetCurrentDirectory()
@@ -726,6 +726,34 @@ CString		GetCurrentDirectory()
 	return sFilePath;
 }
 
+//"c:\\abc/def\\123.txt" 를 호출하면
+//"c:"		"\\abc/def\\"		"123"		".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
+//"c:\\"	"c:\\abc/def\\"		"123"		"txt"	"123.txt"와 같이 보정한다. 폴더는 반드시 '/'로 끝나는 것으로 통일한다.
+//기존에는 "abc/def"로 폴더명을 리턴했으나 그것만 봐서는 def가 폴더명인지 파일명인지 알 수 없기 때문이다.
+//part : 0(drive), 1(drive+folder), 2(filetitle), 3(ext), 4(filename)
+CString		get_part(CString path, int part)
+{
+	TCHAR tDrive[_MAX_DRIVE] = { 0, };
+	TCHAR tDir[_MAX_DIR] = { 0, };
+	TCHAR tFname[_MAX_FNAME] = { 0, };
+	TCHAR tExt[_MAX_EXT] = { 0, };
+	_tsplitpath(path, tDrive, tDir, tFname, tExt);
+
+	CString parts[5] = { tDrive, tDir, tFname, tExt, };
+
+	//확장자를 포함한 파일명
+	parts[4] = parts[2] + parts[3];
+
+	//폴더명은 드라이브 경로까지 모두 포함. "\\abc/def\\" => "c:\\abc/def\\"
+	parts[1] = parts[0] + parts[1];	
+
+	//확장자는 .을 제외시킨다. parts[3]가 ""이어도 .Mid(1)은 에러가 발생하지는 않는다.
+	parts[3] = parts[3].Mid(1);
+
+	return parts[part];
+}
+
+#if 0
 CString		GetFileNameFromFullPath(CString fullpath)
 {
 	fullpath.Replace(_T("/"), _T("\\"));
@@ -738,6 +766,11 @@ CString		GetFileNameFromFullPath(CString fullpath)
 
 CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash)
 {
+	PathStripPath((LPTSTR)(LPCTSTR)sFullPath);
+	return sFullPath;
+
+	TCHAR sep = '/';
+
 	sFullPath.Replace(_T("/"), _T("\\"));
 
 	//sFullPath가 폴더라면 그냥 그 값을 리턴한다.
@@ -779,10 +812,11 @@ CString	GetFileExtension(CString sFullPath, bool dot)
 	else
 		return _T("");
 }
+#endif
 
 int	GetFileTypeFromFilename(CString filename)
 {
-	return GetFileTypeFromExtension(GetFileExtension(filename));
+	return GetFileTypeFromExtension(get_part(filename, 3));
 }
 
 int	GetFileTypeFromExtension(CString sExt)
@@ -807,7 +841,7 @@ int	GetFileTypeFromExtension(CString sExt)
 //applyRealFile이 true이면 실제 파일명도 변경시킨다.
 bool ChangeExtension(CString& filepath, CString newExt, bool applyRealFile)
 {
-	CString sOldExt = GetFileExtension(filepath);
+	CString sOldExt = get_part(filepath, 3);
 	CString sNewFullPath = filepath.Left(filepath.GetLength() - sOldExt.GetLength()) + newExt;
 
 	bool changeSuccess = false;
@@ -845,14 +879,14 @@ CString	normalize_path(CString& filepath)
 }
 
 //폴더에 있는 파일들 중 filetitle이고 extension에 해당하는 파일명을 리턴한다.
-std::deque<CString>	get_filename_from_filetitle(CString folder, CString filetitle, CString extension)
+std::deque<CString>	get_filelist_from_filetitle(CString folder, CString filetitle, CString extension)
 {
 	return FindFilesWithExtensions(folder, filetitle, extension);
 }
 
-std::deque<CString> get_filename_from_filetitle(CString filename, CString extension)
+std::deque<CString> get_filelist_from_filetitle(CString filename, CString extension)
 {
-	return get_filename_from_filetitle(GetFolderNameFromFullPath(filename), GetFileTitle(filename), extension);
+	return get_filelist_from_filetitle(get_part(filename, 1), get_part(filename, 2), extension);
 }
 
 uint64_t get_file_size(CString sfile)
@@ -922,7 +956,8 @@ CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_str
 	return get_size_string(get_file_size(sfile), unit, floats, unit_string);
 }
 
-//unit			: 0:bytes, 1:KB, 2:MB, 3:GB
+//unit			: 0:bytes, 1:KB, 2:MB, 3:GB ~
+//auto일 경우는 1000보다 작을떄까지 나누고 소수점은 2자리까지 표시한다.(ex 7.28TB 32.1TB 123.5TB)
 //floats		: 소수점을 몇 자리까지 표시할지
 //unit_string	: 단위를 표시할 지
 //comma			: 정수 부분에 자리수 콤마를 표시할 지
@@ -932,8 +967,27 @@ CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, b
 	CString size_str;
 	CString unit_str[9] = { _T("Bytes"), _T("KB"), _T("MB"), _T("GB"), _T("TB"), _T("PB"), _T("EB"), _T("ZB"), _T("YB") };
 
-	for (int i = 0; i <unit; i++)
-		dsize /= 1024.0;
+	int i;
+
+	if (unit >= 0)
+	{
+		for (int i = 0; i < unit; i++)
+			dsize /= 1024.0;
+	}
+	else
+	{
+		unit = 0;
+		while (dsize >= 1000.0)
+		{
+			dsize /= 1024.0;
+			unit++;
+		}
+
+		if (dsize < 10)
+			floats = 2;
+		else
+			floats = 1;
+	}
 
 	//dsize = 0.01234;
 	//floats = 2;
@@ -1120,7 +1174,7 @@ void GetURLFileInfo(CString sURL, bool &bInURL, bool &bFileType)
 	{
 		bInURL = TRUE;
 		
-		CString filename = GetFileNameFromFullPath(sURL);
+		CString filename = get_part(sURL, 4);
 		if (filename == "")
 			bFileType = FALSE;
 		else
@@ -1139,20 +1193,19 @@ int	get_char_count(CString sStr, TCHAR ch)
 		return nCount;
 }
 
-CString	get_mac_address_format(TCHAR* src, TCHAR separator)
+CString	get_mac_address_format(CString src, TCHAR separator)
 {
-	CString sMac = CString(src);
-	ASSERT(sMac.GetLength() == 12);
-	ASSERT(get_char_count(sMac, separator) == 0);
+	ASSERT(src.GetLength() == 12);
+	ASSERT(get_char_count(src, separator) == 0);
 
-	if (sMac.GetLength() != 12)
-		return sMac;
+	if (src.GetLength() != 12)
+		return src;
 
 	//2 5 8 11 14
 	for (int i = 0; i < 5; i++)
-		sMac.Insert(i * 3 + 2, CString(separator));
+		src.Insert(i * 3 + 2, CString(separator));
 
-	return sMac;
+	return src;
 }
 
 int	Find_Divide_Position_By_Punctuation(CString str)
@@ -2275,440 +2328,27 @@ std::string utf8ToMultibyte(std::string inputtext)
 }
 
 //http://localhost:4300/test_doc_favorite/test.avi
-bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url)
+bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url, bool is_https)
 {
 	DWORD dwServiceType;
 	INTERNET_PORT nPort;
 
-	//url은 반드시 http:// 또는 https:// 등과 같은 서비스 종류가 표시되어야 한다.
+	//AfxParseURL()을 사용하기 위해서는 url에 반드시 http:// 또는 https:// 등과 같은 서비스 종류가 표시되어야 한다.
 	if (full_url.Left(7) != _T("http://") &&
 		full_url.Left(8) != _T("https://"))
-		full_url = _T("http://") + full_url;
+		full_url = (is_https ? _T("https://") : _T("http://")) + full_url;
 
 	bool ret = AfxParseURL(full_url, dwServiceType, ip, sub_url, nPort);
 	port = (int)nPort;
 	return ret;
 }
 
-//누락된 처리가 있어서 사용하지 않음
-CString	get_uri_old(CString ip, int port, CString sub_url, CString local_file_path)
-{
-	CString result = _T("ok");
-	CString str;
-	CString remoteURL;
-	TCHAR szHead[] = _T("Accept: */*\r\n\r\n");
-	bool is_https = false;
-
-	if (ip.GetLength() < 7)
-		return _T("Invalid IP address = ") + ip;
-
-	if (ip.Left(8) == _T("https://"))
-	{
-		is_https = true;
-	}
-	else if (ip.Left(7) != _T("http://"))
-	{
-		ip = _T("http://") + ip;
-	}
-
-
-	if (port <= 0)
-	{
-		if (is_https)
-			port = 443;
-		else
-			port = 80;
-	}
-
-	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE;// | INTERNET_FLAG_TRANSFER_BINARY; // http
-	if (is_https)
-	{
-		secureFlags |= INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
-	}
-
-	HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-	if (hInternet == NULL)
-		return _T("error=InternetOpen() failed.");
-
-	DWORD dwTimeout = 10000;
-	InternetSetOption(hInternet, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
-
-	if (is_https)
-	{
-		DWORD dwFlags;
-		DWORD dwBuffLen = sizeof(dwFlags);
-		InternetQueryOption(hInternet, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
-		dwFlags |= SECURITY_FLAG_SECURE;
-		dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-		dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
-		dwFlags |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-		dwFlags |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-		InternetSetOption(hInternet, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
-	}
-
-	remoteURL.Format(_T("%s:%d%s"), ip, port, sub_url);
-	HINTERNET hURL = InternetOpenUrl(hInternet, remoteURL, szHead, -1L, secureFlags, 0);
-	if (hURL == NULL) {
-		InternetCloseHandle(hInternet);
-		return _T("error=InternetOpenUrl() failed.");
-	}
-
-	DWORD buffer_size = 1024 * 1024;
-	DWORD dwSize, dwRead, dwWritten, dwTotalSize = 0;
-	char* buffer = new char[buffer_size];
-	char* total_buffer = NULL;
-	TCHAR query_buffer[32] = { 0, };
-	DWORD query_buffer_size = sizeof(query_buffer);
-	
-	memset(buffer, 0, buffer_size);
-
-	if (local_file_path.IsEmpty())
-	{
-		total_buffer = new char[buffer_size * 10];
-		memset(total_buffer, 0, buffer_size * 10);
-	}
-	
-	//size_buffer가 char면 파일크기를 못얻어온다.
-	//파일이 존재하지 않아도 에러 내용이 포함된 html이 넘어오므로 항상 그 값이 0보다 크다.
-	// 연결정보 확인
-
-	bool ret = HttpQueryInfo(hURL, HTTP_QUERY_STATUS_CODE, (LPVOID)&query_buffer, &query_buffer_size, NULL);
-	long nStatusCode = _ttol(query_buffer);
-
-	if (!ret)
-	{
-		AfxMessageBox(get_last_error_message(GetLastError(), true));
-		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
-		InternetCloseHandle(hURL);
-		InternetCloseHandle(hInternet);
-		return _T("error=") + get_last_error_message(GetLastError(), true);
-	}
-
-	if (nStatusCode == HTTP_STATUS_NOT_FOUND ||
-		(nStatusCode != 0 && nStatusCode != HTTP_STATUS_OK))
-	{
-		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
-		InternetCloseHandle(hURL);
-		InternetCloseHandle(hInternet);
-
-		if (nStatusCode == HTTP_STATUS_NOT_FOUND)
-			str.Format(_T("error=%s\n\nremote file does not exist."), sub_url);
-		else
-			str.Format(_T("error=%s\n\nstatus code = %d"), sub_url, nStatusCode);
-
-		return str;
-	}
-
-	HANDLE hFile = NULL;
-
-	if (!local_file_path.IsEmpty())
-	{
-		CString folder = GetFolderNameFromFullPath(local_file_path);
-		make_full_directory(folder);
-	}
-
-	//0바이트의 파일은 다운받지 않아도 될 듯 하지만
-	//서버의 파일과 다운받은 로컬의 파일의 수가 같은지 등을 비교할 수도 있으므로 생성하자.
-	//HTTP_QUERY_FLAG_NUMBER을 넣지 않으면 HttpQueryInfo()에서 오류가 발생한다.
-	DWORD dwBufLen = sizeof(dwTotalSize);
-	ret = HttpQueryInfo(hURL, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
-	//정상적인 파일임에도 크기를 얻어오는데 false가 리턴된다. 우선 막아두자.
-	/*
-	if (!ret)
-	{
-		AfxMessageBox(get_last_error_message(GetLastError(), true));
-
-		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
-		InternetCloseHandle(hURL);
-		InternetCloseHandle(hInternet);
-
-		return _T("error=") + get_last_error_message(GetLastError(), true);
-	}
-
-	if (dwTotalSize == 0)
-	{
-		if (local_file_path.IsEmpty())
-		{
-			result.Empty();
-		}
-		else
-		{
-			hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			if (hFile == INVALID_HANDLE_VALUE)
-			{
-				SAFE_DELETE_ARRAY(buffer);
-				SAFE_DELETE_ARRAY(total_buffer);
-				InternetCloseHandle(hURL);
-				InternetCloseHandle(hInternet);
-
-				return _T("error=") + local_file_path + _T("\n\nfail to CreateFile().");
-			}
-
-			CloseHandle(hFile);
-			result = _T("ok");
-		}		
-
-		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
-		InternetCloseHandle(hURL);
-		InternetCloseHandle(hInternet);
-
-		return result;
-	}
-	*/
-	do
-	{
-		InternetQueryDataAvailable(hURL, &dwSize, 0, 0);
-		InternetReadFile(hURL, buffer, dwSize, &dwRead);
-		
-		if (dwRead == 0)
-			break;
-
-		if (local_file_path.IsEmpty())
-		{
-			strncat(total_buffer, buffer, dwSize);
-		}
-		else
-		{
-			/*
-			CString check_404 = UTF8toCString(buffer).MakeLower();
-			if (check_404.Find(_T("file not found")) >= 0 || check_404.Find(_T("error code: 404")) >= 0)
-			{
-				SAFE_DELETE_ARRAY(buffer);
-				SAFE_DELETE_ARRAY(total_buffer);
-				InternetCloseHandle(hURL);
-				InternetCloseHandle(hInternet);
-
-				return _T("error=") + sub_url + _T("\n\nremote file does not exist.");
-			}
-			*/
-
-			//remote file이 존재하지 않을 경우 로컬에 파일을 만들지 않기 위해 여기서 체크.
-			if (hFile == NULL)
-			{
-				if (PathFileExists(local_file_path) && DeleteFile(local_file_path) == FALSE)
-				{
-					SAFE_DELETE_ARRAY(buffer);
-					SAFE_DELETE_ARRAY(total_buffer);
-					InternetCloseHandle(hURL);
-					InternetCloseHandle(hInternet);
-
-					return _T("error=") + local_file_path + _T("\n\nfail to DeleteFile().");
-				}
-
-				hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-				if (hFile == INVALID_HANDLE_VALUE)
-				{
-					SAFE_DELETE_ARRAY(buffer);
-					SAFE_DELETE_ARRAY(total_buffer);
-					InternetCloseHandle(hURL);
-					InternetCloseHandle(hInternet);
-
-					return _T("error=") + local_file_path + _T("\n\nfail to CreateFile().");
-				}
-			}
-
-			WriteFile(hFile, buffer, dwRead, &dwWritten, NULL);
-		}
-	} while (dwRead != 0);
-
-	if (local_file_path.IsEmpty())
-	{
-		result = UTF8toCString(total_buffer);
-	}
-	else
-	{
-		CloseHandle(hFile);
-		result = _T("ok");
-	}
-
-	SAFE_DELETE_ARRAY(buffer);
-	SAFE_DELETE_ARRAY(total_buffer);
-	InternetCloseHandle(hURL);
-	InternetCloseHandle(hInternet);
-
-	return result;
-	/*
-	try
-	{
-		HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-		if (hInternet == NULL)
-		{
-			return _T("[error] InternetOpen Fail");
-		}
-
-		BOOL isHTTPS = FALSE;
-		CString strServerIP = ip;
-
-		if (ip.Find(_T("https://")) >= 0)
-		{
-			isHTTPS = TRUE;
-			strServerIP.Replace(_T("https://"), _T(""));
-		}
-		else if (ip.Find(_T("http://")) >= 0)
-		{
-			isHTTPS = FALSE;
-			strServerIP.Replace(_T("http://"), _T(""));
-		}
-
-		HINTERNET hConnect = InternetConnect(hInternet, strServerIP, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
-		if (hConnect == NULL)
-		{
-			::InternetCloseHandle(hInternet);
-			return _T("[error] InternetConnect Fail");
-		}
-
-		int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE; // http
-		if (isHTTPS)
-		{
-			secureFlags = INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
-		}
-
-		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), sub_url, NULL, NULL, NULL, secureFlags, 0);
-
-		//delete[] strMultibyte;
-
-		if (hRequest == NULL)
-		{
-			::InternetCloseHandle(hConnect);
-			hConnect = NULL;
-
-			::InternetCloseHandle(hInternet);
-			hInternet = NULL;
-
-			return _T("[error] HttpOpenRequest Fail");
-		}
-		
-		//HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json; charset=utf-8"), -1, HTTP_ADDREQ_FLAG_ADD);
-		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json"), -1, HTTP_ADDREQ_FLAG_ADD);
-
-		if (isHTTPS)
-		{
-			DWORD dwFlags;
-			DWORD dwBuffLen = sizeof(dwFlags);
-			InternetQueryOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
-			dwFlags |= SECURITY_FLAG_SECURE;
-			dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-			dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
-			dwFlags |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-			dwFlags |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-			InternetSetOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
-		}
-
-		BOOL res = HttpSendRequest(hRequest, NULL, 0, NULL, 0);
-		if (!res)
-		{
-			InternetCloseHandle(hRequest);
-			InternetCloseHandle(hConnect);
-			InternetCloseHandle(hInternet);
-			return _T("[error] HttpSendRequest Fail");
-		}
-		else
-		{
-			//See if HttpQueryInfo can get the file size.
-			DWORD status_code = 0;
-			DWORD status_code_size = sizeof(status_code);
-			if (FALSE == HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status_code,	&status_code_size, nullptr))
-			{
-				InternetCloseHandle(hRequest);
-				InternetCloseHandle(hConnect);
-				InternetCloseHandle(hInternet);
-
-				return _T("error=404");
-			}
-		}
-
-		HANDLE hFile = NULL;
-
-		//로컬 파일이 저장될 폴더가 존재하지 않으면 생성해준다.
-		if (!local_file_path.IsEmpty())
-		{
-			CString folder = GetFolderNameFromFullPath(local_file_path);
-			make_full_directory(folder);
-
-			hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			if (hFile == INVALID_HANDLE_VALUE)
-			{
-				InternetCloseHandle(hRequest);
-				InternetCloseHandle(hConnect);
-				InternetCloseHandle(hInternet);
-
-				return local_file_path + _T("\n\nCan't create file.");
-			}
-		}
-
-		int buf_size = 8192;
-		char *chBufAll = new char[buf_size * buf_size];
-		char *chBuf = new char[buf_size];
-		DWORD dwSize = 0;
-		DWORD dwBytesWrite = 0;
-
-		memset(chBuf, 0, buf_size);
-		memset(chBufAll, 0, buf_size);
-
-		int cnt = 0;
-		while (InternetReadFile(hRequest, chBuf, buf_size, &dwSize))
-		{
-			if (dwSize == 0)
-				break;
-
-			if (local_file_path.IsEmpty())
-			{
-				TRACE(_T("%s"), chBuf);
-
-				for (int i = 0; i < dwSize; i++)
-				{
-					chBufAll[cnt] = chBuf[i];
-					chBuf[i] = 0;
-					cnt++;
-				}
-			}
-			else
-			{
-				if (!WriteFile(hFile, chBuf, dwSize, &dwBytesWrite, NULL))
-				{
-					CloseHandle(hFile);
-
-					InternetCloseHandle(hRequest);
-					InternetCloseHandle(hConnect);
-					InternetCloseHandle(hInternet);
-
-					return local_file_path + _T("\n\nCan't write file.");
-				}
-				TRACE(_T("%d bytes written.\n"), dwBytesWrite);
-			}
-		}
-
-		if (local_file_path.IsEmpty())
-		{
-			result = UTF8toCString(chBufAll);
-		}
-		else
-		{
-			CloseHandle(hFile);
-			result = _T("ok");
-		}
-
-		delete[] chBuf;
-		delete[] chBufAll;
-
-		InternetCloseHandle(hRequest);
-		InternetCloseHandle(hConnect);
-		InternetCloseHandle(hInternet);
-
-		return result;
-	}
-	catch (...)
-	{
-		return _T("");
-	}
-	*/
-}
-
-DWORD get_uri(CString& result_str, CString full_url, CString verb, CString header, CString jsonBody, CString local_file_path)
+//void request_url(CRequestUrlParams* params)
+//{
+//	params->status = request_url(params->result, params->ip, params->port, params->sub_url, params->method, &params->headers, params->body, params->local_file_path);
+//}
+/*
+DWORD request_url(CString& result_str, CString full_url, CString verb, std::vector<CString> *headers, CString jsonBody, CString local_file_path)
 {
 	DWORD statusCode = HTTP_STATUS_BAD_REQUEST;
 
@@ -2717,82 +2357,105 @@ DWORD get_uri(CString& result_str, CString full_url, CString verb, CString heade
 
 	parse_url(full_url, ip, port, sub_url);
 
-	return get_uri(result_str, ip, port, sub_url, verb, header, jsonBody, local_file_path);
+	return request_url(result_str, ip, port, sub_url, verb, headers, jsonBody, local_file_path);
 }
-
+*/
 //url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
 //local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
 //local_file_path가 지정되어 있으면 파일로 다운받는다. (이때 result_str은 "")
 //리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
-DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CString verb, CString header, CString jsonBody, CString local_file_path)
+//DWORD request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb, std::vector<CString> *headers, CString jsonBody, CString local_file_path)
+void request_url(CRequestUrlParams* params)
 {
-	result_str = _T("");
+	long t0 = clock();
 
+	//ip에 http://인지 https://인지가 명시되어 있다면 이는 명확하므로
+	//이를 판단하여 params->is_https값을 재설정한다.
+	//포트번호로 https를 판별하는 것은 한계가 있으므로 ip에 명시하든, params->is_https에 정확히 명시하여 사용한다.
+	if (params->ip.Left(4) == _T("http"))
+	{
+		params->is_https = (params->ip.Left(8) == _T("https://"));
+	}
+
+
+	if (params->full_url.IsEmpty() == false)
+	{
+		parse_url(params->full_url, params->ip, params->port, params->sub_url, params->is_https);
+	}
+
+
+	//sub_url의 맨 앞에는 반드시 '/'가 붙어있어야 한다.
+	if (params->sub_url[0] != '/')
+		params->sub_url = _T("/") + params->sub_url;
+
+	params->full_url.Format(_T("%s%s:%d%s"),
+			(params->is_https ? _T("https://") : _T("http://")),
+			params->ip, params->port, params->sub_url);
+
+	bool ret;
 	CString str;
 	CString remoteURL;
 	TCHAR szHead[] = _T("Accept: */*\r\n\r\n");
-	bool is_https = false;
-	DWORD statusCode = HTTP_STATUS_BAD_REQUEST;
 
-	if (ip.GetLength() < 7)
+	if (params->ip.GetLength() < 7)
 	{
-		result_str = _T("Invalid IP address = ") + ip;
-		return statusCode;
-	}
-
-	if (ip.Left(8) == _T("https://") || port == 443 || port == 8443 || port == 4433)
-	{
-		is_https = true;
+		params->result = _T("Invalid IP address = ") + params->ip;
+		params->status = -1;
+		TRACE(_T("result = %s\n"), params->result);
+		return;
 	}
 
 
-	if (port <= 0)
+	//포트가 0보다 작으면 기본 포트를 사용한다.
+	if (params->port <= 0)
 	{
-		if (is_https)
-			port = 443;
+		if (params->is_https)
+			params->port = 443;
 		else
-			port = 80;
+			params->port = 80;
 	}
 
-	verb.MakeUpper();
-	if (!verb.IsEmpty())
+	params->method.MakeUpper();
+	if (!is_one_of(params->method, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
 	{
-		if (!is_one_of(verb, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
-		{
-			statusCode = HTTP_STATUS_BAD_METHOD;
-			result_str = _T("Unknown HTTP Request method(\"") + verb + _T("\")");
-			return statusCode;
-		}
+		params->status = HTTP_STATUS_BAD_METHOD;
+		params->result = _T("Unknown HTTP Request method(\"") + params->method + _T("\")");
+		TRACE(_T("result = %s\n"), params->result);
+		return;
 	}
 
-	HINTERNET hInternetRoot = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
 	if (hInternetRoot == NULL)
 	{
-		result_str = _T("InternetOpen() failed.");
-		return statusCode;
+		params->status = -1;
+		params->result = _T("InternetOpen() failed.");
+		TRACE(_T("result = %s\n"), params->result);
+		return;
 	}
 
 	//ip에 http:// 또는 https:// 가 붙어 있으면 InternetConnect()은 실패한다. 제거하고 호출해줘야 한다.
+	CString ip = params->ip;
 	if (ip.Left(7) == _T("http://"))
 		ip = ip.Mid(7);
 	if (ip.Left(8) == _T("https://"))
 		ip = ip.Mid(8);
 
-	remoteURL.Format(_T("%s:%d%s"), ip, port, sub_url);
-
 
 	HINTERNET hInternetConnect = InternetConnect(hInternetRoot,
 		ip,
-		port,
+		params->port,
 		_T(""),
 		_T(""),
 		INTERNET_SERVICE_HTTP,
 		0,
 		0);
+
 	if (hInternetConnect == NULL)
 	{
-		result_str = _T("hInternetConnect() failed.");
-		return statusCode;
+		params->result = _T("hInternetConnect() failed.");
+		params->status = -1;
+		TRACE(_T("result = %s\n"), params->result);
+		return;
 	}
 
 
@@ -2803,14 +2466,14 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 	//}
 
 	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE;// | INTERNET_FLAG_TRANSFER_BINARY; // http
-	if (is_https)
+	if (params->is_https)
 	{
 		secureFlags |= INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
 	}
 
 	HINTERNET hOpenRequest = HttpOpenRequest(hInternetConnect,
-		verb,
-		sub_url,
+		params->method,
+		params->sub_url,
 		HTTP_VERSION,
 		_T(""),
 		NULL,
@@ -2820,7 +2483,7 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 	DWORD dwTimeout = 10000;
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
 
-	if (is_https)
+	if (params->is_https)
 	{
 		DWORD dwFlags = 0;
 		DWORD dwBuffLen = sizeof(dwFlags);
@@ -2833,36 +2496,36 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 			SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
 		InternetSetOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 	}
-	//InternetQueryOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
 
-	//if (is_https)
-	//{
-	//	dwFlags |= SECURITY_FLAG_SECURE;
-	//	dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-	//	dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
-	//	dwFlags |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-	//	dwFlags |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-	//	InternetSetOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
-	//}
+	//디폴트 헤더 세팅
+	HttpAddRequestHeaders(hOpenRequest, _T("Content-Type: application/json; charset=utf-8\r\n"), -1, HTTP_ADDREQ_FLAG_ADD);
 
-	if (header.IsEmpty())
-		header = _T("Content-Type: application/json; charset=utf-8\r\n");
-
-	HttpAddRequestHeaders(hOpenRequest, header, -1, HTTP_ADDREQ_FLAG_ADD);
+	if (params->headers.size() > 0)
+	{
+		for (int i = 0; i < params->headers.size(); i++)
+		{
+			if (params->headers[i].Right(2) != _T("\r\n"))
+				params->headers[i] += _T("\r\n");
+			HttpAddRequestHeaders(hOpenRequest, params->headers[i], -1, HTTP_ADDREQ_FLAG_ADD);
+		}
+	}
 
 #ifdef _UNICODE
-	wchar_t* wcharMsg = jsonBody.GetBuffer(jsonBody.GetLength());
-	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, wcharMsg, -1, NULL, 0, NULL, NULL);
+	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, params->body, -1, NULL, NULL, NULL, NULL);
 	char jsonData[1024] = { 0, };
-	WideCharToMultiByte(CP_UTF8, 0, wcharMsg, -1, jsonData, char_str_len, 0, 0);
+	ZeroMemory(jsonData, char_str_len);
+	WideCharToMultiByte(CP_UTF8, 0, params->body, -1, jsonData, char_str_len, 0, 0);
 
 	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
 #else
-	//char* charMsg = jsonBody.GetBuffer(jsonBody.GetLength());
-	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, (CStringW)jsonBody, -1, NULL, 0, NULL, NULL);
 	char jsonData[1024] = { 0, };
-	WideCharToMultiByte(CP_UTF8, 0, (CStringW)jsonBody, -1, jsonData, char_str_len, 0, 0);
+	char* charMsg = params->body.GetBuffer(params->body.GetLength());
+	//int char_str_len = WideCharToMultiByte(CP_UTF8, 0, CT2CA(jsonBody), -1, NULL, 0, NULL, NULL);
+	//sprintf(jsonData, "%s", jsonBody);
+	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, (CStringW)(params->body), -1, NULL, 0, NULL, NULL);
 
+	WideCharToMultiByte(CP_UTF8, 0, (CStringW)params->body, -1, jsonData, char_str_len, 0, 0);
+	//CString2char()
 	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
 #endif
 
@@ -2872,8 +2535,10 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
 
-		result_str = _T("HttpSendRequest failed.");
-		return statusCode;
+		params->result = _T("HttpSendRequest failed.");
+		params->status = -1;
+		TRACE(_T("result = %s\n"), params->result);
+		return;
 	}
 
 	DWORD buffer_size = 1024 * 1024;
@@ -2885,7 +2550,7 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 
 	memset(buffer, 0, buffer_size);
 
-	if (local_file_path.IsEmpty())
+	if (params->local_file_path.IsEmpty())
 	{
 		total_buffer = new char[buffer_size * 10];
 		memset(total_buffer, 0, buffer_size * 10);
@@ -2895,8 +2560,8 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 	//파일이 존재하지 않아도 에러 내용이 포함된 html이 넘어오므로 항상 그 값이 0보다 크다.
 	// 연결정보 확인
 
-	bool ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_STATUS_CODE, (LPVOID)&query_buffer, &query_buffer_size, NULL);
-	statusCode = _ttol(query_buffer);
+	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_STATUS_CODE, (LPVOID)&query_buffer, &query_buffer_size, NULL);
+	params->status = _ttol(query_buffer);
 
 	if (!ret)
 	{
@@ -2906,12 +2571,13 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
 
-		result_str = _T("HttpQueryInfo(HTTP_QUERY_STATUS_CODE) failed.");
-		return statusCode;
+		params->result = _T("HttpQueryInfo(HTTP_QUERY_STATUS_CODE) failed.");
+		params->status = -1;
+		TRACE(_T("result = %s\n"), params->result);
+		return;
 	}
 
-	if (statusCode == HTTP_STATUS_NOT_FOUND ||
-		(statusCode != 0 && statusCode != HTTP_STATUS_OK))
+	if (params->status != HTTP_STATUS_OK)
 	{
 		SAFE_DELETE_ARRAY(buffer);
 		SAFE_DELETE_ARRAY(total_buffer);
@@ -2919,14 +2585,14 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
 
-		return statusCode;
+		return;
 	}
 
 	HANDLE hFile = NULL;
 
-	if (!local_file_path.IsEmpty())
+	if (!params->local_file_path.IsEmpty())
 	{
-		CString folder = GetFolderNameFromFullPath(local_file_path);
+		CString folder = get_part(params->local_file_path, 1);
 		make_full_directory(folder);
 	}
 
@@ -2934,83 +2600,32 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 	//서버의 파일과 다운받은 로컬의 파일의 수가 같은지 등을 비교할 수도 있으므로 생성하자.
 	//HTTP_QUERY_FLAG_NUMBER을 넣지 않으면 HttpQueryInfo()에서 오류가 발생한다.
 	DWORD dwBufLen = sizeof(dwTotalSize);
+	uint64_t total_read = 0;
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
-	//정상적인 파일임에도 크기를 얻어오는데 false가 리턴된다. 우선 막아두자.
-	/*
-	if (!ret)
-	{
-		AfxMessageBox(get_last_error_message(GetLastError(), true));
 
-		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
-		InternetCloseHandle(hURL);
-		InternetCloseHandle(hInternetRoot);
-
-		return _T("error=") + get_last_error_message(GetLastError(), true);
-	}
-
-	if (dwTotalSize == 0)
-	{
-		if (local_file_path.IsEmpty())
-		{
-			result.Empty();
-		}
-		else
-		{
-			hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			if (hFile == INVALID_HANDLE_VALUE)
-			{
-				SAFE_DELETE_ARRAY(buffer);
-				SAFE_DELETE_ARRAY(total_buffer);
-				InternetCloseHandle(hURL);
-				InternetCloseHandle(hInternetRoot);
-
-				return _T("error=") + local_file_path + _T("\n\nfail to CreateFile().");
-			}
-
-			CloseHandle(hFile);
-			result = _T("ok");
-		}
-
-		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
-		InternetCloseHandle(hURL);
-		InternetCloseHandle(hInternetRoot);
-
-		return result;
-	}
-	*/
 	do
 	{
-		InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0);
-		InternetReadFile(hOpenRequest, buffer, dwSize, &dwRead);
+		//InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0); //이 함수는 웹페이지의 크기를 리턴하는 듯하다.
+		long t2 = clock();
+		//1.48GB, buffer_size에 따른 시간 비교. 1K:133s, 4K:65s, 1M:63s, 4M:64s
+		//버퍼 크기가 1K면 너무 빈번한 read가 발생하여 느리지만 4K이상이면 큰 차이는 발생하지 않는다.
+		InternetReadFile(hOpenRequest, buffer, buffer_size, &dwRead);
+
+		total_read += dwRead;
 
 		if (dwRead == 0)
 			break;
 
-		if (local_file_path.IsEmpty())
+		if (params->local_file_path.IsEmpty())
 		{
-			strncat(total_buffer, buffer, dwSize);
+			strncat(total_buffer, buffer, dwRead);
 		}
 		else
 		{
-			/*
-			CString check_404 = UTF8toCString(buffer).MakeLower();
-			if (check_404.Find(_T("file not found")) >= 0 || check_404.Find(_T("error code: 404")) >= 0)
-			{
-				SAFE_DELETE_ARRAY(buffer);
-				SAFE_DELETE_ARRAY(total_buffer);
-				InternetCloseHandle(hURL);
-				InternetCloseHandle(hInternetRoot);
-
-				return _T("error=") + sub_url + _T("\n\nremote file does not exist.");
-			}
-			*/
-
 			//remote file이 존재하지 않을 경우 로컬에 파일을 만들지 않기 위해 여기서 체크.
 			if (hFile == NULL)
 			{
-				if (PathFileExists(local_file_path) && !DeleteFile(local_file_path))
+				if (PathFileExists(params->local_file_path) && !DeleteFile(params->local_file_path))
 				{
 					SAFE_DELETE_ARRAY(buffer);
 					SAFE_DELETE_ARRAY(total_buffer);
@@ -3018,11 +2633,13 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 					InternetCloseHandle(hInternetConnect);
 					InternetCloseHandle(hInternetRoot);
 
-					result_str = _T("error=") + local_file_path + _T("\n\nfail to DeleteFile().");
-					return statusCode;
+					params->result = _T("error=") + params->local_file_path + _T("\n\nfail to DeleteFile().");
+					params->status = -1;
+					TRACE(_T("result = %s\n"), params->result);
+					return;
 				}
 
-				hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+				hFile = CreateFile(params->local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 				if (hFile == INVALID_HANDLE_VALUE)
 				{
 					SAFE_DELETE_ARRAY(buffer);
@@ -3031,23 +2648,28 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 					InternetCloseHandle(hInternetConnect);
 					InternetCloseHandle(hInternetRoot);
 
-					result_str = _T("error=") + local_file_path + _T("\n\nfail to CreateFile().");
-					return statusCode;
+					params->result = _T("error=") + params->local_file_path + _T("\n\nfail to CreateFile().");
+					params->status = -1;
+					TRACE(_T("result = %s\n"), params->result);
+					return;
 				}
 			}
 
 			WriteFile(hFile, buffer, dwRead, &dwWritten, NULL);
+			params->downloaded_size += dwWritten;
+
+			//TRACE(_T("id = %d, downloaded_size = %d\n"), params->request_id, params->downloaded_size);
 		}
 	} while (dwRead != 0);
 
-	if (local_file_path.IsEmpty())
+	if (params->local_file_path.IsEmpty())
 	{
-		result_str = UTF8toCString(total_buffer);
+		params->result = UTF8toCString(total_buffer);
 	}
 	else
 	{
 		CloseHandle(hFile);
-		result_str = _T("");
+		params->result = _T("");
 	}
 
 	SAFE_DELETE_ARRAY(buffer);
@@ -3056,182 +2678,7 @@ DWORD get_uri(CString &result_str, CString ip, int port, CString sub_url, CStrin
 	InternetCloseHandle(hInternetConnect);
 	InternetCloseHandle(hInternetRoot);
 
-	return statusCode;
-	/*
-	try
-	{
-		HINTERNET hInternet = InternetOpen(_T("get_uri"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-		if (hInternet == NULL)
-		{
-			return _T("[error] InternetOpen Fail");
-		}
-
-		BOOL isHTTPS = FALSE;
-		CString strServerIP = ip;
-
-		if (ip.Find(_T("https://")) >= 0)
-		{
-			isHTTPS = TRUE;
-			strServerIP.Replace(_T("https://"), _T(""));
-		}
-		else if (ip.Find(_T("http://")) >= 0)
-		{
-			isHTTPS = FALSE;
-			strServerIP.Replace(_T("http://"), _T(""));
-		}
-
-		HINTERNET hConnect = InternetConnect(hInternet, strServerIP, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
-		if (hConnect == NULL)
-		{
-			::InternetCloseHandle(hInternet);
-			return _T("[error] InternetConnect Fail");
-		}
-
-		int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE; // http
-		if (isHTTPS)
-		{
-			secureFlags = INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
-		}
-
-		HINTERNET hRequest = HttpOpenRequest(hConnect, _T("GET"), sub_url, NULL, NULL, NULL, secureFlags, 0);
-
-		//delete[] strMultibyte;
-
-		if (hRequest == NULL)
-		{
-			::InternetCloseHandle(hConnect);
-			hConnect = NULL;
-
-			::InternetCloseHandle(hInternet);
-			hInternet = NULL;
-
-			return _T("[error] HttpOpenRequest Fail");
-		}
-
-		//HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json; charset=utf-8"), -1, HTTP_ADDREQ_FLAG_ADD);
-		HttpAddRequestHeaders(hRequest, _T("Content-Type: application/json"), -1, HTTP_ADDREQ_FLAG_ADD);
-
-		if (isHTTPS)
-		{
-			DWORD dwFlags;
-			DWORD dwBuffLen = sizeof(dwFlags);
-			InternetQueryOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, (LPVOID)&dwFlags, &dwBuffLen);
-			dwFlags |= SECURITY_FLAG_SECURE;
-			dwFlags |= SECURITY_FLAG_IGNORE_UNKNOWN_CA;
-			dwFlags |= SECURITY_FLAG_IGNORE_REVOCATION;
-			dwFlags |= SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-			dwFlags |= SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-			InternetSetOption(hRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
-		}
-
-		BOOL res = HttpSendRequest(hRequest, NULL, 0, NULL, 0);
-		if (!res)
-		{
-			InternetCloseHandle(hRequest);
-			InternetCloseHandle(hConnect);
-			InternetCloseHandle(hInternet);
-			return _T("[error] HttpSendRequest Fail");
-		}
-		else
-		{
-			//See if HttpQueryInfo can get the file size.
-			DWORD status_code = 0;
-			DWORD status_code_size = sizeof(status_code);
-			if (FALSE == HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status_code,	&status_code_size, nullptr))
-			{
-				InternetCloseHandle(hRequest);
-				InternetCloseHandle(hConnect);
-				InternetCloseHandle(hInternet);
-
-				return _T("error=404");
-			}
-		}
-
-		HANDLE hFile = NULL;
-
-		//로컬 파일이 저장될 폴더가 존재하지 않으면 생성해준다.
-		if (!local_file_path.IsEmpty())
-		{
-			CString folder = GetFolderNameFromFullPath(local_file_path);
-			make_full_directory(folder);
-
-			hFile = CreateFile(local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			if (hFile == INVALID_HANDLE_VALUE)
-			{
-				InternetCloseHandle(hRequest);
-				InternetCloseHandle(hConnect);
-				InternetCloseHandle(hInternet);
-
-				return local_file_path + _T("\n\nCan't create file.");
-			}
-		}
-
-		int buf_size = 8192;
-		char *chBufAll = new char[buf_size * buf_size];
-		char *chBuf = new char[buf_size];
-		DWORD dwSize = 0;
-		DWORD dwBytesWrite = 0;
-
-		memset(chBuf, 0, buf_size);
-		memset(chBufAll, 0, buf_size);
-
-		int cnt = 0;
-		while (InternetReadFile(hRequest, chBuf, buf_size, &dwSize))
-		{
-			if (dwSize == 0)
-				break;
-
-			if (local_file_path.IsEmpty())
-			{
-				TRACE(_T("%s"), chBuf);
-
-				for (int i = 0; i < dwSize; i++)
-				{
-					chBufAll[cnt] = chBuf[i];
-					chBuf[i] = 0;
-					cnt++;
-				}
-			}
-			else
-			{
-				if (!WriteFile(hFile, chBuf, dwSize, &dwBytesWrite, NULL))
-				{
-					CloseHandle(hFile);
-
-					InternetCloseHandle(hRequest);
-					InternetCloseHandle(hConnect);
-					InternetCloseHandle(hInternet);
-
-					return local_file_path + _T("\n\nCan't write file.");
-				}
-				TRACE(_T("%d bytes written.\n"), dwBytesWrite);
-			}
-		}
-
-		if (local_file_path.IsEmpty())
-		{
-			result = UTF8toCString(chBufAll);
-		}
-		else
-		{
-			CloseHandle(hFile);
-			result = _T("ok");
-		}
-
-		delete[] chBuf;
-		delete[] chBufAll;
-
-		InternetCloseHandle(hRequest);
-		InternetCloseHandle(hConnect);
-		InternetCloseHandle(hInternet);
-
-		return result;
-	}
-	catch (...)
-	{
-		return _T("");
-	}
-	*/
+	TRACE(_T("elapsed = %ld\n"), clock() - t0);
 }
 
 DWORD	GetURLFileSize(LPCTSTR pUrl)
@@ -3503,7 +2950,8 @@ LONG GetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value
 						(LPTSTR) &lpMsgBuf,
 						0,
 						NULL);
-		AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+		//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+		TRACE(_T("GetRegistryString() error = %s\n"), (LPCTSTR)lpMsgBuf);
 		LocalFree(lpMsgBuf);
 	}
 	
@@ -3541,7 +2989,8 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 								(LPTSTR) &lpMsgBuf,
 								0,
 								NULL);
-				AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+				//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+				TRACE(_T("GetRegistryString() error = %s\n"), (LPCTSTR)lpMsgBuf);
 				LocalFree(lpMsgBuf);
 			}
 		}
@@ -3965,7 +3414,7 @@ void	SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMi
 int			GetNextFileIndex(CString sCurrentFile)
 {
 	TCHAR	ch;
-	CString fileTitle = GetFileTitle(sCurrentFile);
+	CString fileTitle = get_part(sCurrentFile, 2);
 	CString sIndex = _T("");
 
 	for (int i = fileTitle.GetLength() - 1; i >= 0; i--)
@@ -4014,9 +3463,9 @@ CString		GetMostRecentFile(CString sFolder, CString sWildCard /*= "*.*" */, int 
 	}
 	
 	if (nReturnType == 1)
-		return GetFileNameFromFullPath(sMostRecentFile);
+		return get_part(sMostRecentFile, 4);
 	else if (nReturnType == 2)
-		return GetFileTitle(sMostRecentFile);
+		return get_part(sMostRecentFile, 2);
 	
 	return sMostRecentFile;
 }
@@ -4120,6 +3569,22 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 		free(pAdapterInfo);
 
 	return result;
+}
+
+CString	get_mac_addres(bool include_colon)
+{
+	NETWORK_INFO netInfo;
+	CString mac;
+
+	if (GetNetworkInformation(_T(""), &netInfo))
+	{
+		mac = CString(netInfo.sMacAddress);
+
+		if (include_colon)
+			mac = get_mac_address_format(mac);
+	}
+
+	return mac;
 }
 
 bool GetNICAdapterList(IP_ADAPTER_INFO* pAdapters, int& nTotal, int nMax /*= 10*/)
@@ -4390,7 +3855,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		}
 		else
 		{
-			TRACE(_T("%s\n"), sCaptionString);
+			//TRACE(_T("%s\n"), sCaptionString);
 			if (sCaptionString.Find(sCaption) >= 0)
 				return pWnd;
 		}
@@ -4857,8 +4322,8 @@ void sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString
 	{
 		if (only_filename)
 		{
-			a = GetFileNameFromFullPath(a);
-			b = GetFileNameFromFullPath(b);
+			a = get_part(a, 4);
+			b = get_part(b, 4);
 		}
 		return !is_greater_with_numeric(a, b);
 	}
@@ -4932,7 +4397,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	{
 		bWorking = finder.FindNextFile();
 		sfile = finder.GetFilePath();
-		sFilename = GetFileNameFromFullPath(sfile).MakeLower();
+		sFilename = get_part(sfile, 4).MakeLower();
 		
 		if (finder.IsDots())
 			continue;
@@ -4953,7 +4418,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 			else
 			{
 				//예를들어 확장자 목록에 jpg가 있는데 파일명 중간에서 jpg가 발견되면 문제가 된다.
-				if (find_index(&dqExtFilter, GetFileExtension(sFilename).MakeLower()) >= 0)
+				if (find_index(&dqExtFilter, get_part(sFilename, 3).MakeLower()) >= 0)
 					bFound = true;
 				/*
 				for (i = 0; i < dqExtFilter.size(); i++)
@@ -5172,7 +4637,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				continue;
 
 			bool found = false;
-			filetitle = GetFileTitle(file).MakeLower();
+			filetitle = get_part(file, 2).MakeLower();
 
 			if (name_filter.IsEmpty())
 			{
@@ -5214,7 +4679,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			{
 				for (i = 0; i < dq_ext.size(); i++)
 				{
-					if (GetFileExtension(file).MakeLower() == dq_ext[i])
+					if (get_part(file, 3).MakeLower() == dq_ext[i])
 					{
 						found = true;
 						break;
@@ -5255,7 +4720,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				continue;
 
 			bool found = false;
-			filetitle = GetFileTitle(file).MakeLower();
+			filetitle = get_part(file, 2).MakeLower();
 
 			if (name_filter.IsEmpty())
 			{
@@ -5297,7 +4762,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			{
 				for (i = 0; i < dq_ext.size(); i++)
 				{
-					if (GetFileExtension(file).MakeLower() == dq_ext[i])
+					if (get_part(file, 3).MakeLower() == dq_ext[i])
 					{
 						found = true;
 						break;
@@ -5671,7 +5136,7 @@ void DeleteFilesBySubString(CString sFolder, CString filenameSubStr, bool bMatch
 	{
 		bWorking = finder.FindNextFile();
 		sfile = finder.GetFilePath();
-		filename = GetFileNameFromFullPath(sfile);
+		filename = get_part(sfile, 4);
 
 		if (!bMatchCase)
 		{
@@ -7857,7 +7322,7 @@ CString GetToken(CString& str, LPCTSTR c)
 }
 
 //문자열에서 n번째 토큰을 리턴한다.
-CString GetToken(CString src, CString separator, int n)
+CString GetToken(CString src, CString separator, int index)
 {
 	int i = 0;
 	CStringArray saItems;
@@ -7867,10 +7332,10 @@ CString GetToken(CString src, CString separator, int n)
 		saItems.Add(sItem);
 	}
 
-	if (n < 0 || n >= saItems.GetSize())
+	if (index < 0 || index >= saItems.GetSize())
 		return _T("");
 
-	return saItems.GetAt(n);
+	return saItems.GetAt(index);
 }
 
 //Tokenize를 이용하면 공백인 토큰은 처리되지 않고 무시되므로 원하는 개수만큼 추출되지 않는다.
@@ -7886,15 +7351,15 @@ std::deque<CString>	get_token_string(CString src, CString separator)
 	return dq;
 }
 */
-int get_token_string(CString src, std::deque<CString> &dqToken, TCHAR separator, bool allowEmpty, int nMaxToken /*= -1*/)
+int get_token_string(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken /*= -1*/)
 {
-	std::deque<TCHAR> dqSeparator;
+	std::deque<CString> dqSeparator;
 	
 	dqSeparator.push_back(separator);
 	return get_token_string(src, dqToken, dqSeparator, allowEmpty, nMaxToken);
 }
 
-int get_token_string(CString src, std::deque<CString>& dqToken, std::deque<TCHAR> separator, bool allowEmpty, int nMaxToken)
+int get_token_string(CString src, std::deque<CString>& dqToken, std::deque<CString> separator, bool allowEmpty, int nMaxToken)
 {
 	int i, j;
 	CString token;
@@ -8511,6 +7976,40 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 	return true;
 }
 
+//SystemParametersInfo(SPI_GETSCREENSAVEACTIVE...)으로는 제대로 설정값을 얻어오지 못한다.
+//SCRNSAVE.EXE라는 항목이 존재하면 설정된 것이고 없으면 해제된 것이다.
+//설정시간과 잠금화면을 표시할지에 대한 설정값을 얻어올 수 있다.
+bool get_screensaver_setting(int *timeout, int* use_secure)
+{
+	HKEY hKeySreenSaver = NULL;
+	long lReturn = NULL;
+	long lScreenSaver = NULL;
+	long lScreenSaverActive = NULL;
+	DWORD dwType = 0;
+	DWORD dwDataSize = MAX_PATH;
+
+	lReturn = RegOpenKeyEx(HKEY_CURRENT_USER, _T("Control Panel\\Desktop"), 0, KEY_ALL_ACCESS, &hKeySreenSaver);
+
+	if (lReturn == ERROR_SUCCESS)
+	{
+		lScreenSaver = RegQueryValueEx(hKeySreenSaver, _T("SCRNSAVE.EXE"), NULL, &dwType, NULL, &dwDataSize);
+
+		if (lScreenSaver == ERROR_SUCCESS)
+		{
+			if (timeout != NULL)
+				SystemParametersInfo(SPI_GETSCREENSAVETIMEOUT, 0, timeout, 0);
+
+			if (use_secure != NULL)
+				SystemParametersInfo(SPI_GETSCREENSAVESECURE, 0, use_secure, 0);
+
+			return true;
+		}
+	}
+
+	RegCloseKey(hKeySreenSaver);
+
+	return false;
+}
 
 #include <WinIoCtl.h>
 
@@ -9790,7 +9289,7 @@ void combination(std::vector<TCHAR> src, CString temp, std::vector<CString> &res
 	if (depth == 0)//result.size())  // depth == n // 계속 안뽑다가 r 개를 채우지 못한 경우는 이 곳에 걸려야 한다.
 	{
 		result.push_back(temp);
-		trace(_T("%s\n"), temp);
+		Trace(_T("%s\n"), temp);
 		return;
 	}
 
@@ -10481,7 +9980,7 @@ CImage* capture_window(CRect r, CString filename)
 		t.GetYear(), t.GetMonth(), t.GetDay(),
 		t.GetHour(), t.GetMinute(), t.GetSecond());
 	*/
-	CString ext = GetFileExtension(filename).MakeLower();
+	CString ext = get_part(filename, 3).MakeLower();
 	GUID format = Gdiplus::ImageFormatJPEG;
 
 	if (ext == _T("bmp"))
@@ -12330,23 +11829,6 @@ HBITMAP MakeDIBSection(CDC& dc, int width, int height)
 	hBitmap = ::CreateDIBSection(dc.GetSafeHdc(), (BITMAPINFO*)&bmi, DIB_RGB_COLORS, (void**)&pBits, NULL, 0);
 
 	return hBitmap;
-}
-
-void Trace(char* szFormat, ...)
-{
-    char szTempBuf[2048] ;
-    va_list vlMarker ;
-
-    va_start(vlMarker,szFormat) ;
-    vsprintf(szTempBuf,szFormat,vlMarker) ;
-    va_end(vlMarker) ;
-
-#ifdef _DEBUG
-	TRACE(szTempBuf);
-#else
-    //OutputDebugString(szTempBuf) ;
-	printf(szTempBuf);
-#endif
 }
 
 //main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
@@ -16182,7 +15664,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 }
 
 
-//서버의 한글명 파일에 대한 처리때문에 get_uri()함수 대신 추가하여 테스트 해봤으나
+//서버의 한글명 파일에 대한 처리때문에 request_url()함수 대신 추가하여 테스트 해봤으나
 //서버측의 문제인듯하여 우선 이 함수 사용은 보류중...
 bool HttpDownloadFile(CString url, CString local_path)
 {

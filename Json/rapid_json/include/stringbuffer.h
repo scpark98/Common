@@ -78,6 +78,14 @@ public:
         return stack_.template Bottom<Ch>();
     }
 
+    const CString GetCString() const {
+        // Push and pop a null terminator. This is safe.
+        *stack_.template Push<Ch>() = '\0';
+        stack_.template Pop<Ch>(1);
+
+        return CString(stack_.template Bottom<Ch>());
+    }
+
     //! Get the size of string in bytes in the string buffer.
     size_t GetSize() const { return stack_.GetSize(); }
 

@@ -333,7 +333,7 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	for (int i = 0; i < files.size(); i++)
 	{
 		//m_dqThumb[i] = new CThumbImage;
-		m_dqThumb[i].title = GetFileNameFromFullPath(files[i]);
+		m_dqThumb[i].title = get_part(files[i], 4);
 	}
 
 	Invalidate();
@@ -379,7 +379,7 @@ void CThumbCtrl::loading_function(int idx, int start, int end)
 			//img->Load(m_loading_files[i]);
 		}
 
-		pWnd->insert(i, pWnd->m_loading_files[i], GetFileTitle(pWnd->m_loading_files[i]), false, false);
+		pWnd->insert(i, pWnd->m_loading_files[i], get_part(pWnd->m_loading_files[i], 2), false, false);
 	}
 
 	if ((end - start) == 1)
@@ -952,8 +952,8 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 
 #ifdef _DEBUG
 			for (int j = 0; j < m_selected.size(); j++)
-				trace(_T("%d "), m_selected[j]);
-			trace(_T("\n"));
+				Trace(_T("%d "), m_selected[j]);
+			Trace(_T("\n"));
 #endif
 			Invalidate();
 			return;
@@ -1345,7 +1345,7 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 
 		//if (!mat.empty())
 		{
-			insert(m_loading_index, m_loading_files[m_loading_index], GetFileNameFromFullPath(m_loading_files[m_loading_index]), false, false);
+			insert(m_loading_index, m_loading_files[m_loading_index], get_part(m_loading_files[m_loading_index], 4), false, false);
 			//Invalidate();
 		}
 

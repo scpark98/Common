@@ -55,19 +55,19 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	{
 		LPITEMIDLIST pidl_Computer = NULL;
 		SHGetFolderLocation( NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer ); // 컴퓨터
-		SHGetFileInfo((wchar_t*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+		SHGetFileInfo((TCHAR*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
 	else if(szFile == get_shell_known_string_by_csidl(CSIDL_PERSONAL))
 	{
 		LPITEMIDLIST pidl_Document = NULL;
 		SHGetFolderLocation( NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document ); // 내문서
-		SHGetFileInfo((wchar_t*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+		SHGetFileInfo((TCHAR*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
 	else if(szFile == get_shell_known_string_by_csidl(CSIDL_DESKTOP))
 	{
 		LPITEMIDLIST pidl_Desktop = NULL;
 		SHGetFolderLocation( NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop ); // 바탕화면
-		SHGetFileInfo((wchar_t*)pidl_Desktop, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
+		SHGetFileInfo((TCHAR*)pidl_Desktop, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
 	else
 	{

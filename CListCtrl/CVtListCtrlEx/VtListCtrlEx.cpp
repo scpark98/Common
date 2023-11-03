@@ -299,10 +299,10 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			CRect r = itemRect;
 
-			//바그래프는 셀의 높이, 즉 라인 간격과는 관계없다. 폰트의 높이값에 비례하는 높이로 그려주자.
+			//바그래프는 셀의 높이, 즉 라인 간격에 상대적이지 않고 폰트의 높이값에 비례하는 높이로 그려줘야 한다.
 			int cy = r.CenterPoint().y;
-			r.top = cy + (double)m_lf.lfHeight / 1.5;		//이 값을 키우면 바그래프의 높이가 낮아진다.
-			r.bottom = cy - (double)m_lf.lfHeight / 1.5;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
+			r.top = cy + (double)m_lf.lfHeight / 1.4;		//이 값을 키우면 바그래프의 높이가 낮아진다.
+			r.bottom = cy - (double)m_lf.lfHeight / 1.4;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
 
 			double d = _ttof(m_list_db[iItem].text[iSubItem]);
 			d /= 100.0;
@@ -311,29 +311,40 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + (double)(r.Width()) * d;
 			pDC->FillSolidRect(r, m_crProgress);
 
-			CString sPercent = m_list_db[iItem].text[iSubItem] + _T("%");
-			//pDC->SetTextColor(RGB(255, 0, 0));// m_crBack);
-			//pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-			
+			//20231102 CSliderCtrlEx에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
+			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
+			//pDC가 아닌 CMemoryDC를 얻어서 출력하니 원하는대로 출력되지만 다른 row의 값이 그려지지 않는다.
+			//Rgn과 관련하여 OnPaint()와 DrawItem은 뭔가 차이가 있다.
 			if (m_show_progress_text)
 			{
+				CString sPercent = m_list_db[iItem].text[iSubItem] + _T("%");
+				pDC->SetTextColor(m_crProgressText);// m_crBack);
+				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+				/*
 				CRect rcLeft, rcRight;
 				rcLeft = rcRight = itemRect;
-
 				rcRight.left = rcLeft.right = r.right;
 				
-				CRgn rgn;
-				rgn.CreateRectRgnIndirect(rcLeft);
-				pDC->SelectClipRgn(&rgn);
-				pDC->SetTextColor(RGB(255, 0, 0));// m_crBack);
-				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
+				CRgn rgnLeft, rgnRight;
+				rgnLeft.CreateRectRgnIndirect(rcLeft);
+				rgnRight.CreateRectRgnIndirect(rcRight);
 
-				rgn.SetRectRgn(rcRight);
-				pDC->SelectClipRgn(&rgn);
+				pDC->SetTextColor(RGB(255, 0, 0));// m_crBack);
+				pDC->SelectClipRgn(&rgnLeft);
+				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y - 8, sPercent);
+
+				//rgnRight.SetRectRgn(rcRight);
 				pDC->SetTextColor(RGB(255, 255, 0)); //m_crText);
-				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
+				pDC->SelectClipRgn(&rgnRight);
+				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y - 8, sPercent);
+
+				rgnLeft.DeleteObject();
+				rgnRight.DeleteObject();
 
 				pDC->SelectClipRgn(NULL);
+				*/
 			}			
 		}
 		//텍스트 형태이면 문자열을 출력해준다.
@@ -605,6 +616,9 @@ void CVtListCtrlEx::save_column_width(CWinApp* pApp, CString sSection)
 
 CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 {
+	if (!m_hWnd)
+		return CRect();
+
 	// Get the column offset
 	int Offset = 0;
 	for (int iColumn = 0; iColumn < subItem; iColumn++)
@@ -630,11 +644,9 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 		Rect.left -= Size.cx;
 	}
 
-	//약간의 오차 보정 필요.
-	Rect.left += (Offset + 1);
-	Rect.right = Rect.left + GetColumnWidth(subItem) - 1;
+	Rect.left += Offset;
+	Rect.right = Rect.left + GetColumnWidth(subItem);
 	Rect.top += 2;
-	//Rect.bottom += 1;
 
 	return Rect;
 }
@@ -918,6 +930,13 @@ void CVtListCtrlEx::OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult)
 }
 
 
+BOOL CVtListCtrlEx::PreCreateWindow(CREATESTRUCT& cs)
+{
+	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	//AfxMessageBox(_T("sldkf"));
+	return CListCtrl::PreCreateWindow(cs);
+}
+
 void CVtListCtrlEx::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
@@ -944,8 +963,10 @@ void CVtListCtrlEx::modify_style()
 	//헤더컨트롤을 제어할 일이 있는지 확인 필요.
 #if 1
 	// get original view style
+	//LVS_OWNERDATA는 동적으로 설정되지 않는듯하다. resource editor에서 주고 시작하자.
 	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
-	ModifyStyle(LVS_TYPEMASK, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA);
+	//ModifyStyle(LVS_TYPEMASK, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA | LVS_NOSORTHEADER);
+	BOOL b = ModifyStyle(0, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA | LVS_NOSORTHEADER);
 
 	// if view style is other than LVS_REPORT 
 	// returned pointer will be NULL
@@ -957,11 +978,15 @@ void CVtListCtrlEx::modify_style()
 		m_HeaderCtrlEx.SubclassWindow(pHeader->m_hWnd);
 	}
 
-	LONG lStyleOld = GetWindowLong(GetSafeHwnd(), GWL_STYLE);
+	//위에서 스타일을 변경하므로 여기서는 제거.
+	/*
+	LONG lStyleOld = GetWindowLongPtr(GetSafeHwnd(), GWL_STYLE);
 	lStyleOld &= ~(LVS_TYPEMASK);
 	lStyleOld |= (LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA);
 
 	SetWindowLongPtr(GetSafeHwnd(), GWL_STYLE, lStyleOld | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER);
+	*/
+
 	//ASSERT(pHeader->m_hWnd != NULL);
 #endif
 }
@@ -1097,10 +1122,13 @@ void CVtListCtrlEx::OnPaint()
 	CRect rc;
 	CRect rcHeader;
 	CHeaderCtrl* pHeaderCtrl = GetHeaderCtrl();
-	pHeaderCtrl->GetClientRect(&rcHeader);
-
 	GetClientRect(rc);
-	rc.top += rcHeader.Height();
+
+	if (pHeaderCtrl)
+	{
+		pHeaderCtrl->GetClientRect(&rcHeader);
+		rc.top += rcHeader.Height();
+	}
 
 	CMemoryDC dc(&dc1, &rc, true);
 
@@ -1258,7 +1286,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	pEdit->SetFont(&m_font, true);
 	m_pEdit = pEdit;
 
-	CString ext = GetFileExtension(m_old_text);
+	CString ext = get_part(m_old_text, 3);
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
 	{
 		m_pEdit->SetSel(0, m_old_text.GetLength() - ext.GetLength() - 1);
@@ -1314,6 +1342,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(49, 108, 244);
+		m_crProgressText		= RGB(192, 192, 192);
 		break;
 	case color_theme_light_blue :
 		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
@@ -1327,6 +1356,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crHeaderText			= get_color(m_crText, -32);
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
+		m_crProgressText		= RGB(192, 192, 192);
 		break;
 	case color_theme_navy_blue :
 		m_crText				= RGB(204, 216, 225);
@@ -1340,6 +1370,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crHeaderText			= get_color(m_crText, -32);
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
+		m_crProgressText		= RGB(192, 192, 192);
 		break; 
 	case color_theme_dark_blue :
 		m_crText				= RGB( 16, 177, 224);
@@ -1353,6 +1384,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crHeaderText			= RGB(  0, 180, 228);
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
+		m_crProgressText		= RGB(192, 192, 192);
 		break; 
 	case color_theme_dark_gray :
 		m_crText				= RGB(164, 164, 164);
@@ -1366,6 +1398,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crHeaderText			= get_color(m_crText, -16);
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
+		m_crProgressText		= RGB(192, 192, 192);
 		break;
 	}
 
@@ -1586,15 +1619,22 @@ int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool
 	if (index < 0)
 		index = size();
 
-	m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, m_HeaderCtrlEx.GetItemCount()));
+	//이미 해당 index의 row가 존재하는 경우는 값을 변경한다.
+	if (index < m_list_db.size())
+	{
+		set_text(index, 0, text, false);
+	}
+	else
+	{
+		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, m_HeaderCtrlEx.GetItemCount()));
+		SetItemCountEx(m_list_db.size());
+	}
 
-	SetItemCountEx(m_list_db.size());
+	//if (invalidate && ensureVisible)
+	//	EnsureVisible(index, false);
 
-	if (invalidate && ensureVisible)
-		EnsureVisible(index, false);
-
-	if (invalidate)
-		Invalidate();
+	//if (invalidate)
+	//	Invalidate();
 
 	return index;
 }
@@ -1721,6 +1761,9 @@ CString CVtListCtrlEx::get_text(int item, int subItem)
 void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidate)
 {
 	if (item < 0)
+		return;
+
+	if (!m_hWnd)
 		return;
 
 	m_list_db[item].text[subItem] = text;
@@ -2374,7 +2417,7 @@ void CVtListCtrlEx::set_font_size(int font_size)
 	}
 
 	m_font_size = font_size;
-	AfxGetApp()->WriteProfileInt(_T("file list"), _T("font size"), m_font_size);
+
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
@@ -2392,7 +2435,6 @@ void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 	if (m_font_size > 40)
 		m_font_size = 40;
 
-	AfxGetApp()->WriteProfileInt(_T("file list"), _T("font size"), m_font_size);
 	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 	reconstruct_font();
 }
@@ -2625,8 +2667,8 @@ void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
 	m_use_own_imagelist = true;
 
 	set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
-	set_font_size(AfxGetApp()->GetProfileInt(_T("file list"), _T("font size"), 9));
-	set_font_name(AfxGetApp()->GetProfileString(_T("file list"), _T("font name"), _T("맑은 고딕")));
+	set_font_size(9);
+	set_font_name(_T("맑은 고딕"));
 	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면
 	//CHeaderCtrlEx::OnLayout()에서 에러가 발생한다.
 	set_header_height(24);
@@ -2652,7 +2694,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 	if (m_path.Right(1) == '\\')
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	trace(_T("current path = %s\n"), m_path);
+	Trace(_T("current path = %s\n"), m_path);
 
 	refresh_list(refresh);
 }
@@ -2739,19 +2781,19 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	//asce는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_folders[i].text[0]), false, false);
+		index = insert_item(insert_index, get_part(m_cur_folders[i].text[0], 4), false, false);
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
 			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].text[0], m_pShellImageList->get_csidl_map());
 			
-			uint64_t disk_size = GetDiskFreeSize(drive);
+			uint64_t disk_size = get_disk_free_size(drive);
 			if (disk_size > 0)
 				set_text(index, col_filesize, get_size_string(disk_size, 3, 1));
 
-			disk_size = GetDiskTotalSize(drive);
+			disk_size = get_disk_total_size(drive);
 			if (disk_size > 0)
-				set_text(index, col_filedate, get_size_string(GetDiskTotalSize(drive), 3, 1));
+				set_text(index, col_filedate, get_size_string(get_disk_total_size(drive), 3, 1));
 
 			set_text_color(index, col_filesize, RGB(109, 109, 109));
 			set_text_color(index, col_filedate, RGB(109, 109, 109));
@@ -2765,7 +2807,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		index = insert_item(insert_index, GetFileNameFromFullPath(m_cur_files[i].text[0]), false, false);
+		index = insert_item(insert_index, get_part(m_cur_files[i].text[0], 4), false, false);
 
 		set_text(index, col_filesize, m_cur_files[i].text[1]);
 		set_text(index, col_filedate, m_cur_files[i].text[2]);
@@ -3063,7 +3105,7 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_pDragImage->BeginDrag(0, CPoint(nOffset, nOffset - 4));
 	m_pDragImage->DragEnter(GetDesktopWindow(), pNMLV->ptAction);
 
-	trace(_T("start drag...\n"));
+	Trace(_T("start drag...\n"));
 
 	*pResult = 0;
 }
@@ -3095,13 +3137,13 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		//// If we drag outside current window we need to adjust the highlights displayed
 		if (pDropWnd != m_pDropWnd)
 		{
-			trace(_T("pDropWnd != m_pDropWnd\n"));
+			Trace(_T("pDropWnd != m_pDropWnd\n"));
 
 			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 			{
 				if (m_nDropIndex != -1) //If we drag over the CListCtrl header, turn off the hover highlight
 				{
-					trace(_T("m_nDropIndex != -1\n"));
+					Trace(_T("m_nDropIndex != -1\n"));
 					CListCtrl* pList = (CListCtrl*)m_pDropWnd;
 					VERIFY(pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED));
 					// redraw item
@@ -3115,7 +3157,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 					int i = 0;
 					int nCount = pList->GetItemCount();
 
-					trace(_T("m_nDropIndex is not -1, nCount = %d\n"), nCount);
+					Trace(_T("m_nDropIndex is not -1, nCount = %d\n"), nCount);
 
 					for (i = 0; i < nCount; i++)
 					{
@@ -3179,7 +3221,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			HTREEITEM hItem = ((CTreeCtrl*)pDropWnd)->HitTest(pt, &uFlags);
-			trace(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
+			Trace(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
 			pTree->SelectDropTarget(hItem);
 			ASSERT(hItem == pTree->GetDropHilightItem());
 		}
@@ -3211,7 +3253,7 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 	//If we are in a drag and drop operation (otherwise we don't do anything)
 	if (m_bDragging)
 	{
-		trace(_T("OnLButtonUp\n"));
+		Trace(_T("OnLButtonUp\n"));
 		// Release mouse capture, so that other controls can get control/messages
 		ReleaseCapture();
 
@@ -3260,9 +3302,9 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 		get_selected_items(&dq);
 
 		for (int i = 0; i < dq.size(); i++)
-			trace(_T("drag item %d of %p = %s\n"), i, pDragWnd, GetItemText(dq[i], col_filename));
+			Trace(_T("drag item %d of %p = %s\n"), i, pDragWnd, GetItemText(dq[i], col_filename));
 
-		trace(_T("dropped on %p = %s\n"), pDropWnd, (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+		Trace(_T("dropped on %p = %s\n"), pDropWnd, (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
 	}
 	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 	{
@@ -3272,3 +3314,4 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
 }
+

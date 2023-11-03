@@ -8,6 +8,15 @@
 #include "../../system/ShellImageList/ShellImageList.h"
 
 /*
+* CVtListCtrlEx를 사용하기 위해 프로젝트에 추가해야 하는 소스들
+* Common/CListCtrl/CVtListCtrlEx/*
+* Common/Functions.*
+* Common/colors.*
+* Common/system/ShellImageList.*
+* Common/GdiPlusBitmap.*
+*/
+
+/*
 CListCtrl의 각 라인을 CListCtrlData라는 클래스의 인스턴스로 생성하여
 virtual list 기능을 이용하도록 작성된 클래스.
 resource editor에서
@@ -182,8 +191,10 @@ public:
 		column_data_type_unknown = 0,
 		column_data_type_text,
 		column_data_type_numeric,
-		//실제값은 정수지만 그려질땐 막대그래프로 그려짐. 100%가 최대값이므로 100넘는 값도 100%로 표시된다.
-		//만약 최대값을 지정하거나 등의 다른 처리가 필요하다면 부가적인 코드가 필요하다.
+
+		//실제값은 정수지만 그려질땐 막대그래프로 그려짐. 100%가 최대값이므로 %로 변환하여 값을 줘야 함.
+		//100넘는 값도 100%로 표시된다.
+		//만약 최대값을 지정하거나 등의 다른 처리가 필요하다면 부가적인 코드가 필요하므로 우선 100%를 max로 가정함.
 		//일단 이 컬럼의 데이터 타입은 percentage를 막대그래프로 그려주는 것이 목적이므로
 		//값은 0~100까지의 비율로 아예 넣어주자. 110으로 넣어도 관계없다. 다만 100%로 그려질 것이다.
 		column_data_type_percentage_bar,
@@ -318,9 +329,10 @@ public:
 	bool	is_modified() { return m_modified; }
 	void	reset_modified_flag() { m_modified = false; }
 
-//폰트 관련
+//폰트 관련. 반드시 set_headings() 후에 호출할것.
 	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	//-1 : reduce, +1 : enlarge
+	//반드시 set_headings() 후에 호출할것.
 	void	set_font_size(int font_size);
 	void	enlarge_font_size(bool enlarge);
 	void	set_font_bold(bool bold = true);
@@ -360,7 +372,8 @@ public:
 	//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
 	bool	get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
 
-	void	show_progress_text(bool show) { m_show_progress_text = show; Invalidate(); }
+	void	show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
+	void	progress_text_color(COLORREF cr) { m_crProgressText = cr; }
 
 //scroll
 	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
@@ -427,6 +440,7 @@ protected:
 	COLORREF		m_crHeaderText;
 	COLORREF		m_crPercentage;				//percentage bar graph color
 	COLORREF		m_crProgress;				//progress bar
+	COLORREF		m_crProgressText;			//progress text
 
 //편집기능 관련
 	bool			m_allow_edit = false;			//항목 편집이 가능한지...
@@ -487,6 +501,7 @@ public:
 	afx_msg void OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 };
 
 

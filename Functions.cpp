@@ -726,11 +726,10 @@ CString		GetCurrentDirectory()
 	return sFilePath;
 }
 
-//"c:\\abc/def\\123.txt" 를 호출하면
+//_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 //"c:"		"\\abc/def\\"		"123"		".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
-//"c:\\"	"c:\\abc/def\\"		"123"		"txt"	"123.txt"와 같이 보정한다. 폴더는 반드시 '/'로 끝나는 것으로 통일한다.
-//기존에는 "abc/def"로 폴더명을 리턴했으나 그것만 봐서는 def가 폴더명인지 파일명인지 알 수 없기 때문이다.
-//part : 0(drive), 1(drive+folder), 2(filetitle), 3(ext), 4(filename)
+//"c:\\"	"c:\\abc/def"		"123"		"txt"	"123.txt"와 같이 보정한다.
+//part : fn_drive(drive), fn_folder(drive+folder), fn_title(filetitle), fn_ext(ext), fn_name(filename)
 CString		get_part(CString path, int part)
 {
 	TCHAR tDrive[_MAX_DRIVE] = { 0, };
@@ -742,13 +741,17 @@ CString		get_part(CString path, int part)
 	CString parts[5] = { tDrive, tDir, tFname, tExt, };
 
 	//확장자를 포함한 파일명
-	parts[4] = parts[2] + parts[3];
+	parts[fn_name] = parts[fn_title] + parts[fn_ext];
+
+	//폴더명의 끝에 '/' 또는 '\\'라면 제거.
+	if (parts[fn_folder].Right(1) == '/' || parts[fn_folder].Right(1) == '\\')
+		parts[fn_folder].Truncate(parts[fn_folder].GetLength() - 1);
 
 	//폴더명은 드라이브 경로까지 모두 포함. "\\abc/def\\" => "c:\\abc/def\\"
-	parts[1] = parts[0] + parts[1];	
+	parts[fn_folder] = parts[fn_drive] + parts[fn_folder];
 
 	//확장자는 .을 제외시킨다. parts[3]가 ""이어도 .Mid(1)은 에러가 발생하지는 않는다.
-	parts[3] = parts[3].Mid(1);
+	parts[fn_ext] = parts[fn_ext].Mid(1);
 
 	return parts[part];
 }
@@ -6232,7 +6235,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 
 	for (int i = 0; i < files.size(); i++)
 	{
-		//검색된 파일명에서 oldName 다음에 . _Snapshot 이 두개의 패턴은 같은 파일군으로 처리한다.
+		//검색된 파일명에서 oldName 다음에 .과 _Snapshot 이 두개의 패턴은 같은 파일군으로 처리한다.
 		if (files[i].Find(oldName + _T(".")) >= 0 ||
 			files[i].Find(oldName + _T("_Snapshot")) >= 0)
 		{

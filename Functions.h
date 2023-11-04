@@ -774,12 +774,19 @@ struct	NETWORK_INFO
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
 
-	//"c:\\abc/def\\123.txt" 를 호출하면
+	//_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 	//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
-	//"c:\\", "c:\\abc/def\\", "123", "txt", "123.txt와 같이 보정한다. 폴더는 반드시 '/'나 '\\'로 끝나는 것으로 통일한다.
-	//기존에는 "abc/def"로 폴더명을 리턴했으나 그것만 봐서는 def가 폴더명인지 파일명인지 알 수 없기 때문이다.
-	//part : 0(drive), 1(drive+folder), 2(filetitle), 3(ext), 4(filename)
+	//"c:\\", "c:\\abc/def", "123", "txt", "123.txt와 같이 보정한다.
+	//part : fn_drive(drive), fn_folder(drive+folder), fn_title(filetitle), fn_ext(ext), fn_name(filename)
 	CString		get_part(CString path, int part);
+	enum FILENAME_PART
+	{
+		fn_drive,
+		fn_folder,
+		fn_title,
+		fn_ext,
+		fn_name,
+	};
 #if 0
 	CString		GetFileNameFromFullPath(CString fullpath);
 	CString		GetFolderNameFromFullPath(CString fullpath, bool includeSlash = false);	//= PathRemoveFileSpec

@@ -109,7 +109,7 @@ int CCopyThread::do_copy(CString src, CString dst, bool is_copy_mode)
 		if (dqFiles.size() == 0)
 		{
 			delete_file(src, true);
-			dst = dst + _T("\\") + GetFileNameFromFullPath(src);
+			dst = dst + _T("\\") + get_part(src, 4);
 			make_full_directory(dst);
 			return ERROR_SUCCESS;
 		}
@@ -123,7 +123,7 @@ int CCopyThread::do_copy(CString src, CString dst, bool is_copy_mode)
 			m_mutex.Lock();
 			for (int i = 0; i < dqFiles.size(); i++)
 			{
-				CCopyInfo info(dqFiles[i], dst + _T("\\") + GetFileNameFromFullPath(dqFiles[i]), is_copy_mode);
+				CCopyInfo info(dqFiles[i], dst + _T("\\") + get_part(dqFiles[i], 4), is_copy_mode);
 				m_copy_queue.push_back(info);
 				m_total_filesize += info.m_filesize;
 			}
@@ -135,7 +135,7 @@ int CCopyThread::do_copy(CString src, CString dst, bool is_copy_mode)
 	}
 
 	//파일들을 이동할 경우 대상 폴더가 없는 경우는 직접 생성해줘야 한다.
-	CString dstFolder = GetFolderNameFromFullPath(dst);
+	CString dstFolder = get_part(dst, 1);
 	if (PathFileExists(dstFolder) == false)
 		make_full_directory(dstFolder);
 

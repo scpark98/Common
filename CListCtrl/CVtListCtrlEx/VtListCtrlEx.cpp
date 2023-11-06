@@ -1286,7 +1286,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	pEdit->SetFont(&m_font, true);
 	m_pEdit = pEdit;
 
-	CString ext = get_part(m_old_text, 3);
+	CString ext = get_part(m_old_text, fn_ext);
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
 	{
 		m_pEdit->SetSel(0, m_old_text.GetLength() - ext.GetLength() - 1);
@@ -2781,7 +2781,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	//asce는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		index = insert_item(insert_index, get_part(m_cur_folders[i].text[0], 4), false, false);
+		index = insert_item(insert_index, get_part(m_cur_folders[i].text[0], fn_name), false, false);
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
@@ -2807,7 +2807,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		index = insert_item(insert_index, get_part(m_cur_files[i].text[0], 4), false, false);
+		index = insert_item(insert_index, get_part(m_cur_files[i].text[0], fn_name), false, false);
 
 		set_text(index, col_filesize, m_cur_files[i].text[1]);
 		set_text(index, col_filedate, m_cur_files[i].text[2]);

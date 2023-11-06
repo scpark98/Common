@@ -863,7 +863,7 @@ Mat	loadImage( LPCTSTR sfile, int flags /*= CV_LOAD_IMAGE_UNCHANGED*/, bool bDis
 		AfxMessageBox( str );
 	}
 
-	CString sExt = get_part(sfile, 3).MakeLower();
+	CString sExt = get_part(sfile, fn_ext).MakeLower();
 
 	if ( sExt != _T("raw") && sExt != _T("yuv") )
 		return loadMat( sfile, flags, bDisplayError );
@@ -1839,13 +1839,13 @@ bool save_mat(CString sfile, cv::Mat mat, int quality)
 	bool result = false;
 	std::vector<int> qualityType;
 
-	if (get_part(sfile, 3).MakeLower() == _T("jpg"))
+	if (get_part(sfile, fn_ext).MakeLower() == _T("jpg"))
 	{
 		qualityType.push_back(IMWRITE_JPEG_QUALITY);
 		qualityType.push_back(quality);
 		result = imwrite(CString2string(sfile), mat, qualityType);
 	}
-	else if (get_part(sfile, 3).MakeLower() == _T("png") )
+	else if (get_part(sfile, fn_ext).MakeLower() == _T("png") )
 	{
 		qualityType.push_back(IMWRITE_PNG_COMPRESSION);
 		qualityType.push_back(100 - quality);

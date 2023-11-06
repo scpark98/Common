@@ -179,7 +179,7 @@ bool CGdiplusBitmap::load(CString file, bool show_error)
 	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
 	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
 	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
-	bool use_copied_open = (get_part(file, 3).MakeLower() == _T("gif") ? false : true);
+	bool use_copied_open = (get_part(file, fn_ext).MakeLower() == _T("gif") ? false : true);
 
 #ifdef UNICODE
 	if (use_copied_open)
@@ -1912,7 +1912,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 
 	if (!PathIsDirectory(folder))
 	{
-		folder = get_part(folder, 1);
+		folder = get_part(folder, fn_folder);
 	}
 
 	GUID   pageGuid = FrameDimensionTime;
@@ -1922,7 +1922,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 	for (int i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
-		str.Format(_T("%s\\%s_%04d.png"), folder, get_part(m_filename, 4), i);
+		str.Format(_T("%s\\%s_%04d.png"), folder, get_part(m_filename, fn_name), i);
 		save(str);
 	}
 

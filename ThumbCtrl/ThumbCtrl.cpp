@@ -333,7 +333,7 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	for (int i = 0; i < files.size(); i++)
 	{
 		//m_dqThumb[i] = new CThumbImage;
-		m_dqThumb[i].title = get_part(files[i], 4);
+		m_dqThumb[i].title = get_part(files[i], fn_name);
 	}
 
 	Invalidate();
@@ -379,7 +379,7 @@ void CThumbCtrl::loading_function(int idx, int start, int end)
 			//img->Load(m_loading_files[i]);
 		}
 
-		pWnd->insert(i, pWnd->m_loading_files[i], get_part(pWnd->m_loading_files[i], 2), false, false);
+		pWnd->insert(i, pWnd->m_loading_files[i], get_part(pWnd->m_loading_files[i], fn_title), false, false);
 	}
 
 	if ((end - start) == 1)
@@ -1345,7 +1345,7 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 
 		//if (!mat.empty())
 		{
-			insert(m_loading_index, m_loading_files[m_loading_index], get_part(m_loading_files[m_loading_index], 4), false, false);
+			insert(m_loading_index, m_loading_files[m_loading_index], get_part(m_loading_files[m_loading_index], fn_name), false, false);
 			//Invalidate();
 		}
 

@@ -813,10 +813,6 @@ struct	NETWORK_INFO
 	CTime		GetFileLastAccessTime(CString sfile);
 	CString		GetMostRecentFile(CString sFolder, CString sWildCard = _T("*.*"), int nReturnType = 1);
 	CString		GetMostRecentDateFile(CString sFolder, CString sWildCard = _T("*.*"));	//가장 최근 날짜 파일명 리턴
-	CString		GetNextIndexFile(CString sCurrentFile, bool bNext = TRUE);	//다음 인덱스의 파일명 리턴
-	int			GetNextFileIndex(CString sCurrentFile);						//다음 파일의 인덱스 리턴
-	int			GetNumberFromFile(CString sfile);			//파일을 읽어서 한개의 숫자값을 리턴한다. (파일이 없으면 -99999 를 리턴한다.)
-	bool		WriteNumberToFile(CString sfile, int n);	//숫자값을 파일에 기록해준다.
 	CString		GetFileProperty(CString sFilePath, CString sProperty);
 	CString		set_file_property(CString sFilePath, CString sProperty, CString value);
 	size_t		read_raw(CString sfile, uint8_t *dst, size_t size);

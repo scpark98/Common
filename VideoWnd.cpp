@@ -948,7 +948,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		}
 	}
 
-	sExt = GetFileExtension(sfile).MakeLower();
+	sExt = get_part(sfile, fn_ext).MakeLower();
 
 	if ( sfile != "" )
 		m_nFileType = GetFileTypeFromExtension( sExt );
@@ -1023,7 +1023,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		if ( m_bSaveRecentFrame )
 		{
 			CString sRecentFile = AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("") );
-			if ( GetFileNameFromFullPath(sRecentFile).MakeLower() == GetFileNameFromFullPath(sfile).MakeLower() )
+			if (get_part(sRecentFile, fn_name).MakeLower() == get_part(sfile, fn_name).MakeLower() )
 			{
 				m_nCurrentFrame = AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("recent frame"), 0 );
 				DEFAULT_RANGE( m_nCurrentFrame, 0, m_nTotalFrame - 1, 0 );
@@ -1088,7 +1088,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		if ( m_bSaveRecentFrame )
 		{
 			CString sRecentFile = AfxGetApp()->GetProfileString(_T("setting\\video"), _T("recent file"), _T("") );
-			if ( GetFileNameFromFullPath(sRecentFile).MakeLower() == GetFileNameFromFullPath(sfile).MakeLower() )
+			if (get_part(sRecentFile, fn_name).MakeLower() == get_part(sfile, fn_name).MakeLower() )
 			{
 				m_nCurrentFrame = AfxGetApp()->GetProfileInt( _T("setting\\video"), _T("recent frame"), 0 );
 				DEFAULT_RANGE( m_nCurrentFrame, 0, m_nTotalFrame - 1, 0 );
@@ -2716,7 +2716,7 @@ void CVideoWnd::OnPopupMenu( UINT nID )
 void CVideoWnd::OpenSequenceImages( CString sfile )
 {
 	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent sequence image"), sfile );
-	BuildImageArray( sfile, GetFileExtension(sfile) );
+	BuildImageArray( sfile, get_part(sfile, fn_ext) );
 }
 
 void CVideoWnd::OnMenuROIReset()
@@ -2890,7 +2890,7 @@ void CVideoWnd::SaveAsDisplayedSize()
 		nIndex = m_nCurrentFrame;
 
 	if (IsVideoFileOpened())
-		sMediaFilename = GetFileNameFromFullPath(m_sVideoFileName);
+		sMediaFilename = get_part(m_sVideoFileName, fn_name);
 	else// if (m_bImageFromClipboard)
 		sMediaFilename = _T("snapshot");
 
@@ -2915,8 +2915,8 @@ void CVideoWnd::SaveAsDisplayedSize()
 	if ( bShiftKeyPressed || IsShiftPressed() )
 		ShellExecute( m_hWnd, _T("open"), fileDlg.GetPathName(), NULL, NULL, SW_SHOWNORMAL );
 
-	sRecentSavedFormat.Format( _T("*.%s"), GetFileExtension(fileDlg.GetPathName()) );
-	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved folder"), GetFolderNameFromFullPath(fileDlg.GetPathName()) );
+	sRecentSavedFormat.Format( _T("*.%s"), get_part(fileDlg.GetPathName(), fn_ext) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved folder"), get_part(fileDlg.GetPathName(), fn_folder) );
 	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved format"), sRecentSavedFormat );
 }
 
@@ -2933,7 +2933,7 @@ void CVideoWnd::SaveAsOriginalSize()
 		nIndex = m_nCurrentFrame;
 
 	if (IsVideoFileOpened())
-		sMediaFilename = GetFileNameFromFullPath(m_sVideoFileName);
+		sMediaFilename = get_part(m_sVideoFileName, fn_name);
 	else// if (m_bImageFromClipboard)
 		sMediaFilename = _T("snapshot");
 
@@ -2954,8 +2954,8 @@ void CVideoWnd::SaveAsOriginalSize()
 	if ( bShiftKeyPressed || IsShiftPressed() )
 		ShellExecute( m_hWnd, _T("open"), fileDlg.GetPathName(), NULL, NULL, SW_SHOWNORMAL );
 
-	sRecentSavedFormat.Format( _T("*.%s"), GetFileExtension(fileDlg.GetPathName()) );
-	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved folder"), GetFolderNameFromFullPath(fileDlg.GetPathName()) );
+	sRecentSavedFormat.Format( _T("*.%s"), get_part(fileDlg.GetPathName(), fn_ext) );
+	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved folder"), get_part(fileDlg.GetPathName(), fn_folder) );
 	AfxGetApp()->WriteProfileString( _T("setting\\video"), _T("recent saved format"), sRecentSavedFormat );
 }
 
@@ -3075,7 +3075,7 @@ void CVideoWnd::BuildImageArray(CString sfile, CString sExts)
 	}
 	else
 	{
-		sfolder = GetFolderNameFromFullPath(sfile);
+		sfolder = get_part(sfile, fn_folder);
 	}
 
 	FindAllFiles(sfolder, &m_dqImageFiles, _T("*"), sExts);
@@ -3125,7 +3125,7 @@ void CVideoWnd::build_file_list()
 		return;
 
 	m_dqFileList.clear();
-	FindAllFiles( GetFolderNameFromFullPath(m_sVideoFileName), &m_dqFileList, _T("*"), GetFileExtension(m_sVideoFileName) );
+	FindAllFiles(get_part(m_sVideoFileName, fn_folder), &m_dqFileList, _T("*"), get_part(m_sVideoFileName, fn_ext) );
 	std::sort( m_dqFileList.begin(), m_dqFileList.end() );
 }
 

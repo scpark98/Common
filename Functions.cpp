@@ -62,121 +62,6 @@ std::deque<CRect> g_dqMonitors;
 #pragma comment(lib, "version.lib")		//for VerQueryValue
 #pragma comment(lib, "comsuppw.lib ")	//for _bstr_t
 
-CString	GetNextIndexFile(CString sCurrentFile, bool bNext /* = TRUE */)
-{
-	if (sCurrentFile.GetLength() == 0)
-		return _T("");
-	
-	// Ex #1 :	Filename-cd1.avi
-	//			Filename-cd2.avi
-	// Ex #2 :	Filename-cd1-postfix.avi
-	//			Filename-cd2-postfix.avi
-	// Ex #3 :	다모 01 0728.avi
-	//			다모 02 0728.avi
-	
-	// 같은 폴더안에 존재하는 같은 확장자의 파일들을 나열하여 현재 항목의 다음 항목이
-	// 다음 인덱스일 가능성이 매우 높다.
-	// 단, 다음 인덱스의 파일이 존재한다는 가정하에서 찾는 함수이다.
-	// 다음 인덱스의 파일이 존재하지 않으면 ""을 리턴한다.
-	CString		sNextFile = _T("");
-	CString		extension = get_part(sCurrentFile, 3);
-	
-	int			i;
-	int			j;
-	int			nTotal = 0;
-	CString		filename;
-	CString		sFiles[1000];
-	CString		sTemp;
-	CString		sCurrentPath = sCurrentFile.Left(sCurrentFile.ReverseFind('\\'));
-	CFileFind	FileFind;
-	bool		bWorking;
-	
-	if (sCurrentPath.Right(1) != "\\")
-		sCurrentPath += "\\";
-	
-	bWorking = FileFind.FindFile(sCurrentPath + _T("*.") + extension);
-	
-	while (bWorking)
-	{
-		bWorking = FileFind.FindNextFile();
-		
-		if (!FileFind.IsDots() && !FileFind.IsDirectory())
-		{
-			filename = FileFind.GetFilePath();
-			if (get_part(filename, 3) == extension)
-				sFiles[nTotal++] = filename;
-		}
-	}
-	
-	if (nTotal < 2)
-		return _T("");
-	
-	for (i = 0; i < nTotal - 1; i++)
-		for (j = 0; j < nTotal - 1 - i; j++)
-		{
-			if (sFiles[j] > sFiles[j+1])
-			{
-				sTemp		= sFiles[j];
-				sFiles[j]	= sFiles[j+1];
-				sFiles[j+1]	= sTemp;
-			}
-		}
-		
-		if (bNext)
-		{
-			for (i = 0; i < nTotal; i++)
-			{
-				if ((i < nTotal - 1) &&									// 마지막 파일이 아니고
-					(sFiles[i] == sCurrentFile) &&							// 현재파일과 이름이 같고
-					(sFiles[i].GetLength() == sFiles[i+1].GetLength()))	// 현재파일과 길이가 같다면
-				{
-					int nDiffer = 0;
-					CString s1 = sFiles[i];
-					CString s2 = sFiles[i+1];
-					s1.MakeLower();
-					s2.MakeLower();
-					
-					for (int j = 0; j < s1.GetLength(); j++)
-					{
-						if (s1.GetAt(j) != s2.GetAt(j))
-							nDiffer++;
-					}
-					
-					if (nDiffer < 5)
-						return sFiles[i+1];
-				}
-			}
-		}
-		else
-		{
-			for (i = 0; i < nTotal; i++)
-			{
-				if ((i > 0) &&											// 처음 파일이 아니고
-					(sFiles[i] == sCurrentFile) &&						// 현재파일과 타이틀이 같고
-					(sFiles[i].GetLength() == sFiles[i-1].GetLength()))	// 현재파일과 길이가 같다면
-				{
-					int nDiffer = 0;
-					CString s1 = sFiles[i];
-					CString s2 = sFiles[i-1];
-					s1.MakeLower();
-					s2.MakeLower();
-					
-					for (int j = 0; j < s1.GetLength(); j++)
-					{
-						if (s1.GetAt(j) != s2.GetAt(j))
-							nDiffer++;
-					}
-					
-					if (nDiffer < 5)
-						return sFiles[i-1];
-				}
-			}
-		}
-		
-		return _T("");
-}
-
-
 CString	get_date_string(CTime t, CString sep)
 {
 	CString str;
@@ -687,7 +572,7 @@ CString	GetExeDirectory(bool includeSlash)
 	
 	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
 	
-	return get_part(sFilePath, 1);
+	return get_part(sFilePath, fn_folder);
 }
 
 CString GetExeRootDirectory()
@@ -706,14 +591,14 @@ CString		GetExeFilename(bool bFullPath /*= FALSE*/)
 	if (bFullPath)
 		sExeFile = sFilePath;
 	else
-		sExeFile = get_part(sFilePath, 4);
+		sExeFile = get_part(sFilePath, fn_name);
 	
 	return sExeFile;
 }
 
 CString		GetExeFileTitle()
 {
-	return get_part(GetExeFilename(false), 2);
+	return get_part(GetExeFilename(false), fn_title);
 }
 
 CString		GetCurrentDirectory()
@@ -819,7 +704,7 @@ CString	GetFileExtension(CString sFullPath, bool dot)
 
 int	GetFileTypeFromFilename(CString filename)
 {
-	return GetFileTypeFromExtension(get_part(filename, 3));
+	return GetFileTypeFromExtension(get_part(filename, fn_ext));
 }
 
 int	GetFileTypeFromExtension(CString sExt)
@@ -844,7 +729,7 @@ int	GetFileTypeFromExtension(CString sExt)
 //applyRealFile이 true이면 실제 파일명도 변경시킨다.
 bool ChangeExtension(CString& filepath, CString newExt, bool applyRealFile)
 {
-	CString sOldExt = get_part(filepath, 3);
+	CString sOldExt = get_part(filepath, fn_ext);
 	CString sNewFullPath = filepath.Left(filepath.GetLength() - sOldExt.GetLength()) + newExt;
 
 	bool changeSuccess = false;
@@ -889,7 +774,7 @@ std::deque<CString>	get_filelist_from_filetitle(CString folder, CString filetitl
 
 std::deque<CString> get_filelist_from_filetitle(CString filename, CString extension)
 {
-	return get_filelist_from_filetitle(get_part(filename, 1), get_part(filename, 2), extension);
+	return get_filelist_from_filetitle(get_part(filename, fn_folder), get_part(filename, fn_title), extension);
 }
 
 uint64_t get_file_size(CString sfile)
@@ -1177,7 +1062,7 @@ void GetURLFileInfo(CString sURL, bool &bInURL, bool &bFileType)
 	{
 		bInURL = TRUE;
 		
-		CString filename = get_part(sURL, 4);
+		CString filename = get_part(sURL, fn_name);
 		if (filename == "")
 			bFileType = FALSE;
 		else
@@ -2595,7 +2480,7 @@ void request_url(CRequestUrlParams* params)
 
 	if (!params->local_file_path.IsEmpty())
 	{
-		CString folder = get_part(params->local_file_path, 1);
+		CString folder = get_part(params->local_file_path, fn_folder);
 		make_full_directory(folder);
 	}
 
@@ -3417,7 +3302,7 @@ void	SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMi
 int			GetNextFileIndex(CString sCurrentFile)
 {
 	TCHAR	ch;
-	CString fileTitle = get_part(sCurrentFile, 2);
+	CString fileTitle = get_part(sCurrentFile, fn_title);
 	CString sIndex = _T("");
 
 	for (int i = fileTitle.GetLength() - 1; i >= 0; i--)
@@ -3466,9 +3351,9 @@ CString		GetMostRecentFile(CString sFolder, CString sWildCard /*= "*.*" */, int 
 	}
 	
 	if (nReturnType == 1)
-		return get_part(sMostRecentFile, 4);
+		return get_part(sMostRecentFile, fn_name);
 	else if (nReturnType == 2)
-		return get_part(sMostRecentFile, 2);
+		return get_part(sMostRecentFile, fn_title);
 	
 	return sMostRecentFile;
 }
@@ -4325,8 +4210,8 @@ void sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString
 	{
 		if (only_filename)
 		{
-			a = get_part(a, 4);
-			b = get_part(b, 4);
+			a = get_part(a, fn_name);
+			b = get_part(b, fn_name);
 		}
 		return !is_greater_with_numeric(a, b);
 	}
@@ -4400,7 +4285,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	{
 		bWorking = finder.FindNextFile();
 		sfile = finder.GetFilePath();
-		sFilename = get_part(sfile, 4).MakeLower();
+		sFilename = get_part(sfile, fn_name).MakeLower();
 		
 		if (finder.IsDots())
 			continue;
@@ -4421,7 +4306,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 			else
 			{
 				//예를들어 확장자 목록에 jpg가 있는데 파일명 중간에서 jpg가 발견되면 문제가 된다.
-				if (find_index(&dqExtFilter, get_part(sFilename, 3).MakeLower()) >= 0)
+				if (find_index(&dqExtFilter, get_part(sFilename, fn_ext).MakeLower()) >= 0)
 					bFound = true;
 				/*
 				for (i = 0; i < dqExtFilter.size(); i++)
@@ -4640,7 +4525,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				continue;
 
 			bool found = false;
-			filetitle = get_part(file, 2).MakeLower();
+			filetitle = get_part(file, fn_title).MakeLower();
 
 			if (name_filter.IsEmpty())
 			{
@@ -4682,7 +4567,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			{
 				for (i = 0; i < dq_ext.size(); i++)
 				{
-					if (get_part(file, 3).MakeLower() == dq_ext[i])
+					if (get_part(file, fn_ext).MakeLower() == dq_ext[i])
 					{
 						found = true;
 						break;
@@ -4723,7 +4608,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				continue;
 
 			bool found = false;
-			filetitle = get_part(file, 2).MakeLower();
+			filetitle = get_part(file, fn_title).MakeLower();
 
 			if (name_filter.IsEmpty())
 			{
@@ -4765,7 +4650,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 			{
 				for (i = 0; i < dq_ext.size(); i++)
 				{
-					if (get_part(file, 3).MakeLower() == dq_ext[i])
+					if (get_part(file, fn_ext).MakeLower() == dq_ext[i])
 					{
 						found = true;
 						break;
@@ -5139,7 +5024,7 @@ void DeleteFilesBySubString(CString sFolder, CString filenameSubStr, bool bMatch
 	{
 		bWorking = finder.FindNextFile();
 		sfile = finder.GetFilePath();
-		filename = get_part(sfile, 4);
+		filename = get_part(sfile, fn_name);
 
 		if (!bMatchCase)
 		{
@@ -9983,7 +9868,7 @@ CImage* capture_window(CRect r, CString filename)
 		t.GetYear(), t.GetMonth(), t.GetDay(),
 		t.GetHour(), t.GetMinute(), t.GetSecond());
 	*/
-	CString ext = get_part(filename, 3).MakeLower();
+	CString ext = get_part(filename, fn_ext).MakeLower();
 	GUID format = Gdiplus::ImageFormatJPEG;
 
 	if (ext == _T("bmp"))

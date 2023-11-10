@@ -30,6 +30,7 @@ public:
 	bool		create(HWND parentHwnd, CString text = _T(""), CRect rw = 0);
 
 	void		set_text(CString text, int font_size = -1, int font_angle = -1);
+	void		set_font_name(CString fontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void		set_font_size(int size);
 	void		set_font_angle(int angle);
 	void		set_font_color(COLORREF color);
@@ -37,9 +38,9 @@ public:
 	LOGFONT		m_lf;
 	CFont		m_font;
 	CString		m_text = _T("Watermark Test String");
-	int			m_font_size = 20;
+	int			m_font_size = 16;
 	int			m_font_angle = 20;
-	COLORREF	m_font_color = RGB(192, 192, 192);
+	COLORREF	m_font_color = RGB(128, 128, 128);
 
 protected:
 	BOOL RegisterWindowClass();

@@ -2,6 +2,7 @@
 
 #define MAX_THREAD 40
 
+//처리할 총 횟수, thread로 처리할 함수, thread가 끝나면 호출되는 함수
 void CThreadManager::job(int count, ThreadJobFunc thread_func, ThreadEndFunc end_func)
 {
 	int i;
@@ -11,6 +12,7 @@ void CThreadManager::job(int count, ThreadJobFunc thread_func, ThreadEndFunc end
 
 	thread_ended.clear();
 
+	//count에 따라 thread_num을 정해준다.
 	if (count <= 10)
 		thread_num = 5;
 	else if (count <= 100)
@@ -61,7 +63,7 @@ void CThreadManager::job(int count, ThreadJobFunc thread_func, ThreadEndFunc end
 		}
 	}
 
-	printf("%d threads start...\n", thread_num);
+	TRACE(_T("%d threads start...\n"), thread_num);
 
 	std::vector<std::thread> workers;
 

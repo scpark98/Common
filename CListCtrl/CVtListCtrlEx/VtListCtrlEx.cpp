@@ -182,6 +182,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	int			iItem		= (int)lpDIS->itemID;
 	int			iSubItem;
 	CDC			*pDC		= CDC::FromHandle(lpDIS->hDC);
+	int			nSavedDC	= pDC->SaveDC();
 	CRect		rowRect;
 	CRect		itemRect;
 	CRect		textRect;
@@ -295,13 +296,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else if (get_column_data_type(iSubItem) == column_data_type_progress)
 		{
-			pDC->FillSolidRect(itemRect, crBack);
+			//pDC->FillSolidRect(itemRect, crBack);
 
 			CRect r = itemRect;
 
 			//바그래프는 셀의 높이, 즉 라인 간격에 상대적이지 않고 폰트의 높이값에 비례하는 높이로 그려줘야 한다.
 			int cy = r.CenterPoint().y;
-			r.top = cy + (double)m_lf.lfHeight / 1.4;		//이 값을 키우면 바그래프의 높이가 낮아진다.
+			r.top = cy + (double)m_lf.lfHeight / 1.4 + 1;		//이 값을 키우면 바그래프의 높이가 낮아진다.
 			r.bottom = cy - (double)m_lf.lfHeight / 1.4;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
 
 			double d = _ttof(m_list_db[iItem].text[iSubItem]);
@@ -319,32 +320,45 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				CString sPercent = m_list_db[iItem].text[iSubItem] + _T("%");
 				pDC->SetTextColor(m_crProgressText);// m_crBack);
+#if 1
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-				/*
+
+				//for region test
+#elif 0
+				CRgn rgn;
+				CRect r = itemRect;
+				//r.DeflateRect(30, 10);
+				rgn.CreateRectRgnIndirect(&r);
+				int res = ::SelectClipRgn(pDC->GetSafeHdc(), (HRGN)rgn.GetSafeHandle());
+				ASSERT(res == SIMPLEREGION);
+				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
+				pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y + 4, sPercent);
+				rgn.DeleteObject();
+#else
 				CRect rcLeft, rcRight;
 				rcLeft = rcRight = itemRect;
 				rcRight.left = rcLeft.right = r.right;
 				
 				CRgn rgnLeft, rgnRight;
-				rgnLeft.CreateRectRgnIndirect(rcLeft);
-				rgnRight.CreateRectRgnIndirect(rcRight);
+				rgnLeft.CreateRectRgnIndirect(&rcLeft);
+				rgnRight.CreateRectRgnIndirect(&rcRight);
 
 				pDC->SetTextColor(RGB(255, 0, 0));// m_crBack);
 				pDC->SelectClipRgn(&rgnLeft);
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y - 8, sPercent);
+				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
 
 				//rgnRight.SetRectRgn(rcRight);
-				pDC->SetTextColor(RGB(255, 255, 0)); //m_crText);
+				pDC->SetTextColor(RGB(0, 0, 255)); //m_crText);
 				pDC->SelectClipRgn(&rgnRight);
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y - 8, sPercent);
+				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
 
 				rgnLeft.DeleteObject();
 				rgnRight.DeleteObject();
-
+#endif
 				pDC->SelectClipRgn(NULL);
-				*/
+				
 			}			
 		}
 		//텍스트 형태이면 문자열을 출력해준다.
@@ -428,6 +442,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			}
 		}
 	}
+
+	pDC->RestoreDC(nSavedDC);
 }
 
 // ex. "No,20;Item1,50;Item2,50"
@@ -646,7 +662,7 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 
 	Rect.left += Offset;
 	Rect.right = Rect.left + GetColumnWidth(subItem);
-	Rect.top += 2;
+	//Rect.top += 2;
 
 	return Rect;
 }

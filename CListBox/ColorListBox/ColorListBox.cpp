@@ -650,7 +650,7 @@ int CColorListBox::set_folder_list(std::deque<CString>* lists, CString selected_
 
 	for (int i = 0; i < m_folder_list.size(); i++)
 	{
-		add_string(GetFileNameFromFullPath(m_folder_list[i]));
+		add_string(get_part(m_folder_list[i], fn_name));
 	}
 
 	SelectString(-1, selected_text);

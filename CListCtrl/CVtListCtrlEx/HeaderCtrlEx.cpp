@@ -50,8 +50,8 @@ void CHeaderCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 LRESULT CHeaderCtrlEx::OnLayout(WPARAM, LPARAM lParam)
 {
 	LPHDLAYOUT pHL = reinterpret_cast<LPHDLAYOUT>(lParam);
-	if (pHL->prc == INVALID_HANDLE_VALUE ||
-		pHL->pwpos == INVALID_HANDLE_VALUE)
+	if (pHL->prc == NULL || pHL->prc == INVALID_HANDLE_VALUE ||
+		pHL->pwpos == NULL || pHL->pwpos == INVALID_HANDLE_VALUE)
 		return 0;
 
 	memcpy(&m_HDLayout, pHL, sizeof(HDLAYOUT));

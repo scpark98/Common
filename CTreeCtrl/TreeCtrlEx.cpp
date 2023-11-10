@@ -321,7 +321,7 @@ HTREEITEM CTreeCtrlEx::insert_special_folder(int csidl)
 		tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(csidl);
 		tvInsert.hInsertAfter = TVI_LAST;
 		tvInsert.hParent = NULL;
-		tvInsert.item.pszText = (LPWSTR)(LPCWSTR)text;
+		tvInsert.item.pszText = (LPTSTR)(LPCTSTR)text;
 		return InsertItem(&tvInsert);
 	}
 }
@@ -337,7 +337,7 @@ void CTreeCtrlEx::insert_drive(CString driveName)
 	//tvInsert.item.cChildren = TRUE;
 	tvInsert.hInsertAfter = TVI_LAST;
 	tvInsert.hParent = m_computerItem;
-	tvInsert.item.pszText = (LPWSTR)(LPCWSTR)driveName;
+	tvInsert.item.pszText = (LPTSTR)(LPCTSTR)driveName;
 	HTREEITEM hItem = InsertItem(&tvInsert);
 
 	insert_folder(hItem, real_path);
@@ -370,7 +370,7 @@ void CTreeCtrlEx::insert_folder(HTREEITEM hParent, CString sParentPath)
 			//tvInsert.item.cChildren = TRUE;
 			tvInsert.hInsertAfter = TVI_LAST;
 			tvInsert.hParent = hParent;
-			tvInsert.item.pszText = (LPWSTR)(LPCWSTR)curFolder;
+			tvInsert.item.pszText = (LPTSTR)(LPCTSTR)curFolder;
 			HTREEITEM hItem = InsertItem(&tvInsert);
 		}
 	}
@@ -590,7 +590,7 @@ std::deque<CTreeCtrlExFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEI
 		if (fullpath.IsEmpty())
 			folders.push_back(CTreeCtrlExFolder(item, fullpath, m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES)));
 		else
-			folders.push_back(CTreeCtrlExFolder(item, fullpath, GetFileNameFromFullPath(fullpath)));
+			folders.push_back(CTreeCtrlExFolder(item, fullpath, get_part(fullpath, fn_name)));
 		item = GetNextSiblingItem(item);
 	}
 

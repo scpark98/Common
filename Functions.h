@@ -60,8 +60,11 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #endif
 
 //20231101 opencv에 trace가 이미 정의되어 있어서 trace를 Trace로 변경함.
-#define Trace(fmt, ...) trace_output(__function__, __LINE__, fmt, ##__VA_ARGS__)
-#define Traceln(fmt, ...) trace_output_ln(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
+//매크로로 정의되어 그런지 간혹 비정상적으로 출력되는 현상이 있다.
+//일단, thread 내부에서 사용하면 오류가 발생하므로 절대 thread 내부에서는 사용하지 말것.
+//https://stackoverflow.com/questions/3211463/what-is-the-most-efficient-way-to-make-this-code-thread-safe
+#define Trace(fmt, ...) trace_output(__function__, __LINE__, false, fmt, ##__VA_ARGS__)
+#define Traceln(fmt, ...) trace_output(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
 #ifdef __GNUG__
 #include <cxxabi.h>
@@ -255,8 +258,7 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 }
 
 void printf_string(const char* psz, ...);
-void trace_output(TCHAR* func, int line, LPCTSTR format, ...);
-void trace_output_ln(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
+void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
 
 template < typename T > class AutoEraser
 {
@@ -640,9 +642,9 @@ struct	NETWORK_INFO
 	LPCWSTR		LPCTSTR2LPCWSTR(LPCTSTR str, UINT codePage = CP_UTF8);
 	WCHAR*		CString2WCHAR(CString str); //{ return (WCHAR*)(const WCHAR*)CStringW(str); }
 
-	//chStr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
-	//그렇지 않을 경우 chStr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.
-	CString		char2CString(char *chStr, int length = -1);
+	//cstr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
+	//그렇지 않을 경우 cstr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.
+	CString		char2CString(char *cstr, int length = -1);
 	CString		TCHAR2CString(TCHAR *str);
 	VARIANT		CString2VARIANT(CString str);
 

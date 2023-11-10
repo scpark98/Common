@@ -88,7 +88,7 @@ LRESULT CALLBACK WatermarkWndMessageProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 		HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
 		FillRect(hDC, rc, hBrush);
 
-		int x = -100;
+		int x = -200;
 		int y = 100;
 		int line_count = 0;
 
@@ -97,7 +97,7 @@ LRESULT CALLBACK WatermarkWndMessageProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 			if ((x < rc.right) && (y < rc.bottom + 200))
 				TextOut(hDC, x, y, g_pWnd->m_text, g_pWnd->m_text.GetLength());
 
-			x += 300;
+			x += 400;
 
 			//rc.right로 비교하면 안된다. fixed로 비교해야 함.
 			if (x > 2000)
@@ -108,9 +108,9 @@ LRESULT CALLBACK WatermarkWndMessageProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 				if (line_count % 2)
 					x = 10;
 				else
-					x = 10;
+					x = -200;
 
-				y += 200;
+				y += 300;
 			}
 
 			if (y > 1400)
@@ -160,6 +160,7 @@ bool CWatermarkWnd::create(HWND parentHwnd, CString text, CRect rw)
 	m_lf.lfWeight = FW_MEDIUM;
 	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
 	m_lf.lfEscapement = m_font_angle * 10;
+	m_lf.lfQuality = CLEARTYPE_QUALITY;
 
 	reconstruct_font();
 
@@ -195,6 +196,16 @@ void CWatermarkWnd::set_text(CString text, int font_size, int font_angle)
 	reconstruct_font();
 }
 
+void CWatermarkWnd::set_font_name(CString fontname, BYTE byCharSet)
+{
+	if (fontname == _T(""))
+		return;
+
+	m_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), fontname);
+	reconstruct_font();
+}
+
 void CWatermarkWnd::set_font_size(int font_size)
 {
 	if (font_size >= 0)
@@ -215,4 +226,5 @@ void CWatermarkWnd::set_font_color(COLORREF color)
 {
 	m_font_color = color;
 	Invalidate();
+	//RedrawWindow();
 }

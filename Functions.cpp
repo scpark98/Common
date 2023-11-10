@@ -855,8 +855,6 @@ CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, b
 	CString size_str;
 	CString unit_str[9] = { _T("Bytes"), _T("KB"), _T("MB"), _T("GB"), _T("TB"), _T("PB"), _T("EB"), _T("ZB"), _T("YB") };
 
-	int i;
-
 	if (unit >= 0)
 	{
 		for (int i = 0; i < unit; i++)
@@ -2430,7 +2428,7 @@ void request_url(CRequestUrlParams* params)
 	}
 
 	DWORD buffer_size = 1024 * 1024;
-	DWORD dwSize, dwRead, dwWritten, dwTotalSize = 0;
+	DWORD dwRead, dwWritten, dwTotalSize = 0;
 	char* buffer = new char[buffer_size];
 	char* total_buffer = NULL;
 	TCHAR query_buffer[32] = { 0, };
@@ -8285,29 +8283,30 @@ std::string CString2string(CString str)
 //
 // Char → CString
 //
-CString char2CString(char* chStr, int length)
+CString char2CString(char* cstr, int length)
 {
 	CString str;
 
 #if defined(UNICODE) || defined(_UNICODE)
 	//length가 -1인 경우, 즉 길이를 특별히 지정하지 않았고
-	//chStr이 '\0'문자로 끝나는 온전한 값이라면
-	//unicode에서 str = (CString)chStr; 로도 정상 동작한다. 예외가 있는지 확인 필요!
+	//cstr이 '\0'문자로 끝나는 온전한 값이라면
+	//unicode에서 str = CString(cstr); 로도 정상 동작한다. 예외가 있는지 확인 필요!
 
 	int len;
-	BSTR buf;
+	//BSTR buf;
+	TCHAR* buf;
 
 	if (length < 0)
-		len = MultiByteToWideChar(CP_ACP, 0, chStr, strlen(chStr), NULL, NULL);
+		len = MultiByteToWideChar(CP_ACP, 0, cstr, strlen(cstr), NULL, NULL);
 	else
 		len = length;
 
 	buf = SysAllocStringLen(NULL, len);
-	MultiByteToWideChar(CP_ACP, 0, chStr, len, buf, len);
+	MultiByteToWideChar(CP_ACP, 0, cstr, len, buf, len);
 
 	str.Format(_T("%s"), buf);
 #else
-	str.Format("%s", chStr);
+	str.Format("%s", cstr);
 #endif
 	return str;
 }
@@ -13887,12 +13886,7 @@ void printf_string(const char* psz, ...)
 	TRACE(buffer);
 }
 
-void trace_output(TCHAR* func, int line, LPCTSTR format, ...)
-{
-	trace_output_ln(func, line, true, format);
-}
-
-void trace_output_ln(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
+void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);

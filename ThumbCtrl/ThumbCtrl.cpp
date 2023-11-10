@@ -364,7 +364,7 @@ void CThumbCtrl::loading_function(int idx, int start, int end)
 		str.Format(_T("%d job started..."), start);
 	else
 		str.Format(_T("%d ~ %d job started..."), start, end - 1);
-	TRACE(_T("%s\n"), str);
+	Trace(_T("%s\n"), str);
 
 	for (i = start; i < end; i++)
 	{
@@ -386,7 +386,7 @@ void CThumbCtrl::loading_function(int idx, int start, int end)
 		str.Format(_T("job completed : %d"), start);
 	else
 		str.Format(_T("job completed : %d ~ %d"), start, end - 1);
-	TRACE(_T("%s\n"), str);
+	Trace(_T("%s\n"), str);
 
 	mtx.lock();
 	pWnd->m_thread.thread_ended.push_back(idx);
@@ -422,6 +422,13 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 	thumb.img = loadMat(full_path);
 #else
 	thumb.img = new CGdiplusBitmap();
+
+	if (!thumb.img)
+	{
+		Trace(_T("index = %d, can't allocate memory.\n"), index);
+		return -1;
+	}
+
 	thumb.img->load(full_path);
 #endif
 	thumb.width = thumb.img->width;

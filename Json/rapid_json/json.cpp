@@ -2,9 +2,9 @@
 
 #include <sys/stat.h>
 #include <fstream>
-#include "filereadstream.h"
-#include "filewritestream.h"
-#include "prettywriter.h"
+#include "include/filereadstream.h"
+#include "include/filewritestream.h"
+#include "include/prettywriter.h"
 
 using std::string;
 using rapidjson::Document;

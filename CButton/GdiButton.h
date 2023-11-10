@@ -199,6 +199,8 @@ public:
 	void		SetBlink( BOOL bBlink = TRUE );
 
 	void		use_tooltip(bool use) { m_use_tooltip = use; }
+	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.
+	//따라서 tooltip은 가능한 한 main에서 처리하도록 한다.
 	void		set_tooltip_text(CString text);
 
 	std::deque<CButtonImage*> m_image;

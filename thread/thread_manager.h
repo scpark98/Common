@@ -51,6 +51,7 @@
 	}
 */
 
+#include <afxwin.h>
 #include <thread>
 #include <vector>
 
@@ -62,6 +63,7 @@ class CThreadManager
 public:
 	CThreadManager() {};
 
+	//처리할 총 횟수, thread로 처리할 함수, thread가 끝나면 호출되는 함수
 	void job(int count, ThreadJobFunc thread_func, ThreadEndFunc end_func);
 	std::vector<int> thread_ended;
 };

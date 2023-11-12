@@ -347,6 +347,11 @@ COLORREF	get_color(COLORREF crOrigin, int nOffset);
 //두 색의 중간 비율 색상값을 구한다. (ratio가 0.0이면 cr1이, 1.0이면 cr2가 리턴된다.)
 COLORREF	get_color(COLORREF cr1, COLORREF cr2, double ratio);
 
+//"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
+COLORREF	get_color(CString cr);
+//컬러값을 "FF0000"과 같은 문자열로 리턴한다.
+CString		get_color_string(COLORREF cr);
+
 uint8_t		gray_value(uint8_t r, uint8_t g, uint8_t b);
 uint8_t		gray_value(COLORREF cr);
 COLORREF	gray_color(COLORREF cr);

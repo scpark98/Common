@@ -355,8 +355,8 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 		//추가된 필터들이 연결은 되지만 또 다른 파일 소스 필터가 추가되어 재생된다.
 		//따라서 m_SourceBase의 OUT_PIN을 찾아서 수동으로 렌더시켜준다.
 		//hr = m_pGB->RenderFile(wFileName, NULL);
-
 		hr = RenderOutputPins(m_pGB, m_SourceBase);
+
 		if (is_windows_media())
 			analyze_stream(m_SourceBase);
 		else
@@ -1646,7 +1646,7 @@ int CDShow::subtitle_font_enlarge(int enlarge)
 
 	Clamp(m_subCfg.font_size, 10, 100);
 
-	m_subCfg.lf->lfHeight = get_logical_size_from_font_size(m_pParentDC->m_hDC, m_subCfg.font_size);
+	m_subCfg.lf->lfHeight = get_logical_size_from_font_size(m_pParent->m_hWnd, m_subCfg.font_size);
 	update_osd_subtitle();
 
 	return m_subCfg.font_size;

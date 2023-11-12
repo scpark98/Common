@@ -240,6 +240,8 @@ public:
 	//지우기 전 확인창은 호출루틴에서 처리해야 함
 	void		delete_selected_items();
 	void		delete_item(int index);
+	//라인 전체가 공백이면 해당 라인을 삭제한다.
+	void		delete_empty_lines();
 	void		delete_all_items(bool delete_file_list = true);
 	void		DeleteAllItems() { delete_all_items(); }
 
@@ -332,6 +334,7 @@ public:
 //폰트 관련. 반드시 set_headings() 후에 호출할것.
 	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	//-1 : reduce, +1 : enlarge
+	int		get_font_size();
 	//반드시 set_headings() 후에 호출할것.
 	void	set_font_size(int font_size);
 	void	enlarge_font_size(bool enlarge);

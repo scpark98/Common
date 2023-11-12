@@ -2791,7 +2791,7 @@ LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
 }
 
 //#ifndef _USING_V110_SDK71_
-LONG GetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value)
+LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value)
 {
 	HKEY	hkey = NULL;
 	LONG 	nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
@@ -2846,7 +2846,7 @@ LONG GetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value
 	return nError;
 }
 
-LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
+LONG get_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
 {
 	HKEY	hkey = NULL;
 	DWORD	dwType = REG_SZ;
@@ -2901,7 +2901,7 @@ LONG GetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString *s
 	return nError;
 }
 
-LONG SetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
+LONG set_registry_int(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
 {
 	HKEY	hkey;
 	DWORD	dwDesc;
@@ -2920,7 +2920,7 @@ LONG SetRegistryInt(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
 	return lResult;
 }
 
-LONG SetRegistryString(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
+LONG set_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
 {
 	HKEY	hkey;
 	LONG	lResult;

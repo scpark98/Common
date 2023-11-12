@@ -624,6 +624,9 @@ void CVtListCtrlEx::save_column_width(CWinApp* pApp, CString sSection)
 	int		i;
 	CString str;
 
+	if (!m_HeaderCtrlEx || !m_HeaderCtrlEx.m_hWnd)
+		return;
+
 	for (i = 0; i < m_HeaderCtrlEx.GetItemCount(); i++)
 	{
 		pApp->WriteProfileInt(sSection + _T("\\column width"), i2S(i), GetColumnWidth(i));
@@ -1756,6 +1759,18 @@ void CVtListCtrlEx::delete_item(int index)
 	SetItemCount(m_list_db.size());
 }
 
+void CVtListCtrlEx::delete_empty_lines()
+{
+	CString line_text;
+
+	for (int i = size() - 1; i >= 0; i--)
+	{
+		line_text = get_line_text(i, 0, -1, _T(""));
+		if (line_text.IsEmpty())
+			delete_item(i);
+	}
+}
+
 void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 {
 	CListCtrl::DeleteAllItems();
@@ -2406,13 +2421,19 @@ void CVtListCtrlEx::reconstruct_font()
 	if (m_HeaderCtrlEx)
 		m_HeaderCtrlEx.SetFont(&m_font, true);
 
-	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	m_font_size = get_font_size();
 	
 	//set_line_height(4-m_lf.lfHeight);
 	//if (m_auto_line_height)
 		//recalculate_line_height();k
 	
 	ASSERT(bCreated);
+}
+
+int CVtListCtrlEx::get_font_size()
+{
+	m_font_size = -MulDiv(m_lf.lfHeight, 72, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY));
+	return m_font_size;
 }
 
 //-1 : reduce, +1 : enlarge

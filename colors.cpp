@@ -79,6 +79,26 @@ COLORREF get_color(COLORREF cr1, COLORREF cr2, double ratio)
 	return RGB(r, g, b);
 }
 
+//"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
+COLORREF	get_color(CString cr)
+{
+	COLORREF color;
+	if ((color = _tcstol(cr, NULL, 16)) == 0)
+		color = 0x00ffffff;  // default is white
+	else
+		color = rgb_bgr(color);
+
+	return color;
+}
+
+//컬러값을 "FF0000"과 같은 문자열로 리턴한다.
+CString		get_color_string(COLORREF cr)
+{
+	CString str;
+	str.Format(_T("%02x%02x%02x"), GetRValue(cr), GetGValue(cr), GetBValue(cr));
+	return str;
+}
+
 //gray = (2989 * r + 5870 * g + 1140 * b) / 10000; 
 //=>0.2989 * 2^14 = 4897.1776; 
 //출처: http://kipl.tistory.com/80 [Geometry & Recognition]

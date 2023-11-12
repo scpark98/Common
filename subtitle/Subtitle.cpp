@@ -10,19 +10,6 @@ CSubtitle::CSubtitle()
 	reset();
 }
 
-CStringW UTF8toUTF16(const CStringA& utf8)
-{
-	CStringW utf16;
-	int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
-	if (len>1)
-	{ 
-		wchar_t *ptr = utf16.GetBuffer(len-1);
-		if (ptr) MultiByteToWideChar(CP_UTF8, 0, utf8, -1, ptr, len);
-		utf16.ReleaseBuffer();
-	}
-	return utf16;
-}
-
 bool CSubtitle::load_smi(CString sfile)
 {
 	char chLine[1024];
@@ -336,7 +323,7 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 	if (m_fp)
 		fclose(m_fp);
 
-	if (text_encoding <= text_ansi)
+	if (text_encoding <= text_encoding_ansi)
 	{
 		m_fp = _tfopen(sfile, _T("rt"));
 		m_unicode = false;
@@ -351,7 +338,7 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 		return false;
 
 
-	CString ext = GetFileExtensionFromFilename(sfile);
+	CString ext = get_part(sfile, fn_ext);
 	ext.MakeLower();
 
 	if (ext == _T("smi"))
@@ -516,7 +503,7 @@ bool CSubtitle::save_subtitle_file(CString sfile)
 	else
 		m_sfile = sfile;
 
-	CString ext = GetFileExtensionFromFilename(m_sfile);
+	CString ext = get_part(m_sfile, fn_ext);
 	ext.MakeLower();
 
 	if (ext == _T("smi"))

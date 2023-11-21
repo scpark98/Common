@@ -182,7 +182,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	int			iItem		= (int)lpDIS->itemID;
 	int			iSubItem;
 	CDC			*pDC		= CDC::FromHandle(lpDIS->hDC);
-	int			nSavedDC	= pDC->SaveDC();
+	//int			nSavedDC	= pDC->SaveDC();
 	CRect		rowRect;
 	CRect		itemRect;
 	CRect		textRect;
@@ -443,7 +443,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	pDC->RestoreDC(nSavedDC);
+	//pDC->RestoreDC(nSavedDC);
 }
 
 // ex. "No,20;Item1,50;Item2,50"

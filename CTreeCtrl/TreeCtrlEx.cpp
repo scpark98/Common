@@ -590,7 +590,7 @@ std::deque<CTreeCtrlExFolder> CTreeCtrlEx::iterate_tree_with_no_recursion(HTREEI
 		if (fullpath.IsEmpty())
 			folders.push_back(CTreeCtrlExFolder(item, fullpath, m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES)));
 		else
-			folders.push_back(CTreeCtrlExFolder(item, fullpath, get_part(fullpath, fn_name)));
+			folders.push_back(CTreeCtrlExFolder(item, fullpath, get_part(fullpath, fn_last_folder)));
 		item = GetNextSiblingItem(item);
 	}
 

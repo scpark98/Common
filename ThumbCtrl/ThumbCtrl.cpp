@@ -240,7 +240,9 @@ void CThumbCtrl::OnPaint()
 		return;
 	}
 
+	long t0 = clock();
 	draw_function(&dc, true);
+	TRACE(_T("	draw_function(&dc, true) = %ld\n"), clock() - t0);
 }
 
 
@@ -565,10 +567,14 @@ void CThumbCtrl::set_scroll_pos(int pos)
 
 void CThumbCtrl::recalculate_scroll_size()
 {
+	TRACE(_T("%s\n"), __function__);
+
 	CRect	rc;
 	GetClientRect(rc);
 
+	long t0 = clock();
 	draw_function(NULL, false);
+	TRACE(_T("draw_function(NULL, false) = %ld\n"), clock() - t0);
 
 	if (m_dqThumb.size() == 0)
 		return;
@@ -1040,19 +1046,24 @@ void CThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//커서가 스크롤바 영역 근처에 가면 스크롤바를 나타나게 한다.
 	else if (point.x >= m_rScroll.left - m_szMargin.cx)
 	{
-		m_scroll_trans = 0.0;
-		m_crScroll = m_crTitle;
-		InvalidateRect(m_rScroll);
+		if (m_scroll_trans == 1.0)
+		{
+			TRACE(_T("show scroll\n"));
+			m_scroll_trans = 0.0;
+			m_crScroll = m_crTitle;
+			InvalidateRect(m_rScroll);
+		}
 	}
 	//나타날때는 바로, 사라질때는 fade out된다.
 	else if (m_scroll_trans == 0.0)
 	{
+		TRACE(_T("hide scroll\n"));
 		m_scroll_trans = 1.0;
 		InvalidateRect(m_rScroll);
 		//SetTimer(timer_scroll_bar_disappear, 1, NULL);
 	}
 
-	CWnd::OnMouseMove(nFlags, point);
+	//CWnd::OnMouseMove(nFlags, point);
 }
 
 

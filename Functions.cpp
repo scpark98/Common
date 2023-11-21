@@ -614,7 +614,10 @@ CString		GetCurrentDirectory()
 //_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 //"c:"		"\\abc/def\\"		"123"		".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
 //"c:\\"	"c:\\abc/def"		"123"		"txt"	"123.txt"와 같이 보정한다.
-//part : fn_drive(drive), fn_folder(drive+folder), fn_title(filetitle), fn_ext(ext), fn_name(filename)
+//part : fn_drive(drive), fn_folder(drive+folder), fn_last_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
+//만약 path가 "d:\\aaa\\b.abc"이고 b.abc가 파일이 아닌 폴더라면 문제된다.
+//또는 path가 "d:\\aaa\\ccc"인데 폴더가 아닌 파일일수도 있다.
+//파일인지 폴더인지를 구분해서 처리하는 코드는 필수다.(실제 존재하는 경우에만 검사가 가능하다)
 CString		get_part(CString path, int part)
 {
 	TCHAR tDrive[_MAX_DRIVE] = { 0, };
@@ -623,7 +626,7 @@ CString		get_part(CString path, int part)
 	TCHAR tExt[_MAX_EXT] = { 0, };
 	_tsplitpath(path, tDrive, tDir, tFname, tExt);
 
-	CString parts[5] = { tDrive, tDir, tFname, tExt, };
+	CString parts[6] = { tDrive, tDir, _T(""), tFname, tExt, };
 
 	//확장자를 포함한 파일명
 	parts[fn_name] = parts[fn_title] + parts[fn_ext];
@@ -637,6 +640,29 @@ CString		get_part(CString path, int part)
 
 	//확장자는 .을 제외시킨다. parts[3]가 ""이어도 .Mid(1)은 에러가 발생하지는 않는다.
 	parts[fn_ext] = parts[fn_ext].Mid(1);
+
+	//path가 b.abc와 같이 파일명처럼 되어 있지만 파일이 아닌 folder일 경우의 처리(실제 존재할 경우에만 가능)
+	if (PathFileExists(path))
+	{
+		if (PathIsDirectory(path))
+		{
+			//해당 경로가 디렉토리이고 part == fn_name이라고 넘어왔다면
+			//이는 실제로는 fn_last_folder를 요청하는 것으로 봐야 한다.
+			//또는 호출하는 곳에서 미리 판별하여 요청할 수도 있다.
+			//파일이면 fn_name을 요청하고 폴더이면 fn_last_folder를 요청해야 한다.
+			part = fn_last_folder;
+			parts[fn_last_folder] = parts[fn_name];
+			parts[fn_folder] = parts[fn_folder] + _T("\\") + parts[fn_name];
+			parts[fn_title] = parts[fn_ext] = parts[fn_name] = _T("");
+		}
+	}
+	else
+	{
+		//"바탕 화면"과 같이 가상 경로일 경우는 fn_title과 fn_name만 이 값으로 채워지므로
+		//폴더이름에도 이 값을 넣어 사용한다.
+		if (parts[fn_drive].IsEmpty() && parts[fn_folder].IsEmpty() && !parts[fn_name].IsEmpty())
+			parts[fn_folder] = parts[fn_last_folder] = parts[fn_name];
+	}
 
 	return parts[part];
 }
@@ -8280,9 +8306,9 @@ std::string CString2string(CString str)
 	return stdStr;
 }
 
-//
-// Char → CString
-//
+//cstr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
+//그렇지 않을 경우 cstr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.
+//cstr이 '\0'로 끝난다면 유니코드, 멀티바이트 환경에서 CString str = cstr;로 정상 처리된다.
 CString char2CString(char* cstr, int length)
 {
 	CString str;
@@ -9180,11 +9206,17 @@ void combination(std::vector<TCHAR> src, CString temp, std::vector<CString> &res
 		return;
 	}
 
-	for (int i = 0; i < src.size(); i++)
+	//for (int i = 0; i < src.size(); i++)
+	//{
+	//	temp.SetAt(depth-1, src[i]);
+	//	combination(src, temp, result, depth - 1);
+	//}
+	for (auto& ch : src)//int i = 0; i < src.size(); i++)
 	{
-		temp.SetAt(depth-1, src[i]);
+		temp.SetAt(depth - 1, ch);
 		combination(src, temp, result, depth - 1);
 	}
+
 }
 
 //대각 각도로 수평, 수직 화각을 수학적으로 계산한다.
@@ -9333,8 +9365,9 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 					return hProcess;
 				}
 			}
+
+			CloseHandle(hProcess);
 		}
-		CloseHandle(hProcess);
 	} while (Process32Next(hProcessSnapshot, &pe32));
 
 	CloseHandle(hProcessSnapshot);
@@ -9392,9 +9425,11 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 				//자기 자신은 제외하고...
 				if (pe.th32ProcessID != GetCurrentProcessId())
 				{
-					if (OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID) != NULL)
+					HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID);
+					if (hProcess != NULL)
 					{
 						hWnd = GetHWNDbyPID(pe.th32ProcessID);
+						CloseHandle(hProcess);
 						//hWnd = GetWindowHandleFromProcessID(pe.th32ProcessID);
 						break;
 					}
@@ -9417,33 +9452,51 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 }
 
 //<응용 - 프로세스가 실행 중인지를 체크>
-bool IsRunning(CString processname)
+int get_process_running_count(CString processname)
 {
 	HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-
 	PROCESSENTRY32 pe32 = { 0, };
-
 	pe32.dwSize = sizeof(PROCESSENTRY32);
 
 	if (!Process32First(hProcessSnap, &pe32))
-
 	{
 		OutputDebugString(_T("Error checking process"));
 		CloseHandle(hProcessSnap);
-		return false;
+		return 0;
 	}
 
-	do {
-		if (StrCmp(pe32.szExeFile, processname) == 0)
+	int running_count = 0;
+	TCHAR sFilePath[1024] = { 0, };
 
-			return true; // 실행중이면 True를 반환
+	do
+	{
+		if (pe32.th32ProcessID != 0)
+		{
+			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+			if (hProcess)
+			{
+				//processname이 전체 경로라면 fullpath로 비교하고
+				if (PathFileExists(processname))
+				{
+					::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				}
+				//실행파일명만 있다면 exe 파일명만 비교한다.
+				else
+				{
+					_tcscpy(sFilePath, pe32.szExeFile);
+				}
 
+				if (_tcsicmp(sFilePath, processname) == 0)
+					running_count++;
+
+				CloseHandle(hProcess);
+			}
+		}
 	} while (Process32Next(hProcessSnap, &pe32));
-
 
 	CloseHandle(hProcessSnap);
 
-	return false; //실행중이 아니면 False를 반환
+	return running_count; //실행중이 아니면 False를 반환
 } 
 
 bool KillProcess(CString szFilename)
@@ -10816,7 +10869,7 @@ CRect GetRatioRect(CRect rTarget, double dRatio, int attach)
 }
 
 //주어진 점들을 포함하는 최대 사각형을 구한다.
-CRect get_max_rect(CPoint	*pt, int nPoints)
+CRect get_max_rect(CPoint *pt, int nPoints)
 {
 	std::vector<CPoint> pts;
 	for (int i = 0; i < nPoints; i++)

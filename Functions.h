@@ -454,7 +454,10 @@ struct	NETWORK_INFO
 #ifndef _USING_V110_SDK71_
 	CString		GetProcessNameByPID(const DWORD pid);
 #endif
-	bool		IsRunning(CString processname);
+	//해당 프로세스 파일이 실행중인 인스턴스 카운트를 리턴.
+	//실행 파일명만 주면 파일명만 비교하지만 전체 경로를 주면 경로까지 맞아야 카운트 됨.
+	//ex. 풀패스인 c:\test.exe를 주면 d:\test.exe는 실행중이라도 카운트되지 않는다.
+	int			get_process_running_count(CString processname);
 	
 	bool		KillProcess(CString processname);
 	//프로세스 강제 종료.
@@ -644,6 +647,7 @@ struct	NETWORK_INFO
 
 	//cstr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
 	//그렇지 않을 경우 cstr의 끝에 '\0'가 없을 경우 쓰레기 문자들까지 포함될 수 있다.
+	//cstr이 '\0'로 끝난다면 유니코드, 멀티바이트 환경에서 CString str = cstr;로 정상 처리된다.
 	CString		char2CString(char *cstr, int length = -1);
 	CString		TCHAR2CString(TCHAR *str);
 	VARIANT		CString2VARIANT(CString str);
@@ -779,12 +783,15 @@ struct	NETWORK_INFO
 	//_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 	//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
 	//"c:\\", "c:\\abc/def", "123", "txt", "123.txt와 같이 보정한다.
-	//part : fn_drive(drive), fn_folder(drive+folder), fn_title(filetitle), fn_ext(ext), fn_name(filename)
+	//part : fn_drive(drive), fn_folder(drive+folder), fn_last_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
+	//만약 path가 "d:\\aaa\\b.abc"이고 b.abc가 파일이 아닌 폴더라면 문제된다.
+	//파일인지 폴더인지를 구분해서 처리하는 코드는 필수다.(실제 존재하는 경우에만 검사가 가능하다)
 	CString		get_part(CString path, int part);
 	enum FILENAME_PART
 	{
 		fn_drive,
 		fn_folder,
+		fn_last_folder,
 		fn_title,
 		fn_ext,
 		fn_name,

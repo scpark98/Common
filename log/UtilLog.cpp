@@ -190,7 +190,7 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
 					funcName, line, log_text);
 				_ftprintf(m_fp, _T("%s\n"), result);
-				TRACE(_T("%s"), result);
+				TRACE(_T("%s\n"), result);
 			}
 			fflush(m_fp);
 		}

@@ -559,6 +559,8 @@ void processImage(const Mat& inputImage, Mat& outputImage);
 void Sepia( Mat& mat, int magnitude = 75 );
 Mat	 milky_white( Mat src, int blurSize, int level );
 
+void removeShadow(cv::Mat const& src, cv::Mat& result1_diff_img, cv::Mat& result2_norm_img);
+
 //mat이미지를 w x h 크기로 채운다.
 void resizeGrid( Mat& mat, int width, int height );
 

@@ -305,13 +305,14 @@ void CVideoWnd::OnPaint()
 
 		if ( m_bShowVanishingPoint )//&& (m_ptVanishingPoint != CPoint(0,0)) )
 		{
-			CPoint pt = m_ptVanishingPoint;
-			GetScreenPosFromRealPos( m_rDisplayedImageRect, m_mat.cols, &pt );
+			CPoint pt;
+			get_screen_coord_from_real_coord( m_rDisplayedImageRect, m_mat.cols, m_ptVanishingPoint, &pt);
 			DrawLine( &dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, yellow, 1, PS_DASH );
 			DrawLine( &dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, yellow, 1, PS_DASH );
 		}
 
 		//설정중인 ROI 사각형 표시
+		TRACE(_T("%s\n"), get_rect_info_string(m_rScreenROI, 2));
 		DrawRectangle( &dc, m_rScreenROI, red, NULL_BRUSH, 2 );
 
 		dc.SetBkMode( TRANSPARENT );
@@ -330,7 +331,7 @@ void CVideoWnd::OnPaint()
 			COLORREF crText2 = RGB(0, 255, 0);
 			COLORREF crShadow = RGB( 64, 64,  64);
 			//ConvertCoordinateScreen2Image( r );
-			GetRealPosFromScreenPos(m_rDisplayedImageRect, m_mat.cols, &r);
+			get_real_coord_from_screen_coord(m_rDisplayedImageRect, m_mat.cols, m_rSizeInfo, &r);
 			r.OffsetRect( m_rImageROI.TopLeft() );
 			DrawRectangle( &dc, m_rSizeInfo, crText1, NULL_BRUSH, 1, PS_DASH, R2_XORPEN );
 
@@ -443,8 +444,8 @@ void CVideoWnd::OnLButtonDown(UINT nFlags, CPoint point)
 	//shift + LButton = 소실점 설정 임시 기능
 	if ( IsShiftPressed() || IsCtrlPressed() )
 	{
-		GetRealPosFromScreenPos( m_rDisplayedImageRect, m_mat.cols, &point );
-		m_ptVanishingPoint = point;
+		get_real_coord_from_screen_coord( m_rDisplayedImageRect, m_mat.cols, point, &m_ptVanishingPoint);
+
 		if ( m_hParentWnd && m_bSendPlayWndInfo )
 			::SendMessage( m_hParentWnd, message_video_wnd_vanishingpoint_changed, m_nVideoWndID, 0 );
 
@@ -486,13 +487,11 @@ void CVideoWnd::OnLButtonDown(UINT nFlags, CPoint point)
 									m_ptVanishingPointClicked[2].x, m_ptVanishingPointClicked[2].y,
 									m_ptVanishingPointClicked[3].x, m_ptVanishingPointClicked[3].y, isx, isy );
 			CString str;
-			CPoint vp = CPoint(isx, isy);
-			GetRealPosFromScreenPos(m_rDisplayedImageRect, m_mat.cols, &vp);
-			m_ptVanishingPoint = vp;
+			get_real_coord_from_screen_coord(m_rDisplayedImageRect, m_mat.cols, CPoint(isx, isy), &m_ptVanishingPoint);
 			if ( m_hParentWnd && m_bSendPlayWndInfo )
 				::SendMessage( m_hParentWnd, message_video_wnd_vanishingpoint_changed, m_nVideoWndID, 0 );
 
-			str.Format(_T("vanishing point = %d, %d"), vp.x, vp.y );
+			str.Format(_T("vanishing point = %d, %d"), m_ptVanishingPoint.x, m_ptVanishingPoint.y );
 			AfxMessageBox( str );
 			//m_nVanishingPointCount = 0;
 			//Invalidate();
@@ -638,9 +637,7 @@ void CVideoWnd::OnLButtonUp(UINT nFlags, CPoint point)
 	if ( m_rScreenROI.IsRectEmpty() )
 		return;
 
-	m_rImageROI = m_rScreenROI;
-	//ConvertCoordinateScreen2Image( m_rImageROI );
-	GetRealPosFromScreenPos(m_rDisplayedImageRect, m_mat.cols, &m_rImageROI);
+	get_real_coord_from_screen_coord(m_rDisplayedImageRect, m_mat.cols, m_rScreenROI, &m_rImageROI);
 
 	//ROI가 설정되면 ROI 영역이 zoom되서 전체 영상으로 표시되므로
 	//화면상의 ROI 좌표정보는 초기화시켜야 한다.
@@ -693,8 +690,8 @@ void CVideoWnd::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: Add your message handler code here and/or call default
 	if ( IsVideoFileOpened() )
 	{
-		CPoint ptOnRealImage = point;
-		GetRealPosFromScreenPos(m_rDisplayedImageRect, m_mat.cols, &ptOnRealImage);
+		CPoint ptOnRealImage;
+		get_real_coord_from_screen_coord(m_rDisplayedImageRect, m_mat.cols, point, &ptOnRealImage);
 		CMouseEvent me( ptOnRealImage, WM_MOUSEMOVE );
 		::SendMessage( m_hParentWnd, message_video_wnd_mouse_event, m_nVideoWndID, (LPARAM)&me );
 	}
@@ -2764,7 +2761,7 @@ void CVideoWnd::CopyToClipboard()
 	//일그러진 이미지가 클립보드로 복사된다.
 	//일단 CImage로 변경하여 이 문제를 해결했다.
 	CImage img;
-	matToCImage( m_mat, img );
+	matToCImage(m_mat, img);
 
 	CDC memDC;
 	memDC.CreateCompatibleDC(NULL);

@@ -878,6 +878,7 @@ struct	NETWORK_INFO
 
 //////////////////////////////////////////////////////////////////////////
 //폴더 관련
+	//가능하면 PathIsDirectory() 사용할 것
 	bool		IsFolder(CString sfile);				//폴더인지 파일인지
 	bool		isFolder(char *sfile);
 	//파일명이나 폴더명에 '\\', '/' 혼용일 경우가 있으므로 CString의 '==' 연산자로 비교해선 안된다. 
@@ -1303,14 +1304,14 @@ void		SetWallPaper(CString sfile);
 
 //이미지가 표시되고 있는 영역 정보와 화면상의 좌표를 주면 이미지상의 실제 좌표를 리턴한다.
 //단, 계산된 이미지상의 실제 좌표가 이미지 크기를 벗어나면 결과 변수에는 -1값을 채워서 리턴한다.
-	void		GetRealPosFromScreenPos(CRect rDisplayedImageRect, int srcWidth, double *x, double *y);
-	void		GetRealPosFromScreenPos(CRect rDisplayedImageRect, int srcWidth, CPoint *pt);
-	void		GetRealPosFromScreenPos(CRect rDisplayedImageRect, int srcWidth, CRect *r);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
 
 	//이미지가 표시되고 있는 영역 정보와 이미지 상의 좌표를 주면 화면상의 좌표를 리턴한다.
-	void		GetScreenPosFromRealPos(CRect rDisplayedImageRect, int srcWidth, double *x, double *y);
-	void		GetScreenPosFromRealPos(CRect rDisplayedImageRect, int srcWidth, CPoint *pt);
-	void		GetScreenPosFromRealPos(CRect rDisplayedImageRect, int srcWidth, CRect *r);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
 
 
 //직선, Line 관련 함수
@@ -1360,7 +1361,7 @@ void		SetWallPaper(CString sfile);
 	//1 : "(1,2) ~ (4,8)"
 	//2 : "(1,2) ~ (4,8) (2x6)"
 	//3 : "l = 1, t = 2, r = 3, b = 4"
-	CString		GetRectInfoString(CRect r, int nFormat);
+	CString		get_rect_info_string(CRect r, int nFormat);
 
 	void		make_rect(CRect &Rect, int x, int y, int w, int h);
 	CRect		make_rect(int x, int y, int w, int h);
@@ -1372,6 +1373,7 @@ void		SetWallPaper(CString sfile);
 	void		get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
 	CRect		get_zoom_rect(CRect rect, double zoom);
+
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.
 	CPoint		vertex(CRect r, int index, bool rb_cut = false);	
 
@@ -1400,6 +1402,13 @@ void		SetWallPaper(CString sfile);
 	double		getOverlappedRatio(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
 
 	CRect		subtract(CRect r0, CRect r1);
+
+	//스크린에 표시된 이미지에 그려진 사각형의 실제 이미지상의 사각형 좌표
+	//sr : 이미지에 그려진 사각형
+	//displayed : 이미지가 표시되고 있는 사각형 영역
+	//real : 실제 이미지의 크기
+	//resized : zoom in/out에 의해 변경된 크기
+	CRect		get_real_from_screen_coord(CRect sr, CRect displayed, CSize real, CSize resized);
 
 //side 배열의 인덱스는 resize하는 영역 인덱스로서
 //DefWindowProc의 두번째 파라미터에 (SC_SIZE + m_nSideIndex)로 쓰이므로 그 차례를 따른다.
@@ -1446,15 +1455,18 @@ void		SetWallPaper(CString sfile);
 //캡쳐 기능
 	//r은 윈도우 좌표계.
 	CImage*		capture_window(CRect r, CString filename);
-	HBITMAP		CaptureScreenToBitmap(LPRECT pRect);
+	//특정 영역을 캡처하여 HBITMAP으로 리턴한다.
+	//resourceID를 주면 해당 이미지를 overlay하여 리턴한다.(watermark와 같은 용도로 사용시)
+	HBITMAP		capture_screen_to_bitmap(LPRECT pRect, UINT id = 0, int dx = 0, int dy = 0);
 	HBITMAP		CaptureWindowToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	HBITMAP		CaptureClientToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	//hwnd만 주면 해당 윈도우 영역을 캡처하지만 윈도우에서는 불필요한 여백까지 영역으로 처리하므로
 	//pRect를 줘서 정해진 영역만 캡처시킨다.
 	HBITMAP		PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect = NULL);
-	void		WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename);
 
-
+//HBITMAP
+	void		draw_bitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
+	void		save_bitmap(HBITMAP bitmap, LPCTSTR filename);
 
 //키보드 언어를 그 나라 기본언어로 변경한다.
 void		IME_Convert_To_NativeCode(HWND hWnd, bool bNative);

@@ -444,6 +444,22 @@ int CListBoxEx::add_string(CString text, COLORREF crText, COLORREF crBack )
 {
 	m_list.push_back(CListBoxData(text, crText, crBack));
 	Invalidate();
+
+	SCROLLINFO si;
+	ZeroMemory(&si, sizeof(SCROLLINFO));
+	si.cbSize = sizeof(SCROLLINFO);
+	si.nMin = 0;
+	si.nMax = m_list.size() * m_line_height;
+	si.fMask = SIF_RANGE | SIF_PAGE;
+	si.nPage = 10;
+	SetScrollInfo(SB_VERT, &si, TRUE);
+
+	//EnableScrollBarCtrl(SB_VERT);
+	//ShowScrollBar(SB_VERT);
+	//SetScrollRange(SB_VERT, 0, m_list.size() * m_line_height);
+	//bool b = EnableScrollBar(SB_VERT, ESB_ENABLE_BOTH);
+	//DWORD er = GetLastError();
+
 	return m_list.size() - 1;
 }
 

@@ -114,12 +114,12 @@ protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;
 
-	bool		m_bUseColor;		//default = false;
-	bool		m_bUseHover;		//default = false;
+	bool		m_bUseColor;				//default = false;
+	bool		m_bUseHover;				//default = false;
 	BOOL		m_bOutside;
 	int			m_nOverItem;
-	bool		m_as_popup;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
-	bool		m_as_folder_list;	//폴더목록을 표시하는 목적으로 동작하는 경우
+	bool		m_as_popup;					//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
+	bool		m_as_folder_list = false;	//폴더목록을 표시하는 목적으로 동작하는 경우
 	std::deque<CString> m_folder_list;
 
 	COLORREF	m_crText;					//기본 글자색

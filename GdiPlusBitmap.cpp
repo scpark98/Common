@@ -3,6 +3,7 @@
 #include "MemoryDC.h"
 #include <thread>
 
+//Gdiplus 초기화 과정을 자동으로 하기 위해 GdiplusDummy 타입의 static 인스턴스를 선언해준다.
 class GdiplusDummy
 {
 public:
@@ -159,7 +160,8 @@ bool CGdiplusBitmap::load(CString file, bool show_error)
 {
 	if (!PathFileExists(file))
 	{
-		AfxMessageBox(file + _T("\n\nFile not found."));
+		if (show_error)
+			AfxMessageBox(file + _T("\n\nFile not found."));
 		return false;
 	}
 
@@ -1798,6 +1800,33 @@ bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
 
 bool CGdiplusBitmap::copy_to_clipbard()
 {
+	//32bit PNG는 투명처리 안됨
+#if 0
+	HBITMAP hbitmap;
+	auto status = m_pBitmap->GetHBITMAP(0, &hbitmap);
+	if (status != Gdiplus::Ok)
+		return false;
+	BITMAP bm;
+	GetObject(hbitmap, sizeof bm, &bm);
+	DIBSECTION ds;
+	if (sizeof ds == GetObject(hbitmap, sizeof ds, &ds))
+	{
+		HDC hdc = GetDC(NULL);
+		HBITMAP hbitmap_ddb = CreateDIBitmap(hdc, &ds.dsBmih, CBM_INIT,
+			ds.dsBm.bmBits, (BITMAPINFO*)&ds.dsBmih, DIB_RGB_COLORS);
+		ReleaseDC(NULL, hdc);
+		if (OpenClipboard(NULL))
+		{
+			EmptyClipboard();
+			SetClipboardData(CF_BITMAP, hbitmap_ddb);
+			CloseClipboard();
+		}
+		DeleteObject(hbitmap_ddb);
+	}
+	DeleteObject(hbitmap);
+	return true;
+#endif 
+
 	bool res = false;
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
@@ -1826,6 +1855,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	{
 		EmptyClipboard();
 		SetClipboardData(CF_DIBV5, hmem);
+		//SetClipboardData(CF_BITMAP, hbitmap);
 		CloseClipboard();
 		MessageBeep(0);
 		res = true;
@@ -1870,7 +1900,43 @@ bool copyBitmapIntoClipboard(Window& window, const Bitmap& in) {
 	return true;
 }
 */
-//
+
+bool CGdiplusBitmap::paste_from_clipboard()
+{
+	HBITMAP bitmap;
+	if (OpenClipboard(NULL) == false)
+		return false;
+
+	bitmap = (HBITMAP)GetClipboardData(CF_BITMAP);
+	if (!bitmap)
+	{
+		CloseClipboard();
+		return false;
+	}
+
+	//int n = sizeof(bitmap);
+	CloseClipboard();
+
+	release();
+
+	DIBSECTION ds = {};
+	if (!::GetObject(bitmap, sizeof(ds), &ds))
+		return false;
+
+	if (ds.dsBm.bmBits && (ds.dsBm.bmBitsPixel == 32) && (ds.dsBmih.biCompression == BI_RGB))
+	{
+		m_pBitmap = CreateARGBBitmapFromDIB(ds);
+	}
+	else
+	{
+		m_pBitmap = Bitmap::FromHBITMAP(bitmap, NULL);
+	}
+
+	resolution();
+
+	return true;
+}
+
 void CGdiplusBitmap::check_animate_gif()
 {
 	m_run_thread_animation = false;

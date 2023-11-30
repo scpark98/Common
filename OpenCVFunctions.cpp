@@ -3348,3 +3348,54 @@ cv::Mat	HBITMAP2Mat(HBITMAP hBitmap)
 
 	return mat3ch;  
 }
+
+void removeShadow(cv::Mat const& src, cv::Mat& result1_diff_img, cv::Mat& result2_norm_img)
+{
+	std::vector<cv::Mat> channels;
+	cv::split(src, channels);
+
+	cv::Mat zero = cv::Mat::zeros(src.size(), CV_8UC1);
+
+	cv::Mat kernel;
+	kernel = getStructuringElement(cv::MORPH_OPEN, cv::Size(1, 1));
+	cv::Mat diff_img[3];
+	cv::Mat norm_img[3];
+	for (int i = 0; i < 3; i++) {
+		cv::Mat dilated_img;
+		dilate(channels[i], dilated_img, kernel, cv::Point(-1, -1), 1, cv::BORDER_CONSTANT, cv::morphologyDefaultBorderValue());
+		cv::Mat bg_img;
+		cv::medianBlur(channels[i], bg_img, 21);
+		cv::absdiff(channels[i], bg_img, diff_img[i]);
+		cv::bitwise_not(diff_img[i], diff_img[i]);
+		cv::normalize(diff_img[i], norm_img[i], 0, 255, cv::NORM_MINMAX, CV_8UC1, cv::noArray());
+	}
+	std::vector<cv::Mat> R1B1 = { diff_img[0], zero, zero };
+	std::vector<cv::Mat> R1G1 = { zero, diff_img[1], zero };
+	std::vector<cv::Mat> R1R1 = { zero, zero, diff_img[2] };
+
+	cv::Mat result1_B;
+	cv::Mat result1_G;
+	cv::Mat result1_R;
+
+	cv::merge(R1B1, result1_B);
+	cv::merge(R1G1, result1_G);
+	cv::merge(R1R1, result1_R);
+
+	cv::bitwise_or(result1_B, result1_G, result1_G);
+	cv::bitwise_or(result1_G, result1_R, result1_diff_img);
+
+	std::vector<cv::Mat> R2B1 = { norm_img[0], zero, zero };
+	std::vector<cv::Mat> R2G1 = { zero, norm_img[1], zero };
+	std::vector<cv::Mat> R2R1 = { zero, zero, norm_img[2] };
+
+	cv::Mat result2_B;
+	cv::Mat result2_G;
+	cv::Mat result2_R;
+
+	cv::merge(R2B1, result2_B);
+	cv::merge(R2G1, result2_G);
+	cv::merge(R2R1, result2_R);
+
+	cv::bitwise_or(result2_B, result2_G, result2_G);
+	cv::bitwise_or(result2_G, result2_R, result2_norm_img);
+}

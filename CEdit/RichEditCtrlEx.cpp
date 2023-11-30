@@ -81,6 +81,7 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 			break;
 	}
 
+	//new_text의 앞부분에 있는 '\n'을 제외한 나머지 문자열
 	new_text = new_text.Mid(linefeed_count);
 
 
@@ -107,11 +108,9 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 	nInsertionPoint = GetWindowTextLength();
 
-
-
 	if (m_show_time)
 	{
-		//m_show_time = true일때 첫 컬럼이냐 아니냐에 따라 시간값을 찍을지가 결정된다.
+		//m_show_time = true일때 첫 컬럼인 경우에만 시간값을 출력한다.
 		int total_lines = GetLineCount();
 		int len = LineLength(total_lines - 1);
 		if (len > 0)
@@ -124,8 +123,6 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 			skip_time_info = (cur_line.GetLength() > 0);
 		}
 	}
-
-
 
 	int nOldFirstVisibleLine = GetFirstVisibleLine();
 	long lMinSel, lMaxSel;
@@ -141,6 +138,7 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 	SCROLLINFO	si;
 	si.cbSize = sizeof(SCROLLINFO);
+	ZeroMemory(&si, si.cbSize);
 	GetScrollInfo(SB_VERT, &si);
 
 
@@ -156,20 +154,6 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 	pf.wAlignment = m_align;
 	SetParaFormat(pf);
 	SendMessage(EM_SETMODIFY, (WPARAM)TRUE, 0L);
-
-
-	/*
-	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, max = %d, sel = %d, %d\n"),
-		m_auto_scroll,
-		si.nPos,
-		si.nTrackPos,
-		si.nMax,
-		lMinSel, lMaxSel);
-	if (si.nPos != si.nTrackPos)
-		m_auto_scroll = false;
-	*/
-
-
 
 	if (m_show_time && !skip_time_info)
 	{
@@ -201,7 +185,6 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 	else
 		cf.crTextColor = cr;
 
-
 	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
 	if (m_nMaxCharLimit > 0 && nInsertionPoint >= m_nMaxCharLimit)
 	{
@@ -213,27 +196,69 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 	nInsertionPoint = -1;
 	SetSel(nInsertionPoint, -1);
 
-
 	//  Set the character format
 	SetSelectionCharFormat(cf);
 
 	// Replace selection. Because we have nothing selected, this will simply insert
 	// the string at the current caret position.
+	//SetRedraw(FALSE);
 	ReplaceSel(new_text);
+	//SetRedraw(TRUE);
 
 #ifdef _DEBUG
 	TRACE(new_text);
 #endif
 
+	//여기서부터의 코드는 맨 마지막 라인으로 스크롤시킬지 말지를 결정.
+	//스크롤 위치가 맨 끝이면 항상 마지막 라인으로 자동 스크롤하고
+	//스크롤 위치가 중간이면 자동 스크롤시키지 않는다.
+	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, page = %d, min = %d, max = %d, sel = %d, %d\n"),
+		m_auto_scroll,
+		si.nPos,
+		si.nTrackPos,
+		si.nPage,
+		si.nMin,
+		si.nMax,
+		lMinSel, lMaxSel);
+	if (si.nPos != si.nTrackPos)
+		m_auto_scroll = false;
 
+	//뭔가 의도대로 동작하지 않는다.
+	//현재는 포커스를 가지면 항상 맨 마지막으로 자동 스크롤되고
+	//포커스가 없으면 마지막 줄로 자동 스크롤되진 않는다.
+	/*
+	if (si.nPos + si.nPage == si.nMax + 1)
+	{
+		//SetScrollPos(SB_VERT, 10000000);
+		int nVisible = GetNumVisibleLines();
+		LineScroll(INT_MAX);
+		LineScroll(1 - nVisible);
+	}
+	*/
+#if 0
 	//if (!m_auto_scroll)
 	//	return 0;
 
+	int nVisible = GetNumVisibleLines();
+
+	// Now this is the fix of CRichEditCtrl's abnormal behaviour when used
+	// in an application not based on dialogs. Checking the focus prevents
+	// us from scrolling when the CRichEditCtrl does so automatically,
+	// even though ES_AUTOxSCROLL style is NOT set.
+
+
+	if (this != GetFocus())
+	{
+		LineScroll(INT_MAX);
+		LineScroll(1 - nVisible);
+	}
+
+	return;
 
 	CRect rc;
 	GetClientRect(rc);
 	// Get new line count
-	if ((si.nMax - si.nTrackPos) < rc.Height())
+	if (false)//(si.nMax - si.nTrackPos) < rc.Height())
 	{
 		TRACE(_T("true\n"));
 		nNewLines = GetLineCount();
@@ -257,6 +282,7 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 		SetRedraw(TRUE);
 	}
+#endif
 }
 
 

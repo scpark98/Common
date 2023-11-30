@@ -1022,7 +1022,7 @@ CTime		GetFileLastAccessTime(CString sfile)
 	return NULL;
 }
 
-bool		CheckFileIsURL(CString sURL)
+bool CheckFileIsURL(CString sURL)
 {
 	if (sURL.Find(_T("://")) > 0)
 		return TRUE;
@@ -5396,6 +5396,7 @@ void DrawRectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLO
 	else
 		pOldBrush = (CBrush*)pDC->SelectObject(&brBrush);	
 
+	//Rect.NormalizeRect();
 	pDC->Rectangle(Rect);
 
 	pDC->SelectObject(pOldPen);
@@ -9934,9 +9935,29 @@ CImage* capture_window(CRect r, CString filename)
 	return imgCapture;
 }
 
+void draw_bitmap(HDC hdc, int x, int y, HBITMAP hBitmap)
+{
+	HDC MemDC;
+	HBITMAP OldBitMap;
+	int bx, by;
+	BITMAP bitmap;
+
+	MemDC = CreateCompatibleDC(hdc);
+	OldBitMap = (HBITMAP)SelectObject(MemDC, hBitmap);
+
+	GetObject(hBitmap, sizeof(BITMAP), &bitmap);
+	bx = bitmap.bmWidth;
+	by = bitmap.bmHeight;
+
+	BitBlt(hdc, x, y, bx, by, MemDC, 0, 0, SRCCOPY);
+
+	SelectObject(MemDC, OldBitMap);
+	DeleteDC(MemDC);
+}
+
 // Capture screen and create GDI bitmap
 // (full-screen when pRect is NULL)
-HBITMAP CaptureScreenToBitmap(LPRECT pRect)
+HBITMAP capture_screen_to_bitmap(LPRECT pRect, UINT id, int dx, int dy)
 {
 	HDC         hScrDC, hMemDC;         // screen DC and memory DC
 	HBITMAP     hBitmap, hOldBitmap;    // handles to deice-dependent bitmaps
@@ -9993,6 +10014,7 @@ HBITMAP CaptureScreenToBitmap(LPRECT pRect)
 	void* bits;
 	hBitmap = CreateDIBSection(hScrDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
 #else
+
 	// create a bitmap compatible with the screen DC
 	hBitmap = CreateCompatibleBitmap(hScrDC, nWidth, nHeight);	//32bit로 만들어진다.
 #endif
@@ -10002,6 +10024,13 @@ HBITMAP CaptureScreenToBitmap(LPRECT pRect)
 
 	// bitblt screen DC to memory DC
 	BitBlt(hMemDC, 0, 0, nWidth, nHeight, hScrDC, nX, nY, SRCCOPY);
+
+	if (id > 0)
+	{
+		//HBITMAP hbmp = LoadBitmap(AfxGetInstanceHandle(), MAKEINTRESOURCE(id));
+		HBITMAP hbmp = (HBITMAP)LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(id), IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+		draw_bitmap(hMemDC, dx, dy, hbmp);
+	}
 
 	// select old bitmap back into memory DC and get handle to
 	// bitmap of the screen
@@ -10038,7 +10067,7 @@ HBITMAP CaptureWindowToBitmap(HWND hWnd, LPRECT pRect /*= NULL*/)
 
 	// get the bitmap of that window by calling
 	// CopyScreenToBitmap and passing it the window rect
-	hBitmap = CaptureScreenToBitmap(&rectWnd);
+	hBitmap = capture_screen_to_bitmap(&rectWnd);
 
 	// return handle to the bitmap
 	return hBitmap;
@@ -10071,7 +10100,7 @@ HBITMAP CaptureClientToBitmap(HWND hWnd, LPRECT pRect /*= NULL*/)
 
 	// get the bitmap of the client area by calling
 	// CopyScreenToBitmap and passing it the client rect
-	hBitmap = CaptureScreenToBitmap(&rectClient);
+	hBitmap = capture_screen_to_bitmap(&rectClient);
 
 	// return handle to the bitmap
 	return hBitmap;
@@ -10165,9 +10194,32 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	return hBitmap;
 }
 
-
-void WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename)
+#define _S(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
+void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 {
+	PICTDESC pictdesc = {};
+	pictdesc.cbSizeofstruct = sizeof(pictdesc);
+	pictdesc.picType = PICTYPE_BITMAP;
+	pictdesc.bmp.hbitmap = bitmap;
+
+	CComPtr<IPicture> picture;
+	_S(OleCreatePictureIndirect(&pictdesc, __uuidof(IPicture), FALSE, (LPVOID*)&picture));
+
+	// Save to a stream
+
+	CComPtr<IStream> stream;
+	_S(CreateStreamOnHGlobal(NULL, TRUE, &stream));
+	LONG cbSize = 0;
+	_S(picture->SaveAsFile(stream, TRUE, &cbSize));
+
+	// Or save to a file
+
+	CComPtr<IPictureDisp> disp;
+	_S(picture->QueryInterface(&disp));
+	_S(OleSavePictureFile(disp, CComBSTR(filename)));
+	return;
+
+	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
 	BITMAP bmp; 
 	PBITMAPINFO pbmi; 
 	WORD cClrBits; 
@@ -10181,7 +10233,8 @@ void WriteBMP(HBITMAP bitmap, HDC hDC, LPTSTR filename)
 	DWORD dwTmp; 
 
 	// create the bitmapinfo header information
-	if (!GetObject(bitmap, sizeof(BITMAP), (LPSTR)&bmp))
+	int ret = GetObject(bitmap, sizeof(BITMAP), (LPSTR)&bmp);
+	if (ret == 0)
 	{
 		AfxMessageBox(_T("Could not retrieve bitmap info"));
 		return;
@@ -10656,7 +10709,7 @@ void safe_release_gradient_rect_handle()
 //1 : "(1,2)~(4,8)"
 //2 : "(1,2)~(4,8) (2x6)"
 //3 : "l = 1, t = 2, r = 3, b = 4"
-CString GetRectInfoString(CRect r, int nFormat)
+CString get_rect_info_string(CRect r, int nFormat)
 {
 	CString str;
 
@@ -12582,6 +12635,17 @@ CRect subtract(CRect r0, CRect r1)
 	return r;
 }
 
+//스크린에 표시된 이미지에 그려진 사각형의 실제 이미지상의 사각형 좌표
+//sr : 이미지에 그려진 사각형
+//displayed : 이미지가 표시되고 있는 사각형 영역
+//real : 실제 이미지의 크기
+//resized : zoom in/out에 의해 변경된 크기
+CRect get_real_from_screen_coord(CRect sr, CRect displayed, CSize real, CSize resized)
+{
+	CRect r;
+	return r;
+}
+
 CRect getIntersectionRect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
 {
 	CRect r;
@@ -13657,88 +13721,94 @@ void printMessage(std::string msg, uint8_t bNewLine)
 #endif
 }
 
-void GetRealPosFromScreenPos(CRect rDisplayedImageRect, int srcWidth, double *x, double *y)
+void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy)
 {
 	if (srcWidth <= 0)
 		return;
 
 	double dZoom = (double)rDisplayedImageRect.Width() / (double)(srcWidth);
+
+	*dx = sx;
+	*dy = sy;
 
 	//화면에 표시된 영상의 l,t값을 빼서 확대 영상내에서의 상대좌표로 변환한 후
-	*x -= rDisplayedImageRect.left;
-	*y -= rDisplayedImageRect.top;
+	*dx -= rDisplayedImageRect.left;
+	*dy -= rDisplayedImageRect.top;
 
 	//확대된 비율로 나누고
-	*x /= dZoom;
-	*y /= dZoom;
+	*dx /= dZoom;
+	*dy /= dZoom;
 }
 
-void GetRealPosFromScreenPos(CRect rDisplayedImageRect, int srcWidth, CPoint *pt)
+void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst)
 {
-	double x = (double)pt->x;
-	double y = (double)pt->y;
+	double dx = (double)pt_src.x;
+	double dy = (double)pt_src.y;
 
-	GetRealPosFromScreenPos(rDisplayedImageRect, srcWidth, &x, &y);
-	pt->x = (long)x;
-	pt->y = (long)y;
+	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, dx, dy, &dx, &dy);
+	pt_dst->x = (long)dx;
+	pt_dst->y = (long)dy;
 }
 
-void GetRealPosFromScreenPos(CRect rDisplayedImageRect, int srcWidth, CRect *r)
+void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst)
 {
-	double x1 = (double)(r->left);
-	double y1 = (double)(r->top);
-	double x2 = (double)(r->right);
-	double y2 = (double)(r->bottom);
+	double x1 = (double)(r_src.left);
+	double y1 = (double)(r_src.top);
+	double x2 = (double)(r_src.right);
+	double y2 = (double)(r_src.bottom);
 
-	GetRealPosFromScreenPos(rDisplayedImageRect, srcWidth, &x1, &y1);
-	GetRealPosFromScreenPos(rDisplayedImageRect, srcWidth, &x2, &y2);
+	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
+	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
 
-	r->left = (long)(x1);
-	r->top = (long)(y1);
-	r->right = (long)(x2);
-	r->bottom = (long)(y2);
+	r_dst->left = (long)(x1);
+	r_dst->top = (long)(y1);
+	r_dst->right = (long)(x2);
+	r_dst->bottom = (long)(y2);
 }
 
-void GetScreenPosFromRealPos(CRect rDisplayedImageRect, int srcWidth, double *x, double *y)
+void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double* dx, double* dy)
 {
 	if (srcWidth <= 0)
 		return;
 
 	double dZoom = (double)rDisplayedImageRect.Width() / (double)(srcWidth);
 
+	*dx = sx;
+	*dy = sy;
+
 	//확대된 비율을 곱하고
-	*x *= dZoom;
-	*y *= dZoom;
+	*dx *= dZoom;
+	*dy *= dZoom;
 
 	//옵셋만큼 상대좌표로 이동시킨다.
-	*x += rDisplayedImageRect.left;
-	*y += rDisplayedImageRect.top;
+	*dx += rDisplayedImageRect.left;
+	*dy += rDisplayedImageRect.top;
 }
 
-void GetScreenPosFromRealPos(CRect rDisplayedImageRect, int srcWidth, CPoint *pt)
+void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint* pt_dst)
 {
-	double x = (double)pt->x;
-	double y = (double)pt->y;
+	double x = (double)pt_src.x;
+	double y = (double)pt_src.y;
 
-	GetScreenPosFromRealPos(rDisplayedImageRect, srcWidth, &x, &y);
-	pt->x = (long)x;
-	pt->y = (long)y;
+	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x, y, &x, &y);
+	pt_dst->x = (long)x;
+	pt_dst->y = (long)y;
 }
 
-void GetScreenPosFromRealPos(CRect rDisplayedImageRect, int srcWidth, CRect *r)
+void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect* r_dst)
 {
-	double x1 = (double)(r->left);
-	double y1 = (double)(r->top);
-	double x2 = (double)(r->right);
-	double y2 = (double)(r->bottom);
+	double x1 = (double)(r_src.left);
+	double y1 = (double)(r_src.top);
+	double x2 = (double)(r_src.right);
+	double y2 = (double)(r_src.bottom);
 
-	GetScreenPosFromRealPos(rDisplayedImageRect, srcWidth, &x1, &y1);
-	GetScreenPosFromRealPos(rDisplayedImageRect, srcWidth, &x2, &y2);
+	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
+	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
 
-	r->left = (long)(x1);
-	r->top = (long)(y1);
-	r->right = (long)(x2);
-	r->bottom = (long)(y2);
+	r_dst->left = (long)(x1);
+	r_dst->top = (long)(y1);
+	r_dst->right = (long)(x2);
+	r_dst->bottom = (long)(y2);
 }
 
 int	find_index_from_deque(std::deque <CString> dq, CString str)

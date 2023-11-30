@@ -43,6 +43,8 @@ CColorListBox::CColorListBox()
 
 	m_nGutterCharNumber = 0;
 
+	m_as_folder_list = false;
+
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	set_color_theme(color_theme_default, false);

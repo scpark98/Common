@@ -61,6 +61,10 @@ void CControlSplitter::OnLButtonDown(UINT nFlags, CPoint point)
 		CRect rect;
 		GetWindowRect(&rect);
 		m_ptStartPos = rect.TopLeft();
+
+		//parent가 resize된 경우는 이 값을 다시 갱신시켜줘야 한다.
+		GetParent()->GetWindowRect(m_rectMax);
+		GetParent()->ScreenToClient(m_rectMax);
 	}
 	CButton::OnLButtonDown(nFlags, point);
 }
@@ -87,21 +91,29 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 	if(m_bDragging)
 	{
 		CRect rect;
-		::GetWindowRect(m_hWnd,&rect);		
 		CPoint ptMouse;
+
+		::GetWindowRect(m_hWnd,&rect);
 		GetCursorPos(&ptMouse);
+
 		CSize sizeDiff = ptMouse - m_ptStartDrag;
 		CSize sizeMove = m_ptStartPos-rect.TopLeft();
+
 		rect.OffsetRect(sizeMove);
+
 		if(m_nType == CS_HORZ)
 		{							
 			rect.OffsetRect(0, sizeDiff.cy);
-		}else
+		}
+		else
 		{
 			rect.OffsetRect(sizeDiff.cx,0);
 		}
+
 		std::vector<DWORD>::iterator it;
-		GetParent()->ScreenToClient(&rect);			
+
+		GetParent()->ScreenToClient(&rect);
+
 		if((m_nType == CS_HORZ) && ((m_rectMax.top >= rect.top) || (m_rectMax.bottom <= rect.bottom)))
 		{
 			return;
@@ -110,41 +122,42 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			return;
 		}
-		/*
-		TRACE2("M(%d,%d,",m_rectMax.top,m_rectMax.left);
-		TRACE2("%d,%d)\n",m_rectMax.bottom,m_rectMax.right);
-		TRACE2("(%d,%d,",rect.top,rect.left);
-		TRACE2("%d,%d)\n",rect.bottom,rect.right);
-		*/
-		for ( it=m_vtTopLeftControls.begin() ; it < m_vtTopLeftControls.end(); it++ )
+
+		TRACE("Max(%d, %d, %d, %d)\n", m_rectMax.left, m_rectMax.top, m_rectMax.right, m_rectMax.bottom);
+		TRACE("Cur(%d, %d, %d, %d)\n", rect.left, rect.top, rect.right, rect.bottom);
+
+		for (it = m_vtTopLeftControls.begin(); it < m_vtTopLeftControls.end(); it++)
 		{
 			CWnd* pCtrl = GetParent()->GetDlgItem(LOWORD(*it));
 			UINT nFlag = HIWORD(*it);
-			if(pCtrl == NULL) continue;
+
+			if (pCtrl == NULL)
+				continue;
+
 			CRect rectCtrl;
 			pCtrl->GetWindowRect(&rectCtrl);
+
 			if(m_nType == CS_HORZ)
 			{
-				if(nFlag&SPF_BOTTOM)
+				if (nFlag & SPF_BOTTOM)
 				{
 					rectCtrl.bottom +=  sizeMove.cy;
 					rectCtrl.bottom += sizeDiff.cy;
 				}
-				if(!(nFlag&SPF_TOP))
+				if (!(nFlag & SPF_TOP))
 				{
 					rectCtrl.top +=  sizeMove.cy;
 					rectCtrl.top += sizeDiff.cy;
 				}
-
 			}
 			else
 			{
-				if((nFlag&SPF_RIGHT))
+				if ((nFlag & SPF_RIGHT))
 				{
 					rectCtrl.right +=  sizeMove.cx;
 					rectCtrl.right += sizeDiff.cx;
 				}
-				if(0 ==(nFlag&SPF_LEFT))
+				if (0 == (nFlag & SPF_LEFT))
 				{
 					rectCtrl.left +=  sizeMove.cx;
 					rectCtrl.left += sizeDiff.cx;
@@ -153,48 +166,57 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 			GetParent()->ScreenToClient(&rectCtrl);		
 			pCtrl->MoveWindow(rectCtrl);
 		}
-		for ( it=m_vtBottomRightControls.begin() ; it < m_vtBottomRightControls.end(); it++ )
+
+		for (it = m_vtBottomRightControls.begin(); it < m_vtBottomRightControls.end(); it++)
 		{
 			CWnd* pCtrl = GetParent()->GetDlgItem(LOWORD(*it));
 			UINT nFlag = HIWORD(*it);
-			if(pCtrl == NULL) continue;
+
+			if (pCtrl == NULL)
+				continue;
+
 			CRect rectCtrl;
 			pCtrl->GetWindowRect(&rectCtrl);
-			if(m_nType == CS_HORZ)
+
+			if (m_nType == CS_HORZ)
 			{
-				if(nFlag&SPF_TOP)
+				if (nFlag & SPF_TOP)
 				{
 					rectCtrl.top +=  sizeMove.cy;
 					rectCtrl.top += sizeDiff.cy;
 				}
-				if(!(nFlag&SPF_BOTTOM))
+
+				if(!(nFlag & SPF_BOTTOM))
 				{
 					rectCtrl.bottom +=  sizeMove.cy;
 					rectCtrl.bottom += sizeDiff.cy;
 				}
-			}else{
-				if((nFlag&SPF_LEFT))
+			}
+			else
+			{
+				if (nFlag & SPF_LEFT)
 				{
 					rectCtrl.left +=  sizeMove.cx;
 					rectCtrl.left += sizeDiff.cx;
 				}
-				if(!(nFlag&SPF_RIGHT))
+
+				if(!(nFlag & SPF_RIGHT))
 				{
 					rectCtrl.right +=  sizeMove.cx;
 					rectCtrl.right += sizeDiff.cx;
 				}
 			}
+
 			GetParent()->ScreenToClient(&rectCtrl);		
 			pCtrl->MoveWindow(rectCtrl);
-			
 		}
 		
 		MoveWindow(rect);
 		GetParent()->SendMessage(MSG_CONTROL_SPLITTER_MOVED,(WPARAM)m_hWnd,(LPARAM)MAKELONG(point.x,point.y));
 		Invalidate();
 	}
+	
 	CButton::OnMouseMove(nFlags, point);
-
 }
 
 BOOL CControlSplitter::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message) 

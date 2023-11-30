@@ -101,6 +101,8 @@ public:
 	ThreadPool(size_t num_threads = 10);
 	~ThreadPool();
 
+	void resize(size_t num_threads);
+
 	//thread로 동작시킬 함수(job)을 추가한다.
 	template <class F, class... Args>
 	std::future<typename std::result_of<F(Args...)>::type> EnqueueJob(

@@ -101,8 +101,8 @@ protected:
 	DECLARE_MESSAGE_MAP()
 private:
 	int			m_nCtrlID;			//parent에 progress가 여러개 생성될 경우 메시지를 구분하기 위한 ID
-	int			m_lower;
-	int			m_upper;
+	int			m_lower = 0;
+	int			m_upper = 100;
 	bool		m_bUseSlider;		//true이면 슬라이드 컨트롤과 같이 조정할 수 있고 콜백함수를 호출한다.
 	bool		m_bDrawOutline;
 	bool		m_text_show = false;

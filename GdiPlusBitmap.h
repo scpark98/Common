@@ -199,6 +199,7 @@ public:
 
 	bool save(CString filepath);
 	bool copy_to_clipbard();
+	bool paste_from_clipboard();
 
 	int width = 0;
 	int height = 0;

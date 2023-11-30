@@ -1,0 +1,14 @@
+- GdiplusBitmap을 이용한 이미지 표시 컨트롤.
+- 보통은 CStatic을 응용해서 이미지 표시하는 것과 같은 심플 기능.
+- resource 또는 filepath로 이미지 표시.
+
+[일반 이미지 표시 컨트롤 이외의 확장된 기능들]
+- fit2ctrl / original 크기 모드
+
+- original 크기로 표시
+	영역보다 이미지가 클 경우 LB로 이동
+	Ctrl + LB로 영역 선택
+	Ctrl + Wheel로 zoom in/out 가능
+	
+- 이미지 뷰어, 학습데이터 추출 등 이미지 확대, 축소, 이동, 영역 선택 등의 기능이 필요할 경우
+  

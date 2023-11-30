@@ -254,6 +254,28 @@ ThreadPool::~ThreadPool()
     }
 }
 
+void ThreadPool::resize(size_t num_threads)
+{
+    stop_all = true;
+    cond.notify_all();
+
+    for (auto& t : thread_list)
+    {
+        t.join();
+    }
+
+
+    stop_all = false;
+    num_threads_ = num_threads;
+    thread_list.reserve(num_threads_);
+
+    //여기서 람다 함수를 사용해서 넣는  이유는 클래스의 멤버 함수로 스레드를 생성하지 못하기 때문?
+    for (size_t i = 0; i < num_threads_; ++i)
+    {
+        thread_list.emplace_back([this]() { this->WorkerThread(); });
+    }
+}
+
 void ThreadPool::WorkerThread()
 {
     while (true)

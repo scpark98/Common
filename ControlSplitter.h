@@ -16,9 +16,9 @@
 /////////////////////////////////////////////////////////////////////////////
 // CControlSplitter ウィンドウ
 
-#define MSG_CONTROL_SPLITTER_MOVED	WM_APP + 8653
+//#define MSG_CONTROL_SPLITTER_MOVED	WM_APP + 8653
 //#define MSG_CONTROL_SPLITTER_MOVED_MSG		_T("MSG_CONTROL_SPLITTER_MOVED_MSG	")
-//static UINT MSG_CONTROL_SPLITTER_MOVED   = ::RegisterWindowMessage(MSG_CONTROL_SPLITTER_MOVED_MSG);
+static UINT MSG_CONTROL_SPLITTER_MOVED   = ::RegisterWindowMessage(_T("MSG_CONTROL_SPLITTER_MOVED_MSG"));
 
 class CControlSplitter : public CButton
 {	

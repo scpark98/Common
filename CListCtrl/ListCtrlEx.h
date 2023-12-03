@@ -204,10 +204,11 @@ public:
 	CString GetText(int nIndex, int from = 0, int to = -1, CString sep = _T("|"));
 
 	//0번 컬럼에서만 데이터를 찾는다.
-	int		FindString(CString str, int indexFrom = -1, bool bWholeWord = true);
-	//column에 저장된 컬럼들에서 해당 문자열을 찾는다.
+	//int		FindString(CString str, int indexFrom = -1, bool bWholeWord = true);
+	//column에 저장된 컬럼들에서 해당 문자열이 포함된 라인번호들을 찾는다.
 	//column을 NULL로해서 호출하면 모든 컬럼을 모두 검색한다.
-	void	FindString(CString str, int indexFrom, std::vector<int> *column, std::vector<int> &result, bool bWholeWord = TRUE, bool bCaseSensitive = FALSE);
+	//result가 NULL이면 맨 처음 발견된 인덱스를 리턴한다.
+	int		FindString(CString str, int indexFrom = -1, std::vector<int> *column = NULL, std::vector<int> *result = NULL, bool bWholeWord = TRUE, bool bCaseSensitive = FALSE);
 
 	bool	DeleteItem(int nItem);
 	bool	DeleteAllItems();

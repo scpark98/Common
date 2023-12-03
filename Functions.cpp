@@ -4330,7 +4330,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 			else
 			{
 				//예를들어 확장자 목록에 jpg가 있는데 파일명 중간에서 jpg가 발견되면 문제가 된다.
-				if (find_index(&dqExtFilter, get_part(sFilename, fn_ext).MakeLower()) >= 0)
+				if (find_index(dqExtFilter, get_part(sFilename, fn_ext).MakeLower()) >= 0)
 					bFound = true;
 				/*
 				for (i = 0; i < dqExtFilter.size(); i++)
@@ -9452,52 +9452,68 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 	return hWnd;
 }
 
-//<응용 - 프로세스가 실행 중인지를 체크>
+//해당 파일이 실행중인 카운트 리턴
 int get_process_running_count(CString processname)
 {
-	HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (processname.IsEmpty())
+		return 0;
+
+	HANDLE hProcessSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
 	PROCESSENTRY32 pe32 = { 0, };
 	pe32.dwSize = sizeof(PROCESSENTRY32);
 
-	if (!Process32First(hProcessSnap, &pe32))
+	if (!Process32First(hProcessSnapshot, &pe32))
 	{
 		OutputDebugString(_T("Error checking process"));
-		CloseHandle(hProcessSnap);
+		CloseHandle(hProcessSnapshot);
 		return 0;
 	}
 
 	int running_count = 0;
-	TCHAR sFilePath[1024] = { 0, };
 
 	do
 	{
+		//TRACE(_T("process = %s\n"), pe32.szExeFile);
+		//if (_tcsicmp(pe32.szExeFile, _T("natsvc.exe")) == 0)
+		//{
+		//	TRACE(_T("process = %s\n"), pe32.szExeFile);;
+		//}
+
 		if (pe32.th32ProcessID != 0)
 		{
-			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
-			if (hProcess)
+			TCHAR sFilePath[1024] = { 0, };
+			DWORD bufLen = 1024;
+
+			_tcscpy(sFilePath, pe32.szExeFile);
+
+			//processname이 실행파일명만 있다면 exe 파일명만 비교하고
+			//전체 경로라면 fullpath를 구해서 비교한다.
+			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
+			if (PathFileExists(processname))
 			{
-				//processname이 전체 경로라면 fullpath로 비교하고
-				if (PathFileExists(processname))
+				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+				//HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+
+				if (hProcess)
 				{
-					::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+					QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+					//::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+					CloseHandle(hProcess);
 				}
-				//실행파일명만 있다면 exe 파일명만 비교한다.
 				else
 				{
-					_tcscpy(sFilePath, pe32.szExeFile);
+					TRACE(_T("fail to get OpenProcess(). %s\n"), get_last_error_message(false));
 				}
-
-				if (_tcsicmp(sFilePath, processname) == 0)
-					running_count++;
-
-				CloseHandle(hProcess);
 			}
+
+			if (_tcsicmp(sFilePath, processname) == 0)
+				running_count++;
 		}
-	} while (Process32Next(hProcessSnap, &pe32));
+	} while (Process32Next(hProcessSnapshot, &pe32));
 
-	CloseHandle(hProcessSnap);
+	CloseHandle(hProcessSnapshot);
 
-	return running_count; //실행중이 아니면 False를 반환
+	return running_count;
 } 
 
 bool KillProcess(CString szFilename)
@@ -9899,6 +9915,7 @@ bool CheckProcessUsingProcessName(LPCTSTR processName) // unsigned long = DWORD
 	Process32First(snapshotHandle, &processEntry);
 	do
 	{
+		TRACE(_T("processEntry.szExeFile = %s\n"), processEntry.szExeFile);
 		if (!_tcscmp(processName, processEntry.szExeFile))
 			return true;
 	} while (Process32Next(snapshotHandle, &processEntry));
@@ -13809,17 +13826,6 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, C
 	r_dst->top = (long)(y1);
 	r_dst->right = (long)(x2);
 	r_dst->bottom = (long)(y2);
-}
-
-int	find_index_from_deque(std::deque <CString> dq, CString str)
-{
-	for (int i = 0; i < dq.size(); i++)
-	{
-		if (dq[i] == str)
-			return i;
-	}
-
-	return -1;
 }
 
 //str의 from 위치 이후에 있는 숫자 영역값을 num에 넣어주고 숫자 시작위치를 return한다.

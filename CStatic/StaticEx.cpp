@@ -354,8 +354,6 @@ void CStaticEx::OnPaint()
 
 void CStaticEx::SetText(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 {
-	//Invalidate();
-	//RedrawWindow();
 	m_sText = sText;
 
  	if (cTextColor > 0)
@@ -364,7 +362,11 @@ void CStaticEx::SetText(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
 
 	//투명일때 UpdateSurface()를 써야 온전히 갱신된다.
-	UpdateSurface();
+	//=>dlg에서 clip sibling에 따라 결과가 달라진다.
+	if (m_bTransparent)
+		UpdateSurface();
+	else
+		Invalidate();
 }
 
 void CStaticEx::SetBackImage(UINT nIDBack)

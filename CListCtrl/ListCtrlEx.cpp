@@ -832,7 +832,7 @@ int CListCtrlEx::AddLineStringItem(CString sText, TCHAR separator)
 	int index;
 
 	std::deque<CString> dqToken;
-	GetTokenString(sText, dqToken, separator, GetColumnCount());
+	get_token_string(sText, dqToken, separator, true, GetColumnCount());
 
 	for (i = 0; i < MIN(GetColumnCount(), dqToken.size()); i++)
 	{
@@ -1053,6 +1053,8 @@ CString CListCtrlEx::GetText(int nIndex, int from, int to, CString sep)
 }
 
 //0번 컬럼에서만 데이터를 찾는다.
+//제대로 못찾는 듯하다. 없으면 -1을 리턴해야 하는데 0을 리턴한다.
+/*
 int CListCtrlEx::FindString(CString str, int indexFrom, bool bWholeWord)
 {
 	LVFINDINFO info;
@@ -1063,15 +1065,16 @@ int CListCtrlEx::FindString(CString str, int indexFrom, bool bWholeWord)
 	// Delete all of the items that begin with the string.
 	return FindItem(&info, indexFrom);
 }
-
+*/
 //CListCtrl의 FindItem으로도 모든 라인의 모든 컬럼을 검사할 수 있지만
 //일단 직접 구현해서 쓴다.
 //단 결과 result에는 컬럼번호는 저장되지 않고 라인번호만 저장되므로
 //한 라인에서 이미 찾았다면 그 라인의 다른 컬럼에서는 찾지 않고 그냥 break해야 한다.
 //그렇지 않으면 동일한 라인 번호가 result에 모두 저장된다.
-void CListCtrlEx::FindString(CString str, int indexFrom, std::vector<int> *column, std::vector<int> &result, bool bWholeWord/* = TRUE*/, bool bCaseSensitive /*= FALSE*/)
+int CListCtrlEx::FindString(CString str, int indexFrom, std::vector<int> *column, std::vector<int> *result, bool bWholeWord/* = TRUE*/, bool bCaseSensitive /*= FALSE*/)
 {
 	int		i, j;
+	int		first_found_index = -1;
 	CString sText;
 	std::vector<int> targetColumn;
 
@@ -1087,7 +1090,8 @@ void CListCtrlEx::FindString(CString str, int indexFrom, std::vector<int> *colum
 			column->push_back(i);
 	}
 
-	result.clear();
+	if (result)
+		result->clear();
 
 	for (i = indexFrom; i < GetItemCount(); i++)
 	{
@@ -1106,7 +1110,14 @@ void CListCtrlEx::FindString(CString str, int indexFrom, std::vector<int> *colum
 			{
 				if (sText == str)
 				{
-					result.push_back(i);
+					if (result)
+					{
+						result->push_back(i);
+					}
+					else if (first_found_index < 0)
+					{
+						first_found_index = i;
+					}
 					break;
 				}
 			}
@@ -1118,12 +1129,30 @@ void CListCtrlEx::FindString(CString str, int indexFrom, std::vector<int> *colum
 				//항퍊EFindString을 호출할때는 콅E문자열에서 sub string을 검색하도록 한다.
 				if (sText.Find(str) >= 0)
 				{
-					result.push_back(i);
+					if (result)
+					{
+						result->push_back(i);
+					}
+					else if (first_found_index < 0)
+					{
+						first_found_index = i;
+					}
+
 					break;
 				}
 			}
 		}
 	}
+
+	if (result)
+	{
+		if (result->size() > 0)
+			return result->at(0);
+		else
+			return -1;
+	}
+
+	return first_found_index;
 }
 
 int CListCtrlEx::GetSelectedItem(int nStart /*= 0*/)
@@ -2261,7 +2290,7 @@ void CListCtrlEx::PasteInsertFromClipboard()
 			int nSepCount = get_char_count(str, '|');
 			std::deque<CString> dq;
 
-			dq = GetTokenString(str, _T("|"));
+			get_token_string(str, dq, _T("|"));
 
 			if (bDifferWarning && (GetColumnCount() != (nSepCount+1)))
 			{

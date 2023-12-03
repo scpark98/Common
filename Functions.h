@@ -606,12 +606,12 @@ struct	NETWORK_INFO
 	bool		is_exist_keyword(CString src, CString set_of_keyword, bool case_sensitive = false, bool whole_word = false);
 
 	//dqList에서 element값과 일치하는 항목의 index를 리턴한다. 없으면 -1을 리턴.
-	template <typename T> int find_index(std::deque <T> *dqList, T element)
+	template <typename T> int find_index(std::deque <T> &dqList, T element)
 	{
-		std::deque<T>::iterator it = std::find(dqList->begin(), dqList->end(), element);
-		if (it != dqList->end())
+		std::deque<T>::iterator it = std::find(dqList.begin(), dqList.end(), element);
+		if (it != dqList.end())
 		{
-			return distance(dqList->begin(), it);
+			return distance(dqList.begin(), it);
 		}
 
 		return -1;

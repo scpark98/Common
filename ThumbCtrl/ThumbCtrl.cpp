@@ -864,7 +864,7 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		if (m_dqThumb[i].rect.PtInRect(point))
 		{
-			int selected_index = find_index(&m_selected, i);
+			int selected_index = find_index(m_selected, i);
 
 			//컨트롤키를 누르면 m_use_multi_selection이 false라고 해도 다중선택이 가능하다.
 			if (IsCtrlPressed())
@@ -940,7 +940,7 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				if (!m_use_multi_selection)
 					m_selected.clear();
 
-				if (selected_index >= 0 && m_selected.size() && find_index(&m_selected, m_selected[selected_index]) >= 0)
+				if (selected_index >= 0 && m_selected.size() && find_index(m_selected, m_selected[selected_index]) >= 0)
 				{
 					m_selected.erase(m_selected.begin() + selected_index);
 					::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
@@ -948,7 +948,7 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				}
 				else
 				{
-					if (find_index(&m_selected, i) < 0)
+					if (find_index(m_selected, i) < 0)
 						m_selected.push_back(i);
 					::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 						(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
@@ -1939,7 +1939,7 @@ void CThumbCtrl::select_item(int index, bool select, bool make_ensure_visible)
 
 				while (true)
 				{
-					if (find_index(&m_selected, curr) < 0)
+					if (find_index(m_selected, curr) < 0)
 						m_selected.push_front(curr);
 
 					if (curr < last)

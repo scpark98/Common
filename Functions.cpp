@@ -1,6 +1,7 @@
 #include <afxinet.h>	// for Internet
 #include <string>
 #include <utility>
+#include <fstream>
 #include <filesystem>
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
@@ -4853,8 +4854,35 @@ int	get_text_encoding(CString sfile)
 	return text_encoding;
 }
 
-bool save(CString filepath, CString text)
+//unicode 일때는 code_page에 따라 ansi or utf8로 저장되나
+//multibyte 일때는 utf8로 설정해도 ansi로 저장됨.
+bool save(CString filepath, CString text, int code_page)
 {
+	if (code_page != CP_ACP && code_page != CP_UTF8)
+		code_page = CP_UTF8;
+
+	//std::locale::global(std::locale(".UTF-8"));
+	//setlocale(LC_ALL, ".utf8");
+
+	//unicode 환경에서는 아래와 같이 동작하나 multibyte에서는 ansi로만 저장됨.
+	//CT2A(text)			: ANSI로 저장
+	//CT2CA(text, CP_UTF8)	: UTF8로 저장됨
+	std::ofstream of;
+	
+	of.open(filepath, std::ofstream::out);
+	
+	if (!of.is_open())
+		return false;
+
+	//USES_CONVERSION;
+	//text = W2A_CP(text, code_page);
+	//of << text;
+	// 
+	of << CT2CA(text, code_page);
+	//of << CA2CT(text, code_page);
+	of.close();
+
+	/*
 	FILE* fp = NULL;
 
 	_tfopen_s(&fp, filepath, _T("wt")CHARSET);
@@ -4870,6 +4898,7 @@ bool save(CString filepath, CString text)
 	fclose(fp);
 
 	return true;
+	*/
 }
 
 bool file_open(FILE** fp, CString mode, CString file)
@@ -8296,6 +8325,8 @@ WCHAR* CString2WCHAR(CString str)
 //
 std::string CString2string(CString str)
 {
+	return std::string(CT2CA(str));
+	/*
 	std::string stdStr;
 	char* szStr = CString2char(str);
 	if (szStr)
@@ -8305,6 +8336,7 @@ std::string CString2string(CString str)
 	}
 
 	return stdStr;
+	*/
 }
 
 //cstr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.

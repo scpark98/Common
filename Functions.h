@@ -146,7 +146,7 @@ enum FILE_TYPE
 enum TEXT_ENCODING
 {
 	text_encoding_unknown = -1,
-	text_encoding_ansi,
+	text_encoding_ansi = CP_ACP,
 	text_encoding_utf8bom,
 	text_encoding_unicode,
 };
@@ -829,7 +829,7 @@ struct	NETWORK_INFO
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
 	bool		delete_file(CString fullpath, bool bTrashCan = false);
 	int			get_text_encoding(CString sfile);
-	bool		save(CString filepath, CString text);
+	bool		save(CString filepath, CString text, int code_page = CP_UTF8);
 	bool		file_open(FILE** fp, CString mode, CString file);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.

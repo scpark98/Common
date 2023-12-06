@@ -1,4 +1,11 @@
 #pragma once
+
+/*
+* CStatic을 상속받아 만들었으나 단순 항목 표시나 마우스 액션 등은 문제 없지만
+* COutputStatic과 같이 역시 키보드 처리가 안되고 스크롤 등
+* 근본적인 문제로 인해 간단한 용도로만 사용 가능하다.
+*/
+
 #include "afxwin.h"
 
 #include <deque>
@@ -29,7 +36,7 @@ public:
 	std::deque<CListBoxData>	m_list;
 
 //추가, 삭제
-	int				add_string(CString text, COLORREF crText = GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = COLOR_WINDOW);
+	int				add_string(CString text, COLORREF crText = GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = GetSysColor(COLOR_WINDOW));
 	void			set_alt_text(int index, CString alt_text);
 	int				size() { return m_list.size(); }
 	void			delete_all_items();

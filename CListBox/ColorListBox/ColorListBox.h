@@ -1,6 +1,27 @@
 #if !defined(AFX_COLORLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_)
 #define AFX_COLORLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_
 
+
+/*
+* [개발 배경]
+* 로그 등을 출력하는 용도로 기존 CRichEditCtrlEx를 사용했으나
+* 맨 마지막을 SetSel하고 이를 ReplaceSel을 하여 출력하는 방식이다보니
+* 로그가 계속 추가되는 상태에서는 스크롤 및 텍스트 선택 등이 매우 불편했다.
+* 그래서 CStatic을 상속받은 COutputStatic을 제작해봤으나
+  CStatic은 키보드 입력이 처리되지 않고 스크롤 관련 처리도 번거롭다.
+  CListBox를 상속받아 위 단점들을 없애기 위해 제작함.
+
+* DWORD의 컬러값을 SetItemData()로 저장하여 컬러 텍스트를 출력.
+* log 출력등에 CRichEditCtrlEx를 대신하기 위해 수정.
+* (임의 항목을 클릭하면 auto_scroll이 off되고 Ctrl+End 등에 의해 auto_scroll이 on됨.
+* CPathCtrl에서 동적 팝업 리스트창으로 표시하기 위해서도 사용됨.
+* 
+* [caution]
+* - 컨트롤의 너비, 높이가 어느 이상되면 표시 속도가 현저히 느려진다.
+*/
+
+
+
 #if _MSC_VER >= 1000
 #pragma once
 #endif // _MSC_VER >= 1000
@@ -60,34 +81,71 @@ public:
 
 // Operations
 public:
-	int			AddString(CString text, COLORREF crText = ::GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = ::GetSysColor(COLOR_WINDOW), bool invalidate = false);
-	int			add_string(CString text, COLORREF crText = ::GetSysColor(COLOR_WINDOWTEXT), COLORREF crBack = ::GetSysColor(COLOR_WINDOW), bool invalidate = false);
-	int			add_string(CString lpszItem, COLORREF rgb, bool invalidate = true);					// Adds a colored string to the list box
-	int			add_string(std::deque<CString> *lists, bool invalidate = false);
+	//기본 글자색으로 한 줄 추가
+	int			add(LPCTSTR lpszFormat, ...);
+
+	//지정 글자색으로 한 줄 추가
+	int			add(COLORREF cr, LPCTSTR lpszFormat, ...);
+
+	//마지막 라인의 데이터에 텍스트 append
+	int			append(LPCTSTR lpszFormat, ...);
+
+	//여러줄의 문자열을 한번에 추가(shell_listbox에 사용)
+	int			add(std::deque<CString>* lists, COLORREF cr = -1);
+
 	int			insert_string(int nIndex, CString lpszItem);				// Inserts a string to the list box
 	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb);	// Inserts a colored string to the list box
 	void		set_item_color(int nIndex, COLORREF rgb, bool invalidate = true);	// Sets the color of an item in the list box
 	COLORREF	get_item_color(int nIndex);
 
+	void		clear_all() { ResetContent(); Invalidate(); }
+
 	CSize		resizeToFit(bool bHori = true, bool bVert = true);			//변경된 크기를 리턴한다.
 	void		set_minimum_lines(int lines) { m_nMinimumLines = lines; }
-	int			get_line_height() { return m_line_height; }
 
-	void		UseColor(bool bUse = true) { m_bUseColor = bUse; }
-	void		UseHover(bool bUse = true) { m_bUseHover = bUse; }
-	int			get_hover_item() { return (m_bUseHover ? m_nOverItem : -1); }
+	//선택 관련
+	//선택된 항목 리스트 또는 선택된 개수를 리턴
+	int			get_selected_items(std::vector<int>* selected = NULL);
 
-	void		set_back_color(COLORREF cr) { m_crBack = cr; Invalidate(); }
+	//팝업 메뉴
+	enum CONTEXT_MENU
+	{
+		menu_selected_count = WM_USER + 1234,
+		menu_show_log,
+		menu_show_timeinfo,
+		menu_auto_scroll,
+		menu_clear_all,
+		menu_copy_selected_to_clipboard,
+		menu_copy_all_to_clipboard,
+		menu_save_selected,				//선택 로그만 파일로 저장
+		menu_save_all,					//전체 로그 파일로 저장
+	};
+
+	bool		m_use_popup_menu = true;
+	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
+	void		OnPopupMenu(UINT nID);
+
+
+	//라인 간격
+	int			line_height() { return m_line_height; }
+	void		line_height(int _line_height);
+
+	void		use_over(bool use = true) { m_use_over = use; }
+	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
+
+	void		set_back_color(COLORREF cr) { m_cr_back = cr; Invalidate(); }
 
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
 
 	//folder list로 동작시킨다.
+	void		set_as_folder_list();
 	void		set_parent(HWND hWnd) { m_hParentWnd = hWnd; }
 	//root라는 폴더의 하위 폴더들을 리스트에 표시한다.
 	int			set_path(CString root, CString selected_text = _T(""));
 	//lists를 NULL하여 호출하면 멤버변수인 m_folder_list의 내용을 표시한다.
 	int			set_folder_list(std::deque<CString>* lists = NULL, CString selected_text = _T(""));
+
 
 	virtual		CColorListBox&	set_font(LOGFONT& lf);
 	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
@@ -105,7 +163,7 @@ public:
 		//color_theme_dark_gray,
 	};
 
-	void	set_color_theme(int theme, bool apply_now = true);
+	void		set_color_theme(int theme, bool apply_now = true);
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
@@ -114,22 +172,24 @@ protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;
 
-	bool		m_bUseColor;				//default = false;
-	bool		m_bUseHover;				//default = false;
+	bool		m_use_over = false;
 	BOOL		m_bOutside;
-	int			m_nOverItem;
-	bool		m_as_popup;					//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
+	int			m_over_item = -1;
+	bool		m_as_popup = false;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
 	bool		m_as_folder_list = false;	//폴더목록을 표시하는 목적으로 동작하는 경우
 	std::deque<CString> m_folder_list;
 
-	COLORREF	m_crText;					//기본 글자색
-	COLORREF	m_crTextSelected;			//선택 항목의 활성화(active) 글자색
-	COLORREF	m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
-	COLORREF	m_crTextOver;
-	COLORREF	m_crBack;					//기본 배경색
-	COLORREF	m_crBackSelected;
-	COLORREF	m_crBackSelectedInactive;
-	COLORREF	m_crBackOver;
+	bool		m_show_log = true;
+	bool		m_show_time = true;
+
+	COLORREF	m_cr_text;					//기본 글자색
+	COLORREF	m_cr_textSelected;			//선택 항목의 활성화(active) 글자색
+	COLORREF	m_cr_textSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
+	COLORREF	m_cr_textOver;
+	COLORREF	m_cr_back;					//기본 배경색
+	COLORREF	m_cr_backSelected;
+	COLORREF	m_cr_backSelectedInactive;
+	COLORREF	m_cr_backOver;
 
 
 	LOGFONT		m_lf;
@@ -138,17 +198,29 @@ protected:
 
 	int			m_line_height;
 
+	//선택 관련
+	//std::deque<int>	 m_selected;
+	//int			m_last_selected = -1;	//마지막 선택한 항목(범위 선택시 필요)
 
 	//vert fit에서 최소 표시 라인수를 정해놓는다.default = -1(정하지 않을 경우)
 	int			m_nMinimumLines;
 
-	//
-	//int			m_nItemHeight?
 
 
 	//항목 왼쪽에 인덱스를 표시하는 gutter 영역 설정
 	//단위는 픽셀이 아닌 문자 갯수임. default = 0;
-	int			m_nGutterCharNumber;
+	int			m_nGutterCharNumber = 0;
+
+	//스크롤 기능 관련
+	bool		m_auto_scroll = true;
+	bool		m_is_thumb_tracking = false;
+	int			m_max_horizontal_extent = 0;
+
+	CString		get_all_text(bool selected_only = false);
+	void		copy_selected_to_clipboard();
+	void		copy_all_to_clipboard();
+	void		save_selected_to_file();
+	void		save_all_to_file();
 
 // Overrides
 	// ClassWizard generated virtual function overrides
@@ -177,6 +249,7 @@ public:
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg BOOL OnLbnSelchange();
+	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 };
 
 /////////////////////////////////////////////////////////////////////////////

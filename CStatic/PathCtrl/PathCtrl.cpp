@@ -51,28 +51,24 @@ void CPathCtrl::PreSubclassWindow()
 	ModifyStyle(0, SS_NOTIFY);
 
 	// Get Defalut Font 
-	CFont* cf = GetFont();
+	CFont* font = GetFont();
 
-	if (cf != NULL)
-	{
-		cf->GetObject(sizeof(m_lf), &m_lf);
-	}
+	if (font == NULL)
+		font = AfxGetMainWnd()->GetFont();
+
+	if (font != NULL)
+		font->GetObject(sizeof(m_lf), &m_lf);
 	else
-	{
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-	}
 
 	ReconstructFont();
-
-	//CString text;
-	//GetWindowText(text);
-	//SetWindowText(text);
 
 	DWORD dwStyle = WS_POPUP | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL | WS_BORDER;
 
 	m_list_folder.CreateEx(WS_EX_WINDOWEDGE, _T("listbox"),
 							_T("listbox"), dwStyle, CRect(0, 0, m_sz_list_folder.cx, m_sz_list_folder.cy), this, 0);//IDC_LIST_FOLDERS);
 
+	m_list_folder.set_as_folder_list();
 	m_list_folder.set_font(m_lf);
 	m_list_folder.set_color_theme(CColorListBox::color_theme_explorer);
 	//OnNotify, OnSelChange등의 이벤트 핸들러를 추가해봤으나 되지 않아서 선택시에 SendMessage로 처리함.
@@ -81,7 +77,7 @@ void CPathCtrl::PreSubclassWindow()
 
 	CRect rc;
 	GetClientRect(rc);
-	TRACE(_T("rc = %s\n"), GetRectInfoString(rc, 2));
+	TRACE(_T("rc = %s\n"), get_rect_info_string(rc, 2));
 
 	rc.DeflateRect(1, 1);
 	rc.left = ROOT_WIDTH;
@@ -116,7 +112,7 @@ void CPathCtrl::repos_edit()
 	margin.bottom -= (margin.Height() - szText.cy) / 2;
 
 	m_pEdit->SetRect(&margin);
-	TRACE(_T("rc = %s\n"), GetRectInfoString(margin, 2));
+	TRACE(_T("rc = %s\n"), get_rect_info_string(margin, 2));
 }
 
 void CPathCtrl::ReconstructFont()
@@ -488,7 +484,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	total_lines++;
 
 	m_list_folder.SetWindowPos(NULL, pt.x, pt.y,
-		m_sz_list_folder.cx, min(m_sz_list_folder.cy, total_lines * m_list_folder.get_line_height()),
+		m_sz_list_folder.cx, min(m_sz_list_folder.cy, total_lines * m_list_folder.line_height()),
 		SWP_NOZORDER | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
 }
 

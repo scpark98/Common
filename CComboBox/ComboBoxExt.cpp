@@ -438,8 +438,8 @@ void CComboBoxExt::OnPaint()
 	CPoint cp = r.CenterPoint();
 	cp.Offset(-1, 2);
 	int sz = 4;
-	DrawLine(&dc, cp.x - sz, cp.y - sz, cp.x, cp.y, GRAY(128));
-	DrawLine(&dc, cp.x, cp.y, cp.x + sz, cp.y - sz, GRAY(128));
+	DrawLine(&dc, cp.x - sz, cp.y - sz, cp.x, cp.y, GRAY(128), 2);
+	DrawLine(&dc, cp.x + sz, cp.y - sz, cp.x, cp.y, GRAY(128), 2);
 }
 
 

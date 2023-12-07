@@ -181,6 +181,7 @@ protected:
 
 	bool		m_show_log = true;
 	bool		m_show_time = true;
+	bool		m_dim_time_str = true;		//시간 문자열은 연한 회색으로 비강조되도록 표시
 
 	COLORREF	m_cr_text;					//기본 글자색
 	COLORREF	m_cr_textSelected;			//선택 항목의 활성화(active) 글자색

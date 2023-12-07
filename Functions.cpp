@@ -4854,6 +4854,7 @@ int	get_text_encoding(CString sfile)
 	return text_encoding;
 }
 
+//20231206
 //unicode 일때는 code_page에 따라 ansi or utf8로 저장되나
 //multibyte 일때는 utf8로 설정해도 ansi로 저장됨.
 bool save(CString filepath, CString text, int code_page)
@@ -5388,7 +5389,7 @@ void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor /*= 0*/
 	lb.lbStyle = BS_SOLID;
 	lb.lbColor = crColor;
 
-	CPen	Pen(PS_GEOMETRIC | PS_ENDCAP_FLAT | PS_JOIN_MITER | nPenStyle, nWidth, &lb);
+	CPen	Pen(PS_GEOMETRIC | PS_ENDCAP_ROUND | PS_JOIN_MITER | nPenStyle, nWidth, &lb);
 	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
 	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
 

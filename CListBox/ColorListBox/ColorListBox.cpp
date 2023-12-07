@@ -272,7 +272,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	GetText(lpDIS->itemID, sText);
 
 	// Setup the text format.
-	UINT nFormat = DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS;
+	UINT nFormat = DT_LEFT | DT_SINGLELINE | DT_VCENTER;// | DT_END_ELLIPSIS;
 	if (GetStyle() & LBS_USETABSTOPS)
 		nFormat |= DT_EXPANDTABS;
 
@@ -309,13 +309,29 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	rect.right -= 10;
 
-	int cr_text_old = dc.SetTextColor(cr_text);
-	int bkMode = dc.SetBkMode(TRANSPARENT);
+	dc.SetBkMode(TRANSPARENT);
 
+	//m_show_time일 경우 시간값은 항상 옅은 회색으로만 표시
+	if (m_show_time && m_dim_time_str)
+	{
+		CString time_str = sText.Left(25);
+		CSize sz = dc.GetTextExtent(time_str);
+
+		TEXTMETRIC tm;
+		pDC->GetTextMetrics(&tm);
+
+		rect.right = sz.cx + tm.tmAveCharWidth;
+
+		dc.SetTextColor(RGB(192, 192, 192));
+		dc.DrawText(time_str, rect, nFormat | DT_NOCLIP);
+
+		sText = sText.Mid(26);
+		rect.left = rect.right;
+		rect.right = lpDIS->rcItem.right - 10;
+	}
+
+	dc.SetTextColor(cr_text);
 	dc.DrawText(sText, rect, nFormat);
-
-	//dc.SetTextColor(cr_text_old);
-	//dc.SetBkMode(bkMode);
 
 	dc.SelectObject(pOldFont);
 
@@ -819,7 +835,7 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.CheckMenuItem(menu_show_timeinfo, m_show_time ? MF_CHECKED : MF_UNCHECKED);
 	menu.AppendMenu(MF_SEPARATOR);
 
-	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("자동 스크롤"));
+	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("자동 스크롤\tCtrl+End"));
 	menu.CheckMenuItem(menu_auto_scroll, m_auto_scroll ? MF_CHECKED : MF_UNCHECKED);
 	menu.AppendMenu(MF_SEPARATOR);
 

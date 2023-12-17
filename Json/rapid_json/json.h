@@ -2,6 +2,10 @@
 #define JSON_H_
 
 /*
+* json_cpp는 3개의 파일로만 구성되어 간단하지만
+* write시에 멤버들이 알파벳 순으로만 저장된다는 치명적 단점이 있다.
+* 이 단점만 제외하면 json_cpp나 rapid_json 둘 다 좋으나 rapid_json을 권장.
+* 
 * Usage :
 	//json.h와 json.cpp에서 참조하는 rapid_json/include 폴더의 파일들을 상대경로로 include했으므로
 	//프로젝트 속성에서 굳이 추가 포함 디렉토리에 include 폴더를 추가할 필요는 없다.
@@ -12,8 +16,18 @@
 	
 	Json json;
 	json.parse(src);
+
+	//read bool type
 	bool b = json.doc["result"].GetBool();
+
+	//assign bool type
 	json.doc["result"] = false;
+
+	//read array type
+	rapidjson::Value& ar = json.doc["array"];
+	for (int i = 0; i < ar.Size(); i++)
+		TRACE(_T("ar[%d] = %s\n"), i, ar[i].GetCString());
+
 */
 
 /*
@@ -36,7 +50,7 @@ public:
 	//using Value = rapidjson::Value;
 
 	Json() {}
-	~Json() {}
+	~Json() { doc.RemoveAllMembers(); }
 
 	bool		parse(std::string sstr);
 	bool		parse(CString str);
@@ -54,6 +68,10 @@ public:
 	CString		get_string(bool pretty);
 
 	rapidjson::Document doc;
+
+	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
+	rapidjson::Value* read_array_member(std::string arr_name, int n, std::string member);
+	bool read_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value);
 
 protected:
 	void		traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString &result);

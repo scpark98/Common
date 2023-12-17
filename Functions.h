@@ -662,7 +662,8 @@ struct	NETWORK_INFO
 
 	std::string	CStringToUtf8(CString inputtext);
 
-
+	//return받은 char*는 반드시 사용 후 free()해줘야 함.
+	char*		replace(char* s, const char* olds, const char* news);
 
 	//공백, '\t', '\r', '\n', '\0' 모두 제거
 	void		trim(char* src);
@@ -702,7 +703,8 @@ struct	NETWORK_INFO
 	//str에서 앞뒤 문자열 사이에 있는 서브 문자열을 리턴한다. 없으면 "" 리턴.
 	CString		ExtractSubString(CString src, CString sPrev, CString sPost);	//sPrev(필드 앞에 오는 문자열), sPost(필드 뒤에 오는 문자열)
 	//std::string string_format(const std::string fmt, ...);
-	std::string string_format(const std::string fmt_str, ...);	//A safer and more efficient(http://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf)
+	//A safer and more efficient(http://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf)
+	std::string string_format(const std::string fmt_str, ...);
 	/*
 	//format에 줄때는 %s가 아닌 %S??
 	template<typename ... Args> std::string string_format(const std::string& format, Args ... args)
@@ -717,7 +719,7 @@ struct	NETWORK_INFO
 	*/
 	CString		loadResString(UINT nID);
 
-	//simple json parser
+	//simple json parser. Common/json/rapid_json 추천.
 	CString		json_value(CString json, CString key);
 
 	int			get_char_count(CString sStr, TCHAR ch);
@@ -779,7 +781,6 @@ struct	NETWORK_INFO
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
-
 	//_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 	//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
 	//"c:\\", "c:\\abc/def", "123", "txt", "123.txt와 같이 보정한다.

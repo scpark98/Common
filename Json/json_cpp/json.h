@@ -1,6 +1,7 @@
 /*
 * 단 3개의 파일만으로 간단히 사용 가능.
 * 파일로 write시에 멤버들이 알파벳 순으로만 저장된다는 치명적 단점이 있다.
+* 이 단점만 제외하면 json_cpp나 rapid_json 둘 다 좋으나 rapid_json을 권장.
 * Usage :
     #include "../../Common/Json/json_cpp/json.h"
     ...

@@ -223,3 +223,25 @@ CString Json::get_string(bool pretty)
 
 	return buffer.GetCString();
 }
+
+//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
+rapidjson::Value* Json::read_array_member(std::string arr_name, int n, std::string member)
+{
+	if (!doc[arr_name.c_str()].IsArray())
+		return NULL;
+
+	if (n >= doc[arr_name.c_str()].Size())
+		return NULL;
+
+	return &doc[arr_name.c_str()][n][member.c_str()];
+}
+
+bool Json::read_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value)
+{
+	if (n >= doc[arr_name.c_str()].Size())
+		return false;
+
+	value = &doc[arr_name.c_str()][n][member.c_str()];
+
+	return true;
+}

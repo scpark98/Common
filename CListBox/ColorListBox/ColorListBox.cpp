@@ -75,6 +75,10 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CColorListBox::OnLbnSelchange)
 	ON_WM_CONTEXTMENU()
 	ON_COMMAND_RANGE(menu_show_log, menu_save_all, OnPopupMenu)
+	ON_WM_MOUSEWHEEL()
+	ON_WM_MOUSEHWHEEL()
+	ON_WM_DRAWITEM()
+	ON_WM_SIZE()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -250,13 +254,15 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	}
 
-	CBrush brush(cr_back);
-	dc.FillRect(&rect, &brush);
+	//CBrush brush(cr_back);
+	//dc.FillRect(&rect, &brush);
+	DrawRectangle(&dc, rect, cr_back, cr_back, 1);
 
 	if (lpDIS->itemState & ODS_SELECTED)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_textSelected;
+		DrawRectangle(&dc, rect, GetFocus() ? m_cr_backSelectedRect : cr_back, cr_back, 1);
 	}
 	else if (lpDIS->itemState & ODS_DISABLED)
 	{
@@ -312,7 +318,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	dc.SetBkMode(TRANSPARENT);
 
 	//m_show_time일 경우 시간값은 항상 옅은 회색으로만 표시
-	if (m_show_time && m_dim_time_str)
+	if (m_show_time)
 	{
 		CString time_str = sText.Left(25);
 		CSize sz = dc.GetTextExtent(time_str);
@@ -322,7 +328,9 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 		rect.right = sz.cx + tm.tmAveCharWidth;
 
-		dc.SetTextColor(RGB(192, 192, 192));
+		if (m_dim_time_str)
+			dc.SetTextColor(RGB(192, 192, 192));
+
 		dc.DrawText(time_str, rect, nFormat | DT_NOCLIP);
 
 		sText = sText.Mid(26);
@@ -330,8 +338,9 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		rect.right = lpDIS->rcItem.right - 10;
 	}
 
+	//가로 스크롤시에 뭔가 rect영역이 부족해서 출력되지 않는 현상이 있어서 DT_NOCLIP을 추가함.
 	dc.SetTextColor(cr_text);
-	dc.DrawText(sText, rect, nFormat);
+	dc.DrawText(sText, rect, nFormat | DT_NOCLIP);
 
 	dc.SelectObject(pOldFont);
 
@@ -683,6 +692,7 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 
 		m_cr_back = ::GetSysColor(COLOR_WINDOW);
 		m_cr_backSelected = RGB(204, 232, 255);	//m_crBackSelected = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_backSelectedRect = RGB(153, 209, 255);
 		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_backOver = RGB(195, 222, 245); //m_crBackOver = ::GetSysColor(COLOR_HIGHLIGHT);
 		break;
@@ -694,6 +704,7 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 
 		m_cr_back = ::GetSysColor(COLOR_WINDOW); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
 		m_cr_backSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_backSelectedRect = RGB(153, 209, 255);
 		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_backOver = RGB(195, 222, 245);
 		break;
@@ -828,18 +839,18 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_SEPARATOR);
 	}
 
-	menu.AppendMenu(MF_STRING, menu_show_log, _T("로그 표시"));
+	menu.AppendMenu(MF_STRING, menu_show_log, _T("Show log"));
 	menu.CheckMenuItem(menu_show_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
 
-	menu.AppendMenu(MF_STRING, menu_show_timeinfo, _T("시간 표시"));
+	menu.AppendMenu(MF_STRING, menu_show_timeinfo, _T("Show time info"));
 	menu.CheckMenuItem(menu_show_timeinfo, m_show_time ? MF_CHECKED : MF_UNCHECKED);
 	menu.AppendMenu(MF_SEPARATOR);
 
-	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("자동 스크롤\tCtrl+End"));
+	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("Auto scroll\tCtrl+End"));
 	menu.CheckMenuItem(menu_auto_scroll, m_auto_scroll ? MF_CHECKED : MF_UNCHECKED);
 	menu.AppendMenu(MF_SEPARATOR);
 
-	menu.AppendMenu(MF_STRING, menu_clear_all, _T("모두 지우기(&L)"));
+	menu.AppendMenu(MF_STRING, menu_clear_all, _T("Clear all(&L)"));
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, menu_copy_selected_to_clipboard, _T("Copy selected items"));
@@ -979,4 +990,52 @@ void CColorListBox::save_all_to_file()
 	//of.close();
 	save(dlg.GetPathName(), text, CP_UTF8);
 	//save(dlg.GetPathName(), text, CP_ACP);
+}
+
+
+BOOL CColorListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	
+	//mouse wheel 이벤트가 발생하면 자동 스크롤을 멈춘다.
+	m_auto_scroll = false;
+
+	return CListBox::OnMouseWheel(nFlags, zDelta, pt);
+}
+
+
+void CColorListBox::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
+	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	// 
+	//로그를 일시 중지시킨 후 가로 스크롤 할 
+	//Invalidate();
+	RedrawWindow();
+	UpdateWindow();
+	CListBox::OnMouseHWheel(nFlags, zDelta, pt);
+}
+
+
+void CColorListBox::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CListBox::OnDrawItem(nIDCtl, lpDrawItemStruct);
+}
+
+
+void CColorListBox::OnSize(UINT nType, int cx, int cy)
+{
+	CListBox::OnSize(nType, cx, cy);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//자동 스크롤을 off상태에서 세로로 resize하면 목록이 잘 갱신되지만
+	//가로로 resize 또는 가로로 스크롤하면 텍스트들이 표시가 안된다.
+	//time_str과 선택된 항목은 잘 나타난다.
+	//여기서 Invalidate()해서 해결할 문제가 아니다. DrawItem()에서 원인을 찾자.
+	//DrawItem()에서 DrawText()할때 NO_CLIP을 주고 여기서 Invalidate()하면
+	//전혀 문제는 없이 잘 갱신은 되지만 왜 이런 현상이 발생했는지는 아직 미지수임.
+	Invalidate();
 }

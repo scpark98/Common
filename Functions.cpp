@@ -4897,9 +4897,9 @@ bool save(CString filepath, CString text, int code_page)
 	_ftprintf(fp, _T("%s\n"), text);
 
 	fclose(fp);
+	*/
 
 	return true;
-	*/
 }
 
 bool file_open(FILE** fp, CString mode, CString file)
@@ -11021,6 +11021,85 @@ double		GetPolygonAreaSize(CPoint *pt, int nPoints)
 	dArea /= 2.0;
 
 	return dArea;
+}
+
+//return받은 char*는 반드시 사용 후 free()해줘야 함.
+char* replace(char* s, const char* olds, const char* news)
+{
+	char* result;
+	int i, cnt = 0;
+	int newWlen = strlen(news);
+	int oldWlen = strlen(olds);
+
+	// Counting the number of times old word 
+	// occur in the string 
+	for (i = 0; s[i] != '\0'; i++) {
+		if (strstr(&s[i], olds) == &s[i]) {
+			cnt++;
+
+			// Jumping to index after the old word. 
+			i += oldWlen - 1;
+		}
+	}
+
+	// Making new string of enough length 
+	result = (char*)malloc(i + cnt * (newWlen - oldWlen) + 1);
+
+	i = 0;
+	while (*s) {
+		// compare the substring with the result 
+		if (strstr(s, olds) == s) {
+			strcpy(&result[i], news);
+			i += newWlen;
+			s += oldWlen;
+		}
+		else
+			result[i++] = *s++;
+	}
+
+	result[i] = '\0';
+	return result;
+	/*
+	char* result, * sr;
+	size_t i, count = 0;
+	size_t oldlen = strlen(olds); if (oldlen < 1) return s;
+	size_t newlen = strlen(news);
+
+	if (newlen != oldlen)
+	{
+		for (i = 0; s[i] != '\0';)
+		{
+			if (memcmp(&s[i], olds, oldlen) == 0) count++, i += oldlen;
+			else i++;
+		}
+	}
+	else
+	{
+		i = strlen(s);
+	}
+
+	result = (char*)malloc(i + 1 + count * (newlen - oldlen));
+	if (result == NULL)
+		return NULL;
+
+	sr = result;
+	while (*s)
+	{
+		if (memcmp(s, olds, oldlen) == 0)
+		{
+			memcpy(sr, news, newlen);
+			sr += newlen;
+			s += oldlen;
+		}
+		else
+		{
+			*sr++ = *s++;
+		}
+	}
+	*sr = '\0';
+
+	return result;
+	*/
 }
 
 void Trim(char* src)

@@ -188,7 +188,8 @@ protected:
 	COLORREF	m_cr_textSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
 	COLORREF	m_cr_textOver;
 	COLORREF	m_cr_back;					//기본 배경색
-	COLORREF	m_cr_backSelected;
+	COLORREF	m_cr_backSelected;			//선택 항목 배경색
+	COLORREF	m_cr_backSelectedRect;		//선택 항목 테두리(focus()가 있을 경우에만)
 	COLORREF	m_cr_backSelectedInactive;
 	COLORREF	m_cr_backOver;
 
@@ -251,6 +252,10 @@ public:
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg BOOL OnLbnSelchange();
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };
 
 /////////////////////////////////////////////////////////////////////////////

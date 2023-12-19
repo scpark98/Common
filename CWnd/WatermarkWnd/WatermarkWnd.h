@@ -1,7 +1,7 @@
 #pragma once
 
 //scpark. 단순 투명한 워터마크를 표시하는 목적의 창이므로
-//굳이 CDialog를 상속받지 않고 IDD와 같은 resource가 필요없는 투명창으로 만듬.
+//굳이 CDialog를 상속받지 않고 IDD와 같은 resource도 필요없는 투명창으로 동작하도록 만듬.
 /*
 [usage]
 	.h에 변수 선언
@@ -10,7 +10,7 @@
 	.cpp의 OnInitDialog()에서 생성
 	m_watermarkWnd.create(m_hWnd, m_edit_text, rc);
 
-	OnSize() 또는 OnWindowPosChanged()에서 원하는 크기로 MoveWindow()
+	parentWnd의 OnSize() 또는 OnWindowPosChanged()에서 원하는 크기로 m_watermarkWnd.MoveWindow()
 */
 
 #include <afxwin.h>
@@ -43,7 +43,7 @@ public:
 	COLORREF	m_font_color = RGB(128, 128, 128);
 
 protected:
-	BOOL RegisterWindowClass();
+	BOOL		RegisterWindowClass();
 
 	void		reconstruct_font();
 

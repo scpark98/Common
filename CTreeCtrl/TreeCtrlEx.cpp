@@ -36,6 +36,7 @@ BEGIN_MESSAGE_MAP(CTreeCtrlEx, CTreeCtrl)
 	ON_NOTIFY_REFLECT(NM_DBLCLK, &CTreeCtrlEx::OnNMDblclk)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
+	ON_WM_HSCROLL()
 END_MESSAGE_MAP()
 
 
@@ -182,9 +183,9 @@ void CTreeCtrlEx::OnPaint()
 		}
 
 
-		//dc.FillSolidRect(r, pink);
+		//텍스트를 출력할 때 DT_NOCLIP을 주지 않으면 가로 스크롤시에 잔상이 남게된다.
 		dc.SetTextColor(crText);
-		dc.DrawText(_T(" ") + m_folder_list[i].folder, r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+		dc.DrawText(_T(" ") + m_folder_list[i].folder, r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 
 		//텍스트 왼쪽에 아이콘을 그려주고
 		icon_index = m_pShellImageList->GetSystemImageListIcon(m_folder_list[i].fullpath, true);
@@ -923,4 +924,15 @@ void CTreeCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	}
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CTreeCtrlEx, (WPARAM)&(CTreeCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
+}
+
+
+void CTreeCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	//가로 스크롤시에 선택된 항목 사각형이 제대로 그려지지 않는 문제가 있어서 Invalidate()을 호출함.
+	Invalidate();
+
+	CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
 }

@@ -197,6 +197,7 @@ void CWebView2Ctrl::InitializeWebView()
 	//userDataFolder를 주지 않고 nullptr로 할 경우
 	//이 webview2 컴포넌트를 사용하는 프로그램을
 	//Program Files* 폴더에서 실행하면 웹페이지가 표시되지 않게 된다.
+	//vs2015에서 오래된 webView2 Nuget package를 사용하면 
 	HRESULT hr = CreateCoreWebView2EnvironmentWithOptions
 				(subFolder, userDataFolder.c_str(), options.Get(),
 				Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>
@@ -225,7 +226,7 @@ void CWebView2Ctrl::CloseWebView(bool cleanupUserDataFolder)
 		m_webView->remove_DocumentTitleChanged(m_documentTitleChangedToken);
 		m_webView->remove_PermissionRequested(m_permissionRequestedToken);
 
-		wil::com_ptr<ICoreWebView2_8> wvWnd = m_webView.try_query<ICoreWebView2_8>();
+		wil::com_ptr<ICoreWebView2_4> wvWnd = m_webView.try_query<ICoreWebView2_4>();	//1.0.902.49 ~
 		wvWnd->remove_DownloadStarting(m_downloadStartingToken);
 
 		m_webView = nullptr;
@@ -326,9 +327,11 @@ HRESULT CWebView2Ctrl::OnCreateCoreWebView2ControllerCompleted(HRESULT result, I
 
 
 
-		//put_IsMuted는 1.0.1072.54부터 사용 가능
-		wil::com_ptr<ICoreWebView2_8> wvWnd8 = m_webView.try_query<ICoreWebView2_8>();
-		wvWnd8->put_IsMuted(FALSE);
+		//put_IsMuted는 1.0.1072.54부터 사용 가능.
+		//
+		//고객사 PC에서 낮은 버전의 webView2Runtime을 사용중이라면 우선 주석처리해도 된다.
+		//wil::com_ptr<ICoreWebView2_8> wvWnd8 = m_webView.try_query<ICoreWebView2_8>();
+		//wvWnd8->put_IsMuted(FALSE);
 
 		//기본 다운로드 경로를 얻어오거나 변경.
 		//m_profile->get_DefaultDownloadFolderPath(&m_default_download_path);

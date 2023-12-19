@@ -2906,7 +2906,7 @@ void CVideoWnd::SaveAsDisplayedSize()
 	Wait( 500 );
 
 	CClientDC dc(this);
-	WriteBMP( CaptureWindowToBitmap( m_hWnd, m_rDisplayedImageRect ), dc.GetSafeHdc(), (LPTSTR)(LPCTSTR)fileDlg.GetPathName() );
+	//save(CaptureWindowToBitmap(m_hWnd, m_rDisplayedImageRect), dc.GetSafeHdc(), (LPTSTR)(LPCTSTR)fileDlg.GetPathName() );
 	MessageBeep( 0 );
 
 	if ( bShiftKeyPressed || IsShiftPressed() )
@@ -3077,7 +3077,7 @@ void CVideoWnd::BuildImageArray(CString sfile, CString sExts)
 
 	FindAllFiles(sfolder, &m_dqImageFiles, _T("*"), sExts);
 	m_nTotalFrame = m_dqImageFiles.size();
-	m_nCurrentFrame = find_index(&m_dqImageFiles, sfile);
+	m_nCurrentFrame = find_index(m_dqImageFiles, sfile);
 
 	m_nFileType = FILE_TYPE_IMAGE;
 	GotoFrame(m_nCurrentFrame);
@@ -3134,7 +3134,7 @@ void CVideoWnd::open_next_video( bool next )
 	if ( m_dqFileList.size() == 0 )
 		build_file_list();
 
-	int idx = find_index(&m_dqFileList, m_sVideoFileName);// , true, true );
+	int idx = find_index(m_dqFileList, m_sVideoFileName);// , true, true );
 
 	if ( next )
 		idx++;

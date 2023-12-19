@@ -7,9 +7,9 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 [사용 방법]
 - 이 컨트롤을 사용하고자 하는 프로젝트에서 NuGet 패키지 관리자를 열고
   다음 2개의 패키지를 설치.
-  Microsoft.Web.WebView2 (VS2015에서 최신 버전 추가시 에러가 발생하여 1.0.622.22로 설치, VS2022에서는 최신 버전 문제없음)
-  추후 다시 1.0.1293.44로 업그레이드
-  Microsoft.Windows.ImplementationLibrary (최신 버전 설치해도 문제 없음)
+  1.Microsoft.Web.WebView2 (VS2015에서 최신 버전 추가시 에러가 발생하여 1.0.622.22로 설치, VS2022에서는 최신 버전 문제없음)
+    추후 다시 1.0.1293.44로 업그레이드
+  2.Microsoft.Windows.ImplementationLibrary (최신 버전 설치해도 문제 없음)
 
 - 프로젝트에 다음 5개의 파일 추가.(복사가 아님)
   WebView2Ctrl.cpp
@@ -20,12 +20,16 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
   위의 파일들 중 2개의 cpp는 속성->C/C++->미리 컴파일된 헤더 : "미리 컴파일된 헤더 사용 안 함"으로 설정
 
-- mainDlg에 Custom Control을 추가하고 클래스 이름은 CWebView2Ctrl로 입력.
+- mainDlg 리소스 뷰에 Custom Control을 추가하고 클래스 이름은 CWebView2Ctrl로 입력.
 - 위 컨트롤에 CWebView2Ctrl타입의 제어 변수(m_web)를 선언.
 
 - #include "../../Common/webView2Ctrl/WebView2Ctrl.h" 자동 추가되지 않았다면 수동 입력.
   (주의! 이 WebView2Ctrl.h를 다른 include보다 뒤에 선언할 경우
    Microsoft.Windows.ImplementationLibrary의 wil/resource.h에서 컴파일 오류가 발생한다.)
+
+
+- Windows SDK 8.1을 선택하면 다음과 같은 에러가 발생한다. SDK 10.0을 선택하니 에러 없음.
+	.\packages\Microsoft.Windows.ImplementationLibrary.1.0.220201.1\include\wil\result_macros.h(2035,9): error C2144: 구문 오류: HRESULT'은(는) ';' 다음에 와야 합니다.
 
 - 사용 : m_web.navigate(url);
 - navigate이외의 다른 함수를 사용하고자 한다면 m_web.GetWebView()->Navigate(...)처럼 접근하여 호출.
@@ -33,7 +37,7 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
 * WebView2Loader.dll이 없어도 실행되게 하려면(Static build로 변경)
   $(ProjectDir)\packages\Microsoft.Web.WebView2.1.0.xxxx.xx\build 폴더내에
-  Common.targets 파일이 있고 그 파일에서 WebView2LoaderPreference 태그를 찾아 "Static"으로 변경한다.
+  Common.targets 파일이 있고 그 파일에서 <WebView2LoaderPreference>로 시작되는 태그를 찾아 그 값을 "Static"으로 변경한다.
   (버전에 따라 해당 태그의 위치와 구분은 약간씩 다를 수 있음)
 
 
@@ -231,7 +235,7 @@ public:
 	EventRegistrationToken m_stateChangedToken = {};
 	EventRegistrationToken m_processFailedToken = {};
 	void RegisterEventHandlers();
-	void UpdateProgress(ICoreWebView2DownloadOperation* download);
+	void UpdateProgress(ICoreWebView2DownloadOperation* download);	//1.0.902.49 ~
 
 
 	ICoreWebView2Controller* GetWebViewController()

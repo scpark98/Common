@@ -14136,7 +14136,7 @@ void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
 	str.FormatV(format, args);
 	va_end(args);
 
-	str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1), func, line, str, (linefeed ? '\n' : '\0'));
+	str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
 	OutputDebugString(str);
 }
 

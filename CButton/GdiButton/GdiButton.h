@@ -9,15 +9,15 @@
 
 using namespace Gdiplus;
 
-/* scpark
-- gdi+를 이용한 png 투명 버튼 클래스
-- 단색 또는 배경 이미지 선택 가능.
-- 배경 이미지의 포인터를 넘겨받아 버튼의 배경으로 이용함.
-  따라서 배경은 (0,0)에서 시작되고 resize되지 않은 배경인 경우에만 가능함.
+/*
+- gdi+를 이용한 버튼 클래스
+- 투명 png 이미지를 사용할 경우 이미지 모양으로 버튼이 표시됨.
 - 사용 방법에 따라 일반 push button, toggle button(as a checkbox) 등으로 사용할 수 있음.
 
 [usage]
 * Gdiplus 사용을 위한 세팅
+* GdiplusBitmap.cpp의 Dummy 클래스에서 자동으로 초기화 및 해제하므로 별도 세팅 불필요.
+* 기존 세팅 방법 :
 - stdafx.h
 	#include <gdiplus.h>
 	using namespace Gdiplus;
@@ -39,16 +39,13 @@ using namespace Gdiplus;
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
 
 
-- load button image
-	...
 
-- push button
-	m_btnOk.add_image(_T("PNG"), IDB_BTN72_NORMAL, 0, IDB_BTN72_DOWN, IDB_BTN72_DISABLED); //또는
-	m_btnOk.add_image(_T("PNG"), IDB_BTN72_NORMAL); //over, down, disabled 이미지가 별도 지정되지 않으면 자동 생성해줌.
-	m_btnOk.text(_T("확인")).text_color(black, blue, red, gray).SetFontSize(12).SetFontBold();
+* add_image(...)는 한 버튼에 대한 4가지 상태이미지, 즉 normal, over, down, disabled를 설정할 때 사용하고
+  add_images(...)는 한 버튼에 여러 이미지들을 추가해 놓고 active_index()를 이용하여 원하는 이미지를 표시하는 용도로 사용할 수 있다
+  (on/off, checked/unchecked, play/pause, img0/img1/img2...)
 
-- check or radio button
-	checked, unchecked
+* set_auto_repeat()으로 반복 실행되는 버튼으로 동작 가능.
+* 
 */
 
 //버튼 자동 정렬 정의이며 특정 좌표값 기준이 아닌
@@ -207,6 +204,7 @@ public:
 	void		set_auto_repeat(bool use = true);
 	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
 
+	//public으로 하여 CGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
 	std::deque<CButtonImage*> m_image;
 
 protected:

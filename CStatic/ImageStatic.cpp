@@ -35,9 +35,6 @@ END_MESSAGE_MAP()
 
 // CImageStatic 메시지 처리기
 
-
-
-
 void CImageStatic::OnPaint()
 {
 	CPaintDC dc1(this); // device context for painting
@@ -57,8 +54,7 @@ void CImageStatic::OnPaint()
 
 	Graphics g(dc.GetSafeHdc());
 
-	//g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정
-	g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);	//보정 최소화
+	g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정
 
 	if (m_fit2ctrl)
 	{
@@ -380,4 +376,13 @@ CRect CImageStatic::get_image_roi()
 		return CRect(0, 0, m_img.width, m_img.height);
 
 	return m_image_roi;
+}
+
+//이미지 부드럽게 보정
+void CImageStatic::set_smooth_interpolation(bool use)
+{
+	if (use)
+		m_interplationMode = Gdiplus::InterpolationModeHighQualityBicubic;	//부드럽게 보정
+	else
+		m_interplationMode = Gdiplus::InterpolationModeNearestNeighbor;	//보정 최소화
 }

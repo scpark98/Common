@@ -4,9 +4,9 @@
 //#include "stdafx.h"
 #include "GdiButton.h"
 
-#include "../Functions.h"
-#include "../MemoryDC.h"
-#include "../GdiPlusBitmap.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
+#include "../../GdiPlusBitmap.h"
 
 #pragma warning(disable: 4305)	//'argument': truncation from 'double' to 'Gdiplus::REAL'
 
@@ -1228,7 +1228,7 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	UpdateSurface();
 
-	GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+	//GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 
 	if (m_use_auto_repeat)
 	{
@@ -1260,17 +1260,17 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			SetCheck((m_idx = 1));
 		}
-	}
 
-	if (m_use_auto_repeat)
-	{
-		KillTimer(timer_auto_repeat);
-
-		if (GetCapture() != NULL)
+		if (m_use_auto_repeat)
 		{
-			ReleaseCapture();
-			if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
-				GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+			KillTimer(timer_auto_repeat);
+
+			if (GetCapture() != NULL)
+			{
+				ReleaseCapture();
+				if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
+					GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+			}
 		}
 	}
 

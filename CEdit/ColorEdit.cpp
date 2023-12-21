@@ -58,14 +58,14 @@ CColorEdit::~CColorEdit()
 
 BEGIN_MESSAGE_MAP(CColorEdit, CEdit)
 	//{{AFX_MSG_MAP(CColorEdit)
-	ON_WM_CTLCOLOR_REFLECT()
+	//ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_SIZE()
 	//ON_WM_WINDOWPOSCHANGED()
 	//}}AFX_MSG_MAP
 	ON_WM_PAINT()
-	ON_WM_NCCALCSIZE()
-	ON_WM_NCPAINT()
-	ON_WM_CTLCOLOR()
+	//ON_WM_NCCALCSIZE()
+	//ON_WM_NCPAINT()
+	//ON_WM_CTLCOLOR()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -131,6 +131,13 @@ CColorEdit& CColorEdit::SetBackColor(COLORREF crColor)
 	return *this;
 }
 
+CColorEdit& CColorEdit::SetBackColor_Disabled(COLORREF crBackDisabled)
+{
+	m_crBackDisabled = crBackDisabled;
+	RedrawWindow();
+
+	return *this;
+}
 
 HBRUSH CColorEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 {
@@ -142,22 +149,24 @@ HBRUSH CColorEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	HBRUSH hbr;
 	hbr = (HBRUSH)m_brBkgnd; // Passing a Handle to the Brush
 
-	if ( GetStyle() & ES_READONLY )
+	pDC->SetBkMode(TRANSPARENT);
+
+	if (!IsWindowEnabled())
 	{
-		pDC->SetBkColor( ::GetSysColor( COLOR_3DFACE ) );
-	}
-	else if ( !IsWindowEnabled() )
-	{
-		pDC->SetBkColor( ::GetSysColor( COLOR_3DFACE ) );
+		pDC->SetBkColor(m_crBackDisabled);// ::GetSysColor(COLOR_3DFACE));
 		m_brBkgnd.DeleteObject();
-		m_brBkgnd.CreateSolidBrush( ::GetSysColor( COLOR_3DFACE ) );
+		m_brBkgnd.CreateSolidBrush(m_crBackDisabled);// ::GetSysColor(COLOR_3DFACE) );
 		hbr = (HBRUSH)m_brBkgnd;
+	}
+	else if (GetStyle() & ES_READONLY)
+	{
+		pDC->SetBkColor(m_crBack);// ::GetSysColor(COLOR_3DFACE));
 	}
 	else
 	{
 		pDC->SetBkColor(m_crBack);
  		m_brBkgnd.DeleteObject();
- 		m_brBkgnd.CreateSolidBrush( m_crBack );
+ 		m_brBkgnd.CreateSolidBrush(m_crBack);
 		hbr = (HBRUSH)m_brBkgnd;
 	}
 
@@ -174,11 +183,11 @@ BOOL CColorEdit::SetReadOnly( BOOL bReadOnly )
 	if ( bReadOnly )
 	{
 		m_brBkgnd.DeleteObject();
-		m_brBkgnd.CreateSolidBrush( ::GetSysColor( COLOR_3DFACE ) );
+		m_brBkgnd.CreateSolidBrush(::GetSysColor(COLOR_3DFACE));
 	}
 	else
 	{
-		SetBackColor( m_crBack );
+		SetBackColor(m_crBack);
 	}
 
 	return CEdit::SetReadOnly(bReadOnly);
@@ -299,7 +308,7 @@ BOOL CColorEdit::PreTranslateMessage(MSG* pMsg)
 void CColorEdit::OnPaint()
 {
 	//for border???
-#if 0
+#if 1
 	CPaintDC dc(this); // device context for painting
 					   // TODO: Add your message handler code here
 					   // Do not call CEdit::OnPaint() for painting messages
@@ -307,15 +316,18 @@ void CColorEdit::OnPaint()
 
 	GetClientRect( rc );
 
-	CPen	Pen( PS_SOLID, 1, RGB(128, 128, 128) );
-	CPen*	pOldPen = (CPen*)dc.SelectObject( &Pen );
-	//int		nOldDrawMode = dc.SetROP2( nDrawMode );
-	CBrush*	pOldBrush = (CBrush*)dc.SelectStockObject( NULL_BRUSH );
+	//CPen	Pen( PS_SOLID, 1, RGB(128, 128, 128) );
+	//CPen*	pOldPen = (CPen*)dc.SelectObject( &Pen );
+	////int		nOldDrawMode = dc.SetROP2( nDrawMode );
+	//CBrush*	pOldBrush = (CBrush*)dc.SelectStockObject( NULL_BRUSH );
 
-	rc.bottom -= 3;
-	dc.Rectangle( rc );
+	//rc.bottom -= 3;
+	//dc.Rectangle(rc);
+
+	dc.FillSolidRect(rc, IsWindowEnabled() ? m_crBack : m_crBackDisabled);
+
 #endif
-	CEdit::OnPaint();
+	//CEdit::OnPaint();
 }
 
 

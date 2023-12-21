@@ -32,6 +32,8 @@ public:
 
 	virtual CColorEdit&		SetTextColor(COLORREF crText); // This Function is to set the Color for the Text.
 	virtual CColorEdit&		SetBackColor(COLORREF crBack); // This Function is to set the BackGround Color for the Text and the Edit Box.
+	virtual CColorEdit&		SetBackColor_Disabled(COLORREF crBackDisabled);
+
 	virtual	CColorEdit&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CColorEdit&		SetFontSize(int nSize);
 	virtual CColorEdit&		SetFontBold(bool bBold = true);
@@ -43,6 +45,9 @@ public:
 protected:
 	CBrush		m_brBkgnd;		// Holds Brush Color for the Edit Box
 	COLORREF	m_crBack;	// Holds the Background Color for the Text
+	//disabled인 경우 배경색을 윈도우 기본 회색이 아닌 다른 색으로 칠해줘야 할 경우도 있다.
+	//따라서 기본값은 윈도우 기본 회색이지만 다른 색으로 지정 가능하다.
+	COLORREF	m_crBackDisabled = ::GetSysColor(COLOR_3DFACE);
 	COLORREF	m_crText;	// Holds the Color for the Text
 
 	LOGFONT		m_lf;

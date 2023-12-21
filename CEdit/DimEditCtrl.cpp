@@ -278,7 +278,7 @@ void	CDimEditCtrl::DrawDimText()
 	//pDC = &dc;
 	
 	GetClientRect( &rRect );							// Get Drawing Area
-	//pDC->FillSolidRect( rRect, RGB(255,0,0) );
+	dc.FillSolidRect( rRect, RGB(255,0,0) );
 	//rRect.OffsetRect( 1, 1 );							// Add Sanity Space
 	
 	dc.SelectObject( (*GetFont()) );					// Use The Control's Current Font
@@ -312,7 +312,7 @@ BOOL CDimEditCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	BOOL	bStatus = CEdit::OnEraseBkgnd(pDC);
 
-	if( ( bStatus ) && ( m_bShowDimText ) )					// If All Good, And Showing Any Dim Text
+	if (bStatus && m_bShowDimText)					// If All Good, And Showing Any Dim Text
 	{
 		DrawDimText();										// Draw The Dim Text
 	}

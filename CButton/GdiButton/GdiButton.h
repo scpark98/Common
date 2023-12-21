@@ -5,7 +5,7 @@
 #include <deque>
 #include <gdiplus.h>
 
-#include "../GdiplusBitmap.h"
+#include "../../GdiplusBitmap.h"
 
 using namespace Gdiplus;
 
@@ -203,9 +203,19 @@ public:
 	//따라서 tooltip은 가능한 한 main에서 처리하도록 한다.
 	void		set_tooltip_text(CString text);
 
+	//auto repeat
+	void		set_auto_repeat(bool use = true);
+	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
+
 	std::deque<CButtonImage*> m_image;
 
 protected:
+	enum TIMER_ID
+	{
+		timer_blink = 0,
+		timer_auto_repeat,
+	};
+
 	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton
 
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
@@ -269,6 +279,13 @@ protected:
 	CToolTipCtrl	m_tooltip;
 	bool		m_use_tooltip = true;
 	CString		m_tooltip_text = _T("");
+
+
+	//auto repeat
+	int			m_initial_delay = 1;
+	int			m_repeat_delay = 500;
+	bool		m_use_auto_repeat = false;
+	int			m_sent_once_auto_repeat_click_message = 0;	//만약 down후 initial_delay가 되기도 전에 up된다면 이때에도 한번은 마우스 클릭 이벤트를 처리해줘야 한다.
 
 protected:
 	DECLARE_MESSAGE_MAP()

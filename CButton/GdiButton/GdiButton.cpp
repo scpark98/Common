@@ -10,8 +10,6 @@
 
 #pragma warning(disable: 4305)	//'argument': truncation from 'double' to 'Gdiplus::REAL'
 
-#define	TIMER_BLINK		0
-
 // CGdiButton
 
 IMPLEMENT_DYNAMIC(CGdiButton, CButton)
@@ -952,18 +950,28 @@ void CGdiButton::OnMouseLeave()
 void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (nIDEvent == TIMER_BLINK)
+	if (nIDEvent == timer_blink)
 	{
 		m_bBlinkStatus = !m_bBlinkStatus;
 		ShowWindow(m_bBlinkStatus ? SW_SHOW : SW_HIDE);
 
-		KillTimer(TIMER_BLINK);
+		KillTimer(timer_blink);
 
 		if (m_bBlinkStatus)
-			SetTimer(TIMER_BLINK, m_nBlinkTime1, NULL);
+			SetTimer(timer_blink, m_nBlinkTime1, NULL);
 		else
-			SetTimer(TIMER_BLINK, m_nBlinkTime0, NULL);
+			SetTimer(timer_blink, m_nBlinkTime0, NULL);
 	}
+	else if (nIDEvent == timer_auto_repeat)
+	{
+		if ((GetState() & BST_PUSHED) == 0)
+			return;
+
+		SetTimer(timer_auto_repeat, m_repeat_delay, NULL);
+		GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+		m_sent_once_auto_repeat_click_message++;
+	}
+
 
 	CButton::OnTimer(nIDEvent);
 }
@@ -1161,7 +1169,7 @@ LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 
 void CGdiButton::SetBlinkTime(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
 {
-	KillTimer(TIMER_BLINK);
+	KillTimer(timer_blink);
 
 	m_nBlinkTime0		= nTime0;
 	m_nBlinkTime1		= nTime1;
@@ -1176,12 +1184,12 @@ void CGdiButton::SetBlink(BOOL bBlink /*= TRUE*/)
 
 	if (m_bBlink)
 	{
-		SetTimer(TIMER_BLINK, m_nBlinkTime0, NULL);
+		SetTimer(timer_blink, m_nBlinkTime0, NULL);
 	}
 	else
 	{
 		m_bBlink = false;
-		KillTimer(TIMER_BLINK);
+		KillTimer(timer_blink);
 		ShowWindow(SW_SHOW);
 		//UpdateSurface();
 	}
@@ -1219,6 +1227,16 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	UpdateSurface();
+
+	GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+
+	if (m_use_auto_repeat)
+	{
+		//SetCapture();
+		SetTimer(timer_auto_repeat, m_initial_delay, NULL);
+		m_sent_once_auto_repeat_click_message = 0;
+	}
+
 	CButton::OnLButtonDown(nFlags, point);
 }
 
@@ -1241,6 +1259,18 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 		else if (m_button_style == BS_RADIOBUTTON)
 		{
 			SetCheck((m_idx = 1));
+		}
+	}
+
+	if (m_use_auto_repeat)
+	{
+		KillTimer(timer_auto_repeat);
+
+		if (GetCapture() != NULL)
+		{
+			ReleaseCapture();
+			if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
+				GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 		}
 	}
 
@@ -1502,3 +1532,15 @@ BOOL CGdiButton::OnToolTipNotify(UINT /*id*/, NMHDR* pNMHDR, LRESULT* /*pResult*
 	}
 	return FALSE;
 }
+
+void CGdiButton::set_auto_repeat(bool use)
+{
+	m_use_auto_repeat = use;
+}
+
+void CGdiButton::set_auto_repeat_delay(int initial_delay, int repeat_delay)
+{
+	m_initial_delay = initial_delay;
+	m_repeat_delay = repeat_delay;
+}
+

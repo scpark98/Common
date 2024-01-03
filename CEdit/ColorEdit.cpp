@@ -5,8 +5,8 @@
 //
 // There are three functions available Currently:
 // SetBkColor(COLORREF crColor)
-// SetTextColor(COLORREF crColor)
-// SetReadOnly(BOOL flag = TRUE)
+// set_text_color(COLORREF crColor)
+// set_read_only(BOOL flag = TRUE)
 //
 // How To Use:
 // Add three files to your project
@@ -38,14 +38,19 @@ static char THIS_FILE[] = __FILE__;
 // CColorEdit
 
 CColorEdit::CColorEdit()
-	: m_rectNCBottom(0, 0, 0, 0)
-	, m_rectNCTop(0, 0, 0, 0)
+	: m_rect_NCbottom(0, 0, 0, 0)
+	, m_rect_NCtop(0, 0, 0, 0)
 {
-	m_crBack	= RGB( 255, 255, 255 );
-	m_crText	= ::GetSysColor(COLOR_WINDOWTEXT);
-	m_brBkgnd.CreateSolidBrush(m_crBack);
+	m_cr_text = ::GetSysColor(COLOR_WINDOWTEXT);
+	m_cr_back = ::GetSysColor(COLOR_WINDOW);
+	m_cr_text_disabled = ::GetSysColor(COLOR_GRAYTEXT);
+	m_cr_back_disabled = ::GetSysColor(COLOR_3DSHADOW);
 
-	m_bAutoResizeFont = false;
+	m_br_back.CreateSolidBrush(m_cr_back);
+	//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
+	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
+
+	m_auto_resize_font = false;
 	m_auto_resize_ratio = 0.5;
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
@@ -58,14 +63,15 @@ CColorEdit::~CColorEdit()
 
 BEGIN_MESSAGE_MAP(CColorEdit, CEdit)
 	//{{AFX_MSG_MAP(CColorEdit)
-	//ON_WM_CTLCOLOR_REFLECT()
+	ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_SIZE()
-	//ON_WM_WINDOWPOSCHANGED()
-	//}}AFX_MSG_MAP
 	ON_WM_PAINT()
-	//ON_WM_NCCALCSIZE()
-	//ON_WM_NCPAINT()
-	//ON_WM_CTLCOLOR()
+	ON_WM_NCCALCSIZE()
+	ON_WM_NCPAINT()
+	ON_CONTROL_REFLECT(EN_KILLFOCUS, &CColorEdit::OnEnKillfocus)
+	ON_CONTROL_REFLECT(EN_UPDATE, &CColorEdit::OnEnUpdate)
+	ON_WM_WINDOWPOSCHANGED()
+//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -81,15 +87,15 @@ void CColorEdit::PreSubclassWindow()
 	CFont* font = GetParent()->GetFont();
 
 	if (font != NULL)
-		font->GetObject(sizeof(m_lf),&m_lf);
+		font->GetObject(sizeof(m_lf), &m_lf);
 	else
-		GetObject(GetStockObject(SYSTEM_FONT),sizeof(m_lf),&m_lf);
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
-	m_nDefaultHeight = m_lf.lfHeight;
-	ReconstructFont();
+	m_default_height = m_lf.lfHeight;
+	reconstruct_font();
 }
 
-void CColorEdit::ReconstructFont()
+void CColorEdit::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
@@ -113,27 +119,38 @@ int CColorEdit::get_font_size(bool pixel_size)
 	return m_font_size;
 }
 
-CColorEdit& CColorEdit::SetTextColor(COLORREF crColor)
+CColorEdit& CColorEdit::set_text_color(COLORREF crColor)
 {
-	m_crText = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
+	m_cr_text = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
 	RedrawWindow();
 
 	return *this;
 }
 
-CColorEdit& CColorEdit::SetBackColor(COLORREF crColor)
+CColorEdit& CColorEdit::set_back_color(COLORREF crColor)
 {
-	m_crBack = crColor; // Passing the value passed by the dialog to the member varaible for Backgound Color
-	m_brBkgnd.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
-	m_brBkgnd.CreateSolidBrush(crColor); // Creating the Brush Color For the Edit Box Background
+	m_cr_back = crColor; // Passing the value passed by the dialog to the member varaible for Backgound Color
+	m_br_back.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
+	m_br_back.CreateSolidBrush(crColor); // Creating the Brush Color For the Edit Box Background
+	//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
 	RedrawWindow();
 
 	return *this;
 }
 
-CColorEdit& CColorEdit::SetBackColor_Disabled(COLORREF crBackDisabled)
+CColorEdit& CColorEdit::set_text_color_disabled(COLORREF cr_text_disabled)
 {
-	m_crBackDisabled = crBackDisabled;
+	m_cr_text_disabled = cr_text_disabled;
+	RedrawWindow();
+
+	return *this;
+}
+
+CColorEdit& CColorEdit::set_back_color_disabled(COLORREF cr_back_disabled)
+{
+	m_cr_back_disabled = cr_back_disabled;
+	m_br_back_disabled.DeleteObject();
+	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
 	RedrawWindow();
 
 	return *this;
@@ -141,93 +158,94 @@ CColorEdit& CColorEdit::SetBackColor_Disabled(COLORREF crBackDisabled)
 
 HBRUSH CColorEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 {
-	if(m_rectNCTop.IsRectEmpty())
+	if(m_rect_NCtop.IsRectEmpty())
 	{
 		SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED);
 	}
 
-	HBRUSH hbr;
-	hbr = (HBRUSH)m_brBkgnd; // Passing a Handle to the Brush
+	HBRUSH hbr = (HBRUSH)m_br_back; // Passing a Handle to the Brush
 
-	pDC->SetBkMode(TRANSPARENT);
+	//pDC->SetBkMode(TRANSPARENT);
 
-	if (!IsWindowEnabled())
+	if (GetStyle() & ES_READONLY)
 	{
-		pDC->SetBkColor(m_crBackDisabled);// ::GetSysColor(COLOR_3DFACE));
-		m_brBkgnd.DeleteObject();
-		m_brBkgnd.CreateSolidBrush(m_crBackDisabled);// ::GetSysColor(COLOR_3DFACE) );
-		hbr = (HBRUSH)m_brBkgnd;
+		pDC->SetTextColor(m_cr_text);
+		pDC->SetBkColor( ::GetSysColor( COLOR_3DFACE ) );
 	}
-	else if (GetStyle() & ES_READONLY)
+	else if (!IsWindowEnabled())
 	{
-		pDC->SetBkColor(m_crBack);// ::GetSysColor(COLOR_3DFACE));
+		pDC->SetTextColor(RGB(255, 255, 255));// m_cr_text_disabled);
+		pDC->SetBkColor(m_cr_back_disabled);
+		m_br_back_disabled.DeleteObject();
+		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
+		hbr = (HBRUSH)m_br_back_disabled;
 	}
 	else
 	{
-		pDC->SetBkColor(m_crBack);
- 		m_brBkgnd.DeleteObject();
- 		m_brBkgnd.CreateSolidBrush(m_crBack);
-		hbr = (HBRUSH)m_brBkgnd;
+		pDC->SetTextColor(m_cr_text);
+		pDC->SetBkColor(m_cr_back);
+ 		m_br_back.DeleteObject();
+ 		m_br_back.CreateSolidBrush(m_cr_back);
+		//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
+		hbr = (HBRUSH)m_br_back;
 	}
-
-	pDC->SetTextColor(m_crText); // Setting the Text Color to the one Passed by the Dialog
-
 
 	return hbr;
 }
 
-BOOL CColorEdit::SetReadOnly( BOOL bReadOnly )
+BOOL CColorEdit::set_read_only( BOOL bReadOnly )
 {
-	//readonly일 때 SetBackColor를 호출하면 원래 m_crBackColor이 덮어써지므로
+	//readonly일 때 set_back_color를 호출하면 원래 m_cr_backColor이 덮어써지므로
 	//그 변수값은 변경하지 말고 직접 배경색을 변경해준다.
-	if ( bReadOnly )
+	if (bReadOnly)
 	{
-		m_brBkgnd.DeleteObject();
-		m_brBkgnd.CreateSolidBrush(::GetSysColor(COLOR_3DFACE));
+		m_br_back.DeleteObject();
+		m_br_back.CreateSolidBrush(::GetSysColor(COLOR_3DFACE));
+		//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
 	}
 	else
 	{
-		SetBackColor(m_crBack);
+		set_back_color(m_cr_back);
 	}
 
 	return CEdit::SetReadOnly(bReadOnly);
 }
 
-CColorEdit& CColorEdit::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
+CColorEdit& CColorEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
 
-CColorEdit& CColorEdit::SetFontSize( int nSize )
+CColorEdit& CColorEdit::set_font_size( int nSize )
 {
 	m_font_size = nSize;
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
 	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
 
-CColorEdit& CColorEdit::SetFontBold( bool bBold )
+CColorEdit& CColorEdit::set_font_bold( bool bBold )
 {
 	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
 
-CColorEdit& CColorEdit::SetAutoFontSize(bool bAuto, double ratio)
+CColorEdit& CColorEdit::set_auto_font_size(bool bAuto, double ratio)
 {
 	CRect	r;
 	GetClientRect( r );
 
-	m_bAutoResizeFont = bAuto;
+	m_auto_resize_font = bAuto;
 
 	
 	if (bAuto)
@@ -237,27 +255,27 @@ CColorEdit& CColorEdit::SetAutoFontSize(bool bAuto, double ratio)
 	}
 	else
 	{
-		m_lf.lfHeight = m_nDefaultHeight;
+		m_lf.lfHeight = m_default_height;
 	}
 
 	//m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
 
-void CColorEdit::RecalcFontSize()
+void CColorEdit::recalc_font_size()
 {
 	CRect	r;
 	GetClientRect( r );
 
-	if ( m_bAutoResizeFont )
+	if (m_auto_resize_font)
 		m_lf.lfHeight = -((double)r.Height() * m_auto_resize_ratio);
 	else
-		m_lf.lfHeight = m_nDefaultHeight;
+		m_lf.lfHeight = m_default_height;
 
-	ReconstructFont();
+	reconstruct_font();
 }
 
 void CColorEdit::OnSize(UINT nType, int cx, int cy)
@@ -273,8 +291,8 @@ void CColorEdit::OnSize(UINT nType, int cx, int cy)
 	//차일드 컨트롤에서도 WM_SIZE가 발생한다.
 	//따라서 차일드 컨트롤에서는 굳이 OnWindowPosChanged를 사용하지 않고
 	//WM_SIZE를 사용해도 된다.
-	if ( m_bAutoResizeFont )
-		RecalcFontSize();
+	if (m_auto_resize_font)
+		recalc_font_size();
 }
 
 /*
@@ -293,7 +311,7 @@ void CColorEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 	//창의 이동이 아닌 창의 크기가 변했을 때만 수행하자.
 	if ( lpwndpos->flags != 16779797 )
-		RecalcFontSize();
+		recalc_font_size();
 }
 */
 
@@ -308,7 +326,7 @@ BOOL CColorEdit::PreTranslateMessage(MSG* pMsg)
 void CColorEdit::OnPaint()
 {
 	//for border???
-#if 1
+#if 0
 	CPaintDC dc(this); // device context for painting
 					   // TODO: Add your message handler code here
 					   // Do not call CEdit::OnPaint() for painting messages
@@ -316,18 +334,15 @@ void CColorEdit::OnPaint()
 
 	GetClientRect( rc );
 
-	//CPen	Pen( PS_SOLID, 1, RGB(128, 128, 128) );
-	//CPen*	pOldPen = (CPen*)dc.SelectObject( &Pen );
-	////int		nOldDrawMode = dc.SetROP2( nDrawMode );
-	//CBrush*	pOldBrush = (CBrush*)dc.SelectStockObject( NULL_BRUSH );
+	CPen	Pen( PS_SOLID, 1, RGB(128, 128, 128) );
+	CPen*	pOldPen = (CPen*)dc.SelectObject( &Pen );
+	//int		nOldDrawMode = dc.SetROP2( nDrawMode );
+	CBrush*	pOldBrush = (CBrush*)dc.SelectStockObject( NULL_BRUSH );
 
-	//rc.bottom -= 3;
-	//dc.Rectangle(rc);
-
-	dc.FillSolidRect(rc, IsWindowEnabled() ? m_crBack : m_crBackDisabled);
-
+	rc.bottom -= 3;
+	dc.Rectangle( rc );
 #endif
-	//CEdit::OnPaint();
+	CEdit::OnPaint();
 }
 
 
@@ -362,44 +377,69 @@ void CColorEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 	UINT uiCX = (rectWnd.Width() - rectClient.Width()) / 2;
 
 	rectWnd.OffsetRect(-rectWnd.left, -rectWnd.top);
-	m_rectNCTop = rectWnd;
+	m_rect_NCtop = rectWnd;
 
-	m_rectNCTop.DeflateRect(uiCX, uiCY, uiCX, uiCenterOffset + uiVClientHeight + uiCY);
+	m_rect_NCtop.DeflateRect(uiCX, uiCY, uiCX, uiCenterOffset + uiVClientHeight + uiCY);
 
-	m_rectNCBottom = rectWnd;
+	m_rect_NCbottom = rectWnd;
 
-	m_rectNCBottom.DeflateRect(uiCX, uiCenterOffset + uiVClientHeight + uiCY, uiCX, uiCY);
+	m_rect_NCbottom.DeflateRect(uiCX, uiCenterOffset + uiVClientHeight + uiCY, uiCX, uiCY);
 
 	lpncsp->rgrc[0].top += uiCenterOffset;
 	lpncsp->rgrc[0].bottom -= uiCenterOffset;
 
 	lpncsp->rgrc[0].left += uiCX;
 	lpncsp->rgrc[0].right -= uiCY;
-
-
-
 	//CEdit::OnNcCalcSize(bCalcValidRects, lpncsp);
 }
 
 
 void CColorEdit::OnNcPaint()
 {
+	if (!IsWindowEnabled())
+		return;
+
 	Default();
 
 	CWindowDC dc(this);
-	CBrush Brush(m_crBack);//GetSysColor(COLOR_WINDOW));
+	CBrush Brush(m_cr_back);//GetSysColor(COLOR_WINDOW));
 
-	dc.FillRect(m_rectNCBottom, &Brush);
-	dc.FillRect(m_rectNCTop, &Brush);
+	dc.FillRect(m_rect_NCbottom, &Brush);
+	dc.FillRect(m_rect_NCtop, &Brush);
+
+	Brush.DeleteObject();
+}
+
+void CColorEdit::update_ctrl()
+{
+	CWnd* pParent = GetParent();
+	CRect rect;
+
+	GetWindowRect(rect);
+	pParent->ScreenToClient(rect);
+	rect.top -= 5;
+	//rect.InflateRect( 5, 5 );		//이거 안해주면 위치이동시 잔상생김
+
+	pParent->InvalidateRect(rect, FALSE);
 }
 
 
-HBRUSH CColorEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+void CColorEdit::OnEnKillfocus()
 {
-	HBRUSH hbr = CEdit::OnCtlColor(pDC, pWnd, nCtlColor);
+	update_ctrl();
+}
 
-	// TODO:  Change any attributes of the DC here
 
-	// TODO:  Return a different brush if the default is not desired
-	return hbr;
+void CColorEdit::OnEnUpdate()
+{
+	update_ctrl();
+}
+
+
+void CColorEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+{
+	CEdit::OnWindowPosChanged(lpwndpos);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	update_ctrl();
 }

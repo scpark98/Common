@@ -42,9 +42,9 @@ CDimEditCtrl::CDimEditCtrl() :
 //	m_cBlueOS( -0x40 ),										// Set The Default Dim Offset Colors
 //	m_bUseDimOffset( true ),								// Use The Offset Colors
 	m_iDimTextLen( 0 ),										// No Dim Text Set Yet
-	m_crDimTextColor( RGB( 0x00, 0x00, 0x00 ) )				// No "Hard" Dim Text Color
+	m_crDimTextColor(RGB(192, 192, 192))				// No "Hard" Dim Text Color
 {
-	m_crText = RGB( 0, 0, 0 );
+	m_crText = ::GetSysColor(COLOR_WINDOWTEXT);
 	m_caDimText[ 0 ] = _T( '\0' );							// Terminate The Buffer
 	SetDimOffset( -0x40, -0x40, -0x40 );					// Set The Dim Offset
 
@@ -272,18 +272,18 @@ void	CDimEditCtrl::DrawDimText()
 		return;											// Stop Here
 
 	CClientDC	dc( this );
-	CRect		rRect;
+	CRect		rc;
 	int			iState = dc.SaveDC();					// Save The DC State
 
 	//pDC = &dc;
 	
-	GetClientRect( &rRect );							// Get Drawing Area
-	dc.FillSolidRect( rRect, RGB(255,0,0) );
+	GetClientRect( &rc );							// Get Drawing Area
+	dc.FillSolidRect(rc, ::GetSysColor(COLOR_WINDOW));
 	//rRect.OffsetRect( 1, 1 );							// Add Sanity Space
 	
-	dc.SelectObject( (*GetFont()) );					// Use The Control's Current Font
-	dc.SetTextColor( m_crDimTextColor );				// Set The Text Color
-	//pDC->SetBkColor( GetSysColor( COLOR_WINDOW ) );	// Set The Bk Color
+	dc.SelectObject((*GetFont()));					// Use The Control's Current Font
+	dc.SetTextColor(m_crDimTextColor);				// Set The Text Color
+	//pDC->SetBkColor(GetSysColor(COLOR_WINDOW));	// Set The Bk Color
 	dc.SetBkMode(TRANSPARENT);
 
 	DWORD dwStyle = GetStyle();
@@ -301,7 +301,7 @@ void	CDimEditCtrl::DrawDimText()
 		//MAP_STYLE(ES_PATHELLIPSIS, DT_PATH_ELLIPSIS);
 	}
 
-	dc.DrawText(m_caDimText, m_iDimTextLen, &rRect, dwText | DT_SINGLELINE | DT_VCENTER);
+	dc.DrawText(m_caDimText, m_iDimTextLen, &rc, dwText | DT_SINGLELINE | DT_VCENTER);
 	dc.RestoreDC( iState );								// Restore The DC State
 
 	return;												// Done!

@@ -484,7 +484,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	total_lines++;
 
 	m_list_folder.SetWindowPos(NULL, pt.x, pt.y,
-		m_sz_list_folder.cx, min(m_sz_list_folder.cy, total_lines * m_list_folder.line_height()),
+		m_sz_list_folder.cx, min(m_sz_list_folder.cy, total_lines * m_list_folder.get_line_height()),
 		SWP_NOZORDER | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
 }
 

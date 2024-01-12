@@ -37,11 +37,6 @@ CGdiButton::CGdiButton()
 
 	m_b3DRect			= true;
 
-	m_bBlink			= FALSE;
-	m_bBlinkStatus		= FALSE;
-	m_nBlinkTime0		= 400;
-	m_nBlinkTime1		= 1200;
-
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	EnableToolTips(true);
@@ -84,7 +79,7 @@ void CGdiButton::release_all()
 	m_back.release();
 	m_back_origin.release();
 
-	for (int i = 0; i < m_image.size(); i++)
+	for (size_t i = 0; i < m_image.size(); i++)
 	{
 		delete m_image[i];
 		//m_image[i]->normal.release();
@@ -230,7 +225,7 @@ void CGdiButton::use_normal_image_on_disabled(bool use)
 {
 	m_use_normal_image_on_disabled = use;
 
-	for (int i = 0; i < m_image.size(); i++)
+	for (size_t i = 0; i < m_image.size(); i++)
 	{
 		if (m_image[i]->normal)
 		{
@@ -346,7 +341,7 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 
 void CGdiButton::set_alpha(float alpha)
 {
-	for (int i = 0; i < m_image.size(); i++)
+	for (size_t i = 0; i < m_image.size(); i++)
 	{
 		m_image[i]->normal.set_alpha(alpha);
 		m_image[i]->over.set_alpha(alpha);
@@ -357,7 +352,7 @@ void CGdiButton::set_alpha(float alpha)
 
 void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
 {
-	for (int i = 0; i < m_image.size(); i++)
+	for (size_t i = 0; i < m_image.size(); i++)
 	{
 		m_image[i]->normal.add_rgb_loop(red, green, blue, GRAY(50));
 		//m_image[i]->over.set_alpha(alpha);
@@ -763,7 +758,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			Color color;
 			color.SetFromCOLORREF(m_hover_rect_color);
-			Pen pen(color, m_hover_rect_thick);
+			Pen pen(color, (Gdiplus::REAL)m_hover_rect_thick);
 			g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
 		}
 
@@ -776,7 +771,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Color	color;
 
 			color.SetFromCOLORREF(m_crFocusRect);
-			Pen	pen(color, m_nFocusRectWidth);
+			Pen	pen(color, (Gdiplus::REAL)m_nFocusRectWidth);
 			pen.SetDashStyle(DashStyleDot);
 			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 		}
@@ -826,7 +821,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			if (GetCheck())
 			{
-				g.FillEllipse(&br, r.left + r.Width() / 4, r.top + r.Height() / 4, r.Width() / 1.7, r.Height() / 1.7);
+				g.FillEllipse(&br,
+					(Gdiplus::REAL)(r.left + r.Width()) / 4.0f,
+					(Gdiplus::REAL)(r.top + r.Height()) / 4.0f,
+					(Gdiplus::REAL)(r.Width()) / 1.7f,
+					(Gdiplus::REAL)(r.Height()) / 1.7f);
 			}
 
 			rText = r;
@@ -952,15 +951,15 @@ void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (nIDEvent == timer_blink)
 	{
-		m_bBlinkStatus = !m_bBlinkStatus;
-		ShowWindow(m_bBlinkStatus ? SW_SHOW : SW_HIDE);
+		m_blink_status = !m_blink_status;
+		ShowWindow(m_blink_status ? SW_SHOW : SW_HIDE);
 
 		KillTimer(timer_blink);
 
-		if (m_bBlinkStatus)
-			SetTimer(timer_blink, m_nBlinkTime1, NULL);
+		if (m_blink_status)
+			SetTimer(timer_blink, m_blink_time1, NULL);
 		else
-			SetTimer(timer_blink, m_nBlinkTime0, NULL);
+			SetTimer(timer_blink, m_blink_time0, NULL);
 	}
 	else if (nIDEvent == timer_auto_repeat)
 	{
@@ -1171,24 +1170,24 @@ void CGdiButton::SetBlinkTime(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
 {
 	KillTimer(timer_blink);
 
-	m_nBlinkTime0		= nTime0;
-	m_nBlinkTime1		= nTime1;
+	m_blink_time0		= nTime0;
+	m_blink_time1		= nTime1;
 
-	SetBlink(m_bBlink);
+	SetBlink(m_blink);
 }
 
 void CGdiButton::SetBlink(BOOL bBlink /*= TRUE*/)
 {
-	m_bBlink = bBlink;
-	m_bBlinkStatus = FALSE;
+	m_blink = bBlink;
+	m_blink_status = FALSE;
 
-	if (m_bBlink)
+	if (m_blink)
 	{
-		SetTimer(timer_blink, m_nBlinkTime0, NULL);
+		SetTimer(timer_blink, m_blink_time0, NULL);
 	}
 	else
 	{
-		m_bBlink = false;
+		m_blink = false;
 		KillTimer(timer_blink);
 		ShowWindow(SW_SHOW);
 		//UpdateSurface();

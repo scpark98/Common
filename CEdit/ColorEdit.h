@@ -32,8 +32,10 @@ public:
 
 	virtual CColorEdit&		set_text_color(COLORREF crText); // This Function is to set the Color for the Text.
 	virtual CColorEdit&		set_back_color(COLORREF crBack); // This Function is to set the BackGround Color for the Text and the Edit Box.
+	//아직 set_text_color_disabled()는 효과가 적용되고 있지 않다. 수정 필요.
 	virtual CColorEdit&		set_text_color_disabled(COLORREF cr_text_disabled);
 	virtual CColorEdit&		set_back_color_disabled(COLORREF cr_back_disabled);
+
 	virtual	CColorEdit&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CColorEdit&		set_font_size(int nSize);
 	virtual CColorEdit&		set_font_bold(bool bBold = true);
@@ -45,7 +47,7 @@ public:
 protected:
 	COLORREF	m_cr_text;
 	COLORREF	m_cr_back;
-	COLORREF	m_cr_text_disabled;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
+	COLORREF	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
 	COLORREF	m_cr_back_disabled;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
 	CBrush		m_br_back;
 	CBrush		m_br_back_disabled;

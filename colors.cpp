@@ -72,9 +72,9 @@ COLORREF get_color(COLORREF cr1, COLORREF cr2, double ratio)
 	int b2 = GetBValue(cr2);
 	int r, g, b;
 
-	r = r1 - ((double)(r1 - r2) * ratio);
-	g = g1 - ((double)(g1 - g2) * ratio);
-	b = b1 - ((double)(b1 - b2) * ratio);
+	r = r1 - (int)((double)(r1 - r2) * ratio);
+	g = g1 - (int)((double)(g1 - g2) * ratio);
+	b = b1 - (int)((double)(b1 - b2) * ratio);
 
 	return RGB(r, g, b);
 }
@@ -107,7 +107,7 @@ uint8_t gray_value(uint8_t r, uint8_t g, uint8_t b)
 {
 	int cr = r * 4897 + g * 9617 + b * 1868;
 	//float crf = cr >> 14;	//shift연산의 결과는 정수이므로 이 식은 부정확하다.
-	float crf = (float)cr / pow(2,14);
+	float crf = (float)(double)cr / pow(2,14);
 	uint8_t gray = ROUND(crf, 0);
 	return gray;
 }
@@ -134,9 +134,9 @@ double color_similarity_distance(COLORREF c1, COLORREF c2)
 
 void rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV)
 {
-	float	fR = (float)r / 255.0;
-	float	fG = (float)g / 255.0;
-	float	fB = (float)b / 255.0;
+	float	fR = (float)((double)r / 255.0);
+	float	fG = (float)((double)g / 255.0);
+	float	fB = (float)((double)b / 255.0);
 	float fCMax = max(max(fR, fG), fB);
 	float fCMin = min(min(fR, fG), fB);
 	float fDelta = fCMax - fCMin;

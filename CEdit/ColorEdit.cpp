@@ -172,9 +172,9 @@ HBRUSH CColorEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		pDC->SetTextColor(m_cr_text);
 		pDC->SetBkColor( ::GetSysColor( COLOR_3DFACE ) );
 	}
-	else if (!IsWindowEnabled())
+	else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
 	{
-		pDC->SetTextColor(RGB(255, 255, 255));// m_cr_text_disabled);
+		pDC->SetTextColor(m_cr_text_disabled);
 		pDC->SetBkColor(m_cr_back_disabled);
 		m_br_back_disabled.DeleteObject();
 		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
@@ -442,4 +442,10 @@ void CColorEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	update_ctrl();
+}
+
+//ON_WM_CTLCOLOR_REFLECT() 때문인지 OnCtlColor()는 호출되지 않는다.
+HBRUSH CColorEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+	return CEdit::OnCtlColor(pDC, pWnd, nCtlColor);
 }

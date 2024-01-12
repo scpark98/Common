@@ -26,6 +26,10 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 - #include "../../Common/webView2Ctrl/WebView2Ctrl.h" 자동 추가되지 않았다면 수동 입력.
   (주의! 이 WebView2Ctrl.h를 다른 include보다 뒤에 선언할 경우
    Microsoft.Windows.ImplementationLibrary의 wil/resource.h에서 컴파일 오류가 발생한다.)
+- 하나은행 KoinoAVCSupporter 프로젝트에서도 wil/resource.h에서
+  "new (&elem) E();"라인에서 "("가 없다는 에러가 발생했는데
+  다른 include보다 맨 앞에 위치시켜도 마찬가지 에러가 발생함.
+  WebView2Ctrl.h를 stdafx.h에서 MFC 관련 include문 다음으로 옮겼더니 에러없이 정상 빌드됨.
 
 
 - Windows SDK 8.1을 선택하면 다음과 같은 에러가 발생한다. SDK 10.0을 선택하니 에러 없음.

@@ -94,7 +94,7 @@ public:
 	int			add(std::deque<CString>* lists, COLORREF cr = -1);
 
 	int			insert_string(int nIndex, CString lpszItem);				// Inserts a string to the list box
-	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb);	// Inserts a colored string to the list box
+	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb = -1);	// Inserts a colored string to the list box
 	void		set_item_color(int nIndex, COLORREF rgb, bool invalidate = true);	// Sets the color of an item in the list box
 	COLORREF	get_item_color(int nIndex);
 
@@ -104,7 +104,7 @@ public:
 	void		set_minimum_lines(int lines) { m_nMinimumLines = lines; }
 
 	//선택 관련
-	//선택된 항목 리스트 또는 선택된 개수를 리턴
+	//선택된 항목 리스트 및 선택된 개수를 리턴
 	int			get_selected_items(std::vector<int>* selected = NULL);
 
 	//팝업 메뉴
@@ -112,7 +112,8 @@ public:
 	{
 		menu_selected_count = WM_USER + 1234,
 		menu_show_log,
-		menu_show_timeinfo,
+		menu_show_date,
+		menu_show_time,
 		menu_auto_scroll,
 		menu_clear_all,
 		menu_copy_selected_to_clipboard,
@@ -127,12 +128,13 @@ public:
 
 
 	//라인 간격
-	int			line_height() { return m_line_height; }
-	void		line_height(int _line_height);
+	int			get_line_height() { return m_line_height; }
+	void		set_line_height(int _line_height);
 
 	void		use_over(bool use = true) { m_use_over = use; }
 	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
 
+	void		set_text_color(COLORREF cr) { m_cr_text = cr; Invalidate(); }
 	void		set_back_color(COLORREF cr) { m_cr_back = cr; Invalidate(); }
 
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
@@ -168,11 +170,19 @@ public:
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
+	//편집 관련
+	bool		get_use_edit() { return m_use_edit; }
+	void		set_use_edit(bool use = true, bool readonly = false) { m_use_edit = use; m_edit_readonly = readonly; }
+	//index == -1이면 선택된 첫번째 항목 편집
+	void		edit(int index = -1);
+	//modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
+	void		edit_end(bool modify = true);
+
 protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;
 
-	bool		m_use_over = false;
+	bool		m_use_over = false;			//hover hilighted
 	BOOL		m_bOutside;
 	int			m_over_item = -1;
 	bool		m_as_popup = false;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
@@ -180,6 +190,7 @@ protected:
 	std::deque<CString> m_folder_list;
 
 	bool		m_show_log = true;
+	bool		m_show_date = false;
 	bool		m_show_time = true;
 	bool		m_dim_time_str = true;		//시간 문자열은 연한 회색으로 비강조되도록 표시
 
@@ -199,6 +210,13 @@ protected:
 	void		ReconstructFont();
 
 	int			m_line_height;
+
+	//편집 관련
+	bool		m_use_edit = false;
+	bool		m_in_editing = false;
+	bool		m_edit_readonly = false;
+	int			m_edit_index = -1;
+	CEdit*		m_pEdit = NULL;
 
 	//선택 관련
 	//std::deque<int>	 m_selected;
@@ -223,6 +241,7 @@ protected:
 	void		copy_all_to_clipboard();
 	void		save_selected_to_file();
 	void		save_all_to_file();
+
 
 // Overrides
 	// ClassWizard generated virtual function overrides
@@ -256,6 +275,8 @@ public:
 	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 };
 
 /////////////////////////////////////////////////////////////////////////////

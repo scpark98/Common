@@ -26,6 +26,8 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
+#define IDC_EDIT_CELL	WM_USER + 9001
+
 /////////////////////////////////////////////////////////////////////////////
 // CColorListBox
 
@@ -52,16 +54,13 @@ CColorListBox::CColorListBox()
 //-------------------------------------------------------------------
 //
 CColorListBox::~CColorListBox()
-//
-// Return Value:	None.
-//
-// Parameters	:	None.
-//
-// Remarks		:	Destructor.
-//
 {
-}	// ~CColorListBox()
-
+	if (m_pEdit)
+	{
+		m_pEdit->DestroyWindow();
+		delete m_pEdit;
+	}
+}
 
 BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	//{{AFX_MSG_MAP(CColorListBox)
@@ -79,6 +78,9 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	ON_WM_MOUSEHWHEEL()
 	ON_WM_DRAWITEM()
 	ON_WM_SIZE()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONUP()
+	ON_WM_PAINT()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -109,12 +111,13 @@ void CColorListBox::PreSubclassWindow()
 	// Get Defalut Font 
 	CListBox::PreSubclassWindow();
 
-	//CWnd* pWnd = GetParent();
+	//이게 왜 적용이 안될까...
+	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
+	ModifyStyle(LBS_SORT, dwStyle | LBS_HASSTRINGS | LBS_OWNERDRAWFIXED);
 
 	CFont* font = GetFont();
 
 	if (font == NULL)
-		//font = GetParent()->GetFont();
 		font = AfxGetMainWnd()->GetFont();
 
 	if (font != NULL)
@@ -196,6 +199,9 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	COLORREF	cr_text = (COLORREF)lpDIS->itemData;	// Color information is in item data.
 	COLORREF	cr_back = m_cr_back;
 	CRect		rect = lpDIS->rcItem;
+
+	rect.DeflateRect(1, 1);
+	//rect.right -= 4;
 	CRect		rGutter = rect;
 
 	if (m_nGutterCharNumber > 0)
@@ -317,10 +323,18 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	dc.SetBkMode(TRANSPARENT);
 
-	//m_show_time일 경우 시간값은 항상 옅은 회색으로만 표시
+	//시간값은 항상 옅은 회색으로만 표시
+	int date_time_length = 0;
+	if (m_show_date)
+		date_time_length += 10;
 	if (m_show_time)
+		date_time_length += 12;
+	if (m_show_date && m_show_time)
+		date_time_length++;
+
+	if (date_time_length > 0)
 	{
-		CString time_str = sText.Left(25);
+		CString time_str = sText.Left(date_time_length);
 		CSize sz = dc.GetTextExtent(time_str);
 
 		TEXTMETRIC tm;
@@ -333,7 +347,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 		dc.DrawText(time_str, rect, nFormat | DT_NOCLIP);
 
-		sText = sText.Mid(26);
+		sText = sText.Mid(date_time_length + 1);
 		rect.left = rect.right;
 		rect.right = lpDIS->rcItem.right - 10;
 	}
@@ -422,16 +436,22 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	}
 
 
-	CString time_str;
+	CString date_str, time_str;
 	int index = -1;
 
-	if (m_show_time && !skip_time_info)
+	if ((m_show_date || m_show_time) && !skip_time_info)
 	{
 		SYSTEMTIME	t;
 
 		::GetLocalTime(&t);
-		time_str.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-		new_text = time_str + _T(" ") + new_text;
+
+		date_str.Format(_T("%d-%02d-%02d"), t.wYear, t.wMonth, t.wDay);
+		time_str.Format(_T("%02d:%02d:%02d.%03d"), t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+
+		if (m_show_time)
+			new_text = time_str + _T(" ") + new_text;
+		if (m_show_date)
+			new_text = date_str + _T(" ") + new_text;
 	}
 
 	index = AddString(new_text);
@@ -476,6 +496,7 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	ReleaseDC(pDC);
 
 	SetHorizontalExtent(m_max_horizontal_extent + GetSystemMetrics(SM_CXVSCROLL));
+	//가로 스크롤바 재조정 끝.
 
 	return index;
 }
@@ -539,6 +560,8 @@ int CColorListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 	int index = ((CListBox*)this)->InsertString(nIndex,lpszItem);
 	if (index >= 0)
 	{
+		if (rgb < 0)
+			rgb = m_cr_text;
 		SetItemData(index, rgb);
 		RedrawWindow();
 	}
@@ -595,7 +618,7 @@ BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 	//CRect rc;
 	//GetClientRect(rc);
 	//pDC->FillSolidRect(rc, m_crBack);
-	return FALSE;
+	//return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
@@ -648,7 +671,7 @@ CSize CColorListBox::resizeToFit(bool bHori, bool bVert)
 	return CSize(r.Width(), r.Height());
 }
 
-void CColorListBox::line_height(int _line_height)
+void CColorListBox::set_line_height(int _line_height)
 {
 	if (_line_height < 8)
 		_line_height = 8;
@@ -663,9 +686,44 @@ BOOL CColorListBox::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		TRACE(_T("CColorListBox message = %d\n"), pMsg->wParam);
-		return false;
+		//TRACE(_T("CColorListBox message = %d\n"), pMsg->wParam);
+
+		switch (pMsg->wParam)
+		{
+		case VK_F2:
+			if (!m_use_edit)
+				return CListBox::PreTranslateMessage(pMsg);
+			edit(-1);
+			return true;
+		case VK_RETURN :
+			if (m_use_edit && m_in_editing)
+			{
+				edit_end();
+				return true;
+			}
+			break;
+		case VK_ESCAPE:
+			if (m_use_edit && m_in_editing)
+			{
+				edit_end(false);
+				return true;
+			}
+			break;
+		}
 	}
+	else if (pMsg->message == WM_KILLFOCUS)
+	{
+		TRACE(_T("%d, %d\n"), pMsg->wParam, pMsg->lParam);
+	}
+	else if (pMsg->message == WM_LBUTTONDBLCLK)
+	{
+		if (m_use_edit && !m_in_editing)
+		{
+			edit();
+			return true;
+		}
+	}
+
 
 	return CListBox::PreTranslateMessage(pMsg);
 }
@@ -722,6 +780,9 @@ void CColorListBox::OnKillFocus(CWnd* pNewWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	if (m_as_popup)
 		ShowWindow(SW_HIDE);
+
+	if (m_use_edit && m_in_editing)
+		edit_end();
 }
 
 int CColorListBox::set_path(CString root, CString selected_text)
@@ -781,6 +842,11 @@ BOOL CColorListBox::OnLbnSelchange()
 	if (index < 0 || index >= GetCount())
 		return FALSE;
 
+	if (m_use_edit && m_in_editing)
+	{
+		edit_end();
+	}
+
 	//Ctrl+End 또는 PageDown으로 맨 마지막 항목이 선택되면 자동 스크롤,
 	//그 외 항목이 선택되면 자동 스크롤을 멈춘다.
 	m_auto_scroll = (index == GetCount() - 1);
@@ -806,7 +872,10 @@ int CColorListBox::get_selected_items(std::vector<int>* selected)
 {
 	int selected_count = GetSelCount();
 
-	if (selected != NULL)
+	if (selected)
+		selected->clear();
+
+	if (selected_count > 0)
 	{
 		CArray<int, int> aryListBoxSel;
 		aryListBoxSel.SetSize(selected_count);
@@ -842,8 +911,12 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.AppendMenu(MF_STRING, menu_show_log, _T("Show log"));
 	menu.CheckMenuItem(menu_show_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
 
-	menu.AppendMenu(MF_STRING, menu_show_timeinfo, _T("Show time info"));
-	menu.CheckMenuItem(menu_show_timeinfo, m_show_time ? MF_CHECKED : MF_UNCHECKED);
+	menu.AppendMenu(MF_STRING, menu_show_date, _T("Show date"));
+	menu.CheckMenuItem(menu_show_date, m_show_date ? MF_CHECKED : MF_UNCHECKED);
+	menu.AppendMenu(MF_SEPARATOR);
+
+	menu.AppendMenu(MF_STRING, menu_show_time, _T("Show time"));
+	menu.CheckMenuItem(menu_show_time, m_show_time ? MF_CHECKED : MF_UNCHECKED);
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("Auto scroll\tCtrl+End"));
@@ -870,12 +943,19 @@ void CColorListBox::OnPopupMenu(UINT nMenuID)
 	{
 	case menu_show_log:
 		m_show_log = !m_show_log;
+		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("show log"), m_show_log);
 		break;
-	case menu_show_timeinfo:
+	case menu_show_date:
+		m_show_date = !m_show_date;
+		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("show date"), m_show_date);
+		break;
+	case menu_show_time:
 		m_show_time = !m_show_time;
+		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("show time"), m_show_time);
 		break;
 	case menu_auto_scroll:
 		m_auto_scroll = !m_auto_scroll;
+		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("auto scroll"), m_auto_scroll);
 		break;
 	case menu_clear_all:
 		ResetContent();
@@ -1038,4 +1118,86 @@ void CColorListBox::OnSize(UINT nType, int cx, int cy)
 	//DrawItem()에서 DrawText()할때 NO_CLIP을 주고 여기서 Invalidate()하면
 	//전혀 문제는 없이 잘 갱신은 되지만 왜 이런 현상이 발생했는지는 아직 미지수임.
 	Invalidate();
+	RedrawWindow();
+	UpdateWindow();
+}
+
+
+void CColorListBox::edit(int index)
+{
+	if (index < 0 || index >= GetCount())
+	{
+		index = GetCurSel();
+		if (index < 0)
+			return;
+	}
+
+	m_edit_index = index;
+
+	CRect rItem;
+	GetItemRect(index, rItem);
+
+	CString text;
+	GetText(index, text);
+
+	CClientDC dc(this);
+	CSize sz = dc.GetTextExtent(text);
+	//rItem.top = (rItem.Height() - sz.cy) / 2;
+
+	if (!m_pEdit)
+	{
+		DWORD dwStyle = WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | (m_edit_readonly ? ES_READONLY : 0);
+		m_pEdit = new CEdit();
+		m_pEdit->Create(dwStyle, rItem, this, IDC_EDIT_CELL);
+		m_pEdit->SetFont(&m_font);
+		m_pEdit->SetMargins(0, 20);	//이건 적용되지 않는다. 세로로 중앙정렬하고 싶다면 text height를 구해서 보정해야 함.
+	}
+
+	m_pEdit->SetWindowText(text);
+	m_pEdit->MoveWindow(rItem);
+	m_pEdit->ShowWindow(SW_SHOW);
+
+	m_pEdit->SetSel(0, -1);
+	m_pEdit->SetFocus();
+
+	m_in_editing = true;
+}
+
+//modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
+void CColorListBox::edit_end(bool modify)
+{
+	if (!m_use_edit || !m_in_editing || m_edit_index < 0 || m_edit_index >= GetCount())
+		return;
+
+	m_pEdit->ShowWindow(SW_HIDE);
+
+	if (modify)
+	{
+		DWORD cr;
+		CString text;
+		m_pEdit->GetWindowText(text);
+		TRACE(_T("index = %d\n"), m_edit_index);
+
+		cr = GetItemData(m_edit_index);
+		DeleteString(m_edit_index);
+		insert_string(m_edit_index, text, cr);
+	}
+
+	m_in_editing = false;
+}
+
+
+void CColorListBox::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CListBox::OnLButtonDown(nFlags, point);
+}
+
+
+void CColorListBox::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CListBox::OnLButtonUp(nFlags, point);
 }

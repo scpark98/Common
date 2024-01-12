@@ -231,24 +231,24 @@ protected:
 	std::deque <COLORREF>	m_cr_text;
 	std::deque <COLORREF>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
 
-	int			m_width;
-	int			m_height;
+	int			m_width = 0;
+	int			m_height = 0;
 
 	int			m_round = 0;				//round rect
 
-	UINT		m_nAnchor;
-	int			m_nAnchorMarginX;
-	int			m_nAnchorMarginY;
+	UINT		m_nAnchor = 0;
+	int			m_nAnchorMarginX = 0;
+	int			m_nAnchorMarginY = 0;
 
-	bool		m_bAsStatic;			//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
-	bool		m_use_hover = true;		//default = true;
-	bool		m_hover_rect = false;	//hover 테두리 사각형 표시 여부
+	bool		m_bAsStatic = false;		//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
+	bool		m_use_hover = true;			//default = true;
+	bool		m_hover_rect = false;		//hover 테두리 사각형 표시 여부
 	int			m_hover_rect_thick = 2;
 	COLORREF	m_hover_rect_color = RGB(128, 128, 255);
-	bool		m_bHover;
-	bool		m_bIsTracking;
-	bool		m_bPushed;
-	bool		m_bHasFocus;
+	bool		m_bHover = false;
+	bool		m_bIsTracking = false;
+	bool		m_bPushed = false;
+	bool		m_bHasFocus = false;
 	bool		m_bShowFocusRect;		//포커스 사각형 표시 여부(기본값 false)
 	COLORREF	m_crFocusRect;			//색상
 	int			m_nFocusRectWidth;		//두께
@@ -256,10 +256,10 @@ protected:
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
-	BOOL		m_bBlink;
-	BOOL		m_bBlinkStatus;
-	int			m_nBlinkTime0;			//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
-	int			m_nBlinkTime1;
+	bool		m_blink = false;
+	bool		m_blink_status = false;
+	int			m_blink_time0 = 400;	//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
+	int			m_blink_time1 = 1200;
 
 	ColorMatrix m_grayMatrix;
 	ColorMatrix m_hoverMatrix;			//hover이미지에 적용할 매트릭스

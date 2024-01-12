@@ -1,5 +1,7 @@
 #include "SeedProvider.h"
 
+#pragma warning(disable : 4996)		// disable bogus deprecation warning
+
 SeedProvider::SeedProvider()
 {
 	memset(m_header, 0, MAX_HEADER_SIZE + 1);

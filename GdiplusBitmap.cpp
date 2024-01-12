@@ -869,27 +869,27 @@ void CGdiplusBitmap::draw_text(int x, int y, CString text, int font_size, int th
 
 	//Gdiplus::FontFamily   ffami(CStringW(font_name));
 	Gdiplus::FontFamily   ff((WCHAR*)(const WCHAR*)CStringW(font_name));
-	Gdiplus::Font font(&ff, font_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+	Gdiplus::Font font(&ff, (Gdiplus::REAL)font_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 	Gdiplus::StringFormat fmt;
 	//DT_TOP
 	Gdiplus::RectF boundingBox;
 	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &boundingBox);
 
 	if (align & DT_CENTER)
-		x = x - boundingBox.Width / 2;
+		x = x - boundingBox.Width / 2.0f;
 	else if (align & DT_RIGHT)
 		x = x - boundingBox.Width;
 
 	if (align & DT_VCENTER)
-		y = y - boundingBox.Height / 2;
+		y = y - boundingBox.Height / 2.0f;
 	else if (align & DT_BOTTOM)
 		y = y - boundingBox.Height;
 
 	Gdiplus::GraphicsPath   str_path;
 	str_path.AddString(CStringW(text), -1, &ff,
-		Gdiplus::FontStyleRegular, font_size, Gdiplus::Point(x, y), &fmt);
+		Gdiplus::FontStyleRegular, (Gdiplus::REAL)font_size, Gdiplus::Point(x, y), &fmt);
 
-	Gdiplus::Pen   gp(crOutline, thick);
+	Gdiplus::Pen   gp(crOutline, (Gdiplus::REAL)thick);
 	gp.SetLineJoin(Gdiplus::LineJoinRound);
 
 	Gdiplus::Rect    rc(x, y, 30, 60);
@@ -1985,7 +1985,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 
 	CString str;
 
-	for (int i = 0; i < m_frame_count; i++)
+	for (size_t i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
 		str.Format(_T("%s\\%s_%04d.png"), folder, get_part(m_filename, fn_name), i);
@@ -2021,7 +2021,7 @@ void CGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std
 	dqBitmap.clear();
 	dqDelay.clear();
 
-	for (int i = 0; i < m_frame_count; i++)
+	for (size_t i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
 		Gdiplus::Bitmap* img = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
@@ -2047,7 +2047,7 @@ int CGdiplusBitmap::get_total_duration()
 
 	long total_duration = 0;
 
-	for (int i = 0; i < m_frame_count; i++)
+	for (size_t i = 0; i < m_frame_count; i++)
 	{
 		total_duration += ((long*)m_pPropertyItem->value)[i] * 10;
 	}
@@ -2226,7 +2226,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 	propItemLoopCount->type = PropertyTagTypeShort;
 	propItemLoopCount->value = &loopCount;
 
-	for (int i = 0; i < dq.size(); i++)
+	for (size_t i = 0; i < dq.size(); i++)
 	{
 		if (i == 0)
 		{

@@ -192,7 +192,7 @@ enum RATIO_RECT_ATTACH
 //ex. ROUND(0.545, 2) = 0.55
 //ex. ROUND(0.545, 1) = 0.50
 //ex. ROUND(0.545, 0) = 1.00
-#define		ROUND(x, n) (floor((x) * pow(float(10), (n)) + 0.5f) / pow(float(10), (n)))
+#define		ROUND(x, n) (floor((x) * pow(10.0, (n)) + 0.5f) / pow(10.0, (n)))
 #define		SQR(x)		((x)*(x))
 #define		PI				3.141592
 #define		RADIAN(x)		(x) * PI / 180.0	//degree to radian
@@ -269,21 +269,6 @@ public:
 	AutoEraser(T2& ptr)    {    VarPtr = (T*)ptr;   }
 	~AutoEraser()           {    delete[] VarPtr;    }
 };
-/*
-void func()
-{
-	MakeArray2(int,ddd,2,3);
-	MakeArray3(double,fff,2,3,4);
-}
-
-ex>
-
-int array[2][3];을 만들려고 하면..
-MakeArray2(int,array,2,3);
-
-int array[2][3][4];는
-MakeArray3(int,array,2,3,4);
-*/
 
 struct timezone  
 { 
@@ -308,7 +293,7 @@ public:
 
 		if (_headers)
 		{
-			for (int i = 0; i < _headers->size(); i++)
+			for (size_t i = 0; i < _headers->size(); i++)
 			{
 				if (_headers->at(i).Right(2) != _T("\r\n"))
 					_headers->at(i) += _T("\r\n");
@@ -325,21 +310,21 @@ public:
 	}
 
 	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
-	bool		use_thread;
+	bool		use_thread = false;
 
 	//m_request_id로 해당 작업이 무엇인지 구분한다.
-	int			request_id;
+	int			request_id = -1;
 
 	//200, 404...와 같은 HTTP_STATUS를 담지만 invalid address 등과 같은 에러코드도 담기 위해 int로 사용한다. 0보다 작을 경우는 result 문자열에 에러 내용이 담겨있다.
-	int			status;
+	int			status = -1;
 
 	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
 	CString		ip;
 
-	int			port;
+	int			port = 0;
 	CString		sub_url;			//domain을 제외한 나머지 주소
 	CString		method;
-	bool		is_https;
+	bool		is_https = true;
 	CString		body;				//post data(json format)
 	std::vector<CString> headers;	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야 한다.
 	CString		full_url;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
@@ -347,8 +332,8 @@ public:
 
 	//파일 다운로드 관련
 	CString		local_file_path;	//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
-	uint64_t	file_size;		//url 파일 크기
-	uint64_t	downloaded_size;	//현재까지 받은 크기
+	uint64_t	file_size = 0;		//url 파일 크기
+	uint64_t	downloaded_size = 0;//현재까지 받은 크기
 };
 
 class CMouseEvent
@@ -491,6 +476,7 @@ struct	NETWORK_INFO
 
 	//::SetForegroundWindow()가 Win98이후부터는 지원되지 않아 수정된 코드.
 	void		SetForegroundWindowForce(HWND hWnd, bool makeTopMost = false);
+	bool		is_top_most(HWND hWnd);
 
 //클립보드 clipboard
 	bool		copy_to_clipboard(HWND hWnd, CString str);
@@ -776,8 +762,9 @@ struct	NETWORK_INFO
 	uint16_t UpdateCRC16(uint16_t crc_in, uint8_t byte);
 	uint16_t Cal_CRC16(const uint8_t* p_data, uint32_t size);
 
-
-
+	//https://ikcoo.tistory.com/213
+	std::string base64_encode(const std::string& in);
+	std::string base64_decode(const std::string& in);
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
@@ -991,6 +978,7 @@ struct	NETWORK_INFO
 //쉘(shell), 윈도우(window), 레지스트리(registry), 시스템(system)
 	CString		GetComputerNameString();
 	OSVERSIONINFOEX	get_windows_version();
+	DWORD		get_windows_major_version();
 	CString		get_windows_version_string(OSVERSIONINFOEX* posInfo = NULL);
 	CString		get_windows_version_string(DWORD dwMajor, DWORD dwMinor, DWORD dwBuild);
 	//ex. version = "10.0.12345"
@@ -1276,7 +1264,11 @@ void		SetWallPaper(CString sfile);
 	bool		SaveBitmapToTile(CBitmap* bmp, CString strFile, CWnd* pWnd);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);
 	HANDLE		DDBToDIB(CBitmap* bitmap, DWORD dwCompression, CPalette* pPal);
-	HICON		LoadIconEx(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
+	
+	//크기를 지정해서 로딩이 가능하다. LoadIcon()으로는 안된다.
+	HICON		load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
+	//해당 DC에 그리고 아이콘의 실제 크기를 리턴한다.
+	CSize		draw_icon(CDC* pDC, HICON hIcon, CRect r);
 
 	//font size to LOGFONT::lfHeight
 	LONG		get_logical_size_from_font_size(HWND hWnd, int font_size);
@@ -1684,8 +1676,8 @@ template<typename T> inline T random19937(T min, T max)
 		typeid(T) == typeid(long double))
 	{
 		std::uniform_real_distribution<double> dist((double)min, (double)max);
-	return dist(mt);
-}
+		return dist(mt);
+	}
 
 	std::uniform_int_distribution<int> dist((int)min, (int)max);
 	return dist(mt);

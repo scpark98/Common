@@ -7731,6 +7731,23 @@ OSVERSIONINFOEX get_windows_version()
 	return osInfo;
 }
 
+DWORD get_windows_major_version()
+{
+	OSVERSIONINFOEX osInfo;
+	NTSTATUS(WINAPI * RtlGetVersion)(LPOSVERSIONINFOEX);
+
+	*(FARPROC*)&RtlGetVersion = GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
+
+	if (NULL != RtlGetVersion)
+	{
+		osInfo.dwOSVersionInfoSize = sizeof(osInfo);
+		RtlGetVersion(&osInfo);
+	}
+
+	return osInfo.dwMajorVersion;
+
+}
+
 CString	get_windows_version_string(OSVERSIONINFOEX* posInfo)
 {
 	OSVERSIONINFOEX osInfo;
@@ -10634,17 +10651,6 @@ int GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	return shFileInfo.iIcon;
 }
 */
-HICON LoadIconEx(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
-{
-	if (cy == 0)
-		cy = cx;
-
-	//아래 LoadImage 함수를 통해서 아이콘 파일을 불러온 경우
-	//프로그램 종료 시 반드시 DestroyIcon을 해줘야 한다.
-	//그래서 DestroyIcon 안해도 되는 LR_SHARED를 사용했다.
-	return static_cast<HICON>(::LoadImage(hInstance,
-		MAKEINTRESOURCE(nID), IMAGE_ICON, cx, cy, LR_SHARED));
-}
 
 HINSTANCE	g_hInst_msimg32 = NULL;
 LPFNDLLFUNC1 g_dllfunc_GradientFill;
@@ -12067,6 +12073,12 @@ void SetForegroundWindowForce(HWND hWnd, bool makeTopMost)
 	}
 }
 
+bool is_top_most(HWND hWnd)
+{
+	DWORD dwExStyle = ::GetWindowLong(hWnd, GWL_EXSTYLE);
+	return ((dwExStyle & WS_EX_TOPMOST) != 0);
+}
+
 //2D 단일 영상에서 이미 알려진 설정값을 기준으로 영상내의 한 점과 렌즈와의 거리를 계산(by sucwon)
 //단, 차량에 장착된 카메라에서 촬영된 영상이므로 피사체와 렌즈와의 거리가 아닌 차체와의 거리가 더 정확한 값이며
 //따라서 렌즈의 위치인 영상 하단 센터가 아닌 영상의 하단과 피사체의 수직 거리가
@@ -13016,6 +13028,70 @@ void drawArc(CDC *pDC, double cx, double cy,double r1, double r2, double start, 
 	Pen.DeleteObject();
 
 	pDC->SetROP2(nOldDrawMode);
+}
+
+HICON load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
+{
+	if (cy == 0)
+		cy = cx;
+
+	//아래 LoadImage 함수를 통해서 아이콘 파일을 불러온 경우
+	//프로그램 종료 시 반드시 DestroyIcon을 해줘야 한다.
+	//그래서 DestroyIcon 안해도 되는 LR_SHARED를 사용했다.
+	return static_cast<HICON>(::LoadImage(hInstance, MAKEINTRESOURCE(nID), IMAGE_ICON, cx, cy, LR_SHARED));
+}
+
+CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
+{
+	//int cxIcon = GetSystemMetrics(SM_CXICON);
+	//int cyIcon = GetSystemMetrics(SM_CYICON);
+
+	//SM_CXICON을 이용해서 기본값으로 그리는게 아니라
+	//실제 hIcon의 크기를 구해서
+	int w;
+	int h;
+
+	ICONINFO info;
+	ZeroMemory(&info, sizeof(info));
+
+	BITMAP bmp;
+	ZeroMemory(&bmp, sizeof(bmp));
+
+	GetIconInfo(hIcon, &info);
+
+	if (info.hbmColor)
+	{
+		const int nWrittenBytes = GetObject(info.hbmColor, sizeof(bmp), &bmp);
+		if (nWrittenBytes > 0)
+		{
+			w = bmp.bmWidth;
+			h = bmp.bmHeight;
+			//myinfo.nBitsPerPixel = bmp.bmBitsPixel;
+		}
+	}
+	else if (info.hbmMask)
+	{
+		// Icon has no color plane, image data stored in mask
+		const int nWrittenBytes = GetObject(info.hbmMask, sizeof(bmp), &bmp);
+		if (nWrittenBytes > 0)
+		{
+			w = bmp.bmWidth;
+			h = bmp.bmHeight / 2;
+			//myinfo.nBitsPerPixel = 1;
+		}
+	}
+
+	if (info.hbmColor)
+		DeleteObject(info.hbmColor);
+	if (info.hbmMask)
+		DeleteObject(info.hbmMask);
+
+	int x = (r.Width() - w + 1) / 2;
+	int y = (r.Height() - h + 1) / 2;
+
+	::DrawIconEx(pDC->GetSafeHdc(), x, y, hIcon, w, h, 0, NULL, DI_NORMAL);
+
+	return CSize(w, h);
 }
 
 //font size to LOGFONT::lfHeight
@@ -16408,4 +16484,59 @@ CString	set_file_property(CString sFilePath, CString sProperty, CString value)
 	SetPropertyValue(A2CW(LPCTSTR(sFilePath)), A2CW(LPCTSTR(sProperty)), A2CW(LPCTSTR(value)));
 #endif
 	return CString();
+}
+
+//https://ikcoo.tistory.com/213
+std::string base64_encode(const std::string& in)
+{
+	std::string out;
+	int val = 0, valb = -6;
+
+	for (uint8_t c : in)
+	{
+		val = (val << 8) + c;
+		valb += 8;
+
+		while (valb >= 0)
+		{
+			out.push_back("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[(val >> valb) & 0x3F]);
+			valb -= 6;
+		}
+	}
+
+	if (valb > -6)
+		out.push_back("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[((val << 8) >> (valb + 8)) & 0x3F]);
+
+	while (out.size() % 4)
+		out.push_back('=');
+
+	return out;
+}
+
+std::string base64_decode(const std::string& in)
+{
+	static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+	int val = 0, valb = -8;
+	std::string out;
+	std::vector<int> T(256, -1);
+
+	for (int i = 0; i < 64; i++)
+		T[b[i]] = i;
+
+	for (uint8_t c : in)
+	{
+		if (T[c] == -1)
+			break;
+
+		val = (val << 6) + T[c];
+		valb += 6;
+
+		if (valb >= 0)
+		{
+			out.push_back(char((val >> valb) & 0xFF));
+			valb -= 8;
+		}
+	}
+	return out;
 }

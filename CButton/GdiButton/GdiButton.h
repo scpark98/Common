@@ -128,7 +128,7 @@ public:
 	void		set_alpha(float alpha);
 	void		add_rgb(int red, int green, int blue, COLORREF crExcept);
 
-	//void		SetBackImage(Bitmap* pBack);		//배경을 설정, 변경할 경우 사용
+	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	CGdiButton& text(CString text);
 	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
 	CGdiButton& text_color(COLORREF normal);
@@ -151,11 +151,11 @@ public:
 	void		apply_effect_hsl(int hue, int sat = 0, int light = 0);
 
 
-	virtual	CGdiButton&		SetFontName(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual CGdiButton&		SetFontSize( int nSize );
-	virtual CGdiButton&		SetFontBold( bool bBold = true );
+	virtual	CGdiButton&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	virtual CGdiButton&		set_font_size( int nSize );
+	virtual CGdiButton&		set_font_bold( bool bBold = true );
 
-	void		UpdateSurface(bool bErase = false);
+	void		update_surface(bool bErase = false);
 
 	bool		GetCheck();
 	void		SetCheck( bool bCkeck );
@@ -192,8 +192,8 @@ public:
 	void		use_3D_rect(bool use) { m_b3DRect = use; Invalidate(); }
 
 	//blink
-	void		SetBlinkTime( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
-	void		SetBlink( BOOL bBlink = TRUE );
+	void		set_blink_time( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
+	void		set_blink( BOOL bBlink = TRUE );
 
 	void		use_tooltip(bool use) { m_use_tooltip = use; }
 	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.
@@ -270,7 +270,7 @@ protected:
 	LOGFONT		m_lf;
 	CFont		m_font;
 
-	void		ReconstructFont();
+	void		reconstruct_font();
 
 	//enable상태일때는 잘 표시되나 disable일때는 표시되지 않는다.
 	//이를 해결하려면 parent의 PreTranslateMessage()에서 처리해야 한다.

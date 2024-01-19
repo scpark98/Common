@@ -50,7 +50,7 @@ public:
 private:
 // 	LOGFONT		m_lf;
 // 	CFont		m_font;
-// 	void		UpdateSurface();
+// 	void		update_surface();
 // 	void		ReconstructFont();
 
     void		UpdateCtrl();

@@ -108,14 +108,14 @@ public:
 	//data 값을 변경한 후 다시 이미지에 적용
 	bool	set_raw_data();
 
-	bool	empty();
-	bool	valid();
+	bool	is_empty();
+	bool	is_valid();
 	int		channels();
 	CSize	size() { return CSize(width, height); }
 
 	//targetRect를 주면 대상 영역에 비율을 유지하여 그린다.
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.
-	CRect	draw(Gdiplus::Graphics* g, CRect targetRect);
+	CRect	draw(Gdiplus::Graphics* g, CRect targetRect, bool stretch = false);
 	CRect	draw(Gdiplus::Graphics* g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 	CRect	draw(Gdiplus::Graphics* g, CGdiplusBitmap mask, CRect targetRect);
 
@@ -132,6 +132,7 @@ public:
 	//상하대칭
 	void	flip();
 
+	//이미지에 직접 텍스트를 추가
 	void	draw_text(int x, int y, CString text, int font_size, int thick,
 						CString font_name = _T("맑은 고딕"),
 						Gdiplus::Color crOutline = Gdiplus::Color::White,

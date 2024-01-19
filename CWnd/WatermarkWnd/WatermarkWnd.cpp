@@ -164,8 +164,23 @@ bool CWatermarkWnd::create(HWND parentHwnd, CString text, CRect rw)
 
 	reconstruct_font();
 
-	if (!rw.IsRectEmpty())
-		SetWindowPos(NULL, rw.left, rw.top, rw.Width(), rw.Height(), SWP_NOZORDER | SWP_SHOWWINDOW);
+	CRect parentRC = rw;
+
+	//
+	if (rw.IsRectEmpty())
+	{
+		CPoint lt, rb;
+		::GetClientRect(parentHwnd, &parentRC);
+
+		lt = parentRC.TopLeft();
+		rb = parentRC.BottomRight();
+		::ClientToScreen(parentHwnd, &lt);
+		::ClientToScreen(parentHwnd, &rb);
+		parentRC = CRect(lt.x, lt.y, rb.x, rb.y);
+	}
+
+	//if (!rw.IsRectEmpty())
+		SetWindowPos(NULL, parentRC.left, parentRC.top, parentRC.Width(), parentRC.Height(), SWP_NOZORDER | SWP_SHOWWINDOW);
 
 	return true;
 }
@@ -227,4 +242,21 @@ void CWatermarkWnd::set_font_color(COLORREF color)
 	m_font_color = color;
 	Invalidate();
 	//RedrawWindow();
+}
+
+void CWatermarkWnd::adjust_window()
+{
+	CRect rc;
+	CWnd* parent = GetParent();
+
+	if (!parent)
+		return;
+
+	parent->GetClientRect(rc);
+	parent->ClientToScreen(rc);
+	//TRACE(_T("%s\n"), get_rect_info_string(rc, 1));
+	if (m_hWnd)// && m_pDrawWnd->IsWindowVisible())
+	{
+		MoveWindow(rc);
+	}
 }

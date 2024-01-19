@@ -13,10 +13,10 @@
 //scpark
 
 [gradient usage]
-m_static1.SetGradient();
-m_static1.SetGradientColor(RED);
-//m_static1.SetVerticalGradient();
-//m_static1.SetGradientColor(4, RED, GREEN, YELLOW, BLUE);
+m_static1.set_gradient();
+m_static1.set_gradient_color(RED);
+//m_static1.set_vertical_gradient);
+//m_static1.set_gradient_color(4, RED, GREEN, YELLOW, BLUE);
 
 [수정될 내용]
 - 배경이 있는 앱에서는 투명이 잘 적용되지만 기본 스타일의 dlg에서는 화면 갱신이 잘 되지 않는다.
@@ -41,18 +41,18 @@ public:
 	CSCStatic();
 	~CSCStatic();
 	
-	void		SetTransparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
-	void		SetText(CString sText, COLORREF crTextColor = 0);
-	CString		GetText() { return m_sText; }
-	void		SetWindowText(CString sText) { SetText(sText); }
+	void		set_transparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
+	void		set_text(CString sText, COLORREF crTextColor = 0);
+	CString		get_text() { return m_sText; }
+	void		SetWindowText(CString sText) { set_text(sText); }
 	COLORREF	get_back_color() { return m_crBack; }
 
 	//글자색만 변경할 경우
-	void		SetTextColor(COLORREF crTextColor);
+	void		set_text_color(COLORREF crTextColor);
 	//배경색을 지정하면 투명 옵션은 off됨.
-	void		SetBackColor(COLORREF cBackColor) { m_crBack = cBackColor; m_bTransparent = false; Invalidate(); }
+	void		set_back_color(COLORREF cBackColor) { m_crBack = cBackColor; m_bTransparent = false; Invalidate(); }
 	//SetColor를 사용하면 투명 옵션은 off됨.
-	void		SetColor(COLORREF cTextColor, COLORREF cBackColor = ::GetSysColor(COLOR_3DFACE))
+	void		set_color(COLORREF cTextColor, COLORREF cBackColor = ::GetSysColor(COLOR_3DFACE))
 				{
 					m_crText = cTextColor;
 					m_crBack = cBackColor;
@@ -62,13 +62,13 @@ public:
 
 	//gradient
 	//m_crGradient deque에 색상들을 넣고 n등분하여 gradient fill을 해서 표시한다.
-	CSCStatic&		SetGradient(bool bGradient = true);
-	CSCStatic&		SetGradientColor(COLORREF crGradient);			//배경~crGradient 2컬러로 표현됨.
-	CSCStatic&		SetGradientColor(int idx, COLORREF crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
-	CSCStatic&		SetGradientColor(int count, ...);
-	CSCStatic&		AddGradientColor(COLORREF crGradient);			//색상 추가
-	CSCStatic&		InsertGradientColor(int idx, COLORREF crGradient);//idx번째 색상 추가
-	CSCStatic&		SetVerticalGradient(bool bVertical = true);
+	CSCStatic&		set_gradient(bool bGradient = true);
+	CSCStatic&		set_gradient_color(COLORREF crGradient);			//배경~crGradient 2컬러로 표현됨.
+	CSCStatic&		set_gradient_color(int idx, COLORREF crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
+	CSCStatic&		set_gradient_color(int count, ...);
+	CSCStatic&		add_gradient_color(COLORREF crGradient);			//색상 추가
+	CSCStatic&		insert_gradient_color(int idx, COLORREF crGradient);//idx번째 색상 추가
+	CSCStatic&		set_vertical_gradient(bool bVertical = true);
 
 	void		sunken(bool sunken = true) { m_bSunken = sunken; Invalidate(); }
 
@@ -80,29 +80,29 @@ public:
 	bool			m_start_marquee;
 	//void			start_marquee(int start);
 
-	void			SetBackImage(UINT nIDBack);
+	void			set_back_image(UINT nIDBack);
 
-	void			SetRoundHead(bool bRound);
+	void			set_round_head(bool bRound);
 
-	//font
-	virtual CSCStatic& SetFontName(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual CSCStatic& SetFontSize(int nFontSize);
-	virtual CSCStatic& SetFontBold(bool bFontBold = true);
-	virtual CSCStatic& SetFontUnderline(bool bSet);
-	virtual CSCStatic& SetFontAntiAliased(bool bAntiAliased = true);
+	//font. 변경시 컨트롤의 크기가 자동으로 조정되는 기능은 아직 없음.
+	virtual CSCStatic& set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
+	virtual CSCStatic& set_font_size(int nFontSize);
+	virtual CSCStatic& set_font_bold(bool bFontBold = true);
+	virtual CSCStatic& set_font_underline(bool bSet);
+	virtual CSCStatic& set_font_antialiased(bool bAntiAliased = true);
 
-	void		SetFontWidth(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
-	bool		IsBold() { return m_bFontBold; }
+	void		set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
+	bool		is_bold() { return m_bFontBold; }
 
-	void		SetOutlineWidth(int nWidth) { m_nOutlineWidth = nWidth; Invalidate(); }
-	void		SetOutline(int nWidth, COLORREF crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }
+	void		set_outline_width(int nWidth) { m_nOutlineWidth = nWidth; Invalidate(); }
+	void		set_outline(int nWidth, COLORREF crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }
 
-	void		SetBlinkTime(int nTime0 = 400, int nTime1 = 1200);
-	void		SetBlink(BOOL bBlink = TRUE);
-	void		SetTextAlignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
-	void		SetPrefixSpace(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
+	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);
+	void		set_blink(BOOL bBlink = TRUE);
+	void		set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
+	void		set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
-	void		SetIcon(UINT nIDResource, int nSize = 16);
+	void		set_icon(UINT nIDResource, int nSize = 16);
 
 protected:
 	enum ENUM_TIMER
@@ -127,7 +127,7 @@ protected:
 
 
 	//this function will be used only if msimg32.dll library is not available
-	void		DrawGradientRect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF cRight, BOOL a_bVertical);
+	void		draw_gradient_rect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF cRight, BOOL a_bVertical);
 
 
  	int			m_nOutlineWidth;	//두께가 1 이상이면 외곽선으로 그려진다.
@@ -150,8 +150,8 @@ protected:
 
 	LOGFONT		m_lf;
 	CFont		m_font;
-	void		UpdateSurface();
-	void		ReconstructFont();
+	void		update_surface();
+	void		reconstruct_font();
 
 
 	HICON		m_hIcon;
@@ -170,7 +170,7 @@ protected:
 	virtual void PreSubclassWindow();
 
 	//}}AFX_MSG
-//	LRESULT		OnSetText(WPARAM wParam,LPARAM lParam);
+//	LRESULT		Onset_text(WPARAM wParam,LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 
 public:

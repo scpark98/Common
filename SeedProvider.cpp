@@ -1,4 +1,5 @@
 #include "SeedProvider.h"
+#include "Functions.h"
 
 #pragma warning(disable : 4996)		// disable bogus deprecation warning
 

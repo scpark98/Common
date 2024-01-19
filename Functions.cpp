@@ -2241,15 +2241,18 @@ std::string utf8ToMultibyte(std::string inputtext)
 }
 
 //http://localhost:4300/test_doc_favorite/test.avi
-bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url, bool is_https)
+bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url, bool &is_https)
 {
 	DWORD dwServiceType;
 	INTERNET_PORT nPort;
 
 	//AfxParseURL()을 사용하기 위해서는 url에 반드시 http:// 또는 https:// 등과 같은 서비스 종류가 표시되어야 한다.
-	if (full_url.Left(7) != _T("http://") &&
-		full_url.Left(8) != _T("https://"))
+	if (full_url.Left(7) != _T("http://") && full_url.Left(8) != _T("https://"))
 		full_url = (is_https ? _T("https://") : _T("http://")) + full_url;
+	else if (full_url.Left(7) == _T("http://"))
+		is_https = false;
+	else if (full_url.Left(8) == _T("https://"))
+		is_https = true;
 
 	bool ret = AfxParseURL(full_url, dwServiceType, ip, sub_url, nPort);
 	port = (int)nPort;
@@ -2327,6 +2330,9 @@ void request_url(CRequestUrlParams* params)
 		else
 			params->port = 80;
 	}
+
+	if (params->method.IsEmpty())
+		params->method = _T("GET");
 
 	params->method.MakeUpper();
 	if (!is_one_of(params->method, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
@@ -5246,16 +5252,20 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-void draw_outline_text(CDC* pDC, int x, int y, CString text,
-						int font_size, int thick, CString font_name,
-						Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
+void draw_gdip_outline_text(CDC* pDC, int x, int y, int w, int h, CString text,
+							int font_size, int thick, CString font_name,
+							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
 {
-	// GDI draw text
-	//SetTextColor(dc, RGB(0, 0, 255));
-	//TextOut(dc, x, y, text, text.GetLength());
+	draw_gdip_outline_text(pDC, CRect(x, y, x + w, y + h), text, font_size, thick, font_name, crOutline, crFill, align);
+}
+
+void draw_gdip_outline_text(CDC* pDC, CRect rTarget, CString text,
+							int font_size, int thick, CString font_name,
+							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
+{
+	Gdiplus::Graphics   g(pDC->m_hDC);
 
 	// GDI+ draw text
-	Gdiplus::Graphics   g(pDC->m_hDC);
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
@@ -5265,18 +5275,27 @@ void draw_outline_text(CDC* pDC, int x, int y, CString text,
 	Gdiplus::Font font(&ff, font_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 	Gdiplus::StringFormat fmt;
 	//DT_TOP
-	Gdiplus::RectF boundingBox;
-	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &boundingBox);
+	Gdiplus::RectF boundRect;
+
+	int x = rTarget.left;
+	int y = rTarget.top;
+
+	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+
+	if (rTarget.Width() == 0)
+		rTarget.right = rTarget.left + boundRect.Width;
+	if (rTarget.Height() == 0)
+		rTarget.bottom = rTarget.top + boundRect.Height;
 
 	if (align & DT_CENTER)
-		x = x - boundingBox.Width / 2;
+		x = rTarget.CenterPoint().x - boundRect.Width / 2;
 	else if (align & DT_RIGHT)
-		x = x - boundingBox.Width;
+		x = rTarget.right - boundRect.Width;
 
 	if (align & DT_VCENTER)
-		y = y - boundingBox.Height / 2;
+		y = rTarget.CenterPoint().y - boundRect.Height / 2;
 	else if (align & DT_BOTTOM)
-		y = y - boundingBox.Height;
+		y = rTarget.bottom - boundRect.Height;
 
 	Gdiplus::GraphicsPath   str_path;
 	str_path.AddString(CStringW(text), -1, &ff,
@@ -5285,7 +5304,7 @@ void draw_outline_text(CDC* pDC, int x, int y, CString text,
 	Gdiplus::Pen   gp(crOutline, thick);
 	gp.SetLineJoin(Gdiplus::LineJoinRound);
 
-	Gdiplus::Rect    rc(x, y, 30, 60);
+	//Gdiplus::Rect    rc(x, y, 30, 60);
 	//Gdiplus::Color   cStart(255, 128, 0);
 	//Gdiplus::Color   cEnd(0, 128, 255);
 	//Gdiplus::LinearGradientBrush  gb(rc, cStart, cEnd,
@@ -5299,9 +5318,22 @@ void draw_outline_text(CDC* pDC, int x, int y, CString text,
 //출력할 글자를 작게 출력한 후 이를 다시 원래 크기로 늘려
 //blur가 생기게 하고 이를 shadow로 사용하는 방식인데 뭔가 어색하다.
 //ApplyEffect의 blur를 적용해서 구현하는 것이 나을 듯 하다.
-void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int depth,
-						CString font_name,
-						Gdiplus::Color crShadow)
+void draw_gdip_shadow_text(CDC* pDC, int x, int y, int w, int h,
+							CString text, int font_size, int depth,
+							CString font_name,
+							Gdiplus::Color crText,
+							Gdiplus::Color crShadow,
+							UINT align)
+{
+	draw_gdip_shadow_text(pDC, CRect(x, y, x + w, y + h), text, font_size, depth, font_name, crText, crShadow, align);
+}
+
+void draw_gdip_shadow_text(CDC* pDC, CRect rTarget,
+							CString text, int font_size, int depth,
+							CString font_name,
+							Gdiplus::Color crText,
+							Gdiplus::Color crShadow,
+							UINT align)
 {
 	Gdiplus::Graphics   g(pDC->m_hDC);
 
@@ -5316,10 +5348,28 @@ void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int d
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
 	Gdiplus::Font font(&fontFamily, emSize, Gdiplus::FontStyleBold);
 
-	Gdiplus::SolidBrush shadow_brush(Gdiplus::Color(255, 0, 0, 0));
-	Gdiplus::SolidBrush brush2(Gdiplus::Color(255, 255, 0, 0));
+	Gdiplus::SolidBrush shadow_brush(crShadow);
+	Gdiplus::SolidBrush brush2(crText);
+
+	int x = rTarget.left;
+	int y = rTarget.top;
 
 	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+
+	if (rTarget.Width() == 0)
+		rTarget.right = rTarget.left + boundRect.Width;
+	if (rTarget.Height() == 0)
+		rTarget.bottom = rTarget.top + boundRect.Height;
+
+	if (align & DT_CENTER)
+		x = rTarget.CenterPoint().x - boundRect.Width / 2;
+	else if (align & DT_RIGHT)
+		x = rTarget.right - boundRect.Width;
+
+	if (align & DT_VCENTER)
+		y = rTarget.CenterPoint().y - boundRect.Height / 2;
+	else if (align & DT_BOTTOM)
+		y = rTarget.bottom - boundRect.Height;
 
 	Gdiplus::Bitmap bm(boundRect.Width, boundRect.Height);
 	Gdiplus::Graphics g_shadow(&bm);
@@ -5340,6 +5390,10 @@ void draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int d
 	g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &shadow_brush);
 	//save(&bm, _T("z:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
 
+	boundRect.X = x;
+	boundRect.Y = y;
+	boundRect.Width = bm.GetWidth();
+	boundRect.Height = bm.GetHeight();
 	g.DrawImage(&bm, boundRect, 0, 0, bm.GetWidth() * ratio, bm.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
 
 	Gdiplus::StringFormat sf;
@@ -16486,6 +16540,24 @@ CString	set_file_property(CString sFilePath, CString sProperty, CString value)
 	return CString();
 }
 
+CString base64_encode(CString in)
+{
+	USES_CONVERSION;
+
+	std::string sstr = CT2CA(in);
+	sstr = base64_encode(sstr);
+	CString str = CString(sstr.c_str());
+	return str;
+}
+
+CString base64_decode(CString in)
+{
+	std::string sstr = CT2CA(in);
+	sstr = base64_decode(sstr);
+	CString str = CString(sstr.c_str());
+	return str;
+}
+
 //https://ikcoo.tistory.com/213
 std::string base64_encode(const std::string& in)
 {
@@ -16539,4 +16611,15 @@ std::string base64_decode(const std::string& in)
 		}
 	}
 	return out;
+}
+
+
+CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _method, bool _is_https, std::vector<CString>* _headers, CString _body, CString _local_file_path)
+{
+	full_url = _full_url;
+	
+	parse_url(full_url, ip, port, sub_url, _is_https);
+	is_https = _is_https;
+
+	CRequestUrlParams(ip, port, sub_url, _method, is_https, _headers, _body, _local_file_path);
 }

@@ -103,7 +103,7 @@ void CComboBoxExt::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 		dc.FillSolidRect( &lpDrawItemStruct->rcItem, m_crBack );
 	}
 
-	TRACE(_T("%s\n"), strData);
+	//TRACE(_T("%s\n"), strData);
 	dc.DrawText(strData, &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
 
 	dc.SetTextColor(crOldTextColor);

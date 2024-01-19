@@ -24,7 +24,7 @@
 \*|*/
 //#include "stdafx.h"
 #include "DimEditCtrl.h"
-#include "../Functions.h"
+#include "../../Functions.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

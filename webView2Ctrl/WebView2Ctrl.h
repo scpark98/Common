@@ -44,7 +44,6 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
   Common.targets 파일이 있고 그 파일에서 <WebView2LoaderPreference>로 시작되는 태그를 찾아 그 값을 "Static"으로 변경한다.
   (버전에 따라 해당 태그의 위치와 구분은 약간씩 다를 수 있음)
 
-
 [하나은행 메모]
 - C://Program Files (x86)/UCTogether 폴더에서 웹뷰가 포함된 앱을 실행시킬때는
   반드시 InitializeWebView()의 CreateCoreWebView2EnvironmentWithOptions()호출 시	m_userDataFolder를 줘야만 실행된다.
@@ -71,6 +70,13 @@ CWnd를 상속받은 Custom Control에 webView2가 표시되도록 CWebView2Ctrl 제작.
 
 
 [수정사항]
+*20240115
+	- InitializeWebView()의 CreateCoreWebView2EnvironmentWithOptions()호출 시	m_userDataFolder를 지정해줘야 하는데
+	  이 폴더를 고정으로 하여 사용할 경우 다음과 같은 문제가 발생한다.
+	  이 webView2Ctrl을 공통으로 사용하는 A라는 프로젝트와 B라는 프로젝트의 webView2 패키지의 버전이 다를 경우는
+	  후자에 실행하는 프로젝트에서는 webView2가 생성 실패하게 된다.
+	  각 프로젝트 실행파일 폴더 아래 "webView_cache"라는 폴더를 사용하도록 수정함.
+
 *20230122
 	- 이 컨트롤을 포함하는 dlg 또는 이 컨트롤이 hide상태로 시작되면
 	  html이 제대로 로딩되지 않는 문제점 수정.

@@ -97,10 +97,10 @@ void CSCStatic::PreSubclassWindow()
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 	}
 
-	ReconstructFont();
+	reconstruct_font();
 }
 
-void CSCStatic::ReconstructFont()
+void CSCStatic::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
@@ -155,7 +155,7 @@ void CSCStatic::OnPaint()
 			{
 				//msimg32.dll is not available. Let's use our own code to display gradient background.
 				//This code is very simple and produces worse gradient that function from the library - but works!
-				//DrawGradientRect(&dc, rc, m_crBack, m_crGradient, m_bVertical);
+				//draw_gradient_rect(&dc, rc, m_crBack, m_crGradient, m_bVertical);
 			}
 		}
 	}
@@ -352,7 +352,7 @@ void CSCStatic::OnPaint()
 	dc.SelectObject(pOldFont);
 }
 
-void CSCStatic::SetText(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
+void CSCStatic::set_text(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 {
 	m_sText = sText;
 
@@ -361,15 +361,15 @@ void CSCStatic::SetText(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 	
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
 
-	//투명일때 UpdateSurface()를 써야 온전히 갱신된다.
+	//투명일때 update_surface()를 써야 온전히 갱신된다.
 	//=>dlg에서 clip sibling에 따라 결과가 달라진다.
 	if (m_bTransparent)
-		UpdateSurface();
+		update_surface();
 	else
 		Invalidate();
 }
 
-void CSCStatic::SetBackImage(UINT nIDBack)
+void CSCStatic::set_back_image(UINT nIDBack)
 {
 	CBitmap	Bitmap;
 
@@ -384,7 +384,7 @@ void CSCStatic::SetBackImage(UINT nIDBack)
 
 LRESULT CSCStatic::OnSetText(WPARAM wParam,LPARAM lParam)
 {
-	UpdateSurface();
+	update_surface();
 
 	return 0;
 }
@@ -406,17 +406,17 @@ BOOL CSCStatic::OnEraseBkgnd(CDC* pDC)
 }
 
 
-void CSCStatic::SetBlinkTime(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
+void CSCStatic::set_blink_time(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
 {
 	KillTimer(TIMER_BLINK);
 
 	m_nBlinkTime0		= nTime0;
 	m_nBlinkTime1		= nTime1;
 
-	SetBlink(m_bBlink);
+	set_blink(m_bBlink);
 }
 
-void CSCStatic::SetBlink(BOOL bBlink /*= TRUE*/)
+void CSCStatic::set_blink(BOOL bBlink /*= TRUE*/)
 {
 	m_bBlink = bBlink;
 	m_bBlinkStatus = FALSE;
@@ -429,7 +429,7 @@ void CSCStatic::SetBlink(BOOL bBlink /*= TRUE*/)
 	{
 		m_bBlink = false;
 		KillTimer(TIMER_BLINK);
-		UpdateSurface();
+		update_surface();
 	}
 }
 
@@ -438,7 +438,7 @@ void CSCStatic::SetBlink(BOOL bBlink /*= TRUE*/)
 // 또 다른 방법
 // CStaticEx2 message handlers
 /*
-LRESULT CSCStatic::OnSetText(WPARAM wParam,LPARAM lParam)
+LRESULT CSCStatic::Onset_text(WPARAM wParam,LPARAM lParam)
 {
    LRESULT Result = Default();
    Invalidate();
@@ -497,7 +497,7 @@ void CSCStatic::OnTimer(UINT_PTR nIDEvent)
 		if (IsWindowEnabled() == false)
 			m_bBlinkStatus = false;
 
-		UpdateSurface();
+		update_surface();
 
 		if (IsWindowEnabled() == false)
 			return;
@@ -520,7 +520,7 @@ void CSCStatic::OnTimer(UINT_PTR nIDEvent)
 	CStatic::OnTimer(nIDEvent);
 }
 
-void CSCStatic::UpdateSurface()
+void CSCStatic::update_surface()
 {
 	CRect rc;
 
@@ -547,7 +547,7 @@ BOOL CSCStatic::PreTranslateMessage(MSG* pMsg)
 	return CStatic::PreTranslateMessage(pMsg);
 }
 
-void CSCStatic::SetIcon(UINT nIDResource, int nSize /*= 16*/)
+void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 {
 	if  (m_hWnd == NULL)
 		return;
@@ -594,18 +594,18 @@ void CSCStatic::SetIcon(UINT nIDResource, int nSize /*= 16*/)
 	Invalidate();
 }
 
-CSCStatic& CSCStatic::SetFontName(const CString& strFont, BYTE byCharSet)
+CSCStatic& CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), strFont);
-	ReconstructFont();
-	UpdateSurface();
+	reconstruct_font();
+	update_surface();
 
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetFontSize(int nSize)
+CSCStatic& CSCStatic::set_font_size(int nSize)
 {
 	CFont cf;
 	LOGFONT lf;
@@ -616,48 +616,48 @@ CSCStatic& CSCStatic::SetFontSize(int nSize)
 	m_lf.lfHeight = lf.lfHeight;
 	m_lf.lfWidth  = lf.lfWidth;
 
-	ReconstructFont();
-	UpdateSurface();
+	reconstruct_font();
+	update_surface();
 
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetFontBold(bool bBold)
+CSCStatic& CSCStatic::set_font_bold(bool bBold)
 {
 	m_lf.lfWeight = bBold ? FW_BOLD : FW_NORMAL;
-	ReconstructFont();
-	UpdateSurface();
+	reconstruct_font();
+	update_surface();
 
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetFontUnderline(bool bSet)
+CSCStatic& CSCStatic::set_font_underline(bool bSet)
 {
 	m_lf.lfUnderline = bSet;
-	ReconstructFont();
-	UpdateSurface();
+	reconstruct_font();
+	update_surface();
 
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetFontAntiAliased(bool bAntiAliased)
+CSCStatic& CSCStatic::set_font_antialiased(bool bAntiAliased)
 {
 	m_bFontAntiAliased = bAntiAliased;
 	m_lf.lfQuality = (m_bFontAntiAliased ? ANTIALIASED_QUALITY : DEFAULT_QUALITY);
-	ReconstructFont();
-	UpdateSurface();
+	reconstruct_font();
+	update_surface();
 
 	return *this;
 }
 
-void CSCStatic::SetTextColor(COLORREF crTextColor)
+void CSCStatic::set_text_color(COLORREF crTextColor)
 {
 	m_crText = crTextColor;
-	//UpdateSurface();
+	//update_surface();
 	Invalidate();
 }
 
-CSCStatic& CSCStatic::SetGradient(bool bGradient)
+CSCStatic& CSCStatic::set_gradient(bool bGradient)
 {
 	m_bGradient = bGradient;
 
@@ -667,17 +667,17 @@ CSCStatic& CSCStatic::SetGradient(bool bGradient)
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetGradientColor(COLORREF crGradient)
+CSCStatic& CSCStatic::set_gradient_color(COLORREF crGradient)
 {
-	SetGradient();
+	set_gradient();
 	m_crGradient.clear();
 	m_crGradient.push_back(crGradient);
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetGradientColor(int idx, COLORREF crGradient)
+CSCStatic& CSCStatic::set_gradient_color(int idx, COLORREF crGradient)
 {
-	SetGradient();
+	set_gradient();
 	std::deque<COLORREF>::iterator it;
 
 	if (idx >= m_crGradient.size())
@@ -695,9 +695,9 @@ CSCStatic& CSCStatic::SetGradientColor(int idx, COLORREF crGradient)
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetGradientColor(int count, ...)
+CSCStatic& CSCStatic::set_gradient_color(int count, ...)
 {
-	SetGradient();
+	set_gradient();
 	m_crGradient.clear();
 
 	va_list arglist;
@@ -711,16 +711,16 @@ CSCStatic& CSCStatic::SetGradientColor(int count, ...)
 	return *this;
 }
 
-CSCStatic& CSCStatic::AddGradientColor(COLORREF crGradient)
+CSCStatic& CSCStatic::add_gradient_color(COLORREF crGradient)
 {
-	SetGradient();
+	set_gradient();
 	m_crGradient.push_back(crGradient);
 	return *this;
 }
 
-CSCStatic& CSCStatic::InsertGradientColor(int idx, COLORREF crGradient)
+CSCStatic& CSCStatic::insert_gradient_color(int idx, COLORREF crGradient)
 {
-	SetGradient();
+	set_gradient();
 	std::deque<COLORREF>::iterator it;
 
 	if (idx >= m_crGradient.size())
@@ -736,16 +736,16 @@ CSCStatic& CSCStatic::InsertGradientColor(int idx, COLORREF crGradient)
 	return *this;
 }
 
-CSCStatic& CSCStatic::SetVerticalGradient(bool bVertical)
+CSCStatic& CSCStatic::set_vertical_gradient(bool bVertical)
 {
-	SetGradient();
+	set_gradient();
 	m_bVertical = bVertical;
 	Invalidate();
 	return *this;
 }
 
 //this function will be used only if msimg32.dll library is not available
-void CSCStatic::DrawGradientRect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF cRight, BOOL a_bVertical)
+void CSCStatic::draw_gradient_rect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF cRight, BOOL a_bVertical)
 {
 	CRect stepR;					// rectangle for color's band
 	COLORREF color;				// color for the bands

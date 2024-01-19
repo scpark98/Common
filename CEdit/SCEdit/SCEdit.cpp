@@ -10,23 +10,23 @@
 //
 // How To Use:
 // Add three files to your project
-// ColorEdit.cpp, ColorEdit.h and Color.h
+// SCEdit.cpp, SCEdit.h and Color.h
 // Color.h has (#define)'s for different colors (add any color you desire).
 //
-// Add #include "ColorEdit.h" to your Dialogs Header file.
-// Declare an instance of CColorEdit for each edit box being modified.
-// Ex. CColorEdit m_ebName;
+// Add #include "SCEdit.h" to your Dialogs Header file.
+// Declare an instance of CSCEdit for each edit box being modified.
+// Ex. CSCEdit m_ebName;
 //
-// In your OnInitDialog() add a SubclassDlgItem for each CColorEdit member variable.
+// In your OnInitDialog() add a SubclassDlgItem for each CSCEdit member variable.
 // Ex. m_ebName.SubclassDlgItem(IDC_EB_NAME, this);
 // In this same function initialize your color for each box unless you want the default.
 
 
-// ColorEdit.cpp : implementation file
+// SCEdit.cpp : implementation file
 //
 
 //#include "stdafx.h"
-#include "ColorEdit.h"
+#include "SCEdit.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -35,9 +35,9 @@ static char THIS_FILE[] = __FILE__;
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
-// CColorEdit
+// CSCEdit
 
-CColorEdit::CColorEdit()
+CSCEdit::CSCEdit()
 	: m_rect_NCbottom(0, 0, 0, 0)
 	, m_rect_NCtop(0, 0, 0, 0)
 {
@@ -56,28 +56,29 @@ CColorEdit::CColorEdit()
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
-CColorEdit::~CColorEdit()
+CSCEdit::~CSCEdit()
 {
 }
 
 
-BEGIN_MESSAGE_MAP(CColorEdit, CEdit)
-	//{{AFX_MSG_MAP(CColorEdit)
+BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
+	//{{AFX_MSG_MAP(CSCEdit)
 	ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_SIZE()
-	ON_WM_PAINT()
+	//ON_WM_PAINT()
 	ON_WM_NCCALCSIZE()
 	ON_WM_NCPAINT()
-	ON_CONTROL_REFLECT(EN_KILLFOCUS, &CColorEdit::OnEnKillfocus)
-	ON_CONTROL_REFLECT(EN_UPDATE, &CColorEdit::OnEnUpdate)
+	ON_CONTROL_REFLECT(EN_SETFOCUS, &CSCEdit::OnEnSetfocus)
+	ON_CONTROL_REFLECT(EN_KILLFOCUS, &CSCEdit::OnEnKillfocus)
+	ON_CONTROL_REFLECT(EN_UPDATE, &CSCEdit::OnEnUpdate)
 	ON_WM_WINDOWPOSCHANGED()
 //}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CColorEdit message handlers
+// CSCEdit message handlers
 
-void CColorEdit::PreSubclassWindow()
+void CSCEdit::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	CEdit::PreSubclassWindow();
@@ -95,7 +96,7 @@ void CColorEdit::PreSubclassWindow()
 	reconstruct_font();
 }
 
-void CColorEdit::reconstruct_font()
+void CSCEdit::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
@@ -105,7 +106,7 @@ void CColorEdit::reconstruct_font()
 	ASSERT(bCreated);
 }
 
-int CColorEdit::get_font_size(bool pixel_size)
+int CSCEdit::get_font_size(bool pixel_size)
 {
 	if (pixel_size)
 	{
@@ -119,7 +120,7 @@ int CColorEdit::get_font_size(bool pixel_size)
 	return m_font_size;
 }
 
-CColorEdit& CColorEdit::set_text_color(COLORREF crColor)
+CSCEdit& CSCEdit::set_text_color(COLORREF crColor)
 {
 	m_cr_text = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
 	RedrawWindow();
@@ -127,7 +128,7 @@ CColorEdit& CColorEdit::set_text_color(COLORREF crColor)
 	return *this;
 }
 
-CColorEdit& CColorEdit::set_back_color(COLORREF crColor)
+CSCEdit& CSCEdit::set_back_color(COLORREF crColor)
 {
 	m_cr_back = crColor; // Passing the value passed by the dialog to the member varaible for Backgound Color
 	m_br_back.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
@@ -138,7 +139,7 @@ CColorEdit& CColorEdit::set_back_color(COLORREF crColor)
 	return *this;
 }
 
-CColorEdit& CColorEdit::set_text_color_disabled(COLORREF cr_text_disabled)
+CSCEdit& CSCEdit::set_text_color_disabled(COLORREF cr_text_disabled)
 {
 	m_cr_text_disabled = cr_text_disabled;
 	RedrawWindow();
@@ -146,7 +147,7 @@ CColorEdit& CColorEdit::set_text_color_disabled(COLORREF cr_text_disabled)
 	return *this;
 }
 
-CColorEdit& CColorEdit::set_back_color_disabled(COLORREF cr_back_disabled)
+CSCEdit& CSCEdit::set_back_color_disabled(COLORREF cr_back_disabled)
 {
 	m_cr_back_disabled = cr_back_disabled;
 	m_br_back_disabled.DeleteObject();
@@ -156,44 +157,68 @@ CColorEdit& CColorEdit::set_back_color_disabled(COLORREF cr_back_disabled)
 	return *this;
 }
 
-HBRUSH CColorEdit::CtlColor(CDC* pDC, UINT nCtlColor)
+HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 {
-	if(m_rect_NCtop.IsRectEmpty())
-	{
-		SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED);
-	}
+	//if (m_rect_NCtop.IsRectEmpty())
+	//{
+	//	SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED);
+	//}
 
 	HBRUSH hbr = (HBRUSH)m_br_back; // Passing a Handle to the Brush
 
-	//pDC->SetBkMode(TRANSPARENT);
-
-	if (GetStyle() & ES_READONLY)
+	if (m_transparent)
+	{
+		m_br_back.DeleteObject();
+		m_br_back.CreateStockObject(HOLLOW_BRUSH);
+		pDC->SetBkMode(TRANSPARENT);
+	}
+	else if (GetStyle() & ES_READONLY)
 	{
 		pDC->SetTextColor(m_cr_text);
 		pDC->SetBkColor( ::GetSysColor( COLOR_3DFACE ) );
 	}
-	else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
-	{
-		pDC->SetTextColor(m_cr_text_disabled);
-		pDC->SetBkColor(m_cr_back_disabled);
-		m_br_back_disabled.DeleteObject();
-		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
-		hbr = (HBRUSH)m_br_back_disabled;
-	}
+	//else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
+	//{
+	//	pDC->SetTextColor(m_cr_text_disabled);
+	//	pDC->SetBkColor(m_cr_back_disabled);
+	//	m_br_back_disabled.DeleteObject();
+	//	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
+	//	hbr = (HBRUSH)m_br_back_disabled;
+	//}
 	else
 	{
 		pDC->SetTextColor(m_cr_text);
 		pDC->SetBkColor(m_cr_back);
  		m_br_back.DeleteObject();
  		m_br_back.CreateSolidBrush(m_cr_back);
-		//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
 		hbr = (HBRUSH)m_br_back;
 	}
 
 	return hbr;
 }
 
-BOOL CColorEdit::set_read_only( BOOL bReadOnly )
+
+CSCEdit& CSCEdit::set_transparent(bool transparent)
+{
+	m_transparent = transparent;
+
+	m_br_back.DeleteObject();
+
+	if (m_transparent)
+	{
+		m_br_back.CreateStockObject(HOLLOW_BRUSH);
+	}
+	else
+	{
+		m_br_back.CreateSolidBrush(m_cr_back);
+	}
+
+	update_ctrl();
+
+	return *this;
+}
+
+bool CSCEdit::set_read_only(bool bReadOnly)
 {
 	//readonly일 때 set_back_color를 호출하면 원래 m_cr_backColor이 덮어써지므로
 	//그 변수값은 변경하지 말고 직접 배경색을 변경해준다.
@@ -201,7 +226,6 @@ BOOL CColorEdit::set_read_only( BOOL bReadOnly )
 	{
 		m_br_back.DeleteObject();
 		m_br_back.CreateSolidBrush(::GetSysColor(COLOR_3DFACE));
-		//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
 	}
 	else
 	{
@@ -211,7 +235,7 @@ BOOL CColorEdit::set_read_only( BOOL bReadOnly )
 	return CEdit::SetReadOnly(bReadOnly);
 }
 
-CColorEdit& CColorEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+CSCEdit& CSCEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
@@ -220,7 +244,7 @@ CColorEdit& CColorEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	return *this;
 }
 
-CColorEdit& CColorEdit::set_font_size( int nSize )
+CSCEdit& CSCEdit::set_font_size( int nSize )
 {
 	m_font_size = nSize;
 	//For the MM_TEXT mapping mode,
@@ -232,7 +256,7 @@ CColorEdit& CColorEdit::set_font_size( int nSize )
 	return *this;
 }
 
-CColorEdit& CColorEdit::set_font_bold( bool bBold )
+CSCEdit& CSCEdit::set_font_bold( bool bBold )
 {
 	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
 	reconstruct_font();
@@ -240,7 +264,7 @@ CColorEdit& CColorEdit::set_font_bold( bool bBold )
 	return *this;
 }
 
-CColorEdit& CColorEdit::set_auto_font_size(bool bAuto, double ratio)
+CSCEdit& CSCEdit::set_auto_font_size(bool bAuto, double ratio)
 {
 	CRect	r;
 	GetClientRect( r );
@@ -265,7 +289,7 @@ CColorEdit& CColorEdit::set_auto_font_size(bool bAuto, double ratio)
 	return *this;
 }
 
-void CColorEdit::recalc_font_size()
+void CSCEdit::recalc_font_size()
 {
 	CRect	r;
 	GetClientRect( r );
@@ -278,7 +302,7 @@ void CColorEdit::recalc_font_size()
 	reconstruct_font();
 }
 
-void CColorEdit::OnSize(UINT nType, int cx, int cy)
+void CSCEdit::OnSize(UINT nType, int cx, int cy)
 {
 	CEdit::OnSize(nType, cx, cy);
 
@@ -296,7 +320,7 @@ void CColorEdit::OnSize(UINT nType, int cx, int cy)
 }
 
 /*
-void CColorEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+void CSCEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CEdit::OnWindowPosChanged(lpwndpos);
 
@@ -315,15 +339,22 @@ void CColorEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 }
 */
 
-BOOL CColorEdit::PreTranslateMessage(MSG* pMsg)
+BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
+	//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
+	if (pMsg->message == WM_KEYDOWN)
+	{
+		if (m_transparent)
+			update_ctrl();
+	}
 
 	return CEdit::PreTranslateMessage(pMsg);
 }
 
 
-void CColorEdit::OnPaint()
+void CSCEdit::OnPaint()
 {
 	//for border???
 #if 0
@@ -346,7 +377,7 @@ void CColorEdit::OnPaint()
 }
 
 
-void CColorEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
+void CSCEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 {
 	// TODO: Add your message handler code here and/or call default
 	CRect rectWnd, rectClient;
@@ -385,67 +416,123 @@ void CColorEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 	m_rect_NCbottom.DeflateRect(uiCX, uiCenterOffset + uiVClientHeight + uiCY, uiCX, uiCY);
 
-	lpncsp->rgrc[0].top += uiCenterOffset;
-	lpncsp->rgrc[0].bottom -= uiCenterOffset;
+	//lpncsp->rgrc[0].top += uiCenterOffset;
+	//lpncsp->rgrc[0].bottom -= uiCenterOffset;
 
-	lpncsp->rgrc[0].left += uiCX;
-	lpncsp->rgrc[0].right -= uiCY;
-	//CEdit::OnNcCalcSize(bCalcValidRects, lpncsp);
+	//lpncsp->rgrc[0].left += uiCX;
+	//lpncsp->rgrc[0].right -= uiCY;
+	CEdit::OnNcCalcSize(bCalcValidRects, lpncsp);
 }
 
 
-void CColorEdit::OnNcPaint()
+void CSCEdit::OnNcPaint()
 {
+	Default();
+
+	bool draw_border = true;
+	if (m_transparent && draw_border)
+	{
+		CClientDC dc(this);
+		CRect rc;
+
+		GetClientRect(rc);
+		CPen pen(PS_SOLID, 1, RGB(128, 128, 128));
+		CPen* pOldPen = (CPen*)dc.SelectObject(&pen);
+		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
+
+		dc.Rectangle(rc);
+		//dc.Draw3dRect(rc, RGB(128, 128, 128), RGB(128, 128, 128));
+
+		dc.SelectObject(pOldPen);
+		dc.SelectObject(pOldBrush);
+	}
+	return;
+
 	if (!IsWindowEnabled())
 		return;
 
-	Default();
 
-	CWindowDC dc(this);
-	CBrush Brush(m_cr_back);//GetSysColor(COLOR_WINDOW));
+	//CWindowDC dc(this);
+	//CBrush Brush(m_cr_back);//GetSysColor(COLOR_WINDOW));
 
-	dc.FillRect(m_rect_NCbottom, &Brush);
-	dc.FillRect(m_rect_NCtop, &Brush);
+	//dc.FillRect(m_rect_NCbottom, &m_br_back);
+	//dc.FillRect(m_rect_NCtop, &m_br_back);
 
-	Brush.DeleteObject();
+	//Brush.DeleteObject();
 }
 
-void CColorEdit::update_ctrl()
+void CSCEdit::update_ctrl()
 {
+	if (!m_transparent)
+		return;
+	/*
 	CWnd* pParent = GetParent();
 	CRect rect;
 
 	GetWindowRect(rect);
 	pParent->ScreenToClient(rect);
-	rect.top -= 5;
+	//rect.top -= 5;
 	//rect.InflateRect( 5, 5 );		//이거 안해주면 위치이동시 잔상생김
 
 	pParent->InvalidateRect(rect, FALSE);
+	*/
+
+	//만약 parent에 배경색이나 배경 그림이 있고
+//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
+
+	if (m_transparent)
+	{
+		CClientDC dc(this);
+		CRect Rect;
+		GetWindowRect(&Rect);
+		CWnd* pParent = GetParent();
+		ASSERT(pParent);
+		pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
+		//copy what's on the parents at this point
+		CDC* pDC = pParent->GetDC();
+		CDC MemDC;
+		CBitmap bmp;
+		MemDC.CreateCompatibleDC(pDC);
+		bmp.CreateCompatibleBitmap(pDC, Rect.Width(), Rect.Height());
+		CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+		MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pDC, Rect.left, Rect.top, SRCCOPY);
+		dc.BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+		MemDC.SelectObject(pOldBmp);
+		pParent->ReleaseDC(pDC);
+		MemDC.DeleteDC();
+	}
+
 }
 
 
-void CColorEdit::OnEnKillfocus()
+void CSCEdit::OnEnKillfocus()
 {
 	update_ctrl();
 }
 
 
-void CColorEdit::OnEnUpdate()
+void CSCEdit::OnEnUpdate()
 {
 	update_ctrl();
 }
 
 
-void CColorEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+void CSCEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CEdit::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	update_ctrl();
 }
-
+/*
 //ON_WM_CTLCOLOR_REFLECT() 때문인지 OnCtlColor()는 호출되지 않는다.
-HBRUSH CColorEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+HBRUSH CSCEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
 	return CEdit::OnCtlColor(pDC, pWnd, nCtlColor);
+}
+*/
+
+void CSCEdit::OnEnSetfocus()
+{
+	update_ctrl();
 }

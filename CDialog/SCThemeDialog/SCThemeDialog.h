@@ -7,7 +7,7 @@
 	   일단은 resize가 필요한 dlg일 경우는 resource editor에서 Resizing속성을 주고 시작하자)
 	- 윈도우 기본 타이틀바를 사용하지 않거나 필요한 경우 커스터마이즈 된 타이틀바를 표시한다.
 	  (m_titlebar_height가 0보다 크면 동작)
-	- 시스템 버튼은 SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 에서 원하는 버튼들을 추가할 수 있다.
+	- 시스템 버튼은 SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 에서 원하는 버튼들을 추가할 수 있다.
 	  (이미지로 세팅할 수도 있고 이미지를 별도로 지정하지 않으면 DC에 심플하게 그려준다)
 	- 배경 이미지를 설정하면 이 클래스를 상속받은 모든 dlg는 그 배경으로 표시된다.
 	  (별도 설정도 물론 가능해야 한다)
@@ -19,6 +19,7 @@
 #include <afxwin.h>
 #include <afxdialogex.h>
 
+#include "../../GdiplusBitmap.h"
 #include "../../CButton/SCSystemButtons/SCSystemButtons.h"
 
 // CSCThemeDialog 대화 상자
@@ -37,7 +38,28 @@ public:
 	void	set_titlebar_height(int height);
 	void	set_titlebar_text_color(COLORREF cr) { m_cr_titlebar_text = cr; }
 	void	set_titlebar_back_color(COLORREF cr) { m_cr_titlebar_back = cr; }
+
+	//필요한 시스템 버튼들을 추가해준다. 이 함수를 호출하지 않으면 기본 닫기 버튼만 사용된다.
+	//set_system_buttons(SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);	//항상 위에 버튼까지 필요한 경우
+	//set_system_buttons(SC_CLOSE);	//닫기 버튼만 필요한 경우
+	template <typename ... Types> void	set_system_buttons(Types... args)
+	{
+		if (m_system_buttons.m_hWnd)
+		{
+			m_system_buttons.DestroyWindow();
+			m_system_buttons.create(this);
+		}
+
+		int n = sizeof...(args);
+		int arg[] = { args... };
+
+		for (int i = 0; i < n; i++)
+			m_system_buttons.insert_button(-1, arg[i]);
+	}
+
 	void	set_back_color(COLORREF cr) { m_cr_back = cr; }
+	void	set_back_image(CString imgType, UINT nResourceID, bool stretch);
+	//void	set_back_image(CString img_path, bool stretch);
 
 	enum COLOR_THEME
 	{
@@ -66,10 +88,12 @@ protected:
 	CFont*		m_font;
 
 	//프로그램 로고(png만 허용, 이 값이 없다면 기본 앱 아이콘을 사용한다)
-	CGdiplusBitmap	m_app_logo;
+	CGdiplusBitmap		m_img_logo;
 
-	COLORREF	m_cr_back = ::GetSysColor(COLOR_3DFACE);
-	CSCSystemButtons	m_sys_buttons;
+	COLORREF			m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	CGdiplusBitmap		m_img_back;
+
+	CSCSystemButtons	m_system_buttons;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.

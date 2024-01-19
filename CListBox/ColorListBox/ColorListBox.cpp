@@ -200,7 +200,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	COLORREF	cr_back = m_cr_back;
 	CRect		rect = lpDIS->rcItem;
 
-	rect.DeflateRect(1, 1);
+	//rect.DeflateRect(1, 1);
 	//rect.right -= 4;
 	CRect		rGutter = rect;
 
@@ -766,6 +766,18 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_backOver = RGB(195, 222, 245);
 		break;
+	case color_theme_popup_folder_list:
+		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
+		m_cr_textSelected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_cr_textSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_cr_textOver = m_cr_text;
+
+		m_cr_back = ::GetSysColor(COLOR_3DFACE); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_backSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_backSelectedRect = RGB(153, 209, 255);
+		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_backOver = RGB(195, 222, 245);
+		break;
 	}
 
 	if (apply_now)
@@ -809,6 +821,7 @@ void CColorListBox::set_as_folder_list()
 	m_as_folder_list = true;
 	m_as_popup = true;
 	m_show_time = false;
+	m_cr_back = ::GetSysColor(COLOR_3DFACE);
 }
 
 int CColorListBox::set_folder_list(std::deque<CString>* lists, CString selected_text)

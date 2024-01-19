@@ -141,7 +141,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 		return false;
 
 	btn->normal.load(lpType, normal);
-	if (btn->normal.empty())
+	if (btn->normal.is_empty())
 		return false;
 
 	m_width = btn->normal.width;
@@ -194,11 +194,11 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 	CButtonImage* btn = new CButtonImage();
 
 	//normal은 0이어서는 안된다.
-	if (img->empty())
+	if (img->is_empty())
 		return false;
 
 	img->deep_copy(&btn->normal);
-	if (btn->normal.empty())
+	if (btn->normal.is_empty())
 		return false;
 
 	m_width = btn->normal.width;
@@ -257,7 +257,7 @@ void CGdiButton::fit_to_image(bool fit)
 
 	resize_control(m_width, m_height);
 
-	UpdateSurface();
+	update_surface();
 }
 
 void CGdiButton::active_index(int index, bool bErase)
@@ -266,7 +266,7 @@ void CGdiButton::active_index(int index, bool bErase)
 		return;
 
 	m_idx = index;
-	UpdateSurface();
+	update_surface();
 }
 
 //true이면 1번 이미지를 표시해준다. false일 경우는 0번을 표시하는데 만약 없으면 AddGrayImage로 회색 이미지를 자동 추가한 후 선택해준다.
@@ -279,7 +279,7 @@ void CGdiButton::active_index(int index, bool bErase)
 void CGdiButton::SetCheck(bool bCheck)
 {
 	m_idx = bCheck;
-	UpdateSurface();
+	update_surface();
 
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
@@ -305,7 +305,7 @@ void CGdiButton::SetCheck(bool bCheck)
 				{
 					//((CGdiButton*)pWnd)->SetCheck(BST_UNCHECKED); 
 					((CGdiButton*)pWnd)->m_idx = 0;
-					((CGdiButton*)pWnd)->UpdateSurface();
+					((CGdiButton*)pWnd)->update_surface();
 				}
 			} 
 
@@ -317,7 +317,7 @@ void CGdiButton::SetCheck(bool bCheck)
 	}
 }
 /*
-void CGdiButton::SetBackImage(Bitmap* pBack)
+void CGdiButton::set_back_imageBitmap* pBack)
 {
 	if (pBack == NULL)
 		return;
@@ -335,7 +335,7 @@ void CGdiButton::SetBackImage(Bitmap* pBack)
 	Rect cutRect(pt.x, pt.y, rc.Width(), rc.Height());
 	m_pBack = pBack->Clone(cutRect, pBack->GetPixelFormat());
 
-	UpdateSurface();
+	update_surface();
 }
 */
 
@@ -360,14 +360,14 @@ void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
 		//m_image[i]->disabled.set_alpha(alpha);
 	}
 	//Invalidate();
-	UpdateSurface();
+	update_surface();
 }
 
 CGdiButton& CGdiButton::text(CString text)
 {
 	m_text = text;
 	SetWindowText(m_text);
-	UpdateSurface();
+	update_surface();
 	return *this;
 }
 
@@ -385,7 +385,7 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 	m_cr_text.push_back(down);
 	m_cr_text.push_back(disabled);
 
-	UpdateSurface();
+	update_surface();
 	return *this;
 }
 
@@ -412,7 +412,7 @@ CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down
 	m_cr_back.push_back(down);
 	m_cr_back.push_back(disabled);
 
-	UpdateSurface();
+	update_surface();
 	return *this;
 }
 
@@ -509,7 +509,7 @@ void CGdiButton::PreSubclassWindow()
 	else
 		GetObject(GetStockObject(SYSTEM_FONT),sizeof(m_lf),&m_lf);
 
-	ReconstructFont();
+	reconstruct_font();
 
 	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
 	//m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
@@ -553,7 +553,7 @@ void CGdiButton::set_tooltip_text(CString text)
 }
 
 
-void CGdiButton::ReconstructFont()
+void CGdiButton::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
@@ -749,7 +749,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			pImage = &m_image[idx]->normal;
 
 		//배경을 그리고
-		if (!m_back.empty())
+		if (!m_back.is_empty())
 			g.DrawImage(m_back, 0, 0);
 		//else
 			//dc.FillSolidRect(rc, cr_back);
@@ -941,7 +941,7 @@ void CGdiButton::OnMouseLeave()
 
 	m_bIsTracking = false;
 	m_bHover = false;
-	UpdateSurface();
+	update_surface();
 
 	CButton::OnMouseLeave();
 }
@@ -983,7 +983,7 @@ void CGdiButton::OnSetFocus(CWnd* pOldWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//TRACE("set focus\n");
 	m_bHasFocus = true;
-	UpdateSurface();
+	update_surface();
 }
 
 
@@ -994,7 +994,7 @@ void CGdiButton::OnKillFocus(CWnd* pNewWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//TRACE("kill focus\n");
 	m_bHasFocus = false;
-	UpdateSurface();
+	update_surface();
 }
 
 
@@ -1033,7 +1033,7 @@ void CGdiButton::ReAlign()
 			dy = rParentRect.CenterPoint().y - m_height / 2;
 	
 		SetWindowPos(NULL, dx, dy, m_width, m_height, SWP_NOZORDER | SWP_NOSIZE);
-		//SetBackImage(m_pBackOrigin);
+		//set_back_imagem_pBackOrigin);
 	}
 }
 
@@ -1058,7 +1058,7 @@ void CGdiButton::Offset(int x, int y)
 
 	SetWindowPos(&wndNoTopMost, pt.x, pt.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);	
 
-	//SetBackImage(m_pBackOrigin);
+	//set_back_imagem_pBackOrigin);
 }
 
 void CGdiButton::Inflate(int cx, int cy)
@@ -1081,14 +1081,14 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	rc.InflateRect(l, t, r, b);
 
 	//배경 그림이 존재했다면 배경 또한 새로 따와야 한다.
-	if (m_back.valid() && m_back_origin.valid())
+	if (m_back.is_valid() && m_back_origin.is_valid())
 	{
 		m_back_origin.deep_copy(&m_back);
 		m_back.sub_image(rc);
 	}
 
 	SetWindowPos(&wndNoTopMost, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);	
-	UpdateSurface();
+	update_surface();
 }
 
 CGdiButton& CGdiButton::set_round(int round)
@@ -1099,7 +1099,7 @@ CGdiButton& CGdiButton::set_round(int round)
 	m_round = round;
 	m_transparent = (m_round > 0);
 
-	UpdateSurface();
+	update_surface();
 	return *this;
 }
 
@@ -1108,7 +1108,7 @@ bool CGdiButton::GetCheck()
 	return m_idx;
 }
 
-void CGdiButton::UpdateSurface(bool bErase)
+void CGdiButton::update_surface(bool bErase)
 {
 	if (m_transparent)
 	{
@@ -1132,7 +1132,7 @@ void CGdiButton::UpdateSurface(bool bErase)
 void CGdiButton::Toggle()
 {
 	m_idx = !m_idx;
-	UpdateSurface();
+	update_surface();
 }
 
 LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
@@ -1166,17 +1166,17 @@ LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 	return CButton::WindowProc(message, wParam, lParam);
 }
 
-void CGdiButton::SetBlinkTime(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
+void CGdiButton::set_blink_time(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
 {
 	KillTimer(timer_blink);
 
 	m_blink_time0		= nTime0;
 	m_blink_time1		= nTime1;
 
-	SetBlink(m_blink);
+	set_blink(m_blink);
 }
 
-void CGdiButton::SetBlink(BOOL bBlink /*= TRUE*/)
+void CGdiButton::set_blink(BOOL bBlink /*= TRUE*/)
 {
 	m_blink = bBlink;
 	m_blink_status = FALSE;
@@ -1190,31 +1190,31 @@ void CGdiButton::SetBlink(BOOL bBlink /*= TRUE*/)
 		m_blink = false;
 		KillTimer(timer_blink);
 		ShowWindow(SW_SHOW);
-		//UpdateSurface();
+		//update_surface();
 	}
 }
 
-CGdiButton& CGdiButton::SetFontName(LPCTSTR sFontname, BYTE byCharSet)
+CGdiButton& CGdiButton::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
 
-CGdiButton& CGdiButton::SetFontSize(int nSize)
+CGdiButton& CGdiButton::set_font_size(int nSize)
 {
 	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
 
-CGdiButton& CGdiButton::SetFontBold(bool bBold)
+CGdiButton& CGdiButton::set_font_bold(bool bBold)
 {
 	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
-	ReconstructFont();
+	reconstruct_font();
 
 	return *this;
 }
@@ -1225,7 +1225,7 @@ CGdiButton& CGdiButton::SetFontBold(bool bBold)
 void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	UpdateSurface();
+	update_surface();
 
 	//GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 
@@ -1306,7 +1306,7 @@ void CGdiButton::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CButton::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	UpdateSurface();
+	update_surface();
 }
 
 
@@ -1396,7 +1396,7 @@ void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus
 		}
 	}
 
-	UpdateSurface();
+	update_surface();
 }
 
 void CGdiButton::apply_effect_hsl(int hue, int sat, int light)
@@ -1438,7 +1438,7 @@ void CGdiButton::apply_effect_hsl(int hue, int sat, int light)
 		}
 	}
 
-	UpdateSurface();
+	update_surface();
 }
 
 BOOL CGdiButton::OnToolTipNotify(UINT /*id*/, NMHDR* pNMHDR, LRESULT* /*pResult*/)

@@ -65,8 +65,10 @@ BOOL CSCThemeDialog::OnInitDialog()
 		CRect rc;
 		GetClientRect(rc);
 
-		//m_sys_buttons.create(this, rc.right, m_titlebar_height, -1, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);
-		m_sys_buttons.create(this, rc.right, m_titlebar_height, 44, SC_CLOSE);
+		//m_sys_buttons.create(this, rc.right, -1, m_titlebar_height, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);
+		//m_sys_buttons.create(this, rc.right, m_titlebar_height, 44, SC_CLOSE);
+		m_system_buttons.create(this);
+		m_system_buttons.set_buttons_cmd(SC_CLOSE);
 	}
 
 	m_font = GetFont();
@@ -248,7 +250,7 @@ void CSCThemeDialog::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	CMemoryDC dc(&dc1, &rc);
+	CMemoryDC dc(&dc1, &rc, false);
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -262,9 +264,9 @@ void CSCThemeDialog::OnPaint()
 		dc.FillSolidRect(rTitle, m_cr_titlebar_back);
 
 		//프로그램 아이콘 표시
-		if (m_app_logo.valid())//icon exist?
+		if (m_img_logo.is_valid())//icon exist?
 		{
-			m_app_logo.draw(&g, 0, 0);
+			m_img_logo.draw(&g, 0, 0);
 		}
 		else
 		{
@@ -291,12 +293,19 @@ void CSCThemeDialog::OnPaint()
 	}
 
 	//클라이언트 영역 칠하기
-	dc.FillSolidRect(rc, m_cr_back);
+	if (m_img_back.is_valid())
+	{
+		m_img_back.draw(&g, rc, true);
+	}
+	else
+	{
+		dc.FillSolidRect(rc, m_cr_back);
+	}
 }
 
 void CSCThemeDialog::set_color_theme(int theme)
 {
-	m_sys_buttons.set_color_theme(theme);
+	m_system_buttons.set_color_theme(theme);
 
 	switch (theme)
 	{
@@ -324,9 +333,22 @@ void CSCThemeDialog::OnSize(UINT nType, int cx, int cy)
 	CDialogEx::OnSize(nType, cx, cy);
 
 	// TODO: Add your message handler code here
-	if (!m_sys_buttons.m_hWnd)
+	if (!m_system_buttons.m_hWnd)
 		return;
 
-	m_sys_buttons.adjust_right(cx);
-	//Invalidate();
+	m_system_buttons.adjust_right(cx);
+	Invalidate();
 }
+
+void CSCThemeDialog::set_back_image(CString imgType, UINT nResourceID, bool stretch)
+{
+	m_img_back.load(imgType, nResourceID);
+	Invalidate();
+}
+/*
+void CSCThemeDialog::set_back_image(CString img_path, bool stretch)
+{
+	m_img_back.load(img_path);
+	Invalidate();
+}
+*/

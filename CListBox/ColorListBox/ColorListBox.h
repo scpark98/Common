@@ -134,6 +134,7 @@ public:
 	void		use_over(bool use = true) { m_use_over = use; }
 	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
 
+	//»ö»ó
 	void		set_text_color(COLORREF cr) { m_cr_text = cr; Invalidate(); }
 	void		set_back_color(COLORREF cr) { m_cr_back = cr; Invalidate(); }
 
@@ -159,7 +160,7 @@ public:
 	{
 		color_theme_default = 0,
 		color_theme_explorer,
-		//color_theme_light_blue,
+		color_theme_popup_folder_list,
 		//color_theme_navy_blue,
 		//color_theme_dark_blue,
 		//color_theme_dark_gray,

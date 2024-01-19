@@ -12,10 +12,8 @@ IMPLEMENT_DYNAMIC(CSCSystemButtons, CButton)
 CSCSystemButtons::CSCSystemButtons()
 {
 	//특별한 세팅이 없다면 기본 3개의 시스템 버튼으로 시작한다.
-	m_button.resize(3);
-	m_button[0].cmd = SC_MINIMIZE;
-	m_button[1].cmd = SC_MAXIMIZE;
-	m_button[2].cmd = SC_CLOSE;
+	m_button.resize(1);
+	m_button[0].cmd = SC_CLOSE;
 
 	set_color_theme(color_theme_window);
 }
@@ -38,30 +36,61 @@ END_MESSAGE_MAP()
 
 
 // CSCSystemButtons message handlers
-/*
-void CSCSystemButtons::create(CWnd* parent, int right_end, int height, int width)
+
+void CSCSystemButtons::create(CWnd* parent, int right_end, int width, int height)
 {
+	m_button.clear();
+
+	if (right_end > 0)
+	{
+		m_right_end = right_end;
+	}
+	else
+	{
+		CRect parentrc;
+		parent->GetClientRect(parentrc);
+		m_right_end = parentrc.right;
+	}
+
+	if (width > 0)
+		m_button_width = width;
+	if (height > 0)
+		m_button_height = height;
+
 	//컨트롤 생성과 함께 각 버튼의 위치가 정해진다.
 	for (int i = 0; i < m_button.size(); i++)
 	{
-		m_button[i].r = CRect(i * (width + m_gap), 1, i * (width + m_gap) + width, height - 1);
+		m_button[i].r = CRect(i * (m_button_width + m_gap), 1, i * (m_button_width + m_gap) + m_button_width, m_button_height - 1);
 	}
 
 	Create(_T("CSCSystemButtons"), WS_CHILD | BS_PUSHBUTTON,
-		CRect(right_end - m_button.size() * width - (m_button.size() - 1) * m_gap, 0, right_end, height), parent, 0);
+		CRect(m_right_end - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap, 0, m_right_end, m_button_height), parent, 0);
 
+	ShowWindow(SW_SHOW);
 	//Invalidate();
 	//RedrawWindow();
 	//UpdateWindow();
 }
-*/
+
+void CSCSystemButtons::resize()
+{
+	for (int i = 0; i < m_button.size(); i++)
+	{
+		m_button[i].r = CRect(i * (m_button_width + m_gap), 1, i * (m_button_width + m_gap) + m_button_width, m_button_height - 1);
+	}
+
+	MoveWindow(m_right_end - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap, 0,
+		m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
+		m_button_height);
+}
 
 void CSCSystemButtons::adjust_right(int right_end)
 {
 	CRect rc;
 	GetClientRect(rc);
 
-	MoveWindow(right_end - rc.Width(), rc.top, rc.Width(), rc.Height());
+	m_right_end = right_end;
+	MoveWindow(m_right_end - rc.Width(), rc.top, rc.Width(), rc.Height());
 }
 
 int CSCSystemButtons::get_button_index(CPoint pt)
@@ -103,7 +132,7 @@ void CSCSystemButtons::OnPaint()
 		Gdiplus::Graphics g(dc.GetSafeHdc());
 		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
-		if (m_button[i].img.valid())
+		if (m_button[i].img.is_valid())
 		{
 			m_button[i].img.draw(&g, m_button[i].r);
 		}
@@ -113,43 +142,46 @@ void CSCSystemButtons::OnPaint()
 			cr.SetFromCOLORREF(m_cr_pen);
 			cr_back.SetFromCOLORREF(m_cr_back);
 
-			Gdiplus::Pen gp(cr, 1.5F);
-			Gdiplus::Pen gpTrack(Gdiplus::Color(155, 188, 54), 14.0F);
+			Gdiplus::Pen pen(cr, 1.5F);
+			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0F);
 			Gdiplus::SolidBrush br_back(cr_back);
-			Gdiplus::SolidBrush br_pin(Gdiplus::Color(0, 0, 255));
+			Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
 
-			gpTrack.SetStartCap(Gdiplus::LineCapRound);
-			gpTrack.SetEndCap(Gdiplus::LineCapRound);
+			pen_pin.SetStartCap(Gdiplus::LineCapRound);
+			pen_pin.SetEndCap(Gdiplus::LineCapRound);
 
 			CPoint cp = m_button[i].r.CenterPoint();
 
 			if (m_button[i].cmd == SC_MINIMIZE)
 			{
-				g.DrawLine(&gp, cp.x - 5, cp.y + 1, cp.x + 5, cp.y + 1);
+				g.DrawLine(&pen, cp.x - 5, cp.y + 1, cp.x + 5, cp.y + 1);
 			}
 			else if (m_button[i].cmd == SC_MAXIMIZE)
 			{
 				if (GetParent()->IsZoomed())
 				{
-					g.DrawRectangle(&gp, cp.x - 3, cp.y - 4, 8, 8);
+					g.DrawRectangle(&pen, cp.x - 3, cp.y - 4, 8, 8);
 					g.FillRectangle(&br_back, cp.x - 6, cp.y - 1, 8, 8);
-					g.DrawRectangle(&gp, cp.x - 6, cp.y - 1, 8, 8);
+					g.DrawRectangle(&pen, cp.x - 6, cp.y - 1, 8, 8);
 				}
 				else
 				{
-					g.DrawRectangle(&gp, cp.x - 5, cp.y - 5, 10, 10);
+					g.DrawRectangle(&pen, cp.x - 5, cp.y - 5, 10, 10);
 				}
 			}
 			else if (m_button[i].cmd == SC_CLOSE)
 			{
-				g.DrawLine(&gp, cp.x - 5, cp.y - 4, cp.x + 5, cp.y + 6);
-				g.DrawLine(&gp, cp.x - 5, cp.y + 6, cp.x + 5, cp.y - 4);
+				g.DrawLine(&pen, cp.x - 5, cp.y - 4, cp.x + 5, cp.y + 6);
+				g.DrawLine(&pen, cp.x - 5, cp.y + 6, cp.x + 5, cp.y - 4);
 			}
 			else if (m_button[i].cmd == SC_PIN)
 			{
-				//DWORD dwExStyle = ::
-				g.DrawLine(&gpTrack, cp.x - 7, cp.y + 1, cp.x + 7, cp.y + 1);
-				g.FillEllipse(&br_pin, cp.x + (is_top_most(GetParent()->GetSafeHwnd()) ? 1 : -11), cp.y + 1 - 5, 10, 10);
+				g.DrawLine(&pen_pin, cp.x - 7, cp.y, cp.x + 7, cp.y);
+				g.FillEllipse(&br_pin, cp.x + (is_top_most(GetParent()->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
+			}
+			else if (m_button[i].cmd == SC_HELP)
+			{
+				draw_gdip_outline_text(&dc, m_button[i].r, _T("?"), 16, 0, _T("맑은 고딕"), cr, cr, DT_CENTER | DT_VCENTER);
 			}
 		}
 	}
@@ -188,6 +220,9 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 	{
 		switch (m_button[m_over_index].cmd)
 		{
+		case SC_HELP:
+			AfxMessageBox(_T("?"));
+			break;
 		case SC_PIN:
 			if (is_top_most(GetParent()->GetSafeHwnd()))
 				GetParent()->SetWindowPos(&wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);

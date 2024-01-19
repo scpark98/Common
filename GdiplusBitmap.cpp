@@ -3,11 +3,11 @@
 #include "MemoryDC.h"
 #include <thread>
 
-//Gdiplus 초기화 과정을 자동으로 하기 위해 GdiplusDummy 타입의 static 인스턴스를 선언해준다.
-class GdiplusDummy
+//Gdiplus 초기화 과정을 자동으로 하기 위해 CGdiplusDummyForInitialization 타입의 static 인스턴스를 선언해준다.
+class CGdiplusDummyForInitialization
 {
 public:
-	GdiplusDummy()
+	CGdiplusDummyForInitialization()
 	{
 		GdiplusStartupInput gdiplusStartupInput;
 
@@ -17,7 +17,7 @@ public:
 		}
 	}
 
-	~GdiplusDummy()
+	~CGdiplusDummyForInitialization()
 	{
 		::GdiplusShutdown(gdiplusToken);
 	}
@@ -27,7 +27,7 @@ protected:
 	ULONG_PTR gdiplusToken;
 };
 
-static GdiplusDummy gdi_dummy;
+static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
 
 CGdiplusBitmap::CGdiplusBitmap()
 {
@@ -198,7 +198,7 @@ bool CGdiplusBitmap::load(CString file, bool show_error)
 
 	bool open_success = false;
 
-	if (use_copied_open && !temp.empty())
+	if (use_copied_open && !temp.is_empty())
 		open_success = true;
 	else if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
 		open_success = true;
@@ -565,14 +565,14 @@ bool CGdiplusBitmap::set_raw_data()
 	return false;
 }
 
-bool CGdiplusBitmap::empty()
+bool CGdiplusBitmap::is_empty()
 {
 	return (m_pBitmap == NULL);
 }
 
-bool CGdiplusBitmap::valid()
+bool CGdiplusBitmap::is_valid()
 {
-	return !empty();
+	return !is_empty();
 }
 
 int CGdiplusBitmap::channels()
@@ -644,9 +644,9 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics *g, CRect targetRect)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics *g, CRect targetRect, bool stretch)
 {
-	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
+	CRect r = (stretch ? targetRect : GetRatioRect(targetRect, (double)width / (double)height));
 	return draw(g, r.left, r.top, r.Width(), r.Height());
 }
 

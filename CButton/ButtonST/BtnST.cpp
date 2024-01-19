@@ -2527,18 +2527,18 @@ bool CButtonST::SetTextFont( const LOGFONT& lgfnt )
 	return true;
 }
 */
-CButtonST& CButtonST::SetFontSize( int nHeight )
+CButtonST& CButtonST::set_font_size( int nHeight )
 {
 	m_lf.lfHeight = nHeight;
 	ReconstructFont();
 	return *this;
 }
 
-CButtonST& CButtonST::SetFontBold( bool bBold )
+CButtonST& CButtonST::set_font_bold( bool bBold )
 {
 	m_lf.lfWeight = bBold ? FW_BOLD : FW_NORMAL;
 	ReconstructFont();
-	//UpdateSurface();
+	//update_surface();
 	return *this;
 }
 

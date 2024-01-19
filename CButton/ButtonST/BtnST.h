@@ -183,8 +183,8 @@ public:
 	bool SetTextFont(LONG nHeight, bool bBold, bool bItalic, const CString& sFaceName); 
 	bool SetTextFont(const LOGFONT& lgfnt); 
 */
-	CButtonST& SetFontSize( int nHeight );
-	CButtonST& SetFontBold( bool bBold );
+	CButtonST& set_font_size( int nHeight );
+	CButtonST& set_font_bold( bool bBold );
 	//end of added by scpark
 
 

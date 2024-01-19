@@ -302,12 +302,7 @@ public:
 		}
 	}
 
-	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
-	{
-		full_url = _full_url;
-		//parse_url(full_url, ip, port, sub_url);
-		CRequestUrlParams(ip, port, sub_url, _method, _is_https, _headers, _body, _local_file_path);
-	}
+	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
 	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
 	bool		use_thread = false;
@@ -323,7 +318,7 @@ public:
 
 	int			port = 0;
 	CString		sub_url;			//domain을 제외한 나머지 주소
-	CString		method;
+	CString		method = _T("GET");
 	bool		is_https = true;
 	CString		body;				//post data(json format)
 	std::vector<CString> headers;	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야 한다.
@@ -619,7 +614,8 @@ struct	NETWORK_INFO
 	std::wstring CString2wstring(const char* str);
 	//std::string ss = CT2CA(CString(_T("test")); 과 같이 CT2CA를 사용하면 간단함.
 	std::string CString2string(CString cs);
-	CString		string2CString(std::string s);
+	//CString str(sstr.c_str());
+	CString		string2CString(std::string sstr);
 	//멀티바이트 환경에서 이 함수를 호출해서 사용하면 간혹 비정상적으로 동작한다.
 	//아마도 함수내에서 메모리가 할당된 후 호출한 곳에서 사용하려니 문제가 될 수 있다.
 	//이 함수의 바디를 그대로 쓰면 문제가 없으므로 일단 바디 코드를 그대로 복사해서 사용한다.
@@ -765,6 +761,8 @@ struct	NETWORK_INFO
 	//https://ikcoo.tistory.com/213
 	std::string base64_encode(const std::string& in);
 	std::string base64_decode(const std::string& in);
+	CString base64_encode(CString in);
+	CString base64_decode(CString in);
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
@@ -837,7 +835,7 @@ struct	NETWORK_INFO
 	bool		ReadURLFile(LPCTSTR pUrl, CString &strBuffer);
 	void		ReadURLFileString(CString sURL, CString &sString);
 
-	bool		parse_url(CString full_url, CString &ip, int &port, CString &sub_url, bool is_https = true);
+	bool		parse_url(CString full_url, CString &ip, int &port, CString &sub_url, bool &is_https);
 
 	//url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
 	//local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
@@ -1237,14 +1235,28 @@ void		SetWallPaper(CString sfile);
 	void		draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect);
 
 	//Gdiplus
-	void		draw_outline_text(CDC* pDC, int x, int y, CString text, int font_size, int thick,
+	//Gdiplus를 이용한 외곽선 텍스트 출력
+	void		draw_gdip_outline_text(CDC* pDC, int x, int y, int w, int h, CString text, int font_size, int thick,
 								CString font_name = _T("맑은 고딕"),
 								Gdiplus::Color crOutline = Gdiplus::Color::White,
 								Gdiplus::Color crFill = Gdiplus::Color::Black,
 								UINT align = DT_LEFT | DT_TOP);
-	void		draw_shadow_text(CDC* pDC, int x, int y, CString text, int font_size, int depth,
+	void		draw_gdip_outline_text(CDC* pDC, CRect rTarget, CString text, int font_size, int thick,
 								CString font_name = _T("맑은 고딕"),
-								Gdiplus::Color crShadow = Gdiplus::Color::Red);
+								Gdiplus::Color crOutline = Gdiplus::Color::White,
+								Gdiplus::Color crFill = Gdiplus::Color::Black,
+								UINT align = DT_LEFT | DT_TOP);
+
+	void		draw_gdip_shadow_text(CDC* pDC, int x, int y, int w, int h, CString text, int font_size, int depth,
+								CString font_name = _T("맑은 고딕"),
+								Gdiplus::Color crText = Gdiplus::Color::Black,
+								Gdiplus::Color crShadow = Gdiplus::Color::LightGray,
+								UINT align = DT_LEFT | DT_TOP);
+	void		draw_gdip_shadow_text(CDC* pDC, CRect rTarget, CString text, int font_size, int depth,
+								CString font_name = _T("맑은 고딕"),
+								Gdiplus::Color crText = Gdiplus::Color::Black,
+								Gdiplus::Color crShadow = Gdiplus::Color::LightGray,
+								UINT align = DT_LEFT | DT_TOP);
 
 	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 	//이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!

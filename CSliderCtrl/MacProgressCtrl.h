@@ -74,7 +74,7 @@ public:
 		text_format_value,
 	};
 
-	void		show_text(bool show, int text_format) { m_text_show = show; m_text_format = text_format; }
+	void		show_text(bool show = true, int text_format = text_format_percent) { m_text_show = show; m_text_format = text_format; }
 	void		set_text_format(int text_format) { m_text_format = text_format; }
 	
 	COLORREF	GetColor(COLORREF crOrigin, int nOffset);

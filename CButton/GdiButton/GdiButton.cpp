@@ -16,6 +16,8 @@ IMPLEMENT_DYNAMIC(CGdiButton, CButton)
 
 CGdiButton::CGdiButton()
 {
+	RegisterWindowClass();
+
 	m_button_style		= BS_PUSHBUTTON;
 
 	m_bAsStatic			= false;
@@ -72,6 +74,34 @@ CGdiButton::CGdiButton()
 CGdiButton::~CGdiButton()
 {
 	release_all();
+}
+
+BOOL CGdiButton::RegisterWindowClass()
+{
+	WNDCLASS wndcls;
+	HINSTANCE hInst = AfxGetInstanceHandle();
+
+	if (!(::GetClassInfo(hInst, _T("CGdiButton"), &wndcls)))
+	{
+		// otherwise we need to register a new class
+		wndcls.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+		wndcls.lpfnWndProc = ::DefWindowProc;
+		wndcls.cbClsExtra = wndcls.cbWndExtra = 0;
+		wndcls.hInstance = hInst;
+		wndcls.hIcon = NULL;
+		wndcls.hCursor = AfxGetApp()->LoadStandardCursor(IDC_ARROW);
+		wndcls.hbrBackground = (HBRUSH)(COLOR_3DFACE + 1);
+		wndcls.lpszMenuName = NULL;
+		wndcls.lpszClassName = _T("CGdiButton");
+
+		if (!AfxRegisterClass(&wndcls))
+		{
+			AfxThrowResourceException();
+			return FALSE;
+		}
+	}
+
+	return TRUE;
 }
 
 void CGdiButton::release_all()

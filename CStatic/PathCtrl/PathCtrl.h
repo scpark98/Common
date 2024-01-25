@@ -114,7 +114,7 @@ protected:
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만
 	//여기서는 특수폴더와 폴더만 보여주자.
 	CColorListBox		m_list_folder;
-	CSize				m_sz_list_folder = CSize(228, 386);
+	CSize				m_sz_list_folder = CSize(300, 386);	//width는 윈도우 탐색기와 동일하게 300.
 	std::deque<CString>	m_remote_sub_folders;
 	void				show_sub_folder_list(bool show);
 
@@ -125,9 +125,9 @@ protected:
 	void		repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
 
 	std::deque<CPathElement> m_path;
-	int			m_max_width = 200;	//한 path element에 표시할 수 있는 최대 label width in pixel
+	int			m_max_width = 200;		//한 path element에 표시할 수 있는 최대 label width in pixel
 	//int			m_root_width = 35;	//20+15. 맨 왼쪽에 항상 표시되는 영역으로 이 영역은 m_path에는 포함되지 않는다.(width가 작을땐 최하위 항목부터 표시하는데 이때에도 루트는 항상 표시된다.)
-	int			m_width_margin = 5;			//label의 좌우 마진. 양쪽이므로 총 마진 = m_width_margin*2
+	int			m_width_margin = 5;		//label의 좌우 마진. 양쪽이므로 총 마진 = m_width_margin*2
 	int			m_arrow_area_width = 15;
 	void		recalc_path_width();
 	void		recalc_path_position();

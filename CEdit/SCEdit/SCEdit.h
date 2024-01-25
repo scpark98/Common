@@ -30,6 +30,11 @@ public:
 	//}}AFX_VIRTUAL
 
 	bool					set_read_only(bool readonly = true);
+
+	//Test_GdiButton 프로젝트에서는 CSCEdit이 투명하게 잘 표시되나
+	//Test_SCThemeDialog 프로젝트에서는 투명하게 표시되지 않는다.
+	//차이점은 전자의 경우 parent가 순수 CDialog를 상속받은 dlg이고
+	//후자는 SCThemeDialog를 상속받은 dlg라는 점이다. 수정 필요.
 	virtual CSCEdit&		set_transparent(bool transparent = true);
 
 	virtual CSCEdit&		set_text_color(COLORREF crText); // This Function is to set the Color for the Text.

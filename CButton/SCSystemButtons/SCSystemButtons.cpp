@@ -221,7 +221,8 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 		switch (m_button[m_over_index].cmd)
 		{
 		case SC_HELP:
-			AfxMessageBox(_T("?"));
+			//AfxMessageBox(_T("도움말 또는 CAboutDlg 표시 영역"));
+			::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_HELP, 0);
 			break;
 		case SC_PIN:
 			if (is_top_most(GetParent()->GetSafeHwnd()))

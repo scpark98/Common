@@ -619,8 +619,13 @@ CString		GetCurrentDirectory()
 //만약 path가 "d:\\aaa\\b.abc"이고 b.abc가 파일이 아닌 폴더라면 문제된다.
 //또는 path가 "d:\\aaa\\ccc"인데 폴더가 아닌 파일일수도 있다.
 //파일인지 폴더인지를 구분해서 처리하는 코드는 필수다.(실제 존재하는 경우에만 검사가 가능하다)
+//단, path가 "연구소문서(\\192.168.1.103) (Y:)"과 같이 네트워크 경로를 포함한 드라이브 볼륨인 경우는
+//분리해서는 안되므로 그냥 리턴해야 한다.
 CString		get_part(CString path, int part)
 {
+	if (path.Right(2) == _T(":)"))
+		return path;
+
 	TCHAR tDrive[_MAX_DRIVE] = { 0, };
 	TCHAR tDir[_MAX_DIR] = { 0, };
 	TCHAR tFname[_MAX_FNAME] = { 0, };
@@ -7760,7 +7765,8 @@ CString	GetParentDirectory(CString sFolder)
 //GetComputerName API 함수는 항상 대문자로 리턴한다.
 //그냥 확실하게 GetComputerNameString().MakeLower() 등과 같이
 //대소문자를 명확히 하여 비교하는 것이 좋다.
-CString GetComputerNameString()
+//=>255글자까지 리턴되는 GetComputerNameEx()로 변경함.
+CString get_computer_name_string()
 {
 	//TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
 	TCHAR computerName[255] = { 0, };
@@ -8152,6 +8158,8 @@ CString GetHDDVolumeNumber(CString sDrive)
 	return str;
 }
 
+#pragma comment(lib, "mpr.lib")
+
 CString	get_drive_volume(TCHAR drive_letter)
 {
 	TCHAR Label[MAX_PATH] = { 0, };
@@ -8167,9 +8175,26 @@ CString	get_drive_volume(TCHAR drive_letter)
 	CString sLabel = Label;
 
 	if (sLabel.IsEmpty())
+	{
 		sLabel.Format(_T("로컬 디스크 (%c:)"), drive_letter);
+	}
 	else
+	{
 		sLabel.Format(_T("%s (%c:)"), sLabel, drive_letter);
+	}
+
+	if (GetDriveType(drive_root.Left(2)) == DRIVE_REMOTE)
+	{
+		unsigned long bufferLength = MAX_PATH;
+		WNetGetConnection(drive_root.Left(2), Label, &bufferLength);
+		//네트워크 드라이브의 Label이 "\\\\192.168.1.103\\연구소문서" 와 같이 구해진다.
+		//막상 탐색기에서는 "연구소문서(\\192.168.1.103) (Y:)" 와 같이 표현하고 있다. 보정해준다.
+		sLabel = Label;
+		sLabel.Format(_T("%s(%s) (%c:)"),
+			sLabel.Mid(sLabel.ReverseFind('\\') + 1),
+			sLabel.Left(sLabel.ReverseFind('\\')),
+			drive_letter);
+	}
 
 	return sLabel;
 }

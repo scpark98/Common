@@ -25,7 +25,11 @@
 
 enum SCSYSTEM_BUTTON_CUSTOM
 {
-	SC_PIN = SC_SEPARATOR + 0x1001,	//add new sc command for always on top
+	//사용자 정의 cmd를 SC_SEPARATOR + 0x1001부터 했으나
+	//SC_HELP가 다른 시스템 명령과 겹치는 듯하여 WM_USER + 0x1001로 수정함.
+	//SC_SEPARATOR가 WinUser.h파일에서 보면 SC_로 시작되는 #define들 중에 가장 마지막 값이 아니므로
+	//뭔가 다른 값이 겹칠 가능성이 높기 때문에 WM_USER로 변경함.
+	SC_PIN = WM_USER + 0x1001,	//add new sc command for always on top
 	SC_HELP,
 };
 

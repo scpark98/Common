@@ -2,7 +2,7 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
+//#include "stdafx.h"
 #include "OwnMenu.h"
 
 
@@ -61,21 +61,11 @@ void COwnMenu::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	{
 		ZeroMemory(&rectIcon, sizeof(CRect));
 		rectText = rectFull;
-		TextRect = RGB(255, 255, 128);//GetSysColor(COLOR_BTNFACE);// COLORREF(RGB(192,192,192));
+		TextRect = GetSysColor(COLOR_BTNFACE);// COLORREF(RGB(192,192,192));
 	}
 
 	CDC* pDC = CDC::FromHandle(lpDrawItemStruct->hDC);
-	FillFluentRect(pDC->GetSafeHdc(),
-		rectIcon, 255, 0, 0, 0, 255, 0);
-	//::FillRect(pDC->GetSafeHdc(), &rectIcon, 
-		   //         CreateSolidBrush(IconRectRight));
-
-	pDC->FillSolidRect(&rectText,
-		TextRect);
-
-
-
-
+	pDC->FillSolidRect(&rectText, TextRect);
 
 	//if the menu item is selected
 	if ((lpDrawItemStruct->itemState & ODS_SELECTED) &&
@@ -107,7 +97,7 @@ void COwnMenu::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 {
 	MenuObject *pData = (MenuObject*)lpMeasureItemStruct->itemData;
 	//if (pData->m_hIcon == NULL)
-	if (true)
+	if (!pData->m_strCaption.IsEmpty())
 	{
 		lpMeasureItemStruct->itemHeight = 32;
 		lpMeasureItemStruct->itemWidth = ((MenuObject*)lpMeasureItemStruct->itemData)->m_strCaption.GetLength() * 8;

@@ -76,7 +76,6 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	ON_COMMAND_RANGE(menu_show_log, menu_save_all, OnPopupMenu)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHWHEEL()
-	ON_WM_DRAWITEM()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
@@ -598,7 +597,8 @@ void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: Add your message handler code here and/or call default
 	if (m_use_over)
 	{
-		UINT nHover = ItemFromPoint(point, m_bOutside);
+		BOOL outside = false;
+		UINT nHover = ItemFromPoint(point, outside);
 		if (nHover != m_over_item)
 		{
 			m_over_item = nHover;
@@ -615,10 +615,12 @@ void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: Add your message handler code here and/or call default
-	//CRect rc;
-	//GetClientRect(rc);
-	//pDC->FillSolidRect(rc, m_crBack);
-	//return TRUE;
+
+	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
+	CRect rc;
+	GetClientRect(rc);
+	pDC->FillSolidRect(rc, m_cr_back);
+	return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
@@ -760,7 +762,7 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 		m_cr_textSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_cr_textOver = m_cr_text;
 
-		m_cr_back = ::GetSysColor(COLOR_WINDOW); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back = RGB(255, 0, 0); //::GetSysColor(COLOR_WINDOW); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
 		m_cr_backSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_backSelectedRect = RGB(153, 209, 255);
 		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
@@ -864,13 +866,18 @@ BOOL CColorListBox::OnLbnSelchange()
 	//그 외 항목이 선택되면 자동 스크롤을 멈춘다.
 	m_auto_scroll = (index == GetCount() - 1);
 
-	if (m_as_folder_list)
+	if (m_as_popup)
 	{
-		CString text = m_folder_list[index];
+		CString text;
+		
+		if (m_as_folder_list)
+			text = m_folder_list[index];
+		else
+			GetText(index, text);
 
 		if (m_hParentWnd)
 		{
-			::SendMessage(m_hParentWnd, Message_CColorListBox, (WPARAM)&CColorListBoxMessage(this, message_colorlistbox_selchange), (LPARAM)&text);
+			::SendMessage(m_hParentWnd, Message_CColorListBox, (WPARAM)&CColorListBoxMessage(this, message_colorlistbox_selchanged), (LPARAM)&text);
 
 			if (m_as_popup)
 				ShowWindow(SW_HIDE);
@@ -1108,14 +1115,6 @@ void CColorListBox::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	RedrawWindow();
 	UpdateWindow();
 	CListBox::OnMouseHWheel(nFlags, zDelta, pt);
-}
-
-
-void CColorListBox::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct)
-{
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-
-	CListBox::OnDrawItem(nIDCtl, lpDrawItemStruct);
 }
 
 

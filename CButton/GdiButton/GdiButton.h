@@ -208,6 +208,8 @@ public:
 	std::deque<CButtonImage*> m_image;
 
 protected:
+	BOOL	RegisterWindowClass();
+
 	enum TIMER_ID
 	{
 		timer_blink = 0,

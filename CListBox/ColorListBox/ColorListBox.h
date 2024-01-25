@@ -74,7 +74,7 @@ public:
 
 	enum MESSAGES
 	{
-		message_colorlistbox_selchange = 0,
+		message_colorlistbox_selchanged = 0,
 	};
 
 // Attributes
@@ -156,7 +156,7 @@ public:
 	virtual		CColorListBox&	set_font_bold(bool bBold = true);
 
 	//color setting
-	enum listctrlex_color_theme
+	enum COLORLISTBOX_COLOR_THEME
 	{
 		color_theme_default = 0,
 		color_theme_explorer,
@@ -184,7 +184,6 @@ protected:
 	HWND		m_hParentWnd = NULL;
 
 	bool		m_use_over = false;			//hover hilighted
-	BOOL		m_bOutside;
 	int			m_over_item = -1;
 	bool		m_as_popup = false;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
 	bool		m_as_folder_list = false;	//폴더목록을 표시하는 목적으로 동작하는 경우
@@ -210,6 +209,10 @@ protected:
 	CFont		m_font;
 	void		ReconstructFont();
 
+	//라인 높이는 글꼴 높이에 따라 자동 계산된다.
+	//만약 수동으로 라인 간격을 변경하려면 set_line_height(32); 함수를 이용해야 한다.
+	//font_size를 증감했는데 라인 간격이 변경되지 않는 것도 문제가 되니 필요할 경우
+	//해당 함수를 통해 설정하자.
 	int			m_line_height;
 
 	//편집 관련
@@ -274,7 +277,7 @@ public:
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
-	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
+//	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);

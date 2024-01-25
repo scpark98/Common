@@ -465,7 +465,7 @@ void CSCEdit::update_ctrl()
 {
 	if (!m_transparent)
 		return;
-	/*
+	
 	CWnd* pParent = GetParent();
 	CRect rect;
 
@@ -475,11 +475,11 @@ void CSCEdit::update_ctrl()
 	//rect.InflateRect( 5, 5 );		//이거 안해주면 위치이동시 잔상생김
 
 	pParent->InvalidateRect(rect, FALSE);
-	*/
+	
 
 	//만약 parent에 배경색이나 배경 그림이 있고
 //그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
-
+	/*
 	if (m_transparent)
 	{
 		CClientDC dc(this);
@@ -501,7 +501,7 @@ void CSCEdit::update_ctrl()
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
 	}
-
+	*/
 }
 
 

@@ -652,7 +652,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	get_round_path(&roundPath, CRect2GpRect(rc), m_round);
+	get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round);
 
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);

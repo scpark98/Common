@@ -237,12 +237,18 @@ bool CGdiplusBitmap::load(CString file, bool show_error)
 //png일 경우는 sType을 생략할 수 있다.
 bool CGdiplusBitmap::load(UINT id, bool show_error)
 {
+	if (id <= 0)
+		return false;
+
 	return load(_T("PNG"), id, show_error);
 }
 
 bool CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 {
 	release();
+
+	if (id <= 0)
+		return false;
 
 	sType.MakeLower();
 
@@ -632,7 +638,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect tar
 	//temp.m_pBitmap->UnlockBits(&bmData_dst);
 	//save(&mask, _T("d:\\temp\\mask.bmp"));
 
-	CRect r = GetRatioRect(targetRect, (double)width / (double)height);
+	CRect r = get_ratio_max_rect(targetRect, (double)width / (double)height);
 
 	g->DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
 	g->DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
@@ -646,7 +652,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect tar
 
 CRect CGdiplusBitmap::draw(Gdiplus::Graphics *g, CRect targetRect, bool stretch)
 {
-	CRect r = (stretch ? targetRect : GetRatioRect(targetRect, (double)width / (double)height));
+	CRect r = (stretch ? targetRect : get_ratio_max_rect(targetRect, (double)width / (double)height));
 	return draw(g, r.left, r.top, r.Width(), r.Height());
 }
 
@@ -1417,18 +1423,25 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
 	*/
 }
 
-void CGdiplusBitmap::round_corner(float radius, float factor, float position)
+void CGdiplusBitmap::round_corner(float radius, float factor, float position, bool tl, bool tr, bool br, bool bl)
 {
 	if (channel != 4)
 		cvtColor32ARGB();
 
 	GraphicsPath path;
 	float ratio = 0.0f;// ((float)width / (float)height);
-	path.AddArc(0.0, ratio, radius, radius, 180.0, 90.0);
+
+	get_round_rect_path(&path, Gdiplus::Rect(0, 0, width, height), radius);
+	/*
+	if (tl)
+		path.AddArc(0.0, ratio, radius, radius, 180.0, 90.0);
+	else
+		path.AddArc(0.0, ratio, 0.0f, 0.0f, 180.0, 90.0);
 	path.AddArc(width - radius, ratio, radius, radius, 270.0, 90.0);
 	path.AddArc(width - radius, height - ratio - radius, radius, radius, 0.0, 90.0);
 	path.AddArc(0.0, height - ratio - radius, radius, radius, 90.0, 90.0);
 	path.CloseFigure();
+	*/
 
 	if (factor <= 0.0f || position <= 0.0f)
 	{

@@ -5881,7 +5881,7 @@ Gdiplus::RectF CRect2GpRectF(CRect r)
 	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
 }
 
-void get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
+void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
 {
 	//path->SetFillMode(Gdiplus::FillModeWinding);
 
@@ -5898,7 +5898,10 @@ void get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
 
 	Gdiplus::RectF arc(r.X, r.Y, diameter, diameter);
 
-	path->AddArc(arc, 180.0, 90.0);
+	if (false)
+		path->AddArc(arc, 180.0, 90.0);
+	else
+		path->AddRectangle(arc);
 
 	arc.X = r.GetRight() - diameter - 1;
 	path->AddArc(arc, 270.0, 90.0);
@@ -5910,6 +5913,56 @@ void get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
 	path->AddArc(arc, 90.0, 90.0);
 
 	path->CloseFigure();
+}
+
+void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width)
+{
+	int dia = 2 * radius;
+
+	// set to pixel mode
+	int oldPageUnit = g->SetPageUnit(Gdiplus::UnitPixel);
+
+	// define the pen
+	Gdiplus::Pen pen(gcr_stroke, 1);
+	Gdiplus::SolidBrush br(gcr_fill);
+
+	pen.SetAlignment(Gdiplus::PenAlignmentCenter);
+
+	// get the corner path
+	Gdiplus::GraphicsPath path;
+
+	// get path
+	get_round_rect_path(&path, r, dia);
+
+	//fill the round rect
+	g->FillPath(&br, &path);
+
+	// draw the round rect
+	g->DrawPath(&pen, &path);
+
+	// if width > 1
+	for (int i = 1; i < width; i++)
+	{
+		// left stroke
+		r.Inflate(-1, 0);
+		// get the path
+		get_round_rect_path(&path, r, dia);
+
+		// draw the round rect
+		g->DrawPath(&pen, &path);
+
+		// up stroke
+		r.Inflate(0, -1);
+
+		// get the path
+		get_round_rect_path(&path, r, dia);
+
+		// draw the round rect
+		g->DrawPath(&pen, &path);
+	}
+
+	// restore page unit
+	g->SetPageUnit((Gdiplus::Unit)oldPageUnit);
 }
 
 CRect get_zoom_rect(CRect rect, double zoom)
@@ -10861,7 +10914,7 @@ CString get_rect_info_string(CRect r, int nFormat)
 }
 
 
-void adjustRectRange(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize)
+void adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize)
 {
 	if (*l < minx)
 	{
@@ -10910,7 +10963,7 @@ void adjustRectRange(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t min
 	}
 }
 
-void AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize, bool includeBR)
+void adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize, bool includeBottomRight)
 {
 	rect.NormalizeRect();
 	rLimit.NormalizeRect();
@@ -10944,7 +10997,7 @@ void AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize, bool includeBR
 			rect.bottom = rLimit.bottom;
 	}
 
-	if (!includeBR)
+	if (!includeBottomRight)
 	{
 		if (rect.right == rLimit.right)
 			rect.right--;
@@ -10952,16 +11005,16 @@ void AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize, bool includeBR
 			rect.bottom--;
 	}
 
-	//AdjustRectRange(rect, rLimit.left, rLimit.top, rLimit.right, rLimit.bottom, bRetainSize);
+	//adjust_rect_range(rect, rLimit.left, rLimit.top, rLimit.right, rLimit.bottom, bRetainSize);
 }
 
-void AdjustRectRange(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize)
+void adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize)
 {
 	int32_t l = rect.left;
 	int32_t t = rect.top;
 	int32_t r = rect.right;
 	int32_t b = rect.bottom;
-	adjustRectRange(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize);
+	adjust_rect_range(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize);
 	rect = CRect(l, t, r, b);
 }
 
@@ -10984,13 +11037,13 @@ void adjust_with_monitor_attached(CRect rOld, CRect &rNew)
 
 //rTarget에 접하는 dRatio인 최대 사각형을 구한다.
 //attach_left 등의 옵션을 줄 필요가 있다.
-CRect GetRatioRect(CRect rTarget, int w, int h, int attach)
+CRect get_ratio_max_rect(CRect rTarget, int w, int h, int attach)
 {
-	return GetRatioRect(rTarget, (double)w / (double)h, attach);
+	return get_ratio_max_rect(rTarget, (double)w / (double)h, attach);
 }
 
 //rTarget에 접하는 dRatio인 최대 사각형을 구한다.
-CRect GetRatioRect(CRect rTarget, double dRatio, int attach)
+CRect get_ratio_max_rect(CRect rTarget, double dRatio, int attach)
 {
 	int		w = rTarget.Width();
 	int		h = rTarget.Height();
@@ -11054,6 +11107,13 @@ CRect GetRatioRect(CRect rTarget, double dRatio, int attach)
 	}
 
 	return rResult;
+}
+
+//w x h 사각형을 target안에 넣을 때 중앙에 표시되게 하는 사각형 영역을 리턴한다.
+//w, h보다 target이 적을때는 target보다 큰 영역이 리턴될 것이다.
+CRect get_center_rect(CRect target, int w, int h)
+{
+	return CRect(target.left + (target.Width() - w) / 2, target.top + (target.Height() - h) / 2, w, h);
 }
 
 //주어진 점들을 포함하는 최대 사각형을 구한다.
@@ -12078,6 +12138,20 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	TRACE(_T("%s\n"), str);
 
 	return TRUE;
+}
+
+//x, y가 속해있는 모니터 인덱스를 리턴
+int	get_monitor_index(int x, int y)
+{
+	enum_display_monitors();
+
+	for (int i = 0; i < g_dqMonitors.size(); i++)
+	{
+		if (g_dqMonitors[i].PtInRect(CPoint(x, y)))
+			return i;
+	}
+
+	return -1;
 }
 
 //r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.

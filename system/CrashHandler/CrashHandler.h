@@ -4,8 +4,13 @@
 /*by sdh (Koino)
 - 프로젝트에 CrashHandler.cpp, h 두 파일 추가.
 - app.cpp에 DisableSetUnhandledExceptionFilter() 함수 추가 및 호출.
-- 실행파일 경로에 .pdb 파일이 존재해야 하고
-  crash가 발생하면 CrashHandler202303.log와 같이 로그파일이 자동 생성됨.
+- 반드시 실행파일과 함께 .pdb 파일을 함께 배포해야 함!
+
+- crash가 발생하면 CrashHandler20230302.log와 같이 로그파일이 자동 생성됨.
+
+  by scpark
+- 로그파일의 날짜형식을 yyyymmdd로 변경.
+- 
 */
 
 #pragma warning(disable:4091)
@@ -61,7 +66,7 @@ private:
 
 	static TCHAR						m_szProgramFileName[MAX_PATH];
 	static TCHAR						m_szProgramFolder[MAX_PATH];
-	static CHAR							m_szSymbolPath[MAX_PATH];
+	static TCHAR						m_szSymbolPath[MAX_PATH];
 	static TCHAR						m_szPrivateBuild[64];
 	static TCHAR						m_szComputerName[MAX_COMPUTERNAME_LENGTH + 1];
 

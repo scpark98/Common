@@ -466,6 +466,8 @@ struct	NETWORK_INFO
 	//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.
 	//entire_included가 true이면 어떤 모니터에 완전히 속해있는 경우에만 해당 인덱스를 리턴.
 	int			get_monitor_index(CRect r, bool entire_included = false);
+	//x, y가 속해있는 모니터 인덱스를 리턴
+	int			get_monitor_index(int x, int y);
 	//멀티모니터 전체 영역 사각형 리턴
 	CRect		get_entire_monitor_rect();
 
@@ -1382,7 +1384,8 @@ void		SetWallPaper(CString sfile);
 	CRect		GpRect2CRect(Gdiplus::Rect);
 	Gdiplus::Rect	CRect2GpRect(CRect r);
 	Gdiplus::RectF	CRect2GpRectF(CRect r);
-	void		get_round_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
+	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
+	void		draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
 	CRect		get_zoom_rect(CRect rect, double zoom);
 
@@ -1390,17 +1393,21 @@ void		SetWallPaper(CString sfile);
 	CPoint		vertex(CRect r, int index, bool rb_cut = false);	
 
 	//주어진 사각형 범위를 벗어나지 않도록 보정해준다.
-	void		adjustRectRange(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize);
-	//이미지의 경우 includeBR은 false로 해야 끝점 좌표가 유효하다.
-	void		AdjustRectRange(CRect& rect, CRect rLimit, bool bRetainSize = true, bool includeBR = false);
-	void		AdjustRectRange(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true);
+	void		adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize);
+	//이미지의 경우 includeBottomRight은 false로 해야 끝점 좌표가 유효하다.
+	void		adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize = true, bool includeBottomRight = false);
+	void		adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true);
 
 	//모니터의 한쪽에 붙은 사각형을 새로운 크기로 변경할 경우 붙은 상태를 유지하고 변경할 필요가 있을 경우 사용.
 	void		adjust_with_monitor_attached(CRect rOld, CRect &rNew);
 
 	//rTarget에 접하는 dRatio를 유지하는 최대 사각형을 구한다.
-	CRect		GetRatioRect(CRect rTarget, double dRatio, int attach = attach_hcenter | attach_vcenter);
-	CRect		GetRatioRect(CRect rTarget, int w, int h, int attach = attach_hcenter | attach_vcenter);
+	CRect		get_ratio_max_rect(CRect rTarget, double dRatio, int attach = attach_hcenter | attach_vcenter);
+	CRect		get_ratio_max_rect(CRect rTarget, int w, int h, int attach = attach_hcenter | attach_vcenter);
+	//w x h 사각형을 target안에 넣을 때 중앙에 표시되게 하는 사각형 영역을 리턴한다.
+	//w, h보다 target이 적을때는 target보다 큰 영역이 리턴될 것이다.
+	CRect		get_center_rect(CRect target, int w, int h);
+
 	//rSub가 rMain에 완전히 속해있으면 true를 리턴한다.
 	bool		RectInRect(CRect rMain, CRect rSub);
 	//r에서 except영역을 제외하고 cr컬러로 채운다.

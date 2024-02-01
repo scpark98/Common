@@ -174,7 +174,8 @@ public:
 	//factor(0.01~0.99)		: 중점부터 밖으로 까매지는 정도. 0.0이면 blur 없음.
 	//position(0.01~0.99)	: 바깥에서 중점으로 밝아지는 정도. 0.0이면 blur 없음.
 	//일반적인 테두리 블러 효과는 0.95f, 0.10f로 줄것
-	void round_corner(float radius, float factor = 0.0f, float position = 0.0f);
+	//4개의 코너를 라운드 처리 할것인지도 옵션으로 줄 수 있다.
+	void round_corner(float radius, float factor = 0.0f, float position = 0.0f, bool tl = true, bool tr = true, bool br = true, bool bl = true);
 
 	//src의 src_bgra_index에 해당하는 채널값을(bgra중의 n번 채널 인덱스)
 	//dst의 dst_bgra_index에 해당하는 채널값으로 변경

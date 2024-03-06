@@ -448,9 +448,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
-	DrawLine(pDC, rowRect.left, rowRect.bottom-1, rowRect.right, rowRect.bottom-1, GRAY(232));
-	//pDC->RestoreDC(nSavedDC);
+	//GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
+	//DrawLine(pDC, rowRect.left, rowRect.bottom-1, rowRect.right, rowRect.bottom-1, GRAY(232));
 }
 
 // ex. "No,20;Item1,50;Item2,50"

@@ -89,9 +89,9 @@ void CHeaderCtrlEx::OnPaint()
 
 	GetClientRect(rc);
 
-	if (m_flat_style)
-		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));
-	else
+	//if (m_flat_style)
+	//	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));
+	//else
 		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_crBack : GRAY(164));
 
 	dc.SetBkMode(TRANSPARENT);
@@ -114,7 +114,7 @@ void CHeaderCtrlEx::OnPaint()
 		else
 		{
 			if (m_flat_style)
-				DrawLine(&dc, rItem.right, rItem.top + 4, rItem.right, rItem.bottom - 4, GRAY(229));
+				DrawLine(&dc, rItem.right, rItem.top + 4, rItem.right, rItem.bottom - 4, crSunkenLight);
 			else
 				DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
 		}

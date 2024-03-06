@@ -1360,8 +1360,8 @@ void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 
 void CGdiplusBitmap::apply_effect_blur(float radius, BOOL expandEdge)
 {
-	Blur blur;
-	BlurParams param;
+	Gdiplus::Blur blur;
+	Gdiplus::BlurParams param;
 	param.radius = radius;
 	param.expandEdge = expandEdge;
 	blur.SetParameters(&param);

@@ -1,8 +1,5 @@
-//#include "stdafx.h"
 #include "UtilLog.h"
 #include <afxmt.h>
-
-//#include "../Functions.h"
 
 CCriticalSection theCSLog;
 
@@ -85,7 +82,7 @@ BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 			m_filetitle = filetitle;
 
 		CTime t = CTime::GetCurrentTime();
-		m_filename.Format(_T("%s[%d%02d%02d].log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
+		m_filename.Format(_T("%s_%d%02d%02d.log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
 		m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
 
 		//CreateDirectory(m_folder, NULL);

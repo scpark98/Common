@@ -71,6 +71,7 @@ class CColorListBox : public CListBox
 // Construction
 public:
 	CColorListBox();
+	virtual ~CColorListBox();
 
 	enum MESSAGES
 	{
@@ -105,7 +106,7 @@ public:
 
 	//선택 관련
 	//선택된 항목 리스트 및 선택된 개수를 리턴
-	int			get_selected_items(std::vector<int>* selected = NULL);
+	int			get_selected_items(std::deque<int>* selected = NULL);
 
 	//팝업 메뉴
 	enum CONTEXT_MENU
@@ -126,6 +127,8 @@ public:
 	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
 	void		OnPopupMenu(UINT nID);
 
+	//1:show, 0:hide, -1:no change
+	void		show_date_time(int date = -1, int time = -1);
 
 	//라인 간격
 	int			get_line_height() { return m_line_height; }
@@ -254,21 +257,14 @@ protected:
 	//afx_msg LRESULT OnSetFont(WPARAM wParam, LPARAM);
 	//}}AFX_VIRTUAL
 
-// Implementation
-public:
-	virtual ~CColorListBox();
 
 	// Generated message map functions
 protected:
-	//{{AFX_MSG(CColorListBox)
-	//}}AFX_MSG
-
-	DECLARE_MESSAGE_MAP()
-public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	virtual void PreSubclassWindow();
 	afx_msg void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
+	afx_msg void OnPaint();
 	//afx_msg void OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
@@ -277,10 +273,12 @@ public:
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
-//	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
+	//	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+
+	DECLARE_MESSAGE_MAP()
 };
 
 /////////////////////////////////////////////////////////////////////////////

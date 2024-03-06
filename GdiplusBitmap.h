@@ -115,9 +115,11 @@ public:
 
 	//targetRect를 주면 대상 영역에 비율을 유지하여 그린다.
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.
-	CRect	draw(Gdiplus::Graphics* g, CRect targetRect, bool stretch = false);
-	CRect	draw(Gdiplus::Graphics* g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
-	CRect	draw(Gdiplus::Graphics* g, CGdiplusBitmap mask, CRect targetRect);
+	//draw시에 CDC를 넘기느냐 Gdiplus::Graphics를 넘기느냐 고민했으나 Gdiplus::Graphics에 설정코드가 적용된채로 사용하는 경우가 많으므로
+	//Gdiplus::Graphics를 넘기는게 맞다고 판단함.
+	CRect	draw(Gdiplus::Graphics& g, CRect targetRect, bool stretch = false);
+	CRect	draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
+	CRect	draw(Gdiplus::Graphics& g, CGdiplusBitmap mask, CRect targetRect);
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void	clone(CGdiplusBitmap* dst);
@@ -217,6 +219,7 @@ public:
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
 	//parent에 관계없이 투명하게 표시할 경우는 CImageShapeWnd를 사용.
 	void	set_animation(HWND parenthWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
+	void	move(int x = 0, int y = 0, int w = 0, int h = 0);
 	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
 	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }
 	void	start_animation();
@@ -257,4 +260,5 @@ protected:
 
 	void check_animate_gif();
 	void thread_gif_animation();
+	void goto_gif_frame(int frame);
 };

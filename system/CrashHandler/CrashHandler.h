@@ -3,7 +3,27 @@
 
 /*by sdh (Koino)
 - 프로젝트에 CrashHandler.cpp, h 두 파일 추가.
-- app.cpp에 DisableSetUnhandledExceptionFilter() 함수 추가 및 호출.
+- app.cpp에 DisableSetUnhandledExceptionFilter() 함수 바디 추가 및 호출.
+	void DisableSetUnhandledExceptionFilter()
+	{
+		void *addr = (void*)GetProcAddress(LoadLibrary(_T("kernel32.dll")),
+			"SetUnhandledExceptionFilter");
+		if (addr)
+		{
+			unsigned char code[16];
+			int size = 0;
+			code[size++] = 0x33;
+			code[size++] = 0xC0;
+			code[size++] = 0xC2;
+			code[size++] = 0x04;
+			code[size++] = 0x00;
+			DWORD dwOldFlag, dwTempFlag;
+			VirtualProtect(addr, size, PAGE_READWRITE, &dwOldFlag);
+			WriteProcessMemory(GetCurrentProcess(), addr, code, size, NULL);
+			VirtualProtect(addr, size, dwOldFlag, &dwTempFlag);
+		}
+	}
+
 - 반드시 실행파일과 함께 .pdb 파일을 함께 배포해야 함!
 
 - crash가 발생하면 CrashHandler20230302.log와 같이 로그파일이 자동 생성됨.

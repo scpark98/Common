@@ -48,6 +48,9 @@ public:
 	int				get_header_height();
 	void			set_header_height(int height);
 
+	bool			m_flat_style = true;
+	void			set_header_flat_style(bool flat = true);
+
 protected:
 	HDLAYOUT		m_HDLayout;
 

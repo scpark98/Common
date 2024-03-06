@@ -5898,20 +5898,31 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 
 	Gdiplus::RectF arc(r.X, r.Y, diameter, diameter);
 
-	if (false)
+	//https://www.codeproject.com/Articles/1010822/RoundedButton-Control-Demystifying-DrawArc
+	//Arc를 그리는 차례는 tl-bl-br-tr가 아니면 round rect가 그려지지 않는다.
+	//top-left round corder. 180도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
+	if (true)
+	{
 		path->AddArc(arc, 180.0, 90.0);
+	}
 	else
-		path->AddRectangle(arc);
+	{
+		//path->AddLine(r.X + );
+	}
 
+	//bottom-left round corder. 270도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
 	arc.X = r.GetRight() - diameter - 1;
 	path->AddArc(arc, 270.0, 90.0);
 
+	//bottom-right round corder. 0도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
 	arc.Y = r.GetBottom() - diameter - 1;
 	path->AddArc(arc, 0.0, 90.0);
 
+	//top-right round corder. 90도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
 	arc.X = r.GetLeft();
 	path->AddArc(arc, 90.0, 90.0);
 
+	//그려진 네귀퉁이의 호를 연결시킨다.
 	path->CloseFigure();
 }
 
@@ -9634,7 +9645,12 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 	return hWnd;
 }
 
-//해당 파일이 실행중인 카운트 리턴
+//해당 파일이 실행중인 카운트를 리턴하는 함수이며
+//fullpath를 주면 경로까지 동일해야 카운트되도록 기능을 구현했으나
+//권한문제인지 현재 PC에서는 잘 얻어오지만
+//다른 PC에서는 아예 실행조차되지 않는다.
+//우선 보류한다.
+#if 0
 int get_process_running_count(CString processname)
 {
 	if (processname.IsEmpty())
@@ -9697,6 +9713,43 @@ int get_process_running_count(CString processname)
 
 	return running_count;
 } 
+#else
+int get_process_running_count(CString processname)
+{
+	DWORD dwSize = 250;
+	HANDLE hSnapShot;
+	PROCESSENTRY32 pEntry;
+	BOOL bCrrent = FALSE;
+
+	hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+
+	pEntry.dwSize = sizeof(pEntry);
+	// 실행중인 프로세스들의 첫번재 정보를 가져온다.
+	Process32First(hSnapShot, &pEntry);
+
+	int procCount = 0;
+	// Process 가 실행중인지 확인
+	while (1)
+	{
+		// 다음번 프로세스의 정보를 가져온다.
+		BOOL hRes = Process32Next(hSnapShot, &pEntry);
+
+		if (hRes == FALSE)
+			break;
+
+		//if (!wcsncmp(pEntry.szExeFile, processname, 15))
+		if (!_tcsncmp(pEntry.szExeFile, processname, 15))
+		{
+			//CloseHandle(hSnapShot);
+			//return TRUE;
+			procCount++;
+		}
+	}
+
+	CloseHandle(hSnapShot);
+	return procCount;
+}
+#endif
 
 bool KillProcess(CString szFilename)
 {
@@ -9980,6 +10033,25 @@ void getSquareEndPoint(int sx, int sy, int& ex, int& ey)
 	}
 }
 
+BOOL IsWow64()
+{
+	BOOL bIsWow64 = FALSE;
+	typedef BOOL(WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
+	LPFN_ISWOW64PROCESS fnIsWow64Process;
+
+	fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(
+		GetModuleHandle(TEXT("kernel32")), "IsWow64Process");
+
+	if (NULL != fnIsWow64Process)
+	{
+		if (!fnIsWow64Process(GetCurrentProcess(), &bIsWow64))
+		{
+			// handle error
+		}
+	}
+	return bIsWow64;
+}
+
 BOOL Is64BitWindows()
 {
 #if defined(_WIN64)
@@ -9992,6 +10064,23 @@ BOOL Is64BitWindows()
 #else
 	return FALSE; // Win64 does not support Win16
 #endif
+}
+
+BOOL IsXpOr2000()
+{
+	OSVERSIONINFO ovi;
+	ovi.dwOSVersionInfoSize = sizeof(ovi);
+	GetVersionEx(&ovi);
+
+	if (ovi.dwMajorVersion == 5)
+	{
+		// 0 : 2000, 1 : xp
+		if (ovi.dwMinorVersion == 0 || ovi.dwMinorVersion == 1)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 int	GetTrimLength(CString str)
@@ -14251,11 +14340,13 @@ int	compare_version_string(CString ver0, CString ver1, TCHAR separator)
 
 
 //button의 종류를 리턴한다.
-UINT		getButtonStyle(HWND hWnd)
+DWORD		getButtonStyle(HWND hWnd)
 {
 	UINT button_style = BS_PUSHBUTTON;
 
 	DWORD dwStyle = ::GetWindowLongPtr(hWnd, GWL_STYLE); 
+
+	return dwStyle;
 
 	// Check Box 컨트롤인 경우, 3STATE 설정을 확인함. 
 	if (((dwStyle & BS_AUTO3STATE) == BS_AUTO3STATE) || 
@@ -16655,6 +16746,54 @@ CString base64_decode(CString in)
 	sstr = base64_decode(sstr);
 	CString str = CString(sstr.c_str());
 	return str;
+}
+
+std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len)
+{
+	std::string ret;
+	int i = 0;
+	int j = 0;
+	unsigned char char_array_3[3];
+	unsigned char char_array_4[4];
+
+	std::string base64_chars =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz"
+		"0123456789+/";
+
+	while (in_len--) {
+		char_array_3[i++] = *(bytes_to_encode++);
+		if (i == 3) {
+			char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+			char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+			char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+			char_array_4[3] = char_array_3[2] & 0x3f;
+
+			for (i = 0; (i < 4); i++)
+				ret += base64_chars[char_array_4[i]];
+			i = 0;
+		}
+	}
+
+	if (i)
+	{
+		for (j = i; j < 3; j++)
+			char_array_3[j] = '\0';
+
+		char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+		char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+		char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+		char_array_4[3] = char_array_3[2] & 0x3f;
+
+		for (j = 0; (j < i + 1); j++)
+			ret += base64_chars[char_array_4[j]];
+
+		while ((i++ < 3))
+			ret += '=';
+
+	}
+
+	return ret;
 }
 
 //https://ikcoo.tistory.com/213

@@ -595,7 +595,7 @@ int CGdiplusBitmap::channels()
 	return 3;
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect targetRect)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect targetRect)
 {
 	CGdiplusBitmap temp;
 	temp.load(_T("d:\\temp\\mask.bmp"));
@@ -640,8 +640,8 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect tar
 
 	CRect r = get_ratio_max_rect(targetRect, (double)width / (double)height);
 
-	g->DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
-	g->DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
+	g.DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
+	g.DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
 	
 	//CRect r = GetRatioRect(targetRect, (double)width / (double)height);
 	//Graphics g(pDC->m_hDC);
@@ -650,13 +650,13 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics *g, CRect targetRect, bool stretch)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, bool stretch)
 {
 	CRect r = (stretch ? targetRect : get_ratio_max_rect(targetRect, (double)width / (double)height));
 	return draw(g, r.left, r.top, r.Width(), r.Height());
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, int dx, int dy, int dw, int dh)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, int dx, int dy, int dw, int dh)
 {
 	if (dw <= 0)
 		dw = width;
@@ -682,11 +682,11 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics* g, int dx, int dy, int dw, int dh)
 			
 			//save(_T("d:\\temp\\converted.bmp"));
 			*/
-			g->DrawImage(m_pBitmap, dx, dy, dw, dh);
+			g.DrawImage(m_pBitmap, dx, dy, dw, dh);
 		}
 		else
 		{
-			g->DrawImage(m_pBitmap, dx, dy, dw, dh);
+			g.DrawImage(m_pBitmap, dx, dy, dw, dh);
 		}
 	}
 	//StretchBlt를 이용하여 그리기
@@ -2079,8 +2079,17 @@ void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool s
 	m_aniWidth = (w == 0 ? width : w);
 	m_aniHeight = (h == 0 ? height : h);
 
-	if (start)
-		start_animation();
+	m_paused = !start;
+
+	start_animation();
+}
+
+void CGdiplusBitmap::move(int x, int y, int w, int h)
+{
+	m_aniX = x;
+	m_aniY = y;
+	m_aniWidth = (w == 0 ? width : w);
+	m_aniHeight = (h == 0 ? height : h);
 }
 
 void CGdiplusBitmap::start_animation()
@@ -2099,7 +2108,6 @@ void CGdiplusBitmap::start_animation()
 	if (m_frame_count < 2)
 		return;
 
-	m_paused = false;
 	m_run_thread_animation = true;
 
 	GUID   pageGuid = FrameDimensionTime;
@@ -2162,12 +2170,6 @@ void CGdiplusBitmap::thread_gif_animation()
 
 	while (m_run_thread_animation)
 	{
-		if (m_paused)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
-			continue;
-		}
-
 		GUID   pageGuid = FrameDimensionTime;
 
 		if (hDC)
@@ -2189,6 +2191,12 @@ void CGdiplusBitmap::thread_gif_animation()
 			::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
 		}
 
+		if (m_paused)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			continue;
+		}
+
 		m_frame_index++;
 		if (m_frame_index >= m_frame_count)
 			m_frame_index = 0;
@@ -2198,6 +2206,58 @@ void CGdiplusBitmap::thread_gif_animation()
 
 		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+	}
+
+	ReleaseDC(m_displayHwnd, hDC);
+}
+
+void CGdiplusBitmap::goto_gif_frame(int frame)
+{
+	if (m_frame_count < 2 || frame >= m_frame_count)
+		return;
+
+	HDC hDC = GetDC(m_displayHwnd);
+	CDC* pDC = CDC::FromHandle(hDC);
+	CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
+
+	//CRect Rect = r;
+	//CWnd* pParent = CWnd::FromHandle(m_displayHwnd);
+	//ASSERT(pParent);
+	//pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
+	////copy what's on the parents at this point
+	//CDC* pParentDC = pParent->GetDC();
+	//CDC MemDC;
+	//CBitmap bmp;
+	//MemDC.CreateCompatibleDC(pParentDC);
+	//bmp.CreateCompatibleBitmap(pParentDC, Rect.Width(), Rect.Height());
+	//CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+	//MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pParentDC, Rect.left, Rect.top, SRCCOPY);
+	//pParentDC->BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+	//MemDC.SelectObject(pOldBmp);
+	//pParent->ReleaseDC(pParentDC);
+	//MemDC.DeleteDC();
+
+	GUID   pageGuid = FrameDimensionTime;
+
+	if (hDC)
+	{
+		CMemoryDC dc(pDC, &r);
+		Graphics g(dc.m_hDC, r);
+
+		m_pBitmap->SelectActiveFrame(&pageGuid, frame);
+
+		//Graphics g(hDC, r);
+		//배경색을 투명하게 한다 해도 이미지의 투명 영역이
+		//parent에서도 투명하게 표시되진 않는다.
+		//parent의 영역을 그려준 후 이미지를 그려줘야 한다.
+		if (!is_equal(m_crBack, Gdiplus::Color(0, 0, 0, 0), 4))
+		{
+			Gdiplus::SolidBrush brush_tr(m_crBack);
+			g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+		}
+
+		g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+		::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
 	}
 
 	ReleaseDC(m_displayHwnd, hDC);

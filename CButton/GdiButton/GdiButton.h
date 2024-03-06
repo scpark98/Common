@@ -97,7 +97,7 @@ public:
 	//특히 push, check, radio button 처럼 checked, unchecked 등의 상태 image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
 	//on/off, play/pause, img0/img1/img2...
-	template <typename ... Types> void add_images(CString type, Types... args)
+	template <typename ... T> void add_images(CString type, T... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
@@ -216,7 +216,12 @@ protected:
 		timer_auto_repeat,
 	};
 
-	UINT		m_button_style;				//pushbutton(default) or checkbox or radiobutton
+	UINT		m_button_type;				//pushbutton(default) or checkbox or radiobutton
+	UINT		m_button_style;				//pushlike, multiline
+	bool		is_push_button();
+	bool		is_radio_button();
+	bool		is_check_box();
+	bool		is_push_like();
 
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시

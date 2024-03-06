@@ -224,8 +224,16 @@ CString Json::get_string(bool pretty)
 	return buffer.GetCString();
 }
 
+rapidjson::Value* Json::get_member(std::string member)
+{
+	if (!doc.HasMember(member))
+		return NULL;
+
+	return &doc[member];
+}
+
 //arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
-rapidjson::Value* Json::read_array_member(std::string arr_name, int n, std::string member)
+rapidjson::Value* Json::get_array_member(std::string arr_name, int n, std::string member)
 {
 	if (!doc[arr_name.c_str()].IsArray())
 		return NULL;
@@ -233,15 +241,15 @@ rapidjson::Value* Json::read_array_member(std::string arr_name, int n, std::stri
 	if (n >= doc[arr_name.c_str()].Size())
 		return NULL;
 
+	if (!doc[arr_name.c_str()][n].HasMember(member))
+		return NULL;
+
 	return &doc[arr_name.c_str()][n][member.c_str()];
 }
 
-bool Json::read_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value)
+bool Json::get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value)
 {
-	if (n >= doc[arr_name.c_str()].Size())
-		return false;
+	value = get_array_member(arr_name, n, member);
 
-	value = &doc[arr_name.c_str()][n][member.c_str()];
-
-	return true;
+	return (value != NULL);
 }

@@ -333,13 +333,16 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (date_time_length > 0)
 	{
+		CSize sz;
 		CString time_str = sText.Left(date_time_length);
-		CSize sz = dc.GetTextExtent(time_str);
+		GetTextExtentPoint32(pDC->GetSafeHdc(), time_str, time_str.GetLength(), &sz);
+		rect.right = sz.cx;
 
-		TEXTMETRIC tm;
-		pDC->GetTextMetrics(&tm);
+		//CSize sz = dc.GetTextExtent(time_str);
+		//TEXTMETRIC tm;
+		//pDC->GetTextMetrics(&tm);
 
-		rect.right = sz.cx + tm.tmAveCharWidth;
+		//rect.right = sz.cx + tm.tmAveCharWidth;
 
 		if (m_dim_time_str)
 			dc.SetTextColor(RGB(192, 192, 192));
@@ -347,7 +350,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		dc.DrawText(time_str, rect, nFormat | DT_NOCLIP);
 
 		sText = sText.Mid(date_time_length + 1);
-		rect.left = rect.right;
+		rect.left = rect.right + 4;
 		rect.right = lpDIS->rcItem.right - 10;
 	}
 
@@ -463,7 +466,8 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 			SetItemData(index, cr);
 
 		//뒤에 붙었던 '\n'개수만큼 빈 줄을 추가해준다.
-		for (i = 0; i < post_linefeed_count; i++)
+		//단, 보통 로그 출력시 기본적으로 끝에 \n을 붙여 출력하므로 1개일 경우는 스킵시킨다.
+		for (i = 1; i < post_linefeed_count; i++)
 		{
 			AddString(_T(""));
 		}
@@ -479,12 +483,9 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	//항목의 출력 너비에 따라 가로 스크롤바를 재조정해준다.
 	CDC* pDC = GetDC();
 	CFont* pOldFont = (CFont*)pDC->SelectObject(&m_font);
-	TEXTMETRIC tm;
 	CSize sz;
 
-	pDC->GetTextMetrics(&tm);
-	sz = pDC->GetTextExtent(new_text);
-	sz.cx += tm.tmAveCharWidth;
+	GetTextExtentPoint32(pDC->GetSafeHdc(), new_text, new_text.GetLength(), &sz);
 
 	if (sz.cx > m_max_horizontal_extent)
 	{
@@ -611,6 +612,16 @@ void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 	CListBox::OnMouseMove(nFlags, point);
 }
 
+void CColorListBox::OnPaint()
+{
+	CListBox::OnPaint();
+
+	//CPaintDC dc(this);
+	//CRect rc;
+
+	//GetClientRect(rc);
+	//dc.FillSolidRect(rc, RGB(255, 0, 0));
+}
 
 BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 {
@@ -620,6 +631,8 @@ BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 	CRect rc;
 	GetClientRect(rc);
 	pDC->FillSolidRect(rc, m_cr_back);
+
+	pDC->FillSolidRect(CRect(0, 0, 10, 10), RGB(255, 0, 0));
 	return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
@@ -762,7 +775,7 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 		m_cr_textSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_cr_textOver = m_cr_text;
 
-		m_cr_back = RGB(255, 0, 0); //::GetSysColor(COLOR_WINDOW); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back = ::GetSysColor(COLOR_WINDOW); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
 		m_cr_backSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_backSelectedRect = RGB(153, 209, 255);
 		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
@@ -888,7 +901,7 @@ BOOL CColorListBox::OnLbnSelchange()
 }
 
 //선택된 항목 리스트 또는 선택된 개수를 리턴
-int CColorListBox::get_selected_items(std::vector<int>* selected)
+int CColorListBox::get_selected_items(std::deque<int>* selected)
 {
 	int selected_count = GetSelCount();
 
@@ -914,8 +927,31 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	if (!m_use_popup_menu)
 		return;
 
-	std::vector<int> selected;
+	//만약 선택되지 않은 항목에 우클릭했다면
+	//다른 선택항목들은 모두 선택 해제시키고 해당 항목을 선택으로 만든 후에 팝업메뉴를 띠워줘야 한다.
+	//사용자는 우클릭한 항목에 대한 어떤 명령을 수행하려 했기 때문이다.
+	std::deque<int> selected;
 	get_selected_items(&selected);
+
+	BOOL bOutside;
+	CPoint pt = point;
+	ScreenToClient(&pt);
+
+	int rclicked_index = ItemFromPoint(pt, bOutside);
+
+	if (rclicked_index >= 0 && rclicked_index < GetCount())
+	{
+		if (find_index(selected, rclicked_index) < 0)
+		{
+			for (int i = 0; i < selected.size(); i++)
+				SetSel(selected[i], FALSE);
+
+			selected.clear();
+			selected.push_back(rclicked_index);
+			SetSel(rclicked_index);
+			TRACE(_T("rclicked_index = %d\n"), rclicked_index);
+		}
+	}
 
 	CMenu menu;
 
@@ -927,6 +963,9 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.EnableMenuItem(menu_selected_count, MF_DISABLED);
 		menu.AppendMenu(MF_SEPARATOR);
 	}
+
+	menu.AppendMenu(MF_STRING, menu_clear_all, _T("Clear all(&L)"));
+	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, menu_show_log, _T("Show log"));
 	menu.CheckMenuItem(menu_show_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
@@ -941,9 +980,6 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("Auto scroll\tCtrl+End"));
 	menu.CheckMenuItem(menu_auto_scroll, m_auto_scroll ? MF_CHECKED : MF_UNCHECKED);
-	menu.AppendMenu(MF_SEPARATOR);
-
-	menu.AppendMenu(MF_STRING, menu_clear_all, _T("Clear all(&L)"));
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, menu_copy_selected_to_clipboard, _T("Copy selected items"));
@@ -979,6 +1015,7 @@ void CColorListBox::OnPopupMenu(UINT nMenuID)
 		break;
 	case menu_clear_all:
 		ResetContent();
+		SetHorizontalExtent(0);
 		break;
 	case menu_copy_selected_to_clipboard:
 		copy_selected_to_clipboard();
@@ -995,6 +1032,16 @@ void CColorListBox::OnPopupMenu(UINT nMenuID)
 	}
 }
 
+//1:show, 0:hide, -1:no change
+void CColorListBox::show_date_time(int date, int time)
+{
+	if (date >= 0)
+		m_show_date = date;
+
+	if (time >= 0)
+		m_show_time = time;
+}
+
 CString CColorListBox::get_all_text(bool selected_only)
 {
 	int i;
@@ -1003,7 +1050,7 @@ CString CColorListBox::get_all_text(bool selected_only)
 
 	if (selected_only)
 	{
-		std::vector<int> selected;
+		std::deque<int> selected;
 		get_selected_items(&selected);
 
 		for (i = 0; i < selected.size(); i++)
@@ -1020,6 +1067,8 @@ CString CColorListBox::get_all_text(bool selected_only)
 			result += (text + _T("\n"));
 		}
 	}
+
+	result.Trim();
 
 	return result;
 }

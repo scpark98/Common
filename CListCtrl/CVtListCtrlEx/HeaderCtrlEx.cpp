@@ -88,7 +88,11 @@ void CHeaderCtrlEx::OnPaint()
 	dc.SelectObject (GetFont());
 
 	GetClientRect(rc);
-	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_crBack : GRAY(164));
+
+	if (m_flat_style)
+		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));
+	else
+		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_crBack : GRAY(164));
 
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(GetParent()->IsWindowEnabled() ? m_crText : ::GetSysColor(COLOR_GRAYTEXT));
@@ -109,7 +113,10 @@ void CHeaderCtrlEx::OnPaint()
 		}
 		else
 		{
-			DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
+			if (m_flat_style)
+				DrawLine(&dc, rItem.right, rItem.top + 4, rItem.right, rItem.bottom - 4, GRAY(229));
+			else
+				DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
 		}
 
 		DWORD dwAlign = m_header_text_align[i];
@@ -427,3 +434,8 @@ void CHeaderCtrlEx::set_header_height(int height)
 	SendMessage(HDM_LAYOUT, 0, (LPARAM)&m_HDLayout);
 }
 
+void CHeaderCtrlEx::set_header_flat_style(bool flat)
+{
+	m_flat_style = flat;
+	Invalidate();
+}

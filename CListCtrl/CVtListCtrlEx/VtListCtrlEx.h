@@ -303,6 +303,9 @@ public:
 	void	set_color_theme(int theme, bool apply_now = true);
 	COLORREF get_text_color(int item, int subItem);
 	COLORREF get_back_color(int item, int subItem);
+	COLORREF get_back_alt_color(int item, int subItem);
+	void	set_use_back_alt_color(bool use) { m_use_back_alt = use; }
+
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	void	set_text_color(int item, int subItem, COLORREF crText, bool erase = false, bool invalidate = true);
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
@@ -430,11 +433,13 @@ protected:
 	int				m_cur_sorted_column = 0;	//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
+	bool			m_use_back_alt;
 	COLORREF		m_crText;					//기본 글자색
 	COLORREF		m_crTextSelected;			//선택 항목의 활성화(active) 글자색
 	COLORREF		m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
 	COLORREF		m_crTextDropHilited;
 	COLORREF		m_crBack;					//기본 배경색
+	COLORREF		m_crBackAlt;				//줄구분용 
 	COLORREF		m_crBackSelected;
 	COLORREF		m_crBackSelectedInactive;
 	COLORREF		m_crBackDropHilited;

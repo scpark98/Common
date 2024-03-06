@@ -55,6 +55,12 @@ CSCStatic::~CSCStatic()
 	if (m_hIcon)
 		DestroyIcon(m_hIcon);
 
+	for (int i = 0; i < m_header_images.size(); i++)
+	{
+		CGdiplusBitmap* img = m_header_images[i];
+		delete img;
+	}
+
 	//functions.h에 gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 	//종료될 때 해제시켜주자.
 	//일단 이 클래스에서 사용하므로 이 클래스의 소멸자에서 해제 함수를 호출해주고 있으나
@@ -120,6 +126,7 @@ void CSCStatic::OnPaint()
 	GetClientRect(rc);
 
 	CMemoryDC	dc(&dc1, &rc);
+	Gdiplus::Graphics g(dc.GetSafeHdc());
 
 	if (m_ImageBack.m_hImageList != NULL)
 	{
@@ -184,7 +191,7 @@ void CSCStatic::OnPaint()
 		GetWindowText(m_sText);
 	
 
-	if (m_sText == "" && m_hIcon == NULL)
+	if (m_sText == "" && m_hIcon == NULL && m_header_images.size() == 0)
 		return;
 	
 
@@ -237,29 +244,30 @@ void CSCStatic::OnPaint()
 	//아이콘이 있으면 아이콘을 그려준다.
 	if (m_hIcon != NULL)
 	{
-		CRect rIcon;// = rText;
+		CRect rIcon = rText;
+		CSize szImg = m_szIcon;
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
 			if (m_sText != "")
-				rIcon.left = (rc.Width() - szText.cx - m_szIcon.cx) / 2 - m_szIcon.cx / 2 - 2;
+				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
 			else
-				rIcon.left = (rc.Width() - szText.cx - m_szIcon.cx) / 2;
+				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2;
 
-			rText.left = rIcon.left + m_szIcon.cx + 2;
+			rText.left = rIcon.left + szImg.cx + 2;
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
-			rIcon.left = rc.right - szText.cx - m_szIcon.cx - 2 - m_nOutlineWidth * 2;
-			rText.left = rIcon.left + m_szIcon.cx + 2 + m_nOutlineWidth;
+			rIcon.left = rc.right - szText.cx - szImg.cx - 2 - m_nOutlineWidth * 2;
+			rText.left = rIcon.left + szImg.cx + 2 + m_nOutlineWidth;
 		}
 		else
 		{
 			if (m_sText != "")
 			{
 				rIcon.left = 2;
-				rText.left = 2 + m_szIcon.cx + 2;
+				rText.left = 2 + szImg.cx + 2;
 			}
 			else
 			{
@@ -269,13 +277,13 @@ void CSCStatic::OnPaint()
 
 		if (dwStyle & SS_CENTERIMAGE)
 		{
-			rIcon.top = rc.top + (rc.Height() - m_szIcon.cy) / 2;
+			rIcon.top = rc.top + (rc.Height() - szImg.cy) / 2;
 			rText.top = (rc.Height() - szText.cy) / 2;
 		}
 		else
 		{
 			if (m_sText != "")
-				rIcon.top = szText.cy / 2 - m_szIcon.cy / 2;
+				rIcon.top = szText.cy / 2 - szImg.cy / 2;
 			else
 				rIcon.top = 0;
 			
@@ -283,7 +291,57 @@ void CSCStatic::OnPaint()
 		}
 
 		if (!m_bBlinkStatus)
-			::DrawIconEx(dc.GetSafeHdc(), rIcon.left, rIcon.top, m_hIcon, m_szIcon.cx, m_szIcon.cy, 0, NULL, DI_NORMAL);
+			::DrawIconEx(dc.GetSafeHdc(), rIcon.left, rIcon.top, m_hIcon, szImg.cx, szImg.cy, 0, NULL, DI_NORMAL);
+	}
+	else if (m_header_images.size() > 0)
+	{
+		CRect rImg = rText;
+		CSize szImg(m_header_images[m_header_image_index]->width, m_header_images[m_header_image_index]->height);
+
+		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
+		if (dwStyle & SS_CENTER)
+		{
+			if (m_sText != "")
+				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
+			else
+				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2;
+
+			rText.left = rImg.left + m_header_images[m_header_image_index]->width + 2;
+		}
+		else if (dwStyle & SS_RIGHT)
+		{
+			rImg.left = rc.right - szText.cx - szImg.cx - 2 - m_nOutlineWidth * 2;
+			rText.left = rImg.left + szImg.cx + 2 + m_nOutlineWidth;
+		}
+		else
+		{
+			if (m_sText != "")
+			{
+				rImg.left = 2;
+				rText.left = 2 + szImg.cx + 2;
+			}
+			else
+			{
+				rImg.left = 0;
+			}
+		}
+
+		if (dwStyle & SS_CENTERIMAGE)
+		{
+			rImg.top = rc.top + (rc.Height() - szImg.cy) / 2;
+			rText.top = (rc.Height() - szText.cy) / 2;
+		}
+		else
+		{
+			if (m_sText != "")
+				rImg.top = szText.cy / 2 - szImg.cy / 2;
+			else
+				rImg.top = 0;
+
+			rText.top = 0;
+		}
+
+		m_header_images[0]->draw(g, rImg.left, rImg.top);
 	}
 	else
 	{
@@ -556,8 +614,9 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 		::DestroyIcon(m_hIcon);
 
 	//HINSTANCE hInstResource = AfxFindResourceHandle(MAKEINTRESOURCE(nIDResource), RT_GROUP_ICON);
-	//m_hIcon = (HICON)::LoadImage(hInstResource, MAKEINTRESOURCE(nIDResource), IMAGE_ICON, nSize, nSize, 0);
-	m_hIcon = (HICON)(::LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(nIDResource), IMAGE_ICON, nSize, nSize, LR_DEFAULTCOLOR | LR_LOADTRANSPARENT));
+	//m_hIcon = (HICON)::LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(nIDResource), IMAGE_ICON, nSize, nSize, 0);
+	//m_hIcon = (HICON)(::LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(nIDResource), IMAGE_ICON, nSize, nSize, LR_DEFAULTCOLOR | LR_LOADTRANSPARENT));
+	m_hIcon = load_icon(AfxGetInstanceHandle(), nIDResource, nSize, nSize);
 
 	if (m_hIcon == NULL)
 		return;
@@ -805,4 +864,10 @@ void CSCStatic::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 	// TODO: Add your message handler code here
 	Invalidate();
+}
+
+void CSCStatic::add_header_images(UINT id)
+{
+	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
+	m_header_images.push_back(img);
 }

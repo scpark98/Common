@@ -761,6 +761,7 @@ struct	NETWORK_INFO
 	uint16_t Cal_CRC16(const uint8_t* p_data, uint32_t size);
 
 	//https://ikcoo.tistory.com/213
+	std::string base64_encode(unsigned char const*, unsigned int len);
 	std::string base64_encode(const std::string& in);
 	std::string base64_decode(const std::string& in);
 	CString base64_encode(CString in);
@@ -1033,6 +1034,9 @@ struct	NETWORK_INFO
 	void		SystemShutdownNT(int nMode = 2);	// 1:reboot  2:shutdown
 
 	void		HideTaskBar(bool bHide = TRUE);	// FALSE => Show Taskbar
+
+	BOOL		IsWow64();
+	BOOL		IsXpOr2000();
 	BOOL		Is64BitWindows();
 	void		ClickMouse(int x, int y);
 
@@ -1286,7 +1290,7 @@ void		SetWallPaper(CString sfile);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);
 	HANDLE		DDBToDIB(CBitmap* bitmap, DWORD dwCompression, CPalette* pPal);
 	
-	//크기를 지정해서 로딩이 가능하다. LoadIcon()으로는 안된다.
+	//.ico 아이콘 파일을 크기를 지정해서 로딩이 가능하다. LoadIcon()으로는 안되며 PNG와 같은 이미지도 불가하다.
 	HICON		load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
 	//해당 DC에 그리고 아이콘의 실제 크기를 리턴한다.
 	CSize		draw_icon(CDC* pDC, HICON hIcon, CRect r);
@@ -1505,7 +1509,7 @@ bool		IsLeapYear(int nYear);	//윤년인지 판단
 
 
 //UI control 관련
-UINT		getButtonStyle(HWND hWnd);	//button의 종류를 리턴한다.
+DWORD		getButtonStyle(HWND hWnd);	//button의 종류를 리턴한다.
 
 //연속된 버튼들에 대한 일괄 처리용 함수
 //기본 CheckRadioButton같은 경우는 unselect 기능을 제공하지 않기 때문에

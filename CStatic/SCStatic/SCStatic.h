@@ -9,6 +9,10 @@
 
 #include <afxwin.h>
 #include <deque>
+
+//.ico가 아닌 png 이미지들을 앞에 그려주고 필요에 따라 변경되도록 하기 위해 사용.
+#include "../../GdiplusBitmap.h"
+
 /*
 //scpark
 
@@ -70,7 +74,7 @@ public:
 	CSCStatic&		insert_gradient_color(int idx, COLORREF crGradient);//idx번째 색상 추가
 	CSCStatic&		set_vertical_gradient(bool bVertical = true);
 
-	void		sunken(bool sunken = true) { m_bSunken = sunken; Invalidate(); }
+	void			sunken(bool sunken = true) { m_bSunken = sunken; Invalidate(); }
 
 
 //marquee효과를 위해서 간단히 테스트해 보았으나 부드럽게 표현하기 위해서는
@@ -103,6 +107,26 @@ public:
 	void		set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
 	void		set_icon(UINT nIDResource, int nSize = 16);
+
+	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
+	void		add_header_images(UINT id);
+	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다.
+	template <typename ... T> void set_header_images(T... args)
+	{
+		int n = sizeof...(args);
+		int arg[] = { args... };
+
+		m_header_images.clear();
+
+		for (auto id : arg)
+		{
+			//여기서 직접 new로 할당받고 load하여 deque에 넣으려했으나
+			//여기서는 들어간 것처럼 보였지만 실제 OnPaint()에서 보면 deque가 비어있었다.
+			//template이라 그런지 여기서 바로는 들어가지 않는다.
+			//멤버함수를 통해 넣어야 한다.
+			add_header_images(id);
+		}
+	}
 
 protected:
 	enum ENUM_TIMER
@@ -157,6 +181,9 @@ protected:
 	HICON		m_hIcon;
 	CSize		m_szIcon;
 
+	//label의 앞에 그려질 이미지이며 만약 2개 이상일 경우 타이머에 의해 alt되기도 한다.
+	std::deque<CGdiplusBitmap*> m_header_images;
+	int			m_header_image_index = 0;
 
 protected:
 	//{{AFX_MSG(CSCStatic)

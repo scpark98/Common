@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+#include "../../colors.h"
 #include "../../MemoryDC.h"
 #include "../../GdiPlusBitmap.h"
 #include "EditCell.h"
@@ -365,7 +366,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else
 		{
 			pDC->SetTextColor(crText);
-			pDC->FillSolidRect(itemRect, crBack);
+
+			if (m_use_back_alt && (iItem % 2 == 0))
+				pDC->FillSolidRect(itemRect, get_color(crBack, -4));
+			else
+				pDC->FillSolidRect(itemRect, crBack);
 
 			//텍스트가 그려질 때 itemRect에 그리면 좌우 여백이 없어서 양쪽이 꽉차보인다.
 			//약간 줄여서 출력해야 보기 쉽다.
@@ -443,6 +448,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
+	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
+	DrawLine(pDC, rowRect.left, rowRect.bottom-1, rowRect.right, rowRect.bottom-1, GRAY(232));
 	//pDC->RestoreDC(nSavedDC);
 }
 
@@ -526,9 +533,24 @@ int	CVtListCtrlEx::get_column_text_align(int column)
 //default = LVCFMT_LEFT
 void CVtListCtrlEx::set_column_text_align(int column, int format, bool set_to_header)
 {
-	m_column_text_align[column] = format;
-	if (set_to_header)
+	if (column < 0)
+	{
+		for (int i = 0; i < get_column_count(); i++)
+		{
+			m_column_text_align[i] = format;
+			if (set_to_header)
+				m_HeaderCtrlEx.set_header_text_align(i, format);
+		}
+	}
+	else if (column >= get_column_count())
+	{
+		return;
+	}
+	else
+	{
+		m_column_text_align[column] = format;
 		m_HeaderCtrlEx.set_header_text_align(column, format);
+	}
 }
 
 int	CVtListCtrlEx::get_header_text_align(int column)

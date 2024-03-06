@@ -18,7 +18,16 @@ CGdiButton::CGdiButton()
 {
 	RegisterWindowClass();
 
-	m_button_style		= BS_PUSHBUTTON;
+	//default text and back color
+	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_BTNTEXT)));
+	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_HIGHLIGHT)));
+	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_HIGHLIGHT)));
+	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_GRAYTEXT)));
+
+	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNFACE)));
+	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNFACE)));
+	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNFACE)));
+	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNSHADOW)));
 
 	m_bAsStatic			= false;
 
@@ -314,7 +323,7 @@ void CGdiButton::SetCheck(bool bCheck)
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
 	//owner draw 속성때문에 WindowProc의 윈도우 기본 메시지를 받아서 처리할 수 없다.
-	if ((m_button_style == BS_RADIOBUTTON) && bCheck)
+	if (is_radio_button() && bCheck)
 	{
 		CWnd *pWndParent = GetParent(); 
 		CWnd *pWnd = pWndParent->GetNextDlgGroupItem(this); 
@@ -331,7 +340,7 @@ void CGdiButton::SetCheck(bool bCheck)
 
 			if (pWnd->IsKindOf(RUNTIME_CLASS(CGdiButton))) 
 			{ 
-				if (((CGdiButton*)pWnd)->m_button_style == BS_RADIOBUTTON)
+				if (((CGdiButton*)pWnd)->is_radio_button())
 				{
 					//((CGdiButton*)pWnd)->SetCheck(BST_UNCHECKED); 
 					((CGdiButton*)pWnd)->m_idx = 0;
@@ -519,8 +528,42 @@ void CGdiButton::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	// Set control to owner draw
-	m_button_style = getButtonStyle(m_hWnd);
+	m_button_style = GetButtonStyle();
 	
+	m_button_type = m_button_style & BS_TYPEMASK;
+	
+	//버튼 타입을 같은 종끼리 일단 그룹화한다.
+	if ((m_button_type & BS_AUTORADIOBUTTON) == BS_AUTORADIOBUTTON)
+	{
+		m_button_type = BS_RADIOBUTTON;
+	}
+	else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX)
+	{
+		m_button_type = BS_CHECKBOX;
+	}
+
+	if ((m_button_style & BS_PUSHLIKE) == BS_PUSHLIKE)
+	{
+		TRACE(_T("BS_PUSHLIKE\n"));
+	}
+	if ((m_button_style & BS_MULTILINE) == BS_MULTILINE)
+	{
+		TRACE(_T("BS_MULTILINE\n"));
+	}
+
+
+	if ((m_button_type & BS_CHECKBOX) == BS_CHECKBOX)
+	{
+		TRACE(_T("BS_CHECKBOX\n"));
+	}
+	if ((m_button_type & BS_AUTO3STATE) == BS_AUTO3STATE)
+	{
+		TRACE(_T("BS_PUSHLIKE\n"));
+	}
+
+
+
+
 	CString text;
 	GetWindowText(text);
 	//TRACE(_T("%s = %d\n"), str, m_button_style);
@@ -690,7 +733,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//check or radio인데 m_image.size()가 1뿐이라면
 	//checked = normal을, unchecked = disabled를 표시한다.
 	bool use_disabled_image = false;
-	if (m_button_style != BS_PUSHBUTTON && m_image.size() == 1 && m_idx == 0)
+	if (!is_push_button() && m_image.size() == 1 && m_idx == 0)
 		use_disabled_image = true;
 
 	if (m_cr_text.size() == 4)
@@ -815,7 +858,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		m_text = text;
 
-		if (m_button_style == BS_CHECKBOX)
+		if (is_check_box())
 		{
 			r.left += 3;
 			r.right = r.left + size * 2 + 1;
@@ -836,31 +879,40 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			rText.left = rText.right + 4;
 			rText.right = rc.right;
 		}
-		else if (m_button_style == BS_RADIOBUTTON)
+		else if (is_radio_button())
 		{
-			r.left += 3;
-			r.right = r.left + size * 2 + 1;
-			r.top = r.CenterPoint().y - size;
-			r.bottom = r.top + size * 2 + 1;
-
-			Color color;
-			color.SetFromCOLORREF(cr_text);
-			Pen pen(color, 0.8);
-			SolidBrush br(color);
-			g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
-
-			if (GetCheck())
+			if (is_push_like())
 			{
-				g.FillEllipse(&br,
-					(Gdiplus::REAL)(r.left + r.Width()) / 4.0f,
-					(Gdiplus::REAL)(r.top + r.Height()) / 4.0f,
-					(Gdiplus::REAL)(r.Width()) / 1.7f,
-					(Gdiplus::REAL)(r.Height()) / 1.7f);
+				dc.Draw3dRect(rc,
+					GetCheck() ? GRAY160 : white,
+					GetCheck() ? white : GRAY128);
 			}
+			else
+			{
+				r.left += 3;
+				r.right = r.left + size * 2 + 1;
+				r.top = r.CenterPoint().y - size;
+				r.bottom = r.top + size * 2 + 1;
 
-			rText = r;
-			rText.left = rText.right + 4;
-			rText.right = rc.right;
+				Color color;
+				color.SetFromCOLORREF(cr_text);
+				Pen pen(color, 0.8);
+				SolidBrush br(color);
+				g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
+
+				if (GetCheck())
+				{
+					g.FillEllipse(&br,
+						(Gdiplus::REAL)(r.left + r.Width()) / 4.0f,
+						(Gdiplus::REAL)(r.top + r.Height()) / 4.0f,
+						(Gdiplus::REAL)(r.Width()) / 1.7f,
+						(Gdiplus::REAL)(r.Height()) / 1.7f);
+				}
+
+				rText = r;
+				rText.left = rText.right + 4;
+				rText.right = rc.right;
+			}
 		}
 		else
 		{
@@ -885,7 +937,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	//뭔가 제대로 검사되지 않는다. 우선 푸시버튼만 대상으로 한다.
 #if 1
-	if (m_button_style == BS_PUSHBUTTON)
+	if (is_push_button())
 	{
 		/*
 		if ((dwStyle & BS_RIGHT) == BS_RIGHT)
@@ -1257,22 +1309,6 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	update_surface();
 
-	//GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
-
-	if (m_use_auto_repeat)
-	{
-		//SetCapture();
-		SetTimer(timer_auto_repeat, m_initial_delay, NULL);
-		m_sent_once_auto_repeat_click_message = 0;
-	}
-
-	CButton::OnLButtonDown(nFlags, point);
-}
-
-
-void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
-{
-	// TODO: Add your message handler code here and/or call default
 	CRect rc;
 	GetClientRect(rc);
 
@@ -1281,11 +1317,11 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 	//밖에서 up되는 경우는 스킵시킨다.
 	if (rc.PtInRect(point))
 	{
-		if (m_button_style == BS_CHECKBOX)
+		if (is_check_box())
 		{
 			Toggle();
 		}
-		else if (m_button_style == BS_RADIOBUTTON)
+		else if (is_radio_button())
 		{
 			SetCheck((m_idx = 1));
 		}
@@ -1301,6 +1337,20 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 					GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 			}
 		}
+	}
+
+	CButton::OnLButtonDown(nFlags, point);
+}
+
+
+void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: Add your message handler code here and/or call default
+	if (m_use_auto_repeat)
+	{
+		//SetCapture();
+		SetTimer(timer_auto_repeat, m_initial_delay, NULL);
+		m_sent_once_auto_repeat_click_message = 0;
 	}
 
 	CButton::OnLButtonUp(nFlags, point);
@@ -1571,5 +1621,39 @@ void CGdiButton::set_auto_repeat_delay(int initial_delay, int repeat_delay)
 {
 	m_initial_delay = initial_delay;
 	m_repeat_delay = repeat_delay;
+}
+
+bool CGdiButton::is_push_button()
+{
+	if ((m_button_type & BS_PUSHBUTTON) == BS_PUSHBUTTON)
+		return true;
+	else if ((m_button_type & BS_DEFPUSHBUTTON) == BS_DEFPUSHBUTTON)
+		return true;
+	return false;
+}
+
+bool CGdiButton::is_radio_button()
+{
+	if ((m_button_type & BS_RADIOBUTTON) == BS_RADIOBUTTON)
+		return true;
+	else if ((m_button_type & BS_AUTORADIOBUTTON) == BS_AUTORADIOBUTTON)
+		return true;
+	return false;
+}
+
+bool CGdiButton::is_check_box()
+{
+	if ((m_button_type & BS_CHECKBOX) == BS_CHECKBOX)
+		return true;
+	else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX)
+		return true;
+	return false;
+}
+
+bool CGdiButton::is_push_like()
+{
+	if ((m_button_style & BS_PUSHLIKE) == BS_PUSHLIKE)
+		return true;
+	return false;
 }
 

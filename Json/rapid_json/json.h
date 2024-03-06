@@ -24,9 +24,9 @@
 	json.doc["result"] = false;
 
 	//read array type
-	rapidjson::Value& ar = json.doc["array"];
-	for (int i = 0; i < ar.Size(); i++)
-		TRACE(_T("ar[%d] = %s\n"), i, ar[i].GetCString());
+	rapidjson::Value& arr = json.doc["array"];
+	for (int i = 0; i < arr.Size(); i++)
+		TRACE(_T("arr[%d] = %s\n"), i, arr[i].GetCString());
 
 */
 
@@ -69,9 +69,11 @@ public:
 
 	rapidjson::Document doc;
 
+	rapidjson::Value* get_member(std::string member, );
+
 	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
-	rapidjson::Value* read_array_member(std::string arr_name, int n, std::string member);
-	bool read_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value);
+	rapidjson::Value* get_array_member(std::string arr_name, int n, std::string member);
+	bool get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value);
 
 protected:
 	void		traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString &result);

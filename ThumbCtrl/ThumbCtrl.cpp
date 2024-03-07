@@ -75,7 +75,7 @@ void CThumbCtrl::release(int index)
 {
 	for (int i = 0; i < m_dqThumb.size(); i++)
 	{
-		if (m_dqThumb[i].img->valid())
+		if (m_dqThumb[i].img->is_valid())
 		{
 			m_dqThumb[i].img->release();
 			delete m_dqThumb[i].img;
@@ -1588,7 +1588,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		//rTile.InflateRect( 1, 1 );
 		//DrawRectangle( &dc, rTile, get_color(m_crBack, 48), NULL_BRUSH );
 
-		if (m_dqThumb[i].img == NULL || m_dqThumb[i].img->empty())
+		if (m_dqThumb[i].img == NULL || m_dqThumb[i].img->is_empty())
 		{
 			fit = rTile;
 			if (draw && !skip)
@@ -1601,7 +1601,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		{
 			//scvDrawImage(&dc, m_dqThumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_crBackThumb, -1.0);
 			//scvDrawImage(&dc, m_dqThumb[i].mat, rect, m_crBackThumb, -1.0);
-			fit = GetRatioRect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
+			fit = get_ratio_max_rect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
 			if (draw && !skip)
 			{
 				//입체감있는 프레임을 그려주는 코드인데 배경이 짙은 회색 계열이면 잘 표시가 안나서 일단 스킵.
@@ -1621,7 +1621,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 #if USE_OPENCV
 				cv_draw(pDC, m_dqThumb[i].img, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #else
-				m_dqThumb[i].img->draw(&g, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
+				m_dqThumb[i].img->draw(g, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #endif
 			}
 			//DrawSunkenRect(&dc, rect, true, get_color(m_crBack, -16), get_color(m_crBack, +16));
@@ -1829,10 +1829,10 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			CRect r = m_dqThumb[m_selected[i]].rect;
 			r.top -= 4;
 
-			if (m_img_selection_mark.valid())
+			if (m_img_selection_mark.is_valid())
 			{
 				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, m_img_selection_mark.width, m_img_selection_mark.height);
-				m_img_selection_mark.draw(&g, r.left, r.top);
+				m_img_selection_mark.draw(g, r.left, r.top);
 			}
 			else if (m_use_circle_number)
 			{

@@ -433,7 +433,7 @@ protected:
 	int				m_cur_sorted_column = 0;	//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
-	bool			m_use_back_alt;
+	bool			m_use_back_alt = false;
 	COLORREF		m_crText;					//기본 글자색
 	COLORREF		m_crTextSelected;			//선택 항목의 활성화(active) 글자색
 	COLORREF		m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색

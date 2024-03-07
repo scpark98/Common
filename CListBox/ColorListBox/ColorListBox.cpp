@@ -194,6 +194,8 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 	CMemoryDC dc(pDC, NULL, true);
 
+	Gdiplus::Graphics g(dc.GetSafeHdc());
+
 	CString		sText;
 	COLORREF	cr_text = (COLORREF)lpDIS->itemData;	// Color information is in item data.
 	COLORREF	cr_back = m_cr_back;
@@ -313,11 +315,25 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			pOldFont = dc.SelectObject(&m_font);
 		}
 	}
+	else if (m_imagelist.size() > 0)
+	{
+		pOldFont = dc.SelectObject(&m_font);
+
+		int image_index = 0;
+		if (m_imagelist.size() > 1 && cr_text == RGB(0, 0, 255))
+			image_index = 1;
+		else if (m_imagelist.size() > 2 && cr_text == RGB(255, 0, 0))
+			image_index = 2;
+
+		m_imagelist[image_index]->draw(g, rect.left, rect.top + (rect.Height() - m_imagelist[image_index]->height)/2);
+		rect.left += (m_imagelist[image_index]->width + 4);
+	}
 	else
 	{
 		pOldFont = dc.SelectObject(&m_font);
 	}
 
+	//rc의 오른쪽 끝 여백 설정
 	rect.right -= 10;
 
 	dc.SetBkMode(TRANSPARENT);
@@ -592,6 +608,33 @@ COLORREF CColorListBox::get_item_color( int nIndex )
 	return (COLORREF)GetItemData( nIndex );
 }
 
+CString CColorListBox::get_text(int index)
+{
+	CString text;
+
+	if (index < 0 || index >= GetCount())
+	{
+		TRACE(_T("out of range of listbox index = %d.\n"), index);
+		return text;
+	}
+
+	GetText(index, text);
+
+	return text;
+}
+
+void CColorListBox::set_text(int index, CString text, COLORREF cr)
+{
+	if (index < 0 || index >= GetCount())
+	{
+		TRACE(_T("out of range of listbox index = %d.\n"), index);
+		return;
+	}
+
+	DeleteString(index);
+	insert_string(index, text, cr);
+
+}
 
 void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 {
@@ -1261,4 +1304,10 @@ void CColorListBox::OnLButtonUp(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 
 	CListBox::OnLButtonUp(nFlags, point);
+}
+
+void CColorListBox::add_to_imagelist(UINT id)
+{
+	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
+	m_imagelist.push_back(img);
 }

@@ -16,8 +16,14 @@
 * (임의 항목을 클릭하면 auto_scroll이 off되고 Ctrl+End 등에 의해 auto_scroll이 on됨.
 * CPathCtrl에서 동적 팝업 리스트창으로 표시하기 위해서도 사용됨.
 * 
-* [caution]
+* [warning]
 * - 컨트롤의 너비, 높이가 어느 이상되면 표시 속도가 현저히 느려진다.
+* 
+* [수정될 내용]
+* - text color를 SetItemData()를 이용하여 지정하고 있으나 image index 등을 저장하려면
+*   struct를 사용해야 한다.
+*   단, 이 클래스를 사용하는 모든 프로젝트에서 이렇게 할 경우 불필요한 리소스를 할당해야 하므로
+*   flag처리로 꼭 필요할 경우에만 사용하도록 수정되어야 한다.
 */
 
 
@@ -30,6 +36,7 @@
 #include <deque>
 #include "../../Functions.h"
 #include "../../system/ShellImageList/ShellImageList.h"
+#include "../../GdiplusBitmap.h"
 
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
@@ -98,6 +105,9 @@ public:
 	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb = -1);	// Inserts a colored string to the list box
 	void		set_item_color(int nIndex, COLORREF rgb, bool invalidate = true);	// Sets the color of an item in the list box
 	COLORREF	get_item_color(int nIndex);
+
+	CString		get_text(int index);
+	void		set_text(int index, CString text, COLORREF cr = -1);
 
 	void		clear_all() { ResetContent(); Invalidate(); }
 
@@ -182,6 +192,35 @@ public:
 	//modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
 	void		edit_end(bool modify = true);
 
+	//use own imagelist
+	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
+	void		add_to_imagelist(UINT id);
+	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다.
+	template <typename ... T> void set_imagelist(T... args)
+	{
+		int n = sizeof...(args);
+		int arg[] = { args... };
+
+		//set_이므로 기존 항목들을 모두 제거한 후 추가해야 한다.
+		//그냥 하나를 추가한다면 add_header_image()를 사용한다.
+		for (int i = 0; i < m_imagelist.size(); i++)
+		{
+			CGdiplusBitmap* img = m_imagelist[i];
+			delete img;
+		}
+
+		m_imagelist.clear();
+
+		for (auto id : arg)
+		{
+			//여기서 직접 new로 할당받고 load하여 deque에 넣으려했으나
+			//여기서는 들어간 것처럼 보였지만 실제 OnPaint()에서 보면 deque가 비어있었다.
+			//template이라 그런지 여기서 바로는 들어가지 않는다.
+			//멤버함수를 통해 넣어야 한다.
+			add_to_imagelist(id);
+		}
+	}
+
 protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;
@@ -249,6 +288,7 @@ protected:
 	void		save_selected_to_file();
 	void		save_all_to_file();
 
+	std::deque<CGdiplusBitmap*> m_imagelist;
 
 // Overrides
 	// ClassWizard generated virtual function overrides

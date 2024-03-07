@@ -11,7 +11,7 @@
 IMPLEMENT_DYNAMIC(CSCStatic, CStatic)
 CSCStatic::CSCStatic()
 {
-	m_bTransparent	= true;
+	m_bTransparent	= false;
 
 	m_sText			= "";
 	m_crText		= ::GetSysColor(COLOR_BTNTEXT);
@@ -30,7 +30,7 @@ CSCStatic::CSCStatic()
 	}
 	*/
 
-	m_sFontName		= "";
+	m_sFontName		= _T("");
 	m_nFontSize		= 0;
 	m_nFontWidth	= 0;
 	m_bFontBold		= false;
@@ -48,6 +48,7 @@ CSCStatic::CSCStatic()
 	m_nPrefixSpace	= 0;
 
 	m_hIcon			= NULL;
+	m_header_image_index = 0;
 }
 
 CSCStatic::~CSCStatic()
@@ -138,35 +139,7 @@ void CSCStatic::OnPaint()
 	//투명 모드이면 배경도 안칠하고 글자도 배경색 없이 출력된다.
 	dc.SetBkMode(TRANSPARENT);
 
-	if (!m_bTransparent)
-	{
-		if (!m_bGradient)
-		{
-			dc.FillSolidRect(rc, m_crBack);
-			if (m_bSunken)
-			{
-				int sunken_depth = 12;
-				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_crBack, sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_crBack, sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_crBack, -sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_crBack, -sunken_depth));
-			}
-		}
-		else
-		{
-			if (true)// m_bCanDoGradientFill) //msimg32.dll library is loaded
-			{
-				gradient_rect(&dc, rc, m_crGradient, m_bVertical);
-			}
-			else
-			{
-				//msimg32.dll is not available. Let's use our own code to display gradient background.
-				//This code is very simple and produces worse gradient that function from the library - but works!
-				//draw_gradient_rect(&dc, rc, m_crBack, m_crGradient, m_bVertical);
-			}
-		}
-	}
-	else
+	if (m_bTransparent)
 	{
 		CRect Rect;
 		GetWindowRect(&Rect);
@@ -185,6 +158,35 @@ void CSCStatic::OnPaint()
 		MemDC.SelectObject(pOldBmp);
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
+
+	}
+	else
+	{
+		if (m_bGradient)
+		{
+			if (true)// m_bCanDoGradientFill) //msimg32.dll library is loaded
+			{
+				gradient_rect(&dc, rc, m_crGradient, m_bVertical);
+			}
+			else
+			{
+				//msimg32.dll is not available. Let's use our own code to display gradient background.
+				//This code is very simple and produces worse gradient that function from the library - but works!
+				//draw_gradient_rect(&dc, rc, m_crBack, m_crGradient, m_bVertical);
+			}
+		}
+		else
+		{
+			dc.FillSolidRect(rc, m_crBack);
+			if (m_bSunken)
+			{
+				int sunken_depth = 12;
+				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_crBack, sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_crBack, sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_crBack, -sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_crBack, -sunken_depth));
+			}
+		}
 	}
 
 	if (m_sText == "")
@@ -458,7 +460,7 @@ HBRUSH CSCStatic::CtlColor(CDC* pDC, UINT nCtlColor)
 BOOL CSCStatic::OnEraseBkgnd(CDC* pDC) 
 {
 	// TODO: Add your message handler code here and/or call default
-	return false;
+	return FALSE;
 	
 	//CDialog::OnEraseBkgnd(pDC);
 }
@@ -712,7 +714,7 @@ CSCStatic& CSCStatic::set_font_antialiased(bool bAntiAliased)
 void CSCStatic::set_text_color(COLORREF crTextColor)
 {
 	m_crText = crTextColor;
-	//update_surface();
+	update_surface();
 	Invalidate();
 }
 
@@ -863,11 +865,15 @@ void CSCStatic::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CStatic::OnWindowPosChanged(lpwndpos);
 
 	// TODO: Add your message handler code here
-	Invalidate();
+	//Invalidate();
 }
 
-void CSCStatic::add_header_images(UINT id)
+void CSCStatic::add_header_image(UINT id)
 {
 	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
 	m_header_images.push_back(img);
+
+	//RedrawWindow();
+	//UpdateWindow();
+	//Invalidate();
 }

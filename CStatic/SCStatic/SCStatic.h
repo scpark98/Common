@@ -109,12 +109,20 @@ public:
 	void		set_icon(UINT nIDResource, int nSize = 16);
 
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
-	void		add_header_images(UINT id);
+	void		add_header_image(UINT id);
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다.
 	template <typename ... T> void set_header_images(T... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
+
+		//set_이므로 기존 항목들을 모두 제거한 후 추가해야 한다.
+		//그냥 하나를 추가한다면 add_header_image()를 사용한다.
+		for (int i = 0; i < m_header_images.size(); i++)
+		{
+			CGdiplusBitmap* img = m_header_images[i];
+			delete img;
+		}
 
 		m_header_images.clear();
 
@@ -124,7 +132,7 @@ public:
 			//여기서는 들어간 것처럼 보였지만 실제 OnPaint()에서 보면 deque가 비어있었다.
 			//template이라 그런지 여기서 바로는 들어가지 않는다.
 			//멤버함수를 통해 넣어야 한다.
-			add_header_images(id);
+			add_header_image(id);
 		}
 	}
 
@@ -160,7 +168,7 @@ protected:
 
 	COLORREF	m_crText;
 	COLORREF	m_crBack;
-	bool		m_bTransparent = true;		//default = true
+	bool		m_bTransparent;		//default = false
 
 	BOOL		m_bBlink;
 	BOOL		m_bBlinkStatus;
@@ -183,7 +191,7 @@ protected:
 
 	//label의 앞에 그려질 이미지이며 만약 2개 이상일 경우 타이머에 의해 alt되기도 한다.
 	std::deque<CGdiplusBitmap*> m_header_images;
-	int			m_header_image_index = 0;
+	int			m_header_image_index;
 
 protected:
 	//{{AFX_MSG(CSCStatic)

@@ -136,9 +136,9 @@ public:
 	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
 	//(NH프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
-	CGdiButton& back_color(COLORREF normal, bool auto_set_color = false);
-	CGdiButton& text_color() { m_cr_text.clear(); }
-	CGdiButton& back_color() { m_cr_back.clear(); }
+	CGdiButton& back_color(COLORREF normal, bool auto_set_color = true);
+	//CGdiButton& text_color() { m_cr_text.clear(); }
+	//CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]
 	//hover, down일 경우 색상 변화를 주고자 할 경우 사용.(fScale을 1.0보다 크게주면 밝게, 작게주면 어둡게 변경된다.
 	CGdiButton& set_hover_color_matrix(float fScale);	//1.0f = no effect.

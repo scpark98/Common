@@ -243,13 +243,21 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			crBack = m_list_db[iItem].crBack[iSubItem];
 			if (crBack == listctrlex_unused_color)
-				crBack = m_crBack;
+			{
+				if (iItem % 2)
+					crBack = m_crBackAlt;
+				else
+					crBack = m_crBack;
+			}
 		}
+
+	
+		pDC->FillSolidRect(itemRect, crBack);
 
 		//percentage 타입이면 바그래프 형태로 그려주고
 		if (get_column_data_type(iSubItem) == column_data_type_percentage_bar)
 		{
-			pDC->FillSolidRect(itemRect, crBack);
+			//pDC->FillSolidRect(itemRect, crBack);
 
 			CRect r = itemRect;
 
@@ -268,7 +276,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else if (get_column_data_type(iSubItem) == column_data_type_percentage_grid)
 		{
-			pDC->FillSolidRect(itemRect, crBack);
+			//pDC->FillSolidRect(itemRect, crBack);
 
 			CRect r = itemRect;
 
@@ -367,11 +375,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			pDC->SetTextColor(crText);
 
-			if (m_use_back_alt && (iItem % 2 == 0))
-				pDC->FillSolidRect(itemRect, get_color(crBack, -4));
-			else
-				pDC->FillSolidRect(itemRect, crBack);
-
 			//텍스트가 그려질 때 itemRect에 그리면 좌우 여백이 없어서 양쪽이 꽉차보인다.
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
@@ -460,10 +463,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 //정확히 한번만 호출하여 사용하는 것이 정석이므로 우선 별도의 처리는 하지 않음.
 bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 {
-	TRACE(_T("strHeadings = %s\n"), strHeadings);
-
-	modify_style();
-
 	int iStart = 0;
 	int	column = 0;
 
@@ -506,6 +505,8 @@ bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 
 	m_allow_edit_column.resize(column);
 
+	modify_style();
+
 	return TRUE;
 }
 
@@ -528,6 +529,41 @@ int	CVtListCtrlEx::get_column_text_align(int column)
 {
 	return m_column_text_align[column];
 }
+
+//해당 컬럼에서 문자열 길이 최대값을 리턴.
+int CVtListCtrlEx::get_column_max_text_length(int column, bool real_bytes)
+{
+	int len;
+	int max_len = 0;
+
+	for (int i = 0; i < size(); i++)
+	{
+		if (real_bytes)
+			len = WideCharToMultiByte(CP_ACP, 0, get_text(i, column), -1, NULL, 0, NULL, NULL);
+		else
+			len = get_text(i, column).GetLength();
+		if (len > max_len)
+			max_len = len;
+	}
+
+	return max_len;
+}
+
+void CVtListCtrlEx::get_column_max_text_length(std::vector<int>& col_len, bool real_bytes)
+{
+	col_len.clear();
+	col_len.resize(get_column_count());
+
+	for (int i = 0; i < get_column_count(); i++)
+		col_len[i] = get_column_max_text_length(i, real_bytes);
+}
+
+//해당 컬럼에서 출력시에 width 최대값을 리턴.(미구현)
+int CVtListCtrlEx::get_column_max_text_width(int column)
+{
+	return 0;
+}
+
 
 //default = LVCFMT_LEFT
 void CVtListCtrlEx::set_column_text_align(int column, int format, bool set_to_header)
@@ -1375,6 +1411,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crTextSelected		= m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
 		m_crTextSelectedInactive= m_crText;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_crBack				= ::GetSysColor(COLOR_WINDOW);
+		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
 		m_crBackSelected		= RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crSelectedBorder		= RGB(153, 209, 255);
@@ -1389,6 +1426,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crTextSelected		= RGB( 65, 102, 146);
 		m_crTextSelectedInactive= RGB( 65, 102, 146);
 		m_crBack				= RGB(193, 219, 252);
+		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
 		m_crBackSelected		= get_color(m_crBack, -48);
 		m_crBackSelectedInactive= get_color(m_crBack, -48);
 		m_crSelectedBorder		= RGB(153, 209, 255);
@@ -1403,6 +1441,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crTextSelected		= RGB(234, 246, 255);
 		m_crTextSelectedInactive= RGB(105, 142, 186);
 		m_crBack				= RGB( 74,  94, 127);
+		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
 		m_crBackSelected		= RGB( 15,  36,  41);
 		m_crBackSelectedInactive= RGB( 15,  36,  41);
 		m_crSelectedBorder		= RGB(153, 209, 255);
@@ -1417,6 +1456,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crTextSelected		= RGB(224, 180,  59);
 		m_crTextSelectedInactive= RGB(105, 142, 186);
 		m_crBack				= RGB(  2,  21,  36);
+		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
 		m_crBackSelected		= RGB(  3,  42,  59);
 		m_crBackSelectedInactive= RGB( 15,  36,  41);
 		m_crSelectedBorder		= RGB(153, 209, 255);
@@ -1431,6 +1471,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crTextSelected		= RGB(241, 241, 241);
 		m_crTextSelectedInactive= get_color(m_crTextSelected, -36);
 		m_crBack				= RGB( 64,  64,  64);
+		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
 		m_crBackSelected		= get_color(m_crBack, -32);
 		m_crBackSelectedInactive= get_color(m_crBack, -32);
 		m_crSelectedBorder		= RGB(128, 128, 128);
@@ -1620,12 +1661,6 @@ void CVtListCtrlEx::set_item_color(int item, int subItem, COLORREF crText, COLOR
 		}
 	}
 
-	Invalidate();}
-
-void CVtListCtrlEx::set_default_item_color(COLORREF crText, COLORREF crBack)
-{
-	//m_list_db->at(item).crText[subItem] = crText;
-	//m_list_db->at(item).crBack[subItem] = crBack;
 	Invalidate();
 }
 
@@ -1882,6 +1917,13 @@ std::deque<CString> CVtListCtrlEx::get_line_text_list(int index, std::deque<int>
 		dqResult.push_back(get_text(index, dqColumn->at(i)));
 
 	return dqResult;
+}
+
+//txt 출력 시 컬럼 세로 정렬을 맞게 출력하도록 공백을 보정하여 리턴
+//CString은 최대 64K까지만 담을 수 있으므로 vector를 이용함.
+void CVtListCtrlEx::get_line_text_list(std::vector<CString>* vt)
+{
+
 }
 
 int CVtListCtrlEx::get_selected_index(int start)

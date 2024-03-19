@@ -60,6 +60,12 @@ CColorListBox::~CColorListBox()
 		m_pEdit->DestroyWindow();
 		delete m_pEdit;
 	}
+
+	for (int i = 0; i < m_imagelist.size(); i++)
+	{
+		CGdiplusBitmap* img = m_imagelist[i];
+		delete img;
+	}
 }
 
 BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
@@ -79,7 +85,8 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
-	ON_WM_PAINT()
+	//ON_WM_PAINT()
+	ON_WM_WINDOWPOSCHANGED()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -271,7 +278,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		//cr_text = m_cr_textSelected;
 		DrawRectangle(&dc, rect, GetFocus() ? m_cr_backSelectedRect : cr_back, cr_back, 1);
 	}
-	else if (lpDIS->itemState & ODS_DISABLED)
+	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
 		cr_text = ::GetSysColor(COLOR_GRAYTEXT);
 	}
@@ -319,10 +326,14 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		pOldFont = dc.SelectObject(&m_font);
 
+		//scpark 20240313 원래 이미지 인덱스는 각 항목에 저장하는 DWORD를 활용하지만
+		//이 클래스는 그 값을 색상저장용으로 사용하는 클래스로 만들어졌다.
+		//struct를 새로 선언하고 text color, back color, font property, image index 등을 저장하여 사용할 수 있지만
+		//메모리 동적할당 등 많이 복잡해진다. 우선 임시로 텍스트 색상이 blue면 1번 이미지, red면 2번 이미지를 사용한다.
 		int image_index = 0;
-		if (m_imagelist.size() > 1 && cr_text == RGB(0, 0, 255))
+		if (m_imagelist.size() > 1 && cr_text == royalblue)
 			image_index = 1;
-		else if (m_imagelist.size() > 2 && cr_text == RGB(255, 0, 0))
+		else if (m_imagelist.size() > 2 && cr_text == red)
 			image_index = 2;
 
 		m_imagelist[image_index]->draw(g, rect.left, rect.top + (rect.Height() - m_imagelist[image_index]->height)/2);
@@ -631,9 +642,11 @@ void CColorListBox::set_text(int index, CString text, COLORREF cr)
 		return;
 	}
 
+	SetRedraw(FALSE);
 	DeleteString(index);
 	insert_string(index, text, cr);
-
+	SetRedraw(TRUE);
+	UpdateWindow();
 }
 
 void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
@@ -671,12 +684,11 @@ BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: Add your message handler code here and/or call default
 
 	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
-	CRect rc;
-	GetClientRect(rc);
-	pDC->FillSolidRect(rc, m_cr_back);
+	//CRect rc;
+	//GetClientRect(rc);
+	//pDC->FillSolidRect(rc, m_cr_back);
 
-	pDC->FillSolidRect(CRect(0, 0, 10, 10), RGB(255, 0, 0));
-	return TRUE;
+	return FALSE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
@@ -1133,7 +1145,7 @@ void CColorListBox::save_selected_to_file()
 	CString recent = AfxGetApp()->GetProfileString(_T("setting\\ColorListBox"), _T("recent saved file"), _T(""));
 
 	if (recent.IsEmpty())
-		recent.Format(_T("%s\\logs.txt"), GetExeDirectory());
+		recent.Format(_T("%s\\logs.txt"), get_exe_directory());
 	
 	CFileDialog dlg(false, _T("*.txt"), recent, OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_LONGNAMES, _T("*Text file|*.txt|모든 파일|*.*||"));
 	if (dlg.DoModal() == IDCANCEL)
@@ -1155,7 +1167,7 @@ void CColorListBox::save_all_to_file()
 	CString recent = AfxGetApp()->GetProfileString(_T("setting\\ColorListBox"), _T("recent saved file"), _T(""));
 
 	if (recent.IsEmpty())
-		recent.Format(_T("%s\\logs.txt"), GetExeDirectory());
+		recent.Format(_T("%s\\logs.txt"), get_exe_directory());
 
 	CFileDialog dlg(false, _T("*.txt"), recent, OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_LONGNAMES, _T("Text file|*.txt|모든 파일|*.*||"));
 	if (dlg.DoModal() == IDCANCEL)
@@ -1310,4 +1322,17 @@ void CColorListBox::add_to_imagelist(UINT id)
 {
 	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
 	m_imagelist.push_back(img);
+}
+
+
+void CColorListBox::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+{
+	CListBox::OnWindowPosChanged(lpwndpos);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//창의 일부를 모니터 밖으로 나갔다가 들어올 경우 화면이 갱신되지 않는 현상으로 추가.
+	//여기에 넣어도 동일 오류가 있다. 우선은 parent에서 처리함.
+	//Invalidate();
+	//RedrawWindow();
+	//UpdateWindow();
 }

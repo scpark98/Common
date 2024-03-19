@@ -69,7 +69,7 @@ public:
 
 	rapidjson::Document doc;
 
-	rapidjson::Value* get_member(std::string member, );
+	//rapidjson::Value* get_member(std::string member, );
 
 	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 	rapidjson::Value* get_array_member(std::string arr_name, int n, std::string member);

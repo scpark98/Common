@@ -224,6 +224,7 @@ CString Json::get_string(bool pretty)
 	return buffer.GetCString();
 }
 
+/*
 rapidjson::Value* Json::get_member(std::string member)
 {
 	if (!doc.HasMember(member))
@@ -231,7 +232,7 @@ rapidjson::Value* Json::get_member(std::string member)
 
 	return &doc[member];
 }
-
+*/
 //arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 rapidjson::Value* Json::get_array_member(std::string arr_name, int n, std::string member)
 {

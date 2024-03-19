@@ -19,15 +19,17 @@ CGdiButton::CGdiButton()
 	RegisterWindowClass();
 
 	//default text and back color
-	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_BTNTEXT)));
-	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_HIGHLIGHT)));
-	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_HIGHLIGHT)));
-	m_cr_text.push_back(COLORREF(::GetSysColor(COLOR_GRAYTEXT)));
+	//이 기본 색상값은 이미지를 설정하지 않은 경우의 기본값이다.
+	//만약 이미지를 설정한다면 clear()시켜야 한다.
+	m_cr_text.push_back(::GetSysColor(COLOR_BTNTEXT));
+	m_cr_text.push_back(::GetSysColor(COLOR_HIGHLIGHT));
+	m_cr_text.push_back(::GetSysColor(COLOR_HIGHLIGHT));
+	m_cr_text.push_back(::GetSysColor(COLOR_GRAYTEXT));
 
-	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNFACE)));
-	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNFACE)));
-	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNFACE)));
-	m_cr_back.push_back(COLORREF(::GetSysColor(COLOR_BTNSHADOW)));
+	m_cr_back.push_back(::GetSysColor(COLOR_BTNFACE));
+	m_cr_back.push_back(get_color(m_cr_back[0], 16));
+	m_cr_back.push_back(get_color(m_cr_back[0], -16));
+	m_cr_back.push_back(::GetSysColor(COLOR_BTNSHADOW));
 
 	m_bAsStatic			= false;
 
@@ -222,6 +224,10 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 
 	fit_to_image(m_fit2image);
 
+	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
+	m_cr_back.clear();
+	m_transparent = true;
+
 	return true;
 }
 
@@ -256,6 +262,10 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 	m_image.push_back(btn);
 
 	fit_to_image(m_fit2image);
+
+	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
+	m_cr_back.clear();
+	m_transparent = true;
 
 	return true;
 }
@@ -430,8 +440,9 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 
 CGdiButton& CGdiButton::back_color(COLORREF normal, bool auto_set_color)
 {
+	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
 	if (auto_set_color)
-		return back_color(normal, get_color(normal, 64), get_color(normal, -64), gray_color(normal));
+		return back_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
 
 	return back_color(normal, normal, normal, gray_color(normal));
 }
@@ -688,7 +699,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	rText = rc;
 
-	CMemoryDC	dc(pDC1, &rc, false);
+	CMemoryDC	dc(pDC1, &rc);
 	Graphics	g(dc.m_hDC, rc);
 	GraphicsPath	roundPath;
 

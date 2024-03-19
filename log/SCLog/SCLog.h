@@ -1,32 +1,29 @@
 #pragma once
 
 /*
-* 기존 Koino에서 사용하던 UtilLog에 로그를 출력한 함수명과 라인 정보를 추가.
+* 기존 Koino에서 사용하던 SCLog에 로그를 출력한 함수명과 라인 정보를 추가.
 * (#define logWrite...를 사용하므로 멀티쓰레드가 가능할지는 아직 확인 못함)
 * 
 * app.h에서
-	#include "../../Common/log/UtilLog.h"
+	#include "../../Common/log/SCLog.h"
 	...
 	전역변수로 아래 변수 선언.
-	extern UtilLog gLog;
+	extern SCLog gLog;
 
   app.cpp에서 실제 전역변수 선언.
 
-  UtilLog gLog;
+  SCLog gLog;
 
 	//만약 로그파일의 위치를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
 	gLog.Init(_T("../../custom log folder/folder1/folder2"));
 
 	//위치를 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
-	logWrite(LOG_LEVEL_RELEASE, _T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
+	logWrite(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
 
 	//도중에 로그파일의 위치를 변경해도 적용되는지 확인 필요함.
 */
 
 #include <afxwin.h>
-
-#define LOG_LEVEL_RELEASE	1
-#define LOG_LEVEL_DEBUG		2
 
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
@@ -36,14 +33,31 @@
 #define __function__ __FUNCTION__
 #endif
 
-//#define logWrite(fmt, ...) logWrite(LOG_LEVEL_RELEASE, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWrite(level, fmt, ...) pLog->Write(level, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWrite(fmt, ...)	pLog->Write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteI(fmt, ...)	pLog->Write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteW(fmt, ...)	pLog->Write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteE(fmt, ...)	pLog->Write(SCLOG_LEVEL_ERROR, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteC(fmt, ...)	pLog->Write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteS(fmt, ...)	pLog->Write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteD(fmt, ...)	pLog->Write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__)
 
-class UtilLog
+enum SCLOG_LEVEL
+{
+	SCLOG_LEVEL_NONE = 0,
+	SCLOG_LEVEL_INFO,
+	SCLOG_LEVEL_WARN,
+	SCLOG_LEVEL_ERROR,
+	SCLOG_LEVEL_CRITICAL,
+	SCLOG_LEVEL_SQL,
+	SCLOG_LEVEL_RELEASE,	//?
+	SCLOG_LEVEL_DEBUG,		//?
+};
+
+class SCLog
 {
 public:
-	UtilLog();
-	virtual ~UtilLog();
+	SCLog();
+	virtual ~SCLog();
 
 	//폴더 및 로그파일 타이틀을 주지 않으면 실행파일 하위의 "Log" 폴더에 실행파일명[YYYYMMDD].log 파일이 자동 생성됨.
 	//위와 같이 기본 위치와 파일명을 사용할 경우는 Init()을 호출하지 않아도 자동 생성되며
@@ -51,7 +65,7 @@ public:
 	//예)특정 폴더 지정 : "d:\\test\\Log"
 	//예)상대 경로 지정 : "..\\..\\Log" (실행파일이 있는 상위의 상위 폴더에 Log라는 폴더를 생성하여 로그파일 저장)
 	//gLog.Init(_T("../../custom log folder"));와 같이 호출
-	BOOL Init(CString logFolder = _T(""), CString filetitle = _T(""), int showLogLevel = LOG_LEVEL_RELEASE);
+	BOOL Init(CString logFolder = _T(""), CString filetitle = _T(""), int showLogLevel = SCLOG_LEVEL_RELEASE);
 	CString Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
 	BOOL Release();
 	CString get_log_full_path() { return m_fullpath; }
@@ -67,4 +81,4 @@ protected:
 
 };
 
-extern UtilLog* pLog;
+extern SCLog* pLog;

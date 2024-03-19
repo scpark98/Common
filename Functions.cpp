@@ -3,6 +3,8 @@
 #include <utility>
 #include <fstream>
 #include <filesystem>
+#include <regex>		//require c++11
+
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
 #include <TlHelp32.h>	//for CreateToolhelp32Snapshot
@@ -567,29 +569,33 @@ COLORREF	GetComplementaryColor(COLORREF crColor, COLORREF crBack)
 }
 #endif
 
-CString	GetExeDirectory(bool includeSlash)
+CString	get_exe_directory(bool includeSlash)
 {
 	TCHAR	sFilePath[1024];
 	
 	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
 	
-	return get_part(sFilePath, fn_folder);
+	CString exe_directory = get_part(sFilePath, fn_folder);
+	if (includeSlash && exe_directory.Right(1) != _T("\\"))
+		exe_directory += _T("\\");
+
+	return exe_directory;
 }
 
-CString GetExeRootDirectory()
+CString get_exe_root_directory()
 {
-	CString sExePath = GetExeDirectory();
+	CString sExePath = get_exe_directory();
 	return sExePath.Left(sExePath.ReverseFind('\\'));
 }
 
-CString		GetExeFilename(bool bFullPath /*= FALSE*/)
+CString		get_exe_filename(bool fullpath /*= false*/)
 {
 	TCHAR	sFilePath[1024];
 	CString sExeFile;
 	
 	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
 	
-	if (bFullPath)
+	if (fullpath)
 		sExeFile = sFilePath;
 	else
 		sExeFile = get_part(sFilePath, fn_name);
@@ -597,9 +603,9 @@ CString		GetExeFilename(bool bFullPath /*= FALSE*/)
 	return sExeFile;
 }
 
-CString		GetExeFileTitle()
+CString		get_exe_file_title()
 {
-	return get_part(GetExeFilename(false), fn_title);
+	return get_part(get_exe_filename(false), fn_title);
 }
 
 CString		GetCurrentDirectory()
@@ -1034,6 +1040,22 @@ bool CheckFileIsURL(CString sURL)
 		return TRUE;
 	else
 		return FALSE;
+}
+
+//check_prefix가 true이면 http, https까지 체크한다. 뭔가 취약점이 있는듯하여 우선 사용금지.(https://mathiasbynens.be/demo/url-regex)
+bool is_valid_url(CString url, bool check_prefix)
+{
+	std::string pattern;
+	
+	if (check_prefix)
+		pattern = "https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)";
+	else //확인 필요!!
+		pattern = "[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)";
+
+	std::regex url_regex(pattern);
+	std::string stdurl = std::string(CT2CA(url));
+
+	return std::regex_match(stdurl, url_regex);
 }
 
 bool IsFolder(CString sfile)
@@ -2293,9 +2315,16 @@ void request_url(CRequestUrlParams* params)
 	//ip에 http://인지 https://인지가 명시되어 있다면 이는 명확하므로
 	//이를 판단하여 params->is_https값을 재설정한다.
 	//포트번호로 https를 판별하는 것은 한계가 있으므로 ip에 명시하든, params->is_https에 정확히 명시하여 사용한다.
-	if (params->ip.Left(4) == _T("http"))
+	//또한 ip에 http:// 또는 https:// 가 붙어 있으면 InternetConnect()은 실패한다. 제거하고 호출해줘야 한다.
+	if (params->ip.Left(7) == _T("http://"))
 	{
-		params->is_https = (params->ip.Left(8) == _T("https://"));
+		params->is_https = false;
+		params->ip.Replace(_T("http://"), _T(""));
+	}
+	else if (params->ip.Left(8) == _T("https://"))
+	{
+		params->is_https = true;
+		params->ip.Replace(_T("https://"), _T(""));
 	}
 
 
@@ -2357,16 +2386,9 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
-	//ip에 http:// 또는 https:// 가 붙어 있으면 InternetConnect()은 실패한다. 제거하고 호출해줘야 한다.
-	CString ip = params->ip;
-	if (ip.Left(7) == _T("http://"))
-		ip = ip.Mid(7);
-	if (ip.Left(8) == _T("https://"))
-		ip = ip.Mid(8);
-
 
 	HINTERNET hInternetConnect = InternetConnect(hInternetRoot,
-		ip,
+		params->ip,
 		params->port,
 		_T(""),
 		_T(""),
@@ -2434,6 +2456,7 @@ void request_url(CRequestUrlParams* params)
 		}
 	}
 
+
 #ifdef _UNICODE
 	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, params->body, -1, NULL, NULL, NULL, NULL);
 	char jsonData[1024] = { 0, };
@@ -2455,13 +2478,15 @@ void request_url(CRequestUrlParams* params)
 
 	if (!res)
 	{
+		DWORD dwError = GetLastError();
+		params->status = -1;
+		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_last_error_message(dwError, false));
+		TRACE(_T("result = %s\n"), params->result);
+
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
 
-		params->result = _T("HttpSendRequest failed.");
-		params->status = -1;
-		TRACE(_T("result = %s\n"), params->result);
 		return;
 	}
 
@@ -2602,7 +2627,8 @@ void request_url(CRequestUrlParams* params)
 	InternetCloseHandle(hInternetConnect);
 	InternetCloseHandle(hInternetRoot);
 
-	TRACE(_T("elapsed = %ld\n"), clock() - t0);
+	params->elapsed = clock() - t0;
+	TRACE(_T("elapsed = %ld\n"), params->elapsed);
 }
 
 DWORD	GetURLFileSize(LPCTSTR pUrl)
@@ -6169,7 +6195,7 @@ CString get_file_property(CString fullpath, CString strFlag)
 	} *lpTranslate;
 
 	if (fullpath.IsEmpty())
-		fullpath = GetExeFilename(true);
+		fullpath = get_exe_filename(true);
 
 	DWORD dwSize = GetFileVersionInfoSize(fullpath, 0);
 	TCHAR * buffer = new TCHAR[dwSize];
@@ -8938,6 +8964,19 @@ double GetCpuUsage(const char* process)
 	return cpuUsage;
 }
 
+//현재 가용 메모리를 리턴한다. (total_memory : 전체 메모리 용량)
+uint64_t get_available_memory(uint64_t* total_memory)
+{
+	MEMORYSTATUSEX status;
+	status.dwLength = sizeof(status);
+	GlobalMemoryStatusEx(&status);
+
+	if (total_memory)
+		*total_memory = status.ullTotalPhys;
+
+	return status.ullAvailPhys;
+}
+
 unsigned int Crc16(unsigned char* rdata, unsigned int len)
 {
 	unsigned int	i, j;
@@ -9837,7 +9876,7 @@ bool IsDuplicatedRun()
 	return false;
 }
 
-CString run_process(CString exePath, bool wait_process_exit)
+CString run_process(CString exePath, bool wait_process_exit, bool return_after_first_read)
 {
 	CString result(_T(""));
 	STARTUPINFO si;
@@ -9890,7 +9929,7 @@ CString run_process(CString exePath, bool wait_process_exit)
 	}
 	else
 	{
-		DWORD dwWait = ::WaitForInputIdle(pi.hProcess, INFINITE);
+		DWORD dwWait = ::WaitForInputIdle(pi.hProcess, 1000);// INFINITE);
 	}
 
 	if (!CloseHandle(hChildStdoutWr))
@@ -9907,6 +9946,8 @@ CString run_process(CString exePath, bool wait_process_exit)
 			break;
 
 		result += chBuf;
+		if (return_after_first_read)
+			break;
 	}
 
 	// Close process and thread handles. 
@@ -16358,7 +16399,7 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 	if (silentInstall)
 		return true;
 
-	//logWrite(LOG_LEVEL_RELEASE, _T("WebView2 Runtime installed successfully."));
+	//logWrite(_T("WebView2 Runtime installed successfully."));
 	Wait(1000);
 
 	//HANDLE hProcess = NULL;

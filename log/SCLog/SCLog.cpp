@@ -1,20 +1,20 @@
-#include "UtilLog.h"
+#include "SCLog.h"
 #include <afxmt.h>
 
 CCriticalSection theCSLog;
 
-UtilLog* pLog = NULL;
+SCLog* pLog = NULL;
 
-UtilLog::UtilLog()
+SCLog::SCLog()
 {
 	pLog = this;
 
-	m_showLogLevel = LOG_LEVEL_RELEASE;
+	m_showLogLevel = SCLOG_LEVEL_RELEASE;
 
 	m_fp = NULL;
 }
 
-UtilLog::~UtilLog()
+SCLog::~SCLog()
 {
 	try
 	{
@@ -26,7 +26,7 @@ UtilLog::~UtilLog()
 	}
 }
 
-BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
+BOOL SCLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 {
 	try
 	{
@@ -105,7 +105,7 @@ BOOL UtilLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 }
 
 
-BOOL UtilLog::Release()
+BOOL SCLog::Release()
 {
 	try
 	{
@@ -122,7 +122,7 @@ BOOL UtilLog::Release()
 	}
 }
 
-CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
+CString SCLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 {
 	CString result = CString();
 
@@ -139,16 +139,18 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 			}
 		}
 
-		if (logLevel < m_showLogLevel)
-		{
-			theCSLog.Unlock();
-			return result;
-		}
+		//if (logLevel < m_showLogLevel)
+		//{
+		//	theCSLog.Unlock();
+		//	return result;
+		//}
 
 		va_list args;
 		va_start(args, format);
 
 		CString log_text;
+		CString log_level;
+
 		log_text.FormatV(format, args);
 
 		//만약 로그 텍스트의 맨 앞에 \n이 붙어있으면 이전 로그 라인과 라인을 구분하기 위함인데
@@ -167,6 +169,31 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		if (linefeed_count > 0)
 			log_text = log_text.Mid(linefeed_count);
 
+		switch (logLevel)
+		{
+		case SCLOG_LEVEL_INFO :
+			log_level = _T("[info]");
+			break;
+		case SCLOG_LEVEL_WARN:
+			log_level = _T("[warn]");
+			break;
+		case SCLOG_LEVEL_ERROR:
+			log_level = _T("[error]");
+			break;
+		case SCLOG_LEVEL_CRITICAL:
+			log_level = _T("[critical]");
+			break;
+		case SCLOG_LEVEL_SQL:
+			log_level = _T("[sql]");
+			break;
+		case SCLOG_LEVEL_DEBUG:
+			log_level = _T("[debug]");
+			break;
+		case SCLOG_LEVEL_RELEASE:		//release도 no level로 처리한다.
+			//log_text = _T("info");
+			break;
+		}
+
 		SYSTEMTIME t = { 0 };
 		GetLocalTime(&t);
 
@@ -183,9 +210,9 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 				for (i = 0; i < linefeed_count; i++)
 					_ftprintf(m_fp, _T("\n"));
 
-				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%d] %s"),
+				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%d]%s %s"),
 					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
-					funcName, line, log_text);
+					funcName, line, log_level, log_text);
 				_ftprintf(m_fp, _T("%s\n"), result);
 				TRACE(_T("%s\n"), result);
 			}
@@ -207,7 +234,7 @@ CString UtilLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 //usage : sFolder include folder names only except file name.
 //c:\test\00\1.bmp	(x)	=> 1.bmp folder will be created.(not intended)
 //c:\test\00		(o)
-bool UtilLog::recursive_make_full_directory(LPCTSTR sFolder)
+bool SCLog::recursive_make_full_directory(LPCTSTR sFolder)
 {
 	if (PathFileExists(sFolder) && ::PathIsDirectory(sFolder))
 		return true;

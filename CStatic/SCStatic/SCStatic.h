@@ -45,7 +45,7 @@ public:
 	CSCStatic();
 	~CSCStatic();
 	
-	void		set_transparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
+	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void		set_text(CString sText, COLORREF crTextColor = 0);
 	CString		get_text() { return m_sText; }
 	void		SetWindowText(CString sText) { set_text(sText); }
@@ -54,13 +54,13 @@ public:
 	//글자색만 변경할 경우
 	void		set_text_color(COLORREF crTextColor);
 	//배경색을 지정하면 투명 옵션은 off됨.
-	void		set_back_color(COLORREF cBackColor) { m_crBack = cBackColor; m_bTransparent = false; Invalidate(); }
+	void		set_back_color(COLORREF cBackColor) { m_crBack = cBackColor; m_transparent = false; Invalidate(); }
 	//SetColor를 사용하면 투명 옵션은 off됨.
 	void		set_color(COLORREF cTextColor, COLORREF cBackColor = ::GetSysColor(COLOR_3DFACE))
 				{
 					m_crText = cTextColor;
 					m_crBack = cBackColor;
-					m_bTransparent = false;
+					m_transparent = false;
 					Invalidate(FALSE);
 				}
 
@@ -69,7 +69,22 @@ public:
 	CSCStatic&		set_gradient(bool bGradient = true);
 	CSCStatic&		set_gradient_color(COLORREF crGradient);			//배경~crGradient 2컬러로 표현됨.
 	CSCStatic&		set_gradient_color(int idx, COLORREF crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
-	CSCStatic&		set_gradient_color(int count, ...);
+
+	template <typename ... T> CSCStatic& set_gradient_color(T... colors)
+	{
+		set_gradient();
+		m_crGradient.clear();
+
+		int n = sizeof...(colors);
+		int arg[] = { colors... };
+		for (auto cr : arg)
+		{
+			m_crGradient.push_back(cr);
+		}
+
+		return *this;
+	}
+
 	CSCStatic&		add_gradient_color(COLORREF crGradient);			//색상 추가
 	CSCStatic&		insert_gradient_color(int idx, COLORREF crGradient);//idx번째 색상 추가
 	CSCStatic&		set_vertical_gradient(bool bVertical = true);
@@ -168,7 +183,7 @@ protected:
 
 	COLORREF	m_crText;
 	COLORREF	m_crBack;
-	bool		m_bTransparent;		//default = false
+	bool		m_transparent;		//default = false
 
 	BOOL		m_bBlink;
 	BOOL		m_bBlinkStatus;

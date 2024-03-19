@@ -17,8 +17,8 @@
 
 
 #include "MacProgressCtrl.h"
-#include "../Functions.h"
-#include "../MemoryDC.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
 
 
 #ifdef _DEBUG

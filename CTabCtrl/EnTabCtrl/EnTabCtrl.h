@@ -40,7 +40,7 @@ class CEnTabCtrl : public CBaseTabCtrl
 public:
 	CEnTabCtrl();
 
-	static void EnableCustomLook(BOOL bEnable = TRUE, DWORD dwStyle = ETC_FLAT | ETC_COLOR);
+	static void EnableCustomLook(BOOL bEnable = TRUE, DWORD dwStyle = ETC_FLAT | ETC_COLOR | ETC_SELECTION | ETC_GRADIENT | ETC_BACKTABS);
 
 // Attributes
 public:

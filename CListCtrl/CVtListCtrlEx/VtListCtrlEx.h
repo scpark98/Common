@@ -180,6 +180,13 @@ public:
 	void		set_column_text_align(int column, int format = LVCFMT_LEFT, bool set_to_header = true);
 	int			get_column_text_align(int column);
 
+	//해당 컬럼에서 문자열 길이 최대값을 리턴.
+	//real_
+	int			get_column_max_text_length(int column, bool real_bytes);
+	void		get_column_max_text_length(std::vector<int>& col_len, bool real_bytes);
+	//해당 컬럼에서 출력시에 width 최대값을 리턴.(미구현)
+	int			get_column_max_text_width(int column);
+
 	CString		get_header_text(int column);
 	void		set_header_text(int column, CString text);
 	//default = HDF_LEFT
@@ -253,7 +260,10 @@ public:
 	CString		get_line_text(int index, std::deque<int>* dqColumn = NULL, CString sep = _T("|"));
 	std::deque<CString> get_line_text_list(int index, int from = 0, int to = -1);
 	std::deque<CString> get_line_text_list(int index, std::deque<int>* dqColumn = NULL);
-	
+	//txt 출력 시 컬럼 세로 정렬을 맞게 출력하도록 공백을 보정하여 리턴
+	//CString은 최대 64K까지만 담을 수 있으므로 vector를 이용함.
+	void		get_line_text_list(std::vector<CString> *vt);
+
 
 //선택 관련
 	//start부터 맨 처음 선택된 항목의 인덱스를 리턴한다.
@@ -300,64 +310,72 @@ public:
 		color_theme_dark_gray,
 	};
 
-	void	set_color_theme(int theme, bool apply_now = true);
-	COLORREF get_text_color(int item, int subItem);
-	COLORREF get_back_color(int item, int subItem);
-	COLORREF get_back_alt_color(int item, int subItem);
-	void	set_use_back_alt_color(bool use) { m_use_back_alt = use; }
+	void		set_color_theme(int theme, bool apply_now = true);
+	COLORREF	get_text_color(int item, int subItem);
+	COLORREF	get_back_color(int item, int subItem);
+	//특정 셀이 아닌 기본 배경색을 리턴.
+	COLORREF	get_back_color() { return m_crBack; }
+	COLORREF	get_back_alt_color(int item, int subItem) { return m_crBackAlt; }
+	void		set_back_alt_color(COLORREF cr) { m_crBackAlt = cr; }
 
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
-	void	set_text_color(int item, int subItem, COLORREF crText, bool erase = false, bool invalidate = true);
+	//item이 -1이면 모든 라인에, subItem이 -1이면 모든 컬럼에 적용.
+	void		set_text_color(int item, int subItem, COLORREF crText, bool erase = false, bool invalidate = true);
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
-	void	set_back_color(int item, int subItem, COLORREF crBack, bool erase = false);
-	void	set_item_color(int item, int subItem, COLORREF crText, COLORREF crBack);
-	void	set_default_item_color(COLORREF crText, COLORREF crBack);	//기본 글자색, 배경색을 설정한다.
+	void		set_back_color(int item, int subItem, COLORREF crBack, bool erase = false);
+	void		set_item_color(int item, int subItem, COLORREF crText, COLORREF crBack);
+
+	//기본 글자색을 설정한다.
+	void		set_default_text_color(COLORREF cr_text) { m_crText = cr_text; Invalidate(); }
+	//기본 배경색을 설정한다.
+	void		set_default_back_color(COLORREF cr_back) { m_crBack = cr_back; Invalidate(); }
+
 	//컬럼이 percentage를 표시하는 컬럼일 경우 그 표시 색상을 설정한다.
-	void	set_progress_color(COLORREF crProgress);
+	void		set_progress_color(COLORREF crProgress);
 
 //편집 관련
 	//리소스의 ListCtrl 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
-	void	allow_edit(bool allow_edit = true, bool one_click_edit = true);
-	void	allow_one_click_edit(bool allow_one_click_edit) { m_allow_one_click_edit = allow_one_click_edit; }
-	void	allow_edit_column(int column, bool allow_edit = true);
-	bool	is_in_editing()	{ return m_in_editing; }	//편집중인지
-	void	set_flag_in_editing(bool in_editing) { edit_end(); m_in_editing = in_editing; }
-	int		get_recent_edit_item() { return m_edit_item; }
-	int		get_recent_edit_subitem() { return m_edit_subItem; }
-	void	set_recent_edit_subitem(int subItem) { m_edit_subItem = subItem; }
+	void		allow_edit(bool allow_edit = true, bool one_click_edit = true);
+	void		allow_one_click_edit(bool allow_one_click_edit) { m_allow_one_click_edit = allow_one_click_edit; }
+	void		allow_edit_column(int column, bool allow_edit = true);
+	bool		is_in_editing()	{ return m_in_editing; }	//편집중인지
+	void		set_flag_in_editing(bool in_editing) { edit_end(); m_in_editing = in_editing; }
+	int			get_recent_edit_item() { return m_edit_item; }
+	int			get_recent_edit_subitem() { return m_edit_subItem; }
+	void		set_recent_edit_subitem(int subItem) { m_edit_subItem = subItem; }
 	std::deque<int>* get_selected_list_for_edit() { return &m_dqSelected_list_for_edit; }
 	std::deque<int> m_dqSelected_list_for_edit;
-	CString get_old_text() { return m_old_text; }
-	CEdit*	edit_item(int item, int subItem);
-	void	edit_end(bool valid = true);
-	void	undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
-	bool	is_modified() { return m_modified; }
-	void	reset_modified_flag() { m_modified = false; }
+	CString		get_old_text() { return m_old_text; }
+	CEdit*		edit_item(int item, int subItem);
+	void		edit_end(bool valid = true);
+	void		undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
+	bool		is_modified() { return m_modified; }
+	void		reset_modified_flag() { m_modified = false; }
 
 //폰트 관련. 반드시 set_headings() 후에 호출할것.
-	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	//-1 : reduce, +1 : enlarge
-	int		get_font_size();
+	int			get_font_size();
 	//반드시 set_headings() 후에 호출할것.
-	void	set_font_size(int font_size);
-	void	enlarge_font_size(bool enlarge);
-	void	set_font_bold(bool bold = true);
-	void	set_font_italic(bool italic = true);
-	LOGFONT	get_log_font() { return m_lf; }
-	void	set_log_font(LOGFONT lf);
+	void		set_font_size(int font_size);
+	void		enlarge_font_size(bool enlarge);
+	void		set_font_bold(bool bold = true);
+	void		set_font_italic(bool italic = true);
+	LOGFONT		get_log_font() { return m_lf; }
+	void		set_log_font(LOGFONT lf);
 
 //파일, 클립보드 관련
 	//Ctrl+C키로 선택된 항목을 클립보드로 복사할 수 있다. shift를 조합하면 헤더까지 포함된다.
-	bool	list_copy_to_clipboard(bool selected_only = true, TCHAR separator = '|', bool bHead = false);
+	bool		list_copy_to_clipboard(bool selected_only = true, TCHAR separator = '|', bool bHead = false);
 	//void	paste_from_clipboard();
-	bool	save(CString file, TCHAR separator = '|', bool selected_only = false);
-	bool	load(CString sfile, TCHAR separator = '|', bool add_index = false, bool match_column_count = true, bool reset_before_load = true);
+	bool		save(CString file, TCHAR separator = '|', bool selected_only = false);
+	bool		load(CString sfile, TCHAR separator = '|', bool add_index = false, bool match_column_count = true, bool reset_before_load = true);
 
 //기타 레이아웃 관련
 	//header_height는 헤더클래스에서 HDM_LAYOUT 메시지가 발생해야 적용되는데
 	//그렇게 되기 위해서는 SetFont / MoveWindow / SetWindowPos 등이 필요하므로
 	//VtListCtrlEx에게 set_font_name() 호출시에 헤더도 SetFont를 적용하여 해결함.
-	void	set_header_height(int height);
+	void		set_header_height(int height);
 
 	//line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과
 	//(실제 사용할 이미지리스트가 있는 경우는 위 방법을 사용할 수 없다)
@@ -367,19 +385,19 @@ public:
 	//CVtListCtrlEx에 WM_SIZE가 발생하도록 하는 함수를 사용하면 된다)
 	//CVtListCtrlEx가 아닌 그냥 mainDlg만 resize한다고 해서 되지 않는다.
 	//자체 imagelist를 사용하지 않는 컨트롤이라면 쉽게 lineheight를 조절할 수 있다.
-	bool	m_use_own_imagelist = true;
-	void	set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
-	void	set_line_height(int height);
+	bool		m_use_own_imagelist = true;
+	void		set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
+	void		set_line_height(int height);
 
-	void	set_column_width(int nCol, int cx);
-	void	load_column_width(CWinApp* pApp, CString sSection);
-	void	save_column_width(CWinApp* pApp, CString sSection);
-	CRect	get_item_rect(int item, int subItem);
+	void		set_column_width(int nCol, int cx);
+	void		load_column_width(CWinApp* pApp, CString sSection);
+	void		save_column_width(CWinApp* pApp, CString sSection);
+	CRect		get_item_rect(int item, int subItem);
 	//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
-	bool	get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
+	bool		get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
 
-	void	show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
-	void	progress_text_color(COLORREF cr) { m_crProgressText = cr; }
+	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
+	void		progress_text_color(COLORREF cr) { m_crProgressText = cr; }
 
 //scroll
 	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
@@ -433,13 +451,12 @@ protected:
 	int				m_cur_sorted_column = 0;	//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
-	bool			m_use_back_alt = false;
 	COLORREF		m_crText;					//기본 글자색
 	COLORREF		m_crTextSelected;			//선택 항목의 활성화(active) 글자색
 	COLORREF		m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
 	COLORREF		m_crTextDropHilited;
 	COLORREF		m_crBack;					//기본 배경색
-	COLORREF		m_crBackAlt;				//줄구분용 
+	COLORREF		m_crBackAlt;				//줄 구분용
 	COLORREF		m_crBackSelected;
 	COLORREF		m_crBackSelectedInactive;
 	COLORREF		m_crBackDropHilited;

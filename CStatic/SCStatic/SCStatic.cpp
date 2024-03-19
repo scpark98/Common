@@ -11,7 +11,7 @@
 IMPLEMENT_DYNAMIC(CSCStatic, CStatic)
 CSCStatic::CSCStatic()
 {
-	m_bTransparent	= false;
+	m_transparent	= false;
 
 	m_sText			= "";
 	m_crText		= ::GetSysColor(COLOR_BTNTEXT);
@@ -139,7 +139,7 @@ void CSCStatic::OnPaint()
 	//투명 모드이면 배경도 안칠하고 글자도 배경색 없이 출력된다.
 	dc.SetBkMode(TRANSPARENT);
 
-	if (m_bTransparent)
+	if (m_transparent)
 	{
 		CRect Rect;
 		GetWindowRect(&Rect);
@@ -423,7 +423,7 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 
 	//투명일때 update_surface()를 써야 온전히 갱신된다.
 	//=>dlg에서 clip sibling에 따라 결과가 달라진다.
-	if (m_bTransparent)
+	if (m_transparent)
 		update_surface();
 	else
 		Invalidate();
@@ -723,7 +723,7 @@ CSCStatic& CSCStatic::set_gradient(bool bGradient)
 	m_bGradient = bGradient;
 
 	if (m_bGradient)
-		m_bTransparent = false;
+		m_transparent = false;
 
 	return *this;
 }
@@ -755,7 +755,7 @@ CSCStatic& CSCStatic::set_gradient_color(int idx, COLORREF crGradient)
 
 	return *this;
 }
-
+/*
 CSCStatic& CSCStatic::set_gradient_color(int count, ...)
 {
 	set_gradient();
@@ -771,7 +771,7 @@ CSCStatic& CSCStatic::set_gradient_color(int count, ...)
 	
 	return *this;
 }
-
+*/
 CSCStatic& CSCStatic::add_gradient_color(COLORREF crGradient)
 {
 	set_gradient();

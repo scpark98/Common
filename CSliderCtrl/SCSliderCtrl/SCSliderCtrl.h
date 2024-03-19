@@ -1,10 +1,10 @@
-#if !defined(AFX_SLIDERCTRLEX_H__70340BD3_CE86_4EE4_A00B_5A4EC2B6A92D__INCLUDED_)
-#define AFX_SLIDERCTRLEX_H__70340BD3_CE86_4EE4_A00B_5A4EC2B6A92D__INCLUDED_
+#if !defined(AFX_SCSLIDERCTRL_H__70340BD3_CE86_4EE4_A00B_5A4EC2B6A92D__INCLUDED_)
+#define AFX_SCSLIDERCTRL_H__70340BD3_CE86_4EE4_A00B_5A4EC2B6A92D__INCLUDED_
 
 #if _MSC_VER > 1000
 #pragma once
 #endif // _MSC_VER > 1000
-// SliderCtrlEx.h : header file
+// SCSliderCtrl.h : header file
 //
 
 #include <afxwin.h>
@@ -14,12 +14,15 @@
 
 #include <deque>
 #include <algorithm>
+#include <vector>
 
-#define	SLIDERCTRLEX_STYLE_SLIDER		0
-#define SLIDERCTRLEX_STYLE_PROGRESS		1
-#define SLIDERCTRLEX_STYLE_VOLUME		2
+#include "../../GdiplusBitmap.h"
 
-#define MESSAGE_SLIDERCTRLEX			WM_USER + 9424
+#define	SCSLIDERCTRL_STYLE_SLIDER		0
+#define SCSLIDERCTRL_STYLE_PROGRESS		1
+#define SCSLIDERCTRL_STYLE_VOLUME		2
+
+#define MESSAGE_SCSLIDERCTRL			WM_USER + 9424
 
 //트랙 이벤트가 발생했을 때 바로 PostMessage를 호출하게 되면
 //미세한 마우스 움직임들에 대해 무수히 많은 이벤트가 발생하게 되므로
@@ -40,18 +43,18 @@
 //우선 이렇게 timer 방식으로 계속 사용해보고 문제가 없다면 코드를 다시 정리하자.
 
 /////////////////////////////////////////////////////////////////////////////
-// CSliderCtrlEx window
-class CSliderCtrlExMsg
+// CSCSliderCtrl window
+class CSCSliderCtrlMsg
 {
 public:
-	CSliderCtrlExMsg(int _msg, int _ctrl_id, int _pos)
+	CSCSliderCtrlMsg(int _msg, int _ctrl_id, int _pos)
 	{
 		ctrl_id = _ctrl_id;
 		msg = _msg;
 		pos = _pos;
 	}
 
-	enum SliderCtrlExMsgs
+	enum SCSliderCtrlMsgs
 	{
 		msg_thumb_grab = 0,
 		msg_thumb_move,
@@ -64,10 +67,10 @@ public:
 	int		pos;
 };
 
-class CSliderCtrlExBookmark
+class CSCSliderCtrlBookmark
 {
 public:
-	CSliderCtrlExBookmark(int _pos, CString _name)
+	CSCSliderCtrlBookmark(int _pos, CString _name)
 	{
 		pos = _pos;
 		name = _name;
@@ -77,22 +80,41 @@ public:
 	CString name;
 };
 
-class CSliderCtrlEx : public CSliderCtrl
+class CSCSliderCtrlSteps
+{
+public:
+	CSCSliderCtrlSteps() {};
+
+	CRect	r;
+	CGdiplusBitmap m_img;
+};
+
+class CSCSliderCtrl : public CSliderCtrl
 {
 // Construction
 public:
-	CSliderCtrlEx();
+	CSCSliderCtrl();
 
-	enum SliderCtrlStyle
+//slider_step 관련
+	std::vector<CSCSliderCtrlSteps> m_steps;
+//slider_step 관련
+	//step 이미지에 사용될 이미지들을 세팅한다.
+	//void	set_step_images();
+	//pos 위치에 resource id 이미지를 표시한다.
+	void	set_step_image(int pos, int id);
+
+
+	enum SCSliderCtrlStyle
 	{
 		slider_normal = 0,
 		slider_thumb,
 		slider_value,
 		slider_progress,
 		slider_track,
+		slider_step,		//진행 단계를 표시. 1-2-3-4 과 같은 형태. 
 	};
 
-	enum SliderCtrlValueStyle
+	enum SCSliderCtrlValueStyle
 	{
 		none = 0,
 		value,
@@ -104,7 +126,7 @@ public:
 		timer_post_pos = 0,
 	};
 
-	enum SliderCtrlEventMsgStyle
+	enum SCSliderCtrlEventMsgStyle
 	{
 		msg_style_timer = 0,
 		msg_style_post,
@@ -121,18 +143,18 @@ public:
 		m_pCallback_func = p_func;
 	}	//콜백함수 콜 방식으로 이벤트를 전달할 경우 사용.
 
-	int		GetStyle() { return m_nStyle; }
+	int		GetStyle() { return m_style; }
 
-	//slider_thumb,	slider_value, slider_progress, slider_track,
+	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
 	void	SetStyle(int nStyle);
 	void	SetTrackHeight(int height) { m_nTrackHeight = height; }
 	void	SetPos(int nPos);
 	int		GetPos();
-	void	EnableSlide(bool enable = true) { m_bEnableSlide = enable; }
+	void	EnableSlide(bool enable = true) { m_enable_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
-	int		GetLower() { return m_nMin; }
-	int		GetUpper() { return m_nMax; }
-	void	SetRange(int nMin, int nMax, BOOL bRedraw = FALSE);
+	int		GetLower() { return m_lower; }
+	int		GetUpper() { return m_upper; }
+	void	SetRange(int lower, int upper, BOOL bRedraw = FALSE);
 	BOOL	SetBitmapChannel(UINT nChannelID, UINT nActiveID = NULL);
 	BOOL	SetBitmapThumb(	UINT nThumbID, UINT nActiveID = NULL, BOOL bTrans = FALSE, COLORREF crTrans = RGB(0,0,0));
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
@@ -157,7 +179,7 @@ public:
 		bookmark_reset,
 	};
 	void	bookmark(int mode = bookmark_add_current, int pos = -1, CString name = _T(""));
-	std::deque<CSliderCtrlExBookmark> get_bookmark_list() { return m_bookmark; }
+	std::deque<CSCSliderCtrlBookmark> get_bookmark_list() { return m_bookmark; }
 
 	enum TOOLTIP_FORMAT
 	{
@@ -182,20 +204,23 @@ public:
 	//-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
 	void	set_repeat_end(int pos = -2);
 
+
+
 protected:
 	// Attributes
 
 	//slider_thumb,	slider_value, slider_progress, slider_track,
-	int			m_nStyle;
+	int			m_style;
 
 	int			m_nEventMsgStyle;
 
-	int			m_nMin;
-	int			m_nMax;
-	int			m_nPos;
+	int			m_lower;
+	int			m_upper;
+	int			m_pos;
+
 	CRect		m_rc;
 
-	CToolTipCtrl	m_ToolTip;
+	CToolTipCtrl	m_tooltip;
 	bool		m_use_tooltip;	//default = false
 	int			m_tooltip_format;	//default = tooltip_value
 
@@ -205,12 +230,13 @@ protected:
 	int			m_nMarginLeft, m_nMarginRight, m_nMarginTop, m_nMarginBottom;
 	int			m_nMouseOffset;
 
-	BOOL		m_bVertical;
-	bool		m_bEnableSlide;	//enable move the current pos by click or drag even though progress style. default = true
+	BOOL		m_is_vertical;
+	bool		m_enable_slide;	//enable move the current pos by click or drag even though progress style. default = true
+
 
 	//특정 위치들을 기억해두자. 북마크처럼.
 	bool		m_use_bookmark;	//default = false;
-	std::deque<CSliderCtrlExBookmark> m_bookmark;
+	std::deque<CSCSliderCtrlBookmark> m_bookmark;
 	//pos의 위치에 있는 북마크의 인덱스를 리턴한다.
 	int			find_index_bookmark(int pos);
 	//mouse move, sliding할 때 북마크 근처에 가면 이 값이 세팅된다. 근처가 아니면 -1.
@@ -236,7 +262,7 @@ protected:
 	BOOL		m_bTransparentChannel, m_bTransparentThumb, m_bThumb, m_bChannel;
 	BOOL		m_bLButtonDown, m_bHasFocus, m_bDrawFocusRect;
 
-	int			m_nValueStyle;	//only applies to SLIDERCTRLEX_STYLE_PROGRESS. default = value;
+	int			m_nValueStyle;	//only applies to SCSLIDERCTRL_STYLE_PROGRESS. default = value;
 	COLORREF	m_crValueText;	//text color of value. background is transparent. default = RGB(64,64,64);
 
 	CBitmap		m_bmChannel, m_bmChannelMask, m_bmChannelActive, m_bmChannelActiveMask;
@@ -278,16 +304,16 @@ protected:
 
 // Overrides
 	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CSliderCtrlEx)
+	//{{AFX_VIRTUAL(CSCSliderCtrl)
 	//}}AFX_VIRTUAL
 
 // Implementation
 public:
-	virtual ~CSliderCtrlEx();
+	virtual ~CSCSliderCtrl();
 
 	// Generated message map functions
 protected:
-	//{{AFX_MSG(CSliderCtrlEx)
+	//{{AFX_MSG(CSCSliderCtrl)
 	afx_msg void OnPaint();
 	afx_msg void OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
@@ -313,4 +339,4 @@ public:
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.
 
-#endif // !defined(AFX_SLIDERCTRLEX_H__70340BD3_CE86_4EE4_A00B_5A4EC2B6A92D__INCLUDED_)
+#endif // !defined(AFX_SCSLIDERCTRL_H__70340BD3_CE86_4EE4_A00B_5A4EC2B6A92D__INCLUDED_)

@@ -114,7 +114,7 @@ void CHeaderCtrlEx::OnPaint()
 		else
 		{
 			if (m_flat_style)
-				DrawLine(&dc, rItem.right, rItem.top + 4, rItem.right, rItem.bottom - 4, crSunkenLight);
+				DrawLine(&dc, rItem.right, rItem.top + 4, rItem.right, rItem.bottom - 4, crSunkenDark);
 			else
 				DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
 		}

@@ -17,6 +17,7 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	m_gif.load(_T("D:\\media\\test_image\\test.gif"));
 
 	//리소스 로딩 방법. 반드시 .gif를 .bin과 같이 다른 이름으로 변경 후 리소스 추가할 것.
+	//리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
 	m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
 
 	//로딩 후 parent의 DC 및 좌표를 넘겨주면 자동 재생됨.
@@ -93,6 +94,8 @@ public:
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
 	bool	load(CString sFile, bool show_error = false);
+	//다음 예시와 같이 리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
+	//m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
 	bool	load(CString sType, UINT id, bool show_error = false);
 	//png일 경우는 sType을 생략할 수 있다.
 	bool	load(UINT id, bool show_error = false);
@@ -218,13 +221,22 @@ public:
 	int		get_frame_count() { return m_frame_count; }
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
 	//parent에 관계없이 투명하게 표시할 경우는 CImageShapeWnd를 사용.
-	void	set_animation(HWND parenthWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool start = true);
+	void	set_animation(HWND parenthWnd, int x, int y, int w = 0, int h = 0, bool start = true);
+	//void	set_animation(HWND parenthWnd, int x, int y, float ratio = 1.0f, bool start = true);
+	//ratio를 유지하여 r안에 표시한다.
+	void	set_animation(HWND parenthWnd, CRect r, bool start = true);
 	void	move(int x = 0, int y = 0, int w = 0, int h = 0);
+	void	move(CRect r);
 	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
 	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }
 	void	start_animation();
-	void	pause_animation();
+	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
+	void	pause_animation(int pos = 0);
+	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
 	void	stop_animation();
+	void	goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
+	void	goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
+
 	//gif 프레임 이미지들을 지정된 폴더에 저장
 	bool	save_gif_frames(CString folder);
 	//gif 프레임 이미지들을 추출해서 직접 display할 수 있다.

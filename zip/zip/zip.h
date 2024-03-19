@@ -72,6 +72,14 @@ ZRESULT ZipAddFolder(HZIP hz,const TCHAR *dstzn);
 // compressed item itself, which in turn makes it easier when unzipping the
 // zipfile from a pipe.
 
+#include <atlstr.h>	//for CString
+#include <deque>
+//scpark add 지정된 폴더의 파일들을 모두 압축한다.
+//zip_folder_name이 "Log"라면 압축파일 안에 "Log" 폴더를 생성한 후 폴더/파일들이 추가된다.
+//dq의 모든 파일들은 root_dir 폴더 및 그 하위폴더에 존재해야 한다.
+ZRESULT ZipAddFiles(CString zip_folder_name, CString root_dir, std::deque<CString>& dq, CString zip_path);
+
+
 ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len);
 // ZipGetMemory - If the zip was created in memory, via ZipCreate(0,len),
 // then this function will return information about that memory block.

@@ -1,13 +1,12 @@
-// SliderCtrlEx.cpp : implementation file
+// SCSliderCtrl.cpp : implementation file
 //
 
 //#include "stdafx.h"
-#include "SliderCtrlEx.h"
+#include "SCSliderCtrl.h"
 
-#include "../Functions.h"
-#include "../MemoryDC.h"
-#include "../Functions.h"
-#include "../AutoFont.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
+#include "../../AutoFont.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -18,16 +17,16 @@ static char THIS_FILE[] = __FILE__;
 #define THUMB_WIDTH	14
 
 /////////////////////////////////////////////////////////////////////////////
-// CSliderCtrlEx
+// CSCSliderCtrl
 
-CSliderCtrlEx::CSliderCtrlEx()
+CSCSliderCtrl::CSCSliderCtrl()
 {
 	m_pCallback_func = NULL;
 
-	m_nStyle = slider_thumb;
+	m_style = slider_thumb;
 	m_nEventMsgStyle = AfxGetApp()->GetProfileInt(_T("setting"), _T("event msg style"), msg_style_timer);
 
-	m_bEnableSlide	= true;
+	m_enable_slide	= true;
 	m_use_bookmark = false;
 	m_cur_bookmark = -1;
 
@@ -35,9 +34,9 @@ CSliderCtrlEx::CSliderCtrlEx()
 	m_tooltip_format = tooltip_value;
 
 
-	m_nMin		= 0;
-	m_nMax		= 0;
-	m_nPos		= 0;
+	m_lower		= 0;
+	m_upper		= 0;
+	m_pos		= 0;
 
 	m_nMarginLeft = m_nMarginRight = m_nMarginTop = m_nMarginBottom = 0;
 	m_nThumbWidth = THUMB_WIDTH * 2;
@@ -45,7 +44,7 @@ CSliderCtrlEx::CSliderCtrlEx()
 
 	m_nTrackHeight = 5;
 
-	m_bChannel = m_bChannelActive = m_bVertical = m_bThumb = m_bLButtonDown = false;
+	m_bChannel = m_bChannelActive = m_is_vertical = m_bThumb = m_bLButtonDown = false;
 	m_bTransparentChannel = false;
 	m_bDrawFocusRect = false;
 
@@ -70,7 +69,7 @@ CSliderCtrlEx::CSliderCtrlEx()
 	SetThumbColor(m_crThumb);
 }
 
-CSliderCtrlEx::~CSliderCtrlEx()
+CSCSliderCtrl::~CSCSliderCtrl()
 {
 	DeleteObject(m_dcBk.SelectObject(&m_bmpBkOld));
 	DeleteDC(m_dcBk);
@@ -83,8 +82,8 @@ CSliderCtrlEx::~CSliderCtrlEx()
 }
 
 
-BEGIN_MESSAGE_MAP(CSliderCtrlEx, CSliderCtrl)
-	//{{AFX_MSG_MAP(CSliderCtrlEx)
+BEGIN_MESSAGE_MAP(CSCSliderCtrl, CSliderCtrl)
+	//{{AFX_MSG_MAP(CSCSliderCtrl)
 	ON_WM_PAINT()
 	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, OnCustomDraw)
 	ON_WM_ERASEBKGND()
@@ -101,8 +100,8 @@ BEGIN_MESSAGE_MAP(CSliderCtrlEx, CSliderCtrl)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CSliderCtrlEx message handlers
-void CSliderCtrlEx::OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult) 
+// CSCSliderCtrl message handlers
+void CSCSliderCtrl::OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult) 
 //
 // Description	:	Sent by the slider control to notify the parent window 
 //					about drawing operations. This notification is sent in 
@@ -185,9 +184,9 @@ void CSliderCtrlEx::OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 }
 
-void CSliderCtrlEx::OnPaint() 
+void CSCSliderCtrl::OnPaint() 
 {
-	if (m_nStyle == slider_normal)
+	if (m_style == slider_normal)
 	{
 		CSliderCtrl::OnPaint();
 		return;
@@ -202,6 +201,10 @@ void CSliderCtrlEx::OnPaint()
 	GetClientRect(m_rc);
 	CMemoryDC	dc(&dc1, &m_rc, m_bTransparentChannel);
 
+	Gdiplus::Graphics g(dc.m_hDC);
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
 	CDC		dcMem;
 	dcMem.CreateCompatibleDC(&dc);
 
@@ -209,7 +212,7 @@ void CSliderCtrlEx::OnPaint()
 	//m_rc의 y센터좌표
 	int			cy = m_rc.CenterPoint().y;
 	//현재 위치의 실제 픽셀좌표
-	int			pos = Pos2Pixel(m_nPos);
+	int			pos = Pos2Pixel(m_pos);
 	int i;
 	
 	CAutoFont font(_T("굴림"));
@@ -230,7 +233,7 @@ void CSliderCtrlEx::OnPaint()
 		//전체 슬라이드 사각형 영역을 배경색으로 그림
 		dc.FillSolidRect(m_rc, enable_color(m_crBack));
 
-		if (m_nStyle <= slider_value)
+		if (m_style <= slider_value)
 		{
 			dc.FillSolidRect(pos, cy - m_nTrackHeight / 2, m_rc.right - pos, m_nTrackHeight, enable_color(m_crInActive));
 			
@@ -251,12 +254,12 @@ void CSliderCtrlEx::OnPaint()
 			penDark.DeleteObject();
 			penLight.DeleteObject();
 		}
-		else if (m_nStyle == slider_progress)
+		else if (m_style == slider_progress)
 		{
 			CRect	rInActive(pos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
 			dc.FillSolidRect(rInActive, enable_color(m_crInActive));
 		}
-		else if (m_nStyle == slider_track)
+		else if (m_style == slider_track)
 		{
 			CRect r = m_rc;
 			int cy = r.CenterPoint().y;
@@ -272,6 +275,100 @@ void CSliderCtrlEx::OnPaint()
 			DrawSunkenRect(&dc, r, true, get_color(m_crBack, -32), get_color(m_crBack, 32), 1);
 
 		}
+		else if (m_style == slider_step)
+		{
+			CRect r = m_rc;
+			int thumb_size = MIN(r.Width(), r.Height()); //스텝 위치마다 그려질 도형의 크기
+			int interval;
+			CSize gap(0, 0);	//스텝의 시작과 끝의 여백
+			
+			Gdiplus::Color cr_line(255, 255, 0, 255);
+			Gdiplus::Color cr_thumb(255, 62, 134, 193);
+			Gdiplus::Color cr_thumb_inner(255, 255, 255, 255);
+			Gdiplus::Pen pen_line(cr_line, 2.0f);
+			Gdiplus::Pen pen_thumb(cr_thumb, 1.0f);
+
+			m_is_vertical = (m_rc.Height() > m_rc.Width());
+
+			if (m_is_vertical)
+			{
+				r.DeflateRect(0, gap.cy + thumb_size / 2);
+				interval = r.Height() / (m_upper - m_lower);
+
+				//thumb
+				for (i = 0; i <= m_upper - m_lower; i++)
+				{
+					//각 step의 영역이 미리 계산된적이 없다면
+					if (m_steps[i].r.IsRectEmpty())
+					{
+						m_steps[i].r = CRect(r.left, gap.cy + interval * i, r.right, gap.cy + interval * i + thumb_size);
+						m_steps[i].r.DeflateRect(2, 2);
+					}
+
+					//이미지가 지정되어 있다면
+					if (m_steps[i].m_img.is_valid())
+					{
+						m_steps[i].m_img.draw(g, m_steps[i].r);
+					}
+					else
+					{
+						//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
+						CRect rthumb_small = m_steps[i].r;
+						rthumb_small.DeflateRect(4, 4);
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
+					}
+				}
+
+				//라인
+				pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+				for (i = 1; i <= m_upper - m_lower; i++)
+				{
+					g.DrawLine(&pen_line, Gdiplus::Point(r.CenterPoint().x, m_steps[i - 1].r.bottom + 4),
+						Gdiplus::Point(r.CenterPoint().x, m_steps[i].r.top - 4));
+				}
+			}
+			else
+			{
+				r.DeflateRect(gap.cx + thumb_size / 2, 0);
+				interval = r.Width() / (m_upper - m_lower);
+
+				//thumb
+				for (i = 0; i <= m_upper - m_lower; i++)
+				{
+					if (m_steps[i].r.IsRectEmpty())
+					{
+						m_steps[i].r = CRect(gap.cx + interval * i, r.top, gap.cx + interval * i + thumb_size, r.bottom);
+						m_steps[i].r.DeflateRect(2, 2);
+					}
+
+					//이미지가 지정되어 있다면
+					if (m_steps[i].m_img.is_valid())
+					{
+						m_steps[i].m_img.draw(g, m_steps[i].r);
+					}
+					else
+					{
+						//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
+						CRect rthumb_small = m_steps[i].r;
+						rthumb_small.DeflateRect(4, 4);
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
+					}
+				}
+
+				//라인
+				pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+				for (i = 1; i <= m_upper - m_lower; i++)
+				{
+					g.DrawLine(&pen_line, Gdiplus::Point(m_steps[i-1].r.right + 4, r.CenterPoint().y),
+						Gdiplus::Point(m_steps[i].r.left - 4, r.CenterPoint().y));
+				}
+			}
+
+			//for test
+			//DrawRectangle(&dc, m_rc, red);
+		}
 	}
 
 	//경과된 영역(active area) 표시
@@ -283,7 +380,7 @@ void CSliderCtrlEx::OnPaint()
 	}
 	else
 	{
-		if (m_nStyle <= slider_value)
+		if (m_style <= slider_value)
 		{
 			dc.FillSolidRect(m_rc.left, cy - m_nTrackHeight / 2, pos - m_rc.left, m_nTrackHeight, enable_color(m_crActive));
 			
@@ -304,7 +401,7 @@ void CSliderCtrlEx::OnPaint()
 			penLight.DeleteObject();
 			
 		}
-		else if (m_nStyle == slider_progress)
+		else if (m_style == slider_progress)
 		{
 			CRect	rActive(0, m_rc.top + 2, pos, m_rc.bottom - 2);
 			dc.FillSolidRect(rActive, enable_color(m_crActive));
@@ -317,11 +414,11 @@ void CSliderCtrlEx::OnPaint()
 				dc.SetBkMode(TRANSPARENT);
 
 				if (m_nValueStyle == value)
-					str.Format(_T("%ld / %ld"), m_nPos, (m_nMax > 0 ? m_nMax : 0));
-				else if (m_nMax == m_nMin)
+					str.Format(_T("%ld / %ld"), m_pos, (m_upper > 0 ? m_upper : 0));
+				else if (m_upper == m_lower)
 					str = _T("0.0%");
 				else
-					str.Format(_T("%.1f%%"), (double)(m_nPos - m_nMin) / (double)(m_nMax - m_nMin) * 100.0);
+					str.Format(_T("%.1f%%"), (double)(m_pos - m_lower) / (double)(m_upper - m_lower) * 100.0);
 				dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 			}
 
@@ -336,7 +433,7 @@ void CSliderCtrlEx::OnPaint()
 			//dc.SelectObject(pOldBrush);
 			//DrawRectangle(&dc, rActive, (m_crActive), (m_crActive), 1, PS_SOLID, R2_XORPEN);
 		}
-		else if (m_nStyle == slider_track)
+		else if (m_style == slider_track)
 		{
 			CRect r = m_rc;
 			int cy = r.CenterPoint().y;
@@ -356,7 +453,7 @@ void CSliderCtrlEx::OnPaint()
 
 
 	// 손잡이(thumb)를 그린다
-	if (m_nStyle <= slider_value)
+	if (m_style <= slider_value)
 	{
 		if (m_bThumb && !IsWindowEnabled())
 		{
@@ -374,7 +471,7 @@ void CSliderCtrlEx::OnPaint()
 						m_nThumbWidth, m_nThumbHeight,
 						&dcMem, 0, 0, &m_bmThumbMask);
 		}
-		else if (m_nStyle == slider_thumb)
+		else if (m_style == slider_thumb)
 		{
 			CBrush br(enable_color(m_crThumb));
 
@@ -403,7 +500,7 @@ void CSliderCtrlEx::OnPaint()
 			dc.SelectObject(pOldBrush);
 			br.DeleteObject();
 		}
-		else if (m_nStyle == slider_value)
+		else if (m_style == slider_value)
 		{
 			CBrush br(enable_color(m_crThumb));
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
@@ -422,11 +519,11 @@ void CSliderCtrlEx::OnPaint()
 				dc.SetBkMode(TRANSPARENT);
 
 				if (m_nValueStyle == value)
-					str.Format(_T("%ld / %ld"), m_nPos, (m_nMax > 0 ? m_nMax : 0));
-				else if (m_nMax == m_nMin)
+					str.Format(_T("%ld / %ld"), m_pos, (m_upper > 0 ? m_upper : 0));
+				else if (m_upper == m_lower)
 					str = _T("0.0%");
 				else
-					str.Format(_T("%.1f%%"), (double)(m_nPos - m_nMin) / (double)(m_nMax - m_nMin) * 100.0);
+					str.Format(_T("%.1f%%"), (double)(m_pos - m_lower) / (double)(m_upper - m_lower) * 100.0);
 
 				//텍스트를 thumb에 출력하는데 그 너비가 작다면 늘려준다.
 				int		margin = 12;
@@ -451,7 +548,7 @@ void CSliderCtrlEx::OnPaint()
 		}
 	}
 	//트랙의 북마크를 그린다.
-	else if (m_nStyle == slider_track)
+	else if (m_style == slider_track)
 	{
 		if (m_use_bookmark)
 		{
@@ -512,7 +609,7 @@ void CSliderCtrlEx::OnPaint()
 	// Do not call CSliderCtrl::OnPaint() for painting messages
 }
 
-BOOL CSliderCtrlEx::OnEraseBkgnd(CDC* pDC) 
+BOOL CSCSliderCtrl::OnEraseBkgnd(CDC* pDC) 
 {
 	// TODO: Add your message handler code here and/or call default
 	return FALSE;
@@ -520,18 +617,24 @@ BOOL CSliderCtrlEx::OnEraseBkgnd(CDC* pDC)
 	return CSliderCtrl::OnEraseBkgnd(pDC);
 }
 
-void CSliderCtrlEx::SetRange(int nMin, int nMax, BOOL bRedraw)
+void CSCSliderCtrl::SetRange(int lower, int upper, BOOL bRedraw)
 {
-	m_nMin = nMin;
-	m_nMax = nMax;
+	m_lower = lower;
+	m_upper = upper;
 
-	if (m_nMax < m_nMin)
-		m_nMax = m_nMin;
+	if (m_upper < m_lower)
+		m_upper = m_lower;
 
-	CSliderCtrl::SetRange(nMin, nMax, bRedraw);
+	if (m_style == slider_step)
+	{
+		m_steps.clear();
+		m_steps.resize(upper - lower + 1);
+	}
+
+	CSliderCtrl::SetRange(lower, upper, bRedraw);
 }
 
-BOOL CSliderCtrlEx::SetBitmapChannel(UINT nChannelID, UINT nActiveID)
+BOOL CSCSliderCtrl::SetBitmapChannel(UINT nChannelID, UINT nActiveID)
 {
 	// 비트맵의 ID가 정해지지 않았을 때
 	if(!nChannelID)
@@ -588,7 +691,7 @@ BOOL CSliderCtrlEx::SetBitmapChannel(UINT nChannelID, UINT nActiveID)
 	return TRUE;
 }
 
-BOOL CSliderCtrlEx::SetBitmapThumb(UINT nThumbID, UINT nActiveID, BOOL bTrans, COLORREF crTrans)
+BOOL CSCSliderCtrl::SetBitmapThumb(UINT nThumbID, UINT nActiveID, BOOL bTrans, COLORREF crTrans)
 {
 	// 손잡이의 ID값이 NULL일때
 	if(!nThumbID)
@@ -678,84 +781,84 @@ BOOL CSliderCtrlEx::SetBitmapThumb(UINT nThumbID, UINT nActiveID, BOOL bTrans, C
 
 // 컨트롤의 위치값에 해당하는 손잡이 중심의 좌표값을 구한다
 //
-int CSliderCtrlEx::Pos2Pixel(int nPos)
+int CSCSliderCtrl::Pos2Pixel(int nPos)
 {
-	if (m_nMax == m_nMin)
-		return (m_nStyle <= slider_value ? m_nThumbWidth / 2 : 0);
+	if (m_upper == m_lower)
+		return (m_style <= slider_value ? m_nThumbWidth / 2 : 0);
 
-	if (m_bVertical)
+	if (m_is_vertical)
 	{
 		return
 			m_nMarginTop + m_nThumbHeight/2 +
 			(int)(
 			(double)(m_rc.Height() - m_nMarginTop - m_nMarginBottom - m_nThumbHeight) *
-			((double)(nPos - m_nMin) / (double)(m_nMax - m_nMin))
+			((double)(nPos - m_lower) / (double)(m_upper - m_lower))
 			);
 
 	}
 	else
 	{
 		return (int)(
-			(double)(m_rc.Width() - m_nMarginLeft - m_nMarginRight - (m_nStyle <= slider_value ? m_nThumbWidth : 0)) *
-			((double)(nPos - m_nMin) / (double)(m_nMax - m_nMin))
-			) + m_nMarginLeft + (m_nStyle <= slider_value ? m_nThumbWidth/2 : 0);
+			(double)(m_rc.Width() - m_nMarginLeft - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth : 0)) *
+			((double)(nPos - m_lower) / (double)(m_upper - m_lower))
+			) + m_nMarginLeft + (m_style <= slider_value ? m_nThumbWidth/2 : 0);
 	}
 }
 
 // 마우스의 좌표값에 해당하는 컨트롤의 위치값을 구한다
 //
-double CSliderCtrlEx::Pixel2Pos(int nPixel)
+double CSCSliderCtrl::Pixel2Pos(int nPixel)
 {
-	if(m_bVertical)
+	if(m_is_vertical)
 	{
 		return (
-			m_nMin +
+			m_lower +
 			(double)(nPixel - m_nMarginTop - (double)m_nThumbHeight/2.0) /
-			(double)(m_rc.Height() - m_nMarginBottom - m_nMarginTop - (m_nStyle <= slider_value ? m_nThumbHeight : 0)) *
-			(double)(m_nMax - m_nMin) + 0.5
+			(double)(m_rc.Height() - m_nMarginBottom - m_nMarginTop - (m_style <= slider_value ? m_nThumbHeight : 0)) *
+			(double)(m_upper - m_lower) + 0.5
 			);
 
 	}
 	else
 	{
 		return (
-			m_nMin +
-			(double)(nPixel - m_nMarginLeft - (m_nStyle <= slider_value ? (double)m_nThumbWidth/2.0 : 0)) /
-			(double)(m_rc.Width() - m_nMarginLeft - m_nMarginRight - (m_nStyle <= slider_value ? m_nThumbWidth : 0)) *
-			(double)(m_nMax - m_nMin + 1) + 0.0
+			m_lower +
+			(double)(nPixel - m_nMarginLeft - (m_style <= slider_value ? (double)m_nThumbWidth/2.0 : 0)) /
+			(double)(m_rc.Width() - m_nMarginLeft - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth : 0)) *
+			(double)(m_upper - m_lower + 1) + 0.0
 			);
 		//TRACE("d = %f\n", d);
 		//return (int)d;
 	}
 }
 
-int	CSliderCtrlEx::GetPos()
+int	CSCSliderCtrl::GetPos()
 {
-	return m_nPos;
+	return m_pos;
 }
 
-void CSliderCtrlEx::SetPos(int nPos)
+void CSCSliderCtrl::SetPos(int nPos)
 {
-	m_nPos = nPos;
+	m_pos = nPos;
 
-	if (m_nPos < m_nMin)
-		m_nPos = m_nMin;
-	else if (m_nPos > m_nMax)
-		m_nPos = m_nMax;
+	if (m_pos < m_lower)
+		m_pos = m_lower;
+	else if (m_pos > m_upper)
+		m_pos = m_upper;
 
 	Invalidate();
 }
 
-void CSliderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point) 
+void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point) 
 {
 	// TODO: Add your message handler code here and/or call default
-	if (m_bEnableSlide == false)
+	if (m_enable_slide == false)
 		return;
 
 	if (m_use_bookmark && (m_cur_bookmark >= 0))
 	{
 		SetPos(m_bookmark[m_cur_bookmark].pos);
-		::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 		return;
 	}
 
@@ -767,10 +870,10 @@ void CSliderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 	// 손잡이를 마우스로 클릭했을 때
 	// 마우스의 좌표와 손잡이 중심의 좌표를 비교하여
 	// 둘 사이의 거리를 구해둔다
-	if(m_bVertical)
+	if(m_is_vertical)
 	{
-		if(abs(point.y - Pos2Pixel(m_nPos)) <= (m_nStyle <= slider_value ? m_nThumbHeight/2.0 : 0))
-			m_nMouseOffset = point.y - Pos2Pixel(m_nPos);
+		if(abs(point.y - Pos2Pixel(m_pos)) <= (m_style <= slider_value ? m_nThumbHeight/2.0 : 0))
+			m_nMouseOffset = point.y - Pos2Pixel(m_pos);
 		else
 			m_nMouseOffset = 0;
 
@@ -778,7 +881,7 @@ void CSliderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 	else
 	{
 		/*
-		if (m_nStyle == slider_track && !m_enable_bottom_slide)
+		if (m_style == slider_track && !m_enable_bottom_slide)
 		{
 			if (point.y > m_rc.CenterPoint().y + 2)
 			{
@@ -790,25 +893,25 @@ void CSliderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 			}
 		}
 		*/
-		if(abs(point.x - Pos2Pixel(m_nPos)) <= (m_nStyle <= slider_value ? m_nThumbWidth/2.0 : 0))
-			m_nMouseOffset = point.x - Pos2Pixel(m_nPos);
+		if(abs(point.x - Pos2Pixel(m_pos)) <= (m_style <= slider_value ? m_nThumbWidth/2.0 : 0))
+			m_nMouseOffset = point.x - Pos2Pixel(m_pos);
 		else
 			m_nMouseOffset = 0;
 	}
 
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
-		//CSliderCtrlExMsg msg(CSliderCtrlExMsg::msg_thumb_grab, GetDlgCtrlID(), m_nPos);
-		::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_grab, GetDlgCtrlID(), m_nPos), 0);
+		//CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos);
+		::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_post)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_grab, GetDlgCtrlID(), m_nPos), 0);
+		::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_callback)
 	{
 		//if (m_pCallback_func != NULL)
-			//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SLIDERCTRLEX_THUMB_GRAB, m_nPos);
+			//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_THUMB_GRAB, m_pos);
 	}
 
 	OnMouseMove(nFlags, point);
@@ -816,10 +919,10 @@ void CSliderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 	CSliderCtrl::OnLButtonDown(nFlags, point);
 }
 
-void CSliderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point) 
+void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point) 
 {
 	// TODO: Add your message handler code here and/or call default
-	if (m_bEnableSlide == false)
+	if (m_enable_slide == false)
 		return;
 
 	if(!IsWindowEnabled() || !m_bLButtonDown)
@@ -830,23 +933,23 @@ void CSliderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_release, GetDlgCtrlID(), m_nPos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_post)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_release, GetDlgCtrlID(), m_nPos), 0);
+		::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_callback)
 	{
 		//if (m_pCallback_func != NULL)
-			//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SLIDERCTRLEX_THUMB_RELEASE, m_nPos);
+			//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_THUMB_RELEASE, m_pos);
 	}
 
 	
 	CSliderCtrl::OnLButtonUp(nFlags, point);
 }
 
-void CSliderCtrlEx::OnMouseMove(UINT nFlags, CPoint point) 
+void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point) 
 {
 	// TODO: Add your message handler code here and/or call default
 	CString str;
@@ -880,8 +983,8 @@ void CSliderCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		else
 		{
 			str.Format(_T("%s (%s)"), GetTimeStringFromMilliSeconds(m_bookmark[m_cur_bookmark].pos, true, false), m_bookmark[m_cur_bookmark].name);
-			if (m_ToolTip.m_hWnd)
-				m_ToolTip.UpdateTipText(str, this);
+			if (m_tooltip.m_hWnd)
+				m_tooltip.UpdateTipText(str, this);
 		}
 		
 		Invalidate();
@@ -896,10 +999,10 @@ void CSliderCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		else if (m_tooltip_format == tooltip_time_ms)
 			str.Format(_T("%s"), GetTimeStringFromMilliSeconds(pos));
 		else//if (m_tooltip_format == tooltip_value)
-			str.Format(_T("%d / %d"), pos, m_nMax);
+			str.Format(_T("%d / %d"), pos, m_upper);
 
-		if (m_ToolTip.m_hWnd)
-			m_ToolTip.UpdateTipText(str, this);
+		if (m_tooltip.m_hWnd)
+			m_tooltip.UpdateTipText(str, this);
 	}
 
 
@@ -909,29 +1012,29 @@ void CSliderCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 	int nPixel;
 
 	// 범위를 벗어났는지 검사한다
-	if(m_bVertical)
+	if(m_is_vertical)
 	{
 		nPixel = point.y - m_nMouseOffset;
 
-		if(nPixel > m_rc.Height() - m_nMarginBottom - (m_nStyle <= slider_value ? m_nThumbHeight/2 : 0))
-			nPixel = m_rc.Height() - m_nMarginBottom - (m_nStyle<= slider_value ? m_nThumbHeight/2 : 0);
+		if(nPixel > m_rc.Height() - m_nMarginBottom - (m_style <= slider_value ? m_nThumbHeight/2 : 0))
+			nPixel = m_rc.Height() - m_nMarginBottom - (m_style<= slider_value ? m_nThumbHeight/2 : 0);
 
-		if(nPixel < m_nMarginTop + (m_nStyle <= slider_value ? m_nThumbHeight/2 : 0))
-			nPixel = m_nMarginTop + (m_nStyle <= slider_value ? m_nThumbHeight/2 : 0);
+		if(nPixel < m_nMarginTop + (m_style <= slider_value ? m_nThumbHeight/2 : 0))
+			nPixel = m_nMarginTop + (m_style <= slider_value ? m_nThumbHeight/2 : 0);
 	}
 	else
 	{
 		nPixel = point.x - m_nMouseOffset;
 
-		if(nPixel < m_nMarginLeft + (m_nStyle <= slider_value ? m_nThumbWidth/2 : 0))
-			nPixel = m_nMarginLeft + (m_nStyle <= slider_value ? m_nThumbWidth/2 : 0);
+		if(nPixel < m_nMarginLeft + (m_style <= slider_value ? m_nThumbWidth/2 : 0))
+			nPixel = m_nMarginLeft + (m_style <= slider_value ? m_nThumbWidth/2 : 0);
 
-		if(nPixel > m_rc.Width() - m_nMarginRight - (m_nStyle <= slider_value ? m_nThumbWidth/2 : 0))
-			nPixel = m_rc.Width() - m_nMarginRight - (m_nStyle <= slider_value ? m_nThumbWidth/2 : 0);
+		if(nPixel > m_rc.Width() - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth/2 : 0))
+			nPixel = m_rc.Width() - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth/2 : 0);
 	}
 
 	// 변한 내용을 적용한다
-	if(Pos2Pixel(m_nPos) != nPixel)
+	if(Pos2Pixel(m_pos) != nPixel)
 	{
 		SetPos(Pixel2Pos(nPixel));
 
@@ -941,12 +1044,12 @@ void CSliderCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		else if (m_nEventMsgStyle == msg_style_post)
 		{
-			::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+			::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 		}
 		else if (m_nEventMsgStyle == msg_style_callback)
 		{
 			//if (m_pCallback_func != NULL)
-				//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SLIDERCTRLEX_MOVED, m_nPos);
+				//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_MOVED, m_pos);
 		}
 	}
 
@@ -961,7 +1064,7 @@ void CSliderCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 // clrpTransColor의 기본값을 NULL(black)에서
 // 0xFF000000(RGB 값이 아닌 값)으로 바꿨습니다.
 //
-void CSliderCtrlEx::PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
+void CSCSliderCtrl::PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
 								 COLORREF clrpTransColor)
 {
 	BITMAP bm;
@@ -1029,7 +1132,7 @@ void CSliderCtrlEx::PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
 // "Drawing Transparent Bitmap with ease with on the fly masks in MFC"
 // By Raja Segar
 //
-void CSliderCtrlEx::DrawTransparentBitmap(
+void CSCSliderCtrl::DrawTransparentBitmap(
 	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
 	CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask)
 {
@@ -1057,7 +1160,7 @@ void CSliderCtrlEx::DrawTransparentBitmap(
 	hdcMem.DeleteDC();
 }
 
-void CSliderCtrlEx::DrawFocusRect(BOOL bDraw, BOOL bRedraw)
+void CSCSliderCtrl::DrawFocusRect(BOOL bDraw, BOOL bRedraw)
 {
 	m_bDrawFocusRect = bDraw;
 
@@ -1065,7 +1168,7 @@ void CSliderCtrlEx::DrawFocusRect(BOOL bDraw, BOOL bRedraw)
 		Invalidate();
 }
 
-void CSliderCtrlEx::OnSetFocus(CWnd* pOldWnd) 
+void CSCSliderCtrl::OnSetFocus(CWnd* pOldWnd) 
 {
 	CSliderCtrl::OnSetFocus(pOldWnd);
 	
@@ -1075,7 +1178,7 @@ void CSliderCtrlEx::OnSetFocus(CWnd* pOldWnd)
 	//TRACE("SetFocus\n");
 }
 
-void CSliderCtrlEx::OnKillFocus(CWnd* pNewWnd) 
+void CSCSliderCtrl::OnKillFocus(CWnd* pNewWnd) 
 {
 	CSliderCtrl::OnKillFocus(pNewWnd);
 	
@@ -1085,25 +1188,25 @@ void CSliderCtrlEx::OnKillFocus(CWnd* pNewWnd)
 	//TRACE("KillFocus\n");
 }
 
-void CSliderCtrlEx::SetBackColor(COLORREF crBack)
+void CSCSliderCtrl::SetBackColor(COLORREF crBack)
 {
 	m_crBack = crBack;
 	Invalidate();
 }
 
-void CSliderCtrlEx::SetActiveColor(COLORREF crActive)
+void CSCSliderCtrl::SetActiveColor(COLORREF crActive)
 {
 	m_crActive = crActive;
 	Invalidate();
 }
 
-void CSliderCtrlEx::SetInActiveColor(COLORREF crInActive)
+void CSCSliderCtrl::SetInActiveColor(COLORREF crInActive)
 {
 	m_crInActive = crInActive;
 	Invalidate();
 }
 
-void CSliderCtrlEx::SetThumbColor(COLORREF crThumb)
+void CSCSliderCtrl::SetThumbColor(COLORREF crThumb)
 {
 	int nMultiple = 32;
 
@@ -1127,10 +1230,10 @@ void CSliderCtrlEx::SetThumbColor(COLORREF crThumb)
 }
 
 
-BOOL CSliderCtrlEx::PreTranslateMessage(MSG* pMsg)
+BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 {
 	if (m_use_tooltip)
-		m_ToolTip.RelayEvent(pMsg);
+		m_tooltip.RelayEvent(pMsg);
 	// TODO: Add your specialized code here and/or call the base class 
 	if (pMsg->wParam == WM_KEYDOWN)
 	{
@@ -1141,49 +1244,49 @@ BOOL CSliderCtrlEx::PreTranslateMessage(MSG* pMsg)
 }
 
 /*
-void CSliderCtrlEx::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+void CSCSliderCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	// TODO: Add your message handler code here and/or call default
-	TRACE(_T("CSliderCtrlEx::OnKeyDown = %d\n"), nChar);
-	if (m_bEnableSlide == false)
+	TRACE(_T("CSCSliderCtrl::OnKeyDown = %d\n"), nChar);
+	if (m_enable_slide == false)
 		return;
 
 	switch (nChar)
 	{
-		case VK_LEFT :	m_nPos = GetPos() - 1;
-						if (m_nPos < m_nMin)
-							m_nPos = m_nMin;
-						SetPos(m_nPos);
+		case VK_LEFT :	m_pos = GetPos() - 1;
+						if (m_pos < m_lower)
+							m_pos = m_lower;
+						SetPos(m_pos);
 						if (m_nEventMsgStyle == msg_style_timer)
 						{
 							SetTimer(timer_post_pos, 1, NULL);
 						}
 						else if (m_nEventMsgStyle == msg_style_post)
 						{
-							::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+							::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 						}
 						else if (m_nEventMsgStyle == msg_style_callback)
 						{
 							//if (m_pCallback_func != NULL)
-								//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlMsg(CSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+								//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL, (WPARAM)&CSliderCtrlMsg(CSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 						}
 						break;
-		case VK_RIGHT :	m_nPos = GetPos() + 1;
-						if (m_nPos > m_nMax)
-							m_nPos = m_nMax;
-						SetPos(m_nPos);
+		case VK_RIGHT :	m_pos = GetPos() + 1;
+						if (m_pos > m_upper)
+							m_pos = m_upper;
+						SetPos(m_pos);
 						if (m_nEventMsgStyle == msg_style_timer)
 						{
 							SetTimer(timer_post_pos, 1, NULL);
 						}
 						else if (m_nEventMsgStyle == msg_style_post)
 						{
-							::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+							::PostMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 						}
 						else if (m_nEventMsgStyle == msg_style_callback)
 						{
 							//if (m_pCallback_func != NULL)
-								//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SLIDERCTRLEX_MOVED, m_nPos);
+								//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_MOVED, m_pos);
 						}
 						break;
 		default :		::PostMessage(GetParent()->GetSafeHwnd(), WM_KEYDOWN, nChar, 0);
@@ -1194,32 +1297,34 @@ void CSliderCtrlEx::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 }
 */
 
-void CSliderCtrlEx::SetStyle(int nStyle)
+void CSCSliderCtrl::SetStyle(int nStyle)
 {
-	m_nStyle = nStyle;
+	m_style = nStyle;
 
-	if (m_nStyle == slider_thumb)
+	if (m_style == slider_thumb)
 		m_nThumbWidth = THUMB_WIDTH * 2;
-	else if (m_nStyle == slider_value)
+	else if (m_style == slider_value)
 		m_nThumbWidth = THUMB_WIDTH * 4;
-	else if (m_nStyle == slider_progress)
-		m_bEnableSlide = false;
+	else if (m_style == slider_progress)
+		m_enable_slide = false;
+	else if (m_style == slider_step)
+		m_enable_slide = false;
 }
 
 
-void CSliderCtrlEx::OnTimer(UINT_PTR nIDEvent)
+void CSCSliderCtrl::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: Add your message handler code here and/or call default
 	if (nIDEvent == timer_post_pos)
 	{
 		KillTimer(timer_post_pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 	}
 
 	CSliderCtrl::OnTimer(nIDEvent);
 }
 
-void CSliderCtrlEx::SetEventMsgStyle(int style)
+void CSCSliderCtrl::SetEventMsgStyle(int style)
 {
 	if (style < msg_style_timer || style > msg_style_callback)
 		return;
@@ -1229,7 +1334,7 @@ void CSliderCtrlEx::SetEventMsgStyle(int style)
 }
 
 
-void CSliderCtrlEx::OnSize(UINT nType, int cx, int cy)
+void CSCSliderCtrl::OnSize(UINT nType, int cx, int cy)
 {
 	CSliderCtrl::OnSize(nType, cx, cy);
 
@@ -1238,7 +1343,7 @@ void CSliderCtrlEx::OnSize(UINT nType, int cx, int cy)
 }
 
 //pos의 위치에 있는 북마크의 인덱스를 리턴한다.
-int CSliderCtrlEx::find_index_bookmark(int pos)
+int CSCSliderCtrl::find_index_bookmark(int pos)
 {
 	int i;
 
@@ -1251,7 +1356,7 @@ int CSliderCtrlEx::find_index_bookmark(int pos)
 	return -1;
 }
 
-void CSliderCtrlEx::bookmark(int mode, int pos, CString name)
+void CSCSliderCtrl::bookmark(int mode, int pos, CString name)
 {
 	if (!m_use_bookmark)
 		return;
@@ -1275,7 +1380,7 @@ void CSliderCtrlEx::bookmark(int mode, int pos, CString name)
 	{
 		if (name.IsEmpty())
 			name.Format(_T("bookmark%02d"), m_bookmark.size());
-		m_bookmark.push_back(CSliderCtrlExBookmark(pos, name));
+		m_bookmark.push_back(CSCSliderCtrlBookmark(pos, name));
 	}
 	else if (mode <= bookmark_delete)
 	{
@@ -1287,12 +1392,12 @@ void CSliderCtrlEx::bookmark(int mode, int pos, CString name)
 		if (index >= 0)
 		{
 			SetPos(m_bookmark[index].pos);
-			::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SLIDERCTRLEX, (WPARAM)&CSliderCtrlExMsg(CSliderCtrlExMsg::msg_thumb_move, GetDlgCtrlID(), m_nPos), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(),	MESSAGE_SCSLIDERCTRL, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 		}
 	}
 
 	std::sort(m_bookmark.begin(), m_bookmark.end(),
-			[](CSliderCtrlExBookmark a, CSliderCtrlExBookmark b)
+			[](CSCSliderCtrlBookmark a, CSCSliderCtrlBookmark b)
 	{
 		return (a.pos < b.pos);
 	}
@@ -1300,7 +1405,7 @@ void CSliderCtrlEx::bookmark(int mode, int pos, CString name)
 	Invalidate();
 }
 
-int CSliderCtrlEx::get_near_bookmark(int pos, bool forward)
+int CSCSliderCtrl::get_near_bookmark(int pos, bool forward)
 {
 	int i;
 	int index = -1;
@@ -1343,34 +1448,34 @@ int CSliderCtrlEx::get_near_bookmark(int pos, bool forward)
 	return index;
 }
 
-void CSliderCtrlEx::set_bookmark_color(COLORREF cr)
+void CSCSliderCtrl::set_bookmark_color(COLORREF cr)
 {
 	m_crBookmark = cr;
 	Invalidate();
 }
 
-void CSliderCtrlEx::set_bookmark_current_color(COLORREF cr)
+void CSCSliderCtrl::set_bookmark_current_color(COLORREF cr)
 {
 	m_crBookmarkCurrent = cr;
 	Invalidate();
 }
 
-void CSliderCtrlEx::PreSubclassWindow()
+void CSCSliderCtrl::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
-	m_ToolTip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
-	m_ToolTip.SetDelayTime(TTDT_AUTOPOP, -1);
-	m_ToolTip.SetDelayTime(TTDT_INITIAL, 0);
-	m_ToolTip.SetDelayTime(TTDT_RESHOW, 0);
-	m_ToolTip.SetMaxTipWidth(400); 
-	m_ToolTip.AddTool(this, _T(""));
-	m_ToolTip.Activate(TRUE);
+	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
+	m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
+	m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
+	m_tooltip.SetMaxTipWidth(400); 
+	m_tooltip.AddTool(this, _T(""));
+	m_tooltip.Activate(TRUE);
 
 	CSliderCtrl::PreSubclassWindow();
 }
 
 
-void CSliderCtrlEx::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+void CSCSliderCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CSliderCtrl::OnWindowPosChanged(lpwndpos);
 
@@ -1378,14 +1483,14 @@ void CSliderCtrlEx::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	Invalidate();
 }
 
-COLORREF CSliderCtrlEx::enable_color(COLORREF cr, int offset)
+COLORREF CSCSliderCtrl::enable_color(COLORREF cr, int offset)
 {
 	if (IsWindowEnabled())
 		return cr;
 	return get_color(gray_color(cr), offset);
 }
 
-void CSliderCtrlEx::set_repeat_range(int start, int end)
+void CSCSliderCtrl::set_repeat_range(int start, int end)
 {
 	set_repeat_start(start);
 	set_repeat_end(end);
@@ -1393,11 +1498,11 @@ void CSliderCtrlEx::set_repeat_range(int start, int end)
 
 //pos가 0이상이면 그 트랙 위치를 start 또는 end로 설정하고
 //-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
-void CSliderCtrlEx::set_repeat_start(int pos)
+void CSCSliderCtrl::set_repeat_start(int pos)
 {
 	if (pos == -2)
 	{
-		m_repeat_start = m_nPos;
+		m_repeat_start = m_pos;
 	}
 	else if (pos == -1)
 	{
@@ -1412,18 +1517,18 @@ void CSliderCtrlEx::set_repeat_start(int pos)
 	if ((m_repeat_start >= 0) &&
 		(m_repeat_end >= 0) &&
 		(m_repeat_start >= m_repeat_end))
-		m_repeat_end = m_nMax;
+		m_repeat_end = m_upper;
 
 	Invalidate();
 }
 
 //pos가 0이상이면 그 트랙 위치를 start 또는 end로 설정하고
 //-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
-void CSliderCtrlEx::set_repeat_end(int pos)
+void CSCSliderCtrl::set_repeat_end(int pos)
 {
 	if (pos == -2)
 	{
-		m_repeat_end = m_nPos;
+		m_repeat_end = m_pos;
 	}
 	else if (pos == -1)
 	{
@@ -1438,9 +1543,29 @@ void CSliderCtrlEx::set_repeat_end(int pos)
 	if ((m_repeat_start >= 0) &&
 		(m_repeat_end >= 0) &&
 		(m_repeat_end <= m_repeat_start))
-		m_repeat_start = m_nMin;
+		m_repeat_start = m_lower;
 
 	Invalidate();
 }
 
+//pos 위치에 resource id 이미지를 표시한다.
+void CSCSliderCtrl::set_step_image(int pos, int id)
+{
+	if (pos == -1)
+	{
+		for (int i = 0; i < m_steps.size(); i++)
+			m_steps[i].m_img.load(id);
 
+		Invalidate();
+		return;
+	}
+
+	if (pos >= m_steps.size())
+	{
+		TRACE(_T("invalid index = %d\n"), pos);
+		return;
+	}
+
+	m_steps[pos].m_img.load(id);
+	Invalidate();
+}

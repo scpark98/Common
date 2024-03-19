@@ -2084,12 +2084,28 @@ void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool s
 	start_animation();
 }
 
+void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
+{
+	int w = (r.Width() > 0 ? r.Width() : width);
+	int h = (r.Height() > 0 ? r.Height() : height);
+
+	CRect fit = get_ratio_max_rect(CRect(r.left, r.top, r.left + w, r.top + h), width, height);
+	set_animation(hWnd, fit.left, fit.top, fit.Width(), fit.Height(), start);
+}
+
+
 void CGdiplusBitmap::move(int x, int y, int w, int h)
 {
 	m_aniX = x;
 	m_aniY = y;
 	m_aniWidth = (w == 0 ? width : w);
 	m_aniHeight = (h == 0 ? height : h);
+}
+
+void CGdiplusBitmap::move(CRect r)
+{
+	CRect fit = get_ratio_max_rect(CRect(r.left, r.top, r.left + r.Width(), r.top + r.Height()), width, height);
+	move(fit.left, fit.top, fit.Width(), fit.Height());
 }
 
 void CGdiplusBitmap::start_animation()
@@ -2119,12 +2135,23 @@ void CGdiplusBitmap::start_animation()
 	t.detach();
 }
 
-void CGdiplusBitmap::pause_animation()
+//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
+void CGdiplusBitmap::pause_animation(int pos)
 {
-	if (m_frame_count < 2)
+	if (m_frame_count < 2 || !m_run_thread_animation)
 		return;
 
-	m_paused = !m_paused;
+	if (pos >= m_frame_count)
+		pos = 0;
+
+	if (pos < 0)
+	{
+		m_paused = !m_paused;
+	}
+	else
+	{
+		goto_frame(pos, true);
+	}
 }
 
 void CGdiplusBitmap::stop_animation()
@@ -2142,6 +2169,28 @@ void CGdiplusBitmap::stop_animation()
 	::InvalidateRect(m_displayHwnd, &r, TRUE);
 }
 
+void CGdiplusBitmap::goto_frame(int pos, bool pause)
+{
+	if (m_frame_count < 2)
+		return;
+
+	if (pos >= m_frame_count)
+		m_frame_count = 0;
+
+	m_frame_index = pos;
+	m_paused = pause;
+
+	GUID   pageGuid = FrameDimensionTime;
+	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+}
+
+//지정 % 위치의 프레임으로 이동
+void CGdiplusBitmap::goto_frame_percent(int pos, bool pause)
+{
+	double dpos = ((double)pos / (double)m_frame_count) * 100.0;
+	goto_frame((int)dpos, pause);
+}
+
 void CGdiplusBitmap::thread_gif_animation()
 {
 	if (m_frame_count < 2)
@@ -2149,24 +2198,7 @@ void CGdiplusBitmap::thread_gif_animation()
 
 	HDC hDC = GetDC(m_displayHwnd);
 	CDC* pDC = CDC::FromHandle(hDC);
-	CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
 
-	//CRect Rect = r;
-	//CWnd* pParent = CWnd::FromHandle(m_displayHwnd);
-	//ASSERT(pParent);
-	//pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
-	////copy what's on the parents at this point
-	//CDC* pParentDC = pParent->GetDC();
-	//CDC MemDC;
-	//CBitmap bmp;
-	//MemDC.CreateCompatibleDC(pParentDC);
-	//bmp.CreateCompatibleBitmap(pParentDC, Rect.Width(), Rect.Height());
-	//CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
-	//MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pParentDC, Rect.left, Rect.top, SRCCOPY);
-	//pParentDC->BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
-	//MemDC.SelectObject(pOldBmp);
-	//pParent->ReleaseDC(pParentDC);
-	//MemDC.DeleteDC();
 
 	while (m_run_thread_animation)
 	{
@@ -2174,18 +2206,38 @@ void CGdiplusBitmap::thread_gif_animation()
 
 		if (hDC)
 		{
+			CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
 			CMemoryDC dc(pDC, &r);
-			Graphics g(dc.m_hDC, r);
+			Graphics g(dc.m_hDC);
 
+			//CGdiButton과 같이 배경이 투명하게 표시하려 했으나 뭔가 다르다.
+			/*
+			CRect Rect = r;
+			CWnd* pParent = CWnd::FromHandle(m_displayHwnd);
+			ASSERT(pParent);
+			pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
+			//copy what's on the parents at this point
+			CDC* pParentDC = pParent->GetDC();
+			CDC MemDC;
+			CBitmap bmp;
+			MemDC.CreateCompatibleDC(pParentDC);
+			bmp.CreateCompatibleBitmap(pParentDC, Rect.Width(), Rect.Height());
+			CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+			MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pParentDC, Rect.left, Rect.top, SRCCOPY);
+			pParentDC->BitBlt(m_aniX, m_aniY, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+			MemDC.SelectObject(pOldBmp);
+			pParent->ReleaseDC(pParentDC);
+			MemDC.DeleteDC();
+			*/
 			//Graphics g(hDC, r);
 			//배경색을 투명하게 한다 해도 이미지의 투명 영역이
 			//parent에서도 투명하게 표시되진 않는다.
 			//parent의 영역을 그려준 후 이미지를 그려줘야 한다.
-			if (!is_equal(m_crBack, Gdiplus::Color(0, 0, 0, 0), 4))
-			{
-				Gdiplus::SolidBrush brush_tr(m_crBack);
-				g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
-			}
+			//if (!is_equal(m_crBack, Gdiplus::Color(0, 0, 0, 0), 4))
+			//{
+			//	Gdiplus::SolidBrush brush_tr(m_crBack);
+			//	g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+			//}
 
 			g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
 			::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);

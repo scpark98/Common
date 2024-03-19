@@ -41,6 +41,8 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 #include "../Common/colors.h"
 
+#include <WinInet.h>
+
 #define _std_cpp11 201103L
 #define _std_cpp14 201402L
 #define _std_cpp17 201703L
@@ -276,6 +278,19 @@ struct timezone
   int  tz_dsttime;     /* type of dst correction */ 
 }; 
 
+/*
+* 	서버정보가 full_url이나 ip, port로 나눠져있어도 그에 맞는 생성자함수를 호출하여 채움.
+	CRequestUrlParams params(m_server_ip, m_server_port, _T(""), _T("GET"));
+
+	//만약 sub_url이 필요할 경우 아래와 같이 채워주고
+	params.sub_url.Format(_T("/lmm/api/v1.0/temp_envcheck/config-value-return?input_type=flag_windows_auto_update&mgrid=%s"), m_login_id);
+
+	//실제 request를 호출한다. thread방식이 아니면 바로 결과가 params에 채워져서 리턴된다.
+	request_url(&params);
+	...
+	if (params.status == HTTP_STATUS_OK)
+	...
+*/
 class CRequestUrlParams
 {
 public:
@@ -319,11 +334,13 @@ public:
 	int			port = 0;
 	CString		sub_url;			//domain을 제외한 나머지 주소
 	CString		method = _T("GET");
+	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
 	bool		is_https = true;
 	CString		body;				//post data(json format)
 	std::vector<CString> headers;	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야 한다.
 	CString		full_url;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
 	CString		result;
+	long		elapsed = 0;		//소요시간. ms단위.
 
 	//파일 다운로드 관련
 	CString		local_file_path;	//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
@@ -423,10 +440,10 @@ struct	NETWORK_INFO
 //프로세스 관련
 	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
-	CString		GetExeDirectory(bool includeSlash = false);
-	CString		GetExeRootDirectory();
-	CString		GetExeFilename(bool bFullPath = FALSE);
-	CString		GetExeFileTitle();
+	CString		get_exe_directory(bool includeSlash = false);
+	CString		get_exe_root_directory();
+	CString		get_exe_filename(bool fullpath = false);
+	CString		get_exe_file_title();
 	CString		GetCurrentDirectory();
 	ULONG		GetPID(CString processname);
 	ULONG		ProcIDFromWnd(HWND hwnd);
@@ -446,8 +463,11 @@ struct	NETWORK_INFO
 
 	HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 	bool		IsDuplicatedRun();
-	//command 명령 실행 후 결과를 문자열로 리턴.
-	CString		run_process(CString exePath, bool wait_process_exit);
+	//cmd 명령 실행 후 결과를 문자열로 리턴.
+	//wait_until_process_exit : 실행 프로세스가 정상 종료될때까지 기다린다.
+	//return_after_first_read : wait_until_process_exit를 false로 해도 장시간 끝나지 않는 경우가 있어(ex. telnet)
+	//우선 이 값이 true이면 맨 처음 read후에 바로 종료시킨다.
+	CString		run_process(CString cmd, bool wait_until_process_exit, bool return_after_first_read = false);
 	std::string	run_process(const char* cmd);
 
 	//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
@@ -835,7 +855,8 @@ struct	NETWORK_INFO
 	bool		DownloadFile(LPCTSTR pUrl, CString strFileName, bool bOverwrite = TRUE, HWND hWnd = NULL);
 	CString		DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd = NULL);
 	bool		CheckFileIsURL(CString sURL);
-	bool		is_valid_url(CString url);
+	//check_prefix가 true이면 http, https까지 체크한다. 뭔가 취약점이 있는듯하여 우선 사용금지.(https://mathiasbynens.be/demo/url-regex)
+	bool		is_valid_url(CString url, bool check_prefix);
 	void		GetURLFileInfo(CString sURL, bool &bInURL, bool &bFileType);
 	bool		ReadURLFile(LPCTSTR pUrl, CString &strBuffer);
 	void		ReadURLFileString(CString sURL, CString &sString);
@@ -1052,7 +1073,11 @@ struct	NETWORK_INFO
 	double		GetCpuUsage(const char* process);
 
 	//메모리, memory
+	//현재 가용 메모리를 리턴한다. (total_memory : 전체 메모리 용량)
+	uint64_t	get_available_memory(uint64_t *total_memory = NULL);
+
 #ifndef _USING_V110_SDK71_
+	//현재 프로세스의 메모리 사용량을 구한다.
 	SIZE_T		GetCurrentMemUsage();
 #endif
 	INT			IsAvailableMemory(LPVOID pMemoryAddr);

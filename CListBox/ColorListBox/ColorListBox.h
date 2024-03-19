@@ -184,6 +184,10 @@ public:
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
+	//선택 불가 리스트로 동작. disable로 한 후 색상등은 지정된대로 표시한다.
+	//이렇게 해야 키보드, 마우스 이벤트들을 쉽게 차단할 수 있다.
+	void		set_as_static(bool as_static = true) { EnableWindow(FALSE); m_as_static = as_static; }
+
 	//편집 관련
 	bool		get_use_edit() { return m_use_edit; }
 	void		set_use_edit(bool use = true, bool readonly = false) { m_use_edit = use; m_edit_readonly = readonly; }
@@ -225,6 +229,7 @@ protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;
 
+	bool		m_as_static = false;		//true일 경우 키보드, 마우스에 의한 선택 불가
 	bool		m_use_over = false;			//hover hilighted
 	int			m_over_item = -1;
 	bool		m_as_popup = false;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
@@ -319,6 +324,8 @@ protected:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 };
 
 /////////////////////////////////////////////////////////////////////////////

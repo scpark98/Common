@@ -18,7 +18,7 @@ SCLog::~SCLog()
 {
 	try
 	{
-		Release();
+		release();
 	}
 	catch (...)
 	{
@@ -26,13 +26,13 @@ SCLog::~SCLog()
 	}
 }
 
-BOOL SCLog::Init(CString logFolder, CString filetitle, int showLogLevel)
+bool SCLog::init(CString logFolder, CString filetitle, int showLogLevel)
 {
 	try
 	{
-		if (!Release())
+		if (!release())
 		{
-			return FALSE;
+			return false;
 		}
 
 		TCHAR	tExeFullPath[1024];
@@ -93,19 +93,19 @@ BOOL SCLog::Init(CString logFolder, CString filetitle, int showLogLevel)
 		if (m_fp == NULL)
 		{
 			//AfxMessageBox(m_fullpath + _T("\nfopen failed. m_fp is null"));
-			return FALSE;
+			return false;
 		}
 
-		return TRUE;
+		return true;
 	}
 	catch (...)
 	{
-		return FALSE;
+		return false;
 	}
 }
 
 
-BOOL SCLog::Release()
+bool SCLog::release()
 {
 	try
 	{
@@ -114,15 +114,15 @@ BOOL SCLog::Release()
 			fclose(m_fp);
 			m_fp = NULL;
 		}
-		return TRUE;
+		return true;
 	}
 	catch (...)
 	{
-		return FALSE;
+		return false;
 	}
 }
 
-CString SCLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
+CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 {
 	CString result = CString();
 
@@ -132,7 +132,7 @@ CString SCLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 
 		if (m_fp == NULL)
 		{
-			if (!Init(m_folder))
+			if (!init(m_folder))
 			{
 				theCSLog.Unlock();
 				return result;
@@ -197,7 +197,18 @@ CString SCLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		SYSTEMTIME t = { 0 };
 		GetLocalTime(&t);
 
-		CString funcName(func);
+		CString func_name(func);
+		CString line_str;
+
+		line_str.Format(_T("%d"), line);
+
+		//함수명과 라인번호를 감춰야 할 경우
+		//그 값들은 감추되 차후 파싱을 위해 대괄호는 출력한다.
+		if (!m_show_function_name)
+			func_name.Empty();
+
+		if (!m_show_line_number)
+			line_str.Empty();
 
 		if (m_fp)
 		{
@@ -210,21 +221,21 @@ CString SCLog::Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 				for (i = 0; i < linefeed_count; i++)
 					_ftprintf(m_fp, _T("\n"));
 
-				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%d]%s %s"),
+				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%s]%s %s"),
 					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
-					funcName, line, log_level, log_text);
+					func_name, line_str, log_level, log_text);
 				_ftprintf(m_fp, _T("%s\n"), result);
 				TRACE(_T("%s\n"), result);
 			}
 			fflush(m_fp);
 		}
 
-		Release();
+		release();
 		theCSLog.Unlock();
 	}
 	catch (...)
 	{
-		Release();
+		release();
 		theCSLog.Unlock();
 	}
 

@@ -17,6 +17,9 @@
 	//만약 로그파일의 위치를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
 	gLog.Init(_T("../../custom log folder/folder1/folder2"));
 
+	//어떤 프로젝트의 경우에는 함수명이 노출되서는 안되는 경우도 있다. 함수명과 라인번호 표시 유무를 옵션처리.
+
+
 	//위치를 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
 	logWrite(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
 
@@ -33,13 +36,13 @@
 #define __function__ __FUNCTION__
 #endif
 
-#define logWrite(fmt, ...)	pLog->Write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteI(fmt, ...)	pLog->Write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteW(fmt, ...)	pLog->Write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteE(fmt, ...)	pLog->Write(SCLOG_LEVEL_ERROR, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteC(fmt, ...)	pLog->Write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteS(fmt, ...)	pLog->Write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteD(fmt, ...)	pLog->Write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWrite(fmt, ...)	pLog->write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteI(fmt, ...)	pLog->write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteW(fmt, ...)	pLog->write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteE(fmt, ...)	pLog->write(SCLOG_LEVEL_ERROR, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteC(fmt, ...)	pLog->write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteS(fmt, ...)	pLog->write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#define logWriteD(fmt, ...)	pLog->write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__)
 
 enum SCLOG_LEVEL
 {
@@ -65,18 +68,28 @@ public:
 	//예)특정 폴더 지정 : "d:\\test\\Log"
 	//예)상대 경로 지정 : "..\\..\\Log" (실행파일이 있는 상위의 상위 폴더에 Log라는 폴더를 생성하여 로그파일 저장)
 	//gLog.Init(_T("../../custom log folder"));와 같이 호출
-	BOOL Init(CString logFolder = _T(""), CString filetitle = _T(""), int showLogLevel = SCLOG_LEVEL_RELEASE);
-	CString Write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
-	BOOL Release();
-	CString get_log_full_path() { return m_fullpath; }
-	bool	recursive_make_full_directory(LPCTSTR sFolder);
+	bool		init(CString logFolder = _T(""), CString filetitle = _T(""), int showLogLevel = SCLOG_LEVEL_RELEASE);
+
+	//함수명 표시 유무. default show
+	void		show_function_name(bool show) { m_show_function_name = show; }
+
+	//라인번호 표시 유무. default show
+	void		show_line_number(bool show) { m_show_line_number = show; }
+
+	CString		write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
+
+	bool		release();
+	CString		get_log_full_path() { return m_fullpath; }
+	bool		recursive_make_full_directory(LPCTSTR sFolder);
 
 protected:
 	CString m_filetitle;
 	CString m_filename;
 	CString m_folder;
 	CString m_fullpath;
-	int m_showLogLevel;
+	int		m_showLogLevel;
+	bool	m_show_function_name = true;
+	bool	m_show_line_number = true;
 	FILE* m_fp;
 
 };

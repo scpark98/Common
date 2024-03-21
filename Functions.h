@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef _SCPARK_FUNCTIONS_H
-#define _SCPARK_FUNCTIONS_H
+//#ifndef _SCPARK_FUNCTIONS_H
+//#define _SCPARK_FUNCTIONS_H
 
 /*
 MFC의 어떤 클래스를 상속받아 만든 다른 cpp, h파일과는 달리
@@ -1881,4 +1881,4 @@ public:
 		sDigitCode[4] = '\0';
 	}
 };
-#endif
+//#endif

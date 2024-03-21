@@ -2628,7 +2628,7 @@ void request_url(CRequestUrlParams* params)
 	InternetCloseHandle(hInternetRoot);
 
 	params->elapsed = clock() - t0;
-	TRACE(_T("elapsed = %ld\n"), params->elapsed);
+	//TRACE(_T("elapsed = %ld\n"), params->elapsed);
 }
 
 DWORD	GetURLFileSize(LPCTSTR pUrl)
@@ -8534,12 +8534,16 @@ CString char2CString(char* cstr, int length)
 	CString str;
 
 #if defined(UNICODE) || defined(_UNICODE)
-	//length가 -1인 경우, 즉 길이를 특별히 지정하지 않았고
+	//length가 -1인 경우, 즉 길이를 모르거나 특별히 지정하지 않고
 	//cstr이 '\0'문자로 끝나는 온전한 값이라면
 	//unicode에서 str = CString(cstr); 로도 정상 동작한다. 예외가 있는지 확인 필요!
+	if (length < 0)
+	{
+		str = CA2CT(cstr);
+		return str;
+	}
 
 	int len;
-	//BSTR buf;
 	TCHAR* buf;
 
 	if (length < 0)

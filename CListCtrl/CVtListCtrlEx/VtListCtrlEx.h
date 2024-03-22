@@ -264,6 +264,8 @@ public:
 	//CString은 최대 64K까지만 담을 수 있으므로 vector를 이용함.
 	void		get_line_text_list(std::vector<CString> *vt);
 
+	//리스트에 표시할 항목이 없을 경우 표시할 텍스트 설정
+	void		set_text_on_empty(CString text) { m_text_on_empty = text; Invalidate(); };
 
 //선택 관련
 	//start부터 맨 처음 선택된 항목의 인덱스를 리턴한다.
@@ -437,6 +439,8 @@ protected:
 
 //메인 데이터
 	std::deque<CListCtrlData> m_list_db;
+	
+	CString			m_text_on_empty;
 
 //컬럼 관련
 	CHeaderCtrlEx	m_HeaderCtrlEx;

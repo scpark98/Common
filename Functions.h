@@ -469,6 +469,11 @@ struct	NETWORK_INFO
 	//우선 이 값이 true이면 맨 처음 read후에 바로 종료시킨다.
 	CString		run_process(CString cmd, bool wait_until_process_exit, bool return_after_first_read = false);
 	std::string	run_process(const char* cmd);
+	//서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
+	//process_name이 주어지면 좀 더 간단히 제거된다.
+	//정상 제거(또는 서비스가 없을 경우) : true
+	//제거 실패 : false
+	bool		kill_service(CString service_name, CString process_name = _T(""));
 
 	//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
 	bool		CheckProcessUsingPID(unsigned long pid);
@@ -1274,27 +1279,29 @@ void		SetWallPaper(CString sfile);
 
 	//Gdiplus
 	//Gdiplus를 이용한 외곽선 텍스트 출력
-	void		draw_gdip_outline_text(CDC* pDC, int x, int y, int w, int h, CString text, int font_size, int thick,
+	void		draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text, int font_size, int thick,
 								CString font_name = _T("맑은 고딕"),
 								Gdiplus::Color crOutline = Gdiplus::Color::White,
 								Gdiplus::Color crFill = Gdiplus::Color::Black,
-								UINT align = DT_LEFT | DT_TOP);
-	void		draw_gdip_outline_text(CDC* pDC, CRect rTarget, CString text, int font_size, int thick,
+								UINT align = DT_CENTER | DT_VCENTER);
+	void		draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text, int font_size, int thick,
 								CString font_name = _T("맑은 고딕"),
 								Gdiplus::Color crOutline = Gdiplus::Color::White,
 								Gdiplus::Color crFill = Gdiplus::Color::Black,
-								UINT align = DT_LEFT | DT_TOP);
+								UINT align = DT_CENTER | DT_VCENTER);
 
-	void		draw_gdip_shadow_text(CDC* pDC, int x, int y, int w, int h, CString text, int font_size, int depth,
+	void		draw_gdip_shadow_text(Gdiplus::Graphics *g, int x, int y, int w, int h,
+								CString text, int font_size, bool font_bold, int shadow_depth,
 								CString font_name = _T("맑은 고딕"),
 								Gdiplus::Color crText = Gdiplus::Color::Black,
 								Gdiplus::Color crShadow = Gdiplus::Color::LightGray,
-								UINT align = DT_LEFT | DT_TOP);
-	void		draw_gdip_shadow_text(CDC* pDC, CRect rTarget, CString text, int font_size, int depth,
+								UINT align = DT_CENTER | DT_VCENTER);
+	void		draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,
+								CString text, int font_size, bool font_bold, int shadow_depth,
 								CString font_name = _T("맑은 고딕"),
 								Gdiplus::Color crText = Gdiplus::Color::Black,
 								Gdiplus::Color crShadow = Gdiplus::Color::LightGray,
-								UINT align = DT_LEFT | DT_TOP);
+								UINT align = DT_CENTER | DT_VCENTER);
 
 	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 	//이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!

@@ -5283,23 +5283,23 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-void draw_gdip_outline_text(CDC* pDC, int x, int y, int w, int h, CString text,
+void draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
 							int font_size, int thick, CString font_name,
 							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
 {
-	draw_gdip_outline_text(pDC, CRect(x, y, x + w, y + h), text, font_size, thick, font_name, crOutline, crFill, align);
+	draw_gdip_outline_text(g, CRect(x, y, x + w, y + h), text, font_size, thick, font_name, crOutline, crFill, align);
 }
 
-void draw_gdip_outline_text(CDC* pDC, CRect rTarget, CString text,
+void draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 							int font_size, int thick, CString font_name,
 							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
 {
-	Gdiplus::Graphics   g(pDC->m_hDC);
+	//Gdiplus::Graphics   g(pDC->m_hDC);
 
 	// GDI+ draw text
-	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	//Gdiplus::FontFamily   ffami(CStringW(font_name));
 	Gdiplus::FontFamily   ff((WCHAR*)(const WCHAR*)CStringW(font_name));
@@ -5311,7 +5311,7 @@ void draw_gdip_outline_text(CDC* pDC, CRect rTarget, CString text,
 	int x = rTarget.left;
 	int y = rTarget.top;
 
-	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
 
 	if (rTarget.Width() == 0)
 		rTarget.right = rTarget.left + boundRect.Width;
@@ -5342,42 +5342,39 @@ void draw_gdip_outline_text(CDC* pDC, CRect rTarget, CString text,
 	//	Gdiplus::LinearGradientModeVertical);
 	Gdiplus::SolidBrush gb(crFill);
 
-	g.DrawPath(&gp, &str_path);
-	g.FillPath(&gb, &str_path);
+	g->DrawPath(&gp, &str_path);
+	g->FillPath(&gb, &str_path);
 }
 
 //출력할 글자를 작게 출력한 후 이를 다시 원래 크기로 늘려
 //blur가 생기게 하고 이를 shadow로 사용하는 방식인데 뭔가 어색하다.
 //ApplyEffect의 blur를 적용해서 구현하는 것이 나을 듯 하다.
-void draw_gdip_shadow_text(CDC* pDC, int x, int y, int w, int h,
-							CString text, int font_size, int depth,
+void draw_gdip_shadow_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
+							int font_size, bool font_bold, int shadow_depth,
 							CString font_name,
 							Gdiplus::Color crText,
 							Gdiplus::Color crShadow,
 							UINT align)
 {
-	draw_gdip_shadow_text(pDC, CRect(x, y, x + w, y + h), text, font_size, depth, font_name, crText, crShadow, align);
+	draw_gdip_shadow_text(g, CRect(x, y, x + w, y + h), text, font_size, font_bold, shadow_depth, font_name, crText, crShadow, align);
 }
 
-void draw_gdip_shadow_text(CDC* pDC, CRect rTarget,
-							CString text, int font_size, int depth,
+void draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
+							int font_size, bool font_bold, int shadow_depth,
 							CString font_name,
 							Gdiplus::Color crText,
 							Gdiplus::Color crShadow,
 							UINT align)
 {
-	Gdiplus::Graphics   g(pDC->m_hDC);
+	//g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	//g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
-
-	Gdiplus::RectF boundRect;
-	int logPixelsY = ::GetDeviceCaps(pDC->m_hDC, LOGPIXELSY);
-	Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
+	//int logPixelsY = ::GetDeviceCaps(pDC->m_hDC, LOGPIXELSY);
+	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
 
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
-	Gdiplus::Font font(&fontFamily, emSize, Gdiplus::FontStyleBold);
+	Gdiplus::Font font(&fontFamily, font_size, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
 
 	Gdiplus::SolidBrush shadow_brush(crShadow);
 	Gdiplus::SolidBrush brush2(crText);
@@ -5385,7 +5382,8 @@ void draw_gdip_shadow_text(CDC* pDC, CRect rTarget,
 	int x = rTarget.left;
 	int y = rTarget.top;
 
-	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+	Gdiplus::RectF boundRect;
+	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
 
 	if (rTarget.Width() == 0)
 		rTarget.right = rTarget.left + boundRect.Width;
@@ -5402,8 +5400,8 @@ void draw_gdip_shadow_text(CDC* pDC, CRect rTarget,
 	else if (align & DT_BOTTOM)
 		y = rTarget.bottom - boundRect.Height;
 
-	Gdiplus::Bitmap bm(boundRect.Width, boundRect.Height);
-	Gdiplus::Graphics g_shadow(&bm);
+	Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
+	Gdiplus::Graphics g_shadow(&shadow_bitmap);
 	g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 	/*
 	Gdiplus::Blur blur;
@@ -5414,21 +5412,25 @@ void draw_gdip_shadow_text(CDC* pDC, CRect rTarget,
 	//Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &hsl, NULL, NULL, &m_pBitmap);
 	bm.ApplyEffect(&hsl, NULL);
 	*/
-	
-	float ratio = 0.4f;
-	Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
-	g_shadow.SetTransform(&mx);
-	g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(0, 0), &shadow_brush);
-	//save(&bm, _T("z:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
 
-	boundRect.X = x;
-	boundRect.Y = y;
-	boundRect.Width = bm.GetWidth();
-	boundRect.Height = bm.GetHeight();
-	g.DrawImage(&bm, boundRect, 0, 0, bm.GetWidth() * ratio, bm.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
+	if (shadow_depth > 0)
+	{
+		//그림자의 흐릿한 정도. 0.0f : 그림자 없음.
+		float ratio = 0.4f;
+		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
+		g_shadow.SetTransform(&mx);
+		g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(-1, -1), &shadow_brush);
+		//save(&bm, _T("z:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
+
+		boundRect.X = x;
+		boundRect.Y = y;
+		boundRect.Width = shadow_bitmap.GetWidth();
+		boundRect.Height = shadow_bitmap.GetHeight();
+		g->DrawImage(&shadow_bitmap, boundRect, 0, 0, shadow_bitmap.GetWidth() * ratio, shadow_bitmap.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
+	}
 
 	Gdiplus::StringFormat sf;
-	g.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x-3, y-3), &brush2);
+	g->DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x - shadow_depth, y - shadow_depth), &brush2);
 }
 
 //text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
@@ -9974,6 +9976,53 @@ std::string	run_process(const char* cmd)
 			result += buffer.data();
 	}
 	return result;
+}
+
+//서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
+//process_name이 주어지면 좀 더 간단히 제거된다.
+//정상 제거(또는 서비스가 없을 경우) : true
+//제거 실패 : false
+bool kill_service(CString service_name, CString process_name /*= _T("")*/)
+{
+	CString result;
+
+	if (!process_name.IsEmpty())
+	{
+		result = run_process(_T("taskkill /f /im ") + process_name, true);
+		result = run_process(_T("sc delete ") + service_name, true);
+		return true;
+	}
+
+	//CString result = run_process(_T("sc queryex ") + service_name, true);
+	int pid_pos = result.Find(_T("PID"));
+
+	//해당 서비스가 없을 경우
+	if (pid_pos <= 0)
+		return true;
+
+	//PID 이후의 문자열로 만들고
+	result = result.Mid(pid_pos + 3);
+	//':' 이후의 문자열로 만들고
+	result = result.Mid(result.Find(':') + 1);
+	result.Trim();
+
+	result = result.Left(result.Find('\r'));
+
+	int pid = _ttoi(result);
+	CString cmd;
+
+	//해당 서비스의 실제 프로세스를 강제 종료시키면 해당 서비스는 "중지됨"으로 변경된다.
+	cmd.Format(_T("taskkill /pid %d /f"), pid);
+	result = run_process(cmd, true).MakeLower();
+	if (result.Find(_T("성공")) < 0 && result.Find(_T("success")) < 0)
+		return false;
+
+	//중지된 서비스를 삭제한다. 
+	result = run_process(_T("sc delete ") + service_name, true);
+	if (result.Find(_T("성공")) < 0 && result.Find(_T("success")) < 0)
+		return false;
+
+	return true;
 }
 
 bool RectInRect(CRect rMain, CRect rSub)

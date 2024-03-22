@@ -1222,6 +1222,11 @@ void CVtListCtrlEx::OnPaint()
 
 	dc.FillSolidRect(rc, m_crBack);
 
+	if (!m_text_on_empty.IsEmpty())
+	{
+		draw_gdip_shadow_text(&dc, rc, m_text_on_empty, 10, false, 0, _T("¸¼Àº °íµñ"));
+	}
+
 	//CListCtrl::OnPaint();
 	DefWindowProc(WM_PAINT, (WPARAM)dc.m_hDC, (LPARAM)0);
 }

@@ -1749,7 +1749,7 @@ void cvAdjustRectRange(cv::Rect &rect, int32_t minx, int32_t miny, int32_t maxx,
 	int32_t t = rect.y;
 	int32_t r = rect.x + rect.width;
 	int32_t b = rect.y + rect.height;
-	adjustRectRange(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize);
+	adjust_rect_range(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize);
 	rect.x = l;
 	rect.y = t;
 	rect.width = r - l;

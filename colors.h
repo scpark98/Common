@@ -352,9 +352,13 @@ COLORREF	get_color(CString cr);
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 CString		get_color_string(COLORREF cr);
 
+//rgb 평균 리턴
 uint8_t		gray_value(uint8_t r, uint8_t g, uint8_t b);
+//rgb 평균 리턴
 uint8_t		gray_value(COLORREF cr);
+//rgb 평균인 컬러값 리턴
 COLORREF	gray_color(COLORREF cr);
+
 double		color_similarity_distance(COLORREF c1, COLORREF c2);
 COLORREF	get_default_color(int index);
 COLORREF	get_random_color();

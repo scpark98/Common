@@ -685,6 +685,15 @@ void CTreeCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crBackSelectedInactive = get_color(m_crBack, -32);
 		m_crSelectedBorder = RGB(128, 128, 128);
 		break;
+	case color_theme_dark:
+		m_crText = RGB(212, 212, 212);
+		m_crTextSelected = RGB(241, 241, 241);
+		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
+		m_crBack = RGB(37, 37, 38);
+		m_crBackSelected = get_color(m_crBack, -32);
+		m_crBackSelectedInactive = get_color(m_crBack, -32);
+		m_crSelectedBorder = m_crBackSelected;// RGB(128, 128, 128);
+		break;
 	}
 
 	if (apply_now)

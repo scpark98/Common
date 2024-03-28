@@ -295,7 +295,7 @@ class CRequestUrlParams
 {
 public:
 	CRequestUrlParams() {}
-	CRequestUrlParams(CString _ip, int _port, CString _sub_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
+	CRequestUrlParams(CString _ip, int _port, CString _sub_url, CString _method = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
 	{
 		ip = _ip;
 		port = _port;
@@ -317,7 +317,7 @@ public:
 		}
 	}
 
-	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
+	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
 	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
 	bool		use_thread = false;
@@ -337,7 +337,11 @@ public:
 	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
 	bool		is_https = true;
 	CString		body;				//post data(json format)
-	std::vector<CString> headers;	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야 한다.
+
+	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
+	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
+	std::deque<CString> headers;
+
 	CString		full_url;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
 	CString		result;
 	long		elapsed = 0;		//소요시간. ms단위.
@@ -631,9 +635,12 @@ struct	NETWORK_INFO
 	//version string valid check
 	//digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
 	bool valid_version_string(CString versionStr, int digits);
-	//그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로 .을 없앤 숫자로 비교한다.
-	//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:ver0가 큼, -:ver1이 큼, 0:같음)
-	int	compare_version_string(CString ver0, CString ver1, TCHAR separator = '.');
+
+	//버전 또는 IP주소등은 그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로
+	//.을 없앤 숫자로 비교했으나 이 방법도 오류 발생(1.0.1.13 > 1.0.10.3보다 크다고 판단함)
+	//결국 각 자릿수끼리 구분해야 한다.
+	//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:str0가 큼, -:str1이 큼, 0:같음)
+	int	compare_string(CString str0, CString str1, TCHAR separator = '.');
 
 	//http://yeobi27.tistory.com/280
 	//A2W, A2T 및 그 반대 매크로들은 스택을 사용하므로 문제 소지가 있고 크기 제한도 있으므로
@@ -647,6 +654,10 @@ struct	NETWORK_INFO
 	//아마도 함수내에서 메모리가 할당된 후 호출한 곳에서 사용하려니 문제가 될 수 있다.
 	//이 함수의 바디를 그대로 쓰면 문제가 없으므로 일단 바디 코드를 그대로 복사해서 사용한다.
 	LPCWSTR		CString2LPCWSTR(CString str);
+	//char chStr[100] = { 0, };와 같이 pointer 변수가 아닌 배열로 선언된 경우라면
+	//chStr = CString2char(str); 문장은 오류가 발생하므로 아래와 같이 사용할 것.
+	//sprintf(chStr, "%s", (LPSTR)(LPCTSTR)str);	//MBCS : ok, UNICODE : fail
+	//sprintf(chStr, "%s", CStringA(str));		//both : ok
 	//리턴받아 사용한 char* 변수값은 사용 후 반드시 delete [] 해줄것
 	char*		CString2char(CString str);
 	TCHAR*		CString2TCHAR(CString str);
@@ -989,6 +1000,7 @@ struct	NETWORK_INFO
 	bool		CheckInternetIsOnline();
 	bool		IsAvailableEMail(CString sEMail);
 	CString		get_mac_addres(bool include_colon = true);
+	CString		get_ip_error_string(DWORD error_code);
 
 //////////////////////////////////////////////////////////////////////////
 //암호화

@@ -26,7 +26,9 @@ public:
 public:
 	COLORREF		m_crText;
 	COLORREF		m_crBack;
-	void			set_color(COLORREF crText, COLORREF crBack);
+	COLORREF		m_crSeparator;
+
+	void			set_color(COLORREF crText, COLORREF crBack, COLORREF crSeparator = -1);
 	void			set_text_color(COLORREF crText);
 	void			set_back_color(COLORREF crBack);
 

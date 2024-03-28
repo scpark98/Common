@@ -2444,10 +2444,11 @@ void request_url(CRequestUrlParams* params)
 	}
 
 	//디폴트 헤더 세팅
-	HttpAddRequestHeaders(hOpenRequest, _T("Content-Type: application/json; charset=utf-8\r\n"), -1, HTTP_ADDREQ_FLAG_ADD);
+	params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
 
-	if (params->headers.size() > 0)
+	if (params->headers.size() > 1)
 	{
+		//사용자가 명시한 헤더를 추가한다.
 		for (int i = 0; i < params->headers.size(); i++)
 		{
 			if (params->headers[i].Right(2) != _T("\r\n"))
@@ -3535,6 +3536,16 @@ CString	get_mac_addres(bool include_colon)
 	}
 
 	return mac;
+}
+
+CString get_ip_error_string(DWORD error_code)
+{
+	//auto e = GetLastError();
+	DWORD buf_size = 1024;
+	WCHAR buf[1024] = { 0, };
+	GetIpErrorString(error_code, buf, &buf_size);
+
+	return CString(buf);
 }
 
 bool GetNICAdapterList(IP_ADAPTER_INFO* pAdapters, int& nTotal, int nMax /*= 10*/)
@@ -8441,6 +8452,11 @@ std::wstring CString2wstring(const char* str)
 	return std::wstring(buff);
 }
 
+//char chStr[100] = { 0, };와 같이 pointer 변수가 아닌 배열로 선언된 경우라면
+//chStr = CString2char(str); 문장은 오류가 발생하므로 아래와 같이 사용할 것.
+//sprintf(chStr, "%s", (LPSTR)(LPCTSTR)str);	//MBCS : ok, UNICODE : fail
+//sprintf(chStr, "%s", CStringA(str));		//both : ok
+//리턴받아 사용한 char* 변수값은 사용 후 반드시 delete [] 해줄것
 char* CString2char(CString str)
 {
 	char *char_str = NULL;
@@ -14414,24 +14430,49 @@ bool valid_version_string(CString versionStr, int digits)
 	return false;
 }
 
-//그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로 .을 없앤 숫자로 비교한다.
-//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:ver0가 큼, -:ver1이 큼, 0:같음)
-int	compare_version_string(CString ver0, CString ver1, TCHAR separator)
+//버전 또는 IP주소등은 그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로
+//.을 없앤 숫자로 비교했으나 이 방법도 오류 발생(1.0.1.13 > 1.0.10.3보다 크다고 판단함)
+//결국 각 자릿수끼리 구분하거나 자릿수를 맞춘 후 비교한다.
+//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:str0가 큼, -:str1이 큼, 0:같음)
+int	compare_string(CString str0, CString str1, TCHAR separator)
 {
-	ver0.Remove(separator);
-	ver1.Remove(separator);
+	size_t i = 0, j = 0;
+	while (i < str0.GetLength() || j < str1.GetLength())
+	{
+		int acc1 = 0, acc2 = 0;
 
-	int v0 = _ttol(ver0);
-	int v1 = _ttol(ver1);
+		while (i < str0.GetLength() && str0[i] != separator) { acc1 = acc1 * 10 + (str0[i] - '0');  i++; }
+		while (j < str1.GetLength() && str1[j] != separator) { acc2 = acc2 * 10 + (str1[j] - '0');  j++; }
 
-	if (v0 > v1)
-		return 1;
-	else if (v0 < v1)
-		return -1;
+		if (acc1 < acc2)  return -1;
+		if (acc1 > acc2)  return +1;
 
+		++i;
+		++j;
+	}
 	return 0;
-}
+	/*
+	int i;
+	std::deque<CString> token0;
+	std::deque<CString> token1;
+	std::deque<int> num0;
+	std::deque<int> num1;
 
+	get_token_string(str0, token0, separator);
+	get_token_string(str1, token1, separator);
+
+	num0.resize(token0.size());
+	num1.resize(token1.size());
+
+	for (i = 0; i < token0.size(); i++)
+		num0[i] = _ttoi(token0[i]);
+
+	for (i = 0; i < token1.size(); i++)
+		num1[i] = _ttoi(token1[i]);
+
+	return std::lexicographical_compare(num0.begin(), num0.end(), num1.begin(), num1.end());
+	*/
+}
 
 //button의 종류를 리턴한다.
 DWORD		getButtonStyle(HWND hWnd)
@@ -16946,7 +16987,7 @@ std::string base64_decode(const std::string& in)
 }
 
 
-CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _method, bool _is_https, std::vector<CString>* _headers, CString _body, CString _local_file_path)
+CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _method, bool _is_https, std::deque<CString>* _headers, CString _body, CString _local_file_path)
 {
 	full_url = _full_url;
 	

@@ -539,7 +539,7 @@ int CVtListCtrlEx::get_column_max_text_length(int column, bool real_bytes)
 	for (int i = 0; i < size(); i++)
 	{
 		if (real_bytes)
-			len = WideCharToMultiByte(CP_ACP, 0, get_text(i, column), -1, NULL, 0, NULL, NULL);
+			len = WideCharToMultiByte(CP_ACP, 0, (CStringW)get_text(i, column), -1, NULL, 0, NULL, NULL);
 		else
 			len = get_text(i, column).GetLength();
 		if (len > max_len)
@@ -1026,15 +1026,15 @@ void CVtListCtrlEx::modify_style()
 {
 	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
 	//dlg의 parent의 font를 얻어와야 한다.
-	CFont* font = GetParent()->GetFont();
+	CFont* font = GetFont();
+
+	if (font == NULL)
+		font = AfxGetMainWnd()->GetFont();
 
 	if (font != NULL)
 		font->GetObject(sizeof(m_lf), &m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-
-	reconstruct_font();
-
 
 	//헤더컨트롤을 제어할 일이 있는지 확인 필요.
 #if 1
@@ -1065,6 +1065,8 @@ void CVtListCtrlEx::modify_style()
 
 	//ASSERT(pHeader->m_hWnd != NULL);
 #endif
+	//위에서 headerCtrl까지 구한 후 font 세팅을 해야 헤더에도 동일하게 적용된다.
+	reconstruct_font();
 }
 
 
@@ -1207,6 +1209,7 @@ void CVtListCtrlEx::OnPaint()
 	}
 
 	CMemoryDC dc(&dc1, &rc, true);
+	Gdiplus::Graphics g(dc.m_hDC);
 
 	/* 이 코드의 의미는?
 	//헤더는 안칠해지게해서 안깜박거리게 하고자 한듯한데 깜박인다. 일단 패스.
@@ -1224,7 +1227,7 @@ void CVtListCtrlEx::OnPaint()
 
 	if (!m_text_on_empty.IsEmpty())
 	{
-		draw_gdip_shadow_text(&dc, rc, m_text_on_empty, 10, false, 0, _T("맑은 고딕"));
+		draw_gdip_shadow_text(&g, rc, m_text_on_empty, 10, false, 0, _T("맑은 고딕"));
 	}
 
 	//CListCtrl::OnPaint();
@@ -1485,6 +1488,21 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crPercentage			= m_crText;
 		m_crProgress			= RGB(32, 32, 255);
 		m_crProgressText		= RGB(192, 192, 192);
+		break;
+	case color_theme_dark :
+		m_crText = RGB(212, 212, 212);
+		m_crTextSelected = RGB(255, 255, 255);
+		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
+		m_crBack = RGB(37, 37, 38);
+		m_crBackAlt = m_crBack;//get_color(m_crBack, -8);
+		m_crBackSelected = get_color(m_crBack, -16);
+		m_crBackSelectedInactive = get_color(m_crBack, -16);
+		m_crSelectedBorder = m_crBackSelected;
+		m_crHeaderBack = get_color(m_crBack, 16);
+		m_crHeaderText = get_color(m_crText, -32);
+		m_crPercentage = m_crText;
+		m_crProgress = RGB(32, 32, 255);
+		m_crProgressText = RGB(192, 192, 192);
 		break;
 	}
 

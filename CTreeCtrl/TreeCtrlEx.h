@@ -93,6 +93,7 @@ public:
 		color_theme_navy_blue,
 		color_theme_dark_blue,
 		color_theme_dark_gray,
+		color_theme_dark,
 	};
 
 	void	set_color_theme(int theme, bool apply_now = true);

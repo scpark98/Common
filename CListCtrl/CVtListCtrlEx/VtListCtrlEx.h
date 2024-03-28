@@ -51,6 +51,9 @@ m_list.set_color_theme(CVtListCtrlEx::color_theme_dark_gray);
 m_list.set_progress_color(RGB(128, 255, 128));
 m_list.set_headings(_T("파일,200;스냅샷,60;분류,60;평점,60;크기,200;메모,100;경로,300;날짜,100"));
 m_list.set_header_height(24);
+
+<수정될 내용>
+-어떤 컬럼이 이미지만 표시할 경우가 있으므로 column type을 추가하고 sort도 그에 맞게 처리되어야 한다.
 */
 // CVtListCtrlEx
 
@@ -310,6 +313,7 @@ public:
 		color_theme_navy_blue,
 		color_theme_dark_blue,
 		color_theme_dark_gray,
+		color_theme_dark,
 	};
 
 	void		set_color_theme(int theme, bool apply_now = true);
@@ -377,6 +381,7 @@ public:
 	//header_height는 헤더클래스에서 HDM_LAYOUT 메시지가 발생해야 적용되는데
 	//그렇게 되기 위해서는 SetFont / MoveWindow / SetWindowPos 등이 필요하므로
 	//VtListCtrlEx에게 set_font_name() 호출시에 헤더도 SetFont를 적용하여 해결함.
+	//=> SetFont()를 통해서 header의 height를 변경한다.
 	void		set_header_height(int height);
 
 	//line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과

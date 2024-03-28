@@ -114,7 +114,7 @@ void CHeaderCtrlEx::OnPaint()
 		else
 		{
 			if (m_flat_style)
-				DrawLine(&dc, rItem.right, rItem.top + 4, rItem.right, rItem.bottom - 4, crSunkenDark);
+				DrawLine(&dc, rItem.right, rItem.top + 3, rItem.right, rItem.bottom - 3, crSunkenDark);
 			else
 				DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
 		}
@@ -385,13 +385,22 @@ void CHeaderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 	CHeaderCtrl::OnLButtonUp(nFlags, point);
 }
 
-void CHeaderCtrlEx::set_color(COLORREF crText, COLORREF crBack)
+void CHeaderCtrlEx::set_color(COLORREF crText, COLORREF crBack, COLORREF crSeparator)
 {
 	m_crText = crText;
 	m_crBack = crBack;
 
+	if (m_crSeparator == -1)
+	{
+		if (gray_color(m_crBack) < 128)
+			m_crSeparator = get_color(m_crBack, 32);
+		else
+			m_crSeparator = get_color(m_crBack, -32);
+	}
+
 	if (!m_hWnd)
 		return;
+
 	Invalidate();
 }
 
@@ -432,6 +441,31 @@ void CHeaderCtrlEx::set_header_height(int height)
 	//RedrawWindow();
 	//UpdateWindow();
 	SendMessage(HDM_LAYOUT, 0, (LPARAM)&m_HDLayout);
+	/*
+	//=> CFont를 생성하여 SetFont()하면 된다?
+	CDC* pDC = GetDC();
+	int real_height = -MulDiv(height, pDC->GetDeviceCaps(LOGPIXELSY), 72);
+	ReleaseDC(pDC);
+
+	CFont NewFont;
+	NewFont.CreateFont(
+		real_height,               // nHeight 
+		0,                         // nWidth 
+		0,                         // nEscapement 
+		0,                         // nOrientation 
+		FW_NORMAL,                 // nWeight 
+		FALSE,                     // bItalic 
+		FALSE,                     // bUnderline 
+		0,                         // cStrikeOut 
+		ANSI_CHARSET,              // nCharSet 
+		OUT_DEFAULT_PRECIS,        // nOutPrecision 
+		CLIP_DEFAULT_PRECIS,       // nClipPrecision 
+		DEFAULT_QUALITY,           // nQuality 
+		DEFAULT_PITCH | FF_SWISS,  // nPitchAndFamily 
+		_T("Arial"));             // lpszFacename   
+
+	SetFont(&NewFont);
+	*/
 }
 
 void CHeaderCtrlEx::set_header_flat_style(bool flat)

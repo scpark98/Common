@@ -265,7 +265,7 @@ void CVideoWnd::OnPaint()
 	{
 		if (m_mat.data)
 		{
-			m_rDisplayedImageRect = GetRatioRect(rc, m_mat.cols, m_mat.rows);
+			m_rDisplayedImageRect = get_ratio_max_rect(rc, m_mat.cols, m_mat.rows);
 			cv_draw(&dc, m_mat, &m_rDisplayedImageRect, GRAY32, -1.0);
 		}
 		else if ( m_sVideoFileName != _T("") )
@@ -514,7 +514,7 @@ void CVideoWnd::OnLButtonDown(UINT nFlags, CPoint point)
 
 		CRect	rc;
 		GetClientRect( rc );
-		m_rDisplayedImageRect = GetRatioRect( rc, m_mat.cols, m_mat.rows );
+		m_rDisplayedImageRect = get_ratio_max_rect(rc, m_mat.cols, m_mat.rows);
 		m_rScreenROI = m_rImageROI;
 		ConvertCoordinateImage2Screen( m_rScreenROI );
 		Invalidate();
@@ -926,7 +926,7 @@ bool CVideoWnd::OpenVideoFile( CString sfile, bool bRunFileDialog, CString sRece
 		if (bRunFileDialog)
 		{
 			if ( sRecentFile == "" )
-				sRecentFile = GetExeDirectory() + _T("\\*.*");
+				sRecentFile = get_exe_directory() + _T("\\*.*");
 
 			TCHAR			szFilter[] = _T("Media (*.mp4,*.wmv,*.avi,*.bin,*.yuv,*.bmp,*.jpg,*.png)|*.mp4;*.wmv;*.avi;*.bin;*.yuv;*.bmp;*.jpg,*.png|All Files(*.*)|*.*||");
 			CFileDialog		dlg(true, _T("*.*"), sRecentFile, OFN_FILEMUSTEXIST, szFilter, this);
@@ -2891,7 +2891,7 @@ void CVideoWnd::SaveAsDisplayedSize()
 	else// if (m_bImageFromClipboard)
 		sMediaFilename = _T("snapshot");
 
-	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved folder"), GetExeDirectory() );
+	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved folder"), get_exe_directory() );
 	CString sRecentSavedFormat = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved format"), _T("*.jpg") );
 	sImageFile.Format(_T("%s\\%s_%08d.jpg"), sRecentSavedFolder, sMediaFilename, nIndex);
 	CFileDialog fileDlg( false, sRecentSavedFormat, sImageFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, _T("JPG file|*.jpg|BMP file|*.bmp|All files|*.*||") );
@@ -2934,7 +2934,7 @@ void CVideoWnd::SaveAsOriginalSize()
 	else// if (m_bImageFromClipboard)
 		sMediaFilename = _T("snapshot");
 
-	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved folder"), GetExeDirectory() );
+	CString sRecentSavedFolder = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved folder"), get_exe_directory() );
 	CString sRecentSavedFormat = AfxGetApp()->GetProfileString( _T("setting\\video"), _T("recent saved format"), _T("*.jpg") );
 	sImageFile.Format( _T("%s\\%s_%08d.jpg"), sRecentSavedFolder, sMediaFilename, nIndex );
 	CFileDialog fileDlg( false, sRecentSavedFormat, sImageFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, _T("JPG file|*.jpg|BMP file|*.bmp|All files|*.*||") );
@@ -3037,7 +3037,7 @@ CRect CVideoWnd::GetDisplayedImageRect()
 		return 0;
 
 	GetClientRect( rc );
-	m_rDisplayedImageRect = GetRatioRect( rc, m_mat.cols, m_mat.rows );
+	m_rDisplayedImageRect = get_ratio_max_rect( rc, m_mat.cols, m_mat.rows );
 
 	return m_rDisplayedImageRect;
 }

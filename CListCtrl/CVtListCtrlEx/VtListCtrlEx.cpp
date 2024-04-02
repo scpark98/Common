@@ -31,6 +31,7 @@ CVtListCtrlEx::CVtListCtrlEx()
 CVtListCtrlEx::~CVtListCtrlEx()
 {
 	m_font.DeleteObject();
+	safe_release_gradient_rect_handle();
 
 	CoUninitialize();
 }
@@ -272,7 +273,27 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 			
 			r.right = r.left + (double)(r.Width()) * d;
-			pDC->FillSolidRect(r, m_crPercentage);
+
+			if (m_crPercentage.size() == 1)
+			{
+				pDC->FillSolidRect(r, m_crPercentage[0]);
+			}
+			else if (m_crPercentage.size() > 1)
+			{
+				//현재 레벨에 맞는 단색으로 채울 경우
+				if (false)
+				{
+					pDC->FillSolidRect(r, get_color(m_crPercentage[0], m_crPercentage[1], d));
+				}
+				//현재 레벨까지 그라디언트로 채울 경우
+				else
+				{
+					std::deque<COLORREF> dqColor;
+					dqColor.push_back(m_crPercentage[0]);
+					dqColor.push_back(get_color(m_crPercentage[0], m_crPercentage[1], d));
+					gradient_rect(pDC, r, dqColor, false);
+				}
+			}
 		}
 		else if (get_column_data_type(iSubItem) == column_data_type_percentage_grid)
 		{
@@ -291,10 +312,23 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			std::deque<COLORREF> dqColor;
-			dqColor.push_back(m_crPercentage);
-			dqColor.push_back(crBack);
-			gradient_rect(pDC, r, dqColor, false);
+			//std::deque<COLORREF> dqColor(m_crPercentage);
+			//dqColor.push_back(crBack);
+			//gradient_rect(pDC, r, dqColor, false);
+
+			if (m_crPercentage.size() == 1)
+			{
+				pDC->FillSolidRect(r, m_crPercentage[0]);
+			}
+			else if (m_crPercentage.size() > 1)
+			{
+				std::deque<COLORREF> dqColor;
+				dqColor.push_back(m_crPercentage[0]);
+				int hue0 = get_hue(m_crPercentage[0]);
+				int hue1 = get_hue(m_crPercentage[1]);
+				dqColor.push_back(get_color(hue0, hue1, (int)(d * 100.0), 1.0f, 1.0f));
+				gradient_rect(pDC, r, dqColor, false);
+			}
 
 			int i;
 			int half = (int)((double)(r.Height()) / 2.2);
@@ -866,6 +900,45 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					}
 					return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 				}
+				else if (data_type == column_data_type_text_ip)
+				{
+					if (iSub != 0)
+					{
+						if (!include_null)
+						{
+							return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+							//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+							//	return true;
+							//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+							//	return false;
+							//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+							//	return true;
+						}
+						else
+						{
+							return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+							//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
+							//	return false;
+							//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
+							//	return true;
+							//else
+							//{
+							//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
+							//		return false;
+							//	else
+							//		return true;
+							//}
+						}
+					}
+					else
+					{
+						//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
+						return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+					}
+
+					//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
+					return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+				}
 				else
 				{
 					//a.text[iSub].Replace(_T(","), _T(""));
@@ -907,6 +980,45 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 						return (a.text[iSub].MakeLower() > b.text[iSub].MakeLower());
 					}
 					return (_ttof(a.text[iSub].MakeLower()) > _ttof(b.text[iSub].MakeLower()));
+				}
+				else if (data_type == column_data_type_text_ip)
+				{
+					if (iSub != 0)
+					{
+						if (!include_null)
+						{
+							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+							//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+							//	return true;
+							//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+							//	return false;
+							//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+							//	return true;
+						}
+						else
+						{
+							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+							//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
+							//	return false;
+							//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
+							//	return true;
+							//else
+							//{
+							//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
+							//		return false;
+							//	else
+							//		return true;
+							//}
+						}
+					}
+					else
+					{
+						//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
+						return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+					}
+
+					//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
+					return (compare_string(a.text[iSub], b.text[iSub]) == -1);
 				}
 				else
 				{
@@ -1425,7 +1537,8 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= ::GetSysColor(COLOR_3DFACE);
 		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
-		m_crPercentage			= m_crText;
+		m_crPercentage.clear();
+		m_crPercentage.push_back(GRAY192);
 		m_crProgress			= RGB(49, 108, 244);
 		m_crProgressText		= RGB(192, 192, 192);
 		break;
@@ -1440,7 +1553,8 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= get_color(m_crBack, -32);
 		m_crHeaderText			= get_color(m_crText, -32);
-		m_crPercentage			= m_crText;
+		m_crPercentage.clear();
+		m_crPercentage.push_back(get_color(m_crBack, -32));
 		m_crProgress			= RGB(32, 32, 255);
 		m_crProgressText		= RGB(192, 192, 192);
 		break;
@@ -1455,7 +1569,8 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= get_color(m_crBack, -32);
 		m_crHeaderText			= get_color(m_crText, -32);
-		m_crPercentage			= m_crText;
+		m_crPercentage.clear();
+		m_crPercentage.push_back(get_color(m_crBack, -32));
 		m_crProgress			= RGB(32, 32, 255);
 		m_crProgressText		= RGB(192, 192, 192);
 		break; 
@@ -1470,7 +1585,8 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crSelectedBorder		= RGB(153, 209, 255);
 		m_crHeaderBack			= RGB(  0,  13,  22);
 		m_crHeaderText			= RGB(  0, 180, 228);
-		m_crPercentage			= m_crText;
+		m_crPercentage.clear();
+		m_crPercentage.push_back(get_color(m_crBack, 32));
 		m_crProgress			= RGB(32, 32, 255);
 		m_crProgressText		= RGB(192, 192, 192);
 		break; 
@@ -1485,7 +1601,8 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crSelectedBorder		= RGB(128, 128, 128);
 		m_crHeaderBack			= get_color(m_crBack, -16);
 		m_crHeaderText			= get_color(m_crText, -16);
-		m_crPercentage			= m_crText;
+		m_crPercentage.clear();
+		m_crPercentage.push_back(get_color(m_crBack, 32));
 		m_crProgress			= RGB(32, 32, 255);
 		m_crProgressText		= RGB(192, 192, 192);
 		break;
@@ -1500,7 +1617,8 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_crSelectedBorder = m_crBackSelected;
 		m_crHeaderBack = get_color(m_crBack, 16);
 		m_crHeaderText = get_color(m_crText, -32);
-		m_crPercentage = m_crText;
+		m_crPercentage.clear();
+		m_crPercentage.push_back(get_color(m_crBack, 32));
 		m_crProgress = RGB(32, 32, 255);
 		m_crProgressText = RGB(192, 192, 192);
 		break;

@@ -4,6 +4,7 @@
 
 //#include "stdafx.h"
 #include "RandomText.h"
+#include "Functions.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -161,6 +162,36 @@ CString RandomText::GetName()
 	return Name() + _T(" ") + SurName();
 }
 
+CString RandomText::get_ip(int parts)
+{
+	CString ip;
+
+	for (int i = 0; i < parts; i++)
+	{
+		ip = ip + i2S(random19937(0, 255));
+		if (i < parts - 1)
+			ip += _T(".");
+	}
+
+	return ip;
+}
+
+CString RandomText::get_mac()
+{
+	TCHAR ch[3];
+	CString mac;
+
+	for (int i = 0; i < 6; i++)
+	{
+		ch[0] = random19937('0', '9');
+		ch[1] = random19937('A', 'F');
+
+		mac = mac + ch[random19937(0, 1)] + ch[random19937(0, 1)] + (i < 5 ? ':' : ' ');
+	}
+	
+	mac.Trim();
+	return mac;
+}
 
 CString RandomText::GetSlogan()
 {

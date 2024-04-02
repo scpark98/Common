@@ -865,7 +865,7 @@ void CSCStatic::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CStatic::OnWindowPosChanged(lpwndpos);
 
 	// TODO: Add your message handler code here
-	//Invalidate();
+	Invalidate();
 }
 
 void CSCStatic::add_header_image(UINT id)

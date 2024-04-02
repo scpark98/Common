@@ -22,7 +22,7 @@
 #define SCSLIDERCTRL_STYLE_PROGRESS		1
 #define SCSLIDERCTRL_STYLE_VOLUME		2
 
-#define MESSAGE_SCSLIDERCTRL			WM_USER + 9424
+static const UINT Message_CSCSliderCtrl = ::RegisterWindowMessage(_T("MessageString_CSCSliderCtrl"));
 
 //트랙 이벤트가 발생했을 때 바로 PostMessage를 호출하게 되면
 //미세한 마우스 움직임들에 대해 무수히 많은 이벤트가 발생하게 되므로

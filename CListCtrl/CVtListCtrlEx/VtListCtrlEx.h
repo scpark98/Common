@@ -200,6 +200,7 @@ public:
 	{
 		column_data_type_unknown = 0,
 		column_data_type_text,
+		column_data_type_text_ip,		//ip는 text와 동일하지만 sort 방식이 다르다.
 		column_data_type_numeric,
 
 		//실제값은 정수지만 그려질땐 막대그래프로 그려짐. 100%가 최대값이므로 %로 변환하여 값을 줘야 함.
@@ -338,6 +339,19 @@ public:
 
 	//컬럼이 percentage를 표시하는 컬럼일 경우 그 표시 색상을 설정한다.
 	void		set_progress_color(COLORREF crProgress);
+	template <typename ... Types> void set_percentage_gradient(Types... args)
+	{
+		int n = sizeof...(args);
+		COLORREF arg[] = { args... };
+
+		m_crPercentage.clear();
+
+		for (auto item : arg)
+		{
+			m_crPercentage.push_back(item);
+		}
+	}
+
 
 //편집 관련
 	//리소스의 ListCtrl 속성에서 "레이블 편집" 속성은 default값인 false로 하고 이 함수로 편집 가능 여부를 설정해야 한다.
@@ -472,7 +486,7 @@ protected:
 	COLORREF		m_crSelectedBorder;
 	COLORREF		m_crHeaderBack;
 	COLORREF		m_crHeaderText;
-	COLORREF		m_crPercentage;				//percentage bar graph color
+	std::deque<COLORREF> m_crPercentage;		//percentage bar graph color
 	COLORREF		m_crProgress;				//progress bar
 	COLORREF		m_crProgressText;			//progress text
 

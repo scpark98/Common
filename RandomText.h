@@ -17,6 +17,10 @@ public:
 	static CString GetSlogan();
 	static CString GetName();
 
+	//parts를 2로 주면 "1.103"처럼 끝 두 번지만 생성한다.
+	static CString get_ip(int parts = 4);
+	static CString get_mac();
+
 private:
 	static int GetRand(const int top, int& last);
 	static CString Name();

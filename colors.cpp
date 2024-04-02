@@ -99,6 +99,15 @@ CString		get_color_string(COLORREF cr)
 	return str;
 }
 
+//보색
+COLORREF	get_complementary_color(COLORREF cr)
+{
+	//int r = 255 - GetRValue(cr);
+	//int g = 255 - GetGValue(cr);
+	//int b = 255 - GetBValue(cr);
+	return RGB(255 - GetRValue(cr), 255 - GetGValue(cr), 255 - GetBValue(cr));
+}
+
 //gray = (2989 * r + 5870 * g + 1140 * b) / 10000; 
 //=>0.2989 * 2^14 = 4897.1776; 
 //출처: http://kipl.tistory.com/80 [Geometry & Recognition]
@@ -224,4 +233,33 @@ void hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b)
 	r = ROUND(fR * 255.0, 0);
 	g = ROUND(fG * 255.0, 0);
 	b = ROUND(fB * 255.0, 0);
+}
+
+COLORREF hsv2rgb(float fH, float fS, float fV)
+{
+	int r, g, b;
+	hsv2rgb(fH, fS, fV, r, g, b);
+	return RGB(r, g, b);
+}
+
+//red ~ green 범위에서 37%일때의 색상은? get_color(0, 120, 37); (0:red, 120:green of hue)
+//hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)
+COLORREF get_color(int hue_start, int hue_end, int percent, float saturation, float value)
+{
+	int pos = hue_start + (double)(hue_end - hue_start) * (double)percent/100.0;
+	int r, g, b;
+
+	Clamp(saturation, 0.0f, 1.0f);
+	Clamp(value, 0.0f, 1.0f);
+
+	hsv2rgb(pos, saturation, value, r, g, b);
+
+	return RGB(r, g, b);
+}
+
+int	get_hue(COLORREF cr)
+{
+	float h, s, v;
+	rgb2hsv(GetRValue(cr), GetGValue(cr), GetBValue(cr), h, s, v);
+	return (int)h;
 }

@@ -1353,7 +1353,7 @@ void		SetWallPaper(CString sfile);
 	typedef UINT (CALLBACK* LPFNDLLFUNC1)(HDC,CONST PTRIVERTEX,DWORD,CONST PVOID,DWORD,DWORD);
 	extern HINSTANCE	g_hInst_msimg32;
 	extern LPFNDLLFUNC1 g_dllfunc_GradientFill;
-	void		gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool vertical);
+	void gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool vertical = false);
 	enum GRADIENT_RECT_PRESET
 	{
 		gradient_rect_white_black_white = 0,

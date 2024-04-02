@@ -352,6 +352,9 @@ COLORREF	get_color(CString cr);
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 CString		get_color_string(COLORREF cr);
 
+//보색
+COLORREF	get_complementary_color(COLORREF cr);
+
 //rgb 평균 리턴
 uint8_t		gray_value(uint8_t r, uint8_t g, uint8_t b);
 //rgb 평균 리턴
@@ -363,10 +366,16 @@ double		color_similarity_distance(COLORREF c1, COLORREF c2);
 COLORREF	get_default_color(int index);
 COLORREF	get_random_color();
 
-//r,g,b : 0 ~ 255, h : 0 ~ 360, s, v : 0 ~ 1
+//r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
 void		rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
-//r,g,b : 0 ~ 255, h : 0 ~ 360, s, v : 0 ~ 1
+//r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
 void		hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
+COLORREF	hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
+
+//red ~ green 범위에서 37%일때의 색상은? get_color(0, 120, 37); (0:red, 120:green of hue)
+//hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)
+COLORREF	get_color(int hue_start, int hue_end, int percent, float saturation = 1.0f, float value = 1.0f);
+int			get_hue(COLORREF cr);
 
 extern COLORREF g_default_color[16];
 #endif

@@ -9798,8 +9798,20 @@ int get_process_running_count(CString processname)
 		if (hRes == FALSE)
 			break;
 
-		//if (!wcsncmp(pEntry.szExeFile, processname, 15))
-		if (!_tcsncmp(pEntry.szExeFile, processname, 15))
+		//권한이 없을 경우 특정 프로세스들은 OpenProcess()가 NULL을 리턴한다.
+		//간단히 해당 프로세스 카운트만 얻어온다면 OpenProcess()를 호출하지 말자.
+		//권한을 주고 얻어와야 한다면 AdjustTokenPrivileges 등을 이용해야 한다.
+		//if (pEntry.th32ProcessID != 0)
+		//{
+		//	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pEntry.th32ProcessID);
+		//	DbgOutA(_T("hProcess = %p, process = %s, id = %d"), hProcess, pEntry.szExeFile, pEntry.th32ProcessID);
+
+		//}
+		//else
+		//{
+		//}
+
+		if (_tcscmp(pEntry.szExeFile, processname) == 0)
 		{
 			//CloseHandle(hSnapShot);
 			//return TRUE;

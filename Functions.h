@@ -845,6 +845,7 @@ struct	NETWORK_INFO
 	//폴더인 경우는 ""를 리턴함.
 	CString		get_file_size_string(CString sfile, int unit = 1, int floats = 0, bool unit_string = true);
 	CTime		GetFileCreationTime(CString sfile);
+	//탐색기에서 복사하면 last modified time이 유지되지만 web에서 다운받은 파일일 경우는 다운받아 생성된 시각으로 변경됨.
 	CTime		GetFileLastModifiedTime(CString sfile);
 	CTime		GetFileLastAccessTime(CString sfile);
 	CString		GetMostRecentFile(CString sFolder, CString sWildCard = _T("*.*"), int nReturnType = 1);

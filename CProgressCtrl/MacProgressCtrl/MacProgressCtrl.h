@@ -5,6 +5,7 @@
 #include <Afxdisp.h>
 #include <afxext.h>         // MFC 확장입니다.
 #include <afxcmn.h>             // Windows 공용 컨트롤에 대한 MFC 지원입니다.
+#include <deque>
 
 #if _MSC_VER > 1000
 #pragma once
@@ -119,9 +120,16 @@ private:
 	COLORREF	m_border_color = RGB(188, 188, 188);
 
 	bool		m_bGradient;		//default = false
+
+
+	bool		m_bIndeterminate;
+	bool		m_indeterminate_forward = true;
+	int			m_indeterminate_width = 80;
+	std::deque<COLORREF> m_dq_cr_indeterminate;
+	void		thread_indeterminate();
+
 	bool		m_bTransparent;
 	int			m_nIndOffset;
-	bool		m_bIndeterminate;
 	void		DrawVerticalBar(CDC *pDC, const CRect rect);
 	void		DrawHorizontalBar(CDC *pDC, const CRect rect);
 	void		DeletePens();

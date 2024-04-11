@@ -112,6 +112,7 @@ public:
 
 	void		set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
 	bool		is_bold() { return m_bFontBold; }
+	void		set_font(CFont* font);
 
 	void		set_outline_width(int nWidth) { m_nOutlineWidth = nWidth; Invalidate(); }
 	void		set_outline(int nWidth, COLORREF crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }

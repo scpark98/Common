@@ -115,6 +115,12 @@ void CSCStatic::reconstruct_font()
 	ASSERT(bCreated);
 }
 
+void CSCStatic::set_font(CFont* font)
+{
+	font->GetLogFont(&m_lf);
+	reconstruct_font();
+}
+
 // CSCStatic message handlers
 
 void CSCStatic::OnPaint()

@@ -2446,7 +2446,7 @@ void request_url(CRequestUrlParams* params)
 	//디폴트 헤더 세팅
 	params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
 
-	if (params->headers.size() > 1)
+	if (params->headers.size() >= 1)
 	{
 		//사용자가 명시한 헤더를 추가한다.
 		for (int i = 0; i < params->headers.size(); i++)

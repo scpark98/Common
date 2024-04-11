@@ -17,6 +17,7 @@
 
 
 #include "MacProgressCtrl.h"
+#include <thread>
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 
@@ -61,6 +62,9 @@ CMacProgressCtrl::CMacProgressCtrl()
 	m_crBackColor		= ::GetSysColor(COLOR_3DSHADOW);
 	m_bTransparent		= false;
 	m_bGradient			= false;
+	
+	m_dq_cr_indeterminate.push_back(m_crBackColor);
+	m_dq_cr_indeterminate.push_back(RGB(64, 212, 32));
 
 	GetColors();
 	CreatePens();
@@ -77,6 +81,7 @@ CMacProgressCtrl::~CMacProgressCtrl()
 // Remarks		:	None.
 //
 {
+	m_bIndeterminate = false;
 	DeletePens();
 }	// ~CMacProgressCtrl
 
@@ -168,9 +173,21 @@ void CMacProgressCtrl::OnPaint()
 	{
 		//indeterminate일때는 배경색으로 그리는게 아니라 전경색보다 밝은 색으로 그린다.
 		if (m_bIndeterminate)
-			dc.FillSolidRect(rc, GetColor(m_crColor, -128));
-		else
+		{
 			dc.FillSolidRect(rc, m_crBackColor);
+			CRect gradRect;
+			
+			if (m_indeterminate_forward)
+				gradRect = CRect(m_nIndOffset - m_indeterminate_width, rc.top, m_nIndOffset, rc.bottom);
+			else
+				gradRect = CRect(m_nIndOffset, rc.top, m_nIndOffset + m_indeterminate_width, rc.bottom);
+			//gradRect.left = m_nIndOffset;
+			gradient_rect(dc, gradRect, m_dq_cr_indeterminate);
+		}
+		else
+		{
+			dc.FillSolidRect(rc, m_crBackColor);
+		}
 
 		// Determine the size of the bar and draw it.
 		//현재 vertical일 경우는 코드 완성되지 않음.
@@ -292,6 +309,7 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
 
 	if (m_bIndeterminate)
 	{
+		/*
 		pOldPen = pDC->SelectObject(&m_penColor);
 		int nNumBands = (rect.Width() / IND_BAND_WIDTH) + 2;
 		int nHeight = rect.Height() + 1;
@@ -333,6 +351,7 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
 			pDC->MoveTo(nXpos + 7, nTop);
 			pDC->LineTo(nXpos + nHeight + 6, nBottom);
 		}	// for the number of bands
+		*/
 	}	// if indeterminate
 	else if (m_bGradient)
 	{
@@ -682,14 +701,50 @@ void CMacProgressCtrl::SetIndeterminate(BOOL bIndeterminate)
 
 		m_bGradient = false;
 		RedrawWindow();
-		SetTimer(IDT_INDETERMINATE, 25, NULL);
+		std::thread t(&CMacProgressCtrl::thread_indeterminate, this);
+		t.detach();
+		//SetTimer(IDT_INDETERMINATE, 25, NULL);
 	}
 	else
 	{
-		KillTimer(IDT_INDETERMINATE);
+		//KillTimer(IDT_INDETERMINATE);
 		RedrawWindow();
 	}
 }	// SetIndeterminate
+
+void CMacProgressCtrl::thread_indeterminate()
+{
+	m_nIndOffset = 0;
+
+	while (m_bIndeterminate)
+	{
+		CRect rc;
+		GetClientRect(rc);
+
+		if (m_indeterminate_forward)
+		{
+			m_nIndOffset += 2;// m_nIndOffset + ((double)m_nIndOffset + 1.0) * 1.2;
+			if (m_nIndOffset > rc.right + m_indeterminate_width)
+			{
+				m_indeterminate_forward = false;
+				std::reverse(m_dq_cr_indeterminate.begin(), m_dq_cr_indeterminate.end());
+			}
+		}
+		else
+		{
+			m_nIndOffset -= 2;// m_nIndOffset - ((double)m_nIndOffset + 1.0) * 1.2;
+			if (m_nIndOffset < rc.left - m_indeterminate_width)
+			{
+				m_indeterminate_forward = true;
+				std::reverse(m_dq_cr_indeterminate.begin(), m_dq_cr_indeterminate.end());
+			}
+		}
+		TRACE(_T("m_nIndOffset = %d\n"), m_nIndOffset);
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		//Invalidate();
+		RedrawWindow();
+	}
+}
 
 int CMacProgressCtrl::GetRangeMin()
 {
@@ -734,12 +789,16 @@ void CMacProgressCtrl::OnTimer(UINT_PTR nIDEvent)
 	{
 		KillTimer(nIDEvent);
 
-		if (++m_nIndOffset > IND_BAND_WIDTH - 1)
+		if (++m_nIndOffset > 300)
+		{
 			m_nIndOffset = 0;
-		
+		}
+
+		Traceln(_T("m_nIndOffset = %d"), m_nIndOffset);
+
 		RedrawWindow();
 
-		SetTimer(IDT_INDETERMINATE, 25, NULL);
+		SetTimer(IDT_INDETERMINATE, 10, NULL);
 	}
 }	// OnTimer
 

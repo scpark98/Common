@@ -1362,6 +1362,7 @@ void		SetWallPaper(CString sfile);
 		gradient_rect_black_white_black,
 		gradient_rect_black_gray128_black,
 	};
+	//아직 미구현
 	void		gradient_rect(CDC* pDC, CRect &rect, int preset, bool vertical);
 	void		safe_release_gradient_rect_handle();
 

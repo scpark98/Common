@@ -1356,7 +1356,7 @@ void CDShow::prepare_AlphaBitmap()
 	m_AlphaBitmap.rDest.left = 0.0f;//EDGE_BUFFER;
 	m_AlphaBitmap.rDest.right = 1.0f;// - EDGE_BUFFER;
 	m_AlphaBitmap.rDest.top = 0.00f;
-	m_AlphaBitmap.rDest.bottom = 1.0f - EDGE_BUFFER;
+	m_AlphaBitmap.rDest.bottom = 1.0f;// -EDGE_BUFFER;
 	m_AlphaBitmap.rSrc = reText;
 	m_AlphaBitmap.fAlpha = 1.0f;//TRANSPARENCY_VALUE;
 	m_AlphaBitmap.clrSrcKey = m_crColorKey;
@@ -1375,9 +1375,10 @@ HRESULT CDShow::update_osd_subtitle()
 
 	int i;
 	int sx = m_video_size.cx * m_subCfg.pos_x / 100.0;
-	int sy = m_video_size.cy * m_subCfg.pos_y / 100.0 - 56;
+	int sy = m_video_size.cy * m_subCfg.pos_y / 100.0;// -56;
 	HRESULT hr = S_OK;
 
+	Trace(_T("m_video_size = %d, %d"), m_video_size.cx, m_video_size.cy);
 	m_pMemDC[m_buf_index]->SetTextAlign(TA_CENTER);
 	m_pMemDC[m_buf_index]->SetTextCharacterExtra(m_subCfg.char_spacing);
 	m_pMemDC[m_buf_index]->FillSolidRect(0, 0, m_video_size.cx, m_video_size.cy, m_crColorKey);
@@ -1391,8 +1392,8 @@ HRESULT CDShow::update_osd_subtitle()
 
 	gr.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
 	gr.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	//gr.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
-	gr.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
+	gr.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+	//gr.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 
 	if (m_osd_text.IsEmpty() == false)
 	{
@@ -1424,7 +1425,7 @@ HRESULT CDShow::update_osd_subtitle()
 	if (m_show_subtitle && m_cur_subtitle.is_valid())
 	{
 		Gdiplus::FontFamily font(m_subCfg.lf->lfFaceName);
-#if 1
+#if 0
 		strFormat.SetAlignment(Gdiplus::StringAlignmentCenter);
 
 		//라인 간격은 기본 120%를 기본으로 하되
@@ -1486,9 +1487,7 @@ HRESULT CDShow::update_osd_subtitle()
 
 			sy -= line_spacing;
 		}
-#endif
-
-#if 0
+#else
 		//Gdiplus::Graphics gr(m_pMemDC[m_buf_index]->GetSafeHdc());
 		//Gdiplus::StringFormat strFormat;
 		//Gdiplus::GraphicsPath path_outline;
@@ -1532,10 +1531,10 @@ HRESULT CDShow::update_osd_subtitle()
 			//그 값을 복사해서 이동시켜서 칠해주면 그림자가 된다.
 			path_shadow = path_outline.Clone();
 			path_shadow->Transform(&m);
-			gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(/*m_subCfg.alphaShadow*/255, 16, 16, 16)), path_shadow);
+			gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(/*m_subCfg.alphaShadow*/128, 16, 16, 16)), path_shadow);
 
 			//그림자 위에 외곽선을 그려주고
-			gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(/*m_subCfg.alphaOutline*/255, 0, 0, 0)), &path_outline);
+			gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(/*m_subCfg.alphaOutline*/128, 0, 0, 0)), &path_outline);
 
 
 			//마지막으로 실제 글자 출력
@@ -1543,7 +1542,7 @@ HRESULT CDShow::update_osd_subtitle()
 			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
 			{
 				COLORREF crText = get_color(m_cur_subtitle.sentences[i].color);
-				brush.SetColor(Gdiplus::Color(m_subCfg.alpha[0], GetRValue(crText), GetGValue(crText), GetBValue(crText)));
+				brush.SetColor(Gdiplus::Color(/*m_subCfg.alpha[0]*/128, GetRValue(crText), GetGValue(crText), GetBValue(crText)));
 			}
 			gr.FillPath(&brush, path_text);
 
@@ -1566,13 +1565,12 @@ HRESULT CDShow::update_osd_subtitle()
 	m_AlphaBitmap.rDest.left = 0.0f;// + 10;//X_EDGE_BUFFER;
 	m_AlphaBitmap.rDest.right = 1.0f;//textWidthRatioX;// + 10;//X_EDGE_BUFFER;
 	m_AlphaBitmap.rDest.top = 0.0f;//(float)(cy - 100) / (float)cy - 0.05;
-	m_AlphaBitmap.rDest.bottom = 1.0f - EDGE_BUFFER;
+	m_AlphaBitmap.rDest.bottom = 1.0f;// -EDGE_BUFFER;
 	m_AlphaBitmap.rSrc = reText;
 	m_AlphaBitmap.clrSrcKey = m_crColorKey;
 	m_AlphaBitmap.dwFlags |= VMRBITMAP_SRCCOLORKEY;
-	m_AlphaBitmap.fAlpha = (float)m_subCfg.alpha[0];
-	
-	m_AlphaBitmap.fAlpha = (float)m_subCfg.alpha[0] / 255.0;
+	//m_AlphaBitmap.fAlpha = (float)m_subCfg.alpha[0];
+	m_AlphaBitmap.fAlpha = 0.5f;// (float)m_subCfg.alpha[0] / 255.0;
 	m_pVMRMB->SetAlphaBitmap(&m_AlphaBitmap);
 
 	//이걸 해주지 않으면 일시정지인 경우 OSD가 제대로 표시되지 않는다.

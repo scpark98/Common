@@ -858,7 +858,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_use_bookmark && (m_cur_bookmark >= 0))
 	{
 		SetPos(m_bookmark[m_cur_bookmark].pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 		return;
 	}
 
@@ -902,11 +902,11 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
 		//CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_post)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos), 0);
+		::PostMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_callback)
 	{
@@ -933,11 +933,11 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), m_pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_post)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), m_pos), 0);
+		::PostMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), m_pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_callback)
 	{
@@ -1044,7 +1044,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		else if (m_nEventMsgStyle == msg_style_post)
 		{
-			::PostMessage(GetParent()->GetSafeHwnd(),	Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
+			::PostMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 		}
 		else if (m_nEventMsgStyle == msg_style_callback)
 		{
@@ -1318,7 +1318,7 @@ void CSCSliderCtrl::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_post_pos)
 	{
 		KillTimer(timer_post_pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 	}
 
 	CSliderCtrl::OnTimer(nIDEvent);
@@ -1392,7 +1392,7 @@ void CSCSliderCtrl::bookmark(int mode, int pos, CString name)
 		if (index >= 0)
 		{
 			SetPos(m_bookmark[index].pos);
-			::SendMessage(GetParent()->GetSafeHwnd(),	Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), m_pos), 0);
 		}
 	}
 

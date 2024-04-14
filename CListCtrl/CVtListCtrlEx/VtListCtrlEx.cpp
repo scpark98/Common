@@ -355,7 +355,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + (double)(r.Width()) * d;
 			pDC->FillSolidRect(r, m_crProgress);
 
-			//20231102 CSliderCtrlEx에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
+			//20231102 CSCSliderCtrl에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
 			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
 			//pDC가 아닌 CMemoryDC를 얻어서 출력하니 원하는대로 출력되지만 다른 row의 값이 그려지지 않는다.
 			//Rgn과 관련하여 OnPaint()와 DrawItem은 뭔가 차이가 있다.

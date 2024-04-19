@@ -1,6 +1,8 @@
 #include "SCLog.h"
 #include <afxmt.h>
 
+#include "../../Functions.h"
+
 CCriticalSection theCSLog;
 
 SCLog* pLog = NULL;
@@ -35,58 +37,66 @@ bool SCLog::init(CString logFolder, CString filetitle, int showLogLevel)
 			return false;
 		}
 
-		TCHAR	tExeFullPath[1024];
-		CString sExeFolder;
-
-		GetModuleFileName(AfxGetInstanceHandle(), tExeFullPath, MAX_PATH);
-		sExeFolder = tExeFullPath;
-		sExeFolder = sExeFolder.Left(sExeFolder.ReverseFind('\\'));
-
-		m_filetitle = PathFindFileName(tExeFullPath);
-
-		if (m_filetitle.Find(_T(".")) > 0)
-			m_filetitle = m_filetitle.Left(m_filetitle.ReverseFind('.'));
-
-		m_folder = sExeFolder + _T("\\Log");
-
-
 		m_showLogLevel = showLogLevel;
 
-		if (!logFolder.IsEmpty())
+		if (m_fullpath.IsEmpty())
 		{
-			logFolder.Replace(_T("/"), _T("\\"));
+			TCHAR	tExeFullPath[1024];
+			CString originalFilename;
+			CString sExeFolder;
 
-			//절대경로로 설정한 경우
-			if (logFolder.Find(_T(":\\")) > 0)
-				m_folder = logFolder;
-			//상대경로로 설정한 경우
-			else
-				m_folder.Format(_T("%s\\%s"), sExeFolder, logFolder);
+			//간단히 exe 파일명으로 로그파일을 생성하면 문제가 있다.
+			//예를 들어 LMMLauncher.exe를 download폴더에 다운받은 후
+			//해당 파일이 지워지지 않은 상태에서 다시 다운받으면 LMMLauncher (1).exe로 변경되므로
+			//로그파일 또한 LMMLauncher (1).log로 생성되는 문제가 발생한다.
+			//정확한 실행파일명을 얻어서 그 이름으로 생성해야 한다.
+			GetModuleFileName(AfxGetInstanceHandle(), tExeFullPath, MAX_PATH);
+			sExeFolder = get_part(tExeFullPath, fn_folder);
+			originalFilename = get_file_property(tExeFullPath, _T("OriginalFilename"));
+			m_filetitle = get_part(originalFilename, fn_title);
 
-			DWORD  retval = 0;
-			TCHAR buffer[MAX_PATH] = _T("");
+			//if (m_filetitle.Find(_T(".")) > 0)
+			//	m_filetitle = m_filetitle.Left(m_filetitle.ReverseFind('.'));
 
-			retval = GetFullPathName(m_folder, MAX_PATH, buffer, NULL);
+			m_folder = sExeFolder + _T("\\Log");
 
-			if (retval == 0)
+
+			if (!logFolder.IsEmpty())
 			{
-				TRACE(_T("GetFullPathName() error"));
+				logFolder.Replace(_T("/"), _T("\\"));
+
+				//절대경로로 설정한 경우
+				if (logFolder.Find(_T(":\\")) > 0)
+					m_folder = logFolder;
+				//상대경로로 설정한 경우
+				else
+					m_folder.Format(_T("%s\\%s"), sExeFolder, logFolder);
+
+				DWORD  retval = 0;
+				TCHAR buffer[MAX_PATH] = _T("");
+
+				retval = GetFullPathName(m_folder, MAX_PATH, buffer, NULL);
+
+				if (retval == 0)
+				{
+					TRACE(_T("GetFullPathName() error"));
+				}
+				else
+				{
+					m_folder = buffer;
+				}
 			}
-			else
-			{
-				m_folder = buffer;
-			}
+
+			if (!filetitle.IsEmpty())
+				m_filetitle = filetitle;
+
+			CTime t = CTime::GetCurrentTime();
+			m_filename.Format(_T("%s_%d%02d%02d.log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
+			m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
+
+			//CreateDirectory(m_folder, NULL);
+			recursive_make_full_directory(m_folder);
 		}
-
-		if (!filetitle.IsEmpty())
-			m_filetitle = filetitle;
-
-		CTime t = CTime::GetCurrentTime();
-		m_filename.Format(_T("%s_%d%02d%02d.log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
-		m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
-
-		//CreateDirectory(m_folder, NULL);
-		recursive_make_full_directory(m_folder);
 
 		_tfopen_s(&m_fp, m_fullpath, _T("a")CHARSET);
 

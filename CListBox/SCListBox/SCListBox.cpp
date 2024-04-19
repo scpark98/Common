@@ -1,8 +1,8 @@
-// ColorListBox.cpp : implementation file
+// SCListBox.cpp : implementation file
 
 //-------------------------------------------------------------------
 //
-//	CColorListBox class - 
+//	CSCListBox class - 
 //		A CListBox-derived class with optional colored items.
 //
 //		Version: 1.0	01/10/1998 Copyright ?Patrice Godard
@@ -15,7 +15,7 @@
 #include <afxdlgs.h>
 #include <commdlg.h>
 #include <fstream>
-#include "ColorListBox.h"
+#include "SCListBox.h"
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
@@ -29,11 +29,11 @@ static char THIS_FILE[] = __FILE__;
 #define IDC_EDIT_CELL	WM_USER + 9001
 
 /////////////////////////////////////////////////////////////////////////////
-// CColorListBox
+// CSCListBox
 
 //-------------------------------------------------------------------
 //
-CColorListBox::CColorListBox()
+CSCListBox::CSCListBox()
 //
 // Return Value:	None.
 //
@@ -49,11 +49,11 @@ CColorListBox::CColorListBox()
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	set_color_theme(color_theme_explorer, false);
-}	// CColorListBox
+}	// CSCListBox
 
 //-------------------------------------------------------------------
 //
-CColorListBox::~CColorListBox()
+CSCListBox::~CSCListBox()
 {
 	if (m_pEdit)
 	{
@@ -68,8 +68,8 @@ CColorListBox::~CColorListBox()
 	}
 }
 
-BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
-	//{{AFX_MSG_MAP(CColorListBox)
+BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
+	//{{AFX_MSG_MAP(CSCListBox)
 	//}}AFX_MSG_MAP
 	ON_WM_MOUSEMOVE()
 	ON_WM_ERASEBKGND()
@@ -77,7 +77,7 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 	//ON_WM_DRAWITEM_REFLECT()
 	ON_WM_KEYDOWN()
 	ON_WM_KILLFOCUS()
-	ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CColorListBox::OnLbnSelchange)
+	ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CSCListBox::OnLbnSelchange)
 	ON_WM_CONTEXTMENU()
 	ON_COMMAND_RANGE(menu_show_log, menu_save_all, OnPopupMenu)
 	ON_WM_MOUSEWHEEL()
@@ -90,9 +90,9 @@ BEGIN_MESSAGE_MAP(CColorListBox, CListBox)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CColorListBox message handlers
+// CSCListBox message handlers
 /*
-LRESULT CColorListBox::OnSetFont(WPARAM wParam, LPARAM)
+LRESULT CSCListBox::OnSetFont(WPARAM wParam, LPARAM)
 {
 	TRACE("%s\n" __FUNCTION__);
 	LRESULT res = Default();
@@ -111,7 +111,7 @@ LRESULT CColorListBox::OnSetFont(WPARAM wParam, LPARAM)
 	return res;
 }
 */
-void CColorListBox::PreSubclassWindow()
+void CSCListBox::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
 	// Get Defalut Font 
@@ -134,7 +134,7 @@ void CColorListBox::PreSubclassWindow()
 	ReconstructFont();
 }
 
-void CColorListBox::ReconstructFont()
+void CSCListBox::ReconstructFont()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
@@ -147,7 +147,7 @@ void CColorListBox::ReconstructFont()
 	ASSERT(bCreated);
 }
 
-CColorListBox& CColorListBox::set_font(LOGFONT& lf)
+CSCListBox& CSCListBox::set_font(LOGFONT& lf)
 {
 	memcpy(&m_lf, &lf, sizeof(LOGFONT));
 	ReconstructFont();
@@ -155,7 +155,7 @@ CColorListBox& CColorListBox::set_font(LOGFONT& lf)
 	return *this;
 }
 
-CColorListBox& CColorListBox::set_font_name(CString sFontname, BYTE byCharSet)
+CSCListBox& CSCListBox::set_font_name(CString sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
@@ -164,7 +164,7 @@ CColorListBox& CColorListBox::set_font_name(CString sFontname, BYTE byCharSet)
 	return *this;
 }
 
-CColorListBox& CColorListBox::set_font_size(int nSize)
+CSCListBox& CSCListBox::set_font_size(int nSize)
 {
 	HDC hDC = GetDC()->GetSafeHdc();
 	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(hDC, LOGPIXELSY), 72);
@@ -174,7 +174,7 @@ CColorListBox& CColorListBox::set_font_size(int nSize)
 	return *this;
 }
 
-CColorListBox& CColorListBox::set_font_bold(bool bBold)
+CSCListBox& CSCListBox::set_font_bold(bool bBold)
 {
 	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
 	ReconstructFont();
@@ -184,7 +184,7 @@ CColorListBox& CColorListBox::set_font_bold(bool bBold)
 
 //-------------------------------------------------------------------
 //
-void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS) 
+void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS) 
 //
 // Return Value:	None.
 //
@@ -344,6 +344,9 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		pOldFont = dc.SelectObject(&m_font);
 	}
 
+	//text 출력 왼쪽 여백
+	rect.left += 4;
+
 	//rc의 오른쪽 끝 여백 설정
 	rect.right -= 10;
 
@@ -393,7 +396,7 @@ void CColorListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 
 //기본 글자색으로 한 줄 추가
-int	CColorListBox::add(LPCTSTR lpszFormat, ...)
+int	CSCListBox::add(LPCTSTR lpszFormat, ...)
 {
 	//가변인자를 그대로 전달하는 방법은 없다.
 	//고정인자로 변경한 후 add함수를 호출해줘야 한다.
@@ -406,7 +409,7 @@ int	CColorListBox::add(LPCTSTR lpszFormat, ...)
 	return add(m_cr_text, new_text);
 }
 
-int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
+int CSCListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 {
 	if (m_hWnd == NULL)
 		return -1;
@@ -430,6 +433,7 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	int i;
 	int pre_linefeed_count = 0;		//앞에 붙은 \n 처리
 	int post_linefeed_count = 0;	//뒤에 붙은 \n 처리
+	int index = -1;					//AddString에 의해 삽입된 리스트 인덱스
 	bool skip_time_info = false;
 
 	for (i = 0; i < new_text.GetLength(); i++)
@@ -454,7 +458,10 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	//앞에 붙은 '\n'의 개수만큼 라인 추가
 	if (pre_linefeed_count == 0 && new_text.IsEmpty())
 	{
-		AddString(_T(""));
+		index = AddString(_T(""));
+
+		if (new_text.IsEmpty())
+			return index;
 	}
 	else
 	{
@@ -464,9 +471,7 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		}
 	}
 
-
 	CString date_str, time_str;
-	int index = -1;
 
 	if ((m_show_date || m_show_time) && !skip_time_info)
 	{
@@ -493,8 +498,7 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 			SetItemData(index, cr);
 
 		//뒤에 붙었던 '\n'개수만큼 빈 줄을 추가해준다.
-		//단, 보통 로그 출력시 기본적으로 끝에 \n을 붙여 출력하므로 1개일 경우는 스킵시킨다.
-		for (i = 1; i < post_linefeed_count; i++)
+		for (i = 0; i < post_linefeed_count; i++)
 		{
 			AddString(_T(""));
 		}
@@ -528,7 +532,7 @@ int CColorListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	return index;
 }
 
-int CColorListBox::add(std::deque<CString> *lists, COLORREF cr)
+int CSCListBox::add(std::deque<CString> *lists, COLORREF cr)
 {
 	if (cr == -1)
 		cr = m_cr_text;
@@ -541,7 +545,7 @@ int CColorListBox::add(std::deque<CString> *lists, COLORREF cr)
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::insert_string(int nIndex, CString lpszItem)
+int CSCListBox::insert_string(int nIndex, CString lpszItem)
 //
 // Return Value:	The zero-based index of the position at which the 
 //						string was inserted. The return value is LB_ERR if 
@@ -567,7 +571,7 @@ int CColorListBox::insert_string(int nIndex, CString lpszItem)
 
 //-------------------------------------------------------------------
 //
-int CColorListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
+int CSCListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 //
 // Return Value:	The zero-based index of the position at which the 
 //						string was inserted. The return value is LB_ERR if 
@@ -598,7 +602,7 @@ int CColorListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 
 //-------------------------------------------------------------------
 //
-void CColorListBox::set_item_color(int nIndex, COLORREF rgb, bool invalidate)
+void CSCListBox::set_item_color(int nIndex, COLORREF rgb, bool invalidate)
 //
 // Return Value:	None.
 //
@@ -614,12 +618,12 @@ void CColorListBox::set_item_color(int nIndex, COLORREF rgb, bool invalidate)
 		RedrawWindow();
 }
 
-COLORREF CColorListBox::get_item_color( int nIndex )
+COLORREF CSCListBox::get_item_color( int nIndex )
 {
 	return (COLORREF)GetItemData( nIndex );
 }
 
-CString CColorListBox::get_text(int index)
+CString CSCListBox::get_text(int index)
 {
 	CString text;
 
@@ -634,7 +638,7 @@ CString CColorListBox::get_text(int index)
 	return text;
 }
 
-void CColorListBox::set_text(int index, CString text, COLORREF cr)
+void CSCListBox::set_text(int index, CString text, COLORREF cr)
 {
 	if (index < 0 || index >= GetCount())
 	{
@@ -649,7 +653,7 @@ void CColorListBox::set_text(int index, CString text, COLORREF cr)
 	UpdateWindow();
 }
 
-void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
+void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
 	if (m_use_over)
@@ -668,7 +672,7 @@ void CColorListBox::OnMouseMove(UINT nFlags, CPoint point)
 	CListBox::OnMouseMove(nFlags, point);
 }
 
-void CColorListBox::OnPaint()
+void CSCListBox::OnPaint()
 {
 	CListBox::OnPaint();
 
@@ -679,7 +683,7 @@ void CColorListBox::OnPaint()
 	//dc.FillSolidRect(rc, RGB(255, 0, 0));
 }
 
-BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
+BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: Add your message handler code here and/or call default
 
@@ -692,7 +696,7 @@ BOOL CColorListBox::OnEraseBkgnd(CDC* pDC)
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
-CSize CColorListBox::resizeToFit(bool bHori, bool bVert)
+CSize CSCListBox::resizeToFit(bool bHori, bool bVert)
 {
 	CRect	r;
 	GetWindowRect(r);
@@ -741,7 +745,7 @@ CSize CColorListBox::resizeToFit(bool bHori, bool bVert)
 	return CSize(r.Width(), r.Height());
 }
 
-void CColorListBox::set_line_height(int _line_height)
+void CSCListBox::set_line_height(int _line_height)
 {
 	if (_line_height < 8)
 		_line_height = 8;
@@ -751,12 +755,12 @@ void CColorListBox::set_line_height(int _line_height)
 	Invalidate();
 }
 
-BOOL CColorListBox::PreTranslateMessage(MSG* pMsg)
+BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: Add your specialized code here and/or call the base class
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		//TRACE(_T("CColorListBox message = %d\n"), pMsg->wParam);
+		//TRACE(_T("CSCListBox message = %d\n"), pMsg->wParam);
 
 		switch (pMsg->wParam)
 		{
@@ -799,16 +803,16 @@ BOOL CColorListBox::PreTranslateMessage(MSG* pMsg)
 }
 
 
-void CColorListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+void CSCListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	// TODO: Add your message handler code here and/or call default
-	//TRACE(_T("CColorListBox::OnKeyDown = %d\n"), nChar);
+	//TRACE(_T("CSCListBox::OnKeyDown = %d\n"), nChar);
 	//HWND hWnd = GetParent()->GetSafeHwnd();
 	//::PostMessage(hWnd, WM_KEYDOWN, (WPARAM)nChar, 0);
 	CListBox::OnKeyDown(nChar, nRepCnt, nFlags);
 }
 
-void CColorListBox::set_color_theme(int theme, bool apply_now)
+void CSCListBox::set_color_theme(int theme, bool apply_now)
 {
 	switch (theme)
 	{
@@ -855,7 +859,7 @@ void CColorListBox::set_color_theme(int theme, bool apply_now)
 }
 
 
-void CColorListBox::OnKillFocus(CWnd* pNewWnd)
+void CSCListBox::OnKillFocus(CWnd* pNewWnd)
 {
 	CListBox::OnKillFocus(pNewWnd);
 
@@ -867,7 +871,7 @@ void CColorListBox::OnKillFocus(CWnd* pNewWnd)
 		edit_end();
 }
 
-int CColorListBox::set_path(CString root, CString selected_text)
+int CSCListBox::set_path(CString root, CString selected_text)
 {
 	if (root.IsEmpty())
 	{
@@ -884,7 +888,7 @@ int CColorListBox::set_path(CString root, CString selected_text)
 	return set_folder_list(NULL, selected_text);
 }
 
-void CColorListBox::set_as_folder_list()
+void CSCListBox::set_as_folder_list()
 {
 	m_use_over = true;
 	m_use_popup_menu = false;
@@ -894,7 +898,7 @@ void CColorListBox::set_as_folder_list()
 	m_cr_back = ::GetSysColor(COLOR_3DFACE);
 }
 
-int CColorListBox::set_folder_list(std::deque<CString>* lists, CString selected_text)
+int CSCListBox::set_folder_list(std::deque<CString>* lists, CString selected_text)
 {
 	ResetContent();
 
@@ -918,7 +922,7 @@ int CColorListBox::set_folder_list(std::deque<CString>* lists, CString selected_
 	return m_folder_list.size();
 }
 
-BOOL CColorListBox::OnLbnSelchange()
+BOOL CSCListBox::OnLbnSelchange()
 {
 	int index = GetCurSel();
 
@@ -945,7 +949,7 @@ BOOL CColorListBox::OnLbnSelchange()
 
 		if (m_hParentWnd)
 		{
-			::SendMessage(m_hParentWnd, Message_CColorListBox, (WPARAM)&CColorListBoxMessage(this, message_colorlistbox_selchanged), (LPARAM)&text);
+			::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&CSCListBoxMessage(this, message_sclistbox_selchanged), (LPARAM)&text);
 
 			if (m_as_popup)
 				ShowWindow(SW_HIDE);
@@ -956,7 +960,7 @@ BOOL CColorListBox::OnLbnSelchange()
 }
 
 //선택된 항목 리스트 또는 선택된 개수를 리턴
-int CColorListBox::get_selected_items(std::deque<int>* selected)
+int CSCListBox::get_selected_items(std::deque<int>* selected)
 {
 	int selected_count = GetSelCount();
 
@@ -977,7 +981,7 @@ int CColorListBox::get_selected_items(std::deque<int>* selected)
 }
 
 
-void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
+void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 {
 	if (!m_use_popup_menu)
 		return;
@@ -1048,25 +1052,25 @@ void CColorListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.DestroyMenu();
 }
 
-void CColorListBox::OnPopupMenu(UINT nMenuID)
+void CSCListBox::OnPopupMenu(UINT nMenuID)
 {
 	switch (nMenuID)
 	{
 	case menu_show_log:
 		m_show_log = !m_show_log;
-		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("show log"), m_show_log);
+		AfxGetApp()->WriteProfileInt(_T("setting\\SCListBox"), _T("show log"), m_show_log);
 		break;
 	case menu_show_date:
 		m_show_date = !m_show_date;
-		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("show date"), m_show_date);
+		AfxGetApp()->WriteProfileInt(_T("setting\\SCListBox"), _T("show date"), m_show_date);
 		break;
 	case menu_show_time:
 		m_show_time = !m_show_time;
-		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("show time"), m_show_time);
+		AfxGetApp()->WriteProfileInt(_T("setting\\SCListBox"), _T("show time"), m_show_time);
 		break;
 	case menu_auto_scroll:
 		m_auto_scroll = !m_auto_scroll;
-		AfxGetApp()->WriteProfileInt(_T("setting\\ColorListBox"), _T("auto scroll"), m_auto_scroll);
+		AfxGetApp()->WriteProfileInt(_T("setting\\SCListBox"), _T("auto scroll"), m_auto_scroll);
 		break;
 	case menu_clear_all:
 		ResetContent();
@@ -1088,7 +1092,7 @@ void CColorListBox::OnPopupMenu(UINT nMenuID)
 }
 
 //1:show, 0:hide, -1:no change
-void CColorListBox::show_date_time(int date, int time)
+void CSCListBox::show_date_time(int date, int time)
 {
 	if (date >= 0)
 		m_show_date = date;
@@ -1097,7 +1101,7 @@ void CColorListBox::show_date_time(int date, int time)
 		m_show_time = time;
 }
 
-CString CColorListBox::get_all_text(bool selected_only)
+CString CSCListBox::get_all_text(bool selected_only)
 {
 	int i;
 	CString text;
@@ -1128,21 +1132,21 @@ CString CColorListBox::get_all_text(bool selected_only)
 	return result;
 }
 
-void CColorListBox::copy_selected_to_clipboard()
+void CSCListBox::copy_selected_to_clipboard()
 {
 	CString text = get_all_text(true);
 	copy_to_clipboard(m_hWnd, text);
 }
 
-void CColorListBox::copy_all_to_clipboard()
+void CSCListBox::copy_all_to_clipboard()
 {
 	CString text = get_all_text();
 	copy_to_clipboard(m_hWnd, text);
 }
 
-void CColorListBox::save_selected_to_file()
+void CSCListBox::save_selected_to_file()
 {
-	CString recent = AfxGetApp()->GetProfileString(_T("setting\\ColorListBox"), _T("recent saved file"), _T(""));
+	CString recent = AfxGetApp()->GetProfileString(_T("setting\\SCListBox"), _T("recent saved file"), _T(""));
 
 	if (recent.IsEmpty())
 		recent.Format(_T("%s\\logs.txt"), get_exe_directory());
@@ -1162,9 +1166,9 @@ void CColorListBox::save_selected_to_file()
 	//of.close();
 }
 
-void CColorListBox::save_all_to_file()
+void CSCListBox::save_all_to_file()
 {
-	CString recent = AfxGetApp()->GetProfileString(_T("setting\\ColorListBox"), _T("recent saved file"), _T(""));
+	CString recent = AfxGetApp()->GetProfileString(_T("setting\\SCListBox"), _T("recent saved file"), _T(""));
 
 	if (recent.IsEmpty())
 		recent.Format(_T("%s\\logs.txt"), get_exe_directory());
@@ -1197,7 +1201,7 @@ void CColorListBox::save_all_to_file()
 }
 
 
-BOOL CColorListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+BOOL CSCListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	
@@ -1208,7 +1212,7 @@ BOOL CColorListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 }
 
 
-void CColorListBox::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+void CSCListBox::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
 	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
@@ -1222,7 +1226,7 @@ void CColorListBox::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 }
 
 
-void CColorListBox::OnSize(UINT nType, int cx, int cy)
+void CSCListBox::OnSize(UINT nType, int cx, int cy)
 {
 	CListBox::OnSize(nType, cx, cy);
 
@@ -1239,7 +1243,7 @@ void CColorListBox::OnSize(UINT nType, int cx, int cy)
 }
 
 
-void CColorListBox::edit(int index)
+void CSCListBox::edit(int index)
 {
 	if (index < 0 || index >= GetCount())
 	{
@@ -1280,7 +1284,7 @@ void CColorListBox::edit(int index)
 }
 
 //modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
-void CColorListBox::edit_end(bool modify)
+void CSCListBox::edit_end(bool modify)
 {
 	if (!m_use_edit || !m_in_editing || m_edit_index < 0 || m_edit_index >= GetCount())
 		return;
@@ -1303,7 +1307,7 @@ void CColorListBox::edit_end(bool modify)
 }
 
 
-void CColorListBox::OnLButtonDown(UINT nFlags, CPoint point)
+void CSCListBox::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 
@@ -1311,21 +1315,21 @@ void CColorListBox::OnLButtonDown(UINT nFlags, CPoint point)
 }
 
 
-void CColorListBox::OnLButtonUp(UINT nFlags, CPoint point)
+void CSCListBox::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 
 	CListBox::OnLButtonUp(nFlags, point);
 }
 
-void CColorListBox::add_to_imagelist(UINT id)
+void CSCListBox::add_to_imagelist(UINT id)
 {
 	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
 	m_imagelist.push_back(img);
 }
 
 
-void CColorListBox::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+void CSCListBox::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CListBox::OnWindowPosChanged(lpwndpos);
 

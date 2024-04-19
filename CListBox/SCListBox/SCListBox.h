@@ -1,5 +1,5 @@
-#if !defined(AFX_COLORLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_)
-#define AFX_COLORLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_
+#if !defined(AFX_SCLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_)
+#define AFX_SCLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_
 
 
 /*
@@ -18,6 +18,10 @@
 * 
 * [warning]
 * - 컨트롤의 너비, 높이가 어느 이상되면 표시 속도가 현저히 느려진다.
+* 
+* [setting]
+* - 필수 : Has String = true, Owner Draw = Fixed, No Integral Height = false
+* - 선택 : Multiline, Sort
 * 
 * [수정될 내용]
 * - text color를 SetItemData()를 이용하여 지정하고 있으나 image index 등을 저장하려면
@@ -42,11 +46,11 @@
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
 //#define ROOT_LABEL _T("_r")
 
-// ColorListBox.h : header file
+// SCListBox.h : header file
 
 //-------------------------------------------------------------------
 //
-//	CColorListBox class - 
+//	CSCListBox class - 
 //		A CListBox-derived class with optional colored items.
 //
 //		Version: 1.0	01/10/1998 Copyright ?Patrice Godard
@@ -56,14 +60,14 @@
 //-------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
-// CColorListBox window
+// CSCListBox window
 
-static const UINT Message_CColorListBox = ::RegisterWindowMessage(_T("MessageString_CColorListBox"));
+static const UINT Message_CSCListBox = ::RegisterWindowMessage(_T("MessageString_CSCListBox"));
 
-class CColorListBoxMessage
+class CSCListBoxMessage
 {
 public:
-	CColorListBoxMessage(CWnd* _this, int _message)
+	CSCListBoxMessage(CWnd* _this, int _message)
 	{
 		pThis = _this;
 		message = _message;
@@ -73,16 +77,16 @@ public:
 	int		message;
 };
 
-class CColorListBox : public CListBox
+class CSCListBox : public CListBox
 {
 // Construction
 public:
-	CColorListBox();
-	virtual ~CColorListBox();
+	CSCListBox();
+	virtual ~CSCListBox();
 
 	enum MESSAGES
 	{
-		message_colorlistbox_selchanged = 0,
+		message_sclistbox_selchanged = 0,
 	};
 
 // Attributes
@@ -163,13 +167,13 @@ public:
 	int			set_folder_list(std::deque<CString>* lists = NULL, CString selected_text = _T(""));
 
 
-	virtual		CColorListBox&	set_font(LOGFONT& lf);
-	virtual		CColorListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual		CColorListBox&	set_font_size(int nSize);
-	virtual		CColorListBox&	set_font_bold(bool bBold = true);
+	virtual		CSCListBox&	set_font(LOGFONT& lf);
+	virtual		CSCListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	virtual		CSCListBox&	set_font_size(int nSize);
+	virtual		CSCListBox&	set_font_bold(bool bBold = true);
 
 	//color setting
-	enum COLORLISTBOX_COLOR_THEME
+	enum SCLISTBOX_COLOR_THEME
 	{
 		color_theme_default = 0,
 		color_theme_explorer,
@@ -297,7 +301,7 @@ protected:
 
 // Overrides
 	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CColorListBox)
+	//{{AFX_VIRTUAL(CSCListBox)
 	public:
 	//afx_msg LRESULT OnSetFont(WPARAM wParam, LPARAM);
 	//}}AFX_VIRTUAL
@@ -333,4 +337,4 @@ public:
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Developer Studio will insert additional declarations immediately before the previous line.
 
-#endif // !defined(AFX_COLORLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_)
+#endif // !defined(AFX_SCLISTBOX_H__5529A6B1_584A_11D2_A41A_006097BD277B__INCLUDED_)

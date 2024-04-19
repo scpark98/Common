@@ -2,13 +2,12 @@
 
 /*
 * scpark 20240411
-* resource의 IDD 없이 동적으로 popup dialog를 생성하고
+* resource의 IDD 없이 동적으로 modeless dialog를 생성하고
 * progress를 표시하기 위해 제작.
 * 
 */
 
 #include <afxdialogex.h>
-#include <afxribbonprogressbar.h>
 #include "../../CStatic/SCStatic/SCStatic.h"
 #include "../../CProgressCtrl/MacProgressCtrl/MacProgressCtrl.h"
 
@@ -28,10 +27,11 @@ public:
 	void			set_range(int32_t lower, int32_t upper);
 	void			set_indeterminate(bool indeterminate = true);
 
-protected:
-	CWnd*			m_parent = NULL;
 	CSCStatic		m_static;
 	CMacProgressCtrl m_progress;
+
+protected:
+	CWnd*			m_parent = NULL;
 
 
 	LOGFONT			m_lf;

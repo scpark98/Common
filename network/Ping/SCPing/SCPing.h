@@ -101,6 +101,7 @@ public:
 
 	//해당 주소의 핑 쓰레드를 중지. ""이면 모든 핑 중지.
 	void	stop(CString job_name = _T(""));
+	bool	is_thread_running(CString job_name);
 	bool	is_all_threads_stopped();
 
 protected:

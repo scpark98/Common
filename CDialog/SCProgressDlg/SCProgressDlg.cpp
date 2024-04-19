@@ -39,8 +39,12 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 	//dwStyle = (dwStyle & ~WS_CAPTION);
 	//id를 1234로 주면 왜 생성이 안될까...
 	//className과 windowName을 CSCMenu 등 다른걸로 주면 생성이 실패하는 이유는??
-	bool res = CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
+	bool res = CreateEx(WS_EX_WINDOWEDGE | WS_EX_TOPMOST, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
 	//bool res = CreateEx(WS_EX_STATICEDGE | WS_EX_TOPMOST, _T("listbox"), _T("listbox"), dwStyle, CRect(0, 0, 320, 300), parent, 0);
+
+	MoveWindow(left, top, right - left, bottom - top);
+	CRect rc;
+	GetClientRect(rc);
 
 	if (res)
 	{
@@ -54,13 +58,14 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 		else
 			GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
-		int height = 14;
-		int bottom_pos = bottom - (double)(bottom - top) * 0.16 - height;
+		int progress_height = 14;
+		int bottom_pos = rc.bottom - (double)(rc.bottom - rc.top) * 0.16 - progress_height;
 		BOOL bOk;
 		
 		//m_progress = new CMFCRibbonProgressBar(2734, 200);
-		m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_MARQUEE, CRect(left + 20, bottom_pos, right - 20, bottom_pos + height), this, 0);
+		m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_MARQUEE, CRect(rc.left + 20, bottom_pos, rc.right - 20, bottom_pos + progress_height), this, 0);
 		m_progress.ShowWindow(SW_SHOW);
+		m_progress.SetTransparent();
 		//m_progress.SetMarquee(TRUE, 10);
 		//m_progress.SetIndeterminate();
 		//m_progress.SetRange(0, 100);
@@ -73,7 +78,7 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 		//m_progress->SetPos(200, true);
 		//m_progress->SetVisible(TRUE);
 
-		bOk = m_static.Create(text, WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE, CRect(left + 20, top + 8, right - 20, bottom_pos - 8), this, 0);
+		bOk = m_static.Create(text, WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE, CRect(rc.left + 20, rc.top + 8, rc.right - 20, bottom_pos - 8), this, 0);
 		m_static.set_transparent();
 
 		reconstruct_font();

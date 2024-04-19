@@ -224,20 +224,20 @@ void CImageShapeWnd::play()
 	if (m_run_thread_animate)
 		return;
 
-	if (m_img.get_frame_count() == 1)
-	{
-		render(m_img.m_pBitmap);
-	}
-	else
+	if (m_img.is_animated_gif())
 	{
 		std::thread t(&CImageShapeWnd::thread_animate, this);
 		t.detach();
+	}
+	else
+	{
+		render(m_img.m_pBitmap);
 	}
 }
 
 void CImageShapeWnd::set_pos(int pos)
 {
-	if (m_img.empty() || !m_img.is_animated_gif())
+	if (m_img.is_empty() || !m_img.is_animated_gif())
 		return;
 
 	if (m_run_thread_animate)
@@ -253,7 +253,7 @@ void CImageShapeWnd::set_pos(int pos)
 
 void CImageShapeWnd::set_pos(double dpos)
 {
-	if (m_img.empty() || !m_img.is_animated_gif())
+	if (m_img.is_empty() || !m_img.is_animated_gif())
 		return;
 
 	if (dpos < 0.0 || dpos > 1.0)
@@ -450,7 +450,7 @@ void CImageShapeWnd::OnSize(UINT nType, int cx, int cy)
 //이미지의 x, y위치의 색상을 crNew로 대체한다.(한 점이 아닌 이미지 전체 대상)
 void CImageShapeWnd::replace_color(int tx, int ty, Gdiplus::Color crNew)
 {
-	if (m_img.empty())
+	if (m_img.is_empty())
 		return;
 
 	m_use_replace_color = true;

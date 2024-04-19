@@ -593,7 +593,8 @@ CString		get_exe_filename(bool fullpath /*= false*/)
 	TCHAR	sFilePath[1024];
 	CString sExeFile;
 	
-	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
+	//GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
+	GetModuleFileName(NULL, sFilePath, MAX_PATH);
 	
 	if (fullpath)
 		sExeFile = sFilePath;
@@ -765,12 +766,13 @@ int	GetFileTypeFromExtension(CString sExt)
 
 //파일명에서 확장자를 newExt로 변경한다.
 //applyRealFile이 true이면 실제 파일명도 변경시킨다.
-bool ChangeExtension(CString& filepath, CString newExt, bool applyRealFile)
+bool change_extension(CString& filepath, CString newExt, bool applyRealFile)
 {
 	CString sOldExt = get_part(filepath, fn_ext);
 	CString sNewFullPath = filepath.Left(filepath.GetLength() - sOldExt.GetLength()) + newExt;
 
 	bool changeSuccess = false;
+
 	if (applyRealFile)
 	{
 		//실제 파일 확장자를 변경했을때만 filepath도 변경시켜준다.
@@ -2915,8 +2917,8 @@ LONG get_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString 
 {
 	HKEY	hkey = NULL;
 	DWORD	dwType = REG_SZ;
-	DWORD	dwBytes = 1024;
 	TCHAR	buffer[1024] = { 0, };
+	DWORD	dwBytes = sizeof(buffer);
 	LPVOID	lpMsgBuf;
 	
 	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
@@ -2925,6 +2927,7 @@ LONG get_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString 
 	{
 		if (hkey)
 		{
+			//nError = RegQueryValueEx(hkey, entry, NULL, &dwType, (LPBYTE)buffer, &dwBytes);
 			nError = RegQueryValueEx(hkey, entry, NULL, &dwType, (LPBYTE)buffer, &dwBytes);
 			
 			if (nError == ERROR_SUCCESS)
@@ -2962,7 +2965,9 @@ LONG get_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString 
 	
 	RegCloseKey(hkey);
 	
-	*str = CString(buffer);
+	TCHAR tstr[1024] = { 0, };
+	_tcsncpy(tstr, buffer, dwBytes);
+	(*str).Format(_T("%s"), buffer);
 	return nError;
 }
 
@@ -2988,10 +2993,9 @@ LONG set_registry_int(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value
 LONG set_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
 {
 	HKEY	hkey;
-	LONG	lResult;
+	LONG	lResult = ERROR_SUCCESS;
 	DWORD	dwDesc;
 	TCHAR	buffer[1000] = { 0, };
-	DWORD	dwReturn;
 	
 	ZeroMemory(buffer, sizeof(buffer));
 
@@ -3003,14 +3007,11 @@ LONG set_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString 
 		buffer, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
 	
 	if (lResult == ERROR_SUCCESS)
-		dwReturn = RegSetValueEx(hkey, entry, NULL, REG_SZ, (BYTE*)buffer, _tcslen(buffer) + 1);
+		lResult = RegSetValueEx(hkey, entry, NULL, REG_SZ, (BYTE*)buffer, sizeof(buffer) + 1);
 	
 	RegCloseKey(hkey);
 
-	if (dwReturn != ERROR_SUCCESS)
-		return false;
-
-	return true;
+	return lResult;
 }
 //#endif
 

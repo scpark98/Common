@@ -4,7 +4,7 @@
 * 기존 Koino에서 사용하던 SCLog에 로그를 출력한 함수명과 라인 정보를 추가.
 * (#define logWrite...를 사용하므로 멀티쓰레드가 가능할지는 아직 확인 못함)
 * 
-* app.h에서
+* app.h에서 (프로젝트 구성에 따라 App class가 아닌 stdafx.h 또는 pch.h 등에 선언할 수도 있음)
 	#include "../../Common/log/SCLog.h"
 	...
 	전역변수로 아래 변수 선언.
@@ -14,14 +14,18 @@
 
   SCLog gLog;
 
-	//만약 로그파일의 위치를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
+	//만약 로그파일의 경로를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
+	//로그파일명 형식은 projectName_yyyymmdd.log
 	gLog.Init(_T("../../custom log folder/folder1/folder2"));
 
 	//어떤 프로젝트의 경우에는 함수명이 노출되서는 안되는 경우도 있다. 함수명과 라인번호 표시 유무를 옵션처리.
+	show_function_name(false);
+	show_line_number(false);
 
-
-	//위치를 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
+	//경로를 별도로 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
 	logWrite(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
+
+	//SCLOG_LEVEL_WARN 등과 같이 로그레벨을 지정하여 특정 로그들만 기록되게 할 수 있는데 아직 미구현.
 
 	//도중에 로그파일의 위치를 변경해도 적용되는지 확인 필요함.
 */
@@ -83,14 +87,14 @@ public:
 	bool		recursive_make_full_directory(LPCTSTR sFolder);
 
 protected:
-	CString m_filetitle;
-	CString m_filename;
-	CString m_folder;
-	CString m_fullpath;
-	int		m_showLogLevel;
-	bool	m_show_function_name = true;
-	bool	m_show_line_number = true;
-	FILE* m_fp;
+	CString		m_filetitle;
+	CString		m_filename;
+	CString		m_folder;
+	CString		m_fullpath;
+	int			m_showLogLevel;
+	bool		m_show_function_name = true;
+	bool		m_show_line_number = true;
+	FILE*		m_fp;
 
 };
 

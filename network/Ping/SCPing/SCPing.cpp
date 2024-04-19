@@ -36,7 +36,9 @@ void CSCPing::add(CString addr, int retry, int timeout, CString job_name)
 {
 	CSCPingParams *params = new CSCPingParams(addr, retry, timeout, job_name);
 
-	std::map<CString, int>::iterator it = m_map.find(params->job_name);
+	std::map<CString, int>::iterator it = m_map.find(job_name);
+
+	//이미 등록된 장비라면
 	if (it != m_map.end())
 		m_map[params->job_name] = PING_THREAD_IS_RUNNING;
 	else
@@ -69,6 +71,12 @@ void CSCPing::stop(CString job_name)
 	//	TRACE(_T("wait all threads stopped...\n"));
 	//	//Sleep(1000);
 	//}
+}
+
+bool CSCPing::is_thread_running(CString job_name)
+{
+	std::map<CString, int>::iterator it = m_map.find(job_name);
+	return (it != m_map.end() && it->second == PING_THREAD_IS_RUNNING);
 }
 
 bool CSCPing::is_all_threads_stopped()

@@ -831,7 +831,7 @@ struct	NETWORK_INFO
 #endif
 	int			GetFileTypeFromFilename(CString filename);
 	int			GetFileTypeFromExtension(CString sExt);
-	bool		ChangeExtension(CString& filepath, CString newExt, bool applyRealFile);
+	bool		change_extension(CString& filepath, CString newExt, bool applyRealFile);
 	CString		normalize_path(CString& filepath);
 
 	//폴더에 있는 파일들 중 filetitle이고 extension에 해당하는 파일명을 리턴한다.

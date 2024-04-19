@@ -124,7 +124,7 @@ private:
 
 	bool		m_bIndeterminate;
 	bool		m_indeterminate_forward = true;
-	int			m_indeterminate_width = 80;
+	int			m_indeterminate_width = 120;
 	std::deque<COLORREF> m_dq_cr_indeterminate;
 	void		thread_indeterminate();
 

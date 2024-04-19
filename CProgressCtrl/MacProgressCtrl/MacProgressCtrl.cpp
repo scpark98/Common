@@ -63,7 +63,8 @@ CMacProgressCtrl::CMacProgressCtrl()
 	m_bTransparent		= false;
 	m_bGradient			= false;
 	
-	m_dq_cr_indeterminate.push_back(m_crBackColor);
+	//m_dq_cr_indeterminate.push_back(m_crBackColor);
+	m_dq_cr_indeterminate.push_back(::GetSysColor(COLOR_3DFACE));
 	m_dq_cr_indeterminate.push_back(RGB(64, 212, 32));
 
 	GetColors();
@@ -150,31 +151,16 @@ void CMacProgressCtrl::OnPaint()
 			//dcPaint.FillRect(rect, &brLightest);
 			//DrawHorizontalBar(&dc, rect);
 		}
-/*
-		if (m_bShowPercent)
-			m_sText.Format("%.0f %%", (double)(pos - m_lower) / (double)(m_upper - m_lower) * 100.0);
-
-		if (m_sText != "")
-		{
-			CRect	rect1 = rc;
-			dcPaint.SetBkMode(TRANSPARENT);
-
-			rect1.OffsetRect(1, 0);
-			dcPaint.SetTextColor(RGB(0,0,0));
-			dcPaint.DrawText(m_sText, rect1, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-
-			rect1.OffsetRect(-1, -1);
-			dcPaint.SetTextColor(m_cTextColor);
-			dcPaint.DrawText(m_sText, rect1, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-		}
-*/
 	}
 	else
+	{
+		dc.FillSolidRect(rc, m_crBackColor);
+	}
+	
 	{
 		//indeterminate일때는 배경색으로 그리는게 아니라 전경색보다 밝은 색으로 그린다.
 		if (m_bIndeterminate)
 		{
-			dc.FillSolidRect(rc, m_crBackColor);
 			CRect gradRect;
 			
 			if (m_indeterminate_forward)
@@ -183,10 +169,6 @@ void CMacProgressCtrl::OnPaint()
 				gradRect = CRect(m_nIndOffset, rc.top, m_nIndOffset + m_indeterminate_width, rc.bottom);
 			//gradRect.left = m_nIndOffset;
 			gradient_rect(dc, gradRect, m_dq_cr_indeterminate);
-		}
-		else
-		{
-			dc.FillSolidRect(rc, m_crBackColor);
 		}
 
 		// Determine the size of the bar and draw it.
@@ -716,6 +698,8 @@ void CMacProgressCtrl::thread_indeterminate()
 {
 	m_nIndOffset = 0;
 
+	int frame = 0;
+
 	while (m_bIndeterminate)
 	{
 		CRect rc;
@@ -723,8 +707,8 @@ void CMacProgressCtrl::thread_indeterminate()
 
 		if (m_indeterminate_forward)
 		{
-			m_nIndOffset += 2;// m_nIndOffset + ((double)m_nIndOffset + 1.0) * 1.2;
-			if (m_nIndOffset > rc.right + m_indeterminate_width)
+			m_nIndOffset += 6;// m_nIndOffset + ((double)m_nIndOffset + 1.0) * 1.2;
+			if (m_nIndOffset > rc.right + m_indeterminate_width / 1.1)
 			{
 				m_indeterminate_forward = false;
 				std::reverse(m_dq_cr_indeterminate.begin(), m_dq_cr_indeterminate.end());
@@ -732,17 +716,21 @@ void CMacProgressCtrl::thread_indeterminate()
 		}
 		else
 		{
-			m_nIndOffset -= 2;// m_nIndOffset - ((double)m_nIndOffset + 1.0) * 1.2;
-			if (m_nIndOffset < rc.left - m_indeterminate_width)
+			m_nIndOffset -= 6;// m_nIndOffset - ((double)m_nIndOffset + 1.0) * 1.2;
+			if (m_nIndOffset < rc.left - m_indeterminate_width / 1.1)
 			{
 				m_indeterminate_forward = true;
 				std::reverse(m_dq_cr_indeterminate.begin(), m_dq_cr_indeterminate.end());
 			}
 		}
 		TRACE(_T("m_nIndOffset = %d\n"), m_nIndOffset);
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		//Invalidate();
 		RedrawWindow();
+
+		CString str;
+		str.Format(_T("d:\\temp\\progressDlg\\%03d.bmp"), frame++);
+		save_bitmap(CaptureWindowToBitmap(GetParent()->m_hWnd), str);
 	}
 }
 

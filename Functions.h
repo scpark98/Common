@@ -1059,11 +1059,16 @@ struct	NETWORK_INFO
 //#ifndef _USING_V110_SDK71_
 	//HKEY_LOCAL_MACHINE\\SOFTWARE\\MyCompany 에서 읽어올 경우 x64이면 실제 그 경로에서 읽어오지만
 	//32bit이면 HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\MyCompany 에서 읽어온다.
+	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value);
+	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		get_registry_string(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
+	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		set_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);
+	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		set_registry_string(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 //#endif
+
 	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
 	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 

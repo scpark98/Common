@@ -2965,9 +2965,7 @@ LONG get_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString 
 	
 	RegCloseKey(hkey);
 	
-	TCHAR tstr[1024] = { 0, };
-	_tcsncpy(tstr, buffer, dwBytes);
-	(*str).Format(_T("%s"), buffer);
+	(*str) = CString(buffer);
 	return nError;
 }
 
@@ -3000,14 +2998,15 @@ LONG set_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString 
 	ZeroMemory(buffer, sizeof(buffer));
 
 	_stprintf(buffer, _T("%s\0"), str);
-	
+	int len = _tcslen(buffer);
+
 	RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_WRITE, &hkey);
 	
 	lResult = RegCreateKeyEx(hKeyRoot, sSubKey, 0,
 		buffer, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
 	
 	if (lResult == ERROR_SUCCESS)
-		lResult = RegSetValueEx(hkey, entry, NULL, REG_SZ, (BYTE*)buffer, sizeof(buffer) + 1);
+		lResult = RegSetValueEx(hkey, entry, NULL, REG_SZ, (BYTE*)buffer, _tcslen(buffer) * sizeof(TCHAR));
 	
 	RegCloseKey(hkey);
 

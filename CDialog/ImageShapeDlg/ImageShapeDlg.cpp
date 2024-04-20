@@ -166,9 +166,9 @@ void CImageShapeDlg::render(Gdiplus::Bitmap* img)
 		g.SetPageUnit(UnitPixel);
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
 
-		// Draw the dial
-		g.DrawImage(img, 0, 0, sz.cx, sz.cy);
-		g.DrawRectangle(&Pen(Color(128, 255, 0, 0), 4.0f), Gdiplus::Rect(2, 2, sz.cx - 3, sz.cy - 3));
+		//Draw customize
+		g.DrawImage(img, 0, 0, sz.cx - 1, sz.cy - 1);
+		g.DrawRectangle(&Pen(Color(128, 255, 0, 0), 1.0f), Gdiplus::Rect(0, 0, sz.cx - 1, sz.cy - 1));
 
 		::UpdateLayeredWindow(m_hWnd
 			, hDC

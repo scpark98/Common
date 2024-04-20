@@ -5294,14 +5294,14 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-void draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
+CRect draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
 							int font_size, int thick, CString font_name,
 							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
 {
-	draw_gdip_outline_text(g, CRect(x, y, x + w, y + h), text, font_size, thick, font_name, crOutline, crFill, align);
+	return draw_gdip_outline_text(g, CRect(x, y, x + w, y + h), text, font_size, thick, font_name, crOutline, crFill, align);
 }
 
-void draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
+CRect draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 							int font_size, int thick, CString font_name,
 							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
 {
@@ -5321,8 +5321,10 @@ void draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 
 	int x = rTarget.left;
 	int y = rTarget.top;
+	CSize sz;
 
 	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+
 
 	if (rTarget.Width() == 0)
 		rTarget.right = rTarget.left + boundRect.Width;
@@ -5355,31 +5357,33 @@ void draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 
 	g->DrawPath(&gp, &str_path);
 	g->FillPath(&gb, &str_path);
+
+	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }
 
 //출력할 글자를 작게 출력한 후 이를 다시 원래 크기로 늘려
 //blur가 생기게 하고 이를 shadow로 사용하는 방식인데 뭔가 어색하다.
 //ApplyEffect의 blur를 적용해서 구현하는 것이 나을 듯 하다.
-void draw_gdip_shadow_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
+CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
 							int font_size, bool font_bold, int shadow_depth,
 							CString font_name,
 							Gdiplus::Color crText,
 							Gdiplus::Color crShadow,
 							UINT align)
 {
-	draw_gdip_shadow_text(g, CRect(x, y, x + w, y + h), text, font_size, font_bold, shadow_depth, font_name, crText, crShadow, align);
+	return draw_gdip_shadow_text(g, CRect(x, y, x + w, y + h), text, font_size, font_bold, shadow_depth, font_name, crText, crShadow, align);
 }
 
-void draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
+CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
 							int font_size, bool font_bold, int shadow_depth,
 							CString font_name,
 							Gdiplus::Color crText,
 							Gdiplus::Color crShadow,
 							UINT align)
 {
-	//g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	//g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	//int logPixelsY = ::GetDeviceCaps(pDC->m_hDC, LOGPIXELSY);
 	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
@@ -5442,6 +5446,8 @@ void draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
 
 	Gdiplus::StringFormat sf;
 	g->DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x - shadow_depth, y - shadow_depth), &brush2);
+
+	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }
 
 //text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.

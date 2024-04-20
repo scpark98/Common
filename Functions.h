@@ -1297,24 +1297,24 @@ void		SetWallPaper(CString sfile);
 
 	//Gdiplus
 	//Gdiplus¸¦ ÀÌ¿ëÇÑ ¿Ü°û¼± ÅØ½ºÆ® Ãâ·Â
-	void		draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text, int font_size, int thick,
+	CRect		draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text, int font_size, int thick,
 								CString font_name = _T("¸¼Àº °íµñ"),
 								Gdiplus::Color crOutline = Gdiplus::Color::White,
 								Gdiplus::Color crFill = Gdiplus::Color::Black,
 								UINT align = DT_CENTER | DT_VCENTER);
-	void		draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text, int font_size, int thick,
+	CRect		draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text, int font_size, int thick,
 								CString font_name = _T("¸¼Àº °íµñ"),
 								Gdiplus::Color crOutline = Gdiplus::Color::White,
 								Gdiplus::Color crFill = Gdiplus::Color::Black,
 								UINT align = DT_CENTER | DT_VCENTER);
 
-	void		draw_gdip_shadow_text(Gdiplus::Graphics *g, int x, int y, int w, int h,
+	CRect		draw_gdip_shadow_text(Gdiplus::Graphics *g, int x, int y, int w, int h,
 								CString text, int font_size, bool font_bold, int shadow_depth,
 								CString font_name = _T("¸¼Àº °íµñ"),
 								Gdiplus::Color crText = Gdiplus::Color::Black,
 								Gdiplus::Color crShadow = Gdiplus::Color::LightGray,
 								UINT align = DT_CENTER | DT_VCENTER);
-	void		draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,
+	CRect		draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,
 								CString text, int font_size, bool font_bold, int shadow_depth,
 								CString font_name = _T("¸¼Àº °íµñ"),
 								Gdiplus::Color crText = Gdiplus::Color::Black,

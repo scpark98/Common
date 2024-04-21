@@ -1,40 +1,40 @@
-﻿// ImageShapeDlg.cpp: 구현 파일
+﻿// SCShapeDlg.cpp: 구현 파일
 //
 
-#include "ImageShapeDlg.h"
+#include "SCShapeDlg.h"
 #include "afxdialogex.h"
 
 #include <thread>
 #include "../../Functions.h"
 
-// CImageShapeDlg 대화 상자
+// CSCShapeDlg 대화 상자
 
-IMPLEMENT_DYNAMIC(CImageShapeDlg, CDialogEx)
+IMPLEMENT_DYNAMIC(CSCShapeDlg, CDialogEx)
 
-CImageShapeDlg::CImageShapeDlg()
+CSCShapeDlg::CSCShapeDlg()
 {
-
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
-CImageShapeDlg::~CImageShapeDlg()
+CSCShapeDlg::~CSCShapeDlg()
 {
 }
 
-void CImageShapeDlg::DoDataExchange(CDataExchange* pDX)
+void CSCShapeDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 }
 
 
-BEGIN_MESSAGE_MAP(CImageShapeDlg, CDialogEx)
+BEGIN_MESSAGE_MAP(CSCShapeDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
 END_MESSAGE_MAP()
 
 
-// CImageShapeDlg 메시지 처리기
+// CSCShapeDlg 메시지 처리기
 
 
-BOOL CImageShapeDlg::OnInitDialog()
+BOOL CSCShapeDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
@@ -44,7 +44,7 @@ BOOL CImageShapeDlg::OnInitDialog()
 }
 
 
-BOOL CImageShapeDlg::PreTranslateMessage(MSG* pMsg)
+BOOL CSCShapeDlg::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
@@ -59,7 +59,7 @@ BOOL CImageShapeDlg::PreTranslateMessage(MSG* pMsg)
 }
 
 
-void CImageShapeDlg::OnLButtonDown(UINT nFlags, CPoint point)
+void CSCShapeDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	DefWindowProc(WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
@@ -67,7 +67,7 @@ void CImageShapeDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	CDialogEx::OnLButtonDown(nFlags, point);
 }
 
-bool CImageShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
+bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
 	m_parent = parent;
 
@@ -86,32 +86,123 @@ bool CImageShapeDlg::create(CWnd* parent, int left, int top, int right, int bott
 	return res;
 }
 
-void CImageShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
+bool CSCShapeDlg::set_text(CString text, CShapeDlgSetting* setting)
+{
+	if (setting != NULL)
+		memcpy(&m_setting, setting, sizeof(CShapeDlgSetting));
+
+	return set_text(m_parent,
+					text,
+					m_setting.font_size,
+					m_setting.font_bold,
+					m_setting.shadow_depth,
+					m_setting.thickness,
+					m_setting.font_name,
+					m_setting.cr_text,
+					m_setting.cr_stroke,
+					m_setting.cr_shadow,
+					m_setting.cr_back
+	);
+}
+
+//gdiplus를 이용한 text 출력용 dlg 생성
+bool CSCShapeDlg::set_text(CWnd* parent,
+						CString text,
+						int font_size,
+						bool font_bold,
+						int shadow_depth/* = 2*/,
+						int thickness/* = 2*/,
+						CString font_name/* = _T("")*/,
+						Gdiplus::Color cr_text/* = Gdiplus::Color::Black*/,
+						Gdiplus::Color cr_stroke/* = Gdiplus::Color::DarkGray*/,
+						Gdiplus::Color cr_shadow/* = Gdiplus::Color::HotPink*/,
+						Gdiplus::Color cr_back/* = Gdiplus::Color::Transparent*/)
+{
+	bool res = false;
+
+	if (parent == NULL)
+		m_parent = parent = AfxGetMainWnd();
+	else
+		m_parent = parent;
+
+	if (font_name.IsEmpty())
+	{
+		CFont* font = m_parent->GetFont();
+		LOGFONT lf;
+
+		memset(&lf, 0, sizeof(LOGFONT));
+
+		if (font != NULL)
+			font->GetObject(sizeof(lf), &lf);
+		else
+			GetObject(GetStockObject(SYSTEM_FONT), sizeof(lf), &lf);
+
+		m_setting.font_name = font_name = lf.lfFaceName;
+	}
+
+	m_setting = CShapeDlgSetting(font_size, font_bold, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
+
+	//텍스트 출력 크기를 얻어오고
+	CRect r;
+	
+	r = draw_gdip_shadow_text(NULL, CRect(), text,
+		font_size, font_bold, shadow_depth, thickness, font_name,
+		cr_text, cr_stroke, cr_shadow);
+
+	CGdiplusBitmap	img(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
+
+	//해당 캔버스에
+	Gdiplus::Graphics g(img);
+
+	//글자를 출력하고
+	r = draw_gdip_shadow_text(&g, r, text,
+		font_size, font_bold, shadow_depth, thickness, font_name,
+		cr_text, cr_stroke, cr_shadow);
+
+	if (m_hWnd)
+	{
+		res = true;
+		//SetWindowPos(NULL, 0, 0, r.Width(), r.Height(), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+	else
+	{
+		res = create(parent, 0, 0, r.Width(), r.Height());
+	}
+
+	if (!res)
+		return res;
+
+	set_image(&img);
+}
+
+void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
 {
 	if (deep_copy)
 		img->deep_copy(&m_img);
 
-	SetWindowPos(NULL, 0, 0, m_img.width, m_img.height, SWP_NOMOVE | SWP_NOZORDER);
-	ShowWindow(SW_SHOW);
+	SetWindowPos(NULL, 0, 0, m_img.width, m_img.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+	if (!IsWindowVisible())
+		ShowWindow(SW_SHOW);
 
 	gif_play();
 }
 
-bool CImageShapeDlg::load(UINT id)
+bool CSCShapeDlg::load(UINT id)
 {
 	m_img.load(id);
 	set_image(&m_img, false);
 	return false;
 }
 
-bool CImageShapeDlg::load(CString sType, UINT id)
+bool CSCShapeDlg::load(CString sType, UINT id)
 {
 	m_img.load(sType, id);
 	set_image(&m_img, false);
 	return false;
 }
 
-bool CImageShapeDlg::load(CString sFile)
+bool CSCShapeDlg::load(CString sFile)
 {
 	m_img.load(sFile);
 	set_image(&m_img, false);
@@ -119,7 +210,7 @@ bool CImageShapeDlg::load(CString sFile)
 }
 
 //alpha = 0 ~ 255
-void CImageShapeDlg::alpha(int alpha)
+void CSCShapeDlg::alpha(int alpha)
 {
 	m_alpha = alpha;
 
@@ -127,7 +218,7 @@ void CImageShapeDlg::alpha(int alpha)
 		render(m_img.m_pBitmap);
 }
 
-void CImageShapeDlg::render(Gdiplus::Bitmap* img)
+void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 {
 	if (!IsWindow(m_hWnd) || !img)
 		return;
@@ -166,9 +257,9 @@ void CImageShapeDlg::render(Gdiplus::Bitmap* img)
 		g.SetPageUnit(UnitPixel);
 		g.SetSmoothingMode(SmoothingModeAntiAlias);
 
-		//Draw customize
 		g.DrawImage(img, 0, 0, sz.cx - 1, sz.cy - 1);
-		g.DrawRectangle(&Pen(Color(128, 255, 0, 0), 1.0f), Gdiplus::Rect(0, 0, sz.cx - 1, sz.cy - 1));
+		//Draw customized figures
+		//g.DrawRectangle(&Pen(Color(255, 255, 0, 0), 1.0f), Gdiplus::Rect(0, 0, sz.cx - 1, sz.cy - 1));
 
 		::UpdateLayeredWindow(m_hWnd
 			, hDC
@@ -191,7 +282,7 @@ void CImageShapeDlg::render(Gdiplus::Bitmap* img)
 }
 
 //animated gif인 경우
-void CImageShapeDlg::gif_play(int new_state)
+void CSCShapeDlg::gif_play(int new_state)
 {
 	if (new_state == state_stop)
 	{
@@ -218,7 +309,7 @@ void CImageShapeDlg::gif_play(int new_state)
 	if (m_img.is_animated_gif())
 	{
 		m_gif_state = state_play;
-		std::thread t(&CImageShapeDlg::gif_thread, this);
+		std::thread t(&CSCShapeDlg::gif_thread, this);
 		t.detach();
 	}
 	else
@@ -227,22 +318,22 @@ void CImageShapeDlg::gif_play(int new_state)
 	}
 }
 
-void CImageShapeDlg::gif_pause()
+void CSCShapeDlg::gif_pause()
 {
 	m_gif_state = state_pause;
 }
 
-void CImageShapeDlg::gif_stop()
+void CSCShapeDlg::gif_stop()
 {
 	m_gif_state = state_stop;
 }
 
-void CImageShapeDlg::gif_goto(int pos, bool pause)
+void CSCShapeDlg::gif_goto(int pos, bool pause)
 {
 
 }
 
-void CImageShapeDlg::gif_thread()
+void CSCShapeDlg::gif_thread()
 {
 	GUID   pageGuid = FrameDimensionTime;
 	m_gif_index = 0;
@@ -274,4 +365,12 @@ void CImageShapeDlg::gif_thread()
 	}
 
 	Trace(_T("%s terminated."), __function__);
+}
+
+
+void CSCShapeDlg::PreSubclassWindow()
+{
+	// TODO: Add your specialized code here and/or call the base class
+
+	CDialogEx::PreSubclassWindow();
 }

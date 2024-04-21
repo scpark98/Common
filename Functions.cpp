@@ -5294,29 +5294,53 @@ void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
        DeleteObject(rgn);
  }
 
-CRect draw_gdip_outline_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
-							int font_size, int thick, CString font_name,
-							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
+CRect draw_gdip_outline_text(Gdiplus::Graphics* g,
+							int x, int y, int w, int h,
+							CString text,
+							int font_size,
+							bool font_bold,
+							int thickness,
+							CString font_name,
+							Gdiplus::Color cr_text,
+							Gdiplus::Color cr_stroke,
+							UINT align)
 {
-	return draw_gdip_outline_text(g, CRect(x, y, x + w, y + h), text, font_size, thick, font_name, crOutline, crFill, align);
+	return draw_gdip_outline_text(g, CRect(x, y, x + w, y + h), text, font_size, font_bold, thickness, font_name, cr_text, cr_stroke, align);
 }
 
-CRect draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
-							int font_size, int thick, CString font_name,
-							Gdiplus::Color crOutline, Gdiplus::Color crFill, UINT align)
+CRect draw_gdip_outline_text(Gdiplus::Graphics* g,
+							CRect rTarget,
+							CString text,
+							int font_size,
+							bool font_bold,
+							int thickness,
+							CString font_name,
+							Gdiplus::Color cr_text,
+							Gdiplus::Color cr_stroke,
+							UINT align)
 {
-	//Gdiplus::Graphics   g(pDC->m_hDC);
+	bool calcRect = false;
+	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
 
-	// GDI+ draw text
+	if (g == NULL)
+	{
+		calcRect = true;
+
+		HDC hdcMemory = ::CreateCompatibleDC(hDC);
+
+		g = new Gdiplus::Graphics(hDC);
+	}
+
 	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	//Gdiplus::FontFamily   ffami(CStringW(font_name));
+	int logPixelsY = ::GetDeviceCaps(hDC, LOGPIXELSY);
+	Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
+
 	Gdiplus::FontFamily   ff((WCHAR*)(const WCHAR*)CStringW(font_name));
-	Gdiplus::Font font(&ff, font_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+	Gdiplus::Font font(&ff, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 	Gdiplus::StringFormat fmt;
-	//DT_TOP
 	Gdiplus::RectF boundRect;
 
 	int x = rTarget.left;
@@ -5325,7 +5349,6 @@ CRect draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 
 	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
 
-
 	if (rTarget.Width() == 0)
 		rTarget.right = rTarget.left + boundRect.Width;
 	if (rTarget.Height() == 0)
@@ -5341,22 +5364,11 @@ CRect draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 	else if (align & DT_BOTTOM)
 		y = rTarget.bottom - boundRect.Height;
 
-	Gdiplus::GraphicsPath   str_path;
-	str_path.AddString(CStringW(text), -1, &ff,
-		Gdiplus::FontStyleRegular, font_size, Gdiplus::Point(x, y), &fmt);
-
-	Gdiplus::Pen   gp(crOutline, thick);
-	gp.SetLineJoin(Gdiplus::LineJoinRound);
-
-	//Gdiplus::Rect    rc(x, y, 30, 60);
-	//Gdiplus::Color   cStart(255, 128, 0);
-	//Gdiplus::Color   cEnd(0, 128, 255);
-	//Gdiplus::LinearGradientBrush  gb(rc, cStart, cEnd,
-	//	Gdiplus::LinearGradientModeVertical);
-	Gdiplus::SolidBrush gb(crFill);
-
-	g->DrawPath(&gp, &str_path);
-	g->FillPath(&gb, &str_path);
+	if (calcRect)
+	{
+		delete g;
+		return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
+	}
 
 	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }
@@ -5364,41 +5376,85 @@ CRect draw_gdip_outline_text(Gdiplus::Graphics* g, CRect rTarget, CString text,
 //출력할 글자를 작게 출력한 후 이를 다시 원래 크기로 늘려
 //blur가 생기게 하고 이를 shadow로 사용하는 방식인데 뭔가 어색하다.
 //ApplyEffect의 blur를 적용해서 구현하는 것이 나을 듯 하다.
-CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, int x, int y, int w, int h, CString text,
-							int font_size, bool font_bold, int shadow_depth,
+CRect draw_gdip_shadow_text(Gdiplus::Graphics* g,
+							int x, int y, int w, int h,
+							CString text,
+							int font_size,
+							bool font_bold,
+							int shadow_depth,
+							int thickness,
 							CString font_name,
-							Gdiplus::Color crText,
-							Gdiplus::Color crShadow,
+							Gdiplus::Color cr_text,
+							Gdiplus::Color cr_stroke,
+							Gdiplus::Color cr_shadow,
 							UINT align)
 {
-	return draw_gdip_shadow_text(g, CRect(x, y, x + w, y + h), text, font_size, font_bold, shadow_depth, font_name, crText, crShadow, align);
+	return draw_gdip_shadow_text(g,
+							CRect(x, y, x + w, y + h),
+							text,
+							font_size,
+							font_bold,
+							shadow_depth,
+							thickness,
+							font_name,
+							cr_text,
+							cr_stroke,
+							cr_shadow,
+							align);
 }
 
-CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
-							int font_size, bool font_bold, int shadow_depth,
+CRect draw_gdip_shadow_text(Gdiplus::Graphics* g,
+							CRect rTarget,
+							CString text,
+							int font_size,
+							bool font_bold,
+							int shadow_depth,
+							int thickness,
 							CString font_name,
-							Gdiplus::Color crText,
-							Gdiplus::Color crShadow,
+							Gdiplus::Color cr_text,
+							Gdiplus::Color cr_stroke,
+							Gdiplus::Color cr_shadow,
 							UINT align)
 {
+	bool calcRect = false;
+	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
+
+	if (g == NULL)
+	{
+		calcRect = true;
+
+		HDC hdcMemory = ::CreateCompatibleDC(hDC);
+
+		g = new Gdiplus::Graphics(hDC);
+	}
+
+	//큰 글씨는 AntiAlias를 해주는게 좋지만 작은 글씨는 오히려 뭉개지므로 안하는게 좋다.
+	//파라미터로 처리해야 한다.
 	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	//int logPixelsY = ::GetDeviceCaps(pDC->m_hDC, LOGPIXELSY);
-	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 72, logPixelsY);
+	Gdiplus::Unit unit = g->GetPageUnit();
+	float fDpiX = g->GetDpiX();
+	float fDpiY = g->GetDpiY();
+
+	int logPixelsY = ::GetDeviceCaps(hDC, LOGPIXELSY);
+	Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
 
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
 	Gdiplus::Font font(&fontFamily, font_size, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
 
-	Gdiplus::SolidBrush shadow_brush(crShadow);
-	Gdiplus::SolidBrush brush2(crText);
+	Gdiplus::SolidBrush shadow_brush(cr_shadow);
+	Gdiplus::SolidBrush brush2(cr_text);
 
 	int x = rTarget.left;
 	int y = rTarget.top;
 
 	Gdiplus::RectF boundRect;
 	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+
+	boundRect.Width += shadow_depth;
+	boundRect.Height += shadow_depth;
 
 	if (rTarget.Width() == 0)
 		rTarget.right = rTarget.left + boundRect.Width;
@@ -5415,9 +5471,33 @@ CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
 	else if (align & DT_BOTTOM)
 		y = rTarget.bottom - boundRect.Height;
 
+	if (calcRect)
+	{
+		switch (unit)
+		{
+		case Gdiplus::UnitWorld:
+			break;
+		case Gdiplus::UnitPoint:
+			break;
+		case Gdiplus::UnitInch:
+			break;
+		case Gdiplus::UnitDocument:
+			break;
+		case Gdiplus::UnitMillimeter:
+			break;
+		}
+
+		delete g;
+		return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
+	}
+
 	Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
 	Gdiplus::Graphics g_shadow(&shadow_bitmap);
+	g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+	//g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 	/*
 	Gdiplus::Blur blur;
 	BlurParams blurParam;
@@ -5434,7 +5514,7 @@ CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
 		float ratio = 0.4f;
 		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 		g_shadow.SetTransform(&mx);
-		g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(-1, -1), &shadow_brush);
+		g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::PointF(shadow_depth + 1, shadow_depth), &shadow_brush);
 		//save(&bm, _T("z:\\내 드라이브\\media\\test_image\\temp\\shadow.png"));
 
 		boundRect.X = x;
@@ -5444,8 +5524,19 @@ CRect draw_gdip_shadow_text(Gdiplus::Graphics* g, CRect rTarget,	CString text,
 		g->DrawImage(&shadow_bitmap, boundRect, 0, 0, shadow_bitmap.GetWidth() * ratio, shadow_bitmap.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
 	}
 
-	Gdiplus::StringFormat sf;
-	g->DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x - shadow_depth, y - shadow_depth), &brush2);
+	Gdiplus::StringFormat fmt;
+	Gdiplus::GraphicsPath str_path;
+	str_path.AddString(CStringW(text), -1, &fontFamily,
+		font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, font_size, Gdiplus::Point(x, y), &fmt);
+
+	Gdiplus::Pen   gp(cr_stroke, thickness);
+	gp.SetLineJoin(Gdiplus::LineJoinRound);
+	Gdiplus::SolidBrush gb(cr_text);
+
+	g->DrawPath(&gp, &str_path);
+	g->FillPath(&gb, &str_path);
+
+	//g->DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x + 1, y + 1), &brush2);
 
 	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }

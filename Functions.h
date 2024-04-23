@@ -1094,6 +1094,7 @@ struct	NETWORK_INFO
 	LPBYTE		GetPerformanceData(LPTSTR src);
 	int			GetCounterValue(const int& objId, const int& counterId, const char* instanceName, PERF_DATA_BLOCK **dataBlock, LONGLONG &value);
 	double		GetCpuUsage(const char* process);
+	HRESULT		get_cpu_temperature(LPLONG pTemperature);
 
 	//메모리, memory
 	//현재 가용 메모리를 리턴한다. (total_memory : 전체 메모리 용량)
@@ -1171,8 +1172,8 @@ void		SetWallPaper(CString sfile);
 	CString		GetDefaultPrinterName();
 	CSize		GetPrinterPaperSize(CString sPrinterName);
 
-	CString		get_last_error_message(bool show_msgBox);
-	CString		get_last_error_message(DWORD errorId, bool show_msgBox);
+	CString		get_last_error_string(bool show_msgBox = false);
+	CString		get_last_error_string(DWORD errorId, bool show_msgBox = false);
 
 //////////////////////////////////////////////////////////////////////////
 //date, time 날짜/시간

@@ -122,19 +122,21 @@ public:
 	//선택된 항목 리스트 및 선택된 개수를 리턴
 	int			get_selected_items(std::deque<int>* selected = NULL);
 
-	//팝업 메뉴
+	//팝업 메뉴. 맨 처음/끝 항목이 변경되면 반드시 아래의 명령범위 코드도 변경시켜줘야 한다.
+	//ON_COMMAND_RANGE(menu_selected_count, menu_delete_selected, OnPopupMenu)
 	enum CONTEXT_MENU
 	{
 		menu_selected_count = WM_USER + 1234,
+		menu_clear_all,
 		menu_show_log,
 		menu_show_date,
 		menu_show_time,
 		menu_auto_scroll,
-		menu_clear_all,
 		menu_copy_selected_to_clipboard,
 		menu_copy_all_to_clipboard,
 		menu_save_selected,				//선택 로그만 파일로 저장
 		menu_save_all,					//전체 로그 파일로 저장
+		menu_delete_selected,
 	};
 
 	bool		m_use_popup_menu = true;
@@ -228,6 +230,12 @@ public:
 			add_to_imagelist(id);
 		}
 	}
+
+	void		delete_items(bool only_selected = true);
+
+	//항목 추가/삭제시에 가로 스크롤바를 재계산해준다.
+	//추가시에는 추가된 항목과 최대크기 항목을 비교하고 삭제시에는 모든 항목을 재계산해야 한다.
+	void		recalc_horizontal_extent(CString added_text = _T(""));
 
 protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.

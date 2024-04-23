@@ -436,6 +436,10 @@ public:
 	//original IsItemVisible method does not check partial. only check vertical axis.
 	bool			is_item_visible(int index, bool bPartial = false);
 
+	//항목이 추가되면 auto scroll되지만 특정 항목을 선택하면 false로 된다.
+	bool			m_auto_scroll = true;
+
+
 	void random();
 
 	DWORD index_from_point(int x, int y);
@@ -550,6 +554,7 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	afx_msg BOOL OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult);
 };
 
 

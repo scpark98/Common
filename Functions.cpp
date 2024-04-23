@@ -2483,7 +2483,7 @@ void request_url(CRequestUrlParams* params)
 	{
 		DWORD dwError = GetLastError();
 		params->status = -1;
-		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_last_error_message(dwError, false));
+		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_last_error_string(dwError, false));
 		TRACE(_T("result = %s\n"), params->result);
 
 		InternetCloseHandle(hOpenRequest);
@@ -5524,19 +5524,28 @@ CRect draw_gdip_shadow_text(Gdiplus::Graphics* g,
 		g->DrawImage(&shadow_bitmap, boundRect, 0, 0, shadow_bitmap.GetWidth() * ratio, shadow_bitmap.GetHeight() * ratio - 1, Gdiplus::UnitPixel);
 	}
 
-	Gdiplus::StringFormat fmt;
-	Gdiplus::GraphicsPath str_path;
-	str_path.AddString(CStringW(text), -1, &fontFamily,
-		font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, font_size, Gdiplus::Point(x, y), &fmt);
+	if (thickness > 1)
+	{
+		//float emSize = fDpiY * (float)font_size / 72.0;
+		float emSize = fDpiY * font.GetSize() / 72.0;
+		Gdiplus::StringFormat fmt;
+		Gdiplus::GraphicsPath str_path;
+		str_path.AddString(CStringW(text), -1, &fontFamily,
+			font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, boundRect, &fmt);
+		//str_path.AddString(CStringW(text), -1, &fontFamily,
+		//	font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, Gdiplus::Point(x, y), &fmt);
 
-	Gdiplus::Pen   gp(cr_stroke, thickness);
-	gp.SetLineJoin(Gdiplus::LineJoinRound);
-	Gdiplus::SolidBrush gb(cr_text);
+		Gdiplus::Pen   gp(cr_stroke, thickness);
+		//gp.SetLineJoin(Gdiplus::LineJoinRound);
+		Gdiplus::SolidBrush gb(cr_text);
 
-	g->DrawPath(&gp, &str_path);
-	g->FillPath(&gb, &str_path);
-
-	//g->DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x + 1, y + 1), &brush2);
+		g->DrawPath(&gp, &str_path);
+		g->FillPath(&gb, &str_path);
+	}
+	else
+	{
+		g->DrawString(CStringW(text), -1, &font, Gdiplus::PointF(x + 1, y + 1), &brush2);
+	}
 
 	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }
@@ -6451,7 +6460,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 			if (bSuccess)
 				success++;
 			else
-				get_last_error_message(GetLastError(), true);
+				get_last_error_string(GetLastError(), true);
 		}
 	}
 
@@ -9055,12 +9064,14 @@ double GetCpuUsage(const char* process)
 	// 획득한 성능 정보를 이용해서 CPU 사용율을 계산
 	cpuTime_100n = cpuData->PerfTime100nSec;
 
-	if(isCpuFirst){
+	if (isCpuFirst)
+	{
 		isCpuFirst = false;
 		oldCpuVal = newVal;
 		oldCpuTime_100n = cpuTime_100n;
-	} else {
-
+	}
+	else
+	{
 		SYSTEM_INFO sysinfo;
 		GetSystemInfo(&sysinfo);
 
@@ -9081,6 +9092,69 @@ double GetCpuUsage(const char* process)
 	}
 
 	return cpuUsage;
+}
+
+#define _WIN32_DCOM
+#include <comdef.h>
+#include <Wbemidl.h>
+#pragma comment(lib, "wbemuuid.lib")
+HRESULT get_cpu_temperature(LPLONG pTemperature)
+{
+	if (pTemperature == NULL)
+		return E_INVALIDARG;
+
+	*pTemperature = -1;
+	HRESULT ci = CoInitialize(NULL);
+	HRESULT hr = CoInitializeSecurity(NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE, NULL);
+	if (SUCCEEDED(hr))
+	{
+		IWbemLocator* pLocator;
+		hr = CoCreateInstance(CLSID_WbemAdministrativeLocator, NULL, CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID*)&pLocator);
+		if (SUCCEEDED(hr))
+		{
+			IWbemServices* pServices;
+			BSTR ns = SysAllocString(L"root\\WMI");
+			hr = pLocator->ConnectServer(ns, NULL, NULL, NULL, 0, NULL, NULL, &pServices);
+			pLocator->Release();
+			SysFreeString(ns);
+			if (SUCCEEDED(hr))
+			{
+				BSTR query = SysAllocString(L"SELECT * FROM MSAcpi_ThermalZoneTemperature");
+				BSTR wql = SysAllocString(L"WQL");
+				IEnumWbemClassObject* pEnum;
+				hr = pServices->ExecQuery(wql, query, WBEM_FLAG_RETURN_IMMEDIATELY | WBEM_FLAG_FORWARD_ONLY, NULL, &pEnum);
+				SysFreeString(wql);
+				SysFreeString(query);
+				pServices->Release();
+				if (SUCCEEDED(hr))
+				{
+					IWbemClassObject* pObject;
+					ULONG returned;
+					hr = pEnum->Next(WBEM_INFINITE, 1, &pObject, &returned);
+					pEnum->Release();
+					if (SUCCEEDED(hr))
+					{
+						BSTR temp = SysAllocString(L"CurrentTemperature");
+						VARIANT v;
+						VariantInit(&v);
+						hr = pObject->Get(temp, 0, &v, NULL, NULL);
+						pObject->Release();
+						SysFreeString(temp);
+						if (SUCCEEDED(hr))
+						{
+							*pTemperature = V_I4(&v);
+						}
+						VariantClear(&v);
+					}
+				}
+			}
+			if (ci == S_OK)
+			{
+				CoUninitialize();
+			}
+		}
+	}
+	return hr;
 }
 
 //현재 가용 메모리를 리턴한다. (total_memory : 전체 메모리 용량)
@@ -12024,12 +12098,12 @@ CSize GetPrinterPaperSize(CString sPrinterName)
 	return CSize(nPaperWidth, nPaperHeight);
 }
 
-CString	get_last_error_message(bool show_msgBox)
+CString	get_last_error_string(bool show_msgBox)
 {
-	return get_last_error_message(GetLastError(), show_msgBox);
+	return get_last_error_string(GetLastError(), show_msgBox);
 }
 
-CString	get_last_error_message(DWORD errorId, bool show_msgBox)
+CString	get_last_error_string(DWORD errorId, bool show_msgBox)
 {
 	TCHAR* message = nullptr;
 	CString result;
@@ -12037,7 +12111,7 @@ CString	get_last_error_message(DWORD errorId, bool show_msgBox)
 		nullptr,
 		errorId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (TCHAR*)&message, 0, nullptr);
 
-	result = message;
+	result.Format(_T("error code = %d (%s)"), errorId, CString(message).Trim());
 	LocalFree(message);
 
 	if (show_msgBox)

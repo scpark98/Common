@@ -34,7 +34,7 @@ BEGIN_MESSAGE_MAP(CPathCtrl, CStatic)
 	ON_WM_RBUTTONUP()
 	ON_WM_TIMER()
 	//ON_NOTIFY(LBN_SELCHANGE, IDC_LIST_FOLDERS, &CPathCtrl::OnLbnSelchange)
-	ON_REGISTERED_MESSAGE(Message_CColorListBox, &CPathCtrl::OnMessageColorListBox)
+	ON_REGISTERED_MESSAGE(Message_CSCListBox, &CPathCtrl::OnMessageSCListBox)
 	ON_WM_SIZE()
 	ON_WM_KILLFOCUS()
 END_MESSAGE_MAP()
@@ -70,7 +70,7 @@ void CPathCtrl::PreSubclassWindow()
 
 	m_list_folder.set_as_folder_list();
 	m_list_folder.set_font(m_lf);
-	m_list_folder.set_color_theme(CColorListBox::color_theme_popup_folder_list);
+	m_list_folder.set_color_theme(CSCListBox::color_theme_popup_folder_list);
 	//OnNotify, OnSelChange등의 이벤트 핸들러를 추가해봤으나 되지 않아서 선택시에 SendMessage로 처리함.
 	m_list_folder.set_parent(m_hWnd);
 
@@ -693,9 +693,9 @@ void CPathCtrl::OnLbnSelchange(NMHDR* pNMHDR, LRESULT* pResult)
 	return;
 }
 
-LRESULT CPathCtrl::OnMessageColorListBox(WPARAM wParam, LPARAM lParam)
+LRESULT CPathCtrl::OnMessageSCListBox(WPARAM wParam, LPARAM lParam)
 {
-	CColorListBoxMessage* pMsg = (CColorListBoxMessage*)wParam;
+	CSCListBoxMessage* pMsg = (CSCListBoxMessage*)wParam;
 	CString path = *(CString*)lParam;
 
 	if (pMsg->pThis != &m_list_folder)

@@ -13,7 +13,7 @@
 #include <afxwin.h>
 #include <deque>
 #include <map>
-#include "../../CListBox/ColorListBox/ColorListBox.h"
+#include "../../CListBox/SCListBox/SCListBox.h"
 
 //#define ROOT_LABEL	_T("_r")
 #define ROOT_WIDTH	21
@@ -113,7 +113,7 @@ protected:
 
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만
 	//여기서는 특수폴더와 폴더만 보여주자.
-	CColorListBox		m_list_folder;
+	CSCListBox			m_list_folder;
 	CSize				m_sz_list_folder = CSize(300, 386);	//width는 윈도우 탐색기와 동일하게 300.
 	std::deque<CString>	m_remote_sub_folders;
 	void				show_sub_folder_list(bool show);
@@ -149,7 +149,7 @@ protected:
 	void		UpdateSurface();
 	void		ReconstructFont();
 
-	LRESULT		OnMessageColorListBox(WPARAM wParam, LPARAM lParam);
+	LRESULT		OnMessageSCListBox(WPARAM wParam, LPARAM lParam);
 
 protected:
 	DECLARE_MESSAGE_MAP()

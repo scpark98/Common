@@ -48,22 +48,30 @@ void CSCPing::add(CString addr, int retry, int timeout, CString job_name)
 	t.detach();
 }
 
-//해당 인덱스의 핑쓰레드를 중지. -1이면 모든 핑 중지.
+//특정 job의 핑 쓰레드를 중지. ""이면 모든 핑 중지.
 void CSCPing::stop(CString job_name)
 {
-	std::map<CString, int>::iterator it = m_map.find(job_name);
+	std::map<CString, int>::iterator it;
 
-	if (it != m_map.end() && it->second == PING_THREAD_IS_RUNNING)
+	if (!job_name.IsEmpty())
 	{
-		it->second = PING_THREAD_IS_STOPPING;
-		return;
-	}
+		std::map<CString, int>::iterator it = m_map.find(job_name);
 
-	//모두 중지할 경우
-	for (it = m_map.begin(); it != m_map.end(); it++)
-	{
-		if (it->second == PING_THREAD_IS_RUNNING)
+		if (it != m_map.end() && it->second == PING_THREAD_IS_RUNNING)
+		{
+			TRACE(_T("%s job will be stop\n"), job_name);
 			it->second = PING_THREAD_IS_STOPPING;
+			return;
+		}
+	}
+	else
+	{
+		//모두 중지할 경우
+		for (it = m_map.begin(); it != m_map.end(); it++)
+		{
+			if (it->second == PING_THREAD_IS_RUNNING)
+				it->second = PING_THREAD_IS_STOPPING;
+		}
 	}
 
 	//while (!is_all_threads_stopped())
@@ -195,7 +203,8 @@ void CSCPing::thread_ping(CSCPingParams* params)
 				params->status = PING_STATUS_REQUEST_TIMED_OUT;
 			else
 				params->status = e;
-			::SendMessage(m_parent, Message_CSCPing, (WPARAM)params, (LPARAM)0);
+			if (m_map[params->job_name] == PING_THREAD_IS_RUNNING)
+				::SendMessage(m_parent, Message_CSCPing, (WPARAM)params, (LPARAM)0);
 		}
 		else
 		{
@@ -211,7 +220,8 @@ void CSCPing::thread_ping(CSCPingParams* params)
 			{
 				params->TTL = (int)r->Options.Ttl;
 				params->status = PING_STATUS_ALIVE;
-				::SendMessage(m_parent, Message_CSCPing, (WPARAM)params, (LPARAM)0);
+				if (m_map[params->job_name] == PING_THREAD_IS_RUNNING)
+					::SendMessage(m_parent, Message_CSCPing, (WPARAM)params, (LPARAM)0);
 
 				//str.Format(_T("Reply from: %s: bytes=%d time=%d ms TTL=%d"), CString(s_ip), r->DataSize, r->RoundTripTime, (int)r->Options.Ttl);
 				//TRACE(_T("%s\n"), str);
@@ -219,7 +229,8 @@ void CSCPing::thread_ping(CSCPingParams* params)
 			else
 			{
 				params->status = PING_STATUS_REQUEST_TIMED_OUT;
-				::SendMessage(m_parent, Message_CSCPing, (WPARAM)params, (LPARAM)0);
+				if (m_map[params->job_name] == PING_THREAD_IS_RUNNING)
+					::SendMessage(m_parent, Message_CSCPing, (WPARAM)params, (LPARAM)0);
 			}
 
 			//std::cout << "Reply from: " << s_ip << ": bytes=" << r->DataSize << " time=" << r->RoundTripTime << "ms TTL=" << (int)r->Options.Ttl << std::endl;

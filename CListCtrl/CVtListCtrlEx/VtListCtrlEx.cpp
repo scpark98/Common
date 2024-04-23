@@ -54,6 +54,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT(LVN_BEGINDRAG, &CVtListCtrlEx::OnLvnBeginDrag)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
+	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CVtListCtrlEx::OnLvnItemchanged)
 END_MESSAGE_MAP()
 
 
@@ -1274,6 +1275,9 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 							{
 								break;
 							}
+		case VK_END :
+							m_auto_scroll = true;
+							break;
 		/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
 		case VK_DELETE	:	if (m_bInEditing)
@@ -1846,11 +1850,15 @@ int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool
 		SetItemCountEx(m_list_db.size());
 	}
 
-	//if (invalidate && ensureVisible)
-	//	EnsureVisible(index, false);
-
-	//if (invalidate)
-	//	Invalidate();
+	//ensureVisible이면 Invalidate()을 생략해도 된다.
+	if (m_auto_scroll && ensureVisible)
+	{
+		ensure_visible(index, visible_last);
+	}
+	else if (invalidate)
+	{
+		Invalidate();
+	}
 
 	return index;
 }
@@ -2802,6 +2810,9 @@ void CVtListCtrlEx::edit_end(bool valid)
 //mode가 visible_last이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
 void CVtListCtrlEx::ensure_visible(int index, int mode, int offset)
 {
+	EnsureVisible(index, FALSE);
+
+	/*
 	int items_per_page = GetCountPerPage();
 	int top_index = GetTopIndex();
 
@@ -2820,6 +2831,7 @@ void CVtListCtrlEx::ensure_visible(int index, int mode, int offset)
 	{
 		Scroll(CSize(0, (index + offset - items_per_page - top_index + 1) * r.Height()));
 	}
+	*/
 }
 
 bool CVtListCtrlEx::is_item_visible(int index, bool bPartial)
@@ -3556,3 +3568,20 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
 }
 
+
+BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
+
+	if ((pNMListView->uChanged & LVIF_STATE)
+		&& (pNMListView->uNewState & LVIS_SELECTED))
+	{
+		m_auto_scroll = false;
+	}
+
+	return FALSE;
+
+	*pResult = 0;
+}

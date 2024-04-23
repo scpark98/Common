@@ -79,7 +79,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_KILLFOCUS()
 	ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CSCListBox::OnLbnSelchange)
 	ON_WM_CONTEXTMENU()
-	ON_COMMAND_RANGE(menu_show_log, menu_save_all, OnPopupMenu)
+	ON_COMMAND_RANGE(menu_selected_count, menu_delete_selected, OnPopupMenu)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHWHEEL()
 	ON_WM_SIZE()
@@ -195,7 +195,8 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 //						an owner-draw list box changes. 
 //
 {
-	if ((int)lpDIS->itemID < 0)
+	TRACE(_T("GetTopIndex() = %d\n"), GetTopIndex());
+	if ((int)lpDIS->itemID < GetTopIndex())
 		return; 
 
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
@@ -206,8 +207,13 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CString		sText;
 	COLORREF	cr_text = (COLORREF)lpDIS->itemData;	// Color information is in item data.
 	COLORREF	cr_back = m_cr_back;
+
+	CRect		rc;
 	CRect		rect = lpDIS->rcItem;
 
+	GetClientRect(rc);
+	if (rect.top > rc.bottom)
+		return;
 	//rect.DeflateRect(1, 1);
 	//rect.right -= 4;
 	CRect		rGutter = rect;
@@ -511,23 +517,7 @@ int CSCListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 			SetTopIndex(GetCount() - 1);
 	}
 
-	//항목의 출력 너비에 따라 가로 스크롤바를 재조정해준다.
-	CDC* pDC = GetDC();
-	CFont* pOldFont = (CFont*)pDC->SelectObject(&m_font);
-	CSize sz;
-
-	GetTextExtentPoint32(pDC->GetSafeHdc(), new_text, new_text.GetLength(), &sz);
-
-	if (sz.cx > m_max_horizontal_extent)
-	{
-		m_max_horizontal_extent = sz.cx;
-	}
-
-	pDC->SelectObject(pOldFont);
-	ReleaseDC(pDC);
-
-	SetHorizontalExtent(m_max_horizontal_extent + GetSystemMetrics(SM_CXVSCROLL));
-	//가로 스크롤바 재조정 끝.
+	recalc_horizontal_extent();
 
 	return index;
 }
@@ -688,11 +678,11 @@ BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: Add your message handler code here and/or call default
 
 	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
-	//CRect rc;
-	//GetClientRect(rc);
-	//pDC->FillSolidRect(rc, m_cr_back);
+	CRect rc;
+	GetClientRect(rc);
+	pDC->FillSolidRect(rc, m_cr_back);
 
-	return FALSE;
+	return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
@@ -783,6 +773,9 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 				return true;
 			}
 			break;
+		case VK_DELETE:
+			delete_items();
+			return true;
 		}
 	}
 	else if (pMsg->message == WM_KILLFOCUS)
@@ -1020,33 +1013,36 @@ void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	{
 		menu.AppendMenu(MF_STRING, menu_selected_count, i2S(selected.size()) + _T(" item(s) selected"));
 		menu.EnableMenuItem(menu_selected_count, MF_DISABLED);
-		menu.AppendMenu(MF_SEPARATOR);
 	}
 
-	menu.AppendMenu(MF_STRING, menu_clear_all, _T("Clear all(&L)"));
 	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, menu_clear_all, _T("Clear all(&L)"));
 
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_show_log, _T("Show log"));
 	menu.CheckMenuItem(menu_show_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
 
 	menu.AppendMenu(MF_STRING, menu_show_date, _T("Show date"));
 	menu.CheckMenuItem(menu_show_date, m_show_date ? MF_CHECKED : MF_UNCHECKED);
-	menu.AppendMenu(MF_SEPARATOR);
 
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_show_time, _T("Show time"));
 	menu.CheckMenuItem(menu_show_time, m_show_time ? MF_CHECKED : MF_UNCHECKED);
-	menu.AppendMenu(MF_SEPARATOR);
 
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("Auto scroll\tCtrl+End"));
 	menu.CheckMenuItem(menu_auto_scroll, m_auto_scroll ? MF_CHECKED : MF_UNCHECKED);
-	menu.AppendMenu(MF_SEPARATOR);
 
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_copy_selected_to_clipboard, _T("Copy selected items"));
 	menu.AppendMenu(MF_STRING, menu_copy_all_to_clipboard, _T("Copy all items(&C)"));
-	menu.AppendMenu(MF_SEPARATOR);
 
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_save_selected, _T("Save selected items to a file..."));
 	menu.AppendMenu(MF_STRING, menu_save_all, _T("Save all items to a file...(&S)"));
+
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, menu_delete_selected, _T("Delete selected items(&D)"));
 
 	menu.TrackPopupMenu(TPM_LEFTALIGN, point.x, point.y, this);
 	menu.DestroyMenu();
@@ -1073,8 +1069,7 @@ void CSCListBox::OnPopupMenu(UINT nMenuID)
 		AfxGetApp()->WriteProfileInt(_T("setting\\SCListBox"), _T("auto scroll"), m_auto_scroll);
 		break;
 	case menu_clear_all:
-		ResetContent();
-		SetHorizontalExtent(0);
+		delete_items(false);
 		break;
 	case menu_copy_selected_to_clipboard:
 		copy_selected_to_clipboard();
@@ -1088,6 +1083,8 @@ void CSCListBox::OnPopupMenu(UINT nMenuID)
 	case menu_save_all:
 		save_all_to_file();
 		break;
+	case menu_delete_selected:
+		delete_items(true);
 	}
 }
 
@@ -1339,4 +1336,69 @@ void CSCListBox::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	//Invalidate();
 	//RedrawWindow();
 	//UpdateWindow();
+}
+
+void CSCListBox::delete_items(bool only_selected)
+{
+	if (!only_selected)
+	{
+		ResetContent();
+	}
+	else
+	{
+		int count = GetSelCount();
+
+		if (count == 0)
+			return;
+		
+		int* sel_list = new int[count];
+		GetSelItems(count, sel_list);
+
+		for (int i = count - 1; i >= 0; i--)
+		{
+			DeleteString(sel_list[i]);
+		}
+	}
+
+	Invalidate();
+	RedrawWindow();
+	UpdateWindow();
+
+	recalc_horizontal_extent();
+}
+
+void CSCListBox::recalc_horizontal_extent(CString added_text)
+{
+	//항목의 출력 너비에 따라 가로 스크롤바를 재조정해준다.
+	CDC* pDC = GetDC();
+	CFont* pOldFont = (CFont*)pDC->SelectObject(&m_font);
+	CSize sz;
+
+	if (added_text.IsEmpty())
+	{
+		CString text;
+		int max_cx = 0;
+
+		for (int i = 0; i < GetCount(); i++)
+		{
+			GetText(i, text);
+			GetTextExtentPoint32(pDC->GetSafeHdc(), added_text, added_text.GetLength(), &sz);
+			if (sz.cx > max_cx)
+				sz.cx = max_cx;
+		}
+	}
+	else
+	{
+		GetTextExtentPoint32(pDC->GetSafeHdc(), added_text, added_text.GetLength(), &sz);
+	}
+
+	if (sz.cx > m_max_horizontal_extent)
+	{
+		m_max_horizontal_extent = sz.cx;
+	}
+
+	pDC->SelectObject(pOldFont);
+	ReleaseDC(pDC);
+
+	SetHorizontalExtent(m_max_horizontal_extent + GetSystemMetrics(SM_CXVSCROLL));
 }

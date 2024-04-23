@@ -6,7 +6,7 @@ CNVidiaInfo::CNVidiaInfo()
 	HMODULE hmod = LoadLibrary(_T("nvapi64.dll"));
 	if (hmod == NULL)
 	{
-		std::cerr << "Couldn't find nvapi.dll" << std::endl;
+		AfxMessageBox(_T("Couldn't find nvapi.dll. NVidia device only."));
 		return;
 	}
 
@@ -42,12 +42,18 @@ CNVidiaInfo::CNVidiaInfo()
 
 int CNVidiaInfo::get_usage(int index)
 {
+	if (index >= nvgts.count)
+		return -1;
+
 	(*NvAPI_GPU_GetUsages)(gpuHandles[index], gpuUsages);
 	return gpuUsages[3];
 }
 
 int CNVidiaInfo::get_temperature(int index)
 {
+	if (index >= nvgts.count)
+		return -1;
+
 	(*NvAPI_GPU_GetThermalSettings)(gpuHandles[index], 0, &nvgts);
 	return nvgts.sensor[index].currentTemp;
 }

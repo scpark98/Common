@@ -1945,7 +1945,7 @@ void CVtListCtrlEx::delete_selected_items()
 			file.Format(_T("%s\\%s"), m_path, get_text(index, col_filename));
 			if (!delete_file(file, true))
 			{
-				get_last_error_message(true);
+				get_last_error_string(true);
 				break;
 			}
 		}

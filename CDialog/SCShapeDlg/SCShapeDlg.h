@@ -33,7 +33,10 @@ public:
 					Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
 					Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
 					Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
-					Gdiplus::Color _cr_back = Gdiplus::Color::Transparent)
+					Gdiplus::Color _cr_back = Gdiplus::Color::Transparent,
+					int _timeout = 0,
+					bool _fadein = false,
+					bool _fadeout = false)
 	{
 		font_size = _font_size;
 		font_bold = _font_bold;
@@ -44,6 +47,9 @@ public:
 		cr_stroke = _cr_stroke;
 		cr_shadow = _cr_shadow;
 		cr_back = _cr_back;
+		timeout = _timeout;
+		fadein = _fadein;
+		fadeout = _fadeout;
 	}
 
 	int		font_size;
@@ -55,6 +61,9 @@ public:
 	Gdiplus::Color cr_stroke;
 	Gdiplus::Color cr_shadow;
 	Gdiplus::Color cr_back;
+	int		timeout;
+	bool	fadein;
+	bool	fadeout;
 };
 
 //CSCShapeDlg
@@ -68,6 +77,12 @@ public:
 
 	bool			create(CWnd* parent, int left, int top, int right, int bottom);
 
+	//set_image(), set_text()보다 먼저 세팅되어야 효과가 적용된다.
+	//단, set_text()에 이 효과값을 파라미터로 주는 경우는 예외.
+	void			set_timeout(int timeout) { m_setting.timeout = timeout; }
+	void			set_fadein(bool fadein) { m_setting.fadein = fadein; }
+	void			set_fadeout(bool fadeout) { m_setting.fadeout = fadeout; }
+
 	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
 	void			set_image(CGdiplusBitmap* img, bool deep_copy = true);
@@ -75,6 +90,8 @@ public:
 	bool			load(CString sType, UINT id);
 	bool			load(CString sFile);
 
+	//alpha = 0 ~ 255
+	void			alpha(int alpha);
 
 	//gdiplus를 이용한 text 출력용 dlg 생성 및 출력
 	bool			set_text(CWnd* parent, CString text, int font_size, bool font_bold,
@@ -83,12 +100,15 @@ public:
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
+							int timeout = 0,
+							bool fadein = false,
+							bool fadeout = false);
 	bool			set_text(CString text, CShapeDlgSetting* setting = NULL);
+
+	//
 	CShapeDlgSetting m_setting;
 
-	//alpha = 0 ~ 255
-	void			alpha(int alpha);
 
 	//animated gif인 경우
 	enum GIF_PLAY_STATE

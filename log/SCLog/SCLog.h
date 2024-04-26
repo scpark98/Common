@@ -2,7 +2,13 @@
 
 /*
 * 기존 Koino에서 사용하던 SCLog에 로그를 출력한 함수명과 라인 정보를 추가.
-* (#define logWrite...를 사용하므로 멀티쓰레드가 가능할지는 아직 확인 못함)
+* (#define logWrite...매크로를 사용하므로 멀티쓰레드가 가능할지는 아직 확인 못함)
+* 
+* !주의!
+* 일반적인 앱에서는 아주 잘 동작하지만
+* LMMAgent.exe와 같이 SYSTEM session 0번에서 실행되는 프로그램에서는
+* 위 매크로 때문인지 아직 명확히 알 수 없으나 crash가 발생하므로 사용 금지.
+* DbgOutA()를 이용할 것!
 * 
 * app.h에서 (프로젝트 구성에 따라 App class가 아닌 stdafx.h 또는 pch.h 등에 선언할 수도 있음)
 	#include "../../Common/log/SCLog.h"

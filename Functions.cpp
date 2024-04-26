@@ -7564,44 +7564,37 @@ std::deque<CString>	get_token_string(CString src, CString separator)
 */
 int get_token_string(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken /*= -1*/)
 {
-	std::deque<CString> dqSeparator;
-	
-	dqSeparator.push_back(separator);
-	return get_token_string(src, dqToken, dqSeparator, allowEmpty, nMaxToken);
-}
-
-int get_token_string(CString src, std::deque<CString>& dqToken, std::deque<CString> separator, bool allowEmpty, int nMaxToken)
-{
 	int i, j;
 	CString token;
 
 	dqToken.clear();
 
-	for (i = 0; i < src.GetLength(); i++)
+	int pos = 0;
+	
+	while (true)
 	{
-		bool found = false;
-		for (j = 0; j < separator.size(); j++)
+		pos = src.Find(separator, 0);
+
+		if (pos >= 0)
 		{
-			if (src[i] == separator[j])
-			{
-				found = true;
-				if (!token.IsEmpty() || allowEmpty)
-					dqToken.push_back(token);
-				if (nMaxToken > 0 && dqToken.size() == nMaxToken)
-					return dqToken.size();
-				token.Empty();
-				break;
-			}
+			token = src.Left(pos);
+			src = src.Mid(pos + separator.GetLength());
+		}
+		else
+		{
+			//더 이상 separator가 없다면 맨 마지막 token이다.
+			token = src;
 		}
 
-		if (!found)
-		{
-			token += src[i];
-		}
+		if (!token.IsEmpty() || allowEmpty)
+			dqToken.push_back(token);
+
+		if (nMaxToken > 0 && dqToken.size() == nMaxToken)
+			return dqToken.size();
+
+		if (pos < 0)
+			break;
 	}
-
-	if (!token.IsEmpty())
-		dqToken.push_back(token);
 
 	return dqToken.size();
 }

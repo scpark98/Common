@@ -295,7 +295,7 @@ class CRequestUrlParams
 {
 public:
 	CRequestUrlParams() {}
-	CRequestUrlParams(CString _ip, int _port, CString _sub_url, CString _method = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
+	CRequestUrlParams(CString _ip, int _port, CString _sub_url = _T(""), CString _method = _T("GET"), bool _is_https = true, std::deque<CString>*_headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
 	{
 		ip = _ip;
 		port = _port;
@@ -554,8 +554,9 @@ struct	NETWORK_INFO
 	//separator는 기존 CString에서 TCHAR로 통일한다.
 	//2char이상의 문자열이 하나의 separator로 사용될 경우는 거의 없으나
 	//1개 또는 그 이상의 서로 다른 문자를 separator들로 사용할 경우는 있을 것이다.
+	//20240426 separator가 여러개일 경우는 특정 separator에 의해 얻어진 token이 또 다른 separator를 포함할 수 있으므로
+	//그 처리가 매우 복잡해진다. 그냥 CString separator로 처리한다.
 	int			get_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1);
-	int			get_token_string(CString src, std::deque<CString>& dqToken, std::deque<CString> separator, bool allowEmpty = true, int nMaxToken = -1);
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
 

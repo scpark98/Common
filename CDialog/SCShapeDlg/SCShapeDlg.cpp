@@ -101,7 +101,10 @@ bool CSCShapeDlg::set_text(CString text, CShapeDlgSetting* setting)
 					m_setting.cr_text,
 					m_setting.cr_stroke,
 					m_setting.cr_shadow,
-					m_setting.cr_back
+					m_setting.cr_back,
+					m_setting.timeout,
+					m_setting.fadein,
+					m_setting.fadeout
 	);
 }
 
@@ -116,7 +119,11 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 						Gdiplus::Color cr_text/* = Gdiplus::Color::Black*/,
 						Gdiplus::Color cr_stroke/* = Gdiplus::Color::DarkGray*/,
 						Gdiplus::Color cr_shadow/* = Gdiplus::Color::HotPink*/,
-						Gdiplus::Color cr_back/* = Gdiplus::Color::Transparent*/)
+						Gdiplus::Color cr_back/* = Gdiplus::Color::Transparent*/,
+						int timeout/* = 0*/,
+						bool fadein/* = false*/,
+						bool fadeout/* = false*/
+)
 {
 	bool res = false;
 

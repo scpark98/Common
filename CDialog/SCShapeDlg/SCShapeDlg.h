@@ -33,10 +33,7 @@ public:
 					Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
 					Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
 					Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
-					Gdiplus::Color _cr_back = Gdiplus::Color::Transparent,
-					int _timeout = 0,
-					bool _fadein = false,
-					bool _fadeout = false)
+					Gdiplus::Color _cr_back = Gdiplus::Color::Transparent)
 	{
 		font_size = _font_size;
 		font_bold = _font_bold;
@@ -47,9 +44,6 @@ public:
 		cr_stroke = _cr_stroke;
 		cr_shadow = _cr_shadow;
 		cr_back = _cr_back;
-		timeout = _timeout;
-		fadein = _fadein;
-		fadeout = _fadeout;
 	}
 
 	int		font_size;
@@ -61,9 +55,6 @@ public:
 	Gdiplus::Color cr_stroke;
 	Gdiplus::Color cr_shadow;
 	Gdiplus::Color cr_back;
-	int		timeout;
-	bool	fadein;
-	bool	fadeout;
 };
 
 //CSCShapeDlg
@@ -75,13 +66,8 @@ public:
 	CSCShapeDlg();   // 표준 생성자입니다.
 	virtual ~CSCShapeDlg();
 
+	//default : SW_HIDE
 	bool			create(CWnd* parent, int left, int top, int right, int bottom);
-
-	//set_image(), set_text()보다 먼저 세팅되어야 효과가 적용된다.
-	//단, set_text()에 이 효과값을 파라미터로 주는 경우는 예외.
-	void			set_timeout(int timeout) { m_setting.timeout = timeout; }
-	void			set_fadein(bool fadein) { m_setting.fadein = fadein; }
-	void			set_fadeout(bool fadeout) { m_setting.fadeout = fadeout; }
 
 	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
@@ -93,18 +79,25 @@ public:
 	//alpha = 0 ~ 255
 	void			alpha(int alpha);
 
-	//gdiplus를 이용한 text 출력용 dlg 생성 및 출력
+	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성. default : SW_HIDE
 	bool			set_text(CWnd* parent, CString text, int font_size, bool font_bold,
 							int shadow_depth = 2, int thickness = 2,
 							CString font_name = _T(""),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-							int timeout = 0,
-							bool fadein = false,
-							bool fadeout = false);
+							Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 	bool			set_text(CString text, CShapeDlgSetting* setting = NULL);
+
+	//show상태로 만들고 time후에 hide된다.
+	void			time_out(int time, bool fadein, bool fadeout);
+
+	//set_image(), set_text()를 호출해도 아직 hide상태다.
+	//ShowWindow()시키거나 fadein()으로 보여지게 한다.
+	void			fade_in();
+	void			fade_out();
+
+	void			thread_fadeinout(bool fadein);
 
 	//
 	CShapeDlgSetting m_setting;

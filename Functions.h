@@ -1298,52 +1298,34 @@ void		SetWallPaper(CString sfile);
 	void		draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect);
 
 	//Gdiplus
-	//Gdiplus를 이용한 외곽선 텍스트 출력
-	CRect		draw_gdip_outline_text(Gdiplus::Graphics* g,
-								int x, int y, int w, int h,
-								CString text,
-								int font_size,
-								bool font_fold,
-								int thickness,
-								CString font_name = _T("맑은 고딕"),
-								Gdiplus::Color cr_text = Gdiplus::Color::White,
-								Gdiplus::Color cr_stroke = Gdiplus::Color::Black,
-								UINT align = DT_CENTER | DT_VCENTER);
-	CRect		draw_gdip_outline_text(Gdiplus::Graphics* g,
-								CRect rTarget,
-								CString text,
-								int font_size,
-								bool font_fold,
-								int thickness,
-								CString font_name = _T("맑은 고딕"),
-								Gdiplus::Color cr_text = Gdiplus::Color::White,
-								Gdiplus::Color cr_stroke = Gdiplus::Color::Black,
-								UINT align = DT_CENTER | DT_VCENTER);
+	//Gdiplus::MeasureString()의 오류를 대체.(http://www.soen.kr/lecture/library/gdiplus/1-7.htm)
+	Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR String, int length = -1);
 
-	CRect		draw_gdip_shadow_text(Gdiplus::Graphics *g,
-								int x, int y, int w, int h,
-								CString text,
-								int font_size,
-								bool font_bold,
-								int shadow_depth,
-								int thickness,
-								CString font_name = _T("맑은 고딕"),
-								Gdiplus::Color cr_text = Gdiplus::Color::Black,
-								Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
-								Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-								UINT align = DT_CENTER | DT_VCENTER);
-	CRect		draw_gdip_shadow_text(Gdiplus::Graphics* g,
-								CRect rTarget,
-								CString text,
-								int font_size,
-								bool font_bold,
-								int shadow_depth,
-								int thickness,
-								CString font_name = _T("맑은 고딕"),
-								Gdiplus::Color cr_text = Gdiplus::Color::Black,
-								Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
-								Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-								UINT align = DT_CENTER | DT_VCENTER);
+	//Gdiplus를 이용한 텍스트 출력
+	CRect		draw_text(Gdiplus::Graphics *g,
+							int x, int y, int w, int h,
+							CString text,
+							int font_size,
+							bool font_bold,
+							int shadow_depth,
+							int thickness,
+							CString font_name = _T("맑은 고딕"),
+							Gdiplus::Color cr_text = Gdiplus::Color::Black,
+							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							UINT align = DT_CENTER | DT_VCENTER);
+	CRect		draw_text(Gdiplus::Graphics* g,
+							CRect rTarget,
+							CString text,
+							int font_size,
+							bool font_bold,
+							int shadow_depth,
+							int thickness,
+							CString font_name = _T("맑은 고딕"),
+							Gdiplus::Color cr_text = Gdiplus::Color::Black,
+							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							UINT align = DT_CENTER | DT_VCENTER);
 
 	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 	//이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!
@@ -1449,12 +1431,12 @@ void		SetWallPaper(CString sfile);
 
 
 //사각형 Rectangle
-	//사각형 정보를 문자열로 리턴한다.
+	//사각형 정보를 문자열로 리턴한다. (default : 2)
 	//0 : "1 2 3 4"
 	//1 : "(1,2) ~ (4,8)"
 	//2 : "(1,2) ~ (4,8) (2x6)"
 	//3 : "l = 1, t = 2, r = 3, b = 4"
-	CString		get_rect_info_string(CRect r, int nFormat);
+	CString		get_rect_info_string(CRect r, int nFormat = 2);
 
 	void		make_rect(CRect &Rect, int x, int y, int w, int h);
 	CRect		make_rect(int x, int y, int w, int h);

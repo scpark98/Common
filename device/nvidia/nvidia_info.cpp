@@ -42,7 +42,7 @@ CNVidiaInfo::CNVidiaInfo()
 
 int CNVidiaInfo::get_usage(int index)
 {
-	if (index >= nvgts.count)
+	if (index >= gpuCount)
 		return -1;
 
 	(*NvAPI_GPU_GetUsages)(gpuHandles[index], gpuUsages);
@@ -51,7 +51,7 @@ int CNVidiaInfo::get_usage(int index)
 
 int CNVidiaInfo::get_temperature(int index)
 {
-	if (index >= nvgts.count)
+	if (index >= gpuCount)
 		return -1;
 
 	(*NvAPI_GPU_GetThermalSettings)(gpuHandles[index], 0, &nvgts);

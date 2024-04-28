@@ -51,6 +51,9 @@ BOOL CSCShapeDlg::PreTranslateMessage(MSG* pMsg)
 	//모든 키입력은 parent에서 처리.
 	if (pMsg->message == WM_KEYDOWN)
 	{
+		//parent의 PreTranslateMessage()에서 해당 키를 처리하는 코드가 있어야 한다.
+		//ex. VK_ESCAPE키를 눌렀을 때 mainDlg에서 OnBnClickedCancel()가 자동 호출되리라 예상했으나
+		//자동 호출되지 않으므로 처리코드를 추가해야 한다.
 		//Traceln(_T(""));
 		return false;
 	}
@@ -74,7 +77,12 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	DWORD dwStyle = WS_POPUP;
 	//id를 1234로 주면 왜 생성이 안될까...
 	//className과 windowName을 CSCMenu 등 다른걸로 주면 생성이 실패하는 이유는??
-	bool res = CreateEx(WS_EX_WINDOWEDGE | WS_EX_TOPMOST, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
+	bool res = CreateEx(WS_EX_CLIENTEDGE, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
+
+	Trace(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
+	CRect rc;
+	GetClientRect(rc);
+	Trace(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
 	dwStyle &= ~(WS_CAPTION);
@@ -82,6 +90,9 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 
 	dwStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED;
 	SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, dwStyle);
+
+	GetClientRect(rc);
+	Trace(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	return res;
 }
@@ -101,10 +112,7 @@ bool CSCShapeDlg::set_text(CString text, CShapeDlgSetting* setting)
 					m_setting.cr_text,
 					m_setting.cr_stroke,
 					m_setting.cr_shadow,
-					m_setting.cr_back,
-					m_setting.timeout,
-					m_setting.fadein,
-					m_setting.fadeout
+					m_setting.cr_back
 	);
 }
 
@@ -119,11 +127,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 						Gdiplus::Color cr_text/* = Gdiplus::Color::Black*/,
 						Gdiplus::Color cr_stroke/* = Gdiplus::Color::DarkGray*/,
 						Gdiplus::Color cr_shadow/* = Gdiplus::Color::HotPink*/,
-						Gdiplus::Color cr_back/* = Gdiplus::Color::Transparent*/,
-						int timeout/* = 0*/,
-						bool fadein/* = false*/,
-						bool fadeout/* = false*/
-)
+						Gdiplus::Color cr_back/* = Gdiplus::Color::Transparent*/)
 {
 	bool res = false;
 
@@ -152,17 +156,19 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	//텍스트 출력 크기를 얻어오고
 	CRect r;
 	
-	r = draw_gdip_shadow_text(NULL, CRect(), text,
+	r = draw_text(NULL, CRect(), text,
 		font_size, font_bold, shadow_depth, thickness, font_name,
 		cr_text, cr_stroke, cr_shadow);
 
 	CGdiplusBitmap	img(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
 
+	Trace(_T("img rect = (%d,%d)"), img.width, img.height);
+
 	//해당 캔버스에
 	Gdiplus::Graphics g(img);
 
 	//글자를 출력하고
-	r = draw_gdip_shadow_text(&g, r, text,
+	r = draw_text(&g, r, text,
 		font_size, font_bold, shadow_depth, thickness, font_name,
 		cr_text, cr_stroke, cr_shadow);
 
@@ -176,10 +182,16 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 		res = create(parent, 0, 0, r.Width(), r.Height());
 	}
 
+#ifdef _DEBUG
+	img.save(_T("d:\\SCShapeDlg.png"));
+#endif
+
 	if (!res)
 		return res;
 
 	set_image(&img);
+
+	return res;
 }
 
 void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
@@ -188,9 +200,6 @@ void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
 		img->deep_copy(&m_img);
 
 	SetWindowPos(NULL, 0, 0, m_img.width, m_img.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-
-	if (!IsWindowVisible())
-		ShowWindow(SW_SHOW);
 
 	gif_play();
 }
@@ -234,7 +243,7 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	GetWindowRect(rc);
 	POINT ptSrc = { 0, 0 };
 	POINT ptWinPos = { rc.left, rc.top };
-	SIZE sz = { rc.Width(), rc.Height() };
+	SIZE sz = { img->GetWidth(), img->GetHeight() };
 	BLENDFUNCTION stBlend = { AC_SRC_OVER, 0, m_alpha, AC_SRC_ALPHA };
 
 	HDC hDC = ::GetDC(m_hWnd);
@@ -380,4 +389,54 @@ void CSCShapeDlg::PreSubclassWindow()
 	// TODO: Add your specialized code here and/or call the base class
 
 	CDialogEx::PreSubclassWindow();
+}
+
+//show상태로 만들고 time후에 hide된다.
+void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
+{
+	if (timeout <= 0)
+	{
+		ShowWindow(SW_SHOW);
+		return;
+	}
+
+	if (fadein)
+		fade_in();
+
+	Wait(timeout * 1000);
+
+	if (fadeout)
+		fade_out();
+}
+
+//set_image(), set_text()를 호출해도 아직 hide상태다.
+//ShowWindow()시키거나 fadein()으로 보여지게 한다.
+void CSCShapeDlg::fade_in()
+{
+	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true);
+	t.detach();
+}
+
+void CSCShapeDlg::fade_out()
+{
+	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false);
+	t.detach();
+}
+
+void CSCShapeDlg::thread_fadeinout(bool fadein)
+{
+	alpha(fadein ? 0 : 255);
+	ShowWindow(SW_SHOW);
+
+	int _alpha = m_alpha;
+
+	while (true)
+	{
+		_alpha += (fadein ? 5 : -5);
+
+		if (_alpha < 0 || _alpha > 255)
+			break;
+		
+		alpha(_alpha);
+	}
 }

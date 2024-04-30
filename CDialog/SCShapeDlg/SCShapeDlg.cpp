@@ -97,32 +97,32 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	return res;
 }
 
-bool CSCShapeDlg::set_text(CString text, CShapeDlgSetting* setting)
+bool CSCShapeDlg::set_text(CShapeDlgTextSetting* setting)
 {
 	if (setting != NULL)
-		memcpy(&m_setting, setting, sizeof(CShapeDlgSetting));
+		memcpy(&m_text_setting, setting, sizeof(CShapeDlgTextSetting));
 
 	return set_text(m_parent,
-					text,
-					m_setting.font_size,
-					m_setting.font_bold,
-					m_setting.shadow_depth,
-					m_setting.thickness,
-					m_setting.font_name,
-					m_setting.cr_text,
-					m_setting.cr_stroke,
-					m_setting.cr_shadow,
-					m_setting.cr_back
+					m_text_setting.text,
+					m_text_setting.font_size,
+					m_text_setting.font_bold,
+					m_text_setting.shadow_depth,
+					m_text_setting.thickness,
+					m_text_setting.font_name,
+					m_text_setting.cr_text,
+					m_text_setting.cr_stroke,
+					m_text_setting.cr_shadow,
+					m_text_setting.cr_back
 	);
 }
 
 //gdiplus를 이용한 text 출력용 dlg 생성
 bool CSCShapeDlg::set_text(CWnd* parent,
 						CString text,
-						int font_size,
+						float font_size,
 						bool font_bold,
 						int shadow_depth/* = 2*/,
-						int thickness/* = 2*/,
+						float thickness/* = 2*/,
 						CString font_name/* = _T("")*/,
 						Gdiplus::Color cr_text/* = Gdiplus::Color::Black*/,
 						Gdiplus::Color cr_stroke/* = Gdiplus::Color::DarkGray*/,
@@ -148,10 +148,10 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 		else
 			GetObject(GetStockObject(SYSTEM_FONT), sizeof(lf), &lf);
 
-		m_setting.font_name = font_name = lf.lfFaceName;
+		m_text_setting.font_name = font_name = lf.lfFaceName;
 	}
 
-	m_setting = CShapeDlgSetting(font_size, font_bold, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
+	m_text_setting = CShapeDlgTextSetting(text, font_size, font_bold, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
 
 	//텍스트 출력 크기를 얻어오고
 	CRect r;
@@ -162,7 +162,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 	CGdiplusBitmap	img(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
 
-	Trace(_T("img rect = (%d,%d)"), img.width, img.height);
+	TRACE(_T("img rect = (%d,%d)"), img.width, img.height);
 
 	//해당 캔버스에
 	Gdiplus::Graphics g(img);
@@ -380,7 +380,7 @@ void CSCShapeDlg::gif_thread()
 		}
 	}
 
-	Trace(_T("%s terminated."), __function__);
+	TRACE(_T("%s terminated."), __function__);
 }
 
 

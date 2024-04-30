@@ -5315,10 +5315,10 @@ Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR
 CRect draw_text(Gdiplus::Graphics* g,
 				int x, int y, int w, int h,
 				CString text,
-				int font_size,
+				float font_size,
 				bool font_bold,
 				int shadow_depth,
-				int thickness,
+				float thickness,
 				CString font_name,
 				Gdiplus::Color cr_text,
 				Gdiplus::Color cr_stroke,
@@ -5342,10 +5342,10 @@ CRect draw_text(Gdiplus::Graphics* g,
 CRect draw_text(Gdiplus::Graphics* g,
 				CRect rTarget,
 				CString text,
-				int font_size,
+				float font_size,
 				bool font_bold,
 				int shadow_depth,
-				int thickness,
+				float thickness,
 				CString font_name,
 				Gdiplus::Color cr_text,
 				Gdiplus::Color cr_stroke,
@@ -5375,10 +5375,11 @@ CRect draw_text(Gdiplus::Graphics* g,
 	float fDpiY = g->GetDpiY();
 
 	int logPixelsY = ::GetDeviceCaps(hDC, LOGPIXELSY);
-	Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
+	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
+	float emSize = fDpiY * font_size / 96.0;
 
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
-	Gdiplus::Font font(&fontFamily, font_size, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
+	Gdiplus::Font font(&fontFamily, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
 
 	Gdiplus::SolidBrush shadow_brush(cr_shadow);
 	Gdiplus::SolidBrush brush2(cr_text);
@@ -5467,14 +5468,14 @@ CRect draw_text(Gdiplus::Graphics* g,
 			(Gdiplus::REAL)(shadow_bitmap.GetWidth())/ratio, (Gdiplus::REAL)(shadow_bitmap.GetHeight())/ratio);
 	}
 
-	if (thickness == 0)
+	if (thickness == 0.0)
 	{
 		g->DrawString(CStringW(text), -1, &font, boundRect, &sf, &brush2);
 	}
 	else
 	{
-		//float emSize = fDpiY * (float)font_size / 72.0;
-		float emSize = fDpiY * font.GetSize() / 72.0;
+		float emSize = fDpiY * font_size / 72.0;
+		//float emSize = fDpiY * font.GetSize() / 72.0;
 		Gdiplus::GraphicsPath str_path;
 
 		str_path.AddString(CStringW(text), -1, &fontFamily,

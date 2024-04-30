@@ -22,19 +22,22 @@
 
 #include "../../GdiplusBitmap.h"
 
-class CShapeDlgSetting
+class CShapeDlgTextSetting
 {
 public:
-	CShapeDlgSetting(int _font_size = 40,
+	CShapeDlgTextSetting() {};
+	CShapeDlgTextSetting(CString _text,
+					float _font_size = 40,
 					int _font_bold = true,
 					int _shadow_depth = 2,
-					int _thickness = 2,
+					float _thickness = 2,
 					CString _font_name = _T("Arial"),
 					Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
 					Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
 					Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
 					Gdiplus::Color _cr_back = Gdiplus::Color::Transparent)
 	{
+		text = _text;
 		font_size = _font_size;
 		font_bold = _font_bold;
 		shadow_depth = _shadow_depth;
@@ -46,10 +49,11 @@ public:
 		cr_back = _cr_back;
 	}
 
-	int		font_size;
+	CString text;
+	float	font_size;
 	bool	font_bold;
 	int		shadow_depth;
-	int		thickness;
+	float	thickness;
 	CString	font_name;
 	Gdiplus::Color cr_text;
 	Gdiplus::Color cr_stroke;
@@ -80,14 +84,14 @@ public:
 	void			alpha(int alpha);
 
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성. default : SW_HIDE
-	bool			set_text(CWnd* parent, CString text, int font_size, bool font_bold,
-							int shadow_depth = 2, int thickness = 2,
+	bool			set_text(CWnd* parent, CString text, float font_size, bool font_bold,
+							int shadow_depth = 2, float thickness = 2.0f,
 							CString font_name = _T(""),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 							Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
-	bool			set_text(CString text, CShapeDlgSetting* setting = NULL);
+	bool			set_text(CShapeDlgTextSetting* setting = NULL);
 
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);
@@ -100,7 +104,8 @@ public:
 	void			thread_fadeinout(bool fadein);
 
 	//
-	CShapeDlgSetting m_setting;
+	CShapeDlgTextSetting	m_text_setting;
+	CShapeDlgTextSetting* get_text_setting() { return &m_text_setting; }
 
 
 	//animated gif인 경우

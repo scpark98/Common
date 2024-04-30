@@ -2947,7 +2947,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 	if (m_path.Right(1) == '\\')
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	Trace(_T("current path = %s\n"), m_path);
+	TRACE(_T("current path = %s\n"), m_path);
 
 	refresh_list(refresh);
 }
@@ -3358,7 +3358,7 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_pDragImage->BeginDrag(0, CPoint(nOffset, nOffset - 4));
 	m_pDragImage->DragEnter(GetDesktopWindow(), pNMLV->ptAction);
 
-	Trace(_T("start drag...\n"));
+	TRACE(_T("start drag...\n"));
 
 	*pResult = 0;
 }
@@ -3390,13 +3390,13 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		//// If we drag outside current window we need to adjust the highlights displayed
 		if (pDropWnd != m_pDropWnd)
 		{
-			Trace(_T("pDropWnd != m_pDropWnd\n"));
+			TRACE(_T("pDropWnd != m_pDropWnd\n"));
 
 			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 			{
 				if (m_nDropIndex != -1) //If we drag over the CListCtrl header, turn off the hover highlight
 				{
-					Trace(_T("m_nDropIndex != -1\n"));
+					TRACE(_T("m_nDropIndex != -1\n"));
 					CListCtrl* pList = (CListCtrl*)m_pDropWnd;
 					VERIFY(pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED));
 					// redraw item
@@ -3410,7 +3410,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 					int i = 0;
 					int nCount = pList->GetItemCount();
 
-					Trace(_T("m_nDropIndex is not -1, nCount = %d\n"), nCount);
+					TRACE(_T("m_nDropIndex is not -1, nCount = %d\n"), nCount);
 
 					for (i = 0; i < nCount; i++)
 					{
@@ -3474,7 +3474,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			HTREEITEM hItem = ((CTreeCtrl*)pDropWnd)->HitTest(pt, &uFlags);
-			Trace(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
+			TRACE(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
 			pTree->SelectDropTarget(hItem);
 			ASSERT(hItem == pTree->GetDropHilightItem());
 		}
@@ -3506,7 +3506,7 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 	//If we are in a drag and drop operation (otherwise we don't do anything)
 	if (m_bDragging)
 	{
-		Trace(_T("OnLButtonUp\n"));
+		TRACE(_T("OnLButtonUp\n"));
 		// Release mouse capture, so that other controls can get control/messages
 		ReleaseCapture();
 
@@ -3555,9 +3555,9 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 		get_selected_items(&dq);
 
 		for (int i = 0; i < dq.size(); i++)
-			Trace(_T("drag item %d of %p = %s\n"), i, pDragWnd, GetItemText(dq[i], col_filename));
+			TRACE(_T("drag item %d of %p = %s\n"), i, pDragWnd, GetItemText(dq[i], col_filename));
 
-		Trace(_T("dropped on %p = %s\n"), pDropWnd, (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
+		TRACE(_T("dropped on %p = %s\n"), pDropWnd, (droppedItem.IsEmpty() ? _T("same ctrl") : droppedItem));
 	}
 	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 	{

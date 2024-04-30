@@ -9564,7 +9564,7 @@ void combination(std::vector<TCHAR> src, CString temp, std::vector<CString> &res
 	if (depth == 0)//result.size())  // depth == n // 계속 안뽑다가 r 개를 채우지 못한 경우는 이 곳에 걸려야 한다.
 	{
 		result.push_back(temp);
-		Trace(_T("%s\n"), temp);
+		TRACE(_T("%s\n"), temp);
 		return;
 	}
 
@@ -14712,6 +14712,9 @@ void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
 	CString str;
 	str.FormatV(format, args);
 	va_end(args);
+
+	if (str.IsEmpty())
+		return;
 
 	str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
 	OutputDebugString(str);

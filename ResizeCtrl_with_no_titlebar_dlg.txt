@@ -112,4 +112,27 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
         return HTCLIENT;
 	*/
 	
+[2번 방법을 사용한 예]
+- IDD_DIALOG의 속성은 
+	. 시스템 메뉴 false
+	. 제목 표시줄 false
+	. 테두리 None or Thin
+- dlg.h에 변수 추가
+	int				m_corner_index = -1;	//커서가 코너의 어느 영역에 있는지
 
+- 클래스위자드를 통해
+	WM_SETCURSOR, WM_LBUTTONDOWN 핸들러 추가 (WM_MOUSEMOVE, WM_LBUTTONUP은 필수 아님)
+
+- OnInitDialog()
+	//이 코드를 넣어야 작업표시줄에서 클릭하여 minimize, restore된다.
+	//작업표시줄에서 해당 앱을 shift+우클릭하여 SYSMENU를 표시할 수 있다.
+	//DIALOG 속성에서 시스템 메뉴가 true인 경우 작업표시줄 우클릭 메뉴가 다르게 나타난다.
+	SetWindowLongPtr(m_hWnd, GWL_STYLE, WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+
+- OnSetCursor()
+	커서 위치로 9가지 상태(corner_inside, corner_left ~ corner_bottomright)의 인덱스를 얻는다.
+
+- OnLButtonDown()
+	!IsZoom()이고 corner_left ~ corner_bottomright이면
+	DefWindowProc(WM_SYSCOMMAND, SC_SIZE + m_corner_index, MAKELPARAM(point.x, point.y)); 를 실행하고
+	corner_inside이면 창의 이동으로 실행된다.

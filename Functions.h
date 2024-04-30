@@ -64,9 +64,10 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 //20231101 opencv에 trace가 이미 정의되어 있어서 trace를 Trace로 변경함.
 //매크로로 정의되어 그런지 간혹 비정상적으로 출력되는 현상이 있다.
 //일단, thread 내부에서 사용하면 오류가 발생하므로 절대 thread 내부에서는 사용하지 말것.
+//20240429 thread 내부가 아닌 곳에서도 assertion failed되므로 일단 사용 금지!
 //https://stackoverflow.com/questions/3211463/what-is-the-most-efficient-way-to-make-this-code-thread-safe
-#define Trace(fmt, ...) trace_output(__function__, __LINE__, false, fmt, ##__VA_ARGS__)
-#define Traceln(fmt, ...) trace_output(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
+//#define Trace(fmt, ...) trace_output(__function__, __LINE__, false, fmt, ##__VA_ARGS__)
+//#define Traceln(fmt, ...) trace_output(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
 #ifdef __GNUG__
 #include <cxxabi.h>

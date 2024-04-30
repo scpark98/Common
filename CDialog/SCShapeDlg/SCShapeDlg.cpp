@@ -79,10 +79,10 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	//className과 windowName을 CSCMenu 등 다른걸로 주면 생성이 실패하는 이유는??
 	bool res = CreateEx(WS_EX_CLIENTEDGE, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
 
-	Trace(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
+	TRACE(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
 	CRect rc;
 	GetClientRect(rc);
-	Trace(_T("rc = %s\n"), get_rect_info_string(rc));
+	TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
 	dwStyle &= ~(WS_CAPTION);
@@ -92,7 +92,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, dwStyle);
 
 	GetClientRect(rc);
-	Trace(_T("rc = %s\n"), get_rect_info_string(rc));
+	TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	return res;
 }

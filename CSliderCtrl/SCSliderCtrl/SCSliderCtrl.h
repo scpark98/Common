@@ -18,10 +18,6 @@
 
 #include "../../GdiplusBitmap.h"
 
-#define	SCSLIDERCTRL_STYLE_SLIDER		0
-#define SCSLIDERCTRL_STYLE_PROGRESS		1
-#define SCSLIDERCTRL_STYLE_VOLUME		2
-
 static const UINT Message_SCSliderCtrl = ::RegisterWindowMessage(_T("MessageString_SCSliderCtrl"));
 
 //트랙 이벤트가 발생했을 때 바로 PostMessage를 호출하게 되면
@@ -41,6 +37,13 @@ static const UINT Message_SCSliderCtrl = ::RegisterWindowMessage(_T("MessageStri
 //PostMessage를 SendMessage로 변경하고
 //msg를 세분화해서 grab, move, release에 따라 동작 방식을 달리 구현하여 해결되었다.
 //우선 이렇게 timer 방식으로 계속 사용해보고 문제가 없다면 코드를 다시 정리하자.
+
+/*
+* scpark 20240501
+* bitmap 이미지들로 slidectrl를 표현하는 코드에서 시작됐으나 좋은 디자인 이미지가 필요하고 크기조절 지원도 쉽지 않다.
+* 최근 동향은 이미지를 이용한 스타일은 거의 사용되지 않고 gdi로 깔끔하게 그려주는 것이 좋다.
+* 우선 이미지 설정관련 코드들은 살려두되 사용되지 않으며 삭제 예정임.
+*/
 
 /////////////////////////////////////////////////////////////////////////////
 // CSCSliderCtrl window
@@ -108,6 +111,7 @@ public:
 	{
 		slider_normal = 0,
 		slider_thumb,
+		slider_thumb_round,
 		slider_value,
 		slider_progress,
 		slider_track,
@@ -146,24 +150,28 @@ public:
 	int		GetStyle() { return m_style; }
 
 	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
-	void	SetStyle(int nStyle);
-	void	SetTrackHeight(int height) { m_nTrackHeight = height; }
-	void	SetPos(int nPos);
-	int		GetPos();
-	void	EnableSlide(bool enable = true) { m_enable_slide = enable; }
+	void	set_style(int nStyle);
+	void	set_track_height(int height) { m_nTrackHeight = height; }
+
+	void	set_range(int lower, int upper, bool redraw = false);
+	int		get_pos() { return m_pos; }
+	void	set_pos(int pos);
+
+	void	SetRange(int lower, int upper, bool redraw = false) { set_range(lower, upper, redraw); }
+	int		GetPos() { return get_pos(); }
+	void	SetPos(int pos) { set_pos(pos); }
+
+	void	enable_slide(bool enable = true) { m_enable_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
-	int		GetLower() { return m_lower; }
-	int		GetUpper() { return m_upper; }
-	void	SetRange(int lower, int upper, BOOL bRedraw = FALSE);
-	BOOL	SetBitmapChannel(UINT nChannelID, UINT nActiveID = NULL);
-	BOOL	SetBitmapThumb(	UINT nThumbID, UINT nActiveID = NULL, BOOL bTrans = FALSE, COLORREF crTrans = RGB(0,0,0));
+	int		get_lower() { return m_lower; }
+	int		get_upper() { return m_upper; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
 	void	SetValueStyle(int nValueStyle = value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
 
-	void	SetBackColor(COLORREF crBack);
-	void	SetActiveColor(COLORREF crActive);
-	void	SetInActiveColor(COLORREF crInActive);
-	void	SetThumbColor(COLORREF crThumb);
+	void	set_back_color(COLORREF crBack);
+	void	set_active_color(COLORREF crActive);
+	void	set_inactive_color(COLORREF crInActive);
+	void	set_thumb_color(COLORREF crThumb);
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
@@ -204,8 +212,6 @@ public:
 	//-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
 	void	set_repeat_end(int pos = -2);
 
-
-
 protected:
 	// Attributes
 
@@ -225,13 +231,21 @@ protected:
 	int			m_tooltip_format;	//default = tooltip_value
 
 
-	int			m_nChannelWidth, m_nChannelHeight;
-	int			m_nThumbWidth, m_nThumbHeight;
-	int			m_nMarginLeft, m_nMarginRight, m_nMarginTop, m_nMarginBottom;
+	//실제 전체 구간 게이지 영역
+	CRect		m_track;
+	int			m_track_thick = 8;	//게이지 두께
+
+	//잡고 움직이는 영역
+	CSize		m_thumb = CSize(14, 10);
+	//4방향의 여백
+	CRect		m_margin;
 	int			m_nMouseOffset;
 
-	BOOL		m_is_vertical;
-	bool		m_enable_slide;	//enable move the current pos by click or drag even though progress style. default = true
+	//현재는 세로모드에 대한 코드가 거의 구현되어 있지 않다.
+	bool		m_is_vertical;
+
+	//enable move the current pos by click or drag even though progress style. default = true
+	bool		m_enable_slide;
 
 
 	//특정 위치들을 기억해두자. 북마크처럼.
@@ -258,35 +272,25 @@ protected:
 	그렇지 않은 조건일 경우만 이쪽으로 넘겨서 처리하도록 수정 완료.
 	bool		m_enable_bottom_slide;
 	*/
-	BOOL		m_bChannelActive, m_bThumbActive;
-	BOOL		m_bTransparentChannel, m_bTransparentThumb, m_bThumb, m_bChannel;
 	BOOL		m_bLButtonDown, m_bHasFocus, m_bDrawFocusRect;
 
 	int			m_nValueStyle;	//only applies to SCSLIDERCTRL_STYLE_PROGRESS. default = value;
 	COLORREF	m_crValueText;	//text color of value. background is transparent. default = RGB(64,64,64);
 
-	CBitmap		m_bmChannel, m_bmChannelMask, m_bmChannelActive, m_bmChannelActiveMask;
-	CBitmap		m_bmThumb, m_bmThumbMask, m_bmThumbActive, m_bmThumbActiveMask, m_bmThumbBg;
-
-
-	CDC			m_dcBk;
-	CBitmap		m_bmpBk;
-	CBitmap     *m_bmpBkOld;
-
-	COLORREF	m_crBack;		// back color of control
-	COLORREF	m_crActive;			//processed area
-	COLORREF	m_crInActive;		//not processed area
+	COLORREF	m_cr_back;		// back color of control
+	COLORREF	m_cr_active;			//processed area
+	COLORREF	m_cr_inactive;		//not processed area
 	int			m_nTrackHeight;		//processing area height. odd recommend between 3 ~ 11.
 	CPen		m_penThumb;
 	CPen		m_penThumbLight;
 	CPen		m_penThumbLighter;
 	CPen		m_penThumbDark;
 	CPen		m_penThumbDarker;
-	COLORREF	m_crThumb;
-	COLORREF	m_crThumbLight;
-	COLORREF	m_crThumbLighter;
-	COLORREF	m_crThumbDark;
-	COLORREF	m_crThumbDarker;
+	COLORREF	m_cr_thumb;
+	COLORREF	m_cr_thumbLight;
+	COLORREF	m_cr_thumbLighter;
+	COLORREF	m_cr_thumbDark;
+	COLORREF	m_cr_thumbDarker;
 	COLORREF	m_crBookmark;
 	COLORREF	m_crBookmarkCurrent;
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
@@ -315,7 +319,6 @@ public:
 protected:
 	//{{AFX_MSG(CSCSliderCtrl)
 	afx_msg void OnPaint();
-	afx_msg void OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);

@@ -38,42 +38,33 @@ CSCSliderCtrl::CSCSliderCtrl()
 	m_upper		= 0;
 	m_pos		= 0;
 
-	m_nMarginLeft = m_nMarginRight = m_nMarginTop = m_nMarginBottom = 0;
-	m_nThumbWidth = THUMB_WIDTH * 2;
-	m_nThumbHeight = 0;
+	m_margin = CRect(0, 0, 0, 0);
 
 	m_nTrackHeight = 5;
 
-	m_bChannel = m_bChannelActive = m_is_vertical = m_bThumb = m_bLButtonDown = false;
-	m_bTransparentChannel = false;
 	m_bDrawFocusRect = false;
 
 	m_nValueStyle = value;
 	m_crValueText = RGB(32, 32, 32);
 
-	m_dcBk.m_hDC = NULL;
-
-	m_crBack	= ::GetSysColor(COLOR_3DFACE);
-	m_crActive	= RGB(128, 192, 255);
-	m_crInActive= get_color(m_crBack, -64);
-	m_crThumb	= RGB(124, 192, 232);
+	m_cr_back	= ::GetSysColor(COLOR_3DFACE);
+	m_cr_active	= RGB(128, 192, 255);
+	m_cr_inactive= get_color(m_cr_back, -64);
+	m_cr_thumb	= RGB(124, 192, 232);
 
 	//북마크 컬러는 처음에만 배경의 보색으로 설정되지만
 	//차후 배경이 바뀌더라도 북마크의 색상까지 자동으로 보색으로 바꾸는 것은 좋지 않다.
-	m_crBookmark = color_complementary(m_crBack);
+	m_crBookmark = color_complementary(m_cr_back);
 	m_crBookmarkCurrent = green;
 
 	m_repeat_start = -1;
 	m_repeat_end = -1;
 
-	SetThumbColor(m_crThumb);
+	set_thumb_color(m_cr_thumb);
 }
 
 CSCSliderCtrl::~CSCSliderCtrl()
 {
-	DeleteObject(m_dcBk.SelectObject(&m_bmpBkOld));
-	DeleteDC(m_dcBk);
-
 	m_penThumb.DeleteObject();
 	m_penThumbLight.DeleteObject();
 	m_penThumbLighter.DeleteObject();
@@ -85,7 +76,6 @@ CSCSliderCtrl::~CSCSliderCtrl()
 BEGIN_MESSAGE_MAP(CSCSliderCtrl, CSliderCtrl)
 	//{{AFX_MSG_MAP(CSCSliderCtrl)
 	ON_WM_PAINT()
-	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, OnCustomDraw)
 	ON_WM_ERASEBKGND()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
@@ -101,88 +91,6 @@ END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
 // CSCSliderCtrl message handlers
-void CSCSliderCtrl::OnCustomDraw(NMHDR* pNMHDR, LRESULT* pResult) 
-//
-// Description	:	Sent by the slider control to notify the parent window 
-//					about drawing operations. This notification is sent in 
-//					the form of a WM_NOTIFY message.
-// Parameters	:	pNMHDR - a pointer to a NM_CUSTOMDRAW structure.
-//					pResult - value depends on the current drawing state.
-{
-	LPNMCUSTOMDRAW lpcd = (LPNMCUSTOMDRAW)pNMHDR;
-	CDC *pDC = CDC::FromHandle(lpcd->hdc);
-
-	GetClientRect(m_rc);
-
-	switch(lpcd->dwDrawStage)
-	{
-		case CDDS_PREPAINT:
-			*pResult = CDRF_NOTIFYITEMDRAW ;
-			break;
-			//return;  
-		case CDDS_ITEMPREPAINT:
-		if (lpcd->dwItemSpec == TBCD_THUMB)
-		{
-			*pResult = CDRF_DODEFAULT;
-			break;
-		}
-		if (lpcd->dwItemSpec == TBCD_CHANNEL)
-		{
-			CClientDC clientDC(GetParent());
-			CRect crect;
-			CRect wrect;
-			GetClientRect(crect);
-			GetWindowRect(wrect);
-			GetParent()->ScreenToClient(wrect);
-			if (m_dcBk.m_hDC == NULL)
-			{
-				m_dcBk.CreateCompatibleDC(&clientDC);
-				m_bmpBk.CreateCompatibleBitmap(&clientDC, crect.Width(), crect.Height());
-				m_bmpBkOld = m_dcBk.SelectObject(&m_bmpBk);
-				m_dcBk.BitBlt(0, 0, crect.Width(), crect.Height(), &clientDC, wrect.left, wrect.top, SRCCOPY);
-			}
-			//This bit does the tics marks transparently.
-			//create a memory dc to hold a copy of the oldbitmap data that includes the tics,
-			//because when we add the background in we will lose the tic marks
-			CDC SaveCDC;
-			CBitmap SaveCBmp, maskBitmap;
-			//set the colours for the monochrome mask bitmap
-			COLORREF crOldBack = pDC->SetBkColor(RGB(0,0,0));
-			COLORREF crOldText = pDC->SetTextColor(RGB(255,255,255));
-			CDC maskDC;
-			int iWidth = crect.Width();
-			int iHeight = crect.Height();
-			SaveCDC.CreateCompatibleDC(pDC);
-			SaveCBmp.CreateCompatibleBitmap(&SaveCDC, iWidth, iHeight);
-			CBitmap* SaveCBmpOld = (CBitmap *)SaveCDC.SelectObject(SaveCBmp);
-			//fill in the memory dc for the mask
-			maskDC.CreateCompatibleDC(&SaveCDC);
-			//create a monochrome bitmap
-			maskBitmap.CreateBitmap(iWidth, iHeight, 1, 1, NULL);
-			//select the mask bitmap into the dc
-			CBitmap* OldmaskBitmap = maskDC.SelectObject(&maskBitmap);
-			//copy the oldbitmap data into the bitmap, this includes the tics.
-			SaveCDC.BitBlt(0, 0, iWidth, iHeight, pDC, crect.left, crect.top, SRCCOPY);
-			//now copy the background into the slider
-			BitBlt(lpcd->hdc, 0, 0, iWidth, iHeight, m_dcBk.m_hDC, 0, 0, SRCCOPY);
-			// Blit the mask based on background colour
-			maskDC.BitBlt(0, 0, iWidth, iHeight, &SaveCDC, 0, 0, SRCCOPY);
-			// Blit the image using the mask
-			pDC->BitBlt(0, 0, iWidth, iHeight, &SaveCDC, 0, 0, SRCINVERT);
-			pDC->BitBlt(0, 0, iWidth, iHeight, &maskDC, 0, 0, SRCAND);
-			pDC->BitBlt(0, 0, iWidth, iHeight, &SaveCDC, 0, 0, SRCINVERT);
-			//restore and clean up
-			pDC->SetBkColor(crOldBack);
-			pDC->SetTextColor(crOldText);
-			DeleteObject(SelectObject(SaveCDC, SaveCBmpOld));
-			DeleteDC(SaveCDC);
-			DeleteObject(maskDC.SelectObject(OldmaskBitmap));
-			DeleteDC(maskDC);
-			*pResult = 0;
-			break;
-		}
-	}
-}
 
 void CSCSliderCtrl::OnPaint() 
 {
@@ -199,7 +107,7 @@ void CSCSliderCtrl::OnPaint()
 
 	// TODO: Add your message handler code here
 	GetClientRect(m_rc);
-	CMemoryDC	dc(&dc1, &m_rc, m_bTransparentChannel);
+	CMemoryDC	dc(&dc1, &m_rc);
 
 	Gdiplus::Graphics g(dc.m_hDC);
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
@@ -220,263 +128,242 @@ void CSCSliderCtrl::OnPaint()
 	font.SetBold(true);
 	CFont* pOldFont = (CFont*)dc.SelectObject(&font);
 
-	//background
-	if(m_bChannel)
-	{
-		pbmTmp = dcMem.SelectObject(&m_bmChannel);
+	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
+	m_track = m_rc;
 
-		dc.StretchBlt(0, 0, m_rc.Width(), m_rc.Height(), &dcMem,
-						0, 0, m_nChannelWidth, m_nChannelHeight, SRCCOPY);
-	}
+	if (m_is_vertical)
+		m_track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
 	else
+		m_track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
+
+	//background
+	//전체 슬라이드 사각형 영역을 배경색으로 그림
+	dc.FillSolidRect(m_rc, enable_color(m_cr_back));
+
+	if (m_style == slider_thumb_round)
 	{
-		//전체 슬라이드 사각형 영역을 배경색으로 그림
-		dc.FillSolidRect(m_rc, enable_color(m_crBack));
-
-		if (m_style <= slider_value)
-		{
-			dc.FillSolidRect(pos, cy - m_nTrackHeight / 2, m_rc.right - pos, m_nTrackHeight, enable_color(m_crInActive));
+		dc.FillSolidRect(m_track, red);
+	}
+	else if (m_style == slider_thumb || m_style == slider_value)
+	{
+		dc.FillSolidRect(pos, cy - m_nTrackHeight / 2, m_rc.right - pos, m_nTrackHeight, enable_color(m_cr_inactive));
 			
-			CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_crInActive), -24));
-			CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_crInActive), 36));
+		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), -24));
+		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), 36));
 
-			dc.SelectObject(&penDark);
-			dc.MoveTo(pos, cy - m_nTrackHeight / 2);
-			dc.LineTo(m_rc.right, cy - m_nTrackHeight / 2);
-			//dc.LineTo(m_rc.right - 1, cy + m_nTrackHeight / 2);
+		dc.SelectObject(&penDark);
+		dc.MoveTo(pos, cy - m_nTrackHeight / 2);
+		dc.LineTo(m_rc.right, cy - m_nTrackHeight / 2);
+		//dc.LineTo(m_rc.right - 1, cy + m_nTrackHeight / 2);
 
-			dc.SelectObject(&penLight);
-			dc.MoveTo(pos, cy + m_nTrackHeight / 2);
-			dc.LineTo(m_rc.right - 1, cy + m_nTrackHeight / 2);
-			dc.LineTo(m_rc.right - 1, cy - m_nTrackHeight / 2);
+		dc.SelectObject(&penLight);
+		dc.MoveTo(pos, cy + m_nTrackHeight / 2);
+		dc.LineTo(m_rc.right - 1, cy + m_nTrackHeight / 2);
+		dc.LineTo(m_rc.right - 1, cy - m_nTrackHeight / 2);
 
-			dc.SelectObject(pOldPen);
-			penDark.DeleteObject();
-			penLight.DeleteObject();
-		}
-		else if (m_style == slider_progress)
-		{
-			CRect	rInActive(pos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
-			dc.FillSolidRect(rInActive, enable_color(m_crInActive));
-		}
-		else if (m_style == slider_track)
-		{
-			CRect r = m_rc;
-			int cy = r.CenterPoint().y;
-			r.top = cy - 4;
-			r.bottom = cy + 4;
-			/*
-			dc.FillSolidRect(r.left, cy - 4, r.Width(), 2, get_color(m_crBack, -64));
-			dc.FillSolidRect(r.left, cy - 2, r.Width(), 4, m_crBack);//GRAY192);
-			dc.FillSolidRect(r.left, cy + 2, r.Width(), 2, get_color(m_crBack, 64));
-			*/
-			DrawSunkenRect(&dc, r, true, get_color(m_crBack, -32), get_color(m_crBack, 32), 1);
-			r.DeflateRect(1, 1);
-			DrawSunkenRect(&dc, r, true, get_color(m_crBack, -32), get_color(m_crBack, 32), 1);
+		dc.SelectObject(pOldPen);
+		penDark.DeleteObject();
+		penLight.DeleteObject();
+	}
+	else if (m_style == slider_progress)
+	{
+		CRect	rInActive(pos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
+		dc.FillSolidRect(rInActive, enable_color(m_cr_inactive));
+	}
+	else if (m_style == slider_track)
+	{
+		CRect r = m_rc;
+		int cy = r.CenterPoint().y;
+		r.top = cy - 4;
+		r.bottom = cy + 4;
+		/*
+		dc.FillSolidRect(r.left, cy - 4, r.Width(), 2, get_color(m_cr_back, -64));
+		dc.FillSolidRect(r.left, cy - 2, r.Width(), 4, m_cr_back);//GRAY192);
+		dc.FillSolidRect(r.left, cy + 2, r.Width(), 2, get_color(m_cr_back, 64));
+		*/
+		DrawSunkenRect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
+		r.DeflateRect(1, 1);
+		DrawSunkenRect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
 
-		}
-		else if (m_style == slider_step)
-		{
-			CRect r = m_rc;
-			int thumb_size = MIN(r.Width(), r.Height()); //스텝 위치마다 그려질 도형의 크기
-			int interval;
-			CSize gap(0, 0);	//스텝의 시작과 끝의 여백
+	}
+	else if (m_style == slider_step)
+	{
+		CRect r = m_rc;
+		int thumb_size = MIN(r.Width(), r.Height()); //스텝 위치마다 그려질 도형의 크기
+		int interval;
+		CSize gap(0, 0);	//스텝의 시작과 끝의 여백
 			
-			Gdiplus::Color cr_line(255, 255, 0, 255);
-			Gdiplus::Color cr_thumb(255, 62, 134, 193);
-			Gdiplus::Color cr_thumb_inner(255, 255, 255, 255);
-			Gdiplus::Pen pen_line(cr_line, 2.0f);
-			Gdiplus::Pen pen_thumb(cr_thumb, 1.0f);
+		Gdiplus::Color cr_line(255, 255, 0, 255);
+		Gdiplus::Color cr_thumb(255, 62, 134, 193);
+		Gdiplus::Color cr_thumb_inner(255, 255, 255, 255);
+		Gdiplus::Pen pen_line(cr_line, 2.0f);
+		Gdiplus::Pen pen_thumb(cr_thumb, 1.0f);
 
-			m_is_vertical = (m_rc.Height() > m_rc.Width());
+		m_is_vertical = (m_rc.Height() > m_rc.Width());
 
-			if (m_is_vertical)
+		if (m_is_vertical)
+		{
+			r.DeflateRect(0, gap.cy + thumb_size / 2);
+			interval = r.Height() / (m_upper - m_lower);
+
+			//thumb
+			for (i = 0; i <= m_upper - m_lower; i++)
 			{
-				r.DeflateRect(0, gap.cy + thumb_size / 2);
-				interval = r.Height() / (m_upper - m_lower);
-
-				//thumb
-				for (i = 0; i <= m_upper - m_lower; i++)
+				//각 step의 영역이 미리 계산된적이 없다면
+				if (m_steps[i].r.IsRectEmpty())
 				{
-					//각 step의 영역이 미리 계산된적이 없다면
-					if (m_steps[i].r.IsRectEmpty())
-					{
-						m_steps[i].r = CRect(r.left, gap.cy + interval * i, r.right, gap.cy + interval * i + thumb_size);
-						m_steps[i].r.DeflateRect(2, 2);
-					}
-
-					//이미지가 지정되어 있다면
-					if (m_steps[i].m_img.is_valid())
-					{
-						m_steps[i].m_img.draw(g, m_steps[i].r);
-					}
-					else
-					{
-						//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
-						CRect rthumb_small = m_steps[i].r;
-						rthumb_small.DeflateRect(4, 4);
-						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
-					}
+					m_steps[i].r = CRect(r.left, gap.cy + interval * i, r.right, gap.cy + interval * i + thumb_size);
+					m_steps[i].r.DeflateRect(2, 2);
 				}
 
-				//라인
-				pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
-				for (i = 1; i <= m_upper - m_lower; i++)
+				//이미지가 지정되어 있다면
+				if (m_steps[i].m_img.is_valid())
 				{
-					g.DrawLine(&pen_line, Gdiplus::Point(r.CenterPoint().x, m_steps[i - 1].r.bottom + 4),
-						Gdiplus::Point(r.CenterPoint().x, m_steps[i].r.top - 4));
+					m_steps[i].m_img.draw(g, m_steps[i].r);
 				}
-			}
-			else
-			{
-				r.DeflateRect(gap.cx + thumb_size / 2, 0);
-				interval = r.Width() / (m_upper - m_lower);
-
-				//thumb
-				for (i = 0; i <= m_upper - m_lower; i++)
+				else
 				{
-					if (m_steps[i].r.IsRectEmpty())
-					{
-						m_steps[i].r = CRect(gap.cx + interval * i, r.top, gap.cx + interval * i + thumb_size, r.bottom);
-						m_steps[i].r.DeflateRect(2, 2);
-					}
-
-					//이미지가 지정되어 있다면
-					if (m_steps[i].m_img.is_valid())
-					{
-						m_steps[i].m_img.draw(g, m_steps[i].r);
-					}
-					else
-					{
-						//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
-						CRect rthumb_small = m_steps[i].r;
-						rthumb_small.DeflateRect(4, 4);
-						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
-					}
-				}
-
-				//라인
-				pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
-				for (i = 1; i <= m_upper - m_lower; i++)
-				{
-					g.DrawLine(&pen_line, Gdiplus::Point(m_steps[i-1].r.right + 4, r.CenterPoint().y),
-						Gdiplus::Point(m_steps[i].r.left - 4, r.CenterPoint().y));
+					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
+					CRect rthumb_small = m_steps[i].r;
+					rthumb_small.DeflateRect(4, 4);
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
 				}
 			}
 
-			//for test
-			//DrawRectangle(&dc, m_rc, red);
+			//라인
+			pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+			for (i = 1; i <= m_upper - m_lower; i++)
+			{
+				g.DrawLine(&pen_line, Gdiplus::Point(r.CenterPoint().x, m_steps[i - 1].r.bottom + 4),
+					Gdiplus::Point(r.CenterPoint().x, m_steps[i].r.top - 4));
+			}
+		}
+		else
+		{
+			r.DeflateRect(gap.cx + thumb_size / 2, 0);
+			interval = r.Width() / (m_upper - m_lower);
+
+			//thumb
+			for (i = 0; i <= m_upper - m_lower; i++)
+			{
+				if (m_steps[i].r.IsRectEmpty())
+				{
+					m_steps[i].r = CRect(gap.cx + interval * i, r.top, gap.cx + interval * i + thumb_size, r.bottom);
+					m_steps[i].r.DeflateRect(2, 2);
+				}
+
+				//이미지가 지정되어 있다면
+				if (m_steps[i].m_img.is_valid())
+				{
+					m_steps[i].m_img.draw(g, m_steps[i].r);
+				}
+				else
+				{
+					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
+					CRect rthumb_small = m_steps[i].r;
+					rthumb_small.DeflateRect(4, 4);
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
+				}
+			}
+
+			//라인
+			pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+			for (i = 1; i <= m_upper - m_lower; i++)
+			{
+				g.DrawLine(&pen_line, Gdiplus::Point(m_steps[i-1].r.right + 4, r.CenterPoint().y),
+					Gdiplus::Point(m_steps[i].r.left - 4, r.CenterPoint().y));
+			}
 		}
 	}
 
 	//경과된 영역(active area) 표시
-	if (m_bChannelActive)
+	if (m_style <= slider_value)
 	{
-		pbmTmp = dcMem.SelectObject(&m_bmChannelActive);
-		dc.StretchBlt( 0, 0, pos, m_rc.Height(), &dcMem,
-						0, 0, m_nChannelWidth, m_nChannelHeight, SRCCOPY);
+		dc.FillSolidRect(m_rc.left, cy - m_nTrackHeight / 2, pos - m_rc.left, m_nTrackHeight, enable_color(m_cr_active));
+			
+		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_active), -64));
+		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_active), 64));
+
+		dc.SelectObject(&penDark);
+		dc.MoveTo(pos, cy - m_nTrackHeight / 2);
+		dc.LineTo(m_rc.left, cy - m_nTrackHeight / 2);
+		dc.LineTo(m_rc.left, cy + m_nTrackHeight / 2);
+
+		dc.SelectObject(&penLight);
+		dc.MoveTo(m_rc.left + 1, cy + m_nTrackHeight / 2);
+		dc.LineTo(pos, cy + m_nTrackHeight / 2);
+
+		dc.SelectObject(pOldPen);
+		penDark.DeleteObject();
+		penLight.DeleteObject();
+			
 	}
-	else
+	else if (m_style == slider_progress)
 	{
-		if (m_style <= slider_value)
+		CRect	rActive(0, m_rc.top + 2, pos, m_rc.bottom - 2);
+		dc.FillSolidRect(rActive, enable_color(m_cr_active));
+
+		//m_crValueText = RGB(12, 162, 255);
+		//m_cr_active = RGB(128,255,128);
+		if (m_nValueStyle > none)
 		{
-			dc.FillSolidRect(m_rc.left, cy - m_nTrackHeight / 2, pos - m_rc.left, m_nTrackHeight, enable_color(m_crActive));
-			
-			CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_crActive), -64));
-			CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_crActive), 64));
+			dc.SetTextColor(enable_color(m_crValueText));
+			dc.SetBkMode(TRANSPARENT);
 
-			dc.SelectObject(&penDark);
-			dc.MoveTo(pos, cy - m_nTrackHeight / 2);
-			dc.LineTo(m_rc.left, cy - m_nTrackHeight / 2);
-			dc.LineTo(m_rc.left, cy + m_nTrackHeight / 2);
-
-			dc.SelectObject(&penLight);
-			dc.MoveTo(m_rc.left + 1, cy + m_nTrackHeight / 2);
-			dc.LineTo(pos, cy + m_nTrackHeight / 2);
-
-			dc.SelectObject(pOldPen);
-			penDark.DeleteObject();
-			penLight.DeleteObject();
-			
+			if (m_nValueStyle == value)
+				str.Format(_T("%ld / %ld"), m_pos, (m_upper > 0 ? m_upper : 0));
+			else if (m_upper == m_lower)
+				str = _T("0.0%");
+			else
+				str.Format(_T("%.1f%%"), (double)(m_pos - m_lower) / (double)(m_upper - m_lower) * 100.0);
+			dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 		}
-		else if (m_style == slider_progress)
-		{
-			CRect	rActive(0, m_rc.top + 2, pos, m_rc.bottom - 2);
-			dc.FillSolidRect(rActive, enable_color(m_crActive));
 
-			//m_crValueText = RGB(12, 162, 255);
-			//m_crActive = RGB(128,255,128);
-			if (m_nValueStyle > none)
-			{
-				dc.SetTextColor(enable_color(m_crValueText));
-				dc.SetBkMode(TRANSPARENT);
+		//텍스트가 active, inactive 구간의 색상에 반전되도록 그려줘야한다.
+		//텍스트를 반전시켜서 뿌려주는 기능이 없으므로
+		//텍스트를 출력하고 그 위에 구간 색상을 반전시켜서 그려줘야 한다.
+		//미완성.
+		//dc.SetROP2(R2_XORPEN);
+		//CBrush br((m_cr_active));
+		//CBrush *pOldBrush = (CBrush*)dc.SelectObject(&br);
+		//dc.Rectangle(rActive);//, &CBrush(m_cr_active));
+		//dc.SelectObject(pOldBrush);
+		//DrawRectangle(&dc, rActive, (m_cr_active), (m_cr_active), 1, PS_SOLID, R2_XORPEN);
+	}
+	else if (m_style == slider_track)
+	{
+		CRect r = m_rc;
+		int cy = r.CenterPoint().y;
+		r.top = cy - 2;
+		r.bottom = cy + 2;
+		r.left += 2;
+		r.right = pos;
 
-				if (m_nValueStyle == value)
-					str.Format(_T("%ld / %ld"), m_pos, (m_upper > 0 ? m_upper : 0));
-				else if (m_upper == m_lower)
-					str = _T("0.0%");
-				else
-					str.Format(_T("%.1f%%"), (double)(m_pos - m_lower) / (double)(m_upper - m_lower) * 100.0);
-				dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-			}
+		if (r.right > m_rc.right - 2)
+			r.right = m_rc.right - 2;
 
-			//텍스트가 active, inactive 구간의 색상에 반전되도록 그려줘야한다.
-			//텍스트를 반전시켜서 뿌려주는 기능이 없으므로
-			//텍스트를 출력하고 그 위에 구간 색상을 반전시켜서 그려줘야 한다.
-			//미완성.
-			//dc.SetROP2(R2_XORPEN);
-			//CBrush br((m_crActive));
-			//CBrush *pOldBrush = (CBrush*)dc.SelectObject(&br);
-			//dc.Rectangle(rActive);//, &CBrush(m_crActive));
-			//dc.SelectObject(pOldBrush);
-			//DrawRectangle(&dc, rActive, (m_crActive), (m_crActive), 1, PS_SOLID, R2_XORPEN);
-		}
-		else if (m_style == slider_track)
-		{
-			CRect r = m_rc;
-			int cy = r.CenterPoint().y;
-			r.top = cy - 2;
-			r.bottom = cy + 2;
-			r.left += 2;
-			r.right = pos;
-
-			if (r.right > m_rc.right - 2)
-				r.right = m_rc.right - 2;
-
-			//CRect	rActive(0, m_rc.top + 2, pos, m_rc.bottom - 2);
-			if (r.right > r.left)
-				dc.FillSolidRect(r, enable_color(m_crActive));
-		}
+		//CRect	rActive(0, m_rc.top + 2, pos, m_rc.bottom - 2);
+		if (r.right > r.left)
+			dc.FillSolidRect(r, enable_color(m_cr_active));
 	}
 
+	//for test
+	DrawRectangle(&dc, m_rc, red);
 
 	// 손잡이(thumb)를 그린다
 	if (m_style <= slider_value)
 	{
-		if (m_bThumb && !IsWindowEnabled())
+		if (!IsWindowEnabled())
 		{
-			if (m_bThumbActive && m_bLButtonDown)
-				pbmTmp = dcMem.SelectObject(&m_bmThumbActive); // 활성화
-			else
-				pbmTmp = dcMem.SelectObject(&m_bmThumb); // 보통
-	
-	//		dc.BitBlt( pos - m_nThumbWidth / 2,
-	//					m_nMarginTop + m_nChannelHeight / 2 - m_nThumbHeight / 2 - 1,
-	//					m_nThumbWidth, m_nThumbHeight, &dcMem, 0, 0, SRCCOPY);
-
-			DrawTransparentBitmap(&dc, pos - m_nThumbWidth / 2,
-						m_nMarginTop + m_nChannelHeight / 2 - m_nThumbHeight / 2 + 1,
-						m_nThumbWidth, m_nThumbHeight,
-						&dcMem, 0, 0, &m_bmThumbMask);
 		}
 		else if (m_style == slider_thumb)
 		{
-			CBrush br(enable_color(m_crThumb));
+			CBrush br(enable_color(m_cr_thumb));
 
 			int		n = 4;										//라인 개수
-			double	dx = (double)m_nThumbWidth * 0.84 / double(n + 1);	//라인 간격
+			double	dx = (double)m_thumb.cx * 0.84 / double(n + 1);	//라인 간격
 			double	sx = pos - 0.5 * double(n - 1) * dx;		//수직 라인 표시 시작 좌표
 			CRect	rThumb = CRect(pos - THUMB_WIDTH, cy - 6, pos + THUMB_WIDTH, cy + 7);
 
@@ -502,11 +389,11 @@ void CSCSliderCtrl::OnPaint()
 		}
 		else if (m_style == slider_value)
 		{
-			CBrush br(enable_color(m_crThumb));
+			CBrush br(enable_color(m_cr_thumb));
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
 			pOldPen = (CPen*)dc.SelectObject(&m_penThumbDarker);//NULL_PEN);
 
-			CRect	rThumb = CRect(pos - m_nThumbWidth / 2, m_rc.top + 2, pos + m_nThumbWidth / 2, m_rc.bottom - 2);
+			CRect	rThumb = CRect(pos - m_thumb.cx / 2, m_rc.top + 2, pos + m_thumb.cx / 2, m_rc.bottom - 2);
 			dc.RoundRect(rThumb, CPoint(6, 6));
 
 			dc.SelectObject(pOldPen);
@@ -527,18 +414,18 @@ void CSCSliderCtrl::OnPaint()
 
 				//텍스트를 thumb에 출력하는데 그 너비가 작다면 늘려준다.
 				int		margin = 12;
-				int		minWidth = THUMB_WIDTH * 2;
+				int		minWidth = m_thumb.cx * 2;
 				CRect	rText;
 				dc.DrawText(str, rText, DT_CALCRECT);
 
 				if (rText.Width() + margin > minWidth)
 					minWidth = rText.Width() + margin;
 
-				if (m_nThumbWidth != minWidth)
+				if (m_thumb.cx != minWidth)
 				{
-					m_nThumbWidth = minWidth;
+					m_thumb.cx = minWidth;
 
-					rThumb = CRect(pos - m_nThumbWidth / 2, m_rc.top, pos + m_nThumbWidth / 2, m_rc.bottom);
+					rThumb = CRect(pos - m_thumb.cx / 2, m_rc.top, pos + m_thumb.cx / 2, m_rc.bottom);
 					TRACE("%ld, invalidate\n", GetTickCount());
 					Invalidate();
 				}					
@@ -617,7 +504,7 @@ BOOL CSCSliderCtrl::OnEraseBkgnd(CDC* pDC)
 	return CSliderCtrl::OnEraseBkgnd(pDC);
 }
 
-void CSCSliderCtrl::SetRange(int lower, int upper, BOOL bRedraw)
+void CSCSliderCtrl::set_range(int lower, int upper, bool redraw)
 {
 	m_lower = lower;
 	m_upper = upper;
@@ -631,167 +518,21 @@ void CSCSliderCtrl::SetRange(int lower, int upper, BOOL bRedraw)
 		m_steps.resize(upper - lower + 1);
 	}
 
-	CSliderCtrl::SetRange(lower, upper, bRedraw);
-}
-
-BOOL CSCSliderCtrl::SetBitmapChannel(UINT nChannelID, UINT nActiveID)
-{
-	// 비트맵의 ID가 정해지지 않았을 때
-	if(!nChannelID)
-	{
-		m_bChannel = FALSE;
-		m_bmChannel.DeleteObject();
-		m_bmChannelMask.DeleteObject();
-		m_bmChannelActive.DeleteObject();
-		m_bmChannelActiveMask.DeleteObject();
-	
-		return TRUE;
-	}
-
-	// 비트맵을 불러온다
-	m_bmChannel.DeleteObject();
-
-	if(!m_bmChannel.LoadBitmap(nChannelID))
-		return FALSE;
-
-	// 비트맵의 크기 정보를 가져온다.
-	BITMAP	bitmap;
-	m_bmChannel.GetBitmap(&bitmap);
-
-	m_nChannelWidth = bitmap.bmWidth;
-	m_nChannelHeight = bitmap.bmHeight;
-
-	// 활성화 배경 비트맵을 불러온다.
-	if(nActiveID)
-	{
-		m_bmChannelActive.DeleteObject();
-		if(!m_bmChannelActive.LoadBitmap(nActiveID))
-		{
-		}
-		m_bChannelActive = TRUE;
-	}
-	else
-		m_bChannelActive = FALSE;
-
-/*	// 크기를 비교한다
-	if(m_bChannelActive) {
-
-		BITMAP	bitmap;
-		m_bmChannelActive.GetBitmap(&bitmap);
-
-		ASSERT(m_nWidth == bitmap.bmWidth && m_nHeight == bitmap.bmHeight);
-	}
-*/
-
-	GetClientRect(&m_rc);
-
-//	m_bTransparentChannel = bTransparent;
-	m_bChannel = TRUE;
-
-	return TRUE;
-}
-
-BOOL CSCSliderCtrl::SetBitmapThumb(UINT nThumbID, UINT nActiveID, BOOL bTrans, COLORREF crTrans)
-{
-	// 손잡이의 ID값이 NULL일때
-	if(!nThumbID)
-	{
-		m_bThumb = FALSE;
-		m_bmThumb.DeleteObject();
-		m_bmThumbMask.DeleteObject();
-		m_bmThumbActive.DeleteObject();
-		m_bmThumbActiveMask.DeleteObject();
-		m_bmThumbBg.DeleteObject();
-
-		return TRUE;
-	}
-
-	// 비트맵을 불러온다
-	m_bmThumb.DeleteObject();
-
-	if(!m_bmThumb.LoadBitmap(nThumbID))
-		return FALSE;
-
-	// 투명한 비트맵을 그리기 위해 마스크를 만든다.
-	if(bTrans) {
-
-		PrepareMask(&m_bmThumb, &m_bmThumbMask, crTrans);
-	}
-
-	// 활성화 상태를 위한 비트맵을 불러온다.
-	if(nActiveID) {
-
-		m_bmThumbActive.DeleteObject();
-
-		if(!m_bmThumbActive.LoadBitmap(nActiveID)) {
-
-			m_bmThumb.DeleteObject();
-			//if(bTransparent)
-			//	m_bmThumbMask.DeleteObject();
-
-			return FALSE;
-		}
-
-/*		if(bTransparent) {
-
-			PrepareMask(&m_bmThumbActive, &m_bmThumbActiveMask,
-				clrpTransColor, iTransPixelX, iTransPixelY);
-		}
-*/		
-		m_bThumbActive = TRUE;
-
-	// 활성화 상태의 비트맵이 존재하지 않을 때.
-	} else
-		m_bThumbActive = FALSE;
-
-	// 비트맵의 크기 정보를 가져온다.
-	BITMAP	bitmap;
-	m_bmThumb.GetBitmap(&bitmap);
-
-	m_nThumbWidth = bitmap.bmWidth;
-	m_nThumbHeight = bitmap.bmHeight;
-
-	// 배경을 위한 비트맵이 없으면 컨트롤의 사이즈를 기억한다.
-	if(!m_bChannel)
-	{
-		GetClientRect(&m_rc);
-		m_nChannelWidth = m_rc.Width();
-		m_nChannelHeight = m_rc.Height();
-	}
-
-	ASSERT(m_nThumbWidth <= m_nChannelWidth && m_nThumbHeight <= m_nChannelHeight);
-
-	// 크기를 비교한다
-	if(m_bThumbActive) {
-
-		BITMAP	bitmap;
-		m_bmThumbActive.GetBitmap(&bitmap);
-
-		ASSERT(
-			m_nThumbWidth == bitmap.bmWidth &&
-			m_nThumbHeight == bitmap.bmHeight);
-	}
-
-	// 속성값을 설정한다
-	m_bTransparentThumb = 0;//bTransparent;
-	m_bThumb = TRUE;
-
-	return TRUE;
+	CSliderCtrl::SetRange(lower, upper, redraw);
 }
 
 // 컨트롤의 위치값에 해당하는 손잡이 중심의 좌표값을 구한다
-//
 int CSCSliderCtrl::Pos2Pixel(int nPos)
 {
 	if (m_upper == m_lower)
-		return (m_style <= slider_value ? m_nThumbWidth / 2 : 0);
+		return (m_style <= slider_value ? m_thumb.cx / 2 : 0);
 
 	if (m_is_vertical)
 	{
 		return
-			m_nMarginTop + m_nThumbHeight/2 +
+			m_margin.top + m_thumb.cy / 2 +
 			(int)(
-			(double)(m_rc.Height() - m_nMarginTop - m_nMarginBottom - m_nThumbHeight) *
+			(double)(m_rc.Height() - m_margin.top - m_margin.bottom - m_thumb.cy) *
 			((double)(nPos - m_lower) / (double)(m_upper - m_lower))
 			);
 
@@ -799,9 +540,9 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	else
 	{
 		return (int)(
-			(double)(m_rc.Width() - m_nMarginLeft - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth : 0)) *
+			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= slider_value ? m_thumb.cx : 0)) *
 			((double)(nPos - m_lower) / (double)(m_upper - m_lower))
-			) + m_nMarginLeft + (m_style <= slider_value ? m_nThumbWidth/2 : 0);
+			) + m_margin.left + (m_style <= slider_value ? m_thumb.cx/2 : 0);
 	}
 }
 
@@ -813,8 +554,8 @@ double CSCSliderCtrl::Pixel2Pos(int nPixel)
 	{
 		return (
 			m_lower +
-			(double)(nPixel - m_nMarginTop - (double)m_nThumbHeight/2.0) /
-			(double)(m_rc.Height() - m_nMarginBottom - m_nMarginTop - (m_style <= slider_value ? m_nThumbHeight : 0)) *
+			(double)(nPixel - m_margin.top - (double)m_thumb.cy/2.0) /
+			(double)(m_rc.Height() - m_margin.bottom - m_margin.top - (m_style <= slider_value ? m_thumb.cy : 0)) *
 			(double)(m_upper - m_lower) + 0.5
 			);
 
@@ -823,8 +564,8 @@ double CSCSliderCtrl::Pixel2Pos(int nPixel)
 	{
 		return (
 			m_lower +
-			(double)(nPixel - m_nMarginLeft - (m_style <= slider_value ? (double)m_nThumbWidth/2.0 : 0)) /
-			(double)(m_rc.Width() - m_nMarginLeft - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth : 0)) *
+			(double)(nPixel - m_margin.left - (m_style <= slider_value ? (double)m_thumb.cx/2.0 : 0)) /
+			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= slider_value ? m_thumb.cx : 0)) *
 			(double)(m_upper - m_lower + 1) + 0.0
 			);
 		//TRACE("d = %f\n", d);
@@ -832,14 +573,9 @@ double CSCSliderCtrl::Pixel2Pos(int nPixel)
 	}
 }
 
-int	CSCSliderCtrl::GetPos()
+void CSCSliderCtrl::set_pos(int pos)
 {
-	return m_pos;
-}
-
-void CSCSliderCtrl::SetPos(int nPos)
-{
-	m_pos = nPos;
+	m_pos = pos;
 
 	if (m_pos < m_lower)
 		m_pos = m_lower;
@@ -872,7 +608,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	// 둘 사이의 거리를 구해둔다
 	if(m_is_vertical)
 	{
-		if(abs(point.y - Pos2Pixel(m_pos)) <= (m_style <= slider_value ? m_nThumbHeight/2.0 : 0))
+		if(abs(point.y - Pos2Pixel(m_pos)) <= (m_style <= slider_value ? m_thumb.cy/2.0 : 0))
 			m_nMouseOffset = point.y - Pos2Pixel(m_pos);
 		else
 			m_nMouseOffset = 0;
@@ -893,7 +629,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			}
 		}
 		*/
-		if(abs(point.x - Pos2Pixel(m_pos)) <= (m_style <= slider_value ? m_nThumbWidth/2.0 : 0))
+		if(abs(point.x - Pos2Pixel(m_pos)) <= (m_style <= slider_value ? m_thumb.cx/2.0 : 0))
 			m_nMouseOffset = point.x - Pos2Pixel(m_pos);
 		else
 			m_nMouseOffset = 0;
@@ -1016,21 +752,21 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	{
 		nPixel = point.y - m_nMouseOffset;
 
-		if(nPixel > m_rc.Height() - m_nMarginBottom - (m_style <= slider_value ? m_nThumbHeight/2 : 0))
-			nPixel = m_rc.Height() - m_nMarginBottom - (m_style<= slider_value ? m_nThumbHeight/2 : 0);
+		if(nPixel > m_rc.Height() - m_margin.bottom - (m_style <= slider_value ? m_thumb.cy/2 : 0))
+			nPixel = m_rc.Height() - m_margin.bottom - (m_style<= slider_value ? m_thumb.cy/2 : 0);
 
-		if(nPixel < m_nMarginTop + (m_style <= slider_value ? m_nThumbHeight/2 : 0))
-			nPixel = m_nMarginTop + (m_style <= slider_value ? m_nThumbHeight/2 : 0);
+		if(nPixel < m_margin.top + (m_style <= slider_value ? m_thumb.cy/2 : 0))
+			nPixel = m_margin.top + (m_style <= slider_value ? m_thumb.cy/2 : 0);
 	}
 	else
 	{
 		nPixel = point.x - m_nMouseOffset;
 
-		if(nPixel < m_nMarginLeft + (m_style <= slider_value ? m_nThumbWidth/2 : 0))
-			nPixel = m_nMarginLeft + (m_style <= slider_value ? m_nThumbWidth/2 : 0);
+		if(nPixel < m_margin.left + (m_style <= slider_value ? m_thumb.cx/2 : 0))
+			nPixel = m_margin.left + (m_style <= slider_value ? m_thumb.cx/2 : 0);
 
-		if(nPixel > m_rc.Width() - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth/2 : 0))
-			nPixel = m_rc.Width() - m_nMarginRight - (m_style <= slider_value ? m_nThumbWidth/2 : 0);
+		if(nPixel > m_rc.Width() - m_margin.right - (m_style <= slider_value ? m_thumb.cx/2 : 0))
+			nPixel = m_rc.Width() - m_margin.right - (m_style <= slider_value ? m_thumb.cx/2 : 0);
 	}
 
 	// 변한 내용을 적용한다
@@ -1188,33 +924,33 @@ void CSCSliderCtrl::OnKillFocus(CWnd* pNewWnd)
 	//TRACE("KillFocus\n");
 }
 
-void CSCSliderCtrl::SetBackColor(COLORREF crBack)
+void CSCSliderCtrl::set_back_color(COLORREF crBack)
 {
-	m_crBack = crBack;
+	m_cr_back = crBack;
 	Invalidate();
 }
 
-void CSCSliderCtrl::SetActiveColor(COLORREF crActive)
+void CSCSliderCtrl::set_active_color(COLORREF crActive)
 {
-	m_crActive = crActive;
+	m_cr_active = crActive;
 	Invalidate();
 }
 
-void CSCSliderCtrl::SetInActiveColor(COLORREF crInActive)
+void CSCSliderCtrl::set_inactive_color(COLORREF crInActive)
 {
-	m_crInActive = crInActive;
+	m_cr_inactive = crInActive;
 	Invalidate();
 }
 
-void CSCSliderCtrl::SetThumbColor(COLORREF crThumb)
+void CSCSliderCtrl::set_thumb_color(COLORREF crThumb)
 {
 	int nMultiple = 32;
 
-	m_crThumb		= crThumb;
-	m_crThumbLight	= get_color(m_crThumb, nMultiple);
-	m_crThumbLighter= get_color(m_crThumb, nMultiple * 2);
-	m_crThumbDark	= get_color(m_crThumb, -nMultiple);
-	m_crThumbDarker = get_color(m_crThumb, -nMultiple * 2);
+	m_cr_thumb		= crThumb;
+	m_cr_thumbLight	= get_color(m_cr_thumb, nMultiple);
+	m_cr_thumbLighter= get_color(m_cr_thumb, nMultiple * 2);
+	m_cr_thumbDark	= get_color(m_cr_thumb, -nMultiple);
+	m_cr_thumbDarker = get_color(m_cr_thumb, -nMultiple * 2);
 
 	m_penThumb.DeleteObject();
 	m_penThumbLight.DeleteObject();
@@ -1222,11 +958,11 @@ void CSCSliderCtrl::SetThumbColor(COLORREF crThumb)
 	m_penThumbDark.DeleteObject();
 	m_penThumbDarker.DeleteObject();
 
-	m_penThumb.CreatePen(PS_SOLID, 1, m_crThumb);
-	m_penThumbLight.CreatePen(PS_SOLID, 1, m_crThumbLight);
-	m_penThumbLighter.CreatePen(PS_SOLID, 1, m_crThumbLighter);
-	m_penThumbDark.CreatePen(PS_SOLID, 1, m_crThumbDark);
-	m_penThumbDarker.CreatePen(PS_SOLID, 1, m_crThumbDarker);
+	m_penThumb.CreatePen(PS_SOLID, 1, m_cr_thumb);
+	m_penThumbLight.CreatePen(PS_SOLID, 1, m_cr_thumbLight);
+	m_penThumbLighter.CreatePen(PS_SOLID, 1, m_cr_thumbLighter);
+	m_penThumbDark.CreatePen(PS_SOLID, 1, m_cr_thumbDark);
+	m_penThumbDarker.CreatePen(PS_SOLID, 1, m_cr_thumbDarker);
 }
 
 
@@ -1297,14 +1033,14 @@ void CSCSliderCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 }
 */
 
-void CSCSliderCtrl::SetStyle(int nStyle)
+void CSCSliderCtrl::set_style(int nStyle)
 {
 	m_style = nStyle;
 
 	if (m_style == slider_thumb)
-		m_nThumbWidth = THUMB_WIDTH * 2;
+		m_thumb.cx = THUMB_WIDTH * 2;
 	else if (m_style == slider_value)
-		m_nThumbWidth = THUMB_WIDTH * 4;
+		m_thumb.cx = THUMB_WIDTH * 4;
 	else if (m_style == slider_progress)
 		m_enable_slide = false;
 	else if (m_style == slider_step)

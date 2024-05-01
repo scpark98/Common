@@ -782,7 +782,7 @@ void CMacProgressCtrl::OnTimer(UINT_PTR nIDEvent)
 			m_nIndOffset = 0;
 		}
 
-		Traceln(_T("m_nIndOffset = %d"), m_nIndOffset);
+		TRACE(_T("m_nIndOffset = %d\n"), m_nIndOffset);
 
 		RedrawWindow();
 

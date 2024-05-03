@@ -723,27 +723,17 @@ void CMacProgressCtrl::thread_indeterminate()
 				std::reverse(m_dq_cr_indeterminate.begin(), m_dq_cr_indeterminate.end());
 			}
 		}
-		TRACE(_T("m_nIndOffset = %d\n"), m_nIndOffset);
+		//TRACE(_T("m_nIndOffset = %d\n"), m_nIndOffset);
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		//Invalidate();
 		RedrawWindow();
 
-		CString str;
-		str.Format(_T("d:\\temp\\progressDlg\\%03d.bmp"), frame++);
-		save_bitmap(CaptureWindowToBitmap(GetParent()->m_hWnd), str);
+		//for test
+		//CString str;
+		//str.Format(_T("d:\\temp\\progressDlg\\%03d.bmp"), frame++);
+		//save_bitmap(CaptureWindowToBitmap(GetParent()->m_hWnd), str);
 	}
 }
-
-int CMacProgressCtrl::GetRangeMin()
-{
-	return m_lower;
-}
-
-int CMacProgressCtrl::GetRangeMax()
-{
-	return m_upper;
-}
-
 
 //-------------------------------------------------------------------
 //

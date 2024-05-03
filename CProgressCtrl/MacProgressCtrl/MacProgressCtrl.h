@@ -56,8 +56,8 @@ public:
 
 	void		SetCtrlID(int nID) { m_nCtrlID = nID; }
 	void		UseSlider(bool bUseSlider = true) { m_bUseSlider = bUseSlider; }
-	int			GetRangeMin();
-	int			GetRangeMax();
+	int			get_lower() { return m_lower; }
+	int			get_upper() { return m_upper; }
 	BOOL		GetIndeterminate();
 	void		SetIndeterminate(BOOL bIndeterminate = TRUE);
 	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1, BOOL bGradient = TRUE);

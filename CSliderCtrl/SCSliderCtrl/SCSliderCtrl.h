@@ -147,24 +147,16 @@ public:
 		m_pCallback_func = p_func;
 	}	//콜백함수 콜 방식으로 이벤트를 전달할 경우 사용.
 
-	int		GetStyle() { return m_style; }
+	int		get_style() { return m_style; }
+
+	void	SetPos(int pos) { CSliderCtrl::SetPos(pos); Invalidate(); }
 
 	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
 	void	set_style(int nStyle);
 	void	set_track_height(int height) { m_nTrackHeight = height; }
 
-	void	set_range(int lower, int upper, bool redraw = false);
-	int		get_pos() { return m_pos; }
-	void	set_pos(int pos);
-
-	void	SetRange(int lower, int upper, bool redraw = false) { set_range(lower, upper, redraw); }
-	int		GetPos() { return get_pos(); }
-	void	SetPos(int pos) { set_pos(pos); }
-
 	void	enable_slide(bool enable = true) { m_enable_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
-	int		get_lower() { return m_lower; }
-	int		get_upper() { return m_upper; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
 	void	SetValueStyle(int nValueStyle = value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
 
@@ -216,13 +208,9 @@ protected:
 	// Attributes
 
 	//slider_thumb,	slider_value, slider_progress, slider_track,
-	int			m_style;
+	int			m_style = slider_thumb;
 
 	int			m_nEventMsgStyle;
-
-	int			m_lower;
-	int			m_upper;
-	int			m_pos;
 
 	CRect		m_rc;
 
@@ -233,10 +221,10 @@ protected:
 
 	//실제 전체 구간 게이지 영역
 	CRect		m_track;
-	int			m_track_thick = 8;	//게이지 두께
+	int			m_track_thick = 8;	//트랙 두께
 
 	//잡고 움직이는 영역
-	CSize		m_thumb = CSize(14, 10);
+	CSize		m_thumb;
 	//4방향의 여백
 	CRect		m_margin;
 	int			m_nMouseOffset;
@@ -272,7 +260,7 @@ protected:
 	그렇지 않은 조건일 경우만 이쪽으로 넘겨서 처리하도록 수정 완료.
 	bool		m_enable_bottom_slide;
 	*/
-	BOOL		m_bLButtonDown, m_bHasFocus, m_bDrawFocusRect;
+	bool		m_lbuttondown, m_has_focus, m_draw_focus_rect;
 
 	int			m_nValueStyle;	//only applies to SCSLIDERCTRL_STYLE_PROGRESS. default = value;
 	COLORREF	m_crValueText;	//text color of value. background is transparent. default = RGB(64,64,64);

@@ -35,7 +35,7 @@ CSCSliderCtrl::CSCSliderCtrl()
 
 	m_margin = CRect(0, 0, 0, 0);
 
-	m_nTrackHeight = 5;
+	m_track_height = 5;
 
 	m_draw_focus_rect = false;
 
@@ -43,9 +43,9 @@ CSCSliderCtrl::CSCSliderCtrl()
 	m_crValueText = RGB(32, 32, 32);
 
 	m_cr_back	= ::GetSysColor(COLOR_3DFACE);
-	m_cr_active	= RGB(128, 192, 255);
+	m_cr_active	= RGB(64, 80, 181);//RGB(128, 192, 255);
 	m_cr_inactive= get_color(m_cr_back, -64);
-	m_cr_thumb	= RGB(124, 192, 232);
+	m_cr_thumb	= RGB(64, 80, 181); //RGB(124, 192, 232);
 
 	//북마크 컬러는 처음에만 배경의 보색으로 설정되지만
 	//차후 배경이 바뀌더라도 북마크의 색상까지 자동으로 보색으로 바꾸는 것은 좋지 않다.
@@ -142,24 +142,24 @@ void CSCSliderCtrl::OnPaint()
 	//inactive 영역을 먼저 그리고
 	if (m_style == slider_thumb_round)
 	{
-		dc.FillSolidRect(pxpos, cy - m_nTrackHeight / 2, m_track.right - pxpos, m_nTrackHeight, enable_color(m_cr_inactive));
+		dc.FillSolidRect(pxpos, cy - m_track_height / 2, m_track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
 	}
 	else if (m_style == slider_thumb || m_style == slider_value)
 	{
-		dc.FillSolidRect(pxpos, cy - m_nTrackHeight / 2, m_track.right - pxpos, m_nTrackHeight, enable_color(m_cr_inactive));
+		dc.FillSolidRect(pxpos, cy - m_track_height / 2, m_track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
 			
 		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), -24));
 		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), 36));
 
 		dc.SelectObject(&penDark);
-		dc.MoveTo(pxpos, cy - m_nTrackHeight / 2);
-		dc.LineTo(m_track.right, cy - m_nTrackHeight / 2);
-		//dc.LineTo(m_rc.right - 1, cy + m_nTrackHeight / 2);
+		dc.MoveTo(pxpos, cy - m_track_height / 2);
+		dc.LineTo(m_track.right, cy - m_track_height / 2);
+		//dc.LineTo(m_rc.right - 1, cy + m_track_height / 2);
 
 		dc.SelectObject(&penLight);
-		dc.MoveTo(pxpos, cy + m_nTrackHeight / 2);
-		dc.LineTo(m_track.right - 1, cy + m_nTrackHeight / 2);
-		dc.LineTo(m_track.right - 1, cy - m_nTrackHeight / 2);
+		dc.MoveTo(pxpos, cy + m_track_height / 2);
+		dc.LineTo(m_track.right - 1, cy + m_track_height / 2);
+		dc.LineTo(m_track.right - 1, cy - m_track_height / 2);
 
 		dc.SelectObject(pOldPen);
 		penDark.DeleteObject();
@@ -282,19 +282,19 @@ void CSCSliderCtrl::OnPaint()
 #if 1
 	if (m_style <= slider_value)
 	{
-		dc.FillSolidRect(m_track.left, cy - m_nTrackHeight / 2, pxpos - m_track.left, m_nTrackHeight, enable_color(m_cr_active));
+		dc.FillSolidRect(m_track.left, cy - m_track_height / 2, pxpos - m_track.left, m_track_height, enable_color(m_cr_active));
 			
 		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_active), -64));
 		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_active), 64));
 
 		dc.SelectObject(&penDark);
-		dc.MoveTo(pxpos, cy - m_nTrackHeight / 2);
-		dc.LineTo(m_track.left, cy - m_nTrackHeight / 2);
-		dc.LineTo(m_track.left, cy + m_nTrackHeight / 2);
+		dc.MoveTo(pxpos, cy - m_track_height / 2);
+		dc.LineTo(m_track.left, cy - m_track_height / 2);
+		dc.LineTo(m_track.left, cy + m_track_height / 2);
 
 		dc.SelectObject(&penLight);
-		dc.MoveTo(m_track.left + 1, cy + m_nTrackHeight / 2);
-		dc.LineTo(pxpos, cy + m_nTrackHeight / 2);
+		dc.MoveTo(m_track.left + 1, cy + m_track_height / 2);
+		dc.LineTo(pxpos, cy + m_track_height / 2);
 
 		dc.SelectObject(pOldPen);
 		penDark.DeleteObject();
@@ -397,16 +397,18 @@ void CSCSliderCtrl::OnPaint()
 		else if (m_style == slider_thumb_round)
 		{
 			//dc.FillSolidRect(rThumb, m_cr_thumb);
-			Gdiplus::Graphics g(dc);
-			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-			//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+			Gdiplus::Color cr_pen(255, GetRValue(255), GetGValue(0), GetBValue(0));
+			Gdiplus::Pen pen(cr_pen, 1.0f);
+			Gdiplus::Color cr_brush_outer(128, GetRValue(m_cr_thumb), GetGValue(m_cr_thumb), GetBValue(m_cr_thumb));
+			Gdiplus::SolidBrush brush_outer(cr_brush_outer);
+			Gdiplus::Color cr_brush_inner(255, GetRValue(m_cr_thumb-64), GetGValue(m_cr_thumb-64), GetBValue(m_cr_thumb-64));
+			Gdiplus::SolidBrush brush_inner(cr_brush_inner);
 
-			Gdiplus::Color cr_pen(255, GetRValue(m_cr_thumb), GetGValue(m_cr_thumb), GetBValue(m_cr_thumb));
-			Gdiplus::Pen pen(cr_pen, 3.0f);
-			Gdiplus::Color cr_brush(128, GetRValue(m_cr_thumb), GetGValue(m_cr_thumb), GetBValue(m_cr_thumb));
-			Gdiplus::SolidBrush brush(cr_brush);
+			CRect r = rThumb;
+			r.DeflateRect(4, 4);
 
-			g.FillEllipse(&brush, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()));
+			g.FillEllipse(&brush_outer, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()));
+			g.FillEllipse(&brush_inner, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()));
 			//g.DrawEllipse(&pen, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()));
 		}
 		else if (m_style == slider_value)
@@ -794,9 +796,13 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 	// 변한 내용을 적용한다
+	int pix = Pos2Pixel(pos);
+	TRACE(_T("pos2pix(%d) = %d, nPixel = %d\n"), pos, pix, nPixel);
 	if(Pos2Pixel(pos) != nPixel)
 	{
-		SetPos(Pixel2Pos(nPixel));
+		pos = Pixel2Pos(nPixel);
+		TRACE(_T("Pixel2Pos(%d) = %d, nPixel = %d\n"), nPixel, pos, nPixel);
+		SetPos(pos);
 
 		if (m_nEventMsgStyle == msg_style_timer)
 		{
@@ -813,7 +819,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		}
 	}
 
-	//CSliderCtrl::OnMouseMove(nFlags, point);
+	CSliderCtrl::OnMouseMove(nFlags, point);
 }
 
 // PrepareMask
@@ -1061,16 +1067,29 @@ void CSCSliderCtrl::set_style(int nStyle)
 {
 	m_style = nStyle;
 
+	m_track_height = 5;
+
 	if (m_style == slider_thumb)
+	{
 		m_thumb = CSize(28, 12);
+	}
 	else if (m_style == slider_thumb_round)
+	{
 		m_thumb = CSize(16, 16);
+		m_track_height = 3;
+	}
 	else if (m_style == slider_value)
+	{
 		m_thumb = CSize(56, 8);
+	}
 	else if (m_style == slider_progress)
+	{
 		m_enable_slide = false;
+	}
 	else if (m_style == slider_step)
+	{
 		m_enable_slide = false;
+	}
 }
 
 

@@ -153,7 +153,7 @@ public:
 
 	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
 	void	set_style(int nStyle);
-	void	set_track_height(int height) { m_nTrackHeight = height; }
+	void	set_track_height(int height) { m_track_height = height; }
 
 	void	enable_slide(bool enable = true) { m_enable_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
@@ -268,7 +268,7 @@ protected:
 	COLORREF	m_cr_back;		// back color of control
 	COLORREF	m_cr_active;			//processed area
 	COLORREF	m_cr_inactive;		//not processed area
-	int			m_nTrackHeight;		//processing area height. odd recommend between 3 ~ 11.
+	int			m_track_height;		//processing area height. odd recommend between 3 ~ 11.
 	CPen		m_penThumb;
 	CPen		m_penThumbLight;
 	CPen		m_penThumbLighter;

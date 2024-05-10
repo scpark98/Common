@@ -5303,7 +5303,7 @@ Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR
 	Gdiplus::RectF rt;
 
 	sf.SetMeasurableCharacterRanges(1, &chrange);
-	g->MeasureCharacterRanges(String, length, &font, layout, &sf, 1, &rgn);
+	g->MeasureCharacterRanges((CStringW)String, length, &font, layout, &sf, 1, &rgn);
 	rgn.GetBounds(&rt, g);
 
 	return rt;
@@ -14594,6 +14594,17 @@ int	compare_string(CString str0, CString str1, TCHAR separator)
 	*/
 }
 
+//src를 n번 연결한 문자열 리턴. n개의 공백, 탭이 필요할 경우 사용
+CString make_string(CString src, int n)
+{
+	CString result;
+
+	for (int i = 0; i < n; i++)
+		result += src;
+
+	return result;
+}
+
 //button의 종류를 리턴한다.
 DWORD		getButtonStyle(HWND hWnd)
 {
@@ -14702,7 +14713,7 @@ void printf_string(const char* psz, ...)
 	TRACE(buffer);
 }
 
-void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
+void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -14717,7 +14728,9 @@ void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...)
 	if (str.IsEmpty())
 		return;
 
-	str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
+	if (!only_text)
+		str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
+
 	OutputDebugString(str);
 }
 

@@ -66,8 +66,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 //일단, thread 내부에서 사용하면 오류가 발생하므로 절대 thread 내부에서는 사용하지 말것.
 //20240429 thread 내부가 아닌 곳에서도 assertion failed되므로 일단 사용 금지!
 //https://stackoverflow.com/questions/3211463/what-is-the-most-efficient-way-to-make-this-code-thread-safe
-//#define Trace(fmt, ...) trace_output(__function__, __LINE__, false, fmt, ##__VA_ARGS__)
-//#define Traceln(fmt, ...) trace_output(__function__, __LINE__, true, fmt, ##__VA_ARGS__)
+#define Trace(fmt, ...) trace_output(false, __function__, __LINE__, false, fmt, ##__VA_ARGS__)
+#define Traceln(fmt, ...) trace_output(false, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
+#define Trace_only(fmt, ...) trace_output(true, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
 #ifdef __GNUG__
 #include <cxxabi.h>
@@ -261,7 +262,7 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 }
 
 void printf_string(const char* psz, ...);
-void trace_output(TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
+void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
 
 template < typename T > class AutoEraser
 {
@@ -643,6 +644,9 @@ struct	NETWORK_INFO
 	//결국 각 자릿수끼리 구분해야 한다.
 	//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:str0가 큼, -:str1이 큼, 0:같음)
 	int	compare_string(CString str0, CString str1, TCHAR separator = '.');
+
+	//src를 n번 연결한 문자열 리턴. n개의 공백, 탭이 필요할 경우 사용
+	CString make_string(CString src, int n);
 
 	//http://yeobi27.tistory.com/280
 	//A2W, A2T 및 그 반대 매크로들은 스택을 사용하므로 문제 소지가 있고 크기 제한도 있으므로

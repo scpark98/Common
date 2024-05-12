@@ -1298,7 +1298,7 @@ CGdiButton& CGdiButton::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 
 CGdiButton& CGdiButton::set_font_size(int nSize)
 {
-	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), nSize);
 	reconstruct_font();
 
 	return *this;

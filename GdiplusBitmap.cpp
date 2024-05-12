@@ -1854,9 +1854,9 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
 
 	std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
-	auto hdc = GetDC(NULL);
-	GetDIBits(hdc, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
-	ReleaseDC(NULL, hdc);
+	HDC hDC = GetDC(NULL);
+	GetDIBits(hDC, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
+	::DeleteDC(hDC);
 
 	auto hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof bi + vec.size());
 	auto buffer = (BYTE*)GlobalLock(hmem);
@@ -2260,7 +2260,7 @@ void CGdiplusBitmap::thread_gif_animation()
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 	}
 
-	ReleaseDC(m_displayHwnd, hDC);
+	::ReleaseDC(m_displayHwnd, hDC);
 }
 
 void CGdiplusBitmap::goto_gif_frame(int frame)
@@ -2312,7 +2312,7 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 		::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
 	}
 
-	ReleaseDC(m_displayHwnd, hDC);
+	::ReleaseDC(m_displayHwnd, hDC);
 }
 
 void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap)

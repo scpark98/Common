@@ -1036,7 +1036,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	Invalidate();
 }
 
-void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
+void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending, bool text_sort_on_same_color)
 {
 	if (!m_allow_sort)
 		return;
@@ -1055,9 +1055,10 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
 
 	int iSub = subItem;
 	bool sort_asc = m_column_sort_type[subItem];
+	bool text_sort_on_same_color_item = text_sort_on_same_color;
 
 	std::sort(m_list_db.begin(), m_list_db.end(),
-		[sort_asc, iSub](CListCtrlData a, CListCtrlData b)
+		[sort_asc, iSub, text_sort_on_same_color_item](CListCtrlData a, CListCtrlData b)
 	{
 		if (sort_asc)
 		{
@@ -1073,14 +1074,13 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
 			else if (a.crText[iSub] < b.crText[iSub])
 				return false;
 			//텍스트 색상이 같으면 텍스트로 비교하되 일반 항목은 제외시킨다.
-			else if (a.crText[iSub] != listctrlex_unused_color)
+			else if (text_sort_on_same_color_item && (a.crText[iSub] != listctrlex_unused_color))
 			{
 				if (a.text[iSub] < b.text[iSub])
 					return true;
 				else// if (a.text[iSub] < b.text[iSub])
 					return false;
 			}
-			
 		}
 		else
 		{
@@ -2644,7 +2644,7 @@ void CVtListCtrlEx::reconstruct_font()
 
 int CVtListCtrlEx::get_font_size()
 {
-	m_font_size = -MulDiv(m_lf.lfHeight, 72, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY));
+	m_font_size = get_font_size_from_logical_size(GetParent()->GetSafeHwnd(), m_lf.lfHeight);
 	return m_font_size;
 }
 
@@ -2670,7 +2670,8 @@ void CVtListCtrlEx::set_font_size(int font_size)
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
-	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
+
 	reconstruct_font();
 }
 
@@ -2684,7 +2685,8 @@ void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 	if (m_font_size > 40)
 		m_font_size = 40;
 
-	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
+
 	reconstruct_font();
 }
 

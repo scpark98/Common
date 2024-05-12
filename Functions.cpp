@@ -5354,13 +5354,13 @@ CRect draw_text(Gdiplus::Graphics* g,
 {
 	bool calcRect = false;
 	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
+	//HDC hdcMemory = NULL;
 
 	if (g == NULL)
 	{
 		calcRect = true;
 
-		HDC hdcMemory = ::CreateCompatibleDC(hDC);
-
+		//hdcMemory = ::CreateCompatibleDC(hDC);
 		g = new Gdiplus::Graphics(hDC);
 	}
 
@@ -5430,15 +5430,10 @@ CRect draw_text(Gdiplus::Graphics* g,
 		}
 
 		delete g;
+		::DeleteDC(hDC);
 		TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
 		return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 	}
-
-	Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
-	Gdiplus::Graphics g_shadow(&shadow_bitmap);
-	g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	//g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 	/*
@@ -5453,6 +5448,12 @@ CRect draw_text(Gdiplus::Graphics* g,
 
 	if (shadow_depth > 0)
 	{
+		Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
+		Gdiplus::Graphics g_shadow(&shadow_bitmap);
+		g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+		g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
 		//그림자의 흐릿한 정도. 0.0f(그림자 없음), 0.1f(많이 흐림), 0.4f(권장), 1.0f에 가까울수록 선명함.
 		//축소한 글자를 원본크기로 늘려서 흐릿한 이미지로 만듬.
 		float ratio = 0.3f;
@@ -5490,6 +5491,8 @@ CRect draw_text(Gdiplus::Graphics* g,
 		g->DrawPath(&gp, &str_path);
 		g->FillPath(&gb, &str_path);
 	}
+
+	::DeleteDC(hDC);
 
 	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }
@@ -10450,6 +10453,8 @@ CImage* capture_window(CRect r, CString filename)
 		//jpeg
 
 	imgCapture->Save(filename, format);
+	::DeleteDC(hDC);
+
 	return imgCapture;
 }
 
@@ -10674,7 +10679,11 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 
 
 	if (!hBitmap)
+	{
+		::DeleteDC(hDC);
+		::DeleteDC(hMemDC);
 		return NULL;
+	}
 
 	::SelectObject(hMemDC, hBitmap);
 
@@ -10705,8 +10714,8 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 		bSuccess = TRUE;
 	}
 
-	DeleteDC(hDC);
-	DeleteDC(hMemDC);
+	::DeleteDC(hDC);
+	::DeleteDC(hMemDC);
 
 	//WriteBMP(hBitmap, hMemDC, _T("d:\\temp\\test_capture.bmp"));
 	return hBitmap;
@@ -13569,13 +13578,21 @@ CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
 //font size to LOGFONT::lfHeight
 LONG get_logical_size_from_font_size(HWND hWnd, int font_size)
 {
-	return -MulDiv(font_size, GetDeviceCaps(::GetDC(hWnd), LOGPIXELSY), 72);
+	HDC hDC = ::GetDC(hWnd);
+	LONG size = -MulDiv(font_size, GetDeviceCaps(hDC, LOGPIXELSY), 72);
+	::DeleteDC(hDC);
+
+	return size;
 }
 
 //LOGFONT::lfHeight to font size
 LONG get_font_size_from_logical_size(HWND hWnd, int logical_size)
 {
-	return -MulDiv(logical_size, 72, GetDeviceCaps(::GetDC(hWnd), LOGPIXELSY));
+	HDC hDC = ::GetDC(hWnd);
+	LONG size = -MulDiv(logical_size, 72, GetDeviceCaps(hDC, LOGPIXELSY));
+	::DeleteDC(hDC);
+
+	return size;
 }
 
 //메모리 일부 복사 함수

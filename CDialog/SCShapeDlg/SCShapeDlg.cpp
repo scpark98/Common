@@ -183,7 +183,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	}
 
 #ifdef _DEBUG
-	img.save(_T("d:\\SCShapeDlg.png"));
+	//img.save(_T("d:\\SCShapeDlg.png"));
 #endif
 
 	if (!res)
@@ -294,7 +294,7 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	}
 
 	::DeleteDC(hdcMemory);
-	::DeleteDC(hDC);
+	::ReleaseDC(m_hWnd, hDC);
 }
 
 //animated gif인 경우

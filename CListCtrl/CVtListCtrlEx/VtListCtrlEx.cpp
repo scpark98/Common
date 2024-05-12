@@ -2644,7 +2644,7 @@ void CVtListCtrlEx::reconstruct_font()
 
 int CVtListCtrlEx::get_font_size()
 {
-	m_font_size = -MulDiv(m_lf.lfHeight, 72, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY));
+	m_font_size = get_font_size_from_logical_size(GetParent()->GetSafeHwnd(), m_lf.lfHeight);
 	return m_font_size;
 }
 
@@ -2670,7 +2670,8 @@ void CVtListCtrlEx::set_font_size(int font_size)
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
-	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
+
 	reconstruct_font();
 }
 
@@ -2684,7 +2685,8 @@ void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 	if (m_font_size > 40)
 		m_font_size = 40;
 
-	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
+
 	reconstruct_font();
 }
 

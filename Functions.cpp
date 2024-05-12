@@ -10453,6 +10453,8 @@ CImage* capture_window(CRect r, CString filename)
 		//jpeg
 
 	imgCapture->Save(filename, format);
+	::DeleteDC(hDC);
+
 	return imgCapture;
 }
 
@@ -10677,7 +10679,11 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 
 
 	if (!hBitmap)
+	{
+		::DeleteDC(hDC);
+		::DeleteDC(hMemDC);
 		return NULL;
+	}
 
 	::SelectObject(hMemDC, hBitmap);
 
@@ -10708,8 +10714,8 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 		bSuccess = TRUE;
 	}
 
-	DeleteDC(hDC);
-	DeleteDC(hMemDC);
+	::DeleteDC(hDC);
+	::DeleteDC(hMemDC);
 
 	//WriteBMP(hBitmap, hMemDC, _T("d:\\temp\\test_capture.bmp"));
 	return hBitmap;
@@ -13572,13 +13578,21 @@ CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
 //font size to LOGFONT::lfHeight
 LONG get_logical_size_from_font_size(HWND hWnd, int font_size)
 {
-	return -MulDiv(font_size, GetDeviceCaps(::GetDC(hWnd), LOGPIXELSY), 72);
+	HDC hDC = ::GetDC(hWnd);
+	LONG size = -MulDiv(font_size, GetDeviceCaps(hDC, LOGPIXELSY), 72);
+	::DeleteDC(hDC);
+
+	return size;
 }
 
 //LOGFONT::lfHeight to font size
 LONG get_font_size_from_logical_size(HWND hWnd, int logical_size)
 {
-	return -MulDiv(logical_size, 72, GetDeviceCaps(::GetDC(hWnd), LOGPIXELSY));
+	HDC hDC = ::GetDC(hWnd);
+	LONG size = -MulDiv(logical_size, 72, GetDeviceCaps(hDC, LOGPIXELSY));
+	::DeleteDC(hDC);
+
+	return size;
 }
 
 //메모리 일부 복사 함수

@@ -1036,7 +1036,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	Invalidate();
 }
 
-void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
+void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending, bool text_sort_on_same_color)
 {
 	if (!m_allow_sort)
 		return;
@@ -1055,9 +1055,10 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
 
 	int iSub = subItem;
 	bool sort_asc = m_column_sort_type[subItem];
+	bool text_sort_on_same_color_item = text_sort_on_same_color;
 
 	std::sort(m_list_db.begin(), m_list_db.end(),
-		[sort_asc, iSub](CListCtrlData a, CListCtrlData b)
+		[sort_asc, iSub, text_sort_on_same_color_item](CListCtrlData a, CListCtrlData b)
 	{
 		if (sort_asc)
 		{
@@ -1073,14 +1074,13 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending)
 			else if (a.crText[iSub] < b.crText[iSub])
 				return false;
 			//텍스트 색상이 같으면 텍스트로 비교하되 일반 항목은 제외시킨다.
-			else if (a.crText[iSub] != listctrlex_unused_color)
+			else if (text_sort_on_same_color_item && (a.crText[iSub] != listctrlex_unused_color))
 			{
 				if (a.text[iSub] < b.text[iSub])
 					return true;
 				else// if (a.text[iSub] < b.text[iSub])
 					return false;
 			}
-			
 		}
 		else
 		{

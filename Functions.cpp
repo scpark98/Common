@@ -5354,13 +5354,13 @@ CRect draw_text(Gdiplus::Graphics* g,
 {
 	bool calcRect = false;
 	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
+	//HDC hdcMemory = NULL;
 
 	if (g == NULL)
 	{
 		calcRect = true;
 
-		HDC hdcMemory = ::CreateCompatibleDC(hDC);
-
+		//hdcMemory = ::CreateCompatibleDC(hDC);
 		g = new Gdiplus::Graphics(hDC);
 	}
 
@@ -5430,15 +5430,10 @@ CRect draw_text(Gdiplus::Graphics* g,
 		}
 
 		delete g;
+		::DeleteDC(hDC);
 		TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
 		return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 	}
-
-	Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
-	Gdiplus::Graphics g_shadow(&shadow_bitmap);
-	g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	//g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 	/*
@@ -5453,6 +5448,12 @@ CRect draw_text(Gdiplus::Graphics* g,
 
 	if (shadow_depth > 0)
 	{
+		Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
+		Gdiplus::Graphics g_shadow(&shadow_bitmap);
+		g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+		g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
 		//그림자의 흐릿한 정도. 0.0f(그림자 없음), 0.1f(많이 흐림), 0.4f(권장), 1.0f에 가까울수록 선명함.
 		//축소한 글자를 원본크기로 늘려서 흐릿한 이미지로 만듬.
 		float ratio = 0.3f;
@@ -5490,6 +5491,8 @@ CRect draw_text(Gdiplus::Graphics* g,
 		g->DrawPath(&gp, &str_path);
 		g->FillPath(&gb, &str_path);
 	}
+
+	::DeleteDC(hDC);
 
 	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
 }

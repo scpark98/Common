@@ -303,7 +303,7 @@ public:
 	};
 	void		allow_sort(bool allow) { m_allow_sort = allow; }
 	void		sort(int column, int ascending);
-	void		sort_by_text_color(int column, int ascending);
+	void		sort_by_text_color(int column, int ascending, bool text_sort_on_same_color = true);
 	int			cur_sorted_column_index() { return m_cur_sorted_column; }
 
 //컬러 관련

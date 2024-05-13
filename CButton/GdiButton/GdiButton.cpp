@@ -699,8 +699,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	rText = rc;
 
-	CMemoryDC	dc(pDC1, &rc);
-	Graphics	g(dc.m_hDC, rc);
+	CMemoryDC		dc(pDC1, &rc);
+	Graphics		g(dc.m_hDC, rc);
 	GraphicsPath	roundPath;
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
@@ -871,10 +871,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (is_check_box())
 		{
-			r.left += 3;
-			r.right = r.left + size * 2 + 1;
-			r.top = r.CenterPoint().y - size;
-			r.bottom = r.top + size * 2 + 1;
+			r.left += 5;
+			r.right = r.left + size * 2 - 1;
+			r.top = r.CenterPoint().y - size + 2;
+			r.bottom = r.top + size * 2 - 1;
 			DrawRectangle(&dc, r, cr_text, RGB(255, 255, 255));
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
@@ -1636,28 +1636,41 @@ void CGdiButton::set_auto_repeat_delay(int initial_delay, int repeat_delay)
 
 bool CGdiButton::is_push_button()
 {
+	/*
 	if ((m_button_type & BS_PUSHBUTTON) == BS_PUSHBUTTON)
 		return true;
 	else if ((m_button_type & BS_DEFPUSHBUTTON) == BS_DEFPUSHBUTTON)
 		return true;
+	*/
+	if (m_button_type == BS_PUSHBUTTON || m_button_type == BS_DEFPUSHBUTTON)
+		return true;
+
 	return false;
 }
 
 bool CGdiButton::is_radio_button()
 {
-	if ((m_button_type & BS_RADIOBUTTON) == BS_RADIOBUTTON)
+	//if ((m_button_type & BS_RADIOBUTTON) == BS_RADIOBUTTON)
+	//	return true;
+	//else if ((m_button_type & BS_AUTORADIOBUTTON) == BS_AUTORADIOBUTTON)
+	//	return true;
+
+	if (m_button_type == BS_RADIOBUTTON || m_button_type == BS_AUTORADIOBUTTON)
 		return true;
-	else if ((m_button_type & BS_AUTORADIOBUTTON) == BS_AUTORADIOBUTTON)
-		return true;
+
 	return false;
 }
 
 bool CGdiButton::is_check_box()
 {
-	if ((m_button_type & BS_CHECKBOX) == BS_CHECKBOX)
+	//if ((m_button_type & BS_CHECKBOX) == BS_CHECKBOX)
+	//	return true;
+	//else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX)
+	//	return true;
+
+	if (m_button_type == BS_CHECKBOX || m_button_type == BS_AUTOCHECKBOX)
 		return true;
-	else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX)
-		return true;
+
 	return false;
 }
 

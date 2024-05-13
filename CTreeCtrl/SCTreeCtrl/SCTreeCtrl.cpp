@@ -73,6 +73,20 @@ void CSCTreeCtrl::reconstruct_font()
 BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	if (pMsg->message == WM_KEYDOWN)
+	{
+		switch (pMsg->wParam)
+		{
+			case VK_DELETE :
+			{
+				CString label = get_selected_item_text(false);
+				if (AfxMessageBox(label + _T("\ndelete this node?"), MB_YESNO) == IDNO)
+					return TRUE;
+				DeleteItem(GetSelectedItem());
+				return TRUE;
+			}
+		}
+	}
 
 	return CTreeCtrl::PreTranslateMessage(pMsg);
 }
@@ -116,7 +130,8 @@ void CSCTreeCtrl::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	CMemoryDC dc(&dc1, &rc);
+	CMemoryDC	dc(&dc1, &rc);
+	Graphics	g(dc.m_hDC, rc);
 
 	COLORREF	crText = m_crText;
 	COLORREF	crBack = m_crBack;
@@ -135,7 +150,7 @@ void CSCTreeCtrl::OnPaint()
 
 	int		tab_count = 0;
 	int		image_count = 0;
-	int		image_index, image_selected_index;
+	int		image_index = -1, image_selected_index = -1;
 	CRect	rRow, rItem;
 	CString label;
 
@@ -177,12 +192,13 @@ void CSCTreeCtrl::OnPaint()
 		rItem.right = rc.right - 1;
 
 		label = GetItemText(hItem);
+		Trace(_T("%s, rItem.left = %d\n"), label, rItem.left);
 
 		//확장버튼을 그려주고
 		if (GetStyle() & TVS_HASBUTTONS)
 		{
 			CRect expand_rect = makeCenterRect(rItem.left + 16 / 2, rItem.CenterPoint().y, 16, 16);
-			expand_rect.DeflateRect(3, 3, 2, 2);
+			expand_rect.DeflateRect(4, 4, 3, 3);
 
 			if (ItemHasChildren(hItem))
 			{
@@ -208,15 +224,35 @@ void CSCTreeCtrl::OnPaint()
 		//체크박스를 그려주고
 		if (GetStyle() & TVS_CHECKBOXES)
 		{
-			CRect rCheck = rItem;
-			rCheck.right = rCheck.left + 16;
-			rCheck.DeflateRect(2, 2);
+			CRect rCheck = makeCenterRect(rItem.left + 16 / 2, rItem.CenterPoint().y, 16, 16);
+			rCheck.DeflateRect(2, 2, 2, 2);
+
+#if 1
+			draw_checkbox(&dc, rCheck, GetCheck(hItem));
+#else
 			DrawRectangle(&dc, rCheck, GRAY128, white);
+
+			/*
+			dc.SetTextColor(GRAY64);
+			dc.DrawText(GetCheck(hItem) ? _T("√") : _T(""), rCheck, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+			*/
+
+			//3D border가 그려져서 별로다. <uxtheme.h>를 이용하여 윈도우에서 기본 제공하는 모습으로 표시 가능하나
+			//우선 gdiplus로 직접 그려준다.
+			//dc.DrawFrameControl(rCheck, DFC_BUTTON, GetCheck(hItem) ? DFCS_BUTTONCHECK | DFCS_CHECKED : DFCS_BUTTONCHECK);
+			if (GetCheck(hItem))
+			{
+				Pen pen(Color(255, 64, 64, 64), 1.51);
+
+				g.DrawLine(&pen, rCheck.left + 1, rCheck.CenterPoint().y - 2, rCheck.left + 4, rCheck.CenterPoint().y + 2);
+				g.DrawLine(&pen, rCheck.left + 4, rCheck.CenterPoint().y + 3, rCheck.right - 2, rCheck.top + 2);
+			}
+#endif
 			rItem.left += 16;
 		}
 
 		//아이콘을 그려주고
-		if (m_use_own_imagelist)
+		if (m_use_own_imagelist && m_imagelist.GetSafeHandle() && (image_index < m_imagelist.GetImageCount()))
 		{
 			GetItemImage(hItem, image_index, image_selected_index);
 			if (image_index >= 0 && image_index < image_count)
@@ -234,6 +270,8 @@ void CSCTreeCtrl::OnPaint()
 		}
 
 		//레이블을 그려준다.
+		rItem.left += 2;	//2정도의 여백을 두고 label을 그려준다.
+		dc.SetTextColor(crText);
 		dc.DrawText(label, rItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
 		//child가 있다면 child로 이동하고
@@ -565,6 +603,31 @@ HTREEITEM CSCTreeCtrl::find_item(const CString& name, HTREEITEM root)
 	return NULL;
 }
 
+CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
+{
+	CString label;
+	HTREEITEM hItem = GetSelectedItem();
+
+	if (hItem == NULL)
+		return label;
+
+	label = GetItemText(hItem);
+
+	if (!include_parent)
+		return label;
+
+	while (hItem)
+	{
+		hItem = GetParentItem(hItem);
+
+		if (hItem == NULL)
+			break;
+
+		label = GetItemText(hItem) + _T("/") + label;
+	}
+
+	return label;
+}
 
 void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -578,6 +641,18 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 //button, check, text 영역을 내가 정해서 그려주고 이벤트도 수동으로 처리해주는 것이 나을듯하다.
 BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
+#if 0
+	CPoint pt;
+	UINT nFlags;
+
+	GetCursorPos(&pt);
+	ScreenToClient(&pt);
+
+	HTREEITEM hItem = HitTest(pt, &nFlags);
+
+	TRACE(_T("nFlags = %d\n"), nFlags);
+	return TRUE;
+#else
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	UINT nFlags = 0;
 	CString str;
@@ -587,10 +662,10 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 
 	fullpath = get_fullpath(hItem);
 
-	Trace_only(_T("HitTest. nFlags = %d\n"), nFlags);
+	Trace_only(_T("HitTest. hItem = %p, nFlags = %d\n"), hItem, nFlags);
 
+	SelectItem(hItem);
 
-	/*
 	//확장버튼을 누르면 (확장 단추 표시 속성이 TRUE일 경우에만 처리됨)
 	if (nFlags & TVHT_ONITEMBUTTON)
 	{
@@ -612,15 +687,17 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 			Expand(hItem, TVE_TOGGLE);
 		}
 	}
-	//확장버튼의 왼쪽 indent영역이나 아이템의 오른쪽 여백이 눌려도 select로 처리한다.
-	else if ((nFlags & TVHT_ONITEMINDENT) || (nFlags & TVHT_ONITEMRIGHT))
+	else if (nFlags & TVHT_ONITEMSTATEICON)
 	{
-		SelectItem(hItem);
+		BOOL checked = GetCheck(hItem);
+		SetCheck(hItem, !checked);
 	}
-	*/
+
+	return TRUE;
+
 	*pResult = 0;
 
-	return FALSE;
+#endif
 }
 
 CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
@@ -854,9 +931,19 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 	HTREEITEM hItem = HitTest(pt, nFlags);
 
 	CRect rc, r;
+	int label_width;
 
 	GetClientRect(rc);
 	GetItemRect(hItem, &r, TRUE);
+	label_width = r.Width();
+
+	if (pt.x < r.left)
+	{
+		*nFlags = TVHT_ONITEMINDENT;
+		TRACE(_T("nFlags = %d\n"), *nFlags);
+		return hItem;
+	}
+
 	r.right = rc.right - 1;
 
 	CRect button, check, icon;
@@ -888,6 +975,13 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 		*nFlags = TVHT_ONITEMSTATEICON;
 	else if (icon.PtInRect(pt))
 		*nFlags = TVHT_ONITEMICON;
+	else if (pt.x > r.left && pt.x <= r.left + label_width)
+		*nFlags = TVHT_ONITEMLABEL;
+	else
+		*nFlags = TVHT_ONITEMRIGHT;
+
+	TRACE(_T("nFlags = %d\n"), *nFlags);
+	return hItem;
 }
 
 void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
@@ -1243,8 +1337,8 @@ bool CSCTreeCtrl::load_from_string(CString text)
 
 		label.TrimLeft();
 
-		Trace_only(make_string(_T("\t"), tab_count));
-		Trace_only(_T("%s\n"), label);
+		//Trace_only(make_string(_T("\t"), tab_count));
+		//Trace_only(_T("%s\n"), label);
 
 		if (tab_count < img_count)
 			img_index = tab_count;
@@ -1257,6 +1351,8 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, TVI_ROOT);
 			else
 				hItem = InsertItem(label, TVI_ROOT);
+			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+
 			prev_indent = 0;
 			continue;
 		}
@@ -1267,6 +1363,8 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
+			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+
 			prev_indent = tab_count;
 		}
 		//전과 같으면 sibling이고
@@ -1277,6 +1375,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
+			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
 		}
 		//전보다 적으면 (prev_index-tabCount) * parent의 sibling이다.
 		else if (tab_count < prev_indent)
@@ -1291,6 +1390,8 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
+			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+
 			prev_indent++;
 		}
 		else
@@ -1311,6 +1412,30 @@ void CSCTreeCtrl::create_imagelist()
 
 	for (int i = 0; i < m_image_IDs.size(); i++)
 		m_imagelist.Add(AfxGetApp()->LoadIcon(m_image_IDs[i]));
+
+	Invalidate();
+}
+
+void CSCTreeCtrl::set_use_own_imagelist(bool use, bool small_icon)
+{
+	m_use_own_imagelist = use;
+	m_imagelist.DeleteImageList();
+
+	if (m_use_own_imagelist)
+	{
+		m_imagelist.DeleteImageList();
+		m_imagelist.Create(small_icon ? 16 : 32, small_icon ? 16 : 32, ILC_COLOR32 | ILC_MASK, 0, 1);
+
+		for (int i = 0; i < m_image_IDs.size(); i++)
+			m_imagelist.Add(AfxGetApp()->LoadIcon(m_image_IDs[i]));
+	}
+
+	Invalidate();
+}
+
+void CSCTreeCtrl::set_image_size(bool small_icon)
+{
+	set_use_own_imagelist(true, small_icon);
 }
 
 // 아이템 데이터 이동
@@ -1441,4 +1566,75 @@ BOOL CSCTreeCtrl::MoveChildTreeItem(CTreeCtrl* pTree, HTREEITEM hChildItem, HTRE
 	pTree->DeleteItem(hChildItem);
 
 	return TRUE;
+}
+
+void CSCTreeCtrl::theme_init()
+{
+	if (!m_theme_initialized)
+	{
+		m_theme.Init(m_hWnd);
+		m_theme_initialized = true;
+	}
+}
+
+void CSCTreeCtrl::draw_checkbox(CDC* pDC, CRect r, int check_state)
+{
+	theme_init();
+
+	if (m_theme.GetAppearance())
+	{
+		int	nState = 0;
+
+		// Translate from the button state to the appropriate draw state flags
+		switch (check_state)
+		{
+		case BST_CHECKED:
+			nState = CBS_CHECKEDNORMAL;
+			break;
+
+		case BST_UNCHECKED:
+			nState = CBS_UNCHECKEDNORMAL;
+			break;
+
+		default:
+			nState = CBS_MIXEDNORMAL;
+			break;
+		}
+
+		// Now do the actual drawing...
+		m_theme.DrawThemeBackground(pDC->GetSafeHdc(), r, BP_CHECKBOX, nState);
+	}
+	else // No themes - just draw it conventionally
+	{
+		UINT nState = 0;
+
+		// Translate from the button state to the appropriate draw state flags
+		switch (check_state)
+		{
+		case BST_CHECKED:
+			nState = DFCS_BUTTONCHECK | DFCS_CHECKED;
+			break;
+
+		case BST_UNCHECKED:
+			nState = DFCS_BUTTONCHECK;
+			break;
+
+		default:
+			nState = DFCS_BUTTON3STATE;
+			break;
+		}
+
+		// Now do the actual drawing...
+		pDC->DrawFrameControl(r, DFC_BUTTON, nState);
+	}
+}
+
+void CSCTreeCtrl::set_use_checkbox(bool checkbox)
+{
+	ModifyStyle(TVS_CHECKBOXES, 0);
+
+	if (checkbox)
+		ModifyStyle(0, TVS_CHECKBOXES);
+
+	Invalidate();
 }

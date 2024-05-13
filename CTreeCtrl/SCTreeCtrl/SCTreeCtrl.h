@@ -25,10 +25,10 @@
 // CSCTreeCtrl
 #include <afxwin.h>
 #include <afxcmn.h>
-//#include <afxole.h>
-
 #include <deque>
+
 #include "../../system/ShellImageList/ShellImageList.h"
+#include "../../ui/theme/theme.h"
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
 
@@ -80,8 +80,12 @@ public:
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
-	bool		m_use_own_imagelist = true;
-	void		set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
+	//자체 이미지리스트를 쓸 것인지
+	void		set_use_own_imagelist(bool use, bool small_icon = true);
+	void		set_image_size(bool small_icon = true);
+
+	void		set_use_checkbox(bool checkbox = true);
+
 	//ico 파일들을 imagelist에 추가
 	template <typename ... Types> void set_imagelist(Types... ids)
 	{
@@ -117,6 +121,7 @@ public:
 
 	//HTREEITEM	find_item(const CString& name);
 	HTREEITEM	find_item(const CString& name, HTREEITEM root = NULL);
+	CString		get_selected_item_text(bool include_parent = false);
 
 	//recursive traverse
 	void		iterate_tree(HTREEITEM hItem = NULL);
@@ -127,6 +132,10 @@ public:
 
 	void		expand_all(bool expand = true);
 
+	//HitTest()는 클릭된 hItem과 expand button, check, icon, label 영역을 판별하는 함수인데
+	//OnPaint()에서 CTreeCtrl::OnPaint()를 사용하지 않고 직접 그려줄 경우는
+	//HitTest()를 그대로 사용할 수 없으므로 별도 함수로 작성.
+	//만약 OnPaint()에서 그려주는 것이 아닌 CustonDraw()에서 그려주는 경우도 역시 동일한지는 확인 필요.
 	HTREEITEM	hit_test(UINT* nFlags = NULL);
 
 	//컬러 관련
@@ -162,8 +171,15 @@ public:
 	BOOL			MoveChildTreeItem(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
 
 protected:
+	CTheme			m_theme;
+	bool			m_theme_initialized = false;
+	void			theme_init();
+	void			draw_checkbox(CDC* pDC, CRect r, int check_state);
+
 	CImageList		m_imagelist;			//자체 이미지 리스트
 	std::deque<UINT>m_image_IDs;			//이미지 리스트에 추가한 resource id. 이를 저장하는 이유는 icon size 동적 변경도 지원하기 위해.
+	int				m_image_size = 16;		//16 or 32?
+	bool			m_use_own_imagelist = false;	//자체 이미지리스트를 쓸 것인지
 	void			create_imagelist();
 
 	HTREEITEM		m_expandItem;			// 마지막으로 확장한 아이템

@@ -81,8 +81,8 @@ public:
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
 	//자체 이미지리스트를 쓸 것인지
-	void		set_use_own_imagelist(bool use, bool small_icon = true);
-	void		set_image_size(bool small_icon = true);
+	void		set_use_own_imagelist(bool use, int image_size = 16);
+	void		set_image_size(int image_size = 16);
 
 	void		set_use_checkbox(bool checkbox = true);
 
@@ -178,7 +178,7 @@ protected:
 
 	CImageList		m_imagelist;			//자체 이미지 리스트
 	std::deque<UINT>m_image_IDs;			//이미지 리스트에 추가한 resource id. 이를 저장하는 이유는 icon size 동적 변경도 지원하기 위해.
-	int				m_image_size = 16;		//16 or 32?
+	int				m_image_size = -1;		//-1(not yet set), 16 or 32?
 	bool			m_use_own_imagelist = false;	//자체 이미지리스트를 쓸 것인지
 	void			create_imagelist();
 

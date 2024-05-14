@@ -192,11 +192,12 @@ void CSCTreeCtrl::OnPaint()
 		rItem.right = rc.right - 1;
 
 		label = GetItemText(hItem);
-		Trace(_T("%s, rItem.left = %d\n"), label, rItem.left);
+		//Trace(_T("%s, rItem.left = %d\n"), label, rItem.left);
 
 		//확장버튼을 그려주고
 		if (GetStyle() & TVS_HASBUTTONS)
 		{
+			//SetItemHeight() 또는 m_image_size가 16이 아니어도 확장버튼의 크기는 동일해야 한다.
 			CRect expand_rect = makeCenterRect(rItem.left + 16 / 2, rItem.CenterPoint().y, 16, 16);
 			expand_rect.DeflateRect(4, 4, 3, 3);
 
@@ -224,6 +225,7 @@ void CSCTreeCtrl::OnPaint()
 		//체크박스를 그려주고
 		if (GetStyle() & TVS_CHECKBOXES)
 		{
+			//체크박스도 그 크기는 16으로 동일하다.
 			CRect rCheck = makeCenterRect(rItem.left + 16 / 2, rItem.CenterPoint().y, 16, 16);
 			rCheck.DeflateRect(2, 2, 2, 2);
 
@@ -257,8 +259,8 @@ void CSCTreeCtrl::OnPaint()
 			GetItemImage(hItem, image_index, image_selected_index);
 			if (image_index >= 0 && image_index < image_count)
 			{
-				m_imagelist.Draw(&dc, image_index, CPoint(rItem.left, rItem.CenterPoint().y - 16 / 2), ILD_TRANSPARENT);
-				rItem.left += 16;
+				m_imagelist.Draw(&dc, image_index, CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
+				rItem.left += m_image_size;
 			}
 		}
 		else if (m_is_shell_treectrl)
@@ -266,11 +268,11 @@ void CSCTreeCtrl::OnPaint()
 			GetItemImage(hItem, image_index, image_selected_index);
 			image_index = m_pShellImageList->GetSystemImageListIcon(get_fullpath(GetSelectedItem()), true);
 			m_pShellImageList->m_imagelist_small.Draw(&dc, image_index,
-				CPoint(rItem.left, rItem.CenterPoint().y - 8), ILD_TRANSPARENT);
+				CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 		}
 
 		//레이블을 그려준다.
-		rItem.left += 2;	//2정도의 여백을 두고 label을 그려준다.
+		rItem.left += 4;	//여백을 두고 label을 그려준다.
 		dc.SetTextColor(crText);
 		dc.DrawText(label, rItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
@@ -662,8 +664,6 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 
 	fullpath = get_fullpath(hItem);
 
-	Trace_only(_T("HitTest. hItem = %p, nFlags = %d\n"), hItem, nFlags);
-
 	SelectItem(hItem);
 
 	//확장버튼을 누르면 (확장 단추 표시 속성이 TRUE일 경우에만 처리됨)
@@ -940,7 +940,7 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 	if (pt.x < r.left)
 	{
 		*nFlags = TVHT_ONITEMINDENT;
-		TRACE(_T("nFlags = %d\n"), *nFlags);
+		TRACE(_T("hItem = %p, nFlags = %d (%s)\n"), hItem, *nFlags, ENUM_TO_CSTRING(TVHT_ONITEMINDENT));
 		return hItem;
 	}
 
@@ -965,22 +965,36 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 	if (m_is_shell_treectrl || m_imagelist.GetImageCount())
 	{
 		icon = r;
-		icon.right = icon.left + 16;
-		r.left += 16;
+		icon.right = icon.left + m_image_size;
+		r.left += m_image_size;
 	}
 
 	if (button.PtInRect(pt))
+	{
 		*nFlags = TVHT_ONITEMBUTTON;
+		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMBUTTON));
+	}
 	else if (check.PtInRect(pt))
+	{
 		*nFlags = TVHT_ONITEMSTATEICON;
+		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMSTATEICON));
+	}
 	else if (icon.PtInRect(pt))
+	{
 		*nFlags = TVHT_ONITEMICON;
+		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMICON));
+	}
 	else if (pt.x > r.left && pt.x <= r.left + label_width)
+	{
 		*nFlags = TVHT_ONITEMLABEL;
+		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMLABEL));
+	}
 	else
+	{
 		*nFlags = TVHT_ONITEMRIGHT;
+		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMRIGHT));
+	}
 
-	TRACE(_T("nFlags = %d\n"), *nFlags);
 	return hItem;
 }
 
@@ -1407,8 +1421,11 @@ bool CSCTreeCtrl::load_from_string(CString text)
 void CSCTreeCtrl::create_imagelist()
 {
 	m_use_own_imagelist = true;
+
+	if (m_image_size < 0)
+		m_image_size = 16;
 	m_imagelist.DeleteImageList();
-	m_imagelist.Create(16, 16, ILC_COLOR32 | ILC_MASK, 0, 1);
+	m_imagelist.Create(m_image_size, m_image_size, ILC_COLOR32 | ILC_MASK, 0, 1);
 
 	for (int i = 0; i < m_image_IDs.size(); i++)
 		m_imagelist.Add(AfxGetApp()->LoadIcon(m_image_IDs[i]));
@@ -1416,26 +1433,24 @@ void CSCTreeCtrl::create_imagelist()
 	Invalidate();
 }
 
-void CSCTreeCtrl::set_use_own_imagelist(bool use, bool small_icon)
+void CSCTreeCtrl::set_use_own_imagelist(bool use, int image_size)
 {
 	m_use_own_imagelist = use;
 	m_imagelist.DeleteImageList();
 
 	if (m_use_own_imagelist)
 	{
-		m_imagelist.DeleteImageList();
-		m_imagelist.Create(small_icon ? 16 : 32, small_icon ? 16 : 32, ILC_COLOR32 | ILC_MASK, 0, 1);
-
-		for (int i = 0; i < m_image_IDs.size(); i++)
-			m_imagelist.Add(AfxGetApp()->LoadIcon(m_image_IDs[i]));
+		m_image_size = image_size;
+		create_imagelist();
 	}
 
+	SetItemHeight(MAX(16 + 2, m_image_size + 2));
 	Invalidate();
 }
 
-void CSCTreeCtrl::set_image_size(bool small_icon)
+void CSCTreeCtrl::set_image_size(int image_size)
 {
-	set_use_own_imagelist(true, small_icon);
+	set_use_own_imagelist(true, image_size);
 }
 
 // 아이템 데이터 이동

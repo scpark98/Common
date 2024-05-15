@@ -165,7 +165,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	TRACE(_T("img rect = (%d,%d)"), img.width, img.height);
 
 	//해당 캔버스에
-	Gdiplus::Graphics g(img);
+	Gdiplus::Graphics g(img.m_pBitmap);
 
 	//글자를 출력하고
 	r = draw_text(&g, r, text,
@@ -183,7 +183,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	}
 
 #ifdef _DEBUG
-	//img.save(_T("d:\\SCShapeDlg.png"));
+	img.save(_T("d:\\SCShapeDlg.png"));
 #endif
 
 	if (!res)

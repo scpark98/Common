@@ -130,9 +130,9 @@ void CSCSliderCtrl::OnPaint()
 		m_track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
 
 	//m_rc의 y센터좌표
-	int			cy = m_rc.CenterPoint().y;
+	int	cy = m_rc.CenterPoint().y;
 	//현재 위치의 실제 픽셀좌표
-	int			pxpos = Pos2Pixel(pos);
+	int	pxpos = Pos2Pixel(pos);
 	int i;
 
 	//전체 슬라이드 사각형 영역을 배경색으로 그림

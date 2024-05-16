@@ -651,7 +651,7 @@ CString		get_part(CString path, int part)
 	//폴더명은 드라이브 경로까지 모두 포함. "\\abc/def\\" => "c:\\abc/def\\"
 	parts[fn_folder] = parts[fn_drive] + parts[fn_folder];
 
-	//드라이브 루트라면 끝에 '\'를 붙여줘야 한다. C: => C:\\
+	//드라이브 루트라면 끝에 '\'를 붙여줘야 한다. "C:" => "C:\\"
 	if (parts[fn_folder].GetLength() == 2 && parts[fn_folder].Right(1) == _T(":"))
 		parts[fn_folder] += _T("\\");
 

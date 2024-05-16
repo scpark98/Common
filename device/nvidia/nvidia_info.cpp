@@ -6,7 +6,7 @@ CNVidiaInfo::CNVidiaInfo()
 	HMODULE hmod = LoadLibrary(_T("nvapi64.dll"));
 	if (hmod == NULL)
 	{
-		AfxMessageBox(_T("Couldn't find nvapi.dll. NVidia device only."));
+		//AfxMessageBox(_T("Couldn't find nvapi.dll. NVidia device only."));
 		return;
 	}
 

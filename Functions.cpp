@@ -7779,29 +7779,29 @@ CString get_sql_cmd(CString sql, CString* sql_cmd, CString *table_name)
 	return cmd;
 }
 
-CString get_str(CString& buff, CString sep)
+CString get_str(CString& src, CString sep)
 {
-	buff.TrimLeft();
+	src.TrimLeft();
 
-	int pos = buff.Find(sep);
+	int pos = src.Find(sep);
 	if(pos < 0)
 	{
-		pos = buff.GetLength();
+		pos = src.GetLength();
 		if(pos < 1) throw 1;
 	}
 
-	CString ret = buff.Left(pos);
-	if (pos < buff.GetLength())
-		buff = buff.Mid(pos + 1);
+	CString ret = src.Left(pos);
+	if (pos < src.GetLength())
+		src = src.Mid(pos + 1);
 
 	return(ret);
 }
 
-int get_int(CString& buff, CString sep)
+int get_int(CString& src, CString sep)
 {
 	CString str;
 
-	str = get_str(buff, sep);
+	str = get_str(src, sep);
 	str.MakeLower();
 
 	CString fmtstr = str.GetLength() > 2 && (str.Left(2) == _T("&h") || str.Left(2) == _T("0x"))
@@ -7814,11 +7814,11 @@ int get_int(CString& buff, CString sep)
 	return(ret);
 }
 
-double get_double(CString& buff, CString sep)
+double get_double(CString& src, CString sep)
 {
 	CString str;
 
-	str = get_str(buff, sep);
+	str = get_str(src, sep);
 	str.MakeLower();
 
 	float ret;

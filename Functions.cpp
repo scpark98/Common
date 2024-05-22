@@ -61,6 +61,8 @@ bool		initialized_YUV_lookup_table = false;
 
 std::deque<CRect> g_dqMonitors;
 
+void*		g_wow64_preset;
+
 #pragma comment(lib, "imm32.lib")
 #pragma comment(lib, "version.lib")		//for VerQueryValue
 #pragma comment(lib, "comsuppw.lib ")	//for _bstr_t
@@ -10025,11 +10027,57 @@ bool IsDuplicatedRun()
 	return false;
 }
 
+void Wow64Disable(bool disable)
+{
+	if (IsWow64())
+	{
+		//XP 64bit부터 지원되는 API이므로 32bit이면 직접 호출해줘야 한다.
+		if (disable)
+			Wow64DisableWow64FsRedirection(&g_wow64_preset);
+		else
+			Wow64RevertWow64FsRedirection(g_wow64_preset);
+	}
+	else
+	{
+		HMODULE hKernel = GetModuleHandle(_T("Kernel32"));
+		typedef BOOL(WINAPI* tFSDisable)(PVOID*);
+		typedef BOOL(WINAPI* tFSRevert)(PVOID);
+		tFSDisable pDisableFunc = (tFSDisable)GetProcAddress(hKernel, "Wow64DisableWow64FsRedirection");
+		tFSRevert pRevertFunc = (tFSRevert)GetProcAddress(hKernel, "Wow64RevertWow64FsRedirection");
+
+		if ((pDisableFunc) && (pRevertFunc))
+		{
+			if (disable)
+			{
+				if (!pDisableFunc(&g_wow64_preset))  // Turn off the file system redirector
+				{
+					_tprintf(_T("\nFile System Redirection could not be turned off. Reason: %d"), GetLastError());
+					return;
+				}
+			}
+			else
+			{
+				if (!pRevertFunc(g_wow64_preset))  // Restore the file system redirector
+				{
+					_tprintf(_T("\nFile System Redirection could not be restored. Reason: %d"), GetLastError());
+					return;
+				}
+			}
+		}
+	}
+}
+
 CString run_process(CString exePath, bool wait_process_exit, bool return_after_first_read)
 {
+	Wow64Disable(true);
+
+	TCHAR cmd[1024] = { 0, };
 	CString result(_T(""));
-	STARTUPINFO si;
-	PROCESS_INFORMATION pi;
+	STARTUPINFO si{ sizeof(si) };
+	PROCESS_INFORMATION pi{};
+	bool is_win_app = is_windows_application(exePath);
+
+	_stprintf(cmd, _T("%s"), exePath);
 
 	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
@@ -10046,18 +10094,27 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	// Create a pipe to get results from child's stdout.
 	if (!CreatePipe(&hChildStdoutRd, &hChildStdoutWr, &saAttr, 0))
 	{
+		Wow64Disable(false);
 		return result;
 	}
 
 	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 	si.hStdOutput = hChildStdoutWr;
 	si.hStdError = hChildStdoutWr;
-	si.wShowWindow = SW_HIDE;
+	si.wShowWindow = (is_win_app ? SW_SHOWNORMAL : SW_HIDE);
 
+	//dir과 같은 DOS 명령은 외부 실행파일이 아니므로 exePath를 "dir c:\\*.*"과 같이 주면 에러가 발생한다.
+	//"cmd.exe /c dir c:\\*.*"와 같이 전달해야 한다.
+	//하지만 run_process()를 호출하는 사용자 입장에서는 "dir c:\\*.*"과 같이 호출할 것이므로
+	//exePath를 가공해준다.
+	if (!is_win_app)
+	{
+		exePath = _T("/c ") + exePath;
+	}
 
 	// Start the child process. 
-	if (!CreateProcess(NULL,   // No module name (use command line)
-		(TCHAR*)(const TCHAR*)(exePath),        // Command line
+	if (!CreateProcess(NULL,
+		(TCHAR*)(const TCHAR*)(exePath),//_T("dir")과 같이 상수값을 직접 주면 실패.	// Command line
 		NULL,           // Process handle not inheritable
 		NULL,           // Thread handle not inheritable
 		TRUE,          // Set handle inheritance to FALSE
@@ -10067,7 +10124,21 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 		&si,            // Pointer to STARTUPINFO structure
 		&pi)           // Pointer to PROCESS_INFORMATION structure
 		)
+
+	//if (!CreateProcess(NULL,
+	//	(TCHAR*)(const TCHAR*)(exePath),//_T("dir")과 같이 상수값을 직접 주면 실패.	// Command line
+	//	NULL,           // Process handle not inheritable
+	//	NULL,           // Thread handle not inheritable
+	//	TRUE,          // Set handle inheritance to FALSE
+	//	CREATE_NEW_CONSOLE,              // No creation flags
+	//	NULL,           // Use parent's environment block
+	//	NULL,           // Use parent's starting directory 
+	//	&si,            // Pointer to STARTUPINFO structure
+	//	&pi)           // Pointer to PROCESS_INFORMATION structure
+	//	)
 	{
+		TRACE(_T("error = %s\n"), get_last_error_string());
+		Wow64Disable(false);
 		return result;
 	}
 
@@ -10082,21 +10153,28 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	}
 
 	if (!CloseHandle(hChildStdoutWr))
-		return result;
-
-	for (;;)
 	{
-		DWORD dwRead;
-		char chBuf[4096] = { 0, };
+		Wow64Disable(false);
+		return result;
+	}
 
-		bool done = !ReadFile(hChildStdoutRd, chBuf, 4096, &dwRead, NULL) || dwRead == 0;
+	//외부 실행파일일 경우는 result string이 없으므로 이 코드를 실행하면 안된다.
+	if (!is_win_app)
+	{
+		for (;;)
+		{
+			DWORD dwRead;
+			char chBuf[4096] = { 0, };
 
-		if (done)
-			break;
+			bool done = !ReadFile(hChildStdoutRd, chBuf, 4096, &dwRead, NULL) || dwRead == 0;
 
-		result += chBuf;
-		if (return_after_first_read)
-			break;
+			if (done)
+				break;
+
+			result += chBuf;
+			if (return_after_first_read)
+				break;
+		}
 	}
 
 	// Close process and thread handles. 
@@ -10104,23 +10182,57 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 
+	Wow64Disable(false);
+
 	return result;
 }
 
 #include <array>
+CString	run_process(CString cmd)
+{
+	void* prevSet = NULL;
+
+	Wow64Disable(true);
+
+	std::array<TCHAR, 1024> buffer;
+	//std::string result;
+	CString result;
+	std::shared_ptr<FILE> pipe(_tpopen(cmd, _T("r")), _pclose);
+
+	if (!pipe)
+		throw std::runtime_error("_popen() failed!");
+
+	while (!feof(pipe.get()))
+	{
+		if (_fgetts(buffer.data(), 1024, pipe.get()) != NULL)
+			result += buffer.data();
+	}
+
+	Wow64Disable(false);
+
+	return result;
+}
+/*
 std::string	run_process(const char* cmd)
 {
-	std::array<char, 128> buffer;
+	void* prevSet = NULL;
+
+	Wow64Disable(true);
+
+	std::array<char, 10240> buffer;
 	std::string result;
 	std::shared_ptr<FILE> pipe(_popen(cmd, "r"), _pclose);
 	if (!pipe) throw std::runtime_error("_popen() failed!");
 	while (!feof(pipe.get())) {
-		if (fgets(buffer.data(), 128, pipe.get()) != NULL)
+		if (fgets(buffer.data(), 10240, pipe.get()) != NULL)
 			result += buffer.data();
 	}
+
+	Wow64Disable(false);
+
 	return result;
 }
-
+*/
 //서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
 //process_name이 주어지면 좀 더 간단히 제거된다.
 //정상 제거(또는 서비스가 없을 경우) : true
@@ -17155,4 +17267,135 @@ CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _method, bool _i
 	is_https = _is_https;
 
 	CRequestUrlParams(ip, port, sub_url, _method, is_https, _headers, _body, _local_file_path);
+}
+
+// recreate the combo box by copying styles etc, and list items
+// and applying them to a newly created control
+BOOL recreate_combobox(CComboBox* pCombo, LPVOID lpParam/*=0*/)
+{
+	if (pCombo == NULL)
+		return FALSE;
+	if (pCombo->GetSafeHwnd() == NULL)
+		return FALSE;
+
+	CWnd* pParent = pCombo->GetParent();
+	if (pParent == NULL)
+		return FALSE;
+
+	// get current attributes
+	DWORD dwStyle = pCombo->GetStyle();
+	DWORD dwStyleEx = pCombo->GetExStyle();
+	CRect rc;
+	pCombo->GetDroppedControlRect(&rc);
+	pParent->ScreenToClient(&rc);	// map to client co-ords
+	UINT nID = pCombo->GetDlgCtrlID();
+	CFont* pFont = pCombo->GetFont();
+	CWnd* pWndAfter = pCombo->GetNextWindow(GW_HWNDPREV);
+
+	// get the currently selected text (and whether it is a valid list selection)
+	CString sCurText;
+	int nCurSel = pCombo->GetCurSel();
+	BOOL bItemSelValid = nCurSel != -1;
+	if (bItemSelValid)
+		pCombo->GetLBText(nCurSel, sCurText);
+	else
+		pCombo->GetWindowText(sCurText);
+
+	// copy the combo box items into a temp combobox (not sorted)
+	// along with each item's data
+	CComboBox comboNew;
+	
+	//if (!comboNew.CreateEx(dwStyleEx, _T("COMBOBOX"), _T(""), dwStyle, rc, pParent, nID, lpParam))
+	if (!comboNew.Create(dwStyle, rc, pParent, nID))
+		return FALSE;
+
+	comboNew.SetFont(pFont);
+	int nNumItems = pCombo->GetCount();
+	for (int n = 0; n < nNumItems; n++)
+	{
+		CString sText;
+		pCombo->GetLBText(n, sText);
+		int nNewIndex = comboNew.AddString(sText);
+		comboNew.SetItemData(nNewIndex, pCombo->GetItemData(n));
+	}
+	// re-set selected text
+	if (bItemSelValid)
+		comboNew.SetCurSel(comboNew.FindStringExact(-1, sCurText));
+	else
+		comboNew.SetWindowText(sCurText);
+
+	// destroy the existing window, then attach the new one
+	pCombo->DestroyWindow();
+	HWND hwnd = comboNew.Detach();
+	pCombo->Attach(hwnd);
+
+	// position correctly in z-order
+	pCombo->SetWindowPos(pWndAfter == NULL ?
+		&CWnd::wndBottom :
+		pWndAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+	return TRUE;
+}
+
+//콘솔 명령인지 윈도우 프로그램인지 구분
+bool is_windows_application(CString fullPath)
+{
+	//fullPath에서 실행파일명 또는 cmd를 추출한다.
+	CString cmd = fullPath;
+
+	if (fullPath[0] == '\"')
+		cmd = fullPath;
+	else if (fullPath.Find(' ') > 0)
+		cmd = fullPath.Left(fullPath.Find(' '));
+
+	if (PathFileExists(cmd) == FALSE)
+	{
+		LPTSTR lpFilePart;
+		TCHAR filename[MAX_PATH] = { 0, };
+		if (!SearchPath(NULL, cmd, _T(""), MAX_PATH, filename, &lpFilePart))
+		{
+			TRACE(_T("%s cmd is maybe DOS command.\n"), cmd);
+			return false;
+		}
+
+		fullPath = filename;
+	}
+
+	std::string filePath = CString2string(fullPath);
+
+	std::ifstream file(filePath, std::ios::binary);
+
+	if (!file)
+	{
+		LPTSTR lpFilePart;
+		TCHAR filename[MAX_PATH] = { 0, };
+		if (!SearchPath(NULL, fullPath, _T(""), MAX_PATH, filename, &lpFilePart))
+		{
+			TRACE(_T("Unable to open file: %s\n"), filePath);
+			return false;
+		}
+	}
+
+	// Read the first two bytes to check for "MZ" signature
+	uint16_t mzSignature;
+	file.read(reinterpret_cast<char*>(&mzSignature), sizeof(mzSignature));
+	if (mzSignature != 0x5A4D) { // "MZ" in little-endian
+		return false;
+	}
+
+	// Read the offset to the PE header (at 0x3C)
+	file.seekg(0x3C, std::ios::beg);
+	uint32_t peOffset;
+	file.read(reinterpret_cast<char*>(&peOffset), sizeof(peOffset));
+
+	// Move to the PE header and read the signature
+	file.seekg(peOffset, std::ios::beg);
+	uint32_t peSignature;
+	file.read(reinterpret_cast<char*>(&peSignature), sizeof(peSignature));
+
+	if (peSignature == 0x00004550) { // "PE\0\0" in little-endian
+		return true;
+	}
+
+	return false;
 }

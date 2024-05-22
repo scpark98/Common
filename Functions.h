@@ -469,17 +469,32 @@ struct	NETWORK_INFO
 
 	HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 	bool		IsDuplicatedRun();
+
 	//cmd 명령 실행 후 결과를 문자열로 리턴.
 	//wait_until_process_exit : 실행 프로세스가 정상 종료될때까지 기다린다.
 	//return_after_first_read : wait_until_process_exit를 false로 해도 장시간 끝나지 않는 경우가 있어(ex. telnet)
 	//우선 이 값이 true이면 맨 처음 read후에 바로 종료시킨다.
+	//주의! osk.exe라는 가상키보드 프로그램은 system폴더에만 있고 SysWow64 폴더에는 없는데
+	//32bit 프로그램에서 ShellExecute() 또는 CreateProcess()로 실행하면 SysWow64폴더에서 해당 파일을 찾으므로 실패한다.
+	//c:\\windows\\system32\\osk.exe로 실행해도 SysWOW64 폴더로 redirect되므로 역시 실행되지 않는다.
+	//Wow64DisableWow64FsRedirection()를 이용해서 redirection을 disable시켜주고 실행 후 복원시켜줘야 한다.
+	//"dir C:\\*.*"은 성공하나 "dir \"C:\\Program Files\\*.*\"" 명령은 실패한다.
 	CString		run_process(CString cmd, bool wait_until_process_exit, bool return_after_first_read = false);
-	std::string	run_process(const char* cmd);
+
+	//"dir \"C:\\Program Files\\*.*\"" 명령은 잘 동작하나 ping -t와 같이 끝나지 않는 도스명령어나 notepad.exe를 실행할 경우
+	//도스창이 계속 남아있다.
+	CString		run_process(CString cmd);
+	extern		void* g_wow64_preset;
+	void		Wow64Disable(bool disable = true);
+
 	//서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
 	//process_name이 주어지면 좀 더 간단히 제거된다.
 	//정상 제거(또는 서비스가 없을 경우) : true
 	//제거 실패 : false
 	bool		kill_service(CString service_name, CString process_name = _T(""));
+
+	//DOS 명령인지 윈도우 프로그램인지 구분
+	bool		is_windows_application(CString fullPath);
 
 	//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
 	bool		CheckProcessUsingPID(unsigned long pid);
@@ -1856,6 +1871,9 @@ void		rotate90(uint8_t *src, int width, int height, uint8_t *dst, int degree);
 //dst는 반드시 메모리가 할당되어 있어야 한다.
 void		mirror(uint8_t *src, int width, int height, uint8_t *dst, int method);
 
+
+//MFC Common Controls
+BOOL		recreate_combobox(CComboBox* pCombo, LPVOID lpParam = NULL);
 
 
 

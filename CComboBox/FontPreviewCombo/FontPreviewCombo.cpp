@@ -95,15 +95,24 @@ static BOOL CALLBACK EnumFontProc (LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTy
 }
 
 /////////////////////////////////////////////////////////////////////////////
-
+#include "../../Functions.h"
 void CFontPreviewCombo::Init()
 {		
 	//m_img.Create(IDB_TTF_BMP, GLYPH_WIDTH, 1, RGB(255,255,255));
-	CClientDC dc(this);		
+	//DWORD dwStyle = GetStyle();
+
+	ModifyStyle(0, CBS_OWNERDRAWFIXED);
+	ModifyStyle(0, CBS_HASSTRINGS);
+	ModifyStyle(0, CBS_DROPDOWNLIST);
+	ModifyStyle(0, WS_VSCROLL);
+	//recreate_combobox(&m_combo_font);
+	recreate_combobox(this);
+
+	CClientDC dc(this);
 
 	EnumFonts (dc, 0,(FONTENUMPROC) EnumFontProc,(LPARAM)this); //Enumerate font
 
-   SetCurSel(0);
+	SetCurSel(0);
 }
 
 /////////////////////////////////////////////////////////////////////////////

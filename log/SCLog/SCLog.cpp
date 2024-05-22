@@ -132,6 +132,18 @@ bool SCLog::release()
 	}
 }
 
+CString	SCLog::write(LPCTSTR format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	CString log_text;
+
+	log_text.FormatV(format, args);
+
+	return write(SCLOG_LEVEL_NONE, _T(""), 0, log_text);
+}
+
 CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 {
 	CString result = CString();

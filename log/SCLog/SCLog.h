@@ -89,6 +89,10 @@ public:
 	//라인번호 표시 유무. default show
 	void		show_line_number(bool show) { m_show_line_number = show; }
 
+	//logWrite 매크로를 통해서 함수명, 라인수 등을 같이 기록해주므로 편리하지만
+	//LMMAgent 또는 멀티쓰레드로 동작하는 프로젝트에서는 뭔가 오동작을 유발하는 듯하여
+	//단순 로그만 남기는 write 함수를 추가함.
+	CString		write(LPCTSTR format, ...);
 	CString		write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
 
 	bool		release();

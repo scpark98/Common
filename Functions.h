@@ -595,9 +595,13 @@ struct	NETWORK_INFO
 
 	//deque에 있는 원소들을 구분자로 하는 하나의 문자열로 리턴
 	CString		get_tokenized(std::deque<CString> dq, TCHAR separator = ';');
-	CString		get_str(CString& buff, CString sep = _T("|"));
-	int			get_int(CString& buff, CString sep = _T("|"));
-	double		get_double(CString& buff, CString sep = _T("|"));
+
+	//src에서 sep를 구분자로 하나씩 뽑아내고 그 나머지를 다시 src로 치환한다.
+	//src가 계속 변경됨에 주의.
+	CString		get_str(CString& src, CString sep = _T("|"));
+	int			get_int(CString& src, CString sep = _T("|"));
+	double		get_double(CString& src, CString sep = _T("|"));
+
 	//unit			: -1:auto, 0:bytes, 1:KB, 2:MB, 3:GB ~
 	//auto일 경우는 1000보다 작을떄까지 나누고 소수점은 2자리까지 표시한다.(ex 7.28TB)
 	//floats		: 소수점을 몇 자리까지 표시할지

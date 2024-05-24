@@ -876,7 +876,10 @@ struct	NETWORK_INFO
 	CString		GetMostRecentFile(CString sFolder, CString sWildCard = _T("*.*"), int nReturnType = 1);
 	CString		GetMostRecentDateFile(CString sFolder, CString sWildCard = _T("*.*"));	//가장 최근 날짜 파일명 리턴
 	CString		GetFileProperty(CString sFilePath, CString sProperty);
-	CString		set_file_property(CString sFilePath, CString sProperty, CString value);
+
+	//확인 필요
+	//CString		set_file_property(CString sFilePath, CString sProperty, CString value);
+
 	size_t		read_raw(CString sfile, uint8_t *dst, size_t size);
 	bool		save2raw(CString sfile, uint8_t *data, size_t size);
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);

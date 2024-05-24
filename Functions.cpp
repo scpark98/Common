@@ -10029,6 +10029,7 @@ bool IsDuplicatedRun()
 
 void Wow64Disable(bool disable)
 {
+#ifndef _USING_V110_SDK71_
 	if (IsWow64())
 	{
 		//XP 64bit부터 지원되는 API이므로 32bit이면 직접 호출해줘야 한다.
@@ -10038,6 +10039,7 @@ void Wow64Disable(bool disable)
 			Wow64RevertWow64FsRedirection(g_wow64_preset);
 	}
 	else
+#endif
 	{
 		HMODULE hKernel = GetModuleHandle(_T("Kernel32"));
 		typedef BOOL(WINAPI* tFSDisable)(PVOID*);
@@ -16979,7 +16981,8 @@ CString json_value(CString json, CString key)
 	return result;
 }
 
-
+#if 0
+//파일 속성 변경 목적의 코드지만 좀 더 테스트가 필요하고 XP에서는 지원되지 않으므로 우선 주석처리함.
 HRESULT PrintProperty(IPropertyStore* pps, REFPROPERTYKEY key, PCWSTR pszCanonicalName)
 {
 	PROPVARIANT propvarValue = { 0 };
@@ -17136,6 +17139,7 @@ CString	set_file_property(CString sFilePath, CString sProperty, CString value)
 #endif
 	return CString();
 }
+#endif
 
 CString base64_encode(CString in)
 {

@@ -27,15 +27,15 @@ class CShapeDlgTextSetting
 public:
 	CShapeDlgTextSetting() {};
 	CShapeDlgTextSetting(CString _text,
-					float _font_size = 40,
-					int _font_bold = true,
-					int _shadow_depth = 2,
-					float _thickness = 2,
-					CString _font_name = _T("Arial"),
-					Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
-					Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
-					Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
-					Gdiplus::Color _cr_back = Gdiplus::Color::Transparent)
+		float _font_size = 40,
+		int _font_bold = true,
+		int _shadow_depth = 2,
+		float _thickness = 2,
+		CString _font_name = _T("Arial"),
+		Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
+		Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
+		Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
+		Gdiplus::Color _cr_back = Gdiplus::Color(1, 0, 0, 0))	//거의 투명이지만 클릭으로 옮기기 쉽도록
 	{
 		text = _text;
 		font_size = _font_size;
@@ -84,13 +84,14 @@ public:
 	void			alpha(int alpha);
 
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성. default : SW_HIDE
+	//현재 특정 폰트에서 크기를 12이하로 하면 일부분만 표시되는 버그 있음.
 	bool			set_text(CWnd* parent, CString text, float font_size, bool font_bold,
 							int shadow_depth = 2, float thickness = 2.0f,
 							CString font_name = _T(""),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+							Gdiplus::Color cr_back = Gdiplus::Color(1, 0, 0, 0));
 	bool			set_text(CShapeDlgTextSetting* setting = NULL);
 
 	//show상태로 만들고 time후에 hide된다.

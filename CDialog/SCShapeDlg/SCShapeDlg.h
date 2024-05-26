@@ -106,7 +106,8 @@ public:
 
 	//
 	CShapeDlgTextSetting	m_text_setting;
-	CShapeDlgTextSetting* get_text_setting() { return &m_text_setting; }
+	CShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
+	void			set_text_color(Gdiplus::Color cr_text) { m_text_setting.cr_text = cr_text; set_text(&m_text_setting); }
 
 
 	//animated gif인 경우

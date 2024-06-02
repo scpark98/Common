@@ -84,7 +84,18 @@ CGdiButton::CGdiButton()
 
 CGdiButton::~CGdiButton()
 {
+	if (m_tooltip)
+		delete m_tooltip;
+
 	release_all();
+}
+
+//동적 생성시에만 사용.
+BOOL CGdiButton::create(CString caption, DWORD dwStyle, CRect r, CWnd* parent, UINT button_id)
+{
+	BOOL res = Create(caption, dwStyle, r, parent, button_id);
+	prepare_tooltip();
+	return res;
 }
 
 BOOL CGdiButton::RegisterWindowClass()
@@ -175,7 +186,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
 	//그렇지 않으면 어느 시점에서 소멸되어 잘못된 참조가 된다.
-	CButtonImage* btn = new CButtonImage();
+	CGdiButtonImage* btn = new CGdiButtonImage();
 
 	//normal은 0이어서는 안된다.
 	if (normal == 0)
@@ -236,7 +247,7 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
 	//그렇지 않으면 어느 시점에서 소멸되어 잘못된 참조가 된다.
-	CButtonImage* btn = new CButtonImage();
+	CGdiButtonImage* btn = new CGdiButtonImage();
 
 	//normal은 0이어서는 안된다.
 	if (img->is_empty())
@@ -333,7 +344,7 @@ void CGdiButton::SetCheck(bool bCheck)
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
 	//owner draw 속성때문에 WindowProc의 윈도우 기본 메시지를 받아서 처리할 수 없다.
-	if (is_radio_button() && bCheck)
+	if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && bCheck)
 	{
 		CWnd *pWndParent = GetParent(); 
 		CWnd *pWnd = pWndParent->GetNextDlgGroupItem(this); 
@@ -346,11 +357,11 @@ void CGdiButton::SetCheck(bool bCheck)
 			if (pWnd->GetStyle() & WS_GROUP)
 				TRACE(_T("%p : group property\n"), pWnd);
 			else
-				TRACE(_T("%p : not group property\n"), pWnd);
+				TRACE(_T("%p : no group property\n"), pWnd);
 
 			if (pWnd->IsKindOf(RUNTIME_CLASS(CGdiButton))) 
 			{ 
-				if (((CGdiButton*)pWnd)->is_radio_button())
+				if (((CGdiButton*)pWnd)->is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 				{
 					//((CGdiButton*)pWnd)->SetCheck(BST_UNCHECKED); 
 					((CGdiButton*)pWnd)->m_idx = 0;
@@ -572,9 +583,6 @@ void CGdiButton::PreSubclassWindow()
 		TRACE(_T("BS_PUSHLIKE\n"));
 	}
 
-
-
-
 	CString text;
 	GetWindowText(text);
 	//TRACE(_T("%s = %d\n"), str, m_button_style);
@@ -595,7 +603,26 @@ void CGdiButton::PreSubclassWindow()
 
 	reconstruct_font();
 
-	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	//prepare_tooltip();
+
+	//m_tooltip;
+	//m_tooltip1;
+
+	CButton::PreSubclassWindow();
+}
+
+void CGdiButton::prepare_tooltip()
+{
+	m_tooltip = new CToolTipCtrl();
+
+	try
+	{
+		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	}
+	catch (CException* e)
+	{
+		CString str = get_last_error_string();
+	}
 	//m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
 	//m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
 	//m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
@@ -621,8 +648,6 @@ void CGdiButton::PreSubclassWindow()
 	EnableTrackingToolTips(TRUE);
 	m_tooltip.Activate(true);
 	*/
-
-	CButton::PreSubclassWindow();
 }
 
 void CGdiButton::set_tooltip_text(CString text)
@@ -632,8 +657,8 @@ void CGdiButton::set_tooltip_text(CString text)
 	if (!text.IsEmpty())
 		m_use_tooltip = true;
 
-	m_tooltip.UpdateTipText(m_tooltip_text, this);
-	m_tooltip.AddTool(this, m_tooltip_text);
+	m_tooltip->UpdateTipText(m_tooltip_text, this);
+	m_tooltip->AddTool(this, m_tooltip_text);
 }
 
 
@@ -656,11 +681,11 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
 	//이 코드는 main에 있어야 한다.
 	//disabled가 아닌 경우는 잘 표시된다.
-	if (m_use_tooltip && m_tooltip.m_hWnd)
+	if (m_use_tooltip && m_tooltip->m_hWnd)
 	{
 		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
 		MSG msg = *pMsg;
-		msg.hwnd = (HWND)m_tooltip.SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
+		msg.hwnd = (HWND)m_tooltip->SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
 
 		CPoint pt = msg.pt;
 
@@ -670,7 +695,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		msg.lParam = MAKELONG(pt.x, pt.y);
 
 		// relay mouse event before deleting old tool 
-		m_tooltip.SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
+		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
 	}
 
 	return CButton::PreTranslateMessage(pMsg);
@@ -744,7 +769,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//check or radio인데 m_image.size()가 1뿐이라면
 	//checked = normal을, unchecked = disabled를 표시한다.
 	bool use_disabled_image = false;
-	if (!is_push_button() && m_image.size() == 1 && m_idx == 0)
+	if (!is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) && m_image.size() == 1 && m_idx == 0)
 		use_disabled_image = true;
 
 	if (m_cr_text.size() == 4)
@@ -869,7 +894,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		m_text = text;
 
-		if (is_check_box())
+		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
 		{
 			r.left += 5;
 			r.right = r.left + size * 2 - 1;
@@ -890,13 +915,16 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			rText.left = rText.right + 4;
 			rText.right = rc.right;
 		}
-		else if (is_radio_button())
+		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 		{
-			if (is_push_like())
+			if (is_button_style(BS_PUSHLIKE))
 			{
-				dc.Draw3dRect(rc,
-					GetCheck() ? GRAY160 : white,
-					GetCheck() ? white : GRAY128);
+				if (!is_button_style(BS_FLAT))
+				{
+					dc.Draw3dRect(rc,
+						GetCheck() ? GRAY160 : white,
+						GetCheck() ? white : GRAY128);
+				}
 			}
 			else
 			{
@@ -948,7 +976,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	//뭔가 제대로 검사되지 않는다. 우선 푸시버튼만 대상으로 한다.
 #if 1
-	if (is_push_button())
+	if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) ||
+		(is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && is_button_style(BS_PUSHLIKE)) ||
+		(is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE)))
 	{
 		/*
 		if ((dwStyle & BS_RIGHT) == BS_RIGHT)
@@ -996,13 +1026,13 @@ void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//SendMessage(TTM_TRACKPOSITION, 0, (LPARAM)MAKELPARAM(point.x, point.y));
-
+	//TRACE(_T("mousemove\n"));
 	if (!m_bHover)//m_bIsTracking)
 	{
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
 		tme.hwndTrack = m_hWnd;
-		tme.dwFlags = TME_LEAVE;// | TME_HOVER;
+		tme.dwFlags = TME_LEAVE | TME_HOVER;
 		tme.dwHoverTime = 1;
 		m_bHover = true;
 		m_bIsTracking = _TrackMouseEvent(&tme);
@@ -1022,6 +1052,10 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 	m_bHover = true;
 	Invalidate();
 
+	//TRACE(_T("hover\n"));
+	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, WM_MOUSEHOVER)), 0);
+
 	CButton::OnMouseHover(nFlags, point);
 }
 
@@ -1035,6 +1069,10 @@ void CGdiButton::OnMouseLeave()
 	m_bIsTracking = false;
 	m_bHover = false;
 	update_surface();
+
+	//TRACE(_T("leave\n"));
+	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, WM_MOUSELEAVE)), 0);
 
 	CButton::OnMouseLeave();
 }
@@ -1328,11 +1366,11 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 	//밖에서 up되는 경우는 스킵시킨다.
 	if (rc.PtInRect(point))
 	{
-		if (is_check_box())
+		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
 		{
 			Toggle();
 		}
-		else if (is_radio_button())
+		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 		{
 			SetCheck((m_idx = 1));
 		}
@@ -1348,6 +1386,10 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 					GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 			}
 		}
+		else
+		{
+			::PostMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, WM_LBUTTONDOWN)), 0);
+		}
 	}
 
 	CButton::OnLButtonDown(nFlags, point);
@@ -1362,6 +1404,10 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 		//SetCapture();
 		SetTimer(timer_auto_repeat, m_initial_delay, NULL);
 		m_sent_once_auto_repeat_click_message = 0;
+	}
+	else
+	{
+		::PostMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, WM_LBUTTONUP)), 0);
 	}
 
 	CButton::OnLButtonUp(nFlags, point);
@@ -1633,7 +1679,7 @@ void CGdiButton::set_auto_repeat_delay(int initial_delay, int repeat_delay)
 	m_initial_delay = initial_delay;
 	m_repeat_delay = repeat_delay;
 }
-
+#if 0
 bool CGdiButton::is_push_button()
 {
 	/*
@@ -1680,4 +1726,4 @@ bool CGdiButton::is_push_like()
 		return true;
 	return false;
 }
-
+#endif

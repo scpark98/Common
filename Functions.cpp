@@ -12019,6 +12019,7 @@ int get_ucs4_levenshtein_distance(string str1, string str2, double* ratio)
 */
 
 //차량정보파일(xml) 저장 관련
+#if 0
 bool SavePlateInfoFile(char* sfile, char* sPlate, RECT* rect /*= NULL*/)
 {
 	FILE*	fp = fopen(sfile, "wt");
@@ -12041,6 +12042,7 @@ bool SavePlateInfoFile(char* sfile, char* sPlate, RECT* rect /*= NULL*/)
 
 	return true;
 }
+#endif 
 
 //32비트인 dw에 들어있는 R, G, B를 추출하여 16비트(5+6+5) 컬러로 리턴한다.
 WORD RGB24ToRGB565(DWORD dw)
@@ -16767,7 +16769,7 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 	if (silentInstall)
 		return true;
 
-	//logWrite(_T("WebView2 Runtime installed successfully."));
+	//gLog.write(_T("WebView2 Runtime installed successfully."));
 	Wait(1000);
 
 	//HANDLE hProcess = NULL;
@@ -17402,4 +17404,47 @@ bool is_windows_application(CString fullPath)
 	}
 
 	return false;
+}
+
+typedef struct tagCHARMENUITEM
+{
+	// Font of text on the menu item.
+	HFONT hFont;
+
+	// The length of the string pointed to by szItemText.
+	int cchItemText;
+
+	// A pointer to a buffer that specifies the text string. The string does 
+	// not need to be null-terminated, because the c parameter specifies the 
+	// length of the string.
+	wchar_t szItemText[1];
+
+} CHARMENUITEM, * PCHARMENUITEM;
+
+bool	get_menu_item_info(HMENU hMenu, UINT uItem, UINT *uID, CString *caption, BOOL fByPos)
+{
+	MENUITEMINFO mii;
+
+	memset(&mii, 0, sizeof(mii));
+	mii.cbSize = sizeof(mii);
+	mii.fMask = MIIM_SUBMENU | MIIM_STRING | MIIM_FTYPE | MIIM_ID; // | MIIM_STATE
+	mii.dwTypeData = NULL;
+	GetMenuItemInfo(hMenu, uItem, fByPos, &mii);
+
+	PCHARMENUITEM pcmi = NULL;
+
+	pcmi = (PCHARMENUITEM)LocalAlloc(LPTR,
+		sizeof(*pcmi) + mii.cch * sizeof(*pcmi->szItemText));
+
+	pcmi->cchItemText = mii.cch;
+	mii.dwTypeData = (LPTSTR)(pcmi->szItemText);
+	mii.cch++;
+
+	if (!GetMenuItemInfo(hMenu, uItem, TRUE, &mii))
+		return false;
+
+	*uID = mii.wID;
+	*caption = mii.dwTypeData;
+
+	return true;
 }

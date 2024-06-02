@@ -1892,55 +1892,6 @@ void		printMessage(std::string msg, uint8_t bNewLine = true);
 
 int readFilenames(std::vector<std::string> &filenames, const std::string &directory);
 
-class CPlateCode
-{
-public:
-	char	sLocalCode[5];
-	char	sTypeCode[3];
-	char	sUseCode[3];
-	char	sDigitCode[5];
-
-	CPlateCode(char* sPlate)
-	{
-		strcpy_s(sLocalCode, "\0");
-		strcpy_s(sTypeCode, "\0");
-		strcpy_s(sUseCode, "\0");
-		strcpy_s(sDigitCode, "\0");
-
-		//plate = 경기86나9993
-		//local	= 경기
-		//type	= 86
-		//use	= 나
-		//digit	= 9993
-		if (strlen(sPlate) < 8)
-			return;
-		else if (strlen(sPlate) == 8)
-		{
-			strcpy_s(sLocalCode, "\0");
-			strncpy_s(sTypeCode, sPlate, 2);
-			sTypeCode[2] = '\0';
-		}
-		else
-		{
-			strncpy_s(sLocalCode, sPlate, 4);
-			sLocalCode[4] = '\0';
-
-			if (strlen(sPlate) == 11)
-			{
-				strncpy_s(sTypeCode, &(*(sPlate + 4)), 1);
-				sTypeCode[1] = '\0';
-			}
-			else
-			{
-				strncpy_s(sTypeCode, &(*(sPlate + 4)), 2);
-				sTypeCode[2] = '\0';
-			}
-		}
-
-		strncpy_s(sUseCode, &(*(sPlate + strlen(sPlate) - 6)), 2);
-		sUseCode[2] = '\0';
-		strncpy_s(sDigitCode, &(*(sPlate + strlen(sPlate) - 4)), 4);
-		sDigitCode[4] = '\0';
-	}
-};
+//CMenu
+bool	get_menu_item_info(HMENU hMenu, UINT uItem, UINT *uID, CString *caption, BOOL fByPos = FALSE);
 //#endif

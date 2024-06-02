@@ -29,10 +29,10 @@
 	show_line_number(false);
 
 	//경로를 별도로 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
-	logWrite(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
+	gLog.write(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
 
-	//logWrite(_T(""));		//한 줄 빈 라인 추가
-	//logWrite(_T(" "));	//시간, 함수정보까지만 출력되는 라인 추가
+	//gLog.write(_T(""));		//한 줄 빈 라인 추가
+	//gLog.write(_T(" "));	//시간, 함수정보까지만 출력되는 라인 추가
 
 	//SCLOG_LEVEL_WARN 등과 같이 로그레벨을 지정하여 특정 로그들만 기록되게 할 수 있는데 아직 미구현.
 

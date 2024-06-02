@@ -59,10 +59,25 @@ using namespace Gdiplus;
 #define ANCHOR_VCENTER		0x00100000
 #define ANCHOR_CENTER		ANCHOR_HCENTER | ANCHOR_VCENTER
 
-class CButtonImage
+static const UINT Message_CGdiButton = ::RegisterWindowMessage(_T("MessageString_CGdiButton"));
+
+class CGdiButtonMessage
 {
 public:
-	CButtonImage() {};
+	CGdiButtonMessage(CWnd* _this, int _message)
+	{
+		pThis = _this;
+		message = _message;
+	}
+
+	CWnd*		pThis = NULL;
+	int			message;
+};
+
+class CGdiButtonImage
+{
+public:
+	CGdiButtonImage() {};
 
 	CGdiplusBitmap normal;
 	CGdiplusBitmap over;
@@ -79,6 +94,13 @@ class CGdiButton : public CButton, CGdiplusBitmap
 public:
 	CGdiButton();
 	virtual ~CGdiButton();
+
+	enum GdiButtonMessage
+	{
+	};
+
+	//동적 생성시에만 사용.
+	BOOL		create(CString caption, DWORD dwStyle, CRect r, CWnd* parent, UINT button_id);
 
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
@@ -205,10 +227,10 @@ public:
 	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
 
 	//public으로 하여 CGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
-	std::deque<CButtonImage*> m_image;
+	std::deque<CGdiButtonImage*> m_image;
 
 protected:
-	BOOL	RegisterWindowClass();
+	BOOL		RegisterWindowClass();
 
 	enum TIMER_ID
 	{
@@ -216,12 +238,35 @@ protected:
 		timer_auto_repeat,
 	};
 
-	UINT		m_button_type;				//pushbutton(default) or checkbox or radiobutton
-	UINT		m_button_style;				//pushlike, multiline
-	bool		is_push_button();
-	bool		is_radio_button();
-	bool		is_check_box();
-	bool		is_push_like();
+	UINT		m_button_type;				//BS_PUSHBUTTON(default) or BS_CHECKBOX or BS_RADIOBUTTON
+	UINT		m_button_style;				//BS_PUSHLIKE, BS_MULTILINE, BS_FLAT
+	//열거된 style값에 따라 m_button_style로 판별할지 m_button_type으로 판별할지 구분하여 판별함
+	//ex. bool b = is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON);
+	template <typename ... Types> bool is_button_style(Types... args)
+	{
+		UINT styles[] = { args... };
+
+		for (auto style : styles)
+		{
+			if (style >= BS_PUSHBUTTON && style <= BS_PUSHBOX)
+			{
+				if (m_button_type == style)
+					return true;
+			}
+			else if (style >= BS_LEFTTEXT && style <= BS_FLAT)
+			{
+				if ((m_button_style & style) == style)
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	//bool		is_push_button();
+	//bool		is_radio_button();
+	//bool		is_check_box();
+	//bool		is_push_like();
 
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
@@ -281,9 +326,14 @@ protected:
 
 	//enable상태일때는 잘 표시되나 disable일때는 표시되지 않는다.
 	//이를 해결하려면 parent의 PreTranslateMessage()에서 처리해야 한다.
-	CToolTipCtrl	m_tooltip;
+	CToolTipCtrl *m_tooltip = NULL;
+	CToolTipCtrl m_tooltip1;
 	bool		m_use_tooltip = true;
 	CString		m_tooltip_text = _T("");
+	//정적으로 만든 버튼은 문제없으나 동적으로 버튼을 만드는 경우
+	//PreSubclassWindow()에서 툴팁을 초기화하려니 예외가 발생함.
+	//그래서 Create()후에 별도로 prepare_tooltip()을 호출하여 준비되도록 수정.
+	void		prepare_tooltip();
 
 
 	//auto repeat

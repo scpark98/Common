@@ -119,13 +119,13 @@ public:
 	//특히 push, check, radio button 처럼 checked, unchecked 등의 상태 image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
 	//on/off, play/pause, img0/img1/img2...
-	template <typename ... T> void add_images(CString type, T... args)
+	template <typename ... T> void add_images(T... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
 
 		for (auto id : arg)
-			add_image(type, id);
+			add_image(_T("PNG"), id);
 	}
 
 	//하나의 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.

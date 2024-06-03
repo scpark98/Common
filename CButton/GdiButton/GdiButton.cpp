@@ -166,14 +166,18 @@ END_MESSAGE_MAP()
 //기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 {
+	/*
 	DWORD dwStyle = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
+	DWORD dwType = CButton::GetButtonStyle();
 
-	CButton::SetButtonStyle(nStyle, bRedraw);
+	CButton::SetButtonStyle(dwType | nStyle, bRedraw);
 
 	// BS_OWNERDRAW 속성을 설정한다.
 	//주의 : dwStyle은 반드시 CButton::SetButtonStyle() 함수 호출 전에 구한 값을 사용해야 한다.
 	::SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle | BS_OWNERDRAW);
-	m_button_style = nStyle;
+	*/
+	ModifyStyle(0, nStyle);
+	m_button_type = nStyle;
 }
 
 bool CGdiButton::add_image(UINT normal, UINT over, UINT down, UINT disabled)
@@ -233,11 +237,11 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 
 	m_image.push_back(btn);
 
-	fit_to_image(m_fit2image);
+	//fit_to_image(m_fit2image);
 
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
-	m_cr_back.clear();
-	m_transparent = true;
+	//m_cr_back.clear();
+	m_transparent;
 
 	return true;
 }
@@ -272,7 +276,7 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 
 	m_image.push_back(btn);
 
-	fit_to_image(m_fit2image);
+	//fit_to_image(m_fit2image);
 
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
 	m_cr_back.clear();
@@ -681,7 +685,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
 	//이 코드는 main에 있어야 한다.
 	//disabled가 아닌 경우는 잘 표시된다.
-	if (m_use_tooltip && m_tooltip->m_hWnd)
+	if (m_use_tooltip && m_tooltip && m_tooltip->m_hWnd)
 	{
 		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
 		MSG msg = *pMsg;
@@ -871,7 +875,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
 		}
 
-		g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+		//g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
 
 		if (m_bShowFocusRect)//&& m_bHasFocus)
 		{
@@ -1263,6 +1268,7 @@ void CGdiButton::update_surface(bool bErase)
 void CGdiButton::Toggle()
 {
 	m_idx = !m_idx;
+	TRACE(_T("idx = %d\n"), m_idx);
 	update_surface();
 }
 

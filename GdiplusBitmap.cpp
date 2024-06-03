@@ -650,9 +650,20 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, bool stretch)
+CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode)
 {
-	CRect r = (stretch ? targetRect : get_ratio_max_rect(targetRect, (double)width / (double)height));
+	CRect r;
+	
+	if (draw_mode == draw_mode_stretch)
+		r = targetRect;
+	else if (draw_mode == draw_mode_zoom)
+		r = get_ratio_max_rect(targetRect, (double)width / (double)height);
+	else
+	{
+		r = CRect(0, 0, width, height);
+		r.OffsetRect(targetRect.left + (targetRect.Width() - width) / 2, targetRect.top + (targetRect.Height() - height) / 2);
+	}
+
 	return draw(g, r.left, r.top, r.Width(), r.Height());
 }
 
@@ -740,6 +751,9 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 	*/
 
 	//메모리 복사 방식
+	if (dst == NULL)
+		dst = new CGdiplusBitmap();
+
 	dst->m_pBitmap = new Gdiplus::Bitmap(m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight());
 	Gdiplus::BitmapData bmpData;

@@ -120,9 +120,16 @@ public:
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.
 	//draw시에 CDC를 넘기느냐 Gdiplus::Graphics를 넘기느냐 고민했으나 Gdiplus::Graphics에 설정코드가 적용된채로 사용하는 경우가 많으므로
 	//Gdiplus::Graphics를 넘기는게 맞다고 판단함.
-	CRect	draw(Gdiplus::Graphics& g, CRect targetRect, bool stretch = false);
+	CRect	draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode = draw_mode_origin);
 	CRect	draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 	CRect	draw(Gdiplus::Graphics& g, CGdiplusBitmap mask, CRect targetRect);
+
+	enum GDIP_DRAW_MODE
+	{
+		draw_mode_stretch = 0,	//targetRect에 꽉차게 그림(non ratio)
+		draw_mode_zoom,			//targetRect에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
+		draw_mode_origin,		//targetRect의 중앙에 원본 크기로 그림
+	};
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void	clone(CGdiplusBitmap* dst);
@@ -213,7 +220,7 @@ public:
 	int channel = 0;
 	int stride = 0;
 
-	//animatedGif
+	//animated Gif 관련
 	UINT	m_frame_count;
 	UINT	m_frame_index;
 	PropertyItem* m_pPropertyItem = NULL;

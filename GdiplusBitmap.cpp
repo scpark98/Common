@@ -503,6 +503,13 @@ Gdiplus::Bitmap* CGdiplusBitmap::CreateARGBBitmapFromDIB(const DIBSECTION& dib)
 
 void CGdiplusBitmap::resolution()
 {
+	//이미지 데이터를 추출한 인스턴스라면 변경 후 재추출해준다?
+	//data 주소가 변경되므로 위험하다. 좀 더 검토 후 변경할 것!
+	if (data)
+	{
+
+	}
+
 	width = 0;
 	height = 0;
 	channel = 0;
@@ -515,6 +522,7 @@ void CGdiplusBitmap::resolution()
 	height = m_pBitmap->GetHeight();
 	channel = channels();
 	stride = width * channel;
+
 
 	check_animate_gif();
 }
@@ -1067,6 +1075,24 @@ void CGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
 	resize(nw, nh, mode);
 }
 
+//이미지 캔버스 크기를 조정한다.
+void CGdiplusBitmap::canvas_size(int cx, int cy, Gdiplus::Color cr_fill)
+{
+	Bitmap* result = new Bitmap(cx, cy);
+	Graphics g(result);
+	g.Clear(cr_fill);
+
+	int x = (cx - width) / 2;
+	int y = (cy - height) / 2;
+	g.DrawImage(m_pBitmap, x, y);
+
+	delete m_pBitmap;
+	m_pBitmap = result->Clone(0, 0, cx, cy, PixelFormatDontCare);
+	delete result;
+
+	resolution();
+}
+
 void CGdiplusBitmap::sub_image(CRect r)
 {
 	sub_image(r.left, r.top, r.Width(), r.Height());
@@ -1170,6 +1196,20 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 
 	//사본을 ia처리하여 캔버스에 그려준다.
 	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+}
+
+//투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
+void CGdiplusBitmap::replace_back_color(Gdiplus::Color cr_back)
+{
+	Bitmap* result = new Bitmap(width, height);
+	Graphics g(result);
+	g.Clear(cr_back);
+
+	g.DrawImage(m_pBitmap, 0, 0);
+
+	delete m_pBitmap;
+	m_pBitmap = result->Clone(0, 0, width, height, PixelFormatDontCare);
+	delete result;
 }
 
 //현재 이미지에 더해지는 것이므로 계속 누적될 것이다.

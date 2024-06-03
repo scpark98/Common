@@ -156,6 +156,10 @@ public:
 	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
 	void resize(int cx, int cy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 	void resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
+
+	//이미지 캔버스 크기를 조정한다. 남는 공간은 cr_fill로 채운다. cr_fill이 투명이 아닌 경우 주의할 것.
+	void canvas_size(int cx, int cy, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
+
 	void sub_image(int x, int y, int w, int h);
 	void sub_image(CRect r);
 	void sub_image(Gdiplus::Rect r);
@@ -170,6 +174,9 @@ public:
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
 	void replace_color(int tx, int ty, Gdiplus::Color dst);
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
+
+	//투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
+	void replace_back_color(Gdiplus::Color cr_back);
 
 	//현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
 	//원본에 적용하는 것이 정석이나 구조 수정이 필요하다.
@@ -234,8 +241,8 @@ public:
 	void	set_animation(HWND parenthWnd, CRect r, bool start = true);
 	void	move(int x = 0, int y = 0, int w = 0, int h = 0);
 	void	move(CRect r);
-	void	back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
-	void	back_color(Gdiplus::Color cr) { m_crBack = cr; }
+	void	gif_back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
+	void	gif_back_color(Gdiplus::Color cr) { m_crBack = cr; }
 	void	start_animation();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
 	void	pause_animation(int pos = 0);

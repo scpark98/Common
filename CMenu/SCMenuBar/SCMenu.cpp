@@ -568,7 +568,7 @@ void CSCMenu::recalc_items_rect()
 	//보이는 크기보다 실제 영역은 더 크다.
 	GetWindowRect(rw);
 	GetClientRect(rc);
-	border = (rw.Width() - rc.Width()) / 2;
+	border = CSize((rw.Width() - rc.Width()) / 2, (rw.Height() - rc.Height()) / 2);
 
 	ScreenToClient(rw);
 	rw.MoveToXY(0, 0);
@@ -577,13 +577,13 @@ void CSCMenu::recalc_items_rect()
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		is_separator = (m_items[i]->m_id <= 0);
-		m_items[i]->m_r = CRect(2, sy, rw.right - 4, sy + (is_separator ? 5 : m_line_height));
+		m_items[i]->m_r = CRect(2, sy, rw.right - 5 - border.cx, sy + (is_separator ? 5 : m_line_height));
 		sy = m_items[i]->m_r.bottom + 2;
 
 		total_height = m_items[i]->m_r.bottom;
 	}
 
-	rw.bottom = rw.top + total_height + 4;// +8;	//2=margin(equal to top margin), 8 = border height? * 2
+	rw.bottom = rw.top + total_height + 4 + border.cy * 2;	//2=margin(equal to top margin), 8 = border height? * 2
 
 	SetWindowPos(&wndTopMost, 0, 0, rw.Width(), rw.Height(), SWP_NOMOVE);
 }
@@ -629,12 +629,12 @@ void CSCMenu::OnPaint()
 				dc.SetTextColor(m_cr_text_over);
 				//dc.FillSolidRect(m_items[i]->r, m_cr_back_over);
 
-				Gdiplus::Color gcr_over_stroke;
-				Gdiplus::Color gcr_over_fill;
+				Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
+				Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
 
 				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
-				gcr_over_stroke.SetFromCOLORREF(m_cr_back_over);
-				gcr_over_fill.SetFromCOLORREF(m_cr_back_over);
+				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
+				//gcr_over_fill.SetFromCOLORREF(m_cr_back_over);
 				draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), gcr_over_stroke, gcr_over_fill, 0);
 				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), Gdiplus::Color(255,225,0,0), gcr_over_fill, 2);
 

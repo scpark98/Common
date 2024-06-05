@@ -2009,8 +2009,7 @@ void CGdiplusBitmap::check_animate_gif()
 	m_run_thread_animation = false;
 	m_frame_index = 0;
 
-	UINT count = 0;
-	count = m_pBitmap->GetFrameDimensionsCount();
+	UINT count = m_pBitmap->GetFrameDimensionsCount();
 	GUID* pDimensionIDs = new GUID[count];
 
 	// Get the list of frame dimensions from the Image object.
@@ -2023,6 +2022,11 @@ void CGdiplusBitmap::check_animate_gif()
 	// Assume that the image has a property item of type PropertyItemEquipMake.
 	// Get the size of that property item.
 	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
+	if (nSize == 0)
+	{
+		delete[]pDimensionIDs;
+		return;
+	}
 
 	// Allocate a buffer to receive the property item.
 	m_pPropertyItem = (PropertyItem*)malloc(nSize);

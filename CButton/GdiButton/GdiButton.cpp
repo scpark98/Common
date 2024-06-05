@@ -279,8 +279,8 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 	//fit_to_image(m_fit2image);
 
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
-	m_cr_back.clear();
-	m_transparent = true;
+	//m_cr_back.clear();
+	//m_transparent = true;
 
 	return true;
 }
@@ -293,7 +293,10 @@ void CGdiButton::use_normal_image_on_disabled(bool use)
 	{
 		if (m_image[i]->normal)
 		{
+			m_image[i]->normal.save(_T("d:\\normal_before.png"));
 			m_image[i]->normal.deep_copy(&m_image[i]->disabled);
+			m_image[i]->normal.save(_T("d:\\normal_after.png"));
+			m_image[i]->disabled.save(_T("d:\\disabled.png"));
 
 			if (!m_use_normal_image_on_disabled)
 				m_image[i]->disabled.set_matrix(&m_grayMatrix);
@@ -656,6 +659,7 @@ void CGdiButton::prepare_tooltip()
 
 void CGdiButton::set_tooltip_text(CString text)
 {
+	/*
 	m_tooltip_text = text;
 
 	if (!text.IsEmpty())
@@ -663,6 +667,7 @@ void CGdiButton::set_tooltip_text(CString text)
 
 	m_tooltip->UpdateTipText(m_tooltip_text, this);
 	m_tooltip->AddTool(this, m_tooltip_text);
+	*/
 }
 
 
@@ -685,6 +690,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
 	//이 코드는 main에 있어야 한다.
 	//disabled가 아닌 경우는 잘 표시된다.
+	/*
 	if (m_use_tooltip && m_tooltip && m_tooltip->m_hWnd)
 	{
 		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
@@ -701,6 +707,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		// relay mouse event before deleting old tool 
 		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
 	}
+	*/
 
 	return CButton::PreTranslateMessage(pMsg);
 }
@@ -960,7 +967,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			if (m_round == 0 && m_b3DRect)
+			if (m_round == 0 && m_b3DRect && !is_button_style(BS_FLAT))
 			{
 				dc.Draw3dRect(rc,
 					is_down ? GRAY160 : white,
@@ -1059,7 +1066,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 
 	//TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, WM_MOUSEHOVER)), 0);
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSEHOVER)), 0);
 
 	CButton::OnMouseHover(nFlags, point);
 }
@@ -1077,7 +1084,7 @@ void CGdiButton::OnMouseLeave()
 
 	//TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, WM_MOUSELEAVE)), 0);
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSELEAVE)), 0);
 
 	CButton::OnMouseLeave();
 }
@@ -1372,15 +1379,6 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 	//밖에서 up되는 경우는 스킵시킨다.
 	if (rc.PtInRect(point))
 	{
-		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
-		{
-			Toggle();
-		}
-		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
-		{
-			SetCheck((m_idx = 1));
-		}
-
 		if (m_use_auto_repeat)
 		{
 			KillTimer(timer_auto_repeat);
@@ -1391,11 +1389,12 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 				if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
 					GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 			}
+
+			return;
 		}
-		else
-		{
-			::PostMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, WM_LBUTTONDOWN)), 0);
-		}
+
+		SetCapture();
+		::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONDOWN)), 0);
 	}
 
 	CButton::OnLButtonDown(nFlags, point);
@@ -1413,7 +1412,24 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 	}
 	else
 	{
-		::PostMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, WM_LBUTTONUP)), 0);
+		ReleaseCapture();
+
+		CRect rc;
+		GetClientRect(rc);
+
+		if (rc.PtInRect(point))
+		{
+			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
+			{
+				Toggle();
+			}
+			else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
+			{
+				SetCheck((m_idx = 1));
+			}
+
+			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
+		}
 	}
 
 	CButton::OnLButtonUp(nFlags, point);

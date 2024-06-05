@@ -5385,6 +5385,9 @@ CRect draw_text(Gdiplus::Graphics* g,
 	float emSize = fDpiY * font_size / 96.0;
 
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
+	//if (!fontFamily.IsAvailable())
+	//	fontFamily = Gdiplus::default;
+
 	Gdiplus::Font font(&fontFamily, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
 
 	Gdiplus::SolidBrush shadow_brush(cr_shadow);

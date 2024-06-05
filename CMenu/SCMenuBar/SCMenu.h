@@ -126,7 +126,7 @@ public:
 		for (auto id : arg)
 		{
 			CSCMenuSubButton* button = new CSCMenuSubButton(id);
-			item->buttons.push_back(button);
+			item->m_buttons.push_back(button);
 		}
 
 		m_items.push_back(item);
@@ -147,6 +147,8 @@ public:
 	void			use_over(bool use = true) { m_use_over = use; }
 	int				get_over_item() { return (m_use_over ? m_over_item : -1); }
 
+	void			set_back_image(CGdiplusBitmap* img);
+
 	virtual			CSCMenu& set_font(LOGFONT& lf);
 	virtual			CSCMenu& set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual			CSCMenu& set_font_size(int nSize);
@@ -163,8 +165,8 @@ public:
 	void			set_color_theme(int theme, bool apply_now = true);
 
 protected:
-	CWnd*		m_parent = NULL;
-
+	CWnd*			m_parent = NULL;
+	CGdiplusBitmap	m_img_back;
 	std::deque<CSCMenuItem*> m_items;
 
 	bool		m_use_over = true;			//hover hilighted

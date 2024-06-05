@@ -19,6 +19,7 @@ CSCMenuBar::~CSCMenuBar()
 {
 	for (int i = 0; i < m_menu_button.size(); i++)
 	{
+		m_menu_button[i]->DestroyWindow();
 		delete m_menu_button[i];
 	}
 }
@@ -31,7 +32,6 @@ void CSCMenuBar::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CSCMenuBar, CDialogEx)
 	ON_COMMAND_RANGE(MENU_BUTTON_ID, MENU_BUTTON_ID + 100, on_button_clicked)
-	ON_WM_PAINT()
 	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCMenuBar::on_message_SCMenu)
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CSCMenuBar::on_message_GdiButton)
 END_MESSAGE_MAP()
@@ -93,7 +93,7 @@ bool CSCMenuBar::create()
 {
 	DWORD dwStyle = WS_CHILD | WS_VISIBLE;
 
-	bool res = CreateEx(0, NULL, _T("CSCMenuBar"), dwStyle, CRect(0, 0, m_menu_width, m_menu_height), m_parent, 0);
+	bool res = CreateEx(0, NULL, _T("CSCMenuBar"), dwStyle, CRect(m_menu_sx, m_menu_sy, m_menu_sx + m_menu_width, m_menu_sy + m_menu_height), m_parent, 0);
 
 	//LONG_PTR wStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE); // Get the current style
 	//wStyle &= ~WS_BORDER;   // Here, we mask out the style bit(s) we want to remove
@@ -117,23 +117,26 @@ bool CSCMenuBar::create()
 	return res;
 }
 
-void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int menu_item_width, int menu_item_height)
+void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int x, int y, int menu_item_width, int menu_item_height)
 {
 	m_parent = parent;
+	m_menu_sx = x;
+	m_menu_sy = y;
+	m_menu_width = MAX(menu_item_width, m_menu_width);
+	m_menu_height = MAX(menu_item_height, m_menu_height);
+
 	create();
 
-	int x, y;
+	int sx, sy;
 	BOOL bOk;
 	CMenu menu;
 	CMenu* pMenu;
 
-	m_menu_width = MAX(menu_item_width, m_menu_width);
-	m_menu_height = MAX(menu_item_height, m_menu_height);
 
 	menu.LoadMenu(resource_menu_id);
 
-	x = 0;
-	y = 0;
+	sx = 0;
+	sy = 0;
 	int count = menu.GetMenuItemCount();
 
 	//각 메뉴 항목들에 대해서 버튼 생성 및 메뉴 항목들을 추가.
@@ -147,9 +150,9 @@ void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int menu_item_width, 
 		get_menu_item_info(menu.m_hMenu, i, &menu_id, &menu_caption, TRUE);
 
 		CSCMenuButton* menu_button = new CSCMenuButton(menu_caption);
-		bOk = menu_button->create(this, menu_button->caption, CRect(x, y, x + m_menu_width, y + m_menu_height), MENU_BUTTON_ID + i);
+		bOk = menu_button->create(this, menu_button->caption, CRect(sx, sy, sx + m_menu_width, sy + m_menu_height), MENU_BUTTON_ID + i);
 		//menu_button->set_tooltip_text(menu_button->caption);
-		x += m_menu_width;
+		sx += m_menu_width;
 
 		pMenu = menu.GetSubMenu(i);
 
@@ -163,7 +166,7 @@ void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int menu_item_width, 
 	}
 
 	//모든 메뉴 항목들을 추가했다면 menubar를 resize해준다.
-	SetWindowPos(NULL, m_menu_pos.x, m_menu_pos.y, m_menu_width * m_menu_button.size(), m_menu_height, SWP_NOZORDER);
+	SetWindowPos(NULL, m_menu_sx, m_menu_sy, m_menu_width * m_menu_button.size(), m_menu_height, SWP_NOZORDER);
 }
 
 
@@ -191,7 +194,7 @@ void CSCMenuBar::create_menu_buttons()
 	m_parent->ScreenToClient(rw);
 	//MoveWindow(m_menu_pos.x, m_menu_pos.y, m_menu_width * m_menu_button.size(), m_menu_height);
 	
-	SetWindowPos(NULL, m_menu_pos.x, m_menu_pos.y, m_menu_width * m_menu_button.size(), m_menu_height, SWP_NOZORDER);
+	SetWindowPos(NULL, m_menu_sx, m_menu_sy, m_menu_width * m_menu_button.size(), m_menu_height, SWP_NOZORDER);
 
 	for (int i = 0; i < m_menu_button.size(); i++)
 	{
@@ -221,21 +224,10 @@ void CSCMenuBar::on_button_clicked(UINT id)
 	CRect rw;
 
 	m_menu_button[id - MENU_BUTTON_ID - 200]->GetWindowRect(rw);
-	m_menu_button[id - MENU_BUTTON_ID - 200]->popup_menu(rw.left, rw.bottom + 1);
+	m_menu_button[id - MENU_BUTTON_ID - 200]->popup_menu();
 	m_cur_menu = id - MENU_BUTTON_ID - 200;
 }
 
-
-void CSCMenuBar::OnPaint()
-{
-	CPaintDC dc(this); // device context for painting
-					   // TODO: 여기에 메시지 처리기 코드를 추가합니다.
-					   // 그리기 메시지에 대해서는 CDialogEx::OnPaint()을(를) 호출하지 마십시오.
-	CRect rc;
-
-	GetClientRect(rc);
-	dc.FillSolidRect(rc, RGB(255, 128, 128));
-}
 
 LRESULT	CSCMenuBar::on_message_SCMenu(WPARAM wParam, LPARAM lParam)
 {
@@ -256,15 +248,44 @@ LRESULT	CSCMenuBar::on_message_SCMenu(WPARAM wParam, LPARAM lParam)
 LRESULT	CSCMenuBar::on_message_GdiButton(WPARAM wParam, LPARAM lParam)
 {
 	CGdiButtonMessage* msg = (CGdiButtonMessage*)wParam;
-	TRACE(_T("btn = %p, msg = %d\n"), msg->pThis, msg->message);
+	TRACE(_T("btn = %p, msg = %d\n"), msg->m_pWnd, msg->m_message);
 
-	if (m_cur_menu >= 0 && msg->message == WM_MOUSEHOVER)
+	if (m_cur_menu >= 0 && msg->m_message == WM_MOUSEHOVER)
 	{
 		TRACE(_T("hover\n"));
+
+		int new_menu = get_menu_button_index_by_instance(msg->m_pWnd);
+		if (new_menu == m_cur_menu)
+			return 0;
+
 		m_menu_button[m_cur_menu]->popup_hide();
 
-		m_cur_menu = get_menu_button_index_by_instance(msg->pThis);
-		((CSCMenuButton*)(msg->pThis))->popup_menu();
+		m_cur_menu = get_menu_button_index_by_instance(msg->m_pWnd);
+		((CSCMenuButton*)(msg->m_pWnd))->popup_menu();
+	}
+	else if (msg->m_message == WM_LBUTTONUP)
+	{
+		TRACE(_T("m_cur_menu = %d, id = %d, MENU_BUTTON_ID = %d, %d\n"), m_cur_menu, msg->m_ctrl_id, MENU_BUTTON_ID, msg->m_ctrl_id - MENU_BUTTON_ID);
+
+		//현재 보여지는 메뉴 항목이면 hide
+		//메뉴 버튼이 클릭되는 순간 CSCMenu 입장에서는 killfocus가 되므로 메뉴는 사라지고 m_cur_menu도 -1로 리셋되므로
+		//현재는 아래 코드가 수행되지 않는 구조다.
+		if (m_cur_menu == msg->m_ctrl_id - (UINT)MENU_BUTTON_ID - 200)
+		{
+			m_menu_button[m_cur_menu]->popup_hide();
+			m_cur_menu = -1;
+			return 0;
+		}
+
+		m_cur_menu = msg->m_ctrl_id - (UINT)MENU_BUTTON_ID - 200;
+
+		//m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID - 200]->ShowWindow(SW_SHOW);
+
+		CRect rw;
+
+		m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID - 200]->GetWindowRect(rw);
+		m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID - 200]->popup_menu();
+		m_cur_menu = msg->m_ctrl_id - MENU_BUTTON_ID - 200;
 	}
 
 	return 0;
@@ -346,6 +367,13 @@ void CSCMenuBar::set_menu_text_color(COLORREF cr_text)
 void CSCMenuBar::set_menu_back_color(COLORREF cr_back)
 {
 
+}
+
+//메뉴가 표시되는 영역을 반투명으로 표시
+void CSCMenuBar::use_aero_effect(bool use)
+{
+	for (int i = 0; i < m_menu_button.size(); i++)
+		m_menu_button[i]->use_aero_effect(use);
 }
 
 

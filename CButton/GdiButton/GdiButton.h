@@ -64,14 +64,16 @@ static const UINT Message_CGdiButton = ::RegisterWindowMessage(_T("MessageString
 class CGdiButtonMessage
 {
 public:
-	CGdiButtonMessage(CWnd* _this, int _message)
+	CGdiButtonMessage(CWnd* _this, UINT ctrl_id, int _message)
 	{
-		pThis = _this;
-		message = _message;
+		m_pWnd = _this;
+		m_ctrl_id = ctrl_id;
+		m_message = _message;
 	}
 
-	CWnd*		pThis = NULL;
-	int			message;
+	CWnd*		m_pWnd = NULL;
+	UINT		m_ctrl_id;
+	int			m_message;
 };
 
 class CGdiButtonImage
@@ -87,7 +89,7 @@ public:
 
 // CGdiButton
 
-class CGdiButton : public CButton, CGdiplusBitmap
+class CGdiButton : public CButton//, CGdiplusBitmap
 {
 	DECLARE_DYNAMIC(CGdiButton)
 
@@ -119,13 +121,13 @@ public:
 	//특히 push, check, radio button 처럼 checked, unchecked 등의 상태 image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
 	//on/off, play/pause, img0/img1/img2...
-	template <typename ... T> void add_images(T... args)
+	template <typename ... T> void add_images(CString type, T... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
 
 		for (auto id : arg)
-			add_image(_T("PNG"), id);
+			add_image(type, id);
 	}
 
 	//하나의 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.

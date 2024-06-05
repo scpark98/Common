@@ -21,11 +21,11 @@ CSCMenuSubButton::CSCMenuSubButton(UINT _id, int menu_height)
 	m_button_image[1] = new CGdiplusBitmap(_T("PNG"), _id);	//selected
 	m_button_image[0]->gray();
 
-	//기존 버튼 이미지 컬러톤이 cyan 톤이었으나 코드상에서 blue톤으로 변경 가능
+	//기존 버튼 이미지 컬러톤이 cyan 톤이었으나 코드상에서 다른 색상 톤으로 변경 가능
 	m_button_image[1]->apply_effect_hsl(70);
 
 	//menu_height의 80%크기의 높이를 가지도록 조정한다.
-	float img_height = (float)menu_height * (float)0.9;
+	float img_height = (float)menu_height * (float)0.95;
 	float ratio = img_height / (float)(m_button_image[0]->height);
 	m_button_image[0]->resize(ratio, ratio);
 	m_button_image[1]->resize(ratio, ratio);
@@ -38,13 +38,11 @@ CSCMenuSubButton::~CSCMenuSubButton()
 {
 	if (m_button_image[0])
 	{
-		m_button_image[0]->release();
 		delete m_button_image[0];
 	}
 
 	if (m_button_image[1])
 	{
-		m_button_image[1]->release();
 		delete m_button_image[1];
 	}
 }
@@ -65,6 +63,8 @@ CSCMenuItem::~CSCMenuItem()
 	{
 		delete m_buttons[i];
 	}
+
+	m_buttons.clear();
 }
 
 void CSCMenuItem::set_icon(UINT icon_id)
@@ -76,7 +76,7 @@ void CSCMenuItem::set_icon(UINT icon_id)
 		m_icon.load(icon_id);
 
 		//menu_height의 90% 크기의 높이를 가지도록 조정한다.
-		float ico_height = (float)m_menu_height * (float)0.9;
+		float ico_height = (float)m_menu_height * (float)0.95;
 		float ratio = ico_height / (float)(m_icon.height);
 		m_icon.resize(ratio, ratio);
 	}
@@ -150,6 +150,13 @@ CSCMenu::~CSCMenu()
 {
 	for (int i = 0; i < m_items.size(); i++)
 	{
+		for (int j = 0; j < m_items[i]->m_buttons.size(); j++)
+		{
+			delete m_items[i]->m_buttons[j];
+		}
+
+		m_items[i]->m_buttons.clear();
+
 		delete m_items[i];
 	}
 }
@@ -344,7 +351,7 @@ bool CSCMenu::create(CWnd* parent)
 	//CString class_name = AfxRegisterWndClass(CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS, ::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), NULL);
 
 	//CreateEx()에서 첫번째 파라미터를 0으로 준 경우는 class_name도 NULL로 줘도 동작했으나 WS_EX_...스타일이 있을 경우는 NULL로 하면 에러 발생.
-	bool res = CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, wc.lpszClassName, _T("CSCMenu"), dwStyle, CRect(0, 0, 320, 300), parent, 0);
+	bool res = CreateEx(NULL, wc.lpszClassName, _T("CSCMenu"), dwStyle, CRect(0, 0, 320, 300), parent, 0);
 
 	if (res)
 	{
@@ -553,27 +560,32 @@ void CSCMenu::recalc_items_rect()
 	bool is_separator;
 	int total_height = 0;	//모든 메뉴 항목을 표시하는 총 높이
 	int max_width = 0;		//가장 긴 메뉴항목 너비
-	CRect rc;
+	CSize	border;
+	CRect	rw, rc;
 
 	//GetWindowRect()가 아닌 GetClientRect()를 한 후 밑에서 MoveWindow()하면
 	//윈도우 크기는 점점 줄어들게 된다. 윈도우의 border 효과 때문에
 	//보이는 크기보다 실제 영역은 더 크다.
-	GetWindowRect(rc);
-	ScreenToClient(rc);
-	rc.MoveToXY(0, 0);
+	GetWindowRect(rw);
+	GetClientRect(rc);
+	border = (rw.Width() - rc.Width()) / 2;
 
+	ScreenToClient(rw);
+	rw.MoveToXY(0, 0);
+
+	//item rect의 크기는 border 유무에 따라 다를 수 있다.
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		is_separator = (m_items[i]->m_id <= 0);
-		m_items[i]->m_r = CRect(2, sy, rc.right - 9, sy + (is_separator ? 6 : m_line_height));
+		m_items[i]->m_r = CRect(2, sy, rw.right - 4, sy + (is_separator ? 5 : m_line_height));
 		sy = m_items[i]->m_r.bottom + 2;
 
 		total_height = m_items[i]->m_r.bottom;
 	}
 
-	rc.bottom = rc.top + total_height + 2 + 8;	//2=margin(equal to top margin), 8 = border height? * 2
+	rw.bottom = rw.top + total_height + 4;// +8;	//2=margin(equal to top margin), 8 = border height? * 2
 
-	SetWindowPos(&wndTopMost, 0, 0, rc.Width(), rc.Height(), SWP_NOMOVE);
+	SetWindowPos(&wndTopMost, 0, 0, rw.Width(), rw.Height(), SWP_NOMOVE);
 }
 
 void CSCMenu::OnPaint()
@@ -590,7 +602,11 @@ void CSCMenu::OnPaint()
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	dc.FillSolidRect(rc, m_cr_back);
+	//dc.FillSolidRect(rc, m_cr_back);
+	if (m_img_back.is_valid())
+		m_img_back.draw(g, rc);
+	else
+		dc.FillSolidRect(rc, m_cr_back);
 
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(m_cr_text);
@@ -657,8 +673,9 @@ void CSCMenu::OnPaint()
 			{
 				r.right = r.right - 6;
 				r.left = r.right - m_items[i]->m_buttons[j]->m_r.Width();
-				r.top = r.top + (r.Height() - m_items[i]->m_buttons[j]->m_button_image[0]->height) / 2;
-				r.bottom = r.top + m_items[i]->m_buttons[j]->m_button_image[0]->height;
+				//sub button의 영역은 left, right는 정확히 줘야하지만 top, bottom은 메뉴항목과 동일하게 한다.
+				//그래야 버튼을 클릭할 때 버튼보다 약간 위 또는 아래를 눌러도 클릭으로 처리되므로
+				//사용자가 버튼 이미지를 정확히 클릭해야하는 부담이 없다.
 				m_items[i]->m_buttons[j]->m_r = r;
 				m_items[i]->m_buttons[j]->m_button_image[m_items[i]->m_buttons[j]->m_state]->draw(g, r);
 
@@ -684,4 +701,14 @@ void CSCMenu::OnPaint()
 	}
 
 	dc.SelectObject(pOldFont);
+}
+
+void CSCMenu::set_back_image(CGdiplusBitmap* img)
+{
+	m_img_back.release();
+	if (img == NULL)
+		return;
+
+	img->deep_copy(&m_img_back);
+	Invalidate();
 }

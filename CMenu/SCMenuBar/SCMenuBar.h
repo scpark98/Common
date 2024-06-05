@@ -19,11 +19,14 @@ public:
 	~CSCMenuBar();
 
 	//CMenu를 이용하여 resource의 menu를 읽어오는 경우
-	void	init(CWnd* parent, UINT resource_menu_id, int menu_item_width = 0, int menu_item_height = 0);
+	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_item_width = 0, int menu_item_height = 0);
 	void	set_check(int menu_index, UINT menu_id, int sub_button_index, bool check);
 	void	set_color_theme(int theme);
 	void	set_menu_text_color(COLORREF cr_text);
 	void	set_menu_back_color(COLORREF cr_back);
+
+	//메뉴가 표시되는 영역을 반투명으로 표시
+	void	use_aero_effect(bool use);
 
 	//메뉴 아이콘 및 서브 버튼들 설정
 	void	set_icon_and_buttons(int menu_index, UINT menu_id, UINT icon_id = 0)
@@ -52,16 +55,16 @@ public:
 	}
 
 //resource의 menu를 이용하지 않고 직접 추가하는 경우
+	/*
 	template <typename ... Types> void init(CWnd* parent, int x, int y, int total_width, int menu_width, Types... args)
 	{
 		m_parent = parent;
+		m_menu_pos = CPoint(x, y);
 
 		create();
 
 		int n = sizeof...(args);
 		CString arg[] = { args... };
-
-		m_menu_pos = CPoint(x, y);
 
 		if (total_width > 0 && menu_width < 0)
 		{
@@ -80,6 +83,7 @@ public:
 
 		create_menu_buttons();
 	}
+	*/
 
 	//sub_index = -1이면 separator
 	void add(int index, int sub_index = -1, CString _caption = _T(""), UINT _icon_id = 0, CString _hotkey = _T(""))
@@ -118,7 +122,8 @@ protected:
 	std::deque<CSCMenuButton*>	m_menu_button;
 	int			m_cur_menu = -1;
 
-	CPoint		m_menu_pos = CPoint(20, 40);
+	int			m_menu_sx = 0;
+	int			m_menu_sy = 0;
 	int			m_total_width = -1;
 	int			m_menu_width = 80;
 	int			m_menu_height = 28;
@@ -145,6 +150,5 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	afx_msg void OnPaint();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };

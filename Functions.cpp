@@ -8993,7 +8993,7 @@ int GetCounterValue(const int& objId, const int& counterId, const char* instance
 	}
 }
 
-double GetCpuUsage(const char* process)
+double get_cpu_usage(const char* process)
 {
 	const int CPU_INDEX = 230; // Perf: Process
 	const int CPU_COUNTER = 6;  
@@ -9008,7 +9008,7 @@ double GetCpuUsage(const char* process)
 
 	PPERF_DATA_BLOCK cpuData = NULL;
 	// Process 객체(CPU_INDEX)에서 해당 process 이름을 갖는 프로세스의 CPU 값을 얻는다.
-	if(GetCounterValue(CPU_INDEX, CPU_COUNTER, process, &cpuData, newVal) < 0)
+	if (GetCounterValue(CPU_INDEX, CPU_COUNTER, process, &cpuData, newVal) < 0)
 		return -1;
 	// 획득한 성능 정보를 이용해서 CPU 사용율을 계산
 	cpuTime_100n = cpuData->PerfTime100nSec;

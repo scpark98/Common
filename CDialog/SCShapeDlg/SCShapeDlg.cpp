@@ -75,9 +75,13 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	m_parent = parent;
 
 	DWORD dwStyle = WS_POPUP;
-	//id를 1234로 주면 왜 생성이 안될까...
-	//className과 windowName을 CSCMenu 등 다른걸로 주면 생성이 실패하는 이유는??
-	bool res = CreateEx(WS_EX_CLIENTEDGE, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
+
+	WNDCLASS wc = {};
+	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
+	wc.lpszClassName = _T("CSCMenu");
+	AfxRegisterClass(&wc);
+
+	bool res = CreateEx(NULL, wc.lpszClassName, _T("SCShapeDlg"), dwStyle, CRect(left, top, right, bottom), parent, 0);
 
 	TRACE(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
 	CRect rc;

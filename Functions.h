@@ -1121,7 +1121,7 @@ struct	NETWORK_INFO
 	//CPU Usage 관련
 	LPBYTE		GetPerformanceData(LPTSTR src);
 	int			GetCounterValue(const int& objId, const int& counterId, const char* instanceName, PERF_DATA_BLOCK **dataBlock, LONGLONG &value);
-	double		GetCpuUsage(const char* process);
+	double		get_cpu_usage(const char* process);
 	HRESULT		get_cpu_temperature(LPLONG pTemperature);
 
 	//메모리, memory

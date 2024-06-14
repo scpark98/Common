@@ -80,6 +80,7 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 //	ON_MESSAGE(WM_SETTEXT,OnSetText)
 //	ON_WM_CTLCOLOR_REFLECT()
 ON_WM_WINDOWPOSCHANGED()
+ON_WM_SIZE()
 END_MESSAGE_MAP()
 
 
@@ -218,14 +219,11 @@ void CSCStatic::OnPaint()
 		MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
 		MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
 
-
-
 		NMAP_STYLE(	SS_LEFTNOWORDWRAP |
 					SS_CENTERIMAGE |
 					SS_WORDELLIPSIS |
 					SS_ENDELLIPSIS |
 					SS_PATHELLIPSIS,	DT_WORDBREAK);
-
 	}
 
 	//텍스트 출력 루틴
@@ -674,17 +672,71 @@ CSCStatic& CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
 
 CSCStatic& CSCStatic::set_font_size(int nSize)
 {
-	CFont cf;
-	LOGFONT lf;
-
-	cf.CreatePointFont(nSize * 10, m_lf.lfFaceName);
-	cf.GetLogFont(&lf);
-
-	m_lf.lfHeight = lf.lfHeight;
-	m_lf.lfWidth  = lf.lfWidth;
-
+	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, nSize);
 	reconstruct_font();
 	update_surface();
+
+	return *this;
+}
+
+void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf)
+{
+	CDC *pDC = GetDC();
+	double lower = 0.8;
+	double upper = 0.9;
+	int resize_count = 0;
+
+	while (resize_count++ < 50)
+	{
+		CFont font, * pOldFont;
+		font.CreateFontIndirect(lf);
+		pOldFont = (CFont*)pDC->SelectObject(&font);
+
+		CSize sz = pDC->GetTextExtent(text);
+		TRACE(_T("sz.cx = %d, rc.width * %.1f = %.1f ~ rc.width * %.1f = %.1f\n"), sz.cx, lower, r.Width() * lower, upper, r.Width() * upper);
+		if (sz.cx > r.Width() * upper)
+		{
+			if (lf->lfHeight > -12)
+				break;
+
+			lf->lfHeight++;
+			TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
+			pDC->SelectObject(pOldFont);
+			font.DeleteObject();
+		}
+		else if (sz.cx < r.Width() * lower)
+		{
+			lf->lfHeight--;
+			TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
+			pDC->SelectObject(pOldFont);
+			font.DeleteObject();
+		}
+		else
+		{
+			break;
+		}
+	}
+}
+
+CSCStatic& CSCStatic::set_auto_font_size(bool auto_font_size)
+{
+	CRect rc;
+	CString text;
+
+	GetWindowText(text);
+	GetClientRect(rc);
+
+	m_auto_font_size = auto_font_size;
+
+	if (auto_font_size)
+	{
+		get_auto_font_size(this, rc, text, &m_lf);
+		reconstruct_font();
+	}
+	else
+	{
+		set_font_size(m_nFontSize);
+	}
 
 	return *this;
 }
@@ -701,6 +753,15 @@ CSCStatic& CSCStatic::set_font_bold(bool bBold)
 CSCStatic& CSCStatic::set_font_underline(bool bSet)
 {
 	m_lf.lfUnderline = bSet;
+	reconstruct_font();
+	update_surface();
+
+	return *this;
+}
+
+CSCStatic& CSCStatic::set_font_italic(bool italic)
+{
+	m_lf.lfItalic = italic;
 	reconstruct_font();
 	update_surface();
 
@@ -882,4 +943,23 @@ void CSCStatic::add_header_image(UINT id)
 	//RedrawWindow();
 	//UpdateWindow();
 	//Invalidate();
+}
+
+
+void CSCStatic::OnSize(UINT nType, int cx, int cy)
+{
+	CStatic::OnSize(nType, cx, cy);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (m_hWnd && m_auto_font_size)
+	{
+		CRect rc;
+		CString text;
+
+		GetWindowText(text);
+		GetClientRect(rc);
+
+		get_auto_font_size(this, rc, text, &m_lf);
+		reconstruct_font();
+	}
 }

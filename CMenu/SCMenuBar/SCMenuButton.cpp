@@ -37,9 +37,14 @@ void CSCMenuButton::add(int menu_id, CString _caption, UINT icon, CString hotkey
 	m_menu.add(menu_id, _caption, icon, hotkey);
 }
 
-void CSCMenuButton::add_sub_button(int menu_id, UINT sub_button_image_id)
+void CSCMenuButton::add_sub_button_by_menu_id(int menu_id, UINT sub_button_image_id)
 {
-	m_menu.add_sub_button(menu_id, sub_button_image_id);
+	m_menu.add_sub_button_by_menu_id(menu_id, sub_button_image_id);
+}
+
+void CSCMenuButton::add_sub_button_by_menu_index(int index, UINT sub_button_image_id)
+{
+	m_menu.add_sub_button_by_menu_index(index, sub_button_image_id);
 }
 
 void CSCMenuButton::popup_menu()

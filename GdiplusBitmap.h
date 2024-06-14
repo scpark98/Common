@@ -42,8 +42,6 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 #include <algorithm>
 #include <vector>
 
-using namespace Gdiplus;
-
 static const UINT Message_CGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CGdiplusBitmap"));
 
 class CGdiplusBitmapMessage
@@ -72,7 +70,7 @@ public:
 
 public:
 	CGdiplusBitmap();
-	CGdiplusBitmap(Bitmap* src);
+	CGdiplusBitmap(Gdiplus::Bitmap* src);
 	CGdiplusBitmap(HBITMAP hBitmap);
 	CGdiplusBitmap(IStream* pStream);
 	CGdiplusBitmap(CString pFile, bool show_error = false);
@@ -167,7 +165,7 @@ public:
 	void set_colorkey(Gdiplus::Color low, Gdiplus::Color high);
 	bool is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
 
-	void set_matrix(ColorMatrix *colorMatrix, ColorMatrix *grayMatrix = NULL);
+	void set_matrix(Gdiplus::ColorMatrix *colorMatrix, Gdiplus::ColorMatrix *grayMatrix = NULL);
 	void set_alpha(float alpha);
 	void gray();
 	void negative();
@@ -201,11 +199,11 @@ public:
 	//ex. src에 마스크 이미지를, dst에 원본 이미지를 지정하고 index를 3, 3으로 하면
 	//src의 alpha값을 dst의 alpha값으로 변경한다.
 	//이를 이용하여 mask overlay로 활용할 수 있다.
-	void replace_channel(Bitmap* src, Bitmap* dst, int src_bgra_index, int dst_bgra_index);
-	void replace_channel(Bitmap* src, int src_bgra_index, int dst_bgra_index);
+	void replace_channel(Gdiplus::Bitmap* src, Gdiplus::Bitmap* dst, int src_bgra_index, int dst_bgra_index);
+	void replace_channel(Gdiplus::Bitmap* src, int src_bgra_index, int dst_bgra_index);
 	void replace_channel(CString type, UINT srcID, int src_bgra_index, int dst_bgra_index);
 	void replace_channel(CString src_file, int src_bgra_index, int dst_bgra_index);
-	PathGradientBrush* createFluffyBrush(GraphicsPath* gp, float* blendFactors, float* blendPositions, INT count, INT* in_out_count);
+	Gdiplus::PathGradientBrush* createFluffyBrush(Gdiplus::GraphicsPath* gp, float* blendFactors, float* blendPositions, INT count, INT* in_out_count);
 
 
 
@@ -214,7 +212,7 @@ public:
 	//현재 resource에서 읽어들인 이미지는 제대로 변환되지 않는 문제 있음(1/3만 로딩되는 현상)
 	void convert2gray();
 	//미구현
-	void cvtColor(PixelFormat old_format, PixelFormat new_format);
+	void cvtColor(Gdiplus::PixelFormat old_format, Gdiplus::PixelFormat new_format);
 	//현재 이미지를 32bit로 변경한다.
 	void cvtColor32ARGB();
 
@@ -230,7 +228,7 @@ public:
 	//animated Gif 관련
 	UINT	m_frame_count;
 	UINT	m_frame_index;
-	PropertyItem* m_pPropertyItem = NULL;
+	Gdiplus::PropertyItem* m_pPropertyItem = NULL;
 	bool	is_animated_gif() { return (m_frame_count > 1); }
 	int		get_frame_count() { return m_frame_count; }
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
@@ -271,7 +269,7 @@ protected:
 	CString			m_filename = _T("untitled");
 
 	void	resolution();
-	Bitmap* GetImageFromResource(CString lpType, UINT id);
+	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
 
 	//animatedGif
 	bool			m_bIsInitialized;

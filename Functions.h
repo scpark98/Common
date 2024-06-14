@@ -1107,6 +1107,13 @@ struct	NETWORK_INFO
 
 	void		HideTaskBar(bool bHide = TRUE);	// FALSE => Show Taskbar
 
+	//taskbar의 크기 및 현재 show/hide 상태를 리턴한다. (옵션 설정 상태는 get_taskbar_state()으로 판별해야 함)
+	bool		get_taskbar_size(CSize *sz = NULL);
+	//설정값이 auto hide인지는 get_taskbar_state(ABS_ALWAYSONTOP)를 호출하여 판별.
+	//윈7부터는 ABS_ALWAYSONTOP은 항상 true이므로 ABS_ALWAYSONTOP를 판별하는 것은 의미없다.
+	bool		get_taskbar_state(UINT state);
+
+
 	BOOL		IsWow64();
 	BOOL		IsXpOr2000();
 	BOOL		Is64BitWindows();
@@ -1893,5 +1900,6 @@ void		printMessage(std::string msg, uint8_t bNewLine = true);
 int readFilenames(std::vector<std::string> &filenames, const std::string &directory);
 
 //CMenu
+//HMENU에서 메뉴ID와 캡션을 얻어온다.
 bool	get_menu_item_info(HMENU hMenu, UINT uItem, UINT *uID, CString *caption, BOOL fByPos = FALSE);
 //#endif

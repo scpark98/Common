@@ -6,6 +6,52 @@
 
 #include "SCMenuButton.h"
 
+/*
+[CSCMenuBar]
+- fulldown 메뉴 버튼들의 집합(ex. 파일 편집 보기 창 도움말)
+
+	//예제 코드
+	.h 파일에 CSCMenuBar m_menu;를 선언하고
+
+	//CMenu를 이용하여 resource의 menu를 읽어오는 경우
+	m_menu.init(this, IDR_MENU_MAIN, 20, 50, 80, 50);
+
+	//각 메뉴항목에 아이콘과 서브 버튼들을 추가한다.
+
+	//제어
+	m_menu.set_icon_and_buttons(menu_control, ID_MENU_CONTROL_START, IDB_CONTROL_START, IDB_MENU_CHECK);
+	m_menu.set_icon_and_buttons(menu_control, ID_MENU_CONTROL_MODE, IDB_CONTROL_MODE, IDB_MENU_DRIVE_MODE, IDB_MENU_GDI_MODE);
+
+	//메뉴 서브버튼 초기값 설정
+	m_menu.set_check(menu_control, ID_MENU_CONTROL_START, 0, true);
+	m_menu.set_check(menu_control, ID_MENU_CONTROL_MODE, 1, true);	//other sub buttons will be changed to unchecked state automatically
+
+
+[CSCMenuButton]
+- 각 버튼은(CSCMenuButton) 하나의 메뉴 항목이며(ex. 파일) CSCMenu라는 팝업메뉴를 멤버로 가진다.
+
+[CSCMenu]
+- 메뉴 항목들이 추가된 팝업 메뉴창이며 CDialogEx를 파생하여 만들어졌으므로 customize가 용이하다.
+- CSCMenuBar, CSCMenuButton 없이 context menu를 표시할때와 유사하게 CSCMenu만을 사용해서 팝업메뉴를 표시할 수 있다.
+	//sample code. CSCMenu 타입의 m_single_menu는 OnInitDialog()에서 미리 생성해도 되고 아래와 같이 호출시에 생성해도 된다.
+	void CTestSCMenuBarDlg::OnContextMenu(CWnd* pWnd, CPoint point)
+	{
+		if (m_single_menu.m_hWnd == NULL)
+		{
+			m_single_menu.create(this);
+			m_single_menu.load(IDR_MENU_MAIN, 0);
+		}
+
+		m_single_menu.popup_menu(point.x, point.y);
+	}
+
+[클릭된 메뉴 항목 메시지 처리]
+- CMenu를 상속받은 클래스가 아니므로 Menu command event handler를 바로 사용할 수 없는 단점이 있다.
+  대신 ON_REGISTERED_MESSAGE(Message_CSCMenu, &CTestSCMenuBarDlg::on_message_SCMenuBar)로 등록하고
+  on_message_SCMenuBar()함수에서 CSCMenuMessage* msg = (CSCMenuMessage*)wParam; 와 같이 받아서 처리할 수 있다.
+
+*/
+
 #define MENU_BUTTON_ID	WM_USER + 100
 
 
@@ -34,12 +80,12 @@ public:
 		set_icon_and_buttons(menu_index, menu_id, icon_id, 0);
 	}
 
-	template <typename ... Types> void	set_icon_and_buttons(int menu_index, UINT menu_id, UINT icon_id, Types... button_ids)
+	template <typename ... Types> void	set_icon_and_buttons(int menu_index, UINT sub_menu_id, UINT icon_id, Types... button_ids)
 	{
-		if (menu_index < 0 || menu_id <= 0)
+		if (menu_index < 0 || sub_menu_id <= 0)
 			return;
 
-		CSCMenuItem* menu_item = m_menu_button[menu_index]->get_menu_item(menu_id);
+		CSCMenuItem* menu_item = m_menu_button[menu_index]->get_menu_item(sub_menu_id);
 		menu_item->set_icon(icon_id);
 
 		int n = sizeof...(button_ids);

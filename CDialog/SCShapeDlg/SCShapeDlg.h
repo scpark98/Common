@@ -80,11 +80,15 @@ public:
 	bool			load(CString sType, UINT id);
 	bool			load(CString sFile);
 
+	//keyboard, mouse 이벤트 처리 여부.
+	void			use_control(bool use);
+
 	//alpha = 0 ~ 255
 	void			alpha(int alpha);
 
-	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성. default : SW_HIDE
-	//현재 특정 폰트에서 크기를 12이하로 하면 일부분만 표시되는 버그 있음.
+	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
+	//default는 hide 상태로 시작함.
+	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
 	bool			set_text(CWnd* parent, CString text, float font_size, bool font_bold,
 							int shadow_depth = 2, float thickness = 2.0f,
 							CString font_name = _T(""),

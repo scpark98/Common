@@ -229,6 +229,14 @@ bool CSCShapeDlg::load(CString sFile)
 	return false;
 }
 
+//keyboard, mouse 이벤트 처리 여부.
+void CSCShapeDlg::use_control(bool use)
+{
+	ModifyStyleEx(use ? WS_EX_LAYERED | WS_EX_TRANSPARENT : 0, use ? 0 : WS_EX_LAYERED | WS_EX_TRANSPARENT);
+	if (use)
+		render(m_img.m_pBitmap);
+}
+
 //alpha = 0 ~ 255
 void CSCShapeDlg::alpha(int alpha)
 {
@@ -242,6 +250,11 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 {
 	if (!IsWindow(m_hWnd) || !img)
 		return;
+
+	if (img->GetWidth() == 0 || img->GetHeight() == 0)
+	{
+		TRACE(_T("image width or height is invalid.\n"));
+	}
 
 	CRect rc;
 	GetWindowRect(rc);
@@ -271,11 +284,11 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	if (hbmpMem)
 	{
 		HGDIOBJ hbmpOld = ::SelectObject(hdcMemory, hbmpMem);
-		Graphics g(hdcMemory);
+		Gdiplus::Graphics g(hdcMemory);
 
 		g.SetPageScale(1.0);
-		g.SetPageUnit(UnitPixel);
-		g.SetSmoothingMode(SmoothingModeAntiAlias);
+		g.SetPageUnit(Gdiplus::UnitPixel);
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
 		g.DrawImage(img, 0, 0, sz.cx - 1, sz.cy - 1);
 		//Draw customized figures
@@ -355,7 +368,7 @@ void CSCShapeDlg::gif_goto(int pos, bool pause)
 
 void CSCShapeDlg::gif_thread()
 {
-	GUID   pageGuid = FrameDimensionTime;
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_gif_index = 0;
 
 	while (m_gif_state != state_stop)

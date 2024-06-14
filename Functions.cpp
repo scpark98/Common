@@ -5384,11 +5384,14 @@ CRect draw_text(Gdiplus::Graphics* g,
 	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
 	float emSize = fDpiY * font_size / 96.0;
 
-	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
-	//if (!fontFamily.IsAvailable())
-	//	fontFamily = Gdiplus::default;
+	Gdiplus::FontFamily *fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(font_name));
+	if (!fontFamily->IsAvailable())
+	{
+		delete fontFamily;
+		fontFamily = new Gdiplus::FontFamily(_T("Arial"));
+	}
 
-	Gdiplus::Font font(&fontFamily, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
+	Gdiplus::Font font(fontFamily, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
 
 	Gdiplus::SolidBrush shadow_brush(cr_shadow);
 	Gdiplus::SolidBrush brush2(cr_text);
@@ -5438,6 +5441,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 			break;
 		}
 
+		delete fontFamily;
 		delete g;
 		::DeleteDC(hDC);
 		TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
@@ -5488,9 +5492,9 @@ CRect draw_text(Gdiplus::Graphics* g,
 		//float emSize = fDpiY * font.GetSize() / 72.0;
 		Gdiplus::GraphicsPath str_path;
 
-		str_path.AddString(CStringW(text), -1, &fontFamily,
+		str_path.AddString(CStringW(text), -1, fontFamily,
 			font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, boundRect, &sf);
-		//str_path.AddString(CStringW(text), -1, &fontFamily,
+		//str_path.AddString(CStringW(text), -1, fontFamily,
 		//	font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, Gdiplus::Point(x, y), &sf);
 
 		Gdiplus::Pen   gp(cr_stroke, thickness);
@@ -5501,6 +5505,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 		g->FillPath(&gb, &str_path);
 	}
 
+	delete fontFamily;
 	::DeleteDC(hDC);
 
 	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
@@ -17450,4 +17455,64 @@ bool	get_menu_item_info(HMENU hMenu, UINT uItem, UINT *uID, CString *caption, BO
 	*caption = mii.dwTypeData;
 
 	return true;
+}
+
+//taskbar의 크기 및 show/hide 상태를 리턴한다.
+bool get_taskbar_size(CSize* sz)
+{
+	bool is_shown = false;
+	HWND hTaskbarWnd = ::FindWindow(_T("Shell_TrayWnd"), NULL);
+	HMONITOR hMonitor = MonitorFromWindow(hTaskbarWnd, MONITOR_DEFAULTTONEAREST);
+	MONITORINFO info = { sizeof(MONITORINFO) };
+
+	if (GetMonitorInfo(hMonitor, &info))
+	{
+		RECT rect;
+		GetWindowRect(hTaskbarWnd, &rect);
+		if ((rect.top >= info.rcMonitor.bottom - 4) ||
+			(rect.right <= 2) ||
+			(rect.bottom <= 4) ||
+			(rect.left >= info.rcMonitor.right - 2))
+		{
+			is_shown = false;
+		}
+		else
+		{
+			is_shown = true;
+		}
+
+		if (sz)
+		{
+			sz->cx = rect.right - rect.left;
+			sz->cy = rect.bottom - rect.top;
+		}
+	}
+
+	return is_shown;
+}
+
+bool get_taskbar_state(UINT state)
+{
+	APPBARDATA  appBarData;
+	UINT        uState;
+	HWND        hTaskBar;
+
+	hTaskBar = ::FindWindow(_T("Shell_TrayWnd"), NULL);
+
+	if (IsWindow(hTaskBar))
+	{
+		ZeroMemory(&appBarData, sizeof(APPBARDATA));
+
+		appBarData.hWnd = hTaskBar;
+		appBarData.cbSize = sizeof(APPBARDATA);
+
+		uState = (UINT)SHAppBarMessage(ABM_GETSTATE, &appBarData);
+		return (uState == state);
+
+		// 바뀐 속성 적용
+		//appBarData.lParam = uState;
+		//SHAppBarMessage(ABM_SETSTATE, &appBarData);
+	}
+
+	return false;
 }

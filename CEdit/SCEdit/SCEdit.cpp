@@ -270,7 +270,6 @@ CSCEdit& CSCEdit::set_auto_font_size(bool bAuto, double ratio)
 	GetClientRect( r );
 
 	m_auto_resize_font = bAuto;
-
 	
 	if (bAuto)
 	{

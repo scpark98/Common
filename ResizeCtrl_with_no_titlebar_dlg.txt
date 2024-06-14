@@ -136,3 +136,22 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
 	!IsZoom()이고 corner_left ~ corner_bottomright이면
 	DefWindowProc(WM_SYSCOMMAND, SC_SIZE + m_corner_index, MAKELPARAM(point.x, point.y)); 를 실행하고
 	corner_inside이면 창의 이동으로 실행된다.
+
+
+[dlg 속성에 따른 동작 결과]
+
+애플리케이션 창 : false
+스타일 : Popup
+제목표시줄 : True (false로 설정하면 제대로 동작하지 않음)
+
+[auto hide]
+work area 	: 0, 0, 1920, 1080
+taskbar rw	: 0, 1078, 1920, 1118
+mointor info: 0, 0, 1920, 1080
+taskbar rw	: 0, 1078, 1920, 1118
+
+[no hide]
+work area 	: 0, 0, 1920, 1040
+taskbar rw	: 0, 1040, 1920, 1080
+mointor info: 
+taskbar rw	: 

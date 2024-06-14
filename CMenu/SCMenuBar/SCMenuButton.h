@@ -14,7 +14,8 @@ public:
 
 	bool		create(CWnd* parent, CString _caption, CRect r, UINT menu_button_id);
 	void		add(int menu_id, CString _caption, UINT icon = 0, CString hotkey = _T(""));
-	void		add_sub_button(int menu_id, UINT sub_button_image_id);
+	void		add_sub_button_by_menu_id(int menu_id, UINT sub_button_image_id);
+	void		add_sub_button_by_menu_index(int index, UINT sub_button_image_id);
 	void		popup_menu();
 	CRect		get_menu_rect();	//메뉴가 표시될 영역을 미리 계산해서 알 수 있다.
 

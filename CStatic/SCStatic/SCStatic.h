@@ -22,10 +22,16 @@ m_static1.set_gradient_color(RED);
 //m_static1.set_vertical_gradient);
 //m_static1.set_gradient_color(4, RED, GREEN, YELLOW, BLUE);
 
+[주의사항]
+- parent의 WM_SIZE에 의해 CSCStatic의 인스턴스도 resize할 경우 깜빡인다면
+  parent 속성에서 Clip_Children을 true로 설정해야 깜빡이지 않는다.
+
 [수정될 내용]
 - 배경이 있는 앱에서는 투명이 잘 적용되지만 기본 스타일의 dlg에서는 화면 갱신이 잘 되지 않는다.
   우선 기본 스타일의 dlg에서는 배경색을 지정해주자.
 - 출력크기보다 rc가 작으면 키워줘야 한다.
+- "\r\n"으로 multiline을 출력할 경우 center image, no wrap, simple 속성은 반드시 false가 되어야 한다.
+  따라서 이러한 속성을 살리기 위해서는 파싱하여 각 라인을 출력하도록 수정이 필요하다.
 
 [2014-11-27]
 - blink시에 아이콘도 함께 적용되지 않던 문제 수정
@@ -103,12 +109,15 @@ public:
 
 	void			set_round_head(bool bRound);
 
-	//font. 변경시 컨트롤의 크기가 자동으로 조정되는 기능은 아직 없음.
+	void			get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf);
+
 	virtual CSCStatic& set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CSCStatic& set_font_size(int nFontSize);
-	virtual CSCStatic& set_font_bold(bool bFontBold = true);
-	virtual CSCStatic& set_font_underline(bool bSet);
-	virtual CSCStatic& set_font_antialiased(bool bAntiAliased = true);
+	virtual CSCStatic& set_auto_font_size(bool auto_font_size = true);
+	virtual CSCStatic& set_font_bold(bool bold = true);
+	virtual CSCStatic& set_font_underline(bool underline = true);
+	virtual CSCStatic& set_font_italic(bool italic = true);
+	virtual CSCStatic& set_font_antialiased(bool antiAliased = true);
 
 	void		set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
 	bool		is_bold() { return m_bFontBold; }
@@ -163,6 +172,7 @@ protected:
 	CString		m_sText;
 	CString		m_sFontName;
 	int			m_nFontSize;
+	bool		m_auto_font_size = false;
 	int			m_nFontWidth;
 	bool		m_bFontBold;
 	bool		m_bFontUnderline;
@@ -226,5 +236,6 @@ protected:
 
 public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };
 #endif

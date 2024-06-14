@@ -61,6 +61,7 @@ public:
 	BOOL		GetIndeterminate();
 	void		SetIndeterminate(BOOL bIndeterminate = TRUE);
 	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1, BOOL bGradient = TRUE);
+	void		set_back_color(COLORREF cr_back);
 	void		SetTransparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
 	void		SetGradient(bool bGradient = true) { m_bGradient = bGradient; Invalidate(); }
 	void		SetText(CString sText);

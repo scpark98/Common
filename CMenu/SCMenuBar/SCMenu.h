@@ -113,8 +113,13 @@ public:
 		message_scmenu_hide,
 	};
 
-	bool create(CWnd* parent);
-	void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
+	bool			create(CWnd* parent);
+
+	//load from menu resource
+	void			load(UINT resource_id, int menu_index);
+
+	//add menu item manually
+	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
 
 	template <typename ... Types> void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""), Types... args)
 	{
@@ -133,7 +138,28 @@ public:
 		recalc_items_rect();
 	}
 
-	void			add_sub_button(int index, UINT id);
+	template <typename ... Types> void	set_icon_and_buttons(UINT sub_menu_id, UINT icon_id, Types... button_ids)
+	{
+		CSCMenuItem* menu_item = get_menu_item(sub_menu_id);
+		menu_item->set_icon(icon_id);
+
+		int n = sizeof...(button_ids);
+		if (n == 0)
+			return;
+
+		UINT arg[] = { button_ids... };
+		for (auto button_id : arg)
+		{
+			if (button_id > 0)
+				menu_item->add_button(button_id);
+		}
+	}
+
+	void			add_sub_button_by_menu_index(int index, UINT id);
+	void			add_sub_button_by_menu_id(int menu_id, UINT id);
+
+	void			set_check(UINT menu_id, int sub_button_index, bool check);
+
 
 	//모니터 영역을 벗어나지 않도록 보정한 후 표시해야 한다.
 	void			popup_menu(int x, int y);

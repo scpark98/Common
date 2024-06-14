@@ -121,7 +121,7 @@ void CMacProgressCtrl::OnPaint()
 	rect = rc;
 	BOOL bVertical = GetStyle() & PBS_VERTICAL;
 
-	CMemoryDC	dc(&dcPaint, &rc, true);
+	CMemoryDC	dc(&dcPaint, &rc);
 
 	CBrush brLightest(m_crColorLightest);
 	CBrush brColor(m_crColor);
@@ -609,6 +609,14 @@ void CMacProgressCtrl::SetColor(COLORREF crColor,
 	CreatePens();
 	RedrawWindow();
 }	// SetColor
+
+void CMacProgressCtrl::set_back_color(COLORREF cr_back)
+{
+	m_crBackColor = cr_back;
+
+	m_dq_cr_indeterminate[0] = cr_back;
+	Invalidate();
+}
 
 //-------------------------------------------------------------------
 //

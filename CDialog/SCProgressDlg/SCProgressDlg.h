@@ -23,16 +23,29 @@ public:
 
 	bool			create(CWnd* parent, CString text, int left, int top, int right, int bottom);
 	void			set_text(CString text);
+	void			set_text_color(COLORREF cr);
 	void			set_back_color(COLORREF cr);
+	void			set_font_size(int size);
 	void			set_range(int32_t lower, int32_t upper);
 	void			set_indeterminate(bool indeterminate = true);
+
+	//
+	void			timeout(int ms);
+	//특정 실행파일이 실행되면 자동 숨김
+	//max_timeout_ms후에는 숨김처리.
+	//hide조건이 되도 intentional_delay_before_hide_ms후에 숨긴다.
+	void			auto_hide_when_app_found(CString exe_name, int max_timeout_ms, int intentional_delay_before_hide_ms = 0);
 
 	CSCStatic		m_static;
 	CMacProgressCtrl m_progress;
 
 protected:
-	CWnd*			m_parent = NULL;
+	enum TIMER_ID
+	{
+		timer_auto_hide = 0,
+	};
 
+	CWnd*			m_parent = NULL;
 
 	LOGFONT			m_lf;
 	CFont			m_font;
@@ -47,4 +60,5 @@ protected:
 public:
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

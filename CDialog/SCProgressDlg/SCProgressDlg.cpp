@@ -26,6 +26,7 @@ void CSCProgressDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CSCProgressDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -34,12 +35,14 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 {
 	m_parent = parent;
 
-	//DWORD dwStyle = WS_POPUP;
 	DWORD dwStyle = WS_POPUP | WS_BORDER;
-	//dwStyle = (dwStyle & ~WS_CAPTION);
-	//id를 1234로 주면 왜 생성이 안될까...
-	//className과 windowName을 CSCMenu 등 다른걸로 주면 생성이 실패하는 이유는??
-	bool res = CreateEx(WS_EX_WINDOWEDGE | WS_EX_TOPMOST, _T("listbox"), _T("listbox"), dwStyle, CRect(left, top, right, bottom), parent, 0);
+
+	WNDCLASS wc = {};
+	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
+	wc.lpszClassName = _T("CSCProgressDlg");
+	AfxRegisterClass(&wc);
+
+	bool res = CreateEx(WS_EX_WINDOWEDGE | WS_EX_TOPMOST, wc.lpszClassName, _T("CSCProgressDlg"), dwStyle, CRect(left, top, right, bottom), parent, 0);
 	//bool res = CreateEx(WS_EX_STATICEDGE | WS_EX_TOPMOST, _T("listbox"), _T("listbox"), dwStyle, CRect(0, 0, 320, 300), parent, 0);
 
 	MoveWindow(left, top, right - left, bottom - top);
@@ -65,7 +68,7 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 		//m_progress = new CMFCRibbonProgressBar(2734, 200);
 		m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_MARQUEE, CRect(rc.left + 20, bottom_pos, rc.right - 20, bottom_pos + progress_height), this, 0);
 		m_progress.ShowWindow(SW_SHOW);
-		m_progress.SetTransparent();
+		m_progress.SetTransparent(FALSE);
 		//m_progress.SetMarquee(TRUE, 10);
 		//m_progress.SetIndeterminate();
 		//m_progress.SetRange(0, 100);
@@ -124,10 +127,22 @@ void CSCProgressDlg::set_text(CString text)
 	m_static.set_text(text);
 }
 
+void CSCProgressDlg::set_text_color(COLORREF cr)
+{
+	m_static.set_text_color(cr);
+	//Invalidate();
+}
+
 void CSCProgressDlg::set_back_color(COLORREF cr)
 {
 	m_cr_back = cr;
+	m_progress.set_back_color(cr);
 	Invalidate();
+}
+
+void CSCProgressDlg::set_font_size(int size)
+{
+	m_static.set_font_size(size);
 }
 
 void CSCProgressDlg::set_range(int32_t lower, int32_t upper)
@@ -141,3 +156,47 @@ void CSCProgressDlg::set_indeterminate(bool indeterminate)
 	m_progress.SetIndeterminate(indeterminate);
 }
 
+void CSCProgressDlg::timeout(int ms)
+{
+	ShowWindow(SW_SHOW);
+	SetTimer(timer_auto_hide, ms, NULL);
+}
+
+//특정 실행파일이 실행되면 자동 종료
+void CSCProgressDlg::auto_hide_when_app_found(CString exe_name, int max_timeout_ms, int intentional_delay_before_hide_ms)
+{
+	ShowWindow(SW_SHOW);
+
+	int total_wait_time = 0;
+
+	while (true)
+	{
+		if (get_process_running_count(exe_name) > 0)
+		{
+			Wait(intentional_delay_before_hide_ms);
+			break;
+		}
+
+		Wait(100);
+		total_wait_time += 100;
+
+		if (total_wait_time > max_timeout_ms)
+		{
+			break;
+		}
+	}
+
+	ShowWindow(SW_HIDE);
+}
+
+void CSCProgressDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (nIDEvent == timer_auto_hide)
+	{
+		KillTimer(timer_auto_hide);
+		ShowWindow(SW_HIDE);
+	}
+
+	CDialogEx::OnTimer(nIDEvent);
+}

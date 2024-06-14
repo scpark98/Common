@@ -9,9 +9,9 @@ class CGdiplusDummyForInitialization
 public:
 	CGdiplusDummyForInitialization()
 	{
-		GdiplusStartupInput gdiplusStartupInput;
+		Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 
-		if (::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok)
+		if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Gdiplus::Ok)
 		{
 			AfxMessageBox(TEXT("ERROR:Falied to initalize GDI+ library"));
 		}
@@ -19,11 +19,11 @@ public:
 
 	~CGdiplusDummyForInitialization()
 	{
-		::GdiplusShutdown(gdiplusToken);
+		Gdiplus::GdiplusShutdown(gdiplusToken);
 	}
 
 protected:
-	GdiplusStartupInput gdiplusStartupInput;
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
 };
 
@@ -34,7 +34,7 @@ CGdiplusBitmap::CGdiplusBitmap()
 	release();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(Bitmap* src)
+CGdiplusBitmap::CGdiplusBitmap(Gdiplus::Bitmap* src)
 {
 	release();
 
@@ -64,7 +64,7 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 	}
 	else
 	{
-		m_pBitmap = Bitmap::FromHBITMAP(hBitmap, NULL);
+		m_pBitmap = Gdiplus::Bitmap::FromHBITMAP(hBitmap, NULL);
 	}
 
 	/*
@@ -108,11 +108,11 @@ CGdiplusBitmap::CGdiplusBitmap(IStream* pStream)
 {
 	release();
 
-	Gdiplus::Bitmap* temp = Bitmap::FromStream(pStream, TRUE);
+	Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromStream(pStream, TRUE);
 
 	m_pBitmap = new Gdiplus::Bitmap(temp->GetWidth(), temp->GetHeight(), PixelFormat32bppARGB);
 
-	Graphics g(m_pBitmap);
+	Gdiplus::Graphics g(m_pBitmap);
 
 	Gdiplus::SolidBrush brush_tr(Gdiplus::Color(0, 0, 0, 0));
 	g.FillRectangle(&brush_tr, 0, 0, temp->GetWidth(), temp->GetHeight());
@@ -143,7 +143,7 @@ CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id, bool show_error)
 CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
 {
 	m_pBitmap = new Gdiplus::Bitmap(cx, cy, format);
-	Graphics g(m_pBitmap);
+	Gdiplus::Graphics g(m_pBitmap);
 	g.Clear(cr);
 	resolution();
 }
@@ -151,7 +151,7 @@ CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdip
 void CGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
 {
 	m_pBitmap = new Gdiplus::Bitmap(cx, cy, format);
-	Graphics g(m_pBitmap);
+	Gdiplus::Graphics g(m_pBitmap);
 	g.Clear(cr);
 	resolution();
 }
@@ -258,7 +258,7 @@ bool CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 	}
 	else
 	{
-		m_pBitmap = Bitmap::FromResource(NULL, (WCHAR*)MAKEINTRESOURCE(id));
+		m_pBitmap = Gdiplus::Bitmap::FromResource(NULL, (WCHAR*)MAKEINTRESOURCE(id));
 	}
 
 	if (m_pBitmap)
@@ -271,7 +271,7 @@ bool CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 	return false;
 }
 
-Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
+Gdiplus::Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 {
 	HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(id), sType);
 
@@ -289,13 +289,13 @@ Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 
 	IStream* pStream;
 	HRESULT hr = CreateStreamOnHGlobal(hBuffer, TRUE, &pStream);
-	Image image(pStream);
+	Gdiplus::Image image(pStream);
 	pStream->Release();
 
-	if (image.GetLastStatus() != Ok)
+	if (image.GetLastStatus() != Gdiplus::Ok)
 		return NULL;
 
-	Bitmap* pBitmap = static_cast<Bitmap*>(image.Clone());
+	Gdiplus::Bitmap* pBitmap = static_cast<Gdiplus::Bitmap*>(image.Clone());
 
 	return pBitmap;
 }
@@ -538,7 +538,7 @@ bool CGdiplusBitmap::get_raw_data()
 	//8비트는 8비트지만 32비트도 24비트로 처리해야
 	//우선은 SeetaFace가 동작한다.
 	//수정 필요한 부분임.
-	PixelFormat format = m_pBitmap->GetPixelFormat();
+	Gdiplus::PixelFormat format = m_pBitmap->GetPixelFormat();
 	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
 		format = PixelFormat8bppIndexed;
 	else
@@ -564,7 +564,7 @@ bool CGdiplusBitmap::set_raw_data()
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
-	PixelFormat format = m_pBitmap->GetPixelFormat();
+	Gdiplus::PixelFormat format = m_pBitmap->GetPixelFormat();
 
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,
@@ -591,7 +591,7 @@ bool CGdiplusBitmap::is_valid()
 
 int CGdiplusBitmap::channels()
 {
-	PixelFormat pf = m_pBitmap->GetPixelFormat();
+	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
 
 	if (pf == PixelFormat8bppIndexed)		//198659
 		return 1;
@@ -623,11 +623,11 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	}
 	*/
 
-	BitmapData bmData_dst;
-	Rect rect(0, 0, width, height);
+	Gdiplus::BitmapData bmData_dst;
+	Gdiplus::Rect rect(0, 0, width, height);
 
 	temp.m_pBitmap->LockBits(&rect,
-		ImageLockModeRead,
+		Gdiplus::ImageLockModeRead,
 		temp.m_pBitmap->GetPixelFormat(),
 		&bmData_dst);
 
@@ -636,7 +636,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	Gdiplus::Bitmap mask(temp.width, temp.height, temp.width, PixelFormat8bppIndexed, src);
 	int palSize = m_pBitmap->GetPaletteSize();
 
-	ColorPalette* palette = (ColorPalette*)malloc(palSize);
+	Gdiplus::ColorPalette* palette = (Gdiplus::ColorPalette*)malloc(palSize);
 	m_pBitmap->GetPalette(palette, palSize);
 	// invert - only shows the transparent  
 	for (int i = 0; i < 256; i++)
@@ -820,7 +820,7 @@ void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 	resolution();
 }
 
-void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_color)
+void CGdiplusBitmap::rotate(float degree, bool auto_resize, Gdiplus::Color remove_back_color)
 {
 	int originw = width;
 	int originh = height;
@@ -833,9 +833,9 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Color remove_back_co
 	int newh = rotated.Height();
 
 	//create a new empty bitmap to hold rotated image 
-	Bitmap* result = new Bitmap(neww, newh);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(neww, newh);
 	//make a graphics object from the empty bitmap
-	Graphics g(result);
+	Gdiplus::Graphics g(result);
 
 	//첫번째 방식이 정상 동작한다.
 	//두번째 방식이 동작하려면 뭔가 보정해줘야하는데 일단 보류한다.
@@ -889,7 +889,7 @@ void CGdiplusBitmap::draw_text(int x, int y, CString text, int font_size, int th
 								Gdiplus::Color crFill /*= Gdiplus::Color::Black*/,
 								UINT align /*= DT_LEFT | DT_TOP*/)
 {
-	Graphics g(m_pBitmap);
+	Gdiplus::Graphics g(m_pBitmap);
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -931,12 +931,12 @@ void CGdiplusBitmap::draw_text(int x, int y, CString text, int font_size, int th
 	g.FillPath(&gb, &str_path);
 }
 
-void CGdiplusBitmap::fit_to_image(Color remove_back_color)
+void CGdiplusBitmap::fit_to_image(Gdiplus::Color remove_back_color)
 {
 	int x, y;
 	CRect r(0, 0, width, height);
 
-	Color pixel;
+	Gdiplus::Color pixel;
 	bool found = false;
 
 	long t0 = clock();
@@ -1052,14 +1052,14 @@ void CGdiplusBitmap::fit_to_image(Color remove_back_color)
 	sub_image(r);
 }
 
-void CGdiplusBitmap::resize(int cx, int cy, InterpolationMode mode)
+void CGdiplusBitmap::resize(int cx, int cy, Gdiplus::InterpolationMode mode)
 {
-	Bitmap* result = new Bitmap(cx, cy);
-	Graphics g(result);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(cx, cy);
+	Gdiplus::Graphics g(result);
 
 	g.SetInterpolationMode(mode);
 
-	g.DrawImage(m_pBitmap, Rect(0, 0, cx, cy), 0, 0, width, height, UnitPixel);
+	g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, cx, cy), 0, 0, width, height, Gdiplus::UnitPixel);
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, cx, cy, PixelFormatDontCare);
@@ -1078,8 +1078,8 @@ void CGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
 //이미지 캔버스 크기를 조정한다.
 void CGdiplusBitmap::canvas_size(int cx, int cy, Gdiplus::Color cr_fill)
 {
-	Bitmap* result = new Bitmap(cx, cy);
-	Graphics g(result);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(cx, cy);
+	Gdiplus::Graphics g(result);
 	g.Clear(cr_fill);
 
 	int x = (cx - width) / 2;
@@ -1105,10 +1105,10 @@ void CGdiplusBitmap::sub_image(Gdiplus::Rect r)
 
 void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
 {
-	Bitmap* result = new Bitmap(w, h);
-	Graphics g(result);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(w, h);
+	Gdiplus::Graphics g(result);
 
-	g.DrawImage(m_pBitmap, Rect(0, 0, w, h), x, y, w, h, UnitPixel);
+	g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, w, h), x, y, w, h, Gdiplus::UnitPixel);
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
@@ -1126,7 +1126,7 @@ void CGdiplusBitmap::gray()
 	//							0.0f, 0.0f, 0.0f, 1.0, 0.0f,
 	//							0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
-	ColorMatrix colorMatrix = { 0.299f, 0.299f, 0.299f, 0.0f, 0.0f,
+	Gdiplus::ColorMatrix colorMatrix = { 0.299f, 0.299f, 0.299f, 0.0f, 0.0f,
 								0.587f, 0.587f, 0.587f, 0.0f, 0.0f,
 								0.114f, 0.114f, 0.114f, 0.0f, 0.0f,
 								0.0f, 0.0f, 0.0f, 1.0, 0.0f,
@@ -1137,19 +1137,19 @@ void CGdiplusBitmap::gray()
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
-	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+	Gdiplus::ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
 void CGdiplusBitmap::negative()
 {
-	ColorMatrix colorMatrix = { -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+	Gdiplus::ColorMatrix colorMatrix = { -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 0.0f, 1.0, 0.0f,
@@ -1160,14 +1160,14 @@ void CGdiplusBitmap::negative()
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
-	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+	Gdiplus::ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
 void CGdiplusBitmap::replace_color(int tx, int ty, Gdiplus::Color dst)
@@ -1184,10 +1184,10 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
+	Gdiplus::ImageAttributes ia;
 
 	Gdiplus::ColorMap crMap;
 	crMap.oldColor = src;
@@ -1195,14 +1195,14 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 	ia.SetRemapTable(1, &crMap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
 //투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
 void CGdiplusBitmap::replace_back_color(Gdiplus::Color cr_back)
 {
-	Bitmap* result = new Bitmap(width, height);
-	Graphics g(result);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height);
+	Gdiplus::Graphics g(result);
 	g.Clear(cr_back);
 
 	g.DrawImage(m_pBitmap, 0, 0);
@@ -1221,7 +1221,7 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue)
 	float fg = (float)green / 255.0f;
 	float fb = (float)blue / 255.0f;
 
-	ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+	Gdiplus::ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
@@ -1232,16 +1232,16 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue)
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
-	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+	Gdiplus::ImageAttributes ia;
+	ia.SetColorMatrix(&colorMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 	//ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsSkipGray, ColorAdjustTypeBitmap);
 	//ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsAltGray, ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
 void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcept)
@@ -1250,10 +1250,10 @@ void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcep
 	int a, r, g, b;
 
 	Gdiplus::BitmapData bmData;
-	Rect rect(0, 0, width, height);
+	Gdiplus::Rect rect(0, 0, width, height);
 
 	m_pBitmap->LockBits(&rect,
-		ImageLockModeRead | ImageLockModeWrite,
+		Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite,
 		m_pBitmap->GetPixelFormat(),
 		&bmData);
 
@@ -1380,8 +1380,8 @@ void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcep
 
 void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
 {
-	HueSaturationLightness hsl;
-	HueSaturationLightnessParams hslParam;
+	Gdiplus::HueSaturationLightness hsl;
+	Gdiplus::HueSaturationLightnessParams hslParam;
 
 	hslParam.hueLevel = hue;// random19937(-180, 180);
 	hslParam.saturationLevel = sat;
@@ -1395,14 +1395,14 @@ void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
 
 void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 {
-	ColorMatrix cm = {	r, 0.0f, 0.0f, 0.0f, 0.0f,
+	Gdiplus::ColorMatrix cm = {	r, 0.0f, 0.0f, 0.0f, 0.0f,
 						0.0f, g, 0.0f, 0.0f, 0.0f,
 						0.0f, 0.0f, b, 0.0f, 0.0f,
 						0.0f, 0.0f, 0.0f, a, 0.0f,
 						0.0f, 0.0f, 0.0f, 0.0f, 1.0f
 					 };
 
-	ColorMatrixEffect cmEffect;
+	Gdiplus::ColorMatrixEffect cmEffect;
 	cmEffect.SetParameters(&cm);
 
 	//CGdiplusBitmap* temp;
@@ -1429,8 +1429,8 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
 	m_pBitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
 	resolution();
 
-	Graphics g(m_pBitmap);
-	g.Clear(Color::Transparent);
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color::Transparent);
 	//g.Clear(Color::Blue);
 
 
@@ -1482,7 +1482,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 	if (channel != 4)
 		cvtColor32ARGB();
 
-	GraphicsPath path;
+	Gdiplus::GraphicsPath path;
 	float ratio = 0.0f;// ((float)width / (float)height);
 
 	get_round_rect_path(&path, Gdiplus::Rect(0, 0, width, height), radius);
@@ -1504,12 +1504,12 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 		clone(&temp);
 
 		//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-		Graphics g(m_pBitmap);
-		g.Clear(Color::Transparent);
+		Gdiplus::Graphics g(m_pBitmap);
+		g.Clear(Gdiplus::Color::Transparent);
 
-		g.SetSmoothingMode(SmoothingMode::SmoothingModeAntiAlias);
+		g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 		//Brush* brush = new TextureBrush(temp);
-		TextureBrush brush(temp);
+		Gdiplus::TextureBrush brush(temp);
 		g.FillPath(&brush, &path);
 		return;
 	}
@@ -1528,7 +1528,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 		1.0f,
 	};
 
-	PathGradientBrush pgb(&path);
+	Gdiplus::PathGradientBrush pgb(&path);
 
 	//중점 세팅
 	pgb.SetCenterPoint(Gdiplus::Point(width / 2, height / 2));
@@ -1536,15 +1536,15 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 	//블렌드 수준값 세팅
 	pgb.SetBlend(blendFactor, blendPosition, 3);	//blendFactor, blendPosition의 갯수
 
-	pgb.SetCenterColor(Color::Black);
-	Gdiplus::Color colors[] = { Color(Color::Transparent) };
+	pgb.SetCenterColor(Gdiplus::Color::Black);
+	Gdiplus::Color colors[] = { Gdiplus::Color(Gdiplus::Color::Transparent) };
 	pgb.SetSurroundColors(colors, &in_out_count);
 
 	//mask를 CGdiplusBitmap 타입으로 정적 생성하니 오류발생하여 동적 생성함.
 	Gdiplus::Bitmap *mask = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
-	Graphics gMask(mask);
-	gMask.FillRectangle(&SolidBrush(Color::Transparent), Rect(0, 0, width, height));
-	gMask.SetSmoothingMode(SmoothingMode::SmoothingModeHighQuality);
+	Gdiplus::Graphics gMask(mask);
+	gMask.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::Transparent), Gdiplus::Rect(0, 0, width, height));
+	gMask.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeHighQuality);
 	gMask.FillPath(&pgb, &path);
 
 #ifdef _DEBUG
@@ -1570,12 +1570,12 @@ void CGdiplusBitmap::replace_channel(CString src_file, int src_bgra_index, int d
 	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
 }
 
-void CGdiplusBitmap::replace_channel(Bitmap* src, int src_bgra_index, int dst_bgra_index)
+void CGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, int src_bgra_index, int dst_bgra_index)
 {
 	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
 }
 
-void CGdiplusBitmap::replace_channel(Bitmap* src, Bitmap* dst, int src_bgra_index, int dst_bgra_index)
+void CGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, Gdiplus::Bitmap* dst, int src_bgra_index, int dst_bgra_index)
 {
 	//이미지 크기는 동일해야 한다.
 	if ((src->GetWidth() != dst->GetWidth()) || (src->GetHeight() != dst->GetHeight()))
@@ -1583,12 +1583,12 @@ void CGdiplusBitmap::replace_channel(Bitmap* src, Bitmap* dst, int src_bgra_inde
 		return;
 	};
 
-	Rect r(0, 0, src->GetWidth(), src->GetHeight());
+	Gdiplus::Rect r(0, 0, src->GetWidth(), src->GetHeight());
 
-	BitmapData* bdSrc = new BitmapData;
-	src->LockBits(&r, ImageLockMode::ImageLockModeRead, PixelFormat32bppARGB, bdSrc); //PixelFormat(Format32bppArgb)  
-	BitmapData* bdDst = new BitmapData;
-	dst->LockBits(&r, ImageLockMode::ImageLockModeRead, PixelFormat32bppARGB, bdDst);
+	Gdiplus::BitmapData* bdSrc = new Gdiplus::BitmapData;
+	src->LockBits(&r, Gdiplus::ImageLockMode::ImageLockModeRead, PixelFormat32bppARGB, bdSrc); //PixelFormat(Format32bppArgb)  
+	Gdiplus::BitmapData* bdDst = new Gdiplus::BitmapData;
+	dst->LockBits(&r, Gdiplus::ImageLockMode::ImageLockModeRead, PixelFormat32bppARGB, bdDst);
 
 	int src_ch = 4;
 	int dst_ch = 4;
@@ -1650,13 +1650,13 @@ void CGdiplusBitmap::convert2gray()
 	free(pal);
 	*/
 	
-	Bitmap* bitmap = new Bitmap(width, height, PixelFormat8bppIndexed);
+	Gdiplus::Bitmap* bitmap = new Gdiplus::Bitmap(width, height, PixelFormat8bppIndexed);
 	int palSize = bitmap->GetPaletteSize();
 	
-	ColorPalette *palette = (ColorPalette*)malloc(palSize);
+	Gdiplus::ColorPalette *palette = (Gdiplus::ColorPalette*)malloc(palSize);
 
 	bitmap->GetPalette(palette, palSize);
-	palette->Flags = PaletteFlagsGrayScale;
+	palette->Flags = Gdiplus::PaletteFlagsGrayScale;
 	palette->Count = 256;
 	for (int i = 0; i < 256; i++)
 	{
@@ -1664,19 +1664,19 @@ void CGdiplusBitmap::convert2gray()
 	}
 	bitmap->SetPalette(palette);
 
-	BitmapData bmData_src;
-	BitmapData bmData_dst;
-	Rect rect(0, 0, width, height);
+	Gdiplus::BitmapData bmData_src;
+	Gdiplus::BitmapData bmData_dst;
+	Gdiplus::Rect rect(0, 0, width, height);
 
 	gray();
 
 	m_pBitmap->LockBits(&rect,
-		ImageLockModeRead,
+		Gdiplus::ImageLockModeRead,
 		m_pBitmap->GetPixelFormat(),
 		&bmData_src);
 
 	bitmap->LockBits(&rect,
-		ImageLockModeRead,
+		Gdiplus::ImageLockModeRead,
 		bitmap->GetPixelFormat(),
 		&bmData_dst);
 
@@ -1708,7 +1708,7 @@ void CGdiplusBitmap::convert2gray()
 	save(_T("d:\\temp\\gray.bmp"));
 }
 
-void CGdiplusBitmap::cvtColor(PixelFormat old_format, PixelFormat new_format)
+void CGdiplusBitmap::cvtColor(Gdiplus::PixelFormat old_format, Gdiplus::PixelFormat new_format)
 {
 
 }
@@ -1729,10 +1729,10 @@ void CGdiplusBitmap::cvtColor32ARGB()
 	resolution();
 	*/
 	
-	Bitmap* result = new Bitmap(width, height, PixelFormat32bppARGB);
-	Graphics g(result);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(result);
 
-	ImageAttributes ia;
+	Gdiplus::ImageAttributes ia;
 
 	g.DrawImage(m_pBitmap, 0, 0, width, height);
 
@@ -1743,30 +1743,30 @@ void CGdiplusBitmap::cvtColor32ARGB()
 	resolution();
 }
 
-void CGdiplusBitmap::set_matrix(ColorMatrix* colorMatrix, ColorMatrix* grayMatrix)
+void CGdiplusBitmap::set_matrix(Gdiplus::ColorMatrix* colorMatrix, Gdiplus::ColorMatrix* grayMatrix)
 {
 	//원본을 복사해 둘 이미지를 준비하고
 	CGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
+	Gdiplus::ImageAttributes ia;
 
 	if (grayMatrix)
-		ia.SetColorMatrices(colorMatrix, grayMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+		ia.SetColorMatrices(colorMatrix, grayMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 	else
-		ia.SetColorMatrix(colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
+		ia.SetColorMatrix(colorMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
 void CGdiplusBitmap::set_alpha(float alpha)
 {
-	ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+	Gdiplus::ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 0.0f, alpha, 0.0f,
@@ -1782,13 +1782,13 @@ void CGdiplusBitmap::set_alpha(float alpha)
 	//m_pBitmap->ConvertFormat();
 #endif
 
-	Bitmap* result = new Bitmap(width, height, PixelFormat32bppARGB);
-	Graphics g(result);
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(result);
 
-	ImageAttributes ia;
+	Gdiplus::ImageAttributes ia;
 
-	ia.SetColorMatrix(&colorMatrix, ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
-	g.DrawImage(m_pBitmap, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	ia.SetColorMatrix(&colorMatrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
+	g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, width, height, PixelFormatDontCare);
@@ -1812,21 +1812,21 @@ void CGdiplusBitmap::set_alpha(float alpha)
 #endif
 }
 
-void CGdiplusBitmap::set_colorkey(Color low, Color high)
+void CGdiplusBitmap::set_colorkey(Gdiplus::Color low, Gdiplus::Color high)
 {
 	//원본을 복사해 둘 이미지를 준비하고
 	CGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
+	Gdiplus::ImageAttributes ia;
 	ia.SetColorKey(low, high);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(m_pBitmap, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
 bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel)
@@ -1996,7 +1996,7 @@ bool CGdiplusBitmap::paste_from_clipboard()
 	}
 	else
 	{
-		m_pBitmap = Bitmap::FromHBITMAP(bitmap, NULL);
+		m_pBitmap = Gdiplus::Bitmap::FromHBITMAP(bitmap, NULL);
 	}
 
 	resolution();
@@ -2029,7 +2029,7 @@ void CGdiplusBitmap::check_animate_gif()
 	}
 
 	// Allocate a buffer to receive the property item.
-	m_pPropertyItem = (PropertyItem*)malloc(nSize);
+	m_pPropertyItem = (Gdiplus::PropertyItem*)malloc(nSize);
 
 	m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_pPropertyItem);
 
@@ -2052,7 +2052,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 		folder = get_part(folder, fn_folder);
 	}
 
-	GUID   pageGuid = FrameDimensionTime;
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 
 	CString str;
 
@@ -2085,7 +2085,7 @@ void CGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std
 		Wait(100);
 	}
 
-	GUID   pageGuid = FrameDimensionTime;
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 
 	CString str;
 
@@ -2096,7 +2096,7 @@ void CGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
 		Gdiplus::Bitmap* img = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
-		Graphics g(img);
+		Gdiplus::Graphics g(img);
 		g.DrawImage(m_pBitmap, 0, 0, width, height);
 		dqBitmap.push_back(img);
 		dqDelay.push_back(((long*)m_pPropertyItem->value)[i] * 10);
@@ -2184,7 +2184,7 @@ void CGdiplusBitmap::start_animation()
 
 	m_run_thread_animation = true;
 
-	GUID   pageGuid = FrameDimensionTime;
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_frame_index = 0;
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
 	//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
@@ -2238,7 +2238,7 @@ void CGdiplusBitmap::goto_frame(int pos, bool pause)
 	m_frame_index = pos;
 	m_paused = pause;
 
-	GUID   pageGuid = FrameDimensionTime;
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
 }
 
@@ -2260,13 +2260,13 @@ void CGdiplusBitmap::thread_gif_animation()
 
 	while (m_run_thread_animation)
 	{
-		GUID   pageGuid = FrameDimensionTime;
+		GUID   pageGuid = Gdiplus::FrameDimensionTime;
 
 		if (hDC)
 		{
 			CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
 			CMemoryDC dc(pDC, &r);
-			Graphics g(dc.m_hDC);
+			Gdiplus::Graphics g(dc.m_hDC);
 
 			//CGdiButton과 같이 배경이 투명하게 표시하려 했으나 뭔가 다르다.
 			/*
@@ -2347,12 +2347,12 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 	//pParent->ReleaseDC(pParentDC);
 	//MemDC.DeleteDC();
 
-	GUID   pageGuid = FrameDimensionTime;
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 
 	if (hDC)
 	{
 		CMemoryDC dc(pDC, &r);
-		Graphics g(dc.m_hDC, r);
+		Gdiplus::Graphics g(dc.m_hDC, r);
 
 		m_pBitmap->SelectActiveFrame(&pageGuid, frame);
 
@@ -2381,9 +2381,9 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 
 	CString str;
 
-	EncoderParameters	encoderParameters;
+	Gdiplus::EncoderParameters	encoderParameters;
 	ULONG				parameterValue;
-	Status				stat;
+	Gdiplus::Status				stat;
 
 	// An EncoderParameters object has an array of
    // EncoderParameter objects. In this case, there is only
@@ -2391,7 +2391,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 	encoderParameters.Count = 1;
 
 	// Initialize the one EncoderParameter object.
-	encoderParameters.Parameter[0].Guid = EncoderSaveFlag;// FrameDimensionTime;// Gdiplus::ImageFormatGIF;// EncoderSaveFlag;
+	encoderParameters.Parameter[0].Guid = Gdiplus::EncoderSaveFlag;// FrameDimensionTime;// Gdiplus::ImageFormatGIF;// EncoderSaveFlag;
 	encoderParameters.Parameter[0].Type = Gdiplus::EncoderParameterValueType::EncoderParameterValueTypeLong;
 	encoderParameters.Parameter[0].NumberOfValues = 1;
 	encoderParameters.Parameter[0].Value = &parameterValue;
@@ -2401,7 +2401,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 	GetEncoderClsid(L"image/gif", &encoderClsid);
 
 	// Set the loop count.
-	PropertyItem* propItemLoopCount = new PropertyItem;
+	Gdiplus::PropertyItem* propItemLoopCount = new Gdiplus::PropertyItem;
 	SHORT loopCount = 0; //A value of 0 specifies that the animation should be displayed infinitely.
 
 	propItemLoopCount->id = PropertyTagLoopCount;
@@ -2418,7 +2418,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 			// Save the first page (frame).
 			parameterValue = Gdiplus::EncoderValue::EncoderValueMultiFrame;
 			stat = dq[0]->Save(L"d:\\temp\\MultiFrame.gif", &encoderClsid, NULL);// &encoderParameters);
-			if (stat == Ok)
+			if (stat == Gdiplus::Ok)
 				TRACE(_T("Page %d saved successfully.\n"), i);
 		}
 		else
@@ -2434,7 +2434,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 			parameterValue = Gdiplus::EncoderValue::EncoderValueFrameDimensionTime;
 			stat = dq[0]->SaveAdd(dq[i], &encoderParameters);
 
-			if (stat == Ok)
+			if (stat == Gdiplus::Ok)
 				TRACE(_T("Page %d saved successfully.\n"), i);
 		}
 	}
@@ -2442,7 +2442,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 	// Close the multiframe file.
 	parameterValue = Gdiplus::EncoderValue::EncoderValueFlush;
 	stat = dq[0]->SaveAdd(&encoderParameters);
-	if (stat == Ok)
+	if (stat == Gdiplus::Ok)
 		printf("File closed successfully.\n");
 
 	//str.Format(_T("z:\\내 드라이브\\media\\test_image\\temp\\multi.tif"));

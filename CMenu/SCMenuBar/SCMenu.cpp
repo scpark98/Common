@@ -180,12 +180,31 @@ void CSCMenu::add(int _id, CString _caption, UINT icon_id, CString _hot_key)
 	recalc_items_rect();
 }
 
-void CSCMenu::add_sub_button(int index, UINT id)
+void CSCMenu::add_sub_button_by_menu_index(int index, UINT id)
 {
 	CSCMenuSubButton* button = new CSCMenuSubButton(id, m_line_height);
 	m_items[index]->m_buttons.push_back(button);
 }
 
+void CSCMenu::add_sub_button_by_menu_id(int menu_id, UINT id)
+{
+	CSCMenuItem* menu_item = get_menu_item(menu_id);
+	menu_item->add_button(id);
+}
+
+void CSCMenu::set_check(UINT menu_id, int sub_button_index, bool check)
+{
+	CSCMenuItem* menu_item = get_menu_item(menu_id);
+
+	ASSERT(menu_item != NULL);
+
+	if (menu_item == 0)
+	{
+		TRACE(_T("error : no exist menu_id(%d)\n"), menu_id);
+	}
+
+	menu_item->set_check(sub_button_index, check);
+}
 
 //resource editor에서 이 클래스 컨트롤을 추가해서 사용하는 것이 아닌
 //동적으로 create해서 사용하므로 여기에 초기화 코드를 넣어도 의미없다.
@@ -369,6 +388,36 @@ bool CSCMenu::create(CWnd* parent)
 	}
 
 	return res;
+}
+
+//load from menu resource
+void CSCMenu::load(UINT resource_id, int menu_index)
+{
+	CMenu menu;
+	CMenu* pMenu;
+
+	menu.LoadMenu(resource_id);
+	pMenu = menu.GetSubMenu(menu_index);
+
+	int i, nCount = GetMenuItemCount(pMenu->m_hMenu);
+	UINT menu_id;
+	CString menu_caption;
+
+	for (i = 0; i < nCount; i++)
+	{
+		get_menu_item_info(pMenu->m_hMenu, i, &menu_id, &menu_caption, TRUE);
+
+		TRACE(_T("ID = %u, string = %s\n"), menu_id, menu_caption);
+
+		//seperator와 일반 메뉴항목만 허용(서브 팝업메뉴 항목은 배제)
+		if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
+		{
+			std::deque<CString> token;
+			get_token_string(menu_caption, token, _T("\t"));
+
+			add(menu_id, menu_caption, 0, (token.size() == 2 ? token[1] : _T("")));
+		}
+	}
 }
 
 //모니터 영역을 벗어나지 않도록 보정한 후 표시해야 한다.

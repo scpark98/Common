@@ -1812,17 +1812,17 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	//¼±ÅÃ Ç×¸ñ Ç¥½Ã
 	if (draw)
 	{
-		Color cr_text(128, 255, 24, 16);
+		Gdiplus::Color cr_text(128, 255, 24, 16);
 		Gdiplus::Font font(L"Spoqa Han Sans Neo", 32, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-		FontFamily fontFamily(L"¸¼Àº °íµñ");
+		Gdiplus::FontFamily fontFamily(L"¸¼Àº °íµñ");
 		Gdiplus::SolidBrush br_text(cr_text);
-		Pen pen(Color(64, 0, 0, 255), 8);
+		Gdiplus::Pen pen(Gdiplus::Color(64, 0, 0, 255), 8);
 
-		StringFormat format;
+		Gdiplus::StringFormat format;
 		format.SetAlignment(Gdiplus::StringAlignmentCenter);
 		format.SetLineAlignment(Gdiplus::StringAlignmentCenter);
 
-		GraphicsPath path;
+		Gdiplus::GraphicsPath path;
 
 		for (i = 0; i < m_selected.size(); i++)
 		{
@@ -1844,11 +1844,11 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect2GpRectF(r), &format);
 				for (int j = 0; j < 4; ++j)
 				{
-					Pen pen(Color(128, 64, 64, 64), j);		//À±°û¼±
+					Gdiplus::Pen pen(Gdiplus::Color(128, 64, 64, 64), j);		//À±°û¼±
 					pen.SetLineJoin(Gdiplus::LineJoinRound);
 					g.DrawPath(&pen, &path);
 				}
-				SolidBrush brush(Color(128, 255, 128, 255));	//±ÛÀÚ»ö
+				Gdiplus::SolidBrush brush(Gdiplus::Color(128, 255, 128, 255));	//±ÛÀÚ»ö
 				g.FillPath(&brush, &path);
 				path.Reset();
 			}

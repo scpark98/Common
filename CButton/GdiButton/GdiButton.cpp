@@ -1428,6 +1428,7 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 				SetCheck((m_idx = 1));
 			}
 
+			GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
 		}
 	}

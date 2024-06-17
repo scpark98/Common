@@ -73,9 +73,9 @@ public:
 	CGdiplusBitmap(Gdiplus::Bitmap* src);
 	CGdiplusBitmap(HBITMAP hBitmap);
 	CGdiplusBitmap(IStream* pStream);
-	CGdiplusBitmap(CString pFile, bool show_error = false);
+	CGdiplusBitmap(CString pFile);
 	CGdiplusBitmap(CGdiplusBitmap* src);
-	CGdiplusBitmap(CString sType, UINT id, bool show_error = false);
+	CGdiplusBitmap(CString sType, UINT id);
 	CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//not tested.

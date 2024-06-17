@@ -81,10 +81,7 @@ class CGdiButtonImage
 public:
 	CGdiButtonImage() {};
 
-	CGdiplusBitmap normal;
-	CGdiplusBitmap over;
-	CGdiplusBitmap down;
-	CGdiplusBitmap disabled;
+	CGdiplusBitmap img[4];	//normal, over, down, disabled
 };
 
 // CGdiButton
@@ -171,15 +168,19 @@ public:
 	//n번째 이미지의 m번째 상태 이미지의 x, y 픽셀 컬러를 변경한다. 단, disable은 제외된다.
 	void		replace_color(int index, int state_index, int x, int y, Gdiplus::Color newColor);
 
+	//버튼 이미지에 효과를 적용. state_index가 -1이면 모든 상태이미지에 효과 적용. 0이면 normal image만 적용.
 	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
-	void		apply_effect_hsl(int hue, int sat = 0, int light = 0);
+	void		apply_effect_hsl(int state_index, int hue, int sat = 0, int light = 0);
+	void		apply_effect_rgba(int state_index, float r, float g, float b, float a = 1.0);
+	void		apply_effect_blur(int state_index, float radius, BOOL expandEdge);
 
 
 	virtual	CGdiButton&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CGdiButton&		set_font_size( int nSize );
 	virtual CGdiButton&		set_font_bold( bool bBold = true );
 
-	void		update_surface(bool bErase = false);
+	//배경이 투명인 경우는 parent의 배경을 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
+	void		redraw_window(bool bErase = false);
 
 	bool		GetCheck();
 	void		SetCheck( bool bCkeck );
@@ -189,16 +190,21 @@ public:
 	void		SetAsStatic( bool bAsStatic = true ) { m_bAsStatic = bAsStatic; }
 
 
-	//버튼의 크기, 위치 변경
+	//이미지 및 버튼의 크기를 조정한다.
+	void		resize(int cx, int cy);
+
+	//이미지의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.(move는 현재 보류)
+	void		resize_control(int cx, int cy);
+
 	int			width();
 	int			height();
 	void		SetAnchor( UINT nAnchor ) { m_nAnchor = nAnchor; }	//정렬 방식 설정
 	void		SetAnchorMargin( int x, int y ) { m_nAnchorMarginX = x; m_nAnchorMarginY = y; }
 	void		ReAlign();	//parent의 크기가 변하면 설정된 align값에 따라 위치를 재조정해준다.
-	void		Offset( int x, int y );
-	void		Inflate( int cx, int cy );
-	void		Inflate( int l, int t, int r, int b );
-	virtual CGdiButton& set_round(int round);
+	void		Offset(int x, int y);
+	void		Inflate(int cx, int cy);
+	void		Inflate(int l, int t, int r, int b);
+	virtual		CGdiButton& set_round(int round);
 
 	//포커스 사각형 관련
 	void		ShowFocusRect( bool bShow = true ) { m_bShowFocusRect = bShow; Invalidate(); }
@@ -229,6 +235,7 @@ public:
 	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
 
 	//public으로 하여 CGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
+	//하나의 버튼에는 n개의 이미지를 담을 수 있고 각 이미지는 4개의 state image를 각각 설정할 수 있다.
 	std::deque<CGdiButtonImage*> m_image;
 
 protected:
@@ -318,8 +325,6 @@ protected:
 	ColorMatrix m_grayMatrix;
 	ColorMatrix m_hoverMatrix;			//hover이미지에 적용할 매트릭스
 	ColorMatrix m_downMatrix;			//down이미지에 적용할 매트릭스
-
-	void		resize_control(int cx, int cy);
 
 	LOGFONT		m_lf;
 	CFont		m_font;

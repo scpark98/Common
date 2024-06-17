@@ -1,7 +1,6 @@
 // MFCPropertyGridCtrlEx.cpp : 구현 파일입니다.
 //
 
-#include "stdafx.h"
 #include "MFCPropertyGridCtrlEx.h"
 
 
@@ -333,6 +332,13 @@ bool CMFCPropertyGridCtrlEx::AddFolderSelect(	CMFCPropertyGridProperty* pParent,
 	else
 		AddProperty(pFolderSelect);
 
+	return true;
+}
+
+bool CMFCPropertyGridCtrlEx::AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, int min, int max, int value)
+{
+	CPropGridSlider* prop = new CPropGridSlider(sName, value, sName, min, max, max - min);
+	pParent->AddSubItem(prop);
 	return true;
 }
 

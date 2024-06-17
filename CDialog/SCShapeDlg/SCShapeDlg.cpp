@@ -101,10 +101,10 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	return res;
 }
 
-bool CSCShapeDlg::set_text(CShapeDlgTextSetting* setting)
+bool CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 {
 	if (setting != NULL)
-		memcpy(&m_text_setting, setting, sizeof(CShapeDlgTextSetting));
+		memcpy(&m_text_setting, setting, sizeof(CSCShapeDlgTextSetting));
 
 	return set_text(m_parent,
 					m_text_setting.text,
@@ -155,7 +155,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 		m_text_setting.font_name = font_name = lf.lfFaceName;
 	}
 
-	m_text_setting = CShapeDlgTextSetting(text, font_size, font_bold, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
+	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_bold, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
 
 	//텍스트 출력 크기를 얻어오고
 	CRect r;

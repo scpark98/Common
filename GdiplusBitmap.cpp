@@ -124,9 +124,9 @@ CGdiplusBitmap::CGdiplusBitmap(IStream* pStream)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(CString sFile, bool show_error)
+CGdiplusBitmap::CGdiplusBitmap(CString sFile)
 {
-	load(sFile, show_error);
+	load(sFile);
 }
 
 CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
@@ -135,9 +135,9 @@ CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id, bool show_error)
+CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id)
 {
-	load(lpType, id, show_error);
+	load(lpType, id);
 }
 
 CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <afxwin.h>
+#include <afxpropertygridctrl.h>
+#include "PropGridSlider.h"
+
 #define PropertyPage_Assert(x)	if(!(x)) {__asm{int 3}}
 
 // CMFCPropertyGridCtrlEx
@@ -55,7 +59,7 @@ public:
 	BOOL	AddOptionItem( CMFCPropertyGridProperty* pParent, CString sName, CString sDefault, CString sDescription, BOOL bAllowEdit, BOOL bEnable, DWORD dwData, int nOption, LPCTSTR lpszFormat, ... );
 	bool	AddFileSelect( CMFCPropertyGridProperty* pParent, const CString& sName, const _variant_t& varValue, TCHAR* sFilter, CString sDescription = _T(""), DWORD dwData = NULL );
 	bool	AddFolderSelect( CMFCPropertyGridProperty* pParent, const CString& sName, CString sInitialFolder, CString sDescription = _T(""), BOOL bEnable = true, DWORD dwData = NULL );
-
+	bool	AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, int min, int max, int value);
 
 	//bool	addProperty_File(char* strTitle, char* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, char* strFilter, CString* strOut)
 	//bool	addProperty_File(wchar_t* strTitle, wchar_t* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, wchar_t* strFilter, CString* strOut)

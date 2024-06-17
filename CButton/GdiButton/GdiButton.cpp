@@ -134,10 +134,6 @@ void CGdiButton::release_all()
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
 		delete m_image[i];
-		//m_image[i]->normal.release();
-		//m_image[i]->over.release();
-		//m_image[i]->down.release();
-		//m_image[i]->disabled.release();
 	}
 
 	m_image.clear();
@@ -196,42 +192,42 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	if (normal == 0)
 		return false;
 
-	btn->normal.load(lpType, normal);
-	if (btn->normal.is_empty())
+	btn->img[0].load(lpType, normal);
+	if (btn->img[0].is_empty())
 		return false;
 
-	m_width = btn->normal.width;
-	m_height = btn->normal.height;
+	m_width = btn->img[0].width;
+	m_height = btn->img[0].height;
 
 	if (over > 0)
 	{
-		btn->over.load(lpType, over);
+		btn->img[1].load(lpType, over);
 	}
 	else
 	{
-		btn->normal.deep_copy(&btn->over);
-		btn->over.set_matrix(&m_hoverMatrix);
+		btn->img[0].deep_copy(&btn->img[1]);
+		btn->img[1].set_matrix(&m_hoverMatrix);
 	}
 
 	if (down > 0)
 	{
-		btn->down.load(lpType, down);
+		btn->img[2].load(lpType, down);
 	}
 	else
 	{
-		btn->normal.deep_copy(&btn->down);
-		btn->down.set_matrix(&m_downMatrix);
+		btn->img[0].deep_copy(&btn->img[2]);
+		btn->img[2].set_matrix(&m_downMatrix);
 	}
 
 	if (disabled > 0)
 	{
-		btn->disabled.load(lpType, disabled);
+		btn->img[3].load(lpType, disabled);
 	}
 	else
 	{
-		btn->normal.deep_copy(&btn->disabled);
+		btn->img[0].deep_copy(&btn->img[3]);
 		if (!m_use_normal_image_on_disabled)
-			btn->disabled.set_matrix(&m_grayMatrix);
+			btn->img[3].set_matrix(&m_grayMatrix);
 	}
 
 
@@ -240,8 +236,9 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	//fit_to_image(m_fit2image);
 
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
-	//m_cr_back.clear();
-	m_transparent;
+	//만약 배경색 지정이 필요하다면 add_image()후에 set_back_color()로 세팅한다.
+	m_cr_back.clear();
+	m_transparent = true;
 
 	return true;
 }
@@ -257,30 +254,31 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 	if (img->is_empty())
 		return false;
 
-	img->deep_copy(&btn->normal);
-	if (btn->normal.is_empty())
+	img->deep_copy(&btn->img[0]);
+	if (btn->img[0].is_empty())
 		return false;
 
-	m_width = btn->normal.width;
-	m_height = btn->normal.height;
+	m_width = btn->img[0].width;
+	m_height = btn->img[0].height;
 
-	btn->normal.deep_copy(&btn->over);
-	btn->over.set_matrix(&m_hoverMatrix);
+	btn->img[0].deep_copy(&btn->img[1]);
+	btn->img[1].set_matrix(&m_hoverMatrix);
 
-	btn->normal.deep_copy(&btn->down);
-	btn->down.set_matrix(&m_downMatrix);
+	btn->img[0].deep_copy(&btn->img[2]);
+	btn->img[2].set_matrix(&m_downMatrix);
 
-	btn->normal.deep_copy(&btn->disabled);
+	btn->img[0].deep_copy(&btn->img[3]);
 	if (!m_use_normal_image_on_disabled)
-		btn->disabled.set_matrix(&m_grayMatrix);
+		btn->img[3].set_matrix(&m_grayMatrix);
 
 	m_image.push_back(btn);
 
 	//fit_to_image(m_fit2image);
 
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
-	//m_cr_back.clear();
-	//m_transparent = true;
+	//만약 배경색 지정이 필요하다면 add_image()후에 set_back_color()로 세팅한다.
+	m_cr_back.clear();
+	m_transparent = true;
 
 	return true;
 }
@@ -291,15 +289,15 @@ void CGdiButton::use_normal_image_on_disabled(bool use)
 
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
-		if (m_image[i]->normal)
+		if (m_image[i]->img[0])
 		{
-			m_image[i]->normal.save(_T("d:\\normal_before.png"));
-			m_image[i]->normal.deep_copy(&m_image[i]->disabled);
-			m_image[i]->normal.save(_T("d:\\normal_after.png"));
-			m_image[i]->disabled.save(_T("d:\\disabled.png"));
+			//m_image[i]->img[0].save(_T("d:\\normal_before.png"));
+			m_image[i]->img[0].deep_copy(&m_image[i]->img[3]);
+			//m_image[i]->img[0].save(_T("d:\\normal_after.png"));
+			//m_image[i]->img[3].save(_T("d:\\disabled.png"));
 
 			if (!m_use_normal_image_on_disabled)
-				m_image[i]->disabled.set_matrix(&m_grayMatrix);
+				m_image[i]->img[3].set_matrix(&m_grayMatrix);
 		}
 	}
 }
@@ -313,8 +311,8 @@ void CGdiButton::fit_to_image(bool fit)
 
 	if (m_fit2image)
 	{
-		m_width = m_image[0]->normal.width;
-		m_height = m_image[0]->normal.height;
+		m_width = m_image[0]->img[0].width;
+		m_height = m_image[0]->img[0].height;
 	}
 	else
 	{
@@ -324,7 +322,7 @@ void CGdiButton::fit_to_image(bool fit)
 
 	resize_control(m_width, m_height);
 
-	update_surface();
+	redraw_window();
 }
 
 void CGdiButton::active_index(int index, bool bErase)
@@ -333,7 +331,7 @@ void CGdiButton::active_index(int index, bool bErase)
 		return;
 
 	m_idx = index;
-	update_surface();
+	redraw_window();
 }
 
 //true이면 1번 이미지를 표시해준다. false일 경우는 0번을 표시하는데 만약 없으면 AddGrayImage로 회색 이미지를 자동 추가한 후 선택해준다.
@@ -346,7 +344,7 @@ void CGdiButton::active_index(int index, bool bErase)
 void CGdiButton::SetCheck(bool bCheck)
 {
 	m_idx = bCheck;
-	update_surface();
+	redraw_window();
 
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
@@ -372,7 +370,7 @@ void CGdiButton::SetCheck(bool bCheck)
 				{
 					//((CGdiButton*)pWnd)->SetCheck(BST_UNCHECKED); 
 					((CGdiButton*)pWnd)->m_idx = 0;
-					((CGdiButton*)pWnd)->update_surface();
+					((CGdiButton*)pWnd)->redraw_window();
 				}
 			} 
 
@@ -410,10 +408,10 @@ void CGdiButton::set_alpha(float alpha)
 {
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
-		m_image[i]->normal.set_alpha(alpha);
-		m_image[i]->over.set_alpha(alpha);
-		m_image[i]->down.set_alpha(alpha);
-		m_image[i]->disabled.set_alpha(alpha);
+		m_image[i]->img[0].set_alpha(alpha);
+		m_image[i]->img[1].set_alpha(alpha);
+		m_image[i]->img[2].set_alpha(alpha);
+		m_image[i]->img[3].set_alpha(alpha);
 	}
 }
 
@@ -421,20 +419,20 @@ void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
 {
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
-		m_image[i]->normal.add_rgb_loop(red, green, blue, GRAY(50));
+		m_image[i]->img[0].add_rgb_loop(red, green, blue, GRAY(50));
 		//m_image[i]->over.set_alpha(alpha);
 		//m_image[i]->down.set_alpha(alpha);
 		//m_image[i]->disabled.set_alpha(alpha);
 	}
 	//Invalidate();
-	update_surface();
+	redraw_window();
 }
 
 CGdiButton& CGdiButton::text(CString text)
 {
 	m_text = text;
 	SetWindowText(m_text);
-	update_surface();
+	redraw_window();
 	return *this;
 }
 
@@ -452,7 +450,7 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 	m_cr_text.push_back(down);
 	m_cr_text.push_back(disabled);
 
-	update_surface();
+	redraw_window();
 	return *this;
 }
 
@@ -480,7 +478,7 @@ CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down
 	m_cr_back.push_back(down);
 	m_cr_back.push_back(disabled);
 
-	update_surface();
+	redraw_window();
 	return *this;
 }
 
@@ -491,7 +489,7 @@ CGdiButton& CGdiButton::set_hover_color_matrix(float fScale)	//1.0f = no effect.
 	m_hoverMatrix.m[2][2] = fScale;
 
 	if (m_image.size())
-		m_image[0]->over.set_matrix(&m_hoverMatrix);
+		m_image[0]->img[1].set_matrix(&m_hoverMatrix);
 	return *this;
 }
 
@@ -502,8 +500,25 @@ CGdiButton& CGdiButton::set_down_color_matrix(float fScale)	//1.0f = no effect.
 	m_downMatrix.m[2][2] = fScale;
 
 	if (m_image.size())
-		m_image[0]->down.set_matrix(&m_downMatrix);
+		m_image[0]->img[2].set_matrix(&m_downMatrix);
 	return *this;
+}
+
+//이미지 및 버튼의 크기를 조정한다.
+void CGdiButton::resize(int cx, int cy)
+{
+	if (m_image.size() == 0)
+		return;
+
+	for (int i = 0; i < m_image.size(); i++)
+	{
+		m_image[i]->img[0].resize(cx, cy);
+		m_image[i]->img[1].resize(cx, cy);
+		m_image[i]->img[2].resize(cx, cy);
+		m_image[i]->img[3].resize(cx, cy);
+	}
+
+	SetWindowPos(NULL, 0, 0, cx, cy, SWP_NOMOVE | SWP_NOZORDER);
 }
 
 //그림의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.
@@ -824,7 +839,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//return;
 
 	//이미지가 있다면 이미지를 먼저 그려주고
-	if (m_image.size() > 0 && m_image[idx]->normal != NULL)
+	if (m_image.size() > 0 && m_image[idx]->img[0] != NULL)
 	{
 		RectF			grect;
 		ImageAttributes ia;
@@ -840,33 +855,33 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (m_bAsStatic)
 		{
-			pImage = &m_image[idx]->normal;
+			pImage = &m_image[idx]->img[0];
 		}
 		else
 		{
 			if (is_disabled)
 			{
-				pImage = &m_image[idx]->disabled;
+				pImage = &m_image[idx]->img[3];
 			}
 			//다운 이미지. 반드시 hovering보다 먼저 체크되어야 한다.
 			else if (is_down)
 			{
-				pImage = (use_disabled_image ? &m_image[idx]->disabled : &m_image[idx]->down);
+				pImage = (use_disabled_image ? &m_image[idx]->img[3] : &m_image[idx]->img[2]);
 				pt = m_down_offset;
 			}
 			//
 			else if (m_use_hover && m_bHover)
 			{
-				pImage = (use_disabled_image ? &m_image[idx]->disabled : &m_image[idx]->over);
+				pImage = (use_disabled_image ? &m_image[idx]->img[3] : &m_image[idx]->img[1]);
 			}
 			else
 			{
-				pImage = (use_disabled_image ? &m_image[idx]->disabled : &m_image[idx]->normal);
+				pImage = (use_disabled_image ? &m_image[idx]->img[3] : &m_image[idx]->img[0]);
 			}
 		}
 
 		if (pImage == NULL)
-			pImage = &m_image[idx]->normal;
+			pImage = &m_image[idx]->img[0];
 
 		//배경을 그리고
 		if (!m_back.is_empty())
@@ -883,7 +898,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 
 		//g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
-		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
+		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_zoom);
 
 		if (m_bShowFocusRect)//&& m_bHasFocus)
 		{
@@ -1080,7 +1095,7 @@ void CGdiButton::OnMouseLeave()
 
 	m_bIsTracking = false;
 	m_bHover = false;
-	update_surface();
+	redraw_window();
 
 	//TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
@@ -1126,7 +1141,7 @@ void CGdiButton::OnSetFocus(CWnd* pOldWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//TRACE("set focus\n");
 	m_bHasFocus = true;
-	update_surface();
+	redraw_window();
 }
 
 
@@ -1137,7 +1152,7 @@ void CGdiButton::OnKillFocus(CWnd* pNewWnd)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//TRACE("kill focus\n");
 	m_bHasFocus = false;
-	update_surface();
+	redraw_window();
 }
 
 
@@ -1231,7 +1246,7 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	}
 
 	SetWindowPos(&wndNoTopMost, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);	
-	update_surface();
+	redraw_window();
 }
 
 CGdiButton& CGdiButton::set_round(int round)
@@ -1242,7 +1257,7 @@ CGdiButton& CGdiButton::set_round(int round)
 	m_round = round;
 	m_transparent = (m_round > 0);
 
-	update_surface();
+	redraw_window();
 	return *this;
 }
 
@@ -1251,18 +1266,16 @@ bool CGdiButton::GetCheck()
 	return m_idx;
 }
 
-void CGdiButton::update_surface(bool bErase)
+void CGdiButton::redraw_window(bool bErase)
 {
 	if (m_transparent)
 	{
 		CRect rc;
 
 		GetWindowRect(&rc);
-		//RedrawWindow();
 
 		GetParent()->ScreenToClient(&rc);
 		GetParent()->InvalidateRect(rc, bErase);
-		//GetParent()->UpdateWindow();
 	}
 	else
 	{
@@ -1276,7 +1289,7 @@ void CGdiButton::Toggle()
 {
 	m_idx = !m_idx;
 	TRACE(_T("idx = %d\n"), m_idx);
-	update_surface();
+	redraw_window();
 }
 
 LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
@@ -1369,7 +1382,7 @@ CGdiButton& CGdiButton::set_font_bold(bool bBold)
 void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	update_surface();
+	redraw_window();
 
 	CRect rc;
 	GetClientRect(rc);
@@ -1466,7 +1479,7 @@ void CGdiButton::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CButton::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	update_surface();
+	redraw_window();
 }
 
 
@@ -1532,41 +1545,40 @@ void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus
 	{
 		if (state_index < 0)
 		{
-			m_image[i]->normal.m_pBitmap->GetPixel(x, y, &oldColor);
-			m_image[i]->normal.replace_color(oldColor, newColor);
-			m_image[i]->over.m_pBitmap->GetPixel(x, y, &oldColor);
-			m_image[i]->over.replace_color(oldColor, newColor);
-			m_image[i]->down.m_pBitmap->GetPixel(x, y, &oldColor);
-			m_image[i]->down.replace_color(oldColor, newColor);
+			m_image[i]->img[0].m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->img[0].replace_color(oldColor, newColor);
+			m_image[i]->img[1].m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->img[1].replace_color(oldColor, newColor);
+			m_image[i]->img[2].m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->img[2].replace_color(oldColor, newColor);
 		}
 		else if (state_index == 0)
 		{
-			m_image[i]->normal.m_pBitmap->GetPixel(x, y, &oldColor);
-			m_image[i]->normal.replace_color(oldColor, newColor);
+			m_image[i]->img[0].m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->img[0].replace_color(oldColor, newColor);
 		}
 		else if (state_index == 1)
 		{
-			m_image[i]->over.m_pBitmap->GetPixel(x, y, &oldColor);
-			m_image[i]->over.replace_color(oldColor, newColor);
+			m_image[i]->img[1].m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->img[1].replace_color(oldColor, newColor);
 		}
 		else if (state_index == 2)
 		{
-			m_image[i]->down.m_pBitmap->GetPixel(x, y, &oldColor);
-			m_image[i]->down.replace_color(oldColor, newColor);
+			m_image[i]->img[2].m_pBitmap->GetPixel(x, y, &oldColor);
+			m_image[i]->img[2].replace_color(oldColor, newColor);
 		}
 	}
 
-	update_surface();
+	redraw_window();
 }
 
-void CGdiButton::apply_effect_hsl(int hue, int sat, int light)
+void CGdiButton::apply_effect_hsl(int state_index, int hue, int sat, int light)
 {
 	if (m_image.size() == 0)
 		return;
 
 	int start_index = 0;
 	int end_index = start_index + 1;
-	int state_index = 0;
 
 	Gdiplus::Color oldColor;
 
@@ -1580,25 +1592,107 @@ void CGdiButton::apply_effect_hsl(int hue, int sat, int light)
 	{
 		if (state_index < 0)
 		{
-			m_image[i]->normal.apply_effect_hsl(hue, sat, light);
-			m_image[i]->over.apply_effect_hsl(hue, sat, light);
-			m_image[i]->down.apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[0].apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[1].apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[2].apply_effect_hsl(hue, sat, light);
 		}
 		else if (state_index == 0)
 		{
-			m_image[i]->normal.apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[0].apply_effect_hsl(hue, sat, light);
 		}
 		else if (state_index == 1)
 		{
-			m_image[i]->over.apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[1].apply_effect_hsl(hue, sat, light);
 		}
 		else if (state_index == 2)
 		{
-			m_image[i]->down.apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[2].apply_effect_hsl(hue, sat, light);
 		}
 	}
 
-	update_surface();
+	redraw_window();
+}
+
+void CGdiButton::apply_effect_rgba(int state_index, float r, float g, float b, float a)
+{
+	if (m_image.size() == 0)
+		return;
+
+	int start_index = 0;
+	int end_index = start_index + 1;
+
+	Gdiplus::Color oldColor;
+
+	if (true)//index < 0)
+	{
+		start_index = 0;
+		end_index = m_image.size();
+	}
+
+	for (int i = start_index; i < end_index; i++)
+	{
+		if (state_index < 0)
+		{
+			m_image[i]->img[0].apply_effect_rgba(r, g, b, a);
+			m_image[i]->img[1].apply_effect_rgba(r, g, b, a);
+			m_image[i]->img[2].apply_effect_rgba(r, g, b, a);
+		}
+		else if (state_index == 0)
+		{
+			m_image[i]->img[0].apply_effect_rgba(r, g, b, a);
+		}
+		else if (state_index == 1)
+		{
+			m_image[i]->img[1].apply_effect_rgba(r, g, b, a);
+		}
+		else if (state_index == 2)
+		{
+			m_image[i]->img[2].apply_effect_rgba(r, g, b, a);
+		}
+	}
+
+	redraw_window();
+}
+
+void CGdiButton::apply_effect_blur(int state_index, float radius, BOOL expandEdge)
+{
+	if (m_image.size() == 0)
+		return;
+
+	int start_index = 0;
+	int end_index = start_index + 1;
+
+	Gdiplus::Color oldColor;
+
+	if (true)//index < 0)
+	{
+		start_index = 0;
+		end_index = m_image.size();
+	}
+
+	for (int i = start_index; i < end_index; i++)
+	{
+		if (state_index < 0)
+		{
+			m_image[i]->img[0].apply_effect_blur(radius, expandEdge);
+			m_image[i]->img[1].apply_effect_blur(radius, expandEdge);
+			m_image[i]->img[2].apply_effect_blur(radius, expandEdge);
+		}
+		else if (state_index == 0)
+		{
+			m_image[i]->img[0].apply_effect_blur(radius, expandEdge);
+		}
+		else if (state_index == 1)
+		{
+			m_image[i]->img[1].apply_effect_blur(radius, expandEdge);
+		}
+		else if (state_index == 2)
+		{
+			m_image[i]->img[2].apply_effect_blur(radius, expandEdge);
+		}
+	}
+
+	redraw_window();
 }
 
 BOOL CGdiButton::OnToolTipNotify(UINT /*id*/, NMHDR* pNMHDR, LRESULT* /*pResult*/)

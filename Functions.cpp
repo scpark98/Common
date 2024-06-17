@@ -5388,7 +5388,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 	if (!fontFamily->IsAvailable())
 	{
 		delete fontFamily;
-		fontFamily = new Gdiplus::FontFamily(_T("Arial"));
+		fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
 	}
 
 	Gdiplus::Font font(fontFamily, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
@@ -5397,14 +5397,10 @@ CRect draw_text(Gdiplus::Graphics* g,
 	Gdiplus::SolidBrush brush2(cr_text);
 
 	Gdiplus::StringFormat sf;
-	sf.SetAlignment(Gdiplus::StringAlignmentCenter);
-	sf.SetLineAlignment(Gdiplus::StringAlignmentCenter);
 
-	int x = rTarget.left;
-	int y = rTarget.top;
 
 	Gdiplus::RectF boundRect;
-	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(x, y), &boundRect);
+	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(rTarget.left, rTarget.top), &boundRect);
 	//boundRect = measure_string(g, font, text);
 
 	boundRect.Width += shadow_depth;
@@ -5416,14 +5412,23 @@ CRect draw_text(Gdiplus::Graphics* g,
 		rTarget.bottom = rTarget.top + boundRect.Height;
 
 	if (align & DT_CENTER)
-		x = rTarget.CenterPoint().x - boundRect.Width / 2;
+		sf.SetAlignment(Gdiplus::StringAlignmentCenter);
+		//x = rTarget.CenterPoint().x - boundRect.Width / 2;
 	else if (align & DT_RIGHT)
-		x = rTarget.right - boundRect.Width;
+		sf.SetAlignment(Gdiplus::StringAlignmentFar);
+		//x = rTarget.right - boundRect.Width;
+	else
+		sf.SetAlignment(Gdiplus::StringAlignmentNear);
 
 	if (align & DT_VCENTER)
-		y = rTarget.CenterPoint().y - boundRect.Height / 2;
+		//y = rTarget.CenterPoint().y - boundRect.Height / 2;
+		sf.SetLineAlignment(Gdiplus::StringAlignmentCenter);
 	else if (align & DT_BOTTOM)
-		y = rTarget.bottom - boundRect.Height;
+		//y = rTarget.bottom - boundRect.Height;
+		sf.SetLineAlignment(Gdiplus::StringAlignmentFar);
+	else
+		sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
+
 
 	if (calcRect)
 	{
@@ -5445,7 +5450,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 		delete g;
 		::DeleteDC(hDC);
 		TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
-		return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
+		return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 	}
 
 	//g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
@@ -5484,7 +5489,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 
 	if (thickness == 0.0)
 	{
-		g->DrawString(CStringW(text), -1, &font, boundRect, &sf, &brush2);
+		g->DrawString(CStringW(text), -1, &font, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), &sf, &brush2);
 	}
 	else
 	{
@@ -5508,7 +5513,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 	delete fontFamily;
 	::DeleteDC(hDC);
 
-	return CRect(x, y, x + boundRect.Width, y + boundRect.Height);
+	return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 }
 
 //text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.

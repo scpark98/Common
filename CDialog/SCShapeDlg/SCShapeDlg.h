@@ -22,11 +22,11 @@
 
 #include "../../GdiplusBitmap.h"
 
-class CShapeDlgTextSetting
+class CSCShapeDlgTextSetting
 {
 public:
-	CShapeDlgTextSetting() {};
-	CShapeDlgTextSetting(CString _text,
+	CSCShapeDlgTextSetting() {};
+	CSCShapeDlgTextSetting(CString _text,
 		float _font_size = 40,
 		int _font_bold = true,
 		int _shadow_depth = 2,
@@ -96,7 +96,7 @@ public:
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 							Gdiplus::Color cr_back = Gdiplus::Color(1, 0, 0, 0));
-	bool			set_text(CShapeDlgTextSetting* setting = NULL);
+	bool			set_text(CSCShapeDlgTextSetting* setting = NULL);
 
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);
@@ -109,8 +109,9 @@ public:
 	void			thread_fadeinout(bool fadein);
 
 	//
-	CShapeDlgTextSetting	m_text_setting;
-	CShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
+	CSCShapeDlgTextSetting	m_text_setting;
+	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
+	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
 	void			set_text_color(Gdiplus::Color cr_text) { m_text_setting.cr_text = cr_text; set_text(&m_text_setting); }
 
 

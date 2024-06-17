@@ -18,7 +18,7 @@
 
 #include "../../GdiplusBitmap.h"
 
-static const UINT Message_SCSliderCtrl = ::RegisterWindowMessage(_T("MessageString_SCSliderCtrl"));
+static const UINT Message_CSCSliderCtrl = ::RegisterWindowMessage(_T("MessageString_CSCSliderCtrl"));
 
 //트랙 이벤트가 발생했을 때 바로 PostMessage를 호출하게 되면
 //미세한 마우스 움직임들에 대해 무수히 많은 이벤트가 발생하게 되므로
@@ -149,7 +149,8 @@ public:
 
 	int		get_style() { return m_style; }
 
-	void	SetPos(int pos) { CSliderCtrl::SetPos(pos); Invalidate(); }
+	void	SetPos(int pos) { CSliderCtrl::SetPos(pos); redraw_window(); }
+	void	redraw_window(bool bErase = false);
 
 	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
 	void	set_style(int nStyle);
@@ -265,6 +266,7 @@ protected:
 	int			m_nValueStyle;	//only applies to SCSLIDERCTRL_STYLE_PROGRESS. default = value;
 	COLORREF	m_crValueText;	//text color of value. background is transparent. default = RGB(64,64,64);
 
+	bool		m_transparent = false;
 	COLORREF	m_cr_back;		// back color of control
 	COLORREF	m_cr_active;			//processed area
 	COLORREF	m_cr_inactive;		//not processed area

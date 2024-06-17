@@ -136,7 +136,30 @@ void CSCSliderCtrl::OnPaint()
 	int i;
 
 	//전체 슬라이드 사각형 영역을 배경색으로 그림
-	dc.FillSolidRect(m_rc, enable_color(m_cr_back));
+	if (m_transparent)
+	{
+		CRect Rect;
+		GetWindowRect(&Rect);
+		CWnd* pParent = GetParent();
+		ASSERT(pParent);
+		pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
+		//copy what's on the parents at this point
+		CDC* pDC = pParent->GetDC();
+		CDC MemDC;
+		CBitmap bmp;
+		MemDC.CreateCompatibleDC(pDC);
+		bmp.CreateCompatibleBitmap(pDC, Rect.Width(), Rect.Height());
+		CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+		MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pDC, Rect.left, Rect.top, SRCCOPY);
+		dc.BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+		MemDC.SelectObject(pOldBmp);
+		pParent->ReleaseDC(pDC);
+		MemDC.DeleteDC();
+	}
+	else
+	{
+		dc.FillSolidRect(m_rc, enable_color(m_cr_back));
+	}
 
 
 	//inactive 영역을 먼저 그리고
@@ -353,7 +376,7 @@ void CSCSliderCtrl::OnPaint()
 	
 	//for test
 	//DrawRectangle(&dc, m_track, red);
-	DrawRectangle(&dc, m_rc, red);
+	//DrawRectangle(&dc, m_rc, red);
 
 	// 손잡이(thumb)를 그린다
 #if 1
@@ -605,7 +628,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_use_bookmark && (m_cur_bookmark >= 0))
 	{
 		SetPos(m_bookmark[m_cur_bookmark].pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
 		return;
 	}
 
@@ -649,11 +672,11 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
 		//CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_post)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), pos), 0);
+		::PostMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, GetDlgCtrlID(), pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_callback)
 	{
@@ -688,11 +711,11 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_post)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
+		::PostMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
 	}
 	else if (m_nEventMsgStyle == msg_style_callback)
 	{
@@ -749,7 +772,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 				m_tooltip.UpdateTipText(str, this);
 		}
 		
-		Invalidate();
+		redraw_window();
 	}
 
 	if (m_use_tooltip && m_cur_bookmark == -1)
@@ -797,12 +820,13 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 	// 변한 내용을 적용한다
 	int pix = Pos2Pixel(pos);
-	TRACE(_T("pos2pix(%d) = %d, nPixel = %d\n"), pos, pix, nPixel);
+	TRACE(_T("before pos2pix(%d) = %d, nPixel = %d\n"), pos, pix, nPixel);
 	if(Pos2Pixel(pos) != nPixel)
 	{
 		pos = Pixel2Pos(nPixel);
-		TRACE(_T("Pixel2Pos(%d) = %d, nPixel = %d\n"), nPixel, pos, nPixel);
+		TRACE(_T("after Pixel2Pos(%d) = %d, nPixel = %d\n"), nPixel, pos, nPixel);
 		SetPos(pos);
+		//redraw_window();
 
 		if (m_nEventMsgStyle == msg_style_timer)
 		{
@@ -810,13 +834,15 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		else if (m_nEventMsgStyle == msg_style_post)
 		{
-			::PostMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
 		}
 		else if (m_nEventMsgStyle == msg_style_callback)
 		{
 			//if (m_pCallback_func != NULL)
 				//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_MOVED, pos);
 		}
+
+		redraw_window();
 	}
 
 	CSliderCtrl::OnMouseMove(nFlags, point);
@@ -1099,7 +1125,7 @@ void CSCSliderCtrl::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_post_pos)
 	{
 		KillTimer(timer_post_pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), GetPos()), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), GetPos()), 0);
 	}
 
 	CSliderCtrl::OnTimer(nIDEvent);
@@ -1173,7 +1199,7 @@ void CSCSliderCtrl::bookmark(int mode, int pos, CString name)
 		if (index >= 0)
 		{
 			SetPos(m_bookmark[index].pos);
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_SCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
 		}
 	}
 
@@ -1349,4 +1375,23 @@ void CSCSliderCtrl::set_step_image(int pos, int id)
 
 	m_steps[pos].m_img.load(id);
 	Invalidate();
+}
+
+void CSCSliderCtrl::redraw_window(bool bErase)
+{
+	if (m_transparent)
+	{
+		CRect rc;
+
+		GetWindowRect(&rc);
+
+		GetParent()->ScreenToClient(&rc);
+		GetParent()->InvalidateRect(rc, bErase);
+	}
+	//else
+	{
+		Invalidate();
+	}
+
+	return;
 }

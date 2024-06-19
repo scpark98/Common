@@ -812,6 +812,19 @@ CString	normalize_path(CString& filepath)
 	return filepath;
 }
 
+//확장자 집합 문자열로 파일열기 대화상자의 filter string을 리턴한다.
+//simple : "bmp;jpg;jpeg;png;webp;gif;yuv;raw => "JPG files|*.jpg|bmp|*.bmp|
+//extension_group = FILE_EXTENSION_VIDEO or FILE_EXTENSION_SOUND or FILE_EXTENSION_IMAGE or FILE_EXTENSION_MEDIA...
+//현재 미완성!
+CString	get_filter_string(CString extension_group, bool simple)
+{
+	CString filter;
+	std::deque<CString> token;
+	get_token_string(extension_group, token, _T(";"), false);
+
+	return filter;
+}
+
 //폴더에 있는 파일들 중 filetitle이고 extension에 해당하는 파일명을 리턴한다.
 std::deque<CString>	get_filelist_from_filetitle(CString folder, CString filetitle, CString extension)
 {
@@ -5322,7 +5335,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 				int x, int y, int w, int h,
 				CString text,
 				float font_size,
-				bool font_bold,
+				int font_style,
 				int shadow_depth,
 				float thickness,
 				CString font_name,
@@ -5335,7 +5348,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 					CRect(x, y, x + w, y + h),
 					text,
 					font_size,
-					font_bold,
+					font_style,
 					shadow_depth,
 					thickness,
 					font_name,
@@ -5349,7 +5362,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 				CRect rTarget,
 				CString text,
 				float font_size,
-				bool font_bold,
+				int font_style,
 				int shadow_depth,
 				float thickness,
 				CString font_name,
@@ -5391,7 +5404,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 		fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
 	}
 
-	Gdiplus::Font font(fontFamily, emSize, font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular);
+	Gdiplus::Font font(fontFamily, emSize, font_style);
 
 	Gdiplus::SolidBrush shadow_brush(cr_shadow);
 	Gdiplus::SolidBrush brush2(cr_text);
@@ -5449,7 +5462,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 		delete fontFamily;
 		delete g;
 		::DeleteDC(hDC);
-		TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
+		//TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
 		return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 	}
 
@@ -5498,7 +5511,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 		Gdiplus::GraphicsPath str_path;
 
 		str_path.AddString(CStringW(text), -1, fontFamily,
-			font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, boundRect, &sf);
+			font_style, emSize, boundRect, &sf);
 		//str_path.AddString(CStringW(text), -1, fontFamily,
 		//	font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, Gdiplus::Point(x, y), &sf);
 

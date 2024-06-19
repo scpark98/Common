@@ -50,6 +50,12 @@ void CPropGridSlider::OnSliderPosChanged()
 
 void CPropGridSlider::SetSliderPos()
 {
+	if (m_fMax == m_fMin)
+	{
+		m_pSlider->SetPos(0);
+		return;
+	}
+
 	COleVariant value = GetValue();
 	float fval = value.fltVal;
 	float ratio = (fval - m_fMin) / (m_fMax - m_fMin);
@@ -75,7 +81,8 @@ void CPropGridSlider::OnDrawValue(CDC* pDC, CRect rect)
 
 	if (!m_pSlider) {
 		m_pSlider = new CPropSlider(this);
-		DWORD style = WS_VISIBLE | WS_CHILD | TBS_BOTH | TBS_NOTICKS;
+		//원래는 TBS_BOTH였으나 약간 위로 밀리고 thumb도 작게 표시되어 TBS_TOP으로 변경함.
+		DWORD style = WS_VISIBLE | WS_CHILD | TBS_TOP | TBS_NOTICKS;
 		m_pSlider->Create(style, rt, m_pWndList, 5);
 		m_pSlider->SetRange(0, m_iSliderStep);
 		m_pSlider->ShowWindow(SW_SHOW);

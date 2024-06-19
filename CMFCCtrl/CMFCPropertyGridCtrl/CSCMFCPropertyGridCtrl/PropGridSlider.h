@@ -4,10 +4,12 @@
 #include <afxcontrolbars.h>
 ////////////////////////////////////////////////////////////////////////////////////
 class CPropGridSlider;
+
 class CPropSlider : public CSliderCtrl
 {
 public:
-	CPropSlider(CPropGridSlider *parent_prop) :CSliderCtrl() {
+	CPropSlider(CPropGridSlider *parent_prop) : CSliderCtrl()
+	{
 		m_iPrevPos = -1; 
 		m_pParentProp = parent_prop;
 	}
@@ -37,8 +39,8 @@ protected:
 	int m_iEditCtrlWidth;
 
 public:
-	CPropGridSlider(CString name, float val, CString tip, float min, float max, int step, int edit_ctrl_width=-2 ) :
-		CMFCPropertyGridProperty(name, val, tip) {
+	CPropGridSlider(CString name, float val, CString tip, float min, float max, int step, DWORD dwData, int edit_ctrl_width=-2 ) :
+		CMFCPropertyGridProperty(name, val, tip, dwData) {
 		m_fMin = min;
 		m_fMax = max;
 		m_iSliderStep = step;

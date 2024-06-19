@@ -1199,7 +1199,7 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 }
 
 //투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
-void CGdiplusBitmap::replace_back_color(Gdiplus::Color cr_back)
+void CGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height);
 	Gdiplus::Graphics g(result);

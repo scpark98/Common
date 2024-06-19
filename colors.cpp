@@ -263,3 +263,31 @@ int	get_hue(COLORREF cr)
 	rgb2hsv(GetRValue(cr), GetGValue(cr), GetBValue(cr), h, s, v);
 	return (int)h;
 }
+
+COLORREF gpColor2RGB(Gdiplus::Color cr)
+{
+	return RGB(cr.GetRed(), cr.GetGreen(), cr.GetBlue());
+}
+
+Gdiplus::Color RGB2gpColor(COLORREF cr, BYTE alpha)
+{
+	return Gdiplus::Color(alpha, GetRValue(cr), GetGValue(cr), GetBValue(cr));
+}
+
+//cr컬러에서 a,r,g,b 중 한 색을 value로 변경한다.
+void set_color(Gdiplus::Color &cr, int argb, BYTE value)
+{
+	BYTE a = (argb == 0 ? value : cr.GetA());
+	BYTE r = (argb == 1 ? value : cr.GetR());
+	BYTE g = (argb == 2 ? value : cr.GetG());
+	BYTE b = (argb == 3 ? value : cr.GetB());
+
+	cr = Gdiplus::Color(a, r, g, b);
+}
+
+Gdiplus::Color get_color(Gdiplus::Color cr, int argb, BYTE value)
+{
+	Gdiplus::Color cr_new = cr;
+	set_color(cr_new, argb, value);
+	return cr_new;
+}

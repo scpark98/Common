@@ -22,27 +22,44 @@
 
 #include "../../GdiplusBitmap.h"
 
+static const UINT Message_CSCShapeDlg = ::RegisterWindowMessage(_T("MessageString_CSCShapeDlg"));
+
+class CSCShapeDlgMessage
+{
+	CSCShapeDlgMessage(CWnd* _pThis)
+	{
+		pThis = _pThis;
+	}
+
+	enum Messages
+	{
+		msg_window_moved = 0,
+	};
+
+	CWnd*	pThis = NULL;
+};
+
 class CSCShapeDlgTextSetting
 {
 public:
 	CSCShapeDlgTextSetting() {};
 	CSCShapeDlgTextSetting(CString _text,
 		float _font_size = 40,
-		int _font_bold = true,
+		int _font_style = Gdiplus::FontStyleBold,
 		int _shadow_depth = 2,
 		float _thickness = 2,
 		CString _font_name = _T("Arial"),
 		Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
 		Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
 		Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
-		Gdiplus::Color _cr_back = Gdiplus::Color(1, 0, 0, 0))	//거의 투명이지만 클릭으로 옮기기 쉽도록
+		Gdiplus::Color _cr_back = Gdiplus::Color(1, 0, 0, 0))	//alpha=0이면 투명 영역은 클릭되지 않는다.
 	{
 		text = _text;
+		font_name = _font_name;
 		font_size = _font_size;
-		font_bold = _font_bold;
+		font_style = _font_style;
 		shadow_depth = _shadow_depth;
 		thickness = _thickness;
-		font_name = _font_name;
 		cr_text = _cr_text;
 		cr_stroke = _cr_stroke;
 		cr_shadow = _cr_shadow;
@@ -50,11 +67,11 @@ public:
 	}
 
 	CString text;
+	CString font_name;
 	float	font_size;
-	bool	font_bold;
+	int		font_style;
 	int		shadow_depth;
 	float	thickness;
-	CString	font_name;
 	Gdiplus::Color cr_text;
 	Gdiplus::Color cr_stroke;
 	Gdiplus::Color cr_shadow;
@@ -73,7 +90,7 @@ public:
 	//default : SW_HIDE
 	bool			create(CWnd* parent, int left, int top, int right, int bottom);
 
-	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야하지만
+	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
 	void			set_image(CGdiplusBitmap* img, bool deep_copy = true);
 	bool			load(UINT id);
@@ -89,8 +106,11 @@ public:
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
 	//default는 hide 상태로 시작함.
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
-	bool			set_text(CWnd* parent, CString text, float font_size, bool font_bold,
-							int shadow_depth = 2, float thickness = 2.0f,
+	bool			set_text(CWnd* parent, CString text,
+							float font_size,
+							int font_style,
+							int shadow_depth = 2,
+							float thickness = 2.0f,
 							CString font_name = _T(""),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
@@ -114,6 +134,7 @@ public:
 	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
 	void			set_text_color(Gdiplus::Color cr_text) { m_text_setting.cr_text = cr_text; set_text(&m_text_setting); }
 
+	void			get_logfont(LOGFONT *lf);
 
 	//animated gif인 경우
 	enum GIF_PLAY_STATE
@@ -140,8 +161,6 @@ protected:
 	int				m_alpha = 255;
 	void			render(Gdiplus::Bitmap* img);
 
-	LOGFONT			m_lf;
-
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
 
@@ -151,4 +170,5 @@ public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	virtual void PreSubclassWindow();
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 };

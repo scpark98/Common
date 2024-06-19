@@ -175,7 +175,7 @@ public:
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
 
 	//투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
-	void replace_back_color(Gdiplus::Color cr_back);
+	void set_back_color(Gdiplus::Color cr_back);
 
 	//현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
 	//원본에 적용하는 것이 정석이나 구조 수정이 필요하다.

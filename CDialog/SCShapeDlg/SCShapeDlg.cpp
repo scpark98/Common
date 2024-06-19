@@ -13,7 +13,6 @@ IMPLEMENT_DYNAMIC(CSCShapeDlg, CDialogEx)
 
 CSCShapeDlg::CSCShapeDlg()
 {
-	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
 CSCShapeDlg::~CSCShapeDlg()
@@ -28,6 +27,7 @@ void CSCShapeDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CSCShapeDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
+	ON_WM_WINDOWPOSCHANGED()
 END_MESSAGE_MAP()
 
 
@@ -109,7 +109,7 @@ bool CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 	return set_text(m_parent,
 					m_text_setting.text,
 					m_text_setting.font_size,
-					m_text_setting.font_bold,
+					m_text_setting.font_style,
 					m_text_setting.shadow_depth,
 					m_text_setting.thickness,
 					m_text_setting.font_name,
@@ -124,7 +124,7 @@ bool CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 bool CSCShapeDlg::set_text(CWnd* parent,
 						CString text,
 						float font_size,
-						bool font_bold,
+						int font_style,
 						int shadow_depth/* = 2*/,
 						float thickness/* = 2*/,
 						CString font_name/* = _T("")*/,
@@ -155,26 +155,26 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 		m_text_setting.font_name = font_name = lf.lfFaceName;
 	}
 
-	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_bold, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
+	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_style, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
 
 	//텍스트 출력 크기를 얻어오고
 	CRect r;
 	
 	r = draw_text(NULL, CRect(), text,
-		font_size, font_bold, shadow_depth, thickness, font_name,
-		cr_text, cr_stroke, cr_shadow);
+		font_size, font_style, shadow_depth, thickness, font_name,
+		cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
 
 	CGdiplusBitmap	img(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
 
-	TRACE(_T("img rect = (%d,%d)"), img.width, img.height);
+	//TRACE(_T("img rect = (%d,%d)\n"), img.width, img.height);
 
 	//해당 캔버스에
 	Gdiplus::Graphics g(img.m_pBitmap);
 
 	//글자를 출력하고
 	r = draw_text(&g, r, text,
-		font_size, font_bold, shadow_depth, thickness, font_name,
-		cr_text, cr_stroke, cr_shadow);
+		font_size, font_style, shadow_depth, thickness, font_name,
+		cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
 
 	if (m_hWnd)
 	{
@@ -200,33 +200,52 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
 {
+	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
+	if (m_img.is_animated_gif() && m_gif_state == state_play)
+	{
+		TRACE(_T("stop current gif...\n"));
+		m_gif_state = state_stop;
+		Wait(1000);
+	}
+
 	if (deep_copy)
 		img->deep_copy(&m_img);
 
 	SetWindowPos(NULL, 0, 0, m_img.width, m_img.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
-	gif_play();
+	//단일 이미지인지 gif인지에 따라 별도 처리
+	if (m_img.is_animated_gif())
+	{
+		gif_play(state_play);
+	}
+	else
+	{
+		render(m_img.m_pBitmap);
+	}
 }
 
 bool CSCShapeDlg::load(UINT id)
 {
-	m_img.load(id);
-	set_image(&m_img, false);
-	return false;
+	bool res = m_img.load(id);
+	if (res)
+		set_image(&m_img, false);
+	return res;
 }
 
 bool CSCShapeDlg::load(CString sType, UINT id)
 {
-	m_img.load(sType, id);
-	set_image(&m_img, false);
-	return false;
+	bool res = m_img.load(sType, id);
+	if (res)
+		set_image(&m_img, false);
+	return res;
 }
 
 bool CSCShapeDlg::load(CString sFile)
 {
-	m_img.load(sFile);
-	set_image(&m_img, false);
-	return false;
+	bool res = m_img.load(sFile);
+	if (res)
+		set_image(&m_img, false);
+	return res;
 }
 
 //keyboard, mouse 이벤트 처리 여부.
@@ -251,17 +270,18 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	if (!IsWindow(m_hWnd) || !img)
 		return;
 
-	if (img->GetWidth() == 0 || img->GetHeight() == 0)
-	{
-		TRACE(_T("image width or height is invalid.\n"));
-	}
-
 	CRect rc;
 	GetWindowRect(rc);
 	POINT ptSrc = { 0, 0 };
 	POINT ptWinPos = { rc.left, rc.top };
 	SIZE sz = { img->GetWidth(), img->GetHeight() };
 	BLENDFUNCTION stBlend = { AC_SRC_OVER, 0, m_alpha, AC_SRC_ALPHA };
+
+	if (img->GetWidth() == 0 || img->GetHeight() == 0)
+	{
+		TRACE(_T("image width or height is invalid.\n"));
+		return;
+	}
 
 	HDC hDC = ::GetDC(m_hWnd);
 	HDC hdcMemory = ::CreateCompatibleDC(hDC);
@@ -314,7 +334,7 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	::ReleaseDC(m_hWnd, hDC);
 }
 
-//animated gif인 경우
+//일반 이미지와 animated gif 공통으로 사용한다.
 void CSCShapeDlg::gif_play(int new_state)
 {
 	if (new_state == state_stop)
@@ -336,19 +356,18 @@ void CSCShapeDlg::gif_play(int new_state)
 		return;
 	}
 
+	//기존 gif play중이라면 thread를 종료시킨 후 새로 생성한다.
+	if (m_gif_state == state_play)
+	{
+		m_gif_state = state_stop;
+		//Wait(1000);
+	}
+
 	m_gif_state = state_play;
 
 	//단일 이미지인지 gif인지에 따라 별도 처리
-	if (m_img.is_animated_gif())
-	{
-		m_gif_state = state_play;
-		std::thread t(&CSCShapeDlg::gif_thread, this);
-		t.detach();
-	}
-	else
-	{
-		render(m_img.m_pBitmap);
-	}
+	std::thread t(&CSCShapeDlg::gif_thread, this);
+	t.detach();
 }
 
 void CSCShapeDlg::gif_pause()
@@ -373,11 +392,19 @@ void CSCShapeDlg::gif_thread()
 
 	while (m_gif_state != state_stop)
 	{
+		TRACE(_T("gif_thread\n"));
+
 		if (m_gif_state == state_pause)
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 			continue;
 		}
+
+		if (!m_img.is_valid() ||
+			m_img.m_pBitmap == NULL ||
+			m_gif_index > m_img.get_frame_count() ||
+			m_img.m_pPropertyItem == NULL)
+			break;
 
 		m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_gif_index);
 		render(m_img.m_pBitmap);
@@ -456,4 +483,27 @@ void CSCShapeDlg::thread_fadeinout(bool fadein)
 		
 		alpha(_alpha);
 	}
+}
+
+
+void CSCShapeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+{
+	CDialogEx::OnWindowPosChanged(lpwndpos);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+}
+
+void CSCShapeDlg::get_logfont(LOGFONT *lf)
+{
+	memset(lf, 0, sizeof(LOGFONT));
+	_tcscpy_s(lf->lfFaceName, m_text_setting.font_name);
+
+	HDC hDC = ::GetDC(m_hWnd);
+	LONG size = -MulDiv(m_text_setting.font_size, GetDeviceCaps(hDC, LOGPIXELSY), 72);
+	::DeleteDC(hDC);
+
+	lf->lfHeight = size;
+	lf->lfWeight = (m_text_setting.font_style & Gdiplus::FontStyleBold) ? FW_BOLD : FW_NORMAL;
+	lf->lfItalic = (m_text_setting.font_style & Gdiplus::FontStyleItalic) ? true : false;
+	lf->lfStrikeOut = (m_text_setting.font_style & Gdiplus::FontStyleStrikeout) ? true : false;
 }

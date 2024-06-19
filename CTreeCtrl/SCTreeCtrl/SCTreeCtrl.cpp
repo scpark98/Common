@@ -121,8 +121,12 @@ void CSCTreeCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 //GetItemRect()를 이용해서 그려주니 스크롤도 자동 처리된다.
 void CSCTreeCtrl::OnPaint()
 {
-	//CTreeCtrl::OnPaint();
-	//return;
+	//tree가 제대로 구성되어 있는지 기본 OnPaint()로 확인 목적 코드
+	if (use_default_paint)
+	{
+		CTreeCtrl::OnPaint();
+		return;
+	}
 
 	CPaintDC dc1(this); // device context for painting
 					   // TODO: 여기에 메시지 처리기 코드를 추가합니다.
@@ -130,8 +134,8 @@ void CSCTreeCtrl::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	CMemoryDC	dc(&dc1, &rc);
-	Graphics	g(dc.m_hDC, rc);
+	CMemoryDC dc(&dc1, &rc);
+	Gdiplus::Graphics g(dc.m_hDC, rc);
 
 	COLORREF	crText = m_crText;
 	COLORREF	crBack = m_crBack;
@@ -189,6 +193,7 @@ void CSCTreeCtrl::OnPaint()
 		//label영역의 left는 margin, button, checkbox, icon 유무에 관계없이 동일하게 리턴된다.
 		//Lines at Root에 대해서만 자동 반영된다. false일 경우는 2, true일 경우는 22.
 		GetItemRect(hItem, rItem, TRUE);
+		rItem.left = 2;
 		rItem.right = rc.right - 1;
 
 		label = GetItemText(hItem);
@@ -254,7 +259,14 @@ void CSCTreeCtrl::OnPaint()
 		}
 
 		//아이콘을 그려주고
-		if (m_use_own_imagelist && m_imagelist.GetSafeHandle() && (image_index < m_imagelist.GetImageCount()))
+		if (m_is_shell_treectrl)
+		{
+			GetItemImage(hItem, image_index, image_selected_index);
+			image_index = m_pShellImageList->GetSystemImageListIcon(get_fullpath(GetSelectedItem()), true);
+			m_pShellImageList->m_imagelist_small.Draw(&dc, image_index,
+				CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
+		}
+		else if (m_use_own_imagelist && m_imagelist.GetSafeHandle() && (image_index < m_imagelist.GetImageCount()))
 		{
 			GetItemImage(hItem, image_index, image_selected_index);
 			if (image_index >= 0 && image_index < image_count)
@@ -262,13 +274,6 @@ void CSCTreeCtrl::OnPaint()
 				m_imagelist.Draw(&dc, image_index, CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 				rItem.left += m_image_size;
 			}
-		}
-		else if (m_is_shell_treectrl)
-		{
-			GetItemImage(hItem, image_index, image_selected_index);
-			image_index = m_pShellImageList->GetSystemImageListIcon(get_fullpath(GetSelectedItem()), true);
-			m_pShellImageList->m_imagelist_small.Draw(&dc, image_index,
-				CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 		}
 
 		//레이블을 그려준다.
@@ -439,6 +444,7 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 	m_is_shell_treectrl = true;
 	m_is_shell_treectrl_local = is_local;
 	m_use_own_imagelist = true;
+	m_image_size = 16;
 	m_pShellImageList = pShellImageList;
 
 	SetImageList(&m_pShellImageList->m_imagelist_small, TVSIL_NORMAL);

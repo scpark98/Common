@@ -859,6 +859,12 @@ struct	NETWORK_INFO
 	bool		change_extension(CString& filepath, CString newExt, bool applyRealFile);
 	CString		normalize_path(CString& filepath);
 
+	//확장자 집합 문자열로 파일열기 대화상자의 filter string을 리턴한다.
+	//simple : "bmp;jpg;jpeg;png;webp;gif;yuv;raw => "JPG files|*.jpg|bmp|*.bmp|
+	//extension_group = FILE_EXTENSION_VIDEO or FILE_EXTENSION_SOUND or FILE_EXTENSION_IMAGE or FILE_EXTENSION_MEDIA...
+	//현재 미완성!
+	//CString		get_filter_string(CString extension_group, bool simple = true);
+
 	//폴더에 있는 파일들 중 filetitle이고 extension에 해당하는 파일명을 리턴한다.
 	std::deque<CString>		get_filelist_from_filetitle(CString folder, CString filetitle, CString extension);
 	std::deque<CString>		get_filelist_from_filetitle(CString filename, CString extension);
@@ -1340,7 +1346,7 @@ void		SetWallPaper(CString sfile);
 							int x, int y, int w, int h,
 							CString text,
 							float font_size,
-							bool font_bold,
+							int font_style,
 							int shadow_depth,
 							float thickness,
 							CString font_name = _T("맑은 고딕"),
@@ -1352,7 +1358,7 @@ void		SetWallPaper(CString sfile);
 							CRect rTarget,
 							CString text,
 							float font_size,
-							bool font_bold,
+							int font_style,
 							int shadow_depth,
 							float thickness,
 							CString font_name = _T("맑은 고딕"),

@@ -77,6 +77,9 @@ public:
 		message_drag_and_drop,
 	};
 
+	//for test
+	bool		use_default_paint = true;
+
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 

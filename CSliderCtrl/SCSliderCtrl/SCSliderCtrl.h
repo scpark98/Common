@@ -149,7 +149,7 @@ public:
 
 	int		get_style() { return m_style; }
 
-	void	SetPos(int pos) { CSliderCtrl::SetPos(pos); redraw_window(); }
+	//void	SetPos(int pos) { CSliderCtrl::SetPos(pos); Invalidate(); /*redraw_window();*/ }
 	void	redraw_window(bool bErase = false);
 
 	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
@@ -221,7 +221,6 @@ protected:
 
 
 	//실제 전체 구간 게이지 영역
-	CRect		m_track;
 	int			m_track_thick = 8;	//트랙 두께
 
 	//잡고 움직이는 영역
@@ -231,7 +230,7 @@ protected:
 	int			m_nMouseOffset;
 
 	//현재는 세로모드에 대한 코드가 거의 구현되어 있지 않다.
-	bool		m_is_vertical;
+	bool		m_is_vertical = false;
 
 	//enable move the current pos by click or drag even though progress style. default = true
 	bool		m_enable_slide;
@@ -261,7 +260,9 @@ protected:
 	그렇지 않은 조건일 경우만 이쪽으로 넘겨서 처리하도록 수정 완료.
 	bool		m_enable_bottom_slide;
 	*/
-	bool		m_lbuttondown, m_has_focus, m_draw_focus_rect;
+	bool		m_lbuttondown = false;
+	bool		m_has_focus = false;
+	bool		m_draw_focus_rect = false;
 
 	int			m_nValueStyle;	//only applies to SCSLIDERCTRL_STYLE_PROGRESS. default = value;
 	COLORREF	m_crValueText;	//text color of value. background is transparent. default = RGB(64,64,64);
@@ -289,8 +290,8 @@ protected:
 	CWnd*		m_pParentWnd;
 	void		(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos);
 
-	double		Pixel2Pos(int nPixel);
-	int			Pos2Pixel(int nPos);
+	int			Pixel2Pos(int pixel);
+	int			Pos2Pixel(int pos);
 	void		PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
 							 COLORREF clrpTransColor);
 	void		DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,

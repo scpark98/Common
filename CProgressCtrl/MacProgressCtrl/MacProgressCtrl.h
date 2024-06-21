@@ -39,29 +39,27 @@ class CMacProgressCtrl : public CProgressCtrl
 public:
 	CMacProgressCtrl();
 
-	// Attributes
-public:
-
-	// Operations
-public:
-
-	// Overrides
-		// ClassWizard generated virtual function overrides
-		//{{AFX_VIRTUAL(CMacProgressCtrl)
-		//}}AFX_VIRTUAL
-
-	// Implementation
-public:
 	bool		m_bLButtonDown;
 
+	void		set_style(int style) { m_style = style; Invalidate(); }
+	enum MACPROGRESS_STYLE
+	{
+		style_default = 0,
+		style_round_line,
+	};
+
 	void		SetCtrlID(int nID) { m_nCtrlID = nID; }
-	void		UseSlider(bool bUseSlider = true) { m_bUseSlider = bUseSlider; }
+
+	//true로 하면 CSliderCtrl과 같이 위치를 조정할 수 있다.
+	void		use_slider(bool use = true) { m_use_slider = use; }
+
 	int			get_lower() { return m_lower; }
 	int			get_upper() { return m_upper; }
 	BOOL		GetIndeterminate();
 	void		SetIndeterminate(BOOL bIndeterminate = TRUE);
-	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1, BOOL bGradient = TRUE);
+	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1);
 	void		set_back_color(COLORREF cr_back);
+	void		set_back_track_color(COLORREF cr_back);
 	void		SetTransparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
 	void		SetGradient(bool bGradient = true) { m_bGradient = bGradient; Invalidate(); }
 	void		SetText(CString sText);
@@ -102,16 +100,17 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 private:
+	int			m_style = style_default;
 	int			m_nCtrlID;			//parent에 progress가 여러개 생성될 경우 메시지를 구분하기 위한 ID
 	int			m_lower = 0;
 	int			m_upper = 100;
-	bool		m_bUseSlider;		//true이면 슬라이드 컨트롤과 같이 조정할 수 있고 콜백함수를 호출한다.
+	bool		m_use_slider;		//true이면 슬라이드 컨트롤과 같이 조정할 수 있고 콜백함수를 호출한다.
 	bool		m_bDrawOutline;
 	bool		m_text_show = false;
 	int			m_text_format = text_format_percent;
 	CString		m_sText;
-	COLORREF	m_crText0;
-	COLORREF	m_crText1;
+	COLORREF	m_cr_text0;
+	COLORREF	m_cr_text1;
 	bool		m_use_invert_text_color = false;
 	bool		m_text_shadow = false;
 
@@ -120,7 +119,7 @@ private:
 	int			m_border_pen_style = PS_SOLID;
 	COLORREF	m_border_color = RGB(188, 188, 188);
 
-	bool		m_bGradient;		//default = false
+	bool		m_bGradient = false;
 
 
 	bool		m_bIndeterminate;
@@ -131,8 +130,8 @@ private:
 
 	bool		m_bTransparent;
 	int			m_nIndOffset;
-	void		DrawVerticalBar(CDC *pDC, const CRect rect);
-	void		DrawHorizontalBar(CDC *pDC, const CRect rect);
+	void		DrawVerticalBar(CDC *pDC, const CRect rtrack);
+	void		DrawHorizontalBar(CDC *pDC, const CRect rtrack);
 	void		DeletePens();
 	void		CreatePens();
 	CPen		m_penColor;
@@ -144,16 +143,17 @@ private:
 	CPen		m_penShadow;
 	CPen		m_penLiteShadow;
 	void		GetColors();
-	COLORREF	m_crColor;
-	COLORREF	m_crColorLight;
-	COLORREF	m_crColorLighter;
-	COLORREF	m_crColorLightest;
-	COLORREF	m_crColorDark;
-	COLORREF	m_crColorDarker;
+	COLORREF	m_cr_track;
+	COLORREF	m_cr_track_Light;
+	COLORREF	m_cr_track_Lighter;
+	COLORREF	m_cr_track_Lightest;
+	COLORREF	m_cr_track_Dark;
+	COLORREF	m_cr_track_Darker;
 	COLORREF	m_crDkShadow;
 	COLORREF	m_crShadow;
 	COLORREF	m_crLiteShadow;
-	COLORREF	m_crBackColor;
+	COLORREF	m_cr_back;			//back color of client area
+	COLORREF	m_cr_back_track;	//back color of inactive track
 
 	bool		m_auto_hide;	//default : false
 };

@@ -49,21 +49,22 @@ CMacProgressCtrl::CMacProgressCtrl()
 
 	m_auto_hide			= false;
 
-	m_bUseSlider		= false;
+	m_use_slider		= false;
 	m_bLButtonDown		= false;
 
 	m_bIndeterminate	= FALSE;
 	m_nIndOffset		= 0;
-	m_crColor			= RGB(0, 255, 0);//::GetSysColor(COLOR_HIGHLIGHT);
+	m_cr_track			= RGB(0, 255, 0);//::GetSysColor(COLOR_HIGHLIGHT);
 
 	m_sText				= "";
-	m_crText0			= ::GetSysColor(COLOR_BTNTEXT);
-	m_crText1			= RGB(0, 0, 0);
-	m_crBackColor		= ::GetSysColor(COLOR_3DSHADOW);
+	m_cr_text0			= ::GetSysColor(COLOR_BTNTEXT);
+	m_cr_text1			= RGB(0, 0, 0);
+	m_cr_back			= ::GetSysColor(COLOR_3DFACE);
+	m_cr_back_track		= ::GetSysColor(COLOR_3DSHADOW);
 	m_bTransparent		= false;
 	m_bGradient			= false;
 	
-	//m_dq_cr_indeterminate.push_back(m_crBackColor);
+	//m_dq_cr_indeterminate.push_back(m_cr_backColor);
 	m_dq_cr_indeterminate.push_back(::GetSysColor(COLOR_3DFACE));
 	m_dq_cr_indeterminate.push_back(RGB(64, 212, 32));
 
@@ -116,16 +117,27 @@ void CMacProgressCtrl::OnPaint()
 //
 {
 	CPaintDC dcPaint(this); // device context for painting
-	CRect rect, rc;
+	CRect rtrack, rc;
 	GetClientRect(rc);
-	rect = rc;
+	rtrack = rc;
 	BOOL bVertical = GetStyle() & PBS_VERTICAL;
 
 	CMemoryDC	dc(&dcPaint, &rc);
+	Gdiplus::Graphics g(dc.m_hDC);
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	CBrush brLightest(m_crColorLightest);
-	CBrush brColor(m_crColor);
-	CBrush brBack(m_crBackColor);
+	//track의 width는 rc와 동일하나 height는 작은 경우도 있다.(특히 style_round_line과 같은 경우)
+	//실제 트랙이 그려지는 영역
+	if (m_style == style_round_line)
+	{
+		rtrack.top = rtrack.CenterPoint().y - 4;
+		rtrack.bottom = rtrack.CenterPoint().y + 4;
+	}
+
+	CBrush brLightest(m_cr_track_Lightest);
+	CBrush brColor(m_cr_track);
+	CBrush brBack(m_cr_back);
 	//TRACE(_T("%ld : %S\n"), GetTickCount(), __FUNCTION__);
 
 	int pos = GetPos();
@@ -136,14 +148,14 @@ void CMacProgressCtrl::OnPaint()
 		if (bVertical)
 		{
 			if (!m_bIndeterminate)
-				rect.top = rect.bottom - int(((float)rect.Height() * float(pos - m_lower)) / float(m_upper - m_lower));
-			dc.FillRect(rect, &brLightest);
-			DrawVerticalBar(&dc, rect);
+				rtrack.top = rtrack.bottom - int(((float)rtrack.Height() * float(pos - m_lower)) / float(m_upper - m_lower));
+			dc.FillRect(rtrack, &brLightest);
+			DrawVerticalBar(&dc, rtrack);
 		}
 		else
 		{
 			if (!m_bIndeterminate)
-				rect.right = int(((float)rect.Width() * float(pos - m_lower)) / float(m_upper - m_lower));
+				rtrack.right = int(((float)rtrack.Width() * float(pos - m_lower)) / float(m_upper - m_lower));
 
 			//CBrush brTrans;
 			//brTrans.FromHandle((HBRUSH)GetStockObject(NULL_BRUSH));
@@ -154,112 +166,128 @@ void CMacProgressCtrl::OnPaint()
 	}
 	else
 	{
-		dc.FillSolidRect(rc, m_crBackColor);
+		//active track과 inactive track을 사각형으로 칠하므로
+		//style_round_line이 아니면 굳이 배경색을 중복해서 칠할 필요는 없다.
+		if (m_style == style_round_line)
+			dc.FillSolidRect(rc, m_cr_back);
 	}
 	
-	{
-		//indeterminate일때는 배경색으로 그리는게 아니라 전경색보다 밝은 색으로 그린다.
-		if (m_bIndeterminate)
-		{
-			CRect gradRect;
-			
-			if (m_indeterminate_forward)
-				gradRect = CRect(m_nIndOffset - m_indeterminate_width, rc.top, m_nIndOffset, rc.bottom);
-			else
-				gradRect = CRect(m_nIndOffset, rc.top, m_nIndOffset + m_indeterminate_width, rc.bottom);
-			//gradRect.left = m_nIndOffset;
-			gradient_rect(dc, gradRect, m_dq_cr_indeterminate);
-		}
 
-		// Determine the size of the bar and draw it.
-		//현재 vertical일 경우는 코드 완성되지 않음.
-		if (bVertical)
+	//indeterminate일때는 배경색으로 그리는게 아니라 전경색보다 밝은 색으로 그린다.
+	if (m_bIndeterminate)
+	{
+		CRect gradRect;
+			
+		if (m_indeterminate_forward)
+			gradRect = CRect(m_nIndOffset - m_indeterminate_width, rc.top, m_nIndOffset, rc.bottom);
+		else
+			gradRect = CRect(m_nIndOffset, rc.top, m_nIndOffset + m_indeterminate_width, rc.bottom);
+		//gradRect.left = m_nIndOffset;
+		gradient_rect(dc, gradRect, m_dq_cr_indeterminate);
+	}
+
+	// Determine the size of the bar and draw it.
+	//현재 vertical일 경우는 코드 완성되지 않음.
+	if (bVertical)
+	{
+		if (!m_bIndeterminate)
+			rtrack.top = rtrack.bottom - int(((float)rtrack.Height() * float(pos - m_lower)) / float(m_upper - m_lower));
+
+		if (m_bGradient)
 		{
-			if (!m_bIndeterminate)
-				rect.top = rect.bottom - int(((float)rect.Height() * float(pos - m_lower)) / float(m_upper - m_lower));
+			dc.FillRect(rtrack, &brLightest);
+			DrawVerticalBar(&dc, rtrack);
+		}
+		else
+		{
+			dc.FillRect(rtrack, &brColor);
+		}
+	}
+	else
+  	{
+		//draw inactive track
+		if (!m_bIndeterminate)
+		{
+			//rect.right는 경과된 오른쪽 끝.
+			rtrack.right = int(((float)rtrack.Width() * float(pos - m_lower)) / float(m_upper - m_lower));
 
 			if (m_bGradient)
 			{
-				dc.FillRect(rect, &brLightest);
-				DrawVerticalBar(&dc, rect);
+				dc.FillRect(rtrack, &brLightest);
 			}
 			else
 			{
-				dc.FillRect(rect, &brColor);
+				if (m_style == style_round_line)
+				{
+					Gdiplus::Pen pen(RGB2gpColor(m_cr_back_track), rtrack.Height());
+					pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+					g.DrawLine(&pen, rtrack.right + rtrack.Height() / 2, rtrack.CenterPoint().y, rc.right - rtrack.Height() / 2 - 1, rtrack.CenterPoint().y);
+				}
+				else
+				{
+					dc.FillSolidRect(rtrack, m_cr_back_track);
+				}
 			}
+		}
+
+		DrawHorizontalBar(&dc, rtrack);
+	}
+
+	if (m_text_show)
+	{
+		if (m_text_format == text_format_percent)
+		{
+			if (m_upper - m_lower == 0)
+				m_sText = _T("0.0 %%");
+			else
+				m_sText.Format(_T("%.1f %%"), (double)(pos + 0) / (double)(m_upper - m_lower) * 100.0);
 		}
 		else
-  		{
-			if (!m_bIndeterminate)
-			{
-				rect.right = int(((float)rect.Width() * float(pos - m_lower)) / float(m_upper - m_lower));
-				//TRACE(_T("pos = %d, right = %d\n"), pos, rect.right);
-
-				if (m_bGradient)
-					dc.FillRect(rect, &brLightest);
-				else
-					dc.FillSolidRect(rect, m_crColor);
-			}
-
-			DrawHorizontalBar(&dc, rect);
+		{
+			m_sText.Format(_T("%ld / %ld"), pos, m_upper - m_lower);
 		}
 
-		if (m_text_show)
+		if (m_sText != _T(""))
 		{
-			if (m_text_format == text_format_percent)
+			CRect	rText = rc;
+
+			dc.SetBkMode(TRANSPARENT);
+
+			if (m_text_shadow)
 			{
-				if (m_upper - m_lower == 0)
-					m_sText = _T("0.0 %%");
-				else
-					m_sText.Format(_T("%.1f %%"), (double)(pos + 0) / (double)(m_upper - m_lower) * 100.0);
+				rText.OffsetRect(1, 0);
+				dc.SetTextColor(m_crShadow);
+				dc.DrawText(m_sText, rText, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+				rText.OffsetRect(-1, -1);
+			}
+
+			if (m_use_invert_text_color)
+			{
+				CRect rcLeft, rcRight;
+				rcLeft = rcRight = rText;
+				rcRight.left = rcLeft.right = rtrack.right;
+
+				//두 영역을 생성하여 해당 영역에만 그려지는 원리로 글자를 2가지 색으로 그린다.
+				CRgn rgn;
+				rgn.CreateRectRgnIndirect(rcLeft);
+				dc.SelectClipRgn(&rgn);
+				dc.SetTextColor(m_cr_text0);
+				dc.DrawText(m_sText, rText, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+
+				rgn.SetRectRgn(rcRight);
+				dc.SelectClipRgn(&rgn);
+				dc.SetTextColor(m_cr_text1);
+				dc.DrawText(m_sText, rText, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+
+				dc.SelectClipRgn(NULL);
 			}
 			else
 			{
-				m_sText.Format(_T("%ld / %ld"), pos, m_upper - m_lower);
+				dc.SetTextColor(m_cr_text0);
+				dc.DrawText(m_sText, rText, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 			}
-
-			if (m_sText != _T(""))
-			{
-				CRect	rText = rc;
-
-				dc.SetBkMode(TRANSPARENT);
-
-				if (m_text_shadow)
-				{
-					rText.OffsetRect(1, 0);
-					dc.SetTextColor(m_crShadow);
-					dc.DrawText(m_sText, rText, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-					rText.OffsetRect(-1, -1);
-				}
-
-				if (m_use_invert_text_color)
-				{
-					CRect rcLeft, rcRight;
-					rcLeft = rcRight = rText;
-					rcRight.left = rcLeft.right = rect.right;
-
-					//두 영역을 생성하여 해당 영역에만 그려지는 원리로 글자를 2가지 색으로 그린다.
-					CRgn rgn;
-					rgn.CreateRectRgnIndirect(rcLeft);
-					dc.SelectClipRgn(&rgn);
-					dc.SetTextColor(m_crText0);
-					dc.DrawText(m_sText, rText, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-
-					rgn.SetRectRgn(rcRight);
-					dc.SelectClipRgn(&rgn);
-					dc.SetTextColor(m_crText1);
-					dc.DrawText(m_sText, rText, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-
-					dc.SelectClipRgn(NULL);
-				}
-				else
-				{
-					dc.SetTextColor(m_crText0);
-					dc.DrawText(m_sText, rText, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-				}
-			}
-		}//if (m_text_show)
-	}
+		}
+	}//if (m_text_show)
 
 	if (m_draw_border)
 	{
@@ -269,7 +297,7 @@ void CMacProgressCtrl::OnPaint()
 
 //-------------------------------------------------------------------
 //
-void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
+void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rtrack)
 //
 // Return Value:	None.
 //
@@ -279,12 +307,16 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
 // Remarks		:	Draws a horizontal progress bar.
 //
 {
-	if (!rect.Width())
+	if (!rtrack.Width())
 		return;
 
-	int nLeft = rect.left;
-	int nTop = rect.top;
-	int nBottom = rect.bottom;
+	Gdiplus::Graphics g(pDC->m_hDC);
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	int nLeft = rtrack.left;
+	int nTop = rtrack.top;
+	int nBottom = rtrack.bottom;
 
 	// Assume we're not drawing the indeterminate state.
 	CPen *pOldPen = pDC->SelectObject(&m_penColorLight);
@@ -337,28 +369,28 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
 	}	// if indeterminate
 	else if (m_bGradient)
 	{
-		int nRight = rect.right;
+		int nRight = rtrack.right;
 	
 		pDC->MoveTo(nLeft + 2, nBottom - 4);
 		pDC->LineTo(nRight - 2, nBottom - 4);
 		pDC->MoveTo(nLeft + 2, nTop + 2);
 		pDC->LineTo(nRight - 2, nTop + 2);
-		pDC->SetPixel(nLeft + 1, nBottom - 3, m_crColor);
-		pDC->SetPixel(nLeft + 1, nTop + 1, m_crColor);
+		pDC->SetPixel(nLeft + 1, nBottom - 3, m_cr_track);
+		pDC->SetPixel(nLeft + 1, nTop + 1, m_cr_track);
 
 		pDC->SelectObject(&m_penColorLighter);
 		pDC->MoveTo(nLeft + 2, nBottom - 5);
 		pDC->LineTo(nRight - 3, nBottom - 5);
 		pDC->LineTo(nRight - 3, nTop + 3);
 		pDC->LineTo(nLeft + 1, nTop + 3);
-		pDC->SetPixel(nLeft + 1, nBottom - 4, m_crColorLighter);
-		pDC->SetPixel(nLeft + 1, nTop + 2, m_crColorLighter);
+		pDC->SetPixel(nLeft + 1, nBottom - 4, m_cr_track_Lighter);
+		pDC->SetPixel(nLeft + 1, nTop + 2, m_cr_track_Lighter);
 
 		pDC->SelectObject(&m_penColor);
 		pDC->MoveTo(nLeft, nBottom - 1);
 		pDC->LineTo(nLeft, nTop);
 		pDC->LineTo(nLeft + 2, nTop);
-		pDC->SetPixel(nLeft + 1, nBottom - 2, m_crColor);
+		pDC->SetPixel(nLeft + 1, nBottom - 2, m_cr_track);
 		pDC->MoveTo(nLeft + 2, nBottom - 3);
 		pDC->LineTo(nRight - 2, nBottom - 3);
 		pDC->MoveTo(nLeft + 2, nTop + 1);
@@ -370,7 +402,7 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
 		pDC->LineTo(nRight - 2, nTop + 1);
 		pDC->MoveTo(nLeft + 2, nTop);
 		pDC->LineTo(nRight, nTop);
-		pDC->SetPixel(nLeft + 1, nBottom - 1, m_crColorDark);
+		pDC->SetPixel(nLeft + 1, nBottom - 1, m_cr_track_Dark);
 
 		pDC->SelectObject(&m_penColorDarker);
 		pDC->MoveTo(nLeft + 2, nBottom - 1);
@@ -379,7 +411,19 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rect)
 	}	// if not indeterminate
 	else
 	{
-		pDC->FillSolidRect(rect, m_crColor);
+		if (m_style == style_default)
+		{
+			pDC->FillSolidRect(rtrack, m_cr_track);
+		}
+		else if (m_style == style_round_line)
+		{
+			Gdiplus::Pen pen(RGB2gpColor(m_cr_track), rtrack.Height());
+			pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+
+			int end = MAX(0, rtrack.right - rtrack.Height() / 2 + 1);
+			TRACE(_T("end = %d\n"), end);
+			g.DrawLine(&pen, rtrack.Height() / 2 + 1, rtrack.CenterPoint().y, end, rtrack.CenterPoint().y);
+		}
 	}
 
 	pDC->SelectObject(pOldPen);
@@ -462,23 +506,23 @@ void CMacProgressCtrl::DrawVerticalBar(CDC *pDC, const CRect rect)
 			pDC->LineTo(nLeft + 1, nTop + 1);
 			pDC->MoveTo(nRight - 3, nBottom - 3);
 			pDC->LineTo(nRight - 3, nTop + 1);
-			pDC->SetPixel(nRight - 2, nTop + 1, m_crColor);
+			pDC->SetPixel(nRight - 2, nTop + 1, m_cr_track);
 
 			pDC->SelectObject(&m_penColorLight);
 			pDC->MoveTo(nLeft + 2, nBottom - 3);
 			pDC->LineTo(nLeft + 2, nTop + 1);
 			pDC->MoveTo(nRight - 4, nBottom - 3);
 			pDC->LineTo(nRight - 4, nTop + 1);
-			pDC->SetPixel(nLeft + 1, nTop + 1, m_crColorLight);
-			pDC->SetPixel(nRight - 3, nTop + 1, m_crColorLight);
+			pDC->SetPixel(nLeft + 1, nTop + 1, m_cr_track_Light);
+			pDC->SetPixel(nRight - 3, nTop + 1, m_cr_track_Light);
 			
 			pDC->SelectObject(&m_penColorLighter);
 			pDC->MoveTo(nLeft + 3, nBottom - 3);
 			pDC->LineTo(nLeft + 3, nTop + 1);
 			pDC->MoveTo(nRight - 5, nBottom - 3);
 			pDC->LineTo(nRight - 5, nTop + 1);
-			pDC->SetPixel(nLeft + 2, nTop + 1, m_crColorLighter);
-			pDC->SetPixel(nRight - 4, nTop + 1, m_crColorLighter);
+			pDC->SetPixel(nLeft + 2, nTop + 1, m_cr_track_Lighter);
+			pDC->SetPixel(nRight - 4, nTop + 1, m_cr_track_Lighter);
 
 			pDC->SelectObject(&m_penColorDark);
 			pDC->MoveTo(nLeft, nBottom - 1);
@@ -486,7 +530,7 @@ void CMacProgressCtrl::DrawVerticalBar(CDC *pDC, const CRect rect)
 			pDC->MoveTo(nLeft + 2, nBottom - 2);
 			pDC->LineTo(nRight - 2, nBottom - 2);
 			pDC->LineTo(nRight - 2, nTop + 1);
-			pDC->SetPixel(nRight - 1, nTop + 1, m_crColorDark);
+			pDC->SetPixel(nRight - 1, nTop + 1, m_cr_track_Dark);
 
 			pDC->SelectObject(&m_penColorDarker);
 			pDC->MoveTo(nLeft + 1, nBottom - 1);
@@ -495,7 +539,7 @@ void CMacProgressCtrl::DrawVerticalBar(CDC *pDC, const CRect rect)
 		}
 		else
 		{
-			CBrush br(m_crColor);
+			CBrush br(m_cr_track);
 			CBrush *pOldBrush = pDC->SelectObject(&br);
 			pDC->SelectObject(&m_penColorDark);
 			pDC->Rectangle(rect);
@@ -560,11 +604,11 @@ void CMacProgressCtrl::GetColors()
 //						the shadow colors.
 //
 {
-	m_crColorLight = GetColor(m_crColor, 51);
-	m_crColorLighter = GetColor(m_crColorLight, 51);
-	m_crColorLightest = GetColor(m_crColorLighter, 51);
-	m_crColorDark = GetColor(m_crColor, -51);
-	m_crColorDarker = GetColor(m_crColorDark, -51);
+	m_cr_track_Light = GetColor(m_cr_track, 51);
+	m_cr_track_Lighter = GetColor(m_cr_track_Light, 51);
+	m_cr_track_Lightest = GetColor(m_cr_track_Lighter, 51);
+	m_cr_track_Dark = GetColor(m_cr_track, -51);
+	m_cr_track_Darker = GetColor(m_cr_track_Dark, -51);
 	m_crDkShadow = ::GetSysColor(COLOR_3DDKSHADOW);
 	m_crLiteShadow = ::GetSysColor(COLOR_3DSHADOW);
 
@@ -584,8 +628,7 @@ void CMacProgressCtrl::GetColors()
 //-------------------------------------------------------------------
 //
 void CMacProgressCtrl::SetColor(COLORREF crColor,
-								COLORREF crBackColor /*-1*/,
-								BOOL bGradient /*= TRUE*/)
+								COLORREF crBackColor)
 //
 // Return Value:	None.
 //
@@ -595,16 +638,14 @@ void CMacProgressCtrl::SetColor(COLORREF crColor,
 //						darker colors are recalculated, and the pens recreated.
 //
 {
-	m_crColor = crColor;
-	m_crBackColor = crBackColor;
+	m_cr_track = crColor;
+	m_cr_back_track = crBackColor;
 
-	if (m_crBackColor == -1)
+	if (m_cr_back_track == -1)
 		m_bTransparent = TRUE;
 	else
 		m_bTransparent = FALSE;
 	
-	m_bGradient = bGradient;
-
 	GetColors();
 	CreatePens();
 	RedrawWindow();
@@ -612,9 +653,14 @@ void CMacProgressCtrl::SetColor(COLORREF crColor,
 
 void CMacProgressCtrl::set_back_color(COLORREF cr_back)
 {
-	m_crBackColor = cr_back;
+	m_cr_back = cr_back;
+	Invalidate();
+}
 
-	m_dq_cr_indeterminate[0] = cr_back;
+void CMacProgressCtrl::set_back_track_color(COLORREF cr_back_track)
+{
+	m_cr_back_track = cr_back_track;
+	m_dq_cr_indeterminate[0] = cr_back_track;
 	Invalidate();
 }
 
@@ -631,11 +677,11 @@ void CMacProgressCtrl::CreatePens()
 {
 	DeletePens();
 
-	m_penColorLight.CreatePen(PS_SOLID, 1, m_crColorLight);
-	m_penColorLighter.CreatePen(PS_SOLID, 1, m_crColorLighter);
-	m_penColor.CreatePen(PS_SOLID, 1, m_crColor);
-	m_penColorDark.CreatePen(PS_SOLID, 1, m_crColorDark);
-	m_penColorDarker.CreatePen(PS_SOLID, 1, m_crColorDarker);
+	m_penColorLight.CreatePen(PS_SOLID, 1, m_cr_track_Light);
+	m_penColorLighter.CreatePen(PS_SOLID, 1, m_cr_track_Lighter);
+	m_penColor.CreatePen(PS_SOLID, 1, m_cr_track);
+	m_penColorDark.CreatePen(PS_SOLID, 1, m_cr_track_Dark);
+	m_penColorDarker.CreatePen(PS_SOLID, 1, m_cr_track_Darker);
 	m_penDkShadow.CreatePen(PS_SOLID, 1, m_crDkShadow);
 	m_penShadow.CreatePen(PS_SOLID, 1, m_crShadow);
 	m_penLiteShadow.CreatePen(PS_SOLID, 1, m_crLiteShadow);
@@ -796,8 +842,8 @@ void CMacProgressCtrl::SetText(CString sText)
 
 void CMacProgressCtrl::set_text_color(COLORREF crText0, COLORREF crText1)
 {
-	m_crText0 = crText0;
-	m_crText1 = (crText1 == -1 ? crText0 : crText1);
+	m_cr_text0 = crText0;
+	m_cr_text1 = (crText1 == -1 ? crText0 : crText1);
 
 	RedrawWindow();
 }
@@ -829,7 +875,7 @@ void CMacProgressCtrl::use_invert_text_color(bool use)
 void CMacProgressCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_bUseSlider || m_bIndeterminate)
+	if (!m_use_slider || m_bIndeterminate)
 		return;
 
 	m_bLButtonDown = true;
@@ -843,7 +889,7 @@ void CMacProgressCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 void CMacProgressCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_bUseSlider)
+	if (!m_use_slider)
 		return;
 
 	m_bLButtonDown = false;
@@ -856,7 +902,7 @@ void CMacProgressCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 void CMacProgressCtrl::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_bUseSlider)
+	if (!m_use_slider)
 		return;
 
 	if (m_bLButtonDown)

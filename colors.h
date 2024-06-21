@@ -5,6 +5,7 @@
 #include <Afxdisp.h>
 #include <gdiplus.h>
 #include <deque>
+#include <unordered_map>
 
 // RGB -> YUV(YCbCr)
 #define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
@@ -49,6 +50,20 @@
 #define		GRAY224		GRAY(224)
 #define		GRAY(x)		RGB((x), (x), (x))
 
+//std::map으로 컬러 표현
+//참조 방법 : cr = g_cr["white"]
+//컬러 이름과 값을 열거 가능
+//컬러값으로 이름 추출(또는 가장 유사한 색 이름 가능)
+//맵의 []연산자 단점 : g_cr["asdf"]로 접근하면 해당 컬러가 없음에도 "asdf"를 키로 하는 항목이 추가됨!
+//정확히 검색하기 위해서는 find()를 이용해야 한다.
+//데이터 추가 시 unordered_map을 이용해도 순서가 보장되지 않는다.
+//https://80000coding.oopy.io/8af406a3-b3b1-4f3f-b190-2937b23684ed
+extern std::unordered_map<char*, COLORREF> g_cr;
+
+//enum으로 컬러 표현
+//참조 방법 : cr = white
+//모든 멤버 열거 불가능. 별도의 char[]를 선언하고 동일하게 이름을 넣어놔야 함.
+//값으로 컬러이름 출력 불가
 enum Colors
 {
 	//abgr 차례
@@ -383,6 +398,9 @@ Gdiplus::Color	get_color(Gdiplus::Color cr, int argb, BYTE value);
 //hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)
 COLORREF	get_color(int hue_start, int hue_end, int percent, float saturation = 1.0f, float value = 1.0f);
 int			get_hue(COLORREF cr);
+
+//주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
+CString		get_color_name_of_closest(COLORREF cr, COLORREF *cr_closest = NULL);
 
 extern COLORREF g_default_color[16];
 #endif

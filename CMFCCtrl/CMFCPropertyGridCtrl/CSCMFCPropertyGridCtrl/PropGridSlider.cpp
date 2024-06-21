@@ -6,6 +6,7 @@
 BEGIN_MESSAGE_MAP(CPropSlider, CSliderCtrl)
 	ON_NOTIFY_REFLECT(NM_RELEASEDCAPTURE, &CPropSlider::OnNMReleasedcapture)
 	ON_WM_SETCURSOR()
+	ON_WM_CTLCOLOR()
 END_MESSAGE_MAP()
 
 
@@ -118,3 +119,17 @@ BOOL CPropSlider::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 //	// 그리기 메시지에 대해서는 CSliderCtrl::OnPaint()을(를) 호출하지 마십시오.
 //	RedrawWindow();
 //}
+
+
+HBRUSH CPropSlider::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+	HBRUSH hbr = CSliderCtrl::OnCtlColor(pDC, pWnd, nCtlColor);
+
+	// TODO:  여기서 DC의 특성을 변경합니다.
+
+	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
+	pDC->SetBkColor(RGB(255, 0, 0));
+	static CBrush br(RGB(255, 0, 0));
+
+	return (HBRUSH)br;
+}

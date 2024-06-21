@@ -14,8 +14,9 @@ CSCStatic::CSCStatic()
 	m_transparent	= false;
 
 	m_sText			= "";
-	m_crText		= ::GetSysColor(COLOR_BTNTEXT);
-	m_crBack		= ::GetSysColor(COLOR_BTNFACE);
+	m_cr_text		= ::GetSysColor(COLOR_BTNTEXT);
+	m_cr_back		= ::GetSysColor(COLOR_BTNFACE);
+	m_transparent	= false;
 
 	m_bGradient		= false;
 	m_bSunken		= false;
@@ -179,19 +180,19 @@ void CSCStatic::OnPaint()
 			{
 				//msimg32.dll is not available. Let's use our own code to display gradient background.
 				//This code is very simple and produces worse gradient that function from the library - but works!
-				//draw_gradient_rect(&dc, rc, m_crBack, m_crGradient, m_bVertical);
+				//draw_gradient_rect(&dc, rc, m_cr_back, m_crGradient, m_bVertical);
 			}
 		}
 		else
 		{
-			dc.FillSolidRect(rc, m_crBack);
+			dc.FillSolidRect(rc, m_cr_back);
 			if (m_bSunken)
 			{
 				int sunken_depth = 12;
-				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_crBack, sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_crBack, sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_crBack, -sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_crBack, -sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_cr_back, sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_cr_back, sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_cr_back, -sunken_depth));
+				DrawLinePt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_cr_back, -sunken_depth));
 			}
 		}
 	}
@@ -359,7 +360,7 @@ void CSCStatic::OnPaint()
 	if (m_sText != "")
 	{
 		if (IsWindowEnabled())
-			dc.SetTextColor(m_crText);
+			dc.SetTextColor(m_cr_text);
 		else
 			dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 
@@ -405,7 +406,7 @@ void CSCStatic::OnPaint()
 					}
 				}
 
-				dc.SetTextColor(m_crText);
+				dc.SetTextColor(m_cr_text);
 			}
 
 			dc.DrawText(sSpace + m_sText, rText, dwText);
@@ -421,7 +422,7 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 	m_sText = sText;
 
  	if (cTextColor > 0)
- 		m_crText = cTextColor;
+ 		m_cr_text = cTextColor;
 	
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
 
@@ -431,6 +432,17 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 		update_surface();
 	else
 		Invalidate();
+}
+
+void CSCStatic::set_text(LPCTSTR format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	CString text;
+
+	text.FormatV(format, args);
+	set_text(text);
 }
 
 void CSCStatic::set_back_image(UINT nIDBack)
@@ -780,7 +792,7 @@ CSCStatic& CSCStatic::set_font_antialiased(bool bAntiAliased)
 
 void CSCStatic::set_text_color(COLORREF crTextColor)
 {
-	m_crText = crTextColor;
+	m_cr_text = crTextColor;
 	update_surface();
 	Invalidate();
 }
@@ -962,4 +974,17 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 		get_auto_font_size(this, rc, text, &m_lf);
 		reconstruct_font();
 	}
+}
+
+void CSCStatic::set_color(COLORREF cr_text, COLORREF cr_back)
+{
+	m_cr_text = cr_text;
+
+	if (cr_back != -1)
+	{
+		m_cr_back = cr_back;
+		m_transparent = false;
+	}
+
+	Invalidate();
 }

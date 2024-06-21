@@ -2291,9 +2291,9 @@ void CGdiplusBitmap::thread_gif_animation()
 			//배경색을 투명하게 한다 해도 이미지의 투명 영역이
 			//parent에서도 투명하게 표시되진 않는다.
 			//parent의 영역을 그려준 후 이미지를 그려줘야 한다.
-			//if (!is_equal(m_crBack, Gdiplus::Color(0, 0, 0, 0), 4))
+			//if (!is_equal(m_cr_back, Gdiplus::Color(0, 0, 0, 0), 4))
 			//{
-			//	Gdiplus::SolidBrush brush_tr(m_crBack);
+			//	Gdiplus::SolidBrush brush_tr(m_cr_back);
 			//	g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
 			//}
 
@@ -2360,9 +2360,9 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 		//배경색을 투명하게 한다 해도 이미지의 투명 영역이
 		//parent에서도 투명하게 표시되진 않는다.
 		//parent의 영역을 그려준 후 이미지를 그려줘야 한다.
-		if (!is_equal(m_crBack, Gdiplus::Color(0, 0, 0, 0), 4))
+		if (!is_equal(m_cr_back, Gdiplus::Color(0, 0, 0, 0), 4))
 		{
-			Gdiplus::SolidBrush brush_tr(m_crBack);
+			Gdiplus::SolidBrush brush_tr(m_cr_back);
 			g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
 		}
 

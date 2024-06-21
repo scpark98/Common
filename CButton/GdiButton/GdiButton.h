@@ -285,7 +285,7 @@ protected:
 	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
 	bool		m_transparent = true;
 
-	CGdiplusBitmap	m_back;					//버튼의 배경 이미지, NULL이면 m_crBack이 배경색
+	CGdiplusBitmap	m_back;					//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
 	CGdiplusBitmap	m_back_origin;
 
 	CString		m_text = _T("");

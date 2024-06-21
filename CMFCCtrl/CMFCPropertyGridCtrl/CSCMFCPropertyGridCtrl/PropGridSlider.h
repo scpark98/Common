@@ -24,6 +24,7 @@ public:
 	afx_msg void OnNMReleasedcapture(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 };
 
 class CPropGridSlider : public CMFCPropertyGridProperty
@@ -47,8 +48,11 @@ public:
 		m_pSlider = NULL;
 		m_iEditCtrlWidth = edit_ctrl_width;
 	}
-	virtual ~CPropGridSlider() {
-		if (m_pSlider) delete m_pSlider;
+
+	virtual ~CPropGridSlider()
+	{
+		if (m_pSlider)
+			delete m_pSlider;
 	}
 
 	void OnSliderPosChanged();

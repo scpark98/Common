@@ -53,22 +53,20 @@ public:
 	
 	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void		set_text(CString sText, COLORREF crTextColor = 0);
+	void		set_text(LPCTSTR format, ...);
 	CString		get_text() { return m_sText; }
 	void		SetWindowText(CString sText) { set_text(sText); }
-	COLORREF	get_back_color() { return m_crBack; }
+
+	//글자색, 배경색 동시 설정
+	void		set_color(COLORREF cr_text, COLORREF cr_back = -1);
 
 	//글자색만 변경할 경우
 	void		set_text_color(COLORREF crTextColor);
+
+	COLORREF	get_back_color() { return m_cr_back; }
+
 	//배경색을 지정하면 투명 옵션은 off됨.
-	void		set_back_color(COLORREF cBackColor) { m_crBack = cBackColor; m_transparent = false; Invalidate(); }
-	//SetColor를 사용하면 투명 옵션은 off됨.
-	void		set_color(COLORREF cTextColor, COLORREF cBackColor = ::GetSysColor(COLOR_3DFACE))
-				{
-					m_crText = cTextColor;
-					m_crBack = cBackColor;
-					m_transparent = false;
-					Invalidate(FALSE);
-				}
+	void		set_back_color(COLORREF cBackColor) { m_cr_back = cBackColor; m_transparent = false; Invalidate(); }
 
 	//gradient
 	//m_crGradient deque에 색상들을 넣고 n등분하여 gradient fill을 해서 표시한다.
@@ -192,8 +190,8 @@ protected:
  	COLORREF	m_crOutline;		//외곽선 색상
 	bool		m_bSunken;			//default = false;
 
-	COLORREF	m_crText;
-	COLORREF	m_crBack;
+	COLORREF	m_cr_text;
+	COLORREF	m_cr_back;
 	bool		m_transparent;		//default = false
 
 	BOOL		m_bBlink;

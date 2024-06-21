@@ -240,8 +240,8 @@ public:
 	void	set_animation(HWND parenthWnd, CRect r, bool start = true);
 	void	move(int x = 0, int y = 0, int w = 0, int h = 0);
 	void	move(CRect r);
-	void	gif_back_color(COLORREF cr) { m_crBack.SetFromCOLORREF(cr); }
-	void	gif_back_color(Gdiplus::Color cr) { m_crBack = cr; }
+	void	gif_back_color(COLORREF cr) { m_cr_back.SetFromCOLORREF(cr); }
+	void	gif_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
 	void	start_animation();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
 	void	pause_animation(int pos = 0);
@@ -280,7 +280,7 @@ protected:
 	int				m_aniY;
 	int				m_aniWidth;
 	int				m_aniHeight;
-	Gdiplus::Color	m_crBack = Gdiplus::Color::Transparent;
+	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;
 	bool			m_run_thread_animation = false;
 
 	void check_animate_gif();

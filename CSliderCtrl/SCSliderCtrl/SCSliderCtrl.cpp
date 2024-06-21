@@ -98,7 +98,10 @@ void CSCSliderCtrl::OnPaint()
 	int lower = GetRangeMin();
 	int upper = GetRangeMax();
 	int pos = GetPos();
-	TRACE(_T("pos = %d\n"), pos);
+	TRACE(_T("GetPos() OnPaint() = %d\n"), pos);
+
+	if (m_style == slider_step && m_steps.size() < upper - lower)
+		m_steps.resize(upper - lower + 1);
 
 	CPaintDC	dc1(this); // device context for painting
 	CPen*		pOldPen = NULL;
@@ -122,17 +125,18 @@ void CSCSliderCtrl::OnPaint()
 	CFont* pOldFont = (CFont*)dc.SelectObject(&font);
 
 	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
-	m_track = m_rc;
+	CRect track = m_rc;
 
 	if (m_is_vertical)
-		m_track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
+		track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
 	else
-		m_track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
+		track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
 
 	//m_rc의 y센터좌표
 	int	cy = m_rc.CenterPoint().y;
 	//현재 위치의 실제 픽셀좌표
 	int	pxpos = Pos2Pixel(pos);
+	//int	pxpos = int(((float)track.Width() * float(pos - lower)) / float(upper - lower));
 	int i;
 
 	//전체 슬라이드 사각형 영역을 배경색으로 그림
@@ -165,24 +169,24 @@ void CSCSliderCtrl::OnPaint()
 	//inactive 영역을 먼저 그리고
 	if (m_style == slider_thumb_round)
 	{
-		dc.FillSolidRect(pxpos, cy - m_track_height / 2, m_track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
+		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
 	}
 	else if (m_style == slider_thumb || m_style == slider_value)
 	{
-		dc.FillSolidRect(pxpos, cy - m_track_height / 2, m_track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
+		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
 			
 		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), -24));
 		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), 36));
 
 		dc.SelectObject(&penDark);
 		dc.MoveTo(pxpos, cy - m_track_height / 2);
-		dc.LineTo(m_track.right, cy - m_track_height / 2);
+		dc.LineTo(track.right, cy - m_track_height / 2);
 		//dc.LineTo(m_rc.right - 1, cy + m_track_height / 2);
 
 		dc.SelectObject(&penLight);
 		dc.MoveTo(pxpos, cy + m_track_height / 2);
-		dc.LineTo(m_track.right - 1, cy + m_track_height / 2);
-		dc.LineTo(m_track.right - 1, cy - m_track_height / 2);
+		dc.LineTo(track.right - 1, cy + m_track_height / 2);
+		dc.LineTo(track.right - 1, cy - m_track_height / 2);
 
 		dc.SelectObject(pOldPen);
 		penDark.DeleteObject();
@@ -305,18 +309,18 @@ void CSCSliderCtrl::OnPaint()
 #if 1
 	if (m_style <= slider_value)
 	{
-		dc.FillSolidRect(m_track.left, cy - m_track_height / 2, pxpos - m_track.left, m_track_height, enable_color(m_cr_active));
+		dc.FillSolidRect(track.left, cy - m_track_height / 2, pxpos - track.left, m_track_height, enable_color(m_cr_active));
 			
 		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_active), -64));
 		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_active), 64));
 
 		dc.SelectObject(&penDark);
 		dc.MoveTo(pxpos, cy - m_track_height / 2);
-		dc.LineTo(m_track.left, cy - m_track_height / 2);
-		dc.LineTo(m_track.left, cy + m_track_height / 2);
+		dc.LineTo(track.left, cy - m_track_height / 2);
+		dc.LineTo(track.left, cy + m_track_height / 2);
 
 		dc.SelectObject(&penLight);
-		dc.MoveTo(m_track.left + 1, cy + m_track_height / 2);
+		dc.MoveTo(track.left + 1, cy + m_track_height / 2);
 		dc.LineTo(pxpos, cy + m_track_height / 2);
 
 		dc.SelectObject(pOldPen);
@@ -326,7 +330,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == slider_progress)
 	{
-		CRect	rActive(0, m_track.top + 2, pxpos, m_track.bottom - 2);
+		CRect	rActive(0, track.top + 2, pxpos, track.bottom - 2);
 		dc.FillSolidRect(rActive, enable_color(m_cr_active));
 
 		//m_crValueText = RGB(12, 162, 255);
@@ -358,15 +362,15 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == slider_track)
 	{
-		CRect r = m_track;
+		CRect r = track;
 		int cy = r.CenterPoint().y;
 		r.top = cy - 2;
 		r.bottom = cy + 2;
 		r.left += 2;
 		r.right = pxpos;
 
-		if (r.right > m_track.right - 2)
-			r.right = m_track.right - 2;
+		if (r.right > track.right - 2)
+			r.right = track.right - 2;
 
 		//CRect	rActive(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
 		if (r.right > r.left)
@@ -375,7 +379,7 @@ void CSCSliderCtrl::OnPaint()
 #endif
 	
 	//for test
-	//DrawRectangle(&dc, m_track, red);
+	//DrawRectangle(&dc, track, red);
 	//DrawRectangle(&dc, m_rc, red);
 
 	// 손잡이(thumb)를 그린다
@@ -574,41 +578,45 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	}
 	else
 	{
-		return (int)(
+		return 
+			m_margin.left + (m_style <= slider_value ? m_thumb.cx / 2 : 0) +
+			(int)(
 			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= slider_value ? m_thumb.cx : 0)) *
 			((double)(nPos - lower) / (double)(upper - lower))
-			) + m_margin.left + (m_style <= slider_value ? m_thumb.cx/2 : 0);
+			);
 	}
 }
 
 // 마우스의 좌표값에 해당하는 컨트롤의 위치값을 구한다
 //
-double CSCSliderCtrl::Pixel2Pos(int nPixel)
+int CSCSliderCtrl::Pixel2Pos(int nPixel)
 {
 	int lower = GetRangeMin();
 	int upper = GetRangeMax();
+	int pos;
 
 	if(m_is_vertical)
 	{
-		return (
+		pos = int(
 			lower +
 			(double)(nPixel - m_margin.top - (double)m_thumb.cy/2.0) /
 			(double)(m_rc.Height() - m_margin.bottom - m_margin.top - (m_style <= slider_value ? m_thumb.cy : 0)) *
-			(double)(upper - lower) + 0.5
+			(double)(upper - lower)
 			);
-
+		Clamp(pos, lower, upper);
 	}
 	else
 	{
-		return (
+		pos = int(
 			lower +
-			(double)(nPixel - m_margin.left - (m_style <= slider_value ? (double)m_thumb.cx/2.0 : 0)) /
+			(double)(nPixel - m_margin.left - (m_style <= slider_value ? m_thumb.cx/2 : 0)) /
 			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= slider_value ? m_thumb.cx : 0)) *
-			(double)(upper - lower + 1) + 0.0
+			(double)(upper - lower)
 			);
-		//TRACE("d = %f\n", d);
-		//return (int)d;
+		Clamp(pos, lower, upper);
 	}
+
+	return pos;
 }
 
 void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point) 
@@ -632,11 +640,12 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 
-	SetCapture();
-	SetFocus();
-
 	m_lbuttondown = true;
+	SetCapture();
+	OnMouseMove(nFlags, point);
+	//SetFocus();
 
+#if 0
 	// 손잡이를 마우스로 클릭했을 때
 	// 마우스의 좌표와 손잡이 중심의 좌표를 비교하여
 	// 둘 사이의 거리를 구해둔다
@@ -685,7 +694,8 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 
 	//OnMouseMove(nFlags, point);
-	
+#endif
+
 	CSliderCtrl::OnLButtonDown(nFlags, point);
 }
 
@@ -704,11 +714,11 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	if(!IsWindowEnabled() || !m_lbuttondown)
 		return;
 
-	int pos = GetPos();
 
-	ReleaseCapture();
 	m_lbuttondown = false;
+	ReleaseCapture();
 
+	int pos = GetPos();
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
@@ -818,6 +828,21 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			nPixel = m_rc.Width() - m_margin.right - (m_style <= slider_value ? m_thumb.cx/2 : 0);
 	}
 
+	int		lower;
+	int		upper;
+	CRect	Rect;
+
+	GetRange(lower, upper);
+	GetClientRect(&Rect);
+
+	pos = Pixel2Pos(point.x);
+	//pos = (int)((double)point.x * (double)(upper - lower) / (double)Rect.right) + lower;
+	TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
+	SetPos(pos);
+	Invalidate(false);
+
+	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+#if 0
 	// 변한 내용을 적용한다
 	int pix = Pos2Pixel(pos);
 	TRACE(_T("before pos2pix(%d) = %d, nPixel = %d\n"), pos, pix, nPixel);
@@ -844,6 +869,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		redraw_window();
 	}
+#endif
 
 	CSliderCtrl::OnMouseMove(nFlags, point);
 }

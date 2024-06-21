@@ -816,10 +816,10 @@ void CSCListBox::set_color_theme(int theme, bool apply_now)
 		m_cr_textOver = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
 
 		m_cr_back = ::GetSysColor(COLOR_WINDOW);
-		m_cr_backSelected = RGB(204, 232, 255);	//m_crBackSelected = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_backSelected = RGB(204, 232, 255);	//m_cr_backSelected = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_backSelectedRect = RGB(153, 209, 255);
 		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backOver = RGB(195, 222, 245); //m_crBackOver = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_backOver = RGB(195, 222, 245); //m_cr_backOver = ::GetSysColor(COLOR_HIGHLIGHT);
 		break;
 	case color_theme_explorer:
 		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);

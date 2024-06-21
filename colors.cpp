@@ -30,6 +30,149 @@ COLORREF g_default_color[16] = {
 		blanchedalmond,
 	};
 
+std::unordered_map<char*, COLORREF> g_cr =
+{
+	{"aliceblue",		(COLORREF)0x00FFF8F0},
+	{"antiquewhite",	(COLORREF)0x00D7EBFA},
+	{"aqua",			(COLORREF)0x00FFFF00},
+	{"aquamarine",		(COLORREF)0x00D4FF7F},
+	{"azure",			(COLORREF)0x00FFFFF0},
+	{"beige",			(COLORREF)0x00DCF5F5},
+	{"bisque",			(COLORREF)0x00C4E4FF},
+	{"black",			(COLORREF)0x00000000},
+	{"blanchedalmond",	(COLORREF)0x00CDEBFF},
+	{"blue",			(COLORREF)0x00FF0000},
+	{"blueviolet",		(COLORREF)0x00E22B8A},
+	{"brown",			(COLORREF)0x002A2AA5},
+	{"burlywood",		(COLORREF)0x0087B8DE},
+	{"cadetblue",		(COLORREF)0x00A09E5F},
+	{"chartreuse",		(COLORREF)0x0000FF7F},
+	{"chocolate",		(COLORREF)0x001E69D2},
+	{"coral",			(COLORREF)0x00507FFF},
+	{"cornflowerblue",	(COLORREF)0x00ED9564},
+	{"cornsilk",		(COLORREF)0x00DCF8FF},
+	{"crimson",			(COLORREF)0x003C14DC},
+	{"cyan",			(COLORREF)0x00FFFF00},
+	{"darkblue",		(COLORREF)0x008B0000},
+	{"darkcyan",		(COLORREF)0x008B8B00},
+	{"darkgoldenrod",	(COLORREF)0x000B86B8},
+	{"darkgray",		(COLORREF)0x00A9A9A9},
+	{"darkgreen",		(COLORREF)0x00006400},
+	{"darkkhaki",		(COLORREF)0x006BB7BD},
+	{"darkmagenta",		(COLORREF)0x008B008B},
+	{"darkolivegreen",	(COLORREF)0x002F6B55},
+	{"darkorange",		(COLORREF)0x00008CFF},
+	{"darkorchid",		(COLORREF)0x00CC3299},
+	{"darkred",			(COLORREF)0x0000008B},
+	{"darksalmon",		(COLORREF)0x007A96E9},
+	{"darkseagreen",	(COLORREF)0x008BBC8F},
+	{"darkslateblue",	(COLORREF)0x008B3D48},
+	{"darkslategray",	(COLORREF)0x004F4F2F},
+	{"darkturquoise",	(COLORREF)0x00D1CE00},
+	{"darkviolet",		(COLORREF)0x00D30094},
+	{"deeppink",		(COLORREF)0x009314FF},
+	{"deepskyblue",		(COLORREF)0x00FFBF00},
+	{"dimgray",			(COLORREF)0x00696969},
+	{"dodgerblue",		(COLORREF)0x00FF901E},
+	{"firebrick",		(COLORREF)0x002222B2},
+	{"floralwhite",		(COLORREF)0x00F0FAFF},
+	{"forestgreen",		(COLORREF)0x00228B22},
+	{"fuchsia",			(COLORREF)0x00FF00FF},
+	{"gainsboro",		(COLORREF)0x00DCDCDC},
+	{"ghostwhite",		(COLORREF)0x00FFF8F8},
+	{"gold",			(COLORREF)0x0000D7FF},
+	{"goldenrod",		(COLORREF)0x0020A5DA},
+	{"gray",			(COLORREF)0x00808080},
+	{"green",			(COLORREF)0x00008000},
+	{"greenyellow",		(COLORREF)0x002FFFAD},
+	{"honeydew",		(COLORREF)0x00F0FFF0},
+	{"hotpink",			(COLORREF)0x00B469FF},
+	{"indianred",		(COLORREF)0x005C5CCD},
+	{"indigo",			(COLORREF)0x0082004B},
+	{"ivory",			(COLORREF)0x00F0FFFF},
+	{"khaki",			(COLORREF)0x008CE6F0},
+	{"lavender",		(COLORREF)0x00FAE6E6},
+	{"lavenderblush",	(COLORREF)0x00F5F0FF},
+	{"lawngreen",		(COLORREF)0x0000FC7C},
+	{"lemonchiffon",	(COLORREF)0x00CDFAFF},
+	{"lightblue",		(COLORREF)0x00E6D8AD},
+	{"lightcoral",		(COLORREF)0x008080F0},
+	{"lightcyan",		(COLORREF)0x00FFFFE0},
+	{"lightgoldenrodyellow",(COLORREF)0x00D2FAFA},
+	{"lightgray",		(COLORREF)0x00D3D3D3},
+	{"lightgreen",		(COLORREF)0x0090EE90},
+	{"lightpink",		(COLORREF)0x00C1B6FF},
+	{"lightsalmon",		(COLORREF)0x007AA0FF},
+	{"lightseagreen",	(COLORREF)0x00AAB220},
+	{"lightskyblue",	(COLORREF)0x00FACE87},
+	{"lightslategray",	(COLORREF)0x00998877},
+	{"lightsteelblue",	(COLORREF)0x00DEC4B0},
+	{"lightyellow",		(COLORREF)0x00E0FFFF},
+	{"lime",			(COLORREF)0x0000FF00},
+	{"limegreen",		(COLORREF)0x0032CD32},
+	{"linen",			(COLORREF)0x00E6F0FA},
+	{"magenta",			(COLORREF)0x00FF00FF},
+	{"maroon",			(COLORREF)0x00000080},
+	{"mediumaquamarine",(COLORREF)0x00AACD66},
+	{"mediumblue",		(COLORREF)0x00CD0000},
+	{"mediumorchid",	(COLORREF)0x00D355BA},
+	{"mediumpurple",	(COLORREF)0x00DB7093},
+	{"mediumseagreen",	(COLORREF)0x0071B33C},
+	{"mediumslateblue",	(COLORREF)0x00EE687B},
+	{"mediumspringgreen",(COLORREF)0x009AFA00},
+	{"mediumturquoise",	(COLORREF)0x00CCD148},
+	{"mediumvioletred",	(COLORREF)0x008515C7},
+	{"midnightblue",	(COLORREF)0x00701919},
+	{"mintcream",		(COLORREF)0x00FAFFF5},
+	{"mistyrose",		(COLORREF)0x00E1E4FF},
+	{"moccasin",		(COLORREF)0x00B5E4FF},
+	{"navajowhite",		(COLORREF)0x00ADDEFF},
+	{"navy",			(COLORREF)0x00800000},
+	{"oldlace",			(COLORREF)0x00E6F5FD},
+	{"olive",			(COLORREF)0x00008080},
+	{"olivedrab",		(COLORREF)0x00238E6B},
+	{"orange",			(COLORREF)0x0000A5FF},
+	{"orangered",		(COLORREF)0x000045FF},
+	{"orchid",			(COLORREF)0x00D670DA},
+	{"palegoldenrod",	(COLORREF)0x00AAE8EE},
+	{"palegreen",		(COLORREF)0x0098FB98},
+	{"paleturquoise",	(COLORREF)0x00EEEEAF},
+	{"palevioletred",	(COLORREF)0x009370DB},
+	{"papayawhip",		(COLORREF)0x00D5EFFF},
+	{"peachpuff",		(COLORREF)0x00B9DAFF},
+	{"peru",			(COLORREF)0x003F85CD},
+	{"pink",			(COLORREF)0x00CBC0FF},
+	{"plum",			(COLORREF)0x00DDA0DD},
+	{"powderblue",		(COLORREF)0x00E6E0B0},
+	{"purple",			(COLORREF)0x00800080},
+	{"red",				(COLORREF)0x000000FF},
+	{"rosybrown",		(COLORREF)0x008F8FBC},
+	{"royalblue",		(COLORREF)0x00E16941},
+	{"saddlebrown",		(COLORREF)0x0013458B},
+	{"salmon",			(COLORREF)0x007280FA},
+	{"sandybrown",		(COLORREF)0x0060A4F4},
+	{"seagreen",		(COLORREF)0x00578B2E},
+	{"seashell",		(COLORREF)0x00EEF5FF},
+	{"sienna",			(COLORREF)0x002D52A0},
+	{"silver",			(COLORREF)0x00C0C0C0},
+	{"skyblue",			(COLORREF)0x00EBCE87},
+	{"slateblue",		(COLORREF)0x00CD5A6A},
+	{"slategray",		(COLORREF)0x00908070},
+	{"snow",			(COLORREF)0x00FAFAFF},
+	{"springgreen",		(COLORREF)0x007FFF00},
+	{"steelblue",		(COLORREF)0x00B48246},
+	{"tan",				(COLORREF)0x008CB4D2},
+	{"teal",			(COLORREF)0x00808000},
+	{"thistle",			(COLORREF)0x00D8BFD8},
+	{"tomato",			(COLORREF)0x004763FF},
+	{"turquoise",		(COLORREF)0x00D0E040},
+	{"violet",			(COLORREF)0x00EE82EE},
+	{"wheat",			(COLORREF)0x00B3DEF5},
+	{"white",			(COLORREF)0x00FFFFFF},
+	{"whitesmoke",		(COLORREF)0x00F5F5F5},
+	{"yellow",			(COLORREF)0x0000FFFF},
+	{"yellowgreen",		(COLORREF)0x0032CD9A}
+};
 
 COLORREF get_default_color(int index)
 {
@@ -290,4 +433,49 @@ Gdiplus::Color get_color(Gdiplus::Color cr, int argb, BYTE value)
 	Gdiplus::Color cr_new = cr;
 	set_color(cr_new, argb, value);
 	return cr_new;
+}
+
+//주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
+//https://en.wikipedia.org/wiki/Web_colors
+//RGB(255, 190, 200)과 가장 유사한 색은 Pink(255, 192, 203)이라고 보이지만
+//LightPink(255, 182, 193)를 리턴한다. 계산식이 잘못인지 확인 필요.
+CString	get_color_name_of_closest(COLORREF cr_src, COLORREF* cr_closest)
+{
+	CString result;
+
+	double twoPiOver240 = 2.0F * 3.1415926 / 240.0F;
+
+	int dclr, dclrmax;	// delta errors
+	int dH, dL, dS;		// deltas in HLS coords
+	WORD tHH, tLL, tSS;	// test color in HLS coords
+	WORD iHH, iLL, iSS;	// input color in HLS coords
+	dclrmax = SHRT_MAX;	// big number
+	COLORREF crTest;
+
+	::ColorRGBToHLS(cr_src, &iHH, &iLL, &iSS);
+
+	for (auto cr : g_cr)
+	{
+		crTest = cr.second;
+		::ColorRGBToHLS(crTest, &tHH, &tLL, &tSS);
+
+		// compute color difference in HLS space (which are cylindrical coords)
+		//dc = s1^2 + s2^2 - 2*s1*s2*cos(h1-h2) + (l1-l2)^2
+
+		dH = iHH - tHH;
+		dL = iLL - tLL;
+		dS = iSS * iSS + tSS * tSS;
+
+		dclr = (int)((double)dS - 2.0 * iSS * tSS * cos(twoPiOver240 * dH) + (double)dL * dL);
+
+		if (dclr < dclrmax)
+		{
+			dclrmax = dclr;
+			result = cr.first;
+			if (cr_closest)
+				*cr_closest = cr.second;
+		}
+	}
+
+	return result;
 }

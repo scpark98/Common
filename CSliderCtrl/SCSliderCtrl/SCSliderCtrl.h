@@ -114,15 +114,16 @@ public:
 		slider_thumb_round,
 		slider_value,
 		slider_progress,
+		slider_progress_line,
 		slider_track,
 		slider_step,		//진행 단계를 표시. 1-2-3-4 과 같은 형태. 
 	};
 
 	enum SCSliderCtrlValueStyle
 	{
-		none = 0,
-		value,
-		percentage,
+		value_style_none = 0,
+		value_style_value,
+		value_style_percentage,
 	};
 
 	enum TIMER
@@ -159,12 +160,13 @@ public:
 	void	enable_slide(bool enable = true) { m_enable_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
-	void	SetValueStyle(int nValueStyle = value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
+	void	SetValueStyle(int nValueStyle = value_style_value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
 
 	void	set_back_color(COLORREF crBack);
 	void	set_active_color(COLORREF crActive);
 	void	set_inactive_color(COLORREF crInActive);
 	void	set_thumb_color(COLORREF crThumb);
+	void	set_text_color(COLORREF cr_text) { m_crValueText = cr_text; Invalidate(); }
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
@@ -264,8 +266,8 @@ protected:
 	bool		m_has_focus = false;
 	bool		m_draw_focus_rect = false;
 
-	int			m_nValueStyle;	//only applies to SCSLIDERCTRL_STYLE_PROGRESS. default = value;
-	COLORREF	m_crValueText;	//text color of value. background is transparent. default = RGB(64,64,64);
+	int			m_nValueStyle = value_style_value;
+	COLORREF	m_crValueText = RGB(192, 192, 192);
 
 	bool		m_transparent = false;
 	COLORREF	m_cr_back;		// back color of control

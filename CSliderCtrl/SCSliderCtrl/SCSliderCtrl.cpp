@@ -39,9 +39,6 @@ CSCSliderCtrl::CSCSliderCtrl()
 
 	m_draw_focus_rect = false;
 
-	m_nValueStyle = value;
-	m_crValueText = RGB(32, 32, 32);
-
 	m_cr_back	= ::GetSysColor(COLOR_3DFACE);
 	m_cr_active	= RGB(64, 80, 181);//RGB(128, 192, 255);
 	m_cr_inactive= get_color(m_cr_back, -64);
@@ -116,9 +113,6 @@ void CSCSliderCtrl::OnPaint()
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	CDC		dcMem;
-	dcMem.CreateCompatibleDC(&dc);
-
 	CAutoFont font(_T("굴림"));
 	font.SetHeight((double)get_logical_size_from_font_size(m_hWnd, m_rc.Height()) / 2.2);
 	font.SetBold(true);
@@ -127,10 +121,13 @@ void CSCSliderCtrl::OnPaint()
 	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
 	CRect track = m_rc;
 
-	if (m_is_vertical)
-		track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
-	else
-		track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
+	if (m_style <= slider_thumb_round)
+	{
+		if (m_is_vertical)
+			track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
+		else
+			track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
+	}
 
 	//m_rc의 y센터좌표
 	int	cy = m_rc.CenterPoint().y;
@@ -335,12 +332,12 @@ void CSCSliderCtrl::OnPaint()
 
 		//m_crValueText = RGB(12, 162, 255);
 		//m_cr_active = RGB(128,255,128);
-		if (m_nValueStyle > none)
+		if (m_nValueStyle > value_style_none)
 		{
 			dc.SetTextColor(enable_color(m_crValueText));
 			dc.SetBkMode(TRANSPARENT);
 
-			if (m_nValueStyle == value)
+			if (m_nValueStyle == value_style_value)
 				str.Format(_T("%ld / %ld"), pos, (upper > 0 ? upper : 0));
 			else if (upper == lower)
 				str = _T("0.0%");
@@ -444,19 +441,15 @@ void CSCSliderCtrl::OnPaint()
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
 			pOldPen = (CPen*)dc.SelectObject(&m_penThumbDarker);//NULL_PEN);
 
-			CRect	rThumb = CRect(pxpos - m_thumb.cx / 2, m_rc.top + 2, pxpos + m_thumb.cx / 2, m_rc.bottom - 2);
-			dc.RoundRect(rThumb, CPoint(6, 6));
+			rThumb.top = m_rc.top;
+			rThumb.bottom = m_rc.bottom;
 
-			dc.SelectObject(pOldPen);
-			dc.SelectObject(pOldBrush);
-			br.DeleteObject();
-
-			if (m_nValueStyle > none)
+			if (m_nValueStyle > value_style_none)
 			{
 				dc.SetTextColor(enable_color(m_crValueText));
 				dc.SetBkMode(TRANSPARENT);
 
-				if (m_nValueStyle == value)
+				if (m_nValueStyle == value_style_value)
 					str.Format(_T("%ld / %ld"), pos, (upper > 0 ? upper : 0));
 				else if (upper == lower)
 					str = _T("0.0%");
@@ -464,25 +457,33 @@ void CSCSliderCtrl::OnPaint()
 					str.Format(_T("%.1f%%"), (double)(pos - lower) / (double)(upper - lower) * 100.0);
 
 				//텍스트를 thumb에 출력하는데 그 너비가 작다면 늘려준다.
-				int		margin = 12;
-				int		minWidth = m_thumb.cx * 2;
-				CRect	rText;
-				dc.DrawText(str, rText, DT_CALCRECT);
+				int		margin = 8;
+				int		minWidth;
+				CSize	sz;
+				sz = dc.GetTextExtent(str);
 
-				if (rText.Width() + margin > minWidth)
-					minWidth = rText.Width() + margin;
+				//if (rText.Width() + margin > minWidth)
+					minWidth = sz.cx + margin;
 
 				if (m_thumb.cx != minWidth)
 				{
 					m_thumb.cx = minWidth;
 
 					rThumb = CRect(pxpos - m_thumb.cx / 2, m_rc.top, pxpos + m_thumb.cx / 2, m_rc.bottom);
-					//TRACE("%ld, invalidate\n", GetTickCount());
-					Invalidate();
 				}					
+
+				dc.RoundRect(rThumb, CPoint(6, 6));
+			}
+			else
+			{
+				dc.RoundRect(rThumb, CPoint(6, 6));
 			}
 
 			dc.DrawText(str, rThumb, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+
+			dc.SelectObject(pOldPen);
+			dc.SelectObject(pOldBrush);
+			br.DeleteObject();
 		}
 	}
 	//트랙의 북마크를 그린다.

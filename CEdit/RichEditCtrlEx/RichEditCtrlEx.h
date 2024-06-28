@@ -33,51 +33,57 @@ public:
 		id_menu_richedit_toggle_time,
 	};
 
-	void		SetDefaultTextColor( COLORREF crText ) { m_crText = crText; }
-	void		SetBackColor( bool bSysColor, COLORREF crBack );
-	void		SetClearLogInterval( int nInterval );
-	void		SetMaxCharLimit( int nMaxChar ) { m_nMaxCharLimit = nMaxChar; }
+	void		SetDefaultTextColor(COLORREF crText) { m_crText = crText; }
+
+	//back color를 변경한다.
+	void		SetBackColor(COLORREF crBack);
+	void		SetClearLogInterval(int nInterval);
+	void		SetMaxCharLimit(int nMaxChar) { m_nMaxCharLimit = nMaxChar; }
 
 	void		ClearAll();
 
 	void		ToggleShowLog();
-	void		ShowLog( bool bShow = true ) { m_show_log = bShow; }
+	void		ShowLog(bool bShow = true) { m_show_log = bShow; }
 	bool		IsShowLog() { return m_show_log; }
 
 	void		ToggleShowTime();
-	void		ShowTimeInfo( bool bShow = true ) { m_show_time = bShow; }
+	void		ShowTimeInfo(bool bShow = true) { m_show_time = bShow; }
 	bool		IsShowTime() { return m_show_time; }
 
 	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
 
 	UINT		GetLineSpacing();
-	void		SetLineSpacing( UINT nLineSpace );
+	//줄간격. 0=1줄, 1=1.5줄, 2=2.0줄
+	void		SetLineSpacing(UINT nLineSpace);
 
-	//20231004. Append~로 시작되는 4개의 함수를 2개로 간소화한다.
-	void		append(COLORREF cr, LPCTSTR lpszFormat, ... );
-	//void		append(COLORREF cr, CString text, bool linefeed = true);
+	//20231004. Append~로 시작되는 4개의 함수를 1개로 간소화한다.
+	//맨 끝에 "\n"을 자동으로 붙여주지 않으므로 필요하다면 addl()함수를 사용한다.
+	//간혹 한 라인에 추가적인 로그를 표시할 필요가 있으므로 add(), addl()를 분리함.
+	CString		add(COLORREF cr, LPCTSTR lpszFormat, ...);
+	//addl은 add line의 약자로 맨 끝에 "\n"을 추가할 뿐 add와 동일하다.
+	CString		addl(COLORREF cr, LPCTSTR lpszFormat, ...);
 
-	int			AppendToLog(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
-	void		Append(LPCTSTR lpszFormat, ... );
-	void		Append(COLORREF cr, LPCTSTR lpszFormat, ... );
-	int			AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE );
+	int			AppendToLog(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
+	void		Append(LPCTSTR lpszFormat, ...);
+	void		Append(COLORREF cr, LPCTSTR lpszFormat, ...);
+	int			AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);
 
 
 
 	int			GetNumVisibleLines();
 
-	COLORREF	GetComplementaryColor( COLORREF crColor );
+	COLORREF	GetComplementaryColor(COLORREF crColor);
 
 	void		auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
-	void		SetScrollSize( int nLines ) { m_nScrollSize = nLines; }
+	void		SetScrollSize(int nLines) { m_nScrollSize = nLines; }
 
 	int			get_align() { return m_align; }
 	//PFA_LEFT(1), PFA_RIGHT(2), PFA_CENTER(3)
 	void		set_align(int align);
 
-	virtual		CRichEditCtrlEx& SetFontName( TCHAR *sfontname );
-	virtual		CRichEditCtrlEx& SetFontSize( int nSize );
-	virtual		CRichEditCtrlEx& SetFontBold( bool bBold = true );
+	virtual		CRichEditCtrlEx& SetFontName(TCHAR *sfontname);
+	virtual		CRichEditCtrlEx& SetFontSize(int nSize);
+	virtual		CRichEditCtrlEx& SetFontBold(bool bBold = true);
 
 protected:
 	COLORREF	m_crText;

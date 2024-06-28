@@ -48,6 +48,12 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define _std_cpp17 201703L
 #define _std_cpp20 202002L
 
+//프로젝트가 유니코드 문자 집합을 사용할 때 fopen()시 UTF-8로 저장하고
+//멀티바이트 문자 집합이면 ANSI로 저장되도록 한다.
+//단, UTF-8로 저장시 BOM 문자가 헤더에 기록되므로 파일을 쓰기용으로 생성한 후
+//fseek를 이용해서 헤더를 무시해야만 해당 파일이 UTF-8 without BOM으로 생성된다.
+//_tfopen_s(&fp, m_droppedFolder + _T("\\filelist.lst"), _T("wt")CHARSET);
+//fseek(fp, 0L, SEEK_SET);
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
 #define __function__ __FUNCTIONW__

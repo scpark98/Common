@@ -28,7 +28,7 @@ SCLog::~SCLog()
 	}
 }
 
-bool SCLog::init(CString logFolder, CString filetitle, int showLogLevel)
+bool SCLog::init(CString log_folder, CString file_title, int show_log_level)
 {
 	try
 	{
@@ -37,7 +37,7 @@ bool SCLog::init(CString logFolder, CString filetitle, int showLogLevel)
 			return false;
 		}
 
-		m_showLogLevel = showLogLevel;
+		m_showLogLevel = show_log_level;
 
 		if (m_fullpath.IsEmpty())
 		{
@@ -61,16 +61,16 @@ bool SCLog::init(CString logFolder, CString filetitle, int showLogLevel)
 			m_folder = sExeFolder + _T("\\Log");
 
 
-			if (!logFolder.IsEmpty())
+			if (!log_folder.IsEmpty())
 			{
-				logFolder.Replace(_T("/"), _T("\\"));
+				log_folder.Replace(_T("/"), _T("\\"));
 
 				//절대경로로 설정한 경우
-				if (logFolder.Find(_T(":\\")) > 0)
-					m_folder = logFolder;
+				if (log_folder.Find(_T(":\\")) > 0)
+					m_folder = log_folder;
 				//상대경로로 설정한 경우
 				else
-					m_folder.Format(_T("%s\\%s"), sExeFolder, logFolder);
+					m_folder.Format(_T("%s\\%s"), sExeFolder, log_folder);
 
 				DWORD  retval = 0;
 				TCHAR buffer[MAX_PATH] = _T("");
@@ -87,8 +87,8 @@ bool SCLog::init(CString logFolder, CString filetitle, int showLogLevel)
 				}
 			}
 
-			if (!filetitle.IsEmpty())
-				m_filetitle = filetitle;
+			if (!file_title.IsEmpty())
+				m_filetitle = file_title;
 
 			CTime t = CTime::GetCurrentTime();
 			m_filename.Format(_T("%s_%d%02d%02d.log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());

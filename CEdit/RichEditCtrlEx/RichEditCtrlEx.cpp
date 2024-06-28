@@ -16,7 +16,7 @@ IMPLEMENT_DYNAMIC(CRichEditCtrlEx, CRichEditCtrl)
 CRichEditCtrlEx::CRichEditCtrlEx()
 {
 	m_crText			= ::GetSysColor(COLOR_GRAYTEXT);
-	m_crBack			= RGB( 255, 255, 255 );
+	m_crBack			= RGB(255, 255, 255);
 	m_show_log			= true;
 	m_show_time			= AfxGetApp()->GetProfileInt(_T("setting\\rich_edit"), _T("show time"), true);
 	m_nClearLogInterval	= 0;
@@ -43,18 +43,26 @@ END_MESSAGE_MAP()
 
 
 // CRichEditCtrlEx 메시지 처리기입니다.
-//void CRichEditCtrlEx::append(COLORREF cr, CString text, bool linefeed)
-//{
-//	append(cr, _T("%s%c"), text, (linefeed ? '\n' : '\0'));
-//}
-
-void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
+CString CRichEditCtrlEx::addl(COLORREF cr, LPCTSTR lpszFormat, ...)
 {
+	//CString으로 변환
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+
+	return add(cr, new_text + _T("\n"));
+}
+
+CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
+{
+	CString ret;
+
 	if (m_hWnd == NULL)
-		return;
+		return ret;
 
 	if (!m_show_log)
-		return;
+		return ret;
 
 	if (cr == -1)
 		cr = m_crText;
@@ -283,6 +291,8 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 		SetRedraw(TRUE);
 	}
 #endif
+
+	return new_text;
 }
 
 
@@ -336,7 +346,7 @@ void CRichEditCtrlEx::append(COLORREF cr, LPCTSTR lpszFormat, ...)
 * 맨 마지막 라인으로 캐럿을 옮겨놓으면 자동 스크롤되도록 처리했으나
 * 뭔가 깜빡임이 발생한다.
 */
-int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/ )
+int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/)
 {
 	if (m_hWnd == NULL)
 		return 0;
@@ -372,7 +382,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	//str의 끝에 \n이 있던 없던 옵션대로 추가할 건 추가한다.
 	//str의 끝에 \n이 이미 있으면 스킵하려 했으나 의도적인 경우도 존재하므로
 	//코드는 명시된 규칙 그대로 수행하는게 맞다.
-	if (bAddNewLine)// && (str.Right(1) != "\n") )
+	if (bAddNewLine)// && (str.Right(1) != "\n"))
 		str += "\n";
 
 	int			nOldLines = 0, nNewLines = 0, nScroll = 0;
@@ -422,16 +432,16 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 		SYSTEMTIME	t;
 		CString sTime;
 
-		::GetLocalTime( &t );
-		sTime.Format( _T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds );
+		::GetLocalTime(&t);
+		sTime.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
 		cf.cbSize		= sizeof(CHARFORMAT);
 		cf.dwMask		= CFM_COLOR;
 		cf.dwEffects	= 0;	// To disable CFE_AUTOCOLOR
-		cf.crTextColor	= RGB( 128, 128, 128 );
+		cf.crTextColor	= RGB(128, 128, 128);
 		SetSelectionCharFormat(cf);
 
-		ReplaceSel( sTime );
+		ReplaceSel(sTime);
 	}
 
 	// Save number of lines before insertion of new text
@@ -442,7 +452,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	cf.dwMask		= CFM_COLOR;
 	cf.dwEffects	= 0;	// To disable CFE_AUTOCOLOR
 
-	if ( color == -1 )
+	if (color == -1)
 		cf.crTextColor	= m_crText;
 	else
 		cf.crTextColor	= color;
@@ -472,7 +482,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	{
 		//clear
 		SetSel(0, -1);
-		ReplaceSel( _T("") );
+		ReplaceSel(_T(""));
 	}
 
 	nInsertionPoint = -1;
@@ -524,7 +534,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	return 0;
 }
 
-void CRichEditCtrlEx::Append( LPCTSTR lpszFormat, ... )
+void CRichEditCtrlEx::Append(LPCTSTR lpszFormat, ...)
 {
 	TCHAR szBuffer[512];
 
@@ -652,17 +662,17 @@ void CRichEditCtrlEx::Append(COLORREF cr, LPCTSTR lpszFormat, ...)
 //-----------------------------------------------------------------------------
 int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/)
 {
-	if ( m_hWnd == NULL )
+	if (m_hWnd == NULL)
 		return 0;
 
-	if ( !m_show_log )
+	if (!m_show_log)
 		return 0;
 
 	long nVisible = 0;
 	long nInsertionPoint = 0;
 	CHARFORMAT cf;
 	
-	if ( bAddNewLine && ( str.Right( 1 ) != "\n" ) )
+	if (bAddNewLine && (str.Right(1) != "\n"))
 		str += _T("\n");
 
 	// Initialize character format structure
@@ -670,7 +680,7 @@ int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, 
 	cf.dwMask = CFM_COLOR;
 	cf.dwEffects = 0; // To disable CFE_AUTOCOLOR
 
-	if ( color == -1 )
+	if (color == -1)
 		cf.crTextColor = m_crText;
 	else
 		cf.crTextColor = color;
@@ -697,7 +707,7 @@ int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, 
 	// even though ES_AUTOxSCROLL style is NOT set.
 
 
-	if ( this == GetFocus() )
+	if (this == GetFocus())
 	{
 		LineScroll(INT_MAX);
 		LineScroll(1 - nVisible);
@@ -767,36 +777,36 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 
 	menu.CreatePopupMenu();
 
-	menu.AppendMenu( MF_STRING, id_menu_richedit_clearl_log, _T("Clear all logs(&C)") );
-	menu.AppendMenu( MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, id_menu_richedit_toggle_log, _T("Display logs(&S)") );
-	menu.AppendMenu( MF_STRING, id_menu_richedit_toggle_time, _T("Display time info(&D)") );
-	menu.AppendMenu( MF_SEPARATOR);
-	menu.AppendMenu( MF_STRING, id_menu_richedit_line_space10, _T("1.0 line space(&1)") );
-	menu.AppendMenu( MF_STRING, id_menu_richedit_line_space15, _T("1.5 line space(&2)") );
-	menu.AppendMenu( MF_STRING, id_menu_richedit_line_space20, _T("2.0 line space(&3)") );
+	menu.AppendMenu(MF_STRING, id_menu_richedit_clearl_log, _T("Clear all logs(&C)"));
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, id_menu_richedit_toggle_log, _T("Display logs(&S)"));
+	menu.AppendMenu(MF_STRING, id_menu_richedit_toggle_time, _T("Display time info(&D)"));
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, id_menu_richedit_line_space10, _T("1.0 line space(&1)"));
+	menu.AppendMenu(MF_STRING, id_menu_richedit_line_space15, _T("1.5 line space(&2)"));
+	menu.AppendMenu(MF_STRING, id_menu_richedit_line_space20, _T("2.0 line space(&3)"));
 
 	//현재 라인간격값을 얻어온다.
 	PARAFORMAT2	paraFormat;
-	GetParaFormat( paraFormat );
+	GetParaFormat(paraFormat);
 	paraFormat.dwMask = PFM_LINESPACING;
 	BYTE nLineSpacing = paraFormat.bLineSpacingRule;	//줄간격을 1.5배로 한다. 0=1.0, 1=1.5, 2=2.0
 
-	menu.CheckMenuItem( id_menu_richedit_toggle_log, m_show_log ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( id_menu_richedit_toggle_time, m_show_time ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( id_menu_richedit_line_space10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( id_menu_richedit_line_space15, nLineSpacing == 1 ? MF_CHECKED : MF_UNCHECKED );
-	menu.CheckMenuItem( id_menu_richedit_line_space20, nLineSpacing == 2 ? MF_CHECKED : MF_UNCHECKED );
+	menu.CheckMenuItem(id_menu_richedit_toggle_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(id_menu_richedit_toggle_time, m_show_time ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(id_menu_richedit_line_space10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(id_menu_richedit_line_space15, nLineSpacing == 1 ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(id_menu_richedit_line_space20, nLineSpacing == 2 ? MF_CHECKED : MF_UNCHECKED);
 
-	menu.EnableMenuItem( id_menu_richedit_toggle_time, m_show_log ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( id_menu_richedit_line_space10, m_show_log ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( id_menu_richedit_line_space15, m_show_log ? MF_ENABLED : MF_DISABLED );
-	menu.EnableMenuItem( id_menu_richedit_line_space20, m_show_log ? MF_ENABLED : MF_DISABLED );
+	menu.EnableMenuItem(id_menu_richedit_toggle_time, m_show_log ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(id_menu_richedit_line_space10, m_show_log ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(id_menu_richedit_line_space15, m_show_log ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(id_menu_richedit_line_space20, m_show_log ? MF_ENABLED : MF_DISABLED);
 
-	SetMenu( &menu );
+	SetMenu(&menu);
 
-	ClientToScreen( &point );
-	menu.TrackPopupMenu( TPM_LEFTALIGN, point.x, point.y, this );
+	ClientToScreen(&point);
+	menu.TrackPopupMenu(TPM_LEFTALIGN, point.x, point.y, this);
 
 	menu.DestroyMenu();
 
@@ -812,26 +822,26 @@ void CRichEditCtrlEx::OnRButtonDblClk(UINT nFlags, CPoint point)
 
 void CRichEditCtrlEx::ClearAll()
 {
-	//SetSel( 0, -1 );
-	//ReplaceSel( "" );
-	SetWindowText(_T("") );
+	//SetSel(0, -1);
+	//ReplaceSel("");
+	SetWindowText(_T(""));
 }
 
 void CRichEditCtrlEx::ToggleShowLog()
 {
 	m_show_log = !m_show_log;
 
-	if ( m_show_log )
+	if (m_show_log)
 	{
-		AppendToLog(_T("\n") );
-		AppendToLog(_T("로그를 디스플레이합니다."), GetComplementaryColor( m_crBack ) );
+		AppendToLog(_T("\n"));
+		AppendToLog(_T("로그를 디스플레이합니다."), GetComplementaryColor(m_crBack));
 	}
 	else
 	{
 		m_show_log = true;
-		AppendToLog(_T("\n") );
-		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), GetComplementaryColor( m_crBack ) );
-		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), GetComplementaryColor( m_crBack ) );
+		AppendToLog(_T("\n"));
+		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), GetComplementaryColor(m_crBack));
+		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), GetComplementaryColor(m_crBack));
 		m_show_log = false;
 	}
 }
@@ -863,68 +873,70 @@ void CRichEditCtrlEx::OnPopupMenu(UINT menuID)
 	}
 }
 
-void CRichEditCtrlEx::SetLineSpacing( UINT nLineSpace )
+//줄간격. 0=1줄, 1=1.5줄, 2=2.0줄
+void CRichEditCtrlEx::SetLineSpacing(UINT nLineSpace)
 {
 	PARAFORMAT2	paraFormat;
 
-	GetParaFormat( paraFormat );
+	GetParaFormat(paraFormat);
 	paraFormat.dwMask = PFM_LINESPACING;
 	paraFormat.bLineSpacingRule = (BYTE)nLineSpace;		//줄간격. 0=1.0, 1=1.5, 2=2.0
 	
-	SetSel( 0, -1 );
-	SetParaFormat( paraFormat );
-	SetSel( -1, -1 );
+	SetSel(0, -1);
+	SetParaFormat(paraFormat);
+	SetSel(-1, -1);
 }
 
 UINT CRichEditCtrlEx::GetLineSpacing()
 {
 	PARAFORMAT2	paraFormat;
 
-	GetParaFormat( paraFormat );
+	GetParaFormat(paraFormat);
 
 	return paraFormat.bLineSpacingRule;
 }
 
-void CRichEditCtrlEx::SetBackColor( bool bSysColor, COLORREF crBack )
+void CRichEditCtrlEx::SetBackColor(COLORREF crBack)
 {
-	SetBackgroundColor( bSysColor, crBack );
+	//bSysColor = false일때만 crBack값이 유효하다.
+	SetBackgroundColor(false, crBack);
 
 	m_crBack = crBack;
 }
 
-void CRichEditCtrlEx::SetClearLogInterval( int nInterval )
+void CRichEditCtrlEx::SetClearLogInterval(int nInterval)
 {
-	KillTimer( TIMER_CLEAR_LOG );
+	KillTimer(TIMER_CLEAR_LOG);
 
-	if ( nInterval > 0 )
+	if (nInterval > 0)
 	{
 		m_nClearLogInterval = nInterval;
-		SetTimer( TIMER_CLEAR_LOG, m_nClearLogInterval * 1000, NULL );
+		SetTimer(TIMER_CLEAR_LOG, m_nClearLogInterval * 1000, NULL);
 	}
 }
 
 void CRichEditCtrlEx::OnTimer(UINT_PTR nIDEvent)
 {
-	if ( nIDEvent == TIMER_CLEAR_LOG )
+	if (nIDEvent == TIMER_CLEAR_LOG)
 	{
 		ClearAll();
-		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), GetComplementaryColor( m_crBack ) );
+		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), GetComplementaryColor(m_crBack));
 	}
 }
 
-COLORREF CRichEditCtrlEx::GetComplementaryColor( COLORREF crColor )
+COLORREF CRichEditCtrlEx::GetComplementaryColor(COLORREF crColor)
 {
-	int	r = 255 - GetRValue( crColor );
-	int	g = 255 - GetGValue( crColor );
-	int	b = 255 - GetBValue( crColor );
+	int	r = 255 - GetRValue(crColor);
+	int	g = 255 - GetGValue(crColor);
+	int	b = 255 - GetBValue(crColor);
 
 /*
-	Clamp( r, 0, 255 );
-	Clamp( g, 0, 255 );
-	Clamp( b, 0, 255 );
+	Clamp(r, 0, 255);
+	Clamp(g, 0, 255);
+	Clamp(b, 0, 255);
 */
 
-	return RGB( r, g, b );
+	return RGB(r, g, b);
 }
 
 
@@ -933,7 +945,7 @@ void CRichEditCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
 	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TRACE( "wheel on richedit omh: %d\n", zDelta );
+	TRACE("wheel on richedit omh: %d\n", zDelta);
 	CRichEditCtrl::OnMouseHWheel(nFlags, zDelta, pt);
 }
 
@@ -941,13 +953,13 @@ void CRichEditCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	if ( pMsg->message == WM_MOUSEWHEEL )
+	if (pMsg->message == WM_MOUSEWHEEL)
 	{
-		//TRACE( "wheel on richedit ptm: %d\n", pMsg->wParam );
-		if ( (int)(pMsg->wParam) > 0 )
-			LineScroll( -m_nScrollSize );
+		//TRACE("wheel on richedit ptm: %d\n", pMsg->wParam);
+		if ((int)(pMsg->wParam) > 0)
+			LineScroll(-m_nScrollSize);
 		else
-			LineScroll( m_nScrollSize );
+			LineScroll(m_nScrollSize);
 		return true;
 	}
 
@@ -975,12 +987,12 @@ void CRichEditCtrlEx::ReconstructFont()
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	SetFont( &m_font, true );
+	SetFont(&m_font, true);
 
 	ASSERT(bCreated);
 }
 
-CRichEditCtrlEx& CRichEditCtrlEx::SetFontName( TCHAR *sfontname )
+CRichEditCtrlEx& CRichEditCtrlEx::SetFontName(TCHAR *sfontname)
 {
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sfontname);
 	ReconstructFont();
@@ -988,7 +1000,7 @@ CRichEditCtrlEx& CRichEditCtrlEx::SetFontName( TCHAR *sfontname )
 	return *this;
 }
 
-CRichEditCtrlEx& CRichEditCtrlEx::SetFontSize( int nSize )
+CRichEditCtrlEx& CRichEditCtrlEx::SetFontSize(int nSize)
 {
 	HDC hDC = GetDC()->GetSafeHdc();
 	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(hDC, LOGPIXELSY), 72);
@@ -998,9 +1010,9 @@ CRichEditCtrlEx& CRichEditCtrlEx::SetFontSize( int nSize )
 	return *this;
 }
 
-CRichEditCtrlEx& CRichEditCtrlEx::SetFontBold( bool bBold )
+CRichEditCtrlEx& CRichEditCtrlEx::SetFontBold(bool bBold)
 {
-	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
+	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
 	ReconstructFont();
 
 	return *this;

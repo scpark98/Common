@@ -21,7 +21,7 @@ CSCSliderCtrl::CSCSliderCtrl()
 {
 	m_pCallback_func = NULL;
 
-	m_style = slider_thumb;
+	m_style = style_thumb;
 	set_style(m_style);
 
 	m_nEventMsgStyle = AfxGetApp()->GetProfileInt(_T("setting"), _T("event msg style"), msg_style_timer);
@@ -86,7 +86,7 @@ END_MESSAGE_MAP()
 
 void CSCSliderCtrl::OnPaint() 
 {
-	if (m_style == slider_normal)
+	if (m_style == style_normal)
 	{
 		CSliderCtrl::OnPaint();
 		return;
@@ -97,7 +97,7 @@ void CSCSliderCtrl::OnPaint()
 	int pos = GetPos();
 	TRACE(_T("GetPos() OnPaint() = %d\n"), pos);
 
-	if (m_style == slider_step && m_steps.size() < upper - lower)
+	if (m_style == style_step && m_steps.size() < upper - lower)
 		m_steps.resize(upper - lower + 1);
 
 	CPaintDC	dc1(this); // device context for painting
@@ -121,7 +121,7 @@ void CSCSliderCtrl::OnPaint()
 	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
 	CRect track = m_rc;
 
-	if (m_style <= slider_thumb_round)
+	if (m_style <= style_thumb_round)
 	{
 		if (m_is_vertical)
 			track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
@@ -164,11 +164,11 @@ void CSCSliderCtrl::OnPaint()
 
 
 	//inactive 영역을 먼저 그리고
-	if (m_style == slider_thumb_round)
+	if (m_style == style_thumb_round)
 	{
 		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
 	}
-	else if (m_style == slider_thumb || m_style == slider_value)
+	else if (m_style == style_thumb || m_style == style_value)
 	{
 		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
 			
@@ -189,12 +189,21 @@ void CSCSliderCtrl::OnPaint()
 		penDark.DeleteObject();
 		penLight.DeleteObject();
 	}
-	else if (m_style == slider_progress)
+	else if (m_style == style_progress)
 	{
 		CRect	rInActive(pxpos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
 		dc.FillSolidRect(rInActive, enable_color(m_cr_inactive));
 	}
-	else if (m_style == slider_track)
+	else if (m_style == style_progress_line)
+	{
+		CRect rtrack = m_rc;
+		rtrack.top = m_rc.CenterPoint().y - 4;
+		rtrack.bottom = m_rc.CenterPoint().y + 4;
+		Gdiplus::Pen pen(RGB2gpColor(m_cr_inactive), 8);
+		pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+		g.DrawLine(&pen, rtrack.left + rtrack.Height() / 2, rtrack.CenterPoint().y, m_rc.right - rtrack.Height() / 2 - 1, rtrack.CenterPoint().y);
+	}
+	else if (m_style == style_track)
 	{
 		CRect r = m_rc;
 		int cy = r.CenterPoint().y;
@@ -210,7 +219,7 @@ void CSCSliderCtrl::OnPaint()
 		DrawSunkenRect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
 
 	}
-	else if (m_style == slider_step)
+	else if (m_style == style_step)
 	{
 		CRect r = m_rc;
 		int thumb_size = MIN(r.Width(), r.Height()); //스텝 위치마다 그려질 도형의 크기
@@ -304,7 +313,7 @@ void CSCSliderCtrl::OnPaint()
 
 	//경과된 영역(active area) 표시
 #if 1
-	if (m_style <= slider_value)
+	if (m_style <= style_value)
 	{
 		dc.FillSolidRect(track.left, cy - m_track_height / 2, pxpos - track.left, m_track_height, enable_color(m_cr_active));
 			
@@ -325,7 +334,7 @@ void CSCSliderCtrl::OnPaint()
 		penLight.DeleteObject();
 			
 	}
-	else if (m_style == slider_progress)
+	else if (m_style == style_progress)
 	{
 		CRect	rActive(0, track.top + 2, pxpos, track.bottom - 2);
 		dc.FillSolidRect(rActive, enable_color(m_cr_active));
@@ -357,7 +366,22 @@ void CSCSliderCtrl::OnPaint()
 		//dc.SelectObject(pOldBrush);
 		//DrawRectangle(&dc, rActive, (m_cr_active), (m_cr_active), 1, PS_SOLID, R2_XORPEN);
 	}
-	else if (m_style == slider_track)
+	else if (m_style == style_progress_line)
+	{
+		if (GetPos() > lower)
+		{
+			CRect rtrack = m_rc;
+			rtrack.top = m_rc.CenterPoint().y - 4;
+			rtrack.bottom = m_rc.CenterPoint().y + 4;
+
+			Gdiplus::Pen pen(RGB2gpColor(m_cr_active), 8);
+			pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+
+			int end = MAX(0, pxpos - rtrack.Height() / 2 - 1);
+			g.DrawLine(&pen, rtrack.left + rtrack.Height() / 2, rtrack.CenterPoint().y, end, rtrack.CenterPoint().y);
+		}
+	}
+	else if (m_style == style_track)
 	{
 		CRect r = track;
 		int cy = r.CenterPoint().y;
@@ -381,7 +405,7 @@ void CSCSliderCtrl::OnPaint()
 
 	// 손잡이(thumb)를 그린다
 #if 1
-	if (m_style <= slider_value)
+	if (m_style <= style_value)
 	{
 		CRect	rThumb = CRect(pxpos - m_thumb.cx / 2, cy - m_thumb.cy / 2, 0, 0);
 		rThumb.right = rThumb.left + m_thumb.cx;
@@ -390,7 +414,7 @@ void CSCSliderCtrl::OnPaint()
 		if (!IsWindowEnabled())
 		{
 		}
-		else if (m_style == slider_thumb)
+		else if (m_style == style_thumb)
 		{
 			CBrush br(enable_color(m_cr_thumb));
 
@@ -418,7 +442,7 @@ void CSCSliderCtrl::OnPaint()
 			dc.SelectObject(pOldBrush);
 			br.DeleteObject();
 		}
-		else if (m_style == slider_thumb_round)
+		else if (m_style == style_thumb_round)
 		{
 			//dc.FillSolidRect(rThumb, m_cr_thumb);
 			Gdiplus::Color cr_pen(255, GetRValue(255), GetGValue(0), GetBValue(0));
@@ -435,7 +459,7 @@ void CSCSliderCtrl::OnPaint()
 			g.FillEllipse(&brush_inner, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()));
 			//g.DrawEllipse(&pen, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()));
 		}
-		else if (m_style == slider_value)
+		else if (m_style == style_value)
 		{
 			CBrush br(enable_color(m_cr_thumb));
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
@@ -487,7 +511,7 @@ void CSCSliderCtrl::OnPaint()
 		}
 	}
 	//트랙의 북마크를 그린다.
-	else if (m_style == slider_track)
+	else if (m_style == style_track)
 	{
 		if (m_use_bookmark)
 		{
@@ -565,7 +589,7 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	int upper = GetRangeMax();
 
 	if (upper == lower)
-		return (m_style <= slider_value ? m_thumb.cx / 2 : 0);
+		return (m_style <= style_value ? m_thumb.cx / 2 : 0);
 
 	if (m_is_vertical)
 	{
@@ -580,9 +604,9 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	else
 	{
 		return 
-			m_margin.left + (m_style <= slider_value ? m_thumb.cx / 2 : 0) +
+			m_margin.left + (m_style <= style_value ? m_thumb.cx / 2 : 0) +
 			(int)(
-			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= slider_value ? m_thumb.cx : 0)) *
+			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= style_value ? m_thumb.cx : 0)) *
 			((double)(nPos - lower) / (double)(upper - lower))
 			);
 	}
@@ -601,7 +625,7 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 		pos = int(
 			lower +
 			(double)(nPixel - m_margin.top - (double)m_thumb.cy/2.0) /
-			(double)(m_rc.Height() - m_margin.bottom - m_margin.top - (m_style <= slider_value ? m_thumb.cy : 0)) *
+			(double)(m_rc.Height() - m_margin.bottom - m_margin.top - (m_style <= style_value ? m_thumb.cy : 0)) *
 			(double)(upper - lower)
 			);
 		Clamp(pos, lower, upper);
@@ -610,8 +634,8 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 	{
 		pos = int(
 			lower +
-			(double)(nPixel - m_margin.left - (m_style <= slider_value ? m_thumb.cx/2 : 0)) /
-			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= slider_value ? m_thumb.cx : 0)) *
+			(double)(nPixel - m_margin.left - (m_style <= style_value ? m_thumb.cx/2 : 0)) /
+			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= style_value ? m_thumb.cx : 0)) *
 			(double)(upper - lower)
 			);
 		Clamp(pos, lower, upper);
@@ -622,7 +646,7 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 
 void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point) 
 {
-	if (m_style == slider_normal)
+	if (m_style == style_normal)
 	{
 		CSliderCtrl::OnLButtonDown(nFlags, point);
 		return;
@@ -703,7 +727,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point) 
 {
 	// TODO: Add your message handler code here and/or call default
-	if (m_style == slider_normal)
+	if (m_style == style_normal)
 	{
 		CSliderCtrl::OnLButtonUp(nFlags, point);
 		return;
@@ -740,7 +764,7 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point) 
 {
-	if (m_style == slider_normal)
+	if (m_style == style_normal)
 	{
 		CSliderCtrl::OnMouseMove(nFlags, point);
 		return;
@@ -812,21 +836,21 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	{
 		nPixel = point.y - m_nMouseOffset;
 
-		if(nPixel > m_rc.Height() - m_margin.bottom - (m_style <= slider_value ? m_thumb.cy/2 : 0))
-			nPixel = m_rc.Height() - m_margin.bottom - (m_style<= slider_value ? m_thumb.cy/2 : 0);
+		if(nPixel > m_rc.Height() - m_margin.bottom - (m_style <= style_value ? m_thumb.cy/2 : 0))
+			nPixel = m_rc.Height() - m_margin.bottom - (m_style<= style_value ? m_thumb.cy/2 : 0);
 
-		if(nPixel < m_margin.top + (m_style <= slider_value ? m_thumb.cy/2 : 0))
-			nPixel = m_margin.top + (m_style <= slider_value ? m_thumb.cy/2 : 0);
+		if(nPixel < m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0))
+			nPixel = m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0);
 	}
 	else
 	{
 		nPixel = point.x - m_nMouseOffset;
 
-		if(nPixel < m_margin.left + (m_style <= slider_value ? m_thumb.cx/2 : 0))
-			nPixel = m_margin.left + (m_style <= slider_value ? m_thumb.cx/2 : 0);
+		if(nPixel < m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0))
+			nPixel = m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0);
 
-		if(nPixel > m_rc.Width() - m_margin.right - (m_style <= slider_value ? m_thumb.cx/2 : 0))
-			nPixel = m_rc.Width() - m_margin.right - (m_style <= slider_value ? m_thumb.cx/2 : 0);
+		if(nPixel > m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0))
+			nPixel = m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0);
 	}
 
 	int		lower;
@@ -1122,24 +1146,24 @@ void CSCSliderCtrl::set_style(int nStyle)
 
 	m_track_height = 5;
 
-	if (m_style == slider_thumb)
+	if (m_style == style_thumb)
 	{
 		m_thumb = CSize(28, 12);
 	}
-	else if (m_style == slider_thumb_round)
+	else if (m_style == style_thumb_round)
 	{
 		m_thumb = CSize(16, 16);
 		m_track_height = 3;
 	}
-	else if (m_style == slider_value)
+	else if (m_style == style_value)
 	{
 		m_thumb = CSize(56, 8);
 	}
-	else if (m_style == slider_progress)
+	else if (m_style == style_progress)
 	{
 		m_enable_slide = false;
 	}
-	else if (m_style == slider_step)
+	else if (m_style == style_step)
 	{
 		m_enable_slide = false;
 	}

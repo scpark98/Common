@@ -2515,7 +2515,6 @@ void request_url(CRequestUrlParams* params)
 	DWORD buffer_size = 1024 * 1024;
 	DWORD dwRead, dwWritten, dwTotalSize = 0;
 	char* buffer = new char[buffer_size];
-	char* total_buffer = NULL;
 	TCHAR query_buffer[32] = { 0, };
 	DWORD query_buffer_size = sizeof(query_buffer);
 
@@ -2523,8 +2522,8 @@ void request_url(CRequestUrlParams* params)
 
 	if (params->local_file_path.IsEmpty())
 	{
-		total_buffer = new char[buffer_size * 10];
-		memset(total_buffer, 0, buffer_size * 10);
+		//total_buffer = new char[buffer_size * 10];
+		//memset(total_buffer, 0, buffer_size * 10);
 	}
 
 	//size_buffer가 char면 파일크기를 못얻어온다.
@@ -2537,7 +2536,7 @@ void request_url(CRequestUrlParams* params)
 	if (!ret)
 	{
 		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
+		//SAFE_DELETE_ARRAY(total_buffer);
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
@@ -2551,7 +2550,7 @@ void request_url(CRequestUrlParams* params)
 	if (params->status != HTTP_STATUS_OK)
 	{
 		SAFE_DELETE_ARRAY(buffer);
-		SAFE_DELETE_ARRAY(total_buffer);
+		//SAFE_DELETE_ARRAY(total_buffer);
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
@@ -2566,6 +2565,8 @@ void request_url(CRequestUrlParams* params)
 		CString folder = get_part(params->local_file_path, fn_folder);
 		make_full_directory(folder);
 	}
+
+	params->result.Empty();
 
 	//0바이트의 파일은 다운받지 않아도 될 듯 하지만
 	//서버의 파일과 다운받은 로컬의 파일의 수가 같은지 등을 비교할 수도 있으므로 생성하자.
@@ -2589,7 +2590,14 @@ void request_url(CRequestUrlParams* params)
 
 		if (params->local_file_path.IsEmpty())
 		{
-			strncat(total_buffer, buffer, dwRead);
+			//UTF-8 with BOM으로 작성된 txt 파일을 읽어오면 파일 헤더에 EF BB BF 라는 3 char가 붙어온다.
+			//이는 윈도우에서 fopen으로 읽어올때는 문제되지 않으나 InternetReadFile()로 읽어오
+			if (byte(buffer[0]) == 0xEF &&
+				byte(buffer[1]) == 0xBB &&
+				byte(buffer[2]) == 0xBF)
+				memcpy(buffer, buffer + 3, dwRead - 3);
+			TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
+			params->result += UTF8toCString(buffer);
 		}
 		else
 		{
@@ -2599,7 +2607,7 @@ void request_url(CRequestUrlParams* params)
 				if (PathFileExists(params->local_file_path) && !DeleteFile(params->local_file_path))
 				{
 					SAFE_DELETE_ARRAY(buffer);
-					SAFE_DELETE_ARRAY(total_buffer);
+					//SAFE_DELETE_ARRAY(total_buffer);
 					InternetCloseHandle(hOpenRequest);
 					InternetCloseHandle(hInternetConnect);
 					InternetCloseHandle(hInternetRoot);
@@ -2614,7 +2622,7 @@ void request_url(CRequestUrlParams* params)
 				if (hFile == INVALID_HANDLE_VALUE)
 				{
 					SAFE_DELETE_ARRAY(buffer);
-					SAFE_DELETE_ARRAY(total_buffer);
+					//SAFE_DELETE_ARRAY(total_buffer);
 					InternetCloseHandle(hOpenRequest);
 					InternetCloseHandle(hInternetConnect);
 					InternetCloseHandle(hInternetRoot);
@@ -2635,7 +2643,12 @@ void request_url(CRequestUrlParams* params)
 
 	if (params->local_file_path.IsEmpty())
 	{
-		params->result = UTF8toCString(total_buffer);
+		//UTF-8 with BOM으로 인코딩 된 파일의 경우 헤더에 EF BB BF가 붙는다. 제거하자.
+		if (params->result.GetLength() >= 3 &&
+			params->result[0] == 0xEF &&
+			params->result[1] == 0xBB &&
+			params->result[2] == 0xBF)
+			params->result = params->result.Mid(3);
 	}
 	else
 	{
@@ -2644,7 +2657,7 @@ void request_url(CRequestUrlParams* params)
 	}
 
 	SAFE_DELETE_ARRAY(buffer);
-	SAFE_DELETE_ARRAY(total_buffer);
+	//SAFE_DELETE_ARRAY(total_buffer);
 	InternetCloseHandle(hOpenRequest);
 	InternetCloseHandle(hInternetConnect);
 	InternetCloseHandle(hInternetRoot);
@@ -6295,7 +6308,11 @@ CString get_file_property(CString fullpath, CString strFlag)
 	if (fullpath.IsEmpty())
 		fullpath = get_exe_filename(true);
 
+	//.ico 파일과 같은 파일들은 dwSize가 0이므로 더 이상 실행은 의미없다.
 	DWORD dwSize = GetFileVersionInfoSize(fullpath, 0);
+	if (dwSize <= 0)
+		return _T("");
+
 	TCHAR * buffer = new TCHAR[dwSize];
 	memset(buffer, 0, dwSize);
 

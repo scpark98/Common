@@ -52,10 +52,9 @@ public:
 	~CSCStatic();
 	
 	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
-	void		set_text(CString sText, COLORREF crTextColor = 0);
-	void		set_text(LPCTSTR format, ...);
-	CString		get_text() { return m_sText; }
 	void		SetWindowText(CString sText) { set_text(sText); }
+	void		set_text(CString sText, COLORREF crTextColor = -1);
+	void		set_textf(LPCTSTR format, ...);
 
 	//글자색, 배경색 동시 설정
 	void		set_color(COLORREF cr_text, COLORREF cr_back = -1);
@@ -167,7 +166,6 @@ protected:
 	};
 
 	CBitmap		m_Bmp;
-	CString		m_sText;
 	CString		m_sFontName;
 	int			m_nFontSize;
 	bool		m_auto_font_size = false;
@@ -220,16 +218,12 @@ protected:
 protected:
 	//{{AFX_MSG(CSCStatic)
 	afx_msg void OnPaint();
- 	afx_msg LRESULT OnSetText(WPARAM,LPARAM);
-	
-// 	afx_msg HBRUSH CtlColor(CDC* /*pDC*/, UINT /*nCtlColor*/);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	virtual void PreSubclassWindow();
 
 	//}}AFX_MSG
-//	LRESULT		Onset_text(WPARAM wParam,LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 
 public:

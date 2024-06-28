@@ -13,7 +13,6 @@ CSCStatic::CSCStatic()
 {
 	m_transparent	= false;
 
-	m_sText			= "";
 	m_cr_text		= ::GetSysColor(COLOR_BTNTEXT);
 	m_cr_back		= ::GetSysColor(COLOR_BTNFACE);
 	m_transparent	= false;
@@ -75,11 +74,7 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_WM_TIMER()
- 	ON_MESSAGE(WM_SETTEXT,OnSetText)
-// 	ON_WM_CTLCOLOR_REFLECT()
 	//}}AFX_MSG_MAP
-//	ON_MESSAGE(WM_SETTEXT,OnSetText)
-//	ON_WM_CTLCOLOR_REFLECT()
 ON_WM_WINDOWPOSCHANGED()
 ON_WM_SIZE()
 END_MESSAGE_MAP()
@@ -197,11 +192,12 @@ void CSCStatic::OnPaint()
 		}
 	}
 
-	if (m_sText == "")
-		GetWindowText(m_sText);
+
+	CString text;
+	GetWindowText(text);
 	
 
-	if (m_sText == "" && m_hIcon == NULL && m_header_images.size() == 0)
+	if (text.IsEmpty() && m_hIcon == NULL && m_header_images.size() == 0)
 		return;
 	
 
@@ -231,7 +227,7 @@ void CSCStatic::OnPaint()
 	CString sSpace = _T("");
 
 	//문자열 앞에 공백 넣기 옵션이 있을 경우 공백 추가
-	if (m_sText != "")
+	if (!text.IsEmpty())
 	{
 		for (int i = 0; i < m_nPrefixSpace; i++)
 			sSpace = _T(" ") + sSpace;
@@ -241,7 +237,7 @@ void CSCStatic::OnPaint()
 	CRect rText;
 	CSize szText;
 
-	dc.DrawText(sSpace + m_sText, &rText, DT_CALCRECT);	
+	dc.DrawText(sSpace + text, &rText, DT_CALCRECT);
 	szText.cx = rText.Width();// + m_nOutlineWidth * 2;
 	szText.cy = rText.Height();// + m_nOutlineWidth * 2;
 
@@ -257,10 +253,10 @@ void CSCStatic::OnPaint()
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
-			if (m_sText != "")
-				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
-			else
+			if (text.IsEmpty())
 				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2;
+			else
+				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
 
 			rText.left = rIcon.left + szImg.cx + 2;
 		}
@@ -271,14 +267,14 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (m_sText != "")
+			if (text.IsEmpty())
 			{
-				rIcon.left = 2;
-				rText.left = 2 + szImg.cx + 2;
+				rIcon.left = 0;
 			}
 			else
 			{
-				rIcon.left = 0;
+				rIcon.left = 2;
+				rText.left = 2 + szImg.cx + 2;
 			}
 		}
 
@@ -289,11 +285,11 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (m_sText != "")
-				rIcon.top = szText.cy / 2 - szImg.cy / 2;
-			else
+			if (text.IsEmpty())
 				rIcon.top = 0;
-			
+			else
+				rIcon.top = szText.cy / 2 - szImg.cy / 2;
+
 			rText.top = 0;
 		}
 
@@ -308,10 +304,10 @@ void CSCStatic::OnPaint()
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
-			if (m_sText != "")
-				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
-			else
+			if (text.IsEmpty())
 				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2;
+			else
+				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
 
 			rText.left = rImg.left + m_header_images[m_header_image_index]->width + 2;
 		}
@@ -322,14 +318,14 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (m_sText != "")
+			if (text.IsEmpty())
 			{
-				rImg.left = 2;
-				rText.left = 2 + szImg.cx + 2;
+				rImg.left = 0;
 			}
 			else
 			{
-				rImg.left = 0;
+				rImg.left = 2;
+				rText.left = 2 + szImg.cx + 2;
 			}
 		}
 
@@ -340,10 +336,10 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (m_sText != "")
-				rImg.top = szText.cy / 2 - szImg.cy / 2;
-			else
+			if (text.IsEmpty())
 				rImg.top = 0;
+			else
+				rImg.top = szText.cy / 2 - szImg.cy / 2;
 
 			rText.top = 0;
 		}
@@ -357,7 +353,7 @@ void CSCStatic::OnPaint()
 		//rText.bottom = rText.top + szText.cy;
 	}
 
-	if (m_sText != "")
+	if (!text.IsEmpty())
 	{
 		if (IsWindowEnabled())
 			dc.SetTextColor(m_cr_text);
@@ -402,14 +398,14 @@ void CSCStatic::OnPaint()
 						//dc.TextOut(10 + x, 10 + y, str, str.GetLength());
 						CRect	rOffset = rText;
 						rOffset.OffsetRect(x, y);
-						dc.DrawText(sSpace + m_sText, rOffset, dwText);
+						dc.DrawText(sSpace + text, rOffset, dwText);
 					}
 				}
 
 				dc.SetTextColor(m_cr_text);
 			}
 
-			dc.DrawText(sSpace + m_sText, rText, dwText);
+			dc.DrawText(sSpace + text, rText, dwText);
 		}
 	}
 
@@ -417,11 +413,15 @@ void CSCStatic::OnPaint()
 	dc.SelectObject(pOldFont);
 }
 
-void CSCStatic::set_text(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
+void CSCStatic::set_text(CString sText, COLORREF cTextColor /*-1*/)
 {
-	m_sText = sText;
+	CStatic::SetWindowText(sText);
 
- 	if (cTextColor > 0)
+	CString t;
+	GetWindowText(t);
+
+	//-1이면 기본 설정된 글자색 사용
+ 	if (cTextColor != (COLORREF)-1)
  		m_cr_text = cTextColor;
 	
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
@@ -434,7 +434,7 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*= RGB(0,0,0)*/)
 		Invalidate();
 }
 
-void CSCStatic::set_text(LPCTSTR format, ...)
+void CSCStatic::set_textf(LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -455,23 +455,6 @@ void CSCStatic::set_back_image(UINT nIDBack)
 	m_ImageBack.SetBkColor(CLR_NONE);
 	Bitmap.DeleteObject();
 }
-
-// CSCStatic message handlers
-
-LRESULT CSCStatic::OnSetText(WPARAM wParam,LPARAM lParam)
-{
-	update_surface();
-
-	return 0;
-}
-/*
-HBRUSH CSCStatic::CtlColor(CDC* pDC, UINT nCtlColor)
-{
-   pDC->SetBkMode(TRANSPARENT);
-   return (HBRUSH)GetStockObject(NULL_BRUSH);
-}
-*/
-
 
 BOOL CSCStatic::OnEraseBkgnd(CDC* pDC) 
 {

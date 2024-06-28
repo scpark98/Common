@@ -81,7 +81,9 @@ public:
 	//예)특정 폴더 지정 : "d:\\test\\Log"
 	//예)상대 경로 지정 : "..\\..\\Log" (실행파일이 있는 상위의 상위 폴더에 Log라는 폴더를 생성하여 로그파일 저장)
 	//gLog.Init(_T("../../custom log folder"));와 같이 호출
-	bool		init(CString logFolder = _T(""), CString filetitle = _T(""), int showLogLevel = SCLOG_LEVEL_RELEASE);
+	//file_title을 주지 않으면 "실행파일명_yyyymmdd.log" 파일로 저장되고
+	//로그파일명을 지정하고 싶다면 file_title에 값을 주면 "file_title_yyyymmdd.log"로 저장된다.
+	bool		init(CString log_folder = _T(""), CString file_title = _T(""), int show_log_level = SCLOG_LEVEL_RELEASE);
 
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }

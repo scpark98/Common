@@ -109,14 +109,14 @@ public:
 
 	enum SCSliderCtrlStyle
 	{
-		slider_normal = 0,
-		slider_thumb,
-		slider_thumb_round,
-		slider_value,
-		slider_progress,
-		slider_progress_line,
-		slider_track,
-		slider_step,		//진행 단계를 표시. 1-2-3-4 과 같은 형태. 
+		style_normal = 0,
+		style_thumb,
+		style_thumb_round,
+		style_value,
+		style_progress,
+		style_progress_line,
+		style_track,
+		style_step,		//진행 단계를 표시. 1-2-3-4 과 같은 형태. 
 	};
 
 	enum SCSliderCtrlValueStyle
@@ -211,7 +211,7 @@ protected:
 	// Attributes
 
 	//slider_thumb,	slider_value, slider_progress, slider_track,
-	int			m_style = slider_thumb;
+	int			m_style = style_thumb;
 
 	int			m_nEventMsgStyle;
 

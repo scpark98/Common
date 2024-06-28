@@ -168,6 +168,7 @@ void CMacProgressCtrl::OnPaint()
 	{
 		//active track과 inactive track을 사각형으로 칠하므로
 		//style_round_line이 아니면 굳이 배경색을 중복해서 칠할 필요는 없다.
+		//style_round_line일때만 배경색을 칠한다.
 		if (m_style == style_round_line)
 			dc.FillSolidRect(rc, m_cr_back);
 	}
@@ -221,7 +222,7 @@ void CMacProgressCtrl::OnPaint()
 				{
 					Gdiplus::Pen pen(RGB2gpColor(m_cr_back_track), rtrack.Height());
 					pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
-					g.DrawLine(&pen, rtrack.right + rtrack.Height() / 2, rtrack.CenterPoint().y, rc.right - rtrack.Height() / 2 - 1, rtrack.CenterPoint().y);
+					g.DrawLine(&pen, rc.left + rtrack.Height() / 2, rtrack.CenterPoint().y, rc.right - rtrack.Height() / 2 - 1, rtrack.CenterPoint().y);
 				}
 				else
 				{
@@ -420,9 +421,9 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rtrack)
 			Gdiplus::Pen pen(RGB2gpColor(m_cr_track), rtrack.Height());
 			pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
 
-			int end = MAX(0, rtrack.right - rtrack.Height() / 2 + 1);
+			int end = MAX(0, rtrack.right - rtrack.Height() / 2);
 			TRACE(_T("end = %d\n"), end);
-			g.DrawLine(&pen, rtrack.Height() / 2 + 1, rtrack.CenterPoint().y, end, rtrack.CenterPoint().y);
+			g.DrawLine(&pen, rtrack.Height() / 2, rtrack.CenterPoint().y, end, rtrack.CenterPoint().y);
 		}
 	}
 

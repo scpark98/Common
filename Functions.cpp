@@ -17526,22 +17526,31 @@ bool get_taskbar_size(CSize* sz)
 	return is_shown;
 }
 
-bool get_taskbar_state(UINT state)
+bool get_taskbar_state(UINT state, CSize* sz)
 {
 	APPBARDATA  appBarData;
 	UINT        uState;
-	HWND        hTaskBar;
+	HWND        hTaskbarWnd;
 
-	hTaskBar = ::FindWindow(_T("Shell_TrayWnd"), NULL);
+	hTaskbarWnd = ::FindWindow(_T("Shell_TrayWnd"), NULL);
 
-	if (IsWindow(hTaskBar))
+	if (IsWindow(hTaskbarWnd))
 	{
 		ZeroMemory(&appBarData, sizeof(APPBARDATA));
 
-		appBarData.hWnd = hTaskBar;
+		appBarData.hWnd = hTaskbarWnd;
 		appBarData.cbSize = sizeof(APPBARDATA);
 
 		uState = (UINT)SHAppBarMessage(ABM_GETSTATE, &appBarData);
+
+		if (sz != NULL)
+		{
+			RECT rect;
+			GetWindowRect(hTaskbarWnd, &rect);
+			sz->cx = rect.right - rect.left;
+			sz->cy = rect.bottom - rect.top;
+		}
+
 		return (uState == state);
 
 		// 바뀐 속성 적용

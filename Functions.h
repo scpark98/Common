@@ -1121,9 +1121,10 @@ struct	NETWORK_INFO
 
 	//taskbar의 크기 및 현재 show/hide 상태를 리턴한다. (옵션 설정 상태는 get_taskbar_state()으로 판별해야 함)
 	bool		get_taskbar_size(CSize *sz = NULL);
-	//설정값이 auto hide인지는 get_taskbar_state(ABS_ALWAYSONTOP)를 호출하여 판별.
+	//설정값이 auto hide인지는 get_taskbar_state(ABS_AUTOHIDE)를 호출하여 판별.
+	//sz를 주면 크기정보도 알 수 있다.
 	//윈7부터는 ABS_ALWAYSONTOP은 항상 true이므로 ABS_ALWAYSONTOP를 판별하는 것은 의미없다.
-	bool		get_taskbar_state(UINT state);
+	bool		get_taskbar_state(UINT state, CSize *sz = NULL);
 
 
 	BOOL		IsWow64();

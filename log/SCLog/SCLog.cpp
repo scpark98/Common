@@ -28,7 +28,7 @@ SCLog::~SCLog()
 	}
 }
 
-bool SCLog::init(CString log_folder, CString file_title, int show_log_level)
+bool SCLog::set(CString log_folder, CString file_title, int show_log_level)
 {
 	try
 	{
@@ -39,66 +39,56 @@ bool SCLog::init(CString log_folder, CString file_title, int show_log_level)
 
 		m_showLogLevel = show_log_level;
 
-		if (m_fullpath.IsEmpty())
+		//로그 폴더 설정
+		if (log_folder.IsEmpty())
 		{
-			TCHAR	tExeFullPath[1024];
-			CString originalFilename;
-			CString sExeFolder;
+			m_log_folder.Format(_T("%s\\Log"), get_exe_directory());
+		}
+		else
+		{
+			log_folder.Replace(_T("/"), _T("\\"));
 
-			//간단히 exe 파일명으로 로그파일을 생성하면 문제가 있다.
-			//예를 들어 LMMLauncher.exe를 download폴더에 다운받은 후
-			//해당 파일이 지워지지 않은 상태에서 다시 다운받으면 LMMLauncher (1).exe로 변경되므로
-			//로그파일 또한 LMMLauncher (1).log로 생성되는 문제가 발생한다.
-			//정확한 실행파일명을 얻어서 그 이름으로 생성해야 한다.
-			GetModuleFileName(AfxGetInstanceHandle(), tExeFullPath, MAX_PATH);
-			sExeFolder = get_part(tExeFullPath, fn_folder);
-			originalFilename = get_file_property(tExeFullPath, _T("OriginalFilename"));
-			m_filetitle = get_part(originalFilename, fn_title);
-
-			//if (m_filetitle.Find(_T(".")) > 0)
-			//	m_filetitle = m_filetitle.Left(m_filetitle.ReverseFind('.'));
-
-			m_folder = sExeFolder + _T("\\Log");
-
-
-			if (!log_folder.IsEmpty())
+			//절대경로로 설정한 경우
+			if (log_folder.Find(_T(":\\")) > 0)
 			{
-				log_folder.Replace(_T("/"), _T("\\"));
-
-				//절대경로로 설정한 경우
-				if (log_folder.Find(_T(":\\")) > 0)
-					m_folder = log_folder;
-				//상대경로로 설정한 경우
-				else
-					m_folder.Format(_T("%s\\%s"), sExeFolder, log_folder);
-
+				m_log_folder = log_folder;
+			}
+			//상대경로로 설정한 경우
+			else
+			{
 				DWORD  retval = 0;
 				TCHAR buffer[MAX_PATH] = _T("");
 
-				retval = GetFullPathName(m_folder, MAX_PATH, buffer, NULL);
-
+				//상대경로에 포함된 "..\\..\\"와 같은 표현을 없애고 절대경로로 변환.
+				m_log_folder.Format(_T("%s\\%s"), get_exe_directory(), log_folder);
+				retval = GetFullPathName(m_log_folder, MAX_PATH, buffer, NULL);
 				if (retval == 0)
 				{
 					TRACE(_T("GetFullPathName() error"));
 				}
 				else
 				{
-					m_folder = buffer;
+					m_log_folder = CString(buffer);
 				}
 			}
-
-			if (!file_title.IsEmpty())
-				m_filetitle = file_title;
-
-			CTime t = CTime::GetCurrentTime();
-			m_filename.Format(_T("%s_%d%02d%02d.log"), m_filetitle, t.GetYear(), t.GetMonth(), t.GetDay());
-			m_fullpath.Format(_T("%s\\%s"), m_folder, m_filename);
-
-			//CreateDirectory(m_folder, NULL);
-			recursive_make_full_directory(m_folder);
 		}
 
-		_tfopen_s(&m_fp, m_fullpath, _T("a")CHARSET);
+		make_full_directory(m_log_folder);
+
+
+		//로그파일명 설정
+		if (file_title.IsEmpty())
+		{
+			m_log_file_title = get_part(get_exe_filename(), fn_title);// .Format(_T("%s_%d%02d%02d.log"), get_part(get_exe_filename(), fn_title), m_tlog.GetYear(), m_tlog.GetMonth(), m_tlog.GetDay());
+		}
+		else
+		{
+			m_log_file_title = file_title;// .Format(_T("%s_%d%02d%02d.log"), file_title, m_tlog.GetYear(), m_tlog.GetMonth(), m_tlog.GetDay());
+		}
+
+		m_log_fullpath.Format(_T("%s\\%s_%d%02d%02d.log"), m_log_folder, m_log_file_title, m_tlog.GetYear(), m_tlog.GetMonth(), m_tlog.GetDay());
+
+		_tfopen_s(&m_fp, m_log_fullpath, _T("a")CHARSET);
 
 		if (m_fp == NULL)
 		{
@@ -154,7 +144,7 @@ CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 
 		if (m_fp == NULL)
 		{
-			if (!init(m_folder))
+			if (!set(m_log_folder, m_log_file_title))
 			{
 				theCSLog.Unlock();
 				return result;
@@ -193,28 +183,31 @@ CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 
 		switch (logLevel)
 		{
-		case SCLOG_LEVEL_INFO :
-			log_level = _T("[info]");
-			break;
-		case SCLOG_LEVEL_WARN:
-			log_level = _T("[warn]");
-			break;
-		case SCLOG_LEVEL_ERROR:
-			log_level = _T("[error]");
-			break;
-		case SCLOG_LEVEL_CRITICAL:
-			log_level = _T("[critical]");
-			break;
-		case SCLOG_LEVEL_SQL:
-			log_level = _T("[sql]");
-			break;
-		case SCLOG_LEVEL_DEBUG:
-			log_level = _T("[debug]");
-			break;
-		case SCLOG_LEVEL_RELEASE:		//release도 no level로 처리한다.
-			//log_text = _T("info");
-			break;
+			case SCLOG_LEVEL_INFO :
+				log_level = _T("[info]");
+				break;
+			case SCLOG_LEVEL_WARN:
+				log_level = _T("[warn]");
+				break;
+			case SCLOG_LEVEL_ERROR:
+				log_level = _T("[error]");
+				break;
+			case SCLOG_LEVEL_CRITICAL:
+				log_level = _T("[critical]");
+				break;
+			case SCLOG_LEVEL_SQL:
+				log_level = _T("[sql]");
+				break;
+			case SCLOG_LEVEL_DEBUG:
+				log_level = _T("[debug]");
+				break;
+			case SCLOG_LEVEL_RELEASE:		//release도 no level로 처리한다.
+				//log_text = _T("info");
+				break;
 		}
+
+		if (!log_level.IsEmpty())
+			log_level = _T(" ") + log_level;
 
 		SYSTEMTIME t = { 0 };
 		GetLocalTime(&t);

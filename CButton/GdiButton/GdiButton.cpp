@@ -176,6 +176,46 @@ void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 	m_button_type = nStyle;
 }
 
+//기본 이미지를 설정할 때 resize한 후 설정
+bool CGdiButton::add_image_resize(UINT normal, float ratio)
+{
+	if (ratio == 1.0f)
+		return add_image(normal);
+
+	CGdiButtonImage* btn = new CGdiButtonImage();
+
+	//normal은 0이어서는 안된다.
+	if (normal == 0)
+		return false;
+
+	btn->img[0].load(_T("PNG"), normal);
+	if (btn->img[0].is_empty())
+		return false;
+
+	btn->img[0].resize(ratio, ratio);
+
+	btn->img[0].deep_copy(&btn->img[1]);
+	btn->img[1].set_matrix(&m_hoverMatrix);
+
+	btn->img[0].deep_copy(&btn->img[2]);
+	btn->img[2].set_matrix(&m_downMatrix);
+
+	btn->img[0].deep_copy(&btn->img[3]);
+	if (!m_use_normal_image_on_disabled)
+		btn->img[3].set_matrix(&m_grayMatrix);
+
+	m_image.push_back(btn);
+
+	m_fit2image = false;
+
+	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
+	//만약 배경색 지정이 필요하다면 add_image()후에 set_back_color()로 세팅한다.
+	m_cr_back.clear();
+	m_transparent = true;
+
+	return true;
+}
+
 bool CGdiButton::add_image(UINT normal, UINT over, UINT down, UINT disabled)
 {
 	return add_image(_T("PNG"), normal, over, down, disabled);
@@ -898,7 +938,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 
 		//g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
-		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_zoom);
+		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
 
 		if (m_bShowFocusRect)//&& m_bHasFocus)
 		{

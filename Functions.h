@@ -453,7 +453,7 @@ struct	NETWORK_INFO
 	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
 	CString		get_exe_directory(bool includeSlash = false);
-	CString		get_exe_root_directory();
+	CString		get_exe_parent_directory();
 	CString		get_exe_filename(bool fullpath = false);
 	CString		get_exe_file_title();
 	CString		GetCurrentDirectory();
@@ -499,8 +499,8 @@ struct	NETWORK_INFO
 	//제거 실패 : false
 	bool		kill_service(CString service_name, CString process_name = _T(""));
 
-	//DOS 명령인지 윈도우 프로그램인지 구분
-	bool		is_windows_application(CString fullPath);
+	//Console 명령인지 GUI 윈도우 어플리케이션인지 구분
+	bool		is_gui_application(CString fullPath);
 
 	//PID, 프로세스 이름, 윈도우 타이틀 이름, 윈도우 클래스 이름으로 클래스의 생존 상태를 구할수 있습니다. from Devpia
 	bool		CheckProcessUsingPID(unsigned long pid);
@@ -579,9 +579,24 @@ struct	NETWORK_INFO
 	//1개 또는 그 이상의 서로 다른 문자를 separator들로 사용할 경우는 있을 것이다.
 	//20240426 separator가 여러개일 경우는 특정 separator에 의해 얻어진 token이 또 다른 separator를 포함할 수 있으므로
 	//그 처리가 매우 복잡해진다. 그냥 CString separator로 처리한다.
-	int			get_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1);
+	//include_rest는 nMaxToken이 명시된 경우 마지막 토근을 어디까지로 하느냐를 정하는 옵션이다.
+	//예를 들어 "LastUpdated : 1601-01-01 9:00:00"과 같은 문자열을 ':'로 파싱할 경우
+	//nMaxToken을 2로 준 경우 dqToken[0] = "LastUpdated "가 되고
+	//두번째 토큰은 " 1601-01-01 9"가 되지만(실제 기대값은 " 1601-01-01 9:00:00"일 것이다)
+	//include_rest를 true로 주면 dqToken[1] = " 1601-01-01 9:00:00"이 된다.
+	//즉, 최대 토큰 개수가 정해져 있을 때 마지막 토큰을 어디까지로 처리할 것인가에 대한 옵션이다.
+	int			get_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1, bool include_rest = false);
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
+
+	// a_value : 1.1.24050
+	// b_value : Normal
+	// c_value : True
+	// 위와 같이 속성이름 및 값으로 매핑되는 문자열을 파싱하여 std::map에 넣어준다.
+	// lfrf는 라인분리문자열이고 보통 "\n"이거나 "\r\n" 등이 있고
+	// separator는 ':' 이름과 값을 구분하는 구분자이다.
+	// return value : 항목의 개수
+	int			get_map_string(CString src, std::map<CString, CString>& map, CString lfrf = _T("\n"), CString separator = _T(":"));
 
 	//dq항목을 하나의 문자열로 합쳐준다.
 	CString		get_concat_string(std::deque<CString> dq, CString separator = _T("|"));
@@ -899,6 +914,9 @@ struct	NETWORK_INFO
 	int			get_text_encoding(CString sfile);
 	bool		save(CString filepath, CString text, int code_page = CP_UTF8);
 	bool		file_open(FILE** fp, CString mode, CString file);
+
+	//text 파일을 열어서 dqList에 넣어준다.
+	bool		read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
 	//MOBIS 프로젝트 저장 MP4는 mdat 필드의 0x40번지부터 28 bytes가
@@ -1221,7 +1239,7 @@ void		SetWallPaper(CString sfile);
 	CSize		GetPrinterPaperSize(CString sPrinterName);
 
 	CString		get_last_error_string(bool show_msgBox = false);
-	CString		get_last_error_string(DWORD errorId, bool show_msgBox = false);
+	CString		get_last_error_string(DWORD dwError, bool show_msgBox = false);
 
 //////////////////////////////////////////////////////////////////////////
 //date, time 날짜/시간

@@ -132,6 +132,8 @@ public:
 	//타입이 없으면 기본 _T("PNG")로 처리한다.
 	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
+	//기본 이미지를 설정할 때 resize한 후 설정
+	bool		add_image_resize(UINT normal, float ratio = 1.0f);
 	bool		add_image(CString normal, CString over = _T(""), CString down = _T(""), CString disabled = _T(""));
 	bool		add_image(CGdiplusBitmap *img);
 	bool		add_image(Gdiplus::Bitmap *img);

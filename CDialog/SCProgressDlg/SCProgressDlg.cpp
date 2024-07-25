@@ -68,7 +68,6 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 		//m_progress = new CMFCRibbonProgressBar(2734, 200);
 		m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_MARQUEE, CRect(rc.left + 20, bottom_pos, rc.right - 20, bottom_pos + progress_height), this, 0);
 		m_progress.ShowWindow(SW_SHOW);
-		m_progress.SetTransparent(FALSE);
 		//m_progress.SetMarquee(TRUE, 10);
 		//m_progress.SetIndeterminate();
 		//m_progress.SetRange(0, 100);

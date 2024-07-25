@@ -76,14 +76,14 @@ public:
 	virtual ~SCLog();
 
 	//폴더 및 로그파일 타이틀을 주지 않으면 실행파일 하위의 "Log" 폴더에 실행파일명[YYYYMMDD].log 파일이 자동 생성됨.
-	//위와 같이 기본 위치와 파일명을 사용할 경우는 Init()을 호출하지 않아도 자동 생성되며
+	//위와 같이 기본 위치와 파일명을 사용할 경우는 set()을 호출하지 않아도 자동 생성되며
 	//특정 위치에 로그파일을 저장하고자 하는 경우는 폴더를 지정해주면 됨.
 	//예)특정 폴더 지정 : "d:\\test\\Log"
 	//예)상대 경로 지정 : "..\\..\\Log" (실행파일이 있는 상위의 상위 폴더에 Log라는 폴더를 생성하여 로그파일 저장)
-	//gLog.Init(_T("../../custom log folder"));와 같이 호출
+	//gLog.set(_T("../../custom log folder"));와 같이 호출
 	//file_title을 주지 않으면 "실행파일명_yyyymmdd.log" 파일로 저장되고
 	//로그파일명을 지정하고 싶다면 file_title에 값을 주면 "file_title_yyyymmdd.log"로 저장된다.
-	bool		init(CString log_folder = _T(""), CString file_title = _T(""), int show_log_level = SCLOG_LEVEL_RELEASE);
+	bool		set(CString log_folder = _T(""), CString file_title = _T(""), int show_log_level = SCLOG_LEVEL_RELEASE);
 
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }
@@ -98,14 +98,14 @@ public:
 	CString		write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
 
 	bool		release();
-	CString		get_log_full_path() { return m_fullpath; }
+	CString		get_log_full_path() { return m_log_fullpath; }
 	bool		recursive_make_full_directory(LPCTSTR sFolder);
 
 protected:
-	CString		m_filetitle;
-	CString		m_filename;
-	CString		m_folder;
-	CString		m_fullpath;
+	CTime		m_tlog = CTime::GetCurrentTime();
+	CString		m_log_fullpath;
+	CString		m_log_file_title;
+	CString		m_log_folder;
 	int			m_showLogLevel;
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;

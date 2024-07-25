@@ -584,7 +584,7 @@ CString	get_exe_directory(bool includeSlash)
 	return exe_directory;
 }
 
-CString get_exe_root_directory()
+CString get_exe_parent_directory()
 {
 	CString sExePath = get_exe_directory();
 	return sExePath.Left(sExePath.ReverseFind('\\'));
@@ -2447,8 +2447,13 @@ void request_url(CRequestUrlParams* params)
 		secureFlags,
 		0);
 
-	DWORD dwTimeout = 10000;
+	//2009년 블로그에는 INTERNET_OPTION_RECEIVE_TIMEOUT외에 나머지 2개의 timeout은
+	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
+	//https://blog.naver.com/che5886/20061092638
+	DWORD dwTimeout = 10;
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
 
 	if (params->is_https)
 	{
@@ -4993,6 +4998,30 @@ bool file_open(FILE** fp, CString mode, CString file)
 		_tfopen_s(fp, file, mode + CHARSET);
 
 	return (fp == NULL ? false : true);
+}
+
+//text 파일을 열어서 dqList에 넣어준다.
+bool read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8)
+{
+	dqList->clear();
+
+	FILE* fp;
+	TCHAR tline[2048];
+	CString sline;
+
+	_tfopen_s(&fp, filepath, (using_utf8 ? _T("rt")CHARSET : _T("rt")));
+	if (!fp)
+		return false;
+
+	while (_fgetts(tline, sizeof(tline), fp) != NULL)
+	{
+		sline = tline;
+		sline.Trim();
+		dqList->push_back(sline);
+	}
+
+	fclose(fp);
+	return true;
 }
 
 //시작폴더 및 하위 폴더들은 여전히 남아있다.
@@ -7558,7 +7587,7 @@ std::deque<CString>	get_token_string(CString src, CString separator)
 	return dq;
 }
 */
-int get_token_string(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken /*= -1*/)
+int get_token_string(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken, bool include_rest)
 {
 	int i, j;
 	CString token;
@@ -7580,13 +7609,23 @@ int get_token_string(CString src, std::deque<CString> &dqToken, CString separato
 		{
 			//더 이상 separator가 없다면 맨 마지막 token이다.
 			token = src;
+			src.Empty();
 		}
 
 		if (!token.IsEmpty() || allowEmpty)
 			dqToken.push_back(token);
 
 		if (nMaxToken > 0 && dqToken.size() == nMaxToken)
+		{
+			//최대 토큰 개수가 정해져 있을 때 include_rest가 true이면
+			//나머지 문자열도 모두 맨 마지막 토큰뒤에 붙여준다.
+			if (include_rest && !src.IsEmpty())
+			{
+				dqToken[nMaxToken - 1] += (separator + src);
+			}
+
 			return dqToken.size();
+		}
 
 		if (pos < 0)
 			break;
@@ -7653,6 +7692,38 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 	}
 
 	return nToken;
+}
+
+// a_value : 1.1.24050
+// b_value : Normal
+// c_value : True
+// 위와 같이 속성이름 및 값으로 매핑되는 문자열을 파싱하여 std::map에 넣어준다.
+// lfrf는 라인분리문자열이고 보통 "\n"이거나 "\r\n" 등이 있고
+// separator는 ':' 이름과 값을 구분하는 구분자이다.
+// return value : 항목의 개수
+int	get_map_string(CString src, std::map<CString, CString>& map, CString lfrf, CString separator)
+{
+	map.clear();
+
+	std::deque<CString> dqLines;
+	get_token_string(src, dqLines, lfrf, false);
+
+	std::deque<CString> dqToken;
+
+	for (auto line : dqLines)
+	{
+		get_token_string(line, dqToken, separator, true, 2, true);
+		
+		for (int i = 0; i < dqToken.size(); i++)
+			dqToken[i].Trim();
+		
+		if (dqToken.size() != 2 || dqToken[0].IsEmpty())
+			continue;
+
+		map.insert(std::pair<CString, CString>(dqToken[0], dqToken[1]));
+	}
+
+	return map.size();
 }
 
 //dq항목을 하나의 문자열로 합쳐준다.
@@ -9667,12 +9738,10 @@ ULONG GetPID(CString processname)
 		return false;
 	}
 
-	do {
+	do
+	{
 		if (StrCmp(pe32.szExeFile, processname) == 0)
-
 			return pe32.th32ProcessID;
-
-
 
 	} while (Process32Next(hProcessSnap, &pe32));
 
@@ -9935,6 +10004,7 @@ int get_process_running_count(CString processname)
 	return running_count;
 } 
 #else
+
 int get_process_running_count(CString processname)
 {
 	DWORD dwSize = 250;
@@ -9983,6 +10053,7 @@ int get_process_running_count(CString processname)
 	return procCount;
 }
 #endif
+
 
 bool KillProcess(CString szFilename)
 {
@@ -10112,6 +10183,53 @@ void Wow64Disable(bool disable)
 	}
 }
 
+#include <array>
+CString	run_process(CString cmd)
+{
+	void* prevSet = NULL;
+
+	Wow64Disable(true);
+
+	std::array<TCHAR, 1024> buffer;
+	//std::string result;
+	CString result;
+	std::shared_ptr<FILE> pipe(_tpopen(cmd, _T("r")), _pclose);
+
+	if (!pipe)
+		throw std::runtime_error("_popen() failed!");
+
+	while (!feof(pipe.get()))
+	{
+		if (_fgetts(buffer.data(), 1024, pipe.get()) != NULL)
+			result += buffer.data();
+	}
+
+	Wow64Disable(false);
+
+	return result;
+}
+/*
+std::string	run_process(const char* cmd)
+{
+	void* prevSet = NULL;
+
+	Wow64Disable(true);
+
+	std::array<char, 10240> buffer;
+	std::string result;
+	std::shared_ptr<FILE> pipe(_popen(cmd, "r"), _pclose);
+	if (!pipe) throw std::runtime_error("_popen() failed!");
+	while (!feof(pipe.get())) {
+		if (fgets(buffer.data(), 10240, pipe.get()) != NULL)
+			result += buffer.data();
+	}
+
+	Wow64Disable(false);
+
+	return result;
+}
+*/
+
 CString run_process(CString exePath, bool wait_process_exit, bool return_after_first_read)
 {
 	Wow64Disable(true);
@@ -10120,7 +10238,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	CString result(_T(""));
 	STARTUPINFO si{ sizeof(si) };
 	PROCESS_INFORMATION pi{};
-	bool is_win_app = is_windows_application(exePath);
+	bool is_gui_app = is_gui_application(exePath);
 
 	_stprintf(cmd, _T("%s"), exePath);
 
@@ -10146,15 +10264,15 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 	si.hStdOutput = hChildStdoutWr;
 	si.hStdError = hChildStdoutWr;
-	si.wShowWindow = (is_win_app ? SW_SHOWNORMAL : SW_HIDE);
+	si.wShowWindow = (is_gui_app ? SW_SHOWNORMAL : SW_HIDE);
 
 	//dir과 같은 DOS 명령은 외부 실행파일이 아니므로 exePath를 "dir c:\\*.*"과 같이 주면 에러가 발생한다.
 	//"cmd.exe /c dir c:\\*.*"와 같이 전달해야 한다.
 	//하지만 run_process()를 호출하는 사용자 입장에서는 "dir c:\\*.*"과 같이 호출할 것이므로
 	//exePath를 가공해준다.
-	if (!is_win_app)
+	if (!is_gui_app)
 	{
-		exePath = _T("/c ") + exePath;
+		//exePath = _T("/c ") + exePath;
 	}
 
 	// Start the child process. 
@@ -10204,7 +10322,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	}
 
 	//외부 실행파일일 경우는 result string이 없으므로 이 코드를 실행하면 안된다.
-	if (!is_win_app)
+	if (!is_gui_app)
 	{
 		for (;;)
 		{
@@ -10232,52 +10350,6 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	return result;
 }
 
-#include <array>
-CString	run_process(CString cmd)
-{
-	void* prevSet = NULL;
-
-	Wow64Disable(true);
-
-	std::array<TCHAR, 1024> buffer;
-	//std::string result;
-	CString result;
-	std::shared_ptr<FILE> pipe(_tpopen(cmd, _T("r")), _pclose);
-
-	if (!pipe)
-		throw std::runtime_error("_popen() failed!");
-
-	while (!feof(pipe.get()))
-	{
-		if (_fgetts(buffer.data(), 1024, pipe.get()) != NULL)
-			result += buffer.data();
-	}
-
-	Wow64Disable(false);
-
-	return result;
-}
-/*
-std::string	run_process(const char* cmd)
-{
-	void* prevSet = NULL;
-
-	Wow64Disable(true);
-
-	std::array<char, 10240> buffer;
-	std::string result;
-	std::shared_ptr<FILE> pipe(_popen(cmd, "r"), _pclose);
-	if (!pipe) throw std::runtime_error("_popen() failed!");
-	while (!feof(pipe.get())) {
-		if (fgets(buffer.data(), 10240, pipe.get()) != NULL)
-			result += buffer.data();
-	}
-
-	Wow64Disable(false);
-
-	return result;
-}
-*/
 //서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
 //process_name이 주어지면 좀 더 간단히 제거된다.
 //정상 제거(또는 서비스가 없을 경우) : true
@@ -12212,16 +12284,32 @@ CString	get_last_error_string(bool show_msgBox)
 	return get_last_error_string(GetLastError(), show_msgBox);
 }
 
-CString	get_last_error_string(DWORD errorId, bool show_msgBox)
+//#include <system_error>>
+CString	get_last_error_string(DWORD dwError, bool show_msgBox)
 {
-	TCHAR* message = nullptr;
-	CString result;
-	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-		nullptr,
-		errorId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (TCHAR*)&message, 0, nullptr);
+	//std::string msg = std::system_category().message(dwError);
 
-	result.Format(_T("error code = %d (%s)"), errorId, CString(message).Trim());
-	LocalFree(message);
+	LPTSTR lpBuffer = NULL;
+	CString result;
+
+	if (dwError >= 12000 && dwError <= 12174)
+	{
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE,
+			//for ERROR_WINHTTP_TIMEOUT(12002), then use winhttp.dll,
+			//for ERROR_INTERNET_TIMEOUT(12002), then use wininet.dll.
+			GetModuleHandle(_T("wininet.dll")),
+			dwError, 0, (LPTSTR)&lpBuffer, 0, NULL);
+	}
+	else
+	{
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL,
+			dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), lpBuffer, 0, NULL);
+	}
+
+	result.Format(_T("%s"), CString(lpBuffer));
+	result.Trim();
+	LocalFree(lpBuffer);
 
 	if (show_msgBox)
 		AfxMessageBox(result);
@@ -17387,7 +17475,7 @@ BOOL recreate_combobox(CComboBox* pCombo, LPVOID lpParam/*=0*/)
 }
 
 //콘솔 명령인지 윈도우 프로그램인지 구분
-bool is_windows_application(CString fullPath)
+bool is_gui_application(CString fullPath)
 {
 	//fullPath에서 실행파일명 또는 cmd를 추출한다.
 	CString cmd = fullPath;
@@ -17428,7 +17516,8 @@ bool is_windows_application(CString fullPath)
 	// Read the first two bytes to check for "MZ" signature
 	uint16_t mzSignature;
 	file.read(reinterpret_cast<char*>(&mzSignature), sizeof(mzSignature));
-	if (mzSignature != 0x5A4D) { // "MZ" in little-endian
+	if (mzSignature != IMAGE_DOS_SIGNATURE)// 0x5A4D) { // "MZ" in little-endian
+	{
 		return false;
 	}
 
@@ -17442,7 +17531,15 @@ bool is_windows_application(CString fullPath)
 	uint32_t peSignature;
 	file.read(reinterpret_cast<char*>(&peSignature), sizeof(peSignature));
 
-	if (peSignature == 0x00004550) { // "PE\0\0" in little-endian
+	//파일정보만 가지고 해당 파일이 console에서 실행하는 명령어인지,
+	//GUI를 가지고 실행되는 앱인지를 판별하는게 아직은 명확하지 않다.
+	//우선 직접 명시해준다.
+	cmd.MakeLower();
+	if (cmd == _T("powershell.exe"))
+		return false;
+
+	if (peSignature == IMAGE_NT_SIGNATURE)//0x00004550) { // "PE\0\0" in little-endian
+	{
 		return true;
 	}
 

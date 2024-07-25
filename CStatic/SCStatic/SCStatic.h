@@ -54,7 +54,7 @@ public:
 	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void		SetWindowText(CString sText) { set_text(sText); }
 	void		set_text(CString sText, COLORREF crTextColor = -1);
-	void		set_textf(LPCTSTR format, ...);
+	void		set_textf(COLORREF crTextColor, LPCTSTR format, ...);
 
 	//글자색, 배경색 동시 설정
 	void		set_color(COLORREF cr_text, COLORREF cr_back = -1);
@@ -126,6 +126,8 @@ public:
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);
 	void		set_blink(BOOL bBlink = TRUE);
 	void		set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
+
+	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
 	void		set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
 	void		set_icon(UINT nIDResource, int nSize = 16);

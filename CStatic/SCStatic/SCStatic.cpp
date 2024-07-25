@@ -434,7 +434,7 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*-1*/)
 		Invalidate();
 }
 
-void CSCStatic::set_textf(LPCTSTR format, ...)
+void CSCStatic::set_textf(COLORREF crTextColor, LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -442,7 +442,7 @@ void CSCStatic::set_textf(LPCTSTR format, ...)
 	CString text;
 
 	text.FormatV(format, args);
-	set_text(text);
+	set_text(text, crTextColor);
 }
 
 void CSCStatic::set_back_image(UINT nIDBack)

@@ -795,6 +795,12 @@ struct	NETWORK_INFO
 	CString		i2S(int64_t nValue, bool bComma = false, bool fill_zero = false, int digits = 0);
 	CString		i2HS(int64_t nValue, bool bCapital = true);
 	CString		d2S(double dValue, bool bComma = false, int nfDigit = -1);	//nfDigit : 소수점 자릿수. -1이면 그대로 출력.
+
+	//IPv4 문자열을 숫자로 바꾸는 범용 코드이므로 버전 문자열 등 일반 문자열 비교에 사용하지 말것.
+	//버전 문자열 등은 각 자릿수 구성이 다를 수 있으므로 사용할 수 없음.
+	//문자열 비교가 필요하다면 compare_string()을 사용할 것.
+	uint32_t	IP2int(CString IP);
+
 	char*		ushortToBinary(unsigned short i);
 	char*		intToBinary(int i);
 	char*		uintToBinary(unsigned int i);

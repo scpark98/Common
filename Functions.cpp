@@ -4052,6 +4052,28 @@ CString d2S(double dValue, bool bComma, int nfDigit)
 	return str;
 }
 
+//IPv4 문자열을 숫자로 바꾸는 범용 코드이므로 버전 문자열 등 일반 문자열 비교에 사용하지 말것.
+//버전 문자열 등은 각 자릿수 구성이 다를 수 있으므로 사용할 수 없음.
+//문자열 비교가 필요하다면 compare_string()을 사용할 것.
+uint32_t IP2int(CString IP)
+{
+	std::deque<CString> token;
+	get_token_string(IP, token, '.', false);
+
+	if (token.size() != 4)
+	{
+		ASSERT(token.size() == 4);
+		return 0;
+	}
+
+	uint32_t token_int[4];
+
+	for (int i = 0; i < 4; i++)
+		token_int[i] = _ttoi(token[i]);
+
+	return (uint32_t)((token_int[0] << 24) + (token_int[1] << 16) + (token_int[2] << 8) + token_int[3]);
+}
+
 int HexaStringToInt(CString str)
 {
 	if (str.Left(2) == _T("0x"))

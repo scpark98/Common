@@ -117,6 +117,7 @@ public:
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 							Gdiplus::Color cr_back = Gdiplus::Color(1, 0, 0, 0));
 	bool			set_text(CSCShapeDlgTextSetting* setting = NULL);
+	bool			set_text(CString str);
 
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);

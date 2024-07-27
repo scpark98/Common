@@ -101,6 +101,12 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	return res;
 }
 
+bool CSCShapeDlg::set_text(CString str)
+{
+	m_text_setting.text = str;
+	return set_text();
+}
+
 bool CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 {
 	if (setting != NULL)

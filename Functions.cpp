@@ -2337,12 +2337,12 @@ void request_url(CRequestUrlParams* params)
 	//이를 판단하여 params->is_https값을 재설정한다.
 	//포트번호로 https를 판별하는 것은 한계가 있으므로 ip에 명시하든, params->is_https에 정확히 명시하여 사용한다.
 	//또한 ip에 http:// 또는 https:// 가 붙어 있으면 InternetConnect()은 실패한다. 제거하고 호출해줘야 한다.
-	if (params->ip.Left(7) == _T("http://"))
+	if (params->ip.Left(7) == _T("http://") || params->port == 80)
 	{
 		params->is_https = false;
 		params->ip.Replace(_T("http://"), _T(""));
 	}
-	else if (params->ip.Left(8) == _T("https://"))
+	else if (params->ip.Left(8) == _T("https://") || params->port == 443)
 	{
 		params->is_https = true;
 		params->ip.Replace(_T("https://"), _T(""));
@@ -2450,10 +2450,10 @@ void request_url(CRequestUrlParams* params)
 	//2009년 블로그에는 INTERNET_OPTION_RECEIVE_TIMEOUT외에 나머지 2개의 timeout은
 	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
 	//https://blog.naver.com/che5886/20061092638
-	DWORD dwTimeout = 10;
-	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
-	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
-	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	//DWORD dwTimeout = 10;
+	//InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	//InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	//InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
 
 	if (params->is_https)
 	{

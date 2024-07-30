@@ -16,7 +16,9 @@ CLayeredWindowHelperST::CLayeredWindowHelperST()
 CLayeredWindowHelperST::~CLayeredWindowHelperST()
 {
 	// Unload DLL (if any)
-	if (m_hDll)	::FreeLibrary(m_hDll);
+	if (m_hDll)
+		::FreeLibrary(m_hDll);
+
 	m_hDll = NULL;
 }
 

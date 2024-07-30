@@ -231,13 +231,13 @@ EmplaceJobAndGetFuture(Func&& f, Args&&... args)
 #endif
 
 #if 1
-ThreadPool::ThreadPool(size_t num_threads)
-    : num_threads_(num_threads), stop_all(false)
+ThreadPool::ThreadPool(size_t max_num_threads)
+    : m_max_num_threads(max_num_threads), stop_all(false)
 {
-    thread_list.reserve(num_threads_);
+    thread_list.reserve(m_max_num_threads);
 
     //여기서 람다 함수를 사용해서 넣는  이유는 클래스의 멤버 함수로 스레드를 생성하지 못하기 때문?
-    for (size_t i = 0; i < num_threads_; ++i)
+    for (size_t i = 0; i < m_max_num_threads; ++i)
     {
         thread_list.emplace_back([this]() { this->WorkerThread(); });
     }
@@ -266,11 +266,11 @@ void ThreadPool::resize(size_t num_threads)
 
 
     stop_all = false;
-    num_threads_ = num_threads;
-    thread_list.reserve(num_threads_);
+    m_max_num_threads = num_threads;
+    thread_list.reserve(m_max_num_threads);
 
     //여기서 람다 함수를 사용해서 넣는  이유는 클래스의 멤버 함수로 스레드를 생성하지 못하기 때문?
-    for (size_t i = 0; i < num_threads_; ++i)
+    for (size_t i = 0; i < m_max_num_threads; ++i)
     {
         thread_list.emplace_back([this]() { this->WorkerThread(); });
     }

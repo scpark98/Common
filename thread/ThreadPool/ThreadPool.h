@@ -98,22 +98,23 @@ private:
 class ThreadPool
 {
 public:
-	ThreadPool(size_t num_threads = 10);
+	ThreadPool(size_t max_num_threads = 10);
 	~ThreadPool();
 
-	void resize(size_t num_threads);
+	void resize(size_t max_num_threads);
 
 	//thread로 동작시킬 함수(job)을 추가한다.
 	template <class F, class... Args>
 	std::future<typename std::result_of<F(Args...)>::type> EnqueueJob(
 		F&& f, Args&&... args);
 
+	size_t get_max_pool_size() { return m_max_num_threads; }
 	size_t get_job_count() { return job_list.size(); }
 	void stop_all_threads() { stop_all = true; }
 
 private:
 	// 총 Worker 쓰레드의 개수.
-	size_t num_threads_;
+	size_t m_max_num_threads;
 	// Worker 쓰레드를 보관하는 벡터.
 	std::vector<std::thread> thread_list;
 	// 할일들을 보관하는 job 큐.

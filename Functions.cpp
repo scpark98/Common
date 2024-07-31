@@ -3845,6 +3845,8 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		sCaptionString.TrimLeft();
 		sCaptionString.TrimRight();
 		//sCaptionString.MakeLower();
+
+		TRACE(_T("caption = %s\n"), sText);
 		
 		if (bMatchWholeWord)
 		{

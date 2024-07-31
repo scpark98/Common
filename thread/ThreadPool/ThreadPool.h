@@ -113,7 +113,7 @@ public:
 	void stop_all_threads() { stop_all = true; }
 
 private:
-	// 총 Worker 쓰레드의 개수.
+	//Worker 쓰레드의 최대 개수 (1515를 넘지못함).
 	size_t m_max_num_threads;
 	// Worker 쓰레드를 보관하는 벡터.
 	std::vector<std::thread> thread_list;

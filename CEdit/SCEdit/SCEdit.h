@@ -50,6 +50,15 @@ public:
 	void					recalc_font_size();						//recalculate font height when control size is changed.
 	int						get_font_size(bool pixel_size = false);
 
+	//CEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
+	//ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
+	//ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이다.
+	//https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally
+	//생성후에도 SetWindowLong()을 이용하여 변경할 수 있는 속성들
+	//(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
+	//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
+	virtual CSCEdit&		set_line_align(DWORD align = DT_VCENTER);
+
 	// Generated message map functions
 protected:
 	bool		m_transparent = false;

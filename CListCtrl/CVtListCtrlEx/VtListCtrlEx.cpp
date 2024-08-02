@@ -759,6 +759,19 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 	Rect.right = Rect.left + GetColumnWidth(subItem);
 	//Rect.top += 2;
 
+	DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
+	if (subItem == 0)
+	{
+		if (dwExStyle & LVS_EX_CHECKBOXES)
+			Rect.left += 18;
+
+		if (m_is_shell_listctrl)
+		{
+			Rect.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
+			Rect.OffsetRect(0, -1);
+		}
+	}
+
 	return Rect;
 }
 
@@ -1461,19 +1474,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		dwStyle = ES_RIGHT;
 	else
 		dwStyle = ES_CENTER;
-
-	DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
-	if (subItem == 0)
-	{
-		if (dwExStyle & LVS_EX_CHECKBOXES)
-			r.left += 18;
-
-		if (m_is_shell_listctrl)
-		{
-			r.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
-			r.OffsetRect(0, -1);
-		}
-	}
 
 	if (r.right > rc.right)
 		r.right = rc.right;

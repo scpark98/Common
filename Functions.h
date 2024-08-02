@@ -337,7 +337,7 @@ public:
 	int			status = -1;
 
 	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
-	CString		ip;
+	CString		ip = _T("");
 
 	int			port = 0;
 	CString		sub_url;			//domain을 제외한 나머지 주소
@@ -350,6 +350,9 @@ public:
 	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
 	std::deque<CString> headers;
 
+	//한번 호출해서 실패한 후 port나 주소 등 url관련 정보를 수정하여 다시 request_url()을 호출할 때
+	//full_url을 ""로 만들어주지 않으면 이 값을 바로 사용해서 다시 request하므로 역시 실패하게 된다.
+	//반드시 url 관련값을 수정하여 다시 request할 경우에는 반드시 full_url = _T("")로 만들어주고 호출해야 한다.
 	CString		full_url;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
 	CString		result;
 	long		elapsed = 0;		//소요시간. ms단위.

@@ -141,7 +141,7 @@ void CSCStatic::OnPaint()
 
 	//투명 모드이면 배경도 안칠하고 글자도 배경색 없이 출력된다.
 	dc.SetBkMode(TRANSPARENT);
-
+	
 	if (m_transparent)
 	{
 		CRect Rect;
@@ -161,7 +161,6 @@ void CSCStatic::OnPaint()
 		MemDC.SelectObject(pOldBmp);
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
-
 	}
 	else
 	{
@@ -417,9 +416,6 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*-1*/)
 {
 	CStatic::SetWindowText(sText);
 
-	CString t;
-	GetWindowText(t);
-
 	//-1이면 기본 설정된 글자색 사용
  	if (cTextColor != (COLORREF)-1)
  		m_cr_text = cTextColor;
@@ -431,7 +427,7 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*-1*/)
 	if (m_transparent)
 		update_surface();
 	else
-		Invalidate();
+		Invalidate(false);
 }
 
 void CSCStatic::set_textf(COLORREF crTextColor, LPCTSTR format, ...)

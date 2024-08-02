@@ -120,6 +120,30 @@ int CSCEdit::get_font_size(bool pixel_size)
 	return m_font_size;
 }
 
+//CEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
+//ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
+//ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이다.
+//https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally
+//생성후에도 SetWindowLong()을 이용하여 변경할 수 있는 속성들
+//(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
+//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
+CSCEdit& CSCEdit::set_line_align(DWORD align)
+{
+	CRect rc;
+	GetClientRect(rc);
+
+	rc.DeflateRect(2, 2);
+
+	if (align == DT_VCENTER)
+		rc.top = rc.top + (rc.Height() - get_font_size(true)) / 2 - 1;
+	else if (align == DT_BOTTOM)
+		rc.top = rc.bottom - get_font_size(true);
+
+	SetRect(&rc);
+
+	return *this;
+}
+
 CSCEdit& CSCEdit::set_text_color(COLORREF crColor)
 {
 	m_cr_text = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
@@ -175,7 +199,7 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	else if (GetStyle() & ES_READONLY)
 	{
 		pDC->SetTextColor(m_cr_text);
-		pDC->SetBkColor( ::GetSysColor( COLOR_3DFACE ) );
+		pDC->SetBkColor(::GetSysColor(COLOR_3DFACE));
 	}
 	//else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
 	//{
@@ -343,10 +367,13 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
 	//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
-	if (pMsg->message == WM_KEYDOWN)
+	switch (pMsg->message)
 	{
-		if (m_transparent)
+		case WM_KEYDOWN :
+		case WM_LBUTTONDOWN:
+			//투명일 경우에는 캐럿 이동이나 단어 블록 선택 후 마우스 클릭시에도 화면갱샌이 필요하다.
 			update_ctrl();
+			break;
 	}
 
 	return CEdit::PreTranslateMessage(pMsg);
@@ -436,7 +463,7 @@ void CSCEdit::OnNcPaint()
 
 		GetClientRect(rc);
 		CPen pen(PS_SOLID, 1, RGB(128, 128, 128));
-		CPen* pOldPen = (CPen*)dc.SelectObject(&pen);
+		CPen* pOldPen = (CPen*)(draw_border ? dc.SelectObject(&pen) : dc.SelectStockObject(NULL_PEN));
 		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 
 		dc.Rectangle(rc);
@@ -478,7 +505,6 @@ void CSCEdit::update_ctrl()
 
 	//만약 parent에 배경색이나 배경 그림이 있고
 //그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
-	/*
 	if (m_transparent)
 	{
 		CClientDC dc(this);
@@ -500,7 +526,6 @@ void CSCEdit::update_ctrl()
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
 	}
-	*/
 }
 
 

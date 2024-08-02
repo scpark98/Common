@@ -2401,7 +2401,7 @@ void request_url(CRequestUrlParams* params)
 	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
 	if (hInternetRoot == NULL)
 	{
-		params->status = -1;
+		params->status = GetLastError();
 		params->result = _T("InternetOpen() failed.");
 		TRACE(_T("result = %s\n"), params->result);
 		return;
@@ -2420,7 +2420,7 @@ void request_url(CRequestUrlParams* params)
 	if (hInternetConnect == NULL)
 	{
 		params->result = _T("hInternetConnect() failed.");
-		params->status = -1;
+		params->status = GetLastError();
 		TRACE(_T("result = %s\n"), params->result);
 		return;
 	}
@@ -2464,6 +2464,7 @@ void request_url(CRequestUrlParams* params)
 			SECURITY_FLAG_IGNORE_REVOCATION |
 			SECURITY_FLAG_IGNORE_REDIRECT_TO_HTTP |
 			SECURITY_FLAG_IGNORE_REDIRECT_TO_HTTPS |
+			SECURITY_FLAG_IGNORE_WRONG_USAGE |
 			SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
 			SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
 		InternetSetOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
@@ -2506,7 +2507,7 @@ void request_url(CRequestUrlParams* params)
 	if (!res)
 	{
 		DWORD dwError = GetLastError();
-		params->status = -1;
+		params->status = dwError;
 		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_last_error_string(dwError, false));
 		TRACE(_T("result = %s\n"), params->result);
 
@@ -2540,15 +2541,16 @@ void request_url(CRequestUrlParams* params)
 
 	if (!ret)
 	{
+		params->result = _T("HttpQueryInfo(HTTP_QUERY_STATUS_CODE) failed.");
+		//params->status = GetLastError();
+		TRACE(_T("result = %s\n"), params->result);
+
 		SAFE_DELETE_ARRAY(buffer);
 		//SAFE_DELETE_ARRAY(total_buffer);
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
 
-		params->result = _T("HttpQueryInfo(HTTP_QUERY_STATUS_CODE) failed.");
-		params->status = -1;
-		TRACE(_T("result = %s\n"), params->result);
 		return;
 	}
 
@@ -8242,7 +8244,12 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 	{
 		IAutomaticUpdates* pAutomaticUpdates = NULL;
 		// Automatic Updates 객체 생성
-		HRESULT hr = CoCreateInstance(CLSID_AutomaticUpdates, NULL, CLSCTX_INPROC_SERVER, IID_IAutomaticUpdates, (LPVOID*)&pAutomaticUpdates);
+		HRESULT hr = CoCreateInstance(
+			CLSID_AutomaticUpdates,
+			NULL,
+			CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER | CLSCTX_INPROC_SERVER,
+			IID_IAutomaticUpdates,
+			(LPVOID*)&pAutomaticUpdates);
 
 		if (SUCCEEDED(hr))
 		{
@@ -8281,6 +8288,10 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 
 			pAutomaticUpdates->Release();
 		}
+	}
+	else
+	{
+		return false;
 	}
 
 	// COM 라이브러리 정리

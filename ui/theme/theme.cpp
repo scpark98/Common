@@ -1,4 +1,5 @@
 #include "theme.h"
+#include "../../Functions.h"
 
 /************************************************************
 **
@@ -153,6 +154,13 @@ void	CTheme::DrawThemeText( HDC hdc, const RECT *pRect, CString strText, DWORD d
 
 BOOL CTheme::CheckOSVer()
 {
+	OSVERSIONINFOEX osvi = get_windows_version();
+
+	if ((osvi.dwMajorVersion < 5) || ((osvi.dwMajorVersion == 5) && (osvi.dwMinorVersion < 1)))
+		return FALSE;
+
+	return TRUE;
+	/*
 	OSVERSIONINFO osvi;
 	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 	GetVersionEx(&osvi);
@@ -160,15 +168,18 @@ BOOL CTheme::CheckOSVer()
 		return FALSE;
 		
 	return TRUE;
+	*/
 }
 
 
 BOOL	CTheme::GetAppearance(void)
 // Simplified, PAR 27/06/04
 {
-//return FALSE;
+	if (CheckOSVer() == FALSE)
+		return FALSE;
 	// For XP - Detect if the Window Style is Classic or XP
 
+	/*
 	OSVERSIONINFO osvi;
 
 	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
@@ -177,7 +188,8 @@ BOOL	CTheme::GetAppearance(void)
 
 	if ( (osvi.dwMajorVersion < 5) || ((osvi.dwMajorVersion == 5) && (osvi.dwMinorVersion < 1)) )
 		return FALSE;
-		
+	*/
+
 	// OS is OK, so leave it all up to IsAppThemed()
 	return this->IsAppThemed();
 }

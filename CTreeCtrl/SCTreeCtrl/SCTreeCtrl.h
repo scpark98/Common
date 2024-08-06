@@ -77,8 +77,11 @@ public:
 		message_drag_and_drop,
 	};
 
-	//for test
-	bool		use_default_paint = true;
+	//기본 CPaint::OnPaint()를 사용할 지, 직접 그려줄 지
+	void		use_custom_draw(bool custom);
+
+	int			get_indent_size() { return m_indent_size; }
+	void		set_indent_size(int sz) { m_indent_size = sz; Invalidate(); }
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
@@ -87,7 +90,10 @@ public:
 	void		set_use_own_imagelist(bool use, int image_size = 16);
 	void		set_image_size(int image_size = 16);
 
-	void		set_use_checkbox(bool checkbox = true);
+	void		use_checkbox(bool use = true);
+
+	//확장, 축소 버튼 표시 여부
+	void		use_expand_button(bool use = true);
 
 	//ico 파일들을 imagelist에 추가
 	template <typename ... Types> void set_imagelist(Types... ids)
@@ -126,6 +132,9 @@ public:
 	HTREEITEM	find_item(const CString& name, HTREEITEM root = NULL);
 	CString		get_selected_item_text(bool include_parent = false);
 
+	//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
+	bool		is_visible_item(HTREEITEM hItem);
+
 	//recursive traverse
 	void		iterate_tree(HTREEITEM hItem = NULL);
 	//not recursive, top-down traverse
@@ -141,6 +150,9 @@ public:
 	//만약 OnPaint()에서 그려주는 것이 아닌 CustonDraw()에서 그려주는 경우도 역시 동일한지는 확인 필요.
 	HTREEITEM	hit_test(UINT* nFlags = NULL);
 
+	//해당 state인지 판별(ex. TVIS_EXPAND)
+	bool		get_item_state(HTREEITEM hItem, UINT state);
+
 	//컬러 관련
 	enum listctrlex_color_theme
 	{
@@ -153,6 +165,10 @@ public:
 	};
 
 	void	set_color_theme(int theme, bool apply_now = true);
+	void	set_text_color(COLORREF text_color) { m_crText = text_color; Invalidate(); }
+	void	set_back_color(COLORREF back_color) { m_crBack = back_color; Invalidate(); }
+	void	SetTextColor(COLORREF text_color) { set_text_color(text_color); }
+	void	SetBkColor(COLORREF back_color) { set_back_color(back_color); }
 
 	//Drag&Drop 드래깅 관련
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
@@ -173,7 +189,31 @@ public:
 	BOOL			MoveTreeItem(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem);
 	BOOL			MoveChildTreeItem(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
 
+	//20240801 scpark 편집과 관계된 코드 추가
+	void			edit_item(HTREEITEM hItem = NULL);
+	void			edit_end(bool valid = true);
+	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
+	CString			get_edit_old_text();	//편집 후 텍스트
+	CString			get_edit_new_text();	//편집 후 텍스트
+	void			undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
+
+	//폰트 관련
+	int				get_font_size();
+	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void			set_font_size(int font_size);
+	void			enlarge_font_size(bool enlarge);
+	void			set_font_bold(bool bold = true);
+	void			set_font_italic(bool italic = true);
+
+
 protected:
+	bool			m_use_custom_draw = true;
+
+	//들여쓰기 크기
+	int				m_indent_size = 16;
+	bool			m_use_checkbox = false;
+	bool			m_use_expand_button = true;
+
 	CTheme			m_theme;
 	bool			m_theme_initialized = false;
 	void			theme_init();
@@ -219,6 +259,13 @@ protected:
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
 
+	//편집 관련
+	CEdit*			m_pEdit = NULL;
+	CString			m_edit_old_text;
+	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
+	bool			m_in_editing = false;		//편집중인지
+	CRect			get_item_rect(HTREEITEM hItem);
+
 protected:
 	DECLARE_MESSAGE_MAP()
 	virtual void PreSubclassWindow();
@@ -237,6 +284,8 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg BOOL OnTvnBeginlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg BOOL OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
 };
 
 

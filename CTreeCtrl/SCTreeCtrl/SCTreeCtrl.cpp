@@ -37,6 +37,8 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
 	ON_WM_HSCROLL()
+	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
+	ON_NOTIFY_REFLECT_EX(TVN_ENDLABELEDIT, &CSCTreeCtrl::OnTvnEndlabeledit)
 END_MESSAGE_MAP()
 
 
@@ -45,8 +47,6 @@ END_MESSAGE_MAP()
 void CSCTreeCtrl::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	SetItemHeight(22);
-
 	CFont* font = GetParent()->GetFont();
 
 	if (font != NULL)
@@ -67,6 +67,8 @@ void CSCTreeCtrl::reconstruct_font()
 
 	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
 
+	SetItemHeight(-m_lf.lfHeight + 4);
+
 	ASSERT(bCreated);
 }
 
@@ -77,13 +79,23 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 	{
 		switch (pMsg->wParam)
 		{
-			case VK_DELETE :
+			case VK_RETURN:
 			{
-				CString label = get_selected_item_text(false);
-				if (AfxMessageBox(label + _T("\ndelete this node?"), MB_YESNO) == IDNO)
+				if (m_in_editing)
+				{
+					edit_end(true);
 					return TRUE;
-				DeleteItem(GetSelectedItem());
-				return TRUE;
+				}
+				break;
+			}
+			case VK_ESCAPE:
+			{
+				if (m_in_editing)
+				{
+					edit_end(false);
+					return TRUE;
+				}
+				break;
 			}
 		}
 	}
@@ -122,7 +134,7 @@ void CSCTreeCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 void CSCTreeCtrl::OnPaint()
 {
 	//tree가 제대로 구성되어 있는지 기본 OnPaint()로 확인 목적 코드
-	if (use_default_paint)
+	if (m_use_custom_draw == false)
 	{
 		CTreeCtrl::OnPaint();
 		return;
@@ -196,6 +208,8 @@ void CSCTreeCtrl::OnPaint()
 		rItem.left = 2;
 		rItem.right = rc.right - 1;
 
+		rItem.left += (tab_count * m_indent_size);
+
 		label = GetItemText(hItem);
 		//Trace(_T("%s, rItem.left = %d\n"), label, rItem.left);
 
@@ -208,12 +222,14 @@ void CSCTreeCtrl::OnPaint()
 
 			if (ItemHasChildren(hItem))
 			{
+				//확장되어 있으면 '-' 버튼을 
 				if (GetItemState(hItem, TVIF_STATE) & TVIS_EXPANDED)
 				{
 					DrawRectangle(&dc, expand_rect, GRAY(128));
 					expand_rect.DeflateRect(3, 3);
 					DrawLine(&dc, expand_rect.left - 1, expand_rect.CenterPoint().y, expand_rect.right, expand_rect.CenterPoint().y, GRAY(128));
 				}
+				//축소되어 있으면 '+' 버튼을 그려준다.
 				else
 				{
 					DrawRectangle(&dc, expand_rect, GRAY(128));//, GRAY(128));
@@ -276,19 +292,21 @@ void CSCTreeCtrl::OnPaint()
 			}
 		}
 
-		//레이블을 그려준다.
-		rItem.left += 4;	//여백을 두고 label을 그려준다.
+		//레이블을 4픽셀 만큼 띠워서 출력한다.
+		//이 값은 get_item_rect()에서도 동일하게 계산해줘야 한다.
+		rItem.left += 4;
 		dc.SetTextColor(crText);
 		dc.DrawText(label, rItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
-		//child가 있다면 child로 이동하고
-		if (ItemHasChildren(hItem))
+		//현재 노드가 EXPAND 상태이고 child가 존재한다면 child로 이동
+		if (get_item_state(hItem, TVIS_EXPANDED) && ItemHasChildren(hItem))
 		{
 			tab_count++;
 			hItem = GetChildItem(hItem);
+
 			continue;
 		}
-		//child가 없다면 현재 node의 sibling으로 이동한다.
+		//EXPAND상태가 아니거나 child가 없다면 현재 node의 sibling으로 이동한다.
 		else
 		{
 			HTREEITEM hSiblingItem = GetNextSiblingItem(hItem);
@@ -637,6 +655,14 @@ CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
 	return label;
 }
 
+//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
+bool CSCTreeCtrl::is_visible_item(HTREEITEM hItem)
+{
+	CRect r;
+	GetItemRect(hItem, r, FALSE);
+	return (r.Height() > 0);
+}
+
 void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
@@ -649,6 +675,11 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 //button, check, text 영역을 내가 정해서 그려주고 이벤트도 수동으로 처리해주는 것이 나을듯하다.
 BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
+	if (m_in_editing)
+	{
+		edit_end(true);
+	}
+
 #if 0
 	CPoint pt;
 	UINT nFlags;
@@ -968,7 +999,7 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 		r.left += 16;
 	}
 
-	if (m_is_shell_treectrl || m_imagelist.GetImageCount())
+	if (m_is_shell_treectrl || (m_imagelist.GetSafeHandle() && m_imagelist.GetImageCount()))
 	{
 		icon = r;
 		icon.right = icon.left + m_image_size;
@@ -1002,6 +1033,13 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 	}
 
 	return hItem;
+}
+
+//해당 state인지 판별(ex. TVIS_EXPAND)
+bool CSCTreeCtrl::get_item_state(HTREEITEM hItem, UINT state)
+{
+	UINT cur_state = GetItemState(hItem, TVIF_STATE);
+	return (cur_state & state);
 }
 
 void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
@@ -1322,6 +1360,105 @@ void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 //file의 내용을 읽어서 load_from_string()를 호출한다.
 bool CSCTreeCtrl::load(CString file)
 {
+	/*
+	FILE* fp = NULL;
+	CTreeItem item(_T("top"));
+
+	TCHAR	chLine[1000];
+	CString sline;
+
+	//encoding 방식을 읽어온다.
+	int	text_encoding = get_text_encoding(sfile);
+	if (text_encoding < 0)
+		return false;
+
+	//encoding 방식을 판별하여 read/write했으나
+	//utf8만 다루도록 통일한다.
+
+	fp = _tfopen(sfile, _T("rt")CHARSET);
+	//m_unicode_file = true;
+//}
+
+	if (fp == NULL)
+		return false;
+
+	m_tr.clear();
+
+
+	tree<CTreeItem>::iterator top = m_tr.set_head(item);
+	tree<CTreeItem>::iterator it;
+	int prev_indent, tabCount;
+
+	while (_fgetts(chLine, 1000, fp) != NULL)
+	{
+		sline = chLine;
+		sline.TrimRight();
+
+		//빈 라인이 있을 경우는 패스
+		if (sline.GetLength() == 0)
+			continue;
+
+		//맨 처음 노드이면 루트로 추가
+		if (it == NULL)
+		{
+			item = CTreeItem(sline);
+			it = m_tr.append_child(top, item);
+			prev_indent = 0;
+			continue;
+		}
+
+		//읽어온 문자열이 몇 탭 들어간 항목인지 세고
+		tabCount = 0;
+		while (sline[tabCount] == '\t')
+			tabCount++;
+
+		sline.Trim();
+		//prev_indent와 비교하여 레벨에 맞게 추가시킨다.
+
+		item = CTreeItem(sline);
+
+		//전보다 1개 많으면 child이고
+		if (tabCount == prev_indent + 1)
+		{
+			it = m_tr.append_child(it, item);
+			prev_indent = tabCount;
+		}
+		//전과 같으면 sibling이고
+		else if (tabCount == prev_indent)
+		{
+			it = m_tr.parent(it);
+			it = m_tr.append_child(it, item);
+		}
+		//전보다 적으면 (prev_index-tabCount) * parent의 sibling이다.
+		else if (tabCount < prev_indent)
+		{
+			while (prev_indent >= tabCount)
+			{
+				it = m_tr.parent(it);
+				prev_indent--;
+			}
+
+			if (it == NULL)
+			{
+				it = m_tr.insert(m_tr.begin(), item);
+			}
+			else
+			{
+				it = m_tr.append_child(it, item);
+			}
+			prev_indent++;
+		}
+		else
+		{
+			AfxMessageBox(sline + _T("\ntext 파일 입력 오류"));
+			break;
+		}
+	}
+
+	int res = fclose(fp);
+	recalculate_scroll_size();
+	Invalidate();
+	*/
 	return true;
 }
 
@@ -1341,7 +1478,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 	get_token_string(text, lines, '\n', false);
 
 	int			img_index = -1;
-	int			img_count = m_imagelist.GetImageCount();
+	int			img_count = (m_imagelist.GetSafeHandle() ? m_imagelist.GetImageCount() : 0);
 	int			tab_count = 0;
 	int			prev_indent = 0;
 	CString		label;
@@ -1650,12 +1787,246 @@ void CSCTreeCtrl::draw_checkbox(CDC* pDC, CRect r, int check_state)
 	}
 }
 
-void CSCTreeCtrl::set_use_checkbox(bool checkbox)
+void CSCTreeCtrl::use_checkbox(bool use)
 {
+	m_use_checkbox = use;
+
 	ModifyStyle(TVS_CHECKBOXES, 0);
 
-	if (checkbox)
+	if (use)
 		ModifyStyle(0, TVS_CHECKBOXES);
 
 	Invalidate();
+}
+
+void CSCTreeCtrl::use_expand_button(bool use)
+{
+	m_use_expand_button = use;
+
+	ModifyStyle(TVS_HASBUTTONS, 0);
+
+	if (use)
+		ModifyStyle(0, TVS_HASBUTTONS);
+
+	Invalidate();
+}
+
+BOOL CSCTreeCtrl::OnTvnBeginlabeledit(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMTVDISPINFO pTVDispInfo = reinterpret_cast<LPNMTVDISPINFO>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	*pResult = 0;
+
+	TRACE(_T("%s\n"), __function__);
+
+	return FALSE;
+}
+
+
+BOOL CSCTreeCtrl::OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMTVDISPINFO pTVDispInfo = reinterpret_cast<LPNMTVDISPINFO>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	*pResult = 0;
+
+	TRACE(_T("%s\n"), __function__);
+
+	return FALSE;
+}
+
+//기본 CPaint::OnPaint()를 사용할 지, 직접 그려줄 지
+void CSCTreeCtrl::use_custom_draw(bool custom)
+{
+	m_use_custom_draw = custom;
+	Invalidate();
+}
+
+void CSCTreeCtrl::edit_item(HTREEITEM hItem)
+{
+	if (hItem == NULL)
+	{
+		hItem = GetSelectedItem();
+		if (hItem == NULL)
+			return;
+	}
+
+	EnsureVisible(hItem);
+
+	m_edit_item = hItem;
+	m_edit_old_text = GetItemText(hItem);
+
+	//편집 사각형의 right는 레이블 너비보다 좀 더 넉넉하게 준다. 단, rc.right를 넘어가서는 안된다.
+	CRect rc;
+	CRect r = get_item_rect(hItem);
+	r.right += 24;
+	GetClientRect(rc);
+	if (r.right > rc.right - 1)
+		r.right = rc.right - 1;
+
+	if (m_pEdit == NULL)
+	{
+		m_pEdit = new CEdit;
+		m_pEdit->Create(/*WS_BORDER | */WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
+	}
+	else
+	{
+		m_pEdit->MoveWindow(r);
+		m_pEdit->ShowWindow(SW_SHOW);
+	}
+
+	m_pEdit->SetFont(&m_font, true);
+
+	//ES_MULTILINE을 준 이유는 editbox가 세로 중앙정렬되어 표시되지 않으므로
+	//이를 보정해주기 위해서 CEdit::SetRect()를 사용하는데 반드시 ES_MULTILINE 속성이 있어야만 적용되기 때문이다.
+	CRect new_rect;
+	LOGFONT lf;
+
+	m_pEdit->GetClientRect(new_rect);
+	new_rect.DeflateRect(0, 1);
+	new_rect.right += 4;
+
+	m_pEdit->GetFont()->GetLogFont(&lf);
+	new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 2;
+	m_pEdit->SetRect(&new_rect);
+
+	m_pEdit->SetWindowText(m_edit_old_text);
+	m_pEdit->SetSel(0, -1);
+	m_pEdit->SetFocus();
+
+	m_in_editing = true;
+
+	TV_DISPINFO dispinfo;
+	dispinfo.hdr.hwndFrom = m_hWnd;
+	dispinfo.hdr.idFrom = GetDlgCtrlID();
+	dispinfo.hdr.code = TVN_BEGINLABELEDIT;
+
+	dispinfo.item.mask = LVIF_TEXT;
+	dispinfo.item.hItem = hItem;
+	//dispinfo.item.pszText = bEscape ? NULL : LPTSTR((LPCTSTR)Text);
+	//dispinfo.item.cchTextMax = Text.GetLength();
+
+	GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
+}
+
+void CSCTreeCtrl::edit_end(bool valid)
+{
+	if (m_in_editing == false)
+		return;
+
+	//편집 후 Enter키 또는 리스트의 다른곳을 클릭하여 편집을 종료할 때
+	//변경된 text를 변경할 지 아닐지는 mainDlg에게 맡겨야 한다.
+	//여기서는 편집모드만 종료시켜준다.
+	m_in_editing = false;
+	m_pEdit->ShowWindow(SW_HIDE);
+
+	if (valid)
+	{
+		TV_DISPINFO dispinfo;
+		dispinfo.hdr.hwndFrom = m_hWnd;
+		dispinfo.hdr.idFrom = GetDlgCtrlID();
+		dispinfo.hdr.code = TVN_ENDLABELEDIT;
+
+		dispinfo.item.mask = LVIF_TEXT;
+		dispinfo.item.hItem = m_edit_item;
+		//dispinfo.item.pszText = bEscape ? NULL : LPTSTR((LPCTSTR)Text);
+		//dispinfo.item.cchTextMax = Text.GetLength();
+
+		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
+	}
+
+	Invalidate();
+}
+
+//custom draw일 경우는 직접 계산해야 한다?
+CRect CSCTreeCtrl::get_item_rect(HTREEITEM hItem)
+{
+	CRect rc, r;
+	int label_width;
+
+	GetClientRect(rc);
+	GetItemRect(hItem, &r, FALSE);
+
+	CFont font;
+	CFont* pOldFont;
+
+	CClientDC dc(this);
+	font.CreateFontIndirect(&m_lf);
+	pOldFont = (CFont*)dc.SelectObject(&font);
+	CSize sz = dc.GetTextExtent(GetItemText(hItem));
+	dc.SelectObject(pOldFont);
+
+	r.right = rc.right - 1;
+
+	int total_indent = 0;
+	HTREEITEM hParent = hItem;
+	while (hParent)
+	{
+		total_indent += m_indent_size;
+		hParent = GetParentItem(hParent);
+	}
+
+	r.left = total_indent - m_indent_size;
+
+	CRect button, check, icon, label;
+
+	if (GetStyle() & TVS_HASBUTTONS)
+	{
+		button = r;
+		button.right = button.left + 16;
+		r.left += 16;
+	}
+
+	if (GetStyle() & TVS_CHECKBOXES)
+	{
+		check = r;
+		check.right = check.left + 16;
+		r.left += 16;
+	}
+
+	if (m_is_shell_treectrl || (m_imagelist.GetSafeHandle() && m_imagelist.GetImageCount()))
+	{
+		icon = r;
+		icon.right = icon.left + m_image_size;
+		r.left += m_image_size;
+	}
+
+	label = r;
+	label.left += 4;
+	label.right = label.left + sz.cx + 8;
+
+	TRACE(_T("button = %s, check = %s, icon = %s, label = %s\n"),
+		get_rect_info_string(button),
+		get_rect_info_string(check),
+		get_rect_info_string(icon),
+		get_rect_info_string(label));
+
+	return label;
+}
+
+int CSCTreeCtrl::get_font_size()
+{
+	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	return m_font_size;
+}
+
+//예를 들어 폰트 크기를 10으로 설정하면
+void CSCTreeCtrl::set_font_size(int font_size)
+{
+	if (font_size == 0)
+		return;
+
+	m_font_size = font_size;
+	//For the MM_TEXT mapping mode,
+	//you can use the following formula to specify 
+	//a height for a font with a specified point size:
+	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	reconstruct_font();
+}
+
+void CSCTreeCtrl::enlarge_font_size(bool enlarge)
+{
+	m_font_size = get_font_size();
+	enlarge ? m_font_size++ : m_font_size--;
+	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	reconstruct_font();
 }

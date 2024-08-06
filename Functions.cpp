@@ -2545,8 +2545,9 @@ void request_url(CRequestUrlParams* params)
 		//params->status = GetLastError();
 		TRACE(_T("result = %s\n"), params->result);
 
-		SAFE_DELETE_ARRAY(buffer);
-		//SAFE_DELETE_ARRAY(total_buffer);
+		if (buffer)
+			delete[] buffer;
+
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
@@ -2556,8 +2557,9 @@ void request_url(CRequestUrlParams* params)
 
 	if (params->status != HTTP_STATUS_OK)
 	{
-		SAFE_DELETE_ARRAY(buffer);
-		//SAFE_DELETE_ARRAY(total_buffer);
+		if (buffer)
+			delete[] buffer;
+
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
 		InternetCloseHandle(hInternetRoot);
@@ -2598,7 +2600,8 @@ void request_url(CRequestUrlParams* params)
 		if (params->local_file_path.IsEmpty())
 		{
 			//UTF-8 with BOM으로 작성된 txt 파일을 읽어오면 파일 헤더에 EF BB BF 라는 3 char가 붙어온다.
-			//이는 윈도우에서 fopen으로 읽어올때는 문제되지 않으나 InternetReadFile()로 읽어오
+			//이는 윈도우에서 fopen으로 읽어올때는 문제되지 않으나
+			//InternetReadFile()로 읽어와서 저장하면 맨 앞 글자가 깨져 표시되는 문제가 발생한다. 날려준다.
 			if (byte(buffer[0]) == 0xEF &&
 				byte(buffer[1]) == 0xBB &&
 				byte(buffer[2]) == 0xBF)

@@ -455,7 +455,7 @@ void CSCStatic::set_back_image(UINT nIDBack)
 BOOL CSCStatic::OnEraseBkgnd(CDC* pDC) 
 {
 	// TODO: Add your message handler code here and/or call default
-	return FALSE;
+	return TRUE;
 	
 	//CDialog::OnEraseBkgnd(pDC);
 }

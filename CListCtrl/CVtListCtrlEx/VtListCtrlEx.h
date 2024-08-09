@@ -282,6 +282,9 @@ public:
 	void		select_item(int index, bool select = true, bool after_unselect = false);
 	void		unselect_selected_item();
 
+	//drag 도중에 마우스가 다른 앱 영역으로 나갈 경우 drophilited 상태의 아이템이 남는 버그를 제거하기 위해.
+	int			get_drop_hilited_items(std::deque<int>* dq);
+
 //검색 관련
 	//0번 컬럼에서만 데이터를 찾는다.
 	int			find_string(CString str, int start = -1, bool bWholeWord = false, bool bCaseSensitive = false);
@@ -504,7 +507,8 @@ protected:
 	int				m_edit_subItem = -1;			//편집중인 아이템 서브인덱스
 	CString			m_old_text = _T("");			//편집 전 텍스트
 	CEdit*			m_pEdit = NULL;
-	long			m_last_clicked = 0;				//one_click으로 편집모드 진입 시 마지막 클릭 시각
+	long			m_last_clicked_time = 0;		//one_click으로 편집모드 진입 시 마지막 클릭 시각
+	int				m_last_clicked_index = -1;		//one_click으로 편집모드 진입 시 마지막 클릭 인덱스
 
 //폰트 관련
 	LOGFONT			m_lf;
@@ -524,9 +528,6 @@ protected:
 	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
-
-	CImageList* CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint);
-	CImageList* CreateDragImageEx(LPPOINT lpPoint);
 
 protected:
 	DECLARE_MESSAGE_MAP()

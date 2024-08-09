@@ -83,6 +83,16 @@ public:
 	int			get_indent_size() { return m_indent_size; }
 	void		set_indent_size(int sz) { m_indent_size = sz; Invalidate(); }
 
+	//스타일 변경
+	void		full_row_selection(bool full_row);
+	void		has_line(bool line);
+	void		use_checkbox(bool use = true);
+
+	//확장, 축소 버튼 표시 여부
+	void		use_expand_button(bool use = true);
+
+	void		show_area(bool show) { m_show_area = show; Invalidate(); }
+
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
@@ -90,10 +100,6 @@ public:
 	void		set_use_own_imagelist(bool use, int image_size = 16);
 	void		set_image_size(int image_size = 16);
 
-	void		use_checkbox(bool use = true);
-
-	//확장, 축소 버튼 표시 여부
-	void		use_expand_button(bool use = true);
 
 	//ico 파일들을 imagelist에 추가
 	template <typename ... Types> void set_imagelist(Types... ids)
@@ -144,12 +150,6 @@ public:
 
 	void		expand_all(bool expand = true);
 
-	//HitTest()는 클릭된 hItem과 expand button, check, icon, label 영역을 판별하는 함수인데
-	//OnPaint()에서 CTreeCtrl::OnPaint()를 사용하지 않고 직접 그려줄 경우는
-	//HitTest()를 그대로 사용할 수 없으므로 별도 함수로 작성.
-	//만약 OnPaint()에서 그려주는 것이 아닌 CustonDraw()에서 그려주는 경우도 역시 동일한지는 확인 필요.
-	HTREEITEM	hit_test(UINT* nFlags = NULL);
-
 	//해당 state인지 판별(ex. TVIS_EXPAND)
 	bool		get_item_state(HTREEITEM hItem, UINT state);
 
@@ -167,6 +167,7 @@ public:
 	void	set_color_theme(int theme, bool apply_now = true);
 	void	set_text_color(COLORREF text_color) { m_crText = text_color; Invalidate(); }
 	void	set_back_color(COLORREF back_color) { m_crBack = back_color; Invalidate(); }
+	//CTreeCtrl에서 지원하는 기본 함수 override
 	void	SetTextColor(COLORREF text_color) { set_text_color(text_color); }
 	void	SetBkColor(COLORREF back_color) { set_back_color(back_color); }
 
@@ -193,11 +194,18 @@ public:
 	void			edit_item(HTREEITEM hItem = NULL);
 	void			edit_end(bool valid = true);
 	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
-	CString			get_edit_old_text();	//편집 후 텍스트
-	CString			get_edit_new_text();	//편집 후 텍스트
-	void			undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
+	CString			get_edit_old_text() { return m_edit_old_text; }		//편집 후 텍스트
+	CString			get_edit_new_text() { return m_edit_new_text; }	//편집 후 텍스트
+	void			undo_edit_label();									//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
+	//CTreeCtrl::GetEditControl()을 override.
+	CEdit*			GetEditControl() { return get_edit_control(); }
+	CEdit*			get_edit_control() { return m_pEdit; }
+	long			m_last_clicked_time = 0;
+	HTREEITEM		m_last_clicked_item;
 
 	//폰트 관련
+	LOGFONT			get_log_font() { return m_lf; }
+	void			set_log_font(LOGFONT lf);
 	int				get_font_size();
 	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void			set_font_size(int font_size);
@@ -213,6 +221,8 @@ protected:
 	int				m_indent_size = 16;
 	bool			m_use_checkbox = false;
 	bool			m_use_expand_button = true;
+
+	bool			m_show_area = false;
 
 	CTheme			m_theme;
 	bool			m_theme_initialized = false;
@@ -262,9 +272,20 @@ protected:
 	//편집 관련
 	CEdit*			m_pEdit = NULL;
 	CString			m_edit_old_text;
+	CString			m_edit_new_text;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
 	bool			m_in_editing = false;		//편집중인지
-	CRect			get_item_rect(HTREEITEM hItem);
+
+	enum ROW_ITEM_RECT
+	{
+		rect_row = 0,
+		rect_button,
+		rect_check,
+		rect_icon,
+		rect_label,
+	};
+	//fullRow(0), 확장버튼(1), 체크박스(2), 아이콘(3), 레이블(4) 총 5개의 CRect를 구한다.
+	void			get_item_rect(HTREEITEM hItem, CRect r[]);
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -275,7 +296,7 @@ public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnPaint();
-	afx_msg void OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg BOOL OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnNMClick(NMHDR* pNMHDR, LRESULT* pResult);
@@ -286,6 +307,8 @@ public:
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg BOOL OnTvnBeginlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult);
 };
 
 

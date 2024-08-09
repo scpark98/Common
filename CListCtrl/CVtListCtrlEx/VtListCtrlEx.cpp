@@ -1452,7 +1452,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 			return NULL;
 	}
 
-	m_last_clicked = 0;
+	m_last_clicked_time = 0;
 
 
 	CRect r = get_item_rect(item, subItem);
@@ -2756,14 +2756,14 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 			(m_edit_item == item) &&
 			(m_edit_subItem == subItem) &&
 			(get_selected_items() == 1) &&
-			(clock() - m_last_clicked > 800) &&	//이 값이 작으면 더블클릭에도 편집되고
-			(clock() - m_last_clicked < 1600))
+			(clock() - m_last_clicked_time > 500) &&	//이 값이 작으면 더블클릭에도 편집되고
+			(clock() - m_last_clicked_time < 2000))
 		{
 			edit_item(m_edit_item, m_edit_subItem);
 		}
 		else
 		{
-			m_last_clicked = clock();
+			m_last_clicked_time = clock();
 		}
 
 		m_edit_item = item;
@@ -2777,7 +2777,7 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 void CVtListCtrlEx::edit_end(bool valid)
 {
 	m_in_editing = false;
-	m_last_clicked = 0;
+	m_last_clicked_time = 0;
 	m_pEdit->ShowWindow(SW_HIDE);
 	Invalidate();
 
@@ -2940,7 +2940,7 @@ void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
 
 void CVtListCtrlEx::set_path(CString path, bool refresh)
 {
-	m_last_clicked = 0;
+	m_last_clicked_time = 0;
 
 	path = convert_special_folder_to_real_path(path, m_pShellImageList->get_csidl_map());
 
@@ -3111,7 +3111,7 @@ void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
 	//SetItemText(iIndex, 2, GetDateTimeStringFromTime(GetFileLastModifiedTime(pFindFileData->cFileName), true, false, false));
 	add_file(pFindFileData->cFileName, file_is_folder ? _T("-") : get_size_string(ulInt.QuadPart), filedate, true, file_is_folder);
 }
-
+/*
 CImageList* CVtListCtrlEx::CreateDragImageEx(LPPOINT lpPoint)
 {
 	CRect	cSingleRect;
@@ -3206,7 +3206,8 @@ CImageList* CVtListCtrlEx::CreateDragImageEx(LPPOINT lpPoint)
 
 	return(pCompleteImageList);
 }
-
+*/
+/*
 CImageList* CVtListCtrlEx::CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint)
 {
 	if (pList->GetSelectedCount() <= 0) return NULL; // no row selected
@@ -3303,7 +3304,7 @@ CImageList* CVtListCtrlEx::CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint)
 
 	return pCompleteImageList;
 }
-
+*/
 void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	if (!m_use_drag_and_drop)
@@ -3432,6 +3433,8 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 				if ((hItem != NULL) && (TVHT_ONITEM & uFlags))
 				{
+					TRACE(_T("TVHT_ONITEM\n"));
+					pTree->SetItemState(hItem, TVIS_DROPHILITED, TVIF_STATE);
 					pTree->SelectDropTarget(hItem);
 					ASSERT(pTree->GetDropHilightItem() == hItem);
 				}
@@ -3476,7 +3479,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			HTREEITEM hItem = ((CTreeCtrl*)pDropWnd)->HitTest(pt, &uFlags);
-			TRACE(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
+			//TRACE(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
+			//TRACE(_T("TVHT_ONITEM\n"));
+			pTree->SetItemState(hItem, TVIS_DROPHILITED, TVIF_STATE);
 			pTree->SelectDropTarget(hItem);
 			ASSERT(hItem == pTree->GetDropHilightItem());
 		}
@@ -3532,6 +3537,11 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
 			DroppedHandler(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
 		}
+
+		//ListCtrl에서 drag하여 drophilited가 표시된 상태에서 빠르게 마우스를 밖으로 이동시키면
+		//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
+		//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜준다.
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
 	}
 
 	CListCtrl::OnLButtonUp(nFlags, point);

@@ -27,8 +27,8 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_ACTIVATE()
 	ON_WM_ERASEBKGND()
 	ON_WM_KEYDOWN()
-	ON_WM_PAINT()
-	ON_NOTIFY_REFLECT(TVN_SELCHANGED, &CSCTreeCtrl::OnTvnSelchanged)
+	//ON_WM_PAINT()
+	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGED, &CSCTreeCtrl::OnTvnSelchanged)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDING, &CSCTreeCtrl::OnTvnItemexpanding)
 	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CSCTreeCtrl::OnNMClick)
@@ -39,6 +39,8 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_HSCROLL()
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
 	ON_NOTIFY_REFLECT_EX(TVN_ENDLABELEDIT, &CSCTreeCtrl::OnTvnEndlabeledit)
+	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDED, &CSCTreeCtrl::OnTvnItemexpanded)
+	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomdraw)
 END_MESSAGE_MAP()
 
 
@@ -79,6 +81,12 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 	{
 		switch (pMsg->wParam)
 		{
+			case VK_F2:
+			{
+				edit_item(NULL);
+				return TRUE;
+			}
+
 			case VK_RETURN:
 			{
 				if (m_in_editing)
@@ -115,7 +123,14 @@ void CSCTreeCtrl::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 BOOL CSCTreeCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return FALSE;
+	CBrush backBrush(m_crBack);
+	CBrush* pPrevBrush = pDC->SelectObject(&backBrush);
+	CRect rect;
+	pDC->GetClipBox(&rect);
+	pDC->PatBlt(rect.left, rect.top, rect.Width(), rect.Height(),
+		PATCOPY);
+	pDC->SelectObject(backBrush);
+	return TRUE;
 	return CTreeCtrl::OnEraseBkgnd(pDC);
 }
 
@@ -167,7 +182,7 @@ void CSCTreeCtrl::OnPaint()
 	int		tab_count = 0;
 	int		image_count = 0;
 	int		image_index = -1, image_selected_index = -1;
-	CRect	rRow, rItem;
+	CRect	rItem[5];
 	CString label;
 
 	if (!m_is_shell_treectrl && m_use_own_imagelist)
@@ -178,46 +193,36 @@ void CSCTreeCtrl::OnPaint()
 
 	while (hItem)
 	{
-		GetItemRect(hItem, rRow, FALSE);
+		crText = m_crText;
+
+		//GetItemRect(hItem, rRow, FALSE);
+		get_item_rect(hItem, rItem);
+		label = GetItemText(hItem);
 
 		//배경색을 그려주고
 		if (GetItemState(hItem, TVIS_SELECTED) & TVIS_SELECTED)
 		{
 			dc.SetTextColor(red);
 
-			//포커스에 따라 다르다.
-			if (GetFocus() == this)
+			//포커스에 따라 다르다. 단, 편집중일때도 CEdit이 focus를 가지게 되는데 inactive 색상 대신 원래의 선택배경색을 그대로 사용하자.
+			if (GetFocus() == this || m_in_editing)
 			{
 				crText = m_crTextSelected;
-				DrawRectangle(&dc, rRow, m_crSelectedBorder, m_crBackSelected);
+				DrawRectangle(&dc, (GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_crSelectedBorder, m_crBackSelected);
 			}
 			else if (GetStyle() & TVS_SHOWSELALWAYS)
 			{
 				crText = m_crTextSelectedInactive;
-				dc.FillSolidRect(rRow, m_crBackSelectedInactive);
+				dc.FillSolidRect((GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_crBackSelectedInactive);
 			}
 		}
-		else
-		{
-			dc.SetTextColor(m_crText);
-		}
 
-		//label영역의 left는 margin, button, checkbox, icon 유무에 관계없이 동일하게 리턴된다.
-		//Lines at Root에 대해서만 자동 반영된다. false일 경우는 2, true일 경우는 22.
-		GetItemRect(hItem, rItem, TRUE);
-		rItem.left = 2;
-		rItem.right = rc.right - 1;
-
-		rItem.left += (tab_count * m_indent_size);
-
-		label = GetItemText(hItem);
-		//Trace(_T("%s, rItem.left = %d\n"), label, rItem.left);
 
 		//확장버튼을 그려주고
-		if (GetStyle() & TVS_HASBUTTONS)
+		if (rItem[rect_button].Width() > 0)//GetStyle() & TVS_HASBUTTONS)
 		{
 			//SetItemHeight() 또는 m_image_size가 16이 아니어도 확장버튼의 크기는 동일해야 한다.
-			CRect expand_rect = makeCenterRect(rItem.left + 16 / 2, rItem.CenterPoint().y, 16, 16);
+			CRect expand_rect = makeCenterRect(rItem[rect_button].left + 16 / 2 - 1, rItem[rect_button].CenterPoint().y, 16, 16);
 			expand_rect.DeflateRect(4, 4, 3, 3);
 
 			if (ItemHasChildren(hItem))
@@ -238,27 +243,19 @@ void CSCTreeCtrl::OnPaint()
 					DrawLine(&dc, expand_rect.CenterPoint().x, expand_rect.top - 1, expand_rect.CenterPoint().x, expand_rect.bottom, GRAY(128));
 				}
 			}
-
-			//child 유무와 관계없이 너비만큼 left를 이동시켜준다.
-			rItem.left += 16;
 		}
 
 		//체크박스를 그려주고
-		if (GetStyle() & TVS_CHECKBOXES)
+		if (rItem[rect_check].Width() > 0)//GetStyle() & TVS_CHECKBOXES)
 		{
 			//체크박스도 그 크기는 16으로 동일하다.
-			CRect rCheck = makeCenterRect(rItem.left + 16 / 2, rItem.CenterPoint().y, 16, 16);
+			CRect rCheck = makeCenterRect(rItem[rect_check].left + 16 / 2, rItem[rect_check].CenterPoint().y, 16, 16);
 			rCheck.DeflateRect(2, 2, 2, 2);
 
 #if 1
 			draw_checkbox(&dc, rCheck, GetCheck(hItem));
 #else
 			DrawRectangle(&dc, rCheck, GRAY128, white);
-
-			/*
-			dc.SetTextColor(GRAY64);
-			dc.DrawText(GetCheck(hItem) ? _T("√") : _T(""), rCheck, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
-			*/
 
 			//3D border가 그려져서 별로다. <uxtheme.h>를 이용하여 윈도우에서 기본 제공하는 모습으로 표시 가능하나
 			//우선 gdiplus로 직접 그려준다.
@@ -271,7 +268,6 @@ void CSCTreeCtrl::OnPaint()
 				g.DrawLine(&pen, rCheck.left + 4, rCheck.CenterPoint().y + 3, rCheck.right - 2, rCheck.top + 2);
 			}
 #endif
-			rItem.left += 16;
 		}
 
 		//아이콘을 그려주고
@@ -280,23 +276,20 @@ void CSCTreeCtrl::OnPaint()
 			GetItemImage(hItem, image_index, image_selected_index);
 			image_index = m_pShellImageList->GetSystemImageListIcon(get_fullpath(GetSelectedItem()), true);
 			m_pShellImageList->m_imagelist_small.Draw(&dc, image_index,
-				CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
+				CPoint(rItem[rect_icon].left, rItem[rect_icon].CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 		}
 		else if (m_use_own_imagelist && m_imagelist.GetSafeHandle() && (image_index < m_imagelist.GetImageCount()))
 		{
 			GetItemImage(hItem, image_index, image_selected_index);
 			if (image_index >= 0 && image_index < image_count)
 			{
-				m_imagelist.Draw(&dc, image_index, CPoint(rItem.left, rItem.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
-				rItem.left += m_image_size;
+				m_imagelist.Draw(&dc, image_index, CPoint(rItem[rect_icon].left, rItem[rect_icon].CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
+				rItem[rect_icon].left += m_image_size;
 			}
 		}
 
-		//레이블을 4픽셀 만큼 띠워서 출력한다.
-		//이 값은 get_item_rect()에서도 동일하게 계산해줘야 한다.
-		rItem.left += 4;
 		dc.SetTextColor(crText);
-		dc.DrawText(label, rItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+		dc.DrawText(label, rItem[rect_label], DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
 		//현재 노드가 EXPAND 상태이고 child가 존재한다면 child로 이동
 		if (get_item_state(hItem, TVIS_EXPANDED) && ItemHasChildren(hItem))
@@ -434,16 +427,154 @@ void CSCTreeCtrl::OnPaint()
 }
 
 
-void CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
+/*
+void CSCTreeCtrl::OnPaint()
+{
+	CPaintDC dc(this); // device context for painting
+
+	CRect rcClip, rcClient;
+	dc.GetClipBox(&rcClip);
+	GetClientRect(&rcClient);
+
+	// Set clip region to be same as that in paint DC
+	CRgn rgn;
+	rgn.CreateRectRgnIndirect(&rcClip);
+	dc.SelectClipRgn(&rgn);
+	rgn.DeleteObject();
+
+	//COLORREF m_wndColor = m_crBack;// GetSysColor(COLOR_WINDOW);
+
+	dc.SetViewportOrg(0, 0);
+	//dc.SetTextColor(m_wndColor);
+
+	// First let the control do its default drawing.
+	CWnd::DefWindowProc(WM_PAINT, (WPARAM)dc.m_hDC, 0);
+
+	HTREEITEM hItem = GetFirstVisibleItem();
+	int n = GetVisibleCount();
+
+	// the most urgent thing is to erase the labels that were drawn by the tree
+	while (hItem != NULL && n >= 0)
+	{
+		CRect rect;
+		GetItemRect(hItem, &rect, TRUE);
+
+		//dc.FillSolidRect(rect, RGB(255, 0, 0));// m_crBack);
+		hItem = GetNextVisibleItem(hItem);
+		n--;
+	}
+
+	// create the font
+	CFont* pFontDC;
+	CFont fontDC, boldFontDC;
+	LOGFONT logfont;
+
+	CFont* pFont = GetFont();
+	pFont->GetLogFont(&logfont);
+
+	fontDC.CreateFontIndirect(&logfont);
+	pFontDC = dc.SelectObject(&fontDC);
+
+	logfont.lfWeight = 700;
+	boldFontDC.CreateFontIndirect(&logfont);
+
+	// and now let's get to the painting itself
+	UINT nDrawFormat = DT_CENTER;
+
+	BOOL bFoundSpl = FALSE;
+	int m_nSplIndex = 0;
+
+	hItem = GetFirstVisibleItem();
+	n = GetVisibleCount();
+	while (hItem != NULL && n >= 0)
+	{
+		CRect rect;
+
+		BOOL bBold = (GetParentItem(hItem) == NULL);
+		BOOL bSplColor = FALSE;
+		if (bBold && !bFoundSpl && m_nSplIndex >= 0)
+		{
+			HTREEITEM hTmpItem = GetRootItem();
+			int index = 0;
+			while (hTmpItem != NULL)
+			{
+				if (index == m_nSplIndex && hTmpItem == hItem)
+				{
+					bFoundSpl = TRUE;
+					bSplColor = TRUE;
+				}
+				hTmpItem = GetNextSiblingItem(hTmpItem);
+				index++;
+			}
+		}
+
+		UINT selflag = TVIS_DROPHILITED | TVIS_SELECTED;
+
+		if (!(GetItemState(hItem, selflag) & selflag))
+		{
+			dc.SetBkMode(TRANSPARENT);
+
+			CString text = GetItemText(hItem);
+			GetItemRect(hItem, &rect, TRUE);
+
+
+			//dc.SetBkColor(m_crBack);
+			dc.SetTextColor(bSplColor ? RGB(255, 0, 0) : RGB(0, 0, 255));//m_crText);
+
+			if (bBold)
+				dc.SelectObject(&boldFontDC);
+
+			dc.DrawText(text, rect, nDrawFormat);
+
+			if (bBold)
+				dc.SelectObject(&fontDC);
+			//dc.SetTextColor(::GetSysColor(COLOR_WINDOWTEXT));
+		}
+		else
+		{
+			GetItemRect(hItem, &rect, TRUE);
+
+			COLORREF m_highlightColor = m_crBackSelected;// ::GetSysColor(COLOR_HIGHLIGHT);
+			CBrush brush(m_highlightColor);
+
+			//dc.FillRect(rect, &brush);
+
+			// draw a dotted focus rectangle
+			dc.DrawFocusRect(rect);
+
+			CString text = GetItemText(hItem);
+
+			//dc.SetBkColor(m_highlightColor);
+			dc.SetTextColor(m_crTextSelected);// ::GetSysColor(COLOR_HIGHLIGHTTEXT));
+
+			if (bBold)
+				dc.SelectObject(&boldFontDC);
+
+			dc.DrawText(text, rect, nDrawFormat);
+
+			if (bBold)
+				dc.SelectObject(&fontDC);
+		}
+
+		hItem = GetNextVisibleItem(hItem);
+		n--;
+	}
+
+	dc.SelectObject(pFontDC);
+}
+*/
+BOOL CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	HWND hWnd = GetParent()->GetSafeHwnd();
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
-				(WPARAM)&CSCTreeCtrlMessage(this, message_selchanged),
-				(LPARAM)&CString(get_fullpath(GetSelectedItem())));
+	//HWND hWnd = GetParent()->GetSafeHwnd();
+	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
+	//			(WPARAM)&CSCTreeCtrlMessage(this, message_selchanged),
+	//			(LPARAM)&CString(get_fullpath(GetSelectedItem())));
 
 	*pResult = 0;
+
+	return FALSE;
 }
 
 
@@ -473,6 +604,7 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 	for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
 		insert_drive(it->second);
 
+	SetItemHeight(24);
 	//std::thread t(&CSCTreeCtrl::thread_insert_folders, this, GetRootItem());
 	//t.detach();
 
@@ -667,12 +799,26 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	TRACE(_T("%s\n"), __function__);
+	HTREEITEM hItem = pNMTreeView->itemNew.hItem;
+	if (m_is_shell_treectrl)
+	{
+		//만약 child가 없다면 아직 로딩되지 않은 노드이므로 검색해서 추가한다.
+		//물론 실제 child가 없는 폴더일수도 있다.
+		if (GetChildItem(hItem) == NULL)
+			insert_folder(hItem, get_fullpath(hItem));
+
+		m_folder_list = iterate_tree_with_no_recursion();
+	}
+
 	*pResult = 0;
 }
 
 //check, has button등에 의해 HitTest가 알아서 해당 영역을 알려주리라 기대했으나
 //hit 영역을 정확히 리턴해주지 않는다.
 //button, check, text 영역을 내가 정해서 그려주고 이벤트도 수동으로 처리해주는 것이 나을듯하다.
+//이것을 수동으로 해보니 절대 정확히 알아낼 수 없다.
+//결국 OnPaint()에서 직접 그려주는 방법이 아닌 OnCustomDraw()로 전환함.
 BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	if (m_in_editing)
@@ -680,35 +826,76 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 		edit_end(true);
 	}
 
-#if 0
+	LPNMTVDISPINFO pTVDispInfo = reinterpret_cast<LPNMTVDISPINFO>(pNMHDR);
+
+	long t0 = clock();
+
 	CPoint pt;
-	UINT nFlags;
+	GetCursorPos(&pt);
+	ScreenToClient(&pt);
+	HTREEITEM hCurItem = HitTest(pt);
+	HTREEITEM hDispItem = pTVDispInfo->item.hItem;
+
+	CRect r;
+	GetItemRect(hCurItem, r, TRUE);
+
+	TRACE(_T("cur = %ld, last = %ld, m_last_clicked_item = %p, hCurItem = %p, hDispItem = %p\n"),
+		t0, m_last_clicked_time, m_last_clicked_item, hCurItem, hDispItem);
+
+	if (r.PtInRect(pt))
+	{
+		if ((t0 - m_last_clicked_time > 500) && (t0 - m_last_clicked_time < 2000))
+		{
+			if (hCurItem == m_last_clicked_item)
+			{
+				TRACE(_T("edit start\n"));
+				edit_item();
+			}
+			else
+			{
+				TRACE(_T("diff item\n"));
+				m_last_clicked_time = t0;
+				m_last_clicked_item = hCurItem;
+			}
+		}
+		else
+		{
+			TRACE(_T("time over\n"));
+			m_last_clicked_time = t0;
+			m_last_clicked_item = hCurItem;
+		}
+	}
+	else
+	{
+		m_last_clicked_time = 0;
+		m_last_clicked_item = NULL;
+		TRACE(_T("m_last_clicked_time = %ld\n"), m_last_clicked_time);
+	}
+
+	/*
+	CPoint pt;
 
 	GetCursorPos(&pt);
 	ScreenToClient(&pt);
 
-	HTREEITEM hItem = HitTest(pt, &nFlags);
 
-	TRACE(_T("nFlags = %d\n"), nFlags);
-	return TRUE;
-#else
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	UINT nFlags = 0;
 	CString str;
 	CString fullpath;
 
 	HTREEITEM hItem = hit_test(&nFlags);
-
-	fullpath = get_fullpath(hItem);
+	if (hItem == NULL)
+		return TRUE;
 
 	SelectItem(hItem);
 
 	//확장버튼을 누르면 (확장 단추 표시 속성이 TRUE일 경우에만 처리됨)
 	if (nFlags & TVHT_ONITEMBUTTON)
 	{
-		//TRACE(_T("button\n"));
-		nFlags = GetItemState(hItem, TVIF_STATE);
-		//TRACE(_T("expanded = %d\n"), nFlags & TVIS_EXPANDED);
+		nFlags = GetItemState(hItem, TVIS_EXPANDED);
+
+		TRACE(_T("[%s] expanded = %d\n"), GetItemText(hItem), nFlags & TVIS_EXPANDED);
 
 		if (m_is_shell_treectrl)
 		{
@@ -721,20 +908,21 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 		}
 		else
 		{
-			Expand(hItem, TVE_TOGGLE);
+			if (nFlags & TVIS_EXPANDED)
+				Expand(hItem, TVE_COLLAPSE);
+			else// if (nFlags & TVIS_EXPANDED)
+				Expand(hItem, TVE_EXPAND);
 		}
 	}
 	else if (nFlags & TVHT_ONITEMSTATEICON)
 	{
-		BOOL checked = GetCheck(hItem);
-		SetCheck(hItem, !checked);
+		//BOOL checked = GetCheck(hItem);
+		//SetCheck(hItem, !checked);
 	}
-
-	return TRUE;
-
+	*/
 	*pResult = 0;
 
-#endif
+	return FALSE;
 }
 
 CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
@@ -957,7 +1145,7 @@ void CSCTreeCtrl::expand_all(bool expand)
 		hItem = GetNextItem(hItem, TVGN_NEXTVISIBLE);
 	}
 }
-
+/*
 HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 {
 	CPoint pt;
@@ -967,74 +1155,44 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 
 	HTREEITEM hItem = HitTest(pt, nFlags);
 
-	CRect rc, r;
-	int label_width;
+	CRect r[5];
 
-	GetClientRect(rc);
-	GetItemRect(hItem, &r, TRUE);
-	label_width = r.Width();
+	get_item_rect(hItem, r);
 
-	if (pt.x < r.left)
-	{
-		*nFlags = TVHT_ONITEMINDENT;
-		TRACE(_T("hItem = %p, nFlags = %d (%s)\n"), hItem, *nFlags, ENUM_TO_CSTRING(TVHT_ONITEMINDENT));
-		return hItem;
-	}
-
-	r.right = rc.right - 1;
-
-	CRect button, check, icon;
-
-	if (GetStyle() & TVS_HASBUTTONS)
-	{
-		button = r;
-		button.right = button.left + 16;
-		r.left += 16;
-	}
-
-	if (GetStyle() & TVS_CHECKBOXES)
-	{
-		check = r;
-		check.right = check.left + 16;
-		r.left += 16;
-	}
-
-	if (m_is_shell_treectrl || (m_imagelist.GetSafeHandle() && m_imagelist.GetImageCount()))
-	{
-		icon = r;
-		icon.right = icon.left + m_image_size;
-		r.left += m_image_size;
-	}
-
-	if (button.PtInRect(pt))
+	if ((GetStyle() & TVS_HASBUTTONS) && r[rect_button].PtInRect(pt))
 	{
 		*nFlags = TVHT_ONITEMBUTTON;
 		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMBUTTON));
 	}
-	else if (check.PtInRect(pt))
+	else if ((GetStyle() & TVS_CHECKBOXES) && r[rect_check].PtInRect(pt))
 	{
 		*nFlags = TVHT_ONITEMSTATEICON;
 		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMSTATEICON));
 	}
-	else if (icon.PtInRect(pt))
+	else if (r[rect_icon].PtInRect(pt))
 	{
 		*nFlags = TVHT_ONITEMICON;
 		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMICON));
 	}
-	else if (pt.x > r.left && pt.x <= r.left + label_width)
+	else if (r[rect_label].PtInRect(pt))
 	{
 		*nFlags = TVHT_ONITEMLABEL;
 		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMLABEL));
 	}
-	else
+	else if (pt.x > r[rect_label].right)
 	{
 		*nFlags = TVHT_ONITEMRIGHT;
 		TRACE(_T("hItem = %p, nFlags = %s\n"), hItem, ENUM_TO_CSTRING(TVHT_ONITEMRIGHT));
 	}
+	else
+	{
+		*nFlags = TVHT_ONITEMINDENT;
+		TRACE(_T("hItem = %p, nFlags = %d (%s)\n"), hItem, *nFlags, ENUM_TO_CSTRING(TVHT_ONITEMINDENT));
+	}
 
 	return hItem;
 }
-
+*/
 //해당 state인지 판별(ex. TVIS_EXPAND)
 bool CSCTreeCtrl::get_item_state(HTREEITEM hItem, UINT state)
 {
@@ -1051,58 +1209,66 @@ void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 		m_crText = ::GetSysColor(COLOR_BTNTEXT);
 		m_crTextSelected = m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
 		m_crTextSelectedInactive = m_crText;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_crTextDropHilited = m_crText;
+		m_crTextDropHilited = ::GetSysColor(COLOR_HIGHLIGHTTEXT);;
 		m_crBack = ::GetSysColor(COLOR_WINDOW);
 		m_crBackSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBackDropHilited = m_crBackSelected;
+		m_crBackDropHilited = ::GetSysColor(COLOR_HIGHLIGHT);
 		m_crSelectedBorder = RGB(153, 209, 255);
 		break;
 	case color_theme_light_blue:
 		m_crText = ::GetSysColor(COLOR_BTNTEXT);
 		m_crTextSelected = RGB(65, 102, 146);
 		m_crTextSelectedInactive = RGB(65, 102, 146);
-		m_crTextDropHilited = m_crText;
+		m_crTextDropHilited = get_color(m_crText, -48);
 		m_crBack = RGB(193, 219, 252);
 		m_crBackSelected = get_color(m_crBack, -48);
 		m_crBackSelectedInactive = get_color(m_crBack, -48);
-		m_crBackDropHilited = m_crBackSelected;
+		m_crBackDropHilited = get_color(m_crBack, -48);;
 		m_crSelectedBorder = RGB(153, 209, 255);
 		break;
 	case color_theme_navy_blue:
 		m_crText = RGB(204, 216, 225);
 		m_crTextSelected = RGB(234, 246, 255);
 		m_crTextSelectedInactive = RGB(105, 142, 186);
+		m_crTextDropHilited = get_color(m_crText, 48);
 		m_crBack = RGB(74, 94, 127);
 		m_crBackSelected = RGB(15, 36, 41);
 		m_crBackSelectedInactive = RGB(15, 36, 41);
+		m_crBackDropHilited = get_color(m_crBack, 48);
 		m_crSelectedBorder = RGB(153, 209, 255);
 		break;
 	case color_theme_dark_blue:
 		m_crText = RGB(16, 177, 224);
 		m_crTextSelected = RGB(224, 180, 59);
 		m_crTextSelectedInactive = RGB(105, 142, 186);
+		m_crTextDropHilited = get_color(m_crText, 48);
 		m_crBack = RGB(2, 21, 36);
 		m_crBackSelected = RGB(3, 42, 59);
 		m_crBackSelectedInactive = RGB(15, 36, 41);
+		m_crBackDropHilited = blue;
 		m_crSelectedBorder = RGB(153, 209, 255);
 		break;
 	case color_theme_dark_gray:
 		m_crText = RGB(164, 164, 164);
 		m_crTextSelected = RGB(241, 241, 241);
 		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
+		m_crTextDropHilited = get_color(m_crText, 255);
 		m_crBack = RGB(64, 64, 64);
 		m_crBackSelected = get_color(m_crBack, -32);
 		m_crBackSelectedInactive = get_color(m_crBack, -32);
+		m_crBackDropHilited = blue;
 		m_crSelectedBorder = RGB(128, 128, 128);
 		break;
 	case color_theme_dark:
 		m_crText = RGB(212, 212, 212);
 		m_crTextSelected = RGB(241, 241, 241);
 		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
+		m_crTextDropHilited = white;
 		m_crBack = RGB(37, 37, 38);
-		m_crBackSelected = get_color(m_crBack, -32);
-		m_crBackSelectedInactive = get_color(m_crBack, -32);
+		m_crBackSelected = RGB(0, 120, 215);
+		m_crBackSelectedInactive = RGB(0, 120, 215);
+		m_crBackDropHilited = blue;
 		m_crSelectedBorder = m_crBackSelected;// RGB(128, 128, 128);
 		break;
 	}
@@ -1115,6 +1281,7 @@ void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	/*
 	CPoint pt;
 	UINT nFlags = 0;
 
@@ -1142,7 +1309,7 @@ void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 			}
 		}
 	}
-
+	*/
 	*pResult = 0;
 }
 
@@ -1309,6 +1476,10 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
 			DroppedHandler(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
 		}
+	}
+	else
+	{
+		return;
 	}
 
 	CTreeCtrl::OnLButtonUp(nFlags, point);
@@ -1567,11 +1738,18 @@ void CSCTreeCtrl::create_imagelist()
 
 	if (m_image_size < 0)
 		m_image_size = 16;
+
+	//SetImageList(NULL, TVSIL_NORMAL);
+
 	m_imagelist.DeleteImageList();
 	m_imagelist.Create(m_image_size, m_image_size, ILC_COLOR32 | ILC_MASK, 0, 1);
 
 	for (int i = 0; i < m_image_IDs.size(); i++)
 		m_imagelist.Add(AfxGetApp()->LoadIcon(m_image_IDs[i]));
+
+	SetImageList(&m_imagelist, TVSIL_NORMAL);
+	
+	SetItemHeight(MAX(m_image_size, -m_lf.lfHeight));
 
 	Invalidate();
 }
@@ -1587,7 +1765,6 @@ void CSCTreeCtrl::set_use_own_imagelist(bool use, int image_size)
 		create_imagelist();
 	}
 
-	SetItemHeight(MAX(16 + 2, m_image_size + 2));
 	Invalidate();
 }
 
@@ -1854,26 +2031,36 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	m_edit_item = hItem;
 	m_edit_old_text = GetItemText(hItem);
+	m_last_clicked_item = NULL;
+	m_last_clicked_time = 0;
 
 	//편집 사각형의 right는 레이블 너비보다 좀 더 넉넉하게 준다. 단, rc.right를 넘어가서는 안된다.
 	CRect rc;
-	CRect r = get_item_rect(hItem);
+	CRect r;
+	//get_item_rect(hItem, r);
+	GetItemRect(hItem, r, TRUE);
+
+
+	//label영역은 실제 텍스트 너비보다 24픽셀 더 크게 잡아준다.(윈도우 탐색기와 동일)
 	r.right += 24;
+
+	//단, 그 오른쪽 끝이 rc.right를 넘어가지 않게 보정한다.
 	GetClientRect(rc);
 	if (r.right > rc.right - 1)
 		r.right = rc.right - 1;
 
+	r.DeflateRect(1, 0);
+
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CEdit;
-		m_pEdit->Create(/*WS_BORDER | */WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
+		m_pEdit->Create(WS_CHILD | /*WS_BORDER | */WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
 	}
 	else
 	{
-		m_pEdit->MoveWindow(r);
-		m_pEdit->ShowWindow(SW_SHOW);
 	}
 
+	m_pEdit->MoveWindow(r);
 	m_pEdit->SetFont(&m_font, true);
 
 	//ES_MULTILINE을 준 이유는 editbox가 세로 중앙정렬되어 표시되지 않으므로
@@ -1882,14 +2069,15 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	LOGFONT lf;
 
 	m_pEdit->GetClientRect(new_rect);
-	new_rect.DeflateRect(0, 1);
 	new_rect.right += 4;
 
 	m_pEdit->GetFont()->GetLogFont(&lf);
-	new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 2;
+	new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 1;
 	m_pEdit->SetRect(&new_rect);
 
 	m_pEdit->SetWindowText(m_edit_old_text);
+
+	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetSel(0, -1);
 	m_pEdit->SetFocus();
 
@@ -1910,15 +2098,25 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 void CSCTreeCtrl::edit_end(bool valid)
 {
-	if (m_in_editing == false)
+	if (m_in_editing == false || m_pEdit == NULL)
 		return;
 
 	//편집 후 Enter키 또는 리스트의 다른곳을 클릭하여 편집을 종료할 때
 	//변경된 text를 변경할 지 아닐지는 mainDlg에게 맡겨야 한다.
 	//여기서는 편집모드만 종료시켜준다.
 	m_in_editing = false;
+	
+	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
+	
+	CRect r;
+	GetItemRect(m_edit_item, r, FALSE);
+	Invalidate();
 
+	if (m_edit_old_text == m_edit_new_text)
+		return;
+
+	//실제 변경된 텍스트로 해당 아이템의 레이블을 변경하는 것은 main에 맞겨야 한다.
 	if (valid)
 	{
 		TV_DISPINFO dispinfo;
@@ -1926,7 +2124,7 @@ void CSCTreeCtrl::edit_end(bool valid)
 		dispinfo.hdr.idFrom = GetDlgCtrlID();
 		dispinfo.hdr.code = TVN_ENDLABELEDIT;
 
-		dispinfo.item.mask = LVIF_TEXT;
+		dispinfo.item.mask = TVIF_TEXT;
 		dispinfo.item.hItem = m_edit_item;
 		//dispinfo.item.pszText = bEscape ? NULL : LPTSTR((LPCTSTR)Text);
 		//dispinfo.item.cchTextMax = Text.GetLength();
@@ -1938,13 +2136,13 @@ void CSCTreeCtrl::edit_end(bool valid)
 }
 
 //custom draw일 경우는 직접 계산해야 한다?
-CRect CSCTreeCtrl::get_item_rect(HTREEITEM hItem)
+void CSCTreeCtrl::get_item_rect(HTREEITEM hItem, CRect r[])
 {
-	CRect rc, r;
+	CRect rc, temp, row;
 	int label_width;
 
 	GetClientRect(rc);
-	GetItemRect(hItem, &r, FALSE);
+	GetItemRect(hItem, &row, FALSE);
 
 	CFont font;
 	CFont* pOldFont;
@@ -1955,8 +2153,11 @@ CRect CSCTreeCtrl::get_item_rect(HTREEITEM hItem)
 	CSize sz = dc.GetTextExtent(GetItemText(hItem));
 	dc.SelectObject(pOldFont);
 
-	r.right = rc.right - 1;
+	temp = row;
+	temp.right = rc.right - 1;
+	r[rect_row] = temp;
 
+	//indent 적용
 	int total_indent = 0;
 	HTREEITEM hParent = hItem;
 	while (hParent)
@@ -1965,42 +2166,58 @@ CRect CSCTreeCtrl::get_item_rect(HTREEITEM hItem)
 		hParent = GetParentItem(hParent);
 	}
 
-	r.left = total_indent - m_indent_size;
+	temp.left = total_indent - m_indent_size;
 
-	CRect button, check, icon, label;
 
 	if (GetStyle() & TVS_HASBUTTONS)
 	{
-		button = r;
-		button.right = button.left + 16;
-		r.left += 16;
+		r[rect_button] = temp;
+		r[rect_button].right = r[rect_button].left + 16;
+		temp.left += 16;
 	}
 
 	if (GetStyle() & TVS_CHECKBOXES)
 	{
-		check = r;
-		check.right = check.left + 16;
-		r.left += 16;
+		r[rect_check] = temp;
+		r[rect_check].right = r[rect_check].left + 16;
+		temp.left += 16;
 	}
 
 	if (m_is_shell_treectrl || (m_imagelist.GetSafeHandle() && m_imagelist.GetImageCount()))
 	{
-		icon = r;
-		icon.right = icon.left + m_image_size;
-		r.left += m_image_size;
+		r[rect_icon] = temp;
+		r[rect_icon].right = r[rect_icon].left + m_image_size;
+		temp.left += m_image_size;
 	}
 
-	label = r;
-	label.left += 4;
-	label.right = label.left + sz.cx + 8;
+	r[rect_label] = temp;
+	r[rect_label].left += 4;
+	r[rect_label].right = r[rect_label].left + sz.cx + 8;
 
-	TRACE(_T("button = %s, check = %s, icon = %s, label = %s\n"),
-		get_rect_info_string(button),
-		get_rect_info_string(check),
-		get_rect_info_string(icon),
-		get_rect_info_string(label));
+	//영역 확인용 코드
+	if (m_show_area)
+	{
+		Trace(_T("\nrow = %s\nbutton = %s\ncheck = %s\nicon = %s\nlabel = %s\n"),
+			get_rect_info_string(r[rect_row]),
+			get_rect_info_string(r[rect_button]),
+			get_rect_info_string(r[rect_check]),
+			get_rect_info_string(r[rect_icon]),
+			get_rect_info_string(r[rect_label]));
 
-	return label;
+		DrawRectangle(&dc, r[rect_button], red);
+		DrawRectangle(&dc, r[rect_check], skyblue);
+		DrawRectangle(&dc, r[rect_icon], orange);
+		DrawRectangle(&dc, r[rect_label], cyan);
+	}
+}
+
+void CSCTreeCtrl::set_log_font(LOGFONT lf)
+{
+	if (_tcslen(lf.lfFaceName) == 0)
+		return;
+
+	memcpy(&m_lf, &lf, sizeof(LOGFONT));
+	reconstruct_font();
 }
 
 int CSCTreeCtrl::get_font_size()
@@ -2029,4 +2246,155 @@ void CSCTreeCtrl::enlarge_font_size(bool enlarge)
 	enlarge ? m_font_size++ : m_font_size--;
 	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
 	reconstruct_font();
+}
+
+
+void CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	/*
+	UINT nFlags = GetItemState(pNMTreeView->itemNew.hItem, TVIS_EXPANDED);
+
+	TRACE(_T("[%s] expanded = %d\n"), GetItemText(pNMTreeView->itemNew.hItem), nFlags & TVIS_EXPANDED);
+
+	if (nFlags & TVIS_EXPANDED)
+		Expand(pNMTreeView->itemNew.hItem, TVE_COLLAPSE);
+	else// if (nFlags & TVIS_EXPANDED)
+		Expand(pNMTreeView->itemNew.hItem, TVE_EXPAND);
+	*/
+	*pResult = 0;
+}
+
+void CSCTreeCtrl::full_row_selection(bool full_row)
+{
+	ModifyStyle(full_row ? 0 : TVS_FULLROWSELECT, full_row ? TVS_FULLROWSELECT : 0, 0);
+	if (GetStyle() & TVS_FULLROWSELECT)
+		TRACE(_T("full row\n"));
+	else
+		TRACE(_T("no full row\n"));
+}
+
+void CSCTreeCtrl::has_line(bool line)
+{
+	ModifyStyle(line ? 0 : TVS_HASLINES, line ? TVS_HASLINES : 0, 0);
+}
+
+
+void CSCTreeCtrl::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	LPNMCUSTOMDRAW pNMCustomDraw = (LPNMCUSTOMDRAW)pNMHDR;
+	LPNMTVCUSTOMDRAW pNMTVCustomDraw = (LPNMTVCUSTOMDRAW)pNMHDR;
+	HTREEITEM hItem = (HTREEITEM)pNMCustomDraw->dwItemSpec;
+	*pResult = CDRF_DODEFAULT;
+
+	CDC dc;
+	dc.Attach(pNMCustomDraw->hdc);
+
+	CRect rtemp, rcItem;
+	switch (pNMCustomDraw->dwDrawStage)
+	{
+		case CDDS_PREPAINT:
+			*pResult = (CDRF_NOTIFYPOSTPAINT | CDRF_NOTIFYITEMDRAW);
+			break;
+
+		case CDDS_ITEMPREPAINT:
+			rcItem = pNMCustomDraw->rc;
+			GetItemRect(hItem, &rtemp, TRUE);
+			if (rcItem.IsRectEmpty())
+			{
+				*pResult = CDRF_DODEFAULT;
+				break;
+			}
+
+			*pResult = CDRF_NOTIFYPOSTPAINT;
+			break;
+
+		case CDDS_ITEMPOSTPAINT:
+		{
+			GetItemRect(hItem, &rcItem, TRUE);
+
+			COLORREF crText = m_crText;
+			COLORREF crBack = m_crBack;
+
+			int nOldBkMode = dc.SetBkMode(TRANSPARENT);
+
+			if (pNMCustomDraw->uItemState & CDIS_HOT)
+			{
+				TRACE(_T("CDIS_HOT\n"));
+				crText = m_crTextDropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
+				crBack = m_crBackDropHilited;
+			}
+			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
+			else if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
+			{
+				TRACE(_T("CDIS_DROPHILITED\n"));
+				crText = m_crTextDropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
+				crBack = m_crBackDropHilited;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_FOCUS)
+			{
+				TRACE(_T("CDIS_FOCUS\n"));
+				crText = m_crTextSelected;
+				crBack = m_crBackSelected;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			{
+				TRACE(_T("CDIS_SELECTED\n"));
+				crText = m_crTextSelected;
+				crBack = m_crBackSelected;
+			}
+
+			dc.SetTextColor(crText);
+			dc.FillSolidRect(&rcItem, crBack);
+
+			/*
+			switch (pIData->level)
+			{
+			case 0:
+			case 1:
+				hOldFont = (HFONT)dc.SelectObject(pMainWnd->m_fontBold);
+				break;
+			default:
+				hOldFont = (HFONT)dc.SelectObject(pMainWnd->m_fontRegular);
+				break;
+			}
+			*/
+
+			//CRect rIcon = rcItem;
+			////rIcon.left = rcItem.left - m_image_size;
+			//rIcon.right = rIcon.left + m_image_size;// VSLC_TREEVIEW_ICON_WIDTH;
+			//m_imagelist.Draw(&dc, 0, CPoint(rIcon.CenterPoint().x - m_image_size / 2, rIcon.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
+
+			CRect rText = rcItem;
+			//CSize szText = dc.GetTextExtent(GetItemText(hItem));
+			//rText.OffsetRect(m_image_size, 0);
+			//rText.right = rText.left + szText.cx;
+
+			dc.DrawText(GetItemText(hItem), &rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+			//dc.DrawText(GetItemText(hItem), &rcItem, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+			/*
+			for (int j = 0; j < m_ImageInfo.GetCount(); j++)
+			{
+				if (pIData->eStStyle & m_ImageInfo.GetAt(m_ImageInfo.FindIndex(j))->eKind)
+				{
+					m_ImageList->Draw(&dc, j, rcIcon.TopLeft(), ILD_TRANSPARENT);
+					rcIcon.left = rcIcon.right;
+					rcIcon.right = rcIcon.right + VSLC_TREEVIEW_ICON_WIDTH;
+				}
+			}
+			*/
+
+			//dc.SelectObject(hOldFont);
+			break;
+		}
+	}
+
+	dc.Detach();
+
+	//*pResult = 0;
 }

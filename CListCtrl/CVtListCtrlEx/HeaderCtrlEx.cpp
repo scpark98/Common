@@ -440,7 +440,7 @@ void CHeaderCtrlEx::set_header_height(int height)
 	//Invalidate();
 	//RedrawWindow();
 	//UpdateWindow();
-	SendMessage(HDM_LAYOUT, 0, (LPARAM)&m_HDLayout);
+	//SendMessage(HDM_LAYOUT, 0, (LPARAM)&m_HDLayout);
 	/*
 	//=> CFont를 생성하여 SetFont()하면 된다?
 	CDC* pDC = GetDC();

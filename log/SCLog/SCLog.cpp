@@ -242,7 +242,7 @@ CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 				_ftprintf(m_fp, _T("%s\n"), result);
 				TRACE(_T("%s\n"), result);
 			}
-			fflush(m_fp);
+ 			fflush(m_fp);
 		}
 
 		release();

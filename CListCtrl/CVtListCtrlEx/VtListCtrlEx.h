@@ -4,6 +4,7 @@
 #include <Afxwin.h>
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
+#include "../../GdiplusBitmap.h"
 #include "../../Functions.h"
 #include "../../system/ShellImageList/ShellImageList.h"
 
@@ -282,8 +283,14 @@ public:
 	void		select_item(int index, bool select = true, bool after_unselect = false);
 	void		unselect_selected_item();
 
-	//drag 도중에 마우스가 다른 앱 영역으로 나갈 경우 drophilited 상태의 아이템이 남는 버그를 제거하기 위해.
-	int			get_drop_hilited_items(std::deque<int>* dq);
+	//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
+	//LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
+	//drag 도중에 마우스가 다른 앱 영역으로 나가서 WM_LBUTTONUP 될 경우 drophilited 상태로 아이템이 남는 문제를 제거하기 위해.
+	int			get_items_state(UINT state, std::deque<int>* dq = NULL);
+	//dq 목록의 아이템들의 state 세팅. dq가 null이면 모든 항목에 대해 실행
+	//선택 : set_items_state(LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED, dq);
+	//해제 : set_items_state(0, LVIS_SELECTED|LVIS_FOCUSED, dq);
+	int			set_items_state(UINT state, UINT mask, std::deque<int>* dq = NULL);
 
 //검색 관련
 	//0번 컬럼에서만 데이터를 찾는다.
@@ -460,6 +467,7 @@ public:
 	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
 	int				get_drop_index() { return m_nDropIndex; }
+	void			capture_selected_items_to_bitmap(CGdiplusBitmap* bmp);
 
 protected:
 

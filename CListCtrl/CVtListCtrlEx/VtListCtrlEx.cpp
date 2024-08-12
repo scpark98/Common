@@ -8,7 +8,7 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../GdiPlusBitmap.h"
+//#include "../../GdiPlusBitmap.h"
 #include "EditCell.h"
 #include <afxvslistbox.h>
 
@@ -2148,6 +2148,50 @@ void CVtListCtrlEx::unselect_selected_item()
 		select_item(dqSelected[i], false);
 }
 
+//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
+//LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
+//drag 도중에 마우스가 다른 앱 영역으로 나가서 WM_LBUTTONUP 될 경우 drophilited 상태로 아이템이 남는 문제를 제거하기 위해.
+int CVtListCtrlEx::get_items_state(UINT state, std::deque<int>* dq)
+{
+	std::deque<int> items;
+
+	for (int i = 0; i < size(); i++)
+	{
+		if (GetItemState(i, state) & state)
+			items.push_back(i);
+	}
+
+	if (dq != NULL)
+		dq->assign(items.begin(), items.end());
+
+	return items.size();
+}
+
+//dq 목록의 아이템들의 state 세팅. dq가 null이면 모든 항목에 대해 실행
+//선택 : set_items_state(LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED, dq);
+//해제 : set_items_state(0, LVIS_SELECTED|LVIS_FOCUSED, dq);
+int CVtListCtrlEx::set_items_state(UINT state, UINT mask, std::deque<int>* dq)
+{
+	//모든 항목에 대해 수행
+	if (dq == NULL)
+	{
+		for (int i = 0; i < size(); i++)
+		{
+			SetItemState(i, state, mask);
+		}
+	}
+	//해당 항목들에 대해 수행
+	else
+	{
+		for (int i = 0; i < dq->size(); i++)
+		{
+			SetItemState(dq->at(i), state, mask);
+		}
+	}
+	
+	return 0;
+}
+
 //0번 컬럼에서만 데이터를 찾는다.
 int CVtListCtrlEx::find_string(CString str, int start, bool bWholeWord, bool bCaseSensitive)
 {
@@ -3317,22 +3361,25 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	CPoint pt;
 	int nOffset = -10; //offset in pixels for drag image (positive is up and to the left; neg is down and to the right)
 
-	//CFont* pFontDefault = NULL;
-	//pFontDefault = new CFont();
-	//pFontDefault = this->GetFont(); //
-
 	//m_pDragImage = CreateDragImageEx(this, &pt);	<= 이 함수 안된다.
 
 	int sel_count = get_selected_items();
-	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
+	CGdiplusBitmap bmpRes;// (64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 	
-	if (m_drag_images_id.size() == 1)
+	//if (m_drag_images_id.size() == 1)
 		bmpRes.load(m_drag_images_id[0]);
-	else if (m_drag_images_id.size() > 1)
-		bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+	//else if (m_drag_images_id.size() > 1)
+	//	bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
 
 	bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(sel_count), 20, 2,
 					_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+
+	//예전 윈도우 탐색기처럼 선택된 항목들을 그대로 드래그 이미지로 사용하고자 구현했으나
+	//스크롤에 의해 선택항목들이 가려진 경우는 애매하므로 우선 스킵한다.
+	/*
+	CGdiplusBitmap bmpRes(10, 10, PixelFormat32bppARGB, Gdiplus::Color::Transparent);;
+	capture_selected_items_to_bitmap(&bmpRes);
+	*/
 
 	m_pDragImage = new CImageList();
 	m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
@@ -3425,8 +3472,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 			}
 			else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 			{
-				/*
 				CTreeCtrl* pTree = (CTreeCtrl*)m_pDropWnd;
+				pTree->SelectDropTarget(NULL);
+				/*
 				UINT uFlags;
 
 				HTREEITEM hItem = pTree->HitTest(pt, &uFlags);
@@ -3596,4 +3644,54 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	return FALSE;
 
 	*pResult = 0;
+}
+
+void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
+{
+	int i;
+	CRect r, rc;
+	CRect rTotal;
+	std::deque<int> dq;
+	std::deque<CRect> rItem;
+
+	GetClientRect(rc);
+	get_selected_items(&dq);
+
+	//선택 항목들의 합집합으로 최대 사각형을 구하고
+	for (i = 0; i < dq.size(); i++)
+	{
+		GetItemRect(dq[i], r, LVIR_LABEL);
+		//r.right = rc.right;
+		//if (RectInRect(rc, r))
+		{
+			rItem.push_back(r);
+			//ClientToScreen(r);
+
+			if (rTotal.IsRectNull())
+				rTotal = r;
+			else
+				rTotal.UnionRect(rTotal, r);
+
+
+		}
+	}
+
+	//if (rTotal.Height() > 48)
+	//	rTotal.bottom = rTotal.top + 48;
+
+	bmp->resize(rTotal.Width(), rTotal.Height());
+
+	CPoint offset(-rItem[0].left, -rItem[0].top);
+
+	//각 항목 영역을 캡처해서 bmp에 붙여준다.
+	for (i = 0; i < rItem.size(); i++)
+	{
+		r = rItem[i];
+		ClientToScreen(r);
+		HBITMAP hBitmap = capture_screen_to_bitmap(r);
+		CGdiplusBitmap sub(hBitmap);
+
+		rItem[i].OffsetRect(offset);
+		bmp->draw(&sub, &rItem[i]);
+	}
 }

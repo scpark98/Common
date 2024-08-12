@@ -658,6 +658,23 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
+//bmp 이미지를 현재 이미지의 targetRect에 그린다.
+CRect CGdiplusBitmap::draw(CGdiplusBitmap *bmp, CRect* targetRect)
+{
+	Gdiplus::Graphics g(m_pBitmap);
+
+	CRect dst(0, 0, bmp->width, bmp->height);
+
+	if (targetRect)
+	{
+		dst = *targetRect;
+	}
+
+	g.DrawImage(bmp->m_pBitmap, dst.left, dst.top, dst.Width(), dst.Height());
+
+	return dst;
+}
+
 CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode)
 {
 	CRect r;

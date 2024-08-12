@@ -153,6 +153,8 @@ public:
 	//해당 state인지 판별(ex. TVIS_EXPAND)
 	bool		get_item_state(HTREEITEM hItem, UINT state);
 
+	void		set_items_state(UINT state, UINT mask);
+
 	//컬러 관련
 	enum listctrlex_color_theme
 	{

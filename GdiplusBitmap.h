@@ -123,6 +123,9 @@ public:
 	CRect	draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 	CRect	draw(Gdiplus::Graphics& g, CGdiplusBitmap mask, CRect targetRect);
 
+	//bmp 이미지를 현재 이미지의 targetRect에 그린다.
+	CRect	draw(CGdiplusBitmap *bmp, CRect* targetRect = NULL);
+
 	enum GDIP_DRAW_MODE
 	{
 		draw_mode_zoom = 0,		//targetRect에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)

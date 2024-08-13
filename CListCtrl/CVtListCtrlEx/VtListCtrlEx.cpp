@@ -3069,14 +3069,14 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	if (m_path == get_system_label(CSIDL_DRIVES))
 	{
-		set_header_text(col_filesize, _T("사용 가능한 공간"));
-		set_header_text(col_filedate, _T("전체 크기"));
+		set_header_text(col_filesize, GetUserDefaultUILanguage() == 1042 ? _T("사용 가능한 공간") : _T("Free Space"));
+		set_header_text(col_filedate, GetUserDefaultUILanguage() == 1042 ? _T("전체 크기") : _T("Total Size"));
 		set_column_text_align(col_filedate, LVCFMT_RIGHT);
 	}
 	else
 	{
-		set_header_text(col_filesize, _T("크기"));
-		set_header_text(col_filedate, _T("수정한 날짜"));
+		set_header_text(col_filesize, GetUserDefaultUILanguage() == 1042 ? _T("크기") : _T("Size"));
+		set_header_text(col_filedate, GetUserDefaultUILanguage() == 1042 ? _T("수정한 날짜") : _T("Date modified"));
 		set_column_text_align(col_filedate, LVCFMT_LEFT);
 	}
 

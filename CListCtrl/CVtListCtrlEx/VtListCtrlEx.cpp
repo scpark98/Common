@@ -2965,9 +2965,12 @@ void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
 	m_is_shell_listctrl_local = is_local;
 	m_use_own_imagelist = true;
 
-	set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
+	if (GetUserDefaultUILanguage() == 1042)
+		set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
+	else
+		set_headings(_T("Name,200;Size,100;Date mofified,150"));
 	set_font_size(9);
-	set_font_name(_T("맑은 고딕"));
+	//set_font_name(_T("맑은 고딕"));
 	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면
 	//CHeaderCtrlEx::OnLayout()에서 에러가 발생한다.
 	set_header_height(24);

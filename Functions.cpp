@@ -71,7 +71,16 @@ CString	get_date_string(CTime t, CString sep)
 {
 	CString str;
 
-	str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sep, t.GetMonth(), sep, t.GetDay());
+	if (GetUserDefaultUILanguage() == 1042)
+	{
+		str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sep, t.GetMonth(), sep, t.GetDay());
+	}
+	else
+	{
+		sep = _T("/");
+		str.Format(_T("%d%s%d%s%d"), t.GetMonth(), sep, t.GetDay(), sep, t.GetYear());
+	}
+
 	return str;
 }
 
@@ -79,7 +88,16 @@ CString get_date_string(COleDateTime t, CString sep)
 {
 	CString str;
 
-	str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sep, t.GetMonth(), sep, t.GetDay());
+	if (GetUserDefaultUILanguage() == 1042)
+	{
+		str.Format(_T("%d%s%02d%s%02d"), t.GetYear(), sep, t.GetMonth(), sep, t.GetDay());
+	}
+	else
+	{
+		sep = _T("/");
+		str.Format(_T("%d%s%d%s%d"), t.GetMonth(), sep, t.GetDay(), sep, t.GetYear());
+	}
+
 	return str;
 }
 
@@ -110,9 +128,19 @@ CString get_time_string(COleDateTime t, CString sep, bool h24, bool sec)
 	bool am = (h < 12);
 
 	if (h24)
-		str.Format(_T("%02d%s%02d%s%02d"), h, sep, m, sep, s);
+	{
+		if (GetUserDefaultUILanguage() == 1042)
+			str.Format(_T("%02d%s%02d%s%02d"), h, sep, m, sep, s);
+		else
+			str.Format(_T("%02d%s%02d%s%02d"), h, sep, m, sep, s);
+	}
 	else
-		str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
+	{
+		if (GetUserDefaultUILanguage() == 1042)
+			str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
+		else
+			str.Format(_T("%2d%s%02d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, sep, s, (am ? _T("AM") : _T("PM")));
+	}
 
 	if (!sec)
 		str = str.Left(str.GetLength() - 2 - sep.GetLength());

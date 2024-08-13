@@ -81,29 +81,31 @@ public :
 class CVtFileInfo
 {
 public:
-	CVtFileInfo(CString _name, CString _size = _T(""), CString _date = _T(""))
+	CVtFileInfo(CString _path, uint64_t _size = 0, CString _date = _T(""))
 	{
-		if (_size.IsEmpty())
+		if (_size == 0)
 		{
-			_size = get_file_size_string(_name);
-		}
-		else if (_size == _T("-"))
-		{
-			_size.Empty();
+			if (PathIsDirectory(_path))
+				_size = 0;
+			else
+				_size = get_file_size(_path);
 		}
 
 		if (_date.IsEmpty())
 		{
-			_date = get_datetime_string(GetFileLastModifiedTime(_name), 2, true, _T(" "), false, false);
+			_date = get_datetime_string(GetFileLastModifiedTime(_path), 2, true, _T(" "), false, false);
 		}
 
-		text[0] = _name;
-		text[1] = _size;
-		text[2] = _date;
+		path = _path;
+		size = _size;
+		date = _date;
 	}
 
-	//name, size, date으로 멤버를 선언했으나 sort의 lamda등에서도 인덱스로 접근하도록 하기 위해 배열로 변경함.
-	CString		text[3];
+	//sort의 lamda등에서도 인덱스로 접근하도록 하기 위해 text[3];과 같이 배열로 선언했었으나
+	//3개밖에 되지 않고 명확히 사용하고자 타입에 맞게 선언함
+	CString		path;
+	uint64_t	size;
+	CString		date;
 };
 
 
@@ -157,7 +159,7 @@ public:
 	std::deque<CVtFileInfo> m_cur_files;
 	//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
 	//local인 경우 크기와 날짜등이 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
-	void		add_file(CString filename, CString filesize = _T(""), CString filedate = _T(""), bool is_remote = false, bool is_folder = false);
+	void		add_file(CString path, uint64_t size, CString date = _T(""), bool is_remote = false, bool is_folder = false);
 	//local이 아닌 remote의 경우 넘겨받은 구조체값으로 목록을 추가한다.
 	void		add_file(WIN32_FIND_DATA* pFindFileData);
 

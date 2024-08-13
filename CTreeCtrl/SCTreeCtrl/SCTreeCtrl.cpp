@@ -704,15 +704,17 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 		if (!FileFind.IsDots() && !FileFind.IsHidden() && FileFind.IsDirectory())
 		{
 			curFolder = FileFind.GetFileName();
-			TV_INSERTSTRUCT tvInsert;
-			tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-			tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
-			tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
+			TV_INSERTSTRUCT tvItem;
+			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
+			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
 			//tvInsert.item.cChildren = TRUE;
-			tvInsert.hInsertAfter = TVI_LAST;
-			tvInsert.hParent = hParent;
-			tvInsert.item.pszText = (LPTSTR)(LPCTSTR)curFolder;
-			HTREEITEM hItem = InsertItem(&tvInsert);
+			tvItem.hInsertAfter = TVI_LAST;
+			tvItem.hParent = hParent;
+			tvItem.item.pszText = (LPTSTR)(LPCTSTR)curFolder;
+			//하위 폴더가 있을때만 확장버튼이 표시되도록.
+			tvItem.item.cChildren = (get_sub_folders(FileFind.GetFilePath()) > 0);
+			HTREEITEM hItem = InsertItem(&tvItem);
 		}
 	}
 }
@@ -1476,6 +1478,11 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
 			DroppedHandler(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
 		}
+
+		//ListCtrl에서 drag하여 drophilited가 표시된 상태에서 빠르게 마우스를 밖으로 이동시키면
+	//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
+	//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜준다.
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
 	}
 	else
 	{
@@ -2324,8 +2331,8 @@ void CSCTreeCtrl::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (pNMCustomDraw->uItemState & CDIS_HOT)
 			{
 				TRACE(_T("CDIS_HOT\n"));
-				crText = m_crTextDropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
-				crBack = m_crBackDropHilited;
+				crText = m_crTextSelected;
+				crBack = m_crBackSelected;
 			}
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
 			else if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
@@ -2372,7 +2379,7 @@ void CSCTreeCtrl::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//CSize szText = dc.GetTextExtent(GetItemText(hItem));
 			//rText.OffsetRect(m_image_size, 0);
 			//rText.right = rText.left + szText.cx;
-
+			dc.SetBkMode(TRANSPARENT);
 			dc.DrawText(GetItemText(hItem), &rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
 			//dc.DrawText(GetItemText(hItem), &rcItem, DT_LEFT | DT_VCENTER | DT_SINGLELINE);

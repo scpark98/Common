@@ -850,33 +850,43 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 
 
 	int iSub = subItem;
-	bool sort_asc = m_column_sort_type[subItem];
+	int sort_asc = m_column_sort_type[subItem];
 	int data_type = get_column_data_type(subItem);
 	bool include_null = false;
 
+	TRACE(_T("iSub = %d, sort_asc = %d, data_type = %d\n"), iSub, sort_asc, data_type);
+
 	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한 후 보여줘야 하므로 아래 람다를 사용할 수 없다.
+	//또한 파일, 폴더 정렬 시 대소문자를 구분하지 않는다.
 	if (m_is_shell_listctrl)
 	{
-		if (iSub == col_filedate)
-		{
-			std::sort(m_cur_folders.begin(), m_cur_folders.end(),
-				[sort_asc, iSub, data_type, include_null](CVtFileInfo a, CVtFileInfo b)
-				{
-					return (a.text[iSub] > b.text[iSub]);
-				});
+		std::sort(m_cur_folders.begin(), m_cur_folders.end(),
+			[sort_asc, iSub, data_type, include_null](CVtFileInfo a, CVtFileInfo b)
+			{
+				if (iSub == 0)
+					return (a.path.CompareNoCase(b.path) == 1);
+				else if (iSub == 1)
+					return (a.size > b.size);
+				if (iSub == 2)
+					return (a.date.CompareNoCase(b.date) == 1);
+			});
 
-			std::sort(m_cur_files.begin(), m_cur_files.end(),
-				[sort_asc, iSub, data_type](CVtFileInfo a, CVtFileInfo b)
-				{
-					return (a.text[iSub] > b.text[iSub]);
-				});
-		}
+		std::sort(m_cur_files.begin(), m_cur_files.end(),
+			[sort_asc, iSub, data_type](CVtFileInfo a, CVtFileInfo b)
+			{
+				if (iSub == 0)
+					return (a.path.CompareNoCase(b.path) == 1);
+				else if (iSub == 1)
+					return (a.size > b.size);
+				if (iSub == 2)
+					return (a.date.CompareNoCase(b.date) == 1);
+			});
 
 		refresh_list(false);
 		return;
 	}
 
-	
+
 	std::sort(m_list_db.begin(), m_list_db.end(),
 		[sort_asc, iSub, data_type, include_null](CListCtrlData a, CListCtrlData b)
 		{
@@ -1839,12 +1849,14 @@ int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool
 	if (index < 0)
 		index = size();
 
-	//이미 해당 index의 row가 존재하는 경우는 값을 변경한다.
+	/*
+	//이미 해당 index의 row가 존재하는 경우는 값을 변경한다. => 절대 있어서는 안되는 코드임. 왜 이 기능을 구현했는지 확인 필요!
 	if (index < m_list_db.size())
 	{
 		set_text(index, 0, text, false);
 	}
 	else
+	*/
 	{
 		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, m_HeaderCtrlEx.GetItemCount()));
 		SetItemCountEx(m_list_db.size());
@@ -3083,11 +3095,11 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	//asce는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		index = insert_item(insert_index, get_part(m_cur_folders[i].text[0], fn_name), false, false);
+		index = insert_item(insert_index, get_part(m_cur_folders[i].path, fn_name), false, false);
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
-			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].text[0], m_pShellImageList->get_csidl_map());
+			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].path, m_pShellImageList->get_csidl_map());
 			
 			uint64_t disk_size = get_disk_free_size(drive);
 			if (disk_size > 0)
@@ -3102,17 +3114,17 @@ void CVtListCtrlEx::refresh_list(bool reload)
 		}
 		else
 		{
-			set_text(index, col_filedate, m_cur_folders[i].text[2]);
+			set_text(index, col_filedate, m_cur_folders[i].date);
 			set_text_color(index, col_filedate, RGB(109, 109, 109));
 		}
 	}
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		index = insert_item(insert_index, get_part(m_cur_files[i].text[0], fn_name), false, false);
+		index = insert_item(insert_index, get_part(m_cur_files[i].path, fn_name), false, false);
 
-		set_text(index, col_filesize, m_cur_files[i].text[1]);
-		set_text(index, col_filedate, m_cur_files[i].text[2]);
+		set_text(index, col_filesize, get_size_string(m_cur_files[i].size));
+		set_text(index, col_filedate, m_cur_files[i].date);
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
@@ -3120,20 +3132,20 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 //파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
 //local인 경우 크기와 날짜가 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
-void CVtListCtrlEx::add_file(CString filename, CString filesize, CString filedate, bool is_remote, bool is_folder)
+void CVtListCtrlEx::add_file(CString path, uint64_t size, CString date, bool is_remote, bool is_folder)
 {
 	bool file_is_folder = is_folder;
 
 	if (!is_remote)
-		file_is_folder = PathIsDirectory(filename);
+		file_is_folder = PathIsDirectory(path);
 
 	if (file_is_folder)
 	{
-		m_cur_folders.push_back(CVtFileInfo(filename, filesize, filedate));
+		m_cur_folders.push_back(CVtFileInfo(path, size, date));
 	}
 	else
 	{
-		m_cur_files.push_back(CVtFileInfo(filename, filesize, filedate));
+		m_cur_files.push_back(CVtFileInfo(path, size, date));
 	}
 }
 
@@ -3156,7 +3168,7 @@ void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
 	//filedate.Format(_T("%d-%02d-%02d %02d:%02d:%02d"), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 	filedate = get_datetime_string(st, 2, true, _T(" "), false, false, false);
 	//SetItemText(iIndex, 2, GetDateTimeStringFromTime(GetFileLastModifiedTime(pFindFileData->cFileName), true, false, false));
-	add_file(pFindFileData->cFileName, file_is_folder ? _T("-") : get_size_string(ulInt.QuadPart), filedate, true, file_is_folder);
+	add_file(pFindFileData->cFileName, file_is_folder ? 0 : ulInt.QuadPart, filedate, true, file_is_folder);
 }
 /*
 CImageList* CVtListCtrlEx::CreateDragImageEx(LPPOINT lpPoint)

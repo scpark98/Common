@@ -8481,9 +8481,23 @@ CString	get_drive_volume(TCHAR drive_letter)
 
 	CString sLabel = Label;
 
+	/*
+	LANGID langID = GetUserDefaultUILanguage();
+	// Extract the primary language and sublanguage
+	WORD primaryLanguage = PRIMARYLANGID(langID);
+	WORD subLanguage = SUBLANGID(langID);
+
+	// Optionally, convert to a human-readable name using LCIDToLocaleName
+	TCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+	if (LCIDToLocaleName(MAKELCID(langID, SORT_DEFAULT), localeName, LOCALE_NAME_MAX_LENGTH, 0))
+	{
+		TRACE(_T("lang = %d(%s)\n"), langID, localeName);
+	}
+	*/
+
 	if (sLabel.IsEmpty())
 	{
-		sLabel.Format(_T("로컬 디스크 (%c:)"), drive_letter);
+		sLabel.Format(_T("%s (%c:)"), GetUserDefaultUILanguage() == 1042 ? _T("로컬 디스크") : _T("Local Disk"), drive_letter);
 	}
 	else
 	{

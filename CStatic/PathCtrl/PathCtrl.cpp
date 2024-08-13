@@ -331,7 +331,7 @@ void CPathCtrl::add_remote_drive_volume(CString remote_drive_volume)
 	//"C:\\" (볼륨 레이블을 구하지 못하는 경우)
 	if (remote_drive_volume.Right(2) == _T(":\\"))
 	{
-		m_remote_drive_volume.insert(std::pair<TCHAR, CString>(remote_drive_volume[0], _T("로컬 디스크")));
+		m_remote_drive_volume.insert(std::pair<TCHAR, CString>(remote_drive_volume[0], GetUserDefaultUILanguage() == 1042 ? _T("로컬 디스크") : _T("Local Disk")));
 	}
 	//"로컬 디스크 (C:)" (볼륨 레이블까지 포함된 경우)
 	else

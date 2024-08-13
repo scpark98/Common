@@ -3372,7 +3372,7 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//	bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
 
 	bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(sel_count), 20, 2,
-					_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+					_T("Arial"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
 
 	//예전 윈도우 탐색기처럼 선택된 항목들을 그대로 드래그 이미지로 사용하고자 구현했으나
 	//스크롤에 의해 선택항목들이 가려진 경우는 애매하므로 우선 스킵한다.

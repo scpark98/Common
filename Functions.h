@@ -1222,8 +1222,8 @@ h		: 복사할 height 크기(pixel)
 	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
 	void		get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
-//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
-//문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.
+	//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
+	//문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.
 	CString		convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map = NULL);
 	CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*csidl_map = NULL);
 

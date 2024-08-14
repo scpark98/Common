@@ -32,9 +32,9 @@ bool CSCPing::init(HWND hParent)
 	return true;
 }
 
-void CSCPing::add(CString addr, int retry, int timeout, CString job_name)
+void CSCPing::add(CString job_name, CString addr, int retry, int timeout)
 {
-	CSCPingParams *params = new CSCPingParams(addr, retry, timeout, job_name);
+	CSCPingParams *params = new CSCPingParams(job_name, addr, retry, timeout);
 
 	std::map<CString, int>::iterator it = m_map.find(job_name);
 

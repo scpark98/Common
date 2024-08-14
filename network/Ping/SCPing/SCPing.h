@@ -36,31 +36,21 @@ class CSCPingParams
 {
 public:
 	CSCPingParams() {};
-	CSCPingParams(CString _addr, int _retry_total, int _timeout = 5000, CString _job_name = _T(""), int _status = -2, int _retry_count = -1, int _delay = 0)
+	CSCPingParams(CString _job_name, CString _addr, int _retry_total, int _timeout = 5000)
 	{
+		job_name = _job_name;
 		addr = _addr;
 		retry_total = _retry_total;
 		timeout = _timeout;
-		job_name = (_job_name.IsEmpty() ? addr : _job_name);
 	}
 
 	//input
-
-	//id로 각 ping job을 구분하려 했으나 그 아이디는 항상 unique해야하고 변경되지 않아야하므로 제약이 있을 수 있다.
-	//예를 들어 listctrl의 index를 id로 줬는데 sort를 한다면 id는 의미 없어진다.
-	//따라서 addr을 key로 한다.
-	//int			id = -1;
-
+	CString		job_name;				//각 job을 구분할 수 있는 unique 키값이어야 한다.
 	CString		addr = _T("");			//domain name or ip address
 	int			retry_total = -1;		//-1 : infinite
 	int			timeout = 5000;			//ms
-	//job을 구분하는 키로서 ""이면 addr값을 복사해서 사용한다.
-	//몇 개 정도의 ping job을 돌린다면 생략해도 되지만
-	//addr이 중복될 수 있는 경우는 반드시 명시해야 결과값을 구분할 수 있다.
-	CString		job_name;
 
-
-	//out
+	//output
 	CString		addr_ip = _T("");		//converted ip address
 	int			status = -2;
 	int			retry_count = -1;
@@ -96,7 +86,7 @@ public:
 	};
 
 	bool	init(HWND hParent);
-	void	add(CString addr, int retry = -1, int timeout = 5000, CString _job_name = _T(""));
+	void	add(CString job_name, CString addr, int retry = -1, int timeout = 5000);
 	void	thread_ping(CSCPingParams* params);
 
 	//특정 job의 핑 쓰레드를 중지. ""이면 모든 핑 중지.

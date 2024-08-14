@@ -2056,12 +2056,12 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	if (r.right > rc.right - 1)
 		r.right = rc.right - 1;
 
-	r.DeflateRect(1, 0);
+	r.DeflateRect(0, 0);
 
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CEdit;
-		m_pEdit->Create(WS_CHILD | /*WS_BORDER | */WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
+		m_pEdit->Create(WS_CHILD | WS_BORDER | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
 	}
 	else
 	{
@@ -2075,11 +2075,11 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	CRect new_rect;
 	LOGFONT lf;
 
-	m_pEdit->GetClientRect(new_rect);
-	new_rect.right += 4;
-
+	m_pEdit->GetRect(new_rect);
+	//new_rect.right += 4;
+	new_rect.left = 2;
 	m_pEdit->GetFont()->GetLogFont(&lf);
-	new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 1;
+	//new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 1;
 	m_pEdit->SetRect(&new_rect);
 
 	m_pEdit->SetWindowText(m_edit_old_text);

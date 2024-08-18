@@ -2498,18 +2498,16 @@ void request_url(CRequestUrlParams* params)
 		InternetSetOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 	}
 
-	//디폴트 헤더 세팅
-	params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
+	//기본 헤더가 세팅되어 있지 않다면 추가하고
+	if (params->headers.size() == 0)
+		params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
 
-	if (params->headers.size() >= 1)
+	//기본 헤더 및 사용자가 추가한 헤더까지 모두 추가해준다.
+	for (int i = 0; i < params->headers.size(); i++)
 	{
-		//사용자가 명시한 헤더를 추가한다.
-		for (int i = 0; i < params->headers.size(); i++)
-		{
-			if (params->headers[i].Right(2) != _T("\r\n"))
-				params->headers[i] += _T("\r\n");
-			HttpAddRequestHeaders(hOpenRequest, params->headers[i], -1, HTTP_ADDREQ_FLAG_ADD);
-		}
+		if (params->headers[i].Right(2) != _T("\r\n"))
+			params->headers[i] += _T("\r\n");
+		HttpAddRequestHeaders(hOpenRequest, params->headers[i], -1, HTTP_ADDREQ_FLAG_ADD);
 	}
 
 

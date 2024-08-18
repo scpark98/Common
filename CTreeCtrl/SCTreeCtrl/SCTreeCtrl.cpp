@@ -40,7 +40,8 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
 	ON_NOTIFY_REFLECT_EX(TVN_ENDLABELEDIT, &CSCTreeCtrl::OnTvnEndlabeledit)
 	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDED, &CSCTreeCtrl::OnTvnItemexpanded)
-	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomdraw)
+	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomDraw)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -69,7 +70,9 @@ void CSCTreeCtrl::reconstruct_font()
 
 	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
 
-	SetItemHeight(-m_lf.lfHeight + 4);
+	//폰트 height와 line height중에 큰 값으로 조정
+	int height = GetItemHeight();
+	SetItemHeight(MAX(height, -m_lf.lfHeight + 12));
 
 	ASSERT(bCreated);
 }
@@ -146,6 +149,10 @@ void CSCTreeCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 //OnPaint()가 호출되고 여기서 직접 그릴 수 있다.
 //폰트 색상 등의 UI를 자유롭게 변경할 수 있으나 스크롤 처리 등이 복잡해진다.
 //GetItemRect()를 이용해서 그려주니 스크롤도 자동 처리된다.
+//하지만 여전히 확장버튼, 체크박스, 아이콘 등 그 위치를 정확히 얻기 힘들고
+//스크롤 처리도 힘들다. 이를 처리하기 위해서는 많은 처리가 필요하게 되어
+//WM_PAINT를 사용하지 않고 CustomDraw 방식으로 변경함
+/*
 void CSCTreeCtrl::OnPaint()
 {
 	//tree가 제대로 구성되어 있는지 기본 OnPaint()로 확인 목적 코드
@@ -425,7 +432,7 @@ void CSCTreeCtrl::OnPaint()
 
 	//TRACE(_T("total %ld\n"), tTotal);
 }
-
+*/
 
 /*
 void CSCTreeCtrl::OnPaint()
@@ -588,7 +595,7 @@ void CSCTreeCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local)
 {
 	DeleteAllItems();
-	m_folder_list.clear();
+	//m_folder_list.clear();
 
 	m_is_shell_treectrl = true;
 	m_is_shell_treectrl_local = is_local;
@@ -604,11 +611,10 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 	for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
 		insert_drive(it->second);
 
-	SetItemHeight(24);
 	//std::thread t(&CSCTreeCtrl::thread_insert_folders, this, GetRootItem());
 	//t.detach();
 
-	m_folder_list = iterate_tree_with_no_recursion();
+	//m_folder_list = iterate_tree_with_no_recursion();
 
 	//for test
 	//expand_all();
@@ -681,7 +687,8 @@ void CSCTreeCtrl::insert_drive(CString driveName)
 	tvInsert.item.pszText = (LPTSTR)(LPCTSTR)driveName;
 	HTREEITEM hItem = InsertItem(&tvInsert);
 
-	insert_folder(hItem, real_path);
+	//아래 코드는 드라이브 루트를 추가할 때 1레벨 하위 폴더까지 기본으로 추가
+	//insert_folder(hItem, real_path);
 }
 
 void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
@@ -810,7 +817,7 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 		if (GetChildItem(hItem) == NULL)
 			insert_folder(hItem, get_fullpath(hItem));
 
-		m_folder_list = iterate_tree_with_no_recursion();
+		//m_folder_list = iterate_tree_with_no_recursion();
 	}
 
 	*pResult = 0;
@@ -929,6 +936,13 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 
 CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 {
+	if (hItem == NULL)
+	{
+		hItem = GetSelectedItem();
+		if (hItem == NULL)
+			return _T("");
+	}
+
 	CString fullpath;
 	CString folder;
 
@@ -968,7 +982,7 @@ void CSCTreeCtrl::select_folder(CString fullpath)
 		{
 			insert_folder(item, get_fullpath(item));
 			Expand(item, TVE_EXPAND);
-			m_folder_list = iterate_tree_with_no_recursion();
+			//m_folder_list = iterate_tree_with_no_recursion();
 		}
 
 		if (item)
@@ -1391,6 +1405,8 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		pDropWnd->ScreenToClient(&point);
 
+		//drag되는 위치가 컨트롤의 상하끝단에 위치하면 스크롤시켜줘야 한다.
+
 		//If we are hovering over a CListCtrl we need to adjust the highlights
 		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 		{
@@ -1519,6 +1535,12 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 		//dragItem, dropItem 정보는 drag가 시작된 컨트롤이 기억하고 있다.
 		TRACE(_T("drag item = %s\n"), GetItemText(m_DragItem));
 		TRACE(_T("dropped on = %s\n"), pDropTreeCtrl->GetItemText(m_DropItem));
+
+		//같은 CTreeCtrl내에서 노드 이동
+		if (pDragWnd == pDropWnd)
+		{
+			move_tree_item(this, m_DragItem, m_DropItem);
+		}
 	}
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM)&(CSCTreeCtrlMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
@@ -1756,7 +1778,8 @@ void CSCTreeCtrl::create_imagelist()
 
 	SetImageList(&m_imagelist, TVSIL_NORMAL);
 	
-	SetItemHeight(MAX(m_image_size, -m_lf.lfHeight));
+	int height = GetItemHeight();
+	SetItemHeight(MAX(m_image_size, height));
 
 	Invalidate();
 }
@@ -1782,8 +1805,47 @@ void CSCTreeCtrl::set_image_size(int image_size)
 
 // 아이템 데이터 이동
 
-BOOL CSCTreeCtrl::MoveTreeItem(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem)
+BOOL CSCTreeCtrl::move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem)
 {
+	//src의 parent가 dst이면 스킵.
+	if (GetParentItem(hSrcItem) == hDestItem)
+	{
+		TRACE(_T("move to parent node is meaningless. skip.\n"));
+		return TRUE;
+	}
+
+	//ShellTreeCtrl이고 destItem이 아직 확장되기 전의 상태라면 확장시켜준 후 추가해야 한다.
+	if (m_is_shell_treectrl)
+	{
+		if ((GetItemState(hDestItem, TVIF_STATE) & TVIS_EXPANDED) == false)
+		{
+			insert_folder(hDestItem, get_fullpath(hDestItem));
+			Expand(hDestItem, TVE_EXPAND);
+			//m_folder_list = iterate_tree_with_no_recursion();
+		}
+	}
+
+	bool folder_operation = true;
+
+	//ShellTreeCtrl이면 폴더를 move or copy가 성공한 후에 UI를 갱신시킨다.
+	if (m_is_shell_treectrl)
+	{
+		CString srcPath = get_fullpath(hSrcItem);
+		CString dstPath = get_fullpath(hDestItem);
+
+		if (IsCtrlPressed())
+		{
+			TRACE(_T("copy node. %s to %s\n"), srcPath, dstPath);
+			//folder_operation = CopyFile(srcPath, dstPath,);
+		}
+		else
+		{
+			TRACE(_T("move node. %s to %s\n"), srcPath, dstPath);
+			//folder_operation = MoveFile(srcPath, dstPath,);
+		}
+	}
+
+
 	// 이동할 아이템의 정보를 알아내자.
 	TVITEM	TV;
 	TCHAR	str[256];
@@ -1817,11 +1879,10 @@ BOOL CSCTreeCtrl::MoveTreeItem(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM h
 	if (hChildItem)
 	{
 		// 자식 아이템이 있다면 같이 이동하자.
-		MoveChildTreeItem(pTree, hChildItem, hItem);
+		move_child_tree_item(pTree, hChildItem, hItem);
 	}
 
 	// 확장 여부를 알아서 똑같이 하자.
-
 	TVITEM  item;
 
 	item.mask = TVIF_HANDLE;
@@ -1840,11 +1901,14 @@ BOOL CSCTreeCtrl::MoveTreeItem(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM h
 	// 기존 아이템을 제거한다.
 	pTree->DeleteItem(hSrcItem);
 
+	//노드 이동후에는 dropItem의 children을 정렬시켜줘야 한다.
+	pTree->SortChildren(hDestItem);
+
 	return TRUE;
 }
 
 // 현재 트리의 모든 아이템 데이터 이동
-BOOL CSCTreeCtrl::MoveChildTreeItem(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem)
+BOOL CSCTreeCtrl::move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem)
 {
 	HTREEITEM hSrcItem = hChildItem;
 
@@ -1884,7 +1948,7 @@ BOOL CSCTreeCtrl::MoveChildTreeItem(CTreeCtrl* pTree, HTREEITEM hChildItem, HTRE
 		// pTree->GetNextItem(hSrcItem, TVGN_CHILD;
 		if (hChildItem)
 		{
-			MoveChildTreeItem(pTree, hChildItem, hItem);
+			move_child_tree_item(pTree, hChildItem, hItem);
 		}
 
 		// 확장 여부를 알아서 똑같이 하자.
@@ -2139,6 +2203,7 @@ void CSCTreeCtrl::edit_end(bool valid)
 		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
 	}
 
+
 	Invalidate();
 }
 
@@ -2288,7 +2353,7 @@ void CSCTreeCtrl::has_line(bool line)
 }
 
 
-void CSCTreeCtrl::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
+void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
@@ -2337,6 +2402,9 @@ void CSCTreeCtrl::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
 			else if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
 			{
+				//drop을 위해 폴더위에 머무를 경우 해당 폴더가 expand가 아니면 expand시켜준다.
+				SetTimer(timer_expand_for_drop, 1000, NULL);
+
 				TRACE(_T("CDIS_DROPHILITED\n"));
 				crText = m_crTextDropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
 				crBack = m_crBackDropHilited;
@@ -2404,4 +2472,17 @@ void CSCTreeCtrl::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 	dc.Detach();
 
 	//*pResult = 0;
+}
+
+
+void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (nIDEvent == timer_expand_for_drop)
+	{
+		KillTimer(timer_expand_for_drop);
+		Expand(GetDropHilightItem(), TVE_EXPAND);
+	}
+
+	CTreeCtrl::OnTimer(nIDEvent);
 }

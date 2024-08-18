@@ -122,7 +122,8 @@ public:
 
 	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local);
 
-	CString		get_fullpath(HTREEITEM hItem);
+	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
+	CString		get_fullpath(HTREEITEM hItem = NULL);
 	void		select_folder(CString fullpath);
 
 	HTREEITEM	insert_special_folder(int csidl);
@@ -183,14 +184,14 @@ public:
 			m_drag_images_id.push_back(id);
 	}
 
-	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
-	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
+	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
+	void			set_use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
 	HTREEITEM		m_DragItem = NULL;			//drag item in the Tree we are dragging FROM
 	HTREEITEM		m_DropItem = NULL;			//dropped item on the Tree we dropped ON
 	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 
-	BOOL			MoveTreeItem(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem);
-	BOOL			MoveChildTreeItem(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
+	BOOL			move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem);
+	BOOL			move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
 
 	//20240801 scpark 편집과 관계된 코드 추가
 	void			edit_item(HTREEITEM hItem = NULL);
@@ -217,6 +218,11 @@ public:
 
 
 protected:
+	enum TIMER_ID
+	{
+		timer_expand_for_drop = 0,
+	};
+
 	bool			m_use_custom_draw = true;
 
 	//들여쓰기 크기
@@ -241,7 +247,7 @@ protected:
 	HTREEITEM		m_desktopItem;			// 바탕화면 아이템
 	HTREEITEM		m_documentItem;			// 문서 아이템
 	HTREEITEM		m_computerItem;			// 내 PC 아이템
-	std::deque<CSCTreeCtrlFolder> m_folder_list;
+	//std::deque<CSCTreeCtrlFolder> m_folder_list;
 
 	void			thread_insert_folders(HTREEITEM hItem);
 
@@ -310,7 +316,8 @@ public:
 	afx_msg BOOL OnTvnBeginlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };
 
 

@@ -1,7 +1,7 @@
 #include "SCInternetApi.h"
 
 #pragma warning(disable : 4996)		// disable bogus deprecation warning
-
+/*
 CRequestUrlParams::CRequestUrlParams(CString _ip, int _port, CString _sub_url, CString _method, bool _is_https, std::vector<CString>* _headers, CString _body, CString _local_file_path)
 {
 	ip = _ip;
@@ -46,7 +46,7 @@ CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _method, bool _i
 	//	}
 	//}
 }
-
+*/
 CSCInternetApi::CSCInternetApi()
 {
 	std::thread t(&CSCInternetApi::thread_process_queued_request, this);
@@ -355,10 +355,10 @@ void CSCInternetApi::request_url_api(CRequestUrlParams* params)
 
 	//다운로드 폴더가 없다면 생성.
 	//Functions.h를 사용하지 않아야하므로 make_full_directory()는 잠시 주석처리 함.
-	if (!params->local_file_path.IsEmpty())
+	if (params->local_file_path.IsEmpty() == false)
 	{
-		//CString folder = GetFolderNameFromFullPath(params->local_file_path);
-		//make_full_directory(folder);
+		CString folder = get_part(params->local_file_path, fn_folder);
+		make_full_directory(folder);
 	}
 
 	params->result.Empty();
@@ -570,7 +570,7 @@ void CSCInternetApi::thread_download_files(CRequestUrlParams* params, CString re
 		TRACE(_T("%d/%d download start...\n"), i + 1, remote_files.size());
 
 		params = new CRequestUrlParams(temp);
-		params->download_index = i;
+		params->request_id = i;
 		params->sub_url.Format(_T("%s/%s"), remote_root, remote_files[i]);
 		params->local_file_path.Format(_T("%s\\%s"), local_root, local_files[i]);
 

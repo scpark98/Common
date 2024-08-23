@@ -20,8 +20,8 @@ public:
 
 	void		init(CWnd* parent, int x = 0, int y = 0, int width = 0, int height = 0);
 
-	//resourceID와 button_type(BS_PUSHBUTTON or BS_CHECKBOX or BS_RADIOBUTTON...)만 주면 버튼 추가
-	void		add(CString caption, UINT nID, int button_type = BS_PUSHBUTTON);
+	//resource_id와 button_type(BS_PUSHBUTTON or BS_CHECKBOX or BS_RADIOBUTTON...)만 주면 버튼 추가
+	void		add(CString caption, UINT resource_id, int button_type = BS_PUSHBUTTON);
 	void		insert(int index, CString caption, UINT nID, int button_type = BS_PUSHBUTTON);
 	void		remove(int index);
 	void		set_back_color(COLORREF cr_back);

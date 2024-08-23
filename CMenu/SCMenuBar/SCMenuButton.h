@@ -25,8 +25,8 @@ public:
 	void		use_aero_effect(bool use) { m_use_aero_effect = use; }
 
 
-	void		set_text_color(COLORREF cr_text);
-	void		set_back_color(COLORREF cr_back);
+	void		set_text_color(Gdiplus::Color cr_text);
+	void		set_back_color(Gdiplus::Color cr_back);
 
 	CString		caption;
 	LRESULT		on_message_SCMenu(WPARAM wParam, LPARAM lParam);
@@ -37,8 +37,8 @@ public:
 protected:
 	CWnd*		m_parent;
 	CSCMenu		m_menu;
-	COLORREF	m_cr_text = GRAY(212);
-	COLORREF	m_cr_back = RGB(64, 73, 88);
+	Gdiplus::Color	m_cr_text = RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+	Gdiplus::Color	m_cr_back = RGB2gpColor(::GetSysColor(COLOR_3DFACE)); //Gdiplus::Color(128, 64, 73, 88);
 	bool		m_use_aero_effect = false;
 
 	DECLARE_MESSAGE_MAP()

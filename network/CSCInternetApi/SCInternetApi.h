@@ -18,6 +18,8 @@
 #include <condition_variable>
 #include <functional>
 
+#include "../../Functions.h"
+
 /*
 * 개발 목적 :
 *	단순 request 또는 web file download등의 http request를 간단히 사용하기 위한 클래스.
@@ -59,12 +61,12 @@
 */
 
 static const UINT Message_CSCInternetApi = ::RegisterWindowMessage(_T("MessageString_CSCInternetApi"));
-
+/*
 class CRequestUrlParams
 {
 public:
 	CRequestUrlParams() {}
-	CRequestUrlParams(CString _ip, int _port, CString _sub_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
+	CRequestUrlParams(CString _ip, int _port, CString _sub_url = _T(""), CString _method = _T("GET"), bool _is_https = true, std::deque<CString>*_headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::vector<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
 	//용량이 큰 파일 다운로드 등은 CRequestUrlParams *params를 동적으로 할당받고 thread로 실행한 후 Message_CInternetApi 핸들러로 다운로드 상태를 알 수 있다.
@@ -78,13 +80,13 @@ public:
 	//200, 404...와 같은 HTTP_STATUS를 담지만 invalid address 등과 같은 에러코드도 담기 위해 int로 사용한다. 0보다 작을 경우는 result 문자열에 에러 내용이 담겨있다.
 	int			status = -1;
 
-	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
+	//포트로 http와 https를 구분하는 것은 위험하다. is_https=true 또는 ip에 "https://"가 포함되어 있으면 is_https가 자동 true로 설정된다.
 	CString		ip = _T("");
 
-	int			port;
+	int			port = 443;
 	CString		sub_url = _T("");;			//domain을 제외한 나머지 주소
 	CString		method = _T("");;
-	bool		is_https;
+	bool		is_https = true;
 	CString		body = _T("");;				//post data(json format)
 	std::deque<CString> headers;			//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야 한다.
 	CString		full_url = _T("");;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
@@ -96,9 +98,9 @@ public:
 	CString		local_file_path = _T("");;	//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
 	uint64_t	file_size = 0;				//url 파일 크기
 	uint64_t	downloaded_size = 0;		//현재까지 받은 크기
-	int			download_index = -1;		//n개의 파일 다운로드시 현재 파일의 인덱스
+	int			download_index = -1;		//n개의 파일 다운로드시 현재 파일의 인덱스. request_id와는 다름.
 };
-
+*/
 class CSCInternetApi
 {
 public:

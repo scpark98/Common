@@ -4,6 +4,7 @@
 #include "SCMenu.h"
 
 #include "../../Functions.h"
+#include "../../colors.h"
 #include "../../MemoryDC.h"
 
 CSCMenuMessage::CSCMenuMessage(CWnd* _this, int message, CSCMenuItem* menu_item, int button_index, int button_state)
@@ -24,7 +25,7 @@ CSCMenuSubButton::CSCMenuSubButton(UINT _id, int menu_height)
 	//기존 버튼 이미지 컬러톤이 cyan 톤이었으나 코드상에서 다른 색상 톤으로 변경 가능
 	m_button_image[1]->apply_effect_hsl(70);
 
-	//menu_height의 80%크기의 높이를 가지도록 조정한다.
+	//버튼 이미지의 크기는 menu_height의 80% 크기의 높이를 가지도록 조정한다.
 	float img_height = (float)menu_height * (float)0.95;
 	float ratio = img_height / (float)(m_button_image[0]->height);
 	m_button_image[0]->resize(ratio, ratio);
@@ -264,7 +265,7 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 
 	for (int i = 0; i < m_items.size(); i++)
 	{
-		if (m_items[i]->m_id < 0)
+		if (m_items[i]->m_id <= 0)
 			continue;
 
 		for (int j = 0; j < m_items[i]->m_buttons.size(); j++)
@@ -325,7 +326,7 @@ int CSCMenu::get_item_index(CPoint pt)
 {
 	for (int i = 0; i < m_items.size(); i++)
 	{
-		if (m_items[i]->m_id >= 0 && m_items[i]->m_r.PtInRect(pt))
+		if (m_items[i]->m_id > 0 && m_items[i]->m_r.PtInRect(pt))
 			return i;
 	}
 
@@ -356,7 +357,7 @@ void CSCMenu::OnSize(UINT nType, int cx, int cy)
 	// TODO: Add your message handler code here
 }
 
-bool CSCMenu::create(CWnd* parent)
+bool CSCMenu::create(CWnd* parent, int width)
 {
 	m_parent = parent;
 
@@ -370,7 +371,8 @@ bool CSCMenu::create(CWnd* parent)
 	//CString class_name = AfxRegisterWndClass(CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS, ::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), NULL);
 
 	//CreateEx()에서 첫번째 파라미터를 0으로 준 경우는 class_name도 NULL로 줘도 동작했으나 WS_EX_...스타일이 있을 경우는 NULL로 하면 에러 발생.
-	bool res = CreateEx(NULL, wc.lpszClassName, _T("CSCMenu"), dwStyle, CRect(0, 0, 320, 300), parent, 0);
+	//height는 자동 recalc됨.
+	bool res = CreateEx(NULL, wc.lpszClassName, _T("CSCMenu"), dwStyle, CRect(0, 0, width, 300), parent, 0);
 
 	if (res)
 	{
@@ -462,6 +464,9 @@ void CSCMenu::popup_menu(int x, int y)
 
 CSCMenuItem* CSCMenu::get_menu_item(int menu_id)
 {
+	if (menu_id <= 0)
+		return NULL;
+
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		if (m_items[i]->m_id == menu_id)
@@ -478,7 +483,7 @@ void CSCMenu::ReconstructFont()
 
 	SetFont(&m_font, true);
 
-	m_line_height = -m_lf.lfHeight + 16;
+	m_line_height = -m_lf.lfHeight + 10;
 	recalc_items_rect();
 
 	ASSERT(bCreated);
@@ -534,37 +539,37 @@ void CSCMenu::set_color_theme(int theme, bool apply_now)
 	switch (theme)
 	{
 	case color_theme_default:
-		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
-		m_cr_text_selected = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_text_selected_inactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_cr_text = RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+		m_cr_text_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
 		m_cr_text_over = m_cr_text;
 
-		m_cr_back = ::GetSysColor(COLOR_3DFACE);
-		m_cr_back_selected = RGB(174, 215, 247);
+		m_cr_back = RGB2gpColor(::GetSysColor(COLOR_3DFACE));
+		m_cr_back_selected = RGB2gpColor(RGB(174, 215, 247));
 		m_cr_back_selected_border = get_color(m_cr_back_selected, -32);// RGB(0, 120, 215);
-		m_cr_back_selected_inactive = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 		m_cr_back_over = m_cr_back_selected; //RGB(235, 245, 255); //m_crBackOver = ::GetSysColor(COLOR_HIGHLIGHT);
 		break;
 	case color_theme_dark_gray:
-		m_cr_text = RGB(210, 220, 221);
+		m_cr_text = RGB2gpColor(RGB(210, 220, 221));
 		m_cr_text_selected = m_cr_text;
-		m_cr_text_selected_inactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_cr_text_over = RGB(255, 255, 255);
+		m_cr_text_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
+		m_cr_text_over = RGB2gpColor(RGB(255, 255, 255));
 
-		m_cr_back = RGB(27, 27, 28); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_back_selected = RGB(51, 51, 52);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back = RGB2gpColor(RGB(27, 27, 28)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back_selected = RGB2gpColor(RGB(51, 51, 52));// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_back_selected_border = get_color(m_cr_back_selected, 64);// RGB(0, 120, 215);
-		m_cr_back_selected_inactive = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 		m_cr_back_over = m_cr_back_selected;
 		break;
 	case color_theme_linkmemine:
-		m_cr_text = RGB(208, 211, 220);
+		m_cr_text = RGB2gpColor(RGB(208, 211, 220));
 		m_cr_text_selected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_text_selected_inactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_cr_text_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
 		m_cr_text_over = m_cr_text;
 
-		m_cr_back = RGB(64, 73, 88);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_back_selected = RGB(45, 51, 51);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back = RGB2gpColor(RGB(64, 73, 88));// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back_selected = RGB2gpColor(RGB(45, 51, 51));// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_back_selected_border = get_color(m_cr_back_selected, +32);// RGB(0, 120, 215);
 		m_cr_back_selected_inactive = m_cr_back_selected;
 		m_cr_back_over = m_cr_back_selected;
@@ -626,7 +631,7 @@ void CSCMenu::recalc_items_rect()
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		is_separator = (m_items[i]->m_id <= 0);
-		m_items[i]->m_r = CRect(2, sy, rw.right - 5 - border.cx, sy + (is_separator ? 5 : m_line_height));
+		m_items[i]->m_r = CRect(4, sy, rw.right - 5 - border.cx, sy + (is_separator ? 5 : m_line_height));
 		sy = m_items[i]->m_r.bottom + 2;
 
 		total_height = m_items[i]->m_r.bottom;
@@ -655,10 +660,10 @@ void CSCMenu::OnPaint()
 	if (m_img_back.is_valid())
 		m_img_back.draw(g, rc);
 	else
-		dc.FillSolidRect(rc, m_cr_back);
+		dc.FillSolidRect(rc, gpColor2RGB(m_cr_back));
 
 	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(m_cr_text);
+	dc.SetTextColor(gpColor2RGB(m_cr_text));
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
@@ -675,16 +680,18 @@ void CSCMenu::OnPaint()
 			//선택된 항목 표시
 			if (i == m_over_item)
 			{
-				dc.SetTextColor(m_cr_text_over);
-				//dc.FillSolidRect(m_items[i]->r, m_cr_back_over);
+				dc.SetTextColor(gpColor2RGB(m_cr_text_over));
+				dc.FillSolidRect(m_items[i]->m_r, gpColor2RGB(m_cr_back_over));
 
-				Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
-				Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
+				//Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
+				//Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
+				Gdiplus::Color gcr_over_stroke = m_cr_back_selected_border;
+				Gdiplus::Color gcr_over_fill = m_cr_back_over;
 
 				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
 				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
 				//gcr_over_fill.SetFromCOLORREF(m_cr_back_over);
-				draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), gcr_over_stroke, gcr_over_fill, 0);
+				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), gcr_over_stroke, gcr_over_fill, 0);
 				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), Gdiplus::Color(255,225,0,0), gcr_over_fill, 2);
 
 				//CGdiplusBitmap img;
@@ -693,7 +700,7 @@ void CSCMenu::OnPaint()
 			}
 			else
 			{
-				dc.SetTextColor(m_cr_text);
+				dc.SetTextColor(gpColor2RGB(m_cr_text));
 			}
 
 			CRect rText = m_items[i]->m_r;
@@ -702,20 +709,20 @@ void CSCMenu::OnPaint()
 			if (m_items[i]->m_icon.is_valid())
 			{
 				CRect rIcon = m_items[i]->m_r;
-				rIcon.right = rIcon.left + 32;
+				rIcon.right = rIcon.left + 28;
 				rIcon = get_center_rect(rIcon, m_items[i]->m_icon.width, m_items[i]->m_icon.height);
 				m_items[i]->m_icon.draw(g, rIcon.left, rIcon.top);
 			}
 
 			//메뉴 아이콘 유무에 관계없이 아이콘 영역만큼 공백을 준다.
-			rText.left = rText.left + 32 + 4;
+			rText.left = rText.left + 28 + 4;
 
 			//메뉴 캡션 표시
 			dc.DrawText(m_items[i]->m_caption, rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
 			//sub button들이 존재하면 그려준다.
 			CRect r = m_items[i]->m_r;
-			r.top += 2;
+			//r.top += 2;
 			//하나의 메뉴 항목에 표시되는 sub button들의 r은 여기서 계산해서 그린다?
 			//라인 간격이 정해지면 그 때 이미 계산은 가능하다.
 			for (int j = m_items[i]->m_buttons.size() - 1; j >= 0; j--)

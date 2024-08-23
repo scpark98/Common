@@ -201,6 +201,19 @@ COLORREF get_color(COLORREF crOrigin, int nOffset)
 	return RGB(r, g, b);
 }
 
+Gdiplus::Color	get_color(Gdiplus::Color crOrigin, int nOffset)
+{
+	int a = crOrigin.GetA();
+	int r = crOrigin.GetR() + nOffset;
+	int g = crOrigin.GetG() + nOffset;
+	int b = crOrigin.GetB() + nOffset;
+
+	if (r < 0) r = 0; else if (r > 255) r = 255;
+	if (g < 0) g = 0; else if (g > 255) g = 255;
+	if (b < 0) b = 0; else if (b > 255) b = 255;
+
+	return Gdiplus::Color(a, r, g, b);
+}
 
 //두 색의 중간 비율 색상값을 구한다. (ratio는 0.0~1.0사이이고 이 값이 0.0이면 cr1이, 1.0이면 cr2가 리턴된다.)
 COLORREF get_color(COLORREF cr1, COLORREF cr2, double ratio)
@@ -273,6 +286,12 @@ COLORREF gray_color(COLORREF cr)
 {
 	uint8_t gray = gray_value(GetRValue(cr), GetGValue(cr), GetBValue(cr));
 	return RGB(gray, gray, gray);
+}
+
+Gdiplus::Color	gray_color(Gdiplus::Color cr)
+{
+	uint8_t gray = gray_value(cr.GetR(), cr.GetG(), cr.GetB());
+	return Gdiplus::Color(cr.GetA(), gray, gray, gray);
 }
 
 double color_similarity_distance(COLORREF c1, COLORREF c2)

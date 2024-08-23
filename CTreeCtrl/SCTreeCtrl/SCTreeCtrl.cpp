@@ -42,6 +42,12 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDED, &CSCTreeCtrl::OnTvnItemexpanded)
 	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomDraw)
 	ON_WM_TIMER()
+	ON_WM_CONTEXTMENU()
+	ON_NOTIFY_REFLECT(NM_RCLICK, &CSCTreeCtrl::OnNMRClick)
+	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCTreeCtrl::OnMessageCSCMenu)
+	ON_WM_VSCROLL()
+	ON_WM_MOUSEHWHEEL()
+	ON_WM_MOUSEWHEEL()
 END_MESSAGE_MAP()
 
 
@@ -603,7 +609,7 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 	m_image_size = 16;
 	m_pShellImageList = pShellImageList;
 
-	SetImageList(&m_pShellImageList->m_imagelist_small, TVSIL_NORMAL);
+	SetImageList(m_pShellImageList->get_imagelist(true), TVSIL_NORMAL);
 	m_desktopItem = insert_special_folder(CSIDL_DESKTOP);
 	m_documentItem = insert_special_folder(CSIDL_MYDOCUMENTS);
 	m_computerItem = insert_special_folder(CSIDL_DRIVES);
@@ -1209,12 +1215,6 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 	return hItem;
 }
 */
-//해당 state인지 판별(ex. TVIS_EXPAND)
-bool CSCTreeCtrl::get_item_state(HTREEITEM hItem, UINT state)
-{
-	UINT cur_state = GetItemState(hItem, TVIF_STATE);
-	return (cur_state & state);
-}
 
 void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 {
@@ -1344,24 +1344,52 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_DragItem = pNMTreeView->itemNew.hItem;
 	CString path = convert_special_folder_to_real_path(get_fullpath(m_DragItem));
 	
+	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
+	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
+	//"선택 영역 항상 표시" 속성 또한 true여야 한다.
+	::SetFocus(m_hWnd);
+	SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
 
 	int item_count = get_sub_folders(path, NULL, false, true);
 	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 
-	if (m_drag_images_id.size() == 1)
-		bmpRes.load(m_drag_images_id[0]);
-	else if (m_drag_images_id.size() > 1)
-		bmpRes.load(item_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+	if (m_pDragImage)
+	{
+		m_pDragImage->DeleteImageList();
+		m_pDragImage = NULL;
+	}
 
-	bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(item_count), 20, 2,
-		_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+	//drag_image가 없다면 노드 자체 아이콘 및 레이블을 이용한다.
+	//GDI를 이용해서 create_drag_image()를 사용했으나 아이콘과 함께 레이블을 출력할 때 오동작함. 수정 필요.
+	//GDIPlus를 이용한 create_drag_image()를 이용해서 만드는 것도 좋을듯함.
+	if (m_drag_images_id.size() == 0)
+	{
+		//bmpRes.create_drag_image(this);
+		m_pDragImage = create_drag_image((CTreeCtrl*)this, &pNMTreeView->ptDrag);
+	}
+	else
+	{
+		//drag_image가 1개일 경우
+		if (m_drag_images_id.size() == 1)
+		{
+			bmpRes.load(m_drag_images_id[0]);
+		}
+		//drag_image가 2개 이상일 경우는 drag count에 따라 0번 또는 1번 이미지를 사용한다.
+		else if (m_drag_images_id.size() > 1)
+		{
+			bmpRes.load(item_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+		}
 
-	m_pDragImage = new CImageList();
-	m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
+		//bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(item_count), 20, 2,
+		//	_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
 
-	HICON hicon;
-	bmpRes.m_pBitmap->GetHICON(&hicon);
-	m_pDragImage->Add(hicon);
+		m_pDragImage = new CImageList();
+		m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
+
+		HICON hicon;
+		bmpRes.m_pBitmap->GetHICON(&hicon);
+		m_pDragImage->Add(hicon);
+	}
 
 	ASSERT(m_pDragImage); //make sure it was created
 
@@ -1383,6 +1411,124 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	*pResult = 0;
 }
 
+//https://jiniya.net/tt/594/
+//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 사용 중지! 참고만 할것.
+CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
+{
+	//DWORD dwStyle = GetWindowLongPtr(pTree->m_hWnd, GWL_STYLE) & LVS_TYPEMASK;
+	CRect rectComplete(0, 0, 0, 0);
+	HTREEITEM hItem = GetSelectedItem();
+
+	if (hItem == NULL)
+		return NULL;
+
+	// Determine List Control Client width size  
+	CRect rc;
+	pTree->GetClientRect(rc);
+	int nWidth = rc.Width() + 50;
+
+	GetItemRect(hItem, rectComplete, TRUE);
+
+	// Create memory device context  
+	CClientDC dcClient(this);
+	CDC dcMem;
+	CBitmap Bitmap;
+
+	if (!dcMem.CreateCompatibleDC(&dcClient))
+		return NULL;
+
+	if (!Bitmap.CreateCompatibleBitmap(&dcClient
+		, rectComplete.Width()
+		, rectComplete.Height()))
+		return NULL;
+
+	CBitmap* pOldMemDCBitmap = dcMem.SelectObject(&Bitmap);
+	// Use green as mask color  
+	dcMem.FillSolidRect(0
+		, 0
+		, rectComplete.Width()
+		, rectComplete.Height()
+		, RGB(255, 255, 0));
+
+	// 안티알리아스 안된 폰트를 사용하는게 핵심
+	CFont* pFont = pTree->GetFont();
+	LOGFONT lf;
+	pFont->GetLogFont(&lf);
+	//lf.lfQuality = NONANTIALIASED_QUALITY;
+	CFont newFont;
+	newFont.CreateFontIndirect(&lf);
+
+	CFont* oldFont = dcMem.SelectObject(&newFont);
+	////////////////////////////////////////////////  
+
+	// Paint each DragImage in the DC  
+	TCHAR buffer[1000];
+	TVITEM item = { 0 };
+	item.mask = LVIF_TEXT | LVIF_IMAGE;
+	item.hItem = hItem;
+	item.pszText = buffer;
+	item.cchTextMax = 999;
+
+	pTree->GetItem(&item);
+
+	// Draw the icon  
+
+	CImageList* pSingleImageList = pTree->GetImageList(TVSIL_NORMAL);
+
+	if (pSingleImageList)
+	{
+		CRect rectIcon;
+		pTree->GetItemRect(hItem, rectIcon, LVIR_ICON);
+
+		IMAGEINFO info;
+		pSingleImageList->GetImageInfo(item.iImage, &info);
+		CPoint p((rectIcon.left - rectComplete.left
+			+ rectIcon.right - rectComplete.left) / 2
+			- (info.rcImage.right - info.rcImage.left) / 2,
+			(rectIcon.top - rectComplete.top
+				+ rectIcon.bottom - rectComplete.top) / 2
+			- (info.rcImage.bottom - info.rcImage.top) / 2);
+
+		pSingleImageList->Draw(&dcMem, item.iImage, CPoint(0, 0), ILD_TRANSPARENT);
+	}
+
+	// Draw the text  
+	CString text;
+	text = item.pszText;
+	CRect textRect;
+	pTree->GetItemRect(hItem, textRect, LVIR_LABEL);
+
+	textRect.top -= rectComplete.top - 2;
+	textRect.bottom -= rectComplete.top + 1;
+	textRect.left -= rectComplete.left - 2;
+	textRect.right -= rectComplete.left;
+
+	//dcMem.FillSolidRect(textRect, RGB(255, 0, 0));
+	dcMem.SetTextColor(RGB(255, 0, 0));
+	DWORD flags = DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP | DT_WORDBREAK;
+	dcMem.DrawText(text, -1, textRect, flags);
+
+	dcMem.SelectObject(oldFont);
+	dcMem.SelectObject(pOldMemDCBitmap);
+
+	// Create drag image(list)  
+	CImageList* pCompleteImageList = new CImageList;
+	pCompleteImageList->Create(rectComplete.Width()
+		, rectComplete.Height()
+		, ILC_COLOR32 | ILC_MASK
+		, 0
+		, 1);
+	pCompleteImageList->Add(&Bitmap, RGB(0, 255, 0));
+	Bitmap.DeleteObject();
+
+	if (lpPoint)
+	{
+		lpPoint->x = rectComplete.left;
+		lpPoint->y = rectComplete.top;
+	}
+
+	return pCompleteImageList;
+}
 
 void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 {
@@ -1536,8 +1682,8 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 		TRACE(_T("drag item = %s\n"), GetItemText(m_DragItem));
 		TRACE(_T("dropped on = %s\n"), pDropTreeCtrl->GetItemText(m_DropItem));
 
-		//같은 CTreeCtrl내에서 노드 이동
-		if (pDragWnd == pDropWnd)
+		//같은 CTreeCtrl내에서 노드 이동, 같은 item이면 skip.
+		if ((pDragWnd == pDropWnd) && (m_DragItem != m_DropItem))
 		{
 			move_tree_item(this, m_DragItem, m_DropItem);
 		}
@@ -2082,12 +2228,6 @@ BOOL CSCTreeCtrl::OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult)
 	return FALSE;
 }
 
-//기본 CPaint::OnPaint()를 사용할 지, 직접 그려줄 지
-void CSCTreeCtrl::use_custom_draw(bool custom)
-{
-	m_use_custom_draw = custom;
-	Invalidate();
-}
 
 void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 {
@@ -2485,4 +2625,185 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 	}
 
 	CTreeCtrl::OnTimer(nIDEvent);
+}
+
+
+void CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	//context menu를 띠우기 위해 OnContextMenu()를 추가했으나
+	//우클릭으로는 OnContextMenu()가 호출되지 않았고 더블우클릭을 해야 OnContextMenu()가 호출되는 현상이 있다.
+	//검색해보니 NM_RCLICK에서도 아래와 같은 처리를 해줘야 한다.
+
+	TRACE0("CMyTreeCtrl::OnRClick()\n");
+	// Send WM_CONTEXTMENU to self
+	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, GetMessagePos());
+	// Mark message as handled and suppress default handling
+	*pResult = 1;
+}
+
+void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
+{
+	//우클릭되면 해당 아이템을 SELECTED로 수동 설정해야 한다.
+	// if Shift-F10
+	if (point.x == -1 && point.y == -1)
+		point = (CPoint)GetMessagePos();
+
+	UINT uFlags;
+	HTREEITEM hItem;
+
+	ScreenToClient(&point);
+	hItem = HitTest(point, &uFlags);
+
+	if (hItem == NULL)
+		return;
+
+	SelectItem(hItem);
+
+	LANGID langID = GetSystemDefaultUILanguage();
+
+	if (m_menu.m_hWnd == NULL)
+	{
+		m_menu.create(this, 160);
+		m_menu.add(menu_add_item, (m_is_shell_treectrl ? _T("새 폴더(&N)") : _T("새 항목(&N)")));
+		m_menu.add(menu_rename_item, (m_is_shell_treectrl ? _T("이름 바꾸기(&M)") : _T("이름 바꾸기(&M)")));
+		m_menu.add(-1);
+		m_menu.add(menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
+	}
+
+	ClientToScreen(&point);
+	m_menu.popup_menu(point.x, point.y);
+}
+
+
+LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
+{
+	CSCMenuMessage* msg = (CSCMenuMessage*)wParam;
+
+	if (msg->m_message == CSCMenu::message_scmenu_selchanged)
+	{
+		TRACE(_T("m_message = %d, m_menu_item->m_id = %d\n"), msg->m_message, msg->m_menu_item->m_id);
+		switch (msg->m_menu_item->m_id)
+		{
+			case menu_add_item :
+			{
+				add_sub_item();
+				break;
+			}
+			case menu_rename_item:
+			{
+				rename_item();
+				break;
+			}
+			case menu_delete_item:
+			{
+				delete_item();
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
+
+//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.
+void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
+{
+	if (hParent == NULL)
+		hParent = GetSelectedItem();
+	if (hParent == NULL)
+		return;
+
+	HTREEITEM hItem;
+
+	if (label.IsEmpty())
+	{
+		if (m_is_shell_treectrl)
+		{
+			TV_INSERTSTRUCT tvItem;
+			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
+			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
+			//tvInsert.item.cChildren = TRUE;
+			tvItem.hInsertAfter = TVI_LAST;
+			tvItem.hParent = hParent;
+			tvItem.item.pszText = (LPTSTR)(LPCTSTR)_T("새 폴더");
+			hItem = InsertItem(&tvItem);
+		}
+		else
+		{
+			hItem = InsertItem(_T("새 항목"), hParent);
+		}
+
+		edit_item(hItem);
+	}
+	else
+	{
+		hItem = InsertItem(label, hParent);
+	}
+}
+
+//주어진 항목의 label을 변경한다.
+void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
+{
+	if (hItem == NULL)
+		hItem = GetSelectedItem();
+	if (hItem == NULL)
+		return;
+
+	if (new_label.IsEmpty())
+	{
+		edit_item(hItem);
+	}
+	else
+	{
+		SetItemText(hItem, new_label);
+	}
+}
+
+void CSCTreeCtrl::delete_item(bool confirm)
+{
+	HTREEITEM hItem = GetSelectedItem();
+	if (hItem == NULL)
+		return;
+
+	if (confirm)
+	{
+		CString msg;
+		msg.Format(_T("%s\n위 항목을 삭제합니다."), GetItemText(hItem));
+		int res = AfxMessageBox(msg, MB_OKCANCEL);
+		if (res == IDCANCEL)
+			return;
+	}
+
+	DeleteItem(hItem);
+}
+
+
+void CSCTreeCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//기대 : 편집중에 스크롤 할 경우는 편집 취소처리한다.
+	//결과 : 편집중일때는 여기로 오지 않는다. editbox가 가로채는듯하다.
+	edit_end(false);
+
+	CTreeCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+}
+
+//윈도우 탐색기의 폴더뷰를 보면 마우스 휠의 vscroll, hscroll을 모두 vscroll로 처리하고 있으며
+//실제 가로 스크롤
+void CSCTreeCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
+	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	edit_end(false);
+	CTreeCtrl::OnMouseHWheel(nFlags, zDelta, pt);
+}
+
+
+BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	edit_end(false);
+	return CTreeCtrl::OnMouseWheel(nFlags, zDelta, pt);
 }

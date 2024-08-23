@@ -24,6 +24,8 @@ public:
 	void Initialize();
 	int  FindCache(CString szFileExt);
 	void InsertCache(CString szFileExt, int ID);
+
+	CImageList* get_imagelist(bool small_icon = true);
 	
 	int  GetImageListIcon(CString szPath, CString szFile);
 	void GetSystemDisplayName(CString szFile, CString &szDisplayName);

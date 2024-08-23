@@ -454,8 +454,8 @@ void CGdiButton::set_alpha(float alpha)
 		m_image[i]->img[3].set_alpha(alpha);
 	}
 }
-
-void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
+/*
+void CGdiButton::add_rgb(int red, int green, int blue, Gdiplus::Color crExcept)
 {
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
@@ -467,6 +467,13 @@ void CGdiButton::add_rgb(int red, int green, int blue, COLORREF crExcept)
 	//Invalidate();
 	redraw_window();
 }
+*/
+void CGdiButton::set_transparent(bool trans)
+{
+	m_transparent = trans;
+	m_cr_back.clear();
+	redraw_window();
+}
 
 CGdiButton& CGdiButton::text(CString text)
 {
@@ -476,12 +483,12 @@ CGdiButton& CGdiButton::text(CString text)
 	return *this;
 }
 
-CGdiButton& CGdiButton::text_color(COLORREF normal)
+CGdiButton& CGdiButton::text_color(Gdiplus::Color normal)
 {
 	return text_color(normal, normal, normal, gray_color(normal));
 }
 
-CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
+CGdiButton& CGdiButton::text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
 {
 	m_cr_text.clear();
 
@@ -494,7 +501,7 @@ CGdiButton& CGdiButton::text_color(COLORREF normal, COLORREF over, COLORREF down
 	return *this;
 }
 
-CGdiButton& CGdiButton::back_color(COLORREF normal, bool auto_set_color)
+CGdiButton& CGdiButton::back_color(Gdiplus::Color normal, bool auto_set_color)
 {
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
 	if (auto_set_color)
@@ -503,7 +510,7 @@ CGdiButton& CGdiButton::back_color(COLORREF normal, bool auto_set_color)
 	return back_color(normal, normal, normal, gray_color(normal));
 }
 
-CGdiButton& CGdiButton::back_color(COLORREF normal, COLORREF over, COLORREF down, COLORREF disabled)
+CGdiButton& CGdiButton::back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
 {
 	//배경색을 설정하면 배경 이미지는 해제시킨다.
 	//단, round가 들어간다면 투명처리해야 한다.
@@ -780,8 +787,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CPoint		pt(0, 0);
 	CGdiplusBitmap*	pImage = NULL;
 	CString		text;
-	COLORREF	cr_text = ::GetSysColor(COLOR_BTNTEXT);
-	COLORREF	cr_back = ::GetSysColor(COLOR_3DFACE);
+	Gdiplus::Color	cr_text = ::GetSysColor(COLOR_BTNTEXT);
+	Gdiplus::Color	cr_back = ::GetSysColor(COLOR_3DFACE);
 	DWORD		dwStyle = GetStyle();
 	DWORD		dwText = 0;
 
@@ -864,14 +871,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (m_round == 0)
 		{
-			dc.FillSolidRect(rc, cr_back);
+			dc.FillSolidRect(rc, gpColor2RGB(cr_back));
 		}
 		else
 		{
-			Color color;
-			color.SetFromCOLORREF(cr_back);
-
-			SolidBrush brush(color);
+			SolidBrush brush(cr_back);
 			g.FillPath(&brush, &roundPath);
 		}
 	}
@@ -931,9 +935,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (m_use_hover && m_bHover && m_hover_rect)
 		{
-			Color color;
-			color.SetFromCOLORREF(m_hover_rect_color);
-			Pen pen(color, (Gdiplus::REAL)m_hover_rect_thick);
+			Pen pen(m_hover_rect_color, (Gdiplus::REAL)m_hover_rect_thick);
 			g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, m_width, m_height));
 		}
 
@@ -944,10 +946,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			//TRACE(_T("draw focus rect\n"));
 			//pDC->DrawFocusRect(rc);
-			Color	color;
-
-			color.SetFromCOLORREF(m_crFocusRect);
-			Pen	pen(color, (Gdiplus::REAL)m_nFocusRectWidth);
+			Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
 			pen.SetDashStyle(DashStyleDot);
 			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 		}
@@ -967,7 +966,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + size * 2 - 1;
 			r.top = r.CenterPoint().y - size + 2;
 			r.bottom = r.top + size * 2 - 1;
-			DrawRectangle(&dc, r, cr_text, RGB(255, 255, 255));
+			DrawRectangle(&dc, r, gpColor2RGB(cr_text), RGB(255, 255, 255));
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
 
@@ -1000,10 +999,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				r.top = r.CenterPoint().y - size;
 				r.bottom = r.top + size * 2 + 1;
 
-				Color color;
-				color.SetFromCOLORREF(cr_text);
-				Pen pen(color, 0.8);
-				SolidBrush br(color);
+				Pen pen(cr_text, 0.8);
+				SolidBrush br(cr_text);
 				g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
 
 				if (GetCheck())
@@ -1071,7 +1068,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CFont *pOldFont = dc.SelectObject(&m_font);
 
 	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(cr_text);
+	dc.SetTextColor(gpColor2RGB(cr_text));
 	dc.DrawText(m_text, rText, dwText);
 	dc.SelectObject(pOldFont);
 }
@@ -1117,9 +1114,9 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 	//	return;
 
 	m_bHover = true;
-	Invalidate();
+	redraw_window();
 
-	//TRACE(_T("hover\n"));
+	TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSEHOVER)), 0);
 
@@ -1137,7 +1134,7 @@ void CGdiButton::OnMouseLeave()
 	m_bHover = false;
 	redraw_window();
 
-	//TRACE(_T("leave\n"));
+	TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSELEAVE)), 0);
 
@@ -1321,8 +1318,6 @@ void CGdiButton::redraw_window(bool bErase)
 	{
 		Invalidate();
 	}
-
-	return;
 }
 
 void CGdiButton::Toggle()
@@ -1494,7 +1489,7 @@ void CGdiButton::use_hover(bool use)
 	m_use_hover = use;
 }
 
-void CGdiButton::set_hover_rect(int thick, COLORREF cr)
+void CGdiButton::set_hover_rect(int thick, Gdiplus::Color cr)
 {
 	m_hover_rect = true;
 	m_hover_rect_thick = thick;
@@ -1508,7 +1503,7 @@ void CGdiButton::set_hover_rect_thick(int thick)
 	Invalidate();
 }
 
-void CGdiButton::set_hover_rect_color(COLORREF cr)
+void CGdiButton::set_hover_rect_color(Gdiplus::Color cr)
 {
 	m_hover_rect_color = cr;
 	Invalidate();

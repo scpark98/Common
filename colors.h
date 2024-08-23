@@ -358,37 +358,39 @@ enum Colors
 	*/
 };
 
-COLORREF	get_color(COLORREF crOrigin, int nOffset);
+COLORREF		get_color(COLORREF crOrigin, int nOffset);
+Gdiplus::Color	get_color(Gdiplus::Color crOrigin, int nOffset);
 //두 색의 중간 비율 색상값을 구한다. (ratio가 0.0이면 cr1이, 1.0이면 cr2가 리턴된다.)
-COLORREF	get_color(COLORREF cr1, COLORREF cr2, double ratio);
+COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
 
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
-COLORREF	get_color(CString cr);
+COLORREF		get_color(CString cr);
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
-CString		get_color_string(COLORREF cr);
+CString			get_color_string(COLORREF cr);
 
 //보색
-COLORREF	get_complementary_color(COLORREF cr);
+COLORREF		get_complementary_color(COLORREF cr);
 
 //rgb 평균 리턴
-uint8_t		gray_value(uint8_t r, uint8_t g, uint8_t b);
+uint8_t			gray_value(uint8_t r, uint8_t g, uint8_t b);
 //rgb 평균 리턴
-uint8_t		gray_value(COLORREF cr);
+uint8_t			gray_value(COLORREF cr);
 //rgb 평균인 컬러값 리턴
-COLORREF	gray_color(COLORREF cr);
+COLORREF		gray_color(COLORREF cr);
+Gdiplus::Color	gray_color(Gdiplus::Color cr);
 
-double		color_similarity_distance(COLORREF c1, COLORREF c2);
-COLORREF	get_default_color(int index);
-COLORREF	get_random_color();
+double			color_similarity_distance(COLORREF c1, COLORREF c2);
+COLORREF		get_default_color(int index);
+COLORREF		get_random_color();
 
 //r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
-void		rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
+void			rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
 //r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
-void		hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
-COLORREF	hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
+void			hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
+COLORREF		hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
 
-COLORREF	gpColor2RGB(Gdiplus::Color cr);
-Gdiplus::Color RGB2gpColor(COLORREF cr, BYTE alpha = 255);
+COLORREF		gpColor2RGB(Gdiplus::Color cr);
+Gdiplus::Color	RGB2gpColor(COLORREF cr, BYTE alpha = 255);
 
 //cr컬러에서 a,r,g,b 중 한 색을 value로 변경한다.
 void			set_color(Gdiplus::Color &cr, int argb, BYTE value);
@@ -396,11 +398,11 @@ Gdiplus::Color	get_color(Gdiplus::Color cr, int argb, BYTE value);
 
 //red ~ green 범위에서 37%일때의 색상은? get_color(0, 120, 37); (0:red, 120:green of hue)
 //hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)
-COLORREF	get_color(int hue_start, int hue_end, int percent, float saturation = 1.0f, float value = 1.0f);
-int			get_hue(COLORREF cr);
+COLORREF		get_color(int hue_start, int hue_end, int percent, float saturation = 1.0f, float value = 1.0f);
+int				get_hue(COLORREF cr);
 
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
-CString		get_color_name_of_closest(COLORREF cr, COLORREF *cr_closest = NULL);
+CString			get_color_name_of_closest(COLORREF cr, COLORREF *cr_closest = NULL);
 
 extern COLORREF g_default_color[16];
 #endif

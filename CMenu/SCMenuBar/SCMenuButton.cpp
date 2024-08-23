@@ -82,3 +82,14 @@ LRESULT CSCMenuButton::on_message_SCMenu(WPARAM wParam, LPARAM lParam)
 	::SendMessage(m_parent->m_hWnd, Message_CSCMenu, wParam, lParam);
 	return 0;
 }
+
+void CSCMenuButton::set_text_color(Gdiplus::Color cr_text)
+{
+	text_color(cr_text);
+}
+
+void CSCMenuButton::set_back_color(Gdiplus::Color cr_back)
+{
+	back_color(cr_back);
+}
+

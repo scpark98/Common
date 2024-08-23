@@ -31,7 +31,7 @@ void CSCMenuBar::DoDataExchange(CDataExchange* pDX)
 
 
 BEGIN_MESSAGE_MAP(CSCMenuBar, CDialogEx)
-	ON_COMMAND_RANGE(MENU_BUTTON_ID, MENU_BUTTON_ID + 100, on_button_clicked)
+	ON_COMMAND_RANGE(MENU_BUTTON_ID, MENU_BUTTON_ID + 100, &CSCMenuBar::on_menu_button_clicked)
 	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCMenuBar::on_message_SCMenu)
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CSCMenuBar::on_message_GdiButton)
 END_MESSAGE_MAP()
@@ -177,9 +177,6 @@ void CSCMenuBar::reconstruct_font()
 
 	SetFont(&m_font, true);
 
-	//m_line_height = -m_lf.lfHeight + 10;
-	//recalc_items_rect();
-
 	ASSERT(bCreated);
 }
 
@@ -203,29 +200,26 @@ void CSCMenuBar::create_menu_buttons()
 	}
 }
 
-void CSCMenuBar::on_button_clicked(UINT id)
+void CSCMenuBar::on_menu_button_clicked(UINT id)
 {
 	TRACE(_T("m_cur_menu = %d, id = %d, MENU_BUTTON_ID = %d, %d\n"), m_cur_menu, id, MENU_BUTTON_ID, id - MENU_BUTTON_ID);
 
 	//현재 보여지는 메뉴 항목이면 hide
 	//메뉴 버튼이 클릭되는 순간 CSCMenu 입장에서는 killfocus가 되므로 메뉴는 사라지고 m_cur_menu도 -1로 리셋되므로
 	//현재는 아래 코드가 수행되지 않는 구조다.
-	if (m_cur_menu == id - (UINT)MENU_BUTTON_ID - 200)
+	if (m_cur_menu == id - (UINT)MENU_BUTTON_ID)
 	{
 		m_menu_button[m_cur_menu]->popup_hide();
 		m_cur_menu = -1;
 		return;
 	}
 
-	m_cur_menu = id - (UINT)MENU_BUTTON_ID - 200;
-
-	//m_menu_button[id - MENU_BUTTON_ID - 200]->ShowWindow(SW_SHOW);
+	m_cur_menu = id - (UINT)MENU_BUTTON_ID;
 
 	CRect rw;
 
-	m_menu_button[id - MENU_BUTTON_ID - 200]->GetWindowRect(rw);
-	m_menu_button[id - MENU_BUTTON_ID - 200]->popup_menu();
-	m_cur_menu = id - MENU_BUTTON_ID - 200;
+	m_menu_button[m_cur_menu]->GetWindowRect(rw);
+	m_menu_button[m_cur_menu]->popup_menu();
 }
 
 
@@ -265,27 +259,30 @@ LRESULT	CSCMenuBar::on_message_GdiButton(WPARAM wParam, LPARAM lParam)
 	}
 	else if (msg->m_message == WM_LBUTTONUP)
 	{
-		TRACE(_T("m_cur_menu = %d, id = %d, MENU_BUTTON_ID = %d, %d\n"), m_cur_menu, msg->m_ctrl_id, MENU_BUTTON_ID, msg->m_ctrl_id - MENU_BUTTON_ID);
-
+		TRACE(_T("m_cur_menu = %d, id = %d, MENU_BUTTON_ID = %d, id - MENU_BUTTON_ID = %d\n"), m_cur_menu, msg->m_ctrl_id, MENU_BUTTON_ID, msg->m_ctrl_id - MENU_BUTTON_ID);
+		//메뉴버튼이 눌려지면 on_menu_button_clicked()에서 처리하므로
+		//CGdiButton이 보내오는 WM_LBUTTONUP에서는 별도 처리하지 않는다.
+		/*
 		//현재 보여지는 메뉴 항목이면 hide
 		//메뉴 버튼이 클릭되는 순간 CSCMenu 입장에서는 killfocus가 되므로 메뉴는 사라지고 m_cur_menu도 -1로 리셋되므로
 		//현재는 아래 코드가 수행되지 않는 구조다.
-		if (m_cur_menu == msg->m_ctrl_id - (UINT)MENU_BUTTON_ID - 200)
+		if (m_cur_menu == (msg->m_ctrl_id - (UINT)MENU_BUTTON_ID))
 		{
 			m_menu_button[m_cur_menu]->popup_hide();
 			m_cur_menu = -1;
 			return 0;
 		}
 
-		m_cur_menu = msg->m_ctrl_id - (UINT)MENU_BUTTON_ID - 200;
+		m_cur_menu = msg->m_ctrl_id - (UINT)MENU_BUTTON_ID;
 
-		//m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID - 200]->ShowWindow(SW_SHOW);
+		//m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID]->ShowWindow(SW_SHOW);
 
 		CRect rw;
 
-		m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID - 200]->GetWindowRect(rw);
-		m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID - 200]->popup_menu();
-		m_cur_menu = msg->m_ctrl_id - MENU_BUTTON_ID - 200;
+		m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID]->GetWindowRect(rw);
+		m_menu_button[msg->m_ctrl_id - MENU_BUTTON_ID]->popup_menu();
+		m_cur_menu = msg->m_ctrl_id - MENU_BUTTON_ID;
+		*/
 	}
 
 	return 0;
@@ -332,22 +329,22 @@ void CSCMenuBar::set_color_theme(int theme)
 	switch (theme)
 	{
 	case CSCMenu::color_theme_default:
-		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
-		m_cr_text_selected = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_back = ::GetSysColor(COLOR_3DFACE);
-		m_cr_back_selected = RGB(174, 215, 247);
+		m_cr_text = RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+		m_cr_back = RGB2gpColor(::GetSysColor(COLOR_3DFACE));
+		m_cr_back_selected = RGB2gpColor(RGB(174, 215, 247));
 		break;
 	case CSCMenu::color_theme_dark_gray:
-		m_cr_text = RGB(210, 220, 221);
+		m_cr_text = RGB2gpColor(RGB(210, 220, 221));
 		m_cr_text_selected = m_cr_text;
-		m_cr_back = RGB(45, 45, 48); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_back_selected = RGB(27, 27, 28);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back = RGB2gpColor(RGB(45, 45, 48)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back_selected = RGB2gpColor(RGB(27, 27, 28));// ::GetSysColor(COLOR_HIGHLIGHT);
 		break;
 	case CSCMenu::color_theme_linkmemine:
-		m_cr_text = RGB(208, 211, 220);
+		m_cr_text = RGB2gpColor(RGB(208, 211, 220));
 		m_cr_text_selected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_back = RGB(64, 73, 88);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_back_selected = RGB(45, 51, 51);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back = RGB2gpColor(RGB(64, 73, 88));// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back_selected = RGB2gpColor(RGB(45, 51, 51));// ::GetSysColor(COLOR_HIGHLIGHT);
 		break;
 	}
 
@@ -359,14 +356,16 @@ void CSCMenuBar::set_color_theme(int theme)
 	}
 }
 
-void CSCMenuBar::set_menu_text_color(COLORREF cr_text)
+void CSCMenuBar::set_text_color(Gdiplus::Color cr_text)
 {
-
+	for (int i = 0; i < m_menu_button.size(); i++)
+		m_menu_button[i]->set_text_color(cr_text);
 }
 
-void CSCMenuBar::set_menu_back_color(COLORREF cr_back)
+void CSCMenuBar::set_back_color(Gdiplus::Color cr_back)
 {
-
+	for (int i = 0; i < m_menu_button.size(); i++)
+		m_menu_button[i]->set_back_color(cr_back);
 }
 
 //메뉴가 표시되는 영역을 반투명으로 표시
@@ -386,4 +385,10 @@ BOOL CSCMenuBar::PreTranslateMessage(MSG* pMsg)
 	}
 
 	return CDialogEx::PreTranslateMessage(pMsg);
+}
+
+void CSCMenuBar::set_menu_line_height(int height)
+{
+	for (int i = 0; i < m_menu_button.size(); i++)
+		m_menu_button[i]->get_menu()->set_line_height(height);
 }

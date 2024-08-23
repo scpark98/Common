@@ -29,6 +29,7 @@
 
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
+#include "../../CMenu/SCMenuBar/SCMenu.h"
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
 
@@ -77,11 +78,9 @@ public:
 		message_drag_and_drop,
 	};
 
-	//기본 CPaint::OnPaint()를 사용할 지, 직접 그려줄 지
-	void		use_custom_draw(bool custom);
 
 	int			get_indent_size() { return m_indent_size; }
-	void		set_indent_size(int sz) { m_indent_size = sz; Invalidate(); }
+	void		set_indent_size(int size) { m_indent_size = size; Invalidate(); }
 
 	//스타일 변경
 	void		full_row_selection(bool full_row);
@@ -151,11 +150,6 @@ public:
 
 	void		expand_all(bool expand = true);
 
-	//해당 state인지 판별(ex. TVIS_EXPAND)
-	bool		get_item_state(HTREEITEM hItem, UINT state);
-
-	void		set_items_state(UINT state, UINT mask);
-
 	//컬러 관련
 	enum listctrlex_color_theme
 	{
@@ -186,9 +180,9 @@ public:
 
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			set_use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
-	HTREEITEM		m_DragItem = NULL;			//drag item in the Tree we are dragging FROM
-	HTREEITEM		m_DropItem = NULL;			//dropped item on the Tree we dropped ON
-	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
+	HTREEITEM		m_DragItem = NULL;			//drag되는 아이템
+	HTREEITEM		m_DropItem = NULL;			//drop된 아이템
+	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 
 	BOOL			move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem);
 	BOOL			move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
@@ -223,7 +217,25 @@ protected:
 		timer_expand_for_drop = 0,
 	};
 
-	bool			m_use_custom_draw = true;
+	//popup menu
+	enum POPUP_MENU_ID
+	{
+		//Resource의 menu id가 아닌 사용자 정의 id를 사용한다면 주의할 것.
+		//특히 Resource의 menu에서는 separator의 id가 0이므로
+		//사용자가 추가한 메뉴 id도 절대 0부터 시작하지 말것!
+		menu_add_item = WM_USER + 473,
+		menu_rename_item,
+		menu_delete_item,
+	};
+	CSCMenu			m_menu;
+	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
+
+	//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.
+	void			add_sub_item(HTREEITEM hParent = NULL, CString label = _T(""));
+	//주어진 항목의 label을 변경한다.
+	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
+	void			delete_item(bool confirm = true);
+
 
 	//들여쓰기 크기
 	int				m_indent_size = 16;
@@ -276,6 +288,9 @@ protected:
 	bool			m_bDragging = false;		//T during a drag operation
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
+	//https://jiniya.net/tt/594/
+	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
+	CImageList*		create_drag_image(CTreeCtrl* pList, LPPOINT lpPoint);
 
 	//편집 관련
 	CEdit*			m_pEdit = NULL;
@@ -318,6 +333,11 @@ public:
 	afx_msg void OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
+	afx_msg void OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 };
 
 

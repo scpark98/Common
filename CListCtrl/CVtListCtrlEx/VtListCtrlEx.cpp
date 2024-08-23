@@ -425,6 +425,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 				if (m_is_shell_listctrl)
 				{
+					icon_index = m_list_db[iItem].img_idx;
+					/*
 					if (get_text(iItem, col_filesize).IsEmpty())
 					{
 						real_path = _T("c:\\Windows");
@@ -434,9 +436,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					{
 						icon_index = m_pShellImageList->GetSystemImageListIcon(real_path, false);
 					}
+					*/
 
-					m_pShellImageList->m_imagelist_small.Draw(pDC, icon_index,
-						CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+					//if (icon_index > 0)
+					{
+						m_pShellImageList->m_imagelist_small.Draw(pDC, icon_index,
+							CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
+					}
 					/*
 					if (m_shell_list_local)
 					{
@@ -1825,20 +1831,20 @@ void CVtListCtrlEx::set_progress_color(COLORREF crProgress)
 	Invalidate();
 }
 
-int CVtListCtrlEx::add_item(CString text, bool ensureVisible, bool invalidate)
+int CVtListCtrlEx::add_item(CString text, int image_index, bool ensureVisible, bool invalidate)
 {
-	return insert_item(-1, text, ensureVisible, invalidate);
+	return insert_item(-1, text, image_index, ensureVisible, invalidate);
 }
 
-int CVtListCtrlEx::add_line_string_item(CString line_string, TCHAR separator, bool ensureVisible, bool invalidate)
+int CVtListCtrlEx::add_line_string_item(CString line_string, TCHAR separator, int image_index, bool ensureVisible, bool invalidate)
 {
 	std::deque<CString> dq;
 	get_token_string(line_string, dq, separator);
-	return insert_item(-1, dq, ensureVisible, invalidate);
+	return insert_item(-1, dq, image_index, ensureVisible, invalidate);
 }
 
 //index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
-int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool invalidate)
+int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool ensureVisible, bool invalidate)
 {
 	if (get_column_count() <= 0)
 	{
@@ -1858,7 +1864,7 @@ int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool
 	else
 	*/
 	{
-		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, m_HeaderCtrlEx.GetItemCount()));
+		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
 		SetItemCountEx(m_list_db.size());
 	}
 
@@ -1876,14 +1882,14 @@ int CVtListCtrlEx::insert_item(int index, CString text, bool ensureVisible, bool
 }
 
 
-int CVtListCtrlEx::insert_item(int index, std::deque<CString> dqText, bool ensureVisible, bool invalidate)
+int CVtListCtrlEx::insert_item(int index, std::deque<CString> dqText, int image_index, bool ensureVisible, bool invalidate)
 {
 	if (dqText.size() == 0)
 		return -1;
 
 	int count = MIN(get_column_count(), dqText.size());
 	
-	index = insert_item(index, dqText[0], ensureVisible, invalidate);
+	index = insert_item(index, dqText[0], image_index, ensureVisible, invalidate);
 
 	for (int i = 1; i < count; i++)
 		set_text(index, i, dqText[i]);
@@ -2163,7 +2169,7 @@ void CVtListCtrlEx::unselect_selected_item()
 //아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
 //LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
 //drag 도중에 마우스가 다른 앱 영역으로 나가서 WM_LBUTTONUP 될 경우 drophilited 상태로 아이템이 남는 문제를 제거하기 위해.
-int CVtListCtrlEx::get_items_state(UINT state, std::deque<int>* dq)
+int CVtListCtrlEx::get_items_by_state(UINT state, std::deque<int>* dq)
 {
 	std::deque<int> items;
 
@@ -2180,9 +2186,9 @@ int CVtListCtrlEx::get_items_state(UINT state, std::deque<int>* dq)
 }
 
 //dq 목록의 아이템들의 state 세팅. dq가 null이면 모든 항목에 대해 실행
-//선택 : set_items_state(LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED, dq);
-//해제 : set_items_state(0, LVIS_SELECTED|LVIS_FOCUSED, dq);
-int CVtListCtrlEx::set_items_state(UINT state, UINT mask, std::deque<int>* dq)
+//선택 : set_items_with_state(LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED, dq);
+//해제 : set_items_with_state(0, LVIS_SELECTED|LVIS_FOCUSED, dq);
+int CVtListCtrlEx::set_items_with_state(UINT state, UINT mask, std::deque<int>* dq)
 {
 	//모든 항목에 대해 수행
 	if (dq == NULL)
@@ -2367,7 +2373,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 	//dbclick을 편집으로 사용하거나 어떤 액션으로 사용하는 것은
 	//이 클래스를 사용하는 메인에서 구현하는 것이 맞다.
-	//여기서 구현하면 편리한 경우도 있으나 범용성이 좁아진다.
+	//여기서 구현하면 편리한 경우도 있으나 범용성이 없어진다.
 	return FALSE;
 
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
@@ -2997,6 +3003,22 @@ void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
 	allow_edit_column(col_filedate, false);
 }
 
+void CVtListCtrlEx::set_shell_imagelist(CShellImageList* pShellImageList)
+{
+	m_pShellImageList = pShellImageList;
+	//이 설정을 해줘야 다른 클래스에서 CListCtrl* 타입으로도 GetImageList()를 통해 참조할 수 있다.
+	SetImageList(m_pShellImageList->get_imagelist(), LVSIL_SMALL);
+}
+
+//list의 index를 주면 fullpath를 리턴한다.
+CString CVtListCtrlEx::get_path(int index)
+{
+	if (index < 0)
+		return m_path;
+
+	return m_path + _T("\\") + get_text(index, col_filename);
+}
+
 void CVtListCtrlEx::set_path(CString path, bool refresh)
 {
 	m_last_clicked_time = 0;
@@ -3075,6 +3097,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	int index;
 	int insert_index = -1;
+	int img_idx = -1;
 
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
@@ -3092,10 +3115,11 @@ void CVtListCtrlEx::refresh_list(bool reload)
 		set_column_text_align(col_filedate, LVCFMT_LEFT);
 	}
 
-	//asce는 폴더먼저, desc는 파일먼저 표시된다.
+	//asc는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		index = insert_item(insert_index, get_part(m_cur_folders[i].path, fn_name), false, false);
+		img_idx = m_pShellImageList->GetSystemImageListIcon(m_cur_folders[i].path, true);
+		index = insert_item(insert_index, get_part(m_cur_folders[i].path, fn_name), img_idx, false, false);
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
@@ -3114,6 +3138,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 		}
 		else
 		{
+			set_text(index, col_filesize, _T(""));
 			set_text(index, col_filedate, m_cur_folders[i].date);
 			set_text_color(index, col_filedate, RGB(109, 109, 109));
 		}
@@ -3121,7 +3146,8 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		index = insert_item(insert_index, get_part(m_cur_files[i].path, fn_name), false, false);
+		img_idx = m_pShellImageList->GetSystemImageListIcon(m_cur_files[i].path, false);
+		index = insert_item(insert_index, get_part(m_cur_files[i].path, fn_name), img_idx, false, false);
 
 		set_text(index, col_filesize, get_size_string(m_cur_files[i].size));
 		set_text(index, col_filedate, m_cur_files[i].date);
@@ -3170,147 +3196,48 @@ void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
 	//SetItemText(iIndex, 2, GetDateTimeStringFromTime(GetFileLastModifiedTime(pFindFileData->cFileName), true, false, false));
 	add_file(pFindFileData->cFileName, file_is_folder ? 0 : ulInt.QuadPart, filedate, true, file_is_folder);
 }
-/*
-CImageList* CVtListCtrlEx::CreateDragImageEx(LPPOINT lpPoint)
+
+//https://jiniya.net/tt/594/
+//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 사용 중지! 참고만 할것.
+CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 {
-	CRect	cSingleRect;
-	CRect	cCompleteRect(0, 0, 0, 0);
-	int	nIdx;
-	BOOL	bFirst = TRUE;
-	//
-	// Determine the size of the drag image
-	//
-	POSITION pos = GetFirstSelectedItemPosition();
-	while (pos)
-	{
-		nIdx = GetNextSelectedItem(pos);
-		GetItemRect(nIdx, cSingleRect, LVIR_BOUNDS);
-		if (bFirst)
-		{
-			// Initialize the CompleteRect
-			GetItemRect(nIdx, cCompleteRect, LVIR_BOUNDS);
-			bFirst = FALSE;
-		}
-		cCompleteRect.UnionRect(cCompleteRect, cSingleRect);
-	}
-
-	//
-	// Create bitmap in memory DC
-	//
-	CClientDC	cDc(this);
-	CDC		cMemDC;
-	CBitmap   	cBitmap;
-
-	if (!cMemDC.CreateCompatibleDC(&cDc))
-		return NULL;
-
-	if (!cBitmap.CreateCompatibleBitmap(&cDc, cCompleteRect.Width(), cCompleteRect.Height()))
-		return NULL;
-
-	CBitmap* pOldMemDCBitmap = cMemDC.SelectObject(&cBitmap);
-	// Here green is used as mask color
-	cMemDC.FillSolidRect(0, 0, cCompleteRect.Width(), cCompleteRect.Height(), RGB(0, 255, 0));
-
-	//
-	// Paint each DragImage in the DC
-	//
-	CImageList* pSingleImageList;
-	CPoint		cPt;
-
-	pos = GetFirstSelectedItemPosition();
-	while (pos)
-	{
-		nIdx = GetNextSelectedItem(pos);
-		GetItemRect(nIdx, cSingleRect, LVIR_BOUNDS);
-
-		pSingleImageList = CreateDragImage(nIdx, &cPt);
-		if (pSingleImageList)
-		{
-			pSingleImageList->DrawIndirect(&cMemDC,
-				0,
-				CPoint(cSingleRect.left - cCompleteRect.left,
-					cSingleRect.top - cCompleteRect.top),
-				cSingleRect.Size(),
-				CPoint(0, 0));
-			delete pSingleImageList;
-		}
-	}
-
-	cMemDC.SelectObject(pOldMemDCBitmap);
-	//
-	// Create the imagelist	with the merged drag images
-	//
-	CImageList* pCompleteImageList = new CImageList;
-
-	pCompleteImageList->Create(cCompleteRect.Width(),
-		cCompleteRect.Height(),
-		ILC_COLOR | ILC_MASK, 0, 1);
-	// Here green is used as mask color
-	pCompleteImageList->Add(&cBitmap, RGB(0, 255, 0));
-
-	cBitmap.DeleteObject();
-	//
-	// as an optional service:
-	// Find the offset of the current mouse cursor to the imagelist
-	// this we can use in BeginDrag()
-	//
-	if (lpPoint)
-	{
-		CPoint cCursorPos;
-		GetCursorPos(&cCursorPos);
-		ScreenToClient(&cCursorPos);
-		lpPoint->x = cCursorPos.x - cCompleteRect.left;
-		lpPoint->y = cCursorPos.y - cCompleteRect.top;
-	}
-
-	return(pCompleteImageList);
-}
-*/
-/*
-CImageList* CVtListCtrlEx::CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint)
-{
-	if (pList->GetSelectedCount() <= 0) return NULL; // no row selected
-
-	CFont* pFontDrag = NULL;
-
-	pFontDrag = new CFont();
-	pFontDrag->CreateFont(19, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET
-		, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FF_DONTCARE, _T("맑은 고딕")
-	);
-
-	SendMessageToDescendants(WM_SETFONT, (WPARAM)pFontDrag->GetSafeHandle(), 1, TRUE, FALSE);
+	if (pList->GetSelectedCount() <= 0)
+		return NULL; // no row selected  
 
 
-	CRect rectSingle;
+	DWORD dwStyle = GetWindowLong(pList->m_hWnd, GWL_STYLE) & LVS_TYPEMASK;
+
 	CRect rectComplete(0, 0, 0, 0);
 
-	// Determine List Control Client width size
-	pList->GetClientRect(rectSingle);
-	int nWidth = rectSingle.Width();
+	// Determine List Control Client width size  
+	CRect rectClient;
+	pList->GetClientRect(rectClient);
+	int nWidth = rectClient.Width() + 50;
 
-	// Start and Stop index in view area
+	// Start and Stop index in view area  
 	int nIndex = pList->GetTopIndex() - 1;
-	int nBottomIndex = pList->GetTopIndex() + pList->GetCountPerPage() - 1;
+	int nBottomIndex = pList->GetTopIndex() + pList->GetCountPerPage();
 	if (nBottomIndex > (pList->GetItemCount() - 1))
 		nBottomIndex = pList->GetItemCount() - 1;
 
-	// Determine the size of the drag image (limite for rows visibled and Client width)
 	while ((nIndex = pList->GetNextItem(nIndex, LVNI_SELECTED)) != -1)
 	{
 		if (nIndex > nBottomIndex)
 			break;
 
-		pList->GetItemRect(nIndex, rectSingle, LVIR_BOUNDS);
+		CRect rectItem;
+		pList->GetItemRect(nIndex, rectItem, LVIR_BOUNDS);
 
-		if (rectSingle.left < 0)
-			rectSingle.left = 0;
+		if (rectItem.left < 0)
+			rectItem.left = 0;
 
-		if (rectSingle.right > nWidth)
-			rectSingle.right = nWidth;
+		if (rectItem.right > nWidth)
+			rectItem.right = nWidth;
 
-		rectComplete.UnionRect(rectComplete, rectSingle);
+		rectComplete.UnionRect(rectComplete, rectItem);
 	}
 
+	// Create memory device context  
 	CClientDC dcClient(this);
 	CDC dcMem;
 	CBitmap Bitmap;
@@ -3318,41 +3245,100 @@ CImageList* CVtListCtrlEx::CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint)
 	if (!dcMem.CreateCompatibleDC(&dcClient))
 		return NULL;
 
-	if (!Bitmap.CreateCompatibleBitmap(&dcClient, rectComplete.Width(), rectComplete.Height()))
+	if (!Bitmap.CreateCompatibleBitmap(&dcClient
+		, rectComplete.Width()
+		, rectComplete.Height()))
 		return NULL;
 
-	CBitmap *pOldMemDCBitmap = dcMem.SelectObject(&Bitmap);
-	// Use green as mask color
-	dcMem.FillSolidRect(0, 0, rectComplete.Width(), rectComplete.Height(), RGB(0, 255, 0));
+	CBitmap* pOldMemDCBitmap = dcMem.SelectObject(&Bitmap);
+	// Use green as mask color  
+	dcMem.FillSolidRect(0
+		, 0
+		, rectComplete.Width()
+		, rectComplete.Height()
+		, RGB(0, 255, 0));
 
-	// Paint each DragImage in the DC
+	// 안티알리아스 안된 폰트를 사용하는게 핵심
+	CFont* pFont = pList->GetFont();
+	LOGFONT lf;
+	pFont->GetLogFont(&lf);
+	//lf.lfQuality = NONANTIALIASED_QUALITY;
+	CFont newFont;
+	newFont.CreateFontIndirect(&lf);
+
+	CFont* oldFont = dcMem.SelectObject(&newFont);
+	////////////////////////////////////////////////  
+
+	// Paint each DragImage in the DC  
 	nIndex = pList->GetTopIndex() - 1;
 	while ((nIndex = pList->GetNextItem(nIndex, LVNI_SELECTED)) != -1)
 	{
 		if (nIndex > nBottomIndex)
 			break;
 
-		CPoint pt;
-		CImageList* pSingleImageList = pList->CreateDragImage(nIndex, &pt);
+		TCHAR buffer[1000];
+		LVITEM item = { 0 };
+		item.mask = LVIF_TEXT | LVIF_IMAGE;
+		item.iItem = nIndex;
+		item.pszText = buffer;
+		item.cchTextMax = 999;
+
+		pList->GetItem(&item);
+
+		// Draw the icon  
+		
+		CImageList* pSingleImageList = pList->GetImageList((dwStyle & LVS_ICON)
+			? LVSIL_NORMAL : LVSIL_SMALL);
 
 		if (pSingleImageList)
 		{
-			pList->GetItemRect(nIndex, rectSingle, LVIR_BOUNDS);
-			pSingleImageList->Draw(&dcMem,
-				0,
-				CPoint(rectSingle.left - rectComplete.left,
-					rectSingle.top - rectComplete.top),
-				ILD_MASK);
-			pSingleImageList->DeleteImageList();
-			delete pSingleImageList;
+			CRect rectIcon;
+			pList->GetItemRect(nIndex, rectIcon, LVIR_ICON);
+
+			IMAGEINFO info;
+			pSingleImageList->GetImageInfo(m_list_db[nIndex].img_idx, &info);
+			CPoint p((rectIcon.left - rectComplete.left
+				+ rectIcon.right - rectComplete.left) / 2
+				- (info.rcImage.right - info.rcImage.left) / 2,
+				(rectIcon.top - rectComplete.top
+					+ rectIcon.bottom - rectComplete.top) / 2
+				- (info.rcImage.bottom - info.rcImage.top) / 2
+				+ ((dwStyle == LVS_ICON) ? 2 : 0));
+
+			pSingleImageList->Draw(&dcMem, m_list_db[nIndex].img_idx, p, ILD_TRANSPARENT);
 		}
+
+		// Draw the text  
+		CString text;
+		text = item.pszText;
+		CRect textRect;
+		pList->GetItemRect(nIndex, textRect, LVIR_LABEL);
+
+		textRect.top -= rectComplete.top - 2;
+		textRect.bottom -= rectComplete.top + 1;
+		textRect.left -= rectComplete.left - 2;
+		textRect.right -= rectComplete.left;
+
+		//dcMem.FillSolidRect(textRect, RGB(255, 0, 0));
+		dcMem.SetTextColor(RGB(255, 0, 0));
+		DWORD flags = DT_END_ELLIPSIS | /*DT_MODIFYSTRING | */DT_NOCLIP;
+		if (dwStyle == LVS_ICON)
+			flags |= DT_CENTER | DT_WORDBREAK;
+		dcMem.DrawText(text, -1, textRect, flags);
 	}
 
+	dcMem.SelectObject(oldFont);
 
 	dcMem.SelectObject(pOldMemDCBitmap);
+
+	// Create drag image(list)  
 	CImageList* pCompleteImageList = new CImageList;
-	pCompleteImageList->Create(rectComplete.Width(), rectComplete.Height(), ILC_COLOR | ILC_MASK, 0, 1);
-	pCompleteImageList->Add(&Bitmap, RGB(0, 255, 0)); // Green is used as mask color
+	pCompleteImageList->Create(rectComplete.Width()
+		, rectComplete.Height()
+		, ILC_COLOR32 | ILC_MASK
+		, 0
+		, 1);
+	pCompleteImageList->Add(&Bitmap, RGB(0, 255, 0));
 	Bitmap.DeleteObject();
 
 	if (lpPoint)
@@ -3363,7 +3349,7 @@ CImageList* CVtListCtrlEx::CreateDragImageEx(CListCtrl *pList, LPPOINT lpPoint)
 
 	return pCompleteImageList;
 }
-*/
+
 void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	if (!m_use_drag_and_drop)
@@ -3376,32 +3362,54 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	CPoint pt;
 	int nOffset = -10; //offset in pixels for drag image (positive is up and to the left; neg is down and to the right)
 
-	//m_pDragImage = CreateDragImageEx(this, &pt);	<= 이 함수 안된다.
-
 	int sel_count = get_selected_items();
+
+	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
+	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
+	//"선택 영역 항상 표시" 속성 또한 true여야 한다.
+	if (sel_count == 1)
+	{
+		::SetFocus(m_hWnd);
+		select_item(m_nDragIndex);
+	}
+
+	if (m_pDragImage && m_pDragImage->GetSafeHandle())
+	{
+		m_pDragImage->DeleteImageList();
+		m_pDragImage = NULL;
+	}
+
 	CGdiplusBitmap bmpRes;// (64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 	
-	//if (m_drag_images_id.size() == 1)
-		bmpRes.load(m_drag_images_id[0]);
-	//else if (m_drag_images_id.size() > 1)
-	//	bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+	//drag_image가 없다면 노드 자체 아이콘 및 레이블을 이용한다.
+	//GDI를 이용해서 create_drag_image()를 사용했으나 아이콘과 함께 레이블을 출력할 때 오동작함. 수정 필요.
+	//GDIPlus를 이용한 create_drag_image()를 직접 만드는 것도 좋을듯함.
+	if (m_drag_images_id.size() == 0)
+	{
+		//bmpRes.create_drag_image(this);
+		m_pDragImage = create_drag_image((CListCtrl*)this, &pNMLV->ptAction);
+	}
+	else
+	{
+		if (m_drag_images_id.size() == 1)
+		{
+			bmpRes.load(m_drag_images_id[0]);
+		}
+		else if (m_drag_images_id.size() > 1)
+		{
+			bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+		}
 
-	bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(sel_count), 20, 2,
-					_T("Arial"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+		bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(sel_count), 20, 2,
+			_T("Arial"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
 
-	//예전 윈도우 탐색기처럼 선택된 항목들을 그대로 드래그 이미지로 사용하고자 구현했으나
-	//스크롤에 의해 선택항목들이 가려진 경우는 애매하므로 우선 스킵한다.
-	/*
-	CGdiplusBitmap bmpRes(10, 10, PixelFormat32bppARGB, Gdiplus::Color::Transparent);;
-	capture_selected_items_to_bitmap(&bmpRes);
-	*/
+		m_pDragImage = new CImageList();
+		m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
 
-	m_pDragImage = new CImageList();
-	m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
-
-	HICON hicon;
-	bmpRes.m_pBitmap->GetHICON(&hicon);
-	m_pDragImage->Add(hicon);
+		HICON hicon;
+		bmpRes.m_pBitmap->GetHICON(&hicon);
+		m_pDragImage->Add(hicon);
+	}
 
 
 //	SendMessageToDescendants(WM_SETFONT, (WPARAM)pFontDefault->GetSafeHandle(), 1, TRUE, FALSE);
@@ -3660,7 +3668,7 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 
 	*pResult = 0;
 }
-
+/*
 void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
 {
 	int i;
@@ -3710,3 +3718,4 @@ void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
 		bmp->draw(&sub, &rItem[i]);
 	}
 }
+*/

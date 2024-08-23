@@ -2,6 +2,7 @@
 #include "Functions.h"
 #include "MemoryDC.h"
 #include <thread>
+#include <afxcmn.h>
 
 //Gdiplus 초기화 과정을 자동으로 하기 위해 CGdiplusDummyForInitialization 타입의 static 인스턴스를 선언해준다.
 class CGdiplusDummyForInitialization
@@ -154,6 +155,36 @@ void CGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus
 	Gdiplus::Graphics g(m_pBitmap);
 	g.Clear(cr);
 	resolution();
+}
+
+//CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
+void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
+{
+	release();
+
+	if (pWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+	{
+		CTreeCtrl* ctrl = (CTreeCtrl*)pWnd;
+		HTREEITEM hItem = ctrl->GetSelectedItem();
+		if (hItem == NULL)
+			return;
+
+		//CImageList* imglist = ctrl->CreateDragImage(hItem);
+
+		CString text = ctrl->GetItemText(hItem);
+		CRect rItem;
+
+		ctrl->GetItemRect(hItem, rItem, TRUE);
+		m_pBitmap = new Gdiplus::Bitmap(rItem.Width(), rItem.Height(), PixelFormat32bppARGB);
+
+		CFont* font = ctrl->GetFont();
+
+		Gdiplus::Graphics g(m_pBitmap);
+
+		draw_text(0, 0, text, 12, 1);
+
+		resolution();
+	}
 }
 
 bool CGdiplusBitmap::load(CString file, bool show_error)
@@ -1261,6 +1292,7 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue)
 	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
+/*
 void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcept)
 {
 	int x, y;
@@ -1313,87 +1345,8 @@ void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcep
 	}
 
 	m_pBitmap->UnlockBits(&bmData);
-
-	/*
-	HBITMAP hbitmap;
-	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
-	if (status != Gdiplus::Ok)
-		return;
-
-	BITMAP bm;
-	GetObject(hbitmap, sizeof bm, &bm);
-
-	BITMAPINFO bi;
-	BOOL bRes;
-	char* buf;
-
-	// Bitmap header
-	bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
-	bi.bmiHeader.biWidth = width;
-	bi.bmiHeader.biHeight = height;
-	bi.bmiHeader.biPlanes = 1;
-	bi.bmiHeader.biBitCount = 32;
-	bi.bmiHeader.biCompression = BI_RGB;
-	bi.bmiHeader.biSizeImage = width * 4 * height;
-	bi.bmiHeader.biClrUsed = 0;
-	bi.bmiHeader.biClrImportant = 0;
-
-	// Buffer
-	buf = (char*)malloc(width * 4 * height);
-	// Don't use getPixel and SetPixel.It's very slow.
-	// Get the all scanline.
-	bRes = GetDIBits(GetDC(NULL), hbitmap, 0, height, buf, &bi,
-		DIB_RGB_COLORS);
-	long nCount = 0;
-
-	for (int i = 0; i < height; ++i)
-	{
-		for (int j = 0; j < width; ++j)
-		{
-			long lVal = 0;
-			CString str;
-			str.Format(_T("%x"), lVal);
-			memcpy(&lVal, &buf[nCount], 4);
-			// Get the reverse order
-			int b = GetRValue(lVal);
-			int g = GetGValue(lVal);
-			int r = GetBValue(lVal);
-
-			if (lVal != 0 && RGB(r, g, b) != crExcept)
-			{
-				r += red;
-				Clamp(r, 0, 255);
-
-				g += green;
-				Clamp(g, 0, 255);
-
-				b += blue;
-				Clamp(b, 0, 255);
-
-				// Store reverse order
-				lVal = RGB(b, g, r);
-				memcpy(&buf[nCount], &lVal, 4);
-			}
-
-			// Increment with 4. RGB color take 4 bytes. 
-			// The high-order byte must be zero
-			// See in MSDN COLORREF
-			nCount += 4;
-		}
-	}
-
-	// Set again
-	SetDIBits(GetDC(NULL), hbitmap, 0, bRes, buf, &bi, DIB_RGB_COLORS);
-
-	SAFE_DELETE(m_pBitmap);
-	m_pBitmap = Bitmap::FromHBITMAP(hbitmap, NULL);
-
-	if (data)
-		get_raw_data();
-
-	free(buf);
-	*/
 }
+*/
 
 void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
 {

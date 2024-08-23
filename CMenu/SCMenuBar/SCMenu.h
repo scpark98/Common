@@ -71,7 +71,7 @@ public:
 		}
 	}
 
-	int				m_id;	//-1이면 separator
+	int				m_id;	//0 이하는 separator. Resouce의 Menu는 separator를 0으로 취급한다.
 	bool			m_is_separator = false;
 	CRect			m_r = CRect(0, 0, 0, 0);
 	CString			m_caption;
@@ -113,14 +113,15 @@ public:
 		message_scmenu_hide,
 	};
 
-	bool			create(CWnd* parent);
+	bool			create(CWnd* parent, int width = 220);
 
 	//load from menu resource
 	void			load(UINT resource_id, int menu_index);
 
-	//add menu item manually
+	//add menu item manually. _id < 0 = separator
 	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
 
+	//sub button이 여러개일 때 args에 나열하여 호출.
 	template <typename ... Types> void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""), Types... args)
 	{
 		CSCMenuItem* item = new CSCMenuItem(_id, _caption, icon_id, _hot_key);
@@ -199,22 +200,22 @@ protected:
 	int			m_over_item = -1;
 	int			get_item_index(CPoint pt);
 
-	COLORREF	m_cr_text = ::GetSysColor(COLOR_WINDOWTEXT);	//기본 글자색
-	COLORREF	m_cr_text_selected = m_cr_text;					//선택 항목의 활성화(active) 글자색
-	COLORREF	m_cr_text_selected_inactive = m_cr_text;		//선택 항목의 비활성화(inactive) 글자색
-	COLORREF	m_cr_text_over = m_cr_text;
-	COLORREF	m_cr_back = ::GetSysColor(COLOR_3DFACE);		//기본 배경색
-	COLORREF	m_cr_back_selected = ::GetSysColor(COLOR_3DHIGHLIGHT);	//선택 항목 배경색
-	COLORREF	m_cr_back_selected_border;						//선택 항목 테두리(focus()가 있을 경우에만)
-	COLORREF	m_cr_back_selected_inactive;
-	COLORREF	m_cr_back_over = ::GetSysColor(COLOR_3DHIGHLIGHT);
+	Gdiplus::Color	m_cr_text = ::GetSysColor(COLOR_WINDOWTEXT);	//기본 글자색
+	Gdiplus::Color	m_cr_text_selected = m_cr_text;					//선택 항목의 활성화(active) 글자색
+	Gdiplus::Color	m_cr_text_selected_inactive = m_cr_text;		//선택 항목의 비활성화(inactive) 글자색
+	Gdiplus::Color	m_cr_text_over = m_cr_text;
+	Gdiplus::Color	m_cr_back = ::GetSysColor(COLOR_3DFACE);		//기본 배경색
+	Gdiplus::Color	m_cr_back_selected = ::GetSysColor(COLOR_3DHIGHLIGHT);	//선택 항목 배경색
+	Gdiplus::Color	m_cr_back_selected_border;						//선택 항목 테두리(focus()가 있을 경우에만)
+	Gdiplus::Color	m_cr_back_selected_inactive;
+	Gdiplus::Color	m_cr_back_over = ::GetSysColor(COLOR_3DHIGHLIGHT);
 
 	LOGFONT		m_lf;
 	CFont		m_font;
 	void		ReconstructFont();
 
 	//라인 높이는 글꼴 높이에 따라 자동 계산된다.
-	//만약 수동으로 라인 간격을 변경하려면 set_line_height(32); 함수를 이용해야 한다.
+	//만약 수동으로 라인 간격을 변경하려면 set_line_height(32); 와 같이 함수를 이용해야 한다.
 	//font_size를 증감했는데 라인 간격이 변경되지 않는 것도 문제가 되니 필요할 경우
 	//해당 함수를 통해 설정하자.
 	int			m_line_height;

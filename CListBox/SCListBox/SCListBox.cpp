@@ -386,7 +386,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		dc.DrawText(time_str, rect, nFormat | DT_NOCLIP);
 
 		sText = sText.Mid(date_time_length + 1);
-		rect.left = rect.right + 4;
+		rect.left = rect.right + 8;
 		rect.right = lpDIS->rcItem.right - 10;
 	}
 

@@ -71,14 +71,15 @@ void CSCToolBar::init(CWnd* parent, int x, int y, int width, int height)
 	create();
 }
 
-void CSCToolBar::add(CString caption, UINT nID, int button_type)
+void CSCToolBar::add(CString caption, UINT resource_id, int button_type)
 {
-	insert(-1, caption, nID, button_type);
+	insert(-1, caption, resource_id, button_type);
 }
 
 //resourceID와 type(BS_PUSHBUTTON or BS_CHECKBOX or BS_RADIOBUTTON...)만 주면 버튼 추가
-void CSCToolBar::insert(int index, CString caption, UINT nID, int button_type)
+void CSCToolBar::insert(int index, CString caption, UINT resource_id, int button_type)
 {
+	int sz_separator = 20;
 	CRect r = CRect(0, 0, m_width, m_height);
 	CGdiButton* btn = new CGdiButton;
 	
@@ -86,35 +87,37 @@ void CSCToolBar::insert(int index, CString caption, UINT nID, int button_type)
 	btn->set_tooltip_text(caption);
 
 	//빈 버튼 영역 또는 분리기호인 경우
-	if (nID <= 0 || button_type < 0)
+	if (caption.IsEmpty() || resource_id <= 0 || button_type < 0)
 	{
 		if (button_type < 0)
 		{
-			btn->SetWindowPos(NULL, 0, 0, 20, r.Height(), SWP_NOMOVE | SWP_NOZORDER);
+			btn->SetWindowPos(NULL, 0, 0, sz_separator, r.Height(), SWP_NOMOVE | SWP_NOZORDER);
 			btn->GetWindowRect(r);
 		}
 
-		btn->back_color(m_cr_back, m_cr_back, m_cr_back, m_cr_back);
-		btn->EnableWindow(FALSE);
+		btn->set_transparent(true);
+
+		//btn->back_color(m_cr_back, m_cr_back, m_cr_back, m_cr_back);
+		//btn->EnableWindow(FALSE);
 		//btn->use_normal_image_on_disabled();
 	}
 	else
 	{
 		btn->SetButtonStyle(button_type);
 
-		CGdiplusBitmap img(_T("PNG"), nID), img1;
+		CGdiplusBitmap img(_T("PNG"), resource_id), img1;
 		img.canvas_size(m_width, m_height);
 
 		img.deep_copy(&img1);
-		img1.replace_back_color(Gdiplus::Color(255, 45, 51, 51));
+		img1.replace_color(Gdiplus::Color(255, 45, 51, 51));
 
 		btn->back_color(m_cr_back);
 		btn->fit_to_image(false);
 
 		btn->add_image(&img);
+
 		if (button_type == BS_CHECKBOX)
 			btn->add_image(&img1);
-
 	}
 
 	if (index < 0)
@@ -178,6 +181,25 @@ LRESULT	CSCToolBar::on_message_GdiButton(WPARAM wParam, LPARAM lParam)
 		CString caption;
 		msg->m_pWnd->GetWindowText(caption);
 		TRACE(_T("toolbar id = %d, caption = %s\n"), msg->m_ctrl_id, caption);
+	}
+	//main dlg에 그림이 깔려있는 상태에서 투명 GdiButton이 있는 경우라면
+	//배경 그림과 관계없이 투명 GdiButton이 잘 표시되고 leave시에도 잘 갱신되지만
+	//main dlg안에 SCToolbar가 있고 그 안에 투명 GdiButton이 있다면
+	//GdiButton에서 hover, leave시에 화면을 갱신하는 것은 GdiButton 내부에서의 처리로만은 해결되지 않는다.
+	//GdiButton의 parent인 SCToolBar에서 그 메시지를 받아서 main dlg의 해당 영역을 invalidate()해줘야 한다.
+	else if (msg->m_message == WM_MOUSEHOVER)
+	{
+		CRect rc;
+		msg->m_pWnd->GetWindowRect(rc);
+		GetParent()->ScreenToClient(rc);
+		GetParent()->InvalidateRect(rc, TRUE);
+	}
+	else if (msg->m_message == WM_MOUSELEAVE)
+	{
+		CRect rc;
+		msg->m_pWnd->GetWindowRect(rc);
+		GetParent()->ScreenToClient(rc);
+		GetParent()->InvalidateRect(rc, TRUE);
 	}
 
 	return 0;

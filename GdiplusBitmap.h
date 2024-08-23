@@ -88,6 +88,10 @@ public:
 	virtual ~CGdiplusBitmap();
 
 	void	create(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
+
+	//CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
+	void	create_drag_image(CWnd* pWnd);
+
 	void	release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
@@ -175,7 +179,7 @@ public:
 	void negative();
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
 	void replace_color(int tx, int ty, Gdiplus::Color dst);
-	void replace_color(Gdiplus::Color src, Gdiplus::Color dst);
+	void replace_color(Gdiplus::Color src, Gdiplus::Color dst = Gdiplus::Color::Transparent);
 
 	//투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
 	void set_back_color(Gdiplus::Color cr_back);
@@ -183,7 +187,7 @@ public:
 	//현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
 	//원본에 적용하는 것이 정석이나 구조 수정이 필요하다.
 	void add_rgb(int red, int green, int blue);
-	void add_rgb_loop(int red, int green, int blue, COLORREF crExcept);
+	//void add_rgb_loop(int red, int green, int blue, COLORREF crExcept);
 
 	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
 	void apply_effect_hsl(int hue, int sat = 0, int light = 0);

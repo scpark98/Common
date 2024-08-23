@@ -71,8 +71,10 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	}
 	else
 	{
-		if(bDrive) SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-		else SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		if (bDrive)
+			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		else
+			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
 	}
 	
 	return shFileInfo.iIcon;
@@ -115,6 +117,11 @@ void CShellImageList::InsertCache(CString szFileExt, int ID)
 	szFileExt.MakeLower();
 	m_ExtArray.Add(szFileExt);
 	m_IDArray.Add(ID);
+}
+
+CImageList* CShellImageList::get_imagelist(bool small_icon)
+{
+	return (small_icon ? &m_imagelist_small : &m_imagelist_large);
 }
 
 int CShellImageList::GetImageListIcon(CString szPath, CString szFile)

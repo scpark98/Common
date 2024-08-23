@@ -52,7 +52,7 @@
 
 */
 
-#define MENU_BUTTON_ID	WM_USER + 100
+#define MENU_BUTTON_ID	(WM_USER + 100)
 
 
 // CSCMenuBar 대화 상자
@@ -68,8 +68,10 @@ public:
 	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_item_width = 0, int menu_item_height = 0);
 	void	set_check(int menu_index, UINT menu_id, int sub_button_index, bool check);
 	void	set_color_theme(int theme);
-	void	set_menu_text_color(COLORREF cr_text);
-	void	set_menu_back_color(COLORREF cr_back);
+	void	set_text_color(Gdiplus::Color cr_text);
+	void	set_back_color(Gdiplus::Color cr_back);
+
+	void	set_menu_line_height(int height);
 
 	//메뉴가 표시되는 영역을 반투명으로 표시
 	void	use_aero_effect(bool use);
@@ -177,19 +179,18 @@ protected:
 	void		create_menu_buttons();
 	void		set_menu_total_width(int total_width);
 	void		set_menu_width(int width);
-	void		set_menu_height(int height);
 	void		set_menu_pos(int x, int y);
 
-	void		on_button_clicked(UINT id);
+	void		on_menu_button_clicked(UINT id);
 
 	LOGFONT		m_lf;
 	CFont		m_font;
 	void		reconstruct_font();
 
-	COLORREF	m_cr_text;
-	COLORREF	m_cr_text_selected;
-	COLORREF	m_cr_back;
-	COLORREF	m_cr_back_selected;
+	Gdiplus::Color	m_cr_text;
+	Gdiplus::Color	m_cr_text_selected;
+	Gdiplus::Color	m_cr_back;
+	Gdiplus::Color	m_cr_back_selected;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.

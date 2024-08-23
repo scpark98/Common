@@ -340,11 +340,11 @@ public:
 	CString		ip = _T("");
 
 	int			port = 0;
-	CString		sub_url;			//domain을 제외한 나머지 주소
+	CString		sub_url;				//domain을 제외한 나머지 주소
 	CString		method = _T("GET");
 	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
 	bool		is_https = true;
-	CString		body;				//post data(json format)
+	CString		body;					//post data(json format)
 
 	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
 	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
@@ -353,14 +353,15 @@ public:
 	//한번 호출해서 실패한 후 port나 주소 등 url관련 정보를 수정하여 다시 request_url()을 호출할 때
 	//full_url을 ""로 만들어주지 않으면 이 값을 바로 사용해서 다시 request하므로 역시 실패하게 된다.
 	//반드시 url 관련값을 수정하여 다시 request할 경우에는 반드시 full_url = _T("")로 만들어주고 호출해야 한다.
-	CString		full_url;			//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
+	CString		full_url;				//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
 	CString		result;
-	long		elapsed = 0;		//소요시간. ms단위.
+	long		elapsed = 0;			//소요시간. ms단위.
 
 	//파일 다운로드 관련
-	CString		local_file_path;	//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
-	uint64_t	file_size = 0;		//url 파일 크기
-	uint64_t	downloaded_size = 0;//현재까지 받은 크기
+	CString		local_file_path;		//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
+	uint64_t	file_size = 0;			//url 파일 크기
+	uint64_t	downloaded_size = 0;	//현재까지 받은 크기
+	int			download_index = -1;	//n개의 파일 다운로드시 현재 파일의 인덱스. request_id와는 다름.
 };
 
 class CMouseEvent
@@ -1136,10 +1137,18 @@ struct	NETWORK_INFO
 	LONG		set_registry_string(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 //#endif
 
+	//Windows visual effect registry
+	bool		set_windows_visual_effects();
+
+
 	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
 	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 
 	//int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
+
+	//CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
+	void		get_GdiplusBitmap_from_selected_item(CWnd * pWnd);
+
 
 	void		SystemShutdown(int nMode);		// 0:logoff  1:reboot  2:shutdown
 	void		SystemShutdownNT(int nMode = 2);	// 1:reboot  2:shutdown

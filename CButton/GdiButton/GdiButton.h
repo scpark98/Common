@@ -13,6 +13,7 @@ using namespace Gdiplus;
 - gdi+를 이용한 버튼 클래스
 - 투명 png 이미지를 사용할 경우 이미지 모양으로 버튼이 표시됨.
 - 사용 방법에 따라 일반 push button, toggle button(as a checkbox) 등으로 사용할 수 있음.
+- 2024.08.23 COLORREF -> Gdiplus::Color 로 변경
 
 [usage]
 * Gdiplus 사용을 위한 세팅
@@ -149,17 +150,19 @@ public:
 	void		release_all();
 
 	void		set_alpha(float alpha);
-	void		add_rgb(int red, int green, int blue, COLORREF crExcept);
+	//void		add_rgb(int red, int green, int blue, COLORREF crExcept);
+
+	void		set_transparent(bool trans = true);
 
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	CGdiButton& text(CString text);
-	CGdiButton& text_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
-	CGdiButton& text_color(COLORREF normal);
-	CGdiButton& back_color(COLORREF normal, COLORREF hover, COLORREF down, COLORREF disabled);
+	CGdiButton& text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+	CGdiButton& text_color(Gdiplus::Color normal);
+	CGdiButton& back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
 	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
 	//(NH프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
-	CGdiButton& back_color(COLORREF normal, bool auto_set_color = true);
+	CGdiButton& back_color(Gdiplus::Color normal, bool auto_set_color = true);
 	//CGdiButton& text_color() { m_cr_text.clear(); }
 	//CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]
@@ -210,13 +213,13 @@ public:
 
 	//포커스 사각형 관련
 	void		ShowFocusRect( bool bShow = true ) { m_bShowFocusRect = bShow; Invalidate(); }
-	void		SetFocusRectColor( COLORREF crFocus ) { m_crFocusRect = crFocus; Invalidate(); }
+	void		SetFocusRectColor(Gdiplus::Color crFocus ) { m_crFocusRect = crFocus; Invalidate(); }
 	void		SetFocusRectWidth( int nWidth ) { m_nFocusRectWidth = nWidth; Invalidate(); }
 
 	void		use_hover(bool use);
-	void		set_hover_rect(int thick = 2, COLORREF cr = RGB(128, 128, 255));
+	void		set_hover_rect(int thick = 2, Gdiplus::Color cr = RGB(128, 128, 255));
 	void		set_hover_rect_thick(int thick);
-	void		set_hover_rect_color(COLORREF cr);
+	void		set_hover_rect_color(Gdiplus::Color cr);
 	void		down_offset(CPoint offset) { m_down_offset = offset; Invalidate(); }
 	void		down_offset(int offset) { m_down_offset = CPoint(offset, offset); Invalidate(); }
 
@@ -291,8 +294,8 @@ protected:
 	CGdiplusBitmap	m_back_origin;
 
 	CString		m_text = _T("");
-	std::deque <COLORREF>	m_cr_text;
-	std::deque <COLORREF>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
+	std::deque <Gdiplus::Color>	m_cr_text;
+	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
 
 	int			m_width = 0;
 	int			m_height = 0;
@@ -307,13 +310,13 @@ protected:
 	bool		m_use_hover = true;			//default = true;
 	bool		m_hover_rect = false;		//hover 테두리 사각형 표시 여부
 	int			m_hover_rect_thick = 2;
-	COLORREF	m_hover_rect_color = RGB(128, 128, 255);
+	Gdiplus::Color	m_hover_rect_color = RGB(128, 128, 255);
 	bool		m_bHover = false;
 	bool		m_bIsTracking = false;
 	bool		m_bPushed = false;
 	bool		m_bHasFocus = false;
 	bool		m_bShowFocusRect;		//포커스 사각형 표시 여부(기본값 false)
-	COLORREF	m_crFocusRect;			//색상
+	Gdiplus::Color	m_crFocusRect;			//색상
 	int			m_nFocusRectWidth;		//두께
 	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
@@ -372,5 +375,3 @@ public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg BOOL OnToolTipNotify(UINT id, NMHDR* pNMHDR, LRESULT* pResult);
 };
-
-

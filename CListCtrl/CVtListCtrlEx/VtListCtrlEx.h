@@ -142,9 +142,10 @@ public:
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
 	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
 	void		set_as_shell_listctrl(bool is_local = true);
-	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
-	CString		get_path() { return m_path; }
+	//list의 index를 주면 fullpath를 리턴한다.
+	CString		get_path(int index = -1);
 	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
+	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
 	void		set_path(CString path, bool refresh = true);
 	//local이 아닐 경우는 파일목록을 받아서 표시한다.
 	void		set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList);
@@ -172,7 +173,7 @@ public:
 
 	CString		m_path;
 	CShellImageList*	m_pShellImageList = NULL;
-	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
+	void		set_shell_imagelist(CShellImageList* pShellImageList);
 
 //컬럼 관련
 	//ex. "No,20;Item1,50;Item2,50"
@@ -221,13 +222,13 @@ public:
 
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
-	int			add_item(CString text = _T(""), bool ensureVisible = true, bool invalidate = true);
-	int			add_line_string_item(CString line_string, TCHAR separator = '|', bool ensureVisible = true, bool invalidate = true);
-	int			insert_item(int index, CString text = _T(""), bool ensureVisible = true, bool invalidate = true);
-	int			insert_item(int index, std::deque<CString> dqText, bool ensureVisible = true, bool invalidate = true);
+	int			add_item(CString text = _T(""), int image_index = -1, bool ensureVisible = true, bool invalidate = true);
+	int			add_line_string_item(CString line_string, TCHAR separator = '|', int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
+	int			insert_item(int index, CString text = _T(""), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
+	int			insert_item(int index, std::deque<CString> dqText, int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 
 	//여러개의 인자를 args에 주니 모두 기록되지 않는 현상이 있다. 확인 필요!!
-	template <typename ... Types> int insert_item(int index, Types... args)
+	template <typename ... Types> int insert_item(int index, int img_idx, Types... args)
 	{
 		int n = sizeof...(args);
 		CString arg[] = { args... };
@@ -239,7 +240,7 @@ public:
 		for (auto item : arg)
 		{
 			if (subItem == 0)
-				index = insert_item(index, item, false, false);
+				index = insert_item(index, item, img_idx, false, false);
 			else
 				set_text(index, subItem, item, false);
 			subItem++;
@@ -288,11 +289,11 @@ public:
 	//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
 	//LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
 	//drag 도중에 마우스가 다른 앱 영역으로 나가서 WM_LBUTTONUP 될 경우 drophilited 상태로 아이템이 남는 문제를 제거하기 위해.
-	int			get_items_state(UINT state, std::deque<int>* dq = NULL);
+	int			get_items_by_state(UINT state, std::deque<int>* dq = NULL);
 	//dq 목록의 아이템들의 state 세팅. dq가 null이면 모든 항목에 대해 실행
-	//선택 : set_items_state(LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED, dq);
-	//해제 : set_items_state(0, LVIS_SELECTED|LVIS_FOCUSED, dq);
-	int			set_items_state(UINT state, UINT mask, std::deque<int>* dq = NULL);
+	//선택 : set_items_with_state(LVIS_SELECTED|LVIS_FOCUSED, LVIS_SELECTED|LVIS_FOCUSED, dq);
+	//해제 : set_items_with_state(0, LVIS_SELECTED|LVIS_FOCUSED, dq);
+	int			set_items_with_state(UINT state, UINT mask, std::deque<int>* dq = NULL);
 
 //검색 관련
 	//0번 컬럼에서만 데이터를 찾는다.
@@ -469,7 +470,6 @@ public:
 	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
 	int				get_drop_index() { return m_nDropIndex; }
-	void			capture_selected_items_to_bitmap(CGdiplusBitmap* bmp);
 
 protected:
 
@@ -534,10 +534,15 @@ protected:
 	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
 	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
 	bool			m_bDragging = false;		//T during a drag operation
-	int				m_nDragIndex = -1;			//Index of selected item in the List we are dragging FROM
-	int				m_nDropIndex = -1;			//Index at which to drop item in the List we are dropping ON(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
+	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
+	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
+
+	//https://jiniya.net/tt/594/
+	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
+	CImageList* create_drag_image(CListCtrl* pList, LPPOINT lpPoint);
+
 
 protected:
 	DECLARE_MESSAGE_MAP()

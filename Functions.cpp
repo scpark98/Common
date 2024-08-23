@@ -2498,11 +2498,10 @@ void request_url(CRequestUrlParams* params)
 		InternetSetOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 	}
 
-	//기본 헤더가 세팅되어 있지 않다면 추가하고
-	if (params->headers.size() == 0)
-		params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
+	//기본 헤더를 추가하고
+	params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
 
-	//기본 헤더 및 사용자가 추가한 헤더까지 모두 추가해준다.
+	//헤더의 끝문자열 검사 및 추가
 	for (int i = 0; i < params->headers.size(); i++)
 	{
 		if (params->headers[i].Right(2) != _T("\r\n"))
@@ -7644,7 +7643,6 @@ std::deque<CString>	get_token_string(CString src, CString separator)
 */
 int get_token_string(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken, bool include_rest)
 {
-	int i, j;
 	CString token;
 
 	dqToken.clear();
@@ -17735,3 +17733,4 @@ bool get_taskbar_state(UINT state, CSize* sz)
 
 	return false;
 }
+

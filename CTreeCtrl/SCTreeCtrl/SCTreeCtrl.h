@@ -19,6 +19,10 @@
 
 [일반 데이터를 트리에 표현할 경우]
 
+[주의사항]
+	- 가로스크롤과 관련된 처리는 완전하지 않음. 특히 편집중일 때.
+	- 윈도우탐색기도 트리뷰에서 가로스크롤은 세로스크롤로 동작함.
+	- 
 */
 
 
@@ -231,10 +235,11 @@ protected:
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 
 	//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.
+	//새 폴더, 새 항목이 이미 존재하면 뒤에 숫자를 증가시켜 붙여줘야 한다.
 	void			add_sub_item(HTREEITEM hParent = NULL, CString label = _T(""));
 	//주어진 항목의 label을 변경한다.
 	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
-	void			delete_item(bool confirm = true);
+	void			delete_item(HTREEITEM hItem = NULL, bool confirm = true);
 
 
 	//들여쓰기 크기

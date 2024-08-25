@@ -20,6 +20,11 @@ CSCTreeCtrl::CSCTreeCtrl()
 
 CSCTreeCtrl::~CSCTreeCtrl()
 {
+	if (m_pEdit)
+	{
+		m_pEdit->DestroyWindow();
+		delete m_pEdit;
+	}
 }
 
 
@@ -113,6 +118,15 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				break;
+			}
+			case VK_DELETE :
+			{
+				if (m_in_editing)
+					return FALSE;
+
+				delete_item();
+
+				return TRUE;
 			}
 		}
 	}
@@ -687,7 +701,7 @@ void CSCTreeCtrl::insert_drive(CString driveName)
 	tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
 	tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(real_path);
 	tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(real_path);
-	//tvInsert.item.cChildren = TRUE;
+	//tvInsert.item.cChildren = 0;
 	tvInsert.hInsertAfter = TVI_LAST;
 	tvInsert.hParent = m_computerItem;
 	tvInsert.item.pszText = (LPTSTR)(LPCTSTR)driveName;
@@ -721,12 +735,11 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
 			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
 			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
-			//tvInsert.item.cChildren = TRUE;
 			tvItem.hInsertAfter = TVI_LAST;
 			tvItem.hParent = hParent;
 			tvItem.item.pszText = (LPTSTR)(LPCTSTR)curFolder;
 			//하위 폴더가 있을때만 확장버튼이 표시되도록.
-			tvItem.item.cChildren = (get_sub_folders(FileFind.GetFilePath()) > 0);
+			tvItem.item.cChildren = get_sub_folders(FileFind.GetFilePath());
 			HTREEITEM hItem = InsertItem(&tvItem);
 		}
 	}
@@ -2706,6 +2719,7 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 }
 
 //하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.
+//새 폴더, 새 항목이 이미 존재하면 뒤에 숫자를 증가시켜 붙여줘야 한다.
 void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 {
 	if (hParent == NULL)
@@ -2715,31 +2729,28 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 
 	HTREEITEM hItem;
 
-	if (label.IsEmpty())
+	if (m_is_shell_treectrl)
 	{
-		if (m_is_shell_treectrl)
-		{
-			TV_INSERTSTRUCT tvItem;
-			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
-			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
-			//tvInsert.item.cChildren = TRUE;
-			tvItem.hInsertAfter = TVI_LAST;
-			tvItem.hParent = hParent;
-			tvItem.item.pszText = (LPTSTR)(LPCTSTR)_T("새 폴더");
-			hItem = InsertItem(&tvItem);
-		}
-		else
-		{
-			hItem = InsertItem(_T("새 항목"), hParent);
-		}
+		TRACE(_T("parent = %s\n"), get_fullpath(hParent));
 
-		edit_item(hItem);
+		//아직 펼쳐진 적이 없는 폴더라면 우선 서브 폴더들을 추가해준 후 새 폴더를 추가해야 한다.
+		//if (GetChildItem(hParent) == NULL)
+		//	insert_folder(hParent, get_fullpath(hParent));
+		Expand(hParent, TVE_EXPAND);
+
+		hItem = InsertItem(label.IsEmpty() ? _T("새 폴더") : label,
+			m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
+			m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1, hParent);
+
+		CreateDirectory(get_fullpath(hItem), NULL);
 	}
 	else
 	{
-		hItem = InsertItem(label, hParent);
+		hItem = InsertItem(label.IsEmpty() ? _T("새 항목") : label, hParent);
 	}
+
+	if (hItem)
+		edit_item(hItem);
 }
 
 //주어진 항목의 label을 변경한다.
@@ -2752,6 +2763,8 @@ void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
 
 	if (new_label.IsEmpty())
 	{
+		//shell_tree_ctrl이라고 해도 여기서는 편집모드까지만 제공할 뿐
+		//편집 완료 후의 처리는 main dlg에서 처리하는 것이 맞다.
 		edit_item(hItem);
 	}
 	else
@@ -2760,21 +2773,25 @@ void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
 	}
 }
 
-void CSCTreeCtrl::delete_item(bool confirm)
+void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool confirm)
 {
-	HTREEITEM hItem = GetSelectedItem();
+	if (hItem == NULL)
+		hItem = GetSelectedItem();
 	if (hItem == NULL)
 		return;
 
 	if (confirm)
 	{
 		CString msg;
-		msg.Format(_T("%s\n위 항목을 삭제합니다."), GetItemText(hItem));
-		int res = AfxMessageBox(msg, MB_OKCANCEL);
-		if (res == IDCANCEL)
+
+		msg.Format(_T("%s\n\n이 항목을 완전히 삭제하시겠습니까?"), GetItemText(hItem));
+		int res = AfxMessageBox(msg, MB_YESNO);
+		if (res == IDNO)
 			return;
 	}
 
+	//shell_tree_ctrl일 경우는 SHDeleteFolder()를 이용해서 폴더 및 하위폴더까지 모두 삭제시켜야 하지만
+	//위험한 동작이므로 우선 노드만 삭제한다.
 	DeleteItem(hItem);
 }
 

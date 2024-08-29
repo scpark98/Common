@@ -11,6 +11,7 @@
 #include <Afxwin.h>
 #include <afxheaderctrl.h>
 
+#include <gdiplus.h>
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -24,13 +25,13 @@ public:
 
 // Attributes
 public:
-	COLORREF		m_crText;
-	COLORREF		m_crBack;
-	COLORREF		m_crSeparator;
+	Gdiplus::Color	m_cr_text;
+	Gdiplus::Color	m_cr_back;
+	Gdiplus::Color	m_cr_separator;
 
-	void			set_color(COLORREF crText, COLORREF crBack, COLORREF crSeparator = -1);
-	void			set_text_color(COLORREF crText);
-	void			set_back_color(COLORREF crBack);
+	void			set_color(Gdiplus::Color crText, Gdiplus::Color crBack, Gdiplus::Color crSeparator = -1);
+	void			set_text_color(Gdiplus::Color crText);
+	void			set_back_color(Gdiplus::Color crBack);
 
 	bool			m_header_is_clicked;
 	int				m_header_clicked_index;

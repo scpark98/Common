@@ -871,7 +871,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (m_round == 0)
 		{
-			dc.FillSolidRect(rc, gpColor2RGB(cr_back));
+			dc.FillSolidRect(rc, cr_back.ToCOLORREF());
 		}
 		else
 		{
@@ -966,7 +966,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + size * 2 - 1;
 			r.top = r.CenterPoint().y - size + 2;
 			r.bottom = r.top + size * 2 - 1;
-			DrawRectangle(&dc, r, gpColor2RGB(cr_text), RGB(255, 255, 255));
+			draw_rectangle(&dc, r, cr_text, Gdiplus::Color::White);
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
 
@@ -1068,7 +1068,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CFont *pOldFont = dc.SelectObject(&m_font);
 
 	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(gpColor2RGB(cr_text));
+	dc.SetTextColor(cr_text.ToCOLORREF());
 	dc.DrawText(m_text, rText, dwText);
 	dc.SelectObject(pOldFont);
 }

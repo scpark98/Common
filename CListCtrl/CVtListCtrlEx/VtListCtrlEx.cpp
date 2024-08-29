@@ -189,9 +189,9 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CRect		rowRect;
 	CRect		itemRect;
 	CRect		textRect;
-	COLORREF	crText = m_crText;
-	COLORREF	crBack = m_crBack;
-	//COLORREF	crProgress = m_crProgress;
+	Gdiplus::Color	crText = m_cr_text;
+	Gdiplus::Color	crBack = m_cr_back;
+	//COLORREF	crProgress = m_cr_progress;
 	bool		is_show_selection_always = (GetStyle() & LVS_SHOWSELALWAYS);
 	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
 
@@ -215,46 +215,46 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			if (GetFocus() == this)
 			{
-				crText = m_crTextSelected;
-				crBack = m_crBackSelected;
+				crText = m_cr_text_selected;
+				crBack = m_cr_back_selected;
 			}
 			else
 			{
-				crText = m_crTextSelectedInactive;
-				crBack = m_crBackSelectedInactive;
+				crText = m_cr_text_selected_inactive;
+				crBack = m_cr_back_selected_inactive;
 			}
 
 			//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
 			//지정된 색이 있으면 그 색으로 표시하는게 좋은듯하다.
 			//글자의 배경색은 그냥 컬러 스킴을 따른다.
-			if (m_list_db[iItem].crText[iSubItem] != listctrlex_unused_color)
+			if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
 				crText = m_list_db[iItem].crText[iSubItem];
 		}
 		//drophilited라면 active에 관계없이 drop hilited 색상으로 표시한다.
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (GetItemState(iItem, LVIS_DROPHILITED)) //ok
 		{
-			crText = m_crTextSelected;
-			crBack = m_crBackSelected;
+			crText = m_cr_text_selected;
+			crBack = m_cr_back_selected;
 		}
 		else
 		{
 			crText = m_list_db[iItem].crText[iSubItem];
-			if (crText == listctrlex_unused_color)
-				crText = m_crText;
+			if (crText.GetValue() == listctrlex_unused_color.GetValue())
+				crText = m_cr_text;
 
 			crBack = m_list_db[iItem].crBack[iSubItem];
-			if (crBack == listctrlex_unused_color)
+			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
 			{
 				if (iItem % 2)
-					crBack = m_crBackAlt;
+					crBack = m_cr_back_alternated;
 				else
-					crBack = m_crBack;
+					crBack = m_cr_back;
 			}
 		}
 
 	
-		pDC->FillSolidRect(itemRect, crBack);
+		pDC->FillSolidRect(itemRect, crBack.ToCOLORREF());
 
 		//percentage 타입이면 바그래프 형태로 그려주고
 		if (get_column_data_type(iSubItem) == column_data_type_percentage_bar)
@@ -275,23 +275,23 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			
 			r.right = r.left + (double)(r.Width()) * d;
 
-			if (m_crPercentage.size() == 1)
+			if (m_cr_percentage_bar.size() == 1)
 			{
-				pDC->FillSolidRect(r, m_crPercentage[0]);
+				pDC->FillSolidRect(r, m_cr_percentage_bar[0].ToCOLORREF());
 			}
-			else if (m_crPercentage.size() > 1)
+			else if (m_cr_percentage_bar.size() > 1)
 			{
 				//현재 레벨에 맞는 단색으로 채울 경우
 				if (false)
 				{
-					pDC->FillSolidRect(r, get_color(m_crPercentage[0], m_crPercentage[1], d));
+					pDC->FillSolidRect(r, get_color(m_cr_percentage_bar[0], m_cr_percentage_bar[1], d).ToCOLORREF());
 				}
 				//현재 레벨까지 그라디언트로 채울 경우
 				else
 				{
-					std::deque<COLORREF> dqColor;
-					dqColor.push_back(m_crPercentage[0]);
-					dqColor.push_back(get_color(m_crPercentage[0], m_crPercentage[1], d));
+					std::deque<Gdiplus::Color> dqColor;
+					dqColor.push_back(m_cr_percentage_bar[0]);
+					dqColor.push_back(get_color(m_cr_percentage_bar[0], m_cr_percentage_bar[1], d));
 					gradient_rect(pDC, r, dqColor, false);
 				}
 			}
@@ -313,20 +313,20 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			//std::deque<COLORREF> dqColor(m_crPercentage);
+			//std::deque<COLORREF> dqColor(m_cr_percentage_bar);
 			//dqColor.push_back(crBack);
 			//gradient_rect(pDC, r, dqColor, false);
 
-			if (m_crPercentage.size() == 1)
+			if (m_cr_percentage_bar.size() == 1)
 			{
-				pDC->FillSolidRect(r, m_crPercentage[0]);
+				pDC->FillSolidRect(r, m_cr_percentage_bar[0].ToCOLORREF());
 			}
-			else if (m_crPercentage.size() > 1)
+			else if (m_cr_percentage_bar.size() > 1)
 			{
-				std::deque<COLORREF> dqColor;
-				dqColor.push_back(m_crPercentage[0]);
-				int hue0 = get_hue(m_crPercentage[0]);
-				int hue1 = get_hue(m_crPercentage[1]);
+				std::deque<Gdiplus::Color> dqColor;
+				dqColor.push_back(m_cr_percentage_bar[0]);
+				int hue0 = get_hue(m_cr_percentage_bar[0].ToCOLORREF());
+				int hue1 = get_hue(m_cr_percentage_bar[1].ToCOLORREF());
 				dqColor.push_back(get_color(hue0, hue1, (int)(d * 100.0), 1.0f, 1.0f));
 				gradient_rect(pDC, r, dqColor, false);
 			}
@@ -335,7 +335,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			int half = (int)((double)(r.Height()) / 2.2);
 			for (i = r.left + half; i < itemRect.right - half; i += (half * 1.5))
 			{
-				pDC->FillSolidRect(i, r.top, half / 2, r.Height(), crBack);
+				pDC->FillSolidRect(i, r.top, half / 2, r.Height(), crBack.ToCOLORREF());
 			}
 		}
 		else if (get_column_data_type(iSubItem) == column_data_type_progress)
@@ -354,7 +354,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			pDC->FillSolidRect(r, m_crProgress);
+			pDC->FillSolidRect(r, m_cr_progress.ToCOLORREF());
 
 			//20231102 CSCSliderCtrl에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
 			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
@@ -363,7 +363,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (m_show_progress_text)
 			{
 				CString sPercent = m_list_db[iItem].text[iSubItem] + _T("%");
-				pDC->SetTextColor(m_crProgressText);// m_crBack);
+				pDC->SetTextColor(m_cr_progress_text.ToCOLORREF());// m_cr_back);
 #if 1
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
 
@@ -387,13 +387,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				rgnLeft.CreateRectRgnIndirect(&rcLeft);
 				rgnRight.CreateRectRgnIndirect(&rcRight);
 
-				pDC->SetTextColor(RGB(255, 0, 0));// m_crBack);
+				pDC->SetTextColor(RGB(255, 0, 0));// m_cr_back);
 				pDC->SelectClipRgn(&rgnLeft);
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
 				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
 
 				//rgnRight.SetRectRgn(rcRight);
-				pDC->SetTextColor(RGB(0, 0, 255)); //m_crText);
+				pDC->SetTextColor(RGB(0, 0, 255)); //m_cr_text);
 				pDC->SelectClipRgn(&rgnRight);
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
 				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
@@ -408,7 +408,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//텍스트 형태이면 문자열을 출력해준다.
 		else
 		{
-			pDC->SetTextColor(crText);
+			pDC->SetTextColor(crText.ToCOLORREF());
 
 			//텍스트가 그려질 때 itemRect에 그리면 좌우 여백이 없어서 양쪽이 꽉차보인다.
 			//약간 줄여서 출력해야 보기 쉽다.
@@ -487,7 +487,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (GetItemState(i, LVIS_SELECTED))
 			{
 				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
-				DrawRectangle(pDC, rowRect, m_crSelectedBorder);
+				draw_rectangle(pDC, rowRect, m_cr_selected_border);
 			}
 		}
 	}
@@ -1098,12 +1098,12 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending, bool text_sor
 			//일반 색상 항목은 제외시키니 원하는대로 동작됨.
 			//return (a.crText[iSub] > b.crText[iSub]);
 			
-			if (a.crText[iSub] > b.crText[iSub])
+			if (a.crText[iSub].GetValue() > b.crText[iSub].GetValue())
 				return true;
-			else if (a.crText[iSub] < b.crText[iSub])
+			else if (a.crText[iSub].GetValue() < b.crText[iSub].GetValue())
 				return false;
 			//텍스트 색상이 같으면 텍스트로 비교하되 일반 항목은 제외시킨다.
-			else if (text_sort_on_same_color_item && (a.crText[iSub] != listctrlex_unused_color))
+			else if (text_sort_on_same_color_item && (a.crText[iSub].GetValue() != listctrlex_unused_color.GetValue()))
 			{
 				if (a.text[iSub] < b.text[iSub])
 					return true;
@@ -1113,7 +1113,7 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending, bool text_sor
 		}
 		else
 		{
-			return (a.crText[iSub] < b.crText[iSub]);
+			return (a.crText[iSub].GetValue() < b.crText[iSub].GetValue());
 			/*
 			if (a.crText[iSub] < b.crText[iSub])
 				return true;
@@ -1368,7 +1368,7 @@ void CVtListCtrlEx::OnPaint()
 	clip.top -= 5;
 	*/
 
-	dc.FillSolidRect(rc, m_crBack);
+	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	if (!m_text_on_empty.IsEmpty())
 	{
@@ -1474,6 +1474,8 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	CRect r = get_item_rect(item, subItem);
 	CRect rc;
 
+	r.OffsetRect(0, 1);
+
 	GetClientRect(rc);
 
 	// Get Column alignment
@@ -1547,130 +1549,130 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 	{
 		//최근 윈도우 탐색기의 색상을 보면 텍스트 색상은 선택여부, inactive에 무관하게 동일하다.
 	case color_theme_default :
-		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected		= m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_crTextSelectedInactive= m_crText;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_crBack				= ::GetSysColor(COLOR_WINDOW);
-		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
-		m_crBackSelected		= RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crSelectedBorder		= RGB(153, 209, 255);
-		m_crHeaderBack			= ::GetSysColor(COLOR_3DFACE);
-		m_crHeaderText			= ::GetSysColor(COLOR_BTNTEXT);
-		m_crPercentage.clear();
-		m_crPercentage.push_back(GRAY192);
-		m_crProgress			= RGB(49, 108, 244);
-		m_crProgressText		= RGB(192, 192, 192);
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected			= m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_cr_text_selected_inactive	= m_cr_text;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+		m_cr_back_alternated		= m_cr_back;
+		m_cr_back_selected			= /*Gdiplus::Color(255, 255, 0, 0); //*/Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_inactive = Gdiplus::Color(255, 217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
+		m_cr_header_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
+		m_cr_header_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_progress				= Gdiplus::Color(255, 49, 108, 244);
+		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
+		m_cr_percentage_bar.clear();
+		m_cr_percentage_bar.push_back(gGRAY(192));
 		break;
 	case color_theme_light_blue :
-		m_crText				= ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected		= RGB( 65, 102, 146);
-		m_crTextSelectedInactive= RGB( 65, 102, 146);
-		m_crBack				= RGB(193, 219, 252);
-		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
-		m_crBackSelected		= get_color(m_crBack, -48);
-		m_crBackSelectedInactive= get_color(m_crBack, -48);
-		m_crSelectedBorder		= RGB(153, 209, 255);
-		m_crHeaderBack			= get_color(m_crBack, -32);
-		m_crHeaderText			= get_color(m_crText, -32);
-		m_crPercentage.clear();
-		m_crPercentage.push_back(get_color(m_crBack, -32));
-		m_crProgress			= RGB(32, 32, 255);
-		m_crProgressText		= RGB(192, 192, 192);
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected			= Gdiplus::Color(255, 65, 102, 146);
+		m_cr_text_selected_inactive	= Gdiplus::Color(255, 65, 102, 146);
+		m_cr_back					= Gdiplus::Color(255, 193, 219, 252);
+		m_cr_back_alternated		= m_cr_back;
+		m_cr_back_selected			= get_color(m_cr_back, -48);
+		m_cr_back_selected_inactive	= get_color(m_cr_back, -48);
+		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
+		m_cr_header_back			= get_color(m_cr_back, -32);
+		m_cr_header_text			= get_color(m_cr_text, -32);
+		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
+		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
+		m_cr_percentage_bar.clear();
+		m_cr_percentage_bar.push_back(get_color(m_cr_back, -32));
 		break;
 	case color_theme_navy_blue :
-		m_crText				= RGB(204, 216, 225);
-		m_crTextSelected		= RGB(234, 246, 255);
-		m_crTextSelectedInactive= RGB(105, 142, 186);
-		m_crBack				= RGB( 74,  94, 127);
-		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
-		m_crBackSelected		= RGB( 15,  36,  41);
-		m_crBackSelectedInactive= RGB( 15,  36,  41);
-		m_crSelectedBorder		= RGB(153, 209, 255);
-		m_crHeaderBack			= get_color(m_crBack, -32);
-		m_crHeaderText			= get_color(m_crText, -32);
-		m_crPercentage.clear();
-		m_crPercentage.push_back(get_color(m_crBack, -32));
-		m_crProgress			= RGB(32, 32, 255);
-		m_crProgressText		= RGB(192, 192, 192);
-		break; 
+		m_cr_text					= Gdiplus::Color(255, 204, 216, 225);
+		m_cr_text_selected			= Gdiplus::Color(255, 234, 246, 255);
+		m_cr_text_selected_inactive	= Gdiplus::Color(255, 105, 142, 186);
+		m_cr_back					= Gdiplus::Color(255, 74,  94, 127);
+		m_cr_back_alternated		= m_cr_back;
+		m_cr_back_selected			= Gdiplus::Color(255, 15,  36,  41);
+		m_cr_back_selected_inactive	= Gdiplus::Color(255, 15,  36,  41);
+		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
+		m_cr_header_back			= get_color(m_cr_back, -32);
+		m_cr_header_text			= get_color(m_cr_text, -32);
+		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
+		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
+		m_cr_percentage_bar.clear();
+		m_cr_percentage_bar.push_back(get_color(m_cr_back, -32));
+		break;
 	case color_theme_dark_blue :
-		m_crText				= RGB( 16, 177, 224);
-		m_crTextSelected		= RGB(224, 180,  59);
-		m_crTextSelectedInactive= RGB(105, 142, 186);
-		m_crBack				= RGB(  2,  21,  36);
-		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
-		m_crBackSelected		= RGB(  3,  42,  59);
-		m_crBackSelectedInactive= RGB( 15,  36,  41);
-		m_crSelectedBorder		= RGB(153, 209, 255);
-		m_crHeaderBack			= RGB(  0,  13,  22);
-		m_crHeaderText			= RGB(  0, 180, 228);
-		m_crPercentage.clear();
-		m_crPercentage.push_back(get_color(m_crBack, 32));
-		m_crProgress			= RGB(32, 32, 255);
-		m_crProgressText		= RGB(192, 192, 192);
-		break; 
+		m_cr_text					= Gdiplus::Color(255, 16, 177, 224);
+		m_cr_text_selected			= Gdiplus::Color(255, 224, 180,  59);
+		m_cr_text_selected_inactive	= Gdiplus::Color(255, 105, 142, 186);
+		m_cr_back					= Gdiplus::Color(255, 2,  21,  36);
+		m_cr_back_alternated		= m_cr_back;
+		m_cr_back_selected			= Gdiplus::Color(255, 3,  42,  59);
+		m_cr_back_selected_inactive	= Gdiplus::Color(255, 15,  36,  41);
+		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
+		m_cr_header_back			= Gdiplus::Color(255, 0,  13,  22);
+		m_cr_header_text			= Gdiplus::Color(255, 0, 180, 228);
+		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
+		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
+		m_cr_percentage_bar.clear();
+		m_cr_percentage_bar.push_back(get_color(m_cr_back, 32));
+		break;
 	case color_theme_dark_gray :
-		m_crText				= RGB(164, 164, 164);
-		m_crTextSelected		= RGB(241, 241, 241);
-		m_crTextSelectedInactive= get_color(m_crTextSelected, -36);
-		m_crBack				= RGB( 64,  64,  64);
-		m_crBackAlt				= m_crBack;//get_color(m_crBack, -8);
-		m_crBackSelected		= get_color(m_crBack, -32);
-		m_crBackSelectedInactive= get_color(m_crBack, -32);
-		m_crSelectedBorder		= RGB(128, 128, 128);
-		m_crHeaderBack			= get_color(m_crBack, -16);
-		m_crHeaderText			= get_color(m_crText, -16);
-		m_crPercentage.clear();
-		m_crPercentage.push_back(get_color(m_crBack, 32));
-		m_crProgress			= RGB(32, 32, 255);
-		m_crProgressText		= RGB(192, 192, 192);
+		m_cr_text					= Gdiplus::Color(255, 164, 164, 164);
+		m_cr_text_selected			= Gdiplus::Color(255, 241, 241, 241);
+		m_cr_text_selected_inactive	= get_color(m_cr_text_selected, -36);
+		m_cr_back					= Gdiplus::Color(255, 64,  64,  64);
+		m_cr_back_alternated		= m_cr_back;//get_color(m_cr_back, -8);
+		m_cr_back_selected			= get_color(m_cr_back, -32);
+		m_cr_back_selected_inactive	= get_color(m_cr_back, -32);
+		m_cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
+		m_cr_header_back			= get_color(m_cr_back, -16);
+		m_cr_header_text			= get_color(m_cr_text, -16);
+		m_cr_percentage_bar.clear();
+		m_cr_percentage_bar.push_back(get_color(m_cr_back, 32));
+		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
+		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
 		break;
 	case color_theme_dark :
-		m_crText = RGB(212, 212, 212);
-		m_crTextSelected = RGB(255, 255, 255);
-		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
-		m_crBack = RGB(37, 37, 38);
-		m_crBackAlt = m_crBack;//get_color(m_crBack, -8);
-		m_crBackSelected = get_color(m_crBack, -16);
-		m_crBackSelectedInactive = get_color(m_crBack, -16);
-		m_crSelectedBorder = m_crBackSelected;
-		m_crHeaderBack = get_color(m_crBack, 16);
-		m_crHeaderText = get_color(m_crText, -32);
-		m_crPercentage.clear();
-		m_crPercentage.push_back(get_color(m_crBack, 32));
-		m_crProgress = RGB(32, 32, 255);
-		m_crProgressText = RGB(192, 192, 192);
+		m_cr_text = Gdiplus::Color(255, 212, 212, 212);
+		m_cr_text_selected = Gdiplus::Color(255, 255, 255, 255);
+		m_cr_text_selected_inactive = get_color(m_cr_text_selected, -36);
+		m_cr_back = Gdiplus::Color(255, 37, 37, 38);
+		m_cr_back_alternated = m_cr_back;//get_color(m_cr_back, -8);
+		m_cr_back_selected = get_color(m_cr_back, -16);
+		m_cr_back_selected_inactive = get_color(m_cr_back, -16);
+		m_cr_selected_border = m_cr_back_selected;
+		m_cr_header_back = get_color(m_cr_back, 16);
+		m_cr_header_text = get_color(m_cr_text, -32);
+		m_cr_percentage_bar.clear();
+		m_cr_percentage_bar.push_back(get_color(m_cr_back, 32));
+		m_cr_progress = Gdiplus::Color(255, 32, 32, 255);
+		m_cr_progress_text = Gdiplus::Color(255, 192, 192, 192);
 		break;
 	}
 
-	m_HeaderCtrlEx.set_color(m_crHeaderText, m_crHeaderBack);
+	m_HeaderCtrlEx.set_color(m_cr_header_text, m_cr_header_back);
 
 	if (apply_now)
 		Invalidate();
 }
 
-COLORREF CVtListCtrlEx::get_text_color(int item, int subItem)
+Gdiplus::Color CVtListCtrlEx::get_text_color(int item, int subItem)
 {
 	//item이 -1이면 해당 셀의 색상이 아니라 기본 텍스트 색상값을 원하는 것이다.
 	if (item < 0)
-		return m_crText;
+		return m_cr_text;
 
-	COLORREF cr = m_list_db[item].crText[subItem];
-	if (cr == listctrlex_unused_color)
-		return m_crText;
+	Gdiplus::Color cr = m_list_db[item].crText[subItem];
+	if (cr.GetValue() == listctrlex_unused_color.GetValue())
+		return m_cr_text;
 	return cr;
 }
 
-COLORREF CVtListCtrlEx::get_back_color(int item, int subItem)
+Gdiplus::Color CVtListCtrlEx::get_back_color(int item, int subItem)
 {
-	COLORREF cr = m_list_db[item].crBack[subItem];
-	if (cr == listctrlex_unused_color)
-		return m_crBack;
+	Gdiplus::Color cr = m_list_db[item].crBack[subItem];
+	if (cr.GetValue() == listctrlex_unused_color.GetValue())
+		return m_cr_back;
 	return cr;
 }
 
-void CVtListCtrlEx::set_text_color(int item, int subItem, COLORREF crText, bool erase, bool invalidate)
+void CVtListCtrlEx::set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase, bool invalidate)
 {
 	int i, j;
 
@@ -1725,7 +1727,7 @@ void CVtListCtrlEx::set_text_color(int item, int subItem, COLORREF crText, bool 
 		Invalidate();
 }
 
-void CVtListCtrlEx::set_back_color(int item, int subItem, COLORREF crBack, bool erase)
+void CVtListCtrlEx::set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase)
 {
 	int i, j;
 
@@ -1779,7 +1781,7 @@ void CVtListCtrlEx::set_back_color(int item, int subItem, COLORREF crBack, bool 
 	Invalidate();
 }
 
-void CVtListCtrlEx::set_item_color(int item, int subItem, COLORREF crText, COLORREF crBack)
+void CVtListCtrlEx::set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack)
 {
 	int i, j;
 
@@ -1825,9 +1827,9 @@ void CVtListCtrlEx::set_item_color(int item, int subItem, COLORREF crText, COLOR
 	Invalidate();
 }
 
-void CVtListCtrlEx::set_progress_color(COLORREF crProgress)
+void CVtListCtrlEx::set_progress_color(Gdiplus::Color crProgress)
 {
-	m_crProgress = crProgress;
+	m_cr_progress = crProgress;
 	Invalidate();
 }
 

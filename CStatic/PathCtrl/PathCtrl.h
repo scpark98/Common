@@ -90,10 +90,10 @@ public:
 	bool		use_edit() { return m_use_edit; }
 	void		use_edit(bool use) { m_use_edit = use; }
 
-	COLORREF	text_color() { return m_crText; }
-	void		text_color(COLORREF crText) { m_crText = crText; }
-	COLORREF	back_color() { return m_crBack; }
-	void		back_color(COLORREF crBack) { m_crBack = crBack; }
+	Gdiplus::Color	text_color() { return m_cr_text; }
+	void			text_color(Gdiplus::Color crText) { m_cr_text = crText; }
+	Gdiplus::Color	back_color() { return m_cr_back; }
+	void			back_color(Gdiplus::Color crBack) { m_cr_back = crBack; }
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList)
@@ -132,12 +132,12 @@ protected:
 	void		recalc_path_width();
 	void		recalc_path_position();
 
-	COLORREF	m_crText = ::GetSysColor(COLOR_BTNTEXT);
-	COLORREF	m_crBack = ::GetSysColor(COLOR_WINDOW);
-	COLORREF	m_crOver = RGB(229, 243, 255);
-	COLORREF	m_crOverBorder = RGB(204, 232, 255);
-	COLORREF	m_crDown = RGB(204, 232, 255);
-	COLORREF	m_crDownBorder = RGB(153, 209, 255);
+	Gdiplus::Color	m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
+	Gdiplus::Color	m_cr_back = ::GetSysColor(COLOR_WINDOW);
+	Gdiplus::Color	m_crOver = RGB(229, 243, 255);
+	Gdiplus::Color	m_crOverBorder = RGB(204, 232, 255);
+	Gdiplus::Color	m_crDown = RGB(204, 232, 255);
+	Gdiplus::Color	m_crDownBorder = RGB(153, 209, 255);
 
 	int			m_index = -1;	//현재 over되거나 down인 항목
 	bool		m_down = false;

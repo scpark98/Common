@@ -97,21 +97,21 @@ public:
 	int			add(LPCTSTR lpszFormat, ...);
 
 	//지정 글자색으로 한 줄 추가
-	int			add(COLORREF cr, LPCTSTR lpszFormat, ...);
+	int			add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
 
 	//마지막 라인의 데이터에 텍스트 append
 	int			append(LPCTSTR lpszFormat, ...);
 
 	//여러줄의 문자열을 한번에 추가(shell_listbox에 사용)
-	int			add(std::deque<CString>* lists, COLORREF cr = -1);
+	int			add(std::deque<CString>* lists, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	int			insert_string(int nIndex, CString lpszItem);				// Inserts a string to the list box
-	int			insert_string(int nIndex, CString lpszItem, COLORREF rgb = -1);	// Inserts a colored string to the list box
-	void		set_item_color(int nIndex, COLORREF rgb, bool invalidate = true);	// Sets the color of an item in the list box
-	COLORREF	get_item_color(int nIndex);
+	int			insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb = Gdiplus::Color::Transparent);	// Inserts a colored string to the list box
+	void		set_item_color(int nIndex, Gdiplus::Color rgb, bool invalidate = true);	// Sets the color of an item in the list box
+	Gdiplus::Color	get_item_color(int nIndex);
 
 	CString		get_text(int index);
-	void		set_text(int index, CString text, COLORREF cr = -1);
+	void		set_text(int index, CString text, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	void		clear_all() { ResetContent(); Invalidate(); }
 
@@ -154,8 +154,8 @@ public:
 	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
 
 	//색상
-	void		set_text_color(COLORREF cr) { m_cr_text = cr; Invalidate(); }
-	void		set_back_color(COLORREF cr) { m_cr_back = cr; Invalidate(); }
+	void		set_text_color(Gdiplus::Color cr) { m_cr_text = cr; Invalidate(); }
+	void		set_back_color(Gdiplus::Color cr) { m_cr_back = cr; Invalidate(); }
 
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
@@ -241,28 +241,27 @@ protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;
 
-	bool		m_as_static = false;		//true일 경우 키보드, 마우스에 의한 선택 불가
-	bool		m_use_over = false;			//hover hilighted
+	bool		m_as_static = false;				//true일 경우 키보드, 마우스에 의한 선택 불가
+	bool		m_use_over = false;					//hover hilighted
 	int			m_over_item = -1;
-	bool		m_as_popup = false;			//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
-	bool		m_as_folder_list = false;	//폴더목록을 표시하는 목적으로 동작하는 경우
+	bool		m_as_popup = false;					//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
+	bool		m_as_folder_list = false;			//폴더목록을 표시하는 목적으로 동작하는 경우
 	std::deque<CString> m_folder_list;
 
 	bool		m_show_log = true;
 	bool		m_show_date = false;
 	bool		m_show_time = true;
-	bool		m_dim_time_str = true;		//시간 문자열은 연한 회색으로 비강조되도록 표시
+	bool		m_dim_time_str = true;				//시간 문자열은 연한 회색으로 비강조되도록 표시
 
-	COLORREF	m_cr_text;					//기본 글자색
-	COLORREF	m_cr_textSelected;			//선택 항목의 활성화(active) 글자색
-	COLORREF	m_cr_textSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
-	COLORREF	m_cr_textOver;
-	COLORREF	m_cr_back;					//기본 배경색
-	COLORREF	m_cr_backSelected;			//선택 항목 배경색
-	COLORREF	m_cr_backSelectedRect;		//선택 항목 테두리(focus()가 있을 경우에만)
-	COLORREF	m_cr_backSelectedInactive;
-	COLORREF	m_cr_backOver;
-
+	Gdiplus::Color	m_cr_text;						//기본 글자색
+	Gdiplus::Color	m_cr_text_selected;				//선택 항목의 활성화(active) 글자색
+	Gdiplus::Color	m_cr_text_selected_inactive;	//선택 항목의 비활성화(inactive) 글자색
+	Gdiplus::Color	m_cr_text_over;
+	Gdiplus::Color	m_cr_back;						//기본 배경색
+	Gdiplus::Color	m_cr_back_selected;				//선택 항목 배경색
+	Gdiplus::Color	m_cr_back_selected_rect;		//선택 항목 테두리(focus()가 있을 경우에만)
+	Gdiplus::Color	m_cr_back_selected_inactive;
+	Gdiplus::Color	m_cr_back_over;
 
 	LOGFONT		m_lf;
 	CFont		m_font;

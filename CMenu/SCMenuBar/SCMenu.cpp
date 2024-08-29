@@ -660,10 +660,10 @@ void CSCMenu::OnPaint()
 	if (m_img_back.is_valid())
 		m_img_back.draw(g, rc);
 	else
-		dc.FillSolidRect(rc, gpColor2RGB(m_cr_back));
+		dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(gpColor2RGB(m_cr_text));
+	dc.SetTextColor(m_cr_text.ToCOLORREF());
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
@@ -672,7 +672,7 @@ void CSCMenu::OnPaint()
 		//separator의 경우
 		if (m_items[i]->m_id <= 0)
 		{
-			DrawLine(&dc, m_items[i]->m_r.left, m_items[i]->m_r.CenterPoint().y, m_items[i]->m_r.right, m_items[i]->m_r.CenterPoint().y, RGB(214, 214, 214));
+			draw_line(&dc, m_items[i]->m_r.left, m_items[i]->m_r.CenterPoint().y, m_items[i]->m_r.right, m_items[i]->m_r.CenterPoint().y, gGRAY(214));
 		}
 		//일반 메뉴 항목인 경우
 		else
@@ -680,8 +680,8 @@ void CSCMenu::OnPaint()
 			//선택된 항목 표시
 			if (i == m_over_item)
 			{
-				dc.SetTextColor(gpColor2RGB(m_cr_text_over));
-				dc.FillSolidRect(m_items[i]->m_r, gpColor2RGB(m_cr_back_over));
+				dc.SetTextColor(m_cr_text_over.ToCOLORREF());
+				dc.FillSolidRect(m_items[i]->m_r, m_cr_back_over.ToCOLORREF());
 
 				//Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
 				//Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
@@ -700,7 +700,7 @@ void CSCMenu::OnPaint()
 			}
 			else
 			{
-				dc.SetTextColor(gpColor2RGB(m_cr_text));
+				dc.SetTextColor(m_cr_text.ToCOLORREF());
 			}
 
 			CRect rText = m_items[i]->m_r;

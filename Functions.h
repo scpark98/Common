@@ -456,6 +456,8 @@ struct	NETWORK_INFO
 //프로세스 관련
 	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
+	//파일, 폴더의 속성창을 표시한다.
+	void		show_file_property_window(CString fullpath);
 	CString		get_exe_directory(bool includeSlash = false);
 	CString		get_exe_parent_directory();
 	CString		get_exe_filename(bool fullpath = false);
@@ -1326,38 +1328,6 @@ void		SetWallPaper(CString sfile);
 	//unit : ms
 	long		getClock();
 
-
-/*
-//////////////////////////////////////////////////////////////////////////
-//색상
-	COLORREF	get_color(CString sColor);
-	COLORREF	get_color(COLORREF crOrigin, int nOffset);
-	//0~9까지 미리 정해놓은 기본 색상을 리턴한다.
-	COLORREF	GetDefaultColor(int idx);
-	//random19937을 이용하여 랜덤 컬러를 리턴한다.
-	COLORREF	get_random_color();
-	bool		IsHexaColorString(CString str);
-	COLORREF	get_color_from_hexa_string(CString str);
-	COLORREF	GetComplementaryColor(COLORREF crColor, COLORREF crBack = RGB(255,255,255));
-	void		RGB2HSL(int r, int g, int b, int& h, int& s, int& l);
-
-	//32비트인 dw에 들어있는 R, G, B를 추출하여 16비트(5+6+5) 컬러로 리턴한다.
-	WORD		RGB24ToRGB565(DWORD dw);
-	//두 DWORD를 WORD로 변환하여 하나의 DWORD로 변환한다.
-	DWORD		RGB24ToRGB565(DWORD rgb1, DWORD rgb2);
-	//565로 변환된 WORD를 다시 24비트 RGB로 사용하기 위해 DWORD로 복원시킨다.
-	DWORD		RGB565ToRGB24(WORD wd);
-
-	//gray 계열인지
-	bool		isGray(COLORREF cr, int tolerance = 0);
-	//gray image를 3채널 또는 4채널 이미지 포맷으로 복사해준다.
-	//dst는 반드시 할당된 메모리주소이어야 한다.
-	void gray2color(uint8_t *gray, int gray_width, int gray_height, uint8_t *dst, int dst_width, int dst_height, int dst_ch, uint8_t alpha);
-
-	//3채널 또는 4채널 이미지를 단일 흑백 이미지로 복사한다.
-	//dst는 반드시 할당된 메모리주소이어야 한다.
-	void color2gray(uint8_t *src, int src_width, int src_height, int src_ch, uint8_t *dst, int dst_width, int dst_height);
-*/
 	extern bool		initialized_YUV_lookup_table;
 	void		init_YUV_lookup_table();
 	void		yuv420_yv12_to_bgr(unsigned char *src, unsigned char *dst, int w, int h);
@@ -1374,10 +1344,6 @@ void		SetWallPaper(CString sfile);
 
 //////////////////////////////////////////////////////////////////////////
 //GDI
-	void		TextOutShadow(CDC* pDC, int x, int y, CString sText, COLORREF crText = RGB(0,0,0), COLORREF crShadow = GRAY(64), UINT nFlag = TA_LEFT | TA_TOP);
-	void		DrawTextShadow(CDC* pDC, CString sText, CRect r, UINT format, COLORREF crText = RGB(255,255,255), COLORREF crShadow = GRAY(64), int offsetX = 1, int offsetY = 1);
-	void		TextOutOutline(CDC* pDC, int x, int y, CString sText, COLORREF crText = RGB(0,0,0), COLORREF crBorder = RGB(255,255,255), UINT nFlag = TA_LEFT | TA_TOP);
-	void		DrawTextOutline(CDC* pDC, CString sText, CRect r, UINT format, COLORREF crText = RGB(255, 255, 255), COLORREF crShadow = GRAY(64));
 	void		draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect);
 
 	//Gdiplus
@@ -1415,15 +1381,15 @@ void		SetWallPaper(CString sfile);
 	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);
 
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
-	void		DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		DrawRectangle(CDC*	pDC, CRect Rect, COLORREF crColor = RGB(0,0,0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		DrawRectangle(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		DrawSunkenRect(CDC* pDC, CRect Rect, bool bSunken = TRUE, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int nWidth = 1);
-	void		DrawEllipse(CDC* pDC, int cx, int cy, int rx, int ry, COLORREF crLine, COLORREF crFill, int nPenStyle = PS_SOLID, int nWidth = 1, int nDrawMode = R2_COPYPEN);
-	void		drawCircle(CDC* pDC, int xMidPoint,  int yMidPoint,  int radius);
+	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
+	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, int pen_style = PS_SOLID, int draw_mode = R2_COPYPEN);
+	void		draw_rectangle(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
+	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);
+	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);
+	void		draw_ellipse(CDC* pDC, int cx, int cy, int rx, int ry, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);
+	void		draw_circle(CDC* pDC, int xMidPoint,  int yMidPoint,  int radius);
 	void		draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed = true, COLORREF crLine = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		drawArc(CDC *pDC, double cx, double cy,double r1, double r2, double start, double end, int width = 1, int style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN);
+	void		draw_arc(CDC *pDC, double cx, double cy,double r1, double r2, double start, double end, int width = 1, int style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN);
 	bool		LoadBitmapFromFile(CBitmap &bmp, CString strFile);
 	bool		SaveBitmapToTile(CBitmap* bmp, CString strFile, CWnd* pWnd);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);
@@ -1448,7 +1414,7 @@ void		SetWallPaper(CString sfile);
 	typedef UINT (CALLBACK* LPFNDLLFUNC1)(HDC,CONST PTRIVERTEX,DWORD,CONST PVOID,DWORD,DWORD);
 	extern HINSTANCE	g_hInst_msimg32;
 	extern LPFNDLLFUNC1 g_dllfunc_GradientFill;
-	void gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool vertical = false);
+	void gradient_rect(CDC* pDC, CRect &rect, std::deque<Gdiplus::Color> dqColor, bool vertical = false);
 	enum GRADIENT_RECT_PRESET
 	{
 		gradient_rect_white_black_white = 0,

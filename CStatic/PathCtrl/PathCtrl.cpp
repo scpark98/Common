@@ -11,6 +11,13 @@ IMPLEMENT_DYNAMIC(CPathCtrl, CStatic)
 CPathCtrl::CPathCtrl()
 {
 	m_pEdit = NULL;
+
+	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+	m_crOver = Gdiplus::Color(255, 229, 243, 255);
+	m_crOverBorder = Gdiplus::Color(255, 204, 232, 255);
+	m_crDown = Gdiplus::Color(255, 204, 232, 255);
+	m_crDownBorder = Gdiplus::Color(255, 153, 209, 255);
 }
 
 CPathCtrl::~CPathCtrl()
@@ -191,7 +198,7 @@ void CPathCtrl::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, m_crBack);
+	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	if (m_path.size() == 0)
 		return;
@@ -199,9 +206,9 @@ void CPathCtrl::OnPaint()
 	int		i;
 	int		arrow_width = 2;
 	CFont*	pOldFont = dc.SelectObject(&m_font);
-	CPen	pen(PS_SOLID, 1, m_down ? m_crDownBorder : m_crOverBorder);
+	CPen	pen(PS_SOLID, 1, m_down ? m_crDownBorder.ToCOLORREF() : m_crOverBorder.ToCOLORREF());
 	CPen*	pOldPen = (CPen*)dc.SelectObject(&pen);
-	CBrush	brush(m_down ? m_crDown : m_crOver);
+	CBrush	brush(m_down ? m_crDown.ToCOLORREF() : m_crOver.ToCOLORREF());
 	CBrush* pOldBrush = (CBrush*)dc.SelectObject(&brush);
 
 	dc.SetBkMode(TRANSPARENT);
@@ -275,24 +282,24 @@ void CPathCtrl::OnPaint()
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)
 			{
-				DrawLine(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY192, 1);
-				DrawLine(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY192, 1);
-				DrawLine(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY192, 1);
-				DrawLine(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY192, 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, gGRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, gGRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, gGRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, gGRAY(192), 1);
 			}
 			else
 			{
 				//아래로 향한 화살표 표시
 				if (m_down && i == m_index)
 				{
-					DrawLine(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, GRAY192, arrow_width);
-					DrawLine(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, GRAY192, arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, gGRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, gGRAY(192), arrow_width);
 				}
 				//일반상태의 > 화살표 표시
 				else
 				{
-					DrawLine(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, GRAY192, arrow_width);
-					DrawLine(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, GRAY192, arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, gGRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, gGRAY(192), arrow_width);
 				}
 			}
 		}
@@ -300,7 +307,7 @@ void CPathCtrl::OnPaint()
 
 	if (m_pEdit->IsWindowVisible())
 	{
-		DrawRectangle(&dc, rc, RGB(0, 120, 215), NULL_BRUSH);
+		draw_rectangle(&dc, rc, Gdiplus::Color(0, 120, 215));
 	}
 
 	dc.SelectObject(pOldFont);

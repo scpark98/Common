@@ -166,11 +166,11 @@ public:
 	};
 
 	void	set_color_theme(int theme, bool apply_now = true);
-	void	set_text_color(COLORREF text_color) { m_crText = text_color; Invalidate(); }
-	void	set_back_color(COLORREF back_color) { m_crBack = back_color; Invalidate(); }
+	void	set_text_color(Gdiplus::Color text_color) { m_cr_text = text_color; Invalidate(); }
+	void	set_back_color(Gdiplus::Color back_color) { m_cr_back = back_color; Invalidate(); }
 	//CTreeCtrl에서 지원하는 기본 함수 override
-	void	SetTextColor(COLORREF text_color) { set_text_color(text_color); }
-	void	SetBkColor(COLORREF back_color) { set_back_color(back_color); }
+	void	SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
+	void	SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
 
 	//Drag&Drop 드래깅 관련
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
@@ -230,6 +230,7 @@ protected:
 		menu_add_item = WM_USER + 473,
 		menu_rename_item,
 		menu_delete_item,
+		menu_property,
 	};
 	CSCMenu			m_menu;
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
@@ -275,15 +276,16 @@ protected:
 	void			reconstruct_font();
 
 	//컬러 관련
-	COLORREF		m_crText;					//기본 글자색
-	COLORREF		m_crTextSelected;			//선택 항목의 활성화(active) 글자색
-	COLORREF		m_crTextSelectedInactive;	//선택 항목의 비활성화(inactive) 글자색
-	COLORREF		m_crTextDropHilited;
-	COLORREF		m_crBack;					//기본 배경색
-	COLORREF		m_crBackSelected;
-	COLORREF		m_crBackSelectedInactive;
-	COLORREF		m_crBackDropHilited;
-	COLORREF		m_crSelectedBorder;
+	Gdiplus::Color	m_cr_text;					//기본 글자색
+	Gdiplus::Color	m_cr_text_selected;			//선택 항목의 활성화(active) 글자색
+	Gdiplus::Color	m_cr_text_selected_inactive;	//선택 항목의 비활성화(inactive) 글자색
+	Gdiplus::Color	m_cr_text_dropHilited;
+	Gdiplus::Color	m_cr_back;					//기본 배경색
+	Gdiplus::Color	m_cr_back_selected;
+	Gdiplus::Color	m_cr_back_selected_inactive;
+	Gdiplus::Color	m_crBackTrackSelect;		//hot tracking item back color
+	Gdiplus::Color	m_cr_back_dropHilited;
+	Gdiplus::Color	m_cr_selected_border;
 
 	//Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;

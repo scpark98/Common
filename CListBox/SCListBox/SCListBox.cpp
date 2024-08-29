@@ -205,8 +205,8 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 
 	CString		sText;
-	COLORREF	cr_text = (COLORREF)lpDIS->itemData;	// Color information is in item data.
-	COLORREF	cr_back = m_cr_back;
+	Gdiplus::Color	cr_text = (Gdiplus::Color)lpDIS->itemData;	// Color information is in item data.
+	Gdiplus::Color	cr_back = m_cr_back;
 
 	CRect		rc;
 	CRect		rect = lpDIS->rcItem;
@@ -259,13 +259,13 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (lpDIS->itemID == m_over_item)
 	{
-		cr_back = m_cr_backOver;
+		cr_back = m_cr_back_over;
 	}
 	else
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
 		{
-			cr_back = m_cr_backSelected;
+			cr_back = m_cr_back_selected;
 		}
 		else
 		{
@@ -276,22 +276,22 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	//CBrush brush(cr_back);
 	//dc.FillRect(&rect, &brush);
-	DrawRectangle(&dc, rect, cr_back, cr_back, 1);
+	draw_rectangle(&dc, rect, cr_back, cr_back, 1);
 
 	if (lpDIS->itemState & ODS_SELECTED)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
-		//cr_text = m_cr_textSelected;
-		DrawRectangle(&dc, rect, GetFocus() ? m_cr_backSelectedRect : cr_back, cr_back, 1);
+		//cr_text = m_cr_text_selected;
+		draw_rectangle(&dc, rect, GetFocus() ? m_cr_back_selected_rect : cr_back, cr_back, 1);
 	}
 	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
-		cr_text = ::GetSysColor(COLOR_GRAYTEXT);
+		cr_text = RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT));
 	}
 	else
 	{
 		if (lpDIS->itemID == m_over_item)
-			cr_text = m_cr_textOver;
+			cr_text = m_cr_text_over;
 	}
 
 	// Get and display item text.
@@ -337,9 +337,9 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		//struct를 새로 선언하고 text color, back color, font property, image index 등을 저장하여 사용할 수 있지만
 		//메모리 동적할당 등 많이 복잡해진다. 우선 임시로 텍스트 색상이 blue면 1번 이미지, red면 2번 이미지를 사용한다.
 		int image_index = 0;
-		if (m_imagelist.size() > 1 && cr_text == royalblue)
+		if (m_imagelist.size() > 1 && cr_text.ToCOLORREF() == royalblue)
 			image_index = 1;
-		else if (m_imagelist.size() > 2 && cr_text == red)
+		else if (m_imagelist.size() > 2 && cr_text.ToCOLORREF() == red)
 			image_index = 2;
 
 		m_imagelist[image_index]->draw(g, rect.left, rect.top + (rect.Height() - m_imagelist[image_index]->height)/2);
@@ -391,7 +391,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 
 	//가로 스크롤시에 뭔가 rect영역이 부족해서 출력되지 않는 현상이 있어서 DT_NOCLIP을 추가함.
-	dc.SetTextColor(cr_text);
+	dc.SetTextColor(cr_text.ToCOLORREF());
 	dc.DrawText(sText, rect, nFormat | DT_NOCLIP);
 
 	dc.SelectObject(pOldFont);
@@ -415,7 +415,7 @@ int	CSCListBox::add(LPCTSTR lpszFormat, ...)
 	return add(m_cr_text, new_text);
 }
 
-int CSCListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
+int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 {
 	if (m_hWnd == NULL)
 		return -1;
@@ -423,7 +423,7 @@ int CSCListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	if (!m_show_log)
 		return -1;
 
-	if (cr == -1)
+	if (cr.GetValue() == Gdiplus::Color::Transparent)
 		cr = m_cr_text;
 
 	//CString으로 변환
@@ -498,10 +498,10 @@ int CSCListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 	if (index >= 0)
 	{
-		if (cr < 0)
-			SetItemData(index, m_cr_text);
+		if (cr.GetValue() == Gdiplus::Color::Transparent)
+			SetItemData(index, m_cr_text.ToCOLORREF());
 		else
-			SetItemData(index, cr);
+			SetItemData(index, cr.ToCOLORREF());
 
 		//뒤에 붙었던 '\n'개수만큼 빈 줄을 추가해준다.
 		for (i = 0; i < post_linefeed_count; i++)
@@ -522,9 +522,9 @@ int CSCListBox::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	return index;
 }
 
-int CSCListBox::add(std::deque<CString> *lists, COLORREF cr)
+int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 {
-	if (cr == -1)
+	if (cr.GetValue() == Gdiplus::Color::Transparent)
 		cr = m_cr_text;
 
 	for (int i = 0; i < lists->size(); i++)
@@ -561,7 +561,7 @@ int CSCListBox::insert_string(int nIndex, CString lpszItem)
 
 //-------------------------------------------------------------------
 //
-int CSCListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
+int CSCListBox::insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb)
 //
 // Return Value:	The zero-based index of the position at which the 
 //						string was inserted. The return value is LB_ERR if 
@@ -581,9 +581,9 @@ int CSCListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 	int index = ((CListBox*)this)->InsertString(nIndex,lpszItem);
 	if (index >= 0)
 	{
-		if (rgb < 0)
+		if (rgb.GetValue() == Gdiplus::Color::Transparent)
 			rgb = m_cr_text;
-		SetItemData(index, rgb);
+		SetItemData(index, rgb.ToCOLORREF());
 		RedrawWindow();
 	}
 
@@ -592,7 +592,7 @@ int CSCListBox::insert_string(int nIndex, CString lpszItem, COLORREF rgb)
 
 //-------------------------------------------------------------------
 //
-void CSCListBox::set_item_color(int nIndex, COLORREF rgb, bool invalidate)
+void CSCListBox::set_item_color(int nIndex, Gdiplus::Color rgb, bool invalidate)
 //
 // Return Value:	None.
 //
@@ -603,14 +603,14 @@ void CSCListBox::set_item_color(int nIndex, COLORREF rgb, bool invalidate)
 //						item in the list box.
 //
 {
-	SetItemData(nIndex, rgb);
+	SetItemData(nIndex, rgb.ToCOLORREF());
 	if (invalidate)
 		RedrawWindow();
 }
 
-COLORREF CSCListBox::get_item_color( int nIndex )
+Gdiplus::Color CSCListBox::get_item_color(int nIndex)
 {
-	return (COLORREF)GetItemData( nIndex );
+	return (Gdiplus::Color)GetItemData(nIndex);
 }
 
 CString CSCListBox::get_text(int index)
@@ -628,7 +628,7 @@ CString CSCListBox::get_text(int index)
 	return text;
 }
 
-void CSCListBox::set_text(int index, CString text, COLORREF cr)
+void CSCListBox::set_text(int index, CString text, Gdiplus::Color cr)
 {
 	if (index < 0 || index >= GetCount())
 	{
@@ -680,7 +680,7 @@ BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
 	CRect rc;
 	GetClientRect(rc);
-	pDC->FillSolidRect(rc, m_cr_back);
+	pDC->FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);
@@ -791,7 +791,6 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 		}
 	}
 
-
 	return CListBox::PreTranslateMessage(pMsg);
 }
 
@@ -810,40 +809,40 @@ void CSCListBox::set_color_theme(int theme, bool apply_now)
 	switch (theme)
 	{
 	case color_theme_default:
-		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
-		m_cr_textSelected = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_textSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_cr_textOver = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+		m_cr_text_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
+		m_cr_text_over.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHTTEXT));
 
-		m_cr_back = ::GetSysColor(COLOR_WINDOW);
-		m_cr_backSelected = RGB(204, 232, 255);	//m_cr_backSelected = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backSelectedRect = RGB(153, 209, 255);
-		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backOver = RGB(195, 222, 245); //m_cr_backOver = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+		m_cr_back_selected = Gdiplus::Color(255, 204, 232, 255);	//m_cr_back_selected = ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_rect = Gdiplus::Color(255, 153, 209, 255);
+		m_cr_back_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
+		m_cr_back_over = Gdiplus::Color(255, 195, 222, 245); //m_cr_back_over = ::GetSysColor(COLOR_HIGHLIGHT);
 		break;
 	case color_theme_explorer:
-		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
-		m_cr_textSelected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_textSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_cr_textOver = m_cr_text;
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_cr_text_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
+		m_cr_text_over = m_cr_text;
 
-		m_cr_back = ::GetSysColor(COLOR_WINDOW); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_backSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backSelectedRect = RGB(153, 209, 255);
-		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backOver = RGB(195, 222, 245);
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back_selected = Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_rect = Gdiplus::Color(255, 153, 209, 255);
+		m_cr_back_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
+		m_cr_back_over = Gdiplus::Color(255, 195, 222, 245);
 		break;
 	case color_theme_popup_folder_list:
-		m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
-		m_cr_textSelected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_textSelectedInactive = ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_cr_textOver = m_cr_text;
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_cr_text_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
+		m_cr_text_over = m_cr_text;
 
-		m_cr_back = ::GetSysColor(COLOR_3DFACE); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_backSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backSelectedRect = RGB(153, 209, 255);
-		m_cr_backSelectedInactive = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_backOver = RGB(195, 222, 245);
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back_selected = Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_rect = Gdiplus::Color(255, 153, 209, 255);
+		m_cr_back_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
+		m_cr_back_over = Gdiplus::Color(255, 195, 222, 245);
 		break;
 	}
 

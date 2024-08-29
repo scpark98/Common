@@ -1,4 +1,4 @@
-#include <afxinet.h>	// for Internet
+ï»¿#include <afxinet.h>	// for Internet
 #include <string>
 #include <utility>
 #include <fstream>
@@ -14,10 +14,10 @@
 
 #include "Functions.h"
 
-//¾Æ·¡ µÎ ¶óÀÎÀº GetWindowsVersion()ÇÔ¼ö¸¦ À§ÇØ Æ÷ÇÔµÇ¾ú´Âµ¥
-//Functions.h¿¡ includeÇÒ °æ¿ì
-//NHÀÇ LiveWebClient¿¡¼­ »ç¿ëÇÏ´Â opencv¿Í ¹º°¡ Ãæµ¹ÀÌ »ı±ä´Ù.
-//°¡´ÉÇÏ¸é .h¿¡ include¸¦ ÃÖ¼ÒÈ­ ÇÒ ÇÊ¿ä°¡ ÀÖ´Ù.
+//ì•„ë˜ ë‘ ë¼ì¸ì€ GetWindowsVersion()í•¨ìˆ˜ë¥¼ ìœ„í•´ í¬í•¨ë˜ì—ˆëŠ”ë°
+//Functions.hì— includeí•  ê²½ìš°
+//NHì˜ LiveWebClientì—ì„œ ì‚¬ìš©í•˜ëŠ” opencvì™€ ë­”ê°€ ì¶©ëŒì´ ìƒê¸´ë‹¤.
+//ê°€ëŠ¥í•˜ë©´ .hì— includeë¥¼ ìµœì†Œí™” í•  í•„ìš”ê°€ ìˆë‹¤.
 #include <LM.h>
 #pragma comment(lib, "netapi32.lib")
 
@@ -137,7 +137,7 @@ CString get_time_string(COleDateTime t, CString sep, bool h24, bool sec)
 	else
 	{
 		if (GetUserDefaultUILanguage() == 1042)
-			str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("¿ÀÀü") : _T("¿ÀÈÄ")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
+			str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("ì˜¤ì „") : _T("ì˜¤í›„")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
 		else
 			str.Format(_T("%2d%s%02d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, sep, s, (am ? _T("AM") : _T("PM")));
 	}
@@ -208,7 +208,7 @@ CString	get_cur_datetime_string(int type, bool sep, CString mid, bool h24, bool 
 }
 
 #if 0
-//type 0(date), 1(time), 2(date+time), ³â-¿ù-ÀÏ ½Ã:ºĞ:ÃÊ Çü½ÄÀ¸·Î ÇöÀç ½Ã°£ ¸®ÅÏ. mid_char´Â ³¯Â¥¿Í ½Ã°£ »çÀÌ ¹®ÀÚ
+//type 0(date), 1(time), 2(date+time), ë…„-ì›”-ì¼ ì‹œ:ë¶„:ì´ˆ í˜•ì‹ìœ¼ë¡œ í˜„ì¬ ì‹œê°„ ë¦¬í„´. mid_charëŠ” ë‚ ì§œì™€ ì‹œê°„ ì‚¬ì´ ë¬¸ì
 CString GetCurrentDateTimeString(int type, bool separator /*= true*/, CString mid /*= _T(" ")*/, bool h24 /*= true*/)
 {
 	return GetDateTimeString(CTime::GetCurrentTime(), type, separator, mid, h24);
@@ -418,7 +418,7 @@ int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, b
 	return find_dqstring(dqSrc, dqFind, op, bWholeWord, bCaseSensitive);
 }
 
-//dqSrc¿¡ dqFind°¡ ÀÖ´ÂÁö °Ë»ç. ÇöÀç´Â AND ¿¬»êÀÌ¹Ç·Î dqFindÀÇ ¸ğµç ¿ø¼Ò°¡ dqSrc¿¡ Æ÷ÇÔµÇ¾î ÀÖ¾î¾ß ÇÔ.
+//dqSrcì— dqFindê°€ ìˆëŠ”ì§€ ê²€ì‚¬. í˜„ì¬ëŠ” AND ì—°ì‚°ì´ë¯€ë¡œ dqFindì˜ ëª¨ë“  ì›ì†Œê°€ dqSrcì— í¬í•¨ë˜ì–´ ìˆì–´ì•¼ í•¨.
 int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op, bool bWholeWord, bool bCaseSensitive)
 {
 	int i, j;
@@ -445,7 +445,7 @@ int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR o
 			{
 				if (dqFind[j] == dqSrc[i])
 				{
-					//¸¸¾à OR ¿¬»êÀÌ¸é ¿©±â¼­ true ¸®ÅÏ
+					//ë§Œì•½ OR ì—°ì‚°ì´ë©´ ì—¬ê¸°ì„œ true ë¦¬í„´
 					found_count++;
 
 					if (found_index < 0)
@@ -459,7 +459,7 @@ int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR o
 			{
 				if (dqSrc[i].Find(dqFind[j]) >= 0)
 				{
-					//¸¸¾à OR ¿¬»êÀÌ¸é ¿©±â¼­ true ¸®ÅÏ
+					//ë§Œì•½ OR ì—°ì‚°ì´ë©´ ì—¬ê¸°ì„œ true ë¦¬í„´
 					found_count++;
 
 					if (found_index < 0)
@@ -471,13 +471,13 @@ int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR o
 			}
 		}
 
-		//ANDÀÌ¸é Ã£´Â ¹®ÀÚ¿­ÀÌ ¸ğµÎ Á¸ÀçÇØ¾ß ÇÏ°í
+		//ANDì´ë©´ ì°¾ëŠ” ë¬¸ìì—´ì´ ëª¨ë‘ ì¡´ì¬í•´ì•¼ í•˜ê³ 
 		if (op == '&')
 		{
 			if (found_count == dqFind.size())
 				return found_index;
 		}
-		//ORÀÌ¸é ÇÏ³ª¸¸ Á¸ÀçÇØµµ true
+		//ORì´ë©´ í•˜ë‚˜ë§Œ ì¡´ì¬í•´ë„ true
 		else
 		{
 			if (found_count > 0)
@@ -490,7 +490,7 @@ int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR o
 	return found_index;
 }
 
-//Å¬¸³º¸µå clipboard
+//í´ë¦½ë³´ë“œ clipboard
 bool copy_to_clipboard(HWND hWnd, CString str)
 {
 	if (str.IsEmpty())
@@ -501,30 +501,30 @@ bool copy_to_clipboard(HWND hWnd, CString str)
 	pString = (char*)new char[len];
 	WideCharToMultiByte(CP_ACP, 0, (CStringW)str, -1, pString, len, NULL, NULL);
 
-	// ÀúÀåÇÒ ¹®ÀÚ¿­ÀÇ ±æÀÌ¸¦ ±¸ÇÑ´Ù. ('\0'±îÁö Æ÷ÇÔÇÑ Å©±â)
+	// ì €ì¥í•  ë¬¸ìì—´ì˜ ê¸¸ì´ë¥¼ êµ¬í•œë‹¤. ('\0'ê¹Œì§€ í¬í•¨í•œ í¬ê¸°)
 	int string_length = strlen(pString) + 1;
 
-	// Å¬¸³º¸µå·Î ¹®ÀÚ¿­À» º¹»çÇÏ±â À§ÇÏ¿© ¸Ş¸ğ¸®¸¦ ÇÒ´çÇÑ´Ù. 
-	// Å¬¸³º¸µå¿¡´Â ÇÚµéÀ» ³Ö´Â Çü½ÄÀÌ¶ó¼­ HeapAlloc ÇÔ¼ö »ç¿ëÀÌ ºí°¡´ÉÇÏ´Ù. 
+	// í´ë¦½ë³´ë“œë¡œ ë¬¸ìì—´ì„ ë³µì‚¬í•˜ê¸° ìœ„í•˜ì—¬ ë©”ëª¨ë¦¬ë¥¼ í• ë‹¹í•œë‹¤. 
+	// í´ë¦½ë³´ë“œì—ëŠ” í•¸ë“¤ì„ ë„£ëŠ” í˜•ì‹ì´ë¼ì„œ HeapAlloc í•¨ìˆ˜ ì‚¬ìš©ì´ ë¸”ê°€ëŠ¥í•˜ë‹¤. 
 	HANDLE h_data = ::GlobalAlloc(GMEM_DDESHARE | GMEM_MOVEABLE, string_length);
 
-	// ÇÒ´çµÈ ¸Ş¸ğ¸®¿¡ ¹®ÀÚ¿­À» º¹»çÇÏ±â À§ÇØ¼­ »ç¿ë °¡´ÉÇÑ ÁÖ¼Ò¸¦ ¾ò´Â´Ù. 
+	// í• ë‹¹ëœ ë©”ëª¨ë¦¬ì— ë¬¸ìì—´ì„ ë³µì‚¬í•˜ê¸° ìœ„í•´ì„œ ì‚¬ìš© ê°€ëŠ¥í•œ ì£¼ì†Œë¥¼ ì–»ëŠ”ë‹¤. 
 	char *p_data = (char *)::GlobalLock(h_data);
 
 	if (NULL != p_data)
 	{
-		// ÇÒ´çµÈ ¸Ş¸ğ¸® ¿µ¿ª¿¡ »ğÀÔÇÒ ¹®ÀÚ¿­À» º¹»çÇÑ´Ù. 
+		// í• ë‹¹ëœ ë©”ëª¨ë¦¬ ì˜ì—­ì— ì‚½ì…í•  ë¬¸ìì—´ì„ ë³µì‚¬í•œë‹¤. 
 		memcpy(p_data, pString, string_length);
 
-		// ¹®ÀÚ¿­À» º¹»çÇÏ±â À§ÇØ¼­ Lock Çß´ø ¸Ş¸ğ¸®¸¦ ÇØÁ¦ÇÑ´Ù.
+		// ë¬¸ìì—´ì„ ë³µì‚¬í•˜ê¸° ìœ„í•´ì„œ Lock í–ˆë˜ ë©”ëª¨ë¦¬ë¥¼ í•´ì œí•œë‹¤.
 		::GlobalUnlock(h_data);
 
 		if (::OpenClipboard(hWnd))
 		{
-			::EmptyClipboard(); // Å¬¸³º¸µå¸¦ ¿¬´Ù.
-			::SetClipboardData(CF_TEXT, h_data);  // Å¬¸³º¸µå¿¡ ÀúÀåµÈ ±âÁ¸ ¹®ÀÚ¿­À» »èÁ¦ÇÑ´Ù.
-												  // Å¬¸³º¸µå·Î ¹®ÀÚ¿­À» º¹»çÇÑ´Ù.
-			::CloseClipboard(); // Å¬¸³º¸µå¸¦ ´İ´Â´Ù.
+			::EmptyClipboard(); // í´ë¦½ë³´ë“œë¥¼ ì—°ë‹¤.
+			::SetClipboardData(CF_TEXT, h_data);  // í´ë¦½ë³´ë“œì— ì €ì¥ëœ ê¸°ì¡´ ë¬¸ìì—´ì„ ì‚­ì œí•œë‹¤.
+												  // í´ë¦½ë³´ë“œë¡œ ë¬¸ìì—´ì„ ë³µì‚¬í•œë‹¤.
+			::CloseClipboard(); // í´ë¦½ë³´ë“œë¥¼ ë‹«ëŠ”ë‹¤.
 			delete[] pString;
 		}
 	}
@@ -579,7 +579,7 @@ COLORREF	GetDefaultColor(int idx)
 	}
 }
 
-//random19937À» ÀÌ¿ëÇÏ¿© ·£´ı ÄÃ·¯¸¦ ¸®ÅÏÇÑ´Ù.
+//random19937ì„ ì´ìš©í•˜ì—¬ ëœë¤ ì»¬ëŸ¬ë¥¼ ë¦¬í„´í•œë‹¤.
 COLORREF	get_random_color()
 {
 	return RGB(random19937(0, 255), random19937(0, 255), random19937(0, 255));
@@ -649,15 +649,15 @@ CString		GetCurrentDirectory()
 	return sFilePath;
 }
 
-//_tsplitpath("c:\\abc/def\\123.txt", ...)¸¦ ½ÇÇàÇÏ¸é
-//"c:"		"\\abc/def\\"		"123"		".txt" °ú °°ÀÌ ºĞ¸®µÇ´Âµ¥ ±âÁ¸¿¡ »ç¿ëÇÏ´ø ±â´ë°ª°ú ´Ş¶ó º¸Á¤ÇÑ´Ù.
-//"c:\\"	"c:\\abc/def"		"123"		"txt"	"123.txt"¿Í °°ÀÌ º¸Á¤ÇÑ´Ù.
+//_tsplitpath("c:\\abc/def\\123.txt", ...)ë¥¼ ì‹¤í–‰í•˜ë©´
+//"c:"		"\\abc/def\\"		"123"		".txt" ê³¼ ê°™ì´ ë¶„ë¦¬ë˜ëŠ”ë° ê¸°ì¡´ì— ì‚¬ìš©í•˜ë˜ ê¸°ëŒ€ê°’ê³¼ ë‹¬ë¼ ë³´ì •í•œë‹¤.
+//"c:\\"	"c:\\abc/def"		"123"		"txt"	"123.txt"ì™€ ê°™ì´ ë³´ì •í•œë‹¤.
 //part : fn_drive(drive), fn_folder(drive+folder), fn_last_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
-//¸¸¾à path°¡ "d:\\aaa\\b.abc"ÀÌ°í b.abc°¡ ÆÄÀÏÀÌ ¾Æ´Ñ Æú´õ¶ó¸é ¹®Á¦µÈ´Ù.
-//¶Ç´Â path°¡ "d:\\aaa\\ccc"ÀÎµ¥ Æú´õ°¡ ¾Æ´Ñ ÆÄÀÏÀÏ¼öµµ ÀÖ´Ù.
-//ÆÄÀÏÀÎÁö Æú´õÀÎÁö¸¦ ±¸ºĞÇØ¼­ Ã³¸®ÇÏ´Â ÄÚµå´Â ÇÊ¼ö´Ù.(½ÇÁ¦ Á¸ÀçÇÏ´Â °æ¿ì¿¡¸¸ °Ë»ç°¡ °¡´ÉÇÏ´Ù)
-//´Ü, path°¡ "¿¬±¸¼Ò¹®¼­(\\192.168.1.103) (Y:)"°ú °°ÀÌ ³×Æ®¿öÅ© °æ·Î¸¦ Æ÷ÇÔÇÑ µå¶óÀÌºê º¼·ıÀÎ °æ¿ì´Â
-//ºĞ¸®ÇØ¼­´Â ¾ÈµÇ¹Ç·Î ±×³É ¸®ÅÏÇØ¾ß ÇÑ´Ù.
+//ë§Œì•½ pathê°€ "d:\\aaa\\b.abc"ì´ê³  b.abcê°€ íŒŒì¼ì´ ì•„ë‹Œ í´ë”ë¼ë©´ ë¬¸ì œëœë‹¤.
+//ë˜ëŠ” pathê°€ "d:\\aaa\\ccc"ì¸ë° í´ë”ê°€ ì•„ë‹Œ íŒŒì¼ì¼ìˆ˜ë„ ìˆë‹¤.
+//íŒŒì¼ì¸ì§€ í´ë”ì¸ì§€ë¥¼ êµ¬ë¶„í•´ì„œ ì²˜ë¦¬í•˜ëŠ” ì½”ë“œëŠ” í•„ìˆ˜ë‹¤.(ì‹¤ì œ ì¡´ì¬í•˜ëŠ” ê²½ìš°ì—ë§Œ ê²€ì‚¬ê°€ ê°€ëŠ¥í•˜ë‹¤)
+//ë‹¨, pathê°€ "ì—°êµ¬ì†Œë¬¸ì„œ(\\192.168.1.103) (Y:)"ê³¼ ê°™ì´ ë„¤íŠ¸ì›Œí¬ ê²½ë¡œë¥¼ í¬í•¨í•œ ë“œë¼ì´ë¸Œ ë³¼ë¥¨ì¸ ê²½ìš°ëŠ”
+//ë¶„ë¦¬í•´ì„œëŠ” ì•ˆë˜ë¯€ë¡œ ê·¸ëƒ¥ ë¦¬í„´í•´ì•¼ í•œë‹¤.
 CString		get_part(CString path, int part)
 {
 	if (path.Right(2) == _T(":)"))
@@ -671,32 +671,32 @@ CString		get_part(CString path, int part)
 
 	CString parts[6] = { tDrive, tDir, _T(""), tFname, tExt, };
 
-	//È®ÀåÀÚ¸¦ Æ÷ÇÔÇÑ ÆÄÀÏ¸í
+	//í™•ì¥ìë¥¼ í¬í•¨í•œ íŒŒì¼ëª…
 	parts[fn_name] = parts[fn_title] + parts[fn_ext];
 
-	//Æú´õ¸íÀÇ ³¡¿¡ '/' ¶Ç´Â '\\'¶ó¸é Á¦°Å.
+	//í´ë”ëª…ì˜ ëì— '/' ë˜ëŠ” '\\'ë¼ë©´ ì œê±°.
 	if (parts[fn_folder].Right(1) == '/' || parts[fn_folder].Right(1) == '\\')
 		parts[fn_folder].Truncate(parts[fn_folder].GetLength() - 1);
 
-	//Æú´õ¸íÀº µå¶óÀÌºê °æ·Î±îÁö ¸ğµÎ Æ÷ÇÔ. "\\abc/def\\" => "c:\\abc/def\\"
+	//í´ë”ëª…ì€ ë“œë¼ì´ë¸Œ ê²½ë¡œê¹Œì§€ ëª¨ë‘ í¬í•¨. "\\abc/def\\" => "c:\\abc/def\\"
 	parts[fn_folder] = parts[fn_drive] + parts[fn_folder];
 
-	//µå¶óÀÌºê ·çÆ®¶ó¸é ³¡¿¡ '\'¸¦ ºÙ¿©Áà¾ß ÇÑ´Ù. "C:" => "C:\\"
+	//ë“œë¼ì´ë¸Œ ë£¨íŠ¸ë¼ë©´ ëì— '\'ë¥¼ ë¶™ì—¬ì¤˜ì•¼ í•œë‹¤. "C:" => "C:\\"
 	if (parts[fn_folder].GetLength() == 2 && parts[fn_folder].Right(1) == _T(":"))
 		parts[fn_folder] += _T("\\");
 
-	//È®ÀåÀÚ´Â .À» Á¦¿Ü½ÃÅ²´Ù. parts[3]°¡ ""ÀÌ¾îµµ .Mid(1)Àº ¿¡·¯°¡ ¹ß»ıÇÏÁö´Â ¾Ê´Â´Ù.
+	//í™•ì¥ìëŠ” .ì„ ì œì™¸ì‹œí‚¨ë‹¤. parts[3]ê°€ ""ì´ì–´ë„ .Mid(1)ì€ ì—ëŸ¬ê°€ ë°œìƒí•˜ì§€ëŠ” ì•ŠëŠ”ë‹¤.
 	parts[fn_ext] = parts[fn_ext].Mid(1);
 
-	//path°¡ b.abc¿Í °°ÀÌ ÆÄÀÏ¸íÃ³·³ µÇ¾î ÀÖÁö¸¸ ÆÄÀÏÀÌ ¾Æ´Ñ folderÀÏ °æ¿ìÀÇ Ã³¸®(½ÇÁ¦ Á¸ÀçÇÒ °æ¿ì¿¡¸¸ °¡´É)
+	//pathê°€ b.abcì™€ ê°™ì´ íŒŒì¼ëª…ì²˜ëŸ¼ ë˜ì–´ ìˆì§€ë§Œ íŒŒì¼ì´ ì•„ë‹Œ folderì¼ ê²½ìš°ì˜ ì²˜ë¦¬(ì‹¤ì œ ì¡´ì¬í•  ê²½ìš°ì—ë§Œ ê°€ëŠ¥)
 	if (PathFileExists(path))
 	{
 		if (PathIsDirectory(path))
 		{
-			//ÇØ´ç °æ·Î°¡ µğ·ºÅä¸®ÀÌ°í part == fn_nameÀÌ¶ó°í ³Ñ¾î¿Ô´Ù¸é
-			//ÀÌ´Â ½ÇÁ¦·Î´Â fn_last_folder¸¦ ¿äÃ»ÇÏ´Â °ÍÀ¸·Î ºÁ¾ß ÇÑ´Ù.
-			//¶Ç´Â È£ÃâÇÏ´Â °÷¿¡¼­ ¹Ì¸® ÆÇº°ÇÏ¿© ¿äÃ»ÇÒ ¼öµµ ÀÖ´Ù.
-			//ÆÄÀÏÀÌ¸é fn_nameÀ» ¿äÃ»ÇÏ°í Æú´õÀÌ¸é fn_last_folder¸¦ ¿äÃ»ÇØ¾ß ÇÑ´Ù.
+			//í•´ë‹¹ ê²½ë¡œê°€ ë””ë ‰í† ë¦¬ì´ê³  part == fn_nameì´ë¼ê³  ë„˜ì–´ì™”ë‹¤ë©´
+			//ì´ëŠ” ì‹¤ì œë¡œëŠ” fn_last_folderë¥¼ ìš”ì²­í•˜ëŠ” ê²ƒìœ¼ë¡œ ë´ì•¼ í•œë‹¤.
+			//ë˜ëŠ” í˜¸ì¶œí•˜ëŠ” ê³³ì—ì„œ ë¯¸ë¦¬ íŒë³„í•˜ì—¬ ìš”ì²­í•  ìˆ˜ë„ ìˆë‹¤.
+			//íŒŒì¼ì´ë©´ fn_nameì„ ìš”ì²­í•˜ê³  í´ë”ì´ë©´ fn_last_folderë¥¼ ìš”ì²­í•´ì•¼ í•œë‹¤.
 			part = fn_last_folder;
 			parts[fn_last_folder] = parts[fn_name];
 			parts[fn_folder] = parts[fn_folder] + _T("\\") + parts[fn_name];
@@ -705,8 +705,8 @@ CString		get_part(CString path, int part)
 	}
 	else
 	{
-		//"¹ÙÅÁ È­¸é"°ú °°ÀÌ °¡»ó °æ·ÎÀÏ °æ¿ì´Â fn_title°ú fn_name¸¸ ÀÌ °ªÀ¸·Î Ã¤¿öÁö¹Ç·Î
-		//Æú´õÀÌ¸§¿¡µµ ÀÌ °ªÀ» ³Ö¾î »ç¿ëÇÑ´Ù.
+		//"ë°”íƒ• í™”ë©´"ê³¼ ê°™ì´ ê°€ìƒ ê²½ë¡œì¼ ê²½ìš°ëŠ” fn_titleê³¼ fn_nameë§Œ ì´ ê°’ìœ¼ë¡œ ì±„ì›Œì§€ë¯€ë¡œ
+		//í´ë”ì´ë¦„ì—ë„ ì´ ê°’ì„ ë„£ì–´ ì‚¬ìš©í•œë‹¤.
 		if (parts[fn_drive].IsEmpty() && parts[fn_folder].IsEmpty() && !parts[fn_name].IsEmpty())
 			parts[fn_folder] = parts[fn_last_folder] = parts[fn_name];
 	}
@@ -734,7 +734,7 @@ CString		GetFolderNameFromFullPath(CString sFullPath, bool includeSlash)
 
 	sFullPath.Replace(_T("/"), _T("\\"));
 
-	//sFullPath°¡ Æú´õ¶ó¸é ±×³É ±× °ªÀ» ¸®ÅÏÇÑ´Ù.
+	//sFullPathê°€ í´ë”ë¼ë©´ ê·¸ëƒ¥ ê·¸ ê°’ì„ ë¦¬í„´í•œë‹¤.
 	if (PathIsDirectory(sFullPath))
 		return sFullPath;
 
@@ -756,7 +756,7 @@ CString		GetFileTitle(CString sFullPath)
 	CString	filename = GetFileNameFromFullPath(sFullPath);
 	
 	//	AfxMessageBox(filename);
-	// È®Àå¸íÀÌ ÀÖ´Â °æ¿ì¿Í ¾ø´Â °æ¿ì¸¦ ±¸ºĞÇÑ´Ù.
+	// í™•ì¥ëª…ì´ ìˆëŠ” ê²½ìš°ì™€ ì—†ëŠ” ê²½ìš°ë¥¼ êµ¬ë¶„í•œë‹¤.
 	if (filename.Find('.') > 0)
 		return filename.Left(filename.ReverseFind('.'));
 	else
@@ -767,7 +767,7 @@ CString	GetFileExtension(CString sFullPath, bool dot)
 {
 	CString sString = GetFileNameFromFullPath(sFullPath);
 
-	// È®Àå¸íÀÌ ÀÖ´Â °æ¿ì¿Í ¾ø´Â °æ¿ì¸¦ ±¸ºĞÇÑ´Ù.
+	// í™•ì¥ëª…ì´ ìˆëŠ” ê²½ìš°ì™€ ì—†ëŠ” ê²½ìš°ë¥¼ êµ¬ë¶„í•œë‹¤.
 	if (sString.Find('.') > 0)
 		return sString.Mid(sString.ReverseFind('.') + (dot ? 0 : 1));
 	else
@@ -798,8 +798,8 @@ int	GetFileTypeFromExtension(CString sExt)
 		return FILE_TYPE_UNKNOWN;
 }
 
-//ÆÄÀÏ¸í¿¡¼­ È®ÀåÀÚ¸¦ newExt·Î º¯°æÇÑ´Ù.
-//applyRealFileÀÌ trueÀÌ¸é ½ÇÁ¦ ÆÄÀÏ¸íµµ º¯°æ½ÃÅ²´Ù.
+//íŒŒì¼ëª…ì—ì„œ í™•ì¥ìë¥¼ newExtë¡œ ë³€ê²½í•œë‹¤.
+//applyRealFileì´ trueì´ë©´ ì‹¤ì œ íŒŒì¼ëª…ë„ ë³€ê²½ì‹œí‚¨ë‹¤.
 bool change_extension(CString& filepath, CString newExt, bool applyRealFile)
 {
 	CString sOldExt = get_part(filepath, fn_ext);
@@ -809,7 +809,7 @@ bool change_extension(CString& filepath, CString newExt, bool applyRealFile)
 
 	if (applyRealFile)
 	{
-		//½ÇÁ¦ ÆÄÀÏ È®ÀåÀÚ¸¦ º¯°æÇßÀ»¶§¸¸ filepathµµ º¯°æ½ÃÄÑÁØ´Ù.
+		//ì‹¤ì œ íŒŒì¼ í™•ì¥ìë¥¼ ë³€ê²½í–ˆì„ë•Œë§Œ filepathë„ ë³€ê²½ì‹œì¼œì¤€ë‹¤.
 		changeSuccess = MoveFile(filepath, sNewFullPath);
 		if (changeSuccess)
 			filepath = sNewFullPath;
@@ -820,7 +820,7 @@ bool change_extension(CString& filepath, CString newExt, bool applyRealFile)
 	return true;
 }
 
-//°æ·Î»ó¿¡ "\\.." ¶Ç´Â "/.."ÀÌ µé¾îÀÖÀ¸¸é ½ÇÁ¦ °æ·Î·Î Àç±¸¼ºÇØÁØ´Ù.
+//ê²½ë¡œìƒì— "\\.." ë˜ëŠ” "/.."ì´ ë“¤ì–´ìˆìœ¼ë©´ ì‹¤ì œ ê²½ë¡œë¡œ ì¬êµ¬ì„±í•´ì¤€ë‹¤.
 //c:/abc/def/../../test.txt => c://test.txt
 CString	normalize_path(CString& filepath)
 {
@@ -840,10 +840,10 @@ CString	normalize_path(CString& filepath)
 	return filepath;
 }
 
-//È®ÀåÀÚ ÁıÇÕ ¹®ÀÚ¿­·Î ÆÄÀÏ¿­±â ´ëÈ­»óÀÚÀÇ filter stringÀ» ¸®ÅÏÇÑ´Ù.
+//í™•ì¥ì ì§‘í•© ë¬¸ìì—´ë¡œ íŒŒì¼ì—´ê¸° ëŒ€í™”ìƒìì˜ filter stringì„ ë¦¬í„´í•œë‹¤.
 //simple : "bmp;jpg;jpeg;png;webp;gif;yuv;raw => "JPG files|*.jpg|bmp|*.bmp|
 //extension_group = FILE_EXTENSION_VIDEO or FILE_EXTENSION_SOUND or FILE_EXTENSION_IMAGE or FILE_EXTENSION_MEDIA...
-//ÇöÀç ¹Ì¿Ï¼º!
+//í˜„ì¬ ë¯¸ì™„ì„±!
 CString	get_filter_string(CString extension_group, bool simple)
 {
 	CString filter;
@@ -853,7 +853,7 @@ CString	get_filter_string(CString extension_group, bool simple)
 	return filter;
 }
 
-//Æú´õ¿¡ ÀÖ´Â ÆÄÀÏµé Áß filetitleÀÌ°í extension¿¡ ÇØ´çÇÏ´Â ÆÄÀÏ¸íÀ» ¸®ÅÏÇÑ´Ù.
+//í´ë”ì— ìˆëŠ” íŒŒì¼ë“¤ ì¤‘ filetitleì´ê³  extensionì— í•´ë‹¹í•˜ëŠ” íŒŒì¼ëª…ì„ ë¦¬í„´í•œë‹¤.
 std::deque<CString>	get_filelist_from_filetitle(CString folder, CString filetitle, CString extension)
 {
 	return FindFilesWithExtensions(folder, filetitle, extension);
@@ -868,7 +868,7 @@ uint64_t get_file_size(CString sfile)
 {
 	CFileStatus		status;
 	
-	//µğ½ºÅ© µå¶óÀÌºêÀÎ °æ¿ì
+	//ë””ìŠ¤í¬ ë“œë¼ì´ë¸Œì¸ ê²½ìš°
 	if (sfile.Mid(1) == _T(":") || sfile.Mid(2) == _T(":\\"))
 	{
 		return (get_disk_total_size(sfile) - get_disk_free_size(sfile));
@@ -925,17 +925,17 @@ uint64_t get_folder_size(CString path)
 }
 
 //unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
-//unit_string	: ´ÜÀ§¸¦ Ç¥½ÃÇÒ Áö (default = true)
+//unit_string	: ë‹¨ìœ„ë¥¼ í‘œì‹œí•  ì§€ (default = true)
 CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_string)
 {
 	return get_size_string(get_file_size(sfile), unit, floats, unit_string);
 }
 
 //unit			: 0:bytes, 1:KB, 2:MB, 3:GB ~
-//autoÀÏ °æ¿ì´Â 1000º¸´Ù ÀÛÀ»‹š±îÁö ³ª´©°í ¼Ò¼öÁ¡Àº 2ÀÚ¸®±îÁö Ç¥½ÃÇÑ´Ù.(ex 7.28TB 32.1TB 123.5TB)
-//floats		: ¼Ò¼öÁ¡À» ¸î ÀÚ¸®±îÁö Ç¥½ÃÇÒÁö
-//unit_string	: ´ÜÀ§¸¦ Ç¥½ÃÇÒ Áö
-//comma			: Á¤¼ö ºÎºĞ¿¡ ÀÚ¸®¼ö ÄŞ¸¶¸¦ Ç¥½ÃÇÒ Áö
+//autoì¼ ê²½ìš°ëŠ” 1000ë³´ë‹¤ ì‘ì„ë–„ê¹Œì§€ ë‚˜ëˆ„ê³  ì†Œìˆ˜ì ì€ 2ìë¦¬ê¹Œì§€ í‘œì‹œí•œë‹¤.(ex 7.28TB 32.1TB 123.5TB)
+//floats		: ì†Œìˆ˜ì ì„ ëª‡ ìë¦¬ê¹Œì§€ í‘œì‹œí• ì§€
+//unit_string	: ë‹¨ìœ„ë¥¼ í‘œì‹œí•  ì§€
+//comma			: ì •ìˆ˜ ë¶€ë¶„ì— ìë¦¬ìˆ˜ ì½¤ë§ˆë¥¼ í‘œì‹œí•  ì§€
 CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, bool comma)
 {
 	double dsize = (double)size;
@@ -966,12 +966,12 @@ CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, b
 	//floats = 2;
 	double multiply = pow(10.0, floats);
 	dsize = ceil(dsize * multiply) / multiply;// ROUND(dsize, floats);
-	//0.045KBÀÏ ¶§ floats°¡ 0ÀÌ¸é 0KBÀ¸·Î ¸®ÅÏµÉ °ÍÀÌ´Ù.
-	//ÀÌ °æ¿ì¶ó¸é 1KB·Î ¸®ÅÏÇÏ´Â °ÍÀÌ ¸Â´Ù.
-	//½ÇÁ¦ ÆÄÀÏÀÇ Å©±â°¡ 0byteÀÏ¶§¸¸ 0À» ¸®ÅÏÇÏÀÚ.
-	//0.045KBÀÏ ¶§ floats°¡ 1ÀÌ¸é ¿ª½Ã 0.0KB·Î ¸®ÅÏµÉ °ÍÀÌ´Ù.
-	//ÀÌ °æ¿ì¶ó¸é 0.1KB·Î ¸®ÅÏµÇ´Â°Ô ¸Â´Ù.
-	//floats°¡ 1ÀÌ¸é 0.1ÀÌ°í ÀÌ 0.1º¸´Ù dsize°¡ ÀÛ´Ù¸é ±×³É 0.1¶ó°í ÇØÁÖÀÚ.
+	//0.045KBì¼ ë•Œ floatsê°€ 0ì´ë©´ 0KBìœ¼ë¡œ ë¦¬í„´ë  ê²ƒì´ë‹¤.
+	//ì´ ê²½ìš°ë¼ë©´ 1KBë¡œ ë¦¬í„´í•˜ëŠ” ê²ƒì´ ë§ë‹¤.
+	//ì‹¤ì œ íŒŒì¼ì˜ í¬ê¸°ê°€ 0byteì¼ë•Œë§Œ 0ì„ ë¦¬í„´í•˜ì.
+	//0.045KBì¼ ë•Œ floatsê°€ 1ì´ë©´ ì—­ì‹œ 0.0KBë¡œ ë¦¬í„´ë  ê²ƒì´ë‹¤.
+	//ì´ ê²½ìš°ë¼ë©´ 0.1KBë¡œ ë¦¬í„´ë˜ëŠ”ê²Œ ë§ë‹¤.
+	//floatsê°€ 1ì´ë©´ 0.1ì´ê³  ì´ 0.1ë³´ë‹¤ dsizeê°€ ì‘ë‹¤ë©´ ê·¸ëƒ¥ 0.1ë¼ê³  í•´ì£¼ì.
 	double dmin = 1.0 / pow(10.0, floats);
 	if (dsize > 0.0 && dsize < dmin)
 		dsize = dmin;
@@ -985,7 +985,7 @@ CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, b
 }
 
 
-//src¸¦ ÆÄ½ÌÇØ¼­ Æ¯Á¤ ±æÀÌ ÀÌ»óÀÇ ¹®ÀÚ¿­µé·Î ³ª´«´Ù.
+//srcë¥¼ íŒŒì‹±í•´ì„œ íŠ¹ì • ê¸¸ì´ ì´ìƒì˜ ë¬¸ìì—´ë“¤ë¡œ ë‚˜ëˆˆë‹¤.
 std::deque<CString> parse_divide(CString src, int len)
 {
 	std::deque<CString> result;
@@ -1010,7 +1010,7 @@ std::deque<CString> parse_divide(CString src, int len)
 	return result;
 }
 
-//srcÀÇ pos±ÙÃ³¿¡¼­ ±¸µÎÁ¡À» Ã£¾Æ ±× À§Ä¡¸¦ ¸®ÅÏÇÑ´Ù.(±¸µÎÁ¡À¸·Î ¹®ÀåÀ» ³ª´­¶§ ÀÌ¿ë)
+//srcì˜ posê·¼ì²˜ì—ì„œ êµ¬ë‘ì ì„ ì°¾ì•„ ê·¸ ìœ„ì¹˜ë¥¼ ë¦¬í„´í•œë‹¤.(êµ¬ë‘ì ìœ¼ë¡œ ë¬¸ì¥ì„ ë‚˜ëˆŒë•Œ ì´ìš©)
 int	find_punctuation(CString src, int pos)
 {
 	int idx = 0;
@@ -1041,8 +1041,8 @@ int	find_punctuation(CString src, int pos)
 
 bool is_punctuation(TCHAR ch)
 {
-	const wchar_t start_ch = L'°¡';
-	const wchar_t end_ch = L'ÆR';
+	const wchar_t start_ch = L'ê°€';
+	const wchar_t end_ch = L'í£';
 
 	if ((ch >= '0' && ch <= '9') ||
 		(ch >= 'a' && ch <= 'z') ||
@@ -1091,14 +1091,14 @@ bool CheckFileIsURL(CString sURL)
 		return FALSE;
 }
 
-//check_prefix°¡ trueÀÌ¸é http, https±îÁö Ã¼Å©ÇÑ´Ù. ¹º°¡ Ãë¾àÁ¡ÀÌ ÀÖ´ÂµíÇÏ¿© ¿ì¼± »ç¿ë±İÁö.(https://mathiasbynens.be/demo/url-regex)
+//check_prefixê°€ trueì´ë©´ http, httpsê¹Œì§€ ì²´í¬í•œë‹¤. ë­”ê°€ ì·¨ì•½ì ì´ ìˆëŠ”ë“¯í•˜ì—¬ ìš°ì„  ì‚¬ìš©ê¸ˆì§€.(https://mathiasbynens.be/demo/url-regex)
 bool is_valid_url(CString url, bool check_prefix)
 {
 	std::string pattern;
 	
 	if (check_prefix)
 		pattern = "https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)";
-	else //È®ÀÎ ÇÊ¿ä!!
+	else //í™•ì¸ í•„ìš”!!
 		pattern = "[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)";
 
 	std::regex url_regex(pattern);
@@ -1230,7 +1230,7 @@ int	Find_Divide_Position_By_Punctuation(CString str)
 		
 		if (nCenter+nIndex <= 0 || abs(nIndex) > nCenter/2)
 		{
-			// DoubleByteCharacterSetÀÌ¸é...
+			// DoubleByteCharacterSetì´ë©´...
 			if (IsDBCSLeadByte((BYTE)(str.GetAt(nCenter))))
 				return nCenter-1;
 			else
@@ -1239,7 +1239,7 @@ int	Find_Divide_Position_By_Punctuation(CString str)
 	}
 }
 
-//ÁÖ¾îÁø array¿¡¼­ ¿øÇÏ´Â Ç×¸ñÀ» Ã£´Â´Ù.
+//ì£¼ì–´ì§„ arrayì—ì„œ ì›í•˜ëŠ” í•­ëª©ì„ ì°¾ëŠ”ë‹¤.
 int FindStringFromArray(CStringArray& ar, CString sTarget, bool bCaseSensitive, bool bWholeWord)
 {
 	int		i;
@@ -1358,9 +1358,9 @@ CString	GetTimeStringFromSeconds(double dSec, bool bHasHour /*= true*/, bool bMi
 	return str;
 }
 
-//¿ø·¡ double dSec¸¦ »ç¿ëÇÏ¿© À§ÀÇ ÇÔ¼ö¸¦ »ç¿ëÇßÀ¸³ª ¼Ò¼öÁ¡ Ç¥½Ã ¹æ½ÄÀÇ ¿À·ù°¡ Á¸ÀçÇÏ¹Ç·Î
-//1.0ÀÌ¾î¾ß ÇÒ °ªÀÌ 0.999999999998 °ú °°ÀÌ Ç¥ÇöµÇ¾î À§ÀÇ ÇÔ¼ö¸¦ »ç¿ëÇÒ ¼ö ¾øÀ» °æ¿ì°¡ ÀÖ´Ù.
-//±×·¡¼­ ¾Æ¿¹ millisecond°ªµµ int·Î °£ÁÖÇÏ¿© Ã³¸®ÇÑ ¾Æ·¡ ÇÔ¼ö¸¦ »ç¿ëÇÑ´Ù.
+//ì›ë˜ double dSecë¥¼ ì‚¬ìš©í•˜ì—¬ ìœ„ì˜ í•¨ìˆ˜ë¥¼ ì‚¬ìš©í–ˆìœ¼ë‚˜ ì†Œìˆ˜ì  í‘œì‹œ ë°©ì‹ì˜ ì˜¤ë¥˜ê°€ ì¡´ì¬í•˜ë¯€ë¡œ
+//1.0ì´ì–´ì•¼ í•  ê°’ì´ 0.999999999998 ê³¼ ê°™ì´ í‘œí˜„ë˜ì–´ ìœ„ì˜ í•¨ìˆ˜ë¥¼ ì‚¬ìš©í•  ìˆ˜ ì—†ì„ ê²½ìš°ê°€ ìˆë‹¤.
+//ê·¸ë˜ì„œ ì•„ì˜ˆ millisecondê°’ë„ intë¡œ ê°„ì£¼í•˜ì—¬ ì²˜ë¦¬í•œ ì•„ë˜ í•¨ìˆ˜ë¥¼ ì‚¬ìš©í•œë‹¤.
 CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour, bool bHasMilliSec)
 {
 	bool minus = false;
@@ -1421,7 +1421,7 @@ int	GetSecondsFromTimeString(CString timeString)
 }
 
 //"00:01:23.456" => 83456
-//srtÀÚ¸·ÀÇ °æ¿ì´Â .´ë½Å ,¸¦ »ç¿ëÇÏ¹Ç·Î µÑ ´Ù °í·ÁÇØÁØ´Ù.
+//srtìë§‰ì˜ ê²½ìš°ëŠ” .ëŒ€ì‹  ,ë¥¼ ì‚¬ìš©í•˜ë¯€ë¡œ ë‘˜ ë‹¤ ê³ ë ¤í•´ì¤€ë‹¤.
 int	GetMilliSecondsFromTimeString(CString timeString)
 {
 	timeString.Trim();
@@ -1471,7 +1471,7 @@ bool IsHexaColorString(CString str)
 }
 
 #if 0
-// ±âº»ÀûÀ¸·Î 16Áø¼ö ½ºÆ®¸µÀÌ ³Ñ¾î¿Â´Ù°í °¡Á¤...
+// ê¸°ë³¸ì ìœ¼ë¡œ 16ì§„ìˆ˜ ìŠ¤íŠ¸ë§ì´ ë„˜ì–´ì˜¨ë‹¤ê³  ê°€ì •...
 COLORREF get_color_from_hexa_string(CString str)
 {
 	if (IsHexaColorString(str) == false || str.GetLength() != 6)
@@ -1696,7 +1696,7 @@ void SystemShutdownNT(int nMode /* = 2 */)
 	fResult = InitiateSystemShutdown(
 		NULL,					// shut down local computer 
 		_T("System rebooting."),	// message to user 
-		0,						// time-out period (<- ¿©±â¸¦ 20 ÀÌ¶ó°í ¾²¸é 20ÃÊ ÈÄ ¿¡ ¸®ºÎÆÃÇÑ´Ù.)
+		0,						// time-out period (<- ì—¬ê¸°ë¥¼ 20 ì´ë¼ê³  ì“°ë©´ 20ì´ˆ í›„ ì— ë¦¬ë¶€íŒ…í•œë‹¤.)
 		FALSE,					// ask user to close apps 
 		bReboot);				// reboot after shutdown 
 	
@@ -1740,11 +1740,11 @@ bool IsNumericString(const CString& strSource)
 		if(strData.IsEmpty())
 			return FALSE;
 
-		//¼Ò¼ıÁ¡ÀÌ ÀÖ´Â °æ¿ì
+		//ì†Œìˆ«ì ì´ ìˆëŠ” ê²½ìš°
 		int iDotPos = strData.Find(_T(".")); 
 		if (0 <= iDotPos)
 		{
-			if (0<= strData.Find(_T("."), iDotPos + 1))    // µÎ¹øÂ° "."
+			if (0<= strData.Find(_T("."), iDotPos + 1))    // ë‘ë²ˆì§¸ "."
 			{
 				return FALSE;
 			}
@@ -1763,25 +1763,25 @@ bool IsNumericString(const CString& strSource)
 				bool bHasE = (0 <= sChar.FindOneOf(_T("eE"))) ;
 				if(bHasE)
 				{
-					//bool bDotNothing = (iDotPos<0);//.ÀÌ ¾øÀ¸¸é Error
+					//bool bDotNothing = (iDotPos<0);//.ì´ ì—†ìœ¼ë©´ Error
 					//if(bDotNothing)
 					//{
 					// return FALSE;
 					//}
-					bool bDotPosLater = (i<iDotPos);//.ÀÌ Eº¸´Ù µÚ¿¡ ÀÖÀ¸¸é Error
+					bool bDotPosLater = (i<iDotPos);//.ì´ Eë³´ë‹¤ ë’¤ì— ìˆìœ¼ë©´ Error
 					if(bDotPosLater)
 					{
 						return FALSE;
 					}
 					iCountE++;
-					if(1<iCountE){//E°¡ µÎ°³ ÀÖÀ¸¸é Error
+					if(1<iCountE){//Eê°€ ë‘ê°œ ìˆìœ¼ë©´ Error
 						return FALSE;
 					}
 					bNextSign=TRUE;
 					continue;
 				}
 
-				//EµÚ¿¡´Â +³ª -°¡ ÀÖ¾î¾ßÇÏ°í µÚ¿¡´Â ¼ıÀÚ°¡ ÀÖ¾î¾ß ÇÔ
+				//Eë’¤ì—ëŠ” +ë‚˜ -ê°€ ìˆì–´ì•¼í•˜ê³  ë’¤ì—ëŠ” ìˆ«ìê°€ ìˆì–´ì•¼ í•¨
 				if(bNextSign)
 				{
 					if(sChar.FindOneOf(_T("-+")) <0)
@@ -1797,13 +1797,13 @@ bool IsNumericString(const CString& strSource)
 					return FALSE;
 				}
 				bool bSign= (0 <= sChar.FindOneOf(_T("+-"))) ;
-				bool bSignError = bSign && (0!=i); //Ã³À½ÀÌ ¾Æ´Ï¸é Error
+				bool bSignError = bSign && (0!=i); //ì²˜ìŒì´ ì•„ë‹ˆë©´ Error
 				if(bSignError)
 				{
 					return FALSE;
 				}
 			}
-			else //¼ıÀÚÀÎ °æ¿ì
+			else //ìˆ«ìì¸ ê²½ìš°
 			{
 				if(bNextSign)
 				{
@@ -1829,9 +1829,9 @@ bool IsNumericString(const CString& strSource)
 	}
 }
 
-//ÁÖ¾îÁø ¹®ÀÚ¿­ÀÌ ¾ËÆÄºª°ú ¼ıÀÚ·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö °Ë»çÇÑ´Ù.
-//excepts¿¡´Â Æ÷ÇÔµÇµµ µÇ´Â ¹®ÀÚ¿­µéÀÌ µé¾îÀÖ´Âµ¥ ÀÌµéÀº ;À¸·Î ±¸ºĞµÇ¾î ÀÖ°í
-//°Ë»çÇÏ±â Àü¿¡ ¹Ì¸® »èÁ¦ÇÑ ÈÄ °Ë»çÇÑ´Ù.
+//ì£¼ì–´ì§„ ë¬¸ìì—´ì´ ì•ŒíŒŒë²³ê³¼ ìˆ«ìë¡œë§Œ êµ¬ì„±ëœ ë¬¸ìì—´ì¸ì§€ ê²€ì‚¬í•œë‹¤.
+//exceptsì—ëŠ” í¬í•¨ë˜ë„ ë˜ëŠ” ë¬¸ìì—´ë“¤ì´ ë“¤ì–´ìˆëŠ”ë° ì´ë“¤ì€ ;ìœ¼ë¡œ êµ¬ë¶„ë˜ì–´ ìˆê³ 
+//ê²€ì‚¬í•˜ê¸° ì „ì— ë¯¸ë¦¬ ì‚­ì œí•œ í›„ ê²€ì‚¬í•œë‹¤.
 bool IsAlphaNumeric(CString str, CString excepts)
 {
 	int i;
@@ -1858,7 +1858,7 @@ bool IsAlphaNumeric(CString str, CString excepts)
 	return true;
 }
 
-//ASCII ÄÚµåÀÇ #33(0x21)(' ') ~ #126(0x7E)('~') ¹üÀ§ÀÎÁö(ÀĞÀ» ¼ö ÀÖ´Â ¹®ÀÚ¿­ÀÎÁö)
+//ASCII ì½”ë“œì˜ #33(0x21)(' ') ~ #126(0x7E)('~') ë²”ìœ„ì¸ì§€(ì½ì„ ìˆ˜ ìˆëŠ” ë¬¸ìì—´ì¸ì§€)
 bool is_readable_char(CString src)
 {
 	for (int i = 0; i < src.GetLength(); i++)
@@ -1870,11 +1870,11 @@ bool is_readable_char(CString src)
 	return true;
 }
 
-//'°¡'~'ÆR'¹üÀ§ÀÇ ÇÑ±Û·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö °Ë»çÇÑ´Ù.
+//'ê°€'~'í£'ë²”ìœ„ì˜ í•œê¸€ë¡œë§Œ êµ¬ì„±ëœ ë¬¸ìì—´ì¸ì§€ ê²€ì‚¬í•œë‹¤.
 bool is_hangul(CString str)
 {
-	const wchar_t start_ch = L'°¡';
-	const wchar_t end_ch = L'ÆR';
+	const wchar_t start_ch = L'ê°€';
+	const wchar_t end_ch = L'í£';
 
 	for (int i = 0; i < str.GetLength(); i++)
 	{
@@ -1886,22 +1886,22 @@ bool is_hangul(CString str)
 }
 
 static const char* const initial_array[] = {
-	"¤¡", "¤¢", "¤¤", "¤§", "¤¨", "¤©", "¤±", "¤²", "¤³", "¤µ",
-	"¤¶", "¤·", "¤¸", "¤¹", "¤º", "¤»", "¤¼", "¤½", "¤¾"
+	"ã„±", "ã„²", "ã„´", "ã„·", "ã„¸", "ã„¹", "ã…", "ã…‚", "ã…ƒ", "ã……",
+	"ã…†", "ã…‡", "ã…ˆ", "ã…‰", "ã…Š", "ã…‹", "ã…Œ", "ã…", "ã…"
 };
 static const char* const medial_array[] = {
-	"¤¿", "¤À", "¤Á", "¤Â", "¤Ã", "¤Ä", "¤Å", "¤Æ", "¤Ç", "¤È",
-	"¤É", "¤Ê", "¤Ë", "¤Ì", "¤Í", "¤Î", "¤Ï", "¤Ğ", "¤Ñ", "¤Ò",
-	"¤Ó"
+	"ã…", "ã…", "ã…‘", "ã…’", "ã…“", "ã…”", "ã…•", "ã…–", "ã…—", "ã…˜",
+	"ã…™", "ã…š", "ã…›", "ã…œ", "ã…", "ã…", "ã…Ÿ", "ã… ", "ã…¡", "ã…¢",
+	"ã…£"
 };
 static const char* const final_array[] = {
-	  "", "¤¡", "¤¢", "¤£", "¤¤", "¤¥", "¤¦", "¤§", "¤©", "¤ª",
-	"¤«", "¤¬", "¤­", "¤®", "¤¯", "¤°", "¤±", "¤²", "¤´", "¤µ",
-	"¤¶", "¤·", "¤¸", "¤º", "¤»", "¤¼", "¤½", "¤¾"
+	  "", "ã„±", "ã„²", "ã„³", "ã„´", "ã„µ", "ã„¶", "ã„·", "ã„¹", "ã„º",
+	"ã„»", "ã„¼", "ã„½", "ã„¾", "ã„¿", "ã…€", "ã…", "ã…‚", "ã…„", "ã……",
+	"ã…†", "ã…‡", "ã…ˆ", "ã…Š", "ã…‹", "ã…Œ", "ã…", "ã…"
 };
 
-//¹®ÀÚ¿­ÀÌ ¿ÂÀüÇÑÁö ±úÁø ¹®ÀÚÀÎÁö¸¦ ÆÇº°(Æ¯È÷ ÇÑ±Û ÀÎÄÚµù ±úÁü ÆÇº°)
-//"ÇÑ±Û'??œí†µ??¬ì—°ì»×İ¨íŠ¸?´ì¬??"
+//ë¬¸ìì—´ì´ ì˜¨ì „í•œì§€ ê¹¨ì§„ ë¬¸ìì¸ì§€ë¥¼ íŒë³„(íŠ¹íˆ í•œê¸€ ì¸ì½”ë”© ê¹¨ì§ íŒë³„)
+//"í•œê¸€'??ì’—ë„»??ÑŠë¿°è€Œæâ‘¦ë“ƒ?ëŒì˜±??"
 bool is_valid_string(CString src, bool include_hangul)
 {
 	int i;
@@ -1917,11 +1917,11 @@ bool is_valid_string(CString src, bool include_hangul)
 	return true;
 }
 
-//¿Ï¼ºÇü ÇÑ±ÛÀÇ ÇÑ ±ÛÀÚ¸¦ ÃÊ¼º, Áß¼º, Á¾¼ºÀ¸·Î ºĞ¸®ÇÑ´Ù.
+//ì™„ì„±í˜• í•œê¸€ì˜ í•œ ê¸€ìë¥¼ ì´ˆì„±, ì¤‘ì„±, ì¢…ì„±ìœ¼ë¡œ ë¶„ë¦¬í•œë‹¤.
 bool get_consonant(CString src, wchar_t* cho, wchar_t* jung, wchar_t* jong)
 {
 	const wchar_t *tsrc = CString2WCHAR(src);
-	//wchar_t *asdf = L"ÇÑ";
+	//wchar_t *asdf = L"í•œ";
 	wchar_t uniValue = *tsrc - 0xAC00;
 	*jong = uniValue % 28;
 	*jung = ((uniValue - *jong) / 28) % 21;
@@ -1985,7 +1985,7 @@ bool IsInteger(LPCTSTR lpszValue)
 	return true;
 }
 
-//startºÎÅÍ ½ÃÀÛÇØ¼­ Ã³À½ ¸¸³ª´Â ¼ıÀÚ ¿µ¿ªÀ» ÃßÃâÇØ¼­ ¼ıÀÚ·Î ¸®ÅÏÇÑ´Ù.
+//startë¶€í„° ì‹œì‘í•´ì„œ ì²˜ìŒ ë§Œë‚˜ëŠ” ìˆ«ì ì˜ì—­ì„ ì¶”ì¶œí•´ì„œ ìˆ«ìë¡œ ë¦¬í„´í•œë‹¤.
 bool get_number_from_string(CString str, int &num, int start)
 {
 	int i = start;
@@ -2017,21 +2017,21 @@ bool get_number_from_string(CString str, int &num, int start)
 	return true;
 }
 
-//¹®ÀÚ¿­¿¡ Æ÷ÇÔµÈ ¼ıÀÚ¹®ÀÚ¸¦ ¼ıÀÚ·Î °£ÁÖÇÏ¿© ºñ±³ÇÑ´Ù.
-//"a5"´Â "a12345"º¸´Ù ÀÛ´Ù.
-//´Ü, "a5"´Â "a-22"¿Í °°ÀÌ "-"±âÈ£´Â ºÎÈ£·Îµµ, Æ¯¼ö¹®ÀÚ·Îµµ °£ÁÖÇÏÁö ¾ÊÀ¸¹Ç·Î "a5"°¡ ÀÛ´Ù°í Ã³¸®µÈ´Ù.
+//ë¬¸ìì—´ì— í¬í•¨ëœ ìˆ«ìë¬¸ìë¥¼ ìˆ«ìë¡œ ê°„ì£¼í•˜ì—¬ ë¹„êµí•œë‹¤.
+//"a5"ëŠ” "a12345"ë³´ë‹¤ ì‘ë‹¤.
+//ë‹¨, "a5"ëŠ” "a-22"ì™€ ê°™ì´ "-"ê¸°í˜¸ëŠ” ë¶€í˜¸ë¡œë„, íŠ¹ìˆ˜ë¬¸ìë¡œë„ ê°„ì£¼í•˜ì§€ ì•Šìœ¼ë¯€ë¡œ "a5"ê°€ ì‘ë‹¤ê³  ì²˜ë¦¬ëœë‹¤.
 bool is_greater_with_numeric(CString str0, CString str1)
 {
-	//StrCmpLogicalW¸¸À¸·Î´Â Å½»ö±â¿Í °°Àº Â÷·Ê·Î Á¤·ÄµÇÁö ¾Ê¾Æ¼­
-	//¾Æ·¡ ÄÚµå¸¦ ³Ö¾úÀ¸³ª Áö±İ ´Ù½Ã µ¹·Áº¸¸é
-	//StrCmpLogicalW¸¸À¸·Îµµ Å½»ö±â¿Í °°Àº Â÷·Ê·Î Á¤·ÄµÈ´Ù.
-	//ºĞ¸íÈ÷ StrCmpLogicalW¸¸À¸·Î´Â °°Áö ¾Ê¾Ò´Âµ¥...
+	//StrCmpLogicalWë§Œìœ¼ë¡œëŠ” íƒìƒ‰ê¸°ì™€ ê°™ì€ ì°¨ë¡€ë¡œ ì •ë ¬ë˜ì§€ ì•Šì•„ì„œ
+	//ì•„ë˜ ì½”ë“œë¥¼ ë„£ì—ˆìœ¼ë‚˜ ì§€ê¸ˆ ë‹¤ì‹œ ëŒë ¤ë³´ë©´
+	//StrCmpLogicalWë§Œìœ¼ë¡œë„ íƒìƒ‰ê¸°ì™€ ê°™ì€ ì°¨ë¡€ë¡œ ì •ë ¬ëœë‹¤.
+	//ë¶„ëª…íˆ StrCmpLogicalWë§Œìœ¼ë¡œëŠ” ê°™ì§€ ì•Šì•˜ëŠ”ë°...
 	/*
 	int i = 0;
 
 	while (true)
 	{
-		//¼­·Î ´Ù¸¥ ¹®ÀÚ¸¦ ¸¸³¯¶§±îÁö ½ºÅµÇÑ´Ù.
+		//ì„œë¡œ ë‹¤ë¥¸ ë¬¸ìë¥¼ ë§Œë‚ ë•Œê¹Œì§€ ìŠ¤í‚µí•œë‹¤.
 		if (str0[i] == str1[i])
 		{
 			i++;
@@ -2053,13 +2053,13 @@ bool is_greater_with_numeric(CString str0, CString str1)
 	int num0;
 	int num1;
 
-	//¸¸¾à ÆÄÀÏ¸í Ã³À½ ~ i¹Ù·Î Àü±îÁö ¼ıÀÚ¿´°í iºÎÅÍ ¼ıÀÚ°¡ ¾Æ´Ï¸é
-	//ÆÄÀÏ¸í ½ÃÀÛºÎÅÍ ¼ıÀÚ·Î µÈ ÆÄÀÏ¸íÀÎ °æ¿ì´Ù.
+	//ë§Œì•½ íŒŒì¼ëª… ì²˜ìŒ ~ ië°”ë¡œ ì „ê¹Œì§€ ìˆ«ìì˜€ê³  ië¶€í„° ìˆ«ìê°€ ì•„ë‹ˆë©´
+	//íŒŒì¼ëª… ì‹œì‘ë¶€í„° ìˆ«ìë¡œ ëœ íŒŒì¼ëª…ì¸ ê²½ìš°ë‹¤.
 	
 	if ((i > 0) && (str0[i] < '0' || str0[i] > '9' || str1[i] < '0' || str1[i] > '9') &&
 		IsNumeric(str0.Left(i)))
 	{
-		//¾Æ·¡ if¹®Àº Ç×»ó trueÀÏ ¼ö ¹Û¿¡ ¾øÀ» °ÍÀÌ´Ù.
+		//ì•„ë˜ ifë¬¸ì€ í•­ìƒ trueì¼ ìˆ˜ ë°–ì— ì—†ì„ ê²ƒì´ë‹¤.
 		if (get_number_from_string(str0, num0, 0) &&
 			get_number_from_string(str1, num1, 0))
 			return (num0 > num1);
@@ -2080,7 +2080,7 @@ bool is_greater_with_numeric(CString str0, CString str1)
 }
 
 
-//nÀ» 26Áø¼ö ¿¢¼¿ ÄÃ·³ ÀÎµ¦½º·Î º¯È¯ÇÑ ¹®ÀÚ¿­À» ¸®ÅÏ
+//nì„ 26ì§„ìˆ˜ ì—‘ì…€ ì»¬ëŸ¼ ì¸ë±ìŠ¤ë¡œ ë³€í™˜í•œ ë¬¸ìì—´ì„ ë¦¬í„´
 CString	ConvertInt2AZ(int n)
 {
 	int		div, mod;
@@ -2143,23 +2143,23 @@ bool IsNetwork(CString szSite, UINT nPort)
 bool IsAvailableEMail(CString sEMail)
 {
 	if (sEMail == "")
-		return FALSE;  // ÀÌ¸ŞÀÏÀÌ ¾øÀ¸¸é false
+		return FALSE;  // ì´ë©”ì¼ì´ ì—†ìœ¼ë©´ false
 
-	int iAtCount = 0;   //@ À§Ä¡
-	int iDotCount = 0;  // . À§Ä¡
+	int iAtCount = 0;   //@ ìœ„ì¹˜
+	int iDotCount = 0;  // . ìœ„ì¹˜
 	int i;
 
 	for(i = 0; i < sEMail.GetLength(); i++)
 	{
 		if (i > 0 && sEMail.GetAt(i) == '@')
-			iAtCount = i+1;    // ¨ç
+			iAtCount = i+1;    // â‘ 
 
 		if(iAtCount > 0 && i > iAtCount && sEMail.GetAt(i) == '.')
-			iDotCount = i+1;   // ¨è
+			iDotCount = i+1;   // â‘¡
 	}
 
 	if (i > iDotCount && iAtCount > 0 && iDotCount > 0)
-		return TRUE;     // ¨é
+		return TRUE;     // â‘¢
 	
 	return FALSE;
 }
@@ -2322,7 +2322,7 @@ bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url, bool 
 	DWORD dwServiceType;
 	INTERNET_PORT nPort;
 
-	//AfxParseURL()À» »ç¿ëÇÏ±â À§ÇØ¼­´Â url¿¡ ¹İµå½Ã http:// ¶Ç´Â https:// µî°ú °°Àº ¼­ºñ½º Á¾·ù°¡ Ç¥½ÃµÇ¾î¾ß ÇÑ´Ù.
+	//AfxParseURL()ì„ ì‚¬ìš©í•˜ê¸° ìœ„í•´ì„œëŠ” urlì— ë°˜ë“œì‹œ http:// ë˜ëŠ” https:// ë“±ê³¼ ê°™ì€ ì„œë¹„ìŠ¤ ì¢…ë¥˜ê°€ í‘œì‹œë˜ì–´ì•¼ í•œë‹¤.
 	if (full_url.Left(7) != _T("http://") && full_url.Left(8) != _T("https://"))
 		full_url = (is_https ? _T("https://") : _T("http://")) + full_url;
 	else if (full_url.Left(7) == _T("http://"))
@@ -2352,19 +2352,19 @@ DWORD request_url(CString& result_str, CString full_url, CString verb, std::vect
 	return request_url(result_str, ip, port, sub_url, verb, headers, jsonBody, local_file_path);
 }
 */
-//urlÀ» È£ÃâÇÏ¿© °á°ú°ªÀ» ¸®ÅÏÇÏ°Å³ª ÁöÁ¤µÈ ·ÎÄÃ ÆÄÀÏ·Î ´Ù¿î·Îµå ÇÑ´Ù.
-//local_file_path°¡ ""ÀÌ¸é °á°ú°ªÀ» ¹®ÀÚ¿­·Î ¸®ÅÏ¹Ş´Â´Ù.
-//local_file_path°¡ ÁöÁ¤µÇ¾î ÀÖÀ¸¸é ÆÄÀÏ·Î ´Ù¿î¹Ş´Â´Ù. (ÀÌ¶§ result_strÀº "")
-//¸®ÅÏ°ªÀÌ 200ÀÌ ¾Æ´Ò °æ¿ì´Â ¸®ÅÏµÈ ¿¡·¯ÄÚµå¿Í result_str¿¡ ÀúÀåµÈ ¿¡·¯ ¸Ş½ÃÁö¸¦ Á¶ÇÕÇÏ¿© ¿¡·¯ Ã³¸®ÇÑ´Ù.
+//urlì„ í˜¸ì¶œí•˜ì—¬ ê²°ê³¼ê°’ì„ ë¦¬í„´í•˜ê±°ë‚˜ ì§€ì •ëœ ë¡œì»¬ íŒŒì¼ë¡œ ë‹¤ìš´ë¡œë“œ í•œë‹¤.
+//local_file_pathê°€ ""ì´ë©´ ê²°ê³¼ê°’ì„ ë¬¸ìì—´ë¡œ ë¦¬í„´ë°›ëŠ”ë‹¤.
+//local_file_pathê°€ ì§€ì •ë˜ì–´ ìˆìœ¼ë©´ íŒŒì¼ë¡œ ë‹¤ìš´ë°›ëŠ”ë‹¤. (ì´ë•Œ result_strì€ "")
+//ë¦¬í„´ê°’ì´ 200ì´ ì•„ë‹ ê²½ìš°ëŠ” ë¦¬í„´ëœ ì—ëŸ¬ì½”ë“œì™€ result_strì— ì €ì¥ëœ ì—ëŸ¬ ë©”ì‹œì§€ë¥¼ ì¡°í•©í•˜ì—¬ ì—ëŸ¬ ì²˜ë¦¬í•œë‹¤.
 //DWORD request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb, std::vector<CString> *headers, CString jsonBody, CString local_file_path)
 void request_url(CRequestUrlParams* params)
 {
 	long t0 = clock();
 
-	//ip¿¡ http://ÀÎÁö https://ÀÎÁö°¡ ¸í½ÃµÇ¾î ÀÖ´Ù¸é ÀÌ´Â ¸íÈ®ÇÏ¹Ç·Î
-	//ÀÌ¸¦ ÆÇ´ÜÇÏ¿© params->is_https°ªÀ» Àç¼³Á¤ÇÑ´Ù.
-	//Æ÷Æ®¹øÈ£·Î https¸¦ ÆÇº°ÇÏ´Â °ÍÀº ÇÑ°è°¡ ÀÖÀ¸¹Ç·Î ip¿¡ ¸í½ÃÇÏµç, params->is_https¿¡ Á¤È®È÷ ¸í½ÃÇÏ¿© »ç¿ëÇÑ´Ù.
-	//¶ÇÇÑ ip¿¡ http:// ¶Ç´Â https:// °¡ ºÙ¾î ÀÖÀ¸¸é InternetConnect()Àº ½ÇÆĞÇÑ´Ù. Á¦°ÅÇÏ°í È£ÃâÇØÁà¾ß ÇÑ´Ù.
+	//ipì— http://ì¸ì§€ https://ì¸ì§€ê°€ ëª…ì‹œë˜ì–´ ìˆë‹¤ë©´ ì´ëŠ” ëª…í™•í•˜ë¯€ë¡œ
+	//ì´ë¥¼ íŒë‹¨í•˜ì—¬ params->is_httpsê°’ì„ ì¬ì„¤ì •í•œë‹¤.
+	//í¬íŠ¸ë²ˆí˜¸ë¡œ httpsë¥¼ íŒë³„í•˜ëŠ” ê²ƒì€ í•œê³„ê°€ ìˆìœ¼ë¯€ë¡œ ipì— ëª…ì‹œí•˜ë“ , params->is_httpsì— ì •í™•íˆ ëª…ì‹œí•˜ì—¬ ì‚¬ìš©í•œë‹¤.
+	//ë˜í•œ ipì— http:// ë˜ëŠ” https:// ê°€ ë¶™ì–´ ìˆìœ¼ë©´ InternetConnect()ì€ ì‹¤íŒ¨í•œë‹¤. ì œê±°í•˜ê³  í˜¸ì¶œí•´ì¤˜ì•¼ í•œë‹¤.
 	if (params->ip.Left(7) == _T("http://") || params->port == 80)
 	{
 		params->is_https = false;
@@ -2383,7 +2383,7 @@ void request_url(CRequestUrlParams* params)
 	}
 
 
-	//sub_urlÀÇ ¸Ç ¾Õ¿¡´Â ¹İµå½Ã '/'°¡ ºÙ¾îÀÖ¾î¾ß ÇÑ´Ù.
+	//sub_urlì˜ ë§¨ ì•ì—ëŠ” ë°˜ë“œì‹œ '/'ê°€ ë¶™ì–´ìˆì–´ì•¼ í•œë‹¤.
 	if (params->sub_url[0] != '/')
 		params->sub_url = _T("/") + params->sub_url;
 
@@ -2405,7 +2405,7 @@ void request_url(CRequestUrlParams* params)
 	}
 
 
-	//Æ÷Æ®°¡ 0º¸´Ù ÀÛÀ¸¸é ±âº» Æ÷Æ®¸¦ »ç¿ëÇÑ´Ù.
+	//í¬íŠ¸ê°€ 0ë³´ë‹¤ ì‘ìœ¼ë©´ ê¸°ë³¸ í¬íŠ¸ë¥¼ ì‚¬ìš©í•œë‹¤.
 	if (params->port <= 0)
 	{
 		if (params->is_https)
@@ -2475,8 +2475,8 @@ void request_url(CRequestUrlParams* params)
 		secureFlags,
 		0);
 
-	//2009³â ºí·Î±×¿¡´Â INTERNET_OPTION_RECEIVE_TIMEOUT¿Ü¿¡ ³ª¸ÓÁö 2°³ÀÇ timeoutÀº
-	//¹ö±×¶ó°í µÇ¾î ÀÖ´Âµ¥ ÇöÀçµµ ±×·¯ÇÑÁö´Â È®ÀÎµÇÁö ¾Ê°í µ¿ÀÛµµ µÇÁö ¾Ê´ÂµíÇÔ.
+	//2009ë…„ ë¸”ë¡œê·¸ì—ëŠ” INTERNET_OPTION_RECEIVE_TIMEOUTì™¸ì— ë‚˜ë¨¸ì§€ 2ê°œì˜ timeoutì€
+	//ë²„ê·¸ë¼ê³  ë˜ì–´ ìˆëŠ”ë° í˜„ì¬ë„ ê·¸ëŸ¬í•œì§€ëŠ” í™•ì¸ë˜ì§€ ì•Šê³  ë™ì‘ë„ ë˜ì§€ ì•ŠëŠ”ë“¯í•¨.
 	//https://blog.naver.com/che5886/20061092638
 	//DWORD dwTimeout = 10;
 	//InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
@@ -2498,10 +2498,10 @@ void request_url(CRequestUrlParams* params)
 		InternetSetOption(hOpenRequest, INTERNET_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
 	}
 
-	//±âº» Çì´õ¸¦ Ãß°¡ÇÏ°í
+	//ê¸°ë³¸ í—¤ë”ë¥¼ ì¶”ê°€í•˜ê³ 
 	params->headers.push_front(_T("Content-Type: application/json; charset=utf-8\r\n"));
 
-	//Çì´õÀÇ ³¡¹®ÀÚ¿­ °Ë»ç ¹× Ãß°¡
+	//í—¤ë”ì˜ ëë¬¸ìì—´ ê²€ì‚¬ ë° ì¶”ê°€
 	for (int i = 0; i < params->headers.size(); i++)
 	{
 		if (params->headers[i].Right(2) != _T("\r\n"))
@@ -2557,9 +2557,9 @@ void request_url(CRequestUrlParams* params)
 		//memset(total_buffer, 0, buffer_size * 10);
 	}
 
-	//size_buffer°¡ char¸é ÆÄÀÏÅ©±â¸¦ ¸ø¾ò¾î¿Â´Ù.
-	//ÆÄÀÏÀÌ Á¸ÀçÇÏÁö ¾Ê¾Æµµ ¿¡·¯ ³»¿ëÀÌ Æ÷ÇÔµÈ htmlÀÌ ³Ñ¾î¿À¹Ç·Î Ç×»ó ±× °ªÀÌ 0º¸´Ù Å©´Ù.
-	// ¿¬°áÁ¤º¸ È®ÀÎ
+	//size_bufferê°€ charë©´ íŒŒì¼í¬ê¸°ë¥¼ ëª»ì–»ì–´ì˜¨ë‹¤.
+	//íŒŒì¼ì´ ì¡´ì¬í•˜ì§€ ì•Šì•„ë„ ì—ëŸ¬ ë‚´ìš©ì´ í¬í•¨ëœ htmlì´ ë„˜ì–´ì˜¤ë¯€ë¡œ í•­ìƒ ê·¸ ê°’ì´ 0ë³´ë‹¤ í¬ë‹¤.
+	// ì—°ê²°ì •ë³´ í™•ì¸
 
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_STATUS_CODE, (LPVOID)&query_buffer, &query_buffer_size, NULL);
 	params->status = _ttol(query_buffer);
@@ -2602,19 +2602,19 @@ void request_url(CRequestUrlParams* params)
 
 	params->result.Empty();
 
-	//0¹ÙÀÌÆ®ÀÇ ÆÄÀÏÀº ´Ù¿î¹ŞÁö ¾Ê¾Æµµ µÉ µí ÇÏÁö¸¸
-	//¼­¹öÀÇ ÆÄÀÏ°ú ´Ù¿î¹ŞÀº ·ÎÄÃÀÇ ÆÄÀÏÀÇ ¼ö°¡ °°ÀºÁö µîÀ» ºñ±³ÇÒ ¼öµµ ÀÖÀ¸¹Ç·Î »ı¼ºÇÏÀÚ.
-	//HTTP_QUERY_FLAG_NUMBERÀ» ³ÖÁö ¾ÊÀ¸¸é HttpQueryInfo()¿¡¼­ ¿À·ù°¡ ¹ß»ıÇÑ´Ù.
+	//0ë°”ì´íŠ¸ì˜ íŒŒì¼ì€ ë‹¤ìš´ë°›ì§€ ì•Šì•„ë„ ë  ë“¯ í•˜ì§€ë§Œ
+	//ì„œë²„ì˜ íŒŒì¼ê³¼ ë‹¤ìš´ë°›ì€ ë¡œì»¬ì˜ íŒŒì¼ì˜ ìˆ˜ê°€ ê°™ì€ì§€ ë“±ì„ ë¹„êµí•  ìˆ˜ë„ ìˆìœ¼ë¯€ë¡œ ìƒì„±í•˜ì.
+	//HTTP_QUERY_FLAG_NUMBERì„ ë„£ì§€ ì•Šìœ¼ë©´ HttpQueryInfo()ì—ì„œ ì˜¤ë¥˜ê°€ ë°œìƒí•œë‹¤.
 	DWORD dwBufLen = sizeof(dwTotalSize);
 	uint64_t total_read = 0;
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
 
 	do
 	{
-		//InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0); //ÀÌ ÇÔ¼ö´Â À¥ÆäÀÌÁöÀÇ Å©±â¸¦ ¸®ÅÏÇÏ´Â µíÇÏ´Ù.
+		//InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0); //ì´ í•¨ìˆ˜ëŠ” ì›¹í˜ì´ì§€ì˜ í¬ê¸°ë¥¼ ë¦¬í„´í•˜ëŠ” ë“¯í•˜ë‹¤.
 		long t2 = clock();
-		//1.48GB, buffer_size¿¡ µû¸¥ ½Ã°£ ºñ±³. 1K:133s, 4K:65s, 1M:63s, 4M:64s
-		//¹öÆÛ Å©±â°¡ 1K¸é ³Ê¹« ºó¹øÇÑ read°¡ ¹ß»ıÇÏ¿© ´À¸®Áö¸¸ 4KÀÌ»óÀÌ¸é Å« Â÷ÀÌ´Â ¹ß»ıÇÏÁö ¾Ê´Â´Ù.
+		//1.48GB, buffer_sizeì— ë”°ë¥¸ ì‹œê°„ ë¹„êµ. 1K:133s, 4K:65s, 1M:63s, 4M:64s
+		//ë²„í¼ í¬ê¸°ê°€ 1Kë©´ ë„ˆë¬´ ë¹ˆë²ˆí•œ readê°€ ë°œìƒí•˜ì—¬ ëŠë¦¬ì§€ë§Œ 4Kì´ìƒì´ë©´ í° ì°¨ì´ëŠ” ë°œìƒí•˜ì§€ ì•ŠëŠ”ë‹¤.
 		InternetReadFile(hOpenRequest, buffer, buffer_size, &dwRead);
 
 		total_read += dwRead;
@@ -2624,9 +2624,9 @@ void request_url(CRequestUrlParams* params)
 
 		if (params->local_file_path.IsEmpty())
 		{
-			//UTF-8 with BOMÀ¸·Î ÀÛ¼ºµÈ txt ÆÄÀÏÀ» ÀĞ¾î¿À¸é ÆÄÀÏ Çì´õ¿¡ EF BB BF ¶ó´Â 3 char°¡ ºÙ¾î¿Â´Ù.
-			//ÀÌ´Â À©µµ¿ì¿¡¼­ fopenÀ¸·Î ÀĞ¾î¿Ã¶§´Â ¹®Á¦µÇÁö ¾ÊÀ¸³ª
-			//InternetReadFile()·Î ÀĞ¾î¿Í¼­ ÀúÀåÇÏ¸é ¸Ç ¾Õ ±ÛÀÚ°¡ ±úÁ® Ç¥½ÃµÇ´Â ¹®Á¦°¡ ¹ß»ıÇÑ´Ù. ³¯·ÁÁØ´Ù.
+			//UTF-8 with BOMìœ¼ë¡œ ì‘ì„±ëœ txt íŒŒì¼ì„ ì½ì–´ì˜¤ë©´ íŒŒì¼ í—¤ë”ì— EF BB BF ë¼ëŠ” 3 charê°€ ë¶™ì–´ì˜¨ë‹¤.
+			//ì´ëŠ” ìœˆë„ìš°ì—ì„œ fopenìœ¼ë¡œ ì½ì–´ì˜¬ë•ŒëŠ” ë¬¸ì œë˜ì§€ ì•Šìœ¼ë‚˜
+			//InternetReadFile()ë¡œ ì½ì–´ì™€ì„œ ì €ì¥í•˜ë©´ ë§¨ ì• ê¸€ìê°€ ê¹¨ì ¸ í‘œì‹œë˜ëŠ” ë¬¸ì œê°€ ë°œìƒí•œë‹¤. ë‚ ë ¤ì¤€ë‹¤.
 			if (byte(buffer[0]) == 0xEF &&
 				byte(buffer[1]) == 0xBB &&
 				byte(buffer[2]) == 0xBF)
@@ -2636,7 +2636,7 @@ void request_url(CRequestUrlParams* params)
 		}
 		else
 		{
-			//remote fileÀÌ Á¸ÀçÇÏÁö ¾ÊÀ» °æ¿ì ·ÎÄÃ¿¡ ÆÄÀÏÀ» ¸¸µéÁö ¾Ê±â À§ÇØ ¿©±â¼­ Ã¼Å©.
+			//remote fileì´ ì¡´ì¬í•˜ì§€ ì•Šì„ ê²½ìš° ë¡œì»¬ì— íŒŒì¼ì„ ë§Œë“¤ì§€ ì•Šê¸° ìœ„í•´ ì—¬ê¸°ì„œ ì²´í¬.
 			if (hFile == NULL)
 			{
 				if (PathFileExists(params->local_file_path) && !DeleteFile(params->local_file_path))
@@ -2678,7 +2678,7 @@ void request_url(CRequestUrlParams* params)
 
 	if (params->local_file_path.IsEmpty())
 	{
-		//UTF-8 with BOMÀ¸·Î ÀÎÄÚµù µÈ ÆÄÀÏÀÇ °æ¿ì Çì´õ¿¡ EF BB BF°¡ ºÙ´Â´Ù. Á¦°ÅÇÏÀÚ.
+		//UTF-8 with BOMìœ¼ë¡œ ì¸ì½”ë”© ëœ íŒŒì¼ì˜ ê²½ìš° í—¤ë”ì— EF BB BFê°€ ë¶™ëŠ”ë‹¤. ì œê±°í•˜ì.
 		if (params->result.GetLength() >= 3 &&
 			params->result[0] == 0xEF &&
 			params->result[1] == 0xBB &&
@@ -2734,7 +2734,7 @@ DWORD	GetURLFileSize(LPCTSTR pUrl)
 
 bool	DownloadFile(LPCTSTR pUrl, CString strFileName, bool bOverwrite /*= TRUE*/, HWND hWnd/*=NULL*/)
 {
-	// ÀÎÅÍ³İ ¿¬°áÀÌ ¾ÈµÈ °æ¿ì Á÷Á¢ Á¢¼ÓÀ» ½ÃµµÇÏ¸é ¿À·ù°¡ ¹ß»ıÇÏ¹Ç·Î ¿ì¼± Ã¼Å©ÇØ¾ß ÇÑ´Ù.
+	// ì¸í„°ë„· ì—°ê²°ì´ ì•ˆëœ ê²½ìš° ì§ì ‘ ì ‘ì†ì„ ì‹œë„í•˜ë©´ ì˜¤ë¥˜ê°€ ë°œìƒí•˜ë¯€ë¡œ ìš°ì„  ì²´í¬í•´ì•¼ í•œë‹¤.
 	//	if (!CheckInternetIsOnline())
 	//		return FALSE;
 	if (!IsNetwork(_T("www.naver.com"), 80))
@@ -2752,7 +2752,7 @@ bool	DownloadFile(LPCTSTR pUrl, CString strFileName, bool bOverwrite /*= TRUE*/,
 
 	FILE*	pFile = _tfopen(strFileName, _T("rb")); 
 	
-	// ÆÄÀÏÀÌ Á¸ÀçÇÏ¸é...
+	// íŒŒì¼ì´ ì¡´ì¬í•˜ë©´...
 	if (pFile)
 	{ 
 		fclose(pFile);
@@ -2853,7 +2853,7 @@ bool	DownloadFile(LPCTSTR pUrl, CString strFileName, bool bOverwrite /*= TRUE*/,
 CString DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd/*=NULL*/)
 {
 	if (!IsNetwork(_T("www.naver.com"), 80))
-		return _T("³×Æ®¿öÅ©¿¡ Á¢¼ÓÇÒ ¼ö ¾ø½À´Ï´Ù.");
+		return _T("ë„¤íŠ¸ì›Œí¬ì— ì ‘ì†í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
 
 #define HTTPBUFLEN    1024 * 1024 // Size of HTTP Buffer...
 	TCHAR		*httpbuff;
@@ -2937,7 +2937,7 @@ LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *val
 	{
 		if (hkey)
 		{
-			//WinXP SP3¿¡¼­ RegGetValue()°¡ Áö¿øµÇÁö ¾Ê¾Æ RegQueryValueEx()·Î º¯°æÇÔ.
+			//WinXP SP3ì—ì„œ RegGetValue()ê°€ ì§€ì›ë˜ì§€ ì•Šì•„ RegQueryValueEx()ë¡œ ë³€ê²½í•¨.
 			//nError = RegGetValue(hKeyRoot, sSubKey, sEntry, RRF_RT_DWORD, &dwType, value, &cbData);
 
 			nError = RegQueryValueEx(hkey, sEntry, NULL, NULL, reinterpret_cast<LPBYTE>(value), &buf_size);
@@ -3262,7 +3262,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 	file.Write(pData, sizeof(BYTE) * width4 * h);
 
 	/////////////////////////////////////////////////////////////////////
-	// BITMAPFILEHEADER¿¡ bfSize¸¦ ±â·ÏÇÑ´Ù.
+	// BITMAPFILEHEADERì— bfSizeë¥¼ ê¸°ë¡í•œë‹¤.
 	dw = (DWORD)(file.GetLength());
 	file.Seek(2, CFile::begin);
 	file.Write(&dw, sizeof(dw));
@@ -3427,7 +3427,7 @@ void	SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMi
 
 
 
-//´ÙÀ½ ÆÄÀÏÀÇ ÀÎµ¦½º ¸®ÅÏ
+//ë‹¤ìŒ íŒŒì¼ì˜ ì¸ë±ìŠ¤ ë¦¬í„´
 //sCurrentFile = camera02.jpg, then this function will return 3
 int			GetNextFileIndex(CString sCurrentFile)
 {
@@ -3488,7 +3488,7 @@ CString		GetMostRecentFile(CString sFolder, CString sWildCard /*= "*.*" */, int 
 	return sMostRecentFile;
 }
 
-CString		GetMostRecentDateFile(CString sFolder, CString sWildCard /*= "*.*"*/)	//°¡Àå ÃÖ±Ù ³¯Â¥ ÆÄÀÏ¸í ¸®ÅÏ
+CString		GetMostRecentDateFile(CString sFolder, CString sWildCard /*= "*.*"*/)	//ê°€ì¥ ìµœê·¼ ë‚ ì§œ íŒŒì¼ëª… ë¦¬í„´
 {
 	CFileFind	FileFind;
 	bool		bWorking;
@@ -3496,8 +3496,8 @@ CString		GetMostRecentDateFile(CString sFolder, CString sWildCard /*= "*.*"*/)	/
 	CString		sfile;
 	CTime		tFile;
 	
-	//°ú°Å ½Ã°£ ÃÖ´ë´Â 1970³â 1¿ù 1ÀÏ 0½Ã°¡ ¾Æ´Ñ 9½Ã´Ù.
-	//¿Ö³Ä¸é ¿ì¸®³ª¶ó°¡ GMP+9ÀÌ¹Ç·Î. 1970-1-1 8:59:59 ÀÌ°Íµµ assert fail ³­´Ù.
+	//ê³¼ê±° ì‹œê°„ ìµœëŒ€ëŠ” 1970ë…„ 1ì›” 1ì¼ 0ì‹œê°€ ì•„ë‹Œ 9ì‹œë‹¤.
+	//ì™œëƒë©´ ìš°ë¦¬ë‚˜ë¼ê°€ GMP+9ì´ë¯€ë¡œ. 1970-1-1 8:59:59 ì´ê²ƒë„ assert fail ë‚œë‹¤.
 	CTime		tRecent(1970,1,1,9,0,0);
 
 
@@ -3571,8 +3571,8 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 				_tcscpy(pInfo->sGateway, A2T(pAdapter->GatewayList.IpAddress.String));
 				_tcscpy(pInfo->sSubnetMask, A2T(pAdapter->IpAddressList.IpMask.String));
 
-				//TCHAR sMacAddress[16] ÀÌ¹Ç·Î ±¸ºĞÀÚ¸¦ ³Ö¾îÁÖ¸é ¾ÈµÈ´Ù.
-				//main¿¡¼­ Functions.hÀÇ get_mac_address_format()ÇÔ¼ö·Î ±¸ºĞÀÚ¸¦ ³Ö¾î¼­ Ç¥½ÃÇÒ °Í.
+				//TCHAR sMacAddress[16] ì´ë¯€ë¡œ êµ¬ë¶„ìë¥¼ ë„£ì–´ì£¼ë©´ ì•ˆëœë‹¤.
+				//mainì—ì„œ Functions.hì˜ get_mac_address_format()í•¨ìˆ˜ë¡œ êµ¬ë¶„ìë¥¼ ë„£ì–´ì„œ í‘œì‹œí•  ê²ƒ.
 				_stprintf(pInfo->sMacAddress, _T("%02X%02X%02X%02X%02X%02X"),
 					pAdapter->Address[0], pAdapter->Address[1], pAdapter->Address[2], pAdapter->Address[3], pAdapter->Address[4], pAdapter->Address[5]);
 				result = true;
@@ -3831,7 +3831,7 @@ bool FileEncryption(CString sSource, bool bShowErrorMessage /*= TRUE*/)
 		if (bShowErrorMessage)
 		{
 			CString sMsg;
-			sMsg.Format(_T("ÆÄÀÏ ¿­±â ½ÇÆĞ : \n\n¾ÏÈ£È­¸¦ À§ÇØ %s ÆÄÀÏÀ» ¿­ ¼ö ¾ø½À´Ï´Ù."), sSource);
+			sMsg.Format(_T("íŒŒì¼ ì—´ê¸° ì‹¤íŒ¨ : \n\nì•”í˜¸í™”ë¥¼ ìœ„í•´ %s íŒŒì¼ì„ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤."), sSource);
 			AfxMessageBox(sMsg);
 		}
 
@@ -3990,7 +3990,7 @@ CString	GetCommaString(CString sString, CString sComma)
 	CString sIntPart;
 	CString	sFinal = _T("");
 	
-	if (nDotPos > 0)	// ½Ç¼öÀÎ °æ¿ì
+	if (nDotPos > 0)	// ì‹¤ìˆ˜ì¸ ê²½ìš°
 	{
 		sFinal		= sString.Mid(nDotPos);
 		sIntPart	= sString.Left(nDotPos);
@@ -4000,13 +4000,13 @@ CString	GetCommaString(CString sString, CString sComma)
 		sIntPart	= sString;
 	}
 	
-	//¸Ç ³¡ ¼ıÀÚºÎÅÍ ÇÏ³ª¾¿ »õ ¹®ÀÚ¿­¿¡ Ãß°¡½ÃÅ²´Ù.
-	//3ÀÚ¸® µÉ ¶§¸¶´Ù ÄŞ¸¶¸¦ ³Ö¾îÁØ´Ù.
+	//ë§¨ ë ìˆ«ìë¶€í„° í•˜ë‚˜ì”© ìƒˆ ë¬¸ìì—´ì— ì¶”ê°€ì‹œí‚¨ë‹¤.
+	//3ìë¦¬ ë  ë•Œë§ˆë‹¤ ì½¤ë§ˆë¥¼ ë„£ì–´ì¤€ë‹¤.
 	for (int i = 0; i < sIntPart.GetLength(); i++)
 	{
 		sFinal.Insert(0, sIntPart.GetAt(sIntPart.GetLength() - 1 - i));
 		
-		if (((i + 1) % 3 == 0) &&				//3Â° ÀÚ¸®¸¶´Ù
+		if (((i + 1) % 3 == 0) &&				//3ì§¸ ìë¦¬ë§ˆë‹¤
 			 (i != sIntPart.GetLength() - 1))
 			sFinal.Insert(0, sComma);
 	}
@@ -4030,7 +4030,7 @@ CString	GetCommaString(CString sString, CString sComma)
 	*/
 }
 
-//value°¡ 3ÀÚ¸®ÀÌ°í total_digits°¡ 7ÀÌ¸é 4°³ÀÇ 0À» ¾Õ¿¡ ºÙ¿©¼­ ¸®ÅÏÇÑ´Ù.
+//valueê°€ 3ìë¦¬ì´ê³  total_digitsê°€ 7ì´ë©´ 4ê°œì˜ 0ì„ ì•ì— ë¶™ì—¬ì„œ ë¦¬í„´í•œë‹¤.
 CString i2S(int64_t nValue, bool bComma, bool fill_zero, int total_digits)
 {
 	CString str;
@@ -4084,9 +4084,9 @@ CString d2S(double dValue, bool bComma, int nfDigit)
 	return str;
 }
 
-//IPv4 ¹®ÀÚ¿­À» ¼ıÀÚ·Î ¹Ù²Ù´Â ¹ü¿ë ÄÚµåÀÌ¹Ç·Î ¹öÀü ¹®ÀÚ¿­ µî ÀÏ¹İ ¹®ÀÚ¿­ ºñ±³¿¡ »ç¿ëÇÏÁö ¸»°Í.
-//¹öÀü ¹®ÀÚ¿­ µîÀº °¢ ÀÚ¸´¼ö ±¸¼ºÀÌ ´Ù¸¦ ¼ö ÀÖÀ¸¹Ç·Î »ç¿ëÇÒ ¼ö ¾øÀ½.
-//¹®ÀÚ¿­ ºñ±³°¡ ÇÊ¿äÇÏ´Ù¸é compare_string()À» »ç¿ëÇÒ °Í.
+//IPv4 ë¬¸ìì—´ì„ ìˆ«ìë¡œ ë°”ê¾¸ëŠ” ë²”ìš© ì½”ë“œì´ë¯€ë¡œ ë²„ì „ ë¬¸ìì—´ ë“± ì¼ë°˜ ë¬¸ìì—´ ë¹„êµì— ì‚¬ìš©í•˜ì§€ ë§ê²ƒ.
+//ë²„ì „ ë¬¸ìì—´ ë“±ì€ ê° ìë¦¿ìˆ˜ êµ¬ì„±ì´ ë‹¤ë¥¼ ìˆ˜ ìˆìœ¼ë¯€ë¡œ ì‚¬ìš©í•  ìˆ˜ ì—†ìŒ.
+//ë¬¸ìì—´ ë¹„êµê°€ í•„ìš”í•˜ë‹¤ë©´ compare_string()ì„ ì‚¬ìš©í•  ê²ƒ.
 uint32_t IP2int(CString IP)
 {
 	std::deque<CString> token;
@@ -4130,7 +4130,7 @@ CString	GetByteString(uint8_t* bt, int n, bool upper /*= true*/, bool prefix /*=
 	return str;
 }
 
-// »ç¿ë¹ı
+// ì‚¬ìš©ë²•
 //char data[6] = {0x30,0x41,0x00,0x00,0x00,0xE5};
 //CString str = BinaryToHexString((BYTE*)data, 6);
 CString BinaryToHexString(BYTE* pData, int length, TCHAR separator)
@@ -4159,11 +4159,11 @@ CString BinaryToHexString(BYTE* pData, int length, TCHAR separator)
 }
 
 
-//¼Ò¼öÁ¡ ÀÚ¸´¼ö ¸®ÅÏ.
-//0.123456789 À» ³Ñ°ÜÁàµµ d°ªÀº ±×´ë·Î ³Ñ°Ü¹ŞÀ¸³ª
-//sprintf¿¡¼­ 0.123457·Î º¯°æµÈ´Ù.(¼Ò¼öÁ¡ 6ÀÚ¸®·Î¸¸ Ã³¸®µÈ´Ù.)
-//¿ì¼± ÀÌÁ¡À» ÁÖÀÇÇÏ°í ¸¹Àº ÀÚ¸®¼ö¸¦ ±»ÀÌ Á¤È®È÷ ¸®ÅÏÇØ¾ß ÇÑ´Ù¸é
-//ÄÚµå¸¦ Á» ´õ º¸¿ÏÇÏÀÚ.
+//ì†Œìˆ˜ì  ìë¦¿ìˆ˜ ë¦¬í„´.
+//0.123456789 ì„ ë„˜ê²¨ì¤˜ë„ dê°’ì€ ê·¸ëŒ€ë¡œ ë„˜ê²¨ë°›ìœ¼ë‚˜
+//sprintfì—ì„œ 0.123457ë¡œ ë³€ê²½ëœë‹¤.(ì†Œìˆ˜ì  6ìë¦¬ë¡œë§Œ ì²˜ë¦¬ëœë‹¤.)
+//ìš°ì„  ì´ì ì„ ì£¼ì˜í•˜ê³  ë§ì€ ìë¦¬ìˆ˜ë¥¼ êµ³ì´ ì •í™•íˆ ë¦¬í„´í•´ì•¼ í•œë‹¤ë©´
+//ì½”ë“œë¥¼ ì¢€ ë” ë³´ì™„í•˜ì.
 int	getPrecision(double d, bool bExceptZero)
 {
 	int i;
@@ -4185,7 +4185,7 @@ int	getPrecision(double d, bool bExceptZero)
 		else
 		{
 			nPrecision++;
-			//0ÀÌ ¾Æ´Ñ ÀÚ¸´¼ö¸¦ ÇÑ¹ø ¸¸³ª¸é ±× ÈÄ·Î´Â À¯È¿ 0ÀÌ¹Ç·Î Ä«¿îÆ®ÇØ¾ß ÇÑ´Ù.
+			//0ì´ ì•„ë‹Œ ìë¦¿ìˆ˜ë¥¼ í•œë²ˆ ë§Œë‚˜ë©´ ê·¸ í›„ë¡œëŠ” ìœ íš¨ 0ì´ë¯€ë¡œ ì¹´ìš´íŠ¸í•´ì•¼ í•œë‹¤.
 			bExceptZero = false;
 		}
 	}
@@ -4281,15 +4281,15 @@ unsigned int parse_can_data(unsigned char* data,unsigned int startbit,unsigned i
 	return (unsigned int)extract_bits(value, area, startbit);
 }
 
-//±â´É : unsigned °ªÀ» signed ¹üÀ§·Î º¯°æÇÑ´Ù.
-//ex1. 0 ~ 99 ¹üÀ§¸¦ °¡Áø unsigned µ¥ÀÌÅÍ Å¸ÀÔÀ» signed·Î º¯°æÇÒ °æ¿ì
-//signedÀÇ ¹üÀ§´Â -50 ~ +49ÀÏ °ÍÀÌ´Ù.
-//53ÀÌ¶ó´Â °ªÀº 53 - 100 = -47ÀÌ µÈ´Ù.
-//signedÀÇ maxÀÎ 49º¸´Ù ÀÛ°Å³ª °°Àº °ªÀº ±×³É ¸®ÅÏ
-//ex2. 0 ~ 3 ¹üÀ§¸¦ °¡Áø 2bit µ¥ÀÌÅÍ Å¸ÀÔÀ» signed·Î º¯°æÇÒ °æ¿ì
-//signedÀÇ ¹üÀ§´Â -2 ~ +1ÀÏ °ÍÀÌ´Ù.
-//3ÀÌ¶ó´Â °ªÀº 3 - 4 = -1ÀÌ µÈ´Ù.
-//signedÀÇ maxÀÎ 1º¸´Ù ÀÛ°Å³ª °°Àº °ªÀº ±×³É ¸®ÅÏ
+//ê¸°ëŠ¥ : unsigned ê°’ì„ signed ë²”ìœ„ë¡œ ë³€ê²½í•œë‹¤.
+//ex1. 0 ~ 99 ë²”ìœ„ë¥¼ ê°€ì§„ unsigned ë°ì´í„° íƒ€ì…ì„ signedë¡œ ë³€ê²½í•  ê²½ìš°
+//signedì˜ ë²”ìœ„ëŠ” -50 ~ +49ì¼ ê²ƒì´ë‹¤.
+//53ì´ë¼ëŠ” ê°’ì€ 53 - 100 = -47ì´ ëœë‹¤.
+//signedì˜ maxì¸ 49ë³´ë‹¤ ì‘ê±°ë‚˜ ê°™ì€ ê°’ì€ ê·¸ëƒ¥ ë¦¬í„´
+//ex2. 0 ~ 3 ë²”ìœ„ë¥¼ ê°€ì§„ 2bit ë°ì´í„° íƒ€ì…ì„ signedë¡œ ë³€ê²½í•  ê²½ìš°
+//signedì˜ ë²”ìœ„ëŠ” -2 ~ +1ì¼ ê²ƒì´ë‹¤.
+//3ì´ë¼ëŠ” ê°’ì€ 3 - 4 = -1ì´ ëœë‹¤.
+//signedì˜ maxì¸ 1ë³´ë‹¤ ì‘ê±°ë‚˜ ê°™ì€ ê°’ì€ ê·¸ëƒ¥ ë¦¬í„´
 int getSignedFromUnsigned(unsigned value, int bit_length)
 {
 	int range_max = pow(2.0, bit_length);
@@ -4301,15 +4301,15 @@ int getSignedFromUnsigned(unsigned value, int bit_length)
 	return (value - range_max);
 }
 
-//dlgÀÇ OnInitDialog()¿¡¼­ ÀÌ ÇÔ¼ö¸¦ È£ÃâÇÒ °æ¿ì
-//¿¹Àü¿¡´Â Àß Àû¿ëµÇ¾úÀ¸³ª À©10ÀÇ IME ¹æ½ÄÀÌ º¯°æµÇ¾ú´ÂÁö
-//OnInitDialog()¿¡ ³ÖÀ¸¸é Àû¿ëµÇÁö ¾Ê´Â´Ù.
-//SetTimer³ª UI ¹öÆ°À» Ãß°¡ÇÏ¿© º¯°æÇÏ¸é Àß µ¿ÀÛÇÔ.
-//´Ü, OnInitDialog()¿¡¼­ Å¸ÀÌ¸Ó¸¦ 100ms¿Í °°ÀÌ ³Ê¹« Âª°Ô ÁÖ¸é º¯°æ ¾ÈµÊ. ³Ë³ËÈ÷ 500ms ÀÌ»ó ÁÙ °Í.
+//dlgì˜ OnInitDialog()ì—ì„œ ì´ í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•  ê²½ìš°
+//ì˜ˆì „ì—ëŠ” ì˜ ì ìš©ë˜ì—ˆìœ¼ë‚˜ ìœˆ10ì˜ IME ë°©ì‹ì´ ë³€ê²½ë˜ì—ˆëŠ”ì§€
+//OnInitDialog()ì— ë„£ìœ¼ë©´ ì ìš©ë˜ì§€ ì•ŠëŠ”ë‹¤.
+//SetTimerë‚˜ UI ë²„íŠ¼ì„ ì¶”ê°€í•˜ì—¬ ë³€ê²½í•˜ë©´ ì˜ ë™ì‘í•¨.
+//ë‹¨, OnInitDialog()ì—ì„œ íƒ€ì´ë¨¸ë¥¼ 100msì™€ ê°™ì´ ë„ˆë¬´ ì§§ê²Œ ì£¼ë©´ ë³€ê²½ ì•ˆë¨. ë„‰ë„‰íˆ 500ms ì´ìƒ ì¤„ ê²ƒ.
 void IME_Convert_To_NativeCode(HWND hWnd, bool bNative)
 {
-	//¾Æ·¡ ÁÖ¼®Ã³¸®µÈ ºí·°Àº ÀÌÀü ¹æ½ÄÀÌ°í
-	//¸Ç ¾Æ·¡ 3ÁÙÀº °£·«È÷ ¼öÁ¤µÈ ¹æ½Ä. µÑ ´Ù Á¤»ó µ¿ÀÛÇÔ.
+	//ì•„ë˜ ì£¼ì„ì²˜ë¦¬ëœ ë¸”ëŸ­ì€ ì´ì „ ë°©ì‹ì´ê³ 
+	//ë§¨ ì•„ë˜ 3ì¤„ì€ ê°„ëµíˆ ìˆ˜ì •ëœ ë°©ì‹. ë‘˜ ë‹¤ ì •ìƒ ë™ì‘í•¨.
 	/*
 	HIMC hIMC = ImmGetContext(hWnd);
 	DWORD dwConv, dwSent;
@@ -4350,10 +4350,10 @@ void HideIMM(HWND hwnd)
 
 bool IsLeapYear(int nYear)
 {
-	// À±³âÀÌµÇ·Á¸é
-	// 1. 4·Î ³ª´©¾î ³ª¸ÓÁö°¡ ¾ø¾î¾ß ÇÏ°í
-	// 2. 100À¸·Î ³ª´©¾î¶³¾îÁöÁö ¾Ê°Å³ª,
-	// 400À¸·Îµµ ³ª´©¾î¶³¾îÁ®¾ß ÇÔ
+	// ìœ¤ë…„ì´ë˜ë ¤ë©´
+	// 1. 4ë¡œ ë‚˜ëˆ„ì–´ ë‚˜ë¨¸ì§€ê°€ ì—†ì–´ì•¼ í•˜ê³ 
+	// 2. 100ìœ¼ë¡œ ë‚˜ëˆ„ì–´ë–¨ì–´ì§€ì§€ ì•Šê±°ë‚˜,
+	// 400ìœ¼ë¡œë„ ë‚˜ëˆ„ì–´ë–¨ì–´ì ¸ì•¼ í•¨
 	
 	if ((nYear % 4 == 0) && ((nYear % 100 != 0) || (nYear % 400 == 0)))
 		return TRUE;
@@ -4394,10 +4394,10 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	if (sNameFilter == "")
 		sNameFilter = _T("*");
 
-	//ÇÊÅÍ °ü·Ã
+	//í•„í„° ê´€ë ¨
 	std::deque<CString>	dqExtFilter;
 
-	//Á¦¿Ü Ç×¸ñÀ» À§ÇÑ º¯¼öµé
+	//ì œì™¸ í•­ëª©ì„ ìœ„í•œ ë³€ìˆ˜ë“¤
 	std::deque<CString>	dqExcepts;
 	CString			sToken;
 	int				curPos;
@@ -4405,14 +4405,14 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	if (sExtFilter == "")
 		sExtFilter = _T("*");
 
-	//ÇÊÅÍ¿Í Á¦¿Ü ¹®ÀÚ¿­Àº ´ë¼Ò¹®ÀÚ¸¦ ±¸ºĞÇÏÁö ¾Ê´Â´Ù.
+	//í•„í„°ì™€ ì œì™¸ ë¬¸ìì—´ì€ ëŒ€ì†Œë¬¸ìë¥¼ êµ¬ë¶„í•˜ì§€ ì•ŠëŠ”ë‹¤.
 	curPos = 0;
 	sToken = sExtFilter;
 	sExtFilter.MakeLower();
 	dqExtFilter.clear();
 
-	//È®ÀåÀÚ´Â "jpg"¿Í °°ÀÌ dot°¡ ¾øÀÌ ºñ±³ÇÑ´Ù.
-	//È®ÀåÀÚ¿¡ * ¶Ç´Â dot°¡ ÀÖ´Ù¸é Á¦°ÅÇØÁØ´Ù.
+	//í™•ì¥ìëŠ” "jpg"ì™€ ê°™ì´ dotê°€ ì—†ì´ ë¹„êµí•œë‹¤.
+	//í™•ì¥ìì— * ë˜ëŠ” dotê°€ ìˆë‹¤ë©´ ì œê±°í•´ì¤€ë‹¤.
 	sExtFilter.Replace(_T("*"), _T(""));
 	sExtFilter.Replace(_T("."), _T(""));
 	while (true)
@@ -4442,7 +4442,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	if (sFolder.Right(1) != "\\")
 		sFolder += _T("\\");
 
-	//recursive±îÁö °í·ÁÇÏ¿© ¿ì¼±Àº ¸ğµç ÆÄÀÏÀ» ´ë»óÀ¸·Î ÇØ¾ß ÇÑ´Ù.
+	//recursiveê¹Œì§€ ê³ ë ¤í•˜ì—¬ ìš°ì„ ì€ ëª¨ë“  íŒŒì¼ì„ ëŒ€ìƒìœ¼ë¡œ í•´ì•¼ í•œë‹¤.
 	bool bWorking = finder.FindFile(sFolder + sNameFilter);
 
 	while (bWorking)
@@ -4460,7 +4460,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 		}
 		else
 		{
-			//sFilter¿¡ ÇØ´çÇÏ´Â ÆÄÀÏ¸¸À» °Ë»ö ´ë»óÀ¸·Î ÇÑ´Ù.
+			//sFilterì— í•´ë‹¹í•˜ëŠ” íŒŒì¼ë§Œì„ ê²€ìƒ‰ ëŒ€ìƒìœ¼ë¡œ í•œë‹¤.
 			bool bFound = false;
 
 			if (dqExtFilter.size() == 0)
@@ -4469,7 +4469,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 			}
 			else
 			{
-				//¿¹¸¦µé¾î È®ÀåÀÚ ¸ñ·Ï¿¡ jpg°¡ ÀÖ´Âµ¥ ÆÄÀÏ¸í Áß°£¿¡¼­ jpg°¡ ¹ß°ßµÇ¸é ¹®Á¦°¡ µÈ´Ù.
+				//ì˜ˆë¥¼ë“¤ì–´ í™•ì¥ì ëª©ë¡ì— jpgê°€ ìˆëŠ”ë° íŒŒì¼ëª… ì¤‘ê°„ì—ì„œ jpgê°€ ë°œê²¬ë˜ë©´ ë¬¸ì œê°€ ëœë‹¤.
 				if (find_index(dqExtFilter, get_part(sFilename, fn_ext).MakeLower()) >= 0)
 					bFound = true;
 				/*
@@ -4489,7 +4489,7 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 
 			if (bFound)
 			{
-				//Á¦¿ÜÇÒ ¹®ÀÚ¿­ÀÌ Æ÷ÇÔµÇ¾î ÀÖÁö ¾ÊÀº ÆÄÀÏµé¸¸ ¸®½ºÆ®¿¡ Ãß°¡ÇÑ´Ù.
+				//ì œì™¸í•  ë¬¸ìì—´ì´ í¬í•¨ë˜ì–´ ìˆì§€ ì•Šì€ íŒŒì¼ë“¤ë§Œ ë¦¬ìŠ¤íŠ¸ì— ì¶”ê°€í•œë‹¤.
 				bool bExcept = false;
 
 				for (i = 0; i < dqExcepts.size(); i++)
@@ -4518,9 +4518,9 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 	}
 }
 
-//list¸¦ NULL·Î È£ÃâÇÏ¸é ´ÜÁö sub folderÀÇ °¹¼ö¸¸ ÂüÁ¶ÇÒ ¸ñÀûÀÌ´Ù.
-//recursive´Â Á¦°øÇÏÁö ¾Ê´Â´Ù.
-//root°¡ "³» PC"ÀÏ °æ¿ì special_folders°¡ trueÀÌ¸é ´Ù¿î·Îµå, ³» ¹®¼­, ¹ÙÅÁ È­¸é Ç×¸ñ±îÁö Ãß°¡ÇÑ´Ù.
+//listë¥¼ NULLë¡œ í˜¸ì¶œí•˜ë©´ ë‹¨ì§€ sub folderì˜ ê°¯ìˆ˜ë§Œ ì°¸ì¡°í•  ëª©ì ì´ë‹¤.
+//recursiveëŠ” ì œê³µí•˜ì§€ ì•ŠëŠ”ë‹¤.
+//rootê°€ "ë‚´ PC"ì¼ ê²½ìš° special_foldersê°€ trueì´ë©´ ë‹¤ìš´ë¡œë“œ, ë‚´ ë¬¸ì„œ, ë°”íƒ• í™”ë©´ í•­ëª©ê¹Œì§€ ì¶”ê°€í•œë‹¤.
 int get_sub_folders(CString root, std::deque<CString>* list, bool special_folders, bool include_files)
 {
 	if (list)
@@ -4531,7 +4531,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	CString file;
 	CFileFind finder;
 
-	//"·ÎÄÃ µğ½ºÅ© (C:)"
+	//"ë¡œì»¬ ë””ìŠ¤í¬ (C:)"
 	root = convert_special_folder_to_real_path(root);
 
 	if (PathIsDirectory(root))
@@ -4546,7 +4546,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	{
 		folders.push_front(get_system_label(CSIDL_DESKTOP));
 		folders.push_front(get_system_label(CSIDL_PERSONAL));
-		//folders.push_front(get_system_label(CSIDL_DOWNLOAD)_T("´Ù¿î·Îµå"));
+		//folders.push_front(get_system_label(CSIDL_DOWNLOAD)_T("ë‹¤ìš´ë¡œë“œ"));
 	}
 	else if (root == get_system_label(CSIDL_DRIVES))
 	{
@@ -4559,7 +4559,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 		{
 			folders.push_front(get_system_label(CSIDL_DESKTOP));
 			folders.push_front(get_system_label(CSIDL_PERSONAL));
-			//folders.push_front(_T("´Ù¿î·Îµå"));
+			//folders.push_front(_T("ë‹¤ìš´ë¡œë“œ"));
 		}
 	}
 	else
@@ -4623,18 +4623,18 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 
 	std::deque<CString>	dq_ext;
 	std::deque<CString>	dq_except;
-	//ÇÊÅÍ¿Í Á¦¿Ü ¹®ÀÚ¿­Àº ´ë¼Ò¹®ÀÚ¸¦ ±¸ºĞÇÏÁö ¾Ê´Â´Ù.
+	//í•„í„°ì™€ ì œì™¸ ë¬¸ìì—´ì€ ëŒ€ì†Œë¬¸ìë¥¼ êµ¬ë¶„í•˜ì§€ ì•ŠëŠ”ë‹¤.
 	int curPos = 0;
 	CString sToken = ext_filters;
 	CString file;
 	CString filetitle;
 	CString name_field = name_filter.MakeLower();
 
-	//name_filter¿¡¼­ wildcard¸¦ Á¦°ÅÇÑ ºÎºĞ
+	//name_filterì—ì„œ wildcardë¥¼ ì œê±°í•œ ë¶€ë¶„
 	name_field.Replace(_T("*"), _T(""));
 	name_field.Replace(_T("?"), _T(""));
 
-	//name_filter´Â ÀÏ´Ü *¸¸ Çã¿ëÇÑ´Ù.
+	//name_filterëŠ” ì¼ë‹¨ *ë§Œ í—ˆìš©í•œë‹¤.
 	//abc* : 
 	//*abc
 	//*abc*
@@ -4646,8 +4646,8 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 
 	ext_filters.MakeLower();
 
-	//È®ÀåÀÚ´Â "jpg"¿Í °°ÀÌ dot°¡ ¾øÀÌ ºñ±³ÇÑ´Ù.
-	//È®ÀåÀÚ¿¡ * ¶Ç´Â dot°¡ ÀÖ´Ù¸é Á¦°ÅÇØÁØ´Ù.
+	//í™•ì¥ìëŠ” "jpg"ì™€ ê°™ì´ dotê°€ ì—†ì´ ë¹„êµí•œë‹¤.
+	//í™•ì¥ìì— * ë˜ëŠ” dotê°€ ìˆë‹¤ë©´ ì œê±°í•´ì¤€ë‹¤.
 	ext_filters.Replace(_T("*"), _T(""));
 	//ext_filters.Replace(_T("."), _T(""));
 	while (true)
@@ -4747,7 +4747,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				continue;
 
 			bool except = false;
-			//Á¦¿ÜÇÒ ¹®ÀÚ¿­ÀÌ Æ÷ÇÔµÇ¾î ÀÖÁö ¾ÊÀº ÆÄÀÏµé¸¸ ¸®½ºÆ®¿¡ Ãß°¡ÇÑ´Ù.
+			//ì œì™¸í•  ë¬¸ìì—´ì´ í¬í•¨ë˜ì–´ ìˆì§€ ì•Šì€ íŒŒì¼ë“¤ë§Œ ë¦¬ìŠ¤íŠ¸ì— ì¶”ê°€í•œë‹¤.
 			for (i = 0; i < dq_except.size(); i++)
 			{
 				if (CString(file).MakeLower().Find(dq_except[i]) >= 0)
@@ -4830,7 +4830,7 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 				continue;
 
 			bool except = false;
-			//Á¦¿ÜÇÒ ¹®ÀÚ¿­ÀÌ Æ÷ÇÔµÇ¾î ÀÖÁö ¾ÊÀº ÆÄÀÏµé¸¸ ¸®½ºÆ®¿¡ Ãß°¡ÇÑ´Ù.
+			//ì œì™¸í•  ë¬¸ìì—´ì´ í¬í•¨ë˜ì–´ ìˆì§€ ì•Šì€ íŒŒì¼ë“¤ë§Œ ë¦¬ìŠ¤íŠ¸ì— ì¶”ê°€í•œë‹¤.
 			for (i = 0; i < dq_except.size(); i++)
 			{
 				if (CString(file).MakeLower().Find(dq_except[i]) >= 0)
@@ -4905,7 +4905,7 @@ void save_dqlist(std::deque<CString>* dqlist, CString output_text_file_path)
 	if ((fp = _tfopen(output_text_file_path, _T("wt")CHARSET)) == NULL)
 		return;
 
-	//  UniCode BOM ±â·Ï
+	//  UniCode BOM ê¸°ë¡
 	//WORD wMark = 0xFEFF;
 	//fwrite(&wMark, sizeof(WORD), 1, fp);
 
@@ -4924,15 +4924,15 @@ std::deque<CString>	FindFilesWithExtensions(CString folder, CString fileTitle, C
 	std::deque<CString> dqToken;
 	std::deque<CString> result;
 
-	//È®ÀåÀÚ´Â "jpg"¿Í °°ÀÌ dot°¡ ¾øÀÌ ºñ±³ÇÑ´Ù.
-	//È®ÀåÀÚ¿¡ * ¶Ç´Â dot°¡ ÀÖ´Ù¸é Á¦°ÅÇØÁØ´Ù.
+	//í™•ì¥ìëŠ” "jpg"ì™€ ê°™ì´ dotê°€ ì—†ì´ ë¹„êµí•œë‹¤.
+	//í™•ì¥ìì— * ë˜ëŠ” dotê°€ ìˆë‹¤ë©´ ì œê±°í•´ì¤€ë‹¤.
 	extensions.Replace(_T("*"), _T(""));
 	extensions.Replace(_T("."), _T(""));
 
 	get_token_string(extensions, dqToken, ';');
 
-	//Æú´õ³»ÀÇ ÆÄÀÏµéÀ» Ã£¾Æ¼­ ºñ±³ÇÏ´Â°Ô ¾Æ´Ï¶ó
-	//Á¶°Ç¿¡ ¸Â´Â ÆÄÀÏÀÌ Á¸ÀçÇÏ´ÂÁö·Î °Ë»çÇÑ´Ù.
+	//í´ë”ë‚´ì˜ íŒŒì¼ë“¤ì„ ì°¾ì•„ì„œ ë¹„êµí•˜ëŠ”ê²Œ ì•„ë‹ˆë¼
+	//ì¡°ê±´ì— ë§ëŠ” íŒŒì¼ì´ ì¡´ì¬í•˜ëŠ”ì§€ë¡œ ê²€ì‚¬í•œë‹¤.
 	for (int i = 0; i < dqToken.size(); i++)
 	{
 		fullpath.Format(_T("%s\\%s.%s"), folder, fileTitle, dqToken[i]);
@@ -4955,17 +4955,17 @@ bool delete_file(CString fullpath, bool bTrashCan)
 	szTemp[fullpath.GetLength() + 1] = NULL;
 
 	FileOp.hwnd = NULL;
-	FileOp.wFunc = FO_DELETE; // »èÁ¦ ¼Ó¼º ¼³Á¤
+	FileOp.wFunc = FO_DELETE; // ì‚­ì œ ì†ì„± ì„¤ì •
 	FileOp.pFrom = NULL;
 	FileOp.pTo = NULL;
-	//È®ÀÎ¸Ş½ÃÁö°¡ ¾È¶ßµµ·Ï ¼³Á¤
+	//í™•ì¸ë©”ì‹œì§€ê°€ ì•ˆëœ¨ë„ë¡ ì„¤ì •
 	FileOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI;
 	FileOp.fAnyOperationsAborted = false;
 	FileOp.hNameMappings = NULL;
 	FileOp.lpszProgressTitle = NULL;
 	FileOp.pFrom = szTemp;
 
-	int res = SHFileOperation(&FileOp); // »èÁ¦ ÀÛ¾÷
+	int res = SHFileOperation(&FileOp); // ì‚­ì œ ì‘ì—…
 	if (res == 0)
 		return true;
 
@@ -4994,8 +4994,8 @@ int	get_text_encoding(CString sfile)
 }
 
 //20231206
-//unicode ÀÏ¶§´Â code_page¿¡ µû¶ó ansi or utf8·Î ÀúÀåµÇ³ª
-//multibyte ÀÏ¶§´Â utf8·Î ¼³Á¤ÇØµµ ansi·Î ÀúÀåµÊ.
+//unicode ì¼ë•ŒëŠ” code_pageì— ë”°ë¼ ansi or utf8ë¡œ ì €ì¥ë˜ë‚˜
+//multibyte ì¼ë•ŒëŠ” utf8ë¡œ ì„¤ì •í•´ë„ ansië¡œ ì €ì¥ë¨.
 bool save(CString filepath, CString text, int code_page)
 {
 	if (code_page != CP_ACP && code_page != CP_UTF8)
@@ -5004,9 +5004,9 @@ bool save(CString filepath, CString text, int code_page)
 	//std::locale::global(std::locale(".UTF-8"));
 	//setlocale(LC_ALL, ".utf8");
 
-	//unicode È¯°æ¿¡¼­´Â ¾Æ·¡¿Í °°ÀÌ µ¿ÀÛÇÏ³ª multibyte¿¡¼­´Â ansi·Î¸¸ ÀúÀåµÊ.
-	//CT2A(text)			: ANSI·Î ÀúÀå
-	//CT2CA(text, CP_UTF8)	: UTF8·Î ÀúÀåµÊ
+	//unicode í™˜ê²½ì—ì„œëŠ” ì•„ë˜ì™€ ê°™ì´ ë™ì‘í•˜ë‚˜ multibyteì—ì„œëŠ” ansië¡œë§Œ ì €ì¥ë¨.
+	//CT2A(text)			: ANSIë¡œ ì €ì¥
+	//CT2CA(text, CP_UTF8)	: UTF8ë¡œ ì €ì¥ë¨
 	std::ofstream of;
 	
 	of.open(filepath, std::ofstream::out);
@@ -5029,7 +5029,7 @@ bool save(CString filepath, CString text, int code_page)
 
 	if (fp == NULL)
 	{
-		//AfxMessageBox(filepath + _T("\nÀ§ ÆÄÀÏÀ» ¿­ ¼ö ¾ø½À´Ï´Ù."), MB_ICONEXCLAMATION);
+		//AfxMessageBox(filepath + _T("\nìœ„ íŒŒì¼ì„ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤."), MB_ICONEXCLAMATION);
 		return false;
 	}
 
@@ -5043,7 +5043,7 @@ bool save(CString filepath, CString text, int code_page)
 
 bool file_open(FILE** fp, CString mode, CString file)
 {
-	//encording ¹æ½ÄÀ» ÀĞ¾î¿Â´Ù.
+	//encording ë°©ì‹ì„ ì½ì–´ì˜¨ë‹¤.
 	int	text_encoding = get_text_encoding(file);
 
 	if (text_encoding <= text_encoding_ansi)
@@ -5054,7 +5054,7 @@ bool file_open(FILE** fp, CString mode, CString file)
 	return (fp == NULL ? false : true);
 }
 
-//text ÆÄÀÏÀ» ¿­¾î¼­ dqList¿¡ ³Ö¾îÁØ´Ù.
+//text íŒŒì¼ì„ ì—´ì–´ì„œ dqListì— ë„£ì–´ì¤€ë‹¤.
 bool read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8)
 {
 	dqList->clear();
@@ -5078,8 +5078,8 @@ bool read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8)
 	return true;
 }
 
-//½ÃÀÛÆú´õ ¹× ÇÏÀ§ Æú´õµéÀº ¿©ÀüÈ÷ ³²¾ÆÀÖ´Ù.
-//Æú´õ ÅëÂ°·Î ´Ù Áö¿ì·Á¸é ÄÚµåÀÇ ¼öÁ¤ÀÌ ÇÊ¿äÇÏ´Ù.
+//ì‹œì‘í´ë” ë° í•˜ìœ„ í´ë”ë“¤ì€ ì—¬ì „íˆ ë‚¨ì•„ìˆë‹¤.
+//í´ë” í†µì§¸ë¡œ ë‹¤ ì§€ìš°ë ¤ë©´ ì½”ë“œì˜ ìˆ˜ì •ì´ í•„ìš”í•˜ë‹¤.
 int	delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive /*= true*/, bool trash_can /*= false*/)
 {
 	std::deque<CString> files;
@@ -5118,7 +5118,7 @@ bool RecursiveRemoveDirectory(LPCTSTR lpPathName, bool bDeletePermanent/* = TRUE
 	return (ERROR_SUCCESS == SHFileOperation(&fos));
 }
 
-//ÀÎÀÚ·Î ³Ñ¾î¿Â Æú´õ¸¦ Æ÷ÇÔÇÏ¿© ¸ğµç ÇÏÀ§Æú´õ, ÆÄÀÏÀ» Áö¿î´Ù.
+//ì¸ìë¡œ ë„˜ì–´ì˜¨ í´ë”ë¥¼ í¬í•¨í•˜ì—¬ ëª¨ë“  í•˜ìœ„í´ë”, íŒŒì¼ì„ ì§€ìš´ë‹¤.
 bool SHDeleteFolder(CString sFolder)
 {
     SHFILEOPSTRUCT FileOp = {0};
@@ -5128,23 +5128,23 @@ bool SHDeleteFolder(CString sFolder)
     szTemp[_tcslen(szTemp) + 1] = NULL;
  
     FileOp.hwnd = NULL;
-    FileOp.wFunc = FO_DELETE;       // »èÁ¦ ¼Ó¼º ¼³Á¤
+    FileOp.wFunc = FO_DELETE;       // ì‚­ì œ ì†ì„± ì„¤ì •
     FileOp.pTo = NULL;
-    FileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SIMPLEPROGRESS; // È®ÀÎ¸Ş½ÃÁö°¡ ¾È¶ßµµ·Ï ¼³Á¤
+    FileOp.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SIMPLEPROGRESS; // í™•ì¸ë©”ì‹œì§€ê°€ ì•ˆëœ¨ë„ë¡ ì„¤ì •
     FileOp.fAnyOperationsAborted = false;
     FileOp.hNameMappings = NULL;
     FileOp.lpszProgressTitle = sFolder;
     FileOp.pFrom = szTemp;
  
-    if (SHFileOperation(&FileOp) == 0)       // »èÁ¦ ÀÛ¾÷
+    if (SHFileOperation(&FileOp) == 0)       // ì‚­ì œ ì‘ì—…
         return TRUE;
 
 	return FALSE;
 }
  
 //------------------------------------------------------------
-//ÇÏÀ§Æú´õ ¸ğµÎ »èÁ¦
-//ÇÏÀ§ µğ·ºÅä¸® ¸ğµÎ »èÁ¦
+//í•˜ìœ„í´ë” ëª¨ë‘ ì‚­ì œ
+//í•˜ìœ„ ë””ë ‰í† ë¦¬ ëª¨ë‘ ì‚­ì œ
 bool DeleteFolder(LPCTSTR lpFolder)
 {
     WIN32_FIND_DATA FindData;
@@ -5225,7 +5225,7 @@ bool DeleteFolder(LPCTSTR lpFolder)
     return RemoveDirectory(lpFolder);
 }
 
-//Æú´õ³»ÀÇ Æ¯Á¤ ¹®ÀÚ¿­ÀÌ µé¾î°£ ÆÄÀÏµéÀ» Áö¿î´Ù. ÇÏÀ§Æú´õ Áö¿ø¾ÈÇÔ.
+//í´ë”ë‚´ì˜ íŠ¹ì • ë¬¸ìì—´ì´ ë“¤ì–´ê°„ íŒŒì¼ë“¤ì„ ì§€ìš´ë‹¤. í•˜ìœ„í´ë” ì§€ì›ì•ˆí•¨.
 void DeleteFilesBySubString(CString sFolder, CString filenameSubStr, bool bMatchWholeWordOnly/* = FALSE*/, bool bMatchCase/* = FALSE*/)
 {
 	CFileFind	finder;
@@ -5298,87 +5298,6 @@ bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL
 	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, (LPCTSTR)folder, lpsa));
 }
 
-//ÀÌ ÇÔ¼ö¸¦ »ç¿ëÇÏ·Á¸é ¹İµå½Ã SetBkMode(TRANSPARENT);·Î ¼³Á¤ÇØ¾ß È¿°ú°¡ ³ªÅ¸³².
-void TextOutShadow(CDC* pDC, int x, int y, CString sText, COLORREF crText, COLORREF crShadow, UINT nFlag)
-{
-	int oldTextColor = pDC->GetTextColor();
-	int oldBkMode = pDC->SetBkMode(TRANSPARENT);
-	UINT nOldFlag = pDC->SetTextAlign(nFlag);
-
-	pDC->SetTextColor(crShadow);
-	pDC->TextOut(x + 1, y + 1, sText);
-	pDC->SetTextColor(crText);
-	pDC->TextOut(x, y, sText);
-
-	pDC->SetTextAlign(nOldFlag);
-	pDC->SetTextColor(oldTextColor);
-	pDC->SetBkMode(oldBkMode);
-}
-
-//ÀÌ ÇÔ¼ö¸¦ »ç¿ëÇÏ·Á¸é ¹İµå½Ã SetBkMode(TRANSPARENT);·Î ¼³Á¤ÇØ¾ß È¿°ú°¡ ³ªÅ¸³².
-void DrawTextShadow(CDC* pDC, CString sText, CRect r, UINT format,
-					COLORREF crText, COLORREF crShadow, int offsetX, int offsetY)
-{
-	int oldTextColor = pDC->GetTextColor();
-	int oldBkMode = pDC->SetBkMode(TRANSPARENT);
-
-	r.OffsetRect(offsetX, offsetY);
-	pDC->SetTextColor(crShadow);
-	pDC->DrawText(sText, r, format);
-	r.OffsetRect(-offsetX, -offsetY);
-	pDC->SetTextColor(crText);
-	pDC->DrawText(sText, r, format);
-
-	pDC->SetTextColor(oldTextColor);
-	pDC->SetBkMode(oldBkMode);
-}
-
-//ÀÌ ÇÔ¼ö¸¦ »ç¿ëÇÏ·Á¸é ¹İµå½Ã SetBkMode(TRANSPARENT);·Î ¼³Á¤ÇØ¾ß È¿°ú°¡ ³ªÅ¸³².
-void TextOutOutline(CDC* pDC, int x, int y, CString sText, COLORREF crText, COLORREF crBorder, UINT nFlag)
-{
-	int oldTextColor = pDC->GetTextColor();
-	int oldBkMode = pDC->SetBkMode(TRANSPARENT);
-	UINT nOldFlag = pDC->SetTextAlign(nFlag);
-
-	pDC->SetTextColor(crBorder);
-	pDC->TextOut(x - 1, y + 0, sText);
-	pDC->TextOut(x + 0, y - 1, sText);
-	pDC->TextOut(x + 1, y + 0, sText);
-	pDC->TextOut(x + 0, y + 1, sText);
-
-	pDC->SetTextColor(crText);
-	pDC->TextOut(x, y, sText);
-
-	pDC->SetTextAlign(nOldFlag);
-	pDC->SetTextColor(oldTextColor);
-	pDC->SetBkMode(oldBkMode);
-}
-
-//ÀÌ ÇÔ¼ö¸¦ »ç¿ëÇÏ·Á¸é ¹İµå½Ã SetBkMode(TRANSPARENT);·Î ¼³Á¤ÇØ¾ß È¿°ú°¡ ³ªÅ¸³².
-void DrawTextOutline(CDC* pDC, CString sText, CRect r, UINT format, COLORREF crText, COLORREF crShadow)
-{
-	int oldTextColor = pDC->GetTextColor();
-	int oldBkMode = pDC->SetBkMode(TRANSPARENT);
-
-	pDC->SetTextColor(crShadow);
-
-	r.OffsetRect(-1, 0);
-	pDC->DrawText(sText, r, format);
-	r.OffsetRect(+1, -1);
-	pDC->DrawText(sText, r, format);
-	r.OffsetRect(+1, +1);
-	pDC->DrawText(sText, r, format);
-	r.OffsetRect(-1, +1);
-	pDC->DrawText(sText, r, format);
-
-	pDC->SetTextColor(crText);
-	r.OffsetRect(0, -1);
-	pDC->DrawText(sText, r, format);
-
-	pDC->SetTextColor(oldTextColor);
-	pDC->SetBkMode(oldBkMode);
-}
-
 void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
 {
 	CRect rcSavedRect = rcRect;
@@ -5424,9 +5343,9 @@ Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR
 	return rt;
 }
 
-//Ãâ·ÂÇÒ ±ÛÀÚ¸¦ ÀÛ°Ô Ãâ·ÂÇÑ ÈÄ ÀÌ¸¦ ´Ù½Ã ¿ø·¡ Å©±â·Î ´Ã·Á
-//blur°¡ »ı±â°Ô ÇÏ°í ÀÌ¸¦ shadow·Î »ç¿ëÇÏ´Â ¹æ½ÄÀÎµ¥ ¹º°¡ ¾î»öÇÏ´Ù.
-//ApplyEffectÀÇ blur¸¦ Àû¿ëÇØ¼­ ±¸ÇöÇÏ´Â °ÍÀÌ ³ªÀ» µí ÇÏ´Ù.
+//ì¶œë ¥í•  ê¸€ìë¥¼ ì‘ê²Œ ì¶œë ¥í•œ í›„ ì´ë¥¼ ë‹¤ì‹œ ì›ë˜ í¬ê¸°ë¡œ ëŠ˜ë ¤
+//blurê°€ ìƒê¸°ê²Œ í•˜ê³  ì´ë¥¼ shadowë¡œ ì‚¬ìš©í•˜ëŠ” ë°©ì‹ì¸ë° ë­”ê°€ ì–´ìƒ‰í•˜ë‹¤.
+//ApplyEffectì˜ blurë¥¼ ì ìš©í•´ì„œ êµ¬í˜„í•˜ëŠ” ê²ƒì´ ë‚˜ì„ ë“¯ í•˜ë‹¤.
 CRect draw_text(Gdiplus::Graphics* g,
 				int x, int y, int w, int h,
 				CString text,
@@ -5479,8 +5398,8 @@ CRect draw_text(Gdiplus::Graphics* g,
 		g = new Gdiplus::Graphics(hDC);
 	}
 
-	//Å« ±Û¾¾´Â AntiAlias¸¦ ÇØÁÖ´Â°Ô ÁÁÁö¸¸ ÀÛÀº ±Û¾¾´Â ¿ÀÈ÷·Á ¹¶°³Áö¹Ç·Î ¾ÈÇÏ´Â°Ô ÁÁ´Ù.
-	//ÆÄ¶ó¹ÌÅÍ·Î Ã³¸®ÇØ¾ß ÇÑ´Ù.
+	//í° ê¸€ì”¨ëŠ” AntiAliasë¥¼ í•´ì£¼ëŠ”ê²Œ ì¢‹ì§€ë§Œ ì‘ì€ ê¸€ì”¨ëŠ” ì˜¤íˆë ¤ ë­‰ê°œì§€ë¯€ë¡œ ì•ˆí•˜ëŠ”ê²Œ ì¢‹ë‹¤.
+	//íŒŒë¼ë¯¸í„°ë¡œ ì²˜ë¦¬í•´ì•¼ í•œë‹¤.
 	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
@@ -5581,8 +5500,8 @@ CRect draw_text(Gdiplus::Graphics* g,
 		g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 		g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-		//±×¸²ÀÚÀÇ Èå¸´ÇÑ Á¤µµ. 0.0f(±×¸²ÀÚ ¾øÀ½), 0.1f(¸¹ÀÌ Èå¸²), 0.4f(±ÇÀå), 1.0f¿¡ °¡±î¿ï¼ö·Ï ¼±¸íÇÔ.
-		//Ãà¼ÒÇÑ ±ÛÀÚ¸¦ ¿øº»Å©±â·Î ´Ã·Á¼­ Èå¸´ÇÑ ÀÌ¹ÌÁö·Î ¸¸µë.
+		//ê·¸ë¦¼ìì˜ íë¦¿í•œ ì •ë„. 0.0f(ê·¸ë¦¼ì ì—†ìŒ), 0.1f(ë§ì´ íë¦¼), 0.4f(ê¶Œì¥), 1.0fì— ê°€ê¹Œìš¸ìˆ˜ë¡ ì„ ëª…í•¨.
+		//ì¶•ì†Œí•œ ê¸€ìë¥¼ ì›ë³¸í¬ê¸°ë¡œ ëŠ˜ë ¤ì„œ íë¦¿í•œ ì´ë¯¸ì§€ë¡œ ë§Œë“¬.
 		float ratio = 0.3f;
 		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 		g_shadow.SetTransform(&mx);
@@ -5625,8 +5544,8 @@ CRect draw_text(Gdiplus::Graphics* g,
 	return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 }
 
-//textÀÇ Ãâ·ÂÇÈ¼¿ ³Êºñ°¡ max_width¸¦ ³ÑÀ» °æ¿ì ...¿Í ÇÔ²² Ç¥½ÃµÉ ¹®ÀÚÀ§Ä¡¸¦ ¸®ÅÏ.
-//ÀÌ ÇÔ¼ö´Â DrawText½Ã¿¡ DT_END_ELLIPSIS¸¦ Áà¼­ »ç¿ëÇÏ¹Ç·Î ¿ì¼± »ç¿ë º¸·ù!
+//textì˜ ì¶œë ¥í”½ì…€ ë„ˆë¹„ê°€ max_widthë¥¼ ë„˜ì„ ê²½ìš° ...ì™€ í•¨ê»˜ í‘œì‹œë  ë¬¸ììœ„ì¹˜ë¥¼ ë¦¬í„´.
+//ì´ í•¨ìˆ˜ëŠ” DrawTextì‹œì— DT_END_ELLIPSISë¥¼ ì¤˜ì„œ ì‚¬ìš©í•˜ë¯€ë¡œ ìš°ì„  ì‚¬ìš© ë³´ë¥˜!
 int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 {
 	CRect rt;
@@ -5656,118 +5575,54 @@ int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 	return 0;
 }
 
-void DrawLinePt(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
+void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width, int pen_style, int draw_mode)
 {
-	DrawLine(pDC, pt1.x, pt1.y, pt2.x, pt2.y, crColor, nWidth, nPenStyle, nDrawMode);
+	draw_line(pDC, pt1.x, pt1.y, pt2.x, pt2.y, cr, width, pen_style, draw_mode);
 }
 
-void DrawLine(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor /*= 0*/, int nWidth /*= 1*/, int nPenStyle /*= PS_SOLID*/, int nDrawMode /*= R2_COPYPEN*/)
+void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, int width, int pen_style, int draw_mode)
 {
-	LOGBRUSH lb;
-
-	lb.lbStyle = BS_SOLID;
-	lb.lbColor = crColor;
-
-	CPen	Pen(PS_GEOMETRIC | PS_ENDCAP_ROUND | PS_JOIN_MITER | nPenStyle, nWidth, &lb);
-	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
-	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
-
-	pDC->MoveTo(x1, y1);
-	pDC->LineTo(x2, y2);
-
-	pDC->SelectObject(pOldPen);
-	Pen.DeleteObject();
-
-	pDC->SetROP2(nOldDrawMode);
+	Gdiplus::Graphics g(pDC->m_hDC);
+	Gdiplus::Pen pen(cr, width);
+	g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
-void DrawRectangle(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill /*= NULL_BRUSH*/, int nWidth/* = 1*/, int nPenStyle/* = PS_SOLID*/, int nDrawMode /* = R2_COPYPEN*/)
+void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width)
 {
-	DrawRectangle(pDC, CRect(x1, y1, x2, y2), crColor, crFill, nWidth, nPenStyle, nDrawMode);
+	Gdiplus::Graphics g(pDC->m_hDC);
+	Gdiplus::Pen pen(cr_line, width);
+	Gdiplus::SolidBrush br(cr_fill);
+
+	g.FillRectangle(&br, CRect2GpRect(r));
+	g.DrawRectangle(&pen, CRect2GpRect(r));
 }
 
-
-void DrawRectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill /*= NULL_BRUSH*/, int nWidth/* = 1*/, int nPenStyle/* = PS_SOLID*/, int nDrawMode /* = R2_COPYPEN*/)
+void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
 {
-	LOGBRUSH lb;
-
-	lb.lbStyle = BS_SOLID;
-	lb.lbColor = crColor;
-
-	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
-	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
-	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
-	CBrush	brBrush(crFill);
-	CBrush*	pOldBrush;
-	
-	if (crFill == NULL_BRUSH)
-		pOldBrush = (CBrush*)pDC->SelectStockObject(NULL_BRUSH);
-	else
-		pOldBrush = (CBrush*)pDC->SelectObject(&brBrush);	
-
-	//Rect.NormalizeRect();
-	pDC->Rectangle(Rect);
-
-	pDC->SelectObject(pOldPen);
-	pDC->SelectObject(pOldBrush);
-	Pen.DeleteObject();
-	brBrush.DeleteObject();
-
-	pDC->SetROP2(nOldDrawMode);
+	draw_sunken_rect(pDC, r, bSunken, RGB2gpColor(cr1), RGB2gpColor(cr2), width);
 }
 
-void DrawSunkenRect(CDC* pDC, CRect Rect, bool bSunken, COLORREF cr1, COLORREF cr2, int nWidth)
+void draw_sunken_rect(CDC* pDC, CRect r, bool sunken, Gdiplus::Color cr1, Gdiplus::Color cr2, int width)
 {
-	CPen	Pen1(PS_SOLID, nWidth, cr1);
-	CPen	Pen2(PS_SOLID, nWidth, cr2);
-	CPen*	pOldPen;
+	Gdiplus::Graphics g(pDC->m_hDC);
+	Gdiplus::Pen pen1(cr1, width);
+	Gdiplus::Pen pen2(cr2, width);
 
-	pOldPen = (CPen*)pDC->SelectObject(bSunken ? &Pen1 : &Pen2);
+	g.DrawLine(sunken ? &pen1 : &pen2, r.left, r.bottom - 1, r.left, r.top);
+	g.DrawLine(sunken ? &pen1 : &pen2, r.left, r.top, r.right - 1, r.top);
 
-	pDC->MoveTo(Rect.left, Rect.bottom - 1);
-	pDC->LineTo(Rect.left, Rect.top);
-	pDC->LineTo(Rect.right - 1, Rect.top);
-
-	pDC->SelectObject(pOldPen);
-
-	pOldPen = (CPen*)pDC->SelectObject(bSunken ? &Pen2 : &Pen1);
-
-	pDC->MoveTo(Rect.right - 1, Rect.top);
-	pDC->LineTo(Rect.right - 1, Rect.bottom - 1);
-	pDC->LineTo(Rect.left, Rect.bottom - 1);
-
-	pDC->SelectObject(pOldPen);
-
-	Pen1.DeleteObject();
-	Pen2.DeleteObject();
+	g.DrawLine(sunken ? &pen2 : &pen1, r.right - 1, r.top, r.right - 1, r.bottom - 1);
+	g.DrawLine(sunken ? &pen2 : &pen1, r.right - 1, r.bottom - 1, r.left, r.bottom - 1);
 }
 
-void DrawEllipse(CDC* pDC, int cx, int cy, int rx, int ry, COLORREF crLine, COLORREF crFill, int nPenStyle, int nWidth, int nDrawMode)
+void draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int pen_style, int width, int draw_mode)
 {
-	LOGBRUSH lb;
+	Gdiplus::Graphics g(pDC->m_hDC);
+	Gdiplus::Pen pen(cr_line, width);
+	Gdiplus::SolidBrush br(cr_fill);
 
-	lb.lbStyle = BS_SOLID;
-	lb.lbColor = crLine;
-
-	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
-	CPen*	pOldPen = (crLine == NULL_PEN ? (CPen*)pDC->SelectStockObject(NULL_PEN) : (CPen*)pDC->SelectObject(&Pen));
-	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
-	CBrush	brBrush(crFill);
-	CBrush*	pOldBrush;
-
-	if (crFill == NULL_BRUSH)
-		pOldBrush = (CBrush*)pDC->SelectStockObject(NULL_BRUSH);
-	else
-		pOldBrush = (CBrush*)pDC->SelectObject(&brBrush);
-
-	pDC->Ellipse(cx - rx, cy - ry, cx + rx, cy + ry);
-
-	pDC->SelectObject(pOldPen);
-	pDC->SelectObject(pOldBrush);
-	Pen.DeleteObject();
-	brBrush.DeleteObject();
-
-	pDC->SetROP2(nOldDrawMode);
+	g.FillEllipse(&br, CRect2GpRect(r));
+	g.DrawEllipse(&pen, CRect2GpRect(r));
 }
 
 void draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed, COLORREF crLine, int nWidth, int nPenStyle, int nDrawMode)
@@ -5874,7 +5729,7 @@ bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFold
 	return bSuccess;
 }
 
-//À©µµ¿ì ¿î¿µÃ¼Á¦¿¡¼­ Æ¯Á¤ Æú´õ(´Ù¿î·Îµå, ³» ¹®¼­ µî)ÀÇ ½ÇÁ¦ °æ·Î¸¦ ¸®ÅÏÇÑ´Ù.
+//ìœˆë„ìš° ìš´ì˜ì²´ì œì—ì„œ íŠ¹ì • í´ë”(ë‹¤ìš´ë¡œë“œ, ë‚´ ë¬¸ì„œ ë“±)ì˜ ì‹¤ì œ ê²½ë¡œë¥¼ ë¦¬í„´í•œë‹¤.
 //FOLDERID_Downloads, FOLDERID_Documents, ...
 CString get_known_folder(KNOWNFOLDERID folderID)
 {
@@ -5896,7 +5751,7 @@ CString get_known_folder(KNOWNFOLDERID folderID)
 
 CString get_known_folder(int csidl)
 {
-	TCHAR buf[MAX_PATH];
+	TCHAR buf[MAX_PATH] = { 0, };
 	SHGetSpecialFolderPath(NULL, buf, csidl, FALSE);
 	return buf;
 }
@@ -5939,7 +5794,7 @@ void ParseCommandString(CString sParam, CStringArray& ar)
 
 }
 
-//Å¸ÀÌ¸Ó¿¡ ÀÇÇØ È£ÃâµÈ ÇÔ¼ö³»¿¡¼­ »ç¿ëÇÒ °æ¿ì¿¡´Â Á¦´ë·Î µ¿ÀÛÇÏÁö ¾ÊÀ½.
+//íƒ€ì´ë¨¸ì— ì˜í•´ í˜¸ì¶œëœ í•¨ìˆ˜ë‚´ì—ì„œ ì‚¬ìš©í•  ê²½ìš°ì—ëŠ” ì œëŒ€ë¡œ ë™ì‘í•˜ì§€ ì•ŠìŒ.
 void Wait(DWORD dwMillisecond)
 {
     MSG		msg;
@@ -5958,7 +5813,7 @@ void Wait(DWORD dwMillisecond)
     }
 }
 
-//¹İº¹¹®¿¡ ÀÇÇØ process°¡ ÀÀ´ä¾øÀ½ÀÌ µÇÁö ¾Êµµ·Ï ¹İº¹¹®¾È¿¡¼­ È£ÃâÇÏ¿© ¸Ş½ÃÁöÅ¥ÀÇ ³»¿ëÀ» ¹Ù·Î Ã³¸®½ÃÅ²´Ù.
+//ë°˜ë³µë¬¸ì— ì˜í•´ processê°€ ì‘ë‹µì—†ìŒì´ ë˜ì§€ ì•Šë„ë¡ ë°˜ë³µë¬¸ì•ˆì—ì„œ í˜¸ì¶œí•˜ì—¬ ë©”ì‹œì§€íì˜ ë‚´ìš©ì„ ë°”ë¡œ ì²˜ë¦¬ì‹œí‚¨ë‹¤.
 void ProcessWindowMessage()
 {
    MSG msg;
@@ -5970,7 +5825,7 @@ void ProcessWindowMessage()
    }
 }
 
-// 16ºñÆ® Á¤¼ö¸¦ 2Áø¼ö ¹®ÀÚ¿­·Î º¯È¯ ÇÔ¼ö
+// 16ë¹„íŠ¸ ì •ìˆ˜ë¥¼ 2ì§„ìˆ˜ ë¬¸ìì—´ë¡œ ë³€í™˜ í•¨ìˆ˜
 char*	ushortToBinary(unsigned short i)
 {
 	static char s[16 + 1] = { '0', };
@@ -6029,14 +5884,14 @@ unsigned int binaryToUint(char *s) {
   return i;
 }
 
-//¾î¶² ¼öÀÇ x ÀÎµ¦½º À§Ä¡ÀÇ ºñÆ®°ªÀ» ¸®ÅÏ.
+//ì–´ë–¤ ìˆ˜ì˜ x ì¸ë±ìŠ¤ ìœ„ì¹˜ì˜ ë¹„íŠ¸ê°’ì„ ë¦¬í„´.
 int get_bit(int number, int x)
 {
 	int bit = (number >> x) & 1;
 	return bit;
 }
 
-//x°¡ 1ÀÌ¸é n¹øÂ° °ªÀ» 1·Î º¯°æ, x°¡ 0ÀÌ¸é n¹øÂ° °ªÀ» 0À¸·Î º¯°æ
+//xê°€ 1ì´ë©´ në²ˆì§¸ ê°’ì„ 1ë¡œ ë³€ê²½, xê°€ 0ì´ë©´ në²ˆì§¸ ê°’ì„ 0ìœ¼ë¡œ ë³€ê²½
 void set_bit(int& number, int n, int x)
 {
 	number ^= (-x ^ number) & (1 << n);
@@ -6119,8 +5974,8 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 	Gdiplus::RectF arc(r.X, r.Y, diameter, diameter);
 
 	//https://www.codeproject.com/Articles/1010822/RoundedButton-Control-Demystifying-DrawArc
-	//Arc¸¦ ±×¸®´Â Â÷·Ê´Â tl-bl-br-tr°¡ ¾Æ´Ï¸é round rect°¡ ±×·ÁÁöÁö ¾Ê´Â´Ù.
-	//top-left round corder. 180µµ À§Ä¡¿¡¼­ ½Ã°è¹æÇâÀ¸·Î 90µµ ¸¸Å­ÀÇ È£¸¦ ±×¸°´Ù.
+	//Arcë¥¼ ê·¸ë¦¬ëŠ” ì°¨ë¡€ëŠ” tl-bl-br-trê°€ ì•„ë‹ˆë©´ round rectê°€ ê·¸ë ¤ì§€ì§€ ì•ŠëŠ”ë‹¤.
+	//top-left round corder. 180ë„ ìœ„ì¹˜ì—ì„œ ì‹œê³„ë°©í–¥ìœ¼ë¡œ 90ë„ ë§Œí¼ì˜ í˜¸ë¥¼ ê·¸ë¦°ë‹¤.
 	if (true)
 	{
 		path->AddArc(arc, 180.0, 90.0);
@@ -6130,19 +5985,19 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 		//path->AddLine(r.X + );
 	}
 
-	//bottom-left round corder. 270µµ À§Ä¡¿¡¼­ ½Ã°è¹æÇâÀ¸·Î 90µµ ¸¸Å­ÀÇ È£¸¦ ±×¸°´Ù.
+	//bottom-left round corder. 270ë„ ìœ„ì¹˜ì—ì„œ ì‹œê³„ë°©í–¥ìœ¼ë¡œ 90ë„ ë§Œí¼ì˜ í˜¸ë¥¼ ê·¸ë¦°ë‹¤.
 	arc.X = r.GetRight() - diameter - 1;
 	path->AddArc(arc, 270.0, 90.0);
 
-	//bottom-right round corder. 0µµ À§Ä¡¿¡¼­ ½Ã°è¹æÇâÀ¸·Î 90µµ ¸¸Å­ÀÇ È£¸¦ ±×¸°´Ù.
+	//bottom-right round corder. 0ë„ ìœ„ì¹˜ì—ì„œ ì‹œê³„ë°©í–¥ìœ¼ë¡œ 90ë„ ë§Œí¼ì˜ í˜¸ë¥¼ ê·¸ë¦°ë‹¤.
 	arc.Y = r.GetBottom() - diameter - 1;
 	path->AddArc(arc, 0.0, 90.0);
 
-	//top-right round corder. 90µµ À§Ä¡¿¡¼­ ½Ã°è¹æÇâÀ¸·Î 90µµ ¸¸Å­ÀÇ È£¸¦ ±×¸°´Ù.
+	//top-right round corder. 90ë„ ìœ„ì¹˜ì—ì„œ ì‹œê³„ë°©í–¥ìœ¼ë¡œ 90ë„ ë§Œí¼ì˜ í˜¸ë¥¼ ê·¸ë¦°ë‹¤.
 	arc.X = r.GetLeft();
 	path->AddArc(arc, 90.0, 90.0);
 
-	//±×·ÁÁø ³×±ÍÅüÀÌÀÇ È£¸¦ ¿¬°á½ÃÅ²´Ù.
+	//ê·¸ë ¤ì§„ ë„¤ê·€í‰ì´ì˜ í˜¸ë¥¼ ì—°ê²°ì‹œí‚¨ë‹¤.
 	path->CloseFigure();
 }
 
@@ -6206,9 +6061,9 @@ CRect get_zoom_rect(CRect rect, double zoom)
 	return CRect(l, t, r, b);
 }
 
-//0:lt, 1:rt, 2:rb, 3:lb, rb_cutÀÌ trueÀÌ¸é ³¡Á¡-1ÀÎ °ªÀ» ¸®ÅÏÇÏ°í falseÀÌ¸é ³¡Á¡ ÁÂÇ¥¸¦ ¸®ÅÏÇÑ´Ù.
-//½ÇÁ¦ »ç°¢ÇüÀº rb_cutÀÌ falseÀÌÁö¸¸
-//¿µ¿ª ¶Ç´Â ÇÈ¼¿À» º»´Ù¸é true·Î ÇØ¾ß ¸Â´Ù.
+//0:lt, 1:rt, 2:rb, 3:lb, rb_cutì´ trueì´ë©´ ëì -1ì¸ ê°’ì„ ë¦¬í„´í•˜ê³  falseì´ë©´ ëì  ì¢Œí‘œë¥¼ ë¦¬í„´í•œë‹¤.
+//ì‹¤ì œ ì‚¬ê°í˜•ì€ rb_cutì´ falseì´ì§€ë§Œ
+//ì˜ì—­ ë˜ëŠ” í”½ì…€ì„ ë³¸ë‹¤ë©´ trueë¡œ í•´ì•¼ ë§ë‹¤.
 CPoint vertex(CRect r, int index, bool rb_cut)
 {
 	switch (index)
@@ -6223,12 +6078,12 @@ CPoint vertex(CRect r, int index, bool rb_cut)
 }
 
 
-// ÆÄÀÏ¿¡ ´ëÇÑ ¼îÆ®ÄÆÀ» ¸¸µç´Ù.
-// ¾Æ·¡ÀÇ ÇÔ¼ö¿Í °ÅÀÇ µ¿ÀÏÇÏ´Ù.
-// pszSrcFile:¼ôÄÆ ´ë»ó ÆÄÀÏÀÇ Ç® ÆĞ½º
-// pszLnkFile:¼ôÄÆ ÆÄÀÏÀÇ Ç® ÆĞ½º
-// pszArgument:¼îÆ®ÄÆ¿¡ Àü´ŞµÉ ÀÎ¼ö ¹®ÀÚ¿­
-// pszDesc:¼îÆ®ÄÆ ¼³¸í ¹®ÀÚ¿­
+// íŒŒì¼ì— ëŒ€í•œ ì‡¼íŠ¸ì»·ì„ ë§Œë“ ë‹¤.
+// ì•„ë˜ì˜ í•¨ìˆ˜ì™€ ê±°ì˜ ë™ì¼í•˜ë‹¤.
+// pszSrcFile:ìˆì»· ëŒ€ìƒ íŒŒì¼ì˜ í’€ íŒ¨ìŠ¤
+// pszLnkFile:ìˆì»· íŒŒì¼ì˜ í’€ íŒ¨ìŠ¤
+// pszArgument:ì‡¼íŠ¸ì»·ì— ì „ë‹¬ë  ì¸ìˆ˜ ë¬¸ìì—´
+// pszDesc:ì‡¼íŠ¸ì»· ì„¤ëª… ë¬¸ìì—´
 HRESULT	MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
 						  LPTSTR pszWorkingDir/* = NULL*/, LPTSTR pszArgument/* = NULL*/, LPTSTR pszDesc/* = NULL*/)
 {
@@ -6237,7 +6092,7 @@ HRESULT	MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
 	IPersistFile	*pPf;
 	TCHAR wszLnkFile[MAX_PATH]={0,};
 	
-	// IShellLink °´Ã¼¸¦ »ı¼ºÇÏ°í Æ÷ÀÎÅÍ¸¦ ±¸ÇÑ´Ù.
+	// IShellLink ê°ì²´ë¥¼ ìƒì„±í•˜ê³  í¬ì¸í„°ë¥¼ êµ¬í•œë‹¤.
 	CoInitialize(NULL);
 
 	hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
@@ -6246,13 +6101,13 @@ HRESULT	MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
 	if (FAILED(hr))
 		return E_FAIL;
 	
-	// ¼îÆ®ÄÆÀÇ ´ë»óÃ¼¿Í ¼³¸íÀ» ¼³Á¤ÇÑ´Ù.
+	// ì‡¼íŠ¸ì»·ì˜ ëŒ€ìƒì²´ì™€ ì„¤ëª…ì„ ì„¤ì •í•œë‹¤.
 	pSl->SetPath(pszSrcFile);
 	pSl->SetArguments(pszArgument);
 	pSl->SetDescription(pszDesc);
 	pSl->SetWorkingDirectory(pszWorkingDir);
 	
-	// ÀúÀåÇÏ±â À§ÇØ IPersistFile °´Ã¼¸¦ »ı¼ºÇÑ´Ù.
+	// ì €ì¥í•˜ê¸° ìœ„í•´ IPersistFile ê°ì²´ë¥¼ ìƒì„±í•œë‹¤.
 	hr = pSl->QueryInterface(IID_IPersistFile, (void **)&pPf);
 
 	if (FAILED(hr))
@@ -6261,11 +6116,11 @@ HRESULT	MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
 		return E_FAIL;
 	}
 	
-	// À¯´ÏÄÚµå·Î ÆÄÀÏ ÆĞ½º¸¦ º¯°æÇÑ ÈÄ ÀúÀåÇÑ´Ù.
+	// ìœ ë‹ˆì½”ë“œë¡œ íŒŒì¼ íŒ¨ìŠ¤ë¥¼ ë³€ê²½í•œ í›„ ì €ì¥í•œë‹¤.
 	//MultiByteToWideChar(CP_ACP, 0, pszLnkFile, -1, wszLnkFile, MAX_PATH);
 	hr=pPf->Save(pszLnkFile, TRUE);
 	
-	// °´Ã¼ ÇØÁ¦
+	// ê°ì²´ í•´ì œ
 	pPf->Release();
 	pSl->Release();
 
@@ -6377,10 +6232,10 @@ void HideTaskBar(bool bHide /*=TRUE*/)
 	}
 }
 
-//ÇöÀç ½ÇÇàÆÄÀÏÀÇ ¹öÀü°ü·Ã Á¤º¸ ¹®ÀÚ¿­À» ¾ò¾î¿Â´Ù.
-//rc->Version->VS_VERSION_INFO Ç×¸ñ
+//í˜„ì¬ ì‹¤í–‰íŒŒì¼ì˜ ë²„ì „ê´€ë ¨ ì •ë³´ ë¬¸ìì—´ì„ ì–»ì–´ì˜¨ë‹¤.
+//rc->Version->VS_VERSION_INFO í•­ëª©
 //ex. m_sVersion = GetFileVersionInformation(sExeFile, "FileVersion");
-//¾Æ·¡ÀÇ GetFileProperty ÇÔ¼öµµ µ¿ÀÏÇÑ ±â´ÉÀ» ¼öÇàÇÏ´Â ÄÚµåÀÌ³ª °¢ Ç×¸ñº°·Î È®ÀÎ ÇÊ¿ä!
+//ì•„ë˜ì˜ GetFileProperty í•¨ìˆ˜ë„ ë™ì¼í•œ ê¸°ëŠ¥ì„ ìˆ˜í–‰í•˜ëŠ” ì½”ë“œì´ë‚˜ ê° í•­ëª©ë³„ë¡œ í™•ì¸ í•„ìš”!
 CString get_file_property(CString fullpath, CString strFlag)
 {
 	struct LANGANDCODEPAGE {
@@ -6391,7 +6246,7 @@ CString get_file_property(CString fullpath, CString strFlag)
 	if (fullpath.IsEmpty())
 		fullpath = get_exe_filename(true);
 
-	//.ico ÆÄÀÏ°ú °°Àº ÆÄÀÏµéÀº dwSize°¡ 0ÀÌ¹Ç·Î ´õ ÀÌ»ó ½ÇÇàÀº ÀÇ¹Ì¾ø´Ù.
+	//.ico íŒŒì¼ê³¼ ê°™ì€ íŒŒì¼ë“¤ì€ dwSizeê°€ 0ì´ë¯€ë¡œ ë” ì´ìƒ ì‹¤í–‰ì€ ì˜ë¯¸ì—†ë‹¤.
 	DWORD dwSize = GetFileVersionInfoSize(fullpath, 0);
 	if (dwSize <= 0)
 		return _T("");
@@ -6408,7 +6263,7 @@ CString get_file_property(CString fullpath, CString strFlag)
 
 	VerQueryValue(buffer, _T("\\VarFileInfo\\Translation"), (LPVOID*)&lpTranslate, &cbTranslate);
 
-	if(cbTranslate != 0) // ¹öÀü Á¤º¸°¡ ¾øÀ» °æ¿ì "
+	if(cbTranslate != 0) // ë²„ì „ ì •ë³´ê°€ ì—†ì„ ê²½ìš° "
 	{
 		CString strSub;
 		strSub.Format(_T("\\StringFileInfo\\%04x%04x\\%s"), lpTranslate[0].wLanguage, lpTranslate[0].wCodePage, strFlag);
@@ -6423,7 +6278,37 @@ CString get_file_property(CString fullpath, CString strFlag)
 	return strReturn;
 } 
 
-//¸í½ÃµÈ FileVersion ¶Ç´Â ProductVersionÀ» ¾ò¾î¿Â´Ù.
+//íŒŒì¼, í´ë”ì˜ ì†ì„±ì°½ì„ í‘œì‹œí•œë‹¤.
+void show_file_property_window(CString fullpath)
+{
+	//"ë‚´ PC"ë¥¼ ì„ íƒí•œ ê²½ìš° ì‹œìŠ¤í…œ ì†ì„± ì°½ì„ ì—´ì–´ì¤€ë‹¤.
+	if (fullpath == get_system_label(CSIDL_DRIVES))
+	{
+		ShellExecute(NULL, _T("open"), _T("SystemPropertiesAdvanced.exe"), NULL, NULL, SW_SHOW);
+		return;
+	}
+
+	//ê·¸ ì™¸ì—ëŠ” í´ë” ì†ì„±ì°½ì„ ì—´ì–´ì¤€ë‹¤.
+	SHObjectProperties(NULL, SHOP_FILEPATH, fullpath, NULL);
+	return;
+
+	//ShellExecuteExë¥¼ ì´ìš©í•œ ë°©ë²•
+	//"properties"ë¥¼ í‘œì‹œí•˜ê¸° ìœ„í•´ì„œëŠ” SEE_MASK_INVOKEIDLIST ê°€ í•„ìš”í•˜ë‹¤.
+	SHELLEXECUTEINFO info;
+	ZeroMemory(&info, sizeof(info));
+	info.cbSize = sizeof(SHELLEXECUTEINFOW);
+	info.hwnd = NULL;
+	info.fMask = SEE_MASK_DEFAULT | SEE_MASK_INVOKEIDLIST;
+	info.lpVerb = _T("properties");
+	info.lpFile = fullpath;
+	info.lpParameters = NULL;
+	info.lpDirectory = NULL;
+	info.nShow = SW_SHOWNORMAL;
+	info.hInstApp = NULL;
+	ShellExecuteEx(&info);
+}
+
+//ëª…ì‹œëœ FileVersion ë˜ëŠ” ProductVersionì„ ì–»ì–´ì˜¨ë‹¤.
 CString	GetFileProperty(CString sFilePath, CString sProperty)
 {
 	DWORD cbVerInfo, dummy;
@@ -6499,13 +6384,13 @@ bool save2raw(CString sfile, uint8_t *data, size_t size)
 	return true;
 }
 
-//ÇØ´ç Æú´õÀÇ ÀÌÀü ÆÄÀÏ¸í ÀüÃ¼ ¶Ç´Â ÀÏºÎºĞÀ» »õ·Î¿î ÀÌ¸§À¸·Î º¯°æÇÑ´Ù.
-//´Ü, È®ÀåÀÚ´Â Æ÷ÇÔµÇÁö ¾Ê´Â´Ù.
-//µû¶ó¼­ È£ÃâÇÒ ¶§ ¾Æ¿¹ oldName°ú newName¿¡´Â È®ÀåÀÚ´Â ÀÖ¾î¼­´Â ¾ÈµÈ´Ù.
-//ÁÖÀÇ!
-//bWholenameÀÌ false¶ó°í ÇØµµ "*%s*"¿Í °°ÀÌ ¾Õ¿¡µµ *¸¦ ºÙÀÌ¸é
-//¿øÄ¡ ¾Ê´Â °á°ú°¡ ¹ß»ıÇÒ ¼ö ÀÖÀ¸´Ï ¹İµå½Ã µğ¹ö±ëÀ¸·Î È®ÀÎÇÑ ÈÄ »ç¿ëÇÒ ÇÊ¿ä°¡ ÀÖ´Ù.
-//renameÀÌ ¼º°øÇÑ ÆÄÀÏÀÇ °³¼ö¸¦ ¸®ÅÏÇÑ´Ù.
+//í•´ë‹¹ í´ë”ì˜ ì´ì „ íŒŒì¼ëª… ì „ì²´ ë˜ëŠ” ì¼ë¶€ë¶„ì„ ìƒˆë¡œìš´ ì´ë¦„ìœ¼ë¡œ ë³€ê²½í•œë‹¤.
+//ë‹¨, í™•ì¥ìëŠ” í¬í•¨ë˜ì§€ ì•ŠëŠ”ë‹¤.
+//ë”°ë¼ì„œ í˜¸ì¶œí•  ë•Œ ì•„ì˜ˆ oldNameê³¼ newNameì—ëŠ” í™•ì¥ìëŠ” ìˆì–´ì„œëŠ” ì•ˆëœë‹¤.
+//ì£¼ì˜!
+//bWholenameì´ falseë¼ê³  í•´ë„ "*%s*"ì™€ ê°™ì´ ì•ì—ë„ *ë¥¼ ë¶™ì´ë©´
+//ì›ì¹˜ ì•ŠëŠ” ê²°ê³¼ê°€ ë°œìƒí•  ìˆ˜ ìˆìœ¼ë‹ˆ ë°˜ë“œì‹œ ë””ë²„ê¹…ìœ¼ë¡œ í™•ì¸í•œ í›„ ì‚¬ìš©í•  í•„ìš”ê°€ ìˆë‹¤.
+//renameì´ ì„±ê³µí•œ íŒŒì¼ì˜ ê°œìˆ˜ë¥¼ ë¦¬í„´í•œë‹¤.
 int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite, bool bWholename, bool bRecursive)
 {
 	std::deque<CString> files;
@@ -6522,7 +6407,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 
 	for (int i = 0; i < files.size(); i++)
 	{
-		//°Ë»öµÈ ÆÄÀÏ¸í¿¡¼­ oldName ´ÙÀ½¿¡ .°ú _Snapshot ÀÌ µÎ°³ÀÇ ÆĞÅÏÀº °°Àº ÆÄÀÏ±ºÀ¸·Î Ã³¸®ÇÑ´Ù.
+		//ê²€ìƒ‰ëœ íŒŒì¼ëª…ì—ì„œ oldName ë‹¤ìŒì— .ê³¼ _Snapshot ì´ ë‘ê°œì˜ íŒ¨í„´ì€ ê°™ì€ íŒŒì¼êµ°ìœ¼ë¡œ ì²˜ë¦¬í•œë‹¤.
 		if (files[i].Find(oldName + _T(".")) >= 0 ||
 			files[i].Find(oldName + _T("_Snapshot")) >= 0)
 		{
@@ -6546,10 +6431,10 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 	return success;
 }
 
-//mp4 ÆÄÀÏÀÇ Æ¯Á¤ ÅÂ±× µ¥ÀÌÅÍ Áß ¿øÇÏ´Â À§Ä¡ÀÇ µ¥ÀÌÅÍ¸¦ ÃßÃâÇÑ´Ù.
-//MOBIS ÇÁ·ÎÁ§Æ® ÀúÀå MP4´Â mdat ÇÊµåÀÇ 0x40¹øÁöºÎÅÍ n bytes°¡
-//µ¿¿µ»óÀÌ »ı¼ºµÈ Àı´ë½Ã°£ÀÌ ÀúÀåµÇ¾î ÀÖ´Ù.
-//nÀº 0x3CºÎÅÍ 4¹ÙÀÌÆ®°¡ ±× Å©±âÀÌ´Ù.
+//mp4 íŒŒì¼ì˜ íŠ¹ì • íƒœê·¸ ë°ì´í„° ì¤‘ ì›í•˜ëŠ” ìœ„ì¹˜ì˜ ë°ì´í„°ë¥¼ ì¶”ì¶œí•œë‹¤.
+//MOBIS í”„ë¡œì íŠ¸ ì €ì¥ MP4ëŠ” mdat í•„ë“œì˜ 0x40ë²ˆì§€ë¶€í„° n bytesê°€
+//ë™ì˜ìƒì´ ìƒì„±ëœ ì ˆëŒ€ì‹œê°„ì´ ì €ì¥ë˜ì–´ ìˆë‹¤.
+//nì€ 0x3Cë¶€í„° 4ë°”ì´íŠ¸ê°€ ê·¸ í¬ê¸°ì´ë‹¤.
 char* GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLength)
 {
 	FILE	*fp = fopen(sfile, "rb");
@@ -6560,7 +6445,7 @@ char* GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLengt
 	char	type[6][4];
 	char	*pData = NULL;
 
-	//4~7±îÁö 4¹ÙÀÌÆ®°¡ "ftyp"ÀÌ¾î¾ß mp4 ÆÄÀÏÀÌ´Ù.
+	//4~7ê¹Œì§€ 4ë°”ì´íŠ¸ê°€ "ftyp"ì´ì–´ì•¼ mp4 íŒŒì¼ì´ë‹¤.
 	fseek(fp, 4, SEEK_SET);
 	fread(type[0], 4, 1, fp);
 
@@ -6585,8 +6470,8 @@ char* GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLengt
 			fread(&size, 1, tagLength, fp);
 			size = Swap32BE(size);
 
-			//µ¥ÀÌÅÍÀÇ Å©±â´Â 28¹ÙÀÌÆ®ÀÌ¾î¾ß ÇÑ´Ù.
-			//´Ù¸¥ °ªÀÌ¶ó¸é timeStamp°¡ ¾Æ´Ï°Å³ª ¾ø´Â µ¿¿µ»óÀÌ´Ù.
+			//ë°ì´í„°ì˜ í¬ê¸°ëŠ” 28ë°”ì´íŠ¸ì´ì–´ì•¼ í•œë‹¤.
+			//ë‹¤ë¥¸ ê°’ì´ë¼ë©´ timeStampê°€ ì•„ë‹ˆê±°ë‚˜ ì—†ëŠ” ë™ì˜ìƒì´ë‹¤.
 			if (size != 28)
 			{
 				fclose(fp);
@@ -6683,13 +6568,13 @@ std::string CStringToUtf8(CString inputtext)
 char* Utf8Encode(IN LPCTSTR szText)
 {
 	USES_CONVERSION;
-	// strÀÌ UnicodeÀÎÁö Ansi ÀÎÁö µûÁú ÇÊ¿ä¾ø°Ô T2CW·Î º¯È¯    
+	// strì´ Unicodeì¸ì§€ Ansi ì¸ì§€ ë”°ì§ˆ í•„ìš”ì—†ê²Œ T2CWë¡œ ë³€í™˜    
 	const WCHAR* wStr = T2CW(szText);    
 	
-	// ±æÀÌ´Â -1·Î ÁÖ¾î ³ÎNULL ¹®ÀÚµµ º¯È¯µÇµµ·Ï
+	// ê¸¸ì´ëŠ” -1ë¡œ ì£¼ì–´ ë„NULL ë¬¸ìë„ ë³€í™˜ë˜ë„ë¡
 	//WCHAR -> UTF-8
 	
-	int nUTF8codeSize = WideCharToMultiByte(CP_UTF8, 0, wStr, -1, NULL, 0, NULL, NULL); //wStrÀÇ Å©±â¸¦ ±¸ÇÔ
+	int nUTF8codeSize = WideCharToMultiByte(CP_UTF8, 0, wStr, -1, NULL, 0, NULL, NULL); //wStrì˜ í¬ê¸°ë¥¼ êµ¬í•¨
 	char *utf8Str = new char[nUTF8codeSize];
 	ZeroMemory(utf8Str, nUTF8codeSize);
 	
@@ -7461,11 +7346,11 @@ void SetWallPaper(CString sfile)
 }
 #endif
 
-//µÎ Á¡ÀÇ °¢µµ¸¦ ±¸ÇÑ´Ù.
-//¿øÇÏ´Â °á°ú°ªÀº 0~360µµÀÎµ¥
-//atanÀº ºÎÈ£¿¡ µû¸¥ °¢µµ¸¦ ±¸ºĞÇÒ ¼ö ¾ø°í
-//atan2´Â -PI ~ +PI·Î ¸®ÅÏÇÏ¹Ç·Î 0~360 ¹üÀ§¿Í ¸ÂÁö ¾ÊÀ¸¹Ç·Î ¾Æ·¡¿Í °°ÀÌ ±¸ÇØ¾ß ÇÑ´Ù.
-//ScreenCoordÀÏ¶§¿Í Cartesian coordinate(Á÷±³ÁÂÇ¥°è)ÀÏ¶§´Â y°¡ ¹İ´ëÀÓ¿¡ ÁÖÀÇ.
+//ë‘ ì ì˜ ê°ë„ë¥¼ êµ¬í•œë‹¤.
+//ì›í•˜ëŠ” ê²°ê³¼ê°’ì€ 0~360ë„ì¸ë°
+//atanì€ ë¶€í˜¸ì— ë”°ë¥¸ ê°ë„ë¥¼ êµ¬ë¶„í•  ìˆ˜ ì—†ê³ 
+//atan2ëŠ” -PI ~ +PIë¡œ ë¦¬í„´í•˜ë¯€ë¡œ 0~360 ë²”ìœ„ì™€ ë§ì§€ ì•Šìœ¼ë¯€ë¡œ ì•„ë˜ì™€ ê°™ì´ êµ¬í•´ì•¼ í•œë‹¤.
+//ScreenCoordì¼ë•Œì™€ Cartesian coordinate(ì§êµì¢Œí‘œê³„)ì¼ë•ŒëŠ” yê°€ ë°˜ëŒ€ì„ì— ì£¼ì˜.
 double GetAngle(double vx, double vy, bool bScreenCoord)
 {
 	double radian = atan2((bScreenCoord ? -vy : vy), vx);
@@ -7486,7 +7371,7 @@ double GetAngle(CPoint pt0, CPoint pt1, bool bScreenCoord)
 	return GetAngle(pt0.x, pt0.y, pt1.x, pt1.y, bScreenCoord);
 }
 
-//3Á¡ÀÌ ÀÌ·ç´Â °¢µµ
+//3ì ì´ ì´ë£¨ëŠ” ê°ë„
 double GetAngle(CPoint a, CPoint b, CPoint c)
 {
 	CPoint ab(b.x - a.x, b.y - a.y);
@@ -7510,7 +7395,7 @@ double GetDistance(CPoint pt0, CPoint pt1)
 	return DISTANCE((double)pt0.x, (double)pt0.y, (double)pt1.x, (double)pt1.y);
 }
 
-//µÎ Á¡À» Áö³ª´Â Á÷¼±»óÀÇ x3¸¦ ±¸ÇÑ´Ù.
+//ë‘ ì ì„ ì§€ë‚˜ëŠ” ì§ì„ ìƒì˜ x3ë¥¼ êµ¬í•œë‹¤.
 double getLinePointX(double x1, double y1, double x2, double y2, double y3)
 {
 	if (x1 == x2)
@@ -7521,7 +7406,7 @@ double getLinePointX(double x1, double y1, double x2, double y2, double y3)
 	return ((y3 - b) / a);
 }
 
-//µÎ Á¡À» Áö³ª´Â Á÷¼±»óÀÇ y3¸¦ ±¸ÇÑ´Ù.
+//ë‘ ì ì„ ì§€ë‚˜ëŠ” ì§ì„ ìƒì˜ y3ë¥¼ êµ¬í•œë‹¤.
 double getLinePointY(double x1, double y1, double x2, double y2, double x3)
 {
 	if (x1 == x2)
@@ -7537,7 +7422,7 @@ double GetManhattanDistance(double x1, double y1, double x2, double y2)
 	return (fabs(x1 - x2) + fabs(y1 - y2));
 }
 
-//ptCenter¸¦ ±âÁØÀ¸·Î dAngle ¸¸Å­ È¸ÀüµÈ dDist°Å¸®ÀÇ Á¡ÀÇ ÁÂÇ¥¸¦ ±¸ÇÑ´Ù.
+//ptCenterë¥¼ ê¸°ì¤€ìœ¼ë¡œ dAngle ë§Œí¼ íšŒì „ëœ dDistê±°ë¦¬ì˜ ì ì˜ ì¢Œí‘œë¥¼ êµ¬í•œë‹¤.
 CPoint GetRotatedPoint(CPoint ptCenter, double dAngle, double dDist)
 {
 	CPoint	pt;
@@ -7549,7 +7434,7 @@ CPoint GetRotatedPoint(CPoint ptCenter, double dAngle, double dDist)
 	return pt;
 }
 
-//cx, cy¸¦ Áß½ÉÀ¸·Î tx, tyÁ¡ÀÌ degree¸¦ È¸ÀüÇÒ °æ¿ì tx, tyÁ¡ÀÇ º¯°æ ÁÂÇ¥
+//cx, cyë¥¼ ì¤‘ì‹¬ìœ¼ë¡œ tx, tyì ì´ degreeë¥¼ íšŒì „í•  ê²½ìš° tx, tyì ì˜ ë³€ê²½ ì¢Œí‘œ
 void get_rotated(int cx, int cy, int* tx, int* ty, double degree)
 {
 	double radian = RADIAN(degree);
@@ -7611,7 +7496,7 @@ CString GetToken(CString& str, LPCTSTR c)
 	return sToken;
 }
 
-//¹®ÀÚ¿­¿¡¼­ n¹øÂ° ÅäÅ«À» ¸®ÅÏÇÑ´Ù.
+//ë¬¸ìì—´ì—ì„œ në²ˆì§¸ í† í°ì„ ë¦¬í„´í•œë‹¤.
 CString GetToken(CString src, CString separator, int index)
 {
 	int i = 0;
@@ -7628,8 +7513,8 @@ CString GetToken(CString src, CString separator, int index)
 	return saItems.GetAt(index);
 }
 
-//Tokenize¸¦ ÀÌ¿ëÇÏ¸é °ø¹éÀÎ ÅäÅ«Àº Ã³¸®µÇÁö ¾Ê°í ¹«½ÃµÇ¹Ç·Î ¿øÇÏ´Â °³¼ö¸¸Å­ ÃßÃâµÇÁö ¾Ê´Â´Ù.
-//µû¶ó¼­ ¾Æ·¡ ÇÔ¼ö´Â »ç¿ëÇÏÁö ¾Ê´Â´Ù.
+//Tokenizeë¥¼ ì´ìš©í•˜ë©´ ê³µë°±ì¸ í† í°ì€ ì²˜ë¦¬ë˜ì§€ ì•Šê³  ë¬´ì‹œë˜ë¯€ë¡œ ì›í•˜ëŠ” ê°œìˆ˜ë§Œí¼ ì¶”ì¶œë˜ì§€ ì•ŠëŠ”ë‹¤.
+//ë”°ë¼ì„œ ì•„ë˜ í•¨ìˆ˜ëŠ” ì‚¬ìš©í•˜ì§€ ì•ŠëŠ”ë‹¤.
 /*
 std::deque<CString>	get_token_string(CString src, CString separator)
 {
@@ -7660,7 +7545,7 @@ int get_token_string(CString src, std::deque<CString> &dqToken, CString separato
 		}
 		else
 		{
-			//´õ ÀÌ»ó separator°¡ ¾ø´Ù¸é ¸Ç ¸¶Áö¸· tokenÀÌ´Ù.
+			//ë” ì´ìƒ separatorê°€ ì—†ë‹¤ë©´ ë§¨ ë§ˆì§€ë§‰ tokenì´ë‹¤.
 			token = src;
 			src.Empty();
 		}
@@ -7670,8 +7555,8 @@ int get_token_string(CString src, std::deque<CString> &dqToken, CString separato
 
 		if (nMaxToken > 0 && dqToken.size() == nMaxToken)
 		{
-			//ÃÖ´ë ÅäÅ« °³¼ö°¡ Á¤ÇØÁ® ÀÖÀ» ¶§ include_rest°¡ trueÀÌ¸é
-			//³ª¸ÓÁö ¹®ÀÚ¿­µµ ¸ğµÎ ¸Ç ¸¶Áö¸· ÅäÅ«µÚ¿¡ ºÙ¿©ÁØ´Ù.
+			//ìµœëŒ€ í† í° ê°œìˆ˜ê°€ ì •í•´ì ¸ ìˆì„ ë•Œ include_restê°€ trueì´ë©´
+			//ë‚˜ë¨¸ì§€ ë¬¸ìì—´ë„ ëª¨ë‘ ë§¨ ë§ˆì§€ë§‰ í† í°ë’¤ì— ë¶™ì—¬ì¤€ë‹¤.
 			if (include_rest && !src.IsEmpty())
 			{
 				dqToken[nMaxToken - 1] += (separator + src);
@@ -7688,12 +7573,12 @@ int get_token_string(CString src, std::deque<CString> &dqToken, CString separato
 }
 
 
-//nMaxToken ¼ıÀÚ ¸¸Å­ ÅäÅ«À» ºĞ¸®ÇØ¼­ sToken¿¡ ³Ö°í
-//½ÇÁ¦ Ã³¸®µÈ ÅäÅ« °³¼ö¸¦ ¸®ÅÏÇÑ´Ù.
-//src´Â ÅäÅ«ÀÌ ºĞ¸®µÉ ¶§¸¶´Ù ÁÙ¾îµç´Ù.
-//ÀÌ´Â CString::Tokenize() ¶Ç´Â AfxExtractSubString()°ú´Â ´Ù¸£´Ù.
-//(seps = " ,\t\n" °ú °°ÀÌ ºĞ¸®±âÈ£µé·Î ÀÌ·ç¾îÁø ½ºÆ®¸µ µ¥ÀÌÅÍ)
-//strtok_s ÇÔ¼ö´Â ¿¬¼Ó °ø¹éÀÌ³ª ¿¬¼Ó ½°Ç¥ µî Áßº¹µÈ ºĞ¸®ÀÚ´Â ¸ğµÎ ÇÏ³ªÀÇ ±¸ºĞÀÚ·Î Ãë±ŞµÈ´Ù.
+//nMaxToken ìˆ«ì ë§Œí¼ í† í°ì„ ë¶„ë¦¬í•´ì„œ sTokenì— ë„£ê³ 
+//ì‹¤ì œ ì²˜ë¦¬ëœ í† í° ê°œìˆ˜ë¥¼ ë¦¬í„´í•œë‹¤.
+//srcëŠ” í† í°ì´ ë¶„ë¦¬ë  ë•Œë§ˆë‹¤ ì¤„ì–´ë“ ë‹¤.
+//ì´ëŠ” CString::Tokenize() ë˜ëŠ” AfxExtractSubString()ê³¼ëŠ” ë‹¤ë¥´ë‹¤.
+//(seps = " ,\t\n" ê³¼ ê°™ì´ ë¶„ë¦¬ê¸°í˜¸ë“¤ë¡œ ì´ë£¨ì–´ì§„ ìŠ¤íŠ¸ë§ ë°ì´í„°)
+//strtok_s í•¨ìˆ˜ëŠ” ì—°ì† ê³µë°±ì´ë‚˜ ì—°ì† ì‰¼í‘œ ë“± ì¤‘ë³µëœ ë¶„ë¦¬ìëŠ” ëª¨ë‘ í•˜ë‚˜ì˜ êµ¬ë¶„ìë¡œ ì·¨ê¸‰ëœë‹¤.
 //ex. "1,, ,,2" = "1,2"
 int get_token_string(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
 {
@@ -7750,10 +7635,10 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 // a_value : 1.1.24050
 // b_value : Normal
 // c_value : True
-// À§¿Í °°ÀÌ ¼Ó¼ºÀÌ¸§ ¹× °ªÀ¸·Î ¸ÅÇÎµÇ´Â ¹®ÀÚ¿­À» ÆÄ½ÌÇÏ¿© std::map¿¡ ³Ö¾îÁØ´Ù.
-// lfrf´Â ¶óÀÎºĞ¸®¹®ÀÚ¿­ÀÌ°í º¸Åë "\n"ÀÌ°Å³ª "\r\n" µîÀÌ ÀÖ°í
-// separator´Â ':' ÀÌ¸§°ú °ªÀ» ±¸ºĞÇÏ´Â ±¸ºĞÀÚÀÌ´Ù.
-// return value : Ç×¸ñÀÇ °³¼ö
+// ìœ„ì™€ ê°™ì´ ì†ì„±ì´ë¦„ ë° ê°’ìœ¼ë¡œ ë§¤í•‘ë˜ëŠ” ë¬¸ìì—´ì„ íŒŒì‹±í•˜ì—¬ std::mapì— ë„£ì–´ì¤€ë‹¤.
+// lfrfëŠ” ë¼ì¸ë¶„ë¦¬ë¬¸ìì—´ì´ê³  ë³´í†µ "\n"ì´ê±°ë‚˜ "\r\n" ë“±ì´ ìˆê³ 
+// separatorëŠ” ':' ì´ë¦„ê³¼ ê°’ì„ êµ¬ë¶„í•˜ëŠ” êµ¬ë¶„ìì´ë‹¤.
+// return value : í•­ëª©ì˜ ê°œìˆ˜
 int	get_map_string(CString src, std::map<CString, CString>& map, CString lfrf, CString separator)
 {
 	map.clear();
@@ -7779,7 +7664,7 @@ int	get_map_string(CString src, std::map<CString, CString>& map, CString lfrf, C
 	return map.size();
 }
 
-//dqÇ×¸ñÀ» ÇÏ³ªÀÇ ¹®ÀÚ¿­·Î ÇÕÃÄÁØ´Ù.
+//dqí•­ëª©ì„ í•˜ë‚˜ì˜ ë¬¸ìì—´ë¡œ í•©ì³ì¤€ë‹¤.
 CString	get_concat_string(std::deque<CString> dq, CString separator)
 {
 	int i;
@@ -7831,8 +7716,8 @@ bool get_bracket_token(CString src, std::deque<CString>* token, TCHAR bracket)
 	while (true)
 	{
 		end = src.Find(end_bracket, start);
-		//½ÃÀÛ °ıÈ£´Â ÀÖ´Âµ¥ ³¡ °ıÈ£°¡ ¾ø´Ù¸é Á¤»óÀÌ ¾Æ´Ï´Ù.
-		//Á¤»óÀÎ µ¥ÀÌÅÍ¸¸ »ç¿ëÇÒÁö, ¿¡·¯¶ó¸é ¹«Á¶°Ç ¹ö¸±Áö´Â »ç¿ëÇÏ´Â °÷¿¡¼­ ÆÇ´ÜÇÑ´Ù.
+		//ì‹œì‘ ê´„í˜¸ëŠ” ìˆëŠ”ë° ë ê´„í˜¸ê°€ ì—†ë‹¤ë©´ ì •ìƒì´ ì•„ë‹ˆë‹¤.
+		//ì •ìƒì¸ ë°ì´í„°ë§Œ ì‚¬ìš©í• ì§€, ì—ëŸ¬ë¼ë©´ ë¬´ì¡°ê±´ ë²„ë¦´ì§€ëŠ” ì‚¬ìš©í•˜ëŠ” ê³³ì—ì„œ íŒë‹¨í•œë‹¤.
 		if (end < 0)
 			return false;
 
@@ -7840,7 +7725,7 @@ bool get_bracket_token(CString src, std::deque<CString>* token, TCHAR bracket)
 		token->push_back(sub);
 		start = src.Find(bracket, end + 1);
 
-		//´õ ÀÌ»ó ½ÃÀÛ °ıÈ£°¡ ¾ø´Ù¸é Á¾·á.
+		//ë” ì´ìƒ ì‹œì‘ ê´„í˜¸ê°€ ì—†ë‹¤ë©´ ì¢…ë£Œ.
 		if (start < 0)
 			break;
 	}
@@ -7849,8 +7734,8 @@ bool get_bracket_token(CString src, std::deque<CString>* token, TCHAR bracket)
 }
 
 //update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400'
-//À§¿Í °°Àº Çü½Ä¿¡¼­ ÇÊµå¸í°ú °ªÀ» ÃßÃâÇÑ´Ù.
-//fields¿¡´Â ÃßÃâÇÒ ÇÊµå¸íÀ» ³Ñ°ÜÁØ´Ù. "endtime", "env_type"...
+//ìœ„ì™€ ê°™ì€ í˜•ì‹ì—ì„œ í•„ë“œëª…ê³¼ ê°’ì„ ì¶”ì¶œí•œë‹¤.
+//fieldsì—ëŠ” ì¶”ì¶œí•  í•„ë“œëª…ì„ ë„˜ê²¨ì¤€ë‹¤. "endtime", "env_type"...
 void get_sql_token_from_assign_form(CString src, std::map<CString, CString> *map)
 {
 	std::string sql;
@@ -7873,7 +7758,7 @@ void get_sql_token_from_assign_form(CString src, std::map<CString, CString> *map
 }
 
 //insert into neturo_server_info(userid, com_name, s_pub_ip, s_pri_ip) values('14533821', 'DESKTOP-0CN9VAK', '220.85.215.243', 'publicIP')
-//À§¿Í °°Àº sql¿¡¼­ field¿Í value¸¦ ÃßÃâÇÑ´Ù.
+//ìœ„ì™€ ê°™ì€ sqlì—ì„œ fieldì™€ valueë¥¼ ì¶”ì¶œí•œë‹¤.
 void get_sql_token_from_bracket_form(CString src, std::map<CString, CString>* map)
 {
 	std::string sql;
@@ -7924,7 +7809,7 @@ CString get_sql_cmd(CString sql, CString* sql_cmd, CString *table_name)
 										 //"grant", "revoke",};
 	CString cmd = _T("");
 
-	//src°¡ sql_cmd·Î ½ÃÀÛµÇ´Â ¹®ÀåÀÌ¸é true
+	//srcê°€ sql_cmdë¡œ ì‹œì‘ë˜ëŠ” ë¬¸ì¥ì´ë©´ true
 	for (int i = 0; i < sql_cmd_list.size(); i++)
 	{
 		if (sql.Find(sql_cmd_list[i]) == 0)
@@ -7940,7 +7825,7 @@ CString get_sql_cmd(CString sql, CString* sql_cmd, CString *table_name)
 	if (table_name)
 	{
 		sql = sql.Mid(cmd.GetLength() + 1);
-		//table_name ´ÙÀ½¿¡´Â °ø¹é ¶Ç´Â '('°¡ ¿À¹Ç·Î ±× À§Ä¡¸¦ Ã£´Â´Ù.
+		//table_name ë‹¤ìŒì—ëŠ” ê³µë°± ë˜ëŠ” '('ê°€ ì˜¤ë¯€ë¡œ ê·¸ ìœ„ì¹˜ë¥¼ ì°¾ëŠ”ë‹¤.
 		int pos = sql.FindOneOf(_T(" ("));
 		*table_name = sql.Left(pos);
 	}
@@ -7997,9 +7882,9 @@ double get_double(CString& src, CString sep)
 }
 
 
-//src ¹®ÀÚ¿­¿¡ set_of_keyword¿¡ ³ª¿­µÈ ´Ü¾î°¡ ÀÖ´ÂÁö °Ë»ç.
-//set_of_keyword´Â ¼¼¹ÌÄİ·ĞÀ¸·Î ±¸ºĞÇØ¼­ ¿©·¯ ¹®ÀÚ ¶Ç´Â ¹®ÀÚ¿­À» ³ÖÀ» ¼ö ÀÖ´Ù.
-//ex. src = "abcd1234"ÀÏ ¶§ set_of_keyword = "bc;21" => true, set_of_keyword = "212" => false
+//src ë¬¸ìì—´ì— set_of_keywordì— ë‚˜ì—´ëœ ë‹¨ì–´ê°€ ìˆëŠ”ì§€ ê²€ì‚¬.
+//set_of_keywordëŠ” ì„¸ë¯¸ì½œë¡ ìœ¼ë¡œ êµ¬ë¶„í•´ì„œ ì—¬ëŸ¬ ë¬¸ì ë˜ëŠ” ë¬¸ìì—´ì„ ë„£ì„ ìˆ˜ ìˆë‹¤.
+//ex. src = "abcd1234"ì¼ ë•Œ set_of_keyword = "bc;21" => true, set_of_keyword = "212" => false
 bool is_exist_keyword(CString src, CString set_of_keyword, bool case_sensitive, bool whole_word)
 {
 	std::deque<CString> dqKeyword;
@@ -8048,7 +7933,7 @@ SIZE_T GetCurrentMemUsage()
 }
 #endif
 
-//°æ·Î¿¡ '\\' ¶Ç´Â '/'°¡ È¥¿ëµÇ¾î »ç¿ëµÇ´Â °æ¿ì°¡ ÀÖÀ¸¹Ç·Î ÀÌ¸¦ °¨¾ÈÇØ¾ß ÇÑ´Ù.
+//ê²½ë¡œì— '\\' ë˜ëŠ” '/'ê°€ í˜¼ìš©ë˜ì–´ ì‚¬ìš©ë˜ëŠ” ê²½ìš°ê°€ ìˆìœ¼ë¯€ë¡œ ì´ë¥¼ ê°ì•ˆí•´ì•¼ í•œë‹¤.
 //c:\\folder1\\folder2\\	=> c:\\folder1
 //c:\\folder1\\folder2		=> c:\\folder1
 //c:\\folder1\\				=> c:\\
@@ -8056,24 +7941,24 @@ SIZE_T GetCurrentMemUsage()
 
 CString	GetParentDirectory(CString sFolder)
 {
-	//"/"¿Í "\\"°¡ È¥¿ëµÈ °æ¿ì ÅëÀÏ½ÃÅ²´Ù.
+	//"/"ì™€ "\\"ê°€ í˜¼ìš©ëœ ê²½ìš° í†µì¼ì‹œí‚¨ë‹¤.
 	sFolder.Replace(_T("/"), _T("\\"));
 
-	//sFolder ³¡¿¡ "\\"°¡ ºÙ¾ú´Ù¸é Á¦°ÅÇØÁØ´Ù.
+	//sFolder ëì— "\\"ê°€ ë¶™ì—ˆë‹¤ë©´ ì œê±°í•´ì¤€ë‹¤.
 	if (sFolder.Right(1) == _T("\\"))
 		sFolder = sFolder.Left(sFolder.GetLength() - 1);
 
-	//¸¸¾à ±¸ÇØÁø Æú´õ°¡ "c:"¿Í °°ÀÌ µå¶óÀÌºê ·çÆ®¶ó¸é ³¡¿¡ "\\"¸¦ ´Ù½Ã ºÙ¿©Áà¾ßÇÑ´Ù.
+	//ë§Œì•½ êµ¬í•´ì§„ í´ë”ê°€ "c:"ì™€ ê°™ì´ ë“œë¼ì´ë¸Œ ë£¨íŠ¸ë¼ë©´ ëì— "\\"ë¥¼ ë‹¤ì‹œ ë¶™ì—¬ì¤˜ì•¼í•œë‹¤.
 	if (sFolder.GetLength() == 2 && sFolder.GetAt(1) == ':')
 	{
 		sFolder += "\\";
 		return sFolder;
 	}
 
-	//ÇØ´ç Æú´õÀÇ parent Æú´õ¸íÀ» ±¸ÇÑ´Ù.
+	//í•´ë‹¹ í´ë”ì˜ parent í´ë”ëª…ì„ êµ¬í•œë‹¤.
 	sFolder = sFolder.Left(sFolder.ReverseFind('\\'));
 
-	//´Ù½Ã ±¸ÇØÁø Æú´õ°¡ "c:"¿Í °°ÀÌ µå¶óÀÌºê ·çÆ®¶ó¸é ³¡¿¡ "\\"¸¦ ´Ù½Ã ºÙ¿©Áà¾ßÇÑ´Ù.
+	//ë‹¤ì‹œ êµ¬í•´ì§„ í´ë”ê°€ "c:"ì™€ ê°™ì´ ë“œë¼ì´ë¸Œ ë£¨íŠ¸ë¼ë©´ ëì— "\\"ë¥¼ ë‹¤ì‹œ ë¶™ì—¬ì¤˜ì•¼í•œë‹¤.
 	if (sFolder.GetLength() == 2 && sFolder.GetAt(1) == ':')
 	{
 		sFolder += "\\";
@@ -8083,11 +7968,11 @@ CString	GetParentDirectory(CString sFolder)
 	return sFolder;
 }
 
-//MAX_COMPUTERNAME_LENGTH(15) ±æÀÌ±îÁö¸¸ ¸®ÅÏµÊ¿¡ ÁÖÀÇ.
-//GetComputerName API ÇÔ¼ö´Â Ç×»ó ´ë¹®ÀÚ·Î ¸®ÅÏÇÑ´Ù.
-//±×³É È®½ÇÇÏ°Ô GetComputerNameString().MakeLower() µî°ú °°ÀÌ
-//´ë¼Ò¹®ÀÚ¸¦ ¸íÈ®È÷ ÇÏ¿© ºñ±³ÇÏ´Â °ÍÀÌ ÁÁ´Ù.
-//=>255±ÛÀÚ±îÁö ¸®ÅÏµÇ´Â GetComputerNameEx()·Î º¯°æÇÔ.
+//MAX_COMPUTERNAME_LENGTH(15) ê¸¸ì´ê¹Œì§€ë§Œ ë¦¬í„´ë¨ì— ì£¼ì˜.
+//GetComputerName API í•¨ìˆ˜ëŠ” í•­ìƒ ëŒ€ë¬¸ìë¡œ ë¦¬í„´í•œë‹¤.
+//ê·¸ëƒ¥ í™•ì‹¤í•˜ê²Œ GetComputerNameString().MakeLower() ë“±ê³¼ ê°™ì´
+//ëŒ€ì†Œë¬¸ìë¥¼ ëª…í™•íˆ í•˜ì—¬ ë¹„êµí•˜ëŠ” ê²ƒì´ ì¢‹ë‹¤.
+//=>255ê¸€ìê¹Œì§€ ë¦¬í„´ë˜ëŠ” GetComputerNameEx()ë¡œ ë³€ê²½í•¨.
 CString get_computer_name_string()
 {
 	//TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
@@ -8193,7 +8078,7 @@ CString	get_system_label(int csidl, int* sysIconIndex)
 	LPMALLOC pMalloc;
 	SHGetMalloc(&pMalloc);
 	SHFILEINFO sfi = { 0 };
-	// 'My Computer' or '³» ÄÄÇ»ÅÍ' text
+	// 'My Computer' or 'ë‚´ ì»´í“¨í„°' text
 	LPITEMIDLIST pidl;
 	SHGetSpecialFolderLocation(NULL, csidl, &pidl);
 	SHGetFileInfo((TCHAR*)pidl, 0, &sfi, sizeof(sfi), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
@@ -8208,8 +8093,8 @@ CString	get_system_label(int csidl, int* sysIconIndex)
 	return sfi.szDisplayName;
 }
 
-//ÀÌ °ªÀº À©µµ¿ì°¡ ¼³Ä¡µÉ ¶§ »ı¼ºµÇ°í Àç¼³Ä¡µÇÁö ¾ÊÀ¸¸é À¯ÁöµÈ´Ù.
-//´Ü, HDD º¹Á¦½Ã¿¡µµ À¯ÁöµÇ¹Ç·Î ¸Ó½Å¿¡ µû¶ó uniqueÇÏ´Ù°í º¼ ¼ö ¾ø´Ù.
+//ì´ ê°’ì€ ìœˆë„ìš°ê°€ ì„¤ì¹˜ë  ë•Œ ìƒì„±ë˜ê³  ì¬ì„¤ì¹˜ë˜ì§€ ì•Šìœ¼ë©´ ìœ ì§€ëœë‹¤.
+//ë‹¨, HDD ë³µì œì‹œì—ë„ ìœ ì§€ë˜ë¯€ë¡œ ë¨¸ì‹ ì— ë”°ë¼ uniqueí•˜ë‹¤ê³  ë³¼ ìˆ˜ ì—†ë‹¤.
 CString	read_windows_GUID()
 {
 	TCHAR value[1024] = { 0, };
@@ -8266,11 +8151,11 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 	auto_update = false;
 	level = -1;
 
-	// CoInitializeEx() ÇÔ¼ö¸¦ È£ÃâÇÏ¿© COM ¶óÀÌºê·¯¸®¸¦ ÃÊ±âÈ­ÇÕ´Ï´Ù.
+	// CoInitializeEx() í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•˜ì—¬ COM ë¼ì´ë¸ŒëŸ¬ë¦¬ë¥¼ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
 	if (SUCCEEDED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)))
 	{
 		IAutomaticUpdates* pAutomaticUpdates = NULL;
-		// Automatic Updates °´Ã¼ »ı¼º
+		// Automatic Updates ê°ì²´ ìƒì„±
 		HRESULT hr = CoCreateInstance(
 			CLSID_AutomaticUpdates,
 			NULL,
@@ -8281,24 +8166,24 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 		if (SUCCEEDED(hr))
 		{
 			VARIANT_BOOL isAutoUpdateEnabled = VARIANT_FALSE;
-			// ÀÚµ¿ ¾÷µ¥ÀÌÆ® È°¼ºÈ­ ¿©ºÎ È®ÀÎ
+			// ìë™ ì—…ë°ì´íŠ¸ í™œì„±í™” ì—¬ë¶€ í™•ì¸
 			hr = pAutomaticUpdates->get_ServiceEnabled(&isAutoUpdateEnabled);
 			if (SUCCEEDED(hr))
 			{
 				if (isAutoUpdateEnabled == VARIANT_TRUE)
 				{
-					//AfxMessageBox(_T("ÀÚµ¿ ¾÷µ¥ÀÌÆ®°¡ È°¼ºÈ­µÇ¾ú½À´Ï´Ù."));
+					//AfxMessageBox(_T("ìë™ ì—…ë°ì´íŠ¸ê°€ í™œì„±í™”ë˜ì—ˆìŠµë‹ˆë‹¤."));
 					auto_update = true;
 				}
 				else
 				{
-					//AfxMessageBox(_T("ÀÚµ¿ ¾÷µ¥ÀÌÆ®°¡ ºñÈ°¼ºÈ­µÇ¾ú½À´Ï´Ù."));
+					//AfxMessageBox(_T("ìë™ ì—…ë°ì´íŠ¸ê°€ ë¹„í™œì„±í™”ë˜ì—ˆìŠµë‹ˆë‹¤."));
 					auto_update = true;
 				}
 			}
 			else
 			{
-				//AfxMessageBox(_T("ÀÚµ¿ ¾÷µ¥ÀÌÆ® »óÅÂ¸¦ °¡Á®¿À´Â µ¥ ½ÇÆĞÇß½À´Ï´Ù."));
+				//AfxMessageBox(_T("ìë™ ì—…ë°ì´íŠ¸ ìƒíƒœë¥¼ ê°€ì ¸ì˜¤ëŠ” ë° ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤."));
 				return false;
 			}
 
@@ -8321,15 +8206,15 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 		return false;
 	}
 
-	// COM ¶óÀÌºê·¯¸® Á¤¸®
+	// COM ë¼ì´ë¸ŒëŸ¬ë¦¬ ì •ë¦¬
 	CoUninitialize();
 
 	return true;
 }
 
-//SystemParametersInfo(SPI_GETSCREENSAVEACTIVE...)À¸·Î´Â Á¦´ë·Î ¼³Á¤°ªÀ» ¾ò¾î¿ÀÁö ¸øÇÑ´Ù.
-//SCRNSAVE.EXE¶ó´Â Ç×¸ñÀÌ Á¸ÀçÇÏ¸é ¼³Á¤µÈ °ÍÀÌ°í ¾øÀ¸¸é ÇØÁ¦µÈ °ÍÀÌ´Ù.
-//¼³Á¤½Ã°£°ú Àá±İÈ­¸éÀ» Ç¥½ÃÇÒÁö¿¡ ´ëÇÑ ¼³Á¤°ªÀ» ¾ò¾î¿Ã ¼ö ÀÖ´Ù.
+//SystemParametersInfo(SPI_GETSCREENSAVEACTIVE...)ìœ¼ë¡œëŠ” ì œëŒ€ë¡œ ì„¤ì •ê°’ì„ ì–»ì–´ì˜¤ì§€ ëª»í•œë‹¤.
+//SCRNSAVE.EXEë¼ëŠ” í•­ëª©ì´ ì¡´ì¬í•˜ë©´ ì„¤ì •ëœ ê²ƒì´ê³  ì—†ìœ¼ë©´ í•´ì œëœ ê²ƒì´ë‹¤.
+//ì„¤ì •ì‹œê°„ê³¼ ì ê¸ˆí™”ë©´ì„ í‘œì‹œí• ì§€ì— ëŒ€í•œ ì„¤ì •ê°’ì„ ì–»ì–´ì˜¬ ìˆ˜ ìˆë‹¤.
 bool get_screensaver_setting(int *timeout, int* use_secure)
 {
 	HKEY hKeySreenSaver = NULL;
@@ -8364,13 +8249,13 @@ bool get_screensaver_setting(int *timeout, int* use_secure)
 
 #include <WinIoCtl.h>
 
-//HDD serialÀº HardwareInfo.exe°¡ ¾Ë·ÁÁÖ´Â´ë·Î S4EVNM0T230338R 15ÀÚ¸® ÇüÅÂ,
-//¶Ç´Â 0025_3852_2190_FE03 °°Àº ÇüÅÂ·Î ¸®ÅÏµÈ´Ù.
-//¾î¶² PC´Â ÅøÀÌ ¾Ë·ÁÁÖ´Â °ª°ú ÀÌ ÇÁ·Î±×·¥¿¡¼­ ±¸ÇÑ °ªÀÌ °°Áö¸¸(mwj, sdh)
-//¾î¶² PC´Â ÅøÀÌ ¾Ë·ÁÁÖ´Â °ª°ú ´Ù¸¥ Æ÷¸ËÀ¸·Î ¸®ÅÏÇÑ´Ù.(scpark)
-//¿Ö ÀÌ·± Â÷ÀÌ°¡ ¹ß»ıÇÏ´ÂÁö´Â ¾ÆÁ÷ ¾Ë ¼ö ¾øÀ¸³ª
-//uniqueÇÑ Å°°ªÀ» »ç¿ëÇÏ°íÀÚ ÇÔÀÌ¹Ç·Î ¿ì¼± 16ÀÚ¸®·Î ¸ÂÃç¼­ »ç¿ëÇÑ´Ù.
-//unify16 = trueÀÌ¸é 16ÀÚ¸®·Î ÅëÀÏ½ÃÄÑ ¸®ÅÏÇÑ´Ù.
+//HDD serialì€ HardwareInfo.exeê°€ ì•Œë ¤ì£¼ëŠ”ëŒ€ë¡œ S4EVNM0T230338R 15ìë¦¬ í˜•íƒœ,
+//ë˜ëŠ” 0025_3852_2190_FE03 ê°™ì€ í˜•íƒœë¡œ ë¦¬í„´ëœë‹¤.
+//ì–´ë–¤ PCëŠ” íˆ´ì´ ì•Œë ¤ì£¼ëŠ” ê°’ê³¼ ì´ í”„ë¡œê·¸ë¨ì—ì„œ êµ¬í•œ ê°’ì´ ê°™ì§€ë§Œ(mwj, sdh)
+//ì–´ë–¤ PCëŠ” íˆ´ì´ ì•Œë ¤ì£¼ëŠ” ê°’ê³¼ ë‹¤ë¥¸ í¬ë§·ìœ¼ë¡œ ë¦¬í„´í•œë‹¤.(scpark)
+//ì™œ ì´ëŸ° ì°¨ì´ê°€ ë°œìƒí•˜ëŠ”ì§€ëŠ” ì•„ì§ ì•Œ ìˆ˜ ì—†ìœ¼ë‚˜
+//uniqueí•œ í‚¤ê°’ì„ ì‚¬ìš©í•˜ê³ ì í•¨ì´ë¯€ë¡œ ìš°ì„  16ìë¦¬ë¡œ ë§ì¶°ì„œ ì‚¬ìš©í•œë‹¤.
+//unify16 = trueì´ë©´ 16ìë¦¬ë¡œ í†µì¼ì‹œì¼œ ë¦¬í„´í•œë‹¤.
 
 CString get_HDD_serial_number(int index, bool unify16)
 {
@@ -8435,7 +8320,7 @@ CString get_HDD_serial_number(int index, bool unify16)
 	return serialNumber;
 }
 
-//¼ıÀÚ·Î ±¸¼ºµÈ ¹®ÀÚ¿­À» ÀÔ·Â¹Ş¾Æ Á¤ÇØÁø ¿¬»êÀ» ÇÑ ÈÄ µÚ¼¯ÀÎ ¼ıÀÚ¹®ÀÚ¿­À» ¸®ÅÏÇÑ´Ù.
+//ìˆ«ìë¡œ êµ¬ì„±ëœ ë¬¸ìì—´ì„ ì…ë ¥ë°›ì•„ ì •í•´ì§„ ì—°ì‚°ì„ í•œ í›„ ë’¤ì„ì¸ ìˆ«ìë¬¸ìì—´ì„ ë¦¬í„´í•œë‹¤.
 CString	ShuffleNumericString(CString sSrc, bool bSameLength)
 {
 	if (!IsNumericString(sSrc))
@@ -8521,7 +8406,7 @@ CString	get_drive_volume(TCHAR drive_letter)
 
 	if (sLabel.IsEmpty())
 	{
-		sLabel.Format(_T("%s (%c:)"), GetUserDefaultUILanguage() == 1042 ? _T("·ÎÄÃ µğ½ºÅ©") : _T("Local Disk"), drive_letter);
+		sLabel.Format(_T("%s (%c:)"), GetUserDefaultUILanguage() == 1042 ? _T("ë¡œì»¬ ë””ìŠ¤í¬") : _T("Local Disk"), drive_letter);
 	}
 	else
 	{
@@ -8532,8 +8417,8 @@ CString	get_drive_volume(TCHAR drive_letter)
 	{
 		unsigned long bufferLength = MAX_PATH;
 		WNetGetConnection(drive_root.Left(2), Label, &bufferLength);
-		//³×Æ®¿öÅ© µå¶óÀÌºêÀÇ LabelÀÌ "\\\\192.168.1.103\\¿¬±¸¼Ò¹®¼­" ¿Í °°ÀÌ ±¸ÇØÁø´Ù.
-		//¸·»ó Å½»ö±â¿¡¼­´Â "¿¬±¸¼Ò¹®¼­(\\192.168.1.103) (Y:)" ¿Í °°ÀÌ Ç¥ÇöÇÏ°í ÀÖ´Ù. º¸Á¤ÇØÁØ´Ù.
+		//ë„¤íŠ¸ì›Œí¬ ë“œë¼ì´ë¸Œì˜ Labelì´ "\\\\192.168.1.103\\ì—°êµ¬ì†Œë¬¸ì„œ" ì™€ ê°™ì´ êµ¬í•´ì§„ë‹¤.
+		//ë§‰ìƒ íƒìƒ‰ê¸°ì—ì„œëŠ” "ì—°êµ¬ì†Œë¬¸ì„œ(\\192.168.1.103) (Y:)" ì™€ ê°™ì´ í‘œí˜„í•˜ê³  ìˆë‹¤. ë³´ì •í•´ì¤€ë‹¤.
 		sLabel = Label;
 		sLabel.Format(_T("%s(%s) (%c:)"),
 			sLabel.Mid(sLabel.ReverseFind('\\') + 1),
@@ -8563,7 +8448,7 @@ void get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy)
 			strDrive.Format(_T("%c:\\"), i);
 			UINT driveType = GetDriveType(strDrive);
 
-			// CD-ROMÀÌ³ª floppy disk´Â ÇÏÀ§ Æú´õ¸¦ Ç¥½ÃÇÏÁö ¾Ê´Â´Ù.
+			// CD-ROMì´ë‚˜ floppy diskëŠ” í•˜ìœ„ í´ë”ë¥¼ í‘œì‹œí•˜ì§€ ì•ŠëŠ”ë‹¤.
 			if (!include_legacy && (driveType == DRIVE_REMOVABLE || driveType == DRIVE_CDROM))
 				continue;
 
@@ -8572,14 +8457,14 @@ void get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy)
 	} while ((logicalDrives >>= 1) != 0);
 }
 
-//"·ÎÄÃ µğ½ºÅ© (C:)" <-> "C:\\" //ÇÏÀ§ Æú´õ Æ÷ÇÔ À¯¹«¿¡ °ü°è¾øÀÌ º¯È¯
+//"ë¡œì»¬ ë””ìŠ¤í¬ (C:)" <-> "C:\\" //í•˜ìœ„ í´ë” í¬í•¨ ìœ ë¬´ì— ê´€ê³„ì—†ì´ ë³€í™˜
 CString	convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map)
 {
 	TCHAR buf[MAX_PATH];
 	int csidl = -1;
 	std::map<int, CString> csidl_map_temp;
 
-	//"¹ÙÅÁ È­¸é\\"°ú °°ÀÌ ³Ñ¾î¿À´Â °æ¿ì Àß¶ó³½´Ù.
+	//"ë°”íƒ• í™”ë©´\\"ê³¼ ê°™ì´ ë„˜ì–´ì˜¤ëŠ” ê²½ìš° ì˜ë¼ë‚¸ë‹¤.
 	if (special_folder.GetLength() > 2 && special_folder[1] != ':' && special_folder.Right(1) == _T("\\"))
 		special_folder = special_folder.Left(special_folder.GetLength() - 1);
 
@@ -8623,13 +8508,13 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 		real_path = buf;
 #endif
 	}
-	//³» PCÀÏ °æ¿ì´Â real path°¡ Á¸ÀçÇÏÁö ¾Ê´Â´Ù.
+	//ë‚´ PCì¼ ê²½ìš°ëŠ” real pathê°€ ì¡´ì¬í•˜ì§€ ì•ŠëŠ”ë‹¤.
 	else if (csidl == CSIDL_DRIVES)
 	{
 		;
 	}
 	/*
-	else if (csidl == _T("´Ù¿î·Îµå"))
+	else if (csidl == _T("ë‹¤ìš´ë¡œë“œ"))
 	{
 #ifndef _USING_V110_SDK71_
 		real_path = get_known_folder(FOLDERID_Downloads);
@@ -8659,7 +8544,7 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 	return real_path;
 }
 
-//"c:\\abc\\def" => "·ÎÄÃ µğ½ºÅ© (C:)\\abc\\def"
+//"c:\\abc\\def" => "ë¡œì»¬ ë””ìŠ¤í¬ (C:)\\abc\\def"
 CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CString>* csidl_map)
 {
 	CString volume_path = real_path;
@@ -8694,11 +8579,11 @@ std::wstring CString2wstring(const char* str)
 	return std::wstring(buff);
 }
 
-//char chStr[100] = { 0, };¿Í °°ÀÌ pointer º¯¼ö°¡ ¾Æ´Ñ ¹è¿­·Î ¼±¾ğµÈ °æ¿ì¶ó¸é
-//chStr = CString2char(str); ¹®ÀåÀº ¿À·ù°¡ ¹ß»ıÇÏ¹Ç·Î ¾Æ·¡¿Í °°ÀÌ »ç¿ëÇÒ °Í.
+//char chStr[100] = { 0, };ì™€ ê°™ì´ pointer ë³€ìˆ˜ê°€ ì•„ë‹Œ ë°°ì—´ë¡œ ì„ ì–¸ëœ ê²½ìš°ë¼ë©´
+//chStr = CString2char(str); ë¬¸ì¥ì€ ì˜¤ë¥˜ê°€ ë°œìƒí•˜ë¯€ë¡œ ì•„ë˜ì™€ ê°™ì´ ì‚¬ìš©í•  ê²ƒ.
 //sprintf(chStr, "%s", (LPSTR)(LPCTSTR)str);	//MBCS : ok, UNICODE : fail
 //sprintf(chStr, "%s", CStringA(str));		//both : ok
-//¸®ÅÏ¹Ş¾Æ »ç¿ëÇÑ char* º¯¼ö°ªÀº »ç¿ë ÈÄ ¹İµå½Ã delete [] ÇØÁÙ°Í
+//ë¦¬í„´ë°›ì•„ ì‚¬ìš©í•œ char* ë³€ìˆ˜ê°’ì€ ì‚¬ìš© í›„ ë°˜ë“œì‹œ delete [] í•´ì¤„ê²ƒ
 char* CString2char(CString str)
 {
 	char *char_str = NULL;
@@ -8723,7 +8608,7 @@ char* CString2char(CString str)
 }
 
 //
-// CString ¡æ TCHAR
+// CString â†’ TCHAR
 //
 TCHAR* CString2TCHAR(CString str)
 {
@@ -8740,13 +8625,13 @@ TCHAR* CString2TCHAR(CString str)
 LPCSTR		CString2LPCSTR(CString str)
 {
 #if defined(UNICODE) || defined(_UNICODE)
-	//unicode È¯°æ¿¡¼­ CastingÀº °¡´ÉÇÏÁö¸¸
-	//½ÇÁ¦ LPCSTR ÀÎÀÚ·Î ³Ñ°Ü¼­ »ç¿ë ÇÏ´Ï ¹®Á¦ ¹ß»ı.
+	//unicode í™˜ê²½ì—ì„œ Castingì€ ê°€ëŠ¥í•˜ì§€ë§Œ
+	//ì‹¤ì œ LPCSTR ì¸ìë¡œ ë„˜ê²¨ì„œ ì‚¬ìš© í•˜ë‹ˆ ë¬¸ì œ ë°œìƒ.
 	CStringA strA(str);
 	LPCSTR lpcstr = strA;
 	return lpcstr;
 #else
-	//Multibyte È¯°æ¿¡¼­´Â Ä³½ºÆÃÀ¸·Î ¹®Á¦ ¾øÀÌ »ç¿ë °¡´É
+	//Multibyte í™˜ê²½ì—ì„œëŠ” ìºìŠ¤íŒ…ìœ¼ë¡œ ë¬¸ì œ ì—†ì´ ì‚¬ìš© ê°€ëŠ¥
 	LPCSTR lpcstr = (LPSTR)(LPCTSTR)str;
 	return lpcstr;
 #endif
@@ -8768,7 +8653,7 @@ WCHAR* CString2WCHAR(CString str)
 }
 
 //
-// CString ¡æ std::string
+// CString â†’ std::string
 //
 std::string CString2string(CString str)
 {
@@ -8786,17 +8671,17 @@ std::string CString2string(CString str)
 	*/
 }
 
-//cstrÀÇ À¯È¿ÇÑ ±æÀÌ¸¦ ÀÌ¹Ì ¾Ë°í ÀÖ´Ù¸é length¸¦ ÁöÁ¤ÇØÁà¾ß Á¤È®ÇÏ´Ù.
-//±×·¸Áö ¾ÊÀ» °æ¿ì cstrÀÇ ³¡¿¡ '\0'°¡ ¾øÀ» °æ¿ì ¾²·¹±â ¹®ÀÚµé±îÁö Æ÷ÇÔµÉ ¼ö ÀÖ´Ù.
-//cstrÀÌ '\0'·Î ³¡³­´Ù¸é À¯´ÏÄÚµå, ¸ÖÆ¼¹ÙÀÌÆ® È¯°æ¿¡¼­ CString str = cstr;·Î Á¤»ó Ã³¸®µÈ´Ù.
+//cstrì˜ ìœ íš¨í•œ ê¸¸ì´ë¥¼ ì´ë¯¸ ì•Œê³  ìˆë‹¤ë©´ lengthë¥¼ ì§€ì •í•´ì¤˜ì•¼ ì •í™•í•˜ë‹¤.
+//ê·¸ë ‡ì§€ ì•Šì„ ê²½ìš° cstrì˜ ëì— '\0'ê°€ ì—†ì„ ê²½ìš° ì“°ë ˆê¸° ë¬¸ìë“¤ê¹Œì§€ í¬í•¨ë  ìˆ˜ ìˆë‹¤.
+//cstrì´ '\0'ë¡œ ëë‚œë‹¤ë©´ ìœ ë‹ˆì½”ë“œ, ë©€í‹°ë°”ì´íŠ¸ í™˜ê²½ì—ì„œ CString str = cstr;ë¡œ ì •ìƒ ì²˜ë¦¬ëœë‹¤.
 CString char2CString(char* cstr, int length)
 {
 	CString str;
 
 #if defined(UNICODE) || defined(_UNICODE)
-	//length°¡ -1ÀÎ °æ¿ì, Áï ±æÀÌ¸¦ ¸ğ¸£°Å³ª Æ¯º°È÷ ÁöÁ¤ÇÏÁö ¾Ê°í
-	//cstrÀÌ '\0'¹®ÀÚ·Î ³¡³ª´Â ¿ÂÀüÇÑ °ªÀÌ¶ó¸é
-	//unicode¿¡¼­ str = CString(cstr); ·Îµµ Á¤»ó µ¿ÀÛÇÑ´Ù. ¿¹¿Ü°¡ ÀÖ´ÂÁö È®ÀÎ ÇÊ¿ä!
+	//lengthê°€ -1ì¸ ê²½ìš°, ì¦‰ ê¸¸ì´ë¥¼ ëª¨ë¥´ê±°ë‚˜ íŠ¹ë³„íˆ ì§€ì •í•˜ì§€ ì•Šê³ 
+	//cstrì´ '\0'ë¬¸ìë¡œ ëë‚˜ëŠ” ì˜¨ì „í•œ ê°’ì´ë¼ë©´
+	//unicodeì—ì„œ str = CString(cstr); ë¡œë„ ì •ìƒ ë™ì‘í•œë‹¤. ì˜ˆì™¸ê°€ ìˆëŠ”ì§€ í™•ì¸ í•„ìš”!
 	if (length < 0)
 	{
 		str = CA2CT(cstr);
@@ -8822,7 +8707,7 @@ CString char2CString(char* cstr, int length)
 }
 
 //
-// Char ¡æ TCHAR
+// Char â†’ TCHAR
 //
 TCHAR* char2TCHAR(char* str)
 {
@@ -8842,7 +8727,7 @@ TCHAR* char2TCHAR(char* str)
 }
 
 //
-// TCHAR ¡æ CString
+// TCHAR â†’ CString
 //
 CString TCHAR2CString(TCHAR* str)
 {
@@ -8852,7 +8737,7 @@ CString TCHAR2CString(TCHAR* str)
 }
 
 //
-// TCHAR ¡æ Char
+// TCHAR â†’ Char
 //
 char* TCHAR2char(TCHAR* str)
 {
@@ -8906,7 +8791,7 @@ char* CString2char(CString str)
 }
 */
 
-int	GetNumberFromFile(TCHAR* sfile)		//ÆÄÀÏÀ» ÀĞ¾î¼­ ÇÑ°³ÀÇ ¼ıÀÚ°ªÀ» ¸®ÅÏÇÑ´Ù. (ÆÄÀÏÀÌ ¾ø°Å³ª ³»¿ëÀÌ ¾øÀ¸¸é -99999 ¸¦ ¸®ÅÏÇÑ´Ù.)
+int	GetNumberFromFile(TCHAR* sfile)		//íŒŒì¼ì„ ì½ì–´ì„œ í•œê°œì˜ ìˆ«ìê°’ì„ ë¦¬í„´í•œë‹¤. (íŒŒì¼ì´ ì—†ê±°ë‚˜ ë‚´ìš©ì´ ì—†ìœ¼ë©´ -99999 ë¥¼ ë¦¬í„´í•œë‹¤.)
 {
 	FILE*	fp = _tfopen(sfile, _T("r"));
 	TCHAR	sLine[MAX_PATH] = _T("\0");
@@ -8925,7 +8810,7 @@ int	GetNumberFromFile(TCHAR* sfile)		//ÆÄÀÏÀ» ÀĞ¾î¼­ ÇÑ°³ÀÇ ¼ıÀÚ°ªÀ» ¸®ÅÏÇÑ´Ù. (
 	return _tstoi(str);
 }
 
-bool WriteNumberToFile(TCHAR* sfile, int n)	//¼ıÀÚ°ªÀ» ÆÄÀÏ¿¡ ±â·ÏÇØÁØ´Ù.
+bool WriteNumberToFile(TCHAR* sfile, int n)	//ìˆ«ìê°’ì„ íŒŒì¼ì— ê¸°ë¡í•´ì¤€ë‹¤.
 {
 	FILE*	fp = _tfopen(sfile, _T("w"));
 	TCHAR	sLine[MAX_PATH] = _T("\0");
@@ -9194,10 +9079,10 @@ double get_cpu_usage(const char* process)
 	double cpuUsage = 0.0;
 
 	PPERF_DATA_BLOCK cpuData = NULL;
-	// Process °´Ã¼(CPU_INDEX)¿¡¼­ ÇØ´ç process ÀÌ¸§À» °®´Â ÇÁ·Î¼¼½ºÀÇ CPU °ªÀ» ¾ò´Â´Ù.
+	// Process ê°ì²´(CPU_INDEX)ì—ì„œ í•´ë‹¹ process ì´ë¦„ì„ ê°–ëŠ” í”„ë¡œì„¸ìŠ¤ì˜ CPU ê°’ì„ ì–»ëŠ”ë‹¤.
 	if (GetCounterValue(CPU_INDEX, CPU_COUNTER, process, &cpuData, newVal) < 0)
 		return -1;
-	// È¹µæÇÑ ¼º´É Á¤º¸¸¦ ÀÌ¿ëÇØ¼­ CPU »ç¿ëÀ²À» °è»ê
+	// íšë“í•œ ì„±ëŠ¥ ì •ë³´ë¥¼ ì´ìš©í•´ì„œ CPU ì‚¬ìš©ìœ¨ì„ ê³„ì‚°
 	cpuTime_100n = cpuData->PerfTime100nSec;
 
 	if (isCpuFirst)
@@ -9293,7 +9178,7 @@ HRESULT get_cpu_temperature(LPLONG pTemperature)
 	return hr;
 }
 
-//ÇöÀç °¡¿ë ¸Ş¸ğ¸®¸¦ ¸®ÅÏÇÑ´Ù. (total_memory : ÀüÃ¼ ¸Ş¸ğ¸® ¿ë·®)
+//í˜„ì¬ ê°€ìš© ë©”ëª¨ë¦¬ë¥¼ ë¦¬í„´í•œë‹¤. (total_memory : ì „ì²´ ë©”ëª¨ë¦¬ ìš©ëŸ‰)
 uint64_t get_available_memory(uint64_t* total_memory)
 {
 	MEMORYSTATUSEX status;
@@ -9376,7 +9261,7 @@ uint16_t Cal_CRC16(const uint8_t* p_data, uint32_t size)
 	return crc&0xffffu;
 }
 
-double GetElapsedTime(__timeb32 pOldTime)	//pOldTime°ú ÇöÀç ½Ã°£ÀÇ Â÷ÀÌ °è»ê
+double GetElapsedTime(__timeb32 pOldTime)	//pOldTimeê³¼ í˜„ì¬ ì‹œê°„ì˜ ì°¨ì´ ê³„ì‚°
 {
 	__timeb32	tCur;
 
@@ -9388,7 +9273,7 @@ double GetElapsedTime(__timeb32 pOldTime)	//pOldTime°ú ÇöÀç ½Ã°£ÀÇ Â÷ÀÌ °è»ê
 	return (double)(t1 - t0) / 1000.0 ;
 }
 
-CString	GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero, bool bIncludeSec)	//ts°ªÀ» ³Ñ°Ü ¹Ş¾Æ "aÀÏ b½Ã°£ cºĞ dÃÊ" ÇüÅÂ·Î Ç¥½Ã
+CString	GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero, bool bIncludeSec)	//tsê°’ì„ ë„˜ê²¨ ë°›ì•„ "aì¼ bì‹œê°„ cë¶„ dì´ˆ" í˜•íƒœë¡œ í‘œì‹œ
 {
 	CString str;
 	CString sResult = _T("");
@@ -9401,25 +9286,25 @@ CString	GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero, bool bIn
 
 	if (ts.GetDays() || bShowZero)
 	{
-		str.Format(_T("%dÀÏ"), ts.GetDays());
+		str.Format(_T("%dì¼"), ts.GetDays());
 		sResult = sResult + " " + str;
 	}
 
 	if (sResult != "" || ts.GetHours() || bShowZero)
 	{
-		str.Format(_T("%d½Ã°£"), ts.GetHours());
+		str.Format(_T("%dì‹œê°„"), ts.GetHours());
 		sResult = sResult + " " + str;
 	}
 
 	if (sResult != "" || ts.GetMinutes() || bShowZero)
 	{
-		str.Format(_T("%dºĞ"), ts.GetMinutes());
+		str.Format(_T("%dë¶„"), ts.GetMinutes());
 		sResult = sResult + " " + str;
 	}
 
 	if (bIncludeSec && (sResult != "" || ts.GetMinutes() || bShowZero))
 	{
-		str.Format(_T("%dÃÊ"), ts.GetMinutes());
+		str.Format(_T("%dì´ˆ"), ts.GetMinutes());
 		sResult = sResult + " " + str;
 	}
 
@@ -9428,15 +9313,15 @@ CString	GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero, bool bIn
 	if (sResult == "")
 	{
 		if (bIncludeSec)
-			sResult = "0ÃÊ";
+			sResult = "0ì´ˆ";
 		else
-			sResult = "0ºĞ";
+			sResult = "0ë¶„";
 	}
 
 	return sResult;
 }
 
-//ts°ªÀ» ³Ñ°Ü ¹Ş¾Æ "aÀÏ b½Ã°£ cºĞ dÃÊ" ÇüÅÂ·Î Ç¥½Ã
+//tsê°’ì„ ë„˜ê²¨ ë°›ì•„ "aì¼ bì‹œê°„ cë¶„ dì´ˆ" í˜•íƒœë¡œ í‘œì‹œ
 CString	GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bIncludeSec)
 {
 	CString str;
@@ -9444,25 +9329,25 @@ CString	GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bInclude
 
 	if (ts.GetDays() || bShowZero)
 	{
-		str.Format(_T("%dÀÏ"), ts.GetDays());
+		str.Format(_T("%dì¼"), ts.GetDays());
 		sResult = sResult + " " + str;
 	}
 
 	if (sResult != "" || ts.GetHours() || bShowZero)
 	{
-		str.Format(_T("%d½Ã°£"), ts.GetHours());
+		str.Format(_T("%dì‹œê°„"), ts.GetHours());
 		sResult = sResult + " " + str;
 	}
 
 	if (sResult != "" || ts.GetMinutes() || bShowZero)
 	{
-		str.Format(_T("%dºĞ"), ts.GetMinutes());
+		str.Format(_T("%dë¶„"), ts.GetMinutes());
 		sResult = sResult + " " + str;
 	}
 
 	if (bIncludeSec && (sResult != "" || ts.GetMinutes() || bShowZero))
 	{
-		str.Format(_T("%dÃÊ"), ts.GetMinutes());
+		str.Format(_T("%dì´ˆ"), ts.GetMinutes());
 		sResult = sResult + " " + str;
 	}
 
@@ -9471,9 +9356,9 @@ CString	GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bInclude
 	if (sResult == "")
 	{
 		if (bIncludeSec)
-			sResult = "0ÃÊ";
+			sResult = "0ì´ˆ";
 		else
-			sResult = "0ºĞ";
+			sResult = "0ë¶„";
 	}
 
 	return sResult;
@@ -9481,7 +9366,7 @@ CString	GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bInclude
 
 bool IsAM(CTime t /*= 0*/)
 {
-	//t°ªÀÌ 0ÀÎ °æ¿ì´Â ÇöÀç ½Ã°¢À» ¾ò¾î¿Í¼­ ¿ÀÀü, ¿ÀÈÄ¸¦ ÆÇ´ÜÇØÁØ´Ù.
+	//tê°’ì´ 0ì¸ ê²½ìš°ëŠ” í˜„ì¬ ì‹œê°ì„ ì–»ì–´ì™€ì„œ ì˜¤ì „, ì˜¤í›„ë¥¼ íŒë‹¨í•´ì¤€ë‹¤.
 	if (t == 0)
 		t = CTime::GetCurrentTime();
 	
@@ -9500,19 +9385,19 @@ CString	GetDayOfWeekString(CTime t, bool short_str)
 
 	switch (t.GetDayOfWeek())
 	{
-			case 1	:	sWeek = "ÀÏ¿äÀÏ";
+			case 1	:	sWeek = "ì¼ìš”ì¼";
 						break;
-			case 2	:	sWeek = "¿ù¿äÀÏ";
+			case 2	:	sWeek = "ì›”ìš”ì¼";
 						break;
-			case 3	:	sWeek = "È­¿äÀÏ";
+			case 3	:	sWeek = "í™”ìš”ì¼";
 						break;
-			case 4	:	sWeek = "¼ö¿äÀÏ";
+			case 4	:	sWeek = "ìˆ˜ìš”ì¼";
 						break;
-			case 5	:	sWeek = "¸ñ¿äÀÏ";
+			case 5	:	sWeek = "ëª©ìš”ì¼";
 						break;
-			case 6	:	sWeek = "±İ¿äÀÏ";
+			case 6	:	sWeek = "ê¸ˆìš”ì¼";
 						break;
-			case 7	:	sWeek = "Åä¿äÀÏ";
+			case 7	:	sWeek = "í† ìš”ì¼";
 						break;
 	}
 
@@ -9528,7 +9413,7 @@ CString	GetDayOfWeekString(CTime t, bool short_str)
 	return sWeek;
 }
 
-//ÇØ´ç ´ŞÀÇ ³¯Â¥¼ö ¸®ÅÏ
+//í•´ë‹¹ ë‹¬ì˜ ë‚ ì§œìˆ˜ ë¦¬í„´
 int	GetDaysOfMonth(int nYear, int nMonth)
 {
 	if (IsLeapYear(nYear) && nMonth == 2)
@@ -9724,7 +9609,7 @@ CString FormattedString(LPCTSTR lpszFormat, ...)
 /*
 int random(int minimum, int maximum)
 {
-	//¿©±â¿¡¼­ srand¸¦ È£ÃâÇÏ¸é ¿øÇÏ´Â´ë·Î µ¿ÀÛÇÏÁö ¾Ê´Â´Ù. ¸ŞÀÎ¿¡¼­ ½ÃÀÛ½Ã ÇÑ¹ø¸¸ È£ÃâÇÏÀÚ.
+	//ì—¬ê¸°ì—ì„œ srandë¥¼ í˜¸ì¶œí•˜ë©´ ì›í•˜ëŠ”ëŒ€ë¡œ ë™ì‘í•˜ì§€ ì•ŠëŠ”ë‹¤. ë©”ì¸ì—ì„œ ì‹œì‘ì‹œ í•œë²ˆë§Œ í˜¸ì¶œí•˜ì.
 	//srand(time(NULL));
 	if (minimum > maximum)
 		Swap(minimum, maximum);
@@ -9733,14 +9618,14 @@ int random(int minimum, int maximum)
 
 double random(double minimum, double maximum)
 {
-	//¿©±â¿¡¼­ srand¸¦ È£ÃâÇÏ¸é ¿øÇÏ´Â´ë·Î µ¿ÀÛÇÏÁö ¾Ê´Â´Ù. ¸ŞÀÎ¿¡¼­ ½ÃÀÛ½Ã ÇÑ¹ø¸¸ È£ÃâÇÏÀÚ.
+	//ì—¬ê¸°ì—ì„œ srandë¥¼ í˜¸ì¶œí•˜ë©´ ì›í•˜ëŠ”ëŒ€ë¡œ ë™ì‘í•˜ì§€ ì•ŠëŠ”ë‹¤. ë©”ì¸ì—ì„œ ì‹œì‘ì‹œ í•œë²ˆë§Œ í˜¸ì¶œí•˜ì.
 	//srand(time(NULL));
 	if (minimum > maximum)
 		Swap(minimum, maximum);
 	return minimum + (maximum - minimum) * rand() / (RAND_MAX + 1.0);
 }
 */
-//Áöµµ ÁÂÇ¥ <-> µµºĞÃÊ º¯È¯
+//ì§€ë„ ì¢Œí‘œ <-> ë„ë¶„ì´ˆ ë³€í™˜
 double		convert_gps_coord(int d, int m, double s)
 {
 	return (d + (double)m/60.0 + s/3600.0);
@@ -9758,10 +9643,10 @@ double Rounding(double x, int digit)
     return (floor((x) * pow(float(10), digit) + 0.5f) / pow(float(10), digit));
 }
 
-//src³»ÀÇ ¸ğµç ¹®ÀÚ¿¡ ´ëÇØ digitsÀÚ¸´¼öÀÇ Á¶ÇÕ »ı¼º
+//srcë‚´ì˜ ëª¨ë“  ë¬¸ìì— ëŒ€í•´ digitsìë¦¿ìˆ˜ì˜ ì¡°í•© ìƒì„±
 void combination(std::vector<TCHAR> src, CString temp, std::vector<CString> &result, int depth)
 {
-	if (depth == 0)//result.size())  // depth == n // °è¼Ó ¾È»Ì´Ù°¡ r °³¸¦ Ã¤¿ìÁö ¸øÇÑ °æ¿ì´Â ÀÌ °÷¿¡ °É·Á¾ß ÇÑ´Ù.
+	if (depth == 0)//result.size())  // depth == n // ê³„ì† ì•ˆë½‘ë‹¤ê°€ r ê°œë¥¼ ì±„ìš°ì§€ ëª»í•œ ê²½ìš°ëŠ” ì´ ê³³ì— ê±¸ë ¤ì•¼ í•œë‹¤.
 	{
 		result.push_back(temp);
 		TRACE(_T("%s\n"), temp);
@@ -9781,8 +9666,8 @@ void combination(std::vector<TCHAR> src, CString temp, std::vector<CString> &res
 
 }
 
-//´ë°¢ °¢µµ·Î ¼öÆò, ¼öÁ÷ È­°¢À» ¼öÇĞÀûÀ¸·Î °è»êÇÑ´Ù.
-//½ÇÁ¦ ·»Áî ½ºÆå°ú ¹İµå½Ã ÀÏÄ¡ÇÏÁø ¾Ê´Â´Ù.
+//ëŒ€ê° ê°ë„ë¡œ ìˆ˜í‰, ìˆ˜ì§ í™”ê°ì„ ìˆ˜í•™ì ìœ¼ë¡œ ê³„ì‚°í•œë‹¤.
+//ì‹¤ì œ ë Œì¦ˆ ìŠ¤í™ê³¼ ë°˜ë“œì‹œ ì¼ì¹˜í•˜ì§„ ì•ŠëŠ”ë‹¤.
 void get_HV_angle_from_diagonal(int diagonal, int *h, int *v, int width, int height)
 {
 	double dh, dv;
@@ -9797,7 +9682,7 @@ void get_HV_angle_from_diagonal(double diagonal, double *h, double *v, double wi
 	*v = diagonal * sin(atan2(height, width));
 }
 
-//<ÇÁ·Î¼¼½º ÀÌ¸§À¸·Î ÇÁ·Î¼¼½º ID ¾ò±â>
+//<í”„ë¡œì„¸ìŠ¤ ì´ë¦„ìœ¼ë¡œ í”„ë¡œì„¸ìŠ¤ ID ì–»ê¸°>
 ULONG GetPID(CString processname)
 {
 	HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -9827,7 +9712,7 @@ ULONG GetPID(CString processname)
 	return false;
 }
 
-// À©µµ¿ì ÇÚµé·Î ÇÁ·Î¼¼½º ¾ÆÀÌµğ ¾ò±â   
+// ìœˆë„ìš° í•¸ë“¤ë¡œ í”„ë¡œì„¸ìŠ¤ ì•„ì´ë”” ì–»ê¸°   
 ULONG ProcIDFromWnd(HWND hwnd)
 {   
 	ULONG idProc;   
@@ -9835,23 +9720,23 @@ ULONG ProcIDFromWnd(HWND hwnd)
 	return idProc;   
 }
 
-// ÇÁ·Î¼¼½º ¾ÆÀÌµğ·Î À©µµ¿ì ÇÚµé ¾ò±â   
+// í”„ë¡œì„¸ìŠ¤ ì•„ì´ë””ë¡œ ìœˆë„ìš° í•¸ë“¤ ì–»ê¸°   
 HWND GetHWNDbyPID(ULONG pid)
 {   
-	HWND tempHwnd = ::FindWindow(NULL,NULL); // ÃÖ»óÀ§ À©µµ¿ì ÇÚµé Ã£±â   
+	HWND tempHwnd = ::FindWindow(NULL,NULL); // ìµœìƒìœ„ ìœˆë„ìš° í•¸ë“¤ ì°¾ê¸°   
 
 	while(tempHwnd != NULL)   
 	{   
 		//TRACE("tempHwnd = %p\n", tempHwnd);
-		if(::GetParent(tempHwnd) == NULL) // ÃÖ»óÀ§ ÇÚµéÀÎÁö Ã¼Å©, ¹öÆ° µîµµ ÇÚµéÀ» °¡Áú ¼ö ÀÖÀ¸¹Ç·Î ¹«½ÃÇÏ±â À§ÇØ   
+		if(::GetParent(tempHwnd) == NULL) // ìµœìƒìœ„ í•¸ë“¤ì¸ì§€ ì²´í¬, ë²„íŠ¼ ë“±ë„ í•¸ë“¤ì„ ê°€ì§ˆ ìˆ˜ ìˆìœ¼ë¯€ë¡œ ë¬´ì‹œí•˜ê¸° ìœ„í•´   
 			if(pid == ProcIDFromWnd(tempHwnd))   
 				return tempHwnd;   
-		tempHwnd = ::GetWindow(tempHwnd, GW_HWNDNEXT); // ´ÙÀ½ À©µµ¿ì ÇÚµé Ã£±â   
+		tempHwnd = ::GetWindow(tempHwnd, GW_HWNDNEXT); // ë‹¤ìŒ ìœˆë„ìš° í•¸ë“¤ ì°¾ê¸°   
 	}   
 	return NULL;
 }
 
-//ÃâÃ³: https://smok95.tistory.com/300?category=28201 [Only YOUng:Æ¼½ºÅä¸®]
+//ì¶œì²˜: https://smok95.tistory.com/300?category=28201 [Only YOUng:í‹°ìŠ¤í† ë¦¬]
 #ifndef _USING_V110_SDK71_
 CString GetProcessNameByPID(const DWORD pid)
 {
@@ -9935,7 +9820,7 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 }
 
 //default : bCaseSensitive = false, bExceptThis = true
-//¹º°¡ ¿À·ù°¡ ÀÖ´Ù. ´Ù½Ã Å×½ºÆ®ÇØ¾ß ÇÔ.
+//ë­”ê°€ ì˜¤ë¥˜ê°€ ìˆë‹¤. ë‹¤ì‹œ í…ŒìŠ¤íŠ¸í•´ì•¼ í•¨.
 HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSensitive, bool bExceptThis)
 {
 	bool			bFlag = false;
@@ -9982,7 +9867,7 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 
 			if (found)
 			{
-				//ÀÚ±â ÀÚ½ÅÀº Á¦¿ÜÇÏ°í...
+				//ìê¸° ìì‹ ì€ ì œì™¸í•˜ê³ ...
 				if (pe.th32ProcessID != GetCurrentProcessId())
 				{
 					HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID);
@@ -10011,11 +9896,11 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 	return hWnd;
 }
 
-//ÇØ´ç ÆÄÀÏÀÌ ½ÇÇàÁßÀÎ Ä«¿îÆ®¸¦ ¸®ÅÏÇÏ´Â ÇÔ¼öÀÌ¸ç
-//fullpath¸¦ ÁÖ¸é °æ·Î±îÁö µ¿ÀÏÇØ¾ß Ä«¿îÆ®µÇµµ·Ï ±â´ÉÀ» ±¸ÇöÇßÀ¸³ª
-//±ÇÇÑ¹®Á¦ÀÎÁö ÇöÀç PC¿¡¼­´Â Àß ¾ò¾î¿ÀÁö¸¸
-//´Ù¸¥ PC¿¡¼­´Â ¾Æ¿¹ ½ÇÇàÁ¶Â÷µÇÁö ¾Ê´Â´Ù.
-//¿ì¼± º¸·ùÇÑ´Ù.
+//í•´ë‹¹ íŒŒì¼ì´ ì‹¤í–‰ì¤‘ì¸ ì¹´ìš´íŠ¸ë¥¼ ë¦¬í„´í•˜ëŠ” í•¨ìˆ˜ì´ë©°
+//fullpathë¥¼ ì£¼ë©´ ê²½ë¡œê¹Œì§€ ë™ì¼í•´ì•¼ ì¹´ìš´íŠ¸ë˜ë„ë¡ ê¸°ëŠ¥ì„ êµ¬í˜„í–ˆìœ¼ë‚˜
+//ê¶Œí•œë¬¸ì œì¸ì§€ í˜„ì¬ PCì—ì„œëŠ” ì˜ ì–»ì–´ì˜¤ì§€ë§Œ
+//ë‹¤ë¥¸ PCì—ì„œëŠ” ì•„ì˜ˆ ì‹¤í–‰ì¡°ì°¨ë˜ì§€ ì•ŠëŠ”ë‹¤.
+//ìš°ì„  ë³´ë¥˜í•œë‹¤.
 #if 0
 int get_process_running_count(CString processname)
 {
@@ -10050,9 +9935,9 @@ int get_process_running_count(CString processname)
 
 			_tcscpy(sFilePath, pe32.szExeFile);
 
-			//processnameÀÌ ½ÇÇàÆÄÀÏ¸í¸¸ ÀÖ´Ù¸é exe ÆÄÀÏ¸í¸¸ ºñ±³ÇÏ°í
-			//ÀüÃ¼ °æ·Î¶ó¸é fullpath¸¦ ±¸ÇØ¼­ ºñ±³ÇÑ´Ù.
-			//´Ü hProcess°¡ NULLÀÌ¶ó¼­ ÀüÃ¼°æ·Î¸¦ ±¸ÇÏÁö ¸øÇÏ´Â ÇÁ·Î¼¼½ºµµ ÀÖ´Ù.
+			//processnameì´ ì‹¤í–‰íŒŒì¼ëª…ë§Œ ìˆë‹¤ë©´ exe íŒŒì¼ëª…ë§Œ ë¹„êµí•˜ê³ 
+			//ì „ì²´ ê²½ë¡œë¼ë©´ fullpathë¥¼ êµ¬í•´ì„œ ë¹„êµí•œë‹¤.
+			//ë‹¨ hProcessê°€ NULLì´ë¼ì„œ ì „ì²´ê²½ë¡œë¥¼ êµ¬í•˜ì§€ ëª»í•˜ëŠ” í”„ë¡œì„¸ìŠ¤ë„ ìˆë‹¤.
 			if (PathFileExists(processname))
 			{
 				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
@@ -10091,22 +9976,22 @@ int get_process_running_count(CString processname)
 	hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
 
 	pEntry.dwSize = sizeof(pEntry);
-	// ½ÇÇàÁßÀÎ ÇÁ·Î¼¼½ºµéÀÇ Ã¹¹øÀç Á¤º¸¸¦ °¡Á®¿Â´Ù.
+	// ì‹¤í–‰ì¤‘ì¸ í”„ë¡œì„¸ìŠ¤ë“¤ì˜ ì²«ë²ˆì¬ ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 	Process32First(hSnapShot, &pEntry);
 
 	int procCount = 0;
-	// Process °¡ ½ÇÇàÁßÀÎÁö È®ÀÎ
+	// Process ê°€ ì‹¤í–‰ì¤‘ì¸ì§€ í™•ì¸
 	while (1)
 	{
-		// ´ÙÀ½¹ø ÇÁ·Î¼¼½ºÀÇ Á¤º¸¸¦ °¡Á®¿Â´Ù.
+		// ë‹¤ìŒë²ˆ í”„ë¡œì„¸ìŠ¤ì˜ ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 		BOOL hRes = Process32Next(hSnapShot, &pEntry);
 
 		if (hRes == FALSE)
 			break;
 
-		//±ÇÇÑÀÌ ¾øÀ» °æ¿ì Æ¯Á¤ ÇÁ·Î¼¼½ºµéÀº OpenProcess()°¡ NULLÀ» ¸®ÅÏÇÑ´Ù.
-		//°£´ÜÈ÷ ÇØ´ç ÇÁ·Î¼¼½º Ä«¿îÆ®¸¸ ¾ò¾î¿Â´Ù¸é OpenProcess()¸¦ È£ÃâÇÏÁö ¸»ÀÚ.
-		//±ÇÇÑÀ» ÁÖ°í ¾ò¾î¿Í¾ß ÇÑ´Ù¸é AdjustTokenPrivileges µîÀ» ÀÌ¿ëÇØ¾ß ÇÑ´Ù.
+		//ê¶Œí•œì´ ì—†ì„ ê²½ìš° íŠ¹ì • í”„ë¡œì„¸ìŠ¤ë“¤ì€ OpenProcess()ê°€ NULLì„ ë¦¬í„´í•œë‹¤.
+		//ê°„ë‹¨íˆ í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ ì¹´ìš´íŠ¸ë§Œ ì–»ì–´ì˜¨ë‹¤ë©´ OpenProcess()ë¥¼ í˜¸ì¶œí•˜ì§€ ë§ì.
+		//ê¶Œí•œì„ ì£¼ê³  ì–»ì–´ì™€ì•¼ í•œë‹¤ë©´ AdjustTokenPrivileges ë“±ì„ ì´ìš©í•´ì•¼ í•œë‹¤.
 		//if (pEntry.th32ProcessID != 0)
 		//{
 		//	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pEntry.th32ProcessID);
@@ -10144,7 +10029,7 @@ bool KillProcess(CString szFilename)
 	return false;
 }
 
-//ÇÁ·Î¼¼½º °­Á¦ Á¾·á.
+//í”„ë¡œì„¸ìŠ¤ ê°•ì œ ì¢…ë£Œ.
 //return value : 1 : killed, 0 : fail to kill, -1 : not found
 bool ProcessKill(CString szProcessName)
 {
@@ -10222,7 +10107,7 @@ void Wow64Disable(bool disable)
 #ifndef _USING_V110_SDK71_
 	if (IsWow64())
 	{
-		//XP 64bitºÎÅÍ Áö¿øµÇ´Â APIÀÌ¹Ç·Î 32bitÀÌ¸é Á÷Á¢ È£ÃâÇØÁà¾ß ÇÑ´Ù.
+		//XP 64bitë¶€í„° ì§€ì›ë˜ëŠ” APIì´ë¯€ë¡œ 32bitì´ë©´ ì§ì ‘ í˜¸ì¶œí•´ì¤˜ì•¼ í•œë‹¤.
 		if (disable)
 			Wow64DisableWow64FsRedirection(&g_wow64_preset);
 		else
@@ -10342,10 +10227,10 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	si.hStdError = hChildStdoutWr;
 	si.wShowWindow = (is_gui_app ? SW_SHOWNORMAL : SW_HIDE);
 
-	//dir°ú °°Àº DOS ¸í·ÉÀº ¿ÜºÎ ½ÇÇàÆÄÀÏÀÌ ¾Æ´Ï¹Ç·Î exePath¸¦ "dir c:\\*.*"°ú °°ÀÌ ÁÖ¸é ¿¡·¯°¡ ¹ß»ıÇÑ´Ù.
-	//"cmd.exe /c dir c:\\*.*"¿Í °°ÀÌ Àü´ŞÇØ¾ß ÇÑ´Ù.
-	//ÇÏÁö¸¸ run_process()¸¦ È£ÃâÇÏ´Â »ç¿ëÀÚ ÀÔÀå¿¡¼­´Â "dir c:\\*.*"°ú °°ÀÌ È£ÃâÇÒ °ÍÀÌ¹Ç·Î
-	//exePath¸¦ °¡°øÇØÁØ´Ù.
+	//dirê³¼ ê°™ì€ DOS ëª…ë ¹ì€ ì™¸ë¶€ ì‹¤í–‰íŒŒì¼ì´ ì•„ë‹ˆë¯€ë¡œ exePathë¥¼ "dir c:\\*.*"ê³¼ ê°™ì´ ì£¼ë©´ ì—ëŸ¬ê°€ ë°œìƒí•œë‹¤.
+	//"cmd.exe /c dir c:\\*.*"ì™€ ê°™ì´ ì „ë‹¬í•´ì•¼ í•œë‹¤.
+	//í•˜ì§€ë§Œ run_process()ë¥¼ í˜¸ì¶œí•˜ëŠ” ì‚¬ìš©ì ì…ì¥ì—ì„œëŠ” "dir c:\\*.*"ê³¼ ê°™ì´ í˜¸ì¶œí•  ê²ƒì´ë¯€ë¡œ
+	//exePathë¥¼ ê°€ê³µí•´ì¤€ë‹¤.
 	if (!is_gui_app)
 	{
 		//exePath = _T("/c ") + exePath;
@@ -10353,7 +10238,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 
 	// Start the child process. 
 	if (!CreateProcess(NULL,
-		(TCHAR*)(const TCHAR*)(exePath),//_T("dir")°ú °°ÀÌ »ó¼ö°ªÀ» Á÷Á¢ ÁÖ¸é ½ÇÆĞ.	// Command line
+		(TCHAR*)(const TCHAR*)(exePath),//_T("dir")ê³¼ ê°™ì´ ìƒìˆ˜ê°’ì„ ì§ì ‘ ì£¼ë©´ ì‹¤íŒ¨.	// Command line
 		NULL,           // Process handle not inheritable
 		NULL,           // Thread handle not inheritable
 		TRUE,          // Set handle inheritance to FALSE
@@ -10365,7 +10250,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 		)
 
 	//if (!CreateProcess(NULL,
-	//	(TCHAR*)(const TCHAR*)(exePath),//_T("dir")°ú °°ÀÌ »ó¼ö°ªÀ» Á÷Á¢ ÁÖ¸é ½ÇÆĞ.	// Command line
+	//	(TCHAR*)(const TCHAR*)(exePath),//_T("dir")ê³¼ ê°™ì´ ìƒìˆ˜ê°’ì„ ì§ì ‘ ì£¼ë©´ ì‹¤íŒ¨.	// Command line
 	//	NULL,           // Process handle not inheritable
 	//	NULL,           // Thread handle not inheritable
 	//	TRUE,          // Set handle inheritance to FALSE
@@ -10397,7 +10282,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 		return result;
 	}
 
-	//¿ÜºÎ ½ÇÇàÆÄÀÏÀÏ °æ¿ì´Â result stringÀÌ ¾øÀ¸¹Ç·Î ÀÌ ÄÚµå¸¦ ½ÇÇàÇÏ¸é ¾ÈµÈ´Ù.
+	//ì™¸ë¶€ ì‹¤í–‰íŒŒì¼ì¼ ê²½ìš°ëŠ” result stringì´ ì—†ìœ¼ë¯€ë¡œ ì´ ì½”ë“œë¥¼ ì‹¤í–‰í•˜ë©´ ì•ˆëœë‹¤.
 	if (!is_gui_app)
 	{
 		for (;;)
@@ -10426,10 +10311,10 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	return result;
 }
 
-//¼­ºñ½º »óÅÂ°¡ ¹«¾ùÀÌµç Á¾·á, Á¦°Å½ÃÅ²´Ù. sc queryex -> taskkill /pid -> sc delete
-//process_nameÀÌ ÁÖ¾îÁö¸é Á» ´õ °£´ÜÈ÷ Á¦°ÅµÈ´Ù.
-//Á¤»ó Á¦°Å(¶Ç´Â ¼­ºñ½º°¡ ¾øÀ» °æ¿ì) : true
-//Á¦°Å ½ÇÆĞ : false
+//ì„œë¹„ìŠ¤ ìƒíƒœê°€ ë¬´ì—‡ì´ë“  ì¢…ë£Œ, ì œê±°ì‹œí‚¨ë‹¤. sc queryex -> taskkill /pid -> sc delete
+//process_nameì´ ì£¼ì–´ì§€ë©´ ì¢€ ë” ê°„ë‹¨íˆ ì œê±°ëœë‹¤.
+//ì •ìƒ ì œê±°(ë˜ëŠ” ì„œë¹„ìŠ¤ê°€ ì—†ì„ ê²½ìš°) : true
+//ì œê±° ì‹¤íŒ¨ : false
 bool kill_service(CString service_name, CString process_name /*= _T("")*/)
 {
 	CString result;
@@ -10444,13 +10329,13 @@ bool kill_service(CString service_name, CString process_name /*= _T("")*/)
 	//CString result = run_process(_T("sc queryex ") + service_name, true);
 	int pid_pos = result.Find(_T("PID"));
 
-	//ÇØ´ç ¼­ºñ½º°¡ ¾øÀ» °æ¿ì
+	//í•´ë‹¹ ì„œë¹„ìŠ¤ê°€ ì—†ì„ ê²½ìš°
 	if (pid_pos <= 0)
 		return true;
 
-	//PID ÀÌÈÄÀÇ ¹®ÀÚ¿­·Î ¸¸µé°í
+	//PID ì´í›„ì˜ ë¬¸ìì—´ë¡œ ë§Œë“¤ê³ 
 	result = result.Mid(pid_pos + 3);
-	//':' ÀÌÈÄÀÇ ¹®ÀÚ¿­·Î ¸¸µé°í
+	//':' ì´í›„ì˜ ë¬¸ìì—´ë¡œ ë§Œë“¤ê³ 
 	result = result.Mid(result.Find(':') + 1);
 	result.Trim();
 
@@ -10459,15 +10344,15 @@ bool kill_service(CString service_name, CString process_name /*= _T("")*/)
 	int pid = _ttoi(result);
 	CString cmd;
 
-	//ÇØ´ç ¼­ºñ½ºÀÇ ½ÇÁ¦ ÇÁ·Î¼¼½º¸¦ °­Á¦ Á¾·á½ÃÅ°¸é ÇØ´ç ¼­ºñ½º´Â "ÁßÁöµÊ"À¸·Î º¯°æµÈ´Ù.
+	//í•´ë‹¹ ì„œë¹„ìŠ¤ì˜ ì‹¤ì œ í”„ë¡œì„¸ìŠ¤ë¥¼ ê°•ì œ ì¢…ë£Œì‹œí‚¤ë©´ í•´ë‹¹ ì„œë¹„ìŠ¤ëŠ” "ì¤‘ì§€ë¨"ìœ¼ë¡œ ë³€ê²½ëœë‹¤.
 	cmd.Format(_T("taskkill /pid %d /f"), pid);
 	result = run_process(cmd, true).MakeLower();
-	if (result.Find(_T("¼º°ø")) < 0 && result.Find(_T("success")) < 0)
+	if (result.Find(_T("ì„±ê³µ")) < 0 && result.Find(_T("success")) < 0)
 		return false;
 
-	//ÁßÁöµÈ ¼­ºñ½º¸¦ »èÁ¦ÇÑ´Ù. 
+	//ì¤‘ì§€ëœ ì„œë¹„ìŠ¤ë¥¼ ì‚­ì œí•œë‹¤. 
 	result = run_process(_T("sc delete ") + service_name, true);
-	if (result.Find(_T("¼º°ø")) < 0 && result.Find(_T("success")) < 0)
+	if (result.Find(_T("ì„±ê³µ")) < 0 && result.Find(_T("success")) < 0)
 		return false;
 
 	return true;
@@ -10485,10 +10370,10 @@ bool RectInRect(CRect rMain, CRect rSub)
 	return false;
 }
 
-//r¿¡¼­ except¿µ¿ªÀ» Á¦¿ÜÇÏ°í crÄÃ·¯·Î Ã¤¿î´Ù.
+//rì—ì„œ exceptì˜ì—­ì„ ì œì™¸í•˜ê³  crì»¬ëŸ¬ë¡œ ì±„ìš´ë‹¤.
 void fill_except_rect(CDC* pDC, CRect r, CRect except, COLORREF cr)
 {
-	//Ã¤¿öÁö´Â ¿µ¿ª È®ÀÎ¿ë
+	//ì±„ì›Œì§€ëŠ” ì˜ì—­ í™•ì¸ìš©
 	bool confirm = false;
 
 	//left area
@@ -10501,11 +10386,11 @@ void fill_except_rect(CDC* pDC, CRect r, CRect except, COLORREF cr)
 	pDC->FillSolidRect(except.left, except.top + except.Height(), except.Width(), r.bottom - except.top - except.Height(), (confirm ? violet : cr));
 }
 
-//side ¹è¿­ÀÇ ÀÎµ¦½º´Â resizeÇÏ´Â ¿µ¿ª ÀÎµ¦½º·Î¼­
-//DefWindowProcÀÇ µÎ¹øÂ° ÆÄ¶ó¹ÌÅÍ¿¡ (SC_SIZE + m_nSideIndex)·Î ¾²ÀÌ¹Ç·Î ±× Â÷·Ê¸¦ µû¸¥´Ù.
-//´Ü, topÀÇ °æ¿ì, Å×µÎ¸®°¡ ¾ø´Â dialogÀÎ °æ¿ì´Â »ó´ÜÀ» Å¸ÀÌÆ²¹Ù ¿µ¿ªÃ³·³ ¾²¹Ç·Î
-//marginÀÇ Å©±â¸¦ ±×´ë·Î ÀâÀ¸¸é Å¸ÀÌÆ²¹Ù°¡ Á¼¾ÆÁö´Â ºÒÆíÀÌ ÀÖ´Ù.
-//µû¶ó¼­ topÀÇ °æ¿ì´Â 4ÇÈ¼¿·Î °íÁ¤ÇÏ´Â °ÍÀÌ ÀûÀıÇÏ´Ù.
+//side ë°°ì—´ì˜ ì¸ë±ìŠ¤ëŠ” resizeí•˜ëŠ” ì˜ì—­ ì¸ë±ìŠ¤ë¡œì„œ
+//DefWindowProcì˜ ë‘ë²ˆì§¸ íŒŒë¼ë¯¸í„°ì— (SC_SIZE + m_nSideIndex)ë¡œ ì“°ì´ë¯€ë¡œ ê·¸ ì°¨ë¡€ë¥¼ ë”°ë¥¸ë‹¤.
+//ë‹¨, topì˜ ê²½ìš°, í…Œë‘ë¦¬ê°€ ì—†ëŠ” dialogì¸ ê²½ìš°ëŠ” ìƒë‹¨ì„ íƒ€ì´í‹€ë°” ì˜ì—­ì²˜ëŸ¼ ì“°ë¯€ë¡œ
+//marginì˜ í¬ê¸°ë¥¼ ê·¸ëŒ€ë¡œ ì¡ìœ¼ë©´ íƒ€ì´í‹€ë°”ê°€ ì¢ì•„ì§€ëŠ” ë¶ˆí¸ì´ ìˆë‹¤.
+//ë”°ë¼ì„œ topì˜ ê²½ìš°ëŠ” 4í”½ì…€ë¡œ ê³ ì •í•˜ëŠ” ê²ƒì´ ì ì ˆí•˜ë‹¤.
 void GetSideRect(CRect src, CRect *side, int margin)
 {
 	side[corner_left] = CRect(src.left, src.top + margin, src.left + margin, src.bottom - margin);
@@ -10518,8 +10403,8 @@ void GetSideRect(CRect src, CRect *side, int margin)
 	side[corner_bottomright] = CRect(src.right - margin, src.bottom - margin, src.right, src.bottom);
 }
 
-//8±ºµ¥ÀÇ ÄÚ³Ê¿Í »çÀÌµå ¿µ¿ª¿¡ ÇØ´ç Á¡ÀÌ ÀÖ´ÂÁö¸¦ °Ë»çÇÏ¿© ÇØ´ç ¿µ¿ªÀÇ ÀÎµ¦½º¸¦ ¸®ÅÏÇÑ´Ù.
-//ÀÎµ¦½º´Â CORNER_INDEXÀÇ Â÷·ÊÀÌ¸ç ÀÌ´Â DefWindowProc¿¡¼­ »ç¿ëÇÏ´Â Â÷·Ê¿Í µ¿ÀÏÇÏ´Ù.
+//8êµ°ë°ì˜ ì½”ë„ˆì™€ ì‚¬ì´ë“œ ì˜ì—­ì— í•´ë‹¹ ì ì´ ìˆëŠ”ì§€ë¥¼ ê²€ì‚¬í•˜ì—¬ í•´ë‹¹ ì˜ì—­ì˜ ì¸ë±ìŠ¤ë¥¼ ë¦¬í„´í•œë‹¤.
+//ì¸ë±ìŠ¤ëŠ” CORNER_INDEXì˜ ì°¨ë¡€ì´ë©° ì´ëŠ” DefWindowProcì—ì„œ ì‚¬ìš©í•˜ëŠ” ì°¨ë¡€ì™€ ë™ì¼í•˜ë‹¤.
 int get_corner_index(CRect src, CPoint pt, int margin)
 {
 	if ((src.IsRectEmpty()) ||
@@ -10553,7 +10438,7 @@ int get_corner_index(CRect src, CPoint pt, int margin)
 	return -1;
 }
 
-//½ÃÀÛÁ¡À» ÁÖ¸é Á¤»ç°¢ÇüÀ» ÀÌ·ç´Â ³¡Á¡ ÁÂÇ¥¸¦ ¸®ÅÏÇÑ´Ù.
+//ì‹œì‘ì ì„ ì£¼ë©´ ì •ì‚¬ê°í˜•ì„ ì´ë£¨ëŠ” ëì  ì¢Œí‘œë¥¼ ë¦¬í„´í•œë‹¤.
 void getSquareEndPoint(int sx, int sy, int& ex, int& ey)
 {
 	int difX = ex - sx;
@@ -10644,7 +10529,7 @@ CString	ExtractSubString(CString src, CString sPrev, CString sPost)
 }
 
 //-----------------------------------------------------------------
-// PID·Î ÇÁ·Î¼¼½º Ã£±â
+// PIDë¡œ í”„ë¡œì„¸ìŠ¤ ì°¾ê¸°
 //-----------------------------------------------------------------
 bool CheckProcessUsingPID(unsigned long pid) // unsigned long = DWORD
 {
@@ -10656,7 +10541,7 @@ bool CheckProcessUsingPID(unsigned long pid) // unsigned long = DWORD
 		return false;
 
 	//-----------------------------------------------------------------
-	// ÇÁ·Î¼¼½º¸¦ Ã£´Â´Ù
+	// í”„ë¡œì„¸ìŠ¤ë¥¼ ì°¾ëŠ”ë‹¤
 	//-----------------------------------------------------------------
 	Process32First(snapshotHandle, &processEntry);
 	do
@@ -10669,7 +10554,7 @@ bool CheckProcessUsingPID(unsigned long pid) // unsigned long = DWORD
 }
 
 //-----------------------------------------------------------------
-// À©µµ¿ì Å¸ÀÌÆ², Å¬·¡½º ÀÌ¸§À¸·Î ÇÁ·Î¼¼½º Ã£±â
+// ìœˆë„ìš° íƒ€ì´í‹€, í´ë˜ìŠ¤ ì´ë¦„ìœ¼ë¡œ í”„ë¡œì„¸ìŠ¤ ì°¾ê¸°
 //-----------------------------------------------------------------
 bool CheckProcessUsingWindowName(LPCTSTR className, LPCTSTR titleName)
 {
@@ -10677,13 +10562,13 @@ bool CheckProcessUsingWindowName(LPCTSTR className, LPCTSTR titleName)
 		return false;
 
 	//-----------------------------------------------------------------
-	// Å¬·¡½º ÀÌ¸§ ¹× Å¸ÀÌÆ² ÀÌ¸§À¸·Î À©µµ¿ì¸¦ Ã£´Â´Ù
+	// í´ë˜ìŠ¤ ì´ë¦„ ë° íƒ€ì´í‹€ ì´ë¦„ìœ¼ë¡œ ìœˆë„ìš°ë¥¼ ì°¾ëŠ”ë‹¤
 	//-----------------------------------------------------------------
 	HWND targetWindow = FindWindow(className ? className : NULL, titleName ? titleName : NULL);
 	if (targetWindow)
 	{
 		//-----------------------------------------------------------------
-		// Ã£Àº À©µµ¿ì ÇÚµé·Î PID, TID¸¦ ÃëµæÇÏ¿© ÇÁ·Î¼¼½º¸¦ Ã£´Â´Ù
+		// ì°¾ì€ ìœˆë„ìš° í•¸ë“¤ë¡œ PID, TIDë¥¼ ì·¨ë“í•˜ì—¬ í”„ë¡œì„¸ìŠ¤ë¥¼ ì°¾ëŠ”ë‹¤
 		//-----------------------------------------------------------------
 		unsigned long pid = 0, tid = GetWindowThreadProcessId(targetWindow, &pid);
 
@@ -10708,7 +10593,7 @@ bool CheckProcessUsingWindowName(LPCTSTR className, LPCTSTR titleName)
 }
 
 //-----------------------------------------------------------------
-// ÇÁ·Î¼¼½º ÀÌ¸§À¸·Î ÇÁ·Î¼¼½º Ã£±â
+// í”„ë¡œì„¸ìŠ¤ ì´ë¦„ìœ¼ë¡œ í”„ë¡œì„¸ìŠ¤ ì°¾ê¸°
 //-----------------------------------------------------------------
 bool CheckProcessUsingProcessName(LPCTSTR processName) // unsigned long = DWORD
 {
@@ -10723,7 +10608,7 @@ bool CheckProcessUsingProcessName(LPCTSTR processName) // unsigned long = DWORD
 		return false;
 
 	//-----------------------------------------------------------------
-	// ÇÁ·Î¼¼½º¸¦ Ã£´Â´Ù
+	// í”„ë¡œì„¸ìŠ¤ë¥¼ ì°¾ëŠ”ë‹¤
 	//-----------------------------------------------------------------
 	Process32First(snapshotHandle, &processEntry);
 	do
@@ -10818,7 +10703,7 @@ HBITMAP capture_screen_to_bitmap(LPRECT pRect, UINT id, int dx, int dy)
 		nY2 = pRect->bottom;
 
 		//make sure bitmap rectangle is visible
-		//scpark ¸ğ´ÏÅÍ À§Ä¡ ¼³Á¤¿¡ µû¶ó À½¼öÀÏ ¼ö ÀÖ´Ù. ¾Æ·¡ º¸Á¤Àº ÇÏÁö ¾Ê¾Æ¾ß ÇÑ´Ù.
+		//scpark ëª¨ë‹ˆí„° ìœ„ì¹˜ ì„¤ì •ì— ë”°ë¼ ìŒìˆ˜ì¼ ìˆ˜ ìˆë‹¤. ì•„ë˜ ë³´ì •ì€ í•˜ì§€ ì•Šì•„ì•¼ í•œë‹¤.
 		//if (nX < 0) nX = 0;
 		//if (nY < 0) nY = 0;
 	}
@@ -10848,7 +10733,7 @@ HBITMAP capture_screen_to_bitmap(LPRECT pRect, UINT id, int dx, int dy)
 #else
 
 	// create a bitmap compatible with the screen DC
-	hBitmap = CreateCompatibleBitmap(hScrDC, nWidth, nHeight);	//32bit·Î ¸¸µé¾îÁø´Ù.
+	hBitmap = CreateCompatibleBitmap(hScrDC, nWidth, nHeight);	//32bitë¡œ ë§Œë“¤ì–´ì§„ë‹¤.
 #endif
 
 	// select new bitmap into memory DC
@@ -11002,23 +10887,23 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	}
 	else
 	{
-		//ÀüÃ¼È­¸éÀÏ¶§¿Í Ã¢¸ğµåÀÏ¶§ ºÒÇÊ¿äÇÑ ¿©¹éÀ» Àß¶ó³»´Â ÄÚµåµéÀÌ³ª
-		//¿©¹éÀ» Àß¶ó³»¸é ÇØ´ç Å©±â·Î mpeg³ìÈ­µÇÁö ¾Ê´Â ¿¡·¯°¡ ¹ß»ıÇÏ¿©
-		//¿ì¼± Àß¶ó³»´Â ÄÚµå´Â »ç¿ëÇÏÁö ¾Ê´Â´Ù.
+		//ì „ì²´í™”ë©´ì¼ë•Œì™€ ì°½ëª¨ë“œì¼ë•Œ ë¶ˆí•„ìš”í•œ ì—¬ë°±ì„ ì˜ë¼ë‚´ëŠ” ì½”ë“œë“¤ì´ë‚˜
+		//ì—¬ë°±ì„ ì˜ë¼ë‚´ë©´ í•´ë‹¹ í¬ê¸°ë¡œ mpegë…¹í™”ë˜ì§€ ì•ŠëŠ” ì—ëŸ¬ê°€ ë°œìƒí•˜ì—¬
+		//ìš°ì„  ì˜ë¼ë‚´ëŠ” ì½”ë“œëŠ” ì‚¬ìš©í•˜ì§€ ì•ŠëŠ”ë‹¤.
 		if (true)//(rct.left + 8 == DsRct.left || rct.left + 8 == DsRct.left + DsRct.right) && (rct.top + 8 == DsRct.top || rct.top + 8 == DsRct.top + DsRct.bottom) && (rct.right - 8 == DsRct.right || rct.right - 8 == DsRct.right * 2) && (rct.bottom + 32 == DsRct.bottom || rct.bottom + 32 == DsRct.bottom * 2))
 		{
-			// ÀüÃ¼È­¸é
+			// ì „ì²´í™”ë©´
 
 			//StretchBlt(hMemDC, -8, -8, rct.right - rct.left + 8, rct.bottom - rct.top + 8, hMemDC, 0, 0, rct.right - rct.left - 8, rct.bottom - rct.top - 8, SRCCOPY);
 			StretchBlt(hMemDC, 0, 0, rct.Width(), rct.Height(), hMemDC, 0, 0, rct.Width(), rct.Height(), SRCCOPY);
-			// Ä¸ÃÄ ½Ã ¿©¹éÀ» ¾ø¾Ö±â À§ÇØ 8ÇÈ¼¿À» °¡°¨
+			// ìº¡ì³ ì‹œ ì—¬ë°±ì„ ì—†ì• ê¸° ìœ„í•´ 8í”½ì…€ì„ ê°€ê°
 		}
 		else
 		{
-			// Ã¢¸ğµå
+			// ì°½ëª¨ë“œ
 
 			StretchBlt(hMemDC, -7, 0, rct.right - rct.left + 7, rct.bottom - rct.top, hMemDC, 0, 0, rct.right - rct.left - 7, rct.bottom - rct.top - 7, SRCCOPY);
-			// Ä¸ÃÄ ½Ã ¿©¹éÀ» ¾ø¾Ö±â À§ÇØ 7ÇÈ¼¿À» °¡°¨
+			// ìº¡ì³ ì‹œ ì—¬ë°±ì„ ì—†ì• ê¸° ìœ„í•´ 7í”½ì…€ì„ ê°€ê°
 		}
 		bSuccess = TRUE;
 	}
@@ -11380,22 +11265,22 @@ int GetSystemImageListIcon(CString szFile, BOOL bDrive)
 {
 	SHFILEINFO shFileInfo;
 
-	if (szFile == _T("³» PC"))//GetStringById(NFTD_IDS_COMPUTER))
+	if (szFile == _T("ë‚´ PC"))//GetStringById(NFTD_IDS_COMPUTER))
 	{
 		LPITEMIDLIST pidl_Computer = NULL;
-		SHGetFolderLocation(NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer); // ÄÄÇ»ÅÍ
+		SHGetFolderLocation(NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer); // ì»´í“¨í„°
 		SHGetFileInfo((TCHAR*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
-	else if (szFile == _T("³» ¹®¼­"))//GetStringById(NFTD_IDS_DOCUMENT))
+	else if (szFile == _T("ë‚´ ë¬¸ì„œ"))//GetStringById(NFTD_IDS_DOCUMENT))
 	{
 		LPITEMIDLIST pidl_Document = NULL;
-		SHGetFolderLocation(NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document); // ³»¹®¼­
+		SHGetFolderLocation(NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document); // ë‚´ë¬¸ì„œ
 		SHGetFileInfo((TCHAR*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
-	else if (szFile == _T("¹ÙÅÁ È­¸é"))//GetStringById(NFTD_IDS_DESKTOP))
+	else if (szFile == _T("ë°”íƒ• í™”ë©´"))//GetStringById(NFTD_IDS_DESKTOP))
 	{
 		LPITEMIDLIST pidl_Desktop = NULL;
-		SHGetFolderLocation(NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop); // ¹ÙÅÁÈ­¸é
+		SHGetFolderLocation(NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop); // ë°”íƒ•í™”ë©´
 		SHGetFileInfo((TCHAR*)pidl_Desktop, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
 	else
@@ -11435,7 +11320,7 @@ void gradient_rect(CDC* pDC, CRect &rect, int preset, bool vertical)
 	*/
 }
 
-void gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool vertical)
+void gradient_rect(CDC* pDC, CRect &rect, std::deque<Gdiplus::Color> dqColor, bool vertical)
 {
 	rect.NormalizeRect();
 
@@ -11468,7 +11353,7 @@ void gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool ver
 		size++;
 	}
 
-	//width ¶Ç´Â height¸¦ nµîºĞÇØ¼­ gradient fillÀ» ÇÑ´Ù.
+	//width ë˜ëŠ” heightë¥¼ në“±ë¶„í•´ì„œ gradient fillì„ í•œë‹¤.
 	if (vertical)
 	{
 		divide = (double)rect.Height() / (double)(size-1);
@@ -11482,9 +11367,9 @@ void gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool ver
 	{
 		rcVertex[0].x		= x1;
 		rcVertex[0].y		= y1;
-		rcVertex[0].Red		= GetRValue(dqColor[i])<<8;	// color values from 0x0000 to 0xff00 !!!!
-		rcVertex[0].Green	= GetGValue(dqColor[i])<<8;
-		rcVertex[0].Blue	= GetBValue(dqColor[i])<<8;
+		rcVertex[0].Red		= dqColor[i].GetR() << 8;	// color values from 0x0000 to 0xff00 !!!!
+		rcVertex[0].Green	= dqColor[i].GetG() << 8;
+		rcVertex[0].Blue	= dqColor[i].GetB() << 8;
 		rcVertex[0].Alpha	= 0;//128<<8;
 
 		if (vertical)
@@ -11501,9 +11386,9 @@ void gradient_rect(CDC* pDC, CRect &rect, std::deque<COLORREF> dqColor, bool ver
 
 		rcVertex[1].x		= x2;
 		rcVertex[1].y		= y2;
-		rcVertex[1].Red		= GetRValue(dqColor[i+1])<<8;
-		rcVertex[1].Green	= GetGValue(dqColor[i+1])<<8;
-		rcVertex[1].Blue	= GetBValue(dqColor[i+1])<<8;
+		rcVertex[1].Red		= dqColor[i+1].GetR() << 8;
+		rcVertex[1].Green	= dqColor[i+1].GetG() << 8;
+		rcVertex[1].Blue	= dqColor[i+1].GetB() << 8;
 		rcVertex[1].Alpha	= 0;//255<<8;
 
 		GRADIENT_RECT rect;
@@ -11655,7 +11540,7 @@ void adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, in
 	rect = CRect(l, t, r, b);
 }
 
-//¸ğ´ÏÅÍÀÇ ÇÑÂÊ¿¡ ºÙÀº »ç°¢ÇüÀ» »õ·Î¿î Å©±â·Î º¯°æÇÒ °æ¿ì ºÙÀº »óÅÂ¸¦ À¯ÁöÇÏ°í º¯°æÇÒ ÇÊ¿ä°¡ ÀÖÀ» °æ¿ì »ç¿ë.
+//ëª¨ë‹ˆí„°ì˜ í•œìª½ì— ë¶™ì€ ì‚¬ê°í˜•ì„ ìƒˆë¡œìš´ í¬ê¸°ë¡œ ë³€ê²½í•  ê²½ìš° ë¶™ì€ ìƒíƒœë¥¼ ìœ ì§€í•˜ê³  ë³€ê²½í•  í•„ìš”ê°€ ìˆì„ ê²½ìš° ì‚¬ìš©.
 void adjust_with_monitor_attached(CRect rOld, CRect &rNew)
 {
 	int nw = rNew.Width();
@@ -11672,14 +11557,14 @@ void adjust_with_monitor_attached(CRect rOld, CRect &rNew)
 }
 
 
-//rTarget¿¡ Á¢ÇÏ´Â dRatioÀÎ ÃÖ´ë »ç°¢ÇüÀ» ±¸ÇÑ´Ù.
-//attach_left µîÀÇ ¿É¼ÇÀ» ÁÙ ÇÊ¿ä°¡ ÀÖ´Ù.
+//rTargetì— ì ‘í•˜ëŠ” dRatioì¸ ìµœëŒ€ ì‚¬ê°í˜•ì„ êµ¬í•œë‹¤.
+//attach_left ë“±ì˜ ì˜µì…˜ì„ ì¤„ í•„ìš”ê°€ ìˆë‹¤.
 CRect get_ratio_max_rect(CRect rTarget, int w, int h, int attach)
 {
 	return get_ratio_max_rect(rTarget, (double)w / (double)h, attach);
 }
 
-//rTarget¿¡ Á¢ÇÏ´Â dRatioÀÎ ÃÖ´ë »ç°¢ÇüÀ» ±¸ÇÑ´Ù.
+//rTargetì— ì ‘í•˜ëŠ” dRatioì¸ ìµœëŒ€ ì‚¬ê°í˜•ì„ êµ¬í•œë‹¤.
 CRect get_ratio_max_rect(CRect rTarget, double dRatio, int attach)
 {
 	int		w = rTarget.Width();
@@ -11746,14 +11631,14 @@ CRect get_ratio_max_rect(CRect rTarget, double dRatio, int attach)
 	return rResult;
 }
 
-//w x h »ç°¢ÇüÀ» target¾È¿¡ ³ÖÀ» ¶§ Áß¾Ó¿¡ Ç¥½ÃµÇ°Ô ÇÏ´Â »ç°¢Çü ¿µ¿ªÀ» ¸®ÅÏÇÑ´Ù.
-//w, hº¸´Ù targetÀÌ ÀûÀ»¶§´Â targetº¸´Ù Å« ¿µ¿ªÀÌ ¸®ÅÏµÉ °ÍÀÌ´Ù.
+//w x h ì‚¬ê°í˜•ì„ targetì•ˆì— ë„£ì„ ë•Œ ì¤‘ì•™ì— í‘œì‹œë˜ê²Œ í•˜ëŠ” ì‚¬ê°í˜• ì˜ì—­ì„ ë¦¬í„´í•œë‹¤.
+//w, hë³´ë‹¤ targetì´ ì ì„ë•ŒëŠ” targetë³´ë‹¤ í° ì˜ì—­ì´ ë¦¬í„´ë  ê²ƒì´ë‹¤.
 CRect get_center_rect(CRect target, int w, int h)
 {
 	return CRect(target.left + (target.Width() - w) / 2, target.top + (target.Height() - h) / 2, w, h);
 }
 
-//ÁÖ¾îÁø Á¡µéÀ» Æ÷ÇÔÇÏ´Â ÃÖ´ë »ç°¢ÇüÀ» ±¸ÇÑ´Ù.
+//ì£¼ì–´ì§„ ì ë“¤ì„ í¬í•¨í•˜ëŠ” ìµœëŒ€ ì‚¬ê°í˜•ì„ êµ¬í•œë‹¤.
 CRect get_max_rect(CPoint *pt, int nPoints)
 {
 	std::vector<CPoint> pts;
@@ -11787,7 +11672,7 @@ CRect get_max_rect(std::vector<CPoint> pts, int pt_max /*= -1*/)
 }
 
 
-//´Ù°¢ÇüÀÇ ³ĞÀÌ¸¦ ±¸ÇÑ´Ù. ´Ü, º¯ÀÌ ÇÏ³ª¶óµµ ±³Â÷µÇ¸é ¼º¸³ÇÏÁö ¾Ê´Â´Ù.
+//ë‹¤ê°í˜•ì˜ ë„“ì´ë¥¼ êµ¬í•œë‹¤. ë‹¨, ë³€ì´ í•˜ë‚˜ë¼ë„ êµì°¨ë˜ë©´ ì„±ë¦½í•˜ì§€ ì•ŠëŠ”ë‹¤.
 double		GetPolygonAreaSize(CPoint *pt, int nPoints)
 {
 	double dArea = 0.0;
@@ -11805,7 +11690,7 @@ double		GetPolygonAreaSize(CPoint *pt, int nPoints)
 	return dArea;
 }
 
-//return¹ŞÀº char*´Â ¹İµå½Ã »ç¿ë ÈÄ free()ÇØÁà¾ß ÇÔ.
+//returnë°›ì€ char*ëŠ” ë°˜ë“œì‹œ ì‚¬ìš© í›„ free()í•´ì¤˜ì•¼ í•¨.
 char* replace(char* s, const char* olds, const char* news)
 {
 	char* result;
@@ -11902,14 +11787,14 @@ void Trim(char* src)
 	delete [] temp;
 }
 
-//°ø¹é, '\t', '\r', '\n', '\0' ¸ğµÎ Á¦°Å
+//ê³µë°±, '\t', '\r', '\n', '\0' ëª¨ë‘ ì œê±°
 void trim(std::string& str)
 {
 	trim_left(str);
 	trim_right(str);
 }
 
-//°ø¹é, '\t', '\r', '\n' ¸ğµÎ Á¦°Å
+//ê³µë°±, '\t', '\r', '\n' ëª¨ë‘ ì œê±°
 void trim_left(std::string& str)
 {
 	int none_trim_char_pos = 0;
@@ -11942,7 +11827,7 @@ void trim(std::deque<CString>* dq)
 		dq->at(i).Trim();
 }
 
-//src¹®ÀÚ¿­¿¡¼­ chars¸¦ ¸ğµÎ Á¦°ÅÇÑ´Ù.
+//srcë¬¸ìì—´ì—ì„œ charsë¥¼ ëª¨ë‘ ì œê±°í•œë‹¤.
 void remove_chars(CString &src, CString chars)
 {
 	for (int i = 0; i < chars.GetLength(); i++)
@@ -12209,7 +12094,7 @@ int get_ucs4_levenshtein_distance(string str1, string str2, double* ratio)
 }
 */
 
-//Â÷·®Á¤º¸ÆÄÀÏ(xml) ÀúÀå °ü·Ã
+//ì°¨ëŸ‰ì •ë³´íŒŒì¼(xml) ì €ì¥ ê´€ë ¨
 #if 0
 bool SavePlateInfoFile(char* sfile, char* sPlate, RECT* rect /*= NULL*/)
 {
@@ -12235,7 +12120,7 @@ bool SavePlateInfoFile(char* sfile, char* sPlate, RECT* rect /*= NULL*/)
 }
 #endif 
 
-//32ºñÆ®ÀÎ dw¿¡ µé¾îÀÖ´Â R, G, B¸¦ ÃßÃâÇÏ¿© 16ºñÆ®(5+6+5) ÄÃ·¯·Î ¸®ÅÏÇÑ´Ù.
+//32ë¹„íŠ¸ì¸ dwì— ë“¤ì–´ìˆëŠ” R, G, Bë¥¼ ì¶”ì¶œí•˜ì—¬ 16ë¹„íŠ¸(5+6+5) ì»¬ëŸ¬ë¡œ ë¦¬í„´í•œë‹¤.
 WORD RGB24ToRGB565(DWORD dw)
 {
 	BYTE	bt;
@@ -12255,7 +12140,7 @@ WORD RGB24ToRGB565(DWORD dw)
 	return wd;
 }
 
-//µÎ DWORD¸¦ WORD·Î º¯È¯ÇÏ¿© ÇÏ³ªÀÇ DWORD·Î º¯È¯ÇÑ´Ù.
+//ë‘ DWORDë¥¼ WORDë¡œ ë³€í™˜í•˜ì—¬ í•˜ë‚˜ì˜ DWORDë¡œ ë³€í™˜í•œë‹¤.
 DWORD RGB24ToRGB565(DWORD dw1, DWORD dw2)
 {
 	DWORD dw = RGB24ToRGB565(dw1);
@@ -12265,10 +12150,10 @@ DWORD RGB24ToRGB565(DWORD dw1, DWORD dw2)
 	return dw;
 }
 
-//RGB565·Î Ãà¾àµÈ WORD¸¦ ´Ù½Ã 24ºñÆ® RGB(DWORD)·Î º¹¿ø½ÃÅ²´Ù.
+//RGB565ë¡œ ì¶•ì•½ëœ WORDë¥¼ ë‹¤ì‹œ 24ë¹„íŠ¸ RGB(DWORD)ë¡œ ë³µì›ì‹œí‚¨ë‹¤.
 DWORD RGB565ToRGB24(WORD wd)
 {
-	//565·Î ¸¸µé¾îÁø wd¿¡¼­ ´Ù½Ã rgb·Î º¹¿ø½ÃÄÑº¸ÀÚ.
+	//565ë¡œ ë§Œë“¤ì–´ì§„ wdì—ì„œ ë‹¤ì‹œ rgbë¡œ ë³µì›ì‹œì¼œë³´ì.
 	BYTE	r = (wd & 0xf800) >> 11 << 3;
 	BYTE	g = (wd & 0x07e0) >> 5 << 2;
 	BYTE	b = (wd & 0x001f) << 3;
@@ -12393,25 +12278,25 @@ CString	get_last_error_string(DWORD dwError, bool show_msgBox)
 	return result;
 }
 
-//¿øÁ¡¿¡¼­ º¤ÅÍ b°¡ º¤ÅÍ aÀÇ ¹İ½Ã°è ¹æÇâÀÌ¸é ¾ç¼ö, ½Ã°è¹æÇâÀÌ¸é À½¼ö, ÆòÇàÀÌ¸é 0À» ¹İÈ¯ ÇÑ´Ù.
+//ì›ì ì—ì„œ ë²¡í„° bê°€ ë²¡í„° aì˜ ë°˜ì‹œê³„ ë°©í–¥ì´ë©´ ì–‘ìˆ˜, ì‹œê³„ë°©í–¥ì´ë©´ ìŒìˆ˜, í‰í–‰ì´ë©´ 0ì„ ë°˜í™˜ í•œë‹¤.
 double ccw(vector2 a, vector2 b)
 {
     return a.cross(b);
 }
 
-//Á¡ p¸¦ ±âÁØÀ¸·Î º¤ÅÍ b°¡ º¤ÅÍ aÀÇ ¹İ½Ã°è ¹æÇâÀÌ¸é ¾ç¼ö, ½Ã°è¹æÇâÀÌ¸é À½¼ö, ÆòÇàÀÌ¸é 0À» ¹İÈ¯ ÇÑ´Ù.
+//ì  pë¥¼ ê¸°ì¤€ìœ¼ë¡œ ë²¡í„° bê°€ ë²¡í„° aì˜ ë°˜ì‹œê³„ ë°©í–¥ì´ë©´ ì–‘ìˆ˜, ì‹œê³„ë°©í–¥ì´ë©´ ìŒìˆ˜, í‰í–‰ì´ë©´ 0ì„ ë°˜í™˜ í•œë‹¤.
 double ccw(vector2 p, vector2 a, vector2 b)
 {
     return ccw(a-p, b-p);
 }
 
-// - Á¡ a, b¸¦ Áö³ª´Â Á÷¼±°ú Á¡ c, d¸¦ Áö³ª´Â Á÷¼±ÀÇ ±³Á¡À» x¿¡ ¹İÈ¯ÇÑ´Ù.
-// - µÎ Á÷¼±ÀÌ ÆòÇàÀÌ¸é(°ãÄ¡´Â °æ¿ì Æ÷ÇÔ) °ÅÁşÀ», ¾Æ´Ï¸é ÂüÀ» ¹İÈ¯ÇÑ´Ù.
-// ÃâÃ³ : http://bowbowbow.tistory.com/17
+// - ì  a, bë¥¼ ì§€ë‚˜ëŠ” ì§ì„ ê³¼ ì  c, dë¥¼ ì§€ë‚˜ëŠ” ì§ì„ ì˜ êµì ì„ xì— ë°˜í™˜í•œë‹¤.
+// - ë‘ ì§ì„ ì´ í‰í–‰ì´ë©´(ê²¹ì¹˜ëŠ” ê²½ìš° í¬í•¨) ê±°ì§“ì„, ì•„ë‹ˆë©´ ì°¸ì„ ë°˜í™˜í•œë‹¤.
+// ì¶œì²˜ : http://bowbowbow.tistory.com/17
 bool GetIntersectionPoint(vector2 a, vector2 b, vector2 c, vector2 d, vector2& x)
 {
     double det = (b-a).cross(d-c);
-    //µÎ¼±ÀÌ ÆòÇàÀÎ °æ¿ì
+    //ë‘ì„ ì´ í‰í–‰ì¸ ê²½ìš°
     if(fabs(det) < DBL_EPSILON) return false;
     x = a+(b-a)*((c-a).cross(d-c)/det);
     return true;
@@ -12443,13 +12328,13 @@ bool GetIntersectionPoint(int x0, int y0, int x1, int y1, int x2, int y2, int x3
 	return bIntersect;
 }
 
-//4Á¡À¸·Î ±¸¼ºµÈ µÎ ¼±ºĞÀÌ ¼­·Î ±³Â÷ÇÏ´ÂÁö ¿©ºÎ¸¦ ÆÇº°ÇÑ´Ù.
+//4ì ìœ¼ë¡œ êµ¬ì„±ëœ ë‘ ì„ ë¶„ì´ ì„œë¡œ êµì°¨í•˜ëŠ”ì§€ ì—¬ë¶€ë¥¼ íŒë³„í•œë‹¤.
 bool IsIntersect2LineSegment(vector2 a, vector2 b, vector2 c, vector2 d)
 {
     double ab = ccw(a, b, c)*ccw(a, b, d);
     double cd = ccw(c, d ,a)*ccw(c, d, b);
 
-    //µÎ ¼±ºĞÀÌ ÇÑ Á÷¼±¿¡ À§¿¡ ÀÖ°Å³ª ³¡Á¡ÀÌ °ãÄ¡´Â °æ¿ì
+    //ë‘ ì„ ë¶„ì´ í•œ ì§ì„ ì— ìœ„ì— ìˆê±°ë‚˜ ëì ì´ ê²¹ì¹˜ëŠ” ê²½ìš°
     if (ab == 0 && cd == 0)
 	{
         if(b < a) std::swap(a, b);
@@ -12473,41 +12358,41 @@ bool IsIntersect2LineSegment(CPoint* pt, bool bCheckCrossOver)
 	return b0123;
 }
 
-//Á¡ a, b¿Í Á¡ c, d°¡ ÆòÇàÇÑ µÎ ¼±ºĞ ÀÏ ¶§ ÀÌµéÀÌ ÇÑ Á¡¿¡¼­ °ãÄ¡´ÂÁö È®ÀÎÇÑ´Ù.
+//ì  a, bì™€ ì  c, dê°€ í‰í–‰í•œ ë‘ ì„ ë¶„ ì¼ ë•Œ ì´ë“¤ì´ í•œ ì ì—ì„œ ê²¹ì¹˜ëŠ”ì§€ í™•ì¸í•œë‹¤.
 bool paralleSegments(vector2 a, vector2 b, vector2 c, vector2 d, vector2& p){
     if(b < a) std::swap(a,b);
     if(d < c) std::swap(c,d);
 
-    //ÇÑ Á÷¼±À§¿¡ ¾ø°Å³ª µÎ ¼±ºĞÀÌ °ãÄ¡Áö ¾Ê´Â °æ¿ì¸¦ ¿ì¼± °É·¯³½´Ù. º»¹®ÀÇ 1¹ø °ü°èÀÎ °æ¿ìÀÌ´Ù.
+    //í•œ ì§ì„ ìœ„ì— ì—†ê±°ë‚˜ ë‘ ì„ ë¶„ì´ ê²¹ì¹˜ì§€ ì•ŠëŠ” ê²½ìš°ë¥¼ ìš°ì„  ê±¸ëŸ¬ë‚¸ë‹¤. ë³¸ë¬¸ì˜ 1ë²ˆ ê´€ê³„ì¸ ê²½ìš°ì´ë‹¤.
     if(ccw(a, b, c) != 0 || b < c || d < a) return false;
 
-    //µÎ ¼±ºĞÀÌ È®½ÇÈ÷ °ãÄ£´Ù¸é ±³Â÷Á¡ ÇÏ³ª¸¦ Ã£´Â´Ù.
+    //ë‘ ì„ ë¶„ì´ í™•ì‹¤íˆ ê²¹ì¹œë‹¤ë©´ êµì°¨ì  í•˜ë‚˜ë¥¼ ì°¾ëŠ”ë‹¤.
     if(a<c) p = c;
     else p = a;
     return true;
 }
 
 
-// - p°¡ µÎ Á¡ a, b¸¦ °¨½Î¸é¼­ °¢ º¯ÀÌ x, yÃà¿¡ ÆòÇàÇÑ ÃÖ¼Ò»ç°¢Çü ³»ºÎ¿¡ ÀÖ´ÂÁö È®ÀÎÇÑ´Ù.
-// a, b, p´Â ÀÏÁ÷¼± »ó¿¡ ÀÖ´Ù°í °¡Á¤ÇÑ´Ù.
+// - pê°€ ë‘ ì  a, bë¥¼ ê°ì‹¸ë©´ì„œ ê° ë³€ì´ x, yì¶•ì— í‰í–‰í•œ ìµœì†Œì‚¬ê°í˜• ë‚´ë¶€ì— ìˆëŠ”ì§€ í™•ì¸í•œë‹¤.
+// a, b, pëŠ” ì¼ì§ì„  ìƒì— ìˆë‹¤ê³  ê°€ì •í•œë‹¤.
 bool inBoundingRectangle(vector2 p, vector2 a, vector2 b){
     if(b < a) std::swap(a, b);
     return p == a || p == b || (a <p && p < b);
 }
 
 
-// - µÎ Á¡ a, b¸¦ Áö³ª´Â ¼±ºĞ°ú µÎ Á¡ c, b¸¦ Áö³ª´Â ¼±ºĞÀ» p¿¡ ¹İÈ¯ÇÑ´Ù.
-// - ±³ÁüÀÌ ¿©·¯°³ÀÏ °æ¿ì ¾Æ¹«Á¡ÀÌ³ª ¹İÈ¯ÇÑ´Ù.
+// - ë‘ ì  a, bë¥¼ ì§€ë‚˜ëŠ” ì„ ë¶„ê³¼ ë‘ ì  c, bë¥¼ ì§€ë‚˜ëŠ” ì„ ë¶„ì„ pì— ë°˜í™˜í•œë‹¤.
+// - êµì§ì´ ì—¬ëŸ¬ê°œì¼ ê²½ìš° ì•„ë¬´ì ì´ë‚˜ ë°˜í™˜í•œë‹¤.
 bool segmentIntersection(vector2 a, vector2 b, vector2 c, vector2 d, vector2& p){
-    //µÎ Á÷¼±ÀÌ ÆòÇàÀÎ °æ¿ì¸¦ ¿ì¼± ¿¹¿Ü·Î Ã³¸®ÇÑ´Ù.
+    //ë‘ ì§ì„ ì´ í‰í–‰ì¸ ê²½ìš°ë¥¼ ìš°ì„  ì˜ˆì™¸ë¡œ ì²˜ë¦¬í•œë‹¤.
     if(!GetIntersectionPoint(a, b, c, d, p))
         return paralleSegments(a, b, c, d, p);
-    //p°¡ µÎ ¼±ºĞ¿¡ Æ÷ÇÔµÇ¾î ÀÖ´Â °æ¿ì¿¡¸¸ ÂüÀ» ¹İÈ¯ÇÑ´Ù.
+    //pê°€ ë‘ ì„ ë¶„ì— í¬í•¨ë˜ì–´ ìˆëŠ” ê²½ìš°ì—ë§Œ ì°¸ì„ ë°˜í™˜í•œë‹¤.
     return inBoundingRectangle(p, a, b) && inBoundingRectangle(p, c, d);
 }
 
 
-//»ï°¢Çü ¿ÜÁ¢¿øÀÇ Áß½ÉÀ» ±âÇÏÇĞÀûÀ¸·Î ±¸ÇÑ´Ù.(http://kipl.tistory.com/113)
+//ì‚¼ê°í˜• ì™¸ì ‘ì›ì˜ ì¤‘ì‹¬ì„ ê¸°í•˜í•™ì ìœ¼ë¡œ êµ¬í•œë‹¤.(http://kipl.tistory.com/113)
 int circumCenter(CPoint A, CPoint B, CPoint C, double *xc, double *yc)
 {
 	double ax = A.x - C.x ;
@@ -12518,7 +12403,7 @@ int circumCenter(CPoint A, CPoint B, CPoint C, double *xc, double *yc)
 	double bsq = bx * bx + by * by;
 	double ccw = ax * by - ay * bx;
 
-	 // ¼¼ Á¡ÀÓ ÀÏÁ÷¼± À§¿¡ ÀÖÁö ¾Ê´Â °æ¿ì; ÀÌ °æ¿ì¸¸ ¿ÜÁ¢¿øÀÌ Á¤ÀÇµÊ;
+	 // ì„¸ ì ì„ ì¼ì§ì„  ìœ„ì— ìˆì§€ ì•ŠëŠ” ê²½ìš°; ì´ ê²½ìš°ë§Œ ì™¸ì ‘ì›ì´ ì •ì˜ë¨;
 	if (ccw == 0.)
 		return 0;
 
@@ -12527,7 +12412,7 @@ int circumCenter(CPoint A, CPoint B, CPoint C, double *xc, double *yc)
 	return 1;
 }
 
-//»ï°¢Çü ¿ÜÁ¢¿øÀÇ Áß½ÉÀ» ´ë¼öÀûÀ¸·Î ±¸ÇÑ´Ù.
+//ì‚¼ê°í˜• ì™¸ì ‘ì›ì˜ ì¤‘ì‹¬ì„ ëŒ€ìˆ˜ì ìœ¼ë¡œ êµ¬í•œë‹¤.
 int circumCenter2(CPoint P, CPoint Q, CPoint R, double *xc, double *yc)
 {
 	double A = Q.x - P.x;
@@ -12538,7 +12423,7 @@ int circumCenter2(CPoint P, CPoint Q, CPoint R, double *xc, double *yc)
 	double F = C * (P.x + R.x) + D * (P.y + R.y);
 	double G = 2. * (A * D - B * C);
 
-	// ¼¼ Á¡ÀÌ ÀÏÁ÷¼±¿¡ ³õÀÌÁö ¾Ê´Â °æ¿ì; ÀÌ °æ¿ì¸¸ ¿ÜÁ¢¿øÀÌ Á¤ÀÇµÈ´Ù;
+	// ì„¸ ì ì´ ì¼ì§ì„ ì— ë†“ì´ì§€ ì•ŠëŠ” ê²½ìš°; ì´ ê²½ìš°ë§Œ ì™¸ì ‘ì›ì´ ì •ì˜ëœë‹¤;
 	if (G == 0.)
 		return 0;
 
@@ -12547,7 +12432,7 @@ int circumCenter2(CPoint P, CPoint Q, CPoint R, double *xc, double *yc)
 	return 1;
 }
 
-//»ï°¢Çü ¿ÜÁ¢¿øÀÇ ¹İÁö¸§À» ±¸ÇÑ´Ù.
+//ì‚¼ê°í˜• ì™¸ì ‘ì›ì˜ ë°˜ì§€ë¦„ì„ êµ¬í•œë‹¤.
 double circumRadius(CPoint A, CPoint B, CPoint C)
 {
 	double ax = C.x - B.x; 
@@ -12569,8 +12454,8 @@ double circumRadius(CPoint A, CPoint B, CPoint C)
 }
 
 
-//ÀÓÀÇ Á¡ÀÌ Æú¸®°ï ³»¿¡ Á¸ÀçÇÏ´ÂÁö ÆÇº°
-//ÀÌ ÇÔ¼ö ¾Æ·¡ÀÇ PtInPolygon0 ~ PtInPolygon2±îÁö´Â ¹Ì¿ÏÀÎÁö ¹ºÁö ¸ğ¸£°ÚÀ¸³ª ¿Ã¹Ù¸¥ ÆÇº°À» ÇÏÁö ¸øÇÑ´Ù.
+//ì„ì˜ ì ì´ í´ë¦¬ê³¤ ë‚´ì— ì¡´ì¬í•˜ëŠ”ì§€ íŒë³„
+//ì´ í•¨ìˆ˜ ì•„ë˜ì˜ PtInPolygon0 ~ PtInPolygon2ê¹Œì§€ëŠ” ë¯¸ì™„ì¸ì§€ ë­”ì§€ ëª¨ë¥´ê² ìœ¼ë‚˜ ì˜¬ë°”ë¥¸ íŒë³„ì„ í•˜ì§€ ëª»í•œë‹¤.
 bool PtInPolygon(CPoint *ptPolygons, CPoint pt, int nCorners)
 {
 	int counter = 0;
@@ -12672,14 +12557,14 @@ bool PtInPolygon2(CPoint* ptPolygons, CPoint pt, int nCorners)
 CString bstrToCString(BSTR bstr)
 {
 	char* pbstr;
-	USES_CONVERSION; //convert¸¦ À§ÇÑ ¸ÅÅ©·Î
-	pbstr=OLE2A(bstr); //bstrÀ» char·Î convert
+	USES_CONVERSION; //convertë¥¼ ìœ„í•œ ë§¤í¬ë¡œ
+	pbstr=OLE2A(bstr); //bstrì„ charë¡œ convert
 	return CString(pbstr);
 } 
 
 BSTR CStringTobstr(CString str) 
 {
-	return str.AllocSysString(); //CStringÀ» bstr·Î convert
+	return str.AllocSysString(); //CStringì„ bstrë¡œ convert
 }
 
 //[bstr-> char*]
@@ -12700,7 +12585,7 @@ BSTR charStrToBSTR(char* pbstr)
 }
 */
 /*
-//CString ==> CComVariant·Î º¯È¯ 
+//CString ==> CComVariantë¡œ ë³€í™˜ 
 CComVariant out(str.AllocSysString()); or CComVariant out(str);
 
 
@@ -12719,7 +12604,7 @@ VARIANT VariantString(BSTR str)
 	return var;
 }
 
-//256 gray bmi »ı¼º
+//256 gray bmi ìƒì„±
 HBITMAP MakeDIBSection(CDC& dc, int width, int height)
 {
 	LPVOID pBits;
@@ -12753,38 +12638,38 @@ HBITMAP MakeDIBSection(CDC& dc, int width, int height)
 	return hBitmap;
 }
 
-//main¿¡¼­ EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); ¸¦ ½ÇÇàÇÏ°í
-//ÀÌ ÆÄÀÏ¿¡ Àü¿ªº¯¼ö·Î ¼±¾ğµÈ g_dqMonitor¸¦ ÀÌ¿ëÇÏ¸é µÈ´Ù.
-//´Ü, Win32APIÀÎ EnumDisplayMonitors()¸¦ È£ÃâÇÒ¶§´Â ¹İµå½Ã g_dqMonitors.clear()¸¦ ÇØÁà¾ß ÇÏ¹Ç·Î
-//enum_display_monitors()ÇÔ¼ö·Î ´ëÃ¼ÇÑ´Ù.
+//mainì—ì„œ EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); ë¥¼ ì‹¤í–‰í•˜ê³ 
+//ì´ íŒŒì¼ì— ì „ì—­ë³€ìˆ˜ë¡œ ì„ ì–¸ëœ g_dqMonitorë¥¼ ì´ìš©í•˜ë©´ ëœë‹¤.
+//ë‹¨, Win32APIì¸ EnumDisplayMonitors()ë¥¼ í˜¸ì¶œí• ë•ŒëŠ” ë°˜ë“œì‹œ g_dqMonitors.clear()ë¥¼ í•´ì¤˜ì•¼ í•˜ë¯€ë¡œ
+//enum_display_monitors()í•¨ìˆ˜ë¡œ ëŒ€ì²´í•œë‹¤.
 void enum_display_monitors()
 {
 	g_dqMonitors.clear();
 	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
 }
 
-//main¿¡¼­ enum_display_monitors(); ¸¦ ½ÇÇàÇÏ°í
-//ÀÌ ÆÄÀÏ¿¡ Àü¿ªº¯¼ö·Î ¼±¾ğµÈ g_dqMonitor¸¦ ÀÌ¿ëÇÏ¸é µÈ´Ù.
+//mainì—ì„œ enum_display_monitors(); ë¥¼ ì‹¤í–‰í•˜ê³ 
+//ì´ íŒŒì¼ì— ì „ì—­ë³€ìˆ˜ë¡œ ì„ ì–¸ëœ g_dqMonitorë¥¼ ì´ìš©í•˜ë©´ ëœë‹¤.
 BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData)
 {
-	// ¸ğ´ÏÅÍ Á¤º¸¸¦ °¡Á®¿Ã ±¸Á¶Ã¼
+	// ëª¨ë‹ˆí„° ì •ë³´ë¥¼ ê°€ì ¸ì˜¬ êµ¬ì¡°ì²´
 	MONITORINFOEX mi;
 	mi.cbSize = sizeof(MONITORINFOEX);
 
-	// ¸ğ´ÏÅÍ ÇÚµéÀ» »ç¿ëÇÏ¿© ÇØ´ç ¸ğ´ÏÅÍ Á¤º¸¸¦ °¡Á®¿Â´Ù.
+	// ëª¨ë‹ˆí„° í•¸ë“¤ì„ ì‚¬ìš©í•˜ì—¬ í•´ë‹¹ ëª¨ë‹ˆí„° ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 	GetMonitorInfo(hMonitor, &mi);
 
 	CString str;
 
-	// ÁÖ¸ğ´ÏÅÍ·Î ¼³Á¤µÈ ¸ğ´ÏÅÍ Á¤º¸ÀÎÁö¸¦ Ã¼Å©ÇÑ´Ù.
+	// ì£¼ëª¨ë‹ˆí„°ë¡œ ì„¤ì •ëœ ëª¨ë‹ˆí„° ì •ë³´ì¸ì§€ë¥¼ ì²´í¬í•œë‹¤.
 	if (mi.dwFlags & MONITORINFOF_PRIMARY) 
 	{
-		str.Format(_T("hMonitor = %X,  ÁÂÇ¥ : [ (%04d, %04d) - (%04d, %04d) ], < Primary-Monitor > %s"), 
+		str.Format(_T("hMonitor = %X,  ì¢Œí‘œ : [ (%04d, %04d) - (%04d, %04d) ], < Primary-Monitor > %s"), 
 					hMonitor, lprcMonitor->left,lprcMonitor->top,lprcMonitor->right,lprcMonitor->bottom, mi.szDevice);
 	}
 	else
 	{
-		str.Format(_T("hMonitor = %X,  ÁÂÇ¥ : [ (%04d, %04d) - (%04d, %04d) ], %s"), 
+		str.Format(_T("hMonitor = %X,  ì¢Œí‘œ : [ (%04d, %04d) - (%04d, %04d) ], %s"), 
 					hMonitor, lprcMonitor->left,lprcMonitor->top,lprcMonitor->right,lprcMonitor->bottom, mi.szDevice);
 	}
 
@@ -12795,7 +12680,7 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	return TRUE;
 }
 
-//x, y°¡ ¼ÓÇØÀÖ´Â ¸ğ´ÏÅÍ ÀÎµ¦½º¸¦ ¸®ÅÏ
+//x, yê°€ ì†í•´ìˆëŠ” ëª¨ë‹ˆí„° ì¸ë±ìŠ¤ë¥¼ ë¦¬í„´
 int	get_monitor_index(int x, int y)
 {
 	enum_display_monitors();
@@ -12809,7 +12694,7 @@ int	get_monitor_index(int x, int y)
 	return -1;
 }
 
-//rÀÌ °ÉÃÄÀÖ´Â ¸ğ´ÏÅÍ ÀÎµ¦½º¸¦ ¸®ÅÏ. °ãÃÄÁö´Â ¿µ¿ªÀÌ ¾îµğ¿¡µµ ¾ø´Ù¸é -1À» ¸®ÅÏ.
+//rì´ ê±¸ì³ìˆëŠ” ëª¨ë‹ˆí„° ì¸ë±ìŠ¤ë¥¼ ë¦¬í„´. ê²¹ì³ì§€ëŠ” ì˜ì—­ì´ ì–´ë””ì—ë„ ì—†ë‹¤ë©´ -1ì„ ë¦¬í„´.
 int	get_monitor_index(CRect r, bool entire_included)
 {
 	enum_display_monitors();
@@ -12830,7 +12715,7 @@ int	get_monitor_index(CRect r, bool entire_included)
 	return -1;
 }
 
-//¸ÖÆ¼¸ğ´ÏÅÍ ÀüÃ¼ ¿µ¿ª »ç°¢Çü ¸®ÅÏ
+//ë©€í‹°ëª¨ë‹ˆí„° ì „ì²´ ì˜ì—­ ì‚¬ê°í˜• ë¦¬í„´
 CRect get_entire_monitor_rect()
 {
 	enum_display_monitors();
@@ -12849,8 +12734,8 @@ CRect get_entire_monitor_rect()
 
 void SetForegroundWindowForce(HWND hWnd, bool makeTopMost)
 {
-	//ÃÖ»óÀ§·Î ¿Ã¸®´Â ÄÚµå°¡ ÀÌ ÇÔ¼öÀÇ ¸Ç Ã³À½ ºÎºĞ¿¡¼­ ½ÇÇàµÇÁö ¾ÊÀ¸¸é
-	//´Ù¸¥ ÃÖ»óÀ§·Î ½ÇÇàµÈ Ã¢ÀÇ À§·Î Ç×»ó ¿Ã¶ó¿ÀÁö ¾Ê´Â Çö»óÀÌ ÀÖ´Ù.
+	//ìµœìƒìœ„ë¡œ ì˜¬ë¦¬ëŠ” ì½”ë“œê°€ ì´ í•¨ìˆ˜ì˜ ë§¨ ì²˜ìŒ ë¶€ë¶„ì—ì„œ ì‹¤í–‰ë˜ì§€ ì•Šìœ¼ë©´
+	//ë‹¤ë¥¸ ìµœìƒìœ„ë¡œ ì‹¤í–‰ëœ ì°½ì˜ ìœ„ë¡œ í•­ìƒ ì˜¬ë¼ì˜¤ì§€ ì•ŠëŠ” í˜„ìƒì´ ìˆë‹¤.
 	if (makeTopMost)
 		::SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
 
@@ -12887,25 +12772,25 @@ bool is_top_most(HWND hWnd)
 	return ((dwExStyle & WS_EX_TOPMOST) != 0);
 }
 
-//2D ´ÜÀÏ ¿µ»ó¿¡¼­ ÀÌ¹Ì ¾Ë·ÁÁø ¼³Á¤°ªÀ» ±âÁØÀ¸·Î ¿µ»ó³»ÀÇ ÇÑ Á¡°ú ·»Áî¿ÍÀÇ °Å¸®¸¦ °è»ê(by sucwon)
-//´Ü, Â÷·®¿¡ ÀåÂøµÈ Ä«¸Ş¶ó¿¡¼­ ÃÔ¿µµÈ ¿µ»óÀÌ¹Ç·Î ÇÇ»çÃ¼¿Í ·»Áî¿ÍÀÇ °Å¸®°¡ ¾Æ´Ñ Â÷Ã¼¿ÍÀÇ °Å¸®°¡ ´õ Á¤È®ÇÑ °ªÀÌ¸ç
-//µû¶ó¼­ ·»ÁîÀÇ À§Ä¡ÀÎ ¿µ»ó ÇÏ´Ü ¼¾ÅÍ°¡ ¾Æ´Ñ ¿µ»óÀÇ ÇÏ´Ü°ú ÇÇ»çÃ¼ÀÇ ¼öÁ÷ °Å¸®°¡
-//¿ÀÈ÷·Á ´õ Á¤È®ÇÑ °è»êÀÌ µÈ´Ù.
+//2D ë‹¨ì¼ ì˜ìƒì—ì„œ ì´ë¯¸ ì•Œë ¤ì§„ ì„¤ì •ê°’ì„ ê¸°ì¤€ìœ¼ë¡œ ì˜ìƒë‚´ì˜ í•œ ì ê³¼ ë Œì¦ˆì™€ì˜ ê±°ë¦¬ë¥¼ ê³„ì‚°(by sucwon)
+//ë‹¨, ì°¨ëŸ‰ì— ì¥ì°©ëœ ì¹´ë©”ë¼ì—ì„œ ì´¬ì˜ëœ ì˜ìƒì´ë¯€ë¡œ í”¼ì‚¬ì²´ì™€ ë Œì¦ˆì™€ì˜ ê±°ë¦¬ê°€ ì•„ë‹Œ ì°¨ì²´ì™€ì˜ ê±°ë¦¬ê°€ ë” ì •í™•í•œ ê°’ì´ë©°
+//ë”°ë¼ì„œ ë Œì¦ˆì˜ ìœ„ì¹˜ì¸ ì˜ìƒ í•˜ë‹¨ ì„¼í„°ê°€ ì•„ë‹Œ ì˜ìƒì˜ í•˜ë‹¨ê³¼ í”¼ì‚¬ì²´ì˜ ìˆ˜ì§ ê±°ë¦¬ê°€
+//ì˜¤íˆë ¤ ë” ì •í™•í•œ ê³„ì‚°ì´ ëœë‹¤.
 double getObjectDistance(int width, int height, int vanishing_y, int x, int y, int cam_height, double *dx, double *dy, int cali_width, int cali_height, double fl_x, double fl_y)
 {
-		//// Focal Length (4°³ÀÇ »ó¼ö°ªÀº Çù°¢ ±âÁØÀÌ¸ç Ä«¸Ş¶ó¸¶´Ù ´Ù¸¥ °ªÀ» °¡Áü)
+		//// Focal Length (4ê°œì˜ ìƒìˆ˜ê°’ì€ í˜‘ê° ê¸°ì¤€ì´ë©° ì¹´ë©”ë¼ë§ˆë‹¤ ë‹¤ë¥¸ ê°’ì„ ê°€ì§)
 /*
 		double fl_x = 2361.130;
 		double fl_y = 2357.436;
 
-		//// ÁÖÁ¡
+		//// ì£¼ì 
 		double c_x = 1066.161;
 		double c_y = 407.246;
 */
 /*
-		double tilt = atan2(vanishing_y - c_y, fl_y);				// 1¹øÂ° parameter ´Â ÁÖÁ¡, 2¹øÂ° parameter´Â Camera Focal Length
-		double m_x = (x - c_x) / fl_x;								// Á¤±ÔÁÂÇ¥ (x)
-		double m_y = (y - c_y) / fl_y;								// Á¤±ÔÁÂÇ¥ (y)
+		double tilt = atan2(vanishing_y - c_y, fl_y);				// 1ë²ˆì§¸ parameter ëŠ” ì£¼ì , 2ë²ˆì§¸ parameterëŠ” Camera Focal Length
+		double m_x = (x - c_x) / fl_x;								// ì •ê·œì¢Œí‘œ (x)
+		double m_y = (y - c_y) / fl_y;								// ì •ê·œì¢Œí‘œ (y)
 
 		double C1P1 = (double)cam_height * tan((PI/2) + tilt - atan(m_y));	// C`P`
 		double CP1 = sqrt(((double)cam_height * (double)cam_height) + (C1P1*C1P1));					// CP`
@@ -12916,16 +12801,16 @@ double getObjectDistance(int width, int height, int vanishing_y, int x, int y, i
 
 		return real_distance;
 */
-	//Ä«¸Ş¶ó Ä¶¸®ºê·¹ÀÌ¼Ç ¾ÛÀ» ÅëÇØ¼­ Á÷Á¢ ±¸ÇØ¾ß ÇÑ´Ù.
-	//ÁÖÁ¡Àº º¸Åë ÀÔ·Â ¿µ»óÀÇ 1/2ÀÌ´Ù.
+	//ì¹´ë©”ë¼ ìº˜ë¦¬ë¸Œë ˆì´ì…˜ ì•±ì„ í†µí•´ì„œ ì§ì ‘ êµ¬í•´ì•¼ í•œë‹¤.
+	//ì£¼ì ì€ ë³´í†µ ì…ë ¥ ì˜ìƒì˜ 1/2ì´ë‹¤.
 	double c_x = (double)width / 2.0;	//691.448;
 	double c_y = (double)height / 2.0;	//404.974;
 
-	//1920, 1080Àº Ä¶¸®ºê·¹ÀÌ¼Ç¿¡ »ç¿ëÇÑ Ä«¸Ş¶ó ¿µ»óÀÇ Å©±âÀÌ´Ù.
+	//1920, 1080ì€ ìº˜ë¦¬ë¸Œë ˆì´ì…˜ì— ì‚¬ìš©í•œ ì¹´ë©”ë¼ ì˜ìƒì˜ í¬ê¸°ì´ë‹¤.
 	double tilt = atan2((vanishing_y/(double)(height)*((double)(cali_height))) - c_y, fl_y);
-	double csh = (double)cam_height / 10.0;                              // Ä«¸Ş¶ó ¼³Ä¡³ôÀÌ
-	double m_x = ((x / (double)(width) * (double)cali_width) - c_x) / fl_x;                        // Á¤±ÔÁÂÇ¥ (x)
-	double m_y = ((y / (double)(height)*(double)(cali_height)) - c_y) / fl_y;                        // Á¤±ÔÁÂÇ¥ (y)
+	double csh = (double)cam_height / 10.0;                              // ì¹´ë©”ë¼ ì„¤ì¹˜ë†’ì´
+	double m_x = ((x / (double)(width) * (double)cali_width) - c_x) / fl_x;                        // ì •ê·œì¢Œí‘œ (x)
+	double m_y = ((y / (double)(height)*(double)(cali_height)) - c_y) / fl_y;                        // ì •ê·œì¢Œí‘œ (y)
 
 	double C1P1 = csh * tan((3.141592 / 2.0) + tilt - atan(m_y));   // C`P`
 	double CP1 = sqrt((csh*csh) + (C1P1*C1P1));               // CP`
@@ -12941,7 +12826,7 @@ double getObjectDistance(int width, int height, int vanishing_y, int x, int y, i
 
 
 
-//gray °è¿­ÀÎÁö
+//gray ê³„ì—´ì¸ì§€
 bool isGray(COLORREF cr, int tolerance)
 {
 	BYTE r = GetBValue(cr);
@@ -13125,7 +13010,7 @@ void create_integral_image(uchar*	source_img,
 
 	for(y = 0; y < source_height; y++)
 	{
-		integral_img_current_line[-1] = 0;	//	°¡Àå ¿ŞÂÊ ¿­À» 0À¸·Î ¼ÂÆÃ
+		integral_img_current_line[-1] = 0;	//	ê°€ì¥ ì™¼ìª½ ì—´ì„ 0ìœ¼ë¡œ ì…‹íŒ…
 
 		for(s=0, x = 0; x < source_width; x++)
 		{
@@ -13223,7 +13108,7 @@ void resize_image(uint8_t *source_ptr,
 }
 
 //https://stackoverrun.com/ko/q/200236
-//¾ÆÁ÷ Å×½ºÆ® ÇÏÁö ¾ÊÀ½. Ãà¼Ò¸¸ °¡´É? È®´ë, Ãà¼Ò ¸ğµÎ °¡´É? skipÀÌ ÀÖ´Â°É·Î ºÁ¼­ Ãà¼Ò¸¸ °¡´ÉÇÒµíÇÏ´Ù.
+//ì•„ì§ í…ŒìŠ¤íŠ¸ í•˜ì§€ ì•ŠìŒ. ì¶•ì†Œë§Œ ê°€ëŠ¥? í™•ëŒ€, ì¶•ì†Œ ëª¨ë‘ ê°€ëŠ¥? skipì´ ìˆëŠ”ê±¸ë¡œ ë´ì„œ ì¶•ì†Œë§Œ ê°€ëŠ¥í• ë“¯í•˜ë‹¤.
 void scaleImage(uint8_t*src, uint8_t*dest, int srcWidth, int srcHeight, int destWidth, int destHeight)
 {
 	//these are internal counters
@@ -13337,14 +13222,14 @@ void resize_ROI(uint8_t *source_ptr,
 	}
 }
 
-//gray image¸¦ 3Ã¤³Î ¶Ç´Â 4Ã¤³Î ÀÌ¹ÌÁö Æ÷¸ËÀ¸·Î º¹»çÇØÁØ´Ù.
+//gray imageë¥¼ 3ì±„ë„ ë˜ëŠ” 4ì±„ë„ ì´ë¯¸ì§€ í¬ë§·ìœ¼ë¡œ ë³µì‚¬í•´ì¤€ë‹¤.
 void gray2color(uint8_t *gray, int gray_width, int gray_height, uint8_t *dst, int dst_width, int dst_height, int dst_ch, uint8_t alpha)
 {
 	int x, y, k;
 	uint8_t *src = gray;
 	bool resized = false;
 
-	//gray¿Í dstÀÇ Å©±â°¡ ´Ù¸£¸é resizeÇÑ ÈÄ º¹»çÇØ¾ß ÇÑ´Ù.
+	//grayì™€ dstì˜ í¬ê¸°ê°€ ë‹¤ë¥´ë©´ resizeí•œ í›„ ë³µì‚¬í•´ì•¼ í•œë‹¤.
 	if (gray_width != dst_width || gray_height != dst_height)
 	{
 		resized = true;
@@ -13373,8 +13258,8 @@ void gray2color(uint8_t *gray, int gray_width, int gray_height, uint8_t *dst, in
 		free(src);
 }
 
-//3Ã¤³Î ¶Ç´Â 4Ã¤³Î ÀÌ¹ÌÁö¸¦ ´ÜÀÏ Èæ¹é ÀÌ¹ÌÁö·Î º¹»çÇÑ´Ù.
-//dst´Â ¹İµå½Ã ÇÒ´çµÈ ¸Ş¸ğ¸®ÁÖ¼ÒÀÌ¾î¾ß ÇÑ´Ù.
+//3ì±„ë„ ë˜ëŠ” 4ì±„ë„ ì´ë¯¸ì§€ë¥¼ ë‹¨ì¼ í‘ë°± ì´ë¯¸ì§€ë¡œ ë³µì‚¬í•œë‹¤.
+//dstëŠ” ë°˜ë“œì‹œ í• ë‹¹ëœ ë©”ëª¨ë¦¬ì£¼ì†Œì´ì–´ì•¼ í•œë‹¤.
 void color2gray(uint8_t *src, int src_width, int src_height, int src_ch, uint8_t *dst, int dst_width, int dst_height)
 {
 	if (src_ch < 3 || src_ch > 4)
@@ -13385,7 +13270,7 @@ void color2gray(uint8_t *src, int src_width, int src_height, int src_ch, uint8_t
 	uint8_t *gray = dst;
 	bool resized = false;
 	
-	//src¿Í dstÀÇ Å©±â°¡ ´Ù¸£¸é gray·Î º¯È¯ÇÑ ÈÄ resizeÇØÁà¾ß ÇÑ´Ù.
+	//srcì™€ dstì˜ í¬ê¸°ê°€ ë‹¤ë¥´ë©´ grayë¡œ ë³€í™˜í•œ í›„ resizeí•´ì¤˜ì•¼ í•œë‹¤.
 	if (src_width != dst_width || src_height != dst_height)
 	{
 		resized = true;
@@ -13505,8 +13390,8 @@ int scv_countNonZero(uint8_t*src, int w, int h)
 	return count;
 }
 
-//ÇöÀç´Â 1Ã¤³Î ¿µ»ó¸¸ Áö¿øµÈ´Ù.
-//¿ì¼± ±ŞÇÏ°Ô -90µµ¸¸ ±¸ÇöÇÑ´Ù.
+//í˜„ì¬ëŠ” 1ì±„ë„ ì˜ìƒë§Œ ì§€ì›ëœë‹¤.
+//ìš°ì„  ê¸‰í•˜ê²Œ -90ë„ë§Œ êµ¬í˜„í•œë‹¤.
 void rotate90(uint8_t *src, int width, int height, uint8_t *dst, int degree)
 {
 	if (dst == NULL)
@@ -13523,8 +13408,8 @@ void rotate90(uint8_t *src, int width, int height, uint8_t *dst, int degree)
 	}
 }
 
-//opencvÀÇ flip°ú °°Àº µ¿ÀÛÀÌÁö¸¸ ÀÌ¸§ Ãæµ¹À» ÇÇÇÏ±â À§ÇØ mirror¶ó´Â ÀÌ¸§À» »ç¿ëÇÔ.
-//ÇöÀç´Â 1Ã¤³Î ¿µ»ó¸¸ Áö¿øµÈ´Ù.
+//opencvì˜ flipê³¼ ê°™ì€ ë™ì‘ì´ì§€ë§Œ ì´ë¦„ ì¶©ëŒì„ í”¼í•˜ê¸° ìœ„í•´ mirrorë¼ëŠ” ì´ë¦„ì„ ì‚¬ìš©í•¨.
+//í˜„ì¬ëŠ” 1ì±„ë„ ì˜ìƒë§Œ ì§€ì›ëœë‹¤.
 //method : 0(flip vertical), +(flip horizontal), -(both)
 void mirror(uint8_t *src, int width, int height, uint8_t *dst, int method)
 {
@@ -13584,11 +13469,11 @@ CRect subtract(CRect r0, CRect r1)
 	return r;
 }
 
-//½ºÅ©¸°¿¡ Ç¥½ÃµÈ ÀÌ¹ÌÁö¿¡ ±×·ÁÁø »ç°¢ÇüÀÇ ½ÇÁ¦ ÀÌ¹ÌÁö»óÀÇ »ç°¢Çü ÁÂÇ¥
-//sr : ÀÌ¹ÌÁö¿¡ ±×·ÁÁø »ç°¢Çü
-//displayed : ÀÌ¹ÌÁö°¡ Ç¥½ÃµÇ°í ÀÖ´Â »ç°¢Çü ¿µ¿ª
-//real : ½ÇÁ¦ ÀÌ¹ÌÁöÀÇ Å©±â
-//resized : zoom in/out¿¡ ÀÇÇØ º¯°æµÈ Å©±â
+//ìŠ¤í¬ë¦°ì— í‘œì‹œëœ ì´ë¯¸ì§€ì— ê·¸ë ¤ì§„ ì‚¬ê°í˜•ì˜ ì‹¤ì œ ì´ë¯¸ì§€ìƒì˜ ì‚¬ê°í˜• ì¢Œí‘œ
+//sr : ì´ë¯¸ì§€ì— ê·¸ë ¤ì§„ ì‚¬ê°í˜•
+//displayed : ì´ë¯¸ì§€ê°€ í‘œì‹œë˜ê³  ìˆëŠ” ì‚¬ê°í˜• ì˜ì—­
+//real : ì‹¤ì œ ì´ë¯¸ì§€ì˜ í¬ê¸°
+//resized : zoom in/outì— ì˜í•´ ë³€ê²½ëœ í¬ê¸°
 CRect get_real_from_screen_coord(CRect sr, CRect displayed, CSize real, CSize resized)
 {
 	CRect r;
@@ -13614,7 +13499,7 @@ CRect getIntersectionRect(int x1, int y1, int w1, int h1, int x2, int y2, int w2
 	return r;
 }
 
-//µÎ »ç°¢ÇüÀÇ °ãÄ¡´Â ¿µ¿ªÀ» ¸®ÅÏÇÑ´Ù.
+//ë‘ ì‚¬ê°í˜•ì˜ ê²¹ì¹˜ëŠ” ì˜ì—­ì„ ë¦¬í„´í•œë‹¤.
 CRect getIntersectionRect(CRect r1, CRect r2)
 {
 	CRect	r(0, 0, 0, 0);
@@ -13704,7 +13589,7 @@ double tangentfunc(double x, double y)
 		45.0
 	};
 
-	//¡è Àü¿ª »ó¼ö
+	//â†‘ ì „ì—­ ìƒìˆ˜
 
 	const double xv = fabs(x);
 	const double yv = fabs(y);
@@ -13843,9 +13728,9 @@ HICON load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
 	if (cy == 0)
 		cy = cx;
 
-	//¾Æ·¡ LoadImage ÇÔ¼ö¸¦ ÅëÇØ¼­ ¾ÆÀÌÄÜ ÆÄÀÏÀ» ºÒ·¯¿Â °æ¿ì
-	//ÇÁ·Î±×·¥ Á¾·á ½Ã ¹İµå½Ã DestroyIconÀ» ÇØÁà¾ß ÇÑ´Ù.
-	//±×·¡¼­ DestroyIcon ¾ÈÇØµµ µÇ´Â LR_SHARED¸¦ »ç¿ëÇß´Ù.
+	//ì•„ë˜ LoadImage í•¨ìˆ˜ë¥¼ í†µí•´ì„œ ì•„ì´ì½˜ íŒŒì¼ì„ ë¶ˆëŸ¬ì˜¨ ê²½ìš°
+	//í”„ë¡œê·¸ë¨ ì¢…ë£Œ ì‹œ ë°˜ë“œì‹œ DestroyIconì„ í•´ì¤˜ì•¼ í•œë‹¤.
+	//ê·¸ë˜ì„œ DestroyIcon ì•ˆí•´ë„ ë˜ëŠ” LR_SHAREDë¥¼ ì‚¬ìš©í–ˆë‹¤.
 	return static_cast<HICON>(::LoadImage(hInstance, MAKEINTRESOURCE(nID), IMAGE_ICON, cx, cy, LR_SHARED));
 }
 
@@ -13854,8 +13739,8 @@ CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
 	//int cxIcon = GetSystemMetrics(SM_CXICON);
 	//int cyIcon = GetSystemMetrics(SM_CYICON);
 
-	//SM_CXICONÀ» ÀÌ¿ëÇØ¼­ ±âº»°ªÀ¸·Î ±×¸®´Â°Ô ¾Æ´Ï¶ó
-	//½ÇÁ¦ hIconÀÇ Å©±â¸¦ ±¸ÇØ¼­
+	//SM_CXICONì„ ì´ìš©í•´ì„œ ê¸°ë³¸ê°’ìœ¼ë¡œ ê·¸ë¦¬ëŠ”ê²Œ ì•„ë‹ˆë¼
+	//ì‹¤ì œ hIconì˜ í¬ê¸°ë¥¼ êµ¬í•´ì„œ
 	int w;
 	int h;
 
@@ -13922,9 +13807,9 @@ LONG get_font_size_from_logical_size(HWND hWnd, int logical_size)
 	return size;
 }
 
-//¸Ş¸ğ¸® ÀÏºÎ º¹»ç ÇÔ¼ö
-//´Ü, srcÀÇ µ¥ÀÌÅÍ°¡ ¿¬¼ÓµÈ ¸Ş¸ğ¸®»ó¿¡ ÀúÀåµÇ¾î ÀÖ¾î¾ß ÇÏ´Â Á¦¾àÀÌ ÀÖ´Ù.
-//srcÀÇ ÀÏºÎ ºí·°À» º¹»ç. Å×½ºÆ® ÇÊ¿äÇÔ.
+//ë©”ëª¨ë¦¬ ì¼ë¶€ ë³µì‚¬ í•¨ìˆ˜
+//ë‹¨, srcì˜ ë°ì´í„°ê°€ ì—°ì†ëœ ë©”ëª¨ë¦¬ìƒì— ì €ì¥ë˜ì–´ ìˆì–´ì•¼ í•˜ëŠ” ì œì•½ì´ ìˆë‹¤.
+//srcì˜ ì¼ë¶€ ë¸”ëŸ­ì„ ë³µì‚¬. í…ŒìŠ¤íŠ¸ í•„ìš”í•¨.
 bool memcpy_block(uint8_t *src, int srcx, int srcy, int srcw, int srch, uint8_t *dst, int dstx, int dsty, int dstw, int dsth, int w, int h, int ch)
 {
 	int x, y, c;
@@ -13968,7 +13853,7 @@ bool memcpy_block(uint8_t *src, int src_width, int src_height, int x_roi, int y_
 	return true;
 }
 
-//src¿¡¼­ roi ¿µ¿ªÀ» Àß¶ó¼­ dst_width * dst_height Å©±â·Î resize ½ÃÅ²´Ù.
+//srcì—ì„œ roi ì˜ì—­ì„ ì˜ë¼ì„œ dst_width * dst_height í¬ê¸°ë¡œ resize ì‹œí‚¨ë‹¤.
 bool resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height)
 {
 	uint8_t *tmp = (uint8_t*)malloc(w_roi * h_roi);
@@ -13985,8 +13870,8 @@ bool resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_ro
 	return true;
 }
 
-//ÃâÃ³: http://boongubbang.tistory.com/255 [Boongubbang]
-//unicode¸¦ Áö¿øÇÏ´Â ÇÔ¼ö¶ó¼­ Å×½ºÆ® ¹Ì¿Ï!
+//ì¶œì²˜: http://boongubbang.tistory.com/255 [Boongubbang]
+//unicodeë¥¼ ì§€ì›í•˜ëŠ” í•¨ìˆ˜ë¼ì„œ í…ŒìŠ¤íŠ¸ ë¯¸ì™„!
 /*
 void NewTypingMessageFromCodePage(TCHAR* Message, UINT CodePage=0)  
 {  
@@ -14047,7 +13932,7 @@ template<class T> void quicksort(T& v, int end, int start, bool bAscending)
 				while((v[i] < v[start]) && (i < j))
 					i++;
 
-				//ÇÔ¼ö ¿øÇüÀ» quicksort(T *v, ...)¿Í °°ÀÌ Á¤ÀÇÇØ¼­ »ç¿ëÇÏ¸é ¾Æ·¡ ¹®Àå¿¡¼­ µğ¹ö±ë ¿¡·¯°¡ ¹ß»ıÇÑ´Ù.
+				//í•¨ìˆ˜ ì›í˜•ì„ quicksort(T *v, ...)ì™€ ê°™ì´ ì •ì˜í•´ì„œ ì‚¬ìš©í•˜ë©´ ì•„ë˜ ë¬¸ì¥ì—ì„œ ë””ë²„ê¹… ì—ëŸ¬ê°€ ë°œìƒí•œë‹¤.
 				while(v[--j] > v[start])
 					;
 			}
@@ -14079,20 +13964,20 @@ template<class T> void quicksort(T& v, int end, int start, bool bAscending)
 }
 */
 
-//OnInitDialog¿Í °°ÀÌ ÃÖÃÊ ÇÑ¹ø ½ÇÇàµÇ´Â ÇÔ¼ö³»¿¡¼­ È£ÃâÇÑ´Ù.
-//±â¾ïµÈ ÁÂÇ¥´ë·Î º¹¿øÇÏ¿© Ç¥½ÃÇÑ´Ù.
-//´Ü, ±× Å©±â°¡ ¸ğ´ÏÅÍ ¹ÛÀÌ¸é CenterWindow()¸¦,
-//Å©±â°¡ invalidÇÏ´Ù¸é ¿ø·¡ Å©±â·Î Ç¥½ÃÇÑ´Ù.
+//OnInitDialogì™€ ê°™ì´ ìµœì´ˆ í•œë²ˆ ì‹¤í–‰ë˜ëŠ” í•¨ìˆ˜ë‚´ì—ì„œ í˜¸ì¶œí•œë‹¤.
+//ê¸°ì–µëœ ì¢Œí‘œëŒ€ë¡œ ë³µì›í•˜ì—¬ í‘œì‹œí•œë‹¤.
+//ë‹¨, ê·¸ í¬ê¸°ê°€ ëª¨ë‹ˆí„° ë°–ì´ë©´ CenterWindow()ë¥¼,
+//í¬ê¸°ê°€ invalidí•˜ë‹¤ë©´ ì›ë˜ í¬ê¸°ë¡œ í‘œì‹œí•œë‹¤.
 void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool use_maximize, bool resize_window)
 {
 	CRect	rc;
 	CString sSection = _T("screen");
 
-	//resize windowÀÎÁö ÀÚµ¿ Ã¼Å©ÇÏ´Â ÄÚµå°¡ ¾È¸ÔÈ÷´ÂµíÇÏ´Ù.
+	//resize windowì¸ì§€ ìë™ ì²´í¬í•˜ëŠ” ì½”ë“œê°€ ì•ˆë¨¹íˆëŠ”ë“¯í•˜ë‹¤.
 	//bool is_resizable_window = ((::GetWindowLongPtr(pWnd->m_hWnd, GWL_STYLE) & WS_THICKFRAME) == WS_THICKFRAME);
 
 	if (sSubSection != "")
-		sSection = sSubSection + "\\screen";	//½½·¡½Ã°¡ ¾Æ´Ñ ¿ª½½·¡½Ã¸¦ ½á¾ß ÇÑ´Ù.
+		sSection = sSubSection + "\\screen";	//ìŠ¬ë˜ì‹œê°€ ì•„ë‹Œ ì—­ìŠ¬ë˜ì‹œë¥¼ ì¨ì•¼ í•œë‹¤.
 
 	rc.left		= pApp->GetProfileInt(sSection, _T("left"), 0);
 	rc.top		= pApp->GetProfileInt(sSection, _T("top"), 0);
@@ -14105,7 +13990,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 		return;
 	}
 
-	//»ç°¢Çü Á¤º¸°¡ À¯È¿ÇÏ°í ±× Å©±âµµ 10x10À» ³Ñ´Â´Ù¸é ±× Å©±â·Î º¹¿ø½ÃÅ°°í
+	//ì‚¬ê°í˜• ì •ë³´ê°€ ìœ íš¨í•˜ê³  ê·¸ í¬ê¸°ë„ 10x10ì„ ë„˜ëŠ”ë‹¤ë©´ ê·¸ í¬ê¸°ë¡œ ë³µì›ì‹œí‚¤ê³ 
 	if (rc.IsRectEmpty() == false && rc.Width() > 10 && rc.Height() > 10)
 	{
 		UINT_PTR flag = SWP_NOZORDER;
@@ -14125,11 +14010,11 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 		pWnd->ShowWindow(SW_SHOWMAXIMIZED);
 }
 
-//OnBnClickedCancel()°ú °°ÀÌ ÇÁ·Î±×·¥ÀÌ Á¾·áµÉ ¶§ È£ÃâÇÑ´Ù.
-//OnWindowPosChanged()¿¡¼­ ¸Å¹ø È£ÃâÇß¾úÀ¸³ª 
-//OnInitDialog¿¡¼­ RestoreWindowPosition¸¦ È£ÃâÇÒ ¶§
-//OnWindowPosChanged°¡ È£ÃâµÇ¸é¼­ maximized Á¤º¸°¡ false·Î ÃÊ±âÈ­µÇ¾î ¹ö¸°´Ù.
-//sSubSectionÀÌ Á¸ÀçÇÏ¸é ±× ÀÌ¸§¿¡ "\\screen"À» ºÙ¿©¼­ ÀúÀåÇÑ´Ù.
+//OnBnClickedCancel()ê³¼ ê°™ì´ í”„ë¡œê·¸ë¨ì´ ì¢…ë£Œë  ë•Œ í˜¸ì¶œí•œë‹¤.
+//OnWindowPosChanged()ì—ì„œ ë§¤ë²ˆ í˜¸ì¶œí–ˆì—ˆìœ¼ë‚˜ 
+//OnInitDialogì—ì„œ RestoreWindowPositionë¥¼ í˜¸ì¶œí•  ë•Œ
+//OnWindowPosChangedê°€ í˜¸ì¶œë˜ë©´ì„œ maximized ì •ë³´ê°€ falseë¡œ ì´ˆê¸°í™”ë˜ì–´ ë²„ë¦°ë‹¤.
+//sSubSectionì´ ì¡´ì¬í•˜ë©´ ê·¸ ì´ë¦„ì— "\\screen"ì„ ë¶™ì—¬ì„œ ì €ì¥í•œë‹¤.
 void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (pWnd->IsWindowVisible() == false ||	pWnd->IsIconic())
@@ -14139,7 +14024,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 	CString sSection = _T("screen");
 
 	if (sSubSection != "")
-		sSection = sSubSection + "\\screen";	//½½·¡½Ã°¡ ¾Æ´Ñ ¿ª½½·¡½Ã¸¦ ½á¾ß ÇÑ´Ù.
+		sSection = sSubSection + "\\screen";	//ìŠ¬ë˜ì‹œê°€ ì•„ë‹Œ ì—­ìŠ¬ë˜ì‹œë¥¼ ì¨ì•¼ í•œë‹¤.
 
 	pWnd->GetWindowRect(rc);
 	pApp->WriteProfileInt(sSection, _T("maximized"), pWnd->IsZoomed());
@@ -14206,7 +14091,7 @@ void init_YUV_lookup_table()
 	}
 }
 
-//init_YUV_lookup_table(); ÇÔ¼ö¸¦ ¹İµå½Ã ÇÑ¹ø È£ÃâÇÑ ÈÄ »ç¿ëÇÒ °Í.
+//init_YUV_lookup_table(); í•¨ìˆ˜ë¥¼ ë°˜ë“œì‹œ í•œë²ˆ í˜¸ì¶œí•œ í›„ ì‚¬ìš©í•  ê²ƒ.
 void yuv420_yv12_to_bgr(unsigned char *src, unsigned char *dst, int w, int h)
 {
 	if (!initialized_YUV_lookup_table)
@@ -14225,8 +14110,8 @@ void yuv420_yv12_to_bgr(unsigned char *src, unsigned char *dst, int w, int h)
 	int u,v;    
 	unsigned char *p;
 
-	// À©µµ¿ì¿¡¼­´Â ¿µ»óÀÇ »óÇÏ°¡ °Å²Ù·Î ÀúÀåµÇÁö ¶§¹®¿¡ ¾Æ·¡¿Í °°ÀÌ ÄÚµå ÀÛ¼º.
-	//matÀ» »ç¿ëÇÏ¿© convertingÇÏ´Â °æ¿ì ¾Æ·¡ ÄÚµå°¡ µÚÁıÈù´Ù.
+	// ìœˆë„ìš°ì—ì„œëŠ” ì˜ìƒì˜ ìƒí•˜ê°€ ê±°ê¾¸ë¡œ ì €ì¥ë˜ì§€ ë•Œë¬¸ì— ì•„ë˜ì™€ ê°™ì´ ì½”ë“œ ì‘ì„±.
+	//matì„ ì‚¬ìš©í•˜ì—¬ convertingí•˜ëŠ” ê²½ìš° ì•„ë˜ ì½”ë“œê°€ ë’¤ì§‘íŒë‹¤.
 	/*
 	for(y=0; y<=h-2; y+=2)
 	{
@@ -14264,7 +14149,7 @@ void yuv420_yv12_to_bgr(unsigned char *src, unsigned char *dst, int w, int h)
 	}
 	*/
 
-	// ÀÏ¹İÀûÀÎ °æ¿ì ¾Æ·¡ÀÇ ÄÚµå »ç¿ëÇÔ.
+	// ì¼ë°˜ì ì¸ ê²½ìš° ì•„ë˜ì˜ ì½”ë“œ ì‚¬ìš©í•¨.
 	for(y=0; y<=h-2; y+=2)
 	{
 		for(x=0; x<=w-2; x+=2)
@@ -14301,7 +14186,7 @@ void yuv420_yv12_to_bgr(unsigned char *src, unsigned char *dst, int w, int h)
 	}
 }
 /*
-//ÀÌ ÇÔ¼ö´Â yv12¿ëÀÌ ¾Æ´Ñ°Í°°´Ù. Á» ´õ È®ÀÎÇØºÁ¾ß ÇÑ´Ù.
+//ì´ í•¨ìˆ˜ëŠ” yv12ìš©ì´ ì•„ë‹Œê²ƒê°™ë‹¤. ì¢€ ë” í™•ì¸í•´ë´ì•¼ í•œë‹¤.
 cv::Mat yuv420_yv12_to_bgr(uchar *pBuffer,long bufferSize, int width,int height)
 {
     cv::Mat result(height,width,CV_8UC3);
@@ -14493,12 +14378,12 @@ bool yuv444_to_yuv420(BYTE* u, BYTE* v, BYTE *U, BYTE *V, int w, int h)
 		pos0 = i*w + j;       pos1 = pos0 + 1;
 		pos2 = pos0 + w;      pos3 = pos2 + 1;
 
-		//¿À¸¥ÂÊ ½¬ÇÁÆ® ¿¬»ê 2¹ø
+		//ì˜¤ë¥¸ìª½ ì‰¬í”„íŠ¸ ì—°ì‚° 2ë²ˆ
 		value = ((int)u[pos0]+(int)u[pos1]+(int)u[pos2]+(int)u[pos3])>>2;
 		Clamp(value, 0, 255); 
 		U[addr] = (BYTE)value;
 
-		//Áï ³ª´©±â 4 : Æò±Õ³»±â
+		//ì¦‰ ë‚˜ëˆ„ê¸° 4 : í‰ê· ë‚´ê¸°
 		value = ((int)v[pos0]+(int)v[pos1]+(int)v[pos2]+(int)v[pos3])>>2;
 		Clamp(value, 0, 255); 
 		V[addr] = (BYTE)value;
@@ -14507,7 +14392,7 @@ bool yuv444_to_yuv420(BYTE* u, BYTE* v, BYTE *U, BYTE *V, int w, int h)
 	return  true;
 }
 
-//Å×½ºÆ® ÇÊ¿äÇÔ.
+//í…ŒìŠ¤íŠ¸ í•„ìš”í•¨.
 void yuv_yuyv_to_bgr(unsigned char* src, unsigned char* dst, int w, int h)
 {
 	const int K1 = int(1.402f * (1 << 16));
@@ -14752,11 +14637,11 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, d
 	*dx = sx;
 	*dy = sy;
 
-	//È­¸é¿¡ Ç¥½ÃµÈ ¿µ»óÀÇ l,t°ªÀ» »©¼­ È®´ë ¿µ»ó³»¿¡¼­ÀÇ »ó´ëÁÂÇ¥·Î º¯È¯ÇÑ ÈÄ
+	//í™”ë©´ì— í‘œì‹œëœ ì˜ìƒì˜ l,tê°’ì„ ë¹¼ì„œ í™•ëŒ€ ì˜ìƒë‚´ì—ì„œì˜ ìƒëŒ€ì¢Œí‘œë¡œ ë³€í™˜í•œ í›„
 	*dx -= rDisplayedImageRect.left;
 	*dy -= rDisplayedImageRect.top;
 
-	//È®´ëµÈ ºñÀ²·Î ³ª´©°í
+	//í™•ëŒ€ëœ ë¹„ìœ¨ë¡œ ë‚˜ëˆ„ê³ 
 	*dx /= dZoom;
 	*dy /= dZoom;
 }
@@ -14797,11 +14682,11 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, d
 	*dx = sx;
 	*dy = sy;
 
-	//È®´ëµÈ ºñÀ²À» °öÇÏ°í
+	//í™•ëŒ€ëœ ë¹„ìœ¨ì„ ê³±í•˜ê³ 
 	*dx *= dZoom;
 	*dy *= dZoom;
 
-	//¿É¼Â¸¸Å­ »ó´ëÁÂÇ¥·Î ÀÌµ¿½ÃÅ²´Ù.
+	//ì˜µì…‹ë§Œí¼ ìƒëŒ€ì¢Œí‘œë¡œ ì´ë™ì‹œí‚¨ë‹¤.
 	*dx += rDisplayedImageRect.left;
 	*dy += rDisplayedImageRect.top;
 }
@@ -14832,10 +14717,10 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, C
 	r_dst->bottom = (long)(y2);
 }
 
-//strÀÇ from À§Ä¡ ÀÌÈÄ¿¡ ÀÖ´Â ¼ıÀÚ ¿µ¿ª°ªÀ» num¿¡ ³Ö¾îÁÖ°í ¼ıÀÚ ½ÃÀÛÀ§Ä¡¸¦ returnÇÑ´Ù.
-//¸®ÅÏµÇ´Â ¼ıÀÚÀÇ ½ÃÀÛÀ§Ä¡´Â fromºÎÅÍ°¡ ¾Æ´Ñ str ÀüÃ¼ ¹®ÀÚ¿­¿¡¼­ÀÇ À§Ä¡ÀÌ´Ù.
-//¼ıÀÚ ¾Õ¿¡ ºÙÀº '+' or '-'Àº ¹«½ÃµÇ¹Ç·Î ¸¸¾à ºÎÈ£¸¦ ÆÇº°ÇØ¾ß ÇÑ´Ù¸é
-//¸®ÅÏµÇ´Â À§Ä¡ÀÇ ¾Õ¿¡ ÀÖ´Â ¹®ÀÚ¸¦ °Ë»çÇÏ¿© ¾ç¼öÀÎÁö, À½¼öÀÎÁö ÆÇº°ÇÏ¸é µÈ´Ù.
+//strì˜ from ìœ„ì¹˜ ì´í›„ì— ìˆëŠ” ìˆ«ì ì˜ì—­ê°’ì„ numì— ë„£ì–´ì£¼ê³  ìˆ«ì ì‹œì‘ìœ„ì¹˜ë¥¼ returní•œë‹¤.
+//ë¦¬í„´ë˜ëŠ” ìˆ«ìì˜ ì‹œì‘ìœ„ì¹˜ëŠ” fromë¶€í„°ê°€ ì•„ë‹Œ str ì „ì²´ ë¬¸ìì—´ì—ì„œì˜ ìœ„ì¹˜ì´ë‹¤.
+//ìˆ«ì ì•ì— ë¶™ì€ '+' or '-'ì€ ë¬´ì‹œë˜ë¯€ë¡œ ë§Œì•½ ë¶€í˜¸ë¥¼ íŒë³„í•´ì•¼ í•œë‹¤ë©´
+//ë¦¬í„´ë˜ëŠ” ìœ„ì¹˜ì˜ ì•ì— ìˆëŠ” ë¬¸ìë¥¼ ê²€ì‚¬í•˜ì—¬ ì–‘ìˆ˜ì¸ì§€, ìŒìˆ˜ì¸ì§€ íŒë³„í•˜ë©´ ëœë‹¤.
 int extract_digit_number(char *str, int from, double *num)
 {
 	int i;
@@ -14855,7 +14740,7 @@ int extract_digit_number(char *str, int from, double *num)
 			if (first_pos < 0)
 				first_pos = i;
 		}
-		//¼Ò¼öÁ¡Àº ¸Ç Ã³À½¿À°Å³ª Áßº¹µÇ¸é ½ºÅµµÈ´Ù.
+		//ì†Œìˆ˜ì ì€ ë§¨ ì²˜ìŒì˜¤ê±°ë‚˜ ì¤‘ë³µë˜ë©´ ìŠ¤í‚µëœë‹¤.
 		else if (str[i] == '.')
 		{
 			if ((num_len > 0) && !punc)
@@ -14883,7 +14768,7 @@ int extract_digit_number(char *str, int from, double *num)
 }
 
 //version string valid check
-//digits : ÀÚ¸´¼ö(1.0.0.1ÀÏ °æ¿ì´Â ÀÚ¸´¼ö 4)
+//digits : ìë¦¿ìˆ˜(1.0.0.1ì¼ ê²½ìš°ëŠ” ìë¦¿ìˆ˜ 4)
 bool valid_version_string(CString versionStr, int digits)
 {
 	std::deque<CString> token;
@@ -14894,10 +14779,10 @@ bool valid_version_string(CString versionStr, int digits)
 	return false;
 }
 
-//¹öÀü ¶Ç´Â IPÁÖ¼ÒµîÀº ±×³É ¹®ÀÚ¿­·Î ºñ±³ÇÏ¸é 1.0.9.0ÀÌ 1.0.10.0º¸´Ù ´õ Å©´Ù°í ³ª¿À¹Ç·Î
-//.À» ¾ø¾Ø ¼ıÀÚ·Î ºñ±³ÇßÀ¸³ª ÀÌ ¹æ¹ıµµ ¿À·ù ¹ß»ı(1.0.1.13 > 1.0.10.3º¸´Ù Å©´Ù°í ÆÇ´ÜÇÔ)
-//°á±¹ °¢ ÀÚ¸´¼ö³¢¸® ±¸ºĞÇÏ°Å³ª ÀÚ¸´¼ö¸¦ ¸ÂÃá ÈÄ ºñ±³ÇÑ´Ù.
-//¸®ÅÏ°ªÀº strcmp¿Í µ¿ÀÏÇÑ ±ÔÄ¢À¸·Î ÆÇ´ÜÇÑ´Ù.(+:str0°¡ Å­, -:str1ÀÌ Å­, 0:°°À½)
+//ë²„ì „ ë˜ëŠ” IPì£¼ì†Œë“±ì€ ê·¸ëƒ¥ ë¬¸ìì—´ë¡œ ë¹„êµí•˜ë©´ 1.0.9.0ì´ 1.0.10.0ë³´ë‹¤ ë” í¬ë‹¤ê³  ë‚˜ì˜¤ë¯€ë¡œ
+//.ì„ ì—†ì•¤ ìˆ«ìë¡œ ë¹„êµí–ˆìœ¼ë‚˜ ì´ ë°©ë²•ë„ ì˜¤ë¥˜ ë°œìƒ(1.0.1.13 > 1.0.10.3ë³´ë‹¤ í¬ë‹¤ê³  íŒë‹¨í•¨)
+//ê²°êµ­ ê° ìë¦¿ìˆ˜ë¼ë¦¬ êµ¬ë¶„í•˜ê±°ë‚˜ ìë¦¿ìˆ˜ë¥¼ ë§ì¶˜ í›„ ë¹„êµí•œë‹¤.
+//ë¦¬í„´ê°’ì€ strcmpì™€ ë™ì¼í•œ ê·œì¹™ìœ¼ë¡œ íŒë‹¨í•œë‹¤.(+:str0ê°€ í¼, -:str1ì´ í¼, 0:ê°™ìŒ)
 int	compare_string(CString str0, CString str1, TCHAR separator)
 {
 	size_t i = 0, j = 0;
@@ -14938,7 +14823,7 @@ int	compare_string(CString str0, CString str1, TCHAR separator)
 	*/
 }
 
-//src¸¦ n¹ø ¿¬°áÇÑ ¹®ÀÚ¿­ ¸®ÅÏ. n°³ÀÇ °ø¹é, ÅÇÀÌ ÇÊ¿äÇÒ °æ¿ì »ç¿ë
+//srcë¥¼ në²ˆ ì—°ê²°í•œ ë¬¸ìì—´ ë¦¬í„´. nê°œì˜ ê³µë°±, íƒ­ì´ í•„ìš”í•  ê²½ìš° ì‚¬ìš©
 CString make_string(CString src, int n)
 {
 	CString result;
@@ -14949,7 +14834,7 @@ CString make_string(CString src, int n)
 	return result;
 }
 
-//buttonÀÇ Á¾·ù¸¦ ¸®ÅÏÇÑ´Ù.
+//buttonì˜ ì¢…ë¥˜ë¥¼ ë¦¬í„´í•œë‹¤.
 DWORD		getButtonStyle(HWND hWnd)
 {
 	UINT button_style = BS_PUSHBUTTON;
@@ -14958,12 +14843,12 @@ DWORD		getButtonStyle(HWND hWnd)
 
 	return dwStyle;
 
-	// Check Box ÄÁÆ®·ÑÀÎ °æ¿ì, 3STATE ¼³Á¤À» È®ÀÎÇÔ. 
+	// Check Box ì»¨íŠ¸ë¡¤ì¸ ê²½ìš°, 3STATE ì„¤ì •ì„ í™•ì¸í•¨. 
 	if (((dwStyle & BS_AUTO3STATE) == BS_AUTO3STATE) || 
 		((dwStyle & BS_3STATE) == BS_3STATE))
 		button_style = BS_CHECKBOX; 
 
-	switch (dwStyle & 0x0F) // ¹öÆ°¼Ó¼º. 
+	switch (dwStyle & 0x0F) // ë²„íŠ¼ì†ì„±. 
 	{ 
 	case BS_CHECKBOX: 
 	case BS_AUTOCHECKBOX: 
@@ -14979,9 +14864,9 @@ DWORD		getButtonStyle(HWND hWnd)
 
 	if ((button_style == BS_CHECKBOX) || (button_style == BS_RADIOBUTTON))
 	{ 
-		// BS_AUTO3STATE | BS_3STATE »óÅÂ¸¦ Á¦°ÅÇÑ´Ù. 
+		// BS_AUTO3STATE | BS_3STATE ìƒíƒœë¥¼ ì œê±°í•œë‹¤. 
 		DWORD dwRemove = BS_AUTO3STATE | BS_3STATE;        
-		// BS_OWNERDRAW ¼Ó¼ºÀ» ¼³Á¤ÇÑ´Ù. 
+		// BS_OWNERDRAW ì†ì„±ì„ ì„¤ì •í•œë‹¤. 
 		dwNewStyle = (dwStyle & ~dwRemove) | BS_OWNERDRAW; 
 	}
 	else
@@ -14994,18 +14879,18 @@ DWORD		getButtonStyle(HWND hWnd)
 	return button_style;
 }
 
-//±×·ì³»ÀÇ ¿¬¼ÓµÈ radio ¹öÆ°µé¿¡ ´ëÇÑ ÀÏ°ı Ã³¸®¿ë ÇÔ¼ö.
-//MFCÀÇ ±âº» CheckRadioButton() ÇÔ¼ö°°Àº °æ¿ì´Â BST_UNCHECKED ±â´ÉÀ» Á¦°øÇÏÁö ¾Ê±â ¶§¹®¿¡
-//¾Æ·¡ ÇÔ¼ö¸¦ »õ·ÎÀÌ Á¤ÀÇÇØ¼­ »ç¿ëÇÑ´Ù.
-//id_offsetÀÌ 0º¸´Ù ÀÛÀ¸¸é first ~ last±îÁö ¸ğµÎ unchecked.
-//¶ÇÇÑ Æ¯Á¤ radio buttonÀ» »ç¿ëÀÚÀÇ ¸¶¿ì½º Å¬¸¯ÀÌ³ª Å°º¸µå µî°ú °°ÀÌ
-//Á÷Á¢ Ã¼Å©ÇÏ´Â °æ¿ì°¡ ¾Æ´Ñ
-//ÇÁ·Î±×·¥»ó¿¡¼­ SetCheck¿Í °°ÀÌ ÀÚµ¿À¸·Î ¼±ÅÃµÈ »óÅÂ·Î Ç¥½ÃÇÏ°Ô µÇ¸é
-//ÀÌÀü ¼±ÅÃµÇ¾ú´ø radio°¡ ¿©ÀüÈ÷ focus¸¦ °¡Áö°í ÀÖ°Ô µÇ°í
-//ÀÌ´Â ´Ù¸¥ Ã¢¿¡ focus¸¦ ÁÖ¾ú´Ù°¡ ÇöÀç dlg°¡ ´Ù½Ã focus¸¦ °¡Á®¿Â ¼ø°£
-//ON_CONTROL_RANGEÇÔ¼ö°¡ È£ÃâµÇ¸é¼­ ÀÇµµÄ¡ ¾ÊÀº Çö»óÀÌ ¹ß»ıÇÏ°Ô µÈ´Ù.
-//µû¶ó¼­ Æ¯Á¤ ¹üÀ§ÀÇ radio button Áß¿¡ ÇÏ³ª¸¦ ÇÁ·Î±×·¥»ó¿¡¼­ ÀÚµ¿À¸·Î ¼±ÅÃµÇ°Ô ÇÏ·Á¸é
-//¹İµå½Ã focus±îÁö °°ÀÌ Áà¾ß¸¸ ÀÌ·¯ÇÑ ¿Àµ¿ÀÛÀ» ÇÇÇÒ ¼ö ÀÖ´Ù.
+//ê·¸ë£¹ë‚´ì˜ ì—°ì†ëœ radio ë²„íŠ¼ë“¤ì— ëŒ€í•œ ì¼ê´„ ì²˜ë¦¬ìš© í•¨ìˆ˜.
+//MFCì˜ ê¸°ë³¸ CheckRadioButton() í•¨ìˆ˜ê°™ì€ ê²½ìš°ëŠ” BST_UNCHECKED ê¸°ëŠ¥ì„ ì œê³µí•˜ì§€ ì•Šê¸° ë•Œë¬¸ì—
+//ì•„ë˜ í•¨ìˆ˜ë¥¼ ìƒˆë¡œì´ ì •ì˜í•´ì„œ ì‚¬ìš©í•œë‹¤.
+//id_offsetì´ 0ë³´ë‹¤ ì‘ìœ¼ë©´ first ~ lastê¹Œì§€ ëª¨ë‘ unchecked.
+//ë˜í•œ íŠ¹ì • radio buttonì„ ì‚¬ìš©ìì˜ ë§ˆìš°ìŠ¤ í´ë¦­ì´ë‚˜ í‚¤ë³´ë“œ ë“±ê³¼ ê°™ì´
+//ì§ì ‘ ì²´í¬í•˜ëŠ” ê²½ìš°ê°€ ì•„ë‹Œ
+//í”„ë¡œê·¸ë¨ìƒì—ì„œ SetCheckì™€ ê°™ì´ ìë™ìœ¼ë¡œ ì„ íƒëœ ìƒíƒœë¡œ í‘œì‹œí•˜ê²Œ ë˜ë©´
+//ì´ì „ ì„ íƒë˜ì—ˆë˜ radioê°€ ì—¬ì „íˆ focusë¥¼ ê°€ì§€ê³  ìˆê²Œ ë˜ê³ 
+//ì´ëŠ” ë‹¤ë¥¸ ì°½ì— focusë¥¼ ì£¼ì—ˆë‹¤ê°€ í˜„ì¬ dlgê°€ ë‹¤ì‹œ focusë¥¼ ê°€ì ¸ì˜¨ ìˆœê°„
+//ON_CONTROL_RANGEí•¨ìˆ˜ê°€ í˜¸ì¶œë˜ë©´ì„œ ì˜ë„ì¹˜ ì•Šì€ í˜„ìƒì´ ë°œìƒí•˜ê²Œ ëœë‹¤.
+//ë”°ë¼ì„œ íŠ¹ì • ë²”ìœ„ì˜ radio button ì¤‘ì— í•˜ë‚˜ë¥¼ í”„ë¡œê·¸ë¨ìƒì—ì„œ ìë™ìœ¼ë¡œ ì„ íƒë˜ê²Œ í•˜ë ¤ë©´
+//ë°˜ë“œì‹œ focusê¹Œì§€ ê°™ì´ ì¤˜ì•¼ë§Œ ì´ëŸ¬í•œ ì˜¤ë™ì‘ì„ í”¼í•  ìˆ˜ ìˆë‹¤.
 void CheckRadioButtons(CWnd *pWnd, int idFirst, int idLast, int id_offset, int nCheck)
 {
 	int i;
@@ -15025,10 +14910,10 @@ void CheckRadioButtons(CWnd *pWnd, int idFirst, int idLast, int id_offset, int n
 	}
 }
 
-//dialog based¿¡¼­ Å°ÀÔ·ÂÀ¸·Î µ¿ÀÛÀ» Á¤ÀÇÇÏ´Âµ¥ CEdit°ú °°Àº ÀÔ·ÂÃ¢¿¡ Æ÷Ä¿½º°¡ ÀÖÀ¸¸é
-//PreTranslateMessage¿¡¼­ ¹æÇâÅ°³ª charÅ°¸¦ Ã³¸®ÇÏ±â°¡ °ï¶õÇÏ´Ù.
-//µû¶ó¼­ ÇöÀç Æ÷Ä¿½º¸¦ °¡Áø ÄÁÆ®·ÑÀÌ CEditÀÌ°í enableÀÌ°í readonly°¡ ¾Æ´Ñ °æ¿ì¿¡´Â
-//PreTranslateMessage¿¡¼­ ÀÔ·ÂµÈ Å°¸¦ Ã³¸®ÇÏµµ·Ï ÇÑ´Ù.
+//dialog basedì—ì„œ í‚¤ì…ë ¥ìœ¼ë¡œ ë™ì‘ì„ ì •ì˜í•˜ëŠ”ë° CEditê³¼ ê°™ì€ ì…ë ¥ì°½ì— í¬ì»¤ìŠ¤ê°€ ìˆìœ¼ë©´
+//PreTranslateMessageì—ì„œ ë°©í–¥í‚¤ë‚˜ charí‚¤ë¥¼ ì²˜ë¦¬í•˜ê¸°ê°€ ê³¤ë€í•˜ë‹¤.
+//ë”°ë¼ì„œ í˜„ì¬ í¬ì»¤ìŠ¤ë¥¼ ê°€ì§„ ì»¨íŠ¸ë¡¤ì´ CEditì´ê³  enableì´ê³  readonlyê°€ ì•„ë‹Œ ê²½ìš°ì—ëŠ”
+//PreTranslateMessageì—ì„œ ì…ë ¥ëœ í‚¤ë¥¼ ì²˜ë¦¬í•˜ë„ë¡ í•œë‹¤.
 bool IsEditCtrlAcceptKeyState(CWnd *pWnd)
 {
 	if (pWnd->IsKindOf(RUNTIME_CLASS(CEdit)) == false || pWnd->IsWindowEnabled() == false)
@@ -15128,7 +15013,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 	return 0;
 }
 
-//"yy-MM-dd" ¶Ç´Â "yy/MM/dd" ³¯Â¥ Ç¥½Ã Çü½Ä¿¡ ¸Â´ÂÁö °Ë»ç
+//"yy-MM-dd" ë˜ëŠ” "yy/MM/dd" ë‚ ì§œ í‘œì‹œ í˜•ì‹ì— ë§ëŠ”ì§€ ê²€ì‚¬
 //31, 30
 bool is_valid_date(CString str)
 {
@@ -15154,7 +15039,7 @@ bool is_valid_date(CString str)
 	return true;
 }
 
-//"hh:mm:ss" ½Ã°£ Ç¥½Ã Çü½Ä¿¡ ¸Â´ÂÁö °Ë»ç
+//"hh:mm:ss" ì‹œê°„ í‘œì‹œ í˜•ì‹ì— ë§ëŠ”ì§€ ê²€ì‚¬
 bool is_valid_time(CString str)
 {
 	//1:23:45 => 01:23:45
@@ -15186,11 +15071,11 @@ bool is_valid_time(CString str)
 	return true;
 }
 
-//³¯Â¥½Ã°¢ Çü½ÄÀ» yyyy/mm/dd hh:mm:ss Æ÷¸ËÀ¸·Î ¸ÂÃá´Ù.
-//230303192736			//ÃÖ¼ÒÇÑÀÇ ±æÀÌ´Â 12
-//23/3/3 9:7:6			//ÃÖ¼ÒÇÑÀÇ ±æÀÌ´Â 12
+//ë‚ ì§œì‹œê° í˜•ì‹ì„ yyyy/mm/dd hh:mm:ss í¬ë§·ìœ¼ë¡œ ë§ì¶˜ë‹¤.
+//230303192736			//ìµœì†Œí•œì˜ ê¸¸ì´ëŠ” 12
+//23/3/3 9:7:6			//ìµœì†Œí•œì˜ ê¸¸ì´ëŠ” 12
 //2023/3/3 9:7:6
-//=>2023/03/14 19:27:36.123	//ÃÖ´ë±æÀÌ´Â 23
+//=>2023/03/14 19:27:36.123	//ìµœëŒ€ê¸¸ì´ëŠ” 23
 void normalize_datetime(CString &src)
 {
 	CString result;
@@ -15233,15 +15118,15 @@ void normalize_datetime(CString &src)
 	src = result;
 }
 
-//¼öÇà½Ã°£À» ÃøÁ¤ÇÏ´Âµ¥
-//°íÁ¤¹Ğ ÃøÁ¤Àº QueryPerformanceFrequency¿Í QueryPerformanceCounter¸¦ ÀÌ¿ëÇÑ´Ù.
-//ÀÌ´Â ¹«°Ì±âµµ ÇÏ°í thread safeÇÏÁö ¾ÊÀ¸¹Ç·Î °¡´ÉÇÏ¸é »ç¿ëÀ» ±ÇÀåÇÏÁö ¾Ê´Â´Ù.
-//clockÀ» ÀÌ¿ëÇÑ ¹æ½ÄÀ¸·Îµµ °ÅÀÇ À¯»çÇÑ ¼Ò¿ä ½Ã°£À» ÃøÁ¤ÇÒ ¼ö ÀÖ°í
-//linux¿¡¼­µµ ±×´ë·Î »ç¿ëÇÒ ¼ö ÀÖ´Â ÀåÁ¡ÀÌ ÀÖ´Ù.
-//GetTickCount()´Â ÆíÂ÷°¡ ¸¹ÀÌ ¹ß»ıÇÏ´Â ´ÜÁ¡ÀÌ ÀÖ´Ù.
+//ìˆ˜í–‰ì‹œê°„ì„ ì¸¡ì •í•˜ëŠ”ë°
+//ê³ ì •ë°€ ì¸¡ì •ì€ QueryPerformanceFrequencyì™€ QueryPerformanceCounterë¥¼ ì´ìš©í•œë‹¤.
+//ì´ëŠ” ë¬´ê²ê¸°ë„ í•˜ê³  thread safeí•˜ì§€ ì•Šìœ¼ë¯€ë¡œ ê°€ëŠ¥í•˜ë©´ ì‚¬ìš©ì„ ê¶Œì¥í•˜ì§€ ì•ŠëŠ”ë‹¤.
+//clockì„ ì´ìš©í•œ ë°©ì‹ìœ¼ë¡œë„ ê±°ì˜ ìœ ì‚¬í•œ ì†Œìš” ì‹œê°„ì„ ì¸¡ì •í•  ìˆ˜ ìˆê³ 
+//linuxì—ì„œë„ ê·¸ëŒ€ë¡œ ì‚¬ìš©í•  ìˆ˜ ìˆëŠ” ì¥ì ì´ ìˆë‹¤.
+//GetTickCount()ëŠ” í¸ì°¨ê°€ ë§ì´ ë°œìƒí•˜ëŠ” ë‹¨ì ì´ ìˆë‹¤.
 //unit : ms
-//´Ü, ÀÌ °ªÀÌ longÀ¸·Î °è»êµÇ¹Ç·Î ±× ¸®ÅÏ°ªÀº À½¼ö·Î Ç¥ÇöµÉ ¼ö ÀÖ´Ù.
-//ÇÏÁö¸¸ ½Ã°£ ÃøÁ¤ÇÏ´Âµ¥´Â ¹®Á¦µÇÁö ¾Ê´Â´Ù.
+//ë‹¨, ì´ ê°’ì´ longìœ¼ë¡œ ê³„ì‚°ë˜ë¯€ë¡œ ê·¸ ë¦¬í„´ê°’ì€ ìŒìˆ˜ë¡œ í‘œí˜„ë  ìˆ˜ ìˆë‹¤.
+//í•˜ì§€ë§Œ ì‹œê°„ ì¸¡ì •í•˜ëŠ”ë°ëŠ” ë¬¸ì œë˜ì§€ ì•ŠëŠ”ë‹¤.
 long getClock()
 {
 	struct timeval tv;
@@ -16308,14 +16193,14 @@ void resize_bilinear_c4(const unsigned char* src, int srcw, int srch, unsigned c
 }
 
 /*
-IsAvailableMemory : 1. ÁÖ¾îÁø ¸Ş¸ğ¸® ÁÖ¼ÒÀÇ »óÅÂ°¡ ¹°¸® ÁÖ¼Ò·Î È®Á¤µÇ¾ú´ÂÁö °Ë»ç (½ÇÁ¦ »ç¿ëÀ» À§ÇØ ÇÊ¿ä)
-					2. ÁÖ¾îÁø ¸Ş¸ğ¸®ÀÇ º¸È£ ¼Ó¼ºÀÌ ÀĞ±â³ª ¾²±â°¡ °¡´ÉÇÑÁö °Ë»ç
+IsAvailableMemory : 1. ì£¼ì–´ì§„ ë©”ëª¨ë¦¬ ì£¼ì†Œì˜ ìƒíƒœê°€ ë¬¼ë¦¬ ì£¼ì†Œë¡œ í™•ì •ë˜ì—ˆëŠ”ì§€ ê²€ì‚¬ (ì‹¤ì œ ì‚¬ìš©ì„ ìœ„í•´ í•„ìš”)
+					2. ì£¼ì–´ì§„ ë©”ëª¨ë¦¬ì˜ ë³´í˜¸ ì†ì„±ì´ ì½ê¸°ë‚˜ ì“°ê¸°ê°€ ê°€ëŠ¥í•œì§€ ê²€ì‚¬
 	Param :
-		LPVOID  pMemoryAddr : °Ë»çÇÏ°íÀÚ ÇÏ´Â ¸Ş¸ğ¸®ÀÇ ÁÖ¼Ò
+		LPVOID  pMemoryAddr : ê²€ì‚¬í•˜ê³ ì í•˜ëŠ” ë©”ëª¨ë¦¬ì˜ ì£¼ì†Œ
 	Return Value :
-		ERROR_SUCCESS : System Error Code, ¸ğµç °ÍÀÌ ¼º°øÇÒ °æ¿ìÀÇ ¿¡·¯ÄÚµå
-		±âÅ¸ °ª : Read/Write °¡´ÉÇÑ ¸Ş¸ğ¸®°¡ ¾Æ´Ï¸é ÇØ´ç ÁÖ¼ÒÀÇ Protect Mode ¸¦
-					³ªÅ¸³»´Â 0ÀÌ ¾Æ´Ñ °ªÀ» ¸®ÅÏÇÔ.
+		ERROR_SUCCESS : System Error Code, ëª¨ë“  ê²ƒì´ ì„±ê³µí•  ê²½ìš°ì˜ ì—ëŸ¬ì½”ë“œ
+		ê¸°íƒ€ ê°’ : Read/Write ê°€ëŠ¥í•œ ë©”ëª¨ë¦¬ê°€ ì•„ë‹ˆë©´ í•´ë‹¹ ì£¼ì†Œì˜ Protect Mode ë¥¼
+					ë‚˜íƒ€ë‚´ëŠ” 0ì´ ì•„ë‹Œ ê°’ì„ ë¦¬í„´í•¨.
 	Reference :
 		1. https://docs.microsoft.com/en-us/previous-versions/aa915370(v=msdn.10)/
 		2. https://docs.microsoft.com/en-us/windows/desktop/debug/system-error-codes--0-499-/
@@ -16327,7 +16212,7 @@ INT IsAvailableMemory(LPVOID pMemoryAddr)
 
 	nResult = VirtualQuery(pMemoryAddr, &MemInfo, sizeof(MemInfo));
 
-	if (nResult == 0) // Ä¿³Î ¿µ¿ªÀÎ °æ¿ì VirtualQuery ÀÚÃ¼°¡ FailÇÔ.  
+	if (nResult == 0) // ì»¤ë„ ì˜ì—­ì¸ ê²½ìš° VirtualQuery ìì²´ê°€ Failí•¨.  
 	{
 		return -1;
 	}
@@ -16337,7 +16222,7 @@ INT IsAvailableMemory(LPVOID pMemoryAddr)
 	}
 	else if ((MemInfo.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE)))
 	{
-		return  ERROR_SUCCESS; // System Error Code ¼º°ø : Reference ÂüÁ¶
+		return  ERROR_SUCCESS; // System Error Code ì„±ê³µ : Reference ì°¸ì¡°
 	}
 	else
 	{
@@ -16539,12 +16424,12 @@ int getFilelist(char (*sfiles)[NAME_MAX+1], char* folder, char* sfilter, int max
 
 /**
  * @ingroup HttpFileUpload
- * @brief HTTP POST ¸Ş¼Òµå·Î ÆÄÀÏÀ» ¾÷·ÎµåÇÑ´Ù.
+ * @brief HTTP POST ë©”ì†Œë“œë¡œ íŒŒì¼ì„ ì—…ë¡œë“œí•œë‹¤.
  * @param pszUrl   HTTP URL
- * @param pszFilePath ¾÷·Îµå ÆÄÀÏ full path
- * @returns ¼º°øÇÏ¸é true ¸¦ ¸®ÅÏÇÏ°í ±×·¸Áö ¾ÊÀ¸¸é false ¸¦ ¸®ÅÏÇÑ´Ù.
- * ÇöÀç ÄÚµå´Â chatIdx ÇÊµå¿Í image ÇÊµå(ÆÄÀÏ°æ·Î)¸¦ »ç¿ëÇÏ´Â ÄÚµåÀÌ¹Ç·Î
- * ÇÊ¿ä¿¡ µû¶ó ÄÚµå¸¦ ¼öÁ¤ÇÏ¿© »ç¿ëÇÏ¸é µÈ´Ù.
+ * @param pszFilePath ì—…ë¡œë“œ íŒŒì¼ full path
+ * @returns ì„±ê³µí•˜ë©´ true ë¥¼ ë¦¬í„´í•˜ê³  ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ false ë¥¼ ë¦¬í„´í•œë‹¤.
+ * í˜„ì¬ ì½”ë“œëŠ” chatIdx í•„ë“œì™€ image í•„ë“œ(íŒŒì¼ê²½ë¡œ)ë¥¼ ì‚¬ìš©í•˜ëŠ” ì½”ë“œì´ë¯€ë¡œ
+ * í•„ìš”ì— ë”°ë¼ ì½”ë“œë¥¼ ìˆ˜ì •í•˜ì—¬ ì‚¬ìš©í•˜ë©´ ëœë‹¤.
  *	if (HttpUploadFile(_T("http://54.180.43.235:4300/rest/saveImage"), _T("c:\\scpark\\media\\test_image\\waiting_status.png"), 6340))
 		AfxMessageBox(_T("Upload success."));
  */
@@ -16565,7 +16450,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 	pszFilePath = T2W(filepath);
 #endif
 
-	// pszUrl ¿¡¼­ host, path ¸¦ °¡Á®¿Â´Ù.
+	// pszUrl ì—ì„œ host, path ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 	WCHAR* pszHost = NULL;
 	DWORD dwFlag = 0;
 	int iPort = 80;
@@ -16601,7 +16486,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		strHost.erase(pszPort - strHost.c_str());
 	}
 
-	// ÆÄÀÏ °æ·Î¿¡¼­ ÆÄÀÏ ÀÌ¸§À» °¡Á®¿Â´Ù.
+	// íŒŒì¼ ê²½ë¡œì—ì„œ íŒŒì¼ ì´ë¦„ì„ ê°€ì ¸ì˜¨ë‹¤.
 	int iLen = wcslen(pszFilePath);
 	WCHAR* pszFileName = NULL;
 	for (int i = iLen - 1; i >= 0; --i)
@@ -16613,7 +16498,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		}
 	}
 
-	// ÆÄÀÏ Å©±â¸¦ °¡Á®¿Â´Ù.
+	// íŒŒì¼ í¬ê¸°ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 	struct _stat sttStat;
 	if (_wstat(pszFilePath, &sttStat) == -1)
 	{
@@ -16631,7 +16516,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 		char szBuf[8192];
 		CInternetSession clsSession;
 
-		// HTTP ¿¬°áÇÏ°í ÆÄÀÏÀ» Àü¼ÛÇÑ´Ù.
+		// HTTP ì—°ê²°í•˜ê³  íŒŒì¼ì„ ì „ì†¡í•œë‹¤.
 		CHttpConnection* pclsHttpConn = clsSession.GetHttpConnection(CString(strHost.c_str()), dwFlag, (INTERNET_PORT)iPort, NULL, NULL);
 		if (pclsHttpConn)
 		{
@@ -16644,7 +16529,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 				USES_CONVERSION;
 				std::string strBoundary = "55CA7C5681214d98912C76366A8042BA";
 
-				// HTTP ¿äÃ» header ¸¦ »ı¼ºÇÑ´Ù.
+				// HTTP ìš”ì²­ header ë¥¼ ìƒì„±í•œë‹¤.
 				std::wstring strContentType = L"Content-Type: multipart/form-data; boundary=";
 				//strContentType.append(A2T(strBoundary.c_str()));
 				strContentType.append(strBoundary.begin(), strBoundary.end());
@@ -16654,7 +16539,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 				std::string strBody;
 				std::string strChatIndex = std::to_string(chatIndex);
 
-				// body¿¡ chatIdx¸¦ ÀúÀåÇÑ´Ù.
+				// bodyì— chatIdxë¥¼ ì €ì¥í•œë‹¤.
 				strBody.append("--");
 				strBody.append(strBoundary);
 				strBody.append("\r\n");
@@ -16662,7 +16547,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 				strBody.append(strChatIndex);
 				strBody.append("\r\n");
 
-				// body¿¡ ÆÄÀÏ¸íÀ» ÀúÀåÇÑ´Ù.
+				// bodyì— íŒŒì¼ëª…ì„ ì €ì¥í•œë‹¤.
 				strBody.append("--");
 				strBody.append(strBoundary);
 				strBody.append("\r\n");
@@ -16686,14 +16571,14 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 
 				try
 				{
-					// HTTP ¿äÃ» header ¸¦ Àü¼ÛÇÑ´Ù.
+					// HTTP ìš”ì²­ header ë¥¼ ì „ì†¡í•œë‹¤.
 					pclsHttpFile->SendRequestEx(strBody.length(), HSR_SYNC | HSR_INITIATE);
 
-					// HTTP ¿äÃ» body ¸¦ Àü¼ÛÇÑ´Ù.
+					// HTTP ìš”ì²­ body ë¥¼ ì „ì†¡í•œë‹¤.
 					pclsHttpFile->Write(strBody.c_str(), strBody.length());
 					pclsHttpFile->EndRequest(HSR_SYNC);
 
-					// HTTP ÀÀ´ä body ¸¦ ¼ö½ÅÇÑ´Ù.
+					// HTTP ì‘ë‹µ body ë¥¼ ìˆ˜ì‹ í•œë‹¤.
 					std::string strResponse;
 					DWORD dwCode;
 					while (1)
@@ -16703,7 +16588,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 						strResponse.append(szBuf, iLen);
 					}
 
-					// ÀÀ´ä ÄÚµå°¡ 200 OK ÀÎÁö È®ÀÎÇÑ´Ù.
+					// ì‘ë‹µ ì½”ë“œê°€ 200 OK ì¸ì§€ í™•ì¸í•œë‹¤.
 					pclsHttpFile->QueryInfoStatusCode(dwCode);
 					if (dwCode == HTTP_STATUS_OK)
 					{
@@ -16712,7 +16597,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 				}
 				catch (CInternetException* pclsException)
 				{
-					// À¥¼­¹ö ¿¬°á¿¡ ½ÇÆĞÇÏ¸é CInternetException ÀÌ ¹ß»ıÇÑ´Ù.
+					// ì›¹ì„œë²„ ì—°ê²°ì— ì‹¤íŒ¨í•˜ë©´ CInternetException ì´ ë°œìƒí•œë‹¤.
 				}
 
 				delete pclsHttpFile;
@@ -16725,8 +16610,8 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 }
 
 
-//¼­¹öÀÇ ÇÑ±Û¸í ÆÄÀÏ¿¡ ´ëÇÑ Ã³¸®¶§¹®¿¡ request_url()ÇÔ¼ö ´ë½Å Ãß°¡ÇÏ¿© Å×½ºÆ® ÇØºÃÀ¸³ª
-//¼­¹öÃøÀÇ ¹®Á¦ÀÎµíÇÏ¿© ¿ì¼± ÀÌ ÇÔ¼ö »ç¿ëÀº º¸·ùÁß...
+//ì„œë²„ì˜ í•œê¸€ëª… íŒŒì¼ì— ëŒ€í•œ ì²˜ë¦¬ë•Œë¬¸ì— request_url()í•¨ìˆ˜ ëŒ€ì‹  ì¶”ê°€í•˜ì—¬ í…ŒìŠ¤íŠ¸ í•´ë´¤ìœ¼ë‚˜
+//ì„œë²„ì¸¡ì˜ ë¬¸ì œì¸ë“¯í•˜ì—¬ ìš°ì„  ì´ í•¨ìˆ˜ ì‚¬ìš©ì€ ë³´ë¥˜ì¤‘...
 bool HttpDownloadFile(CString url, CString local_path)
 {
 	return false;
@@ -16766,7 +16651,7 @@ bool HttpDownloadFile(CString url, CString local_path)
 
 	if (m_pHttpFile)
 	{
-		if (!FileWrite.Open("c:\\scpark\\¸ğµâ.pdf", CFile::modeCreate | CFile::modeReadWrite | CFile::shareDenyNone))
+		if (!FileWrite.Open("c:\\scpark\\ëª¨ë“ˆ.pdf", CFile::modeCreate | CFile::modeReadWrite | CFile::shareDenyNone))
 		{
 			//exception found
 			//lots of clean up code
@@ -16824,7 +16709,7 @@ bool HttpDownloadFile(CString url, CString local_path)
 	pszFilePath = T2W(local_path);
 #endif
 
-	// pszUrl ¿¡¼­ host, path ¸¦ °¡Á®¿Â´Ù.
+	// pszUrl ì—ì„œ host, path ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 	WCHAR* pszHost = NULL;
 	DWORD dwFlag = INTERNET_FLAG_KEEP_CONNECTION;
 	int iPort = 80;
@@ -16860,7 +16745,7 @@ bool HttpDownloadFile(CString url, CString local_path)
 		strHost.erase(pszPort - strHost.c_str());
 	}
 
-	// ÆÄÀÏ °æ·Î¿¡¼­ ÆÄÀÏ ÀÌ¸§À» °¡Á®¿Â´Ù.
+	// íŒŒì¼ ê²½ë¡œì—ì„œ íŒŒì¼ ì´ë¦„ì„ ê°€ì ¸ì˜¨ë‹¤.
 	int iLen = wcslen(pszFilePath);
 	WCHAR* pszFileName = NULL;
 	for (int i = iLen - 1; i >= 0; --i)
@@ -16872,7 +16757,7 @@ bool HttpDownloadFile(CString url, CString local_path)
 		}
 	}
 
-	// ÆÄÀÏ Å©±â¸¦ °¡Á®¿Â´Ù.
+	// íŒŒì¼ í¬ê¸°ë¥¼ ê°€ì ¸ì˜¨ë‹¤.
 	//struct _stat sttStat;
 	//if (_wstat(pszFilePath, &sttStat) == -1)
 	//{
@@ -16899,14 +16784,14 @@ bool HttpDownloadFile(CString url, CString local_path)
 
 		//::AfxParseURL(url.GetBuffer(url.GetLength()), AFX_INET_SERVICE_HTTP, 
 
-		// HTTP ¿¬°áÇÏ°í ÆÄÀÏÀ» Àü¼ÛÇÑ´Ù.
+		// HTTP ì—°ê²°í•˜ê³  íŒŒì¼ì„ ì „ì†¡í•œë‹¤.
 		CHttpConnection* pclsHttpConn = clsSession.GetHttpConnection(CString(strHost.c_str()), dwFlag, (INTERNET_PORT)iPort, NULL, NULL);
 		if (pclsHttpConn)
 		{
 			CHttpFile* pclsHttpFile = pclsHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_GET, CString(pszPath));
 			if (pclsHttpFile)
 			{
-				// HTTP ¿äÃ» header ¸¦ »ı¼ºÇÑ´Ù.
+				// HTTP ìš”ì²­ header ë¥¼ ìƒì„±í•œë‹¤.
 				std::wstring strContentType = L"Accept: text";
 				pclsHttpFile->AddRequestHeaders(CString(strContentType.c_str()));// .c_str());
 
@@ -16943,9 +16828,9 @@ bool HttpDownloadFile(CString url, CString local_path)
 //webView2 Runtime
 bool is_WebView2Runtime_installed()
 {
-	//VS¿¡¼­ ÀÌ ÇÁ·ÎÁ§Æ®¸¦ ½ÇÇàÇÏ¿© WebView2¸¦ ¼³Ä¡ÇÏ¸é HKEY_CURRENT_USER¿¡ ±â·ÏÀÌ ¹İ¿µµÇ°í
-	//urlschemeÀ» ÅëÇØ¼­ KoinoAVCSupporter.exe -> WebView2¸¦ ¼³Ä¡ÇÏ¸é HKEY_LOCAL_MACHINE¿¡ ±â·ÏÀÌ ³²´Â´Ù.
-	//webview2¸¦ uninstallÇÏ¸é(Microsoft Edge WebView2 ·±Å¸ÀÓ) µÎ °÷ ¸ğµÎ Á¦°ÅµÈ´Ù.
+	//VSì—ì„œ ì´ í”„ë¡œì íŠ¸ë¥¼ ì‹¤í–‰í•˜ì—¬ WebView2ë¥¼ ì„¤ì¹˜í•˜ë©´ HKEY_CURRENT_USERì— ê¸°ë¡ì´ ë°˜ì˜ë˜ê³ 
+	//urlschemeì„ í†µí•´ì„œ KoinoAVCSupporter.exe -> WebView2ë¥¼ ì„¤ì¹˜í•˜ë©´ HKEY_LOCAL_MACHINEì— ê¸°ë¡ì´ ë‚¨ëŠ”ë‹¤.
+	//webview2ë¥¼ uninstallí•˜ë©´(Microsoft Edge WebView2 ëŸ°íƒ€ì„) ë‘ ê³³ ëª¨ë‘ ì œê±°ëœë‹¤.
 	LONG result1 = IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
 	LONG result2 = IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
 
@@ -16982,7 +16867,7 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 	//HANDLE hProcess = NULL;
 	HWND hWnd = NULL;
 	int wait_count = 0;
-	//¼³Ä¡°¡ ¿Ï·áµÇ¸é ¼³Ä¡¿Í °ü·ÃµÈ Ã¢Àº ¸ğµÎ ´İ¾ÆÁØ´Ù.
+	//ì„¤ì¹˜ê°€ ì™„ë£Œë˜ë©´ ì„¤ì¹˜ì™€ ê´€ë ¨ëœ ì°½ì€ ëª¨ë‘ ë‹«ì•„ì¤€ë‹¤.
 	do
 	{
 		hWnd = GetHWndByExeFilename(_T("MicrosoftEdgeWebView2RuntimeInstallerX64.exe"));
@@ -17125,7 +17010,7 @@ bool save(Gdiplus::Bitmap* bitmap, CString filename)
 		GetEncoderClsid(L"image/bmp", &encoderClsid);
 	else
 	{
-		AfxMessageBox(_T("Ã³¸® ÄÚµå°¡ Ãß°¡µÇÁö ¾ÊÀº Æ÷¸Ë. ÄÚµå ¼öÁ¤ ÇÊ¿ä"));
+		AfxMessageBox(_T("ì²˜ë¦¬ ì½”ë“œê°€ ì¶”ê°€ë˜ì§€ ì•Šì€ í¬ë§·. ì½”ë“œ ìˆ˜ì • í•„ìš”"));
 		return false;
 	}
 	/*
@@ -17191,7 +17076,7 @@ CString json_value(CString json, CString key)
 }
 
 #if 0
-//ÆÄÀÏ ¼Ó¼º º¯°æ ¸ñÀûÀÇ ÄÚµåÁö¸¸ Á» ´õ Å×½ºÆ®°¡ ÇÊ¿äÇÏ°í XP¿¡¼­´Â Áö¿øµÇÁö ¾ÊÀ¸¹Ç·Î ¿ì¼± ÁÖ¼®Ã³¸®ÇÔ.
+//íŒŒì¼ ì†ì„± ë³€ê²½ ëª©ì ì˜ ì½”ë“œì§€ë§Œ ì¢€ ë” í…ŒìŠ¤íŠ¸ê°€ í•„ìš”í•˜ê³  XPì—ì„œëŠ” ì§€ì›ë˜ì§€ ì•Šìœ¼ë¯€ë¡œ ìš°ì„  ì£¼ì„ì²˜ë¦¬í•¨.
 HRESULT PrintProperty(IPropertyStore* pps, REFPROPERTYKEY key, PCWSTR pszCanonicalName)
 {
 	PROPVARIANT propvarValue = { 0 };
@@ -17550,10 +17435,10 @@ BOOL recreate_combobox(CComboBox* pCombo, LPVOID lpParam/*=0*/)
 	return TRUE;
 }
 
-//ÄÜ¼Ö ¸í·ÉÀÎÁö À©µµ¿ì ÇÁ·Î±×·¥ÀÎÁö ±¸ºĞ
+//ì½˜ì†” ëª…ë ¹ì¸ì§€ ìœˆë„ìš° í”„ë¡œê·¸ë¨ì¸ì§€ êµ¬ë¶„
 bool is_gui_application(CString fullPath)
 {
-	//fullPath¿¡¼­ ½ÇÇàÆÄÀÏ¸í ¶Ç´Â cmd¸¦ ÃßÃâÇÑ´Ù.
+	//fullPathì—ì„œ ì‹¤í–‰íŒŒì¼ëª… ë˜ëŠ” cmdë¥¼ ì¶”ì¶œí•œë‹¤.
 	CString cmd = fullPath;
 
 	if (fullPath[0] == '\"')
@@ -17607,9 +17492,9 @@ bool is_gui_application(CString fullPath)
 	uint32_t peSignature;
 	file.read(reinterpret_cast<char*>(&peSignature), sizeof(peSignature));
 
-	//ÆÄÀÏÁ¤º¸¸¸ °¡Áö°í ÇØ´ç ÆÄÀÏÀÌ console¿¡¼­ ½ÇÇàÇÏ´Â ¸í·É¾îÀÎÁö,
-	//GUI¸¦ °¡Áö°í ½ÇÇàµÇ´Â ¾ÛÀÎÁö¸¦ ÆÇº°ÇÏ´Â°Ô ¾ÆÁ÷Àº ¸íÈ®ÇÏÁö ¾Ê´Ù.
-	//¿ì¼± Á÷Á¢ ¸í½ÃÇØÁØ´Ù.
+	//íŒŒì¼ì •ë³´ë§Œ ê°€ì§€ê³  í•´ë‹¹ íŒŒì¼ì´ consoleì—ì„œ ì‹¤í–‰í•˜ëŠ” ëª…ë ¹ì–´ì¸ì§€,
+	//GUIë¥¼ ê°€ì§€ê³  ì‹¤í–‰ë˜ëŠ” ì•±ì¸ì§€ë¥¼ íŒë³„í•˜ëŠ”ê²Œ ì•„ì§ì€ ëª…í™•í•˜ì§€ ì•Šë‹¤.
+	//ìš°ì„  ì§ì ‘ ëª…ì‹œí•´ì¤€ë‹¤.
 	cmd.MakeLower();
 	if (cmd == _T("powershell.exe"))
 		return false;
@@ -17665,7 +17550,7 @@ bool	get_menu_item_info(HMENU hMenu, UINT uItem, UINT *uID, CString *caption, BO
 	return true;
 }
 
-//taskbarÀÇ Å©±â ¹× show/hide »óÅÂ¸¦ ¸®ÅÏÇÑ´Ù.
+//taskbarì˜ í¬ê¸° ë° show/hide ìƒíƒœë¥¼ ë¦¬í„´í•œë‹¤.
 bool get_taskbar_size(CSize* sz)
 {
 	bool is_shown = false;
@@ -17726,7 +17611,7 @@ bool get_taskbar_state(UINT state, CSize* sz)
 
 		return (uState == state);
 
-		// ¹Ù²ï ¼Ó¼º Àû¿ë
+		// ë°”ë€ ì†ì„± ì ìš©
 		//appBarData.lParam = uState;
 		//SHAppBarMessage(ABM_SETSTATE, &appBarData);
 	}

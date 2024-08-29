@@ -2,9 +2,10 @@
 
 #include <deque>
 #include <Afxwin.h>
+#include <gdiplus.h>
 
 //특정 색상값을 [색상없음]의 의미로 사용하기 위해.
-#define listctrlex_unused_color	RGB(17,235,53)
+#define listctrlex_unused_color	Gdiplus::Color(17,235,53)
 
 //한 라인에 대한 정보를 담는 클래스
 class CListCtrlData
@@ -41,10 +42,10 @@ public:
 	bool checked = false;
 	int selected = false;
 
-	//이 벡터가 NULL이면 CVtListCtrlEx의 멤버인 m_crText, m_crBack을 사용하고
+	//이 벡터가 NULL이면 CVtListCtrlEx의 멤버인 m_cr_text, m_cr_back을 사용하고
 	//색상값이 특정색이 아니면 해당 색으로 그 컬럼을 표시한다.
-	std::deque<COLORREF> crText;
-	std::deque<COLORREF> crBack;
+	std::deque<Gdiplus::Color> crText;
+	std::deque<Gdiplus::Color> crBack;
 
 	bool compare(const CListCtrlData &a, int index) const
 	{

@@ -146,7 +146,7 @@ void CSCTreeCtrl::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 BOOL CSCTreeCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	CBrush backBrush(m_crBack);
+	CBrush backBrush(m_cr_back.ToCOLORREF());
 	CBrush* pPrevBrush = pDC->SelectObject(&backBrush);
 	CRect rect;
 	pDC->GetClipBox(&rect);
@@ -191,10 +191,10 @@ void CSCTreeCtrl::OnPaint()
 	CMemoryDC dc(&dc1, &rc);
 	Gdiplus::Graphics g(dc.m_hDC, rc);
 
-	COLORREF	crText = m_crText;
-	COLORREF	crBack = m_crBack;
+	COLORREF	crText = m_cr_text;
+	COLORREF	crBack = m_cr_back;
 
-	dc.FillSolidRect(rc, m_crBack);
+	dc.FillSolidRect(rc, m_cr_back);
 
 	CFont font;
 	CFont* pOldFont;
@@ -220,7 +220,7 @@ void CSCTreeCtrl::OnPaint()
 
 	while (hItem)
 	{
-		crText = m_crText;
+		crText = m_cr_text;
 
 		//GetItemRect(hItem, rRow, FALSE);
 		get_item_rect(hItem, rItem);
@@ -234,13 +234,13 @@ void CSCTreeCtrl::OnPaint()
 			//포커스에 따라 다르다. 단, 편집중일때도 CEdit이 focus를 가지게 되는데 inactive 색상 대신 원래의 선택배경색을 그대로 사용하자.
 			if (GetFocus() == this || m_in_editing)
 			{
-				crText = m_crTextSelected;
-				DrawRectangle(&dc, (GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_crSelectedBorder, m_crBackSelected);
+				crText = m_cr_text_selected;
+				DrawRectangle(&dc, (GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_cr_selected_border, m_cr_back_selected);
 			}
 			else if (GetStyle() & TVS_SHOWSELALWAYS)
 			{
-				crText = m_crTextSelectedInactive;
-				dc.FillSolidRect((GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_crBackSelectedInactive);
+				crText = m_cr_text_selected_inactive;
+				dc.FillSolidRect((GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_cr_back_selected_inactive);
 			}
 		}
 
@@ -386,8 +386,8 @@ void CSCTreeCtrl::OnPaint()
 		{
 			TRACE(_T("drophilited\n"));
 			//GetItemState(m_folder_list[i].item, TVIS_DROPHILITED))
-			crText = m_crTextDropHilited;
-			dc.FillSolidRect(rRow, m_crBackDropHilited);
+			crText = m_cr_text_dropHilited;
+			dc.FillSolidRect(rRow, m_cr_back_dropHilited);
 		}
 		else if (GetSelectedItem() == m_folder_list[i].item)
 		//else if (GetItemState(m_folder_list[i].item, TVIS_SELECTED) & TVIS_SELECTED)
@@ -397,13 +397,13 @@ void CSCTreeCtrl::OnPaint()
 			//포커스에 따라 다르다.
 			if (GetFocus() == this)
 			{
-				crText = m_crTextSelected;
-				DrawRectangle(&dc, rRow, m_crSelectedBorder, m_crBackSelected);
+				crText = m_cr_text_selected;
+				DrawRectangle(&dc, rRow, m_cr_selected_border, m_cr_back_selected);
 			}
 			else if ((GetStyle() & TVS_SHOWSELALWAYS))
 			{
-				crText = m_crTextSelectedInactive;
-				dc.FillSolidRect(rRow, m_crBackSelectedInactive);
+				crText = m_cr_text_selected_inactive;
+				dc.FillSolidRect(rRow, m_cr_back_selected_inactive);
 			}
 		}
 
@@ -469,7 +469,7 @@ void CSCTreeCtrl::OnPaint()
 	dc.SelectClipRgn(&rgn);
 	rgn.DeleteObject();
 
-	//COLORREF m_wndColor = m_crBack;// GetSysColor(COLOR_WINDOW);
+	//COLORREF m_wndColor = m_cr_back;// GetSysColor(COLOR_WINDOW);
 
 	dc.SetViewportOrg(0, 0);
 	//dc.SetTextColor(m_wndColor);
@@ -486,7 +486,7 @@ void CSCTreeCtrl::OnPaint()
 		CRect rect;
 		GetItemRect(hItem, &rect, TRUE);
 
-		//dc.FillSolidRect(rect, RGB(255, 0, 0));// m_crBack);
+		//dc.FillSolidRect(rect, Gdiplus::Color(255, 255, 0, 0));// m_cr_back);
 		hItem = GetNextVisibleItem(hItem);
 		n--;
 	}
@@ -545,8 +545,8 @@ void CSCTreeCtrl::OnPaint()
 			GetItemRect(hItem, &rect, TRUE);
 
 
-			//dc.SetBkColor(m_crBack);
-			dc.SetTextColor(bSplColor ? RGB(255, 0, 0) : RGB(0, 0, 255));//m_crText);
+			//dc.SetBkColor(m_cr_back);
+			dc.SetTextColor(bSplColor ? Gdiplus::Color(255, 255, 0, 0) : Gdiplus::Color(255, 0, 0, 255));//m_cr_text);
 
 			if (bBold)
 				dc.SelectObject(&boldFontDC);
@@ -561,7 +561,7 @@ void CSCTreeCtrl::OnPaint()
 		{
 			GetItemRect(hItem, &rect, TRUE);
 
-			COLORREF m_highlightColor = m_crBackSelected;// ::GetSysColor(COLOR_HIGHLIGHT);
+			COLORREF m_highlightColor = m_cr_back_selected;// ::GetSysColor(COLOR_HIGHLIGHT);
 			CBrush brush(m_highlightColor);
 
 			//dc.FillRect(rect, &brush);
@@ -572,7 +572,7 @@ void CSCTreeCtrl::OnPaint()
 			CString text = GetItemText(hItem);
 
 			//dc.SetBkColor(m_highlightColor);
-			dc.SetTextColor(m_crTextSelected);// ::GetSysColor(COLOR_HIGHLIGHTTEXT));
+			dc.SetTextColor(m_cr_text_selected);// ::GetSysColor(COLOR_HIGHLIGHTTEXT));
 
 			if (bBold)
 				dc.SelectObject(&boldFontDC);
@@ -683,12 +683,16 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 		CString text = m_pShellImageList->get_shell_known_string_by_csidl(csidl);
 
 		TV_INSERTSTRUCT tvInsert;
-		tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
+		tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+		tvInsert.item.pszText = (LPTSTR)(LPCTSTR)text;
 		tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(csidl);
 		tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(csidl);
+
+		//내 PC인 경우는 가상폴더이므로 물리적 path가 없다.
+		if (PathFileExists(path))
+			tvInsert.item.cChildren = (get_sub_folders(path) > 0);
 		tvInsert.hInsertAfter = TVI_LAST;
 		tvInsert.hParent = NULL;
-		tvInsert.item.pszText = (LPTSTR)(LPCTSTR)text;
 		return InsertItem(&tvInsert);
 	}
 }
@@ -733,6 +737,9 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 			curFolder = FileFind.GetFileName();
 			TV_INSERTSTRUCT tvItem;
 			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+			//tvItem.item.mask |= TVIF_STATE;
+			//tvItem.item.stateMask |= TVIS_OVERLAYMASK;
+			//tvItem.item.state |= INDEXTOOVERLAYMASK(0);
 			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
 			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
 			tvItem.hInsertAfter = TVI_LAST;
@@ -1235,70 +1242,76 @@ void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 	{
 		//최근 윈도우 탐색기의 색상을 보면 텍스트 색상은 선택여부, inactive에 무관하게 동일하다.
 	case color_theme_default:
-		m_crText = ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected = m_crText;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_crTextSelectedInactive = m_crText;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_crTextDropHilited = ::GetSysColor(COLOR_HIGHLIGHTTEXT);;
-		m_crBack = ::GetSysColor(COLOR_WINDOW);
-		m_crBackSelected = RGB(204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBackSelectedInactive = RGB(217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBackDropHilited = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crSelectedBorder = RGB(153, 209, 255);
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		m_cr_text_selected_inactive = m_cr_text;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+		m_cr_text_dropHilited.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+		m_cr_back_selected = Gdiplus::Color(255, 205, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected_inactive = Gdiplus::Color(255, 217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_crBackTrackSelect = Gdiplus::Color(255, 229, 243, 255);
+		m_cr_back_dropHilited.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
+		m_cr_selected_border = Gdiplus::Color(255, 153, 209, 255);
 		break;
 	case color_theme_light_blue:
-		m_crText = ::GetSysColor(COLOR_BTNTEXT);
-		m_crTextSelected = RGB(65, 102, 146);
-		m_crTextSelectedInactive = RGB(65, 102, 146);
-		m_crTextDropHilited = get_color(m_crText, -48);
-		m_crBack = RGB(193, 219, 252);
-		m_crBackSelected = get_color(m_crBack, -48);
-		m_crBackSelectedInactive = get_color(m_crBack, -48);
-		m_crBackDropHilited = get_color(m_crBack, -48);;
-		m_crSelectedBorder = RGB(153, 209, 255);
+		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_text_selected = Gdiplus::Color(255, 65, 102, 146);
+		m_cr_text_selected_inactive = Gdiplus::Color(255, 65, 102, 146);
+		m_cr_text_dropHilited = get_color(m_cr_text, -48);
+		m_cr_back = Gdiplus::Color(255, 193, 219, 252);
+		m_cr_back_selected = get_color(m_cr_back, -48);
+		m_cr_back_selected_inactive = get_color(m_cr_back, -48);
+		m_crBackTrackSelect = get_color(m_cr_back_selected, 48);
+		m_cr_back_dropHilited = get_color(m_cr_back, -48);;
+		m_cr_selected_border = Gdiplus::Color(255, 153, 209, 255);
 		break;
 	case color_theme_navy_blue:
-		m_crText = RGB(204, 216, 225);
-		m_crTextSelected = RGB(234, 246, 255);
-		m_crTextSelectedInactive = RGB(105, 142, 186);
-		m_crTextDropHilited = get_color(m_crText, 48);
-		m_crBack = RGB(74, 94, 127);
-		m_crBackSelected = RGB(15, 36, 41);
-		m_crBackSelectedInactive = RGB(15, 36, 41);
-		m_crBackDropHilited = get_color(m_crBack, 48);
-		m_crSelectedBorder = RGB(153, 209, 255);
+		m_cr_text = Gdiplus::Color(255, 204, 216, 225);
+		m_cr_text_selected = Gdiplus::Color(255, 234, 246, 255);
+		m_cr_text_selected_inactive = Gdiplus::Color(255, 105, 142, 186);
+		m_cr_text_dropHilited = get_color(m_cr_text, 48);
+		m_cr_back = Gdiplus::Color(255, 74, 94, 127);
+		m_cr_back_selected = Gdiplus::Color(255, 15, 36, 41);
+		m_cr_back_selected_inactive = Gdiplus::Color(255, 15, 36, 41);
+		m_crBackTrackSelect = get_color(m_cr_back_selected, 48);
+		m_cr_back_dropHilited = get_color(m_cr_back, 48);
+		m_cr_selected_border = Gdiplus::Color(255, 153, 209, 255);
 		break;
 	case color_theme_dark_blue:
-		m_crText = RGB(16, 177, 224);
-		m_crTextSelected = RGB(224, 180, 59);
-		m_crTextSelectedInactive = RGB(105, 142, 186);
-		m_crTextDropHilited = get_color(m_crText, 48);
-		m_crBack = RGB(2, 21, 36);
-		m_crBackSelected = RGB(3, 42, 59);
-		m_crBackSelectedInactive = RGB(15, 36, 41);
-		m_crBackDropHilited = blue;
-		m_crSelectedBorder = RGB(153, 209, 255);
+		m_cr_text = Gdiplus::Color(255, 16, 177, 224);
+		m_cr_text_selected = Gdiplus::Color(255, 224, 180, 59);
+		m_cr_text_selected_inactive = Gdiplus::Color(255, 105, 142, 186);
+		m_cr_text_dropHilited = get_color(m_cr_text, 48);
+		m_cr_back = Gdiplus::Color(255, 2, 21, 36);
+		m_cr_back_selected = Gdiplus::Color(255, 3, 42, 59);
+		m_cr_back_selected_inactive = Gdiplus::Color(255, 15, 36, 41);
+		m_crBackTrackSelect = get_color(m_cr_back_selected, 48);
+		m_cr_back_dropHilited = blue;
+		m_cr_selected_border = Gdiplus::Color(255, 153, 209, 255);
 		break;
 	case color_theme_dark_gray:
-		m_crText = RGB(164, 164, 164);
-		m_crTextSelected = RGB(241, 241, 241);
-		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
-		m_crTextDropHilited = get_color(m_crText, 255);
-		m_crBack = RGB(64, 64, 64);
-		m_crBackSelected = get_color(m_crBack, -32);
-		m_crBackSelectedInactive = get_color(m_crBack, -32);
-		m_crBackDropHilited = blue;
-		m_crSelectedBorder = RGB(128, 128, 128);
+		m_cr_text = Gdiplus::Color(255, 164, 164, 164);
+		m_cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
+		m_cr_text_selected_inactive = get_color(m_cr_text_selected, -36);
+		m_cr_text_dropHilited = get_color(m_cr_text, 255);
+		m_cr_back = Gdiplus::Color(255, 64, 64, 64);
+		m_cr_back_selected = get_color(m_cr_back, -16);
+		m_cr_back_selected_inactive = get_color(m_cr_back, -32);
+		m_crBackTrackSelect = get_color(m_cr_back_selected, 48);
+		m_cr_back_dropHilited = blue;
+		m_cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 		break;
 	case color_theme_dark:
-		m_crText = RGB(212, 212, 212);
-		m_crTextSelected = RGB(241, 241, 241);
-		m_crTextSelectedInactive = get_color(m_crTextSelected, -36);
-		m_crTextDropHilited = white;
-		m_crBack = RGB(37, 37, 38);
-		m_crBackSelected = RGB(0, 120, 215);
-		m_crBackSelectedInactive = RGB(0, 120, 215);
-		m_crBackDropHilited = blue;
-		m_crSelectedBorder = m_crBackSelected;// RGB(128, 128, 128);
+		m_cr_text = Gdiplus::Color(255, 212, 212, 212);
+		m_cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
+		m_cr_text_selected_inactive = get_color(m_cr_text_selected, -36);
+		m_cr_text_dropHilited = white;
+		m_cr_back = Gdiplus::Color(255, 37, 37, 38);
+		m_cr_back_selected = Gdiplus::Color(255, 0, 120, 215);
+		m_cr_back_selected_inactive = Gdiplus::Color(255, 0, 120, 215);
+		m_crBackTrackSelect = get_color(m_cr_back_selected, 48);
+		m_cr_back_dropHilited = blue;
+		m_cr_selected_border = m_cr_back_selected;// Gdiplus::Color(255, 128, 128, 128);
 		break;
 	}
 
@@ -1461,7 +1474,7 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 		, 0
 		, rectComplete.Width()
 		, rectComplete.Height()
-		, RGB(255, 255, 0));
+		, m_cr_back_selected.ToCOLORREF());
 
 	// 안티알리아스 안된 폰트를 사용하는게 핵심
 	CFont* pFont = pTree->GetFont();
@@ -1516,8 +1529,8 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 	textRect.left -= rectComplete.left - 2;
 	textRect.right -= rectComplete.left;
 
-	//dcMem.FillSolidRect(textRect, RGB(255, 0, 0));
-	dcMem.SetTextColor(RGB(255, 0, 0));
+	//dcMem.FillSolidRect(textRect, Gdiplus::Color(255, 255, 0, 0));
+	dcMem.SetTextColor(m_cr_text_selected.ToCOLORREF());
 	DWORD flags = DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP | DT_WORDBREAK;
 	dcMem.DrawText(text, -1, textRect, flags);
 
@@ -2264,6 +2277,9 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	//get_item_rect(hItem, r);
 	GetItemRect(hItem, r, TRUE);
 
+	//아이템이 선택되었을 때 label의 크기가 좌우 타이트하여 left -= 2;
+	//CustomDraw에서도 -2하여 그림.
+	//r.left -= 2;
 
 	//label영역은 실제 텍스트 너비보다 24픽셀 더 크게 잡아준다.(윈도우 탐색기와 동일)
 	r.right += 24;
@@ -2429,10 +2445,10 @@ void CSCTreeCtrl::get_item_rect(HTREEITEM hItem, CRect r[])
 			get_rect_info_string(r[rect_icon]),
 			get_rect_info_string(r[rect_label]));
 
-		DrawRectangle(&dc, r[rect_button], red);
-		DrawRectangle(&dc, r[rect_check], skyblue);
-		DrawRectangle(&dc, r[rect_icon], orange);
-		DrawRectangle(&dc, r[rect_label], cyan);
+		draw_rectangle(&dc, r[rect_button], RGB2gpColor(red));
+		draw_rectangle(&dc, r[rect_check], RGB2gpColor(skyblue));
+		draw_rectangle(&dc, r[rect_icon], RGB2gpColor(orange));
+		draw_rectangle(&dc, r[rect_label], RGB2gpColor(cyan));
 	}
 }
 
@@ -2540,17 +2556,24 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 		case CDDS_ITEMPOSTPAINT:
 		{
 			GetItemRect(hItem, &rcItem, TRUE);
+			//rcItem.left -= 2;
 
-			COLORREF crText = m_crText;
-			COLORREF crBack = m_crBack;
+			Gdiplus::Color crText = m_cr_text;
+			Gdiplus::Color crBack = m_cr_back;
 
 			int nOldBkMode = dc.SetBkMode(TRANSPARENT);
 
-			if (pNMCustomDraw->uItemState & CDIS_HOT)
+			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			{
+				TRACE(_T("CDIS_SELECTED\n"));
+				crText = m_cr_text_selected;
+				crBack = m_cr_back_selected;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_HOT)
 			{
 				TRACE(_T("CDIS_HOT\n"));
-				crText = m_crTextSelected;
-				crBack = m_crBackSelected;
+				//crText = m_cr_text_selected;
+				crBack = m_crBackTrackSelect;
 			}
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
 			else if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
@@ -2559,24 +2582,24 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				SetTimer(timer_expand_for_drop, 1000, NULL);
 
 				TRACE(_T("CDIS_DROPHILITED\n"));
-				crText = m_crTextDropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
-				crBack = m_crBackDropHilited;
+				crText = m_cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
+				crBack = m_cr_back_dropHilited;
 			}
-			else if (pNMCustomDraw->uItemState & CDIS_FOCUS)
+			//else if (pNMCustomDraw->uItemState & CDIS_FOCUS)
+			//{
+			//	TRACE(_T("CDIS_FOCUS\n"));
+			//	crText = m_cr_text_selected;
+			//	crBack = m_cr_back_selected;
+			//}
+
+			dc.SetTextColor(crText.ToCOLORREF());
+			dc.FillSolidRect(&rcItem, crBack.ToCOLORREF());
+
+			if (pNMCustomDraw->uItemState & CDIS_FOCUS)
 			{
 				TRACE(_T("CDIS_FOCUS\n"));
-				crText = m_crTextSelected;
-				crBack = m_crBackSelected;
+				//draw_rectangle(&dc, rcItem, m_cr_selected_border);
 			}
-			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
-			{
-				TRACE(_T("CDIS_SELECTED\n"));
-				crText = m_crTextSelected;
-				crBack = m_crBackSelected;
-			}
-
-			dc.SetTextColor(crText);
-			dc.FillSolidRect(&rcItem, crBack);
 
 			/*
 			switch (pIData->level)
@@ -2597,6 +2620,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//m_imagelist.Draw(&dc, 0, CPoint(rIcon.CenterPoint().x - m_image_size / 2, rIcon.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 
 			CRect rText = rcItem;
+			//rText.left += 2;
 			//CSize szText = dc.GetTextExtent(GetItemText(hItem));
 			//rText.OffsetRect(m_image_size, 0);
 			//rText.right = rText.left + szText.cx;
@@ -2678,9 +2702,19 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 	{
 		m_menu.create(this, 160);
 		m_menu.add(menu_add_item, (m_is_shell_treectrl ? _T("새 폴더(&N)") : _T("새 항목(&N)")));
-		m_menu.add(menu_rename_item, (m_is_shell_treectrl ? _T("이름 바꾸기(&M)") : _T("이름 바꾸기(&M)")));
-		m_menu.add(-1);
-		m_menu.add(menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
+
+		//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
+		if (m_is_shell_treectrl)
+		{
+			m_menu.add(-1);
+			m_menu.add(menu_property, _T("속성(&R)"));
+		}
+		else
+		{
+			m_menu.add(menu_rename_item, (m_is_shell_treectrl ? _T("이름 바꾸기(&M)") : _T("이름 바꾸기(&M)")));
+			m_menu.add(-1);
+			m_menu.add(menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
+		}
 	}
 
 	ClientToScreen(&point);
@@ -2710,6 +2744,16 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 			case menu_delete_item:
 			{
 				delete_item();
+				break;
+			}
+			case menu_property :
+			{
+				HTREEITEM hItem = GetSelectedItem();
+				if (hItem)
+				{
+					CString full_path = get_fullpath(hItem);
+					show_file_property_window(full_path);
+				}
 				break;
 			}
 		}
@@ -2756,6 +2800,10 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 //주어진 항목의 label을 변경한다.
 void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
 {
+	//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
+	if (m_is_shell_treectrl)
+		return;
+
 	if (hItem == NULL)
 		hItem = GetSelectedItem();
 	if (hItem == NULL)
@@ -2775,6 +2823,10 @@ void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
 
 void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool confirm)
 {
+	//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
+	if (m_is_shell_treectrl)
+		return;
+
 	if (hItem == NULL)
 		hItem = GetSelectedItem();
 	if (hItem == NULL)

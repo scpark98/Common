@@ -312,7 +312,7 @@ void CVideoWnd::OnPaint()
 		}
 
 		//설정중인 ROI 사각형 표시
-		TRACE(_T("%s\n"), get_rect_info_string(m_rScreenROI, 2));
+		//TRACE(_T("%s\n"), get_rect_info_string(m_rScreenROI, 2));
 		DrawRectangle( &dc, m_rScreenROI, red, NULL_BRUSH, 2 );
 
 		dc.SetBkMode( TRANSPARENT );

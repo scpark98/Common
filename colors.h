@@ -49,6 +49,7 @@
 #define		GRAY208		GRAY(208)
 #define		GRAY224		GRAY(224)
 #define		GRAY(x)		RGB((x), (x), (x))
+#define		gGRAY(x)	Gdiplus::Color(255, (x), (x), (x))
 
 //std::map으로 컬러 표현
 //참조 방법 : cr = g_cr["white"]
@@ -362,6 +363,7 @@ COLORREF		get_color(COLORREF crOrigin, int nOffset);
 Gdiplus::Color	get_color(Gdiplus::Color crOrigin, int nOffset);
 //두 색의 중간 비율 색상값을 구한다. (ratio가 0.0이면 cr1이, 1.0이면 cr2가 리턴된다.)
 COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
+Gdiplus::Color	get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio);
 
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
 COLORREF		get_color(CString cr);
@@ -371,10 +373,11 @@ CString			get_color_string(COLORREF cr);
 //보색
 COLORREF		get_complementary_color(COLORREF cr);
 
-//rgb 평균 리턴
+//rgb 평균값 리턴
 uint8_t			gray_value(uint8_t r, uint8_t g, uint8_t b);
-//rgb 평균 리턴
+//rgb 평균값 리턴
 uint8_t			gray_value(COLORREF cr);
+uint8_t			gray_value(Gdiplus::Color cr);
 //rgb 평균인 컬러값 리턴
 COLORREF		gray_color(COLORREF cr);
 Gdiplus::Color	gray_color(Gdiplus::Color cr);
@@ -389,7 +392,6 @@ void			rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
 void			hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
 COLORREF		hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
 
-COLORREF		gpColor2RGB(Gdiplus::Color cr);
 Gdiplus::Color	RGB2gpColor(COLORREF cr, BYTE alpha = 255);
 
 //cr컬러에서 a,r,g,b 중 한 색을 value로 변경한다.

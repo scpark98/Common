@@ -17,8 +17,8 @@ static char THIS_FILE[] = __FILE__;
 
 CHeaderCtrlEx::CHeaderCtrlEx()
 {
-	m_crBack = ::GetSysColor(COLOR_3DFACE);
-	m_crText = ::GetSysColor(COLOR_BTNTEXT);
+	m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
 	m_header_is_clicked = false;
 	m_header_clicked_index = -1;
 	m_header_height = 16;
@@ -92,13 +92,13 @@ void CHeaderCtrlEx::OnPaint()
 	//if (m_flat_style)
 	//	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));
 	//else
-		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_crBack : GRAY(164));
+		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_cr_back.ToCOLORREF() : GRAY(164));
 
 	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(GetParent()->IsWindowEnabled() ? m_crText : ::GetSysColor(COLOR_GRAYTEXT));
+	dc.SetTextColor(GetParent()->IsWindowEnabled() ? m_cr_text.ToCOLORREF() : ::GetSysColor(COLOR_GRAYTEXT));
 
-	COLORREF crSunkenLight = get_color(m_crBack, 48);
-	COLORREF crSunkenDark  = get_color(m_crBack, -48);
+	Gdiplus::Color crSunkenLight = get_color(m_cr_back, 48);
+	Gdiplus::Color crSunkenDark  = get_color(m_cr_back, -48);
 
 	for (int i = 0; i < GetItemCount(); i++)
 	{
@@ -108,15 +108,15 @@ void CHeaderCtrlEx::OnPaint()
 
 		if (i == m_header_clicked_index)
 		{
-			DrawSunkenRect(&dc, rItem, true, crSunkenDark, crSunkenLight);
+			draw_sunken_rect(&dc, rItem, true, crSunkenDark, crSunkenLight);
 			rItem.OffsetRect(1, 1);
 		}
 		else
 		{
 			if (m_flat_style)
-				DrawLine(&dc, rItem.right, rItem.top + 3, rItem.right, rItem.bottom - 3, crSunkenDark);
+				draw_line(&dc, rItem.right, rItem.top + 3, rItem.right, rItem.bottom - 3, crSunkenDark);
 			else
-				DrawSunkenRect(&dc, rItem, false, crSunkenDark, crSunkenLight);
+				draw_sunken_rect(&dc, rItem, false, crSunkenDark, crSunkenLight);
 		}
 
 		DWORD dwAlign = m_header_text_align[i];
@@ -385,17 +385,17 @@ void CHeaderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 	CHeaderCtrl::OnLButtonUp(nFlags, point);
 }
 
-void CHeaderCtrlEx::set_color(COLORREF crText, COLORREF crBack, COLORREF crSeparator)
+void CHeaderCtrlEx::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gdiplus::Color cr_separator)
 {
-	m_crText = crText;
-	m_crBack = crBack;
+	m_cr_text = cr_text;
+	m_cr_back = cr_back;
 
-	if (m_crSeparator == -1)
+	if (m_cr_separator.GetValue() == Gdiplus::Color::Transparent)
 	{
-		if (gray_color(m_crBack) < 128)
-			m_crSeparator = get_color(m_crBack, 32);
+		if (gray_value(m_cr_back) < 128)
+			m_cr_separator = get_color(m_cr_back, 32);
 		else
-			m_crSeparator = get_color(m_crBack, -32);
+			m_cr_separator = get_color(m_cr_back, -32);
 	}
 
 	if (!m_hWnd)
@@ -404,18 +404,18 @@ void CHeaderCtrlEx::set_color(COLORREF crText, COLORREF crBack, COLORREF crSepar
 	Invalidate();
 }
 
-void CHeaderCtrlEx::set_text_color(COLORREF crText)
+void CHeaderCtrlEx::set_text_color(Gdiplus::Color crText)
 {
-	m_crText = crText;
+	m_cr_text = crText;
 
 	if (!m_hWnd)
 		return;
 	Invalidate();
 }
 
-void CHeaderCtrlEx::set_back_color(COLORREF crBack)
+void CHeaderCtrlEx::set_back_color(Gdiplus::Color crBack)
 {
-	m_crBack = crBack;
+	m_cr_back = crBack;
 
 	if (!m_hWnd)
 		return;

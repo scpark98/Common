@@ -223,6 +223,7 @@ COLORREF get_color(COLORREF cr1, COLORREF cr2, double ratio)
 	int r1 = GetRValue(cr1);
 	int g1 = GetGValue(cr1);
 	int b1 = GetBValue(cr1);
+
 	int r2 = GetRValue(cr2);
 	int g2 = GetGValue(cr2);
 	int b2 = GetBValue(cr2);
@@ -233,6 +234,29 @@ COLORREF get_color(COLORREF cr1, COLORREF cr2, double ratio)
 	b = b1 - (int)((double)(b1 - b2) * ratio);
 
 	return RGB(r, g, b);
+}
+
+Gdiplus::Color get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio)
+{
+	Clamp(ratio, 0.0, 1.0);
+
+	int a1 = cr1.GetA();
+	int r1 = cr1.GetR();
+	int g1 = cr1.GetG();
+	int b1 = cr1.GetB();
+
+	int a2 = cr2.GetA();
+	int r2 = cr2.GetR();
+	int g2 = cr2.GetG();
+	int b2 = cr2.GetB();
+	int a, r, g, b;
+
+	a = a1 - (int)((double)(a1 - a2) * ratio);
+	r = r1 - (int)((double)(r1 - r2) * ratio);
+	g = g1 - (int)((double)(g1 - g2) * ratio);
+	b = b1 - (int)((double)(b1 - b2) * ratio);
+
+	return Gdiplus::Color(a, r, g, b);
 }
 
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
@@ -280,6 +304,11 @@ uint8_t gray_value(uint8_t r, uint8_t g, uint8_t b)
 uint8_t	gray_value(COLORREF cr)
 {
 	return gray_value(GetRValue(cr), GetGValue(cr), GetBValue(cr));
+}
+
+uint8_t	gray_value(Gdiplus::Color cr)
+{
+	return gray_value(cr.GetR(), cr.GetG(), cr.GetB());
 }
 
 COLORREF gray_color(COLORREF cr)

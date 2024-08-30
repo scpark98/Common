@@ -7,6 +7,62 @@
 #include <deque>
 #include <unordered_map>
 
+/*
+- CListCtrl, CTreeCtrl 등 MFC 및 사용자 컨트롤등에서 컬러 테마 관련 코드가 중복되어
+  CSCColorTheme이라는 클래스로 공통 처리하고자 함.
+  일부 변수는 특정 컨트롤에만 해당되는 경우도 있음.
+
+  CSCColorTheme m_theme;
+  m_theme.set_color_theme(CSCColorTheme::color_theme_dark);
+*/
+
+class CSCColorTheme
+{
+public :
+	CSCColorTheme()
+	{
+		set_color_theme(color_theme_default);
+	};
+
+	enum SC_COLOR_THEMES
+	{
+		color_theme_default = 0,	//윈도우 테마를 따름
+		color_theme_gray,
+		color_theme_dark_gray,
+		color_theme_dark,
+	};
+
+	int		get_color_theme() { return cur_theme; }
+	void	set_color_theme(int color_theme);
+	static std::deque<CString> get_color_theme_list();
+
+	Gdiplus::Color	cr_text;
+	Gdiplus::Color	cr_text_hover;
+	Gdiplus::Color	cr_text_dropHilited;
+	Gdiplus::Color	cr_text_selected;
+	Gdiplus::Color	cr_text_selected_inactive;
+
+	Gdiplus::Color	cr_selected_border;
+
+	Gdiplus::Color	cr_back;
+	Gdiplus::Color	cr_back_hover;				//= hover, over, track_select...
+	Gdiplus::Color	cr_back_dropHilited;
+	Gdiplus::Color	cr_back_selected;
+	Gdiplus::Color	cr_back_selected_inactive;
+	Gdiplus::Color	cr_back_selected_border;
+	Gdiplus::Color	cr_back_alternated;
+
+	//CListCtrl에서만 사용될것으로 예상.
+	Gdiplus::Color	cr_header_text;
+	Gdiplus::Color	cr_header_back;
+	std::deque<Gdiplus::Color> cr_percentage_bar;	//percentage bar graph color
+	Gdiplus::Color	cr_progress;					//progress bar
+	Gdiplus::Color	cr_progress_text;				//progress text
+
+protected:
+	int				cur_theme = color_theme_default;
+};
+
 // RGB -> YUV(YCbCr)
 #define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
 #define		RGB2U(R, G, B) CLIP(((-38 * (R) -  74 * (G) + 112 * (B) + 128) >> 8) + 128)

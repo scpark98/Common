@@ -13,8 +13,6 @@ IMPLEMENT_DYNAMIC(CSCTreeCtrl, CTreeCtrl)
 
 CSCTreeCtrl::CSCTreeCtrl()
 {
-	set_color_theme(color_theme_default, false);
-
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
@@ -146,7 +144,7 @@ void CSCTreeCtrl::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 BOOL CSCTreeCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	CBrush backBrush(m_cr_back.ToCOLORREF());
+	CBrush backBrush(m_theme.cr_back.ToCOLORREF());
 	CBrush* pPrevBrush = pDC->SelectObject(&backBrush);
 	CRect rect;
 	pDC->GetClipBox(&rect);
@@ -1236,6 +1234,7 @@ HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 }
 */
 
+/*
 void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 {
 	switch (theme)
@@ -1318,7 +1317,7 @@ void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 	if (apply_now)
 		Invalidate();
 }
-
+*/
 
 void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -1474,7 +1473,7 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 		, 0
 		, rectComplete.Width()
 		, rectComplete.Height()
-		, m_cr_back_selected.ToCOLORREF());
+		, m_theme.cr_back_selected.ToCOLORREF());
 
 	// 안티알리아스 안된 폰트를 사용하는게 핵심
 	CFont* pFont = pTree->GetFont();
@@ -1530,7 +1529,7 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 	textRect.right -= rectComplete.left;
 
 	//dcMem.FillSolidRect(textRect, Gdiplus::Color(255, 255, 0, 0));
-	dcMem.SetTextColor(m_cr_text_selected.ToCOLORREF());
+	dcMem.SetTextColor(m_theme.cr_text_selected.ToCOLORREF());
 	DWORD flags = DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP | DT_WORDBREAK;
 	dcMem.DrawText(text, -1, textRect, flags);
 
@@ -2146,20 +2145,20 @@ BOOL CSCTreeCtrl::move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, H
 	return TRUE;
 }
 
-void CSCTreeCtrl::theme_init()
+void CSCTreeCtrl::winctrl_theme_init()
 {
-	if (!m_theme_initialized)
+	if (!m_winctrl_theme_initialized)
 	{
-		m_theme.Init(m_hWnd);
-		m_theme_initialized = true;
+		m_winctrl_theme.Init(m_hWnd);
+		m_winctrl_theme_initialized = true;
 	}
 }
 
 void CSCTreeCtrl::draw_checkbox(CDC* pDC, CRect r, int check_state)
 {
-	theme_init();
+	winctrl_theme_init();
 
-	if (m_theme.GetAppearance())
+	if (m_winctrl_theme.GetAppearance())
 	{
 		int	nState = 0;
 
@@ -2180,7 +2179,7 @@ void CSCTreeCtrl::draw_checkbox(CDC* pDC, CRect r, int check_state)
 		}
 
 		// Now do the actual drawing...
-		m_theme.DrawThemeBackground(pDC->GetSafeHdc(), r, BP_CHECKBOX, nState);
+		m_winctrl_theme.DrawThemeBackground(pDC->GetSafeHdc(), r, BP_CHECKBOX, nState);
 	}
 	else // No themes - just draw it conventionally
 	{
@@ -2558,22 +2557,22 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			GetItemRect(hItem, &rcItem, TRUE);
 			//rcItem.left -= 2;
 
-			Gdiplus::Color crText = m_cr_text;
-			Gdiplus::Color crBack = m_cr_back;
+			Gdiplus::Color crText = m_theme.cr_text;
+			Gdiplus::Color crBack = m_theme.cr_back;
 
 			int nOldBkMode = dc.SetBkMode(TRANSPARENT);
 
 			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
 				TRACE(_T("CDIS_SELECTED\n"));
-				crText = m_cr_text_selected;
-				crBack = m_cr_back_selected;
+				crText = m_theme.cr_text_selected;
+				crBack = m_theme.cr_back_selected;
 			}
 			else if (pNMCustomDraw->uItemState & CDIS_HOT)
 			{
 				TRACE(_T("CDIS_HOT\n"));
 				//crText = m_cr_text_selected;
-				crBack = m_crBackTrackSelect;
+				crBack = m_theme.cr_back_hover;
 			}
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
 			else if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
@@ -2582,8 +2581,8 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				SetTimer(timer_expand_for_drop, 1000, NULL);
 
 				TRACE(_T("CDIS_DROPHILITED\n"));
-				crText = m_cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
-				crBack = m_cr_back_dropHilited;
+				crText = m_theme.cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
+				crBack = m_theme.cr_back_dropHilited;
 			}
 			//else if (pNMCustomDraw->uItemState & CDIS_FOCUS)
 			//{

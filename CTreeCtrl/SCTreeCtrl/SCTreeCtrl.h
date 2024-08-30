@@ -34,6 +34,7 @@
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
 #include "../../CMenu/SCMenuBar/SCMenu.h"
+#include "../../colors.h"
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
 
@@ -75,6 +76,8 @@ class CSCTreeCtrl : public CTreeCtrl
 public:
 	CSCTreeCtrl();
 	virtual ~CSCTreeCtrl();
+
+	CSCColorTheme	m_theme;
 
 	enum CSCTreeCtrlMsgs
 	{
@@ -165,9 +168,9 @@ public:
 		color_theme_dark,
 	};
 
-	void	set_color_theme(int theme, bool apply_now = true);
-	void	set_text_color(Gdiplus::Color text_color) { m_cr_text = text_color; Invalidate(); }
-	void	set_back_color(Gdiplus::Color back_color) { m_cr_back = back_color; Invalidate(); }
+	void	set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
+	void	set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
+	void	set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
 	//CTreeCtrl에서 지원하는 기본 함수 override
 	void	SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
 	void	SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
@@ -250,9 +253,9 @@ protected:
 
 	bool			m_show_area = false;
 
-	CTheme			m_theme;
-	bool			m_theme_initialized = false;
-	void			theme_init();
+	CTheme			m_winctrl_theme;
+	bool			m_winctrl_theme_initialized = false;
+	void			winctrl_theme_init();
 	void			draw_checkbox(CDC* pDC, CRect r, int check_state);
 
 	CImageList		m_imagelist;			//자체 이미지 리스트
@@ -276,6 +279,7 @@ protected:
 	void			reconstruct_font();
 
 	//컬러 관련
+	/*
 	Gdiplus::Color	m_cr_text;					//기본 글자색
 	Gdiplus::Color	m_cr_text_selected;			//선택 항목의 활성화(active) 글자색
 	Gdiplus::Color	m_cr_text_selected_inactive;	//선택 항목의 비활성화(inactive) 글자색
@@ -286,6 +290,7 @@ protected:
 	Gdiplus::Color	m_crBackTrackSelect;		//hot tracking item back color
 	Gdiplus::Color	m_cr_back_dropHilited;
 	Gdiplus::Color	m_cr_selected_border;
+	*/
 
 	//Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;

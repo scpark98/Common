@@ -20,8 +20,6 @@ IMPLEMENT_DYNAMIC(CVtListCtrlEx, CListCtrl)
 
 CVtListCtrlEx::CVtListCtrlEx()
 {
-	set_color_theme(color_theme_default, false);
-
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	NCOverride = FALSE; //False as default...
@@ -189,8 +187,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CRect		rowRect;
 	CRect		itemRect;
 	CRect		textRect;
-	Gdiplus::Color	crText = m_cr_text;
-	Gdiplus::Color	crBack = m_cr_back;
+	Gdiplus::Color	crText = m_theme.cr_text;
+	Gdiplus::Color	crBack = m_theme.cr_back;
 	//COLORREF	crProgress = m_cr_progress;
 	bool		is_show_selection_always = (GetStyle() & LVS_SHOWSELALWAYS);
 	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
@@ -215,13 +213,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			if (GetFocus() == this)
 			{
-				crText = m_cr_text_selected;
-				crBack = m_cr_back_selected;
+				crText = m_theme.cr_text_selected;
+				crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				crText = m_cr_text_selected_inactive;
-				crBack = m_cr_back_selected_inactive;
+				crText = m_theme.cr_text_selected_inactive;
+				crBack = m_theme.cr_back_selected_inactive;
 			}
 
 			//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
@@ -234,22 +232,22 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (GetItemState(iItem, LVIS_DROPHILITED)) //ok
 		{
-			crText = m_cr_text_selected;
-			crBack = m_cr_back_selected;
+			crText = m_theme.cr_text_selected;
+			crBack = m_theme.cr_back_selected;
 		}
 		else
 		{
 			crText = m_list_db[iItem].crText[iSubItem];
 			if (crText.GetValue() == listctrlex_unused_color.GetValue())
-				crText = m_cr_text;
+				crText = m_theme.cr_text;
 
 			crBack = m_list_db[iItem].crBack[iSubItem];
 			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
 			{
-				if (iItem % 2)
-					crBack = m_cr_back_alternated;
+				if (m_use_alternated_back_color && (iItem % 2))
+					crBack = m_theme.cr_back_alternated;
 				else
-					crBack = m_cr_back;
+					crBack = m_theme.cr_back;
 			}
 		}
 
@@ -275,23 +273,23 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			
 			r.right = r.left + (double)(r.Width()) * d;
 
-			if (m_cr_percentage_bar.size() == 1)
+			if (m_theme.cr_percentage_bar.size() == 1)
 			{
-				pDC->FillSolidRect(r, m_cr_percentage_bar[0].ToCOLORREF());
+				pDC->FillSolidRect(r, m_theme.cr_percentage_bar[0].ToCOLORREF());
 			}
-			else if (m_cr_percentage_bar.size() > 1)
+			else if (m_theme.cr_percentage_bar.size() > 1)
 			{
 				//현재 레벨에 맞는 단색으로 채울 경우
 				if (false)
 				{
-					pDC->FillSolidRect(r, get_color(m_cr_percentage_bar[0], m_cr_percentage_bar[1], d).ToCOLORREF());
+					pDC->FillSolidRect(r, get_color(m_theme.cr_percentage_bar[0], m_theme.cr_percentage_bar[1], d).ToCOLORREF());
 				}
 				//현재 레벨까지 그라디언트로 채울 경우
 				else
 				{
 					std::deque<Gdiplus::Color> dqColor;
-					dqColor.push_back(m_cr_percentage_bar[0]);
-					dqColor.push_back(get_color(m_cr_percentage_bar[0], m_cr_percentage_bar[1], d));
+					dqColor.push_back(m_theme.cr_percentage_bar[0]);
+					dqColor.push_back(get_color(m_theme.cr_percentage_bar[0], m_theme.cr_percentage_bar[1], d));
 					gradient_rect(pDC, r, dqColor, false);
 				}
 			}
@@ -317,16 +315,16 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//dqColor.push_back(crBack);
 			//gradient_rect(pDC, r, dqColor, false);
 
-			if (m_cr_percentage_bar.size() == 1)
+			if (m_theme.cr_percentage_bar.size() == 1)
 			{
-				pDC->FillSolidRect(r, m_cr_percentage_bar[0].ToCOLORREF());
+				pDC->FillSolidRect(r, m_theme.cr_percentage_bar[0].ToCOLORREF());
 			}
-			else if (m_cr_percentage_bar.size() > 1)
+			else if (m_theme.cr_percentage_bar.size() > 1)
 			{
 				std::deque<Gdiplus::Color> dqColor;
-				dqColor.push_back(m_cr_percentage_bar[0]);
-				int hue0 = get_hue(m_cr_percentage_bar[0].ToCOLORREF());
-				int hue1 = get_hue(m_cr_percentage_bar[1].ToCOLORREF());
+				dqColor.push_back(m_theme.cr_percentage_bar[0]);
+				int hue0 = get_hue(m_theme.cr_percentage_bar[0].ToCOLORREF());
+				int hue1 = get_hue(m_theme.cr_percentage_bar[1].ToCOLORREF());
 				dqColor.push_back(get_color(hue0, hue1, (int)(d * 100.0), 1.0f, 1.0f));
 				gradient_rect(pDC, r, dqColor, false);
 			}
@@ -354,7 +352,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			pDC->FillSolidRect(r, m_cr_progress.ToCOLORREF());
+			pDC->FillSolidRect(r, m_theme.cr_progress.ToCOLORREF());
 
 			//20231102 CSCSliderCtrl에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
 			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
@@ -363,7 +361,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (m_show_progress_text)
 			{
 				CString sPercent = m_list_db[iItem].text[iSubItem] + _T("%");
-				pDC->SetTextColor(m_cr_progress_text.ToCOLORREF());// m_cr_back);
+				pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());// m_cr_back);
 #if 1
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
 
@@ -487,7 +485,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (GetItemState(i, LVIS_SELECTED))
 			{
 				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
-				draw_rectangle(pDC, rowRect, m_cr_selected_border);
+				draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
 			}
 		}
 	}
@@ -1368,7 +1366,7 @@ void CVtListCtrlEx::OnPaint()
 	clip.top -= 5;
 	*/
 
-	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	if (!m_text_on_empty.IsEmpty())
 	{
@@ -1545,6 +1543,14 @@ void CVtListCtrlEx::undo_edit_label()
 
 void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 {
+	m_theme.set_color_theme(theme);
+
+	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
+
+	if (m_hWnd)
+		Invalidate();
+
+	/*
 	switch (theme)
 	{
 		//최근 윈도우 탐색기의 색상을 보면 텍스트 색상은 선택여부, inactive에 무관하게 동일하다.
@@ -1554,7 +1560,7 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_cr_text_selected_inactive	= m_cr_text;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
 		m_cr_back_alternated		= m_cr_back;
-		m_cr_back_selected			= /*Gdiplus::Color(255, 255, 0, 0); //*/Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+		m_cr_back_selected			= Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_back_selected_inactive = Gdiplus::Color(255, 217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
 		m_cr_header_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
@@ -1645,22 +1651,18 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 		m_cr_progress_text = Gdiplus::Color(255, 192, 192, 192);
 		break;
 	}
-
-	m_HeaderCtrlEx.set_color(m_cr_header_text, m_cr_header_back);
-
-	if (apply_now)
-		Invalidate();
+	*/
 }
 
 Gdiplus::Color CVtListCtrlEx::get_text_color(int item, int subItem)
 {
 	//item이 -1이면 해당 셀의 색상이 아니라 기본 텍스트 색상값을 원하는 것이다.
 	if (item < 0)
-		return m_cr_text;
+		return m_theme.cr_text;
 
 	Gdiplus::Color cr = m_list_db[item].crText[subItem];
 	if (cr.GetValue() == listctrlex_unused_color.GetValue())
-		return m_cr_text;
+		return m_theme.cr_text;
 	return cr;
 }
 
@@ -1668,7 +1670,7 @@ Gdiplus::Color CVtListCtrlEx::get_back_color(int item, int subItem)
 {
 	Gdiplus::Color cr = m_list_db[item].crBack[subItem];
 	if (cr.GetValue() == listctrlex_unused_color.GetValue())
-		return m_cr_back;
+		return m_theme.cr_back;
 	return cr;
 }
 
@@ -1829,7 +1831,7 @@ void CVtListCtrlEx::set_item_color(int item, int subItem, Gdiplus::Color crText,
 
 void CVtListCtrlEx::set_progress_color(Gdiplus::Color crProgress)
 {
-	m_cr_progress = crProgress;
+	m_theme.cr_progress = crProgress;
 	Invalidate();
 }
 

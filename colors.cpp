@@ -527,3 +527,99 @@ CString	get_color_name_of_closest(COLORREF cr_src, COLORREF* cr_closest)
 
 	return result;
 }
+
+std::deque<CString>  CSCColorTheme::get_color_theme_list()
+{
+	std::deque<CString> dq;
+	dq.push_back(_T("default"));
+	dq.push_back(_T("gray"));
+	dq.push_back(_T("dark_gray"));
+	dq.push_back(_T("dark"));
+
+	return dq;
+}
+
+void CSCColorTheme::set_color_theme(int color_theme)
+{
+	//일부 색상을 변경했을 경우 다시 호출하면 기본값으로 롤백된다.
+	switch (color_theme)
+	{
+		case color_theme_dark_gray :
+			cur_theme				= color_theme_dark_gray;
+			cr_text					= Gdiplus::Color(255, 164, 164, 164);
+			cr_text_hover			= cr_text;
+			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
+			cr_text_selected_inactive = cr_text_selected;
+			cr_text_dropHilited		= white;
+
+			cr_selected_border		= cr_text_selected;
+
+			cr_back					= Gdiplus::Color(255, 64, 64, 64);
+			cr_back_selected		= get_color(cr_back, -16);
+			cr_back_selected_inactive = cr_back_selected;
+			cr_back_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover			= cr_back_selected;
+			cr_back_alternated		= get_color(cr_back, 8);
+
+			cr_header_text			= get_color(cr_text, -16);
+			cr_header_back			= get_color(cr_back, -16);
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
+			cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+
+			break;
+		case color_theme_dark :
+			cur_theme				= color_theme_dark;
+			cr_text					= Gdiplus::Color(255, 212, 212, 212);
+			cr_text_hover			= cr_text;
+			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
+			cr_text_selected_inactive = cr_text_selected;
+			cr_text_dropHilited		= white;
+
+			cr_selected_border		= cr_text_selected;
+
+			cr_back					= Gdiplus::Color(255, 37, 37, 38);
+			cr_back_selected		= Gdiplus::Color(255, 0, 120, 215);
+			cr_back_selected_inactive = cr_back_selected;
+			cr_back_selected_border = cr_back_selected;
+			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover			= get_color(cr_back_selected, 48);
+			cr_back_alternated		= get_color(cr_back, 8);
+
+			cr_header_back			= get_color(cr_back, 16);
+			cr_header_text			= get_color(cr_text, -32);
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
+			cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+
+			break;
+
+		default : //case color_theme_default :
+			cur_theme				= color_theme_default;
+			cr_text					= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+			cr_text_hover			= cr_text;
+			cr_text_selected		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
+			cr_text_selected_inactive = cr_text_selected;
+			cr_text_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+
+			cr_selected_border		= cr_text_selected;
+
+			cr_back					= RGB2gpColor(::GetSysColor(COLOR_WINDOW));
+			cr_back_selected		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_selected_inactive = cr_back_selected;
+			cr_back_selected_border = get_color(cr_back_selected, -32);
+			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
+			cr_back_alternated		= get_color(cr_back, -16);
+
+			cr_header_text			= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+			cr_header_back			= RGB2gpColor(::GetSysColor(COLOR_3DFACE));
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(gGRAY(192));
+			cr_progress				= Gdiplus::Color(255, 49, 108, 244);
+			cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+	}
+}

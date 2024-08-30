@@ -19,6 +19,12 @@ CHeaderCtrlEx::CHeaderCtrlEx()
 {
 	m_cr_back = ::GetSysColor(COLOR_3DFACE);
 	m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
+
+	if (gray_value(m_cr_back) < 128)
+		m_cr_separator = get_color(m_cr_back, 32);
+	else
+		m_cr_separator = get_color(m_cr_back, -32);
+
 	m_header_is_clicked = false;
 	m_header_clicked_index = -1;
 	m_header_height = 16;
@@ -404,9 +410,9 @@ void CHeaderCtrlEx::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gd
 	Invalidate();
 }
 
-void CHeaderCtrlEx::set_text_color(Gdiplus::Color crText)
+void CHeaderCtrlEx::set_text_color(Gdiplus::Color cr_text)
 {
-	m_cr_text = crText;
+	m_cr_text = cr_text;
 
 	if (!m_hWnd)
 		return;

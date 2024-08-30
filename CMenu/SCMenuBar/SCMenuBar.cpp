@@ -12,7 +12,6 @@ IMPLEMENT_DYNAMIC(CSCMenuBar, CDialogEx)
 
 CSCMenuBar::CSCMenuBar()
 {
-
 }
 
 CSCMenuBar::~CSCMenuBar()
@@ -93,7 +92,7 @@ bool CSCMenuBar::create()
 {
 	DWORD dwStyle = WS_CHILD | WS_VISIBLE;
 
-	bool res = CreateEx(0, NULL, _T("CSCMenuBar"), dwStyle, CRect(m_menu_sx, m_menu_sy, m_menu_sx + m_menu_width, m_menu_sy + m_menu_height), m_parent, 0);
+	bool res = CreateEx(0, NULL, _T("CSCMenuBar"), dwStyle, CRect(m_menubar_sx, m_menubar_sy, m_menubar_sx + m_menu_button_width, m_menubar_sy + m_menu_button_height), m_parent, 0);
 
 	//LONG_PTR wStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE); // Get the current style
 	//wStyle &= ~WS_BORDER;   // Here, we mask out the style bit(s) we want to remove
@@ -117,13 +116,13 @@ bool CSCMenuBar::create()
 	return res;
 }
 
-void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int x, int y, int menu_item_width, int menu_item_height)
+void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int x, int y, int menu_button_width, int menu_button_height)
 {
 	m_parent = parent;
-	m_menu_sx = x;
-	m_menu_sy = y;
-	m_menu_width = MAX(menu_item_width, m_menu_width);
-	m_menu_height = MAX(menu_item_height, m_menu_height);
+	m_menubar_sx = x;
+	m_menubar_sy = y;
+	m_menu_button_width = MAX(menu_button_width, m_menu_button_width);
+	m_menu_button_height = MAX(menu_button_height, m_menu_button_height);
 
 	create();
 
@@ -150,9 +149,9 @@ void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int x, int y, int men
 		get_menu_item_info(menu.m_hMenu, i, &menu_id, &menu_caption, TRUE);
 
 		CSCMenuButton* menu_button = new CSCMenuButton(menu_caption);
-		bOk = menu_button->create(this, menu_button->caption, CRect(sx, sy, sx + m_menu_width, sy + m_menu_height), MENU_BUTTON_ID + i);
+		bOk = menu_button->create(this, menu_button->caption, CRect(sx, sy, sx + m_menu_button_width, sy + m_menu_button_height), MENU_BUTTON_ID + i);
 		//menu_button->set_tooltip_text(menu_button->caption);
-		sx += m_menu_width;
+		sx += m_menu_button_width;
 
 		pMenu = menu.GetSubMenu(i);
 
@@ -166,7 +165,7 @@ void CSCMenuBar::init(CWnd* parent, UINT resource_menu_id, int x, int y, int men
 	}
 
 	//모든 메뉴 항목들을 추가했다면 menubar를 resize해준다.
-	SetWindowPos(NULL, m_menu_sx, m_menu_sy, m_menu_width * m_menu_button.size(), m_menu_height, SWP_NOZORDER);
+	SetWindowPos(NULL, m_menubar_sx, m_menubar_sy, m_menu_button_width * m_menu_button.size(), m_menu_button_height, SWP_NOZORDER);
 }
 
 
@@ -191,12 +190,12 @@ void CSCMenuBar::create_menu_buttons()
 	m_parent->ScreenToClient(rw);
 	//MoveWindow(m_menu_pos.x, m_menu_pos.y, m_menu_width * m_menu_button.size(), m_menu_height);
 	
-	SetWindowPos(NULL, m_menu_sx, m_menu_sy, m_menu_width * m_menu_button.size(), m_menu_height, SWP_NOZORDER);
+	SetWindowPos(NULL, m_menubar_sx, m_menubar_sy, m_menu_button_width * m_menu_button.size(), m_menu_button_height, SWP_NOZORDER);
 
 	for (int i = 0; i < m_menu_button.size(); i++)
 	{
-		bOk = m_menu_button[i]->create(this, m_menu_button[i]->caption, CRect(x, y, x + m_menu_width, y + m_menu_height), MENU_BUTTON_ID + i);
-		x += m_menu_width;
+		bOk = m_menu_button[i]->create(this, m_menu_button[i]->caption, CRect(x, y, x + m_menu_button_width, y + m_menu_button_height), MENU_BUTTON_ID + i);
+		x += m_menu_button_width;
 	}
 }
 
@@ -326,44 +325,36 @@ void CSCMenuBar::set_check(int menu_index, UINT menu_id, int sub_button_index, b
 
 void CSCMenuBar::set_color_theme(int theme)
 {
-	switch (theme)
-	{
-	case CSCMenu::color_theme_default:
-		m_cr_text = RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
-		m_cr_text_selected = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
-		m_cr_back = RGB2gpColor(::GetSysColor(COLOR_3DFACE));
-		m_cr_back_selected = RGB2gpColor(RGB(174, 215, 247));
-		break;
-	case CSCMenu::color_theme_dark_gray:
-		m_cr_text = RGB2gpColor(RGB(210, 220, 221));
-		m_cr_text_selected = m_cr_text;
-		m_cr_back = RGB2gpColor(RGB(45, 45, 48)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
-		m_cr_back_selected = RGB2gpColor(RGB(27, 27, 28));// ::GetSysColor(COLOR_HIGHLIGHT);
-		break;
-	case CSCMenu::color_theme_linkmemine:
-		m_cr_text = RGB2gpColor(RGB(208, 211, 220));
-		m_cr_text_selected = m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_back = RGB2gpColor(RGB(64, 73, 88));// ::GetSysColor(COLOR_WINDOW);
-		m_cr_back_selected = RGB2gpColor(RGB(45, 51, 51));// ::GetSysColor(COLOR_HIGHLIGHT);
-		break;
-	}
+	m_theme.set_color_theme(theme);
+	
+	if (!m_hWnd)
+		return;
+	
+	Invalidate();
 
 	for (int i = 0; i < m_menu_button.size(); i++)
 	{
-		m_menu_button[i]->text_color(m_cr_text);
-		m_menu_button[i]->back_color(m_cr_back);
+		//메뉴 버튼들의 색상 설정
+		m_menu_button[i]->text_color(m_theme.cr_text);
+		m_menu_button[i]->back_color(m_theme.cr_back);
+
+		//각 메뉴버튼에 연결된 팝업메뉴 항목들도 색상 설정
 		m_menu_button[i]->get_menu()->set_color_theme(theme);
 	}
 }
 
 void CSCMenuBar::set_text_color(Gdiplus::Color cr_text)
 {
+	m_theme.cr_text = cr_text;
+
 	for (int i = 0; i < m_menu_button.size(); i++)
 		m_menu_button[i]->set_text_color(cr_text);
 }
 
 void CSCMenuBar::set_back_color(Gdiplus::Color cr_back)
 {
+	m_theme.cr_back = cr_back;
+
 	for (int i = 0; i < m_menu_button.size(); i++)
 		m_menu_button[i]->set_back_color(cr_back);
 }

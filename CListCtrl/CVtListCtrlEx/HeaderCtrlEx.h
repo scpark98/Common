@@ -29,9 +29,9 @@ public:
 	Gdiplus::Color	m_cr_back;
 	Gdiplus::Color	m_cr_separator;
 
-	void			set_color(Gdiplus::Color crText, Gdiplus::Color crBack, Gdiplus::Color crSeparator = -1);
-	void			set_text_color(Gdiplus::Color crText);
-	void			set_back_color(Gdiplus::Color crBack);
+	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gdiplus::Color cr_separator = Gdiplus::Color::Transparent);
+	void			set_text_color(Gdiplus::Color cr_text);
+	void			set_back_color(Gdiplus::Color cr_back);
 
 	bool			m_header_is_clicked;
 	int				m_header_clicked_index;

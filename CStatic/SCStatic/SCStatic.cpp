@@ -13,8 +13,8 @@ CSCStatic::CSCStatic()
 {
 	m_transparent	= false;
 
-	m_cr_text		= ::GetSysColor(COLOR_BTNTEXT);
-	m_cr_back		= ::GetSysColor(COLOR_BTNFACE);
+	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_BTNFACE));
 	m_transparent	= false;
 
 	m_bGradient		= false;
@@ -179,14 +179,14 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			dc.FillSolidRect(rc, m_cr_back);
+			dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 			if (m_bSunken)
 			{
 				int sunken_depth = 12;
-				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_cr_back, sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_cr_back, sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_cr_back, -sunken_depth));
-				DrawLinePt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_cr_back, -sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_cr_back, sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_cr_back, sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_cr_back, -sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_cr_back, -sunken_depth));
 			}
 		}
 	}
@@ -355,7 +355,7 @@ void CSCStatic::OnPaint()
 	if (!text.IsEmpty())
 	{
 		if (IsWindowEnabled())
-			dc.SetTextColor(m_cr_text);
+			dc.SetTextColor(m_cr_text.ToCOLORREF());
 		else
 			dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 
@@ -388,7 +388,7 @@ void CSCStatic::OnPaint()
 		{
 			if (m_nOutlineWidth > 0)
 			{
-				dc.SetTextColor(m_crOutline);
+				dc.SetTextColor(m_crOutline.ToCOLORREF());
 
 				for (int x = -m_nOutlineWidth; x <= m_nOutlineWidth; ++x)
 				{
@@ -401,7 +401,7 @@ void CSCStatic::OnPaint()
 					}
 				}
 
-				dc.SetTextColor(m_cr_text);
+				dc.SetTextColor(m_cr_text.ToCOLORREF());
 			}
 
 			dc.DrawText(sSpace + text, rText, dwText);
@@ -412,12 +412,12 @@ void CSCStatic::OnPaint()
 	dc.SelectObject(pOldFont);
 }
 
-void CSCStatic::set_text(CString sText, COLORREF cTextColor /*-1*/)
+void CSCStatic::set_text(CString sText, Gdiplus::Color cTextColor /*-1*/)
 {
 	CStatic::SetWindowText(sText);
 
 	//-1이면 기본 설정된 글자색 사용
- 	if (cTextColor != (COLORREF)-1)
+ 	if (cTextColor.GetValue() != Gdiplus::Color::Transparent)
  		m_cr_text = cTextColor;
 	
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
@@ -430,7 +430,7 @@ void CSCStatic::set_text(CString sText, COLORREF cTextColor /*-1*/)
 		Invalidate(false);
 }
 
-void CSCStatic::set_textf(COLORREF crTextColor, LPCTSTR format, ...)
+void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -566,7 +566,7 @@ void CSCStatic::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == TIMER_MARQUEE)
 	{
-		COLORREF cr = m_crGradient[m_crGradient.size()-1];
+		Gdiplus::Color cr = m_crGradient[m_crGradient.size()-1];
 		m_crGradient.insert(m_crGradient.begin(), cr);
 		m_crGradient.pop_back();
 		Invalidate();
@@ -769,7 +769,7 @@ CSCStatic& CSCStatic::set_font_antialiased(bool bAntiAliased)
 	return *this;
 }
 
-void CSCStatic::set_text_color(COLORREF crTextColor)
+void CSCStatic::set_text_color(Gdiplus::Color crTextColor)
 {
 	m_cr_text = crTextColor;
 	update_surface();
@@ -786,7 +786,7 @@ CSCStatic& CSCStatic::set_gradient(bool bGradient)
 	return *this;
 }
 
-CSCStatic& CSCStatic::set_gradient_color(COLORREF crGradient)
+CSCStatic& CSCStatic::set_gradient_color(Gdiplus::Color crGradient)
 {
 	set_gradient();
 	m_crGradient.clear();
@@ -794,10 +794,10 @@ CSCStatic& CSCStatic::set_gradient_color(COLORREF crGradient)
 	return *this;
 }
 
-CSCStatic& CSCStatic::set_gradient_color(int idx, COLORREF crGradient)
+CSCStatic& CSCStatic::set_gradient_color(int idx, Gdiplus::Color crGradient)
 {
 	set_gradient();
-	std::deque<COLORREF>::iterator it;
+	std::deque<Gdiplus::Color>::iterator it;
 
 	if (idx >= m_crGradient.size())
 	{
@@ -830,17 +830,17 @@ CSCStatic& CSCStatic::set_gradient_color(int count, ...)
 	return *this;
 }
 */
-CSCStatic& CSCStatic::add_gradient_color(COLORREF crGradient)
+CSCStatic& CSCStatic::add_gradient_color(Gdiplus::Color crGradient)
 {
 	set_gradient();
 	m_crGradient.push_back(crGradient);
 	return *this;
 }
 
-CSCStatic& CSCStatic::insert_gradient_color(int idx, COLORREF crGradient)
+CSCStatic& CSCStatic::insert_gradient_color(int idx, Gdiplus::Color crGradient)
 {
 	set_gradient();
-	std::deque<COLORREF>::iterator it;
+	std::deque<Gdiplus::Color>::iterator it;
 
 	if (idx >= m_crGradient.size())
 	{
@@ -864,10 +864,10 @@ CSCStatic& CSCStatic::set_vertical_gradient(bool bVertical)
 }
 
 //this function will be used only if msimg32.dll library is not available
-void CSCStatic::draw_gradient_rect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF cRight, BOOL a_bVertical)
+void CSCStatic::draw_gradient_rect(CDC *pDC, CRect r, Gdiplus::Color cLeft, Gdiplus::Color cRight, BOOL a_bVertical)
 {
 	CRect stepR;					// rectangle for color's band
-	COLORREF color;				// color for the bands
+	Gdiplus::Color color;			// color for the bands
 	float fStep;
 	
 	if(a_bVertical)
@@ -896,11 +896,11 @@ void CSCStatic::draw_gradient_rect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF c
 		}
 
 		// set current color
-		color = RGB((GetRValue(cRight)-GetRValue(cLeft))*((float)iOnBand)/255.0f+GetRValue(cLeft),
-			(GetGValue(cRight)-GetGValue(cLeft))*((float)iOnBand)/255.0f+GetGValue(cLeft),
-			(GetBValue(cRight)-GetBValue(cLeft))*((float)iOnBand)/255.0f+GetBValue(cLeft));
+		color = Gdiplus::Color(255, ((cRight.GetR() - cLeft.GetR()) * ((float)iOnBand) / 255.0f + cLeft.GetR()),
+			(cRight.GetG() - cLeft.GetG()) * ((float)iOnBand) / 255.0f + cLeft.GetG(),
+			(cRight.GetB() - cLeft.GetB()) * ((float)iOnBand) / 255.0f + cLeft.GetB());
 		// fill current band
-		pDC->FillSolidRect(stepR,color);
+		pDC->FillSolidRect(stepR, color.ToCOLORREF());
 	}
 }
 /*
@@ -955,11 +955,11 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 	}
 }
 
-void CSCStatic::set_color(COLORREF cr_text, COLORREF cr_back)
+void CSCStatic::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
 {
 	m_cr_text = cr_text;
 
-	if (cr_back != -1)
+	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_cr_back = cr_back;
 		m_transparent = false;

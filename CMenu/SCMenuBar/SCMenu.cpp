@@ -144,7 +144,6 @@ IMPLEMENT_DYNAMIC(CSCMenu, CDialogEx)
 CSCMenu::CSCMenu()
 {
 	memset(&m_lf, 0, sizeof(LOGFONT));
-	set_color_theme(color_theme_default, false);
 }
 
 CSCMenu::~CSCMenu()
@@ -533,7 +532,7 @@ CSCMenu& CSCMenu::set_font_bold(bool bBold)
 
 	return *this;
 }
-
+/*
 void CSCMenu::set_color_theme(int theme, bool apply_now)
 {
 	switch (theme)
@@ -556,7 +555,7 @@ void CSCMenu::set_color_theme(int theme, bool apply_now)
 		m_cr_text_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
 		m_cr_text_over = RGB2gpColor(RGB(255, 255, 255));
 
-		m_cr_back = RGB2gpColor(RGB(27, 27, 28)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+		m_cr_back = RGB2gpColor(RGB(45, 45, 48)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
 		m_cr_back_selected = RGB2gpColor(RGB(51, 51, 52));// ::GetSysColor(COLOR_HIGHLIGHT);
 		m_cr_back_selected_border = get_color(m_cr_back_selected, 64);// RGB(0, 120, 215);
 		m_cr_back_selected_inactive = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
@@ -579,7 +578,7 @@ void CSCMenu::set_color_theme(int theme, bool apply_now)
 	if (apply_now)
 		Invalidate();
 }
-
+*/
 //선택된 메뉴ID를 전달한다.
 /*
 BOOL CSCMenu::OnLbnSelchange()
@@ -660,10 +659,10 @@ void CSCMenu::OnPaint()
 	if (m_img_back.is_valid())
 		m_img_back.draw(g, rc);
 	else
-		dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+		dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(m_cr_text.ToCOLORREF());
+	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
@@ -680,13 +679,13 @@ void CSCMenu::OnPaint()
 			//선택된 항목 표시
 			if (i == m_over_item)
 			{
-				dc.SetTextColor(m_cr_text_over.ToCOLORREF());
-				dc.FillSolidRect(m_items[i]->m_r, m_cr_back_over.ToCOLORREF());
+				dc.SetTextColor(m_theme.cr_text_hover.ToCOLORREF());
+				dc.FillSolidRect(m_items[i]->m_r, m_theme.cr_back_hover.ToCOLORREF());
 
 				//Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
 				//Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
-				Gdiplus::Color gcr_over_stroke = m_cr_back_selected_border;
-				Gdiplus::Color gcr_over_fill = m_cr_back_over;
+				Gdiplus::Color gcr_over_stroke = m_theme.cr_back_selected_border;
+				Gdiplus::Color gcr_over_fill = m_theme.cr_back_hover;
 
 				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
 				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
@@ -700,7 +699,7 @@ void CSCMenu::OnPaint()
 			}
 			else
 			{
-				dc.SetTextColor(m_cr_text.ToCOLORREF());
+				dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 			}
 
 			CRect rText = m_items[i]->m_r;

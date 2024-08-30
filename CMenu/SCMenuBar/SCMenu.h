@@ -9,6 +9,7 @@
 #include <afxdialogex.h>
 #include <deque>
 #include "../../CButton/GdiButton/GdiButton.h"
+#include "../../colors.h"
 
 static const UINT Message_CSCMenu = ::RegisterWindowMessage(_T("MessageString_CSCMenu"));
 
@@ -181,17 +182,11 @@ public:
 	virtual			CSCMenu& set_font_size(int nSize);
 	virtual			CSCMenu& set_font_bold(bool bBold = true);
 
-	//color setting
-	enum CSCMENU_COLOR_THEME
-	{
-		color_theme_default = 0,
-		color_theme_dark_gray,
-		color_theme_linkmemine,
-	};
-
-	void			set_color_theme(int theme, bool apply_now = true);
+	void			set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
 
 protected:
+	CSCColorTheme	m_theme;
+
 	CWnd*			m_parent = NULL;
 	CGdiplusBitmap	m_img_back;
 	std::deque<CSCMenuItem*> m_items;
@@ -199,16 +194,6 @@ protected:
 	bool		m_use_over = true;			//hover hilighted
 	int			m_over_item = -1;
 	int			get_item_index(CPoint pt);
-
-	Gdiplus::Color	m_cr_text = ::GetSysColor(COLOR_WINDOWTEXT);	//기본 글자색
-	Gdiplus::Color	m_cr_text_selected = m_cr_text;					//선택 항목의 활성화(active) 글자색
-	Gdiplus::Color	m_cr_text_selected_inactive = m_cr_text;		//선택 항목의 비활성화(inactive) 글자색
-	Gdiplus::Color	m_cr_text_over = m_cr_text;
-	Gdiplus::Color	m_cr_back = ::GetSysColor(COLOR_3DFACE);		//기본 배경색
-	Gdiplus::Color	m_cr_back_selected = ::GetSysColor(COLOR_3DHIGHLIGHT);	//선택 항목 배경색
-	Gdiplus::Color	m_cr_back_selected_border;						//선택 항목 테두리(focus()가 있을 경우에만)
-	Gdiplus::Color	m_cr_back_selected_inactive;
-	Gdiplus::Color	m_cr_back_over = ::GetSysColor(COLOR_3DHIGHLIGHT);
 
 	LOGFONT		m_lf;
 	CFont		m_font;

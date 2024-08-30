@@ -53,25 +53,25 @@ public:
 	
 	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void		SetWindowText(CString sText) { set_text(sText); }
-	void		set_text(CString sText, COLORREF crTextColor = -1);
-	void		set_textf(COLORREF crTextColor, LPCTSTR format, ...);
+	void		set_text(CString sText, Gdiplus::Color crTextColor = -1);
+	void		set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...);
 
 	//글자색, 배경색 동시 설정
-	void		set_color(COLORREF cr_text, COLORREF cr_back = -1);
+	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = -1);
 
 	//글자색만 변경할 경우
-	void		set_text_color(COLORREF crTextColor);
+	void		set_text_color(Gdiplus::Color crTextColor);
 
-	COLORREF	get_back_color() { return m_cr_back; }
+	Gdiplus::Color	get_back_color() { return m_cr_back; }
 
 	//배경색을 지정하면 투명 옵션은 off됨.
-	void		set_back_color(COLORREF cBackColor) { m_cr_back = cBackColor; m_transparent = false; Invalidate(); }
+	void		set_back_color(Gdiplus::Color cBackColor) { m_cr_back = cBackColor; m_transparent = false; Invalidate(); }
 
 	//gradient
 	//m_crGradient deque에 색상들을 넣고 n등분하여 gradient fill을 해서 표시한다.
 	CSCStatic&		set_gradient(bool bGradient = true);
-	CSCStatic&		set_gradient_color(COLORREF crGradient);			//배경~crGradient 2컬러로 표현됨.
-	CSCStatic&		set_gradient_color(int idx, COLORREF crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
+	CSCStatic&		set_gradient_color(Gdiplus::Color crGradient);			//배경~crGradient 2컬러로 표현됨.
+	CSCStatic&		set_gradient_color(int idx, Gdiplus::Color crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
 
 	template <typename ... T> CSCStatic& set_gradient_color(T... colors)
 	{
@@ -88,8 +88,8 @@ public:
 		return *this;
 	}
 
-	CSCStatic&		add_gradient_color(COLORREF crGradient);			//색상 추가
-	CSCStatic&		insert_gradient_color(int idx, COLORREF crGradient);//idx번째 색상 추가
+	CSCStatic&		add_gradient_color(Gdiplus::Color crGradient);			//색상 추가
+	CSCStatic&		insert_gradient_color(int idx, Gdiplus::Color crGradient);//idx번째 색상 추가
 	CSCStatic&		set_vertical_gradient(bool bVertical = true);
 
 	void			sunken(bool sunken = true) { m_bSunken = sunken; Invalidate(); }
@@ -121,7 +121,7 @@ public:
 	void		set_font(CFont* font);
 
 	void		set_outline_width(int nWidth) { m_nOutlineWidth = nWidth; Invalidate(); }
-	void		set_outline(int nWidth, COLORREF crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }
+	void		set_outline(int nWidth, Gdiplus::Color crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }
 
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);
 	void		set_blink(BOOL bBlink = TRUE);
@@ -177,21 +177,21 @@ protected:
 	bool		m_bFontAntiAliased;
 
 	//gradient background fill
-	std::deque<COLORREF> m_crGradient;
+	std::deque<Gdiplus::Color> m_crGradient;
 	bool		m_bGradient;		//gradient background?
 	bool		m_bVertical;		//vertical gradient?
 
 
 	//this function will be used only if msimg32.dll library is not available
-	void		draw_gradient_rect(CDC *pDC, CRect r, COLORREF cLeft, COLORREF cRight, BOOL a_bVertical);
+	void		draw_gradient_rect(CDC *pDC, CRect r, Gdiplus::Color cLeft, Gdiplus::Color cRight, BOOL a_bVertical);
 
 
  	int			m_nOutlineWidth;	//두께가 1 이상이면 외곽선으로 그려진다.
- 	COLORREF	m_crOutline;		//외곽선 색상
+	Gdiplus::Color	m_crOutline;		//외곽선 색상
 	bool		m_bSunken;			//default = false;
 
-	COLORREF	m_cr_text;
-	COLORREF	m_cr_back;
+	Gdiplus::Color	m_cr_text;
+	Gdiplus::Color	m_cr_back;
 	bool		m_transparent;		//default = false
 
 	BOOL		m_bBlink;

@@ -4,6 +4,7 @@
 #include <afxdialogex.h>
 #include <deque>
 
+#include "../../colors.h"
 #include "SCMenuButton.h"
 
 /*
@@ -64,8 +65,10 @@ public:
 	CSCMenuBar();   // 표준 생성자입니다.
 	~CSCMenuBar();
 
+	CSCColorTheme	m_theme;
+
 	//CMenu를 이용하여 resource의 menu를 읽어오는 경우
-	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_item_width = 0, int menu_item_height = 0);
+	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_button_width = 0, int menu_button_height = 0);
 	void	set_check(int menu_index, UINT menu_id, int sub_button_index, bool check);
 	void	set_color_theme(int theme);
 	void	set_text_color(Gdiplus::Color cr_text);
@@ -170,11 +173,11 @@ protected:
 	std::deque<CSCMenuButton*>	m_menu_button;
 	int			m_cur_menu = -1;
 
-	int			m_menu_sx = 0;
-	int			m_menu_sy = 0;
-	int			m_total_width = -1;
-	int			m_menu_width = 80;
-	int			m_menu_height = 28;
+	int			m_menubar_sx = 0;			//메뉴바의 시작 x
+	int			m_menubar_sy = 0;			//메뉴바의 시작 y
+	int			m_total_width = -1;			//메뉴바 전체 width
+	int			m_menu_button_width = 80;	//메뉴 버튼의 width
+	int			m_menu_button_height = 28;	//메뉴 버튼의 height
 
 	void		create_menu_buttons();
 	void		set_menu_total_width(int total_width);
@@ -187,10 +190,12 @@ protected:
 	CFont		m_font;
 	void		reconstruct_font();
 
+	/*
 	Gdiplus::Color	m_cr_text;
 	Gdiplus::Color	m_cr_text_selected;
 	Gdiplus::Color	m_cr_back;
 	Gdiplus::Color	m_cr_back_selected;
+	*/
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.

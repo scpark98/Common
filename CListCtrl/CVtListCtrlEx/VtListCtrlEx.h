@@ -6,6 +6,7 @@
 #include "HeaderCtrlEx.h"
 #include "../../GdiplusBitmap.h"
 #include "../../Functions.h"
+#include "../../colors.h"
 #include "../../system/ShellImageList/ShellImageList.h"
 
 /*
@@ -117,13 +118,15 @@ public:
 	CVtListCtrlEx();
 	virtual ~CVtListCtrlEx();
 
-	void		modify_style();
+	CSCColorTheme	m_theme;
+
+	void			modify_style();
 
 	BOOL NCOverride;
 	int Who;
 
-	BOOL m_bHorizLine = TRUE;
-	void HideScrollBars(int Type, int Which = SB_BOTH);
+	BOOL			m_bHorizLine = TRUE;
+	void			HideScrollBars(int Type, int Which = SB_BOTH);
 
 	enum CVtListCtrlExMsgs
 	{
@@ -320,23 +323,13 @@ public:
 	int			cur_sorted_column_index() { return m_cur_sorted_column; }
 
 //컬러 관련
-	enum listctrlex_color_theme
-	{
-		color_theme_default = 0,
-		color_theme_light_blue,
-		color_theme_navy_blue,
-		color_theme_dark_blue,
-		color_theme_dark_gray,
-		color_theme_dark,
-	};
-
 	void			set_color_theme(int theme, bool apply_now = true);
 	Gdiplus::Color	get_text_color(int item, int subItem);
 	Gdiplus::Color	get_back_color(int item, int subItem);
 	//특정 셀이 아닌 기본 배경색을 리턴.
-	Gdiplus::Color	get_back_color() { return m_cr_back; }
-	Gdiplus::Color	get_back_alt_color(int item, int subItem) { return m_cr_back_alternated; }
-	void			set_back_alt_color(Gdiplus::Color cr) { m_cr_back_alternated = cr; }
+	Gdiplus::Color	get_back_color() { return m_theme.cr_back; }
+	Gdiplus::Color	get_back_alt_color(int item, int subItem) { return m_theme.cr_back_alternated; }
+	void			set_back_alt_color(Gdiplus::Color cr) { m_theme.cr_back_alternated = cr; }
 
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	//item이 -1이면 모든 라인에, subItem이 -1이면 모든 컬럼에 적용.
@@ -346,9 +339,9 @@ public:
 	void		set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack);
 
 	//기본 글자색을 설정한다.
-	void		set_default_text_color(Gdiplus::Color cr_text) { m_cr_text = cr_text; Invalidate(); }
+	void		set_default_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	//기본 배경색을 설정한다.
-	void		set_default_back_color(Gdiplus::Color cr_back) { m_cr_back = cr_back; Invalidate(); }
+	void		set_default_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; Invalidate(); }
 
 	//컬럼이 percentage를 표시하는 컬럼일 경우 그 표시 색상을 설정한다.
 	void		set_progress_color(Gdiplus::Color crProgress);
@@ -431,7 +424,7 @@ public:
 	bool		get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
 
 	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
-	void		progress_text_color(Gdiplus::Color cr) { m_cr_progress_text = cr; }
+	void		progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }
 
 //scroll
 	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
@@ -491,21 +484,7 @@ protected:
 	int				m_cur_sorted_column = 0;		//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
-	Gdiplus::Color	m_cr_text;						//기본 글자색
-	Gdiplus::Color	m_cr_text_selected;				//선택 항목의 활성화(active) 글자색
-	Gdiplus::Color	m_cr_text_selected_inactive;	//선택 항목의 비활성화(inactive) 글자색
-	Gdiplus::Color	m_cr_text_dropHilited;
-	Gdiplus::Color	m_cr_back;						//기본 배경색
-	Gdiplus::Color	m_cr_back_alternated;			//줄 구분용
-	Gdiplus::Color	m_cr_back_selected;
-	Gdiplus::Color	m_cr_back_selected_inactive;
-	Gdiplus::Color	m_cr_back_dropHilited;
-	Gdiplus::Color	m_cr_selected_border;
-	Gdiplus::Color	m_cr_header_back;
-	Gdiplus::Color	m_cr_header_text;
-	std::deque<Gdiplus::Color> m_cr_percentage_bar;	//percentage bar graph color
-	Gdiplus::Color	m_cr_progress;					//progress bar
-	Gdiplus::Color	m_cr_progress_text;				//progress text
+	bool			m_use_alternated_back_color = false;
 
 //편집기능 관련
 	bool			m_allow_edit = false;			//항목 편집이 가능한지...

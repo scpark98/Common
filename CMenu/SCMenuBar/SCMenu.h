@@ -185,7 +185,7 @@ public:
 	void			set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
 
 protected:
-	CSCColorTheme	m_theme;
+	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	CWnd*			m_parent = NULL;
 	CGdiplusBitmap	m_img_back;

@@ -65,7 +65,7 @@ public:
 	CSCMenuBar();   // 표준 생성자입니다.
 	~CSCMenuBar();
 
-	CSCColorTheme	m_theme;
+	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	//CMenu를 이용하여 resource의 menu를 읽어오는 경우
 	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_button_width = 0, int menu_button_height = 0);

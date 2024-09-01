@@ -10,10 +10,6 @@
 
 IMPLEMENT_DYNAMIC(CSCMenuBar, CDialogEx)
 
-CSCMenuBar::CSCMenuBar()
-{
-}
-
 CSCMenuBar::~CSCMenuBar()
 {
 	for (int i = 0; i < m_menu_button.size(); i++)

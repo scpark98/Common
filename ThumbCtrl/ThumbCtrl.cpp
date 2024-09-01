@@ -215,7 +215,7 @@ void CThumbCtrl::OnPaint()
 	if (m_loading_files.size() > 0 && !m_loading_completed)
 	{
 		CRect r = makeCenterRect(rc.CenterPoint().x, rc.CenterPoint().y, rc.Width() / 2, 16);
-		DrawSunkenRect(&dc, r);
+		draw_sunken_rect(&dc, r, true, Gdiplus::Color::DimGray, Gdiplus::Color::DarkGray);
 		r.DeflateRect(1, 1);
 		double width = r.Width();
 		/*
@@ -235,7 +235,7 @@ void CThumbCtrl::OnPaint()
 		//DrawTextShadow(&dc, str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, GRAY64, red);
 		//DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), rc,
 		//	DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, 0, red, 2, 4);
-		DrawRectangle(&dc, rc, GRAY192);
+		draw_rectangle(&dc, rc, GRAY192);
 
 		return;
 	}
@@ -1434,6 +1434,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	CRect	rc;
 	//CRect	rect(m_szMargin.cx, m_szMargin.cy - GetScrollPos(SB_VERT), m_szMargin.cx + m_szTile.cx, m_szMargin.cy + m_szTile.cy - GetScrollPos(SB_VERT));
 	CRect	rect(m_szMargin.cx, m_szMargin.cy + m_scroll_pos, m_szMargin.cx + m_szTile.cx, m_szMargin.cy + m_szTile.cy + m_scroll_pos);
+	Gdiplus::Graphics g(pDC->GetSafeHdc());
 
 	CString str;
 	CClientDC dc(this);
@@ -1446,7 +1447,6 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	if (draw)
 		pDC->FillSolidRect(rc, m_crBack);
 
-	Gdiplus::Graphics g(pDC->GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
@@ -1762,11 +1762,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			}
 
 			pDC->SetTextAlign(nFormat);
-			TextOutShadow(pDC, cpText.x, cpText.y, CString(m_dqThumb[i].info[j]), m_crInfoText[j]);
-			//DrawTextShadow( &dc, m_rInfoText[j], CString(m_dqThumb[i].info[j]), DT_CENTER | DT_TOP | DT_NOCLIP, (m_crInfoText[i] == -1 ? RGB(255, 255, 255) : m_crInfoText[i]) );
-			//DrawShadowText(pDC->GetSafeHdc(), CString2PCWSTR(m_dqThumb[i].info[j]), _tcslen(m_dqThumb[i].info[j]),
-			//				CRect(cpText.x, cpText.y, cpText.x + m_szTile.cx, cpText.y - m_lf.lfHeight),
-			//				DT_CENTER | DT_VCENTER, m_crInfoText[j], RGB(255, 0, 0), 2, 1);
+			//draw_text(&g, cpText.x, cpText.y, CString(m_dqThumb[i].info[j]), m_crInfoText[j]);
 		}
 
 		//이전 text align값을 기억했다가 복원해줘야 한다.
@@ -1854,12 +1850,12 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			}
 			else
 			{
-				DrawRectangle(pDC, r, RGB(0, 128, 255), NULL_BRUSH, 3);
+				draw_rectangle(pDC, r, RGB(0, 128, 255), NULL_BRUSH, 3);
 			}
 		}
 	}
 
-	DrawRectangle(pDC, rc, GRAY192);
+	draw_rectangle(pDC, rc, GRAY192);
 	pDC->SelectObject(pOldfont);
 }
 

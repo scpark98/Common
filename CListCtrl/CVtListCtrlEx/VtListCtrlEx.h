@@ -118,7 +118,7 @@ public:
 	CVtListCtrlEx();
 	virtual ~CVtListCtrlEx();
 
-	CSCColorTheme	m_theme;
+	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	void			modify_style();
 

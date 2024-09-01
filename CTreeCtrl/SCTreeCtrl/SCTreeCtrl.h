@@ -77,7 +77,7 @@ public:
 	CSCTreeCtrl();
 	virtual ~CSCTreeCtrl();
 
-	CSCColorTheme	m_theme;
+	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	enum CSCTreeCtrlMsgs
 	{

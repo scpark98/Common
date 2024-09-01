@@ -1366,6 +1366,8 @@ void CVtListCtrlEx::OnPaint()
 	clip.top -= 5;
 	*/
 
+	//CTreeCtrl, CListCtrl의 배경색은
+	//dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	if (!m_text_on_empty.IsEmpty())
@@ -1544,6 +1546,12 @@ void CVtListCtrlEx::undo_edit_label()
 void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 {
 	m_theme.set_color_theme(theme);
+
+	//color_theme_default일 경우
+	//CWnd, CListCtrl, CTreeCtrl, CEdit 등은 COLOR_WINDOW를 사용하고
+	//CDialog, CButton, CStatic 등은 COLOR_BTNFACE를 사용하므로 이를 보정해줘야 한다.
+	if (theme == CSCColorTheme::color_theme_default)
+		m_theme.cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
 
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
 

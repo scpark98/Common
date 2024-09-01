@@ -6,6 +6,7 @@
 #include <afxext.h>         // MFC 확장입니다.
 #include <afxcmn.h>             // Windows 공용 컨트롤에 대한 MFC 지원입니다.
 #include <deque>
+#include <gdiplus.h>
 
 #if _MSC_VER > 1000
 #pragma once
@@ -125,7 +126,7 @@ private:
 	bool		m_bIndeterminate;
 	bool		m_indeterminate_forward = true;
 	int			m_indeterminate_width = 120;
-	std::deque<COLORREF> m_dq_cr_indeterminate;
+	std::deque<Gdiplus::Color> m_dq_cr_indeterminate;
 	void		thread_indeterminate();
 
 	bool		m_bTransparent;

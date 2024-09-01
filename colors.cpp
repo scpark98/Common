@@ -607,7 +607,19 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_selected_border		= cr_text_selected;
 
-			cr_back					= RGB2gpColor(::GetSysColor(COLOR_WINDOW));
+			if (m_parent->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || 
+				m_parent->IsKindOf(RUNTIME_CLASS(CListBox)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CEdit)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CRichEditCtrl)))
+			{
+				cr_back = RGB2gpColor(::GetSysColor(COLOR_WINDOW));
+			}
+			else
+			{
+				cr_back = RGB2gpColor(::GetSysColor(COLOR_BTNFACE));
+			}
+
 			cr_back_selected		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_selected_inactive = cr_back_selected;
 			cr_back_selected_border = get_color(cr_back_selected, -32);

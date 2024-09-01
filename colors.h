@@ -2,25 +2,36 @@
 #define _COLOR_MAP_H
 
 #include <Afxwin.h>
-#include <Afxdisp.h>
+#include <afxcmn.h>
+//#include <Afxdisp.h>
 #include <gdiplus.h>
 #include <deque>
 #include <unordered_map>
 
 /*
-- CListCtrl, CTreeCtrl 등 MFC 및 사용자 컨트롤등에서 컬러 테마 관련 코드가 중복되어
-  CSCColorTheme이라는 클래스로 공통 처리하고자 함.
-  일부 변수는 특정 컨트롤에만 해당되는 경우도 있음.
+* 2024.8.30
+- CListCtrl, CTreeCtrl 등 MFC 및 사용자 컨트롤등에서 컬러 테마 관련 코드를 매번 추가하다보니
+  중복도 많아지고 일관되지 않아 CSCColorTheme이라는 클래스로 공통 처리하고자 함.
+  일부 색상 변수는 특정 컨트롤에만 해당되는 경우도 있음.
 
-  CSCColorTheme m_theme;
+  //사용할 클래스의 .h파일에 인스턴스 선언시 this를 넘겨주는 이유는
+  //color theme을 적용할 때 color_theme_default라면
+  //대상 클래스가 CTreeCtrl, CListCtrl등이면 배경이 COLOR_WINDOW로 세팅되고
+  //CButton, CStatic, CDialog등이면 COLOR_BTNFACE로 세팅되야 하므로 이를 판단하기 위함.
+  CSCColorTheme	m_theme = CSCColorTheme(this);
+
+  //.cpp에서 다음과 같이 테마를 변경해준다.
   m_theme.set_color_theme(CSCColorTheme::color_theme_dark);
+
+- 지원되는 color theme 리스트를 얻기 위해서는 get_color_theme_list()의 리턴값을 이용한다.
 */
 
 class CSCColorTheme
 {
 public :
-	CSCColorTheme()
+	CSCColorTheme(CWnd* pWnd)
 	{
+		m_parent = pWnd;
 		set_color_theme(color_theme_default);
 	};
 
@@ -44,7 +55,7 @@ public :
 
 	Gdiplus::Color	cr_selected_border;
 
-	Gdiplus::Color	cr_back;
+	Gdiplus::Color	cr_back;					//BTNFACE	: for CDialog, CButton, CStatic...
 	Gdiplus::Color	cr_back_hover;				//= hover, over, track_select...
 	Gdiplus::Color	cr_back_dropHilited;
 	Gdiplus::Color	cr_back_selected;
@@ -60,6 +71,7 @@ public :
 	Gdiplus::Color	cr_progress_text;				//progress text
 
 protected:
+	CWnd*			m_parent = NULL;
 	int				cur_theme = color_theme_default;
 };
 

@@ -595,6 +595,9 @@ struct	NETWORK_INFO
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
 
+	//간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
+	CString		get_unescape_string(CString src);
+
 	// a_value : 1.1.24050
 	// b_value : Normal
 	// c_value : True
@@ -820,28 +823,39 @@ struct	NETWORK_INFO
 	CString		GetByteString(uint8_t* bt, int n, bool upper = true, bool prefix = true);
 	CString		BinaryToHexString(BYTE* pData, int length, TCHAR separator = _T(' '));
 	int			getPrecision(double d, bool bExceptZero = true);	//소수점 자릿수 리턴
-	template<class T> CString getBinaryString(T number, bool blank = true)
+	template<class T> CString get_binary_string(T n, bool separator = true)
 	{
-		int i;
-		std::vector<char> result;
-		CString str;
+		CString res;
 
-		for (i = 0; number > 0; i++)
+		while (n != 0)
 		{
-			result.push_back('0' + number % 2);
-			number /= 2;
+			res = (n % 2 == 0 ? '0' : '1') + res;
+			n /= 2;
 		}
 
-		for (i = 0; i < result.size(); i++)
+		//4자릿수로 맞춤
+		int len = res.GetLength();
+		if (len % 4 != 0)
 		{
-			str = result.at(i) + str;
-			if (blank && (i % 4 == 3))
-				str = _T(" ") + str;
+			int count = 4 - len % 4;
+			while (count-- > 0)
+			{
+				res = '0' + res;
+			}
 		}
 
-		str.Trim();
+		//4자릿수 공백 추가
+		if (separator)
+		{
+			int pos = 4;
+			while (pos < res.GetLength())
+			{
+				res.Insert(pos, ' ');
+				pos += 5;
+			}
+		}
 
-		return str;
+		return res;
 	}
 
 	unsigned __int64 binaryStringToInt64(char *str, int len);
@@ -1586,7 +1600,7 @@ void		SetWallPaper(CString sfile);
 	CImage*		capture_window(CRect r, CString filename);
 	//특정 영역을 캡처하여 HBITMAP으로 리턴한다.
 	//resourceID를 주면 해당 이미지를 overlay하여 리턴한다.(watermark와 같은 용도로 사용시)
-	HBITMAP		capture_screen_to_bitmap(LPRECT pRect, UINT id = 0, int dx = 0, int dy = 0);
+	HBITMAP		capture_screen_to_bitmap(LPRECT pRect, UINT id = 0, int dx = 0, int dy = 0, bool show_cursor = false);
 	HBITMAP		CaptureWindowToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	HBITMAP		CaptureClientToBitmap(HWND hWnd, LPRECT pRect = NULL);
 	//hwnd만 주면 해당 윈도우 영역을 캡처하지만 윈도우에서는 불필요한 여백까지 영역으로 처리하므로

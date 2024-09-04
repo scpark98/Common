@@ -4262,9 +4262,9 @@ unsigned int getBitsValueFromInt64(uint8_t* bt, int num_of_bytes, int startbit, 
 	for (i = 0; i < bit_length; i++)
 		mask[nbits-1-i] = '1';
 
-	_tprintf(_T("reverse origin  = %s\n"), getBinaryString(reverse, true));
+	_tprintf(_T("reverse origin  = %s\n"), get_binary_string(reverse, true));
 	reverse = reverse >> startbit;
-	_tprintf(_T("reverse shifted = %s\n"), getBinaryString(reverse, true));
+	_tprintf(_T("reverse shifted = %s\n"), get_binary_string(reverse, true));
 
 	unsigned __int64 imask = binaryStringToInt64(mask, nbits);
 	delete [] mask;
@@ -7632,6 +7632,18 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 	return nToken;
 }
 
+//간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
+CString	get_unescape_string(CString src)
+{
+	CString result = src;
+	result.Replace(_T("\r"), _T("\\r"));
+	result.Replace(_T("\n"), _T("\\n"));
+	result.Replace(_T("\t"), _T("\\t"));
+	result.Replace(_T("\\"), _T("\\\\"));
+
+	return result;
+}
+
 // a_value : 1.1.24050
 // b_value : Normal
 // c_value : True
@@ -10674,7 +10686,7 @@ void draw_bitmap(HDC hdc, int x, int y, HBITMAP hBitmap)
 
 // Capture screen and create GDI bitmap
 // (full-screen when pRect is NULL)
-HBITMAP capture_screen_to_bitmap(LPRECT pRect, UINT id, int dx, int dy)
+HBITMAP capture_screen_to_bitmap(LPRECT pRect, UINT id, int dx, int dy, bool show_cursor)
 {
 	HDC         hScrDC, hMemDC;         // screen DC and memory DC
 	HBITMAP     hBitmap, hOldBitmap;    // handles to deice-dependent bitmaps
@@ -10748,6 +10760,22 @@ HBITMAP capture_screen_to_bitmap(LPRECT pRect, UINT id, int dx, int dy)
 		HBITMAP hbmp = (HBITMAP)LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(id), IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
 		draw_bitmap(hMemDC, dx, dy, hbmp);
 	}
+
+	//캡처화면에 커서를 포함시킬지
+	if (show_cursor)
+	{
+		CURSORINFO cursor = { sizeof(cursor) };
+		GetCursorInfo(&cursor);
+		ICONINFO info = { sizeof(info) };
+		GetIconInfo(cursor.hCursor, &info);
+		const int x = cursor.ptScreenPos.x - pRect->left - pRect->left - info.xHotspot;
+		const int y = cursor.ptScreenPos.y - pRect->top - pRect->top - info.yHotspot;
+		BITMAP bmpCursor = { 0 };
+		GetObject(info.hbmColor, sizeof(bmpCursor), &bmpCursor);
+		DrawIconEx(hMemDC, x, y, cursor.hCursor, bmpCursor.bmWidth, bmpCursor.bmHeight,
+			0, NULL, DI_NORMAL);
+	}
+
 
 	// select old bitmap back into memory DC and get handle to
 	// bitmap of the screen

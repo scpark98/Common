@@ -41,8 +41,14 @@ static const UINT Message_CSCSliderCtrl = ::RegisterWindowMessage(_T("MessageStr
 /*
 * scpark 20240501
 * bitmap 이미지들로 slidectrl를 표현하는 코드에서 시작됐으나 좋은 디자인 이미지가 필요하고 크기조절 지원도 쉽지 않다.
-* 최근 동향은 이미지를 이용한 스타일은 거의 사용되지 않고 gdi로 깔끔하게 그려주는 것이 좋다.
+* 최근 동향은 이미지를 이용한 스타일은 거의 사용되지 않고 gdiplus로 깔끔하게 그려주는 것이 좋다.
 * 우선 이미지 설정관련 코드들은 살려두되 사용되지 않으며 삭제 예정임.
+* 
+* scpark 20240902
+* WM_LBUTTONDOWN, WM_MOUSEMOVE와 같은 핸들러의 맨 마지막줄에 보면 CSliderCtrl::OnLButtonDown(nFlags, point);과 같이
+* 기본 핸들러를 호출하는데 이 코드를 살려두면 클릭시, 드래그시에 WM_PAINT가 호출되면서 pos가 달라지는 부작용이 발생했다.
+* 이 기본 핸들러를 주석처리하니 원하는 형태로 잘 동작한다.
+* CMacProgress에서는 주석처리하지 않아도 잘 동작한다. 뭔가 차이가 있는 듯 하다.
 */
 
 /////////////////////////////////////////////////////////////////////////////
@@ -147,6 +153,9 @@ public:
 		m_pParentWnd = GetParent();
 		m_pCallback_func = p_func;
 	}	//콜백함수 콜 방식으로 이벤트를 전달할 경우 사용.
+
+	//int		GetPos();
+	void	SetPos(int pos);
 
 	int		get_style() { return m_style; }
 

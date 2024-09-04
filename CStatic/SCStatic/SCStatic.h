@@ -53,11 +53,11 @@ public:
 	
 	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void		SetWindowText(CString sText) { set_text(sText); }
-	void		set_text(CString sText, Gdiplus::Color crTextColor = -1);
+	void		set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
 	void		set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...);
 
 	//글자색, 배경색 동시 설정
-	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = -1);
+	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 	//글자색만 변경할 경우
 	void		set_text_color(Gdiplus::Color crTextColor);
@@ -161,6 +161,11 @@ public:
 	}
 
 protected:
+	//SetWindowText(), GetWindowText()를 쓰면 m_text를 굳이 선언해서 사용안해도 될 듯 하지만
+	//SetWindowText()를 호출하는 순간 화면갱신이 일어나고 MFC내부적으로는 많은 처리를 할 것이다.
+	//특히 transparent일 경우는 그 깜빡임이 크므로 m_text를 별도 선언하여 사용한다.
+	CString		m_text;
+
 	enum ENUM_TIMER
 	{
 		TIMER_BLINK = 0,

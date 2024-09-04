@@ -2695,6 +2695,10 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	SelectItem(hItem);
 
+	//팝업메뉴를 사용하지 않아도 우클릭을 하면 선택상태로는 변경시켜줘야 하므로 여기서 리턴한다.
+	if (!m_use_popup_menu)
+		return;
+
 	LANGID langID = GetSystemDefaultUILanguage();
 
 	if (m_menu.m_hWnd == NULL)
@@ -2874,4 +2878,14 @@ BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	edit_end(false);
 	return CTreeCtrl::OnMouseWheel(nFlags, zDelta, pt);
+}
+
+void CSCTreeCtrl::set_color_theme(int theme)
+{
+	m_theme.set_color_theme(theme);
+	
+	if (!m_hWnd)
+		return;
+	
+	Invalidate();
 }

@@ -15,7 +15,6 @@ CSCStatic::CSCStatic()
 
 	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
 	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_BTNFACE));
-	m_transparent	= false;
 
 	m_bGradient		= false;
 	m_bSunken		= false;
@@ -85,6 +84,8 @@ void CSCStatic::PreSubclassWindow()
 	// TODO: Add your specialized code here and/or call the base class
 
 	CStatic::PreSubclassWindow();
+
+	CStatic::GetWindowText(m_text);
 
 	//modified the style to avoid text overlap when press tab 
 	ModifyStyle(0, BS_ICON);
@@ -192,11 +193,7 @@ void CSCStatic::OnPaint()
 	}
 
 
-	CString text;
-	GetWindowText(text);
-	
-
-	if (text.IsEmpty() && m_hIcon == NULL && m_header_images.size() == 0)
+	if (m_text.IsEmpty() && m_hIcon == NULL && m_header_images.size() == 0)
 		return;
 	
 
@@ -226,7 +223,7 @@ void CSCStatic::OnPaint()
 	CString sSpace = _T("");
 
 	//문자열 앞에 공백 넣기 옵션이 있을 경우 공백 추가
-	if (!text.IsEmpty())
+	if (!m_text.IsEmpty())
 	{
 		for (int i = 0; i < m_nPrefixSpace; i++)
 			sSpace = _T(" ") + sSpace;
@@ -236,7 +233,7 @@ void CSCStatic::OnPaint()
 	CRect rText;
 	CSize szText;
 
-	dc.DrawText(sSpace + text, &rText, DT_CALCRECT);
+	dc.DrawText(sSpace + m_text, &rText, DT_CALCRECT);
 	szText.cx = rText.Width();// + m_nOutlineWidth * 2;
 	szText.cy = rText.Height();// + m_nOutlineWidth * 2;
 
@@ -252,7 +249,7 @@ void CSCStatic::OnPaint()
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
-			if (text.IsEmpty())
+			if (m_text.IsEmpty())
 				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2;
 			else
 				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
@@ -266,7 +263,7 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (text.IsEmpty())
+			if (m_text.IsEmpty())
 			{
 				rIcon.left = 0;
 			}
@@ -284,7 +281,7 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (text.IsEmpty())
+			if (m_text.IsEmpty())
 				rIcon.top = 0;
 			else
 				rIcon.top = szText.cy / 2 - szImg.cy / 2;
@@ -303,7 +300,7 @@ void CSCStatic::OnPaint()
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
-			if (text.IsEmpty())
+			if (m_text.IsEmpty())
 				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2;
 			else
 				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
@@ -317,7 +314,7 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (text.IsEmpty())
+			if (m_text.IsEmpty())
 			{
 				rImg.left = 0;
 			}
@@ -335,7 +332,7 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (text.IsEmpty())
+			if (m_text.IsEmpty())
 				rImg.top = 0;
 			else
 				rImg.top = szText.cy / 2 - szImg.cy / 2;
@@ -352,7 +349,7 @@ void CSCStatic::OnPaint()
 		//rText.bottom = rText.top + szText.cy;
 	}
 
-	if (!text.IsEmpty())
+	if (!m_text.IsEmpty())
 	{
 		if (IsWindowEnabled())
 			dc.SetTextColor(m_cr_text.ToCOLORREF());
@@ -397,14 +394,14 @@ void CSCStatic::OnPaint()
 						//dc.TextOut(10 + x, 10 + y, str, str.GetLength());
 						CRect	rOffset = rText;
 						rOffset.OffsetRect(x, y);
-						dc.DrawText(sSpace + text, rOffset, dwText);
+						dc.DrawText(sSpace + m_text, rOffset, dwText);
 					}
 				}
 
 				dc.SetTextColor(m_cr_text.ToCOLORREF());
 			}
 
-			dc.DrawText(sSpace + text, rText, dwText);
+			dc.DrawText(sSpace + m_text, rText, dwText);
 		}
 	}
 
@@ -412,13 +409,14 @@ void CSCStatic::OnPaint()
 	dc.SelectObject(pOldFont);
 }
 
-void CSCStatic::set_text(CString sText, Gdiplus::Color cTextColor /*-1*/)
+void CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
 {
-	CStatic::SetWindowText(sText);
+	m_text = sText;
+	//CStatic::SetWindowText(sText);
 
 	//-1이면 기본 설정된 글자색 사용
- 	if (cTextColor.GetValue() != Gdiplus::Color::Transparent)
- 		m_cr_text = cTextColor;
+ 	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)
+ 		m_cr_text = cr_text_color;
 	
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
 
@@ -455,7 +453,7 @@ void CSCStatic::set_back_image(UINT nIDBack)
 BOOL CSCStatic::OnEraseBkgnd(CDC* pDC) 
 {
 	// TODO: Add your message handler code here and/or call default
-	return TRUE;
+	return FALSE;
 	
 	//CDialog::OnEraseBkgnd(pDC);
 }
@@ -712,16 +710,14 @@ void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *l
 CSCStatic& CSCStatic::set_auto_font_size(bool auto_font_size)
 {
 	CRect rc;
-	CString text;
 
-	GetWindowText(text);
 	GetClientRect(rc);
 
 	m_auto_font_size = auto_font_size;
 
 	if (auto_font_size)
 	{
-		get_auto_font_size(this, rc, text, &m_lf);
+		get_auto_font_size(this, rc, m_text, &m_lf);
 		reconstruct_font();
 	}
 	else
@@ -945,12 +941,10 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 	if (m_hWnd && m_auto_font_size)
 	{
 		CRect rc;
-		CString text;
 
-		GetWindowText(text);
 		GetClientRect(rc);
 
-		get_auto_font_size(this, rc, text, &m_lf);
+		get_auto_font_size(this, rc, m_text, &m_lf);
 		reconstruct_font();
 	}
 }

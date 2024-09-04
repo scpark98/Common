@@ -157,23 +157,12 @@ public:
 
 	void		expand_all(bool expand = true);
 
-	//컬러 관련
-	enum listctrlex_color_theme
-	{
-		color_theme_default = 0,
-		color_theme_light_blue,
-		color_theme_navy_blue,
-		color_theme_dark_blue,
-		color_theme_dark_gray,
-		color_theme_dark,
-	};
-
-	void	set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
-	void	set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
-	void	set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
+	void		set_color_theme(int theme);
+	void		set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
+	void		set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
 	//CTreeCtrl에서 지원하는 기본 함수 override
-	void	SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
-	void	SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
+	void		SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
+	void		SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
 
 	//Drag&Drop 드래깅 관련
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
@@ -184,6 +173,8 @@ public:
 		for (auto id : arg)
 			m_drag_images_id.push_back(id);
 	}
+
+	void			set_use_popup_menu(bool use) { m_use_popup_menu = use; }
 
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			set_use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
@@ -236,6 +227,7 @@ protected:
 		menu_property,
 	};
 	CSCMenu			m_menu;
+	bool			m_use_popup_menu = false;
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 
 	//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.

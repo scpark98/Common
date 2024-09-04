@@ -214,9 +214,9 @@ void CSCSliderCtrl::OnPaint()
 		dc.FillSolidRect(r.left, cy - 2, r.Width(), 4, m_cr_back);//GRAY192);
 		dc.FillSolidRect(r.left, cy + 2, r.Width(), 2, get_color(m_cr_back, 64));
 		*/
-		DrawSunkenRect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
+		draw_sunken_rect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
 		r.DeflateRect(1, 1);
-		DrawSunkenRect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
+		draw_sunken_rect(&dc, r, true, get_color(m_cr_back, -32), get_color(m_cr_back, 32), 1);
 
 	}
 	else if (m_style == style_step)
@@ -655,6 +655,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_enable_slide == false)
 		return;
 
+	/*
 	int pos = GetPos();
 
 	// TODO: Add your message handler code here and/or call default
@@ -664,10 +665,22 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
 		return;
 	}
+	*/
+	/*
+	int		lower;
+	int		upper;
+	CRect	rc;
 
+	GetRange(lower, upper);
+	GetClientRect(&rc);
+
+	int pos = (int)((double)point.x * (double)(upper - lower) / (double)rc.right) + lower;
+	TRACE(_T("lower = %d, upper = %d, pos = %d\n"), lower, upper, pos);
+	SetPos(pos);
+	*/
 	m_lbuttondown = true;
-	SetCapture();
 	OnMouseMove(nFlags, point);
+	SetCapture();
 	//SetFocus();
 
 #if 0
@@ -721,7 +734,9 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	//OnMouseMove(nFlags, point);
 #endif
 
-	CSliderCtrl::OnLButtonDown(nFlags, point);
+	//이 코드를 살려두면 뭔가 WM_PAINT가 발생하여 현재의 pos가 실제 pos와 다르게 설정되는 문제가 발생한다.
+	//막아둬야만 정상 동작한다.
+	//CSliderCtrl::OnLButtonDown(nFlags, point);
 }
 
 void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point) 
@@ -742,7 +757,8 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 	m_lbuttondown = false;
 	ReleaseCapture();
-
+	Invalidate();
+	/*
 	int pos = GetPos();
 	if (m_nEventMsgStyle == msg_style_timer)
 	{
@@ -757,7 +773,7 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		//if (m_pCallback_func != NULL)
 			//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_THUMB_RELEASE, pos);
 	}
-
+	*/
 	
 	CSliderCtrl::OnLButtonUp(nFlags, point);
 }
@@ -771,7 +787,16 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 	// TODO: Add your message handler code here and/or call default
-	int pos = GetPos();
+	//int pos = GetPos();
+
+	int		lower;
+	int		upper;
+	CRect	rc;
+
+	GetRange(lower, upper);
+	GetClientRect(&rc);
+
+	int pos = (int)((double)point.x * (double)(upper - lower) / (double)rc.right) + lower;
 	CString str;
 
 	if (m_use_bookmark)
@@ -826,77 +851,45 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 
-	if(!m_lbuttondown || !IsWindowEnabled())
-		return;
-
-	int nPixel;
-
-	// 범위를 벗어났는지 검사한다
-	if(m_is_vertical)
+	if (m_lbuttondown && IsWindowEnabled())
 	{
-		nPixel = point.y - m_nMouseOffset;
+		int nPixel;
+		/*
+		// 범위를 벗어났는지 검사한다
+		if(m_is_vertical)
+		{
+			nPixel = point.y - m_nMouseOffset;
 
-		if(nPixel > m_rc.Height() - m_margin.bottom - (m_style <= style_value ? m_thumb.cy/2 : 0))
-			nPixel = m_rc.Height() - m_margin.bottom - (m_style<= style_value ? m_thumb.cy/2 : 0);
+			if(nPixel > m_rc.Height() - m_margin.bottom - (m_style <= style_value ? m_thumb.cy/2 : 0))
+				nPixel = m_rc.Height() - m_margin.bottom - (m_style<= style_value ? m_thumb.cy/2 : 0);
 
-		if(nPixel < m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0))
-			nPixel = m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0);
-	}
-	else
-	{
-		nPixel = point.x - m_nMouseOffset;
+			if(nPixel < m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0))
+				nPixel = m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0);
+		}
+		else
+		{
+			nPixel = point.x - m_nMouseOffset;
 
-		if(nPixel < m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0))
-			nPixel = m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0);
+			if(nPixel < m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0))
+				nPixel = m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0);
 
-		if(nPixel > m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0))
-			nPixel = m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0);
-	}
+			if(nPixel > m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0))
+				nPixel = m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0);
+		}
 
-	int		lower;
-	int		upper;
-	CRect	Rect;
 
-	GetRange(lower, upper);
-	GetClientRect(&Rect);
-
-	pos = Pixel2Pos(point.x);
-	//pos = (int)((double)point.x * (double)(upper - lower) / (double)Rect.right) + lower;
-	TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
-	SetPos(pos);
-	Invalidate(false);
-
-	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
-#if 0
-	// 변한 내용을 적용한다
-	int pix = Pos2Pixel(pos);
-	TRACE(_T("before pos2pix(%d) = %d, nPixel = %d\n"), pos, pix, nPixel);
-	if(Pos2Pixel(pos) != nPixel)
-	{
-		pos = Pixel2Pos(nPixel);
-		TRACE(_T("after Pixel2Pos(%d) = %d, nPixel = %d\n"), nPixel, pos, nPixel);
+		pos = Pixel2Pos(point.x);
+		//pos = (int)((double)point.x * (double)(upper - lower) / (double)Rect.right) + lower;
+		*/
+		TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
 		SetPos(pos);
-		//redraw_window();
-
-		if (m_nEventMsgStyle == msg_style_timer)
-		{
-			SetTimer(timer_post_pos, 1, NULL);
-		}
-		else if (m_nEventMsgStyle == msg_style_post)
-		{
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
-		}
-		else if (m_nEventMsgStyle == msg_style_callback)
-		{
-			//if (m_pCallback_func != NULL)
-				//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_MOVED, pos);
-		}
-
-		redraw_window();
+		//Invalidate(false);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
 	}
-#endif
 
-	CSliderCtrl::OnMouseMove(nFlags, point);
+	//이 코드를 살려놓으면 thumb위에서 마우스가 클릭되지 않고 움직여도 WM_PAINT가 호출되는 현상이 발생한다.
+	//우선 주석처리한다.
+	//CSliderCtrl::OnMouseMove(nFlags, point);
 }
 
 // PrepareMask
@@ -1445,4 +1438,15 @@ void CSCSliderCtrl::redraw_window(bool bErase)
 	}
 
 	return;
+}
+/*
+int CSCSliderCtrl::GetPos()
+{
+
+}
+*/
+void CSCSliderCtrl::SetPos(int pos)
+{
+	CSliderCtrl::SetPos(pos);
+	Invalidate();
 }

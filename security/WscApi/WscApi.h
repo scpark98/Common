@@ -4,7 +4,7 @@
 
 #include <afxwin.h>
 #include <Wscapi.h>
-#include <iwscapi.h>
+#include <iwscapi.h>	//Windows 8 or later
 #include <deque>
 
 #define WSC_PROVIDER_COUNT 3	//for WSC_SECURITY_PROVIDER_ANTIVIRUS, WSC_SECURITY_PROVIDER_ANTISPYWARE, WSC_SECURITY_PROVIDER_FIREWALL
@@ -23,11 +23,16 @@ class CWscApi
 {
 public :
 	CWscApi();
+	~CWscApi();
 
 	void	refresh();
 
-	//사용자가 좀 더 쉽게 사용하기 위한 멤버함수 정의.
+	//기본 Microsoft Defender만 있을 경우는 해당 state가 on인지 판별하고
+	//그 외에 다른 백신을 설치한 경우에는 하나라도 state_on이면 true를 리턴한다.
 	bool	is_antivirus_state_on();
+
+	//기본 Microsoft Defender만 있을 경우는 해당 status가 up-to-date인지 판별하고
+	//그 외에 다른 백신을 설치한 경우에는 하나라도 up-to-date이면 true를 리턴한다.
 	bool	is_antivirus_latest_version();
 
 	//provider is not a index, but defined value. ex)
@@ -46,6 +51,8 @@ public :
 	WSC_SECURITY_SIGNATURE_STATUS	get_product_status(WSC_SECURITY_PROVIDER provider, int product_index);
 
 protected :
+	void		release();
+
 	WSC_SECURITY_PROVIDER provider[WSC_PROVIDER_COUNT];		//for antiVirus, antiSpyware, firewall
 	std::deque<CWscProduct> product[WSC_PROVIDER_COUNT];
 	IWSCProductList* productList[WSC_PROVIDER_COUNT];

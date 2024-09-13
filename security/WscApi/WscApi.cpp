@@ -2,14 +2,46 @@
 
 CWscApi::CWscApi()
 {
+	CoInitializeEx(0, COINIT_APARTMENTTHREADED);
+
+	int i;
+
+	for (i = 0; i < WSC_PROVIDER_COUNT; i++)
+	{
+		productList[i] = NULL;
+	}
+
 	refresh();
+}
+
+CWscApi::~CWscApi()
+{
+	release();
+
+	//release() 전에 호출하면 종료 시 release() 함수내에서 엑세스 위반이 발생한다.
+	CoUninitialize();
+}
+
+void CWscApi::release()
+{
+	int i;
+
+	for (i = 0; i < WSC_PROVIDER_COUNT; i++)
+	{
+		product[i].clear();
+
+		if (productList[i])
+		{
+			productList[i]->Release();
+			productList[i] = NULL;
+		}
+	}
 }
 
 void CWscApi::refresh()
 {
-	product->clear();
+	release();
 
-	CoInitializeEx(0, COINIT_APARTMENTTHREADED);
 
 	int i, j;
 	HRESULT hr = S_OK;
@@ -36,17 +68,20 @@ void CWscApi::refresh()
 
 		// Initialize can only be called once per instance, so you need to
 		// CoCreateInstance for each security product type you want to query.
-		hr = CoCreateInstance(
-			__uuidof(WSCProductList),
-			NULL,
-			CLSCTX_INPROC_SERVER,
-			__uuidof(IWSCProductList),
-			reinterpret_cast<LPVOID*> (&productList[i]));
-
-		if (FAILED(hr))
+		if (productList[i] == NULL)
 		{
-			TRACE(_T("CoCreateInstance returned error = 0x%d \n"), hr);
-			return;
+			hr = CoCreateInstance(
+				__uuidof(WSCProductList),
+				NULL,
+				CLSCTX_INPROC_SERVER,
+				__uuidof(IWSCProductList),
+				reinterpret_cast<LPVOID*> (&productList[i]));
+
+			if (FAILED(hr))
+			{
+				TRACE(_T("CoCreateInstance returned error = 0x%d \n"), hr);
+				return;
+			}
 		}
 
 		// Initialize the product list with the type of security product you're 
@@ -66,7 +101,7 @@ void CWscApi::refresh()
 			return;
 		}
 
-		IWscProduct* PtrProduct;
+		IWscProduct* PtrProduct = NULL;
 		BSTR PtrVal;
 		CWscProduct wscProduct;
 
@@ -122,10 +157,10 @@ void CWscApi::refresh()
 			}
 
 			product[i].push_back(wscProduct);
+			PtrProduct->Release();
 		}
 	}
 
-	CoUninitialize();
 }
 
 int CWscApi::get_provider_index(WSC_SECURITY_PROVIDER provider_def)
@@ -148,78 +183,75 @@ size_t CWscApi::get_product_count(WSC_SECURITY_PROVIDER provider)
 	return product[index].size();
 }
 
-//product_index를 -1로 줄 경우 다음과 같이 처리된다.
-//product 리스트가 1개일 경우는 Windows Defender 항목의 값을 리턴하고
-//2개 이상일 경우는 Windows Defender가 아닌 항목 중 첫 번째 항목의 상태값을 리턴한다.
-//Windows Defender가 기본 설치되어 있는 윈도우에 V3 or Avast등을 설치하면
-//Windows Defender의 Antivirus state는 Off로 변경되고
-//V3 or Avast의 state가 실제 유효한 state가 되므로 이 항목의 state를 리턴해야 함.
 WSC_SECURITY_PRODUCT_STATE CWscApi::get_product_state(WSC_SECURITY_PROVIDER provider, int product_index)
 {
-	int index = get_provider_index(provider);
-	if (index < 0 || index >= product->size())
+	int provider_index = get_provider_index(provider);
+	if (provider_index < 0 || provider_index >= WSC_PROVIDER_COUNT)
 		return (WSC_SECURITY_PRODUCT_STATE)-1;
 
-	if (product_index < 0)
-	{
-		if (product->size() == 1)
-		{
-			product_index = 0;
-		}
-		else
-		{
-			for (int i = 0; i < product->size(); i++)
-			{
-				if (product[index][i].name.Find(_T("Microsoft Defender ")) < 0)
-				{
-					product_index = i;
-					break;
-				}
-			}
-		}
-	}
+	if (product_index < 0 || product_index >= product[provider_index].size())
+		return (WSC_SECURITY_PRODUCT_STATE)-1;
 
-	return product[index][product_index].state;
+	return product[provider_index][product_index].state;
 }
 
-//product_index를 -1로 주면 product 리스트 중 맨 마지막 항목의 값을 리턴
 WSC_SECURITY_SIGNATURE_STATUS CWscApi::get_product_status(WSC_SECURITY_PROVIDER provider, int product_index)
 {
-	int index = get_provider_index(provider);
-	if (index < 0 || index >= product->size())
+	int provider_index = get_provider_index(provider);
+	if (provider_index < 0 || provider_index >= WSC_PROVIDER_COUNT)
 		return (WSC_SECURITY_SIGNATURE_STATUS)-1;
 
-	if (product_index < 0)
+	return product[provider_index][product_index].status;
+}
+
+//기본 Microsoft Defender만 있을 경우는 해당 state가 on인지 판별하고
+//그 외에 다른 백신을 설치한 경우에는 하나라도 state_on이면 true를 리턴한다.
+bool CWscApi::is_antivirus_state_on()
+{
+	int provider_index = get_provider_index(WSC_SECURITY_PROVIDER_ANTIVIRUS);
+	if (provider_index < 0 || provider_index >= WSC_PROVIDER_COUNT)
+		return false;
+
+	//기본 Microsoft Defender만 있을 경우
+	if (product[provider_index].size() == 1)
+		return (product[provider_index][0].state == WSC_SECURITY_PRODUCT_STATE_ON);
+
+	//기본 Microsoft Defender 외에 다른 백신을 설치한 경우에는
+	//하나라도 state_on이면 true를 리턴한다.
+	for (int i = 0; i < product->size(); i++)
 	{
-		if (product->size() == 1)
+		if (product[provider_index][i].name.Find(_T("Microsoft Defender ")) < 0)
 		{
-			product_index = 0;
-		}
-		else
-		{
-			for (int i = 0; i < product->size(); i++)
-			{
-				if (product[index][i].name.Find(_T("Microsoft Defender ")) < 0)
-				{
-					product_index = i;
-					break;
-				}
-			}
+			if (product[provider_index][i].state == WSC_SECURITY_PRODUCT_STATE_ON)
+				return true;
 		}
 	}
 
-	return product[index][product_index].status;
+	return false;
 }
 
-//사용자가 좀 더 쉽게 사용하기 위한 멤버함수 정의.
-bool CWscApi::is_antivirus_state_on()
-{
-	WSC_SECURITY_PRODUCT_STATE state = get_product_state(WSC_SECURITY_PROVIDER_ANTIVIRUS, -1);
-	return (state == WSC_SECURITY_PRODUCT_STATE_ON);
-}
-
+//기본 Microsoft Defender만 있을 경우는 해당 status가 up-to-date인지 판별하고
+//그 외에 다른 백신을 설치한 경우에는 하나라도 up-to-date이면 true를 리턴한다.
 bool CWscApi::is_antivirus_latest_version()
 {
-	WSC_SECURITY_SIGNATURE_STATUS status = get_product_status(WSC_SECURITY_PROVIDER_ANTIVIRUS, -1);
-	return (status == WSC_SECURITY_PRODUCT_UP_TO_DATE);
+	int provider_index = get_provider_index(WSC_SECURITY_PROVIDER_ANTIVIRUS);
+	if (provider_index < 0 || provider_index >= WSC_PROVIDER_COUNT)
+		return false;
+
+	//기본 Microsoft Defender만 있을 경우
+	if (product[provider_index].size() == 1)
+		return (product[provider_index][0].status == WSC_SECURITY_PRODUCT_UP_TO_DATE);
+
+	//기본 Microsoft Defender 외에 다른 백신을 설치한 경우에는
+	//하나라도 up_to_date이면 true를 리턴한다.
+	for (int i = 0; i < product->size(); i++)
+	{
+		if (product[provider_index][i].name.Find(_T("Microsoft Defender ")) < 0)
+		{
+			if (product[provider_index][i].status == WSC_SECURITY_PRODUCT_UP_TO_DATE)
+				return true;
+		}
+	}
+
+	return false;
 }

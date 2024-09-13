@@ -117,7 +117,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 #undef GDIPVER
 #endif
 
-#define	GDIPVER 0x0110
+#define		GDIPVER 0x0110
 
 #define		ENUM_TO_STRING(a) #a
 #define		ENUM_TO_CSTRING(a) CString(#a)
@@ -141,6 +141,8 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
 #define		check_range_return(x, lower, upper) {if ((x) < (lower) || (x) > (upper)) return;}
 
+typedef void (WINAPI* PGNSI)(LPSYSTEM_INFO);
+typedef BOOL(WINAPI* PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 
 
 enum FILE_TYPE
@@ -976,7 +978,9 @@ struct	NETWORK_INFO
 	void		request_url(CRequestUrlParams* params);
 
 
-	CString		GetDefaultBrowserPath();	//[출처] [VC++] Windows 기본 웹 브라우저 파일 경로 얻어오기|작성자 데브머신
+	//기본 브라우저로 설정된 브라우저 이름을 리턴하고 부가적으로 경로, 버전을 얻을 수 있다.
+	CString		get_default_browser_info(CString* pPath = NULL, CString* pVersion = NULL);
+
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
 	bool		HttpUploadFile(CString url, CString filepath, int chatIndex);
 
@@ -1108,12 +1112,15 @@ struct	NETWORK_INFO
 	//대소문자를 명확히 하여 비교하는 것이 좋다.
 	//=>255글자까지 리턴되는 GetComputerNameEx()로 변경함.
 	CString		get_computer_name_string();
+	//버전정보를 구조체로 리턴
 	OSVERSIONINFOEX	get_windows_version();
+	//버전정보를 숫자와 '.'로 리턴. ex. "10.0.12345"
+	CString		get_windows_version_number();
 	DWORD		get_windows_major_version();
-	CString		get_windows_version_string(OSVERSIONINFOEX* posInfo = NULL);
-	CString		get_windows_version_string(DWORD dwMajor, DWORD dwMinor, DWORD dwBuild);
-	//ex. version = "10.0.12345"
-	CString		get_windows_version_string(CString version);
+	//detail=true이면 edition 정보까지 포함
+	CString		get_windows_version_string(bool detail = true);
+	//
+	//CString		get_windows_version_string(CString version);
 
 	CString		get_system_label(int csidl, int *sysIconIndex = NULL);
 

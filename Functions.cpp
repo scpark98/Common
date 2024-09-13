@@ -2902,17 +2902,50 @@ CString DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd/*=NULL*/
 	return (Cause);
 }
 
-CString GetDefaultBrowserPath()
+//기본 브라우저로 설정된 브라우저 이름을 리턴하고 부가적으로 경로, 버전을 얻을 수 있다.
+CString	get_default_browser_info(CString* pPath, CString* pVersion)
 {
-	TCHAR szPath[_MAX_PATH];
+	CString ProgId;
+	CString browser;
+	CString path;
+	CString version;
 
-	HFILE h = _lcreat("dummy.htm", 0) ;
-	_lclose(h);
+	get_registry_string(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice"), _T("ProgId"), &ProgId);
 
-	FindExecutable(_T("dummy.htm"), NULL, szPath);
-	DeleteFile(_T("dummy.htm"));
+	if (ProgId.Find(_T("Chrome")) >= 0)			//ChromeHTML
+		browser = _T("Google Chrome");
+	else if (ProgId.Find(_T("Edge")) >= 0)		//FirefoxURL
+		browser = _T("Microsoft Edge");
+	else if (ProgId.Find(_T("Firefox")) >= 0)	//MSEdgeHTM
+		browser = _T("Mozilla Firefox");
+	else if (ProgId.Find(_T("IE.HTTP")) >= 0)	//IE.HTTP
+		browser = _T("Internet Explorer");
+	else if (ProgId.Find(_T("WhaleHTM")) >= 0)	//Naver Whale
+		browser = _T("Naver Whale");
+	else
+		browser = _T("Unknown Browser");
 
-	return szPath;
+	//"C:\Program Files\Google\Chrome\Application\chrome.exe" --single-argument %1
+	//"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --single-argument %1
+	//"C:\Program Files\Internet Explorer\iexplore.exe" %1
+
+	CString section;
+	section.Format(_T("SOFTWARE\\Classes\\%s\\shell\\open\\command"), ProgId);
+	get_registry_string(HKEY_LOCAL_MACHINE, section, _T(""), &path);
+
+	int pos = path.Find(_T(".exe\""));
+	if (pos > 0)
+	{
+		path = path.Left(pos) + _T(".exe");
+		path.Remove('\"');
+	}
+	if (pPath)
+		*pPath = path;
+
+	if (pVersion)
+		*pVersion = get_file_property(path);
+
+	return browser;
 }
 
 LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
@@ -8010,79 +8043,142 @@ OSVERSIONINFOEX get_windows_version()
 	return osInfo;
 }
 
+CString get_windows_version_number()
+{
+	CString version;
+	OSVERSIONINFOEX osvi = get_windows_version();
+
+	version.Format(_T("%d.%d.%d"), osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber);
+	return version;
+}
+
 DWORD get_windows_major_version()
 {
-	OSVERSIONINFOEX osInfo;
-	NTSTATUS(WINAPI * RtlGetVersion)(LPOSVERSIONINFOEX);
-
-	*(FARPROC*)&RtlGetVersion = GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
-
-	if (NULL != RtlGetVersion)
-	{
-		osInfo.dwOSVersionInfoSize = sizeof(osInfo);
-		RtlGetVersion(&osInfo);
-	}
-
-	return osInfo.dwMajorVersion;
-
+	OSVERSIONINFOEX osvi = get_windows_version();;
+	return osvi.dwMajorVersion;
 }
 
-CString	get_windows_version_string(OSVERSIONINFOEX* posInfo)
+CString	get_windows_version_string(bool detail)
 {
-	OSVERSIONINFOEX osInfo;
-	if (posInfo == NULL)
-		osInfo = get_windows_version();
-	else
-		osInfo = *posInfo;
+	CString version;
+	OSVERSIONINFOEX osvi = get_windows_version();
+	SYSTEM_INFO si;
 
-	return get_windows_version_string(osInfo.dwMajorVersion, osInfo.dwMinorVersion, osInfo.dwBuildNumber);
-}
-
-//ex. version = "10.0.12345"
-CString	get_windows_version_string(CString version)
-{
-	std::deque<CString> dq;
-	get_token_string(version, dq, '.');
-
-	DWORD dwMajor = 0;
-	DWORD dwMinor = 0;
-	DWORD dwBuild = 0;
-	
-	if (dq.size() >= 2)
+	if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
+		version = _T("Microsoft Windows XP");
+	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
+		version = _T("Microsoft Windows Vista");
+	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
+		version = _T("Microsoft Windows 7");
+	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
+		version = _T("Microsoft Windows 8");
+	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
+		version = _T("Microsoft Windows 8.1");
+	else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0)
 	{
-		dwMajor = _ttoi(dq[0]);
-		dwMinor = _ttoi(dq[1]);
-	}
-
-	if (dq.size() == 3)
-	{
-		dwBuild = _ttoi(dq[2]);
-	}
-
-	return get_windows_version_string(dwMajor, dwMinor, dwBuild);
-}
-
-CString	get_windows_version_string(DWORD dwMajor, DWORD dwMinor, DWORD dwBuild)
-{
-	if (dwMajor == 5 && dwMinor == 1)
-		return _T("Windows XP");
-	else if (dwMajor == 6 && dwMinor == 0)
-		return _T("Windows Vista");
-	else if (dwMajor == 6 && dwMinor == 1)
-		return _T("Windows 7");
-	else if (dwMajor == 6 && dwMinor == 2)
-		return _T("Windows 8");
-	else if (dwMajor == 6 && dwMinor == 3)
-		return _T("Windows 8.1");
-	else if (dwMajor == 10 && dwMinor == 0)
-	{
-		if (dwBuild >= 22000)
-			return _T("Windows 11");
+		if (osvi.dwBuildNumber >= 22000)
+			version = _T("Microsoft Windows 11");
 		else
-			return _T("Windows 10");
+			version = _T("Microsoft Windows 10");
+	}
+	else
+	{
+		version = _T("Unknown OS version");
 	}
 
-	return _T("Unknown OS version");
+	version.Format(_T("%s (Build %d)"), version, osvi.dwBuildNumber);
+
+	if (detail)
+	{
+		PGNSI pGNSI;
+		PGPI pGPI;
+		DWORD dwType;
+		CString sType;
+
+		pGPI = (PGPI)GetProcAddress(
+			GetModuleHandle(TEXT("kernel32.dll")),
+			"GetProductInfo");
+
+		pGPI(osvi.dwMajorVersion, osvi.dwMinorVersion, 0, 0, &dwType);
+
+		switch (dwType)
+		{
+			case PRODUCT_ULTIMATE:
+				sType = _T("Ultimate Edition");
+				break;
+			case PRODUCT_PROFESSIONAL:
+				sType = _T("Professional");
+				break;
+			case PRODUCT_HOME_PREMIUM:
+				sType = _T("Home Premium Edition");
+				break;
+			case PRODUCT_HOME_BASIC:
+				sType = _T("Home Basic Edition");
+				break;
+			case PRODUCT_ENTERPRISE:
+				sType = _T("Enterprise Edition");
+				break;
+			case PRODUCT_BUSINESS:
+				sType = _T("Business Edition");
+				break;
+			case PRODUCT_STARTER:
+				sType = _T("Starter Edition");
+				break;
+			case PRODUCT_CLUSTER_SERVER:
+				sType = _T("Cluster Server Edition");
+				break;
+			case PRODUCT_DATACENTER_SERVER:
+				sType = _T("Datacenter Edition");
+				break;
+			case PRODUCT_DATACENTER_SERVER_CORE:
+				sType = _T("Datacenter Edition (core installation)");
+				break;
+			case PRODUCT_ENTERPRISE_SERVER:
+				sType = _T("Enterprise Edition");
+				break;
+			case PRODUCT_ENTERPRISE_SERVER_CORE:
+				sType = _T("Enterprise Edition (core installation)");
+				break;
+			case PRODUCT_ENTERPRISE_SERVER_IA64:
+				sType = _T("Enterprise Edition for Itanium-based Systems");
+				break;
+			case PRODUCT_SMALLBUSINESS_SERVER:
+				sType = _T("Small Business Server");
+				break;
+			case PRODUCT_SMALLBUSINESS_SERVER_PREMIUM:
+				sType = _T("Small Business Server Premium Edition");
+				break;
+			case PRODUCT_STANDARD_SERVER:
+				sType = _T("Standard Edition");
+				break;
+			case PRODUCT_STANDARD_SERVER_CORE:
+				sType = _T("Standard Edition (core installation)");
+				break;
+			case PRODUCT_WEB_SERVER:
+				sType = _T("Web Server Edition");
+				break;
+		}
+
+		if (sType.IsEmpty() == false)
+		{
+			version = version + _T(" ") + sType;
+		}
+
+		pGNSI = (PGNSI)GetProcAddress(
+			GetModuleHandle(TEXT("kernel32.dll")),
+			"GetNativeSystemInfo");
+		if (NULL != pGNSI)
+			pGNSI(&si);
+		else
+			GetSystemInfo(&si);
+
+		if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
+			version = version + _T(", 64-bit");
+		else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
+			version = version + _T(", 32-bit");
+	}
+
+	return version;
 }
 
 CString	get_system_label(int csidl, int* sysIconIndex)

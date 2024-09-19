@@ -118,6 +118,7 @@ protected:
 #define		GRAY224		GRAY(224)
 #define		GRAY(x)		RGB((x), (x), (x))
 #define		gGRAY(x)	Gdiplus::Color(255, (x), (x), (x))
+#define		gRGB(r,g,b)	Gdiplus::Color(255, (r), (g), (b))
 
 //std::map으로 컬러 표현
 //참조 방법 : cr = g_cr["white"]

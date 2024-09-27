@@ -17,11 +17,11 @@
 	#include "../../Common/log/SCLog.h"
 	...
 	전역변수로 아래 변수 선언.
-	extern SCLog gLog;
+	extern CSCLog gLog;
 
   app.cpp에서 실제 전역변수 선언.
 
-  SCLog gLog;
+  CSCLog gLog;
 
 	//만약 로그파일의 경로를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
 	//로그파일명 형식은 projectName_yyyymmdd.log
@@ -72,11 +72,11 @@ enum SCLOG_LEVEL
 	SCLOG_LEVEL_DEBUG,		//?
 };
 
-class SCLog
+class CSCLog
 {
 public:
-	SCLog();
-	virtual ~SCLog();
+	CSCLog();
+	virtual ~CSCLog();
 
 	//폴더 및 로그파일 타이틀을 주지 않으면 실행파일 하위의 "Log" 폴더에 실행파일명[YYYYMMDD].log 파일이 자동 생성됨.
 	//위와 같이 기본 위치와 파일명을 사용할 경우는 set()을 호출하지 않아도 자동 생성되며
@@ -116,4 +116,4 @@ protected:
 
 };
 
-extern SCLog* pLog;
+extern CSCLog* pLog;

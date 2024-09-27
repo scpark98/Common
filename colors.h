@@ -14,17 +14,30 @@
   중복도 많아지고 일관되지 않아 CSCColorTheme이라는 클래스로 공통 처리하고자 함.
   일부 색상 변수는 특정 컨트롤에만 해당되는 경우도 있음.
 
+  .h 파일에
+  #include "../../colors.h"
+  ...
+  CSCColorTheme	m_theme = CSCColorTheme(this);
+  ...
+  void		set_color_theme(int theme); 함수 선언.
+
   //사용할 클래스의 .h파일에 인스턴스 선언시 this를 넘겨주는 이유는
   //color theme을 적용할 때 color_theme_default라면
   //대상 클래스가 CTreeCtrl, CListCtrl등이면 배경이 COLOR_WINDOW로 세팅되고
   //CButton, CStatic, CDialog등이면 COLOR_BTNFACE로 세팅되야 하므로 이를 판단하기 위함.
-  CSCColorTheme	m_theme = CSCColorTheme(this);
 
-  //.cpp에서 다음과 같이 테마를 변경해준다.
+
+  .cpp의 set_color_theme()에서 다음과 같이 테마를 변경해준다.
   m_theme.set_color_theme(CSCColorTheme::color_theme_dark);
 
 - 지원되는 color theme 리스트를 얻기 위해서는 get_color_theme_list()의 리턴값을 이용한다.
 */
+
+enum COLOR_THEME_MEMBER_INDEX
+{
+	cri_text = 0,
+
+};
 
 class CSCColorTheme
 {
@@ -37,10 +50,11 @@ public :
 
 	enum SC_COLOR_THEMES
 	{
-		color_theme_default = 0,	//윈도우 테마를 따름
+		color_theme_default = 0,		//윈도우 테마를 따름
 		color_theme_gray,
 		color_theme_dark_gray,
 		color_theme_dark,
+		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
 	};
 
 	int		get_color_theme() { return cur_theme; }
@@ -55,13 +69,13 @@ public :
 
 	Gdiplus::Color	cr_selected_border;
 
-	Gdiplus::Color	cr_back;					//BTNFACE	: for CDialog, CButton, CStatic...
-	Gdiplus::Color	cr_back_hover;				//= hover, over, track_select...
+	Gdiplus::Color	cr_back;						//BTNFACE	: for CDialog, CButton, CStatic...
+	Gdiplus::Color	cr_back_hover;					//= hover = over = track_select... 다양한 같은 의미가 있으나 hover로 통일하자.
 	Gdiplus::Color	cr_back_dropHilited;
 	Gdiplus::Color	cr_back_selected;
 	Gdiplus::Color	cr_back_selected_inactive;
 	Gdiplus::Color	cr_back_selected_border;
-	Gdiplus::Color	cr_back_alternated;
+	Gdiplus::Color	cr_back_alternated;				//list의 경우 짝수라인, 홀수라인 번갈아 색상을 표시하는 목적
 
 	//CListCtrl에서만 사용될것으로 예상.
 	Gdiplus::Color	cr_header_text;

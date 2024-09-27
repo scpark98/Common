@@ -199,21 +199,21 @@ void CSCStatic::OnPaint()
 
 	CFont *pOldFont=dc.SelectObject(&m_font);
 	DWORD dwStyle = GetStyle();
-	DWORD dwText = 0;
+	DWORD dwText = DT_NOCLIP;
 	
 	if (m_dwStyle == 0)
 	{
 		MAP_STYLE(SS_LEFT,			DT_LEFT						);
 		MAP_STYLE(SS_RIGHT,			DT_RIGHT					);
 		MAP_STYLE(SS_CENTER,		DT_CENTER					);
-		MAP_STYLE(SS_CENTERIMAGE,	DT_VCENTER | DT_SINGLELINE	);
+		//MAP_STYLE(SS_CENTERIMAGE,	DT_VCENTER | DT_SINGLELINE	);
 		MAP_STYLE(SS_NOPREFIX,		DT_NOPREFIX					);
 		MAP_STYLE(SS_WORDELLIPSIS,	DT_WORD_ELLIPSIS			);
 		MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
 		MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
 
 		NMAP_STYLE(	SS_LEFTNOWORDWRAP |
-					SS_CENTERIMAGE |
+					//SS_CENTERIMAGE |
 					SS_WORDELLIPSIS |
 					SS_ENDELLIPSIS |
 					SS_PATHELLIPSIS,	DT_WORDBREAK);
@@ -356,16 +356,13 @@ void CSCStatic::OnPaint()
 		else
 			dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 
-
-		// Draw the text
-
-		//line space때문에 약간 아래 출력되므로 이를 보정해준다.
+		//SS_CENTERIMAGE 일 경우 DT_VCENTER는 반드시 DT_SINGLELINE을 동반해야 한다.
+		//하지만 그럴 경우 multiline을 표현할 수 없으므로
+		//SS_CENTERIMAGE 일 경우는 세로 출력위치를 직접 보정해준다.
 		if (dwStyle & SS_CENTERIMAGE)
 		{
-			//rText.OffsetRect(0, -3);
-
-			// 			if (rText.top < 0)
-			// 				rText.OffsetRect(0, -rText.top);
+			rText.top = (rc.Height() - szText.cy) / 2;
+			rText.bottom = rText.top + szText.cy;
 		}
 		else
 		{
@@ -422,9 +419,9 @@ void CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
 
 	//투명일때 update_surface()를 써야 온전히 갱신된다.
 	//=>dlg에서 clip sibling에 따라 결과가 달라진다.
-	if (m_transparent)
+	//if (m_transparent)
 		update_surface();
-	else
+	//else
 		Invalidate(false);
 }
 

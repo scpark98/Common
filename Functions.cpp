@@ -2337,7 +2337,7 @@ bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url, bool 
 
 //void request_url(CRequestUrlParams* params)
 //{
-//	params->status = request_url(params->result, params->ip, params->port, params->sub_url, params->method, &params->headers, params->body, params->local_file_path);
+//	params->status = request_url(params->result, params->ip, params->port, params->sub_url, params->verb, &params->headers, params->body, params->local_file_path);
 //}
 /*
 DWORD request_url(CString& result_str, CString full_url, CString verb, std::vector<CString> *headers, CString jsonBody, CString local_file_path)
@@ -2414,14 +2414,14 @@ void request_url(CRequestUrlParams* params)
 			params->port = 80;
 	}
 
-	if (params->method.IsEmpty())
-		params->method = _T("GET");
+	if (params->verb.IsEmpty())
+		params->verb = _T("GET");
 
-	params->method.MakeUpper();
-	if (!is_one_of(params->method, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
+	params->verb.MakeUpper();
+	if (!is_one_of(params->verb, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
 	{
 		params->status = HTTP_STATUS_BAD_METHOD;
-		params->result = _T("Unknown HTTP Request method(\"") + params->method + _T("\")");
+		params->result = _T("Unknown HTTP Request method(\"") + params->verb + _T("\")");
 		TRACE(_T("result = %s\n"), params->result);
 		return;
 	}
@@ -2467,7 +2467,7 @@ void request_url(CRequestUrlParams* params)
 	}
 
 	HINTERNET hOpenRequest = HttpOpenRequest(hInternetConnect,
-		params->method,
+		params->verb,
 		params->sub_url,
 		HTTP_VERSION,
 		_T(""),
@@ -3646,6 +3646,11 @@ CString get_ip_error_string(DWORD error_code)
 	GetIpErrorString(error_code, buf, &buf_size);
 
 	return CString(buf);
+}
+
+bool port_is_open(const std::string& address, int port)
+{
+	return false;
 }
 
 bool GetNICAdapterList(IP_ADAPTER_INFO* pAdapters, int& nTotal, int nMax /*= 10*/)
@@ -6569,6 +6574,7 @@ CString UTF8toCString(char* pszCode)
 	// Get nLength of the multi byte buffer
 	nLength = WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, NULL, 0, NULL, NULL);
 	pszAnsi = new char[nLength];
+	ZeroMemory(pszAnsi, nLength);
 	// Change from unicode to mult byte
 	WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, pszAnsi, nLength, NULL, NULL);
 	SysFreeString(bstrWide);
@@ -6577,6 +6583,41 @@ CString UTF8toCString(char* pszCode)
 	delete[] pszAnsi;
 
 	return strResult;
+}
+
+char* UTF8toANSI(char* pszCode)
+{
+	BSTR    bstrWide;
+	char* pszAnsi;
+	int     nLength;
+	// Get nLength of the Wide Char buffer
+	nLength = MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, NULL, NULL);
+	bstrWide = SysAllocStringLen(NULL, nLength);
+	// Change UTF-8 to Unicode (UTF-16)
+	MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, bstrWide, nLength);
+	// Get nLength of the multi byte buffer
+	nLength = WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, NULL, 0, NULL, NULL);
+	pszAnsi = new char[nLength];
+	ZeroMemory(pszAnsi, nLength);
+	// Change from unicode to mult byte
+	WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, pszAnsi, nLength, NULL, NULL);
+	SysFreeString(bstrWide);
+	return pszAnsi;
+}
+
+char* ANSItoUTF8(char* pszCode)
+{
+	BSTR bstrCode;
+	char* pszUTFCode = NULL;
+	int  nLength, nLength2;
+	nLength = MultiByteToWideChar(CP_ACP, 0, pszCode, strlen(pszCode), NULL, NULL);
+	bstrCode = SysAllocStringLen(NULL, nLength);
+	MultiByteToWideChar(CP_ACP, 0, pszCode, strlen(pszCode), bstrCode, nLength);
+	nLength2 = WideCharToMultiByte(CP_UTF8, 0, bstrCode, -1, pszUTFCode, 0, NULL, NULL);
+	pszUTFCode = new char[nLength2 + 1];
+	ZeroMemory(pszUTFCode, nLength2 + 1);
+	WideCharToMultiByte(CP_UTF8, 0, bstrCode, -1, pszUTFCode, nLength2, NULL, NULL);
+	return pszUTFCode;
 }
 
 CString utf8ToCString(std::string inputtext)
@@ -17481,14 +17522,14 @@ std::string base64_decode(const std::string& in)
 }
 
 
-CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _method, bool _is_https, std::deque<CString>* _headers, CString _body, CString _local_file_path)
+CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _verb, bool _is_https, std::deque<CString>* _headers, CString _body, CString _local_file_path)
 {
 	full_url = _full_url;
 	
 	parse_url(full_url, ip, port, sub_url, _is_https);
 	is_https = _is_https;
 
-	CRequestUrlParams(ip, port, sub_url, _method, is_https, _headers, _body, _local_file_path);
+	CRequestUrlParams(ip, port, sub_url, _verb, is_https, _headers, _body, _local_file_path);
 }
 
 // recreate the combo box by copying styles etc, and list items

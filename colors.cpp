@@ -597,6 +597,19 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			break;
 
+		case color_theme_popup_folder_list:
+			cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+			cr_text_selected = cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+			cr_text_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
+			cr_text_hover = cr_text;
+
+			cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+			cr_back_selected = Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+			cr_back_selected_border = Gdiplus::Color(255, 153, 209, 255);
+			cr_back_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = Gdiplus::Color(255, 195, 222, 245);
+			break;
+
 		default : //case color_theme_default :
 			cur_theme				= color_theme_default;
 			cr_text					= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));

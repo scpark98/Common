@@ -6,6 +6,16 @@
 #include "include/filewritestream.h"
 #include "include/prettywriter.h"
 
+#ifdef UNICODE
+#define CHARSET _T(",ccs=UTF-8")
+#define __function__ __FUNCTIONW__
+#else
+#define CHARSET _T("")
+#define __function__ __FUNCTION__
+#endif
+
+#pragma warning(disable : 4996)	//_CRT_SECURE_NO_WARNINGS
+
 using std::string;
 using rapidjson::Document;
 using rapidjson::FileReadStream;
@@ -26,19 +36,36 @@ bool Json::parse(std::string sstr)
 	return !doc.HasParseError();
 }
 
-bool Json::read(CString input_json)
+bool Json::load(CString input_json)
 {
 	//return read(CT2CA(input_json));
 	//위와 같이 한줄로 표현 안됨.
 
-	std::string sstr = CT2CA(input_json);
-	return read(sstr);
-}
+	//std::string sstr = CT2CA(input_json);
+	//return read(sstr);
 
+	FILE* fp = _tfopen(input_json, _T("rb")CHARSET);
+	if (!fp)
+		return false;
+
+	struct stat stat_buf;
+	stat(CT2A(input_json), &stat_buf);
+	int size = stat_buf.st_size;
+
+	char* readBuffer = new char[size];
+	FileReadStream readStream(fp, readBuffer, size);
+	bool result = !doc.ParseStream(readStream).HasParseError();
+
+	delete[] readBuffer;
+	fclose(fp);
+
+	return result;
+}
+/*
 bool Json::read(std::string input_json)
 {
 	FILE* fp = NULL;
-	errno_t err = ::fopen_s(&fp, input_json.c_str(), "rb");
+	errno_t err = fopen_s(&fp, input_json.c_str(), "rb");
 	if (err) {
 		return false;
 	}
@@ -56,13 +83,23 @@ bool Json::read(std::string input_json)
 
 	return result;
 }
-
-bool Json::write(CString output_json)
+*/
+bool Json::save(CString output_json)
 {
-	std::string sstr = CT2CA(output_json);
-	return write(sstr);
-}
+	FILE* fp = _tfopen(output_json, _T("wb")CHARSET);
+	if (!fp)
+		return false;
 
+	char writeBuffer[10240];
+	FileWriteStream writeStream(fp, writeBuffer, _countof(writeBuffer));
+	PrettyWriter<FileWriteStream> writer(writeStream);
+	doc.Accept(writer);
+
+	fclose(fp);
+
+	return true;
+}
+/*
 bool Json::write(std::string output_json)
 {
 	FILE* fp = NULL;
@@ -81,7 +118,7 @@ bool Json::write(std::string output_json)
 
 	return true;
 }
-
+*/
 void Json::print()
 {
 	CString result;
@@ -206,7 +243,7 @@ void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CStr
 	}
 }
 
-CString Json::get_string(bool pretty)
+CString Json::get_json_string(bool pretty)
 {
 	StringBuffer buffer;
 

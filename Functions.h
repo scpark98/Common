@@ -305,13 +305,13 @@ class CRequestUrlParams
 {
 public:
 	CRequestUrlParams() {}
-	CRequestUrlParams(CString _ip, int _port, CString _sub_url = _T(""), CString _method = _T("GET"), bool _is_https = true, std::deque<CString>*_headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
+	CRequestUrlParams(CString _ip, int _port, CString _sub_url = _T(""), CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>*_headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
 	{
 		ip = _ip;
 		port = _port;
 		sub_url = _sub_url;
 
-		method = _method;
+		verb = _verb;
 		is_https = _is_https;
 		body = _body;
 		local_file_path = _local_file_path;
@@ -327,7 +327,7 @@ public:
 		}
 	}
 
-	CRequestUrlParams(CString _full_url, CString _method = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
+	CRequestUrlParams(CString _full_url, CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
 	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
 	bool		use_thread = false;
@@ -343,7 +343,7 @@ public:
 
 	int			port = 0;
 	CString		sub_url;				//domain을 제외한 나머지 주소
-	CString		method = _T("GET");
+	CString		verb = _T("GET");
 	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
 	bool		is_https = true;
 	CString		body;					//post data(json format)
@@ -732,6 +732,8 @@ struct	NETWORK_INFO
 	CStringA	UTF16toUTF8(const CStringW& utf16);
 	CStringW	UTF8toUTF16(const CStringA& utf8);
 	CString		UTF8toCString(char* pszCode);
+	char*		UTF8toANSI(char* pszCode);
+	char*		ANSItoUTF8(char* pszCode);
 	CString		utf8ToCString(std::string inputtext);
 	std::string	multibyteToUtf8(std::string inputtext);
 	std::string	utf8ToMultibyte(std::string inputtext);
@@ -1090,6 +1092,7 @@ struct	NETWORK_INFO
 	bool		IsAvailableEMail(CString sEMail);
 	CString		get_mac_addres(bool include_colon = true);
 	CString		get_ip_error_string(DWORD error_code);
+	bool		port_is_open(const std::string& address, int port);
 
 //////////////////////////////////////////////////////////////////////////
 //암호화

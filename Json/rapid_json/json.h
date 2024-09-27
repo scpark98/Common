@@ -12,10 +12,35 @@
 
 	#include "../../Common/Json/rapid_json/json.h"
 	...
-	CString src = _T("{\"result\":true,\"user_id\":\"user9\",\"int_value\":12345,\"double_value\":3.141592,\"array\":[\"item1\",\"item2\"]}");
+	//real json data
+	{
+		"result": false,
+		"user_id": "홍길동",
+		"int_value": 12345,
+		"double_value": 3.141592,
+		"person": {
+			"name": "peter",
+			"age": 21,
+			"job": "student"
+		},
+		"array1": [
+			"ar_item0",
+			"ar_item1"
+		]
+	}
+
+	CString src = _T("{\"result\":false,\"user_id\":\"홍길동\",\"int_value\":12345,\"double_value\":3.141592,\"person\": {\"name\":\"peter\",\"age\":21,\"job\":\"student\"},\"array1\":[\"ar_item0\",\"ar_item1\"]}");
 	
 	Json json;
 	json.parse(src);
+
+	//checking a member exists
+	json.doc["asdfsd"]; => assert fail
+	bool is_member = json.doc.HasMember("asdfsd");
+	if (!is_member)
+		TRACE(_T("asdfsd member not found.\n"));
+	else
+		TRACE(_T("asdfsd = %s\n"), json.doc["asdfsd"].GetCString());
 
 	//read bool type
 	bool b = json.doc["result"].GetBool();
@@ -23,10 +48,14 @@
 	//assign bool type
 	json.doc["result"] = false;
 
+	//read objects member
+	TRACE(_T("person : name = %s\n"), json.doc["person"]["name"].GetCString());
+
 	//read array type
-	rapidjson::Value& arr = json.doc["array"];
+	rapidjson::Value& arr = json.doc["array1"];
+	//ASSERT(a.IsArray());
 	for (int i = 0; i < arr.Size(); i++)
-		TRACE(_T("arr[%d] = %s\n"), i, arr[i].GetCString());
+		TRACE(_T("array1[%d] = %s\n"), i, arr[i].GetCString());
 
 */
 
@@ -55,17 +84,35 @@ public:
 	bool		parse(std::string sstr);
 	bool		parse(CString str);
 
-	bool		read(std::string input_json);
-	bool		read(CString input_json);
+	//bool		read(std::string input_json);
+	bool		load(CString input_json);
 
-	bool		write(std::string output_json);
-	bool		write(CString output_json);
+	//bool		write(std::string output_json);
+	bool		save(CString output_json);
 
 	//traverse로 구현된 TRACE 출력.
 	void		print();
 
 	//pretty가 true이면 indent가 적용된 형식으로 리턴.
-	CString		get_string(bool pretty);
+	CString		get_json_string(bool pretty = true);
+
+	//template을 이용해서 요청하는 타입으로 리턴하는 함수 작성 중...
+	//해당 필드가 없을 경우 assert가 발생하는데 이 또한 미리 확인가능하지만 어떻게 처리할지...
+	//CString str = json.read("person");
+	//int num = json.read("person", "age");
+#if 0
+	rapidjson::Value* read(char* members)
+	{
+		return &doc[members];
+		/*
+		//char* member[] = { members... };
+		if (doc[members].IsString())
+			return doc[members].GetCString();
+		else if (doc[members].IsInt())
+			return doc[members].GetInt();
+			*/
+	}
+#endif
 
 	rapidjson::Document doc;
 

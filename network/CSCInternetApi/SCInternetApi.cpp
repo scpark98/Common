@@ -148,7 +148,7 @@ void CSCInternetApi::request_url_api(CRequestUrlParams* params)
 			params->port = 80;
 	}
 
-	params->method.MakeUpper();
+	params->verb.MakeUpper();
 	/*
 	if (!is_one_of(params->method, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
 	{
@@ -212,7 +212,7 @@ void CSCInternetApi::request_url_api(CRequestUrlParams* params)
 	}
 
 	HINTERNET hOpenRequest = HttpOpenRequest(hInternetConnect,
-		params->method,
+		params->verb,
 		params->sub_url,
 		HTTP_VERSION,
 		_T(""),

@@ -219,6 +219,7 @@ public:
 		column_data_type_percentage_grid,
 		//progress는 막대그래프 모양이 아닌 실제 진행상태를 표시하는 ProgressBar에 가깝다.
 		column_data_type_progress,
+		column_data_type_combo,
 	};
 	int			get_column_data_type(int column);
 	void		set_column_data_type(int column, int nType = column_data_type_text, bool invalidate = false);
@@ -226,6 +227,7 @@ public:
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
 	int			add_item(CString text = _T(""), int image_index = -1, bool ensureVisible = true, bool invalidate = true);
+	//default separator = '|'
 	int			add_line_string_item(CString line_string, TCHAR separator = '|', int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, CString text = _T(""), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
@@ -550,6 +552,7 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	afx_msg BOOL OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 };
 
 

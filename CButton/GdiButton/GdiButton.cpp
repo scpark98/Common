@@ -21,15 +21,15 @@ CGdiButton::CGdiButton()
 	//default text and back color
 	//이 기본 색상값은 이미지를 설정하지 않은 경우의 기본값이다.
 	//만약 이미지를 설정한다면 clear()시켜야 한다.
-	m_cr_text.push_back(::GetSysColor(COLOR_BTNTEXT));
-	m_cr_text.push_back(::GetSysColor(COLOR_HIGHLIGHT));
-	m_cr_text.push_back(::GetSysColor(COLOR_HIGHLIGHT));
-	m_cr_text.push_back(::GetSysColor(COLOR_GRAYTEXT));
+	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNTEXT)));
+	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT)));
+	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT)));
+	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT)));
 
-	m_cr_back.push_back(::GetSysColor(COLOR_BTNFACE));
+	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
 	m_cr_back.push_back(get_color(m_cr_back[0], 16));
 	m_cr_back.push_back(get_color(m_cr_back[0], -16));
-	m_cr_back.push_back(::GetSysColor(COLOR_BTNSHADOW));
+	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNSHADOW)));
 
 	m_bAsStatic			= false;
 
@@ -45,7 +45,7 @@ CGdiButton::CGdiButton()
 
 	m_bHasFocus			= false;
 	m_bShowFocusRect	= false;
-	m_crFocusRect		= RGB(6, 205, 255);
+	m_crFocusRect		= gRGB(6, 205, 255);
 	m_nFocusRectWidth	= 2;
 
 	m_b3DRect			= true;
@@ -1368,9 +1368,9 @@ void CGdiButton::set_blink_time(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
 	set_blink(m_blink);
 }
 
-void CGdiButton::set_blink(BOOL bBlink /*= TRUE*/)
+void CGdiButton::set_blink(bool blink /*= TRUE*/)
 {
-	m_blink = bBlink;
+	m_blink = blink;
 	m_blink_status = FALSE;
 
 	if (m_blink)

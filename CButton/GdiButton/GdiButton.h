@@ -227,8 +227,8 @@ public:
 	void		use_3D_rect(bool use) { m_b3DRect = use; Invalidate(); }
 
 	//blink
-	void		set_blink_time( int nTime0 = 400, int nTime1 = 1200 );	//nTime0:hidden, nTime1:shown
-	void		set_blink( BOOL bBlink = TRUE );
+	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown
+	void		set_blink(bool blink = true);
 
 	void		use_tooltip(bool use) { m_use_tooltip = use; }
 	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.

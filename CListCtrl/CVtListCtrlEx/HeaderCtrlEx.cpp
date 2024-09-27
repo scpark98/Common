@@ -17,8 +17,8 @@ static char THIS_FILE[] = __FILE__;
 
 CHeaderCtrlEx::CHeaderCtrlEx()
 {
-	m_cr_back = ::GetSysColor(COLOR_3DFACE);
-	m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
+	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
+	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
 
 	if (gray_value(m_cr_back) < 128)
 		m_cr_separator = get_color(m_cr_back, 32);

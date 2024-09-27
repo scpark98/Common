@@ -53,6 +53,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CVtListCtrlEx::OnLvnItemchanged)
+	ON_WM_CONTEXTMENU()
 END_MESSAGE_MAP()
 
 
@@ -763,10 +764,11 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 	Rect.right = Rect.left + GetColumnWidth(subItem);
 	//Rect.top += 2;
 
-	DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
 	if (subItem == 0)
 	{
-		if (dwExStyle & LVS_EX_CHECKBOXES)
+		//DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
+
+		if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
 			Rect.left += 18;
 
 		if (m_is_shell_listctrl)
@@ -3725,3 +3727,8 @@ void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
 	}
 }
 */
+
+void CVtListCtrlEx::OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+}

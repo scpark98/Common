@@ -41,6 +41,7 @@
 #include "../../Functions.h"
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../GdiplusBitmap.h"
+#include "../../colors.h"
 
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
@@ -84,6 +85,8 @@ public:
 	CSCListBox();
 	virtual ~CSCListBox();
 
+	CSCColorTheme	m_theme = CSCColorTheme(this);
+
 	enum MESSAGES
 	{
 		message_sclistbox_selchanged = 0,
@@ -96,7 +99,8 @@ public:
 	//기본 글자색으로 한 줄 추가
 	int			add(LPCTSTR lpszFormat, ...);
 
-	//지정 글자색으로 한 줄 추가
+	//지정 글자색으로 한 줄 추가.
+	//cr = Gdiplus::Color::Transparent일 경우는 기본 글자색을 사용한다. 이때에는 위의 add()를 사용하면 된다.
 	int			add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
 
 	//마지막 라인의 데이터에 텍스트 append
@@ -154,8 +158,8 @@ public:
 	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
 
 	//색상
-	void		set_text_color(Gdiplus::Color cr) { m_cr_text = cr; Invalidate(); }
-	void		set_back_color(Gdiplus::Color cr) { m_cr_back = cr; Invalidate(); }
+	void		set_text_color(Gdiplus::Color cr) { m_theme.cr_text = cr; Invalidate(); }
+	void		set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; Invalidate(); }
 
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
@@ -174,18 +178,7 @@ public:
 	virtual		CSCListBox&	set_font_size(int nSize);
 	virtual		CSCListBox&	set_font_bold(bool bBold = true);
 
-	//color setting
-	enum SCLISTBOX_COLOR_THEME
-	{
-		color_theme_default = 0,
-		color_theme_explorer,
-		color_theme_popup_folder_list,
-		//color_theme_navy_blue,
-		//color_theme_dark_blue,
-		//color_theme_dark_gray,
-	};
-
-	void		set_color_theme(int theme, bool apply_now = true);
+	void		set_color_theme(int theme);
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
@@ -252,16 +245,6 @@ protected:
 	bool		m_show_date = false;
 	bool		m_show_time = true;
 	bool		m_dim_time_str = true;				//시간 문자열은 연한 회색으로 비강조되도록 표시
-
-	Gdiplus::Color	m_cr_text;						//기본 글자색
-	Gdiplus::Color	m_cr_text_selected;				//선택 항목의 활성화(active) 글자색
-	Gdiplus::Color	m_cr_text_selected_inactive;	//선택 항목의 비활성화(inactive) 글자색
-	Gdiplus::Color	m_cr_text_over;
-	Gdiplus::Color	m_cr_back;						//기본 배경색
-	Gdiplus::Color	m_cr_back_selected;				//선택 항목 배경색
-	Gdiplus::Color	m_cr_back_selected_rect;		//선택 항목 테두리(focus()가 있을 경우에만)
-	Gdiplus::Color	m_cr_back_selected_inactive;
-	Gdiplus::Color	m_cr_back_over;
 
 	LOGFONT		m_lf;
 	CFont		m_font;

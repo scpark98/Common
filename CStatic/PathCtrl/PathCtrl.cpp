@@ -77,7 +77,8 @@ void CPathCtrl::PreSubclassWindow()
 
 	m_list_folder.set_as_folder_list();
 	m_list_folder.set_font(m_lf);
-	m_list_folder.set_color_theme(CSCListBox::color_theme_popup_folder_list);
+	m_list_folder.set_color_theme(CSCColorTheme::color_theme_popup_folder_list);// popup_folder_list);
+
 	//OnNotify, OnSelChange등의 이벤트 핸들러를 추가해봤으나 되지 않아서 선택시에 SendMessage로 처리함.
 	m_list_folder.set_parent(m_hWnd);
 

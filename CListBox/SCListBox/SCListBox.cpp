@@ -48,7 +48,7 @@ CSCListBox::CSCListBox()
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
-	set_color_theme(color_theme_explorer, false);
+	set_color_theme(CSCColorTheme::color_theme_default);
 }	// CSCListBox
 
 //-------------------------------------------------------------------
@@ -205,8 +205,10 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 
 	CString		sText;
-	Gdiplus::Color	cr_text = (Gdiplus::Color)lpDIS->itemData;	// Color information is in item data.
-	Gdiplus::Color	cr_back = m_cr_back;
+	Gdiplus::Color	cr_text;
+	Gdiplus::Color	cr_back = m_theme.cr_back;
+
+	cr_text.SetFromCOLORREF(lpDIS->itemData);	// Color information is in item data.
 
 	CRect		rc;
 	CRect		rect = lpDIS->rcItem;
@@ -259,17 +261,17 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (lpDIS->itemID == m_over_item)
 	{
-		cr_back = m_cr_back_over;
+		cr_back = m_theme.cr_back_hover;
 	}
 	else
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
 		{
-			cr_back = m_cr_back_selected;
+			cr_back = m_theme.cr_back_selected;
 		}
 		else
 		{
-			cr_back = m_cr_back;
+			cr_back = m_theme.cr_back;
 		}
 
 	}
@@ -282,7 +284,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_text_selected;
-		draw_rectangle(&dc, rect, GetFocus() ? m_cr_back_selected_rect : cr_back, cr_back, 1);
+		draw_rectangle(&dc, rect, GetFocus() ? m_theme.cr_back_selected_border : cr_back, cr_back, 1);
 	}
 	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
@@ -291,7 +293,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	else
 	{
 		if (lpDIS->itemID == m_over_item)
-			cr_text = m_cr_text_over;
+			cr_text = m_theme.cr_text_hover;
 	}
 
 	// Get and display item text.
@@ -337,9 +339,9 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		//struct를 새로 선언하고 text color, back color, font property, image index 등을 저장하여 사용할 수 있지만
 		//메모리 동적할당 등 많이 복잡해진다. 우선 임시로 텍스트 색상이 blue면 1번 이미지, red면 2번 이미지를 사용한다.
 		int image_index = 0;
-		if (m_imagelist.size() > 1 && cr_text.ToCOLORREF() == royalblue)
+		if (m_imagelist.size() > 1 && cr_text.GetValue() == Gdiplus::Color::RoyalBlue)
 			image_index = 1;
-		else if (m_imagelist.size() > 2 && cr_text.ToCOLORREF() == red)
+		else if (m_imagelist.size() > 2 && cr_text.GetValue() == Gdiplus::Color::Red)
 			image_index = 2;
 
 		m_imagelist[image_index]->draw(g, rect.left, rect.top + (rect.Height() - m_imagelist[image_index]->height)/2);
@@ -412,7 +414,7 @@ int	CSCListBox::add(LPCTSTR lpszFormat, ...)
 	va_start(args, lpszFormat);
 	new_text.FormatV(lpszFormat, args);
 
-	return add(m_cr_text, new_text);
+	return add(m_theme.cr_text, new_text);
 }
 
 int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
@@ -424,7 +426,7 @@ int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 		return -1;
 
 	if (cr.GetValue() == Gdiplus::Color::Transparent)
-		cr = m_cr_text;
+		cr = m_theme.cr_text;
 
 	//CString으로 변환
 	CString new_text;
@@ -499,7 +501,7 @@ int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	if (index >= 0)
 	{
 		if (cr.GetValue() == Gdiplus::Color::Transparent)
-			SetItemData(index, m_cr_text.ToCOLORREF());
+			SetItemData(index, m_theme.cr_text.ToCOLORREF());
 		else
 			SetItemData(index, cr.ToCOLORREF());
 
@@ -525,7 +527,7 @@ int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 {
 	if (cr.GetValue() == Gdiplus::Color::Transparent)
-		cr = m_cr_text;
+		cr = m_theme.cr_text;
 
 	for (int i = 0; i < lists->size(); i++)
 		add(cr, lists->at(i));
@@ -582,7 +584,7 @@ int CSCListBox::insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb)
 	if (index >= 0)
 	{
 		if (rgb.GetValue() == Gdiplus::Color::Transparent)
-			rgb = m_cr_text;
+			rgb = m_theme.cr_text;
 		SetItemData(index, rgb.ToCOLORREF());
 		RedrawWindow();
 	}
@@ -680,7 +682,7 @@ BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
 	CRect rc;
 	GetClientRect(rc);
-	pDC->FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);
@@ -803,7 +805,7 @@ void CSCListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	//::PostMessage(hWnd, WM_KEYDOWN, (WPARAM)nChar, 0);
 	CListBox::OnKeyDown(nChar, nRepCnt, nFlags);
 }
-
+/*
 void CSCListBox::set_color_theme(int theme, bool apply_now)
 {
 	switch (theme)
@@ -849,7 +851,7 @@ void CSCListBox::set_color_theme(int theme, bool apply_now)
 	if (apply_now)
 		Invalidate();
 }
-
+*/
 
 void CSCListBox::OnKillFocus(CWnd* pNewWnd)
 {
@@ -887,7 +889,7 @@ void CSCListBox::set_as_folder_list()
 	m_as_folder_list = true;
 	m_as_popup = true;
 	m_show_time = false;
-	m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	m_theme.cr_back = ::GetSysColor(COLOR_3DFACE);
 }
 
 int CSCListBox::set_folder_list(std::deque<CString>* lists, CString selected_text)
@@ -1400,4 +1402,14 @@ void CSCListBox::recalc_horizontal_extent(CString added_text)
 	ReleaseDC(pDC);
 
 	SetHorizontalExtent(m_max_horizontal_extent + GetSystemMetrics(SM_CXVSCROLL));
+}
+
+void CSCListBox::set_color_theme(int theme)
+{
+	m_theme.set_color_theme(theme);
+
+	if (!m_hWnd)
+		return;
+
+	Invalidate();
 }

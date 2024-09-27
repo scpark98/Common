@@ -5,9 +5,9 @@
 
 CCriticalSection theCSLog;
 
-SCLog* pLog = NULL;
+CSCLog* pLog = NULL;
 
-SCLog::SCLog()
+CSCLog::CSCLog()
 {
 	pLog = this;
 
@@ -16,7 +16,7 @@ SCLog::SCLog()
 	m_fp = NULL;
 }
 
-SCLog::~SCLog()
+CSCLog::~CSCLog()
 {
 	try
 	{
@@ -28,7 +28,7 @@ SCLog::~SCLog()
 	}
 }
 
-bool SCLog::set(CString log_folder, CString file_title, int show_log_level)
+bool CSCLog::set(CString log_folder, CString file_title, int show_log_level)
 {
 	try
 	{
@@ -105,7 +105,7 @@ bool SCLog::set(CString log_folder, CString file_title, int show_log_level)
 }
 
 
-bool SCLog::release()
+bool CSCLog::release()
 {
 	try
 	{
@@ -122,7 +122,7 @@ bool SCLog::release()
 	}
 }
 
-CString	SCLog::write(LPCTSTR format, ...)
+CString	CSCLog::write(LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -134,7 +134,7 @@ CString	SCLog::write(LPCTSTR format, ...)
 	return write(SCLOG_LEVEL_NONE, _T(""), 0, log_text);
 }
 
-CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
+CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 {
 	CString result = CString();
 
@@ -260,7 +260,7 @@ CString SCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 //usage : sFolder include folder names only except file name.
 //c:\test\00\1.bmp	(x)	=> 1.bmp folder will be created.(not intended)
 //c:\test\00		(o)
-bool SCLog::recursive_make_full_directory(LPCTSTR sFolder)
+bool CSCLog::recursive_make_full_directory(LPCTSTR sFolder)
 {
 	if (PathFileExists(sFolder) && ::PathIsDirectory(sFolder))
 		return true;

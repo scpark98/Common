@@ -50,6 +50,9 @@ class CSCStatic : public CStatic
 public:
 	CSCStatic();
 	~CSCStatic();
+
+	//동적생성시에 사용
+	BOOL		create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID = 0xffff);
 	
 	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void		SetWindowText(CString sText) { set_text(sText); }

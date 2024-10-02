@@ -6327,7 +6327,7 @@ void show_file_property_window(CString fullpath)
 	}
 
 	//그 외에는 폴더 속성창을 열어준다.
-	SHObjectProperties(NULL, SHOP_FILEPATH, fullpath, NULL);
+	SHObjectProperties(NULL, SHOP_FILEPATH, (CStringW)fullpath, NULL);
 	return;
 
 	//ShellExecuteEx를 이용한 방법

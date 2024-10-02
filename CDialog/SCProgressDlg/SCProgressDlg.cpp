@@ -11,6 +11,8 @@ IMPLEMENT_DYNAMIC(CSCProgressDlg, CDialogEx)
 CSCProgressDlg::CSCProgressDlg()
 {
 	memset(&m_lf, 0, sizeof(LOGFONT));
+
+	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 }
 
 CSCProgressDlg::~CSCProgressDlg()
@@ -80,7 +82,8 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 		//m_progress->SetPos(200, true);
 		//m_progress->SetVisible(TRUE);
 
-		bOk = m_static.Create(text, WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE, CRect(rc.left + 20, rc.top + 8, rc.right - 20, bottom_pos - 8), this, 0);
+		bOk = m_static.create(text, WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE, CRect(rc.left + 20, rc.top + 8, rc.right - 20, bottom_pos - 8), this, 0);
+
 		m_static.set_transparent();
 
 		reconstruct_font();
@@ -110,7 +113,7 @@ void CSCProgressDlg::OnPaint()
 	CRect rc;
 
 	GetClientRect(rc);
-	dc.FillSolidRect(rc, m_cr_back);
+	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 }
 
 
@@ -126,16 +129,16 @@ void CSCProgressDlg::set_text(CString text)
 	m_static.set_text(text);
 }
 
-void CSCProgressDlg::set_text_color(COLORREF cr)
+void CSCProgressDlg::set_text_color(Gdiplus::Color cr)
 {
 	m_static.set_text_color(cr);
 	//Invalidate();
 }
 
-void CSCProgressDlg::set_back_color(COLORREF cr)
+void CSCProgressDlg::set_back_color(Gdiplus::Color cr)
 {
 	m_cr_back = cr;
-	m_progress.set_back_color(cr);
+	m_progress.set_back_color(cr.ToCOLORREF());
 	Invalidate();
 }
 

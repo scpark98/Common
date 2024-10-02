@@ -78,6 +78,11 @@ ON_WM_WINDOWPOSCHANGED()
 ON_WM_SIZE()
 END_MESSAGE_MAP()
 
+BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
+{
+	m_text = lpszText;
+	return CStatic::Create(lpszText, dwStyle, rect, pParentWnd, nID);
+}
 
 void CSCStatic::PreSubclassWindow() 
 {
@@ -85,7 +90,9 @@ void CSCStatic::PreSubclassWindow()
 
 	CStatic::PreSubclassWindow();
 
-	CStatic::GetWindowText(m_text);
+	//동적 생성시에는 이미 m_text에 들어가지만 정적 생성시에는 직접 얻어와야 한다.
+	if (m_text.IsEmpty())
+		CStatic::GetWindowText(m_text);
 
 	//modified the style to avoid text overlap when press tab 
 	ModifyStyle(0, BS_ICON);

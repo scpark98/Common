@@ -23,8 +23,8 @@ public:
 
 	bool			create(CWnd* parent, CString text, int left, int top, int right, int bottom);
 	void			set_text(CString text);
-	void			set_text_color(COLORREF cr);
-	void			set_back_color(COLORREF cr);
+	void			set_text_color(Gdiplus::Color cr);
+	void			set_back_color(Gdiplus::Color cr);
 	void			set_font_size(int size);
 	void			set_range(int32_t lower, int32_t upper);
 	void			set_indeterminate(bool indeterminate = true);
@@ -51,7 +51,7 @@ protected:
 	CFont			m_font;
 	void			reconstruct_font();
 
-	COLORREF		m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	Gdiplus::Color	m_cr_back = ::GetSysColor(COLOR_3DFACE);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.

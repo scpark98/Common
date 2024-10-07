@@ -275,3 +275,9 @@ bool CSCLog::recursive_make_full_directory(LPCTSTR sFolder)
 
 	return false;
 }
+
+//현재 로그파일을 열어준다.
+void CSCLog::open_log_file()
+{
+	ShellExecute(NULL, _T("open"), m_log_fullpath, NULL, NULL, SW_SHOWNORMAL);
+}

@@ -142,6 +142,8 @@ void CXListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 	else
 	{
+		long t0 = clock();
+
 		int selChange   = lpDIS->itemAction & ODA_SELECT;
 		int focusChange = lpDIS->itemAction & ODA_FOCUS;
 		int drawEntire  = lpDIS->itemAction & ODA_DRAWENTIRE;
@@ -223,6 +225,7 @@ void CXListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 				if (buf)
 					delete [] buf;
 			}
+
 		}
 
 		if (focusChange || (drawEntire && (lpDIS->itemState & ODS_FOCUS)))

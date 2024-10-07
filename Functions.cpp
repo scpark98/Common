@@ -1171,15 +1171,34 @@ void GetURLFileInfo(CString sURL, bool &bInURL, bool &bFileType)
 	}
 }
 
-int	get_char_count(CString sStr, TCHAR ch)
+int	get_char_count(CString sStr, TCHAR ch, bool stop_at_first_mismatch, bool forward)
 {
-	int	nCount = 0;
+	int	count = 0;
 	
-	for (int i = 0; i < sStr.GetLength(); i++)
-		if (sStr.GetAt(i) == ch)
-			nCount++;
-		
-		return nCount;
+	if (forward)
+	{
+		for (int i = 0; i < sStr.GetLength(); i++)
+		{
+			if (sStr.GetAt(i) == ch)
+				count++;
+			else if (stop_at_first_mismatch)
+				break;
+		}
+
+		return count;
+	}
+	else
+	{
+		for (int i = sStr.GetLength() - 1; i >= 0; i--)
+		{
+			if (sStr.GetAt(i) == ch)
+				count++;
+			else if (stop_at_first_mismatch)
+				break;
+		}
+
+		return count;
+	}
 }
 
 CString	get_mac_address_format(CString src, TCHAR separator)

@@ -801,7 +801,7 @@ struct	NETWORK_INFO
 	//simple json parser. Common/json/rapid_json 추천.
 	CString		json_value(CString json, CString key);
 
-	int			get_char_count(CString sStr, TCHAR ch);
+	int			get_char_count(CString sStr, TCHAR ch, bool stop_at_first_mismatch = false, bool forward = true);
 	CString		get_mac_address_format(CString src, TCHAR separator = ':');
 
 //데이터 변환

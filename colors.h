@@ -67,8 +67,6 @@ public :
 	Gdiplus::Color	cr_text_selected;
 	Gdiplus::Color	cr_text_selected_inactive;
 
-	Gdiplus::Color	cr_selected_border;
-
 	Gdiplus::Color	cr_back;						//BTNFACE	: for CDialog, CButton, CStatic...
 	Gdiplus::Color	cr_back_hover;					//= hover = over = track_select... 다양한 같은 의미가 있으나 hover로 통일하자.
 	Gdiplus::Color	cr_back_dropHilited;
@@ -468,6 +466,7 @@ Gdiplus::Color	gray_color(Gdiplus::Color cr);
 double			color_similarity_distance(COLORREF c1, COLORREF c2);
 COLORREF		get_default_color(int index);
 COLORREF		get_random_color();
+Gdiplus::Color	get_random_gcolor(bool use_alpha = false);
 
 //r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
 void			rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);

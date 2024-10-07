@@ -188,6 +188,19 @@ COLORREF get_random_color()
 	return RGB(r, g, b);
 }
 
+Gdiplus::Color get_random_gcolor(bool use_alpha)
+{
+	int a = 255;
+	int r = random19937(0, 255);
+	int g = random19937(0, 255);
+	int b = random19937(0, 255);
+
+	if (use_alpha)
+		a = random19937(0, 255);
+
+	return Gdiplus::Color(a, r, g, b);
+}
+
 COLORREF get_color(COLORREF crOrigin, int nOffset)
 {
 	int r	= GetRValue(crOrigin) + nOffset;
@@ -552,8 +565,6 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = cr_text_selected;
 			cr_text_dropHilited		= white;
 
-			cr_selected_border		= cr_text_selected;
-
 			cr_back					= Gdiplus::Color(255, 64, 64, 64);
 			cr_back_selected		= get_color(cr_back, -16);
 			cr_back_selected_inactive = cr_back_selected;
@@ -577,8 +588,6 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
 			cr_text_selected_inactive = cr_text_selected;
 			cr_text_dropHilited		= white;
-
-			cr_selected_border		= cr_text_selected;
 
 			cr_back					= Gdiplus::Color(255, 37, 37, 38);
 			cr_back_selected		= Gdiplus::Color(255, 0, 120, 215);
@@ -617,8 +626,6 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
 			cr_text_selected_inactive = cr_text_selected;
 			cr_text_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
-
-			cr_selected_border		= cr_text_selected;
 
 			if (m_parent->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || 

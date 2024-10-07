@@ -200,9 +200,9 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		return; 
 
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
-	CMemoryDC dc(pDC, NULL, true);
+	//CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생.
 
-	Gdiplus::Graphics g(dc.GetSafeHdc());
+	Gdiplus::Graphics g(pDC->GetSafeHdc());
 
 	CString		sText;
 	Gdiplus::Color	cr_text;
@@ -222,14 +222,14 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (m_nGutterCharNumber > 0)
 	{
-		rGutter.right = rGutter.left + dc.GetTextExtent(_T("M")).cx * m_nGutterCharNumber;
+		rGutter.right = rGutter.left + pDC->GetTextExtent(_T("M")).cx * m_nGutterCharNumber;
 		rect.left = rGutter.right;
 		CBrush brush(::GetSysColor(COLOR_3DFACE));
-		dc.FillRect(&rGutter, &brush);
-		dc.SetTextColor(RGB(128, 128, 128));
+		pDC->FillRect(&rGutter, &brush);
+		pDC->SetTextColor(RGB(128, 128, 128));
 		sText.Format(_T("%d"), (int)lpDIS->itemID);
 		rGutter.right -= 4;
-		dc.DrawText(sText, rGutter, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+		pDC->DrawText(sText, rGutter, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
 	}
 
 	//다른 컨트롤에서는 ReconstructFont()안에서 SetFont(&m_font, true);와 같이 글꼴을 적용시키지만
@@ -253,11 +253,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	// If item has focus, draw the focus rect.
 	if ((lpDIS->itemAction & ODA_FOCUS) && (lpDIS->itemState & ODS_FOCUS))
-		dc.DrawFocusRect(&rect); 
+		pDC->DrawFocusRect(&rect);
 
 	//// If item does not have focus, redraw (erase) the focus rect.
 	if ((lpDIS->itemAction & ODA_FOCUS) &&	!(lpDIS->itemState & ODS_FOCUS))
-		dc.DrawFocusRect(&rect);
+		pDC->DrawFocusRect(&rect);
 
 	if (lpDIS->itemID == m_over_item)
 	{
@@ -278,13 +278,13 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	//CBrush brush(cr_back);
 	//dc.FillRect(&rect, &brush);
-	draw_rectangle(&dc, rect, cr_back, cr_back, 1);
+	draw_rectangle(pDC, rect, cr_back, cr_back, 1);
 
 	if (lpDIS->itemState & ODS_SELECTED)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_text_selected;
-		draw_rectangle(&dc, rect, GetFocus() ? m_theme.cr_back_selected_border : cr_back, cr_back, 1);
+		draw_rectangle(pDC, rect, GetFocus() ? m_theme.cr_back_selected_border : cr_back, cr_back, 1);
 	}
 	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
@@ -311,7 +311,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		rect.left += 6;		//left margin
 		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID], m_pShellImageList->get_csidl_map());
-		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(real_path, true),
+		m_pShellImageList->m_imagelist_small.Draw(pDC, m_pShellImageList->GetSystemImageListIcon(real_path, true),
 			CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		rect.left += 16;	//small icon width
 		rect.left += 14;	//margin between icon and text
@@ -323,16 +323,16 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			memcpy(&lf, &m_lf, sizeof(LOGFONT));
 			lf.lfWeight = FW_SEMIBOLD;
 			BOOL bCreated = font_selected.CreateFontIndirect(&lf);
-			pOldFont = dc.SelectObject(&font_selected);
+			pOldFont = pDC->SelectObject(&font_selected);
 		}
 		else
 		{
-			pOldFont = dc.SelectObject(&m_font);
+			pOldFont = pDC->SelectObject(&m_font);
 		}
 	}
 	else if (m_imagelist.size() > 0)
 	{
-		pOldFont = dc.SelectObject(&m_font);
+		pOldFont = pDC->SelectObject(&m_font);
 
 		//scpark 20240313 원래 이미지 인덱스는 각 항목에 저장하는 DWORD를 활용하지만
 		//이 클래스는 그 값을 색상저장용으로 사용하는 클래스로 만들어졌다.
@@ -349,7 +349,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 	else
 	{
-		pOldFont = dc.SelectObject(&m_font);
+		pOldFont = pDC->SelectObject(&m_font);
 	}
 
 	//text 출력 왼쪽 여백
@@ -358,7 +358,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	//rc의 오른쪽 끝 여백 설정
 	rect.right -= 10;
 
-	dc.SetBkMode(TRANSPARENT);
+	pDC->SetBkMode(TRANSPARENT);
 
 	//시간값은 항상 옅은 회색으로만 표시
 	int date_time_length = 0;
@@ -383,9 +383,9 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		//rect.right = sz.cx + tm.tmAveCharWidth;
 
 		if (m_dim_time_str)
-			dc.SetTextColor(RGB(192, 192, 192));
+			pDC->SetTextColor(RGB(192, 192, 192));
 
-		dc.DrawText(time_str, rect, nFormat | DT_NOCLIP);
+		pDC->DrawText(time_str, rect, nFormat | DT_NOCLIP);
 
 		sText = sText.Mid(date_time_length + 1);
 		rect.left = rect.right + 8;
@@ -393,10 +393,10 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 
 	//가로 스크롤시에 뭔가 rect영역이 부족해서 출력되지 않는 현상이 있어서 DT_NOCLIP을 추가함.
-	dc.SetTextColor(cr_text.ToCOLORREF());
-	dc.DrawText(sText, rect, nFormat | DT_NOCLIP);
+	pDC->SetTextColor(cr_text.ToCOLORREF());
+	pDC->DrawText(sText, rect, nFormat | DT_NOCLIP);
 
-	dc.SelectObject(pOldFont);
+	pDC->SelectObject(pOldFont);
 
 	if (m_as_folder_list)
 		font_selected.DeleteObject();
@@ -680,9 +680,9 @@ BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: Add your message handler code here and/or call default
 
 	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
-	CRect rc;
-	GetClientRect(rc);
-	pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+	//CRect rc;
+	//GetClientRect(rc);
+	//pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	return TRUE;
 	return CListBox::OnEraseBkgnd(pDC);

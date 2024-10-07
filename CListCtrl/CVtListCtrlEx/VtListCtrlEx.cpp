@@ -479,14 +479,14 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_is_shell_listctrl && !m_in_editing && (GetFocus() == this))
+	if (false)//m_is_shell_listctrl && !m_in_editing && (GetFocus() == this))
 	{
 		for (int i = 0; i < size(); i++)
 		{
 			if (GetItemState(i, LVIS_SELECTED))
 			{
 				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
-				draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
+				draw_rectangle(pDC, rowRect, m_theme.cr_back_selected_border);
 			}
 		}
 	}

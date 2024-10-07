@@ -23,9 +23,9 @@
 
   CSCLog gLog;
 
-	//만약 로그파일의 경로를 특정하고자 하면 아래와 같이 Init()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
+	//만약 로그파일의 경로를 특정하고자 하면 아래와 같이 set()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
 	//로그파일명 형식은 projectName_yyyymmdd.log
-	gLog.Init(_T("../../custom log folder/folder1/folder2"));
+	gLog.set(_T("../../custom log folder/folder1/folder2"));
 
 	//어떤 프로젝트의 경우에는 함수명이 노출되서는 안되는 경우도 있다. 함수명과 라인번호 표시 유무를 옵션처리.
 	show_function_name(false);
@@ -34,7 +34,8 @@
 	//경로를 별도로 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
 	gLog.write(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
 
-	//gLog.write(_T(""));		//한 줄 빈 라인 추가
+	//간혹 특별한 로그 내용이 없어도 linefeed 또는 함수진입 기록등의 목적으로 "" 또는 " "을 넘김.
+	//gLog.write(_T(""));	//한 줄 빈 라인 추가
 	//gLog.write(_T(" "));	//시간, 함수정보까지만 출력되는 라인 추가
 
 	//SCLOG_LEVEL_WARN 등과 같이 로그레벨을 지정하여 특정 로그들만 기록되게 할 수 있는데 아직 미구현.
@@ -103,6 +104,9 @@ public:
 	bool		release();
 	CString		get_log_full_path() { return m_log_fullpath; }
 	bool		recursive_make_full_directory(LPCTSTR sFolder);
+
+	//현재 로그파일을 열어준다.
+	void		open_log_file();
 
 protected:
 	CTime		m_tlog = CTime::GetCurrentTime();

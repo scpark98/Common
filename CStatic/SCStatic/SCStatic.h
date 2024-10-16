@@ -51,6 +51,8 @@ public:
 	CSCStatic();
 	~CSCStatic();
 
+	//CParagraph
+
 	//동적생성시에 사용
 	BOOL		create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID = 0xffff);
 	

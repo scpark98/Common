@@ -83,6 +83,7 @@ public:
 	{
 		message_selchanged = 0,
 		message_drag_and_drop,
+		message_request_folder_list,	//remote일 경우 OnTvnItemexpanding() 메시지가 발생하면 remote의 폴더목록을 받아서 넣어줘야 한다.
 	};
 
 
@@ -128,9 +129,12 @@ public:
 
 	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local);
 
+	//드라이브 폴더를 다시 읽어들인다.
+	void		refresh();
+
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
 	CString		get_fullpath(HTREEITEM hItem = NULL);
-	void		select_folder(CString fullpath);
+	void		set_path(CString fullpath);
 
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CString driveName);
@@ -142,7 +146,8 @@ public:
 	bool		load_from_string(CString text);
 
 	//HTREEITEM	find_item(const CString& name);
-	HTREEITEM	find_item(const CString& name, HTREEITEM root = NULL);
+	//hItem 위치부터 child, sibling들을 탐색하여 label을 찾는다. 
+	HTREEITEM	find_item(const CString& label, HTREEITEM hItem = NULL);
 	CString		get_selected_item_text(bool include_parent = false);
 
 	//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
@@ -256,7 +261,7 @@ protected:
 	bool			m_use_own_imagelist = false;	//자체 이미지리스트를 쓸 것인지
 	void			create_imagelist();
 
-	HTREEITEM		m_expandItem;			// 마지막으로 확장한 아이템
+	HTREEITEM		m_expanding_item;		// 확장버튼이 눌려진 아이템. 이를 기억해서 remote의 폴더목록을 넣어준다.
 	HTREEITEM		m_desktopItem;			// 바탕화면 아이템
 	HTREEITEM		m_documentItem;			// 문서 아이템
 	HTREEITEM		m_computerItem;			// 내 PC 아이템

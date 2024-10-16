@@ -624,7 +624,7 @@ void CPathCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			if (i != m_index)
 			{
 				m_index = i;
-				TRACE(_T("m_index = %d\n"), m_index);
+				//TRACE(_T("m_index = %d\n"), m_index);
 				Invalidate();
 				if (m_down)
 					show_sub_folder_list(m_down);

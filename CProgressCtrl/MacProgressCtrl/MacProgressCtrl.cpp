@@ -138,7 +138,7 @@ void CMacProgressCtrl::OnPaint()
 	CBrush brLightest(m_cr_track_Lightest);
 	CBrush brColor(m_cr_track);
 	CBrush brBack(m_cr_back);
-	TRACE(_T("%ld : %s\n"), GetTickCount(), __function__);
+	//TRACE(_T("%ld : %s\n"), GetTickCount(), __function__);
 
 	int pos = GetPos();
 

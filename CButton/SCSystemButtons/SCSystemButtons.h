@@ -20,6 +20,7 @@
 #include <afxwin.h>
 #include <deque>
 #include "../../GdiplusBitmap.h"
+#include "../../colors.h"
 
 #define DEFAULT_SYSTEM_BUTTON_WIDTH 44
 
@@ -61,9 +62,9 @@ public:
 	//m_sys_buttons.create(this, rc.right, m_titlebar_height, -1, SC_CLOSE);//종료 버튼만 필요한 경우
 
 	//각 버튼의 크기는 윈도우10과 동일한 값을 기본값을 함.
-	void create(CWnd* parent, int right_end = -1, int width = 44, int height = 32);
+	void create(CWnd* parent, int top = 0, int right = -1, int width = 44, int height = 32);
 
-	template <typename ... Types> void	create(CWnd* parent, int right_end, int width, int height, Types... args)
+	template <typename ... Types> void	create(CWnd* parent, int top, int right, int width, int height, Types... args)
 	{
 		int n = sizeof...(args);
 		int arg[] = { args... };
@@ -76,8 +77,10 @@ public:
 			m_button.resize(n);
 		}
 
-		if (right_end > 0)
-			m_right_end = right_end;
+		m_top = top;
+
+		if (right > 0)
+			m_right = right;
 		if (width > 0)
 			m_button_width = width;
 		if (height > 0)
@@ -87,11 +90,11 @@ public:
 		for (int i = 0; i < m_button.size(); i++)
 		{
 			m_button[i].cmd = arg[i];
-			m_button[i].r = CRect(i * (m_button_width + m_gap), 1, i * (m_button_width + m_gap) + m_button_width, m_button_height - 1);
+			m_button[i].r = CRect(i * (m_button_width + m_gap), 0, i * (m_button_width + m_gap) + m_button_width, m_button_height);
 		}
 
 		Create(_T("CSCSystemButtons"), WS_CHILD,
-			CRect(m_right_end - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap, 0, m_right_end, m_button_height), parent, 0);
+			CRect(m_right - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap, m_top, m_right, m_button_height), parent, 0);
 
 		ShowWindow(SW_SHOW);
 	}
@@ -148,21 +151,20 @@ public:
 	}
 
 	void	resize();
-	void	adjust_right(int right_end);
+	void	adjust(int top, int right);
 
-	enum COLOR_THEME
-	{
-		color_theme_window = 0,
-		color_theme_visualstudio,
-		color_theme_gray,
-	};
+	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void	set_color_theme(int theme);
+	void	set_text_color(Gdiplus::Color cr_text);
+	void	set_back_color(Gdiplus::Color cr_back);
 
 protected:
+
 	std::deque<CSCSystemButtonProperty> m_button;
 	int		m_button_width = 44;
 	int		m_button_height = 32;
-	int		m_right_end;			//버튼 컨트롤의 우측 좌표에 맞춰 n개의 버튼 위치가 결정된다.
+	int		m_top;
+	int		m_right;				//버튼 컨트롤의 우측 좌표에 맞춰 n개의 버튼 위치가 결정된다.
 	int		m_gap = 0;				//버튼 사이 간격
 
 	bool	m_mouse_hover = false;	//마우스가 컨트롤에 들어왔는지
@@ -171,11 +173,6 @@ protected:
 	bool	m_down_state = false;
 
 	int		get_button_index(CPoint pt);
-
-	COLORREF	m_cr_back = ::GetSysColor(COLOR_ACTIVECAPTION);
-	COLORREF	m_cr_over;	//m_cr_back으로 계산
-	COLORREF	m_cr_down;	//m_cr_back으로 계산
-	COLORREF	m_cr_pen;	//그리기 색상
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -187,6 +184,7 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
 	afx_msg void OnMouseLeave();
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };
 
 

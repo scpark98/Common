@@ -220,6 +220,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	//여기서부터의 코드는 맨 마지막 라인으로 스크롤시킬지 말지를 결정.
 	//스크롤 위치가 맨 끝이면 항상 마지막 라인으로 자동 스크롤하고
 	//스크롤 위치가 중간이면 자동 스크롤시키지 않도록 구현하려 했으나 아직 미완성.
+	/*
 	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, page = %d, min = %d, max = %d, sel = %d, %d\n"),
 		m_auto_scroll,
 		si.nPos,
@@ -228,6 +229,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		si.nMin,
 		si.nMax,
 		lMinSel, lMaxSel);
+	*/
 	if (si.nPos != si.nTrackPos)
 		m_auto_scroll = false;
 

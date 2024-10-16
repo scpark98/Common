@@ -484,6 +484,9 @@ struct	NETWORK_INFO
 	HWND		GetWindowHandleFromProcessID(DWORD dwProcId);
 	bool		IsDuplicatedRun();
 
+	int			find_parameter(CString target);
+
+
 	//cmd 명령 실행 후 결과를 문자열로 리턴.
 	//wait_until_process_exit : 실행 프로세스가 정상 종료될때까지 기다린다.
 	//return_after_first_read : wait_until_process_exit를 false로 해도 장시간 끝나지 않는 경우가 있어(ex. telnet)
@@ -737,7 +740,12 @@ struct	NETWORK_INFO
 	CString		utf8ToCString(std::string inputtext);
 	std::string	multibyteToUtf8(std::string inputtext);
 	std::string	utf8ToMultibyte(std::string inputtext);
-
+	std::wstring multibyteToUnicode(std::string inputtext);
+	std::string unicodeToMultibyte(std::wstring inputtext);
+	std::wstring utf8ToUnicode(std::string inputtext);
+	std::string unicodeToUtf8(std::wstring inputtext);
+	std::string multibyteToUtf8(std::string inputtext);
+	std::string utf8ToMultibyte(std::string inputtext);
 
 	std::string	CStringToUtf8(CString inputtext);
 
@@ -1090,6 +1098,7 @@ struct	NETWORK_INFO
 	bool		GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo);
 	bool		CheckInternetIsOnline();
 	bool		IsAvailableEMail(CString sEMail);
+	CString		get_my_ip();
 	CString		get_mac_addres(bool include_colon = true);
 	CString		get_ip_error_string(DWORD error_code);
 	bool		port_is_open(const std::string& address, int port);

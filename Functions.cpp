@@ -3641,6 +3641,47 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 	return result;
 }
 
+CString get_my_ip()
+{
+	char szBuffer[1024];
+
+#ifdef WIN32
+	WSADATA wsaData;
+	WORD wVersionRequested = MAKEWORD(2, 0);
+	if (::WSAStartup(wVersionRequested, &wsaData) != 0)
+		return _T("");
+#endif
+
+
+	if (gethostname(szBuffer, sizeof(szBuffer)) == SOCKET_ERROR)
+	{
+#ifdef WIN32
+		WSACleanup();
+#endif
+		return _T("");
+	}
+
+	struct hostent* host = gethostbyname(szBuffer);
+	if (host == NULL)
+	{
+#ifdef WIN32
+		WSACleanup();
+#endif
+		return _T("");
+	}
+
+	//Obtain the computer's IP
+	TCHAR ip[4];
+	ip[0] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b1;
+	ip[1] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b2;
+	ip[2] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b3;
+	ip[3] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b4;
+
+	CString my_ip;
+	my_ip.Format(_T("%c.%c.%c.%c"), ip[0], ip[1], ip[2], ip[3]);
+	return my_ip;
+}
+
 CString	get_mac_addres(bool include_colon)
 {
 	NETWORK_INFO netInfo;
@@ -5651,6 +5692,10 @@ void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr
 	Gdiplus::SolidBrush br(cr_fill);
 
 	g.FillRectangle(&br, CRect2GpRect(r));
+
+	//DrawRectangle()로 그리면 right, bottom까지 그리는데 영역을 벗어나게 된다.
+	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
+	r.DeflateRect(0, 0, 1, 1);
 	g.DrawRectangle(&pen, CRect2GpRect(r));
 }
 
@@ -9618,73 +9663,6 @@ bool StringArrayCompareAndSwap(CStringArray* pArray, int pos)
 
 	return FALSE;
 }
-/*
-bool GetMemory
-#ifdef _WIN64
-MEMORYSTATUSEX memStatus;
-memStatus.dwLength = sizeof(MEMORYSTATUSEX);
-
-if(!GlobalMemoryStatusEx(&memStatus))
-{
-	m_static_availableMemory.SetWindowText("N/A");
-	m_static_totalMemory.SetWindowText("N/A");
-	m_static_memoryLoad.SetWindowText("N/A");
-}
-else
-{
-	counterString.Format("%5.2f MB", (float)(memStatus.ullAvailPhys / (float)ONE_MEG));
-	m_static_availableMemory.SetWindowText(counterString);
-
-	counterString.Format("%5.2f MB", (float)(memStatus.ullTotalPhys / (float)ONE_MEG));
-	m_static_totalMemory.SetWindowText(counterString);
-
-	counterString.Format("%d%%", memStatus.dwMemoryLoad);
-	m_static_memoryLoad.SetWindowText(counterString);
-}
-#else
-
-MEMORYSTATUSEX memStatus;
-memStatus.dwLength = sizeof(MEMORYSTATUSEX);
-
-HANDLE procHandle = GetCurrentProcess();
-PROCESS_MEMORY_COUNTERS pmc;
-
-if(!GlobalMemoryStatusEx(&memStatus) || !GetProcessMemoryInfo(procHandle, &pmc, sizeof(pmc)))
-{
-	m_static_availableMemory.SetWindowText("N/A");
-	m_static_totalMemory.SetWindowText("N/A");
-	m_static_memoryLoad.SetWindowText("N/A");
-}
-else
-{
-	DWORDLONG availMemory_32bit = 0;
-	DWORDLONG totalMemory_32bit = 0;
-
-	if (memStatus.ullAvailPhys > (TWO_GIG - pmc.WorkingSetSize))
-	{
-		totalMemory_32bit = TWO_GIG;
-		availMemory_32bit = (TWO_GIG - pmc.WorkingSetSize);
-	}
-	else
-	{
-		totalMemory_32bit = (pmc.WorkingSetSize + memStatus.ullAvailPhys);
-		availMemory_32bit = memStatus.ullAvailPhys;
-	}
-
-	counterString.Format("%5.2f MB", (float)(availMemory_32bit)/(float)ONE_MEG);
-	m_static_availableMemory.SetWindowText(counterString);
-
-	counterString.Format("%5.2f MB", (float)(totalMemory_32bit) / (float)ONE_MEG);
-	m_static_totalMemory.SetWindowText(counterString);
-
-	counterString.Format("%3.1f%%",  ((float)(totalMemory_32bit - availMemory_32bit)/(float)totalMemory_32bit) * 100.0);
-	m_static_memoryLoad.SetWindowText(counterString);
-}
-#endif
-}
-*/
-
-
 
 //#include <algorithm>
 /*
@@ -10268,6 +10246,15 @@ bool IsDuplicatedRun()
 		return true;
 
 	return false;
+}
+
+int find_parameter(CString target)
+{
+	for (int i = 1; i < __argc - 1; i++)
+	{
+		if (CString(__targv[i]) == target)
+			return i;
+	}
 }
 
 void Wow64Disable(bool disable)
@@ -13963,8 +13950,8 @@ CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
 	if (info.hbmMask)
 		DeleteObject(info.hbmMask);
 
-	int x = (r.Width() - w + 1) / 2;
-	int y = (r.Height() - h + 1) / 2;
+	int x = r.left + (r.Width() - w + 1) / 2;
+	int y = r.top + (r.Height() - h + 1) / 2;
 
 	::DrawIconEx(pDC->GetSafeHdc(), x, y, hIcon, w, h, 0, NULL, DI_NORMAL);
 
@@ -17802,4 +17789,3 @@ bool get_taskbar_state(UINT state, CSize* sz)
 
 	return false;
 }
-

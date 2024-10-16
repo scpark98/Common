@@ -2615,22 +2615,6 @@ ZRESULT TZip::istore()
 	return ZR_OK;
 }
 
-
-char* ANSItoUTF8(char* pszCode)
-{
-	BSTR bstrCode;
-	char* pszUTFCode = NULL;
-	int  nLength, nLength2;
-	nLength = MultiByteToWideChar(CP_ACP, 0, pszCode, strlen(pszCode), NULL, NULL);
-	bstrCode = SysAllocStringLen(NULL, nLength);
-	MultiByteToWideChar(CP_ACP, 0, pszCode, strlen(pszCode), bstrCode, nLength);
-	nLength2 = WideCharToMultiByte(CP_UTF8, 0, bstrCode, -1, pszUTFCode, 0, NULL, NULL);
-	pszUTFCode = new char[nLength2 + 1];
-	WideCharToMultiByte(CP_UTF8, 0, bstrCode, -1, pszUTFCode, nLength2, NULL, NULL);
-	return pszUTFCode;
-}
-
-
 bool has_seeded = false;
 ZRESULT TZip::Add(const TCHAR* odstzn, void* src, unsigned int len, DWORD flags)
 {

@@ -684,7 +684,7 @@ void CSCMenu::OnPaint()
 
 				//Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
 				//Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
-				Gdiplus::Color gcr_over_stroke = m_theme.cr_back_selected_border;
+				Gdiplus::Color gcr_over_stroke = m_theme.cr_selected_border;
 				Gdiplus::Color gcr_over_fill = m_theme.cr_back_hover;
 
 				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);

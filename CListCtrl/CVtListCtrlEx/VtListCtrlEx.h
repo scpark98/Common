@@ -82,9 +82,9 @@ public :
 class CVtFileInfo
 {
 public:
-	CVtFileInfo(CString _path, uint64_t _size = 0, CString _date = _T(""))
+	CVtFileInfo(CString _path, uint64_t _size = 0, CString _date = _T(""), bool _is_remote = false, bool _is_folder = false)
 	{
-		if (_size == 0)
+		if (!_is_remote && _size == 0)
 		{
 			if (PathIsDirectory(_path))
 				_size = 0;
@@ -92,7 +92,7 @@ public:
 				_size = get_file_size(_path);
 		}
 
-		if (_date.IsEmpty())
+		if (!_is_remote && _date.IsEmpty())
 		{
 			_date = get_datetime_string(GetFileLastModifiedTime(_path), 2, true, _T(" "), false, false);
 		}
@@ -100,13 +100,17 @@ public:
 		path = _path;
 		size = _size;
 		date = _date;
+		is_remote = _is_remote;
+		is_folder = is_folder;
 	}
 
 	//sort의 lamda등에서도 인덱스로 접근하도록 하기 위해 text[3];과 같이 배열로 선언했었으나
 	//3개밖에 되지 않고 명확히 사용하고자 타입에 맞게 선언함
 	CString		path;
-	uint64_t	size;
+	uint64_t	size = 0;
 	CString		date;
+	bool		is_remote = false;
+	bool		is_folder = false;
 };
 
 
@@ -132,6 +136,7 @@ public:
 	{
 		message_progress_pos = 0,
 		message_drag_and_drop,
+		message_path_changed,
 	};
 
 
@@ -144,8 +149,8 @@ public:
 	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
 	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
-	void		set_as_shell_listctrl(bool is_local = true);
-	//list의 index를 주면 fullpath를 리턴한다.
+	void		set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local = true);
+	//list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.
 	CString		get_path(int index = -1);
 	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
@@ -157,6 +162,10 @@ public:
 	//(sort의 경우 폴더/파일 목록을 sort하여 보여줄 뿐 파일목록을 reload하진 않는다)
 	//다른 코드에 의해 이미 m_cur_folders/m_cur_files 가 채워졌다면 reload를 false로 호출한다.
 	void		refresh_list(bool reload = true);
+
+	//m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
+	void		display_list();
+
 
 	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
 	std::deque<CVtFileInfo> m_cur_folders;

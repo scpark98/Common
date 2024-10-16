@@ -479,14 +479,14 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (false)//m_is_shell_listctrl && !m_in_editing && (GetFocus() == this))
+	if (/*m_is_shell_listctrl && */!m_in_editing && (GetFocus() == this))
 	{
 		for (int i = 0; i < size(); i++)
 		{
 			if (GetItemState(i, LVIS_SELECTED))
 			{
 				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
-				draw_rectangle(pDC, rowRect, m_theme.cr_back_selected_border);
+				draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
 			}
 		}
 	}
@@ -1216,7 +1216,44 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: Add your specialized code here and/or call the base class
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	if (pMsg->message == WM_MOUSEWHEEL && m_in_editing)
+
+	//마우스 back button up
+	if (pMsg->message == WM_XBUTTONUP)
+	{
+		if (m_in_editing)
+		{
+			edit_end(false);
+			return true;
+		}
+
+		if (m_is_shell_listctrl)
+		{
+			CString path = get_path();
+			CString thisPC = m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES);
+
+			if (path == thisPC)
+				return true;
+
+			//드라이브라면 내 컴퓨터로 back (path = "C:", go to ThisPC)
+			if (path.GetLength() == 2 && path[1] == ':')
+			{
+				path = thisPC;
+			}
+			//일반 폴더라면 상위폴더로 이동
+			else
+			{
+				path = GetParentDirectory(path);
+			}
+
+			if (m_is_shell_listctrl_local)
+				set_path(path);
+
+			//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
+			//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&path);
+		}
+	}
+	else if (pMsg->message == WM_MOUSEWHEEL && m_in_editing)
 	{
 		return true;
 
@@ -2985,11 +3022,15 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }
 
-void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
+void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local)
 {
 	m_is_shell_listctrl = true;
 	m_is_shell_listctrl_local = is_local;
 	m_use_own_imagelist = true;
+
+	m_pShellImageList = pShellImageList;
+	//이 설정을 해줘야 다른 클래스에서 CListCtrl* 타입으로도 GetImageList()를 통해 참조할 수 있다.
+	SetImageList(m_pShellImageList->get_imagelist(), LVSIL_SMALL);
 
 	if (GetUserDefaultUILanguage() == 1042)
 		set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
@@ -3011,14 +3052,7 @@ void CVtListCtrlEx::set_as_shell_listctrl(bool is_local)
 	allow_edit_column(col_filedate, false);
 }
 
-void CVtListCtrlEx::set_shell_imagelist(CShellImageList* pShellImageList)
-{
-	m_pShellImageList = pShellImageList;
-	//이 설정을 해줘야 다른 클래스에서 CListCtrl* 타입으로도 GetImageList()를 통해 참조할 수 있다.
-	SetImageList(m_pShellImageList->get_imagelist(), LVSIL_SMALL);
-}
-
-//list의 index를 주면 fullpath를 리턴한다.
+//list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.
 CString CVtListCtrlEx::get_path(int index)
 {
 	if (index < 0)
@@ -3101,8 +3135,15 @@ void CVtListCtrlEx::refresh_list(bool reload)
 				m_cur_files.push_back(CVtFileInfo(sfile));
 			}
 		}
-	}
 
+		display_list();
+	}
+}
+
+//m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
+void CVtListCtrlEx::display_list()
+{
+	int i;
 	int index;
 	int insert_index = -1;
 	int img_idx = -1;
@@ -3126,20 +3167,24 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	//asc는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		img_idx = m_pShellImageList->GetSystemImageListIcon(m_cur_folders[i].path, true);
+		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].path, m_pShellImageList->get_csidl_map());
+
+		if (m_is_shell_listctrl_local)
+			img_idx = m_pShellImageList->GetSystemImageListIcon(real_path, true);
+		else
+			img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);
+
 		index = insert_item(insert_index, get_part(m_cur_folders[i].path, fn_name), img_idx, false, false);
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
-			CString drive = convert_special_folder_to_real_path(m_cur_folders[i].path, m_pShellImageList->get_csidl_map());
-			
-			uint64_t disk_size = get_disk_free_size(drive);
+			uint64_t disk_size = get_disk_free_size(real_path);
 			if (disk_size > 0)
 				set_text(index, col_filesize, get_size_string(disk_size, 3, 1));
 
-			disk_size = get_disk_total_size(drive);
+			disk_size = get_disk_total_size(real_path);
 			if (disk_size > 0)
-				set_text(index, col_filedate, get_size_string(get_disk_total_size(drive), 3, 1));
+				set_text(index, col_filedate, get_size_string(get_disk_total_size(real_path), 3, 1));
 
 			set_text_color(index, col_filesize, RGB(109, 109, 109));
 			set_text_color(index, col_filedate, RGB(109, 109, 109));
@@ -3175,11 +3220,11 @@ void CVtListCtrlEx::add_file(CString path, uint64_t size, CString date, bool is_
 
 	if (file_is_folder)
 	{
-		m_cur_folders.push_back(CVtFileInfo(path, size, date));
+		m_cur_folders.push_back(CVtFileInfo(path, size, date, is_remote, is_folder));
 	}
 	else
 	{
-		m_cur_files.push_back(CVtFileInfo(path, size, date));
+		m_cur_files.push_back(CVtFileInfo(path, size, date, is_remote, is_folder));
 	}
 }
 

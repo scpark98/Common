@@ -440,6 +440,12 @@ void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
 	CString text;
 
 	text.FormatV(format, args);
+
+	if (crTextColor.GetValue() == (DWORD)-1)
+	{
+		crTextColor = m_cr_text;
+	}
+
 	set_text(text, crTextColor);
 }
 

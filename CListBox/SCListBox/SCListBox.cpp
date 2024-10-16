@@ -284,7 +284,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_text_selected;
-		draw_rectangle(pDC, rect, GetFocus() ? m_theme.cr_back_selected_border : cr_back, cr_back, 1);
+		draw_rectangle(pDC, rect, GetFocus() ? m_theme.cr_selected_border : cr_back, cr_back, 1);
 	}
 	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{

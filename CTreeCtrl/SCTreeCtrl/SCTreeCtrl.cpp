@@ -612,30 +612,32 @@ void CSCTreeCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local)
 {
-	DeleteAllItems();
-	//m_folder_list.clear();
-
 	m_is_shell_treectrl = true;
 	m_is_shell_treectrl_local = is_local;
 	m_use_own_imagelist = true;
 	m_image_size = 16;
 	m_pShellImageList = pShellImageList;
 
-	SetImageList(m_pShellImageList->get_imagelist(true), TVSIL_NORMAL);
+	if (GetImageList(TVSIL_NORMAL) == NULL)
+		SetImageList(m_pShellImageList->get_imagelist(true), TVSIL_NORMAL);
+
+	refresh();
+}
+
+//드라이브 폴더를 다시 읽어들인다.
+void CSCTreeCtrl::refresh()
+{
+	DeleteAllItems();
+
 	m_desktopItem = insert_special_folder(CSIDL_DESKTOP);
 	m_documentItem = insert_special_folder(CSIDL_MYDOCUMENTS);
 	m_computerItem = insert_special_folder(CSIDL_DRIVES);
 
-	for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
-		insert_drive(it->second);
-
-	//std::thread t(&CSCTreeCtrl::thread_insert_folders, this, GetRootItem());
-	//t.detach();
-
-	//m_folder_list = iterate_tree_with_no_recursion();
-
-	//for test
-	//expand_all();
+	if (m_is_shell_treectrl_local)
+	{
+		for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
+			insert_drive(it->second);
+	}
 }
 
 void CSCTreeCtrl::thread_insert_folders(HTREEITEM hItem)
@@ -735,9 +737,6 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 			curFolder = FileFind.GetFileName();
 			TV_INSERTSTRUCT tvItem;
 			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-			//tvItem.item.mask |= TVIF_STATE;
-			//tvItem.item.stateMask |= TVIS_OVERLAYMASK;
-			//tvItem.item.state |= INDEXTOOVERLAYMASK(0);
 			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
 			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
 			tvItem.hInsertAfter = TVI_LAST;
@@ -752,7 +751,25 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData)
 {
+	TV_INSERTSTRUCT tvItem;
+	tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+	tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
+	tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
+	tvItem.hInsertAfter = TVI_LAST;
+	tvItem.hParent = m_expanding_item;
+	tvItem.item.pszText = pFindFileData->cFileName;
 
+	//하위 폴더가 있을때만 확장버튼이 표시되도록.
+	//remote일 경우는 일단 true로 세팅한다.
+	if (m_is_shell_treectrl)
+	{
+		if (m_is_shell_treectrl_local)
+			tvItem.item.cChildren = get_sub_folders(get_fullpath(m_expanding_item) + _T("\\") + pFindFileData->cFileName);
+		else
+			tvItem.item.cChildren = true;
+	}
+
+	HTREEITEM hItem = InsertItem(&tvItem);
 }
 /*
 HTREEITEM CSCTreeCtrl::find_item(const CString& name)
@@ -770,8 +787,45 @@ HTREEITEM CSCTreeCtrl::find_item(const CString& name)
 	return NULL;
 }
 */
-HTREEITEM CSCTreeCtrl::find_item(const CString& name, HTREEITEM root)
+
+//item위치부터 child, sibling들을 탐색하여 label을 찾는다. 
+HTREEITEM CSCTreeCtrl::find_item(const CString& label, HTREEITEM hItem)
 {
+	CString cur_label;
+
+	if (hItem)
+	{
+		cur_label = GetItemText(hItem);
+		TRACE(_T("%s\n"), cur_label);
+		if (cur_label == label)
+			return hItem;
+
+		hItem = GetNextItem(hItem, TVGN_CHILD);
+		while (hItem)
+		{
+			HTREEITEM hFound = find_item(label, hItem);
+			if (hFound)
+				return hFound;
+
+			hItem = GetNextItem(hItem, TVGN_NEXT);
+		}
+	}
+	else
+	{
+		HTREEITEM hItem = GetNextItem(NULL, TVGN_ROOT);
+		while (hItem)
+		{
+			HTREEITEM hFound = find_item(label, hItem);
+			if (hFound)
+				return hFound;
+
+			hItem = GetNextItem(hItem, TVGN_NEXT);
+		}
+	}
+
+	// return NULL if nothing was found
+	return NULL;
+	/*
 	if (root == NULL)
 		root = GetRootItem();
 
@@ -780,18 +834,25 @@ HTREEITEM CSCTreeCtrl::find_item(const CString& name, HTREEITEM root)
 	if (text == name)
 		return root;
 
-	HTREEITEM child = GetChildItem(root);
+	HTREEITEM next_item = GetChildItem(root);
 
-	while (child)
+	while (true)
 	{
-		HTREEITEM item = find_item(name, child);
-		if (item)
-			return item;
-
-		child = GetNextSiblingItem(child);
+		//child가 있으면 child부터 탐색하기 위한 recursive call을, 없다면 sibling을 검사한다.
+		if (next_item)
+		{
+			HTREEITEM item = find_item(name, next_item);
+			if (item)
+				return item;
+		}
+		else
+		{
+			next_item = GetNextSiblingItem(next_item);
+		}
 	}
 
 	return NULL;
+	*/
 }
 
 CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
@@ -832,16 +893,25 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	TRACE(_T("%s\n"), __function__);
-	HTREEITEM hItem = pNMTreeView->itemNew.hItem;
+	//TRACE(_T("%s\n"), __function__);
+	m_expanding_item = pNMTreeView->itemNew.hItem;
+
 	if (m_is_shell_treectrl)
 	{
 		//만약 child가 없다면 아직 로딩되지 않은 노드이므로 검색해서 추가한다.
 		//물론 실제 child가 없는 폴더일수도 있다.
-		if (GetChildItem(hItem) == NULL)
-			insert_folder(hItem, get_fullpath(hItem));
-
-		//m_folder_list = iterate_tree_with_no_recursion();
+		if (GetChildItem(m_expanding_item) == NULL)
+		{
+			if (m_is_shell_treectrl_local)
+			{
+				insert_folder(m_expanding_item, get_fullpath(m_expanding_item));
+			}
+			else
+			{
+				//remote라면 요청해서 넣어야 한다.
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_fullpath(m_expanding_item));
+			}
+		}
 	}
 
 	*pResult = 0;
@@ -872,8 +942,8 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	CRect r;
 	GetItemRect(hCurItem, r, TRUE);
 
-	TRACE(_T("cur = %ld, last = %ld, m_last_clicked_item = %p, hCurItem = %p, hDispItem = %p\n"),
-		t0, m_last_clicked_time, m_last_clicked_item, hCurItem, hDispItem);
+	//TRACE(_T("cur = %ld, last = %ld, m_last_clicked_item = %p, hCurItem = %p, hDispItem = %p\n"),
+	//	t0, m_last_clicked_time, m_last_clicked_item, hCurItem, hDispItem);
 
 	if (r.PtInRect(pt))
 	{
@@ -881,19 +951,19 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 		{
 			if (hCurItem == m_last_clicked_item)
 			{
-				TRACE(_T("edit start\n"));
+				//TRACE(_T("edit start\n"));
 				edit_item();
 			}
 			else
 			{
-				TRACE(_T("diff item\n"));
+				//TRACE(_T("diff item\n"));
 				m_last_clicked_time = t0;
 				m_last_clicked_item = hCurItem;
 			}
 		}
 		else
 		{
-			TRACE(_T("time over\n"));
+			//TRACE(_T("time over\n"));
 			m_last_clicked_time = t0;
 			m_last_clicked_item = hCurItem;
 		}
@@ -902,7 +972,7 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		m_last_clicked_time = 0;
 		m_last_clicked_item = NULL;
-		TRACE(_T("m_last_clicked_time = %ld\n"), m_last_clicked_time);
+		//TRACE(_T("m_last_clicked_time = %ld\n"), m_last_clicked_time);
 	}
 
 	/*
@@ -973,7 +1043,6 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 	while (hItem)
 	{
 		folder = GetItemText(hItem);
-		//AfxMessageBox(folder);
 		fullpath = folder + _T("\\") + fullpath;
 
 		if (folder.Right(2) == _T(":)"))
@@ -987,13 +1056,13 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 	return convert_special_folder_to_real_path(fullpath, m_pShellImageList->get_csidl_map());
 }
 
-void CSCTreeCtrl::select_folder(CString fullpath)
+void CSCTreeCtrl::set_path(CString fullpath)
 {
 	fullpath = m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath);
 	//AfxMessageBox(fullpath);
 
 	std::deque<CString> dq;
-	get_token_string(fullpath, dq, '\\');
+	get_token_string(fullpath, dq, '\\', false);
 
 	HTREEITEM item = NULL;
 
@@ -1667,8 +1736,8 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		}
 
 		//ListCtrl에서 drag하여 drophilited가 표시된 상태에서 빠르게 마우스를 밖으로 이동시키면
-	//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
-	//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜준다.
+		//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
+		//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜준다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
 	}
 	else
@@ -2564,13 +2633,13 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
-				TRACE(_T("CDIS_SELECTED\n"));
+				//TRACE(_T("CDIS_SELECTED\n"));
 				crText = m_theme.cr_text_selected;
 				crBack = m_theme.cr_back_selected;
 			}
 			else if (pNMCustomDraw->uItemState & CDIS_HOT)
 			{
-				TRACE(_T("CDIS_HOT\n"));
+				//TRACE(_T("CDIS_HOT\n"));
 				//crText = m_cr_text_selected;
 				crBack = m_theme.cr_back_hover;
 			}
@@ -2580,7 +2649,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//drop을 위해 폴더위에 머무를 경우 해당 폴더가 expand가 아니면 expand시켜준다.
 				SetTimer(timer_expand_for_drop, 1000, NULL);
 
-				TRACE(_T("CDIS_DROPHILITED\n"));
+				//TRACE(_T("CDIS_DROPHILITED\n"));
 				crText = m_theme.cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
 				crBack = m_theme.cr_back_dropHilited;
 			}
@@ -2591,13 +2660,21 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//	crBack = m_cr_back_selected;
 			//}
 
-			dc.SetTextColor(crText.ToCOLORREF());
-			dc.FillSolidRect(&rcItem, crBack.ToCOLORREF());
+			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			{
+				//TRACE(_T("CDIS_SELECTED\n"));
+				draw_rectangle(&dc, rcItem, m_theme.cr_selected_border, crBack);
+			}
+			else
+			{
+				dc.FillSolidRect(&rcItem, crBack.ToCOLORREF());
+			}
 
 			if (pNMCustomDraw->uItemState & CDIS_FOCUS)
 			{
-				TRACE(_T("CDIS_FOCUS\n"));
+				//TRACE(_T("CDIS_FOCUS\n"));
 				//draw_rectangle(&dc, rcItem, m_cr_selected_border);
+				//dc.DrawFocusRect(rcItem);
 			}
 
 			/*
@@ -2624,6 +2701,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//rText.OffsetRect(m_image_size, 0);
 			//rText.right = rText.left + szText.cx;
 			dc.SetBkMode(TRANSPARENT);
+			dc.SetTextColor(crText.ToCOLORREF());
 			dc.DrawText(GetItemText(hItem), &rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
 			//dc.DrawText(GetItemText(hItem), &rcItem, DT_LEFT | DT_VCENTER | DT_SINGLELINE);

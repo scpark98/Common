@@ -45,7 +45,9 @@ public:
 
 // 귽깛긵깏긽깛긡?긘깈깛
 public:
+	//CS_VERT이고 AddToBottomOrRightCtrls()로 추가할 때 SPF_LEFT만 주면 그 컨트롤은 width를 유지한 채 splitter에 붙어 이동한다.
 	void AddToBottomOrRightCtrls(UINT nCtrlId, WORD nFlags = SPF_TOP|SPF_LEFT|SPF_RIGHT|SPF_BOTTOM);
+
 	void AddToTopOrLeftCtrls(UINT nCtrlId, WORD nFlags = SPF_TOP|SPF_LEFT|SPF_BOTTOM|SPF_RIGHT);
 	void SetType(UINT nType);
 	virtual ~CControlSplitter();

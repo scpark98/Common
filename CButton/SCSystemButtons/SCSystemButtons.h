@@ -155,8 +155,8 @@ public:
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void	set_color_theme(int theme);
-	void	set_text_color(Gdiplus::Color cr_text);
-	void	set_back_color(Gdiplus::Color cr_back);
+	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
+	void	set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; }
 
 protected:
 

@@ -820,7 +820,7 @@ void CPathCtrl::recalc_path_position()
 		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가
 		//remote인 경우는 하위 폴더목록을 request해서 받기 전까지는 구할 수 없다.
 		//하지만 m_path.size() - 1보다 하위의 폴더라면 이미 하위폴더가 있다는 뜻이므로 우선 이렇게 처리한다.
-		bool has_sub = get_sub_folders(get_full_path(i));
+		bool has_sub = (m_is_local_device ? get_sub_folders(get_full_path(i)) : true);
 		rt.right += (has_sub || (i < m_path.size() - 1) ? m_arrow_area_width : 0);
 
 		rt.top = rc.top;

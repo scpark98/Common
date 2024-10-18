@@ -603,7 +603,8 @@ CString	get_exe_directory(bool includeSlash)
 {
 	TCHAR	sFilePath[1024];
 	
-	GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
+	//GetModuleFileName(AfxGetInstanceHandle(), sFilePath, MAX_PATH);
+	GetModuleFileName(NULL, sFilePath, MAX_PATH);
 	
 	CString exe_directory = get_part(sFilePath, fn_folder);
 	if (includeSlash && exe_directory.Right(1) != _T("\\"))
@@ -880,6 +881,20 @@ uint64_t get_file_size(CString sfile)
 	}
 	
 	return 0;
+}
+
+bool get_file_size(CString path, ULARGE_INTEGER* ulFileSize)
+{
+	HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (hFile == INVALID_HANDLE_VALUE)
+		return false;
+
+	ulFileSize->LowPart = ::GetFileSize(hFile, &(ulFileSize->HighPart));
+
+	CloseHandle(hFile);
+
+	return true;
 }
 
 uint64_t get_folder_size(CString path)
@@ -3678,7 +3693,7 @@ CString get_my_ip()
 	ip[3] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b4;
 
 	CString my_ip;
-	my_ip.Format(_T("%c.%c.%c.%c"), ip[0], ip[1], ip[2], ip[3]);
+	my_ip.Format(_T("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
 	return my_ip;
 }
 
@@ -4481,7 +4496,7 @@ void sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString
 }
 
 void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFilter, CString sExtFilter,
-				  bool bRecursive, CString sExceptStr, bool auto_sort)
+				  bool bRecursive, bool include_folder, CString sExceptStr, bool auto_sort)
 {
 	int				i;
 	CTime			tTime;
@@ -4551,58 +4566,39 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 		
 		if (finder.IsDots())
 			continue;
-		else if (finder.IsDirectory())
+
+		//검색 대상인 확장자 파일인지 검사한다.
+		bool ext_matched = false;
+
+		if (dqExtFilter.size() == 0 || find_index(dqExtFilter, get_part(sFilename, fn_ext).MakeLower()) >= 0)
+			ext_matched = true;
+
+		//제외할 문자열이 포함되어 있지 않은 파일들만 리스트에 추가한다.
+		bool excepted = false;
+
+		for (i = 0; i < dqExcepts.size(); i++)
+		{
+			if (sFilename.Find(dqExcepts[i]) >= 0)
+			{
+				excepted = true;
+				break;
+			}
+		}
+
+		if (finder.IsDirectory())
 		{
 			if (bRecursive)
-				FindAllFiles(sfile, dqFiles, sNameFilter, sExtFilter, bRecursive, sExceptStr, auto_sort);
+				FindAllFiles(sfile, dqFiles, sNameFilter, sExtFilter, bRecursive, include_folder, sExceptStr, auto_sort);
+			else if (include_folder)
+			{
+				dqFiles->push_back(sfile);
+			}
 		}
 		else
 		{
-			//sFilter에 해당하는 파일만을 검색 대상으로 한다.
-			bool bFound = false;
-
-			if (dqExtFilter.size() == 0)
+			if (ext_matched && !excepted)
 			{
-				bFound = true;
-			}
-			else
-			{
-				//예를들어 확장자 목록에 jpg가 있는데 파일명 중간에서 jpg가 발견되면 문제가 된다.
-				if (find_index(dqExtFilter, get_part(sFilename, fn_ext).MakeLower()) >= 0)
-					bFound = true;
-				/*
-				for (i = 0; i < dqExtFilter.size(); i++)
-				{
-					//if (PathMatchSpec(sFilename, arExtFilter.GetAt(i)))
-					CString sExt = GetFileExtensionFromFilename(sFilename);
-					if (sExt == dqExtFilter[i])
-					{
-						bFound = true;
-						break;
-					}
-				}*/
-			}
-
-			//if (arFilter.GetCount() == 1 && (arFilter.GetAt(0) == "*" || arFilter.GetAt(0) == "*.*"))
-
-			if (bFound)
-			{
-				//제외할 문자열이 포함되어 있지 않은 파일들만 리스트에 추가한다.
-				bool bExcept = false;
-
-				for (i = 0; i < dqExcepts.size(); i++)
-				{
-					if (sFilename.Find(dqExcepts[i]) >= 0)
-					{
-						bExcept = true;
-						break;
-					}
-				}
-
-				if (!bExcept)
-				{
-					dqFiles->push_back(sfile);
-				}
+				dqFiles->push_back(sfile);
 			}
 		}
 	}
@@ -4614,6 +4610,39 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 		sort_like_explorer(dqFiles);
 //#endif
 	}
+}
+
+
+void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter, bool include_folder)
+{
+	HANDLE hFind;
+	WIN32_FIND_DATA data;
+
+	dq->clear();
+
+	if (filter.IsEmpty())
+		filter = _T("*");
+
+	hFind = FindFirstFile(folder + _T("\\") + filter, &data);
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		FindClose(hFind);
+		return;
+	}
+
+	do
+	{
+		if (!include_folder && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		{
+
+		}
+		else
+		{
+			dq->push_back(data);
+		}
+	} while (FindNextFile(hFind, &data));
+
+	FindClose(hFind);
 }
 
 //list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
@@ -5181,7 +5210,7 @@ bool read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8)
 int	delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive /*= true*/, bool trash_can /*= false*/)
 {
 	std::deque<CString> files;
-	FindAllFiles(folder, &files, name_filter, ext_filter, recursive);
+	FindAllFiles(folder, &files, name_filter, ext_filter, recursive, false);
 
 	if (files.size() == 0)
 		return 0;
@@ -5691,7 +5720,8 @@ void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
 
-	g.FillRectangle(&br, CRect2GpRect(r));
+	if (cr_fill.GetValue() != Gdiplus::Color::Transparent)
+		g.FillRectangle(&br, CRect2GpRect(r));
 
 	//DrawRectangle()로 그리면 right, bottom까지 그리는데 영역을 벗어나게 된다.
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
@@ -6505,7 +6535,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 	else
 		names.Format(_T("%s*"), oldName);
 
-	FindAllFiles(folder, &files, names, _T("*"), bRecursive, _T(""), false);
+	FindAllFiles(folder, &files, names, _T("*"), bRecursive, false, _T(""), false);
 
 	for (int i = 0; i < files.size(); i++)
 	{

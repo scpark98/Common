@@ -929,7 +929,10 @@ struct	NETWORK_INFO
 	std::deque<CString>		get_filelist_from_filetitle(CString filename, CString extension);
 
 	uint64_t	get_file_size(CString sfile);
+	bool		get_file_size(CString path, ULARGE_INTEGER* ulFileSize);
+
 	uint64_t	get_folder_size(CString path);
+
 	//unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
 	//unit_string	: 단위를 표시할 지 (default = true)
 	//폴더인 경우는 ""를 리턴함.
@@ -941,6 +944,7 @@ struct	NETWORK_INFO
 	CString		GetMostRecentFile(CString sFolder, CString sWildCard = _T("*.*"), int nReturnType = 1);
 	CString		GetMostRecentDateFile(CString sFolder, CString sWildCard = _T("*.*"));	//가장 최근 날짜 파일명 리턴
 	CString		GetFileProperty(CString sFilePath, CString sProperty);
+
 
 	//확인 필요
 	//CString		set_file_property(CString sFilePath, CString sProperty, CString value);
@@ -1024,9 +1028,13 @@ struct	NETWORK_INFO
 	//sExceptStr = "test;temp;error" 와 같이 세미콜론으로 구분하여 검색 제외할 파일명 지정 가능.
 	//주의! dqFiles는 이 함수에 의해 초기화되지 않으므로 필요한 경우 초기화하여 호출할 것!
 	//bRecursive이면 하위 폴더들 내의 모든 파일들도 검색한다. 폴더 자체는 리스트에 포함되지 않는다.
-	void		FindAllFiles(	CString sFolder, std::deque<CString> *dqFiles,
-								CString sNameFilter = _T("*"), CString sExtFilter = _T("*"),
-								bool bRecursive = false, CString sExceptStr = _T(""),
+	void		FindAllFiles(	CString sFolder,
+								std::deque<CString> *dqFiles,
+								CString sNameFilter = _T("*"),
+								CString sExtFilter = _T("*"),
+								bool bRecursive = false,
+								bool include_folder = false,
+								CString sExceptStr = _T(""),
 								bool auto_sort = true);
 	//stdc++17의 std::filesystem을 이용한 함수로서
 	//FindAllFiles가 recursive function에다가 옵션이 많다고는 해도
@@ -1038,6 +1046,9 @@ struct	NETWORK_INFO
 #if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
 	std::deque<CString>	find_all_files(CString path, CString name_filter = _T(""), CString ext_filters = _T(""), CString except_str = _T(""), bool recursive = true, bool auto_sort = true);
 #endif
+
+	void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter = _T("*"), bool include_folder = false);
+
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
 	//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
 	//include_files가 true이면 파일도 포함된다.

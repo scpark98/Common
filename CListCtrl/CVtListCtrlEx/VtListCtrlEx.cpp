@@ -413,47 +413,19 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
 
-			if (iSubItem == 0 && m_is_shell_listctrl)
+			//아이콘 표시
+			if (iSubItem == 0 && (m_is_shell_listctrl || m_use_own_imagelist))
 			{
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
 				textRect.left += 3;
 				CString text = get_text(iItem, iSubItem);
-				CString real_path = convert_special_folder_to_real_path(m_path + _T("\\") + get_text(iItem, iSubItem),
-																		m_pShellImageList->get_csidl_map());
 				int icon_index;
 
-				if (m_is_shell_listctrl)
+				if (m_list_db[iItem].img_idx >= 0 && (m_list_db[iItem].img_idx < m_pShellImageList->m_imagelist_small.GetImageCount()))
 				{
 					icon_index = m_list_db[iItem].img_idx;
-					/*
-					if (get_text(iItem, col_filesize).IsEmpty())
-					{
-						real_path = _T("c:\\Windows");
-						icon_index = m_pShellImageList->GetSystemImageListIcon(real_path, true);
-					}
-					else
-					{
-						icon_index = m_pShellImageList->GetSystemImageListIcon(real_path, false);
-					}
-					*/
-
-					//if (icon_index > 0)
-					{
-						m_pShellImageList->m_imagelist_small.Draw(pDC, icon_index,
+					m_pShellImageList->m_imagelist_small.Draw(pDC, icon_index,
 							CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
-					}
-					/*
-					if (m_shell_list_local)
-					{
-						m_imagelist_small.Draw(pDC, icon_index, false),
-							CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
-					}
-					else
-					{
-						m_imagelist_small.Draw(pDC, icon_index,
-							CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
-					}
-					*/
 				}
 
 				textRect.left += 16;	//small icon width
@@ -464,6 +436,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				textRect.DeflateRect(4, 0);
 			}
 
+			//레이블 출력
 			UINT format = 0;
 
 			if (get_column_text_align(iSubItem) == LVCFMT_LEFT)
@@ -1908,10 +1881,14 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 	}
 	else
 	*/
+
+	if (image_index < 0 && m_pShellImageList)
 	{
-		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
-		SetItemCountEx(m_list_db.size());
+		image_index = m_pShellImageList->GetSystemImageListIcon(text, false);
 	}
+
+	m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
+	SetItemCountEx(m_list_db.size());
 
 	//ensureVisible이면 Invalidate()을 생략해도 된다.
 	if (m_auto_scroll && ensureVisible)

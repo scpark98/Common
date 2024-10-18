@@ -185,7 +185,7 @@ public:
 
 	CString		m_path;
 	CShellImageList*	m_pShellImageList = NULL;
-	void		set_shell_imagelist(CShellImageList* pShellImageList);
+	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
 //컬럼 관련
 	//ex. "No,20;Item1,50;Item2,50"

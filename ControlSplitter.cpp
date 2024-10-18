@@ -20,7 +20,7 @@ CControlSplitter::CControlSplitter()
 	m_hCursor = NULL;
 	m_rectMax.SetRectEmpty();
 	
-	m_crBack = RGB(255, 249, 228);
+	m_crBack = ::GetSysColor(COLOR_WINDOW);//::GetSysColor(COLOR_3DFACE);//RGB(255, 249, 228);
 }
 
 CControlSplitter::~CControlSplitter()

@@ -81,8 +81,8 @@ public:
 
 	enum CSCTreeCtrlMsgs
 	{
-		message_selchanged = 0,
-		message_drag_and_drop,
+		//message_selchanged = 0,		//TVN_SELCHANGED를 이용하므로 제거한다.
+		message_drag_and_drop = 0,
 		message_request_folder_list,	//remote일 경우 OnTvnItemexpanding() 메시지가 발생하면 remote의 폴더목록을 받아서 넣어줘야 한다.
 	};
 

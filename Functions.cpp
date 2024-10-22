@@ -4613,12 +4613,10 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 }
 
 
-void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter, bool include_folder)
+void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter, bool include_folder, bool recursive)
 {
 	HANDLE hFind;
 	WIN32_FIND_DATA data;
-
-	dq->clear();
 
 	if (filter.IsEmpty())
 		filter = _T("*");
@@ -4632,9 +4630,10 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 
 	do
 	{
-		if (!include_folder && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		if (recursive && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 		{
-
+			if ((_tcscmp(data.cFileName, _T(".")) != 0) && (_tcscmp(data.cFileName, _T("..")) != 0))
+				find_all_files(folder + _T("\\") + CString(data.cFileName), dq, filter, false, recursive);
 		}
 		else
 		{

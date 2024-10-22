@@ -329,6 +329,20 @@ public:
 
 	CRequestUrlParams(CString _full_url, CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
+	void		reset()
+	{
+		status = -1;
+		sub_url.Empty();
+		full_url.Empty();
+		body.Empty();
+		result.Empty();
+		elapsed = 0;
+		local_file_path.Empty();
+		file_size = 0;
+		downloaded_size = 0;
+		download_index = -1;
+	}
+
 	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
 	bool		use_thread = false;
 
@@ -1047,7 +1061,9 @@ struct	NETWORK_INFO
 	std::deque<CString>	find_all_files(CString path, CString name_filter = _T(""), CString ext_filters = _T(""), CString except_str = _T(""), bool recursive = true, bool auto_sort = true);
 #endif
 
-	void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter = _T("*"), bool include_folder = false);
+	//include_folder가 true이면 폴더도 하나의 항목으로 리턴하고
+	//include_folder가 false이고 recursive가 true이면 sub folder들의 모든 파일목록을 리턴한다.
+	void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter = _T("*"), bool include_folder = false, bool recursive = false);
 
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
 	//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.

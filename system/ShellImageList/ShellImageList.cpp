@@ -18,17 +18,6 @@ static char THIS_FILE[]=__FILE__;
 
 CShellImageList::CShellImageList()
 {
-	CoInitialize(NULL);
-
-	::get_drive_map(&m_drive_map);
-
-	SHFILEINFO shInfo;
-	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
-	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
-
-	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DRIVES, get_system_label(CSIDL_DRIVES)));
-	m_csidl_map.insert(std::pair<int, CString>(CSIDL_PERSONAL, get_system_label(CSIDL_PERSONAL)));
-	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_system_label(CSIDL_DESKTOP)));
 }
 
 CShellImageList::~CShellImageList()
@@ -57,10 +46,10 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 		SHGetFolderLocation( NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer ); // 컴퓨터
 		SHGetFileInfo((TCHAR*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
-	else if(szFile == get_shell_known_string_by_csidl(CSIDL_PERSONAL))
+	else if(szFile == get_shell_known_string_by_csidl(CSIDL_MYDOCUMENTS))
 	{
 		LPITEMIDLIST pidl_Document = NULL;
-		SHGetFolderLocation( NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document ); // 내문서
+		SHGetFolderLocation( NULL, CSIDL_MYDOCUMENTS, NULL, 0, &pidl_Document ); // 내문서
 		SHGetFileInfo((TCHAR*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
 	else if(szFile == get_shell_known_string_by_csidl(CSIDL_DESKTOP))
@@ -90,6 +79,26 @@ void CShellImageList::GetSystemDisplayName(CString szFile, CString &szDisplayNam
 
 void CShellImageList::Initialize()
 {
+	CoInitialize(NULL);
+
+	//local일 경우는 직접 얻어오지만 remote일 경우는 받아와서 채워줘야 한다.
+	//0번에는 local의 drive_list를 얻어오고 그 후 용도에 따라 remote0, remote1...의 drive_list를 추가해준다.
+	std::deque<CString> drive_list;
+	::get_drive_list(&drive_list);
+	m_drive_lists.push_back(drive_list);
+
+	SHFILEINFO shInfo;
+
+	//SHGetFileInfo()로 얻은 himagelist를 CImageList.Attach(himagelist)할 경우
+	//CShellImageList의 다른 인스턴스에서 다시 CImageList.Attach(himagelist)하게되면 ASSERT FAIL이 발생한다.
+	//하나의 프로세스에서 얻어온 himagelist는 반드시 단 한번만 Attach()해야한다.
+	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
+	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
+
+	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DRIVES, get_system_label(CSIDL_DRIVES)));
+	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_system_label(CSIDL_DESKTOP)));
+	m_csidl_map.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_system_label(CSIDL_MYDOCUMENTS)));
+
 	m_ExtArray.RemoveAll();
 	m_IDArray.RemoveAll();
 
@@ -209,4 +218,59 @@ int CShellImageList::get_csidl_by_shell_known_string(CString str)
 	}
 
 	return -1;
+}
+/*
+void CShellImageList::set_drive_map(std::map<TCHAR, CString>* drive_map)
+{
+	m_drive_map.clear();
+	m_drive_map.insert(drive_map->begin(), drive_map->end());
+}
+
+void CShellImageList::set_drive_map(std::deque<CString>* drive_list)
+{
+	m_drive_map.clear();
+
+	for (int i = 0; i < drive_list->size(); i++)
+	{
+		CString drive_volume = drive_list->at(i);
+		int colon = drive_volume.Find(_T(":"));
+		if (colon < 0)
+			continue;
+		m_drive_map.insert(std::pair<TCHAR, CString>(drive_volume[colon-1], drive_volume));
+	}
+}
+*/
+
+void CShellImageList::set_drive_list(int index, std::deque<CString>* drive_list)
+{
+	if (index >= m_drive_lists.size())
+		m_drive_lists.resize(index);
+
+	m_drive_lists[index].clear();
+	m_drive_lists[index].assign(drive_list->begin(), drive_list->end());
+}
+
+void CShellImageList::add_drive_list(std::deque<CString> *drive_list)
+{
+	m_drive_lists.push_back(*drive_list);
+}
+
+CString	CShellImageList::get_drive_volume(int index, CString path)
+{
+	int pos = path.Find(':');
+	if (pos < 0)
+		return _T("");
+
+	if (index < 0 || index >= m_drive_lists.size())
+		return _T("");
+
+	CString drive_letter = path.Mid(pos - 1, 2);
+
+	for (int i = 3; i < m_drive_lists[index].size(); i++)
+	{
+		if (m_drive_lists[index][i].Find(drive_letter) >= 0)
+			return m_drive_lists[index][i];
+	}
+
+	return _T("");
 }

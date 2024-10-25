@@ -164,7 +164,7 @@ public:
 	void		refresh_list(bool reload = true);
 
 	//m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
-	void		display_list();
+	void		display_list(CString cur_path);
 
 
 	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
@@ -457,9 +457,9 @@ public:
 	bool			m_auto_scroll = true;
 
 
-	void random();
+	void			random();
 
-	DWORD index_from_point(int x, int y);
+	DWORD			index_from_point(int x, int y);
 
 	//Drag&Drop 드래깅 관련
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
@@ -474,6 +474,10 @@ public:
 	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
 	int				get_drop_index() { return m_nDropIndex; }
+
+	//text = "     some text"일 경우 앞의 공백을 들여쓰기 용도로 사용한다.
+	//"     " 만큼 들여써서 "some text"를 출력한다. 아이콘도 함께 적용된다.
+	void			use_indent_from_prefix_space(bool use_indent) { m_use_indent_from_prefix_space = use_indent; }
 
 protected:
 
@@ -533,6 +537,7 @@ protected:
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
 	CImageList* create_drag_image(CListCtrl* pList, LPPOINT lpPoint);
 
+	bool			m_use_indent_from_prefix_space = false;
 
 protected:
 	DECLARE_MESSAGE_MAP()

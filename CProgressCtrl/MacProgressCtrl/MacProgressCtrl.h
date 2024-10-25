@@ -39,6 +39,7 @@ class CMacProgressCtrl : public CProgressCtrl
 	// Construction
 public:
 	CMacProgressCtrl();
+	virtual		~CMacProgressCtrl();
 
 	bool		m_bLButtonDown;
 
@@ -84,7 +85,11 @@ public:
 	void		SetPos(int pos);
 	void		SetAutoHide(bool auto_hide) { m_auto_hide = auto_hide; }
 
-	virtual		~CMacProgressCtrl();
+protected:
+	LOGFONT			m_lf;
+	CFont			m_font;
+	void			reconstruct_font();
+
 
 	// Generated message map functions
 protected:
@@ -96,6 +101,7 @@ protected:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnNcPaint();
+//	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 
 	//}}AFX_MSG
 
@@ -157,6 +163,7 @@ private:
 	COLORREF	m_cr_back_track;	//back color of inactive track
 
 	bool		m_auto_hide;	//default : false
+	virtual void PreSubclassWindow();
 };
 
 /////////////////////////////////////////////////////////////////////////////

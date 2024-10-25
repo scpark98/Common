@@ -635,8 +635,10 @@ void CSCTreeCtrl::refresh()
 
 	if (m_is_shell_treectrl_local)
 	{
-		for (std::map<TCHAR, CString>::iterator it = m_pShellImageList->get_drive_map()->begin(); it != m_pShellImageList->get_drive_map()->end(); it++)
-			insert_drive(it->second);
+		std::deque<CString> drive_list;
+		get_drive_list(&drive_list);
+		for (int i = 3; i < drive_list.size(); i++)
+			insert_drive(drive_list[i]);
 	}
 }
 
@@ -749,7 +751,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	}
 }
 
-void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData)
+void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_children)
 {
 	TV_INSERTSTRUCT tvItem;
 	tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
@@ -766,7 +768,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData)
 		if (m_is_shell_treectrl_local)
 			tvItem.item.cChildren = get_sub_folders(get_fullpath(m_expanding_item) + _T("\\") + pFindFileData->cFileName);
 		else
-			tvItem.item.cChildren = true;
+			tvItem.item.cChildren = has_children;
 	}
 
 	HTREEITEM hItem = InsertItem(&tvItem);
@@ -1053,6 +1055,18 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 		hItem = GetParentItem(hItem);
 	}
 
+	if (m_is_shell_treectrl_local)
+		return convert_special_folder_to_real_path(fullpath, m_pShellImageList->get_csidl_map());
+
+	//remote의 바탕화면, 내 문서, 내 PC는 별도 처리해야 한다.
+	//내 문서의 기본 레이블인 "문서"를 리턴하면 이를 m_remoteDocumentPath로 변경하여 사용한다.
+	if (fullpath == get_system_label(CSIDL_DESKTOP) + _T("\\") ||
+		fullpath == get_system_label(CSIDL_MYDOCUMENTS) + _T("\\") ||
+		fullpath == get_system_label(CSIDL_DRIVES) + _T("\\"))
+	{
+		return folder;
+	}
+
 	return convert_special_folder_to_real_path(fullpath, m_pShellImageList->get_csidl_map());
 }
 
@@ -1202,7 +1216,7 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 		text = GetItemText(item);
 		//trace(_T("%s\n"), text);
 		if (text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DESKTOP) ||
-			text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_PERSONAL))
+			text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_MYDOCUMENTS))
 		{
 			fullpath = GetItemText(item);
 		}

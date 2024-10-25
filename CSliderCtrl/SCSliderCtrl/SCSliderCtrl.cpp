@@ -113,10 +113,7 @@ void CSCSliderCtrl::OnPaint()
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	CAutoFont font(_T("굴림"));
-	font.SetHeight((double)get_logical_size_from_font_size(m_hWnd, m_rc.Height()) / 2.2);
-	font.SetBold(true);
-	CFont* pOldFont = (CFont*)dc.SelectObject(&font);
+	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
 	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
 	CRect track = m_rc;
@@ -536,13 +533,15 @@ void CSCSliderCtrl::OnPaint()
 		dc.SetTextColor(RGB(0,255,0));
 
 		LOGFONT lf;
-		font.GetLogFont(&lf);
+		memcpy(&lf, &m_lf, sizeof(LOGFONT));
 		lf.lfHeight = -8;
 		lf.lfWeight = FW_ULTRABOLD;
 		//lf.lfQuality = ANTIALIASED_QUALITY;
 		lf.lfWidth = 8;
-		font.SetLogFont(lf);
-		dc.SelectObject(&font);
+
+		CFont font_bracket;
+		font_bracket.CreateFontIndirect(&lf);
+		pOldFont = (CFont*)dc.SelectObject(&font_bracket);
 		int repeat_pos;
 
 		if (m_repeat_start >= 0)
@@ -560,6 +559,9 @@ void CSCSliderCtrl::OnPaint()
 			dc.DrawText(_T("]"), CRect(repeat_pos, m_rc.top-2, repeat_pos, m_rc.bottom),
 				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 		}
+
+		font_bracket.DeleteObject();
+		dc.SelectObject(pOldFont);
 	}
 #endif
 	// 포커스 사각형을 그린다
@@ -568,6 +570,7 @@ void CSCSliderCtrl::OnPaint()
 		dc.DrawFocusRect(m_rc);
 	}
 
+	dc.SelectObject(pOldFont);
 	dc.SelectObject(pOldFont);
 	dc.SelectObject(pOldPen);
 
@@ -1314,6 +1317,22 @@ void CSCSliderCtrl::set_bookmark_current_color(COLORREF cr)
 void CSCSliderCtrl::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
+	
+	// Get Defalut Font 
+	CFont* font = GetFont();
+
+	if (font == NULL)
+	{
+		font = AfxGetMainWnd()->GetFont();
+
+		if (font == NULL)
+			GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+		else
+			font->GetObject(sizeof(m_lf), &m_lf);
+	}
+
+	reconstruct_font();
+
 	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
 	m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
 	m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
@@ -1325,6 +1344,13 @@ void CSCSliderCtrl::PreSubclassWindow()
 	CSliderCtrl::PreSubclassWindow();
 }
 
+void CSCSliderCtrl::reconstruct_font()
+{
+	m_font.DeleteObject();
+	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+
+	ASSERT(bCreated);
+}
 
 void CSCSliderCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {

@@ -871,7 +871,7 @@ int CSCListBox::set_path(CString root, CString selected_text)
 	{
 		m_folder_list.clear();
 		m_folder_list.push_back(get_system_label(CSIDL_DRIVES));
-		m_folder_list.push_back(get_system_label(CSIDL_PERSONAL));
+		m_folder_list.push_back(get_system_label(CSIDL_MYDOCUMENTS));
 		m_folder_list.push_back(get_system_label(CSIDL_DESKTOP));
 	}
 	else

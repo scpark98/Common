@@ -1063,6 +1063,7 @@ struct	NETWORK_INFO
 
 	//include_folder가 true이면 폴더도 하나의 항목으로 리턴하고
 	//include_folder가 false이고 recursive가 true이면 sub folder들의 모든 파일목록을 리턴한다.
+	//dq에는 검색된 폴더 또는 파일의 fullpath가 기록된다.
 	void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter = _T("*"), bool include_folder = false, bool recursive = false);
 
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
@@ -1291,7 +1292,7 @@ h		: 복사할 height 크기(pixel)
 	CString		get_HDD_serial_number(int index, bool unify16 = true);
 
 	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
-	void		get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy = false);
+	void		get_drive_list(std::deque<CString> *drive_list, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
 	//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
 	//문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.

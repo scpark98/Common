@@ -515,15 +515,12 @@ void CWndShadow::MakeShadow(UINT32 *pShadBits, HWND hParent, RECT *rcParent)
 		int j;
 		if(ptAnchors[i][0] < ptAnchors[i][1])
 		{
-
 			// Start of line
-			for(j = ptAnchors[i][0];
-				j < min(max(ptAnchors[i - 1][0], ptAnchors[i + 1][0]) + 1, ptAnchors[i][1]);
-				j++)
+			for(j = ptAnchors[i][0]; j < min(max(ptAnchors[i - 1][0], ptAnchors[i + 1][0]) + 1, ptAnchors[i][1]); j++)
 			{
 				for(int k = 0; k <= 2 * nKernelSize; k++)
 				{
-					UINT32 *pPixel = pShadBits +
+					UINT32* pPixel = pShadBits +
 						(szShadow.cy - i - 1 + nKernelSize - k) * szShadow.cx + j - nKernelSize;
 					UINT32 *pKernelPixel = pKernel + k * (2 * nKernelSize + 1);
 					for(int l = 0; l <= 2 * nKernelSize; l++)

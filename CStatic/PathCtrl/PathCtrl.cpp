@@ -324,6 +324,7 @@ void CPathCtrl::set_is_local_device(bool is_local)
 
 //원격일 경우 드라이브 볼륨 리스트를 얻어와서 이 함수를 통해 미리 넣어줘야 한다.
 //({drive0 letter, drive0 volume}, {drive1 letter, drive1 volume}, ...)
+/*
 void CPathCtrl::set_remote_drive_volume(std::map<TCHAR, CString>* remote_drive_volume)
 {
 	if (!remote_drive_volume)
@@ -349,7 +350,7 @@ void CPathCtrl::add_remote_drive_volume(CString remote_drive_volume)
 		m_remote_drive_volume.insert(std::pair<TCHAR, CString>(real_path[0], remote_drive_volume));
 	}
 }
-
+*/
 void CPathCtrl::SetWindowText(CString path, std::deque<CString>* sub_folders)
 {
 	set_path(path, sub_folders);
@@ -402,7 +403,16 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	//드라이브 명을 레이블로 변경
 	if (path.Mid(1, 2) == _T(":\\"))
 	{
-		CString drive_volume = (m_is_local_device ? get_drive_volume(path[0]) : m_remote_drive_volume[toupper(path[0])]);
+		CString drive_volume;
+		
+		if (m_is_local_device)
+		{
+			drive_volume = get_drive_volume(path[0]);
+		}
+		else
+		{
+			drive_volume = m_pShellImageList->get_drive_volume(1, path);
+		}
 		m_path[0].label.Format(_T("%s"), drive_volume);
 	}
 

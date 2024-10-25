@@ -77,9 +77,9 @@ public:
 
 	//원격일 경우 드라이브 볼륨 리스트를 얻어와서 이 함수를 통해 미리 넣어줘야 한다.
 	//({drive0 letter, drive0 volume}, {drive1 letter, drive1 volume}, ...)
-	void		set_remote_drive_volume(std::map<TCHAR, CString>* remote_drive_volume);
+	//void		set_remote_drive_volume(std::map<TCHAR, CString>* remote_drive_volume);
 	//한번에 map에 넣기 힘든 구조라면 아래 함수를 통해 하나씩 추가해도 된다.(add_remote_drive_volume(_T("로컬 디스크 (C:)"));
-	void		add_remote_drive_volume(CString remote_drive_volume);
+	//void		add_remote_drive_volume(CString remote_drive_volume);
 
 	//특정 인덱스까지의 fullpath를 리턴한다. -1이면 현재 over 또는 down된 경로까지 리턴.
 	CString		get_full_path(int index = -1);
@@ -109,7 +109,7 @@ protected:
 	};
 
 	bool						m_is_local_device = true;
-	std::map<TCHAR, CString>	m_remote_drive_volume;
+	//std::map<TCHAR, CString>	m_remote_drive_volume;
 
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만
 	//여기서는 특수폴더와 폴더만 보여주자.

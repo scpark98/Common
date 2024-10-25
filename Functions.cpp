@@ -4630,14 +4630,42 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 
 	do
 	{
-		if (recursive && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
 			if ((_tcscmp(data.cFileName, _T(".")) != 0) && (_tcscmp(data.cFileName, _T("..")) != 0))
-				find_all_files(folder + _T("\\") + CString(data.cFileName), dq, filter, false, recursive);
+			{
+				if (include_folder)
+				{
+					TCHAR temp[1024] = { 0, };
+					_stprintf(temp, _T("%s\\%s"), folder, data.cFileName);
+					if (_tcslen(temp) < MAX_PATH)
+					{
+						_tcscpy(data.cFileName, temp);
+						dq->push_back(data);
+					}
+					else
+					{
+						TRACE(_T("exceed filename length : %d. (%s)\n"), _tcslen(temp), temp);
+					}
+				}
+
+				if (recursive)
+					find_all_files(CString(data.cFileName), dq, filter, include_folder, recursive);
+			}
 		}
 		else
 		{
-			dq->push_back(data);
+			TCHAR temp[1024] = { 0, };
+			_stprintf(temp, _T("%s\\%s"), folder, data.cFileName);
+			if (_tcslen(temp) < MAX_PATH)
+			{
+				_tcscpy(data.cFileName, temp);
+				dq->push_back(data);
+			}
+			else
+			{
+				TRACE(_T("exceed filename length : %d. (%s)\n"), _tcslen(temp), temp);
+			}
 		}
 	} while (FindNextFile(hFind, &data));
 
@@ -4671,20 +4699,20 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	if (root == _T(""))
 	{
 		folders.push_front(get_system_label(CSIDL_DESKTOP));
-		folders.push_front(get_system_label(CSIDL_PERSONAL));
+		folders.push_front(get_system_label(CSIDL_MYDOCUMENTS));
 		//folders.push_front(get_system_label(CSIDL_DOWNLOAD)_T("다운로드"));
 	}
 	else if (root == get_system_label(CSIDL_DRIVES))
 	{
-		std::map<TCHAR, CString> drive_map;
-		get_drive_map(&drive_map);
-		for (std::map<TCHAR, CString>::iterator it = drive_map.begin(); it != drive_map.end(); it++)
-			folders.push_back(it->second);
+		std::deque<CString> drive_list;
+		get_drive_list(&drive_list);
+		for (int i = 3; i < drive_list.size(); i++)
+			folders.push_back(drive_list[i]);
 
 		if (special_folders)
 		{
 			folders.push_front(get_system_label(CSIDL_DESKTOP));
-			folders.push_front(get_system_label(CSIDL_PERSONAL));
+			folders.push_front(get_system_label(CSIDL_MYDOCUMENTS));
 			//folders.push_front(_T("다운로드"));
 		}
 	}
@@ -8317,6 +8345,10 @@ CString	get_windows_version_string(bool detail)
 
 CString	get_system_label(int csidl, int* sysIconIndex)
 {
+	//이걸 해주지 않을 경우 CSIDL_DRIVES (내 PC)는 레이블을 잘 가져오지만
+	//CSIDL_DESKTOP, CSIDL_MYDOCUMENTS는 가져오지 못한다.
+	CoInitialize(NULL);
+
 	LPMALLOC pMalloc;
 	SHGetMalloc(&pMalloc);
 	SHFILEINFO sfi = { 0 };
@@ -8331,6 +8363,8 @@ CString	get_system_label(int csidl, int* sysIconIndex)
 	{
 		*sysIconIndex = sfi.iIcon;
 	}
+
+	CoUninitialize();
 
 	return sfi.szDisplayName;
 }
@@ -8671,13 +8705,18 @@ CString	get_drive_volume(TCHAR drive_letter)
 	return sLabel;
 }
 
-void get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy)
+void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
 {
 	DWORD dwError = 0;
 	TCHAR tzDriveString[MAX_PATH] = { 0, };
 	CString strDrive;
 
-	drive_map->clear();
+	drive_list->clear();
+
+	//탐색기 차례와 동일하게 내 PC, 바탕화면, 문서
+	drive_list->push_back(get_system_label(CSIDL_DRIVES));
+	drive_list->push_back(get_known_folder(CSIDL_DESKTOP));
+	drive_list->push_back(get_known_folder(CSIDL_MYDOCUMENTS));
 
 	DWORD logicalDrives = GetLogicalDrives();
 	unsigned int i = 64;
@@ -8694,7 +8733,7 @@ void get_drive_map(std::map<TCHAR, CString> *drive_map, bool include_legacy)
 			if (!include_legacy && (driveType == DRIVE_REMOVABLE || driveType == DRIVE_CDROM))
 				continue;
 
-			drive_map->insert(std::pair<TCHAR, CString>(strDrive[0], get_drive_volume(strDrive[0])));
+			drive_list->push_back(get_drive_volume(strDrive[0]));
 		}
 	} while ((logicalDrives >>= 1) != 0);
 }
@@ -8717,8 +8756,8 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 		csidl_map = &csidl_map_temp;
 		SHGetSpecialFolderPath(NULL, buf, CSIDL_DESKTOP, FALSE);
 		csidl_map->insert(std::pair<int, CString>(CSIDL_DESKTOP, buf));
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_PERSONAL, FALSE);
-		csidl_map->insert(std::pair<int, CString>(CSIDL_PERSONAL, buf));
+		SHGetSpecialFolderPath(NULL, buf, CSIDL_MYDOCUMENTS, FALSE);
+		csidl_map->insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, buf));
 		SHGetSpecialFolderPath(NULL, buf, CSIDL_DRIVES, FALSE);
 		csidl_map->insert(std::pair<int, CString>(CSIDL_DRIVES, buf));
 	}
@@ -8741,7 +8780,7 @@ CString	convert_special_folder_to_real_path(CString special_folder, std::map<int
 		real_path = buf;
 #endif
 	}
-	else if (csidl == CSIDL_PERSONAL)
+	else if (csidl == CSIDL_MYDOCUMENTS)
 	{
 #ifndef _USING_V110_SDK71_
 		real_path = get_known_folder(FOLDERID_Documents);
@@ -8794,10 +8833,7 @@ CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CSt
 	if (real_path.Mid(1, 2) != _T(":\\"))
 		return real_path;
 
-	std::map<TCHAR, CString> drive_map;
-	get_drive_map(&drive_map);
-
-	CString volume = drive_map[toupper(real_path[0])];
+	CString volume = get_drive_volume(real_path[0]);
 
 	volume_path.Replace(CString(real_path[0]) + _T(":"), volume);
 
@@ -11474,7 +11510,7 @@ int GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	else if (szFile == _T("내 문서"))//GetStringById(NFTD_IDS_DOCUMENT))
 	{
 		LPITEMIDLIST pidl_Document = NULL;
-		SHGetFolderLocation(NULL, CSIDL_PERSONAL, NULL, 0, &pidl_Document); // 내문서
+		SHGetFolderLocation(NULL, CSIDL_MYDOCUMENTS, NULL, 0, &pidl_Document); // 내문서
 		SHGetFileInfo((TCHAR*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
 	else if (szFile == _T("바탕 화면"))//GetStringById(NFTD_IDS_DESKTOP))

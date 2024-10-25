@@ -361,7 +361,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//Rgn과 관련하여 OnPaint()와 DrawItem은 뭔가 차이가 있다.
 			if (m_show_progress_text)
 			{
-				CString sPercent = m_list_db[iItem].text[iSubItem] + _T("%");
+				CString text = m_list_db[iItem].text[iSubItem];
+				CString sPercent;
+				
+				if (!text.IsEmpty())
+					text += _T("%");
 				pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());// m_cr_back);
 #if 1
 				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
@@ -412,13 +416,21 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//텍스트가 그려질 때 itemRect에 그리면 좌우 여백이 없어서 양쪽이 꽉차보인다.
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
+			CString text = get_text(iItem, iSubItem);
+
+			//0번 컬럼의 text 앞에 공백이 있을 경우 이를 들여쓰기로 처리하는 경우
+			if (iSubItem == 0 && m_use_indent_from_prefix_space)
+			{
+				int space_count = get_char_count(text, ' ', true);
+				textRect.left += (space_count * 16);
+				text = text.Mid(space_count);
+			}
 
 			//아이콘 표시
 			if (iSubItem == 0 && (m_is_shell_listctrl || m_use_own_imagelist))
 			{
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
 				textRect.left += 3;
-				CString text = get_text(iItem, iSubItem);
 				int icon_index;
 
 				if (m_list_db[iItem].img_idx >= 0 && (m_list_db[iItem].img_idx < m_pShellImageList->m_imagelist_small.GetImageCount()))
@@ -447,7 +459,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				format = DT_RIGHT;
 
 			format = format | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS;
-			pDC->DrawText(m_list_db[iItem].text[iSubItem], textRect, format);
+			pDC->DrawText(text, textRect, format);
 		}
 	}
 
@@ -1141,15 +1153,12 @@ void CVtListCtrlEx::modify_style()
 {
 	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
 	//dlg의 parent의 font를 얻어와야 한다.
-	CFont* font = GetFont();
+	CFont* font = AfxGetMainWnd()->GetFont();
 
 	if (font == NULL)
-		font = AfxGetMainWnd()->GetFont();
-
-	if (font != NULL)
-		font->GetObject(sizeof(m_lf), &m_lf);
-	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	else
+		font->GetObject(sizeof(m_lf), &m_lf);
 
 	//헤더컨트롤을 제어할 일이 있는지 확인 필요.
 #if 1
@@ -3084,10 +3093,10 @@ void CVtListCtrlEx::refresh_list(bool reload)
 	{
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
-			std::map<TCHAR, CString> drive_map;
-			get_drive_map(&drive_map);
-			for (std::map<TCHAR, CString>::iterator it = drive_map.begin(); it != drive_map.end(); it++)
-				m_cur_folders.push_back(CVtFileInfo(it->second));
+			std::deque<CString> drive_list;
+			get_drive_list(&drive_list);
+			for (i = 3; i < drive_list.size(); i++)
+				m_cur_folders.push_back(CVtFileInfo(drive_list[i]));
 		}
 		else
 		{
@@ -3113,12 +3122,12 @@ void CVtListCtrlEx::refresh_list(bool reload)
 			}
 		}
 
-		display_list();
+		display_list(m_path);
 	}
 }
 
 //m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
-void CVtListCtrlEx::display_list()
+void CVtListCtrlEx::display_list(CString cur_path)
 {
 	int i;
 	int index;
@@ -3128,7 +3137,7 @@ void CVtListCtrlEx::display_list()
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
 
-	if (m_path == get_system_label(CSIDL_DRIVES))
+	if (cur_path == get_system_label(CSIDL_DRIVES))
 	{
 		set_header_text(col_filesize, GetUserDefaultUILanguage() == 1042 ? _T("사용 가능한 공간") : _T("Free Space"));
 		set_header_text(col_filedate, GetUserDefaultUILanguage() == 1042 ? _T("전체 크기") : _T("Total Size"));
@@ -3146,7 +3155,7 @@ void CVtListCtrlEx::display_list()
 	{
 		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].path, m_pShellImageList->get_csidl_map());
 
-		if (m_is_shell_listctrl_local)
+		if (m_is_shell_listctrl_local || real_path.Right(2) == _T(":\\"))
 			img_idx = m_pShellImageList->GetSystemImageListIcon(real_path, true);
 		else
 			img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);

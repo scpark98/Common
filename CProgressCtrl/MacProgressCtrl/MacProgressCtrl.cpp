@@ -70,6 +70,8 @@ CMacProgressCtrl::CMacProgressCtrl()
 
 	GetColors();
 	CreatePens();
+
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }	// CMacProgressCtrl
 
 //-------------------------------------------------------------------
@@ -126,6 +128,8 @@ void CMacProgressCtrl::OnPaint()
 	Gdiplus::Graphics g(dc.m_hDC);
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	CFont* pOldFont = dc.SelectObject(&m_font);
 
 	//track의 width는 rc와 동일하나 height는 작은 경우도 있다.(특히 style_round_line과 같은 경우)
 	//실제 트랙이 그려지는 영역
@@ -294,6 +298,8 @@ void CMacProgressCtrl::OnPaint()
 	{
 		draw_rectangle(&dc, rc, RGB2gpColor(m_border_color));// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
+
+	dc.SelectObject(pOldFont);
 }	// OnPaint	
 
 //-------------------------------------------------------------------
@@ -957,3 +963,32 @@ void CMacProgressCtrl::SetPos(int pos)
 	if (m_auto_hide && (pos >= m_upper || pos < 0))
 		ShowWindow(SW_HIDE);
 }
+
+
+void CMacProgressCtrl::PreSubclassWindow()
+{
+	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	CWnd* pWnd = AfxGetMainWnd();
+	CFont* font = NULL;
+	
+	if (pWnd)
+		font = pWnd->GetFont();
+
+	if (font == NULL)
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	else
+		font->GetObject(sizeof(m_lf), &m_lf);
+
+	reconstruct_font();
+
+	CProgressCtrl::PreSubclassWindow();
+}
+
+void CMacProgressCtrl::reconstruct_font()
+{
+	m_font.DeleteObject();
+	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+
+	ASSERT(bCreated);
+}
+

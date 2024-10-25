@@ -139,7 +139,7 @@ public:
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CString driveName);
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
-	void		insert_folder(WIN32_FIND_DATA* pFindFileData);
+	void		insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_children = true);
 
 	bool		load(CString file);
 	bool		save(CString file);

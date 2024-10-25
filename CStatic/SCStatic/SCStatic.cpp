@@ -98,16 +98,16 @@ void CSCStatic::PreSubclassWindow()
 	ModifyStyle(0, BS_ICON);
 
 	// Get Defalut Font 
-	CFont* cf = GetFont();
+	CWnd* pWnd = AfxGetMainWnd();
+	CFont* font = NULL;
 
-	if (cf != NULL)
-	{
-		cf->GetObject(sizeof(m_lf), &m_lf);
-	}
-	else
-	{
+	if (pWnd)
+		font = pWnd->GetFont();
+
+	if (font == NULL)
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-	}
+	else
+		font->GetObject(sizeof(m_lf), &m_lf);
 
 	reconstruct_font();
 }

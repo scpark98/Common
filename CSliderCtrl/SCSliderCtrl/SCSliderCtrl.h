@@ -308,6 +308,11 @@ protected:
 	void		DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
 										CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask);
 
+	//font ฐüทร
+	LOGFONT		m_lf;
+	CFont		m_font;
+	void		reconstruct_font();
+
 // Overrides
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CSCSliderCtrl)

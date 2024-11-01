@@ -613,7 +613,7 @@ void CSCTreeCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local)
 {
 	m_is_shell_treectrl = true;
-	m_is_shell_treectrl_local = is_local;
+	m_is_local = is_local;
 	m_use_own_imagelist = true;
 	m_image_size = 16;
 	m_pShellImageList = pShellImageList;
@@ -633,11 +633,11 @@ void CSCTreeCtrl::refresh()
 	m_documentItem = insert_special_folder(CSIDL_MYDOCUMENTS);
 	m_computerItem = insert_special_folder(CSIDL_DRIVES);
 
-	if (m_is_shell_treectrl_local)
+	if (m_is_local)
 	{
 		std::deque<CString> drive_list;
 		get_drive_list(&drive_list);
-		for (int i = 3; i < drive_list.size(); i++)
+		for (int i = 0; i < drive_list.size(); i++)
 			insert_drive(drive_list[i]);
 	}
 }
@@ -682,7 +682,7 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 	else
 	{
 		CString path = get_known_folder(csidl);
-		CString text = m_pShellImageList->get_shell_known_string_by_csidl(csidl);
+		CString text = m_pShellImageList->m_volume[0].get_label(csidl);
 
 		TV_INSERTSTRUCT tvInsert;
 		tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
@@ -723,7 +723,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	bool		bWorking;
 	CString		curFolder;
 
-	sParentPath = convert_special_folder_to_real_path(sParentPath, m_pShellImageList->get_csidl_map());
+	sParentPath = convert_special_folder_to_real_path(sParentPath);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
 
 	if (sParentPath.Right(1) != "\\")
 		sParentPath += "\\";
@@ -765,7 +765,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_childre
 	//remote일 경우는 일단 true로 세팅한다.
 	if (m_is_shell_treectrl)
 	{
-		if (m_is_shell_treectrl_local)
+		if (m_is_local)
 			tvItem.item.cChildren = get_sub_folders(get_fullpath(m_expanding_item) + _T("\\") + pFindFileData->cFileName);
 		else
 			tvItem.item.cChildren = has_children;
@@ -773,6 +773,25 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_childre
 
 	HTREEITEM hItem = InsertItem(&tvItem);
 }
+
+//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
+void CSCTreeCtrl::update_drive_list(CString thisPC, std::deque<CString>* drive_list)
+{
+	//local이 아닌데 drive_list가 NULL이면 잘못된 호출.
+	if (!m_is_local && drive_list == NULL)
+		return;
+
+	HTREEITEM hItem = find_item(thisPC);
+	DeleteItem(hItem);
+
+	m_computerItem = insert_special_folder(CSIDL_DRIVES);
+
+	for (int i = 0; i < drive_list->size(); i++)
+		insert_drive(drive_list->at(i));
+
+	Expand(m_computerItem, TVE_EXPAND);
+}
+
 /*
 HTREEITEM CSCTreeCtrl::find_item(const CString& name)
 {
@@ -904,7 +923,7 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 		//물론 실제 child가 없는 폴더일수도 있다.
 		if (GetChildItem(m_expanding_item) == NULL)
 		{
-			if (m_is_shell_treectrl_local)
+			if (m_is_local)
 			{
 				insert_folder(m_expanding_item, get_fullpath(m_expanding_item));
 			}
@@ -1040,23 +1059,34 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 	}
 
 	CString fullpath;
-	CString folder;
+	CString text;
+	CString temp;
 
 	while (hItem)
 	{
-		folder = GetItemText(hItem);
-		fullpath = folder + _T("\\") + fullpath;
+		text = GetItemText(hItem);
+		//만약 folder가 내 PC, 바탕 화면, 문서와 같은 특수 폴더라면 절대경로로 변경해준다.
+		//temp = m_pShellImageList->m_volume[!m_is_local].get_path(text);
+		//if (!temp.IsEmpty())
+		//	text = temp;
 
-		if (folder.Right(2) == _T(":)"))
-		{
+		fullpath = text + _T("\\") + fullpath;
+
+		if (text.Right(2) == _T(":)"))
 			break;
-		}
 
 		hItem = GetParentItem(hItem);
 	}
 
-	if (m_is_shell_treectrl_local)
-		return convert_special_folder_to_real_path(fullpath, m_pShellImageList->get_csidl_map());
+	//fullpath의 맨 끝에 '\\'가 붙어있다면 제거한다.
+	if (fullpath.Right(1) == '\\')
+		fullpath.Truncate(fullpath.GetLength() - 1);
+
+	return fullpath;
+
+	/*
+	if (m_is_local)
+		return convert_special_folder_to_real_path(fullpath, m_pShellImageList->m_volume[!m_is_local].get_label_map());
 
 	//remote의 바탕화면, 내 문서, 내 PC는 별도 처리해야 한다.
 	//내 문서의 기본 레이블인 "문서"를 리턴하면 이를 m_remoteDocumentPath로 변경하여 사용한다.
@@ -1067,12 +1097,13 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 		return folder;
 	}
 
-	return convert_special_folder_to_real_path(fullpath, m_pShellImageList->get_csidl_map());
+	return convert_special_folder_to_real_path(fullpath, m_pShellImageList->m_volume[!m_is_local].get_label_map());
+	*/
 }
 
 void CSCTreeCtrl::set_path(CString fullpath)
 {
-	fullpath = m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath);
+	fullpath = m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath);
 	//AfxMessageBox(fullpath);
 
 	std::deque<CString> dq;
@@ -1215,8 +1246,8 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 
 		text = GetItemText(item);
 		//trace(_T("%s\n"), text);
-		if (text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DESKTOP) ||
-			text == m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_MYDOCUMENTS))
+		if (text == m_pShellImageList->m_volume[0].get_label(CSIDL_DESKTOP) ||
+			text == m_pShellImageList->m_volume[0].get_label(CSIDL_MYDOCUMENTS))
 		{
 			fullpath = GetItemText(item);
 		}
@@ -1227,9 +1258,9 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 
 		//내 PC일 경우는 ""로 리턴되므로
 		if (fullpath.IsEmpty())
-			folders.push_back(CSCTreeCtrlFolder(item, fullpath, m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES)));
+			folders.push_back(CSCTreeCtrlFolder(item, fullpath, m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES)));
 		else
-			folders.push_back(CSCTreeCtrlFolder(item, fullpath, get_part(fullpath, fn_last_folder)));
+			folders.push_back(CSCTreeCtrlFolder(item, fullpath, get_part(fullpath, fn_leaf_folder)));
 		item = GetNextSiblingItem(item);
 	}
 

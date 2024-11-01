@@ -651,14 +651,12 @@ CString		GetCurrentDirectory()
 }
 
 //_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
-//"c:"		"\\abc/def\\"		"123"		".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
-//"c:\\"	"c:\\abc/def"		"123"		"txt"	"123.txt"와 같이 보정한다.
-//part : fn_drive(drive), fn_folder(drive+folder), fn_last_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
+//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
+//"c:\\", "c:\\abc/def", "123", "txt", "123.txt와 같이 보정한다.
+//part : fn_drive(drive), fn_folder(drive+folder), fn_leaf_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
 //만약 path가 "d:\\aaa\\b.abc"이고 b.abc가 파일이 아닌 폴더라면 문제된다.
-//또는 path가 "d:\\aaa\\ccc"인데 폴더가 아닌 파일일수도 있다.
-//파일인지 폴더인지를 구분해서 처리하는 코드는 필수다.(실제 존재하는 경우에만 검사가 가능하다)
-//단, path가 "연구소문서(\\192.168.1.103) (Y:)"과 같이 네트워크 경로를 포함한 드라이브 볼륨인 경우는
-//분리해서는 안되므로 그냥 리턴해야 한다.
+//remote의 파일이라면 PathIsFolder()함수로 검사할수도 없으므로
+//path가 file이 아닌 폴더명이라고 하면 반드시 호출할때부터 맨 끝에 '\\'를 붙여서 호출해야 정확히 분리된다.
 CString		get_part(CString path, int part)
 {
 	if (path.Right(2) == _T(":)"))
@@ -672,6 +670,12 @@ CString		get_part(CString path, int part)
 
 	CString parts[6] = { tDrive, tDir, _T(""), tFname, tExt, };
 
+	//넘어온 path와 추출된 tDir이 동일하다면 path가 폴더이므로 별도 처리.
+	if (path == parts[fn_folder])
+	{
+
+	}
+
 	//확장자를 포함한 파일명
 	parts[fn_name] = parts[fn_title] + parts[fn_ext];
 
@@ -679,8 +683,9 @@ CString		get_part(CString path, int part)
 	if (parts[fn_folder].Right(1) == '/' || parts[fn_folder].Right(1) == '\\')
 		parts[fn_folder].Truncate(parts[fn_folder].GetLength() - 1);
 
-	//폴더명은 드라이브 경로까지 모두 포함. "\\abc/def\\" => "c:\\abc/def\\"
+	//폴더명은 드라이브 경로까지 모두 포함. "\\abc/def" => "c:\\abc/def"
 	parts[fn_folder] = parts[fn_drive] + parts[fn_folder];
+	parts[fn_leaf_folder] = parts[fn_folder].Mid(parts[fn_folder].ReverseFind('\\') + 1);
 
 	//드라이브 루트라면 끝에 '\'를 붙여줘야 한다. "C:" => "C:\\"
 	if (parts[fn_folder].GetLength() == 2 && parts[fn_folder].Right(1) == _T(":"))
@@ -690,26 +695,30 @@ CString		get_part(CString path, int part)
 	parts[fn_ext] = parts[fn_ext].Mid(1);
 
 	//path가 b.abc와 같이 파일명처럼 되어 있지만 파일이 아닌 folder일 경우의 처리(실제 존재할 경우에만 가능)
+	//이 처리는 취약하여 삭제하고 처음부터 path를 명확히 줘서 사용하도록 한다.
+	//path가 file이 아닌 폴더명이라고 하면 호출할때부터 맨 끝에 '\\'를 붙여서 호출해야 한다.
+	/*
 	if (PathFileExists(path))
 	{
 		if (PathIsDirectory(path))
 		{
 			//해당 경로가 디렉토리이고 part == fn_name이라고 넘어왔다면
-			//이는 실제로는 fn_last_folder를 요청하는 것으로 봐야 한다.
+			//이는 실제로는 fn_leaf_folder를 요청하는 것으로 봐야 한다.
 			//또는 호출하는 곳에서 미리 판별하여 요청할 수도 있다.
-			//파일이면 fn_name을 요청하고 폴더이면 fn_last_folder를 요청해야 한다.
-			part = fn_last_folder;
-			parts[fn_last_folder] = parts[fn_name];
+			//파일이면 fn_name을 요청하고 폴더이면 fn_leaf_folder를 요청해야 한다.
+			part = fn_leaf_folder;
+			parts[fn_leaf_folder] = parts[fn_name];
 			parts[fn_folder] = parts[fn_folder] + _T("\\") + parts[fn_name];
 			parts[fn_title] = parts[fn_ext] = parts[fn_name] = _T("");
 		}
 	}
 	else
+	*/
 	{
 		//"바탕 화면"과 같이 가상 경로일 경우는 fn_title과 fn_name만 이 값으로 채워지므로
 		//폴더이름에도 이 값을 넣어 사용한다.
 		if (parts[fn_drive].IsEmpty() && parts[fn_folder].IsEmpty() && !parts[fn_name].IsEmpty())
-			parts[fn_folder] = parts[fn_last_folder] = parts[fn_name];
+			parts[fn_folder] = parts[fn_leaf_folder] = parts[fn_name];
 	}
 
 	return parts[part];
@@ -2460,7 +2469,7 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
-	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG | INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
 	if (hInternetRoot == NULL)
 	{
 		params->status = GetLastError();
@@ -2494,7 +2503,7 @@ void request_url(CRequestUrlParams* params)
 	//	return _T("error=InternetOpenUrl() failed.");
 	//}
 
-	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE;// | INTERNET_FLAG_TRANSFER_BINARY; // http
+	int secureFlags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_TRANSFER_BINARY; // http
 	if (params->is_https)
 	{
 		secureFlags |= INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID; // https
@@ -2512,10 +2521,10 @@ void request_url(CRequestUrlParams* params)
 	//2009년 블로그에는 INTERNET_OPTION_RECEIVE_TIMEOUT외에 나머지 2개의 timeout은
 	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
 	//https://blog.naver.com/che5886/20061092638
-	//DWORD dwTimeout = 10;
-	//InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
-	//InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
-	//InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	DWORD dwTimeout = 100000000;
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
 
 	if (params->is_https)
 	{
@@ -2577,13 +2586,13 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
-	DWORD buffer_size = 1024 * 1024;
+	DWORD buffer_size = 4096;
 	DWORD dwRead, dwWritten, dwTotalSize = 0;
-	char* buffer = new char[buffer_size];
+	char* buffer = new char[buffer_size + 1];
 	TCHAR query_buffer[32] = { 0, };
 	DWORD query_buffer_size = sizeof(query_buffer);
 
-	memset(buffer, 0, buffer_size);
+	memset(buffer, 0, buffer_size + 1);
 
 	if (params->local_file_path.IsEmpty())
 	{
@@ -2641,8 +2650,17 @@ void request_url(CRequestUrlParams* params)
 	//HTTP_QUERY_FLAG_NUMBER을 넣지 않으면 HttpQueryInfo()에서 오류가 발생한다.
 	DWORD dwBufLen = sizeof(dwTotalSize);
 	uint64_t total_read = 0;
+	char* total_result = NULL;
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
+	/*
+	if (ret)
+		dwTotalSize = 1024 * 1024 * 4;
+	else
+		dwTotalSize = 1024 * 1024;
 
+	total_result = new char[dwTotalSize];
+	memset(total_result, 0, sizeof(char) * dwTotalSize);
+	*/
 	do
 	{
 		//InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0); //이 함수는 웹페이지의 크기를 리턴하는 듯하다.
@@ -2666,7 +2684,11 @@ void request_url(CRequestUrlParams* params)
 				byte(buffer[2]) == 0xBF)
 				memcpy(buffer, buffer + 3, dwRead - 3);
 			TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
+			buffer[dwRead] = '\0';
+			//strcat(total_result, buffer);
+			//TRACE(_T("total_result len = %d\n"), strlen(total_result));
 			params->result += UTF8toCString(buffer);
+			TRACE(_T("params->result len = %d\n"), params->result.GetLength());
 		}
 		else
 		{
@@ -2709,6 +2731,7 @@ void request_url(CRequestUrlParams* params)
 			//TRACE(_T("id = %d, downloaded_size = %d\n"), params->request_id, params->downloaded_size);
 		}
 	} while (dwRead != 0);
+
 
 	if (params->local_file_path.IsEmpty())
 	{
@@ -4637,7 +4660,8 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 				if (include_folder)
 				{
 					TCHAR temp[1024] = { 0, };
-					_stprintf(temp, _T("%s\\%s"), folder, data.cFileName);
+
+					_stprintf(temp, _T("%s%s%s"), folder, folder.Right(1) == '\\' ? _T("") : _T("\\"), data.cFileName);
 					if (_tcslen(temp) < MAX_PATH)
 					{
 						_tcscpy(data.cFileName, temp);
@@ -4656,7 +4680,7 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 		else
 		{
 			TCHAR temp[1024] = { 0, };
-			_stprintf(temp, _T("%s\\%s"), folder, data.cFileName);
+			_stprintf(temp, _T("%s%s%s"), folder, folder.Right(1) == '\\' ? _T("") : _T("\\"), data.cFileName);
 			if (_tcslen(temp) < MAX_PATH)
 			{
 				_tcscpy(data.cFileName, temp);
@@ -4706,7 +4730,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	{
 		std::deque<CString> drive_list;
 		get_drive_list(&drive_list);
-		for (int i = 3; i < drive_list.size(); i++)
+		for (int i = 0; i < drive_list.size(); i++)
 			folders.push_back(drive_list[i]);
 
 		if (special_folders)
@@ -8713,11 +8737,6 @@ void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
 
 	drive_list->clear();
 
-	//탐색기 차례와 동일하게 내 PC, 바탕화면, 문서
-	drive_list->push_back(get_system_label(CSIDL_DRIVES));
-	drive_list->push_back(get_known_folder(CSIDL_DESKTOP));
-	drive_list->push_back(get_known_folder(CSIDL_MYDOCUMENTS));
-
 	DWORD logicalDrives = GetLogicalDrives();
 	unsigned int i = 64;
 
@@ -8738,95 +8757,82 @@ void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
 	} while ((logicalDrives >>= 1) != 0);
 }
 
-//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
-CString	convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map)
+//"로컬 디스크 (C:)" -> "C:\\"
+//"문서" -> "C:\\Documents"
+//"문서\\AnySupport" -> "C:\\Documents\\AnySupport"
+//"Seagate(\\192.168.0.52) (X:)" -> "X:"	(네트워크 드라이브)
+//하위 폴더 포함 유무에 관계없이 변환.
+//remote의 경로인 경우는 system_label, system_path, drive_list까지 모두 파라미터로 전달받아 처리해야하므로 복잡해지기 때문에
+//이 함수에서는 remote인 경우는 처리하지 않는다.
+//local->remote로 path를 전달할 때 그대로 전달하고 remote에서 이 함수를 통해 실제 경로로 변환해서 사용하자.
+CString	convert_special_folder_to_real_path(CString special_folder)
 {
-	TCHAR buf[MAX_PATH];
-	int csidl = -1;
-	std::map<int, CString> csidl_map_temp;
-
-	//"바탕 화면\\"과 같이 넘어오는 경우 잘라낸다.
-	if (special_folder.GetLength() > 2 && special_folder[1] != ':' && special_folder.Right(1) == _T("\\"))
-		special_folder = special_folder.Left(special_folder.GetLength() - 1);
+	//실제 존재한다고 판별되면 이는 real_path이므로 그대로 리턴.
+	if (special_folder.IsEmpty() || PathFileExists(special_folder))
+		return special_folder;
 
 	CString real_path = special_folder;
+	CString drive_prefix;
 
-	if (!csidl_map)
+	//"바탕 화면\\", "문서", "문서\\abc"와 같이 넘어오므로 맨 처음 항목의 실제 경로를 구해야 한다.
+	//"Seagate(\\192.168.0.52) (X:)"과 같은 네트워크 드라이브도 존재하므로 '\\'로만 판별해서는 안된다.
+	bool is_network_drive = false;
+
+	int pos1 = special_folder.Find(_T(":)"));
+	int pos2 = special_folder.Find(_T("\\"));
+	if (pos1 > 0 && pos2 > 0 && pos1 > pos2)
 	{
-		csidl_map = &csidl_map_temp;
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_DESKTOP, FALSE);
-		csidl_map->insert(std::pair<int, CString>(CSIDL_DESKTOP, buf));
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_MYDOCUMENTS, FALSE);
-		csidl_map->insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, buf));
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_DRIVES, FALSE);
-		csidl_map->insert(std::pair<int, CString>(CSIDL_DRIVES, buf));
+		is_network_drive = true;
+		drive_prefix = special_folder.Left(special_folder.Find(_T(":)")) + 2);
+	}
+	else
+	{
+		std::deque<CString> token;
+		get_token_string(special_folder, token, _T("\\"), false);
+		drive_prefix = token[0];
 	}
 
-	for (auto it = csidl_map->begin(); it != csidl_map->end(); ++it)
+	CString rest_path = special_folder;
+	rest_path.Replace(drive_prefix, _T(""));
+
+	if (drive_prefix == ::get_system_label(CSIDL_DRIVES))
+		real_path.Format(_T("%s%s"), ::get_system_label(CSIDL_DRIVES), rest_path);
+	else if (drive_prefix == ::get_system_label(CSIDL_DESKTOP))
+		real_path.Format(_T("%s%s"), get_known_folder(CSIDL_DESKTOP), rest_path);
+	else if (drive_prefix == ::get_system_label(CSIDL_MYDOCUMENTS))
+		real_path.Format(_T("%s%s"), get_known_folder(CSIDL_MYDOCUMENTS), rest_path);
+	else
 	{
-		if (it->second == special_folder)
+		std::deque<CString> drive_list;
+		get_drive_list(&drive_list);
+
+		for (int i = 0; i < drive_list.size(); i++)
 		{
-			csidl = it->first;
-			break;
+			//"로컬 디스크 (C:)"
+			if (drive_list[i] == drive_prefix)
+			{
+				int pos = real_path.Find(_T(":)"));
+				if (pos < 0)
+					return real_path;
+
+				CString rest = real_path.Mid(pos + 2);
+				CString drive_letter = real_path.Mid(pos - 1, 1);
+
+				if (rest.Left(1) == _T("\\"))
+					rest = rest.Mid(1);
+
+				real_path.Format(_T("%s:\\%s"), drive_letter, rest);
+				break;
+			}
 		}
 	}
 
-	if (csidl == CSIDL_DESKTOP)
-	{
-#ifndef _USING_V110_SDK71_
-		real_path = get_known_folder(FOLDERID_Desktop);
-#else
-		SHGetSpecialFolderPath(NULL, buf, csidl, FALSE);
-		real_path = buf;
-#endif
-	}
-	else if (csidl == CSIDL_MYDOCUMENTS)
-	{
-#ifndef _USING_V110_SDK71_
-		real_path = get_known_folder(FOLDERID_Documents);
-#else
-		SHGetSpecialFolderPath(NULL, buf, csidl, FALSE);
-		real_path = buf;
-#endif
-	}
-	//내 PC일 경우는 real path가 존재하지 않는다.
-	else if (csidl == CSIDL_DRIVES)
-	{
-		;
-	}
-	/*
-	else if (csidl == _T("다운로드"))
-	{
-#ifndef _USING_V110_SDK71_
-		real_path = get_known_folder(FOLDERID_Downloads);
-#else
-		SHGetSpecialFolderPath(NULL, buf, CSIDL_DOWNLOADS, FALSE);
-		real_path = buf;
-#endif
-	}
-	*/
-
-	if (real_path == get_system_label(CSIDL_DRIVES))
-		return real_path;
-
-	real_path.Replace(get_system_label(CSIDL_DRIVES), _T(""));
-
-	int pos = real_path.Find(_T(":)"));
-	if (pos < 0)
-		return real_path;
-
-	CString rest = real_path.Mid(pos + 2);
-	CString drive_letter = real_path.Mid(pos - 1, 1);
-
-	if (rest.Left(1) == _T("\\"))
-		rest = rest.Mid(1);
-
-	real_path.Format(_T("%s:\\%s"), drive_letter, rest);
 	return real_path;
 }
 
 //"c:\\abc\\def" => "로컬 디스크 (C:)\\abc\\def"
-CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CString>* csidl_map)
+//미완성!!!! 현재 사용되는 곳은 없는 상태.
+CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CString>* system_path_map)
 {
 	CString volume_path = real_path;
 
@@ -11927,17 +11933,17 @@ double		GetPolygonAreaSize(CPoint *pt, int nPoints)
 }
 
 //return받은 char*는 반드시 사용 후 free()해줘야 함.
-char* replace(char* s, const char* olds, const char* news)
+TCHAR* replace(TCHAR* src, const TCHAR* olds, const TCHAR* news)
 {
-	char* result;
+	TCHAR* result;
 	int i, cnt = 0;
-	int newWlen = strlen(news);
-	int oldWlen = strlen(olds);
+	int newWlen = _tcslen(news);
+	int oldWlen = _tcslen(olds);
 
 	// Counting the number of times old word 
 	// occur in the string 
-	for (i = 0; s[i] != '\0'; i++) {
-		if (strstr(&s[i], olds) == &s[i]) {
+	for (i = 0; src[i] != '\0'; i++) {
+		if (_tcsstr(&src[i], olds) == &src[i]) {
 			cnt++;
 
 			// Jumping to index after the old word. 
@@ -11946,18 +11952,20 @@ char* replace(char* s, const char* olds, const char* news)
 	}
 
 	// Making new string of enough length 
-	result = (char*)malloc(i + cnt * (newWlen - oldWlen) + 1);
+	result = (TCHAR*)malloc(i + cnt * (newWlen - oldWlen) + 1);
 
 	i = 0;
-	while (*s) {
+	while (*src)
+	{
 		// compare the substring with the result 
-		if (strstr(s, olds) == s) {
-			strcpy(&result[i], news);
+		if (_tcsstr(src, olds) == src)
+		{
+			_tcscpy(&result[i], news);
 			i += newWlen;
-			s += oldWlen;
+			src += oldWlen;
 		}
 		else
-			result[i++] = *s++;
+			result[i++] = *src++;
 	}
 
 	result[i] = '\0';

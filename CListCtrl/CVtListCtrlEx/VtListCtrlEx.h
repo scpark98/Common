@@ -142,9 +142,9 @@ public:
 
 //ShellList로 동작시키기
 	bool		m_is_shell_listctrl = false;
-	bool		m_is_shell_listctrl_local = true;
+	bool		m_is_local = true;
 	bool		is_shell_listctrl() { return m_is_shell_listctrl; }
-	bool		is_shell_listctrl_local() { return m_is_shell_listctrl_local; }
+	bool		is_local() { return m_is_local; }
 	//맨 처음 이 명령을 주면 모든 세팅과 동작이 ShellListCtrl로 동작된다.
 	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만

@@ -123,9 +123,9 @@ public:
 	}
 
 	bool		m_is_shell_treectrl = false;
-	bool		m_is_shell_treectrl_local = true;
-	bool		is_is_shell_treectrl() { return m_is_shell_treectrl; }
-	bool		is_is_shell_treectrl_local() { return m_is_shell_treectrl_local; }
+	bool		m_is_local = true;
+	bool		is_shell_treectrl() { return m_is_shell_treectrl; }
+	bool		is_local() { return m_is_local; }
 
 	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local);
 
@@ -140,6 +140,9 @@ public:
 	void		insert_drive(CString driveName);
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
 	void		insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_children = true);
+
+	//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
+	void		update_drive_list(CString thisPC, std::deque<CString>* drive_list = NULL);
 
 	bool		load(CString file);
 	bool		save(CString file);

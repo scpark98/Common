@@ -1211,7 +1211,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		if (m_is_shell_listctrl)
 		{
 			CString path = get_path();
-			CString thisPC = m_pShellImageList->get_shell_known_string_by_csidl(CSIDL_DRIVES);
+			CString thisPC = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 
 			if (path == thisPC)
 				return true;
@@ -1227,7 +1227,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 				path = GetParentDirectory(path);
 			}
 
-			if (m_is_shell_listctrl_local)
+			if (m_is_local)
 				set_path(path);
 
 			//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
@@ -1258,7 +1258,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		{
 			//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
 			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
-			if (m_is_shell_listctrl && m_is_shell_listctrl_local)
+			if (m_is_shell_listctrl && m_is_local)
 			{
 				if (m_path == get_system_label(CSIDL_DRIVES))
 					return true;
@@ -1314,7 +1314,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 							//	edit_end();
 							//	return true;
 							//}
-							if (m_is_shell_listctrl && m_is_shell_listctrl_local)
+							if (m_is_shell_listctrl && m_is_local)
 							{
 								refresh_list();
 								return true;
@@ -1988,7 +1988,7 @@ void CVtListCtrlEx::delete_selected_items()
 
 		bool deleted = true;
 
-		if (m_is_shell_listctrl && m_is_shell_listctrl_local)
+		if (m_is_shell_listctrl && m_is_local)
 		{
 			CString file;
 			file.Format(_T("%s\\%s"), m_path, get_text(index, col_filename));
@@ -2418,14 +2418,14 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 	TRACE(_T("%d, %d\n"), item, subItem);
 
-	if (m_is_shell_listctrl && m_is_shell_listctrl_local)
+	if (m_is_shell_listctrl && m_is_local)
 	{
 		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
-			m_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList->get_csidl_map());
+			m_path = convert_special_folder_to_real_path(get_text(item, col_filename));//, m_pShellImageList->m_volume[!m_is_local].get_label_map());
 		}
 		else
 		{
@@ -3011,7 +3011,7 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local)
 {
 	m_is_shell_listctrl = true;
-	m_is_shell_listctrl_local = is_local;
+	m_is_local = is_local;
 	m_use_own_imagelist = true;
 
 	m_pShellImageList = pShellImageList;
@@ -3049,9 +3049,12 @@ CString CVtListCtrlEx::get_path(int index)
 
 void CVtListCtrlEx::set_path(CString path, bool refresh)
 {
+	if (m_pShellImageList == NULL)
+		return;
+
 	m_last_clicked_time = 0;
 
-	path = convert_special_folder_to_real_path(path, m_pShellImageList->get_csidl_map());
+	path = convert_special_folder_to_real_path(path);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
 
 	m_path = path;
 
@@ -3089,13 +3092,13 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	//local일 경우는 파일목록을 다시 읽어서 표시한다.
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
-	if (m_is_shell_listctrl_local && reload)
+	if (m_is_local && reload)
 	{
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
 			std::deque<CString> drive_list;
 			get_drive_list(&drive_list);
-			for (i = 3; i < drive_list.size(); i++)
+			for (i = 0; i < drive_list.size(); i++)
 				m_cur_folders.push_back(CVtFileInfo(drive_list[i]));
 		}
 		else
@@ -3153,9 +3156,9 @@ void CVtListCtrlEx::display_list(CString cur_path)
 	//asc는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].path, m_pShellImageList->get_csidl_map());
+		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].path);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
 
-		if (m_is_shell_listctrl_local || real_path.Right(2) == _T(":\\"))
+		if (m_is_local || real_path.Right(2) == _T(":\\"))
 			img_idx = m_pShellImageList->GetSystemImageListIcon(real_path, true);
 		else
 			img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);

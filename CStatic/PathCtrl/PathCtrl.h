@@ -108,7 +108,7 @@ protected:
 		timer_mouse_over = 0,
 	};
 
-	bool						m_is_local_device = true;
+	bool						m_is_local = true;
 	//std::map<TCHAR, CString>	m_remote_drive_volume;
 
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만

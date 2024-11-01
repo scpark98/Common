@@ -310,7 +310,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (m_as_folder_list)
 	{
 		rect.left += 6;		//left margin
-		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID], m_pShellImageList->get_csidl_map());
+		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID]);// , m_pShellImageList->m_volume[0].get_label_map());
 		m_pShellImageList->m_imagelist_small.Draw(pDC, m_pShellImageList->GetSystemImageListIcon(real_path, true),
 			CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		rect.left += 16;	//small icon width

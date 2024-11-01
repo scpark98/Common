@@ -95,7 +95,7 @@ void CSCSliderCtrl::OnPaint()
 	int lower = GetRangeMin();
 	int upper = GetRangeMax();
 	int pos = GetPos();
-	TRACE(_T("GetPos() OnPaint() = %d\n"), pos);
+	//TRACE(_T("GetPos() OnPaint() = %d\n"), pos);
 
 	if (m_style == style_step && m_steps.size() < upper - lower)
 		m_steps.resize(upper - lower + 1);
@@ -884,7 +884,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		pos = Pixel2Pos(point.x);
 		//pos = (int)((double)point.x * (double)(upper - lower) / (double)Rect.right) + lower;
 		*/
-		TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
+		//TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
 		SetPos(pos);
 		//Invalidate(false);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);

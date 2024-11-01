@@ -145,6 +145,7 @@ void CMacProgressCtrl::OnPaint()
 	//TRACE(_T("%ld : %s\n"), GetTickCount(), __function__);
 
 	int pos = GetPos();
+	TRACE(_T("pos = %d\n"), pos);
 
 	//우선 투명은 패스하자.
 	if (m_bTransparent)
@@ -230,7 +231,7 @@ void CMacProgressCtrl::OnPaint()
 				}
 				else
 				{
-					dc.FillSolidRect(rtrack, m_cr_back_track);
+					dc.FillSolidRect(rc, m_cr_back_track);
 				}
 			}
 		}
@@ -418,6 +419,8 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rtrack)
 	}	// if not indeterminate
 	else
 	{
+		TRACE(_T("m_style = %d, rtrack.right = %d\n"), m_style, rtrack.right);
+
 		if (m_style == style_default)
 		{
 			pDC->FillSolidRect(rtrack, m_cr_track);
@@ -428,7 +431,7 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rtrack)
 			pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
 
 			int end = MAX(0, rtrack.right - rtrack.Height() / 2);
-			TRACE(_T("end = %d\n"), end);
+			//TRACE(_T("end = %d\n"), end);
 			g.DrawLine(&pen, rtrack.Height() / 2, rtrack.CenterPoint().y, end, rtrack.CenterPoint().y);
 		}
 	}
@@ -923,10 +926,10 @@ void CMacProgressCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		int nPos = (int)((double)point.x * (double)(m_upper - m_lower) / (double)Rect.right) + m_lower;
 		SetPos(nPos);
-		Invalidate(false);
+		//Invalidate(false);
 
-		//TRACE("%d\n", nPos);
 		::SendMessage( GetParent()->GetSafeHwnd(), MESSAGE_MACPROGRESSCTRL_MOVED, m_nCtrlID, nPos);
+		TRACE("%d\n", nPos);
 	}
 
 	CProgressCtrl::OnMouseMove(nFlags, point);
@@ -958,6 +961,7 @@ void CMacProgressCtrl::SetRange(int lower, int upper)
 void CMacProgressCtrl::SetPos(int pos)
 {
 	CProgressCtrl::SetPos(pos);
+	pos = GetPos();
 	Invalidate();
 
 	if (m_auto_hide && (pos >= m_upper || pos < 0))

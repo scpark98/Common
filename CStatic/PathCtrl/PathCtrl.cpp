@@ -149,7 +149,7 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 			m_pEdit->ShowWindow(SW_HIDE);
 			m_pEdit->GetWindowText(text);
 
-			if (m_is_local_device)
+			if (m_is_local)
 			{
 				if (!PathFileExists(text))
 					text = m_old_text;
@@ -319,7 +319,7 @@ void CPathCtrl::OnPaint()
 //로컬인지 원격인지 세팅
 void CPathCtrl::set_is_local_device(bool is_local)
 {
-	m_is_local_device = is_local;
+	m_is_local = is_local;
 }
 
 //원격일 경우 드라이브 볼륨 리스트를 얻어와서 이 함수를 통해 미리 넣어줘야 한다.
@@ -358,16 +358,16 @@ void CPathCtrl::SetWindowText(CString path, std::deque<CString>* sub_folders)
 
 void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 {
-	if (path.IsEmpty())
+	if (m_pShellImageList == NULL || path.IsEmpty())
 		return;
 
 	m_path.clear();
 
-	path = convert_special_folder_to_real_path(path, m_pShellImageList->get_csidl_map());
+	path = convert_special_folder_to_real_path(path);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
 
 	CString folder;
 
-	if (m_is_local_device)
+	if (m_is_local)
 	{
 		m_has_subfolder = (get_sub_folders(path) > 0);	//마지막 폴더명 아래 서브폴더가 존재하는지
 	}
@@ -376,6 +376,8 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 		if (sub_folders)
 		{
 			m_has_subfolder = (sub_folders->size() > 0);
+			m_remote_sub_folders.clear();
+			m_remote_sub_folders.assign(sub_folders->begin(), sub_folders->end());
 		}
 		else
 		{
@@ -405,13 +407,13 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	{
 		CString drive_volume;
 		
-		if (m_is_local_device)
+		if (m_is_local)
 		{
 			drive_volume = get_drive_volume(path[0]);
 		}
 		else
 		{
-			drive_volume = m_pShellImageList->get_drive_volume(1, path);
+			drive_volume = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(path);
 		}
 		m_path[0].label.Format(_T("%s"), drive_volume);
 	}
@@ -469,7 +471,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 			//맨 끝 폴더가 아니면 하위 폴더 목록에서 다음 폴더 항목이 선택된 상태로 표시되게 한다.
 			if (m_index < m_path.size() - 1)
 			{
-				if (m_is_local_device)
+				if (m_is_local)
 				{
 					total_lines = m_list_folder.set_path(full_path, m_path[m_index + 1].label);
 				}
@@ -481,7 +483,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 			}
 			else
 			{
-				if (m_is_local_device)
+				if (m_is_local)
 				{
 					total_lines = m_list_folder.set_path(full_path);
 				}
@@ -527,7 +529,7 @@ CString CPathCtrl::get_full_path(int index)
 	//special folder들인 경우(바탕 화면 등등)
 	if (m_path[2].label.Find(_T(":\\")) < 0 && m_path[2].label.Find(_T(":)")) < 0)
 	{
-		fullpath = convert_special_folder_to_real_path(m_path[2].label, m_pShellImageList->get_csidl_map());
+		fullpath = convert_special_folder_to_real_path(m_path[2].label);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
 		return fullpath;
 	}
 
@@ -577,7 +579,7 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	int count = 0;
 	CString full_path = get_full_path(m_index);
 
-	if (m_is_local_device)
+	if (m_is_local)
 	{
 		count = get_sub_folders(full_path);
 	}
@@ -830,7 +832,7 @@ void CPathCtrl::recalc_path_position()
 		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가
 		//remote인 경우는 하위 폴더목록을 request해서 받기 전까지는 구할 수 없다.
 		//하지만 m_path.size() - 1보다 하위의 폴더라면 이미 하위폴더가 있다는 뜻이므로 우선 이렇게 처리한다.
-		bool has_sub = (m_is_local_device ? get_sub_folders(get_full_path(i)) : true);
+		bool has_sub = (m_is_local ? get_sub_folders(get_full_path(i)) : true);
 		rt.right += (has_sub || (i < m_path.size() - 1) ? m_arrow_area_width : 0);
 
 		rt.top = rc.top;

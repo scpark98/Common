@@ -12,9 +12,94 @@ static char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
+CShellVolumeList::CShellVolumeList()
+{
+	//local일 경우는 직접 얻어오지만 remote일 경우는 받아와서 채워줘야 한다.
+	m_label.insert(std::pair<int, CString>(CSIDL_DRIVES, get_system_label(CSIDL_DRIVES)));
+	m_label.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_system_label(CSIDL_DESKTOP)));
+	m_label.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_system_label(CSIDL_MYDOCUMENTS)));
+
+	m_path.insert(std::pair<int, CString>(CSIDL_DRIVES, get_known_folder(CSIDL_DRIVES)));
+	m_path.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_known_folder(CSIDL_DESKTOP)));
+	m_path.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_known_folder(CSIDL_MYDOCUMENTS)));
+
+	std::deque<CString> drive_list;
+	::get_drive_list(&drive_list);
+	set_drive_list(&drive_list);
+}
+
+int CShellVolumeList::get_csidl(CString label)
+{
+	std::map<int, CString>::iterator it;
+
+	for (it = m_label.begin(); it != m_label.end(); it++)
+	{
+		if (it->second == label)
+			return it->first;
+	}
+
+	return -1;
+}
+
+CString CShellVolumeList::get_label(int csidl)
+{
+	if (m_label.find(csidl) != m_label.end())
+		return m_label[csidl];
+
+	return _T("");
+}
+
+//csidl에 해당하는 실제 경로 리턴
+CString CShellVolumeList::get_path(int csidl)
+{
+	if (m_path.find(csidl) != m_path.end())
+		return m_path[csidl];
+
+	return _T("");
+}
+
+//label에 해당하는 실제 경로 리턴
+CString CShellVolumeList::get_path(CString label)
+{
+	int csidl = get_csidl(label);
+	return get_path(csidl);
+}
+
+CString CShellVolumeList::get_drive_volume(CString path)
+{
+	int pos = path.Find(':');
+	if (pos < 0)
+		return _T("");
+
+	CString drive_letter = path.Mid(pos - 1, 2);
+
+	for (int i = 0; i < m_drives.size(); i++)
+	{
+		if (m_drives[i].Find(drive_letter) >= 0)
+			return m_drives[i];
+	}
+
+	return _T("");
+}
+
+void CShellVolumeList::set_system_label(std::map<int, CString>* map)
+{
+	m_label.clear();
+	m_label.insert(map->begin(), map->end());
+}
+
+void CShellVolumeList::set_system_path(std::map<int, CString>* map)
+{
+	m_path.clear();
+	m_path.insert(map->begin(), map->end());
+}
+
+void CShellVolumeList::set_drive_list(std::deque<CString>* drive_list)
+{
+	m_drives.clear();
+	m_drives.assign(drive_list->begin(), drive_list->end());
+}
+
 
 CShellImageList::CShellImageList()
 {
@@ -30,7 +115,7 @@ CShellImageList::~CShellImageList()
 
 int CShellImageList::GetSystemImageListIcon(int csidl, BOOL bDrive)
 {
-	return GetSystemImageListIcon(get_shell_known_string_by_csidl(csidl), bDrive);
+	return GetSystemImageListIcon(m_volume[0].get_label(csidl), bDrive);
 }
 
 int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
@@ -40,19 +125,19 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	//"내 PC"인 경우는 아래 함수에 의해 ""로 변환된다.
 	//szFile = convert_special_folder_to_real_path(szFile);
 	
-	if(szFile.IsEmpty() || szFile == get_shell_known_string_by_csidl(CSIDL_DRIVES))
+	if(szFile.IsEmpty() || szFile == m_volume[0].get_label(CSIDL_DRIVES))
 	{
 		LPITEMIDLIST pidl_Computer = NULL;
 		SHGetFolderLocation( NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer ); // 컴퓨터
 		SHGetFileInfo((TCHAR*)pidl_Computer, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
-	else if(szFile == get_shell_known_string_by_csidl(CSIDL_MYDOCUMENTS))
+	else if(szFile == m_volume[0].get_label(CSIDL_MYDOCUMENTS))
 	{
 		LPITEMIDLIST pidl_Document = NULL;
 		SHGetFolderLocation( NULL, CSIDL_MYDOCUMENTS, NULL, 0, &pidl_Document ); // 내문서
 		SHGetFileInfo((TCHAR*)pidl_Document, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_DISPLAYNAME | SHGFI_SYSICONINDEX | SHGFI_PIDL);
 	}
-	else if(szFile == get_shell_known_string_by_csidl(CSIDL_DESKTOP))
+	else if(szFile == m_volume[0].get_label(CSIDL_DESKTOP))
 	{
 		LPITEMIDLIST pidl_Desktop = NULL;
 		SHGetFolderLocation( NULL, CSIDL_DESKTOP, NULL, 0, &pidl_Desktop ); // 바탕화면
@@ -81,11 +166,8 @@ void CShellImageList::Initialize()
 {
 	CoInitialize(NULL);
 
-	//local일 경우는 직접 얻어오지만 remote일 경우는 받아와서 채워줘야 한다.
-	//0번에는 local의 drive_list를 얻어오고 그 후 용도에 따라 remote0, remote1...의 drive_list를 추가해준다.
-	std::deque<CString> drive_list;
-	::get_drive_list(&drive_list);
-	m_drive_lists.push_back(drive_list);
+	CShellVolumeList volume;
+	m_volume.push_back(volume);
 
 	SHFILEINFO shInfo;
 
@@ -94,10 +176,6 @@ void CShellImageList::Initialize()
 	//하나의 프로세스에서 얻어온 himagelist는 반드시 단 한번만 Attach()해야한다.
 	m_imagelist_small.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_SMALLICON));
 	m_imagelist_large.Attach((HIMAGELIST)SHGetFileInfo((LPCTSTR)_T("C:\\"), 0, &shInfo, sizeof(SHFILEINFO), SHGFI_SYSICONINDEX | SHGFI_LARGEICON));
-
-	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DRIVES, get_system_label(CSIDL_DRIVES)));
-	m_csidl_map.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_system_label(CSIDL_DESKTOP)));
-	m_csidl_map.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_system_label(CSIDL_MYDOCUMENTS)));
 
 	m_ExtArray.RemoveAll();
 	m_IDArray.RemoveAll();
@@ -175,6 +253,31 @@ int CShellImageList::GetVirtualImageListIcon(CString szExt)
 	return cache;
 }
 
+void CShellImageList::set_system_label(int index, std::map<int, CString>* map)
+{
+	if (index >= m_volume.size() - 1)
+		m_volume.resize(index + 1);
+
+	m_volume[index].set_system_label(map);
+}
+
+void CShellImageList::set_system_path(int index, std::map<int, CString>* map)
+{
+	if (index >= m_volume.size() - 1)
+		m_volume.resize(index + 1);
+
+	m_volume[index].set_system_path(map);
+}
+
+void CShellImageList::set_drive_list(int index, std::deque<CString>* drive_list)
+{
+	if (index >= m_volume.size() - 1)
+		m_volume.resize(index + 1);
+
+	m_volume[index].set_drive_list(drive_list);
+}
+
+/*
 CString CShellImageList::get_shell_known_string_by_csidl(int csidl)
 {
 	if (this == NULL)
@@ -204,14 +307,14 @@ std::map<int, CString>* CShellImageList::get_csidl_map()
 }
 
 //OS언어에 따라, 윈도우 버전에 따라 "내 컴퓨터"는 "내 PC", "내 컴퓨터", "My Computer" 등등 다양하므로 csidl로 구분한다.
-int CShellImageList::get_csidl_by_shell_known_string(CString str)
+int CShellImageList::get_csidl_by_shell_known_string(CString label)
 {
 	if (m_csidl_map.size() == 0)
 		return -1;
 
 	for (auto const& element : m_csidl_map)
 	{
-		if (element.second.Compare(str) == 0)
+		if (element.second.Compare(label) == 0)
 		{
 			return element.first;
 		}
@@ -219,7 +322,7 @@ int CShellImageList::get_csidl_by_shell_known_string(CString str)
 
 	return -1;
 }
-/*
+
 void CShellImageList::set_drive_map(std::map<TCHAR, CString>* drive_map)
 {
 	m_drive_map.clear();
@@ -239,7 +342,6 @@ void CShellImageList::set_drive_map(std::deque<CString>* drive_list)
 		m_drive_map.insert(std::pair<TCHAR, CString>(drive_volume[colon-1], drive_volume));
 	}
 }
-*/
 
 void CShellImageList::set_drive_list(int index, std::deque<CString>* drive_list)
 {
@@ -274,3 +376,4 @@ CString	CShellImageList::get_drive_volume(int index, CString path)
 
 	return _T("");
 }
+*/

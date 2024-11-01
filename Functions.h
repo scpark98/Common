@@ -764,7 +764,7 @@ struct	NETWORK_INFO
 	std::string	CStringToUtf8(CString inputtext);
 
 	//return받은 char*는 반드시 사용 후 free()해줘야 함.
-	char*		replace(char* s, const char* olds, const char* news);
+	TCHAR*		replace(TCHAR* src, const TCHAR* olds, const TCHAR* news);
 
 	//공백, '\t', '\r', '\n', '\0' 모두 제거
 	void		trim(char* src);
@@ -906,17 +906,17 @@ struct	NETWORK_INFO
 	//_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 	//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
 	//"c:\\", "c:\\abc/def", "123", "txt", "123.txt와 같이 보정한다.
-	//part : fn_drive(drive), fn_folder(drive+folder), fn_last_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
-	//만약 path가 "d:\\aaa\\b.abc"이고 b.abc가 파일이 아닌 폴더라면 문제된다.
-	//파일인지 폴더인지를 구분해서 처리하는 코드는 필수다.(실제 존재하는 경우에만 검사가 가능하다)
-	//단, path가 "연구소문서(\\192.168.1.103) (Y:)"과 같이 네트워크 경로를 포함한 드라이브 볼륨인 경우는
-	//분리해서는 안되므로 그냥 리턴해야 한다.
+	//part : fn_drive(drive), fn_folder(drive+folder), fn_leaf_folder(folder name), fn_title(filetitle), fn_ext(ext), fn_name(filename)
+	//fn_folder는 path가 파일이든 폴더든 전체 폴더 경로가 저장된다.
+	//만약 path가 "d:\\aaa\\bb"라면 bb가 파일인지 폴더인지 알 수 없다.
+	//remote의 파일이라면 PathIsFolder()함수로 검사할수도 없으므로
+ 	//path가 file이 아닌 폴더명이라고 하면 반드시 호출할때부터 맨 끝에 '\\'를 붙여서 호출해야 정확히 분리된다.
 	CString		get_part(CString path, int part);
 	enum FILENAME_PART
 	{
 		fn_drive,
 		fn_folder,
-		fn_last_folder,
+		fn_leaf_folder,
 		fn_title,
 		fn_ext,
 		fn_name,
@@ -1294,10 +1294,17 @@ h		: 복사할 height 크기(pixel)
 	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
 	void		get_drive_list(std::deque<CString> *drive_list, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
-	//"로컬 디스크 (C:)" <-> "C:\\" //하위 폴더 포함 유무에 관계없이 변환
-	//문서 -> "C:\\Documents", 그 외 일반 폴더는 그대로 리턴.
-	CString		convert_special_folder_to_real_path(CString special_folder, std::map<int, CString>* csidl_map = NULL);
-	CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*csidl_map = NULL);
+
+	//"로컬 디스크 (C:)" -> "C:\\"
+	//"문서" -> "C:\\Documents"
+	//"문서\\AnySupport" -> "C:\\Documents\\AnySupport"
+	//하위 폴더 포함 유무에 관계없이 변환.
+	//remote의 경로인 경우는 system_label, system_path, drive_list까지 모두 파라미터로 전달받아 처리해야하므로 복잡해지기 때문에
+	//이 함수에서는 remote인 경우는 처리하지 않는다.
+	//local->remote로 path를 전달할 때 그대로 전달하고 remote에서 이 함수를 통해 실제 경로로 변환해서 사용하자.
+	CString		convert_special_folder_to_real_path(CString special_folder);
+	//미구현!
+	CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*system_path_map = NULL);
 
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)

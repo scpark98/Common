@@ -53,7 +53,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CVtListCtrlEx::OnLvnItemchanged)
-	ON_WM_CONTEXTMENU()
+	//ON_WM_CONTEXTMENU()
 END_MESSAGE_MAP()
 
 
@@ -427,7 +427,9 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			}
 
 			//아이콘 표시
-			if (iSubItem == 0 && (m_is_shell_listctrl || m_use_own_imagelist))
+			if (iSubItem == 0 &&
+				(m_is_shell_listctrl ||
+				(m_use_own_imagelist && m_pShellImageList && m_pShellImageList->get_imagelist() && m_pShellImageList->get_imagelist()->GetImageCount())))
 			{
 				//16x16 아이콘을 22x21 영역에 표시한다. (21은 기본 height이며 m_line_height에 따라 달라진다.)
 				textRect.left += 3;

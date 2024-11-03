@@ -1116,7 +1116,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 	m_bHover = true;
 	redraw_window();
 
-	TRACE(_T("hover\n"));
+	//TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSEHOVER)), 0);
 
@@ -1134,7 +1134,7 @@ void CGdiButton::OnMouseLeave()
 	m_bHover = false;
 	redraw_window();
 
-	TRACE(_T("leave\n"));
+	//TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSELEAVE)), 0);
 

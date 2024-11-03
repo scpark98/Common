@@ -83,10 +83,10 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 
 	bool res = CreateEx(NULL, wc.lpszClassName, _T("SCShapeDlg"), dwStyle, CRect(left, top, right, bottom), parent, 0);
 
-	TRACE(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
+	//TRACE(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
 	CRect rc;
 	GetClientRect(rc);
-	TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
+	//TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
 	dwStyle &= ~(WS_CAPTION);

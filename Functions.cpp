@@ -10326,6 +10326,8 @@ int find_parameter(CString target)
 		if (CString(__targv[i]) == target)
 			return i;
 	}
+
+	return -1;
 }
 
 void Wow64Disable(bool disable)

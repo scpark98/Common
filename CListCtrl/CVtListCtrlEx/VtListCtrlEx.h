@@ -437,6 +437,8 @@ public:
 	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
 	void		progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }
 
+	void		set_draw_selected_border(bool draw) { m_draw_selected_border = draw; }
+
 //scroll
 	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
 	{
@@ -538,6 +540,8 @@ protected:
 	CImageList* create_drag_image(CListCtrl* pList, LPPOINT lpPoint);
 
 	bool			m_use_indent_from_prefix_space = false;
+
+	bool			m_draw_selected_border = true;
 
 protected:
 	DECLARE_MESSAGE_MAP()

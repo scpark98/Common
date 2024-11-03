@@ -466,7 +466,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (/*m_is_shell_listctrl && */!m_in_editing && (GetFocus() == this))
+	if (m_draw_selected_border && !m_in_editing && (GetFocus() == this))
 	{
 		for (int i = 0; i < size(); i++)
 		{

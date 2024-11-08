@@ -145,7 +145,7 @@ void CMacProgressCtrl::OnPaint()
 	//TRACE(_T("%ld : %s\n"), GetTickCount(), __function__);
 
 	int pos = GetPos();
-	TRACE(_T("pos = %d\n"), pos);
+	//TRACE(_T("pos = %d\n"), pos);
 
 	//우선 투명은 패스하자.
 	if (m_bTransparent)
@@ -419,7 +419,7 @@ void CMacProgressCtrl::DrawHorizontalBar(CDC *pDC, const CRect rtrack)
 	}	// if not indeterminate
 	else
 	{
-		TRACE(_T("m_style = %d, rtrack.right = %d\n"), m_style, rtrack.right);
+		//TRACE(_T("m_style = %d, rtrack.right = %d\n"), m_style, rtrack.right);
 
 		if (m_style == style_default)
 		{

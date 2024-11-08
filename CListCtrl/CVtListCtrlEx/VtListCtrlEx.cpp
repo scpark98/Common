@@ -54,6 +54,10 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_LBUTTONUP()
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CVtListCtrlEx::OnLvnItemchanged)
 	//ON_WM_CONTEXTMENU()
+	ON_WM_MOUSEHOVER()
+	ON_WM_MOUSELEAVE()
+	ON_WM_SETFOCUS()
+	ON_WM_KILLFOCUS()
 END_MESSAGE_MAP()
 
 
@@ -210,15 +214,17 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
 		//포커스를 가졌거나 Always Show Selection이라면 선택 항목의 색상을 표시해주고
-		if (((GetFocus() == this) || is_show_selection_always) && GetItemState(iItem, LVIS_SELECTED)) //ok
+		if ((m_has_focus || is_show_selection_always) && GetItemState(iItem, LVIS_SELECTED)) //ok
 		{
-			if (GetFocus() == this)
+			if (m_has_focus)
 			{
+				TRACE(_T("list. OnPaint. has focus\n"));
 				crText = m_theme.cr_text_selected;
 				crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
+				TRACE(_T("list. OnPaint. LVIS_SELECTED\n"));
 				crText = m_theme.cr_text_selected_inactive;
 				crBack = m_theme.cr_back_selected_inactive;
 			}
@@ -233,6 +239,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (GetItemState(iItem, LVIS_DROPHILITED)) //ok
 		{
+			TRACE(_T("list. OnPaint. LVIS_DROPHILITED\n"));
 			crText = m_theme.cr_text_selected;
 			crBack = m_theme.cr_back_selected;
 		}
@@ -345,8 +352,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			//바그래프는 셀의 높이, 즉 라인 간격에 상대적이지 않고 폰트의 높이값에 비례하는 높이로 그려줘야 한다.
 			int cy = r.CenterPoint().y;
-			r.top = cy + (double)m_lf.lfHeight / 1.4 + 1;		//이 값을 키우면 바그래프의 높이가 낮아진다.
-			r.bottom = cy - (double)m_lf.lfHeight / 1.4;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
+			r.top = cy + (double)m_lf.lfHeight / 2.0;		//이 값을 키우면 바그래프의 높이가 낮아진다.
+			r.bottom = cy - (double)m_lf.lfHeight / 2.0;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
 
 			double d = _ttof(m_list_db[iItem].text[iSubItem]);
 			d /= 100.0;
@@ -466,7 +473,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_draw_selected_border && !m_in_editing && (GetFocus() == this))
+	if (m_draw_selected_border && !m_in_editing && m_has_focus)
 	{
 		for (int i = 0; i < size(); i++)
 		{
@@ -849,8 +856,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 
 	TRACE(_T("iSub = %d, sort_asc = %d, data_type = %d\n"), iSub, sort_asc, data_type);
 
-	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한 후 보여줘야 하므로 아래 람다를 사용할 수 없다.
-	//또한 파일, 폴더 정렬 시 대소문자를 구분하지 않는다.
+	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한다.
 	if (m_is_shell_listctrl)
 	{
 		std::sort(m_cur_folders.begin(), m_cur_folders.end(),
@@ -860,7 +866,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					return (a.path.CompareNoCase(b.path) == 1);
 				else if (iSub == 1)
 					return (a.size > b.size);
-				if (iSub == 2)
+				else if (iSub == 2)
 					return (a.date.CompareNoCase(b.date) == 1);
 			});
 
@@ -871,7 +877,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					return (a.path.CompareNoCase(b.path) == 1);
 				else if (iSub == 1)
 					return (a.size > b.size);
-				if (iSub == 2)
+				else if (iSub == 2)
 					return (a.date.CompareNoCase(b.date) == 1);
 			});
 
@@ -2182,13 +2188,16 @@ int CVtListCtrlEx::get_selected_items(std::deque<int> *dqSelected)
 }
 
 
-void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_unselect)
+void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_unselect, bool make_visible)
 {
 	if (after_unselect)
 		unselect_selected_item();
 
 	SetItemState(nIndex, bSelect ? LVIS_SELECTED : 0, LVIS_SELECTED);
 	SetItemState(nIndex, bSelect ? LVIS_FOCUSED : 0, LVIS_FOCUSED);
+
+	if (make_visible)
+		ensure_visible(nIndex, visible_last);
 }
 
 void CVtListCtrlEx::unselect_selected_item()
@@ -3094,36 +3103,42 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	//local일 경우는 파일목록을 다시 읽어서 표시한다.
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
-	if (m_is_local && reload)
+	if (m_is_local)
 	{
-		if (m_path == get_system_label(CSIDL_DRIVES))
+		if (reload)
 		{
-			std::deque<CString> drive_list;
-			get_drive_list(&drive_list);
-			for (i = 0; i < drive_list.size(); i++)
-				m_cur_folders.push_back(CVtFileInfo(drive_list[i]));
-		}
-		else
-		{
-			CFileFind	finder;
+			m_cur_folders.clear();
+			m_cur_files.clear();
 
-			bool bWorking = finder.FindFile(m_path + _T("\\*"));
-
-			while (bWorking)
+			if (m_path == get_system_label(CSIDL_DRIVES))
 			{
-				bWorking = finder.FindNextFile();
-				sfile = finder.GetFilePath();
+				std::deque<CString> drive_list;
+				get_drive_list(&drive_list);
+				for (i = 0; i < drive_list.size(); i++)
+					m_cur_folders.push_back(CVtFileInfo(drive_list[i]));
+			}
+			else
+			{
+				CFileFind	finder;
 
-				if (finder.IsDots() || finder.IsHidden() || finder.IsSystem())
-					continue;
+				bool bWorking = finder.FindFile(m_path + _T("\\*"));
 
-				if (finder.IsDirectory())
+				while (bWorking)
 				{
-					m_cur_folders.push_back(CVtFileInfo(sfile));
-					continue;
-				}
+					bWorking = finder.FindNextFile();
+					sfile = finder.GetFilePath();
 
-				m_cur_files.push_back(CVtFileInfo(sfile));
+					if (finder.IsDots() || finder.IsHidden() || finder.IsSystem())
+						continue;
+
+					if (finder.IsDirectory())
+					{
+						m_cur_folders.push_back(CVtFileInfo(sfile));
+						continue;
+					}
+
+					m_cur_files.push_back(CVtFileInfo(sfile));
+				}
 			}
 		}
 
@@ -3490,6 +3505,21 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 	//Also, while over a CListCtrl, this routine will highlight
 	// the item we are hovering over.
 
+	if (!m_is_hovering)
+	{
+		TRACE(_T("list. move\n"));
+		TRACKMOUSEEVENT tme;
+		tme.cbSize = sizeof(tme);
+		tme.hwndTrack = m_hWnd;
+		//TME_HOVER를 넣으면 마우스가 hover되면 자동으로 focus를 가진다.
+		tme.dwFlags = TME_LEAVE;// | TME_HOVER;
+		tme.dwHoverTime = 1;
+		m_is_hovering = true;
+		/*m_bIsTracking = */_TrackMouseEvent(&tme);
+		//RedrawWindow();
+	}
+
+
 	//// If we are in a drag/drop procedure (m_bDragging is true)
 	if (m_bDragging)
 	{
@@ -3767,4 +3797,57 @@ void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
 void CVtListCtrlEx::OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+}
+
+
+void CVtListCtrlEx::OnMouseHover(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACE(_T("list. hover\n"));
+	CListCtrl::OnMouseHover(nFlags, point);
+}
+
+
+void CVtListCtrlEx::OnMouseLeave()
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACE(_T("list. leave\n"));
+	m_is_hovering = false;
+	CListCtrl::OnMouseLeave();
+}
+
+//HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 CListCtrl의 Get/SetItemData() 함수를 사용할 수 없다.
+//이 두 함수를 사용할 수 있도록 CListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
+DWORD_PTR CVtListCtrlEx::GetItemData(int nItem)
+{
+	if (nItem < 0 || nItem >= m_list_db.size())
+		return NULL;
+
+	return m_list_db[nItem].data;
+}
+
+BOOL CVtListCtrlEx::SetItemData(int nItem, DWORD_PTR dwData)
+{
+	if (nItem < 0 || nItem >= m_list_db.size())
+		return FALSE;
+
+	m_list_db[nItem].data = dwData;
+}
+
+
+void CVtListCtrlEx::OnSetFocus(CWnd* pOldWnd)
+{
+	CListCtrl::OnSetFocus(pOldWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	m_has_focus = true;
+}
+
+
+void CVtListCtrlEx::OnKillFocus(CWnd* pNewWnd)
+{
+	CListCtrl::OnKillFocus(pNewWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	m_has_focus = false;
 }

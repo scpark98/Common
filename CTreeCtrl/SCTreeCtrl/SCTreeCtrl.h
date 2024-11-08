@@ -30,6 +30,7 @@
 #include <afxwin.h>
 #include <afxcmn.h>
 #include <deque>
+#include <functional>
 
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
@@ -84,6 +85,7 @@ public:
 		//message_selchanged = 0,		//TVN_SELCHANGED를 이용하므로 제거한다.
 		message_drag_and_drop = 0,
 		message_request_folder_list,	//remote일 경우 OnTvnItemexpanding() 메시지가 발생하면 remote의 폴더목록을 받아서 넣어줘야 한다.
+		message_edit_item,				//F2키를 누르면 메인에서 편집작업을 수행하기 위해.
 	};
 
 
@@ -172,6 +174,7 @@ public:
 	void		SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
 	void		SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
 
+
 	//Drag&Drop 드래깅 관련
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	{
@@ -216,8 +219,22 @@ public:
 	void			set_font_bold(bool bold = true);
 	void			set_font_italic(bool italic = true);
 
+	//색상 관련
+	//std::function<void()>	function_check_dim_text;
+	//void			set_dim_text_function(std::function<void()> func) { function_check_dim_text = func; }
+	bool			(*check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
+	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { check_is_dim_text = func; }
+
+	//루트 항목 관련
+	void			set_root_item(UINT icon, CString label);
 
 protected:
+	//root 항목은 실제 또는 형식상의 root일 수 있다.
+	//탐색기의 "내 PC"는 형식상의 root이고 "로컬 디스크 (C:)"는 실제적인 root다.
+	//이런 루트를 표시할 것인지에 관련한 항목 정의.
+	HTREEITEM		m_root = NULL;
+	bool			m_use_root = false;
+
 	enum TIMER_ID
 	{
 		timer_expand_for_drop = 0,
@@ -244,6 +261,9 @@ protected:
 	//주어진 항목의 label을 변경한다.
 	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
 	void			delete_item(HTREEITEM hItem = NULL, bool confirm = true);
+
+	//마우스가 컨트롤 안에 들어온 경우 true
+	bool			m_is_hovering = false;
 
 
 	//들여쓰기 크기
@@ -278,20 +298,6 @@ protected:
 	int				m_font_size;
 	void			reconstruct_font();
 
-	//컬러 관련
-	/*
-	Gdiplus::Color	m_cr_text;					//기본 글자색
-	Gdiplus::Color	m_cr_text_selected;			//선택 항목의 활성화(active) 글자색
-	Gdiplus::Color	m_cr_text_selected_inactive;	//선택 항목의 비활성화(inactive) 글자색
-	Gdiplus::Color	m_cr_text_dropHilited;
-	Gdiplus::Color	m_cr_back;					//기본 배경색
-	Gdiplus::Color	m_cr_back_selected;
-	Gdiplus::Color	m_cr_back_selected_inactive;
-	Gdiplus::Color	m_crBackTrackSelect;		//hot tracking item back color
-	Gdiplus::Color	m_cr_back_dropHilited;
-	Gdiplus::Color	m_cr_selected_border;
-	*/
-
 	//Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;
 	CWnd*			m_pDragWnd = NULL;			//Which wnd we are dragging FROM
@@ -319,8 +325,6 @@ protected:
 		rect_icon,
 		rect_label,
 	};
-	//fullRow(0), 확장버튼(1), 체크박스(2), 아이콘(3), 레이블(4) 총 5개의 CRect를 구한다.
-	void			get_item_rect(HTREEITEM hItem, CRect r[]);
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -350,6 +354,8 @@ public:
 	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
+	afx_msg void OnMouseLeave();
 };
 
 

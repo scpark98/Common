@@ -41,6 +41,9 @@ public:
 	int max_column;
 	bool checked = false;
 	int selected = false;
+	//HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 Get/SetItemData() 함수를 사용할 수 없다.
+	//이 두 함수를 사용할 수 있도록 data 멤버를 추가한다.
+	DWORD_PTR data = 0;
 
 	//이 벡터가 NULL이면 CVtListCtrlEx의 멤버인 m_cr_text, m_cr_back을 사용하고
 	//색상값이 특정색이 아니면 해당 색으로 그 컬럼을 표시한다.

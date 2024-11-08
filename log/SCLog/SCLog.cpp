@@ -163,7 +163,15 @@ CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		CString log_text;
 		CString log_level;
 
-		log_text.FormatV(format, args);
+		try
+		{
+			log_text.FormatV(format, args);
+		}
+		catch (CException* e)
+		{
+			CString str = get_last_error_string();
+			AfxMessageBox(str);
+		}
 
 		//만약 로그 텍스트의 맨 앞에 \n이 붙어있으면 이전 로그 라인과 라인을 구분하기 위함인데
 		//그냥 기록하면 시간부터 라인번호까지 출력한 후 라인이 변경된다.

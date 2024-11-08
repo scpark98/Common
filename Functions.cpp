@@ -2683,12 +2683,15 @@ void request_url(CRequestUrlParams* params)
 				byte(buffer[1]) == 0xBB &&
 				byte(buffer[2]) == 0xBF)
 				memcpy(buffer, buffer + 3, dwRead - 3);
-			TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
+			//TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
 			buffer[dwRead] = '\0';
 			//strcat(total_result, buffer);
 			//TRACE(_T("total_result len = %d\n"), strlen(total_result));
 			params->result += UTF8toCString(buffer);
-			TRACE(_T("params->result len = %d\n"), params->result.GetLength());
+			//params->result += UTF8toANSI(buffer);
+			//params->result += ANSItoUTF8(buffer);
+			//params->result += CStringA(buffer);
+			//TRACE(_T("params->result len = %d\n"), params->result.GetLength());
 		}
 		else
 		{
@@ -5169,6 +5172,34 @@ int	get_text_encoding(CString sfile)
 	fclose(fp);
 
 	return text_encoding;
+}
+
+CString read(CString filepath, int code_page)
+{
+	CString result;
+
+	if (PathFileExists(filepath) == false)
+		return result;
+
+	if (code_page != CP_ACP && code_page != CP_UTF8)
+		code_page = CP_UTF8;
+
+	FILE* fp = NULL;
+	
+	if (code_page == CP_UTF8)
+		fp = _tfopen(filepath, _T("rt")CHARSET);
+	else
+		fp = _tfopen(filepath, _T("rt"));
+
+	uint64_t filesize = get_file_size(filepath);
+	TCHAR* data = new TCHAR[filesize];
+	_fgetts(data, get_file_size(filepath) * 2, fp);
+
+	fclose(fp);
+
+	result = CString(data);
+	delete[] data;
+	return result;
 }
 
 //20231206

@@ -42,10 +42,10 @@
 	else
 		TRACE(_T("asdfsd = %s\n"), json.doc["asdfsd"].GetCString());
 
-	//read bool type
+	//read bool type value
 	bool b = json.doc["result"].GetBool();
 
-	//assign bool type
+	//assign bool type value
 	json.doc["result"] = false;
 
 	//read objects member
@@ -65,6 +65,8 @@
 
 #define RAPIDJSON_HAS_STDSTRING 1
 
+#include <vector>
+#include <map>
 #include <string>
 #include <afxwin.h>
 #include "string.h"
@@ -88,13 +90,22 @@ public:
 	bool		load(CString input_json);
 
 	//bool		write(std::string output_json);
-	bool		save(CString output_json);
+	bool		save(CString output_json_file);
 
 	//traverse로 구현된 TRACE 출력.
 	void		print();
 
 	//pretty가 true이면 indent가 적용된 형식으로 리턴.
 	CString		get_json_string(bool pretty = true);
+
+	//array2:[{"name": "peter", "age": 21}, {"name": "mike", "age":24}]과 같이 항목과 값이 pair로 존재하는 array를
+	//map으로 변환해준다. 단, 모든 필드값은 무조건 CString으로 강제 변환한다.
+	//koino 프로젝트에서 사용한 Api::JsonToArray() 대체용
+	//src는 CString, arr_name은 std::string으로 한 이유는 다음과 같다.
+	//src는 request후에 params.result라는 CString 타입의 json 데이터이며
+	//arr_name은 "objects" 또는 "data"와 같이 추출할 json 필드명이므로 호출할 때는 다음과 같이 호출하면 된다.
+	//json.array_to_map(params.result, "objects", &arr);
+	bool		array_to_map(CString src, std::string arr_name, std::vector<std::map<CString, CString>>* arr);
 
 	//template을 이용해서 요청하는 타입으로 리턴하는 함수 작성 중...
 	//해당 필드가 없을 경우 assert가 발생하는데 이 또한 미리 확인가능하지만 어떻게 처리할지...

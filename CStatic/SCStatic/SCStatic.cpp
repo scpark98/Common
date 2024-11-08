@@ -97,8 +97,8 @@ void CSCStatic::PreSubclassWindow()
 	//modified the style to avoid text overlap when press tab 
 	ModifyStyle(0, BS_ICON);
 
-	// Get Defalut Font 
-	CWnd* pWnd = AfxGetMainWnd();
+	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
+	CWnd* pWnd = GetParent();
 	CFont* font = NULL;
 
 	if (pWnd)

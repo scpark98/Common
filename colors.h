@@ -62,6 +62,7 @@ public :
 	static std::deque<CString> get_color_theme_list();
 
 	Gdiplus::Color	cr_text;
+	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목
 	Gdiplus::Color	cr_text_hover;
 	Gdiplus::Color	cr_text_dropHilited;
 	Gdiplus::Color	cr_text_selected;

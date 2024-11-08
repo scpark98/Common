@@ -297,7 +297,7 @@ public:
 	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
 	int			get_selected_items(std::deque<int> *dqSelected = NULL);
 	//index = -1 : 전체선택
-	void		select_item(int index, bool select = true, bool after_unselect = false);
+	void		select_item(int index, bool select = true, bool after_unselect = false, bool make_visible = true);
 	void		unselect_selected_item();
 
 	//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
@@ -473,13 +473,18 @@ public:
 			m_drag_images_id.push_back(id);
 	}
 
-	bool			use_drag_and_drop() { return m_use_drag_and_drop; }
-	void			use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
+	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
+	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
 	int				get_drop_index() { return m_nDropIndex; }
 
 	//text = "     some text"일 경우 앞의 공백을 들여쓰기 용도로 사용한다.
 	//"     " 만큼 들여써서 "some text"를 출력한다. 아이콘도 함께 적용된다.
 	void			use_indent_from_prefix_space(bool use_indent) { m_use_indent_from_prefix_space = use_indent; }
+
+	//HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 Get/SetItemData() 함수를 사용할 수 없다.
+	//이 두 함수를 사용할 수 있도록 CListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
+	DWORD_PTR		GetItemData(int nItem);
+	BOOL			SetItemData(int nItem, DWORD_PTR dwData);
 
 protected:
 
@@ -524,6 +529,9 @@ protected:
 
 	bool			m_show_progress_text = true;
 
+	//마우스가 컨트롤 안에 들어온 경우 true
+	bool			m_is_hovering = false;
+
 //Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;
 	CWnd*			m_pDragWnd = NULL;			//Which ListCtrl we are dragging FROM
@@ -543,6 +551,7 @@ protected:
 
 	bool			m_draw_selected_border = true;
 
+	bool			m_has_focus = false;
 protected:
 	DECLARE_MESSAGE_MAP()
 public:
@@ -571,6 +580,10 @@ public:
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	afx_msg BOOL OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
+	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
+	afx_msg void OnMouseLeave();
+	afx_msg void OnSetFocus(CWnd* pOldWnd);
+	afx_msg void OnKillFocus(CWnd* pNewWnd);
 };
 
 

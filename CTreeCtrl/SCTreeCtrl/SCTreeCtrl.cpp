@@ -51,6 +51,8 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_VSCROLL()
 	ON_WM_MOUSEHWHEEL()
 	ON_WM_MOUSEWHEEL()
+	ON_WM_MOUSEHOVER()
+	ON_WM_MOUSELEAVE()
 END_MESSAGE_MAP()
 
 
@@ -59,12 +61,18 @@ END_MESSAGE_MAP()
 void CSCTreeCtrl::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	CFont* font = GetParent()->GetFont();
 
-	if (font != NULL)
-		font->GetObject(sizeof(m_lf), &m_lf);
-	else
+	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
+	CWnd* pWnd = GetParent();
+	CFont* font = NULL;
+
+	if (pWnd)
+		font = pWnd->GetFont();
+
+	if (font == NULL)
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	else
+		font->GetObject(sizeof(m_lf), &m_lf);
 
 	reconstruct_font();
 
@@ -95,8 +103,12 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_F2:
 			{
-				edit_item(NULL);
-				return TRUE;
+				//편집을 컨트롤 내부에서 처리하는게 편하지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
+				//(실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능)
+				//edit_item(NULL);
+				//return TRUE;
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
+				return FALSE;
 			}
 
 			case VK_RETURN:
@@ -945,6 +957,8 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 //결국 OnPaint()에서 직접 그려주는 방법이 아닌 OnCustomDraw()로 전환함.
 BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
+	TRACE(_T("OnNMClick\n"));
+
 	if (m_in_editing)
 	{
 		edit_end(true);
@@ -972,8 +986,10 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 		{
 			if (hCurItem == m_last_clicked_item)
 			{
-				//TRACE(_T("edit start\n"));
-				edit_item();
+				//편집을 컨트롤 내부에서 처리하는게 편하지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
+				//(실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능)
+				//edit_item();
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
 			}
 			else
 			{
@@ -996,54 +1012,6 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 		//TRACE(_T("m_last_clicked_time = %ld\n"), m_last_clicked_time);
 	}
 
-	/*
-	CPoint pt;
-
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
-
-
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	UINT nFlags = 0;
-	CString str;
-	CString fullpath;
-
-	HTREEITEM hItem = hit_test(&nFlags);
-	if (hItem == NULL)
-		return TRUE;
-
-	SelectItem(hItem);
-
-	//확장버튼을 누르면 (확장 단추 표시 속성이 TRUE일 경우에만 처리됨)
-	if (nFlags & TVHT_ONITEMBUTTON)
-	{
-		nFlags = GetItemState(hItem, TVIS_EXPANDED);
-
-		TRACE(_T("[%s] expanded = %d\n"), GetItemText(hItem), nFlags & TVIS_EXPANDED);
-
-		if (m_is_shell_treectrl)
-		{
-			//만약 child가 없다면 아직 로딩되지 않은 노드이므로 검색해서 추가한다.
-			//물론 실제 child가 없는 폴더일수도 있다.
-			if (GetChildItem(hItem) == NULL)
-				insert_folder(hItem, get_fullpath(hItem));
-
-			m_folder_list = iterate_tree_with_no_recursion();
-		}
-		else
-		{
-			if (nFlags & TVIS_EXPANDED)
-				Expand(hItem, TVE_COLLAPSE);
-			else// if (nFlags & TVIS_EXPANDED)
-				Expand(hItem, TVE_EXPAND);
-		}
-	}
-	else if (nFlags & TVHT_ONITEMSTATEICON)
-	{
-		//BOOL checked = GetCheck(hItem);
-		//SetCheck(hItem, !checked);
-	}
-	*/
 	*pResult = 0;
 
 	return FALSE;
@@ -1672,6 +1640,20 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (!m_is_hovering)
+	{
+		TRACE(_T("tree. move\n"));
+		TRACKMOUSEEVENT tme;
+		tme.cbSize = sizeof(tme);
+		tme.hwndTrack = m_hWnd;
+		//TME_HOVER를 넣으면 마우스가 hover되면 자동으로 focus를 가진다.
+		tme.dwFlags = TME_LEAVE;// | TME_HOVER;
+		tme.dwHoverTime = 1;
+		m_is_hovering = true;
+		/*m_bIsTracking = */_TrackMouseEvent(&tme);
+		//RedrawWindow();
+	}
+
 	if (m_bDragging)
 	{
 		GetCursorPos(&point);
@@ -1748,6 +1730,23 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	CTreeCtrl::OnMouseMove(nFlags, point);
 }
 
+
+void CSCTreeCtrl::OnMouseHover(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACE(_T("tree. hover\n"));
+	CTreeCtrl::OnMouseHover(nFlags, point);
+}
+
+
+void CSCTreeCtrl::OnMouseLeave()
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	m_is_hovering = false;
+	KillTimer(timer_expand_for_drop);
+	TRACE(_T("tree. leave\n"));
+	CTreeCtrl::OnMouseLeave();
+}
 
 void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 {
@@ -2387,7 +2386,7 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	//편집 사각형의 right는 레이블 너비보다 좀 더 넉넉하게 준다. 단, rc.right를 넘어가서는 안된다.
 	CRect rc;
 	CRect r;
-	//get_item_rect(hItem, r);
+
 	GetItemRect(hItem, r, TRUE);
 
 	//아이템이 선택되었을 때 label의 크기가 좌우 타이트하여 left -= 2;
@@ -2462,108 +2461,20 @@ void CSCTreeCtrl::edit_end(bool valid)
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
 	
-	CRect r;
-	GetItemRect(m_edit_item, r, FALSE);
-	Invalidate();
+	//실제 변경 유무와 관계없이 후처리는 main에 맞겨야 한다.
+	TV_DISPINFO dispinfo;
+	dispinfo.hdr.hwndFrom = m_hWnd;
+	dispinfo.hdr.idFrom = GetDlgCtrlID();
+	dispinfo.hdr.code = TVN_ENDLABELEDIT;
 
-	if (m_edit_old_text == m_edit_new_text)
-		return;
+	dispinfo.item.mask = TVIF_TEXT;
+	dispinfo.item.hItem = m_edit_item;
 
-	//실제 변경된 텍스트로 해당 아이템의 레이블을 변경하는 것은 main에 맞겨야 한다.
-	if (valid)
-	{
-		TV_DISPINFO dispinfo;
-		dispinfo.hdr.hwndFrom = m_hWnd;
-		dispinfo.hdr.idFrom = GetDlgCtrlID();
-		dispinfo.hdr.code = TVN_ENDLABELEDIT;
-
-		dispinfo.item.mask = TVIF_TEXT;
-		dispinfo.item.hItem = m_edit_item;
-		//dispinfo.item.pszText = bEscape ? NULL : LPTSTR((LPCTSTR)Text);
-		//dispinfo.item.cchTextMax = Text.GetLength();
-
-		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
-	}
-
+	GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
 
 	Invalidate();
 }
 
-//custom draw일 경우는 직접 계산해야 한다?
-void CSCTreeCtrl::get_item_rect(HTREEITEM hItem, CRect r[])
-{
-	CRect rc, temp, row;
-	int label_width;
-
-	GetClientRect(rc);
-	GetItemRect(hItem, &row, FALSE);
-
-	CFont font;
-	CFont* pOldFont;
-
-	CClientDC dc(this);
-	font.CreateFontIndirect(&m_lf);
-	pOldFont = (CFont*)dc.SelectObject(&font);
-	CSize sz = dc.GetTextExtent(GetItemText(hItem));
-	dc.SelectObject(pOldFont);
-
-	temp = row;
-	temp.right = rc.right - 1;
-	r[rect_row] = temp;
-
-	//indent 적용
-	int total_indent = 0;
-	HTREEITEM hParent = hItem;
-	while (hParent)
-	{
-		total_indent += m_indent_size;
-		hParent = GetParentItem(hParent);
-	}
-
-	temp.left = total_indent - m_indent_size;
-
-
-	if (GetStyle() & TVS_HASBUTTONS)
-	{
-		r[rect_button] = temp;
-		r[rect_button].right = r[rect_button].left + 16;
-		temp.left += 16;
-	}
-
-	if (GetStyle() & TVS_CHECKBOXES)
-	{
-		r[rect_check] = temp;
-		r[rect_check].right = r[rect_check].left + 16;
-		temp.left += 16;
-	}
-
-	if (m_is_shell_treectrl || (m_imagelist.GetSafeHandle() && m_imagelist.GetImageCount()))
-	{
-		r[rect_icon] = temp;
-		r[rect_icon].right = r[rect_icon].left + m_image_size;
-		temp.left += m_image_size;
-	}
-
-	r[rect_label] = temp;
-	r[rect_label].left += 4;
-	r[rect_label].right = r[rect_label].left + sz.cx + 8;
-
-	//영역 확인용 코드
-	if (m_show_area)
-	{
-		Trace(_T("\nrow = %s\nbutton = %s\ncheck = %s\nicon = %s\nlabel = %s\n"),
-			get_rect_info_string(r[rect_row]),
-			get_rect_info_string(r[rect_button]),
-			get_rect_info_string(r[rect_check]),
-			get_rect_info_string(r[rect_icon]),
-			get_rect_info_string(r[rect_label]));
-
-		draw_rectangle(&dc, r[rect_button], RGB2gpColor(red));
-		draw_rectangle(&dc, r[rect_check], RGB2gpColor(skyblue));
-		draw_rectangle(&dc, r[rect_icon], RGB2gpColor(orange));
-		draw_rectangle(&dc, r[rect_label], RGB2gpColor(cyan));
-	}
-}
 
 void CSCTreeCtrl::set_log_font(LOGFONT lf)
 {
@@ -2673,6 +2584,14 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			Gdiplus::Color crText = m_theme.cr_text;
 			Gdiplus::Color crBack = m_theme.cr_back;
+
+			//간혹 특정 조건의 아이템의 색상을 달리 표현할 필요가 있는데 이를 판별하는 것은 parent에서 하도록 해야
+			//범용성이 유지된다.
+			//parent의 함수포인터를 지정받아서 호출하고 그 결과에 따라 정해진 액션을 취한다.
+			//이 컨트롤의 CWnd*와 아이템 핸들을 건네주면 parent에서 판별하여 리턴한다.
+			if (check_is_dim_text && check_is_dim_text(this, hItem))
+				crText = m_theme.cr_text_dim;
+
 
 			int nOldBkMode = dc.SetBkMode(TRANSPARENT);
 
@@ -3012,3 +2931,4 @@ void CSCTreeCtrl::set_color_theme(int theme)
 	
 	Invalidate();
 }
+

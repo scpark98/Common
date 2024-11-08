@@ -968,6 +968,7 @@ struct	NETWORK_INFO
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
 	bool		delete_file(CString fullpath, bool bTrashCan = false);
 	int			get_text_encoding(CString sfile);
+	CString		read(CString filepath, int code_page = CP_UTF8);
 	bool		save(CString filepath, CString text, int code_page = CP_UTF8);
 	bool		file_open(FILE** fp, CString mode, CString file);
 

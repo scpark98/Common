@@ -560,6 +560,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		case color_theme_dark_gray :
 			cur_theme				= color_theme_dark_gray;
 			cr_text					= Gdiplus::Color(255, 164, 164, 164);
+			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
 			cr_text_selected_inactive = cr_text_selected;
@@ -585,6 +586,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		case color_theme_dark :
 			cur_theme				= color_theme_dark;
 			cr_text					= Gdiplus::Color(255, 212, 212, 212);
+			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
 			cr_text_selected_inactive = cr_text_selected;
@@ -626,6 +628,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		default : //case color_theme_default :
 			cur_theme				= color_theme_default;
 			cr_text					= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+			cr_text_dim				= get_color(cr_text, 32);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= cr_text;// RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
 			cr_text_selected_inactive = cr_text_selected;

@@ -18,6 +18,8 @@
 * 
 * 또는 CGdiplusBitmap 이미지를 생성한 후 render(Gdiplus::Bitmap* img)함수를 호출하여
 * 이미지를 설정한다.
+* 
+* set_text()를 사용하면 이미지 대신 텍스트가 표시되는 shapeDlg를 표시할 수 있다.
 */
 
 #include "../../GdiplusBitmap.h"
@@ -92,10 +94,10 @@ public:
 
 	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
-	void			set_image(CGdiplusBitmap* img, bool deep_copy = true);
-	bool			load(UINT id);
-	bool			load(CString sType, UINT id);
-	bool			load(CString sFile);
+	void			set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy = true);
+	bool			load(CWnd* parent, UINT id);
+	bool			load(CWnd* parent, CString sType, UINT id);
+	bool			load(CWnd* parent, CString sFile);
 
 	//keyboard, mouse 이벤트 처리 여부.
 	void			use_control(bool use);

@@ -199,12 +199,12 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	if (!res)
 		return res;
 
-	set_image(&img);
+	set_image(parent, &img);
 
 	return res;
 }
 
-void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
+void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)
 {
 	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
 	if (m_img.is_animated_gif() && m_gif_state == state_play)
@@ -216,6 +216,15 @@ void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
 
 	if (deep_copy)
 		img->deep_copy(&m_img);
+
+	m_parent = parent;
+
+	if (!m_hWnd)
+	{
+		if (!create(m_parent, 0, 0, img->width, img->height))
+			return;
+	}
+
 
 	SetWindowPos(NULL, 0, 0, m_img.width, m_img.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
@@ -230,27 +239,27 @@ void CSCShapeDlg::set_image(CGdiplusBitmap* img, bool deep_copy)
 	}
 }
 
-bool CSCShapeDlg::load(UINT id)
+bool CSCShapeDlg::load(CWnd* parent, UINT id)
 {
 	bool res = m_img.load(id);
 	if (res)
-		set_image(&m_img, false);
+		set_image(parent, &m_img, false);
 	return res;
 }
 
-bool CSCShapeDlg::load(CString sType, UINT id)
+bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 {
 	bool res = m_img.load(sType, id);
 	if (res)
-		set_image(&m_img, false);
+		set_image(parent, &m_img, false);
 	return res;
 }
 
-bool CSCShapeDlg::load(CString sFile)
+bool CSCShapeDlg::load(CWnd* parent, CString sFile)
 {
 	bool res = m_img.load(sFile);
 	if (res)
-		set_image(&m_img, false);
+		set_image(parent, &m_img, false);
 	return res;
 }
 

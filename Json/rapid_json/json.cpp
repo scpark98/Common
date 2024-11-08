@@ -36,7 +36,7 @@ bool Json::parse(std::string sstr)
 	return !doc.HasParseError();
 }
 
-bool Json::load(CString input_json)
+bool Json::load(CString input_json_file)
 {
 	//return read(CT2CA(input_json));
 	//위와 같이 한줄로 표현 안됨.
@@ -44,12 +44,12 @@ bool Json::load(CString input_json)
 	//std::string sstr = CT2CA(input_json);
 	//return read(sstr);
 
-	FILE* fp = _tfopen(input_json, _T("rb")CHARSET);
+	FILE* fp = _tfopen(input_json_file, _T("rb")CHARSET);
 	if (!fp)
 		return false;
 
 	struct stat stat_buf;
-	stat(CT2A(input_json), &stat_buf);
+	stat(CT2A(input_json_file), &stat_buf);
 	int size = stat_buf.st_size;
 
 	char* readBuffer = new char[size];
@@ -84,9 +84,9 @@ bool Json::read(std::string input_json)
 	return result;
 }
 */
-bool Json::save(CString output_json)
+bool Json::save(CString output_json_file)
 {
-	FILE* fp = _tfopen(output_json, _T("wb")CHARSET);
+	FILE* fp = _tfopen(output_json_file, _T("wb")CHARSET);
 	if (!fp)
 		return false;
 
@@ -290,4 +290,49 @@ bool Json::get_array_member(std::string arr_name, int n, std::string member, rap
 	value = get_array_member(arr_name, n, member);
 
 	return (value != NULL);
+}
+
+//array2:[{"name": "peter", "age": 21}, {"name": "mike", "age":24}]과 같이 항목과 값이 pair로 존재하는 array를
+//map으로 변환해준다. 단, 모든 필드값은 무조건 CString으로 강제 변환한다.
+//koino 프로젝트에서 사용한 Api::JsonToArray() 대체용
+//src는 CString, arr_name은 std::string으로 한 이유는 다음과 같다.
+//src는 request후에 params.result라는 CString 타입의 json 데이터이며
+//arr_name은 "objects" 또는 "data"와 같이 추출할 json 필드명이므로 호출할 때는 다음과 같이 호출하면 된다.
+//json.array_to_map(params.result, "objects", &arr);
+bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<CString, CString>>* arr)
+{
+	arr->clear();
+
+	if (parse(src) == false)
+		return false;
+
+	CString name;
+	CString value;
+
+	rapidjson::Value& arr_pair = doc[arr_name];
+	for (int i = 0; i < arr_pair.Size(); i++)
+	{
+		std::map<CString, CString> m;
+
+		for (rapidjson::Value::ConstMemberIterator it = arr_pair[i].MemberBegin(); it != arr_pair[i].MemberEnd(); it++)
+		{
+			name = it->name.GetCString();
+
+			switch (it->value.GetType())
+			{
+				case kNullType:
+					value = _T("0");
+					break;
+				case kNumberType :
+					value.Format(_T("%d"), it->value.GetInt());
+					break;
+				default :
+					value.Format(_T("%s"), it->value.GetCString());
+			}
+
+			m.insert(std::pair<CString, CString>(name, value));
+		}
+
+		arr->push_back(m);
+	}
 }

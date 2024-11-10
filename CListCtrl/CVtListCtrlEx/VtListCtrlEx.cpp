@@ -197,6 +197,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//COLORREF	crProgress = m_cr_progress;
 	bool		is_show_selection_always = (GetStyle() & LVS_SHOWSELALWAYS);
 	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
+	bool		is_selected = GetItemState(iItem, LVIS_SELECTED);
+	bool		is_drophilited = GetItemState(iItem, LVIS_DROPHILITED);
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
@@ -214,17 +216,15 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
 		//포커스를 가졌거나 Always Show Selection이라면 선택 항목의 색상을 표시해주고
-		if ((m_has_focus || is_show_selection_always) && GetItemState(iItem, LVIS_SELECTED)) //ok
+		if ((m_has_focus || is_show_selection_always) && is_selected) //ok
 		{
 			if (m_has_focus)
 			{
-				TRACE(_T("list. OnPaint. has focus\n"));
 				crText = m_theme.cr_text_selected;
 				crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				TRACE(_T("list. OnPaint. LVIS_SELECTED\n"));
 				crText = m_theme.cr_text_selected_inactive;
 				crBack = m_theme.cr_back_selected_inactive;
 			}
@@ -237,9 +237,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		//drophilited라면 active에 관계없이 drop hilited 색상으로 표시한다.
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
-		else if (GetItemState(iItem, LVIS_DROPHILITED)) //ok
+		else if (is_drophilited) //ok
 		{
-			TRACE(_T("list. OnPaint. LVIS_DROPHILITED\n"));
 			crText = m_theme.cr_text_selected;
 			crBack = m_theme.cr_back_selected;
 		}
@@ -473,20 +472,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_draw_selected_border && !m_in_editing && m_has_focus)
+	if (m_draw_selected_border && !m_in_editing && m_has_focus && is_selected)
 	{
-		for (int i = 0; i < size(); i++)
-		{
-			if (GetItemState(i, LVIS_SELECTED))
-			{
-				GetSubItemRect(i, 0, LVIR_BOUNDS, rowRect);
-				draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
-			}
-		}
+		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
+		draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
 	}
-
-	//GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
-	//DrawLine(pDC, rowRect.left, rowRect.bottom-1, rowRect.right, rowRect.bottom-1, GRAY(232));
 }
 
 // ex. "No,20;Item1,50;Item2,50"

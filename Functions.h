@@ -218,11 +218,11 @@ enum RATIO_RECT_ATTACH
 #define		GByte		MByte * 1024.0
 #define		TByte		GByte * 1024.0
 
-#ifndef WIDTHSTEP4
+#ifndef WIDTHSTEP4	
 #define		WIDTHSTEP4(bits)	(((bits) + 31) / 32 * 4)	//bits is not width, but (width * bitCount)
 #endif
 
-//num보다 큰 n의 배수로 만들어준다.
+//num보다 큰 n의 배수로 만들어준다.	//old : MAKE4WIDTH_D()도 MAKE_MULTIPLY_U()를 이용할 것!
 #define		MAKE_MULTIPLY_U(num, n)		(((num) + ((n)-1)) & ~((n)-1))
 //num보다 작은 n의 배수로 만들어준다.
 #define		MAKE_MULTIPLY_D(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))

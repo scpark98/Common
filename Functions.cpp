@@ -2588,11 +2588,11 @@ void request_url(CRequestUrlParams* params)
 
 	DWORD buffer_size = 4096;
 	DWORD dwRead, dwWritten, dwTotalSize = 0;
-	char* buffer = new char[buffer_size + 1];
+	char* buffer = new char[buffer_size];
 	TCHAR query_buffer[32] = { 0, };
 	DWORD query_buffer_size = sizeof(query_buffer);
 
-	memset(buffer, 0, buffer_size + 1);
+	memset(buffer, 0, buffer_size);
 
 	if (params->local_file_path.IsEmpty())
 	{
@@ -2613,8 +2613,7 @@ void request_url(CRequestUrlParams* params)
 		//params->status = GetLastError();
 		TRACE(_T("result = %s\n"), params->result);
 
-		if (buffer)
-			delete[] buffer;
+		SAFE_DELETE_ARRAY(buffer);
 
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
@@ -2625,8 +2624,7 @@ void request_url(CRequestUrlParams* params)
 
 	if (params->status != HTTP_STATUS_OK)
 	{
-		if (buffer)
-			delete[] buffer;
+		SAFE_DELETE_ARRAY(buffer);
 
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
@@ -2652,15 +2650,13 @@ void request_url(CRequestUrlParams* params)
 	uint64_t total_read = 0;
 	char* total_result = NULL;
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
-	/*
-	if (ret)
-		dwTotalSize = 1024 * 1024 * 4;
-	else
-		dwTotalSize = 1024 * 1024;
 
-	total_result = new char[dwTotalSize];
-	memset(total_result, 0, sizeof(char) * dwTotalSize);
-	*/
+	if (!ret)
+		dwTotalSize = 4 * 10240;
+
+	total_result = new char[dwTotalSize + 1];
+	memset(total_result, 0, sizeof(char) * (dwTotalSize + 1));
+
 	do
 	{
 		//InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0); //이 함수는 웹페이지의 크기를 리턴하는 듯하다.
@@ -2684,14 +2680,10 @@ void request_url(CRequestUrlParams* params)
 				byte(buffer[2]) == 0xBF)
 				memcpy(buffer, buffer + 3, dwRead - 3);
 			//TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
-			buffer[dwRead] = '\0';
-			//strcat(total_result, buffer);
+			//buffer[dwRead] = '\0';
+			strncat(total_result, buffer, dwRead);
 			//TRACE(_T("total_result len = %d\n"), strlen(total_result));
-			params->result += UTF8toCString(buffer);
-			//params->result += UTF8toANSI(buffer);
-			//params->result += ANSItoUTF8(buffer);
-			//params->result += CStringA(buffer);
-			//TRACE(_T("params->result len = %d\n"), params->result.GetLength());
+			//params->result += UTF8toCString(buffer);
 		}
 		else
 		{
@@ -2701,7 +2693,8 @@ void request_url(CRequestUrlParams* params)
 				if (PathFileExists(params->local_file_path) && !DeleteFile(params->local_file_path))
 				{
 					SAFE_DELETE_ARRAY(buffer);
-					//SAFE_DELETE_ARRAY(total_buffer);
+					SAFE_DELETE_ARRAY(total_result);
+
 					InternetCloseHandle(hOpenRequest);
 					InternetCloseHandle(hInternetConnect);
 					InternetCloseHandle(hInternetRoot);
@@ -2716,7 +2709,8 @@ void request_url(CRequestUrlParams* params)
 				if (hFile == INVALID_HANDLE_VALUE)
 				{
 					SAFE_DELETE_ARRAY(buffer);
-					//SAFE_DELETE_ARRAY(total_buffer);
+					SAFE_DELETE_ARRAY(total_result);
+
 					InternetCloseHandle(hOpenRequest);
 					InternetCloseHandle(hInternetConnect);
 					InternetCloseHandle(hInternetRoot);
@@ -2735,6 +2729,8 @@ void request_url(CRequestUrlParams* params)
 		}
 	} while (dwRead != 0);
 
+	total_result[dwTotalSize] = '\0';
+	params->result = UTF8toCString(total_result);
 
 	if (params->local_file_path.IsEmpty())
 	{
@@ -2752,7 +2748,8 @@ void request_url(CRequestUrlParams* params)
 	}
 
 	SAFE_DELETE_ARRAY(buffer);
-	//SAFE_DELETE_ARRAY(total_buffer);
+	SAFE_DELETE_ARRAY(total_result);
+
 	InternetCloseHandle(hOpenRequest);
 	InternetCloseHandle(hInternetConnect);
 	InternetCloseHandle(hInternetRoot);

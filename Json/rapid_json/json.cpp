@@ -309,7 +309,13 @@ bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<
 	CString name;
 	CString value;
 
+	//우선 arr_name이라는 array가 존재하는지 검사해야 한다.
+	if (!doc[arr_name.c_str()].IsArray())
+		return false;
+
+
 	rapidjson::Value& arr_pair = doc[arr_name];
+
 	for (int i = 0; i < arr_pair.Size(); i++)
 	{
 		std::map<CString, CString> m;
@@ -335,4 +341,6 @@ bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<
 
 		arr->push_back(m);
 	}
+
+	return true;
 }

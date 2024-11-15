@@ -146,6 +146,8 @@ public:
 	//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
 	void		update_drive_list(CString thisPC, std::deque<CString>* drive_list = NULL);
 
+	//탭을 이용해서 작성된 트리 구조 문자열을 파싱하여 트리로 표현함.
+	//각 노드의 이미지는 그 depth에 따라 m_imagelist의 인덱스를 사용함.
 	bool		load(CString file);
 	bool		save(CString file);
 	bool		load_from_string(CString text);
@@ -188,7 +190,7 @@ public:
 	void			set_use_popup_menu(bool use) { m_use_popup_menu = use; }
 
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
-	void			set_use_drag_and_drop(bool use_drag) { m_use_drag_and_drop = use_drag; }
+	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
 	HTREEITEM		m_DragItem = NULL;			//drag되는 아이템
 	HTREEITEM		m_DropItem = NULL;			//drop된 아이템
 	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
@@ -225,15 +227,28 @@ public:
 	bool			(*check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
 	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { check_is_dim_text = func; }
 
-	//루트 항목 관련
-	void			set_root_item(UINT icon, CString label);
+	//가상 루트 항목 설정.
+	//가상 루트가 없는 상태에서 노드들이 추가된 경우, 가상 루트를 새로 추가할 경우
+	//가상 루트를 추가하고 기존 노드들을 모두 가상루트의 child로 이동시킨다.
+	//image_index, selected_image_index는 미리 정의한 imagelist에 추가된 아이콘의 index이므로
+	//반드시 set_imagelist()로 이미지들을 지정한 후에 호출해야 한다.
+	//이미 root_item을 지정한 상태에서 DeleteAllItems()로 실제 노드들을 모두 삭제하는 경우가 있는데
+	//이 때 다시 가상 루트를 넣을 때에는 파라미터 없이 set_root_item();을 호출하여 저장된 정보를 이용하도록 함.
+	bool			get_use_root() { return m_use_root; }
+	void			set_root_item(CString label = _T(""), int image_index = -1, int selected_image_index = -1);
+	HTREEITEM		get_root_item() { return (m_use_root ? m_root_item : GetRootItem()); }
+	TV_INSERTSTRUCT get_root_tvItem() { return m_root_tvItem; }
 
 protected:
-	//root 항목은 실제 또는 형식상의 root일 수 있다.
-	//탐색기의 "내 PC"는 형식상의 root이고 "로컬 디스크 (C:)"는 실제적인 root다.
+	//root 항목은 실제 또는 가상의 root일 수 있다.
+	//탐색기의 "내 PC"는 가상의 root이고 "로컬 디스크 (C:)"는 C드라이브의 실제적인 root다.
+	//트리 데이터에서 루트를 정한 경우는 m_use_root를 false로 사용하면 되고
+	//가상의 루트 노드가 필요한 경우에는 set_root_item(CString label, UINT img_id);으로 호출해서 설정한다.
 	//이런 루트를 표시할 것인지에 관련한 항목 정의.
-	HTREEITEM		m_root = NULL;
 	bool			m_use_root = false;
+	HTREEITEM		m_root_item = NULL;
+	TV_INSERTSTRUCT m_root_tvItem;		//기억시켜놔야 DeleteAllItem()후에도 다시 추가할 수 있다.
+
 
 	enum TIMER_ID
 	{
@@ -260,7 +275,9 @@ protected:
 	void			add_sub_item(HTREEITEM hParent = NULL, CString label = _T(""));
 	//주어진 항목의 label을 변경한다.
 	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
-	void			delete_item(HTREEITEM hItem = NULL, bool confirm = true);
+
+	//only_children이 true이면 해당 노드의 자식들만 제거한다.
+	void			delete_item(HTREEITEM hItem = NULL, bool only_children = false, bool confirm = false);
 
 	//마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;

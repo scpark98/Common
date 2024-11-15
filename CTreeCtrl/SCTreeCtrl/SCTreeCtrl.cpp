@@ -131,12 +131,16 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 			}
 			case VK_DELETE :
 			{
+				/*
 				if (m_in_editing)
 					return FALSE;
 
-				delete_item();
+				//여기서 삭제하는 것은 매우 위험하다. 메인에서 처리해야 한다.
+				//delete_item();
 
 				return TRUE;
+				*/
+				break;
 			}
 		}
 	}
@@ -157,6 +161,7 @@ BOOL CSCTreeCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	CBrush backBrush(m_theme.cr_back.ToCOLORREF());
+	//CBrush backBrush(RGB(255, 0, 0));
 	CBrush* pPrevBrush = pDC->SelectObject(&backBrush);
 	CRect rect;
 	pDC->GetClipBox(&rect);
@@ -1953,7 +1958,15 @@ bool CSCTreeCtrl::save(CString file)
 
 bool CSCTreeCtrl::load_from_string(CString text)
 {
-	DeleteAllItems();
+	//가상 루트가 있다면 그 children들만 제거하고 불러와야 한다.
+	if (m_use_root)
+	{
+		delete_item(m_root_item, true);
+	}
+	else
+	{
+		DeleteAllItems();
+	}
 
 	text.Replace(_T("\r\n"), _T("\n"));
 	text.Trim();
@@ -1966,7 +1979,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 	int			tab_count = 0;
 	int			prev_indent = 0;
 	CString		label;
-	HTREEITEM	hItem = TVI_ROOT;
+	HTREEITEM	hItem = get_root_item();
 
 	Trace(_T("\n"));
 
@@ -1982,17 +1995,17 @@ bool CSCTreeCtrl::load_from_string(CString text)
 		//Trace_only(_T("%s\n"), label);
 
 		if (tab_count < img_count)
-			img_index = tab_count;
+			img_index = tab_count + 1;
 		else
 			img_index = -1;
 
 		if (tab_count == 0)
 		{
 			if (img_index >= 0)
-				hItem = InsertItem(label, img_index, img_index, TVI_ROOT);
+				hItem = InsertItem(label, img_index, img_index, (m_use_root ? m_root_item : TVI_ROOT));
 			else
-				hItem = InsertItem(label, TVI_ROOT);
-			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+				hItem = InsertItem(label, (m_use_root ? m_root_item : TVI_ROOT));
+			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 
 			prev_indent = 0;
 			continue;
@@ -2004,7 +2017,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
-			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 
 			prev_indent = tab_count;
 		}
@@ -2016,7 +2029,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
-			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 		}
 		//전보다 적으면 (prev_index-tabCount) * parent의 sibling이다.
 		else if (tab_count < prev_indent)
@@ -2031,7 +2044,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
-			Trace(_T("hItem = %p, label = %s\n"), hItem, label);
+			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 
 			prev_indent++;
 		}
@@ -2548,7 +2561,6 @@ void CSCTreeCtrl::has_line(bool line)
 
 void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	LPNMCUSTOMDRAW pNMCustomDraw = (LPNMCUSTOMDRAW)pNMHDR;
 	LPNMTVCUSTOMDRAW pNMTVCustomDraw = (LPNMTVCUSTOMDRAW)pNMHDR;
@@ -2563,6 +2575,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		case CDDS_PREPAINT:
 			*pResult = (CDRF_NOTIFYPOSTPAINT | CDRF_NOTIFYITEMDRAW);
+			//*pResult = (CDRF_NOTIFYITEMDRAW);
 			break;
 
 		case CDDS_ITEMPREPAINT:
@@ -2683,6 +2696,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			*/
 
 			//dc.SelectObject(hOldFont);
+			* pResult = CDRF_DODEFAULT;
 			break;
 		}
 	}
@@ -2866,14 +2880,18 @@ void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
 	}
 }
 
-void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool confirm)
+//only_children이 true이면 해당 노드의 자식들만 제거한다.
+void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 {
 	//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
 	if (m_is_shell_treectrl)
 		return;
 
+	//hItem을 지정하지 않으면 선택된 아이템을 기준으로 동작한다.
 	if (hItem == NULL)
 		hItem = GetSelectedItem();
+
+	//선택된 항목도 없다면 아무것도 하지 않는다.
 	if (hItem == NULL)
 		return;
 
@@ -2889,7 +2907,22 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool confirm)
 
 	//shell_tree_ctrl일 경우는 SHDeleteFolder()를 이용해서 폴더 및 하위폴더까지 모두 삭제시켜야 하지만
 	//위험한 동작이므로 우선 노드만 삭제한다.
-	DeleteItem(hItem);
+
+	//현재 노드 포함 모든 삭제
+	if (!only_children)
+	{
+		DeleteItem(hItem);
+		return;
+	}
+
+	//only_children이면 모든 child들을 순회해서 삭제한다.
+	hItem = GetChildItem(hItem);
+
+	while (hItem)
+	{
+		DeleteItem(hItem);
+		hItem = GetNextSiblingItem(hItem);
+	}
 }
 
 
@@ -2932,3 +2965,61 @@ void CSCTreeCtrl::set_color_theme(int theme)
 	Invalidate();
 }
 
+//가상 루트 항목 설정.
+//가상 루트가 없는 상태에서 노드들이 추가된 경우, 가상 루트를 새로 추가할 경우
+//가상 루트를 추가하고 기존 노드들을 모두 가상루트의 child로 이동시킨다.
+//image_index, selected_image_index는 미리 정의한 imagelist에 추가된 아이콘의 index이므로
+//반드시 set_imagelist()로 이미지들을 지정한 후에 호출해야 한다.
+void CSCTreeCtrl::set_root_item(CString label, int image_index, int selected_image_index)
+{
+	//이미 가상 루트를 설정한 상태라면 label과 img만 변경시킨다.
+	if (label.IsEmpty())
+	{
+		if (m_use_root && m_root_item)
+			InsertItem(&m_root_tvItem);
+		return;
+	}
+	else
+	{
+
+	}
+
+	HTREEITEM hItem = GetRootItem();
+
+
+	m_use_root = true;
+
+	//해당 아이템을 루트로 추가하고
+	m_root_tvItem.item.mask = TVIF_TEXT | TVIF_CHILDREN;
+
+	if (image_index >= 0 && m_imagelist.m_hImageList && image_index < m_imagelist.GetImageCount())
+	{
+		m_root_tvItem.item.mask |= TVIF_IMAGE;
+		m_root_tvItem.item.iImage = image_index;
+	}
+
+	if (selected_image_index >= 0 && m_imagelist.m_hImageList && selected_image_index < m_imagelist.GetImageCount())
+	{
+		m_root_tvItem.item.mask |= TVIF_SELECTEDIMAGE;
+		m_root_tvItem.item.iSelectedImage = selected_image_index;
+	}
+
+	m_root_tvItem.hInsertAfter = TVI_FIRST;
+	m_root_tvItem.hParent = TVI_ROOT;
+	m_root_tvItem.item.pszText = (LPTSTR)(LPCTSTR)label;
+	//기존에 노드들이 존재했다면 확장버튼을 표시한다.
+	m_root_tvItem.item.cChildren = 1;// (GetRootItem() != NULL);
+	m_root_item = InsertItem(&m_root_tvItem);
+
+	//기존에 노드들이 이미 추가되어 있던 상태라면 그들을 모두 root의 child로 이동시킨다.
+	//기존에 있던 노드들은 최상위에 추가된 m_root_item의 sibling으로 존재할 것이다.
+	hItem = GetNextSiblingItem(m_root_item);
+
+	while (hItem)
+	{
+		move_tree_item(this, hItem, m_root_item);
+		hItem = GetNextSiblingItem(m_root_item);
+	}
+
+	TRACE(_T("m_root_item = %p\n"), m_root_item);
+}

@@ -2683,6 +2683,9 @@ void request_url(CRequestUrlParams* params)
 			//buffer[dwRead] = '\0';
 			strncat(total_result, buffer, dwRead);
 			//TRACE(_T("total_result len = %d\n"), strlen(total_result));
+
+			//buffer_size씩 읽어와서 UTF8toCString()하여 result에 넣어주면 반쪽짜리 한글이 생겨서 깨지게 된다.
+			//모두 읽어온 후 한번에 UTF8toCString()을 돌려야 한다.
 			//params->result += UTF8toCString(buffer);
 		}
 		else

@@ -1913,14 +1913,27 @@ bool is_readable_char(CString src)
 	return true;
 }
 
-//'가'~'힣'범위의 한글로만 구성된 문자열인지 검사한다.
-bool is_hangul(CString str)
+//'가'~'힣'범위의 온전한 한글인지 검사한다.
+//'가' = true
+//'강' = true
+//'강ㄷ' = false
+//allow_ascii가 true라면 영문, 숫자, 특수문자가 있어도 한글만 온전하면 true이며
+//allow_ascii가 false라면 오로지 한글로만 구성되었는지를 판별하여 리턴한다.
+bool is_hangul(CString str, bool allow_ascii)
 {
 	const wchar_t start_ch = L'가';
 	const wchar_t end_ch = L'힣';
 
 	for (int i = 0; i < str.GetLength(); i++)
 	{
+		int code = str[i];
+
+		if (allow_ascii)
+		{
+			if (code >= 0 && code <= 255)
+				continue;
+		}
+
 		if (str[i] < start_ch || str[i] > end_ch)
 			return false;
 	}
@@ -2555,7 +2568,7 @@ void request_url(CRequestUrlParams* params)
 
 #ifdef _UNICODE
 	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, params->body, -1, NULL, NULL, NULL, NULL);
-	char jsonData[1024] = { 0, };
+	char* jsonData = new char[char_str_len];
 	ZeroMemory(jsonData, char_str_len);
 	WideCharToMultiByte(CP_UTF8, 0, params->body, -1, jsonData, char_str_len, 0, 0);
 
@@ -2578,6 +2591,8 @@ void request_url(CRequestUrlParams* params)
 		params->status = dwError;
 		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_last_error_string(dwError, false));
 		TRACE(_T("result = %s\n"), params->result);
+
+		SAFE_DELETE_ARRAY(jsonData);
 
 		InternetCloseHandle(hOpenRequest);
 		InternetCloseHandle(hInternetConnect);
@@ -2613,6 +2628,7 @@ void request_url(CRequestUrlParams* params)
 		//params->status = GetLastError();
 		TRACE(_T("result = %s\n"), params->result);
 
+		SAFE_DELETE_ARRAY(jsonData);
 		SAFE_DELETE_ARRAY(buffer);
 
 		InternetCloseHandle(hOpenRequest);
@@ -2624,6 +2640,7 @@ void request_url(CRequestUrlParams* params)
 
 	if (params->status != HTTP_STATUS_OK)
 	{
+		SAFE_DELETE_ARRAY(jsonData);
 		SAFE_DELETE_ARRAY(buffer);
 
 		InternetCloseHandle(hOpenRequest);
@@ -2750,6 +2767,7 @@ void request_url(CRequestUrlParams* params)
 		params->result = _T("");
 	}
 
+	SAFE_DELETE_ARRAY(jsonData);
 	SAFE_DELETE_ARRAY(buffer);
 	SAFE_DELETE_ARRAY(total_result);
 
@@ -9963,22 +9981,26 @@ ULONG GetPID(CString processname)
 // 윈도우 핸들로 프로세스 아이디 얻기   
 ULONG ProcIDFromWnd(HWND hwnd)
 {   
-	ULONG idProc;   
+	ULONG idProc = 0;   
 	::GetWindowThreadProcessId(hwnd, &idProc);   
 	return idProc;   
 }
 
 // 프로세스 아이디로 윈도우 핸들 얻기   
-HWND GetHWNDbyPID(ULONG pid)
+HWND get_hwnd_by_pid(ULONG pid)
 {   
 	HWND tempHwnd = ::FindWindow(NULL,NULL); // 최상위 윈도우 핸들 찾기   
 
 	while(tempHwnd != NULL)   
 	{   
-		//TRACE("tempHwnd = %p\n", tempHwnd);
-		if(::GetParent(tempHwnd) == NULL) // 최상위 핸들인지 체크, 버튼 등도 핸들을 가질 수 있으므로 무시하기 위해   
-			if(pid == ProcIDFromWnd(tempHwnd))   
-				return tempHwnd;   
+		TRACE("tempHwnd = %p, pid = %u\n", tempHwnd, ProcIDFromWnd(tempHwnd));
+
+		if (::GetParent(tempHwnd) == NULL) // 최상위 핸들인지 체크, 버튼 등도 핸들을 가질 수 있으므로 무시하기 위해   
+		{
+			if (pid == ProcIDFromWnd(tempHwnd))
+				return tempHwnd;
+		}
+
 		tempHwnd = ::GetWindow(tempHwnd, GW_HWNDNEXT); // 다음 윈도우 핸들 찾기   
 	}   
 	return NULL;
@@ -10047,101 +10069,162 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 
 	do
 	{
-		hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
-		if (hProcess != NULL)
-		{
-			if (_tcscmp(pe32.szExeFile, szFilename) == 0)
-			{
-				if (ProcessIdToSessionId(pe32.th32ProcessID, &sessionIDTemp) && sessionIDTemp == sessionID)
-				{
-					CloseHandle(hProcessSnapshot);
-					return hProcess;
-				}
-			}
 
-			CloseHandle(hProcess);
+		TCHAR sFilePath[MAX_PATH] = { 0, };
+		DWORD bufLen = MAX_PATH;
+
+		_tcscpy(sFilePath, pe32.szExeFile);
+
+		//전체경로로 검색하는 경우
+		if (PathFileExists(szFilename))
+		{
+			hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+
+			if (hProcess != NULL)
+			{
+				QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				//TRACE(_T("%s\n"), sFilePath);
+				CloseHandle(hProcess);
+			}
+		}
+
+		if (_tcsicmp(sFilePath, szFilename) == 0)
+		{
+			get_hwnd_by_pid(pe32.th32ProcessID);
+			CloseHandle(hProcessSnapshot);
 		}
 	} while (Process32Next(hProcessSnapshot, &pe32));
 
 	CloseHandle(hProcessSnapshot);
+
 	return INVALID_HANDLE_VALUE;
 }
 
-//default : bCaseSensitive = false, bExceptThis = true
-//뭔가 오류가 있다. 다시 테스트해야 함.
-HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSensitive, bool bExceptThis)
+//실행파일명으로부터 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
+HWND get_hwnd_by_exe_file(CString target_exe_file)
 {
-	bool			bFlag = false;
 	HANDLE			hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL); 
-	PROCESSENTRY32	pe;
+	PROCESSENTRY32	pe32 = { 0, };
 	HWND			hWnd = NULL;
 
 	if (!hSnapShot)
 	{
-		::MessageBoxA(NULL, "CreateToolhelp32Snapshot() : Fail!", NULL,NULL);
 		return NULL;
 	}
 
-	hWndToFind = NULL;
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+	CString exe_name;
 
-	pe.dwSize = sizeof(PROCESSENTRY32);
-	CString szExeFile;
-	bool found = false;
-
-	if (Process32First(hSnapShot, &pe)) 
+	if (!Process32First(hSnapShot, &pe32))
 	{
-		do 
+		CloseHandle(hSnapShot);
+		return NULL;
+	}
+
+	do 
+	{
+		exe_name = pe32.szExeFile;
+		exe_name.MakeLower();
+		target_exe_file.MakeLower();
+
+		TCHAR sFilePath[MAX_PATH] = { 0, };
+		DWORD bufLen = MAX_PATH;
+
+		//target_exe_file이 실행 파일명만 있다면 exe 파일명만 비교하고
+		//전체 경로라면 fullpath를 구해서 비교한다.
+		//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
+		if (PathFileExists(target_exe_file))
 		{
-			found = false;
-			szExeFile = pe.szExeFile;
+			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
 
-			//TRACE(_T("pe.szExeFile = %s\n"), pe.szExeFile);
-			if (!bCaseSensitive)
+			if (hProcess)
 			{
-				szExeFile.MakeLower();
-				sExeFile.MakeLower();
-			}
-
-			if (bWholeWordsOnly)
-			{
-				if (szExeFile == sExeFile)
-					found = true;
-			}
-			else
-			{
-				if (szExeFile.Find(sExeFile) >= 0)
-					found = true;
-			}
-
-			if (found)
-			{
-				//자기 자신은 제외하고...
-				if (pe.th32ProcessID != GetCurrentProcessId())
-				{
-					HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID);
-					if (hProcess != NULL)
-					{
-						hWnd = GetHWNDbyPID(pe.th32ProcessID);
-						CloseHandle(hProcess);
-						//hWnd = GetWindowHandleFromProcessID(pe.th32ProcessID);
-						break;
-					}
-					
-					//if (::EnumWindows(&EnumWindowsProc, (LPARAM)pe.th32ProcessID) == FALSE)
-					//{
-					//	hWnd = hWndToFind;
-					//	break;
-					//}
-				}
-				//SetPriorityClass(hProcess, THREAD_PRIORITY_HIGHEST);
+				QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				//TRACE(_T("%s\n"), sFilePath);
+				CloseHandle(hProcess);
 			}
 		}
-		while (Process32Next(hSnapShot, &pe)); 
+
+		if (_tcsicmp(sFilePath, target_exe_file) == 0)
+		{
+			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+			if (hProcess != NULL)
+			{
+				hWnd = get_hwnd_by_pid(pe32.th32ProcessID);
+				CloseHandle(hProcess);
+				break;
+			}
+		}
 	}
+	while (Process32Next(hSnapShot, &pe32)); 
 
 	CloseHandle(hSnapShot);
 
 	return hWnd;
+}
+
+//return value : 1(killed), 0(fail to kill), -1(not found)
+int	kill_process_by_fullpath(CString fullpath)
+{
+	int res = -1;
+
+	if (fullpath.IsEmpty() || !PathFileExists(fullpath) || get_process_running_count(fullpath) <= 0)
+		return -1;
+
+	HANDLE hProcessSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
+	PROCESSENTRY32 pe32 = { 0, };
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+
+	if (!Process32First(hProcessSnapshot, &pe32))
+	{
+		OutputDebugString(_T("Error while checking process"));
+		CloseHandle(hProcessSnapshot);
+		return 0;
+	}
+
+	do
+	{
+		if (pe32.th32ProcessID != 0)
+		{
+			TCHAR sFilePath[1024] = { 0, };
+			DWORD bufLen = 1024;
+
+			_tcscpy(sFilePath, pe32.szExeFile);
+
+			//processname이 실행파일명만 있다면 exe 파일명만 비교하고
+			//전체 경로라면 fullpath를 구해서 비교한다.
+			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
+			//HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+
+			if (hProcess)
+			{
+				QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				//TRACE(_T("%s\n"), sFilePath);
+				CloseHandle(hProcess);
+
+				if (_tcsicmp(sFilePath, fullpath) == 0)
+				{
+					hProcess = OpenProcess(PROCESS_TERMINATE, false, pe32.th32ProcessID);
+					TerminateProcess(hProcess, 1);
+					CloseHandle(hProcess);
+					res = 1;
+					break;
+				}
+			}
+			else
+			{
+
+			}
+		}
+	} while (Process32Next(hProcessSnapshot, &pe32));
+
+	CloseHandle(hProcessSnapshot);
+
+	return res;
 }
 
 //해당 파일이 실행중인 카운트를 리턴하는 함수이며
@@ -10149,7 +10232,7 @@ HWND GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly, bool bCaseSens
 //권한문제인지 현재 PC에서는 잘 얻어오지만
 //다른 PC에서는 아예 실행조차되지 않는다.
 //우선 보류한다.
-#if 0
+#if 1
 int get_process_running_count(CString processname)
 {
 	if (processname.IsEmpty())
@@ -10161,7 +10244,7 @@ int get_process_running_count(CString processname)
 
 	if (!Process32First(hProcessSnapshot, &pe32))
 	{
-		OutputDebugString(_T("Error checking process"));
+		OutputDebugString(_T("Error while checking process"));
 		CloseHandle(hProcessSnapshot);
 		return 0;
 	}
@@ -10171,10 +10254,6 @@ int get_process_running_count(CString processname)
 	do
 	{
 		//TRACE(_T("process = %s\n"), pe32.szExeFile);
-		//if (_tcsicmp(pe32.szExeFile, _T("natsvc.exe")) == 0)
-		//{
-		//	TRACE(_T("process = %s\n"), pe32.szExeFile);;
-		//}
 
 		if (pe32.th32ProcessID != 0)
 		{
@@ -10188,18 +10267,19 @@ int get_process_running_count(CString processname)
 			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
 			if (PathFileExists(processname))
 			{
-				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
-				//HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+				//HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+				HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
 
 				if (hProcess)
 				{
 					QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
-					//::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+					::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+					//TRACE(_T("%s\n"), sFilePath);
 					CloseHandle(hProcess);
 				}
 				else
 				{
-					TRACE(_T("fail to get OpenProcess(). %s\n"), get_last_error_message(false));
+					TRACE(_T("fail to get OpenProcess(). %s\n"), get_last_error_string(false));
 				}
 			}
 
@@ -12044,6 +12124,34 @@ TCHAR* replace(TCHAR* src, const TCHAR* olds, const TCHAR* news)
 
 	return result;
 	*/
+}
+
+//src의 끝에서 length 길이 만큼 잘라낸다.
+CString truncate(CString src, int length)
+{
+	CString result;
+
+	int src_len = src.GetLength();
+	if (length < src_len)
+	{
+		result = src.Left(src.GetLength() - length);
+	}
+	
+	return result;
+}
+
+//src끝의 문자열이 sub와 일치하면 잘라낸다.
+CString	truncate(CString src, CString sub)
+{
+	CString result;
+
+	int sub_len = sub.GetLength();
+	if (src.GetLength() > sub_len)
+	{
+		result = src.Left(src.GetLength() - sub_len);
+	}
+
+	return result;
 }
 
 void Trim(char* src)
@@ -17147,7 +17255,7 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 	//설치가 완료되면 설치와 관련된 창은 모두 닫아준다.
 	do
 	{
-		hWnd = GetHWndByExeFilename(_T("MicrosoftEdgeWebView2RuntimeInstallerX64.exe"));
+		hWnd = get_hwnd_by_exe_file(_T("MicrosoftEdgeWebView2RuntimeInstallerX64.exe"));
 		//hProcess = GetProcessHandleFromHwnd(hWnd);
 		if (hWnd != INVALID_HANDLE_VALUE)
 			TerminateProcess(hWnd, 0);
@@ -17166,7 +17274,7 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 	wait_count = 0;
 	do
 	{
-		hWnd = GetHWndByExeFilename(_T("MicrosoftEdgeUpdate.exe"));
+		hWnd = get_hwnd_by_exe_file(_T("MicrosoftEdgeUpdate.exe"));
 		if (hWnd != INVALID_HANDLE_VALUE)
 			TerminateProcess(hWnd, 0);
 		else

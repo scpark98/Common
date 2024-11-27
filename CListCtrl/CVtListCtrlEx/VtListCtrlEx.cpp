@@ -3524,6 +3524,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		CWnd* pDropWnd = WindowFromPoint(pt);
 		ASSERT(pDropWnd); //make sure we have a window
 
+		CListCtrl* pList = NULL;
+		CTreeCtrl* pTree = NULL;
+
 		//// If we drag outside current window we need to adjust the highlights displayed
 		if (pDropWnd != m_pDropWnd)
 		{
@@ -3531,10 +3534,11 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 			{
+				pList = (CListCtrl*)m_pDropWnd;
+
 				if (m_nDropIndex != -1) //If we drag over the CListCtrl header, turn off the hover highlight
 				{
 					TRACE(_T("m_nDropIndex != -1\n"));
-					CListCtrl* pList = (CListCtrl*)m_pDropWnd;
 					VERIFY(pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED));
 					// redraw item
 					VERIFY(pList->RedrawItems(m_nDropIndex, m_nDropIndex));
@@ -3543,7 +3547,6 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 				}
 				else //If we drag out of the CListCtrl altogether
 				{
-					CListCtrl* pList = (CListCtrl*)m_pDropWnd;
 					int i = 0;
 					int nCount = pList->GetItemCount();
 
@@ -3559,21 +3562,28 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 			}
 			else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 			{
-				CTreeCtrl* pTree = (CTreeCtrl*)m_pDropWnd;
-				pTree->SelectDropTarget(NULL);
-				/*
+				pTree = (CTreeCtrl*)m_pDropWnd;
 				UINT uFlags;
 
 				HTREEITEM hItem = pTree->HitTest(pt, &uFlags);
 
 				if ((hItem != NULL) && (TVHT_ONITEM & uFlags))
 				{
-					TRACE(_T("TVHT_ONITEM\n"));
-					pTree->SetItemState(hItem, TVIS_DROPHILITED, TVIF_STATE);
 					pTree->SelectDropTarget(hItem);
 					ASSERT(pTree->GetDropHilightItem() == hItem);
 				}
-				*/
+			}
+			else
+			{
+				if (pList && m_nDropIndex >= 0)
+				{
+					pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+				}
+
+				if (pTree)
+				{
+					pTree->SelectDropTarget(NULL);
+				}
 			}
 		}
 
@@ -3590,7 +3600,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 			//Note that we can drop here
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
 			UINT uFlags;
-			CListCtrl* pList = (CListCtrl*)pDropWnd;
+			pList = (CListCtrl*)pDropWnd;
 
 			// Turn off hilight for previous drop target
 			pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
@@ -3610,7 +3620,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
 			UINT uFlags;
-			CTreeCtrl* pTree = (CTreeCtrl*)pDropWnd;
+			pTree = (CTreeCtrl*)pDropWnd;
 
 			// Get the item that is below cursor
 			HTREEITEM hItem = ((CTreeCtrl*)pDropWnd)->HitTest(pt, &uFlags);
@@ -3622,6 +3632,16 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		else
 		{
+			if (pList && m_nDropIndex >= 0)
+			{
+				pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+			}
+
+			if (pTree)
+			{
+				pTree->SelectDropTarget(NULL);
+			}
+
 			//If we are not hovering over a CListCtrl, change the cursor
 			// to note that we cannot drop here
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));

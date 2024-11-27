@@ -919,6 +919,24 @@ CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
 	return label;
 }
 
+//hItem = NULL인 경우는 모든 노드를 unselect로 만드는데 사용된다.
+//NULL이 아닌 어떤 노드를 select상태로 만들지만 기존 selected 노드에는 영향을 주지 않는다.
+void CSCTreeCtrl::select_item(HTREEITEM hItem)
+{
+	if (hItem == NULL)
+	{
+		hItem = GetSelectedItem();
+		if (hItem)
+		{
+			SetItemState(hItem, 0, TVIS_SELECTED);
+		}
+
+		return;
+	}
+
+	SelectItem(hItem);
+}
+
 //해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
 bool CSCTreeCtrl::is_visible_item(HTREEITEM hItem)
 {
@@ -1750,6 +1768,8 @@ void CSCTreeCtrl::OnMouseLeave()
 	m_is_hovering = false;
 	KillTimer(timer_expand_for_drop);
 	TRACE(_T("tree. leave\n"));
+	SelectDropTarget(NULL);
+
 	CTreeCtrl::OnMouseLeave();
 }
 

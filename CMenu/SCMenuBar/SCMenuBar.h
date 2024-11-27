@@ -62,7 +62,7 @@ class CSCMenuBar : public CDialogEx
 	DECLARE_DYNAMIC(CSCMenuBar)
 
 public:
-	CSCMenuBar();   // 표준 생성자입니다.
+	CSCMenuBar() {};   // 표준 생성자입니다.
 	~CSCMenuBar();
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);

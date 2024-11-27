@@ -44,6 +44,7 @@
 */
 
 #include <afxwin.h>
+#include <mutex>
 
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
@@ -109,6 +110,7 @@ public:
 	void		open_log_file();
 
 protected:
+	std::mutex	m_mutex;
 	CTime		m_tlog = CTime::GetCurrentTime();
 	CString		m_log_fullpath;
 	CString		m_log_file_title;

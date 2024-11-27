@@ -129,6 +129,8 @@ public:
 	bool		is_shell_treectrl() { return m_is_shell_treectrl; }
 	bool		is_local() { return m_is_local; }
 
+	//윈도우 탐색기의 폴더 트리와 같이 동작한다.
+	//is_local이 false일 경우는 remote의 폴더정보를 얻어와서 표시해줘야 한다.
 	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local);
 
 	//드라이브 폴더를 다시 읽어들인다.
@@ -156,6 +158,10 @@ public:
 	//hItem 위치부터 child, sibling들을 탐색하여 label을 찾는다. 
 	HTREEITEM	find_item(const CString& label, HTREEITEM hItem = NULL);
 	CString		get_selected_item_text(bool include_parent = false);
+
+	//hItem = NULL인 경우는 모든 노드를 unselect로 만드는데 사용된다.
+	//NULL이 아닌 어떤 노드를 select상태로 만들지만 기존 selected 노드에는 영향을 주지 않는다.
+	void		select_item(HTREEITEM hItem = NULL);
 
 	//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
 	bool		is_visible_item(HTREEITEM hItem);

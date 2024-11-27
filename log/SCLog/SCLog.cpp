@@ -3,7 +3,7 @@
 
 #include "../../Functions.h"
 
-CCriticalSection theCSLog;
+//CCriticalSection theCSLog;
 
 CSCLog* pLog = NULL;
 
@@ -140,13 +140,15 @@ CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 
 	try
 	{
-		theCSLog.Lock();
+		//theCSLog.Lock();
+		m_mutex.lock();
 
 		if (m_fp == NULL)
 		{
 			if (!set(m_log_folder, m_log_file_title))
 			{
-				theCSLog.Unlock();
+				//theCSLog.Unlock();
+				m_mutex.unlock();
 				return result;
 			}
 		}
@@ -170,7 +172,9 @@ CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		catch (CException* e)
 		{
 			CString str = get_last_error_string();
-			AfxMessageBox(str);
+			TRACE(_T("%s\n"), str);
+			m_mutex.unlock();
+			return _T("log_text.FormatV() exception.");
 		}
 
 		//만약 로그 텍스트의 맨 앞에 \n이 붙어있으면 이전 로그 라인과 라인을 구분하기 위함인데
@@ -254,12 +258,14 @@ CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		}
 
 		release();
-		theCSLog.Unlock();
+		m_mutex.unlock();
+		//theCSLog.Unlock();
 	}
 	catch (...)
 	{
 		release();
-		theCSLog.Unlock();
+		m_mutex.unlock();
+		//theCSLog.Unlock();
 	}
 
 	return result;

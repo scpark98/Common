@@ -329,11 +329,10 @@ public:
 
 	CRequestUrlParams(CString _full_url, CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
-	void		reset()
+	void		reset(bool sub_url_reset = false)
 	{
 		status = -1;
-		sub_url.Empty();
-		full_url.Empty();
+		full_url.Empty();	//full_url ¸â¹ö°ªÀÌ Ã¤¿öÁ®ÀÖÀ¸¸é ±× ¹®ÀÚ¿­À» ÆÄ½ÌÇÏ¿© ip, port, sub_url·Î ºĞ¸®ÇÏ¹Ç·Î reset()ÇÒ °æ¿ì´Â ¹İµå½Ã ºñ¿öÁà¾ß ÇÑ´Ù.
 		body.Empty();
 		result.Empty();
 		elapsed = 0;
@@ -341,6 +340,9 @@ public:
 		file_size = 0;
 		downloaded_size = 0;
 		download_index = -1;
+
+		if (sub_url_reset)
+			sub_url.Empty();
 	}
 
 	//thread·Î º°µµ ½ÇÇàÇÒÁö(Æ¯È÷ ÆÄÀÏ ´Ù¿î·Îµå request), request °á°ú¸¦ ¹Ù·Î ¹Ş¾Æ¼­ Ã³¸®ÇÒÁö(´Ü¼ø request)
@@ -481,7 +483,7 @@ struct	NETWORK_INFO
 	CString		GetCurrentDirectory();
 	ULONG		GetPID(CString processname);
 	ULONG		ProcIDFromWnd(HWND hwnd);
-	HWND		GetHWNDbyPID(ULONG pid);
+	HWND		get_hwnd_by_pid(ULONG pid);
 #ifndef _USING_V110_SDK71_
 	CString		GetProcessNameByPID(const DWORD pid);
 #endif
@@ -490,7 +492,10 @@ struct	NETWORK_INFO
 	//ex. Ç®ÆĞ½ºÀÎ c:\test.exe¸¦ ÁÖ¸é d:\test.exe´Â ½ÇÇàÁßÀÌ¶óµµ Ä«¿îÆ®µÇÁö ¾Ê´Â´Ù.
 	int			get_process_running_count(CString processname);
 	
-	bool		KillProcess(CString processname);
+	//return value : 1(killed), 0(fail to kill), -1(not found)
+	int			kill_process_by_fullpath(CString fullpath);
+
+	bool		kill_process(CString processname);
 	//ÇÁ·Î¼¼½º °­Á¦ Á¾·á.
 	//return value : 1 : killed, 0 : fail to kill, -1 : not found
 	bool		ProcessKill(CString szProcessName);
@@ -586,8 +591,13 @@ struct	NETWORK_INFO
 	//ASCII ÄÚµåÀÇ #33(0x21)(' ') ~ #126(0x7E)('~') ¹üÀ§ÀÎÁö(ÀĞÀ» ¼ö ÀÖ´Â ¹®ÀÚ¿­ÀÎÁö)
 	bool		is_readable_char(CString src);
 
-	//'°¡'~'?'¹üÀ§ÀÇ ÇÑ±Û·Î¸¸ ±¸¼ºµÈ ¹®ÀÚ¿­ÀÎÁö °Ë»çÇÑ´Ù.
-	bool		is_hangul(CString str);
+	//'°¡'~'ÆR'¹üÀ§ÀÇ ¿ÂÀüÇÑ ÇÑ±ÛÀÎÁö °Ë»çÇÑ´Ù.
+	//'°¡' = true
+	//'°­' = true
+	//'°­¤§' = false
+	//allow_ascii°¡ true¶ó¸é ¿µ¹®, ¼ıÀÚ, Æ¯¼ö¹®ÀÚ°¡ ÀÖ¾îµµ ÇÑ±Û¸¸ ¿ÂÀüÇÏ¸é trueÀÌ¸ç
+	//allow_ascii°¡ false¶ó¸é ¿À·ÎÁö ÇÑ±Û·Î¸¸ ±¸¼ºµÇ¾ú´ÂÁö¸¦ ÆÇº°ÇÏ¿© ¸®ÅÏÇÑ´Ù.
+	bool		is_hangul(CString str, bool allow_ascii = false);
 
 	//¹®ÀÚ¿­ÀÌ ¿ÂÀüÇÑÁö ±úÁø ¹®ÀÚÀÎÁö¸¦ ÆÇº°(Æ¯È÷ ÇÑ±Û ÀÎÄÚµù ±úÁü ÆÇº°)
 	bool		is_valid_string(CString src, bool include_hangul);
@@ -766,6 +776,11 @@ struct	NETWORK_INFO
 	//return¹ŞÀº char*´Â ¹İµå½Ã »ç¿ë ÈÄ free()ÇØÁà¾ß ÇÔ.
 	TCHAR*		replace(TCHAR* src, const TCHAR* olds, const TCHAR* news);
 
+	//srcÀÇ ³¡¿¡¼­ length ±æÀÌ ¸¸Å­ Àß¶ó³½´Ù.
+	CString		truncate(CString src, int length);
+	//src³¡ÀÇ ¹®ÀÚ¿­ÀÌ sub¿Í ÀÏÄ¡ÇÏ¸é Àß¶ó³½´Ù.
+	CString		truncate(CString src, CString sub);
+
 	//°ø¹é, '\t', '\r', '\n', '\0' ¸ğµÎ Á¦°Å
 	void		trim(char* src);
 	void		trim(std::string &str);
@@ -821,7 +836,7 @@ struct	NETWORK_INFO
 	CString		loadResString(UINT nID);
 
 	//simple json parser. Common/json/rapid_json ÃßÃµ.
-	CString		json_value(CString json, CString key);
+	//CString		json_value(CString json, CString key);
 
 	int			get_char_count(CString sStr, TCHAR ch, bool stop_at_first_mismatch = false, bool forward = true);
 	CString		get_mac_address_format(CString src, TCHAR separator = ':');
@@ -1181,7 +1196,8 @@ struct	NETWORK_INFO
 	bool		get_screensaver_setting(int *timeout = NULL, int* use_secure = NULL);
 
 	//Á» ´õ Å×½ºÆ® ÇÊ¿ä!
-	HWND		GetHWndByExeFilename(CString sExeFile, bool bWholeWordsOnly = false, bool bCaseSensitive = false, bool bExceptThis = true);
+	//½ÇÇàÆÄÀÏ¸íÀ¸·ÎºÎÅÍ À©µµ¿ì ÇÚµé ¸®ÅÏ. ½ÇÇàÆÄÀÏ¸í ¶Ç´Â fullpath·Î °Ë»ö.
+	HWND		get_hwnd_by_exe_file(CString target_exe_file);
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
 
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE);

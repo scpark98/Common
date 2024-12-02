@@ -2574,7 +2574,8 @@ void request_url(CRequestUrlParams* params)
 
 	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
 #else
-	char jsonData[1024] = { 0, };
+	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, params->body, -1, NULL, NULL, NULL, NULL);
+	char* jsonData = new char[char_str_len];
 	char* charMsg = params->body.GetBuffer(params->body.GetLength());
 	//int char_str_len = WideCharToMultiByte(CP_UTF8, 0, CT2CA(jsonBody), -1, NULL, 0, NULL, NULL);
 	//sprintf(jsonData, "%s", jsonBody);
@@ -8161,6 +8162,14 @@ double get_double(CString& src, CString sep)
 	return((double)ret);
 }
 
+//resource string table의 문자열을 리턴한다.
+CString	load_string(UINT nID)
+{
+	CString str;
+	str.LoadString(nID);
+	return str;
+}
+
 
 //src 문자열에 set_of_keyword에 나열된 단어가 있는지 검사.
 //set_of_keyword는 세미콜론으로 구분해서 여러 문자 또는 문자열을 넣을 수 있다.
@@ -10650,11 +10659,130 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	return result;
 }
 
+//서비스 관련 명령을 쉽게 처리하기 위해 작성.
+//cmd는 다음과 같은 키워드를 사용하며 명령에 따라 리턴값의 의미도 다르므로 주의할 것.
+//"query"	: status를 리턴
+//"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
+//			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
+//"delete"	: 서비스 삭제가 성공하면 0이 아닌 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
+DWORD service_command(CString service_name, CString cmd, CString *detail)
+{
+	DWORD res = 0;
+	SERVICE_STATUS status;
+	ZeroMemory(&status, sizeof(status));
+
+	cmd.MakeLower();
+
+	//service control manager를 얻어와서 서비스 상태값을 조회.
+	SC_HANDLE hManager = NULL;
+	SC_HANDLE hService = NULL; 
+
+	if ((hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS)) == NULL)
+	{
+		res = GetLastError();
+		TRACE(_T("get_last_error_string = %s\n"), get_last_error_string(res));
+		return res;
+	}
+
+	if ((hService = OpenService(hManager, service_name, SC_MANAGER_ALL_ACCESS)) == NULL)
+	{
+		res = GetLastError();
+		switch (res)
+		{
+			case ERROR_ACCESS_DENIED:
+				if (detail)
+					*detail = _T("ERROR_ACCESS_DENIED");
+				break;
+			case ERROR_INVALID_HANDLE:
+				if (detail)
+					*detail = _T("ERROR_INVALID_HANDLE");
+				break;
+			case ERROR_INVALID_NAME:
+				if (detail)
+					*detail = _T("ERROR_INVALID_NAME");
+				break;
+			case ERROR_SERVICE_DOES_NOT_EXIST:
+				if (detail)
+					*detail = _T("ERROR_SERVICE_DOES_NOT_EXIST");
+				break;
+			default :
+				*detail = _T("not defined error.");
+		}
+
+		TRACE(_T("detail = %s\n"), (detail ? *detail : _T("")));
+		CloseServiceHandle(hManager);
+		return res;
+	}
+
+	//서비스에게 INTERROGATE 제어신호를 보내면 해당 서비스는 자신의 현재 상태를 리턴한다.
+	//SCM이 서비스의 상태를 조사하는 것이 아니라 서비스 자신이 스스로의 상태를 보고하는 것이므로
+	//QueryServiceStatus 함수를 사용하는 것보다 훨씬 더 정확하다.
+	//https://blog.naver.com/wwwkasa/80150694337
+	//하지만 MSDN에는 해당 항목에 "SCM이 서비스의 현재 상태를 인식하기 때문에 이 컨트롤은 일반적으로 유용하지 않습니다."라는
+	//설명이 있으므로 
+
+	if (QueryServiceStatus(hService, &status))
+		//if (ControlService(hService, SERVICE_CONTROL_INTERROGATE, &status))	//error = ERROR_ACCESS_DENIED
+	{
+		if (cmd == _T("query"))
+			res = status.dwCurrentState;
+	}
+	else
+	{
+		res = GetLastError();
+		TRACE(_T("get_last_error_string = %s\n"), get_last_error_string(res));
+	}
+
+	//delete할 경우는 반드시 stop후에 delete해야 함.
+	if (cmd == _T("stop") || cmd == _T("delete"))
+	{
+		if (status.dwCurrentState != SERVICE_STOPPED)
+		{
+			if (ControlService(hService, SERVICE_CONTROL_STOP, &status))
+			{
+				//SERVICE_CONTROL_STOP 명령을 내린 후 SERVICE_STOP_PENDING (3) 상태가 된 후 SERVICE_STOPPED 상태로 변경되므로
+				//
+				while (status.dwCurrentState != SERVICE_STOPPED)
+					QueryServiceStatus(hService, &status);
+				res = SERVICE_STOPPED;
+			}
+			else
+			{
+				res = GetLastError();
+				TRACE(_T("get_last_error_string = %s\n"), get_last_error_string(res));
+			}
+		}
+
+		if (cmd == _T("delete"))
+		{
+			res = DeleteService(hService);
+			if (res == 0)
+				res = GetLastError();
+		}
+	}
+
+	//5		: ERROR_ACCESS_DENIED
+	//6		: ERROR_INVALID_HANDLE
+	//87	: ERROR_INVALID_PARAMETER
+	//1051	: ERROR_DEPENDENT_SERVICES_RUNNING
+	//1052	: ERROR_INVALID_SERVICE_CONTROL
+	//1053	: ERROR_SERVICE_REQUEST_TIMEOUT
+	//1061	: ERROR_SERVICE_CANNOT_ACCEPT_CTRL
+	//1062	: ERROR_SERVICE_NOT_ACTIVE
+	//1115	: ERROR_SHUTDOWN_IN_PROGRESS
+
+	CloseServiceHandle(hService);
+	CloseServiceHandle(hManager);
+
+	return res;
+}
+
+/*
 //서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
 //process_name이 주어지면 좀 더 간단히 제거된다.
 //정상 제거(또는 서비스가 없을 경우) : true
 //제거 실패 : false
-bool kill_service(CString service_name, CString process_name /*= _T("")*/)
+bool kill_service(CString service_name, CString process_name)
 {
 	CString result;
 
@@ -10665,7 +10793,7 @@ bool kill_service(CString service_name, CString process_name /*= _T("")*/)
 		return true;
 	}
 
-	//CString result = run_process(_T("sc queryex ") + service_name, true);
+	result = run_process(_T("sc queryex ") + service_name, true);
 	int pid_pos = result.Find(_T("PID"));
 
 	//해당 서비스가 없을 경우
@@ -10684,10 +10812,17 @@ bool kill_service(CString service_name, CString process_name /*= _T("")*/)
 	CString cmd;
 
 	//해당 서비스의 실제 프로세스를 강제 종료시키면 해당 서비스는 "중지됨"으로 변경된다.
-	cmd.Format(_T("taskkill /pid %d /f"), pid);
-	result = run_process(cmd, true).MakeLower();
-	if (result.Find(_T("성공")) < 0 && result.Find(_T("success")) < 0)
+	//cmd.Format(_T("taskkill /pid %d /f"), pid);
+	//result = run_process(cmd, true).MakeLower();
+	//if (result.Find(_T("성공")) < 0 && result.Find(_T("success")) < 0)
+	//	return false;
+
+	//위에서 서비스의 실제 프로세스를 강제 종료시켜봤으나 결과는 성공이라고 나오지만 실제로는 종료되지 않거나
+	//종료되더라도 다시 살아나는 현상이 발생하여 sc stop으로 변경
+	result = run_process(_T("sc stop ") + service_name, true);
+	if (result.Find(_T("STOP_PENDING")) < 0)
 		return false;
+
 
 	//중지된 서비스를 삭제한다. 
 	result = run_process(_T("sc delete ") + service_name, true);
@@ -10696,6 +10831,7 @@ bool kill_service(CString service_name, CString process_name /*= _T("")*/)
 
 	return true;
 }
+*/
 
 bool RectInRect(CRect rMain, CRect rSub)
 {

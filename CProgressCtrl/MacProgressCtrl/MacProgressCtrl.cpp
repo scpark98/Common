@@ -60,7 +60,7 @@ CMacProgressCtrl::CMacProgressCtrl()
 	m_cr_text0			= ::GetSysColor(COLOR_BTNTEXT);
 	m_cr_text1			= RGB(0, 0, 0);
 	m_cr_back			= ::GetSysColor(COLOR_3DFACE);
-	m_cr_back_track		= ::GetSysColor(COLOR_3DSHADOW);
+	m_cr_back_track		= ::GetSysColor(COLOR_BTNSHADOW);
 	m_bTransparent		= false;
 	m_bGradient			= false;
 	

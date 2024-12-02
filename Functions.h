@@ -523,11 +523,13 @@ struct	NETWORK_INFO
 	extern		void* g_wow64_preset;
 	void		Wow64Disable(bool disable = true);
 
-	//서비스 상태가 무엇이든 종료, 제거시킨다. sc queryex -> taskkill /pid -> sc delete
-	//process_name이 주어지면 좀 더 간단히 제거된다.
-	//정상 제거(또는 서비스가 없을 경우) : true
-	//제거 실패 : false
-	bool		kill_service(CString service_name, CString process_name = _T(""));
+	//서비스 관련 명령을 쉽게 처리하기 위해 작성.
+	//cmd는 다음과 같은 키워드를 사용한다.
+	//"query"	: status를 리턴
+	//"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
+	//			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
+	//"delete"	: 서비스 삭제가 성공하면 0이 아닌 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
+	DWORD		service_command(CString service_name, CString cmd, CString *detail = NULL);
 
 	//Console 명령인지 GUI 윈도우 어플리케이션인지 구분
 	bool		is_gui_application(CString fullPath);
@@ -660,6 +662,9 @@ struct	NETWORK_INFO
 	CString		get_str(CString& src, CString sep = _T("|"));
 	int			get_int(CString& src, CString sep = _T("|"));
 	double		get_double(CString& src, CString sep = _T("|"));
+
+	//resource string table의 문자열을 리턴한다.
+	CString		load_string(UINT nID);
 
 	//unit			: -1:auto, 0:bytes, 1:KB, 2:MB, 3:GB ~
 	//auto일 경우는 1000보다 작을떄까지 나누고 소수점은 2자리까지 표시한다.(ex 7.28TB)

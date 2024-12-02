@@ -2574,12 +2574,11 @@ void request_url(CRequestUrlParams* params)
 
 	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
 #else
-	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, params->body, -1, NULL, NULL, NULL, NULL);
+	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, CStringW(params->body), -1, NULL, 0, NULL, NULL);
 	char* jsonData = new char[char_str_len];
 	char* charMsg = params->body.GetBuffer(params->body.GetLength());
 	//int char_str_len = WideCharToMultiByte(CP_UTF8, 0, CT2CA(jsonBody), -1, NULL, 0, NULL, NULL);
 	//sprintf(jsonData, "%s", jsonBody);
-	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, (CStringW)(params->body), -1, NULL, 0, NULL, NULL);
 
 	WideCharToMultiByte(CP_UTF8, 0, (CStringW)params->body, -1, jsonData, char_str_len, 0, 0);
 	//CString2char()

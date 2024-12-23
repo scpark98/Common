@@ -77,10 +77,17 @@ public:
 			m_button.resize(n);
 		}
 
-		m_top = top;
+		m_top = top + 1;
 
-		if (right > 0)
-			m_right = right;
+		if (right <= 0)
+		{
+			CRect r;
+			parent->GetClientRect(r);
+			right = r.right;
+		}
+
+		m_right = right;
+
 		if (width > 0)
 			m_button_width = width;
 		if (height > 0)
@@ -90,7 +97,7 @@ public:
 		for (int i = 0; i < m_button.size(); i++)
 		{
 			m_button[i].cmd = arg[i];
-			m_button[i].r = CRect(i * (m_button_width + m_gap), 0, i * (m_button_width + m_gap) + m_button_width, m_button_height);
+			m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height);
 		}
 
 		Create(_T("CSCSystemButtons"), WS_CHILD,
@@ -157,13 +164,18 @@ public:
 	void	set_color_theme(int theme);
 	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
 	void	set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; }
+	void	set_back_hover_color(Gdiplus::Color cr_back_hover) { m_theme.cr_back_hover = cr_back_hover; }
+	int		get_button_width() { return m_button_width; }
+	void	set_button_width(int width);
+	int		get_button_height() { return m_button_height; }
+	void	set_button_height(int height);
 
 protected:
 
 	std::deque<CSCSystemButtonProperty> m_button;
 	int		m_button_width = 44;
 	int		m_button_height = 32;
-	int		m_top;
+	int		m_top = 1;
 	int		m_right;				//버튼 컨트롤의 우측 좌표에 맞춰 n개의 버튼 위치가 결정된다.
 	int		m_gap = 0;				//버튼 사이 간격
 

@@ -63,9 +63,9 @@ protected:
 //CShellImageList		m_shell_imagelist_local;
 //CShellImageList		m_shell_imagelist_remote;
 //위와 같이 두 인스턴스를 실행하면 CImageList의 Attach()에서 ASSERT FAIL이 발생한다.
-//한 프로세스에서는 시스템 이미지 리스트 핸들을 한번씩만 Attach()해야 하는 규칙이 있다.
+//MSDN에는 한 프로세스에서는 시스템 이미지 리스트 핸들을 한번씩만 Attach()해야 하는 규칙이 있다.
 
-class CShellImageList  
+class CShellImageList
 {
 public:
 	CImageList m_imagelist_small;
@@ -108,12 +108,18 @@ public:
 	CString	get_drive_volume(int index, CString path);
 	*/
 
+	//하나의 프로젝트에서 CShellImageList의 객체는 단 1개뿐이어야 한다. 2개를 선언할 경우 Attach()에서 에러가 나며 이는 MSDN이 정한 규칙이다.
+	//따라서 하나의 CShellImageList의 객체를 선언해놓고 CVtListCtrl, CPathCtrl, CTreeCtrl 등에서 이 인스턴스의 포인터를 참조하여 동작하도록 되어 있다.
 	//m_volume[0]은 local pc에 대한 정보를,
 	//m_volume[1]부터는 remote pc들에 대한 정보가 저장된다.
 	std::deque<CShellVolumeList>	m_volume;
 	void		set_system_label(int index, std::map<int, CString>* map);
 	void		set_system_path(int index, std::map<int, CString>* map);
 	void		set_drive_list(int index, std::deque<CString>* drive_list);
+
+	CString		get_system_label(int index, int csidl);
+	CString		get_system_path(int index, int csidl);
+
 private:
 	CStringArray m_ExtArray;
 	CUIntArray   m_IDArray;

@@ -82,7 +82,7 @@ public:
 	//void		add_remote_drive_volume(CString remote_drive_volume);
 
 	//특정 인덱스까지의 fullpath를 리턴한다. -1이면 현재 over 또는 down된 경로까지 리턴.
-	CString		get_full_path(int index = -1);
+	CString		get_path(int index = -1);
 
 	void		set_path(CString path, std::deque<CString> *sub_folders = NULL);
 	void		SetWindowText(CString path, std::deque<CString>* sub_folders = NULL);
@@ -150,6 +150,7 @@ protected:
 	void		ReconstructFont();
 
 	LRESULT		OnMessageSCListBox(WPARAM wParam, LPARAM lParam);
+	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 protected:
 	DECLARE_MESSAGE_MAP()

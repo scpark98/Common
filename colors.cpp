@@ -568,7 +568,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back					= Gdiplus::Color(255, 64, 64, 64);
 			cr_back_selected		= get_color(cr_back, -16);
-			cr_back_selected_inactive = cr_back_selected;
+			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= cr_back_selected;
 			cr_back_alternated		= get_color(cr_back, 8);
@@ -580,7 +580,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-			cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
 			break;
 		case color_theme_dark :
@@ -594,7 +594,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back					= Gdiplus::Color(255, 37, 37, 38);
 			cr_back_selected		= Gdiplus::Color(255, 0, 120, 215);
-			cr_back_selected_inactive = cr_back_selected;
+			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= get_color(cr_back_selected, 48);
 			cr_back_alternated		= get_color(cr_back, 8);
@@ -606,7 +606,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-			cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
 			break;
 
@@ -649,7 +649,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			}
 
 			cr_back_selected		= gRGB(204, 235, 255);//RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_selected_inactive = cr_back_selected;
+			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternated		= get_color(cr_back, -16);
@@ -659,7 +659,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(gGRAY(192));
 			cr_progress				= Gdiplus::Color(255, 49, 108, 244);
-			cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
 			cr_selected_border		= gRGB(153, 209, 255);//get_color(cr_back_selected, -32);
 	}

@@ -54,29 +54,29 @@ public:
 	//CParagraph
 
 	//동적생성시에 사용
-	BOOL		create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID = 0xffff);
+	BOOL			create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID = 0xffff);
 	
-	void		set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
-	void		SetWindowText(CString sText) { set_text(sText); }
-	void		set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
-	void		set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...);
+	void			set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
+	void			SetWindowText(CString sText) { set_text(sText); }
+	void			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
+	void			set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...);
 
 	//글자색, 배경색 동시 설정
-	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 	//글자색만 변경할 경우
-	void		set_text_color(Gdiplus::Color crTextColor);
+	void			set_text_color(Gdiplus::Color crTextColor);
 
 	Gdiplus::Color	get_back_color() { return m_cr_back; }
 
 	//배경색을 지정하면 투명 옵션은 off됨.
-	void		set_back_color(Gdiplus::Color cBackColor) { m_cr_back = cBackColor; m_transparent = false; Invalidate(); }
+	void			set_back_color(Gdiplus::Color cBackColor) { m_cr_back = cBackColor; m_transparent = false; Invalidate(); }
 
 	//gradient
 	//m_crGradient deque에 색상들을 넣고 n등분하여 gradient fill을 해서 표시한다.
-	CSCStatic&		set_gradient(bool bGradient = true);
-	CSCStatic&		set_gradient_color(Gdiplus::Color crGradient);			//배경~crGradient 2컬러로 표현됨.
-	CSCStatic&		set_gradient_color(int idx, Gdiplus::Color crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
+	void			set_gradient(bool bGradient = true);
+	void			set_gradient_color(Gdiplus::Color crGradient);			//배경~crGradient 2컬러로 표현됨.
+	void			set_gradient_color(int idx, Gdiplus::Color crGradient);	//idx의 색상을 crGradient로 변경. idx가 없으면 idx까지 crGradient로 채움.
 
 	template <typename ... T> CSCStatic& set_gradient_color(T... colors)
 	{
@@ -93,9 +93,9 @@ public:
 		return *this;
 	}
 
-	CSCStatic&		add_gradient_color(Gdiplus::Color crGradient);			//색상 추가
-	CSCStatic&		insert_gradient_color(int idx, Gdiplus::Color crGradient);//idx번째 색상 추가
-	CSCStatic&		set_vertical_gradient(bool bVertical = true);
+	void			add_gradient_color(Gdiplus::Color crGradient);			//색상 추가
+	void			insert_gradient_color(int idx, Gdiplus::Color crGradient);//idx번째 색상 추가
+	void			set_vertical_gradient(bool bVertical = true);
 
 	void			sunken(bool sunken = true) { m_bSunken = sunken; Invalidate(); }
 
@@ -113,32 +113,32 @@ public:
 
 	void			get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf);
 
-	virtual CSCStatic& set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual CSCStatic& set_font_size(int nFontSize);
-	virtual CSCStatic& set_auto_font_size(bool auto_font_size = true);
-	virtual CSCStatic& set_font_bold(bool bold = true);
-	virtual CSCStatic& set_font_underline(bool underline = true);
-	virtual CSCStatic& set_font_italic(bool italic = true);
-	virtual CSCStatic& set_font_antialiased(bool antiAliased = true);
+	void			set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
+	void			set_font_size(int nFontSize);
+	void			set_auto_font_size(bool auto_font_size = true);
+	void			set_font_bold(bool bold = true);
+	void			set_font_underline(bool underline = true);
+	void			set_font_italic(bool italic = true);
+	void			set_font_antialiased(bool antiAliased = true);
 
-	void		set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
-	bool		is_bold() { return m_bFontBold; }
-	void		set_font(CFont* font);
+	void			set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
+	bool			is_bold() { return m_bFontBold; }
+	void			set_font(CFont* font);
 
-	void		set_outline_width(int nWidth) { m_nOutlineWidth = nWidth; Invalidate(); }
-	void		set_outline(int nWidth, Gdiplus::Color crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }
+	void			set_outline_width(int nWidth) { m_nOutlineWidth = nWidth; Invalidate(); }
+	void			set_outline(int nWidth, Gdiplus::Color crOutline) { m_nOutlineWidth = nWidth; m_crOutline = crOutline; Invalidate(); }
 
-	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);
-	void		set_blink(BOOL bBlink = TRUE);
-	void		set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
+	void			set_blink_time(int nTime0 = 400, int nTime1 = 1200);
+	void			set_blink(BOOL bBlink = TRUE);
+	void			set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
 
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
-	void		set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
+	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
-	void		set_icon(UINT nIDResource, int nSize = 16);
+	void			set_icon(UINT nIDResource, int nSize = 16);
 
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
-	void		add_header_image(UINT id);
+	void			add_header_image(UINT id);
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다.
 	template <typename ... T> void set_header_images(T... args)
 	{

@@ -1,9 +1,11 @@
-﻿#include <afxinet.h>	// for Internet
+﻿
+#include <afxinet.h>	// for Internet
 #include <string>
 #include <utility>
 #include <fstream>
 #include <filesystem>
 #include <regex>		//require c++11
+#include <set>
 
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
@@ -23,6 +25,7 @@
 
 
 #include <limits>
+
 //#include "SystemInfo.h"
 #pragma comment(lib, "Psapi.lib")
 
@@ -689,7 +692,11 @@ CString		get_part(CString path, int part)
 
 	//드라이브 루트라면 끝에 '\'를 붙여줘야 한다. "C:" => "C:\\"
 	if (parts[fn_folder].GetLength() == 2 && parts[fn_folder].Right(1) == _T(":"))
+	{
 		parts[fn_folder] += _T("\\");
+		//드라이브 루트인 경우라면 leaf_folder = folder와 동일하다.
+		parts[fn_leaf_folder] = parts[fn_folder];
+	}
 
 	//확장자는 .을 제외시킨다. parts[3]가 ""이어도 .Mid(1)은 에러가 발생하지는 않는다.
 	parts[fn_ext] = parts[fn_ext].Mid(1);
@@ -850,6 +857,120 @@ CString	normalize_path(CString& filepath)
 	return filepath;
 }
 
+//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
+//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
+bool is_protected(CString folder, CShellImageList *plist, int index)
+{
+	folder = convert_special_folder_to_real_path(folder, plist, index);
+	folder.MakeLower();
+
+	//바탕 화면, 문서 등 특수 폴더는 보호. "내 PC"의 패스는 ""으로 세팅되어 있으므로 비교 제외.
+	std::map<int, CString> path_map = *plist->m_volume[index].get_path_map();
+	if (folder.Find(path_map[CSIDL_DESKTOP]) >= 0)
+		return true;
+	if (folder.Find(path_map[CSIDL_MYDOCUMENTS]) >= 0)
+		return true;
+
+	//드라이브 루트는 모두 보호.
+	for (auto drive_volume : *plist->m_volume[index].get_drive_list())
+	{
+		CString drive_root = convert_special_folder_to_real_path(drive_volume, plist, index);
+		if (folder == drive_root)
+			return true;
+	}
+
+	std::deque<CString> protected_folder;
+	protected_folder.push_back(_T("c:\\documents and settings"));
+	protected_folder.push_back(_T("c:\\program files"));
+	protected_folder.push_back(_T("c:\\program files (x86)"));
+	protected_folder.push_back(_T("c:\\programdata"));
+	protected_folder.push_back(_T("c:\\recovery"));
+	protected_folder.push_back(_T("c:\\system volume information"));
+	protected_folder.push_back(_T("c:\\windows"));
+	protected_folder.push_back(_T("c:\\users"));
+
+	int found = find_dqstring(protected_folder, folder, true, false);
+	if (found >= 0)
+		return true;
+
+	return false;
+
+	//c드라이브는 모두 보호? 다운로드, 문서, 바탕 화면 등은 사용자가 자주 사용하는 폴더이므로 제외시켜야 한다.
+	//if (folder.Find(_T("c:\\")) >= 0)
+	//	return true;
+	//if (folder.Find(_T("c:\\program files") >= 0))
+	//	return true;
+	//if (folder.Find(_T("c:\\program files (x86)") >= 0))
+	//	return true;
+	//if (folder.Find(_T("c:\\users") >= 0))
+	//	return true;
+	//if (folder.Find(_T("c:\\windows") >= 0))
+	//	return true;
+
+
+
+	return false;
+}
+
+//새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
+//zero_prefix가 2이면 001, 002로 된 인덱스가 붙은 파일/폴더들만 대상으로 하려 했으나 아직 미구현.
+int	get_file_index(CString folder, CString title, int zero_prefix)
+{
+	std::deque<CString> dq;
+	find_all_files(folder, &dq, title + _T("*"), true, false);
+
+	int max_index = -1;
+	std::set<int> idx_set;
+
+	for (auto item : dq)
+	{
+		item.Replace(folder + _T("\\"), _T(""));
+		if (item.MakeLower() == title.MakeLower())
+			idx_set.insert(1);
+
+		//끝 ')'를 찾고
+		int start_paren = -1;
+		int end_paren = item.ReverseFind(')');
+		int found_index = -1;
+
+		if (end_paren > 0)
+		{
+			//시작 '('를 찾아서 그 사이의 숫자를 추출
+			item = item.Left(end_paren);
+			start_paren = item.ReverseFind('(');
+
+			if (start_paren > 0)
+			{
+				item = item.Mid(start_paren + 1);
+				found_index = _ttoi(item);
+			}
+		}
+
+		if (found_index > 0)
+			idx_set.insert(found_index);
+	}
+
+	//set 항목 중 비어있는 인덱스를 리턴해준다.
+	int index = 0;
+	bool found = false;
+
+	for (int elem : idx_set)
+	{
+		index++;
+		if (elem != index)
+		{
+			found = true;
+			break;
+		}
+	}
+
+	//만약 1 ~ n까지 모든 순번이 순차적으로 들어있다면 1 증가된 값을 리턴해주면 된다.
+	if (!found)
+		index++;
+
+	return index;
+}
+
 //확장자 집합 문자열로 파일열기 대화상자의 filter string을 리턴한다.
 //simple : "bmp;jpg;jpeg;png;webp;gif;yuv;raw => "JPG files|*.jpg|bmp|*.bmp|
 //extension_group = FILE_EXTENSION_VIDEO or FILE_EXTENSION_SOUND or FILE_EXTENSION_IMAGE or FILE_EXTENSION_MEDIA...
@@ -874,7 +995,7 @@ std::deque<CString> get_filelist_from_filetitle(CString filename, CString extens
 	return get_filelist_from_filetitle(get_part(filename, fn_folder), get_part(filename, fn_title), extension);
 }
 
-uint64_t get_file_size(CString sfile)
+ULONGLONG get_file_size(CString sfile)
 {
 	CFileStatus		status;
 	
@@ -906,10 +1027,10 @@ bool get_file_size(CString path, ULARGE_INTEGER* ulFileSize)
 	return true;
 }
 
-uint64_t get_folder_size(CString path)
+ULONGLONG get_folder_size(CString path)
 {
 	WIN32_FIND_DATA data;
-	uint64_t size = 0;
+	ULONGLONG size = 0;
 	CString fname = path + "\\*.*";
 	HANDLE h = FindFirstFile(fname, &data);
 	if (h != INVALID_HANDLE_VALUE)
@@ -942,7 +1063,6 @@ uint64_t get_folder_size(CString path)
 			}
 		} while (FindNextFile(h, &data) != 0);
 		FindClose(h);
-
 	}
 
 	return size;
@@ -950,9 +1070,17 @@ uint64_t get_folder_size(CString path)
 
 //unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
 //unit_string	: 단위를 표시할 지 (default = true)
-CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_string)
+CString		get_file_size_str(CString sfile, int unit, int floats, bool unit_string)
 {
-	return get_size_string(get_file_size(sfile), unit, floats, unit_string);
+	return get_size_str(get_file_size(sfile), unit, floats, unit_string);
+}
+
+CString		get_file_size_str(WIN32_FIND_DATA data, int unit, int floats, bool unit_string)
+{
+	ULARGE_INTEGER filesize;
+	filesize.HighPart = data.nFileSizeHigh;
+	filesize.LowPart = data.nFileSizeLow;
+	return get_size_str(filesize.QuadPart, unit, floats, unit_string);
 }
 
 //unit			: 0:bytes, 1:KB, 2:MB, 3:GB ~
@@ -960,11 +1088,11 @@ CString		get_file_size_string(CString sfile, int unit, int floats, bool unit_str
 //floats		: 소수점을 몇 자리까지 표시할지
 //unit_string	: 단위를 표시할 지
 //comma			: 정수 부분에 자리수 콤마를 표시할 지
-CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, bool comma)
+CString		get_size_str(ULONGLONG size, int unit, int floats, bool unit_string, bool comma)
 {
 	double dsize = (double)size;
 	CString size_str;
-	CString unit_str[9] = { _T("Bytes"), _T("KB"), _T("MB"), _T("GB"), _T("TB"), _T("PB"), _T("EB"), _T("ZB"), _T("YB") };
+	CString unit_str[9] = { _T(" Bytes"), _T("KB"), _T("MB"), _T("GB"), _T("TB"), _T("PB"), _T("EB"), _T("ZB"), _T("YB") };
 
 	if (unit >= 0)
 	{
@@ -974,16 +1102,27 @@ CString		get_size_string(int64_t size, int unit, int floats, bool unit_string, b
 	else
 	{
 		unit = 0;
+
+		//1024가 아니라 1000인 점에 주의!
 		while (dsize >= 1000.0)
 		{
 			dsize /= 1024.0;
 			unit++;
 		}
 
-		if (dsize < 10)
-			floats = 2;
-		else
-			floats = 1;
+		//정수가 3자리면 소숫점 자리는 0,
+		//정수가 2자리면 소숫점 자리는 1,
+		//정수가 1자리면 소숫점 자리는 2,
+		floats = 3 - d2S(dsize, false, 0).GetLength();
+
+		//단, bytes 단위라면 소숫점 자리수는 0이다.
+		if (unit == 0)
+			floats = 0;
+		TRACE(_T("floats = %d\n"), floats);
+		//if (dsize < 10)
+		//	floats = 2;
+		//else
+		//	floats = 1;
 	}
 
 	//dsize = 0.01234;
@@ -1366,7 +1505,7 @@ CTime GetTimeFromDateTimeString(CString sDateTime)
 							_tstoi((TCHAR*)(LPCTSTR)sDateTime.Mid(13, 2)));
 }
 
-CString	GetTimeStringFromSeconds(double dSec, bool bHasHour /*= true*/, bool bMilliSec /*=false*/)
+CString	get_time_string(double dSec, bool bHasHour /*= true*/, bool bMilliSec /*=false*/)
 {
 	bool minus = false;
 
@@ -3646,6 +3785,7 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 	IP_ADAPTER_INFO*	pAdapterInfo = NULL;
 	IP_ADAPTER_INFO*	pAdapter = NULL;
 	ULONG				ulOutBufLen = 0;
+	TCHAR				zeroIP[] = _T("0.0.0.0");
 
 	USES_CONVERSION;
 
@@ -3676,7 +3816,7 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 		{
 			_tcscpy(pInfo->sDescription, A2T(pAdapter->Description));
 
-			if (pAdapter->Type == MIB_IF_TYPE_ETHERNET && CString(pInfo->sDescription).Find(sTargetDeviceDescription) >= 0)
+			//if (pAdapter->Type == MIB_IF_TYPE_ETHERNET && CString(pInfo->sDescription).Find(sTargetDeviceDescription) >= 0)
 			{
 				_tcscpy(pInfo->sIPAddress, A2T(pAdapter->IpAddressList.IpAddress.String));
 				_tcscpy(pInfo->sGateway, A2T(pAdapter->GatewayList.IpAddress.String));
@@ -3684,10 +3824,25 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 
 				//TCHAR sMacAddress[16] 이므로 구분자를 넣어주면 안된다.
 				//main에서 Functions.h의 get_mac_address_format()함수로 구분자를 넣어서 표시할 것.
+
 				_stprintf(pInfo->sMacAddress, _T("%02X%02X%02X%02X%02X%02X"),
 					pAdapter->Address[0], pAdapter->Address[1], pAdapter->Address[2], pAdapter->Address[3], pAdapter->Address[4], pAdapter->Address[5]);
-				result = true;
-				break;
+
+				TRACE(_T("pInfo->sDescription = %s, sIPAddress = %s, sGateway = %s, sSubnetMask = %s, sMacAddress = %s\n"),
+					pInfo->sDescription,
+					pInfo->sIPAddress,
+					pInfo->sGateway,
+					pInfo->sSubnetMask,
+					pInfo->sMacAddress);
+
+				if (_tcscmp(pInfo->sIPAddress, zeroIP) != 0 &&
+					_tcscmp(pInfo->sGateway, zeroIP) != 0 &&
+					_tcscmp(pInfo->sSubnetMask, zeroIP) != 0 &&
+					_tcscmp(pInfo->sMacAddress, _T("")) != 0)
+				{
+					result = true;
+					break;
+				}
 			}
 
 			pAdapter = pAdapter->Next;
@@ -3702,43 +3857,9 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 
 CString get_my_ip()
 {
-	char szBuffer[1024];
-
-#ifdef WIN32
-	WSADATA wsaData;
-	WORD wVersionRequested = MAKEWORD(2, 0);
-	if (::WSAStartup(wVersionRequested, &wsaData) != 0)
-		return _T("");
-#endif
-
-
-	if (gethostname(szBuffer, sizeof(szBuffer)) == SOCKET_ERROR)
-	{
-#ifdef WIN32
-		WSACleanup();
-#endif
-		return _T("");
-	}
-
-	struct hostent* host = gethostbyname(szBuffer);
-	if (host == NULL)
-	{
-#ifdef WIN32
-		WSACleanup();
-#endif
-		return _T("");
-	}
-
-	//Obtain the computer's IP
-	TCHAR ip[4];
-	ip[0] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b1;
-	ip[1] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b2;
-	ip[2] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b3;
-	ip[3] = ((struct in_addr*)(host->h_addr))->S_un.S_un_b.s_b4;
-
-	CString my_ip;
-	my_ip.Format(_T("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
-	return my_ip;
+	NETWORK_INFO ni;
+	GetNetworkInformation(_T(""), &ni);
+	return ni.sIPAddress;
 }
 
 CString	get_mac_addres(bool include_colon)
@@ -4081,7 +4202,7 @@ HINSTANCE FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDirectory, LPTSTR lpResult)
     return hinstance;   
 }   
 */
-uint64_t get_disk_free_size(CString sDrive)
+ULONGLONG get_disk_free_size(CString sDrive)
 {
 	TCHAR Drive[10];
 	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
@@ -4101,10 +4222,10 @@ uint64_t get_disk_free_size(CString sDrive)
 		&m_lTotalNumberOfBytes, 
 		&m_lTotalNumberOfFreeBytes);
 
-	return (uint64_t)(m_lTotalNumberOfFreeBytes.QuadPart);
+	return m_lTotalNumberOfFreeBytes.QuadPart;
 }
 
-uint64_t get_disk_total_size(CString sDrive)
+ULONGLONG get_disk_total_size(CString sDrive)
 {
 	TCHAR			Drive[10];
 	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
@@ -4124,7 +4245,7 @@ uint64_t get_disk_total_size(CString sDrive)
 		&m_lTotalNumberOfBytes, 
 		&m_lTotalNumberOfFreeBytes);
 
-	return (uint64_t)(m_lTotalNumberOfBytes.QuadPart);
+	return m_lTotalNumberOfBytes.QuadPart;
 }
 
 //
@@ -4657,7 +4778,17 @@ void FindAllFiles(CString sFolder, std::deque<CString> *dqFiles, CString sNameFi
 }
 
 
-void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter, bool include_folder, bool recursive)
+void find_all_files(CString folder, std::deque<CString>* dq_path, CString filter, bool include_folder, bool recursive, bool include_hidden_files, bool include_system_files)
+{
+	dq_path->clear();
+	std::deque<WIN32_FIND_DATA> dq;
+	find_all_files(folder, &dq, filter, include_folder, recursive, include_hidden_files, include_system_files);
+
+	for (auto file : dq)
+		dq_path->push_back(file.cFileName);
+}
+
+void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter, bool include_folder, bool recursive, bool include_hidden_files, bool include_system_files)
 {
 	HANDLE hFind;
 	WIN32_FIND_DATA data;
@@ -4674,6 +4805,16 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 
 	do
 	{
+		if (!include_hidden_files && (data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN))
+		{
+			continue;
+		}
+
+		if (!include_system_files && (data.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM))
+		{
+			continue;
+		}
+
 		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
 			if ((_tcscmp(data.cFileName, _T(".")) != 0) && (_tcscmp(data.cFileName, _T("..")) != 0))
@@ -4715,6 +4856,23 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 	} while (FindNextFile(hFind, &data));
 
 	FindClose(hFind);
+	bool res;
+	//sort looks like windows10 explorer
+	if (dq->size())// && auto_sort)
+	{
+		std::sort(dq->begin(), dq->end(),
+			[&res](WIN32_FIND_DATA a, WIN32_FIND_DATA b)
+			{
+				res = (_tcsicmp(a.cFileName, b.cFileName) < 0);
+				//TRACE(_T("%s < %s = %d\n"), a.cFileName, b.cFileName, res);
+				return res;
+				//return (_tcsicmp(a.cFileName, b.cFileName) == 1);
+				//CString aa = get_part(a.cFileName, fn_name);
+				//CString bb = get_part(b.cFileName, fn_name);
+				//return (aa < bb);
+			}
+		);
+	}
 }
 
 //list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
@@ -5821,12 +5979,12 @@ void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr
 	Gdiplus::SolidBrush br(cr_fill);
 
 	if (cr_fill.GetValue() != Gdiplus::Color::Transparent)
-		g.FillRectangle(&br, CRect2GpRect(r));
+		g.FillRectangle(&br, CRectTogpRect(r));
 
 	//DrawRectangle()로 그리면 right, bottom까지 그리는데 영역을 벗어나게 된다.
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
 	r.DeflateRect(0, 0, 1, 1);
-	g.DrawRectangle(&pen, CRect2GpRect(r));
+	g.DrawRectangle(&pen, CRectTogpRect(r));
 }
 
 void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
@@ -5853,8 +6011,8 @@ void draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_f
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
 
-	g.FillEllipse(&br, CRect2GpRect(r));
-	g.DrawEllipse(&pen, CRect2GpRect(r));
+	g.FillEllipse(&br, CRectTogpRect(r));
+	g.DrawEllipse(&pen, CRectTogpRect(r));
 }
 
 void draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed, COLORREF crLine, int nWidth, int nPenStyle, int nDrawMode)
@@ -6173,17 +6331,17 @@ CRect getCenterRect(int cx, int cy, int w, int h)
 	return r;
 }
 
-CRect GpRect2CRect(Gdiplus::Rect r)
+CRect gpRectToCRect(Gdiplus::Rect r)
 {
 	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
 }
 
-Gdiplus::Rect CRect2GpRect(CRect r)
+Gdiplus::Rect CRectTogpRect(CRect r)
 {
 	return Gdiplus::Rect(r.left, r.top, r.Width(), r.Height());
 }
 
-Gdiplus::RectF CRect2GpRectF(CRect r)
+Gdiplus::RectF CRectTogpRectF(CRect r)
 {
 	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
 }
@@ -6235,6 +6393,14 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 
 void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width)
 {
+	if (radius <= 0)
+	{
+		CDC dc;
+		dc.FromHandle(g->GetHDC());
+		draw_rectangle(&dc, gpRectToCRect(r), gcr_stroke, gcr_fill, width);
+		return;
+	}
+
 	int dia = 2 * radius;
 
 	// set to pixel mode
@@ -6511,18 +6677,17 @@ CString get_file_property(CString fullpath, CString strFlag)
 } 
 
 //파일, 폴더의 속성창을 표시한다.
-void show_file_property_window(CString fullpath)
+bool show_file_property_window(CString fullpath)
 {
 	//"내 PC"를 선택한 경우 시스템 속성 창을 열어준다.
 	if (fullpath == get_system_label(CSIDL_DRIVES))
 	{
 		ShellExecute(NULL, _T("open"), _T("SystemPropertiesAdvanced.exe"), NULL, NULL, SW_SHOW);
-		return;
+		return true;
 	}
 
 	//그 외에는 폴더 속성창을 열어준다.
-	SHObjectProperties(NULL, SHOP_FILEPATH, (CStringW)fullpath, NULL);
-	return;
+	return SHObjectProperties(NULL, SHOP_FILEPATH, (CStringW)fullpath, NULL);
 
 	//ShellExecuteEx를 이용한 방법
 	//"properties"를 표시하기 위해서는 SEE_MASK_INVOKEIDLIST 가 필요하다.
@@ -6588,6 +6753,17 @@ CString	GetFileProperty(CString sFilePath, CString sProperty)
 	delete [] pVerInfo;
 
 	return sResult;
+}
+
+CString get_file_time_str(FILETIME filetime)
+{
+	SYSTEMTIME st;
+	FILETIME ftLocal;
+
+	FileTimeToLocalFileTime(&(filetime), &ftLocal);
+	FileTimeToSystemTime(&ftLocal, &st);
+
+	return get_datetime_string(st, 2, true, _T(" "), false, false, false);
 }
 
 size_t read_raw(CString sfile, uint8_t *dst, size_t size)
@@ -8814,19 +8990,36 @@ void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
 	} while ((logicalDrives >>= 1) != 0);
 }
 
+//"내 PC\\로컬 디스크 (C:)" -> "C:\\"
 //"로컬 디스크 (C:)" -> "C:\\"
 //"문서" -> "C:\\Documents"
 //"문서\\AnySupport" -> "C:\\Documents\\AnySupport"
 //"Seagate(\\192.168.0.52) (X:)" -> "X:"	(네트워크 드라이브)
 //하위 폴더 포함 유무에 관계없이 변환.
-//remote의 경로인 경우는 system_label, system_path, drive_list까지 모두 파라미터로 전달받아 처리해야하므로 복잡해지기 때문에
-//이 함수에서는 remote인 경우는 처리하지 않는다.
-//local->remote로 path를 전달할 때 그대로 전달하고 remote에서 이 함수를 통해 실제 경로로 변환해서 사용하자.
-CString	convert_special_folder_to_real_path(CString special_folder)
+CString	convert_special_folder_to_real_path(CString special_folder, CShellImageList *plist, int index)
 {
 	//실제 존재한다고 판별되면 이는 real_path이므로 그대로 리턴.
 	if (special_folder.IsEmpty() || PathFileExists(special_folder))
 		return special_folder;
+
+	//"내 PC"가 존재하면 날린다.
+	CString myPC_label;
+	
+	if (plist && plist->m_volume.size() > index)
+		myPC_label = plist->m_volume[index].get_label(CSIDL_DRIVES);
+	else
+		myPC_label = get_system_label(CSIDL_DRIVES);
+
+	if (special_folder == myPC_label)
+		return myPC_label;
+
+	//"내 PC\\연구소문서(\\\\192.168.1.103) (Y:)"
+	if (special_folder.Find(myPC_label) >= 0)
+		special_folder.Replace(myPC_label, _T(""));
+
+	//"\\연구소문서(\\\\192.168.1.103) (Y:)"
+	if (special_folder.GetLength() > 1 && special_folder.Left(1) == '\\')
+		special_folder = special_folder.Mid(1);
 
 	CString real_path = special_folder;
 	CString drive_prefix;
@@ -8836,7 +9029,7 @@ CString	convert_special_folder_to_real_path(CString special_folder)
 	bool is_network_drive = false;
 
 	int pos1 = special_folder.Find(_T(":)"));
-	int pos2 = special_folder.Find(_T("\\"));
+	int pos2 = special_folder.Find(_T("\\\\"));
 	if (pos1 > 0 && pos2 > 0 && pos1 > pos2)
 	{
 		is_network_drive = true;
@@ -8852,34 +9045,72 @@ CString	convert_special_folder_to_real_path(CString special_folder)
 	CString rest_path = special_folder;
 	rest_path.Replace(drive_prefix, _T(""));
 
-	if (drive_prefix == ::get_system_label(CSIDL_DRIVES))
-		real_path.Format(_T("%s%s"), ::get_system_label(CSIDL_DRIVES), rest_path);
-	else if (drive_prefix == ::get_system_label(CSIDL_DESKTOP))
-		real_path.Format(_T("%s%s"), get_known_folder(CSIDL_DESKTOP), rest_path);
-	else if (drive_prefix == ::get_system_label(CSIDL_MYDOCUMENTS))
-		real_path.Format(_T("%s%s"), get_known_folder(CSIDL_MYDOCUMENTS), rest_path);
+	//local일 경우는 직접 구해서 비교하고
+	if (plist == NULL)
+	{
+		if (drive_prefix == ::get_system_label(CSIDL_DRIVES))
+			real_path.Format(_T("%s%s"), ::get_system_label(CSIDL_DRIVES), rest_path);
+		else if (drive_prefix == ::get_system_label(CSIDL_DESKTOP))
+			real_path.Format(_T("%s%s"), get_known_folder(CSIDL_DESKTOP), rest_path);
+		else if (drive_prefix == ::get_system_label(CSIDL_MYDOCUMENTS))
+			real_path.Format(_T("%s%s"), get_known_folder(CSIDL_MYDOCUMENTS), rest_path);
+		else
+		{
+			std::deque<CString> drive_list;
+			get_drive_list(&drive_list);
+
+			for (int i = 0; i < drive_list.size(); i++)
+			{
+				//"로컬 디스크 (C:)"
+				if (drive_list[i] == drive_prefix)
+				{
+					int pos = real_path.Find(_T(":)"));
+					if (pos < 0)
+						return real_path;
+
+					CString rest = real_path.Mid(pos + 2);
+					CString drive_letter = real_path.Mid(pos - 1, 1);
+
+					if (rest.Left(1) == _T("\\"))
+						rest = rest.Mid(1);
+
+					real_path.Format(_T("%s:\\%s"), drive_letter, rest);
+					break;
+				}
+			}
+		}
+	}
+	//remote일 경우는 map을 이용해서 비교
 	else
 	{
-		std::deque<CString> drive_list;
-		get_drive_list(&drive_list);
-
-		for (int i = 0; i < drive_list.size(); i++)
+		if (drive_prefix == plist->m_volume[index].get_label(CSIDL_DRIVES))
+			real_path.Format(_T("%s%s"), plist->m_volume[index].get_label(CSIDL_DRIVES), rest_path);
+		else if (drive_prefix == ::get_system_label(CSIDL_DESKTOP))
+			real_path.Format(_T("%s%s"), plist->m_volume[index].get_path(CSIDL_DESKTOP), rest_path);
+		else if (drive_prefix == ::get_system_label(CSIDL_MYDOCUMENTS))
+			real_path.Format(_T("%s%s"), plist->m_volume[index].get_path(CSIDL_MYDOCUMENTS), rest_path);
+		else
 		{
-			//"로컬 디스크 (C:)"
-			if (drive_list[i] == drive_prefix)
+			std::deque<CString>* drive_list = plist->m_volume[index].get_drive_list();
+
+			for (int i = 0; i < drive_list->size(); i++)
 			{
-				int pos = real_path.Find(_T(":)"));
-				if (pos < 0)
-					return real_path;
+				//"로컬 디스크 (C:)"
+				if (drive_list->at(i) == drive_prefix)
+				{
+					int pos = real_path.Find(_T(":)"));
+					if (pos < 0)
+						return real_path;
 
-				CString rest = real_path.Mid(pos + 2);
-				CString drive_letter = real_path.Mid(pos - 1, 1);
+					CString rest = real_path.Mid(pos + 2);
+					CString drive_letter = real_path.Mid(pos - 1, 1);
 
-				if (rest.Left(1) == _T("\\"))
-					rest = rest.Mid(1);
+					if (rest.Left(1) == _T("\\"))
+						rest = rest.Mid(1);
 
-				real_path.Format(_T("%s:\\%s"), drive_letter, rest);
-				break;
+					real_path.Format(_T("%s:\\%s"), drive_letter, rest);
+					break;
+				}
 			}
 		}
 	}
@@ -8887,16 +9118,35 @@ CString	convert_special_folder_to_real_path(CString special_folder)
 	return real_path;
 }
 
-//"c:\\abc\\def" => "로컬 디스크 (C:)\\abc\\def"
-//미완성!!!! 현재 사용되는 곳은 없는 상태.
-CString	convert_real_path_to_special_folder(CString real_path, std::map<int, CString>* system_path_map)
+//"c:\\abc\\def"				=> "로컬 디스크 (C:)\\abc\\def"
+//"C:\Users\scpark\Desktop"		=> "바탕 화면"
+//"C:\Users\scpark\Documents"	=> "문서"
+CString	convert_real_path_to_special_folder(CString real_path, CShellImageList* plist, int index)
 {
+	if (plist == NULL)
+	{
+		if (real_path == get_known_folder(CSIDL_DESKTOP))
+			return get_system_label(CSIDL_DESKTOP);
+		else if (real_path == get_known_folder(CSIDL_MYDOCUMENTS))
+			return get_system_label(CSIDL_MYDOCUMENTS);
+	}
+	else
+	{
+		if (real_path == plist->m_volume[index].get_path(CSIDL_DESKTOP))
+			return plist->m_volume[index].get_label(CSIDL_DESKTOP);
+		else if (real_path == plist->m_volume[index].get_path(CSIDL_MYDOCUMENTS))
+			return plist->m_volume[index].get_label(CSIDL_MYDOCUMENTS);
+	}
+
 	CString volume_path = real_path;
 
 	if (real_path.Mid(1, 2) != _T(":\\"))
 		return real_path;
 
 	CString volume = get_drive_volume(real_path[0]);
+
+	if (plist)
+		volume = plist->m_volume[index].get_drive_volume(real_path);
 
 	volume_path.Replace(CString(real_path[0]) + _T(":"), volume);
 
@@ -10090,7 +10340,7 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 
 			if (hProcess != NULL)
 			{
-				QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
@@ -10148,7 +10398,7 @@ HWND get_hwnd_by_exe_file(CString target_exe_file)
 
 			if (hProcess)
 			{
-				QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
@@ -10209,7 +10459,7 @@ int	kill_process_by_fullpath(CString fullpath)
 
 			if (hProcess)
 			{
-				QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
@@ -10280,7 +10530,7 @@ int get_process_running_count(CString processname)
 
 				if (hProcess)
 				{
-					QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+					//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 					::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
 					//TRACE(_T("%s\n"), sFilePath);
 					CloseHandle(hProcess);
@@ -11405,7 +11655,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	return hBitmap;
 }
 
-#define _S(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
+#define _M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
 void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 {
 	PICTDESC pictdesc = {};
@@ -11414,20 +11664,20 @@ void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 	pictdesc.bmp.hbitmap = bitmap;
 
 	CComPtr<IPicture> picture;
-	_S(OleCreatePictureIndirect(&pictdesc, __uuidof(IPicture), FALSE, (LPVOID*)&picture));
+	_M(OleCreatePictureIndirect(&pictdesc, __uuidof(IPicture), FALSE, (LPVOID*)&picture));
 
 	// Save to a stream
 
 	CComPtr<IStream> stream;
-	_S(CreateStreamOnHGlobal(NULL, TRUE, &stream));
+	_M(CreateStreamOnHGlobal(NULL, TRUE, &stream));
 	LONG cbSize = 0;
-	_S(picture->SaveAsFile(stream, TRUE, &cbSize));
+	_M(picture->SaveAsFile(stream, TRUE, &cbSize));
 
 	// Or save to a file
 
 	CComPtr<IPictureDisp> disp;
-	_S(picture->QueryInterface(&disp));
-	_S(OleSavePictureFile(disp, CComBSTR(filename)));
+	_M(picture->QueryInterface(&disp));
+	_M(OleSavePictureFile(disp, CComBSTR(filename)));
 	return;
 
 	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
@@ -12262,7 +12512,7 @@ TCHAR* replace(TCHAR* src, const TCHAR* olds, const TCHAR* news)
 }
 
 //src의 끝에서 length 길이 만큼 잘라낸다.
-CString truncate(CString src, int length)
+CString truncate(CString &src, int length)
 {
 	CString result;
 
@@ -12272,11 +12522,12 @@ CString truncate(CString src, int length)
 		result = src.Left(src.GetLength() - length);
 	}
 	
+	src = result;
 	return result;
 }
 
 //src끝의 문자열이 sub와 일치하면 잘라낸다.
-CString	truncate(CString src, CString sub)
+CString	truncate(CString &src, CString sub)
 {
 	CString result;
 
@@ -12286,6 +12537,7 @@ CString	truncate(CString src, CString sub)
 		result = src.Left(src.GetLength() - sub_len);
 	}
 
+	src = result;
 	return result;
 }
 

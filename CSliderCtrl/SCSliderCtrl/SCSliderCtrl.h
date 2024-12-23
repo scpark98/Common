@@ -125,11 +125,13 @@ public:
 		style_step,		//진행 단계를 표시. 1-2-3-4 과 같은 형태. 
 	};
 
-	enum SCSliderCtrlValueStyle
+	enum SCSliderCtrlTextStyle
 	{
-		value_style_none = 0,
-		value_style_value,
-		value_style_percentage,
+		text_style_none = 0,
+		text_style_value,			//GetPos()의 값으로 표시
+		text_style_percentage,		//percentage 값으로 표시
+		text_style_user_defined,	//중앙에 사용자가 직접 설정한 값으로 표시
+		text_style_dual_text,		//양쪽에 사용자가 직접 설정한 값으로 표시
 	};
 
 	enum TIMER
@@ -156,7 +158,8 @@ public:
 
 	//int		GetPos();
 	void	SetPos(int pos);
-
+	int		get_min();
+	int		get_max();
 	int		get_style() { return m_style; }
 
 	//void	SetPos(int pos) { CSliderCtrl::SetPos(pos); Invalidate(); /*redraw_window();*/ }
@@ -169,13 +172,17 @@ public:
 	void	enable_slide(bool enable = true) { m_enable_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
-	void	SetValueStyle(int nValueStyle = value_style_value, COLORREF crText = RGB(64, 64, 64)) { m_nValueStyle = nValueStyle; m_crValueText = crText; }
 
+	void	set_track_color(COLORREF cr_active, COLORREF cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
 	void	set_back_color(COLORREF crBack);
 	void	set_active_color(COLORREF crActive);
 	void	set_inactive_color(COLORREF crInActive);
 	void	set_thumb_color(COLORREF crThumb);
-	void	set_text_color(COLORREF cr_text) { m_crValueText = cr_text; Invalidate(); }
+
+	void	set_text_color(COLORREF cr_text) { m_cr_text = cr_text; Invalidate(); }
+	void	set_text_style(int text_style) { m_text_style = text_style; Invalidate(); }
+	void	set_text(LPCTSTR text, ...);
+	void	set_text_dual(LPCTSTR text_dual, ...);
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
@@ -199,65 +206,78 @@ public:
 		tooltip_time,
 		tooltip_time_ms,
 	};
-	void	use_tooltip(bool use = true) { m_use_tooltip = use; }
-	void	set_tooltip_format(int format = tooltip_value) { m_tooltip_format = format; }
+	void			use_tooltip(bool use = true) { m_use_tooltip = use; }
+	void			set_tooltip_format(int format = tooltip_value) { m_tooltip_format = format; }
 
 //구간 반복 관련(slider_track style일 경우)
-	int		m_repeat_start;
-	int		m_repeat_end;
+	int				m_repeat_start;
+	int				m_repeat_end;
 	//둘 다 -1이면 반복 해제.
 	//하나만 -1이면 시작 또는 끝은 미디어의 시작 또는 끝으로
-	void	set_repeat_range(int start, int end);
+	void			set_repeat_range(int start, int end);
 
 	//pos가 0이상이면 그 트랙 위치를 start 또는 end로 설정하고
 	//-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
-	void	set_repeat_start(int pos = -2);
+	void			set_repeat_start(int pos = -2);
 	//pos가 0이상이면 그 트랙 위치를 start 또는 end로 설정하고
 	//-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
-	void	set_repeat_end(int pos = -2);
+	void			set_repeat_end(int pos = -2);
 
+//폰트 관련
+	LOGFONT			get_log_font() { return m_lf; }
+	void			set_log_font(LOGFONT lf);
+	int				get_font_size();
+	void			set_font_size(int font_size);
+	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);
+	void			set_font_bold(bool bold = true);
+	void			set_font_italic(bool italic = true);
+	void			enlarge_font_size(bool enlarge);
+
+	//border
+	void			draw_progress_border(bool draw = true) { m_draw_progress_border = draw; }
+	void			set_progress_border_color(Gdiplus::Color cr) { m_cr_progress_border = cr; }
 protected:
 	// Attributes
 
 	//slider_thumb,	slider_value, slider_progress, slider_track,
-	int			m_style = style_thumb;
+	int				m_style = style_thumb;
 
-	int			m_nEventMsgStyle;
+	int				m_nEventMsgStyle;
 
-	CRect		m_rc;
+	CRect			m_rc;
 
 	CToolTipCtrl	m_tooltip;
-	bool		m_use_tooltip;	//default = false
-	int			m_tooltip_format;	//default = tooltip_value
+	bool			m_use_tooltip;	//default = false
+	int				m_tooltip_format;	//default = tooltip_value
 
 
 	//실제 전체 구간 게이지 영역
-	int			m_track_thick = 8;	//트랙 두께
+	int				m_track_thick = 8;	//트랙 두께
 
 	//잡고 움직이는 영역
-	CSize		m_thumb;
+	CSize			m_thumb;
 	//4방향의 여백
-	CRect		m_margin;
-	int			m_nMouseOffset;
+	CRect			m_margin;
+	int				m_nMouseOffset;
 
 	//현재는 세로모드에 대한 코드가 거의 구현되어 있지 않다.
-	bool		m_is_vertical = false;
+	bool			m_is_vertical = false;
 
 	//enable move the current pos by click or drag even though progress style. default = true
-	bool		m_enable_slide;
+	bool			m_enable_slide;
 
 
 	//특정 위치들을 기억해두자. 북마크처럼.
-	bool		m_use_bookmark;	//default = false;
+	bool			m_use_bookmark;	//default = false;
 	std::deque<CSCSliderCtrlBookmark> m_bookmark;
 	//pos의 위치에 있는 북마크의 인덱스를 리턴한다.
-	int			find_index_bookmark(int pos);
+	int				find_index_bookmark(int pos);
 	//mouse move, sliding할 때 북마크 근처에 가면 이 값이 세팅된다. 근처가 아니면 -1.
-	int			m_cur_bookmark;
+	int				m_cur_bookmark;
 	//마우스 위치에서 가장 가까운 북마크를 찾는데 그 허용 오차를 미리 구해놓는다.
-	int			m_bookmark_near_tolerance;
+	int				m_bookmark_near_tolerance;
 	//현재 위치에서 가장 가까운 이전/다음 북마크 위치를 찾는다.
-	int			get_near_bookmark(int pos, bool forward);
+	int				get_near_bookmark(int pos, bool forward);
 
 
 	/*
@@ -271,47 +291,54 @@ protected:
 	그렇지 않은 조건일 경우만 이쪽으로 넘겨서 처리하도록 수정 완료.
 	bool		m_enable_bottom_slide;
 	*/
-	bool		m_lbuttondown = false;
-	bool		m_has_focus = false;
-	bool		m_draw_focus_rect = false;
+	bool			m_lbuttondown = false;
+	bool			m_has_focus = false;
+	bool			m_draw_focus_rect = false;
 
-	int			m_nValueStyle = value_style_value;
-	COLORREF	m_crValueText = RGB(192, 192, 192);
+	CString			m_text;			//m_text_style == text_style_user_defined일 경우 표시되는 텍스트
+	CString			m_text_dual;	//m_text_style == text_style_dual_text일 경우 오른쪽에 표시되는 텍스트
+	int				m_text_style = text_style_value;
+	COLORREF		m_cr_text = RGB(192, 192, 192);
 
-	bool		m_transparent = false;
-	COLORREF	m_cr_back;		// back color of control
-	COLORREF	m_cr_active;			//processed area
-	COLORREF	m_cr_inactive;		//not processed area
-	int			m_track_height;		//processing area height. odd recommend between 3 ~ 11.
-	CPen		m_penThumb;
-	CPen		m_penThumbLight;
-	CPen		m_penThumbLighter;
-	CPen		m_penThumbDark;
-	CPen		m_penThumbDarker;
-	COLORREF	m_cr_thumb;
-	COLORREF	m_cr_thumbLight;
-	COLORREF	m_cr_thumbLighter;
-	COLORREF	m_cr_thumbDark;
-	COLORREF	m_cr_thumbDarker;
-	COLORREF	m_crBookmark;
-	COLORREF	m_crBookmarkCurrent;
+	bool			m_transparent = false;
+	COLORREF		m_cr_back;			// back color of control
+	COLORREF		m_cr_active;		//processed area
+	COLORREF		m_cr_inactive;		//not processed area
+	int				m_track_height;		//processing area height. odd recommend between 3 ~ 11.
+	CPen			m_penThumb;
+	CPen			m_penThumbLight;
+	CPen			m_penThumbLighter;
+	CPen			m_penThumbDark;
+	CPen			m_penThumbDarker;
+	COLORREF		m_cr_thumb;
+	COLORREF		m_cr_thumbLight;
+	COLORREF		m_cr_thumbLighter;
+	COLORREF		m_cr_thumbDark;
+	COLORREF		m_cr_thumbDarker;
+	COLORREF		m_crBookmark;
+	COLORREF		m_crBookmarkCurrent;
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
-	COLORREF	enable_color(COLORREF cr, int offset = 0);
+	COLORREF		enable_color(COLORREF cr, int offset = 0);
 
-	CWnd*		m_pParentWnd;
-	void		(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos);
+	CWnd*			m_pParentWnd;
+	void			(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos);
 
-	int			Pixel2Pos(int pixel);
-	int			Pos2Pixel(int pos);
-	void		PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
-							 COLORREF clrpTransColor);
-	void		DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
-										CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask);
+	int				Pixel2Pos(int pixel);
+	int				Pos2Pixel(int pos);
+	void			PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
+								 COLORREF clrpTransColor);
+	void			DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
+											CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask);
 
-	//font 관련
-	LOGFONT		m_lf;
-	CFont		m_font;
-	void		reconstruct_font();
+	//폰트 관련
+	LOGFONT			m_lf;
+	CFont			m_font;
+	int				m_font_size;
+	void			reconstruct_font();
+
+	//border
+	Gdiplus::Color	m_cr_progress_border = Gdiplus::Color(188, 188, 188);
+	bool			m_draw_progress_border = false;	//ctrl의 border가 아닌 progress style에서 progress bar의 border
 
 // Overrides
 	// ClassWizard generated virtual function overrides

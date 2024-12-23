@@ -102,7 +102,11 @@ CString CSCPing::get_ip_error_string(DWORD error_code)
 {
 	//auto e = GetLastError();
 	DWORD buf_size = 1024;
+#ifdef _UNICODE
 	TCHAR buf[1024] = { 0, };
+#else
+	WCHAR buf[1024] = { 0, };
+#endif
 	GetIpErrorString(error_code, buf, &buf_size);
 
 	return CString(buf);
@@ -131,7 +135,11 @@ void CSCPing::thread_ping(CSCPingParams* params)
 		m_map[params->job_name] = PING_THREAD_NOT_RUNNING;
 		auto e = GetLastError();
 		DWORD buf_size = 1024;
+#ifdef _UNICODE
 		TCHAR buf[1024] = { 0, };
+#else
+		WCHAR buf[1024] = { 0, };
+#endif
 		GetIpErrorString(e, buf, &buf_size);
 
 		str = get_ip_error_string(GetLastError());

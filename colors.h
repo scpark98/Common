@@ -82,7 +82,7 @@ public :
 	Gdiplus::Color	cr_header_back;
 	std::deque<Gdiplus::Color> cr_percentage_bar;	//percentage bar graph color
 	Gdiplus::Color	cr_progress;					//progress bar
-	Gdiplus::Color	cr_progress_text;				//progress text
+	//Gdiplus::Color	cr_progress_text;				//progress text
 
 protected:
 	CWnd*			m_parent = NULL;
@@ -122,17 +122,17 @@ protected:
 //complementary color
 #define		color_complementary(c) (~(c)&0x00ffffff)
 
-#define		GRAY_FACE	::GetSysColor(COLOR_3DFACE)
-#define		GRAY32		GRAY(32)
-#define		GRAY64		GRAY(64)
-#define		GRAY128		GRAY(128)
-#define		GRAY160		GRAY(160)
-#define		GRAY192		GRAY(192)
-#define		GRAY208		GRAY(208)
-#define		GRAY224		GRAY(224)
-#define		GRAY(x)		RGB((x), (x), (x))
-#define		gGRAY(x)	Gdiplus::Color(255, (x), (x), (x))
-#define		gRGB(r,g,b)	Gdiplus::Color(255, (r), (g), (b))
+#define		GRAY_FACE		::GetSysColor(COLOR_3DFACE)
+#define		GRAY32			GRAY(32)
+#define		GRAY64			GRAY(64)
+#define		GRAY128			GRAY(128)
+#define		GRAY160			GRAY(160)
+#define		GRAY192			GRAY(192)
+#define		GRAY208			GRAY(208)
+#define		GRAY224			GRAY(224)
+#define		GRAY(x)			RGB((x), (x), (x))
+#define		gGRAY(x)		Gdiplus::Color(255, (x), (x), (x))
+#define		gRGB(r,g,b)		Gdiplus::Color(255, (r), (g), (b))
 
 //std::map으로 컬러 표현
 //참조 방법 : cr = g_cr["white"]

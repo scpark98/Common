@@ -255,7 +255,7 @@ int CShellImageList::GetVirtualImageListIcon(CString szExt)
 
 void CShellImageList::set_system_label(int index, std::map<int, CString>* map)
 {
-	if (index >= m_volume.size() - 1)
+	if (index >= m_volume.size())
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_system_label(map);
@@ -263,7 +263,7 @@ void CShellImageList::set_system_label(int index, std::map<int, CString>* map)
 
 void CShellImageList::set_system_path(int index, std::map<int, CString>* map)
 {
-	if (index >= m_volume.size() - 1)
+	if (index >= m_volume.size())
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_system_path(map);
@@ -271,7 +271,7 @@ void CShellImageList::set_system_path(int index, std::map<int, CString>* map)
 
 void CShellImageList::set_drive_list(int index, std::deque<CString>* drive_list)
 {
-	if (index >= m_volume.size() - 1)
+	if (index >= m_volume.size())
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_drive_list(drive_list);

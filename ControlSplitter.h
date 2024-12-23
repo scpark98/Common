@@ -49,6 +49,10 @@ public:
 	void AddToBottomOrRightCtrls(UINT nCtrlId, WORD nFlags = SPF_TOP|SPF_LEFT|SPF_RIGHT|SPF_BOTTOM);
 
 	void AddToTopOrLeftCtrls(UINT nCtrlId, WORD nFlags = SPF_TOP|SPF_LEFT|SPF_BOTTOM|SPF_RIGHT);
+
+	//어떤 컨트롤은 스플리터와 함께 움직여야 한다. 양쪽 모두 줘야한다.
+	void AddToBoth(UINT nCtrlId, WORD nFlags = SPF_TOP | SPF_LEFT | SPF_BOTTOM | SPF_RIGHT);
+
 	void SetType(UINT nType);
 	virtual ~CControlSplitter();
 

@@ -138,7 +138,7 @@ public:
 
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
 	CString		get_fullpath(HTREEITEM hItem = NULL);
-	void		set_path(CString fullpath);
+	void		set_path(CString fullpath, bool expand = true);
 
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CString driveName);
@@ -221,7 +221,7 @@ public:
 	LOGFONT			get_log_font() { return m_lf; }
 	void			set_log_font(LOGFONT lf);
 	int				get_font_size();
-	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);
 	void			set_font_size(int font_size);
 	void			enlarge_font_size(bool enlarge);
 	void			set_font_bold(bool bold = true);

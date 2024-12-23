@@ -22,42 +22,59 @@
 #include "../../GdiplusBitmap.h"
 #include "../../CButton/SCSystemButtons/SCSystemButtons.h"
 
-// CSCThemeDialog 대화 상자
-class CSCThemeDialog : public CDialogEx
+// CSCThemeDlg 대화 상자
+class CSCThemeDlg : public CDialogEx
 {
-	DECLARE_DYNAMIC(CSCThemeDialog)
+	DECLARE_DYNAMIC(CSCThemeDlg)
 
 public:
-	CSCThemeDialog(CWnd* pParent = nullptr);   // 표준 생성자입니다.
-	CSCThemeDialog(UINT nResourceID, CWnd* pParent = nullptr);   // 표준 생성자입니다.
-	virtual ~CSCThemeDialog();
+	CSCThemeDlg(CWnd* pParent = nullptr, int left = 0, int top = 0, int right = 0, int bottom = 0);   // 표준 생성자입니다.
+	CSCThemeDlg(UINT nResourceID, CWnd* pParent = nullptr);   // 표준 생성자입니다.
+	//CSCThemeDlg(CString message, CString headline);
+	virtual ~CSCThemeDlg();
 
 	//윈도우 기본 타이틀바가 있는 dlg일 경우는 타이틀바와 관계된 모든 옵션은 무시된다.
 	//void	SetWindowText(CString title) { set_title(title); }
-	void	set_title(CString title) { m_title = title; }
+	void	set_title(CString title) { m_title = title; Invalidate(); }
+	void	set_title_bold(bool bold = true);
 	void	set_titlebar_height(int height);
-	void	set_titlebar_text_color(COLORREF cr) { m_cr_titlebar_text = cr; }
-	void	set_titlebar_back_color(COLORREF cr) { m_cr_titlebar_back = cr; }
+	void	set_titlebar_text_color(Gdiplus::Color cr);
+	void	set_titlebar_back_color(Gdiplus::Color cr);
+
+	void	set_logo(UINT icon_id) { m_img_logo.load(icon_id); }
+	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
+
+	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void	set_font_size(int size);
+
+
+	//parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.
+	void	adjust();
 
 	//필요한 시스템 버튼들을 추가해준다. 이 함수를 호출하지 않으면 기본 닫기 버튼만 사용된다.
 	//set_system_buttons(SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);	//항상 위에 버튼까지 필요한 경우
 	//set_system_buttons(SC_CLOSE);	//닫기 버튼만 필요한 경우
 	template <typename ... Types> void	set_system_buttons(Types... args)
 	{
-		if (m_system_buttons.m_hWnd)
+		int button_width = -1;
+		if (m_sys_buttons.m_hWnd)
 		{
-			m_system_buttons.DestroyWindow();
-			m_system_buttons.create(this);
+			button_width = m_sys_buttons.get_button_width();
+			m_sys_buttons.DestroyWindow();
+			m_sys_buttons.create(this);
 		}
 
 		int n = sizeof...(args);
 		int arg[] = { args... };
 
 		for (int i = 0; i < n; i++)
-			m_system_buttons.insert_button(-1, arg[i]);
+			m_sys_buttons.insert_button(-1, arg[i]);
+
+		m_sys_buttons.set_button_width(button_width);
+		m_sys_buttons.set_button_height(m_titlebar_height);
 	}
 
-	void	set_back_color(COLORREF cr) { m_cr_back = cr; }
+	void	set_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
 	void	set_back_image(CString imgType, UINT nResourceID, bool stretch);
 	//void	set_back_image(CString img_path, bool stretch);
 
@@ -69,7 +86,6 @@ public:
 	};
 
 	void	set_color_theme(int theme);
-
 	void	enable_resize(bool resizable);
 
 	virtual BOOL OnInitDialog();
@@ -78,22 +94,32 @@ public:
 	virtual void OnCancel() {};
 
 protected:
-	CRect		m_border_thickness;
-	bool		m_is_resizable = true;
+	CRect				m_border_thickness;
+	bool				m_is_resizable = true;
 
-	int			m_titlebar_height = 32;// GetSystemMetrics(SM_CYCAPTION);
-	COLORREF	m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
-	COLORREF	m_cr_titlebar_back = RGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);
-	CString		m_title;
-	CFont*		m_font;
+	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
+	Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
+	Gdiplus::Color		m_cr_titlebar_back = gRGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);
+	CString				m_title;
 
+	//프로그램 로고 아이콘 표시 여부. 기본값 false
+	bool				m_show_logo = false;
 	//프로그램 로고(png만 허용, 이 값이 없다면 기본 앱 아이콘을 사용한다)
 	CGdiplusBitmap		m_img_logo;
 
-	COLORREF			m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	LOGFONT				m_lf;
+	CFont				m_title_font;
+	void				reconstruct_font();
+
+
+	Gdiplus::Color		m_cr_back = ::GetSysColor(COLOR_3DFACE);
 	CGdiplusBitmap		m_img_back;
 
-	CSCSystemButtons	m_system_buttons;
+	CSCSystemButtons	m_sys_buttons;
+
+	//IDD 리소스를 사용하지 않고 동적 생성할 경우
+	CWnd*				m_parent = NULL;
+	bool				create(CWnd* parent, int left, int top, int right, int bottom);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
@@ -107,4 +133,5 @@ public:
 	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
 	afx_msg void OnPaint();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };

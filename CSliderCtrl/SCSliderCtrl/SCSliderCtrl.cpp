@@ -53,6 +53,8 @@ CSCSliderCtrl::CSCSliderCtrl()
 	m_repeat_end = -1;
 
 	set_thumb_color(m_cr_thumb);
+
+	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
 CSCSliderCtrl::~CSCSliderCtrl()
@@ -103,7 +105,7 @@ void CSCSliderCtrl::OnPaint()
 	CPaintDC	dc1(this); // device context for painting
 	CPen*		pOldPen = NULL;
 	CBrush*		pOldBrush = NULL;
-	CString		str;
+	CString		str, str_dual;
 
 	// TODO: Add your message handler code here
 	GetClientRect(m_rc);
@@ -188,15 +190,17 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		CRect	rInActive(pxpos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
-		dc.FillSolidRect(rInActive, enable_color(m_cr_inactive));
+		track = CRect(pxpos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
+		dc.FillSolidRect(track, enable_color(m_cr_inactive));
 	}
 	else if (m_style == style_progress_line)
 	{
+		int track_height = 10;
+		int marginy = MAX(0, (m_rc.Height() - track_height) / 2);
 		CRect rtrack = m_rc;
-		rtrack.top = m_rc.CenterPoint().y - 4;
-		rtrack.bottom = m_rc.CenterPoint().y + 4;
-		Gdiplus::Pen pen(RGB2gpColor(m_cr_inactive), 8);
+		rtrack.top = m_rc.CenterPoint().y - marginy;
+		rtrack.bottom = m_rc.CenterPoint().y + marginy;
+		Gdiplus::Pen pen(RGB2gpColor(m_cr_inactive), track_height);
 		pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
 		g.DrawLine(&pen, rtrack.left + rtrack.Height() / 2, rtrack.CenterPoint().y, m_rc.right - rtrack.Height() / 2 - 1, rtrack.CenterPoint().y);
 	}
@@ -254,10 +258,10 @@ void CSCSliderCtrl::OnPaint()
 				else
 				{
 					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRectTogpRect(m_steps[i].r));
 					CRect rthumb_small = m_steps[i].r;
 					rthumb_small.DeflateRect(4, 4);
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRectTogpRect(rthumb_small));
 				}
 			}
 
@@ -291,10 +295,10 @@ void CSCSliderCtrl::OnPaint()
 				else
 				{
 					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRectTogpRect(m_steps[i].r));
 					CRect rthumb_small = m_steps[i].r;
 					rthumb_small.DeflateRect(4, 4);
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRectTogpRect(rthumb_small));
 				}
 			}
 
@@ -329,49 +333,84 @@ void CSCSliderCtrl::OnPaint()
 		dc.SelectObject(pOldPen);
 		penDark.DeleteObject();
 		penLight.DeleteObject();
-			
 	}
 	else if (m_style == style_progress)
 	{
-		CRect	rActive(0, track.top + 2, pxpos, track.bottom - 2);
-		dc.FillSolidRect(rActive, enable_color(m_cr_active));
+		track = CRect(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
+		dc.FillSolidRect(track, enable_color(m_cr_active));
 
 		//m_crValueText = RGB(12, 162, 255);
 		//m_cr_active = RGB(128,255,128);
-		if (m_nValueStyle > value_style_none)
+		if (m_text_style > text_style_none)
 		{
-			dc.SetTextColor(enable_color(m_crValueText));
+			dc.SetTextColor(enable_color(m_cr_text));
 			dc.SetBkMode(TRANSPARENT);
 
-			if (m_nValueStyle == value_style_value)
+			if (m_text_style == text_style_value)
 				str.Format(_T("%ld / %ld"), pos, (upper > 0 ? upper : 0));
+			else if (m_text_style == text_style_user_defined)
+				str = m_text;
+			else if (m_text_style == text_style_dual_text)
+			{
+				str = m_text;
+				str_dual = m_text_dual;
+			}
 			else if (upper == lower)
 				str = _T("0.0%");
 			else
 				str.Format(_T("%.1f%%"), (double)(pos - lower) / (double)(upper - lower) * 100.0);
-			dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+			//dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 		}
 
 		//텍스트가 active, inactive 구간의 색상에 반전되도록 그려줘야한다.
-		//텍스트를 반전시켜서 뿌려주는 기능이 없으므로
-		//텍스트를 출력하고 그 위에 구간 색상을 반전시켜서 그려줘야 한다.
-		//미완성.
-		//dc.SetROP2(R2_XORPEN);
-		//CBrush br((m_cr_active));
-		//CBrush *pOldBrush = (CBrush*)dc.SelectObject(&br);
-		//dc.Rectangle(rActive);//, &CBrush(m_cr_active));
-		//dc.SelectObject(pOldBrush);
-		//DrawRectangle(&dc, rActive, (m_cr_active), (m_cr_active), 1, PS_SOLID, R2_XORPEN);
+		CRect rcLeft, rcRight;
+		rcLeft = rcRight = m_rc;
+		rcRight.left = rcLeft.right = pxpos;
+
+		//두 영역을 생성하여 해당 영역에만 그려지는 원리로 글자를 2가지 색으로 그린다.
+		CRgn rgn;
+		rgn.CreateRectRgnIndirect(rcLeft);
+		dc.SelectClipRgn(&rgn);
+		dc.SetTextColor(m_cr_text);
+
+		if ((m_text_style == text_style_dual_text))
+		{
+			dc.DrawText(_T("  ") + str, m_rc, DT_VCENTER | DT_LEFT | DT_SINGLELINE);
+			//dc.SetTextColor(m_cr_active);// m_crBack);
+			dc.DrawText(str_dual + _T("  "), m_rc, DT_VCENTER | DT_RIGHT | DT_SINGLELINE);
+		}
+		else
+		{
+			dc.DrawText(str, m_rc, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+		}
+
+		rgn.SetRectRgn(rcRight);
+		dc.SelectClipRgn(&rgn);
+		dc.SetTextColor(m_cr_active); //m_crText);
+		if ((m_text_style == text_style_dual_text))
+		{
+			dc.DrawText(_T("  ") + str, m_rc, DT_VCENTER | DT_LEFT | DT_SINGLELINE);
+			//dc.SetTextColor(m_cr_text);
+			dc.DrawText(str_dual + _T("  "), m_rc, DT_VCENTER | DT_RIGHT | DT_SINGLELINE);
+		}
+		else
+		{
+			dc.DrawText(str, m_rc, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+		}
+
+		dc.SelectClipRgn(NULL);
 	}
 	else if (m_style == style_progress_line)
 	{
 		if (GetPos() > lower)
 		{
+			int track_height = 10;
+			int marginy = MAX(0, (m_rc.Height() - track_height) / 2);
 			CRect rtrack = m_rc;
-			rtrack.top = m_rc.CenterPoint().y - 4;
-			rtrack.bottom = m_rc.CenterPoint().y + 4;
+			rtrack.top = m_rc.CenterPoint().y - marginy;
+			rtrack.bottom = m_rc.CenterPoint().y + marginy;
 
-			Gdiplus::Pen pen(RGB2gpColor(m_cr_active), 8);
+			Gdiplus::Pen pen(RGB2gpColor(m_cr_active), track_height);
 			pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
 
 			int end = MAX(0, pxpos - rtrack.Height() / 2 - 1);
@@ -465,13 +504,15 @@ void CSCSliderCtrl::OnPaint()
 			rThumb.top = m_rc.top;
 			rThumb.bottom = m_rc.bottom;
 
-			if (m_nValueStyle > value_style_none)
+			if (m_text_style > text_style_none)
 			{
-				dc.SetTextColor(enable_color(m_crValueText));
+				dc.SetTextColor(enable_color(m_cr_text));
 				dc.SetBkMode(TRANSPARENT);
 
-				if (m_nValueStyle == value_style_value)
+				if (m_text_style == text_style_value)
 					str.Format(_T("%ld / %ld"), pos, (upper > 0 ? upper : 0));
+				else if (m_text_style == text_style_user_defined)
+					str = m_text;
 				else if (upper == lower)
 					str = _T("0.0%");
 				else
@@ -568,6 +609,13 @@ void CSCSliderCtrl::OnPaint()
 	if(m_draw_focus_rect && m_has_focus && !IsWindowEnabled())
 	{
 		dc.DrawFocusRect(m_rc);
+	}
+
+	if (m_draw_progress_border)
+	{
+		track.left = 0;
+		track.right = m_rc.right - 1;
+		draw_rectangle(&dc, track, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 
 	dc.SelectObject(pOldFont);
@@ -1318,18 +1366,16 @@ void CSCSliderCtrl::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
 	
-	// Get Defalut Font 
-	CFont* font = GetFont();
+	CWnd* pWnd = GetParent();
+	CFont* font = NULL;
+
+	if (pWnd)
+		font = pWnd->GetFont();
 
 	if (font == NULL)
-	{
-		font = AfxGetMainWnd()->GetFont();
-
-		if (font == NULL)
-			GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-		else
-			font->GetObject(sizeof(m_lf), &m_lf);
-	}
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	else
+		font->GetObject(sizeof(m_lf), &m_lf);
 
 	reconstruct_font();
 
@@ -1475,4 +1521,93 @@ void CSCSliderCtrl::SetPos(int pos)
 {
 	CSliderCtrl::SetPos(pos);
 	Invalidate();
+}
+
+int CSCSliderCtrl::get_min()
+{
+	int min, max;
+	GetRange(min, max);
+	return min;
+}
+
+int CSCSliderCtrl::get_max()
+{
+	int min, max;
+	GetRange(min, max);
+	return max;
+}
+
+void CSCSliderCtrl::set_text(LPCTSTR text, ...)
+{
+	va_list args;
+	va_start(args, text);
+
+	m_text.FormatV(text, args);
+	Invalidate();
+}
+
+void CSCSliderCtrl::set_text_dual(LPCTSTR text_dual, ...)
+{
+	va_list args;
+	va_start(args, text_dual);
+
+	m_text_dual.FormatV(text_dual, args);
+	Invalidate();
+}
+
+
+void CSCSliderCtrl::set_log_font(LOGFONT lf)
+{
+	if (_tcslen(lf.lfFaceName) == 0)
+		return;
+
+	memcpy(&m_lf, &lf, sizeof(LOGFONT));
+	reconstruct_font();
+}
+
+int CSCSliderCtrl::get_font_size()
+{
+	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	return m_font_size;
+}
+
+//예를 들어 폰트 크기를 10으로 설정하면
+void CSCSliderCtrl::set_font_size(int font_size)
+{
+	if (font_size == 0)
+		return;
+
+	m_font_size = font_size;
+	//For the MM_TEXT mapping mode,
+	//you can use the following formula to specify 
+	//a height for a font with a specified point size:
+	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	reconstruct_font();
+}
+
+void CSCSliderCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+{
+	m_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
+	reconstruct_font();
+}
+
+void CSCSliderCtrl::enlarge_font_size(bool enlarge)
+{
+	m_font_size = get_font_size();
+	enlarge ? m_font_size++ : m_font_size--;
+	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	reconstruct_font();
+}
+
+void CSCSliderCtrl::set_font_bold(bool bold)
+{
+	m_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	reconstruct_font();
+}
+
+void CSCSliderCtrl::set_font_italic(bool italic)
+{
+	m_lf.lfItalic = italic;
+	reconstruct_font();
 }

@@ -4,7 +4,7 @@
 /*
 * json_cpp는 3개의 파일로만 구성되어 간단하지만
 * write시에 멤버들이 알파벳 순으로만 저장된다는 치명적 단점이 있다.
-* 이 단점만 제외하면 json_cpp나 rapid_json 둘 다 좋으나 rapid_json을 권장.
+* 이 단점만 제외하면 json_cpp나 rapid_json 둘 다 좋으나 rapid_json을 사용하기로 결정함.
 * 
 * Usage :
 	//json.h와 json.cpp에서 참조하는 rapid_json/include 폴더의 파일들을 상대경로로 include했으므로
@@ -97,6 +97,40 @@ public:
 
 	//pretty가 true이면 indent가 적용된 형식으로 리턴.
 	CString		get_json_string(bool pretty = true);
+
+	//어떤 멤버값을 읽어올 때 해당 멤버가 존재하지 않으면 exception이 발생하므로 이럴 경우 default_value를 리턴하도록 함수 추가.
+	int			get_int(std::string member, int default_value = 0);
+	CString		get_CString(std::string member, CString default_value = _T(""));
+
+	//위와 같이 모든 타입에 대해 wrapper 함수를 추가하지 않고 template을 쓰려했으나 컴파일 에러 발생함. 수정 중...
+	template<typename T> T get(std::string member, T default_value)
+	{
+		if (!doc.HasMember(member))
+			return default_value;
+
+		switch (doc[member].GetType())
+		{
+			case rapidjson::kStringType:
+			{
+				return doc[member].GetCString();
+			}
+			case rapidjson::kNullType:
+			{
+				return default_value;
+			}
+		}
+		/*
+		if (typeid(T) == typeid(int))
+			return doc[member].GetInt();
+		else if (typeid(T) == typeid(CString))
+			return doc[member].GetCString();
+		else if (typeid(T) == typeid(String))
+			return doc[member].GetString();
+		*/
+
+		TRACE(_T("json::get. unknown type"));
+		return default_value;
+	}
 
 	//array2:[{"name": "peter", "age": 21}, {"name": "mike", "age":24}]과 같이 항목과 값이 pair로 존재하는 array를
 	//map으로 변환해준다. 단, 모든 필드값은 무조건 CString으로 강제 변환한다.

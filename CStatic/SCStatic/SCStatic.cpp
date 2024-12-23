@@ -658,24 +658,20 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 	Invalidate();
 }
 
-CSCStatic& CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
+void CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), strFont);
 	reconstruct_font();
 	update_surface();
-
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_font_size(int nSize)
+void CSCStatic::set_font_size(int nSize)
 {
 	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, nSize);
 	reconstruct_font();
 	update_surface();
-
-	return *this;
 }
 
 void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf)
@@ -717,7 +713,7 @@ void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *l
 	}
 }
 
-CSCStatic& CSCStatic::set_auto_font_size(bool auto_font_size)
+void CSCStatic::set_auto_font_size(bool auto_font_size)
 {
 	CRect rc;
 
@@ -734,45 +730,35 @@ CSCStatic& CSCStatic::set_auto_font_size(bool auto_font_size)
 	{
 		set_font_size(m_nFontSize);
 	}
-
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_font_bold(bool bBold)
+void CSCStatic::set_font_bold(bool bBold)
 {
 	m_lf.lfWeight = bBold ? FW_BOLD : FW_NORMAL;
 	reconstruct_font();
 	update_surface();
-
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_font_underline(bool bSet)
+void CSCStatic::set_font_underline(bool bSet)
 {
 	m_lf.lfUnderline = bSet;
 	reconstruct_font();
 	update_surface();
-
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_font_italic(bool italic)
+void CSCStatic::set_font_italic(bool italic)
 {
 	m_lf.lfItalic = italic;
 	reconstruct_font();
 	update_surface();
-
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_font_antialiased(bool bAntiAliased)
+void CSCStatic::set_font_antialiased(bool bAntiAliased)
 {
 	m_bFontAntiAliased = bAntiAliased;
 	m_lf.lfQuality = (m_bFontAntiAliased ? ANTIALIASED_QUALITY : DEFAULT_QUALITY);
 	reconstruct_font();
 	update_surface();
-
-	return *this;
 }
 
 void CSCStatic::set_text_color(Gdiplus::Color crTextColor)
@@ -782,25 +768,22 @@ void CSCStatic::set_text_color(Gdiplus::Color crTextColor)
 	Invalidate();
 }
 
-CSCStatic& CSCStatic::set_gradient(bool bGradient)
+void CSCStatic::set_gradient(bool bGradient)
 {
 	m_bGradient = bGradient;
 
 	if (m_bGradient)
 		m_transparent = false;
-
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_gradient_color(Gdiplus::Color crGradient)
+void CSCStatic::set_gradient_color(Gdiplus::Color crGradient)
 {
 	set_gradient();
 	m_crGradient.clear();
 	m_crGradient.push_back(crGradient);
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_gradient_color(int idx, Gdiplus::Color crGradient)
+void CSCStatic::set_gradient_color(int idx, Gdiplus::Color crGradient)
 {
 	set_gradient();
 	std::deque<Gdiplus::Color>::iterator it;
@@ -810,17 +793,14 @@ CSCStatic& CSCStatic::set_gradient_color(int idx, Gdiplus::Color crGradient)
 		int loop = idx -  m_crGradient.size() + 1;
 		for (int i = 0; i < loop; i++)
 			m_crGradient.push_back(crGradient);
-		return *this;
 	}
 	else
 	{
 		m_crGradient[idx] = crGradient;
 	}
-
-	return *this;
 }
 /*
-CSCStatic& CSCStatic::set_gradient_color(int count, ...)
+void CSCStatic::set_gradient_color(int count, ...)
 {
 	set_gradient();
 	m_crGradient.clear();
@@ -832,18 +812,15 @@ CSCStatic& CSCStatic::set_gradient_color(int count, ...)
 		m_crGradient.push_back(va_arg(arglist, DWORD));
 	
 	va_end(arglist);
-	
-	return *this;
 }
 */
-CSCStatic& CSCStatic::add_gradient_color(Gdiplus::Color crGradient)
+void CSCStatic::add_gradient_color(Gdiplus::Color crGradient)
 {
 	set_gradient();
 	m_crGradient.push_back(crGradient);
-	return *this;
 }
 
-CSCStatic& CSCStatic::insert_gradient_color(int idx, Gdiplus::Color crGradient)
+void CSCStatic::insert_gradient_color(int idx, Gdiplus::Color crGradient)
 {
 	set_gradient();
 	std::deque<Gdiplus::Color>::iterator it;
@@ -853,20 +830,17 @@ CSCStatic& CSCStatic::insert_gradient_color(int idx, Gdiplus::Color crGradient)
 		int loop = idx -  m_crGradient.size();
 		for (int i = 0; i < loop; i++)
 			m_crGradient.push_back(crGradient);
-		return *this;
 	}
 
 	it = m_crGradient.begin();
 	m_crGradient.insert(it + idx, crGradient);
-	return *this;
 }
 
-CSCStatic& CSCStatic::set_vertical_gradient(bool bVertical)
+void CSCStatic::set_vertical_gradient(bool bVertical)
 {
 	set_gradient();
 	m_bVertical = bVertical;
 	Invalidate();
-	return *this;
 }
 
 //this function will be used only if msimg32.dll library is not available

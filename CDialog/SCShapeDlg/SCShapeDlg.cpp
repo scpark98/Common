@@ -78,7 +78,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
-	wc.lpszClassName = _T("CSCMenu");
+	wc.lpszClassName = _T("CSCShapeDlg");
 	AfxRegisterClass(&wc);
 
 	bool res = CreateEx(NULL, wc.lpszClassName, _T("SCShapeDlg"), dwStyle, CRect(left, top, right, bottom), parent, 0);
@@ -142,7 +142,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	bool res = false;
 
 	if (parent == NULL)
-		m_parent = parent = AfxGetMainWnd();
+		m_parent = parent = AfxGetApp()->GetMainWnd();
 	else
 		m_parent = parent;
 

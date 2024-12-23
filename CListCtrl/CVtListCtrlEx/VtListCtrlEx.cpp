@@ -188,17 +188,15 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	int			iItem		= (int)lpDIS->itemID;
 	int			iSubItem;
 	CDC			*pDC		= CDC::FromHandle(lpDIS->hDC);
-	//int			nSavedDC	= pDC->SaveDC();
 	CRect		rowRect;
 	CRect		itemRect;
 	CRect		textRect;
-	Gdiplus::Color	crText = m_theme.cr_text;
-	Gdiplus::Color	crBack = m_theme.cr_back;
-	//COLORREF	crProgress = m_cr_progress;
 	bool		is_show_selection_always = (GetStyle() & LVS_SHOWSELALWAYS);
 	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
 	bool		is_selected = GetItemState(iItem, LVIS_SELECTED);
 	bool		is_drophilited = GetItemState(iItem, LVIS_DROPHILITED);
+	Gdiplus::Color	crText = m_theme.cr_text;
+	Gdiplus::Color	crBack = m_theme.cr_back;
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
@@ -220,17 +218,19 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			if (m_has_focus)
 			{
+				TRACE(_T("active\n"));
 				crText = m_theme.cr_text_selected;
 				crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
+				TRACE(_T("inactive\n"));
 				crText = m_theme.cr_text_selected_inactive;
 				crBack = m_theme.cr_back_selected_inactive;
 			}
 
 			//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
-			//지정된 색이 있으면 그 색으로 표시하는게 좋은듯하다.
+			//지정된 색 우선으로 해야 한다.
 			//글자의 배경색은 그냥 컬러 스킴을 따른다.
 			if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
 				crText = m_list_db[iItem].crText[iSubItem];
@@ -264,8 +264,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//percentage 타입이면 바그래프 형태로 그려주고
 		if (get_column_data_type(iSubItem) == column_data_type_percentage_bar)
 		{
-			//pDC->FillSolidRect(itemRect, crBack);
-
 			CRect r = itemRect;
 
 			//바그래프는 셀의 높이, 즉 라인 간격과는 관계없다. 폰트의 높이값에 비례하는 높이로 그려주자.
@@ -351,8 +349,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			//바그래프는 셀의 높이, 즉 라인 간격에 상대적이지 않고 폰트의 높이값에 비례하는 높이로 그려줘야 한다.
 			int cy = r.CenterPoint().y;
-			r.top = cy + (double)m_lf.lfHeight / 2.0;		//이 값을 키우면 바그래프의 높이가 낮아진다.
-			r.bottom = cy - (double)m_lf.lfHeight / 2.0;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
+			r.top = cy + (double)m_lf.lfHeight / 1.8;		//나누는 값이 커지면 바그래프의 높이가 낮아진다.
+			r.bottom = cy - (double)m_lf.lfHeight / 1.8;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
 
 			double d = _ttof(m_list_db[iItem].text[iSubItem]);
 			d /= 100.0;
@@ -371,47 +369,56 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				CString sPercent;
 				
 				if (!text.IsEmpty())
-					text += _T("%");
-				pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());// m_cr_back);
+				{
+					//progress type이라도 무조건 %를 붙여서는 안된다. text가 숫자이며 끝에 %가 없을 경우에만 자동으로 붙여준다.
+					if (IsNumericString(text) && (text.GetLength() > 0) && (text.Right(1) != '%'))
+						text += _T("%");
+
+					//text color를 별도로 준 경우는 그 컬러를 쓰고 그렇지 않으면 m_theme에 정의된 컬러를 쓴다.
+					if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
+						pDC->SetTextColor(m_list_db[iItem].crText[iSubItem].ToCOLORREF());
+					else
+						//pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());
+						pDC->SetTextColor(crText.ToCOLORREF());
 #if 1
-				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
 
-				//for region test
+					//for region test
 #elif 0
-				CRgn rgn;
-				CRect r = itemRect;
-				//r.DeflateRect(30, 10);
-				rgn.CreateRectRgnIndirect(&r);
-				int res = ::SelectClipRgn(pDC->GetSafeHdc(), (HRGN)rgn.GetSafeHandle());
-				ASSERT(res == SIMPLEREGION);
-				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
-				pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y + 4, sPercent);
-				rgn.DeleteObject();
+					CRgn rgn;
+					CRect r = itemRect;
+					//r.DeflateRect(30, 10);
+					rgn.CreateRectRgnIndirect(&r);
+					int res = ::SelectClipRgn(pDC->GetSafeHdc(), (HRGN)rgn.GetSafeHandle());
+					ASSERT(res == SIMPLEREGION);
+					pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
+					pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y + 4, sPercent);
+					rgn.DeleteObject();
 #else
-				CRect rcLeft, rcRight;
-				rcLeft = rcRight = itemRect;
-				rcRight.left = rcLeft.right = r.right;
-				
-				CRgn rgnLeft, rgnRight;
-				rgnLeft.CreateRectRgnIndirect(&rcLeft);
-				rgnRight.CreateRectRgnIndirect(&rcRight);
+					CRect rcLeft, rcRight;
+					rcLeft = rcRight = itemRect;
+					rcRight.left = rcLeft.right = r.right;
 
-				pDC->SetTextColor(RGB(255, 0, 0));// m_cr_back);
-				pDC->SelectClipRgn(&rgnLeft);
-				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
+					CRgn rgnLeft, rgnRight;
+					rgnLeft.CreateRectRgnIndirect(&rcLeft);
+					rgnRight.CreateRectRgnIndirect(&rcRight);
 
-				//rgnRight.SetRectRgn(rcRight);
-				pDC->SetTextColor(RGB(0, 0, 255)); //m_cr_text);
-				pDC->SelectClipRgn(&rgnRight);
-				pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-				//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
+					pDC->SetTextColor(RGB(255, 0, 0));// m_cr_back);
+					pDC->SelectClipRgn(&rgnLeft);
+					pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+					//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
 
-				rgnLeft.DeleteObject();
-				rgnRight.DeleteObject();
+					//rgnRight.SetRectRgn(rcRight);
+					pDC->SetTextColor(RGB(0, 0, 255)); //m_cr_text);
+					pDC->SelectClipRgn(&rgnRight);
+					pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
+					//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
+
+					rgnLeft.DeleteObject();
+					rgnRight.DeleteObject();
+					pDC->SelectClipRgn(NULL);
 #endif
-				pDC->SelectClipRgn(NULL);
-				
+				}
 			}			
 		}
 		//텍스트 형태이면 문자열을 출력해준다.
@@ -524,12 +531,15 @@ bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 	m_column_text_align.resize(column);
 	m_column_text_align.assign(column, LVCFMT_LEFT);
 
-	m_HeaderCtrlEx.m_header_text_align.resize(column);
-	m_HeaderCtrlEx.m_header_text_align.assign(column, HDF_LEFT);
+	modify_style();
+
+	if (m_HeaderCtrlEx && m_HeaderCtrlEx.m_hWnd)
+	{
+		m_HeaderCtrlEx.m_header_text_align.resize(column);
+		m_HeaderCtrlEx.m_header_text_align.assign(column, HDF_LEFT);
+	}
 
 	m_allow_edit_column.resize(column);
-
-	modify_style();
 
 	return TRUE;
 }
@@ -853,22 +863,22 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 			[sort_asc, iSub, data_type, include_null](CVtFileInfo a, CVtFileInfo b)
 			{
 				if (iSub == 0)
-					return (a.path.CompareNoCase(b.path) == 1);
+					return (_tcsicmp(a.data.cFileName, b.data.cFileName) == 1);
 				else if (iSub == 1)
-					return (a.size > b.size);
+					return (a.filesize.QuadPart > b.filesize.QuadPart);
 				else if (iSub == 2)
-					return (a.date.CompareNoCase(b.date) == 1);
+					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
 			});
 
 		std::sort(m_cur_files.begin(), m_cur_files.end(),
 			[sort_asc, iSub, data_type](CVtFileInfo a, CVtFileInfo b)
 			{
 				if (iSub == 0)
-					return (a.path.CompareNoCase(b.path) == 1);
+					return (_tcsicmp(a.data.cFileName, b.data.cFileName) == 1);
 				else if (iSub == 1)
-					return (a.size > b.size);
+					return (a.filesize.QuadPart > b.filesize.QuadPart);
 				else if (iSub == 2)
-					return (a.date.CompareNoCase(b.date) == 1);
+					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
 			});
 
 		refresh_list(false);
@@ -1151,7 +1161,11 @@ void CVtListCtrlEx::modify_style()
 {
 	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
 	//dlg의 parent의 font를 얻어와야 한다.
-	CFont* font = AfxGetMainWnd()->GetFont();
+	CWnd* pWnd = GetParent();
+	CFont* font = NULL;
+
+	if (pWnd)
+		font = pWnd->GetFont();
 
 	if (font == NULL)
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
@@ -1306,21 +1320,13 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 							}
 							break;
 		case VK_F5		:	
-							//editing일 경우는 F5키 이벤트가 발생하지 않는다.
-							//if (m_in_editing)
-							//{
-							//	edit_end();
-							//	return true;
-							//}
-							if (m_is_shell_listctrl && m_is_local)
-							{
-								refresh_list();
-								return true;
-							}
-							else
-							{
-								break;
-							}
+							//editing일 경우는 F5키가 CEdit에서 발생하므로 여기 오지 않는다.
+							//CEdit을 파생해서 F5 이벤트가 발생하면 편집을 종료시키고 새로고침 해줘야 한다.
+							if (m_in_editing)
+								edit_end();
+
+							refresh_list();
+							return true;
 		case VK_END :
 							m_auto_scroll = true;
 							break;
@@ -1432,7 +1438,20 @@ BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 		}
 		else
 		{
+			bool res = true;
 			set_text(m_edit_item, m_edit_subItem, plvItem->pszText);
+
+			//local일 경우는 MoveFile()이 실패하면 undo시킨다.
+			if (m_is_shell_listctrl && m_is_local)
+			{
+				//실제 파일명 변경이 성공해야 아이템의 텍스트도 변경한다.
+				CString old_name, new_name;
+				old_name.Format(_T("%s\\%s"), get_path(), m_old_text);
+				new_name.Format(_T("%s\\%s"), get_path(), plvItem->pszText);
+				res = MoveFile(old_name, new_name);
+				if (!res)
+					undo_edit_label();
+			}
 		}
 	}
 
@@ -1464,6 +1483,9 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	// Make sure that nCol is valid
 	CHeaderCtrl* pHeader = (CHeaderCtrl*)GetDlgItem(0);
 	int nColumnCount = pHeader->GetItemCount();
+
+	if (item < 0)
+		item = get_selected_index();
 
 	//맨 처음 subItem이 설정된 적이 없다면 -1이 넘어오는데
 	//그럴 경우는 0번 컬럼의 편집이라고 가정한다.
@@ -1925,6 +1947,112 @@ int CVtListCtrlEx::insert_item(int index, std::deque<CString> dqText, int image_
 
 	return index;
 }
+
+int CVtListCtrlEx::insert_item(int index, WIN32_FIND_DATA data, bool ensureVisible, bool invalidate)
+{
+	int img_idx;
+	CString filename = get_part(data.cFileName, fn_name);
+
+	if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		img_idx = m_pShellImageList->GetSystemImageListIcon(_T("C:\\Windows"), true);
+	else
+		img_idx = m_pShellImageList->GetSystemImageListIcon(data.cFileName, false);
+
+	//기존에 존재하는 파일이라면 크기, 수정한 날짜를 갱신해주고
+	//없다면 리스트에 추가한다.
+	int old_index = find_string(filename, 0, true);
+	if (old_index < 0)
+	{
+		index = insert_item(index, filename, img_idx, ensureVisible, invalidate);
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			m_list_db[index].set_text(col_filesize, _T(""));
+		}
+		else
+		{
+			m_list_db[index].set_text(col_filesize, get_file_size_str(data));
+		}
+
+		m_list_db[index].set_text(col_filedate, get_file_time_str(data.ftLastWriteTime));
+		Invalidate();
+	}
+	else
+	{
+		index = update_item(old_index, data);
+	}
+
+	return index;
+}
+
+int CVtListCtrlEx::update_item(int index, WIN32_FIND_DATA data, bool ensureVisible, bool invalidate)
+{
+	if (index < 0 || index >= size())
+		return -1;
+
+	CString filename = get_part(data.cFileName, fn_name);
+	m_list_db[index].set_text(col_filename, filename);
+
+	if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+	{
+		m_list_db[index].set_text(col_filesize, _T(""));
+	}
+	else
+	{
+		m_list_db[index].set_text(col_filesize, get_file_size_str(data));
+	}
+
+	m_list_db[index].set_text(col_filedate, get_file_time_str(data.ftLastWriteTime));
+
+	return index;
+}
+
+int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
+{
+	int img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);
+	index = insert_item(index, new_folder_name, img_idx, false, false);
+
+	set_text(index, col_filesize, _T(""));
+	set_text(index, col_filedate, get_cur_datetime_string(2, true, _T(" "), false, false));
+	set_text_color(index, col_filedate, RGB(109, 109, 109));
+
+	return index;
+}
+
+//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
+bool CVtListCtrlEx::new_folder(CString new_folder_title)
+{
+	if (!m_is_shell_listctrl || !m_is_local)
+		return false;
+
+	int index = get_file_index(m_path, new_folder_title);
+
+	CString folder;
+
+	if (index == 1)
+		folder.Format(_T("%s\\%s"), m_path, new_folder_title, index);
+	else
+		folder.Format(_T("%s\\%s (%d)"), m_path, new_folder_title, index);
+
+	//실제 폴더를 생성한 후 리스트에 목록을 추가한다.
+	BOOL res = CreateDirectory(folder, NULL);
+	if (!res)
+	{
+		TRACE(_T("fail to create folder : %s. error = %d"), folder, GetLastError());
+		return false;
+	}
+
+	folder = get_part(folder, fn_name);
+	index = insert_folder(-1, folder);
+
+	if (index < 0)
+		return false;
+
+	select_item(index, true, true, true);
+	edit_item(index, 0);
+
+	return true;
+}
+
 /*
 int CVtListCtrlEx::insert_item(int index, LPCTSTR pszText, ...)
 {
@@ -2004,11 +2132,31 @@ void CVtListCtrlEx::delete_selected_items()
 	SetItemCount(m_list_db.size());
 }
 
-void CVtListCtrlEx::delete_item(int index)
+//shell_listctrl이라면 파일 또한 삭제할 지 파라미터를 줄 수 있고 실제 파일을 지운 후에 리스트에서도 삭제해야 한다.
+bool CVtListCtrlEx::delete_item(int index, bool delete_physical_file)
 {
-	CListCtrl::DeleteItem(index);
-	m_list_db.erase(m_list_db.begin() + index);
-	SetItemCount(m_list_db.size());
+	bool res = true;
+
+	if (index < 0 || index >= m_list_db.size())
+		return false;
+
+	if (m_is_shell_listctrl && m_is_local && delete_physical_file)
+	{
+		CString file = get_path(index);
+		if (PathFileExists(file) == false)
+			return false;
+
+		res = delete_file(file, true);
+	}
+
+	if (res)
+	{
+		CListCtrl::DeleteItem(index);
+		m_list_db.erase(m_list_db.begin() + index);
+		SetItemCount(m_list_db.size());
+	}
+
+	return res;
 }
 
 void CVtListCtrlEx::delete_empty_lines()
@@ -2157,10 +2305,10 @@ int CVtListCtrlEx::get_last_selected_item()
 }
 
 //선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
-int CVtListCtrlEx::get_selected_items(std::deque<int> *dqSelected)
+int CVtListCtrlEx::get_selected_items(std::deque<int> *dq)
 {
-	if (dqSelected != NULL)
-		dqSelected->clear();
+	if (dq != NULL)
+		dq->clear();
 
 	int index;
 	int selected_count = 0;
@@ -2170,13 +2318,58 @@ int CVtListCtrlEx::get_selected_items(std::deque<int> *dqSelected)
 	{
 		index = GetNextSelectedItem(pos);
 		selected_count++;
-		if (dqSelected != NULL)
-			dqSelected->push_back(index);
+		if (dq != NULL)
+			dq->push_back(index);
 	}
 
 	return selected_count;
 }
 
+//선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 fullpath = true이면 각 항목의 전체경로를 담는다.
+int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool fullpath)
+{
+	std::deque<int> dq_index;
+	get_selected_items(&dq_index);
+
+	CString folder = get_path();
+	
+	if (dq)
+	{
+		dq->clear();
+		for (auto item : dq_index)
+		{
+			if (m_is_shell_listctrl && fullpath)
+				dq->push_back(folder + _T("\\") + get_text(item, col_filename));
+			else
+				dq->push_back(get_text(item, col_filename));
+		}
+	}
+
+	return dq_index.size();
+}
+
+int CVtListCtrlEx::get_selected_items(std::deque<WIN32_FIND_DATA>* dq, bool fullpath)
+{
+	std::deque<int> dq_index;
+	get_selected_items(&dq_index);
+
+	//CString folder = get_path();
+
+	if (dq)
+	{
+		dq->clear();
+		for (auto item : dq_index)
+		{
+			WIN32_FIND_DATA data;
+			memset(&data, 0, sizeof(data));
+			data = get_file_data(item);
+			if (_tcslen(data.cFileName) > 0)
+				dq->push_back(data);
+		}
+	}
+
+	return dq_index.size();
+}
 
 void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_unselect, bool make_visible)
 {
@@ -2426,7 +2619,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
-			m_path = convert_special_folder_to_real_path(get_text(item, col_filename));//, m_pShellImageList->m_volume[!m_is_local].get_label_map());
+			m_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList, !m_is_local);
 		}
 		else
 		{
@@ -2481,7 +2674,7 @@ bool CVtListCtrlEx::list_copy_to_clipboard(bool onlySelected /*= true*/, TCHAR s
 	int		i;
 	CString sResult = _T("");
 
-	if (onlySelected && get_selected_items() == 0)
+	if (onlySelected && get_selected_index() < 0)
 		return false;
 
 	int		nCount = 0;
@@ -2722,7 +2915,7 @@ void CVtListCtrlEx::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
-	SetFont(&m_font, true);
+	SetFont(&m_font, false);
 
 	if (m_HeaderCtrlEx)
 		m_HeaderCtrlEx.SetFont(&m_font, true);
@@ -2849,7 +3042,7 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 		if (m_allow_one_click_edit &&
 			(m_edit_item == item) &&
 			(m_edit_subItem == subItem) &&
-			(get_selected_items() == 1) &&
+			(GetSelectedCount() == 1) &&
 			(clock() - m_last_clicked_time > 500) &&	//이 값이 작으면 더블클릭에도 편집되고
 			(clock() - m_last_clicked_time < 2000))
 		{
@@ -3042,10 +3235,78 @@ void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool
 //list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.
 CString CVtListCtrlEx::get_path(int index)
 {
+	//"D:\Temp"와 같이 리턴해야하는데 "D:\\Temp"와 같이 리턴되는 현상이 있다.
+	//우선 중복된 역슬래쉬를 제거하고 리턴해준다.
+	//추후 모든 path는 반드시 '\'로 끝나도록 하는 규칙에 따라 변경 예정.
+	m_path.Replace(_T("\\\\"), _T("\\"));
+
 	if (index < 0)
 		return m_path;
 
-	return m_path + _T("\\") + get_text(index, col_filename);
+	CString fullpath;
+
+	if (m_path.GetLength() > 1 && m_path.Right(1) != '\\')
+		fullpath = m_path + _T("\\") + get_text(index, col_filename);
+	else
+		fullpath = m_path + get_text(index, col_filename);
+
+	return fullpath;
+}
+
+//현재 선택된 항목이 폴더이면 해당 경로까지의 fullpath를, 파일이라면 현재 리스트의 경로를 리턴한다.
+CString	CVtListCtrlEx::get_selected_path()
+{
+	CString path;
+
+	if (!m_is_shell_listctrl)
+		return path;
+
+	int index = get_selected_index();
+	if (index < 0)
+		return path;
+
+	path = get_path();
+
+	if (get_text(index, col_filesize).IsEmpty())
+	{
+		if (path.Right(1) == '\\')
+			path.Format(_T("%s%s\\"), get_path(), get_text(index, col_filename));
+		else
+			path.Format(_T("%s\\%s\\"), get_path(), get_text(index, col_filename));
+	}
+	else
+	{
+		path = get_path();
+	}
+
+	return path;
+}
+
+//해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.
+WIN32_FIND_DATA	CVtListCtrlEx::get_file_data(int index)
+{
+	int i;
+
+	CString path = get_path(index);
+	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
+
+	CString item_path;
+
+	for (i = 0; i < m_cur_folders.size(); i++)
+	{
+		item_path = convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
+		if (path.CompareNoCase(item_path) == 0)
+			return m_cur_folders[i].data;
+	}
+
+	for (i = 0; i < m_cur_files.size(); i++)
+	{
+		item_path = convert_special_folder_to_real_path(m_cur_files[i].data.cFileName, m_pShellImageList, !m_is_local);
+		if (path.CompareNoCase(item_path) == 0)
+			return m_cur_files[i].data;
+	}
+
+	return WIN32_FIND_DATA();
 }
 
 void CVtListCtrlEx::set_path(CString path, bool refresh)
@@ -3055,11 +3316,13 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 
 	m_last_clicked_time = 0;
 
-	path = convert_special_folder_to_real_path(path);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
+	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 
 	m_path = path;
 
-	if (m_path.Right(1) == '\\')
+	//C 드라이브는 "C:\\"로, "C:\\temp\\"는 "C:\\temp"로 변경한다.
+	//즉, 드라이브 루트는 역슬래시가 붙지만 그 외의 폴더는 붙이지 않아야 하므로 제거시켜준다.
+	if (m_path.Right(1) == '\\' && m_path.GetLength() > 3)
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
 	TRACE(_T("current path = %s\n"), m_path);
@@ -3105,34 +3368,35 @@ void CVtListCtrlEx::refresh_list(bool reload)
 				std::deque<CString> drive_list;
 				get_drive_list(&drive_list);
 				for (i = 0; i < drive_list.size(); i++)
-					m_cur_folders.push_back(CVtFileInfo(drive_list[i]));
+				{
+					CVtFileInfo fi;
+					_tcscpy(fi.data.cFileName, drive_list[i]);
+					fi.filesize.QuadPart = 0;
+					fi.data.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+					fi.is_remote = false;
+					m_cur_folders.push_back(fi);
+				}
 			}
 			else
 			{
-				CFileFind	finder;
-
-				bool bWorking = finder.FindFile(m_path + _T("\\*"));
-
-				while (bWorking)
+				std::deque<WIN32_FIND_DATA> dq;
+				find_all_files(m_path, &dq, _T("*"), true, false);
+				for (auto item : dq)
 				{
-					bWorking = finder.FindNextFile();
-					sfile = finder.GetFilePath();
-
-					if (finder.IsDots() || finder.IsHidden() || finder.IsSystem())
-						continue;
-
-					if (finder.IsDirectory())
-					{
-						m_cur_folders.push_back(CVtFileInfo(sfile));
-						continue;
-					}
-
-					m_cur_files.push_back(CVtFileInfo(sfile));
+					if (item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+						m_cur_folders.push_back(CVtFileInfo(item));
+					else
+						m_cur_files.push_back(CVtFileInfo(item));
 				}
 			}
 		}
 
 		display_list(m_path);
+	}
+	else
+	{
+		//remote일 경우는 mainDlg에 메시지를 보내서 목록을 다시 불러와서 표시한다.
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&m_path);
 	}
 }
 
@@ -3143,6 +3407,8 @@ void CVtListCtrlEx::display_list(CString cur_path)
 	int index;
 	int insert_index = -1;
 	int img_idx = -1;
+
+	m_path = cur_path;
 
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
@@ -3163,24 +3429,24 @@ void CVtListCtrlEx::display_list(CString cur_path)
 	//asc는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].path);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
+		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
 
 		if (m_is_local || real_path.Right(2) == _T(":\\"))
 			img_idx = m_pShellImageList->GetSystemImageListIcon(real_path, true);
 		else
 			img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);
 
-		index = insert_item(insert_index, get_part(m_cur_folders[i].path, fn_name), img_idx, false, false);
+		index = insert_item(insert_index, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
 
 		if (m_path == get_system_label(CSIDL_DRIVES))
 		{
 			uint64_t disk_size = get_disk_free_size(real_path);
 			if (disk_size > 0)
-				set_text(index, col_filesize, get_size_string(disk_size, 3, 1));
+				set_text(index, col_filesize, get_size_str(disk_size, 3, 1));
 
 			disk_size = get_disk_total_size(real_path);
 			if (disk_size > 0)
-				set_text(index, col_filedate, get_size_string(get_disk_total_size(real_path), 3, 1));
+				set_text(index, col_filedate, get_size_str(get_disk_total_size(real_path), 3, 1));
 
 			set_text_color(index, col_filesize, RGB(109, 109, 109));
 			set_text_color(index, col_filedate, RGB(109, 109, 109));
@@ -3188,44 +3454,31 @@ void CVtListCtrlEx::display_list(CString cur_path)
 		else
 		{
 			set_text(index, col_filesize, _T(""));
-			set_text(index, col_filedate, m_cur_folders[i].date);
+			set_text(index, col_filedate, get_file_time_str(m_cur_folders[i].data.ftLastWriteTime));
 			set_text_color(index, col_filedate, RGB(109, 109, 109));
 		}
 	}
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		img_idx = m_pShellImageList->GetSystemImageListIcon(m_cur_files[i].path, false);
-		index = insert_item(insert_index, get_part(m_cur_files[i].path, fn_name), img_idx, false, false);
+		img_idx = m_pShellImageList->GetSystemImageListIcon(m_cur_files[i].data.cFileName, false);
+		index = insert_item(insert_index, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
 
-		set_text(index, col_filesize, get_size_string(m_cur_files[i].size));
-		set_text(index, col_filedate, m_cur_files[i].date);
+		set_text(index, col_filesize, get_size_str(m_cur_files[i].filesize.QuadPart));
+		set_text(index, col_filedate, m_cur_files[i].get_file_time_str());
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
 }
 
-//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
-//local인 경우 크기와 날짜가 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
-void CVtListCtrlEx::add_file(CString path, uint64_t size, CString date, bool is_remote, bool is_folder)
+void CVtListCtrlEx::add_file(WIN32_FIND_DATA* data, bool is_remote)
 {
-	bool file_is_folder = is_folder;
-
-	if (!is_remote)
-		file_is_folder = PathIsDirectory(path);
-
-	if (file_is_folder)
-	{
-		m_cur_folders.push_back(CVtFileInfo(path, size, date, is_remote, is_folder));
-	}
+	if (data->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		m_cur_folders.push_back(CVtFileInfo(*data, is_remote));
 	else
-	{
-		m_cur_files.push_back(CVtFileInfo(path, size, date, is_remote, is_folder));
-	}
-}
-
-void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
-{
+		m_cur_files.push_back(CVtFileInfo(*data, is_remote));
+	return;
+	/*
 	bool file_is_folder = ((pFindFileData->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY);
 
 	ULARGE_INTEGER ulInt;
@@ -3244,7 +3497,29 @@ void CVtListCtrlEx::add_file(WIN32_FIND_DATA* pFindFileData)
 	filedate = get_datetime_string(st, 2, true, _T(" "), false, false, false);
 	//SetItemText(iIndex, 2, GetDateTimeStringFromTime(GetFileLastModifiedTime(pFindFileData->cFileName), true, false, false));
 	add_file(pFindFileData->cFileName, file_is_folder ? 0 : ulInt.QuadPart, filedate, true, file_is_folder);
+	*/
 }
+
+//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
+//local인 경우 크기와 날짜가 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
+/*
+void CVtListCtrlEx::add_file(CString path, uint64_t size, CString date, bool is_remote, bool is_folder)
+{
+	bool file_is_folder = is_folder;
+
+	if (!is_remote)
+		file_is_folder = PathIsDirectory(path);
+
+	if (file_is_folder)
+	{
+		m_cur_folders.push_back(CVtFileInfo(path, size, date, is_remote, is_folder));
+	}
+	else
+	{
+		m_cur_files.push_back(CVtFileInfo(path, size, date, is_remote, is_folder));
+	}
+}
+*/
 
 //https://jiniya.net/tt/594/
 //이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 사용 중지! 참고만 할것.
@@ -3406,12 +3681,20 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	int item = -1;// = pNMItemActivate->iItem;
+	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
+
+	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, false) ||
+		item < 0 || subItem < 0)
+		return;
+
 	m_nDragIndex = pNMLV->iItem;
 
 	CPoint pt;
 	int nOffset = -10; //offset in pixels for drag image (positive is up and to the left; neg is down and to the right)
 
-	int sel_count = get_selected_items();
+	int sel_count = GetSelectedCount();
 
 	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
@@ -3449,8 +3732,8 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 			bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
 		}
 
-		bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(sel_count), 20, 2,
-			_T("Arial"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+		bmpRes.draw_text(bmpRes.width / 2 - 4, bmpRes.height / 2 + 4, i2S(sel_count), 20, 2,
+			_T("Arial"), Gdiplus::Color(255, 0, 0, 0), Gdiplus::Color(255, 255, 128, 128), DT_CENTER | DT_VCENTER);
 
 		m_pDragImage = new CImageList();
 		m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
@@ -3497,7 +3780,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 	if (!m_is_hovering)
 	{
-		TRACE(_T("list. move\n"));
+		//TRACE(_T("list. move\n"));
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
 		tme.hwndTrack = m_hWnd;
@@ -3821,7 +4104,7 @@ void CVtListCtrlEx::OnMouseHover(UINT nFlags, CPoint point)
 void CVtListCtrlEx::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TRACE(_T("list. leave\n"));
+	//TRACE(_T("list. leave\n"));
 	m_is_hovering = false;
 	CListCtrl::OnMouseLeave();
 }
@@ -3842,6 +4125,7 @@ BOOL CVtListCtrlEx::SetItemData(int nItem, DWORD_PTR dwData)
 		return FALSE;
 
 	m_list_db[nItem].data = dwData;
+	return TRUE;
 }
 
 
@@ -3860,4 +4144,44 @@ void CVtListCtrlEx::OnKillFocus(CWnd* pNewWnd)
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	m_has_focus = false;
+}
+
+//remote일 경우는 fullpath로 해당 파일의 WIN32_FIND_DATA값을 얻어야 할 경우가 있다.
+void CVtListCtrlEx::get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data)
+{
+	int i;
+
+	//lambda를 이용한 방법인데 우선 보류.
+	//std::find(m_cur_folders.begin(), m_cur_folders.end(), [&fullpath](const CVtFileInfo& x)
+	//	{
+	//		)
+
+	fullpath = convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
+
+	for (i = 0; i < m_cur_folders.size(); i++)
+	{
+		if (get_part(fullpath, fn_name) == get_part(m_cur_folders[i].data.cFileName, fn_name))
+		{
+			memcpy(data, &m_cur_folders[i].data, sizeof(WIN32_FIND_DATA));
+			//_tcscpy(data->cFileName, m_cur_folders[i].data.cFileName);
+			//data->dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+			//data->nFileSizeHigh = 0;
+			//data->nFileSizeLow = 0;
+			//data->ftLastWriteTime = m_cur_folders[i].get_file_time_str();
+			return;
+		}
+	}
+
+	for (i = 0; i < m_cur_files.size(); i++)
+	{
+		if (get_part(fullpath, fn_name) == get_part(m_cur_files[i].data.cFileName, fn_name))
+		{
+			memcpy(data, &m_cur_files[i].data, sizeof(WIN32_FIND_DATA));
+			//_tcscpy(data->cFileName, m_cur_files[i].data.cFileName);
+			//data->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+			//data->nFileSizeHigh = m_cur_files[i].filesize.HighPart;
+			//data->nFileSizeLow = m_cur_files[i].filesize.LowPart;
+			return;
+		}
+	}
 }

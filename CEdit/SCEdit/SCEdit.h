@@ -13,6 +13,21 @@
 
 #include <Afxwin.h>
 
+static const UINT Message_CSCEditMessage = ::RegisterWindowMessage(_T("MessageString_CSCEditMessage"));
+
+class CSCEditMessage
+{
+public:
+	CSCEditMessage(CWnd* _this, int _message)
+	{
+		pThis = _this;
+		message = _message;
+	}
+
+	CWnd* pThis = NULL;
+	int		message;
+};
+
 /////////////////////////////////////////////////////////////////////////////
 // CSCEdit window
 //color, font
@@ -24,6 +39,11 @@ public:
 	CSCEdit();
 	virtual ~CSCEdit();
 
+	enum MESSAGES
+	{
+		message_scedit_killfocus = 0,
+	};
+
 // Overrides
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CSCEdit)
@@ -34,7 +54,7 @@ public:
 	//Test_GdiButton 프로젝트에서는 CSCEdit이 투명하게 잘 표시되나
 	//Test_SCThemeDialog 프로젝트에서는 투명하게 표시되지 않는다.
 	//차이점은 전자의 경우 parent가 순수 CDialog를 상속받은 dlg이고
-	//후자는 SCThemeDialog를 상속받은 dlg라는 점이다. 수정 필요.
+	//후자는 SCThemeDlg를 상속받은 dlg라는 점이다. 수정 필요.
 	virtual CSCEdit&		set_transparent(bool transparent = true);
 
 	virtual CSCEdit&		set_text_color(COLORREF crText); // This Function is to set the Color for the Text.
@@ -99,6 +119,7 @@ public:
 	afx_msg void OnEnUpdate();
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnEnSetfocus();
+	afx_msg void OnKillFocus(CWnd* pNewWnd);
 };
 
 /////////////////////////////////////////////////////////////////////////////

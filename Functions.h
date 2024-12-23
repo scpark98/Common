@@ -1,5 +1,11 @@
 #pragma once
 
+//#ifdef DPSAPI_VERSION
+//#undef DPSAPI_VERSION
+//#endif
+//
+//#define DPSAPI_VERSION 1
+
 //#ifndef _SCPARK_FUNCTIONS_H
 //#define _SCPARK_FUNCTIONS_H
 
@@ -39,7 +45,8 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <gdiplus.h>
 
-#include "../Common/colors.h"
+#include "./colors.h"
+#include "./system/ShellImageList/ShellImageList.h"
 
 #include <WinInet.h>
 
@@ -62,6 +69,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define __function__ __FUNCTION__
 #endif
 
+#define _S load_string
 
 #ifdef _MSC_VER
 #define __class_func__ __function__
@@ -69,8 +77,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 //20231101 opencv에 trace가 이미 정의되어 있어서 trace를 Trace로 변경함.
 //매크로로 정의되어 그런지 간혹 비정상적으로 출력되는 현상이 있다.
-//일단, thread 내부에서 사용하면 오류가 발생하므로 절대 thread 내부에서는 사용하지 말것.
-//20240429 thread 내부가 아닌 곳에서도 assertion failed되므로 일단 사용 금지!
+//일단, thread 내부에서 사용하는 일부 프로젝트에서는 오류가 발생하므로 주의할 것.
 //https://stackoverflow.com/questions/3211463/what-is-the-most-efficient-way-to-make-this-code-thread-safe
 #define Trace(fmt, ...) trace_output(false, __function__, __LINE__, false, fmt, ##__VA_ARGS__)
 #define Traceln(fmt, ...) trace_output(false, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
@@ -475,7 +482,7 @@ struct	NETWORK_INFO
 	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
 	//파일, 폴더의 속성창을 표시한다.
-	void		show_file_property_window(CString fullpath);
+	bool		show_file_property_window(CString fullpath);
 	CString		get_exe_directory(bool includeSlash = false);
 	CString		get_exe_parent_directory();
 	CString		get_exe_filename(bool fullpath = false);
@@ -671,7 +678,7 @@ struct	NETWORK_INFO
 	//floats		: 소수점을 몇 자리까지 표시할지
 	//unit_string	: 단위를 표시할 지
 	//comma			: 정수 부분에 자리수 콤마를 표시할 지
-	CString		get_size_string(int64_t size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = true);
+	CString		get_size_str(ULONGLONG size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = true);
 
 	//src를 파싱해서 특정 길이 이상의 문자열들로 나눈다.
 	std::deque<CString> parse_divide(CString src, int len);
@@ -782,9 +789,9 @@ struct	NETWORK_INFO
 	TCHAR*		replace(TCHAR* src, const TCHAR* olds, const TCHAR* news);
 
 	//src의 끝에서 length 길이 만큼 잘라낸다.
-	CString		truncate(CString src, int length);
+	CString		truncate(CString &src, int length);
 	//src끝의 문자열이 sub와 일치하면 잘라낸다.
-	CString		truncate(CString src, CString sub);
+	CString		truncate(CString &src, CString sub);
 
 	//공백, '\t', '\r', '\n', '\0' 모두 제거
 	void		trim(char* src);
@@ -923,6 +930,7 @@ struct	NETWORK_INFO
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
+//폴더 관련
 	//_tsplitpath("c:\\abc/def\\123.txt", ...)를 실행하면
 	//"c:", "\\abc/def\\", "123", ".txt" 과 같이 분리되는데 기존에 사용하던 기대값과 달라 보정한다.
 	//"c:\\", "c:\\abc/def", "123", "txt", "123.txt와 같이 보정한다.
@@ -934,12 +942,12 @@ struct	NETWORK_INFO
 	CString		get_part(CString path, int part);
 	enum FILENAME_PART
 	{
-		fn_drive,
-		fn_folder,
-		fn_leaf_folder,
-		fn_title,
-		fn_ext,
-		fn_name,
+		fn_drive,			//드라이브명으로 반드시 \로 끝난다.
+		fn_folder,			//fullpath 폴더명이므로 드라이브 경로까지 모두 포함한다.	
+		fn_leaf_folder,		//fullpath의 마지막 폴더명. fullpath가 "C:\"일 경우 drive, folder, leaf_folder는 모두 동일한 값인 "C:\"가 된다.
+		fn_title,			//파일 타이틀(확장자 제외)
+		fn_ext,				//파일 확장자(dot 제외)
+		fn_name,			//파일 확장자를 포함한 파일명
 	};
 #if 0
 	CString		GetFileNameFromFullPath(CString fullpath);
@@ -951,6 +959,14 @@ struct	NETWORK_INFO
 	int			GetFileTypeFromExtension(CString sExt);
 	bool		change_extension(CString& filepath, CString newExt, bool applyRealFile);
 	CString		normalize_path(CString& filepath);
+
+	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
+	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
+	bool		is_protected(CString folder, CShellImageList *plist, int index);
+
+	//새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
+	//zero_prefix가 2이면 001, 002로 된 인덱스가 붙은 파일/폴더들만 대상으로 하려 했으나 아직 미구현.
+	int			get_file_index(CString folder, CString title, int zero_prefix = 0);
 
 	//확장자 집합 문자열로 파일열기 대화상자의 filter string을 리턴한다.
 	//simple : "bmp;jpg;jpeg;png;webp;gif;yuv;raw => "JPG files|*.jpg|bmp|*.bmp|
@@ -970,7 +986,8 @@ struct	NETWORK_INFO
 	//unit_limit	: 0:bytes, 1:KB, 2:MB, 3:GB (default = 3)
 	//unit_string	: 단위를 표시할 지 (default = true)
 	//폴더인 경우는 ""를 리턴함.
-	CString		get_file_size_string(CString sfile, int unit = 1, int floats = 0, bool unit_string = true);
+	CString		get_file_size_str(CString sfile, int unit = 1, int floats = 0, bool unit_string = true);
+	CString		get_file_size_str(WIN32_FIND_DATA data, int unit = 1, int floats = 0, bool unit_string = true);
 	CTime		GetFileCreationTime(CString sfile);
 	//탐색기에서 복사하면 last modified time이 유지되지만 web에서 다운받은 파일일 경우는 다운받아 생성된 시각으로 변경됨.
 	CTime		GetFileLastModifiedTime(CString sfile);
@@ -978,6 +995,8 @@ struct	NETWORK_INFO
 	CString		GetMostRecentFile(CString sFolder, CString sWildCard = _T("*.*"), int nReturnType = 1);
 	CString		GetMostRecentDateFile(CString sFolder, CString sWildCard = _T("*.*"));	//가장 최근 날짜 파일명 리턴
 	CString		GetFileProperty(CString sFilePath, CString sProperty);
+
+	CString		get_file_time_str(FILETIME filetime);
 
 
 	//확인 필요
@@ -1084,8 +1103,9 @@ struct	NETWORK_INFO
 
 	//include_folder가 true이면 폴더도 하나의 항목으로 리턴하고
 	//include_folder가 false이고 recursive가 true이면 sub folder들의 모든 파일목록을 리턴한다.
-	//dq에는 검색된 폴더 또는 파일의 fullpath가 기록된다.
-	void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter = _T("*"), bool include_folder = false, bool recursive = false);
+	//dq의 cFileName에는 검색된 폴더 또는 파일의 fullpath가 기록된다.
+	void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString filter = _T("*"), bool include_folder = false, bool recursive = false, bool include_hidden_files = false, bool include_system_files = false);
+	void find_all_files(CString folder, std::deque<CString>* dq, CString filter = _T("*"), bool include_folder = false, bool recursive = false, bool include_hidden_files = false, bool include_system_files = false);
 
 	//list를 NULL로 호출하면 단지 sub folder의 갯수만 참조할 목적이다.
 	//root가 "내 PC"일 경우 special_folders가 true이면 다운로드, 내 문서, 바탕 화면 항목까지 추가한다.
@@ -1297,9 +1317,9 @@ h		: 복사할 height 크기(pixel)
 	bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
 
 //HDD
-	uint64_t	get_disk_free_size(CString sDrive);
-	uint64_t	get_disk_total_size(CString sDrive);
-	//위의 함수로 크기를 구한 후 get_size_string()을 이용할 것
+	ULONGLONG	get_disk_free_size(CString sDrive);
+	ULONGLONG	get_disk_total_size(CString sDrive);
+	//위의 함수로 크기를 구한 후 get_size_str()을 이용할 것
 	//CString		GetDiskSizeString(CString sDrive, int unit = 3, int nfDigit = 0);	// "1.25G / 380.00G", nfDigit은 소수점 자리수
 	CString		GetHDDSerialNumber(int nPhysicalDrive);
 	CString		GetHDDVolumeNumber(CString sDrive);
@@ -1320,13 +1340,13 @@ h		: 복사할 height 크기(pixel)
 	//"로컬 디스크 (C:)" -> "C:\\"
 	//"문서" -> "C:\\Documents"
 	//"문서\\AnySupport" -> "C:\\Documents\\AnySupport"
+	//"Seagate(\\192.168.0.52) (X:)" -> "X:"	(네트워크 드라이브)
 	//하위 폴더 포함 유무에 관계없이 변환.
-	//remote의 경로인 경우는 system_label, system_path, drive_list까지 모두 파라미터로 전달받아 처리해야하므로 복잡해지기 때문에
-	//이 함수에서는 remote인 경우는 처리하지 않는다.
-	//local->remote로 path를 전달할 때 그대로 전달하고 remote에서 이 함수를 통해 실제 경로로 변환해서 사용하자.
-	CString		convert_special_folder_to_real_path(CString special_folder);
-	//미구현!
-	CString		convert_real_path_to_special_folder(CString real_path, std::map<int, CString>*system_path_map = NULL);
+	CString		convert_special_folder_to_real_path(CString special_folder, CShellImageList* plist = NULL, int index = 0);
+	//"c:\\abc\\def"				=> "로컬 디스크 (C:)\\abc\\def"
+	//"C:\Users\scpark\Desktop"		=> "바탕 화면"
+	//"C:\Users\scpark\Documents"	=> "문서"
+	CString		convert_real_path_to_special_folder(CString real_path, CShellImageList * plist = NULL, int index = 0);
 
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
@@ -1362,6 +1382,7 @@ void		SetWallPaper(CString sfile);
 	CString		get_time_string(COleDateTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
 	CString		get_time_string(__timeb32 tb, CString sep = _T(":"), bool h24 = true, bool sec = true);
 	CString		get_time_string(SYSTEMTIME st, CString sep = _T(":"), bool h24 = true, bool sec = true, bool msec = true);
+	CString		get_time_string(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
 
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
 	CString		get_datetime_string(CTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
@@ -1381,7 +1402,6 @@ void		SetWallPaper(CString sfile);
 	//CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
 	//CString		GetDateTimeStringFromTime(COleDateTime t, bool bSeparator = true);
 	CTime		GetTimeFromDateTimeString(CString sDateTime);
-	CString		GetTimeStringFromSeconds(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
 	CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour = true, bool bHasMilliSec = true);
 	int			GetSecondsFromTimeString(CString timeString);
 	int			GetMilliSecondsFromTimeString(CString timeString);
@@ -1457,9 +1477,9 @@ void		SetWallPaper(CString sfile);
 							CRect rTarget,
 							CString text,
 							float font_size,
-							int font_style,
-							int shadow_depth,
-							float thickness,
+							int font_style = Gdiplus::FontStyleRegular,
+							int shadow_depth = 0,
+							float thickness = 0.0f,
 							CString font_name = _T("맑은 고딕"),
 							Gdiplus::Color cr_text = Gdiplus::Color::Black,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
@@ -1581,9 +1601,9 @@ void		SetWallPaper(CString sfile);
 	CRect		make_rect(int x, int y, int w, int h);
 	CRect		makeCenterRect(int cx, int cy, int w, int h);
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
-	CRect		GpRect2CRect(Gdiplus::Rect);
-	Gdiplus::Rect	CRect2GpRect(CRect r);
-	Gdiplus::RectF	CRect2GpRectF(CRect r);
+	CRect		gpRectToCRect(Gdiplus::Rect);
+	Gdiplus::Rect	CRectTogpRect(CRect r);
+	Gdiplus::RectF	CRectTogpRectF(CRect r);
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
 	void		draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);

@@ -3,6 +3,7 @@
 
 #include "PathCtrl.h"
 #include "../../MemoryDC.h"
+#include "../../CEdit/SCEdit/SCEdit.h"
 
 // CPathCtrl
 
@@ -42,6 +43,7 @@ BEGIN_MESSAGE_MAP(CPathCtrl, CStatic)
 	ON_WM_TIMER()
 	//ON_NOTIFY(LBN_SELCHANGE, IDC_LIST_FOLDERS, &CPathCtrl::OnLbnSelchange)
 	ON_REGISTERED_MESSAGE(Message_CSCListBox, &CPathCtrl::OnMessageSCListBox)
+	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CPathCtrl::on_message_CSCEdit)
 	ON_WM_SIZE()
 	ON_WM_KILLFOCUS()
 END_MESSAGE_MAP()
@@ -90,7 +92,7 @@ void CPathCtrl::PreSubclassWindow()
 	rc.DeflateRect(1, 1);
 	rc.left = ROOT_WIDTH;
 	dwStyle = WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE;
-	m_pEdit = new CEdit();// (this, item, subItem, GetItemText(item, subItem));
+	m_pEdit = new CSCEdit();// (this, item, subItem, GetItemText(item, subItem));
 	m_pEdit->Create(dwStyle, rc, this, 0);
 	m_pEdit->SetFont(&m_font, true);
 
@@ -218,7 +220,7 @@ void CPathCtrl::OnPaint()
 	//항상 표시되는 항목
 	if (m_pShellImageList)
 	{
-		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(get_full_path(m_path.size() - 1), true),
+		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(get_path(m_path.size() - 1), true),
 			CPoint(rc.left + 2, rc.CenterPoint().y - 8), ILD_TRANSPARENT);
 	}
 
@@ -363,7 +365,7 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 
 	m_path.clear();
 
-	path = convert_special_folder_to_real_path(path);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
+	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 
 	CString folder;
 
@@ -419,7 +421,8 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	}
 
 	//기본 토큰 추가
-	if ((m_path.size() > 0 && m_path[0].label != get_system_label(CSIDL_DRIVES)) ||
+	if ((m_path.size() == 0) ||
+		(m_path.size() > 0 && m_path[0].label != get_system_label(CSIDL_DRIVES)) ||
 		(m_path.size() > 1 && m_path[1].label != get_system_label(CSIDL_DRIVES)))
 		m_path.push_front(CPathElement(get_system_label(CSIDL_DRIVES)));
 
@@ -447,7 +450,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	//현재 선택된 폴더의 하위 폴더들을 리스트에 표시하는데
 	//현재 폴더의 하위 폴더가 m_path에 존재하면 해당 항목을 선택된 항목으로(또는 볼드체로) 표시해준다.
 	int total_lines = 0;
-	CString full_path = get_full_path(m_index);
+	CString full_path = get_path(m_index);
 
 	if (show)
 	{
@@ -509,7 +512,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 }
 
 
-CString CPathCtrl::get_full_path(int index)
+CString CPathCtrl::get_path(int index)
 {
 	CString fullpath;
 
@@ -529,7 +532,7 @@ CString CPathCtrl::get_full_path(int index)
 	//special folder들인 경우(바탕 화면 등등)
 	if (m_path[2].label.Find(_T(":\\")) < 0 && m_path[2].label.Find(_T(":)")) < 0)
 	{
-		fullpath = convert_special_folder_to_real_path(m_path[2].label);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
+		fullpath = convert_special_folder_to_real_path(m_path[2].label, m_pShellImageList, !m_is_local);
 		return fullpath;
 	}
 
@@ -544,7 +547,7 @@ CString CPathCtrl::get_full_path(int index)
 
 	for (int i = 3; i <= index; i++)
 	{
-		fullpath = fullpath + m_path[i].label + _T("\\");
+		fullpath = fullpath + m_path[i].label + (i == index ? _T("") : _T("\\"));
 	}
 
 	return fullpath;
@@ -562,7 +565,7 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		repos_edit();
 
-		m_old_text = get_full_path(m_path.size() - 1);
+		m_old_text = get_path(-1);
 
 		m_pEdit->ShowWindow(SW_SHOW);
 		m_pEdit->SetWindowText(m_old_text);
@@ -577,7 +580,7 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	//클릭된 위치가 폴더명인지 pulldown영역인지 구분.
 	CRect r = m_path[m_index].r;
 	int count = 0;
-	CString full_path = get_full_path(m_index);
+	CString full_path = get_path(m_index);
 
 	if (m_is_local)
 	{
@@ -832,7 +835,7 @@ void CPathCtrl::recalc_path_position()
 		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가
 		//remote인 경우는 하위 폴더목록을 request해서 받기 전까지는 구할 수 없다.
 		//하지만 m_path.size() - 1보다 하위의 폴더라면 이미 하위폴더가 있다는 뜻이므로 우선 이렇게 처리한다.
-		bool has_sub = (m_is_local ? get_sub_folders(get_full_path(i)) : true);
+		bool has_sub = (m_is_local ? get_sub_folders(get_path(i)) : true);
 		rt.right += (has_sub || (i < m_path.size() - 1) ? m_arrow_area_width : 0);
 
 		rt.top = rc.top;
@@ -941,11 +944,28 @@ void CPathCtrl::recalc_path_position()
 
 void CPathCtrl::OnKillFocus(CWnd* pNewWnd)
 {
-	//CStatic::OnKillFocus(pNewWnd);
+	CStatic::OnKillFocus(pNewWnd);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//editbox가 표시된 상태에서는 이 KillFocus가 발생할 수 없으므로 아래 코드는 처리되지 않는다.
+	//실제 editbox에서 KillFocus()되면 이를 메시지로 받아서 처리해야 한다.
 	//if (m_pEdit && m_pEdit->IsWindowVisible())
 	//{
 	//	m_pEdit->ShowWindow(SW_HIDE);
 	//}
+}
+
+LRESULT CPathCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+{
+	CSCEdit* pEdit = (CSCEdit*)wParam;
+
+	if (!pEdit->IsWindowVisible())
+		return 0;
+
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
+	pEdit->ShowWindow(SW_HIDE);
+
+	//SetWindowText(m_old_text);
+
+	return 0;
 }

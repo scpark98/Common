@@ -82,35 +82,57 @@ public :
 class CVtFileInfo
 {
 public:
-	CVtFileInfo(CString _path, uint64_t _size = 0, CString _date = _T(""), bool _is_remote = false, bool _is_folder = false)
+	CVtFileInfo() {};
+	CVtFileInfo(WIN32_FIND_DATA _data, bool _is_remote = false)
 	{
-		if (!_is_remote && _size == 0)
+		data = _data;
+		filesize.HighPart = data.nFileSizeHigh;
+		filesize.LowPart = data.nFileSizeLow;
+		is_remote = _is_remote;
+		//path = data.cFileName;
+		//filesize.HighPart = data.nFileSizeHigh;
+		//filesize.LowPart = data.nFileSizeLow;
+		//filetime = data.ftLastWriteTime;
+		//is_folder = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+		//memcpy(&filetime, &data.ftLastWriteTime, sizeof(FILETIME));
+	}
+	/*
+	CVtFileInfo(CString _path, ULARGE_INTEGER _filesize, FILETIME _filetime, bool _is_remote = false, bool _is_folder = false)
+	{
+		if (!_is_remote && _filesize.QuadPart == 0)
 		{
 			if (PathIsDirectory(_path))
-				_size = 0;
+				_filesize.QuadPart = 0;
 			else
-				_size = get_file_size(_path);
+				_filesize.QuadPart = get_file_size(_path);
 		}
 
-		if (!_is_remote && _date.IsEmpty())
-		{
-			_date = get_datetime_string(GetFileLastModifiedTime(_path), 2, true, _T(" "), false, false);
-		}
+		//if (!_is_remote)
+		//{
+		//	_date = get_datetime_string(GetFileLastModifiedTime(_path), 2, true, _T(" "), false, false);
+		//}
 
 		path = _path;
-		size = _size;
-		date = _date;
+		filesize = _filesize;
+		filetime = _filetime;
 		is_remote = _is_remote;
 		is_folder = is_folder;
 	}
+	*/
 
+	CString get_file_time_str()
+	{
+		return ::get_file_time_str(data.ftLastWriteTime);
+	}
+
+	WIN32_FIND_DATA	data;
 	//sort의 lamda등에서도 인덱스로 접근하도록 하기 위해 text[3];과 같이 배열로 선언했었으나
 	//3개밖에 되지 않고 명확히 사용하고자 타입에 맞게 선언함
-	CString		path;
-	uint64_t	size = 0;
-	CString		date;
-	bool		is_remote = false;
-	bool		is_folder = false;
+	//CString			path;
+	ULARGE_INTEGER	filesize;
+	//FILETIME		filetime;
+	bool			is_remote = false;
+	//bool			is_folder = false;
 };
 
 
@@ -150,12 +172,21 @@ public:
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
 	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
 	void		set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local = true);
+	
 	//list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.
+	//만약 선택된 항목이 폴더이고 해당 폴더까지의 경로를 원한다면 get_selected_path()를 사용해야 한다.
 	CString		get_path(int index = -1);
+
+	//현재 선택된 항목이 폴더이면 해당 경로까지의 fullpath를, 파일이라면 현재 리스트의 경로를 리턴한다.('\' 포함)
+	CString		get_selected_path();
+
+	//해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.
+	WIN32_FIND_DATA	get_file_data(int index);
+
 	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
 	void		set_path(CString path, bool refresh = true);
-	//local이 아닐 경우는 파일목록을 받아서 표시한다.
+	//remote일 경우는 파일목록을 받아서 표시한다.
 	void		set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList);
 
 	//reload가 true라면 local의 파일목록을 다시 불러오지만 false라면 목록을 다시 리스트에 표시한다
@@ -170,11 +201,18 @@ public:
 	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
 	std::deque<CVtFileInfo> m_cur_folders;
 	std::deque<CVtFileInfo> m_cur_files;
+	//remote일 경우는 fullpath로 해당 파일의 WIN32_FIND_DATA값을 얻어야 할 경우가 있다.
+	void		get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data);
+
 	//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
 	//local인 경우 크기와 날짜등이 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.
-	void		add_file(CString path, uint64_t size, CString date = _T(""), bool is_remote = false, bool is_folder = false);
+	//void		add_file(CString path, uint64_t size, CString date = _T(""), bool is_remote = false, bool is_folder = false);
 	//local이 아닌 remote의 경우 넘겨받은 구조체값으로 목록을 추가한다.
-	void		add_file(WIN32_FIND_DATA* pFindFileData);
+	void		add_file(WIN32_FIND_DATA* data, bool is_remote);
+
+	//단일 파일을 리스트에 추가한다. 하나의 파일 전송이 끝나면 바로 리스트를 갱신하기 위해 사용.
+	//list에만 추가할 뿐 m_cur_folders, m_cur_files에는 추가하지 않는다.
+	//void		add_file(WIN32_FIND_DATA* data, bool is_remote);
 
 	enum SHELL_LIST_COLUMN
 	{
@@ -185,7 +223,9 @@ public:
 
 	CString		m_path;
 	CShellImageList*	m_pShellImageList = NULL;
-	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
+	CShellImageList*	get_shell_imagelist() { return m_pShellImageList; }
+	void				set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
+
 
 //컬럼 관련
 	//ex. "No,20;Item1,50;Item2,50"
@@ -240,6 +280,15 @@ public:
 	int			add_line_string_item(CString line_string, TCHAR separator = '|', int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, CString text = _T(""), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
+	int			insert_item(int index, WIN32_FIND_DATA data, bool ensureVisible = true, bool invalidate = true);
+	int			update_item(int index, WIN32_FIND_DATA data, bool ensureVisible = true, bool invalidate = true);
+
+	//현재 폴더에 폴더를 추가한다.
+	int			insert_folder(int index, CString new_folder_name);
+
+	//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
+	//"새 폴더" or "New Folder" 등 다국어까지 고려하여 타이틀을 받는다.
+	bool		new_folder(CString new_folder_title);
 
 	//여러개의 인자를 args에 주니 모두 기록되지 않는 현상이 있다. 확인 필요!!
 	template <typename ... Types> int insert_item(int index, int img_idx, Types... args)
@@ -268,7 +317,10 @@ public:
 //삭제 관련
 	//지우기 전 확인창은 호출루틴에서 처리해야 함
 	void		delete_selected_items();
-	void		delete_item(int index);
+
+	//shell_listctrl이라면 파일 또한 삭제할 지 파라미터를 줄 수 있고 실제 파일을 지운 후에 리스트에서도 삭제해야 한다.
+	bool		delete_item(int index, bool delete_physical_file = false);
+
 	//라인 전체가 공백이면 해당 라인을 삭제한다.
 	void		delete_empty_lines();
 	void		delete_all_items(bool delete_file_list = true);
@@ -294,8 +346,12 @@ public:
 	int			get_selected_index(int start = 0);
 	//맨 끝에서부터 선택된 한 항목의 인덱스를 리턴한다.
 	int			get_last_selected_item();
-	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
-	int			get_selected_items(std::deque<int> *dqSelected = NULL);
+	//선택된 항목들을 dq에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
+	int			get_selected_items(std::deque<int> *dq = NULL);
+	//선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 fullpath = true이면 각 항목의 전체경로를 담는다.
+	int			get_selected_items(std::deque<CString>* dq = NULL, bool fullpath = false);
+	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq = NULL, bool fullpath = false);
+
 	//index = -1 : 전체선택
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool make_visible = true);
 	void		unselect_selected_item();
@@ -347,6 +403,7 @@ public:
 	void		set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase = false, bool invalidate = true);
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	void		set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase = false);
+	//글자색과 배경색 동시 변경
 	void		set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack);
 
 	//기본 글자색을 설정한다.
@@ -383,7 +440,9 @@ public:
 	std::deque<int>* get_selected_list_for_edit() { return &m_dqSelected_list_for_edit; }
 	std::deque<int> m_dqSelected_list_for_edit;
 	CString		get_old_text() { return m_old_text; }
-	CEdit*		edit_item(int item, int subItem);
+	//item = -1이면 선택된 항목을, subItem = -1이면 0번 컬럼을 편집 시작한다.
+	//return되는 CEdit*를 이용할 경우도 필요하여 리턴함.
+	CEdit*		edit_item(int item = -1, int subItem = -1);
 	void		edit_end(bool valid = true);
 	void		undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 	bool		is_modified() { return m_modified; }
@@ -435,7 +494,7 @@ public:
 	bool		get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
 
 	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
-	void		progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }
+	//void		set_progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }
 
 	void		set_draw_selected_border(bool draw) { m_draw_selected_border = draw; }
 

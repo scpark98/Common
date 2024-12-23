@@ -41,11 +41,11 @@ void CSCSystemButtons::create(CWnd* parent, int top, int right_end, int width, i
 {
 	m_button.clear();
 
-	m_top = top;
+	m_top = top + 1;
 
 	if (right_end > 0)
 	{
-		m_right = right_end;
+		m_right = right_end - 1;
 	}
 	else
 	{
@@ -62,7 +62,7 @@ void CSCSystemButtons::create(CWnd* parent, int top, int right_end, int width, i
 	//컨트롤 생성과 함께 각 버튼의 위치가 정해진다.
 	for (int i = 0; i < m_button.size(); i++)
 	{
-		m_button[i].r = CRect(i * (m_button_width + m_gap), 0, i * (m_button_width + m_gap) + m_button_width, m_button_height);
+		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height);
 	}
 
 	Create(_T("CSCSystemButtons"), WS_CHILD | BS_PUSHBUTTON,
@@ -78,10 +78,10 @@ void CSCSystemButtons::resize()
 {
 	for (int i = 0; i < m_button.size(); i++)
 	{
-		m_button[i].r = CRect(i * (m_button_width + m_gap), 0, i * (m_button_width + m_gap) + m_button_width, m_button_height);
+		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height);
 	}
 
-	MoveWindow(m_right - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
+	MoveWindow(m_right - 1 - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
 		m_top,
 		m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
 		m_button_height);
@@ -92,9 +92,10 @@ void CSCSystemButtons::adjust(int top, int right)
 	CRect rc;
 	GetClientRect(rc);
 
-	m_top = top;
-	m_right = right;
-	MoveWindow(m_right - rc.Width(), m_top, rc.Width(), rc.Height());
+	m_top = top + 1;
+	m_right = right - 1;
+	resize();
+	//MoveWindow(m_right - rc.Width(), m_top, rc.Width(), rc.Height());
 }
 
 int CSCSystemButtons::get_button_index(CPoint pt)
@@ -171,8 +172,8 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_CLOSE)
 			{
-				g.DrawLine(&pen, cp.x - 5, cp.y - 5, cp.x + 5, cp.y + 5);
-				g.DrawLine(&pen, cp.x - 5, cp.y + 5, cp.x + 5, cp.y - 5);
+				g.DrawLine(&pen, cp.x - 5, cp.y - 6, cp.x + 5, cp.y + 4);
+				g.DrawLine(&pen, cp.x - 5, cp.y + 4, cp.x + 5, cp.y - 6);
 			}
 			else if (m_button[i].cmd == SC_PIN)
 			{
@@ -181,7 +182,7 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{
-				draw_text(&g, m_button[i].r, _T("?"), 16, 0, 0, 1.0f, _T("맑은 고딕"), m_theme.cr_text, m_theme.cr_text, DT_CENTER | DT_VCENTER);
+				draw_text(&g, m_button[i].r, _T("?"), 12, 0, 0, 1.0f, _T("맑은 고딕"), m_theme.cr_text);// , m_theme.cr_text, DT_CENTER | DT_VCENTER | DT_SINGELINE);
 			}
 		}
 	}
@@ -326,11 +327,43 @@ BOOL CSCSystemButtons::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_KEYDOWN ||
-		pMsg->message == WM_KEYUP)
+		pMsg->message == WM_KEYUP ||
+		pMsg->message == WM_NCHITTEST)
 	{
-		TRACE(_T("key on CSCSystemButtons\n"));
+		TRACE(_T("msg(%d) on CSCSystemButtons\n"), pMsg->message);
 		return FALSE;
 	}
 
 	return CButton::PreTranslateMessage(pMsg);
+}
+
+void CSCSystemButtons::set_button_width(int width)
+{
+	m_button_width = width;
+	resize();
+}
+
+void CSCSystemButtons::set_button_height(int height)
+{
+	m_button_height = height - 1;
+	resize();
+	/*
+	return;
+	for (int i = 0; i < m_button.size(); i++)
+	{
+		m_button[i].r.bottom = m_button[i].r.top + m_button_height;
+	}
+
+	CRect rc;
+	GetClientRect(rc);
+
+	SetWindowPos(NULL, 0, 0, rc.Width(), m_button_height, SWP_NOMOVE | SWP_NOZORDER);
+
+	//CRect rc;
+
+	//GetRect(rc);
+	//ScreenToClient(rc);
+	//rc.bottom = rc.top + height;
+	//MoveWindow(rc);
+	*/
 }

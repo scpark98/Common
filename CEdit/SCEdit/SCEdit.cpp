@@ -73,6 +73,7 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_CONTROL_REFLECT(EN_UPDATE, &CSCEdit::OnEnUpdate)
 	ON_WM_WINDOWPOSCHANGED()
 //}}AFX_MSG_MAP
+ON_WM_KILLFOCUS()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -528,10 +529,18 @@ void CSCEdit::update_ctrl()
 	}
 }
 
+//OnEnKillfocus()보다 먼저 호출된다.
+void CSCEdit::OnKillFocus(CWnd* pNewWnd)
+{
+	CEdit::OnKillFocus(pNewWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+}
 
 void CSCEdit::OnEnKillfocus()
 {
 	update_ctrl();
+	::SendMessage(GetParent()->m_hWnd, Message_CSCEditMessage, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
 }
 
 
@@ -560,3 +569,4 @@ void CSCEdit::OnEnSetfocus()
 {
 	update_ctrl();
 }
+

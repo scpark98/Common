@@ -273,16 +273,16 @@ rapidjson::Value* Json::get_member(std::string member)
 //arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 rapidjson::Value* Json::get_array_member(std::string arr_name, int n, std::string member)
 {
-	if (!doc[arr_name.c_str()].IsArray())
+	if (!doc[arr_name].IsArray())
 		return NULL;
 
-	if (n >= doc[arr_name.c_str()].Size())
+	if (n >= doc[arr_name].Size())
 		return NULL;
 
-	if (!doc[arr_name.c_str()][n].HasMember(member))
+	if (!doc[arr_name][n].HasMember(member))
 		return NULL;
 
-	return &doc[arr_name.c_str()][n][member.c_str()];
+	return &doc[arr_name][n][member];
 }
 
 bool Json::get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value)
@@ -343,4 +343,20 @@ bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<
 	}
 
 	return true;
+}
+
+int	Json::get_int(std::string member, int default_value)
+{
+	if (!doc.HasMember(member))
+		return default_value;
+
+	return doc[member].GetInt();
+}
+
+CString	Json::get_CString(std::string member, CString default_value)
+{
+	if (!doc.HasMember(member))
+		return default_value;
+
+	return doc[member].GetCString();
 }

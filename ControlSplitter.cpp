@@ -123,8 +123,8 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 			return;
 		}
 
-		TRACE("Max(%d, %d, %d, %d)\n", m_rectMax.left, m_rectMax.top, m_rectMax.right, m_rectMax.bottom);
-		TRACE("Cur(%d, %d, %d, %d)\n", rect.left, rect.top, rect.right, rect.bottom);
+		//TRACE("Max(%d, %d, %d, %d)\n", m_rectMax.left, m_rectMax.top, m_rectMax.right, m_rectMax.bottom);
+		//TRACE("Cur(%d, %d, %d, %d)\n", rect.left, rect.top, rect.right, rect.bottom);
 
 		for (it = m_vtTopLeftControls.begin(); it < m_vtTopLeftControls.end(); it++)
 		{
@@ -250,6 +250,13 @@ BOOL CControlSplitter::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 void CControlSplitter::SetType(UINT nType)
 {
 	m_nType = nType;
+}
+
+//어떤 컨트롤은 스플리터와 함께 움직여야 한다. 양쪽 모두 줘야한다.
+void CControlSplitter::AddToBoth(UINT nCtrlId, WORD nFlags)
+{
+	AddToTopOrLeftCtrls(nCtrlId, nFlags);
+	AddToBottomOrRightCtrls(nCtrlId, nFlags);
 }
 
 void CControlSplitter::AddToTopOrLeftCtrls(UINT nCtrlId, WORD nFlags)

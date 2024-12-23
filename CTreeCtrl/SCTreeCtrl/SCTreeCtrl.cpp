@@ -698,8 +698,8 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 	}
 	else
 	{
-		CString path = get_known_folder(csidl);
-		CString text = m_pShellImageList->m_volume[0].get_label(csidl);
+		CString path = m_pShellImageList->m_volume[!m_is_local].get_path(csidl);
+		CString text = m_pShellImageList->m_volume[!m_is_local].get_label(csidl);
 
 		TV_INSERTSTRUCT tvInsert;
 		tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
@@ -718,7 +718,7 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 
 void CSCTreeCtrl::insert_drive(CString driveName)
 {
-	CString real_path = convert_special_folder_to_real_path(driveName);
+	CString real_path = convert_special_folder_to_real_path(driveName, m_pShellImageList, !m_is_local);
 
 	TV_INSERTSTRUCT tvInsert;
 	tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
@@ -740,18 +740,34 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	bool		bWorking;
 	CString		curFolder;
 
-	sParentPath = convert_special_folder_to_real_path(sParentPath);// , m_pShellImageList->m_volume[!m_is_local].get_label_map());
+	sParentPath = convert_special_folder_to_real_path(sParentPath, m_pShellImageList, !m_is_local);
 
 	if (sParentPath.Right(1) != "\\")
 		sParentPath += "\\";
 
+	std::deque<WIN32_FIND_DATA> dq;
+	find_all_files(sParentPath, &dq, _T("*"), true);
+
+	for (auto item : dq)
+	{
+		if (item.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN ||
+			item.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
+			continue;
+
+		if (item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			insert_folder(&item, get_sub_folders(item.cFileName) > 0);
+		}
+	}
+
+	/*
 	bWorking = FileFind.FindFile(sParentPath + _T("*"));
 
 	while (bWorking)
 	{
 		bWorking = FileFind.FindNextFile();
 
-		if (!FileFind.IsDots() && !FileFind.IsHidden() && FileFind.IsDirectory())
+		if (!FileFind.IsDots() && !FileFind.IsHidden() && FileFind.IsDirectory() && !FileFind.IsSystem())
 		{
 			curFolder = FileFind.GetFileName();
 			TV_INSERTSTRUCT tvItem;
@@ -766,9 +782,10 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 			HTREEITEM hItem = InsertItem(&tvItem);
 		}
 	}
+	*/
 }
 
-void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_children)
+void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 {
 	TV_INSERTSTRUCT tvItem;
 	tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
@@ -776,14 +793,28 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_childre
 	tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
 	tvItem.hInsertAfter = TVI_LAST;
 	tvItem.hParent = m_expanding_item;
-	tvItem.item.pszText = pFindFileData->cFileName;
+
+	//cFileName이 fullpath인 경우는 폴더명만 취해야 한다.
+	if (get_char_count(data->cFileName, '\\') > 0)
+	{
+		TCHAR* p = data->cFileName;
+		CString parent = get_fullpath(m_expanding_item);
+		parent = convert_special_folder_to_real_path(parent, m_pShellImageList, !m_is_local);
+		if (parent.Right(1) == '\\')
+			p += parent.GetLength();
+		else
+			p += (parent.GetLength() + 1);
+		_tcscpy(data->cFileName, p);
+	}
+
+	tvItem.item.pszText = data->cFileName;
 
 	//하위 폴더가 있을때만 확장버튼이 표시되도록.
 	//remote일 경우는 일단 true로 세팅한다.
 	if (m_is_shell_treectrl)
 	{
 		if (m_is_local)
-			tvItem.item.cChildren = get_sub_folders(get_fullpath(m_expanding_item) + _T("\\") + pFindFileData->cFileName);
+			tvItem.item.cChildren = get_sub_folders(get_fullpath(m_expanding_item) + _T("\\") + data->cFileName);
 		else
 			tvItem.item.cChildren = has_children;
 	}
@@ -1092,9 +1123,10 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 	*/
 }
 
-void CSCTreeCtrl::set_path(CString fullpath)
+void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 {
-	fullpath = m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath);
+	fullpath = convert_real_path_to_special_folder(fullpath, m_pShellImageList);
+	//fullpath = m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath, m_pShellImageList);
 	//AfxMessageBox(fullpath);
 
 	std::deque<CString> dq;
@@ -1109,6 +1141,7 @@ void CSCTreeCtrl::set_path(CString fullpath)
 		//만약 현재 노드에 아직 child가 추가된 상태가 아니라면 우선 children을 넣어준 후 검색해야 한다.
 		if (GetChildItem(item) == NULL)
 		{
+			m_expanding_item = item;
 			insert_folder(item, get_fullpath(item));
 			Expand(item, TVE_EXPAND);
 			//m_folder_list = iterate_tree_with_no_recursion();
@@ -1122,7 +1155,8 @@ void CSCTreeCtrl::set_path(CString fullpath)
 		if (!item)
 			return;
 
-		Expand(item, TVE_EXPAND);
+		if (expand)
+			Expand(item, TVE_EXPAND);
 	}
 
 	if (item)
@@ -1472,7 +1506,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	GetClientRect(rc);
 
 	m_DragItem = pNMTreeView->itemNew.hItem;
-	CString path = convert_special_folder_to_real_path(get_fullpath(m_DragItem));
+	CString path = convert_special_folder_to_real_path(get_fullpath(m_DragItem), m_pShellImageList, !m_is_local);
 	
 	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
@@ -1483,7 +1517,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	int item_count = get_sub_folders(path, NULL, false, true);
 	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 
-	if (m_pDragImage)
+	if (m_pDragImage && m_pDragImage->GetSafeHandle())
 	{
 		m_pDragImage->DeleteImageList();
 		m_pDragImage = NULL;
@@ -1665,7 +1699,7 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (!m_is_hovering)
 	{
-		TRACE(_T("tree. move\n"));
+		//TRACE(_T("tree. move\n"));
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
 		tme.hwndTrack = m_hWnd;
@@ -1767,7 +1801,7 @@ void CSCTreeCtrl::OnMouseLeave()
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	m_is_hovering = false;
 	KillTimer(timer_expand_for_drop);
-	TRACE(_T("tree. leave\n"));
+	//TRACE(_T("tree. leave\n"));
 	SelectDropTarget(NULL);
 
 	CTreeCtrl::OnMouseLeave();
@@ -2546,6 +2580,18 @@ void CSCTreeCtrl::enlarge_font_size(bool enlarge)
 	reconstruct_font();
 }
 
+void CSCTreeCtrl::set_font_bold(bool bold)
+{
+	m_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	reconstruct_font();
+}
+
+void CSCTreeCtrl::set_font_italic(bool italic)
+{
+	m_lf.lfItalic = italic;
+	reconstruct_font();
+}
+
 
 void CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -2627,21 +2673,10 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 
 			int nOldBkMode = dc.SetBkMode(TRANSPARENT);
-
-			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
-			{
-				//TRACE(_T("CDIS_SELECTED\n"));
-				crText = m_theme.cr_text_selected;
-				crBack = m_theme.cr_back_selected;
-			}
-			else if (pNMCustomDraw->uItemState & CDIS_HOT)
-			{
-				//TRACE(_T("CDIS_HOT\n"));
-				//crText = m_cr_text_selected;
-				crBack = m_theme.cr_back_hover;
-			}
+			
+			//CDIS_DROPHILITED 의 우선순위가 가장 높다. > CDIS_HOT > CDIS_SELECTED
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
-			else if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
+			if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
 			{
 				//drop을 위해 폴더위에 머무를 경우 해당 폴더가 expand가 아니면 expand시켜준다.
 				SetTimer(timer_expand_for_drop, 1000, NULL);
@@ -2649,6 +2684,26 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//TRACE(_T("CDIS_DROPHILITED\n"));
 				crText = m_theme.cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
 				crBack = m_theme.cr_back_dropHilited;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_HOT)
+			{
+				//TRACE(_T("CDIS_HOT\n"));
+				//crText = m_cr_text_selected;
+				crBack = m_theme.cr_back_hover;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			{
+				//TRACE(_T("CDIS_SELECTED\n"));
+				if (GetFocus() == this)
+				{
+					crText = m_theme.cr_text_selected;
+					crBack = m_theme.cr_back_selected;
+				}
+				else
+				{
+					crText = m_theme.cr_text_selected_inactive;
+					crBack = m_theme.cr_back_selected_inactive;
+				}
 			}
 			//else if (pNMCustomDraw->uItemState & CDIS_FOCUS)
 			//{
@@ -2660,7 +2715,12 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
 				//TRACE(_T("CDIS_SELECTED\n"));
-				draw_rectangle(&dc, rcItem, m_theme.cr_selected_border, crBack);
+				//배경색으로 그려주지 않으면 기본 텍스트 출력 + 커스텀 출력 텍스트가 중복되서 표시되므로
+				//배경색을 칠해서 기본 텍스트 출력을 가리고 커스텀 출력을 해줘야 한다.
+				if (GetFocus() == this)
+					draw_rectangle(&dc, rcItem, m_theme.cr_selected_border, crBack);
+				else
+					draw_rectangle(&dc, rcItem, crBack, crBack);
 			}
 			else
 			{

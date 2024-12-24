@@ -798,7 +798,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 	if (get_char_count(data->cFileName, '\\') > 0)
 	{
 		TCHAR* p = data->cFileName;
-		CString parent = get_fullpath(m_expanding_item);
+		CString parent = get_path(m_expanding_item);
 		parent = convert_special_folder_to_real_path(parent, m_pShellImageList, !m_is_local);
 		if (parent.Right(1) == '\\')
 			p += parent.GetLength();
@@ -814,7 +814,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 	if (m_is_shell_treectrl)
 	{
 		if (m_is_local)
-			tvItem.item.cChildren = get_sub_folders(get_fullpath(m_expanding_item) + _T("\\") + data->cFileName);
+			tvItem.item.cChildren = get_sub_folders(get_path(m_expanding_item) + _T("\\") + data->cFileName);
 		else
 			tvItem.item.cChildren = has_children;
 	}
@@ -991,12 +991,12 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 		{
 			if (m_is_local)
 			{
-				insert_folder(m_expanding_item, get_fullpath(m_expanding_item));
+				insert_folder(m_expanding_item, get_path(m_expanding_item));
 			}
 			else
 			{
 				//remote라면 요청해서 넣어야 한다.
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_fullpath(m_expanding_item));
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_path(m_expanding_item));
 			}
 		}
 	}
@@ -1071,7 +1071,7 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	return FALSE;
 }
 
-CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
+CString CSCTreeCtrl::get_path(HTREEITEM hItem)
 {
 	if (hItem == NULL)
 	{
@@ -1125,12 +1125,15 @@ CString CSCTreeCtrl::get_fullpath(HTREEITEM hItem)
 
 void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 {
-	fullpath = convert_real_path_to_special_folder(fullpath, m_pShellImageList);
+	fullpath = convert_real_path_to_special_folder(fullpath, m_pShellImageList, !m_is_local);
 	//fullpath = m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath, m_pShellImageList);
 	//AfxMessageBox(fullpath);
 
 	std::deque<CString> dq;
 	get_token_string(fullpath, dq, '\\', false);
+
+	if (dq.size() == 0)
+		dq.push_back(m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES));
 
 	HTREEITEM item = NULL;
 
@@ -1142,7 +1145,7 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 		if (GetChildItem(item) == NULL)
 		{
 			m_expanding_item = item;
-			insert_folder(item, get_fullpath(item));
+			insert_folder(item, get_path(item));
 			Expand(item, TVE_EXPAND);
 			//m_folder_list = iterate_tree_with_no_recursion();
 		}
@@ -1278,7 +1281,7 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 		}
 		else
 		{
-			fullpath = get_fullpath(item);
+			fullpath = get_path(item);
 		}
 
 		//내 PC일 경우는 ""로 리턴되므로
@@ -1506,7 +1509,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	GetClientRect(rc);
 
 	m_DragItem = pNMTreeView->itemNew.hItem;
-	CString path = convert_special_folder_to_real_path(get_fullpath(m_DragItem), m_pShellImageList, !m_is_local);
+	CString path = convert_special_folder_to_real_path(get_path(m_DragItem), m_pShellImageList, !m_is_local);
 	
 	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
@@ -2170,7 +2173,7 @@ BOOL CSCTreeCtrl::move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM
 	{
 		if ((GetItemState(hDestItem, TVIF_STATE) & TVIS_EXPANDED) == false)
 		{
-			insert_folder(hDestItem, get_fullpath(hDestItem));
+			insert_folder(hDestItem, get_path(hDestItem));
 			Expand(hDestItem, TVE_EXPAND);
 			//m_folder_list = iterate_tree_with_no_recursion();
 		}
@@ -2181,8 +2184,8 @@ BOOL CSCTreeCtrl::move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM
 	//ShellTreeCtrl이면 폴더를 move or copy가 성공한 후에 UI를 갱신시킨다.
 	if (m_is_shell_treectrl)
 	{
-		CString srcPath = get_fullpath(hSrcItem);
-		CString dstPath = get_fullpath(hDestItem);
+		CString srcPath = get_path(hSrcItem);
+		CString dstPath = get_path(hDestItem);
 
 		if (IsCtrlPressed())
 		{
@@ -2890,7 +2893,7 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 				HTREEITEM hItem = GetSelectedItem();
 				if (hItem)
 				{
-					CString full_path = get_fullpath(hItem);
+					CString full_path = get_path(hItem);
 					show_file_property_window(full_path);
 				}
 				break;
@@ -2914,7 +2917,7 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 
 	if (m_is_shell_treectrl)
 	{
-		TRACE(_T("parent = %s\n"), get_fullpath(hParent));
+		TRACE(_T("parent = %s\n"), get_path(hParent));
 
 		//아직 펼쳐진 적이 없는 폴더라면 우선 서브 폴더들을 추가해준 후 새 폴더를 추가해야 한다.
 		//if (GetChildItem(hParent) == NULL)
@@ -2925,7 +2928,7 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 			m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
 			m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1, hParent);
 
-		CreateDirectory(get_fullpath(hItem), NULL);
+		CreateDirectory(get_path(hItem), NULL);
 	}
 	else
 	{

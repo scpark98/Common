@@ -5,6 +5,7 @@
 #include "VtListCtrlEx.h"
 
 #include <algorithm>
+#include <set>
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
@@ -2019,19 +2020,21 @@ int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
 }
 
 //현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
-bool CVtListCtrlEx::new_folder(CString new_folder_title)
+bool CVtListCtrlEx::new_folder(CString &new_folder_title)
 {
-	if (!m_is_shell_listctrl || !m_is_local)
+	if (!m_is_shell_listctrl)
 		return false;
 
 	int index = get_file_index(m_path, new_folder_title);
 
-	CString folder;
+	CString folder = m_path;
+	if (is_drive_root(folder))
+		truncate(folder, 1);
 
 	if (index == 1)
-		folder.Format(_T("%s\\%s"), m_path, new_folder_title, index);
+		folder.Format(_T("%s\\%s"), folder, new_folder_title);
 	else
-		folder.Format(_T("%s\\%s (%d)"), m_path, new_folder_title, index);
+		folder.Format(_T("%s\\%s (%d)"), folder, new_folder_title, index);
 
 	//실제 폴더를 생성한 후 리스트에 목록을 추가한다.
 	BOOL res = CreateDirectory(folder, NULL);
@@ -2051,6 +2054,69 @@ bool CVtListCtrlEx::new_folder(CString new_folder_title)
 	edit_item(index, 0);
 
 	return true;
+}
+
+//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
+int CVtListCtrlEx::get_file_index(CString path, CString new_folder_title)
+{
+	int i;
+	int max_index = -1;
+	std::set<int> idx_set;
+
+	CString folder;
+
+	for (i = 0; i < size(); i++)
+	{
+		if (!get_text(i, col_filesize).IsEmpty())
+			continue;
+
+		folder = get_text(i, col_filename);
+		folder.Replace(path + _T("\\"), _T(""));
+
+		if (folder == new_folder_title)
+			idx_set.insert(1);
+
+		//끝 ')'를 찾고
+		int start_paren = -1;
+		int end_paren = folder.ReverseFind(')');
+		int found_index = -1;
+
+		if (end_paren > 0)
+		{
+			//시작 '('를 찾아서 그 사이의 숫자를 추출
+			folder = folder.Left(end_paren);
+			start_paren = folder.ReverseFind('(');
+
+			if (start_paren > 0)
+			{
+				folder = folder.Mid(start_paren + 1);
+				found_index = _ttoi(folder);
+			}
+		}
+
+		if (found_index > 0)
+			idx_set.insert(found_index);
+	}
+
+	//set 항목 중 비어있는 인덱스를 리턴해준다.
+	int index = 0;
+	bool found = false;
+
+	for (int elem : idx_set)
+	{
+		index++;
+		if (elem != index)
+		{
+			found = true;
+			break;
+		}
+	}
+
+	//만약 1 ~ n까지 모든 순번이 순차적으로 들어있다면 1 증가된 값을 리턴해주면 된다.
+	if (!found)
+		index++;
+
+	return index;
 }
 
 /*
@@ -3250,7 +3316,7 @@ CString CVtListCtrlEx::get_path(int index)
 	else
 		fullpath = m_path + get_text(index, col_filename);
 
-	return fullpath;
+	return convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
 }
 
 //현재 선택된 항목이 폴더이면 해당 경로까지의 fullpath를, 파일이라면 현재 리스트의 경로를 리턴한다.
@@ -3267,7 +3333,9 @@ CString	CVtListCtrlEx::get_selected_path()
 
 	path = get_path();
 
-	if (get_text(index, col_filesize).IsEmpty())
+	//내 PC 목록이 표시되고 있거나 폴더인 경우는 선택된 항목까지의 경로를 리턴한다.
+	if (path == m_pShellImageList->get_system_path(!m_is_local, CSIDL_DRIVES) ||
+		get_text(index, col_filesize).IsEmpty())
 	{
 		if (path.Right(1) == '\\')
 			path.Format(_T("%s%s\\"), get_path(), get_text(index, col_filename));
@@ -3276,10 +3344,13 @@ CString	CVtListCtrlEx::get_selected_path()
 	}
 	else
 	{
-		path = get_path();
+		if (path.Right(1) == '\\')
+			path.Format(_T("%s%s"), get_path(), get_text(index, col_filename));
+		else
+			path.Format(_T("%s\\%s"), get_path(), get_text(index, col_filename));
 	}
 
-	return path;
+	return convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 }
 
 //해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.
@@ -3317,6 +3388,9 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 	m_last_clicked_time = 0;
 
 	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
+
+	if (path.IsEmpty())
+		path = m_pShellImageList->get_system_path(!m_is_local, CSIDL_DRIVES);
 
 	m_path = path;
 
@@ -3705,44 +3779,46 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 		select_item(m_nDragIndex);
 	}
 
-	if (m_pDragImage && m_pDragImage->GetSafeHandle())
-	{
-		m_pDragImage->DeleteImageList();
-		m_pDragImage = NULL;
-	}
+	//if (m_pDragImage && m_pDragImage->GetSafeHandle())
+	//{
+	//	m_pDragImage->DeleteImageList();
+	//	m_pDragImage = NULL;
+	//}
 
 	CGdiplusBitmap bmpRes;// (64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 	
 	//drag_image가 없다면 노드 자체 아이콘 및 레이블을 이용한다.
 	//GDI를 이용해서 create_drag_image()를 사용했으나 아이콘과 함께 레이블을 출력할 때 오동작함. 수정 필요.
 	//GDIPlus를 이용한 create_drag_image()를 직접 만드는 것도 좋을듯함.
-	if (m_drag_images_id.size() == 0)
+	if (m_pDragImage == NULL || m_pDragImage->m_hImageList == NULL)
 	{
-		//bmpRes.create_drag_image(this);
-		m_pDragImage = create_drag_image((CListCtrl*)this, &pNMLV->ptAction);
-	}
-	else
-	{
-		if (m_drag_images_id.size() == 1)
+		if (m_drag_images_id.size() == 0)
 		{
-			bmpRes.load(m_drag_images_id[0]);
+			//bmpRes.create_drag_image(this);
+			m_pDragImage = create_drag_image((CListCtrl*)this, &pNMLV->ptAction);
 		}
-		else if (m_drag_images_id.size() > 1)
+		else
 		{
-			bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+			if (m_drag_images_id.size() == 1)
+			{
+				bmpRes.load(m_drag_images_id[0]);
+			}
+			else if (m_drag_images_id.size() > 1)
+			{
+				bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+			}
+
+			bmpRes.draw_text(bmpRes.width / 2 - 4, bmpRes.height / 2 + 4, i2S(sel_count), 20, 2,
+				_T("Arial"), Gdiplus::Color(255, 0, 0, 0), Gdiplus::Color(255, 255, 128, 128), DT_CENTER | DT_VCENTER);
+
+			m_pDragImage = new CImageList();
+			m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
+
+			HICON hicon;
+			bmpRes.m_pBitmap->GetHICON(&hicon);
+			m_pDragImage->Add(hicon);
 		}
-
-		bmpRes.draw_text(bmpRes.width / 2 - 4, bmpRes.height / 2 + 4, i2S(sel_count), 20, 2,
-			_T("Arial"), Gdiplus::Color(255, 0, 0, 0), Gdiplus::Color(255, 255, 128, 128), DT_CENTER | DT_VCENTER);
-
-		m_pDragImage = new CImageList();
-		m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
-
-		HICON hicon;
-		bmpRes.m_pBitmap->GetHICON(&hicon);
-		m_pDragImage->Add(hicon);
 	}
-
 
 //	SendMessageToDescendants(WM_SETFONT, (WPARAM)pFontDefault->GetSafeHandle(), 1, TRUE, FALSE);
 
@@ -3961,7 +4037,7 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 		// End dragging image
 		m_pDragImage->DragLeave(GetDesktopWindow());
 		m_pDragImage->EndDrag();
-		delete m_pDragImage; //must delete it because it was created at the beginning of the drag
+		//delete m_pDragImage; //must delete it because it was created at the beginning of the drag
 
 		CPoint pt(point); //Get current mouse coordinates
 		ClientToScreen(&pt); //Convert to screen coordinates

@@ -137,7 +137,7 @@ public:
 	void		refresh();
 
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
-	CString		get_fullpath(HTREEITEM hItem = NULL);
+	CString		get_path(HTREEITEM hItem = NULL);
 	void		set_path(CString fullpath, bool expand = true);
 
 	HTREEITEM	insert_special_folder(int csidl);
@@ -322,7 +322,7 @@ protected:
 	void			reconstruct_font();
 
 	//Drag&Drop 드래깅 관련
-	bool			m_use_drag_and_drop = false;
+	bool			m_use_drag_and_drop = false;//default = false
 	CWnd*			m_pDragWnd = NULL;			//Which wnd we are dragging FROM
 	CWnd*			m_pDropWnd = NULL;			//Which wnd we are dropping ON
 	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image

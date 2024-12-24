@@ -55,7 +55,7 @@ public:
 
 protected:
 	std::map<int, CString> m_label;	//내 PC, 바탕 화면, 내 문서 의 CSIDL과 system label
-	std::map<int, CString> m_path;		//내 PC, 바탕 화면, 내 문서 의 실제 경로
+	std::map<int, CString> m_path;	//내 PC, 바탕 화면, 내 문서 의 실제 경로
 	std::deque<CString> m_drives;	//volume['C'] = "로컬 디스크",...
 };
 

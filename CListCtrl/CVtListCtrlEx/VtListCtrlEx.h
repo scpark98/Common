@@ -288,7 +288,10 @@ public:
 
 	//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
 	//"새 폴더" or "New Folder" 등 다국어까지 고려하여 타이틀을 받는다.
-	bool		new_folder(CString new_folder_title);
+	bool		new_folder(CString &new_folder_title);
+
+	//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
+	int			get_file_index(CString path, CString new_folder_title);
 
 	//여러개의 인자를 args에 주니 모두 기록되지 않는 현상이 있다. 확인 필요!!
 	template <typename ... Types> int insert_item(int index, int img_idx, Types... args)

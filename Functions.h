@@ -483,6 +483,7 @@ struct	NETWORK_INFO
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
 	//파일, 폴더의 속성창을 표시한다.
 	bool		show_file_property_window(CString fullpath);
+	bool		show_multifile_property_window(std::deque<CString> fullpath);
 	CString		get_exe_directory(bool includeSlash = false);
 	CString		get_exe_parent_directory();
 	CString		get_exe_filename(bool fullpath = false);
@@ -963,6 +964,9 @@ struct	NETWORK_INFO
 	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
 	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
 	bool		is_protected(CString folder, CShellImageList *plist, int index);
+
+	//"C:\\", "C:\\Temp"와 같이 루트일때와 일반 폴더일 경우 끝에 역슬래시 유무가 다르므로 필요.
+	bool		is_drive_root(CString path);
 
 	//새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
 	//zero_prefix가 2이면 001, 002로 된 인덱스가 붙은 파일/폴더들만 대상으로 하려 했으나 아직 미구현.

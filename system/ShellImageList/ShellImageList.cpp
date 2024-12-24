@@ -19,7 +19,8 @@ CShellVolumeList::CShellVolumeList()
 	m_label.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_system_label(CSIDL_DESKTOP)));
 	m_label.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_system_label(CSIDL_MYDOCUMENTS)));
 
-	m_path.insert(std::pair<int, CString>(CSIDL_DRIVES, get_known_folder(CSIDL_DRIVES)));
+	//"내 PC"는 가상 폴더이므로 실제 경로는 없다. 하지만 ""로 처리할 경우 실제 공백인 경로와 구분되지 않으므로 경로 또한 레이블과 동일하게 "내 PC"로 설정한다.
+	m_path.insert(std::pair<int, CString>(CSIDL_DRIVES, get_system_label(CSIDL_DRIVES)));
 	m_path.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_known_folder(CSIDL_DESKTOP)));
 	m_path.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_known_folder(CSIDL_MYDOCUMENTS)));
 
@@ -275,6 +276,22 @@ void CShellImageList::set_drive_list(int index, std::deque<CString>* drive_list)
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_drive_list(drive_list);
+}
+
+CString CShellImageList::get_system_label(int index, int csidl)
+{
+	if (index >= m_volume.size())
+		return _T("");
+
+	return m_volume[index].get_label(csidl);
+}
+
+CString CShellImageList::get_system_path(int index, int csidl)
+{
+	if (index >= m_volume.size())
+		return _T("");
+
+	return m_volume[index].get_path(csidl);
 }
 
 /*

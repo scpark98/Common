@@ -13,7 +13,7 @@
 * 
 * => 불필요한 중간 dlg를 생략하고 create으로 직접 생성해서 사용하자!
 * 
-* //CPopupDlg::OnInitDialog()에서 이미지를 지정한다.
+* //OnInitDialog()에서 이미지를 지정한다.
 * load(_T("Z:\\내 드라이브\\media\\test_image\\progress\\checking.gif"));
 * 
 * 또는 CGdiplusBitmap 이미지를 생성한 후 render(Gdiplus::Bitmap* img)함수를 호출하여
@@ -103,7 +103,7 @@ public:
 	void			use_control(bool use);
 
 	//alpha = 0 ~ 255
-	void			alpha(int alpha);
+	void			set_alpha(int alpha);
 
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
 	//default는 hide 상태로 시작함.
@@ -126,10 +126,12 @@ public:
 
 	//set_image(), set_text()를 호출해도 아직 hide상태다.
 	//ShowWindow()시키거나 fadein()으로 보여지게 한다.
-	void			fade_in();
+	//0 ~ 255까지 5간격으로 alpha를 변경한다.
+	//hide_after_ms, fadeout 파라미터는 fade_in에서만 사용된다.
+	void			fade_in(int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
 	void			fade_out();
 
-	void			thread_fadeinout(bool fadein);
+	void			thread_fadeinout(bool fadein, int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
 
 	//
 	CSCShapeDlgTextSetting	m_text_setting;

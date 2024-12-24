@@ -862,14 +862,14 @@ CString	normalize_path(CString& filepath)
 bool is_protected(CString folder, CShellImageList *plist, int index)
 {
 	folder = convert_special_folder_to_real_path(folder, plist, index);
-	folder.MakeLower();
+	//folder.MakeLower();
 
 	//바탕 화면, 문서 등 특수 폴더는 보호. "내 PC"의 패스는 ""으로 세팅되어 있으므로 비교 제외.
-	std::map<int, CString> path_map = *plist->m_volume[index].get_path_map();
-	if (folder.Find(path_map[CSIDL_DESKTOP]) >= 0)
-		return true;
-	if (folder.Find(path_map[CSIDL_MYDOCUMENTS]) >= 0)
-		return true;
+	//std::map<int, CString> path_map = *plist->m_volume[index].get_path_map();
+	//if (folder.Find(path_map[CSIDL_DESKTOP]) >= 0)
+	//	return true;
+	//if (folder.Find(path_map[CSIDL_MYDOCUMENTS]) >= 0)
+	//	return true;
 
 	//드라이브 루트는 모두 보호.
 	for (auto drive_volume : *plist->m_volume[index].get_drive_list())
@@ -879,15 +879,20 @@ bool is_protected(CString folder, CShellImageList *plist, int index)
 			return true;
 	}
 
+	//windows 폴더 및 하위 폴더는 모두 보호.
+	if (folder.Find(_T("C:\\Windows")) >= 0)
+		return true;
+
+
 	std::deque<CString> protected_folder;
-	protected_folder.push_back(_T("c:\\documents and settings"));
-	protected_folder.push_back(_T("c:\\program files"));
-	protected_folder.push_back(_T("c:\\program files (x86)"));
-	protected_folder.push_back(_T("c:\\programdata"));
-	protected_folder.push_back(_T("c:\\recovery"));
-	protected_folder.push_back(_T("c:\\system volume information"));
-	protected_folder.push_back(_T("c:\\windows"));
-	protected_folder.push_back(_T("c:\\users"));
+	protected_folder.push_back(_T("C:\\Documents and Settings"));
+	protected_folder.push_back(_T("C:\\Program Files"));
+	protected_folder.push_back(_T("C:\\Program Files (x86)"));
+	protected_folder.push_back(_T("C:\\ProgramData"));
+	protected_folder.push_back(_T("C:\\Recovery"));
+	protected_folder.push_back(_T("C:\\System Volume Information"));
+	protected_folder.push_back(_T("C:\\Windows"));
+	protected_folder.push_back(_T("C:\\Users"));
 
 	int found = find_dqstring(protected_folder, folder, true, false);
 	if (found >= 0)
@@ -912,6 +917,15 @@ bool is_protected(CString folder, CShellImageList *plist, int index)
 	return false;
 }
 
+//"C:\\", "C:\\Temp"와 같이 루트일때와 일반 폴더일 경우 끝에 역슬래시 유무가 다르므로 필요.
+bool is_drive_root(CString path)
+{
+	if (path.GetLength() == 3 && path.Right(1) == '\\')
+		return true;
+
+	return false;
+}
+
 //새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
 //zero_prefix가 2이면 001, 002로 된 인덱스가 붙은 파일/폴더들만 대상으로 하려 했으나 아직 미구현.
 int	get_file_index(CString folder, CString title, int zero_prefix)
@@ -921,6 +935,9 @@ int	get_file_index(CString folder, CString title, int zero_prefix)
 
 	int max_index = -1;
 	std::set<int> idx_set;
+
+	if (is_drive_root(folder))
+		truncate(folder, 1);
 
 	for (auto item : dq)
 	{
@@ -6703,6 +6720,61 @@ bool show_file_property_window(CString fullpath)
 	info.nShow = SW_SHOWNORMAL;
 	info.hInstApp = NULL;
 	ShellExecuteEx(&info);
+}
+
+bool show_multifile_property_window(std::deque<CString> fullpath)
+{
+	CoInitialize(NULL);
+
+	LPOLESTR pszFile = OLESTR("c:\\Windows\\notepad.exe");
+	LPOLESTR pszFile2 = OLESTR("c:\\Windows\\System32\\notepad.exe");
+	LPITEMIDLIST pidl;
+	LPITEMIDLIST pidl2;
+	HRESULT hr;
+	IShellFolder* pDesktop;
+	IDataObject* pDataObject;
+
+	hr = SHGetDesktopFolder(&pDesktop);
+	if (FAILED(hr))
+	{
+		CoUninitialize();
+		return 0;
+	}
+
+	hr = pDesktop->ParseDisplayName(HWND_DESKTOP, NULL, pszFile, NULL, &pidl, NULL);
+	if (FAILED(hr)) {
+		pDesktop->Release();
+		CoUninitialize();
+		return 0;
+	}
+
+	hr = pDesktop->ParseDisplayName(HWND_DESKTOP, NULL, pszFile2, NULL, &pidl2, NULL);
+	if (FAILED(hr)) {
+		SHFree(pidl);
+		pDesktop->Release();
+		CoUninitialize();
+		return 0;
+	}
+
+	LPCITEMIDLIST list[] = { pidl, pidl2 };
+	hr = pDesktop->GetUIObjectOf(HWND_DESKTOP, 2, (LPCITEMIDLIST*)list, IID_IDataObject, NULL, (void**)&pDataObject);
+	// alternatively, you can also use SHCreateDataObject() or CIDLData_CreateFromIDArray() to create the IDataObject
+	pDesktop->Release();
+	SHFree(pidl);
+	SHFree(pidl2);
+
+	if (SUCCEEDED(hr)) {
+		hr = SHMultiFileProperties(pDataObject, 0);
+		pDataObject->Release();
+
+		if (SUCCEEDED(hr)) {
+			MessageBox(0, _T("Dummy message box"), 0, 0);
+			Sleep(10000); // Give the system time to show the dialog before exiting
+		}
+	}
+
+	CoUninitialize();
+	return 0;
 }
 
 //명시된 FileVersion 또는 ProductVersion을 얻어온다.

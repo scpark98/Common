@@ -360,8 +360,11 @@ void CPathCtrl::SetWindowText(CString path, std::deque<CString>* sub_folders)
 
 void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 {
-	if (m_pShellImageList == NULL || path.IsEmpty())
+	if (m_pShellImageList == NULL)
 		return;
+
+	if (path.IsEmpty())
+		path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 
 	m_path.clear();
 

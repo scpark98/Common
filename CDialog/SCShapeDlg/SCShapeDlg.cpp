@@ -272,7 +272,7 @@ void CSCShapeDlg::use_control(bool use)
 }
 
 //alpha = 0 ~ 255
-void CSCShapeDlg::alpha(int alpha)
+void CSCShapeDlg::set_alpha(int alpha)
 {
 	m_alpha = alpha;
 
@@ -470,24 +470,27 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 
 //set_image(), set_text()를 호출해도 아직 hide상태다.
 //ShowWindow()시키거나 fadein()으로 보여지게 한다.
-void CSCShapeDlg::fade_in()
+void CSCShapeDlg::fade_in(int delay_ms, int hide_after_ms, bool fadeout)
 {
-	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true);
+	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true, delay_ms, hide_after_ms, fadeout);
 	t.detach();
 }
 
 void CSCShapeDlg::fade_out()
 {
-	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false);
+	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false, 0, 0, false);
 	t.detach();
 }
 
-void CSCShapeDlg::thread_fadeinout(bool fadein)
+void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms, bool fadeout)
 {
-	alpha(fadein ? 0 : 255);
+	set_alpha(fadein ? 0 : 255);
 	ShowWindow(SW_SHOW);
 
 	int _alpha = m_alpha;
+
+	if (delay_ms <= 0)
+		delay_ms = 50;
 
 	while (true)
 	{
@@ -496,8 +499,38 @@ void CSCShapeDlg::thread_fadeinout(bool fadein)
 		if (_alpha < 0 || _alpha > 255)
 			break;
 		
-		alpha(_alpha);
+		set_alpha(_alpha);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
 	}
+
+	/*
+	if (hide_after_ms > 0)
+		std::this_thread::sleep_for(std::chrono::milliseconds(hide_after_ms));
+
+	if (fadeout)
+	{
+		int _alpha = m_alpha;
+
+		if (delay_ms <= 0)
+			delay_ms = 50;
+
+		while (true)
+		{
+			_alpha += (fadein ? 5 : -5);
+
+			if (_alpha < 0 || _alpha > 255)
+				break;
+
+			set_alpha(_alpha);
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+		}
+
+		ShowWindow(SW_HIDE);
+		set_alpha(255);
+	}
+	*/
 }
 
 

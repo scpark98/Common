@@ -40,12 +40,12 @@ public:
 	void	set_titlebar_height(int height);
 	void	set_titlebar_text_color(Gdiplus::Color cr);
 	void	set_titlebar_back_color(Gdiplus::Color cr);
+	void	set_title_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void	set_title_font_size(int size);
 
 	void	set_logo(UINT icon_id) { m_img_logo.load(icon_id); }
 	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
 
-	void	set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void	set_font_size(int size);
 
 
 	//parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.
@@ -75,14 +75,20 @@ public:
 	}
 
 	void	set_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
-	void	set_back_image(CString imgType, UINT nResourceID, bool stretch);
-	//void	set_back_image(CString img_path, bool stretch);
 
-	enum COLOR_THEME
+	//배경에 그림 표시, zoom? stretch? original size?, 
+	void	set_back_image(CString imgType, UINT nResourceID, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
+	void	set_back_image(CString img_path, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
+	void	set_back_image(UINT resource_id, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
+
+	void	set_border_color(Gdiplus::Color cr) { m_cr_border = cr; }
+
+	enum THEMES
 	{
-		color_theme_window = 0,
-		color_theme_visualstudio,
-		color_theme_gray,
+		theme_default = 0,
+		theme_visualstudio,
+		theme_gray,
+		theme_linkmemine,
 	};
 
 	void	set_color_theme(int theme);
@@ -94,26 +100,34 @@ public:
 	virtual void OnCancel() {};
 
 protected:
-	CRect				m_border_thickness;
+	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
 	bool				m_is_resizable = true;
 
+	CString				m_title;
 	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
+
 	Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
 	Gdiplus::Color		m_cr_titlebar_back = gRGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);
-	CString				m_title;
+	Gdiplus::Color		m_cr_sys_buttons_back_hover;
+	Gdiplus::Color		m_cr_text;
+	Gdiplus::Color		m_cr_back;
 
-	//프로그램 로고 아이콘 표시 여부. 기본값 false
-	bool				m_show_logo = false;
+	Gdiplus::Color		m_cr_border = Gdiplus::Color::DimGray;
+	int					m_border_width = 1;		//그려질 테두리 두께
+
+
+	//프로그램 로고 아이콘 표시 여부. 기본값 true
+	bool				m_show_logo = true;
 	//프로그램 로고(png만 허용, 이 값이 없다면 기본 앱 아이콘을 사용한다)
 	CGdiplusBitmap		m_img_logo;
 
-	LOGFONT				m_lf;
+	LOGFONT				m_title_lf;
 	CFont				m_title_font;
-	void				reconstruct_font();
+	void				reconstruct_title_font();
 
-
-	Gdiplus::Color		m_cr_back = ::GetSysColor(COLOR_3DFACE);
 	CGdiplusBitmap		m_img_back;
+	int					m_img_back_mode = CGdiplusBitmap::draw_mode_stretch;	//default = CGdiplusBitmap::draw_mode_stretch
+	Gdiplus::Color		m_cr_out_of_back_img;		//배경 이미지를 zoom or origin크기로 그릴 경우 남은 영역의 색 채우기
 
 	CSCSystemButtons	m_sys_buttons;
 
@@ -134,4 +148,5 @@ public:
 	afx_msg void OnPaint();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 };

@@ -1218,6 +1218,13 @@ void CGdiplusBitmap::negative()
 	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
+Gdiplus::Color  CGdiplusBitmap::get_color(int x, int y)
+{
+	Gdiplus::Color cr;
+	m_pBitmap->GetPixel(x, y, &cr);
+	return cr;
+}
+
 void CGdiplusBitmap::replace_color(int tx, int ty, Gdiplus::Color dst)
 {
 	Gdiplus::Color cr;

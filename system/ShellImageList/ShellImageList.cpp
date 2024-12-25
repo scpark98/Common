@@ -146,10 +146,28 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	}
 	else
 	{
+		//SHGetStockIconInfo()
+		//bDrive일 경우 remote의 F:\ 드라이브 아이콘을 구하려고 실제 "F:\"를 줘서는 안된다.
+		//아이콘 정보는 local에서 추출하는데 local에 F드라이브가 없을 수 있다.
+		//그렇다고 D라고 가정할수도 없다. D는 local drive일수도, 네트워크 드라이브일수도, 구글 드라이브일수도 있다.
+		//확인 필요!
+		//
 		if (bDrive)
-			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		{
+			if (szFile.GetLength() == 3)
+			{
+				if (szFile.MakeUpper() == _T("C:\\"))
+					SHGetFileInfo(_T("C:\\"), FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+				else
+					SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+			}
+			else
+				SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		}
 		else
+		{
 			SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+		}
 	}
 	
 	return shFileInfo.iIcon;

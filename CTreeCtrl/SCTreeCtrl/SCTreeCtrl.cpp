@@ -2893,8 +2893,7 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 				HTREEITEM hItem = GetSelectedItem();
 				if (hItem)
 				{
-					CString full_path = get_path(hItem);
-					show_file_property_window(full_path);
+					show_property_window(std::deque<CString> {get_path(hItem)});
 				}
 				break;
 			}

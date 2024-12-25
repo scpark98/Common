@@ -481,9 +481,8 @@ struct	NETWORK_INFO
 //프로세스 관련
 	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
-	//파일, 폴더의 속성창을 표시한다.
-	bool		show_file_property_window(CString fullpath);
-	bool		show_multifile_property_window(std::deque<CString> fullpath);
+	//파일 or 폴더 or 드라이브 or "내 PC"의 속성창을 표시한다.
+	bool		show_property_window(std::deque<CString> fullpath);
 	CString		get_exe_directory(bool includeSlash = false);
 	CString		get_exe_parent_directory();
 	CString		get_exe_filename(bool fullpath = false);

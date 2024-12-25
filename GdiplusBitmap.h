@@ -122,7 +122,9 @@ public:
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.
 	//draw시에 CDC를 넘기느냐 Gdiplus::Graphics를 넘기느냐 고민했으나 Gdiplus::Graphics에 설정코드가 적용된채로 사용하는 경우가 많으므로
 	//Gdiplus::Graphics를 넘기는게 맞다고 판단함.
-	//draw_mode = draw_mode_zoom(resize to fit),
+	//draw_mode = draw_mode_zoom(maintain ratio, resize to fit),
+	//draw_mode = draw_mode_stretch,
+	//draw_mode = draw_mode_origin(as image original 1:1 size),
 	CRect	draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode = draw_mode_zoom);
 	CRect	draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 	CRect	draw(Gdiplus::Graphics& g, CGdiplusBitmap mask, CRect targetRect);
@@ -177,6 +179,9 @@ public:
 	void set_alpha(float alpha);
 	void gray();
 	void negative();
+
+	Gdiplus::Color get_color(int x, int y);
+
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
 	void replace_color(int tx, int ty, Gdiplus::Color dst);
 	void replace_color(Gdiplus::Color src, Gdiplus::Color dst = Gdiplus::Color::Transparent);
@@ -233,7 +238,7 @@ public:
 	int channel = 0;
 	int stride = 0;
 
-	//animated Gif 관련
+//animated Gif 관련
 	UINT	m_frame_count;
 	UINT	m_frame_index;
 	Gdiplus::PropertyItem* m_pPropertyItem = NULL;
@@ -290,7 +295,7 @@ protected:
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;
 	bool			m_run_thread_animation = false;
 
-	void check_animate_gif();
-	void thread_gif_animation();
-	void goto_gif_frame(int frame);
+	void			check_animate_gif();
+	void			thread_gif_animation();
+	void			goto_gif_frame(int frame);
 };

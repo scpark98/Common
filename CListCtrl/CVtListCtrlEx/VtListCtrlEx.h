@@ -595,7 +595,7 @@ protected:
 	bool			m_is_hovering = false;
 
 //Drag&Drop µå·¡±ë °ü·Ã
-	bool			m_use_drag_and_drop = false;
+	bool			m_use_drag_and_drop = false;//default = false
 	CWnd*			m_pDragWnd = NULL;			//Which ListCtrl we are dragging FROM
 	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
 	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image

@@ -48,6 +48,8 @@ public:
 	void		set_drive_list(std::deque<CString>* drive_list);
 
 	//disk drive list를 리턴
+	//drive label만 가지고는 해당 드라이브가 local disk인지, network drive인지, google drive인지, one drive인지 알 수 없다.
+	//추후 label, icon, type등을 저장하도록 변경해야 한다.
 	std::deque<CString>* get_drive_list() { return &m_drives; }
 
 	//path를 주면 해당 드라이브의 label을 리턴

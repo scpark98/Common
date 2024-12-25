@@ -3808,8 +3808,8 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 				bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
 			}
 
-			bmpRes.draw_text(bmpRes.width / 2 - 4, bmpRes.height / 2 + 4, i2S(sel_count), 20, 2,
-				_T("Arial"), Gdiplus::Color(255, 0, 0, 0), Gdiplus::Color(255, 255, 128, 128), DT_CENTER | DT_VCENTER);
+			//bmpRes.draw_text(bmpRes.width / 2 - 4, bmpRes.height / 2 + 4, i2S(sel_count), 20, 2,
+			//	_T("Arial"), Gdiplus::Color(255, 0, 0, 0), Gdiplus::Color(255, 255, 128, 128), DT_CENTER | DT_VCENTER);
 
 			m_pDragImage = new CImageList();
 			m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
@@ -3883,7 +3883,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		CWnd* pDropWnd = WindowFromPoint(pt);
 		ASSERT(pDropWnd); //make sure we have a window
 
-		CListCtrl* pList = NULL;
+		CVtListCtrlEx* pList = NULL;
 		CTreeCtrl* pTree = NULL;
 
 		//// If we drag outside current window we need to adjust the highlights displayed
@@ -3891,9 +3891,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			TRACE(_T("pDropWnd != m_pDropWnd\n"));
 
-			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 			{
-				pList = (CListCtrl*)m_pDropWnd;
+				pList = (CVtListCtrlEx*)m_pDropWnd;
 
 				if (m_nDropIndex != -1) //If we drag over the CListCtrl header, turn off the hover highlight
 				{
@@ -3954,12 +3954,20 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		pDropWnd->ScreenToClient(&pt);
 
 		//If we are hovering over a CListCtrl we need to adjust the highlights
-		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 		{
+			UINT uFlags;
+			pList = (CVtListCtrlEx*)pDropWnd;
+
+			//target listctrl이 drag&drop 가능이 아니면 그냥 리턴.
+			if (!pList->get_use_drag_and_drop())
+			{
+				::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
+				return;
+			}
+
 			//Note that we can drop here
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
-			UINT uFlags;
-			pList = (CListCtrl*)pDropWnd;
 
 			// Turn off hilight for previous drop target
 			pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
@@ -3967,9 +3975,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
 
 			// Get the item that is below cursor
-			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(pt, &uFlags);
+			m_nDropIndex = ((CVtListCtrlEx*)pDropWnd)->HitTest(pt, &uFlags);
 			// Highlight it (폴더인 경우에만 hilite시킨다)
-			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
+			if (m_nDropIndex >= 0 && ((CVtListCtrlEx*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
 			// Redraw item
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
@@ -4045,7 +4053,7 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 		CWnd* pDropWnd = WindowFromPoint(pt);
 		ASSERT(pDropWnd); //make sure we have a window pointer
 		// If window is CListCtrl, we perform the drop
-		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
+		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)) ||
 			pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 		{
 			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
@@ -4070,9 +4078,9 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 
 	CString droppedItem;
 
-	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 	{
-		CListCtrl* pDropListCtrl = (CListCtrl*)pDropWnd;
+		CVtListCtrlEx* pDropListCtrl = (CVtListCtrlEx*)pDropWnd;
 
 		if (m_nDropIndex >= 0)
 			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, col_filename);
@@ -4089,7 +4097,6 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	{
 
 	}
-
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
 }

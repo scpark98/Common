@@ -48,6 +48,7 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_NCCALCSIZE()
 	ON_WM_PAINT()
 	ON_WM_SIZE()
+	ON_WM_LBUTTONDBLCLK()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
@@ -134,40 +135,40 @@ BOOL CSCThemeDlg::OnInitDialog()
 	CFont* font = GetFont();
 
 	if (font != NULL)
-		font->GetObject(sizeof(m_lf), &m_lf);
+		font->GetObject(sizeof(m_title_lf), &m_title_lf);
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_title_lf), &m_title_lf);
 
-	reconstruct_font();
+	reconstruct_title_font();
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 				  // 예외: OCX 속성 페이지는 FALSE를 반환해야 합니다.
 }
 
-void CSCThemeDlg::reconstruct_font()
+void CSCThemeDlg::reconstruct_title_font()
 {
 	m_title_font.DeleteObject();
-	m_title_font.CreateFontIndirect(&m_lf);
+	m_title_font.CreateFontIndirect(&m_title_lf);
 	Invalidate();
 }
 
-void CSCThemeDlg::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+void CSCThemeDlg::set_title_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
-	m_lf.lfCharSet = byCharSet;
-	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
-	reconstruct_font();
+	m_title_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_title_lf.lfFaceName, _countof(m_title_lf.lfFaceName), sFontname);
+	reconstruct_title_font();
 }
 
-void CSCThemeDlg::set_font_size(int size)
+void CSCThemeDlg::set_title_font_size(int size)
 {
-	m_lf.lfHeight = -MulDiv(size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
-	reconstruct_font();
+	m_title_lf.lfHeight = -MulDiv(size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	reconstruct_title_font();
 }
 
 void CSCThemeDlg::set_title_bold(bool bold)
 {
-	m_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
-	reconstruct_font();
+	m_title_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	reconstruct_title_font();
 }
 
 INT_PTR CSCThemeDlg::DoModal()
@@ -179,7 +180,6 @@ INT_PTR CSCThemeDlg::DoModal()
 BOOL CSCThemeDlg::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-
 	return FALSE;
 }
 
@@ -348,13 +348,14 @@ void CSCThemeDlg::OnPaint()
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	//dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
+	//타이틀바 영역
 	if (m_titlebar_height > 0)
 	{
-		//타이틀바 칠하기
 		CRect rTitle = rc;
 		rTitle.bottom = m_titlebar_height;
+		//dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
 		dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
 
 		//프로그램 아이콘 표시
@@ -362,13 +363,13 @@ void CSCThemeDlg::OnPaint()
 		{
 			if (m_img_logo.is_valid())//icon exist?
 			{
-				m_img_logo.draw(g, 0, 0);
+				m_img_logo.draw(g, 0, 1);
 			}
 			else
 			{
 				//윈도우 기본 타이틀바에 표시되는 아이콘은 16x16이고 32x32 영역에 그려진다.
 				HICON hIcon = load_icon(AfxGetInstanceHandle(), 128, 16, 16);
-				draw_icon(&dc, hIcon, CRect(0, 0, m_titlebar_height, m_titlebar_height));
+				draw_icon(&dc, hIcon, CRect(0, 1, m_titlebar_height, m_titlebar_height));
 				rTitle.left += m_titlebar_height;
 			}
 		}
@@ -385,27 +386,29 @@ void CSCThemeDlg::OnPaint()
 		CFont* pOldFont = (CFont*)dc.SelectObject(&m_title_font);
 		dc.DrawText(m_title, rTitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 		dc.SelectObject(pOldFont);
-
-		//타이틀바 아래의 client영역의 시작.
-		rc.top = rTitle.bottom;
-
-		//m_sys_buttons.adjust_right(rc.right);
-		//m_sys_buttons.draw(pDC);
 	}
 
 	//클라이언트 영역 칠하기
+	CRect rclient = rc;
+	rclient.top += m_titlebar_height;
 	if (m_img_back.is_valid())
 	{
-		m_img_back.draw(g, rc, true);
+		if (m_img_back_mode == CGdiplusBitmap::draw_mode_zoom ||
+			m_img_back_mode == CGdiplusBitmap::draw_mode_origin)
+		{
+			dc.FillSolidRect(rclient, m_cr_out_of_back_img.ToCOLORREF());
+		}
+
+		m_img_back.draw(g, rclient, CGdiplusBitmap::draw_mode_zoom);
 	}
 	else
 	{
-		dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+		dc.FillSolidRect(rclient, m_cr_back.ToCOLORREF());
 	}
 
 	//border
 	GetClientRect(rc);
-	draw_rectangle(&dc, rc, Gdiplus::Color::DimGray, Gdiplus::Color::Transparent, 1);
+	draw_rectangle(&dc, rc, m_cr_border, Gdiplus::Color::Transparent, m_border_width);
 }
 
 void CSCThemeDlg::set_color_theme(int theme)
@@ -414,20 +417,38 @@ void CSCThemeDlg::set_color_theme(int theme)
 
 	switch (theme)
 	{
-	case color_theme_window :
-		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
-		m_cr_titlebar_back = ::GetSysColor(COLOR_ACTIVECAPTION);
-		m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	case theme_visualstudio :
+		m_cr_titlebar_text = gRGB(192, 192, 192);
+		m_cr_titlebar_back = gRGB(31, 31, 31);
+		m_cr_back = gRGB(54, 54, 54);
 		break;
-	case color_theme_visualstudio:
-		m_cr_titlebar_text = RGB(192, 192, 192);
-		m_cr_titlebar_back = RGB(31, 31, 31);
-		m_cr_back = RGB(54, 54, 54);
+	case theme_gray :
+		m_cr_titlebar_text = gRGB(192, 192, 192);
+		m_cr_titlebar_back = gRGB(31, 31, 31);
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 		break;
-	case color_theme_gray:
-		m_cr_titlebar_text = RGB(192, 192, 192);
-		m_cr_titlebar_back = RGB(31, 31, 31);
-		m_cr_back = ::GetSysColor(COLOR_3DFACE);
+	case theme_linkmemine :
+		m_titlebar_height = 32;
+
+		m_cr_titlebar_text = Gdiplus::Color::White;
+		m_cr_titlebar_back = gRGB(59, 70, 92);
+
+		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 32);
+		m_sys_buttons.set_back_color(m_cr_titlebar_back);
+		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
+
+		m_title_lf.lfWeight = FW_BOLD;
+		m_title_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, 10);
+		reconstruct_title_font();
+
+		m_cr_back = Gdiplus::Color::White;
+		m_cr_border = Gdiplus::Color::Red;
+		m_border_width = 4;
+		break;
+	default :
+		m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
+		m_cr_titlebar_back.SetFromCOLORREF(::GetSysColor(COLOR_ACTIVECAPTION));
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 		break;
 	}
 }
@@ -442,12 +463,6 @@ void CSCThemeDlg::OnSize(UINT nType, int cx, int cy)
 		return;
 
 	m_sys_buttons.adjust(0, cx);
-	Invalidate();
-}
-
-void CSCThemeDlg::set_back_image(CString imgType, UINT nResourceID, bool stretch)
-{
-	m_img_back.load(imgType, nResourceID);
 	Invalidate();
 }
 
@@ -484,3 +499,40 @@ BOOL CSCThemeDlg::PreTranslateMessage(MSG* pMsg)
 
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
+
+
+void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (point.y < m_titlebar_height)
+	{
+		if (IsZoomed())
+			ShowWindow(SW_RESTORE);
+		else
+			ShowWindow(SW_MAXIMIZE);
+	}
+
+	CDialogEx::OnLButtonDblClk(nFlags, point);
+}
+
+void CSCThemeDlg::set_back_image(CString imgType, UINT nResourceID, int draw_mode)
+{
+	m_img_back.load(imgType, nResourceID);
+	m_img_back_mode = draw_mode;
+	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
+}
+
+void CSCThemeDlg::set_back_image(CString img_path, int draw_mode)
+{
+	m_img_back.load(img_path);
+	m_img_back_mode = draw_mode;
+	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
+}
+
+void CSCThemeDlg::set_back_image(UINT resource_id, int draw_mode)
+{
+	m_img_back.load(resource_id);
+	m_img_back_mode = draw_mode;
+	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
+}
+

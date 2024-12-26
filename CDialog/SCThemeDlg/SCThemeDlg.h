@@ -21,6 +21,7 @@
 
 #include "../../GdiplusBitmap.h"
 #include "../../CButton/SCSystemButtons/SCSystemButtons.h"
+#include "../../CWnd/WndShadow/WndShadow.h"
 
 // CSCThemeDlg 대화 상자
 class CSCThemeDlg : public CDialogEx
@@ -35,7 +36,7 @@ public:
 
 	//윈도우 기본 타이틀바가 있는 dlg일 경우는 타이틀바와 관계된 모든 옵션은 무시된다.
 	//void	SetWindowText(CString title) { set_title(title); }
-	void	set_title(CString title) { m_title = title; Invalidate(); }
+	//void	SetWindowText(CString title) { CWnd::SetWindowText(title); m_title = title; Invalidate(); }
 	void	set_title_bold(bool bold = true);
 	void	set_titlebar_height(int height);
 	void	set_titlebar_text_color(Gdiplus::Color cr);
@@ -100,10 +101,14 @@ public:
 	virtual void OnCancel() {};
 
 protected:
+	bool				m_use_shadow = true;	//default = true
+	CWndShadow			m_shadow;
+	void				init_shadow();
+
 	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
 	bool				m_is_resizable = true;
 
-	CString				m_title;
+	//CString				m_title;
 	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
 
 	Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
@@ -149,4 +154,5 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 };

@@ -49,6 +49,7 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDBLCLK()
+	ON_WM_CTLCOLOR()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
@@ -141,8 +142,21 @@ BOOL CSCThemeDlg::OnInitDialog()
 
 	reconstruct_title_font();
 
+	init_shadow();
+
 	return TRUE;  // return TRUE unless you set the focus to a control
 				  // 예외: OCX 속성 페이지는 FALSE를 반환해야 합니다.
+}
+
+void CSCThemeDlg::init_shadow()
+{
+	CWndShadow::Initialize(AfxGetInstanceHandle());
+	m_shadow.Create(GetSafeHwnd());
+	m_shadow.SetSize(8);	// -19 ~ 19
+	m_shadow.SetSharpness(19);	// 0 ~ 19
+	m_shadow.SetDarkness(200);	// 0 ~ 254
+	m_shadow.SetPosition(0, 0);	// -19 ~ 19
+	m_shadow.SetColor(RGB(0, 0, 0));
 }
 
 void CSCThemeDlg::reconstruct_title_font()
@@ -383,8 +397,11 @@ void CSCThemeDlg::OnPaint()
 		dc.SetBkMode(TRANSPARENT);
 		dc.SetTextColor(m_cr_titlebar_text.ToCOLORREF());
 
+		CString title;
+		GetWindowText(title);
+
 		CFont* pOldFont = (CFont*)dc.SelectObject(&m_title_font);
-		dc.DrawText(m_title, rTitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+		dc.DrawText(title, rTitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 		dc.SelectObject(pOldFont);
 	}
 
@@ -428,6 +445,7 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 		break;
 	case theme_linkmemine :
+		SetWindowText(_T("LinkMeMine"));
 		m_titlebar_height = 32;
 
 		m_cr_titlebar_text = Gdiplus::Color::White;
@@ -442,8 +460,7 @@ void CSCThemeDlg::set_color_theme(int theme)
 		reconstruct_title_font();
 
 		m_cr_back = Gdiplus::Color::White;
-		m_cr_border = Gdiplus::Color::Red;
-		m_border_width = 4;
+		//m_cr_border = Gdiplus::Color::Red;
 		break;
 	default :
 		m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
@@ -453,7 +470,12 @@ void CSCThemeDlg::set_color_theme(int theme)
 	}
 }
 
-
+//CSCThemeDlg를 상속받은 클래스가 크기 변경 가능한 dlg라면
+//그 클래스의 OnSize()에서 기본 핸들러 호출을
+//CDialogEx::OnSize(nType, cx, cy); 가 아닌
+//CSCThemeDlg::OnSize(nType, cx, cy); 로 호출해줘야 한다.
+//만약 dlg가 resize를 지원하지 않거나 OnSize()에서 별도의 처리가 불필요한 경우는
+//아예 WM_SIZE에 대한 이벤트 핸들러를 추가할 필요가 없다.
 void CSCThemeDlg::OnSize(UINT nType, int cx, int cy)
 {
 	CDialogEx::OnSize(nType, cx, cy);
@@ -536,3 +558,23 @@ void CSCThemeDlg::set_back_image(UINT resource_id, int draw_mode)
 	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
 }
 
+
+
+HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+	//HBRUSH hbr = CDialogEx::OnCtlColor(pDC, pWnd, nCtlColor);
+
+	// TODO:  여기서 DC의 특성을 변경합니다.
+	//if (nCtlColor == CTLCOLOR_STATIC)
+	//{
+	//	pDC->SetBkMode(TRANSPARENT); /// 배경을 투명하게
+	//	return (HBRUSH)::GetStockObject(NULL_BRUSH);
+	//}
+
+	//hbr = (HBRUSH)::GetStockObject(NULL_BRUSH);
+	return (HBRUSH)GetStockObject(WHITE_BRUSH);
+
+
+	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
+	//return hbr;
+}

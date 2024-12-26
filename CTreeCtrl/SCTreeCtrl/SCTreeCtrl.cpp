@@ -710,6 +710,9 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 		//내 PC인 경우는 가상폴더이므로 물리적 path가 없다.
 		if (PathFileExists(path))
 			tvInsert.item.cChildren = (get_sub_folders(path) > 0);
+		else
+			tvInsert.item.cChildren = 1;
+
 		tvInsert.hInsertAfter = TVI_LAST;
 		tvInsert.hParent = NULL;
 		return InsertItem(&tvInsert);

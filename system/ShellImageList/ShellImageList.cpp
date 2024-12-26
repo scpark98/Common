@@ -154,14 +154,14 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 		//
 		if (bDrive)
 		{
-			if (szFile.GetLength() == 3)
-			{
-				if (szFile.MakeUpper() == _T("C:\\"))
-					SHGetFileInfo(_T("C:\\"), FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-				else
-					SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-			}
-			else
+			//if (szFile.GetLength() == 3)
+			//{
+			//	//if (szFile.MakeUpper() == _T("C:\\"))
+			//	//	SHGetFileInfo(_T("C:\\"), FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+			//	//else
+			//		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+			//}
+			//else
 				SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
 		}
 		else

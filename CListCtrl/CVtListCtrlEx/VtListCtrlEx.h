@@ -351,9 +351,10 @@ public:
 	int			get_last_selected_item();
 	//선택된 항목들을 dq에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
 	int			get_selected_items(std::deque<int> *dq = NULL);
-	//선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 fullpath = true이면 각 항목의 전체경로를 담는다.
-	int			get_selected_items(std::deque<CString>* dq = NULL, bool fullpath = false);
-	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq = NULL, bool fullpath = false);
+	//선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 is_fullpath = true이면 각 항목의 전체경로를 담는다.
+	int			get_selected_items(std::deque<CString>* dq = NULL, bool is_fullpath = false);
+	//선택된 항목들의 목록을 dq에 담는다. shelllist에서만 사용되며 cFileName은 이미 전체경로를 가지고 있다.
+	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq = NULL);
 
 	//index = -1 : 전체선택
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool make_visible = true);

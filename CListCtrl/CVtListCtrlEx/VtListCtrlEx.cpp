@@ -2392,34 +2392,43 @@ int CVtListCtrlEx::get_selected_items(std::deque<int> *dq)
 }
 
 //선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 fullpath = true이면 각 항목의 전체경로를 담는다.
-int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool fullpath)
+int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool is_fullpath)
 {
 	std::deque<int> dq_index;
 	get_selected_items(&dq_index);
 
-	CString folder = get_path();
+	CString folder = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+	CString fullpath;
+
+	if (is_drive_root(folder))
+		truncate(folder, 1);
 	
 	if (dq)
 	{
 		dq->clear();
 		for (auto item : dq_index)
 		{
-			if (m_is_shell_listctrl && fullpath)
-				dq->push_back(folder + _T("\\") + get_text(item, col_filename));
+			if (m_is_shell_listctrl && is_fullpath)
+			{
+				fullpath = folder + _T("\\") + get_text(item, col_filename);
+				//fullpath = convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
+				dq->push_back(fullpath);
+			}
 			else
+			{
 				dq->push_back(get_text(item, col_filename));
+			}
 		}
 	}
 
 	return dq_index.size();
 }
 
-int CVtListCtrlEx::get_selected_items(std::deque<WIN32_FIND_DATA>* dq, bool fullpath)
+//선택된 항목들의 목록을 dq에 담는다. shelllist에서만 사용되며 cFileName은 이미 전체경로를 가지고 있다.
+int CVtListCtrlEx::get_selected_items(std::deque<WIN32_FIND_DATA>* dq)
 {
 	std::deque<int> dq_index;
 	get_selected_items(&dq_index);
-
-	//CString folder = get_path();
 
 	if (dq)
 	{
@@ -3304,7 +3313,7 @@ CString CVtListCtrlEx::get_path(int index)
 	//"D:\Temp"와 같이 리턴해야하는데 "D:\\Temp"와 같이 리턴되는 현상이 있다.
 	//우선 중복된 역슬래쉬를 제거하고 리턴해준다.
 	//추후 모든 path는 반드시 '\'로 끝나도록 하는 규칙에 따라 변경 예정.
-	m_path.Replace(_T("\\\\"), _T("\\"));
+	//m_path.Replace(_T("\\\\"), _T("\\"));
 
 	if (index < 0)
 		return m_path;
@@ -4062,7 +4071,7 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 
 		//ListCtrl에서 drag하여 drophilited가 표시된 상태에서 빠르게 마우스를 밖으로 이동시키면
 		//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
-		//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜준다.
+		//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜줘야 한다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
 	}
 
@@ -4081,6 +4090,9 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 	{
 		CVtListCtrlEx* pDropListCtrl = (CVtListCtrlEx*)pDropWnd;
+		
+		if (!pDropListCtrl->get_use_drag_and_drop())
+			return;
 
 		if (m_nDropIndex >= 0)
 			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, col_filename);

@@ -6695,10 +6695,13 @@ CString get_file_property(CString fullpath, CString strFlag)
 
 bool show_property_window(std::deque<CString> fullpath)
 {
+	CoInitialize(NULL);
+
 	//"내 PC"를 선택한 경우 시스템 속성 창을 열어준다.
 	if (fullpath.size() == 1 && fullpath[0] == get_system_label(CSIDL_DRIVES))
 	{
 		ShellExecute(NULL, _T("open"), _T("SystemPropertiesAdvanced.exe"), NULL, NULL, SW_SHOW);
+		CoUninitialize();
 		return true;
 	}
 
@@ -6711,42 +6714,42 @@ bool show_property_window(std::deque<CString> fullpath)
 	hr = SHGetDesktopFolder(&pDesktop);
 	if (FAILED(hr))
 	{
+		CoUninitialize();
 		return 0;
 	}
 
 	for (int i = 0; i < fullpath.size(); i++)
 	{
-		hr = pDesktop->ParseDisplayName(HWND_DESKTOP, NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, (LPITEMIDLIST*)&pidl[i], NULL);
+		hr = pDesktop->ParseDisplayName(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, (LPITEMIDLIST*)&pidl[i], NULL);
 		if (FAILED(hr))
 		{
 			pDesktop->Release();
+			CoUninitialize();
 			return 0;
 		}
 	}
 
-	hr = pDesktop->GetUIObjectOf(HWND_DESKTOP, fullpath.size(), (LPCITEMIDLIST*)pidl, IID_IDataObject, NULL, (void**)&pDataObject);
+	hr = pDesktop->GetUIObjectOf(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, fullpath.size(), (LPCITEMIDLIST*)pidl, IID_IDataObject, NULL, (void**)&pDataObject);
 	// alternatively, you can also use SHCreateDataObject() or CIDLData_CreateFromIDArray() to create the IDataObject
 
 	if (SUCCEEDED(hr))
 	{
-		CoInitialize(NULL);
-
 		hr = SHMultiFileProperties(pDataObject, 0);
 		pDataObject->Release();
-		CoUninitialize();
 
 		if (SUCCEEDED(hr))
 		{
 			//MessageBox(0, _T("Dummy message box"), 0, 0);
-			//Sleep(10000); // Give the system time to show the dialog before exiting
+			//Sleep(2500); // Give the system time to show the dialog before exiting
 		}
 
 		pDesktop->Release();
 	}
 
-
 	for (i = 0; i < fullpath.size(); i++)
 		ILFree(pidl[i]);
+
+	CoUninitialize();
 
 	return 0;
 }

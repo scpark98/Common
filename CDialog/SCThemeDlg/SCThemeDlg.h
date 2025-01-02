@@ -84,12 +84,12 @@ public:
 
 	void	set_border_color(Gdiplus::Color cr) { m_cr_border = cr; }
 
-	enum THEMES
+	enum COLOR_THEMES
 	{
-		theme_default = 0,
-		theme_visualstudio,
-		theme_gray,
-		theme_linkmemine,
+		color_theme_default = 0,
+		color_theme_visualstudio,
+		color_theme_gray,
+		color_theme_linkmemine,
 	};
 
 	void	set_color_theme(int theme);

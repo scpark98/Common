@@ -434,17 +434,17 @@ void CSCThemeDlg::set_color_theme(int theme)
 
 	switch (theme)
 	{
-	case theme_visualstudio :
+	case color_theme_visualstudio :
 		m_cr_titlebar_text = gRGB(192, 192, 192);
 		m_cr_titlebar_back = gRGB(31, 31, 31);
 		m_cr_back = gRGB(54, 54, 54);
 		break;
-	case theme_gray :
+	case color_theme_gray :
 		m_cr_titlebar_text = gRGB(192, 192, 192);
 		m_cr_titlebar_back = gRGB(31, 31, 31);
 		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 		break;
-	case theme_linkmemine :
+	case color_theme_linkmemine :
 		SetWindowText(_T("LinkMeMine"));
 		m_titlebar_height = 32;
 

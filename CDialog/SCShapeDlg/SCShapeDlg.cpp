@@ -276,6 +276,9 @@ void CSCShapeDlg::set_alpha(int alpha)
 {
 	m_alpha = alpha;
 
+	//if (!IsWindowVisible())
+	//	ShowWindow(SW_SHOW);
+
 	if (!m_img.is_animated_gif())
 		render(m_img.m_pBitmap);
 }
@@ -459,15 +462,16 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 		return;
 	}
 
-	if (fadein)
-		fade_in();
+	//if (fadein)
+	//	fade_in();
 
-	Wait(timeout * 1000);
+	//Wait(timeout * 1000);
 
-	if (fadeout)
-		fade_out();
+	//if (fadeout)
+	//	fade_out();
 }
 
+#if 1
 //set_image(), set_text()를 호출해도 아직 hide상태다.
 //ShowWindow()시키거나 fadein()으로 보여지게 한다.
 void CSCShapeDlg::fade_in(int delay_ms, int hide_after_ms, bool fadeout)
@@ -504,12 +508,14 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
 	}
 
-	/*
 	if (hide_after_ms > 0)
 		std::this_thread::sleep_for(std::chrono::milliseconds(hide_after_ms));
+	else
+		return;
 
 	if (fadeout)
 	{
+		set_alpha(255);
 		int _alpha = m_alpha;
 
 		if (delay_ms <= 0)
@@ -517,7 +523,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 
 		while (true)
 		{
-			_alpha += (fadein ? 5 : -5);
+			_alpha -= 5;
 
 			if (_alpha < 0 || _alpha > 255)
 				break;
@@ -530,9 +536,12 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 		ShowWindow(SW_HIDE);
 		set_alpha(255);
 	}
-	*/
+	else
+	{
+		ShowWindow(SW_HIDE);
+	}
 }
-
+#endif
 
 void CSCShapeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {

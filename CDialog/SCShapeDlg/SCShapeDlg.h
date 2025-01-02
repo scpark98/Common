@@ -113,7 +113,7 @@ public:
 							int font_style,
 							int shadow_depth = 2,
 							float thickness = 2.0f,
-							CString font_name = _T(""),
+							CString font_name = _T("맑은 고딕"),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,

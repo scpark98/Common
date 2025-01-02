@@ -150,19 +150,33 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 		//bDrive일 경우 remote의 F:\ 드라이브 아이콘을 구하려고 실제 "F:\"를 줘서는 안된다.
 		//아이콘 정보는 local에서 추출하는데 local에 F드라이브가 없을 수 있다.
 		//그렇다고 D라고 가정할수도 없다. D는 local drive일수도, 네트워크 드라이브일수도, 구글 드라이브일수도 있다.
+		//우선 현재는 C:\\라고 가정하고 처리함.
 		//확인 필요!
-		//
+		//우선 bDrive일 경우는 로컬에 해당 드라이브가 없다면 DRIVE_FIXED 드라이브중의 마지막 드라이브라고 가정하고 표시한다.
+		//이러한 이유로 이전 버전의 nFTD에서도 리모트의 모든 드라이브가 시스템 드라이브로 표시된다.
 		if (bDrive)
 		{
-			//if (szFile.GetLength() == 3)
-			//{
-			//	//if (szFile.MakeUpper() == _T("C:\\"))
-			//	//	SHGetFileInfo(_T("C:\\"), FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-			//	//else
-			//		SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-			//}
-			//else
+			if (szFile.GetLength() == 3)
+			{
+				//LPITEMIDLIST pidl = NULL;
+				//HRESULT hr = SHGetFolderLocation(NULL, CSIDL_DRIVES, NULL, 0, &pidl);
+				//hr = SHGetFileInfo((LPCTSTR)pidl,
+				//	-1,
+				//	&shFileInfo,
+				//	sizeof(shFileInfo),
+				//	SHGFI_PIDL | SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+
+				//만약 local에 해당 드라이브가 존재하지 않는다면 C:\\라고 가정하고 표시한다.
+				UINT drive_type = GetDriveType(szFile);
+				if (GetDriveType(szFile) <= DRIVE_NO_ROOT_DIR)
+					szFile = _T("C:\\");
+
 				SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+			}
+			else
+			{
+				SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+			}
 		}
 		else
 		{

@@ -50,6 +50,8 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_CTLCOLOR()
+	ON_WM_SYSCOMMAND()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
@@ -529,9 +531,14 @@ void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 	if (point.y < m_titlebar_height)
 	{
 		if (IsZoomed())
+		{
 			ShowWindow(SW_RESTORE);
+		}
 		else
+		{
 			ShowWindow(SW_MAXIMIZE);
+		}
+		m_sys_buttons.Invalidate();
 	}
 
 	CDialogEx::OnLButtonDblClk(nFlags, point);
@@ -577,4 +584,29 @@ HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
 	//return hbr;
+}
+
+
+void CSCThemeDlg::OnSysCommand(UINT nID, LPARAM lParam)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	CDialogEx::OnSysCommand(nID, lParam);
+
+
+	//UINT id = (nID & 0xFFF0);
+	//if ((nID & 0xFFF0) == SC_MOVE)
+	//	m_sys_buttons.Invalidate();
+	//	SetTimer(0, 1000, NULL);
+}
+
+
+void CSCThemeDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//if (nIDEvent == 0)
+	//{
+	//	KillTimer(nIDEvent);
+	//	m_sys_buttons.Invalidate();
+	//}
+	CDialogEx::OnTimer(nIDEvent);
 }

@@ -317,7 +317,10 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 
 	PVOID pvBits = NULL;
 	HBITMAP hbmpMem = ::CreateDIBSection(NULL, (PBITMAPINFO)&bmih, DIB_RGB_COLORS, &pvBits, NULL, 0);
-	ASSERT(hbmpMem != NULL);
+	if (!hbmpMem)
+		return;
+	//ASSERT(hbmpMem != NULL);
+
 	memset(pvBits, 0, sz.cx * 4 * sz.cy);
 	if (hbmpMem)
 	{
@@ -476,18 +479,33 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 //ShowWindow()시키거나 fadein()으로 보여지게 한다.
 void CSCShapeDlg::fade_in(int delay_ms, int hide_after_ms, bool fadeout)
 {
+	if (m_fadeinout_ing)
+	{
+		m_fadeinout_ing = false;
+		Wait(100);
+	}
+
 	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true, delay_ms, hide_after_ms, fadeout);
 	t.detach();
 }
 
 void CSCShapeDlg::fade_out()
 {
+	if (m_fadeinout_ing)
+	{
+		m_fadeinout_ing = false;
+		Wait(100);
+	}
+
 	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false, 0, 0, false);
 	t.detach();
 }
 
 void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms, bool fadeout)
 {
+	if (m_fadeinout_ing)
+		return;
+
 	set_alpha(fadein ? 0 : 255);
 	ShowWindow(SW_SHOW);
 
@@ -496,7 +514,9 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 	if (delay_ms <= 0)
 		delay_ms = 50;
 
-	while (true)
+	m_fadeinout_ing = true;
+
+	while (m_fadeinout_ing)
 	{
 		_alpha += (fadein ? 5 : -5);
 
@@ -507,6 +527,9 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
 	}
+
+	if (!m_fadeinout_ing)
+		return;
 
 	if (hide_after_ms > 0)
 		std::this_thread::sleep_for(std::chrono::milliseconds(hide_after_ms));
@@ -521,7 +544,8 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 		if (delay_ms <= 0)
 			delay_ms = 50;
 
-		while (true)
+		m_fadeinout_ing = true;
+		while (m_fadeinout_ing)
 		{
 			_alpha -= 5;
 
@@ -540,6 +564,8 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 	{
 		ShowWindow(SW_HIDE);
 	}
+
+	m_fadeinout_ing = false;
 }
 #endif
 

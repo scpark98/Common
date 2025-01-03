@@ -3,38 +3,16 @@
 
 /*by sdh (Koino)
 - 프로젝트에 CrashHandler.cpp, h 두 파일 추가.
-- app.cpp에 DisableSetUnhandledExceptionFilter() 함수 바디 추가 및 호출.
-	void DisableSetUnhandledExceptionFilter()
-	{
-		void *addr = (void*)GetProcAddress(LoadLibrary(_T("kernel32.dll")),
-			"SetUnhandledExceptionFilter");
-		if (addr)
-		{
-			unsigned char code[16];
-			int size = 0;
-			code[size++] = 0x33;
-			code[size++] = 0xC0;
-			code[size++] = 0xC2;
-			code[size++] = 0x04;
-			code[size++] = 0x00;
-			DWORD dwOldFlag, dwTempFlag;
-			VirtualProtect(addr, size, PAGE_READWRITE, &dwOldFlag);
-			WriteProcessMemory(GetCurrentProcess(), addr, code, size, NULL);
-			VirtualProtect(addr, size, dwOldFlag, &dwTempFlag);
-		}
-	}
-
-- 반드시 실행파일과 함께 .pdb 파일을 함께 배포해야 함!
-
-- crash가 발생하면 CrashHandler20230302.log와 같이 로그파일이 자동 생성됨.
-
-  by scpark
-- 로그파일의 날짜형식을 yyyymmdd로 변경.
-- 
+- app.cpp에 DisableSetUnhandledExceptionFilter() 함수 추가 및 호출.
+- 실행파일 경로에 .pdb 파일이 존재해야 하고
+crash가 발생하면 CrashHandler202303.log와 같이 로그파일이 자동 생성됨.
 */
 
+#define USE_CRASH_HANDLER
+#ifdef USE_CRASH_HANDLER
+#include <tchar.h>
+#include <Windows.h>
 #pragma warning(disable:4091)
-#include <afxwin.h>
 #include <dbghelp.h>
 
 class CCrashHandler
@@ -86,7 +64,7 @@ private:
 
 	static TCHAR						m_szProgramFileName[MAX_PATH];
 	static TCHAR						m_szProgramFolder[MAX_PATH];
-	static TCHAR						m_szSymbolPath[MAX_PATH];
+	static CHAR							m_szSymbolPath[MAX_PATH];
 	static TCHAR						m_szPrivateBuild[64];
 	static TCHAR						m_szComputerName[MAX_COMPUTERNAME_LENGTH + 1];
 
@@ -99,4 +77,5 @@ private:
 extern CCrashHandler	g_CrashHandler;
 #endif
 
+#endif	// USE_CRASH_HANDLER
 #endif // __INC_CRASHDOCTOR_H__

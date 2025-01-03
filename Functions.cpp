@@ -9066,7 +9066,7 @@ CString	convert_special_folder_to_real_path(CString special_folder, CShellImageL
 	if (special_folder.Find(myPC_label) >= 0)
 		special_folder.Replace(myPC_label, _T(""));
 
-	//"\\연구소문서(\\\\192.168.1.103) (Y:)"
+	//"\\연구소문서(\\\\192.168.1.103) (Y:)"와 같이 맨 앞에 '\\'가 붙어있다면 제거.
 	if (special_folder.GetLength() > 1 && special_folder.Left(1) == '\\')
 		special_folder = special_folder.Mid(1);
 

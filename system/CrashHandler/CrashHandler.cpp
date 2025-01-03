@@ -1,8 +1,11 @@
-//#include "stdafx.h"
-
+#include <stdio.h>
 #include "CrashHandler.h"
+
 #pragma warning(disable:4312)
 #pragma warning(disable:4996)
+
+#ifdef USE_CRASH_HANDLER
+#pragma warning(disable:4312)
 
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "Version.lib")
@@ -17,14 +20,14 @@
 #define	_CD_MESSAGE_LOGOUT_TITLE _T("에러 파일 작성 완료")
 #endif
 
-#define	_CD_SYMBOL_PATH	  _T("%SYSTEMROOT%;.\\Symbols\\;..\\Symbols\\;..\\..\\Symbols\\;..\\..\\..\\Symbols\\;.\\")
+#define	_CD_SYMBOL_PATH	  "%SYSTEMROOT%;.\\Symbols\\;..\\Symbols\\;..\\..\\Symbols\\;..\\..\\..\\Symbols\\;.\\"
 
 TCHAR	CCrashHandler::m_szProgramFileName[MAX_PATH]					= { 0 };
 TCHAR	CCrashHandler::m_szProgramFolder[MAX_PATH]					= { 0 };
 TCHAR	CCrashHandler::m_szLogFileName[MAX_PATH]						= { 0 };
 TCHAR	CCrashHandler::m_szPrivateBuild[64]							= { 0 };
 TCHAR	CCrashHandler::m_szComputerName[MAX_COMPUTERNAME_LENGTH + 1]	= { 0 };
-TCHAR	CCrashHandler::m_szSymbolPath[MAX_PATH]						= { 0 };
+CHAR	CCrashHandler::m_szSymbolPath[MAX_PATH]						= { 0 };
 BOOL	CCrashHandler::m_bAppendMode									= TRUE;
 HANDLE	CCrashHandler::m_hReportFile									= INVALID_HANDLE_VALUE;
 
@@ -57,7 +60,7 @@ CCrashHandler::CCrashHandler()
 						  m_szPrivateBuild,
 						  sizeof(m_szPrivateBuild) / sizeof(TCHAR));
 
-	ExpandEnvironmentStrings(_CD_SYMBOL_PATH, m_szSymbolPath, sizeof(m_szSymbolPath));
+	ExpandEnvironmentStringsA(_CD_SYMBOL_PATH, m_szSymbolPath, sizeof(m_szSymbolPath));
 
 	SetDefaultLogFileName();
 }
@@ -77,7 +80,7 @@ void CCrashHandler::SetLogFileName(LPCTSTR lpszLogFileName, BOOL bFileNew)
 
 void CCrashHandler::SetSymbolPath(LPCTSTR lpszSymbolPath)
 {
-	_sntprintf(m_szSymbolPath, sizeof(m_szSymbolPath), _T("%S"), lpszSymbolPath);
+	_snprintf(m_szSymbolPath, sizeof(m_szSymbolPath), "%S", lpszSymbolPath);
 }
 
 void CCrashHandler::SetDefaultLogFileName()
@@ -120,7 +123,7 @@ void CCrashHandler::SetDefaultLogFileName()
 	::GetLocalTime(&stm);
 
 	TCHAR szFileName[64];
-	wsprintf(szFileName, _T("CrashHandler%d%02d%02d.log"), stm.wYear, stm.wMonth, stm.wDay);
+	wsprintf(szFileName, _T("CrashHandler%d%02d.log"), stm.wYear, stm.wMonth);
 
 	_tcscat(m_szLogFileName, szFileName);
 }
@@ -798,15 +801,11 @@ int __cdecl CCrashHandler::PrintLog(const TCHAR * format, ...)
 
 BOOL CCrashHandler::InitializeSymbols(HANDLE hHandle)
 {
-	SymCleanup(hHandle);
+	SymCleanup( hHandle );
 
-	//char m_szSymbolPath[MAX_PATH] 로 선언한 변수를
-	//TCHAR m_szSymbolPath[MAX_PATH] 로 변경하고
-	//SymInitialize() 함수 호출 시 굳이 m_szSymbolPath를 주지않고 NULL로 줘도 결과는 동일함)
-	//SymInitialize(hHandle, m_szSymbolPath, TRUE);
-	SymInitialize(hHandle, NULL, TRUE);
+	SymInitialize(hHandle, m_szSymbolPath, TRUE);
 
 	return TRUE;
 }
 
-//#endif // _DEBUG
+#endif // USE_CRASH_HANDLER

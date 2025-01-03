@@ -11,7 +11,7 @@ CSCLog::CSCLog()
 {
 	pLog = this;
 
-	m_showLogLevel = SCLOG_LEVEL_RELEASE;
+	m_log_level = SCLOG_LEVEL_RELEASE;
 
 	m_fp = NULL;
 }
@@ -37,7 +37,7 @@ bool CSCLog::set(CString log_folder, CString file_title, int show_log_level)
 			return false;
 		}
 
-		m_showLogLevel = show_log_level;
+		m_log_level = show_log_level;
 
 		//로그 폴더 설정
 		if (log_folder.IsEmpty())
@@ -104,6 +104,11 @@ bool CSCLog::set(CString log_folder, CString file_title, int show_log_level)
 	}
 }
 
+void CSCLog::set_log_level(int log_level)
+{
+	m_log_level = log_level;
+	logWrite(_T("set_log_level = %d"), m_log_level);
+}
 
 bool CSCLog::release()
 {
@@ -134,36 +139,28 @@ CString	CSCLog::write(LPCTSTR format, ...)
 	return write(SCLOG_LEVEL_NONE, _T(""), 0, log_text);
 }
 
-CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
+CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 {
 	CString result = CString();
 
 	try
 	{
-		//theCSLog.Lock();
 		m_mutex.lock();
 
-		if (m_fp == NULL)
+		if ((m_fp == NULL) && (log_level <= m_log_level))
 		{
-			if (!set(m_log_folder, m_log_file_title))
+			if (!set(m_log_folder, m_log_file_title, m_log_level))
 			{
-				//theCSLog.Unlock();
 				m_mutex.unlock();
 				return result;
 			}
 		}
 
-		//if (logLevel < m_showLogLevel)
-		//{
-		//	theCSLog.Unlock();
-		//	return result;
-		//}
-
 		va_list args;
 		va_start(args, format);
 
 		CString log_text;
-		CString log_level;
+		CString log_level_str;
 
 		try
 		{
@@ -193,33 +190,33 @@ CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		if (linefeed_count > 0)
 			log_text = log_text.Mid(linefeed_count);
 
-		switch (logLevel)
+		switch (log_level)
 		{
 			case SCLOG_LEVEL_INFO :
-				log_level = _T("[info]");
+				log_level_str = _T("[info]");
 				break;
 			case SCLOG_LEVEL_WARN:
-				log_level = _T("[warn]");
+				log_level_str = _T("[warn]");
 				break;
 			case SCLOG_LEVEL_ERROR:
-				log_level = _T("[error]");
+				log_level_str = _T("[error]");
 				break;
 			case SCLOG_LEVEL_CRITICAL:
-				log_level = _T("[critical]");
+				log_level_str = _T("[critical]");
 				break;
 			case SCLOG_LEVEL_SQL:
-				log_level = _T("[sql]");
+				log_level_str = _T("[sql]");
 				break;
 			case SCLOG_LEVEL_DEBUG:
-				log_level = _T("[debug]");
+				log_level_str = _T("[debug]");
 				break;
 			case SCLOG_LEVEL_RELEASE:		//release도 no level로 처리한다.
 				//log_text = _T("info");
 				break;
 		}
 
-		if (!log_level.IsEmpty())
-			log_level = _T(" ") + log_level;
+		if (!log_level_str.IsEmpty())
+			log_level_str = _T(" ") + log_level_str;
 
 		SYSTEMTIME t = { 0 };
 		GetLocalTime(&t);
@@ -237,24 +234,29 @@ CString CSCLog::write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...)
 		if (!m_show_line_number)
 			line_str.Empty();
 
-		if (m_fp)
+		if (linefeed_count == 0 && log_text.IsEmpty())
 		{
-			if (linefeed_count == 0 && log_text.IsEmpty())
-			{
+			if (m_fp)
 				_ftprintf(m_fp, _T("\n"));
-			}
-			else
+		}
+		else
+		{
+			if (m_fp)
 			{
 				for (i = 0; i < linefeed_count; i++)
 					_ftprintf(m_fp, _T("\n"));
+			}
 
-				result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%s]%s %s"),
-					t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
-					func_name, line_str, log_level, log_text);
+			result.Format(_T("[%d/%02d/%02d %02d:%02d:%02d.%03d][%s][%s]%s %s"),
+				t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
+				func_name, line_str, log_level_str, log_text);
+
+			if (m_fp)
+			{
 				_ftprintf(m_fp, _T("%s\n"), result);
 				TRACE(_T("%s\n"), result);
+				fflush(m_fp);
 			}
- 			fflush(m_fp);
 		}
 
 		release();

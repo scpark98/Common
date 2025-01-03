@@ -155,4 +155,6 @@ public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
+	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

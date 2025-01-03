@@ -166,6 +166,8 @@ protected:
 	int				m_alpha = 255;
 	void			render(Gdiplus::Bitmap* img);
 
+	bool			m_fadeinout_ing = false;
+
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
 

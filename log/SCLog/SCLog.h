@@ -23,10 +23,14 @@
 
   CSCLog gLog;
 
+[set Log folder path]
+	//set()함수를 통해 로그파일 저장폴더, 로그파일 타이틀, 로그 레벨을 설정할 수 있다.
 	//만약 로그파일의 경로를 특정하고자 하면 아래와 같이 set()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
 	//로그파일명 형식은 projectName_yyyymmdd.log
-	gLog.set(_T("../../custom log folder/folder1/folder2"));
+	gLog.set(_T("../../custom log folder/folder1/folder2"), _T("TestLogFileName"), SCLOG_LEVEL_DEBUG);
+	기본 로그 레벨이 SCLOG_LEVEL_RELEASE이므로 이 경우 logWriteD()를 호출할 경우는 로그 기록이 스킵된다.
 
+[show or not the function name or line number]
 	//어떤 프로젝트의 경우에는 함수명이 노출되서는 안되는 경우도 있다. 함수명과 라인번호 표시 유무를 옵션처리.
 	show_function_name(false);
 	show_line_number(false);
@@ -34,13 +38,10 @@
 	//경로를 별도로 지정하지 않고 아래와 같이 바로 사용하면 exe 파일 아래의 Log 폴더에 로그 파일 자동 생성됨.
 	gLog.write(_T("log test = %d, %s, %s"), 123, _T("abc"), _T("한글  테스트"));
 
+[write blank line log]
 	//간혹 특별한 로그 내용이 없어도 linefeed 또는 함수진입 기록등의 목적으로 "" 또는 " "을 넘김.
 	//gLog.write(_T(""));	//한 줄 빈 라인 추가
 	//gLog.write(_T(" "));	//시간, 함수정보까지만 출력되는 라인 추가
-
-	//SCLOG_LEVEL_WARN 등과 같이 로그레벨을 지정하여 특정 로그들만 기록되게 할 수 있는데 아직 미구현.
-
-	//도중에 로그파일의 위치를 변경해도 적용되는지 확인 필요함.
 */
 
 #include <afxwin.h>
@@ -89,6 +90,7 @@ public:
 	//file_title을 주지 않으면 "실행파일명_yyyymmdd.log" 파일로 저장되고
 	//로그파일명을 지정하고 싶다면 file_title에 값을 주면 "file_title_yyyymmdd.log"로 저장된다.
 	bool		set(CString log_folder = _T(""), CString file_title = _T(""), int show_log_level = SCLOG_LEVEL_RELEASE);
+	void		set_log_level(int log_level = SCLOG_LEVEL_RELEASE);
 
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }
@@ -100,7 +102,7 @@ public:
 	//LMMAgent 또는 멀티쓰레드로 동작하는 프로젝트에서는 뭔가 오동작을 유발하는 듯하여
 	//단순 로그만 남기는 write 함수를 추가함.
 	CString		write(LPCTSTR format, ...);
-	CString		write(int logLevel, TCHAR* func, int line, LPCTSTR format, ...);
+	CString		write(int log_level, TCHAR* func, int line, LPCTSTR format, ...);
 
 	bool		release();
 	CString		get_log_full_path() { return m_log_fullpath; }
@@ -115,7 +117,7 @@ protected:
 	CString		m_log_fullpath;
 	CString		m_log_file_title;
 	CString		m_log_folder;
-	int			m_showLogLevel;
+	int			m_log_level = SCLOG_LEVEL_RELEASE;
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;
 	FILE*		m_fp;

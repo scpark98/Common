@@ -1398,7 +1398,7 @@ void CVtListCtrlEx::OnPaint()
 
 	if (!m_text_on_empty.IsEmpty())
 	{
-		draw_text(&g, rc, m_text_on_empty, 10, false, 0, 0, _T("¸¼Àº °íµñ"));
+		draw_text(g, rc, m_text_on_empty, 10, false, 0, 0, _T("¸¼Àº °íµñ"));
 	}
 
 	//CListCtrl::OnPaint();

@@ -43,7 +43,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <deque>
 #include <map>
 #include <algorithm>
-#include <gdiplus.h>
+//#include <gdiplus.h>
+//#include <gdipluseffects.h>
+#include "GdiplusBitmap.h"
 
 #include "./colors.h"
 #include "./system/ShellImageList/ShellImageList.h"
@@ -1464,19 +1466,20 @@ void		SetWallPaper(CString sfile);
 	Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR String, int length = -1);
 
 	//Gdiplus를 이용한 텍스트 출력
-	CRect		draw_text(Gdiplus::Graphics *g,
+	CRect		draw_text(Gdiplus::Graphics &g,
 							int x, int y, int w, int h,
 							CString text,
 							float font_size,
-							int font_style,
-							int shadow_depth,
-							float thickness,
+							int font_style = Gdiplus::FontStyleRegular,
+							int shadow_depth = 0,
+							float thickness = 0.0f,
 							CString font_name = _T("맑은 고딕"),
 							Gdiplus::Color cr_text = Gdiplus::Color::Black,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
 							UINT align = DT_CENTER | DT_VCENTER);
-	CRect		draw_text(Gdiplus::Graphics* g,
+	CRect		draw_text(Gdiplus::Graphics &g,
 							CRect rTarget,
 							CString text,
 							float font_size,
@@ -1487,6 +1490,7 @@ void		SetWallPaper(CString sfile);
 							Gdiplus::Color cr_text = Gdiplus::Color::Black,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
 							UINT align = DT_CENTER | DT_VCENTER);
 
 	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
@@ -1497,6 +1501,7 @@ void		SetWallPaper(CString sfile);
 	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, int pen_style = PS_SOLID, int draw_mode = R2_COPYPEN);
 	void		draw_rectangle(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
+	void		draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);
 	void		draw_ellipse(CDC* pDC, int cx, int cy, int rx, int ry, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);

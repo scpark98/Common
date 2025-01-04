@@ -181,7 +181,7 @@ void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
 
 		Gdiplus::Graphics g(m_pBitmap);
 
-		draw_text(0, 0, text, 12, 1);
+		//draw_text(0, 0, text, 12, 1);
 
 		resolution();
 	}
@@ -931,14 +931,47 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Gdiplus::Color remov
 	//save(_T("d:\\temp\\rotated_fit.png"));
 }
 
-void CGdiplusBitmap::draw_text(int x, int y, CString text, int font_size, int thick,
-								CString font_name /*= _T("맑은 고딕")*/,
-								Gdiplus::Color crOutline /*= Gdiplus::Color::White*/,
-								Gdiplus::Color crFill /*= Gdiplus::Color::Black*/,
-								UINT align /*= DT_LEFT | DT_TOP*/)
+CRect CGdiplusBitmap::draw_text(int x, int y, int w, int h,
+							CString text,
+							float font_size,
+							int font_style,
+							int shadow_depth,
+							float thickness,
+							CString font_name,
+							Gdiplus::Color cr_text,
+							Gdiplus::Color cr_stroke,
+							Gdiplus::Color cr_shadow,
+							Gdiplus::Color cr_back,
+							UINT align)
+{
+	CRect rTarget(x, y, w, h);
+	//adjust_rect_range()
+	return draw_text(rTarget, text, font_size, font_style, shadow_depth, thickness, font_name,
+		cr_text, cr_stroke, cr_shadow, cr_back, align);
+}
+
+CRect CGdiplusBitmap::draw_text(CRect rTarget,
+							CString text,
+							float font_size,
+							int font_style,
+							int shadow_depth,
+							float thickness,
+							CString font_name,
+							Gdiplus::Color cr_text,
+							Gdiplus::Color cr_stroke,
+							Gdiplus::Color cr_shadow,
+							Gdiplus::Color cr_back,
+							UINT align)
 {
 	Gdiplus::Graphics g(m_pBitmap);
 
+	if (rTarget.IsRectEmpty())
+		rTarget = CRect(0, 0, width, height);
+
+	return ::draw_text(g, rTarget, text, font_size, font_style, shadow_depth, thickness, font_name,
+		cr_text, cr_stroke, cr_shadow, cr_back, align);
+
+	/*
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
@@ -977,6 +1010,7 @@ void CGdiplusBitmap::draw_text(int x, int y, CString text, int font_size, int th
 
 	g.DrawPath(&gp, &str_path);
 	g.FillPath(&gb, &str_path);
+	*/
 }
 
 void CGdiplusBitmap::fit_to_image(Gdiplus::Color remove_back_color)

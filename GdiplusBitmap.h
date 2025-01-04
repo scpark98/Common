@@ -83,7 +83,7 @@ public:
 	IStream* CreateStreamOnResource(LPCTSTR lpName, LPCTSTR lpType);
 	IWICBitmapSource* LoadBitmapFromStream(IStream* ipImageStream);
 
-
+	Gdiplus::Graphics* get_graphics() { Gdiplus::Graphics g(m_pBitmap); return &g; }
 
 	virtual ~CGdiplusBitmap();
 
@@ -153,11 +153,31 @@ public:
 	void	flip();
 
 	//이미지에 직접 텍스트를 추가
-	void	draw_text(int x, int y, CString text, int font_size, int thick,
-						CString font_name = _T("맑은 고딕"),
-						Gdiplus::Color crOutline = Gdiplus::Color::White,
-						Gdiplus::Color crFill = Gdiplus::Color::Black,
-						UINT align = DT_LEFT | DT_TOP);
+	CRect		draw_text(	int x, int y, int w, int h,
+							CString text,
+							float font_size,
+							int font_style = Gdiplus::FontStyleRegular,
+							int shadow_depth = 0,
+							float thickness = 0.0f,
+							CString font_name = _T("맑은 고딕"),
+							Gdiplus::Color cr_text = Gdiplus::Color::Black,
+							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
+							UINT align = DT_CENTER | DT_VCENTER);
+
+	CRect		draw_text(	CRect rTarget,
+							CString text,
+							float font_size,
+							int font_style = Gdiplus::FontStyleRegular,
+							int shadow_depth = 0,
+							float thickness = 0.0f,
+							CString font_name = _T("맑은 고딕"),
+							Gdiplus::Color cr_text = Gdiplus::Color::Black,
+							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
+							UINT align = DT_CENTER | DT_VCENTER);
 
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함

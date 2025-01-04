@@ -28,7 +28,7 @@ CThumbCtrl::CThumbCtrl()
 	m_modified = false;
 	m_last_clicked = 0;
 
-	color_theme(color_theme_default, false);
+	set_color_theme(color_theme_default, false);
 
 	m_index = 0;
 	m_loading_index = -1;
@@ -168,7 +168,7 @@ BOOL CThumbCtrl::RegisterWindowClass()
 	{
 		// otherwise we need to register a new class
 		CBrush	brush;
-		brush.CreateSolidBrush(m_crBack);
+		brush.CreateSolidBrush(m_cr_back.ToCOLORREF());
 
 		wndcls.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
 		wndcls.lpfnWndProc = ::DefWindowProc;
@@ -210,7 +210,7 @@ void CThumbCtrl::OnPaint()
 	GetClientRect(rc);
 
 	CMemoryDC	dc(&dc1, &rc);
-	dc.FillSolidRect(rc, m_crBack);
+	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	if (m_loading_files.size() > 0 && !m_loading_completed)
 	{
@@ -553,7 +553,7 @@ void CThumbCtrl::set_scroll_pos(int pos)
 	m_scroll_pos = pos;
 	//TRACE(_T("current = %d / %d\n"), m_scroll_pos, m_scroll_total);
 	m_scroll_trans = 0.0;
-	m_crScroll = m_crTitle;
+	m_cr_scroll = m_cr_title;
 	Invalidate(false);
 
 	CPoint pt;
@@ -1050,7 +1050,7 @@ void CThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			TRACE(_T("show scroll\n"));
 			m_scroll_trans = 0.0;
-			m_crScroll = m_crTitle;
+			m_cr_scroll = m_cr_title;
 			InvalidateRect(m_rScroll);
 		}
 	}
@@ -1341,14 +1341,14 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 	{
 		KillTimer(timer_scroll_bar_disappear);
 
-		//m_crScroll = get_color(m_crTitle, m_crBack, m_scroll_trans);
+		//m_cr_scroll = get_color(m_cr_title, m_cr_back, m_scroll_trans);
 
 		m_scroll_trans = 1.0;
 		if (true)//m_scroll_trans >= 1.0)
 		{
 			KillTimer(timer_scroll_bar_disappear);
 			m_scroll_trans = 1.0;
-			m_crScroll = m_crBack;
+			m_cr_scroll = m_cr_back;
 		}
 		else
 		{
@@ -1402,25 +1402,25 @@ void CThumbCtrl::OnTimer(UINT_PTR nIDEvent)
 	CWnd::OnTimer(nIDEvent);
 }
 
-void CThumbCtrl::color_theme(int theme, bool invalidate)
+void CThumbCtrl::set_color_theme(int theme, bool invalidate)
 {
 	switch (theme)
 	{
 	case color_theme_default:
-		m_crTitle = ::GetSysColor(COLOR_BTNTEXT);
-		m_crResolution = ::GetSysColor(COLOR_BTNTEXT);
-		m_crSelected = ::GetSysColor(COLOR_HIGHLIGHT);
-		m_crBack = ::GetSysColor(COLOR_WINDOW);
-		m_crBackThumb = ::GetSysColor(COLOR_WINDOW);
-		m_crScroll = m_crTitle;
+		m_cr_title.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_resolution.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+		m_cr_selected.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
+		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+		m_cr_back_thumb.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+		m_cr_scroll = m_cr_title;
 		break;
 	case color_theme_dark_gray:
-		m_crTitle = GRAY(164);
-		m_crResolution = GRAY(164);
-		m_crSelected = GRAY(64);
-		m_crBack = GRAY(32);
-		m_crBackThumb = RGB(255, 0, 0);
-		m_crScroll = m_crTitle;
+		m_cr_title = gGRAY(164);
+		m_cr_resolution = gGRAY(164);
+		m_cr_selected = gGRAY(64);
+		m_cr_back = gGRAY(32);
+		m_cr_back_thumb = gRGB(255, 0, 0);
+		m_cr_scroll = m_cr_title;
 		break;
 	}
 
@@ -1445,7 +1445,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		pDC = &dc;
 
 	if (draw)
-		pDC->FillSolidRect(rc, m_crBack);
+		pDC->FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -1548,10 +1548,10 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		int pos = (double)(rc.Height() - m_scroll_grip_size) * ((double)(-m_scroll_pos) / (double)(m_scroll_total - rc.Height()));
 		//TRACE(_T("%d / %d, pos = %d\n"), m_scroll_pos, m_scroll_total, pos);
 		int round = 2;
-		CBrush brush(m_crScroll);
+		CBrush brush(m_cr_scroll.ToCOLORREF());
 		CBrush* pOldBrush = (CBrush*)pDC->SelectObject(&brush);
 		CPen* pOldPen = (CPen*)pDC->SelectStockObject(NULL_PEN);
-		//pDC->FillSolidRect(m_rScroll, m_crScroll);
+		//pDC->FillSolidRect(m_rScroll, m_cr_scroll);
 		//pDC->RoundRect(m_rScroll, CPoint(round, round));
 		pDC->Rectangle(m_rScroll);
 		pDC->SelectObject(pOldBrush);
@@ -1586,7 +1586,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 		//타일 크기의 사각형 표시
 		//rTile.InflateRect( 1, 1 );
-		//DrawRectangle( &dc, rTile, get_color(m_crBack, 48), NULL_BRUSH );
+		//DrawRectangle( &dc, rTile, get_color(m_cr_back, 48), NULL_BRUSH );
 
 		if (m_dqThumb[i].img == NULL || m_dqThumb[i].img->is_empty())
 		{
@@ -1599,8 +1599,8 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		}
 		else
 		{
-			//scvDrawImage(&dc, m_dqThumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_crBackThumb, -1.0);
-			//scvDrawImage(&dc, m_dqThumb[i].mat, rect, m_crBackThumb, -1.0);
+			//scvDrawImage(&dc, m_dqThumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_cr_back_thumb, -1.0);
+			//scvDrawImage(&dc, m_dqThumb[i].mat, rect, m_cr_back_thumb, -1.0);
 			fit = get_ratio_max_rect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
 			if (draw && !skip)
 			{
@@ -1624,7 +1624,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 				m_dqThumb[i].img->draw(g, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #endif
 			}
-			//DrawSunkenRect(&dc, rect, true, get_color(m_crBack, -16), get_color(m_crBack, +16));
+			//DrawSunkenRect(&dc, rect, true, get_color(m_cr_back, -16), get_color(m_cr_back, +16));
 		}
 
 		//썸네일 인덱스를 표시한다.
@@ -1633,10 +1633,10 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			str.Format(_T("%d"), i + 1);
 
 			CRect rIndex = rect;
-			rIndex.top += 2;
+			//rIndex.top += 2;
 			if (draw && !skip)
 			{
-				pDC->SetTextColor(m_crIndex);
+				//pDC->SetTextColor(m_cr_index.ToCOLORREF());
 
 				//멀티바이트 환경에서는 DrawShadowText를 쓰기위해서는 manifest를 추가해야 하는 등
 				//번거로워 일단 DrawTextShadow로 대체한다.
@@ -1644,7 +1644,12 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 				DrawShadowText(pDC->GetSafeHdc(), str, str.GetLength(), rIndex,
 					DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
 #else
-				DrawTextOutline(pDC, str, rIndex, DT_CENTER | DT_TOP | DT_NOCLIP, m_crIndex, m_crIndexShadow);
+				draw_text(g, rIndex, str, 50.0f, Gdiplus::FontStyleRegular, 14, 2.0F, _T("맑은 고딕"),
+					m_cr_index,
+					gRGB(255, 0, 0),
+					gRGB(0, 0, 255),// m_cr_index_shadow,
+					Gdiplus::Color(0, 255, 255, 255),
+					DT_CENTER | DT_TOP);
 #endif
 			}
 		}
@@ -1658,7 +1663,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		if (m_show_resolution)
 		{
 			if (draw && !skip)
-				pDC->SetTextColor(m_crResolution);
+				pDC->SetTextColor(m_cr_resolution.ToCOLORREF());
 			resRect.top = rect.bottom;
 			resRect.bottom = resRect.top + 20;
 			/*
@@ -1666,7 +1671,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			{
 			CRect rBack = resRect;
 			rBack.InflateRect(4, 4);
-			pDC->FillSolidRect(rBack, m_crSelected);
+			pDC->FillSolidRect(rBack, m_cr_selected);
 			}
 			*/
 
@@ -1682,9 +1687,9 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 		if (m_show_title && m_dqThumb[i].title.GetLength())
 		{
-			pDC->SetTextColor(m_crTitle);
+			pDC->SetTextColor(m_cr_title.ToCOLORREF());
 			//DrawShadowText(pDC->GetSafeHdc(), m_dqThumb[i].title, _tcslen(m_dqThumb[i].title), rTitle,
-			//				DT_CENTER | DT_VCENTER, RGB(255, 0, 0), GetComplementaryColor(m_crBack), 2, 1);
+			//				DT_CENTER | DT_VCENTER, RGB(255, 0, 0), GetComplementaryColor(m_cr_back), 2, 1);
 			pDC->DrawText(m_dqThumb[i].title, rTitle, DT_CALCRECT | DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
 			int text_max_height = MIN(48, rTitle.Height());
 
@@ -1697,7 +1702,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			{
 			CRect rBack = rTitle;
 			rBack.InflateRect(4, 4);
-			pDC->FillSolidRect(rBack, m_crSelected);
+			pDC->FillSolidRect(rBack, m_cr_selected);
 			}
 			*/
 			if (draw && !skip)
@@ -1836,8 +1841,8 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
 
-				g.DrawEllipse(&pen, CRect2GpRectF(r));
-				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect2GpRectF(r), &format);
+				g.DrawEllipse(&pen, CRectTogpRectF(r));
+				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRectTogpRectF(r), &format);
 				for (int j = 0; j < 4; ++j)
 				{
 					Gdiplus::Pen pen(Gdiplus::Color(128, 64, 64, 64), j);		//윤곽선
@@ -1850,12 +1855,12 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			}
 			else
 			{
-				draw_rectangle(pDC, r, RGB(0, 128, 255), NULL_BRUSH, 3);
+				draw_rectangle(pDC, r, gRGB(0, 128, 255), NULL_BRUSH, 3);
 			}
 		}
 	}
 
-	draw_rectangle(pDC, rc, GRAY192);
+	draw_rectangle(pDC, rc, gGRAY(192));
 	pDC->SelectObject(pOldfont);
 }
 

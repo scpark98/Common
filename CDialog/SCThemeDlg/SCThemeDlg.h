@@ -131,7 +131,7 @@ protected:
 	void				reconstruct_title_font();
 
 	CGdiplusBitmap		m_img_back;
-	int					m_img_back_mode = CGdiplusBitmap::draw_mode_stretch;	//default = CGdiplusBitmap::draw_mode_stretch
+	int					m_img_back_draw_mode = CGdiplusBitmap::draw_mode_stretch;	//default = CGdiplusBitmap::draw_mode_stretch
 	Gdiplus::Color		m_cr_out_of_back_img;		//배경 이미지를 zoom or origin크기로 그릴 경우 남은 영역의 색 채우기
 
 	CSCSystemButtons	m_sys_buttons;

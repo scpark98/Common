@@ -5748,7 +5748,7 @@ Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR
 //출력할 글자를 작게 출력한 후 이를 다시 원래 크기로 늘려
 //blur가 생기게 하고 이를 shadow로 사용하는 방식인데 뭔가 어색하다.
 //ApplyEffect의 blur를 적용해서 구현하는 것이 나을 듯 하다.
-CRect draw_text(Gdiplus::Graphics* g,
+CRect draw_text(Gdiplus::Graphics &g,
 				int x, int y, int w, int h,
 				CString text,
 				float font_size,
@@ -5759,6 +5759,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 				Gdiplus::Color cr_text,
 				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
+				Gdiplus::Color cr_back,
 				UINT align)
 {
 	return draw_text(g,
@@ -5772,10 +5773,11 @@ CRect draw_text(Gdiplus::Graphics* g,
 					cr_text,
 					cr_stroke,
 					cr_shadow,
+					cr_back,
 					align);
 }
 
-CRect draw_text(Gdiplus::Graphics* g,
+CRect draw_text(Gdiplus::Graphics &g,
 				CRect rTarget,
 				CString text,
 				float font_size,
@@ -5786,29 +5788,33 @@ CRect draw_text(Gdiplus::Graphics* g,
 				Gdiplus::Color cr_text,
 				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
+				Gdiplus::Color cr_back,
 				UINT align)
 {
 	bool calcRect = false;
 	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
 	//HDC hdcMemory = NULL;
 
-	if (g == NULL)
-	{
-		calcRect = true;
+	//if (g == NULL)
+	//{
+	//	calcRect = true;
 
-		//hdcMemory = ::CreateCompatibleDC(hDC);
-		g = new Gdiplus::Graphics(hDC);
-	}
+	//	//hdcMemory = ::CreateCompatibleDC(hDC);
+	//	g = new Gdiplus::Graphics(hDC);
+	//}
+
+	//배경색
+	draw_rectangle(g, rTarget, Gdiplus::Color::Transparent, cr_back);
 
 	//큰 글씨는 AntiAlias를 해주는게 좋지만 작은 글씨는 오히려 뭉개지므로 안하는게 좋다.
 	//파라미터로 처리해야 한다.
-	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g->SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g->SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	Gdiplus::Unit unit = g->GetPageUnit();
-	float fDpiX = g->GetDpiX();
-	float fDpiY = g->GetDpiY();
+	Gdiplus::Unit unit = g.GetPageUnit();
+	float fDpiX = g.GetDpiX();
+	float fDpiY = g.GetDpiY();
 
 	int logPixelsY = ::GetDeviceCaps(hDC, LOGPIXELSY);
 	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
@@ -5830,7 +5836,7 @@ CRect draw_text(Gdiplus::Graphics* g,
 
 
 	Gdiplus::RectF boundRect;
-	g->MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(rTarget.left, rTarget.top), &boundRect);
+	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(rTarget.left, rTarget.top), &boundRect);
 	//boundRect = measure_string(g, font, text);
 
 	boundRect.Width += shadow_depth;
@@ -5877,26 +5883,31 @@ CRect draw_text(Gdiplus::Graphics* g,
 		}
 
 		delete fontFamily;
-		delete g;
+		//delete g;
 		::DeleteDC(hDC);
 		//TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
 		return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 	}
 
 	//g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
-	/*
-	Gdiplus::Blur blur;
-	BlurParams blurParam;
-
-	blur.SetParameters(&blurParam);
-
-	//Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &hsl, NULL, NULL, &m_pBitmap);
-	bm.ApplyEffect(&hsl, NULL);
-	*/
 
 	if (shadow_depth > 0)
 	{
-		Gdiplus::Bitmap shadow_bitmap(boundRect.Width, boundRect.Height);
+		//blur를 이용한 방법. 간단하지만 속도가 매우 느림
+		/*
+		CGdiplusBitmap shadow(rTarget.Width(), rTarget.Height());
+		Gdiplus::Graphics g_shadow(shadow.m_pBitmap);
+
+		g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), &sf, &shadow_brush);
+		shadow.apply_effect_blur(20.0f, FALSE);
+		//g->DrawImage(shadow.m_pBitmap, (Gdiplus::REAL)shadow_depth, (Gdiplus::REAL)shadow_depth);
+		g->DrawImage(shadow.m_pBitmap, (Gdiplus::REAL)shadow_depth/2, (Gdiplus::REAL)shadow_depth/2);
+		*/
+
+		//작게 이미지를 만든 후 늘리는 방식은 quality도 떨어지고 그림자 방향을 정하는 것도 다소 문제있다.
+		//shadow는 (+n, +n)에 그림자를 그리고 실제 텍스트를 그리는 방식도 있지만 text를 둘러싸는 그림자도 있으므로
+		//좀 복잡하다. 우선 간단한 방법으로의 shadow만 고려한다.
+		Gdiplus::Bitmap shadow_bitmap(rTarget.Width(), rTarget.Height());
 		Gdiplus::Graphics g_shadow(&shadow_bitmap);
 		g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 		g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -5904,22 +5915,20 @@ CRect draw_text(Gdiplus::Graphics* g,
 
 		//그림자의 흐릿한 정도. 0.0f(그림자 없음), 0.1f(많이 흐림), 0.4f(권장), 1.0f에 가까울수록 선명함.
 		//축소한 글자를 원본크기로 늘려서 흐릿한 이미지로 만듬.
-		float ratio = 0.3f;
+		float ratio = 0.4f;
 		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 		g_shadow.SetTransform(&mx);
-		g_shadow.DrawString(CStringW(text), -1, &font, boundRect, &sf, &shadow_brush);
+		g_shadow.DrawString(CStringW(text), -1, &font, CRectTogpRectF(rTarget), &sf, &shadow_brush);
 
-		//boundRect.X = x;
-		//boundRect.Y = y;
-		//boundRect.Width = shadow_bitmap.GetWidth();
-		//boundRect.Height = shadow_bitmap.GetHeight();
-		g->DrawImage(&shadow_bitmap, (Gdiplus::REAL)shadow_depth, (Gdiplus::REAL)shadow_depth,
-			(Gdiplus::REAL)(shadow_bitmap.GetWidth())/ratio, (Gdiplus::REAL)(shadow_bitmap.GetHeight())/ratio);
+		g.DrawImage(&shadow_bitmap, (Gdiplus::REAL)shadow_depth, (Gdiplus::REAL)shadow_depth,
+			(Gdiplus::REAL)(shadow_bitmap.GetWidth()) / ratio, (Gdiplus::REAL)(shadow_bitmap.GetHeight()) / ratio);
 	}
+
+	//return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 
 	if (thickness == 0.0)
 	{
-		g->DrawString(CStringW(text), -1, &font, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), &sf, &brush2);
+		g.DrawString(CStringW(text), -1, &font, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), &sf, &brush2);
 	}
 	else
 	{
@@ -5928,16 +5937,14 @@ CRect draw_text(Gdiplus::Graphics* g,
 		Gdiplus::GraphicsPath str_path;
 
 		str_path.AddString(CStringW(text), -1, fontFamily,
-			font_style, emSize, boundRect, &sf);
-		//str_path.AddString(CStringW(text), -1, fontFamily,
-		//	font_bold ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular, emSize, Gdiplus::Point(x, y), &sf);
+			font_style, emSize, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), &sf);
 
 		Gdiplus::Pen   gp(cr_stroke, thickness);
 		//gp.SetLineJoin(Gdiplus::LineJoinMiter);
 		Gdiplus::SolidBrush gb(cr_text);
 
-		g->DrawPath(&gp, &str_path);
-		g->FillPath(&gb, &str_path);
+		g.DrawPath(&gp, &str_path);
+		g.FillPath(&gb, &str_path);
 	}
 
 	delete fontFamily;
@@ -5992,6 +5999,11 @@ void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, int 
 void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
+	draw_rectangle(g, r, cr_line, cr_fill, width);
+}
+
+void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width)
+{
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
 

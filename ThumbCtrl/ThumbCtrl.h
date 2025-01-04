@@ -34,7 +34,7 @@
 #include <sys/timeb.h>
 #include <deque>
 #include <algorithm>
-#include "../ui/ExtWndShadow.h"
+#include "../ui/ExtWndShadow/ExtWndShadow.h"
 #include "../thread/thread_manager.h"
 
 #define USE_OPENCV			false
@@ -188,26 +188,26 @@ public:
 		color_theme_dark_gray,
 	};
 	//인덱스 글자색
-	COLORREF		m_crIndex;
-	COLORREF		m_crIndexShadow;
+	Gdiplus::Color	m_cr_index;
+	Gdiplus::Color	m_cr_index_shadow;
 	//타이틀 글자색
-	COLORREF		m_crTitle;
+	Gdiplus::Color	m_cr_title;
 	//해상도 글자색
-	COLORREF		m_crResolution;
+	Gdiplus::Color	m_cr_resolution;
 	//선택항목 사각형
-	COLORREF		m_crSelected;
+	Gdiplus::Color	m_cr_selected;
 	//컨트롤 전체 배경색
-	COLORREF		m_crBack;
+	Gdiplus::Color	m_cr_back;
 	//썸네일 타일 배경색
-	COLORREF		m_crBackThumb;
+	Gdiplus::Color	m_cr_back_thumb;
 
-	void			color_theme(int theme, bool invalidate = true);
-	void			back_color(COLORREF cr) { m_crBack = cr; Invalidate(); }
-	void			thumb_back_color(COLORREF cr) { m_crBackThumb = cr; Invalidate(); }
-	void			text_color(COLORREF cr) { m_crTitle = cr; Invalidate(); }
-	void			index_color(COLORREF cr) { m_crIndex = cr; Invalidate(); }
-	void			index_shadow_color(COLORREF cr) { m_crIndexShadow = cr; Invalidate(); }
-	void			resolution_color(COLORREF cr) { m_crResolution = cr; Invalidate(); }
+	void			set_color_theme(int theme, bool invalidate = true);
+	void			set_back_color(Gdiplus::Color cr) { m_cr_back = cr; Invalidate(); }
+	void			set_thumb_back_color(Gdiplus::Color cr) { m_cr_back_thumb = cr; Invalidate(); }
+	void			set_text_color(Gdiplus::Color cr) { m_cr_title = cr; Invalidate(); }
+	void			set_index_color(Gdiplus::Color cr) { m_cr_index = cr; Invalidate(); }
+	void			set_index_shadow_color(Gdiplus::Color cr) { m_cr_index_shadow = cr; Invalidate(); }
+	void			set_resolution_color(Gdiplus::Color cr) { m_cr_resolution = cr; Invalidate(); }
 
 //선택 관련
 	std::deque<int> m_selected;
@@ -310,13 +310,8 @@ protected:
 
 	bool			m_modified;
 
-//컬러
-	//...
-
-
 	int				m_index;		//현재 화면에 디스플레이되는 첫 번째 썸네일의 실제 인덱스
 									//선택 관련
-
 
 	bool			m_show_index;	//썸네일의 인덱스 번호를 표시할지
 	bool			m_show_title;	//썸네일 아래 타이틀 문자열을 표시할지...
@@ -347,7 +342,7 @@ protected:
 	bool			m_scroll_drag;
 	int				m_scroll_grip_size;
 	CRect			m_rScroll;
-	COLORREF		m_crScroll;
+	Gdiplus::Color	m_cr_scroll;
 	double			m_scroll_trans;
 
 //키보드 입력 관련

@@ -144,7 +144,7 @@ BOOL CSCThemeDlg::OnInitDialog()
 
 	reconstruct_title_font();
 
-	init_shadow();
+	//init_shadow();
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 				  // 예외: OCX 속성 페이지는 FALSE를 반환해야 합니다.
@@ -412,13 +412,13 @@ void CSCThemeDlg::OnPaint()
 	rclient.top += m_titlebar_height;
 	if (m_img_back.is_valid())
 	{
-		if (m_img_back_mode == CGdiplusBitmap::draw_mode_zoom ||
-			m_img_back_mode == CGdiplusBitmap::draw_mode_origin)
+		if (m_img_back_draw_mode == CGdiplusBitmap::draw_mode_zoom ||
+			m_img_back_draw_mode == CGdiplusBitmap::draw_mode_origin)
 		{
 			dc.FillSolidRect(rclient, m_cr_out_of_back_img.ToCOLORREF());
 		}
 
-		m_img_back.draw(g, rclient, CGdiplusBitmap::draw_mode_zoom);
+		m_img_back.draw(g, rclient, m_img_back_draw_mode);
 	}
 	else
 	{
@@ -547,25 +547,23 @@ void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 void CSCThemeDlg::set_back_image(CString imgType, UINT nResourceID, int draw_mode)
 {
 	m_img_back.load(imgType, nResourceID);
-	m_img_back_mode = draw_mode;
+	m_img_back_draw_mode = draw_mode;
 	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
 }
 
 void CSCThemeDlg::set_back_image(CString img_path, int draw_mode)
 {
 	m_img_back.load(img_path);
-	m_img_back_mode = draw_mode;
+	m_img_back_draw_mode = draw_mode;
 	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
 }
 
 void CSCThemeDlg::set_back_image(UINT resource_id, int draw_mode)
 {
 	m_img_back.load(resource_id);
-	m_img_back_mode = draw_mode;
+	m_img_back_draw_mode = draw_mode;
 	m_cr_out_of_back_img = m_img_back.get_color(0, 0);
 }
-
-
 
 HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {

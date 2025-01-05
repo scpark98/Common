@@ -182,7 +182,7 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{
-				draw_text(&g, m_button[i].r, _T("?"), 12, 0, 0, 1.0f, _T("¸¼Àº °íµñ"), m_theme.cr_text);// , m_theme.cr_text, DT_CENTER | DT_VCENTER | DT_SINGELINE);
+				draw_text(g, m_button[i].r, _T("?"), 12, 0, 1, 1.0f, _T("¸¼Àº °íµñ"), m_theme.cr_text);// , m_theme.cr_text, DT_CENTER | DT_VCENTER | DT_SINGELINE);
 			}
 		}
 	}

@@ -2013,7 +2013,7 @@ int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
 	index = insert_item(index, new_folder_name, img_idx, false, false);
 
 	set_text(index, col_filesize, _T(""));
-	set_text(index, col_filedate, get_cur_datetime_string(2, true, _T(" "), false, false));
+	set_text(index, col_filedate, get_cur_datetime_str(2, true, _T(" "), false, false));
 	set_text_color(index, col_filedate, RGB(109, 109, 109));
 
 	return index;

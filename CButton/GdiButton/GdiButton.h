@@ -16,6 +16,18 @@ using namespace Gdiplus;
 - 사용 방법에 따라 일반 push button, toggle button(as a checkbox) 등으로 사용할 수 있음.
 - 2024.08.23 COLORREF -> Gdiplus::Color 로 변경
 
+[기본값 설정 기준]
+- png를 주로 사용하기 위한 클래스를 목적으로 제작되었지만
+  이미지를 사용하지 않고 CButton과 유사하게 표현하여 사용하는 경우도 많다.
+  따라서 기본 배경색도 윈도우 기본값으로 설정되어 있고, m_transparent = false로 시작한다.
+  그래야만 이미지를 사용하지 않는 버튼들도 별다른 세팅없이 일반 버튼처럼 표시된다.
+
+- png를 사용한다면 add_image()등의 멤버함수를 이용해서 세팅하므로 이 세팅을 할 경우는
+  m_transparent는 자동으로 true로 변경된다.
+  단, 투명 png라도 배경색을 투명색이 아닌 다른 색으로도 설정할 수 있으므로
+  back_color()를 이용해 배경색을 칠할 경우에는 m_transparent는 false로 변경된다.
+  따라서 배경색을 별도로 지정할 경우에는 반드시 add_image() 설정후에 해야 한다.
+
 [usage]
 * Gdiplus 사용을 위한 세팅
 * GdiplusBitmap.cpp의 Dummy 클래스에서 자동으로 초기화 및 해제하므로 별도 세팅 불필요.
@@ -132,6 +144,7 @@ public:
 	//하나의 버튼에 대한 normal, over, down, disabled 이미지들을 각각 세팅할 때 사용된다.
 	//UINT가 0이면 자동 생성해준다.
 	//타입이 없으면 기본 _T("PNG")로 처리한다.
+	//배경색을 별도로 지정할 경우에는 반드시 add_image()후에 set_back_color()를 호출해줘야 한다.
 	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	//기본 이미지를 설정할 때 resize한 후 설정
@@ -156,14 +169,13 @@ public:
 	void		set_transparent(bool trans = true);
 
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
-	void		text(CString text);
-	void		text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
-	void		text_color(Gdiplus::Color normal);
-	void		back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+	void		set_text_color(Gdiplus::Color normal);
+	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
 	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
 	//(NH 프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
-	void		back_color(Gdiplus::Color normal, bool auto_set_color = true);
+	void		set_back_color(Gdiplus::Color normal, bool auto_set_color = true);
 	//CGdiButton& text_color() { m_cr_text.clear(); }
 	//CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]
@@ -290,12 +302,12 @@ protected:
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
 	CRect		m_rOrigin = 0;				//컨트롤의 원래 크기 정보
 
-	//배경이 단색이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
+	//배경이 윈도우 기본값이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
 	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
 	bool		m_transparent = false;
 
-	CGdiplusBitmap	m_back;					//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
-	CGdiplusBitmap	m_back_origin;
+	CGdiplusBitmap	m_back_img;					//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
+	CGdiplusBitmap	m_back_img_origin;
 
 	CString		m_text = _T("");
 	std::deque <Gdiplus::Color>	m_cr_text;

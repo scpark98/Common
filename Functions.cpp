@@ -70,7 +70,7 @@ void*		g_wow64_preset;
 #pragma comment(lib, "version.lib")		//for VerQueryValue
 #pragma comment(lib, "comsuppw.lib ")	//for _bstr_t
 
-CString	get_date_string(CTime t, CString sep)
+CString	get_date_str(CTime t, CString sep)
 {
 	CString str;
 
@@ -87,7 +87,7 @@ CString	get_date_string(CTime t, CString sep)
 	return str;
 }
 
-CString get_date_string(COleDateTime t, CString sep)
+CString get_date_str(COleDateTime t, CString sep)
 {
 	CString str;
 
@@ -104,24 +104,24 @@ CString get_date_string(COleDateTime t, CString sep)
 	return str;
 }
 
-CString get_date_string(__timeb32 tb, CString sep)
+CString get_date_str(__timeb32 tb, CString sep)
 {
 	CTime	t(tb.time);
-	return get_date_string(t, sep);
+	return get_date_str(t, sep);
 }
 
-CString get_date_string(SYSTEMTIME st, CString sep)
+CString get_date_str(SYSTEMTIME st, CString sep)
 {
 	CTime	t(st);
-	return get_date_string(t, sep);
+	return get_date_str(t, sep);
 }
 
-CString get_time_string(CTime t, CString sep, bool h24, bool sec)
+CString get_time_str(CTime t, CString sep, bool h24, bool sec)
 {
-	return get_time_string(COleDateTime(t.GetTime()), sep, h24, sec);
+	return get_time_str(COleDateTime(t.GetTime()), sep, h24, sec);
 }
 
-CString get_time_string(COleDateTime t, CString sep, bool h24, bool sec)
+CString get_time_str(COleDateTime t, CString sep, bool h24, bool sec)
 {
 	CString str;
 
@@ -151,29 +151,29 @@ CString get_time_string(COleDateTime t, CString sep, bool h24, bool sec)
 	return str;
 }
 
-CString get_time_string(__timeb32 tb, CString sep, bool h24, bool sec)
+CString get_time_str(__timeb32 tb, CString sep, bool h24, bool sec)
 {
 	CTime	t(tb.time);
-	return get_time_string(t, sep, h24, sec);
+	return get_time_str(t, sep, h24, sec);
 }
 
-CString	get_time_string(SYSTEMTIME st, CString sep, bool h24, bool sec, bool msec)
+CString	get_time_str(SYSTEMTIME st, CString sep, bool h24, bool sec, bool msec)
 {
 	CString str;
 	CTime t(st);
-	str.Format(_T("%s%s%s"), get_time_string(t, sep, h24, sec), (msec ? _T(".") : _T("")), (msec ? i2S(st.wMilliseconds, false, true, 3) : _T("")));
+	str.Format(_T("%s%s%s"), get_time_str(t, sep, h24, sec), (msec ? _T(".") : _T("")), (msec ? i2S(st.wMilliseconds, false, true, 3) : _T("")));
 	return str;
 }
 
-CString	get_datetime_string(CTime t, int type, bool sep, CString mid, bool h24, bool sec)
+CString	get_datetime_str(CTime t, int type, bool sep, CString mid, bool h24, bool sec)
 {
-	return get_datetime_string(COleDateTime(t.GetTime()), type, sep, mid, h24, sec);
+	return get_datetime_str(COleDateTime(t.GetTime()), type, sep, mid, h24, sec);
 }
 
-CString	get_datetime_string(COleDateTime t, int type, bool sep, CString mid, bool h24, bool sec)
+CString	get_datetime_str(COleDateTime t, int type, bool sep, CString mid, bool h24, bool sec)
 {
-	CString sDate = (sep ? get_date_string(t) : get_date_string(t, _T("")));
-	CString sTime = (sep ? get_time_string(t, _T(":"), h24, sec) : get_time_string(t, _T(""), h24, sec));
+	CString sDate = (sep ? get_date_str(t) : get_date_str(t, _T("")));
+	CString sTime = (sep ? get_time_str(t, _T(":"), h24, sec) : get_time_str(t, _T(""), h24, sec));
 
 	if (type == 0)
 		return sDate;
@@ -183,16 +183,16 @@ CString	get_datetime_string(COleDateTime t, int type, bool sep, CString mid, boo
 	return sDate + mid + sTime;
 }
 
-CString	get_datetime_string(__timeb32 tb, int type, bool sep, CString mid, bool h24, bool sec)
+CString	get_datetime_str(__timeb32 tb, int type, bool sep, CString mid, bool h24, bool sec)
 {
 	CTime	t(tb.time);
-	return get_datetime_string(t, type, sep, mid, h24, sec);
+	return get_datetime_str(t, type, sep, mid, h24, sec);
 }
 
-CString	get_datetime_string(SYSTEMTIME st, int type, bool sep, CString mid, bool h24, bool sec, bool msec)
+CString	get_datetime_str(SYSTEMTIME st, int type, bool sep, CString mid, bool h24, bool sec, bool msec)
 {
-	CString sDate = (sep ? get_date_string(st) : get_date_string(st, _T("")));
-	CString sTime = (sep ? get_time_string(st, _T(":"), h24, sec, msec) : get_time_string(st, _T(""), h24, sec, msec));
+	CString sDate = (sep ? get_date_str(st) : get_date_str(st, _T("")));
+	CString sTime = (sep ? get_time_str(st, _T(":"), h24, sec, msec) : get_time_str(st, _T(""), h24, sec, msec));
 
 	if (type == 0)
 		return sDate;
@@ -203,11 +203,11 @@ CString	get_datetime_string(SYSTEMTIME st, int type, bool sep, CString mid, bool
 }
 
 
-CString	get_cur_datetime_string(int type, bool sep, CString mid, bool h24, bool sec, bool msec)
+CString	get_cur_datetime_str(int type, bool sep, CString mid, bool h24, bool sec, bool msec)
 {
 	SYSTEMTIME st;
 	GetLocalTime(&st);
-	return get_datetime_string(st, type, sep, mid, h24, sec, msec);
+	return get_datetime_str(st, type, sep, mid, h24, sec, msec);
 }
 
 #if 0
@@ -1522,7 +1522,7 @@ CTime GetTimeFromDateTimeString(CString sDateTime)
 							_tstoi((TCHAR*)(LPCTSTR)sDateTime.Mid(13, 2)));
 }
 
-CString	get_time_string(double dSec, bool bHasHour /*= true*/, bool bMilliSec /*=false*/)
+CString	get_time_str(double dSec, bool bHasHour /*= true*/, bool bMilliSec /*=false*/)
 {
 	bool minus = false;
 
@@ -5793,17 +5793,8 @@ CRect draw_text(Gdiplus::Graphics &g,
 {
 	bool calcRect = false;
 	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
-	//HDC hdcMemory = NULL;
 
-	//if (g == NULL)
-	//{
-	//	calcRect = true;
-
-	//	//hdcMemory = ::CreateCompatibleDC(hDC);
-	//	g = new Gdiplus::Graphics(hDC);
-	//}
-
-	//배경색
+	//배경색을 rTarget 크기로 그려서는 안된다. 실제 텍스트가 그려질 boundRect 영역만 그려져야 한다.
 	draw_rectangle(g, rTarget, Gdiplus::Color::Transparent, cr_back);
 
 	//큰 글씨는 AntiAlias를 해주는게 좋지만 작은 글씨는 오히려 뭉개지므로 안하는게 좋다.
@@ -6824,7 +6815,7 @@ CString get_file_time_str(FILETIME filetime)
 	FileTimeToLocalFileTime(&(filetime), &ftLocal);
 	FileTimeToSystemTime(&ftLocal, &st);
 
-	return get_datetime_string(st, 2, true, _T(" "), false, false, false);
+	return get_datetime_str(st, 2, true, _T(" "), false, false, false);
 }
 
 size_t read_raw(CString sfile, uint8_t *dst, size_t size)
@@ -10373,7 +10364,6 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 	HANDLE hProcess;
 	PROCESSENTRY32 pe32;
 	DWORD sessionID;
-	DWORD sessionIDTemp;
 
 	sessionID = WTSGetActiveConsoleSessionId();
 	hProcessSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, 0);
@@ -15791,7 +15781,7 @@ void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR 
 		return;
 
 	if (!only_text)
-		str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_string(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
+		str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_str(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
 
 	OutputDebugString(str);
 }

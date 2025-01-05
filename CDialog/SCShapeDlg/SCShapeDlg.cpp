@@ -163,43 +163,60 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_style, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
 
-	//텍스트 출력 크기를 얻어오고
+	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r;
 	
-	r = draw_text(NULL, CRect(), text,
-		font_size, font_style, shadow_depth, thickness, font_name,
-		cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
-
-	CGdiplusBitmap	img(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
+	if (m_img.is_empty())
+		m_img.create(100, 100, PixelFormat32bppARGB, cr_back);
+	else
+		m_img.clear(cr_back);
 
 	//TRACE(_T("img rect = (%d,%d)\n"), img.width, img.height);
 
 	//해당 캔버스에
-	Gdiplus::Graphics g(img.m_pBitmap);
+	Gdiplus::Graphics g(m_img.m_pBitmap);
 
 	//글자를 출력하고
-	r = draw_text(&g, r, text,
+	r = draw_text(g, r, text,
 		font_size, font_style, shadow_depth, thickness, font_name,
 		cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
+
+	//출력
 
 	if (m_hWnd)
 	{
 		res = true;
-		//SetWindowPos(NULL, 0, 0, r.Width(), r.Height(), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	}
 	else
 	{
 		res = create(parent, 0, 0, r.Width(), r.Height());
 	}
 
+	SetWindowPos(NULL, 0, 0, r.Width(), r.Height(), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+	//캔버스 크기가 실제 텍스트 출력크기와 다르면
+	if (r.Width() != m_img.width || r.Height() != m_img.height)
+	{
+		//resize하거나 실제 크기로 다시 생성한다.
+		m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
+
+		//해당 캔버스에
+		Gdiplus::Graphics g(m_img.m_pBitmap);
+
+		//글자를 출력하고
+		r = draw_text(g, r, text,
+			font_size, font_style, shadow_depth, thickness, font_name,
+			cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
+	}
+
 #ifdef _DEBUG
-	img.save(_T("d:\\SCShapeDlg.png"));
+	m_img.save(_T("d:\\SCShapeDlg.png"));
 #endif
 
 	if (!res)
 		return res;
 
-	set_image(parent, &img);
+	set_image(parent, &m_img, false);
 
 	return res;
 }

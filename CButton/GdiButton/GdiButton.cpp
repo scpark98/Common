@@ -128,8 +128,8 @@ BOOL CGdiButton::RegisterWindowClass()
 
 void CGdiButton::release_all()
 {
-	m_back.release();
-	m_back_origin.release();
+	m_back_img.release();
+	m_back_img_origin.release();
 
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
@@ -475,19 +475,12 @@ void CGdiButton::set_transparent(bool trans)
 	redraw_window();
 }
 
-void CGdiButton::text(CString text)
+void CGdiButton::set_text_color(Gdiplus::Color normal)
 {
-	m_text = text;
-	SetWindowText(m_text);
-	redraw_window();
+	set_text_color(normal, normal, normal, gray_color(normal));
 }
 
-void CGdiButton::text_color(Gdiplus::Color normal)
-{
-	text_color(normal, normal, normal, gray_color(normal));
-}
-
-void CGdiButton::text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
+void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
 {
 	m_cr_text.clear();
 
@@ -499,23 +492,23 @@ void CGdiButton::text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus:
 	redraw_window();
 }
 
-void CGdiButton::back_color(Gdiplus::Color normal, bool auto_set_color)
+void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_set_color)
 {
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
 	if (auto_set_color)
-		back_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
+		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
 	else
-		back_color(normal, normal, normal, gray_color(normal));
+		set_back_color(normal, normal, normal, gray_color(normal));
 }
 
-void CGdiButton::back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
+void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
 {
 	//배경색을 설정하면 배경 이미지는 해제시킨다.
 	//단, round가 들어간다면 투명처리해야 한다.
 	m_transparent = false;
 
-	m_back.release();
-	m_back_origin.release();
+	m_back_img.release();
+	m_back_img_origin.release();
 
 	m_cr_back.clear();
 	m_cr_back.push_back(normal);
@@ -925,8 +918,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			pImage = &m_image[idx]->img[0];
 
 		//배경을 그리고
-		if (!m_back.is_empty())
-			g.DrawImage(m_back, 0, 0);
+		if (!m_back_img.is_empty())
+			g.DrawImage(m_back_img, 0, 0);
 		//else
 			//dc.FillSolidRect(rc, cr_back);
 
@@ -939,8 +932,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		int		size = 6;
 		CRect	r = rc;
-
-		m_text = text;
 
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
 		{
@@ -1017,7 +1008,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	if (m_text.IsEmpty())
+	//이미지 버튼이면 텍스트는 출력하지 않는다.
+	if (m_image.size() > 0 || text.IsEmpty())
 		return;
 
 	//뭔가 제대로 검사되지 않는다. 우선 푸시버튼만 대상으로 한다.
@@ -1051,7 +1043,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(cr_text.ToCOLORREF());
-	dc.DrawText(m_text, rText, dwText);
+	dc.DrawText(text, rText, dwText);
 	dc.SelectObject(pOldFont);
 
 	//border는 맨 마지막에 그려준다.
@@ -1276,10 +1268,10 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	rc.InflateRect(l, t, r, b);
 
 	//배경 그림이 존재했다면 배경 또한 새로 따와야 한다.
-	if (m_back.is_valid() && m_back_origin.is_valid())
+	if (m_back_img.is_valid() && m_back_img_origin.is_valid())
 	{
-		m_back_origin.deep_copy(&m_back);
-		m_back.sub_image(rc);
+		m_back_img_origin.deep_copy(&m_back_img);
+		m_back_img.sub_image(rc);
 	}
 
 	SetWindowPos(&wndNoTopMost, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);	

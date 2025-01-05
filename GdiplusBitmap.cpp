@@ -143,6 +143,8 @@ CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id)
 
 CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
 {
+	release();
+
 	m_pBitmap = new Gdiplus::Bitmap(cx, cy, format);
 	Gdiplus::Graphics g(m_pBitmap);
 	g.Clear(cr);
@@ -151,6 +153,8 @@ CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdip
 
 void CGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
 {
+	release();
+
 	m_pBitmap = new Gdiplus::Bitmap(cx, cy, format);
 	Gdiplus::Graphics g(m_pBitmap);
 	g.Clear(cr);
@@ -1299,6 +1303,16 @@ void CGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
 	delete m_pBitmap;
 	m_pBitmap = result->Clone(0, 0, width, height, PixelFormatDontCare);
 	delete result;
+}
+
+//지정된 색으로 채운다.
+void CGdiplusBitmap::clear(Gdiplus::Color cr)
+{
+	if (is_empty())
+		return;
+
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(cr);
 }
 
 //현재 이미지에 더해지는 것이므로 계속 누적될 것이다.

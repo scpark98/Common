@@ -1378,25 +1378,25 @@ void		SetWallPaper(CString sfile);
 
 //////////////////////////////////////////////////////////////////////////
 //date, time 날짜/시간
-	CString		get_date_string(CTime t, CString sep = _T("-"));
-	CString		get_date_string(COleDateTime t, CString sep = _T("-"));
-	CString		get_date_string(__timeb32 tb, CString sep = _T("-"));
-	CString		get_date_string(SYSTEMTIME st, CString sep = _T("-"));
+	CString		get_date_str(CTime t, CString sep = _T("-"));
+	CString		get_date_str(COleDateTime t, CString sep = _T("-"));
+	CString		get_date_str(__timeb32 tb, CString sep = _T("-"));
+	CString		get_date_str(SYSTEMTIME st, CString sep = _T("-"));
 
-	CString		get_time_string(CTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
-	CString		get_time_string(COleDateTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
-	CString		get_time_string(__timeb32 tb, CString sep = _T(":"), bool h24 = true, bool sec = true);
-	CString		get_time_string(SYSTEMTIME st, CString sep = _T(":"), bool h24 = true, bool sec = true, bool msec = true);
-	CString		get_time_string(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
-
-	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
-	CString		get_datetime_string(CTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
-	CString		get_datetime_string(COleDateTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
-	CString		get_datetime_string(__timeb32 tb, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
-	CString		get_datetime_string(SYSTEMTIME st, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = true);
+	CString		get_time_str(CTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_str(COleDateTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_str(__timeb32 tb, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_str(SYSTEMTIME st, CString sep = _T(":"), bool h24 = true, bool sec = true, bool msec = true);
+	CString		get_time_str(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
 
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
-	CString		get_cur_datetime_string(int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = false);
+	CString		get_datetime_str(CTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
+	CString		get_datetime_str(COleDateTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
+	CString		get_datetime_str(__timeb32 tb, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
+	CString		get_datetime_str(SYSTEMTIME st, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = true);
+
+	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
+	CString		get_cur_datetime_str(int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true, bool msec = false);
 
 
 	//2003-04-16 18:01:00.120

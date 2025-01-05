@@ -904,7 +904,6 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 	if (m_lbuttondown && IsWindowEnabled())
 	{
-		int nPixel;
 		/*
 		// 범위를 벗어났는지 검사한다
 		if(m_is_vertical)

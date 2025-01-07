@@ -53,6 +53,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHOVER()
 	ON_WM_MOUSELEAVE()
+	ON_WM_GETMINMAXINFO()
 END_MESSAGE_MAP()
 
 
@@ -316,7 +317,7 @@ void CSCTreeCtrl::OnPaint()
 		if (m_is_shell_treectrl)
 		{
 			GetItemImage(hItem, image_index, image_selected_index);
-			image_index = m_pShellImageList->GetSystemImageListIcon(get_fullpath(GetSelectedItem()), true);
+			image_index = m_pShellImageList->GetSystemImageListIcon(get_path(GetSelectedItem()), true);
 			m_pShellImageList->m_imagelist_small.Draw(&dc, image_index,
 				CPoint(rItem[rect_icon].left, rItem[rect_icon].CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 		}
@@ -612,7 +613,7 @@ BOOL CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	//HWND hWnd = GetParent()->GetSafeHwnd();
 	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
 	//			(WPARAM)&CSCTreeCtrlMessage(this, message_selchanged),
-	//			(LPARAM)&CString(get_fullpath(GetSelectedItem())));
+	//			(LPARAM)&CString(get_path(GetSelectedItem())));
 
 	*pResult = 0;
 
@@ -1475,7 +1476,7 @@ void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 	ScreenToClient(&pt);
 
 	HTREEITEM hItem = HitTest(pt, &nFlags);
-	TRACE(_T("%s, %d, %d, %d\n"), get_fullpath(hItem), pt.x, pt.y, nFlags);
+	TRACE(_T("%s, %d, %d, %d\n"), get_path(hItem), pt.x, pt.y, nFlags);
 
 	//아이콘+레이블 영역이라면
 	if (nFlags & TVHT_ONITEM)
@@ -1490,7 +1491,7 @@ void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 			//물론 실제 child가 없는 폴더일수도 있다.
 			if (GetChildItem(hItem) == NULL)
 			{
-				insert_folder(hItem, get_fullpath(hItem));
+				insert_folder(hItem, get_path(hItem));
 				m_folder_list = iterate_tree_with_no_recursion();
 			}
 		}
@@ -2923,7 +2924,7 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 
 		//아직 펼쳐진 적이 없는 폴더라면 우선 서브 폴더들을 추가해준 후 새 폴더를 추가해야 한다.
 		//if (GetChildItem(hParent) == NULL)
-		//	insert_folder(hParent, get_fullpath(hParent));
+		//	insert_folder(hParent, get_path(hParent));
 		Expand(hParent, TVE_EXPAND);
 
 		hItem = InsertItem(label.IsEmpty() ? _T("새 폴더") : label,
@@ -3107,4 +3108,14 @@ void CSCTreeCtrl::set_root_item(CString label, int image_index, int selected_ima
 	}
 
 	TRACE(_T("m_root_item = %p\n"), m_root_item);
+}
+
+
+void CSCTreeCtrl::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	lpMMI->ptMinTrackSize.x = 50;
+	lpMMI->ptMinTrackSize.y = 50;
+
+	CTreeCtrl::OnGetMinMaxInfo(lpMMI);
 }

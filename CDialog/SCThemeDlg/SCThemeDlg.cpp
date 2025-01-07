@@ -52,6 +52,10 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_CTLCOLOR()
 	ON_WM_SYSCOMMAND()
 	ON_WM_TIMER()
+	ON_WM_KILLFOCUS()
+	//ON_WM_ACTIVATE()
+	//ON_WM_ACTIVATEAPP()
+	ON_WM_WINDOWPOSCHANGED()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
@@ -313,12 +317,12 @@ LRESULT CSCThemeDlg::OnNcHitTest(CPoint point)
 BOOL CSCThemeDlg::OnNcActivate(BOOL bActive)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_is_resizable)
+	//if (m_is_resizable)
 	{
 		//return을 FALSE로 하게 되면 메시지박스가 떴을 때 액션이 동작되지 않는다.
 		//또한 여기서 Invalidate()을 해주지 않으면 상단 잔상이 생긴다.
 		Invalidate();
-		//RedrawWindow();
+		RedrawWindow();
 		return TRUE;// FALSE;
 	}
 
@@ -358,7 +362,7 @@ void CSCThemeDlg::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	CMemoryDC dc(&dc1, &rc, false);
+	CMemoryDC dc(&dc1, &rc);
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -519,7 +523,10 @@ BOOL CSCThemeDlg::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_KEYDOWN)
+	{
+		TRACE(_T("keydown on CSCThemeDlg\n"));
 		return FALSE;
+	}
 
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
@@ -567,7 +574,7 @@ void CSCThemeDlg::set_back_image(UINT resource_id, int draw_mode)
 
 HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
-	//HBRUSH hbr = CDialogEx::OnCtlColor(pDC, pWnd, nCtlColor);
+	HBRUSH hbr = CDialogEx::OnCtlColor(pDC, pWnd, nCtlColor);
 
 	// TODO:  여기서 DC의 특성을 변경합니다.
 	//if (nCtlColor == CTLCOLOR_STATIC)
@@ -577,11 +584,11 @@ HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 	//}
 
 	//hbr = (HBRUSH)::GetStockObject(NULL_BRUSH);
-	return (HBRUSH)GetStockObject(WHITE_BRUSH);
+	//return (HBRUSH)GetStockObject(WHITE_BRUSH);
 
 
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
-	//return hbr;
+	return hbr;
 }
 
 
@@ -601,10 +608,53 @@ void CSCThemeDlg::OnSysCommand(UINT nID, LPARAM lParam)
 void CSCThemeDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	//if (nIDEvent == 0)
+	//if (nIDEvent == timer_refresh_title_area)
 	//{
-	//	KillTimer(nIDEvent);
-	//	m_sys_buttons.Invalidate();
+	//	TRACE(_T("timer_refresh_title_area\n"));
 	//}
 	CDialogEx::OnTimer(nIDEvent);
+}
+
+
+void CSCThemeDlg::OnKillFocus(CWnd* pNewWnd)
+{
+	CDialogEx::OnKillFocus(pNewWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//Invalidate();
+	//RedrawWindow();
+}
+
+
+void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+{
+	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+
+	//nFTDServer 프로젝트에서 deactivate되면 타이틀바 영역의
+	//Wait(1000);
+
+	//Invalidate();
+	//RedrawWindow();
+}
+
+
+void CSCThemeDlg::OnActivateApp(BOOL bActive, DWORD dwThreadID)
+{
+	CDialogEx::OnActivateApp(bActive, dwThreadID);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//Invalidate();
+	//RedrawWindow();
+}
+
+
+void CSCThemeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+{
+	CDialogEx::OnWindowPosChanged(lpwndpos);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//Invalidate();
+	//RedrawWindow();
 }

@@ -233,10 +233,15 @@ bool CGdiplusBitmap::load(CString file, bool show_error)
 
 	bool open_success = false;
 
-	if (use_copied_open && !temp.is_empty())
+	if (use_copied_open)
+	{
+		if (temp.m_pBitmap)
+			open_success = true;
+	}
+	else if (m_pBitmap && m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+	{
 		open_success = true;
-	else if (m_pBitmap->GetLastStatus() == Gdiplus::Ok)
-		open_success = true;
+	}
 
 	if (open_success)
 	{
@@ -616,7 +621,7 @@ bool CGdiplusBitmap::set_raw_data()
 
 bool CGdiplusBitmap::is_empty()
 {
-	return (m_pBitmap == NULL);
+	return (m_pBitmap == NULL || width <= 0 || height <= 0);
 }
 
 bool CGdiplusBitmap::is_valid()

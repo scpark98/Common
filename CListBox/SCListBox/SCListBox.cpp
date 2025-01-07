@@ -310,9 +310,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (m_as_folder_list)
 	{
 		rect.left += 6;		//left margin
-		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID], m_pShellImageList);
+		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID], m_pShellImageList, !m_is_local);
 		m_pShellImageList->m_imagelist_small.Draw(pDC, m_pShellImageList->GetSystemImageListIcon(real_path, true),
 			CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		//m_pShellImageList->m_imagelist_small.Draw(pDC, m_folder_list[lpDIS->itemID].,
+		//	CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		rect.left += 16;	//small icon width
 		rect.left += 14;	//margin between icon and text
 
@@ -943,10 +945,10 @@ BOOL CSCListBox::OnLbnSelchange()
 
 		if (m_hParentWnd)
 		{
-			::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&CSCListBoxMessage(this, message_sclistbox_selchanged), (LPARAM)&text);
-
 			if (m_as_popup)
 				ShowWindow(SW_HIDE);
+
+			::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&CSCListBoxMessage(this, message_sclistbox_selchanged), (LPARAM)&text);
 		}
 	}
 

@@ -195,7 +195,7 @@ public:
 	void		refresh_list(bool reload = true);
 
 	//m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
-	void		display_list(CString cur_path);
+	void		display_filelist(CString cur_path);
 
 
 	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
@@ -488,6 +488,8 @@ public:
 	//자체 imagelist를 사용하지 않는 컨트롤이라면 쉽게 lineheight를 조절할 수 있다.
 	bool		m_use_own_imagelist = true;
 	void		set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
+
+	int			get_line_height() { return m_line_height; }
 	void		set_line_height(int height);
 
 	void		set_column_width(int nCol, int cx);

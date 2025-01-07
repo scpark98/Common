@@ -78,6 +78,19 @@ public:
 	int		message;
 };
 
+
+class CSCListBoxItem
+{
+	CSCListBoxItem(WIN32_FIND_DATA _data, UINT _icon_index)
+	{
+		data = _data;
+		icon_index = _icon_index;
+	}
+
+	WIN32_FIND_DATA		data;
+	UINT				icon_index = 0;	//remote의 파일/폴더목록을 표시할 경우 이 값
+};
+
 class CSCListBox : public CListBox
 {
 // Construction
@@ -181,7 +194,7 @@ public:
 	void		set_color_theme(int theme);
 
 	CShellImageList* m_pShellImageList = NULL;
-	void		set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
+	void		set_shell_imagelist(CShellImageList* pShellImageList, bool is_local) { m_pShellImageList = pShellImageList; m_is_local = is_local; }
 
 	//선택 불가 리스트로 동작. disable로 한 후 색상등은 지정된대로 표시한다.
 	//이렇게 해야 키보드, 마우스 이벤트들을 쉽게 차단할 수 있다.
@@ -238,6 +251,8 @@ protected:
 	bool		m_use_over = false;					//hover hilighted
 	int			m_over_item = -1;
 	bool		m_as_popup = false;					//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
+
+	bool		m_is_local = true;
 	bool		m_as_folder_list = false;			//폴더목록을 표시하는 목적으로 동작하는 경우
 	std::deque<CString> m_folder_list;
 

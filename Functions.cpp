@@ -14840,7 +14840,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 //sSubSection이 존재하면 그 이름에 "\\screen"을 붙여서 저장한다.
 void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
-	if (pWnd->IsWindowVisible() == false ||	pWnd->IsIconic())
+	if (!pWnd || !pWnd->m_hWnd || pWnd->IsWindowVisible() == false ||	pWnd->IsIconic())
 		return;
 
 	CRect	rc;

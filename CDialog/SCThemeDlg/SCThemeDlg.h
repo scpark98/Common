@@ -13,9 +13,26 @@
 	  (별도 설정도 물론 가능해야 한다)
 
 * Dialog의 Resource 속성
-	- resource 속성에 무관하게 동작되어야 하지만 뭔가 차이가 발생하고 있음.
+	- resource의 제목표시줄 유무, 테두리 속성등에 무관하게 동작되도록 구현해야 하지만
+	  뭔가 모든 경우의 수에 대한 처리가 되지 않은 듯하다.
 	  따라서 우선 속성을 제목표시줄 = 없음, 테두리 = Resizing 으로 설정할 것.
 	  만약 resize를 지원하지 않는 dlg일 경우는 제목표시줄 = 없음, 테두리 = Dialog Frame 으로 설정.
+
+	  또한 main dlg의 OnInitDialog()에서 다음의 코드를 추가해줘야 한다.
+		//이 코드를 넣어야 작업표시줄에서 클릭하여 minimize, restore된다.
+		//작업표시줄에서 해당 앱을 shift+우클릭하여 SYSMENU를 표시할 수 있다.
+		//또한 CResizeCtrl을 이용하면 resize할 때 모든 컨트롤들의 레이아웃을 자동으로 맞춰주는데
+		//아래 코드를 사용하지 않으면 타이틀바가 없는 dlg는 상단에 흰색 여백 공간이 생기는 부작용이 생긴다.
+		//resize가 가능한 dlg일 경우는 WS_THICKFRAME을 넣어주면 윈도우에서 기본 제공하는 shadow도 표시되므로 CWndShadow와 같은
+		//별도의 클래스를 이용하지 않아도 된다.
+		//단, resize가 불필요한 dlg일 경우는 WS_THICKFRAME을 넣어주면 안되는데 이럴 경우는 부작용이 발생한다.
+		//좀 더 방법을 찾아야 한다.
+		SetWindowLong(m_hWnd, GWL_STYLE, WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME);
+
+* main dlg의 OnBnClickedCancel(), PreTranslateMessage()를 추가한 경우 기본 처리 함수는
+	CSCThemeDlg::OnCancel();이 아닌 CDialogEx::OnCancel();이어야 하고
+	PreTranslateMessage()에서도
+	return CSCThemeDlg::PreTranslateMessage(pMsg);가 아닌 return CDialogEx::PreTranslateMessage(pMsg);로 되어 있어야 한다.
 */
 
 #pragma once
@@ -105,6 +122,9 @@ public:
 	virtual void OnCancel() {};
 
 protected:
+	//CSCThemeDlg를 상속받아 만든 dlg들에서도 TIMER_ID를 지정할 수 있고 일반적으로 0번부터 지정하므로
+	//여기서 0번부터 타이머 ID를 주면 위험하다. 다른 파생 dlg에서 사용하지 않을 법한 id부터 시작하자.
+
 	bool				m_use_shadow = true;	//default = true
 	CWndShadow			m_shadow;
 	void				init_shadow();
@@ -161,4 +181,8 @@ public:
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnKillFocus(CWnd* pNewWnd);
+	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
+	afx_msg void OnActivateApp(BOOL bActive, DWORD dwThreadID);
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 };

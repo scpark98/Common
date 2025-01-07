@@ -106,6 +106,7 @@ void CHeaderCtrlEx::OnPaint()
 	Gdiplus::Color crSunkenLight = get_color(m_cr_back, 48);
 	Gdiplus::Color crSunkenDark  = get_color(m_cr_back, -48);
 
+	int header_count = GetItemCount();
 	for (int i = 0; i < GetItemCount(); i++)
 	{
 		GetItemRect(i, rItem);

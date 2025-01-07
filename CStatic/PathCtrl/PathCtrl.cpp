@@ -427,7 +427,7 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	if ((m_path.size() == 0) ||
 		(m_path.size() > 0 && m_path[0].label != get_system_label(CSIDL_DRIVES)) ||
 		(m_path.size() > 1 && m_path[1].label != get_system_label(CSIDL_DRIVES)))
-		m_path.push_front(CPathElement(get_system_label(CSIDL_DRIVES)));
+		m_path.push_front(CPathElement(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES)));
 
 	//항상 표시되는 최상위 항목 추가
 	if (!m_path[0].label.IsEmpty())
@@ -469,7 +469,7 @@ void CPathCtrl::show_sub_folder_list(bool show)
 				lists.push_back(m_path[i].label);
 			}
 
-			lists.push_back(_T("바탕 화면"));
+			lists.push_back(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DESKTOP));//  _T("바탕 화면"));
 			total_lines = m_list_folder.set_folder_list(&lists, m_path[m_start_index].label);
 		}
 		else
@@ -530,7 +530,7 @@ CString CPathCtrl::get_path(int index)
 	if (index == 0)
 		return _T("");
 	else if (index == 1)
-		return get_system_label(CSIDL_DRIVES);
+		return m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 
 	//special folder들인 경우(바탕 화면 등등)
 	if (m_path[2].label.Find(_T(":\\")) < 0 && m_path[2].label.Find(_T(":)")) < 0)
@@ -591,8 +591,18 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	else
 	{
+		if (m_index == 0 && full_path.IsEmpty())
+		{
+			m_remote_sub_folders.clear();
+			m_remote_sub_folders.push_back(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES));
+			m_remote_sub_folders.push_back(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_MYDOCUMENTS));
+			m_remote_sub_folders.push_back(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DESKTOP));
+		}
+		else
+		{
+			::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
+		}
 		count = m_remote_sub_folders.size();
-		::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_request_remote_subfolders, full_path), (LPARAM)&m_remote_sub_folders);
 	}
 
 	if (m_index == 0)

@@ -96,10 +96,10 @@ public:
 	void			back_color(Gdiplus::Color crBack) { m_cr_back = crBack; }
 
 	CShellImageList* m_pShellImageList = NULL;
-	void		set_shell_imagelist(CShellImageList* pShellImageList)
+	void		set_shell_imagelist(CShellImageList* pShellImageList, bool is_local)
 	{
 		m_pShellImageList = pShellImageList;
-		m_list_folder.set_shell_imagelist(pShellImageList);
+		m_list_folder.set_shell_imagelist(pShellImageList, is_local);
 	}
 
 protected:

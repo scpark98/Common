@@ -495,6 +495,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 //정확히 한번만 호출하여 사용하는 것이 정석이므로 우선 별도의 처리는 하지 않음.
 bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 {
+	TRACE(_T("list = %p\n"), this);
+
 	int iStart = 0;
 	int	column = 0;
 
@@ -3474,7 +3476,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 			}
 		}
 
-		display_list(m_path);
+		display_filelist(m_path);
 	}
 	else
 	{
@@ -3484,7 +3486,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 }
 
 //m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
-void CVtListCtrlEx::display_list(CString cur_path)
+void CVtListCtrlEx::display_filelist(CString cur_path)
 {
 	int i;
 	int index;
@@ -3959,6 +3961,26 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		//if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 		m_pDropWnd = pDropWnd;
 
+		//드롭 대상 컨트롤의 상단, 하단에 마우스가 hovering되면 자동 스크롤 시켜줘야 한다.
+		if (m_pDropWnd)
+		{
+			CRect rw;
+			m_pDropWnd->GetWindowRect(rw);
+
+			if (rw.PtInRect(pt))
+			{
+				if (pt.x < rw.left + 32)
+					m_pDropWnd->SendMessage(WM_HSCROLL, SB_LINELEFT);
+				else if (pt.x > rw.right - 32)
+					m_pDropWnd->SendMessage(WM_HSCROLL, SB_LINERIGHT);
+
+				if (pt.y < rw.top + 32)
+					m_pDropWnd->SendMessage(WM_VSCROLL, SB_LINEUP);
+				else if (pt.y > rw.bottom - 32)
+					m_pDropWnd->SendMessage(WM_VSCROLL, SB_LINEDOWN);
+			}
+		}
+
 		// Convert from screen coordinates to drop target client coordinates
 		pDropWnd->ScreenToClient(&pt);
 
@@ -4000,8 +4022,6 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			HTREEITEM hItem = ((CTreeCtrl*)pDropWnd)->HitTest(pt, &uFlags);
-			//TRACE(_T("%d, %d, hItem = %p\n"), pt.x, pt.y, hItem);
-			//TRACE(_T("TVHT_ONITEM\n"));
 			pTree->SetItemState(hItem, TVIS_DROPHILITED, TVIF_STATE);
 			pTree->SelectDropTarget(hItem);
 			ASSERT(hItem == pTree->GetDropHilightItem());

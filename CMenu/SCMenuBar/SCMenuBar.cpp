@@ -331,8 +331,8 @@ void CSCMenuBar::set_color_theme(int theme)
 	for (int i = 0; i < m_menu_button.size(); i++)
 	{
 		//메뉴 버튼들의 색상 설정
-		m_menu_button[i]->text_color(m_theme.cr_text);
-		m_menu_button[i]->back_color(m_theme.cr_back);
+		m_menu_button[i]->set_text_color(m_theme.cr_text);
+		m_menu_button[i]->set_back_color(m_theme.cr_back);
 
 		//각 메뉴버튼에 연결된 팝업메뉴 항목들도 색상 설정
 		m_menu_button[i]->get_menu()->set_color_theme(theme);

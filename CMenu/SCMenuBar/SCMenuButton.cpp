@@ -24,8 +24,8 @@ bool CSCMenuButton::create(CWnd* parent, CString _caption, CRect r, UINT menu_bu
 	BOOL res = CGdiButton::create(_caption, WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_FLAT,
 					r, m_parent, menu_button_id);
 
-	text_color(m_cr_text);
-	back_color(m_cr_back);
+	set_text_color(m_cr_text);
+	set_back_color(m_cr_back);
 
 	m_menu.create(this);
 
@@ -85,11 +85,11 @@ LRESULT CSCMenuButton::on_message_SCMenu(WPARAM wParam, LPARAM lParam)
 
 void CSCMenuButton::set_text_color(Gdiplus::Color cr_text)
 {
-	text_color(cr_text);
+	set_text_color(cr_text);
 }
 
 void CSCMenuButton::set_back_color(Gdiplus::Color cr_back)
 {
-	back_color(cr_back);
+	set_back_color(cr_back);
 }
 

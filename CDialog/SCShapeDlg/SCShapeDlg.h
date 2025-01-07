@@ -102,7 +102,7 @@ public:
 	//keyboard, mouse 이벤트 처리 여부.
 	void			use_control(bool use);
 
-	//alpha = 0 ~ 255
+	//0 : 투명, 255 : 불투명
 	void			set_alpha(int alpha);
 
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
@@ -116,7 +116,7 @@ public:
 							CString font_name = _T("맑은 고딕"),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
-							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DimGray,
 							Gdiplus::Color cr_back = Gdiplus::Color(1, 0, 0, 0));
 	bool			set_text(CSCShapeDlgTextSetting* setting = NULL);
 	bool			set_text(CString str);
@@ -163,6 +163,7 @@ protected:
 	CWnd*			m_parent = NULL;
 
 	CGdiplusBitmap	m_img;
+	//0 : 투명, 255 : 불투명
 	int				m_alpha = 255;
 	void			render(Gdiplus::Bitmap* img);
 

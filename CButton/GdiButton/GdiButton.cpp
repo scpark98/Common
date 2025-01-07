@@ -935,10 +935,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
 		{
-			r.left += 5;
-			r.right = r.left + size * 2 - 1;
-			r.top = r.CenterPoint().y - size + 2;
-			r.bottom = r.top + size * 2 - 1;
+			r.left += 2;
+			r.right = r.left + size * 2 + 1;
+			r.top = r.CenterPoint().y - size - 1;
+			r.bottom = r.top + size * 2 + 1;
 			draw_rectangle(&dc, r, cr_text, Gdiplus::Color::White);
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
@@ -953,6 +953,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			rText.left = rText.right + 4;
 			rText.right = rc.right;
+			//rText.bottom -= 1;
 		}
 		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 		{
@@ -967,27 +968,31 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			}
 			else
 			{
-				r.left += 3;
-				r.right = r.left + size * 2 + 1;
-				r.top = r.CenterPoint().y - size;
-				r.bottom = r.top + size * 2 + 1;
+				//dc.DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONRADIO);
+				r.left += 2;
+				r.right = r.left + size * 2 + 0;
+				r.top = r.CenterPoint().y - size - 0;
+				r.bottom = r.top + size * 2 + 0;
 
-				Pen pen(cr_text, 0.8);
+				Pen pen(cr_text, 1.0);
 				SolidBrush br(cr_text);
 				g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
 
 				if (GetCheck())
 				{
+					r.DeflateRect(2, 2);
 					g.FillEllipse(&br,
-						(Gdiplus::REAL)(r.left + r.Width()) / 4.0f,
-						(Gdiplus::REAL)(r.top + r.Height()) / 4.0f,
-						(Gdiplus::REAL)(r.Width()) / 1.7f,
-						(Gdiplus::REAL)(r.Height()) / 1.7f);
+						(Gdiplus::REAL)(r.left) + 0.2f,
+						(Gdiplus::REAL)(r.top) + 0.2f,
+						(Gdiplus::REAL)(r.Width()) - 0.4f,
+						(Gdiplus::REAL)(r.Height()) - 0.4f);
+					r.InflateRect(2, 2);
 				}
 
 				rText = r;
 				rText.left = rText.right + 4;
 				rText.right = rc.right;
+				rText.bottom += 1;
 			}
 		}
 		else

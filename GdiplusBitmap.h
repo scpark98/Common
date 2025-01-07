@@ -113,6 +113,7 @@ public:
 	//data 값을 변경한 후 다시 이미지에 적용
 	bool	set_raw_data();
 
+	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
 	bool	is_empty();
 	bool	is_valid();
 	int		channels();

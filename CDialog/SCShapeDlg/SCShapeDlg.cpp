@@ -228,7 +228,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)
 	{
 		TRACE(_T("stop current gif...\n"));
 		m_gif_state = state_stop;
-		Wait(1000);
+		Wait(100);
 	}
 
 	if (deep_copy)
@@ -254,6 +254,9 @@ void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)
 	{
 		render(m_img.m_pBitmap);
 	}
+
+	set_alpha(255);
+	ShowWindow(SW_SHOW);
 }
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
@@ -267,8 +270,10 @@ bool CSCShapeDlg::load(CWnd* parent, UINT id)
 bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 {
 	bool res = m_img.load(sType, id);
+
 	if (res)
 		set_image(parent, &m_img, false);
+
 	return res;
 }
 
@@ -288,7 +293,7 @@ void CSCShapeDlg::use_control(bool use)
 		render(m_img.m_pBitmap);
 }
 
-//alpha = 0 ~ 255
+//0 : 투명, 255 : 불투명
 void CSCShapeDlg::set_alpha(int alpha)
 {
 	m_alpha = alpha;
@@ -425,13 +430,13 @@ void CSCShapeDlg::gif_goto(int pos, bool pause)
 
 void CSCShapeDlg::gif_thread()
 {
+	TRACE(_T("gif_thread started...\n"));
+
 	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_gif_index = 0;
 
 	while (m_gif_state != state_stop)
 	{
-		TRACE(_T("gif_thread\n"));
-
 		if (m_gif_state == state_pause)
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -449,7 +454,7 @@ void CSCShapeDlg::gif_thread()
 		long delay = ((long*)m_img.m_pPropertyItem->value)[m_gif_index] * 10;
 		//if (delay < 10)
 		//	delay = 10;
-		TRACE(_T("%3d = %ld ms\n"), m_gif_index, delay);
+		//TRACE(_T("gif_thread %3d = %ld ms\n"), m_gif_index, delay);
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 		m_gif_index++;
 

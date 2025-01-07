@@ -1322,8 +1322,8 @@ h		: 복사할 height 크기(pixel)
 	bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
 
 //HDD
-	ULONGLONG	get_disk_free_size(CString sDrive);
 	ULONGLONG	get_disk_total_size(CString sDrive);
+	ULONGLONG	get_disk_free_size(CString sDrive);
 	//위의 함수로 크기를 구한 후 get_size_str()을 이용할 것
 	//CString		GetDiskSizeString(CString sDrive, int unit = 3, int nfDigit = 0);	// "1.25G / 380.00G", nfDigit은 소수점 자리수
 	CString		GetHDDSerialNumber(int nPhysicalDrive);

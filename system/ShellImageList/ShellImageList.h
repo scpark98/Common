@@ -12,14 +12,16 @@
 #include <afxwin.h>
 #include <map>
 #include <deque>
-/*
-enum ENUM_SHELL_LIST
+
+class CDiskDriveInfo
 {
-	system_label_thisPC = 0,		//내 PC
-	system_label_desktop,			//바탕 화면
-	system_label_mydocuments,		//내 문서
+	UINT			type;	//DRIVE_FIXED, DRIVE_REMOTE, ...
+	CString			label;	//"로컬 디스크 (C:)"
+	CString			path;	//"C:\\"
+	ULARGE_INTEGER	total_space;
+	ULARGE_INTEGER	free_space;
 };
-*/
+
 //내 PC, 바탕 화면, 내 문서 등의 label과 (추후 Downloads 폴더 등도 추가 가능)
 //실제 경로 및 C드라이브~등의 volume label 저장
 //ex. 

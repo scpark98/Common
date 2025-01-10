@@ -43,12 +43,14 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <deque>
 #include <map>
 #include <algorithm>
+#include <set>
+
 //#include <gdiplus.h>
 //#include <gdipluseffects.h>
 #include "GdiplusBitmap.h"
 
-#include "./colors.h"
-#include "./system/ShellImageList/ShellImageList.h"
+#include "colors.h"
+#include "system/ShellImageList/ShellImageList.h"
 
 #include <WinInet.h>
 
@@ -71,7 +73,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define __function__ __FUNCTION__
 #endif
 
-#define _S load_string
+#ifndef _S
+	#define _S load_string
+#endif
 
 #ifdef _MSC_VER
 #define __class_func__ __function__
@@ -237,6 +241,9 @@ enum RATIO_RECT_ATTACH
 #define		MAKE_MULTIPLY_D(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))
 
 extern		int			g_nDaysOfMonth[12];
+
+//°¢ ¾ğ¾î¿¡ »ç¿ëµÇ´Â ÁÖ¼®¸¶Å©
+extern		std::deque<CString>		g_comment_mark;
 
 //serial port °ü·Ã
 #define		MAX_BAUD_RATE	15
@@ -602,13 +609,18 @@ struct	NETWORK_INFO
 	//ASCII ÄÚµåÀÇ #33(0x21)(' ') ~ #126(0x7E)('~') ¹üÀ§ÀÎÁö(ÀĞÀ» ¼ö ÀÖ´Â ¹®ÀÚ¿­ÀÎÁö)
 	bool		is_readable_char(CString src);
 
+	//°¢ ¾ğ¾î¸¶´Ù ÁÖ¼®Ã³¸® ¹®ÀÚ¿­ÀÌ ´Ù¸£¹Ç·Î ÁÖ¼®Ã³¸®µÈ ¶óÀÎÀÎÁö ÆÇº°
+	//¸®ÅÏ°ªÀº ÇØ´ç ÁÖ¼®Ã³¸® ¹®ÀÚ¿­
+	CString		is_comment(CString src);
+
 	//'°¡'~'ÆR'¹üÀ§ÀÇ ¿ÂÀüÇÑ ÇÑ±ÛÀÎÁö °Ë»çÇÑ´Ù.
 	//'°¡' = true
 	//'°­' = true
 	//'°­¤§' = false
 	//allow_ascii°¡ true¶ó¸é ¿µ¹®, ¼ıÀÚ, Æ¯¼ö¹®ÀÚ°¡ ÀÖ¾îµµ ÇÑ±Û¸¸ ¿ÂÀüÇÏ¸é trueÀÌ¸ç
 	//allow_ascii°¡ false¶ó¸é ¿À·ÎÁö ÇÑ±Û·Î¸¸ ±¸¼ºµÇ¾ú´ÂÁö¸¦ ÆÇº°ÇÏ¿© ¸®ÅÏÇÑ´Ù.
-	bool		is_hangul(CString str, bool allow_ascii = false);
+	//allow_ascii°¡ trueÀÏ °æ¿ì ½ÇÁ¦ ÇÑ±Û¹®ÀÚ°¡ Æ÷ÇÔµÇ¾ú´ÂÁöµµ ÆÇº°ÇÒ °æ¿ì´Â int*¸¦ ³Ñ°Ü¹Ş¾Æ ÆÇ´ÜÇÏ¸é µÈ´Ù.
+	bool		is_hangul(CString str, bool allow_ascii = false, int *hangul_count = NULL);
 
 	//¹®ÀÚ¿­ÀÌ ¿ÂÀüÇÑÁö ±úÁø ¹®ÀÚÀÎÁö¸¦ ÆÇº°(Æ¯È÷ ÇÑ±Û ÀÎÄÚµù ±úÁü ÆÇº°)
 	bool		is_valid_string(CString src, bool include_hangul);
@@ -673,7 +685,7 @@ struct	NETWORK_INFO
 	double		get_double(CString& src, CString sep = _T("|"));
 
 	//resource string tableÀÇ ¹®ÀÚ¿­À» ¸®ÅÏÇÑ´Ù.
-	CString		load_string(UINT nID);
+	extern CString load_string(UINT nID);
 
 	//unit			: -1:auto, 0:bytes, 1:KB, 2:MB, 3:GB ~
 	//autoÀÏ °æ¿ì´Â 1000º¸´Ù ÀÛÀ»‹š±îÁö ³ª´©°í ¼Ò¼öÁ¡Àº 2ÀÚ¸®±îÁö Ç¥½ÃÇÑ´Ù.(ex 7.28TB)
@@ -968,6 +980,8 @@ struct	NETWORK_INFO
 
 	//"C:\\", "C:\\Temp"¿Í °°ÀÌ ·çÆ®ÀÏ¶§¿Í ÀÏ¹İ Æú´õÀÏ °æ¿ì ³¡¿¡ ¿ª½½·¡½Ã À¯¹«°¡ ´Ù¸£¹Ç·Î ÇÊ¿ä.
 	bool		is_drive_root(CString path);
+	//src Æú´õ °æ·Î¿¡ sub Æú´õ °æ·Î¸¦ ºÙ¿©ÁÖ´Â ´Ü¼øÇÑ ÇÔ¼öÁö¸¸ µå¶óÀÌºê ·çÆ®ÀÏ¶§¿Í ¾Æ´Ò¶§ µîÀÇ Ã³¸®¶§¹®¿¡ °Ë»çÇÏ¿© °áÇÕÇØÁÖ´Â ¸ñÀûÀ¸·Î Ãß°¡.
+	CString		concat_path(CString src, CString sub);
 
 	//»õ Æú´õ, »õ Æú´õ (2)¿Í °°ÀÌ Æú´õ³»¿¡ »õ Ç×¸ñÀ» ¸¸µé ¶§ »ç¿ë °¡´ÉÇÑ ÀÎµ¦½º¸¦ ¸®ÅÏÇÑ´Ù.
 	//zero_prefix°¡ 2ÀÌ¸é 001, 002·Î µÈ ÀÎµ¦½º°¡ ºÙÀº ÆÄÀÏ/Æú´õµé¸¸ ´ë»óÀ¸·Î ÇÏ·Á ÇßÀ¸³ª ¾ÆÁ÷ ¹Ì±¸Çö.
@@ -1014,7 +1028,7 @@ struct	NETWORK_INFO
 	int			get_text_encoding(CString sfile);
 	CString		read(CString filepath, int code_page = CP_UTF8);
 	bool		save(CString filepath, CString text, int code_page = CP_UTF8);
-	bool		file_open(FILE** fp, CString mode, CString file);
+	int			file_open(FILE** fp, CString mode, CString file);
 
 	//text ÆÄÀÏÀ» ¿­¾î¼­ dqList¿¡ ³Ö¾îÁØ´Ù.
 	bool		read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8);
@@ -1024,6 +1038,8 @@ struct	NETWORK_INFO
 	//µ¿¿µ»óÀÌ »ı¼ºµÈ Àı´ë½Ã°£ÀÌ ÀúÀåµÇ¾î ÀÖ´Ù.
 	//nÀº 0x3CºÎÅÍ 4¹ÙÀÌÆ®°¡ ±× Å©±âÀÌ´Ù.(28 bytes)
 	char*		GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLength);
+
+	bool		is_binary(CString sfile);
 
 //////////////////////////////////////////////////////////////////////////
 //ÀÎÅÍ³İ ÆÄÀÏ

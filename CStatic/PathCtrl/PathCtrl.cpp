@@ -42,7 +42,7 @@ BEGIN_MESSAGE_MAP(CPathCtrl, CStatic)
 	ON_WM_RBUTTONUP()
 	ON_WM_TIMER()
 	//ON_NOTIFY(LBN_SELCHANGE, IDC_LIST_FOLDERS, &CPathCtrl::OnLbnSelchange)
-	ON_REGISTERED_MESSAGE(Message_CSCListBox, &CPathCtrl::OnMessageSCListBox)
+	ON_REGISTERED_MESSAGE(Message_CSCListBox, &CPathCtrl::on_message_CSCListBox)
 	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CPathCtrl::on_message_CSCEdit)
 	ON_WM_SIZE()
 	ON_WM_KILLFOCUS()
@@ -80,6 +80,7 @@ void CPathCtrl::PreSubclassWindow()
 	m_list_folder.set_as_folder_list();
 	m_list_folder.set_font(m_lf);
 	m_list_folder.set_color_theme(CSCColorTheme::color_theme_popup_folder_list);// popup_folder_list);
+	m_list_folder.set_draw_border();
 
 	//OnNotify, OnSelChange등의 이벤트 핸들러를 추가해봤으나 되지 않아서 선택시에 SendMessage로 처리함.
 	m_list_folder.set_parent(m_hWnd);
@@ -144,26 +145,7 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 		switch (pMsg->wParam)
 		{
 		case VK_RETURN :
-			if (!m_pEdit->IsWindowVisible() || (GetFocus() != m_pEdit))
-				break;
-
-			TRACE(_T("return\n"));
-			m_pEdit->ShowWindow(SW_HIDE);
-			m_pEdit->GetWindowText(text);
-
-			if (m_is_local)
-			{
-				if (!PathFileExists(text))
-					text = m_old_text;
-			}
-			else
-			{
-				::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)0);
-				//if (!is_exist)
-				//	text = m_old_text;
-			}
-
-			set_path(text);
+			edit_end();
 			return true;
 
 		case VK_ESCAPE:
@@ -176,13 +158,6 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 			return true;
 		}
 	}
-	//else if (pMsg->message == WM_KILLFOCUS)
-	//{
-	//	if (m_pEdit && m_pEdit->IsWindowVisible())
-	//	{
-	//		m_pEdit->ShowWindow(SW_HIDE);
-	//	}
-	//}
 
 	return CStatic::PreTranslateMessage(pMsg);
 }
@@ -425,8 +400,8 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 
 	//기본 토큰 추가
 	if ((m_path.size() == 0) ||
-		(m_path.size() > 0 && m_path[0].label != get_system_label(CSIDL_DRIVES)) ||
-		(m_path.size() > 1 && m_path[1].label != get_system_label(CSIDL_DRIVES)))
+		(m_path.size() > 0 && m_path[0].label != m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES)) ||
+		(m_path.size() > 1 && m_path[1].label != m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES)))
 		m_path.push_front(CPathElement(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES)));
 
 	//항상 표시되는 최상위 항목 추가
@@ -729,7 +704,7 @@ void CPathCtrl::OnLbnSelchange(NMHDR* pNMHDR, LRESULT* pResult)
 	return;
 }
 
-LRESULT CPathCtrl::OnMessageSCListBox(WPARAM wParam, LPARAM lParam)
+LRESULT CPathCtrl::on_message_CSCListBox(WPARAM wParam, LPARAM lParam)
 {
 	CSCListBoxMessage* pMsg = (CSCListBoxMessage*)wParam;
 	CString path = *(CString*)lParam;
@@ -971,14 +946,45 @@ void CPathCtrl::OnKillFocus(CWnd* pNewWnd)
 LRESULT CPathCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 {
 	CSCEdit* pEdit = (CSCEdit*)wParam;
+	int	msg = (int)lParam;
 
 	if (!pEdit->IsWindowVisible())
 		return 0;
 
 	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
-	pEdit->ShowWindow(SW_HIDE);
+	if (msg == WM_KILLFOCUS)
+		pEdit->ShowWindow(SW_HIDE);
 
-	//SetWindowText(m_old_text);
+	Invalidate();
 
 	return 0;
+}
+
+void CPathCtrl::edit_end(bool valid)
+{
+	if (!m_pEdit->IsWindowVisible() || (GetFocus() != m_pEdit))
+		return;
+
+	TRACE(_T("edit_end(%d)\n"), valid);
+
+	m_pEdit->ShowWindow(SW_HIDE);
+
+	CString text;
+
+	if (valid)
+		m_pEdit->GetWindowText(text);
+	else
+		text = m_old_text;
+
+	if (m_is_local)
+	{
+		if (!PathFileExists(text))
+			text = m_old_text;
+	}
+	else
+	{
+		::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)0);
+	}
+
+	set_path(text);
 }

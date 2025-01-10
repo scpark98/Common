@@ -319,7 +319,7 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 
 	if (img->GetWidth() == 0 || img->GetHeight() == 0)
 	{
-		TRACE(_T("image width or height is invalid.\n"));
+		TRACE(_T("image width or height is invalid. m_alpha = %d\n"), m_alpha);
 		return;
 	}
 

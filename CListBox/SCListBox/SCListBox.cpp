@@ -87,6 +87,8 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_LBUTTONUP()
 	//ON_WM_PAINT()
 	ON_WM_WINDOWPOSCHANGED()
+	//ON_WM_NCPAINT()
+	//ON_WM_CTLCOLOR()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -195,11 +197,12 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 //						an owner-draw list box changes. 
 //
 {
+	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
+
 	TRACE(_T("GetTopIndex() = %d\n"), GetTopIndex());
 	if ((int)lpDIS->itemID < GetTopIndex())
 		return; 
 
-	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 	//CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생.
 
 	Gdiplus::Graphics g(pDC->GetSafeHdc());
@@ -670,11 +673,16 @@ void CSCListBox::OnPaint()
 {
 	CListBox::OnPaint();
 
-	//CPaintDC dc(this);
-	//CRect rc;
+	CPaintDC dc1(this);
+	CRect rc;
 
-	//GetClientRect(rc);
-	//dc.FillSolidRect(rc, RGB(255, 0, 0));
+	GetClientRect(rc);
+	
+	CMemoryDC dc(&dc1, &rc);
+
+	//DrawItem()에서 각 아이템을 모두 그린 후 OnPaint()에서 border를 그리려 했으나
+	//DrawItem()에서 그려진 내용이 모두 가려진다. 우선 WM_PAINT는 주석처리한다.
+	draw_rectangle(&dc, rc, m_theme.cr_border);
 }
 
 BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
@@ -685,8 +693,9 @@ BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 	//CRect rc;
 	//GetClientRect(rc);
 	//pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+	//draw_line(pDC, 0, 0, 100, 100);
 
-	return TRUE;
+	return FALSE;
 	return CListBox::OnEraseBkgnd(pDC);
 }
 
@@ -1414,4 +1423,21 @@ void CSCListBox::set_color_theme(int theme)
 		return;
 
 	Invalidate();
+}
+
+
+void CSCListBox::OnNcPaint()
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	// 그리기 메시지에 대해서는 CListBox::OnNcPaint()을(를) 호출하지 마십시오.
+}
+
+
+HBRUSH CSCListBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+	HBRUSH hbr = CListBox::OnCtlColor(pDC, pWnd, nCtlColor);
+
+	// TODO:  여기서 DC의 특성을 변경합니다.
+	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
+	return hbr;
 }

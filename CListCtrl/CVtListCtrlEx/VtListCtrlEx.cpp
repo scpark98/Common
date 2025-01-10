@@ -201,6 +201,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
+		//TRACE(_T("in DrawItem. %d, %d\n"), iItem, iSubItem);
+
+		crText = m_list_db[iItem].crText[iSubItem];
+		crBack = m_list_db[iItem].crBack[iSubItem];
+
 		//먼저 선택 여부, focus여부 등에 따라 셀이 그려질 글자색, 배경색을 골라주고...
 
 		//LVIR_BOUNDS로 구할 경우 0번 컬럼은 한 라인의 사각형 영역을 리턴한다.
@@ -229,12 +234,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				crText = m_theme.cr_text_selected_inactive;
 				crBack = m_theme.cr_back_selected_inactive;
 			}
-
-			//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
-			//지정된 색 우선으로 해야 한다.
-			//글자의 배경색은 그냥 컬러 스킴을 따른다.
-			if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
-				crText = m_list_db[iItem].crText[iSubItem];
 		}
 		//drophilited라면 active에 관계없이 drop hilited 색상으로 표시한다.
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
@@ -245,9 +244,10 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			crText = m_list_db[iItem].crText[iSubItem];
 			if (crText.GetValue() == listctrlex_unused_color.GetValue())
 				crText = m_theme.cr_text;
+			else
+				crText = m_list_db[iItem].crText[iSubItem];
 
 			crBack = m_list_db[iItem].crBack[iSubItem];
 			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
@@ -259,6 +259,12 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			}
 		}
 
+		//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
+		//지정된 색이 있다면 그 색을 우선으로 해야 한다.
+		if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
+			crText = m_list_db[iItem].crText[iSubItem];
+		if (m_list_db[iItem].crBack[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
+			crBack = m_list_db[iItem].crBack[iSubItem];
 	
 		pDC->FillSolidRect(itemRect, crBack.ToCOLORREF());
 
@@ -1225,14 +1231,14 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 
 		if (m_is_shell_listctrl)
 		{
-			CString path = get_path();
+			CString path = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
 			CString thisPC = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 
 			if (path == thisPC)
 				return true;
 
 			//드라이브라면 내 컴퓨터로 back (path = "C:", go to ThisPC)
-			if (path.GetLength() == 2 && path[1] == ':')
+			if (is_drive_root(path))
 			{
 				path = thisPC;
 			}
@@ -1273,14 +1279,14 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		{
 			//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
 			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
-			if (m_is_shell_listctrl && m_is_local)
+			if (m_is_shell_listctrl)
 			{
-				if (m_path == get_system_label(CSIDL_DRIVES))
+				if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 					return true;
 
 				//드라이브면 내 PC로 가고
 				if (m_path.Mid(1) == _T(":"))
-					m_path = get_system_label(CSIDL_DRIVES);
+					m_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 				//그렇지 않으면 상위 디렉토리로 이동
 				else
 					m_path = GetParentDirectory(m_path);
@@ -1398,7 +1404,7 @@ void CVtListCtrlEx::OnPaint()
 	//dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
-	if (!m_text_on_empty.IsEmpty())
+	if (m_list_db.size() == 0 && !m_text_on_empty.IsEmpty())
 	{
 		draw_text(g, rc, m_text_on_empty, 10, false, 0, 0, _T("맑은 고딕"));
 	}
@@ -2412,7 +2418,7 @@ int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool is_fullpath)
 		{
 			if (m_is_shell_listctrl && is_fullpath)
 			{
-				fullpath = folder + _T("\\") + get_text(item, col_filename);
+				fullpath = concat_path(folder, get_text(item, col_filename));
 				//fullpath = convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
 				dq->push_back(fullpath);
 			}
@@ -2676,7 +2682,10 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	//dbclick을 편집으로 사용하거나 어떤 액션으로 사용하는 것은
 	//이 클래스를 사용하는 메인에서 구현하는 것이 맞다.
 	//여기서 구현하면 편리한 경우도 있으나 범용성이 없어진다.
-	return FALSE;
+	//=>shell_listctrl이라면 여기서 처리하는 것이 더 범용적인듯하다.
+	//다만 더블클릭으로 경로가 변경되는 이벤트가 발생한 것이므로
+	//이를 parent에도 알려줘야 CPathCtrl, CSCTreeCtrl도 경로가 변경될 것이다.
+	//return FALSE;
 
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: Add your control notification handler code here
@@ -2689,24 +2698,27 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 	TRACE(_T("%d, %d\n"), item, subItem);
 
-	if (m_is_shell_listctrl && m_is_local)
+	if (m_is_shell_listctrl)// && m_is_local)
 	{
 		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
 
-		if (m_path == get_system_label(CSIDL_DRIVES))
+		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 		{
 			m_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList, !m_is_local);
 		}
 		else
 		{
-			if (!PathIsDirectory(m_path + _T("\\") + get_text(item, col_filename)))
+			//파일일 경우는 현재로는 아무처리하지 않는다.
+			if (!(get_file_data(item).dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 				return TRUE;
 
-			m_path = m_path + _T("\\") + get_text(item, col_filename);
+			m_path = concat_path(m_path, get_text(item, col_filename));
 		}
 
 		set_path(m_path);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&m_path);
+
 		return TRUE;
 	}
 
@@ -3322,10 +3334,7 @@ CString CVtListCtrlEx::get_path(int index)
 
 	CString fullpath;
 
-	if (m_path.GetLength() > 1 && m_path.Right(1) != '\\')
-		fullpath = m_path + _T("\\") + get_text(index, col_filename);
-	else
-		fullpath = m_path + get_text(index, col_filename);
+	fullpath = concat_path(m_path, get_text(index, col_filename));
 
 	return convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
 }
@@ -3455,7 +3464,7 @@ void CVtListCtrlEx::refresh_list(bool reload)
 				for (i = 0; i < drive_list.size(); i++)
 				{
 					CVtFileInfo fi;
-					_tcscpy(fi.data.cFileName, drive_list[i]);
+					_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), drive_list[i]);
 					fi.filesize.QuadPart = 0;
 					fi.data.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
 					fi.is_remote = false;
@@ -3498,7 +3507,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
 
-	if (cur_path == get_system_label(CSIDL_DRIVES))
+	if (cur_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 	{
 		set_header_text(col_filesize, GetUserDefaultUILanguage() == 1042 ? _T("사용 가능한 공간") : _T("Free Space"));
 		set_header_text(col_filedate, GetUserDefaultUILanguage() == 1042 ? _T("전체 크기") : _T("Total Size"));
@@ -3523,15 +3532,29 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 		index = insert_item(insert_index, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
 
-		if (m_path == get_system_label(CSIDL_DRIVES))
+		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 		{
-			uint64_t disk_size = get_disk_free_size(real_path);
-			if (disk_size > 0)
-				set_text(index, col_filesize, get_size_str(disk_size, 3, 1));
+			ULARGE_INTEGER ul_free_space;
+			ULARGE_INTEGER ul_total_space;
 
-			disk_size = get_disk_total_size(real_path);
-			if (disk_size > 0)
-				set_text(index, col_filedate, get_size_str(get_disk_total_size(real_path), 3, 1));
+			ul_free_space.QuadPart = 0;
+			ul_total_space.QuadPart = 0;
+
+			if (m_is_local)
+			{
+				ul_free_space.QuadPart = get_disk_free_size(real_path);
+				ul_total_space.QuadPart = get_disk_total_size(real_path);
+			}
+			else
+			{
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_free_space, NULL, real_path)), (LPARAM)&ul_free_space);
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_total_space, NULL, real_path)), (LPARAM)&ul_total_space);
+			}
+
+			if (ul_free_space.QuadPart > 0)
+				set_text(index, col_filesize, get_size_str(ul_free_space.QuadPart, -1));
+			if (ul_total_space.QuadPart > 0)
+				set_text(index, col_filedate, get_size_str(ul_total_space.QuadPart, -1));
 
 			set_text_color(index, col_filesize, RGB(109, 109, 109));
 			set_text_color(index, col_filedate, RGB(109, 109, 109));

@@ -82,13 +82,16 @@ public:
 	//void		add_remote_drive_volume(CString remote_drive_volume);
 
 	//특정 인덱스까지의 fullpath를 리턴한다. -1이면 현재 over 또는 down된 경로까지 리턴.
-	CString		get_path(int index = -1);
+	CString			get_path(int index = -1);
 
-	void		set_path(CString path, std::deque<CString> *sub_folders = NULL);
-	void		SetWindowText(CString path, std::deque<CString>* sub_folders = NULL);
+	void			set_path(CString path, std::deque<CString> *sub_folders = NULL);
+	void			SetWindowText(CString path, std::deque<CString>* sub_folders = NULL);
 
-	bool		use_edit() { return m_use_edit; }
-	void		use_edit(bool use) { m_use_edit = use; }
+	bool			use_edit() { return m_use_edit; }
+	void			use_edit(bool use) { m_use_edit = use; }
+	//편집중인데 edit box가 focus를 잃거나, esc를 입력하거나, enter를 입력하면 편집모드를 종료시킨다.
+	//parent의 OnLButtonDown(), OnRButtonDown()일때에도 편집모드를 종료시키는 코드를 직접 넣어줘야 한다.
+	void			edit_end(bool valid = true);
 
 	Gdiplus::Color	text_color() { return m_cr_text; }
 	void			text_color(Gdiplus::Color crText) { m_cr_text = crText; }
@@ -108,7 +111,7 @@ protected:
 		timer_mouse_over = 0,
 	};
 
-	bool						m_is_local = true;
+	bool					m_is_local = true;
 	//std::map<TCHAR, CString>	m_remote_drive_volume;
 
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만
@@ -119,7 +122,7 @@ protected:
 	void				show_sub_folder_list(bool show);
 
 	bool		m_use_edit = true;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
-	CEdit*		m_pEdit;
+	CEdit*		m_pEdit = NULL;
 	CString		m_old_text;				//편집되기 전의 원본 텍스트
 	CRect		m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
 	void		repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
@@ -149,7 +152,7 @@ protected:
 	void		UpdateSurface();
 	void		ReconstructFont();
 
-	LRESULT		OnMessageSCListBox(WPARAM wParam, LPARAM lParam);
+	LRESULT		on_message_CSCListBox(WPARAM wParam, LPARAM lParam);
 	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 protected:

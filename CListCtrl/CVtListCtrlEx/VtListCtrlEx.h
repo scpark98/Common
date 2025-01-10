@@ -67,16 +67,18 @@ static const UINT Message_CVtListCtrlEx = ::RegisterWindowMessage(_T("MessageStr
 class CVtListCtrlExMessage
 {
 public :
-	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL)
+	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""))
 	{
 		pThis = _this;
 		message = _message;
 		pTarget = _pTarget;
+		param0 = _param0;
 	}
 
 	CWnd*	pThis = NULL;
 	CWnd*	pTarget = NULL;
 	int		message;
+	CString param0 = _T("");
 };
 
 class CVtFileInfo
@@ -159,6 +161,8 @@ public:
 		message_progress_pos = 0,
 		message_drag_and_drop,
 		message_path_changed,
+		message_get_remote_free_space,
+		message_get_remote_total_space,
 	};
 
 

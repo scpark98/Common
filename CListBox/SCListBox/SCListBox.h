@@ -174,6 +174,8 @@ public:
 	void		set_text_color(Gdiplus::Color cr) { m_theme.cr_text = cr; Invalidate(); }
 	void		set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; Invalidate(); }
 
+	void		set_draw_border(bool draw = true) { m_draw_border = draw; }
+
 	int			GetGutterCharNumber() { return m_nGutterCharNumber; }
 	void		SetGutterCharNumber(int chars) { m_nGutterCharNumber = chars; }
 
@@ -261,6 +263,8 @@ protected:
 	bool		m_show_time = true;
 	bool		m_dim_time_str = true;				//시간 문자열은 연한 회색으로 비강조되도록 표시
 
+	bool		m_draw_border = true;				//border
+
 	LOGFONT		m_lf;
 	CFont		m_font;
 	void		ReconstructFont();
@@ -335,6 +339,8 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
+	afx_msg void OnNcPaint();
+	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 };
 
 /////////////////////////////////////////////////////////////////////////////

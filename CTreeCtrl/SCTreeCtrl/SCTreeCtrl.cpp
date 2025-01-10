@@ -808,7 +808,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 			p += parent.GetLength();
 		else
 			p += (parent.GetLength() + 1);
-		_tcscpy(data->cFileName, p);
+		_tcscpy_s(data->cFileName, _countof(data->cFileName), p);
 	}
 
 	tvItem.item.pszText = data->cFileName;
@@ -818,7 +818,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 	if (m_is_shell_treectrl)
 	{
 		if (m_is_local)
-			tvItem.item.cChildren = get_sub_folders(get_path(m_expanding_item) + _T("\\") + data->cFileName);
+			tvItem.item.cChildren = get_sub_folders(concat_path(get_path(m_expanding_item), data->cFileName));
 		else
 			tvItem.item.cChildren = has_children;
 	}
@@ -1129,9 +1129,11 @@ CString CSCTreeCtrl::get_path(HTREEITEM hItem)
 
 void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 {
+	//set_path로 넘어온 경로가 현재 경로와 동일하다면 스킵.
+	if (fullpath == get_path())
+		return;
+
 	fullpath = convert_real_path_to_special_folder(fullpath, m_pShellImageList, !m_is_local);
-	//fullpath = m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES) + _T("\\") + convert_real_path_to_special_folder(fullpath, m_pShellImageList);
-	//AfxMessageBox(fullpath);
 
 	std::deque<CString> dq;
 	get_token_string(fullpath, dq, '\\', false);
@@ -1143,7 +1145,7 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 
 	for (int i = 0; i < dq.size(); i++)
 	{
-		TRACE(_T("finding [%s] from [%s] node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
+		TRACE(_T("CSCTreeCtrl::set_path(). finding [%s] from [%s] node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
 
 		//만약 현재 노드에 아직 child가 추가된 상태가 아니라면 우선 children을 넣어준 후 검색해야 한다.
 		if (GetChildItem(item) == NULL)

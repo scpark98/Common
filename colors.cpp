@@ -582,6 +582,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
 			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
+			cr_border				= Gdiplus::Color::DarkGray;
 			break;
 		case color_theme_dark :
 			cur_theme				= color_theme_dark;
@@ -608,21 +609,23 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
 			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
+			cr_border				= Gdiplus::Color::Black;
 			break;
 
 		case color_theme_popup_folder_list:
 			cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-			cr_text_selected = cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+			cr_text_selected		= cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
 			cr_text_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
-			cr_text_hover = cr_text;
+			cr_text_hover			= cr_text;
 
 			cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
-			cr_back_selected = Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
+			cr_back_selected		= Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 			cr_back_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = Gdiplus::Color(255, 195, 222, 245);
+			cr_back_hover			= Gdiplus::Color(255, 195, 222, 245);
 
-			cr_selected_border = Gdiplus::Color(255, 153, 209, 255);
+			cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
 
+			cr_border				= Gdiplus::Color::DimGray;
 			break;
 
 		default : //case color_theme_default :
@@ -662,5 +665,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
 			cr_selected_border		= gRGB(153, 209, 255);//get_color(cr_back_selected, -32);
+
+			cr_border				= Gdiplus::Color::DimGray;
 	}
 }

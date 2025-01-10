@@ -85,6 +85,11 @@ void CSCSystemButtons::resize()
 		m_top,
 		m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
 		m_button_height);
+
+	//MoveWindow()를 호출하니 Invalidate()이 불필요하게 보이지만 MoveWindow()는 동일한 크기라면 repaint를 하지 않는 듯 하다.
+	//parent dlg가 resize될 때 CSCSystemButtons의 위치가 변경되는데 이 때 크기는 변경되지 않으므로 MoveWindow()에서 repaint를 하지 않는 듯 하다.
+	//따라서 강제로 Invalidate()을 호출한다.
+	Invalidate();
 }
 
 void CSCSystemButtons::adjust(int top, int right)

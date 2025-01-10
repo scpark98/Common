@@ -5,7 +5,6 @@
 #include <fstream>
 #include <filesystem>
 #include <regex>		//require c++11
-#include <set>
 
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
@@ -62,9 +61,10 @@ int			g_nBaudRate[MAX_BAUD_RATE] = { 110, 300, 600, 1200, 2400, 4800, 9600, 1440
 
 bool		initialized_YUV_lookup_table = false;
 
-std::deque<CRect> g_dqMonitors;
+std::deque<CRect>		g_dqMonitors;
+std::deque<CString>		g_comment_mark = { _T("//"), _T("/*"), _T("<!"), _T("#"), };
 
-void*		g_wow64_preset;
+void*					g_wow64_preset;
 
 #pragma comment(lib, "imm32.lib")
 #pragma comment(lib, "version.lib")		//for VerQueryValue
@@ -924,6 +924,15 @@ bool is_drive_root(CString path)
 		return true;
 
 	return false;
+}
+
+//src 폴더 경로에 sub 폴더 경로를 붙여주는 단순한 함수지만 드라이브 루트일때와 아닐때 등의 처리때문에 검사하여 결합해주는 목적으로 추가.
+CString	concat_path(CString src, CString sub)
+{
+	if (is_drive_root(src))
+		return src + sub;
+	
+	return src + _T("\\") + sub;
 }
 
 //새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
@@ -2069,16 +2078,40 @@ bool is_readable_char(CString src)
 	return true;
 }
 
+//각 언어마다 주석처리 문자열이 다르므로 주석처리된 라인인지 판별
+//리턴값은 해당 주석처리 문자열
+CString	is_comment(CString src)
+{
+	src.Trim();
+
+	if (src.IsEmpty())
+		return _T("");
+
+	std::deque<CString>::iterator it;
+	
+	for (it = g_comment_mark.begin(); it != g_comment_mark.end(); it++)
+	{
+		if (src.Find(*it) == 0)
+			return *it;
+	}
+
+	return _T("");
+}
+
+
 //'가'~'힣'범위의 온전한 한글인지 검사한다.
 //'가' = true
 //'강' = true
 //'강ㄷ' = false
 //allow_ascii가 true라면 영문, 숫자, 특수문자가 있어도 한글만 온전하면 true이며
-//allow_ascii가 false라면 오로지 한글로만 구성되었는지를 판별하여 리턴한다.
-bool is_hangul(CString str, bool allow_ascii)
+//allow_ascii가 false라면 오로지 정상적인 한글로만 구성되었는지를 판별하여 리턴한다.
+bool is_hangul(CString str, bool allow_ascii, int* hangul_count)
 {
 	const wchar_t start_ch = L'가';
 	const wchar_t end_ch = L'힣';
+
+	if (hangul_count)
+		*hangul_count = 0;
 
 	for (int i = 0; i < str.GetLength(); i++)
 	{
@@ -2092,6 +2125,9 @@ bool is_hangul(CString str, bool allow_ascii)
 
 		if (str[i] < start_ch || str[i] > end_ch)
 			return false;
+
+		if (hangul_count)
+			(*hangul_count)++;
 	}
 
 	return true;
@@ -4226,6 +4262,9 @@ ULONGLONG get_disk_free_size(CString sDrive)
 	ULARGE_INTEGER	m_lTotalNumberOfBytes;
 	ULARGE_INTEGER	m_lTotalNumberOfFreeBytes;
 	
+	if (sDrive.IsEmpty())
+		sDrive = GetCurrentDirectory();
+
 	if (sDrive.GetLength() == 1)
 		_stprintf(Drive, _T("%s:\\"), sDrive);
 	else
@@ -5350,16 +5389,19 @@ int	get_text_encoding(CString sfile)
 {
 	int text_encoding = text_encoding_ansi;
 
-	unsigned char buf[16];
+	unsigned char buf[1024];
+	int result;
 
 	FILE* fp = _tfopen(sfile, _T("rb"));
 	if (fp == NULL)
 		return text_encoding_unknown;
 
-	fread(buf, 1, 16, fp);
+	fread(buf, 1, 1024, fp);
 	if (buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf)
 		text_encoding = text_encoding_utf8bom;
 	else if (buf[0] == 0xff && buf[1] == 0xfe)
+		text_encoding = text_encoding_unicode;
+	else if (IsTextUnicode(buf, 500, &result))
 		text_encoding = text_encoding_unicode;
 
 	fclose(fp);
@@ -5443,7 +5485,7 @@ bool save(CString filepath, CString text, int code_page)
 	return true;
 }
 
-bool file_open(FILE** fp, CString mode, CString file)
+int file_open(FILE** fp, CString mode, CString file)
 {
 	//encording 방식을 읽어온다.
 	int	text_encoding = get_text_encoding(file);
@@ -5453,7 +5495,10 @@ bool file_open(FILE** fp, CString mode, CString file)
 	else
 		_tfopen_s(fp, file, mode + CHARSET);
 
-	return (fp == NULL ? false : true);
+	if (fp == NULL)
+		return -1;
+
+	return text_encoding;
 }
 
 //text 파일을 열어서 dqList에 넣어준다.
@@ -6717,6 +6762,9 @@ bool show_property_window(std::deque<CString> fullpath)
 	hr = SHGetDesktopFolder(&pDesktop);
 	if (FAILED(hr))
 	{
+#ifdef _DEBUG
+		AfxMessageBox(_T("SHGetDesktopFolder() fail"));
+#endif
 		CoUninitialize();
 		return 0;
 	}
@@ -6726,6 +6774,9 @@ bool show_property_window(std::deque<CString> fullpath)
 		hr = pDesktop->ParseDisplayName(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, (LPITEMIDLIST*)&pidl[i], NULL);
 		if (FAILED(hr))
 		{
+#ifdef _DEBUG
+			AfxMessageBox(_T("pDesktop->ParseDisplayName() fail"));
+#endif
 			pDesktop->Release();
 			CoUninitialize();
 			return 0;
@@ -6956,6 +7007,32 @@ char* GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLengt
 	return NULL;
 }
 
+bool is_binary(CString sfile)
+{
+	std::string filename = CT2CA(sfile);
+	std::ifstream file(filename, std::ios::binary); // Open in binary mode
+	if (!file)
+	{
+		//std::cerr << "Cannot open file: " << filename << std::endl;
+		return false;
+	}
+
+	const size_t bufferSize = 512;
+	char buffer[bufferSize];
+
+	// Read the first 512 bytes (or less if file is smaller)
+	file.read(buffer, bufferSize);
+	std::streamsize bytesRead = file.gcount();
+
+	// Check for non-printable characters
+	for (std::streamsize i = 0; i < bytesRead; ++i)
+	{
+		if (!isprint(static_cast<unsigned char>(buffer[i])) && buffer[i] != '\n' && buffer[i] != '\t' && buffer[i] != '\r') {
+			return true; // Non-printable character found, likely a binary file
+		}
+	}
+	return false; // No non-printable characters, likely a text file
+}
 
 CStringA UTF16toUTF8(const CStringW& utf16)
 {

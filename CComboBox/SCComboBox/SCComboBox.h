@@ -1,21 +1,23 @@
 #pragma once
 
 /*
-- CComboBoxEx라는 클래스를 MFC에서 기본 제공하므로 CComboBoxExt로 파생.
-- 리소스 속성에서 Has String, Owner Draw Fixed를 true로 변경.
+- 리소스 속성에서 Has String = true, Owner Draw = Fixed로 변경.
 */
 
 #include <afxwin.h>
 
 // CColorComboBox
 
-class CComboBoxExt : public CComboBox
+class CSCComboBox : public CComboBox
 {
-	DECLARE_DYNAMIC(CComboBoxExt)
+	DECLARE_DYNAMIC(CSCComboBox)
 
 public:
-	CComboBoxExt();
-	virtual ~CComboBoxExt();
+	CSCComboBox();
+	virtual ~CSCComboBox();
+
+	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
+	int				add(CString text = _T(""));
 
 	COLORREF		m_crText;
 	COLORREF		m_crBack;
@@ -42,13 +44,28 @@ public:
 	//src내에 존재하는 콤보박스 아이템의 인덱스를 리턴.
 	int				find_string(CString src);
 
+//편집 관련
+	void			edit_end(bool valid);
+	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+
+
 protected:
 
-	//폰트 관련
+//폰트 관련
 	LOGFONT			m_lf;
 	CFont			m_font;
 	int				m_font_size;
 	void			reconstruct_font();
+
+//편집 관련
+	bool		m_use_edit = true;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
+	CEdit*		m_pEdit = NULL;
+	CString		m_old_text;				//편집되기 전의 원본 텍스트
+	CRect		m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
+	void		repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
+
+//즐겨찾기 관련
+	CString			m_reg_section;		//load or save할 때 넘어온 section값을 기억해놓는다.
 
 	DECLARE_MESSAGE_MAP()
 public:
@@ -64,6 +81,13 @@ public:
 	virtual void PreSubclassWindow();
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	afx_msg void OnCbnSetfocus();
+	afx_msg void OnCbnKillfocus();
+	afx_msg void OnCbnSelchange();
+	afx_msg void OnCbnSelendok();
+	afx_msg void OnCbnSelendcancel();
+	afx_msg HBRUSH CtlColor(CDC* /*pDC*/, UINT /*nCtlColor*/);
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };
 
 

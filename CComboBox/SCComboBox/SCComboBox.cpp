@@ -620,6 +620,8 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 //현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 int CSCComboBox::add(CString text)
 {
+	int index = -1;
+
 	if (text.IsEmpty())
 		GetWindowText(text);
 
@@ -628,7 +630,7 @@ int CSCComboBox::add(CString text)
 
 	if (FindString(-1, text) < 0)
 	{
-		AddString(text);
+		index = AddString(text);
 
 		if (!m_reg_section.IsEmpty())
 		{
@@ -640,5 +642,7 @@ int CSCComboBox::add(CString text)
 			AfxGetApp()->WriteProfileString(m_reg_section, key, text);
 		}
 	}
+
+	return index;
 }
 

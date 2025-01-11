@@ -1209,19 +1209,15 @@ void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
 }
 
 //회색톤으로 변경만 할 뿐 실제 픽셀포맷은 변경되지 않는다.
-void CGdiplusBitmap::gray()
+//weight가 1.0f이면 original gray이미지로 변경되지만 1.0f보다 크면 밝아지고 작으면 어두워짐.
+void CGdiplusBitmap::gray(float weight)
 {
-	//ColorMatrix colorMatrix = { 0.333f, 0.333f, 0.333f, 0.0f, 0.0f,
-	//							0.333f, 0.333f, 0.333f, 0.0f, 0.0f,
-	//							0.333f, 0.333f, 0.333f, 0.0f, 0.0f,
-	//							0.0f, 0.0f, 0.0f, 1.0, 0.0f,
-	//							0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
-	Gdiplus::ColorMatrix colorMatrix = { 0.299f, 0.299f, 0.299f, 0.0f, 0.0f,
-								0.587f, 0.587f, 0.587f, 0.0f, 0.0f,
-								0.114f, 0.114f, 0.114f, 0.0f, 0.0f,
-								0.0f, 0.0f, 0.0f, 1.0, 0.0f,
-								0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+	Gdiplus::ColorMatrix colorMatrix = { 0.299f * weight, 0.299f * weight, 0.299f * weight, 0.0f, 0.0f,		//red
+										 0.587f * weight, 0.587f * weight, 0.587f * weight, 0.0f, 0.0f,		//green
+										 0.114f * weight, 0.114f * weight, 0.114f * weight, 0.0f, 0.0f,		//blue
+										 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,				//alpha
+										 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
 	//원본을 복사해 둘 이미지를 준비하고
 	CGdiplusBitmap temp;
@@ -1407,8 +1403,94 @@ void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcep
 	m_pBitmap->UnlockBits(&bmData);
 }
 */
+void CGdiplusBitmap::black_and_white(float red, float green, float blue)
+{
+	Gdiplus::ColorMatrix cm = { 1.5f, 1.5f, 1.5f, 0.0f, 0.0f,
+								1.5f, 1.5f, 1.5f, 0.0f, 0.0f,
+								1.5f, 1.5f, 1.5f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								red,  green, blue, 0.0f, 1.0f
+	};
 
-void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
+	Gdiplus::ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+}
+
+void CGdiplusBitmap::adjust_bright(int bright)
+{
+	float fb = (float)bright / 255.0f;
+	Gdiplus::ColorMatrix cm = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								fb, fb, fb, 0.0f, 1.0f
+	};
+
+	Gdiplus::ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+}
+
+void CGdiplusBitmap::adjust_contrast(int contrast)
+{
+	float fc = (float)contrast / 255.0f;
+	float ft = (1.0 - fc) / 2.0;
+	Gdiplus::ColorMatrix cm = { fc, 0.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, fc, 0.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, fc, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								ft, ft, ft, 0.0f, 1.0f
+	};
+
+	Gdiplus::ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+}
+
+void CGdiplusBitmap::sepia()
+{
+	Gdiplus::ColorMatrix cm = { 0.393f, 0.349f, 0.272f, 0.0f, 0.0f,
+								0.769f, 0.686f, 0.534f, 0.0f, 0.0f,
+								0.189f, 0.168f, 0.131f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	Gdiplus::ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+}
+
+void CGdiplusBitmap::polaroid()
+{
+	Gdiplus::ColorMatrix cm = { 1.439, -0.062f, -0.062f, 0.0f, 0.0f,
+								-0.122f, 1.378f, -0.122f, 0.0f, 0.0f,
+								-0.016f, -0.016f, 1.483f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								-0.030f, 0.050f, -0.020f, 0.0f, 1.0f
+	};
+
+	Gdiplus::ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+}
+
+void CGdiplusBitmap::rgb_to_bgr()
+{
+	Gdiplus::ColorMatrix cm = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+								1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, 0.0f, 1.0f
+	};
+
+	Gdiplus::ColorMatrixEffect cmEffect;
+	cmEffect.SetParameters(&cm);
+	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+}
+
+void CGdiplusBitmap::adjust_hsl(int hue, int sat, int light)
 {
 	Gdiplus::HueSaturationLightness hsl;
 	Gdiplus::HueSaturationLightnessParams hslParam;
@@ -1423,7 +1505,7 @@ void CGdiplusBitmap::apply_effect_hsl(int hue, int sat, int light)
 	m_pBitmap->ApplyEffect(&hsl, NULL);
 }
 
-void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
+void CGdiplusBitmap::adjust_rgba(float r, float g, float b, float a)
 {
 	Gdiplus::ColorMatrix cm = {	r, 0.0f, 0.0f, 0.0f, 0.0f,
 						0.0f, g, 0.0f, 0.0f, 0.0f,
@@ -1442,14 +1524,14 @@ void CGdiplusBitmap::apply_effect_rgba(float r, float g, float b, float a)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::apply_effect_blur(float radius, BOOL expandEdge)
+void CGdiplusBitmap::blur(float radius, BOOL expandEdge)
 {
-	Gdiplus::Blur blur;
+	Gdiplus::Blur gdi_blur;
 	Gdiplus::BlurParams param;
 	param.radius = radius;
 	param.expandEdge = expandEdge;
-	blur.SetParameters(&param);
-	m_pBitmap->ApplyEffect(&blur, NULL);
+	gdi_blur.SetParameters(&param);
+	m_pBitmap->ApplyEffect(&gdi_blur, NULL);
 }
 
 void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
@@ -1477,7 +1559,7 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
 
 	g.DrawImage(shadow, 10, 10, shadow.width, shadow.height);
 	//save(_T("d:\\temp\\shadow.png"));
-	apply_effect_blur(14.0f, FALSE);
+	blur(14.0f, FALSE);
 	//save(_T("d:\\temp\\shadow_blur.png"));
 	/*
 	Gdiplus::BlurParams myBlurParams;

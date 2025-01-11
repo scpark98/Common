@@ -23,7 +23,7 @@ CSCMenuSubButton::CSCMenuSubButton(UINT _id, int menu_height)
 	m_button_image[0]->gray();
 
 	//기존 버튼 이미지 컬러톤이 cyan 톤이었으나 코드상에서 다른 색상 톤으로 변경 가능
-	m_button_image[1]->apply_effect_hsl(70);
+	m_button_image[1]->adjust_hsl(70);
 
 	//버튼 이미지의 크기는 menu_height의 80% 크기의 높이를 가지도록 조정한다.
 	float img_height = (float)menu_height * (float)0.95;

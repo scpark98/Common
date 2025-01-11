@@ -33,7 +33,6 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 #ifdef GDIPVER
 #undef GDIPVER
 #endif
-
 #define GDIPVER 0x0110
 
 #include <afxwin.h>
@@ -183,53 +182,72 @@ public:
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
 	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
-	void resize(int cx, int cy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
-	void resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
+	void	resize(int cx, int cy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
+	void	resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 
 	//이미지 캔버스 크기를 조정한다. 남는 공간은 cr_fill로 채운다. cr_fill이 투명이 아닌 경우 주의할 것.
-	void canvas_size(int cx, int cy, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
+	void	canvas_size(int cx, int cy, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
 
-	void sub_image(int x, int y, int w, int h);
-	void sub_image(CRect r);
-	void sub_image(Gdiplus::Rect r);
-	void fit_to_image(Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
-	void set_colorkey(Gdiplus::Color low, Gdiplus::Color high);
-	bool is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
+	void	sub_image(int x, int y, int w, int h);
+	void	sub_image(CRect r);
+	void	sub_image(Gdiplus::Rect r);
+	void	fit_to_image(Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
+	void	set_colorkey(Gdiplus::Color low, Gdiplus::Color high);
+	bool	is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
 
-	void set_matrix(Gdiplus::ColorMatrix *colorMatrix, Gdiplus::ColorMatrix *grayMatrix = NULL);
-	void set_alpha(float alpha);
-	void gray();
-	void negative();
+	void	set_matrix(Gdiplus::ColorMatrix *colorMatrix, Gdiplus::ColorMatrix *grayMatrix = NULL);
+	void	set_alpha(float alpha);
+
 
 	Gdiplus::Color get_color(int x, int y);
 
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
-	void replace_color(int tx, int ty, Gdiplus::Color dst);
-	void replace_color(Gdiplus::Color src, Gdiplus::Color dst = Gdiplus::Color::Transparent);
+	void	replace_color(int tx, int ty, Gdiplus::Color dst);
+	void	replace_color(Gdiplus::Color src, Gdiplus::Color dst = Gdiplus::Color::Transparent);
 
 	//투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
-	void set_back_color(Gdiplus::Color cr_back);
+	void	set_back_color(Gdiplus::Color cr_back);
 
 	//지정된 색으로 채운다.
-	void clear(Gdiplus::Color cr);
+	void	clear(Gdiplus::Color cr);
 
 	//현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
 	//원본에 적용하는 것이 정석이나 구조 수정이 필요하다.
-	void add_rgb(int red, int green, int blue);
+	void	add_rgb(int red, int green, int blue);
 	//void add_rgb_loop(int red, int green, int blue, COLORREF crExcept);
 
-	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
-	void apply_effect_hsl(int hue, int sat = 0, int light = 0);
-	void apply_effect_rgba(float r, float g, float b, float a = 1.0);
-	void apply_effect_blur(float radius, BOOL expandEdge);
+//조정
+	void	adjust_bright(int bright);
+	//contrast = 255이면 원본과 동일.
+	void	adjust_contrast(int contrast);
 
-	void round_shadow_rect(int w, int h, float radius);
+	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
+	void	adjust_hsl(int hue, int sat = 0, int light = 0);
+	void	adjust_rgba(float r, float g, float b, float a = 1.0);
+
+//효과
+	void	blur(float radius, BOOL expandEdge);
+	//round shadow rect 이미지를 만들어주는 함수인데 미완성!
+	void	round_shadow_rect(int w, int h, float radius);
+
+	void	transformBits();
+
+
+	//회색톤으로 변경만 할 뿐 실제 픽셀포맷은 변경되지 않는다.
+//weight가 1.0f이면 original gray이미지로 변경되지만 1.0f보다 크면 밝아지고 작으면 어두워짐.
+	void	gray(float weight = 1.0f);
+	//rgb 모두 -1.0f이면 black&white가 되고 red만 1.0f라면 red&white와 같이 효과가 적용된다.
+	void	black_and_white(float red = -1.0f, float green = -1.0f, float blue = -1.0f);
+	void	negative();
+	void	sepia();
+	void	polaroid();
+	void	rgb_to_bgr();
 
 	//factor(0.01~0.99)		: 중점부터 밖으로 까매지는 정도. 0.0이면 blur 없음.
 	//position(0.01~0.99)	: 바깥에서 중점으로 밝아지는 정도. 0.0이면 blur 없음.
 	//일반적인 테두리 블러 효과는 0.95f, 0.10f로 줄것
 	//4개의 코너를 라운드 처리 할것인지도 옵션으로 줄 수 있다.
-	void round_corner(float radius, float factor = 0.0f, float position = 0.0f, bool tl = true, bool tr = true, bool br = true, bool bl = true);
+	void	round_corner(float radius, float factor = 0.0f, float position = 0.0f, bool tl = true, bool tr = true, bool br = true, bool bl = true);
 
 	//src의 src_bgra_index에 해당하는 채널값을(bgra중의 n번 채널 인덱스)
 	//dst의 dst_bgra_index에 해당하는 채널값으로 변경

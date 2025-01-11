@@ -41,7 +41,7 @@ CGdiButton::CGdiButton()
 	m_use_hover			= true;
 	m_is_hover			= false;
 	m_bIsTracking		= false;
-	m_down_offset		= CPoint(1, 1);
+	m_down_offset		= CPoint(2, 2);
 
 	m_bHasFocus			= false;
 	m_draw_focus_rect	= false;
@@ -887,6 +887,29 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//중간 느낌
 		//g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
 
+		//이미지를 그리기 전에 shadow를 먼저 그려준다.
+		if (m_draw_shadow)
+		{
+			CGdiplusBitmap img_shadow;
+			m_image[idx]->img[0].clone(&img_shadow);
+#ifdef _DEBUG
+			img_shadow.save(_T("d:\\0.origin.png"));
+#endif
+			//img_shadow.resize(rc.Width(), rc.Height());
+			img_shadow.gray(m_shadow_weight);
+			//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
+#ifdef _DEBUG
+			img_shadow.save(_T("d:\\1.gray.png"));
+#endif
+			img_shadow.blur(25, TRUE);
+#ifdef _DEBUG
+			img_shadow.save(_T("d:\\2.blur.png"));
+#endif
+			CRect rc_shadow = rc;
+			//rc_shadow.OffsetRect(4, 4);
+			img_shadow.draw(g, rc_shadow, CGdiplusBitmap::draw_mode_origin);
+		}
+
 		if (m_bAsStatic)
 		{
 			pImage = &m_image[idx]->img[0];
@@ -918,13 +941,19 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			pImage = &m_image[idx]->img[0];
 
 		//배경을 그리고
-		if (!m_back_img.is_empty())
+		if (m_back_img.is_valid())
 			g.DrawImage(m_back_img, 0, 0);
-		//else
-			//dc.FillSolidRect(rc, cr_back);
+		else if (m_cr_back.size())
+			dc.FillSolidRect(rc, cr_back.ToCOLORREF());
 
-		//g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
-		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
+		//down 옵셋만 변경해서 그릴 경우
+		//g.DrawImage(*pImage, pt.x, pt.y, m_width, m_height);
+
+		//down 작은 크기로 그릴 경우
+		g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+
+		//down 효과없이 그릴 경우
+		//pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
 	}
 	//설정된 이미지가 없는 경우 버튼의 이미지를 그려주고
 	//기본 텍스트도 출력한다.
@@ -1508,6 +1537,15 @@ void CGdiButton::draw_border(bool draw, Gdiplus::Color cr, int thick)
 	m_border_thick = thick;
 }
 
+//투명 버튼의 경우 그림자를 표시한다.
+//weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
+//이미지 원본에 따라 shadow의 밝기가 다르므로 이 값으로 적절하게 조정한다.
+void CGdiButton::draw_shadow(bool draw, float weight)
+{
+	m_draw_shadow = draw;
+	m_shadow_weight = weight;
+}
+
 void CGdiButton::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CButton::OnWindowPosChanged(lpwndpos);
@@ -1626,21 +1664,21 @@ void CGdiButton::apply_effect_hsl(int state_index, int hue, int sat, int light)
 	{
 		if (state_index < 0)
 		{
-			m_image[i]->img[0].apply_effect_hsl(hue, sat, light);
-			m_image[i]->img[1].apply_effect_hsl(hue, sat, light);
-			m_image[i]->img[2].apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[0].adjust_hsl(hue, sat, light);
+			m_image[i]->img[1].adjust_hsl(hue, sat, light);
+			m_image[i]->img[2].adjust_hsl(hue, sat, light);
 		}
 		else if (state_index == 0)
 		{
-			m_image[i]->img[0].apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[0].adjust_hsl(hue, sat, light);
 		}
 		else if (state_index == 1)
 		{
-			m_image[i]->img[1].apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[1].adjust_hsl(hue, sat, light);
 		}
 		else if (state_index == 2)
 		{
-			m_image[i]->img[2].apply_effect_hsl(hue, sat, light);
+			m_image[i]->img[2].adjust_hsl(hue, sat, light);
 		}
 	}
 
@@ -1667,21 +1705,21 @@ void CGdiButton::apply_effect_rgba(int state_index, float r, float g, float b, f
 	{
 		if (state_index < 0)
 		{
-			m_image[i]->img[0].apply_effect_rgba(r, g, b, a);
-			m_image[i]->img[1].apply_effect_rgba(r, g, b, a);
-			m_image[i]->img[2].apply_effect_rgba(r, g, b, a);
+			m_image[i]->img[0].adjust_rgba(r, g, b, a);
+			m_image[i]->img[1].adjust_rgba(r, g, b, a);
+			m_image[i]->img[2].adjust_rgba(r, g, b, a);
 		}
 		else if (state_index == 0)
 		{
-			m_image[i]->img[0].apply_effect_rgba(r, g, b, a);
+			m_image[i]->img[0].adjust_rgba(r, g, b, a);
 		}
 		else if (state_index == 1)
 		{
-			m_image[i]->img[1].apply_effect_rgba(r, g, b, a);
+			m_image[i]->img[1].adjust_rgba(r, g, b, a);
 		}
 		else if (state_index == 2)
 		{
-			m_image[i]->img[2].apply_effect_rgba(r, g, b, a);
+			m_image[i]->img[2].adjust_rgba(r, g, b, a);
 		}
 	}
 
@@ -1708,21 +1746,21 @@ void CGdiButton::apply_effect_blur(int state_index, float radius, BOOL expandEdg
 	{
 		if (state_index < 0)
 		{
-			m_image[i]->img[0].apply_effect_blur(radius, expandEdge);
-			m_image[i]->img[1].apply_effect_blur(radius, expandEdge);
-			m_image[i]->img[2].apply_effect_blur(radius, expandEdge);
+			m_image[i]->img[0].blur(radius, expandEdge);
+			m_image[i]->img[1].blur(radius, expandEdge);
+			m_image[i]->img[2].blur(radius, expandEdge);
 		}
 		else if (state_index == 0)
 		{
-			m_image[i]->img[0].apply_effect_blur(radius, expandEdge);
+			m_image[i]->img[0].blur(radius, expandEdge);
 		}
 		else if (state_index == 1)
 		{
-			m_image[i]->img[1].apply_effect_blur(radius, expandEdge);
+			m_image[i]->img[1].blur(radius, expandEdge);
 		}
 		else if (state_index == 2)
 		{
-			m_image[i]->img[2].apply_effect_blur(radius, expandEdge);
+			m_image[i]->img[2].blur(radius, expandEdge);
 		}
 	}
 

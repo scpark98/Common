@@ -59,7 +59,10 @@ using namespace Gdiplus;
   (on/off, checked/unchecked, play/pause, img0/img1/img2...)
 
 * set_auto_repeat()으로 반복 실행되는 버튼으로 동작 가능.
-* 
+
+* 지원되는 버튼 종류
+	[투명 png 버튼]
+	- 
 */
 
 //버튼 자동 정렬 정의이며 특정 좌표값 기준이 아닌
@@ -240,7 +243,12 @@ public:
 	void		draw_border(bool draw = true, Gdiplus::Color cr = Gdiplus::Color::DimGray, int thick = 1);
 
 	//3D, sunken 
-	void		use_3D_rect(bool use) { m_b3DRect = use; Invalidate(); }
+	void		use_3D_rect(bool use = true) { m_b3DRect = use; Invalidate(); }
+
+	//투명 버튼의 경우 그림자를 표시한다.
+	//weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
+	//이미지 원본에 따라 shadow의 밝기가 다르므로 이 값으로 적절하게 조정한다.
+	void		draw_shadow(bool draw = true, float weight = 1.0f);
 
 	//blink
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown
@@ -339,6 +347,11 @@ protected:
 	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
+
+	//투명 버튼의 경우 그림자를 표시한다.
+	bool		m_draw_shadow = false;
+	//weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
+	float		m_shadow_weight = 1.0f;
 
 	bool		m_draw_border = false;
 	Gdiplus::Color m_cr_border = Gdiplus::Color::DimGray;

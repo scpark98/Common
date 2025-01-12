@@ -58,16 +58,20 @@ public:
 class CSCTreeCtrlMessage
 {
 public:
-	CSCTreeCtrlMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL)
+	CSCTreeCtrlMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""), CString _param1 = _T(""))
 	{
 		pThis = _this;
 		message = _message;
 		pTarget = _pTarget;
+		param0 = _param0;
+		param1 = _param1;
 	}
 
 	CWnd*	pThis = NULL;
 	CWnd*	pTarget = NULL;
-	int		message;
+	int		message = 0;
+	CString	param0;
+	CString	param1;
 };
 
 class CSCTreeCtrl : public CTreeCtrl
@@ -85,6 +89,8 @@ public:
 		//message_selchanged = 0,		//TVN_SELCHANGED를 이용하므로 제거한다.
 		message_drag_and_drop = 0,
 		message_request_folder_list,	//remote일 경우 OnTvnItemexpanding() 메시지가 발생하면 remote의 폴더목록을 받아서 넣어줘야 한다.
+		message_request_new_folder,
+		message_request_rename,
 		message_edit_item,				//F2키를 누르면 메인에서 편집작업을 수행하기 위해.
 	};
 
@@ -134,7 +140,15 @@ public:
 	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local);
 
 	//드라이브 폴더를 다시 읽어들인다.
-	void		refresh();
+	void		refresh(HTREEITEM hParent = NULL);
+
+	//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
+	//"새 폴더" or "New Folder" 등 다국어까지 고려하여 타이틀을 받는다.
+	bool		add_item(HTREEITEM hParent, CString new_folder_title, bool edit_mode);
+
+	//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
+	int			get_file_index(CString path, CString new_folder_title);
+
 
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
 	CString		get_path(HTREEITEM hItem = NULL);
@@ -193,7 +207,7 @@ public:
 			m_drag_images_id.push_back(id);
 	}
 
-	void			set_use_popup_menu(bool use) { m_use_popup_menu = use; }
+	void			set_use_popup_menu(bool use = true) { m_use_popup_menu = use; }
 
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
@@ -204,7 +218,7 @@ public:
 	BOOL			move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hDestItem);
 	BOOL			move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
 
-	//20240801 scpark 편집과 관계된 코드 추가
+//편집 관련
 	void			edit_item(HTREEITEM hItem = NULL);
 	void			edit_end(bool valid = true);
 	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
@@ -217,7 +231,7 @@ public:
 	long			m_last_clicked_time = 0;
 	HTREEITEM		m_last_clicked_item;
 
-	//폰트 관련
+//폰트 관련
 	LOGFONT			get_log_font() { return m_lf; }
 	void			set_log_font(LOGFONT lf);
 	int				get_font_size();
@@ -227,7 +241,7 @@ public:
 	void			set_font_bold(bool bold = true);
 	void			set_font_italic(bool italic = true);
 
-	//색상 관련
+//색상 관련
 	//std::function<void()>	function_check_dim_text;
 	//void			set_dim_text_function(std::function<void()> func) { function_check_dim_text = func; }
 	bool			(*check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
@@ -273,7 +287,8 @@ protected:
 		menu_property,
 	};
 	CSCMenu			m_menu;
-	bool			m_use_popup_menu = false;
+	bool			m_use_popup_menu = false;	//팝업메뉴 사용 여부. default = false
+	void			OnPopupMenu(UINT nID);
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 
 	//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.

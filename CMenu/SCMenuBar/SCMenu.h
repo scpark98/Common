@@ -77,6 +77,7 @@ public:
 	CRect			m_r = CRect(0, 0, 0, 0);
 	CString			m_caption;
 	CString			m_hot_key;
+	int				m_access_key = 0;	//메뉴 캡션에 (&N)과 같은 문자열이 있다면 이를 추출해서 n키를 접근키로 사용한다.
 	int				m_menu_height;
 
 	//icon 이미지는 투명 png로 제작하고 m_line_height의 높이와 동일한 정사각형 크기로 제작해야 한다.

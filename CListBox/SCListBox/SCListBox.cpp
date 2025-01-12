@@ -763,7 +763,7 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		//TRACE(_T("CSCListBox message = %d\n"), pMsg->wParam);
+		TRACE(_T("CSCListBox message = %d\n"), pMsg->wParam);
 
 		switch (pMsg->wParam)
 		{
@@ -811,7 +811,7 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 void CSCListBox::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	// TODO: Add your message handler code here and/or call default
-	//TRACE(_T("CSCListBox::OnKeyDown = %d\n"), nChar);
+	TRACE(_T("CSCListBox::OnKeyDown = %d\n"), nChar);
 	//HWND hWnd = GetParent()->GetSafeHwnd();
 	//::PostMessage(hWnd, WM_KEYDOWN, (WPARAM)nChar, 0);
 	CListBox::OnKeyDown(nChar, nRepCnt, nFlags);

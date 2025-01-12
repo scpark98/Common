@@ -222,6 +222,7 @@ BOOL CSCMenu::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 	if (pMsg->message == WM_KEYDOWN)
 	{
+		TRACE(_T("CSCMenu::PreTranslateMessage() WM_KEYDOWN\n"));
 		switch (pMsg->wParam)
 		{
 			case VK_ESCAPE :

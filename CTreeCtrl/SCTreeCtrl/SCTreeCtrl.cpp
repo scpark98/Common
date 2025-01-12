@@ -54,6 +54,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSEHOVER()
 	ON_WM_MOUSELEAVE()
 	ON_WM_GETMINMAXINFO()
+	ON_COMMAND_RANGE(menu_add_item, menu_property, &CSCTreeCtrl::OnPopupMenu)
 END_MESSAGE_MAP()
 
 
@@ -100,6 +101,7 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_KEYDOWN)
 	{
+		TRACE(_T("CSCTreeCtrl::PreTranslateMessage() WM_KEYDOWN\n"));
 		switch (pMsg->wParam)
 		{
 			case VK_F2:
@@ -643,21 +645,131 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 }
 
 //드라이브 폴더를 다시 읽어들인다.
-void CSCTreeCtrl::refresh()
+void CSCTreeCtrl::refresh(HTREEITEM hParent)
 {
-	DeleteAllItems();
-
-	m_desktopItem = insert_special_folder(CSIDL_DESKTOP);
-	m_documentItem = insert_special_folder(CSIDL_MYDOCUMENTS);
-	m_computerItem = insert_special_folder(CSIDL_DRIVES);
-
-	if (m_is_local)
+	if (hParent == NULL)
 	{
-		std::deque<CString> drive_list;
-		get_drive_list(&drive_list);
-		for (int i = 0; i < drive_list.size(); i++)
-			insert_drive(drive_list[i]);
+		DeleteAllItems();
+
+		m_desktopItem = insert_special_folder(CSIDL_DESKTOP);
+		m_documentItem = insert_special_folder(CSIDL_MYDOCUMENTS);
+		m_computerItem = insert_special_folder(CSIDL_DRIVES);
+
+		if (m_is_local)
+		{
+			std::deque<CString> drive_list;
+			get_drive_list(&drive_list);
+			for (int i = 0; i < drive_list.size(); i++)
+				insert_drive(drive_list[i]);
+		}
 	}
+}
+
+/*
+//주어진 노드 아래 새 폴더를 생성하고 편집모드로 표시한다.
+bool CSCTreeCtrl::new_folder(HTREEITEM hParent, CString new_folder_title, bool edit_mode)
+{
+	if (!m_is_shell_treectrl)
+		return false;
+
+	CString folder = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+
+	int index = get_file_index(folder, new_folder_title);
+
+
+	if (index == 1)
+		folder.Format(_T("%s\\%s"), folder, new_folder_title);
+	else
+		folder.Format(_T("%s\\%s (%d)"), folder, new_folder_title, index);
+
+	//실제 폴더를 생성한 후 리스트에 목록을 추가한다.
+	BOOL res = CreateDirectory(folder, NULL);
+	if (!res)
+	{
+		TRACE(_T("fail to create folder : %s. error = %d"), folder, GetLastError());
+		return false;
+	}
+
+	folder = get_part(folder, fn_name);
+	index = insert_folder(-1, folder);
+
+	if (index < 0)
+		return false;
+
+	select_item(index, true, true, true);
+	edit_item(index, 0);
+
+	return true;
+}
+*/
+
+//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
+int CSCTreeCtrl::get_file_index(CString path, CString new_folder_title)
+{
+	int i;
+	int max_index = -1;
+	std::set<int> idx_set;
+
+	std::deque<WIN32_FIND_DATA> dq;
+	find_all_files(path, &dq, _T("*"), true);
+
+	CString folder_name;
+	
+	for (i = 0; i < dq.size(); i++)
+	{
+		if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			//fn_name이지만 fullpath가 폴더경로를 담고 있으므로 실제로는 맨 끝 폴더명을 리턴한다.
+			folder_name = get_part(dq[i].cFileName, fn_name);
+
+			if (folder_name == new_folder_title)
+			{
+				idx_set.insert(1);
+				continue;
+			}
+
+			//끝 ')'를 찾고
+			int start_paren = -1;
+			int end_paren = folder_name.ReverseFind(')');
+			int found_index = -1;
+
+			if (end_paren > 0)
+			{
+				//시작 '('를 찾아서 그 사이의 숫자를 추출
+				folder_name = folder_name.Left(end_paren);
+				start_paren = folder_name.ReverseFind('(');
+
+				if (start_paren > 0)
+				{
+					folder_name = folder_name.Mid(start_paren + 1);
+					found_index = _ttoi(folder_name);
+				}
+			}
+
+			if (found_index > 0)
+				idx_set.insert(found_index);
+		}
+	}
+
+	//set 항목 중 비어있는 인덱스를 리턴해준다.
+	int index = 0;
+	bool found = false;
+
+	for (int elem : idx_set)
+	{
+		index++;
+		if (elem != index)
+		{
+			found = true;
+			break;
+		}
+	}
+
+	//만약 1 ~ n까지 모든 순번이 순차적으로 들어있다면 1 증가된 값을 리턴해주면 된다.
+	if (!found)
+		index++;
+
+	return index;
 }
 
 void CSCTreeCtrl::thread_insert_folders(HTREEITEM hItem)
@@ -2536,6 +2648,28 @@ void CSCTreeCtrl::edit_end(bool valid)
 	
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
+
+	//shell tree의 label이 변경되면 실제 폴더명도 변경해줘야 한다.
+	if (m_is_shell_treectrl)
+	{
+		CString parent_path = GetParentDirectory(get_path());
+		parent_path = convert_special_folder_to_real_path(parent_path, m_pShellImageList, !m_is_local);
+		BOOL res = FALSE;
+
+		CString old_path = concat_path(parent_path, m_edit_old_text);
+		CString new_path = get_path();
+
+		if (m_is_local)
+			res = MoveFile(old_path, new_path);
+		else
+			::SendMessage(GetParent()->GetSafeHwnd(),
+				Message_CSCTreeCtrl,
+				(WPARAM) & (CSCTreeCtrlMessage(this, message_request_rename, NULL, old_path, new_path)),
+				(LPARAM)&res);
+
+		if (!res)
+			undo_edit_label();
+	}
 	
 	//실제 변경 유무와 관계없이 후처리는 main에 맞겨야 한다.
 	TV_DISPINFO dispinfo;
@@ -2551,6 +2685,14 @@ void CSCTreeCtrl::edit_end(bool valid)
 	Invalidate();
 }
 
+//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
+void CSCTreeCtrl::undo_edit_label()
+{
+	if (!m_edit_item)
+		return;
+
+	SetItemText(m_edit_item, m_edit_old_text);
+}
 
 void CSCTreeCtrl::set_log_font(LOGFONT lf)
 {
@@ -2813,9 +2955,9 @@ void CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	//context menu를 띠우기 위해 OnContextMenu()를 추가했으나
 	//우클릭으로는 OnContextMenu()가 호출되지 않았고 더블우클릭을 해야 OnContextMenu()가 호출되는 현상이 있다.
-	//검색해보니 NM_RCLICK에서도 아래와 같은 처리를 해줘야 한다.
+	//검색해보니 NM_RCLICK에서 아래와 같은 처리를 해줘야 OnContextMenu()가 호출된다.
 
-	TRACE0("CMyTreeCtrl::OnRClick()\n");
+	TRACE("CMyTreeCtrl::OnRClick()\n");
 	// Send WM_CONTEXTMENU to self
 	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, GetMessagePos());
 	// Mark message as handled and suppress default handling
@@ -2831,9 +2973,9 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	UINT uFlags;
 	HTREEITEM hItem;
-
-	ScreenToClient(&point);
-	hItem = HitTest(point, &uFlags);
+	CPoint pt = point;
+	ScreenToClient(&pt);
+	hItem = HitTest(pt, &uFlags);
 
 	if (hItem == NULL)
 		return;
@@ -2846,6 +2988,7 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	LANGID langID = GetSystemDefaultUILanguage();
 
+	/*
 	if (m_menu.m_hWnd == NULL)
 	{
 		m_menu.create(this, 160);
@@ -2864,11 +3007,60 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 			m_menu.add(menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
 		}
 	}
+	*/
+	CMenu	menu;
+	menu.CreatePopupMenu();
 
-	ClientToScreen(&point);
-	m_menu.popup_menu(point.x, point.y);
+	menu.AppendMenu(MF_STRING, menu_add_item, (m_is_shell_treectrl ? _T("새 폴더(&N)") : _T("새 항목(&N)")));
+
+	//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
+	if (m_is_shell_treectrl)
+	{
+		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING, menu_property, _T("속성(&R)"));
+	}
+	else
+	{
+		menu.AppendMenu(MF_STRING, menu_rename_item, (m_is_shell_treectrl ? _T("이름 바꾸기(&M)") : _T("이름 바꾸기(&M)")));
+		menu.AppendMenu(MF_SEPARATOR);
+		menu.AppendMenu(MF_STRING, menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
+	}
+
+	menu.TrackPopupMenu(TPM_LEFTALIGN, point.x, point.y, this);
+	menu.DestroyMenu();
 }
 
+void CSCTreeCtrl::OnPopupMenu(UINT nMenuID)
+{
+	switch (nMenuID)
+	{
+		case menu_add_item:
+		{
+			add_sub_item(NULL, _T("새 폴더"));
+			break;
+		}
+		case menu_rename_item:
+		{
+			rename_item();
+			break;
+		}
+		case menu_delete_item:
+		{
+			delete_item();
+			break;
+		}
+		case menu_property:
+		{
+			HTREEITEM hItem = GetSelectedItem();
+			if (hItem)
+			{
+				CString path = convert_special_folder_to_real_path(get_path(hItem), m_pShellImageList, !m_is_local);
+				show_property_window(std::deque<CString> {path});
+			}
+			break;
+		}
+	}
+}
 
 LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 {
@@ -2899,7 +3091,8 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 				HTREEITEM hItem = GetSelectedItem();
 				if (hItem)
 				{
-					show_property_window(std::deque<CString> {get_path(hItem)});
+					CString path = convert_special_folder_to_real_path(get_path(hItem), m_pShellImageList, !m_is_local);
+					show_property_window(std::deque<CString> {path});
 				}
 				break;
 			}
@@ -2929,11 +3122,40 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 		//	insert_folder(hParent, get_path(hParent));
 		Expand(hParent, TVE_EXPAND);
 
-		hItem = InsertItem(label.IsEmpty() ? _T("새 폴더") : label,
-			m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
-			m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1, hParent);
+		//hItem = InsertItem(label.IsEmpty() ? _T("새 폴더") : label,
+		//	m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
+		//	m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1, hParent);
 
-		CreateDirectory(get_path(hItem), NULL);
+		CString path = convert_special_folder_to_real_path(get_path(hParent), m_pShellImageList, !m_is_local);
+
+		int index = get_file_index(path, label);
+		path = concat_path(path, label);
+
+		if (index > 1)
+			path.Format(_T("%s (%d)"), path, index);
+
+		BOOL res = FALSE;
+
+		//local이면 폴더를 직접 생성하고 remote이면 폴더 생성 요청을 보내고 그 결과를 res로 받는다.
+		if (m_is_local)
+			res = CreateDirectory(path, NULL);
+		else
+			::SendMessage(GetParent()->GetSafeHwnd(),
+				Message_CSCTreeCtrl,
+				(WPARAM)&(CSCTreeCtrlMessage(this, message_request_new_folder, NULL, path)),
+				(LPARAM)&res);
+
+		if (res)
+		{
+			//fn_name이지만 fullpath가 폴더경로를 담고 있으므로 실제로는 맨 끝 폴더명을 리턴한다.
+			path = get_part(path, fn_name);
+			hItem = InsertItem(path,
+				m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
+				m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
+				hParent);
+		}
+
+		//refresh(hParent);
 	}
 	else
 	{
@@ -2941,7 +3163,10 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 	}
 
 	if (hItem)
+	{
+		SelectItem(hItem);
 		edit_item(hItem);
+	}
 }
 
 //주어진 항목의 label을 변경한다.

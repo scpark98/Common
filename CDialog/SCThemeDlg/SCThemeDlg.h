@@ -33,6 +33,9 @@
 	CSCThemeDlg::OnCancel();이 아닌 CDialogEx::OnCancel();이어야 하고
 	PreTranslateMessage()에서도
 	return CSCThemeDlg::PreTranslateMessage(pMsg);가 아닌 return CDialogEx::PreTranslateMessage(pMsg);로 되어 있어야 한다.
+	따라서 만약 main dlg에서 PreTranslateMessage()를 추가하지 않으면
+	기본적으로 CSCThemeDlg::PreTranslateMessage()가 호출되므로
+	main dlg의 OnBnClickedCancel() 함수가 호출되지 않는다.
 */
 
 #pragma once
@@ -59,7 +62,10 @@ public:
 	//void	SetWindowText(CString title) { set_title(title); }
 	//void	SetWindowText(CString title) { CWnd::SetWindowText(title); m_title = title; Invalidate(); }
 	void	set_title_bold(bool bold = true);
+
+	int		get_titlebar_height() { return m_titlebar_height; }
 	void	set_titlebar_height(int height);
+
 	void	set_titlebar_text_color(Gdiplus::Color cr);
 	void	set_titlebar_back_color(Gdiplus::Color cr);
 	void	set_title_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);

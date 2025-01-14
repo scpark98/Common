@@ -9,8 +9,9 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
+#include "../../CEdit/SCEdit/SCEdit.h"
 //#include "../../GdiPlusBitmap.h"
-#include "EditCell.h"
+//#include "EditCell.h"
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -59,6 +60,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
+	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CVtListCtrlEx::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 
@@ -877,6 +879,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					return (a.filesize.QuadPart > b.filesize.QuadPart);
 				else if (iSub == 2)
 					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
+				return false;
 			});
 
 		std::sort(m_cur_files.begin(), m_cur_files.end(),
@@ -888,6 +891,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					return (a.filesize.QuadPart > b.filesize.QuadPart);
 				else if (iSub == 2)
 					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
+				return false;
 			});
 
 		refresh_list(false);
@@ -1130,7 +1134,8 @@ void CVtListCtrlEx::sort_by_text_color(int subItem, int ascending, bool text_sor
 			}
 			*/
 		}
-	}
+		return false;
+		}
 	);
 
 	Invalidate();
@@ -1275,8 +1280,29 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		//TRACE(_T("listctrl key = %d\n"), pMsg->wParam);
 		switch (pMsg->wParam)
 		{
+		case VK_RETURN:
+		{
+			if (m_in_editing)
+			{
+				edit_end(true);
+				return TRUE;
+			}
+			break;
+		}
+		case VK_ESCAPE:
+		{
+			if (m_in_editing)
+			{
+				edit_end(false);
+				return TRUE;
+			}
+			break;
+		}
 		case VK_BACK	:
 		{
+			if (m_in_editing)
+				break;
+
 			//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
 			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
 			if (m_is_shell_listctrl)
@@ -1427,7 +1453,7 @@ BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 	LV_DISPINFO *plvDispInfo = (LV_DISPINFO *)pNMHDR;
 	LV_ITEM	*plvItem = &plvDispInfo->item;
 
-	if (plvItem->pszText != NULL && plvItem->pszText != m_old_text)
+	if (plvItem->pszText != NULL && plvItem->pszText != m_edit_old_text)
 	{
 		m_modified = true;
 
@@ -1455,7 +1481,7 @@ BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 			{
 				//실제 파일명 변경이 성공해야 아이템의 텍스트도 변경한다.
 				CString old_name, new_name;
-				old_name.Format(_T("%s\\%s"), get_path(), m_old_text);
+				old_name.Format(_T("%s\\%s"), get_path(), m_edit_old_text);
 				new_name.Format(_T("%s\\%s"), get_path(), plvItem->pszText);
 				res = MoveFile(old_name, new_name);
 				if (!res)
@@ -1546,25 +1572,36 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	if (r.right > rc.right)
 		r.right = rc.right;
 
-	m_old_text = GetItemText(item, subItem);
+	m_edit_old_text = GetItemText(item, subItem);
 
 	dwStyle |= WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
-	CEdit *pEdit = new gxEditCell(this, item, subItem, GetItemText(item, subItem));
-	pEdit->Create(dwStyle, r, this, IDC_EDIT_CELL);
-	pEdit->SetFont(&m_font, true);
-	m_pEdit = pEdit;
+	//CEdit *pEdit = new gxEditCell(this, item, subItem, GetItemText(item, subItem));
+	if (m_pEdit == NULL)
+	{
+		m_pEdit = new CSCEdit;
+		m_pEdit->Create(WS_CHILD | WS_BORDER | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, IDC_EDIT_CELL);
+	}
 
-	CString ext = get_part(m_old_text, fn_ext);
+	m_pEdit->MoveWindow(r);
+	m_pEdit->SetRect(&r);
+	m_pEdit->SetFont(&m_font, true);
+	m_pEdit->SetWindowText(m_edit_old_text);
+
+	m_pEdit->ShowWindow(SW_SHOW);
+	m_pEdit->SetSel(0, -1);
+	m_pEdit->SetFocus();
+
+
+	CString ext = get_part(m_edit_old_text, fn_ext);
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
 	{
-		m_pEdit->SetSel(0, m_old_text.GetLength() - ext.GetLength() - 1);
+		m_pEdit->SetSel(0, m_edit_old_text.GetLength() - ext.GetLength() - 1);
 	}
 
 	m_in_editing = true;
 	m_edit_item = item;
 	m_edit_subItem = subItem;
 	get_selected_items(&m_dqSelected_list_for_edit);
-
 
 	// Send Notification to parent of ListView ctrl
 	//기본 지원되는 폴翡 기능을 이퓖E舊갋않컖EEditSubItem이라는 함수를 제작해서 사퓖E薩갋때문에
@@ -1584,13 +1621,30 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 
 	GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
 
-	return pEdit;
+	return m_pEdit;
 }
 
 //편집 전의 텍스트로 되돌린다.(편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 void CVtListCtrlEx::undo_edit_label()
 {
-	set_text(m_edit_item, m_edit_subItem, m_old_text);
+	set_text(m_edit_item, m_edit_subItem, m_edit_old_text);
+}
+
+LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+{
+	CSCEdit* pEdit = (CSCEdit*)wParam;
+	int	msg = (int)lParam;
+
+	if (!pEdit->IsWindowVisible())
+		return 0;
+
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
+	if (msg == WM_KILLFOCUS)
+		edit_end();
+
+	Invalidate();
+
+	return 0;
 }
 
 void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
@@ -3150,36 +3204,59 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 }
 
+//m_is_shell_list라면 이름 변경은 굳이 main이 아닌 여기서 처리해도 될듯하다.
+//단, 중복되는 이름이 존재하여 실패할 경우는 main에게 이를 알려 메시지를 표시해야 한다.
 void CVtListCtrlEx::edit_end(bool valid)
 {
+	if (m_in_editing == false || m_pEdit == NULL)
+		return;
+
 	m_in_editing = false;
 	m_last_clicked_time = 0;
+	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
-	Invalidate();
 
-	/*
-	CString sText;
-
-	if (valid)
+	//shell listctrl의 label이 변경되면 실제 파일/폴더명도 변경해줘야 한다.
+	if (m_is_shell_listctrl)
 	{
-		m_pEdit->GetWindowText(sText);
+		CString path = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+		bool res = false;
 
-		if (sText == m_old_title)
-			return;
+		CString old_path = concat_path(path, m_edit_old_text);
+		CString new_path = concat_path(path, m_edit_new_text);
 
-		TRACE(_T("editted text = %s\n"), sText);
-		sText.Trim();
+		if (m_is_local)
+		{
+			//이미 동일한 항목이 존재하면 parent에게 알려 메시지를 표시하도록 한다.
+			if (new_path != old_path && PathFileExists(new_path))
+			{
+				::SendMessage(GetParent()->GetSafeHwnd(),
+					Message_CVtListCtrlEx,
+					(WPARAM) & (CVtListCtrlExMessage(this, message_rename_duplicated, NULL, old_path, new_path)),
+					(LPARAM)&res);
+				edit_item(m_edit_item, m_edit_subItem);
+				return;
+			}
 
-		if (sText.IsEmpty())
-			return;
+			res = MoveFile(old_path, new_path);
+		}
+		else
+		{
+			::SendMessage(GetParent()->GetSafeHwnd(),
+				Message_CVtListCtrlEx,
+				(WPARAM) & (CVtListCtrlExMessage(this, message_request_rename, NULL, old_path, new_path)),
+				(LPARAM)&res);
+		}
 
-		m_dqThumb[m_editing_index].title = sText;
-		Invalidate();
-
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
-			(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_rename, m_editing_index), 0);
+		if (res)
+		{
+			set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
+		}
+		else
+		{
+			edit_item(m_edit_item, m_edit_subItem);
+		}
 	}
-	*/
 }
 
 //어떤 항목이 특정 위치에 표시되도록 스크롤시킨다.
@@ -3459,12 +3536,12 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 			if (m_path == get_system_label(CSIDL_DRIVES))
 			{
-				std::deque<CString> drive_list;
+				std::deque<CDiskDriveInfo> drive_list;
 				get_drive_list(&drive_list);
 				for (i = 0; i < drive_list.size(); i++)
 				{
 					CVtFileInfo fi;
-					_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), drive_list[i]);
+					_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), drive_list[i].label);
 					fi.filesize.QuadPart = 0;
 					fi.data.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
 					fi.is_remote = false;
@@ -3547,8 +3624,9 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 			}
 			else
 			{
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_free_space, NULL, real_path)), (LPARAM)&ul_free_space);
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_total_space, NULL, real_path)), (LPARAM)&ul_total_space);
+				m_pShellImageList->m_volume[!m_is_local].get_drive_space(real_path, &ul_total_space, &ul_free_space);
+				//::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_free_space, NULL, real_path)), (LPARAM)&ul_free_space);
+				//::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_total_space, NULL, real_path)), (LPARAM)&ul_total_space);
 			}
 
 			if (ul_free_space.QuadPart > 0)

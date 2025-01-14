@@ -159,6 +159,7 @@ public:
 
 	void	resize();
 	void	adjust(int top, int right);
+	CSize	get_size() { return CSize(m_button_width * m_button.size(), m_button_height); }
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void	set_color_theme(int theme);

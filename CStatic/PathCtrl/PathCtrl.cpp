@@ -953,7 +953,7 @@ LRESULT CPathCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
 	if (msg == WM_KILLFOCUS)
-		pEdit->ShowWindow(SW_HIDE);
+		edit_end();
 
 	Invalidate();
 

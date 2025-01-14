@@ -407,7 +407,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		font_selected.DeleteObject();
 }	// DrawItem
 
-
+/*
 //기본 글자색으로 한 줄 추가
 int	CSCListBox::add(LPCTSTR lpszFormat, ...)
 {
@@ -528,6 +528,7 @@ int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 
 	return index;
 }
+*/
 
 int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 {
@@ -535,36 +536,10 @@ int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 		cr = m_theme.cr_text;
 
 	for (int i = 0; i < lists->size(); i++)
-		add(cr, lists->at(i));
+		insert_string(-1, lists->at(i), cr);
 
 	return lists->size();
 }
-
-//-------------------------------------------------------------------
-//
-int CSCListBox::insert_string(int nIndex, CString lpszItem)
-//
-// Return Value:	The zero-based index of the position at which the 
-//						string was inserted. The return value is LB_ERR if 
-//						an error occurs; the return value is LB_ERRSPACE if 
-//						insufficient space is available to store the new string.
-//
-// Parameters	:	nIndex - Specifies the zero-based index of the position
-//							to insert the string. If this parameter is ?, the string
-//							is added to the end of the list.
-//						lpszItem - Points to the null-terminated string that 
-//							is to be inserted.
-//
-// Remarks		:	Inserts a string into the list box.	Provided because 
-//						CListBox::InsertString is NOT a virtual function.
-//
-{
-	int nItem = ((CListBox*)this)->InsertString(nIndex, lpszItem);
-	SetTopIndex(GetCount() - 1);
-	
-	return nItem;
-
-}	// InsertString
 
 //-------------------------------------------------------------------
 //
@@ -917,7 +892,7 @@ int CSCListBox::set_folder_list(std::deque<CString>* lists, CString selected_tex
 
 	for (int i = 0; i < m_folder_list.size(); i++)
 	{
-		add(get_part(m_folder_list[i], fn_name));
+		insert_string(-1, get_part(m_folder_list[i], fn_name));
 	}
 
 	SelectString(-1, selected_text);

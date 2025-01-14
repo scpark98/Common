@@ -50,7 +50,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include "GdiplusBitmap.h"
 
 #include "colors.h"
-#include "system/ShellImageList/ShellImageList.h"
+#include "./system/ShellImageList/ShellImageList.h"
 
 #include <WinInet.h>
 
@@ -1355,7 +1355,7 @@ h		: 복사할 height 크기(pixel)
 	CString		get_HDD_serial_number(int index, bool unify16 = true);
 
 	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
-	void		get_drive_list(std::deque<CString> *drive_list, bool include_legacy = false);
+	void		get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
 
 	//"로컬 디스크 (C:)" -> "C:\\"

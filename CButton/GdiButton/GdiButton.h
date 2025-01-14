@@ -217,6 +217,9 @@ public:
 	//이미지의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.(move는 현재 보류)
 	void		resize_control(int cx, int cy);
 
+	//이미지를 사용하지 않고 직접 그려주는 버튼의 경우 width를 정확히 구해야하는 경우가 있다.
+	CRect		calc_rect();
+
 	int			width();
 	int			height();
 	void		SetAnchor( UINT nAnchor ) { m_nAnchor = nAnchor; }	//정렬 방식 설정

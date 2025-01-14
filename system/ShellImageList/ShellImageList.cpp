@@ -24,7 +24,7 @@ CShellVolumeList::CShellVolumeList()
 	m_path.insert(std::pair<int, CString>(CSIDL_DESKTOP, get_known_folder(CSIDL_DESKTOP)));
 	m_path.insert(std::pair<int, CString>(CSIDL_MYDOCUMENTS, get_known_folder(CSIDL_MYDOCUMENTS)));
 
-	std::deque<CString> drive_list;
+	std::deque<CDiskDriveInfo> drive_list;
 	::get_drive_list(&drive_list);
 	set_drive_list(&drive_list);
 }
@@ -76,11 +76,23 @@ CString CShellVolumeList::get_drive_volume(CString path)
 
 	for (int i = 0; i < m_drives.size(); i++)
 	{
-		if (m_drives[i].Find(drive_letter) >= 0)
-			return m_drives[i];
+		if (_tcsstr(m_drives[i].path, drive_letter) != NULL)
+			return m_drives[i].label;
 	}
 
 	return _T("");
+}
+
+void CShellVolumeList::get_drive_space(CString path, ULARGE_INTEGER* total_space, ULARGE_INTEGER* free_space)
+{
+	for (auto drive : m_drives)
+	{
+		if (CString(drive.path).Find(path) >= 0)
+		{
+			total_space->QuadPart = drive.total_space.QuadPart;
+			free_space->QuadPart = drive.free_space.QuadPart;
+		}
+	}
 }
 
 void CShellVolumeList::set_system_label(std::map<int, CString>* map)
@@ -95,7 +107,7 @@ void CShellVolumeList::set_system_path(std::map<int, CString>* map)
 	m_path.insert(map->begin(), map->end());
 }
 
-void CShellVolumeList::set_drive_list(std::deque<CString>* drive_list)
+void CShellVolumeList::set_drive_list(std::deque<CDiskDriveInfo>* drive_list)
 {
 	m_drives.clear();
 	m_drives.assign(drive_list->begin(), drive_list->end());
@@ -176,8 +188,8 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 			else
 			{
 				//만약 remote라서 아이콘 정보를 얻을 수 없는 경우 기본 폴더 이미지로 표시한다.
-				if (!PathFileExists(szFile))
-					szFile = _T("C:\\Windows");
+				//if (!PathFileExists(szFile))
+				//	szFile = _T("C:\\Windows");
 				SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
 			}
 		}
@@ -305,7 +317,7 @@ void CShellImageList::set_system_path(int index, std::map<int, CString>* map)
 	m_volume[index].set_system_path(map);
 }
 
-void CShellImageList::set_drive_list(int index, std::deque<CString>* drive_list)
+void CShellImageList::set_drive_list(int index, std::deque<CDiskDriveInfo>* drive_list)
 {
 	if (index >= m_volume.size())
 		m_volume.resize(index + 1);

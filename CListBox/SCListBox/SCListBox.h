@@ -109,6 +109,9 @@ public:
 
 // Operations
 public:
+	//가변 인자를 사용하면 CString::FormatV()를 이용하는데 문자열에 %가 포함되면 format specifier로 인식되므로 에러가 발생한다.
+	//add 대신 insert_string()을 이용하자.
+	/*
 	//기본 글자색으로 한 줄 추가
 	int			add(LPCTSTR lpszFormat, ...);
 
@@ -118,11 +121,11 @@ public:
 
 	//마지막 라인의 데이터에 텍스트 append
 	int			append(LPCTSTR lpszFormat, ...);
+	*/
 
 	//여러줄의 문자열을 한번에 추가(shell_listbox에 사용)
 	int			add(std::deque<CString>* lists, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
-	int			insert_string(int nIndex, CString lpszItem);				// Inserts a string to the list box
 	int			insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb = Gdiplus::Color::Transparent);	// Inserts a colored string to the list box
 	void		set_item_color(int nIndex, Gdiplus::Color rgb, bool invalidate = true);	// Sets the color of an item in the list box
 	Gdiplus::Color	get_item_color(int nIndex);

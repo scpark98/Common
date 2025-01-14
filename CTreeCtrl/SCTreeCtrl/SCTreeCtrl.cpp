@@ -6,6 +6,8 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../GdiPlusBitmap.h"
+#include "../../CEdit/SCEdit/SCEdit.h"
+
 
 // CSCTreeCtrl
 
@@ -55,6 +57,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSELEAVE()
 	ON_WM_GETMINMAXINFO()
 	ON_COMMAND_RANGE(menu_add_item, menu_property, &CSCTreeCtrl::OnPopupMenu)
+	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CSCTreeCtrl::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 
@@ -657,7 +660,7 @@ void CSCTreeCtrl::refresh(HTREEITEM hParent)
 
 		if (m_is_local)
 		{
-			std::deque<CString> drive_list;
+			std::deque<CDiskDriveInfo> drive_list;
 			get_drive_list(&drive_list);
 			for (int i = 0; i < drive_list.size(); i++)
 				insert_drive(drive_list[i]);
@@ -832,18 +835,19 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 	}
 }
 
-void CSCTreeCtrl::insert_drive(CString driveName)
+void CSCTreeCtrl::insert_drive(CDiskDriveInfo drive_info)
 {
-	CString real_path = convert_special_folder_to_real_path(driveName, m_pShellImageList, !m_is_local);
+	//CString real_path = convert_special_folder_to_real_path(driveName, m_pShellImageList, !m_is_local);
 
 	TV_INSERTSTRUCT tvInsert;
 	tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-	tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(real_path);
-	tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(real_path);
+	//tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(drive_info.label);
+	tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("\\\\192.168.0.52\\Seagate"));
+	tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(drive_info.label);
 	//tvInsert.item.cChildren = 0;
 	tvInsert.hInsertAfter = TVI_LAST;
 	tvInsert.hParent = m_computerItem;
-	tvInsert.item.pszText = (LPTSTR)(LPCTSTR)driveName;
+	tvInsert.item.pszText = (LPTSTR)(LPCTSTR)drive_info.label;
 	HTREEITEM hItem = InsertItem(&tvInsert);
 
 	//아래 코드는 드라이브 루트를 추가할 때 1레벨 하위 폴더까지 기본으로 추가
@@ -939,7 +943,7 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 }
 
 //local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
-void CSCTreeCtrl::update_drive_list(CString thisPC, std::deque<CString>* drive_list)
+void CSCTreeCtrl::update_drive_list(CString thisPC, std::deque<CDiskDriveInfo>* drive_list)
 {
 	//local이 아닌데 drive_list가 NULL이면 잘못된 호출.
 	if (!m_is_local && drive_list == NULL)
@@ -2593,11 +2597,8 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	if (m_pEdit == NULL)
 	{
-		m_pEdit = new CEdit;
+		m_pEdit = new CSCEdit;
 		m_pEdit->Create(WS_CHILD | WS_BORDER | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
-	}
-	else
-	{
 	}
 
 	m_pEdit->MoveWindow(r);
@@ -2641,9 +2642,6 @@ void CSCTreeCtrl::edit_end(bool valid)
 	if (m_in_editing == false || m_pEdit == NULL)
 		return;
 
-	//편집 후 Enter키 또는 리스트의 다른곳을 클릭하여 편집을 종료할 때
-	//변경된 text를 변경할 지 아닐지는 mainDlg에게 맡겨야 한다.
-	//여기서는 편집모드만 종료시켜준다.
 	m_in_editing = false;
 	
 	m_pEdit->GetWindowText(m_edit_new_text);
@@ -2657,18 +2655,55 @@ void CSCTreeCtrl::edit_end(bool valid)
 		BOOL res = FALSE;
 
 		CString old_path = concat_path(parent_path, m_edit_old_text);
-		CString new_path = get_path();
+		CString new_path = concat_path(parent_path, m_edit_new_text);
 
 		if (m_is_local)
+		{
+			//이미 동일한 폴더명이 존재하면 parent에게 알려 메시지를 표시하도록 한다.
+			if (new_path != old_path && PathFileExists(new_path))
+			{
+				::SendMessage(GetParent()->GetSafeHwnd(),
+					Message_CSCTreeCtrl,
+					(WPARAM) & (CSCTreeCtrlMessage(this, message_rename_duplicated, NULL, old_path, new_path)),
+					(LPARAM)&res);
+				edit_item(m_edit_item);
+				return;
+			}
+
 			res = MoveFile(old_path, new_path);
+		}
 		else
+		{
+			if (new_path != old_path)
+			{
+				::SendMessage(GetParent()->GetSafeHwnd(),
+					Message_CSCTreeCtrl,
+					(WPARAM) & (CSCTreeCtrlMessage(this, message_request_rename, NULL, old_path, new_path)),
+					(LPARAM)&res);
+				if (!res)
+				{
+					edit_item(m_edit_item);
+					return;
+				}
+			}
+
+			res = true;
+		}
+	
+		if (res)
+		{
+			SetItemText(m_edit_item, m_edit_new_text);
+			//path가 변경된 것을 parent에게 알려야 listctrl, pathctrl을 갱신한다.
 			::SendMessage(GetParent()->GetSafeHwnd(),
 				Message_CSCTreeCtrl,
-				(WPARAM) & (CSCTreeCtrlMessage(this, message_request_rename, NULL, old_path, new_path)),
+				(WPARAM) & (CSCTreeCtrlMessage(this, message_path_changed, NULL, new_path)),
 				(LPARAM)&res);
-
-		if (!res)
-			undo_edit_label();
+		}
+		else
+		{
+			//undo_edit_label();
+			edit_item(m_edit_item);
+		}
 	}
 	
 	//실제 변경 유무와 관계없이 후처리는 main에 맞겨야 한다.
@@ -2692,6 +2727,23 @@ void CSCTreeCtrl::undo_edit_label()
 		return;
 
 	SetItemText(m_edit_item, m_edit_old_text);
+}
+
+LRESULT CSCTreeCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+{
+	CSCEdit* pEdit = (CSCEdit*)wParam;
+	int	msg = (int)lParam;
+
+	if (!pEdit->IsWindowVisible())
+		return 0;
+
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
+	if (msg == WM_KILLFOCUS)
+		edit_end();
+
+	Invalidate();
+
+	return 0;
 }
 
 void CSCTreeCtrl::set_log_font(LOGFONT lf)
@@ -3055,7 +3107,16 @@ void CSCTreeCtrl::OnPopupMenu(UINT nMenuID)
 			if (hItem)
 			{
 				CString path = convert_special_folder_to_real_path(get_path(hItem), m_pShellImageList, !m_is_local);
-				show_property_window(std::deque<CString> {path});
+				if (m_is_local)
+				{
+					show_property_window(std::deque<CString> {path});
+				}
+				else
+				{
+					::SendMessage(GetParent()->GetSafeHwnd(),
+						Message_CSCTreeCtrl,
+						(WPARAM) & (CSCTreeCtrlMessage(this, message_request_property, NULL, path)), 0);
+				}
 			}
 			break;
 		}
@@ -3111,7 +3172,7 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 	if (hParent == NULL)
 		return;
 
-	HTREEITEM hItem;
+	HTREEITEM hItem = NULL;
 
 	if (m_is_shell_treectrl)
 	{
@@ -3128,22 +3189,40 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 
 		CString path = convert_special_folder_to_real_path(get_path(hParent), m_pShellImageList, !m_is_local);
 
-		int index = get_file_index(path, label);
-		path = concat_path(path, label);
+		int index = 0;
+		
+		//우선 새 폴더의 인덱스를 구하고
+		if (m_is_local)
+		{
+			index = get_file_index(path, label);
+		}
+		else
+		{
+			::SendMessage(GetParent()->GetSafeHwnd(),
+				Message_CSCTreeCtrl,
+				(WPARAM) & (CSCTreeCtrlMessage(this, message_request_new_folder_index, NULL, path, label)),
+				(LPARAM)&index);
+		}
 
 		if (index > 1)
-			path.Format(_T("%s (%d)"), path, index);
+			label.Format(_T("%s (%d)"), label, index);
+
+		path = concat_path(path, label);
 
 		BOOL res = FALSE;
 
 		//local이면 폴더를 직접 생성하고 remote이면 폴더 생성 요청을 보내고 그 결과를 res로 받는다.
 		if (m_is_local)
+		{
 			res = CreateDirectory(path, NULL);
+		}
 		else
+		{
 			::SendMessage(GetParent()->GetSafeHwnd(),
 				Message_CSCTreeCtrl,
-				(WPARAM)&(CSCTreeCtrlMessage(this, message_request_new_folder, NULL, path)),
+				(WPARAM) & (CSCTreeCtrlMessage(this, message_request_new_folder, NULL, path)),
 				(LPARAM)&res);
+		}
 
 		if (res)
 		{

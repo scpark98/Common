@@ -67,18 +67,20 @@ static const UINT Message_CVtListCtrlEx = ::RegisterWindowMessage(_T("MessageStr
 class CVtListCtrlExMessage
 {
 public :
-	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""))
+	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""), CString _param1 = _T(""))
 	{
 		pThis = _this;
 		message = _message;
 		pTarget = _pTarget;
 		param0 = _param0;
+		param1 = _param1;
 	}
 
 	CWnd*	pThis = NULL;
 	CWnd*	pTarget = NULL;
 	int		message;
 	CString param0 = _T("");
+	CString param1 = _T("");
 };
 
 class CVtFileInfo
@@ -161,6 +163,8 @@ public:
 		message_progress_pos = 0,
 		message_drag_and_drop,
 		message_path_changed,
+		message_rename_duplicated,
+		message_request_rename,
 		message_get_remote_free_space,
 		message_get_remote_total_space,
 	};
@@ -447,7 +451,7 @@ public:
 	void		set_recent_edit_subitem(int subItem) { m_edit_subItem = subItem; }
 	std::deque<int>* get_selected_list_for_edit() { return &m_dqSelected_list_for_edit; }
 	std::deque<int> m_dqSelected_list_for_edit;
-	CString		get_old_text() { return m_old_text; }
+	CString		get_edit_old_text() { return m_edit_old_text; }
 	//item = -1이면 선택된 항목을, subItem = -1이면 0번 컬럼을 편집 시작한다.
 	//return되는 CEdit*를 이용할 경우도 필요하여 리턴함.
 	CEdit*		edit_item(int item = -1, int subItem = -1);
@@ -455,6 +459,7 @@ public:
 	void		undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 	bool		is_modified() { return m_modified; }
 	void		reset_modified_flag() { m_modified = false; }
+	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 //폰트 관련. 반드시 set_headings() 후에 호출할것.
 	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
@@ -585,7 +590,8 @@ protected:
 	bool			m_in_editing = false;			//편집중인지
 	int				m_edit_item = -1;				//편집중인 아이템 인덱스
 	int				m_edit_subItem = -1;			//편집중인 아이템 서브인덱스
-	CString			m_old_text = _T("");			//편집 전 텍스트
+	CString			m_edit_old_text;				//편집 전 텍스트
+	CString			m_edit_new_text;				//편집 후 텍스트
 	CEdit*			m_pEdit = NULL;
 	long			m_last_clicked_time = 0;		//one_click으로 편집모드 진입 시 마지막 클릭 시각
 	int				m_last_clicked_index = -1;		//one_click으로 편집모드 진입 시 마지막 클릭 인덱스

@@ -62,7 +62,13 @@ int			g_nBaudRate[MAX_BAUD_RATE] = { 110, 300, 600, 1200, 2400, 4800, 9600, 1440
 bool		initialized_YUV_lookup_table = false;
 
 std::deque<CRect>		g_dqMonitors;
-std::deque<CString>		g_comment_mark = { _T("//"), _T("/*"), _T("<!"), _T("#"), };
+std::deque<CString>		g_comment_mark = {
+											_T("//"),	// single : C / C++ / C# / JAVA / Kotlin / Swift / Go / R / Javascript / Objective-C
+											_T("/*"),	// block  : C / C++ / C# / JAVA / Kotlin / Swift / Go / R / Javascript / Objective-C
+											_T("<!--"),	// html / xml
+											_T("#"),	// single : Python / Ruby
+											_T("..."),	// block  : Python / Ruby
+										};
 
 void*					g_wow64_preset;
 
@@ -872,10 +878,10 @@ bool is_protected(CString folder, CShellImageList *plist, int index)
 	//	return true;
 
 	//드라이브 루트는 모두 보호.
-	for (auto drive_volume : *plist->m_volume[index].get_drive_list())
+	for (auto drive_list : *plist->m_volume[index].get_drive_list())
 	{
-		CString drive_root = convert_special_folder_to_real_path(drive_volume, plist, index);
-		if (folder == drive_root)
+		//CString drive_root = convert_special_folder_to_real_path(drive_list.path, plist, index);
+		if (folder.CompareNoCase(drive_list.path) == 0)
 			return true;
 	}
 
@@ -4882,8 +4888,13 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 					_stprintf(temp, _T("%s%s%s"), folder, folder.Right(1) == '\\' ? _T("") : _T("\\"), data.cFileName);
 					if (_tcslen(temp) < MAX_PATH)
 					{
-						_tcscpy(data.cFileName, temp);
-						dq->push_back(data);
+						//V3 제품군을 설치하면 랜섬웨어 방지를 위한 Decoy로 인해 각 드라이브 루트에 ")GTFE0E"와 같은 폴더가 생기고
+						//그 안에는 오피스 파일들이 생긴다. 이 경로는 스킵한다.
+						//if (_tcslen(data.cAlternateFileName) == 0)
+						{
+							_tcscpy(data.cFileName, temp);
+							dq->push_back(data);
+						}
 					}
 					else
 					{
@@ -4901,8 +4912,11 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 			_stprintf(temp, _T("%s%s%s"), folder, folder.Right(1) == '\\' ? _T("") : _T("\\"), data.cFileName);
 			if (_tcslen(temp) < MAX_PATH)
 			{
-				_tcscpy(data.cFileName, temp);
-				dq->push_back(data);
+				//if (_tcslen(data.cAlternateFileName) == 0)
+				{
+					_tcscpy(data.cFileName, temp);
+					dq->push_back(data);
+				}
 			}
 			else
 			{
@@ -4963,10 +4977,10 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	}
 	else if (root == get_system_label(CSIDL_DRIVES))
 	{
-		std::deque<CString> drive_list;
+		std::deque<CDiskDriveInfo> drive_list;
 		get_drive_list(&drive_list);
 		for (int i = 0; i < drive_list.size(); i++)
-			folders.push_back(drive_list[i]);
+			folders.push_back(drive_list[i].label);
 
 		if (special_folders)
 		{
@@ -6458,14 +6472,6 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 
 void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width)
 {
-	if (radius <= 0)
-	{
-		CDC dc;
-		dc.FromHandle(g->GetHDC());
-		draw_rectangle(&dc, gpRectToCRect(r), gcr_stroke, gcr_fill, width);
-		return;
-	}
-
 	int dia = 2 * radius;
 
 	// set to pixel mode
@@ -9091,7 +9097,7 @@ CString	get_drive_volume(TCHAR drive_letter)
 	return sLabel;
 }
 
-void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
+void get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy)
 {
 	DWORD dwError = 0;
 	TCHAR tzDriveString[MAX_PATH] = { 0, };
@@ -9114,7 +9120,10 @@ void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
 			if (!include_legacy && (driveType == DRIVE_REMOVABLE || driveType == DRIVE_CDROM))
 				continue;
 
-			drive_list->push_back(get_drive_volume(strDrive[0]));
+			ULARGE_INTEGER total_space, free_space;
+			total_space.QuadPart = get_disk_total_size(strDrive);
+			free_space.QuadPart = get_disk_free_size(strDrive);
+			drive_list->push_back(CDiskDriveInfo(driveType, get_drive_volume(strDrive[0]), strDrive, total_space, free_space));
 		}
 	} while ((logicalDrives >>= 1) != 0);
 }
@@ -9185,13 +9194,13 @@ CString	convert_special_folder_to_real_path(CString special_folder, CShellImageL
 			real_path.Format(_T("%s%s"), get_known_folder(CSIDL_MYDOCUMENTS), rest_path);
 		else
 		{
-			std::deque<CString> drive_list;
+			std::deque<CDiskDriveInfo> drive_list;
 			get_drive_list(&drive_list);
 
 			for (int i = 0; i < drive_list.size(); i++)
 			{
 				//"로컬 디스크 (C:)"
-				if (drive_list[i] == drive_prefix)
+				if (_tcsicmp(drive_list[i].label, drive_prefix) == 0)
 				{
 					int pos = real_path.Find(_T(":)"));
 					if (pos < 0)
@@ -9220,12 +9229,12 @@ CString	convert_special_folder_to_real_path(CString special_folder, CShellImageL
 			real_path.Format(_T("%s%s"), plist->m_volume[index].get_path(CSIDL_MYDOCUMENTS), rest_path);
 		else
 		{
-			std::deque<CString>* drive_list = plist->m_volume[index].get_drive_list();
+			auto drive_list = plist->m_volume[index].get_drive_list();
 
 			for (int i = 0; i < drive_list->size(); i++)
 			{
 				//"로컬 디스크 (C:)"
-				if (drive_list->at(i) == drive_prefix)
+				if (_tcsicmp(drive_list->at(i).label, drive_prefix) == 0)
 				{
 					int pos = real_path.Find(_T(":)"));
 					if (pos < 0)

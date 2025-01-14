@@ -88,9 +88,13 @@ public:
 	{
 		//message_selchanged = 0,		//TVN_SELCHANGED를 이용하므로 제거한다.
 		message_drag_and_drop = 0,
+		message_path_changed,
 		message_request_folder_list,	//remote일 경우 OnTvnItemexpanding() 메시지가 발생하면 remote의 폴더목록을 받아서 넣어줘야 한다.
 		message_request_new_folder,
+		message_request_new_folder_index,
 		message_request_rename,
+		message_request_property,
+		message_rename_duplicated,		//중복된 폴더명이 존재할 경우
 		message_edit_item,				//F2키를 누르면 메인에서 편집작업을 수행하기 위해.
 	};
 
@@ -155,12 +159,12 @@ public:
 	void		set_path(CString fullpath, bool expand = true);
 
 	HTREEITEM	insert_special_folder(int csidl);
-	void		insert_drive(CString driveName);
+	void		insert_drive(CDiskDriveInfo drive_info);
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
 	void		insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_children = true);
 
 	//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
-	void		update_drive_list(CString thisPC, std::deque<CString>* drive_list = NULL);
+	void		update_drive_list(CString thisPC, std::deque<CDiskDriveInfo>* drive_list = NULL);
 
 	//탭을 이용해서 작성된 트리 구조 문자열을 파싱하여 트리로 표현함.
 	//각 노드의 이미지는 그 depth에 따라 m_imagelist의 인덱스를 사용함.
@@ -230,6 +234,8 @@ public:
 	CEdit*			get_edit_control() { return m_pEdit; }
 	long			m_last_clicked_time = 0;
 	HTREEITEM		m_last_clicked_item;
+	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+
 
 //폰트 관련
 	LOGFONT			get_log_font() { return m_lf; }

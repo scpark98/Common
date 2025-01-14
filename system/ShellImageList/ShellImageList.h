@@ -15,9 +15,25 @@
 
 class CDiskDriveInfo
 {
-	UINT			type;	//DRIVE_FIXED, DRIVE_REMOTE, ...
-	CString			label;	//"로컬 디스크 (C:)"
-	CString			path;	//"C:\\"
+public:
+	CDiskDriveInfo()
+	{
+		total_space.QuadPart = 0;
+		free_space.QuadPart = 0;
+	}
+
+	CDiskDriveInfo(UINT _type, CString _label, CString _path, ULARGE_INTEGER _total_space, ULARGE_INTEGER _free_space)
+	{
+		type = _type;
+		_stprintf(label, _T("%s"), _label);
+		_stprintf(path, _T("%s"), _path);
+		total_space = _total_space;
+		free_space = _free_space;
+	}
+
+	UINT			type = DRIVE_UNKNOWN;	//DRIVE_FIXED, DRIVE_REMOTE, ...
+	TCHAR			label[MAX_PATH] = { 0, };	//"로컬 디스크 (C:)"
+	TCHAR			path[MAX_PATH] = { 0, };	//"C:\\"
 	ULARGE_INTEGER	total_space;
 	ULARGE_INTEGER	free_space;
 };
@@ -47,20 +63,21 @@ public:
 
 	void		set_system_label(std::map<int, CString>* map);
 	void		set_system_path(std::map<int, CString>* map);
-	void		set_drive_list(std::deque<CString>* drive_list);
+	void		set_drive_list(std::deque<CDiskDriveInfo>* drive_list);
 
 	//disk drive list를 리턴
 	//drive label만 가지고는 해당 드라이브가 local disk인지, network drive인지, google drive인지, one drive인지 알 수 없다.
 	//추후 label, icon, type등을 저장하도록 변경해야 한다.
-	std::deque<CString>* get_drive_list() { return &m_drives; }
+	std::deque<CDiskDriveInfo>* get_drive_list() { return &m_drives; }
 
 	//path를 주면 해당 드라이브의 label을 리턴
 	CString		get_drive_volume(CString path);
 
+	void		get_drive_space(CString path, ULARGE_INTEGER* total_space, ULARGE_INTEGER* free_space);
 protected:
 	std::map<int, CString> m_label;	//내 PC, 바탕 화면, 내 문서 의 CSIDL과 system label
 	std::map<int, CString> m_path;	//내 PC, 바탕 화면, 내 문서 의 실제 경로
-	std::deque<CString> m_drives;	//volume['C'] = "로컬 디스크",...
+	std::deque<CDiskDriveInfo> m_drives;	//volume['C'] = "로컬 디스크",...
 };
 
 //drive_list가 local, remote에 따라 다르므로 이 또한 멤버로 추가하여 기억하도록 구현했었으나
@@ -119,7 +136,7 @@ public:
 	std::deque<CShellVolumeList>	m_volume;
 	void		set_system_label(int index, std::map<int, CString>* map);
 	void		set_system_path(int index, std::map<int, CString>* map);
-	void		set_drive_list(int index, std::deque<CString>* drive_list);
+	void		set_drive_list(int index, std::deque<CDiskDriveInfo>* drive_list);
 
 	CString		get_system_label(int index, int csidl);
 	CString		get_system_path(int index, int csidl);

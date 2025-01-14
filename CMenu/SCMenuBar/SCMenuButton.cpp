@@ -85,11 +85,11 @@ LRESULT CSCMenuButton::on_message_SCMenu(WPARAM wParam, LPARAM lParam)
 
 void CSCMenuButton::set_text_color(Gdiplus::Color cr_text)
 {
-	set_text_color(cr_text);
+	__super::set_text_color(cr_text);
 }
 
 void CSCMenuButton::set_back_color(Gdiplus::Color cr_back)
 {
-	set_back_color(cr_back);
+	__super::set_back_color(cr_back);
 }
 

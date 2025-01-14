@@ -349,6 +349,7 @@ void CGdiButton::fit_to_image(bool fit)
 
 	m_fit2image = fit;
 
+
 	if (m_fit2image)
 	{
 		m_width = m_image[0]->img[0].width;
@@ -356,8 +357,17 @@ void CGdiButton::fit_to_image(bool fit)
 	}
 	else
 	{
-		m_width = m_rOrigin.Width();
-		m_height = m_rOrigin.Height();
+		CRect rc;
+		GetClientRect(rc);
+		//m_width = m_rOrigin.Width();
+		//m_height = m_rOrigin.Height();
+		m_width = rc.Width();
+		m_height = rc.Height();
+
+		for (auto img : m_image)
+		{
+			img->img->resize(m_width, m_height);
+		}
 	}
 
 	resize_control(m_width, m_height);
@@ -542,9 +552,6 @@ void CGdiButton::set_down_color_matrix(float fScale)	//1.0f = no effect.
 //이미지 및 버튼의 크기를 조정한다.
 void CGdiButton::resize(int cx, int cy)
 {
-	if (m_image.size() == 0)
-		return;
-
 	for (int i = 0; i < m_image.size(); i++)
 	{
 		m_image[i]->img[0].resize(cx, cy);
@@ -600,6 +607,38 @@ void CGdiButton::resize_control(int cx, int cy)
 	//w, h에 +1을 해 준 이유는 버튼의 크기가 fit하면 눌렸을 때 (x+1), (y+1)에 그려지므로
 	//오른쪽과 하단의 1픽셀씩 안보이게 된다. 따라서 버튼의 크기는 실제 이미지의 w, h보다 1이 더 커야 한다.
 	SetWindowPos(NULL, 0, 0, m_width, m_height, SWP_NOMOVE | SWP_NOZORDER);
+}
+
+//이미지를 사용하지 않고 직접 그려주는 버튼의 경우 width를 정확히 구해야하는 경우가 있다.
+CRect CGdiButton::calc_rect()
+{
+	CRect rc;
+	CClientDC dc(this);
+	CString text;
+
+	GetClientRect(rc);
+	GetWindowText(text);
+
+	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
+	CSize sz = dc.GetTextExtent(text);
+	dc.SelectObject(pOldFont);
+	//dc.DrawText(text, &rText, DT_LEFT | DT_CALCRECT);
+
+	int total_width = 2;	//left margin
+
+	if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) ||
+		is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
+	{
+		if (is_button_style(BS_PUSHLIKE))
+			return CRect(2, 0, 2 + sz.cx + 2, sz.cy);
+
+		total_width += (6 * 2 + 1);		//check or radio image
+		total_width += 4;				//the gap of check or radio image and text
+		total_width += sz.cx;			//text extend
+		total_width += 2;				//right margin
+	}
+
+	return CRect(2, 0, 2 + total_width + 2, sz.cy);
 }
 
 
@@ -870,7 +909,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	//return;
 
 	//이미지가 있다면 이미지를 먼저 그려주고
 	if (m_image.size() > 0 && m_image[idx]->img[0] != NULL)
@@ -1042,6 +1080,28 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
+	//focus_rect, border를 그려준다.
+	if (m_draw_focus_rect)//&& m_bHasFocus)
+	{
+		//TRACE(_T("draw focus rect\n"));
+		//pDC->DrawFocusRect(rc);
+		Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
+		pen.SetDashStyle(DashStyleDot);
+		g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
+	}
+	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
+	{
+		draw_round_rect(&g, CRectTogpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
+	}
+	else if (m_draw_border)// && !m_is_hover)
+	{
+		TRACE(_T("draw_border\n"));
+		draw_round_rect(&g, CRectTogpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+		//draw_round_rect(&g, CRectTogpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Blue, m_round, 4);
+	}
+
+
+
 	//이미지 버튼이면 텍스트는 출력하지 않는다.
 	if (m_image.size() > 0 || text.IsEmpty())
 		return;
@@ -1079,24 +1139,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	dc.SetTextColor(cr_text.ToCOLORREF());
 	dc.DrawText(text, rText, dwText);
 	dc.SelectObject(pOldFont);
-
-	//border는 맨 마지막에 그려준다.
-	if (m_draw_focus_rect)//&& m_bHasFocus)
-	{
-		//TRACE(_T("draw focus rect\n"));
-		//pDC->DrawFocusRect(rc);
-		Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
-		pen.SetDashStyle(DashStyleDot);
-		g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
-	}
-	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
-	{
-		draw_round_rect(&g, CRectTogpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
-	}
-	else if (m_draw_border && !m_is_hover)
-	{
-		draw_round_rect(&g, CRectTogpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
-	}
 }
 
 
@@ -1153,7 +1195,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 void CGdiButton::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_use_hover)// || !m_is_hover)
+	if (!m_use_hover || !m_is_hover)
 		return;
 
 	m_bIsTracking = false;
@@ -1535,6 +1577,7 @@ void CGdiButton::draw_border(bool draw, Gdiplus::Color cr, int thick)
 	m_draw_border = draw;
 	m_cr_border = cr;
 	m_border_thick = thick;
+	Invalidate();
 }
 
 //투명 버튼의 경우 그림자를 표시한다.

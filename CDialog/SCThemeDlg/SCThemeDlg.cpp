@@ -56,6 +56,7 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	//ON_WM_ACTIVATE()
 	//ON_WM_ACTIVATEAPP()
 	ON_WM_WINDOWPOSCHANGED()
+	ON_WM_GETMINMAXINFO()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
@@ -664,4 +665,17 @@ void CSCThemeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//Invalidate();
 	//RedrawWindow();
+}
+
+
+void CSCThemeDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	CSize sz;
+	bool is_shown_taskbar = get_taskbar_size(&sz);
+
+	lpMMI->ptMaxPosition.y = 0;
+	lpMMI->ptMaxSize.y -= (2 + (is_shown_taskbar ? sz.cy : 0));
+
+	CDialogEx::OnGetMinMaxInfo(lpMMI);
 }

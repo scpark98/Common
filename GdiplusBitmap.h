@@ -281,14 +281,14 @@ public:
 	int stride = 0;
 
 //animated Gif 관련
-	UINT	m_frame_count;
-	UINT	m_frame_index;
+	int		m_frame_count;
+	int		m_frame_index;
 	Gdiplus::PropertyItem* m_pPropertyItem = NULL;
-	bool	is_animated_gif() { return (m_frame_count > 1); }
+	bool	is_animated_gif() { return (is_valid() && (m_frame_count > 1)); }
 	int		get_frame_count() { return m_frame_count; }
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
 	//parent에 관계없이 투명하게 표시할 경우는 CImageShapeWnd를 사용.
-	void	set_animation(HWND parenthWnd, int x, int y, int w = 0, int h = 0, bool start = true);
+	void	set_animation(HWND parenthWnd, int x = 0, int y = 0, int w = 0, int h = 0, bool auto_play = true);
 	//void	set_animation(HWND parenthWnd, int x, int y, float ratio = 1.0f, bool start = true);
 	//ratio를 유지하여 r안에 표시한다.
 	void	set_animation(HWND parenthWnd, CRect r, bool start = true);
@@ -296,13 +296,14 @@ public:
 	void	move(CRect r);
 	void	gif_back_color(COLORREF cr) { m_cr_back.SetFromCOLORREF(cr); }
 	void	gif_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
-	void	start_animation();
+	void	play_animation();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
 	void	pause_animation(int pos = 0);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
 	void	stop_animation();
 	void	goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void	goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
+	void	set_mirror(bool is_mirror = true) { m_is_gif_mirror = is_mirror; }
 
 	//gif 프레임 이미지들을 지정된 폴더에 저장
 	bool	save_gif_frames(CString folder);
@@ -313,10 +314,10 @@ public:
 	//총 재생시간을 ms단위로 리턴한다.
 	int		get_total_duration();
 
-	int		ani_width() { return m_aniWidth; }
-	int		ani_height() { return m_aniHeight; }
-	int		ani_width(int dpwidth) { m_aniWidth = dpwidth; return m_aniWidth; }
-	int		ani_height(int dpheight) { m_aniHeight = dpheight; return m_aniHeight; }
+	int		get_ani_width() { return m_ani_width; }
+	int		get_ani_height() { return m_ani_height; }
+	int		set_ani_width(int dpwidth) { m_ani_width = dpwidth; return m_ani_width; }
+	int		set_ani_height(int dpheight) { m_ani_height = dpheight; return m_ani_height; }
 
 	void	save_multi_image();// std::vector<Gdiplus::Bitmap*>& dqBitmap);
 
@@ -326,16 +327,21 @@ protected:
 	void	resolution();
 	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
 
-	//animatedGif
+//animatedGif
 	bool			m_bIsInitialized;
 	bool			m_paused = false;
-	HWND			m_displayHwnd;
-	int				m_aniX;
-	int				m_aniY;
-	int				m_aniWidth;
-	int				m_aniHeight;
+
+	//ani gif 표시 윈도우
+	HWND			m_target_hwnd;
+
+	//ani 시작 x 좌표
+	int				m_ani_sx;
+	int				m_ani_sy;
+	int				m_ani_width;
+	int				m_ani_height;
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;
 	bool			m_run_thread_animation = false;
+	bool			m_is_gif_mirror = false;
 
 	void			check_animate_gif();
 	void			thread_gif_animation();

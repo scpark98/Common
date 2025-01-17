@@ -1358,6 +1358,9 @@ h		: 복사할 height 크기(pixel)
 	void		get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
 
+	//드라이브 패스는 "C:\\"와 같이 3개 문자로 구성되고 첫문자는 대문자로 표시하는 것이 일반적이다.
+	CString		normalize_drive_path(CString drive_path);
+
 	//"로컬 디스크 (C:)" -> "C:\\"
 	//"문서" -> "C:\\Documents"
 	//"문서\\AnySupport" -> "C:\\Documents\\AnySupport"

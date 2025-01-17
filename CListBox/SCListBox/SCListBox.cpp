@@ -199,7 +199,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 
-	TRACE(_T("GetTopIndex() = %d\n"), GetTopIndex());
+	//TRACE(_T("GetTopIndex() = %d\n"), GetTopIndex());
 	if ((int)lpDIS->itemID < GetTopIndex())
 		return; 
 
@@ -314,8 +314,8 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		rect.left += 6;		//left margin
 		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID], m_pShellImageList, !m_is_local);
-		m_pShellImageList->m_imagelist_small.Draw(pDC, m_pShellImageList->GetSystemImageListIcon(real_path, true),
-			CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
+		int img_index = (is_drive_root(real_path) ? m_pShellImageList->get_drive_icon(!m_is_local, real_path) : m_pShellImageList->GetSystemImageListIcon(!m_is_local, real_path, true));
+		m_pShellImageList->m_imagelist_small.Draw(pDC, img_index, CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		//m_pShellImageList->m_imagelist_small.Draw(pDC, m_folder_list[lpDIS->itemID].,
 		//	CPoint(textRect.left, textRect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		rect.left += 16;	//small icon width

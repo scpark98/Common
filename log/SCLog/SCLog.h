@@ -92,6 +92,12 @@ public:
 	bool		set(CString log_folder = _T(""), CString file_title = _T(""), int show_log_level = SCLOG_LEVEL_RELEASE);
 	void		set_log_level(int log_level = SCLOG_LEVEL_RELEASE);
 
+	//프로그램 시작 시 일반적인 정보를 로그에 기록하면서 시작한다.
+	void		write_start_log();
+
+	//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.
+	void		write_end_log();
+
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }
 
@@ -107,6 +113,7 @@ public:
 	bool		release();
 	CString		get_log_full_path() { return m_log_fullpath; }
 	bool		recursive_make_full_directory(LPCTSTR sFolder);
+
 
 	//현재 로그파일을 열어준다.
 	void		open_log_file();

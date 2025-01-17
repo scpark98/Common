@@ -173,8 +173,10 @@ public:
 	bool		load_from_string(CString text);
 
 	//HTREEITEM	find_item(const CString& name);
-	//hItem 위치부터 child, sibling들을 탐색하여 label을 찾는다. 
+	//hItem 위치부터 child, sibling들을 recursive하게 모두 탐색하여 label을 찾는다. 
 	HTREEITEM	find_item(const CString& label, HTREEITEM hItem = NULL);
+	//hParentItem의 첫 레벨 children만 검사한다. recursive를 사용하지 않는다.
+	HTREEITEM	find_children_item(const CString& label, HTREEITEM hParentItem = NULL);
 	CString		get_selected_item_text(bool include_parent = false);
 
 	//hItem = NULL인 경우는 모든 노드를 unselect로 만드는데 사용된다.

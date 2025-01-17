@@ -49,16 +49,16 @@ void CImageStatic::OnPaint()
 
 	dc.FillSolidRect(rc, GRAY32);
 
-	if (m_img.empty())
+	if (m_img.is_empty())
 		return;
 
-	Graphics g(dc.GetSafeHdc());
+	Gdiplus::Graphics g(dc.GetSafeHdc());
 
 	g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정
 
 	if (m_fit2ctrl)
 	{
-		m_displayed = m_img.draw(&g, rc);
+		m_displayed = m_img.draw(g, rc);
 		m_zoom = (double)m_displayed.Width() / (double)m_img.width;
 	}
 	else
@@ -100,7 +100,7 @@ void CImageStatic::OnPaint()
 			sy = (rc.Height() - nh) / 2;
 		}
 
-		m_displayed = m_img.draw(&g, sx, sy, nw, nh);
+		m_displayed = m_img.draw(g, sx, sy, nw, nh);
 #endif
 	}
 
@@ -114,7 +114,7 @@ void CImageStatic::OnPaint()
 		get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
 	}
 
-	DrawRectangle(&dc, m_screen_roi, red, NULL_BRUSH, 1);
+	draw_rectangle(&dc, m_screen_roi, red, NULL_BRUSH, 1);
 	
 
 	//TRACE(_T("before = %s\n"), get_rect_info_string(m_screen_roi, 2));

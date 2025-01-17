@@ -195,7 +195,7 @@ void CPathCtrl::OnPaint()
 	//항상 표시되는 항목
 	if (m_pShellImageList)
 	{
-		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(get_path(m_path.size() - 1), true),
+		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(!m_is_local, get_path(m_path.size() - 1), true),
 			CPoint(rc.left + 2, rc.CenterPoint().y - 8), ILD_TRANSPARENT);
 	}
 
@@ -962,7 +962,7 @@ LRESULT CPathCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 void CPathCtrl::edit_end(bool valid)
 {
-	if (!m_pEdit->IsWindowVisible() || (GetFocus() != m_pEdit))
+	if (!m_pEdit->IsWindowVisible())// || (GetFocus() != m_pEdit))
 		return;
 
 	TRACE(_T("edit_end(%d)\n"), valid);
@@ -976,15 +976,12 @@ void CPathCtrl::edit_end(bool valid)
 	else
 		text = m_old_text;
 
-	if (m_is_local)
-	{
-		if (!PathFileExists(text))
-			text = m_old_text;
-	}
-	else
-	{
-		::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)0);
-	}
+	bool res = false;
+
+	::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)&res);
+
+	if (!res)
+		text = m_old_text;
 
 	set_path(text);
 }

@@ -25,8 +25,8 @@ public:
 	CDiskDriveInfo(UINT _type, CString _label, CString _path, ULARGE_INTEGER _total_space, ULARGE_INTEGER _free_space)
 	{
 		type = _type;
-		_stprintf(label, _T("%s"), _label);
-		_stprintf(path, _T("%s"), _path);
+		_stprintf_s(label, sizeof(label) / sizeof(TCHAR), _T("%s"), _label);
+		_stprintf_s(path, sizeof(path) / sizeof(TCHAR), _T("%s"), _path);
 		total_space = _total_space;
 		free_space = _free_space;
 	}
@@ -66,8 +66,6 @@ public:
 	void		set_drive_list(std::deque<CDiskDriveInfo>* drive_list);
 
 	//disk drive list를 리턴
-	//drive label만 가지고는 해당 드라이브가 local disk인지, network drive인지, google drive인지, one drive인지 알 수 없다.
-	//추후 label, icon, type등을 저장하도록 변경해야 한다.
 	std::deque<CDiskDriveInfo>* get_drive_list() { return &m_drives; }
 
 	//path를 주면 해당 드라이브의 label을 리턴
@@ -105,8 +103,14 @@ public:
 	void GetSystemDisplayName(CString szFile, CString &szDisplayName);
 	int  GetVirtualImageListIcon(CString szExt);
 
-	int  GetSystemImageListIcon(CString szFile, BOOL bDrive = TRUE);
-	int  GetSystemImageListIcon(int csidl, BOOL bDrive = TRUE);
+	//index = 0(local), 1(remote)
+	int  GetSystemImageListIcon(int index, CString szFile, BOOL bDrive = TRUE);
+	int  GetSystemImageListIcon(int index, int csidl, BOOL bDrive = TRUE);
+
+	UINT	get_drive_type(int index, CString path);
+	int		get_drive_index(int index, CString path);
+	int		get_drive_icon(UINT drive_type);
+	int		get_drive_icon(int index, CString path);
 
 	/*
 	//내 PC, 문서, 바탕 화면 등의 정해진 문자열을 저장(다국어 지원시에 특히 필요)

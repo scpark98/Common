@@ -18,6 +18,8 @@ CSCLog::CSCLog()
 
 CSCLog::~CSCLog()
 {
+	write_end_log();
+
 	try
 	{
 		release();
@@ -108,6 +110,27 @@ void CSCLog::set_log_level(int log_level)
 {
 	m_log_level = log_level;
 	logWrite(_T("set_log_level = %d"), m_log_level);
+}
+
+//프로그램 시작 시 일반적인 정보를 로그에 기록하면서 시작한다.
+void CSCLog::write_start_log()
+{
+	logWrite(_T("\n==================== Program Start ===================="));
+
+	CString sVersion = get_file_property(get_exe_filename(true), _T("FileVersion"));
+	logWrite(_T("file version = %s"), sVersion);
+	//gLog.write(_T("file version = 2023.7.24.1"));// , sVersion);
+
+	CTime t = GetFileLastModifiedTime(get_exe_filename(true));
+	logWrite(_T("built datetime = %s"), get_datetime_str(t));
+
+	logWrite(_T("log path = %s"), get_log_full_path());
+}
+
+//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.
+void CSCLog::write_end_log()
+{
+	logWrite(_T("==================== Program Exit ====================\n"));
 }
 
 bool CSCLog::release()

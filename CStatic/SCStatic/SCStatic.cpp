@@ -140,13 +140,6 @@ void CSCStatic::OnPaint()
 	CMemoryDC	dc(&dc1, &rc);
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 
-	if (m_ImageBack.m_hImageList != NULL)
-	{
-		// 배경 그림을 칠한다.
-		for (int i = rc.left; i < rc.right; i += 2)
-			m_ImageBack.Draw(&dc, 0, CPoint(i, rc.top), ILD_TRANSPARENT);
-	}
-
 	//투명 모드이면 배경도 안칠하고 글자도 배경색 없이 출력된다.
 	dc.SetBkMode(TRANSPARENT);
 	
@@ -170,6 +163,13 @@ void CSCStatic::OnPaint()
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
 	}
+	
+	if (m_img_back.is_valid() && !m_img_back.is_animated_gif())
+	{
+		// 배경 그림을 그린다.
+		m_img_back.draw(g, rc, CGdiplusBitmap::draw_mode_stretch);
+		//m_img_back.save(_T("d:\\copy.png"));
+	}
 	else
 	{
 		if (m_bGradient)
@@ -191,10 +191,10 @@ void CSCStatic::OnPaint()
 			if (m_bSunken)
 			{
 				int sunken_depth = 12;
-				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), get_color(m_cr_back, sunken_depth));
-				draw_line_pt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), get_color(m_cr_back, sunken_depth));
-				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), get_color(m_cr_back, -sunken_depth));
-				draw_line_pt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), get_color(m_cr_back, -sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), ::get_color(m_cr_back, sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), ::get_color(m_cr_back, sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), ::get_color(m_cr_back, -sunken_depth));
+				draw_line_pt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), ::get_color(m_cr_back, -sunken_depth));
 			}
 		}
 	}
@@ -449,15 +449,88 @@ void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
 	set_text(text, crTextColor);
 }
 
-void CSCStatic::set_back_image(UINT nIDBack)
+void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back)
 {
-	CBitmap	Bitmap;
+	m_img_back.load(type, nIDBack);
+	m_cr_back = cr_back;
 
-	Bitmap.LoadBitmap(nIDBack);
-	m_ImageBack.Create(2, 23, ILC_COLORDDB|ILC_MASK, 1, 0);
-	m_ImageBack.Add(&Bitmap, RGB(0,255,0));
-	m_ImageBack.SetBkColor(CLR_NONE);
-	Bitmap.DeleteObject();
+	m_transparent = true;
+	m_img_back.set_back_color(m_cr_back);
+
+	if (m_img_back.is_animated_gif())
+		m_img_back.set_animation(m_hWnd);
+	//CBitmap	Bitmap;
+
+	//Bitmap.LoadBitmap(nIDBack);
+	//m_ImageBack.Create(2, 23, ILC_COLORDDB|ILC_MASK, 1, 0);
+	//m_ImageBack.Add(&Bitmap, RGB(0,255,0));
+	//m_ImageBack.SetBkColor(CLR_NONE);
+	//Bitmap.DeleteObject();
+}
+
+//배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.
+void CSCStatic::set_back_image_mirror(bool is_mirror)
+{
+	if (m_img_back.is_animated_gif())
+		m_img_back.set_mirror(is_mirror);
+	else
+		m_img_back.mirror();
+}
+
+void CSCStatic::play_animation()
+{
+	if (!m_img_back.is_animated_gif())
+		return;
+
+	m_img_back.play_animation();
+}
+
+//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
+void CSCStatic::pause_animation(int pos)
+{
+	if (!m_img_back.is_animated_gif())
+		return;
+
+	m_img_back.pause_animation(pos);
+}
+
+//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
+void CSCStatic::stop_animation()
+{
+	if (!m_img_back.is_animated_gif())
+		return;
+
+	m_img_back.stop_animation();
+}
+
+
+//배경 이미지 크기에 맞게 컨트롤을 resize한다.
+void CSCStatic::fit_to_back_image(bool fit_to_image)
+{
+	m_fit_to_back_image = fit_to_image;
+
+	if (m_img_back.is_empty())
+		return;
+
+	if (fit_to_image)
+	{
+		SetWindowPos(NULL, 0, 0, m_img_back.width, m_img_back.height, SWP_NOMOVE | SWP_NOZORDER);
+	}
+	else
+	{
+		CRect rc;
+		GetClientRect(rc);
+
+		if (m_img_back.is_animated_gif())
+		{
+			m_img_back.set_ani_width(rc.Width());
+			m_img_back.set_ani_height(rc.Height());
+		}
+		else
+		{
+			m_img_back.resize(rc.Width(), rc.Height());
+		}
+	}
 }
 
 BOOL CSCStatic::OnEraseBkgnd(CDC* pDC) 
@@ -922,14 +995,29 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 	CStatic::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (m_hWnd && m_auto_font_size)
+	if (m_hWnd)
 	{
 		CRect rc;
 
 		GetClientRect(rc);
 
-		get_auto_font_size(this, rc, m_text, &m_lf);
-		reconstruct_font();
+		if (m_auto_font_size)
+		{
+			get_auto_font_size(this, rc, m_text, &m_lf);
+			reconstruct_font();
+		}
+		else if (m_img_back.is_valid() && !m_fit_to_back_image)
+		{
+			if (m_img_back.is_animated_gif())
+			{
+				m_img_back.set_ani_width(rc.Width());
+				m_img_back.set_ani_height(rc.Height());
+			}
+			else
+			{
+				m_img_back.resize(rc.Width(), rc.Height());
+			}
+		}
 	}
 }
 

@@ -662,8 +662,11 @@ void CSCTreeCtrl::refresh(HTREEITEM hParent)
 		{
 			std::deque<CDiskDriveInfo> drive_list;
 			get_drive_list(&drive_list);
+
 			for (int i = 0; i < drive_list.size(); i++)
 				insert_drive(drive_list[i]);
+
+			Expand(m_computerItem, TVE_EXPAND);
 		}
 	}
 }
@@ -820,8 +823,8 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 		TV_INSERTSTRUCT tvInsert;
 		tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
 		tvInsert.item.pszText = (LPTSTR)(LPCTSTR)text;
-		tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(csidl);
-		tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(csidl);
+		tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(!m_is_local, csidl);
+		tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(!m_is_local, csidl);
 
 		//내 PC인 경우는 가상폴더이므로 물리적 path가 없다.
 		if (PathFileExists(path))
@@ -841,9 +844,18 @@ void CSCTreeCtrl::insert_drive(CDiskDriveInfo drive_info)
 
 	TV_INSERTSTRUCT tvInsert;
 	tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-	//tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(drive_info.label);
-	tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("\\\\192.168.0.52\\Seagate"));
-	tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(drive_info.label);
+
+	if (m_is_local || (_tcsicmp(drive_info.path, _T("C:\\")) == 0))
+	{
+		tvInsert.item.iImage = m_pShellImageList->GetSystemImageListIcon(!m_is_local, drive_info.path);
+		tvInsert.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(!m_is_local, drive_info.path);
+	}
+	else
+	{
+		tvInsert.item.iImage = m_pShellImageList->get_drive_icon(drive_info.type);
+		tvInsert.item.iSelectedImage = m_pShellImageList->get_drive_icon(drive_info.type);
+	}
+
 	//tvInsert.item.cChildren = 0;
 	tvInsert.hInsertAfter = TVI_LAST;
 	tvInsert.hParent = m_computerItem;
@@ -909,8 +921,8 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 {
 	TV_INSERTSTRUCT tvItem;
 	tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-	tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
-	tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
+	tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows"));
+	tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")) + 1;
 	tvItem.hInsertAfter = TVI_LAST;
 	tvItem.hParent = m_expanding_item;
 
@@ -1014,34 +1026,28 @@ HTREEITEM CSCTreeCtrl::find_item(const CString& label, HTREEITEM hItem)
 
 	// return NULL if nothing was found
 	return NULL;
-	/*
-	if (root == NULL)
-		root = GetRootItem();
+}
 
-	CString text = GetItemText(root);
-	
-	if (text == name)
-		return root;
+//hItem의 첫 레벨 children만 검사한다. recursive를 사용하지 않는다.
+HTREEITEM CSCTreeCtrl::find_children_item(const CString& label, HTREEITEM hParentItem)
+{
+ 	if (hParentItem == NULL)
+		hParentItem = GetRootItem();// GetNextItem(NULL, TVGN_ROOT);
 
-	HTREEITEM next_item = GetChildItem(root);
+	CString cur_label;
+	HTREEITEM hItem = GetChildItem(hParentItem);
 
-	while (true)
+	while (hItem)
 	{
-		//child가 있으면 child부터 탐색하기 위한 recursive call을, 없다면 sibling을 검사한다.
-		if (next_item)
-		{
-			HTREEITEM item = find_item(name, next_item);
-			if (item)
-				return item;
-		}
-		else
-		{
-			next_item = GetNextSiblingItem(next_item);
-		}
+		cur_label = GetItemText(hItem);
+		TRACE(_T("cur_label = %s\n"), cur_label);
+
+		if (cur_label == label)
+			return hItem;
+		hItem = GetNextSiblingItem(hItem);
 	}
 
 	return NULL;
-	*/
 }
 
 CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
@@ -1102,11 +1108,13 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	//TRACE(_T("%s\n"), __function__);
 	m_expanding_item = pNMTreeView->itemNew.hItem;
+	TRACE(_T("OnTvnItemexpanding. %s\n"), GetItemText(m_expanding_item));
 
 	if (m_is_shell_treectrl)
 	{
 		//만약 child가 없다면 아직 로딩되지 않은 노드이므로 검색해서 추가한다.
 		//물론 실제 child가 없는 폴더일수도 있다.
+		//if (!ItemHasChildren(m_expanding_item))
 		if (GetChildItem(m_expanding_item) == NULL)
 		{
 			if (m_is_local)
@@ -1116,6 +1124,7 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 			else
 			{
 				//remote라면 요청해서 넣어야 한다.
+				TRACE(_T("send message_request_folder_list, cur_path = %s\n"), get_path(m_expanding_item));
 				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_path(m_expanding_item));
 			}
 		}
@@ -1249,36 +1258,53 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 	if (fullpath == get_path())
 		return;
 
+	//"작업 디스크 (D:)\\temp"
 	fullpath = convert_real_path_to_special_folder(fullpath, m_pShellImageList, !m_is_local);
 
+	//"내 PC\\작업 디스크 (D:)\\temp"
+	//':)' 기호가 있는 디스크 드라이브 경로인 경우에는 맨 앞에 '내 PC'를 붙여준다.
+	if (fullpath.Find(_T(":)")) > 0)
+		fullpath = concat_path(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES), fullpath);
+
+	//각 토큰 분리
 	std::deque<CString> dq;
 	get_token_string(fullpath, dq, '\\', false);
 
 	if (dq.size() == 0)
 		dq.push_back(m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES));
 
-	HTREEITEM item = NULL;
+	HTREEITEM item = find_item(dq[0]);
+	if (item == NULL)
+		return;
 
-	for (int i = 0; i < dq.size(); i++)
+	//fullpath가 "작업 디스크 (D:)\\temp"라고 넘어오면 이를 토큰분리한 후 "작업 디스크 (D:)" -> "temp" 순서로 폴더를 찾아간다.
+	for (int i = 1; i < dq.size(); i++)
 	{
-		TRACE(_T("CSCTreeCtrl::set_path(). finding [%s] from [%s] node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
+		TRACE(_T("CSCTreeCtrl::set_path(). finding '%s' from '%s' node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
 
 		//만약 현재 노드에 아직 child가 추가된 상태가 아니라면 우선 children을 넣어준 후 검색해야 한다.
-		if (GetChildItem(item) == NULL)
+		if (item && (GetChildItem(item) == NULL))
 		{
 			m_expanding_item = item;
-			insert_folder(item, get_path(item));
+
+			//if (m_is_local)
+			//{
+			//	insert_folder(item, get_path(item));
+			//}
+			//else
+			//{
+			//	//remote라면 요청해서 넣어야 한다.
+			//	TRACE(_T("send message_request_folder_list of %s\n"), get_path(m_expanding_item));
+			//	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_path(m_expanding_item));
+			//}
+
 			Expand(item, TVE_EXPAND);
-			//m_folder_list = iterate_tree_with_no_recursion();
 		}
 
-		if (item)
-			item = find_item(dq[i], item);
-		else
-			item = find_item(dq[i]);
+		item = find_children_item(dq[i], item);
 
 		if (!item)
-			return;
+  			return;
 
 		if (expand)
 			Expand(item, TVE_EXPAND);
@@ -3229,8 +3255,8 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 			//fn_name이지만 fullpath가 폴더경로를 담고 있으므로 실제로는 맨 끝 폴더명을 리턴한다.
 			path = get_part(path, fn_name);
 			hItem = InsertItem(path,
-				m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
-				m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
+				m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")),
+				m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")),
 				hParent);
 		}
 

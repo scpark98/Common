@@ -935,9 +935,15 @@ bool is_drive_root(CString path)
 //src 폴더 경로에 sub 폴더 경로를 붙여주는 단순한 함수지만 드라이브 루트일때와 아닐때 등의 처리때문에 검사하여 결합해주는 목적으로 추가.
 CString	concat_path(CString src, CString sub)
 {
-	if (is_drive_root(src))
+	if (src.IsEmpty())
+		return sub;
+
+	if (sub.IsEmpty())
+		return src;
+
+	if (is_drive_root(src) || (src.Right(1) == '\\'))
 		return src + sub;
-	
+
 	return src + _T("\\") + sub;
 }
 
@@ -2732,7 +2738,8 @@ void request_url(CRequestUrlParams* params)
 	//2009년 블로그에는 INTERNET_OPTION_RECEIVE_TIMEOUT외에 나머지 2개의 timeout은
 	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
 	//https://blog.naver.com/che5886/20061092638
-	DWORD dwTimeout = 100000000;
+	//20250117 30초 timeout됨을 확인 완료.
+	DWORD dwTimeout = 30000;
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
@@ -9095,6 +9102,24 @@ CString	get_drive_volume(TCHAR drive_letter)
 	}
 
 	return sLabel;
+}
+
+//드라이브 패스는 "C:\\"와 같이 3개 문자로 구성되고 첫문자는 대문자로 표시하는 것이 일반적이다.
+CString	normalize_drive_path(CString drive_path)
+{
+	if (drive_path.IsEmpty())
+		return _T("");
+
+	drive_path.MakeUpper();
+
+	if (drive_path.GetLength() == 1)
+		drive_path += _T(":\\");
+	else if (drive_path.GetLength() == 2 && drive_path.Right(1) == ';')
+		drive_path += _T("\\");
+	else
+		drive_path = drive_path.Left(3);
+
+	return drive_path;
 }
 
 void get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy)

@@ -107,7 +107,16 @@ public:
 	bool			m_start_marquee;
 	//void			start_marquee(int start);
 
-	void			set_back_image(UINT nIDBack);
+	//gif도 가능
+	void			set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back);
+	//배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.
+	void			set_back_image_mirror(bool is_mirror);
+
+	//배경 이미지 크기에 맞게 컨트롤을 resize한다.
+	//fit_to_image = false이면 컨트롤의 크기에 맞게 이미지를 resize한다.
+	void			fit_to_back_image(bool fit_to_image = true);
+	//m_fit_to_back_image = false이면 컨트롤이 resize될 때 이미지도 resize된다.
+	bool			m_fit_to_back_image = false;
 
 	void			set_round_head(bool bRound);
 
@@ -165,6 +174,14 @@ public:
 		}
 	}
 
+//animated gif 관련
+	void	play_animation();
+	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
+	void	pause_animation(int pos = 0);
+	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
+	void	stop_animation();
+
+
 protected:
 	//SetWindowText(), GetWindowText()를 쓰면 m_text를 굳이 선언해서 사용안해도 될 듯 하지만
 	//SetWindowText()를 호출하는 순간 화면갱신이 일어나고 MFC내부적으로는 많은 처리를 할 것이다.
@@ -211,7 +228,7 @@ protected:
 
 	DWORD		m_dwStyle;
 	int			m_nPrefixSpace;
-	CImageList	m_ImageBack;
+	CGdiplusBitmap	m_img_back;
 
 
 	LOGFONT		m_lf;

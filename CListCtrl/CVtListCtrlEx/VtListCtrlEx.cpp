@@ -226,13 +226,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			if (m_has_focus)
 			{
-				TRACE(_T("active\n"));
+				//TRACE(_T("active\n"));
 				crText = m_theme.cr_text_selected;
 				crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				TRACE(_T("inactive\n"));
+				//TRACE(_T("inactive\n"));
 				crText = m_theme.cr_text_selected_inactive;
 				crBack = m_theme.cr_back_selected_inactive;
 			}
@@ -1976,7 +1976,7 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 
 	if (image_index < 0 && m_pShellImageList)
 	{
-		image_index = m_pShellImageList->GetSystemImageListIcon(text, false);
+		image_index = m_pShellImageList->GetSystemImageListIcon(!m_is_local, text, false);
 	}
 
 	m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
@@ -2017,9 +2017,9 @@ int CVtListCtrlEx::insert_item(int index, WIN32_FIND_DATA data, bool ensureVisib
 	CString filename = get_part(data.cFileName, fn_name);
 
 	if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-		img_idx = m_pShellImageList->GetSystemImageListIcon(_T("C:\\Windows"), true);
+		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, _T("C:\\Windows"), true);
 	else
-		img_idx = m_pShellImageList->GetSystemImageListIcon(data.cFileName, false);
+		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, data.cFileName, false);
 
 	//기존에 존재하는 파일이라면 크기, 수정한 날짜를 갱신해주고
 	//없다면 리스트에 추가한다.
@@ -2071,7 +2071,7 @@ int CVtListCtrlEx::update_item(int index, WIN32_FIND_DATA data, bool ensureVisib
 
 int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
 {
-	int img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);
+	int img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, _T("c:\\windows"), true);
 	index = insert_item(index, new_folder_name, img_idx, false, false);
 
 	set_text(index, col_filesize, _T(""));
@@ -2750,7 +2750,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		item < 0 || subItem < 0)
 		return TRUE;
 
-	TRACE(_T("%d, %d\n"), item, subItem);
+	//TRACE(_T("%d, %d\n"), item, subItem);
 
 	if (m_is_shell_listctrl)// && m_is_local)
 	{
@@ -3602,10 +3602,21 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 	{
 		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
 
-		if (m_is_local || real_path.Right(2) == _T(":\\"))
-			img_idx = m_pShellImageList->GetSystemImageListIcon(real_path, true);
+		if (m_is_local)
+		{
+			img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, real_path, true);
+		}
 		else
-			img_idx = m_pShellImageList->GetSystemImageListIcon(_T("c:\\windows"), true);
+		{
+			if (is_drive_root(real_path))
+			{
+				img_idx = m_pShellImageList->get_drive_icon(!m_is_local, real_path);
+			}
+			else
+			{
+				img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, _T("c:\\windows"), true);
+			}
+		}
 
 		index = insert_item(insert_index, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
 
@@ -3647,7 +3658,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		img_idx = m_pShellImageList->GetSystemImageListIcon(m_cur_files[i].data.cFileName, false);
+		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, m_cur_files[i].data.cFileName, false);
 		index = insert_item(insert_index, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
 
 		set_text(index, col_filesize, get_size_str(m_cur_files[i].filesize.QuadPart));

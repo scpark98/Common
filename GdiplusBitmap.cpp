@@ -1295,6 +1295,10 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 //투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
 void CGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
 {
+	m_cr_back = cr_back;
+	if (is_animated_gif())
+		return;
+
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height);
 	Gdiplus::Graphics g(result);
 	g.Clear(cr_back);
@@ -2238,20 +2242,20 @@ int CGdiplusBitmap::get_total_duration()
 	return (int)total_duration;
 }
 
-void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool start)
+void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool auto_play)
 {
 	if (m_frame_count < 2)
 		return;
 
-	m_displayHwnd = hWnd;
-	m_aniX = x;
-	m_aniY = y;
-	m_aniWidth = (w == 0 ? width : w);
-	m_aniHeight = (h == 0 ? height : h);
+	m_target_hwnd = hWnd;
+	m_ani_sx = x;
+	m_ani_sy = y;
+	m_ani_width = (w == 0 ? width : w);
+	m_ani_height = (h == 0 ? height : h);
 
-	m_paused = !start;
+	m_paused = !auto_play;
 
-	start_animation();
+	play_animation();
 }
 
 void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
@@ -2266,10 +2270,10 @@ void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
 
 void CGdiplusBitmap::move(int x, int y, int w, int h)
 {
-	m_aniX = x;
-	m_aniY = y;
-	m_aniWidth = (w == 0 ? width : w);
-	m_aniHeight = (h == 0 ? height : h);
+	m_ani_sx = x;
+	m_ani_sy = y;
+	m_ani_width = (w == 0 ? width : w);
+	m_ani_height = (h == 0 ? height : h);
 }
 
 void CGdiplusBitmap::move(CRect r)
@@ -2278,7 +2282,7 @@ void CGdiplusBitmap::move(CRect r)
 	move(fit.left, fit.top, fit.Width(), fit.Height());
 }
 
-void CGdiplusBitmap::start_animation()
+void CGdiplusBitmap::play_animation()
 {
 	if (m_run_thread_animation)
 	{
@@ -2311,6 +2315,9 @@ void CGdiplusBitmap::pause_animation(int pos)
 	if (m_frame_count < 2 || !m_run_thread_animation)
 		return;
 
+	//m_frame_count가 UINT이고 pos = -1일 경우 아래 if문은 true가 된다.
+	//if (-1 >= (UINT)20) => true
+	//취약하므로 m_frame_count의 type을 UINT에서 int로 변경한다.
 	if (pos >= m_frame_count)
 		pos = 0;
 
@@ -2332,11 +2339,11 @@ void CGdiplusBitmap::stop_animation()
 	m_run_thread_animation = false;
 	Wait(500);
 	RECT r;
-	r.left = m_aniX;
-	r.top = m_aniY;
-	r.right = r.left + m_aniWidth;
-	r.bottom = r.top + m_aniHeight;
-	::InvalidateRect(m_displayHwnd, &r, TRUE);
+	r.left = m_ani_sx;
+	r.top = m_ani_sy;
+	r.right = r.left + m_ani_width;
+	r.bottom = r.top + m_ani_height;
+	::InvalidateRect(m_target_hwnd, &r, TRUE);
 }
 
 void CGdiplusBitmap::goto_frame(int pos, bool pause)
@@ -2366,9 +2373,11 @@ void CGdiplusBitmap::thread_gif_animation()
 	if (m_frame_count < 2)
 		return;
 
-	HDC hDC = GetDC(m_displayHwnd);
+	HDC hDC = GetDC(m_target_hwnd);
 	CDC* pDC = CDC::FromHandle(hDC);
+	Gdiplus::SolidBrush brush_tr(m_cr_back);
 
+	bool mirror_applied = false;
 
 	while (m_run_thread_animation)
 	{
@@ -2376,14 +2385,17 @@ void CGdiplusBitmap::thread_gif_animation()
 
 		if (hDC)
 		{
-			CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
+			CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
 			CMemoryDC dc(pDC, &r);
 			Gdiplus::Graphics g(dc.m_hDC);
+
+			//if (m_cr_back.GetValue() != 
+			g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
 
 			//CGdiButton과 같이 배경이 투명하게 표시하려 했으나 뭔가 다르다.
 			/*
 			CRect Rect = r;
-			CWnd* pParent = CWnd::FromHandle(m_displayHwnd);
+			CWnd* pParent = CWnd::FromHandle(m_target_hwnd);
 			ASSERT(pParent);
 			pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
 			//copy what's on the parents at this point
@@ -2394,7 +2406,7 @@ void CGdiplusBitmap::thread_gif_animation()
 			bmp.CreateCompatibleBitmap(pParentDC, Rect.Width(), Rect.Height());
 			CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
 			MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pParentDC, Rect.left, Rect.top, SRCCOPY);
-			pParentDC->BitBlt(m_aniX, m_aniY, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+			pParentDC->BitBlt(m_ani_sx, m_ani_sy, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
 			MemDC.SelectObject(pOldBmp);
 			pParent->ReleaseDC(pParentDC);
 			MemDC.DeleteDC();
@@ -2406,11 +2418,26 @@ void CGdiplusBitmap::thread_gif_animation()
 			//if (!is_equal(m_cr_back, Gdiplus::Color(0, 0, 0, 0), 4))
 			//{
 			//	Gdiplus::SolidBrush brush_tr(m_cr_back);
-			//	g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+			//	g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
 			//}
 
-			g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
-			::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
+			//save(_T("d:\\copy.png"));
+
+			//mirror할 경우 m_pBitmap을 mirror()하면 gif정보가 사라지므로 clone한 이미지를 mirror하여 표시해야 한다.
+			Gdiplus::Bitmap* pBitmap = m_pBitmap;
+			if (m_is_gif_mirror)
+			{
+				pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
+				pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
+			}
+
+			//save(_T("d:\\copy.png"));
+			g.DrawImage(pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
+			::SendMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
+
+			//clone된 경우는 반드시 release해줘야 한다.
+			if (pBitmap != m_pBitmap)
+				SAFE_DELETE(pBitmap);
 		}
 
 		if (m_paused)
@@ -2424,13 +2451,14 @@ void CGdiplusBitmap::thread_gif_animation()
 			m_frame_index = 0;
 
 		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+
 		//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
 		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 	}
 
-	::ReleaseDC(m_displayHwnd, hDC);
+	::ReleaseDC(m_target_hwnd, hDC);
 }
 
 void CGdiplusBitmap::goto_gif_frame(int frame)
@@ -2438,12 +2466,12 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 	if (m_frame_count < 2 || frame >= m_frame_count)
 		return;
 
-	HDC hDC = GetDC(m_displayHwnd);
+	HDC hDC = GetDC(m_target_hwnd);
 	CDC* pDC = CDC::FromHandle(hDC);
-	CRect r(m_aniX, m_aniY, m_aniX + m_aniWidth, m_aniY + m_aniHeight);
+	CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
 
 	//CRect Rect = r;
-	//CWnd* pParent = CWnd::FromHandle(m_displayHwnd);
+	//CWnd* pParent = CWnd::FromHandle(m_target_hwnd);
 	//ASSERT(pParent);
 	//pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
 	////copy what's on the parents at this point
@@ -2475,14 +2503,14 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 		if (!is_equal(m_cr_back, Gdiplus::Color(0, 0, 0, 0), 4))
 		{
 			Gdiplus::SolidBrush brush_tr(m_cr_back);
-			g.FillRectangle(&brush_tr, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
+			g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
 		}
 
-		g.DrawImage(m_pBitmap, m_aniX, m_aniY, m_aniWidth, m_aniHeight);
-		::SendMessage(m_displayHwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
+		g.DrawImage(m_pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
+		::SendMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
 	}
 
-	::ReleaseDC(m_displayHwnd, hDC);
+	::ReleaseDC(m_target_hwnd, hDC);
 }
 
 void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap)

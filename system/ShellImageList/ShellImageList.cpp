@@ -126,19 +126,19 @@ CShellImageList::~CShellImageList()
 	CoUninitialize();
 }
 
-int CShellImageList::GetSystemImageListIcon(int csidl, BOOL bDrive)
+int CShellImageList::GetSystemImageListIcon(int index, int csidl, BOOL bDrive)
 {
-	return GetSystemImageListIcon(m_volume[0].get_label(csidl), bDrive);
+	return GetSystemImageListIcon(index, m_volume[index].get_label(csidl), bDrive);
 }
 
-int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
+int CShellImageList::GetSystemImageListIcon(int index, CString szFile, BOOL bDrive)
 {   
 	SHFILEINFO shFileInfo;
 
 	//"내 PC"인 경우는 아래 함수에 의해 ""로 변환된다.
 	//szFile = convert_special_folder_to_real_path(szFile);
 	
-	if(szFile.IsEmpty() || szFile == m_volume[0].get_label(CSIDL_DRIVES))
+	if(szFile.IsEmpty() || szFile == m_volume[index].get_label(CSIDL_DRIVES))
 	{
 		LPITEMIDLIST pidl_Computer = NULL;
 		SHGetFolderLocation( NULL, CSIDL_DRIVES, NULL, 0, &pidl_Computer ); // 컴퓨터
@@ -188,8 +188,8 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 			else
 			{
 				//만약 remote라서 아이콘 정보를 얻을 수 없는 경우 기본 폴더 이미지로 표시한다.
-				//if (!PathFileExists(szFile))
-				//	szFile = _T("C:\\Windows");
+				if (!PathFileExists(szFile))
+					szFile = _T("C:\\Windows");
 				SHGetFileInfo(szFile, 0, &shFileInfo, sizeof(shFileInfo), SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
 			}
 		}
@@ -200,6 +200,80 @@ int CShellImageList::GetSystemImageListIcon(CString szFile, BOOL bDrive)
 	}
 	
 	return shFileInfo.iIcon;
+}
+
+UINT CShellImageList::get_drive_type(int index, CString path)
+{
+	if (index >= m_volume.size() || path.IsEmpty())
+		return DRIVE_UNKNOWN;
+
+	if (path.GetLength() == 1)
+		path += _T(":\\");
+	else if (path.GetLength() == 2 && path.Right(1) == ';')
+		path += _T("\\");
+	else
+		path = path.Left(3);
+
+	std::deque<CDiskDriveInfo>* drives = m_volume[index].get_drive_list();
+	for (int i = 0; i < drives->size(); i++)
+	{
+		if (CString(drives->at(i).path).CompareNoCase(path) == 0)
+			return drives->at(i).type;
+	}
+
+	return DRIVE_UNKNOWN;
+}
+
+int CShellImageList::get_drive_index(int index, CString path)
+{
+	path = normalize_drive_path(path);
+
+	if (index >= m_volume.size() || path.IsEmpty())
+		return 0;
+
+	std::deque<CDiskDriveInfo>* drives = m_volume[index].get_drive_list();
+	for (int i = 0; i < drives->size(); i++)
+	{
+		if (CString(drives->at(i).path).CompareNoCase(path) == 0)
+			return i;
+	}
+
+	return 0;
+}
+
+//shell32.dll에 있는 아이콘의 인덱스 리턴
+int CShellImageList::get_drive_icon(UINT drive_type)
+{
+	switch (drive_type)
+	{
+	case DRIVE_FIXED :
+		return 7;
+	case DRIVE_REMOTE :
+		return 9;
+	case DRIVE_CDROM :
+		return 11;
+	case DRIVE_NO_ROOT_DIR :
+		return 12;
+	case DRIVE_REMOVABLE :
+		return 26;
+	case DRIVE_RAMDISK :
+		return 12;
+	}
+
+	return 7;
+}
+
+int CShellImageList::get_drive_icon(int index, CString path)
+{
+	path = normalize_drive_path(path);
+	if (path.IsEmpty())
+		return 0;
+
+	//C drive는 local이든 remote이든 동일하다.
+	if (path.Left(3) == _T("C:\\"))
+		return GetSystemImageListIcon(index, _T("C:\\"), TRUE);
+
+	return get_drive_icon(get_drive_type(index, path));
 }
 
 void CShellImageList::GetSystemDisplayName(CString szFile, CString &szDisplayName)
@@ -229,7 +303,7 @@ void CShellImageList::Initialize()
 	m_IDArray.RemoveAll();
 
 	CreateDirectory(_T("c:\\nFTDTemp_qrehadfkjn\\"),NULL);
-	int cache = GetSystemImageListIcon("c:\\nFTDTemp_qrehadfkjn\\");
+	int cache = GetSystemImageListIcon(0, "c:\\nFTDTemp_qrehadfkjn\\");
 	RemoveDirectory(_T("c:\\nFTDTemp_qrehadfkjn\\"));
 	InsertCache("\\", cache);
 }
@@ -276,7 +350,7 @@ int CShellImageList::GetImageListIcon(CString szPath, CString szFile)
 	}
 	
 	// 캐쉬에 없다면
-	cache = GetSystemImageListIcon(szPath);
+	cache = GetSystemImageListIcon(0, szPath);
 	InsertCache(szExt, cache);
 	return cache;
 }
@@ -295,7 +369,7 @@ int CShellImageList::GetVirtualImageListIcon(CString szExt)
 	CString temp;
 	temp.Format(_T("c:\\nFTDtemp.%s"),szExt);
 	
-	cache = GetSystemImageListIcon(temp, FALSE);
+	cache = GetSystemImageListIcon(0, temp, FALSE);
 	InsertCache(szExt,cache);
 	
 	return cache;

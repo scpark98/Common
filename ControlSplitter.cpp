@@ -272,7 +272,7 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 
 			if(m_type == CS_HORZ)
 			{
-				TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 
 				//if (rectCtrl.Height() < 50)
 				//	return;
@@ -287,11 +287,11 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.top += sizeDiff.cy;
 				}
 
-				TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 			else
 			{
-				TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 				//if (rectCtrl.Width() < 50)
 				//	return;
 				if ((nFlag & SPF_RIGHT))
@@ -304,7 +304,7 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.left +=  sizeMove.cx;
 					rectCtrl.left += sizeDiff.cx;
 				}
-				TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 
 			GetParent()->ScreenToClient(&rectCtrl);		
@@ -324,7 +324,7 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 
 			if (m_type == CS_HORZ)
 			{
-				TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 				//if (rectCtrl.Height() < 50)
 				//	return;
 				if (nFlag & SPF_TOP)
@@ -338,11 +338,11 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.bottom +=  sizeMove.cy;
 					rectCtrl.bottom += sizeDiff.cy;
 				}
-				TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 			else
 			{
-				TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 				//if (rectCtrl.Width() < 50)
 				//	return;
 				if (nFlag & SPF_LEFT)
@@ -356,7 +356,7 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.right +=  sizeMove.cx;
 					rectCtrl.right += sizeDiff.cx;
 				}
-				TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
+				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 
 			GetParent()->ScreenToClient(&rectCtrl);		

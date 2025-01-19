@@ -12,11 +12,7 @@ IMPLEMENT_DYNAMIC(CSCComboBox, CComboBox)
 
 CSCComboBox::CSCComboBox()
 {
-	m_crText = ::GetSysColor( COLOR_WINDOWTEXT );
-	m_crBack = ::GetSysColor( COLOR_WINDOW );
-	m_crHighlightText = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-	m_crHighlightTextBack = ::GetSysColor(COLOR_HIGHLIGHT);
-
+	m_theme.set_color_theme(CSCColorTheme::color_theme_dark_gray);
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
@@ -473,7 +469,7 @@ void CSCComboBox::OnCbnSetfocus()
 {
 	if (false)//m_use_edit)
 	{
-		repos_edit();
+		//repos_edit();
 
 		GetWindowText(m_old_text);
 

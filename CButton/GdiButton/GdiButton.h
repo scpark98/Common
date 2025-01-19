@@ -101,6 +101,14 @@ public:
 	CGdiplusBitmap img[4];	//normal, over, down, disabled
 };
 
+class CGdiButtonParagragh
+{
+public:
+	CGdiButtonParagragh();
+
+
+};
+
 // CGdiButton
 
 class CGdiButton : public CButton//, CGdiplusBitmap
@@ -120,7 +128,23 @@ public:
 
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
-	//enum 
+	
+	//기본 PUSH_BUTTON, CHECKBOX, RADIOBUTTON과 같은 style과는 달리
+	//PUSH_BUTTON인데 표시 모양이 문단 형태로 표시되는 mobile ui에 주로 사용되는 항목 표시용으로 추가(Tile UI)
+	//ex. Visual Studio 시작 시 "리포지토리 복제", "프로젝트 또는 솔루션 열기", "로컬 폴더 열기", "새 프로젝트 만들기"
+	//ex. 파일 복사 시 존재하는 파일이 있을 경우 "Copy and Replace", "Don't copy", "Copy, but keep both files"
+	//기본 hover효과, round corner, 속성의 flat = true로 설정할 것
+	enum BUTTON_TYPE
+	{
+		type_default = 0,
+		type_paragraph,		//1st line : header img, title, 2nd line : comment, other lines : multiline body text
+	};
+	//1st line : header img, title, 2nd line : comment, other lines : multiline body text
+	void		set_paragraph(int header_icon_id, CString title, CString comment, int main_icon_id = -1, CString body_text = _T(""))
+	{
+
+	}
+	
 
 	//pBack은 버튼의 배경이 되는 그림으로 parent 창의 배경이미지에 사용된 Bitmap*이다.
 	//그 배경에서 버튼의 배경을 추출하여 DrawItem에서 배경+전경 이미지를 그려주게 된다.
@@ -304,10 +328,6 @@ protected:
 		return false;
 	}
 
-	//bool		is_push_button();
-	//bool		is_radio_button();
-	//bool		is_check_box();
-	//bool		is_push_like();
 
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시

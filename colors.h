@@ -14,12 +14,11 @@
   중복도 많아지고 일관되지 않아 CSCColorTheme이라는 클래스로 공통 처리하고자 함.
   일부 색상 변수는 특정 컨트롤에만 해당되는 경우도 있음.
 
-  .h 파일에
+  .h 파일에 인스턴스 선언(반드시 this를 파라미터로 줄 것)
   #include "../../colors.h"
-  ...
-  CSCColorTheme	m_theme = CSCColorTheme(this);
-  ...
-  void		set_color_theme(int theme); 함수 선언.
+	CSCColorTheme	m_theme = CSCColorTheme(this);	//m_theme(this); 는 오류.
+	...
+	void		set_color_theme(int theme); 함수 선언.
 
   //사용할 클래스의 .h파일에 인스턴스 선언시 this를 넘겨주는 이유는
   //color theme을 적용할 때 color_theme_default라면

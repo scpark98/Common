@@ -123,7 +123,8 @@ protected:
 
 	bool		m_use_edit = true;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
 	CEdit*		m_pEdit = NULL;
-	CString		m_old_text;				//편집되기 전의 원본 텍스트
+	CString		m_edit_old_text;		//편집되기 전의 원본 텍스트
+	CString		m_edit_new_text;		//편집되기 전의 원본 텍스트
 	CRect		m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
 	void		repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
 

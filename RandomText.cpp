@@ -37,6 +37,15 @@ CString RandomText::Animal(bool plural)
 	return temp;
 }
 
+CString RandomText::extension(bool dot)
+{
+	CString extensions[] = { _T("ai"), _T("bmp"), _T("doc"), _T("exe"), _T("jpg"), _T("txt"), _T("zip"), };
+	static int prev = -1;
+
+	int index = GetRand(sizeof(extensions) / sizeof(CString), prev);
+	return ((dot ? _T(".") : _T("")) + extensions[index]);
+}
+
 CString RandomText::Cute()
 {
 	//From: http://www.namestatistics.com/

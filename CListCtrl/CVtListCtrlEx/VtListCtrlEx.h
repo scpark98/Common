@@ -234,6 +234,7 @@ public:
 	CShellImageList*	get_shell_imagelist() { return m_pShellImageList; }
 	void				set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
 
+	void				move_parent_folder();
 
 //컬럼 관련
 	//ex. "No,20;Item1,50;Item2,50"
@@ -294,9 +295,9 @@ public:
 	//현재 폴더에 폴더를 추가한다.
 	int			insert_folder(int index, CString new_folder_name);
 
-	//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
+	//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다. 생성된 폴더명을 리턴한다.
 	//"새 폴더" or "New Folder" 등 다국어까지 고려하여 타이틀을 받는다.
-	bool		new_folder(CString &new_folder_title);
+	CString		new_folder(CString &new_folder_title);
 
 	//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
 	int			get_file_index(CString path, CString new_folder_title);
@@ -452,6 +453,7 @@ public:
 	std::deque<int>* get_selected_list_for_edit() { return &m_dqSelected_list_for_edit; }
 	std::deque<int> m_dqSelected_list_for_edit;
 	CString		get_edit_old_text() { return m_edit_old_text; }
+	CString		get_edit_new_text() { return m_edit_new_text; }
 	//item = -1이면 선택된 항목을, subItem = -1이면 0번 컬럼을 편집 시작한다.
 	//return되는 CEdit*를 이용할 경우도 필요하여 리턴함.
 	CEdit*		edit_item(int item = -1, int subItem = -1);

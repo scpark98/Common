@@ -441,6 +441,7 @@ int CHeaderCtrlEx::get_header_height()
 void CHeaderCtrlEx::set_header_height(int height)
 {
 	m_header_height = height;
+	Invalidate();
 	//OnLayout이 호출되야 실제 높이가 적용되는데
 	//아래 화면갱신 함수로는 적용되지 않는다.
 	//SetFont / MoveWindow / SetWindowPos 등이 필요.

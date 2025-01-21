@@ -138,7 +138,8 @@ void CSCProgressDlg::set_text_color(Gdiplus::Color cr)
 void CSCProgressDlg::set_back_color(Gdiplus::Color cr)
 {
 	m_cr_back = cr;
-	m_progress.set_back_color(cr.ToCOLORREF());
+	m_progress.set_back_color(m_cr_back.ToCOLORREF());
+	m_static.set_back_color(m_cr_back);
 	Invalidate();
 }
 

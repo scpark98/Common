@@ -1219,6 +1219,41 @@ void CVtListCtrlEx::modify_style()
 	reconstruct_font();
 }
 
+void CVtListCtrlEx::move_parent_folder()
+{
+	if (m_in_editing)
+	{
+		edit_end(false);
+		return;
+	}
+
+	if (m_is_shell_listctrl)
+	{
+		CString path = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+		CString thisPC = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
+
+		if (path == thisPC)
+			return;
+
+		//드라이브라면 내 컴퓨터로 back (path = "C:", go to ThisPC)
+		if (is_drive_root(path))
+		{
+			path = thisPC;
+		}
+		//일반 폴더라면 상위폴더로 이동
+		else
+		{
+			path = GetParentDirectory(path);
+		}
+
+		if (m_is_local)
+			set_path(path);
+
+		//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
+		//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&path);
+	}
+}
 
 BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
@@ -1228,38 +1263,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 	//마우스 back button up
 	if (pMsg->message == WM_XBUTTONUP)
 	{
-		if (m_in_editing)
-		{
-			edit_end(false);
-			return true;
-		}
-
-		if (m_is_shell_listctrl)
-		{
-			CString path = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
-			CString thisPC = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
-
-			if (path == thisPC)
-				return true;
-
-			//드라이브라면 내 컴퓨터로 back (path = "C:", go to ThisPC)
-			if (is_drive_root(path))
-			{
-				path = thisPC;
-			}
-			//일반 폴더라면 상위폴더로 이동
-			else
-			{
-				path = GetParentDirectory(path);
-			}
-
-			if (m_is_local)
-				set_path(path);
-
-			//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
-			//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&path);
-		}
+		move_parent_folder();
 	}
 	else if (pMsg->message == WM_MOUSEWHEEL && m_in_editing)
 	{
@@ -1350,7 +1354,9 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 							}
 							else
 							{
-								edit_item(get_selected_index(), m_edit_subItem);
+								//현재 경로가 "내 PC"인 경우는 우선 편집을 보류한다.
+								if (!m_is_shell_listctrl || get_path() != m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES))
+									edit_item(get_selected_index(), m_edit_subItem);
 								return true;
 							}
 							break;
@@ -1450,6 +1456,9 @@ void CVtListCtrlEx::OnLvnBeginlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 
 BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 {
+	//이미 edit_end()에서 필요한 모든 처리를 마친 상태이므로 여기서는 별도 처리없이
+	//return FALSE;하여 main dlg에서 LVN_ENDLABELEDIT에 대한 메시지를 처리하도록 하면 된다.
+	/*
 	LV_DISPINFO *plvDispInfo = (LV_DISPINFO *)pNMHDR;
 	LV_ITEM	*plvItem = &plvDispInfo->item;
 
@@ -1493,7 +1502,7 @@ BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 	m_in_editing = false;
 
 	*pResult = FALSE;
-
+	*/
 	return FALSE;
 }
 
@@ -2082,14 +2091,16 @@ int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
 }
 
 //현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다.
-bool CVtListCtrlEx::new_folder(CString &new_folder_title)
+CString CVtListCtrlEx::new_folder(CString &new_folder_title)
 {
+	CString folder;
+
 	if (!m_is_shell_listctrl)
-		return false;
+		return _T("");
 
 	int index = get_file_index(m_path, new_folder_title);
 
-	CString folder = m_path;
+	folder = m_path;
 	if (is_drive_root(folder))
 		truncate(folder, 1);
 
@@ -2103,19 +2114,19 @@ bool CVtListCtrlEx::new_folder(CString &new_folder_title)
 	if (!res)
 	{
 		TRACE(_T("fail to create folder : %s. error = %d"), folder, GetLastError());
-		return false;
+		return _T("");
 	}
 
 	folder = get_part(folder, fn_name);
 	index = insert_folder(-1, folder);
 
 	if (index < 0)
-		return false;
+		return _T("");
 
 	select_item(index, true, true, true);
 	edit_item(index, 0);
 
-	return true;
+	return folder;
 }
 
 //현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
@@ -2301,6 +2312,8 @@ void CVtListCtrlEx::delete_empty_lines()
 
 void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 {
+	SetRedraw(FALSE);
+
 	CListCtrl::DeleteAllItems();
 	m_list_db.clear();
 	SetItemCount(0);
@@ -2310,6 +2323,8 @@ void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 		m_cur_files.clear();
 		m_cur_folders.clear();
 	}
+
+	SetRedraw(TRUE);
 }
 
 CString CVtListCtrlEx::get_text(int item, int subItem)
@@ -2748,7 +2763,10 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, true) ||
 		item < 0 || subItem < 0)
+	{
+		move_parent_folder();
 		return TRUE;
+	}
 
 	//TRACE(_T("%d, %d\n"), item, subItem);
 
@@ -2764,7 +2782,8 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		else
 		{
 			//파일일 경우는 현재로는 아무처리하지 않는다.
-			if (!(get_file_data(item).dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			//if (!(get_file_data(item).dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			if (!get_text(item, col_filesize).IsEmpty())
 				return TRUE;
 
 			m_path = concat_path(m_path, get_text(item, col_filename));
@@ -3189,6 +3208,10 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 			(clock() - m_last_clicked_time > 500) &&	//이 값이 작으면 더블클릭에도 편집되고
 			(clock() - m_last_clicked_time < 2000))
 		{
+			//트리에서 "내 PC"를 선택하여 리스트에 드라이브 리스트가 표시된 상태에서는 시간차 클릭에 의한 편집은 지원하지 않는다.
+			if (get_path() == m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES))
+				return TRUE;
+
 			edit_item(m_edit_item, m_edit_subItem);
 		}
 		else
@@ -3215,6 +3238,9 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_last_clicked_time = 0;
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
+
+	//if (m_edit_new_text == m_edit_old_text)
+	//	return;
 
 	//shell listctrl의 label이 변경되면 실제 파일/폴더명도 변경해줘야 한다.
 	if (m_is_shell_listctrl)
@@ -3250,7 +3276,20 @@ void CVtListCtrlEx::edit_end(bool valid)
 
 		if (res)
 		{
+			m_modified = true;
+
 			set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
+
+			LV_DISPINFO dispinfo;
+			dispinfo.hdr.hwndFrom = m_hWnd;
+			dispinfo.hdr.idFrom = GetDlgCtrlID();
+			dispinfo.hdr.code = LVN_ENDLABELEDIT;
+			dispinfo.item.mask = LVIF_TEXT;
+			dispinfo.item.iItem = m_edit_item;
+			dispinfo.item.iSubItem = m_edit_subItem;
+
+			//이 컨트롤에 LVN_ENDLABELEDIT 이벤트를 보내 기본 핸들러에서 처리할 것이 있다면 처리한다.
+			GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
 		}
 		else
 		{
@@ -3581,6 +3620,8 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 	m_path = cur_path;
 
+	SetRedraw(FALSE);
+
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
 
@@ -3666,6 +3707,8 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
+
+	SetRedraw(TRUE);
 }
 
 void CVtListCtrlEx::add_file(WIN32_FIND_DATA* data, bool is_remote)

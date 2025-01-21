@@ -56,7 +56,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSEHOVER()
 	ON_WM_MOUSELEAVE()
 	ON_WM_GETMINMAXINFO()
-	ON_COMMAND_RANGE(menu_add_item, menu_property, &CSCTreeCtrl::OnPopupMenu)
+	ON_COMMAND_RANGE(menu_add_item, menu_favorite, &CSCTreeCtrl::OnPopupMenu)
 	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CSCTreeCtrl::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
@@ -669,6 +669,25 @@ void CSCTreeCtrl::refresh(HTREEITEM hParent)
 			Expand(m_computerItem, TVE_EXPAND);
 		}
 	}
+	else
+	{
+		//Expand(hParent, TVE_COLLAPSE);
+
+		delete_item(hParent, true);
+
+		if (m_is_local)
+		{
+			insert_folder(hParent, get_path(hParent));
+			//Expand(hParent, TVE_EXPAND);
+		}
+		else
+		{
+			//remote라면 요청해서 넣어야 한다.
+			m_expanding_item = hParent;
+			TRACE(_T("send message_request_folder_list, cur_path = %s\n"), get_path(m_expanding_item));
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_path(hParent));
+		}
+	}
 }
 
 /*
@@ -868,10 +887,6 @@ void CSCTreeCtrl::insert_drive(CDiskDriveInfo drive_info)
 
 void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 {
-	CFileFind	FileFind;
-	bool		bWorking;
-	CString		curFolder;
-
 	sParentPath = convert_special_folder_to_real_path(sParentPath, m_pShellImageList, !m_is_local);
 
 	if (sParentPath.Right(1) != "\\")
@@ -879,6 +894,8 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 	std::deque<WIN32_FIND_DATA> dq;
 	find_all_files(sParentPath, &dq, _T("*"), true);
+
+	bool folder_inserted = false;
 
 	for (auto item : dq)
 	{
@@ -888,9 +905,19 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 		if (item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			insert_folder(&item, get_sub_folders(item.cFileName) > 0);
+			insert_folder(hParent, &item, get_sub_folders(item.cFileName) > 0);
+			folder_inserted = true;
 		}
 	}
+
+	//hParent에 insert_folder()가 수행되면 children 유무에 따라 확장버튼을 갱신시켜줘야 한다.
+	TVITEM tvItem;
+	memset(&tvItem, 0, sizeof(TVITEM));
+
+	tvItem.mask = TVIF_HANDLE | TVIF_CHILDREN;
+	tvItem.hItem = hParent;
+	tvItem.cChildren = folder_inserted;
+	SetItem(&tvItem);
 
 	/*
 	bWorking = FileFind.FindFile(sParentPath + _T("*"));
@@ -917,20 +944,20 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	*/
 }
 
-void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
+void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool has_children)
 {
-	TV_INSERTSTRUCT tvItem;
-	tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-	tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows"));
-	tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")) + 1;
-	tvItem.hInsertAfter = TVI_LAST;
-	tvItem.hParent = m_expanding_item;
+	TV_INSERTSTRUCT tvInsertItem;
+	tvInsertItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+	tvInsertItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows"));
+	tvInsertItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")) + 1;
+	tvInsertItem.hInsertAfter = TVI_LAST;
+	tvInsertItem.hParent = hParent;
 
 	//cFileName이 fullpath인 경우는 폴더명만 취해야 한다.
 	if (get_char_count(data->cFileName, '\\') > 0)
 	{
 		TCHAR* p = data->cFileName;
-		CString parent = get_path(m_expanding_item);
+		CString parent = get_path(hParent);
 		parent = convert_special_folder_to_real_path(parent, m_pShellImageList, !m_is_local);
 		if (parent.Right(1) == '\\')
 			p += parent.GetLength();
@@ -939,19 +966,28 @@ void CSCTreeCtrl::insert_folder(WIN32_FIND_DATA* data, bool has_children)
 		_tcscpy_s(data->cFileName, _countof(data->cFileName), p);
 	}
 
-	tvItem.item.pszText = data->cFileName;
+	tvInsertItem.item.pszText = data->cFileName;
 
 	//하위 폴더가 있을때만 확장버튼이 표시되도록.
 	//remote일 경우는 일단 true로 세팅한다.
 	if (m_is_shell_treectrl)
 	{
 		if (m_is_local)
-			tvItem.item.cChildren = get_sub_folders(concat_path(get_path(m_expanding_item), data->cFileName));
+			tvInsertItem.item.cChildren = get_sub_folders(concat_path(get_path(hParent), data->cFileName));
 		else
-			tvItem.item.cChildren = has_children;
+			tvInsertItem.item.cChildren = has_children;
 	}
 
-	HTREEITEM hItem = InsertItem(&tvItem);
+	HTREEITEM hItem = InsertItem(&tvInsertItem);
+
+	//hParent는 확장버튼을 가진 노드로 표시되어야 한다.
+	TVITEM tvItem;
+	memset(&tvItem, 0, sizeof(TVITEM));
+
+	tvItem.mask = TVIF_HANDLE | TVIF_CHILDREN;
+	tvItem.hItem = hParent;
+	tvItem.cChildren = true;
+	SetItem(&tvItem);
 }
 
 //local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
@@ -2676,7 +2712,7 @@ void CSCTreeCtrl::edit_end(bool valid)
 	//shell tree의 label이 변경되면 실제 폴더명도 변경해줘야 한다.
 	if (m_is_shell_treectrl)
 	{
-		CString parent_path = GetParentDirectory(get_path());
+		CString parent_path = GetParentDirectory(get_path(m_edit_item));
 		parent_path = convert_special_folder_to_real_path(parent_path, m_pShellImageList, !m_is_local);
 		BOOL res = FALSE;
 
@@ -3089,6 +3125,10 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 	CMenu	menu;
 	menu.CreatePopupMenu();
 
+	//menu.AppendMenu(MF_STRING, menu_favorite, _T("새로고침\tF5"));
+	//menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, menu_refresh, _T("새로고침\tF5"));
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_add_item, (m_is_shell_treectrl ? _T("새 폴더(&N)") : _T("새 항목(&N)")));
 
 	//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
@@ -3099,6 +3139,7 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 	}
 	else
 	{
+		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, menu_rename_item, (m_is_shell_treectrl ? _T("이름 바꾸기(&M)") : _T("이름 바꾸기(&M)")));
 		menu.AppendMenu(MF_SEPARATOR);
 		menu.AppendMenu(MF_STRING, menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
@@ -3114,7 +3155,12 @@ void CSCTreeCtrl::OnPopupMenu(UINT nMenuID)
 	{
 		case menu_add_item:
 		{
-			add_sub_item(NULL, _T("새 폴더"));
+			add_new_item(NULL, _T("새 폴더"), true, true);
+			break;
+		}
+		case menu_refresh :
+		{
+			refresh(GetSelectedItem());
 			break;
 		}
 		case menu_rename_item:
@@ -3160,7 +3206,7 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 		{
 			case menu_add_item :
 			{
-				add_sub_item();
+				add_new_item();
 				break;
 			}
 			case menu_rename_item:
@@ -3189,9 +3235,10 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.
-//새 폴더, 새 항목이 이미 존재하면 뒤에 숫자를 증가시켜 붙여줘야 한다.
-void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
+//hParent 항목 아래 하위 항목을 추가한다. NULL이면 현재 선택된 항목이 hParent가 된다.
+//label이 ""이면 기본 "새 폴더"명으로 추가한 후 edit_item() 호출.
+//auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
+void CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index, bool edit_mode)
 {
 	if (hParent == NULL)
 		hParent = GetSelectedItem();
@@ -3215,23 +3262,26 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 
 		CString path = convert_special_folder_to_real_path(get_path(hParent), m_pShellImageList, !m_is_local);
 
-		int index = 0;
-		
-		//우선 새 폴더의 인덱스를 구하고
-		if (m_is_local)
+		if (auto_index)
 		{
-			index = get_file_index(path, label);
-		}
-		else
-		{
-			::SendMessage(GetParent()->GetSafeHwnd(),
-				Message_CSCTreeCtrl,
-				(WPARAM) & (CSCTreeCtrlMessage(this, message_request_new_folder_index, NULL, path, label)),
-				(LPARAM)&index);
-		}
+			int index = 0;
 
-		if (index > 1)
-			label.Format(_T("%s (%d)"), label, index);
+			//우선 새 폴더의 인덱스를 구하고
+			if (m_is_local)
+			{
+				index = get_file_index(path, label);
+			}
+			else
+			{
+				::SendMessage(GetParent()->GetSafeHwnd(),
+					Message_CSCTreeCtrl,
+					(WPARAM) & (CSCTreeCtrlMessage(this, message_request_new_folder_index, NULL, path, label)),
+					(LPARAM)&index);
+			}
+
+			if (index > 1)
+				label.Format(_T("%s (%d)"), label, index);
+		}
 
 		path = concat_path(path, label);
 
@@ -3240,7 +3290,10 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 		//local이면 폴더를 직접 생성하고 remote이면 폴더 생성 요청을 보내고 그 결과를 res로 받는다.
 		if (m_is_local)
 		{
-			res = CreateDirectory(path, NULL);
+			if (PathFileExists(path))
+				res = true;
+			else
+				res = CreateDirectory(path, NULL);
 		}
 		else
 		{
@@ -3269,8 +3322,20 @@ void CSCTreeCtrl::add_sub_item(HTREEITEM hParent, CString label)
 
 	if (hItem)
 	{
-		SelectItem(hItem);
-		edit_item(hItem);
+		//원래 하위 노드가 없는 상태에서 새 노드가 추가되면 cChildren의 속성도 true로 변경해줘야만 child가 나타난다.
+			//hParent에 insert_folder()가 수행되면 children 유무에 따라 확장버튼을 갱신시켜줘야 한다.
+		TVITEM tvItem;
+		memset(&tvItem, 0, sizeof(TVITEM));
+
+		tvItem.mask = TVIF_HANDLE | TVIF_CHILDREN;
+		tvItem.hItem = hParent;
+		tvItem.cChildren = true;
+		SetItem(&tvItem);
+
+		Expand(hParent, TVE_EXPAND);
+
+		if (edit_mode)
+			edit_item(hItem);
 	}
 }
 
@@ -3298,13 +3363,22 @@ void CSCTreeCtrl::rename_item(HTREEITEM hItem, CString new_label)
 	}
 }
 
+//현재 선택된 노드의 하위 노드들 중에서 old_label을 찾아서 new_label로 이름을 변경한다.
+void CSCTreeCtrl::rename_child_item(HTREEITEM hParent, CString old_label, CString new_label)
+{
+	if (hParent == NULL)
+		hParent = GetSelectedItem();
+
+	HTREEITEM hItem = find_children_item(old_label, hParent);
+	if (!hItem)
+		return;
+
+	SetItemText(hItem, new_label);
+}
+
 //only_children이 true이면 해당 노드의 자식들만 제거한다.
 void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 {
-	//shell treectrl일 경우 rename, delete은 위험하므로 여기서는 허용하지 않는다.
-	if (m_is_shell_treectrl)
-		return;
-
 	//hItem을 지정하지 않으면 선택된 아이템을 기준으로 동작한다.
 	if (hItem == NULL)
 		hItem = GetSelectedItem();
@@ -3326,7 +3400,7 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 	//shell_tree_ctrl일 경우는 SHDeleteFolder()를 이용해서 폴더 및 하위폴더까지 모두 삭제시켜야 하지만
 	//위험한 동작이므로 우선 노드만 삭제한다.
 
-	//현재 노드 포함 모든 삭제
+	//현재 노드 포함 모든 하위 노드까지 삭제
 	if (!only_children)
 	{
 		DeleteItem(hItem);
@@ -3334,13 +3408,26 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 	}
 
 	//only_children이면 모든 child들을 순회해서 삭제한다.
-	hItem = GetChildItem(hItem);
+	HTREEITEM hChildItem = GetChildItem(hItem);
 
-	while (hItem)
+	SetRedraw(FALSE);
+
+	while (hChildItem)
 	{
-		DeleteItem(hItem);
-		hItem = GetNextSiblingItem(hItem);
+		DeleteItem(hChildItem);
+		hChildItem = GetNextItem(hItem, TVGN_CHILD);
 	}
+
+	SetRedraw(TRUE);
+
+	//children을 모두 삭제했으면 확장버튼도 갱신시켜준다.
+	TVITEM tvItem;
+	memset(&tvItem, 0, sizeof(TVITEM));
+
+	tvItem.mask = TVIF_HANDLE | TVIF_CHILDREN;
+	tvItem.hItem = hItem;
+	tvItem.cChildren = 0;
+	SetItem(&tvItem);
 }
 
 

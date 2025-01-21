@@ -150,8 +150,19 @@ public:
 	//"새 폴더" or "New Folder" 등 다국어까지 고려하여 타이틀을 받는다.
 	bool		add_item(HTREEITEM hParent, CString new_folder_title, bool edit_mode);
 
+	//hParent 항목 아래 하위 항목을 추가한다. NULL이면 현재 선택된 항목이 hParent가 된다.
+	//label이 ""이면 기본 "새 폴더"명으로 추가한 후 edit_item() 호출.
+	//auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
+	void			add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
+	//주어진 항목의 label을 변경한다.
+	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
+	//현재 선택된 노드의 하위 노드들 중에서 old_label을 찾아서 new_label로 이름을 변경한다.
+	void			rename_child_item(HTREEITEM hParent, CString old_label, CString new_label);
+
+	//only_children이 true이면 해당 노드의 자식들만 제거한다.
+	void			delete_item(HTREEITEM hItem = NULL, bool only_children = false, bool confirm = false);
 	//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
-	int			get_file_index(CString path, CString new_folder_title);
+	int				get_file_index(CString path, CString new_folder_title);
 
 
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
@@ -161,7 +172,7 @@ public:
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CDiskDriveInfo drive_info);
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
-	void		insert_folder(WIN32_FIND_DATA* pFindFileData, bool has_children = true);
+	void		insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData, bool has_children = true);
 
 	//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
 	void		update_drive_list(CString thisPC, std::deque<CDiskDriveInfo>* drive_list = NULL);
@@ -182,6 +193,9 @@ public:
 	//hItem = NULL인 경우는 모든 노드를 unselect로 만드는데 사용된다.
 	//NULL이 아닌 어떤 노드를 select상태로 만들지만 기존 selected 노드에는 영향을 주지 않는다.
 	void		select_item(HTREEITEM hItem = NULL);
+
+	//폴더 펼침 이벤트가 발생한 노드 아이템 리턴
+	HTREEITEM	get_expanding_item() { return m_expanding_item; }
 
 	//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
 	bool		is_visible_item(HTREEITEM hItem);
@@ -293,20 +307,15 @@ protected:
 		menu_rename_item,
 		menu_delete_item,
 		menu_property,
+		menu_refresh,
+		menu_favorite,
 	};
 	CSCMenu			m_menu;
 	bool			m_use_popup_menu = false;	//팝업메뉴 사용 여부. default = false
 	void			OnPopupMenu(UINT nID);
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 
-	//하위 항목을 추가한다. label이 ""이면 기본이름으로 추가한 후 edit_item() 호출.
-	//새 폴더, 새 항목이 이미 존재하면 뒤에 숫자를 증가시켜 붙여줘야 한다.
-	void			add_sub_item(HTREEITEM hParent = NULL, CString label = _T(""));
-	//주어진 항목의 label을 변경한다.
-	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
 
-	//only_children이 true이면 해당 노드의 자식들만 제거한다.
-	void			delete_item(HTREEITEM hItem = NULL, bool only_children = false, bool confirm = false);
 
 	//마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;

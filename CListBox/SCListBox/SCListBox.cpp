@@ -199,12 +199,12 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 
-	//TRACE(_T("GetTopIndex() = %d\n"), GetTopIndex());
+	//TRACE(_T("cur index() = %d\n"), (int)lpDIS->itemID);
 	if ((int)lpDIS->itemID < GetTopIndex())
 		return; 
 
-	//CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생.
-
+	CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생하여 사용하지 않았으나 현재는 재현안됨.
+	pDC = &dc;
 	Gdiplus::Graphics g(pDC->GetSafeHdc());
 
 	CString		sText;

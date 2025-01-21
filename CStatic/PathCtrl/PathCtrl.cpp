@@ -154,7 +154,7 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 
 			TRACE(_T("escape\n"));
 			m_pEdit->ShowWindow(SW_HIDE);
-			SetWindowText(m_old_text);
+			SetWindowText(m_edit_old_text);
 			return true;
 		}
 	}
@@ -543,10 +543,10 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		repos_edit();
 
-		m_old_text = get_path(-1);
+		m_edit_old_text = get_path(-1);
 
 		m_pEdit->ShowWindow(SW_SHOW);
-		m_pEdit->SetWindowText(m_old_text);
+		m_pEdit->SetWindowText(m_edit_old_text);
 
 		m_pEdit->SetSel(0, -1);
 		m_pEdit->SetFocus();
@@ -969,19 +969,25 @@ void CPathCtrl::edit_end(bool valid)
 
 	m_pEdit->ShowWindow(SW_HIDE);
 
-	CString text;
-
 	if (valid)
-		m_pEdit->GetWindowText(text);
-	else
-		text = m_old_text;
+		m_pEdit->GetWindowText(m_edit_new_text);
+	//else
+	//	m_edit_old_text;
+
+	if (m_edit_old_text == m_edit_new_text)
+	{
+		Invalidate();
+		return;
+	}
 
 	bool res = false;
 
-	::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, text), (LPARAM)&res);
+	::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, m_edit_new_text), (LPARAM)&res);
 
 	if (!res)
-		text = m_old_text;
+		set_path(m_edit_old_text);
 
-	set_path(text);
+	set_path(m_edit_new_text);
+
+	Invalidate();
 }

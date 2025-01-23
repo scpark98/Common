@@ -1396,7 +1396,7 @@ void		SetWallPaper(CString sfile);
 	CString		get_last_error_string(DWORD dwError, bool show_msgBox = false);
 
 //////////////////////////////////////////////////////////////////////////
-//date, time 날짜/시간
+//날짜/시간 date, time 
 	CString		get_date_str(CTime t, CString sep = _T("-"));
 	CString		get_date_str(COleDateTime t, CString sep = _T("-"));
 	CString		get_date_str(__timeb32 tb, CString sep = _T("-"));

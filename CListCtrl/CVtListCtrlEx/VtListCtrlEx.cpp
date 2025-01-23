@@ -3279,23 +3279,28 @@ void CVtListCtrlEx::edit_end(bool valid)
 			m_modified = true;
 
 			set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
-
-			LV_DISPINFO dispinfo;
-			dispinfo.hdr.hwndFrom = m_hWnd;
-			dispinfo.hdr.idFrom = GetDlgCtrlID();
-			dispinfo.hdr.code = LVN_ENDLABELEDIT;
-			dispinfo.item.mask = LVIF_TEXT;
-			dispinfo.item.iItem = m_edit_item;
-			dispinfo.item.iSubItem = m_edit_subItem;
-
-			//이 컨트롤에 LVN_ENDLABELEDIT 이벤트를 보내 기본 핸들러에서 처리할 것이 있다면 처리한다.
-			GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
 		}
 		else
 		{
 			edit_item(m_edit_item, m_edit_subItem);
 		}
 	}
+	else
+	{
+		if (valid)
+			set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
+	}
+
+	LV_DISPINFO dispinfo;
+	dispinfo.hdr.hwndFrom = m_hWnd;
+	dispinfo.hdr.idFrom = GetDlgCtrlID();
+	dispinfo.hdr.code = LVN_ENDLABELEDIT;
+	dispinfo.item.mask = LVIF_TEXT;
+	dispinfo.item.iItem = m_edit_item;
+	dispinfo.item.iSubItem = m_edit_subItem;
+
+	//이 컨트롤에 LVN_ENDLABELEDIT 이벤트를 보내 기본 핸들러에서 처리할 것이 있다면 처리한다.
+	GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
 }
 
 //어떤 항목이 특정 위치에 표시되도록 스크롤시킨다.

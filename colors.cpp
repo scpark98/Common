@@ -571,7 +571,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= cr_back_selected;
-			cr_back_alternated		= get_color(cr_back, 8);
+			cr_back_alternate		= get_color(cr_back, 8);
 
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
 
@@ -598,7 +598,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= get_color(cr_back_selected, 48);
-			cr_back_alternated		= get_color(cr_back, 8);
+			cr_back_alternate		= get_color(cr_back, 8);
 
 			cr_selected_border		= cr_back_selected;
 
@@ -655,7 +655,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
-			cr_back_alternated		= get_color(cr_back, -16);
+			cr_back_alternate		= get_color(cr_back, -16);
 
 			cr_header_text			= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
 			cr_header_back			= RGB2gpColor(::GetSysColor(COLOR_3DFACE));

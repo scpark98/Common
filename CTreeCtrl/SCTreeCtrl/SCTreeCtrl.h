@@ -294,7 +294,7 @@ protected:
 
 	enum TIMER_ID
 	{
-		timer_expand_for_drop = 0,
+		timer_expand_for_drag_hover = 0,	//drag하여 트리 항목위에 머물경우 해당 트리를 expand시켜준다.
 	};
 
 	//popup menu

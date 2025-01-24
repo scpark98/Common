@@ -12,6 +12,7 @@
 //
 
 #include <Afxwin.h>
+#include "../../GdiplusBitmap.h"
 
 static const UINT Message_CSCEditMessage = ::RegisterWindowMessage(_T("MessageString_CSCEditMessage"));
 
@@ -42,6 +43,8 @@ public:
 	enum MESSAGES
 	{
 		message_scedit_killfocus = 0,
+		message_scedit_action_button_down,
+		message_scedit_action_button_up,
 	};
 
 // Overrides
@@ -50,6 +53,17 @@ public:
 	//}}AFX_VIRTUAL
 
 	bool					set_read_only(bool readonly = true);
+
+	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
+	//ex)action_find : 돋보기 그림을 그려주고 클릭하면 검색으로 사용
+	//클릭되면 parent에게 message_scedit_action_button_down 혹은 up 메시지를 전송한다.
+	void					set_action_button(int action);
+
+	enum BUTTON_ACTION
+	{
+		action_none = 0,
+		action_find,
+	};
 
 	//Test_GdiButton 프로젝트에서는 CSCEdit이 투명하게 잘 표시되나
 	//Test_SCThemeDialog 프로젝트에서는 투명하게 표시되지 않는다.
@@ -82,6 +96,17 @@ public:
 	// Generated message map functions
 protected:
 	bool		m_transparent = false;
+
+	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
+	//ex)돋보기 그림을 그려주고 클릭하면 검색으로 사용
+	int			m_button_action = 0;
+	//CGdiplusBitmap	m_img_action_button;
+
+	//
+	CSize		m_sz_action_button;
+	//마우스가 액션버튼내에 있는지 판별
+	bool		in_action_button();
+
 	COLORREF	m_cr_text;
 	COLORREF	m_cr_back;
 	COLORREF	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
@@ -120,6 +145,10 @@ public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnEnSetfocus();
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
+	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 };
 
 /////////////////////////////////////////////////////////////////////////////

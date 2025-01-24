@@ -254,8 +254,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			crBack = m_list_db[iItem].crBack[iSubItem];
 			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
 			{
-				if (m_use_alternated_back_color && (iItem % 2))
-					crBack = m_theme.cr_back_alternated;
+				if (m_use_alternate_back_color && (iItem % 2))
+					crBack = m_theme.cr_back_alternate;
 				else
 					crBack = m_theme.cr_back;
 			}

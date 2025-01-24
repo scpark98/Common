@@ -408,8 +408,8 @@ public:
 	Gdiplus::Color	get_back_color(int item, int subItem);
 	//특정 셀이 아닌 기본 배경색을 리턴.
 	Gdiplus::Color	get_back_color() { return m_theme.cr_back; }
-	Gdiplus::Color	get_back_alt_color(int item, int subItem) { return m_theme.cr_back_alternated; }
-	void			set_back_alt_color(Gdiplus::Color cr) { m_theme.cr_back_alternated = cr; }
+	Gdiplus::Color	get_back_alternate_color(int item, int subItem) { return m_theme.cr_back_alternate; }
+	void			set_back_alternate_color(bool use, Gdiplus::Color cr) { m_use_alternate_back_color = use; m_theme.cr_back_alternate = cr; }
 
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	//item이 -1이면 모든 라인에, subItem이 -1이면 모든 컬럼에 적용.
@@ -582,7 +582,7 @@ protected:
 	int				m_cur_sorted_column = 0;		//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
-	bool			m_use_alternated_back_color = false;
+	bool			m_use_alternate_back_color = false;
 
 //편집기능 관련
 	bool			m_allow_edit = false;			//항목 편집이 가능한지...

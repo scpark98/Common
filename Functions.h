@@ -1626,7 +1626,7 @@ void		SetWallPaper(CString sfile);
 
 	void		make_rect(CRect &Rect, int x, int y, int w, int h);
 	CRect		make_rect(int x, int y, int w, int h);
-	CRect		makeCenterRect(int cx, int cy, int w, int h);
+	CRect		make_center_rect(int cx, int cy, int w, int h);
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
 	CRect		gpRectToCRect(Gdiplus::Rect);
 	Gdiplus::Rect	CRectTogpRect(CRect r);

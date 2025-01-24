@@ -2770,14 +2770,19 @@ void request_url(CRequestUrlParams* params)
 		HttpAddRequestHeaders(hOpenRequest, params->headers[i], -1, HTTP_ADDREQ_FLAG_ADD);
 	}
 
-
+	BOOL res = FALSE;
 #ifdef _UNICODE
 	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, params->body, -1, NULL, NULL, NULL, NULL);
 	char* jsonData = new char[char_str_len];
 	ZeroMemory(jsonData, char_str_len);
 	WideCharToMultiByte(CP_UTF8, 0, params->body, -1, jsonData, char_str_len, 0, 0);
 
-	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
+	//body = ""일 경우 아래 if문이 의미없다고 판단되나 backend의 .py에서 ""와 null string을 처리하는 방식이
+	//postman과는 다르다는 GPT의 설명이 있다. 우선 이 if문을 그대로 둔다.
+	if (strlen(jsonData) == 0)
+		res = HttpSendRequest(hOpenRequest, NULL, 0, 0, 0);
+	else
+		res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
 #else
 	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, CStringW(params->body), -1, NULL, 0, NULL, NULL);
 	char* jsonData = new char[char_str_len];
@@ -2787,7 +2792,7 @@ void request_url(CRequestUrlParams* params)
 
 	WideCharToMultiByte(CP_UTF8, 0, (CStringW)params->body, -1, jsonData, char_str_len, 0, 0);
 	//CString2char()
-	BOOL res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
+	res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
 #endif
 
 	if (!res)
@@ -6386,7 +6391,7 @@ CRect make_rect(int x, int y, int w, int h)
 	return CRect(x, y, x+w, y+h);
 }
 
-CRect makeCenterRect(int cx, int cy, int w, int h)
+CRect make_center_rect(int cx, int cy, int w, int h)
 {
 	CRect result;
 	result.left		= cx - w/2;

@@ -25,8 +25,9 @@
 // SCEdit.cpp : implementation file
 //
 
-//#include "stdafx.h"
 #include "SCEdit.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -74,6 +75,10 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_WM_WINDOWPOSCHANGED()
 //}}AFX_MSG_MAP
 ON_WM_KILLFOCUS()
+ON_WM_ERASEBKGND()
+ON_WM_LBUTTONDOWN()
+ON_WM_LBUTTONUP()
+ON_WM_SETCURSOR()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -219,6 +224,14 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		hbr = (HBRUSH)m_br_back;
 	}
 
+	if (m_button_action)
+	{
+		CRect r;
+		GetClientRect(r);
+		r.left = r.right - m_sz_action_button.cx;
+		ExcludeClipRect(pDC->m_hDC, r.left, r.top, r.right, r.bottom);
+	}
+
 	return hbr;
 }
 
@@ -258,6 +271,21 @@ bool CSCEdit::set_read_only(bool bReadOnly)
 	}
 
 	return CEdit::SetReadOnly(bReadOnly);
+}
+
+void CSCEdit::set_action_button(int action)
+{
+	m_button_action = action;
+
+	CRect r;
+	GetRect(r);
+
+	CRect rc;
+	GetClientRect(rc);
+
+	m_sz_action_button = CSize(rc.Height(), rc.Height());
+	r.right -= (m_button_action > 0 ? m_sz_action_button.cx : -m_sz_action_button.cx);
+	SetRect(&r);
 }
 
 CSCEdit& CSCEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
@@ -475,6 +503,7 @@ void CSCEdit::OnNcPaint()
 		dc.SelectObject(pOldPen);
 		dc.SelectObject(pOldBrush);
 	}
+
 	return;
 
 	if (!IsWindowEnabled())
@@ -572,3 +601,93 @@ void CSCEdit::OnEnSetfocus()
 	update_ctrl();
 }
 
+
+
+BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_button_action)
+	{
+		CRect r;
+
+		GetClientRect(r);
+		r.left = r.right - m_sz_action_button.cx;
+
+		CMemoryDC dc(pDC, &r);
+		Gdiplus::Graphics g(dc.m_hDC);
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+		dc.FillSolidRect(r, m_cr_back);
+
+		Gdiplus::Pen pen(Gdiplus::Color::RoyalBlue, 2.0F);
+
+		CPoint cp = r.CenterPoint();
+
+		//검색일 경우 돋보기 이미지를 그려준다.
+		if (m_button_action == action_find)
+		{
+			r = make_center_rect(cp.x, cp.y, 12, 12);
+			r.OffsetRect(-2, -2);
+			g.DrawEllipse(&pen, CRectTogpRect(r));
+			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
+		}
+
+		return FALSE;
+	}
+
+	return CEdit::OnEraseBkgnd(pDC);
+}
+
+
+void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_button_action && in_action_button())
+	{
+		TRACE(_T("lbutton down\n"));
+		return;
+	}
+
+	CEdit::OnLButtonDown(nFlags, point);
+}
+
+
+void CSCEdit::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	if (m_button_action && in_action_button())
+	{
+		TRACE(_T("lbutton up\n"));
+		return;
+	}
+
+	CEdit::OnLButtonUp(nFlags, point);
+}
+
+//마우스가 액션버튼내에 있는지 판별
+bool CSCEdit::in_action_button()
+{
+	CRect rc;
+	GetClientRect(rc);
+
+	CPoint pt;
+	GetCursorPos(&pt);
+	ScreenToClient(&pt);
+
+	rc.left = rc.right - m_sz_action_button.cx;
+	if (rc.PtInRect(pt))
+		return true;
+
+	return false;
+}
+
+BOOL CSCEdit::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_button_action && in_action_button())
+	{
+		::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
+		return true;
+	}
+
+	return CEdit::OnSetCursor(pWnd, nHitTest, message);
+}

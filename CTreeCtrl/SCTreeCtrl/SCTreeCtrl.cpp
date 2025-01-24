@@ -1886,7 +1886,7 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (!m_is_hovering)
 	{
-		//TRACE(_T("tree. move\n"));
+		TRACE(_T("tree. move\n"));
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
 		tme.hwndTrack = m_hWnd;
@@ -1987,8 +1987,8 @@ void CSCTreeCtrl::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	m_is_hovering = false;
-	KillTimer(timer_expand_for_drop);
-	//TRACE(_T("tree. leave\n"));
+	KillTimer(timer_expand_for_drag_hover);
+	TRACE(_T("tree. leave\n"));
 	SelectDropTarget(NULL);
 
 	CTreeCtrl::OnMouseLeave();
@@ -2944,7 +2944,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
 			{
 				//drop을 위해 폴더위에 머무를 경우 해당 폴더가 expand가 아니면 expand시켜준다.
-				SetTimer(timer_expand_for_drop, 1000, NULL);
+				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 
 				//TRACE(_T("CDIS_DROPHILITED\n"));
 				crText = m_theme.cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
@@ -3055,9 +3055,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (nIDEvent == timer_expand_for_drop)
+	if (nIDEvent == timer_expand_for_drag_hover)
 	{
-		KillTimer(timer_expand_for_drop);
+		KillTimer(timer_expand_for_drag_hover);
 		Expand(GetDropHilightItem(), TVE_EXPAND);
 	}
 

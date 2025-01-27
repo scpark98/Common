@@ -42,14 +42,17 @@ CSCEdit::CSCEdit()
 	: m_rect_NCbottom(0, 0, 0, 0)
 	, m_rect_NCtop(0, 0, 0, 0)
 {
-	m_cr_text = ::GetSysColor(COLOR_WINDOWTEXT);
-	m_cr_back = ::GetSysColor(COLOR_WINDOW);
-	m_cr_text_disabled = ::GetSysColor(COLOR_GRAYTEXT);
-	m_cr_back_disabled = ::GetSysColor(COLOR_3DSHADOW);
+	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_WINDOWTEXT));
+	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
+	m_cr_text_disabled.SetFromCOLORREF(::GetSysColor(COLOR_GRAYTEXT));
+	m_cr_back_disabled.SetFromCOLORREF(GetSysColor(COLOR_3DSHADOW));
 
-	m_br_back.CreateSolidBrush(m_cr_back);
-	//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
-	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
+	m_cr_button_back = Gdiplus::Color(0, 255, 0);
+	m_cr_button_back_hover = Gdiplus::Color(64, 255, 64);
+	m_cr_button_back_down = Gdiplus::Color(0, 192, 0);
+
+	m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
+	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
 
 	m_auto_resize_font = false;
 	m_auto_resize_ratio = 0.5;
@@ -66,19 +69,19 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	//{{AFX_MSG_MAP(CSCEdit)
 	ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_SIZE()
-	//ON_WM_PAINT()
+	ON_WM_PAINT()
 	ON_WM_NCCALCSIZE()
 	ON_WM_NCPAINT()
-	ON_CONTROL_REFLECT(EN_SETFOCUS, &CSCEdit::OnEnSetfocus)
-	ON_CONTROL_REFLECT(EN_KILLFOCUS, &CSCEdit::OnEnKillfocus)
+	ON_CONTROL_REFLECT_EX(EN_SETFOCUS, &CSCEdit::OnEnSetfocus)
+	ON_CONTROL_REFLECT_EX(EN_KILLFOCUS, &CSCEdit::OnEnKillfocus)
 	ON_CONTROL_REFLECT(EN_UPDATE, &CSCEdit::OnEnUpdate)
 	ON_WM_WINDOWPOSCHANGED()
-//}}AFX_MSG_MAP
-ON_WM_KILLFOCUS()
-ON_WM_ERASEBKGND()
-ON_WM_LBUTTONDOWN()
-ON_WM_LBUTTONUP()
-ON_WM_SETCURSOR()
+	//}}AFX_MSG_MAP
+	ON_WM_ERASEBKGND()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONUP()
+	ON_WM_SETCURSOR()
+	ON_CONTROL_REFLECT(EN_CHANGE, &CSCEdit::OnEnChange)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -150,7 +153,7 @@ CSCEdit& CSCEdit::set_line_align(DWORD align)
 	return *this;
 }
 
-CSCEdit& CSCEdit::set_text_color(COLORREF crColor)
+CSCEdit& CSCEdit::set_text_color(Gdiplus::Color crColor)
 {
 	m_cr_text = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
 	RedrawWindow();
@@ -158,18 +161,18 @@ CSCEdit& CSCEdit::set_text_color(COLORREF crColor)
 	return *this;
 }
 
-CSCEdit& CSCEdit::set_back_color(COLORREF crColor)
+CSCEdit& CSCEdit::set_back_color(Gdiplus::Color crColor)
 {
 	m_cr_back = crColor; // Passing the value passed by the dialog to the member varaible for Backgound Color
 	m_br_back.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
-	m_br_back.CreateSolidBrush(crColor); // Creating the Brush Color For the Edit Box Background
+	m_br_back.CreateSolidBrush(crColor.ToCOLORREF()); // Creating the Brush Color For the Edit Box Background
 	//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
 	RedrawWindow();
 
 	return *this;
 }
 
-CSCEdit& CSCEdit::set_text_color_disabled(COLORREF cr_text_disabled)
+CSCEdit& CSCEdit::set_text_color_disabled(Gdiplus::Color cr_text_disabled)
 {
 	m_cr_text_disabled = cr_text_disabled;
 	RedrawWindow();
@@ -177,11 +180,11 @@ CSCEdit& CSCEdit::set_text_color_disabled(COLORREF cr_text_disabled)
 	return *this;
 }
 
-CSCEdit& CSCEdit::set_back_color_disabled(COLORREF cr_back_disabled)
+CSCEdit& CSCEdit::set_back_color_disabled(Gdiplus::Color cr_back_disabled)
 {
 	m_cr_back_disabled = cr_back_disabled;
 	m_br_back_disabled.DeleteObject();
-	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
+	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
 	RedrawWindow();
 
 	return *this;
@@ -204,7 +207,7 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	}
 	else if (GetStyle() & ES_READONLY)
 	{
-		pDC->SetTextColor(m_cr_text);
+		pDC->SetTextColor(m_cr_text.ToCOLORREF());
 		pDC->SetBkColor(::GetSysColor(COLOR_3DFACE));
 	}
 	//else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
@@ -217,14 +220,14 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	//}
 	else
 	{
-		pDC->SetTextColor(m_cr_text);
-		pDC->SetBkColor(m_cr_back);
+		pDC->SetTextColor(m_cr_text.ToCOLORREF());
+		pDC->SetBkColor(m_cr_back.ToCOLORREF());
  		m_br_back.DeleteObject();
- 		m_br_back.CreateSolidBrush(m_cr_back);
+ 		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
 		hbr = (HBRUSH)m_br_back;
 	}
 
-	if (m_button_action)
+	if (m_action_button)
 	{
 		CRect r;
 		GetClientRect(r);
@@ -248,7 +251,7 @@ CSCEdit& CSCEdit::set_transparent(bool transparent)
 	}
 	else
 	{
-		m_br_back.CreateSolidBrush(m_cr_back);
+		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
 	}
 
 	update_ctrl();
@@ -275,7 +278,7 @@ bool CSCEdit::set_read_only(bool bReadOnly)
 
 void CSCEdit::set_action_button(int action)
 {
-	m_button_action = action;
+	m_action_button = action;
 
 	CRect r;
 	GetRect(r);
@@ -284,7 +287,7 @@ void CSCEdit::set_action_button(int action)
 	GetClientRect(rc);
 
 	m_sz_action_button = CSize(rc.Height(), rc.Height());
-	r.right -= (m_button_action > 0 ? m_sz_action_button.cx : -m_sz_action_button.cx);
+	r.right -= (m_action_button > 0 ? m_sz_action_button.cx : -m_sz_action_button.cx);
 	SetRect(&r);
 }
 
@@ -413,6 +416,9 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 
 void CSCEdit::OnPaint()
 {
+	Default();
+	draw_dim_text();
+
 	//for border???
 #if 0
 	CPaintDC dc(this); // device context for painting
@@ -430,7 +436,7 @@ void CSCEdit::OnPaint()
 	rc.bottom -= 3;
 	dc.Rectangle( rc );
 #endif
-	CEdit::OnPaint();
+	//CEdit::OnPaint();
 }
 
 
@@ -484,21 +490,21 @@ void CSCEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSCEdit::OnNcPaint()
 {
+	//return;
 	Default();
 
-	bool draw_border = true;
-	if (m_transparent && draw_border)
+	if (m_transparent && m_draw_border)
 	{
 		CClientDC dc(this);
 		CRect rc;
 
 		GetClientRect(rc);
 		CPen pen(PS_SOLID, 1, RGB(128, 128, 128));
-		CPen* pOldPen = (CPen*)(draw_border ? dc.SelectObject(&pen) : dc.SelectStockObject(NULL_PEN));
+		CPen* pOldPen = (CPen*)(m_draw_border ? dc.SelectObject(&pen) : dc.SelectStockObject(NULL_PEN));
 		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 
-		dc.Rectangle(rc);
-		//dc.Draw3dRect(rc, RGB(128, 128, 128), RGB(128, 128, 128));
+		//dc.Rectangle(rc);
+		dc.Draw3dRect(rc, RGB(128, 128, 128), RGB(128, 128, 128));
 
 		dc.SelectObject(pOldPen);
 		dc.SelectObject(pOldBrush);
@@ -560,18 +566,13 @@ void CSCEdit::update_ctrl()
 	}
 }
 
-//OnEnKillfocus()보다 먼저 호출된다.
-void CSCEdit::OnKillFocus(CWnd* pNewWnd)
+BOOL CSCEdit::OnEnKillfocus()
 {
-	CEdit::OnKillFocus(pNewWnd);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-}
-
-void CSCEdit::OnEnKillfocus()
-{
+	TRACE(_T("OnEnKillfocus\n"));
 	update_ctrl();
+	draw_dim_text();
 	::SendMessage(GetParent()->m_hWnd, Message_CSCEditMessage, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
+	return FALSE;
 }
 
 
@@ -596,9 +597,11 @@ HBRUSH CSCEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 }
 */
 
-void CSCEdit::OnEnSetfocus()
+BOOL CSCEdit::OnEnSetfocus()
 {
+	TRACE(_T("OnEnSetfocus\n"));
 	update_ctrl();
+	return FALSE;
 }
 
 
@@ -606,44 +609,67 @@ void CSCEdit::OnEnSetfocus()
 BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_button_action)
-	{
-		CRect r;
+	CRect r;
 
-		GetClientRect(r);
+	GetClientRect(r);
+	Gdiplus::Graphics g(pDC->GetSafeHdc());
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	if (m_action_button)
+	{
 		r.left = r.right - m_sz_action_button.cx;
 
-		CMemoryDC dc(pDC, &r);
-		Gdiplus::Graphics g(dc.m_hDC);
-		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		//CMemoryDC dc(pDC, &r);
 
-		dc.FillSolidRect(r, m_cr_back);
+		if (!IsWindowEnabled())
+		{
+			pDC->FillSolidRect(r, RGB(192, 192, 192));
+		}
+		else if (m_action_button_down)
+		{
+			pDC->FillSolidRect(r, m_cr_button_back_down.ToCOLORREF());
+		}
+		else
+		{
+			pDC->FillSolidRect(r, m_cr_button_back.ToCOLORREF());
+		}
 
-		Gdiplus::Pen pen(Gdiplus::Color::RoyalBlue, 2.0F);
+		Gdiplus::Pen pen(IsWindowEnabled() ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::Gray, 2.0F);
 
 		CPoint cp = r.CenterPoint();
 
 		//검색일 경우 돋보기 이미지를 그려준다.
-		if (m_button_action == action_find)
+		if (m_action_button == action_find)
 		{
-			r = make_center_rect(cp.x, cp.y, 12, 12);
+			if (m_action_button_down)
+				cp.Offset(1, 1);
+
+			int size = 12;
+			r = make_center_rect(cp.x, cp.y, size, size);
 			r.OffsetRect(-2, -2);
 			g.DrawEllipse(&pen, CRectTogpRect(r));
 			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
 		}
-
-		return FALSE;
 	}
 
-	return CEdit::OnEraseBkgnd(pDC);
+	if (m_draw_border)
+	{
+		GetClientRect(r);
+		draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Red : Gdiplus::Color::Gray);
+	}
+
+	return FALSE;
+	//return CEdit::OnEraseBkgnd(pDC);
 }
 
 
 void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_button_action && in_action_button())
+	if (m_action_button && in_action_button())
 	{
+		m_action_button_down = true;
+		Invalidate();
 		TRACE(_T("lbutton down\n"));
 		return;
 	}
@@ -654,8 +680,10 @@ void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CSCEdit::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	if (m_button_action && in_action_button())
+	if (m_action_button && in_action_button())
 	{
+		m_action_button_down = false;
+		Invalidate();
 		TRACE(_T("lbutton up\n"));
 		return;
 	}
@@ -683,11 +711,75 @@ bool CSCEdit::in_action_button()
 BOOL CSCEdit::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_button_action && in_action_button())
+	if (m_action_button && in_action_button())
 	{
 		::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
 		return true;
 	}
 
 	return CEdit::OnSetCursor(pWnd, nHitTest, message);
+}
+
+
+void CSCEdit::OnEnChange()
+{
+
+}
+
+void CSCEdit::draw_dim_text()
+{
+	CString text;
+	GetWindowText(text);
+
+	if (GetFocus() == this || !IsWindowEnabled() || text.GetLength())
+		return;
+
+	if (!m_show_dim_text || m_dim_text.GetLength() == 0)
+		return;
+
+	CClientDC	dc(this);
+	CRect		rc;
+	int			iState = dc.SaveDC();					// Save The DC State
+
+	//pDC = &dc;
+	GetClientRect(&rc);							// Get Drawing Area
+
+	if (m_action_button)
+		rc.right -= m_sz_action_button.cx;
+
+	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	//rRect.OffsetRect( 1, 1 );							// Add Sanity Space
+
+	dc.SelectObject((*GetFont()));					// Use The Control's Current Font
+	dc.SetTextColor(m_cr_dim_text.ToCOLORREF());				// Set The Text Color
+	//pDC->SetBkColor(GetSysColor(COLOR_WINDOW));	// Set The Bk Color
+	dc.SetBkMode(TRANSPARENT);
+
+	DWORD dwStyle = GetStyle();
+	DWORD dwText = 0;
+
+	if (m_dwStyle == 0)
+	{
+		MAP_STYLE(ES_LEFT, DT_LEFT);
+		MAP_STYLE(ES_RIGHT, DT_RIGHT);
+		MAP_STYLE(ES_CENTER, DT_CENTER);
+		//MAP_STYLE(ES_CENTERIMAGE, DT_VCENTER | DT_SINGLELINE);
+		//MAP_STYLE(ES_NOPREFIX, DT_NOPREFIX);
+		//MAP_STYLE(ES_WORDELLIPSIS, DT_WORD_ELLIPSIS);
+		//MAP_STYLE(ES_ENDELLIPSIS, DT_END_ELLIPSIS);
+		//MAP_STYLE(ES_PATHELLIPSIS, DT_PATH_ELLIPSIS);
+	}
+
+	dc.DrawText(_T(" ") + m_dim_text, -1, &rc, dwText | DT_SINGLELINE | DT_VCENTER);
+	dc.RestoreDC(iState);								// Restore The DC State
+
+	return;												// Done!
+}
+
+CSCEdit& CSCEdit::set_dim_text(bool show, CString dim_text, Gdiplus::Color cr)
+{
+	m_show_dim_text = show;
+	m_dim_text = dim_text;
+	m_cr_dim_text = cr;
+	return *this;
 }

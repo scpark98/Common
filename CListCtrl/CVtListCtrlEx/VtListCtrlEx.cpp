@@ -1564,12 +1564,20 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	GetClientRect(rc);
 
 	// Get Column alignment
+	DWORD dwStyle = ES_LEFT;
+	int align = get_column_text_align(subItem);
+	if (align == HDF_CENTER)
+		dwStyle = ES_CENTER;
+	else if (align == HDF_RIGHT)
+		dwStyle = ES_RIGHT;
+
+	TRACE(_T("subItem = %d, dwStyle = %d\n"), subItem, dwStyle);
+	/*
 	LV_COLUMN	lvCol;
 
 	lvCol.mask = LVCF_FMT;
 	GetColumn (subItem, &lvCol);
 
-	DWORD dwStyle;
 
 	if ((lvCol.fmt & LVCFMT_JUSTIFYMASK) == LVCFMT_LEFT)
 		dwStyle = ES_LEFT;
@@ -1577,20 +1585,26 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		dwStyle = ES_RIGHT;
 	else
 		dwStyle = ES_CENTER;
+	*/
 
 	if (r.right > rc.right)
 		r.right = rc.right;
 
 	m_edit_old_text = GetItemText(item, subItem);
 
-	dwStyle |= WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
-	//CEdit *pEdit = new gxEditCell(this, item, subItem, GetItemText(item, subItem));
+	//edit을 동적으로 생성할 때 ES_MULTILINE 속성이 있을 경우
+	//edit의 높이는 1줄이고 너비가 텍스트 길이보다 작을 경우 word wrap되어 일부 텍스트가 다음줄로 넘어가서 보이지 않게 된다.
+	//따라서 SetRect를 이용해서 세로 중앙에 표시하는 등 ES_MULTILINE이 반드시 필요한 경우에만 명시한다.
+	//이 CVtListCtrlEx는 single line을 기본으로 하므로 ES_MULTILINE을 생략한다.
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CSCEdit;
-		m_pEdit->Create(WS_CHILD | WS_BORDER | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, IDC_EDIT_CELL);
+		m_pEdit->Create(dwStyle | WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL /* | ES_MULTILINE*/, r, this, IDC_EDIT_CELL);
 	}
 
+	//ES_MULTILINE, ES_LEFT, ES_CENTER, ES_RIGHT 등은 동적변경이 불가능한 스타일이므로
+	//edit_end()에서 기존에는 hide시켰으나 delete으로 변경함.
+	//BOOL res = m_pEdit->ModifyStyle(0, dwStyle);
 	m_pEdit->MoveWindow(r);
 	m_pEdit->SetRect(&r);
 	m_pEdit->SetFont(&m_font, true);
@@ -1599,7 +1613,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetSel(0, -1);
 	m_pEdit->SetFocus();
-
 
 	CString ext = get_part(m_edit_old_text, fn_ext);
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
@@ -3209,7 +3222,7 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 			(clock() - m_last_clicked_time < 2000))
 		{
 			//트리에서 "내 PC"를 선택하여 리스트에 드라이브 리스트가 표시된 상태에서는 시간차 클릭에 의한 편집은 지원하지 않는다.
-			if (get_path() == m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES))
+			if (m_is_shell_listctrl && (get_path() == m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES)))
 				return TRUE;
 
 			edit_item(m_edit_item, m_edit_subItem);
@@ -3237,7 +3250,10 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_in_editing = false;
 	m_last_clicked_time = 0;
 	m_pEdit->GetWindowText(m_edit_new_text);
-	m_pEdit->ShowWindow(SW_HIDE);
+	//m_pEdit->ShowWindow(SW_HIDE);
+	m_pEdit->DestroyWindow();
+	delete m_pEdit;
+	m_pEdit = NULL;
 
 	//if (m_edit_new_text == m_edit_old_text)
 	//	return;
@@ -4386,20 +4402,20 @@ void CVtListCtrlEx::OnMouseLeave()
 
 //HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 CListCtrl의 Get/SetItemData() 함수를 사용할 수 없다.
 //이 두 함수를 사용할 수 있도록 CListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
-DWORD_PTR CVtListCtrlEx::GetItemData(int nItem)
+DWORD_PTR CVtListCtrlEx::GetItemData(int index)
 {
-	if (nItem < 0 || nItem >= m_list_db.size())
+	if (index < 0 || index >= m_list_db.size())
 		return NULL;
 
-	return m_list_db[nItem].data;
+	return m_list_db[index].data;
 }
 
-BOOL CVtListCtrlEx::SetItemData(int nItem, DWORD_PTR dwData)
+BOOL CVtListCtrlEx::SetItemData(int index, DWORD_PTR dwData)
 {
-	if (nItem < 0 || nItem >= m_list_db.size())
+	if (index < 0 || index >= m_list_db.size())
 		return FALSE;
 
-	m_list_db[nItem].data = dwData;
+	m_list_db[index].data = dwData;
 	return TRUE;
 }
 

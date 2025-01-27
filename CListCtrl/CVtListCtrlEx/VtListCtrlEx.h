@@ -559,8 +559,8 @@ public:
 
 	//HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 Get/SetItemData() 함수를 사용할 수 없다.
 	//이 두 함수를 사용할 수 있도록 CListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
-	DWORD_PTR		GetItemData(int nItem);
-	BOOL			SetItemData(int nItem, DWORD_PTR dwData);
+	DWORD_PTR		GetItemData(int index);
+	BOOL			SetItemData(int index, DWORD_PTR dwData);
 
 protected:
 

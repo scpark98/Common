@@ -71,11 +71,11 @@ public:
 	//후자는 SCThemeDlg를 상속받은 dlg라는 점이다. 수정 필요.
 	virtual CSCEdit&		set_transparent(bool transparent = true);
 
-	virtual CSCEdit&		set_text_color(COLORREF crText); // This Function is to set the Color for the Text.
-	virtual CSCEdit&		set_back_color(COLORREF crBack); // This Function is to set the BackGround Color for the Text and the Edit Box.
+	virtual CSCEdit&		set_text_color(Gdiplus::Color crText); // This Function is to set the Color for the Text.
+	virtual CSCEdit&		set_back_color(Gdiplus::Color crBack); // This Function is to set the BackGround Color for the Text and the Edit Box.
 	//아직 set_text_color_disabled()는 효과가 적용되고 있지 않다. 수정 필요.
-	virtual CSCEdit&		set_text_color_disabled(COLORREF cr_text_disabled);
-	virtual CSCEdit&		set_back_color_disabled(COLORREF cr_back_disabled);
+	virtual CSCEdit&		set_text_color_disabled(Gdiplus::Color cr_text_disabled);
+	virtual CSCEdit&		set_back_color_disabled(Gdiplus::Color cr_back_disabled);
 
 	virtual	CSCEdit&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CSCEdit&		set_font_size(int nSize);
@@ -93,38 +93,55 @@ public:
 	//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
 	virtual CSCEdit&		set_line_align(DWORD align = DT_VCENTER);
 
+//dim text
+	virtual CSCEdit&		set_dim_text(bool show, CString dim_text, Gdiplus::Color cr = Gdiplus::Color::LightGray);
+
 	// Generated message map functions
 protected:
-	bool		m_transparent = false;
+	bool			m_transparent = false;
+
+//border
+	bool			m_draw_border = true;
 
 	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
 	//ex)돋보기 그림을 그려주고 클릭하면 검색으로 사용
-	int			m_button_action = 0;
-	//CGdiplusBitmap	m_img_action_button;
+	int				m_action_button = 0;
+	bool			m_action_button_down = false;
+	Gdiplus::Color	m_cr_button_back;
+	Gdiplus::Color	m_cr_button_back_hover;
+	Gdiplus::Color	m_cr_button_back_down;
+
+//dim text
+	bool			m_show_dim_text = false;
+	CString			m_dim_text = _T("asldkfj");
+	Gdiplus::Color	m_cr_dim_text;
+	DWORD			m_dwStyle;
+	void			draw_dim_text();
+
 
 	//
-	CSize		m_sz_action_button;
+	CSize			m_sz_action_button;
 	//마우스가 액션버튼내에 있는지 판별
-	bool		in_action_button();
+	bool			in_action_button();
 
-	COLORREF	m_cr_text;
-	COLORREF	m_cr_back;
-	COLORREF	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
-	COLORREF	m_cr_back_disabled;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
-	CBrush		m_br_back;
-	CBrush		m_br_back_disabled;
+	Gdiplus::Color	m_cr_text;
+	Gdiplus::Color	m_cr_back;
+	Gdiplus::Color	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
+	Gdiplus::Color	m_cr_back_disabled;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
+	CBrush			m_br_back;
+	CBrush			m_br_back_disabled;
 
-	LOGFONT		m_lf;
-	CFont		m_font;
-	int			m_font_size;
-	bool		m_auto_resize_font;	//default = false
-	double		m_auto_resize_ratio;
-	int			m_default_height;
-	void		reconstruct_font();
-	void		update_ctrl();
+	LOGFONT			m_lf;
+	CFont			m_font;
+	int				m_font_size;
+	bool			m_auto_resize_font;	//default = false
+	double			m_auto_resize_ratio;
+	int				m_default_height;
+	void			reconstruct_font();
+	void			update_ctrl();
 
-	CRect		m_rect_NCbottom;
-	CRect		m_rect_NCtop;
+	CRect			m_rect_NCbottom;
+	CRect			m_rect_NCtop;
 
 	//{{AFX_MSG(CSCEdit)
 	afx_msg HBRUSH CtlColor(CDC* pDC, UINT nCtlColor); // This Function Gets Called Every Time Your Window Gets Redrawn.
@@ -140,15 +157,15 @@ public:
 	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
 	afx_msg void OnNcPaint();
 	//afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
-	afx_msg void OnEnKillfocus();
+	afx_msg BOOL OnEnKillfocus();
 	afx_msg void OnEnUpdate();
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
-	afx_msg void OnEnSetfocus();
-	afx_msg void OnKillFocus(CWnd* pNewWnd);
+	afx_msg BOOL OnEnSetfocus();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnEnChange();
 };
 
 /////////////////////////////////////////////////////////////////////////////

@@ -266,6 +266,8 @@ public:
 //색상 관련
 	//std::function<void()>	function_check_dim_text;
 	//void			set_dim_text_function(std::function<void()> func) { function_check_dim_text = func; }
+	//특정 노드는 어떤 조건에 의해 다른색으로 표현하고 싶은데 그 판별은 parent에서 해야 할 때
+	//이 함수를 parent에서 호출하면서 판별함수를 지정할 수 있다. (LMM CSManager에서 속한 device가 없는 그룹의 색상을 dim처리)
 	bool			(*check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
 	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { check_is_dim_text = func; }
 

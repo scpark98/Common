@@ -5,6 +5,10 @@ scpark.
 기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CGdiplusBitmap이라는 하나의 클래스로 합치고
 Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
+* Gdiplus를 자동 초기화, 해제하기 위해 CGdiplusDummyForInitialization 클래스를 추가하고
+  GdiplusBitmap.cpp의 맨 위에서 static 인스턴스를 선언함.
+
+
 - 20221217. animatedGif 추가
 	//다른 이미지 포맷과는 달리 내부 쓰레드에서 parent의 DC에 디스플레이 함.
 
@@ -42,6 +46,31 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 #include <vector>
 
 static const UINT Message_CGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CGdiplusBitmap"));
+
+//Gdiplus 초기화 과정을 자동으로 하기 위해 CGdiplusDummyForInitialization 클래스를 선언하고
+//GdiplusBitmap.cpp의 맨 위에서 static 인스턴스를 선언함.
+class CGdiplusDummyForInitialization
+{
+public:
+	CGdiplusDummyForInitialization()
+	{
+		Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+
+		if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Gdiplus::Ok)
+		{
+			AfxMessageBox(TEXT("ERROR:Falied to initalize GDI+ library"));
+		}
+	}
+
+	~CGdiplusDummyForInitialization()
+	{
+		Gdiplus::GdiplusShutdown(gdiplusToken);
+	}
+
+protected:
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR gdiplusToken;
+};
 
 class CGdiplusBitmapMessage
 {

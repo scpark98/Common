@@ -4,30 +4,6 @@
 #include <thread>
 #include <afxcmn.h>
 
-//Gdiplus 초기화 과정을 자동으로 하기 위해 CGdiplusDummyForInitialization 타입의 static 인스턴스를 선언해준다.
-class CGdiplusDummyForInitialization
-{
-public:
-	CGdiplusDummyForInitialization()
-	{
-		Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-
-		if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Gdiplus::Ok)
-		{
-			AfxMessageBox(TEXT("ERROR:Falied to initalize GDI+ library"));
-		}
-	}
-
-	~CGdiplusDummyForInitialization()
-	{
-		Gdiplus::GdiplusShutdown(gdiplusToken);
-	}
-
-protected:
-	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-	ULONG_PTR gdiplusToken;
-};
-
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
 
 CGdiplusBitmap::CGdiplusBitmap()

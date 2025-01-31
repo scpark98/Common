@@ -5032,8 +5032,8 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 
 bool has_sub_folders(CString path)
 {
-	if (path.Right(1) != _T("\\"))
-		path += _T("\\");
+	if (path.GetLength() > 2 && path.Right(1) == _T("\\"))
+		truncate(path, 1);
 
 	CString file;
 	CFileFind filefind;
@@ -6766,7 +6766,15 @@ bool show_property_window(std::deque<CString> fullpath)
 	//"내 PC"를 선택한 경우 시스템 속성 창을 열어준다.
 	if (fullpath.size() == 1 && fullpath[0] == get_system_label(CSIDL_DRIVES))
 	{
-		ShellExecute(NULL, _T("open"), _T("SystemPropertiesAdvanced.exe"), NULL, NULL, SW_SHOW);
+		//탐색기에서 "내 PC" 우클릭하여 속성창을 열 때와 동일한 코드.
+		ShellExecute(NULL, _T("properties"), _T("shell:::{20D04FE0-3AEA-1069-A2D8-08002B30309D}"), NULL, NULL, SW_SHOWNORMAL);
+
+		//5개의 탭으로 구성된 간단한 시스템 속성창을 표시한다.
+		//ShellExecute(NULL, _T("open"), _T("SystemPropertiesComputerName.exe"), NULL, NULL, SW_SHOW);
+
+		//탐색기에서 "내 PC" 우클릭하여 속성을 선택하면 보여지는 창은 작업관리자로 보면 다음 명령어와 파라미터로 실행되나
+		//정작 cmd창에서는 실행되지 않고 아래와 같은 명령으로도 실행되지 않는다.
+		//ShellExecute(NULL, _T("open"), _T("C:\\Windows\\ImmersiveControlPanel\\SystemSettings.exe"), _T("-ServerName:microsoft.windows.immersivecontrolpanel"), NULL, SW_SHOWNORMAL);
 		CoUninitialize();
 		return true;
 	}

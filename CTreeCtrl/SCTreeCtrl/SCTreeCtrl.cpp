@@ -847,7 +847,7 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 
 		//내 PC인 경우는 가상폴더이므로 물리적 path가 없다.
 		if (PathFileExists(path))
-			tvInsert.item.cChildren = (get_sub_folders(path) > 0);
+			tvInsert.item.cChildren = has_sub_folders(path);
 		else
 			tvInsert.item.cChildren = 1;
 
@@ -905,7 +905,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 		if (item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			insert_folder(hParent, &item, get_sub_folders(item.cFileName) > 0);
+			insert_folder(hParent, &item, has_sub_folders(convert_special_folder_to_real_path(item.cFileName, m_pShellImageList, !m_is_local)));
 			folder_inserted = true;
 		}
 	}
@@ -973,7 +973,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool h
 	if (m_is_shell_treectrl)
 	{
 		if (m_is_local)
-			tvInsertItem.item.cChildren = get_sub_folders(concat_path(get_path(hParent), data->cFileName));
+			tvInsertItem.item.cChildren = has_sub_folders(convert_special_folder_to_real_path(concat_path(get_path(hParent), data->cFileName), m_pShellImageList, !m_is_local));
 		else
 			tvInsertItem.item.cChildren = has_children;
 	}
@@ -1701,7 +1701,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	::SetFocus(m_hWnd);
 	SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
 
-	int item_count = get_sub_folders(path, NULL, false, true);
+	bool sub_folder_exist = has_sub_folders(path);
 	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 
 	if (m_pDragImage && m_pDragImage->GetSafeHandle())
@@ -1728,7 +1728,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 		//drag_image가 2개 이상일 경우는 drag count에 따라 0번 또는 1번 이미지를 사용한다.
 		else if (m_drag_images_id.size() > 1)
 		{
-			bmpRes.load(item_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
+			bmpRes.load(sub_folder_exist ? m_drag_images_id[1] : m_drag_images_id[0]);
 		}
 
 		//bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(item_count), 20, 2,
@@ -3078,10 +3078,11 @@ void CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 	*pResult = 1;
 }
 
+//context menu를 컨트롤 내부에서 처리하면 레이블 변경, 삭제, 추가 등의 일반적인 메뉴항목들을 처리하는 것이 간단해지지만
+//로그를 남기는 등 별도의 추가 처리가 복잡해진다. 따라서 가능한 한 parent에서 처리하는 것이 맞다.
 void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 {
 	//우클릭되면 해당 아이템을 SELECTED로 수동 설정해야 한다.
-	// if Shift-F10
 	if (point.x == -1 && point.y == -1)
 		point = (CPoint)GetMessagePos();
 

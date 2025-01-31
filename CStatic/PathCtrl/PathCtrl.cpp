@@ -96,6 +96,7 @@ void CPathCtrl::PreSubclassWindow()
 	m_pEdit = new CSCEdit();// (this, item, subItem, GetItemText(item, subItem));
 	m_pEdit->Create(dwStyle, rc, this, 0);
 	m_pEdit->SetFont(&m_font, true);
+	((CSCEdit*)m_pEdit)->set_draw_border(false);
 
 	repos_edit();
 
@@ -349,7 +350,7 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 
 	if (m_is_local)
 	{
-		m_has_subfolder = (get_sub_folders(path) > 0);	//마지막 폴더명 아래 서브폴더가 존재하는지
+		m_has_subfolder = has_sub_folders(path);	//마지막 폴더명 아래 서브폴더가 존재하는지
 	}
 	else
 	{
@@ -823,7 +824,7 @@ void CPathCtrl::recalc_path_position()
 		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가
 		//remote인 경우는 하위 폴더목록을 request해서 받기 전까지는 구할 수 없다.
 		//하지만 m_path.size() - 1보다 하위의 폴더라면 이미 하위폴더가 있다는 뜻이므로 우선 이렇게 처리한다.
-		bool has_sub = (m_is_local ? get_sub_folders(get_path(i)) : true);
+		bool has_sub = (m_is_local ? has_sub_folders(convert_special_folder_to_real_path(get_path(i), m_pShellImageList, !m_is_local)) : true);
 		rt.right += (has_sub || (i < m_path.size() - 1) ? m_arrow_area_width : 0);
 
 		rt.top = rc.top;

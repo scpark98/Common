@@ -96,6 +96,7 @@ public:
 //dim text
 	virtual CSCEdit&		set_dim_text(bool show, CString dim_text, Gdiplus::Color cr = Gdiplus::Color::LightGray);
 
+	void					set_draw_border(bool draw = true) { m_draw_border = draw; }
 	// Generated message map functions
 protected:
 	bool			m_transparent = false;

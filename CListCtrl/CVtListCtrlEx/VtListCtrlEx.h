@@ -644,7 +644,7 @@ public:
 	afx_msg void OnPaint();
 	afx_msg void OnLvnBeginlabeledit(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg BOOL OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg BOOL OnNMClickList(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg BOOL OnNMClick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult);
 	//afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	//afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
@@ -661,6 +661,13 @@ public:
 	afx_msg void OnMouseLeave();
 	afx_msg void OnSetFocus(CWnd* pOldWnd);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
+	afx_msg BOOL OnLvnItemchanging(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg LRESULT OnNcHitTest(CPoint point);
+	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg void OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult);
 };
 
 

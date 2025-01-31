@@ -655,7 +655,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	if (m_draw_border)
 	{
 		GetClientRect(r);
-		draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Red : Gdiplus::Color::Gray);
+		draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Blue : Gdiplus::Color::Gray);
 	}
 
 	return FALSE;

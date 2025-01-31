@@ -48,7 +48,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT(LVN_BEGINLABELEDIT, &CVtListCtrlEx::OnLvnBeginlabeledit)
 	ON_NOTIFY_REFLECT_EX(LVN_ENDLABELEDIT, &CVtListCtrlEx::OnLvnEndlabeledit)
 	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CVtListCtrlEx::OnNMDblclk)
-	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CVtListCtrlEx::OnNMClickList)
+	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CVtListCtrlEx::OnNMClick)
 	ON_WM_DROPFILES()
 	ON_WM_MEASUREITEM_REFLECT()
 	ON_NOTIFY_REFLECT(LVN_BEGINDRAG, &CVtListCtrlEx::OnLvnBeginDrag)
@@ -61,6 +61,13 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CVtListCtrlEx::on_message_CSCEdit)
+	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGING, &CVtListCtrlEx::OnLvnItemchanging)
+	ON_WM_LBUTTONDOWN()
+	ON_WM_NCHITTEST()
+	ON_WM_HSCROLL()
+	ON_WM_VSCROLL()
+	ON_NOTIFY_REFLECT(LVN_BEGINSCROLL, &CVtListCtrlEx::OnLvnBeginScroll)
+	ON_NOTIFY_REFLECT(LVN_ENDSCROLL, &CVtListCtrlEx::OnLvnEndScroll)
 END_MESSAGE_MAP()
 
 
@@ -804,8 +811,10 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 	int last = MIN(size(), first + GetCountPerPage());
 	for (int i = first; i < last; i++)
 	{
-		//라인을 먼저 찾고
+		//LVIR_BOUNDS로 itemRect를 구하면 맨 끝 컬럼의 우측 클릭 시 범위안에 들어오지 않으므로
+		//item도 -1을 리턴한다. itemRect.right는 rc.right로 검사해줘야 subItem은 -1이더라도 item은 알 수 있다.
 		GetItemRect(i, &itemRect, LVIR_BOUNDS);
+		itemRect.right = rc.right;
 
 		if (itemRect.PtInRect(pt))
 		{
@@ -832,6 +841,8 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 					return true;
 				}
 			}
+
+			return true;
 		}
 	}
 
@@ -3182,7 +3193,7 @@ void CVtListCtrlEx::set_log_font(LOGFONT lf)
 
 //어떤 항목을 클릭한 후 단축키 F2를 누르면 해당 텍스트를 편집하는 용도이므로
 //이 때 클릭된 subItem을 기억해놓는다.
-BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
+BOOL CVtListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	int item = -1;// = pNMItemActivate->iItem;
@@ -3190,7 +3201,10 @@ BOOL CVtListCtrlEx::OnNMClickList(NMHDR *pNMHDR, LRESULT *pResult)
 
 	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, false) ||
 		item < 0 || subItem < 0)
+	{
+		*pResult = 1;
 		return TRUE;
+	}
 
 	//TRACE(_T("%d, %d\n"), item, subItem);
 
@@ -4309,6 +4323,16 @@ void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
 }
 
+//https://learn.microsoft.com/en-us/windows/win32/controls/lvn-itemchanging
+//LVS_OWNERDATA style, LVN_ITEMCHANGING notification codes are not sent.
+BOOL CVtListCtrlEx::OnLvnItemchanging(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	*pResult = 0;
+
+	return FALSE;
+}
 
 BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -4475,4 +4499,78 @@ void CVtListCtrlEx::get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data
 			return;
 		}
 	}
+}
+
+
+void CVtListCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	UINT uFlags = 0;
+	//int item = HitTest(point, &uFlags);
+
+	int item = -1;// = pNMItemActivate->iItem;
+	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
+
+
+	get_index_from_point(point, item, subItem, false);
+
+	TRACE(_T("%d, %d, uFlags = %d\n"), item, subItem, uFlags);
+
+	if (item >= 0 && subItem < 0)
+		return;
+
+	//if (uFlags == 14)
+	//	//nFlags = 1;
+	//	return; LVHT_ONITEMLABEL
+	CListCtrl::OnLButtonDown(nFlags, point);
+}
+
+
+LRESULT CVtListCtrlEx::OnNcHitTest(CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//TRACE(_T("OnNcHitTest\n"));
+	return CListCtrl::OnNcHitTest(point);
+}
+
+
+void CVtListCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACE(_T("CVtListCtrlEx::OnHScroll\n"));
+	if (m_in_editing)
+		edit_end();
+	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+}
+
+
+void CVtListCtrlEx::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACE(_T("CVtListCtrlEx::OnVScroll\n"));
+	if (m_in_editing)
+		edit_end();
+	CListCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+}
+
+
+void CVtListCtrlEx::OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	// 이 기능을 사용하려면 Internet Explorer 5.5 이상이 필요합니다.
+	// _WIN32_IE 기호는 0x0560보다 크거나 같아야 합니다.
+	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	TRACE(_T("CVtListCtrlEx::OnLvnBeginScroll\n"));
+	*pResult = 0;
+}
+
+
+void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	// 이 기능을 사용하려면 Internet Explorer 5.5 이상이 필요합니다.
+	// _WIN32_IE 기호는 0x0560보다 크거나 같아야 합니다.
+	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
+	*pResult = 0;
 }

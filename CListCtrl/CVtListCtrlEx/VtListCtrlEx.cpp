@@ -2785,17 +2785,17 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	int item;// = pNMItemActivate->iItem;
 	int subItem;// = pNMItemActivate->iSubItem;
 
-	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, true) ||
-		item < 0 || subItem < 0)
-	{
-		move_parent_folder();
-		return TRUE;
-	}
-
 	//TRACE(_T("%d, %d\n"), item, subItem);
 
 	if (m_is_shell_listctrl)// && m_is_local)
 	{
+		if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, true) ||
+			item < 0 || subItem < 0)
+		{
+			move_parent_folder();
+			return TRUE;
+		}
+
 		if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 			return TRUE;
 

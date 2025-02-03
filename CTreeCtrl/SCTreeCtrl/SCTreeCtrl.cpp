@@ -48,7 +48,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomDraw)
 	ON_WM_TIMER()
 	ON_WM_CONTEXTMENU()
-	ON_NOTIFY_REFLECT(NM_RCLICK, &CSCTreeCtrl::OnNMRClick)
+	ON_NOTIFY_REFLECT_EX(NM_RCLICK, &CSCTreeCtrl::OnNMRClick)
 	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCTreeCtrl::OnMessageCSCMenu)
 	ON_WM_VSCROLL()
 	ON_WM_MOUSEHWHEEL()
@@ -650,6 +650,9 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 //드라이브 폴더를 다시 읽어들인다.
 void CSCTreeCtrl::refresh(HTREEITEM hParent)
 {
+	if (hParent == m_computerItem)
+		hParent = NULL;
+
 	if (hParent == NULL)
 	{
 		DeleteAllItems();
@@ -3065,17 +3068,18 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 }
 
 
-void CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
+BOOL CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	//context menu를 띠우기 위해 OnContextMenu()를 추가했으나
 	//우클릭으로는 OnContextMenu()가 호출되지 않았고 더블우클릭을 해야 OnContextMenu()가 호출되는 현상이 있다.
 	//검색해보니 NM_RCLICK에서 아래와 같은 처리를 해줘야 OnContextMenu()가 호출된다.
 
-	TRACE("CMyTreeCtrl::OnRClick()\n");
+	TRACE("CSCTreeCtrl::OnRClick()\n");
 	// Send WM_CONTEXTMENU to self
-	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, GetMessagePos());
+	//SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, GetMessagePos());
 	// Mark message as handled and suppress default handling
-	*pResult = 1;
+	//*pResult = 1;
+	return FALSE;
 }
 
 //context menu를 컨트롤 내부에서 처리하면 레이블 변경, 삭제, 추가 등의 일반적인 메뉴항목들을 처리하는 것이 간단해지지만
@@ -3321,8 +3325,15 @@ void CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index
 		hItem = InsertItem(label.IsEmpty() ? _T("새 항목") : label, hParent);
 	}
 
+
 	if (hItem)
 	{
+		//새 항목을 추가하고 그 항목을 선택상태로 만드는 경우
+		//list에서 새 폴더 추가 후 성공하면 트리에도 새 폴더를 만들어주는데 SelectItem()을 수행하면
+		//list의 경로가 변경되면서 edit_end()할 때 오류가 발생한다.
+		//일단 SelectItem()은 스킵한다.
+		//SelectItem(hItem);
+
 		//원래 하위 노드가 없는 상태에서 새 노드가 추가되면 cChildren의 속성도 true로 변경해줘야만 child가 나타난다.
 			//hParent에 insert_folder()가 수행되면 children 유무에 따라 확장버튼을 갱신시켜줘야 한다.
 		TVITEM tvItem;

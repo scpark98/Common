@@ -24,7 +24,8 @@ CGdiButton::CGdiButton()
 	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNTEXT)));
 	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT)));
 	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT)));
-	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT)));
+	//m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT)));
+	m_cr_text.push_back(Gdiplus::Color(192, 192, 192));
 
 	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
 	m_cr_back.push_back(get_color(m_cr_back[0], 16));

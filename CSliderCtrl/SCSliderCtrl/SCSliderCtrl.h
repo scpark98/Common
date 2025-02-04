@@ -53,12 +53,16 @@ static const UINT Message_CSCSliderCtrl = ::RegisterWindowMessage(_T("MessageStr
 
 /////////////////////////////////////////////////////////////////////////////
 // CSCSliderCtrl window
+
+class CSCSliderCtrl;
+
 class CSCSliderCtrlMsg
 {
 public:
-	CSCSliderCtrlMsg(int _msg, int _ctrl_id, int _pos)
+	CSCSliderCtrlMsg(int _msg, CSCSliderCtrl* _this, int _pos)
 	{
-		ctrl_id = _ctrl_id;
+		//ctrl_id = _ctrl_id;
+		pThis = _this;
 		msg = _msg;
 		pos = _pos;
 	}
@@ -71,8 +75,9 @@ public:
 		msg_thumb_track_bottom_slide,
 	};
 
+	CSCSliderCtrl* pThis = NULL;
 	int		msg;
-	int		ctrl_id;
+	//int		ctrl_id;
 	int		pos;
 };
 
@@ -304,7 +309,7 @@ protected:
 	COLORREF		m_cr_back;			// back color of control
 	COLORREF		m_cr_active;		//processed area
 	COLORREF		m_cr_inactive;		//not processed area
-	int				m_track_height;		//processing area height. odd recommend between 3 ~ 11.
+	int				m_track_height;		//rc.CenterPoint().y +- m_track_height / 2. ex) 6 and 7 is equal height
 	CPen			m_penThumb;
 	CPen			m_penThumbLight;
 	CPen			m_penThumbLighter;

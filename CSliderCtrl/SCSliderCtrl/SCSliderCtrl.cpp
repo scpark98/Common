@@ -35,7 +35,7 @@ CSCSliderCtrl::CSCSliderCtrl()
 
 	m_margin = CRect(0, 0, 0, 0);
 
-	m_track_height = 5;
+	m_track_height = 14;
 
 	m_draw_focus_rect = false;
 
@@ -190,7 +190,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		track = CRect(pxpos, m_rc.top + 2, m_rc.right, m_rc.bottom - 2);
+		track = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2);
 		dc.FillSolidRect(track, enable_color(m_cr_inactive));
 	}
 	else if (m_style == style_progress_line)
@@ -336,7 +336,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		track = CRect(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
+		track = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2);
 		dc.FillSolidRect(track, enable_color(m_cr_active));
 
 		//m_crValueText = RGB(12, 162, 255);
@@ -934,7 +934,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		//TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
 		SetPos(pos);
 		//Invalidate(false);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 	}
 
 	//이 코드를 살려놓으면 thumb위에서 마우스가 클릭되지 않고 움직여도 WM_PAINT가 호출되는 현상이 발생한다.
@@ -1187,16 +1187,17 @@ void CSCSliderCtrl::set_style(int nStyle)
 {
 	m_style = nStyle;
 
-	m_track_height = 5;
+	//m_track_height = 5;
 
 	if (m_style == style_thumb)
 	{
-		m_thumb = CSize(28, 12);
+		m_track_height = 8;
+		m_thumb = CSize(28, m_track_height + 6);
 	}
 	else if (m_style == style_thumb_round)
 	{
 		m_thumb = CSize(16, 16);
-		m_track_height = 3;
+		m_track_height = 4;
 	}
 	else if (m_style == style_value)
 	{
@@ -1219,7 +1220,7 @@ void CSCSliderCtrl::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_post_pos)
 	{
 		KillTimer(timer_post_pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), GetPos()), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, GetPos()), 0);
 	}
 
 	CSliderCtrl::OnTimer(nIDEvent);
@@ -1293,7 +1294,7 @@ void CSCSliderCtrl::bookmark(int mode, int pos, CString name)
 		if (index >= 0)
 		{
 			SetPos(m_bookmark[index].pos);
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 		}
 	}
 

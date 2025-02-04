@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <set>
 
+#include <locale>
+
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
@@ -878,6 +880,8 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 
 	TRACE(_T("iSub = %d, sort_asc = %d, data_type = %d\n"), iSub, sort_asc, data_type);
 
+	setlocale(LC_ALL, NULL);
+
 	//shelllist인 경우는 폴더와 파일을 나눠서 정렬한다.
 	if (m_is_shell_listctrl)
 	{
@@ -885,9 +889,14 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 			[sort_asc, iSub, data_type, include_null](CVtFileInfo a, CVtFileInfo b)
 			{
 				if (iSub == 0)
-					return (_tcsicmp(a.data.cFileName, b.data.cFileName) == 1);
+				{
+					TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, _tcsicmp(a.data.cFileName, b.data.cFileName));
+					return (CString(get_part(a.data.cFileName, fn_name)).CompareNoCase(get_part(b.data.cFileName, fn_name)) == 1);
+				}
 				else if (iSub == 1)
-					return (a.filesize.QuadPart > b.filesize.QuadPart);
+				{
+					return (get_file_size(a.data) > get_file_size(b.data));
+				}
 				else if (iSub == 2)
 					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
 				return false;
@@ -897,9 +906,14 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 			[sort_asc, iSub, data_type](CVtFileInfo a, CVtFileInfo b)
 			{
 				if (iSub == 0)
-					return (_tcsicmp(a.data.cFileName, b.data.cFileName) == 1);
+				{
+					TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, _tcsicmp(a.data.cFileName, b.data.cFileName));
+					return (CString(a.data.cFileName).CompareNoCase(b.data.cFileName) == 1);
+				}
 				else if (iSub == 1)
-					return (a.filesize.QuadPart > b.filesize.QuadPart);
+				{
+					return (get_file_size(a.data) > get_file_size(b.data));
+				}
 				else if (iSub == 2)
 					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
 				return false;
@@ -3560,6 +3574,12 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 
 	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 
+	if (path == m_path)
+	{
+		TRACE(_T("path is same to m_path. skip."));
+		return;
+	}
+
 	if (path.IsEmpty())
 		path = m_pShellImageList->get_system_path(!m_is_local, CSIDL_DRIVES);
 
@@ -3570,7 +3590,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 	if (m_path.Right(1) == '\\' && m_path.GetLength() > 3)
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	TRACE(_T("current path = %s\n"), m_path);
+	TRACE(_T("set_path(%s)\n"), m_path);
 
 	refresh_list(refresh);
 }
@@ -3616,7 +3636,6 @@ void CVtListCtrlEx::refresh_list(bool reload)
 				{
 					CVtFileInfo fi;
 					_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), drive_list[i].label);
-					fi.filesize.QuadPart = 0;
 					fi.data.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
 					fi.is_remote = false;
 					m_cur_folders.push_back(fi);
@@ -3626,12 +3645,12 @@ void CVtListCtrlEx::refresh_list(bool reload)
 			{
 				std::deque<WIN32_FIND_DATA> dq;
 				find_all_files(m_path, &dq, _T("*"), true, false);
-				for (auto item : dq)
+				for (int i = 0; i < dq.size(); i++)
 				{
-					if (item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-						m_cur_folders.push_back(CVtFileInfo(item));
+					if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+						m_cur_folders.push_back(CVtFileInfo(dq[i]));
 					else
-						m_cur_files.push_back(CVtFileInfo(item));
+						m_cur_files.push_back(CVtFileInfo(dq[i]));
 				}
 			}
 		}
@@ -3656,6 +3675,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 	m_path = cur_path;
 
 	SetRedraw(FALSE);
+	::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_WAIT));
 
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;
@@ -3673,9 +3693,15 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		set_column_text_align(col_filedate, LVCFMT_LEFT);
 	}
 
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+				(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(-1));
+
 	//asc는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(i + 1));
+
 		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
 
 		if (m_is_local)
@@ -3734,16 +3760,20 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(m_cur_folders.size() + i + 1));
+
 		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, m_cur_files[i].data.cFileName, false);
 		index = insert_item(insert_index, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
 
-		set_text(index, col_filesize, get_size_str(m_cur_files[i].filesize.QuadPart));
+		set_text(index, col_filesize, get_size_str(get_file_size(m_cur_files[i].data)));
 		set_text(index, col_filedate, m_cur_files[i].get_file_time_str());
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
 
 	SetRedraw(TRUE);
+	::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
 }
 
 void CVtListCtrlEx::add_file(WIN32_FIND_DATA* data, bool is_remote)
@@ -4560,7 +4590,7 @@ void CVtListCtrlEx::OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	// _WIN32_IE 기호는 0x0560보다 크거나 같아야 합니다.
 	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	TRACE(_T("CVtListCtrlEx::OnLvnBeginScroll\n"));
+	//TRACE(_T("CVtListCtrlEx::OnLvnBeginScroll\n"));
 	*pResult = 0;
 }
 
@@ -4571,6 +4601,6 @@ void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	// _WIN32_IE 기호는 0x0560보다 크거나 같아야 합니다.
 	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
+	//TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
 	*pResult = 0;
 }

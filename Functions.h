@@ -999,6 +999,7 @@ struct	NETWORK_INFO
 
 	uint64_t	get_file_size(CString sfile);
 	bool		get_file_size(CString path, ULARGE_INTEGER* ulFileSize);
+	ULONGLONG	get_file_size(WIN32_FIND_DATA data);
 
 	uint64_t	get_folder_size(CString path);
 
@@ -1372,6 +1373,8 @@ h		: 복사할 height 크기(pixel)
 	//"C:\Users\scpark\Documents"	=> "문서"
 	CString		convert_real_path_to_special_folder(CString real_path, CShellImageList * plist = NULL, int index = 0);
 
+	//"c:\windows"를 입력하면 "C:\Windows"와 같이 실제 파일시스템에 저장된 경로명 리턴.
+	CString		get_original_path(CString path);
 
 //파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
 	void		ParseCommandString(CString sParam, CStringArray& ar);

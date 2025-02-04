@@ -67,13 +67,14 @@ static const UINT Message_CVtListCtrlEx = ::RegisterWindowMessage(_T("MessageStr
 class CVtListCtrlExMessage
 {
 public :
-	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""), CString _param1 = _T(""))
+	CVtListCtrlExMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""), CString _param1 = _T(""), int _reserved = 0)
 	{
 		pThis = _this;
 		message = _message;
 		pTarget = _pTarget;
 		param0 = _param0;
 		param1 = _param1;
+		reserved = _reserved;
 	}
 
 	CWnd*	pThis = NULL;
@@ -81,48 +82,23 @@ public :
 	int		message;
 	CString param0 = _T("");
 	CString param1 = _T("");
+	int		reserved = 0;
 };
 
 class CVtFileInfo
 {
 public:
-	CVtFileInfo() {};
+	CVtFileInfo()
+	{
+		memset(&data, 0, sizeof(data));
+		is_remote = false;
+	};
+
 	CVtFileInfo(WIN32_FIND_DATA _data, bool _is_remote = false)
 	{
 		data = _data;
-		filesize.HighPart = data.nFileSizeHigh;
-		filesize.LowPart = data.nFileSizeLow;
 		is_remote = _is_remote;
-		//path = data.cFileName;
-		//filesize.HighPart = data.nFileSizeHigh;
-		//filesize.LowPart = data.nFileSizeLow;
-		//filetime = data.ftLastWriteTime;
-		//is_folder = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-		//memcpy(&filetime, &data.ftLastWriteTime, sizeof(FILETIME));
 	}
-	/*
-	CVtFileInfo(CString _path, ULARGE_INTEGER _filesize, FILETIME _filetime, bool _is_remote = false, bool _is_folder = false)
-	{
-		if (!_is_remote && _filesize.QuadPart == 0)
-		{
-			if (PathIsDirectory(_path))
-				_filesize.QuadPart = 0;
-			else
-				_filesize.QuadPart = get_file_size(_path);
-		}
-
-		//if (!_is_remote)
-		//{
-		//	_date = get_datetime_string(GetFileLastModifiedTime(_path), 2, true, _T(" "), false, false);
-		//}
-
-		path = _path;
-		filesize = _filesize;
-		filetime = _filetime;
-		is_remote = _is_remote;
-		is_folder = is_folder;
-	}
-	*/
 
 	CString get_file_time_str()
 	{
@@ -133,7 +109,7 @@ public:
 	//sort의 lamda등에서도 인덱스로 접근하도록 하기 위해 text[3];과 같이 배열로 선언했었으나
 	//3개밖에 되지 않고 명확히 사용하고자 타입에 맞게 선언함
 	//CString			path;
-	ULARGE_INTEGER	filesize;
+	//ULARGE_INTEGER	filesize;
 	//FILETIME		filetime;
 	bool			is_remote = false;
 	//bool			is_folder = false;
@@ -167,6 +143,7 @@ public:
 		message_request_rename,
 		message_get_remote_free_space,
 		message_get_remote_total_space,
+		message_list_processing,		//C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
 	};
 
 

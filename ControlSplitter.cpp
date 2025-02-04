@@ -112,7 +112,7 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 		CSize sizeDiff = ptMouse - m_ptStartDrag;
 		CSize sizeMove = m_ptStartPos-rect.TopLeft();
 
-		TRACE(_T("diff = %d, %d, move = %d, %d, rect w = %d, h = %d\n"), sizeDiff.cx, sizeDiff.cy, sizeMove.cx, sizeMove.cy, rect.Width(), rect.Height());
+		//TRACE(_T("diff = %d, %d, move = %d, %d, rect w = %d, h = %d\n"), sizeDiff.cx, sizeDiff.cy, sizeMove.cx, sizeMove.cy, rect.Width(), rect.Height());
 
 		rect.OffsetRect(sizeMove);
 

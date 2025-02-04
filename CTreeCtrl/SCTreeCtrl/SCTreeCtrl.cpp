@@ -900,15 +900,22 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 	bool folder_inserted = false;
 
-	for (auto item : dq)
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
+		(WPARAM) & (CSCTreeCtrlMessage(this, message_tree_processing, NULL, _T(""), _T(""), dq.size())), (LPARAM)(-1));
+
+	//C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
+	for (int i = 0; i < dq.size(); i++)
 	{
-		if (item.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN ||
-			item.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
+						(WPARAM) & (CSCTreeCtrlMessage(this, message_tree_processing, NULL, _T(""), _T(""), dq.size())), (LPARAM)(i+1));
+
+		if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_HIDDEN ||
+			dq[i].dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
 			continue;
 
-		if (item.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			insert_folder(hParent, &item, has_sub_folders(convert_special_folder_to_real_path(item.cFileName, m_pShellImageList, !m_is_local)));
+			insert_folder(hParent, &dq[i], has_sub_folders(convert_special_folder_to_real_path(dq[i].cFileName, m_pShellImageList, !m_is_local)));
 			folder_inserted = true;
 		}
 	}
@@ -1079,7 +1086,7 @@ HTREEITEM CSCTreeCtrl::find_children_item(const CString& label, HTREEITEM hParen
 	while (hItem)
 	{
 		cur_label = GetItemText(hItem);
-		TRACE(_T("cur_label = %s\n"), cur_label);
+		//TRACE(_T("cur_label = %s\n"), cur_label);
 
 		if (cur_label == label)
 			return hItem;
@@ -1158,7 +1165,9 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 		{
 			if (m_is_local)
 			{
+				::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_WAIT));
 				insert_folder(m_expanding_item, get_path(m_expanding_item));
+				::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
 			}
 			else
 			{
@@ -1889,7 +1898,7 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (!m_is_hovering)
 	{
-		TRACE(_T("tree. move\n"));
+		//TRACE(_T("tree. move\n"));
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
 		tme.hwndTrack = m_hWnd;
@@ -1991,7 +2000,7 @@ void CSCTreeCtrl::OnMouseLeave()
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	m_is_hovering = false;
 	KillTimer(timer_expand_for_drag_hover);
-	TRACE(_T("tree. leave\n"));
+	//TRACE(_T("tree. leave\n"));
 	SelectDropTarget(NULL);
 
 	CTreeCtrl::OnMouseLeave();

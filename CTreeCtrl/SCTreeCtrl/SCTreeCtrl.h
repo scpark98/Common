@@ -58,13 +58,14 @@ public:
 class CSCTreeCtrlMessage
 {
 public:
-	CSCTreeCtrlMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""), CString _param1 = _T(""))
+	CSCTreeCtrlMessage(CWnd* _this, int _message, CWnd* _pTarget = NULL, CString _param0 = _T(""), CString _param1 = _T(""), int _reserved = 0)
 	{
 		pThis = _this;
 		message = _message;
 		pTarget = _pTarget;
 		param0 = _param0;
 		param1 = _param1;
+		reserved = _reserved;
 	}
 
 	CWnd*	pThis = NULL;
@@ -72,6 +73,7 @@ public:
 	int		message = 0;
 	CString	param0;
 	CString	param1;
+	int		reserved = 0;
 };
 
 class CSCTreeCtrl : public CTreeCtrl
@@ -96,6 +98,7 @@ public:
 		message_request_property,
 		message_rename_duplicated,		//중복된 폴더명이 존재할 경우
 		message_edit_item,				//F2키를 누르면 메인에서 편집작업을 수행하기 위해.
+		message_tree_processing,		//폴더들을 노드에 추가할 경우 C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
 	};
 
 

@@ -1065,6 +1065,14 @@ bool get_file_size(CString path, ULARGE_INTEGER* ulFileSize)
 	return true;
 }
 
+ULONGLONG get_file_size(WIN32_FIND_DATA data)
+{
+	ULARGE_INTEGER ul;
+	ul.HighPart = data.nFileSizeHigh;
+	ul.LowPart = data.nFileSizeLow;
+	return ul.QuadPart;
+}
+
 ULONGLONG get_folder_size(CString path)
 {
 	WIN32_FIND_DATA data;
@@ -9327,6 +9335,28 @@ CString	convert_real_path_to_special_folder(CString real_path, CShellImageList* 
 	volume_path.Replace(CString(real_path[0]) + _T(":"), volume);
 
 	return volume_path;
+}
+
+//"c:\windows"를 입력하면 "C:\Windows"와 같이 실제 파일시스템에 저장된 경로명 리턴.
+CString	get_original_path(CString path)
+{
+	//존재하지 않는 경로가 넘어오면 아래 함수들에서는 ""이 리턴되지만
+	//이 함수의 역할로 봐서는 넘어온 그대로 리턴하는 것이 맞는 듯 하다.
+	//존재하지 않는 경로에 대한 처리가 필요하다면 main에서 먼저 처리한다.
+	if (!PathFileExists(path))
+		return path;
+
+	TCHAR short_path[MAX_PATH] = { 0, };
+	TCHAR long_path[MAX_PATH] = { 0, };
+	GetShortPathName(path, short_path, MAX_PATH);
+	GetLongPathName(short_path, long_path, MAX_PATH);
+
+	//단, 드라이브명까지 자동 변경되지 않는다.
+	//소문자로 넘어오면 소문자 그대로 리턴되므로 대문자로 변경하여 리턴한다.
+	if (_tcslen(long_path) > 0)
+		long_path[0] = _toupper(long_path[0]);
+
+	return CString(long_path);
 }
 
 void ClickMouse(int x, int y)

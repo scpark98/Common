@@ -972,8 +972,17 @@ void CPathCtrl::edit_end(bool valid)
 
 	if (valid)
 		m_pEdit->GetWindowText(m_edit_new_text);
-	//else
-	//	m_edit_old_text;
+
+	//입력한 경로를 실제 폴더경로와 동일한 대소문자로 보정해줘야 한다.
+	//ex. "c:\windows"를 입력하면 "C:\Windows"와 같이 실제 파일시스템에 저장된 경로명으로 표시해줘야 한다.
+	//GetFullPathName(), _tfullpath(), PathCanonicalize(), SHGetFileInfo(), GetLongPathName() 모두 사용해봤으나
+	//GetShortPathName()으로 변환한 후 GetLongPathName()을 호출하면 된다.
+	if (!PathFileExists(m_edit_new_text))
+		m_edit_new_text = _T("");
+	else
+		m_edit_new_text = get_original_path(m_edit_new_text);
+
+	TRACE(_T("m_edit_new_text = %s\n"), m_edit_new_text);
 
 	if (m_edit_old_text == m_edit_new_text)
 	{

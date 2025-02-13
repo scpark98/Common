@@ -936,11 +936,13 @@ struct	NETWORK_INFO
 	uint16_t Cal_CRC16(const uint8_t* p_data, uint32_t size);
 
 	//https://ikcoo.tistory.com/213
+#ifndef REMOTESDK
+	std::string base64_decode(const std::string& in);
 	std::string base64_encode(unsigned char const*, unsigned int len);
 	std::string base64_encode(const std::string& in);
-	std::string base64_decode(const std::string& in);
 	CString base64_encode(CString in);
 	CString base64_decode(CString in);
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 //파일 관련
@@ -1523,6 +1525,7 @@ void		SetWallPaper(CString sfile);
 	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, int pen_style = PS_SOLID, int draw_mode = R2_COPYPEN);
 	void		draw_rectangle(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
+	void		draw_rectangle(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);

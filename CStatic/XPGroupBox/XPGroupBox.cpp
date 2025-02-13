@@ -1,7 +1,6 @@
 // XPGroupBox.cpp : implementation file
 //
 
-#include "stdafx.h"
 #include "XPGroupBox.h"
 
 
@@ -39,16 +38,6 @@ IMPLEMENT_DYNAMIC(CXPGroupBox,CButton);
 //////////////////////////////////////////////////////////////////////////
 CXPGroupBox::CXPGroupBox()
 {
-    m_strTitle = _T("");
-
-	m_crTitleText = RGB( 0, 0, 0 );
-	m_crTitleBack = RGB(249, 236, 168);
-	m_crClientBack = RGB(255, 249, 228);
-
-	m_clrBorder = ::GetSysColor(COLOR_3DSHADOW);
-
-	m_nType = XPGB_FRAME;
-	m_dwAlignment = SS_CENTER;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -106,16 +95,17 @@ void CXPGroupBox::OnPaint()
 	CFont *pOldFont = dc.SelectObject(&m_font);
   		
 	// get Text if need
-	if ( m_strTitle.IsEmpty() )
+	if (m_strTitle.IsEmpty())
 	{ 
         GetWindowText(m_strTitle);
-		if ( ! m_strTitle.IsEmpty() )
-			m_strTitle = _T(" ") + m_strTitle + _T(" ");
+		if (!m_strTitle.IsEmpty())
+			m_strTitle = _T("  ") + m_strTitle + _T("  ");	//좌우 여백 추가
 	}
 	
-	if ( ! m_strTitle.IsEmpty() )
+	if (!m_strTitle.IsEmpty())
 	{
 		sizeText = dc.GetTextExtent(m_strTitle);
+		sizeText.cy++;
 	}
 	else
 	{
@@ -123,7 +113,7 @@ void CXPGroupBox::OnPaint()
 		sizeText.cy = 0;
 	}
 	
-	if ( m_nType == XPGB_FRAME ) // Frame style
+	if (m_nType == XPGB_FRAME) // Frame style
 	{
 		// Calculate Text Rect 
 		switch(m_dwAlignment)
@@ -144,7 +134,7 @@ void CXPGroupBox::OnPaint()
 			break;
 		case SS_RIGHT	:
 			rectText.top = rectClient.top;
-			rectText.right = rectClient.right -10 ;
+			rectText.right = rectClient.right - 10 ;
 			
 			rectText.bottom = rectText.top + sizeText.cy;
 			rectText.left = rectText.right - sizeText.cx;
@@ -153,12 +143,12 @@ void CXPGroupBox::OnPaint()
 		
 		//  Calculate Frame rect
 		rectFrame.left = rectClient.left;
-		rectFrame.top = rectClient.top + sizeText.cy/2;
+		rectFrame.top = rectClient.top + sizeText.cy / 2;
 		
 		rectFrame.right = rectClient.right;
-		rectFrame.bottom = rectFrame.top + rectClient.Height() - sizeText.cy/2; 
+		rectFrame.bottom = rectFrame.top + rectClient.Height() - sizeText.cy / 2; 
 		
-		dc.FillSolidRect( rectClient, m_crBase );
+		//dc.FillSolidRect(rectClient, m_crBase);
 
 		// Draw Frame border
 		CPen penFrame;
@@ -181,12 +171,12 @@ void CXPGroupBox::OnPaint()
 	{
 		// Calculate Title size
 		m_rectTitle.top = rectClient.top;
-		m_rectTitle.left = rectClient.left ;
+		m_rectTitle.left = rectClient.left;
 		
 		m_rectTitle.right = rectClient.right;
 		m_rectTitle.bottom = rectClient.top + sizeText.cy + 4;
 		
-		dc.FillSolidRect( rectClient, m_crBase );
+		//dc.FillSolidRect(rectClient, m_crBase);
 
 		// Draw Title round rect
 		CPen penFrame;
@@ -197,7 +187,8 @@ void CXPGroupBox::OnPaint()
 		penFrame.CreatePen(PS_SOLID, 1, m_clrBorder);
 		
 		CPen* pOldPen = dc.SelectObject(&penFrame);
-		CBrush* pOldBrush = dc.SelectObject(&brushBKTitle);
+		//CBrush* pOldBrush = dc.SelectObject(&brushBKTitle);
+		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 		
 		dc.RoundRect(rectClient, CPoint(10, 10)); 
 		
@@ -210,7 +201,8 @@ void CXPGroupBox::OnPaint()
 		rectContent.right = rectClient.right;
 		rectContent.bottom = rectContent.top + rectClient.Height() - sizeText.cy - 4; 
 		
-		pOldBrush = dc.SelectObject(&brushBKContent); 
+		//pOldBrush = dc.SelectObject(&brushBKContent); 
+		pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 		
 		dc.Rectangle(rectContent);  
 		
@@ -223,21 +215,21 @@ void CXPGroupBox::OnPaint()
 		{
 		case SS_LEFT:	
 			rectText.top = m_rectTitle.top + 2;
-			rectText.left = m_rectTitle.left + 2 ;
+			rectText.left = m_rectTitle.left + 2;
 			
 			rectText.bottom = rectText.top + sizeText.cy;
 			rectText.right = rectText.left + sizeText.cx ;
 			break;
 		case	SS_CENTER:	
 			rectText.top = m_rectTitle.top + 2;
-			rectText.left = m_rectTitle.left + (m_rectTitle.Width() - sizeText.cx) / 2 ;
+			rectText.left = m_rectTitle.left + (m_rectTitle.Width() - sizeText.cx) / 2;
 			
 			rectText.bottom = rectText.top + sizeText.cy;
-			rectText.right = rectText.left + sizeText.cx ;
+			rectText.right = rectText.left + sizeText.cx;
 			break;
 		case	SS_RIGHT	:
 			rectText.top = m_rectTitle.top + 2;
-			rectText.right = rectClient.right - 2  ;
+			rectText.right = rectClient.right - 2;
 			
 			rectText.bottom = rectText.top + sizeText.cy;
 			rectText.left = rectText.right - sizeText.cx;
@@ -250,7 +242,7 @@ void CXPGroupBox::OnPaint()
 	COLORREF clrOldText = dc.SetTextColor(m_crTitleText);
 	UINT nMode = dc.SetBkMode(TRANSPARENT);
 	
-	dc.DrawText(m_strTitle, &rectText, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_NOCLIP ); //DT_END_ELLIPSIS);
+	dc.DrawText(m_strTitle, &rectText, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_NOCLIP); //DT_END_ELLIPSIS);
 	
 	// restore DC
 	dc.SetBkMode(nMode);
@@ -327,11 +319,11 @@ void CXPGroupBox::PreSubclassWindow()
 
 
 	DWORD dwAlign = GetStyle();
-	if ( (dwAlign & BS_CENTER) == BS_CENTER )
+	if ((dwAlign & BS_CENTER) == BS_CENTER)
 		m_dwAlignment = SS_CENTER;
-	else if ( dwAlign & BS_LEFT )
+	else if (dwAlign & BS_LEFT)
 		m_dwAlignment = SS_LEFT;
-	else if ( dwAlign & BS_RIGHT )
+	else if (dwAlign & BS_RIGHT)
 		m_dwAlignment = SS_RIGHT;
 }
 
@@ -376,7 +368,7 @@ void CXPGroupBox::UpdateSurface()
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetXPGroupStyle
+// Function:		CXPGroupBox::set_XPGroup_style
 //
 // Description:		Set Groupbox style
 //
@@ -388,9 +380,9 @@ void CXPGroupBox::UpdateSurface()
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetXPGroupStyle(XPGroupBoxStyle eStyle) 
+CXPGroupBox& CXPGroupBox::set_XPGroup_style(XPGroupBoxStyle style)
 {
-   m_nType = eStyle;
+   m_nType = style;
    UpdateSurface();
    return *this;
 }
@@ -419,7 +411,7 @@ CXPGroupBox& CXPGroupBox::SetFont(LOGFONT lf)
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetFontBold
+// Function:		CXPGroupBox::set_font_bold
 //
 // Description:		Sets Font Style
 //
@@ -431,9 +423,9 @@ CXPGroupBox& CXPGroupBox::SetFont(LOGFONT lf)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetFontBold(BOOL bBold)
+CXPGroupBox& CXPGroupBox::set_font_bold(bool bold)
 {
-	m_lf.lfWeight = bBold ? FW_BOLD : FW_NORMAL;
+	m_lf.lfWeight = bold ? FW_BOLD : FW_NORMAL;
 	ReconstructFont();
 	UpdateSurface();
 	return *this;
@@ -441,7 +433,7 @@ CXPGroupBox& CXPGroupBox::SetFontBold(BOOL bBold)
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetFontName
+// Function:		CXPGroupBox::set_font_name
 //
 // Description:		Sets the fonts face name
 //
@@ -453,11 +445,11 @@ CXPGroupBox& CXPGroupBox::SetFontBold(BOOL bBold)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetFontName(const CString& strFont, BYTE byCharSet)
+CXPGroupBox& CXPGroupBox::set_font_name(const CString& font_name, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 
-	_tcscpy(m_lf.lfFaceName,strFont);
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), font_name);
 	ReconstructFont();
 	UpdateSurface();
 
@@ -466,7 +458,7 @@ CXPGroupBox& CXPGroupBox::SetFontName(const CString& strFont, BYTE byCharSet)
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetFontUnderline
+// Function:		CXPGroupBox::set_font_underline
 //
 // Description:		Sets font underline attribue
 //
@@ -478,9 +470,9 @@ CXPGroupBox& CXPGroupBox::SetFontName(const CString& strFont, BYTE byCharSet)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetFontUnderline(BOOL bSet)
+CXPGroupBox& CXPGroupBox::set_font_underline(bool underline)
 {
-	m_lf.lfUnderline = bSet;
+	m_lf.lfUnderline = underline;
 	ReconstructFont();
 	UpdateSurface();
 
@@ -489,7 +481,7 @@ CXPGroupBox& CXPGroupBox::SetFontUnderline(BOOL bSet)
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetFontItalic
+// Function:		CXPGroupBox::set_font_italic
 //
 // Description:		Sets font italic attribue
 //
@@ -501,9 +493,9 @@ CXPGroupBox& CXPGroupBox::SetFontUnderline(BOOL bSet)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetFontItalic(BOOL bSet)
+CXPGroupBox& CXPGroupBox::set_font_italic(bool italic)
 {
-	m_lf.lfItalic = bSet;
+	m_lf.lfItalic = italic;
 	ReconstructFont();
 	UpdateSurface();
 
@@ -542,16 +534,16 @@ CXPGroupBox& CXPGroupBox::SetFontSize(int nSize)
 }
 
 //clrBase : 이 컨트롤이 그려질 parent의 배경색
-CXPGroupBox& CXPGroupBox::SetBaseColor(COLORREF clrBase)
+CXPGroupBox& CXPGroupBox::set_base_color(COLORREF cr_base)
 {
-	m_crBase = clrBase;
+	m_crBase = cr_base;
 
 	return *this;
 }
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetBorderColor
+// Function:		CXPGroupBox::set_border_color
 //
 // Description:		Set groupbox border Color
 //
@@ -563,16 +555,16 @@ CXPGroupBox& CXPGroupBox::SetBaseColor(COLORREF clrBase)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetBorderColor(COLORREF clrBorder)
+CXPGroupBox& CXPGroupBox::set_border_color(COLORREF cr_border)
 {
-	m_clrBorder = clrBorder;
+	m_clrBorder = cr_border;
 	UpdateSurface();
 	return *this;
 }
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetTitleTextColor
+// Function:		CXPGroupBox::set_title_text_color
 //
 // Description:		Set groupbox title color
 //
@@ -584,16 +576,16 @@ CXPGroupBox& CXPGroupBox::SetBorderColor(COLORREF clrBorder)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetTitleTextColor(COLORREF clrText ) 
+CXPGroupBox& CXPGroupBox::set_title_text_color(COLORREF cr_text)
 {
-	m_crTitleText = clrText;
+	m_crTitleText = cr_text;
 	UpdateSurface();
 	return *this;
 }
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetBackgroundColor
+// Function:		CXPGroupBox::set_back_color
 //
 // Description:		Set groupbox backgroup color when group style is XPGB_FRAME
 //
@@ -605,17 +597,17 @@ CXPGroupBox& CXPGroupBox::SetTitleTextColor(COLORREF clrText )
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetBackgroundColor(COLORREF clrBKClient)
+CXPGroupBox& CXPGroupBox::set_back_color(COLORREF cr_back_client)
 {
-	m_crTitleBack = clrBKClient;
-	m_crClientBack = clrBKClient;
+	m_crTitleBack = cr_back_client;
+	m_crClientBack = cr_back_client;
 	UpdateSurface();
 	return *this;
 }
 
 //////////////////////////////////////////////////////////////////////////
 //
-// Function:		CXPGroupBox::SetBackgroundColor
+// Function:		CXPGroupBox::set_back_color
 //
 // Description:		Set groupbox backgroup color when group style is XPGB_WINDOW
 //
@@ -627,10 +619,10 @@ CXPGroupBox& CXPGroupBox::SetBackgroundColor(COLORREF clrBKClient)
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetBackgroundColor(COLORREF clrBKTilte,  COLORREF clrBKClient)
+CXPGroupBox& CXPGroupBox::set_back_color(COLORREF cr_back_title,  COLORREF cr_back_client)
 {
-	m_crTitleBack = clrBKTilte;
-	m_crClientBack = clrBKClient;
+	m_crTitleBack = cr_back_title;
+	m_crClientBack = cr_back_client;
 	UpdateSurface();
 	return *this;
 }
@@ -649,13 +641,13 @@ CXPGroupBox& CXPGroupBox::SetBackgroundColor(COLORREF clrBKTilte,  COLORREF clrB
 // Name                     Date        Version Comments
 // Jack Jin					2003-12-03    1.0     Origin
 //////////////////////////////////////////////////////////////////////////
-CXPGroupBox& CXPGroupBox::SetText(LPCTSTR lpszText)
+CXPGroupBox& CXPGroupBox::set_text(LPCTSTR lpszText)
 {
 	if(IsWindow(this->GetSafeHwnd())) 
 	{
 		m_strTitle = lpszText;
 		m_strTitle = _T(" ") + m_strTitle + _T(" ");
-		InvalidateRect( m_rectTitle, false );
+		InvalidateRect(m_rectTitle, false);
 	}
 	
 	return *this;

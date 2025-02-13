@@ -1339,15 +1339,20 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 				if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 					return true;
 
+				CString new_path;
+
 				//드라이브면 내 PC로 가고
-				if (m_path.Mid(1) == _T(":"))
-					m_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
+				if (is_drive_root(m_path))
+					new_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 				//그렇지 않으면 상위 디렉토리로 이동
 				else
-					m_path = GetParentDirectory(m_path);
+					new_path = GetParentDirectory(m_path);
 
-				set_path(m_path);
-				//return true;
+				set_path(new_path);
+				
+				//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
+				//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&new_path);
 			}
 				
 			break;
@@ -2116,7 +2121,7 @@ int CVtListCtrlEx::update_item(int index, WIN32_FIND_DATA data, bool ensureVisib
 	return index;
 }
 
-int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
+int CVtListCtrlEx::insert_folder(int index, CString new_folder_name, bool is_remote)
 {
 	int img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, _T("c:\\windows"), true);
 	index = insert_item(index, new_folder_name, img_idx, false, false);
@@ -2124,6 +2129,15 @@ int CVtListCtrlEx::insert_folder(int index, CString new_folder_name)
 	set_text(index, col_filesize, _T(""));
 	set_text(index, col_filedate, get_cur_datetime_str(2, true, _T(" "), false, false));
 	set_text_color(index, col_filedate, RGB(109, 109, 109));
+
+	CVtFileInfo fi;
+	WIN32_FIND_DATA data;
+
+	memset(&data, 0, sizeof(data));
+	_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), concat_path(m_path, new_folder_name));
+	fi.data.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+	fi.is_remote = is_remote;
+	m_cur_folders.push_back(fi);
 
 	return index;
 }
@@ -2136,7 +2150,21 @@ CString CVtListCtrlEx::new_folder(CString &new_folder_title)
 	if (!m_is_shell_listctrl)
 		return _T("");
 
-	int index = get_file_index(m_path, new_folder_title);
+	int index;
+	
+	folder = convert_special_folder_to_real_path(m_path, m_pShellImageList, !m_is_local);
+
+	if (m_is_local)
+	{
+		index = get_file_index(folder, new_folder_title);
+	}
+	else
+	{
+		::SendMessage(GetParent()->GetSafeHwnd(),
+			Message_CVtListCtrlEx,
+			(WPARAM) & (CVtListCtrlExMessage(this, message_request_new_folder_index, NULL, folder, new_folder_title)),
+			(LPARAM)&index);
+	}
 
 	folder = m_path;
 	if (is_drive_root(folder))
@@ -2148,7 +2176,20 @@ CString CVtListCtrlEx::new_folder(CString &new_folder_title)
 		folder.Format(_T("%s\\%s (%d)"), folder, new_folder_title, index);
 
 	//실제 폴더를 생성한 후 리스트에 목록을 추가한다.
-	BOOL res = CreateDirectory(folder, NULL);
+	BOOL res;
+	
+	if (m_is_local)
+	{
+		res = CreateDirectory(folder, NULL);
+	}
+	else
+	{
+		::SendMessage(GetParent()->GetSafeHwnd(),
+			Message_CVtListCtrlEx,
+			(WPARAM) & (CVtListCtrlExMessage(this, message_request_new_folder, NULL, folder)),
+			(LPARAM)&res);
+	}
+
 	if (!res)
 	{
 		TRACE(_T("fail to create folder : %s. error = %d"), folder, GetLastError());
@@ -2156,7 +2197,7 @@ CString CVtListCtrlEx::new_folder(CString &new_folder_title)
 	}
 
 	folder = get_part(folder, fn_name);
-	index = insert_folder(-1, folder);
+	index = insert_folder(-1, folder, false);
 
 	if (index < 0)
 		return _T("");
@@ -2542,23 +2583,24 @@ int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool is_fullpath)
 //선택된 항목들의 목록을 dq에 담는다. shelllist에서만 사용되며 cFileName은 이미 전체경로를 가지고 있다.
 int CVtListCtrlEx::get_selected_items(std::deque<WIN32_FIND_DATA>* dq)
 {
-	std::deque<int> dq_index;
-	get_selected_items(&dq_index);
+	std::deque<int> selected_index;
+	get_selected_items(&selected_index);
 
 	if (dq)
 	{
 		dq->clear();
-		for (auto item : dq_index)
+		for (int i = 0; i < selected_index.size(); i++)
 		{
 			WIN32_FIND_DATA data;
 			memset(&data, 0, sizeof(data));
-			data = get_file_data(item);
+			data = get_file_data(selected_index[i]);
+			TRACE(_T("get_selected_items. selected_index[%d] = %d. label = %s\n"), i, selected_index[i], data.cFileName);
 			if (_tcslen(data.cFileName) > 0)
 				dq->push_back(data);
 		}
 	}
 
-	return dq_index.size();
+	return selected_index.size();
 }
 
 void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_unselect, bool make_visible)
@@ -2803,6 +2845,8 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 	if (m_is_shell_listctrl)// && m_is_local)
 	{
+		CString new_path;
+
 		if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, true) ||
 			item < 0 || subItem < 0)
 		{
@@ -2815,7 +2859,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 		{
-			m_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList, !m_is_local);
+			new_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList, !m_is_local);
 		}
 		else
 		{
@@ -2824,11 +2868,11 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 			if (!get_text(item, col_filesize).IsEmpty())
 				return TRUE;
 
-			m_path = concat_path(m_path, get_text(item, col_filename));
+			new_path = concat_path(m_path, get_text(item, col_filename));
 		}
 
-		set_path(m_path);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&m_path);
+		set_path(new_path);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&new_path);
 
 		return TRUE;
 	}
@@ -3539,30 +3583,17 @@ CString	CVtListCtrlEx::get_selected_path()
 }
 
 //해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.
+//초기에는 각 항목의 label을 m_cur_folders, m_cur_files에서 찾았으나
+//그 갯수가 많아지면 현저히 느려지게 된다.
+//display_filelist()를 할 때 m_cur_folders, m_cur_files 항목을 추가하면서
+//SetItemData(index, no);로 해당 항목이 위 두 배열에서 몇번째인지 저장한 후
+//GetItemData(index);를 통해 해당 항목의 WIN32_FIND_DATA 값을 얻어오도록 수정함.
 WIN32_FIND_DATA	CVtListCtrlEx::get_file_data(int index)
 {
-	int i;
-
-	CString path = get_path(index);
-	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
-
-	CString item_path;
-
-	for (i = 0; i < m_cur_folders.size(); i++)
-	{
-		item_path = convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
-		if (path.CompareNoCase(item_path) == 0)
-			return m_cur_folders[i].data;
-	}
-
-	for (i = 0; i < m_cur_files.size(); i++)
-	{
-		item_path = convert_special_folder_to_real_path(m_cur_files[i].data.cFileName, m_pShellImageList, !m_is_local);
-		if (path.CompareNoCase(item_path) == 0)
-			return m_cur_files[i].data;
-	}
-
-	return WIN32_FIND_DATA();
+	int idx = GetItemData(index);
+	if (idx >= 0 && idx < m_cur_folders.size())
+		return m_cur_folders[idx].data;
+	return m_cur_files[idx - m_cur_folders.size()].data;
 }
 
 void CVtListCtrlEx::set_path(CString path, bool refresh)
@@ -3574,7 +3605,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 
 	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 
-	if (path == m_path)
+	if (!refresh && (path == m_path))
 	{
 		TRACE(_T("path is same to m_path. skip."));
 		return;
@@ -3721,6 +3752,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		}
 
 		index = insert_item(insert_index, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
+		SetItemData(index, i);
 
 		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 		{
@@ -3765,6 +3797,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, m_cur_files[i].data.cFileName, false);
 		index = insert_item(insert_index, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
+		SetItemData(index, m_cur_folders.size() + i);
 
 		set_text(index, col_filesize, get_size_str(get_file_size(m_cur_files[i].data)));
 		set_text(index, col_filedate, m_cur_files[i].get_file_time_str());

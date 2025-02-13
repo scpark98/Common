@@ -128,6 +128,9 @@ public:
 
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
+
+	void		set_3state(bool tri_state = true) { m_is_3state = tri_state; }
+	bool		is_3state() { return m_is_3state; }
 	
 	//기본 PUSH_BUTTON, CHECKBOX, RADIOBUTTON과 같은 style과는 달리
 	//PUSH_BUTTON인데 표시 모양이 문단 형태로 표시되는 mobile ui에 주로 사용되는 항목 표시용으로 추가(Tile UI)
@@ -154,7 +157,7 @@ public:
 	//GetParent()->UpdateWindow()를 이용하여 뿌려주는 방식은 배경 데이터를 명시하지 않아도 투명하게 뿌려지는 장점은 있으나
 	//UpdateWindow로 인해 이미지를 변경하는 이벤트가 발생하면 깜빡이는 단점이 존재한다.
 
-	//add_images는 하나의 버튼에 여러개의 이미지를 추가할 때 사용한다.
+	//add_images는 하나의 버튼에 여러개의 resouce 이미지를 추가할 때 사용한다.
 	//즉, 이미지 개수만큼 add_image를 호출한다.
 	//특히 push, check, radio button 처럼 checked, unchecked 등의 상태 image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
@@ -221,18 +224,18 @@ public:
 
 
 	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void		set_font_size( int nSize );
-	void		set_font_bold( bool bBold = true );
+	void		set_font_size(int nSize);
+	void		set_font_bold(bool bBold = true);
 
 	//배경이 투명인 경우는 parent의 배경을 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
 	void		redraw_window(bool bErase = false);
 
-	bool		GetCheck();
-	void		SetCheck( bool bCkeck );
+	int			GetCheck();
+	void		SetCheck(int check_state);
 	void		Toggle();
 
 	//m_bAsStatic이 true일 경우 hover와 down에는 반응을 하지 않는다.
-	void		SetAsStatic( bool bAsStatic = true ) { m_bAsStatic = bAsStatic; }
+	void		SetAsStatic(bool bAsStatic = true) { m_bAsStatic = bAsStatic; }
 
 
 	//이미지 및 버튼의 크기를 조정한다.
@@ -305,6 +308,12 @@ protected:
 
 	UINT		m_button_type;				//BS_PUSHBUTTON(default) or BS_CHECKBOX or BS_RADIOBUTTON
 	UINT		m_button_style;				//BS_PUSHLIKE, BS_MULTILINE, BS_FLAT
+
+	//3state 버튼은 checkbox의 속성에 줄 수 있는데 이럴 경우 DrawItem()이 아예 호출되지 않는다.
+	//따라서 3stat가 필요한 checkbox는 BS_CHECKBOX로 처리하되 m_is_3state로 별도 그려줘야 한다.
+	//리소스에서는 해당 옵션을 주지 않아야 하고 set_3state(true);로 세팅해야 한다.
+	bool		m_is_3state = false;
+
 	//열거된 style값에 따라 m_button_style로 판별할지 m_button_type으로 판별할지 구분하여 판별함
 	//ex. bool b = is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON);
 	template <typename ... Types> bool is_button_style(Types... args)
@@ -328,7 +337,6 @@ protected:
 		return false;
 	}
 
-
 	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
 	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
 	CRect		m_rOrigin = 0;				//컨트롤의 원래 크기 정보
@@ -349,12 +357,12 @@ protected:
 
 	int			m_round = 0;				//round rect
 
-	UINT		m_nAnchor = 0;
+	UINT		m_nAnchor = ANCHOR_NONE;
 	int			m_nAnchorMarginX = 0;
 	int			m_nAnchorMarginY = 0;
 
 	bool		m_bAsStatic = false;		//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
-	bool		m_use_hover = true;			//default = true
+	bool		m_use_hover = false;		//default = false
 	bool		m_draw_hover_rect = false;	//hover 테두리 사각형 표시 여부. default = false
 	int			m_hover_rect_thick = 2;
 	Gdiplus::Color	m_hover_rect_color = gRGB(128, 128, 255);
@@ -363,12 +371,12 @@ protected:
 	bool		m_bPushed = false;
 
 	bool		m_bHasFocus = false;
-	bool		m_draw_focus_rect;		//포커스 사각형 표시 여부(기본값 false)
-	Gdiplus::Color	m_crFocusRect;			//색상
-	int			m_nFocusRectWidth;		//두께
+	bool		m_draw_focus_rect = false;				//포커스 사각형 표시 여부(기본값 false)
+	Gdiplus::Color	m_crFocusRect = gRGB(6, 205, 255);	//색상
+	int			m_nFocusRectWidth = 2;					//두께
 
-	bool		m_b3DRect;				//입체 느낌의 3D, 누르면 sunken. default = true;
-	CPoint		m_down_offset;			//눌렸을 때 그려질 위치(기본값=1);
+	bool		m_b3DRect = true;						//입체 느낌의 3D, 누르면 sunken. default = true;
+	CPoint		m_down_offset = CPoint(2, 2);			//눌렸을 때 그려질 위치(기본값=1);
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
 	//투명 버튼의 경우 그림자를 표시한다.

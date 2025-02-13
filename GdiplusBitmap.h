@@ -161,11 +161,13 @@ public:
 	//bmp 이미지를 현재 이미지의 targetRect에 그린다.
 	CRect	draw(CGdiplusBitmap *bmp, CRect* targetRect = NULL);
 
+	//이 차례는 3state button의 차례와 동일하게 정의함.
+	//BST_UNCHECKED, BST_CHECKED, BST_INDETERMINATE
 	enum GDIP_DRAW_MODE
 	{
-		draw_mode_zoom = 0,		//targetRect에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
+		draw_mode_origin = 0,	//targetRect의 중앙에 원본 크기로 그림
 		draw_mode_stretch,		//targetRect에 꽉차게 그림(non ratio)
-		draw_mode_origin,		//targetRect의 중앙에 원본 크기로 그림
+		draw_mode_zoom,			//targetRect에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
 	};
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.

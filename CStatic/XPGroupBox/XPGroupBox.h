@@ -7,6 +7,8 @@
 // XPGroupBox.h : header file
 //
 
+#include <afxwin.h>
+
 /////////////////////////////////////////////////////////////////////////////
 // CXPGroupBox window
 
@@ -19,26 +21,28 @@ public:
 	CXPGroupBox();
 
 	enum XPGroupBoxStyle
-	{ XPGB_FRAME,  
-	XPGB_WINDOW};
+	{
+		XPGB_FRAME,
+		XPGB_WINDOW
+	};
 
 	// Attributes
 public:
 
 	// Operations
 public:
-	virtual CXPGroupBox& SetBaseColor(COLORREF clrBase);
-	virtual CXPGroupBox& SetBorderColor(COLORREF clrBorder);
-	virtual CXPGroupBox& SetTitleTextColor(COLORREF clrText);
-	virtual CXPGroupBox& SetBackgroundColor(COLORREF clrBKClient);
-	virtual CXPGroupBox& SetBackgroundColor(COLORREF clrBKTitle,  COLORREF clrBKClient);
-	virtual CXPGroupBox& SetXPGroupStyle(XPGroupBoxStyle eStyle); 
+	virtual CXPGroupBox& set_base_color(COLORREF cr_base);
+	virtual CXPGroupBox& set_border_color(COLORREF cr_border);
+	virtual CXPGroupBox& set_title_text_color(COLORREF cr_text);
+	virtual CXPGroupBox& set_back_color(COLORREF cr_back_client);
+	virtual CXPGroupBox& set_back_color(COLORREF cr_back_title,  COLORREF cr_back_client);
+	virtual CXPGroupBox& set_XPGroup_style(XPGroupBoxStyle style); 
 
-	virtual CXPGroupBox& SetText(LPCTSTR lpszTitle);
-	virtual CXPGroupBox& SetFontBold(BOOL bBold);
-	virtual CXPGroupBox& SetFontName(const CString& strFont, BYTE byCharSet = ANSI_CHARSET);
-	virtual CXPGroupBox& SetFontUnderline(BOOL bSet);
-	virtual CXPGroupBox& SetFontItalic(BOOL bSet);
+	virtual CXPGroupBox& set_text(LPCTSTR lpszTitle);
+	virtual CXPGroupBox& set_font_bold(bool bold = true);
+	virtual CXPGroupBox& set_font_name(const CString& font_name, BYTE byCharSet = DEFAULT_CHARSET);
+	virtual CXPGroupBox& set_font_underline(bool underline);
+	virtual CXPGroupBox& set_font_italic(bool italic);
 	virtual CXPGroupBox& SetFontSize(int nSize);
 	virtual CXPGroupBox& SetFont(LOGFONT lf);
 
@@ -70,21 +74,20 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-	CString		m_strTitle;
-	CRect		m_rectTitle;
+	CString			m_strTitle;
+	CRect			m_rectTitle;
 
-	COLORREF	m_crBase;		//타이틀이 roundrect라서 양쪽 모퉁이의 색이 그려지지 않게 된다. parent배경색으로 칠해줘야 roundrect가 온전히 표시된다.
-	COLORREF	m_clrBorder;
-	COLORREF	m_crTitleBack;
-	COLORREF	m_crClientBack;
-	COLORREF	m_crTitleText;
+	COLORREF		m_crBase;		//타이틀이 roundrect라서 양쪽 모퉁이의 색이 그려지지 않게 된다. parent배경색으로 칠해줘야 roundrect가 온전히 표시된다.
+	COLORREF		m_clrBorder = ::GetSysColor(COLOR_3DSHADOW);
+	COLORREF		m_crTitleText = RGB(0, 0, 0);
+	COLORREF		m_crTitleBack = RGB(249, 236, 192);
+	COLORREF		m_crClientBack = RGB(255, 249, 228);
 
-	XPGroupBoxStyle		m_nType;
-	DWORD       m_dwAlignment;  
+	XPGroupBoxStyle	m_nType = XPGB_FRAME;
+	DWORD			m_dwAlignment = SS_LEFT;
 
 	LOGFONT			m_lf;
 	CFont			m_font;
-
 };
 
 /////////////////////////////////////////////////////////////////////////////

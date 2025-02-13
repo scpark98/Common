@@ -93,6 +93,7 @@ public:
 	void		set_log_level(int log_level = SCLOG_LEVEL_RELEASE);
 
 	//프로그램 시작 시 일반적인 정보를 로그에 기록하면서 시작한다.
+	//시작 단락 표시, exe path, file version, built time을 기록한다.
 	void		write_start_log();
 
 	//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.

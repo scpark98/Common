@@ -107,8 +107,10 @@ public:
 	bool			m_start_marquee;
 	//void			start_marquee(int start);
 
-	//gif도 가능
-	void			set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back);
+	//gif도 가능.
+	//m_static_copy.set_back_image(_T("GIF"), IDR_GIF_COPY, Gdiplus::Color::White);
+	void			set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+
 	//배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.
 	void			set_back_image_mirror(bool is_mirror);
 

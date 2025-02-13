@@ -32,25 +32,6 @@ CGdiButton::CGdiButton()
 	m_cr_back.push_back(get_color(m_cr_back[0], -16));
 	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNSHADOW)));
 
-	m_bAsStatic			= false;
-
-	m_nAnchor			= ANCHOR_NONE;
-	m_nAnchorMarginX	= 0;
-	m_nAnchorMarginY	= 0;
-
-	m_bPushed			= false;
-	m_use_hover			= true;
-	m_is_hover			= false;
-	m_bIsTracking		= false;
-	m_down_offset		= CPoint(2, 2);
-
-	m_bHasFocus			= false;
-	m_draw_focus_rect	= false;
-	m_crFocusRect		= gRGB(6, 205, 255);
-	m_nFocusRectWidth	= 2;
-
-	m_b3DRect			= true;
-
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	EnableToolTips(true);
@@ -392,15 +373,16 @@ void CGdiButton::active_index(int index, bool bErase)
 //문제2. GetButtonStyle()로 버튼 타입이 잘 구분되지 않는다. 뭔가 명확한 방법을 찾아야 한다.
 //check나 radio의 on, off를 하나의 이미지로만 간단히 사용한다면
 //on이미지를 추가한 후 AddGrayImage()를 추가로 호출하여 사용하자.
-void CGdiButton::SetCheck(bool bCheck)
+//일반적인 2state 버튼은 BST_UNCHECKED(0), BST_CHECKED(1)을 가지지만 3state에서는 BST_INDETERMINATE(2)를 가질 수 있다.
+void CGdiButton::SetCheck(int check_state)
 {
-	m_idx = bCheck;
+	m_idx = check_state;
 	redraw_window();
 
 	//radio 버튼이 눌려지거나 SetCheck(true)가 호출되면
 	//같은 group 내의 다른 버튼들은 unchecked로 만들어 줘야한다.
 	//owner draw 속성때문에 WindowProc의 윈도우 기본 메시지를 받아서 처리할 수 없다.
-	if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && bCheck)
+	if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && check_state)
 	{
 		CWnd *pWndParent = GetParent(); 
 		CWnd *pWnd = pWndParent->GetNextDlgGroupItem(this); 
@@ -656,7 +638,9 @@ void CGdiButton::PreSubclassWindow()
 	{
 		m_button_type = BS_RADIOBUTTON;
 	}
-	else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX)
+	else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX ||
+			 (m_button_type & BS_3STATE) == BS_3STATE ||
+			 (m_button_type & BS_AUTO3STATE) == BS_AUTO3STATE)
 	{
 		m_button_type = BS_CHECKBOX;
 	}
@@ -1011,10 +995,18 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			Pen pen(Color(255, 32, 32, 32), 1.51);
 
-			if (GetCheck())
+			int check_state = GetCheck();
+
+			if (check_state == BST_CHECKED)
 			{
 				g.DrawLine(&pen, r.left + 1, r.CenterPoint().y - 1, r.left + 4, r.CenterPoint().y + 3);
 				g.DrawLine(&pen, r.left + 4, r.CenterPoint().y + 3, r.right - 3, r.top + 3);
+			}
+			else if (check_state == BST_INDETERMINATE)
+			{
+				CRect inner = r;
+				inner.DeflateRect(3, 3);
+				draw_rectangle(&dc, inner, cr_text, cr_text);
 			}
 
 			rText = r;
@@ -1138,7 +1130,13 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(cr_text.ToCOLORREF());
+
+//#ifdef _UNICODE
+//	DrawShadowText(dc.GetSafeHdc(), text, text.GetLength(), rText,
+//		DT_CENTER | DT_TOP | DT_NOCLIP, cr_text.ToCOLORREF(), 0, 2, 1);
+//#else
 	dc.DrawText(text, rText, dwText);
+//#endif
 	dc.SelectObject(pOldFont);
 }
 
@@ -1160,7 +1158,7 @@ void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//SendMessage(TTM_TRACKPOSITION, 0, (LPARAM)MAKELPARAM(point.x, point.y));
 	//TRACE(_T("mousemove\n"));
-	if (!m_is_hover)//m_bIsTracking)
+	if (m_use_hover && !m_is_hover)//m_bIsTracking)
 	{
 		TRACKMOUSEEVENT tme;
 		tme.cbSize = sizeof(tme);
@@ -1366,7 +1364,7 @@ void CGdiButton::set_round(int round)
 	redraw_window();
 }
 
-bool CGdiButton::GetCheck()
+int CGdiButton::GetCheck()
 {
 	return m_idx;
 }
@@ -1390,7 +1388,16 @@ void CGdiButton::redraw_window(bool bErase)
 
 void CGdiButton::Toggle()
 {
-	m_idx = !m_idx;
+	if (is_3state())
+	{
+		m_idx++;
+		Cycle(m_idx, BST_UNCHECKED, BST_INDETERMINATE);
+	}
+	else
+	{
+		m_idx = !m_idx;
+	}
+
 	TRACE(_T("idx = %d\n"), m_idx);
 	redraw_window();
 }

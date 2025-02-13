@@ -156,7 +156,8 @@ public:
 	//hParent 항목 아래 하위 항목을 추가한다. NULL이면 현재 선택된 항목이 hParent가 된다.
 	//label이 ""이면 기본 "새 폴더"명으로 추가한 후 edit_item() 호출.
 	//auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
-	void			add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
+	//새로 추가된 항목의 label을 리턴한다.
+	CString		add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
 	//주어진 항목의 label을 변경한다.
 	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
 	//현재 선택된 노드의 하위 노드들 중에서 old_label을 찾아서 new_label로 이름을 변경한다.

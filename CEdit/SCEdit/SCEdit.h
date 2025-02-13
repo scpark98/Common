@@ -123,7 +123,7 @@ protected:
 	//
 	CSize			m_sz_action_button;
 	//마우스가 액션버튼내에 있는지 판별
-	bool			in_action_button();
+	bool			mouse_in_action_button(CPoint pt = CPoint(0, 0));
 
 	Gdiplus::Color	m_cr_text;
 	Gdiplus::Color	m_cr_back;
@@ -159,14 +159,14 @@ public:
 	afx_msg void OnNcPaint();
 	//afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	afx_msg BOOL OnEnKillfocus();
-	afx_msg void OnEnUpdate();
+	afx_msg BOOL OnEnUpdate();
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg BOOL OnEnSetfocus();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
-	afx_msg void OnEnChange();
+	afx_msg BOOL OnEnChange();
 };
 
 /////////////////////////////////////////////////////////////////////////////

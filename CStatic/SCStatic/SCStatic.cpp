@@ -187,7 +187,9 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+			if (!m_transparent)
+				dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+
 			if (m_bSunken)
 			{
 				int sunken_depth = 12;
@@ -454,11 +456,11 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 	m_img_back.load(type, nIDBack);
 	m_cr_back = cr_back;
 
-	m_transparent = true;
+	//m_transparent = true;
 	m_img_back.set_back_color(m_cr_back);
 
 	if (m_img_back.is_animated_gif())
-		m_img_back.set_animation(m_hWnd);
+		m_img_back.set_animation(m_hWnd, CRect(), false);
 	//CBitmap	Bitmap;
 
 	//Bitmap.LoadBitmap(nIDBack);

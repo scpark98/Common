@@ -6066,6 +6066,35 @@ void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, int 
 	g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
+void draw_rectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill /*= NULL_BRUSH*/, int nWidth/* = 1*/, int nPenStyle/* = PS_SOLID*/, int nDrawMode /* = R2_COPYPEN*/)
+{
+	LOGBRUSH lb;
+
+	lb.lbStyle = BS_SOLID;
+	lb.lbColor = crColor;
+
+	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
+	CPen* pOldPen = (CPen*)pDC->SelectObject(&Pen);
+	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
+	CBrush	brBrush(crFill);
+	CBrush* pOldBrush;
+
+	if (crFill == NULL_BRUSH)
+		pOldBrush = (CBrush*)pDC->SelectStockObject(NULL_BRUSH);
+	else
+		pOldBrush = (CBrush*)pDC->SelectObject(&brBrush);
+
+	//Rect.NormalizeRect();
+	pDC->Rectangle(Rect);
+
+	pDC->SelectObject(pOldPen);
+	pDC->SelectObject(pOldBrush);
+	Pen.DeleteObject();
+	brBrush.DeleteObject();
+
+	pDC->SetROP2(nOldDrawMode);
+}
+
 void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
@@ -6769,29 +6798,54 @@ CString get_file_property(CString fullpath, CString strFlag)
 
 bool show_property_window(std::deque<CString> fullpath)
 {
-	CoInitialize(NULL);
+	HRESULT hr = CoInitialize(NULL);
+	if (FAILED(hr))
+	{
+		AfxMessageBox(_T("fail to CoInitialize() to show property window."));
+		return false;
+	}
 
 	//"내 PC"를 선택한 경우 시스템 속성 창을 열어준다.
-	if (fullpath.size() == 1 && fullpath[0] == get_system_label(CSIDL_DRIVES))
+	if (fullpath.size() == 1)
 	{
-		//탐색기에서 "내 PC" 우클릭하여 속성창을 열 때와 동일한 코드.
-		ShellExecute(NULL, _T("properties"), _T("shell:::{20D04FE0-3AEA-1069-A2D8-08002B30309D}"), NULL, NULL, SW_SHOWNORMAL);
+		if (fullpath[0] == get_system_label(CSIDL_DRIVES))
+		{
+			//탐색기에서 "내 PC" 우클릭하여 속성창을 열 때와 동일한 코드.
+			ShellExecute(NULL, _T("properties"), _T("shell:::{20D04FE0-3AEA-1069-A2D8-08002B30309D}"), NULL, NULL, SW_SHOWNORMAL);
 
-		//5개의 탭으로 구성된 간단한 시스템 속성창을 표시한다.
-		//ShellExecute(NULL, _T("open"), _T("SystemPropertiesComputerName.exe"), NULL, NULL, SW_SHOW);
+			//5개의 탭으로 구성된 간단한 시스템 속성창을 표시한다.
+			//ShellExecute(NULL, _T("open"), _T("SystemPropertiesComputerName.exe"), NULL, NULL, SW_SHOW);
 
-		//탐색기에서 "내 PC" 우클릭하여 속성을 선택하면 보여지는 창은 작업관리자로 보면 다음 명령어와 파라미터로 실행되나
-		//정작 cmd창에서는 실행되지 않고 아래와 같은 명령으로도 실행되지 않는다.
-		//ShellExecute(NULL, _T("open"), _T("C:\\Windows\\ImmersiveControlPanel\\SystemSettings.exe"), _T("-ServerName:microsoft.windows.immersivecontrolpanel"), NULL, SW_SHOWNORMAL);
+			//탐색기에서 "내 PC" 우클릭하여 속성을 선택하면 보여지는 창은 작업관리자로 보면 다음 명령어와 파라미터로 실행되나
+			//정작 cmd창에서는 실행되지 않고 아래와 같은 명령으로도 실행되지 않는다.
+			//ShellExecute(NULL, _T("open"), _T("C:\\Windows\\ImmersiveControlPanel\\SystemSettings.exe"), _T("-ServerName:microsoft.windows.immersivecontrolpanel"), NULL, SW_SHOWNORMAL);
+		}
+		else
+		{
+			//처음 실행후에는 SHMultiFileProperties()가 잘 동작하나 한두번 파일전송후에는
+			//local에서 SHMultiFileProperties()가 에러를 표시하며 제대로 동작하지 않는다.
+			//그럼에도 1개 파일에 대해서는 정상 표시되므로 우선 1개일때는 아래 함수를 호출한다.
+			//SHMultiFileProperties() 호출후에 인위적인 딜레이를 줘서 아직까지는 에러가 발생하는 현상이 없으므로
+			//더 이상 에러창이 뜨지 않는다면 1개 항목일때의 처리를 별도로 하지 않아도 됨.
+			SHObjectProperties(NULL, SHOP_FILEPATH, (CStringW)fullpath[0], NULL);
+		}
+
 		CoUninitialize();
 		return true;
 	}
 
 	int i;
-	LPITEMIDLIST* pidl = (LPITEMIDLIST*)malloc(sizeof(LPITEMIDLIST) * fullpath.size());
+	//LPITEMIDLIST* pidl = (LPITEMIDLIST*)malloc(sizeof(LPITEMIDLIST) * fullpath.size());
+	LPITEMIDLIST* pidl = new LPITEMIDLIST[fullpath.size()];
 	IShellFolder* pDesktop;
 	IDataObject* pDataObject;
-	HRESULT hr;
+
+	if (!pidl)
+	{
+		AfxMessageBox(_T("pidl is null."));
+		CoUninitialize();
+		return false;
+	}
 
 	hr = SHGetDesktopFolder(&pDesktop);
 	if (FAILED(hr))
@@ -6800,12 +6854,15 @@ bool show_property_window(std::deque<CString> fullpath)
 		AfxMessageBox(_T("SHGetDesktopFolder() fail"));
 #endif
 		CoUninitialize();
-		return 0;
+		return false;
 	}
 
 	for (int i = 0; i < fullpath.size(); i++)
 	{
-		hr = pDesktop->ParseDisplayName(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, (LPITEMIDLIST*)&pidl[i], NULL);
+		//hr = pDesktop->ParseDisplayName(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, (LPITEMIDLIST*)&pidl[i], NULL);
+		//hr = pDesktop->ParseDisplayName(GetDesktopWindow(), NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, &pidl[i], NULL);
+		SFGAOF sfgao;
+		hr = SHParseDisplayName(fullpath[i], NULL, &pidl[i], 0, &sfgao);
 		if (FAILED(hr))
 		{
 #ifdef _DEBUG
@@ -6813,17 +6870,58 @@ bool show_property_window(std::deque<CString> fullpath)
 #endif
 			pDesktop->Release();
 			CoUninitialize();
-			return 0;
+			return false;
 		}
 	}
 
-	hr = pDesktop->GetUIObjectOf(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, fullpath.size(), (LPCITEMIDLIST*)pidl, IID_IDataObject, NULL, (void**)&pDataObject);
+	// 4. PIDL 배열을 이용하여 IShellItemArray 생성
+	IShellItemArray* psia = nullptr;
+	hr = SHCreateShellItemArrayFromIDLists(fullpath.size(), (LPCITEMIDLIST*)pidl, &psia);
+	if (FAILED(hr) || !psia)
+	{
+		AfxMessageBox(_T("SHCreateShellItemArrayFromIDLists 실패"));
+		for (int i = 0; i < fullpath.size(); i++)
+		{
+			if (pidl[i])
+				CoTaskMemFree(pidl[i]);
+		}
+		delete[] pidl;
+		CoUninitialize();
+		return 1;
+	}
+
+	// 5. IShellItemArray에서 IDataObject 얻기
+	IDataObject* pdtobj = nullptr;
+	hr = psia->BindToHandler(NULL, BHID_DataObject, IID_PPV_ARGS(&pdtobj));
+	if (FAILED(hr) || !pdtobj)
+	{
+		AfxMessageBox(_T("IShellItemArray로부터 IDataObject 획득 실패"));
+		psia->Release();
+		for (int i = 0; i < fullpath.size(); i++)
+		{
+			if (pidl[i])
+				CoTaskMemFree(pidl[i]);
+		}
+		delete[] pidl;
+		CoUninitialize();
+		return 1;
+	}
+
+	//hr = pDesktop->GetUIObjectOf(GetDesktopWindow(), fullpath.size(), (LPCITEMIDLIST*)pidl, IID_IDataObject, NULL, (void**)&pDataObject);
+	//hr = pDesktop->GetUIObjectOf(GetDesktopWindow(), fullpath.size(), (LPCITEMIDLIST*)pidl, IID_IDataObject, NULL, (void**)&pDataObject);
+	//pDesktop->Release();
 	// alternatively, you can also use SHCreateDataObject() or CIDLData_CreateFromIDArray() to create the IDataObject
 
 	if (SUCCEEDED(hr))
 	{
-		hr = SHMultiFileProperties(pDataObject, 0);
-		pDataObject->Release();
+		//hr = SHMultiFileProperties(pDataObject, 0);
+		hr = SHMultiFileProperties(pdtobj, 0);
+		//SHMultiFileProperties()을 호출한 후 OS에서 표시할 시간을 약간 준다는 정보를 어디선가 본 듯하다.
+		//간혹 "속성창을 열 수 없다"는 오류가 표시되는 현상이 있었는데 인위적인 딜레이를 주니 아직까지는 발생하지 않았다.
+		//좀 더 테스트가 필요하다.
+		Wait(500);
+		pdtobj->Release();
+		psia->Release();
 
 		if (SUCCEEDED(hr))
 		{
@@ -6831,15 +6929,17 @@ bool show_property_window(std::deque<CString> fullpath)
 			//Sleep(2500); // Give the system time to show the dialog before exiting
 		}
 
-		pDesktop->Release();
 	}
 
 	for (i = 0; i < fullpath.size(); i++)
-		ILFree(pidl[i]);
+		//ILFree(pidl[i]);
+		//SHFree(pidl[i]);
+		CoTaskMemFree(pidl[i]);
+	delete[] pidl;
 
 	CoUninitialize();
 
-	return 0;
+	return true;
 }
 
 //명시된 FileVersion 또는 ProductVersion을 얻어온다.
@@ -8242,11 +8342,38 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 //간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
 CString	get_unescape_string(CString src)
 {
-	CString result = src;
-	result.Replace(_T("\r"), _T("\\r"));
-	result.Replace(_T("\n"), _T("\\n"));
-	result.Replace(_T("\t"), _T("\\t"));
-	result.Replace(_T("\\"), _T("\\\\"));
+	CString result = _T("");
+
+	//result.Replace(_T("\r"), _T("\\r"));
+	//result.Replace(_T("\n"), _T("\\n"));
+	//result.Replace(_T("\t"), _T("\\t"));
+	//result.Replace(_T("\\"), _T("\\\\"));
+	//result.Replace(_T("&"))
+
+	CString escape_set = _T("\r\n\t\\&");
+
+	//Replace를 쓸 경우 "\\r"의 "\r"도 "\\r"로 변경시키므로 결과적으로는 "\\\r"이 된다.
+	//escape char는 하나의 char이므로 원시적으로 처리한다.
+	for (int i = 0; i < src.GetLength(); i++)
+	{
+		if (escape_set.Find(src[i]) < 0)
+		{
+			result += src[i];
+		}
+		else
+		{
+			if (src[i] == '&')
+				result += _T("&&");
+			else if (src[i] == '\\')
+				result += _T("\\\\");
+			else if (src[i] == '\r')
+				result += _T("\\r");
+			else if (src[i] == '\n')
+				result += _T("\\n");
+			else if (src[i] == '\t')
+				result += _T("\\t");
+		}
+	}
 
 	return result;
 }
@@ -18212,6 +18339,7 @@ CString	set_file_property(CString sFilePath, CString sProperty, CString value)
 }
 #endif
 
+#ifndef REMOTESDK
 CString base64_encode(CString in)
 {
 	USES_CONVERSION;
@@ -18228,6 +18356,34 @@ CString base64_decode(CString in)
 	sstr = base64_decode(sstr);
 	CString str = CString(sstr.c_str());
 	return str;
+}
+
+std::string base64_decode(const std::string& in)
+{
+	static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+	int val = 0, valb = -8;
+	std::string out;
+	std::vector<int> T(256, -1);
+
+	for (int i = 0; i < 64; i++)
+		T[b[i]] = i;
+
+	for (uint8_t c : in)
+	{
+		if (T[c] == -1)
+			break;
+
+		val = (val << 6) + T[c];
+		valb += 6;
+
+		if (valb >= 0)
+		{
+			out.push_back(char((val >> valb) & 0xFF));
+			valb -= 8;
+		}
+	}
+	return out;
 }
 
 std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len)
@@ -18304,35 +18460,7 @@ std::string base64_encode(const std::string& in)
 
 	return out;
 }
-
-std::string base64_decode(const std::string& in)
-{
-	static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-	int val = 0, valb = -8;
-	std::string out;
-	std::vector<int> T(256, -1);
-
-	for (int i = 0; i < 64; i++)
-		T[b[i]] = i;
-
-	for (uint8_t c : in)
-	{
-		if (T[c] == -1)
-			break;
-
-		val = (val << 6) + T[c];
-		valb += 6;
-
-		if (valb >= 0)
-		{
-			out.push_back(char((val >> valb) & 0xFF));
-			valb -= 8;
-		}
-	}
-	return out;
-}
-
+#endif
 
 CRequestUrlParams::CRequestUrlParams(CString _full_url, CString _verb, bool _is_https, std::deque<CString>* _headers, CString _body, CString _local_file_path)
 {

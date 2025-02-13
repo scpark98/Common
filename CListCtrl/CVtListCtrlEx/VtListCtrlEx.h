@@ -141,6 +141,8 @@ public:
 		message_path_changed,
 		message_rename_duplicated,
 		message_request_rename,
+		message_request_new_folder,
+		message_request_new_folder_index,
 		message_get_remote_free_space,
 		message_get_remote_total_space,
 		message_list_processing,		//C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
@@ -170,6 +172,7 @@ public:
 
 	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
+	//m_path를 변경한 후 set_path(m_path)와 같이 절대 호출하지 말것. set_path()내부에서 변경하려는 path와 m_path가 같으면 스킵되므로.
 	void		set_path(CString path, bool refresh = true);
 	//remote일 경우는 파일목록을 받아서 표시한다.
 	void		set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList);
@@ -183,7 +186,8 @@ public:
 	void		display_filelist(CString cur_path);
 
 
-	//폴더와 파일을 별도로 처리한 이유는 정렬시에 파일과 폴더가 별도 처리되기 때문
+	//리스트에 파일/폴더는 분리되어 표시/정렬되므로 나눠서 저장시켜야 한다.
+	//추가/삭제시에도 이 목록에 추가/삭제시켜야 하는 불편함이 있다.
 	std::deque<CVtFileInfo> m_cur_folders;
 	std::deque<CVtFileInfo> m_cur_files;
 	//remote일 경우는 fullpath로 해당 파일의 WIN32_FIND_DATA값을 얻어야 할 경우가 있다.
@@ -270,7 +274,7 @@ public:
 	int			update_item(int index, WIN32_FIND_DATA data, bool ensureVisible = true, bool invalidate = true);
 
 	//현재 폴더에 폴더를 추가한다.
-	int			insert_folder(int index, CString new_folder_name);
+	int			insert_folder(int index, CString new_folder_name, bool is_remote);
 
 	//현재 폴더에 새 폴더를 생성하고 편집모드로 표시한다. 생성된 폴더명을 리턴한다.
 	//"새 폴더" or "New Folder" 등 다국어까지 고려하여 타이틀을 받는다.

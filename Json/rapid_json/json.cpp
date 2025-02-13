@@ -326,14 +326,17 @@ bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<
 
 			switch (it->value.GetType())
 			{
-				case kNullType:
-					value = _T("0");
-					break;
-				case kNumberType :
-					value.Format(_T("%d"), it->value.GetInt());
-					break;
-				default :
-					value.Format(_T("%s"), it->value.GetCString());
+			//case kNullType:
+			//	value = _T("");
+			//	break;
+			case kNumberType:
+				value.Format(_T("%d"), it->value.GetInt());
+				break;
+			case kStringType:
+				value.Format(_T("%s"), it->value.GetCString());
+				break;
+			default:
+				value = _T("");
 			}
 
 			m.insert(std::pair<CString, CString>(name, value));

@@ -74,14 +74,14 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_WM_NCPAINT()
 	ON_CONTROL_REFLECT_EX(EN_SETFOCUS, &CSCEdit::OnEnSetfocus)
 	ON_CONTROL_REFLECT_EX(EN_KILLFOCUS, &CSCEdit::OnEnKillfocus)
-	ON_CONTROL_REFLECT(EN_UPDATE, &CSCEdit::OnEnUpdate)
+	ON_CONTROL_REFLECT_EX(EN_UPDATE, &CSCEdit::OnEnUpdate)
 	ON_WM_WINDOWPOSCHANGED()
 	//}}AFX_MSG_MAP
 	ON_WM_ERASEBKGND()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_SETCURSOR()
-	ON_CONTROL_REFLECT(EN_CHANGE, &CSCEdit::OnEnChange)
+	ON_CONTROL_REFLECT_EX(EN_CHANGE, &CSCEdit::OnEnChange)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -576,9 +576,11 @@ BOOL CSCEdit::OnEnKillfocus()
 }
 
 
-void CSCEdit::OnEnUpdate()
+BOOL CSCEdit::OnEnUpdate()
 {
 	update_ctrl();
+
+	return FALSE;
 }
 
 
@@ -619,7 +621,8 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	{
 		r.left = r.right - m_sz_action_button.cx;
 
-		//CMemoryDC dc(pDC, &r);
+		CMemoryDC dc(pDC, &r);
+		pDC = &dc;
 
 		if (!IsWindowEnabled())
 		{
@@ -666,7 +669,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_action_button && in_action_button())
+	if (m_action_button && mouse_in_action_button())
 	{
 		m_action_button_down = true;
 		Invalidate();
@@ -680,7 +683,7 @@ void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CSCEdit::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	if (m_action_button && in_action_button())
+	if (m_action_button && mouse_in_action_button())
 	{
 		m_action_button_down = false;
 		Invalidate();
@@ -692,14 +695,16 @@ void CSCEdit::OnLButtonUp(UINT nFlags, CPoint point)
 }
 
 //마우스가 액션버튼내에 있는지 판별
-bool CSCEdit::in_action_button()
+bool CSCEdit::mouse_in_action_button(CPoint pt)
 {
 	CRect rc;
 	GetClientRect(rc);
 
-	CPoint pt;
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
+	if (pt.x == 0 && pt.y == 0)
+	{
+		GetCursorPos(&pt);
+		ScreenToClient(&pt);
+	}
 
 	rc.left = rc.right - m_sz_action_button.cx;
 	if (rc.PtInRect(pt))
@@ -711,7 +716,7 @@ bool CSCEdit::in_action_button()
 BOOL CSCEdit::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_action_button && in_action_button())
+	if (m_action_button && mouse_in_action_button())
 	{
 		::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
 		return true;
@@ -721,9 +726,10 @@ BOOL CSCEdit::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 }
 
 
-void CSCEdit::OnEnChange()
+BOOL CSCEdit::OnEnChange()
 {
-
+	TRACE(_T("CSCEdit::OnEnChange()\n"));
+	return FALSE;
 }
 
 void CSCEdit::draw_dim_text()
@@ -772,8 +778,6 @@ void CSCEdit::draw_dim_text()
 
 	dc.DrawText(_T(" ") + m_dim_text, -1, &rc, dwText | DT_SINGLELINE | DT_VCENTER);
 	dc.RestoreDC(iState);								// Restore The DC State
-
-	return;												// Done!
 }
 
 CSCEdit& CSCEdit::set_dim_text(bool show, CString dim_text, Gdiplus::Color cr)

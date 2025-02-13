@@ -285,13 +285,13 @@ void CVideoWnd::OnPaint()
 			for ( i = 0; i < m_nVanishingPointCount; i++ )
 			{
 				if ( i == 1 )
-					DrawLinePt( &dc, m_ptVanishingPointClicked[0], m_ptVanishingPointClicked[1], orange, 2 );
+					draw_line_pt( &dc, m_ptVanishingPointClicked[0], m_ptVanishingPointClicked[1], orange, 2 );
 				else if ( i == 3 )
-					DrawLinePt( &dc, m_ptVanishingPointClicked[2], m_ptVanishingPointClicked[3], orange, 2 );
+					draw_line_pt( &dc, m_ptVanishingPointClicked[2], m_ptVanishingPointClicked[3], orange, 2 );
 
 				CRect	r(m_ptVanishingPointClicked[i], m_ptVanishingPointClicked[i]);
 				r.InflateRect( 4, 4 );
-				DrawRectangle( &dc, r, red, NULL_BRUSH );
+				draw_rectangle( &dc, r, red, NULL_BRUSH );
 			}
 
 			if ( m_nVanishingPointCount % 2 == 1 )
@@ -299,7 +299,7 @@ void CVideoWnd::OnPaint()
 				CPoint ptCur;
 				GetCursorPos( &ptCur );
 				ScreenToClient( &ptCur );
-				DrawLinePt( &dc, m_ptVanishingPointClicked[m_nVanishingPointCount - 1], ptCur, orange, 1 );
+				draw_line_pt( &dc, m_ptVanishingPointClicked[m_nVanishingPointCount - 1], ptCur, orange, 1 );
 			}
 		}
 
@@ -307,13 +307,13 @@ void CVideoWnd::OnPaint()
 		{
 			CPoint pt;
 			get_screen_coord_from_real_coord( m_rDisplayedImageRect, m_mat.cols, m_ptVanishingPoint, &pt);
-			DrawLine( &dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, yellow, 1, PS_DASH );
-			DrawLine( &dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, yellow, 1, PS_DASH );
+			draw_line( &dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, yellow, 1, PS_DASH );
+			draw_line( &dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, yellow, 1, PS_DASH );
 		}
 
 		//설정중인 ROI 사각형 표시
 		//TRACE(_T("%s\n"), get_rect_info_string(m_rScreenROI, 2));
-		DrawRectangle( &dc, m_rScreenROI, red, NULL_BRUSH, 2 );
+		draw_rectangle( &dc, m_rScreenROI, red, NULL_BRUSH, 2 );
 
 		dc.SetBkMode( TRANSPARENT );
 
@@ -333,19 +333,26 @@ void CVideoWnd::OnPaint()
 			//ConvertCoordinateScreen2Image( r );
 			get_real_coord_from_screen_coord(m_rDisplayedImageRect, m_mat.cols, m_rSizeInfo, &r);
 			r.OffsetRect( m_rImageROI.TopLeft() );
-			DrawRectangle( &dc, m_rSizeInfo, crText1, NULL_BRUSH, 1, PS_DASH, R2_XORPEN );
+			draw_rectangle(&dc, m_rSizeInfo, crText1, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 
-			uOldFormat = dc.SetTextAlign( TA_RIGHT | TA_BOTTOM );
+			uOldFormat = dc.SetTextAlign(TA_RIGHT | TA_BOTTOM);
 			str.Format(_T("(%d, %d)"), r.left, r.top );
-			TextOutOutline( &dc, m_rSizeInfo.left, m_rSizeInfo.top, str, crText1, crShadow);
+			//TextOutOutline(&dc, m_rSizeInfo.left, m_rSizeInfo.top, str, crText1, crShadow);
+			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), CRect(m_rSizeInfo.left, m_rSizeInfo.top, 1, 1),
+							DT_LEFT | DT_BOTTOM | DT_NOCLIP, crText1, 0, 2, 1);
 
-			dc.SetTextAlign( TA_LEFT | TA_TOP );
+
+			dc.SetTextAlign(TA_LEFT | TA_TOP);
 			str.Format(_T("(%d, %d)"), r.right, r.bottom );
-			TextOutOutline( &dc, m_rSizeInfo.right, m_rSizeInfo.bottom, str, crText1, crShadow);
+			//TextOutOutline( &dc, m_rSizeInfo.right, m_rSizeInfo.bottom, str, crText1, crShadow);
+			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), CRect(m_rSizeInfo.right, m_rSizeInfo.bottom, 1, 1),
+							DT_LEFT | DT_TOP | DT_NOCLIP, crText1, 0, 2, 1);
 
-			dc.SetTextAlign( uOldFormat );
+
+			dc.SetTextAlign(uOldFormat);
 			str.Format(_T("%.1f (%d x %d)"), GetDistance( r.TopLeft(), r.BottomRight() ), r.Width(), r.Height() );
-			DrawTextOutline( &dc, str, m_rSizeInfo, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP, crText2, crShadow);
+			//DrawTextOutline(&dc, str, m_rSizeInfo, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP, crText2, crShadow);
+			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), m_rSizeInfo, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP, crText1, 0, 2, 1);
 		}
 
 		CAutoFont	Font( _T("FixedSys") );
@@ -392,11 +399,11 @@ void CVideoWnd::OnPaint()
 
 	//border 표시
 	if ( m_crBorder != -1 )
-		DrawRectangle( &dc, rc, m_crBorder, NULL_BRUSH, m_nBorderWidth, PS_SOLID );//, R2_XORPEN );
+		draw_rectangle( &dc, rc, m_crBorder, NULL_BRUSH, m_nBorderWidth, PS_SOLID );//, R2_XORPEN );
 
 	//focus rect 표시
 	if ( m_bDrawFocusRect && (this == GetFocus()) )
-		DrawRectangle( &dc, rc, RGB( 212, 208, 193 ), NULL_BRUSH, 1, PS_DASH );//, R2_XORPEN );
+		draw_rectangle( &dc, rc, RGB( 212, 208, 193 ), NULL_BRUSH, 1, PS_DASH );//, R2_XORPEN );
 
 	//trackbar를 표시해준다.
 	if ( !IsVideoFileOpened() || m_nTotalFrame <= 1 || m_bImageFromClipboard)
@@ -414,13 +421,13 @@ void CVideoWnd::OnPaint()
 	//DrawLine( &dc, m_rDisplayedImageRect.left, m_rDisplayedImageRect.bottom - yoffset + 5, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset + 5, GRAY(212) );
 	//DrawLine( &dc, m_rDisplayedImageRect.left, m_rDisplayedImageRect.bottom - yoffset + 6, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset + 6, GRAY(164) );
 	for ( i = 0; i < 5; i++ )
-		DrawLine(	&dc,
+		draw_line(	&dc,
 					m_rDisplayedImageRect.left,
 					m_rDisplayedImageRect.bottom - yoffset + i,
 					m_rDisplayedImageRect.left + x,
 					m_rDisplayedImageRect.bottom - yoffset + i,
 					(i % 4 == 0 ? (i == 0 ? GRAY128 : GRAY(212)) : RGB(0, 121, 212)) );
-	DrawLine( &dc, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset + 4, GRAY128 );
+	draw_line( &dc, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset, m_rDisplayedImageRect.left + x, m_rDisplayedImageRect.bottom - yoffset + 4, GRAY128 );
 	//for resize area test
 	/*CRect	side[8];
 	GetSideRect( rc, side, 10 );

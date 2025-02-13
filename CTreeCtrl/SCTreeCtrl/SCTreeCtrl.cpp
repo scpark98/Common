@@ -1523,6 +1523,7 @@ void CSCTreeCtrl::expand_all(bool expand)
 		hItem = GetNextItem(hItem, TVGN_NEXTVISIBLE);
 	}
 }
+
 /*
 HTREEITEM CSCTreeCtrl::hit_test(UINT* nFlags)
 {
@@ -3252,12 +3253,12 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 //hParent 항목 아래 하위 항목을 추가한다. NULL이면 현재 선택된 항목이 hParent가 된다.
 //label이 ""이면 기본 "새 폴더"명으로 추가한 후 edit_item() 호출.
 //auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
-void CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index, bool edit_mode)
+CString CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index, bool edit_mode)
 {
 	if (hParent == NULL)
 		hParent = GetSelectedItem();
 	if (hParent == NULL)
-		return;
+		return _T("");
 
 	HTREEITEM hItem = NULL;
 
@@ -3326,8 +3327,6 @@ void CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index
 				m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")),
 				hParent);
 		}
-
-		//refresh(hParent);
 	}
 	else
 	{
@@ -3337,6 +3336,8 @@ void CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index
 
 	if (hItem)
 	{
+		EnsureVisible(hItem);
+
 		//새 항목을 추가하고 그 항목을 선택상태로 만드는 경우
 		//list에서 새 폴더 추가 후 성공하면 트리에도 새 폴더를 만들어주는데 SelectItem()을 수행하면
 		//list의 경로가 변경되면서 edit_end()할 때 오류가 발생한다.
@@ -3358,6 +3359,8 @@ void CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index
 		if (edit_mode)
 			edit_item(hItem);
 	}
+
+	return label;
 }
 
 //주어진 항목의 label을 변경한다.

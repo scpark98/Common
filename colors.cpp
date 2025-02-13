@@ -1,6 +1,6 @@
 #include "colors.h"
 
-#include "../Common/Functions.h"
+#include "Functions.h"
 
 
 //regathered from https://www.colordic.org/

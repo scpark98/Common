@@ -924,7 +924,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\1.gray.png"));
 #endif
-			img_shadow.blur(25, TRUE);
+			img_shadow.blur(20, TRUE);
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\2.blur.png"));
 #endif
@@ -1084,12 +1084,18 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
 	{
-		draw_round_rect(&g, CRectTogpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
+		if (m_round > 0)
+			draw_round_rect(&g, CRectTogpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
+		else
+			draw_rectangle(g, rc, m_cr_border);
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
 		TRACE(_T("draw_border\n"));
-		draw_round_rect(&g, CRectTogpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+		if (m_round > 0)
+			draw_round_rect(&g, CRectTogpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+		else
+			draw_rectangle(g, rc, m_cr_border);
 		//draw_round_rect(&g, CRectTogpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Blue, m_round, 4);
 	}
 
@@ -1558,12 +1564,20 @@ void CGdiButton::use_hover(bool use)
 	m_use_hover = use;
 }
 
-void CGdiButton::draw_hover_rect(bool draw, Gdiplus::Color cr, int thick)
+void CGdiButton::draw_hover_rect(bool draw, int thick, int round, Gdiplus::Color cr)
 {
 	m_use_hover = true;
 	m_draw_hover_rect = true;
 	m_hover_rect_color = cr;
-	m_hover_rect_thick = thick;
+
+	if (thick > 0)
+		m_hover_rect_thick = thick;
+	else if (draw && thick == 0)
+		m_hover_rect_thick = 1;
+
+	if (round > 0)
+		set_round(round);
+
 	Invalidate();
 }
 
@@ -1580,11 +1594,19 @@ void CGdiButton::set_hover_rect_color(Gdiplus::Color cr)
 }
 
 //border
-void CGdiButton::draw_border(bool draw, Gdiplus::Color cr, int thick)
+void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr)
 {
 	m_draw_border = draw;
 	m_cr_border = cr;
-	m_border_thick = thick;
+
+	if (thick > 0)
+		m_border_thick = thick;
+	else if (draw && thick)
+		m_border_thick = 1;
+
+	if (round > 0)
+		set_round(round);
+
 	Invalidate();
 }
 

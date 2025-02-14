@@ -263,14 +263,15 @@ public:
 	void		SetFocusRectWidth( int nWidth ) { m_nFocusRectWidth = nWidth; Invalidate(); }
 
 	void		use_hover(bool use);
-	void		draw_hover_rect(bool draw = true, Gdiplus::Color cr = Gdiplus::Color::DimGray, int thick = 1);
+	//thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
+	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void		set_hover_rect_thick(int thick);
 	void		set_hover_rect_color(Gdiplus::Color cr);
 	void		down_offset(CPoint offset) { m_down_offset = offset; Invalidate(); }
 	void		down_offset(int offset) { m_down_offset = CPoint(offset, offset); Invalidate(); }
 
-	//border
-	void		draw_border(bool draw = true, Gdiplus::Color cr = Gdiplus::Color::DimGray, int thick = 1);
+	//border. thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
+	void		draw_border(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 
 	//3D, sunken 
 	void		use_3D_rect(bool use = true) { m_b3DRect = use; Invalidate(); }
@@ -364,7 +365,7 @@ protected:
 	bool		m_bAsStatic = false;		//단순 이미지 표시 용도로 사용되고 클릭해도 변화가 없다. 기본값 false.
 	bool		m_use_hover = false;		//default = false
 	bool		m_draw_hover_rect = false;	//hover 테두리 사각형 표시 여부. default = false
-	int			m_hover_rect_thick = 2;
+	int			m_hover_rect_thick = 1;
 	Gdiplus::Color	m_hover_rect_color = gRGB(128, 128, 255);
 	bool		m_is_hover = false;			//현재 hover 상태인지
 	bool		m_bIsTracking = false;

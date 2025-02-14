@@ -1,8 +1,13 @@
 ﻿#include "GdiplusBitmap.h"
+
+
 #include "Functions.h"
 #include "MemoryDC.h"
+
+#include "image_processing/fast_gaussianl_blur/fast_gaussian_blur_template.h"
 #include <thread>
 #include <afxcmn.h>
+
 
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
 
@@ -1514,6 +1519,22 @@ void CGdiplusBitmap::blur(float radius, BOOL expandEdge)
 	m_pBitmap->ApplyEffect(&gdi_blur, NULL);
 }
 
+void CGdiplusBitmap::fast_blur(float sigma, int order)
+{
+	CGdiplusBitmap temp;
+	deep_copy(&temp);
+	temp.get_raw_data();
+
+	get_raw_data();
+	
+	fast_gaussian_blur(temp.data, data, width, height, channel, sigma, order, Border::kMirror);
+	set_raw_data();
+
+#ifdef _DEBUG
+	save(_T("d:\\fast_blur (sigma=%.1f, order=%d).png"), sigma, order);
+#endif
+}
+
 void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
 {
 	release();
@@ -1952,8 +1973,14 @@ bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channe
 }
 
 
-bool CGdiplusBitmap::save(CString filename)//, ULONG quality/* = 100*/)
+bool CGdiplusBitmap::save(LPCTSTR filepath, ...)
 {
+	va_list args;
+	va_start(args, filepath);
+
+	CString filename;
+	filename.FormatV(filepath, args);
+
 	return ::save(m_pBitmap, filename);
 }
 

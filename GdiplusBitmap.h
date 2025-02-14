@@ -89,7 +89,6 @@ class CGdiplusBitmap
 {
 public:
 	Gdiplus::Bitmap* m_pBitmap = NULL;
-	uint8_t* data = NULL;
 
 	enum CGdiplusBitmapMsgs
 	{
@@ -135,11 +134,14 @@ public:
 
 	operator Gdiplus::Bitmap*() const { return m_pBitmap; }
 
+//image pixel data를 사용하고자 할 경우
 	//기본적으로는 이미지 raw data를 추출하진 않는다.
 	//cv::Mat의 data처럼 raw data가 필요한 경우에 이 함수를 호출하면 사용이 가능해진다.
-	bool	get_raw_data();
-	//data 값을 변경한 후 다시 이미지에 적용
-	bool	set_raw_data();
+	bool		get_raw_data();
+	//data 값을 변경한 후 다시 이미지에 적용시키려면 반드시 set_raw_data()를 호출해야 유지된다.
+	bool		set_raw_data();
+	uint8_t*	data = NULL;
+
 
 	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
 	bool	is_empty();
@@ -257,7 +259,15 @@ public:
 	void	adjust_rgba(float r, float g, float b, float a = 1.0);
 
 //효과
-	void	blur(float radius, BOOL expandEdge);
+	//Gdiplus에서 제공하는 GaussianBlur 방식이지만 radius가 작을 경우는 좌우로만 흐려지는 등의 문제가 있다.
+	//void	blur(float radius, BOOL expandEdge);
+
+	//https://github.com/bfraboni/FastGaussianBlur
+	//sigma = Gaussian standard deviation (float). Should be positive.
+	//order: optional filter order [1: box, 2: bilinear, 3: biquadratic, 4. bicubic, ..., 10]. should be positive. Default is 3
+	//border: optional treatment of image boundaries[mirror, extend, crop, wrap].Default is mirror.
+	void	fast_blur(float sigma = 5.0f, int order = 1/*, int border = 2*/);
+
 	//round shadow rect 이미지를 만들어주는 함수인데 미완성!
 	void	round_shadow_rect(int w, int h, float radius);
 
@@ -302,7 +312,7 @@ public:
 	//현재 이미지를 32bit로 변경한다.
 	void cvtColor32ARGB();
 
-	bool save(CString filepath);
+	bool save(LPCTSTR filepath, ...);
 	bool copy_to_clipbard();
 	bool paste_from_clipboard();
 
@@ -355,7 +365,7 @@ public:
 protected:
 	CString			m_filename = _T("untitled");
 
-	void	resolution();
+	void			resolution();
 	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
 
 //animatedGif

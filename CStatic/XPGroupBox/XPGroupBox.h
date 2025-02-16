@@ -7,7 +7,12 @@
 // XPGroupBox.h : header file
 //
 
+//2025.02.16 scpark COLORREF를 Gdiplus::Color로 타입은 변경했으나
+//아직 실제 코드들을 완전히 변경하지 않은 상태임.
+
 #include <afxwin.h>
+#include "../../Functions.h"
+#include "../../colors.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // CXPGroupBox window
@@ -31,11 +36,11 @@ public:
 
 	// Operations
 public:
-	virtual CXPGroupBox& set_base_color(COLORREF cr_base);
-	virtual CXPGroupBox& set_border_color(COLORREF cr_border);
-	virtual CXPGroupBox& set_title_text_color(COLORREF cr_text);
-	virtual CXPGroupBox& set_back_color(COLORREF cr_back_client);
-	virtual CXPGroupBox& set_back_color(COLORREF cr_back_title,  COLORREF cr_back_client);
+	virtual CXPGroupBox& set_base_color(Gdiplus::Color cr_base);
+	virtual CXPGroupBox& set_border_color(Gdiplus::Color cr_border);
+	virtual CXPGroupBox& set_title_text_color(Gdiplus::Color cr_text);
+	virtual CXPGroupBox& set_back_color(Gdiplus::Color cr_back_client);
+	virtual CXPGroupBox& set_back_color(Gdiplus::Color cr_back_title, Gdiplus::Color cr_back_client);
 	virtual CXPGroupBox& set_XPGroup_style(XPGroupBoxStyle style); 
 
 	virtual CXPGroupBox& set_text(LPCTSTR lpszTitle);
@@ -43,10 +48,10 @@ public:
 	virtual CXPGroupBox& set_font_name(const CString& font_name, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CXPGroupBox& set_font_underline(bool underline);
 	virtual CXPGroupBox& set_font_italic(bool italic);
-	virtual CXPGroupBox& SetFontSize(int nSize);
-	virtual CXPGroupBox& SetFont(LOGFONT lf);
+	virtual CXPGroupBox& set_font_size(int nSize);
+	virtual CXPGroupBox& set_font(LOGFONT lf);
 
-	virtual CXPGroupBox& SetAlignment(DWORD dwType);
+	virtual CXPGroupBox& set_alignment(DWORD dwType);
 
 
 	// Overrides
@@ -65,8 +70,8 @@ public:
 
 	// Generated message map functions
 protected:
-	void UpdateSurface();
-	void ReconstructFont();
+	void update_surface();
+	void reconstruct_font();
 	//{{AFX_MSG(CXPGroupBox)
 	afx_msg void OnPaint();
 	//}}AFX_MSG
@@ -74,17 +79,17 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-	CString			m_strTitle;
-	CRect			m_rectTitle;
+	CString			m_title;
+	CRect			m_rt_title;
 
-	COLORREF		m_crBase;		//타이틀이 roundrect라서 양쪽 모퉁이의 색이 그려지지 않게 된다. parent배경색으로 칠해줘야 roundrect가 온전히 표시된다.
-	COLORREF		m_clrBorder = ::GetSysColor(COLOR_3DSHADOW);
-	COLORREF		m_crTitleText = RGB(0, 0, 0);
-	COLORREF		m_crTitleBack = RGB(249, 236, 192);
-	COLORREF		m_crClientBack = RGB(255, 249, 228);
+	Gdiplus::Color	m_crBase;		//타이틀이 roundrect라서 양쪽 모퉁이의 색이 그려지지 않게 된다. parent배경색으로 칠해줘야 roundrect가 온전히 표시된다.
+	Gdiplus::Color	m_cr_border = Gdiplus::Color::Gray;// ::GetSysColor(COLOR_3DSHADOW);
+	Gdiplus::Color	m_cr_title_text = gRGB(0, 0, 0);
+	Gdiplus::Color	m_cr_title_back = gRGB(249, 236, 192);
+	Gdiplus::Color	m_cr_client_back = gRGB(255, 249, 228);
 
-	XPGroupBoxStyle	m_nType = XPGB_FRAME;
-	DWORD			m_dwAlignment = SS_LEFT;
+	XPGroupBoxStyle	m_type = XPGB_FRAME;
+	DWORD			m_alignment = SS_LEFT;
 
 	LOGFONT			m_lf;
 	CFont			m_font;

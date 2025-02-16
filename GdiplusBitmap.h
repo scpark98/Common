@@ -229,7 +229,8 @@ public:
 	bool	is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);
 
 	void	set_matrix(Gdiplus::ColorMatrix *colorMatrix, Gdiplus::ColorMatrix *grayMatrix = NULL);
-	void	set_alpha(float alpha);
+	//0(transparent) ~ 255(opaque)
+	void	set_alpha(int alpha);
 
 
 	Gdiplus::Color get_color(int x, int y);
@@ -260,13 +261,13 @@ public:
 
 //효과
 	//Gdiplus에서 제공하는 GaussianBlur 방식이지만 radius가 작을 경우는 좌우로만 흐려지는 등의 문제가 있다.
-	//void	blur(float radius, BOOL expandEdge);
+	void	blur(float radius, BOOL expandEdge);
 
 	//https://github.com/bfraboni/FastGaussianBlur
 	//sigma = Gaussian standard deviation (float). Should be positive.
 	//order: optional filter order [1: box, 2: bilinear, 3: biquadratic, 4. bicubic, ..., 10]. should be positive. Default is 3
 	//border: optional treatment of image boundaries[mirror, extend, crop, wrap].Default is mirror.
-	void	fast_blur(float sigma = 5.0f, int order = 1/*, int border = 2*/);
+	void	fast_blur(float sigma = 10.0f, int order = 1/*, int border = 2*/);
 
 	//round shadow rect 이미지를 만들어주는 함수인데 미완성!
 	void	round_shadow_rect(int w, int h, float radius);

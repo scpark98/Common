@@ -4,7 +4,7 @@
 #include "Functions.h"
 #include "MemoryDC.h"
 
-#include "image_processing/fast_gaussianl_blur/fast_gaussian_blur_template.h"
+#include "image_processing/fast_gaussian_blur/fast_gaussian_blur_template.h"
 #include <thread>
 #include <afxcmn.h>
 
@@ -560,10 +560,10 @@ bool CGdiplusBitmap::get_raw_data()
 	//우선은 SeetaFace가 동작한다.
 	//수정 필요한 부분임.
 	Gdiplus::PixelFormat format = m_pBitmap->GetPixelFormat();
-	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
-		format = PixelFormat8bppIndexed;
-	else
-		format = PixelFormat24bppRGB;
+	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+	//	format = PixelFormat8bppIndexed;
+	//else
+	//	format = PixelFormat24bppRGB;
 
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,
@@ -1877,12 +1877,13 @@ void CGdiplusBitmap::set_matrix(Gdiplus::ColorMatrix* colorMatrix, Gdiplus::Colo
 	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
-void CGdiplusBitmap::set_alpha(float alpha)
+//0(transparent) ~ 255(opaque)
+void CGdiplusBitmap::set_alpha(int alpha)
 {
 	Gdiplus::ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-								0.0f, 0.0f, 0.0f, alpha, 0.0f,
+								0.0f, 0.0f, 0.0f, (float)alpha / 255.0f, 0.0f,
 								0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
 	//new를 사용하지 않는 아래 방식으로 할 경우
@@ -1897,6 +1898,8 @@ void CGdiplusBitmap::set_alpha(float alpha)
 
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(result);
+
+	//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
 	Gdiplus::ImageAttributes ia;
 
@@ -1914,14 +1917,14 @@ void CGdiplusBitmap::set_alpha(float alpha)
 	//m_pBitmap->ConvertFormat();
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-	ImageAttributes ia;
+	Gdiplus::ImageAttributes ia;
 	ia.SetColorMatrix(&colorMatrix);// , ColorMatrixFlagsDefault, ColorAdjustTypeBitmap);
 
 	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, Rect(0, 0, width, height), 0, 0, width, height, UnitPixel, &ia);
+	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 #endif
 }
 

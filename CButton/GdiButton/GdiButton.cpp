@@ -348,7 +348,8 @@ void CGdiButton::fit_to_image(bool fit)
 
 		for (auto img : m_image)
 		{
-			img->img->resize(m_width, m_height);
+			for (int i = 0; i < 4; i++)
+				img->img[i].resize(m_width, m_height);
 		}
 	}
 
@@ -437,7 +438,8 @@ void CGdiButton::set_back_imageBitmap* pBack)
 }
 */
 
-void CGdiButton::set_alpha(float alpha)
+//0(transparent) ~ 255(opaque)
+void CGdiButton::set_alpha(int alpha)
 {
 	for (size_t i = 0; i < m_image.size(); i++)
 	{
@@ -786,7 +788,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 	return CButton::PreTranslateMessage(pMsg);
 }
 
-#define MAP_STYLE(src, dest) if(dwStyle & (src)) dwText |= (dest)
+//#define MAP_STYLE(src, dest) if(dwStyle & (src)) dwText |= (dest)
 
 void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 {
@@ -914,19 +916,20 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_draw_shadow)
 		{
 			CGdiplusBitmap img_shadow;
-			m_image[idx]->img[0].clone(&img_shadow);
+			m_image[idx]->img[0].deep_copy(&img_shadow);
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\0.origin.png"));
 #endif
 			//img_shadow.resize(rc.Width(), rc.Height());
+			//img_shadow.blur(20, TRUE);
+			img_shadow.fast_blur(3.0f, 10);
+#ifdef _DEBUG
+			img_shadow.save(_T("d:\\1.blur.png"));
+#endif
 			img_shadow.gray(m_shadow_weight);
 			//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
 #ifdef _DEBUG
-			img_shadow.save(_T("d:\\1.gray.png"));
-#endif
-			img_shadow.blur(20, TRUE);
-#ifdef _DEBUG
-			img_shadow.save(_T("d:\\2.blur.png"));
+			img_shadow.save(_T("d:\\2.gray.png"));
 #endif
 			CRect rc_shadow = rc;
 			//rc_shadow.OffsetRect(4, 4);
@@ -1107,27 +1110,27 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	//뭔가 제대로 검사되지 않는다. 우선 푸시버튼만 대상으로 한다.
 #if 1
-	if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) ||
-		(is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && is_button_style(BS_PUSHLIKE)) ||
-		(is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE)))
+	//if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) ||
+	//	(is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && is_button_style(BS_PUSHLIKE)) ||
+	//	(is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE)))
 	{
-		/*
-		if ((dwStyle & BS_RIGHT) == BS_RIGHT)
-			dwText |= DT_RIGHT;
-		else if ((dwStyle & BS_LEFT) == BS_LEFT)
-			dwText |= DT_LEFT;
+		//dwStyle = GetButtonStyle();
+		LONG_PTR style = GetWindowLong(m_hWnd, GWL_STYLE);
+		if (style & BS_RIGHT)
+			dwText = DT_RIGHT;
+		else if (style & BS_LEFT)
+			dwText = DT_LEFT;
 		else//if (dwStyle & BS_CENTER)
-		*/
-			dwText |= DT_CENTER;
+			dwText = DT_CENTER;
 	}
-	else
-	{
-		dwText |= DT_LEFT;
-	}
+	//else
+	//{
+	//	dwText |= DT_LEFT;
+	//}
 #else		
 	MAP_STYLE(BS_LEFT,	 DT_LEFT);
-	MAP_STYLE(BS_RIGHT,	 DT_RIGHT);
 	MAP_STYLE(BS_CENTER, DT_CENTER);
+	MAP_STYLE(BS_RIGHT,	 DT_RIGHT);
 #endif
 	dwText |= (DT_SINGLELINE | DT_VCENTER);
 

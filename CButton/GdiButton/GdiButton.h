@@ -193,7 +193,9 @@ public:
 
 	void		release_all();
 
-	void		set_alpha(float alpha);
+	//0(transparent) ~ 255(opaque)
+	void		set_alpha(int alpha);
+
 	//void		add_rgb(int red, int green, int blue, COLORREF crExcept);
 
 	void		set_transparent(bool trans = true);

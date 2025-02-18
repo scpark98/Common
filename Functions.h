@@ -861,8 +861,11 @@ struct	NETWORK_INFO
 	*/
 	CString		loadResString(UINT nID);
 
-	//simple json parser. Common/json/rapid_json 추천.
-	//CString		json_value(CString json, CString key);
+	//simple json parser.
+	//이전 Koino 개발자가 간단히 만든 코드이나 대괄호 처리 등 취약점이 많음.
+	//심플한 json에 대해서는 정상 동작하므로 기존 코드와의 호환성때문에 우선 사용하지만
+	//Common/json/rapid_json 로 대체되어야 함.
+	CString		json_value(CString json, CString key);
 
 	int			get_char_count(CString sStr, TCHAR ch, bool stop_at_first_mismatch = false, bool forward = true);
 	CString		get_mac_address_format(CString src, TCHAR separator = ':');
@@ -1291,6 +1294,25 @@ struct	NETWORK_INFO
 	//윈7부터는 ABS_ALWAYSONTOP은 항상 true이므로 ABS_ALWAYSONTOP를 판별하는 것은 의미없다.
 	bool		get_taskbar_state(UINT state, CSize *sz = NULL);
 
+//trayIcon 관련
+#if 1
+	struct TRAYDATA
+	{
+		HWND hwnd;
+		UINT uID;
+		UINT uCallbackMessage;
+		DWORD Reserved[2];
+		HICON hIcon;
+	};
+	bool		refresh_tray_icon();
+	HWND		find_tray_toolbar_window();
+#else
+	//트레이에 아이콘 잔상이 남아 있는 경우가 있는데, 이를 제거하기 위해서는 아래의 코드로 작업하는 것이 효과적이다.
+	//인터넷 상에서 돌고 있는 트레이아이콘의 갯수를 구해서 트레이아이콘에 삭제 메시지를 날리는 방법은
+	//프로세스가 이미 종료된 상태에서는 작동되지 않는 문제가 있기 때문이다.
+	void		refresh_tray_icon();
+	void		process_notification_area(HWND hWnd);
+#endif
 
 	BOOL		IsWow64();
 	BOOL		IsXpOr2000();

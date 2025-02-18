@@ -364,9 +364,6 @@ public:
 	int			find_string(CString str, int start = -1, bool bWholeWord = false, bool bCaseSensitive = false);
 	//separator가 ""이 아닌 공백 또는 다른 문자열일 경우는
 	//str을 분리해서 모두 찾는다.
-	void		find_string(CString find_target, std::deque<int>* result,
-							int start_idx = 0, int end_idx = -1, int start_column = 0, int end_column = -1,
-							bool result_reset = true, bool bWholeWord = false, bool bCaseSensitive = false, bool select = false);
 	int			find_string(CString find_target, std::deque<int>* result,
 							int start_idx = 0, int end_idx = -1,
 							std::deque<int>* dqColumn = NULL, bool stop_first_found = false);

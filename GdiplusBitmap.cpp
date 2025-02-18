@@ -4,9 +4,10 @@
 #include "Functions.h"
 #include "MemoryDC.h"
 
-#include "image_processing/fast_gaussian_blur/fast_gaussian_blur_template.h"
 #include <thread>
 #include <afxcmn.h>
+
+#include "image_processing/fast_gaussian_blur/fast_gaussian_blur_template.h"
 
 
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;

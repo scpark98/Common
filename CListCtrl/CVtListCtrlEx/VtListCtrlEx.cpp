@@ -2032,9 +2032,13 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 	}
 
 	m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
-	SetItemCountEx(m_list_db.size());
+
+	//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
+	//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
+	SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 
 	//ensureVisible이면 Invalidate()을 생략해도 된다.
+	TRACE(_T("m_auto_scroll = %d, ensureVisible = %d\n"), m_auto_scroll, ensureVisible);
 	if (m_auto_scroll && ensureVisible)
 	{
 		ensure_visible(index, visible_last);
@@ -2720,35 +2724,15 @@ int CVtListCtrlEx::find_string(CString str, int start, bool bWholeWord, bool bCa
 //'&'로 구분하면 각 단어가 모두 들어간 목록을(AND)
 //구분 기호가 없으면 wholeword로 검색한다.
 //작품명의 경우 영문대문자-숫자인 패턴이 많으므로 '-'가 없다면 숫자 앞에 자동 넣어준다.
-void CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
-								int start_idx, int end_idx, int column_start, int column_end,
-								bool result_reset, bool bWholeWord, bool bCaseSensitive, bool select)
-{
-	if (column_start < 0)
-		column_start = 0;
-	if (column_end < 0)
-		column_end = get_column_count() - 1;
-
-	if (column_start > column_end)
-		return;
-
-	if (result_reset && result->size())
-		result->clear();
-
-	int i;
-	std::deque<int> dqColumn;
-	for (i = column_start; i <= column_end; i++)
-		dqColumn.push_back(i);
-
-	find_string(find_target, result, start_idx, end_idx, &dqColumn);
-}
-
-int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int start_idx, int end_idx, std::deque<int>* dqColumn, bool stop_first_found)
+int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
+								int start_idx, int end_idx,
+								std::deque<int>* dqColumn, bool stop_first_found)
 {
 	int		i;
 	TCHAR	op;
 	CString sText;
 	std::deque<CString> dqTarget;	//separator가 ""이 아닐 경우는 토큰으로 분리하여 모두 찾는다.
+	std::deque<int> dq_columns;
 
 	if (start_idx < 0)
 		start_idx = 0;
@@ -2772,6 +2756,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result, int
 
 	if (dqColumn == NULL || dqColumn->size() == 0)
 	{
+		dqColumn = &dq_columns;
 		for (i = 0; i < get_column_count(); i++)
 			dqColumn->push_back(i);
 	}
@@ -3397,9 +3382,8 @@ void CVtListCtrlEx::edit_end(bool valid)
 //mode가 visible_last이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
 void CVtListCtrlEx::ensure_visible(int index, int mode, int offset)
 {
-	EnsureVisible(index, FALSE);
+	//EnsureVisible(index, FALSE);
 
-	/*
 	int items_per_page = GetCountPerPage();
 	int top_index = GetTopIndex();
 
@@ -3418,7 +3402,6 @@ void CVtListCtrlEx::ensure_visible(int index, int mode, int offset)
 	{
 		Scroll(CSize(0, (index + offset - items_per_page - top_index + 1) * r.Height()));
 	}
-	*/
 }
 
 bool CVtListCtrlEx::is_item_visible(int index, bool bPartial)

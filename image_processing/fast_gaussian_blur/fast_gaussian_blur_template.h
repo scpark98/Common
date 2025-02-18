@@ -7,8 +7,22 @@
 //
 #pragma once
 
-#undef min
-#undef max
+/* 20250217 scpark 맨 처음 가져와서 min, max를 #undef하고 <algorithm>, <cmath>를 추가하여
+*  Test_GdiButton 프로젝트에서는 정상 동작했으나
+*  Koino의 ManualLauncher 프로젝트에서는 std::max와 충돌등으로 에러가 발생하고 
+*  constexpr(..)에서도 "구문 오류: ';'이(가) '{' 앞에 없습니다." 등의 오류가 발생하여
+*  std::min, std::max를 min, max로 변경하고 constexpr(..)도 사용하지 않도록 수정하여
+*  현재는 모두 정상적으로 동작되고 있음.
+*/
+
+//#ifdef min
+//    #undef min
+//#endif
+//
+//#ifdef max
+//    #undef max
+//#endif
+
 #include <algorithm>
 #include <cmath>
 
@@ -55,41 +69,44 @@
 //!
 enum Border
 {
-    kExtend,
-    kKernelCrop,
-    kMirror,
-    kWrap,
+	kExtend,
+	kKernelCrop,
+	kMirror,
+	kWrap,
 };
 
 //! Helper to compute array indices for different border policies.
 template<Border P>
 inline int remap_index(const int begin, const int end, const int index)
 {
-    const bool inside = index >= begin && index < end;
-    if (!inside)
-    {
-        if constexpr (P == kWrap)
-        {
-            const int length = end-begin;
-            const int repeat = std::abs(index / length)+1;
-            const int value = index + repeat * length;
-            return begin+(value%length);
-        }
-        else if constexpr (P == kMirror)
-        {
-            //! FIXME: is there a better way ?
-            const int length = end-begin, last = end-1, slength = length-1;
-            const int pindex = index < begin ? last-index+slength : index-begin;
-            const int repeat = pindex / slength;
-            const int mod = pindex % slength;
-            return repeat%2 ? slength-mod+begin : mod+begin;
-        }
-        else if constexpr (P == kExtend)
-        {
-            return std::min(end-1, std::max(begin, index));
-        }
-    }
-    return index;
+	const bool inside = index >= begin && index < end;
+	if (!inside)
+	{
+		//if constexpr (P == kWrap)
+		if (P == kWrap)
+		{
+			const int length = end - begin;
+			const int repeat = std::abs(index / length) + 1;
+			const int value = index + repeat * length;
+			return begin + (value % length);
+		}
+		//else if constexpr (P == kMirror)
+		else if (P == kMirror)
+		{
+			//! FIXME: is there a better way ?
+			const int length = end - begin, last = end - 1, slength = length - 1;
+			const int pindex = index < begin ? last - index + slength : index - begin;
+			const int repeat = pindex / slength;
+			const int mod = pindex % slength;
+			return repeat % 2 ? slength - mod + begin : mod + begin;
+		}
+		//else if constexpr (P == kExtend)
+		else if (P == kExtend)
+		{
+			return min(end - 1, max(begin, index));
+		}
+	}
+	return index;
 };
 
 //!
@@ -109,9 +126,9 @@ inline int remap_index(const int begin, const int end, const int index)
 //!
 enum Kernel
 {
-    kSmall,
-    kMid,
-    kLarge,
+	kSmall,
+	kMid,
+	kLarge,
 };
 
 //!
@@ -133,124 +150,127 @@ constexpr float round_v() { return std::is_integral_v<T> ? 0.5f : 0.f; }
 //! \param[in] r            box dimension
 //!
 template<typename T, int C, Kernel kernel = kSmall>
-inline void horizontal_blur_extend(const T * in, T * out, const int w, const int h, const int r)
+inline void horizontal_blur_extend(const T* in, T* out, const int w, const int h, const int r)
 {
-    // change the local variable types depending on the template type for faster calculations
-    using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
+	// change the local variable types depending on the template type for faster calculations
+	using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
 
-    const float iarr = 1.f / (r+r+1);
-    #pragma omp parallel for
-    for(int i=0; i<h; i++) 
-    {
-        const int begin = i*w;
-        const int end = begin+w;
-        calc_type fv[C], lv[C], acc[C];                 // first value, last value, sliding accumulator
+	const float iarr = 1.f / (r + r + 1);
+#pragma omp parallel for
+	for (int i = 0; i < h; i++)
+	{
+		const int begin = i * w;
+		const int end = begin + w;
+		calc_type fv[C], lv[C], acc[C];                 // first value, last value, sliding accumulator
 
-        // init fv, lv, acc by extending outside the image buffer
-        for(int ch=0; ch<C; ++ch)
-        {
-            fv[ch] =  in[begin*C+ch];
-            lv[ch] =  in[(end-1)*C+ch];
-            acc[ch] = (r+1)*fv[ch];
-        }
+		// init fv, lv, acc by extending outside the image buffer
+		for (int ch = 0; ch < C; ++ch)
+		{
+			fv[ch] = in[begin * C + ch];
+			lv[ch] = in[(end - 1) * C + ch];
+			acc[ch] = (r + 1) * fv[ch];
+		}
 
-        if constexpr(kernel == kLarge)
-        {
-            // initial acucmulation
-            for(int j=0; j<r; j++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                // prefilling the accumulator with the last value seems slower than/equal to this ternary
-                acc[ch] += j < w ? in[(begin+j)*C+ch] : lv[ch];
-            }
+		//if constexpr(kernel == kLarge)
+		if (kernel == kLarge)
+		{
+			// initial acucmulation
+			for (int j = 0; j < r; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					// prefilling the accumulator with the last value seems slower than/equal to this ternary
+					acc[ch] += j < w ? in[(begin + j) * C + ch] : lv[ch];
+				}
 
-            for(int ti = begin; ti < end; ti++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += lv[ch] - fv[ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
-        }
-        else if constexpr(kernel == kMid)
-        {
-            // current index, left index, right index
-            int ti = begin, li = begin-r-1, ri = begin+r;
+			for (int ti = begin; ti < end; ti++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += lv[ch] - fv[ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+		}
+		//else if constexpr(kernel == kMid)
+		else if (kernel == kMid)
+		{
+			// current index, left index, right index
+			int ti = begin, li = begin - r - 1, ri = begin + r;
 
-            // initial acucmulation
-            for(int j=ti; j<ri; j++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+			// initial acucmulation
+			for (int j = ti; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // 1. left side out and right side in
-            for(; ri<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[ri*C+ch] - fv[ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 1. left side out and right side in
+			for (; ri < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch] - fv[ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 4. left side out and right side out
-            for(; li<begin; ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += lv[ch] - fv[ch]; //! mid kernels
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 4. left side out and right side out
+			for (; li < begin; ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += lv[ch] - fv[ch]; //! mid kernels
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 3. left side in and right side out
-            for(; ti<end; ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += lv[ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
-        }
-        else if constexpr(kernel == kSmall)
-        {
-            // current index, left index, right index
-            int ti = begin, li = begin-r-1, ri = begin+r;
+			// 3. left side in and right side out
+			for (; ti < end; ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += lv[ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+		}
+		//else if constexpr(kernel == kSmall)
+		else if (kernel == kSmall)
+		{
+			// current index, left index, right index
+			int ti = begin, li = begin - r - 1, ri = begin + r;
 
-            // initial acucmulation
-            for(int j=ti; j<ri; j++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+			// initial acucmulation
+			for (int j = ti; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // 1. left side out and right side in
-            for(; li<begin; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[ri*C+ch] - fv[ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 1. left side out and right side in
+			for (; li < begin; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch] - fv[ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 2. left side in and right side in
-            for(; ri<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[ri*C+ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 2. left side in and right side in
+			for (; ri < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 3. left side in and right side out
-            for(; ti<end; ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += lv[ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
-        }
-    }
+			// 3. left side in and right side out
+			for (; ti < end; ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += lv[ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+		}
+	}
 }
 
 //!
@@ -265,117 +285,120 @@ inline void horizontal_blur_extend(const T * in, T * out, const int w, const int
 //! \param[in] r            box dimension
 //!
 template<typename T, int C, Kernel kernel = kSmall>
-inline void horizontal_blur_kernel_crop(const T * in, T * out, const int w, const int h, const int r)
+inline void horizontal_blur_kernel_crop(const T* in, T* out, const int w, const int h, const int r)
 {
-    // change the local variable types depending on the template type for faster calculations
-    using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
+	// change the local variable types depending on the template type for faster calculations
+	using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
 
-    const float iarr = 1.f / (r+r+1);
-    const float iwidth = 1.f / w;
-    #pragma omp parallel for
-    for(int i=0; i<h; i++)
-    {
-        const int begin = i*w;
-        const int end = begin+w;
-        calc_type acc[C] = { 0 };
+	const float iarr = 1.f / (r + r + 1);
+	const float iwidth = 1.f / w;
+#pragma omp parallel for
+	for (int i = 0; i < h; i++)
+	{
+		const int begin = i * w;
+		const int end = begin + w;
+		calc_type acc[C] = { 0 };
 
-        if constexpr(kernel == kLarge)
-        {
-            // initial acucmulation
-            for(int j=begin; j<end; j++)
-            for(int ch=0; ch < C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+		//if constexpr(kernel == kLarge)
+		if (kernel == kLarge)
+		{
+			// initial acucmulation
+			for (int j = begin; j < end; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // this is constant
-            for(int j=begin; j<end; j++)
-            for(int ch=0; ch < C; ++ch)
-            {
-                out[j*C+ch] = acc[ch]*iwidth + round_v<T>();
-            }
-        }
-        else if constexpr(kernel == kMid)
-        {
-            // current index, left index, right index
-            int ti = begin, li = begin-r-1, ri = begin+r;   
-            
-            // initial acucmulation
-            for(int j=ti; j<ri; j++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+			// this is constant
+			for (int j = begin; j < end; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					out[j * C + ch] = acc[ch] * iwidth + round_v<T>();
+				}
+		}
+		//else if constexpr(kernel == kMid)
+		else if (kernel == kMid)
+		{
+			// current index, left index, right index
+			int ti = begin, li = begin - r - 1, ri = begin + r;
 
-            // 1. left side out and right side in
-            for(; ri<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                acc[ch] += in[ri*C+ch];
-                // assert(acc[ch] >= 0);
-                const float inorm = 1.f / float(ri+1-begin);
-                out[ti*C+ch] = acc[ch]*inorm + round_v<T>();
-            }
+			// initial acucmulation
+			for (int j = ti; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // 4. left side out and right side out
-            for(; li<begin; ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                out[ti*C+ch] = acc[ch]*iwidth + round_v<T>();
-            }
+			// 1. left side out and right side in
+			for (; ri < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch];
+					// assert(acc[ch] >= 0);
+					const float inorm = 1.f / float(ri + 1 - begin);
+					out[ti * C + ch] = acc[ch] * inorm + round_v<T>();
+				}
 
-            // 3. left side in and right side out
-            for(; ti<end; ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                acc[ch] -= in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                const float inorm = 1.f / float(end-li-1);
-                out[ti*C+ch] = acc[ch]*inorm + round_v<T>();
-            }
-        }
-        else if constexpr(kernel == kSmall)
-        {
-            // current index, left index, right index
-            int ti = begin, li = begin-r-1, ri = begin+r;
+			// 4. left side out and right side out
+			for (; li < begin; ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					out[ti * C + ch] = acc[ch] * iwidth + round_v<T>();
+				}
 
-            // initial acucmulation
-            for(int j=ti; j<ri; j++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+			// 3. left side in and right side out
+			for (; ti < end; ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] -= in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					const float inorm = 1.f / float(end - li - 1);
+					out[ti * C + ch] = acc[ch] * inorm + round_v<T>();
+				}
+		}
+		//else if constexpr(kernel == kSmall)
+		else if (kernel == kSmall)
+		{
+			// current index, left index, right index
+			int ti = begin, li = begin - r - 1, ri = begin + r;
 
-            // 1. left side out and right side in
-            for(; li<begin; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                acc[ch] += in[ri*C+ch];
-                // assert(acc[ch] >= 0);
-                const float inorm = 1.f / float(ri+1-begin);
-                out[ti*C+ch] = acc[ch]*inorm + round_v<T>();
-            }
+			// initial acucmulation
+			for (int j = ti; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // 2. left side in and right side in
-            for(; ri<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                acc[ch] += in[ri*C+ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 1. left side out and right side in
+			for (; li < begin; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch];
+					// assert(acc[ch] >= 0);
+					const float inorm = 1.f / float(ri + 1 - begin);
+					out[ti * C + ch] = acc[ch] * inorm + round_v<T>();
+				}
 
-            // 3. left side in and right side out
-            for(; ti<end; ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                acc[ch] -= in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                const float inorm = 1.f / float(end-li-1);
-                out[ti*C+ch] = acc[ch]*inorm + round_v<T>();
-            }
-        }
-    }
+			// 2. left side in and right side in
+			for (; ri < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+
+			// 3. left side in and right side out
+			for (; ti < end; ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] -= in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					const float inorm = 1.f / float(end - li - 1);
+					out[ti * C + ch] = acc[ch] * inorm + round_v<T>();
+				}
+		}
+	}
 }
 
 //!
@@ -393,131 +416,134 @@ inline void horizontal_blur_kernel_crop(const T * in, T * out, const int w, cons
 template<typename T, int C, Kernel kernel = kSmall>
 inline void horizontal_blur_mirror(const T* in, T* out, const int w, const int h, const int r)
 {
-    // change the local variable types depending on the template type for faster calculations
-    using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
+	// change the local variable types depending on the template type for faster calculations
+	using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
 
-    const double iarr = 1.f/(r+r+1);
-    #pragma omp parallel for
-    for (int i = 0; i < h; i++)
-    {
-        const int begin = i*w;
-        const int end = begin+w;
-        calc_type acc[C] = { 0 };
+	const double iarr = 1.f / (r + r + 1);
+#pragma omp parallel for
+	for (int i = 0; i < h; i++)
+	{
+		const int begin = i * w;
+		const int end = begin + w;
+		calc_type acc[C] = { 0 };
 
-        // current index, left index, right index
-        int ti = begin, li = begin-r-1, ri = begin+r;
+		// current index, left index, right index
+		int ti = begin, li = begin - r - 1, ri = begin + r;
 
-        if constexpr(kernel == kLarge) // generic but slow
-        {
-            // initial acucmulation
-            for(int j=li; j<ri; j++) 
-            for(int ch=0; ch<C; ++ch)
-            {
-                const int id = remap_index<kMirror>(begin, end, j);
-                acc[ch] += in[id*C+ch];
-            }
+		//if constexpr(kernel == kLarge) // generic but slow
+		if (kernel == kLarge)
+		{
+			// initial acucmulation
+			for (int j = li; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int id = remap_index<kMirror>(begin, end, j);
+					acc[ch] += in[id * C + ch];
+				}
 
-            // perform filtering
-            for(int j=0; j<w; j++, ri++, ti++, li++) 
-            for(int ch=0; ch<C; ++ch)
-            { 
-                const int rid = remap_index<kMirror>(begin, end, ri);
-                const int lid = remap_index<kMirror>(begin, end, li);
-                acc[ch] += in[rid*C+ch] - in[lid*C+ch];
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
-        }
-        else if constexpr(kernel == kMid)
-        {
-            for(int j=li; j<begin; j++) 
-            for(int ch=0; ch<C; ++ch)
-            {
-                const int lid = 2 * begin - j; // mirrored id
-                acc[ch] += in[lid*C+ch];
-            }
+			// perform filtering
+			for (int j = 0; j < w; j++, ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int rid = remap_index<kMirror>(begin, end, ri);
+					const int lid = remap_index<kMirror>(begin, end, li);
+					acc[ch] += in[rid * C + ch] - in[lid * C + ch];
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+		}
+		//else if constexpr(kernel == kMid)
+		else if (kernel == kMid)
+		{
+			for (int j = li; j < begin; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int lid = 2 * begin - j; // mirrored id
+					acc[ch] += in[lid * C + ch];
+				}
 
-            for(int j=begin; j<ri; j++) 
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+			for (int j = begin; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // 1. left side out and right side in
-            for(; ri<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                const int lid = 2 * begin - li; // left mirrored id
-                acc[ch] += in[ri*C+ch] - in[lid*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 1. left side out and right side in
+			for (; ri < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int lid = 2 * begin - li; // left mirrored id
+					acc[ch] += in[ri * C + ch] - in[lid * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 4. left side out and right side out
-            for(; li<begin; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                const int rid = 2 * end - 2 - ri;   // right mirrored id
-                const int lid = 2 * begin - li;     // left mirrored id
-                acc[ch] += in[rid*C+ch] - in[lid*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 4. left side out and right side out
+			for (; li < begin; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int rid = 2 * end - 2 - ri;   // right mirrored id
+					const int lid = 2 * begin - li;     // left mirrored id
+					acc[ch] += in[rid * C + ch] - in[lid * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 3. left side in and right side out
-            for(; ti<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                const int rid = 2*end-2-ri; // right mirrored id
-                acc[ch] += in[rid*C+ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
-        }
-        else if constexpr(kernel == kSmall)
-        {
-            for(int j=li; j<begin; j++) 
-            for(int ch=0; ch<C; ++ch)
-            {
-                const int lid = 2 * begin - j; // mirrored id
-                acc[ch] += in[lid*C+ch];
-            }
+			// 3. left side in and right side out
+			for (; ti < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int rid = 2 * end - 2 - ri; // right mirrored id
+					acc[ch] += in[rid * C + ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+		}
+		//else if constexpr(kernel == kSmall)
+		else if (kernel == kSmall)
+		{
+			for (int j = li; j < begin; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int lid = 2 * begin - j; // mirrored id
+					acc[ch] += in[lid * C + ch];
+				}
 
-            for(int j=begin; j<ri; j++) 
-            for(int ch=0; ch<C; ++ch)
-            {
-                acc[ch] += in[j*C+ch];
-            }
+			for (int j = begin; j < ri; j++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[j * C + ch];
+				}
 
-            // 1. left side out and right side in
-            for(; li<begin; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            { 
-                const int lid = 2 * begin - li; // left mirrored id
-                acc[ch] += in[ri*C+ch] - in[lid*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 1. left side out and right side in
+			for (; li < begin; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int lid = 2 * begin - li; // left mirrored id
+					acc[ch] += in[ri * C + ch] - in[lid * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 2. left side in and right side in
-            for(; ri<end; ri++, ti++, li++) 
-            for(int ch=0; ch<C; ++ch)
-            { 
-                acc[ch] += in[ri*C+ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
+			// 2. left side in and right side in
+			for (; ri < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					acc[ch] += in[ri * C + ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
 
-            // 3. left side in and right side out
-            for(; ti<end; ri++, ti++, li++)
-            for(int ch=0; ch<C; ++ch)
-            {
-                const int rid = 2*end-2-ri; // right mirrored id
-                acc[ch] += in[rid*C+ch] - in[li*C+ch];
-                // assert(acc[ch] >= 0);
-                out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-            }
-        }
-    }
+			// 3. left side in and right side out
+			for (; ti < end; ri++, ti++, li++)
+				for (int ch = 0; ch < C; ++ch)
+				{
+					const int rid = 2 * end - 2 - ri; // right mirrored id
+					acc[ch] += in[rid * C + ch] - in[li * C + ch];
+					// assert(acc[ch] >= 0);
+					out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+				}
+		}
+	}
 }
 
 //!
@@ -535,36 +561,36 @@ inline void horizontal_blur_mirror(const T* in, T* out, const int w, const int h
 template<typename T, int C>
 inline void horizontal_blur_wrap(const T* in, T* out, const int w, const int h, const int r)
 {
-    // change the local variable types depending on the template type for faster calculations
-    using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
+	// change the local variable types depending on the template type for faster calculations
+	using calc_type = std::conditional_t<std::is_integral_v<T>, int, float>;
 
-    const float iarr = 1.f / (r+r+1);
-    #pragma omp parallel for
-    for(int i=0; i<h; i++) 
-    {
-        const int begin = i*w;
-        const int end = begin+w;
-        int ti = begin, li = begin-r-1, ri = begin+r;   // current index, left index, right index
-        calc_type acc[C] = { 0 };                       // sliding accumulator
+	const float iarr = 1.f / (r + r + 1);
+#pragma omp parallel for
+	for (int i = 0; i < h; i++)
+	{
+		const int begin = i * w;
+		const int end = begin + w;
+		int ti = begin, li = begin - r - 1, ri = begin + r;   // current index, left index, right index
+		calc_type acc[C] = { 0 };                       // sliding accumulator
 
-        // initial acucmulation
-        for(int j=li; j<ri; j++) 
-        for(int ch=0; ch<C; ++ch)
-        {
-            const int id = remap_index<kWrap>(begin, end, j);
-            acc[ch] += in[id*C+ch];
-        }
+		// initial acucmulation
+		for (int j = li; j < ri; j++)
+			for (int ch = 0; ch < C; ++ch)
+			{
+				const int id = remap_index<kWrap>(begin, end, j);
+				acc[ch] += in[id * C + ch];
+			}
 
-        // perform filtering
-        for(int j=0; j<w; j++, ri++, ti++, li++) 
-        for(int ch=0; ch<C; ++ch)
-        {
-            const int rid = remap_index<kWrap>(begin, end, ri);
-            const int lid = remap_index<kWrap>(begin, end, li);
-            acc[ch] += in[rid*C+ch] - in[lid*C+ch];
-            out[ti*C+ch] = acc[ch]*iarr + round_v<T>();
-        }
-    }
+		// perform filtering
+		for (int j = 0; j < w; j++, ri++, ti++, li++)
+			for (int ch = 0; ch < C; ++ch)
+			{
+				const int rid = remap_index<kWrap>(begin, end, ri);
+				const int lid = remap_index<kWrap>(begin, end, li);
+				acc[ch] += in[rid * C + ch] - in[lid * C + ch];
+				out[ti * C + ch] = acc[ch] * iarr + round_v<T>();
+			}
+	}
 }
 
 //!
@@ -578,30 +604,34 @@ inline void horizontal_blur_wrap(const T* in, T* out, const int w, const int h, 
 //! \param[in] r            box dimension
 //!
 template<typename T, int C, Border P = kMirror>
-inline void horizontal_blur(const T * in, T * out, const int w, const int h, const int r)
+inline void horizontal_blur(const T* in, T* out, const int w, const int h, const int r)
 {
-    if constexpr(P == kExtend)
-    {
-        if( r < w/2 )       horizontal_blur_extend<T,C,Kernel::kSmall>(in, out, w, h, r);
-        else if( r < w )    horizontal_blur_extend<T,C,Kernel::kMid  >(in, out, w, h, r);
-        else                horizontal_blur_extend<T,C,Kernel::kLarge>(in, out, w, h, r);
-    }
-    else if constexpr(P == kKernelCrop)
-    {
-        if( r < w/2 )       horizontal_blur_kernel_crop<T,C,Kernel::kSmall>(in, out, w, h, r);
-        else if( r < w )    horizontal_blur_kernel_crop<T,C,Kernel::kMid  >(in, out, w, h, r);
-        else                horizontal_blur_kernel_crop<T,C,Kernel::kLarge>(in, out, w, h, r);
-    }
-    else if constexpr(P == kMirror)
-    {
-        if( r < w/2 )       horizontal_blur_mirror<T,C,Kernel::kSmall>(in, out, w, h, r);
-        else if( r < w )    horizontal_blur_mirror<T,C,Kernel::kMid  >(in, out, w, h, r);
-        else                horizontal_blur_mirror<T,C,Kernel::kLarge>(in, out, w, h, r);
-    }
-    else if constexpr(P == kWrap)
-    {
-        horizontal_blur_wrap<T,C>(in, out, w, h, r);
-    }
+	//if constexpr(P == kExtend)
+	if (P == kExtend)
+	{
+		if (r < w / 2)       horizontal_blur_extend<T, C, Kernel::kSmall>(in, out, w, h, r);
+		else if (r < w)    horizontal_blur_extend<T, C, Kernel::kMid  >(in, out, w, h, r);
+		else                horizontal_blur_extend<T, C, Kernel::kLarge>(in, out, w, h, r);
+	}
+	//else if constexpr(P == kKernelCrop)
+	else if (P == kKernelCrop)
+	{
+		if (r < w / 2)       horizontal_blur_kernel_crop<T, C, Kernel::kSmall>(in, out, w, h, r);
+		else if (r < w)    horizontal_blur_kernel_crop<T, C, Kernel::kMid  >(in, out, w, h, r);
+		else                horizontal_blur_kernel_crop<T, C, Kernel::kLarge>(in, out, w, h, r);
+	}
+	//else if constexpr(P == kMirror)
+	else if (P == kMirror)
+	{
+		if (r < w / 2)       horizontal_blur_mirror<T, C, Kernel::kSmall>(in, out, w, h, r);
+		else if (r < w)    horizontal_blur_mirror<T, C, Kernel::kMid  >(in, out, w, h, r);
+		else                horizontal_blur_mirror<T, C, Kernel::kLarge>(in, out, w, h, r);
+	}
+	//else if constexpr(P == kWrap)
+	else if (P == kWrap)
+	{
+		horizontal_blur_wrap<T, C>(in, out, w, h, r);
+	}
 }
 
 //!
@@ -615,17 +645,17 @@ inline void horizontal_blur(const T * in, T * out, const int w, const int h, con
 //! \param[in] r            box dimension
 //!
 template<typename T, Border P = kMirror>
-inline void horizontal_blur(const T * in, T * out, const int w, const int h, const int c, const int r)
+inline void horizontal_blur(const T* in, T* out, const int w, const int h, const int c, const int r)
 {
-    switch(c)
-    {
-        case 1: horizontal_blur<T,1,P>(in, out, w, h, r); break;
-        case 2: horizontal_blur<T,2,P>(in, out, w, h, r); break;
-        case 3: horizontal_blur<T,3,P>(in, out, w, h, r); break;
-        case 4: horizontal_blur<T,4,P>(in, out, w, h, r); break;
-        default: printf("horizontal_blur over %d channels is not supported yet. Add a specific case if possible or fall back to the generic version.\n", c); break;
-        // default: horizontal_blur<T>(in, out, w, h, c, r); break;
-    }
+	switch (c)
+	{
+	case 1: horizontal_blur<T, 1, P>(in, out, w, h, r); break;
+	case 2: horizontal_blur<T, 2, P>(in, out, w, h, r); break;
+	case 3: horizontal_blur<T, 3, P>(in, out, w, h, r); break;
+	case 4: horizontal_blur<T, 4, P>(in, out, w, h, r); break;
+	default: printf("horizontal_blur over %d channels is not supported yet. Add a specific case if possible or fall back to the generic version.\n", c); break;
+		// default: horizontal_blur<T>(in, out, w, h, c, r); break;
+	}
 }
 
 //!
@@ -641,31 +671,31 @@ inline void horizontal_blur(const T * in, T * out, const int w, const int h, con
 //! \param[in] h            image height
 //!
 template<typename T, int C>
-inline void flip_block(const T * in, T * out, const int w, const int h)
+inline void flip_block(const T* in, T* out, const int w, const int h)
 {
-    constexpr int block = 256/C;
-    #pragma omp parallel for collapse(2)
-    for(int x= 0; x < w; x+= block)
-    for(int y= 0; y < h; y+= block)
-    {
-        const T * p = in + y*w*C + x*C;
-        T * q = out + y*C + x*h*C;
-        
-        const int blockx= std::min(w, x+block) - x;
-        const int blocky= std::min(h, y+block) - y;
-        for(int xx= 0; xx < blockx; xx++)
-        {
-            for(int yy= 0; yy < blocky; yy++)
-            {
-                for(int k= 0; k < C; k++)
-                    q[k]= p[k];
-                p+= w*C;
-                q+= C;                    
-            }
-            p+= -blocky*w*C + C;
-            q+= -blocky*C + h*C;
-        }
-    }
+	constexpr int block = 256 / C;
+#pragma omp parallel for collapse(2)
+	for (int x = 0; x < w; x += block)
+		for (int y = 0; y < h; y += block)
+		{
+			const T* p = in + y * w * C + x * C;
+			T* q = out + y * C + x * h * C;
+
+			const int blockx = min(w, x + block) - x;
+			const int blocky = min(h, y + block) - y;
+			for (int xx = 0; xx < blockx; xx++)
+			{
+				for (int yy = 0; yy < blocky; yy++)
+				{
+					for (int k = 0; k < C; k++)
+						q[k] = p[k];
+					p += w * C;
+					q += C;
+				}
+				p += -blocky * w * C + C;
+				q += -blocky * C + h * C;
+			}
+		}
 }
 //!
 //! \brief Utility template dispatcher function for flip_block. Templated by buffer data type T.
@@ -677,17 +707,17 @@ inline void flip_block(const T * in, T * out, const int w, const int h)
 //! \param[in] c            image channels
 //!
 template<typename T>
-inline void flip_block(const T * in, T * out, const int w, const int h, const int c)
+inline void flip_block(const T* in, T* out, const int w, const int h, const int c)
 {
-    switch(c)
-    {
-        case 1: flip_block<T,1>(in, out, w, h); break;
-        case 2: flip_block<T,2>(in, out, w, h); break;
-        case 3: flip_block<T,3>(in, out, w, h); break;
-        case 4: flip_block<T,4>(in, out, w, h); break;
-        default: printf("flip_block over %d channels is not supported yet. Add a specific case if possible or fall back to the generic version.\n", c); break;
-        // default: flip_block<T>(in, out, w, h, c); break;
-    }
+	switch (c)
+	{
+	case 1: flip_block<T, 1>(in, out, w, h); break;
+	case 2: flip_block<T, 2>(in, out, w, h); break;
+	case 3: flip_block<T, 3>(in, out, w, h); break;
+	case 4: flip_block<T, 4>(in, out, w, h); break;
+	default: printf("flip_block over %d channels is not supported yet. Add a specific case if possible or fall back to the generic version.\n", c); break;
+		// default: flip_block<T>(in, out, w, h, c); break;
+	}
 }
 
 //!
@@ -704,19 +734,19 @@ inline void flip_block(const T * in, T * out, const int w, const int h, const in
 //!
 inline float sigma_to_box_radius(int boxes[], const float sigma, const int n)
 {
-    // ideal filter width
-    float wi = std::sqrt((12*sigma*sigma/n)+1);
-    int wl = wi; // no need std::floor  
-    if(wl%2==0) wl--;
-    int wu = wl+2;
-                
-    float mi = (12*sigma*sigma - n*wl*wl - 4*n*wl - 3*n)/(-4*wl - 4);
-    int m = mi+0.5f; // avoid std::round by adding 0.5f and cast to integer type
-                
-    for(int i=0; i<n; i++) 
-        boxes[i] = ((i < m ? wl : wu) - 1) / 2;
+	// ideal filter width
+	float wi = std::sqrt((12 * sigma * sigma / n) + 1);
+	int wl = wi; // no need std::floor  
+	if (wl % 2 == 0) wl--;
+	int wu = wl + 2;
 
-    return std::sqrt((m*wl*wl+(n-m)*wu*wu-n)/12.f);
+	float mi = (12 * sigma * sigma - n * wl * wl - 4 * n * wl - 3 * n) / (-4 * wl - 4);
+	int m = mi + 0.5f; // avoid std::round by adding 0.5f and cast to integer type
+
+	for (int i = 0; i < n; i++)
+		boxes[i] = ((i < m ? wl : wu) - 1) / 2;
+
+	return std::sqrt((m * wl * wl + (n - m) * wu * wu - n) / 12.f);
 }
 
 //!
@@ -747,60 +777,60 @@ inline float sigma_to_box_radius(int boxes[], const float sigma, const int n)
 //! \param[in] sigma        Gaussian standard deviation
 //!
 template<typename T, unsigned int N, Border P>
-inline void fast_gaussian_blur(T *& in, T *& out, const int w, const int h, const int c, const float sigma) 
+inline void fast_gaussian_blur(T*& in, T*& out, const int w, const int h, const int c, const float sigma)
 {
-    // compute box kernel sizes
-    int boxes[N];
-    sigma_to_box_radius(boxes, sigma, N);
+	// compute box kernel sizes
+	int boxes[N];
+	sigma_to_box_radius(boxes, sigma, N);
 
-    // perform N horizontal blur passes
-    for(int i = 0; i < N; ++i)
-    {
-        horizontal_blur<T,P>(in, out, w, h, c, boxes[i]);
-        std::swap(in, out);
-    }   
+	// perform N horizontal blur passes
+	for (int i = 0; i < N; ++i)
+	{
+		horizontal_blur<T, P>(in, out, w, h, c, boxes[i]);
+		std::swap(in, out);
+	}
 
-    // flip buffer
-    flip_block(in, out, w, h, c);
-    std::swap(in, out);
-    
-    // perform N horizontal blur passes on flipped image
-    for(int i = 0; i < N; ++i)
-    {
-        horizontal_blur<T,P>(in, out, h, w, c, boxes[i]);
-        std::swap(in, out);
-    }   
-    
-    // flip buffer
-    flip_block(in, out, h, w, c);
+	// flip buffer
+	flip_block(in, out, w, h, c);
+	std::swap(in, out);
+
+	// perform N horizontal blur passes on flipped image
+	for (int i = 0; i < N; ++i)
+	{
+		horizontal_blur<T, P>(in, out, h, w, c, boxes[i]);
+		std::swap(in, out);
+	}
+
+	// flip buffer
+	flip_block(in, out, h, w, c);
 }
 
 // specialized 3 passes
 template<typename T, Border P>
-inline void fast_gaussian_blur(T *& in, T *& out, const int w, const int h, const int c, const float sigma) 
+inline void fast_gaussian_blur(T*& in, T*& out, const int w, const int h, const int c, const float sigma)
 {
-    // compute box kernel sizes
-    int boxes[3];
-    sigma_to_box_radius(boxes, sigma, 3);
+	// compute box kernel sizes
+	int boxes[3];
+	sigma_to_box_radius(boxes, sigma, 3);
 
-    // perform 3 horizontal blur passes
-    horizontal_blur<T,P>(in, out, w, h, c, boxes[0]);
-    horizontal_blur<T,P>(out, in, w, h, c, boxes[1]);
-    horizontal_blur<T,P>(in, out, w, h, c, boxes[2]);
-    
-    // flip buffer
-    flip_block(out, in, w, h, c);
-    
-    // perform 3 horizontal blur passes on flipped image
-    horizontal_blur<T,P>(in, out, h, w, c, boxes[0]);
-    horizontal_blur<T,P>(out, in, h, w, c, boxes[1]);
-    horizontal_blur<T,P>(in, out, h, w, c, boxes[2]);
-    
-    // flip buffer
-    flip_block(out, in, h, w, c);
-    
-    // swap pointers to get result in the ouput buffer 
-    std::swap(in, out);    
+	// perform 3 horizontal blur passes
+	horizontal_blur<T, P>(in, out, w, h, c, boxes[0]);
+	horizontal_blur<T, P>(out, in, w, h, c, boxes[1]);
+	horizontal_blur<T, P>(in, out, w, h, c, boxes[2]);
+
+	// flip buffer
+	flip_block(out, in, w, h, c);
+
+	// perform 3 horizontal blur passes on flipped image
+	horizontal_blur<T, P>(in, out, h, w, c, boxes[0]);
+	horizontal_blur<T, P>(out, in, h, w, c, boxes[1]);
+	horizontal_blur<T, P>(in, out, h, w, c, boxes[2]);
+
+	// flip buffer
+	flip_block(out, in, h, w, c);
+
+	// swap pointers to get result in the ouput buffer 
+	std::swap(in, out);
 }
 
 //!
@@ -817,23 +847,23 @@ inline void fast_gaussian_blur(T *& in, T *& out, const int w, const int h, cons
 //! \param[in] n            number of passes, should be > 0
 //!
 template<typename T, Border P = kMirror>
-void fast_gaussian_blur(T *& in, T *& out, const int w, const int h, const int c, const float sigma, const uint32_t n)
+void fast_gaussian_blur(T*& in, T*& out, const int w, const int h, const int c, const float sigma, const uint32_t n)
 {
-    switch(n)
-    {
-        case 1: fast_gaussian_blur<T,1,P>(in, out, w, h, c, sigma); break;
-        case 2: fast_gaussian_blur<T,2,P>(in, out, w, h, c, sigma); break;
-        case 3: fast_gaussian_blur<T,  P>(in, out, w, h, c, sigma); break; // specialized 3 passes version
-        case 4: fast_gaussian_blur<T,4,P>(in, out, w, h, c, sigma); break;
-        case 5: fast_gaussian_blur<T,5,P>(in, out, w, h, c, sigma); break;
-        case 6: fast_gaussian_blur<T,6,P>(in, out, w, h, c, sigma); break;
-        case 7: fast_gaussian_blur<T,7,P>(in, out, w, h, c, sigma); break;
-        case 8: fast_gaussian_blur<T,8,P>(in, out, w, h, c, sigma); break;
-        case 9: fast_gaussian_blur<T,9,P>(in, out, w, h, c, sigma); break;
-        case 10: fast_gaussian_blur<T,10,P>(in, out, w, h, c, sigma); break;
-        default: printf("fast_gaussian_blur with %d passes is not supported yet. Add a specific case if possible or fall back to the generic version.\n", n); break;
-        // default: fast_gaussian_blur<T,10>(in, out, w, h, c, sigma, n); break;
-    }
+	switch (n)
+	{
+	case 1: fast_gaussian_blur<T, 1, P>(in, out, w, h, c, sigma); break;
+	case 2: fast_gaussian_blur<T, 2, P>(in, out, w, h, c, sigma); break;
+	case 3: fast_gaussian_blur<T, P>(in, out, w, h, c, sigma); break; // specialized 3 passes version
+	case 4: fast_gaussian_blur<T, 4, P>(in, out, w, h, c, sigma); break;
+	case 5: fast_gaussian_blur<T, 5, P>(in, out, w, h, c, sigma); break;
+	case 6: fast_gaussian_blur<T, 6, P>(in, out, w, h, c, sigma); break;
+	case 7: fast_gaussian_blur<T, 7, P>(in, out, w, h, c, sigma); break;
+	case 8: fast_gaussian_blur<T, 8, P>(in, out, w, h, c, sigma); break;
+	case 9: fast_gaussian_blur<T, 9, P>(in, out, w, h, c, sigma); break;
+	case 10: fast_gaussian_blur<T, 10, P>(in, out, w, h, c, sigma); break;
+	default: printf("fast_gaussian_blur with %d passes is not supported yet. Add a specific case if possible or fall back to the generic version.\n", n); break;
+		// default: fast_gaussian_blur<T,10>(in, out, w, h, c, sigma, n); break;
+	}
 }
 
 //!
@@ -852,20 +882,20 @@ void fast_gaussian_blur(T *& in, T *& out, const int w, const int h, const int c
 //!
 template<typename T>
 void fast_gaussian_blur(
-    T *& in,
-    T *& out,
-    const int w,
-    const int h,
-    const int c,
-    const float sigma,
-    const uint32_t n = 3,
-    const Border p = kExtend)
+	T*& in,
+	T*& out,
+	const int w,
+	const int h,
+	const int c,
+	const float sigma,
+	const uint32_t n = 3,
+	const Border p = kExtend)
 {
-    switch(p)
-    {
-        case kExtend:       fast_gaussian_blur<T, kExtend>       (in, out, w, h, c, sigma, n); break;
-        case kMirror:       fast_gaussian_blur<T, kMirror>       (in, out, w, h, c, sigma, n); break;
-        case kKernelCrop:   fast_gaussian_blur<T, kKernelCrop>   (in, out, w, h, c, sigma, n); break;
-        case kWrap:         fast_gaussian_blur<T, kWrap>         (in, out, w, h, c, sigma, n); break;
-    }
+	switch (p)
+	{
+		case kExtend:       fast_gaussian_blur<T, kExtend>(in, out, w, h, c, sigma, n); break;
+		case kMirror:       fast_gaussian_blur<T, kMirror>(in, out, w, h, c, sigma, n); break;
+		case kKernelCrop:   fast_gaussian_blur<T, kKernelCrop>(in, out, w, h, c, sigma, n); break;
+		case kWrap:         fast_gaussian_blur<T, kWrap>(in, out, w, h, c, sigma, n); break;
+	}
 }

@@ -123,6 +123,9 @@ public:
 	int			append(LPCTSTR lpszFormat, ...);
 	*/
 
+	//한줄의 내용을 추가할 경우 (printf()와 같이 사용 가능)
+	int			add(LPCTSTR text, ...);
+
 	//여러줄의 문자열을 한번에 추가(shell_listbox에 사용)
 	int			add(std::deque<CString>* lists, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 

@@ -203,6 +203,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if ((int)lpDIS->itemID < GetTopIndex())
 		return; 
 
+	//bBg = false로 하면 최신 항목만 표시되고 다른 항목은 표시되지 않는 현상이 발생한다.
 	CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생하여 사용하지 않았으나 현재는 재현안됨.
 	pDC = &dc;
 	Gdiplus::Graphics g(pDC->GetSafeHdc());
@@ -217,10 +218,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CRect		rect = lpDIS->rcItem;
 
 	GetClientRect(rc);
+
+	//현재 아이템의 top이 rc.bottom보다 아래라면 그릴필요없다.
 	if (rect.top > rc.bottom)
 		return;
-	//rect.DeflateRect(1, 1);
-	//rect.right -= 4;
+
 	CRect		rGutter = rect;
 
 	if (m_nGutterCharNumber > 0)
@@ -367,12 +369,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	//시간값은 항상 옅은 회색으로만 표시
 	int date_time_length = 0;
+
+	if (m_show_time)
+		date_time_length = 12;
 	if (m_show_date)
 		date_time_length += 10;
-	if (m_show_time)
-		date_time_length += 12;
-	if (m_show_date && m_show_time)
-		date_time_length++;
 
 	if (date_time_length > 0)
 	{
@@ -530,6 +531,18 @@ int CSCListBox::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 }
 */
 
+int CSCListBox::add(LPCTSTR text, ...)
+{
+	va_list args;
+	va_start(args, text);
+
+	CString new_text;
+
+	new_text.FormatV(text, args);
+
+	return insert_string(-1, new_text);
+}
+
 int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 {
 	if (cr.GetValue() == Gdiplus::Color::Transparent)
@@ -543,7 +556,7 @@ int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 
 //-------------------------------------------------------------------
 //
-int CSCListBox::insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb)
+int CSCListBox::insert_string(int nIndex, CString text, Gdiplus::Color rgb)
 //
 // Return Value:	The zero-based index of the position at which the 
 //						string was inserted. The return value is LB_ERR if 
@@ -560,13 +573,33 @@ int CSCListBox::insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb)
 // Remarks		:	Inserts a colored string into the list box.
 //
 {
-	int index = ((CListBox*)this)->InsertString(nIndex,lpszItem);
+	CString date_str, time_str;
+
+	if (m_show_date || m_show_time)
+	{
+		SYSTEMTIME	t;
+
+		::GetLocalTime(&t);
+
+		date_str.Format(_T("%d-%02d-%02d"), t.wYear, t.wMonth, t.wDay);
+		time_str.Format(_T("%02d:%02d:%02d.%03d"), t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+
+		if (m_show_time)
+			text = time_str + _T(" ") + text;
+		if (m_show_date)
+			text = date_str + _T(" ") + text;
+	}
+
+	int index = ((CListBox*)this)->InsertString(nIndex, text);
 	if (index >= 0)
 	{
 		if (rgb.GetValue() == Gdiplus::Color::Transparent)
 			rgb = m_theme.cr_text;
 		SetItemData(index, rgb.ToCOLORREF());
 		RedrawWindow();
+
+		if (m_auto_scroll)
+			SetTopIndex(index);
 	}
 
 	return index;
@@ -1009,12 +1042,11 @@ void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.AppendMenu(MF_STRING, menu_show_log, _T("Show log"));
 	menu.CheckMenuItem(menu_show_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
 
-	menu.AppendMenu(MF_STRING, menu_show_date, _T("Show date"));
-	menu.CheckMenuItem(menu_show_date, m_show_date ? MF_CHECKED : MF_UNCHECKED);
-
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_show_time, _T("Show time"));
 	menu.CheckMenuItem(menu_show_time, m_show_time ? MF_CHECKED : MF_UNCHECKED);
+	menu.AppendMenu(MF_STRING, menu_show_date, _T("Show date"));
+	menu.CheckMenuItem(menu_show_date, m_show_date ? MF_CHECKED : MF_UNCHECKED);
 
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_auto_scroll, _T("Auto scroll\tCtrl+End"));

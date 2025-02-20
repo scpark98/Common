@@ -18,6 +18,14 @@
 
 #include "../../GdiplusBitmap.h"
 
+/*
+[주의]
+이벤트 메시지 처리 방식 주의!
+일반적인 CSliderCtrl은 parent에서 WM_HSCROLL 이벤트로 처리하지만
+이 CSCSliderCtrl에서는 grab, release 등의 세밀한 이벤트 처리가 필요하므로 WM_HSCROLL을 써서는 안된다.
+반드시 아래 메시지를 수신받아 처리할 것!
+*/
+
 static const UINT Message_CSCSliderCtrl = ::RegisterWindowMessage(_T("MessageString_CSCSliderCtrl"));
 
 //트랙 이벤트가 발생했을 때 바로 PostMessage를 호출하게 되면
@@ -174,7 +182,7 @@ public:
 	void	set_style(int nStyle);
 	void	set_track_height(int height) { m_track_height = height; }
 
-	void	enable_slide(bool enable = true) { m_enable_slide = enable; }
+	void	set_use_slide(bool enable = true) { m_use_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
 
@@ -215,8 +223,8 @@ public:
 	void			set_tooltip_format(int format = tooltip_value) { m_tooltip_format = format; }
 
 //구간 반복 관련(slider_track style일 경우)
-	int				m_repeat_start;
-	int				m_repeat_end;
+	int				m_repeat_start = -1;
+	int				m_repeat_end = -1;
 	//둘 다 -1이면 반복 해제.
 	//하나만 -1이면 시작 또는 끝은 미디어의 시작 또는 끝으로
 	void			set_repeat_range(int start, int end);
@@ -245,15 +253,15 @@ protected:
 	// Attributes
 
 	//slider_thumb,	slider_value, slider_progress, slider_track,
-	int				m_style = style_thumb;
+	int				m_style = style_normal;
 
 	int				m_nEventMsgStyle;
 
 	CRect			m_rc;
 
 	CToolTipCtrl	m_tooltip;
-	bool			m_use_tooltip;	//default = false
-	int				m_tooltip_format;	//default = tooltip_value
+	bool			m_use_tooltip = false;	//default = false
+	int				m_tooltip_format = tooltip_value;	//default = tooltip_value
 
 
 	//실제 전체 구간 게이지 영역
@@ -262,23 +270,23 @@ protected:
 	//잡고 움직이는 영역
 	CSize			m_thumb;
 	//4방향의 여백
-	CRect			m_margin;
+	CRect			m_margin = CRect(0, 0, 0, 0);
 	int				m_nMouseOffset;
 
 	//현재는 세로모드에 대한 코드가 거의 구현되어 있지 않다.
 	bool			m_is_vertical = false;
 
 	//enable move the current pos by click or drag even though progress style. default = true
-	bool			m_enable_slide;
+	bool			m_use_slide = true;
 
 
 	//특정 위치들을 기억해두자. 북마크처럼.
-	bool			m_use_bookmark;	//default = false;
+	bool			m_use_bookmark = false;	//default = false;
 	std::deque<CSCSliderCtrlBookmark> m_bookmark;
 	//pos의 위치에 있는 북마크의 인덱스를 리턴한다.
 	int				find_index_bookmark(int pos);
 	//mouse move, sliding할 때 북마크 근처에 가면 이 값이 세팅된다. 근처가 아니면 -1.
-	int				m_cur_bookmark;
+	int				m_cur_bookmark = -1;
 	//마우스 위치에서 가장 가까운 북마크를 찾는데 그 허용 오차를 미리 구해놓는다.
 	int				m_bookmark_near_tolerance;
 	//현재 위치에서 가장 가까운 이전/다음 북마크 위치를 찾는다.
@@ -306,10 +314,10 @@ protected:
 	COLORREF		m_cr_text = RGB(192, 192, 192);
 
 	bool			m_transparent = false;
-	COLORREF		m_cr_back;			// back color of control
-	COLORREF		m_cr_active;		//processed area
-	COLORREF		m_cr_inactive;		//not processed area
-	int				m_track_height;		//rc.CenterPoint().y +- m_track_height / 2. ex) 6 and 7 is equal height
+	COLORREF		m_cr_back;				// back color of control
+	COLORREF		m_cr_active;			//processed area
+	COLORREF		m_cr_inactive;			//not processed area
+	int				m_track_height = 14;	//rc.CenterPoint().y +- m_track_height / 2. ex) 6 and 7 is equal height
 	CPen			m_penThumb;
 	CPen			m_penThumbLight;
 	CPen			m_penThumbLighter;
@@ -321,12 +329,13 @@ protected:
 	COLORREF		m_cr_thumbDark;
 	COLORREF		m_cr_thumbDarker;
 	COLORREF		m_crBookmark;
-	COLORREF		m_crBookmarkCurrent;
+	COLORREF		m_crBookmarkCurrent = RGB(0, 255, 0);
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
 	COLORREF		enable_color(COLORREF cr, int offset = 0);
+	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 0);
 
 	CWnd*			m_pParentWnd;
-	void			(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos);
+	void			(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos) = NULL;
 
 	int				Pixel2Pos(int pixel);
 	int				Pos2Pixel(int pos);

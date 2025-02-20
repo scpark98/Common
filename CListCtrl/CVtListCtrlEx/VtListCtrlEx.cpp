@@ -512,7 +512,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 //정확히 한번만 호출하여 사용하는 것이 정석이므로 우선 별도의 처리는 하지 않음.
 bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 {
-	TRACE(_T("list = %p\n"), this);
+	//TRACE(_T("list = %p\n"), this);
 
 	int iStart = 0;
 	int	column = 0;
@@ -2038,7 +2038,7 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 	SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 
 	//ensureVisible이면 Invalidate()을 생략해도 된다.
-	TRACE(_T("m_auto_scroll = %d, ensureVisible = %d\n"), m_auto_scroll, ensureVisible);
+	//TRACE(_T("m_auto_scroll = %d, ensureVisible = %d\n"), m_auto_scroll, ensureVisible);
 	if (m_auto_scroll && ensureVisible)
 	{
 		ensure_visible(index, visible_last);
@@ -4560,7 +4560,7 @@ void CVtListCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 
 	get_index_from_point(point, item, subItem, false);
 
-	TRACE(_T("%d, %d, uFlags = %d\n"), item, subItem, uFlags);
+	//TRACE(_T("%d, %d, uFlags = %d\n"), item, subItem, uFlags);
 
 	if (item >= 0 && subItem < 0)
 		return;

@@ -19,25 +19,9 @@ static char THIS_FILE[] = __FILE__;
 
 CSCSliderCtrl::CSCSliderCtrl()
 {
-	m_pCallback_func = NULL;
-
-	m_style = style_thumb;
 	set_style(m_style);
 
 	m_nEventMsgStyle = AfxGetApp()->GetProfileInt(_T("setting"), _T("event msg style"), msg_style_timer);
-
-	m_enable_slide	= true;
-	m_use_bookmark = false;
-	m_cur_bookmark = -1;
-
-	m_use_tooltip = false;
-	m_tooltip_format = tooltip_value;
-
-	m_margin = CRect(0, 0, 0, 0);
-
-	m_track_height = 14;
-
-	m_draw_focus_rect = false;
 
 	m_cr_back	= ::GetSysColor(COLOR_3DFACE);
 	m_cr_active	= RGB(64, 80, 181);//RGB(128, 192, 255);
@@ -47,10 +31,6 @@ CSCSliderCtrl::CSCSliderCtrl()
 	//북마크 컬러는 처음에만 배경의 보색으로 설정되지만
 	//차후 배경이 바뀌더라도 북마크의 색상까지 자동으로 보색으로 바꾸는 것은 좋지 않다.
 	m_crBookmark = color_complementary(m_cr_back);
-	m_crBookmarkCurrent = green;
-
-	m_repeat_start = -1;
-	m_repeat_end = -1;
 
 	set_thumb_color(m_cr_thumb);
 
@@ -107,6 +87,12 @@ void CSCSliderCtrl::OnPaint()
 	CBrush*		pOldBrush = NULL;
 	CString		str, str_dual;
 
+	COLORREF	cr_back = enable_color(m_cr_back);
+	COLORREF	cr_active = enable_color(m_cr_active);
+	COLORREF	cr_inactive = enable_color(m_cr_inactive);
+	COLORREF	cr_text = enable_color(m_cr_text);
+	COLORREF	cr_thumb = enable_color(m_cr_thumb);
+
 	// TODO: Add your message handler code here
 	GetClientRect(m_rc);
 	CMemoryDC	dc(&dc1, &m_rc);
@@ -158,21 +144,21 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else
 	{
-		dc.FillSolidRect(m_rc, enable_color(m_cr_back));
+		dc.FillSolidRect(m_rc, cr_back);
 	}
 
 
 	//inactive 영역을 먼저 그리고
 	if (m_style == style_thumb_round)
 	{
-		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
+		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, cr_inactive);
 	}
 	else if (m_style == style_thumb || m_style == style_value)
 	{
-		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, enable_color(m_cr_inactive));
+		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, cr_inactive);
 			
-		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), -24));
-		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_inactive), 36));
+		CPen	penDark(PS_SOLID, 1, get_color(cr_inactive, -24));
+		CPen	penLight(PS_SOLID, 1, get_color(cr_inactive, 36));
 
 		dc.SelectObject(&penDark);
 		dc.MoveTo(pxpos, cy - m_track_height / 2);
@@ -191,7 +177,7 @@ void CSCSliderCtrl::OnPaint()
 	else if (m_style == style_progress)
 	{
 		track = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2);
-		dc.FillSolidRect(track, enable_color(m_cr_inactive));
+		dc.FillSolidRect(track, cr_inactive);
 	}
 	else if (m_style == style_progress_line)
 	{
@@ -316,10 +302,10 @@ void CSCSliderCtrl::OnPaint()
 #if 1
 	if (m_style <= style_value)
 	{
-		dc.FillSolidRect(track.left, cy - m_track_height / 2, pxpos - track.left, m_track_height, enable_color(m_cr_active));
+		dc.FillSolidRect(track.left, cy - m_track_height / 2, pxpos - track.left, m_track_height, cr_active);
 			
-		CPen	penDark(PS_SOLID, 1, get_color(enable_color(m_cr_active), -64));
-		CPen	penLight(PS_SOLID, 1, get_color(enable_color(m_cr_active), 64));
+		CPen	penDark(PS_SOLID, 1, get_color(cr_active, -64));
+		CPen	penLight(PS_SOLID, 1, get_color(cr_active, 64));
 
 		dc.SelectObject(&penDark);
 		dc.MoveTo(pxpos, cy - m_track_height / 2);
@@ -337,13 +323,13 @@ void CSCSliderCtrl::OnPaint()
 	else if (m_style == style_progress)
 	{
 		track = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2);
-		dc.FillSolidRect(track, enable_color(m_cr_active));
+		dc.FillSolidRect(track, cr_active);
 
 		//m_crValueText = RGB(12, 162, 255);
 		//m_cr_active = RGB(128,255,128);
 		if (m_text_style > text_style_none)
 		{
-			dc.SetTextColor(enable_color(m_cr_text));
+			dc.SetTextColor(cr_text);
 			dc.SetBkMode(TRANSPARENT);
 
 			if (m_text_style == text_style_value)
@@ -371,7 +357,7 @@ void CSCSliderCtrl::OnPaint()
 		CRgn rgn;
 		rgn.CreateRectRgnIndirect(rcLeft);
 		dc.SelectClipRgn(&rgn);
-		dc.SetTextColor(m_cr_text);
+		dc.SetTextColor(cr_text);
 
 		if ((m_text_style == text_style_dual_text))
 		{
@@ -386,7 +372,7 @@ void CSCSliderCtrl::OnPaint()
 
 		rgn.SetRectRgn(rcRight);
 		dc.SelectClipRgn(&rgn);
-		dc.SetTextColor(m_cr_active); //m_crText);
+		dc.SetTextColor(cr_active); //m_crText);
 		if ((m_text_style == text_style_dual_text))
 		{
 			dc.DrawText(_T("  ") + str, m_rc, DT_VCENTER | DT_LEFT | DT_SINGLELINE);
@@ -431,7 +417,7 @@ void CSCSliderCtrl::OnPaint()
 
 		//CRect	rActive(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
 		if (r.right > r.left)
-			dc.FillSolidRect(r, enable_color(m_cr_active));
+			dc.FillSolidRect(r, cr_active);
 	}
 #endif
 	
@@ -447,12 +433,12 @@ void CSCSliderCtrl::OnPaint()
 		rThumb.right = rThumb.left + m_thumb.cx;
 		rThumb.bottom = rThumb.top + m_thumb.cy;
 
-		if (!IsWindowEnabled())
+		if (false)//!IsWindowEnabled())
 		{
 		}
 		else if (m_style == style_thumb)
 		{
-			CBrush br(enable_color(m_cr_thumb));
+			CBrush br(cr_thumb);
 
 			int		n = 4;										//라인 개수
 			double	dx = (double)m_thumb.cx * 0.84 / double(n + 1);	//라인 간격
@@ -482,11 +468,11 @@ void CSCSliderCtrl::OnPaint()
 		{
 			//dc.FillSolidRect(rThumb, m_cr_thumb);
 			Gdiplus::Color cr_pen(255, GetRValue(255), GetGValue(0), GetBValue(0));
-			Gdiplus::Pen pen(cr_pen, 1.0f);
+			Gdiplus::Pen pen(enable_color(cr_pen), 1.0f);
 			Gdiplus::Color cr_brush_outer(128, GetRValue(m_cr_thumb), GetGValue(m_cr_thumb), GetBValue(m_cr_thumb));
-			Gdiplus::SolidBrush brush_outer(cr_brush_outer);
+			Gdiplus::SolidBrush brush_outer(enable_color(cr_brush_outer));
 			Gdiplus::Color cr_brush_inner(255, GetRValue(m_cr_thumb-64), GetGValue(m_cr_thumb-64), GetBValue(m_cr_thumb-64));
-			Gdiplus::SolidBrush brush_inner(cr_brush_inner);
+			Gdiplus::SolidBrush brush_inner(enable_color(cr_brush_inner));
 
 			CRect r = rThumb;
 			r.DeflateRect(4, 4);
@@ -497,7 +483,7 @@ void CSCSliderCtrl::OnPaint()
 		}
 		else if (m_style == style_value)
 		{
-			CBrush br(enable_color(m_cr_thumb));
+			CBrush br(cr_thumb);
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
 			pOldPen = (CPen*)dc.SelectObject(&m_penThumbDarker);//NULL_PEN);
 
@@ -506,7 +492,7 @@ void CSCSliderCtrl::OnPaint()
 
 			if (m_text_style > text_style_none)
 			{
-				dc.SetTextColor(enable_color(m_cr_text));
+				dc.SetTextColor(cr_text);
 				dc.SetBkMode(TRANSPARENT);
 
 				if (m_text_style == text_style_value)
@@ -703,7 +689,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 
-	if (m_enable_slide == false)
+	if (m_use_slide == false)
 		return;
 
 	/*
@@ -799,7 +785,7 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		return;
 	}
 
-	if (m_enable_slide == false)
+	if (m_use_slide == false)
 		return;
 
 	if(!IsWindowEnabled() || !m_lbuttondown)
@@ -1134,7 +1120,7 @@ void CSCSliderCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	// TODO: Add your message handler code here and/or call default
 	TRACE(_T("CSCSliderCtrl::OnKeyDown = %d\n"), nChar);
-	if (m_enable_slide == false)
+	if (m_use_slide == false)
 		return;
 
 	switch (nChar)
@@ -1205,11 +1191,11 @@ void CSCSliderCtrl::set_style(int nStyle)
 	}
 	else if (m_style == style_progress)
 	{
-		m_enable_slide = false;
+		m_use_slide = false;
 	}
 	else if (m_style == style_step)
 	{
-		m_enable_slide = false;
+		m_use_slide = false;
 	}
 }
 
@@ -1407,6 +1393,13 @@ void CSCSliderCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 }
 
 COLORREF CSCSliderCtrl::enable_color(COLORREF cr, int offset)
+{
+	if (IsWindowEnabled())
+		return cr;
+	return get_color(gray_color(cr), offset);
+}
+
+Gdiplus::Color CSCSliderCtrl::enable_color(Gdiplus::Color cr, int offset)
 {
 	if (IsWindowEnabled())
 		return cr;

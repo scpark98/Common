@@ -667,15 +667,35 @@ void CSCThemeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	//RedrawWindow();
 }
 
-
+//For top - level windows, this value is based on(...) the primary monitor.
 void CSCThemeDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	CSize sz;
 	bool is_shown_taskbar = get_taskbar_size(&sz);
 
+	CPoint pt;
+	GetCursorPos(&pt);
+	int index = get_monitor_index(pt.x, pt.y);
+	TRACE(_T("index = %d, r = %s\n"), index, get_rect_info_string(g_monitors[index].rMonitor));
 	lpMMI->ptMaxPosition.y = 0;
+
+	TRACE(_T("before ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
+
+	//GetMonitorInfo()
+	//lpMMI값은 항상 기본 모니터를 기준으로 넘어오므로
+	//다른 모니터에서 SW_MAXIMIZE할 때 크기가 기본 모니터를 기준으로 동작하여 넘치거나 잘리는 현상이 있었다.
+	//따라서 현재 모니터 인덱스를 구하고 그 영역 정보로 lpMMI를 다시 채워줘야 한다.
+	//단, ptMaxSize와 실제 모니터의 크기가 차이가 발생했는데 scpark 모니터에서 테스트 한 경우 그 차이값이 14가 발생했고
+	//g_monitors의 0번이 기본 모니터이므로 그 차이값 만큼 보정해줘야 한다.
+	CSize sz_diff = CSize(lpMMI->ptMaxSize.x - g_monitors[0].rMonitor.Width(), lpMMI->ptMaxSize.y - g_monitors[0].rMonitor.Height());
+
+	lpMMI->ptMaxSize.x = g_monitors[index].rMonitor.Width() +sz_diff.cx;
+	lpMMI->ptMaxSize.y = g_monitors[index].rMonitor.Height() +sz_diff.cy;
+	//lpMMI->ptMaxSize.y -= (sz_diff.cy + 1 + (is_shown_taskbar ? sz.cy : 0));
 	lpMMI->ptMaxSize.y -= (2 + (is_shown_taskbar ? sz.cy : 0));
+
+	TRACE(_T("after  ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
 
 	CDialogEx::OnGetMinMaxInfo(lpMMI);
 }

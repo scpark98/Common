@@ -449,7 +449,7 @@ void CSCMenu::popup_menu(int x, int y)
 	}
 
 	rw.MoveToXY(x, y);
-	rMonitor = g_dqMonitors[idx];
+	rMonitor = g_monitors[idx].rMonitor;
 
 	//모니터 영역을 벗어나는 경우 모니터의 right or bottom에서 10정도는 떨어뜨린다.
 	rMonitor.DeflateRect(10, 10);

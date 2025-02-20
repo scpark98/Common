@@ -218,8 +218,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	if (btn->img[0].is_empty())
 		return false;
 
-	m_width = btn->img[0].width;
-	m_height = btn->img[0].height;
+	m_img_origin = CSize(btn->img[0].width, btn->img[0].height);
 
 	if (over > 0)
 	{
@@ -255,8 +254,6 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 
 	m_image.push_back(btn);
 
-	//fit_to_image(m_fit2image);
-
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
 	//만약 배경색 지정이 필요하다면 add_image()후에 set_back_color()로 세팅한다.
 	m_cr_back.clear();
@@ -280,8 +277,8 @@ bool CGdiButton::add_image(CGdiplusBitmap *img)
 	if (btn->img[0].is_empty())
 		return false;
 
-	m_width = btn->img[0].width;
-	m_height = btn->img[0].height;
+	//m_width = btn->img[0].width;
+	//m_height = btn->img[0].height;
 
 	btn->img[0].deep_copy(&btn->img[1]);
 	btn->img[1].set_matrix(&m_hoverMatrix);
@@ -331,29 +328,20 @@ void CGdiButton::fit_to_image(bool fit)
 
 	m_fit2image = fit;
 
-
 	if (m_fit2image)
 	{
-		m_width = m_image[0]->img[0].width;
-		m_height = m_image[0]->img[0].height;
+		SetWindowPos(NULL, 0, 0, m_img_origin.cx, m_img_origin.cy, SWP_NOMOVE | SWP_NOZORDER);
 	}
 	else
 	{
-		CRect rc;
-		GetClientRect(rc);
-		//m_width = m_rOrigin.Width();
-		//m_height = m_rOrigin.Height();
-		m_width = rc.Width();
-		m_height = rc.Height();
-
 		for (auto img : m_image)
 		{
 			for (int i = 0; i < 4; i++)
-				img->img[i].resize(m_width, m_height);
+				img->img[i].resize(m_rOrigin.Width(), m_rOrigin.Height());
 		}
 	}
 
-	resize_control(m_width, m_height);
+//	resize_control(rc.Width(), rc.Height());
 
 	redraw_window();
 }
@@ -591,7 +579,7 @@ void CGdiButton::resize_control(int cx, int cy)
 	*/
 	//w, h에 +1을 해 준 이유는 버튼의 크기가 fit하면 눌렸을 때 (x+1), (y+1)에 그려지므로
 	//오른쪽과 하단의 1픽셀씩 안보이게 된다. 따라서 버튼의 크기는 실제 이미지의 w, h보다 1이 더 커야 한다.
-	SetWindowPos(NULL, 0, 0, m_width, m_height, SWP_NOMOVE | SWP_NOZORDER);
+	SetWindowPos(NULL, 0, 0, rc.Width(), rc.Height(), SWP_NOMOVE | SWP_NOZORDER);
 }
 
 //이미지를 사용하지 않고 직접 그려주는 버튼의 경우 width를 정확히 구해야하는 경우가 있다.
@@ -811,9 +799,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	rText = rc;
 
-	CMemoryDC		dc(pDC1, &rc);
-	Graphics		g(dc.m_hDC, rc);
-	GraphicsPath	roundPath;
+	CMemoryDC				dc(pDC1, &rc);
+	Gdiplus::Graphics		g(dc.m_hDC, rc);
+	Gdiplus::GraphicsPath	roundPath;
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -891,30 +879,39 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			SolidBrush brush(cr_back);
+			Gdiplus::SolidBrush brush(cr_back);
 			g.FillPath(&brush, &roundPath);
 		}
 	}
 
+	//배경 이미지가 지정되어 있다면 배경 이미지를 그리고
+	if (!m_transparent)
+	{
+		if (m_back_img.is_valid())
+			g.DrawImage(m_back_img, 0, 0);
+		else if (m_cr_back.size())
+			dc.FillSolidRect(rc, cr_back.ToCOLORREF());
+	}
 
 	//이미지가 있다면 이미지를 먼저 그려주고
 	if (m_image.size() > 0 && m_image[idx]->img[0] != NULL)
 	{
-		RectF			grect;
-		ImageAttributes ia;
+		Gdiplus::RectF				grect;
+		Gdiplus::ImageAttributes	ia;
 
 		//원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
-		//g.SetInterpolationMode(InterpolationModeNearestNeighbor);
+		//g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
 
 		//부드럽게 resize되지만 약간 뿌옇게 변함
-		g.SetInterpolationMode(InterpolationModeHighQualityBilinear);
+		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBilinear);
 
 		//중간 느낌
-		//g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+		//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
 		//이미지를 그리기 전에 shadow를 먼저 그려준다.
 		if (m_draw_shadow)
 		{
+			m_down_offset = CPoint(1, 1);
 			CGdiplusBitmap img_shadow;
 			m_image[idx]->img[0].deep_copy(&img_shadow);
 #ifdef _DEBUG
@@ -922,7 +919,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 #endif
 			//img_shadow.resize(rc.Width(), rc.Height());
 			//img_shadow.blur(20, TRUE);
-			img_shadow.fast_blur(3.0f, 10);
+			img_shadow.blur(m_blur_sigma);
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\1.blur.png"));
 #endif
@@ -932,8 +929,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			img_shadow.save(_T("d:\\2.gray.png"));
 #endif
 			CRect rc_shadow = rc;
-			//rc_shadow.OffsetRect(4, 4);
-			img_shadow.draw(g, rc_shadow, CGdiplusBitmap::draw_mode_origin);
+			rc_shadow.OffsetRect(2, 2);
+			img_shadow.draw(g, rc_shadow, CGdiplusBitmap::draw_mode_zoom);
+		}
+		else
+		{
+			//m_down_offset = CPoint(1, 3);
 		}
 
 		if (m_bAsStatic)
@@ -966,17 +967,14 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (pImage == NULL)
 			pImage = &m_image[idx]->img[0];
 
-		//배경을 그리고
-		if (m_back_img.is_valid())
-			g.DrawImage(m_back_img, 0, 0);
-		else if (m_cr_back.size())
-			dc.FillSolidRect(rc, cr_back.ToCOLORREF());
-
 		//down 옵셋만 변경해서 그릴 경우
 		//g.DrawImage(*pImage, pt.x, pt.y, m_width, m_height);
 
-		//down 작은 크기로 그릴 경우
-		g.DrawImage(*pImage, pt.x, pt.y, m_width - pt.x * 2, m_height - pt.y * 2);
+		//down 작은 크기로 shrink시키면서 그릴 경우
+		//g.DrawImage(*pImage, pt.x, pt.y, rc.Width() - pt.x * 2, rc.Height() - pt.y * 2);
+
+		//down 시 offset만 변경해서 그릴 경우(입체적으로 눌리는 느낌이 표현됨)
+		g.DrawImage(*pImage, pt.x, pt.y, rc.Width(), rc.Height());
 
 		//down 효과없이 그릴 경우
 		//pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
@@ -996,7 +994,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.bottom = r.top + size * 2 + 1;
 			draw_rectangle(&dc, r, cr_text, Gdiplus::Color::White);
 
-			Pen pen(Color(255, 32, 32, 32), 1.51);
+			Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
 
 			int check_state = GetCheck();
 
@@ -1037,8 +1035,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				r.top = r.CenterPoint().y - size - 0;
 				r.bottom = r.top + size * 2 + 0;
 
-				Pen pen(cr_text, 1.0);
-				SolidBrush br(cr_text);
+				Gdiplus::Pen pen(cr_text, 1.0);
+				Gdiplus::SolidBrush br(cr_text);
 				g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
 
 				if (GetCheck())
@@ -1081,8 +1079,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		//TRACE(_T("draw focus rect\n"));
 		//pDC->DrawFocusRect(rc);
-		Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
-		pen.SetDashStyle(DashStyleDot);
+		Gdiplus::Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
+		pen.SetDashStyle(Gdiplus::DashStyleDot);
 		g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 	}
 	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
@@ -1134,7 +1132,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 #endif
 	dwText |= (DT_SINGLELINE | DT_VCENTER);
 
-	g.SetSmoothingMode(SmoothingModeAntiAlias);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	CFont *pOldFont = dc.SelectObject(&m_font);
 
 	dc.SetBkMode(TRANSPARENT);
@@ -1292,18 +1290,19 @@ void CGdiButton::ReAlign()
 			dy = m_nAnchorMarginY;
 
 		if (m_nAnchor & ANCHOR_RIGHT)
-			dx = rParentRect.right - m_width - m_nAnchorMarginX;
+			//dx = rParentRect.right - m_width - m_nAnchorMarginX;
+			dx = rParentRect.right - width() - m_nAnchorMarginX;
 
 		if (m_nAnchor & ANCHOR_BOTTOM)
-			dy = rParentRect.bottom - m_height - m_nAnchorMarginY;
+			dy = rParentRect.bottom - height() - m_nAnchorMarginY;
 
 		if (m_nAnchor & ANCHOR_HCENTER)
-			dx = rParentRect.CenterPoint().x - m_width / 2;
+			dx = rParentRect.CenterPoint().x - width() / 2;
 
 		if (m_nAnchor & ANCHOR_VCENTER)
-			dy = rParentRect.CenterPoint().y - m_height / 2;
+			dy = rParentRect.CenterPoint().y - height() / 2;
 	
-		SetWindowPos(NULL, dx, dy, m_width, m_height, SWP_NOZORDER | SWP_NOSIZE);
+		SetWindowPos(NULL, dx, dy, width(), height(), SWP_NOZORDER | SWP_NOSIZE);
 		//set_back_imagem_pBackOrigin);
 	}
 }
@@ -1614,12 +1613,23 @@ void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr)
 }
 
 //투명 버튼의 경우 그림자를 표시한다.
-//weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
-//이미지 원본에 따라 shadow의 밝기가 다르므로 이 값으로 적절하게 조정한다.
-void CGdiButton::draw_shadow(bool draw, float weight)
+//shadow_weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
+//blur_sigma가 크면 클수록 그림자의 blur가 강해짐
+//만약 draw_shadow()를 단 한번만 호출하는 경우라면 문제없으나
+//옵션값에 따라 shadow정도를 보기위함 등 여러번 호출할 경우
+//
+void CGdiButton::draw_shadow(bool draw, float shadow_weight, float blur_sigma)
 {
 	m_draw_shadow = draw;
-	m_shadow_weight = weight;
+
+	if (shadow_weight >= 0.0f)
+		m_shadow_weight = shadow_weight;
+
+	if (blur_sigma >= 0.0f)
+		m_blur_sigma = blur_sigma;
+
+	//Invalidate();
+	RedrawWindow();
 }
 
 void CGdiButton::OnWindowPosChanged(WINDOWPOS* lpwndpos)
@@ -1636,15 +1646,15 @@ void CGdiButton::OnSize(UINT nType, int cx, int cy)
 	CButton::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (m_fit2image)
-	{
-	}
-	else
-	{
-		m_width = cx;
-		m_height = cy;
-		resize_control(cx, cy);
-	}
+	//if (m_fit2image)
+	//{
+	//}
+	//else
+	//{
+	//	m_width = cx;
+	//	m_height = cy;
+	//	resize_control(cx, cy);
+	//}
 }
 
 int	CGdiButton::width()
@@ -1653,11 +1663,10 @@ int	CGdiButton::width()
 	{
 		CRect rc;
 		GetClientRect(rc);
-		m_width = rc.Width();
-		m_height = rc.Height();
+		return rc.Width();
 	}
 
-	return m_width;
+	return m_image[0]->img->width;
 }
 
 int	CGdiButton::height()
@@ -1666,11 +1675,10 @@ int	CGdiButton::height()
 	{
 		CRect rc;
 		GetClientRect(rc);
-		m_width = rc.Width();
-		m_height = rc.Height();
+		return rc.Height();
 	}
 
-	return m_height;
+	return m_image[0]->img->height;
 }
 
 void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus::Color newColor)

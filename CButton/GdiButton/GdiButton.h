@@ -8,13 +8,25 @@
 #include "../../colors.h"
 #include "../../GdiplusBitmap.h"
 
-using namespace Gdiplus;
+//using namespace Gdiplus;
 
 /*
 - gdi+를 이용한 버튼 클래스
 - 투명 png 이미지를 사용할 경우 이미지 모양으로 버튼이 표시됨.
 - 사용 방법에 따라 일반 push button, toggle button(as a checkbox) 등으로 사용할 수 있음.
 - 2024.08.23 COLORREF -> Gdiplus::Color 로 변경
+
+[개선 방향 정리]
+- 지원되는 버튼 종류 m_button_shape
+	- PushButton, CheckBox, RadioButton + PushLike
+	- 이미지가 있을 경우
+		.이미지만 있는 경우
+		.이미지 + 텍스트
+	- 이미지가 없을 경우
+		.기본 MFC 버튼과 동일하게 표시
+- 이미지 설정
+	-
+
 
 [기본값 설정 기준]
 - png를 주로 사용하기 위한 클래스를 목적으로 제작되었지만
@@ -27,6 +39,14 @@ using namespace Gdiplus;
   단, 투명 png라도 배경색을 투명색이 아닌 다른 색으로도 설정할 수 있으므로
   back_color()를 이용해 배경색을 칠할 경우에는 m_transparent는 false로 변경된다.
   따라서 배경색을 별도로 지정할 경우에는 반드시 add_image() 설정후에 해야 한다.
+
+[fit_to_image 관련]
+- 사용할 이미지를 실제 UI design에 맞게 resize해서 사용하는 것을 원칙으로 한다.
+1. 컨트롤의 크기에 맞춰 이미지의 크기를 자동 조정해서 그려줄 경우
+   resource editor에서 그린 크기대로 표시된다.
+   단, resize에 의해 해당 컨트롤이 동적으로 변경되는 경우는 이미지까지 자동 resize가 되지 않으므로 문제된다.
+2. 이미지의 크기대로 컨트롤의 크기를 변경시킬 경우
+   이미지의 실제크기를 직관적으로 알 수 없으므로 레이아웃이 design단계와 다르게 나타날 수 있다.
 
 [usage]
 * Gdiplus 사용을 위한 세팅
@@ -162,6 +182,8 @@ public:
 	//특히 push, check, radio button 처럼 checked, unchecked 등의 상태 image를 별도로 세팅할 때 사용할 수 있고
 	//하나의 버튼이 여러개의 이미지를 가지도록 할 필요가 있을 경우에도 사용된다.
 	//on/off, play/pause, img0/img1/img2...
+	//이미지를 지정하면 기본적으로 컨트롤의 크기에 맞게 이미지가 자동으로 그려진다.
+	//이미지 원본 크기대로 그려지길 원하는 경우는 fit_to_image(true);를 호출해준다.
 	template <typename ... T> void add_images(CString type, T... args)
 	{
 		int n = sizeof...(args);
@@ -175,6 +197,8 @@ public:
 	//UINT가 0이면 자동 생성해준다.
 	//타입이 없으면 기본 _T("PNG")로 처리한다.
 	//배경색을 별도로 지정할 경우에는 반드시 add_image()후에 set_back_color()를 호출해줘야 한다.
+	//이미지를 지정하면 기본적으로 컨트롤의 크기에 맞게 이미지가 자동으로 그려진다.
+	//이미지 원본 크기대로 그려지길 원하는 경우는 fit_to_image(true);를 호출해준다.
 	bool		add_image(CString type, UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	bool		add_image(UINT normal, UINT over = 0, UINT down = 0, UINT disabled = 0);
 	//기본 이미지를 설정할 때 resize한 후 설정
@@ -264,7 +288,7 @@ public:
 	void		SetFocusRectColor(Gdiplus::Color crFocus ) { m_crFocusRect = crFocus; Invalidate(); }
 	void		SetFocusRectWidth( int nWidth ) { m_nFocusRectWidth = nWidth; Invalidate(); }
 
-	void		use_hover(bool use);
+	void		use_hover(bool use = true);
 	//thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
 	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void		set_hover_rect_thick(int thick);
@@ -279,9 +303,11 @@ public:
 	void		use_3D_rect(bool use = true) { m_b3DRect = use; Invalidate(); }
 
 	//투명 버튼의 경우 그림자를 표시한다.
-	//weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
-	//이미지 원본에 따라 shadow의 밝기가 다르므로 이 값으로 적절하게 조정한다.
-	void		draw_shadow(bool draw = true, float weight = 1.0f);
+	//shadow_weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
+	//blur_sigma가 크면 클수록 그림자의 blur가 강해짐
+	//0.0f보다 작은 음수일 경우는 해당 멤버변수값을 갱신하지 않는다.
+	//draw_shadow(true, 5.0f, -1.0f);라고 주면 m_shadow_weight는 갱신되지만 m_blur_sigma값은 변경되지 않는다.
+	void		draw_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 2.5f);
 
 	//blink
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown
@@ -340,23 +366,32 @@ protected:
 		return false;
 	}
 
-	int			m_idx = 0;					//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
-	bool		m_fit2image = true;			//true : 이미지 크기대로 컨트롤 크기 변경, false : 원래 컨트롤 크기로 이미지 표시
-	CRect		m_rOrigin = 0;				//컨트롤의 원래 크기 정보
+	//현재 표시할 m_image의 인덱스 (checkbox나 radio는 미선택=0, 선택=1)
+	int			m_idx = 0;
+
+	//default = false(컨트롤 크기로 이미지 자동 resize), true(이미지 크기대로 컨트롤 크기 변경)
+	bool		m_fit2image = false;
+
+	//이미지 원본 크기
+	CSize		m_img_origin;
+
+	//컨트롤의 원래 크기 정보
+	CRect		m_rOrigin = 0;
 
 	//배경이 윈도우 기본값이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
 	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
 	bool		m_transparent = false;
 
-	CGdiplusBitmap	m_back_img;					//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
+	//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
+	CGdiplusBitmap	m_back_img;
 	CGdiplusBitmap	m_back_img_origin;
 
 	CString		m_text = _T("");
 	std::deque <Gdiplus::Color>	m_cr_text;
-	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경이 그려진다.
+	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경색이 그려진다.
 
-	int			m_width = 0;
-	int			m_height = 0;
+	//int			m_width = 0;
+	//int			m_height = 0;
 
 	int			m_round = 0;				//round rect
 
@@ -379,13 +414,15 @@ protected:
 	int			m_nFocusRectWidth = 2;					//두께
 
 	bool		m_b3DRect = true;						//입체 느낌의 3D, 누르면 sunken. default = true;
-	CPoint		m_down_offset = CPoint(2, 2);			//눌렸을 때 그려질 위치(기본값=1);
+	CPoint		m_down_offset = CPoint(1, 1);			//눌렸을 때 그려질 위치. 이 값이 클 경우 이미지가 여백이 없다면 ㅇ
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
 	//투명 버튼의 경우 그림자를 표시한다.
 	bool		m_draw_shadow = false;
-	//weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
+	//m_shadow_weight
 	float		m_shadow_weight = 1.0f;
+	//m_blur_sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
+	float		m_blur_sigma = 5.0f;
 
 	bool		m_draw_border = false;
 	Gdiplus::Color m_cr_border = Gdiplus::Color::DimGray;
@@ -396,9 +433,9 @@ protected:
 	int			m_blink_time0 = 400;	//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
 	int			m_blink_time1 = 1200;
 
-	ColorMatrix m_grayMatrix;
-	ColorMatrix m_hoverMatrix;			//hover이미지에 적용할 매트릭스
-	ColorMatrix m_downMatrix;			//down이미지에 적용할 매트릭스
+	Gdiplus::ColorMatrix m_grayMatrix;
+	Gdiplus::ColorMatrix m_hoverMatrix;			//hover이미지에 적용할 매트릭스
+	Gdiplus::ColorMatrix m_downMatrix;			//down이미지에 적용할 매트릭스
 
 	LOGFONT		m_lf;
 	CFont		m_font;

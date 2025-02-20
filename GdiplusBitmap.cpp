@@ -1510,7 +1510,7 @@ void CGdiplusBitmap::adjust_rgba(float r, float g, float b, float a)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::blur(float radius, BOOL expandEdge)
+void CGdiplusBitmap::gdip_blur(float radius, BOOL expandEdge)
 {
 	Gdiplus::Blur gdi_blur;
 	Gdiplus::BlurParams param;
@@ -1520,7 +1520,7 @@ void CGdiplusBitmap::blur(float radius, BOOL expandEdge)
 	m_pBitmap->ApplyEffect(&gdi_blur, NULL);
 }
 
-void CGdiplusBitmap::fast_blur(float sigma, int order)
+void CGdiplusBitmap::blur(float sigma, int order)
 {
 	CGdiplusBitmap temp;
 	deep_copy(&temp);

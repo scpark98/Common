@@ -157,6 +157,23 @@ t2 c, d; // c is 'int*' and d is 'int'
 typedef void (WINAPI* PGNSI)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI* PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 
+//기존 g_monitors는 모니터 영역만 저장했으나 좀 더 필요한 정보가 있어 이를 class로 확장함
+class CSCMonitorInfo
+{
+public:
+	CSCMonitorInfo(MONITORINFOEX *_mi, HMONITOR _handle)
+	{
+		memcpy(&mi, _mi, sizeof(MONITORINFOEX));
+		handle = _handle;
+		rMonitor = mi.rcMonitor;
+		rWork = mi.rcWork;
+	}
+
+	MONITORINFOEX	mi;
+	HMONITOR		handle;
+	CRect			rMonitor;	//mi.rcMonitor가 LPRECT라서 사용 편의성을 위해 추가
+	CRect			rWork;
+};
 
 enum FILE_TYPE
 {
@@ -558,9 +575,9 @@ struct	NETWORK_INFO
 	//모니터 정보
 	//main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
 	//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
-	//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_dqMonitors.clear()를 해줘야 하므로
+	//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_monitors.clear()를 해줘야 하므로
 	//enum_display_monitors()함수로 대체한다.
-	extern std::deque<CRect> g_dqMonitors;
+	extern std::deque<CSCMonitorInfo> g_monitors;
 	void		enum_display_monitors();
 	BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);
 	//r이 걸쳐있는 모니터 인덱스를 리턴. 겹쳐지는 영역이 어디에도 없다면 -1을 리턴.

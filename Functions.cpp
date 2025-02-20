@@ -61,8 +61,8 @@ int			g_nBaudRate[MAX_BAUD_RATE] = { 110, 300, 600, 1200, 2400, 4800, 9600, 1440
 
 bool		initialized_YUV_lookup_table = false;
 
-std::deque<CRect>		g_dqMonitors;
-std::deque<CString>		g_comment_mark = {
+std::deque<CSCMonitorInfo>	g_monitors;
+std::deque<CString>			g_comment_mark = {
 											_T("//"),	// single : C / C++ / C# / JAVA / Kotlin / Swift / Go / R / Javascript / Objective-C
 											_T("/*"),	// block  : C / C++ / C# / JAVA / Kotlin / Swift / Go / R / Javascript / Objective-C
 											_T("<!--"),	// html / xml
@@ -70,7 +70,7 @@ std::deque<CString>		g_comment_mark = {
 											_T("..."),	// block  : Python / Ruby
 										};
 
-void*					g_wow64_preset;
+void*						g_wow64_preset;
 
 #pragma comment(lib, "imm32.lib")
 #pragma comment(lib, "version.lib")		//for VerQueryValue
@@ -3219,7 +3219,7 @@ CString	get_default_browser_info(CString* pPath, CString* pVersion)
 	else if (ProgId.Find(_T("WhaleHTM")) >= 0)	//Naver Whale
 		browser = _T("Naver Whale");
 	else
-		browser = _T("Unknown Browser");
+		browser = ProgId;
 
 	//"C:\Program Files\Google\Chrome\Application\chrome.exe" --single-argument %1
 	//"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --single-argument %1
@@ -3914,6 +3914,16 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 					pInfo->sSubnetMask,
 					pInfo->sMacAddress);
 
+#ifdef LMM_SERVICE_SAMSUNGLIFE
+				result = true;
+				break;
+#else
+				//20241223 scpark 여러개의 네트워크 카드중에서 실제 연결된 네트워크 카드의 정보를 얻어야하므로
+				//아래의 4개 값이 0이 아닌 경우가 실제 연결된 네트워크 정보임.
+				//단, 삼성생명 LMM에서는 mgrid를 사원번호_MAC 으로 정했으므로
+				//어떤 사원이 이더넷을 쓰다가 와이파이로 변경하면 아래 코드에 의해 mgrid 값이 달라질 수 있다.
+				//단, 삼성생명 마지막 패치에 반입된 LMM_SSL_Launcher.exe는 20240905이므로 아래 코드가 추가된 20241223보다 훨씬 이전이므로
+				//LMM_SSL_Launcher.exe는 네트워크 연결 방식과 관계없이 무조건 0번 카드의 정보를 리턴하게 되어 있다.
 				if (_tcscmp(pInfo->sIPAddress, zeroIP) != 0 &&
 					_tcscmp(pInfo->sGateway, zeroIP) != 0 &&
 					_tcscmp(pInfo->sSubnetMask, zeroIP) != 0 &&
@@ -3922,6 +3932,7 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 					result = true;
 					break;
 				}
+#endif
 			}
 
 			pAdapter = pAdapter->Next;
@@ -6862,7 +6873,7 @@ bool show_property_window(std::deque<CString> fullpath)
 		//hr = pDesktop->ParseDisplayName(/*AfxGetApp()->GetMainWnd()->GetSafeHwnd()*/NULL, NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, (LPITEMIDLIST*)&pidl[i], NULL);
 		//hr = pDesktop->ParseDisplayName(GetDesktopWindow(), NULL, (LPWSTR)(LPCTSTR)fullpath[i], NULL, &pidl[i], NULL);
 		SFGAOF sfgao;
-		hr = SHParseDisplayName(fullpath[i], NULL, &pidl[i], 0, &sfgao);
+		hr = SHParseDisplayName((CStringW)fullpath[i], NULL, &pidl[i], 0, &sfgao);
 		if (FAILED(hr))
 		{
 #ifdef _DEBUG
@@ -12618,14 +12629,14 @@ void adjust_with_monitor_attached(CRect rOld, CRect &rNew)
 	int nw = rNew.Width();
 	int nh = rNew.Height();
 
-	if (rOld.left == g_dqMonitors[0].left)
-		rNew.MoveToX(g_dqMonitors[0].left);
-	if (rOld.top == g_dqMonitors[0].top)
-		rNew.MoveToY(g_dqMonitors[0].top);
-	if (rOld.right == g_dqMonitors[0].right)
-		rNew.MoveToX(g_dqMonitors[0].right - nw);
-	if (rOld.bottom == g_dqMonitors[0].bottom)
-		rNew.MoveToY(g_dqMonitors[0].bottom - nh);
+	if (rOld.left == g_monitors[0].rMonitor.left)
+		rNew.MoveToX(g_monitors[0].rMonitor.left);
+	if (rOld.top == g_monitors[0].rMonitor.top)
+		rNew.MoveToY(g_monitors[0].rMonitor.top);
+	if (rOld.right == g_monitors[0].rMonitor.right)
+		rNew.MoveToX(g_monitors[0].rMonitor.right - nw);
+	if (rOld.bottom == g_monitors[0].rMonitor.bottom)
+		rNew.MoveToY(g_monitors[0].rMonitor.bottom - nh);
 }
 
 
@@ -13744,11 +13755,11 @@ HBITMAP MakeDIBSection(CDC& dc, int width, int height)
 
 //main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
 //이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
-//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_dqMonitors.clear()를 해줘야 하므로
+//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_monitors.clear()를 해줘야 하므로
 //enum_display_monitors()함수로 대체한다.
 void enum_display_monitors()
 {
-	g_dqMonitors.clear();
+	g_monitors.clear();
 	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0);
 }
 
@@ -13765,19 +13776,20 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 
 	CString str;
 
-	// 주모니터로 설정된 모니터 정보인지를 체크한다.
+	// 주모니터로 설정된 모니터 정보인지를 체크하고 주모니터는 맨 앞 0번에 추가한다.
 	if (mi.dwFlags & MONITORINFOF_PRIMARY) 
 	{
-		str.Format(_T("hMonitor = %X,  좌표 : [ (%04d, %04d) - (%04d, %04d) ], < Primary-Monitor > %s"), 
-					hMonitor, lprcMonitor->left,lprcMonitor->top,lprcMonitor->right,lprcMonitor->bottom, mi.szDevice);
+		str.Format(_T("hMonitor = %X, name = %s, rcMonitor = %s, rcWork = %s, <Primary-Monitor> %s"), 
+					hMonitor, mi.szDevice, get_rect_info_string(mi.rcMonitor), get_rect_info_string(mi.rcWork), mi.szDevice);
+
+		g_monitors.push_front(CSCMonitorInfo(&mi, hMonitor));
 	}
 	else
 	{
-		str.Format(_T("hMonitor = %X,  좌표 : [ (%04d, %04d) - (%04d, %04d) ], %s"), 
-					hMonitor, lprcMonitor->left,lprcMonitor->top,lprcMonitor->right,lprcMonitor->bottom, mi.szDevice);
+		str.Format(_T("hMonitor = %X, name = %s, rcMonitor = %s, rcWork = %s, %s"), 
+					hMonitor, mi.szDevice, get_rect_info_string(mi.rcMonitor), get_rect_info_string(mi.rcWork), mi.szDevice);
+		g_monitors.push_back(CSCMonitorInfo(&mi, hMonitor));
 	}
-
-	g_dqMonitors.push_back(lprcMonitor);
 
 	TRACE(_T("%s\n"), str);
 
@@ -13789,9 +13801,9 @@ int	get_monitor_index(int x, int y)
 {
 	enum_display_monitors();
 
-	for (int i = 0; i < g_dqMonitors.size(); i++)
+	for (int i = 0; i < g_monitors.size(); i++)
 	{
-		if (g_dqMonitors[i].PtInRect(CPoint(x, y)))
+		if (g_monitors[i].rMonitor.PtInRect(CPoint(x, y)))
 			return i;
 	}
 
@@ -13803,14 +13815,14 @@ int	get_monitor_index(CRect r, bool entire_included)
 {
 	enum_display_monitors();
 
-	for (int i = 0; i < g_dqMonitors.size(); i++)
+	for (int i = 0; i < g_monitors.size(); i++)
 	{
 		if (entire_included)
 		{
-			if (RectInRect(g_dqMonitors[i], r))
+			if (RectInRect(g_monitors[i].rMonitor, r))
 				return i;
 		}
-		else if (r.IntersectRect(r, g_dqMonitors[i]))
+		else if (r.IntersectRect(r, g_monitors[i].rMonitor))
 		{
 			return i;
 		}
@@ -13825,12 +13837,12 @@ CRect get_entire_monitor_rect()
 	enum_display_monitors();
 	CRect rEntire(0, 0, 0, 0);
 
-	for (int i = 0; i < g_dqMonitors.size(); i++)
+	for (int i = 0; i < g_monitors.size(); i++)
 	{
-		rEntire.left = MIN(rEntire.left, g_dqMonitors[i].left);
-		rEntire.top = MIN(rEntire.top, g_dqMonitors[i].top);
-		rEntire.right = MAX(rEntire.right, g_dqMonitors[i].right);
-		rEntire.bottom = MAX(rEntire.bottom, g_dqMonitors[i].bottom);
+		rEntire.left = MIN(rEntire.left, g_monitors[i].rMonitor.left);
+		rEntire.top = MIN(rEntire.top, g_monitors[i].rMonitor.top);
+		rEntire.right = MAX(rEntire.right, g_monitors[i].rMonitor.right);
+		rEntire.bottom = MAX(rEntire.bottom, g_monitors[i].rMonitor.bottom);
 	}
 
 	return rEntire;

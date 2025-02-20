@@ -215,7 +215,8 @@ public:
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
 	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
-	void	resize(int cx, int cy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
+	//cy <= 0인 경우는 cx / width 비율에 따라 결정된다.
+	void	resize(int cx, int cy = 0, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 	void	resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 
 	//이미지 캔버스 크기를 조정한다. 남는 공간은 cr_fill로 채운다. cr_fill이 투명이 아닌 경우 주의할 것.

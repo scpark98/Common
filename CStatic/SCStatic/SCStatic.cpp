@@ -1069,3 +1069,11 @@ BOOL CSCStatic::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 
 	return CStatic::OnSetCursor(pWnd, nHitTest, message);
 }
+
+//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수
+void CSCStatic::set_link(CString url, Gdiplus::Color cr_link)
+{
+	ModifyStyle(0, SS_NOTIFY);
+	m_link_url = url;
+	m_cr_link = cr_link;
+}

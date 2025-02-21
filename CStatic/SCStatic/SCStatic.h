@@ -143,8 +143,8 @@ public:
 	void			set_blink(BOOL bBlink = TRUE);
 	void			set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
 
-	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수
-	void			set_link(CString url, Gdiplus::Color cr_link = Gdiplus::Color::RoyalBlue) { m_link_url = url; m_cr_link = cr_link; }
+	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수이므로 자동 설정되도록 수정
+	void			set_link(CString url, Gdiplus::Color cr_link = Gdiplus::Color::RoyalBlue);
 
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
 	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }

@@ -20,9 +20,7 @@
 #include <map>
 // CTableCtrl
 
-using namespace Gdiplus;
-
-#define GRAY_COLOR(i) ((i) == 8 ? Color(255, 255, 255, 255) : Color(255, 32 * i, 32 * i, 32 * i))
+#define GRAY_COLOR(i) ((i) == 8 ? Gdiplus::Color(255, 255, 255, 255) : Gdiplus::Color(255, 32 * i, 32 * i, 32 * i))
 
 class CTableItem
 {
@@ -32,8 +30,9 @@ public:
 	CTableItem(CString _text,
 		bool _bold = false,
 		float _line_thick = 1.0,
-		Color _text_color = GRAY_COLOR(1),
-		Color _line_color = GRAY_COLOR(7),
+		Gdiplus::Color _text_color = GRAY_COLOR(1),
+		Gdiplus::Color _line_color = GRAY_COLOR(7),
+		
 		int _y_margin = 0)
 	{
 		text = _text;
@@ -45,10 +44,10 @@ public:
 	}
 
 	CString text = _T("");
-	Color text_color = GRAY_COLOR(1);
+	Gdiplus::Color text_color = GRAY_COLOR(1);
 	bool text_bold = false;
 	float line_thick = 1.0;
-	Color line_color = GRAY_COLOR(7);
+	Gdiplus::Color line_color = GRAY_COLOR(7);
 	int y_margin = 0;
 };
 
@@ -57,8 +56,6 @@ class CTableItemText
 public:
 	CString text;
 };
-
-using namespace Gdiplus;
 
 class CTableCtrl : public CWnd
 {
@@ -81,8 +78,10 @@ public:
 	void set_width(int num, ...);
 	void line_height(int height) { m_line_height = height; Invalidate(); }
 	
-	void draw_first_line(bool draw) { m_draw_first_line = draw; }
-	void draw_end_line(bool draw) { m_draw_end_line = draw; }
+	void draw_first_line(bool draw = true) { m_draw_first_line = draw; }
+	void draw_end_line(bool draw = true) { m_draw_end_line = draw; }
+
+	void set_back_color(Gdiplus::Color cr_back, Gdiplus::Color cr_back_alt);
 
 	//item_text에 해당하는 항목의 셀 인덱스를 얻어온다.
 	CPoint find_string(CString find_str, bool discard_blank = true);
@@ -97,8 +96,10 @@ protected:
 	bool m_draw_first_line = true;
 	bool m_draw_end_line = true;
 
-	Color m_cr_text = GRAY_COLOR(1);
-	Color m_cr_line = GRAY_COLOR(7);
+	Gdiplus::Color m_cr_text = GRAY_COLOR(1);
+	Gdiplus::Color m_cr_line = GRAY_COLOR(7);
+	Gdiplus::Color m_cr_back = Gdiplus::Color::White;
+	Gdiplus::Color m_cr_back_alt = Gdiplus::Color(242, 247, 255);
 
 protected:
 	BOOL			RegisterWindowClass();

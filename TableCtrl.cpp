@@ -94,19 +94,19 @@ void CTableCtrl::OnPaint()
 
 	GetClientRect(rc);
 	CMemoryDC dc(&dc1, &rc);
-	Graphics g(dc);
+	Gdiplus::Graphics g(dc.GetSafeHdc());
 
-	g.SetSmoothingMode(SmoothingModeAntiAlias);
-	g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	Color m_cr_text(255, 32, 32, 32);
+	Gdiplus::Color m_cr_text(255, 32, 32, 32);
 
-	Gdiplus::Font font_bold(_T("Arial"), 14, FontStyleBold, UnitPixel);
-	Gdiplus::Font font_normal(_T("Arial"), 14, FontStyleRegular, UnitPixel);
+	Gdiplus::Font font_bold(_T("Arial"), 14, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
+	Gdiplus::Font font_normal(_T("Arial"), 14, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 	Gdiplus::SolidBrush br_text(m_cr_text);
-	StringFormat format;
-	format.SetAlignment(StringAlignmentNear);
-	format.SetLineAlignment(StringAlignmentCenter);
+	Gdiplus::StringFormat format;
+	format.SetAlignment(Gdiplus::StringAlignmentNear);
+	format.SetLineAlignment(Gdiplus::StringAlignmentCenter);
 
 	int i, j;
 	int margin = 8;
@@ -116,16 +116,18 @@ void CTableCtrl::OnPaint()
 	if (m.size() == 0)
 		return;
 
-	Color cr_grid(GRAY_COLOR(7));
+	Gdiplus::Color cr_grid(GRAY_COLOR(7));
 
 	for (i = 0; i < m.size(); i++)
 	{
-		Pen pen_gridH(m[i][0].line_color, m[i][0].line_thick);
-		Pen pen_gridV(cr_grid, 1.0);
+		draw_rectangle(g, CRect(rc.left, sy, rc.right, sy + m_line_height), Gdiplus::Color::Transparent, i % 2 ? m_cr_back_alt : m_cr_back);
+
+		Gdiplus::Pen pen_gridH(m[i][0].line_color, m[i][0].line_thick);
+		Gdiplus::Pen pen_gridV(cr_grid, 1.0);
 
 		for (j = 0; j < m[i].size(); j++)
 		{
-			RectF rtext = RectF(sx + margin, sy, m_width[j] - margin*2, m_line_height);
+			Gdiplus::RectF rtext = Gdiplus::RectF(sx + margin, sy, m_width[j] - margin*2, m_line_height);
 			if (!m[i][j].text.IsEmpty())
 				g.DrawString(m[i][j].text, -1, m[i][j].text_bold ? &font_bold : &font_normal, rtext, &format, &br_text);
 
@@ -145,7 +147,7 @@ void CTableCtrl::OnPaint()
 
 	//마지막 라인
 	if (m_draw_end_line)
-		g.DrawLine(&Pen(cr_grid, m[0][0].line_thick), margin, sy, rc.right - margin, sy);
+		g.DrawLine(&Gdiplus::Pen(cr_grid, m[0][0].line_thick), margin, sy, rc.right - margin, sy);
 }
 
 

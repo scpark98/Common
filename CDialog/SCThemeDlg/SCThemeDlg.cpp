@@ -54,7 +54,6 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_TIMER()
 	ON_WM_KILLFOCUS()
 	//ON_WM_ACTIVATE()
-	//ON_WM_ACTIVATEAPP()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_GETMINMAXINFO()
 END_MESSAGE_MAP()
@@ -201,7 +200,7 @@ INT_PTR CSCThemeDlg::DoModal()
 BOOL CSCThemeDlg::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return FALSE;
+	return TRUE;
 }
 
 
@@ -612,7 +611,26 @@ void CSCThemeDlg::OnSysCommand(UINT nID, LPARAM lParam)
 	//	SetTimer(0, 1000, NULL);
 }
 
+/*
+void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+{
+	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
 
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+
+	//nFTDServer 프로젝트에서 deactivate되면 타이틀바 영역의
+	if (nState == 0)
+		//::SetTimer(m_hWnd, timer_refresh_title_area, 10, NULL);
+		SetTimer(timer_refresh_title_area, 10, NULL);
+	//Wait(1000);
+
+	//Invalidate();
+	//RedrawWindow();
+}
+*/
+
+//base class인 이 클래스에서 SetTimer()를 호출해도 OnTimer는 derived class의 OnTimer가 먼저 호출된다.
+//deactive될 때 타이틀바 영역이 깨지는 현상때문에 refresh하도록 main에 코드를 추가함.
 void CSCThemeDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
@@ -623,34 +641,9 @@ void CSCThemeDlg::OnTimer(UINT_PTR nIDEvent)
 	CDialogEx::OnTimer(nIDEvent);
 }
 
-
 void CSCThemeDlg::OnKillFocus(CWnd* pNewWnd)
 {
 	CDialogEx::OnKillFocus(pNewWnd);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	//Invalidate();
-	//RedrawWindow();
-}
-
-
-void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
-{
-	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-
-	//nFTDServer 프로젝트에서 deactivate되면 타이틀바 영역의
-	//Wait(1000);
-
-	//Invalidate();
-	//RedrawWindow();
-}
-
-
-void CSCThemeDlg::OnActivateApp(BOOL bActive, DWORD dwThreadID)
-{
-	CDialogEx::OnActivateApp(bActive, dwThreadID);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	//Invalidate();

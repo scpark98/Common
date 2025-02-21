@@ -188,8 +188,7 @@ public:
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
-	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
-	afx_msg void OnActivateApp(BOOL bActive, DWORD dwThreadID);
+	//afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 };

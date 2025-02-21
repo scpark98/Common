@@ -3483,7 +3483,7 @@ void CVtListCtrlEx::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 	//CListCtrl::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }
 
-void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local)
+void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local, CString default_path)
 {
 	m_is_shell_listctrl = true;
 	m_is_local = is_local;
@@ -3511,6 +3511,8 @@ void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool
 	allow_edit();
 	allow_edit_column(col_filesize, false);
 	allow_edit_column(col_filedate, false);
+
+	set_path(default_path);
 }
 
 //list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.
@@ -3690,6 +3692,10 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 	SetRedraw(FALSE);
 	::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_WAIT));
+
+	//아직 준비되지 않은 상태에서 호출될 경우는 그냥 리턴.
+	if (m_cur_sorted_column >= m_column_sort_type.size())
+		return;
 
 	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
 		insert_index = 0;

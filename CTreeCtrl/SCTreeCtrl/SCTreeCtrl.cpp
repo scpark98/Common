@@ -633,7 +633,7 @@ void CSCTreeCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
 
-void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local)
+void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local, CString default_path)
 {
 	m_is_shell_treectrl = true;
 	m_is_local = is_local;
@@ -645,6 +645,8 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 		SetImageList(m_pShellImageList->get_imagelist(true), TVSIL_NORMAL);
 
 	refresh();
+
+	set_path(default_path);
 }
 
 //드라이브 폴더를 다시 읽어들인다.

@@ -1058,7 +1058,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			if (m_round == 0 && m_b3DRect && !is_button_style(BS_FLAT))
+			if (m_img_header.is_valid())
+			{
+				
+			}
+			else if (m_round == 0 && m_b3DRect && !is_button_style(BS_FLAT))
 			{
 				dc.Draw3dRect(rc,
 					is_down ? GRAY160 : white,
@@ -2000,3 +2004,9 @@ bool CGdiButton::is_push_like()
 	return false;
 }
 #endif
+
+void CGdiButton::set_header_image(UINT id, UINT align)
+{
+	m_img_header.load(id);
+	m_img_header_align = align;
+}

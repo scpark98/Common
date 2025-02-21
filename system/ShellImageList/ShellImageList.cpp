@@ -116,6 +116,7 @@ void CShellVolumeList::set_drive_list(std::deque<CDiskDriveInfo>* drive_list)
 
 CShellImageList::CShellImageList()
 {
+	Initialize();
 }
 
 CShellImageList::~CShellImageList()

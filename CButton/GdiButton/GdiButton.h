@@ -17,11 +17,11 @@
 - 2024.08.23 COLORREF -> Gdiplus::Color 로 변경
 
 [개선 방향 정리]
-- 지원되는 버튼 종류 m_button_shape
+- 지원되는 버튼 종류 m_button_shape?
 	- PushButton, CheckBox, RadioButton + PushLike
 	- 이미지가 있을 경우
 		.이미지만 있는 경우
-		.이미지 + 텍스트
+		.이미지 + 텍스트 => m_img_header
 	- 이미지가 없을 경우
 		.기본 MFC 버튼과 동일하게 표시
 - 이미지 설정
@@ -214,6 +214,9 @@ public:
 	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
 
+	//텍스트 버튼인 경우 텍스트 앞에 이미지를 표시한다.
+	void		set_header_image(UINT id, UINT align = DT_CENTER);
+
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
 
@@ -387,6 +390,10 @@ protected:
 	//배경이 윈도우 기본값이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
 	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
 	bool		m_transparent = false;
+
+	//버튼 텍스트 앞에 그려질 이미지. 이미지 버튼이 아닌 기본 MFC 버튼 형태일 경우 앞에 이미지를 추가할 경우 사용.
+	CGdiplusBitmap	m_img_header;
+	UINT			m_img_header_align = DT_CENTER;
 
 	//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
 	CGdiplusBitmap	m_back_img;

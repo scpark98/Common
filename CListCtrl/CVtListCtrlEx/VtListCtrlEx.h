@@ -158,7 +158,7 @@ public:
 	//세팅 이후 ShellList가 아닌 형태로 동작시키는 등은 허용하지 않는다.
 	//is_local이 true이면 파일목록을 직접 얻어와서 표시하지만
 	//false, 즉 remote일 경우는 파일목록을 받아서 표시해야 한다.
-	void		set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local = true);
+	void		set_as_shell_listctrl(CShellImageList* pShellImageList, bool is_local = true, CString default_path = _T("C:\\"));
 	
 	//list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.
 	//만약 선택된 항목이 폴더이고 해당 폴더까지의 경로를 원한다면 get_selected_path()를 사용해야 한다.

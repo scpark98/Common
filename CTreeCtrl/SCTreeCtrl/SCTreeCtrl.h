@@ -144,7 +144,7 @@ public:
 
 	//윈도우 탐색기의 폴더 트리와 같이 동작한다.
 	//is_local이 false일 경우는 remote의 폴더정보를 얻어와서 표시해줘야 한다.
-	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local);
+	void		set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local = true, CString default_path = _T("C:\\"));
 
 	//드라이브 폴더를 다시 읽어들인다.
 	void		refresh(HTREEITEM hParent = NULL);

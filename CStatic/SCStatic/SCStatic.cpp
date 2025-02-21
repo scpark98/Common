@@ -76,6 +76,8 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 	//}}AFX_MSG_MAP
 ON_WM_WINDOWPOSCHANGED()
 ON_WM_SIZE()
+ON_WM_LBUTTONDOWN()
+ON_WM_SETCURSOR()
 END_MESSAGE_MAP()
 
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
@@ -361,9 +363,16 @@ void CSCStatic::OnPaint()
 	if (!m_text.IsEmpty())
 	{
 		if (IsWindowEnabled())
-			dc.SetTextColor(m_cr_text.ToCOLORREF());
+		{
+			if (m_link_url.IsEmpty())
+				dc.SetTextColor(m_cr_text.ToCOLORREF());
+			else
+				dc.SetTextColor(m_cr_link.ToCOLORREF());
+		}
 		else
+		{
 			dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
+		}
 
 		//SS_CENTERIMAGE 일 경우 DT_VCENTER는 반드시 DT_SINGLELINE을 동반해야 한다.
 		//하지만 그럴 경우 multiline을 표현할 수 없으므로
@@ -1034,4 +1043,29 @@ void CSCStatic::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
 	}
 
 	Invalidate();
+}
+
+
+void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (!m_link_url.IsEmpty())
+	{
+		ShellExecute(NULL, _T("open"), m_link_url, 0, 0, SW_SHOWNORMAL);
+	}
+
+	CStatic::OnLButtonDown(nFlags, point);
+}
+
+
+BOOL CSCStatic::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (!m_link_url.IsEmpty())
+	{
+		::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_HAND));
+		return TRUE;
+	}
+
+	return CStatic::OnSetCursor(pWnd, nHitTest, message);
 }

@@ -143,6 +143,9 @@ public:
 	void			set_blink(BOOL bBlink = TRUE);
 	void			set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
 
+	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수
+	void			set_link(CString url, Gdiplus::Color cr_link = Gdiplus::Color::RoyalBlue) { m_link_url = url; m_cr_link = cr_link; }
+
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
 	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
@@ -228,6 +231,9 @@ protected:
 	int			m_nBlinkTime0;		//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
 	int			m_nBlinkTime1;
 
+	CString		m_link_url;
+	Gdiplus::Color m_cr_link = Gdiplus::Color::RoyalBlue;
+
 	DWORD		m_dwStyle;
 	int			m_nPrefixSpace;
 	CGdiplusBitmap	m_img_back;
@@ -260,5 +266,7 @@ protected:
 public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 };
 #endif

@@ -269,8 +269,8 @@ public:
 	//Gdiplus에서 제공하는 GaussianBlur 방식이지만 radius가 작을 경우는 좌우로만 흐려지는 등의 문제가 있다.
 	void	gdip_blur(float radius, BOOL expandEdge);
 
-	//round shadow rect 이미지를 만들어주는 함수인데 미완성!
-	void	round_shadow_rect(int w, int h, float radius);
+	//round shadow rect 이미지로 생성
+	void	round_shadow_rect(int w, int h, float radius, float blur_sigma = 5.0f, Gdiplus::Color cr_shadow = Gdiplus::Color::Gray);
 
 	void	transformBits();
 

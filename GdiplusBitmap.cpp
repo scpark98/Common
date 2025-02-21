@@ -1534,7 +1534,7 @@ void CGdiplusBitmap::blur(float sigma, int order)
 
 	get_raw_data();
 	
-	fast_gaussian_blur(temp.data, data, width, height, channel, sigma, order, Border::kMirror);
+	fast_gaussian_blur(temp.data, data, width, height, channel, sigma, order, Border::kKernelCrop);
 	set_raw_data();
 
 #ifdef _DEBUG
@@ -1542,7 +1542,7 @@ void CGdiplusBitmap::blur(float sigma, int order)
 #endif
 }
 
-void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
+void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_sigma, Gdiplus::Color cr_shadow)
 {
 	release();
 
@@ -1559,16 +1559,22 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius)
 	//apply_effect_blur(20.0f, FALSE);
 	
 	Gdiplus::Matrix matrix(1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-	CGdiplusBitmap shadow(w - 20, h - 20, PixelFormat32bppARGB, Gdiplus::Color(255, 64, 64, 64));
-	//shadow.save(_T("d:\\temp\\shadow.png"));
-	shadow.round_corner(radius);// , 0.90f, 0.1f);
-	//shadow.apply_effect_blur(40.0f, FALSE);
-	//shadow.save(_T("d:\\temp\\shadow_blur.png"));
+	CGdiplusBitmap shadow(w, h, PixelFormat32bppARGB, cr_shadow);
+#ifdef _DEBUG
+	shadow.save(_T("d:\\temp\\shadow_1default.png"));
+#endif
 
-	g.DrawImage(shadow, 10, 10, shadow.width, shadow.height);
-	//save(_T("d:\\temp\\shadow.png"));
-	blur(14.0f, FALSE);
-	//save(_T("d:\\temp\\shadow_blur.png"));
+	shadow.round_corner(radius);// , 0.90f, 0.1f);
+#ifdef _DEBUG
+	shadow.save(_T("d:\\temp\\shadow_2round.png"));
+#endif
+
+	shadow.gdip_blur(14.0f, FALSE);
+#ifdef _DEBUG
+	shadow.save(_T("d:\\temp\\shadow_3blur.png"));
+#endif
+
+	g.DrawImage(shadow, 0, 0, shadow.width, shadow.height);
 	/*
 	Gdiplus::BlurParams myBlurParams;
 	myBlurParams.expandEdge = true;

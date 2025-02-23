@@ -1127,6 +1127,15 @@ void CGdiplusBitmap::fit_to_image(Gdiplus::Color remove_back_color)
 
 void CGdiplusBitmap::resize(int cx, int cy, Gdiplus::InterpolationMode mode)
 {
+	if (cx <= 0 && cy <= 0)
+		return;
+
+	if (cx <= 0)
+	{
+		double ratio = (double)height / (double)cy;
+		cx = (double)width / ratio;
+	}
+
 	if (cy <= 0)
 	{
 		double ratio = (double)width / (double)cx;

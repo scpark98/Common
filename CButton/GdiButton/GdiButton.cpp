@@ -1058,11 +1058,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			if (m_img_header.is_valid())
-			{
-				
-			}
-			else if (m_round == 0 && m_b3DRect && !is_button_style(BS_FLAT))
+			if (m_round == 0 && m_b3DRect && !is_button_style(BS_FLAT))
 			{
 				dc.Draw3dRect(rc,
 					is_down ? GRAY160 : white,
@@ -1110,25 +1106,45 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (m_image.size() > 0 || text.IsEmpty())
 		return;
 
-	//뭔가 제대로 검사되지 않는다. 우선 푸시버튼만 대상으로 한다.
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	CFont* pOldFont = dc.SelectObject(&m_font);
+
+	dc.SetBkMode(TRANSPARENT);
+	dc.SetTextColor(cr_text.ToCOLORREF());
+
+	//align은 resource editor에서 설정한 속성을 그대로 반영하고자 했으나 정확히 얻어오지 못한다.
+	//우선 기본값으로 pushbutton은 DT_CENTER, checkbox와 radio는 DT_LEFT를 기본값으로 한다.
 #if 1
-	//if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) ||
-	//	(is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && is_button_style(BS_PUSHLIKE)) ||
-	//	(is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE)))
-	{
-		//dwStyle = GetButtonStyle();
-		LONG_PTR style = GetWindowLong(m_hWnd, GWL_STYLE);
-		if (style & BS_RIGHT)
-			dwText = DT_RIGHT;
-		else if (style & BS_LEFT)
-			dwText = DT_LEFT;
-		else//if (dwStyle & BS_CENTER)
-			dwText = DT_CENTER;
-	}
-	//else
+	dwStyle = GetStyle();
+	if (dwStyle & BS_CENTER == BS_CENTER)
+		dwText = DT_CENTER;
+	else if (dwStyle & BS_RIGHT == BS_RIGHT)
+		dwText = DT_RIGHT;
+	else
+		dwText = DT_LEFT;
+
+	TRACE(_T("%s = %d\n"), text, dwText);
+
+
+	//if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) || is_button_style(BS_PUSHLIKE))
+	//	dwText = DT_CENTER;
+	//else if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)))
+	//	dwText = DT_LEFT;
+
 	//{
-	//	dwText |= DT_LEFT;
+	//	//dwStyle = GetButtonStyle();
+	//	LONG_PTR style = GetWindowLong(m_hWnd, GWL_STYLE);
+	//	if (style & BS_RIGHT)
+	//		dwText = DT_RIGHT;
+	//	else if (style & BS_LEFT)
+	//		dwText = DT_LEFT;
+	//	else//if (dwStyle & BS_CENTER)
+	//		dwText = DT_CENTER;
 	//}
+	////else
+	////{
+	////	dwText |= DT_LEFT;
+	////}
 #else		
 	MAP_STYLE(BS_LEFT,	 DT_LEFT);
 	MAP_STYLE(BS_CENTER, DT_CENTER);
@@ -1136,11 +1152,35 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 #endif
 	dwText |= (DT_SINGLELINE | DT_VCENTER);
 
-	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	CFont *pOldFont = dc.SelectObject(&m_font);
+	CSize sz_text = dc.GetTextExtent(text);
 
-	dc.SetBkMode(TRANSPARENT);
-	dc.SetTextColor(cr_text.ToCOLORREF());
+	//m_img_header 유무에 따라 텍스트 정렬도 재정의된다.
+	if (m_img_header.is_valid())
+	{
+		int x, y;
+		int gap = 8;	//gap between imgand text
+		int margin = 8;	//left or right margin
+		int img_height = (float)rc.Height() * m_img_header_ratio;
+		int img_width = (double)m_img_header.height * (double)img_height / (double)m_img_header.width;
+
+		if (m_img_header_align & DT_LEFT)
+			x = rc.left + margin;
+		else if (m_img_header_align & DT_CENTER)
+			x = (rc.Width() - (img_width + gap + sz_text.cx)) / 2;
+		else
+			x = rc.right - margin - img_width - gap - img_width;
+
+		if (m_img_header_align & DT_TOP)
+			y = rc.top + 4;
+		else if (m_img_header_align & DT_VCENTER)
+			y = (rc.Height() - img_height) / 2;
+		else
+			y = rc.bottom - 4 - img_height;
+
+		m_img_header.draw(g, x, y, img_width, img_height);
+		rText.MoveToX(x + img_width + gap);
+		dwText = DT_LEFT | DT_VCENTER | DT_SINGLELINE;
+	}
 
 //#ifdef _UNICODE
 //	DrawShadowText(dc.GetSafeHdc(), text, text.GetLength(), rText,
@@ -2005,8 +2045,9 @@ bool CGdiButton::is_push_like()
 }
 #endif
 
-void CGdiButton::set_header_image(UINT id, UINT align)
+void CGdiButton::set_header_image(UINT id, float ratio, UINT align)
 {
 	m_img_header.load(id);
+	m_img_header_ratio = ratio;
 	m_img_header_align = align;
 }

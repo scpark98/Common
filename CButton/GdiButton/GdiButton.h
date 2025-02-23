@@ -215,7 +215,10 @@ public:
 	void		use_normal_image_on_disabled(bool use = true);
 
 	//텍스트 버튼인 경우 텍스트 앞에 이미지를 표시한다.
-	void		set_header_image(UINT id, UINT align = DT_CENTER);
+	//이미지의 높이는 rc.Height()에 대한 비율로 결정되며 이미지 ratio에 맞게 width도 자동 조정된다.
+	//align에 따라 이미지와 텍스트가 정렬되며 align flag는 CDC::DrawText()에서 사용하는 DT_ 정의를 사용한다.
+	//이미지의 여백 정도에 따라 크기 또는 텍스트와의 갭이 적절하지 않을 수 있다.
+	void		set_header_image(UINT id, float ratio = 0.7f, UINT align = DT_CENTER | DT_VCENTER);
 
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
@@ -394,6 +397,7 @@ protected:
 	//버튼 텍스트 앞에 그려질 이미지. 이미지 버튼이 아닌 기본 MFC 버튼 형태일 경우 앞에 이미지를 추가할 경우 사용.
 	CGdiplusBitmap	m_img_header;
 	UINT			m_img_header_align = DT_CENTER;
+	float			m_img_header_ratio = 0.6f;
 
 	//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
 	CGdiplusBitmap	m_back_img;

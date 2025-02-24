@@ -1115,21 +1115,21 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//align은 resource editor에서 설정한 속성을 그대로 반영하고자 했으나 정확히 얻어오지 못한다.
 	//우선 기본값으로 pushbutton은 DT_CENTER, checkbox와 radio는 DT_LEFT를 기본값으로 한다.
 #if 1
-	dwStyle = GetStyle();
-	if (dwStyle & BS_CENTER == BS_CENTER)
-		dwText = DT_CENTER;
-	else if (dwStyle & BS_RIGHT == BS_RIGHT)
-		dwText = DT_RIGHT;
-	else
-		dwText = DT_LEFT;
-
-	TRACE(_T("%s = %d\n"), text, dwText);
-
-
-	//if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) || is_button_style(BS_PUSHLIKE))
+	//dwStyle = GetStyle();
+	//if (dwStyle & BS_CENTER == BS_CENTER)
 	//	dwText = DT_CENTER;
-	//else if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)))
+	//else if (dwStyle & BS_RIGHT == BS_RIGHT)
+	//	dwText = DT_RIGHT;
+	//else
 	//	dwText = DT_LEFT;
+
+	//TRACE(_T("%s = %d\n"), text, dwText);
+
+
+	if (is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) || is_button_style(BS_PUSHLIKE))
+		dwText = DT_CENTER;
+	else if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)))
+		dwText = DT_LEFT;
 
 	//{
 	//	//dwStyle = GetButtonStyle();
@@ -1158,24 +1158,25 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (m_img_header.is_valid())
 	{
 		int x, y;
-		int gap = 8;	//gap between imgand text
-		int margin = 8;	//left or right margin
+		int gap = 6;	//header image와 text사이의 간격. 이미지의 여백 정도에 따라 다르게 표시될 수 있다. 이미지의 여백까지 검사해서 정해져야 정확하다.
+		int margin = 8;	//왼쪽 또는 오른쪽 마진
 		int img_height = (float)rc.Height() * m_img_header_ratio;
 		int img_width = (double)m_img_header.height * (double)img_height / (double)m_img_header.width;
 
-		if (m_img_header_align & DT_LEFT)
-			x = rc.left + margin;
-		else if (m_img_header_align & DT_CENTER)
+		if (m_img_header_align & DT_CENTER)
 			x = (rc.Width() - (img_width + gap + sz_text.cx)) / 2;
-		else
+		else if (m_img_header_align & DT_RIGHT)
 			x = rc.right - margin - img_width - gap - img_width;
+		else// if (m_img_header_align & DT_LEFT == DT_LEFT)
+			x = rc.left + margin;
 
 		if (m_img_header_align & DT_TOP)
 			y = rc.top + 4;
-		else if (m_img_header_align & DT_VCENTER)
-			y = (rc.Height() - img_height) / 2;
-		else
+		else if (m_img_header_align & DT_BOTTOM)
 			y = rc.bottom - 4 - img_height;
+		else//if (m_img_header_align & DT_VCENTER == DT_VCENTER)
+			y = (rc.Height() - img_height) / 2;
+
 
 		m_img_header.draw(g, x, y, img_width, img_height);
 		rText.MoveToX(x + img_width + gap);

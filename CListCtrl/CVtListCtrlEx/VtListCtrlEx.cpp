@@ -3512,7 +3512,8 @@ void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool
 	allow_edit_column(col_filesize, false);
 	allow_edit_column(col_filedate, false);
 
-	set_path(default_path);
+	if (!default_path.IsEmpty())
+		set_path(default_path);
 }
 
 //list의 index를 주면 fullpath를 리턴한다. -1이면 현재 path를 리턴한다.

@@ -222,6 +222,9 @@ public:
 	//이미지 캔버스 크기를 조정한다. 남는 공간은 cr_fill로 채운다. cr_fill이 투명이 아닌 경우 주의할 것.
 	void	canvas_size(int cx, int cy, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
 
+	//투명 png의 l, t, r, b의 투명한 영역 크기를 구한다.
+	CRect	get_transparent_rect();
+
 	void	sub_image(int x, int y, int w, int h);
 	void	sub_image(CRect r);
 	void	sub_image(Gdiplus::Rect r);
@@ -233,8 +236,12 @@ public:
 	//0(transparent) ~ 255(opaque)
 	void	set_alpha(int alpha);
 
-
+	//Gdiplus::Bitmap::GetPixel()이므로 data를 추출하지 않고도 구할 수 있으나 속도가 느림
 	Gdiplus::Color get_color(int x, int y);
+
+	//data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
+	Gdiplus::Color get_pixel(int x, int y);
+
 
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
 	void	replace_color(int tx, int ty, Gdiplus::Color dst);

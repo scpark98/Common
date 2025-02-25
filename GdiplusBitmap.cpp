@@ -2616,3 +2616,98 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 	//str.Format(_T("z:\\내 드라이브\\media\\test_image\\temp\\multi.tif"));
 	//save(dq[0], str);
 }
+
+//투명 png의 l, t, r, b의 투명한 영역 크기를 구한다.
+CRect CGdiplusBitmap::get_transparent_rect()
+{
+	CRect r;
+
+	if (is_empty())
+		return r;
+
+	//이미지가 큰 경우 탐색시간이 길어지므로 작게 줄여서 검사한다.
+	double ratio;
+	int new_width;
+	int new_height;
+
+	CGdiplusBitmap	temp;
+	deep_copy(&temp);
+
+	if (width > height)
+	{
+		temp.resize(50, 0);
+		ratio = (double)width / (double)temp.width;
+	}
+	else
+	{
+		temp.resize(0, 50);
+		ratio = (double)height / (double)temp.height;
+	}
+
+	temp.get_raw_data();
+
+	int x, y;
+
+	//scan left
+	for (x = 0; x < width; x++)
+	{
+		for (y = 0; y < height; y++)
+		{
+			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+				r.left = x;
+		}
+	}
+
+	//scan top
+	for (y = 0; y < height; y++)
+	{
+		for (x = 0; x < width; x++)
+		{
+			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+				r.top = y;
+		}
+	}
+
+	//scan right
+	for (x = width - 1; x >= 0; x--)
+	{
+		for (y = 0; y < height; y++)
+		{
+			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+				r.right = x;
+		}
+	}
+
+
+	//scan bottom
+	for (y = height - 1; y >= 0; y--)
+	{
+		for (x = 0; x < width; x++)
+		{
+			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+				r.bottom = y;
+		}
+	}
+
+	return r;
+}
+
+//data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
+Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
+{
+	if (data == NULL || x < 0 || x >= width || y < 0 || y >= height)
+		return Gdiplus::Color(0, 0, 0, 0);
+
+	if (channel == 1)
+		return Gdiplus::Color(*(data + y * width * channel + x * channel));
+
+	else if (channel == 3)
+		return Gdiplus::Color(	*(data + y * width * channel + x * channel + 2),
+								*(data + y * width * channel + x * channel + 1),
+								*(data + y * width * channel + x * channel + 0));
+
+	return Gdiplus::Color(	*(data + y * width * channel + x * channel + 3),
+							*(data + y * width * channel + x * channel + 2),
+							*(data + y * width * channel + x * channel + 1),
+							*(data + y * width * channel + x * channel + 0));
+}

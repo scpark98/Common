@@ -1158,7 +1158,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (m_img_header.is_valid())
 	{
 		int x, y;
-		int gap = 6;	//header image와 text사이의 간격. 이미지의 여백 정도에 따라 다르게 표시될 수 있다. 이미지의 여백까지 검사해서 정해져야 정확하다.
+		int gap = m_img_header_gap;	//header image와 text사이의 간격. 이미지의 여백 정도에 따라 다르게 표시될 수 있다. 이미지의 여백까지 검사해서 정해져야 정확하다.
 		int margin = 8;	//왼쪽 또는 오른쪽 마진
 		int img_height = (float)rc.Height() * m_img_header_ratio;
 		int img_width = (double)m_img_header.height * (double)img_height / (double)m_img_header.width;
@@ -2051,4 +2051,12 @@ void CGdiButton::set_header_image(UINT id, float ratio, UINT align)
 	m_img_header.load(id);
 	m_img_header_ratio = ratio;
 	m_img_header_align = align;
+
+	CRect r = m_img_header.get_transparent_rect();
+}
+
+//이미지와 레이블 사이의 간격 픽셀 크기. m_img_header_gap. default = 4;
+void CGdiButton::set_header_image_gap(int gap)
+{
+	m_img_header_gap = gap;
 }

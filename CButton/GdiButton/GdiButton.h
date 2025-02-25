@@ -219,6 +219,8 @@ public:
 	//align에 따라 이미지와 텍스트가 정렬되며 align flag는 CDC::DrawText()에서 사용하는 DT_ 정의를 사용한다.
 	//이미지의 여백 정도에 따라 크기 또는 텍스트와의 갭이 적절하지 않을 수 있다.
 	void		set_header_image(UINT id, float ratio = 0.7f, UINT align = DT_CENTER | DT_VCENTER);
+	//이미지와 레이블 사이의 간격 픽셀 크기. m_img_header_gap. default = 4;
+	void		set_header_image_gap(int gap);
 
 	//fit = true이면 컨트롤의 크기를 이미지 크기로 resize한다. false이면 컨트롤의 크기에 맞게 이미지를 그려준다.
 	void		fit_to_image(bool fit = true);
@@ -398,6 +400,7 @@ protected:
 	CGdiplusBitmap	m_img_header;
 	UINT			m_img_header_align = DT_CENTER;
 	float			m_img_header_ratio = 0.6f;
+	int				m_img_header_gap = 4;
 
 	//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
 	CGdiplusBitmap	m_back_img;

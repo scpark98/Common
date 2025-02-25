@@ -540,6 +540,8 @@ public:
 	DWORD_PTR		GetItemData(int index);
 	BOOL			SetItemData(int index, DWORD_PTR dwData);
 
+	CHeaderCtrlEx*	get_header_ctrl() { return &m_HeaderCtrlEx; }
+
 protected:
 
 //메인 데이터

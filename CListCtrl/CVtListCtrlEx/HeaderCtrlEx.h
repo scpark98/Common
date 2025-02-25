@@ -54,8 +54,23 @@ public:
 	bool			m_flat_style = true;
 	void			set_header_flat_style(bool flat = true);
 
+	void			use_header_separator(bool use) { m_use_header_separator = use; }
+
+//폰트 관련
+	void			set_font(LOGFONT* lf);
+	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void			set_font_bold(bool bold = true);
+	void			set_font_italic(bool italic = true);
+
+
 protected:
 	HDLAYOUT		m_HDLayout;
+	bool			m_use_header_separator = true;
+
+//폰트 관련
+	LOGFONT			m_lf;
+	CFont			m_font;
+	void			reconstruct_font();
 
 public:
 

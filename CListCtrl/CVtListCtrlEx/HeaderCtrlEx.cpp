@@ -106,6 +106,8 @@ void CHeaderCtrlEx::OnPaint()
 	Gdiplus::Color crSunkenLight = get_color(m_cr_back, 48);
 	Gdiplus::Color crSunkenDark  = get_color(m_cr_back, -48);
 
+	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
+
 	int header_count = GetItemCount();
 	for (int i = 0; i < GetItemCount(); i++)
 	{
@@ -121,9 +123,14 @@ void CHeaderCtrlEx::OnPaint()
 		else
 		{
 			if (m_flat_style)
-				draw_line(&dc, rItem.right, rItem.top + 3, rItem.right, rItem.bottom - 3, crSunkenDark);
+			{
+				if (m_use_header_separator)
+					draw_line(&dc, rItem.right, rItem.top + 3, rItem.right, rItem.bottom - 3, crSunkenDark);
+			}
 			else
+			{
 				draw_sunken_rect(&dc, rItem, false, crSunkenDark, crSunkenLight);
+			}
 		}
 
 		DWORD dwAlign = m_header_text_align[i];
@@ -139,6 +146,7 @@ void CHeaderCtrlEx::OnPaint()
 		dc.DrawText(get_header_text(i), rItem, dwFormat);
 	}
 
+	dc.SelectObject(pOldFont);
 	/*
 	CPaintDC dc(this); // device context for painting
 	
@@ -481,3 +489,39 @@ void CHeaderCtrlEx::set_header_flat_style(bool flat)
 	m_flat_style = flat;
 	Invalidate();
 }
+
+//폰트 관련
+void CHeaderCtrlEx::set_font(LOGFONT* lf)
+{
+	memcpy(&m_lf, lf, sizeof(LOGFONT));
+	reconstruct_font();
+}
+
+void CHeaderCtrlEx::reconstruct_font()
+{
+	m_font.DeleteObject();
+	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+	SetFont(&m_font, false);
+}
+
+void CHeaderCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+{
+	if (sFontname == _T(""))
+		return;
+	m_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
+	reconstruct_font();
+}
+
+void CHeaderCtrlEx::set_font_bold(bool bold)
+{
+	m_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	reconstruct_font();
+}
+
+void CHeaderCtrlEx::set_font_italic(bool italic)
+{
+	m_lf.lfItalic = italic;
+	reconstruct_font();
+}
+

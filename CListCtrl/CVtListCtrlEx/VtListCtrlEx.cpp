@@ -3147,7 +3147,7 @@ void CVtListCtrlEx::reconstruct_font()
 	SetFont(&m_font, false);
 
 	if (m_HeaderCtrlEx)
-		m_HeaderCtrlEx.SetFont(&m_font, true);
+		m_HeaderCtrlEx.set_font(&m_lf);
 
 	m_font_size = get_font_size();
 	

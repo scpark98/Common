@@ -493,6 +493,11 @@ public:
 
 	void		set_draw_selected_border(bool draw) { m_draw_selected_border = draw; }
 
+	//한 라인에 대한 상단 라인 표시 여부 설정. m_draw_top_line
+	void		draw_top_line(bool draw, Gdiplus::Color cr = Gdiplus::Color::LightGray) { m_draw_top_line = draw; m_cr_top_line = cr; }
+	//한 라인에 대한 하단 라인 표시 여부 설정. m_draw_top_line
+	void		draw_bottom_line(bool draw, Gdiplus::Color cr = Gdiplus::Color::LightGray) { m_draw_bottom_line = draw; m_cr_bottom_line = cr; }
+
 //scroll
 	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
 	{
@@ -609,6 +614,13 @@ protected:
 	bool			m_draw_selected_border = true;
 
 	bool			m_has_focus = false;
+
+	bool			m_draw_top_line = false;
+	Gdiplus::Color	m_cr_top_line = Gdiplus::Color::LightGray;
+
+	bool			m_draw_bottom_line = false;
+	Gdiplus::Color	m_cr_bottom_line = Gdiplus::Color::LightGray;
+
 protected:
 	DECLARE_MESSAGE_MAP()
 public:

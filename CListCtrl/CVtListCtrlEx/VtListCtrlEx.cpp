@@ -210,6 +210,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
 
+	GetItemRect(iItem, &rowRect, LVIR_BOUNDS);
+
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
 		//TRACE(_T("in DrawItem. %d, %d\n"), iItem, iSubItem);
@@ -221,8 +223,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//LVIR_BOUNDS로 구할 경우 0번 컬럼은 한 라인의 사각형 영역을 리턴한다.
 		//0번 컬럼 이후부터는 해당 셀의 사각형 영역만을 리턴한다.
-		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, rowRect);
-		itemRect = rowRect;
+		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, itemRect);
 
 		if (iSubItem == 0)
 		{
@@ -501,6 +502,17 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
 		draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
+	}
+
+	if (m_draw_top_line)
+	{
+		draw_line(pDC, rowRect.left, rowRect.top, rowRect.right, rowRect.top, m_cr_top_line);
+	}
+
+	if (m_draw_bottom_line)
+	{
+		//rowRect.bottom으로 써주면 아이템 영역밖이므로 그려지지 않는다. 반드시 -1을 해야 함.
+		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_cr_bottom_line);
 	}
 }
 

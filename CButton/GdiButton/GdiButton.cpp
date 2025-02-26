@@ -838,6 +838,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
 		MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pDC, Rect.left, Rect.top, SRCCOPY);
 		dc.BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
+#ifdef _DEBUG
+		save(CGdiplusBitmap((HBITMAP)bmp.GetSafeHandle()), _T("d:\\parent_bmp.bmp"));
+#endif
 		MemDC.SelectObject(pOldBmp);
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
@@ -1424,6 +1427,9 @@ int CGdiButton::GetCheck()
 
 void CGdiButton::redraw_window(bool bErase)
 {
+	//투명이미지인 경우에는 parent에서 invalidate한 후 이 버튼이 그려져야하므로 GetParent()->InvalidateRect()을 호출했는데
+	//이로인해 깜빡임이 발생한다.
+	//GetParent()->InvalidateRect()호출하지 않을 경우 투명png 버튼일 경우 투명 영역이 계속 쌓이면서 투명으로 보이지 않게 된다.
 	if (m_transparent)
 	{
 		CRect rc;

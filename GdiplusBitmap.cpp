@@ -2626,23 +2626,23 @@ CRect CGdiplusBitmap::get_transparent_rect()
 		return r;
 
 	//이미지가 큰 경우 탐색시간이 길어지므로 작게 줄여서 검사한다.
-	double ratio;
+	double ratio = 1.0;
 	int new_width;
 	int new_height;
 
 	CGdiplusBitmap	temp;
 	deep_copy(&temp);
-
-	if (width > height)
-	{
-		temp.resize(50, 0);
-		ratio = (double)width / (double)temp.width;
-	}
-	else
-	{
-		temp.resize(0, 50);
-		ratio = (double)height / (double)temp.height;
-	}
+	temp.save(_T("d:\\temp.png"));
+	//if (width > height)
+	//{
+	//	temp.resize(50, 0);
+	//	ratio = (double)width / (double)temp.width;
+	//}
+	//else
+	//{
+	//	temp.resize(0, 50);
+	//	ratio = (double)height / (double)temp.height;
+	//}
 
 	temp.get_raw_data();
 
@@ -2653,7 +2653,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 	{
 		for (y = 0; y < height; y++)
 		{
-			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
 				r.left = x;
 		}
 	}
@@ -2663,7 +2663,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 	{
 		for (x = 0; x < width; x++)
 		{
-			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
 				r.top = y;
 		}
 	}
@@ -2673,7 +2673,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 	{
 		for (y = 0; y < height; y++)
 		{
-			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
 				r.right = x;
 		}
 	}
@@ -2684,7 +2684,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 	{
 		for (x = 0; x < width; x++)
 		{
-			if (get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
 				r.bottom = y;
 		}
 	}

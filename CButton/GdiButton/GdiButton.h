@@ -267,7 +267,8 @@ public:
 	void		set_font_size(int nSize);
 	void		set_font_bold(bool bBold = true);
 
-	//배경이 투명인 경우는 parent의 배경을 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
+	//배경이 투명인 경우는 parent의 배경까지 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
+	//그렇지 않으면 투명 픽셀들이 계속 누적되어 투명으로 표시되지 않는다.
 	void		redraw_window(bool bErase = false);
 
 	int			GetCheck();

@@ -46,6 +46,16 @@
   back_color()를 이용해 배경색을 칠할 경우에는 m_transparent는 false로 변경된다.
   따라서 배경색을 별도로 지정할 경우에는 반드시 add_image() 설정후에 해야 한다.
 
+[투명 png 또는 round button의 깜빡임 원인 및 현재 조치 내용]
+- 버튼이 그려지기 전에 parent에서 버튼 영역을 invalidate() 시킨 후 버튼을 그려야만 투명도가 중첩되는 부작용을 막을 수 있다.
+  장점은 배경에 어떤 이미지를 깔아도 버튼이 투명하게 표시된다.
+  근데 이렇게하면 깜빡임이 발생했다.
+  일반적으로 parent에 배경 이미지를 사용하는 경우는 거의 없다보니 단색으로 칠한 후 버튼을 그리게하도록 수정하여
+  깜빡임을 없앴다.
+- 만약 parent에 배경 이미지를 표시할 경우 resize를 지원하지 않는 경우라면 *m_img_parent_back에 저장하고
+  버튼 영역만큼 이미지를 잘라와서 그려준 후 버튼을 그리면 된다.
+  parent가 resize를 지원해야 한다면 매우 복잡해진다.
+
 [fit_to_image 관련]
 - 사용할 이미지를 실제 UI design에 맞게 resize해서 사용하는 것을 원칙으로 한다.
 1. 컨트롤의 크기에 맞춰 이미지의 크기를 자동 조정해서 그려줄 경우
@@ -236,7 +246,7 @@ public:
 
 	//void		add_rgb(int red, int green, int blue, COLORREF crExcept);
 
-	void		set_transparent(bool trans = true);
+	void		set_transparent(bool trans = true, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
@@ -246,6 +256,10 @@ public:
 	//(NH 프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
 	void		set_back_color(Gdiplus::Color normal, bool auto_set_color = true);
+
+	//투명 png를 그리거나 round button일 경우는 parent back으로 칠해주고 그려줘야 한다. 그래야 깜빡임을 없앨 수 있다.
+	void		set_parent_back_color(Gdiplus::Color cr_parent_back);
+
 	//CGdiButton& text_color() { m_cr_text.clear(); }
 	//CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]
@@ -267,9 +281,6 @@ public:
 	void		set_font_size(int nSize);
 	void		set_font_bold(bool bBold = true);
 
-	//배경이 투명인 경우는 parent의 배경까지 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
-	//그렇지 않으면 투명 픽셀들이 계속 누적되어 투명으로 표시되지 않는다.
-	void		redraw_window(bool bErase = false);
 
 	int			GetCheck();
 	void		SetCheck(int check_state);
@@ -396,6 +407,17 @@ protected:
 	//배경이 윈도우 기본값이 아닌 그림이고 투명 PNG를 그리는 경우, resize까지 할 경우는 true로 한다.
 	//단, 이 경우 아직 완성된 기능이 아니라서 약간 깜빡이는 현상이 있다.
 	bool		m_transparent = false;
+
+	//parent의 배경에 사용된 이미지를 설정해야 투명 png를 올바르게 표시할 수 있다.
+	//parent가 resize가 가능한 경우는 처리가 매우 복잡해진다. 그때는 어쩔수없이 redraw_window()로 갱신해야 한다.
+	//만약 parent가 resize를 사용하지 않거나 배경이 단색이라면 깜빡임 없이 그릴 수 있다.
+	CGdiplusBitmap* m_img_parent = NULL;
+	Gdiplus::Color	m_cr_parent_back = Gdiplus::Color::Transparent;
+
+	//배경이 투명인 경우는 parent의 배경까지 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
+	//그렇지 않으면 투명 픽셀들이 계속 누적되어 투명으로 표시되지 않는다.
+	void		redraw_window(bool bErase = false);
+
 
 	//버튼 텍스트 앞에 그려질 이미지. 이미지 버튼이 아닌 기본 MFC 버튼 형태일 경우 앞에 이미지를 추가할 경우 사용.
 	CGdiplusBitmap	m_img_header;

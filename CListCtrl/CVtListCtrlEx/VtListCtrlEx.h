@@ -168,7 +168,9 @@ public:
 	CString		get_selected_path();
 
 	//해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.
-	WIN32_FIND_DATA	get_file_data(int index);
+	WIN32_FIND_DATA	get_win32_find_data(int index);
+	//해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 갱신한다.
+	void		set_win32_find_data(int index, WIN32_FIND_DATA data);
 
 	//path를 받아 m_path에 저장하고 refresh_list()를 호출한다.
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시

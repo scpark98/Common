@@ -2609,7 +2609,7 @@ int CVtListCtrlEx::get_selected_items(std::deque<WIN32_FIND_DATA>* dq)
 		{
 			WIN32_FIND_DATA data;
 			memset(&data, 0, sizeof(data));
-			data = get_file_data(selected_index[i]);
+			data = get_win32_find_data(selected_index[i]);
 			TRACE(_T("get_selected_items. selected_index[%d] = %d. label = %s\n"), i, selected_index[i], data.cFileName);
 			if (_tcslen(data.cFileName) > 0)
 				dq->push_back(data);
@@ -2861,7 +2861,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		else
 		{
 			//파일일 경우는 현재로는 아무처리하지 않는다.
-			//if (!(get_file_data(item).dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			//if (!(get_win32_find_data(item).dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 			if (!get_text(item, col_filesize).IsEmpty())
 				return TRUE;
 
@@ -3586,12 +3586,22 @@ CString	CVtListCtrlEx::get_selected_path()
 //display_filelist()를 할 때 m_cur_folders, m_cur_files 항목을 추가하면서
 //SetItemData(index, no);로 해당 항목이 위 두 배열에서 몇번째인지 저장한 후
 //GetItemData(index);를 통해 해당 항목의 WIN32_FIND_DATA 값을 얻어오도록 수정함.
-WIN32_FIND_DATA	CVtListCtrlEx::get_file_data(int index)
+WIN32_FIND_DATA	CVtListCtrlEx::get_win32_find_data(int index)
 {
 	int idx = GetItemData(index);
 	if (idx >= 0 && idx < m_cur_folders.size())
 		return m_cur_folders[idx].data;
 	return m_cur_files[idx - m_cur_folders.size()].data;
+}
+
+//해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 갱신한다.
+void CVtListCtrlEx::set_win32_find_data(int index, WIN32_FIND_DATA data)
+{
+	int idx = GetItemData(index);
+	if (idx >= 0 && idx < m_cur_folders.size())
+		memcpy(&m_cur_folders[idx].data, &data, sizeof(WIN32_FIND_DATA));
+	else
+		memcpy(&m_cur_files[idx - m_cur_folders.size()].data, &data, sizeof(WIN32_FIND_DATA));
 }
 
 void CVtListCtrlEx::set_path(CString path, bool refresh)

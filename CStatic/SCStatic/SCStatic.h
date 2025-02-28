@@ -59,7 +59,10 @@ public:
 	void			set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void			SetWindowText(CString sText) { set_text(sText); }
 	void			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
-	void			set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...);
+
+	//printf()와 같이 변수값을 바로 문자열로 세팅할 수 있다.
+	//컬러값을 변경하지 않으려면 cr_text = -1로 넘겨준다.
+	void			set_textf(Gdiplus::Color cr_text, LPCTSTR format, ...);
 
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
@@ -143,7 +146,7 @@ public:
 	void			set_blink(BOOL bBlink = TRUE);
 	void			set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
 
-	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수이므로 자동 설정되도록 수정
+	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수이므로 자동 설정되도록 수정함.
 	void			set_link(CString url, Gdiplus::Color cr_link = Gdiplus::Color::RoyalBlue);
 
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)

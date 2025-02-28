@@ -451,10 +451,17 @@ void CGdiButton::add_rgb(int red, int green, int blue, Gdiplus::Color crExcept)
 	redraw_window();
 }
 */
-void CGdiButton::set_transparent(bool trans)
+void CGdiButton::set_transparent(bool trans, Gdiplus::Color cr_parent_back)
 {
 	m_transparent = trans;
-	m_cr_back.clear();
+
+	if (cr_parent_back.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_parent_back = cr_parent_back;
+
+	//radiobutton 또는 checkbox가 m_img도 없을 경우는 배경이 투명해야 하므로 그때만 m_cr_back을 clear()한다.
+	if (m_image.size() == 0 && (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))))
+		m_cr_back.clear();
+
 	redraw_window();
 }
 
@@ -797,6 +804,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	GetClientRect(rc);
 	GetWindowText(text);
 
+	//if (text == _T("센터정렬"))
+	//	text = _T("센터정렬");
+
 	rText = rc;
 
 	CMemoryDC				dc(pDC1, &rc);
@@ -822,6 +832,33 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
 	if (m_transparent)
 	{
+		//버튼의 위치를 얻어온다.
+		CRect rbutton;
+		GetWindowRect(&rbutton);
+		CWnd* pParent = GetParent();
+		ASSERT(pParent);
+		pParent->ScreenToClient(&rbutton);  //convert our corrdinates to our parents
+
+		//투명 png button일 경우 또는 round 버튼일 경우는 그 배경이 parent의 배경 이미지 또는 parent의 배경색으로 먼저 칠해져야 한다.
+		if (m_img_parent != NULL && m_img_parent->is_valid())
+		{
+		}
+		else
+		{
+			dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
+			//CDC* pDC = pParent->GetDC();
+			//CDC MemDC;
+			//CBitmap bmp;
+			//MemDC.CreateCompatibleDC(pDC);
+			//bmp.CreateCompatibleBitmap(pDC, rbutton.Width(), rbutton.Height());
+			//CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+			//MemDC.BitBlt(0, 0, rbutton.Width(), rbutton.Height(), pDC, rbutton.left, rbutton.top, SRCCOPY);
+			//dc.BitBlt(0, 0, rbutton.Width(), rbutton.Height(), &MemDC, 0, 0, SRCCOPY);
+			//MemDC.SelectObject(pOldBmp);
+			//pParent->ReleaseDC(pDC);
+			//MemDC.DeleteDC();
+		}
+		/*
 		cr_back = Gdiplus::Color::Transparent;
 
 		CRect Rect;
@@ -844,6 +881,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		MemDC.SelectObject(pOldBmp);
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
+		*/
 	}
 
 	//check or radio인데 m_image.size()가 1뿐이라면
@@ -1100,7 +1138,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			draw_round_rect(&g, CRectTogpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
 			draw_rectangle(g, rc, m_cr_border);
-		//draw_round_rect(&g, CRectTogpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Blue, m_round, 4);
 	}
 
 
@@ -1415,7 +1452,9 @@ void CGdiButton::set_round(int round)
 		round = 0;
 
 	m_round = round;
-	m_transparent = (m_round > 0);
+
+	if (m_round > 0)
+		set_transparent(true);
 
 	redraw_window();
 }
@@ -1427,9 +1466,11 @@ int CGdiButton::GetCheck()
 
 void CGdiButton::redraw_window(bool bErase)
 {
+	Invalidate();
 	//투명이미지인 경우에는 parent에서 invalidate한 후 이 버튼이 그려져야하므로 GetParent()->InvalidateRect()을 호출했는데
 	//이로인해 깜빡임이 발생한다.
 	//GetParent()->InvalidateRect()호출하지 않을 경우 투명png 버튼일 경우 투명 영역이 계속 쌓이면서 투명으로 보이지 않게 된다.
+	/*
 	if (m_transparent)
 	{
 		CRect rc;
@@ -1443,6 +1484,7 @@ void CGdiButton::redraw_window(bool bErase)
 	{
 		Invalidate();
 	}
+	*/
 }
 
 void CGdiButton::Toggle()

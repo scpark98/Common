@@ -834,6 +834,8 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	GetClientRect(&rc);
 
 	int pos = (int)((double)point.x * (double)(upper - lower) / (double)rc.right) + lower;
+	Clamp(pos, lower, upper);
+
 	CString str;
 
 	if (m_use_bookmark)

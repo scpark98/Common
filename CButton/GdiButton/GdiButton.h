@@ -333,7 +333,7 @@ public:
 	//blur_sigma가 크면 클수록 그림자의 blur가 강해짐
 	//0.0f보다 작은 음수일 경우는 해당 멤버변수값을 갱신하지 않는다.
 	//draw_shadow(true, 5.0f, -1.0f);라고 주면 m_shadow_weight는 갱신되지만 m_blur_sigma값은 변경되지 않는다.
-	void		draw_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 2.5f);
+	void		draw_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 4.0f);
 
 	//blink
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown

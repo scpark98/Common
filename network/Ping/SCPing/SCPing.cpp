@@ -23,6 +23,8 @@ CSCPing::CSCPing()
 
 CSCPing::~CSCPing()
 {
+	stop();
+
 	WSACleanup();
 }
 
@@ -42,7 +44,7 @@ void CSCPing::add(CString job_name, CString addr, int retry, int timeout)
 	if (it != m_map.end())
 		m_map[params->job_name] = PING_THREAD_IS_RUNNING;
 	else
-		m_map.insert(std::pair<CString, bool>(params->job_name, PING_THREAD_IS_RUNNING));
+		m_map.insert(std::pair<CString, int>(params->job_name, PING_THREAD_IS_RUNNING));
 
 	std::thread t(&CSCPing::thread_ping, this, params);
 	t.detach();

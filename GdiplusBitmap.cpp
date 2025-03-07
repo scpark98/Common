@@ -2625,7 +2625,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 	if (is_empty())
 		return r;
 
-	//이미지가 큰 경우 탐색시간이 길어지므로 작게 줄여서 검사한다.
+	//이미지가 큰 경우 탐색시간이 길어지므로 작게 줄여서 검사한다. 미완성!
 	double ratio = 1.0;
 	int new_width;
 	int new_height;

@@ -2393,6 +2393,56 @@ bool CVtListCtrlEx::delete_item(int index, bool delete_physical_file)
 	return res;
 }
 
+bool CVtListCtrlEx::delete_item(CString label)
+{
+	//shell_listctrl일 경우 fullpath라면 파일명 또는 폴더명만 추출한다.
+	if (m_is_shell_listctrl)
+	{
+		CString filename = get_part(label, fn_name);
+
+		std::deque<CListCtrlData>::iterator it_data;
+		it_data = std::find_if(m_list_db.begin(), m_list_db.end(),
+			[filename](CListCtrlData data)
+			{
+				return (data.text[0].Compare(filename) == 0);
+			});
+
+		int index = std::distance(m_list_db.begin(), it_data);
+
+		//리스트에서 지우고
+		delete_item(index);
+
+		//파일, 폴더 목록에서도 지워준다.
+		std::deque<CVtFileInfo>::iterator it;
+		it = std::find_if(m_cur_folders.begin(), m_cur_folders.end(),
+			[label](CVtFileInfo fi)
+			{
+				return (label.CompareNoCase(fi.data.cFileName) == 0);
+			});
+
+		if (it != m_cur_folders.end())
+		{
+			m_cur_folders.erase(it);
+			return true;
+		}
+
+		it = std::find_if(m_cur_files.begin(), m_cur_files.end(),
+			[label](CVtFileInfo fi)
+			{
+				return (label.CompareNoCase(fi.data.cFileName) == 0);
+			});
+
+		if (it != m_cur_files.end())
+		{
+			m_cur_files.erase(it);
+			return true;
+		}
+
+	}
+
+	return true;
+}
+
 void CVtListCtrlEx::delete_empty_lines()
 {
 	CString line_text;
@@ -3436,7 +3486,7 @@ bool CVtListCtrlEx::is_item_visible(int index, bool bPartial)
 	return false;
 }
 
-void CVtListCtrlEx::random()
+void CVtListCtrlEx::shuffle()
 {
 	std::random_device rd;
 	std::default_random_engine re(rd());
@@ -3736,8 +3786,12 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		set_column_text_align(col_filedate, LVCFMT_LEFT);
 	}
 
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
-				(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(-1));
+	//해당 폴더내에 폴더, 파일이 전혀 없으면 이 메시지를 보낼 필요도 없다.
+	if (m_cur_folders.size() + m_cur_files.size() > 0)
+	{
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(-1));
+	}
 
 	//asc는 폴더먼저, desc는 파일먼저 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)

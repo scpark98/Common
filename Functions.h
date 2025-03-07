@@ -747,7 +747,7 @@ struct	NETWORK_INFO
 		std::deque<T>::iterator it = std::find(dqList.begin(), dqList.end(), element);
 		if (it != dqList.end())
 		{
-			return distance(dqList.begin(), it);
+			return std::distance(dqList.begin(), it);
 		}
 
 		return -1;
@@ -1062,7 +1062,10 @@ struct	NETWORK_INFO
 	//n은 0x3C부터 4바이트가 그 크기이다.(28 bytes)
 	char*		GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLength);
 
+	//text, binary를 구분하고자 했으나 정상 동작하지 않고 있음. 수정 필요!
 	bool		is_binary(CString sfile);
+
+	void		watch_file_system(CString fullpath);
 
 //////////////////////////////////////////////////////////////////////////
 //인터넷 파일

@@ -315,6 +315,7 @@ public:
 
 	//shell_listctrl이라면 파일 또한 삭제할 지 파라미터를 줄 수 있고 실제 파일을 지운 후에 리스트에서도 삭제해야 한다.
 	bool		delete_item(int index, bool delete_physical_file = false);
+	bool		delete_item(CString label);
 
 	//라인 전체가 공백이면 해당 라인을 삭제한다.
 	void		delete_empty_lines();
@@ -519,8 +520,8 @@ public:
 	//항목이 추가되면 auto scroll되지만 특정 항목을 선택하면 false로 된다.
 	bool			m_auto_scroll = true;
 
-
-	void			random();
+	//리스트 항목들을 무작위로 섞는다.
+	void			shuffle();
 
 	DWORD			index_from_point(int x, int y);
 

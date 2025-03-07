@@ -57,7 +57,6 @@ public:
 	int			delay = 0;
 	int			payload_size = 0;
 	int			TTL = 0;
-
 };
 
 class CSCPing

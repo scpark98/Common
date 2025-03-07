@@ -139,18 +139,36 @@ CString get_time_str(COleDateTime t, CString sep, bool h24, bool sec)
 	if (h24)
 	{
 		if (GetUserDefaultUILanguage() == 1042)
+		{
 			str.Format(_T("%02d%s%02d%s%02d"), h, sep, m, sep, s);
+		}
 		else
+		{
 			str.Format(_T("%02d%s%02d%s%02d"), h, sep, m, sep, s);
+		}
 	}
 	else
 	{
 		if (GetUserDefaultUILanguage() == 1042)
+		{
 			str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
+		}
 		else
-			str.Format(_T("%2d%s%02d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, sep, s, (am ? _T("AM") : _T("PM")));
+		{
+			if (sec)
+			{
+				str.Format(_T("%2d%s%02d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, sep, s, (am ? _T("AM") : _T("PM")));
+			}
+			else
+			{
+				str.Format(_T("%2d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, (am ? _T("AM") : _T("PM")));
+				return str;
+			}
+		}
 	}
 
+	//초 표시가 false일 경우는 위에서 2자리와 sep길이만큼 잘라준다.
+	//단, !h24이고 한글윈도우인 경우에만 아래 처리를 해야 한다.
 	if (!sec)
 		str = str.Left(str.GetLength() - 2 - sep.GetLength());
 
@@ -7179,6 +7197,11 @@ bool is_binary(CString sfile)
 	return false; // No non-printable characters, likely a text file
 }
 
+void watch_file_system(CString fullpath)
+{
+
+}
+
 CStringA UTF16toUTF8(const CStringW& utf16)
 {
 	CStringA utf8;
@@ -9491,8 +9514,10 @@ CString	get_original_path(CString path)
 
 	//단, 드라이브명까지 자동 변경되지 않는다.
 	//소문자로 넘어오면 소문자 그대로 리턴되므로 대문자로 변경하여 리턴한다.
+	//_toupper 가 아닌 반드시 _totupper를 사용함에 주의할 것.
+	//_toupper는 아스키 코드값을 shift시키는 단순 매크로임.
 	if (_tcslen(long_path) > 0)
-		long_path[0] = _toupper(long_path[0]);
+		long_path[0] = _totupper(long_path[0]);
 
 	return CString(long_path);
 }
@@ -13791,7 +13816,7 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 		g_monitors.push_back(CSCMonitorInfo(&mi, hMonitor));
 	}
 
-	TRACE(_T("%s\n"), str);
+	//TRACE(_T("%s\n"), str);
 
 	return TRUE;
 }

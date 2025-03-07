@@ -670,10 +670,10 @@ void CSCThemeDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	CPoint pt;
 	GetCursorPos(&pt);
 	int index = get_monitor_index(pt.x, pt.y);
-	TRACE(_T("index = %d, r = %s\n"), index, get_rect_info_string(g_monitors[index].rMonitor));
+	//TRACE(_T("index = %d, r = %s\n"), index, get_rect_info_string(g_monitors[index].rMonitor));
 	lpMMI->ptMaxPosition.y = 0;
 
-	TRACE(_T("before ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
+	//TRACE(_T("before ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
 
 	//GetMonitorInfo()
 	//lpMMI값은 항상 기본 모니터를 기준으로 넘어오므로
@@ -688,7 +688,7 @@ void CSCThemeDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	//lpMMI->ptMaxSize.y -= (sz_diff.cy + 1 + (is_shown_taskbar ? sz.cy : 0));
 	lpMMI->ptMaxSize.y -= (2 + (is_shown_taskbar ? sz.cy : 0));
 
-	TRACE(_T("after  ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
+	//TRACE(_T("after  ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
 
 	CDialogEx::OnGetMinMaxInfo(lpMMI);
 }

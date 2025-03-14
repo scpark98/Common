@@ -1576,6 +1576,14 @@ UINT CDirectoryChangeWatcher::MonitorDirectoryChanges(LPVOID lpvThis)
 
     do
     {
+		//while (pThis->m_watching_paused)
+		//{
+		//	TRACE(_T("watching paused.\n"));
+		//	Sleep(1000);
+		//}
+
+		TRACE(_T("watching...\n"));
+
         // Retrieve the directory info for this directory
         // through the io port's completion key
         if( !GetQueuedCompletionStatus( pThis->m_hCompPort,
@@ -1666,7 +1674,7 @@ UINT CDirectoryChangeWatcher::MonitorDirectoryChanges(LPVOID lpvThis)
 											NULL) )//no completion routine!
 						{
 							pdi->m_dwReadDirError = GetLastError();
-							if( pdi->GetChangeHandler() )
+							if (pdi->GetChangeHandler())
 								pdi->GetChangeHandler()->On_WatchStarted(pdi->m_dwReadDirError, pdi->m_strDirName);
 						}
 						else
@@ -1674,9 +1682,10 @@ UINT CDirectoryChangeWatcher::MonitorDirectoryChanges(LPVOID lpvThis)
 						 //allow it to run normally
 							pdi->m_RunningState = CDirWatchInfo::RUNNING_STATE_NORMAL;
 							pdi->m_dwReadDirError = ERROR_SUCCESS;
-							if( pdi->GetChangeHandler() )
+							if (pdi->GetChangeHandler())
 								pdi->GetChangeHandler()->On_WatchStarted(ERROR_SUCCESS, pdi->m_strDirName );
 						}
+
 						pdi->m_StartStopEvent.SetEvent();//signall that the ReadDirectoryChangesW has been called
 														 //check CDirWatchInfo::m_dwReadDirError to see whether or not ReadDirectoryChangesW succeeded...
 

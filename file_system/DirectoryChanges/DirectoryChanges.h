@@ -365,7 +365,6 @@ private:
 
 ///////////////////////////////////////////////////////////
 
-class CDirectoryChangeWatcher  
 /***************************************
 	A class to monitor a directory for changes made to files in it, or it's subfolders.
 	The class CDirectoryChangeHandler handles the changes. You derive a class from CDirectoryChangeHandler to handle them.
@@ -375,27 +374,28 @@ class CDirectoryChangeWatcher
 
 	Multiple directories can be watched simultaneously using a single instance of CDirectoryChangeWatcher.
 	Single or multiple instances of CDirectoryChangeHandler object(s) can be used to handle changes to watched directories.
-	Directories can be added and removed from the watch dynamically at run time without destroying 
+	Directories can be added and removed from the watch dynamically at run time without destroying
 	the CDirectoryChangeWatcher object (or CDirectoryChangeHandler object(s).
 
 	This class uses a worker thread, an io completion port, and ReadDirectoryChangesW() to monitor changes to a direcory (or subdirectories).
 	There will always only be a single thread no matter how many directories are being watched(per instance of CDirectoryChangeHandler)
 
 	THREAD ISSUES:
-    This class uses worker threads.
-	Notifications (calling CDirectoryChangeHandler's virtual functions) are executed 
+	This class uses worker threads.
+	Notifications (calling CDirectoryChangeHandler's virtual functions) are executed
 	in the context of either the main thread, OR in a worker thread.
 
 	The 'main' thread is the thread that first calls CDirectoryChangeWatcher::WatchDirectory().
-	For notifications to execute in the main thread, it's required that the calling thread(usually the main thread) 
+	For notifications to execute in the main thread, it's required that the calling thread(usually the main thread)
 	has a message pump in order to process the notifications.
 
 	For applications w/out a message pump, notifications are executed in the context of a worker thread.
 
 	See the constructor for CDirectoryChangeWatcher.
 
-  
+
 ****************************************/
+class CDirectoryChangeWatcher  
 {
 public:
 
@@ -432,6 +432,12 @@ public:
 	BOOL	IsWatchingDirectory (const CString & strDirName)const;
 	int		NumWatchedDirectories()const; //counts # of directories being watched.
 
+	//scpark add. 간혹 모니터링을 일시정지해야 할 경우가 있다.
+	//UnwatchDirectory() 한 후 다시 WatchDirectory() 해도 동일하나 watching 대상이 많을 경우는 번거로울 수 있다.
+	//우선 watching되는 모든 항목을 일시정지한다.
+	//이렇게하면 
+	void	pause_watching(bool pause) { m_watching_paused = pause; }
+	bool	get_pause_state() { return m_watching_paused; }
 	
 	BOOL	UnwatchDirectory(const CString & strDirToStopWatching);//stops watching specified directory.
 	BOOL	UnwatchAllDirectories();//stops watching ALL watched directories.
@@ -533,7 +539,7 @@ public:
 
 	bool	m_bAppHasGUI; //dispatch to main thread, or a worker thread?
 	DWORD	m_dwFilterFlags;//options for determining the behavior of the filter tests.
-	
+	bool	m_watching_paused = false;
 };
 
 

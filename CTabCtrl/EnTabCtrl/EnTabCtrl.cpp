@@ -167,7 +167,7 @@ void CEnTabCtrl::DrawItem(LPDRAWITEMSTRUCT lpdis)
 	FormatText(sTemp, pDC, rItem.Width());
 
 	pDC->SetTextColor(GetTabTextColor(bSelected));
-	pDC->DrawText(sTemp, rItem, DT_NOPREFIX | DT_CENTER);
+	pDC->DrawText(sTemp, rItem, DT_NOPREFIX | DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 }
 
 void CEnTabCtrl::DrawItemBorder(LPDRAWITEMSTRUCT lpdis)
@@ -189,14 +189,14 @@ void CEnTabCtrl::DrawItemBorder(LPDRAWITEMSTRUCT lpdis)
 		rItem.bottom += bSelected ? -1 : 1;
 
 		// edges
-		pDC->FillSolidRect(CRect(rItem.left, rItem.top, rItem.left + 1, rItem.bottom), crHighlight);
-		pDC->FillSolidRect(CRect(rItem.left, rItem.top, rItem.right, rItem.top + 1), crHighlight);
-		pDC->FillSolidRect(CRect(rItem.right - 1, rItem.top, rItem.right, rItem.bottom), crShadow);
+		//pDC->FillSolidRect(CRect(rItem.left, rItem.top, rItem.left + 1, rItem.bottom), crHighlight);
+		//pDC->FillSolidRect(CRect(rItem.left, rItem.top, rItem.right, rItem.top + 1), crHighlight);
+		//pDC->FillSolidRect(CRect(rItem.right - 1, rItem.top, rItem.right, rItem.bottom), crShadow);
 	}
 	else // draw simple dividers
 	{
-		pDC->FillSolidRect(CRect(rItem.left - 1, rItem.top, rItem.left, rItem.bottom), crShadow);
-		pDC->FillSolidRect(CRect(rItem.right - 1, rItem.top, rItem.right, rItem.bottom), crShadow);
+		//pDC->FillSolidRect(CRect(rItem.left - 1, rItem.top, rItem.left, rItem.bottom), crShadow);
+		//pDC->FillSolidRect(CRect(rItem.right - 1, rItem.top, rItem.right, rItem.bottom), crShadow);
 	}
 }
 
@@ -209,7 +209,7 @@ void CEnTabCtrl::DrawMainBorder(LPDRAWITEMSTRUCT lpdis)
 	COLORREF crHighlight = Lighter(crTab, 1.5f);
 	COLORREF crShadow = Darker(crTab, 0.75f);
 
-	pDC->Draw3dRect(rBorder, crHighlight, crShadow);
+	//pDC->Draw3dRect(rBorder, crHighlight, crShadow);
 }
 
 COLORREF CEnTabCtrl::GetTabColor(BOOL bSelected)

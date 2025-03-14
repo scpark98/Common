@@ -337,6 +337,12 @@ public:
 	//리스트에 표시할 항목이 없을 경우 표시할 텍스트 설정
 	void		set_text_on_empty(CString text) { m_text_on_empty = text; Invalidate(); };
 
+	//shell_listctrl일 때 윈도우 탐색기에서 파일/폴더의 레이블을 변경하는 이벤트가 발생하면
+	//main에서 이 함수를 호출하여 레이블을 변경한다.
+	//shell_listctrl이 아니어도 사용 가능하나 레이블로 비교하므로 동일한 항목이 있을 경우는 정상 처리되지 않으므로
+	//사용하지 말 것!
+	void		rename(CString old_text, CString new_text);
+
 //선택 관련
 	//start부터 맨 처음 선택된 항목의 인덱스를 리턴한다.
 	int			get_selected_index(int start = 0);

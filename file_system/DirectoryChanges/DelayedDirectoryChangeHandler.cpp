@@ -392,8 +392,7 @@ bool CDelayedNotificationThread::StartThread()
 bool CDelayedNotificationThread::StopThread()
 {
 	TRACE(_T("CDelayedNotificationThread::StopThread()\n"));
-	if( s_hThread != NULL 
-	&&	s_dwThreadID != 0 )
+	if (s_hThread != NULL && s_dwThreadID != 0)
 	{
 		PostThreadMessage(s_dwThreadID, WM_QUIT, 0,0);
 

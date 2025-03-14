@@ -3911,13 +3911,13 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 
  		while (pAdapter)
 		{
-			_tcscpy(pInfo->sDescription, A2T(pAdapter->Description));
+			_tcscpy(pInfo->sDescription, CString(pAdapter->Description));
 
 			//if (pAdapter->Type == MIB_IF_TYPE_ETHERNET && CString(pInfo->sDescription).Find(sTargetDeviceDescription) >= 0)
 			{
-				_tcscpy(pInfo->sIPAddress, A2T(pAdapter->IpAddressList.IpAddress.String));
-				_tcscpy(pInfo->sGateway, A2T(pAdapter->GatewayList.IpAddress.String));
-				_tcscpy(pInfo->sSubnetMask, A2T(pAdapter->IpAddressList.IpMask.String));
+				_tcscpy(pInfo->sIPAddress, CString(pAdapter->IpAddressList.IpAddress.String));
+				_tcscpy(pInfo->sGateway, CString(pAdapter->GatewayList.IpAddress.String));
+				_tcscpy(pInfo->sSubnetMask, CString(pAdapter->IpAddressList.IpMask.String));
 
 				//TCHAR sMacAddress[16] 이므로 구분자를 넣어주면 안된다.
 				//main에서 Functions.h의 get_mac_address_format()함수로 구분자를 넣어서 표시할 것.
@@ -5452,51 +5452,143 @@ int	get_text_encoding(CString sfile)
 {
 	int text_encoding = text_encoding_ansi;
 
-	unsigned char buf[1024];
+	unsigned char buf[4096] = { 0, };
 	int result;
 
 	FILE* fp = _tfopen(sfile, _T("rb"));
 	if (fp == NULL)
 		return text_encoding_unknown;
 
-	fread(buf, 1, 1024, fp);
-	if (buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf)
-		text_encoding = text_encoding_utf8bom;
-	else if (buf[0] == 0xff && buf[1] == 0xfe)
-		text_encoding = text_encoding_unicode;
-	else if (IsTextUnicode(buf, 500, &result))
-		text_encoding = text_encoding_unicode;
-
+	size_t dwRead = fread(buf, 1, 4096, fp);
 	fclose(fp);
+
+	if (dwRead >= 3 && buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf)
+		text_encoding = text_encoding_utf8bom;
+	else if (dwRead >= 2 && buf[0] == 0xfe && buf[1] == 0xff)
+		text_encoding = text_encoding_utf16be;
+	else if (dwRead >= 2 && buf[0] == 0xff && buf[1] == 0xfe)
+		text_encoding = text_encoding_utf16be;
+	else if (dwRead >= 4 && buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0xfe && buf[3] == 0xff)
+		text_encoding = text_encoding_utf32be;
+	else if (dwRead >= 4 && buf[0] == 0xff && buf[1] == 0xfe && buf[2] == 0x00 && buf[3] == 0x00)
+		text_encoding = text_encoding_utf32le;
+	else if (dwRead >= 4 && buf[0] == 0x2b && buf[1] == 0x2f && buf[2] == 0x76 && buf[3] == 0x38)
+		text_encoding = text_encoding_utf7;
+	else if (dwRead >= 4 && buf[0] == 0x2b && buf[1] == 0x2f && buf[2] == 0x76 && buf[3] == 0x39)
+		text_encoding = text_encoding_utf7;
+	{
+		//BOM이 없는 일반 파일의 경우 아래와 같이 utf8 문자 범위를 검사하여 utf8인지 euc-kr인지 판별한다.
+		//출처: https://dev-drive.tistory.com/10 [Dev Drive:티스토리]
+		//단, 용량이 0바이트이면 판별이 불가하므로 utf8로 간주한다.
+		bool is_utf8 = true;
+
+		unsigned char* start = (unsigned char*)buf;
+		unsigned char* end = (unsigned char*)buf + dwRead;
+
+		while (start < end)
+		{
+			if (*start < 0x80) // (10000000)[output][/output]
+			{
+				start++;
+			}
+			else if (*start < (0xC0)) // (11000000)
+			{
+				is_utf8 = false;
+				break;
+			}
+			else if (*start < (0xE0)) // (11100000)
+			{
+				if (start >= end - 1)
+					break;
+				if ((start[1] & (0xC0)) != 0x80)
+				{
+					is_utf8 = false;
+					break;
+				}
+				start += 2;
+			}
+			else if (*start < (0xF0)) // (11110000)
+			{
+				if (start >= end - 2)
+					break;
+				if ((start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80)
+				{
+					is_utf8 = false;
+					break;
+				}
+				start += 3;
+			}
+			else
+			{
+				is_utf8 = false;
+				break;
+			}
+		}
+
+		if (is_utf8)
+			text_encoding = text_encoding_utf8;
+		else
+			text_encoding = text_encoding_ansi;
+	}
 
 	return text_encoding;
 }
 
-CString read(CString filepath, int code_page)
+//파일을 읽어서 CString으로 리턴한다. max_length < 0이면 전체 파일을 읽어서 리턴한다.
+//encoding < 0이면 encoding 방식을 자동 판별하여 읽어온다.
+CString read(CString filepath, int max_length, int encoding)
 {
 	CString result;
 
 	if (PathFileExists(filepath) == false)
 		return result;
 
-	if (code_page != CP_ACP && code_page != CP_UTF8)
-		code_page = CP_UTF8;
+	int text_encoding = get_text_encoding(filepath);
+	uint64_t filesize = get_file_size(filepath);
+
+	if (max_length > 0)
+		max_length = MIN(filesize, max_length);
+	else
+		max_length = filesize;
+
+	if (filesize == 0)
+		return result;
+
+	if (encoding < 0)
+	{
+		if (text_encoding == text_encoding_ansi)
+			encoding = CP_ACP;
+		else
+			encoding = CP_UTF8;
+	}
+	else if (encoding != CP_ACP && encoding != CP_UTF8)
+	{
+		encoding = CP_UTF8;
+	}
 
 	FILE* fp = NULL;
 	
-	if (code_page == CP_UTF8)
+	if (encoding == CP_UTF8)
+	{
+		TCHAR* data = new TCHAR[max_length * 2 + 1];
+		memset(data, 0, sizeof(TCHAR) * (max_length * 2 + 1));
 		fp = _tfopen(filepath, _T("rt")CHARSET);
+		fread(data, 1, max_length * 2, fp);
+		result = CString(data);
+		delete[] data;
+	}
 	else
-		fp = _tfopen(filepath, _T("rt"));
-
-	uint64_t filesize = get_file_size(filepath);
-	TCHAR* data = new TCHAR[filesize];
-	_fgetts(data, get_file_size(filepath) * 2, fp);
+	{
+		char* data = new char[max_length + 1];
+		memset(data, 0, sizeof(char) * (max_length + 1));
+		_tfopen_s(&fp, filepath, _T("rt"));
+		fread(data, 1, max_length, fp);
+		result = CString(data);
+		delete[] data;
+	}
 
 	fclose(fp);
 
-	result = CString(data);
-	delete[] data;
 	return result;
 }
 
@@ -7172,29 +7264,12 @@ char* GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLengt
 
 bool is_binary(CString sfile)
 {
-	std::string filename = CT2CA(sfile);
-	std::ifstream file(filename, std::ios::binary); // Open in binary mode
-	if (!file)
-	{
-		//std::cerr << "Cannot open file: " << filename << std::endl;
-		return false;
-	}
+	int text_encoding = get_text_encoding(sfile);
 
-	const size_t bufferSize = 512;
-	char buffer[bufferSize];
+	if (text_encoding == text_encoding_unknown)
+		return true;
 
-	// Read the first 512 bytes (or less if file is smaller)
-	file.read(buffer, bufferSize);
-	std::streamsize bytesRead = file.gcount();
-
-	// Check for non-printable characters
-	for (std::streamsize i = 0; i < bytesRead; ++i)
-	{
-		if (!isprint(static_cast<unsigned char>(buffer[i])) && buffer[i] != '\n' && buffer[i] != '\t' && buffer[i] != '\r') {
-			return true; // Non-printable character found, likely a binary file
-		}
-	}
-	return false; // No non-printable characters, likely a text file
+	return false;
 }
 
 void watch_file_system(CString fullpath)
@@ -14869,6 +14944,9 @@ HICON load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
 	if (cy == 0)
 		cy = cx;
 
+	if (hInstance == NULL)
+		hInstance = AfxGetInstanceHandle();
+
 	//아래 LoadImage 함수를 통해서 아이콘 파일을 불러온 경우
 	//프로그램 종료 시 반드시 DestroyIcon을 해줘야 한다.
 	//그래서 DestroyIcon 안해도 되는 LR_SHARED를 사용했다.
@@ -14877,6 +14955,9 @@ HICON load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy /*= 0*/)
 
 CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
 {
+	if (hIcon == NULL)
+		return CSize(0, 0);
+
 	//int cxIcon = GetSystemMetrics(SM_CXICON);
 	//int cyIcon = GetSystemMetrics(SM_CYICON);
 
@@ -18900,3 +18981,35 @@ void process_notification_area(HWND hWnd)
 	}
 }
 #endif
+
+CString get_asterisk_addr(CString ip)
+{
+	CString result;
+	bool is_num_ip = false;
+
+	if (ip.IsEmpty())
+		return result;
+
+	CString temp = ip;
+	temp.Replace(_T("."), _T(""));
+	is_num_ip = IsNatural(temp);
+
+	int dot1 = ip.Find('.');
+	int dot2 = ip.ReverseFind('.');
+
+	result = ip.Left(dot1);
+
+	if (is_num_ip)
+	{
+		for (int i = 0; i < dot2 - dot1; i++)
+			result += '*';
+		result += ip.Mid(dot2 + 1);
+	}
+	else
+	{
+		for (int i = 0; i < ip.GetLength() - dot1; i++)
+			result += '*';
+	}
+
+	return result;
+}

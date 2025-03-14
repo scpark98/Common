@@ -16,7 +16,7 @@
 	- resource의 제목표시줄 유무, 테두리 속성등에 무관하게 동작되도록 구현해야 하지만
 	  뭔가 모든 경우의 수에 대한 처리가 되지 않은 듯하다.
 	  따라서 우선 속성을 제목표시줄 = 없음, 테두리 = Resizing 으로 설정할 것.
-	  만약 resize를 지원하지 않는 dlg일 경우는 제목표시줄 = 없음, 테두리 = Dialog Frame 으로 설정.
+	  만약 resize를 지원하지 않는 dlg일 경우는 테두리 = Dialog Frame, 제목표시줄 = 없음 으로 설정.
 
 	  또한 main dlg의 OnInitDialog()에서 다음의 코드를 추가해줘야 한다.
 		//이 코드를 넣어야 작업표시줄에서 클릭하여 minimize, restore된다.
@@ -58,6 +58,7 @@ public:
 	//CSCThemeDlg(CString message, CString headline);
 	virtual ~CSCThemeDlg();
 
+
 	//윈도우 기본 타이틀바가 있는 dlg일 경우는 타이틀바와 관계된 모든 옵션은 무시된다.
 	//void	SetWindowText(CString title) { set_title(title); }
 	//void	SetWindowText(CString title) { CWnd::SetWindowText(title); m_title = title; Invalidate(); }
@@ -71,7 +72,9 @@ public:
 	void	set_title_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void	set_title_font_size(int size);
 
-	void	set_logo(UINT icon_id) { m_img_logo.load(icon_id); }
+	void	set_title_icon(UINT icon_id) { m_hIcon = AfxGetApp()->LoadIcon(icon_id); }
+	void	set_title_icon(HICON hIcon) { m_hIcon = hIcon; }
+	void	set_logo(UINT png_id) { m_img_logo.load(png_id); }
 	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
 
 
@@ -99,7 +102,7 @@ public:
 			m_sys_buttons.insert_button(-1, arg[i]);
 
 		m_sys_buttons.set_button_width(button_width);
-		m_sys_buttons.set_button_height(m_titlebar_height);
+		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 	}
 
 	void	set_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
@@ -131,9 +134,11 @@ protected:
 	//CSCThemeDlg를 상속받아 만든 dlg들에서도 TIMER_ID를 지정할 수 있고 일반적으로 0번부터 지정하므로
 	//여기서 0번부터 타이머 ID를 주면 위험하다. 다른 파생 dlg에서 사용하지 않을 법한 id부터 시작하자.
 
-	bool				m_use_shadow = true;	//default = true
-	CWndShadow			m_shadow;
-	void				init_shadow();
+	//bool				m_use_shadow = true;	//default = true
+	//CWndShadow			m_shadow;
+	//void				init_shadow();
+
+	HICON				m_hIcon;
 
 	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
 	bool				m_is_resizable = true;

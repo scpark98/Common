@@ -153,7 +153,7 @@ BOOL CSCThemeDlg::OnInitDialog()
 	return TRUE;  // return TRUE unless you set the focus to a control
 				  // 예외: OCX 속성 페이지는 FALSE를 반환해야 합니다.
 }
-
+/*
 void CSCThemeDlg::init_shadow()
 {
 	CWndShadow::Initialize(AfxGetInstanceHandle());
@@ -164,7 +164,7 @@ void CSCThemeDlg::init_shadow()
 	m_shadow.SetPosition(0, 0);	// -19 ~ 19
 	m_shadow.SetColor(RGB(0, 0, 0));
 }
-
+*/
 void CSCThemeDlg::reconstruct_title_font()
 {
 	m_title_font.DeleteObject();
@@ -200,7 +200,7 @@ INT_PTR CSCThemeDlg::DoModal()
 BOOL CSCThemeDlg::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return TRUE;
+	return FALSE;
 }
 
 
@@ -378,24 +378,29 @@ void CSCThemeDlg::OnPaint()
 		//dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
 		dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
 
-		//프로그램 아이콘 표시
+		//프로그램 아이콘 표시. 
 		if (m_show_logo)
 		{
-			if (m_img_logo.is_valid())//icon exist?
+			//png logo 이미지가 설정되어 있으면 우선하여 그리고
+			if (m_img_logo.is_valid())//
 			{
-				m_img_logo.draw(g, 0, 1);
+				m_img_logo.draw(g, 0, 0);
+			}
+			//없다면 main에서 set_title_icon()으로 설정한 아이콘을 그려준다.
+			else if (m_hIcon)//icon exist?
+			{
+				//윈도우 기본 타이틀바에 표시되는 아이콘은 16x16이고 32x32 영역에 그려진다.
+				draw_icon(&dc, m_hIcon, CRect(0, 0, m_titlebar_height, m_titlebar_height));
+				rTitle.left += m_titlebar_height;
 			}
 			else
 			{
-				//윈도우 기본 타이틀바에 표시되는 아이콘은 16x16이고 32x32 영역에 그려진다.
-				HICON hIcon = load_icon(AfxGetInstanceHandle(), 128, 16, 16);
-				draw_icon(&dc, hIcon, CRect(0, 1, m_titlebar_height, m_titlebar_height));
-				rTitle.left += m_titlebar_height;
+				
 			}
 		}
 		else
 		{
-			rTitle.left += 8;
+			rTitle.left += 6;
 		}
 
 
@@ -457,9 +462,10 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_cr_titlebar_text = Gdiplus::Color::White;
 		m_cr_titlebar_back = gRGB(59, 70, 92);
 
-		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 32);
+		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
 		m_sys_buttons.set_back_color(m_cr_titlebar_back);
 		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
+		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
 		m_title_lf.lfWeight = FW_BOLD;
 		m_title_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, 10);

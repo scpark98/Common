@@ -188,9 +188,14 @@ enum FILE_TYPE
 enum TEXT_ENCODING
 {
 	text_encoding_unknown = -1,
-	text_encoding_ansi = CP_ACP,
+	text_encoding_ansi = CP_ACP,	//= EUC-KR
+	text_encoding_utf7 = CP_UTF7,
+	text_encoding_utf8 = CP_UTF8,
 	text_encoding_utf8bom,
-	text_encoding_unicode,
+	text_encoding_utf16be,
+	text_encoding_utf16le,
+	text_encoding_utf32be,
+	text_encoding_utf32le,
 };
 
 enum RATIO_RECT_ATTACH
@@ -1049,8 +1054,10 @@ struct	NETWORK_INFO
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
 	bool		delete_file(CString fullpath, bool bTrashCan = false);
 	int			get_text_encoding(CString sfile);
-	CString		read(CString filepath, int code_page = CP_UTF8);
-	bool		save(CString filepath, CString text, int code_page = CP_UTF8);
+	//파일을 읽어서 CString으로 리턴한다. max_length < 0이면 전체 파일을 읽어서 리턴한다.
+	//encoding < 0이면 encoding 방식을 자동 판별하여 읽어온다.
+	CString		read(CString filepath, int max_length = -1, int encoding = -1);
+	bool		save(CString filepath, CString text, int encoding = CP_UTF8);
 	int			file_open(FILE** fp, CString mode, CString file);
 
 	//text 파일을 열어서 dqList에 넣어준다.
@@ -1063,6 +1070,7 @@ struct	NETWORK_INFO
 	char*		GetDataFromMP4File(char* sfile, char* sTag, uint8_t tagStart, int tagLength);
 
 	//text, binary를 구분하고자 했으나 정상 동작하지 않고 있음. 수정 필요!
+	//sfile
 	bool		is_binary(CString sfile);
 
 	void		watch_file_system(CString fullpath);
@@ -1218,6 +1226,9 @@ struct	NETWORK_INFO
 	CString		get_mac_addres(bool include_colon = true);
 	CString		get_ip_error_string(DWORD error_code);
 	bool		port_is_open(const std::string& address, int port);
+	//ip 또는 domain의 일부 값을 '*'로 치환한다.
+	CString		get_asterisk_addr(CString ip);
+
 
 //////////////////////////////////////////////////////////////////////////
 //암호화

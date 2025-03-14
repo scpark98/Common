@@ -2479,7 +2479,7 @@ CString CVtListCtrlEx::get_text(int item, int subItem)
 
 void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidate)
 {
-	if (item < 0)
+	if (item < 0 || item >= size())
 		return;
 
 	if (!m_hWnd)
@@ -2556,6 +2556,67 @@ std::deque<CString> CVtListCtrlEx::get_line_text_list(int index, std::deque<int>
 void CVtListCtrlEx::get_line_text_list(std::vector<CString>* vt)
 {
 
+}
+
+//shell_listctrl일 때 윈도우 탐색기에서 파일/폴더의 레이블을 변경하는 이벤트가 발생하면
+//main에서 이 함수를 호출하여 레이블을 변경한다.
+//shell_listctrl이 아니어도 사용 가능하나 레이블로 비교하므로 동일한 항목이 있을 경우는 정상 처리되지 않으므로
+//사용하지 말 것!
+void CVtListCtrlEx::rename(CString old_text, CString new_text)
+{
+	//shell_listctrl일 경우 fullpath라면 파일명 또는 폴더명만 추출한다.
+	if (m_is_shell_listctrl)
+	{
+		CString old_label = get_part(old_text, fn_name);
+		CString new_label = get_part(new_text, fn_name);
+
+		std::deque<CListCtrlData>::iterator it_data;
+		it_data = std::find_if(m_list_db.begin(), m_list_db.end(),
+			[old_label](CListCtrlData data)
+			{
+				return (data.text[0].Compare(old_label) == 0);
+			});
+
+		if (it_data == m_list_db.end())
+		{
+			TRACE(_T("%s item not found."), old_text);
+			return;
+		}
+
+		int index = std::distance(m_list_db.begin(), it_data);
+
+		//리스트에서 label을 변경시키고
+		set_text(index, col_filename, new_label);
+
+		//파일, 폴더 목록에서도 변경시켜준다.
+
+		//우선 폴더 목록에서 찾아보고
+		std::deque<CVtFileInfo>::iterator it;
+		it = std::find_if(m_cur_folders.begin(), m_cur_folders.end(),
+			[old_text](CVtFileInfo fi)
+			{
+				return (old_text.CompareNoCase(fi.data.cFileName) == 0);
+			});
+
+		if (it != m_cur_folders.end())
+		{
+			_tcscpy_s(it->data.cFileName, _countof(it->data.cFileName), new_text);
+			return;
+		}
+
+		//없으면 파일 목록에서 찾아서 변경해준다.
+		it = std::find_if(m_cur_files.begin(), m_cur_files.end(),
+			[old_text](CVtFileInfo fi)
+			{
+				return (old_text.CompareNoCase(fi.data.cFileName) == 0);
+			});
+
+		if (it != m_cur_files.end())
+		{
+			_tcscpy_s(it->data.cFileName, _countof(it->data.cFileName), new_text);
+			return;
+		}
+	}
 }
 
 int CVtListCtrlEx::get_selected_index(int start)

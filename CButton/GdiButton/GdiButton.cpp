@@ -700,7 +700,7 @@ void CGdiButton::prepare_tooltip()
 	{
 		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
 	}
-	catch (CException* e)
+	catch (CException*)
 	{
 		CString str = get_last_error_string();
 	}

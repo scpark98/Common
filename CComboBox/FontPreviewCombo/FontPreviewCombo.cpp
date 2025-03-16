@@ -105,7 +105,9 @@ void CFontPreviewCombo::Init()
 	ModifyStyle(0, CBS_HASSTRINGS);
 	ModifyStyle(0, CBS_DROPDOWNLIST);
 	ModifyStyle(0, WS_VSCROLL);
-	//recreate_combobox(&m_combo_font);
+
+	//resource editor에서 위의 속성을 주지 않고도 동적으로 변경하려
+	//recreate_combobox()를 호출하는 방법을 사용했으나
 	recreate_combobox(this);
 
 	CClientDC dc(this);

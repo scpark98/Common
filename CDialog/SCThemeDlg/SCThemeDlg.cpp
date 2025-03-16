@@ -172,20 +172,30 @@ void CSCThemeDlg::reconstruct_title_font()
 	Invalidate();
 }
 
-void CSCThemeDlg::set_title_font_name(LPCTSTR sFontname, BYTE byCharSet)
+void CSCThemeDlg::set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_title_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_title_lf.lfFaceName, _countof(m_title_lf.lfFaceName), sFontname);
 	reconstruct_title_font();
 }
 
-void CSCThemeDlg::set_title_font_size(int size)
+void CSCThemeDlg::set_titlebar_icon(UINT icon_id, int cx, int cy)
+{
+	m_hIcon = load_icon(NULL, icon_id, cx, cy);
+}
+
+void CSCThemeDlg::set_titlebar_icon(HICON hIcon)
+{
+	m_hIcon = hIcon;
+}
+
+void CSCThemeDlg::set_titlebar_font_size(int size)
 {
 	m_title_lf.lfHeight = -MulDiv(size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 	reconstruct_title_font();
 }
 
-void CSCThemeDlg::set_title_bold(bool bold)
+void CSCThemeDlg::set_titlebar_bold(bool bold)
 {
 	m_title_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
 	reconstruct_title_font();
@@ -416,6 +426,7 @@ void CSCThemeDlg::OnPaint()
 		dc.SelectObject(pOldFont);
 	}
 
+	/*
 	//클라이언트 영역 칠하기
 	CRect rclient = rc;
 	rclient.top += m_titlebar_height;
@@ -437,6 +448,7 @@ void CSCThemeDlg::OnPaint()
 	//border
 	GetClientRect(rc);
 	draw_rectangle(&dc, rc, m_cr_border, Gdiplus::Color::Transparent, m_border_width);
+	*/
 }
 
 void CSCThemeDlg::set_color_theme(int theme)

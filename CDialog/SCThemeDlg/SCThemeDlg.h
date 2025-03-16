@@ -62,21 +62,21 @@ public:
 	//윈도우 기본 타이틀바가 있는 dlg일 경우는 타이틀바와 관계된 모든 옵션은 무시된다.
 	//void	SetWindowText(CString title) { set_title(title); }
 	//void	SetWindowText(CString title) { CWnd::SetWindowText(title); m_title = title; Invalidate(); }
-	void	set_title_bold(bool bold = true);
+	void	set_titlebar_bold(bool bold = true);
 
 	int		get_titlebar_height() { return m_titlebar_height; }
 	void	set_titlebar_height(int height);
 
 	void	set_titlebar_text_color(Gdiplus::Color cr);
 	void	set_titlebar_back_color(Gdiplus::Color cr);
-	void	set_title_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void	set_title_font_size(int size);
+	void	set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void	set_titlebar_font_size(int size);
 
-	void	set_title_icon(UINT icon_id) { m_hIcon = AfxGetApp()->LoadIcon(icon_id); }
-	void	set_title_icon(HICON hIcon) { m_hIcon = hIcon; }
+	//
+	void	set_titlebar_icon(UINT icon_id, int cx = 16, int cy = 16);
+	void	set_titlebar_icon(HICON hIcon);
 	void	set_logo(UINT png_id) { m_img_logo.load(png_id); }
 	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
-
 
 
 	//parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.

@@ -18626,8 +18626,8 @@ BOOL recreate_combobox(CComboBox* pCombo, LPVOID lpParam/*=0*/)
 	// along with each item's data
 	CComboBox comboNew;
 	
-	//if (!comboNew.CreateEx(dwStyleEx, _T("COMBOBOX"), _T(""), dwStyle, rc, pParent, nID, lpParam))
-	if (!comboNew.Create(dwStyle, rc, pParent, nID))
+	if (!comboNew.CreateEx(dwStyleEx, _T("COMBOBOX"), _T(""), dwStyle, rc, pParent, nID, lpParam))
+	//if (!comboNew.Create(dwStyle, rc, pParent, nID))
 		return FALSE;
 
 	comboNew.SetFont(pFont);

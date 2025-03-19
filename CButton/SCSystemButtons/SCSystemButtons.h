@@ -157,6 +157,9 @@ public:
 		}
 	}
 
+	//SC_MAXIMIZE 등의 특정 명령 버튼이 포함되어 있는지 판별
+	bool	has_button(int cmd);
+
 	void	resize();
 	void	adjust(int top, int right);
 	CSize	get_size() { return CSize(m_button_width * m_button.size(), m_button_height); }

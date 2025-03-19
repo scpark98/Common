@@ -382,9 +382,13 @@ void CGdiButton::SetCheck(int check_state)
 		while (pWnd && (pWnd != this) && (pWnd != pWndFirstCheck)) 
 		{ 
 			if (pWnd->GetStyle() & WS_GROUP)
-				TRACE(_T("%p : group property\n"), pWnd);
+			{
+				//TRACE(_T("%p : group property\n"), pWnd);
+			}
 			else
-				TRACE(_T("%p : no group property\n"), pWnd);
+			{
+				//TRACE(_T("%p : no group property\n"), pWnd);
+			}
 
 			if (pWnd->IsKindOf(RUNTIME_CLASS(CGdiButton))) 
 			{ 
@@ -654,11 +658,11 @@ void CGdiButton::PreSubclassWindow()
 
 	if ((m_button_type & BS_CHECKBOX) == BS_CHECKBOX)
 	{
-		TRACE(_T("BS_CHECKBOX\n"));
+		//TRACE(_T("BS_CHECKBOX\n"));
 	}
 	if ((m_button_type & BS_AUTO3STATE) == BS_AUTO3STATE)
 	{
-		TRACE(_T("BS_PUSHLIKE\n"));
+		//TRACE(_T("BS_PUSHLIKE\n"));
 	}
 
 	CString text;

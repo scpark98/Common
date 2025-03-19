@@ -1268,6 +1268,8 @@ struct	NETWORK_INFO
 	CString		read_windows_GUID();
 	CString		create_GUID();
 
+	bool		is_VMWare();
+
 	//윈도우10이상은 auto_update가 항상 true.
 	//(registry에서 특정값을 추가하여 설정할 경우는 false로도 리턴됨)
 	//WinXP에서 자동 업데이트를 사용하지 않음으로 해도 true이며 아래 level=1이 리턴됨.

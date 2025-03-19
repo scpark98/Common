@@ -387,7 +387,7 @@ public:
 	void		allow_sort(bool allow) { m_allow_sort = allow; }
 	void		sort(int column, int ascending);
 	void		sort_by_text_color(int column, int ascending, bool text_sort_on_same_color = true);
-	int			cur_sorted_column_index() { return m_cur_sorted_column; }
+	int			cur_sorted_column_index() { return m_cur_sort_column; }
 
 //컬러 관련
 	void			set_color_theme(int theme, bool apply_now = true);
@@ -573,7 +573,7 @@ protected:
 //정렬 관련
 	bool			m_allow_sort = true;
 	std::deque<int> m_column_sort_type;				//asceding or descending
-	int				m_cur_sorted_column = 0;		//정렬된 컬럼 인덱스(색상 정렬은 제외)
+	int				m_cur_sort_column = 0;		//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
 	bool			m_use_alternate_back_color = false;

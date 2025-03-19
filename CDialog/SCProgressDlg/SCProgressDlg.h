@@ -5,6 +5,21 @@
 * resource의 IDD 없이 동적으로 modeless dialog를 생성하고
 * progress를 표시하기 위해 제작.
 * 
+* [사용 방법]
+	//.h 파일에 인스턴스 선언.
+	CSCProgressDlg		m_progressDlg;
+
+	//.cpp의 OnInitDialog()에 생성
+	m_progressDlg.create(this, msg, 0, 0, 320, 120);
+	m_progressDlg.set_text_color(cr_text);
+	m_progressDlg.set_back_color(cr_back);
+	m_progressDlg.set_indeterminate();
+	m_progressDlg.SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+	m_progressDlg.CenterWindow(this);
+
+	//필요한 곳에서 show / hide
+	m_progressDlg.ShowWindow(SW_SHOW);
+
 */
 
 #include <afxdialogex.h>

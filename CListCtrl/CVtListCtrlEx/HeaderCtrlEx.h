@@ -37,6 +37,9 @@ public:
 	int				m_header_clicked_index;
 	int				get_clicked_header(CPoint point);
 
+	//m_cr_sort_arrow 기본값은 DarkGray이며 이 값을 변경하려면 Transparent가 아닌 다른색을, 변경하지 않을 경우는 해당 파라미터를 생략하면 된다.
+	void			set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_sort_arrow = Gdiplus::Color::Transparent);
+
 // Operations
 	CString			get_header_text(int column);
 	void			set_header_text(int column, CString sText);
@@ -66,6 +69,10 @@ public:
 protected:
 	HDLAYOUT		m_HDLayout;
 	bool			m_use_header_separator = true;
+
+	int				m_cur_sort_column = -1;
+	bool			m_cur_sort_asc = true;
+	Gdiplus::Color	m_cr_sort_arrow = Gdiplus::Color::DarkGray;
 
 //폰트 관련
 	LOGFONT			m_lf;

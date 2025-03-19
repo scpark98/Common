@@ -63,12 +63,15 @@ public:
 	//void	SetWindowText(CString title) { set_title(title); }
 	//void	SetWindowText(CString title) { CWnd::SetWindowText(title); m_title = title; Invalidate(); }
 	void	set_titlebar_bold(bool bold = true);
+	bool	get_titlebar_bold() { return (m_title_lf.lfWeight == FW_BOLD); }
 
-	int		get_titlebar_height() { return m_titlebar_height; }
 	void	set_titlebar_height(int height);
+	int		get_titlebar_height() { return m_titlebar_height; }
 
 	void	set_titlebar_text_color(Gdiplus::Color cr);
+	Gdiplus::Color get_titlebar_text_color() { return m_cr_titlebar_text; }
 	void	set_titlebar_back_color(Gdiplus::Color cr);
+	Gdiplus::Color get_titlebar_back_color() { return m_cr_titlebar_back; }
 	void	set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void	set_titlebar_font_size(int size);
 

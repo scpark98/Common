@@ -24,7 +24,6 @@ public:
 	//메뉴가 표시되는 영역을 반투명으로 표시
 	void		use_aero_effect(bool use) { m_use_aero_effect = use; }
 
-
 	void		set_text_color(Gdiplus::Color cr_text);
 	void		set_back_color(Gdiplus::Color cr_back);
 

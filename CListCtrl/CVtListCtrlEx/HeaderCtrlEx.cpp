@@ -144,6 +144,27 @@ void CHeaderCtrlEx::OnPaint()
 
 		rItem.DeflateRect(6, 0);
 		dc.DrawText(get_header_text(i), rItem, dwFormat);
+
+		//7x4 크기의 화살표를 그린다.
+		if (i == m_cur_sort_column)
+		{
+			CRect rArrow = rItem;
+			rArrow.left = rItem.CenterPoint().x - 4;
+			rArrow.right = rItem.CenterPoint().x + 3;
+			rArrow.top = rItem.top + 1;
+			rArrow.bottom = rArrow.top + 4;
+
+			if (m_cur_sort_asc)
+			{
+				draw_line(&dc, rArrow.left, rArrow.bottom - 1, rArrow.CenterPoint().x, rArrow.top, m_cr_sort_arrow);
+				draw_line(&dc, rArrow.CenterPoint().x, rArrow.top, rArrow.right - 1, rArrow.bottom - 1, m_cr_sort_arrow);
+			}
+			else
+			{
+				draw_line(&dc, rArrow.left, rArrow.top + 1, rArrow.CenterPoint().x, rArrow.bottom, m_cr_sort_arrow);
+				draw_line(&dc, rArrow.CenterPoint().x, rArrow.bottom, rArrow.right - 1, rArrow.top + 1, m_cr_sort_arrow);
+			}
+		}
 	}
 
 	dc.SelectObject(pOldFont);
@@ -369,6 +390,17 @@ int CHeaderCtrlEx::get_clicked_header(CPoint point)
 
 	m_header_clicked_index = -1;
 	return m_header_clicked_index;
+}
+
+void CHeaderCtrlEx::set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_sort_arrow)
+{
+	m_cur_sort_column = column;
+	m_cur_sort_asc = sort_asc;
+
+	if (cr_sort_arrow.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_sort_arrow = cr_sort_arrow;
+
+	Invalidate();
 }
 
 void CHeaderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)

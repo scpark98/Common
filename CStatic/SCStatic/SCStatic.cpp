@@ -674,9 +674,13 @@ void CSCStatic::update_surface()
 	GetWindowRect(&rc);
 	//RedrawWindow();
 
-	GetParent()->ScreenToClient(&rc);
-	GetParent()->InvalidateRect(rc, false);
-	GetParent()->UpdateWindow();
+	CWnd* parent = GetParent();
+	if (parent == NULL)
+		return;
+
+	parent->ScreenToClient(&rc);
+	parent->InvalidateRect(rc, false);
+	parent->UpdateWindow();
 }
 
 BOOL CSCStatic::PreTranslateMessage(MSG* pMsg)

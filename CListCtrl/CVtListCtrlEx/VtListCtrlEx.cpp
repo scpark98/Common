@@ -870,7 +870,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	if (!m_allow_sort)
 		return;
 
-	m_cur_sorted_column = subItem;
+	m_cur_sort_column = subItem;
 
 	if (ascending == -1)
 	{
@@ -900,211 +900,259 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 		std::sort(m_cur_folders.begin(), m_cur_folders.end(),
 			[sort_asc, iSub, data_type, include_null](CVtFileInfo a, CVtFileInfo b)
 			{
-				if (iSub == 0)
+				if (iSub == col_filename)
 				{
-					TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, _tcsicmp(a.data.cFileName, b.data.cFileName));
-					return (CString(get_part(a.data.cFileName, fn_name)).CompareNoCase(get_part(b.data.cFileName, fn_name)) == 1);
+					bool res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+					if (!sort_asc)
+						res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+
+					//TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, res);
+					return res;
 				}
-				else if (iSub == 1)
+				else if (iSub == col_filesize)
 				{
-					return (get_file_size(a.data) > get_file_size(b.data));
+					ULONGLONG size_a = get_file_size(a.data);
+					ULONGLONG size_b = get_file_size(b.data);
+					//TRACE(_T("%s vs %s = %llu vs %llu\n"), a.data.cFileName, b.data.cFileName, size_a, size_b);
+
+					//파일크기가 같다면 이름순으로 정렬한다.
+					if (sort_asc)
+					{
+						if (size_a == size_b)
+							return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+						return (size_a < size_b);
+					}
+
+					if (size_a == size_b)
+						return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+
+					return (size_a > size_b);
 				}
-				else if (iSub == 2)
-					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
+				else if (iSub == col_filedate)
+				{
+					if (sort_asc)
+						return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) < 0);
+
+					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) > 0);
+				}
 				return false;
 			});
 
 		std::sort(m_cur_files.begin(), m_cur_files.end(),
 			[sort_asc, iSub, data_type](CVtFileInfo a, CVtFileInfo b)
 			{
-				if (iSub == 0)
+				if (iSub == col_filename)
 				{
-					TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, _tcsicmp(a.data.cFileName, b.data.cFileName));
-					return (CString(a.data.cFileName).CompareNoCase(b.data.cFileName) == 1);
+					bool res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+
+					if (!sort_asc)
+						res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+					
+					//TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, res);
+					return res;
 				}
-				else if (iSub == 1)
+				else if (iSub == col_filesize)
 				{
-					return (get_file_size(a.data) > get_file_size(b.data));
+					ULONGLONG size_a = get_file_size(a.data);
+					ULONGLONG size_b = get_file_size(b.data);
+					//TRACE(_T("%s vs %s = %llu vs %llu\n"), a.data.cFileName, b.data.cFileName, size_a, size_b);
+
+					//파일크기가 같다면 이름순으로 정렬한다.
+					if (sort_asc)
+					{
+						if (size_a == size_b)
+							return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+						return (size_a < size_b);
+					}
+
+					if (size_a == size_b)
+						return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+
+					return (size_a > size_b);
 				}
-				else if (iSub == 2)
-					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) == 1);
+				else if (iSub == col_filedate)
+				{
+					if (sort_asc)
+						return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) < 0);
+
+					return (CompareFileTime(&a.data.ftLastWriteTime, &b.data.ftLastWriteTime) > 0);
+				}
 				return false;
 			});
 
 		refresh_list(false);
-		return;
 	}
-
-
-	std::sort(m_list_db.begin(), m_list_db.end(),
-		[sort_asc, iSub, data_type, include_null](CListCtrlData a, CListCtrlData b)
-		{
-			if (sort_asc)
+	else
+	{
+		std::sort(m_list_db.begin(), m_list_db.end(),
+			[sort_asc, iSub, data_type, include_null](CListCtrlData a, CListCtrlData b)
 			{
-				if (data_type == column_data_type_text)
+				if (sort_asc)
 				{
-					if (iSub != 0)
+					if (data_type == column_data_type_text)
 					{
-						if (!include_null)
+						if (iSub != 0)
 						{
-							if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								return true;
-							else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-								return false;
-							else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								return true;
-						}
+							if (!include_null)
+							{
+								if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+									return true;
+								else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+									return false;
+								else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+									return true;
+							}
 
-						if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-							return false;
-						else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-							return true;
+							if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
+								return false;
+							else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
+								return true;
+							else
+							{
+								if (a.text[0].MakeLower() > b.text[0].MakeLower())
+									return false;
+								else
+									return true;
+							}
+						}
 						else
 						{
-							if (a.text[0].MakeLower() > b.text[0].MakeLower())
-								return false;
-							else
-								return true;
+							return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 						}
-					}
-					else
-					{
 						return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 					}
-					return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
-				}
-				else if (data_type == column_data_type_text_ip)
-				{
-					if (iSub != 0)
+					else if (data_type == column_data_type_text_ip)
 					{
-						if (!include_null)
+						if (iSub != 0)
 						{
-							return (compare_string(a.text[iSub], b.text[iSub]) == 1);
-							//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-							//	return true;
-							//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-							//	return false;
-							//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-							//	return true;
+							if (!include_null)
+							{
+								return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+								//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								//	return true;
+								//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+								//	return false;
+								//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								//	return true;
+							}
+							else
+							{
+								return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+								//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
+								//	return false;
+								//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
+								//	return true;
+								//else
+								//{
+								//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
+								//		return false;
+								//	else
+								//		return true;
+								//}
+							}
 						}
 						else
 						{
+							//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 							return (compare_string(a.text[iSub], b.text[iSub]) == 1);
-							//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-							//	return false;
-							//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-							//	return true;
-							//else
-							//{
-							//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
-							//		return false;
-							//	else
-							//		return true;
-							//}
 						}
-					}
-					else
-					{
+
 						//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 						return (compare_string(a.text[iSub], b.text[iSub]) == 1);
 					}
-
-					//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
-					return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+					else
+					{
+						//a.text[iSub].Replace(_T(","), _T(""));
+						a.text[iSub].Remove(',');
+						b.text[iSub].Remove(',');
+						return (_ttof(a.text[iSub]) < _ttof(b.text[iSub]));
+					}
 				}
 				else
 				{
-					//a.text[iSub].Replace(_T(","), _T(""));
-					a.text[iSub].Remove(',');
-					b.text[iSub].Remove(',');
-					return (_ttof(a.text[iSub]) < _ttof(b.text[iSub]));
-				}
-			}
-			else
-			{
-				if (data_type == column_data_type_text)
-				{
-					if (iSub != 0)
+					if (data_type == column_data_type_text)
 					{
-						if (!include_null)
+						if (iSub != 0)
 						{
-							if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+							if (!include_null)
+							{
+								if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+									return true;
+								else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+									return false;
+								else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+									return true;
+							}
+
+							if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
 								return true;
-							else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+							else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
 								return false;
-							else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								return true;
+							else
+							{
+								if (a.text[0].MakeLower() > b.text[0].MakeLower())
+									return true;
+								else
+									return false;
+							}
+						}
+						else
+						{
+							return (a.text[iSub].MakeLower() > b.text[iSub].MakeLower());
+						}
+						return (_ttof(a.text[iSub].MakeLower()) > _ttof(b.text[iSub].MakeLower()));
+					}
+					else if (data_type == column_data_type_text_ip)
+					{
+						if (iSub != 0)
+						{
+							if (!include_null)
+							{
+								return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+								//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								//	return true;
+								//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
+								//	return false;
+								//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
+								//	return true;
+							}
+							else
+							{
+								return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+								//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
+								//	return false;
+								//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
+								//	return true;
+								//else
+								//{
+								//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
+								//		return false;
+								//	else
+								//		return true;
+								//}
+							}
+						}
+						else
+						{
+							//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
+							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
 						}
 
-						if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-							return true;
-						else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-							return false;
-						else
-						{
-							if (a.text[0].MakeLower() > b.text[0].MakeLower())
-								return true;
-							else
-								return false;
-						}
-					}
-					else
-					{
-						return (a.text[iSub].MakeLower() > b.text[iSub].MakeLower());
-					}
-					return (_ttof(a.text[iSub].MakeLower()) > _ttof(b.text[iSub].MakeLower()));
-				}
-				else if (data_type == column_data_type_text_ip)
-				{
-					if (iSub != 0)
-					{
-						if (!include_null)
-						{
-							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
-							//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-							//	return true;
-							//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-							//	return false;
-							//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-							//	return true;
-						}
-						else
-						{
-							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
-							//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-							//	return false;
-							//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-							//	return true;
-							//else
-							//{
-							//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
-							//		return false;
-							//	else
-							//		return true;
-							//}
-						}
-					}
-					else
-					{
 						//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 						return (compare_string(a.text[iSub], b.text[iSub]) == -1);
 					}
-
-					//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
-					return (compare_string(a.text[iSub], b.text[iSub]) == -1);
-				}
-				else
-				{
-					a.text[iSub].Remove(',');
-					b.text[iSub].Remove(',');
-					return (_ttof(a.text[iSub]) > _ttof(b.text[iSub]));
+					else
+					{
+						a.text[iSub].Remove(',');
+						b.text[iSub].Remove(',');
+						return (_ttof(a.text[iSub]) > _ttof(b.text[iSub]));
+					}
 				}
 			}
+		);
+	}
 
-			return true;
-		}
-	);
-
+	m_HeaderCtrlEx.set_sort_arrow(subItem, sort_asc);
 	Invalidate();
 }
 
@@ -2482,7 +2530,15 @@ void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidat
 	if (item < 0 || item >= size())
 		return;
 
-	if (!m_hWnd)
+	if (!m_hWnd || m_hWnd == INVALID_HANDLE_VALUE)
+		return;
+
+	if (m_is_shell_listctrl && !m_pShellImageList)
+		return;
+
+	//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
+	//원인을 파악중이며 우선 임시로 처리한다.
+	if (m_list_db.size() > 10000)
 		return;
 
 	m_list_db[item].text[subItem] = text;
@@ -3771,13 +3827,13 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 	//local일 경우는 파일목록을 다시 읽어서 표시한다.
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
-	if (m_is_local)
+	if (reload)
 	{
-		if (reload)
-		{
-			m_cur_folders.clear();
-			m_cur_files.clear();
+		m_cur_folders.clear();
+		m_cur_files.clear();
 
+		if (m_is_local)
+		{
 			if (m_path == get_system_label(CSIDL_DRIVES))
 			{
 				std::deque<CDiskDriveInfo> drive_list;
@@ -3803,14 +3859,21 @@ void CVtListCtrlEx::refresh_list(bool reload)
 						m_cur_files.push_back(CVtFileInfo(dq[i]));
 				}
 			}
-		}
+			TRACE(_T("cur folders[0] = %s\n"), m_cur_folders.size() > 0 ? m_cur_folders[0].data.cFileName : _T(""));
+			TRACE(_T("cur files[0] = %s\n"), m_cur_files.size() > 0 ? m_cur_files[0].data.cFileName : _T(""));
 
-		display_filelist(m_path);
+			display_filelist(m_path);
+		}
+		else
+		{
+			//message_path_changed를 보내면 main에서 remote 파일목록을 얻어서 display_filelist(m_path);까지 호출한다.
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&m_path);
+		}
 	}
 	else
 	{
-		//remote일 경우는 mainDlg에 메시지를 보내서 목록을 다시 불러와서 표시한다.
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&m_path);
+		//sort()에 의해 여기까지 온 경우 목록만 다시 표시한다.
+		display_filelist(m_path);
 	}
 }
 
@@ -3828,11 +3891,8 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 	::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_WAIT));
 
 	//아직 준비되지 않은 상태에서 호출될 경우는 그냥 리턴.
-	if (m_cur_sorted_column >= m_column_sort_type.size())
+	if (m_cur_sort_column >= m_column_sort_type.size())
 		return;
-
-	if (m_column_sort_type[m_cur_sorted_column] == sort_descending)
-		insert_index = 0;
 
 	if (cur_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 	{
@@ -3854,7 +3914,9 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(-1));
 	}
 
-	//asc는 폴더먼저, desc는 파일먼저 표시된다.
+
+	//asc일 경우		: 폴더 먼저 0번 위치부터 표시하고 파일은 현재 리스트의 맨 끝에 추가한다.
+	//desc일 경우	: 폴더는 역시 0번부터 표시하고 파일은 i번째에 추가하면 된다. 폴더는 자연히 뒤로 밀리면서 파일들보다 아래에	 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
@@ -3878,7 +3940,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 			}
 		}
 
-		index = insert_item(insert_index, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
+		index = insert_item(i, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
 		SetItemData(index, i);
 
 		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
@@ -3923,7 +3985,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(m_cur_folders.size() + i + 1));
 
 		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, m_cur_files[i].data.cFileName, false);
-		index = insert_item(insert_index, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
+		index = insert_item(m_column_sort_type[m_cur_sort_column] == sort_descending ? i : -1, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
 		SetItemData(index, m_cur_folders.size() + i);
 
 		set_text(index, col_filesize, get_size_str(get_file_size(m_cur_files[i].data)));

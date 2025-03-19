@@ -74,6 +74,18 @@ void CSCSystemButtons::create(CWnd* parent, int top, int right_end, int width, i
 	//UpdateWindow();
 }
 
+//SC_MAXIMIZE와 같이 특정 명령이 포함되어 있는지 판별
+bool CSCSystemButtons::has_button(int cmd)
+{
+	for (int i = 0; i < m_button.size(); i++)
+	{
+		if (m_button[i].cmd == cmd)
+			return true;
+	}
+
+	return false;
+}
+
 void CSCSystemButtons::resize()
 {
 	for (int i = 0; i < m_button.size(); i++)

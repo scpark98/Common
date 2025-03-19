@@ -4982,7 +4982,8 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 		std::sort(dq->begin(), dq->end(),
 			[&res](WIN32_FIND_DATA a, WIN32_FIND_DATA b)
 			{
-				res = (_tcsicmp(a.cFileName, b.cFileName) < 0);
+				res = (StrCmpLogicalW(a.cFileName, b.cFileName) == -1);
+				//res = (_tcsicmp(a.cFileName, b.cFileName) < 0);
 				//TRACE(_T("%s < %s = %d\n"), a.cFileName, b.cFileName, res);
 				return res;
 				//return (_tcsicmp(a.cFileName, b.cFileName) == 1);
@@ -11191,7 +11192,7 @@ CString	run_process(CString cmd)
 
 	Wow64Disable(true);
 
-	std::array<TCHAR, 1024> buffer;
+	std::array<TCHAR, 10240> buffer;
 	//std::string result;
 	CString result;
 	std::shared_ptr<FILE> pipe(_tpopen(cmd, _T("r")), _pclose);
@@ -11201,7 +11202,7 @@ CString	run_process(CString cmd)
 
 	while (!feof(pipe.get()))
 	{
-		if (_fgetts(buffer.data(), 1024, pipe.get()) != NULL)
+		if (_fgetts(buffer.data(), 10240, pipe.get()) != NULL)
 			result += buffer.data();
 	}
 
@@ -11235,7 +11236,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 {
 	Wow64Disable(true);
 
-	TCHAR cmd[1024] = { 0, };
+	TCHAR cmd[10240] = { 0, };
 	CString result(_T(""));
 	STARTUPINFO si{ sizeof(si) };
 	PROCESS_INFORMATION pi{};
@@ -11328,9 +11329,9 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 		for (;;)
 		{
 			DWORD dwRead;
-			char chBuf[4096] = { 0, };
+			char chBuf[10240] = { 0, };
 
-			bool done = !ReadFile(hChildStdoutRd, chBuf, 4096, &dwRead, NULL) || dwRead == 0;
+			bool done = !ReadFile(hChildStdoutRd, chBuf, 10240, &dwRead, NULL) || dwRead == 0;
 
 			if (done)
 				break;
@@ -19012,4 +19013,90 @@ CString get_asterisk_addr(CString ip)
 	}
 
 	return result;
+}
+
+//x86에서만 가능
+bool is_VMWare()
+{
+	bool res = true;
+
+	__try
+	{
+		__asm
+		{
+			push   edx
+			push   ecx
+			push   ebx
+
+			mov    eax, 'VMXh'
+			mov    ebx, 0
+			mov    ecx, 10 // get VMWare version
+			mov    edx, 'VX' // port number
+
+			in     eax, dx // read port
+			// on return EAX returns the VERSION
+
+			cmp    ebx, 'VMXh' // compare with target
+			setz[res] // set return value
+
+				pop    ebx
+					pop    ecx
+					pop    edx
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		res = false;
+	}
+
+	return res;
+}
+
+bool IsVM()
+{
+	int cpuInfo[4] = {};
+
+	//
+	// Upon execution, code should check bit 31 of register ECX
+	// (the “hypervisor present bit”). If this bit is set, a hypervisor is present.
+	// In a non-virtualized environment, the bit will be clear.
+	//
+	__cpuid(cpuInfo, 1);
+
+
+	if (!(cpuInfo[2] & (1 << 31)))
+		return false;
+
+	//
+	// A hypervisor is running on the machine. Query the vendor id.
+	//
+	const auto queryVendorIdMagic = 0x40000000;
+	__cpuid(cpuInfo, queryVendorIdMagic);
+
+	const int vendorIdLength = 13;
+	using VendorIdStr = char[vendorIdLength];
+
+	VendorIdStr hyperVendorId = {};
+
+	memcpy(hyperVendorId + 0, &cpuInfo[1], 4);
+	memcpy(hyperVendorId + 4, &cpuInfo[2], 4);
+	memcpy(hyperVendorId + 8, &cpuInfo[3], 4);
+	hyperVendorId[12] = '\0';
+
+	static const VendorIdStr vendors[]{
+	"KVMKVMKVM\0\0\0", // KVM 
+	"Microsoft Hv",    // Microsoft Hyper-V or Windows Virtual PC */
+	"VMwareVMware",    // VMware 
+	"XenVMMXenVMM",    // Xen 
+	"prl hyperv  ",    // Parallels
+	"VBoxVBoxVBox"     // VirtualBox 
+	};
+
+	for (const auto& vendor : vendors)
+	{
+		if (!memcmp(vendor, hyperVendorId, vendorIdLength))
+			return true;
+	}
+
+	return false;
 }

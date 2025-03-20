@@ -56,6 +56,7 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	//ON_WM_ACTIVATE()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_GETMINMAXINFO()
+	ON_WM_SETCURSOR()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
@@ -110,8 +111,8 @@ BOOL CSCThemeDlg::OnInitDialog()
 	//SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
 
 	//find border thickness
-	m_is_resizable = GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME;
-	if (m_is_resizable)
+	m_has_thickframe = GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME;
+	if (m_has_thickframe)
 	{
 		AdjustWindowRectEx(&m_border_thickness, GetWindowLongPtr(m_hWnd, GWL_STYLE), FALSE, NULL);
 		m_border_thickness.left *= -1;
@@ -219,6 +220,8 @@ void CSCThemeDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (point.y < m_titlebar_height)
 		DefWindowProc(WM_NCLBUTTONDOWN, HTCAPTION, MAKEWORD(point.x, point.y));
+	else if (!m_use_resizable)
+		return;
 
 	CDialogEx::OnLButtonDown(nFlags, point);
 }
@@ -243,7 +246,7 @@ void CSCThemeDlg::set_titlebar_height(int height)
 
 void CSCThemeDlg::enable_resize(bool resizable)
 {
-	m_is_resizable = resizable;
+	m_has_thickframe = resizable;
 
 	if (resizable)
 	{
@@ -274,7 +277,16 @@ void CSCThemeDlg::enable_resize(bool resizable)
 LRESULT CSCThemeDlg::OnNcHitTest(CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_is_resizable)
+	CPoint pt;
+	GetCursorPos(&pt);
+	ScreenToClient(&pt);
+	TRACE(_T("pt.y = %d\n"), pt.y);
+
+	//resize하지 않는 dlg라도 타이틀바는 반응해야 한다.
+	if (!m_use_resizable && pt.y > m_titlebar_height)
+		return -1;
+
+	if (!m_has_thickframe)
 	{
 		return CDialogEx::OnNcHitTest(point);
 	}
@@ -343,7 +355,7 @@ BOOL CSCThemeDlg::OnNcActivate(BOOL bActive)
 void CSCThemeDlg::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_is_resizable)
+	if (m_has_thickframe)
 	{
 		DWORD win_ver = get_windows_major_version();
 
@@ -710,4 +722,14 @@ void CSCThemeDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	//TRACE(_T("after  ptMaxSize.x = %ld, ptMaxSize.y = %ld, ptMaxTrackSize.x = %ld, ptMaxTrackSize.y = %ld\n"), lpMMI->ptMaxSize.x, lpMMI->ptMaxSize.y, lpMMI->ptMaxTrackSize.x, lpMMI->ptMaxTrackSize.y);
 
 	CDialogEx::OnGetMinMaxInfo(lpMMI);
+}
+
+BOOL CSCThemeDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (!m_use_resizable)
+	{
+		return TRUE;
+	}
+	return CDialogEx::OnSetCursor(pWnd, nHitTest, message);
 }

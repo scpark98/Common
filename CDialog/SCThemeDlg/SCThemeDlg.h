@@ -81,6 +81,9 @@ public:
 	void	set_logo(UINT png_id) { m_img_logo.load(png_id); }
 	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
 
+	//WS_THICKFRAME이 있어야만 윈도우 테두리에 그림자가 생기고 모니터 자동 레이아웃도 지원된다.
+	//이 속성을 주면 resize가 가능해지는데 만약 이를 막고 싶다면 set_use_resizable(false)를 호출한다.
+	void	set_use_resizable(bool use_resizable = true) { m_use_resizable = use_resizable; }
 
 	//parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.
 	void	adjust();
@@ -144,7 +147,9 @@ protected:
 	HICON				m_hIcon;
 
 	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
-	bool				m_is_resizable = true;
+	bool				m_has_thickframe = true;
+
+	bool				m_use_resizable = true;
 
 	//CString				m_title;
 	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
@@ -199,4 +204,5 @@ public:
 	//afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 };

@@ -2362,7 +2362,7 @@ bool is_greater_with_numeric(CString str0, CString str1)
 	s1 = A2W(str1);
 #endif
 
-	return (StrCmpLogicalW(s0, s1) == 1);
+	return (StrCmpLogicalW((CStringW)s0, (CStringW)s1) == 1);
 }
 
 
@@ -4982,7 +4982,7 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 		std::sort(dq->begin(), dq->end(),
 			[&res](WIN32_FIND_DATA a, WIN32_FIND_DATA b)
 			{
-				res = (StrCmpLogicalW(a.cFileName, b.cFileName) == -1);
+				res = (StrCmpLogicalW((CStringW)a.cFileName, (CStringW)b.cFileName) == -1);
 				//res = (_tcsicmp(a.cFileName, b.cFileName) < 0);
 				//TRACE(_T("%s < %s = %d\n"), a.cFileName, b.cFileName, res);
 				return res;

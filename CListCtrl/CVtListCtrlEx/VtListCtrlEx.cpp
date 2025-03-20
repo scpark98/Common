@@ -902,9 +902,9 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 			{
 				if (iSub == col_filename)
 				{
-					bool res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+					bool res = (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) < 0);
 					if (!sort_asc)
-						res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+						res = (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) > 0);
 
 					//TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, res);
 					return res;
@@ -919,12 +919,12 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					if (sort_asc)
 					{
 						if (size_a == size_b)
-							return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+							return (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) < 0);
 						return (size_a < size_b);
 					}
 
 					if (size_a == size_b)
-						return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+						return (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) > 0);
 
 					return (size_a > size_b);
 				}
@@ -943,10 +943,10 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 			{
 				if (iSub == col_filename)
 				{
-					bool res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+					bool res = (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) < 0);
 
 					if (!sort_asc)
-						res = (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+						res = (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) > 0);
 					
 					//TRACE(_T("%s vs %s = %d\n"), a.data.cFileName, b.data.cFileName, res);
 					return res;
@@ -961,12 +961,12 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 					if (sort_asc)
 					{
 						if (size_a == size_b)
-							return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) < 0);
+							return (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) < 0);
 						return (size_a < size_b);
 					}
 
 					if (size_a == size_b)
-						return (StrCmpLogicalW(a.data.cFileName, b.data.cFileName) > 0);
+						return (StrCmpLogicalW((CStringW)a.data.cFileName, (CStringW)b.data.cFileName) > 0);
 
 					return (size_a > size_b);
 				}

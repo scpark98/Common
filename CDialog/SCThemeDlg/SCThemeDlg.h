@@ -147,6 +147,8 @@ protected:
 	HICON				m_hIcon;
 
 	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
+	//이 변수는 DwmExtendFrameIntoClientArea()과 관련된 변수로 true/false에 따라 동작하게 하려 했으나 false일 경우는 부작용이 많다. 우선 true로 고정한다.
+	//메인에서 WS_THICKFRAME을 주면 
 	bool				m_has_thickframe = true;
 
 	bool				m_use_resizable = true;

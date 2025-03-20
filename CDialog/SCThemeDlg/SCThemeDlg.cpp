@@ -283,7 +283,7 @@ LRESULT CSCThemeDlg::OnNcHitTest(CPoint point)
 	TRACE(_T("pt.y = %d\n"), pt.y);
 
 	//resize하지 않는 dlg라도 타이틀바는 반응해야 한다.
-	if (!m_use_resizable && pt.y > m_titlebar_height)
+	if (!m_use_resizable && (pt.y < 7 || pt.y > m_titlebar_height))
 		return -1;
 
 	if (!m_has_thickframe)

@@ -41,8 +41,22 @@ public:
 	void			set_text_color(Gdiplus::Color cr);
 	void			set_back_color(Gdiplus::Color cr);
 	void			set_font_size(int size);
+
 	void			set_range(int32_t lower, int32_t upper);
+	void			SetRange(int32_t lower, int32_t upper) { set_range(lower, upper); }
+	void			get_range(int32_t& lower, int32_t upper);
+	int32_t			get_lower();
+	int32_t			get_upper();
+
+	void			set_pos(int32_t pos) { m_progress.SetPos(pos); }
+	void			SetPos(int32_t pos) { m_progress.SetPos(pos); }
 	void			set_indeterminate(bool indeterminate = true);
+
+	//마우스로 드래그하여 이동가능하게 설정
+	void			set_enable_move(bool enable = true) { m_enable_move = enable; }
+
+	//step 단위 증감, 변경된 위치값 리턴.
+	int32_t			step(int step = 1);
 
 	//
 	void			timeout(int ms);
@@ -62,6 +76,8 @@ protected:
 
 	CWnd*			m_parent = NULL;
 
+	bool			m_enable_move = false;
+
 	LOGFONT			m_lf;
 	CFont			m_font;
 	void			reconstruct_font();
@@ -76,4 +92,5 @@ public:
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 };

@@ -553,10 +553,13 @@ struct	NETWORK_INFO
 	//c:\\windows\\system32\\osk.exe로 실행해도 SysWOW64 폴더로 redirect되므로 역시 실행되지 않는다.
 	//Wow64DisableWow64FsRedirection()를 이용해서 redirection을 disable시켜주고 실행 후 복원시켜줘야 한다.
 	//"dir C:\\*.*"은 성공하나 "dir \"C:\\Program Files\\*.*\"" 명령은 실패한다.
+	//"ipconfig /all"은 wait_until_process_exit가 true or false 모두 문제없지만
+	//"systeminfo"와 "tasklist"는 wait_until_process_exit를 true로 주면 무한 대기하는 현상이 있다. false로 줘도 정보는 모두 리턴된다.
 	CString		run_process(CString cmd, bool wait_until_process_exit, bool return_after_first_read = false);
 
 	//"dir \"C:\\Program Files\\*.*\"" 명령은 잘 동작하나 ping -t와 같이 끝나지 않는 도스명령어나 notepad.exe를 실행할 경우
 	//도스창이 계속 남아있다.
+	//또한 이 방식은 도스창이 표시되었다가 사라지는 부작용이 있다. 도스창 표시가 불필요하다면 위의 run_process()를 사용해야 한다.
 	CString		run_process(CString cmd);
 	extern		void* g_wow64_preset;
 	void		Wow64Disable(bool disable = true);
@@ -579,9 +582,9 @@ struct	NETWORK_INFO
 
 	//모니터 정보
 	//main에서 EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, 0); 를 실행하고
-	//이 파일에 전역변수로 선언된 g_dqMonitor를 이용하면 된다.
+	//이 파일에 전역변수로 선언된 g_monitors를 이용하면 된다.
 	//단, Win32API인 EnumDisplayMonitors()를 호출할때는 반드시 g_monitors.clear()를 해줘야 하므로
-	//enum_display_monitors()함수로 대체한다.
+	//enum_display_monitors()함수를 사용하도록 한다.
 	extern std::deque<CSCMonitorInfo> g_monitors;
 	void		enum_display_monitors();
 	BOOL		CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData);

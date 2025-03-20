@@ -11349,6 +11349,8 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 
 	Wow64Disable(false);
 
+	result.Replace(_T("\r\n"), _T("\n"));
+
 	return result;
 }
 

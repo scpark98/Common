@@ -29,6 +29,7 @@ BEGIN_MESSAGE_MAP(CSCProgressDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_WM_TIMER()
+	ON_WM_LBUTTONDOWN()
 END_MESSAGE_MAP()
 
 
@@ -67,20 +68,8 @@ bool CSCProgressDlg::create(CWnd* parent, CString text, int left, int top, int r
 		int bottom_pos = rc.bottom - (double)(rc.bottom - rc.top) * 0.16 - progress_height;
 		BOOL bOk;
 		
-		//m_progress = new CMFCRibbonProgressBar(2734, 200);
-		m_progress.Create(WS_CHILD | WS_VISIBLE | PBS_MARQUEE, CRect(rc.left + 20, bottom_pos, rc.right - 20, bottom_pos + progress_height), this, 0);
+		m_progress.Create(WS_CHILD | WS_VISIBLE, CRect(rc.left + 20, bottom_pos, rc.right - 20, bottom_pos + progress_height), this, 0);
 		m_progress.ShowWindow(SW_SHOW);
-		//m_progress.SetMarquee(TRUE, 10);
-		//m_progress.SetIndeterminate();
-		//m_progress.SetRange(0, 100);
-		//m_progress.SetPos(50);
-		//m_progress.setinfi
-		//m_progress->ShowWindow(SW_SHOW);
-
-		//m_progress->SetInfiniteMode(TRUE);
-		//m_progress->SetRange(0, 200);
-		//m_progress->SetPos(200, true);
-		//m_progress->SetVisible(TRUE);
 
 		bOk = m_static.create(text, WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE, CRect(rc.left + 20, rc.top + 8, rc.right - 20, bottom_pos - 8), this, 0);
 
@@ -154,9 +143,45 @@ void CSCProgressDlg::set_range(int32_t lower, int32_t upper)
 	m_progress.SetRange32(lower, upper);
 }
 
+void CSCProgressDlg::get_range(int32_t& lower, int32_t upper)
+{
+	m_progress.GetRange(lower, upper);
+}
+
+int32_t CSCProgressDlg::get_lower()
+{
+	if (m_progress.GetIndeterminate())
+		return 0;
+
+	int32_t lower, upper;
+	m_progress.GetRange(lower, upper);
+	return lower;
+}
+
+int32_t CSCProgressDlg::get_upper()
+{
+	if (m_progress.GetIndeterminate())
+		return 0;
+
+	int32_t lower, upper;
+	m_progress.GetRange(lower, upper);
+	return upper;
+}
+
+
 void CSCProgressDlg::set_indeterminate(bool indeterminate)
 {
 	m_progress.SetIndeterminate(indeterminate);
+}
+
+
+
+//step 단위 증감
+int32_t CSCProgressDlg::step(int step)
+{
+	int pos = m_progress.GetPos();
+	m_progress.SetPos(pos + step);
+	return m_progress.GetPos();
 }
 
 void CSCProgressDlg::timeout(int ms)
@@ -202,4 +227,13 @@ void CSCProgressDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 
 	CDialogEx::OnTimer(nIDEvent);
+}
+
+void CSCProgressDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_enable_move)
+		DefWindowProc(WM_NCLBUTTONDOWN, HTCAPTION, MAKEWORD(point.x, point.y));
+
+	CDialogEx::OnLButtonDown(nFlags, point);
 }

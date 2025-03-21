@@ -60,6 +60,7 @@ public:
 	BOOL		GetIndeterminate();
 	void		SetIndeterminate(BOOL bIndeterminate = TRUE);
 	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1);
+	void		set_track_color(COLORREF cr) { m_cr_track = cr; }
 	void		set_back_color(COLORREF cr_back);
 	void		set_back_track_color(COLORREF cr_back);
 	void		SetTransparent(bool bTransparent = true) { m_bTransparent = bTransparent; Invalidate(); }
@@ -67,6 +68,8 @@ public:
 	void		SetText(CString sText);
 	void		set_text_color(COLORREF crText0, COLORREF crText1 = -1);
 	void		use_invert_text_color(bool use = true);
+
+
 	void		use_text_shadow(bool shadow = true);
 	void		draw_border(bool border = true, int width = 1, COLORREF cr = RGB(188, 188, 188), int pen_style = PS_SOLID);
 

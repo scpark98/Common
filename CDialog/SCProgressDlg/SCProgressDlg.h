@@ -40,14 +40,19 @@ public:
 	void			set_text(CString text);
 	void			set_text_color(Gdiplus::Color cr);
 	void			set_back_color(Gdiplus::Color cr);
+	void			set_track_color(Gdiplus::Color cr) { m_progress.set_track_color(cr.ToCOLORREF()); }
+
 	void			set_font_size(int size);
 
 	void			set_range(int32_t lower, int32_t upper);
 	void			SetRange(int32_t lower, int32_t upper) { set_range(lower, upper); }
-	void			get_range(int32_t& lower, int32_t upper);
+	void			get_range(int32_t& lower, int32_t& upper);
+	void			GetRange(int32_t& lower, int32_t& upper) { get_range(lower, upper); }
 	int32_t			get_lower();
 	int32_t			get_upper();
 
+	int32_t			get_pos() { return m_progress.GetPos(); }
+	int32_t			GetPos() { return get_pos(); }
 	void			set_pos(int32_t pos) { m_progress.SetPos(pos); }
 	void			SetPos(int32_t pos) { m_progress.SetPos(pos); }
 	void			set_indeterminate(bool indeterminate = true);

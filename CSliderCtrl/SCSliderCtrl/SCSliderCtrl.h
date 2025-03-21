@@ -173,7 +173,10 @@ public:
 	void	SetPos(int pos);
 	int		get_min();
 	int		get_max();
+	void	set_step_completed() { m_step_completed = true; Invalidate(); }
 	int		get_style() { return m_style; }
+
+	int32_t	step(int step = 1);
 
 	//void	SetPos(int pos) { CSliderCtrl::SetPos(pos); Invalidate(); /*redraw_window();*/ }
 	void	redraw_window(bool bErase = false);
@@ -279,6 +282,9 @@ protected:
 	//enable move the current pos by click or drag even though progress style. default = true
 	bool			m_use_slide = true;
 
+	//다른 슬라이더와는 다르게 style_step일 경우 pos를 기준으로 처리 - 현재 처리중인 위치 - 아직 처리하지 않은 위치
+	//이렇게 3단계로 구분해서 그려주는데 pos가 upper step을 처리 완료한 후, 즉 모든 스텝이 끝나면 upper 또한 처리된 곳으로 표시해야 한다.
+	bool			m_step_completed = false;
 
 	//특정 위치들을 기억해두자. 북마크처럼.
 	bool			m_use_bookmark = false;	//default = false;

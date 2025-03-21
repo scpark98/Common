@@ -1061,6 +1061,9 @@ struct	NETWORK_INFO
 	//encoding < 0이면 encoding 방식을 자동 판별하여 읽어온다.
 	CString		read(CString filepath, int max_length = -1, int encoding = -1);
 	bool		save(CString filepath, CString text, int encoding = CP_UTF8);
+
+	//텍스트 파일을 열 때 ansi, utf-8 등을 자동으로 판별하여 열어주고 encoding 방식을 리턴한다.
+	//return value : text_encoding_ansi / text_encoding_utf8 / ....
 	int			file_open(FILE** fp, CString mode, CString file);
 
 	//text 파일을 열어서 dqList에 넣어준다.
@@ -1580,8 +1583,8 @@ void		SetWallPaper(CString sfile);
 	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);
 
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
-	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, int pen_style = PS_SOLID, int draw_mode = R2_COPYPEN);
+	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, float thick = 1.0f, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int nDrawMode = R2_COPYPEN);
+	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int draw_mode = R2_COPYPEN);
 	void		draw_rectangle(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
 	void		draw_rectangle(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1);
@@ -1589,8 +1592,8 @@ void		SetWallPaper(CString sfile);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);
 	void		draw_ellipse(CDC* pDC, int cx, int cy, int rx, int ry, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);
 	void		draw_circle(CDC* pDC, int xMidPoint,  int yMidPoint,  int radius);
-	void		draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed = true, COLORREF crLine = 0, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		draw_arc(CDC *pDC, double cx, double cy,double r1, double r2, double start, double end, int width = 1, int style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN);
+	void		draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed = true, COLORREF crLine = 0, int nWidth = 1, int pen_style = PS_SOLID, int nDrawMode = R2_COPYPEN);
+	void		draw_arc(CDC *pDC, double cx, double cy,double r1, double r2, double start, double end, int width = 1, int pen_style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN);
 	bool		LoadBitmapFromFile(CBitmap &bmp, CString strFile);
 	bool		SaveBitmapToTile(CBitmap* bmp, CString strFile, CWnd* pWnd);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);

@@ -143,7 +143,7 @@ void CSCProgressDlg::set_range(int32_t lower, int32_t upper)
 	m_progress.SetRange32(lower, upper);
 }
 
-void CSCProgressDlg::get_range(int32_t& lower, int32_t upper)
+void CSCProgressDlg::get_range(int32_t& lower, int32_t& upper)
 {
 	m_progress.GetRange(lower, upper);
 }

@@ -86,7 +86,7 @@ public:
 	void	set_use_resizable(bool use_resizable = true) { m_use_resizable = use_resizable; }
 
 	//parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.
-	void	adjust();
+	void	adjust_sys_buttons();
 
 	//필요한 시스템 버튼들을 추가해준다. 이 함수를 호출하지 않으면 기본 닫기 버튼만 사용된다.
 	//set_system_buttons(SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);	//항상 위에 버튼까지 필요한 경우

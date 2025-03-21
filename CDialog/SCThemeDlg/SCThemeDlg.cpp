@@ -537,14 +537,14 @@ void CSCThemeDlg::set_titlebar_back_color(Gdiplus::Color cr)
 }
 
 //parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.
-void CSCThemeDlg::adjust()
+void CSCThemeDlg::adjust_sys_buttons()
 {
 	if (m_sys_buttons.m_hWnd == NULL)
 		return;
 
 	CRect r;
 	GetClientRect(r);
-	TRACE(_T("CSCThemeDlg::adjust(). r.w = %d, r.h = %d\n"), r.Width(), r.Height());
+	TRACE(_T("CSCThemeDlg::adjust_sys_buttons(). r.w = %d, r.h = %d\n"), r.Width(), r.Height());
 	m_sys_buttons.adjust(r.top, r.right);
 }
 
@@ -687,8 +687,18 @@ void CSCThemeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CDialogEx::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (!m_sys_buttons.m_hWnd)
+		return;
+
+	//parent가 RestoreWindowPosition(), SetWindowPos() 등에 의해 크기 변경이 되면
+	//sys_buttons가 parent의 right align을 하게 되는데
+	//parent가 크기 변경 이벤트가 없는 앱이라면 right align되지 않은 상태로 시작된다.
+	//이를 해결하기 위해 여기서 adjust_sys_buttons()를 호출해준다.
+	adjust_sys_buttons();
+
+	//parent 창이 움직이거나 가려질 때 간혹 상단에 흰색 영역이 표시되어
+	//타이틀바 그래픽이 깨질때가 있어서 여기서 Invalidate()을 호출했었으나 
 	//Invalidate();
-	//RedrawWindow();
 }
 
 //For top - level windows, this value is based on(...) the primary monitor.

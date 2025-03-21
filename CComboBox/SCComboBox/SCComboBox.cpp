@@ -102,15 +102,15 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	if (lpDrawItemStruct->itemState & ODS_SELECTED)
 	{
-		dc.SetTextColor(m_crHighlightText);
-		dc.SetBkColor(m_crHighlightTextBack);
-		dc.FillSolidRect( &lpDrawItemStruct->rcItem, m_crHighlightTextBack );
+		//dc.SetTextColor(m_crHighlightText);
+		//dc.SetBkColor(m_crHighlightTextBack);
+		//dc.FillSolidRect( &lpDrawItemStruct->rcItem, m_crHighlightTextBack );
 	}
 	else
 	{
-		dc.SetTextColor(m_crText);
-		dc.SetBkColor(m_crBack);
-		dc.FillSolidRect(&lpDrawItemStruct->rcItem, m_crBack);
+		//dc.SetTextColor(m_crText);
+		//dc.SetBkColor(m_crBack);
+		//dc.FillSolidRect(&lpDrawItemStruct->rcItem, m_crBack);
 	}
 
 	//TRACE(_T("%s\n"), strData);
@@ -441,7 +441,7 @@ void CSCComboBox::OnPaint()
 	GetClientRect(rc);
 
 	//dc.FillSolidRect(rc, RGB(255, 0, 0));
-	draw_rectangle(&dc, rc, gGRAY(192), m_crBack);
+	//draw_rectangle(&dc, rc, gGRAY(192), m_crBack);
 
 	//owner draw fixed, has string 때문인지 dropdown 버튼이 표시되지 않는다.
 	//우선 수동으로 그려준다.

@@ -76,6 +76,7 @@ void CSCSliderCtrl::OnPaint()
 
 	int lower = GetRangeMin();
 	int upper = GetRangeMax();
+	GetRange(lower, upper);
 	int pos = GetPos();
 	//TRACE(_T("GetPos() OnPaint() = %d\n"), pos);
 
@@ -92,6 +93,9 @@ void CSCSliderCtrl::OnPaint()
 	COLORREF	cr_inactive = enable_color(m_cr_inactive);
 	COLORREF	cr_text = enable_color(m_cr_text);
 	COLORREF	cr_thumb = enable_color(m_cr_thumb);
+
+	Gdiplus::Color gcr_thumb;
+	gcr_thumb.SetFromCOLORREF(cr_thumb);
 
 	// TODO: Add your message handler code here
 	GetClientRect(m_rc);
@@ -209,31 +213,32 @@ void CSCSliderCtrl::OnPaint()
 	else if (m_style == style_step)
 	{
 		CRect r = m_rc;
-		int thumb_size = MIN(r.Width(), r.Height()); //스텝 위치마다 그려질 도형의 크기
+		int thumb_size = m_thumb.cx;// MIN(r.Width(), r.Height()); //스텝 위치마다 그려질 도형의 크기
 		int interval;
 		CSize gap(0, 0);	//스텝의 시작과 끝의 여백
 			
-		Gdiplus::Color cr_line(255, 255, 0, 255);
-		Gdiplus::Color cr_thumb(255, 62, 134, 193);
-		Gdiplus::Color cr_thumb_inner(255, 255, 255, 255);
-		Gdiplus::Pen pen_line(cr_line, 2.0f);
-		Gdiplus::Pen pen_thumb(cr_thumb, 1.0f);
+		Gdiplus::Color gcr_line = Gdiplus::Color::RoyalBlue;
+		Gdiplus::Color gcr_thumb_inner(255, 255, 255, 255);
+		Gdiplus::Pen pen_line(gcr_line, 1.7f);
+		Gdiplus::Pen pen_gray(Gdiplus::Color::Color(192, 192, 192), 1.7f);
+		Gdiplus::Pen pen_thumb(gcr_thumb, 1.0f);
+
 
 		m_is_vertical = (m_rc.Height() > m_rc.Width());
 
 		if (m_is_vertical)
 		{
-			r.DeflateRect(0, gap.cy + thumb_size / 2);
+			r.DeflateRect(0, gap.cy + thumb_size);
 			interval = r.Height() / (upper - lower);
 
 			//thumb
-			for (i = 0; i <= upper - lower; i++)
+			for (i = lower; i <= upper; i++)
 			{
 				//각 step의 영역이 미리 계산된적이 없다면
 				if (m_steps[i].r.IsRectEmpty())
 				{
-					m_steps[i].r = CRect(r.left, gap.cy + interval * i, r.right, gap.cy + interval * i + thumb_size);
-					m_steps[i].r.DeflateRect(2, 2);
+					m_steps[i].r = CRect(r.CenterPoint().x - thumb_size / 2, gap.cy + interval * i, r.CenterPoint().x + thumb_size / 2, gap.cy + interval * i + thumb_size);
+					m_steps[i].r.DeflateRect(2, 2);	
 				}
 
 				//이미지가 지정되어 있다면
@@ -244,19 +249,35 @@ void CSCSliderCtrl::OnPaint()
 				else
 				{
 					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRectTogpRect(m_steps[i].r));
-					CRect rthumb_small = m_steps[i].r;
-					rthumb_small.DeflateRect(4, 4);
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRectTogpRect(rthumb_small));
+					g.FillEllipse(&Gdiplus::SolidBrush(gcr_thumb), CRectTogpRect(m_steps[i].r));
+
+					//pos 미만은 파란색 원에 체크 표시를
+					if (i < pos)
+					{
+						draw_line(&dc, m_steps[i].r.CenterPoint().x - 3, m_steps[i].r.CenterPoint().y - 0, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
+						draw_line(&dc, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, m_steps[i].r.CenterPoint().x + 3, m_steps[i].r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
+					}
+					else if (i == pos)
+					{
+						CRect rthumb_small = m_steps[i].r;
+						rthumb_small.DeflateRect(2, 2);
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+					}
+					else
+					{
+						CRect rthumb_small = m_steps[i].r;
+						rthumb_small.DeflateRect(1, 1);
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+					}
 				}
 			}
 
-			//라인
+			//각 thumb들 사이에 라인을 그려준다.
 			pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
 			for (i = 1; i <= upper - lower; i++)
 			{
-				g.DrawLine(&pen_line, Gdiplus::Point(r.CenterPoint().x, m_steps[i - 1].r.bottom + 4),
-					Gdiplus::Point(r.CenterPoint().x, m_steps[i].r.top - 4));
+				g.DrawLine(i > pos ? &pen_gray : &pen_line, Gdiplus::Point(r.CenterPoint().x, m_steps[i - 1].r.bottom + 0),
+					Gdiplus::Point(r.CenterPoint().x, m_steps[i].r.top - 0));
 			}
 		}
 		else
@@ -292,7 +313,7 @@ void CSCSliderCtrl::OnPaint()
 			pen_line.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
 			for (i = 1; i <= upper - lower; i++)
 			{
-				g.DrawLine(&pen_line, Gdiplus::Point(m_steps[i-1].r.right + 4, r.CenterPoint().y),
+				g.DrawLine(i > pos ? &pen_gray : &pen_line, Gdiplus::Point(m_steps[i - 1].r.right + 4, r.CenterPoint().y),
 					Gdiplus::Point(m_steps[i].r.left - 4, r.CenterPoint().y));
 			}
 		}
@@ -418,6 +439,22 @@ void CSCSliderCtrl::OnPaint()
 		//CRect	rActive(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
 		if (r.right > r.left)
 			dc.FillSolidRect(r, cr_active);
+	}
+	else if (m_style == style_step)
+	{
+		CRect r = m_steps[pos].r;
+
+		if (m_step_completed)
+		{
+			g.FillEllipse(&Gdiplus::SolidBrush(gcr_thumb), CRectTogpRect(m_steps[pos].r));
+			draw_line(&dc, r.CenterPoint().x - 3, r.CenterPoint().y - 0, r.CenterPoint().x - 1, r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
+			draw_line(&dc, r.CenterPoint().x - 1, r.CenterPoint().y + 2, r.CenterPoint().x + 3, r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
+		}
+		else
+		{
+			r.DeflateRect(4, 4);
+			g.FillEllipse(&Gdiplus::SolidBrush(gcr_thumb), CRectTogpRect(r));
+		}
 	}
 #endif
 	
@@ -1197,6 +1234,7 @@ void CSCSliderCtrl::set_style(int nStyle)
 	}
 	else if (m_style == style_step)
 	{
+		m_thumb = CSize(22, 22);
 		m_use_slide = false;
 	}
 }
@@ -1514,6 +1552,9 @@ int CSCSliderCtrl::GetPos()
 */
 void CSCSliderCtrl::SetPos(int pos)
 {
+	//style_step일 때 SetPos()를 호출한다는 얘기는 아직 처리중이고 pos == upper인 경우라도 맨 마지막 스텝을 처리중이라는 뜻이므로
+	//SetPos()에서는 m_step_completed는 항상 false이며 parent에서 모든 처리가 완료된 시점에 이 값을 true로 세팅해줘야 한다.
+	m_step_completed = false;
 	CSliderCtrl::SetPos(pos);
 	Invalidate();
 }
@@ -1605,4 +1646,12 @@ void CSCSliderCtrl::set_font_italic(bool italic)
 {
 	m_lf.lfItalic = italic;
 	reconstruct_font();
+}
+
+//step 단위 증감
+int32_t CSCSliderCtrl::step(int step)
+{
+	int pos = GetPos();
+	SetPos(pos + step);
+	return GetPos();
 }

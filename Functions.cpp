@@ -5643,16 +5643,20 @@ bool save(CString filepath, CString text, int code_page)
 
 int file_open(FILE** fp, CString mode, CString file)
 {
+	//binary open이면 그냥 열어주고
+	if (mode.Find(_T("b")) > 0)
+	{
+		_tfopen_s(fp, file, mode);
+		return text_encoding_unknown;
+	}
+
 	//encording 방식을 읽어온다.
 	int	text_encoding = get_text_encoding(file);
 
 	if (text_encoding <= text_encoding_ansi)
 		_tfopen_s(fp, file, mode);
-	else
+	else if (text_encoding != text_encoding_unknown)
 		_tfopen_s(fp, file, mode + CHARSET);
-
-	if (fp == NULL)
-		return -1;
 
 	return text_encoding;
 }
@@ -6176,19 +6180,20 @@ int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 	return 0;
 }
 
-void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width, int pen_style, int draw_mode)
+void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width, Gdiplus::DashStyle pen_style, int draw_mode)
 {
 	draw_line(pDC, pt1.x, pt1.y, pt2.x, pt2.y, cr, width, pen_style, draw_mode);
 }
 
-void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, int width, int pen_style, int draw_mode)
+void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
-	Gdiplus::Pen pen(cr, width);
+	Gdiplus::Pen pen(cr, thick);
+	pen.SetDashStyle(pen_style);
 	g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
-void draw_rectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill /*= NULL_BRUSH*/, int nWidth/* = 1*/, int nPenStyle/* = PS_SOLID*/, int nDrawMode /* = R2_COPYPEN*/)
+void draw_rectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill, int nWidth, int nPenStyle, int nDrawMode)
 {
 	LOGBRUSH lb;
 
@@ -19018,6 +19023,7 @@ CString get_asterisk_addr(CString ip)
 }
 
 //x86에서만 가능
+#ifdef _M_IX86
 bool is_VMWare()
 {
 	bool res = true;
@@ -19053,8 +19059,8 @@ bool is_VMWare()
 
 	return res;
 }
-
-bool IsVM()
+#else
+bool is_VMWare()
 {
 	int cpuInfo[4] = {};
 
@@ -19102,3 +19108,4 @@ bool IsVM()
 
 	return false;
 }
+#endif

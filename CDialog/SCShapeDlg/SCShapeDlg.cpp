@@ -141,6 +141,9 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 {
 	bool res = false;
 
+	//m_auto_color = true이면 배경색에 따라 cr_text를 변경시키도록 한다.
+	cr_text = Gdiplus::Color::Gray;
+
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
 	else

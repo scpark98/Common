@@ -58,12 +58,13 @@ void CSCStepCtrl::OnPaint()
 	//스텝의 시작과 끝의 여백.
 	int interval;
 	if (m_horz)
-		interval = (rc.Width() - m_margin.left - m_margin.right - m_step_size * m_step.size()) / (m_step.size() - 1);
+		interval = (rc.Width() - m_margin.left - m_margin.right - m_thumb_size * m_step.size()) / (m_step.size() - 1);
 	else
-		interval = (rc.Height() - m_margin.top - m_margin.bottom - m_step_size * m_step.size()) / (m_step.size() - 1);
+		interval = (rc.Height() - m_margin.top - m_margin.bottom - m_thumb_size * m_step.size()) / (m_step.size() - 1);
 
 	for (i = 0; i < m_step.size(); i++)
 	{
+		int thumb_style = m_thumb_style;
 		Gdiplus::Color cr_thumb = m_cr_thumb_active;
 		Gdiplus::Color cr_text = m_cr_text_active;
 
@@ -78,26 +79,33 @@ void CSCStepCtrl::OnPaint()
 			cr_text = m_cr_text_current;
 		}
 
-		//thumb와 text의 색상이 지정되어 있다면 지정된 색을 사용한다.
+		//thumb_style, thumb 색상, text의 색상을 별도로 지정한 위치라면 그 설정대로 그려준다.
+		if (m_step[i].thumb_style != thumb_style_none)
+			thumb_style = m_step[i].thumb_style;
+
 		if (m_step[i].cr_text.GetValue() != Gdiplus::Color::Transparent)
 			cr_text = m_step[i].cr_text;
 
 		if (m_step[i].cr_thumb.GetValue() != Gdiplus::Color::Transparent)
 			cr_thumb = m_step[i].cr_thumb;
 
+
 		if (m_step[i].r.IsRectEmpty())
 		{
 			if (m_horz)
 			{
-				m_step[i].r = make_rect(m_margin.left + (interval + m_step_size) * i, rc.top + m_margin.left, m_step_size, m_step_size);
+				m_step[i].r = make_rect(m_margin.left + (interval + m_thumb_size) * i, rc.top + m_margin.left, m_thumb_size, m_thumb_size);
 			}
 			else
 			{
-				m_step[i].r = make_rect(rc.left + m_margin.left, m_margin.top + (interval + m_step_size) * i, m_step_size, m_step_size);
+				m_step[i].r = make_rect(rc.left + m_margin.left, m_margin.top + (interval + m_thumb_size) * i, m_thumb_size, m_thumb_size);
 			}
 		}
 
-		g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(m_step[i].r));
+		if (thumb_style == thumb_style_rect)
+			g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(m_step[i].r));
+		else
+			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(m_step[i].r));
 
 		//pos 미만은 파란색 원에 체크 표시를
 		if (i < m_pos)
@@ -108,16 +116,32 @@ void CSCStepCtrl::OnPaint()
 		else if (i == m_pos)
 		{
 			CRect rthumb_small = m_step[i].r;
+
 			rthumb_small.DeflateRect(1, 1);
-			g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+			if (thumb_style == thumb_style_rect)
+				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+			else
+				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+
 			rthumb_small.DeflateRect(3, 3);
-			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rthumb_small));
+			if (thumb_style == thumb_style_rect)
+				//g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rthumb_small));
+				draw_rectangle(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
+			else if (thumb_style == thumb_style_diamond)
+				;// draw_diamond(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
+			else if (thumb_style == thumb_style_circle)
+				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rthumb_small));
+				//draw_ellipse(&dc,)
 		}
 		else
 		{
 			CRect rthumb_small = m_step[i].r;
+
 			rthumb_small.DeflateRect(1, 1);
-			g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+			if (thumb_style == thumb_style_rect)
+				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+			else
+				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
 		}
 
 		//draw text
@@ -192,7 +216,7 @@ void CSCStepCtrl::reconstruct_font()
 void CSCStepCtrl::set_step_style(int style)
 {
 	for (auto& step : m_step)
-		step.style = style;
+		step.thumb_style = style;
 
 	Invalidate();
 }
@@ -202,7 +226,7 @@ void CSCStepCtrl::set_step_style(int index, int style)
 	if (index >= m_step.size())
 		return;
 
-	m_step[index].style = style;
+	m_step[index].thumb_style = style;
 }
 
 //각 스텝에 텍스트 지정

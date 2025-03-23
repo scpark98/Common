@@ -31,12 +31,14 @@
   m_step.set_step_count(4);
 */
 
-enum STEP_STYLE
+enum THUMB_STYLE
 {
-	step_style_none = -1,
-	step_style_circle,
-	step_style_circle_with_num,
-	step_style_rect,
+	thumb_style_none = -1,
+	thumb_style_circle,
+	thumb_style_circle_with_num,
+	thumb_style_rect,
+	thumb_style_rect_round,
+	thumb_style_diamond,
 };
 
 class CSCStepElement
@@ -46,7 +48,7 @@ public:
 	CString			text;
 
 	//각 스텝 모양은 m_step_style을 기본 스타일로 하지만 어느 경우는 달리 표시할 필요도 있다.
-	int				style = step_style_none;
+	int				thumb_style = thumb_style_none;
 
 	//이 기본값인 투명색 그대로이면 대표 컬러인 m_cr_thumb를 사용하고 지정되어 있으면 해당 색으로 표시
 	Gdiplus::Color	cr_thumb = Gdiplus::Color::Transparent;
@@ -61,7 +63,7 @@ public:
 	CSCStepCtrl();
 	virtual ~CSCStepCtrl();
 
-	void			set_direction(bool is_horz) { m_horz = is_horz; }
+	void			set_style(bool is_horz, int thumb_style = thumb_style_circle) { m_horz = is_horz; m_thumb_style = thumb_style; }
 
 	//총 단계 수
 	void			set_step_count(int count) { m_pos = -1; m_step.resize(count); }
@@ -100,7 +102,7 @@ public:
 	void			reset_step_color(int index = -1);
 
 	//각 스텝이 그려지는 픽셀 크기
-	void			set_step_size(int size) { m_step_size = size; }
+	void			set_step_size(int size) { m_thumb_size = size; }
 
 	void			set_draw_line(bool draw) { m_draw_line = draw; }
 
@@ -112,8 +114,8 @@ protected:
 	bool			m_horz = true;
 	bool			m_draw_line = true;
 	int				m_pos = -1;
-	int				m_step_style = step_style_circle;
-	int				m_step_size = 16;
+	int				m_thumb_style = thumb_style_circle;
+	int				m_thumb_size = 16;
 	CRect			m_margin = CRect(8, 8, 8, 8);
 	int				m_gap_to_text = 8;	//step과 텍스트 사이 간격
 

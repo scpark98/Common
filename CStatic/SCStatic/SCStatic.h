@@ -112,6 +112,8 @@ public:
 
 	//gif도 가능.
 	//m_static_copy.set_back_image(_T("GIF"), IDR_GIF_COPY, Gdiplus::Color::White);
+	//만약 원본 크기가 static ctrl의 크기보다 클 경우는 보이지 않게 되므로
+	//m_static_copy.fit_to_back_image(false);를 호출해서 이미지 출력 크기를 컨트롤에 맞춰서 출력되도록 해야 한다.
 	void			set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 	//배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.

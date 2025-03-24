@@ -5593,50 +5593,47 @@ CString read(CString filepath, int max_length, int encoding)
 	return result;
 }
 
-//20231206
-//unicode 일때는 code_page에 따라 ansi or utf8로 저장되나
-//multibyte 일때는 utf8로 설정해도 ansi로 저장됨.
-bool save(CString filepath, CString text, int code_page)
+//text 파일로 저장한다. 만약 base64_encode된 text라면 encoding = CP_ACP, is_binary_data = true로 해야 한다.
+bool save(CString filepath, CString text, int code_page, bool is_binary_data)
 {
 	if (code_page != CP_ACP && code_page != CP_UTF8)
 		code_page = CP_UTF8;
 
-	//std::locale::global(std::locale(".UTF-8"));
-	//setlocale(LC_ALL, ".utf8");
-
-	//unicode 환경에서는 아래와 같이 동작하나 multibyte에서는 ansi로만 저장됨.
-	//CT2A(text)			: ANSI로 저장
-	//CT2CA(text, CP_UTF8)	: UTF8로 저장됨
-	std::ofstream of;
-	
-	of.open(filepath, std::ofstream::out);
-	
-	if (!of.is_open())
-		return false;
-
-	//USES_CONVERSION;
-	//text = W2A_CP(text, code_page);
-	//of << text;
-	// 
-	of << CT2CA(text, code_page);
-	//of << CA2CT(text, code_page);
-	of.close();
-
-	/*
 	FILE* fp = NULL;
 
-	_tfopen_s(&fp, filepath, _T("wt")CHARSET);
+	if (code_page == CP_UTF8)
+		_tfopen_s(&fp, filepath, _T("wt")CHARSET);
+	else
+		_tfopen_s(&fp, filepath, _T("wt"));
 
 	if (fp == NULL)
-	{
-		//AfxMessageBox(filepath + _T("\n위 파일을 열 수 없습니다."), MB_ICONEXCLAMATION);
 		return false;
+
+	if (code_page == CP_ACP)
+	{
+		char* chText = CString2char(text);
+
+		if (is_binary_data)
+		{
+			fwrite(chText, sizeof(char), strlen(chText), fp);
+
+			//맨 마지막에 null char를 써주지 않으면 여전히 UTF-8로 인식된다.
+			char null_ch = '\0';
+			fwrite(&null_ch, 1, 1, fp);
+		}
+		else
+		{
+			_ftprintf(fp, _T("%S"), chText);
+		}
+
+		delete[] chText;
+	}
+	else
+	{
+		_ftprintf(fp, _T("%s"), text);
 	}
 
-	_ftprintf(fp, _T("%s\n"), text);
-
 	fclose(fp);
-	*/
 
 	return true;
 }

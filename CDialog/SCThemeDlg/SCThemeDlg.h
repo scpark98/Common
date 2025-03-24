@@ -74,7 +74,7 @@ public:
 	Gdiplus::Color get_titlebar_back_color() { return m_cr_titlebar_back; }
 	void	set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void	set_titlebar_font_size(int size);
-
+	void	set_titlebar_font_bold(bool bold) { m_titlebar_bold = bold; m_title_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL); }
 	//
 	void	set_titlebar_icon(UINT icon_id, int cx = 16, int cy = 16);
 	void	set_titlebar_icon(HICON hIcon);
@@ -153,8 +153,8 @@ protected:
 
 	bool				m_use_resizable = true;
 
-	//CString				m_title;
 	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
+	bool				m_titlebar_bold = false;
 
 	Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
 	Gdiplus::Color		m_cr_titlebar_back = gRGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);

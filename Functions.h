@@ -1060,7 +1060,10 @@ struct	NETWORK_INFO
 	//파일을 읽어서 CString으로 리턴한다. max_length < 0이면 전체 파일을 읽어서 리턴한다.
 	//encoding < 0이면 encoding 방식을 자동 판별하여 읽어온다.
 	CString		read(CString filepath, int max_length = -1, int encoding = -1);
-	bool		save(CString filepath, CString text, int encoding = CP_UTF8);
+	//text 파일로 저장한다.
+	//encoding = CP_ACP이면 ANSI 파일로, CP_UTF8이면 utf8 형식으로 저장된다.
+	//만약 base64_encode된 text라면 encoding = CP_ACP, is_binary_data = true로 해야 ANSI로 저장된다.
+	bool		save(CString filepath, CString text, int encoding = CP_UTF8, bool is_binary_data = false);
 
 	//텍스트 파일을 열 때 ansi, utf-8 등을 자동으로 판별하여 열어주고 encoding 방식을 리턴한다.
 	//return value : text_encoding_ansi / text_encoding_utf8 / ....

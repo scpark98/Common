@@ -280,7 +280,7 @@ LRESULT CSCThemeDlg::OnNcHitTest(CPoint point)
 	CPoint pt;
 	GetCursorPos(&pt);
 	ScreenToClient(&pt);
-	TRACE(_T("pt.y = %d\n"), pt.y);
+	//TRACE(_T("pt.y = %d\n"), pt.y);
 
 	//resize하지 않는 dlg라도 타이틀바는 반응해야 한다.
 	if (!m_use_resizable && (pt.y < 7 || pt.y > m_titlebar_height))
@@ -491,7 +491,7 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = FW_BOLD;
+		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 		m_title_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, 10);
 		reconstruct_title_font();
 

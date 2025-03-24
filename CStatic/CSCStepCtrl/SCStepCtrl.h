@@ -31,6 +31,7 @@
   m_step.set_step_count(4);
 */
 
+//각 스텝의 모양
 enum THUMB_STYLE
 {
 	thumb_style_none = -1,
@@ -39,6 +40,7 @@ enum THUMB_STYLE
 	thumb_style_rect,
 	thumb_style_rect_round,
 	thumb_style_diamond,
+	thumb_style_arrow,
 };
 
 class CSCStepElement

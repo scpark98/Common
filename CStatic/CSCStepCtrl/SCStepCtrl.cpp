@@ -94,11 +94,11 @@ void CSCStepCtrl::OnPaint()
 		{
 			if (m_horz)
 			{
-				m_step[i].r = make_rect(m_margin.left + (interval + m_thumb_size) * i, rc.top + m_margin.left, m_thumb_size, m_thumb_size);
+				m_step[i].r = make_rect(m_margin.left + (interval + m_thumb_size) * i, m_margin.top, m_thumb_size, m_thumb_size);
 			}
 			else
 			{
-				m_step[i].r = make_rect(rc.left + m_margin.left, m_margin.top + (interval + m_thumb_size) * i, m_thumb_size, m_thumb_size);
+				m_step[i].r = make_rect(m_margin.left, m_margin.top + (interval + m_thumb_size) * i, m_thumb_size, m_thumb_size);
 			}
 		}
 
@@ -117,13 +117,13 @@ void CSCStepCtrl::OnPaint()
 		{
 			CRect rthumb_small = m_step[i].r;
 
-			rthumb_small.DeflateRect(1, 1);
+			rthumb_small.DeflateRect(2, 2);
 			if (thumb_style == thumb_style_rect)
 				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
 			else
 				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
 
-			rthumb_small.DeflateRect(3, 3);
+			rthumb_small.DeflateRect(2, 2);
 			if (thumb_style == thumb_style_rect)
 				//g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rthumb_small));
 				draw_rectangle(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
@@ -180,7 +180,9 @@ void CSCStepCtrl::OnPaint()
 			dc.SetTextColor(cr_text.ToCOLORREF());
 
 			dc.DrawText(m_step[i].text, rtext, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
-			//draw_rectangle(g, rtext, Gdiplus::Color::Red);
+#ifdef _DEBUG
+			draw_rectangle(g, rtext, Gdiplus::Color::Red);	//text 영역 확인용
+#endif
 			dc.SelectObject(pOldFont);
 		}
 
@@ -213,20 +215,21 @@ void CSCStepCtrl::reconstruct_font()
 	ASSERT(bCreated);
 }
 
-void CSCStepCtrl::set_step_style(int style)
+void CSCStepCtrl::set_thumb_style(int index, int style)
 {
-	for (auto& step : m_step)
-		step.thumb_style = style;
+	if (index < 0)
+	{
+		for (auto& step : m_step)
+		{
+			step.thumb_style = style;
+		}
+	}
+	else
+	{
+		m_step[index].thumb_style = style;
+	}
 
 	Invalidate();
-}
-
-void CSCStepCtrl::set_step_style(int index, int style)
-{
-	if (index >= m_step.size())
-		return;
-
-	m_step[index].thumb_style = style;
 }
 
 //각 스텝에 텍스트 지정
@@ -288,6 +291,17 @@ void  CSCStepCtrl::reset_step_color(int index)
 	Invalidate();
 }
 
+//각 스텝의 thumb 크기
+void CSCStepCtrl::set_thumb_size(int size)
+{
+	m_thumb_size = size;
+
+	for (auto& step : m_step)
+		step.r.SetRectEmpty();
+
+	Invalidate();
+}
+
 void CSCStepCtrl::OnSize(UINT nType, int cx, int cy)
 {
 	CStatic::OnSize(nType, cx, cy);
@@ -298,6 +312,7 @@ void CSCStepCtrl::OnSize(UINT nType, int cx, int cy)
 
 	for (auto& step : m_step)
 		step.r.SetRectEmpty();
+
 	Invalidate();
 }
 

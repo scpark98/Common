@@ -4,7 +4,8 @@
 #include <Afxwin.h>
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
-#include "../../GdiplusBitmap.h"
+//#include "../../GdiplusBitmap.h"
+#include "../../CButton/GdiButton/GdiButton.h"
 #include "../../Functions.h"
 #include "../../colors.h"
 #include "../../system/ShellImageList/ShellImageList.h"
@@ -432,6 +433,7 @@ public:
 	void		allow_edit(bool allow_edit = true, bool one_click_edit = true);
 	void		allow_one_click_edit(bool allow_one_click_edit) { m_allow_one_click_edit = allow_one_click_edit; }
 	void		allow_edit_column(int column, bool allow_edit = true);
+	void		set_edit_readonly(bool readonly = true) { m_edit_readonly = readonly; }
 	bool		is_in_editing()	{ return m_in_editing; }	//편집중인지
 	void		set_flag_in_editing(bool in_editing) { edit_end(); m_in_editing = in_editing; }
 	int			get_recent_edit_item() { return m_edit_item; }
@@ -524,7 +526,12 @@ public:
 	bool			is_item_visible(int index, bool bPartial = false);
 
 	//항목이 추가되면 auto scroll되지만 특정 항목을 선택하면 false로 된다.
+	//scroll_end_button은 m_auto_scroll = false 일때만 화면에 표시된다.
 	bool			m_auto_scroll = true;
+	bool			m_show_auto_scroll_button = false;
+	void			show_auto_scroll_button(bool show = true);
+	void			set_auto_scroll(bool auto_scroll);
+	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
 
 	//리스트 항목들을 무작위로 섞는다.
 	void			shuffle();
@@ -586,6 +593,7 @@ protected:
 	bool			m_in_editing = false;			//편집중인지
 	int				m_edit_item = -1;				//편집중인 아이템 인덱스
 	int				m_edit_subItem = -1;			//편집중인 아이템 서브인덱스
+	bool			m_edit_readonly = false;		//편집모드로는 들어가지만 편집해서는 안되는 데이터인 경우 set_edit_readonly(true);를 호출한다.
 	CString			m_edit_old_text;				//편집 전 텍스트
 	CString			m_edit_new_text;				//편집 후 텍스트
 	CEdit*			m_pEdit = NULL;
@@ -630,6 +638,11 @@ protected:
 	bool			m_draw_bottom_line = false;
 	Gdiplus::Color	m_cr_bottom_line = Gdiplus::Color::LightGray;
 
+//스크롤 버튼
+	CGdiButton*		m_button_scroll_to_end = NULL;
+	int				m_auto_scroll_button_size = 24;
+	void			init_auto_scroll_button();
+
 protected:
 	DECLARE_MESSAGE_MAP()
 public:
@@ -669,6 +682,7 @@ public:
 	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };
 
 

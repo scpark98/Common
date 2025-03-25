@@ -4,7 +4,9 @@
 //#include "stdafx.h"
 #include "HeaderCtrlEx.h"
 #include "VtListCtrlEx.h"
+
 #include "../../Functions.h"
+#include "../../MemoryDC.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -88,12 +90,15 @@ LRESULT CHeaderCtrlEx::OnLayout(WPARAM, LPARAM lParam)
 
 void CHeaderCtrlEx::OnPaint() 
 {
-	CPaintDC dc(this);
+	CPaintDC dc1(this);
 	CRect rc, rItem;
 
-	dc.SelectObject (GetFont());
-
 	GetClientRect(rc);
+
+	CMemoryDC dc(&dc1, &rc);
+
+	dc.SelectObject(GetFont());
+
 
 	//if (m_flat_style)
 	//	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));

@@ -238,8 +238,8 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 				break;
 		}
 
-		if (!log_level_str.IsEmpty())
-			log_level_str = _T(" ") + log_level_str;
+		//if (!log_level_str.IsEmpty())
+		//	log_level_str = _T(" ") + log_level_str;
 
 		SYSTEMTIME t = { 0 };
 		GetLocalTime(&t);

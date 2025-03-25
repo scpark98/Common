@@ -14,7 +14,7 @@
 #include <Afxwin.h>
 #include "../../GdiplusBitmap.h"
 
-static const UINT Message_CSCEditMessage = ::RegisterWindowMessage(_T("MessageString_CSCEditMessage"));
+static const UINT Message_CSCEdit = ::RegisterWindowMessage(_T("MessageString_CSCEdit"));
 
 class CSCEditMessage
 {

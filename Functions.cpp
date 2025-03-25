@@ -411,7 +411,7 @@ time_t _mkgmtime(const struct tm *tm)
     return rt < 0 ? -1 : rt;
 }
 
-int	find_string(CString target, CString find_string, bool case_sensitive)
+int	find(CString target, CString find_string, bool case_sensitive)
 {
 	if (!case_sensitive)
 	{

@@ -12,8 +12,6 @@
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
-//#include "../../GdiPlusBitmap.h"
-//#include "EditCell.h"
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -32,6 +30,12 @@ CVtListCtrlEx::CVtListCtrlEx()
 
 CVtListCtrlEx::~CVtListCtrlEx()
 {
+	if (m_button_scroll_to_end)
+	{
+		m_button_scroll_to_end->DestroyWindow();
+		delete m_button_scroll_to_end;
+	}
+
 	m_font.DeleteObject();
 	safe_release_gradient_rect_handle();
 
@@ -62,7 +66,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
-	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CVtListCtrlEx::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CVtListCtrlEx::on_message_CSCEdit)
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGING, &CVtListCtrlEx::OnLvnItemchanging)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_NCHITTEST()
@@ -70,6 +74,8 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_VSCROLL()
 	ON_NOTIFY_REFLECT(LVN_BEGINSCROLL, &CVtListCtrlEx::OnLvnBeginScroll)
 	ON_NOTIFY_REFLECT(LVN_ENDSCROLL, &CVtListCtrlEx::OnLvnEndScroll)
+	ON_WM_SIZE()
+	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CVtListCtrlEx::on_message_CGdiButton)
 END_MESSAGE_MAP()
 
 
@@ -1253,6 +1259,9 @@ void CVtListCtrlEx::PreSubclassWindow()
 	//동적으로 생성할 경우 PreSubclassWindow()함수내에서
 	//GetHeaderCtrl()은 항상 NULL을 리턴한다.
 	//이를 보완하기 위해 타이머, SendMessage등의 방법을 사용해봤으나 쉽지 않다.
+
+
+
 	CListCtrl::PreSubclassWindow();
 }
 
@@ -1419,19 +1428,19 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		}
 
 		case 220		:	return true;	//'\'키를 누르면 리스트 맨 처음으로 이동되는 현상 방지.
-		case 'A'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
+		case 'A'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
 							{
 								select_item(-1);
 							}
 							break;
-		case 'C'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
+		case 'C'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
 							{
 								//CopyToClipboard(_T("|"));
 								MessageBeep(MB_ICONINFORMATION);
 								return true;
 							}
 							break;
-		case 'V'		:	if (GetKeyState(VK_CONTROL) & 0x8000)
+		case 'V'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
 							{
 								//PasteInsertFromClipboard();
 								//MessageBeep(MB_ICONINFORMATION);
@@ -1458,9 +1467,12 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 
 							refresh_list();
 							return true;
-		case VK_END :
-							m_auto_scroll = true;
-							break;
+		case VK_END :		if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
+							{
+								set_auto_scroll(true);
+								return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
+							}
+							return false;
 		/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
 		case VK_DELETE	:	if (m_bInEditing)
@@ -1509,18 +1521,6 @@ void CVtListCtrlEx::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc, true);
 	Gdiplus::Graphics g(dc.m_hDC);
-
-	/* 이 코드의 의미는?
-	//헤더는 안칠해지게해서 안깜박거리게 하고자 한듯한데 깜박인다. 일단 패스.
-	CRect headerRect;
-	GetDlgItem(0)->GetWindowRect(&headerRect);
-	ScreenToClient(&headerRect);
-	dc.ExcludeClipRect(&headerRect);
-
-	CRect clip;
-	dc.GetClipBox(&clip);
-	clip.top -= 5;
-	*/
 
 	//CTreeCtrl, CListCtrl의 배경색은
 	//dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
@@ -1608,7 +1608,15 @@ void CVtListCtrlEx::allow_edit_column(int column, bool allow_edit)
 {
 	if (m_allow_edit_column.size() <= column)
 		m_allow_edit_column.resize(column + 1);
+
 	m_allow_edit_column[column] = allow_edit;
+
+	//한 컬럼이라도 allow_edit이라면 m_allow_edit은 true이어야 한다.
+	if (allow_edit)
+	{
+		m_allow_edit = true;
+		m_allow_one_click_edit = true;
+	}
 }
 
 
@@ -1703,6 +1711,10 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetSel(0, -1);
 	m_pEdit->SetFocus();
+
+	//ES_READONLY는 ModifyStyle()로는 동적변경할 수 없다. 아래와 같이 EM_SETREADONLY를 보내야 한다.
+	//m_pEdit->ModifyStyle(m_edit_readonly ? 0 : ES_READONLY, m_edit_readonly ? ES_READONLY : 0);
+	m_pEdit->SendMessage(EM_SETREADONLY, m_edit_readonly ? TRUE : FALSE, 0);
 
 	CString ext = get_part(m_edit_old_text, fn_ext);
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
@@ -4595,7 +4607,7 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	if ((pNMListView->uChanged & LVIF_STATE)
 		&& (pNMListView->uNewState & LVIS_SELECTED))
 	{
-		m_auto_scroll = false;
+		set_auto_scroll(false);
 	}
 
 	return FALSE;
@@ -4825,4 +4837,68 @@ void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	//TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
 	*pResult = 0;
+}
+
+void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
+{
+	CListCtrl::OnSize(nType, cx, cy);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (!m_button_scroll_to_end)
+		return;
+
+	CRect rc;
+	GetClientRect(rc);
+	m_button_scroll_to_end->MoveWindow(CRect(rc.right - 5 - m_auto_scroll_button_size, rc.bottom - 5 - m_auto_scroll_button_size, rc.right - 5, rc.bottom - 5));
+}
+
+void CVtListCtrlEx::show_auto_scroll_button(bool show)
+{
+	m_show_auto_scroll_button = show;
+
+	if (!m_button_scroll_to_end)
+	{
+		init_auto_scroll_button();
+	}
+}
+
+void CVtListCtrlEx::set_auto_scroll(bool auto_scroll)
+{
+	m_auto_scroll = auto_scroll;
+
+	if (m_button_scroll_to_end)
+		m_button_scroll_to_end->ShowWindow(m_auto_scroll ? SW_HIDE: SW_SHOW);
+}
+
+LRESULT CVtListCtrlEx::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
+{
+	auto msg = (CGdiButtonMessage*)wParam;
+
+	if (msg->m_message == WM_LBUTTONUP)
+		set_auto_scroll(true);
+
+	return 0;
+}
+
+void CVtListCtrlEx::init_auto_scroll_button()
+{
+	//우측 하단에 auto_scroll 버튼을 표시한다.
+	CRect r(0, 0, m_auto_scroll_button_size, m_auto_scroll_button_size);
+	r.DeflateRect(4, 4);
+
+	CGdiplusBitmap img(m_auto_scroll_button_size, m_auto_scroll_button_size);
+	Gdiplus::Graphics g(img.m_pBitmap);
+	Gdiplus::Pen pen(Gdiplus::Color::RoyalBlue, 2.0f);
+	pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+
+	g.DrawLine(&pen, r.CenterPoint().x, r.top + 2, r.CenterPoint().x, r.bottom);
+	g.DrawLine(&pen, r.left, r.bottom + 1, r.right, r.bottom + 1);
+	g.DrawLine(&pen, r.CenterPoint().x, r.bottom, r.CenterPoint().x - 6, r.bottom - 6);
+	g.DrawLine(&pen, r.CenterPoint().x - 1, r.bottom, r.CenterPoint().x + 5, r.bottom - 6);
+
+	img.set_alpha(128);
+
+	m_button_scroll_to_end = new CGdiButton();
+	m_button_scroll_to_end->create(_T("end"), WS_CHILD | BS_PUSHLIKE, CRect(0, 0, m_auto_scroll_button_size, m_auto_scroll_button_size), this, WM_USER + 3872);
+	m_button_scroll_to_end->add_image(&img);
 }

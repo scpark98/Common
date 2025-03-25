@@ -111,7 +111,7 @@ void CSCToolBar::insert(int index, CString caption, UINT resource_id, int button
 		img.deep_copy(&img1);
 		img1.replace_color(Gdiplus::Color(255, 45, 51, 51));
 
-		btn->back_color(m_cr_back);
+		btn->set_back_color(m_cr_back);
 		btn->fit_to_image(false);
 
 		btn->add_image(&img);

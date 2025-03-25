@@ -71,10 +71,10 @@ public:
 	void			set_step_count(int count) { m_pos = -1; m_step.resize(count); }
 	int				get_step_count() { return m_step.size(); }
 
-	void			set_step_style(int style);
-	void			set_step_style(int index, int style);
+	//index < 0이면 모든 thumb에 적용.
+	void			set_thumb_style(int index, int style);
 
-	//l, t, r, b의 margin. 
+	//l, t, r, b의 margin. 가로형일 경우 텍스트가 충분히 표시되도록 좌우 여백을 줘야 한다.
 	void			set_margin(int left, int top, int right, int bottom) { m_margin = CRect(left, top, right, bottom); }
 	//step과 텍스트 간격
 	void			set_gap_to_text(int gap) { m_gap_to_text = gap; }
@@ -103,8 +103,8 @@ public:
 	//index == -1이면 모든 스텝 리셋
 	void			reset_step_color(int index = -1);
 
-	//각 스텝이 그려지는 픽셀 크기
-	void			set_step_size(int size) { m_thumb_size = size; }
+	//각 스텝의 thumb 크기
+	void			set_thumb_size(int size);
 
 	void			set_draw_line(bool draw) { m_draw_line = draw; }
 
@@ -117,7 +117,7 @@ protected:
 	bool			m_draw_line = true;
 	int				m_pos = -1;
 	int				m_thumb_style = thumb_style_circle;
-	int				m_thumb_size = 16;
+	int				m_thumb_size = 18;
 	CRect			m_margin = CRect(8, 8, 8, 8);
 	int				m_gap_to_text = 8;	//step과 텍스트 사이 간격
 

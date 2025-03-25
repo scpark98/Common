@@ -76,7 +76,7 @@ CGdiButton::~CGdiButton()
 BOOL CGdiButton::create(CString caption, DWORD dwStyle, CRect r, CWnd* parent, UINT button_id)
 {
 	BOOL res = Create(caption, dwStyle, r, parent, button_id);
-	prepare_tooltip();
+	//prepare_tooltip();
 	return res;
 }
 
@@ -685,7 +685,7 @@ void CGdiButton::PreSubclassWindow()
 
 	reconstruct_font();
 
-	prepare_tooltip();
+	//prepare_tooltip();
 
 	CButton::PreSubclassWindow();
 }

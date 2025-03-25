@@ -320,6 +320,7 @@ public:
 	//현재 이미지를 32bit로 변경한다.
 	void cvtColor32ARGB();
 
+	//printf()처럼 save(_T("D:\\test_%d.png"), i);와 같이 사용할 수 있다.
 	bool save(LPCTSTR filepath, ...);
 	bool copy_to_clipbard();
 	bool paste_from_clipboard();

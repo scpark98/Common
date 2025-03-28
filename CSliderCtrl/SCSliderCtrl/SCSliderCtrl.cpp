@@ -1603,7 +1603,7 @@ void CSCSliderCtrl::set_log_font(LOGFONT lf)
 
 int CSCSliderCtrl::get_font_size()
 {
-	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	m_font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 	return m_font_size;
 }
 
@@ -1617,7 +1617,7 @@ void CSCSliderCtrl::set_font_size(int font_size)
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
 	reconstruct_font();
 }
 
@@ -1632,7 +1632,7 @@ void CSCSliderCtrl::enlarge_font_size(bool enlarge)
 {
 	m_font_size = get_font_size();
 	enlarge ? m_font_size++ : m_font_size--;
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
 	reconstruct_font();
 }
 

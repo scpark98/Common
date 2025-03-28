@@ -126,6 +126,11 @@ public:
 		color_theme_visualstudio,
 		color_theme_gray,
 		color_theme_linkmemine,
+		color_theme_linkmemine_se,
+		color_theme_helpu,
+		color_theme_anysupport,
+		color_theme_pcanypro,
+		color_theme_custom,
 	};
 
 	void	set_color_theme(int theme);
@@ -144,7 +149,7 @@ protected:
 	//CWndShadow			m_shadow;
 	//void				init_shadow();
 
-	HICON				m_hIcon;
+	HICON				m_hIcon = NULL;
 
 	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
 	//이 변수는 DwmExtendFrameIntoClientArea()과 관련된 변수로 true/false에 따라 동작하게 하려 했으나 false일 경우는 부작용이 많다. 우선 true로 고정한다.

@@ -1608,9 +1608,9 @@ void		SetWallPaper(CString sfile);
 	CSize		draw_icon(CDC* pDC, HICON hIcon, CRect r);
 
 	//font size to LOGFONT::lfHeight
-	LONG		get_logical_size_from_font_size(HWND hWnd, int font_size);
+	LONG		get_pixel_size_from_font_size(HWND hWnd, int font_size);
 	//LOGFONT::lfHeight to font size
-	LONG		get_font_size_from_logical_size(HWND hWnd, int logical_size);
+	LONG		get_font_size_from_pixel_size(HWND hWnd, int logical_size);
 
 	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);

@@ -12,7 +12,7 @@ IMPLEMENT_DYNAMIC(CSCComboBox, CComboBox)
 
 CSCComboBox::CSCComboBox()
 {
-	m_theme.set_color_theme(CSCColorTheme::color_theme_dark_gray);
+	//m_theme.set_color_theme(CSCColorTheme::color_theme_default);
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
@@ -36,15 +36,15 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	ON_CONTROL_REFLECT(CBN_DROPDOWN, &CSCComboBox::OnCbnDropdown)
-	ON_WM_PAINT()
+	//ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_CONTROL_REFLECT(CBN_SETFOCUS, &CSCComboBox::OnCbnSetfocus)
 	ON_CONTROL_REFLECT(CBN_KILLFOCUS, &CSCComboBox::OnCbnKillfocus)
 	ON_CONTROL_REFLECT(CBN_SELCHANGE, &CSCComboBox::OnCbnSelchange)
 	ON_CONTROL_REFLECT(CBN_SELENDOK, &CSCComboBox::OnCbnSelendok)
 	ON_CONTROL_REFLECT(CBN_SELENDCANCEL, &CSCComboBox::OnCbnSelendcancel)
-	ON_WM_CTLCOLOR_REFLECT()
-	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CSCComboBox::on_message_CSCEdit)
+	//ON_WM_CTLCOLOR_REFLECT()
+	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 
@@ -97,27 +97,36 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	dc.Attach(lpDrawItemStruct->hDC);
 	GetLBText(lpDrawItemStruct->itemID, strData);
 
-	COLORREF crOldTextColor = dc.GetTextColor();
-	COLORREF crOldBkColor = dc.GetBkColor();
+	COLORREF cr_text = m_theme.cr_text.ToCOLORREF();
+	COLORREF cr_back = m_theme.cr_back.ToCOLORREF();
+
+	CRect rItem = lpDrawItemStruct->rcItem;
+
+	Gdiplus::Color cr = GetItemData(lpDrawItemStruct->itemID);
+	if (cr.GetValue() != Gdiplus::Color::Transparent)
+		cr_text = cr.ToCOLORREF();
+
 
 	if (lpDrawItemStruct->itemState & ODS_SELECTED)
 	{
-		//dc.SetTextColor(m_crHighlightText);
-		//dc.SetBkColor(m_crHighlightTextBack);
-		//dc.FillSolidRect( &lpDrawItemStruct->rcItem, m_crHighlightTextBack );
+		//cr_text = m_theme.cr_text_selected.ToCOLORREF();
+		cr_back = m_theme.cr_back_selected.ToCOLORREF();
+	}
+	else if (lpDrawItemStruct->itemState & ODS_HOTLIGHT)
+	{
+		//cr_text = m_theme.cr_text_hover.ToCOLORREF();
+		cr_back = m_theme.cr_back_hover.ToCOLORREF();
 	}
 	else
 	{
-		//dc.SetTextColor(m_crText);
-		//dc.SetBkColor(m_crBack);
-		//dc.FillSolidRect(&lpDrawItemStruct->rcItem, m_crBack);
 	}
+
+	dc.FillSolidRect(rItem, cr_back);
+
+	dc.SetTextColor(cr_text);
 
 	//TRACE(_T("%s\n"), strData);
 	dc.DrawText(strData, &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
-
-	dc.SetTextColor(crOldTextColor);
-	dc.SetBkColor(crOldBkColor);
 
 	dc.Detach();
 }
@@ -301,6 +310,25 @@ void CSCComboBox::OnCbnDropdown()
 	SetDroppedWidth(nWidth);
 }
 
+void CSCComboBox::set_line_height(int height_logical_unit)
+{
+	m_line_height = -get_pixel_size_from_font_size(m_hWnd, height_logical_unit);
+
+	//0보다 크다면 지정된 높이로 변경하고
+	if (m_line_height > 0)
+	{
+		//-1을 주면 입력박스의 높이가 변경된다.
+		SetItemHeight(-1, m_line_height);
+		//0을 주면 리스트박스의 모든 아이템의 높이가 변경된다.
+		SetItemHeight(0, m_line_height);
+	}
+	//0이하라면 폰트 크기에 따라 자동 조정된다.
+	else
+	{
+		reconstruct_font();
+	}
+}
+
 void CSCComboBox::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	if (sFontname == _T(""))
@@ -330,6 +358,12 @@ void CSCComboBox::set_font_size(int font_size)
 	reconstruct_font();
 }
 
+void CSCComboBox::set_font_bold(int weight)
+{
+	m_lf.lfWeight = weight;
+	reconstruct_font();
+}
+
 //이 함수에서는 m_lf 정보를 이용해서 폰트를 재생성한다.
 //즉, m_lf.lfHeight 값을 이용해서 폰트가 만들어지므로
 //m_font_size 멤버 변수의 값이 변경되었다면
@@ -344,10 +378,21 @@ void CSCComboBox::reconstruct_font()
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	SetFont(&m_font, true);
 
+	int line_height = m_line_height;
+
+	if (m_line_height > 0)
+	{
+		line_height = m_line_height;
+	}
+	else
+	{
+		line_height = -m_lf.lfHeight;
+	}
+
 	//-1을 주면 입력박스의 높이가 변경된다.
-	SetItemHeight(-1, -m_lf.lfHeight + 4);
+	SetItemHeight(-1, line_height);
 	//0을 주면 리스트박스의 모든 아이템의 높이가 변경된다.
-	SetItemHeight(0, -m_lf.lfHeight + 4);
+	SetItemHeight(0, line_height);
 
 	ASSERT(bCreated);
 }
@@ -432,8 +477,8 @@ int CSCComboBox::find_string(CString src)
 
 void CSCComboBox::OnPaint()
 {
-	CComboBox::OnPaint();
-	return;
+	//CComboBox::OnPaint();
+	//return;
 	CPaintDC dc(this); // device context for painting
 					   // TODO: 여기에 메시지 처리기 코드를 추가합니다.
 					   // 그리기 메시지에 대해서는 CComboBox::OnPaint()을(를) 호출하지 마십시오.
@@ -614,7 +659,7 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 }
 
 //현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
-int CSCComboBox::add(CString text)
+int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 {
 	int index = -1;
 
@@ -627,6 +672,8 @@ int CSCComboBox::add(CString text)
 	if (FindString(-1, text) < 0)
 	{
 		index = AddString(text);
+		if (cr_text.GetValue() != Gdiplus::Color::Transparent)
+			SetItemData(index, cr_text.GetValue());
 
 		if (!m_reg_section.IsEmpty())
 		{
@@ -642,3 +689,7 @@ int CSCComboBox::add(CString text)
 	return index;
 }
 
+void CSCComboBox::set_color_theme(int theme)
+{
+	m_theme.set_color_theme(theme);
+}

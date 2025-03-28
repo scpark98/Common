@@ -57,7 +57,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSELEAVE()
 	ON_WM_GETMINMAXINFO()
 	ON_COMMAND_RANGE(menu_add_item, menu_favorite, &CSCTreeCtrl::OnPopupMenu)
-	ON_REGISTERED_MESSAGE(Message_CSCEditMessage, &CSCTreeCtrl::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCTreeCtrl::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 
@@ -90,7 +90,7 @@ void CSCTreeCtrl::reconstruct_font()
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	SetFont(&m_font, true);
 
-	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	m_font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 
 	//폰트 height와 line height중에 큰 값으로 조정
 	int height = GetItemHeight();
@@ -109,11 +109,9 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_F2:
 			{
-				//편집을 컨트롤 내부에서 처리하는게 편하지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
-				//(실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능)
-				//edit_item(NULL);
-				//return TRUE;
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
+				//편집을 컨트롤 내부에서 처리하는게 편할수도 있지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
+				//실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능 등...
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM)&(CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
 				return FALSE;
 			}
 
@@ -2638,6 +2636,9 @@ BOOL CSCTreeCtrl::OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 {
+	if (!m_allow_edit)
+		return;
+
 	if (hItem == NULL)
 	{
 		hItem = GetSelectedItem();
@@ -2834,7 +2835,7 @@ void CSCTreeCtrl::set_log_font(LOGFONT lf)
 
 int CSCTreeCtrl::get_font_size()
 {
-	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	m_font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 	return m_font_size;
 }
 
@@ -2848,7 +2849,7 @@ void CSCTreeCtrl::set_font_size(int font_size)
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
 	reconstruct_font();
 }
 
@@ -2856,7 +2857,7 @@ void CSCTreeCtrl::enlarge_font_size(bool enlarge)
 {
 	m_font_size = get_font_size();
 	enlarge ? m_font_size++ : m_font_size--;
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
 	reconstruct_font();
 }
 

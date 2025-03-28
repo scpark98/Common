@@ -408,13 +408,29 @@ void CHeaderCtrlEx::set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_
 	Invalidate();
 }
 
+//pt가 separator 위치인지 판별
+bool CHeaderCtrlEx::is_separator(CPoint pt)
+{
+	int margin = 2;
+	CRect rItem;
+
+	for (int i = 0; i < GetItemCount(); i++)
+	{
+		GetItemRect(i, rItem);
+		if (pt.x > rItem.left + margin && pt.x < rItem.right - margin)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void CHeaderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
-	CVtListCtrlEx*	pListCtrl = (CVtListCtrlEx*)GetParent();
-
-	//if (pListCtrl->m_bAllowSort == false)
-	//	return;
+	if (!m_allow_sort && !is_separator(point))
+		return;
 
 	m_header_is_clicked = true;
 	m_header_clicked_index = get_clicked_header(point);
@@ -425,10 +441,8 @@ void CHeaderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CHeaderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	CVtListCtrlEx*	pListCtrl = (CVtListCtrlEx*)GetParent();
-
-	//if (pListCtrl->m_bAllowSort == false)
-	//	return;
+	if ((!m_allow_sort || !m_header_is_clicked) && !is_separator(point))
+		return;
 
 	// TODO: Add your message handler code here and/or call default
 	m_header_is_clicked = false;
@@ -550,9 +564,9 @@ void CHeaderCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	reconstruct_font();
 }
 
-void CHeaderCtrlEx::set_font_bold(bool bold)
+void CHeaderCtrlEx::set_font_bold(int weight)
 {
-	m_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	m_lf.lfWeight = weight;
 	reconstruct_font();
 }
 

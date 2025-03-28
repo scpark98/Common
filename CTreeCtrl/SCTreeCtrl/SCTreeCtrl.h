@@ -201,7 +201,7 @@ public:
 	//폴더 펼침 이벤트가 발생한 노드 아이템 리턴
 	HTREEITEM	get_expanding_item() { return m_expanding_item; }
 
-	//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)
+	//해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴되는 특징으로 판별함)
 	bool		is_visible_item(HTREEITEM hItem);
 
 	//recursive traverse
@@ -243,6 +243,7 @@ public:
 	BOOL			move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, HTREEITEM hDestItem);
 
 //편집 관련
+	void			allow_edit(bool allow) { m_allow_edit = allow; }
 	void			edit_item(HTREEITEM hItem = NULL);
 	void			edit_end(bool valid = true);
 	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
@@ -323,11 +324,11 @@ protected:
 
 
 
-	//마우스가 컨트롤 안에 들어온 경우 true
+//마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;
 
 
-	//들여쓰기 크기
+//들여쓰기 크기
 	int				m_indent_size = 16;
 	bool			m_use_checkbox = false;
 	bool			m_use_expand_button = true;
@@ -353,13 +354,13 @@ protected:
 
 	void			thread_insert_folders(HTREEITEM hItem);
 
-	//폰트 관련
+//폰트 관련
 	LOGFONT			m_lf;
 	CFont			m_font;
 	int				m_font_size;
 	void			reconstruct_font();
 
-	//Drag&Drop 드래깅 관련
+//Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;//default = false
 	CWnd*			m_pDragWnd = NULL;			//Which wnd we are dragging FROM
 	CWnd*			m_pDropWnd = NULL;			//Which wnd we are dropping ON
@@ -371,12 +372,13 @@ protected:
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
 	CImageList*		create_drag_image(CTreeCtrl* pList, LPPOINT lpPoint);
 
-	//편집 관련
+//편집 관련
+	bool			m_allow_edit = true;
+	bool			m_in_editing = false;		//편집중인지
 	CEdit*			m_pEdit = NULL;
 	CString			m_edit_old_text;
 	CString			m_edit_new_text;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
-	bool			m_in_editing = false;		//편집중인지
 
 	enum ROW_ITEM_RECT
 	{

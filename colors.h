@@ -447,6 +447,7 @@ Gdiplus::Color	get_color(Gdiplus::Color crOrigin, int nOffset);
 //두 색의 중간 비율 색상값을 구한다. (ratio가 0.0이면 cr1이, 1.0이면 cr2가 리턴된다.)
 COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
 Gdiplus::Color	get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio);
+Gdiplus::Color	get_color(COLORREF rgb);
 
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
 COLORREF		get_color(CString cr);

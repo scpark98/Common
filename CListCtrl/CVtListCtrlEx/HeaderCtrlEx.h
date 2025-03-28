@@ -33,12 +33,16 @@ public:
 	void			set_text_color(Gdiplus::Color cr_text);
 	void			set_back_color(Gdiplus::Color cr_back);
 
-	bool			m_header_is_clicked;
-	int				m_header_clicked_index;
+	bool			m_header_is_clicked = false;
+	int				m_header_clicked_index = -1;
 	int				get_clicked_header(CPoint point);
 
 	//m_cr_sort_arrow 기본값은 DarkGray이며 이 값을 변경하려면 Transparent가 아닌 다른색을, 변경하지 않을 경우는 해당 파라미터를 생략하면 된다.
 	void			set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_sort_arrow = Gdiplus::Color::Transparent);
+	void			allow_sort(bool allow) { m_allow_sort = allow; }
+
+	//pt가 separator 위치인지 판별
+	bool			is_separator(CPoint pt);
 
 // Operations
 	CString			get_header_text(int column);
@@ -62,7 +66,7 @@ public:
 //폰트 관련
 	void			set_font(LOGFONT* lf);
 	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void			set_font_bold(bool bold = true);
+	void			set_font_bold(int weight = FW_BOLD);
 	void			set_font_italic(bool italic = true);
 
 
@@ -70,6 +74,7 @@ protected:
 	HDLAYOUT		m_HDLayout;
 	bool			m_use_header_separator = true;
 
+	bool			m_allow_sort = true;
 	int				m_cur_sort_column = -1;
 	bool			m_cur_sort_asc = true;
 	Gdiplus::Color	m_cr_sort_arrow = Gdiplus::Color::DarkGray;

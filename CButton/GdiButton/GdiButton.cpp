@@ -1566,9 +1566,15 @@ void CGdiButton::set_blink(bool blink /*= TRUE*/)
 	}
 }
 
-void CGdiButton::set_font_size(int nSize)
+void CGdiButton::set_font(CFont* font)
 {
-	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), nSize);
+	font->GetLogFont(&m_lf);
+	reconstruct_font();
+}
+
+void CGdiButton::set_font_size(int size)
+{
+	m_lf.lfHeight = get_pixel_size_from_font_size(GetParent()->GetSafeHwnd(), size);
 	reconstruct_font();
 }
 
@@ -1579,9 +1585,9 @@ void CGdiButton::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	reconstruct_font();
 }
 
-void CGdiButton::set_font_bold(bool bBold)
+void CGdiButton::set_font_bold(int weight)
 {
-	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
+	m_lf.lfWeight = weight;
 	reconstruct_font();
 }
 

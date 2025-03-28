@@ -272,6 +272,13 @@ Gdiplus::Color get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio)
 	return Gdiplus::Color(a, r, g, b);
 }
 
+Gdiplus::Color get_color(COLORREF rgb)
+{
+	Gdiplus::Color gcr;
+	gcr.SetFromCOLORREF(rgb);
+	return gcr;
+}
+
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
 COLORREF	get_color(CString cr)
 {

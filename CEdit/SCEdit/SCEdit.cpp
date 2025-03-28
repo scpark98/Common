@@ -129,9 +129,9 @@ int CSCEdit::get_font_size(bool pixel_size)
 	return m_font_size;
 }
 
-//CEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
+//CEdit::SetRect()를 이용해서 상하좌우 여백의 크기를 조정할 수 있는데
 //ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
-//ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이다.
+//ES_MULTILINE 속성은 생성후에는 변경할 수 없으므로 반드시 속성창에서 설정해줘야 한다.
 //https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally
 //생성후에도 SetWindowLong()을 이용하여 변경할 수 있는 속성들
 //(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
@@ -139,16 +139,15 @@ int CSCEdit::get_font_size(bool pixel_size)
 CSCEdit& CSCEdit::set_line_align(DWORD align)
 {
 	CRect rc;
-	GetClientRect(rc);
 
-	rc.DeflateRect(2, 2);
+	GetRect(rc);
 
 	if (align == DT_VCENTER)
 		rc.top = rc.top + (rc.Height() - get_font_size(true)) / 2 - 1;
 	else if (align == DT_BOTTOM)
-		rc.top = rc.bottom - get_font_size(true);
+		rc.top = rc.bottom - get_font_size(true) - 50;
 
-	SetRect(&rc);
+	SetRect(rc);
 
 	return *this;
 }
@@ -199,6 +198,9 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 
 	HBRUSH hbr = (HBRUSH)m_br_back; // Passing a Handle to the Brush
 
+	CRect r;
+	GetClientRect(r);
+
 	if (m_transparent)
 	{
 		m_br_back.DeleteObject();
@@ -224,13 +226,13 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		pDC->SetBkColor(m_cr_back.ToCOLORREF());
  		m_br_back.DeleteObject();
  		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
+		//r.DeflateRect(2, 2);
+		//ExcludeClipRect(pDC->m_hDC, r.left + 1, r.top, r.left + 1, r.bottom);
 		hbr = (HBRUSH)m_br_back;
 	}
 
 	if (m_action_button)
 	{
-		CRect r;
-		GetClientRect(r);
 		r.left = r.right - m_sz_action_button.cx;
 		ExcludeClipRect(pDC->m_hDC, r.left, r.top, r.right, r.bottom);
 	}
@@ -490,7 +492,7 @@ void CSCEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSCEdit::OnNcPaint()
 {
-	//return;
+	return;
 	Default();
 
 	if (m_transparent && m_draw_border)
@@ -504,7 +506,7 @@ void CSCEdit::OnNcPaint()
 		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 
 		//dc.Rectangle(rc);
-		dc.Draw3dRect(rc, RGB(128, 128, 128), RGB(128, 128, 128));
+		//dc.Draw3dRect(rc, RGB(128, 128, 128), RGB(128, 128, 128));
 
 		dc.SelectObject(pOldPen);
 		dc.SelectObject(pOldBrush);
@@ -658,7 +660,8 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	if (m_draw_border)
 	{
 		GetClientRect(r);
-		draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Blue : Gdiplus::Color::Gray);
+		//draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Blue : Gdiplus::Color::Gray);
+		draw_rectangle(g, r, Gdiplus::Color::Transparent, IsWindowEnabled() ? m_cr_back : Gdiplus::Color::Gray);
 	}
 
 	return FALSE;

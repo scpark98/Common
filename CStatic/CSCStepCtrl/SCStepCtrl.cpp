@@ -181,7 +181,7 @@ void CSCStepCtrl::OnPaint()
 
 			dc.DrawText(m_step[i].text, rtext, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 #ifdef _DEBUG
-			draw_rectangle(g, rtext, Gdiplus::Color::Red);	//text 영역 확인용
+			//draw_rectangle(g, rtext, Gdiplus::Color::Red);	//text 영역 확인용
 #endif
 			dc.SelectObject(pOldFont);
 		}
@@ -247,11 +247,8 @@ void CSCStepCtrl::set_text(int index, CString text, Gdiplus::Color cr)
 //thumb와 text의 색상을 모두 변경한다.
 void CSCStepCtrl::set_step_color(int index, Gdiplus::Color cr)
 {
-	if (index >= m_step.size())
-		return;
-
-	m_step[index].cr_text = cr;
-	m_step[index].cr_thumb = cr;
+	set_thumb_color(index, cr);
+	set_text_color(index, cr);
 }
 
 void CSCStepCtrl::set_thumb_color(int index, Gdiplus::Color cr)
@@ -259,7 +256,17 @@ void CSCStepCtrl::set_thumb_color(int index, Gdiplus::Color cr)
 	if (index >= m_step.size())
 		return;
 
-	m_step[index].cr_thumb = cr;
+	if (index < 0)
+	{
+		for (int i = 0; i < m_step.size(); i++)
+		{
+			m_step[i].cr_thumb = cr;
+		}
+	}
+	else
+	{
+		m_step[index].cr_thumb = cr;
+	}
 }
 
 void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr)
@@ -267,7 +274,17 @@ void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr)
 	if (index >= m_step.size())
 		return;
 
-	m_step[index].cr_text = cr;
+	if (index < 0)
+	{
+		for (int i = 0; i < m_step.size(); i++)
+		{
+			m_step[i].cr_text = cr;
+		}
+	}
+	else
+	{
+		m_step[index].cr_text = cr;
+	}
 }
 
 //특정 step의 thumb와 text의 색상을 리셋시키고 기본색을 사용하게 한다.

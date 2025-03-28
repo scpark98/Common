@@ -269,12 +269,12 @@ public:
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
 	int			add_item(CString text = _T(""), int image_index = -1, bool ensureVisible = true, bool invalidate = true);
-	//default separator = '|'
-	int			add_line_string_item(CString line_string, TCHAR separator = '|', int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, CString text = _T(""), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, WIN32_FIND_DATA data, bool ensureVisible = true, bool invalidate = true);
 	int			update_item(int index, WIN32_FIND_DATA data, bool ensureVisible = true, bool invalidate = true);
+	//default separator = _T("|")
+	int			insert_line(int index, CString line_string, CString separator = _T("|"), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 
 	//현재 폴더에 폴더를 추가한다.
 	int			insert_folder(int index, CString new_folder_name, bool is_remote);
@@ -326,6 +326,11 @@ public:
 //텍스트 관련
 	CString		get_text(int item, int subItem);
 	void		set_text(int item, int subItem, CString text, bool invalidate = true);
+
+	//한 라인의 각 컬럼값은 separator로 구분되어 있는 여러 라인 데이터로 index위치부터 리스트를 채운다.
+	//reset = true이면 모든 데이터를 삭제한 후 새로 채운다. 이 때 index는 0으로 리셋된다.
+	void		set_text(int index, CString text, CString separator = _T("|"), bool reset = true);
+
 	//from ~ to 컬럼까지의 텍스트를 하나로 합쳐서 리턴해준다.
 	CString		get_line_text(int index, int from = 0, int to = -1, CString sep = _T("|"));
 	CString		get_line_text(int index, std::deque<int>* dqColumn = NULL, CString sep = _T("|"));
@@ -385,7 +390,7 @@ public:
 		sort_descending,
 		sort_ascending,
 	};
-	void		allow_sort(bool allow) { m_allow_sort = allow; }
+	void		allow_sort(bool allow);
 	void		sort(int column, int ascending);
 	void		sort_by_text_color(int column, int ascending, bool text_sort_on_same_color = true);
 	int			cur_sorted_column_index() { return m_cur_sort_column; }

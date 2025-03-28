@@ -869,6 +869,12 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 	return false;
 }
 
+void CVtListCtrlEx::allow_sort(bool allow)
+{
+	m_allow_sort = allow;
+	m_HeaderCtrlEx.allow_sort(m_allow_sort);
+}
+
 //debug모드에서는 매우 느리다. lambda때문인지 모르겠다.
 //0번 컬럼이 아닌 다른 컬럼으로 정렬할 때 두 값이 같으면 0번 컬럼으로 한번 더 검사한다.
 void CVtListCtrlEx::sort(int subItem, int ascending)
@@ -1779,109 +1785,6 @@ void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
 
 	if (m_hWnd)
 		Invalidate();
-
-	/*
-	switch (theme)
-	{
-		//최근 윈도우 탐색기의 색상을 보면 텍스트 색상은 선택여부, inactive에 무관하게 동일하다.
-	case color_theme_default :
-		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-		m_cr_text_selected			= m_cr_text;// ::GetSysColor(COLOR_HIGHLIGHTTEXT);
-		m_cr_text_selected_inactive	= m_cr_text;// ::GetSysColor(COLOR_INACTIVECAPTIONTEXT);
-		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
-		m_cr_back_alternated		= m_cr_back;
-		m_cr_back_selected			= Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_back_selected_inactive = Gdiplus::Color(255, 217, 217, 217);// ::GetSysColor(COLOR_HIGHLIGHT);
-		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
-		m_cr_header_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
-		m_cr_header_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-		m_cr_progress				= Gdiplus::Color(255, 49, 108, 244);
-		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
-		m_cr_percentage_bar.clear();
-		m_cr_percentage_bar.push_back(gGRAY(192));
-		break;
-	case color_theme_light_blue :
-		m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-		m_cr_text_selected			= Gdiplus::Color(255, 65, 102, 146);
-		m_cr_text_selected_inactive	= Gdiplus::Color(255, 65, 102, 146);
-		m_cr_back					= Gdiplus::Color(255, 193, 219, 252);
-		m_cr_back_alternated		= m_cr_back;
-		m_cr_back_selected			= get_color(m_cr_back, -48);
-		m_cr_back_selected_inactive	= get_color(m_cr_back, -48);
-		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
-		m_cr_header_back			= get_color(m_cr_back, -32);
-		m_cr_header_text			= get_color(m_cr_text, -32);
-		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
-		m_cr_percentage_bar.clear();
-		m_cr_percentage_bar.push_back(get_color(m_cr_back, -32));
-		break;
-	case color_theme_navy_blue :
-		m_cr_text					= Gdiplus::Color(255, 204, 216, 225);
-		m_cr_text_selected			= Gdiplus::Color(255, 234, 246, 255);
-		m_cr_text_selected_inactive	= Gdiplus::Color(255, 105, 142, 186);
-		m_cr_back					= Gdiplus::Color(255, 74,  94, 127);
-		m_cr_back_alternated		= m_cr_back;
-		m_cr_back_selected			= Gdiplus::Color(255, 15,  36,  41);
-		m_cr_back_selected_inactive	= Gdiplus::Color(255, 15,  36,  41);
-		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
-		m_cr_header_back			= get_color(m_cr_back, -32);
-		m_cr_header_text			= get_color(m_cr_text, -32);
-		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
-		m_cr_percentage_bar.clear();
-		m_cr_percentage_bar.push_back(get_color(m_cr_back, -32));
-		break;
-	case color_theme_dark_blue :
-		m_cr_text					= Gdiplus::Color(255, 16, 177, 224);
-		m_cr_text_selected			= Gdiplus::Color(255, 224, 180,  59);
-		m_cr_text_selected_inactive	= Gdiplus::Color(255, 105, 142, 186);
-		m_cr_back					= Gdiplus::Color(255, 2,  21,  36);
-		m_cr_back_alternated		= m_cr_back;
-		m_cr_back_selected			= Gdiplus::Color(255, 3,  42,  59);
-		m_cr_back_selected_inactive	= Gdiplus::Color(255, 15,  36,  41);
-		m_cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
-		m_cr_header_back			= Gdiplus::Color(255, 0,  13,  22);
-		m_cr_header_text			= Gdiplus::Color(255, 0, 180, 228);
-		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
-		m_cr_percentage_bar.clear();
-		m_cr_percentage_bar.push_back(get_color(m_cr_back, 32));
-		break;
-	case color_theme_dark_gray :
-		m_cr_text					= Gdiplus::Color(255, 164, 164, 164);
-		m_cr_text_selected			= Gdiplus::Color(255, 241, 241, 241);
-		m_cr_text_selected_inactive	= get_color(m_cr_text_selected, -36);
-		m_cr_back					= Gdiplus::Color(255, 64,  64,  64);
-		m_cr_back_alternated		= m_cr_back;//get_color(m_cr_back, -8);
-		m_cr_back_selected			= get_color(m_cr_back, -32);
-		m_cr_back_selected_inactive	= get_color(m_cr_back, -32);
-		m_cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
-		m_cr_header_back			= get_color(m_cr_back, -16);
-		m_cr_header_text			= get_color(m_cr_text, -16);
-		m_cr_percentage_bar.clear();
-		m_cr_percentage_bar.push_back(get_color(m_cr_back, 32));
-		m_cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-		m_cr_progress_text			= Gdiplus::Color(255, 192, 192, 192);
-		break;
-	case color_theme_dark :
-		m_cr_text = Gdiplus::Color(255, 212, 212, 212);
-		m_cr_text_selected = Gdiplus::Color(255, 255, 255, 255);
-		m_cr_text_selected_inactive = get_color(m_cr_text_selected, -36);
-		m_cr_back = Gdiplus::Color(255, 37, 37, 38);
-		m_cr_back_alternated = m_cr_back;//get_color(m_cr_back, -8);
-		m_cr_back_selected = get_color(m_cr_back, -16);
-		m_cr_back_selected_inactive = get_color(m_cr_back, -16);
-		m_cr_selected_border = m_cr_back_selected;
-		m_cr_header_back = get_color(m_cr_back, 16);
-		m_cr_header_text = get_color(m_cr_text, -32);
-		m_cr_percentage_bar.clear();
-		m_cr_percentage_bar.push_back(get_color(m_cr_back, 32));
-		m_cr_progress = Gdiplus::Color(255, 32, 32, 255);
-		m_cr_progress_text = Gdiplus::Color(255, 192, 192, 192);
-		break;
-	}
-	*/
 }
 
 Gdiplus::Color CVtListCtrlEx::get_text_color(int item, int subItem)
@@ -2070,11 +1973,11 @@ int CVtListCtrlEx::add_item(CString text, int image_index, bool ensureVisible, b
 	return insert_item(-1, text, image_index, ensureVisible, invalidate);
 }
 
-int CVtListCtrlEx::add_line_string_item(CString line_string, TCHAR separator, int image_index, bool ensureVisible, bool invalidate)
+int CVtListCtrlEx::insert_line(int index, CString line_string, CString separator, int image_index, bool ensureVisible, bool invalidate)
 {
 	std::deque<CString> dq;
 	get_token_string(line_string, dq, separator);
-	return insert_item(-1, dq, image_index, ensureVisible, invalidate);
+	return insert_item(index, dq, image_index, ensureVisible, invalidate);
 }
 
 //index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
@@ -2558,6 +2461,24 @@ void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidat
 		InvalidateRect(get_item_rect(item, subItem), false);
 }
 
+//한 라인의 각 컬럼값은 separator로 구분되어 있는 여러 라인 데이터로 index위치부터 리스트를 채운다.
+//reset = true이면 모든 데이터를 삭제한 후 새로 채운다. 이 때 index는 0으로 리셋된다.
+void CVtListCtrlEx::set_text(int index, CString text, CString separator, bool reset)
+{
+	if (reset)
+	{
+		delete_all_items();
+		index = 0;
+	}
+
+	std::deque<CString> dqlines;
+	get_token_string(text, dqlines, _T("\n"));
+
+	for (int i = 0; i < dqlines.size(); i++)
+	{
+		insert_line(index + i, dqlines[i], separator, -1, false, false);
+	}
+}
 
 CString CVtListCtrlEx::get_line_text(int index, int from, int to, CString sep)
 {
@@ -3265,7 +3186,7 @@ bool CVtListCtrlEx::load(CString sfile, TCHAR separator, bool match_column_count
 			fclose(fp);
 			return false;
 		}
-		add_line_string_item(CString(sLine), separator);
+		insert_line(-1, CString(sLine), separator);
 	}
 
 	fclose(fp);
@@ -3351,7 +3272,7 @@ void CVtListCtrlEx::reconstruct_font()
 
 int CVtListCtrlEx::get_font_size()
 {
-	m_font_size = get_font_size_from_logical_size(GetParent()->GetSafeHwnd(), m_lf.lfHeight);
+	m_font_size = get_font_size_from_pixel_size(GetParent()->GetSafeHwnd(), m_lf.lfHeight);
 	return m_font_size;
 }
 
@@ -3377,14 +3298,14 @@ void CVtListCtrlEx::set_font_size(int font_size)
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
-	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
 
 	reconstruct_font();
 }
 
 void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 {
-	m_font_size = get_font_size_from_logical_size(m_hWnd, m_lf.lfHeight);
+	m_font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 	enlarge ? m_font_size++ : m_font_size--;
 
 	if (m_font_size < 4)
@@ -3392,7 +3313,7 @@ void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 	if (m_font_size > 40)
 		m_font_size = 40;
 
-	m_lf.lfHeight = get_logical_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
 
 	reconstruct_font();
 }
@@ -4775,8 +4696,8 @@ void CVtListCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 	int item = -1;// = pNMItemActivate->iItem;
 	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
 
-
-	get_index_from_point(point, item, subItem, false);
+	//include_icon = false로 주면 아이콘을 클릭해도 해당 항목이 선택되지 않는다.
+	get_index_from_point(point, item, subItem, true);
 
 	//TRACE(_T("%d, %d, uFlags = %d\n"), item, subItem, uFlags);
 

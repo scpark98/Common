@@ -119,14 +119,14 @@ class CGdiButtonMessage
 public:
 	CGdiButtonMessage(CWnd* _this, UINT ctrl_id, int _message)
 	{
-		m_pWnd = _this;
-		m_ctrl_id = ctrl_id;
-		m_message = _message;
+		pWnd = _this;
+		ctrl_id = ctrl_id;
+		message = _message;
 	}
 
-	CWnd*		m_pWnd = NULL;
-	UINT		m_ctrl_id;
-	int			m_message;
+	CWnd*		pWnd = NULL;
+	UINT		ctrl_id;
+	int			message;
 };
 
 class CGdiButtonImage
@@ -278,9 +278,9 @@ public:
 
 
 	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void		set_font_size(int nSize);
-	void		set_font_bold(bool bBold = true);
-
+	void		set_font_size(int size);
+	void		set_font_bold(int weight = FW_BOLD);
+	void		set_font(CFont* font);
 
 	int			GetCheck();
 	void		SetCheck(int check_state);

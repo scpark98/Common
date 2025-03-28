@@ -19,23 +19,24 @@ public:
 	virtual ~CSCComboBox();
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
+	void			set_color_theme(int theme);
 
 	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
-	int				add(CString text = _T(""));
+	//색상을 별도로 지정하지 않으면 기본 cr_text를 사용한다.
+	int				add(CString text = _T(""), Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
 
-	//void			SetTextColor( COLORREF crText ) { m_crText = crText; RedrawWindow(); }
-	//void			SetBackColor( COLORREF crBack ) { m_crBack = crBack; RedrawWindow(); }
-	//void			SetHighlightTextColor( COLORREF cr ) { m_crHighlightText = cr; RedrawWindow(); }
-	//void			SetHighlightTextBackColor( COLORREF cr ) { m_crHighlightTextBack = cr; RedrawWindow(); }
+//design
+	//설정값은 픽셀 단위가 아닌 logical_unit이다. 즉 set_font_size()의 단위와 통일시킨다.
+	//픽셀 크기로 높이를 설정한다면 set_line_height_px()을 호출한다.
+	void			set_line_height(int height_logical_unit);
+	void			set_line_height_px(int height_pixel_unit);
 
+//font
 	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	//-1 : reduce, +1 : enlarge
 	void			set_font_size(int font_size);
-	//void	enlarge_font_size(bool enlarge);
-	//void	set_font_bold(bool bold = true);
-	//void	set_font_italic(bool italic = true);
-	//LOGFONT	get_log_font() { return m_lf; }
-	//void	set_log_font(LOGFONT lf);
+	void			set_font_bold(int weight = FW_BOLD);
+	LOGFONT			get_log_font() { return m_lf; }
+	void			set_log_font(LOGFONT lf);
 
 	void			load_history(CWinApp* app, CString section);
 	void			save_history(CWinApp* app, CString section);
@@ -49,6 +50,9 @@ public:
 
 
 protected:
+//design
+	//-1이면 폰트크기에 따라 자동 조정
+	int				m_line_height = -1;
 
 //폰트 관련
 	LOGFONT			m_lf;

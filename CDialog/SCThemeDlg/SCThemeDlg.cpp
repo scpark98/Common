@@ -484,6 +484,8 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_titlebar_height = 32;
 
 		m_cr_titlebar_text = Gdiplus::Color::White;
+		m_sys_buttons.set_text_color(m_cr_titlebar_text);
+
 		m_cr_titlebar_back = gRGB(59, 70, 92);
 
 		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
@@ -492,11 +494,70 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
 		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, 10);
+		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 		reconstruct_title_font();
 
 		m_cr_back = Gdiplus::Color::White;
-		//m_cr_border = Gdiplus::Color::Red;
+		break;
+	case color_theme_linkmemine_se:
+		SetWindowText(_T("LinkMeMine 3.0 SE"));
+		m_titlebar_height = 32;
+
+		m_cr_titlebar_text = Gdiplus::Color::White;
+		m_sys_buttons.set_text_color(m_cr_titlebar_text);
+
+		m_cr_titlebar_back = gRGB(168, 68, 28);
+
+		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
+		m_sys_buttons.set_back_color(m_cr_titlebar_back);
+		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
+		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+
+		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_title_font();
+
+		m_cr_back = Gdiplus::Color::White;
+		break;
+	case color_theme_helpu:
+		SetWindowText(_T("HelpU"));
+		m_titlebar_height = 32;
+
+		m_cr_titlebar_text = Gdiplus::Color::White;
+		m_sys_buttons.set_text_color(m_cr_titlebar_text);
+
+		m_cr_titlebar_back = gRGB(42, 150, 157);
+
+		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
+		m_sys_buttons.set_back_color(m_cr_titlebar_back);
+		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
+		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+
+		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_title_font();
+
+		m_cr_back = Gdiplus::Color::White;
+		break;
+	case color_theme_anysupport:
+		SetWindowText(_T("AnySupport"));
+		m_titlebar_height = 32;
+
+		m_cr_titlebar_text = Gdiplus::Color::White;
+		m_sys_buttons.set_text_color(m_cr_titlebar_text);
+
+		m_cr_titlebar_back = gRGB(15, 31, 61);
+
+		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
+		m_sys_buttons.set_back_color(m_cr_titlebar_back);
+		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
+		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+
+		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_title_font();
+
+		m_cr_back = Gdiplus::Color::White;
 		break;
 	default :
 		m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
@@ -544,7 +605,7 @@ void CSCThemeDlg::adjust_sys_buttons()
 
 	CRect r;
 	GetClientRect(r);
-	TRACE(_T("CSCThemeDlg::adjust_sys_buttons(). r.w = %d, r.h = %d\n"), r.Width(), r.Height());
+	//TRACE(_T("CSCThemeDlg::adjust_sys_buttons(). r.w = %d, r.h = %d\n"), r.Width(), r.Height());
 	m_sys_buttons.adjust(r.top, r.right);
 }
 

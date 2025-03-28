@@ -757,7 +757,7 @@ void CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
 
 void CSCStatic::set_font_size(int nSize)
 {
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, nSize);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, nSize);
 	reconstruct_font();
 	update_surface();
 }

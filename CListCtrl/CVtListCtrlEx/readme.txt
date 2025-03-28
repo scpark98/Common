@@ -1,0 +1,1 @@
+- 개발 초기에는 편집 시 EditCell을 사용했으나 Common/CEdit/CSCEdit으로 변경함.

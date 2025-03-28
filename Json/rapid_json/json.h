@@ -53,7 +53,7 @@
 
 	//read array type
 	rapidjson::Value& arr = json.doc["array1"];
-	//ASSERT(a.IsArray());
+	//ASSERT(arr.IsArray());
 	for (int i = 0; i < arr.Size(); i++)
 		TRACE(_T("array1[%d] = %s\n"), i, arr[i].GetCString());
 
@@ -110,25 +110,30 @@ public:
 
 		switch (doc[member].GetType())
 		{
-			case rapidjson::kStringType:
-			{
-				return doc[member].GetCString();
-			}
+			//case rapidjson::kStringType:
+			//{
+			//	return dynamic_cast<CString>(doc[member].GetCString());
+			//}
 			case rapidjson::kNullType:
 			{
 				return default_value;
 			}
+			case rapidjson::kNumberType:
+			{
+				return (T)doc[member].GetInt();
+			}
 		}
+		
 		/*
 		if (typeid(T) == typeid(int))
 			return doc[member].GetInt();
 		else if (typeid(T) == typeid(CString))
 			return doc[member].GetCString();
-		else if (typeid(T) == typeid(String))
+		else if (typeid(T) == typeid(std::string))
 			return doc[member].GetString();
-		*/
 
 		TRACE(_T("json::get. unknown type"));
+		*/
 		return default_value;
 	}
 
@@ -162,6 +167,12 @@ public:
 	rapidjson::Document doc;
 
 	//rapidjson::Value* get_member(std::string member, );
+
+	//rapidjson::Value* ar = json.doc["array_name"]; 과 같이 사용할 경우
+	//Debug모드에서는 해당 array가 존재하지 않으면 assert_fail이 발생하므로
+	//먼저 해당 array가 존재하는지 확인한 후 리턴하도록 함수 추가
+	rapidjson::Value* get_array(std::string array_name);
+	rapidjson::Value& get_array1(std::string array_name);
 
 	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 	rapidjson::Value* get_array_member(std::string arr_name, int n, std::string member);

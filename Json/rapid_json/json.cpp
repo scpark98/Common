@@ -270,6 +270,26 @@ rapidjson::Value* Json::get_member(std::string member)
 	return &doc[member];
 }
 */
+
+//rapidjson::Value* ar = json.doc["array_name"]; 과 같이 사용할 경우
+//Debug모드에서는 해당 array가 존재하지 않으면 assert_fail이 발생하므로
+//먼저 해당 array가 존재하는지 확인한 후 리턴하도록 함수 추가
+rapidjson::Value* Json::get_array(std::string array_name)
+{
+	if (!doc.HasMember(array_name))
+		return NULL;
+
+	return &doc[array_name];
+}
+
+rapidjson::Value& Json::get_array1(std::string array_name)
+{
+	if (!doc.HasMember(array_name))
+		return rapidjson::Value();
+
+	return doc[array_name];
+}
+
 //arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 rapidjson::Value* Json::get_array_member(std::string arr_name, int n, std::string member)
 {

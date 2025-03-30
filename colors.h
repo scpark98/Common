@@ -41,7 +41,7 @@ enum COLOR_THEME_MEMBER_INDEX
 class CSCColorTheme
 {
 public :
-	CSCColorTheme(CWnd* pWnd)
+	CSCColorTheme(CWnd* pWnd, int theme = color_theme_default)
 	{
 		m_parent = pWnd;
 		set_color_theme(color_theme_default);
@@ -76,6 +76,10 @@ public :
 
 	Gdiplus::Color	cr_selected_border;
 	Gdiplus::Color	cr_border;
+
+	//caption이 없는 dialog based에서 사용
+	Gdiplus::Color	cr_title_text;
+	Gdiplus::Color	cr_title_back;
 
 	//CListCtrl에서만 사용될것으로 예상.
 	Gdiplus::Color	cr_header_text;

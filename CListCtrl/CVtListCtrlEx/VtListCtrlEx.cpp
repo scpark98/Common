@@ -4795,7 +4795,7 @@ LRESULT CVtListCtrlEx::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 {
 	auto msg = (CGdiButtonMessage*)wParam;
 
-	if (msg->m_message == WM_LBUTTONUP)
+	if (msg->msg == WM_LBUTTONUP)
 		set_auto_scroll(true);
 
 	return 0;

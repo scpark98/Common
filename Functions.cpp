@@ -15224,7 +15224,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 		if (!resize_window)
 			flag |= SWP_NOSIZE;
 
-		SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), 0);
+		SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), flag);
 		//pWnd->MoveWindow(rc);
 	}
 	else

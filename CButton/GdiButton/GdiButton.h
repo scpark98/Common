@@ -117,16 +117,16 @@ static const UINT Message_CGdiButton = ::RegisterWindowMessage(_T("MessageString
 class CGdiButtonMessage
 {
 public:
-	CGdiButtonMessage(CWnd* _this, UINT ctrl_id, int _message)
+	CGdiButtonMessage(CWnd* _this, UINT ctrl_id, int _msg)
 	{
 		pWnd = _this;
 		ctrl_id = ctrl_id;
-		message = _message;
+		msg = _msg;
 	}
 
 	CWnd*		pWnd = NULL;
 	UINT		ctrl_id;
-	int			message;
+	int			msg;
 };
 
 class CGdiButtonImage

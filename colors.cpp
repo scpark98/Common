@@ -664,12 +664,15 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternate		= get_color(cr_back, -16);
 
+			cr_title_text			= Gdiplus::Color::Black;
+			cr_title_back			= Gdiplus::Color::LightGray;
+
+			//CVtListCtrlEx에서 사용되는 컬러
 			cr_header_text			= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
 			cr_header_back			= RGB2gpColor(::GetSysColor(COLOR_3DFACE));
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(gGRAY(192));
 			cr_progress				= Gdiplus::Color(255, 49, 108, 244);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
 			cr_selected_border		= gRGB(153, 209, 255);//get_color(cr_back_selected, -32);
 

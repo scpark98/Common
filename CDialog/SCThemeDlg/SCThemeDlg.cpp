@@ -13,16 +13,12 @@ IMPLEMENT_DYNAMIC(CSCThemeDlg, CDialogEx)
 
 CSCThemeDlg::CSCThemeDlg(CWnd* parent, int left, int top, int right, int bottom)
 {
-	m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
-	m_cr_titlebar_back.SetFromCOLORREF(::GetSysColor(COLOR_ACTIVECAPTION));
 	create(parent, left, top, right, bottom);
 }
 
 CSCThemeDlg::CSCThemeDlg(UINT nResourceID, CWnd* pParent /*=nullptr*/)
 	: CDialogEx(nResourceID, pParent)
 {
-	m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
-	m_cr_titlebar_back.SetFromCOLORREF(::GetSysColor(COLOR_ACTIVECAPTION));
 }
 /*
 CSCThemeDlg::CSCThemeDlg(CString message, CString headline)
@@ -128,16 +124,12 @@ BOOL CSCThemeDlg::OnInitDialog()
 
 	if (m_titlebar_height > 0)
 	{
-		CRect rc;
-		GetClientRect(rc);
-
-		//m_sys_buttons.create(this, rc.right, -1, m_titlebar_height, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);
-		//m_sys_buttons.create(this, rc.right, m_titlebar_height, 44, SC_CLOSE);
 		m_sys_buttons.create(this);
+		m_sys_buttons.set_color_theme(m_theme.get_color_theme());
 		m_sys_buttons.set_buttons_cmd(SC_CLOSE);
-		m_sys_buttons.set_text_color(m_cr_titlebar_text);
-		m_sys_buttons.set_back_color(m_cr_titlebar_back);
-		m_sys_buttons.set_button_height(m_titlebar_height);
+		//m_sys_buttons.set_text_color(m_cr_titlebar_text);
+		//m_sys_buttons.set_back_color(m_cr_titlebar_back);
+		//m_sys_buttons.set_button_height(m_titlebar_height);
 	}
 
 	CFont* font = GetFont();
@@ -211,7 +203,7 @@ INT_PTR CSCThemeDlg::DoModal()
 BOOL CSCThemeDlg::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return FALSE;
+	return TRUE;
 }
 
 
@@ -398,7 +390,7 @@ void CSCThemeDlg::OnPaint()
 		CRect rTitle = rc;
 		rTitle.bottom = m_titlebar_height;
 		//dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
-		dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
+		dc.FillSolidRect(rTitle, m_theme.cr_title_back.ToCOLORREF());
 
 		//프로그램 아이콘 표시. 
 		if (m_show_logo)
@@ -428,7 +420,7 @@ void CSCThemeDlg::OnPaint()
 
 		//타이틀 출력
 		dc.SetBkMode(TRANSPARENT);
-		dc.SetTextColor(m_cr_titlebar_text.ToCOLORREF());
+		dc.SetTextColor(m_theme.cr_title_text.ToCOLORREF());
 
 		CString title;
 		GetWindowText(title);
@@ -460,45 +452,45 @@ void CSCThemeDlg::OnPaint()
 
 	//border
 	GetClientRect(rc);
-	draw_rectangle(&dc, rc, m_cr_border, Gdiplus::Color::Transparent, m_border_width);
+	draw_rectangle(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent, m_border_width);
 }
+
 
 void CSCThemeDlg::set_color_theme(int theme)
 {
+	m_theme.set_color_theme(theme);
 	m_sys_buttons.set_color_theme(theme);
 
 	switch (theme)
 	{
-	case color_theme_visualstudio :
-		m_cr_titlebar_text = gRGB(192, 192, 192);
-		m_cr_titlebar_back = gRGB(31, 31, 31);
-		m_cr_back = gRGB(54, 54, 54);
+	//case CSCColorTheme::color_theme_visualstudio :
+	//	m_cr_titlebar_text = gRGB(192, 192, 192);
+	//	m_cr_titlebar_back = gRGB(31, 31, 31);
+	//	m_cr_back = gRGB(54, 54, 54);
+	//	break;
+	case CSCColorTheme::color_theme_gray :
+		//m_cr_titlebar_text = gRGB(192, 192, 192);
+		//m_cr_titlebar_back = gRGB(31, 31, 31);
+		//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 		break;
-	case color_theme_gray :
-		m_cr_titlebar_text = gRGB(192, 192, 192);
-		m_cr_titlebar_back = gRGB(31, 31, 31);
-		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
-		break;
-	case color_theme_linkmemine :
+	case CSCColorTheme::color_theme_linkmemine :
 		SetWindowText(_T("LinkMeMine"));
 		m_titlebar_height = 32;
 
-		m_cr_titlebar_text = Gdiplus::Color::White;
-		m_sys_buttons.set_text_color(m_cr_titlebar_text);
+		m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
-		m_cr_titlebar_back = gRGB(59, 70, 92);
-
-		m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
-		m_sys_buttons.set_back_color(m_cr_titlebar_back);
-		m_sys_buttons.set_back_hover_color(m_cr_sys_buttons_back_hover);
+		//m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
+		m_sys_buttons.set_back_color(m_theme.cr_title_back);
+		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
 		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 		reconstruct_title_font();
 
-		m_cr_back = Gdiplus::Color::White;
+		//m_cr_back = Gdiplus::Color::White;
 		break;
+		/*
 	case color_theme_linkmemine_se:
 		SetWindowText(_T("LinkMeMine 3.0 SE"));
 		m_titlebar_height = 32;
@@ -559,10 +551,11 @@ void CSCThemeDlg::set_color_theme(int theme)
 
 		m_cr_back = Gdiplus::Color::White;
 		break;
+		*/
 	default :
-		m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
-		m_cr_titlebar_back.SetFromCOLORREF(::GetSysColor(COLOR_ACTIVECAPTION));
-		m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
+		//m_cr_titlebar_text.SetFromCOLORREF(::GetSysColor(COLOR_CAPTIONTEXT));
+		//m_cr_titlebar_back.SetFromCOLORREF(::GetSysColor(COLOR_ACTIVECAPTION));
+		//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 		break;
 	}
 }
@@ -587,13 +580,13 @@ void CSCThemeDlg::OnSize(UINT nType, int cx, int cy)
 
 void CSCThemeDlg::set_titlebar_text_color(Gdiplus::Color cr)
 {
-	m_cr_titlebar_text = cr;
+	m_theme.cr_title_text = cr;
 	m_sys_buttons.set_text_color(cr);
 }
 
 void CSCThemeDlg::set_titlebar_back_color(Gdiplus::Color cr)
 {
-	m_cr_titlebar_back = cr;
+	m_theme.cr_title_back = cr;
 	m_sys_buttons.set_back_color(cr);
 }
 

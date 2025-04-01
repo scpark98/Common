@@ -191,7 +191,7 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 		}
 		catch (CException* e)
 		{
-			CString str = get_last_error_string();
+			CString str = get_last_error_string(GetLastError());
 			TRACE(_T("%s\n"), str);
 			m_mutex.unlock();
 			return _T("log_text.FormatV() exception.");

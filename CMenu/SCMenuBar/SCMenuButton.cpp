@@ -56,7 +56,8 @@ void CSCMenuButton::popup_menu()
 		CRect rmenu = get_menu_rect();
 		HBITMAP hBitmap = capture_screen_to_bitmap(&rmenu);
 		CGdiplusBitmap img(hBitmap);
-		img.blur(35.3, FALSE);
+		//img.blur(35.3, FALSE);	//신규 추가된 blur()는 오류가 발생됨.
+		img.gdip_blur(35.3, FALSE);
 		m_menu.set_back_image(&img);
 	}
 	else

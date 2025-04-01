@@ -210,7 +210,7 @@ void CSCStatic::OnPaint()
 
 	CFont *pOldFont=dc.SelectObject(&m_font);
 	DWORD dwStyle = GetStyle();
-	DWORD dwText = DT_NOCLIP;
+	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
 	
 	if (m_dwStyle == 0)
 	{
@@ -223,11 +223,11 @@ void CSCStatic::OnPaint()
 		MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
 		MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
 
-		NMAP_STYLE(	SS_LEFTNOWORDWRAP |
-					//SS_CENTERIMAGE |
-					SS_WORDELLIPSIS |
-					SS_ENDELLIPSIS |
-					SS_PATHELLIPSIS,	DT_WORDBREAK);
+		//NMAP_STYLE(	SS_LEFTNOWORDWRAP |
+		//			//SS_CENTERIMAGE |
+		//			SS_WORDELLIPSIS |
+		//			SS_ENDELLIPSIS |
+		//			SS_PATHELLIPSIS,	DT_WORDBREAK);
 	}
 
 	//텍스트 출력 루틴
@@ -241,20 +241,21 @@ void CSCStatic::OnPaint()
 	}
 
 	//텍스트의 출력 크기를 구한다.
-	CRect rText;
 	CSize szText;
 
-	dc.DrawText(sSpace + m_text, &rText, DT_CALCRECT);
-	szText.cx = rText.Width();// + m_nOutlineWidth * 2;
-	szText.cy = rText.Height();// + m_nOutlineWidth * 2;
+	//m_rect_text.SetRectEmpty();
+	dc.DrawText(sSpace + m_text, &m_rect_text, DT_CALCRECT);// | DT_WORDBREAK);
+	TRACE(_T("calcRect in static = %s\n"), get_rect_info_string(m_rect_text));
+	szText.cx = m_rect_text.Width();// + m_nOutlineWidth * 2;
+	szText.cy = m_rect_text.Height();// + m_nOutlineWidth * 2;
 
-	rText = rc;
+	m_rect_text = rc;
 
 
 	//아이콘이 있으면 아이콘을 그려준다.
 	if (m_hIcon != NULL)
 	{
-		CRect rIcon = rText;
+		CRect rIcon = m_rect_text;
 		CSize szImg = m_szIcon;
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
@@ -265,12 +266,12 @@ void CSCStatic::OnPaint()
 			else
 				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
 
-			rText.left = rIcon.left + szImg.cx + 2;
+			m_rect_text.left = rIcon.left + szImg.cx + 2;
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
 			rIcon.left = rc.right - szText.cx - szImg.cx - 2 - m_nOutlineWidth * 2;
-			rText.left = rIcon.left + szImg.cx + 2 + m_nOutlineWidth;
+			m_rect_text.left = rIcon.left + szImg.cx + 2 + m_nOutlineWidth;
 		}
 		else
 		{
@@ -281,14 +282,14 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rIcon.left = 2;
-				rText.left = 2 + szImg.cx + 2;
+				m_rect_text.left = 2 + szImg.cx + 2;
 			}
 		}
 
 		if (dwStyle & SS_CENTERIMAGE)
 		{
 			rIcon.top = rc.top + (rc.Height() - szImg.cy) / 2;
-			rText.top = (rc.Height() - szText.cy) / 2;
+			m_rect_text.top = (rc.Height() - szText.cy) / 2;
 		}
 		else
 		{
@@ -297,7 +298,7 @@ void CSCStatic::OnPaint()
 			else
 				rIcon.top = szText.cy / 2 - szImg.cy / 2;
 
-			rText.top = 0;
+			m_rect_text.top = 0;
 		}
 
 		if (!m_bBlinkStatus)
@@ -305,7 +306,7 @@ void CSCStatic::OnPaint()
 	}
 	else if (m_header_images.size() > 0)
 	{
-		CRect rImg = rText;
+		CRect rImg = m_rect_text;
 		CSize szImg(m_header_images[m_header_image_index]->width, m_header_images[m_header_image_index]->height);
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
@@ -316,12 +317,12 @@ void CSCStatic::OnPaint()
 			else
 				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
 
-			rText.left = rImg.left + m_header_images[m_header_image_index]->width + 2;
+			m_rect_text.left = rImg.left + m_header_images[m_header_image_index]->width + 2;
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
 			rImg.left = rc.right - szText.cx - szImg.cx - 2 - m_nOutlineWidth * 2;
-			rText.left = rImg.left + szImg.cx + 2 + m_nOutlineWidth;
+			m_rect_text.left = rImg.left + szImg.cx + 2 + m_nOutlineWidth;
 		}
 		else
 		{
@@ -332,14 +333,14 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rImg.left = 2;
-				rText.left = 2 + szImg.cx + 2;
+				m_rect_text.left = 2 + szImg.cx + 2;
 			}
 		}
 
 		if (dwStyle & SS_CENTERIMAGE)
 		{
 			rImg.top = rc.top + (rc.Height() - szImg.cy) / 2;
-			rText.top = (rc.Height() - szText.cy) / 2;
+			m_rect_text.top = (rc.Height() - szText.cy) / 2;
 		}
 		else
 		{
@@ -348,7 +349,7 @@ void CSCStatic::OnPaint()
 			else
 				rImg.top = szText.cy / 2 - szImg.cy / 2;
 
-			rText.top = 0;
+			m_rect_text.top = 0;
 		}
 
 		m_header_images[0]->draw(g, rImg.left, rImg.top);
@@ -356,8 +357,8 @@ void CSCStatic::OnPaint()
 	else
 	{
 		//이 코드가 있어서 center image가 false인데도 세로 중앙에 표시된다. 왜 이 코드가 있는지 확인하자!
-		//rText.top = (rc.Height() - szText.cy) / 2;
-		//rText.bottom = rText.top + szText.cy;
+		//m_rect_text.top = (rc.Height() - szText.cy) / 2;
+		//m_rect_text.bottom = m_rect_text.top + szText.cy;
 	}
 
 	if (!m_text.IsEmpty())
@@ -379,8 +380,8 @@ void CSCStatic::OnPaint()
 		//SS_CENTERIMAGE 일 경우는 세로 출력위치를 직접 보정해준다.
 		if (dwStyle & SS_CENTERIMAGE)
 		{
-			rText.top = (rc.Height() - szText.cy) / 2;
-			rText.bottom = rText.top + szText.cy;
+			m_rect_text.top = (rc.Height() - szText.cy) / 2;
+			m_rect_text.bottom = m_rect_text.top + szText.cy;
 		}
 		else
 		{
@@ -407,7 +408,7 @@ void CSCStatic::OnPaint()
 					for (int y = -m_nOutlineWidth; y <= m_nOutlineWidth; ++y)
 					{
 						//dc.TextOut(10 + x, 10 + y, str, str.GetLength());
-						CRect	rOffset = rText;
+						CRect	rOffset = m_rect_text;
 						rOffset.OffsetRect(x, y);
 						dc.DrawText(sSpace + m_text, rOffset, dwText);
 					}
@@ -416,15 +417,17 @@ void CSCStatic::OnPaint()
 				dc.SetTextColor(m_cr_text.ToCOLORREF());
 			}
 
-			dc.DrawText(sSpace + m_text, rText, dwText);
+			dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
 		}
 	}
 
+
+	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
 	// Select old font
 	dc.SelectObject(pOldFont);
 }
 
-void CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
+CRect CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
 {
 	m_text = sText;
 	//CStatic::SetWindowText(sText);
@@ -441,6 +444,8 @@ void CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
 		update_surface();
 	//else
 		Invalidate(false);
+
+	return m_rect_text;
 }
 
 void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
@@ -458,6 +463,34 @@ void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
 	}
 
 	set_text(text, crTextColor);
+}
+
+DWORD CSCStatic::get_text_align()
+{
+	DWORD dwText = DT_NOCLIP;
+	DWORD dwStyle = GetStyle();
+
+	MAP_STYLE(SS_LEFT, DT_LEFT);
+	MAP_STYLE(SS_RIGHT, DT_RIGHT);
+	MAP_STYLE(SS_CENTER, DT_CENTER);
+	//MAP_STYLE(SS_CENTERIMAGE,	DT_VCENTER | DT_SINGLELINE	);
+	MAP_STYLE(SS_NOPREFIX, DT_NOPREFIX);
+	MAP_STYLE(SS_WORDELLIPSIS, DT_WORD_ELLIPSIS);
+	MAP_STYLE(SS_ENDELLIPSIS, DT_END_ELLIPSIS);
+	MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
+
+	NMAP_STYLE(SS_LEFTNOWORDWRAP |
+		//SS_CENTERIMAGE |
+		SS_WORDELLIPSIS |
+		SS_ENDELLIPSIS |
+		SS_PATHELLIPSIS, DT_WORDBREAK);
+
+	if (dwStyle & SS_CENTERIMAGE)
+		dwText |= (DT_VCENTER | DT_SINGLELINE);
+	else
+		dwText |= DT_TOP;
+
+	return dwText;
 }
 
 void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back)

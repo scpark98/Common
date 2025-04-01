@@ -5454,7 +5454,6 @@ int	get_text_encoding(CString sfile)
 	int text_encoding = text_encoding_ansi;
 
 	unsigned char buf[4096] = { 0, };
-	int result;
 
 	FILE* fp = _tfopen(sfile, _T("rb"));
 	if (fp == NULL)
@@ -6962,7 +6961,7 @@ bool show_property_window(std::deque<CString> fullpath)
 	//LPITEMIDLIST* pidl = (LPITEMIDLIST*)malloc(sizeof(LPITEMIDLIST) * fullpath.size());
 	LPITEMIDLIST* pidl = new LPITEMIDLIST[fullpath.size()];
 	IShellFolder* pDesktop;
-	IDataObject* pDataObject;
+	//IDataObject* pDataObject;
 
 	if (!pidl)
 	{
@@ -11304,7 +11303,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	//	&pi)           // Pointer to PROCESS_INFORMATION structure
 	//	)
 	{
-		TRACE(_T("error = %s\n"), get_last_error_string());
+		TRACE(_T("error = %s\n"), get_last_error_string(GetLastError()));
 		Wow64Disable(false);
 		return result;
 	}
@@ -13458,11 +13457,6 @@ CSize GetPrinterPaperSize(CString sPrinterName)
 	PrinterDC.DeleteDC();
 
 	return CSize(nPaperWidth, nPaperHeight);
-}
-
-CString	get_last_error_string(bool show_msgBox)
-{
-	return get_last_error_string(GetLastError(), show_msgBox);
 }
 
 //#include <system_error>>

@@ -167,6 +167,9 @@ public:
 
 	void		set_3state(bool tri_state = true) { m_is_3state = tri_state; }
 	bool		is_3state() { return m_is_3state; }
+
+	//SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 등의 한 값으로 줄 경우 해당 버튼이 그려진다.
+	void		set_button_cmd(UINT cmd) { m_button_cmd = cmd; }
 	
 	//기본 PUSH_BUTTON, CHECKBOX, RADIOBUTTON과 같은 style과는 달리
 	//PUSH_BUTTON인데 표시 모양이 문단 형태로 표시되는 mobile ui에 주로 사용되는 항목 표시용으로 추가(Tile UI)
@@ -249,13 +252,14 @@ public:
 	void		set_transparent(bool trans = true, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
-	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
 	void		set_text_color(Gdiplus::Color normal);
-	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
 	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
 	//(NH 프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
 	void		set_back_color(Gdiplus::Color normal, bool auto_set_color = true);
+	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+	void		set_hover_back_color(Gdiplus::Color hover_back);
 
 	//투명 png를 그리거나 round button일 경우는 parent back으로 칠해주고 그려줘야 한다. 그래야 깜빡임을 없앨 수 있다.
 	void		set_parent_back_color(Gdiplus::Color cr_parent_back);
@@ -364,6 +368,9 @@ protected:
 	UINT		m_button_type;				//BS_PUSHBUTTON(default) or BS_CHECKBOX or BS_RADIOBUTTON
 	UINT		m_button_style;				//BS_PUSHLIKE, BS_MULTILINE, BS_FLAT
 
+	//set_button_action()으로 SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 중의 한 값으로 줄 경우 해당 버튼이 그려진다.
+	int			m_button_cmd = -1;
+
 	//3state 버튼은 checkbox의 속성에 줄 수 있는데 이럴 경우 DrawItem()이 아예 호출되지 않는다.
 	//따라서 3stat가 필요한 checkbox는 BS_CHECKBOX로 처리하되 m_is_3state로 별도 그려줘야 한다.
 	//리소스에서는 해당 옵션을 주지 않아야 하고 set_3state(true);로 세팅해야 한다.
@@ -453,8 +460,8 @@ protected:
 
 	bool		m_bHasFocus = false;
 	bool		m_draw_focus_rect = false;				//포커스 사각형 표시 여부(기본값 false)
-	Gdiplus::Color	m_crFocusRect = gRGB(6, 205, 255);	//색상
-	int			m_nFocusRectWidth = 2;					//두께
+	Gdiplus::Color	m_crFocusRect = Gdiplus::Color::DimGray;	//색상
+	int			m_nFocusRectWidth = 1;					//두께
 
 	bool		m_b3DRect = true;						//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(1, 1);			//눌렸을 때 그려질 위치. 이 값이 클 경우 이미지가 여백이 없다면 ㅇ

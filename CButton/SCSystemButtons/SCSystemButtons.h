@@ -4,13 +4,8 @@
 * titlebar가 없는 dlg를 자주 만들게 되는데 시스템 버튼의 조합도 다양할 수 있다.
 * parent dlg의 h에서 다음과 같이 선언하고
 		CSCSystemButtons	m_sys_buttons;
-  cpp에서 다음과 같이 생성해준다.
-		//4개 버튼을 사용하는 경우
-		m_sys_buttons.create(this, rc.right, m_titlebar_height, -1, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);
-		//종료 버튼만 필요한 경우는 아래와 같이 호출
-		m_sys_buttons.create(this, rc.right, m_titlebar_height, -1, SC_CLOSE);
-		//또는 create(this);하여 먼저 생성하고
-		//set_buttons_cmd(SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE); 와 같이 버튼을 나중에 추가하는 것도 가능하다.
+  cpp에서 다음과 같이 호출하면 생성 및 설정이 완료된다.
+		set_system_buttons(SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);
   
 * set_color_theme()으로 컬러 테마를 선택할 수 있다.
 * parent dlg의 OnSize()등에서 아래와 같이 보정해줘야 올바른 위치에 표시된다.

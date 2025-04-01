@@ -513,6 +513,14 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	redraw_window();
 }
 
+void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
+{
+	if (m_cr_back.size() < 2)
+		return;
+
+	m_cr_back[1] = hover_back;
+}
+
 void CGdiButton::set_hover_color_matrix(float fScale)	//1.0f = no effect.
 {
 	m_hoverMatrix.m[0][0] = fScale;
@@ -706,7 +714,7 @@ void CGdiButton::prepare_tooltip()
 	}
 	catch (CException*)
 	{
-		CString str = get_last_error_string();
+		CString str = get_last_error_string(GetLastError());
 	}
 
 	m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);
@@ -784,6 +792,25 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
 	}
 
+	if (pMsg->message == WM_KEYDOWN)
+	{
+		switch (pMsg->wParam)
+		{
+			case VK_SPACE :
+				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONDOWN)), 0);
+				break;
+		}
+	}
+	else if (pMsg->message == WM_KEYUP)
+	{
+		switch (pMsg->wParam)
+		{
+			case VK_SPACE:
+				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
+				break;
+		}
+	}
+
 	return CButton::PreTranslateMessage(pMsg);
 }
 
@@ -808,8 +835,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	GetClientRect(rc);
 	GetWindowText(text);
 
-	//if (text == _T("센터정렬"))
-	//	text = _T("센터정렬");
+	if (text == _T("진단 시작"))
+		text = _T("진단 시작");
 
 	rText = rc;
 
@@ -825,7 +852,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
-	//TRACE(_T("is_down = %d\n"), is_down);
+	TRACE(_T("%s\n"), __function__);
 
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
@@ -834,7 +861,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	//만약 parent에 배경색이나 배경 그림이 있고
 	//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
-	if (m_transparent)
+	//
+	if (false)//m_transparent)
 	{
 		//버튼의 위치를 얻어온다.
 		CRect rbutton;
@@ -849,18 +877,18 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
-			//CDC* pDC = pParent->GetDC();
-			//CDC MemDC;
-			//CBitmap bmp;
-			//MemDC.CreateCompatibleDC(pDC);
-			//bmp.CreateCompatibleBitmap(pDC, rbutton.Width(), rbutton.Height());
-			//CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
-			//MemDC.BitBlt(0, 0, rbutton.Width(), rbutton.Height(), pDC, rbutton.left, rbutton.top, SRCCOPY);
-			//dc.BitBlt(0, 0, rbutton.Width(), rbutton.Height(), &MemDC, 0, 0, SRCCOPY);
-			//MemDC.SelectObject(pOldBmp);
-			//pParent->ReleaseDC(pDC);
-			//MemDC.DeleteDC();
+			//dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
+			CDC* pDC = pParent->GetDC();
+			CDC MemDC;
+			CBitmap bmp;
+			MemDC.CreateCompatibleDC(pDC);
+			bmp.CreateCompatibleBitmap(pDC, rbutton.Width(), rbutton.Height());
+			CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
+			MemDC.BitBlt(0, 0, rbutton.Width(), rbutton.Height(), pDC, rbutton.left, rbutton.top, SRCCOPY);
+			dc.BitBlt(0, 0, rbutton.Width(), rbutton.Height(), &MemDC, 0, 0, SRCCOPY);
+			MemDC.SelectObject(pOldBmp);
+			pParent->ReleaseDC(pDC);
+			MemDC.DeleteDC();
 		}
 		/*
 		cr_back = Gdiplus::Color::Transparent;
@@ -929,7 +957,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	//배경 이미지가 지정되어 있다면 배경 이미지를 그리고
+	//배경 이미지가 지정되어 있다면 배경 이미지를 그리고 없다면 배경색으로 칠한다.
 	if (!m_transparent)
 	{
 		if (m_back_img.is_valid())
@@ -1114,19 +1142,64 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				//if (is_down)
 				//	r.OffsetRect(1, 1);
 			}
+			//SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE는 텍스트는 없지만 도형으로 그려준다.
+			else if (m_button_cmd > 0)
+			{
+				Gdiplus::Pen pen(cr_text, 1.5F);
+				Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0F);
+				Gdiplus::SolidBrush br_back(cr_back);
+				Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
+
+				CPoint cp = rc.CenterPoint();
+
+				switch (m_button_cmd)
+				{
+					case SC_MINIMIZE :
+						g.DrawLine(&pen, cp.x - 5, cp.y + 3, cp.x + 5, cp.y + 3);
+						break;
+					case SC_MAXIMIZE :
+						if (GetParent()->IsZoomed())
+						{
+							g.DrawRectangle(&pen, cp.x - 3, cp.y - 5, 8, 8);
+							g.FillRectangle(&br_back, cp.x - 6, cp.y - 2, 8, 8);
+							g.DrawRectangle(&pen, cp.x - 6, cp.y - 2, 8, 8);
+						}
+						else
+						{
+							g.DrawRectangle(&pen, cp.x - 5, cp.y - 6, 10, 10);
+						}
+						break;
+					case SC_CLOSE:
+						g.DrawLine(&pen, cp.x - 5, cp.y - 6, cp.x + 5, cp.y + 4);
+						g.DrawLine(&pen, cp.x - 5, cp.y + 4, cp.x + 5, cp.y - 6);
+						break;
+					//case SC_PIN :
+					//	g.DrawLine(&pen_pin, cp.x - 7, cp.y, cp.x + 7, cp.y);
+					//	g.FillEllipse(&br_pin, cp.x + (is_top_most(GetParent()->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
+					//	break;
+					//case SC_HELP :
+					//	draw_text(g, rc, _T("?"), 12, 0, 1, 1.0f, _T("맑은 고딕"), cr_text);// , m_theme.cr_text, DT_CENTER | DT_VCENTER | DT_SINGELINE);
+					//	break;
+				}
+			}
 
 			rText = r;
 		}
 	}
 
 	//focus_rect, border를 그려준다.
-	if (m_draw_focus_rect)//&& m_bHasFocus)
+	//if (((lpDIS->itemAction & ODA_FOCUS) || (lpDIS->itemAction & ODA_DRAWENTIRE)) && (lpDIS->itemState & ODS_FOCUS))	//ok
+	//if (lpDIS->itemState & ODS_FOCUS)	//ok
+	//if (GetFocus() == this)	//ok
+	if (m_draw_focus_rect && m_bHasFocus)	//옵션처리하기 위해 이 코드를 사용함
 	{
+		CRect rfocus = rc;
+		rfocus.DeflateRect(1, 1);
 		//TRACE(_T("draw focus rect\n"));
-		//pDC->DrawFocusRect(rc);
-		Gdiplus::Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
-		pen.SetDashStyle(Gdiplus::DashStyleDot);
-		g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
+		dc.DrawFocusRect(rfocus);
+		//Gdiplus::Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
+		//pen.SetDashStyle(Gdiplus::DashStyleDot);
+		//g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 	}
 	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
 	{
@@ -1459,8 +1532,8 @@ void CGdiButton::set_round(int round)
 
 	if (m_round > 0)
 		set_transparent(true);
-
-	redraw_window();
+	else
+		redraw_window();
 }
 
 int CGdiButton::GetCheck()

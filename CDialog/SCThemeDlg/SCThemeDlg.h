@@ -69,9 +69,9 @@ public:
 	int		get_titlebar_height() { return m_titlebar_height; }
 
 	void	set_titlebar_text_color(Gdiplus::Color cr);
-	Gdiplus::Color get_titlebar_text_color() { return m_cr_titlebar_text; }
+	Gdiplus::Color get_titlebar_text_color() { return m_theme.cr_title_text; }
 	void	set_titlebar_back_color(Gdiplus::Color cr);
-	Gdiplus::Color get_titlebar_back_color() { return m_cr_titlebar_back; }
+	Gdiplus::Color get_titlebar_back_color() { return m_theme.cr_title_back; }
 	void	set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void	set_titlebar_font_size(int size);
 	void	set_titlebar_font_bold(bool bold) { m_titlebar_bold = bold; m_title_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL); }
@@ -111,27 +111,27 @@ public:
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 	}
 
-	void	set_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
+	void	set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; }
 
 	//배경에 그림 표시, zoom? stretch? original size?, 
 	void	set_back_image(CString imgType, UINT nResourceID, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
 	void	set_back_image(CString img_path, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
 	void	set_back_image(UINT resource_id, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
 
-	void	set_border_color(Gdiplus::Color cr) { m_cr_border = cr; }
+	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border = cr; }
 
-	enum COLOR_THEMES
-	{
-		color_theme_default = 0,
-		color_theme_visualstudio,
-		color_theme_gray,
-		color_theme_linkmemine,
-		color_theme_linkmemine_se,
-		color_theme_helpu,
-		color_theme_anysupport,
-		color_theme_pcanypro,
-		color_theme_custom,
-	};
+	//enum COLOR_THEMES
+	//{
+	//	color_theme_default = 0,
+	//	color_theme_visualstudio,
+	//	color_theme_gray,
+	//	color_theme_linkmemine,
+	//	color_theme_linkmemine_se,
+	//	color_theme_helpu,
+	//	color_theme_anysupport,
+	//	color_theme_pcanypro,
+	//	color_theme_custom,
+	//};
 
 	void	set_color_theme(int theme);
 	void	enable_resize(bool resizable);
@@ -161,13 +161,14 @@ protected:
 	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
 	bool				m_titlebar_bold = false;
 
-	Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
-	Gdiplus::Color		m_cr_titlebar_back = gRGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);
-	Gdiplus::Color		m_cr_sys_buttons_back_hover;
-	Gdiplus::Color		m_cr_text;
-	Gdiplus::Color		m_cr_back;
+	CSCColorTheme		m_theme = CSCColorTheme(this);
+	//Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
+	//Gdiplus::Color		m_cr_titlebar_back = gRGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);
+	//Gdiplus::Color		m_cr_sys_buttons_back_hover;
+	//Gdiplus::Color		m_cr_text;
+	//Gdiplus::Color		m_cr_back;
 
-	Gdiplus::Color		m_cr_border = Gdiplus::Color::DimGray;
+	//Gdiplus::Color		m_cr_border = Gdiplus::Color::DimGray;
 	int					m_border_width = 1;		//그려질 테두리 두께
 
 

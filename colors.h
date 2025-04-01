@@ -54,9 +54,15 @@ public :
 		color_theme_dark_gray,
 		color_theme_dark,
 		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
+		color_theme_linkmemine,
+		color_theme_linkmemine_se,
+		color_theme_anysupport,
+		color_theme_helpu,
+		color_theme_pcanypro,
+		color_theme_custom,
 	};
 
-	int		get_color_theme() { return cur_theme; }
+	int		get_color_theme() { return m_cur_theme; }
 	void	set_color_theme(int color_theme);
 	static std::deque<CString> get_color_theme_list();
 
@@ -80,6 +86,7 @@ public :
 	//caption이 없는 dialog based에서 사용
 	Gdiplus::Color	cr_title_text;
 	Gdiplus::Color	cr_title_back;
+	Gdiplus::Color	cr_sys_buttons_hover_back;
 
 	//CListCtrl에서만 사용될것으로 예상.
 	Gdiplus::Color	cr_header_text;
@@ -90,7 +97,7 @@ public :
 
 protected:
 	CWnd*			m_parent = NULL;
-	int				cur_theme = color_theme_default;
+	int				m_cur_theme = color_theme_default;
 };
 
 // RGB -> YUV(YCbCr)

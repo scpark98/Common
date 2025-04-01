@@ -545,6 +545,8 @@ void CGdiplusBitmap::resolution()
 	channel = channels();
 	stride = width * channel;
 
+	if (stride < 0)
+		stride = -stride;
 
 	check_animate_gif();
 }
@@ -573,7 +575,7 @@ bool CGdiplusBitmap::get_raw_data()
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
 		memcpy(data, bmpData.Scan0, len); //복사
-		stride = bmpData.Stride;
+		stride = std::abs(bmpData.Stride);
 		m_pBitmap->UnlockBits(&bmpData); //락 풀기
 		return true;
 	}
@@ -587,6 +589,11 @@ bool CGdiplusBitmap::set_raw_data()
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
 	Gdiplus::PixelFormat format = m_pBitmap->GetPixelFormat();
+
+	//if (format == PixelFormat8bppIndexed)
+	//	format = PixelFormat8bppIndexed;
+	//else
+	//	format = PixelFormat24bppRGB;
 
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,

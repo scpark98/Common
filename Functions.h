@@ -1461,7 +1461,6 @@ void		SetWallPaper(CString sfile);
 	CString		GetDefaultPrinterName();
 	CSize		GetPrinterPaperSize(CString sPrinterName);
 
-	CString		get_last_error_string(bool show_msgBox = false);
 	CString		get_last_error_string(DWORD dwError, bool show_msgBox = false);
 
 //////////////////////////////////////////////////////////////////////////

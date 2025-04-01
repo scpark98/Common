@@ -58,11 +58,16 @@ public:
 	
 	void			set_transparent(bool bTransparent = true) { m_transparent = bTransparent; Invalidate(); }
 	void			SetWindowText(CString sText) { set_text(sText); }
-	void			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
+	CRect			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
 
 	//printf()와 같이 변수값을 바로 문자열로 세팅할 수 있다.
 	//컬러값을 변경하지 않으려면 cr_text = -1로 넘겨준다.
 	void			set_textf(Gdiplus::Color cr_text, LPCTSTR format, ...);
+
+	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등의
+	DWORD			get_text_align();
+
+	CRect			get_text_rect() { return m_rect_text; }
 
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
@@ -197,6 +202,13 @@ protected:
 	//SetWindowText()를 호출하는 순간 화면갱신이 일어나고 MFC내부적으로는 많은 처리를 할 것이다.
 	//특히 transparent일 경우는 그 깜빡임이 크므로 m_text를 별도 선언하여 사용한다.
 	CString		m_text;
+
+	//텍스트가 실제 출력될 영역의 크기인데 이 CSCStatic을 사용하는 dlg에서 텍스트 출력크기에 따라 dlg의 크기가 변경되어야 하는
+	//CSCMessageBox와 같은 클래스에서 필요하다.
+	//CSCMessageBox에서 DT_CALC로 그 출력 크기를 얻어오려 했으나 관련 자료를 검색해 본 결과
+	//이는 불가능하며 직접 출력시킨 후 그 크기를 알 수 있다.
+	//get_text_rect() 함수를 사용하여 실제 출력되는 사각형 영역 정보를 알 수 있다.
+	CRect		m_rect_text;
 
 	enum ENUM_TIMER
 	{

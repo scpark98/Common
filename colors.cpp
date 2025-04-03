@@ -582,7 +582,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = Gdiplus::Color::White;
-			cr_title_back = gRGB(59, 70, 92);
+			cr_title_back = gRGB(34, 46, 61);
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
@@ -611,8 +611,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_title_text = Gdiplus::Color::White;
-			cr_title_back = gRGB(59, 70, 92);
+			cr_title_text = gRGB(253, 126, 20);
+			cr_title_back = gRGB(34, 46, 61);
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
@@ -641,8 +641,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_title_text = Gdiplus::Color::White;
-			cr_title_back = gRGB(59, 70, 92);
+			cr_title_text = gRGB(48, 154, 192);
+			cr_title_back = gRGB(13, 41, 71);
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
@@ -671,8 +671,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_title_text = Gdiplus::Color::White;
-			cr_title_back = gRGB(59, 70, 92);
+			cr_title_text = gRGB(18, 24, 58);
+			cr_title_back = gRGB(32, 178, 174);
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
@@ -701,8 +701,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_title_text = Gdiplus::Color::White;
-			cr_title_back = gRGB(59, 70, 92);
+			cr_title_text = gRGB(18, 24, 58);
+			cr_title_back = gRGB(245, 164, 25);
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
@@ -827,4 +827,11 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border				= Gdiplus::Color::DimGray;
 	}
+}
+
+Gdiplus::Color get_sys_color(int index)
+{
+	Gdiplus::Color gcr;
+	gcr.SetFromCOLORREF(::GetSysColor(index));
+	return gcr;
 }

@@ -7,10 +7,11 @@
 #include "../../CStatic/SCStatic/SCStatic.h"
 
 // CSCMessageBox 대화 상자
-#define DEFAULT_SIZE_CX		400
-#define DEFAULT_SIZE_CY		240
-#define DEFAULT_BUTTON_CX	84
-#define DEFAULT_BUTTON_CY	26
+#define DEFAULT_SIZE_CX				400
+#define DEFAULT_SIZE_CY				240
+#define DEFAULT_BUTTON_CX			84
+#define DEFAULT_BUTTON_CY			28
+#define DEFAULT_TITLE_HEIGHT		24
 
 class CSCMessageBox : public CDialogEx
 {
@@ -53,14 +54,15 @@ protected:
 	int				m_timeout_sec = 0;
 	DWORD			m_align = SS_CENTER | SS_CENTERIMAGE;
 
-	int				m_response = IDOK;
+	int				m_response = -1;
 
 	CString			m_title;
-	int				m_title_height = 28;
+	int				m_title_height = DEFAULT_TITLE_HEIGHT;
 
 	CSize			m_sz_button = CSize(DEFAULT_BUTTON_CX, DEFAULT_BUTTON_CY);
 
 	CSCStatic		m_static_message;
+
 	CGdiButton		m_button_ok;
 	CGdiButton		m_button_cancel;
 	CGdiButton		m_button_retry;

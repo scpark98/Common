@@ -43,9 +43,6 @@ void CSCStepCtrl::OnPaint()
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	Gdiplus::Pen pen_line(m_cr_line_active, 1.7f);
-	Gdiplus::Pen pen_gray(m_cr_line_inactive, 1.7f);
-
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
 	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
@@ -65,13 +62,16 @@ void CSCStepCtrl::OnPaint()
 	for (i = 0; i < m_step.size(); i++)
 	{
 		int thumb_style = m_thumb_style;
+
 		Gdiplus::Color cr_thumb = m_cr_thumb_active;
 		Gdiplus::Color cr_text = m_cr_text_active;
+		Gdiplus::Color cr_line = m_cr_line_active;
 
 		if (i > m_pos)
 		{
 			cr_thumb = m_cr_thumb_inactive;
 			cr_text = m_cr_text_inactive;
+			cr_line = m_cr_line_inactive;
 		}
 		else if (i == m_pos)
 		{
@@ -189,17 +189,19 @@ void CSCStepCtrl::OnPaint()
 		//각 스텝 사이의 라인을 그려준다.
 		if (i > 0)
 		{
+			Gdiplus::Pen pen_line(cr_line, 1.7f);
+
 			if (m_horz)
 			{
 				//draw_line(&dc, m_step[i - 1].r.right + 0, m_step[i].r.CenterPoint().y,
 				//	m_step[i].r.left - 0, m_step[i].r.CenterPoint().y, (i > m_pos) ? m_cr_line_inactive : m_cr_line_inactive, 2.0f, Gdiplus::DashStyleDash);
-				g.DrawLine(i > m_pos ? &pen_gray : &pen_line,
+				g.DrawLine(&pen_line,
 					m_step[i - 1].r.right + 0, m_step[i].r.CenterPoint().y,
 					m_step[i].r.left - 0, m_step[i].r.CenterPoint().y);
 			}
 			else
 			{
-				g.DrawLine(i > m_pos ? &pen_gray : &pen_line,
+				g.DrawLine(&pen_line,
 					m_step[i - 1].r.CenterPoint().x, m_step[i - 1].r.bottom,
 					m_step[i].r.CenterPoint().x, m_step[i].r.top);
 			}
@@ -235,7 +237,7 @@ void CSCStepCtrl::set_thumb_style(int index, int style)
 //각 스텝에 텍스트 지정
 void CSCStepCtrl::set_text(int index, CString text, Gdiplus::Color cr)
 {
-	if (index >= m_step.size())
+	if (index >= (int)m_step.size())
 		return;
 
 	m_step[index].text = text;
@@ -245,45 +247,55 @@ void CSCStepCtrl::set_text(int index, CString text, Gdiplus::Color cr)
 }
 
 //thumb와 text의 색상을 모두 변경한다.
-void CSCStepCtrl::set_step_color(int index, Gdiplus::Color cr)
+void CSCStepCtrl::set_step_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current)
 {
-	set_thumb_color(index, cr);
-	set_text_color(index, cr);
+	set_thumb_color(index, cr_active, cr_current);
+	set_text_color(index, cr_active, cr_current);
 }
 
-void CSCStepCtrl::set_thumb_color(int index, Gdiplus::Color cr)
+void CSCStepCtrl::set_thumb_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current)
 {
-	if (index >= m_step.size())
+	if (index >= (int)m_step.size())
 		return;
 
 	if (index < 0)
 	{
+		m_cr_thumb_active = cr_active;
+
+		if (cr_current.GetValue() != Gdiplus::Color::Transparent)
+			m_cr_thumb_current = cr_current;
+
 		for (int i = 0; i < m_step.size(); i++)
 		{
-			m_step[i].cr_thumb = cr;
+			m_step[i].cr_thumb = cr_active;
 		}
 	}
 	else
 	{
-		m_step[index].cr_thumb = cr;
+		m_step[index].cr_thumb = cr_active;
 	}
 }
 
-void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr)
+void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current)
 {
-	if (index >= m_step.size())
+	if (index >= (int)m_step.size())
 		return;
 
 	if (index < 0)
 	{
+		m_cr_text_active = cr_active;
+
+		if (cr_current.GetValue() != Gdiplus::Color::Transparent)
+			m_cr_thumb_current = cr_current;
+
 		for (int i = 0; i < m_step.size(); i++)
 		{
-			m_step[i].cr_text = cr;
+			m_step[i].cr_text = cr_active;
 		}
 	}
 	else
 	{
-		m_step[index].cr_text = cr;
+		m_step[index].cr_text = cr_active;
 	}
 }
 
@@ -291,14 +303,14 @@ void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr)
 //index == -1이면 모든 스텝 리셋
 void  CSCStepCtrl::reset_step_color(int index)
 {
-	if (index >= 0 && index < m_step.size())
+	if (index >= 0 && index < (int)m_step.size())
 	{
 		m_step[index].cr_text = Gdiplus::Color::Transparent;
 		m_step[index].cr_thumb = Gdiplus::Color::Transparent;
 	}
 	else
 	{
-		for (int i = 0; i < m_step.size(); i++)
+		for (int i = 0; i < (int)m_step.size(); i++)
 		{
 			m_step[i].cr_text = Gdiplus::Color::Transparent;
 			m_step[i].cr_thumb = Gdiplus::Color::Transparent;

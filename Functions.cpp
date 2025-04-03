@@ -2765,7 +2765,7 @@ void request_url(CRequestUrlParams* params)
 	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
 	//https://blog.naver.com/che5886/20061092638
 	//20250117 30초 timeout됨을 확인 완료.
-	DWORD dwTimeout = 30000;
+	DWORD dwTimeout = params->timeout_ms;
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
@@ -6397,6 +6397,16 @@ CString get_known_folder(int csidl)
 	return buf;
 }
 
+//사용자 문서 폴더는 "C:\Users\user_id\Documents" 와 같이 윈도우 로그인 계정인 user_id에 따라 경로가 달라지므로
+//"__user_documents_folder__"라는 키워드가 있다면 이를 "C:\Users\user_id\Documents"로 변경해준다.
+CString	adjust_special_folder_path(CString path)
+{
+	if (path.Find(_T("__user_documents_folder__")) == 0)
+		path.Replace(_T("__user_documents_folder__"), get_known_folder(CSIDL_MYDOCUMENTS));
+
+	return path;
+}
+
 void ParseCommandString(CString sParam, CStringArray& ar)
 {
 //	AfxMessageBox("sParam = [" + sParam + "]");
@@ -8325,7 +8335,7 @@ CString GetToken(CString src, CString separator, int index)
 		saItems.Add(sItem);
 	}
 
-	if (index < 0 || index >= saItems.GetSize())
+	if (index < 0 || index >= (int)saItems.GetSize())
 		return _T("");
 
 	return saItems.GetAt(index);

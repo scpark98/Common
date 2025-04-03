@@ -116,7 +116,7 @@ void CEnTabCtrl::DrawItem(LPDRAWITEMSTRUCT lpdis)
 	// blend from back color to COLOR_3DFACE if 16 bit mode or better
 	COLORREF crFrom = GetTabColor(bSelected);
 	
-	if (s_dwCustomLook & ETC_GRADIENT && pDC->GetDeviceCaps(BITSPIXEL) >= 16)
+	if (false)//s_dwCustomLook & ETC_GRADIENT && pDC->GetDeviceCaps(BITSPIXEL) >= 16)
 	{
 		COLORREF crTo = bSelected ? ::GetSysColor(COLOR_3DFACE) : Darker(!bColor || m_crBack == -1 ? ::GetSysColor(COLOR_3DFACE) : m_crBack, 0.7f);
 
@@ -278,4 +278,16 @@ void CEnTabCtrl::PreSubclassWindow()
 
 	if (s_dwCustomLook)
 		ModifyStyle(0, TCS_OWNERDRAWFIXED);
+}
+
+CRect CEnTabCtrl::get_item_rect(int index)
+{
+	CRect rItem;
+
+	if (index < GetItemCount())
+	{
+		GetItemRect(index, rItem);
+	}
+
+	return rItem;
 }

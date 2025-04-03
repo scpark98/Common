@@ -35,9 +35,6 @@ CSCStatic::CSCStatic()
 	m_bFontBold		= false;
 	m_bFontUnderline= false;
 
-	m_nOutlineWidth	= 0;
-	m_crOutline		= 0;//RGB(255, 255, 255);
-
 	m_bBlink		= FALSE;
 	m_bBlinkStatus	= FALSE;
 	m_nBlinkTime0	= 400;
@@ -141,18 +138,28 @@ void CSCStatic::OnPaint()
 
 	CMemoryDC	dc(&dc1, &rc);
 	Gdiplus::Graphics g(dc.GetSafeHdc());
+	Gdiplus::GraphicsPath	roundPath;
+
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	if (m_round > 0)
+		get_round_rect_path(&roundPath, CRectTogpRect(rc), m_round);
 
 	//투명 모드이면 배경도 안칠하고 글자도 배경색 없이 출력된다.
 	dc.SetBkMode(TRANSPARENT);
-	
-	if (m_transparent)
+
+	if (m_round > 0 || m_transparent)
 	{
+		dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
+		/*
 		CRect Rect;
 		GetWindowRect(&Rect);
 		CWnd* pParent = GetParent();
 		ASSERT(pParent);
 		pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
 		//copy what's on the parents at this point
+		/*
 		CDC* pDC = pParent->GetDC();
 		CDC MemDC;
 		CBitmap bmp;
@@ -164,6 +171,7 @@ void CSCStatic::OnPaint()
 		MemDC.SelectObject(pOldBmp);
 		pParent->ReleaseDC(pDC);
 		MemDC.DeleteDC();
+		*/
 	}
 	
 	if (m_img_back.is_valid() && !m_img_back.is_animated_gif())
@@ -189,8 +197,15 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
-			if (!m_transparent)
+			if (m_transparent || m_round > 0)
+			{
+				Gdiplus::SolidBrush brush(m_cr_back);
+				g.FillPath(&brush, &roundPath);
+			}
+			else
+			{
 				dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+			}
 
 			if (m_bSunken)
 			{
@@ -270,8 +285,8 @@ void CSCStatic::OnPaint()
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
-			rIcon.left = rc.right - szText.cx - szImg.cx - 2 - m_nOutlineWidth * 2;
-			m_rect_text.left = rIcon.left + szImg.cx + 2 + m_nOutlineWidth;
+			rIcon.left = rc.right - szText.cx - szImg.cx - 2;
+			m_rect_text.left = rIcon.left + szImg.cx + 2;
 		}
 		else
 		{
@@ -321,8 +336,8 @@ void CSCStatic::OnPaint()
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
-			rImg.left = rc.right - szText.cx - szImg.cx - 2 - m_nOutlineWidth * 2;
-			m_rect_text.left = rImg.left + szImg.cx + 2 + m_nOutlineWidth;
+			rImg.left = rc.right - szText.cx - szImg.cx - 2;
+			m_rect_text.left = rImg.left + szImg.cx + 2;
 		}
 		else
 		{
@@ -399,32 +414,32 @@ void CSCStatic::OnPaint()
 
 		if (!m_bBlinkStatus)
 		{
-			if (m_nOutlineWidth > 0)
-			{
-				dc.SetTextColor(m_crOutline.ToCOLORREF());
-
-				for (int x = -m_nOutlineWidth; x <= m_nOutlineWidth; ++x)
-				{
-					for (int y = -m_nOutlineWidth; y <= m_nOutlineWidth; ++y)
-					{
-						//dc.TextOut(10 + x, 10 + y, str, str.GetLength());
-						CRect	rOffset = m_rect_text;
-						rOffset.OffsetRect(x, y);
-						dc.DrawText(sSpace + m_text, rOffset, dwText);
-					}
-				}
-
-				dc.SetTextColor(m_cr_text.ToCOLORREF());
-			}
-
 			dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
 		}
 	}
 
+	if (m_draw_border)
+	{
+		TRACE(_T("draw_border\n"));
+		if (m_round > 0)
+			draw_round_rect(&g, CRectTogpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+		else
+			draw_rectangle(g, rc, m_gcr_border);
+	}
 
 	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
 	// Select old font
 	dc.SelectObject(pOldFont);
+}
+
+void CSCStatic::set_transparent(bool transparent, Gdiplus::Color cr_parent_back)
+{
+	m_transparent = transparent;
+
+	if (cr_parent_back.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_parent_back = cr_parent_back;
+
+	Invalidate();
 }
 
 CRect CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
@@ -779,6 +794,25 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 	Invalidate();
 }
 
+void CSCStatic::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	gcr_parent_back)
+{
+	if (round < 0)
+		round = 0;
+
+	m_round = round;
+
+	if (gcr_border.GetValue() != Gdiplus::Color::Transparent)
+	{
+		m_draw_border = true;
+		m_gcr_border = gcr_border;
+	}
+
+	if (m_round > 0)
+		set_transparent(true, gcr_parent_back);
+	else
+		Invalidate();
+}
+
 void CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
@@ -886,6 +920,16 @@ void CSCStatic::set_text_color(Gdiplus::Color crTextColor)
 {
 	m_cr_text = crTextColor;
 	update_surface();
+	Invalidate();
+}
+
+void CSCStatic::set_back_color(Gdiplus::Color cr_back)
+{
+	m_cr_back = cr_back;
+
+	if (m_round <= 0)
+		m_transparent = false;
+
 	Invalidate();
 }
 

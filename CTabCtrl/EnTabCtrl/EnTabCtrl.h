@@ -41,6 +41,7 @@ public:
 	CEnTabCtrl();
 
 	static void EnableCustomLook(BOOL bEnable = TRUE, DWORD dwStyle = ETC_FLAT | ETC_COLOR | ETC_SELECTION | ETC_GRADIENT | ETC_BACKTABS);
+	CRect		get_item_rect(int index);
 
 // Attributes
 public:

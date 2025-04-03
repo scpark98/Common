@@ -2885,10 +2885,11 @@ ZRESULT ZipAddHandle(HZIP hz, const TCHAR* dstzn, HANDLE h) { return ZipAddInter
 ZRESULT ZipAddHandle(HZIP hz, const TCHAR* dstzn, HANDLE h, unsigned int len) { return ZipAddInternal(hz, dstzn, h, len, ZIP_HANDLE); }
 ZRESULT ZipAddFolder(HZIP hz, const TCHAR* dstzn) { return ZipAddInternal(hz, dstzn, 0, 0, ZIP_FOLDER); }
 
-//scpark add 지정된 폴더의 파일들을 모두 압축한다.
+//scpark add.
+//지정된 폴더의 파일들을 모두 압축한다.
 //zip_folder_name이 "Log"라면 압축파일 안에 "Log" 폴더를 생성한 후 폴더/파일들이 추가된다.
 //dq의 모든 파일들은 root_dir 폴더 및 그 하위폴더에 존재해야 한다.
-ZRESULT ZipAddFiles(CString zip_folder_name, CString root_dir, std::deque<CString> &dq, CString zip_path)
+ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::deque<CString> &dq, CString zip_path)
 {
 	HZIP hz;
 	ZRESULT zr = ZR_OK;
@@ -2899,8 +2900,8 @@ ZRESULT ZipAddFiles(CString zip_folder_name, CString root_dir, std::deque<CStrin
 	CString		folder_in_zip;
 	CFileFind	finder;
 
-	if (!zip_folder_name.IsEmpty())
-		zr = ZipAddFolder(hz, zip_folder_name);
+	if (!folder_name_in_zip.IsEmpty())
+		zr = ZipAddFolder(hz, folder_name_in_zip);
 
 	if (root_dir.Right(1) != _T("\\"))
 		root_dir += _T("\\");
@@ -2927,10 +2928,10 @@ ZRESULT ZipAddFiles(CString zip_folder_name, CString root_dir, std::deque<CStrin
 		}
 		else
 		{
-			if (!zip_folder_name.IsEmpty())
+			if (!folder_name_in_zip.IsEmpty())
 			{
-				zr = ZipAddFolder(hz, zip_folder_name + _T("\\") + folder_in_zip);
-				file = zip_folder_name + _T("\\") + file;
+				zr = ZipAddFolder(hz, folder_name_in_zip + _T("\\") + folder_in_zip);
+				file = folder_name_in_zip + _T("\\") + file;
 			}
 			else
 			{

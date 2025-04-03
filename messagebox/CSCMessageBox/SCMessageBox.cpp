@@ -56,7 +56,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, int cx, in
 	m_as_modal = false;
 	m_parent = parent;
 	m_title = title;
-	m_hIcon = load_icon(NULL, icon_id, 20, 20);
+	m_hIcon = load_icon(NULL, icon_id, 16, 16);
 
 	if (cx < 0 || cy < 0)
 	{
@@ -317,6 +317,8 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	//return CDialogEx::DoModal();
 
+	KillTimer(timer_timeout);
+	m_response = -1;
 	m_as_modal = true;
 
 	if (!msg.IsEmpty())
@@ -333,8 +335,6 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 
 	MSG		stmsg;
 
-	m_response = -1;
-
 	//for Modal Dialog
 	m_parent->EnableWindow(FALSE);
 
@@ -342,7 +342,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 	{
 		while (PeekMessage(&stmsg, NULL, 0, 0, PM_REMOVE))
 		{
-			TRACE("GetFocus() = %p, tick = %d\n", GetFocus(), GetTickCount());
+			//TRACE("GetFocus() = %p, tick = %d\n", GetFocus(), GetTickCount());
 			if (stmsg.message == WM_KEYDOWN || stmsg.message == WM_KEYUP)
 			{
 				GetFocus()->PreTranslateMessage(&stmsg);
@@ -357,10 +357,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 
 	m_parent->EnableWindow(TRUE);
 
-	if (m_response == IDOK)
-		CDialog::OnOK();
-	else if (m_response == IDCANCEL)
-		CDialog::OnCancel();
+	EndDialog(m_response);
 
 	return m_response;
 }

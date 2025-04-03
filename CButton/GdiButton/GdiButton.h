@@ -311,7 +311,9 @@ public:
 	void		Offset(int x, int y);
 	void		Inflate(int cx, int cy);
 	void		Inflate(int l, int t, int r, int b);
-	void		set_round(int round);
+
+	//gcr_border, gcr_parent_back은 Gdiplus::Color::Transparent가 아닐 경우에만 적용된다.
+	void		set_round(int round, Gdiplus::Color gcr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
 
 	//포커스 사각형 관련
 	void		ShowFocusRect( bool bShow = true ) { m_draw_focus_rect = bShow; Invalidate(); }
@@ -326,10 +328,10 @@ public:
 	void		down_offset(CPoint offset) { m_down_offset = offset; Invalidate(); }
 	void		down_offset(int offset) { m_down_offset = CPoint(offset, offset); Invalidate(); }
 
-	//border. thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
+//border. thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
 	void		draw_border(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 
-	//3D, sunken 
+//3D, sunken 
 	void		use_3D_rect(bool use = true) { m_b3DRect = use; Invalidate(); }
 
 	//투명 버튼의 경우 그림자를 표시한다.
@@ -339,16 +341,15 @@ public:
 	//draw_shadow(true, 5.0f, -1.0f);라고 주면 m_shadow_weight는 갱신되지만 m_blur_sigma값은 변경되지 않는다.
 	void		draw_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 4.0f);
 
-	//blink
+//blink
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown
 	void		set_blink(bool blink = true);
 
-	void		use_tooltip(bool use) { m_use_tooltip = use; }
+//tooltip
 	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.
-	//따라서 tooltip은 가능한 한 main에서 처리하도록 한다.
-	void		set_tooltip_text(CString text);
+	//따라서 tooltip은 결국 parent에서 처리하도록 한다.
 
-	//auto repeat
+//auto repeat
 	void		set_auto_repeat(bool use = true);
 	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
 
@@ -475,7 +476,7 @@ protected:
 	float		m_blur_sigma = 5.0f;
 
 	bool		m_draw_border = false;
-	Gdiplus::Color m_cr_border = Gdiplus::Color::DimGray;
+	Gdiplus::Color m_gcr_border = Gdiplus::Color::DimGray;
 	int			m_border_thick = 1;
 
 	bool		m_blink = false;
@@ -492,19 +493,7 @@ protected:
 
 	void		reconstruct_font();
 
-	//enable상태일때는 잘 표시되나 disable일때는 표시되지 않는다.
-	//이를 해결하려면 parent의 PreTranslateMessage()에서 처리해야 한다.
-	CToolTipCtrl *m_tooltip = NULL;
-	CToolTipCtrl m_tooltip1;
-	bool		m_use_tooltip = true;
-	CString		m_tooltip_text = _T("");
-	//정적으로 만든 버튼은 문제없으나 동적으로 버튼을 만드는 경우
-	//PreSubclassWindow()에서 툴팁을 초기화하려니 예외가 발생함.
-	//그래서 Create()후에 별도로 prepare_tooltip()을 호출하여 준비되도록 수정.
-	void		prepare_tooltip();
-
-
-	//auto repeat
+//auto repeat
 	int			m_initial_delay = 1;
 	int			m_repeat_delay = 500;
 	bool		m_use_auto_repeat = false;
@@ -529,5 +518,4 @@ public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
-	afx_msg BOOL OnToolTipNotify(UINT id, NMHDR* pNMHDR, LRESULT* pResult);
 };

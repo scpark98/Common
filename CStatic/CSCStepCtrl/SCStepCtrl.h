@@ -2,6 +2,8 @@
 
 #include <afxwin.h>
 #include <deque>
+
+#include "../../colors.h"
 #include "../../GdiplusBitmap.h"
 
 // CSCStepCtrl
@@ -94,10 +96,10 @@ public:
 			m_step[i].text = texts[i];
 	}
 
-	//thumb와 text의 색상을 모두 변경한다.
-	void			set_step_color(int index, Gdiplus::Color cr);
-	void			set_thumb_color(int index, Gdiplus::Color cr);
-	void			set_text_color(int index, Gdiplus::Color cr);
+	//thumb와 text의 색상을 모두 변경한다. cr_current가 투명이면 m_cr_text_current, m_cr_thumb_current 값은 변경하지 않는다.
+	void			set_step_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current = Gdiplus::Color::Transparent);
+	void			set_thumb_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current = Gdiplus::Color::Transparent);
+	void			set_text_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current = Gdiplus::Color::Transparent);
 
 	//특정 step의 thumb와 text의 색상을 리셋시키고 기본색을 사용하게 한다.
 	//index == -1이면 모든 스텝 리셋
@@ -124,7 +126,7 @@ protected:
 	std::deque<CSCStepElement> m_step;
 
 //color
-	Gdiplus::Color	m_cr_back;	//보통 dlg를 만들면 배경이 GetSysColor(COLOR_3DFACE)인데 이 값을 여기서는 초기화 할 수 없고 생성자에서 해야 함.
+	Gdiplus::Color	m_cr_back = get_sys_color(COLOR_3DFACE);
 
 	Gdiplus::Color	m_cr_text_active = Gdiplus::Color::RoyalBlue;
 	Gdiplus::Color	m_cr_text_current = Gdiplus::Color::Blue;

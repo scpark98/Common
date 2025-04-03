@@ -502,5 +502,7 @@ int				get_hue(COLORREF cr);
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
 CString			get_color_name_of_closest(COLORREF cr, COLORREF *cr_closest = NULL);
 
+Gdiplus::Color	get_sys_color(int index);
+
 extern COLORREF g_default_color[16];
 #endif

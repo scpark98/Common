@@ -34,9 +34,6 @@ CGdiButton::CGdiButton()
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
-	EnableToolTips(true);
-	EnableTrackingToolTips(true);
-
 	//매트릭스는 CGdiplusBitmap으로 이동할것!
 	m_grayMatrix = {
 		0.299f, 0.299f, 0.299f, 0.00f, 0.00f,
@@ -66,9 +63,6 @@ CGdiButton::CGdiButton()
 
 CGdiButton::~CGdiButton()
 {
-	if (m_tooltip)
-		delete m_tooltip;
-
 	release_all();
 }
 
@@ -76,7 +70,6 @@ CGdiButton::~CGdiButton()
 BOOL CGdiButton::create(CString caption, DWORD dwStyle, CRect r, CWnd* parent, UINT button_id)
 {
 	BOOL res = Create(caption, dwStyle, r, parent, button_id);
-	//prepare_tooltip();
 	return res;
 }
 
@@ -134,7 +127,6 @@ BEGIN_MESSAGE_MAP(CGdiButton, CButton)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
-	//ON_NOTIFY_EX(TTN_NEEDTEXT, 0, &CGdiButton::OnToolTipNotify)
 END_MESSAGE_MAP()
 
 
@@ -693,67 +685,7 @@ void CGdiButton::PreSubclassWindow()
 
 	reconstruct_font();
 
-	//prepare_tooltip();
-
 	CButton::PreSubclassWindow();
-}
-
-void CGdiButton::prepare_tooltip()
-{
-	if (m_tooltip)
-	{
-		m_tooltip->DestroyWindow();
-		delete m_tooltip;
-	}
-
-	m_tooltip = new CToolTipCtrl();
-
-	try
-	{
-		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
-	}
-	catch (CException*)
-	{
-		CString str = get_last_error_string(GetLastError());
-	}
-
-	m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);
-	m_tooltip->SetDelayTime(TTDT_INITIAL, 0);
-	m_tooltip->SetDelayTime(TTDT_RESHOW, 0);
-	m_tooltip->SetMaxTipWidth(400);
-	m_tooltip->AddTool(this, _T(""));
-	m_tooltip->Activate(TRUE);
-	EnableToolTips(TRUE);
-	EnableTrackingToolTips(TRUE);
-
-	//TOOLINFO ti;
-	//ti.cbSize = TTTOOLINFOW_V2_SIZE;// sizeof(TOOLINFO);
-	//ti.uFlags = TTF_IDISHWND | TTF_TRACK | TTF_ABSOLUTE;
-	//ti.rect.left = ti.rect.top = ti.rect.bottom = ti.rect.right = 0;
-	//ti.hwnd = GetParent()->GetSafeHwnd();
-	//ti.uId = (UINT)GetSafeHwnd();
-	//ti.hinst = AfxGetInstanceHandle();
-	//ti.lpszText = (LPTSTR)_T("skldfjkl");
-
-	//SendMessage(TTM_ADDTOOL, 0, (LPARAM)&ti);
-	//SendMessage(TTM_TRACKACTIVATE, TRUE, (LPARAM)&ti);
-
-	//EnableTrackingToolTips(TRUE);
-	//m_tooltip->Activate(true);
-}
-
-void CGdiButton::set_tooltip_text(CString text)
-{
-	m_tooltip_text = text;
-
-	if (!text.IsEmpty())
-		m_use_tooltip = true;
-
-	if (!m_tooltip)
-		return;
-
-	m_tooltip->UpdateTipText(m_tooltip_text, this);
-	m_tooltip->AddTool(this, m_tooltip_text);
 }
 
 
@@ -771,32 +703,13 @@ void CGdiButton::reconstruct_font()
 BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-
-	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
-	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
-	//이 코드는 main에 있어야만 disable 상태일때도 잘 표시된다.
-	if (m_use_tooltip && m_tooltip && m_tooltip->m_hWnd)
-	{
-		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
-		MSG msg = *pMsg;
-		msg.hwnd = (HWND)m_tooltip->SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
-
-		CPoint pt = msg.pt;
-
-		if (msg.message >= WM_MOUSEFIRST && msg.message <= WM_MOUSELAST)
-			::ScreenToClient(msg.hwnd, &pt);
-
-		msg.lParam = MAKELONG(pt.x, pt.y);
-
-		// relay mouse event before deleting old tool 
-		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
-	}
-
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		switch (pMsg->wParam)
 		{
 			case VK_SPACE :
+				redraw_window();
+				Wait(50);
 				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONDOWN)), 0);
 				break;
 		}
@@ -806,6 +719,8 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		switch (pMsg->wParam)
 		{
 			case VK_SPACE:
+				redraw_window();
+				Wait(50);
 				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
 				break;
 		}
@@ -862,7 +777,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//만약 parent에 배경색이나 배경 그림이 있고
 	//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
 	//
-	if (false)//m_transparent)
+	if (m_transparent)
 	{
 		//버튼의 위치를 얻어온다.
 		CRect rbutton;
@@ -875,7 +790,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_img_parent != NULL && m_img_parent->is_valid())
 		{
 		}
-		else
+		else if (m_image.size() > 0)
 		{
 			//dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
 			CDC* pDC = pParent->GetDC();
@@ -889,6 +804,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			MemDC.SelectObject(pOldBmp);
 			pParent->ReleaseDC(pDC);
 			MemDC.DeleteDC();
+		}
+		else if (m_round > 0)
+		{
+			dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
 		}
 		/*
 		cr_back = Gdiplus::Color::Transparent;
@@ -1206,15 +1125,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round > 0)
 			draw_round_rect(&g, CRectTogpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
-			draw_rectangle(g, rc, m_cr_border);
+			draw_rectangle(g, rc, m_gcr_border);
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
 		TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRectTogpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			draw_round_rect(&g, CRectTogpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
-			draw_rectangle(g, rc, m_cr_border);
+			draw_rectangle(g, rc, m_gcr_border);
 	}
 
 
@@ -1523,15 +1442,21 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	redraw_window();
 }
 
-void CGdiButton::set_round(int round)
+void CGdiButton::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	gcr_parent_back)
 {
 	if (round < 0)
 		round = 0;
 
 	m_round = round;
 
+	if (gcr_border.GetValue() != Gdiplus::Color::Transparent)
+	{
+		m_draw_border = true;
+		m_gcr_border = gcr_border;
+	}
+
 	if (m_round > 0)
-		set_transparent(true);
+		set_transparent(true, gcr_parent_back);
 	else
 		redraw_window();
 }
@@ -1775,7 +1700,7 @@ void CGdiButton::set_hover_rect_color(Gdiplus::Color cr)
 void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr)
 {
 	m_draw_border = draw;
-	m_cr_border = cr;
+	m_gcr_border = cr;
 
 	if (thick > 0)
 		m_border_thick = thick;
@@ -2027,96 +1952,6 @@ void CGdiButton::apply_effect_blur(int state_index, float radius, BOOL expandEdg
 	redraw_window();
 }
 
-BOOL CGdiButton::OnToolTipNotify(UINT /*id*/, NMHDR* pNMHDR, LRESULT* /*pResult*/)
-{
-	TOOLTIPTEXT* pTTT = (TOOLTIPTEXT*)pNMHDR;
-	TOOLTIPTEXTA* pTTTA = (TOOLTIPTEXTA*)pNMHDR;
-	TOOLTIPTEXTW* pTTTW = (TOOLTIPTEXTW*)pNMHDR;
-	CString strTipText = "";
-	CString rString = "";
-	UINT nID = pNMHDR->idFrom;
-
-	ASSERT(pNMHDR->code == TTN_NEEDTEXTA || pNMHDR->code == TTN_NEEDTEXTW);
-
-	// if there is a top level routing frame then let it handle the message
-	if (GetRoutingFrame() != NULL) return FALSE;
-
-
-	// to be through we will need to handle UNICODE versions of the message also !!
-	if (pNMHDR->code == TTN_NEEDTEXTA && (pTTTA->uFlags & TTF_IDISHWND) ||
-		pNMHDR->code == TTN_NEEDTEXTW && (pTTTW->uFlags & TTF_IDISHWND))
-	{
-		// idFrom is actually the HWND of the tool
-		UINT nIdentifier = ::GetDlgCtrlID((HWND)pNMHDR->idFrom);
-
-		pTTT->lpszText = NULL;
-
-		//set tooltips for buttons
-		/*
-		switch (nIdentifier)
-		{
-		case IDC_STARTALL: // use the resource ID's of control that need text
-			pTTT->lpszText = "Start all messages";
-			break;
-
-		case IDC_STOPALL:
-			pTTT->lpszText = "Stop all messages";
-			break;
-
-		case IDC_STARTSELECTED:
-			pTTT->lpszText = "Start selected messages";
-			break;
-
-		case IDC_STOPSELECTED:
-			pTTT->lpszText = "Stop selected messages";
-			break;
-
-		case IDC_EDITITEM:
-			pTTT->lpszText = "Edit selected item";
-			break;
-
-		case IDC_APPLY_ADD:
-			GetDlgItem(IDC_APPLY_ADD)->GetWindowText(rString);
-			if (rString == "Add Message") pTTT->lpszText = "Add message to list";
-			else if (rString == "Apply Changes") pTTT->lpszText = "Apply changes";
-			break;
-		}
-		*/
-		if (pTTT->lpszText != NULL)
-			return TRUE; // there is text to display
-	}
-
-	//set tooltips for toolbar
-	if (nID != 0) // will be zero on a separator
-	{
-		strTipText.LoadString(nID);
-
-#ifndef _UNICODE
-		if (pNMHDR->code == TTN_NEEDTEXTA)
-		{
-			lstrcpyn(pTTTA->szText, strTipText, sizeof(pTTTA->szText));
-		}
-		else
-		{
-			_mbstowcsz(pTTTW->szText, strTipText, sizeof(pTTTW->szText));
-		}
-#else
-		if (pNMHDR->code == TTN_NEEDTEXTA)
-		{
-			_wcstombsz(pTTTA->szText, strTipText, sizeof(pTTTA->szText));
-		}
-		else
-		{
-			lstrcpyn(pTTTW->szText, strTipText, sizeof(pTTTW->szText));
-		}
-#endif
-
-		// bring the tooltip window above other popup windows
-		::SetWindowPos(pNMHDR->hwndFrom, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE |
-			SWP_NOSIZE | SWP_NOMOVE | SWP_NOOWNERZORDER); return TRUE;
-	}
-	return FALSE;
-}
 
 void CGdiButton::set_auto_repeat(bool use)
 {

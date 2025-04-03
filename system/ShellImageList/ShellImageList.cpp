@@ -205,7 +205,7 @@ int CShellImageList::GetSystemImageListIcon(int index, CString szFile, BOOL bDri
 
 UINT CShellImageList::get_drive_type(int index, CString path)
 {
-	if (index >= m_volume.size() || path.IsEmpty())
+	if (index >= (int)m_volume.size() || path.IsEmpty())
 		return DRIVE_UNKNOWN;
 
 	if (path.GetLength() == 1)
@@ -229,7 +229,7 @@ int CShellImageList::get_drive_index(int index, CString path)
 {
 	path = normalize_drive_path(path);
 
-	if (index >= m_volume.size() || path.IsEmpty())
+	if (index >= (int)m_volume.size() || path.IsEmpty())
 		return 0;
 
 	std::deque<CDiskDriveInfo>* drives = m_volume[index].get_drive_list();
@@ -378,7 +378,7 @@ int CShellImageList::GetVirtualImageListIcon(CString szExt)
 
 void CShellImageList::set_system_label(int index, std::map<int, CString>* map)
 {
-	if (index >= m_volume.size())
+	if (index >= (int)m_volume.size())
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_system_label(map);
@@ -386,7 +386,7 @@ void CShellImageList::set_system_label(int index, std::map<int, CString>* map)
 
 void CShellImageList::set_system_path(int index, std::map<int, CString>* map)
 {
-	if (index >= m_volume.size())
+	if (index >= (int)m_volume.size())
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_system_path(map);
@@ -394,7 +394,7 @@ void CShellImageList::set_system_path(int index, std::map<int, CString>* map)
 
 void CShellImageList::set_drive_list(int index, std::deque<CDiskDriveInfo>* drive_list)
 {
-	if (index >= m_volume.size())
+	if (index >= (int)m_volume.size())
 		m_volume.resize(index + 1);
 
 	m_volume[index].set_drive_list(drive_list);
@@ -402,7 +402,7 @@ void CShellImageList::set_drive_list(int index, std::deque<CDiskDriveInfo>* driv
 
 CString CShellImageList::get_system_label(int index, int csidl)
 {
-	if (index >= m_volume.size())
+	if (index >= (int)m_volume.size())
 		return _T("");
 
 	return m_volume[index].get_label(csidl);
@@ -410,7 +410,7 @@ CString CShellImageList::get_system_label(int index, int csidl)
 
 CString CShellImageList::get_system_path(int index, int csidl)
 {
-	if (index >= m_volume.size())
+	if (index >= (int)m_volume.size())
 		return _T("");
 
 	return m_volume[index].get_path(csidl);

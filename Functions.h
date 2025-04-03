@@ -401,6 +401,7 @@ public:
 	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
 	bool		is_https = true;
 	CString		body;					//post data(json format)
+	int			timeout_ms = 30000;
 
 	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
 	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
@@ -1222,8 +1223,12 @@ struct	NETWORK_INFO
 
 	//윈도우 운영체제에서 특정 폴더(다운로드, 내 문서 등)의 실제 경로를 리턴한다.
 	//FOLDERID_Downloads, FOLDERID_Documents, ...
-	CString get_known_folder(KNOWNFOLDERID folderID);
-	CString get_known_folder(int csidl);
+	CString		get_known_folder(KNOWNFOLDERID folderID);
+	CString		get_known_folder(int csidl);
+
+	//사용자 문서 폴더는 "C:\Users\user_id\Documents" 와 같이 윈도우 로그인 계정인 user_id에 따라 경로가 달라지므로
+	//"__user_documents_folder__"라는 키워드가 있다면 이를 "C:\Users\user_id\Documents"로 변경해준다.
+	CString		adjust_special_folder_path(CString path);
 
 //////////////////////////////////////////////////////////////////////////
 //네트워크, 인터넷

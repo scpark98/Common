@@ -74,10 +74,11 @@ ZRESULT ZipAddFolder(HZIP hz,const TCHAR *dstzn);
 
 #include <atlstr.h>	//for CString
 #include <deque>
+
 //scpark add 지정된 폴더내의 모든 파일들을 압축한다.
-//zip_folder_name이 "Log"라면 압축파일 안에 "Log" 폴더를 생성한 후 폴더/파일들이 추가된다.
+//folder_name_in_zip : 생성될 로그파일내에 별도 폴더를 생성할 것인지. ""이면 생성하지 않고 이 값이 "Log"라면 압축파일 안에 "Log" 폴더를 생성한 후 폴더/파일들이 추가된다.
 //dq의 모든 파일들은 root_dir 폴더 및 그 하위폴더에 존재해야 한다.
-ZRESULT ZipAddFiles(CString zip_folder_name, CString root_dir, std::deque<CString>& dq, CString zip_path);
+ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::deque<CString>& dq, CString zip_path);
 
 
 ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len);

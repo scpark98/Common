@@ -342,18 +342,18 @@ public:
 	//void	set_animation(HWND parenthWnd, int x, int y, float ratio = 1.0f, bool start = true);
 	//ratio를 유지하여 r안에 표시한다.
 	void	set_animation(HWND parenthWnd, CRect r, bool start = true);
-	void	move(int x = 0, int y = 0, int w = 0, int h = 0);
-	void	move(CRect r);
-	void	gif_back_color(COLORREF cr) { m_cr_back.SetFromCOLORREF(cr); }
-	void	gif_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
-	void	play_animation();
+	void	move_gif(int x = 0, int y = 0, int w = 0, int h = 0);
+	void	move_gif(CRect r);
+	void	set_gif_back_color(COLORREF cr) { m_cr_back.SetFromCOLORREF(cr); }
+	void	set_gif_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
+	void	play_gif();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void	pause_animation(int pos = 0);
+	void	pause_gif(int pos = 0);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-	void	stop_animation();
+	void	stop_gif();
 	void	goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void	goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
-	void	set_mirror(bool is_mirror = true) { m_is_gif_mirror = is_mirror; }
+	void	set_gif_mirror(bool is_mirror = true) { m_is_gif_mirror = is_mirror; }
 
 	//gif 프레임 이미지들을 지정된 폴더에 저장
 	bool	save_gif_frames(CString folder);

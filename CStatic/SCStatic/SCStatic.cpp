@@ -260,7 +260,7 @@ void CSCStatic::OnPaint()
 
 	//m_rect_text.SetRectEmpty();
 	dc.DrawText(sSpace + m_text, &m_rect_text, DT_CALCRECT);// | DT_WORDBREAK);
-	TRACE(_T("calcRect in static = %s\n"), get_rect_info_string(m_rect_text));
+	//TRACE(_T("calcRect in static = %s\n"), get_rect_info_string(m_rect_text));
 	szText.cx = m_rect_text.Width();// + m_nOutlineWidth * 2;
 	szText.cy = m_rect_text.Height();// + m_nOutlineWidth * 2;
 
@@ -420,14 +420,14 @@ void CSCStatic::OnPaint()
 
 	if (m_draw_border)
 	{
-		TRACE(_T("draw_border\n"));
+		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
 			draw_round_rect(&g, CRectTogpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
 			draw_rectangle(g, rc, m_gcr_border);
 	}
 
-	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
+	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
 	// Select old font
 	dc.SelectObject(pOldFont);
 }
@@ -531,35 +531,35 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 void CSCStatic::set_back_image_mirror(bool is_mirror)
 {
 	if (m_img_back.is_animated_gif())
-		m_img_back.set_mirror(is_mirror);
+		m_img_back.set_gif_mirror(is_mirror);
 	else
 		m_img_back.mirror();
 }
 
-void CSCStatic::play_animation()
+void CSCStatic::play_gif()
 {
 	if (!m_img_back.is_animated_gif())
 		return;
 
-	m_img_back.play_animation();
+	m_img_back.play_gif();
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCStatic::pause_animation(int pos)
+void CSCStatic::pause_gif(int pos)
 {
 	if (!m_img_back.is_animated_gif())
 		return;
 
-	m_img_back.pause_animation(pos);
+	m_img_back.pause_gif(pos);
 }
 
 //animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-void CSCStatic::stop_animation()
+void CSCStatic::stop_gif()
 {
 	if (!m_img_back.is_animated_gif())
 		return;
 
-	m_img_back.stop_animation();
+	m_img_back.stop_gif();
 }
 
 
@@ -843,21 +843,21 @@ void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *l
 		pOldFont = (CFont*)pDC->SelectObject(&font);
 
 		CSize sz = pDC->GetTextExtent(text);
-		TRACE(_T("sz.cx = %d, rc.width * %.1f = %.1f ~ rc.width * %.1f = %.1f\n"), sz.cx, lower, r.Width() * lower, upper, r.Width() * upper);
+		//TRACE(_T("sz.cx = %d, rc.width * %.1f = %.1f ~ rc.width * %.1f = %.1f\n"), sz.cx, lower, r.Width() * lower, upper, r.Width() * upper);
 		if (sz.cx > r.Width() * upper)
 		{
 			if (lf->lfHeight > -12)
 				break;
 
 			lf->lfHeight++;
-			TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
+			//TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
 			pDC->SelectObject(pOldFont);
 			font.DeleteObject();
 		}
 		else if (sz.cx < r.Width() * lower)
 		{
 			lf->lfHeight--;
-			TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
+			//TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
 			pDC->SelectObject(pOldFont);
 			font.DeleteObject();
 		}

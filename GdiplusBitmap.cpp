@@ -2290,7 +2290,7 @@ void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool a
 
 	m_paused = !auto_play;
 
-	play_animation();
+	play_gif();
 }
 
 void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
@@ -2303,7 +2303,7 @@ void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
 }
 
 
-void CGdiplusBitmap::move(int x, int y, int w, int h)
+void CGdiplusBitmap::move_gif(int x, int y, int w, int h)
 {
 	m_ani_sx = x;
 	m_ani_sy = y;
@@ -2311,13 +2311,13 @@ void CGdiplusBitmap::move(int x, int y, int w, int h)
 	m_ani_height = (h == 0 ? height : h);
 }
 
-void CGdiplusBitmap::move(CRect r)
+void CGdiplusBitmap::move_gif(CRect r)
 {
 	CRect fit = get_ratio_max_rect(CRect(r.left, r.top, r.left + r.Width(), r.top + r.Height()), width, height);
-	move(fit.left, fit.top, fit.Width(), fit.Height());
+	move_gif(fit.left, fit.top, fit.Width(), fit.Height());
 }
 
-void CGdiplusBitmap::play_animation()
+void CGdiplusBitmap::play_gif()
 {
 	if (m_run_thread_animation)
 	{
@@ -2345,7 +2345,7 @@ void CGdiplusBitmap::play_animation()
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CGdiplusBitmap::pause_animation(int pos)
+void CGdiplusBitmap::pause_gif(int pos)
 {
 	if (m_frame_count < 2 || !m_run_thread_animation)
 		return;
@@ -2366,7 +2366,7 @@ void CGdiplusBitmap::pause_animation(int pos)
 	}
 }
 
-void CGdiplusBitmap::stop_animation()
+void CGdiplusBitmap::stop_gif()
 {
 	if (m_frame_count < 2)
 		return;

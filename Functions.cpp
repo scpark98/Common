@@ -2825,7 +2825,7 @@ void request_url(CRequestUrlParams* params)
 	{
 		DWORD dwError = GetLastError();
 		params->status = dwError;
-		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_last_error_string(dwError, false));
+		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_error_str(dwError, false));
 		TRACE(_T("result = %s\n"), params->result);
 
 		SAFE_DELETE_ARRAY(jsonData);
@@ -7202,7 +7202,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 			if (bSuccess)
 				success++;
 			else
-				get_last_error_string(GetLastError(), true);
+				get_error_str(GetLastError(), true);
 		}
 	}
 
@@ -10992,7 +10992,7 @@ int get_process_running_count(CString processname)
 				}
 				else
 				{
-					TRACE(_T("fail to get OpenProcess(). %s\n"), get_last_error_string(false));
+					TRACE(_T("fail to get OpenProcess(). %s\n"), get_error_str(false));
 				}
 			}
 
@@ -11313,7 +11313,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	//	&pi)           // Pointer to PROCESS_INFORMATION structure
 	//	)
 	{
-		TRACE(_T("error = %s\n"), get_last_error_string(GetLastError()));
+		TRACE(_T("error = %s\n"), get_error_str(GetLastError()));
 		Wow64Disable(false);
 		return result;
 	}
@@ -11386,7 +11386,7 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 	if ((hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS)) == NULL)
 	{
 		res = GetLastError();
-		TRACE(_T("get_last_error_string = %s\n"), get_last_error_string(res));
+		TRACE(_T("get_error_str = %s\n"), get_error_str(res));
 		return res;
 	}
 
@@ -11436,7 +11436,7 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 	else
 	{
 		res = GetLastError();
-		TRACE(_T("get_last_error_string = %s\n"), get_last_error_string(res));
+		TRACE(_T("get_error_str = %s\n"), get_error_str(res));
 	}
 
 	//delete할 경우는 반드시 stop후에 delete해야 함.
@@ -11455,7 +11455,7 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 			else
 			{
 				res = GetLastError();
-				TRACE(_T("get_last_error_string = %s\n"), get_last_error_string(res));
+				TRACE(_T("get_error_str = %s\n"), get_error_str(res));
 			}
 		}
 
@@ -13470,9 +13470,10 @@ CSize GetPrinterPaperSize(CString sPrinterName)
 }
 
 //#include <system_error>>
-CString	get_last_error_string(DWORD dwError, bool show_msgBox)
+CString	get_error_str(DWORD dwError, bool show_msgBox)
 {
-	//std::string msg = std::system_category().message(dwError);
+	std::string msg = std::system_category().message(dwError);
+	return CString(msg.c_str());
 
 	LPTSTR lpBuffer = NULL;
 	CString result;

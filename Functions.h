@@ -1466,7 +1466,7 @@ void		SetWallPaper(CString sfile);
 	CString		GetDefaultPrinterName();
 	CSize		GetPrinterPaperSize(CString sPrinterName);
 
-	CString		get_last_error_string(DWORD dwError, bool show_msgBox = false);
+	CString		get_error_str(DWORD dwError, bool show_msgBox = false);
 
 //////////////////////////////////////////////////////////////////////////
 //날짜/시간 date, time 

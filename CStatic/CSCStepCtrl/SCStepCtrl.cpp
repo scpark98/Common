@@ -189,7 +189,7 @@ void CSCStepCtrl::OnPaint()
 		//각 스텝 사이의 라인을 그려준다.
 		if (i > 0)
 		{
-			Gdiplus::Pen pen_line(cr_line, 1.7f);
+			Gdiplus::Pen pen_line(cr_thumb, 1.7f);
 
 			if (m_horz)
 			{

@@ -1604,10 +1604,26 @@ CString	get_time_str(double dSec, bool bHasHour /*= true*/, bool bMilliSec /*=fa
 	return str;
 }
 
+//185초일 경우 "3m 5s"를 리턴한다.
+CString	get_remain_time_str(int seconds, bool include_sec)
+{
+	int		hour = (seconds / 60 / 60);
+	int		minute = (seconds / 60) % 60;
+	int		second = (seconds % 60);
+	CString	str;
+
+	if (include_sec)
+		str.Format(_T("%dh %dm %ds"), hour, minute, second);
+	else
+		str.Format(_T("%dh %dm"), hour, minute);
+
+	return str;
+}
+
 //원래 double dSec를 사용하여 위의 함수를 사용했으나 소수점 표시 방식의 오류가 존재하므로
 //1.0이어야 할 값이 0.999999999998 과 같이 표현되어 위의 함수를 사용할 수 없을 경우가 있다.
 //그래서 아예 millisecond값도 int로 간주하여 처리한 아래 함수를 사용한다.
-CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour, bool bHasMilliSec)
+CString	GetTimeStringFromMilliSeconds(int ms, bool bHasHour, bool bHasMilliSec)
 {
 	bool minus = false;
 
@@ -15251,7 +15267,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pWnd || !pWnd->m_hWnd || pWnd->IsWindowVisible() == false || pWnd->IsIconic())
 	{
-		TRACE(_T("[warning] SaveWindowPosition"));
+		TRACE(_T("[warning] SaveWindowPosition() just return because pWnd is invalid.\n"));
 		return;
 	}
 
@@ -19114,3 +19130,80 @@ bool is_VMWare()
 	return false;
 }
 #endif
+
+//https://stackoverflow.com/questions/1956790/how-to-get-the-icon-of-a-file-in-c
+HICON ExtractShellIcon(int nIndex, bool bLargeIcons)
+{
+	HICON hIcon = NULL;
+
+	// Shell icons can be customized by the registry:
+
+	// HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\
+
+	// Explorer\Shell Icons
+
+	// "<ShellIconIndex>" = "<Filename>,<IconIndex>"
+
+	// E.g.
+
+	// "3" = "c:\MyFolderIcon.ico,1"
+
+	HKEY hkeyShellIcons;
+	if (RegOpenKeyEx(
+		HKEY_LOCAL_MACHINE,
+		_T("SOFTWARE\\Microsoft\\Windows\\
+			CurrentVersion\\Explorer\\Shell Icons"),
+			0,
+			KEY_READ,
+			&hkeyShellIcons) == ERROR_SUCCESS)
+	{
+		TCHAR szBuffer[MAX_PATH * sizeof TCHAR];
+		DWORD dwSize = MAX_PATH * sizeof TCHAR;
+
+		TCHAR szIndex[6] = { 0 };
+		_stprintf(szIndex, _T("%d"), nIndex);
+		if (RegQueryValueEx(hkeyShellIcons, szIndex,
+			NULL, NULL, (LPBYTE)szBuffer,
+			&dwSize) == ERROR_SUCCESS)
+		{
+#ifdef _AFXDLL
+			CString strFileName, strIndex;
+			VERIFY(AfxExtractSubString(strFileName,
+				szBuffer, 0, _T(',')));
+			VERIFY(AfxExtractSubString(strIndex,
+				szBuffer, 1, _T(',')));
+			ExtractIconEx(
+				strFileName,
+				nIndex,
+				bLargeIcons ? &hIcon : NULL,
+				bLargeIcons ? NULL : &hIcon,
+				1);
+#else
+			std::vector<std::tstring> ls;
+			tokenize(std::back_inserter(ls),
+				szBuffer, _T(","));
+			ExtractIconEx(
+				ls[0].c_str(),
+				atoi(ls[1].c_str()),
+				bLargeIcons ? &hIcon : NULL,
+				bLargeIcons ? NULL : &hIcon,
+				1);
+#endif
+		}
+
+		RegCloseKey(hkeyShellIcons);
+	}
+
+	// Not customized? Then get the original icon from
+
+	// shell23.dll
+
+	if (!hIcon)
+		ExtractIconEx(
+			_T("SHELL32.DLL"),
+			nIndex, bLargeIcons ? &hIcon : NULL,
+			bLargeIcons ? NULL : &hIcon,
+			1);
+
+	return hIcon;
+}

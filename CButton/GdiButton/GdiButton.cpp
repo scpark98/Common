@@ -767,7 +767,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
-	TRACE(_T("%s\n"), __function__);
+	//TRACE(_T("%s\n"), __function__);
 
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
@@ -1271,7 +1271,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 	m_is_hover = true;
 	redraw_window();
 
-	TRACE(_T("hover\n"));
+	//TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSEHOVER)), 0);
 
@@ -1289,7 +1289,7 @@ void CGdiButton::OnMouseLeave()
 	m_is_hover = false;
 	redraw_window();
 
-	TRACE(_T("leave\n"));
+	//TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSELEAVE)), 0);
 
@@ -1654,6 +1654,7 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 				SetCheck((m_idx = 1));
 			}
 
+			TRACE(_T("GetDlgCtrlID() = %d\n"), GetDlgCtrlID());
 			GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
 		}

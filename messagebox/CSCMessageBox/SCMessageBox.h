@@ -1,5 +1,21 @@
 ﻿#pragma once
 
+/*
+* 20250330 scpark
+  - AfxMessageBox(), ::MessageBox를 사용하면 타이틀바 커스텀이 불가하므로 새로 구현함.
+  - Resource에 IDD_ 와 같은 리소스가 필요없이 동적 생성함.
+  - 사용법 및 옵션은 대부분 AfxMessageBox()와 동일함.
+  - ColorTheme 역시 CColorTheme을 공통으로 사용하므로
+	parent의 ColorTheme을 설정해주면 parent와 동일한 테마로 동작함.
+  - 사용법은 아래와 같음.
+	* parent의 .h에 CSCMessageBox m_message;를 선언해서 사용해도 되고
+	  매번 사용할 때마다 인스턴스 선언 후 dlg.DoModal()을 호출해도 된다.
+	1.AfxMessageBox()와 같이 Modal()로 띠울 경우
+	  
+
+* 
+*/
+
 #include "afxdialogex.h"
 
 #include "../../colors.h"
@@ -7,11 +23,32 @@
 #include "../../CStatic/SCStatic/SCStatic.h"
 
 // CSCMessageBox 대화 상자
-#define DEFAULT_SIZE_CX				400
+#define DEFAULT_SIZE_CX				440
 #define DEFAULT_SIZE_CY				240
 #define DEFAULT_BUTTON_CX			84
 #define DEFAULT_BUTTON_CY			28
 #define DEFAULT_TITLE_HEIGHT		24
+
+#define TOTAL_BUTTON_COUNT			12
+#define SC_BUTTON_ID				(WM_USER + 123)	//#define의 계산식은 반드시 괄호로 묶어주는 것을 잊지 않아야 한다.
+
+/*
+* 각 버튼의 ID는 winuser.h에 정의된 것과 동일하게 사용한다.
+#define IDOK                1
+#define IDCANCEL            2
+#define IDABORT             3
+#define IDRETRY             4
+#define IDIGNORE            5
+#define IDYES               6
+#define IDNO                7
+#if(WINVER >= 0x0400)
+#define IDCLOSE         8
+#define IDHELP          9
+#endif
+#if(WINVER >= 0x0500)
+#define IDTRYAGAIN      10
+#define IDCONTINUE      11
+*/
 
 class CSCMessageBox : public CDialogEx
 {
@@ -32,7 +69,7 @@ public:
 	void			set_title_height(int title_height) { m_title_height = title_height; }
 	void			set_icon(UINT icon_id);
 
-//표시할 메시지 및 옵션 설정
+//Modeless로 실행할 경우 호출. //실제 사용 시 MAX_WIDTH(800)를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
 	void			set_message(CString msg, int type = MB_OK, int timeout = 0, DWORD align = SS_CENTER | SS_CENTERIMAGE);
 	void			set_align(DWORD align);
 
@@ -63,9 +100,8 @@ protected:
 
 	CSCStatic		m_static_message;
 
-	CGdiButton		m_button_ok;
-	CGdiButton		m_button_cancel;
-	CGdiButton		m_button_retry;
+	CString			m_button_caption[TOTAL_BUTTON_COUNT];
+	CGdiButton		m_button[12];	//UNDEF(0), IDOK(1) ~ IDCONTINUE(11)
 	CGdiButton		m_button_quit;
 	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
 
@@ -92,6 +128,7 @@ public:
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedCancel();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	//실제 사용 시 MAX_WIDTH(800)를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
 	virtual INT_PTR DoModal(CString msg = _T(""), int type = MB_OK, int timeout = 0);
 	afx_msg void OnPaint();
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);

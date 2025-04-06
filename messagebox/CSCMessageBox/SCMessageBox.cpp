@@ -5,9 +5,9 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 
-#define MIN_WIDTH	280
-#define MAX_WIDTH	520
-#define MIN_HEIGHT	160
+#define MIN_SIZE_CX	320
+#define MAX_SIZE_CX	800
+#define MIN_SIZE_CY	160
 
 // CSCMessageBox 대화 상자
 
@@ -20,14 +20,17 @@ CSCMessageBox::CSCMessageBox(CWnd* parent, CString title, UINT icon_id, bool as_
 
 	m_as_modal = as_modal;
 	memset(&m_lf, 0, sizeof(LOGFONT));
+
 	create(parent, title, icon_id, cx, cy);
 }
 
 CSCMessageBox::~CSCMessageBox()
 {
-	m_button_ok.DestroyWindow();
-	m_button_cancel.DestroyWindow();
-	m_button_retry.DestroyWindow();
+	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
+	{
+		m_button[i].DestroyWindow();
+	}
+
 	m_button_quit.DestroyWindow();
 	m_static_message.DestroyWindow();
 
@@ -57,6 +60,18 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, int cx, in
 	m_parent = parent;
 	m_title = title;
 	m_hIcon = load_icon(NULL, icon_id, 16, 16);
+
+	m_button_caption[IDOK] = _T("확인");
+	m_button_caption[IDCANCEL] = _T("취소");
+	m_button_caption[IDABORT] = _T("중지");
+	m_button_caption[IDRETRY] = _T("재시도");
+	m_button_caption[IDIGNORE] = _T("무시");
+	m_button_caption[IDYES] = _T("예");
+	m_button_caption[IDNO] = _T("아니오");
+	m_button_caption[IDCLOSE] = _T("닫기");
+	m_button_caption[IDHELP] = _T("도움말");
+	m_button_caption[IDTRYAGAIN] = _T("다시 시도");
+	m_button_caption[IDCONTINUE] = _T("계속");
 
 	if (cx < 0 || cy < 0)
 	{
@@ -96,15 +111,15 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, int cx, in
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
-	m_button_ok.create(_T("Ok"), WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, 0);
-	m_button_ok.use_hover();
+	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
+	{
+		m_button[i].create(m_button_caption[i], WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, SC_BUTTON_ID + i);
+		m_button[i].use_hover();
+	}
 
-	m_button_cancel.create(_T("Cancel"), WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, 0);
-	m_button_cancel.use_hover();
-
-	m_button_retry.create(_T("Retry"), WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, 0);
-
-	m_button_quit.create(_T(""), WS_CHILD | WS_VISIBLE | BS_FLAT, CRect(rc.right - 2 - m_title_height, rc.top + 2, rc.right - 2, m_title_height - 1), this, 0);
+	//종료 버튼은 IDCLOSE가 아닌 IDCANCEL로 처리해야 한다.
+	m_button_quit.create(_T(""), WS_CHILD | WS_VISIBLE | BS_FLAT,
+						CRect(rc.right - 2 - m_title_height, rc.top + 2, rc.right - 2, m_title_height - 1), this, SC_BUTTON_ID + IDCANCEL);
 	m_button_quit.set_button_cmd(SC_CLOSE);
 	m_button_quit.set_text_color(m_theme.cr_title_text);
 	m_button_quit.set_back_color(m_theme.cr_title_back);
@@ -126,10 +141,10 @@ void CSCMessageBox::reconstruct_font()
 
 	SetFont(&m_font, true);
 
-	m_button_ok.set_font(&m_font);
-	m_button_cancel.set_font(&m_font);
-	m_button_retry.set_font(&m_font);
-	m_static_message.set_font(&m_font);
+	for (int i = 0; i < 12; i++)
+	{
+		m_button[i].set_font(&m_font);
+	}
 
 	ASSERT(bCreated);
 }
@@ -146,7 +161,6 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	m_timeout_sec = timeout_sec;
 	m_align = align;
 
-
 	CRect rc;
 	GetClientRect(rc);
 
@@ -158,7 +172,9 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	rc.top += m_title_height;
 
 	//메시지 너비, 높이에 따라 대화상자 크기를 재조정한다.
-	//최소 cx = 240, cy = 140이며 cx의 최대 크기는 800으로 제한한다. 이 값을 넘으면 DT_WORDBREAK를 넣어 다시 계산한다.
+	//최소 cx = 240, cy = 140이며 cx의 최대 크기는 800으로 제한한다.
+	//이 값을 넘으면 DT_WORDBREAK를 넣어 다시 계산하려 했으나 많이 복잡해진다. 우선 MAX_WIDTH로 제한한다.
+	//실제 사용 시 MAX_WIDTH를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
 	if (m_auto_size)
 	{
 		CRect rmsg(rc.left + gap_side, rc.top + gap, rc.Width() - gap_side * 2, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
@@ -169,16 +185,16 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		//DWORD dwText = m_static_message.get_text_align();
 		dc.DrawText(msg, rmsg, DT_CALCRECT);// | DT_WORDBREAK);
 
-		TRACE(_T("rmsg = %s\n"), get_rect_info_string(rmsg));
+		//TRACE(_T("rmsg = %s\n"), get_rect_info_string(rmsg));
 
 		//right, bottom을 줄 때는 dlg의 최소 크기를 고려한다.
-		rc.right = MAX(rmsg.Width() + gap_side * 2, MIN_WIDTH);// m_sz_button.cx * 2 + gap + button_gap * 2 + 40);
+		rc.right = MAX(rmsg.Width() + gap_side * 2, MIN_SIZE_CX);// m_sz_button.cx * 2 + gap + button_gap * 2 + 40);
 
 		//만약 최대 너비를 넘어간다면 DT_WORDBREAK를 주고 다시 계산해서 height를 늘리려했으나 많이 복잡해진다.
 		//그냥 메시지박스를 띠울 때 width가 max를
-		if (rc.right > MAX_WIDTH)
+		if (rc.right > MAX_SIZE_CX)
 		{
-			rc.right = MAX_WIDTH;
+			rc.right = MAX_SIZE_CX;
 			//CRect rtext = m_static_message.set_text(msg);
 			//rc.bottom = rc.top + rtext.Height();
 			//rmsg.right = rc.right;
@@ -191,7 +207,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		}
 		else
 		{
-			rc.bottom = MAX(rc.top + gap + rmsg.Height() + gap + m_sz_button.cy + bottom_gap, MIN_HEIGHT);
+			rc.bottom = MAX(rc.top + gap + rmsg.Height() + gap + m_sz_button.cy + bottom_gap, MIN_SIZE_CY);
 		}
 
 		dc.SelectObject(pOldFont);
@@ -205,27 +221,94 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	}
 
 	//버튼의 조합에 따라 버튼 위치를 재조정한다.
+	int x;
+	int button_count = 1;
+
 	if (type == MB_OKCANCEL)
 	{
-		int x = rc.CenterPoint().x + button_gap / 2;
-		m_button_cancel.MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		button_count = 2;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDOK].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 
-		x = rc.CenterPoint().x - button_gap / 2 - m_sz_button.cx;
-		m_button_ok.MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+	}
+	else if (type == MB_ABORTRETRYIGNORE)
+	{
+		button_count = 3;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDABORT].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDRETRY].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDIGNORE].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+	}
+	else if (type == MB_YESNOCANCEL)
+	{
+		button_count = 3;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDYES].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDNO].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+	}
+	else if (type == MB_YESNO)
+	{
+		button_count = 2;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDYES].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDNO].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+	}
+	else if (type == MB_RETRYCANCEL)
+	{
+		button_count = 2;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDRETRY].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+	}
+	else if (type == MB_CANCELTRYCONTINUE)
+	{
+		button_count = 3;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDTRYAGAIN].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDCONTINUE].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 	}
 	else //if (type == MB_OK)
 	{
-		int x = rc.CenterPoint().x - m_sz_button.cx / 2;
-		m_button_ok.MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		button_count = 1;
+		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
+		m_button[IDOK].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 	}
 
-	m_static_message.MoveWindow(rc.left + gap_side, rc.top + gap, rc.Width() - gap_side * 2, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
+	//아이콘의 크기만큼 좌측에서 떨어져서 메시지 본문이 표시된다.
+	m_static_message.MoveWindow(rc.left + gap_side + 32 + 8, rc.top + gap, rc.Width() - gap_side * 2 - 32 - 8, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
 	m_static_message.SetWindowText(m_message);
 	m_static_message.ModifyStyle(0, m_align);
 	m_static_message.ShowWindow(SW_SHOW);
 	
-	m_button_ok.ShowWindow(SW_SHOW);
-	m_button_cancel.ShowWindow(type == MB_OKCANCEL ? SW_SHOW : SW_HIDE);
+	m_button[IDOK].ShowWindow(type <= MB_OKCANCEL ? SW_SHOW : SW_HIDE);
+	m_button[IDCANCEL].ShowWindow(type == MB_OKCANCEL || type == MB_YESNOCANCEL ? SW_SHOW : SW_HIDE);
+	m_button[IDABORT].ShowWindow(type == MB_ABORTRETRYIGNORE ? SW_SHOW : SW_HIDE);
+	m_button[IDRETRY].ShowWindow(type == MB_RETRYCANCEL || type == MB_ABORTRETRYIGNORE ? SW_SHOW : SW_HIDE);
+	m_button[IDIGNORE].ShowWindow(type == MB_ABORTRETRYIGNORE ? SW_SHOW : SW_HIDE);
+	m_button[IDYES].ShowWindow(type == MB_YESNO || type == MB_YESNOCANCEL ? SW_SHOW : SW_HIDE);
+	m_button[IDNO].ShowWindow(type == MB_YESNO || type == MB_YESNOCANCEL ? SW_SHOW : SW_HIDE);
+	m_button[IDTRYAGAIN].ShowWindow(type == MB_CANCELTRYCONTINUE ? SW_SHOW : SW_HIDE);
+	m_button[IDCONTINUE].ShowWindow(type == MB_CANCELTRYCONTINUE ? SW_SHOW : SW_HIDE);
 
 	Invalidate();
 }
@@ -251,6 +334,10 @@ LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 	auto msg = (CGdiButtonMessage*)wParam;
 	if (msg->msg == WM_LBUTTONUP)
 	{
+		TRACE(_T("on_message_CGdiButton, WM_LBUTTONUP = %s\n"), m_button_caption[msg->ctrl_id - SC_BUTTON_ID]);
+		m_response = msg->ctrl_id - SC_BUTTON_ID;
+
+		/*
 		if (msg->pWnd == &m_button_ok)
 		{
 			m_response = IDOK;
@@ -269,6 +356,7 @@ LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 			if (!m_as_modal)
 				;// OnBnClickedRetry();
 		}
+		*/
 	}
 
 	return 0;
@@ -400,6 +488,13 @@ void CSCMessageBox::OnPaint()
 
 	dc.DrawText(title, rtitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 	dc.SelectObject(pOldFont);
+
+	WORD index = 161;
+	//HICON hIcon = ExtractAssociatedIcon(AfxGetInstanceHandle(), _T("C:\\Windows\\system32\\shell32.dll"), &index);
+
+	HICON hIcon = ExtractShellIcon(index);
+	//SHDefExtractIcon(_T("C:\\Windows\\system32\\shell32.dll"), index, 0, &hIcon, NULL, 0);
+	dc.DrawIcon(20, m_title_height + 20, hIcon);
 
 	//draw border
 	draw_rectangle(g, rc, Gdiplus::Color::DimGray);

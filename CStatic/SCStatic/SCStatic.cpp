@@ -746,6 +746,42 @@ BOOL CSCStatic::PreTranslateMessage(MSG* pMsg)
 	return CStatic::PreTranslateMessage(pMsg);
 }
 
+void CSCStatic::set_icon(HICON hIcon, int nSize)
+{
+	ICONINFO	iconInfo;
+
+	m_hIcon = hIcon;
+
+	::ZeroMemory(&iconInfo, sizeof(ICONINFO));
+	BOOL bRetValue = ::GetIconInfo(m_hIcon, &iconInfo);
+
+	if (bRetValue == false)
+		return;
+
+	m_szIcon.cx = nSize;//(DWORD)(iconInfo.xHotspot * 2);
+	m_szIcon.cy = nSize;//(DWORD)(iconInfo.yHotspot * 2);
+
+
+	//GetIconInfo 함수는 hbmMask와 hbmColor 비트맵을 생성하여 리턴하므로
+	//hbmMask와 hbmColor 비트맵을 해제해주어야 함. 그렇지 않으면 GDI개체가 계속 늘어남.
+	::DeleteObject(iconInfo.hbmMask);
+	::DeleteObject(iconInfo.hbmColor);
+
+
+	CRect	rc, rParentRect;
+
+	GetWindowRect(rc);
+
+	//컨트롤의 크기가 아이콘의 크기보다 작다면 컨트롤의 크기를 아이콘의 크기로 맞춰준다.
+	//단, 텍스트가 존재할 경우에는 추가적인 코딩이 필요하다.
+	if (m_hIcon && rc.Width() < nSize)
+		SetWindowPos(NULL, rc.left, rc.top, nSize, rc.Height(), SWP_NOZORDER | SWP_NOMOVE);
+	if (m_hIcon && rc.Height() < nSize)
+		SetWindowPos(NULL, rc.left, rc.top, rc.Width(), nSize, SWP_NOZORDER | SWP_NOMOVE);
+
+	Invalidate();
+}
+
 void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 {
 	if  (m_hWnd == NULL)
@@ -762,36 +798,7 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 	if (m_hIcon == NULL)
 		return;
 
-	ICONINFO	iconInfo;
-
-	::ZeroMemory(&iconInfo, sizeof(ICONINFO));
-	BOOL bRetValue = ::GetIconInfo(m_hIcon, &iconInfo);
-
-	if (bRetValue == false)
-		return;
-
-	m_szIcon.cx = nSize;//(DWORD)(iconInfo.xHotspot * 2);
-	m_szIcon.cy = nSize;//(DWORD)(iconInfo.yHotspot * 2);
-
-
-	//GetIconInfo 함수는 hbmMask와 hbmColor 비트맵을 생성하여 리턴하므로
-	//hbmMask와 hbmColor 비트맵을 해제해주어야 함. 그렇지 않으면 GDI개체가 계속 늘어남.
- 	::DeleteObject(iconInfo.hbmMask);
- 	::DeleteObject(iconInfo.hbmColor);
-
-
-	CRect	rc, rParentRect;
-
-	GetWindowRect(rc);
-
-	//컨트롤의 크기가 아이콘의 크기보다 작다면 컨트롤의 크기를 아이콘의 크기로 맞춰준다.
-	//단, 텍스트가 존재할 경우에는 추가적인 코딩이 필요하다.
-	if (m_hIcon && rc.Width() < nSize)
-		SetWindowPos(NULL, rc.left, rc.top, nSize, rc.Height(), SWP_NOZORDER | SWP_NOMOVE);
-	if (m_hIcon && rc.Height() < nSize)
-		SetWindowPos(NULL, rc.left, rc.top, rc.Width(), nSize, SWP_NOZORDER | SWP_NOMOVE);
-
-	Invalidate();
+	set_icon(m_hIcon, nSize);
 }
 
 void CSCStatic::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	gcr_parent_back)

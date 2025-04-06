@@ -1481,6 +1481,9 @@ void		SetWallPaper(CString sfile);
 	CString		get_time_str(SYSTEMTIME st, CString sep = _T(":"), bool h24 = true, bool sec = true, bool msec = true);
 	CString		get_time_str(double dSecond, bool bHasHour = true, bool bHasMilliSec = false);
 
+	//185초일 경우 "3m 5s"를 리턴한다.
+	CString		get_remain_time_str(int seconds, bool include_sec = true);
+
 	//type 0(date), 1(time:24h), 2(date+time) 년-월-일 시:분:초 형식으로 현재 시간 리턴. mid는 날짜와 시간 사이 문자열
 	CString		get_datetime_str(CTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
 	CString		get_datetime_str(COleDateTime t, int type = 2, bool sep = true, CString mid = _T(" "), bool h24 = true, bool sec = true);
@@ -1606,6 +1609,8 @@ void		SetWallPaper(CString sfile);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);
 	HANDLE		DDBToDIB(CBitmap* bitmap, DWORD dwCompression, CPalette* pPal);
 	
+	HICON		ExtractShellIcon(int nIndex, bool bLargeIcons = true);
+
 	//.ico 아이콘 파일을 크기를 지정해서 로딩이 가능하다. LoadIcon()으로는 안되며 PNG와 같은 이미지도 불가하다.
 	HICON		load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
 	//해당 DC에 그리고 아이콘의 실제 크기를 리턴한다.

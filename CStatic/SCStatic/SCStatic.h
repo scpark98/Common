@@ -171,6 +171,7 @@ public:
 	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
 	void			set_icon(UINT nIDResource, int nSize = 16);
+	void			set_icon(HICON hIcon, int nSize = 16);
 
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
 	void			add_header_image(UINT id);

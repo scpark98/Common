@@ -214,7 +214,7 @@ void CThumbCtrl::OnPaint()
 
 	if (m_loading_files.size() > 0 && !m_loading_completed)
 	{
-		CRect r = makeCenterRect(rc.CenterPoint().x, rc.CenterPoint().y, rc.Width() / 2, 16);
+		CRect r = make_center_rect(rc.CenterPoint().x, rc.CenterPoint().y, rc.Width() / 2, 16);
 		draw_sunken_rect(&dc, r, true, Gdiplus::Color::DimGray, Gdiplus::Color::DarkGray);
 		r.DeflateRect(1, 1);
 		double width = r.Width();

@@ -54,9 +54,9 @@ END_MESSAGE_MAP()
 
 
 // CSCMessageBox 메시지 처리기
-bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, int cx, int cy)
+bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_modal, int cx, int cy)
 {
-	m_as_modal = false;
+	m_as_modal = as_modal;
 	m_parent = parent;
 	m_title = title;
 	m_hIcon = load_icon(NULL, icon_id, 16, 16);
@@ -72,6 +72,13 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, int cx, in
 	m_button_caption[IDHELP] = _T("도움말");
 	m_button_caption[IDTRYAGAIN] = _T("다시 시도");
 	m_button_caption[IDCONTINUE] = _T("계속");
+
+	//extract 4 icons from imageres.dll
+	CString dll_path = _T("C:\\Windows\\System32\\imageres.dll");
+	ExtractIconEx(dll_path, 93, &m_icons[0], NULL, 1);
+	ExtractIconEx(dll_path, 94, &m_icons[1], NULL, 1);
+	ExtractIconEx(dll_path, 79, &m_icons[2], NULL, 1);
+	ExtractIconEx(dll_path, 76, &m_icons[3], NULL, 1);
 
 	if (cx < 0 || cy < 0)
 	{
@@ -223,94 +230,112 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	//버튼의 조합에 따라 버튼 위치를 재조정한다.
 	int x;
 	int button_count = 1;
-
-	if (type == MB_OKCANCEL)
+	//int res = type & MB_YESNO;
+	if ((type & MB_OKCANCEL) == MB_OKCANCEL)
 	{
 		button_count = 2;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDOK].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDOK].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 	}
-	else if (type == MB_ABORTRETRYIGNORE)
+	else if ((type & MB_ABORTRETRYIGNORE) == MB_ABORTRETRYIGNORE)
 	{
 		button_count = 3;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDABORT].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDABORT].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDRETRY].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDRETRY].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDIGNORE].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDIGNORE].ShowWindow(SW_SHOW);
 	}
-	else if (type == MB_YESNOCANCEL)
+	else if ((type & MB_YESNOCANCEL) == MB_YESNOCANCEL)
 	{
 		button_count = 3;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDYES].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDYES].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDNO].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDNO].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 	}
-	else if (type == MB_YESNO)
+	else if ((type & MB_YESNO) == MB_YESNO)
 	{
 		button_count = 2;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDYES].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDYES].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDNO].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDNO].ShowWindow(SW_SHOW);
 	}
-	else if (type == MB_RETRYCANCEL)
+	else if ((type & MB_RETRYCANCEL) == MB_RETRYCANCEL)
 	{
 		button_count = 2;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDRETRY].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDRETRY].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 	}
-	else if (type == MB_CANCELTRYCONTINUE)
+	else if ((type & MB_CANCELTRYCONTINUE) == MB_CANCELTRYCONTINUE)
 	{
 		button_count = 3;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDTRYAGAIN].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDTRYAGAIN].ShowWindow(SW_SHOW);
 
 		x += (button_gap + m_sz_button.cx);
 		m_button[IDCONTINUE].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDCONTINUE].ShowWindow(SW_SHOW);
 	}
 	else //if (type == MB_OK)
 	{
 		button_count = 1;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDOK].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDOK].ShowWindow(SW_SHOW);
 	}
 
+	//아이콘을 이 dlg에서 표시한다? CSCStatic에서 표시한다?
+	//CSCStatic에서도 아이콘을 표시하는 기능이 있지만 주로 한줄의 캡션과 함께 사용하는 것이 많고
+	//메시지박스의 아이콘의 레이아웃을 보면 메시지가 센터정렬이라고 해도 아이콘은 왼쪽 정렬되어 표시되는 등 다른점이 있으므로
+	//CSCStatic에 표시하지 않고 이 클래스의 OnPaint()에서 별도로 표시한다.
 	//아이콘의 크기만큼 좌측에서 떨어져서 메시지 본문이 표시된다.
-	m_static_message.MoveWindow(rc.left + gap_side + 32 + 8, rc.top + gap, rc.Width() - gap_side * 2 - 32 - 8, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
+	m_static_message.MoveWindow(rc.left + gap_side + 32 + 16, rc.top + gap, rc.Width() - gap_side * 2 - 32 - 16, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
+	//m_static_message.MoveWindow(rc.left + gap_side, rc.top + gap, rc.Width() - gap_side * 2, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
 	m_static_message.SetWindowText(m_message);
 	m_static_message.ModifyStyle(0, m_align);
+	//m_static_message.set_icon(m_icons[m_icon_index], 32);
 	m_static_message.ShowWindow(SW_SHOW);
-	
-	m_button[IDOK].ShowWindow(type <= MB_OKCANCEL ? SW_SHOW : SW_HIDE);
-	m_button[IDCANCEL].ShowWindow(type == MB_OKCANCEL || type == MB_YESNOCANCEL ? SW_SHOW : SW_HIDE);
-	m_button[IDABORT].ShowWindow(type == MB_ABORTRETRYIGNORE ? SW_SHOW : SW_HIDE);
-	m_button[IDRETRY].ShowWindow(type == MB_RETRYCANCEL || type == MB_ABORTRETRYIGNORE ? SW_SHOW : SW_HIDE);
-	m_button[IDIGNORE].ShowWindow(type == MB_ABORTRETRYIGNORE ? SW_SHOW : SW_HIDE);
-	m_button[IDYES].ShowWindow(type == MB_YESNO || type == MB_YESNOCANCEL ? SW_SHOW : SW_HIDE);
-	m_button[IDNO].ShowWindow(type == MB_YESNO || type == MB_YESNOCANCEL ? SW_SHOW : SW_HIDE);
-	m_button[IDTRYAGAIN].ShowWindow(type == MB_CANCELTRYCONTINUE ? SW_SHOW : SW_HIDE);
-	m_button[IDCONTINUE].ShowWindow(type == MB_CANCELTRYCONTINUE ? SW_SHOW : SW_HIDE);
 
 	Invalidate();
+
+	if (!m_as_modal)
+	{
+		CenterWindow(m_parent);
+		ShowWindow(SW_SHOW);
+	}
 }
 
 void CSCMessageBox::set_align(DWORD align)
@@ -468,7 +493,7 @@ void CSCMessageBox::OnPaint()
 
 	rtitle.left += 8;
 
-	//draw icon
+	//draw title icon
 	if (m_hIcon)
 	{
 		CRect ricon = rtitle;
@@ -476,6 +501,8 @@ void CSCMessageBox::OnPaint()
 		rtitle.left = ricon.right + 8;
 		draw_icon(&dc, m_hIcon, ricon);
 	}
+	//end of draw title icon
+
 	
 	//draw title text
 	CFont* pOldFont = dc.SelectObject(&m_font);
@@ -488,13 +515,19 @@ void CSCMessageBox::OnPaint()
 
 	dc.DrawText(title, rtitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 	dc.SelectObject(pOldFont);
+	//end of draw title text
 
-	WORD index = 161;
-	//HICON hIcon = ExtractAssociatedIcon(AfxGetInstanceHandle(), _T("C:\\Windows\\system32\\shell32.dll"), &index);
 
-	HICON hIcon = ExtractShellIcon(index);
-	//SHDefExtractIcon(_T("C:\\Windows\\system32\\shell32.dll"), index, 0, &hIcon, NULL, 0);
-	dc.DrawIcon(20, m_title_height + 20, hIcon);
+	//draw messagebox icon
+	//아이콘의 세로 위치는 메시지박스의 m_align에	따라 다르다.
+	CRect rmsg;
+	m_static_message.GetWindowRect(rmsg);
+	ScreenToClient(rmsg);
+	if (m_align & SS_CENTERIMAGE)
+		dc.DrawIcon(16, rmsg.CenterPoint().y - 16, m_icons[m_icon_index]);
+	else
+		dc.DrawIcon(16, rmsg.top, m_icons[m_icon_index]);
+
 
 	//draw border
 	draw_rectangle(g, rc, Gdiplus::Color::DimGray);

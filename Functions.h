@@ -1496,7 +1496,7 @@ void		SetWallPaper(CString sfile);
 
 	//2003-04-16 18:01:00.120
 	CString		GetCurrentTimeString(bool bSeparator = true, bool msec = false);
-	CTime		GetTimeFromTimeString(CString sDate, CString sTime);
+	CTime		get_CTime_from_datetime_string(CString date, CString time = _T("00:00:00"));
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
 	//CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
 	//CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
@@ -1609,8 +1609,6 @@ void		SetWallPaper(CString sfile);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);
 	HANDLE		DDBToDIB(CBitmap* bitmap, DWORD dwCompression, CPalette* pPal);
 	
-	HICON		ExtractShellIcon(int nIndex, bool bLargeIcons = true);
-
 	//.ico 아이콘 파일을 크기를 지정해서 로딩이 가능하다. LoadIcon()으로는 안되며 PNG와 같은 이미지도 불가하다.
 	HICON		load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
 	//해당 DC에 그리고 아이콘의 실제 크기를 리턴한다.

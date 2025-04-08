@@ -522,9 +522,9 @@ public:
 		visible_last,
 	};
 	//어떤 항목이 특정 위치에 표시되도록 스크롤시킨다.
-	//mode가 visible_first이고 offset이 3이면 위에서 3+1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-	//mode가 visible_center이고 offset이 0이면 중앙 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-	//mode가 visible_last이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
+	//mode가 visible_first(0)이고 offset이 3이면 위에서 3+1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
+	//mode가 visible_center(1)이고 offset이 0이면 중앙 위치에 해당 아이템이 표시되도록 스크롤시킨다.
+	//mode가 visible_last(2)이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
 	//mode default = visible_center
 	void			ensure_visible(int index, int mode = visible_center, int offset = 0);
 	//original IsItemVisible method does not check partial. only check vertical axis.

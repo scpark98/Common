@@ -9,8 +9,16 @@
 	parent의 ColorTheme을 설정해주면 parent와 동일한 테마로 동작함.
   - 사용법은 아래와 같음.
 	* parent의 .h에 CSCMessageBox m_message;를 선언해서 사용해도 되고
-	  매번 사용할 때마다 인스턴스 선언 후 dlg.DoModal()을 호출해도 된다.
+	  매번 사용할 때마다 인스턴스 선언 후 dlg.DoModal()을 호출해도 되지만 전자를 권장함.
+	  왜냐하면 m_message.set_color_theme(CSCColorTheme::color_theme_linkmemine);과 같이 테마를 설정하면
+	  해당 프로젝트에서는 지정한 테마가 적용되므로 매번 테마를 설정할 필요가 없음.
 	1.AfxMessageBox()와 같이 Modal()로 띠울 경우
+	2.Modeless로 띠울 경우
+		- m_e
+		- m_message.create(this, _T("Title Text"));// , IDR_MAINFRAME);
+		- m_message.set_color_theme(CSCColorTheme::color_theme_linkmemine);
+		- m_message.set_message(_T("Test MessageBox"), MB_OKCANCEL);
+		- m_message.ShowWindow(SW_SHOW);
 	  
 
 * 
@@ -62,12 +70,12 @@ public:
 	//.cpp의 OnInitDialog()에서 create() 및 필요한 설정을 하면
 	//그 클래스의 어디서든 ret = DoModal(_T("message");처럼 호출해서사용할 수 있다.
 
-	bool			create(CWnd* parent, CString title, UINT icon_id = 0, int cx = -1, int cy = -1);
+	bool			create(CWnd* parent, CString title, UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);
 
 //title 관련
 	void			set_title(CString title);
 	void			set_title_height(int title_height) { m_title_height = title_height; }
-	void			set_icon(UINT icon_id);
+	void			set_title_icon(UINT icon_id);
 
 //Modeless로 실행할 경우 호출. //실제 사용 시 MAX_WIDTH(800)를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
 	void			set_message(CString msg, int type = MB_OK, int timeout = 0, DWORD align = SS_CENTER | SS_CENTERIMAGE);
@@ -104,6 +112,11 @@ protected:
 	CGdiButton		m_button[12];	//UNDEF(0), IDOK(1) ~ IDCONTINUE(11)
 	CGdiButton		m_button_quit;
 	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
+
+//messagebox icon
+//https://blog.naver.com/pks1217/220407691110
+	int				m_icon_index = 3;
+	HICON			m_icons[4];	//MB_ICONSTOP, MB_ICONQUESTION, MB_ICONEXCLAMATION, MB_ICONINFORMATION
 
 //font
 	LOGFONT			m_lf;

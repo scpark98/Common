@@ -348,32 +348,32 @@ CString GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator /*= true*/, bool
 
 #endif
 
-//sDate = "20140403"
-//sTime = "123456"
+//date = "20140403"
+//time = "123456"
 //CTime t = 
-CTime GetTimeFromTimeString(CString sDate, CString sTime)
+CTime get_CTime_from_datetime_string(CString date, CString time)
 {
-	sDate.Remove('-');
-	sDate.Remove('/');
-	sDate.Remove(' ');
+	date.Remove('-');
+	date.Remove('/');
+	date.Remove(' ');
 
-	sTime.Remove(':');
-	sTime.Remove(' ');
+	time.Remove(':');
+	time.Remove(' ');
 
-	ASSERT(sDate.GetLength() == 8);
-	ASSERT(sTime.GetLength() == 6);
+	ASSERT(date.GetLength() == 8);
+	ASSERT(time.GetLength() == 6);
 
-	CTime t(_tstoi((TCHAR*)(LPCTSTR)(sDate.Left(4))), _tstoi((TCHAR*)(LPCTSTR)(sDate.Mid(4, 2))), _tstoi((TCHAR*)(LPCTSTR)(sDate.Right(2))),
-			 _tstoi((TCHAR*)(LPCTSTR)(sTime.Left(2))), _tstoi((TCHAR*)(LPCTSTR)(sTime.Mid(2, 2))), _tstoi((TCHAR*)(LPCTSTR)(sTime.Right(2))));
+	CTime t(_tstoi((TCHAR*)(LPCTSTR)(date.Left(4))), _tstoi((TCHAR*)(LPCTSTR)(date.Mid(4, 2))), _tstoi((TCHAR*)(LPCTSTR)(date.Right(2))),
+			 _tstoi((TCHAR*)(LPCTSTR)(time.Left(2))), _tstoi((TCHAR*)(LPCTSTR)(time.Mid(2, 2))), _tstoi((TCHAR*)(LPCTSTR)(time.Right(2))));
 
 	return t;
 }
 
-CTimeSpan GetTimeSpanFromTimeString(CString sTime)
+CTimeSpan GetTimeSpanFromTimeString(CString time)
 {
-	ASSERT(sTime.GetLength() == 6 || sTime.GetLength() == 8);
-	sTime.Remove(':');
-	return CTimeSpan(0, _ttoi(sTime.Left(2)), _ttoi(sTime.Mid(2,2)), _ttoi(sTime.Right(2)));
+	ASSERT(time.GetLength() == 6 || time.GetLength() == 8);
+	time.Remove(':');
+	return CTimeSpan(0, _ttoi(time.Left(2)), _ttoi(time.Mid(2,2)), _ttoi(time.Right(2)));
 }
 
 void GetTimeFromSeconds(int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds)
@@ -19131,79 +19131,3 @@ bool is_VMWare()
 }
 #endif
 
-//https://stackoverflow.com/questions/1956790/how-to-get-the-icon-of-a-file-in-c
-HICON ExtractShellIcon(int nIndex, bool bLargeIcons)
-{
-	HICON hIcon = NULL;
-
-	// Shell icons can be customized by the registry:
-
-	// HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\
-
-	// Explorer\Shell Icons
-
-	// "<ShellIconIndex>" = "<Filename>,<IconIndex>"
-
-	// E.g.
-
-	// "3" = "c:\MyFolderIcon.ico,1"
-
-	HKEY hkeyShellIcons;
-	if (RegOpenKeyEx(
-		HKEY_LOCAL_MACHINE,
-		_T("SOFTWARE\\Microsoft\\Windows\\
-			CurrentVersion\\Explorer\\Shell Icons"),
-			0,
-			KEY_READ,
-			&hkeyShellIcons) == ERROR_SUCCESS)
-	{
-		TCHAR szBuffer[MAX_PATH * sizeof TCHAR];
-		DWORD dwSize = MAX_PATH * sizeof TCHAR;
-
-		TCHAR szIndex[6] = { 0 };
-		_stprintf(szIndex, _T("%d"), nIndex);
-		if (RegQueryValueEx(hkeyShellIcons, szIndex,
-			NULL, NULL, (LPBYTE)szBuffer,
-			&dwSize) == ERROR_SUCCESS)
-		{
-#ifdef _AFXDLL
-			CString strFileName, strIndex;
-			VERIFY(AfxExtractSubString(strFileName,
-				szBuffer, 0, _T(',')));
-			VERIFY(AfxExtractSubString(strIndex,
-				szBuffer, 1, _T(',')));
-			ExtractIconEx(
-				strFileName,
-				nIndex,
-				bLargeIcons ? &hIcon : NULL,
-				bLargeIcons ? NULL : &hIcon,
-				1);
-#else
-			std::vector<std::tstring> ls;
-			tokenize(std::back_inserter(ls),
-				szBuffer, _T(","));
-			ExtractIconEx(
-				ls[0].c_str(),
-				atoi(ls[1].c_str()),
-				bLargeIcons ? &hIcon : NULL,
-				bLargeIcons ? NULL : &hIcon,
-				1);
-#endif
-		}
-
-		RegCloseKey(hkeyShellIcons);
-	}
-
-	// Not customized? Then get the original icon from
-
-	// shell23.dll
-
-	if (!hIcon)
-		ExtractIconEx(
-			_T("SHELL32.DLL"),
-			nIndex, bLargeIcons ? &hIcon : NULL,
-			bLargeIcons ? NULL : &hIcon,
-			1);
-
-	return hIcon;
-}

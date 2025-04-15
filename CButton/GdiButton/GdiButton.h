@@ -165,6 +165,8 @@ public:
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
 
+	void		set_text(CString text) { SetWindowText(text); }
+
 	void		set_3state(bool tri_state = true) { m_is_3state = tri_state; }
 	bool		is_3state() { return m_is_3state; }
 

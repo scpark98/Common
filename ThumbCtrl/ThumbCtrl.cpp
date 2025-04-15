@@ -1832,14 +1832,14 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 			if (m_img_selection_mark.is_valid())
 			{
-				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, m_img_selection_mark.width, m_img_selection_mark.height);
+				r = make_center_rect(r.CenterPoint().x, r.CenterPoint().y, m_img_selection_mark.width, m_img_selection_mark.height);
 				m_img_selection_mark.draw(g, r.left, r.top);
 			}
 			else if (m_use_circle_number)
 			{
 				//g.DrawString(CStringW(i2S(i)), -1, &font, CRect2GpRectF(r), &format, &br_text);
 
-				r = makeCenterRect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
+				r = make_center_rect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
 
 				g.DrawEllipse(&pen, CRectTogpRectF(r));
 				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRectTogpRectF(r), &format);

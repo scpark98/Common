@@ -171,8 +171,8 @@ public:
 
 	//int		GetPos();
 	void	SetPos(int pos);
-	int		get_min();
-	int		get_max();
+	int		get_lower();
+	int		get_upper();
 	void	set_step_completed() { m_step_completed = true; Invalidate(); }
 	int		get_style() { return m_style; }
 
@@ -245,7 +245,7 @@ public:
 	int				get_font_size();
 	void			set_font_size(int font_size);
 	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);
-	void			set_font_bold(bool bold = true);
+	void			set_font_bold(int weight = FW_BOLD);
 	void			set_font_italic(bool italic = true);
 	void			enlarge_font_size(bool enlarge);
 

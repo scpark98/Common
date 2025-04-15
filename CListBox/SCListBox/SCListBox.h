@@ -197,7 +197,7 @@ public:
 	virtual		CSCListBox&	set_font(LOGFONT& lf);
 	virtual		CSCListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual		CSCListBox&	set_font_size(int nSize);
-	virtual		CSCListBox&	set_font_bold(bool bBold = true);
+	virtual		CSCListBox&	set_font_bold(int weight = FW_BOLD);
 
 	void		set_color_theme(int theme);
 

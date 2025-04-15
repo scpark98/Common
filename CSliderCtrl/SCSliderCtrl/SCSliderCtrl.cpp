@@ -1559,14 +1559,14 @@ void CSCSliderCtrl::SetPos(int pos)
 	Invalidate();
 }
 
-int CSCSliderCtrl::get_min()
+int CSCSliderCtrl::get_lower()
 {
 	int min, max;
 	GetRange(min, max);
 	return min;
 }
 
-int CSCSliderCtrl::get_max()
+int CSCSliderCtrl::get_upper()
 {
 	int min, max;
 	GetRange(min, max);
@@ -1636,9 +1636,9 @@ void CSCSliderCtrl::enlarge_font_size(bool enlarge)
 	reconstruct_font();
 }
 
-void CSCSliderCtrl::set_font_bold(bool bold)
+void CSCSliderCtrl::set_font_bold(int weight)
 {
-	m_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	m_lf.lfWeight = weight;
 	reconstruct_font();
 }
 

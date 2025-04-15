@@ -530,6 +530,7 @@ struct	NETWORK_INFO
 	//실행 파일명만 주면 파일명만 비교하지만 전체 경로를 주면 경로까지 맞아야 카운트 됨.
 	//ex. 풀패스인 c:\test.exe를 주면 d:\test.exe는 실행중이라도 카운트되지 않는다.
 	int			get_process_running_count(CString processname);
+	bool		is_running(CString processname);
 	
 	//return value : 1(killed), 0(fail to kill), -1(not found)
 	int			kill_process_by_fullpath(CString fullpath);
@@ -1466,7 +1467,8 @@ void		SetWallPaper(CString sfile);
 	CString		GetDefaultPrinterName();
 	CSize		GetPrinterPaperSize(CString sPrinterName);
 
-	CString		get_error_str(DWORD dwError, bool show_msgBox = false);
+	//system error code를 문자열로 리턴.
+	CString		get_error_str(DWORD dwError);
 
 //////////////////////////////////////////////////////////////////////////
 //날짜/시간 date, time 
@@ -1496,7 +1498,7 @@ void		SetWallPaper(CString sfile);
 
 	//2003-04-16 18:01:00.120
 	CString		GetCurrentTimeString(bool bSeparator = true, bool msec = false);
-	CTime		get_CTime_from_datetime_string(CString date, CString time = _T("00:00:00"));
+	CTime		get_CTime_from_datetime_str(CString date, CString time = _T("00:00:00"));
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
 	//CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
 	//CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
@@ -2132,3 +2134,88 @@ int readFilenames(std::vector<std::string> &filenames, const std::string &direct
 //HMENU에서 메뉴ID와 캡션을 얻어온다.
 bool	get_menu_item_info(HMENU hMenu, UINT uItem, UINT *uID, CString *caption, BOOL fByPos = FALSE);
 //#endif
+
+template <class CharT>
+constexpr auto GetFormatMessageFunction()
+{
+	if constexpr (std::is_same_v<CharT, char>)
+	{
+		return &FormatMessageA;
+	}
+	else
+	{
+		return &FormatMessageW;
+	}
+}
+
+template <class CharT = char>
+std::basic_string<CharT> GetSystemErrorMesssage(const DWORD errorCode)
+{
+	const auto formatMessageFunction = GetFormatMessageFunction<CharT>();
+
+	DWORD langId;
+	if (0 == GetLocaleInfoEx(LOCALE_NAME_SYSTEM_DEFAULT,
+		LOCALE_ILANGUAGE |
+		LOCALE_RETURN_NUMBER,
+		reinterpret_cast<LPWSTR>(&langId),
+		sizeof(langId) / sizeof(wchar_t)))
+	{
+		langId = MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL);
+	}
+
+	std::basic_string<CharT> result;
+	for (;;)
+	{
+		CharT* msg;
+		const auto msgLen = formatMessageFunction(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			nullptr,
+			errorCode,
+			langId,
+			reinterpret_cast<CharT*>(&msg),
+			0,
+			nullptr);
+		if (msgLen != 0)
+		{
+			try
+			{
+				result.assign(msg, msgLen);
+			}
+			catch (...)
+			{
+				LocalFree(msg);
+				throw;
+			}
+			LocalFree(msg);
+			break;
+		}
+		const auto primaryLangId = PRIMARYLANGID(langId);
+		if (primaryLangId == LANG_NEUTRAL)
+		{
+			break;
+		}
+		const auto subLangId = SUBLANGID(langId);
+		if (subLangId == SUBLANG_NEUTRAL)
+		{
+			langId = MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL);
+		}
+		else if (subLangId == SUBLANG_DEFAULT)
+		{
+			langId = MAKELANGID(primaryLangId, SUBLANG_NEUTRAL);
+		}
+		else
+		{
+			langId = MAKELANGID(primaryLangId, SUBLANG_DEFAULT);
+		}
+	}
+	for (auto charIndex = result.size() - 1; charIndex != MAXSIZE_T; charIndex--)
+	{
+		if (result[charIndex] != '\n' && result[charIndex] != '\r')
+		{
+			break;
+		}
+		result.resize(charIndex);
+	}
+	return result;
+}

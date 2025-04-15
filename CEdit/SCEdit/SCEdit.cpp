@@ -314,9 +314,9 @@ CSCEdit& CSCEdit::set_font_size( int nSize )
 	return *this;
 }
 
-CSCEdit& CSCEdit::set_font_bold( bool bBold )
+CSCEdit& CSCEdit::set_font_bold(int weight)
 {
-	m_lf.lfWeight = ( bBold ? FW_BOLD : FW_NORMAL );
+	m_lf.lfWeight = weight;
 	reconstruct_font();
 
 	return *this;
@@ -743,7 +743,7 @@ void CSCEdit::draw_dim_text()
 	if (GetFocus() == this || !IsWindowEnabled() || text.GetLength())
 		return;
 
-	if (!m_show_dim_text || m_dim_text.GetLength() == 0)
+	if (m_dim_text.GetLength() == 0)
 		return;
 
 	CClientDC	dc(this);
@@ -783,10 +783,12 @@ void CSCEdit::draw_dim_text()
 	dc.RestoreDC(iState);								// Restore The DC State
 }
 
-CSCEdit& CSCEdit::set_dim_text(bool show, CString dim_text, Gdiplus::Color cr)
+CSCEdit& CSCEdit::set_dim_text(CString dim_text, Gdiplus::Color cr)
 {
-	m_show_dim_text = show;
 	m_dim_text = dim_text;
-	m_cr_dim_text = cr;
+
+	if (cr.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_dim_text = cr;
+
 	return *this;
 }

@@ -80,7 +80,10 @@ END_MESSAGE_MAP()
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
 {
 	m_text = lpszText;
-	return CStatic::Create(lpszText, dwStyle, rect, pParentWnd, nID);
+	BOOL res = CStatic::Create(lpszText, dwStyle, rect, pParentWnd, nID);
+	reconstruct_font();
+
+	return res;
 }
 
 void CSCStatic::PreSubclassWindow() 
@@ -894,9 +897,9 @@ void CSCStatic::set_auto_font_size(bool auto_font_size)
 	}
 }
 
-void CSCStatic::set_font_bold(bool bBold)
+void CSCStatic::set_font_bold(int weight)
 {
-	m_lf.lfWeight = bBold ? FW_BOLD : FW_NORMAL;
+	m_lf.lfWeight = weight;
 	reconstruct_font();
 	update_surface();
 }

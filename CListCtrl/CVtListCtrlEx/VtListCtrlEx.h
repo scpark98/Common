@@ -464,7 +464,7 @@ public:
 	//반드시 set_headings() 후에 호출할것.
 	void		set_font_size(int font_size);
 	void		enlarge_font_size(bool enlarge);
-	void		set_font_bold(bool bold = true);
+	void		set_font_bold(int weight = FW_BOLD);
 	void		set_font_italic(bool italic = true);
 	LOGFONT		get_log_font() { return m_lf; }
 	void		set_log_font(LOGFONT lf);

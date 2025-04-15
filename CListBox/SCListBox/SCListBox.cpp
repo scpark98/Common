@@ -176,9 +176,9 @@ CSCListBox& CSCListBox::set_font_size(int nSize)
 	return *this;
 }
 
-CSCListBox& CSCListBox::set_font_bold(bool bBold)
+CSCListBox& CSCListBox::set_font_bold(int weight)
 {
-	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
+	m_lf.lfWeight = weight;
 	ReconstructFont();
 
 	return *this;

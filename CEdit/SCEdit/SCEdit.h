@@ -79,7 +79,7 @@ public:
 
 	virtual	CSCEdit&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CSCEdit&		set_font_size(int nSize);
-	virtual CSCEdit&		set_font_bold(bool bBold = true);
+	virtual CSCEdit&		set_font_bold(int weight = FW_BOLD);
 	virtual CSCEdit&		set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
 	void					recalc_font_size();						//recalculate font height when control size is changed.
 	int						get_font_size(bool pixel_size = false);
@@ -94,9 +94,12 @@ public:
 	virtual CSCEdit&		set_line_align(DWORD align = DT_VCENTER);
 
 //dim text
-	virtual CSCEdit&		set_dim_text(bool show, CString dim_text, Gdiplus::Color cr = Gdiplus::Color::LightGray);
+	//m_cr_dim_text의 기본값은 Gdiplus::Color::LightGray이며
+	//이 함수를 호출할 때 Gdiplus::Color::Transparent라는 값일 경우는 dim_text 파라미터만 변경하고자 하는 의미일 것이다.
+	virtual CSCEdit&		set_dim_text(CString dim_text, Gdiplus::Color cr_dim_text = Gdiplus::Color::Transparent);
 
 	void					set_draw_border(bool draw = true) { m_draw_border = draw; }
+
 	// Generated message map functions
 protected:
 	bool			m_transparent = false;
@@ -113,9 +116,8 @@ protected:
 	Gdiplus::Color	m_cr_button_back_down;
 
 //dim text
-	bool			m_show_dim_text = false;
-	CString			m_dim_text = _T("asldkfj");
-	Gdiplus::Color	m_cr_dim_text;
+	CString			m_dim_text;
+	Gdiplus::Color	m_cr_dim_text = Gdiplus::Color::LightGray;
 	DWORD			m_dwStyle;
 	void			draw_dim_text();
 

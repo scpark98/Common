@@ -3327,9 +3327,9 @@ void CVtListCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	reconstruct_font();
 }
 
-void CVtListCtrlEx::set_font_bold(bool bBold)
+void CVtListCtrlEx::set_font_bold(int weight)
 {
-	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
+	m_lf.lfWeight = weight;
 	reconstruct_font();
 }
 

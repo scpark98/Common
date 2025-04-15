@@ -61,17 +61,18 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_title = title;
 	m_hIcon = load_icon(NULL, icon_id, 16, 16);
 
-	m_button_caption[IDOK] = _T("확인");
-	m_button_caption[IDCANCEL] = _T("취소");
-	m_button_caption[IDABORT] = _T("중지");
-	m_button_caption[IDRETRY] = _T("재시도");
-	m_button_caption[IDIGNORE] = _T("무시");
-	m_button_caption[IDYES] = _T("예");
-	m_button_caption[IDNO] = _T("아니오");
-	m_button_caption[IDCLOSE] = _T("닫기");
-	m_button_caption[IDHELP] = _T("도움말");
-	m_button_caption[IDTRYAGAIN] = _T("다시 시도");
-	m_button_caption[IDCONTINUE] = _T("계속");
+	LANGID lang = GetUserDefaultUILanguage();
+	m_button_caption[IDOK]			= (lang == 1042 ? _T("확인") : _T("Ok"));
+	m_button_caption[IDCANCEL]		= (lang == 1042 ? _T("취소") : _T("Cancel"));
+	m_button_caption[IDABORT]		= (lang == 1042 ? _T("중지") : _T("Stop"));
+	m_button_caption[IDRETRY]		= (lang == 1042 ? _T("재시도") : _T("Retry"));
+	m_button_caption[IDIGNORE]		= (lang == 1042 ? _T("무시") : _T("Ignore"));
+	m_button_caption[IDYES]			= (lang == 1042 ? _T("예") : _T("Yes"));
+	m_button_caption[IDNO]			= (lang == 1042 ? _T("아니오") : _T("No"));
+	m_button_caption[IDCLOSE]		= (lang == 1042 ? _T("닫기") : _T("Close"));
+	m_button_caption[IDHELP]		= (lang == 1042 ? _T("도움말") : _T("Help"));
+	m_button_caption[IDTRYAGAIN]	= (lang == 1042 ? _T("다시 시도") : _T("Retry"));
+	m_button_caption[IDCONTINUE]	= (lang == 1042 ? _T("계속") : _T("Continue"));
 
 	//extract 4 icons from imageres.dll
 	CString dll_path = _T("C:\\Windows\\System32\\imageres.dll");
@@ -124,6 +125,8 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 		m_button[i].use_hover();
 	}
 
+	reconstruct_font();
+
 	//종료 버튼은 IDCLOSE가 아닌 IDCANCEL로 처리해야 한다.
 	m_button_quit.create(_T(""), WS_CHILD | WS_VISIBLE | BS_FLAT,
 						CRect(rc.right - 2 - m_title_height, rc.top + 2, rc.right - 2, m_title_height - 1), this, SC_BUTTON_ID + IDCANCEL);
@@ -135,8 +138,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 
 	m_static_message.create(_T("message"), WS_CHILD | WS_VISIBLE, CRect(0, m_title_height, cx, rc.bottom - 20 - 8 - m_sz_button.cy), this, 0);
 	m_static_message.set_back_color(m_theme.cr_back);
-
-	reconstruct_font();
+	m_static_message.set_font(&m_font);
 
 	return res;
 }

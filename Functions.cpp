@@ -351,7 +351,7 @@ CString GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator /*= true*/, bool
 //date = "20140403"
 //time = "123456"
 //CTime t = 
-CTime get_CTime_from_datetime_string(CString date, CString time)
+CTime get_CTime_from_datetime_str(CString date, CString time)
 {
 	date.Remove('-');
 	date.Remove('/');
@@ -2841,7 +2841,7 @@ void request_url(CRequestUrlParams* params)
 	{
 		DWORD dwError = GetLastError();
 		params->status = dwError;
-		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_error_str(dwError, false));
+		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_error_str(dwError));
 		TRACE(_T("result = %s\n"), params->result);
 
 		SAFE_DELETE_ARRAY(jsonData);
@@ -7218,7 +7218,7 @@ int RenameFiles(CString folder, CString oldName, CString newName, bool overwrite
 			if (bSuccess)
 				success++;
 			else
-				get_error_str(GetLastError(), true);
+				get_error_str(GetLastError());
 		}
 	}
 
@@ -10956,6 +10956,11 @@ int	kill_process_by_fullpath(CString fullpath)
 	return res;
 }
 
+bool is_running(CString processname)
+{
+	return (get_process_running_count(processname) > 0);
+}
+
 //해당 파일이 실행중인 카운트를 리턴하는 함수이며
 //fullpath를 주면 경로까지 동일해야 카운트되도록 기능을 구현했으나
 //권한문제인지 현재 PC에서는 잘 얻어오지만
@@ -13486,11 +13491,8 @@ CSize GetPrinterPaperSize(CString sPrinterName)
 }
 
 //#include <system_error>>
-CString	get_error_str(DWORD dwError, bool show_msgBox)
+CString	get_error_str(DWORD dwError)
 {
-	std::string msg = std::system_category().message(dwError);
-	return CString(msg.c_str());
-
 	LPTSTR lpBuffer = NULL;
 	CString result;
 
@@ -13504,17 +13506,17 @@ CString	get_error_str(DWORD dwError, bool show_msgBox)
 	}
 	else
 	{
-		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL,
-			dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), lpBuffer, 0, NULL);
+		std::string msg = std::system_category().message(dwError);
+		return CString(msg.c_str());
+
+		//FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		//	NULL,
+		//	dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), lpBuffer, 0, NULL);
 	}
 
 	result.Format(_T("%s"), CString(lpBuffer));
 	result.Trim();
 	LocalFree(lpBuffer);
-
-	if (show_msgBox)
-		AfxMessageBox(result);
 
 	return result;
 }

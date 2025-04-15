@@ -176,7 +176,7 @@ void CWebView2Ctrl::InitializeWebView()
 	//아래 userDataFolder가 동일하면 초기화 실패한다.
 	//각 프로젝트마다 이 폴더를 개별적으로 설정되도록 변경한다.
 	CString dataFolder;
-	dataFolder.Format(_T("%s\\webView_cache"), GetExeDirectory());	//폴더는 자동 생성됨
+	dataFolder.Format(_T("%s\\webView_cache"), get_exe_directory());	//폴더는 자동 생성됨
 	//userDataFolder = CStringW(get_known_folder(FOLDERID_Cookies));
 	userDataFolder = CStringW(dataFolder);
 	auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();

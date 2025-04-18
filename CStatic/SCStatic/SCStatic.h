@@ -37,10 +37,22 @@ m_static1.set_gradient_color(RED);
   깜빡임이 발생하기도 하고 투명 이미지를 덮어써서 그리는 이벤트가 발생되면 투명정보가 점점 불투명해지는 부작용이 있다.
   배경 그림이 있거나 그림의 크기가 1:1이 아닌 경우는 우선 현재 시점에서는 배재시킨다.
 
+[이미지 추가 시]
+- set_icon()을 이용해서 텍스트 앞에 아이콘을 표시할 수 있다.
+- add_header_image()를 이용해서 텍스트 앞에 이미지를 표시할 수 있다.
+  set_icon()과 다른 점은 .ico 파일이 아닌 png 등의 이미지 포맷을 지원하고
+  2장 이상의 이미지를 추가한 후 필요에 따라 이미지를 변경할 수도 있다.
+- 두 함수 모두 left_align_fix를 true로 설정하면 이미지는 왼쪽 정렬로 고정되고 텍스트는 설정된 정렬방식으로 표시된다.
+  이 파라미터를 추가한 이유 CSCMessageBox에서 이 CSCStatic을 사용하는데 메시지박스를 보면 아이콘은 항상 왼쪽에, 텍스트는 왼쪽 또는 중앙정렬로 표시된다.
+  false일 경우는 텍스트의 위치에 따라 아이콘과 이미지의 위치가 변경된다.
+
+
+[2014-11-26]
+
 [수정될 내용]
 - 배경이 있는 앱에서는 투명이 잘 적용되지만 기본 스타일의 dlg에서는 화면 갱신이 잘 되지 않는다.
   우선 기본 스타일의 dlg에서는 배경색을 지정해주자.
-- 출력크기보다 rc가 작으면 키워줘야 한다.
+- 출력크기보다 rc가 작으면 키워줘야 한다?
 - "\r\n"으로 multiline을 출력할 경우 center image, no wrap, simple 속성은 반드시 false가 되어야 한다.
   따라서 이러한 속성을 살리기 위해서는 파싱하여 각 라인을 출력하도록 수정이 필요하다.
 
@@ -170,11 +182,11 @@ public:
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
 	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
-	void			set_icon(UINT nIDResource, int nSize = 16);
-	void			set_icon(HICON hIcon, int nSize = 16);
+	void			set_icon(UINT nIDResource, int nSize = 16, bool left_align_fix = false);
+	void			set_icon(HICON hIcon, int nSize = 16, bool left_align_fix = false);
 
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
-	void			add_header_image(UINT id);
+	void			add_header_image(UINT id, bool left_align_fix = false);
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다.
 	template <typename ... T> void set_header_images(T... args)
 	{
@@ -283,6 +295,10 @@ protected:
 	//label의 앞에 그려질 이미지이며 만약 2개 이상일 경우 타이머에 의해 alt되기도 한다.
 	std::deque<CGdiplusBitmap*> m_header_images;
 	int				m_header_image_index;
+
+	//텍스트 앞에 표시되는 아이콘 또는 헤더 이미지를 텍스트와 별개로 무조건 왼쪽에 그려줄 경우
+	//CSCMessageBox에서 아이콘은 왼쪽에, 텍스트는 중앙정렬되어 표시되야 하므로 이 옵션이 추가됨.
+	bool			m_image_left_align_fix = false;
 
 protected:
 	//{{AFX_MSG(CSCStatic)

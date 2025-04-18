@@ -119,10 +119,13 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
+	//필요한 버튼들만 생성하고자 했으나 복잡도 문제로 모두 생성한다.
 	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
 	{
 		m_button[i].create(m_button_caption[i], WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, SC_BUTTON_ID + i);
 		m_button[i].use_hover();
+		m_button[i].set_round(8, Gdiplus::Color::LightGray);
+		//m_button[i].draw_focus_rect(true, Gdiplus::Color::Red);
 	}
 
 	reconstruct_font();
@@ -163,12 +166,20 @@ void CSCMessageBox::set_title(CString title)
 	m_title = title;
 }
 
-void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD align)
+//set_message(_T("changed message"));와 같이 동적으로 메시지만 변경할 경우는 type, timeout_sec, align은 기본 음수를 가지며
+//음수일 경우는 기본값 또는 이미 설정된 값을 사용한다.
+void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int align)
 {
 	m_message = msg;
-	m_type = type;
-	m_timeout_sec = timeout_sec;
-	m_align = align;
+
+	if (type >= MB_OK)
+		m_type = type;
+
+	if (timeout_sec > 0)
+		m_timeout_sec = timeout_sec;
+
+	if (align > -1)
+		m_align = align;
 
 	CRect rc;
 	GetClientRect(rc);
@@ -177,6 +188,14 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	int button_gap = 8;		//두 버튼 사이의 가로 간격
 	int gap = 8;			//타이틀바 <-> 메시지박스 영역 <-> 버튼 여백
 	int gap_side = 16;		//메시지박스의 좌우 여백
+	int icon_msg_gap = 16;	//아이콘과 메시지 사이의 간격	-> 설정 함수로 변경할 것!
+	int icon_size = 32;
+
+	if (m_icon_index < 0)
+	{
+		icon_size = 0;
+		icon_msg_gap = 0;
+	}
 
 	rc.top += m_title_height;
 
@@ -197,7 +216,9 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		//TRACE(_T("rmsg = %s\n"), get_rect_info_string(rmsg));
 
 		//right, bottom을 줄 때는 dlg의 최소 크기를 고려한다.
-		rc.right = MAX(rmsg.Width() + gap_side * 2, MIN_SIZE_CX);// m_sz_button.cx * 2 + gap + button_gap * 2 + 40);
+		//width는 MIN_SIZE_CX 크기가 기본이지만 메시지가 길어지면 아이콘과의 기본 간격을 유지하면서 MAX_SIZE_CX까지 늘어난다.
+		int needed_width = icon_size + icon_msg_gap + rmsg.Width() + gap_side * 2;
+		rc.right = MAX(needed_width + 48, MIN_SIZE_CX);	//m_sz_button.cx * 2 + gap + button_gap * 2 + 40);
 
 		//만약 최대 너비를 넘어간다면 DT_WORDBREAK를 주고 다시 계산해서 height를 늘리려했으나 많이 복잡해진다.
 		//그냥 메시지박스를 띠울 때 width가 max를
@@ -232,8 +253,8 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	//버튼의 조합에 따라 버튼 위치를 재조정한다.
 	int x;
 	int button_count = 1;
-	//int res = type & MB_YESNO;
-	if ((type & MB_OKCANCEL) == MB_OKCANCEL)
+
+	if ((m_type & MB_OKCANCEL) == MB_OKCANCEL)
 	{
 		button_count = 2;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -244,7 +265,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 	}
-	else if ((type & MB_ABORTRETRYIGNORE) == MB_ABORTRETRYIGNORE)
+	else if ((m_type & MB_ABORTRETRYIGNORE) == MB_ABORTRETRYIGNORE)
 	{
 		button_count = 3;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -259,7 +280,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDIGNORE].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDIGNORE].ShowWindow(SW_SHOW);
 	}
-	else if ((type & MB_YESNOCANCEL) == MB_YESNOCANCEL)
+	else if ((m_type & MB_YESNOCANCEL) == MB_YESNOCANCEL)
 	{
 		button_count = 3;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -274,7 +295,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 	}
-	else if ((type & MB_YESNO) == MB_YESNO)
+	else if ((m_type & MB_YESNO) == MB_YESNO)
 	{
 		button_count = 2;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -285,7 +306,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDNO].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDNO].ShowWindow(SW_SHOW);
 	}
-	else if ((type & MB_RETRYCANCEL) == MB_RETRYCANCEL)
+	else if ((m_type & MB_RETRYCANCEL) == MB_RETRYCANCEL)
 	{
 		button_count = 2;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -296,7 +317,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDCANCEL].ShowWindow(SW_SHOW);
 	}
-	else if ((type & MB_CANCELTRYCONTINUE) == MB_CANCELTRYCONTINUE)
+	else if ((m_type & MB_CANCELTRYCONTINUE) == MB_CANCELTRYCONTINUE)
 	{
 		button_count = 3;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -311,7 +332,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDCONTINUE].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDCONTINUE].ShowWindow(SW_SHOW);
 	}
-	else //if (type == MB_OK)
+	else //if (m_type == MB_OK)
 	{
 		button_count = 1;
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
@@ -319,16 +340,68 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 		m_button[IDOK].ShowWindow(SW_SHOW);
 	}
 
+
+	//옵션에 따라 아이콘 인덱스 결정
+	//m_use_typed_title_back_color이 true이면 question은 연두색, error는 핑크색, info는 하늘색, warning은 주황색으로 표시된다.
+	if ((m_type & MB_ICONMASK) == MB_ICONSTOP)
+	{
+		m_icon_index = 0;
+		if (m_use_typed_title_back_color)
+			m_theme.cr_title_back = gRGB(242, 222, 222);
+	}
+	else if ((m_type & MB_ICONMASK) == MB_ICONQUESTION)
+	{
+		m_icon_index = 1;
+		if (m_use_typed_title_back_color)
+			m_theme.cr_title_back = gRGB(223, 240, 216);
+	}
+	else if ((m_type & MB_ICONMASK) == MB_ICONEXCLAMATION)
+	{
+		m_icon_index = 2;
+		if (m_use_typed_title_back_color)
+			m_theme.cr_title_back = gRGB(254, 219, 156);
+	}
+	else if ((m_type & MB_ICONMASK) == MB_ICONINFORMATION)
+	{
+		m_icon_index = 3;
+		if (m_use_typed_title_back_color)
+			m_theme.cr_title_back = gRGB(217, 237, 247);
+	}
+	else
+	{
+		m_icon_index = -1;
+	}
+
+	//메시지 타입에 따라 타이틀바 색상을 다르게 한다.
+	if (m_use_typed_title_back_color)
+	{
+		m_theme.cr_title_text = gRGB(0, 0, 0);
+
+		//버튼 색상도 타이틀바 색상과 동일하게 하려 했으나 우선 포커스 색상만 동일하게 한다.
+		for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
+		{
+			m_button[i].draw_focus_rect(true, m_theme.cr_title_back);
+			//m_button[i].set_text_color(m_theme.cr_title_text);
+			//m_button[i].set_back_color(m_theme.cr_title_back);
+		}
+
+		m_button_quit.set_text_color(m_theme.cr_title_text);
+		m_button_quit.set_back_color(m_theme.cr_title_back);
+		m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
+	}
+
+
 	//아이콘을 이 dlg에서 표시한다? CSCStatic에서 표시한다?
 	//CSCStatic에서도 아이콘을 표시하는 기능이 있지만 주로 한줄의 캡션과 함께 사용하는 것이 많고
 	//메시지박스의 아이콘의 레이아웃을 보면 메시지가 센터정렬이라고 해도 아이콘은 왼쪽 정렬되어 표시되는 등 다른점이 있으므로
 	//CSCStatic에 표시하지 않고 이 클래스의 OnPaint()에서 별도로 표시한다.
 	//아이콘의 크기만큼 좌측에서 떨어져서 메시지 본문이 표시된다.
-	m_static_message.MoveWindow(rc.left + gap_side + 32 + 16, rc.top + gap, rc.Width() - gap_side * 2 - 32 - 16, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
+	m_static_message.MoveWindow(rc.left + gap_side, rc.top + gap, rc.Width() - gap_side * 2, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
 	//m_static_message.MoveWindow(rc.left + gap_side, rc.top + gap, rc.Width() - gap_side * 2, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
 	m_static_message.SetWindowText(m_message);
 	m_static_message.ModifyStyle(0, m_align);
-	//m_static_message.set_icon(m_icons[m_icon_index], 32);
+	if (m_icon_index >= 0)
+		m_static_message.set_icon(m_icons[m_icon_index], icon_size, true);
 	m_static_message.ShowWindow(SW_SHOW);
 
 	Invalidate();
@@ -337,10 +410,13 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, DWORD al
 	{
 		CenterWindow(m_parent);
 		ShowWindow(SW_SHOW);
+
+		if (m_timeout_sec > 0)
+			SetTimer(timer_timeout, 1000, NULL);
 	}
 }
 
-void CSCMessageBox::set_align(DWORD align)
+void CSCMessageBox::set_align(int align)
 {
 	m_align = align;
 	m_static_message.ModifyStyle(0, align);
@@ -351,6 +427,7 @@ void CSCMessageBox::set_color_theme(int theme)
 	m_theme.set_color_theme(theme);
 
 	m_static_message.set_back_color(m_theme.cr_back);
+
 	m_button_quit.set_text_color(m_theme.cr_title_text);
 	m_button_quit.set_back_color(m_theme.cr_title_back);
 	m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
@@ -364,6 +441,11 @@ LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 		TRACE(_T("on_message_CGdiButton, WM_LBUTTONUP = %s\n"), m_button_caption[msg->ctrl_id - SC_BUTTON_ID]);
 		m_response = msg->ctrl_id - SC_BUTTON_ID;
 
+		if (!m_as_modal)
+		{
+			::SendMessage(m_parent->m_hWnd, Message_CSCMessageBox, (WPARAM)this, m_response);
+			ShowWindow(SW_HIDE);
+		}
 		/*
 		if (msg->pWnd == &m_button_ok)
 		{
@@ -409,16 +491,13 @@ void CSCMessageBox::OnBnClickedOk()
 {
 	m_response = IDOK;
 	if (!m_as_modal)
-		//CDialogEx::OnOK();
 		ShowWindow(SW_HIDE);
 }
 
 void CSCMessageBox::OnBnClickedCancel()
 {
-	//CDialogEx::OnCancel();
 	m_response = IDCANCEL;
 	if (!m_as_modal)
-		//CDialogEx::OnCancel();
 		ShowWindow(SW_HIDE);
 }
 
@@ -444,9 +523,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 
 	m_timeout_sec = timeout_sec;
 	if (m_timeout_sec > 0)
-	{
 		SetTimer(timer_timeout, 1000, NULL);
-	}
 
 	MSG		stmsg;
 
@@ -522,13 +599,13 @@ void CSCMessageBox::OnPaint()
 
 	//draw messagebox icon
 	//아이콘의 세로 위치는 메시지박스의 m_align에	따라 다르다.
-	CRect rmsg;
-	m_static_message.GetWindowRect(rmsg);
-	ScreenToClient(rmsg);
-	if (m_align & SS_CENTERIMAGE)
-		dc.DrawIcon(16, rmsg.CenterPoint().y - 16, m_icons[m_icon_index]);
-	else
-		dc.DrawIcon(16, rmsg.top, m_icons[m_icon_index]);
+	//CRect rmsg;
+	//m_static_message.GetWindowRect(rmsg);
+	//ScreenToClient(rmsg);
+	//if (m_align & SS_CENTERIMAGE)
+	//	dc.DrawIcon(16, rmsg.CenterPoint().y - 16, m_icons[m_icon_index]);
+	//else
+	//	dc.DrawIcon(16, rmsg.top, m_icons[m_icon_index]);
 
 
 	//draw border
@@ -556,7 +633,7 @@ void CSCMessageBox::OnTimer(UINT_PTR nIDEvent)
 
 		m_timeout_sec--;
 
-		if (m_timeout_sec < 0)
+		if (m_timeout_sec <= 0)
 		{
 			KillTimer(timer_timeout);
 

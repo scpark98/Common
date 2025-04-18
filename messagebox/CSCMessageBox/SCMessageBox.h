@@ -7,20 +7,34 @@
   - 사용법 및 옵션은 대부분 AfxMessageBox()와 동일함.
   - ColorTheme 역시 CColorTheme을 공통으로 사용하므로
 	parent의 ColorTheme을 설정해주면 parent와 동일한 테마로 동작함.
+
   - 사용법은 아래와 같음.
 	* parent의 .h에 CSCMessageBox m_message;를 선언해서 사용해도 되고
 	  매번 사용할 때마다 인스턴스 선언 후 dlg.DoModal()을 호출해도 되지만 전자를 권장함.
 	  왜냐하면 m_message.set_color_theme(CSCColorTheme::color_theme_linkmemine);과 같이 테마를 설정하면
 	  해당 프로젝트에서는 지정한 테마가 적용되므로 매번 테마를 설정할 필요가 없음.
-	1.AfxMessageBox()와 같이 Modal()로 띠울 경우
-	2.Modeless로 띠울 경우
-		- m_e
-		- m_message.create(this, _T("Title Text"));// , IDR_MAINFRAME);
-		- m_message.set_color_theme(CSCColorTheme::color_theme_linkmemine);
-		- m_message.set_message(_T("Test MessageBox"), MB_OKCANCEL);
-		- m_message.ShowWindow(SW_SHOW);
-	  
 
+	1.AfxMessageBox()와 같이 Modal()로 띠울 경우
+		//OnInitDialog() 등에서 아래와 같이 생성해준 후
+		m_message.create(this, _T("Title Text"), IDR_MAINFRAME);
+		m_message.set_color_theme(CSCColorTheme::color_theme_linkmemine);
+		...
+		//필요한 곳에서 DoModal()로 호출해서 사용.
+		int res = m_message.DoModal(_T("Test MessageBox"));	//선택된 버튼이 res로 넘어옴. if (res == MB_OK) ...
+
+	2.Modeless로 띠울 경우
+		//OnInitDialog() 등에서 아래와 같이 생성해준 후
+		- m_message.create(this, _T("Title Text"), IDR_MAINFRAME, false);
+		- m_message.set_color_theme(CSCColorTheme::color_theme_linkmemine);
+		...
+		//필요한 곳에서 set_message()로 메시지박스 표시
+		- m_message.set_message(_T("Test MessageBox"), MB_OKCANCEL);	//버튼 선택값은 메시지를 통해 parent로 전달됨.
+	  
+	* text의 width에 따라 어느 정도까지는 자동으로 넓혀지지만 MAX에 다다르면 잘리게 되는데
+	  WORDWRAP으로 처리해보고자 했으나 로직이 많이 복잡해지므로 굳이 처리하지 않음.
+	  text가 길어서 잘릴듯하다면 '\n'을 넣어서 멀티라인으로 출력할 것!
+
+* 
 * 
 */
 
@@ -29,6 +43,9 @@
 #include "../../colors.h"
 #include "../../CButton/GdiButton/GdiButton.h"
 #include "../../CStatic/SCStatic/SCStatic.h"
+
+//modeless로 생성한 경우 클릭된 버튼의 응답결과를 parent로 전달하기 위한 메시지
+static const UINT Message_CSCMessageBox = ::RegisterWindowMessage(_T("MessageString_CSCMessageBox"));
 
 // CSCMessageBox 대화 상자
 #define DEFAULT_SIZE_CX				440
@@ -78,12 +95,19 @@ public:
 	void			set_title_icon(UINT icon_id);
 
 //Modeless로 실행할 경우 호출. //실제 사용 시 MAX_WIDTH(800)를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
-	void			set_message(CString msg, int type = MB_OK, int timeout = 0, DWORD align = SS_CENTER | SS_CENTERIMAGE);
-	void			set_align(DWORD align);
+	//set_message(_T("changed message"));와 같이 동적으로 메시지만 변경할 경우는 type, timeout_sec, align은 기본 음수를 가지며
+	//음수일 경우는 기본값 또는 이미 설정된 값을 사용한다.
+	void			set_message(CString msg, int type = -1, int timeout = -1, int align = -1);
+	void			set_align(int align);
 
 //theme 관련 설정
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void			set_color_theme(int theme);
+
+	//normal message일 경우는 theme에 지정된 title_back_color를 사용하지만 이 함수를 사용하면
+	//question은 연두색, warning은 주황색, error는 핑크색, info는 하늘색으로 표시된다.
+	//타이틀바의 글자색은 검정으로 고정된다.
+	void			use_typed_title_back_color(bool use = true) { m_use_typed_title_back_color = use; }
 
 protected:
 	enum TIMER_ID
@@ -97,7 +121,7 @@ protected:
 	CString			m_message;
 	int				m_type = MB_OK;
 	int				m_timeout_sec = 0;
-	DWORD			m_align = SS_CENTER | SS_CENTERIMAGE;
+	int				m_align = SS_CENTER | SS_CENTERIMAGE;
 
 	int				m_response = -1;
 
@@ -115,8 +139,9 @@ protected:
 
 //messagebox icon
 //https://blog.naver.com/pks1217/220407691110
+	//MB_ICONSTOP, MB_ICONQUESTION, MB_ICONEXCLAMATION, MB_ICONINFORMATION
 	int				m_icon_index = 3;
-	HICON			m_icons[4];	//MB_ICONSTOP, MB_ICONQUESTION, MB_ICONEXCLAMATION, MB_ICONINFORMATION
+	HICON			m_icons[4];
 
 //font
 	LOGFONT			m_lf;
@@ -127,6 +152,9 @@ protected:
 	bool			m_auto_size = true;
 	void			recalc_layout();
 
+//theme
+	//true이면 question은 연두색, error는 핑크색, info는 하늘색, warning은 주황색으로 표시된다.
+	bool			m_use_typed_title_back_color = false;
 
 // 대화 상자 데이터입니다.
 //#ifdef AFX_DESIGN_TIME

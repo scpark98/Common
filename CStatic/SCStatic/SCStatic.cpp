@@ -269,27 +269,47 @@ void CSCStatic::OnPaint()
 
 	m_rect_text = rc;
 
+	//아이콘 또는 헤더 이미지와 텍스트 사이의 갭 크기지만 이미지의 여백, 크기 정도에 따라 갭은 비율로 조정되도록 수정되어야 한다.
+	int gap = 8;
 
 	//아이콘이 있으면 아이콘을 그려준다.
 	if (m_hIcon != NULL)
 	{
+		gap = 4;
+
 		CRect rIcon = m_rect_text;
-		CSize szImg = m_szIcon;
+		CSize szIcon = m_szIcon;
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
 			if (m_text.IsEmpty())
-				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2;
+				rIcon.left = rc.CenterPoint().x - m_szIcon.cx / 2;// (rc.Width() - szText.cx - m_szIcon.cx) / 2;
 			else
-				rIcon.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
+				rIcon.left = (rc.Width() - (m_szIcon.cx + gap + szText.cx)) / 2;// -m_szIcon.cx / 2 - 2;
 
-			m_rect_text.left = rIcon.left + szImg.cx + 2;
+			if (m_image_left_align_fix)
+			{
+				rIcon.left = 8;
+				m_rect_text.left = rc.CenterPoint().x - szText.cx / 2;
+			}
+			else
+			{
+				m_rect_text.left = rIcon.left + gap + m_szIcon.cx;
+			}
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
-			rIcon.left = rc.right - szText.cx - szImg.cx - 2;
-			m_rect_text.left = rIcon.left + szImg.cx + 2;
+			if (m_image_left_align_fix)
+			{
+				rIcon.left = 8;
+				m_rect_text.left = rc.right - gap - szText.cx;
+			}
+			else
+			{
+				rIcon.left = rc.right - szText.cx - m_szIcon.cx - 2;
+				m_rect_text.left = rIcon.left + m_szIcon.cx + 2;
+			}
 		}
 		else
 		{
@@ -300,47 +320,77 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rIcon.left = 2;
-				m_rect_text.left = 2 + szImg.cx + 2;
+				m_rect_text.left = rIcon.left + m_szIcon.cx + gap;
 			}
 		}
 
 		if (dwStyle & SS_CENTERIMAGE)
 		{
-			rIcon.top = rc.top + (rc.Height() - szImg.cy) / 2;
+			rIcon.top = rc.top + (rc.Height() - m_szIcon.cy) / 2;
 			m_rect_text.top = (rc.Height() - szText.cy) / 2;
 		}
 		else
 		{
 			if (m_text.IsEmpty())
+			{
 				rIcon.top = 0;
+			}
 			else
-				rIcon.top = szText.cy / 2 - szImg.cy / 2;
+			{
+				rIcon.top = szText.cy / 2 - m_szIcon.cy / 2;
 
-			m_rect_text.top = 0;
+				//top 정렬인데 아이콘이 커서 상단을 벗어난다면 이미지, 텍스트 모두 아래로 내려준다.
+				if (rIcon.top < 0)
+				{
+					m_rect_text.top -= rIcon.top;
+					rIcon.top = 0;
+				}
+			}
 		}
 
 		if (!m_bBlinkStatus)
-			::DrawIconEx(dc.GetSafeHdc(), rIcon.left, rIcon.top, m_hIcon, szImg.cx, szImg.cy, 0, NULL, DI_NORMAL);
+			::DrawIconEx(dc.GetSafeHdc(), rIcon.left, rIcon.top, m_hIcon, m_szIcon.cx, m_szIcon.cy, 0, NULL, DI_NORMAL);
 	}
 	else if (m_header_images.size() > 0)
 	{
 		CRect rImg = m_rect_text;
 		CSize szImg(m_header_images[m_header_image_index]->width, m_header_images[m_header_image_index]->height);
 
-		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
+		//보통 align은 텍스트가 중앙 정렬이면 "image + header" 둘 다 중앙에, LEFT이면 둘 다 왼쪽부터 정렬되지만
+		//m_image_left_align_fix가 true로 설정된 경우에는 이미지만 왼쪽에 정렬하고 텍스트는 지정된 align으로 정렬된다.
+		//특별이 이러한 경우가 적용되는 곳은 바로 CSCMessageBox이다.
+		//AfxMessageBox() 또는 그와 유사한 메시지박스들을 보면 아이콘은 항상 왼쪽에 표시되고 텍스트는 아이콘과 관계없이 지정된 정렬방식으로 표시된다.
+
+		//header image의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
 			if (m_text.IsEmpty())
-				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2;
+				rImg.left = rc.CenterPoint().x - szImg.cx / 2;
 			else
-				rImg.left = (rc.Width() - szText.cx - szImg.cx) / 2 - szImg.cx / 2 - 2;
+				rImg.left = (rc.Width() - (szImg.cx + gap + szText.cx)) / 2;
 
-			m_rect_text.left = rImg.left + m_header_images[m_header_image_index]->width + 2;
+			if (m_image_left_align_fix)
+			{
+				rImg.left = 8;
+				m_rect_text.left = rc.CenterPoint().x - szText.cx / 2;
+			}
+			else
+			{
+				m_rect_text.left = rImg.left + gap + m_header_images[m_header_image_index]->width;
+			}
 		}
 		else if (dwStyle & SS_RIGHT)
 		{
-			rImg.left = rc.right - szText.cx - szImg.cx - 2;
-			m_rect_text.left = rImg.left + szImg.cx + 2;
+			if (m_image_left_align_fix)
+			{
+				rImg.left = 8;
+				m_rect_text.left = rc.right - gap - szText.cx;
+			}
+			else
+			{
+				rImg.left = rc.right - szText.cx - szImg.cx - 2;
+				m_rect_text.left = rImg.left + szImg.cx + 2;
+			}
 		}
 		else
 		{
@@ -351,7 +401,7 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rImg.left = 2;
-				m_rect_text.left = 2 + szImg.cx + 2;
+				m_rect_text.left = rImg.left + szImg.cx + gap;
 			}
 		}
 
@@ -362,12 +412,23 @@ void CSCStatic::OnPaint()
 		}
 		else
 		{
+			//m_rect_text.top = 0;
+
 			if (m_text.IsEmpty())
+			{
 				rImg.top = 0;
+			}
 			else
+			{
 				rImg.top = szText.cy / 2 - szImg.cy / 2;
 
-			m_rect_text.top = 0;
+				//top 정렬인데 아이콘이 커서 상단을 벗어난다면 이미지, 텍스트 모두 아래로 내려준다.
+				if (rImg.top < 0)
+				{
+					m_rect_text.top -= rImg.top;
+					rImg.top = 0;
+				}
+			}
 		}
 
 		m_header_images[0]->draw(g, rImg.left, rImg.top);
@@ -408,7 +469,7 @@ void CSCStatic::OnPaint()
 		//아이콘이 있을 경우에는 아이콘의 좌표가 결정되고 텍스트의 좌표 또한
 		//정렬 방식에 따라 자동 결정된다. 따라서 정렬 플래그 값을 무시하도록 해야 정상 표시된다.
 		//이는 차후 위의 아이콘과 텍스트에 대한 좌표값 계산 루틴을 전체적으로 수정해야 할 듯하다.
-		if (m_hIcon)
+		if (m_hIcon || (m_header_images.size() > 0))
 		{
 			dwText &= ~(DT_CENTER);
 			dwText &= ~(DT_RIGHT);
@@ -749,7 +810,7 @@ BOOL CSCStatic::PreTranslateMessage(MSG* pMsg)
 	return CStatic::PreTranslateMessage(pMsg);
 }
 
-void CSCStatic::set_icon(HICON hIcon, int nSize)
+void CSCStatic::set_icon(HICON hIcon, int nSize, bool left_align_fix)
 {
 	ICONINFO	iconInfo;
 
@@ -764,6 +825,7 @@ void CSCStatic::set_icon(HICON hIcon, int nSize)
 	m_szIcon.cx = nSize;//(DWORD)(iconInfo.xHotspot * 2);
 	m_szIcon.cy = nSize;//(DWORD)(iconInfo.yHotspot * 2);
 
+	m_image_left_align_fix = left_align_fix;
 
 	//GetIconInfo 함수는 hbmMask와 hbmColor 비트맵을 생성하여 리턴하므로
 	//hbmMask와 hbmColor 비트맵을 해제해주어야 함. 그렇지 않으면 GDI개체가 계속 늘어남.
@@ -785,7 +847,7 @@ void CSCStatic::set_icon(HICON hIcon, int nSize)
 	Invalidate();
 }
 
-void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
+void CSCStatic::set_icon(UINT nIDResource, int nSize, bool left_align_fix)
 {
 	if  (m_hWnd == NULL)
 		return;
@@ -801,7 +863,7 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize /*= 16*/)
 	if (m_hIcon == NULL)
 		return;
 
-	set_icon(m_hIcon, nSize);
+	set_icon(m_hIcon, nSize, left_align_fix);
 }
 
 void CSCStatic::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	gcr_parent_back)
@@ -1081,11 +1143,11 @@ void CSCStatic::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	Invalidate();
 }
 
-void CSCStatic::add_header_image(UINT id)
+void CSCStatic::add_header_image(UINT id, bool left_align_fix)
 {
 	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
 	m_header_images.push_back(img);
-
+	m_image_left_align_fix = left_align_fix;
 	//RedrawWindow();
 	//UpdateWindow();
 	//Invalidate();

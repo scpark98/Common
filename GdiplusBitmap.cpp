@@ -173,14 +173,10 @@ void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
 	}
 }
 
-bool CGdiplusBitmap::load(CString file, bool show_error)
+bool CGdiplusBitmap::load(CString file)
 {
 	if (!PathFileExists(file))
-	{
-		if (show_error)
-			AfxMessageBox(file + _T("\n\nFile not found."));
 		return false;
-	}
 
 	release();
 
@@ -233,39 +229,25 @@ bool CGdiplusBitmap::load(CString file, bool show_error)
 		resolution();
 
 		if (width == 0 || height == 0)
-		{
-			if (show_error)
-			{
-				CString str;
-				str.Format(_T("%s\nImage width or height is 0."));
-				AfxMessageBox(str);
-			}
 			return false;
-		}
 
 		m_filename = file;
 		return true;
 	}
 
-	if (show_error)
-	{
-		CString str;
-		str.Format(_T("%s\nFile open failed."), file);
-		AfxMessageBox(str);
-	}
 	return false;
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-bool CGdiplusBitmap::load(UINT id, bool show_error)
+bool CGdiplusBitmap::load(UINT id)
 {
 	if (id <= 0)
 		return false;
 
-	return load(_T("PNG"), id, show_error);
+	return load(_T("PNG"), id);
 }
 
-bool CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
+bool CGdiplusBitmap::load(CString sType, UINT id)
 {
 	release();
 
@@ -283,19 +265,66 @@ bool CGdiplusBitmap::load(CString sType, UINT id, bool show_error)
 		m_pBitmap = Gdiplus::Bitmap::FromResource(NULL, (WCHAR*)MAKEINTRESOURCE(id));
 	}
 
-	if (m_pBitmap)
-	{
-		m_filename = _T("resource_image.") + sType;
-		resolution();
-		return true;
-	}
+	if (!m_pBitmap)
+		return false;
 
-	return false;
+	m_filename = _T("resource_image.") + sType;
+	resolution();
+	return true;
+}
+
+bool CGdiplusBitmap::load_icon(UINT id, int size)
+{
+	release();
+
+	HICON hIcon = ::load_icon(NULL, id, size);
+	if (hIcon == NULL)
+		return false;
+
+	//FromHICON()을 이용하면 16bit로? 로드되므로 깔끔하게 그려지지 않는다.
+	//m_pBitmap = Gdiplus::Bitmap::FromHICON(hIcon);
+
+	//실패
+	//m_pBitmap = GetImageFromResource(_T("ICO"), id);
+
+	//직접 m_pBitmap을 생성하고 DC를 얻어 그려주는 방법 시도.
+	create(size, size);
+	Gdiplus::Graphics g(m_pBitmap);
+
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	HDC hdc = g.GetHDC();
+	// Make GDI calls, but don't call any methods
+	// on g until after the call to ReleaseHDC.
+	::DrawIconEx(hdc, 0, 0, hIcon, size, size, 0, NULL, DI_NORMAL);
+	g.ReleaseHDC(hdc);
+
+	//g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, size, size));
+
+
+	m_filename = _T("resource ico image.");
+	resolution();
+
+	save(_T("d:\\ico.png"));
+	return true;
 }
 
 Gdiplus::Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 {
-	HRSRC hResource = FindResource(NULL, MAKEINTRESOURCE(id), sType);
+	HRSRC hResource;
+
+	//ICO를 이렇게 바로 로딩하는 것은 일단 실패함.
+	if (sType == _T("ICO"))
+	{
+		//HMODULE hMod = LoadLibraryExW(L"C:\\Windows\\SysWOW64\\explorer.exe",
+		//	NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+		hResource = FindResource(AfxGetInstanceHandle(), MAKEINTRESOURCE(id), RT_ICON);
+	}
+	else
+	{
+		hResource = FindResource(NULL, MAKEINTRESOURCE(id), sType);
+	}
 
 	if (!hResource)
 		return NULL;
@@ -687,19 +716,19 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
-//bmp 이미지를 현재 이미지의 targetRect에 그린다.
-CRect CGdiplusBitmap::draw(CGdiplusBitmap *bmp, CRect* targetRect)
+//CGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
+CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 {
 	Gdiplus::Graphics g(m_pBitmap);
 
-	CRect dst(0, 0, bmp->width, bmp->height);
+	CRect dst(0, 0, img->width, img->height);
 
 	if (targetRect)
 	{
 		dst = *targetRect;
 	}
 
-	g.DrawImage(bmp->m_pBitmap, dst.left, dst.top, dst.Width(), dst.Height());
+	g.DrawImage(img->m_pBitmap, dst.left, dst.top, dst.Width(), dst.Height());
 
 	return dst;
 }

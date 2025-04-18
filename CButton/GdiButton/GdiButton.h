@@ -318,9 +318,9 @@ public:
 	void		set_round(int round, Gdiplus::Color gcr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
 
 	//포커스 사각형 관련
-	void		ShowFocusRect( bool bShow = true ) { m_draw_focus_rect = bShow; Invalidate(); }
-	void		SetFocusRectColor(Gdiplus::Color crFocus ) { m_crFocusRect = crFocus; Invalidate(); }
-	void		SetFocusRectWidth( int nWidth ) { m_nFocusRectWidth = nWidth; Invalidate(); }
+	void		draw_focus_rect(bool draw = true, Gdiplus::Color cr_focus = Gdiplus::Color::LightGray) { m_draw_focus_rect = draw; m_cr_focus_rect = cr_focus; Invalidate(); }
+	void		set_focus_rect_color(Gdiplus::Color cr_focus) { m_cr_focus_rect = cr_focus; Invalidate(); }
+	void		set_focus_rect_width(int nWidth) { m_focus_rect_width = nWidth; Invalidate(); }
 
 	void		use_hover(bool use = true);
 	//thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
@@ -463,8 +463,8 @@ protected:
 
 	bool		m_bHasFocus = false;
 	bool		m_draw_focus_rect = false;				//포커스 사각형 표시 여부(기본값 false)
-	Gdiplus::Color	m_crFocusRect = Gdiplus::Color::DimGray;	//색상
-	int			m_nFocusRectWidth = 1;					//두께
+	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::DimGray;	//색상
+	int			m_focus_rect_width = 1;					//두께
 
 	bool		m_b3DRect = true;						//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(1, 1);			//눌렸을 때 그려질 위치. 이 값이 클 경우 이미지가 여백이 없다면 ㅇ

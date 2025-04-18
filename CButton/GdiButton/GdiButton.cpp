@@ -491,7 +491,8 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 {
 	//배경색을 설정하면 배경 이미지는 해제시킨다.
 	//단, round가 들어간다면 투명처리해야 한다.
-	m_transparent = false;
+	if (m_round <= 0)
+		m_transparent = false;
 
 	m_back_img.release();
 	m_back_img_origin.release();
@@ -1113,12 +1114,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (m_draw_focus_rect && m_bHasFocus)	//옵션처리하기 위해 이 코드를 사용함
 	{
 		CRect rfocus = rc;
-		rfocus.DeflateRect(1, 1);
+		rfocus.DeflateRect(1, 1, 2, 2);
 		//TRACE(_T("draw focus rect\n"));
-		dc.DrawFocusRect(rfocus);
-		//Gdiplus::Pen	pen(m_crFocusRect, (Gdiplus::REAL)m_nFocusRectWidth);
-		//pen.SetDashStyle(Gdiplus::DashStyleDot);
-		//g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
+		//dc.DrawFocusRect(rfocus);
+		Gdiplus::Pen	pen(m_cr_focus_rect, (Gdiplus::REAL)m_focus_rect_width);
+		pen.SetDashStyle(Gdiplus::DashStyleDot);
+		if (m_round <= 0)
+			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
+		else
+			draw_round_rect(&g, CRectTogpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
 	}
 	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
 	{

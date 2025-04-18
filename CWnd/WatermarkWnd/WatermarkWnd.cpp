@@ -158,7 +158,7 @@ bool CWatermarkWnd::create(HWND parentHwnd, CString text, CRect rw)
 	memset(&m_lf, 0, sizeof(LOGFONT));
 	_tcscpy_s(m_lf.lfFaceName, _T("맑은 고딕"));
 	m_lf.lfWeight = FW_MEDIUM;
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
 	m_lf.lfEscapement = m_font_angle * 10;
 	m_lf.lfQuality = CLEARTYPE_QUALITY;
 
@@ -189,7 +189,7 @@ void CWatermarkWnd::reconstruct_font()
 {
 	m_font.DeleteObject();
 
-	m_lf.lfHeight = get_logical_size_from_font_size(m_hWnd, m_font_size);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
 	m_lf.lfEscapement = m_font_angle * 10;
 
 	m_font.DeleteObject();

@@ -102,6 +102,8 @@ public:
 	CGdiplusBitmap(IStream* pStream);
 	CGdiplusBitmap(CString pFile);
 	CGdiplusBitmap(CGdiplusBitmap* src);
+	//sType은 "png", "jpg", "gif"를 대표적으로 지원하며 "tiff", "webp" 등 다른 포맷도 지원하지만 우선 배제함.
+	//"ico" 파일은 크기 파라미터도 중요하므로 load_icon()을 사용하도록 한다.
 	CGdiplusBitmap(CString sType, UINT id);
 	CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
@@ -122,12 +124,13 @@ public:
 	void	release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
-	bool	load(CString sFile, bool show_error = false);
+	bool	load(CString sFile);
 	//다음 예시와 같이 리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
 	//m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
-	bool	load(CString sType, UINT id, bool show_error = false);
+	bool	load(CString sType, UINT id);
 	//png일 경우는 sType을 생략할 수 있다.
-	bool	load(UINT id, bool show_error = false);
+	bool	load(UINT id);
+	bool	load_icon(UINT id, int size = 32);
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 
@@ -160,8 +163,8 @@ public:
 	CRect	draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 	CRect	draw(Gdiplus::Graphics& g, CGdiplusBitmap mask, CRect targetRect);
 
-	//bmp 이미지를 현재 이미지의 targetRect에 그린다.
-	CRect	draw(CGdiplusBitmap *bmp, CRect* targetRect = NULL);
+	//CGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
+	CRect	draw(CGdiplusBitmap *img, CRect* targetRect = NULL);
 
 	//이 차례는 3state button의 차례와 동일하게 정의함.
 	//BST_UNCHECKED, BST_CHECKED, BST_INDETERMINATE

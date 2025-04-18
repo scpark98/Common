@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "../../colors.h"
 #include "../../GdiplusBitmap.h"
 
 /*
@@ -125,7 +126,6 @@ public:
 	//pos 위치에 resource id 이미지를 표시한다.
 	void	set_step_image(int pos, int id);
 
-
 	enum SCSliderCtrlStyle
 	{
 		style_normal = 0,
@@ -136,6 +136,7 @@ public:
 		style_progress_line,
 		style_track,
 		style_step,		//진행 단계를 표시. 1-2-3-4 과 같은 형태. 
+		style_koino,
 	};
 
 	enum SCSliderCtrlTextStyle
@@ -171,6 +172,7 @@ public:
 
 	//int		GetPos();
 	void	SetPos(int pos);
+	void	set_range(int lower, int upper) { SetRange(lower, upper); }
 	int		get_lower();
 	int		get_upper();
 	void	set_step_completed() { m_step_completed = true; Invalidate(); }
@@ -190,15 +192,19 @@ public:
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
 
 	void	set_track_color(COLORREF cr_active, COLORREF cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
-	void	set_back_color(COLORREF crBack);
+	//void	set_back_color(COLORREF crBack);
 	void	set_active_color(COLORREF crActive);
 	void	set_inactive_color(COLORREF crInActive);
 	void	set_thumb_color(COLORREF crThumb);
 
-	void	set_text_color(COLORREF cr_text) { m_cr_text = cr_text; Invalidate(); }
+	//void	set_text_color(COLORREF cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	void	set_text_style(int text_style) { m_text_style = text_style; Invalidate(); }
 	void	set_text(LPCTSTR text, ...);
 	void	set_text_dual(LPCTSTR text_dual, ...);
+
+	int		m_tic_freq = 0;
+	bool	m_tic_show_text = false;	//default = false
+	void	set_tic_freq(int freq, bool show_text = false) { m_tic_freq = freq; m_tic_show_text = show_text; }
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
@@ -252,6 +258,11 @@ public:
 	//border
 	void			draw_progress_border(bool draw = true) { m_draw_progress_border = draw; }
 	void			set_progress_border_color(Gdiplus::Color cr) { m_cr_progress_border = cr; }
+
+//color theme 관련
+	CSCColorTheme	m_theme = CSCColorTheme(this);	//m_theme(this); 는 오류.
+	void			set_color_theme(int theme);
+
 protected:
 	// Attributes
 
@@ -317,27 +328,27 @@ protected:
 	CString			m_text;			//m_text_style == text_style_user_defined일 경우 표시되는 텍스트
 	CString			m_text_dual;	//m_text_style == text_style_dual_text일 경우 오른쪽에 표시되는 텍스트
 	int				m_text_style = text_style_value;
-	COLORREF		m_cr_text = RGB(192, 192, 192);
+	//COLORREF		m_cr_text = RGB(192, 192, 192);
 
 	bool			m_transparent = false;
-	COLORREF		m_cr_back;				// back color of control
-	COLORREF		m_cr_active;			//processed area
-	COLORREF		m_cr_inactive;			//not processed area
+	//COLORREF		m_cr_back;				// back color of control
+	Gdiplus::Color	m_cr_active;			//processed area
+	Gdiplus::Color	m_cr_inactive;			//not processed area
 	int				m_track_height = 14;	//rc.CenterPoint().y +- m_track_height / 2. ex) 6 and 7 is equal height
 	CPen			m_penThumb;
 	CPen			m_penThumbLight;
 	CPen			m_penThumbLighter;
 	CPen			m_penThumbDark;
 	CPen			m_penThumbDarker;
-	COLORREF		m_cr_thumb;
-	COLORREF		m_cr_thumbLight;
-	COLORREF		m_cr_thumbLighter;
-	COLORREF		m_cr_thumbDark;
-	COLORREF		m_cr_thumbDarker;
-	COLORREF		m_crBookmark;
-	COLORREF		m_crBookmarkCurrent = RGB(0, 255, 0);
+	Gdiplus::Color	m_cr_thumb;
+	Gdiplus::Color	m_cr_thumbLight;
+	Gdiplus::Color	m_cr_thumbLighter;
+	Gdiplus::Color	m_cr_thumbDark;
+	Gdiplus::Color	m_cr_thumbDarker;
+	Gdiplus::Color	m_crBookmark;
+	Gdiplus::Color	m_crBookmarkCurrent = RGB(0, 255, 0);
+
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
-	COLORREF		enable_color(COLORREF cr, int offset = 0);
 	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 0);
 
 	CWnd*			m_pParentWnd;

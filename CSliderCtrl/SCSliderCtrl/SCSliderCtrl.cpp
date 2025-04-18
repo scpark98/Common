@@ -22,18 +22,7 @@ CSCSliderCtrl::CSCSliderCtrl()
 	set_style(m_style);
 
 	m_nEventMsgStyle = AfxGetApp()->GetProfileInt(_T("setting"), _T("event msg style"), msg_style_timer);
-
-	m_cr_back	= ::GetSysColor(COLOR_3DFACE);
-	m_cr_active	= RGB(64, 80, 181);//RGB(128, 192, 255);
-	m_cr_inactive= get_color(m_cr_back, -64);
-	m_cr_thumb	= RGB(64, 80, 181); //RGB(124, 192, 232);
-
-	//북마크 컬러는 처음에만 배경의 보색으로 설정되지만
-	//차후 배경이 바뀌더라도 북마크의 색상까지 자동으로 보색으로 바꾸는 것은 좋지 않다.
-	m_crBookmark = color_complementary(m_cr_back);
-
-	set_thumb_color(m_cr_thumb);
-
+	//set_color_theme(CSCColorTheme::color_theme_default);
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
 
@@ -108,14 +97,14 @@ void CSCSliderCtrl::OnPaint()
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
 	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
-	CRect track = m_rc;
+	CRect rtrack = m_rc;
 
 	if (m_style <= style_thumb_round)
 	{
 		if (m_is_vertical)
-			track.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
+			rtrack.DeflateRect((m_rc.Width() - m_track_thick) / 2, m_thumb.cy / 2);
 		else
-			track.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
+			rtrack.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - m_track_thick) / 2);
 	}
 
 	//m_rc의 y센터좌표
@@ -153,35 +142,44 @@ void CSCSliderCtrl::OnPaint()
 
 
 	//inactive 영역을 먼저 그리고
-	if (m_style == style_thumb_round)
+	if (m_style <= style_value)
 	{
-		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, cr_inactive);
-	}
-	else if (m_style == style_thumb || m_style == style_value)
-	{
-		dc.FillSolidRect(pxpos, cy - m_track_height / 2, track.right - pxpos, m_track_height, cr_inactive);
-			
-		CPen	penDark(PS_SOLID, 1, get_color(cr_inactive, -24));
-		CPen	penLight(PS_SOLID, 1, get_color(cr_inactive, 36));
+		//tic text가 표시되는 경우에는 gap + m_thumb.cy + 4 + text_height(12) 만큼이 센터에 위치하도록 보정해준다.
+		if (m_tic_show_text)
+		{
+			rtrack.top = (m_rc.Height() - (2 + m_thumb.cy + 10)) / 2;
+			rtrack.bottom = rtrack.top + m_thumb.cy;
+			dc.FillSolidRect(pxpos, rtrack.CenterPoint().y - m_track_height / 2, rtrack.right - pxpos, m_track_height, cr_inactive);
+		}
+		else
+		{
+			dc.FillSolidRect(pxpos, cy - m_track_height / 2, rtrack.right - pxpos, m_track_height, cr_inactive);
+		}
+		
+		if (m_style == style_value)
+		{
+			CPen	penDark(PS_SOLID, 1, get_color(cr_inactive, -24));
+			CPen	penLight(PS_SOLID, 1, get_color(cr_inactive, 36));
 
-		dc.SelectObject(&penDark);
-		dc.MoveTo(pxpos, cy - m_track_height / 2);
-		dc.LineTo(track.right, cy - m_track_height / 2);
-		//dc.LineTo(m_rc.right - 1, cy + m_track_height / 2);
+			dc.SelectObject(&penDark);
+			dc.MoveTo(pxpos, cy - m_track_height / 2);
+			dc.LineTo(rtrack.right, cy - m_track_height / 2);
+			//dc.LineTo(m_rc.right - 1, cy + m_track_height / 2);
 
-		dc.SelectObject(&penLight);
-		dc.MoveTo(pxpos, cy + m_track_height / 2);
-		dc.LineTo(track.right - 1, cy + m_track_height / 2);
-		dc.LineTo(track.right - 1, cy - m_track_height / 2);
+			dc.SelectObject(&penLight);
+			dc.MoveTo(pxpos, cy + m_track_height / 2);
+			dc.LineTo(rtrack.right - 1, cy + m_track_height / 2);
+			dc.LineTo(rtrack.right - 1, cy - m_track_height / 2);
 
-		dc.SelectObject(pOldPen);
-		penDark.DeleteObject();
-		penLight.DeleteObject();
+			dc.SelectObject(pOldPen);
+			penDark.DeleteObject();
+			penLight.DeleteObject();
+		}
 	}
 	else if (m_style == style_progress)
 	{
-		track = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2);
-		dc.FillSolidRect(track, cr_inactive);
+		rtrack = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2);
+		dc.FillSolidRect(rtrack, cr_inactive);
 	}
 	else if (m_style == style_progress_line)
 	{
@@ -323,28 +321,39 @@ void CSCSliderCtrl::OnPaint()
 #if 1
 	if (m_style <= style_value)
 	{
-		dc.FillSolidRect(track.left, cy - m_track_height / 2, pxpos - track.left, m_track_height, cr_active);
-			
-		CPen	penDark(PS_SOLID, 1, get_color(cr_active, -64));
-		CPen	penLight(PS_SOLID, 1, get_color(cr_active, 64));
+		//tic text가 표시되는 경우에는 m_thumb.cy + 2(gap) + text_height(10) 만큼이 센터에 위치하도록 보정해준다.
+		if (m_tic_show_text)
+		{
+			dc.FillSolidRect(rtrack.left, rtrack.CenterPoint().y - m_track_height / 2, pxpos - rtrack.left, m_track_height, cr_active);
+		}
+		else
+		{
+			dc.FillSolidRect(rtrack.left, cy - m_track_height / 2, pxpos - rtrack.left, m_track_height, cr_active);
+		}
+		
+		if (m_style == style_value)
+		{
+			CPen	penDark(PS_SOLID, 1, get_color(cr_active, -64));
+			CPen	penLight(PS_SOLID, 1, get_color(cr_active, 64));
 
-		dc.SelectObject(&penDark);
-		dc.MoveTo(pxpos, cy - m_track_height / 2);
-		dc.LineTo(track.left, cy - m_track_height / 2);
-		dc.LineTo(track.left, cy + m_track_height / 2);
+			dc.SelectObject(&penDark);
+			dc.MoveTo(pxpos, cy - m_track_height / 2);
+			dc.LineTo(rtrack.left, cy - m_track_height / 2);
+			dc.LineTo(rtrack.left, cy + m_track_height / 2);
 
-		dc.SelectObject(&penLight);
-		dc.MoveTo(track.left + 1, cy + m_track_height / 2);
-		dc.LineTo(pxpos, cy + m_track_height / 2);
+			dc.SelectObject(&penLight);
+			dc.MoveTo(rtrack.left + 1, cy + m_track_height / 2);
+			dc.LineTo(pxpos, cy + m_track_height / 2);
 
-		dc.SelectObject(pOldPen);
-		penDark.DeleteObject();
-		penLight.DeleteObject();
+			dc.SelectObject(pOldPen);
+			penDark.DeleteObject();
+			penLight.DeleteObject();
+		}
 	}
 	else if (m_style == style_progress)
 	{
-		track = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2);
-		dc.FillSolidRect(track, cr_active);
+		rtrack = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2);
+		dc.FillSolidRect(rtrack, cr_active);
 
 		//m_crValueText = RGB(12, 162, 255);
 		//m_cr_active = RGB(128,255,128);
@@ -426,15 +435,15 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_track)
 	{
-		CRect r = track;
+		CRect r = rtrack;
 		int cy = r.CenterPoint().y;
 		r.top = cy - 2;
 		r.bottom = cy + 2;
 		r.left += 2;
 		r.right = pxpos;
 
-		if (r.right > track.right - 2)
-			r.right = track.right - 2;
+		if (r.right > rtrack.right - 2)
+			r.right = rtrack.right - 2;
 
 		//CRect	rActive(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
 		if (r.right > r.left)
@@ -462,13 +471,55 @@ void CSCSliderCtrl::OnPaint()
 	//DrawRectangle(&dc, track, red);
 	//DrawRectangle(&dc, m_rc, red);
 
+
+	//tic 표시
+	if (m_tic_freq > 0)
+	{
+		int		tic = lower;
+		int		tic_pos = 0;
+		int		tic_interval = (upper - lower) / m_tic_freq;
+		if (m_is_vertical)
+		{
+			for (i = 0; i <= m_tic_freq; i++)
+			{
+				tic_pos = Pos2Pixel(tic);
+				//dc.FillSolidRect(m_rc.left, tic_pos - 1, m_rc.Width(), 2, cr_text);
+				//g.FillEllipse(&Gdiplus::SolidBrush(gcr_thumb), CRectTogpRect(r));
+				tic += tic_interval;
+			}
+		}
+		else
+		{
+			dc.SetBkMode(TRANSPARENT);
+			dc.SetTextColor(m_cr_text);
+
+			for (i = 0; i <= m_tic_freq; i++)
+			{
+				tic_pos = Pos2Pixel(tic);
+				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
+				g.FillEllipse(&Gdiplus::SolidBrush(gcr_thumb), CRectTogpRect(rtic));
+
+				if (m_tic_show_text)
+				{
+					//range가 0 ~ 100일 때 0은 충분히 표시되지만 100은 우측이 잘리게 된다.
+					//이를 보정하려면 트랙 양쪽을 텍스트가 잘리지 않게 줄여줘야 하지만 좌표 계산들이 여기저기 복잡해진다.
+					//따라서 텍스트를 -6 ~ +6까지 12의 width를 주고 center 정렬하여 표시하고 맨 마지막 틱만 오른쪽 정렬로 처리한다.
+					CRect rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
+					if (i == m_tic_freq)
+						dc.DrawText(i2S(get_lower() + tic_interval * i), rtext, DT_RIGHT | DT_TOP | DT_NOCLIP);
+					else
+						dc.DrawText(i2S(get_lower() + tic_interval * i), rtext, DT_CENTER | DT_TOP | DT_NOCLIP);
+				}
+				tic += tic_interval;
+			}
+		}
+	}
+
 	// 손잡이(thumb)를 그린다
 #if 1
 	if (m_style <= style_value)
 	{
-		CRect	rThumb = CRect(pxpos - m_thumb.cx / 2, cy - m_thumb.cy / 2, 0, 0);
-		rThumb.right = rThumb.left + m_thumb.cx;
-		rThumb.bottom = rThumb.top + m_thumb.cy;
+		CRect	rThumb = make_center_rect(pxpos, rtrack.CenterPoint().y - 1, m_thumb.cx, m_thumb.cy);
 
 		if (false)//!IsWindowEnabled())
 		{
@@ -506,7 +557,7 @@ void CSCSliderCtrl::OnPaint()
 			//dc.FillSolidRect(rThumb, m_cr_thumb);
 			Gdiplus::Color cr_pen(255, GetRValue(255), GetGValue(0), GetBValue(0));
 			Gdiplus::Pen pen(enable_color(cr_pen), 1.0f);
-			Gdiplus::Color cr_brush_outer(128, GetRValue(m_cr_thumb), GetGValue(m_cr_thumb), GetBValue(m_cr_thumb));
+			Gdiplus::Color cr_brush_outer(96, GetRValue(m_cr_thumb), GetGValue(m_cr_thumb), GetBValue(m_cr_thumb));
 			Gdiplus::SolidBrush brush_outer(enable_color(cr_brush_outer));
 			Gdiplus::Color cr_brush_inner(255, GetRValue(m_cr_thumb-64), GetGValue(m_cr_thumb-64), GetBValue(m_cr_thumb-64));
 			Gdiplus::SolidBrush brush_inner(enable_color(cr_brush_inner));
@@ -636,14 +687,17 @@ void CSCSliderCtrl::OnPaint()
 
 	if (m_draw_progress_border)
 	{
-		track.left = 0;
-		track.right = m_rc.right - 1;
-		draw_rectangle(&dc, track, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
+		rtrack.left = 0;
+		rtrack.right = m_rc.right - 1;
+		draw_rectangle(&dc, rtrack, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 
 	dc.SelectObject(pOldFont);
 	dc.SelectObject(pOldFont);
 	dc.SelectObject(pOldPen);
+
+	//영역 확인용
+	//draw_rectangle(&dc, m_rc, red);
 
 	// Do not call CSliderCtrl::OnPaint() for painting messages
 }
@@ -1222,7 +1276,7 @@ void CSCSliderCtrl::set_style(int nStyle)
 	else if (m_style == style_thumb_round)
 	{
 		m_thumb = CSize(16, 16);
-		m_track_height = 4;
+		m_track_height = 2;
 	}
 	else if (m_style == style_value)
 	{
@@ -1654,4 +1708,14 @@ int32_t CSCSliderCtrl::step(int step)
 	int pos = GetPos();
 	SetPos(pos + step);
 	return GetPos();
+}
+
+void CSCSliderCtrl::set_color_theme(int theme)
+{
+	m_theme.set_color_theme(theme);
+	m_cr_inactive = get_color(m_theme.cr_back, -64);
+
+	//기본 m_theme에서 보유하지 않은 다른 컬러들에 대한 세팅 추가
+	m_cr_active = gRGB(64, 80, 181);//RGB(128, 192, 255);
+	m_cr_thumb = gRGB(64, 80, 181); //RGB(124, 192, 232);
 }

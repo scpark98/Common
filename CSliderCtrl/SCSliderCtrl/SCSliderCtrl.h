@@ -191,13 +191,13 @@ public:
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
 
-	void	set_track_color(COLORREF cr_active, COLORREF cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
-	//void	set_back_color(COLORREF crBack);
-	void	set_active_color(COLORREF crActive);
-	void	set_inactive_color(COLORREF crInActive);
-	void	set_thumb_color(COLORREF crThumb);
+	void	set_track_color(Gdiplus::Color cr_active, Gdiplus::Color cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
+	void	set_back_color(Gdiplus::Color cr_back);
+	void	set_active_color(Gdiplus::Color cr_active);
+	void	set_inactive_color(Gdiplus::Color cr_inactive);
+	void	set_thumb_color(Gdiplus::Color cr_thumb);
 
-	//void	set_text_color(COLORREF cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
+	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	void	set_text_style(int text_style) { m_text_style = text_style; Invalidate(); }
 	void	set_text(LPCTSTR text, ...);
 	void	set_text_dual(LPCTSTR text_dual, ...);
@@ -208,8 +208,8 @@ public:
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
-	void	set_bookmark_color(COLORREF cr);
-	void	set_bookmark_current_color(COLORREF cr);
+	void	set_bookmark_color(Gdiplus::Color cr);
+	void	set_bookmark_current_color(Gdiplus::Color cr);
 	enum BOOKMARK
 	{
 		bookmark_add_current = 0,
@@ -346,7 +346,7 @@ protected:
 	Gdiplus::Color	m_cr_thumbDark;
 	Gdiplus::Color	m_cr_thumbDarker;
 	Gdiplus::Color	m_crBookmark;
-	Gdiplus::Color	m_crBookmarkCurrent = RGB(0, 255, 0);
+	Gdiplus::Color	m_crBookmarkCurrent = gRGB(0, 255, 0);
 
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
 	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 0);
@@ -356,8 +356,7 @@ protected:
 
 	int				Pixel2Pos(int pixel);
 	int				Pos2Pixel(int pos);
-	void			PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask,
-								 COLORREF clrpTransColor);
+	void			PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask, Gdiplus::Color clrpTransColor);
 	void			DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
 											CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask);
 

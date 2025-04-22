@@ -535,7 +535,7 @@ void CGdiButton::set_down_color_matrix(float fScale)	//1.0f = no effect.
 }
 
 //이미지 및 버튼의 크기를 조정한다.
-void CGdiButton::resize(int cx, int cy)
+void CGdiButton::resize(bool image_only, int cx, int cy)
 {
 	for (int i = 0; i < m_image.size(); i++)
 	{
@@ -545,7 +545,8 @@ void CGdiButton::resize(int cx, int cy)
 		m_image[i]->img[3].resize(cx, cy);
 	}
 
-	SetWindowPos(NULL, 0, 0, cx, cy, SWP_NOMOVE | SWP_NOZORDER);
+	if (!image_only)
+		SetWindowPos(NULL, 0, 0, cx, cy, SWP_NOMOVE | SWP_NOZORDER);
 }
 
 //그림의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.
@@ -967,10 +968,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//g.DrawImage(*pImage, pt.x, pt.y, rc.Width() - pt.x * 2, rc.Height() - pt.y * 2);
 
 		//down 시 offset만 변경해서 그릴 경우(입체적으로 눌리는 느낌이 표현됨)
-		g.DrawImage(*pImage, pt.x, pt.y, rc.Width(), rc.Height());
+		//g.DrawImage(*pImage, pt.x, pt.y, rc.Width(), rc.Height());
+
 
 		//down 효과없이 그릴 경우
-		//pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
+		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
 	}
 	//설정된 이미지가 없는 경우 버튼의 이미지를 그려주고
 	//기본 텍스트도 출력한다.

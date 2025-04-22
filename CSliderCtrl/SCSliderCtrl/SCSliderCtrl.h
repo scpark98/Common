@@ -171,7 +171,8 @@ public:
 	}	//콜백함수 콜 방식으로 이벤트를 전달할 경우 사용.
 
 	//int		GetPos();
-	void	SetPos(int pos);
+	void	set_pos(int pos);
+	void	SetPos(int pos) { set_pos(pos); }
 	void	set_range(int lower, int upper) { SetRange(lower, upper); }
 	int		get_lower();
 	int		get_upper();
@@ -204,7 +205,9 @@ public:
 
 	int		m_tic_freq = 0;
 	bool	m_tic_show_text = false;	//default = false
-	void	set_tic_freq(int freq, bool show_text = false) { m_tic_freq = freq; m_tic_show_text = show_text; }
+	//freq는 CSliderCtrl::SetTicFreq()와 동일하게 lower ~ upper 사이의 구간을 몇 등분할 것인지가 아닌 간격을 의미한다.
+	//즉, freq = 23이면 23 등분이 아니라 0 ~ 23 ~ 46 ~ 69 ~ 92와 같이 틱이 표시된다.
+	void	set_tic_freq(int freq, bool show_text = false);
 
 	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
@@ -255,13 +258,22 @@ public:
 	void			set_font_italic(bool italic = true);
 	void			enlarge_font_size(bool enlarge);
 
-	//border
+//border
 	void			draw_progress_border(bool draw = true) { m_draw_progress_border = draw; }
 	void			set_progress_border_color(Gdiplus::Color cr) { m_cr_progress_border = cr; }
 
 //color theme 관련
 	CSCColorTheme	m_theme = CSCColorTheme(this);	//m_theme(this); 는 오류.
 	void			set_color_theme(int theme);
+
+	//disable이면 gray로 표시되지만 때로는 disable이 아니어도 gray로 표시해야 하는 경우도 있다.
+	void			set_forced_gray(bool forced_gray, bool include_back = true) { m_forced_gray = forced_gray; m_forced_gray_include_back = include_back; Invalidate(); }
+
+//layout
+	//slider의 thumb는 거의 대부분 표시되는 상태지만 간혹 어떤 조건에 따라 pos는 그대로지만 thumb를 감출 필요가 있을 경우도 있다.
+	//ex. zoom slider인 경우 80% 위치로 수동 설정했으나 auto fit을 클릭하면 화면 크기에 따라 그 값이 달라지는데
+	//그 배율을 slider의 pos로 설정할 수도 있지만 auto fit을 토글하여 수동 설정된 배율과 auto fit을 토글할 수도 있다.
+	void			hide_thumb(bool hide = true) { m_thumb_hide = hide; Invalidate(); }
 
 protected:
 	// Attributes
@@ -349,7 +361,7 @@ protected:
 	Gdiplus::Color	m_crBookmarkCurrent = gRGB(0, 255, 0);
 
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
-	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 0);
+	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 64);
 
 	CWnd*			m_pParentWnd;
 	void			(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos) = NULL;
@@ -369,6 +381,11 @@ protected:
 	//border
 	Gdiplus::Color	m_cr_progress_border = Gdiplus::Color(188, 188, 188);
 	bool			m_draw_progress_border = false;	//ctrl의 border가 아닌 progress style에서 progress bar의 border
+
+//layout
+	bool			m_thumb_hide = false;				//thumb을 감출 것인지 여부. default = false
+	bool			m_forced_gray = false;				//강제로 gray로 표시할 것인지 여부. default = false
+	bool			m_forced_gray_include_back = true;	//강제로 gray로 표시할 경우 배경까지도 강제 gray로 표시할 것인지. default = true;
 
 // Overrides
 	// ClassWizard generated virtual function overrides

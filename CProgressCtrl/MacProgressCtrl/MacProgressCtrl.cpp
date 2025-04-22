@@ -790,6 +790,10 @@ void CMacProgressCtrl::thread_indeterminate()
 		//TRACE(_T("m_nIndOffset = %d\n"), m_nIndOffset);
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		//Invalidate();
+
+		if (!m_hWnd)
+			return;
+
 		RedrawWindow();
 
 		//for test

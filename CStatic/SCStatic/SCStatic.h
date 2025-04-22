@@ -160,6 +160,7 @@ public:
 	void			set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
 	void			set_font_size(int nFontSize);
 	void			set_auto_font_size(bool auto_font_size = true);
+	//default bold = FW_BOLD
 	void			set_font_bold(int weight = FW_BOLD);
 	void			set_font_underline(bool underline = true);
 	void			set_font_italic(bool italic = true);

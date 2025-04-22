@@ -78,9 +78,9 @@ void CSCSliderCtrl::OnPaint()
 	CBrush*		pOldBrush = NULL;
 	CString		str, str_dual;
 
-	Gdiplus::Color	cr_back = enable_color(m_theme.cr_back);
+	Gdiplus::Color	cr_back = (m_forced_gray_include_back ? enable_color(m_theme.cr_back) : m_theme.cr_back);
 	Gdiplus::Color	cr_active = enable_color(m_cr_active);
-	Gdiplus::Color	cr_inactive = enable_color(m_cr_inactive);
+	Gdiplus::Color	cr_inactive = enable_color(m_cr_inactive, 32);
 	Gdiplus::Color	cr_text = enable_color(m_theme.cr_text);
 	Gdiplus::Color	cr_thumb = enable_color(m_cr_thumb);
 
@@ -474,25 +474,27 @@ void CSCSliderCtrl::OnPaint()
 	//tic 표시
 	if (m_tic_freq > 0)
 	{
-		int		tic = lower;
-		int		tic_pos = 0;
-		int		tic_interval = (upper - lower) / m_tic_freq;
+		int	tic = lower;
+		int	tic_pos = 0;
+		CRect rtext;
+		CString text;
+
 		if (m_is_vertical)
 		{
-			for (i = 0; i <= m_tic_freq; i++)
+			while (tic <= upper)
 			{
 				tic_pos = Pos2Pixel(tic);
 				//dc.FillSolidRect(m_rc.left, tic_pos - 1, m_rc.Width(), 2, cr_text);
 				//g.FillEllipse(&Gdiplus::SolidBrush(gcr_thumb), CRectTogpRect(r));
-				tic += tic_interval;
+				tic += m_tic_freq;
 			}
 		}
 		else
 		{
 			dc.SetBkMode(TRANSPARENT);
-			dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+			dc.SetTextColor(cr_text.ToCOLORREF());
 
-			for (i = 0; i <= m_tic_freq; i++)
+			while (tic <= upper)
 			{
 				tic_pos = Pos2Pixel(tic);
 				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
@@ -503,20 +505,49 @@ void CSCSliderCtrl::OnPaint()
 					//range가 0 ~ 100일 때 0은 충분히 표시되지만 100은 우측이 잘리게 된다.
 					//이를 보정하려면 트랙 양쪽을 텍스트가 잘리지 않게 줄여줘야 하지만 좌표 계산들이 여기저기 복잡해진다.
 					//따라서 텍스트를 -6 ~ +6까지 12의 width를 주고 center 정렬하여 표시하고 맨 마지막 틱만 오른쪽 정렬로 처리한다.
-					CRect rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
-					if (i == m_tic_freq)
-						dc.DrawText(i2S(get_lower() + tic_interval * i), rtext, DT_RIGHT | DT_TOP | DT_NOCLIP);
+					rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
+
+					if (m_text_style == text_style_percentage)
+						text.Format(_T("%d%%"), tic);
 					else
-						dc.DrawText(i2S(get_lower() + tic_interval * i), rtext, DT_CENTER | DT_TOP | DT_NOCLIP);
+						text.Format(_T("%d"), tic);
+
+					if (tic == lower)
+						dc.DrawText(text, rtext, DT_LEFT | DT_TOP | DT_NOCLIP);
+					else if (tic == upper)
+						dc.DrawText(text, rtext, DT_RIGHT | DT_TOP | DT_NOCLIP);
+					else
+						dc.DrawText(text, rtext, DT_CENTER | DT_TOP | DT_NOCLIP);
 				}
-				tic += tic_interval;
+				tic += m_tic_freq;
+			}
+
+			//마지막 틱을 그린다.
+			if ((tic > upper) && (tic < upper + m_tic_freq))
+			{
+				tic = upper;
+				tic_pos = Pos2Pixel(upper);
+				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
+				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rtic));
+
+				if (m_tic_show_text)
+				{
+					rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
+
+					if (m_text_style == text_style_percentage)
+						text.Format(_T("%d%%"), tic);
+					else
+						text.Format(_T("%d"), tic);
+
+					dc.DrawText(text, rtext, DT_RIGHT | DT_TOP | DT_NOCLIP);
+				}
 			}
 		}
 	}
 
 	// 손잡이(thumb)를 그린다
 #if 1
-	if (m_style <= style_value)
+	if (!m_thumb_hide && m_style <= style_value)
 	{
 		CRect	rThumb = make_center_rect(pxpos, rtrack.CenterPoint().y - 1, m_thumb.cx, m_thumb.cy);
 
@@ -697,7 +728,7 @@ void CSCSliderCtrl::OnPaint()
 	dc.SelectObject(pOldPen);
 
 	//영역 확인용
-	//draw_rectangle(&dc, m_rc, red);
+	//draw_rectangle(g, m_rc, Gdiplus::Color::Blue);
 
 	// Do not call CSliderCtrl::OnPaint() for painting messages
 }
@@ -1488,8 +1519,9 @@ void CSCSliderCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 Gdiplus::Color CSCSliderCtrl::enable_color(Gdiplus::Color cr, int offset)
 {
-	if (IsWindowEnabled())
+	if (IsWindowEnabled() && !m_forced_gray)
 		return cr;
+
 	return get_color(gray_color(cr), offset);
 }
 
@@ -1597,11 +1629,12 @@ int CSCSliderCtrl::GetPos()
 
 }
 */
-void CSCSliderCtrl::SetPos(int pos)
+void CSCSliderCtrl::set_pos(int pos)
 {
 	//style_step일 때 SetPos()를 호출한다는 얘기는 아직 처리중이고 pos == upper인 경우라도 맨 마지막 스텝을 처리중이라는 뜻이므로
 	//SetPos()에서는 m_step_completed는 항상 false이며 parent에서 모든 처리가 완료된 시점에 이 값을 true로 세팅해줘야 한다.
 	m_step_completed = false;
+	m_thumb_hide = false;
 	CSliderCtrl::SetPos(pos);
 	Invalidate();
 }
@@ -1638,6 +1671,16 @@ void CSCSliderCtrl::set_text_dual(LPCTSTR text_dual, ...)
 	Invalidate();
 }
 
+//freq는 CSliderCtrl::SetTicFreq()와 동일하게 lower ~ upper 사이의 구간을 몇 등분할 것인지가 아닌 간격을 의미한다.
+//즉, freq = 23이면 23 등분이 아니라 0 ~ 23 ~ 46 ~ 69 ~ 92와 같이 틱이 표시된다.
+void CSCSliderCtrl::set_tic_freq(int freq, bool show_text)
+{
+	m_tic_freq = freq;
+	m_tic_show_text = show_text;
+
+	if (style_normal)
+		SetTicFreq(m_tic_freq);
+}
 
 void CSCSliderCtrl::set_log_font(LOGFONT lf)
 {

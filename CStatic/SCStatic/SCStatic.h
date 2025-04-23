@@ -90,7 +90,11 @@ public:
 	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등의
 	DWORD			get_text_align();
 
+	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 흡사하다.
+	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
 	CRect			get_text_rect() { return m_rect_text; }
+	//텍스트의 너비, 높이를 알고자 할 경우 사용.
+	CSize			get_text_extent();
 
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
@@ -159,6 +163,7 @@ public:
 
 	void			set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
 	void			set_font_size(int nFontSize);
+	void			enlarge_font_size(bool enlarge);
 	void			set_auto_font_size(bool auto_font_size = true);
 	//default bold = FW_BOLD
 	void			set_font_bold(int weight = FW_BOLD);
@@ -228,12 +233,10 @@ protected:
 	//특히 transparent일 경우는 그 깜빡임이 크므로 m_text를 별도 선언하여 사용한다.
 	CString			m_text;
 
-	//텍스트가 실제 출력될 영역의 크기인데 이 CSCStatic을 사용하는 dlg에서 텍스트 출력크기에 따라 dlg의 크기가 변경되어야 하는
-	//CSCMessageBox와 같은 클래스에서 필요하다.
-	//CSCMessageBox에서 DT_CALC로 그 출력 크기를 얻어오려 했으나 관련 자료를 검색해 본 결과
-	//이는 불가능하며 직접 출력시킨 후 그 크기를 알 수 있다.
-	//get_text_rect() 함수를 사용하여 실제 출력되는 사각형 영역 정보를 알 수 있다.
+	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 흡사하다.
+	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
 	CRect			m_rect_text;
+	int				m_text_extent = 0;	//텍스트의 크기
 
 	enum ENUM_TIMER
 	{

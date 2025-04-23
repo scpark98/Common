@@ -118,8 +118,7 @@ void CSCStatic::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
-
-	ASSERT(bCreated);
+	Invalidate();
 }
 
 void CSCStatic::set_font(CFont* font)
@@ -263,7 +262,8 @@ void CSCStatic::OnPaint()
 
 	//m_rect_text.SetRectEmpty();
 	dc.DrawText(sSpace + m_text, &m_rect_text, DT_CALCRECT);// | DT_WORDBREAK);
-	//TRACE(_T("calcRect in static = %s\n"), get_rect_info_string(m_rect_text));
+	m_text_extent = m_rect_text.Width();
+	//TRACE(_T("width = %d (%s)\n"), m_rect_text.Width(), m_text);
 	szText.cx = m_rect_text.Width();// + m_nOutlineWidth * 2;
 	szText.cy = m_rect_text.Height();// + m_nOutlineWidth * 2;
 
@@ -901,6 +901,21 @@ void CSCStatic::set_font_size(int nSize)
 	update_surface();
 }
 
+void CSCStatic::enlarge_font_size(bool enlarge)
+{
+	int font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
+	enlarge ? font_size++ : font_size--;
+
+	if (font_size < 4)
+		font_size = 4;
+	if (font_size > 40)
+		font_size = 40;
+
+	m_lf.lfHeight = get_pixel_size_from_font_size(GetParent()->GetSafeHwnd(), font_size);
+
+	reconstruct_font();
+}
+
 void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf)
 {
 	CDC *pDC = GetDC();
@@ -1182,6 +1197,8 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 				m_img_back.resize(rc.Width(), rc.Height());
 			}
 		}
+
+		Invalidate();
 	}
 }
 
@@ -1230,3 +1247,13 @@ void CSCStatic::set_link(CString url, Gdiplus::Color cr_link)
 	m_link_url = url;
 	m_cr_link = cr_link;
 }
+
+//align 관계없이 현재 텍스트의 너비를 알고자 할 경우 사용.
+CSize CSCStatic::get_text_extent()
+{
+	CClientDC dc(this);
+	CFont* pOldFont = dc.SelectObject(&m_font);
+	CSize sz = dc.GetTextExtent(m_text);
+	return sz;
+}
+

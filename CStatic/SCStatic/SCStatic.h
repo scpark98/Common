@@ -56,6 +56,9 @@ m_static1.set_gradient_color(RED);
 - "\r\n"으로 multiline을 출력할 경우 center image, no wrap, simple 속성은 반드시 false가 되어야 한다.
   따라서 이러한 속성을 살리기 위해서는 파싱하여 각 라인을 출력하도록 수정이 필요하다.
 
+- set_text(_T("<cr=red>test</cr>"))와 같이 html 태그를 지원하려면? <b>, <i>, <u>, <s> 정도 지원 예정.
+  태그가 있는 텍스트와 없는 텍스트를 혼합하여 출력할 경우는 paragraph 구조체가 필요하다.
+
 [2014-11-27]
 - blink시에 아이콘도 함께 적용되지 않던 문제 수정
 - blink를 false로 할 경우 숨겨진 상태로 blink가 종료되던 문제 수정
@@ -66,6 +69,7 @@ m_static1.set_gradient_color(RED);
 
 typedef UINT (CALLBACK* LPFNDLLFUNC1)(HDC,CONST PTRIVERTEX,DWORD,CONST PVOID,DWORD,DWORD);
 
+
 class CSCStatic : public CStatic
 {
 	DECLARE_DYNAMIC(CSCStatic)
@@ -74,7 +78,6 @@ public:
 	CSCStatic();
 	~CSCStatic();
 
-	//CParagraph
 
 	//동적생성시에 사용
 	BOOL			create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID = 0xffff);

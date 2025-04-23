@@ -8476,6 +8476,55 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 	return nToken;
 }
 
+//"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
+//위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
+void get_tag_str(CString src, std::deque<CString>& tags)
+{
+	int		i;
+	CString str;
+
+	tags.clear();
+
+	//태그와 텍스트를 분리한다.
+	for (i = 0; i < src.GetLength(); i++)
+	{
+		if (src[i] == '<')
+		{
+			//시작 태그를 만난 경우 그 전까지의 문자열을 저장한다.
+			if (str.GetLength() > 0)
+			{
+				//태그가 아닌 일반 텍스트가 저장된다.
+				tags.push_back(str);
+				str.Empty();
+			}
+
+			str += src[i];
+
+			while (src[i] != '>')
+			{
+				i++;
+
+				if (i >= src.GetLength())
+					break;
+				str += src[i];
+			}
+
+			//태그가 저장된다.
+			str.Replace(_T(" "), _T(""));	//태그내의 공백은 제거한다.
+			tags.push_back(str);
+			str.Empty();
+		}
+		else
+		{
+			str += src[i];
+		}
+	}
+
+	//맨 마지막까지 잔여 텍스트가 있다면 모두 넣어줘야 한다.
+	if (str.GetLength() > 0)
+		tags.push_back(str);
+}
+
 //간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
 CString	get_unescape_string(CString src)
 {

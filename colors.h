@@ -7,6 +7,7 @@
 #include <gdiplus.h>
 #include <deque>
 #include <unordered_map>
+#include <string>
 
 /*
 * 2024.8.30
@@ -99,6 +100,197 @@ protected:
 	CWnd*			m_parent = NULL;
 	int				m_cur_theme = color_theme_default;
 };
+
+//color name으로 Gdiplus::Color 값을 구하기 위해 정의.
+//반대로 Gdiplus::Color 값으로 그 이름을 구하는 경우는 많지 않을 듯 하여 first key를 name으로 정함.
+class CSCColorMap
+{
+public:
+	CSCColorMap(std::string _name, Gdiplus::Color _cr)
+	{
+		name = _name;
+		cr = _cr;
+		get_color_map()[name] = cr;
+	}
+
+	// auto-cast Error to integer error code
+	operator Gdiplus::Color() { return cr; }
+
+	static Gdiplus::Color get_color(std::string name)
+	{
+		m_cr_map::iterator it = get_color_map().find(name);
+		if (it == get_color_map().end())
+			return Gdiplus::Color::Black;
+		return it->second;
+	}
+
+	//get color name by color value. 미구현
+	static std::string get_color_name(Gdiplus::Color cr)
+	{
+	}
+
+private:
+	Gdiplus::Color cr;
+	std::string name;
+
+	typedef std::unordered_map<std::string, Gdiplus::Color> m_cr_map;
+	static m_cr_map& get_color_map()
+	{
+		static m_cr_map cr_map;
+		return cr_map;
+	}
+};
+
+static CSCColorMap MediumVioletRed	("MediumVioletRed",		Gdiplus::Color::MediumVioletRed);
+static CSCColorMap DeepPink			("DeepPink",			Gdiplus::Color::DeepPink);
+static CSCColorMap PaleVioletRed	("PaleVioletRed",		Gdiplus::Color::PaleVioletRed);
+static CSCColorMap HotPink			("HotPink",				Gdiplus::Color::HotPink);
+static CSCColorMap LightPink		("LightPink",			Gdiplus::Color::LightPink);
+static CSCColorMap Pink				("Pink",				Gdiplus::Color::Pink);
+
+static CSCColorMap DarkRed			("DarkRed",				Gdiplus::Color::DarkRed);
+static CSCColorMap Red				("Red",					Gdiplus::Color::Red);
+static CSCColorMap Firebrick		("Firebrick",			Gdiplus::Color::Firebrick);
+static CSCColorMap Crimson			("Crimson",				Gdiplus::Color::Crimson);
+static CSCColorMap IndianRed		("IndianRed",			Gdiplus::Color::IndianRed);
+static CSCColorMap LightCoral		("LightCoral",			Gdiplus::Color::LightCoral);
+static CSCColorMap Salmon			("Salmon",				Gdiplus::Color::Salmon);
+static CSCColorMap DarkSalmon		("DarkSalmon",			Gdiplus::Color::DarkSalmon);
+static CSCColorMap LightSalmon		("LightSalmon",			Gdiplus::Color::LightSalmon);
+
+static CSCColorMap OrangeRed		("OrangeRed",			Gdiplus::Color::OrangeRed);
+static CSCColorMap Tomato			("Tomato",				Gdiplus::Color::Tomato);
+static CSCColorMap DarkOrange		("DarkOrange",			Gdiplus::Color::DarkOrange);
+static CSCColorMap Coral			("Coral",				Gdiplus::Color::Coral);
+static CSCColorMap Orange			("Orange",				Gdiplus::Color::Orange);
+
+static CSCColorMap DarkKhaki		("DarkKhaki",			Gdiplus::Color::DarkKhaki);
+static CSCColorMap Gold				("Gold",				Gdiplus::Color::Gold);
+static CSCColorMap Khaki			("Khaki",				Gdiplus::Color::Khaki);
+static CSCColorMap PeachPuff		("PeachPuff",			Gdiplus::Color::PeachPuff);
+static CSCColorMap Yellow			("Yellow",				Gdiplus::Color::Yellow);
+static CSCColorMap PaleGoldenrod	("PaleGoldenrod",		Gdiplus::Color::PaleGoldenrod);
+static CSCColorMap Moccasin			("Moccasin",			Gdiplus::Color::Moccasin);
+static CSCColorMap PapayaWhip		("PapayaWhip",			Gdiplus::Color::PapayaWhip);
+static CSCColorMap LightGoldenrodYellow("LightGoldenrodYellow", Gdiplus::Color::LightGoldenrodYellow);
+static CSCColorMap LemonChiffon		("LemonChiffon",		Gdiplus::Color::LemonChiffon);
+static CSCColorMap LightYellow		("LightYellow",			Gdiplus::Color::LightYellow);
+
+static CSCColorMap Maroon			("Maroon",				Gdiplus::Color::Maroon);
+static CSCColorMap Brown			("Brown",				Gdiplus::Color::Brown);
+static CSCColorMap SaddleBrown		("SaddleBrown",			Gdiplus::Color::SaddleBrown);
+static CSCColorMap Sienna			("Sienna",				Gdiplus::Color::Sienna);
+static CSCColorMap Chocolate		("Chocolate",			Gdiplus::Color::Chocolate);
+static CSCColorMap DarkGoldenrod	("DarkGoldenrod",		Gdiplus::Color::DarkGoldenrod);
+static CSCColorMap Peru				("Peru",				Gdiplus::Color::Peru);
+static CSCColorMap RosyBrown		("RosyBrown",			Gdiplus::Color::RosyBrown);
+static CSCColorMap Goldenrod		("Goldenrod",			Gdiplus::Color::Goldenrod);
+static CSCColorMap SandyBrown		("SandyBrown",			Gdiplus::Color::SandyBrown);
+static CSCColorMap Tan				("Tan",					Gdiplus::Color::Tan);
+static CSCColorMap BurlyWood		("BurlyWood",			Gdiplus::Color::BurlyWood);
+static CSCColorMap Wheat			("Wheat",				Gdiplus::Color::Wheat);
+static CSCColorMap NavajoWhite		("NavajoWhite",			Gdiplus::Color::NavajoWhite);
+static CSCColorMap Bisque			("Bisque",				Gdiplus::Color::Bisque);
+static CSCColorMap BlanchedAlmond	("BlanchedAlmond",		Gdiplus::Color::BlanchedAlmond);
+static CSCColorMap Cornsilk			("Cornsilk",			Gdiplus::Color::Cornsilk);
+
+static CSCColorMap Indigo			("Indigo",				Gdiplus::Color::Indigo);
+static CSCColorMap Purple			("Purple",				Gdiplus::Color::Purple);
+static CSCColorMap DarkMagenta		("DarkMagenta",			Gdiplus::Color::DarkMagenta);
+static CSCColorMap DarkViolet		("DarkViolet",			Gdiplus::Color::DarkViolet);
+static CSCColorMap DarkSlateBlue	("DarkSlateBlue",		Gdiplus::Color::DarkSlateBlue);
+static CSCColorMap BlueViolet		("BlueViolet",			Gdiplus::Color::BlueViolet);
+static CSCColorMap DarkOrchid		("DarkOrchid",			Gdiplus::Color::DarkOrchid);
+static CSCColorMap Fuchsia			("Fuchsia",				Gdiplus::Color::Fuchsia);
+static CSCColorMap Magenta			("Magenta",				Gdiplus::Color::Magenta);
+static CSCColorMap SlateBlue		("SlateBlue",			Gdiplus::Color::SlateBlue);
+static CSCColorMap MediumSlateBlue	("MediumSlateBlue",		Gdiplus::Color::MediumSlateBlue);
+static CSCColorMap MediumOrchid		("MediumOrchid",		Gdiplus::Color::MediumOrchid);
+static CSCColorMap MediumPurple		("MediumPurple",		Gdiplus::Color::MediumPurple);
+static CSCColorMap Orchid			("Orchid",				Gdiplus::Color::Orchid);
+static CSCColorMap Violet			("Violet",				Gdiplus::Color::Violet);
+static CSCColorMap Plum				("Plum",				Gdiplus::Color::Plum);
+static CSCColorMap Thistle			("Thistle",				Gdiplus::Color::Thistle);
+static CSCColorMap Lavender			("Lavender",			Gdiplus::Color::Lavender);
+
+static CSCColorMap MidnightBlue		("MidnightBlue",		Gdiplus::Color::MidnightBlue);
+static CSCColorMap Navy				("Navy",				Gdiplus::Color::Navy);
+static CSCColorMap DarkBlue			("DarkBlue",			Gdiplus::Color::DarkBlue);
+static CSCColorMap MediumBlue		("MediumBlue",			Gdiplus::Color::MediumBlue);
+static CSCColorMap Blue				("Blue",				Gdiplus::Color::Blue);
+static CSCColorMap RoyalBlue		("RoyalBlue",			Gdiplus::Color::RoyalBlue);
+static CSCColorMap SteelBlue		("SteelBlue",			Gdiplus::Color::SteelBlue);
+static CSCColorMap DodgerBlue		("DodgerBlue",			Gdiplus::Color::DodgerBlue);
+static CSCColorMap DeepSkyBlue		("DeepSkyBlue",			Gdiplus::Color::DeepSkyBlue);
+static CSCColorMap CornflowerBlue	("CornflowerBlue",		Gdiplus::Color::CornflowerBlue);
+static CSCColorMap SkyBlue			("SkyBlue",				Gdiplus::Color::SkyBlue);
+static CSCColorMap LightSkyBlue		("LightSkyBlue",		Gdiplus::Color::LightSkyBlue);
+static CSCColorMap LightSteelBlue	("LightSteelBlue",		Gdiplus::Color::LightSteelBlue);
+static CSCColorMap LightBlue		("LightBlue",			Gdiplus::Color::LightBlue);
+static CSCColorMap PowderBlue		("PowderBlue",			Gdiplus::Color::PowderBlue);
+
+static CSCColorMap Teal				("Teal",				Gdiplus::Color::Teal);
+static CSCColorMap DarkCyan			("DarkCyan",			Gdiplus::Color::DarkCyan);
+static CSCColorMap LightSeaGreen	("LightSeaGreen",		Gdiplus::Color::LightSeaGreen);
+static CSCColorMap CadetBlue		("CadetBlue",			Gdiplus::Color::CadetBlue);
+static CSCColorMap DarkTurquoise	("DarkTurquoise",		Gdiplus::Color::DarkTurquoise);
+static CSCColorMap MediumTurquoise	("MediumTurquoise",		Gdiplus::Color::MediumTurquoise);
+static CSCColorMap Turquoise		("Turquoise",			Gdiplus::Color::Turquoise);
+static CSCColorMap Aqua				("Aqua",				Gdiplus::Color::Aqua);
+static CSCColorMap Cyan				("Cyan",				Gdiplus::Color::Cyan);
+static CSCColorMap Aquamarine		("Aquamarine",			Gdiplus::Color::Aquamarine);
+static CSCColorMap PaleTurquoise	("PaleTurquoise",		Gdiplus::Color::PaleTurquoise);
+static CSCColorMap LightCyan		("LightCyan",			Gdiplus::Color::LightCyan);
+
+static CSCColorMap DarkGreen		("DarkGreen",			Gdiplus::Color::DarkGreen);
+static CSCColorMap Green			("Green",				Gdiplus::Color::Green);
+static CSCColorMap DarkOliveGreen	("DarkOliveGreen",		Gdiplus::Color::DarkOliveGreen);
+static CSCColorMap ForestGreen		("ForestGreen",			Gdiplus::Color::ForestGreen);
+static CSCColorMap SeaGreen			("SeaGreen",			Gdiplus::Color::SeaGreen);
+static CSCColorMap Olive			("Olive",				Gdiplus::Color::Olive);
+static CSCColorMap OliveDrab		("OliveDrab",			Gdiplus::Color::OliveDrab);
+static CSCColorMap MediumSeaGreen	("MediumSeaGreen",		Gdiplus::Color::MediumSeaGreen);
+static CSCColorMap LimeGreen		("LimeGreen",			Gdiplus::Color::LimeGreen);
+static CSCColorMap Lime				("Lime",				Gdiplus::Color::Lime);
+static CSCColorMap SpringGreen		("SpringGreen",			Gdiplus::Color::SpringGreen);
+static CSCColorMap MediumSpringGreen("MediumSpringGreen",	Gdiplus::Color::MediumSpringGreen);
+static CSCColorMap DarkSeaGreen		("DarkSeaGreen",		Gdiplus::Color::DarkSeaGreen);
+static CSCColorMap MediumAquamarine	("MediumAquamarine",	Gdiplus::Color::MediumAquamarine);
+static CSCColorMap YellowGreen		("YellowGreen",			Gdiplus::Color::YellowGreen);
+static CSCColorMap LawnGreen		("LawnGreen",			Gdiplus::Color::LawnGreen);
+static CSCColorMap Chartreuse		("Chartreuse",			Gdiplus::Color::Chartreuse);
+static CSCColorMap LightGreen		("LightGreen",			Gdiplus::Color::LightGreen);
+static CSCColorMap GreenYellow		("GreenYellow",			Gdiplus::Color::GreenYellow);
+static CSCColorMap PaleGreen		("PaleGreen",			Gdiplus::Color::PaleGreen);
+
+static CSCColorMap MistyRose		("MistyRose",			Gdiplus::Color::MistyRose);
+static CSCColorMap AntiqueWhite		("AntiqueWhite",		Gdiplus::Color::AntiqueWhite);
+static CSCColorMap Linen			("Linen",				Gdiplus::Color::Linen);
+static CSCColorMap Beige			("Beige",				Gdiplus::Color::Beige);
+static CSCColorMap WhiteSmoke		("WhiteSmoke",			Gdiplus::Color::WhiteSmoke);
+static CSCColorMap LavenderBlush	("LavenderBlush",		Gdiplus::Color::LavenderBlush);
+static CSCColorMap OldLace			("OldLace",				Gdiplus::Color::OldLace);
+static CSCColorMap AliceBlue		("AliceBlue",			Gdiplus::Color::AliceBlue);
+static CSCColorMap SeaShell			("SeaShell",			Gdiplus::Color::SeaShell);
+static CSCColorMap GhostWhite		("GhostWhite",			Gdiplus::Color::GhostWhite);
+static CSCColorMap Honeydew			("Honeydew",			Gdiplus::Color::Honeydew);
+static CSCColorMap FloralWhite		("FloralWhite",			Gdiplus::Color::FloralWhite);
+static CSCColorMap Azure			("Azure",				Gdiplus::Color::Azure);
+static CSCColorMap MintCream		("MintCream",			Gdiplus::Color::MintCream);
+static CSCColorMap Snow				("Snow",				Gdiplus::Color::Snow);
+static CSCColorMap Ivory			("Ivory",				Gdiplus::Color::Ivory);
+static CSCColorMap White			("White",				Gdiplus::Color::White);
+
+static CSCColorMap Black			("Black",				Gdiplus::Color::Black);
+static CSCColorMap DarkSlateGray	("DarkSlateGray",		Gdiplus::Color::DarkSlateGray);
+static CSCColorMap DimGray			("DimGray",				Gdiplus::Color::DimGray);
+static CSCColorMap SlateGray		("SlateGray",			Gdiplus::Color::SlateGray);
+static CSCColorMap Gray				("Gray",				Gdiplus::Color::Gray);
+static CSCColorMap LightSlateGray	("LightSlateGray",		Gdiplus::Color::LightSlateGray);
+static CSCColorMap DarkGray			("DarkGray",			Gdiplus::Color::DarkGray);
+static CSCColorMap Silver			("Silver",				Gdiplus::Color::Silver);
+static CSCColorMap LightGray		("LightGray",			Gdiplus::Color::LightGray);
+static CSCColorMap Gainsboro		("Gainsboro",			Gdiplus::Color::Gainsboro);
 
 // RGB -> YUV(YCbCr)
 #define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
@@ -459,9 +651,10 @@ Gdiplus::Color	get_color(Gdiplus::Color crOrigin, int nOffset);
 COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
 Gdiplus::Color	get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio);
 Gdiplus::Color	get_color(COLORREF rgb);
+Gdiplus::Color	get_color(std::string cr_name);
 
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
-COLORREF		get_color(CString cr);
+COLORREF		get_color_from_hexadecimal(CString cr);
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 CString			get_color_string(COLORREF cr);
 

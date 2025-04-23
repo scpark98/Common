@@ -674,6 +674,10 @@ struct	NETWORK_INFO
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
 
+	//"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
+	//위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
+	void		get_tag_str(CString src, std::deque<CString>& tags);
+
 	//간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
 	CString		get_unescape_string(CString src);
 

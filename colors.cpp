@@ -279,8 +279,13 @@ Gdiplus::Color get_color(COLORREF rgb)
 	return gcr;
 }
 
+Gdiplus::Color get_color(std::string cr_name)
+{
+	return CSCColorMap::get_color(cr_name);
+}
+
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
-COLORREF	get_color(CString cr)
+COLORREF	get_color_from_hexadecimal(CString cr)
 {
 	COLORREF color;
 	if ((color = _tcstol(cr, NULL, 16)) == 0)

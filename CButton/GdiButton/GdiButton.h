@@ -327,8 +327,7 @@ public:
 	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void		set_hover_rect_thick(int thick);
 	void		set_hover_rect_color(Gdiplus::Color cr);
-	void		down_offset(CPoint offset) { m_down_offset = offset; Invalidate(); }
-	void		down_offset(int offset) { m_down_offset = CPoint(offset, offset); Invalidate(); }
+	void		set_down_offset(int ox, int oy) { m_down_offset = CPoint(ox, oy); Invalidate(); }
 
 //border. thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
 	void		draw_border(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
@@ -467,7 +466,7 @@ protected:
 	int			m_focus_rect_width = 1;					//두께
 
 	bool		m_b3DRect = true;						//입체 느낌의 3D, 누르면 sunken. default = true;
-	CPoint		m_down_offset = CPoint(1, 1);			//눌렸을 때 그려질 위치. 이 값이 클 경우 이미지가 여백이 없다면 ㅇ
+	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
 	//투명 버튼의 경우 그림자를 표시한다.

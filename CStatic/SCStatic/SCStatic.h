@@ -191,6 +191,10 @@ public:
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
 	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
 
+	void			set_margin(int l, int t, int r, int b) { set_margin(CRect(l, t, r, b)); }
+	void			set_margin(CRect margin);
+	void			get_margin(CSize sz_margin) { set_margin(CRect(sz_margin.cx, sz_margin.cy, sz_margin.cx, sz_margin.cy)); }
+
 	void			set_icon(UINT nIDResource, int nSize = 16, bool left_align_fix = false);
 	void			set_icon(HICON hIcon, int nSize = 16, bool left_align_fix = false);
 
@@ -229,6 +233,8 @@ public:
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
 	void	stop_gif();
 
+	HICON			m_hIcon;
+	CSize			m_sz_icon;
 
 protected:
 	//SetWindowText(), GetWindowText()를 쓰면 m_text를 굳이 선언해서 사용안해도 될 듯 하지만
@@ -295,9 +301,7 @@ protected:
 	void			update_surface();
 	void			reconstruct_font();
 
-
-	HICON			m_hIcon;
-	CSize			m_szIcon;
+	CRect			m_margin;			//텍스트의 여백을 설정한다. 기본값은 CStatic과 동일하게 0.
 
 	//label의 앞에 그려질 이미지이며 만약 2개 이상일 경우 타이머에 의해 alt되기도 한다.
 	std::deque<CGdiplusBitmap*> m_header_images;

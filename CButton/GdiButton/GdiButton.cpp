@@ -905,7 +905,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//이미지를 그리기 전에 shadow를 먼저 그려준다.
 		if (m_draw_shadow)
 		{
-			m_down_offset = CPoint(1, 1);
+			//m_down_offset = CPoint(1, 1);
 			CGdiplusBitmap img_shadow;
 			m_image[idx]->img[0].deep_copy(&img_shadow);
 #ifdef _DEBUG
@@ -961,18 +961,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (pImage == NULL)
 			pImage = &m_image[idx]->img[0];
 
-		//down 옵셋만 변경해서 그릴 경우
-		//g.DrawImage(*pImage, pt.x, pt.y, m_width, m_height);
-
 		//down 작은 크기로 shrink시키면서 그릴 경우
 		//g.DrawImage(*pImage, pt.x, pt.y, rc.Width() - pt.x * 2, rc.Height() - pt.y * 2);
 
-		//down 시 offset만 변경해서 그릴 경우(입체적으로 눌리는 느낌이 표현됨)
-		//g.DrawImage(*pImage, pt.x, pt.y, rc.Width(), rc.Height());
+		//down 시 입체적으로 눌리는 느낌(위치가 변경되는 느낌)을 주려면 set_down_offset(1, 1)과 같이 줘야 한다.
+		g.DrawImage(*pImage, pt.x, pt.y, rc.Width(), rc.Height());
 
 
 		//down 효과없이 그릴 경우
-		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
+		//pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
 	}
 	//설정된 이미지가 없는 경우 버튼의 이미지를 그려주고
 	//기본 텍스트도 출력한다.

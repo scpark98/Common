@@ -652,9 +652,13 @@ COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
 Gdiplus::Color	get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio);
 Gdiplus::Color	get_color(COLORREF rgb);
 Gdiplus::Color	get_color(std::string cr_name);
+Gdiplus::Color	get_color(CString cr_str);
 
-//"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
+//#RRGGBB와 같은 16진수 컬러 문자열을 COLORREF로 변환
 COLORREF		get_color_from_hexadecimal(CString cr);
+//#RRGGBB 또는 #AARRGGBB와 같은 16진수 컬러 문자열을 Gdiplus::Color로 변환
+Gdiplus::Color	get_gcolor_from_hexadecimal(CString cr);
+
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 CString			get_color_string(COLORREF cr);
 

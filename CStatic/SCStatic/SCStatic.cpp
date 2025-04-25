@@ -278,15 +278,15 @@ void CSCStatic::OnPaint()
 		gap = 4;
 
 		CRect rIcon = m_rect_text;
-		CSize szIcon = m_szIcon;
+		CSize szIcon = m_sz_icon;
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
 		if (dwStyle & SS_CENTER)
 		{
 			if (m_text.IsEmpty())
-				rIcon.left = rc.CenterPoint().x - m_szIcon.cx / 2;// (rc.Width() - szText.cx - m_szIcon.cx) / 2;
+				rIcon.left = rc.CenterPoint().x - m_sz_icon.cx / 2;// (rc.Width() - szText.cx - m_szIcon.cx) / 2;
 			else
-				rIcon.left = (rc.Width() - (m_szIcon.cx + gap + szText.cx)) / 2;// -m_szIcon.cx / 2 - 2;
+				rIcon.left = (rc.Width() - (m_sz_icon.cx + gap + szText.cx)) / 2;// -m_szIcon.cx / 2 - 2;
 
 			if (m_image_left_align_fix)
 			{
@@ -295,7 +295,7 @@ void CSCStatic::OnPaint()
 			}
 			else
 			{
-				m_rect_text.left = rIcon.left + gap + m_szIcon.cx;
+				m_rect_text.left = rIcon.left + gap + m_sz_icon.cx;
 			}
 		}
 		else if (dwStyle & SS_RIGHT)
@@ -307,8 +307,8 @@ void CSCStatic::OnPaint()
 			}
 			else
 			{
-				rIcon.left = rc.right - szText.cx - m_szIcon.cx - 2;
-				m_rect_text.left = rIcon.left + m_szIcon.cx + 2;
+				rIcon.left = rc.right - szText.cx - m_sz_icon.cx - 2;
+				m_rect_text.left = rIcon.left + m_sz_icon.cx + 2;
 			}
 		}
 		else
@@ -320,13 +320,13 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rIcon.left = 2;
-				m_rect_text.left = rIcon.left + m_szIcon.cx + gap;
+				m_rect_text.left = rIcon.left + m_sz_icon.cx + gap;
 			}
 		}
 
 		if (dwStyle & SS_CENTERIMAGE)
 		{
-			rIcon.top = rc.top + (rc.Height() - m_szIcon.cy) / 2;
+			rIcon.top = rc.top + (rc.Height() - m_sz_icon.cy) / 2;
 			m_rect_text.top = (rc.Height() - szText.cy) / 2;
 		}
 		else
@@ -337,7 +337,7 @@ void CSCStatic::OnPaint()
 			}
 			else
 			{
-				rIcon.top = szText.cy / 2 - m_szIcon.cy / 2;
+				rIcon.top = szText.cy / 2 - m_sz_icon.cy / 2;
 
 				//top 정렬인데 아이콘이 커서 상단을 벗어난다면 이미지, 텍스트 모두 아래로 내려준다.
 				if (rIcon.top < 0)
@@ -349,7 +349,7 @@ void CSCStatic::OnPaint()
 		}
 
 		if (!m_bBlinkStatus)
-			::DrawIconEx(dc.GetSafeHdc(), rIcon.left, rIcon.top, m_hIcon, m_szIcon.cx, m_szIcon.cy, 0, NULL, DI_NORMAL);
+			::DrawIconEx(dc.GetSafeHdc(), rIcon.left, rIcon.top, m_hIcon, m_sz_icon.cx, m_sz_icon.cy, 0, NULL, DI_NORMAL);
 	}
 	else if (m_header_images.size() > 0)
 	{
@@ -822,8 +822,8 @@ void CSCStatic::set_icon(HICON hIcon, int nSize, bool left_align_fix)
 	if (bRetValue == false)
 		return;
 
-	m_szIcon.cx = nSize;//(DWORD)(iconInfo.xHotspot * 2);
-	m_szIcon.cy = nSize;//(DWORD)(iconInfo.yHotspot * 2);
+	m_sz_icon.cx = nSize;//(DWORD)(iconInfo.xHotspot * 2);
+	m_sz_icon.cy = nSize;//(DWORD)(iconInfo.yHotspot * 2);
 
 	m_image_left_align_fix = left_align_fix;
 
@@ -837,19 +837,24 @@ void CSCStatic::set_icon(HICON hIcon, int nSize, bool left_align_fix)
 
 	GetWindowRect(rc);
 
-	//컨트롤의 크기가 아이콘의 크기보다 작다면 컨트롤의 크기를 아이콘의 크기로 맞춰준다.
+	//컨트롤의 크기가 아이콘의 크기보다 작다면 컨트롤의 크기를 아이콘의 크기로 맞춰준다?
 	//단, 텍스트가 존재할 경우에는 추가적인 코딩이 필요하다.
-	if (m_hIcon && rc.Width() < nSize)
-		SetWindowPos(NULL, rc.left, rc.top, nSize, rc.Height(), SWP_NOZORDER | SWP_NOMOVE);
-	if (m_hIcon && rc.Height() < nSize)
-		SetWindowPos(NULL, rc.left, rc.top, rc.Width(), nSize, SWP_NOZORDER | SWP_NOMOVE);
+	//if (m_hIcon && rc.Width() < nSize)
+	//	SetWindowPos(NULL, rc.left, rc.top, nSize, rc.Height(), SWP_NOZORDER | SWP_NOMOVE);
+	//if (m_hIcon && rc.Height() < nSize)
+	//	SetWindowPos(NULL, rc.left, rc.top, rc.Width(), nSize, SWP_NOZORDER | SWP_NOMOVE);
 
 	Invalidate();
 }
 
+void CSCStatic::set_margin(CRect margin)
+{
+	m_margin = margin;
+}
+
 void CSCStatic::set_icon(UINT nIDResource, int nSize, bool left_align_fix)
 {
-	if  (m_hWnd == NULL)
+	if (m_hWnd == NULL)
 		return;
 
 	if (m_hIcon)
@@ -918,18 +923,21 @@ void CSCStatic::enlarge_font_size(bool enlarge)
 
 void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf)
 {
-	CDC *pDC = GetDC();
+	CClientDC dc(this);
 	double lower = 0.8;
 	double upper = 0.9;
 	int resize_count = 0;
 
+	CFont font, *pOldFont;
+
 	while (resize_count++ < 50)
 	{
-		CFont font, * pOldFont;
+		font.DeleteObject();
 		font.CreateFontIndirect(lf);
-		pOldFont = (CFont*)pDC->SelectObject(&font);
 
-		CSize sz = pDC->GetTextExtent(text);
+		pOldFont = (CFont*)dc.SelectObject(&font);
+
+		CSize sz = dc.GetTextExtent(text);
 		//TRACE(_T("sz.cx = %d, rc.width * %.1f = %.1f ~ rc.width * %.1f = %.1f\n"), sz.cx, lower, r.Width() * lower, upper, r.Width() * upper);
 		if (sz.cx > r.Width() * upper)
 		{
@@ -938,21 +946,21 @@ void CSCStatic::get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *l
 
 			lf->lfHeight++;
 			//TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
-			pDC->SelectObject(pOldFont);
-			font.DeleteObject();
+			dc.SelectObject(pOldFont);
 		}
 		else if (sz.cx < r.Width() * lower)
 		{
 			lf->lfHeight--;
 			//TRACE(_T("lf->lfHeight = %d\n"), lf->lfHeight);
-			pDC->SelectObject(pOldFont);
-			font.DeleteObject();
+			dc.SelectObject(pOldFont);
 		}
 		else
 		{
 			break;
 		}
 	}
+
+	font.DeleteObject();
 }
 
 void CSCStatic::set_auto_font_size(bool auto_font_size)

@@ -51,6 +51,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 #include "colors.h"
 #include "./system/ShellImageList/ShellImageList.h"
+#include "data_structure/SCParagraph/SCParagraph.h"
 
 #include <WinInet.h>
 

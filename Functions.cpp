@@ -8478,12 +8478,18 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 
 //"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
 //위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
+//"\r", "\n"과 같은 line break는 모두 <br>로 변경한다.
 void get_tag_str(CString src, std::deque<CString>& tags)
 {
 	int		i;
 	CString str;
 
 	tags.clear();
+
+	//line break는 모두 <br>로 변경한다.
+	src.Replace(_T("\r\n"), _T("<br>"));
+	src.Replace(_T("\r"), _T("<br>"));
+	src.Replace(_T("\n"), _T("<br>"));
 
 	//태그와 텍스트를 분리한다.
 	for (i = 0; i < src.GetLength(); i++)
@@ -8509,8 +8515,11 @@ void get_tag_str(CString src, std::deque<CString>& tags)
 				str += src[i];
 			}
 
-			//태그가 저장된다.
-			str.Replace(_T(" "), _T(""));	//태그내의 공백은 제거한다.
+			//태그가 저장된다. 공백, 하이픈, 언더바는 모두 제거된다.
+			//컬러명은 Red로 주면 Gdiplus::Color::Red를 사용하므로 대소문자를 구분한다.
+			str.Replace(_T(" "), _T(""));
+			str.Replace(_T("_"), _T(""));
+			str.Replace(_T("-"), _T(""));
 			tags.push_back(str);
 			str.Empty();
 		}

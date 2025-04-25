@@ -1273,8 +1273,7 @@ void CVtListCtrlEx::PreSubclassWindow()
 
 void CVtListCtrlEx::modify_style()
 {
-	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
-	//dlg의 parent의 font를 얻어와야 한다.
+	//get parent font
 	CWnd* pWnd = GetParent();
 	CFont* font = NULL;
 

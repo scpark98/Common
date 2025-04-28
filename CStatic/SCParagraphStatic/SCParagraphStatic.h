@@ -24,12 +24,17 @@
 * 
 * 흐름 : set_text() -> get_tag_str() -> recalc_text_size() -> OnPaint()
 * recalc_text_size()에서 각 항목이 출력될 위치까지 모두 계산되고 OnPaint()에서는 정해진 위치에 그리기만 한다.
-* 
+
+* cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다.
+	<cr=#RRGGBBAA>,		//rgba, #으로 시작되는 16진수값.
+	<cr=123,45,67,128>	//rgba, 숫자로만 3자리 또는 4자리를 콤마로 표현한다.
+	<cr=h90,30,100>,	//hsi	h로 시작되고 콤마로 표현한다.
+*
 * [수정할 내용]
-* - cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원해야 한다.
-	<cr=#RRGGBBAA>,		//rgba, #으로 시작된다.
-	<cr=123,45,67,128>	//rgba, 숫자로만 3자리 또는 4자리로 표현한다.
-	<cr=h90,30,100>,	//hsi	h로 시작된다.
+* - outline <o>
+* - shadow <sd>
+* - <sdc=Red>		//shadow color
+* - <sdd=3>			//shadow depth
 */
 
 // CSCParagraphStatic은 CSCStatic을 상속받아 만들었으나 OnPaint()가 완전히 다르므로

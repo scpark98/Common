@@ -91,7 +91,7 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 			cr_str = tags[i].Mid(5, tags[i].GetLength() - 6);
 			para_temp.cr_back = get_color(cr_str);
 		}
-		else if (tags[i].Find(_T("</crb>")) >= 0)
+		else if (tags[i].Find(_T("</cb>")) >= 0 || tags[i].Find(_T("</crb>")) >= 0)
 		{
 			para_temp.cr_back = basic_para.cr_back;
 		}

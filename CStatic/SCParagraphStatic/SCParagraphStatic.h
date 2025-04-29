@@ -31,6 +31,7 @@
 	<cr=h90,30,100>,	//hsi	h로 시작되고 콤마로 표현한다.
 *
 * [수정할 내용]
+* - recalc_text_rect 및 OnPaint()에서 CDC가 아닌 Gdiplus로 모두 전환하고자 했으나 GetTextExtent()와 MeasureString()의 차이 문제로 우선 보류중.
 * - outline <o>
 * - shadow <sd>
 * - <sdc=Red>		//shadow color
@@ -60,20 +61,24 @@ public:
 	//<crb=Blue> = <cb=Blue>	//text back color.
 	//"<b><cr=Red>This</b></cr > is a <ct=Blue><i>sample</i> <b>paragraph</b>."
 	CRect			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
-	CSize			get_text_extent() { return m_sz_text; }
-	void			draw_hover_rect(bool draw = true, Gdiplus::Color cr_rect = Gdiplus::Color::Transparent);
+
+	//마우스가 hover된 음절에 사각형 표시
+	void			draw_word_hover_rect(bool draw = true, Gdiplus::Color cr_rect = Gdiplus::Color::Transparent);
 
 protected:
-	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 단어
+	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 음절
 
-	CSize			m_sz_text;				//텍스트 출력 크기
 	CRect			recalc_text_size();
+
+	//m_para[line][index]의 설정값대로 font를 SelectObject()하고 pOldFont를 리턴한다.
 	CFont*			select_paragraph_font(int line, int index, CDC* pDC, CFont* font);
+	void			get_paragraph_font(int line, int index, Gdiplus::Graphics& g, Gdiplus::Font** font);
 
 	int				m_max_width;			//각 라인들 중 최대 너비
 	int				m_max_width_line;		//각 라인들 중 최대 너비인 라인 번호
 	CPoint			m_pt_icon;
 
+//마우스가 hover된 단어를 표시
 	bool			m_draw_word_hover_rect = false;				//마우스가 hover된 단어를 표시할 지
 	Gdiplus::Color	m_cr_word_hover_rect = Gdiplus::Color::Red;	//hover된 단어를 표시할 색상
 	CPoint			m_pos_word_hover = CPoint(-1, -1);			//마우스가 위치한 단어의 i, j 인덱스 (좌표값이 아닌 인덱스)

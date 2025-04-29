@@ -296,7 +296,7 @@ public:
 	void		SetAsStatic(bool bAsStatic = true) { m_bAsStatic = bAsStatic; }
 
 
-	//이미지 및 버튼의 크기를 조정한다.
+	//이미지 및 버튼의 크기를 조정한다. image_only = true이면 이미지의 크기만 조정할 뿐 버튼의 크기는 조정하지 않는다.
 	void		resize(bool image_only, int cx, int cy);
 
 	//이미지의 크기에 맞게 컨트롤을 resize하고 dx, dy, nAnchor에 따라 move해준다.(move는 현재 보류)

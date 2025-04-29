@@ -51,9 +51,17 @@ CRect CSCParagraphStatic::recalc_text_size()
 	int i, j;
 	int sx = 0;
 	int sy = 0;				//각 라인의 시작 위치(높이값 누적)
+	int total_text_height;
 	CFont font, * pOldFont;
 	CClientDC dc(this);
 	LOGFONT lf;
+
+	Gdiplus::Graphics g(dc.m_hDC);
+	Gdiplus::StringFormat sf;
+
+	sf.SetAlignment(Gdiplus::StringAlignmentNear);
+	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
+	sf.SetFormatFlags(Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
 
 	m_max_width = 0;
 	m_max_width_line = 0;
@@ -66,10 +74,12 @@ CRect CSCParagraphStatic::recalc_text_size()
 
 		for (j = 0; j < m_para[i].size(); j++)
 		{
+			CSize sz;
+#if 1
 			pOldFont = select_paragraph_font(i, j, &dc, &font);
 
 			//GetTextExtent()와 DrawText(DT_CALCRECT)로 구한 크기는 동일하며 italic은 약간 잘림.
-			CSize sz = dc.GetTextExtent(m_para[i][j].text);
+			sz = dc.GetTextExtent(m_para[i][j].text);
 			//GetTextExtentExPoint(dc.m_hDC, m_paragraph[i].text, m_paragraph[i].text.GetLength(), 0, NULL, NULL, &sz);
 
 			if (m_para[i][j].italic)
@@ -83,11 +93,23 @@ CRect CSCParagraphStatic::recalc_text_size()
 			}
 
 			m_para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
-
-			CRect r;
-			dc.DrawText(m_para[i][j].text, r, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
-			TRACE(_T("[%d] text = %s, sz = %dx%d, r = %s\n"), i, m_para[i][j].text, sz.cx, sz.cy, get_rect_info_string(m_para[i][j].r));
+#else
+			Gdiplus::Font* font = NULL;
+			get_paragraph_font(i, j, g, &font);
+			Gdiplus::RectF boundRect;
+			//g.MeasureString(CStringW(m_para[i][j].text), -1, font, Gdiplus::PointF(0, 0), &boundRect);
+			//g.MeasureString(CStringW(m_para[i][j].text), -1, font, Gdiplus::PointF(0, 0), &sf, &boundRect);
+			Gdiplus::Region rgn[] = Gdiplus::Region[1];
+			g.MeasureCharacterRanges(CStringW(m_para[i][j].text), -1, font, boundRect, &sf, 1, &rgn);
+			boundRect = rgn[0].GetBounds(g);
+			sz.cx = boundRect.Width;
+			sz.cy = boundRect.Height;
+			m_para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+#endif
+			TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, m_para[i][j].text, sz.cx, sz.cy, get_rect_info_string(m_para[i][j].r));
 			sz_text.cx += sz.cx;
+
+			//한 라인에서 가장 cy가 큰 값을 기억시킨다.
 			sz_text.cy = max(sz_text.cy, sz.cy);
 		}
 
@@ -102,7 +124,7 @@ CRect CSCParagraphStatic::recalc_text_size()
 		sy += sz_text.cy;
 	}
 
-	m_sz_text.cy = sy;
+	total_text_height = sy;
 
 	font.DeleteObject();
 
@@ -182,7 +204,7 @@ CRect CSCParagraphStatic::recalc_text_size()
 	if (dwStyle & SS_CENTERIMAGE)
 	{
 		//전체 높이에서 전체 텍스트 높이 합계를 뺀 1/2 만큼 shift 시킨다.
-		sy = (rc.Height() - m_sz_text.cy) / 2;
+		sy = (rc.Height() - total_text_height) / 2;
 		for (i = 0; i < m_para.size(); i++)
 		{
 			for (j = 0; j < m_para[i].size(); j++)
@@ -213,20 +235,21 @@ CRect CSCParagraphStatic::recalc_text_size()
 		m_rect_text.left = m_para[m_max_width_line][0].r.left;	//최대 넓이 라인의 0번 아이템의 left
 		m_rect_text.top = m_para[0][0].r.top;					//최상단 항목의 top
 		m_rect_text.right = m_para[m_max_width_line][m_para[m_max_width_line].size() - 1].r.right;	//최대 넓이 라인의 마지막 항목의 right
-		m_rect_text.bottom = m_para[0][0].r.top + m_sz_text.cy;	//최상단 항목의 top + 전체 텍스트 높이
+		m_rect_text.bottom = m_para[0][0].r.top + total_text_height;	//최상단 항목의 top + 전체 텍스트 높이
 	}
 	else
 	{
 		m_pt_icon.x = sx - m_sz_icon.cx;
 		m_pt_icon.y = sy - m_sz_icon.cy / 2;
 
-		m_rect_text = make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_text.cx, m_sz_text.cy);
+		m_rect_text = make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_icon.cx, m_sz_icon.cy);
 	}
 
 	return m_rect_text;
 }
 
-void CSCParagraphStatic::draw_hover_rect(bool draw, Gdiplus::Color cr_rect)
+//마우스가 hover된 음절에 사각형 표시
+void CSCParagraphStatic::draw_word_hover_rect(bool draw, Gdiplus::Color cr_rect)
 {
 	m_draw_word_hover_rect = draw;
 
@@ -243,7 +266,7 @@ CFont* CSCParagraphStatic::select_paragraph_font(int line, int index, CDC* pDC, 
 
 	_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), m_para[line][index].name);
 
-	lf.lfHeight = -MulDiv(m_para[line][index].size, GetDeviceCaps(pDC->m_hDC, LOGPIXELSY), 72);
+	lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_para[line][index].size);////-MulDiv(m_para[line][index].size, GetDeviceCaps(pDC->m_hDC, LOGPIXELSY), 72);
 	lf.lfWeight = m_para[line][index].bold ? FW_BOLD : FW_NORMAL;
 	lf.lfItalic = m_para[line][index].italic;
 	lf.lfUnderline = m_para[line][index].underline;
@@ -251,6 +274,40 @@ CFont* CSCParagraphStatic::select_paragraph_font(int line, int index, CDC* pDC, 
 
 	font->CreateFontIndirect(&lf);
 	return (CFont*)pDC->SelectObject(font);
+}
+
+void CSCParagraphStatic::get_paragraph_font(int line, int index, Gdiplus::Graphics &g, Gdiplus::Font** font)
+{
+	Gdiplus::Unit unit = g.GetPageUnit();
+	float fDpiX = g.GetDpiX();
+	float fDpiY = g.GetDpiY();
+
+	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
+	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
+	float emSize = fDpiY * m_para[line][index].size / 96.0;
+
+	Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(m_para[line][index].name));
+	if (!fontFamily->IsAvailable())
+	{
+		delete fontFamily;
+		fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
+	}
+
+	int font_style = 0;
+	if (m_para[line][index].bold)
+		font_style |= Gdiplus::FontStyleBold;
+	if (m_para[line][index].italic)
+		font_style |= Gdiplus::FontStyleItalic;
+	if (m_para[line][index].underline)
+		font_style |= Gdiplus::FontStyleUnderline;
+	if (m_para[line][index].strike)
+		font_style |= Gdiplus::FontStyleStrikeout;
+
+	Gdiplus::Font ff(fontFamily, emSize, font_style);
+	*font = ff.Clone();
+
+	if (fontFamily)
+		delete fontFamily;
 }
 
 void CSCParagraphStatic::OnPaint()
@@ -266,13 +323,14 @@ void CSCParagraphStatic::OnPaint()
 	CFont font, *pOldFont = NULL;
 
 	Gdiplus::Graphics g(dc.m_hDC, rc);
-	//Gdiplus::StringFormat sf;
+	Gdiplus::StringFormat sf;
 
-	//g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-	//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	//sf.SetAlignment(Gdiplus::StringAlignmentNear);
-	//sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
+	sf.SetAlignment(Gdiplus::StringAlignmentNear);
+	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
 
 	//dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 	draw_rectangle(g, rc, Gdiplus::Color::Transparent, m_cr_back);
@@ -293,6 +351,7 @@ void CSCParagraphStatic::OnPaint()
 	{
 		for (j = 0; j < m_para[i].size(); j++)
 		{
+#if 1
 			pOldFont = select_paragraph_font(i, j, &dc, &font);
 
 			//text 배경색을 칠하고
@@ -304,6 +363,18 @@ void CSCParagraphStatic::OnPaint()
 			dc.DrawText(m_para[i][j].text, m_para[i][j].r, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
 			//draw_text(g, m_para[i][j].r, m_para[i][j].cr_text, m_para[i][j].text, m_para[i][j].size, m_para[i][j].);
 			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
+			dc.SelectObject(pOldFont);
+#else
+			Gdiplus::Font* font;
+			get_paragraph_font(i, j, g, &font);
+
+			//text 배경색을 칠하고
+			draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Transparent, m_para[i][j].cr_back);
+
+			//text를 출력한다.
+			Gdiplus::SolidBrush text_brush(m_para[i][j].cr_text);
+			g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf, &text_brush);
+#endif
 
 			if (m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)
 			{
@@ -312,7 +383,11 @@ void CSCParagraphStatic::OnPaint()
 		}
 	}
 
-	draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 2);
+	//텍스트 출력 영역 확인용
+#ifdef _DEBUG
+	draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
+	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
+#endif
 
 	font.DeleteObject();
 	dc.SelectObject(pOldFont);
@@ -353,6 +428,7 @@ void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)
 		}
 
 		m_pos_word_hover = CPoint(-1, -1);
+		Invalidate();
 	}
 
 	CSCStatic::OnMouseMove(nFlags, point);

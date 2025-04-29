@@ -28,6 +28,7 @@ public:
 	CRect			r;				//이 텍스트가 그려질 위치(절대좌표가 아닌 0,0을 기준으로 상대좌표)
 
 	//text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
+	//cr_text, cr_back은 글자, 배경 기본값
 	static void		build_paragraph_str(CString text, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, Gdiplus::Color cr_text, Gdiplus::Color cr_back);
 
 protected:

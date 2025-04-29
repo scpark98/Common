@@ -244,6 +244,7 @@ protected:
 
 	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 흡사하다.
 	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
+	//단, CSCParagraphStatic은 m_rect_text가 실제 출력되는 텍스트 영역값을 가지도록 구현되었다.
 	CRect			m_rect_text;
 	int				m_text_extent = 0;	//텍스트의 크기
 

@@ -3294,7 +3294,8 @@ LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *val
 	LONG 	nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
 	DWORD	buf_size = 256;
 	TCHAR	buffer[256] = { 0, };
-	LPVOID lpMsgBuf;
+	LPVOID	lpMsgBuf;
+	DWORD	dwType = REG_DWORD;
 
 	if (nError == ERROR_SUCCESS)
 	{
@@ -3303,7 +3304,8 @@ LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *val
 			//WinXP SP3에서 RegGetValue()가 지원되지 않아 RegQueryValueEx()로 변경함.
 			//nError = RegGetValue(hKeyRoot, sSubKey, sEntry, RRF_RT_DWORD, &dwType, value, &cbData);
 
-			nError = RegQueryValueEx(hkey, sEntry, NULL, NULL, reinterpret_cast<LPBYTE>(value), &buf_size);
+			//dwType을 주지 않으면 실제 그 값이 0인 REG_DWORD 값임에도 불구하고 '0'이 되어 48이라는 값을 리턴하게 된다.
+			nError = RegQueryValueEx(hkey, sEntry, NULL, &dwType, reinterpret_cast<LPBYTE>(value), &buf_size);
 
 			if (nError == ERROR_SUCCESS)
 			{

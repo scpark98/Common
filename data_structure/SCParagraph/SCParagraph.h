@@ -15,8 +15,8 @@ public:
 	CSCParagraph();
 	~CSCParagraph();
 
-	Gdiplus::Color	cr_text;		//<cr>
-	Gdiplus::Color	cr_back;		//<crb>
+	Gdiplus::Color	cr_text;								//<cr>
+	Gdiplus::Color	cr_back = Gdiplus::Color::Transparent;	//<cb> = <crb>
 
 	CString			text;
 	CString 		name;			//<fontname="Arial">

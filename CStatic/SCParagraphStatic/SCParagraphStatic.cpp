@@ -28,7 +28,7 @@ END_MESSAGE_MAP()
 
 
 // CSCParagraphStatic 메시지 처리기
-CRect CSCParagraphStatic::set_text(CString text, Gdiplus::Color cr_text_color /*-1*/)
+CRect CSCParagraphStatic::set_text(CString text)
 {
 	m_para.clear();
 	CSCParagraph::build_paragraph_str(text, m_para, &m_lf, m_cr_text, m_cr_back);
@@ -245,6 +245,17 @@ CRect CSCParagraphStatic::recalc_text_size()
 		m_rect_text = make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_icon.cx, m_sz_icon.cy);
 	}
 
+	if (m_auto_ctrl_size)
+	{
+		CRect rc;
+		GetClientRect(rc);
+		if (m_rect_text.Width() > rc.Width() || m_rect_text.Height() > rc.Height())
+		{
+			//MoveWindow(m_rect_text);
+			SetWindowPos(NULL, 0, 0, m_rect_text.Width(), m_rect_text.Height(), SWP_NOMOVE | SWP_NOZORDER);
+		}
+	}
+
 	return m_rect_text;
 }
 
@@ -355,8 +366,9 @@ void CSCParagraphStatic::OnPaint()
 			pOldFont = select_paragraph_font(i, j, &dc, &font);
 
 			//text 배경색을 칠하고
-			//dc.FillSolidRect(m_para[i][j].r, m_para[i][j].cr_back.ToCOLORREF());
-			draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Transparent, m_para[i][j].cr_back);
+			if (m_para[i][j].cr_back.GetValue() != Gdiplus::Color::Transparent)
+				//dc.FillSolidRect(m_para[i][j].r, m_para[i][j].cr_back.ToCOLORREF());
+				draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Transparent, m_para[i][j].cr_back);
 
 			//text를 출력한다.
 			dc.SetTextColor(m_para[i][j].cr_text.ToCOLORREF());
@@ -385,9 +397,9 @@ void CSCParagraphStatic::OnPaint()
 
 	//텍스트 출력 영역 확인용
 #ifdef _DEBUG
-	draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
-	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
+	//draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
 #endif
+	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
 
 	font.DeleteObject();
 	dc.SelectObject(pOldFont);

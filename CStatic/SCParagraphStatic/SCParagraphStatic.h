@@ -60,7 +60,7 @@ public:
 	//<cr=Red> = <ct=Red>		//text color. Red는 Gdiplus::Color에 정의된 색상 이름을 사용한다.
 	//<crb=Blue> = <cb=Blue>	//text back color.
 	//"<b><cr=Red>This</b></cr > is a <ct=Blue><i>sample</i> <b>paragraph</b>."
-	CRect			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
+	CRect			set_text(CString sText);
 
 	//마우스가 hover된 음절에 사각형 표시
 	void			draw_word_hover_rect(bool draw = true, Gdiplus::Color cr_rect = Gdiplus::Color::Transparent);
@@ -78,8 +78,10 @@ protected:
 	int				m_max_width_line;		//각 라인들 중 최대 너비인 라인 번호
 	CPoint			m_pt_icon;
 
+	bool			m_auto_ctrl_size = true;//출력될 텍스트의 크기가 컨트롤의 크기보다 클 경우 컨트롤의 크기를 자동으로 늘려준다. default = true
+
 //마우스가 hover된 단어를 표시
-	bool			m_draw_word_hover_rect = false;				//마우스가 hover된 단어를 표시할 지
+	bool			m_draw_word_hover_rect = false;				//마우스가 hover된 단어를 표시할 지. default = false
 	Gdiplus::Color	m_cr_word_hover_rect = Gdiplus::Color::Red;	//hover된 단어를 표시할 색상
 	CPoint			m_pos_word_hover = CPoint(-1, -1);			//마우스가 위치한 단어의 i, j 인덱스 (좌표값이 아닌 인덱스)
 

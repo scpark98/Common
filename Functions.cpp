@@ -3320,7 +3320,9 @@ LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *val
 								(LPTSTR) &lpMsgBuf,
 								0,
 								NULL);
-				AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+				//여기서는 굳이 메시지박스를 표시하지 않는다.
+				//실제 해당 entry가 없을 수 있으며 없을 경우 "지정된 파일을 찾을 수 없습니다."와 같은 시스템 에러 메시지가 표시된다.
+				//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
 				LocalFree(lpMsgBuf);
 			}
 		}

@@ -47,9 +47,13 @@ m_static1.set_gradient_color(RED);
   false일 경우는 텍스트의 위치에 따라 아이콘과 이미지의 위치가 변경된다.
 
 
+
 [2014-11-26]
 
 [수정될 내용]
+- CSCStatic과 CSCParagraphStatic을 합친다? CSCTagStatic 이름변경?
+  tag가 포함되었느냐에 따라 OnPaint() 등이 달라진다.
+
 - 배경이 있는 앱에서는 투명이 잘 적용되지만 기본 스타일의 dlg에서는 화면 갱신이 잘 되지 않는다.
   우선 기본 스타일의 dlg에서는 배경색을 지정해주자.
 - 출력크기보다 rc가 작으면 키워줘야 한다?

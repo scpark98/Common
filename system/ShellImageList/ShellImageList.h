@@ -58,7 +58,8 @@ public:
 
 	void		set_system_label(std::map<int, CString>* map);
 	void		set_system_path(std::map<int, CString>* map);
-	void		set_drive_list(std::deque<CDiskDriveInfo>* drive_list);
+	//remote인 경우는 drive_list를 받아서 채워주고 NULL일 경우는 로컬의 drive list를 직접 구해서 m_drives에 저장한다.
+	void		set_drive_list(std::deque<CDiskDriveInfo>* drive_list = NULL);
 
 	//disk drive list를 리턴
 	std::deque<CDiskDriveInfo>* get_drive_list() { return &m_drives; }
@@ -135,10 +136,30 @@ public:
 	std::deque<CShellVolumeList>	m_volume;
 	void		set_system_label(int index, std::map<int, CString>* map);
 	void		set_system_path(int index, std::map<int, CString>* map);
+
+	std::deque<CDiskDriveInfo>* get_drive_list(int index) { return m_volume[index].get_drive_list(); }
 	void		set_drive_list(int index, std::deque<CDiskDriveInfo>* drive_list);
 
 	CString		get_system_label(int index, int csidl);
 	CString		get_system_path(int index, int csidl);
+
+	//"내 PC\\로컬 디스크 (C:)" -> "C:\\"
+	//"로컬 디스크 (C:)" -> "C:\\"
+	//"문서" -> "C:\\Documents"
+	//"문서\\AnySupport" -> "C:\\Documents\\AnySupport"
+	//"Seagate(\\192.168.0.52) (X:)" -> "X:"	(네트워크 드라이브)
+	//하위 폴더 포함 유무에 관계없이 변환.
+	CString		convert_special_folder_to_real_path(int index, CString special_folder);
+	//"c:\\abc\\def"				=> "로컬 디스크 (C:)\\abc\\def"
+	//"C:\Users\scpark\Desktop"		=> "바탕 화면"
+	//"C:\Users\scpark\Documents"	=> "문서"
+	CString		convert_real_path_to_special_folder(int index, CString real_path);
+
+
+	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
+	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
+	bool		is_protected(int index, CString folder);
+
 
 private:
 	CStringArray m_ExtArray;

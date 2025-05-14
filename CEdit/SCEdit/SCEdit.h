@@ -47,6 +47,9 @@ public:
 		message_scedit_action_button_up,
 	};
 
+	CString					get_text() { CString text; GetWindowText(text); return text; }
+	void					set_text(CString text) { CEdit::SetWindowText(text); }
+
 // Overrides
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CSCEdit)

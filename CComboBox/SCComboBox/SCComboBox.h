@@ -21,6 +21,8 @@ public:
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void			set_color_theme(int theme);
 
+	CString			get_cur_text() { CString text; GetLBText(GetCurSel(), text); return text; }
+
 	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 	//색상을 별도로 지정하지 않으면 기본 cr_text를 사용한다.
 	int				add(CString text = _T(""), Gdiplus::Color cr_text = Gdiplus::Color::Transparent);

@@ -133,7 +133,7 @@ protected:
 	CSCStatic		m_static_message;
 
 	CString			m_button_caption[TOTAL_BUTTON_COUNT];
-	CGdiButton		m_button[12];	//UNDEF(0), IDOK(1) ~ IDCONTINUE(11)
+	CGdiButton		m_button[TOTAL_BUTTON_COUNT];	//UNDEF(0), IDOK(1) ~ IDCONTINUE(11)
 	CGdiButton		m_button_quit;
 	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
 

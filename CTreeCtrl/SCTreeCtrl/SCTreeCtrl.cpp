@@ -663,11 +663,10 @@ void CSCTreeCtrl::refresh(HTREEITEM hParent)
 
 		if (m_is_local)
 		{
-			std::deque<CDiskDriveInfo> drive_list;
-			get_drive_list(&drive_list);
+			std::deque<CDiskDriveInfo>* drive_list = m_pShellImageList->m_volume[!m_is_local].get_drive_list();
 
-			for (int i = 0; i < drive_list.size(); i++)
-				insert_drive(drive_list[i]);
+			for (int i = 0; i < drive_list->size(); i++)
+				insert_drive(drive_list->at(i));
 
 			Expand(m_computerItem, TVE_EXPAND);
 		}
@@ -890,7 +889,7 @@ void CSCTreeCtrl::insert_drive(CDiskDriveInfo drive_info)
 
 void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 {
-	sParentPath = convert_special_folder_to_real_path(sParentPath, m_pShellImageList, !m_is_local);
+	sParentPath = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, sParentPath);
 
 	if (sParentPath.Right(1) != "\\")
 		sParentPath += "\\";
@@ -915,7 +914,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 		if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			insert_folder(hParent, &dq[i], has_sub_folders(convert_special_folder_to_real_path(dq[i].cFileName, m_pShellImageList, !m_is_local)));
+			insert_folder(hParent, &dq[i], has_sub_folders(m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, dq[i].cFileName)));
 			folder_inserted = true;
 		}
 	}
@@ -928,30 +927,6 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	tvItem.hItem = hParent;
 	tvItem.cChildren = folder_inserted;
 	SetItem(&tvItem);
-
-	/*
-	bWorking = FileFind.FindFile(sParentPath + _T("*"));
-
-	while (bWorking)
-	{
-		bWorking = FileFind.FindNextFile();
-
-		if (!FileFind.IsDots() && !FileFind.IsHidden() && FileFind.IsDirectory() && !FileFind.IsSystem())
-		{
-			curFolder = FileFind.GetFileName();
-			TV_INSERTSTRUCT tvItem;
-			tvItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
-			tvItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows"));
-			tvItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1;
-			tvItem.hInsertAfter = TVI_LAST;
-			tvItem.hParent = hParent;
-			tvItem.item.pszText = (LPTSTR)(LPCTSTR)curFolder;
-			//하위 폴더가 있을때만 확장버튼이 표시되도록.
-			tvItem.item.cChildren = get_sub_folders(FileFind.GetFilePath());
-			HTREEITEM hItem = InsertItem(&tvItem);
-		}
-	}
-	*/
 }
 
 void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool has_children)
@@ -968,7 +943,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool h
 	{
 		TCHAR* p = data->cFileName;
 		CString parent = get_path(hParent);
-		parent = convert_special_folder_to_real_path(parent, m_pShellImageList, !m_is_local);
+		parent = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, parent);
 		if (parent.Right(1) == '\\')
 			p += parent.GetLength();
 		else
@@ -983,7 +958,7 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool h
 	if (m_is_shell_treectrl)
 	{
 		if (m_is_local)
-			tvInsertItem.item.cChildren = has_sub_folders(convert_special_folder_to_real_path(concat_path(get_path(hParent), data->cFileName), m_pShellImageList, !m_is_local));
+			tvInsertItem.item.cChildren = has_sub_folders(m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, concat_path(get_path(hParent), data->cFileName)));
 		else
 			tvInsertItem.item.cChildren = has_children;
 	}
@@ -1307,7 +1282,7 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 		return;
 
 	//"작업 디스크 (D:)\\temp"
-	fullpath = convert_real_path_to_special_folder(fullpath, m_pShellImageList, !m_is_local);
+	fullpath = m_pShellImageList->convert_real_path_to_special_folder(!m_is_local, fullpath);
 
 	//"내 PC\\작업 디스크 (D:)\\temp"
 	//':)' 기호가 있는 디스크 드라이브 경로인 경우에는 맨 앞에 '내 PC'를 붙여준다.
@@ -1504,7 +1479,7 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 		//"C:\\" => "로컬 디스크 (C:)"로 변경해준다.
 		if (folders[i].fullpath.Right(2) == _T(":\\"))
 		{
-			folders[i].folder = get_drive_volume(folders[i].fullpath[0]);
+			folders[i].folder = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(folders[i].fullpath[0]);
 		}
 	}
 
@@ -1706,7 +1681,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	GetClientRect(rc);
 
 	m_DragItem = pNMTreeView->itemNew.hItem;
-	CString path = convert_special_folder_to_real_path(get_path(m_DragItem), m_pShellImageList, !m_is_local);
+	CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(m_DragItem));
 	
 	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
@@ -2729,7 +2704,7 @@ void CSCTreeCtrl::edit_end(bool valid)
 	if (m_is_shell_treectrl)
 	{
 		CString parent_path = GetParentDirectory(get_path(m_edit_item));
-		parent_path = convert_special_folder_to_real_path(parent_path, m_pShellImageList, !m_is_local);
+		parent_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, parent_path);
 		BOOL res = FALSE;
 
 		CString old_path = concat_path(parent_path, m_edit_old_text);
@@ -2889,6 +2864,21 @@ void CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 		Expand(pNMTreeView->itemNew.hItem, TVE_EXPAND);
 	*/
 	*pResult = 0;
+}
+
+//해당 아이템에 지정된 이미지 인덱스를 리턴한다.
+//이 노드가 어떤 종류의 노드인지 구분하기 위해 사용된다.
+int CSCTreeCtrl::get_image_index(HTREEITEM hItem)
+{
+	if (hItem == NULL)
+		return -1;
+
+	TVITEM item;
+	item.mask = TVIF_HANDLE | TVIF_IMAGE;
+	item.hItem = hItem;
+	GetItem(&item);
+	TRACE(_T("image index = %d\n"), item.iImage);
+	return item.iImage;
 }
 
 void CSCTreeCtrl::full_row_selection(bool full_row)
@@ -3196,7 +3186,7 @@ void CSCTreeCtrl::OnPopupMenu(UINT nMenuID)
 			HTREEITEM hItem = GetSelectedItem();
 			if (hItem)
 			{
-				CString path = convert_special_folder_to_real_path(get_path(hItem), m_pShellImageList, !m_is_local);
+				CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hItem));
 				if (m_is_local)
 				{
 					show_property_window(std::deque<CString> {path});
@@ -3242,7 +3232,7 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 				HTREEITEM hItem = GetSelectedItem();
 				if (hItem)
 				{
-					CString path = convert_special_folder_to_real_path(get_path(hItem), m_pShellImageList, !m_is_local);
+					CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hItem));
 					show_property_window(std::deque<CString> {path});
 				}
 				break;
@@ -3278,7 +3268,7 @@ CString CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_in
 		//	m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")),
 		//	m_pShellImageList->GetSystemImageListIcon(_T("C:\\windows")) + 1, hParent);
 
-		CString path = convert_special_folder_to_real_path(get_path(hParent), m_pShellImageList, !m_is_local);
+		CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hParent));
 
 		if (auto_index)
 		{
@@ -3564,4 +3554,18 @@ void CSCTreeCtrl::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	lpMMI->ptMinTrackSize.y = 50;
 
 	CTreeCtrl::OnGetMinMaxInfo(lpMMI);
+}
+
+//해당 아이템의 depth level을 리턴한다. hItem == NULL이면 -1을 리턴한다.
+int CSCTreeCtrl::get_indent_level(HTREEITEM hItem)
+{
+	if (hItem == NULL)
+		return -1;
+
+	int indent = 0;
+
+	while ((hItem = GetParentItem(hItem)) != NULL)
+		indent++;
+
+	return indent;
 }

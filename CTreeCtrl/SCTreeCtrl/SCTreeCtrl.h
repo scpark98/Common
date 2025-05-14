@@ -101,9 +101,15 @@ public:
 		message_tree_processing,		//폴더들을 노드에 추가할 경우 C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
 	};
 
+	//해당 아이템의 depth level을 리턴한다. hItem == NULL이면 -1을 리턴한다.
+	int			get_indent_level(HTREEITEM hItem);
 
 	int			get_indent_size() { return m_indent_size; }
 	void		set_indent_size(int size) { m_indent_size = size; Invalidate(); }
+
+	//해당 아이템에 지정된 이미지 인덱스를 리턴한다.
+	//이 노드가 어떤 종류의 노드인지 구분하기 위해 사용된다.
+	int			get_image_index(HTREEITEM hItem);
 
 	//스타일 변경
 	void		full_row_selection(bool full_row);
@@ -159,14 +165,14 @@ public:
 	//새로 추가된 항목의 label을 리턴한다.
 	CString		add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
 	//주어진 항목의 label을 변경한다.
-	void			rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
+	void		rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
 	//현재 선택된 노드의 하위 노드들 중에서 old_label을 찾아서 new_label로 이름을 변경한다.
-	void			rename_child_item(HTREEITEM hParent, CString old_label, CString new_label);
+	void		rename_child_item(HTREEITEM hParent, CString old_label, CString new_label);
 
 	//only_children이 true이면 해당 노드의 자식들만 제거한다.
-	void			delete_item(HTREEITEM hItem = NULL, bool only_children = false, bool confirm = false);
+	void		delete_item(HTREEITEM hItem = NULL, bool only_children = false, bool confirm = false);
 	//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
-	int				get_file_index(CString path, CString new_folder_title);
+	int			get_file_index(CString path, CString new_folder_title);
 
 
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.

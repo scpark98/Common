@@ -344,7 +344,7 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 
 	m_path.clear();
 
-	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
+	path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, path);
 
 	CString folder;
 
@@ -386,16 +386,19 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	//드라이브 명을 레이블로 변경
 	if (path.Mid(1, 2) == _T(":\\"))
 	{
-		CString drive_volume;
+		CString drive_volume = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(path);
 		
+		/*
 		if (m_is_local)
 		{
-			drive_volume = get_drive_volume(path[0]);
+			drive_volume = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(path[0]);
 		}
 		else
 		{
 			drive_volume = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(path);
 		}
+		*/
+
 		m_path[0].label.Format(_T("%s"), drive_volume);
 	}
 
@@ -511,7 +514,7 @@ CString CPathCtrl::get_path(int index)
 	//special folder들인 경우(바탕 화면 등등)
 	if (m_path[2].label.Find(_T(":\\")) < 0 && m_path[2].label.Find(_T(":)")) < 0)
 	{
-		fullpath = convert_special_folder_to_real_path(m_path[2].label, m_pShellImageList, !m_is_local);
+		fullpath = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_path[2].label);
 		return fullpath;
 	}
 
@@ -824,7 +827,7 @@ void CPathCtrl::recalc_path_position()
 		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가
 		//remote인 경우는 하위 폴더목록을 request해서 받기 전까지는 구할 수 없다.
 		//하지만 m_path.size() - 1보다 하위의 폴더라면 이미 하위폴더가 있다는 뜻이므로 우선 이렇게 처리한다.
-		bool has_sub = (m_is_local ? has_sub_folders(convert_special_folder_to_real_path(get_path(i), m_pShellImageList, !m_is_local)) : true);
+		bool has_sub = (m_is_local ? has_sub_folders(m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(i))) : true);
 		rt.right += (has_sub || (i < m_path.size() - 1) ? m_arrow_area_width : 0);
 
 		rt.top = rc.top;

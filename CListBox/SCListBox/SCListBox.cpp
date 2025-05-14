@@ -315,7 +315,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if (m_as_folder_list)
 	{
 		rect.left += 6;		//left margin
-		CString real_path = convert_special_folder_to_real_path(m_folder_list[lpDIS->itemID], m_pShellImageList, !m_is_local);
+		CString real_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_folder_list[lpDIS->itemID]);
 		int img_index = (is_drive_root(real_path) ? m_pShellImageList->get_drive_icon(!m_is_local, real_path) : m_pShellImageList->GetSystemImageListIcon(!m_is_local, real_path, true));
 		m_pShellImageList->m_imagelist_small.Draw(pDC, img_index, CPoint(rect.left, rect.CenterPoint().y - 8), ILD_TRANSPARENT);
 		//m_pShellImageList->m_imagelist_small.Draw(pDC, m_folder_list[lpDIS->itemID].,
@@ -886,6 +886,8 @@ void CSCListBox::OnKillFocus(CWnd* pNewWnd)
 
 int CSCListBox::set_path(CString root, CString selected_text)
 {
+	root = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, root);
+
 	if (root.IsEmpty())
 	{
 		m_folder_list.clear();

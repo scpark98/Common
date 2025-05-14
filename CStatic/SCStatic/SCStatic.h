@@ -231,11 +231,11 @@ public:
 	}
 
 //animated gif 관련
-	void	play_gif();
+	void			play_gif();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void	pause_gif(int pos = 0);
+	void			pause_gif(int pos = 0);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-	void	stop_gif();
+	void			stop_gif();
 
 	HICON			m_hIcon;
 	CSize			m_sz_icon;

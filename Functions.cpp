@@ -12,7 +12,6 @@
 #include "Psapi.h"		//for GetCurrentMemUsage()
 #include <wuapi.h>		//for windows update option check
 
-
 #include "Functions.h"
 
 //아래 두 라인은 GetWindowsVersion()함수를 위해 포함되었는데
@@ -21,6 +20,10 @@
 //가능하면 .h에 include를 최소화 할 필요가 있다.
 #include <LM.h>
 #pragma comment(lib, "netapi32.lib")
+
+//get_proxy_info()를 위해 추가했으나 HTTP_VERSION_INFO 재정의 등 충돌 발생하여 우선 주석처리함. (XP호환이 원인)
+//#include <winhttp.h>
+//#pragma comment(lib, "Winhttp.lib")
 
 
 #include <limits>
@@ -35,7 +38,6 @@
 //for file property api
 #include <propvarutil.h>
 #pragma comment(lib, "propsys.lib")
-
 
 #pragma warning(disable : 4018)		// '<': signed/unsigned mismatch
 #pragma warning(disable : 4127)		// conditional expression is constant
@@ -879,66 +881,6 @@ CString	normalize_path(CString& filepath)
 	filepath = buffer;
 
 	return filepath;
-}
-
-//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
-//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
-bool is_protected(CString folder, CShellImageList *plist, int index)
-{
-	folder = convert_special_folder_to_real_path(folder, plist, index);
-	//folder.MakeLower();
-
-	//바탕 화면, 문서 등 특수 폴더는 보호. "내 PC"의 패스는 ""으로 세팅되어 있으므로 비교 제외.
-	//std::map<int, CString> path_map = *plist->m_volume[index].get_path_map();
-	//if (folder.Find(path_map[CSIDL_DESKTOP]) >= 0)
-	//	return true;
-	//if (folder.Find(path_map[CSIDL_MYDOCUMENTS]) >= 0)
-	//	return true;
-
-	//드라이브 루트는 모두 보호.
-	for (auto drive_list : *plist->m_volume[index].get_drive_list())
-	{
-		//CString drive_root = convert_special_folder_to_real_path(drive_list.path, plist, index);
-		if (folder.CompareNoCase(drive_list.path) == 0)
-			return true;
-	}
-
-	//windows 폴더 및 하위 폴더는 모두 보호.
-	if (folder.Find(_T("C:\\Windows")) >= 0)
-		return true;
-
-
-	std::deque<CString> protected_folder;
-	protected_folder.push_back(_T("C:\\Documents and Settings"));
-	protected_folder.push_back(_T("C:\\Program Files"));
-	protected_folder.push_back(_T("C:\\Program Files (x86)"));
-	protected_folder.push_back(_T("C:\\ProgramData"));
-	protected_folder.push_back(_T("C:\\Recovery"));
-	protected_folder.push_back(_T("C:\\System Volume Information"));
-	protected_folder.push_back(_T("C:\\Windows"));
-	protected_folder.push_back(_T("C:\\Users"));
-
-	int found = find_dqstring(protected_folder, folder, true, false);
-	if (found >= 0)
-		return true;
-
-	return false;
-
-	//c드라이브는 모두 보호? 다운로드, 문서, 바탕 화면 등은 사용자가 자주 사용하는 폴더이므로 제외시켜야 한다.
-	//if (folder.Find(_T("c:\\")) >= 0)
-	//	return true;
-	//if (folder.Find(_T("c:\\program files") >= 0))
-	//	return true;
-	//if (folder.Find(_T("c:\\program files (x86)") >= 0))
-	//	return true;
-	//if (folder.Find(_T("c:\\users") >= 0))
-	//	return true;
-	//if (folder.Find(_T("c:\\windows") >= 0))
-	//	return true;
-
-
-
-	return false;
 }
 
 //"C:\\", "C:\\Temp"와 같이 루트일때와 일반 폴더일 경우 끝에 역슬래시 유무가 다르므로 필요.
@@ -2659,6 +2601,8 @@ DWORD request_url(CString& result_str, CString full_url, CString verb, std::vect
 //local_file_path가 지정되어 있으면 파일로 다운받는다. (이때 result_str은 "")
 //리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
 //DWORD request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb, std::vector<CString> *headers, CString jsonBody, CString local_file_path)
+//https://m.blog.naver.com/nawoo/80132924296
+//https://blog.naver.com/tija98/120037685173
 void request_url(CRequestUrlParams* params)
 {
 	long t0 = clock();
@@ -2728,7 +2672,12 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
-	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG | INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+	//INTERNET_OPEN_TYPE_PRECONFIG만 사용하면 Proxy 설정 유무와 무관하게 정상 동작한다.
+	//단, 어떤 request때문에 INTERNET_OPEN_TYPE_DIRECT 옵션을 넣었었으나 이 옵션이 추가되면 Proxy 설정이 있을 경우 실패하게 된다.
+	//또한 Proxy 설정정보가 변경된 후에는 407 에러가 발생하는데
+	//윈도우에서 Proxy 설정정보를 다시 입력받는 창이 나오고 정상 입력된 후에는 이 API도 정상적으로 동작하게 된다.
+	//만약 407 에러가 발생하면 
+	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG/* | INTERNET_OPEN_TYPE_DIRECT*/, NULL, NULL, 0);
 	if (hInternetRoot == NULL)
 	{
 		params->status = GetLastError();
@@ -2786,6 +2735,17 @@ void request_url(CRequestUrlParams* params)
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
 
+	//Proxy 계정관련 코드를 추가했으나 확인 필요.
+	if (params->proxy_id.IsEmpty() == false || params->proxy_pw.IsEmpty() == false)
+	{
+		char* proxy_id = CString2char(params->proxy_id);
+		char* proxy_pw = CString2char(params->proxy_pw);
+		InternetSetOption(hOpenRequest, INTERNET_OPTION_PROXY_USERNAME, proxy_id, strlen(proxy_id));
+		InternetSetOption(hOpenRequest, INTERNET_OPTION_PROXY_PASSWORD, proxy_pw, strlen(proxy_pw));
+		delete[] proxy_id;
+		delete[] proxy_pw;
+	}
+
 	if (params->is_https)
 	{
 		DWORD dwFlags = 0;
@@ -2841,7 +2801,7 @@ void request_url(CRequestUrlParams* params)
 	{
 		DWORD dwError = GetLastError();
 		params->status = dwError;
-		params->result.Format(_T("HttpSendRequest failed. error code = %d(%s)"), dwError, get_error_str(dwError));
+		params->result.Format(_T("HttpSendRequest failed. elapsed = %ldms. error code = %d(%s)"), clock() - t0, dwError, get_error_str(dwError));
 		TRACE(_T("result = %s\n"), params->result);
 
 		SAFE_DELETE_ARRAY(jsonData);
@@ -3240,7 +3200,7 @@ CString	get_default_browser_info(CString* pPath, CString* pVersion)
 	CString path;
 	CString version;
 
-	get_registry_string(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice"), _T("ProgId"), &ProgId);
+	get_registry_str(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice"), _T("ProgId"), &ProgId);
 
 	if (ProgId.Find(_T("Chrome")) >= 0)			//ChromeHTML
 		browser = _T("Google Chrome");
@@ -3261,7 +3221,7 @@ CString	get_default_browser_info(CString* pPath, CString* pVersion)
 
 	CString section;
 	section.Format(_T("SOFTWARE\\Classes\\%s\\shell\\open\\command"), ProgId);
-	get_registry_string(HKEY_LOCAL_MACHINE, section, _T(""), &path);
+	get_registry_str(HKEY_LOCAL_MACHINE, section, _T(""), &path);
 
 	int pos = path.Find(_T(".exe\""));
 	if (pos > 0)
@@ -3347,7 +3307,7 @@ LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *val
 	return nError;
 }
 
-LONG get_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
+LONG get_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
 {
 	HKEY	hkey = NULL;
 	DWORD	dwType = REG_SZ;
@@ -3422,7 +3382,7 @@ LONG set_registry_int(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value
 	return lResult;
 }
 
-LONG set_registry_string(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
+LONG set_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
 {
 	HKEY	hkey;
 	LONG	lResult = ERROR_SUCCESS;
@@ -5029,7 +4989,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	CFileFind finder;
 
 	//"로컬 디스크 (C:)"
-	root = convert_special_folder_to_real_path(root);
+	//root = convert_special_folder_to_real_path(root);
 
 	if (PathIsDirectory(root))
 	{
@@ -5047,10 +5007,10 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	}
 	else if (root == get_system_label(CSIDL_DRIVES))
 	{
-		std::deque<CDiskDriveInfo> drive_list;
+		std::deque<CString> drive_list;
 		get_drive_list(&drive_list);
 		for (int i = 0; i < drive_list.size(); i++)
-			folders.push_back(drive_list[i].label);
+			folders.push_back(drive_list[i]);
 
 		if (special_folders)
 		{
@@ -9469,7 +9429,7 @@ CString	normalize_drive_path(CString drive_path)
 	return drive_path;
 }
 
-void get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy)
+void get_drive_list(std::deque<CString> *drive_list, bool include_legacy)
 {
 	DWORD dwError = 0;
 	TCHAR tzDriveString[MAX_PATH] = { 0, };
@@ -9492,14 +9452,13 @@ void get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy)
 			if (!include_legacy && (driveType == DRIVE_REMOVABLE || driveType == DRIVE_CDROM))
 				continue;
 
-			ULARGE_INTEGER total_space, free_space;
-			total_space.QuadPart = get_disk_total_size(strDrive);
-			free_space.QuadPart = get_disk_free_size(strDrive);
-			drive_list->push_back(CDiskDriveInfo(driveType, get_drive_volume(strDrive[0]), strDrive, total_space, free_space));
+			drive_list->push_back(get_drive_volume(strDrive[0]));
 		}
 	} while ((logicalDrives >>= 1) != 0);
 }
 
+
+/*
 //"내 PC\\로컬 디스크 (C:)" -> "C:\\"
 //"로컬 디스크 (C:)" -> "C:\\"
 //"문서" -> "C:\\Documents"
@@ -9662,6 +9621,7 @@ CString	convert_real_path_to_special_folder(CString real_path, CShellImageList* 
 
 	return volume_path;
 }
+*/
 
 //"c:\windows"를 입력하면 "C:\Windows"와 같이 실제 파일시스템에 저장된 경로명 리턴.
 CString	get_original_path(CString path)
@@ -19017,7 +18977,7 @@ HWND find_tray_toolbar_window()
 			if (hWnd_SysPager)
 				hWnd_ToolbarWindow32 = ::FindWindowEx(hWnd_SysPager, NULL, _T("ToolbarWindow32"), NULL);
 
-			// Win2000 일 경우에는 SysPager 가 없이 TrayNotifyWnd -> ToolbarWindow32 로 넘어간다
+				// Win2000 일 경우에는 SysPager 가 없이 TrayNotifyWnd -> ToolbarWindow32 로 넘어간다
 			else
 				hWnd_ToolbarWindow32 = ::FindWindowEx(hWnd_TrayNotifyWnd, NULL, _T("ToolbarWindow32"), NULL);
 		}
@@ -19106,6 +19066,302 @@ CString get_asterisk_addr(CString ip)
 
 	return result;
 }
+
+#if 1
+//윈도우 네트워크 정보에 설정된 proxy 정보를 읽어온다. use proxy이면 true 리턴.
+void get_proxy_info(bool& proxy_enable, CString& ip, int& port, CString& bypass, CString& PAC_url)
+{
+	DWORD is_enabled;
+	get_registry_int(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"), _T("ProxyEnable"), &is_enabled);
+	proxy_enable = (is_enabled == 1);
+
+	get_registry_str(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"), _T("ProxyServer"), &ip);
+	if (ip.GetLength() > 3 && ip.Find(_T(":")) > 0)
+	{
+		std::deque<CString> token;
+		get_token_string(ip, token, _T(":"), false);
+		if (token.size() == 2)
+		{
+			ip = token[0];
+			port = _ttoi(token[1]);
+		}
+	}
+
+	get_registry_str(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"), _T("ProxyOverride"), &bypass);
+	get_registry_str(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"), _T("AutoConfigURL"), &PAC_url);
+
+	/*
+	DWORD dwSize = sizeof(INTERNET_PROXY_INFO);
+	auto* pInfo = (INTERNET_PROXY_INFO*)GlobalAlloc(GPTR, dwSize);
+
+	if (InternetQueryOption(nullptr, INTERNET_OPTION_PROXY, pInfo, &dwSize))
+	{
+		switch (pInfo->dwAccessType)
+		{
+			case INTERNET_OPEN_TYPE_DIRECT:
+				TRACE(_T("no proxy-direct connection\n"));
+				break;
+			case INTERNET_OPEN_TYPE_PROXY:
+				TRACE(_T("Proxy server: %s, Bypass list: %s\n"), pInfo->lpszProxy, pInfo->lpszProxyBypass);
+				break;
+			case INTERNET_OPEN_TYPE_PRECONFIG:
+				TRACE(_T("Use user's IE settings\n"));
+				break;
+		}
+	}
+	else
+	{
+		TRACE(_T("InternetQueryOption(INTERNET_OPTION_PROXY) failed: %d\n"), GetLastError());
+		return false;
+	}
+	*/
+
+	/*
+	HINTERNET hHttpSession = NULL;
+	HINTERNET hConnect = NULL;
+	HINTERNET hRequest = NULL;
+	BOOL	bProxyEnv = FALSE;
+
+	WINHTTP_AUTOPROXY_OPTIONS  AutoProxyOptions;
+	WINHTTP_PROXY_INFO         ProxyInfo;
+	DWORD                      cbProxyInfoSize = sizeof(ProxyInfo);
+
+	WINHTTP_CURRENT_USER_IE_PROXY_CONFIG ieProxyConfig = { 0 };
+	ZeroMemory(&AutoProxyOptions, sizeof(AutoProxyOptions));
+	ZeroMemory(&ProxyInfo, sizeof(ProxyInfo));
+
+	char logbuf[512];
+	memset(logbuf, 0x00, sizeof(logbuf));
+
+	if (!::WinHttpGetIEProxyConfigForCurrentUser(&ieProxyConfig))
+	{
+		goto NEXT;
+	}
+
+	//if (m_log)
+	{
+		TRACE(_T("[SOCKET]FindProxyFromWinHttp(ieProxyConfig ==>\r\n\t(AutoDetect : %d)\r\n\t(configUrl : %s)\r\n\t(szProxy : %s)\r\n\t(proxyBypass : %s)\r\n"),
+			ieProxyConfig.fAutoDetect, ieProxyConfig.lpszAutoConfigUrl, ieProxyConfig.lpszProxy, ieProxyConfig.lpszProxyBypass);
+	}
+
+	//PAC 방식이면
+	if (ieProxyConfig.lpszAutoConfigUrl != NULL) //auto config
+	{
+		//wsprintf(logbuf , "[SUCCESS] Get PAC file (%S) \r\n" , ieProxyConfig.lpszAutoConfigUrl);
+		//if (m_log)
+		{
+			//m_log->koino(_T("[SUCCESS] Get PAC file (%S)") , ieProxyConfig.lpszAutoConfigUrl); 
+			TRACE(_T("[SOCKET][SUCCESS] Get PAC file (%s)"), ieProxyConfig.lpszAutoConfigUrl); // 2018.10.11 pac 프록시 잘못 된 부분 수정
+		}
+
+		if (strlen((LPSTR)ieProxyConfig.lpszAutoConfigUrl))
+		{
+			AutoProxyOptions.lpszAutoConfigUrl = ieProxyConfig.lpszAutoConfigUrl;
+
+			hHttpSession = WinHttpOpen(0,
+				WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+				WINHTTP_NO_PROXY_NAME,
+				WINHTTP_NO_PROXY_BYPASS,
+				WINHTTP_FLAG_ASYNC);
+
+			// Exit if WinHttpOpen failed.
+			if (!hHttpSession)
+			{
+				goto NEXT;
+			}
+
+			// Use auto-detection because the Proxy 
+			// Auto-Config URL is not known.
+			AutoProxyOptions.dwFlags = WINHTTP_AUTOPROXY_CONFIG_URL;
+
+			// Use DHCP and DNS-based auto-detection.
+			AutoProxyOptions.dwAutoDetectFlags =
+				WINHTTP_AUTO_DETECT_TYPE_DHCP |
+				WINHTTP_AUTO_DETECT_TYPE_DNS_A;
+
+			// If obtaining the PAC script requires NTLM/Negotiate
+			// authentication, then automatically supply the client
+			// domain credentials.
+			AutoProxyOptions.fAutoLogonIfChallenged = TRUE;
+
+			AutoProxyOptions.lpszAutoConfigUrl = ieProxyConfig.lpszAutoConfigUrl;
+
+			if (WinHttpGetProxyForUrl(hHttpSession,
+				L"http://www.anysupport.net",
+				&AutoProxyOptions,
+				&ProxyInfo))
+			{
+
+				if (ProxyInfo.lpszProxy == NULL)
+				{
+					goto NEXT;
+				}
+
+				if (strlen((LPSTR)ProxyInfo.lpszProxy) == 0)
+				{
+					goto NEXT;
+				}
+
+				//wsprintf(logbuf , "[SUCCESS] Get PAC Proxy Info (%S) \r\n" , ProxyInfo.lpszProxy);
+
+				//if (m_log)
+				{
+					//m_log->koino(_T("[SUCCESS] Get PAC Proxy Info (%S)") , ProxyInfo.lpszProxy);
+					TRACE(_T("[SOCKET][SUCCESS] Get PAC Proxy Info (%s)"), ProxyInfo.lpszProxy); // 2018.10.11 pac 프록시 잘못 된 부분 수정
+				}
+
+				CString strProyxIP;
+				strProyxIP.Format(_T("%s"), ProxyInfo.lpszProxy);
+				strProyxIP.Remove(' ');
+
+				int n = -1;
+				n = strProyxIP.Find(_T(";"));
+
+				if (n == -1)
+				{
+					n = strProyxIP.Find(_T(":"));
+					if (n == -1)
+					{
+						ip = strProyxIP;
+						port = 80;
+
+						TRACE(_T("[SOCKET][SUCCESS] Get PAC Proxy Info1 (%s:%d)"), ip, port);
+
+						bProxyEnv = TRUE;
+						goto END;
+					}
+					else
+					{
+						ip = strProyxIP.Left(n);
+						port = _ttoi(strProyxIP.Right(strProyxIP.GetLength() - (n + 1)));
+
+						TRACE(_T("[SOCKET][SUCCESS] Get PAC Proxy Info2 (%s:%d)"), ip, port);
+						bProxyEnv = TRUE;
+						goto END;
+					}
+
+				}
+				else
+				{
+					CString strProxyIP2;
+					strProxyIP2 = strProyxIP.Left(n);
+
+					n = strProxyIP2.Find(_T(":"));
+					if (n == -1)
+					{
+						ip = strProxyIP2;
+						port = 80;
+
+						TRACE(_T("[SOCKET][SUCCESS] Get PAC Proxy Info3 (%s:%d)"), ip, port);
+
+						bProxyEnv = TRUE;
+						goto END;
+					}
+					else
+					{
+						ip = strProxyIP2.Left(n);
+						port = _ttoi(strProxyIP2.Right(strProxyIP2.GetLength() - (n + 1)));
+
+						TRACE(_T("[SOCKET][SUCCESS] Get PAC Proxy Info4 (%s:%d)"), ip, port);
+						bProxyEnv = TRUE;
+						goto END;
+					}
+
+				}
+			}
+			else
+			{
+				goto NEXT;
+			}
+
+		}
+	}
+
+NEXT:
+
+	if (ieProxyConfig.lpszProxy != NULL) //manual config
+	{
+		//if(strlen((LPSTR)ieProxyConfig.lpszProxy)) //수동 방식이면
+		if (_tcslen((LPWSTR)ieProxyConfig.lpszProxy)) //수동 방식이면 // 2018.10.11 pac 프록시 잘못 된 부분 수정
+		{
+			//Socket::PrintLog(1 , "[SUCCESS] Get Manual Proxy Info from IE(%S) \r\n" , ieProxyConfig.lpszProxy);
+			ip = ieProxyConfig.lpszProxy; // 2018.10.14 fix -  호스트 프로그램에서 프록시 안되는 문제, 로그가 설정안되어도 프록시 IP를 설정해야한다.
+
+			//if (m_log)
+			{
+				///strProxyIP.setString(ieProxyConfig.lpszProxy); // 2018.10.14 fix -  호스트 프로그램에서 프록시 안되는 문제, 로그가  설정안되어도 프록시 IP를 설정해야한다.
+				TRACE(_T("[SOCKET][SUCCESS] Get Manual Proxy Info from IE(%s)"), ip);
+			}
+
+			if (ip.Find(_T(":") > 0))
+			{
+				std::deque<CString> chunks;
+				get_token_string(ip, chunks, _T(":"), false);
+				ip = chunks[0];
+				port = _ttoi(chunks[1]);
+
+				//if (m_log)
+					TRACE(_T("[SOCKET][SUCCESS] Get Proxy IP : Port from IE(%s : %d)"), ip, port);
+				bProxyEnv = TRUE;
+				goto END;
+			}
+			else
+			{
+				//if (m_log)
+					TRACE(_T("[SOCKET][SUCCESS] Get Proxy IP : Port from IE(%s : %d)"), ip, port);
+
+				bProxyEnv = FALSE;
+				goto END;
+			}
+		}
+		else //proxy 환경이 아님..
+		{
+			bProxyEnv = FALSE;
+			goto END;
+		}
+	}
+	else
+	{
+		bProxyEnv = FALSE;
+		// No Proxy Env
+	}
+
+END:
+	//
+	// Clean up the WINHTTP_PROXY_INFO structure.
+	//
+	if (ieProxyConfig.lpszAutoConfigUrl != NULL)
+		GlobalFree(ieProxyConfig.lpszAutoConfigUrl);
+
+	if (ieProxyConfig.lpszProxyBypass != NULL)
+		GlobalFree(ieProxyConfig.lpszProxyBypass);
+
+	if (ieProxyConfig.lpszProxy != NULL)
+		GlobalFree(ieProxyConfig.lpszProxy);
+
+
+	if (ProxyInfo.lpszProxy != NULL)
+		GlobalFree(ProxyInfo.lpszProxy);
+
+	if (ProxyInfo.lpszProxyBypass != NULL)
+		GlobalFree(ProxyInfo.lpszProxyBypass);
+
+	//
+	// Close the WinHTTP handles.
+	//
+	if (hRequest != NULL)
+		WinHttpCloseHandle(hRequest);
+
+	if (hConnect != NULL)
+		WinHttpCloseHandle(hConnect);
+
+	if (hHttpSession != NULL)
+		WinHttpCloseHandle(hHttpSession);
+
+	return bProxyEnv;
+	*/
+}
+#endif
 
 //x86에서만 가능
 #ifdef _M_IX86

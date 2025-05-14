@@ -45,12 +45,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <set>
 
-//#include <gdiplus.h>
-//#include <gdipluseffects.h>
 #include "GdiplusBitmap.h"
 
 #include "colors.h"
-#include "./system/ShellImageList/ShellImageList.h"
 #include "data_structure/SCParagraph/SCParagraph.h"
 
 #include <WinInet.h>
@@ -407,6 +404,11 @@ public:
 	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
 	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
 	std::deque<CString> headers;
+
+	//proxy 계정 정보가 없어서 실패하면 407(Proxy Authentication Required) error가 발생하므로 이때는 사용자에게 직접 입력받고
+	//다시 호출해줘야 한다.
+	CString		proxy_id;
+	CString		proxy_pw;
 
 	//한번 호출해서 실패한 후 port나 주소 등 url관련 정보를 수정하여 다시 request_url()을 호출할 때
 	//full_url을 ""로 만들어주지 않으면 이 값을 바로 사용해서 다시 request하므로 역시 실패하게 된다.
@@ -1011,10 +1013,6 @@ struct	NETWORK_INFO
 	bool		change_extension(CString& filepath, CString newExt, bool applyRealFile);
 	CString		normalize_path(CString& filepath);
 
-	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
-	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
-	bool		is_protected(CString folder, CShellImageList *plist, int index);
-
 	//"C:\\", "C:\\Temp"와 같이 루트일때와 일반 폴더일 경우 끝에 역슬래시 유무가 다르므로 필요.
 	bool		is_drive_root(CString path);
 	//src 폴더 경로에 sub 폴더 경로를 붙여주는 단순한 함수지만 드라이브 루트일때와 아닐때 등의 처리때문에 검사하여 결합해주는 목적으로 추가.
@@ -1248,7 +1246,10 @@ struct	NETWORK_INFO
 	bool		port_is_open(const std::string& address, int port);
 	//ip 또는 domain의 일부 값을 '*'로 치환한다.
 	CString		get_asterisk_addr(CString ip);
-
+#if 1
+	//윈도우 네트워크 정보에 설정된 proxy 정보를 읽어온다. use proxy이면 true 리턴.
+	void		get_proxy_info(bool& proxy_enable, CString& ip, int& port, CString& bypass, CString& PAC_url);
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 //암호화
@@ -1315,11 +1316,11 @@ struct	NETWORK_INFO
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value);
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
-	LONG		get_registry_string(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
+	LONG		get_registry_str(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString *str);
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		set_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
-	LONG		set_registry_string(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
+	LONG		set_registry_str(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 //#endif
 
 	//Windows visual effect registry
@@ -1433,7 +1434,7 @@ h		: 복사할 height 크기(pixel)
 	CString		get_HDD_serial_number(int index, bool unify16 = true);
 
 	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
-	void		get_drive_list(std::deque<CDiskDriveInfo> *drive_list, bool include_legacy = false);
+	void		get_drive_list(std::deque<CString> *drive_list, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
 
 	//드라이브 패스는 "C:\\"와 같이 3개 문자로 구성되고 첫문자는 대문자로 표시하는 것이 일반적이다.
@@ -1444,11 +1445,11 @@ h		: 복사할 height 크기(pixel)
 	//"문서\\AnySupport" -> "C:\\Documents\\AnySupport"
 	//"Seagate(\\192.168.0.52) (X:)" -> "X:"	(네트워크 드라이브)
 	//하위 폴더 포함 유무에 관계없이 변환.
-	CString		convert_special_folder_to_real_path(CString special_folder, CShellImageList* plist = NULL, int index = 0);
+	//CString		convert_special_folder_to_real_path(CString special_folder, CShellImageList* plist = NULL, int index = 0);
 	//"c:\\abc\\def"				=> "로컬 디스크 (C:)\\abc\\def"
 	//"C:\Users\scpark\Desktop"		=> "바탕 화면"
 	//"C:\Users\scpark\Documents"	=> "문서"
-	CString		convert_real_path_to_special_folder(CString real_path, CShellImageList * plist = NULL, int index = 0);
+	//CString		convert_real_path_to_special_folder(CString real_path, CShellImageList * plist = NULL, int index = 0);
 
 	//"c:\windows"를 입력하면 "C:\Windows"와 같이 실제 파일시스템에 저장된 경로명 리턴.
 	CString		get_original_path(CString path);

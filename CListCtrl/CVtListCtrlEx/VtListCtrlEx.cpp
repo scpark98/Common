@@ -1328,7 +1328,7 @@ void CVtListCtrlEx::move_parent_folder()
 
 	if (m_is_shell_listctrl)
 	{
-		CString path = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+		CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path());
 		CString thisPC = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 
 		if (path == thisPC)
@@ -2130,7 +2130,7 @@ CString CVtListCtrlEx::new_folder(CString &new_folder_title)
 
 	int index;
 	
-	folder = convert_special_folder_to_real_path(m_path, m_pShellImageList, !m_is_local);
+	folder = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_path);
 
 	if (m_is_local)
 	{
@@ -2668,7 +2668,7 @@ int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool is_fullpath)
 	std::deque<int> dq_index;
 	get_selected_items(&dq_index);
 
-	CString folder = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+	CString folder = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path());//convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
 	CString fullpath;
 
 	if (is_drive_root(folder))
@@ -2682,7 +2682,6 @@ int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool is_fullpath)
 			if (m_is_shell_listctrl && is_fullpath)
 			{
 				fullpath = concat_path(folder, get_text(item, col_filename));
-				//fullpath = convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
 				dq->push_back(fullpath);
 			}
 			else
@@ -2955,7 +2954,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 
 		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
 		{
-			new_path = convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList, !m_is_local);
+			new_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_text(item, col_filename));//convert_special_folder_to_real_path(get_text(item, col_filename), m_pShellImageList, !m_is_local);
 		}
 		else
 		{
@@ -3429,7 +3428,7 @@ void CVtListCtrlEx::edit_end(bool valid)
 	//shell listctrl의 label이 변경되면 실제 파일/폴더명도 변경해줘야 한다.
 	if (m_is_shell_listctrl)
 	{
-		CString path = convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
+		CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path());//convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
 		bool res = false;
 
 		CString old_path = concat_path(path, m_edit_old_text);
@@ -3642,7 +3641,7 @@ CString CVtListCtrlEx::get_path(int index)
 
 	fullpath = concat_path(m_path, get_text(index, col_filename));
 
-	return convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
+	return m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, fullpath);//convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
 }
 
 //현재 선택된 항목이 폴더이면 해당 경로까지의 fullpath를, 파일이라면 현재 리스트의 경로를 리턴한다.
@@ -3676,7 +3675,7 @@ CString	CVtListCtrlEx::get_selected_path()
 			path.Format(_T("%s\\%s"), get_path(), get_text(index, col_filename));
 	}
 
-	return convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
+	return m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, path);//convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 }
 
 //해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.
@@ -3710,7 +3709,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 
 	m_last_clicked_time = 0;
 
-	path = convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
+	path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, path);//convert_special_folder_to_real_path(path, m_pShellImageList, !m_is_local);
 
 	if (!refresh && (path == m_path))
 	{
@@ -3768,12 +3767,11 @@ void CVtListCtrlEx::refresh_list(bool reload)
 		{
 			if (m_path == get_system_label(CSIDL_DRIVES))
 			{
-				std::deque<CDiskDriveInfo> drive_list;
-				get_drive_list(&drive_list);
-				for (i = 0; i < drive_list.size(); i++)
+				std::deque<CDiskDriveInfo>* drive_list = m_pShellImageList->get_drive_list(!m_is_local);
+				for (i = 0; i < drive_list->size(); i++)
 				{
 					CVtFileInfo fi;
-					_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), drive_list[i].label);
+					_tcscpy_s(fi.data.cFileName, _countof(fi.data.cFileName), drive_list->at(i).label);
 					fi.data.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
 					fi.is_remote = false;
 					m_cur_folders.push_back(fi);
@@ -3854,7 +3852,7 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
 			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(i + 1));
 
-		CString real_path = convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
+		CString real_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_cur_folders[i].data.cFileName);//convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
 
 		if (m_is_local)
 		{
@@ -4655,7 +4653,7 @@ void CVtListCtrlEx::get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data
 	//	{
 	//		)
 
-	fullpath = convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
+	fullpath = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, fullpath);//convert_special_folder_to_real_path(fullpath, m_pShellImageList, !m_is_local);
 
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{

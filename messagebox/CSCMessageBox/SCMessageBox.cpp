@@ -254,6 +254,11 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	int x;
 	int button_count = 1;
 
+	//m_type에 따라 필요한 버튼들만 SW_SHOW하므로 이전에 실행됐을 때 SW_SHOW였던 버튼들은 모두 SW_HIDE로 만들어놓고 시작해야 한다.
+	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
+		m_button[i].ShowWindow(SW_HIDE);
+
+	//m_type에 따라 필요한 버튼들만 SW_SHOW 시킨다.
 	if ((m_type & MB_OKCANCEL) == MB_OKCANCEL)
 	{
 		button_count = 2;

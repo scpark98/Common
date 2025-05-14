@@ -153,6 +153,7 @@ inline bool isError(Code code)         { return isError(static_cast<int>(code));
  * \return The standard HTTP reason phrase for the given \p code or an empty \c std::string()
  * if no standard phrase for the given \p code is known.
  */
+//https://learn.microsoft.com/en-us/troubleshoot/developer/webapps/iis/health-diagnostic-performance/http-status-code
 inline std::tuple<std::string, std::string> reasonPhrase(int code)
 {
 	switch (code)
@@ -160,76 +161,76 @@ inline std::tuple<std::string, std::string> reasonPhrase(int code)
 		//####### 1xx - Informational #######
 		case 100: return { "Continue", "Initial part of the request has been received and hasn't yet been rejected by the server. The server intends to send a final response after the request has been fully received and acted upon." };
 		case 101: return { "Switching Protocols", "Server understands and is willing to comply with client's request for a change in the application protocol being used." };
-		case 102: return "Processing";
-		case 103: return "Early Hints";
+		case 102: return { "Processing", "A request has been received by the server, but no status was available at the time of the response." };
+		case 103: return { "Early Hints", "Used to return some response headers before final HTTP message." };
 
 		//####### 2xx - Successful #######
-		case 200: return "OK";
-		case 201: return "Created";
-		case 202: return "Accepted";
-		case 203: return "Non-Authoritative Information";
-		case 204: return "No Content";
-		case 205: return "Reset Content";
-		case 206: return "Partial Content";
-		case 207: return "Multi-Status";
-		case 208: return "Already Reported";
-		case 226: return "IM Used";
+		case 200: return { "OK", "The request succeeded." };
+		case 201: return { "Created", "The request succeeded, and a new resource was created as a result." };
+		case 202: return { "Accepted", "The request has been received but not yet acted upon." };
+		case 203: return { "Non-Authoritative Information", "The returned metadata is not exactly the same as is available from the origin server, but is collected from a local or a third-party copy." };
+		case 204: return { "No Content", "There is no content to send for this request, but the headers are useful. The user agent may update its cached headers for this resource with the new ones." };
+		case 205: return { "Reset Content", "Tells the user agent to reset the document which sent this request." };
+		case 206: return { "Partial Content", "This response code is used in response to a range request when the client has requested a part or parts of a resource." };
+		case 207: return { "Multi-Status", "Conveys information about multiple resources, for situations where multiple status codes might be appropriate." };
+		case 208: return { "Already Reported", "Used inside a <dav:propstat> response element to avoid repeatedly enumerating the internal members of multiple bindings to the same collection." };
+		case 226: return { "IM Used", "The server has fulfilled a GET request for the resource, and the response is a representation of the result of one or more instance-manipulations applied to the current instance." };
 
 		//####### 3xx - Redirection #######
-		case 300: return "Multiple Choices";
-		case 301: return "Moved Permanently";
-		case 302: return "Found";
-		case 303: return "See Other";
-		case 304: return "Not Modified";
-		case 305: return "Use Proxy";
-		case 307: return "Temporary Redirect";
-		case 308: return "Permanent Redirect";
+		case 300: return { "Multiple Choices", "In agent-driven content negotiation, the request has more than one possible response and the user agent or user should choose one of them." };
+		case 301: return { "Moved Permanently", "The URL of the requested resource has been changed permanently. The new URL is given in the response." };
+		case 302: return { "Found", "The URI of requested resource has been changed temporarily." };
+		case 303: return { "See Other", "The server sent this response to direct the client to get the requested resource at another URI with a GET request." };
+		case 304: return { "Not Modified", "This is used for caching purposes. It tells the client that the response has not been modified, so the client can continue to use the same cached version of the response." };
+		case 305: return { "Use Proxy", "Defined in a previous version of the HTTP specification to indicate that a requested response must be accessed by a proxy. It has been deprecated due to security concerns regarding in-band configuration of a proxy." };
+		case 307: return { "Temporary Redirect", "The server sends this response to direct the client to get the requested resource at another URI with the same method that was used in the prior request." };
+		case 308: return { "Permanent Redirect", "This means that the resource is now permanently located at another URI, specified by the Location response header." };
 
 		//####### 4xx - Client Error #######
-		case 400: return "Bad Request";
-		case 401: return "Unauthorized";
-		case 402: return "Payment Required";
-		case 403: return "Forbidden";
-		case 404: return "Not Found";
-		case 405: return "Method Not Allowed";
-		case 406: return "Not Acceptable";
-		case 407: return "Proxy Authentication Required";
-		case 408: return "Request Timeout";
-		case 409: return "Conflict";
-		case 410: return "Gone";
-		case 411: return "Length Required";
-		case 412: return "Precondition Failed";
-		case 413: return "Content Too Large";
-		case 414: return "URI Too Long";
-		case 415: return "Unsupported Media Type";
-		case 416: return "Range Not Satisfiable";
-		case 417: return "Expectation Failed";
-		case 418: return "I'm a teapot";
-		case 421: return "Misdirected Request";
-		case 422: return "Unprocessable Content";
-		case 423: return "Locked";
-		case 424: return "Failed Dependency";
-		case 425: return "Too Early";
-		case 426: return "Upgrade Required";
-		case 428: return "Precondition Required";
-		case 429: return "Too Many Requests";
-		case 431: return "Request Header Fields Too Large";
-		case 451: return "Unavailable For Legal Reasons";
+		case 400: return { "Bad Request", "he request couldn't be understood by the server due to malformed syntax. The client shouldn't repeat the request without modifications. For more information, see Troubleshooting HTTP 400 Errors in IIS." };
+		case 401: return { "Unauthorized", "The request hasn't been applied because it lacks valid authentication credentials for the target resource." };
+		case 402: return { "Payment Required", "The initial purpose of this code was for digital payment systems, however this status code is rarely used and no standard convention exists." };
+		case 403: return { "Forbidden", "The server understood the request but refuses to fulfill it." };
+		case 404: return { "Not Found", "The server cannot find the requested resource. In the browser, this means the URL is not recognized." };
+		case 405: return { "Method Not Allowed", "The request method is known by the server but is not supported by the target resource." };
+		case 406: return { "Not Acceptable", "This response is sent when the web server, after performing server-driven content negotiation, doesn't find any content that conforms to the criteria given by the user agent." };
+		case 407: return { "Proxy Authentication Required", "This is similar to 401 Unauthorized but authentication is needed to be done by a proxy." };
+		case 408: return { "Request Timeout", "This response is sent on an idle connection by some servers, even without any previous request by the client." };
+		case 409: return { "Conflict", "This response is sent when a request conflicts with the current state of the server." };
+		case 410: return { "Gone", "" };
+		case 411: return { "Length Required", "" };
+		case 412: return { "Precondition Failed", "One or more conditions given in the request header fields evaluated to false when tested on the server." };
+		case 413: return { "Content Too Large", "The HTTP request payload is too large." };
+		case 414: return { "URI Too Long", "" };
+		case 415: return { "Unsupported Media Type", "" };
+		case 416: return { "Range Not Satisfiable", "" };
+		case 417: return { "Expectation Failed", "" };
+		case 418: return { "I'm a teapot", "" };
+		case 421: return { "Misdirected Request", "" };
+		case 422: return { "Unprocessable Content", "" };
+		case 423: return { "Locked", "" };
+		case 424: return { "Failed Dependency", "" };
+		case 425: return { "Too Early", "" };
+		case 426: return { "Upgrade Required", "" };
+		case 428: return { "Precondition Required", "" };
+		case 429: return { "Too Many Requests", "" };
+		case 431: return { "Request Header Fields Too Large", "" };
+		case 451: return { "Unavailable For Legal Reasons", "" };
 
 		//####### 5xx - Server Error #######
-		case 500: return "Internal Server Error";
-		case 501: return "Not Implemented";
-		case 502: return "Bad Gateway";
-		case 503: return "Service Unavailable";
-		case 504: return "Gateway Timeout";
-		case 505: return "HTTP Version Not Supported";
-		case 506: return "Variant Also Negotiates";
-		case 507: return "Insufficient Storage";
-		case 508: return "Loop Detected";
-		case 510: return "Not Extended";
-		case 511: return "Network Authentication Required";
+		case 500: return { "Internal Server Error", "The server encountered an unexpected condition that prevented it from fulfilling the request." };
+		case 501: return { "Not Implemented", "The server doesn't support the functionality required to fulfill the request." };
+		case 502: return { "Bad Gateway", "The server, while acting as a gateway or proxy, received an invalid response from an inbound server it accessed while attempting to fulfill the request." };
+		case 503: return { "Service Unavailable", "The server is currently unable to handle the request due to a temporary overload or scheduled maintenance, which will likely be alleviated after some delay." };
+		case 504: return { "Gateway Timeout", "" };
+		case 505: return { "HTTP Version Not Supported", "" };
+		case 506: return { "Variant Also Negotiates", "" };
+		case 507: return { "Insufficient Storage", "" };
+		case 508: return { "Loop Detected", "" };
+		case 510: return { "Not Extended", "" };
+		case 511: return { "Network Authentication Required", "" };
 
-		default: return std::string();
+		default: return { "Not defined status code", "" };
 	}
 }
 
@@ -239,7 +240,7 @@ inline std::tuple<std::string, std::string> reasonPhrase(int code)
  * \return The standard HTTP reason phrase for the given \p code or an empty \c std::string()
  * if no standard phrase for the given \p code is known.
  */
-inline std::string reasonPhrase(Code code)
+inline std::tuple<std::string, std::string> reasonPhrase(Code code)
 {
 	return reasonPhrase(static_cast<int>(code));
 }

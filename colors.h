@@ -63,6 +63,7 @@ public :
 		color_theme_custom,
 	};
 
+	//현재 설정된 color theme 인덱스를 리턴
 	int		get_color_theme() { return m_cur_theme; }
 	void	set_color_theme(int color_theme);
 	static std::deque<CString> get_color_theme_list();
@@ -88,6 +89,7 @@ public :
 	Gdiplus::Color	cr_title_text;
 	Gdiplus::Color	cr_title_back;
 	Gdiplus::Color	cr_sys_buttons_hover_back;
+	Gdiplus::Color	cr_sys_buttons_down_back;
 
 	//CListCtrl에서만 사용될것으로 예상.
 	Gdiplus::Color	cr_header_text;

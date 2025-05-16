@@ -190,7 +190,9 @@ public:
 	//탭을 이용해서 작성된 트리 구조 문자열을 파싱하여 트리로 표현함.
 	//각 노드의 이미지는 그 depth에 따라 m_imagelist의 인덱스를 사용함.
 	bool		load(CString file);
+	//탭으로 구분되는 텍스트 파일로 저장
 	bool		save(CString file);
+	//탭으로 구분된 텍스트 파일 로딩
 	bool		load_from_string(CString text);
 
 	//HTREEITEM	find_item(const CString& name);

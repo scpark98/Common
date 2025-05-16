@@ -119,7 +119,7 @@ bool Json::write(std::string output_json)
 	return true;
 }
 */
-void Json::print()
+CString Json::get_all_data()
 {
 	CString result;
 
@@ -131,7 +131,9 @@ void Json::print()
 		traverse_rapid_json(doc[itr->name.GetString()], sKey, result);
 	}
 
-	TRACE(_T("[result]\n%s"), result);
+	TRACE(_T("all data = \n%s"), result);
+
+	return result;
 }
 
 void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString &result)
@@ -217,11 +219,10 @@ void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CStr
 		break;
 		case kArrayType:
 		{
-			sDebugStr.Format(_T("[%s]=Array\n"), (LPCTSTR)sKey);
+			unsigned int nArrCnt = oRoot.Size();
+			sDebugStr.Format(_T("[%s]=Array. count = %d\n"), (LPCTSTR)sKey, nArrCnt);
 			OutputDebugString(sDebugStr);
 			result += sDebugStr;
-
-			unsigned int nArrCnt = oRoot.Size();
 
 			CString sPath;
 			for (unsigned int index = 0; index < nArrCnt; ++index)
@@ -229,7 +230,7 @@ void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CStr
 				sDebugStr.Format(_T("[%s][%d]"), (LPCTSTR)sKey, index);
 				if (sKey != _T(""))
 				{
-					sPath.Format(_T("%s/%d"), (LPCTSTR)sKey, index);
+					sPath.Format(_T("%s[%d]"), (LPCTSTR)sKey, index);
 				}
 				else
 				{

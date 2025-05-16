@@ -646,15 +646,16 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_dropHilited = white;
 
 			cr_back = Gdiplus::Color::White;
-			cr_back_selected = get_color(cr_back, 16);
+			cr_back_selected = get_color(cr_back, -32);
 			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
+			cr_back_hover = get_color(cr_back, -16);
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = Gdiplus::Color::White;
 			cr_title_back = gRGB(97, 132, 180);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 
@@ -684,7 +685,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text = Gdiplus::Color::White; //gRGB(253, 126, 20);
 			cr_title_back = gRGB(186, 89, 18);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 
@@ -714,7 +716,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text = gRGB(13, 41, 71);
 			cr_title_back = gRGB(48, 154, 192); 
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 
@@ -744,7 +747,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text = gRGB(18, 24, 58);
 			cr_title_back = gRGB(32, 178, 174);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 
@@ -774,7 +778,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text = Gdiplus::Color::White;// gRGB(18, 24, 58);
 			cr_title_back = gRGB(214, 129, 8);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 30);
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 
@@ -802,6 +807,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover			= cr_back_selected;
 			cr_back_alternate		= get_color(cr_back, 8);
 
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
 
 			cr_header_text			= get_color(cr_text, -16);
@@ -827,6 +835,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= get_color(cr_back_selected, 48);
 			cr_back_alternate		= get_color(cr_back, 8);
+
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border		= cr_back_selected;
 
@@ -883,6 +894,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternate		= get_color(cr_back, -16);
+
+			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_title_text			= Gdiplus::Color::Black;
 			cr_title_back			= Gdiplus::Color::LightGray;

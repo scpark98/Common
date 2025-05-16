@@ -93,7 +93,7 @@ public:
 	bool		save(CString output_json_file);
 
 	//traverse로 구현된 TRACE 출력.
-	void		print();
+	CString		get_all_data();
 
 	//pretty가 true이면 indent가 적용된 형식으로 리턴.
 	CString		get_json_string(bool pretty = true);
@@ -176,10 +176,11 @@ public:
 
 	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 	rapidjson::Value* get_array_member(std::string arr_name, int n, std::string member);
-	bool get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value);
+	bool		get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value);
+
+	void		traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString& result);
 
 protected:
-	void		traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString &result);
 };
 
 #endif

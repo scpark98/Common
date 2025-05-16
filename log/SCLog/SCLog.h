@@ -14,14 +14,15 @@
   (테스트 방법. 0 ~ 999까지 10ms 간격으로 로그를 기록하는 50개 쓰레드를 생성하여 기록 후 확인함)
 
 * app.h에서 (프로젝트 구성에 따라 App class가 아닌 stdafx.h 또는 pch.h 등에 선언할 수도 있음)
-	#include "../../Common/log/SCLog.h"
+	#include "../Common/log/SCLog/SCLog.h"
 	...
 	전역변수로 아래 변수 선언.
 	extern CSCLog gLog;
 
   app.cpp에서 실제 전역변수 선언.
+    CSCLog gLog;
 
-  CSCLog gLog;
+  
 
 [set Log folder path]
 	//set()함수를 통해 로그파일 저장폴더, 로그파일 타이틀, 로그 레벨을 설정할 수 있다.

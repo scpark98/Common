@@ -145,9 +145,9 @@ void CSCSystemButtons::OnPaint()
 		if (i == m_over_index)
 		{
 			if (m_down_state)
-				dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_back_selected.ToCOLORREF());
+				dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_sys_buttons_down_back.ToCOLORREF());
 			else
-				dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_back_hover.ToCOLORREF());
+				dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_sys_buttons_hover_back.ToCOLORREF());
 		}
 
 		//각 버튼을 그려준다.

@@ -1129,7 +1129,7 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	//TRACE(_T("%s\n"), __function__);
 	m_expanding_item = pNMTreeView->itemNew.hItem;
-	TRACE(_T("OnTvnItemexpanding. %s\n"), GetItemText(m_expanding_item));
+	//TRACE(_T("OnTvnItemexpanding. %s\n"), GetItemText(m_expanding_item));
 
 	if (m_is_shell_treectrl)
 	{
@@ -1163,7 +1163,7 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 //결국 OnPaint()에서 직접 그려주는 방법이 아닌 OnCustomDraw()로 전환함.
 BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	TRACE(_T("OnNMClick\n"));
+	//TRACE(_T("OnNMClick\n"));
 
 	if (m_in_editing)
 	{
@@ -1432,6 +1432,7 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 	CString text;
 
 	HTREEITEM item = (hItem ? hItem : GetRootItem());
+
 	while (item != NULL || s.size())
 	{
 		while (item != NULL)
@@ -1443,43 +1444,50 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 		item = s[0];
 		s.pop_front();
 
-		text = GetItemText(item);
-		//trace(_T("%s\n"), text);
-		if (text == m_pShellImageList->m_volume[0].get_label(CSIDL_DESKTOP) ||
-			text == m_pShellImageList->m_volume[0].get_label(CSIDL_MYDOCUMENTS))
+		if (m_is_shell_treectrl)
 		{
-			fullpath = GetItemText(item);
-		}
-		else
-		{
-			fullpath = get_path(item);
+			text = GetItemText(item);
+
+			if (text == m_pShellImageList->m_volume[0].get_label(CSIDL_DESKTOP) ||
+				text == m_pShellImageList->m_volume[0].get_label(CSIDL_MYDOCUMENTS))
+			{
+				fullpath = GetItemText(item);
+			}
+			else
+			{
+				fullpath = get_path(item);
+			}
+
+			//내 PC일 경우는 ""로 리턴되므로
+			if (fullpath.IsEmpty())
+				folders.push_back(CSCTreeCtrlFolder(item, fullpath, m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES)));
+			else
+				folders.push_back(CSCTreeCtrlFolder(item, fullpath, get_part(fullpath, fn_leaf_folder)));
 		}
 
-		//내 PC일 경우는 ""로 리턴되므로
-		if (fullpath.IsEmpty())
-			folders.push_back(CSCTreeCtrlFolder(item, fullpath, m_pShellImageList->m_volume[0].get_label(CSIDL_DRIVES)));
-		else
-			folders.push_back(CSCTreeCtrlFolder(item, fullpath, get_part(fullpath, fn_leaf_folder)));
 		item = GetNextSiblingItem(item);
 	}
 
 	//바탕 화면, 문서, 내 PC 3개 항목을 제외하고 정렬.
 	//기본 정렬과 탐색기의 정렬은 약간 다르므로 탐색기와 같은 정렬이 되도록.
-	std::sort(folders.begin() +3, folders.end(),
-		[](CSCTreeCtrlFolder a, CSCTreeCtrlFolder b)
-		{
-			return !is_greater_with_numeric(a.fullpath, b.fullpath);
-		}
-	);
-
-	for (int i = 0; i < folders.size(); i++)
+	if (m_is_shell_treectrl)
 	{
-		//trace(_T("%s\n"), folders[i]);
+		std::sort(folders.begin() + 3, folders.end(),
+			[](CSCTreeCtrlFolder a, CSCTreeCtrlFolder b)
+			{
+				return !is_greater_with_numeric(a.fullpath, b.fullpath);
+			}
+		);
 
-		//"C:\\" => "로컬 디스크 (C:)"로 변경해준다.
-		if (folders[i].fullpath.Right(2) == _T(":\\"))
+		for (int i = 0; i < folders.size(); i++)
 		{
-			folders[i].folder = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(folders[i].fullpath[0]);
+			//trace(_T("%s\n"), folders[i]);
+
+			//"C:\\" => "로컬 디스크 (C:)"로 변경해준다.
+			if (folders[i].fullpath.Right(2) == _T(":\\"))
+			{
+				folders[i].folder = m_pShellImageList->m_volume[!m_is_local].get_drive_volume(folders[i].fullpath[0]);
+			}
 		}
 	}
 

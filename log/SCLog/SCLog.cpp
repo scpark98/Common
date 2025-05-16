@@ -14,6 +14,13 @@ CSCLog::CSCLog()
 	m_log_level = SCLOG_LEVEL_RELEASE;
 
 	m_fp = NULL;
+
+	//여기서 시작 로그 기록함수를 바로 호출하면 편하지만
+	//로그파일명, 로그저장 경로등을 변경한 후 기록해야 하는 경우는 오히려 불필요한 로그가 생기는 단점이 있다.
+	//따라서 여기 생성자에서는 직접 호출하지 않고
+	//실제 사용하는 CWinApp의 InitInstance()에서 로그파일명, 로그저장 경로등을 모두 확정한 후,
+	//또는 변경사항이 없이 기본값을 사용하더라도 거기에서 write_start_log()를 호출해주는 것이 맞다.
+	//write_start_log();
 }
 
 CSCLog::~CSCLog()
@@ -113,6 +120,8 @@ void CSCLog::set_log_level(int log_level)
 }
 
 //프로그램 시작 시 일반적인 정보를 로그에 기록하면서 시작한다.
+//소멸자에서는 write_end_log()가 자동으로 불려지지만
+//생성자에서는 아직
 void CSCLog::write_start_log()
 {
 	logWrite(_T("\n==================== Program Start ===================="));

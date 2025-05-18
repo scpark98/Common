@@ -355,6 +355,9 @@ CString GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator /*= true*/, bool
 //CTime t = 
 CTime get_CTime_from_datetime_str(CString date, CString time)
 {
+	if (date.IsEmpty())
+		date = get_cur_datetime_str(0);
+
 	date.Remove('-');
 	date.Remove('/');
 	date.Remove(' ');
@@ -362,7 +365,6 @@ CTime get_CTime_from_datetime_str(CString date, CString time)
 	time.Remove(':');
 	time.Remove(' ');
 
-	ASSERT(date.GetLength() == 8);
 	ASSERT(time.GetLength() == 6);
 
 	CTime t(_tstoi((TCHAR*)(LPCTSTR)(date.Left(4))), _tstoi((TCHAR*)(LPCTSTR)(date.Mid(4, 2))), _tstoi((TCHAR*)(LPCTSTR)(date.Right(2))),

@@ -2729,7 +2729,11 @@ CRect CGdiplusBitmap::get_transparent_rect()
 //data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
 Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 {
-	if (data == NULL || x < 0 || x >= width || y < 0 || y >= height)
+	//data가 불려지지 않은 상태에서 get_pixel()이 호출되면 raw_data를 추출한다.
+	if (data == NULL)
+		get_raw_data();
+
+	if (x < 0 || x >= width || y < 0 || y >= height)
 		return Gdiplus::Color(0, 0, 0, 0);
 
 	if (channel == 1)

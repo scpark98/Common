@@ -379,6 +379,11 @@ COLORREF	get_complementary_color(COLORREF cr)
 	return RGB(255 - GetRValue(cr), 255 - GetGValue(cr), 255 - GetBValue(cr));
 }
 
+Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr)
+{
+	return Gdiplus::Color(cr.GetA(), 255 - cr.GetR(), 255 - cr.GetG(), 255 - cr.GetB());
+}
+
 //gray = (2989 * r + 5870 * g + 1140 * b) / 10000; 
 //=>0.2989 * 2^14 = 4897.1776; 
 //√‚√≥: http://kipl.tistory.com/80 [Geometry & Recognition]

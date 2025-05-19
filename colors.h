@@ -666,6 +666,7 @@ CString			get_color_string(COLORREF cr);
 
 //보색
 COLORREF		get_complementary_color(COLORREF cr);
+Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr);
 
 //rgb 평균값 리턴
 uint8_t			gray_value(uint8_t r, uint8_t g, uint8_t b);

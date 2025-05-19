@@ -3,8 +3,8 @@
 
 #include "ImageStatic.h"
 
-#include "../Functions.h"
-#include "../MemoryDC.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
 
 // CImageStatic
 
@@ -328,7 +328,7 @@ bool CImageStatic::load()
 	return load(recent);
 }
 
-bool CImageStatic::load(CString sFile, bool show_error)
+bool CImageStatic::load(CString sFile)
 {
 	m_filename = sFile;
 
@@ -336,7 +336,7 @@ bool CImageStatic::load(CString sFile, bool show_error)
 	m_screen_roi.SetRectEmpty();
 
 	AfxGetApp()->WriteProfileString(_T("setting\\ImageStatic"), _T("recent file"), sFile);
-	bool res = m_img.load(sFile, show_error);
+	bool res = m_img.load(sFile);
 	Invalidate();
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CImageStatic, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
@@ -344,14 +344,14 @@ bool CImageStatic::load(CString sFile, bool show_error)
 	return res;
 }
 
-bool CImageStatic::load(CString sType, UINT id, bool show_error)
+bool CImageStatic::load(CString sType, UINT id)
 {
 	m_filename.Format(_T("Resource Image(id:%d)"), id);
 
 	m_image_roi.SetRectEmpty();
 	m_screen_roi.SetRectEmpty();
 
-	bool res = m_img.load(sType, id, show_error);
+	bool res = m_img.load(sType, id);// , show_error);
 	Invalidate();
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CImageStatic, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
@@ -360,9 +360,9 @@ bool CImageStatic::load(CString sType, UINT id, bool show_error)
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-bool CImageStatic::load(UINT id, bool show_error)
+bool CImageStatic::load(UINT id)
 {
-	return load(_T("PNG"), id, show_error);
+	return load(_T("PNG"), id);
 }
 
 bool CImageStatic::copy_to_clipbard()

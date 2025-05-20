@@ -2071,9 +2071,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 		DeleteObject(hbitmap_ddb);
 	}
 	DeleteObject(hbitmap);
-	return true;
-#endif 
-
+#elif 1
 	bool res = false;
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
@@ -2083,37 +2081,72 @@ bool CGdiplusBitmap::copy_to_clipbard()
 
 	BITMAP bm;
 
-	GetObject(hbitmap, sizeof bm, &bm);
+	GetObject(hbitmap, sizeof(bm), &bm);
 
-	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
+	uint64_t bufSize = width * height * 4;
+
+	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_PNG };
+
+	BITMAPV5HEADER header;
+	header.bV5Size = sizeof(BITMAPV5HEADER);
+	header.bV5Width = width; // <-- size of the bitmap in pixels, width and height
+	header.bV5Height = height;
+	header.bV5Planes = 1;
+	header.bV5BitCount = 0;
+	header.bV5Compression = BI_PNG;
+	header.bV5SizeImage = bufSize;
+	header.bV5XPelsPerMeter = 0;
+	header.bV5YPelsPerMeter = 0;
+	header.bV5ClrUsed = 0;
+	header.bV5ClrImportant = 0;
+	header.bV5RedMask = 0xFF000000;
+	header.bV5GreenMask = 0x00FF0000;
+	header.bV5BlueMask = 0x0000FF00;
+	header.bV5AlphaMask = 0x000000FF;
+	header.bV5CSType = LCS_sRGB;
+	header.bV5Endpoints;    // ignored
+	header.bV5GammaRed = 0;
+	header.bV5GammaGreen = 0;
+	header.bV5GammaBlue = 0;
+	header.bV5Intent = 0;
+	header.bV5ProfileData = 0;
+	header.bV5ProfileSize = 0;
+	header.bV5Reserved = 0;
 
 	std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
 	HDC hDC = GetDC(NULL);
 	GetDIBits(hDC, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
 	::DeleteDC(hDC);
 
-	auto hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof bi + vec.size());
-	auto buffer = (BYTE*)GlobalLock(hmem);
-	memcpy(buffer, &bi, sizeof bi);
-	memcpy(buffer + sizeof bi, vec.data(), vec.size());
+	HGLOBAL hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof(header) + bufSize);
+	void* buffer = (BYTE*)GlobalLock(hmem);
+	memcpy(buffer, &header, sizeof(BITMAPV5HEADER));
+	//memcpy((char*)buffer + sizeof(BITMAPV5HEADER), vec.data(), vec.size());
+
+	get_raw_data();
+	memcpy((char*)buffer + sizeof(BITMAPV5HEADER), data, bufSize);
 	GlobalUnlock(hmem);
 
 	if (OpenClipboard(NULL))
 	{
 		EmptyClipboard();
-		SetClipboardData(CF_DIBV5, hmem);
+		auto fmt = RegisterClipboardFormat(_T("PNG"));
+		SetClipboardData(fmt, hmem);
+		//SetClipboardData(CF_DIBV5, hmem);
 		//SetClipboardData(CF_BITMAP, hbitmap);
 		CloseClipboard();
 		MessageBeep(0);
 		res = true;
 	}
+	else
+	{
+		GlobalFree(hmem);
+	}
 
 	DeleteObject(hbitmap);
-
+	TRACE(_T("copied to clipboard.\n"));
 	return res;
-}
-/*
-bool copyBitmapIntoClipboard(Window& window, const Bitmap& in) {
+#elif 0
 	//  this section is my code for creating a png file
 	StreamWrite stream = StreamWrite::asBufferCreate();
 	in.savePng(stream);
@@ -2133,7 +2166,7 @@ bool copyBitmapIntoClipboard(Window& window, const Bitmap& in) {
 	}
 	EmptyClipboard();
 
-	auto fmt = RegisterClipboardFormat("PNG"); // or `L"PNG", as applicable
+	auto fmt = RegisterClipboardFormat(_T("PNG")); // or `L"PNG", as applicable
 
 	void* giftLocked = GlobalLock(gift);
 	if (giftLocked) {
@@ -2145,8 +2178,8 @@ bool copyBitmapIntoClipboard(Window& window, const Bitmap& in) {
 
 	CloseClipboard();
 	return true;
+#endif
 }
-*/
 
 bool CGdiplusBitmap::paste_from_clipboard()
 {

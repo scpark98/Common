@@ -13,7 +13,12 @@ IMPLEMENT_DYNAMIC(CSCImageDlg, CDialog)
 
 CSCImageDlg::CSCImageDlg(CWnd* parent)
 {
-
+	//m_font_pixel.CreateFont(-10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+	//	DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+	//	DEFAULT_QUALITY, DEFAULT_PITCH, _T("Consolas"));
+	//m_font_title.CreateFont(-24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+	//	DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+	//	DEFAULT_QUALITY, DEFAULT_PITCH, _T("Consolas"));
 }
 
 CSCImageDlg::~CSCImageDlg()
@@ -38,6 +43,12 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
 	dwStyle &= ~(WS_CAPTION);
 	SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
+
+	CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
+	m_static_pixel.create(_T("A 0\nR 0\nG 0\nB 0"), WS_CHILD | SS_CENTER | SS_CENTERIMAGE, r_pixel, this);
+	m_static_pixel.sunken();
+	m_static_pixel.set_font_name(_T("Consolas"));
+	m_static_pixel.set_font_size(8);
 }
 
 void CSCImageDlg::DoDataExchange(CDataExchange* pDX)
@@ -53,7 +64,10 @@ BEGIN_MESSAGE_MAP(CSCImageDlg, CDialog)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
-	ON_WM_MOUSEWHEEL()
+	//ON_WM_MOUSEWHEEL()
+	ON_WM_MOUSEHOVER()
+	ON_WM_MOUSELEAVE()
+	ON_WM_SETCURSOR()
 END_MESSAGE_MAP()
 
 
@@ -71,14 +85,31 @@ void CSCImageDlg::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
+	//pixel info SCStatic이 깜빡이지 않도록 clip영역을 줬으나 여전히 깜빡거림. OnMouseMove에서 이전값과 다르면 갱신하도록 수정함.
+	CRgn rgn_pixel_info;
+	CRect rc_pixel_info = m_static_pixel.get_rect();
+	if (m_static_pixel.IsWindowVisible() && rgn_pixel_info.CreateRectRgnIndirect(&rc_pixel_info))
+	{
+		CRgn rgn, rgn_target;
+		rgn.CreateRectRgnIndirect(&rc);
+
+		rgn_target.CreateRectRgnIndirect(&rc);
+		rgn_target.CombineRgn(&rgn, &rgn_pixel_info, RGN_XOR);
+
+		dc.SelectClipRgn(&rgn_target);
+	}
+
 	dc.FillSolidRect(rc, GRAY32);
 
 	if (m_img.is_empty())
+	{
+		dc.SelectClipRgn(NULL);
 		return;
+	}
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 
-	g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정
+	g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정 or 실제 픽셀
 
 	if (m_fit2ctrl)
 	{
@@ -131,25 +162,21 @@ void CSCImageDlg::OnPaint()
 	//설정중인 ROI 사각형 표시
 	if (IsCtrlPressed())
 	{
-		//DrawRectangle(&dc, m_screen_roi, red, NULL_BRUSH, 1);
+		draw_rectangle(&dc, m_screen_roi, red, NULL_BRUSH, 2, PS_DASH, R2_XORPEN);
 	}
-	else
+	else if (!m_image_roi.IsRectEmpty())
 	{
 		get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+		draw_rectangle(&dc, m_screen_roi, red, NULL_BRUSH, 2, PS_DASH, R2_XORPEN);
+
+		get_resizable_handle(m_screen_roi, m_roi_handle, 4);
+
+		//9군데 조절 핸들을 그려준다.
+		for (int i = 0; i < 9; i++)
+			draw_rectangle(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
 	}
 
-	draw_rectangle(&dc, m_screen_roi, red, NULL_BRUSH, 1);
-
-
-	if (m_show_pixel)
-	{
-		CRect r = m_r_pixel;
-		Gdiplus::SolidBrush brush(m_cr_pixel);
-		g.FillRectangle(&brush, CRectTogpRectF(r));
-		draw_rectangle(&dc, r, GRAY(96));
-		r.DeflateRect(1, 1);
-		draw_rectangle(&dc, r, GRAY(160));
-	}
+	dc.SelectClipRgn(NULL);
 }
 
 BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
@@ -164,12 +191,12 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 				return FALSE;
 
 			case VK_DIVIDE :
-				m_fit2ctrl = false;
+				fit2ctrl(false);
 				m_zoom = 1.0;
 				Invalidate();
 				return TRUE;
 			case VK_MULTIPLY :
-				m_fit2ctrl = true;
+				fit2ctrl(true);
 				Invalidate();
 				return TRUE;
 
@@ -179,6 +206,13 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_SUBTRACT :
 				zoom(-1);
 				return TRUE;
+			case 'C' :
+				if (IsCtrlPressed())
+				{
+					copy_to_clipbard();
+					return TRUE;
+				}
+				break;
 		}
 	}
 
@@ -236,6 +270,12 @@ bool CSCImageDlg::load(UINT id)
 	return load(_T("PNG"), id);
 }
 
+void CSCImageDlg::set_show_pixel(bool show)
+{
+	m_show_pixel = show;
+	AfxGetApp()->WriteProfileInt(_T("setting"), _T("show pixel"), m_show_pixel);
+}
+
 bool CSCImageDlg::copy_to_clipbard()
 {
 	return m_img.copy_to_clipbard();
@@ -255,12 +295,15 @@ void CSCImageDlg::set_smooth_interpolation(bool use)
 	if (use)
 		m_interplationMode = Gdiplus::InterpolationModeHighQualityBicubic;	//부드럽게 보정
 	else
-		m_interplationMode = Gdiplus::InterpolationModeNearestNeighbor;	//보정 최소화
+		m_interplationMode = Gdiplus::InterpolationModeNearestNeighbor;	//보정 없음
+
+	Invalidate();
 }
 
 void CSCImageDlg::fit2ctrl(bool fit)
 {
 	m_fit2ctrl = fit;
+	AfxGetApp()->WriteProfileInt(_T("setting"), _T("fit to ctrl"), m_fit2ctrl);
 	Invalidate();
 }
 
@@ -286,12 +329,14 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 	CDialog::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (m_static_pixel.m_hWnd == NULL)
+		return;
+
 	CRect rc;
 	GetClientRect(rc);
 
-	int margin = 8;
-	int size = 44;
-	m_r_pixel.SetRect(rc.left + margin, rc.bottom - margin - size, rc.left + margin + size, rc.bottom - margin);
+	CRect r_pixel = make_rect(rc.left + 8, rc.bottom - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
+	m_static_pixel.MoveWindow(r_pixel);
 
 	Invalidate();
 }
@@ -347,7 +392,6 @@ void CSCImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			get_real_coord_from_screen_coord(m_displayed, m_img.width, m_screen_roi, &m_image_roi);
 			Invalidate();
 			Wait(10);
-
 			//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CImageStaticMessage(this, WM_LBUTTONUP), 0);
 		}
 	}
@@ -385,26 +429,76 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 	if (m_show_pixel)
 	{
+		TRACKMOUSEEVENT tme;
+		tme.cbSize = sizeof(tme);
+		tme.hwndTrack = m_hWnd;
+		tme.dwFlags = TME_LEAVE | TME_HOVER;
+		tme.dwHoverTime = 1;
+		_TrackMouseEvent(&tme);
+
 		CPoint pt;
 		get_real_coord_from_screen_coord(m_displayed, m_img.width, point, &pt);
 		m_cr_pixel = m_img.get_pixel(pt.x, pt.y);
-		TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
-		InvalidateRect(m_r_pixel);
-		//m_static_pixel.set_back_color(m_cr_pixel);
-		//m_static_pixel.set_text_color(get_complementary_gcolor(m_cr_pixel));
-		//m_static_pixel.set_textf(get_complementary_gcolor(m_cr_pixel), _T("%d %d %d %d"), m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+		//TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+
+		//픽셀 정보 표시창을 커서	위치에 맞춰서 이동시킨다. rc를 벗어나지 않도록 보정까지 한다.
+		CRect r = make_rect(point.x + 24, point.y, PIXEL_INFO_CX, PIXEL_INFO_CY);
+
+		CRect rc;
+		GetClientRect(rc);
+
+		adjust_rect_range(r, rc, true);
+		//m_static_pixel.MoveWindow(r);
+		//m_static_pixel.SetWindowPos(NULL, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+		CString str;
+
+		str.Format(_T("A %3d\nR %3d\nG %3d\nB %3d"), m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+
+		if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
+		{
+			m_static_pixel.set_back_color(m_cr_pixel);
+			m_static_pixel.set_text_color(get_distinct_gcolor(m_cr_pixel));
+			m_static_pixel.set_text(str);
+			//m_static_pixel.set_textf(Gdiplus::Color::RoyalBlue, str);
+			m_cr_pixel_old = m_cr_pixel;
+		}
 	}
 
 	CDialog::OnMouseMove(nFlags, point);
 }
 
-BOOL CSCImageDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+void CSCImageDlg::OnMouseHover(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (IsCtrlPressed())
+	if (m_show_pixel && m_static_pixel.IsWindowVisible() == false)
+		m_static_pixel.ShowWindow(SW_SHOW);
+
+	CDialog::OnMouseHover(nFlags, point);
+}
+
+void CSCImageDlg::OnMouseLeave()
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	m_static_pixel.ShowWindow(SW_HIDE);
+
+	CDialog::OnMouseLeave();
+}
+
+BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_screen_roi.IsRectEmpty() == false)
 	{
-		//zoom(zDelta > 0 ? -1 : 1);
+		CPoint pt;
+		CRect rc;
+
+		GetClientRect(rc);
+
+		GetCursorPos(&pt);
+		ScreenToClient(&pt);
+
+		m_handle_index = get_handle_index(m_screen_roi, pt, 4);
 	}
 
-	return CDialog::OnMouseWheel(nFlags, zDelta, pt);
+	return CDialog::OnSetCursor(pWnd, nHitTest, message);
 }

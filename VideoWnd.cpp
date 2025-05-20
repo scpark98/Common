@@ -307,8 +307,8 @@ void CVideoWnd::OnPaint()
 		{
 			CPoint pt;
 			get_screen_coord_from_real_coord( m_rDisplayedImageRect, m_mat.cols, m_ptVanishingPoint, &pt);
-			draw_line( &dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, yellow, 1, PS_DASH );
-			draw_line( &dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, yellow, 1, PS_DASH );
+			draw_line(&dc, m_rDisplayedImageRect.left, pt.y, m_rDisplayedImageRect.right, pt.y, yellow, 1, Gdiplus::DashStyleSolid);// PS_DASH );
+			draw_line(&dc, pt.x, m_rDisplayedImageRect.top, pt.x, m_rDisplayedImageRect.bottom, yellow, 1, Gdiplus::DashStyleSolid);// PS_DASH );
 		}
 
 		//설정중인 ROI 사각형 표시

@@ -117,6 +117,8 @@ void CSCStatic::PreSubclassWindow()
 void CSCStatic::reconstruct_font()
 {
 	m_font.DeleteObject();
+	//m_lf.lfQuality = PROOF_QUALITY;// CLEARTYPE_QUALITY;
+	TRACE(_T("m_lf.lfQuality = %d\n"), m_lf.lfQuality);// ANTIALIASED_QUALITY
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	Invalidate();
 }
@@ -211,11 +213,7 @@ void CSCStatic::OnPaint()
 
 			if (m_bSunken)
 			{
-				int sunken_depth = 12;
-				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 2, true), ::get_color(m_cr_back, sunken_depth));
-				draw_line_pt(&dc, vertex(rc, 2, true), vertex(rc, 3, true), ::get_color(m_cr_back, sunken_depth));
-				draw_line_pt(&dc, vertex(rc, 1, true), vertex(rc, 0, true), ::get_color(m_cr_back, -sunken_depth));
-				draw_line_pt(&dc, vertex(rc, 0, true), vertex(rc, 3, true), ::get_color(m_cr_back, -sunken_depth));
+				draw_sunken_rect(&dc, rc, true, GRAY128, GRAY192);
 			}
 		}
 	}
@@ -479,6 +477,8 @@ void CSCStatic::OnPaint()
 		if (!m_bBlinkStatus)
 		{
 			dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
+			//DrawShadowText(dc.GetSafeHdc(), sSpace + m_text, CString(sSpace + m_text).GetLength(), m_rect_text,
+			//	DT_CENTER | DT_TOP | DT_NOCLIP, m_cr_text.ToCOLORREF(), 0, 2, 1);
 		}
 	}
 
@@ -527,7 +527,7 @@ CRect CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
 	return m_rect_text;
 }
 
-void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
+void CSCStatic::set_textf(LPCTSTR format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -536,12 +536,7 @@ void CSCStatic::set_textf(Gdiplus::Color crTextColor, LPCTSTR format, ...)
 
 	text.FormatV(format, args);
 
-	if (crTextColor.GetValue() == (DWORD)-1)
-	{
-		crTextColor = m_cr_text;
-	}
-
-	set_text(text, crTextColor);
+	set_text(text);
 }
 
 DWORD CSCStatic::get_text_align()
@@ -1265,3 +1260,14 @@ CSize CSCStatic::get_text_extent()
 	return sz;
 }
 
+//parent에서 현재 이 static의 위치를 리턴.
+CRect CSCStatic::get_rect()
+{
+	CWnd* parent = GetParent();
+
+	CRect r;
+	GetWindowRect(r);
+	parent->ScreenToClient(r);
+
+	return r;
+}

@@ -668,6 +668,13 @@ CString			get_color_string(COLORREF cr);
 COLORREF		get_complementary_color(COLORREF cr);
 Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr);
 
+//보색과는 달리 밝기에 따라 black or white를 리턴한다.
+//어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+COLORREF		get_distinct_color(COLORREF cr);
+//보색과는 달리 밝기에 따라 black or white를 리턴한다.
+//어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+Gdiplus::Color	get_distinct_gcolor(Gdiplus::Color cr);
+
 //rgb 평균값 리턴
 uint8_t			gray_value(uint8_t r, uint8_t g, uint8_t b);
 //rgb 평균값 리턴

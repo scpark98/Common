@@ -1784,6 +1784,9 @@ void		SetWallPaper(CString sfile);
 	//시작점을 주면 정사각형을 이루는 끝점 좌표를 리턴한다.
 	void		getSquareEndPoint(int sx, int sy, int& ex, int& ey);
 
+	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다. sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
+	void		get_resizable_handle(CRect src, CRect handle[], int sz = 2);
+
 //다각형 polygon 관련
 	//임의 점이 다각형 내에 존재하는지 판별.
 	bool PtInPolygon(CPoint* ptPolygons, CPoint pt, int nCorners);

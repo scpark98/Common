@@ -6179,7 +6179,7 @@ void draw_rectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COL
 	lb.lbColor = crColor;
 
 	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
-	CPen* pOldPen = (CPen*)pDC->SelectObject(&Pen);
+	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
 	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
 	CBrush	brBrush(crFill);
 	CBrush* pOldBrush;
@@ -11684,6 +11684,24 @@ void getSquareEndPoint(int sx, int sy, int& ex, int& ey)
 		else
 			ex = sx - abs(difY);
 	}
+}
+
+//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다. sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
+void get_resizable_handle(CRect src, CRect handle[], int sz)
+{
+	//right, bottom을 -1씩 줄여줘야 정확하다.
+	src.DeflateRect(0, 0, 1, 1);
+	// 
+	//순번은 CORNER_INDEX와 일관되게 처리한다.
+	handle[corner_inside]		= CRect(src.CenterPoint().x - sz, src.CenterPoint().y - sz, src.CenterPoint().x + sz, src.CenterPoint().y + sz);
+	handle[corner_left]			= CRect(src.left - sz, src.CenterPoint().y - sz, src.left + sz, src.CenterPoint().y + sz);
+	handle[corner_right]		= CRect(src.right - sz, src.CenterPoint().y - sz, src.right + sz, src.CenterPoint().y + sz);
+	handle[corner_top]			= CRect(src.CenterPoint().x - sz, src.top - sz, src.CenterPoint().x + sz, src.top + sz);
+	handle[corner_topleft]		= CRect(src.left - sz, src.top - sz, src.left + sz, src.top + sz);
+	handle[corner_topright]		= CRect(src.right - sz, src.top - sz, src.right + sz, src.top + sz);
+	handle[corner_bottom]		= CRect(src.CenterPoint().x - sz, src.bottom - sz, src.CenterPoint().x + sz, src.bottom + sz);
+	handle[corner_bottomleft]	= CRect(src.left - sz, src.bottom - sz, src.left + sz, src.bottom + sz);
+	handle[corner_bottomright]	= CRect(src.right - sz, src.bottom - sz, src.right + sz, src.bottom + sz);
 }
 
 BOOL IsWow64()

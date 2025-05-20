@@ -384,6 +384,31 @@ Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr)
 	return Gdiplus::Color(cr.GetA(), 255 - cr.GetR(), 255 - cr.GetG(), 255 - cr.GetB());
 }
 
+//보색과는 달리 밝기에 따라 black or white를 리턴한다.
+//어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+COLORREF get_distinct_color(COLORREF cr)
+{
+	if (gray_value(cr) > 128)
+		return RGB(0, 0, 0);
+
+	return RGB(255, 255, 255);
+}
+
+//보색과는 달리 밝기에 따라 black or white를 리턴한다.
+//어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+Gdiplus::Color get_distinct_gcolor(Gdiplus::Color cr)
+{
+	int gray = gray_value(cr);
+
+	if (gray == 25)
+		gray = gray;
+
+	if (gray > 128)
+		return Gdiplus::Color::Black;
+
+	return Gdiplus::Color::White;
+}
+
 //gray = (2989 * r + 5870 * g + 1140 * b) / 10000; 
 //=>0.2989 * 2^14 = 4897.1776; 
 //출처: http://kipl.tistory.com/80 [Geometry & Recognition]
@@ -404,6 +429,7 @@ uint8_t	gray_value(COLORREF cr)
 
 uint8_t	gray_value(Gdiplus::Color cr)
 {
+	TRACE(_T("%d, %d, %d, %d gray value = %d\n"), cr.GetA(), cr.GetR(), cr.GetG(), cr.GetB(), gray_value(cr.GetR(), cr.GetG(), cr.GetB()));
 	return gray_value(cr.GetR(), cr.GetG(), cr.GetB());
 }
 

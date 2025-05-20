@@ -9,6 +9,12 @@
 #include "afxdialogex.h"
 
 #include "../../GdiplusBitmap.h"
+#include "../../CStatic/SCStatic/SCStatic.h"
+#include "../../CToolTipCtrl/RichToolTipCtrl.h"
+//#include "../../CToolTipCtrl/XInfoTip.h"
+
+#define PIXEL_INFO_CX		80
+#define PIXEL_INFO_CY		76
 
 // CSCImageDlg 대화 상자
 
@@ -38,6 +44,7 @@ public:
 
 	bool			get_show_filename() { return true; }
 	bool			get_show_pixel() { return m_show_pixel; }
+	void			set_show_pixel(bool show);
 
 	bool			copy_to_clipbard();
 
@@ -46,6 +53,7 @@ public:
 	//mode : 1(zoom in), -1(zoom out), 0(reset)
 	void			zoom(int mode);
 
+	//true일 경우 이 컨트롤의 크기에 맞춰서 이미지를 stretch한다.
 	void			fit2ctrl(bool fit);
 	bool			get_fit2ctrl() { return m_fit2ctrl; }
 
@@ -56,6 +64,7 @@ public:
 	int				get_offset_size() { return m_offset_size; }
 
 	//이미지 부드럽게 보정
+	bool			get_smooth_interpolation() { return (m_interplationMode == Gdiplus::InterpolationModeHighQualityBicubic); }
 	void			set_smooth_interpolation(bool use = true);
 
 	CGdiplusBitmap	m_img;
@@ -85,14 +94,26 @@ protected:
 	//roi를 screen기준으로만 저장하면 이미지 scroll, resize 등을 할때마다 항상 보정해줘야 하므로
 	//roi가 설정된 순간에 image_roi를 계산해서 저장해 놓고
 	//위치, 크기 변경시에 image_roi를 screen_roi로 변경하여 표시한다.
-	CRect			m_image_roi;	//영상의 실제 ROI
-	CRect			m_screen_roi;	//디스플레이되고 있는 화면상의 ROI
+	CRect			m_image_roi;		//영상의 실제 ROI
+	CRect			m_screen_roi;		//디스플레이되고 있는 화면상의 ROI
 
-//픽셀값을 dc에 그릴지, CSCStatic으로 할지...
+	int				m_handle_index = -1;//이동 및 크기 조정을 위해 마우스가 위치하거나 클릭된 핸들 인덱스
+	CRect			m_roi_handle[9];	//이동 및 크기 조정을 위한 작은 사각형
+
+//픽셀값을 dc에 그릴지, CSCStatic으로 할지?
+	//dc에 그리면 처음엔 심플하지만 font, draw style(multiline vcenter)등 CSCStatic 구현 시 했던 번거로움이 그대로 발생한다.
+	//CSCStatic으로 하면 생성 등 처음엔 복잡하지만 결국 더 편한 방법이 된다.
 	bool			m_show_pixel = true;
-	CRect			m_r_pixel;
+	//CRect			m_r_pixel;
 	Gdiplus::Color	m_cr_pixel = Gdiplus::Color::Black;
-	//CSCStatic		m_static_pixel;
+	Gdiplus::Color	m_cr_pixel_old = Gdiplus::Color::Black;
+	CSCStatic		m_static_pixel;
+
+	CToolTipCtrl	m_tooltip;
+
+//pixel info font
+	//CFont			m_font_pixel;
+	//CFont			m_font_title;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
@@ -106,5 +127,8 @@ public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
-	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	//afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
+	afx_msg void OnMouseLeave();
+	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 };

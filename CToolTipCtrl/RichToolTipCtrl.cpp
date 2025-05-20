@@ -129,17 +129,16 @@ DWORD _RichToolTipCtrlCookie::Read(LPBYTE lpBuffer, DWORD dwCount)
 
 
 	// copy the text
-	/*
 	#if _MSC_VER >= 1400
 	strncpy_s((LPSTR)lpBuffer, dwCount, lpszText, _TRUNCATE);
 	#else
 	strncpy((LPSTR)lpBuffer, lpszText, dwCount);
 	#endif // _MSC_VER
-	*/
+
 	//2014 01 08 scpark
 	//위의 strncpy의 경우 맨 마지막 한 문자가 잘리는 현상이 생긴다.
 	//왜 strcpy를 안쓰고 strncpy를 사용한 것일까.. 우선 strcpy로 변경해서 사용한다.
-	strcpy_s((char*)lpBuffer, m_sText.GetLength(), (char*)lpszText);
+	//strcpy_s((char*)lpBuffer, m_sText.GetLength(), (char*)lpszText);
 
 	// keep where we got to
 	m_dwCount += dwCount;

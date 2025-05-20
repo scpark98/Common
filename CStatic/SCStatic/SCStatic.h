@@ -91,8 +91,9 @@ public:
 	CRect			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
 
 	//printf()와 같이 변수값을 바로 문자열로 세팅할 수 있다.
-	//컬러값을 변경하지 않으려면 cr_text = -1로 넘겨준다.
-	void			set_textf(Gdiplus::Color cr_text, LPCTSTR format, ...);
+	//초기 버전에서는 첫번째 파라미터로 컬러를 주고 그 값이 -1이면 default text color를 사용하도록 구현했었으나
+	//-1 비교가 제대로 되지 않아 우선 제거함.
+	void			set_textf(LPCTSTR format, ...);
 
 	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등의
 	DWORD			get_text_align();
@@ -102,6 +103,9 @@ public:
 	CRect			get_text_rect() { return m_rect_text; }
 	//텍스트의 너비, 높이를 알고자 할 경우 사용.
 	CSize			get_text_extent();
+
+	//parent에서 현재 이 static의 위치를 리턴.
+	CRect			get_rect();
 
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);

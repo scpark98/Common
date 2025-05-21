@@ -429,7 +429,7 @@ uint8_t	gray_value(COLORREF cr)
 
 uint8_t	gray_value(Gdiplus::Color cr)
 {
-	TRACE(_T("%d, %d, %d, %d gray value = %d\n"), cr.GetA(), cr.GetR(), cr.GetG(), cr.GetB(), gray_value(cr.GetR(), cr.GetG(), cr.GetB()));
+	//TRACE(_T("%d, %d, %d, %d gray value = %d\n"), cr.GetA(), cr.GetR(), cr.GetG(), cr.GetB(), gray_value(cr.GetR(), cr.GetG(), cr.GetB()));
 	return gray_value(cr.GetR(), cr.GetG(), cr.GetB());
 }
 

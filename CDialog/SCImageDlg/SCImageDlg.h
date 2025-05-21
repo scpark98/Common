@@ -13,8 +13,10 @@
 #include "../../CToolTipCtrl/RichToolTipCtrl.h"
 //#include "../../CToolTipCtrl/XInfoTip.h"
 
-#define PIXEL_INFO_CX		80
-#define PIXEL_INFO_CY		76
+#define PIXEL_INFO_CX		72
+#define PIXEL_INFO_CY		68
+
+#define MAX_RECT_HANDLE		9
 
 // CSCImageDlg 대화 상자
 
@@ -48,7 +50,7 @@ public:
 
 	bool			copy_to_clipbard();
 
-	CRect			get_image_roi();
+	Gdiplus::RectF	get_image_roi();
 
 	//mode : 1(zoom in), -1(zoom out), 0(reset)
 	void			zoom(int mode);
@@ -94,11 +96,11 @@ protected:
 	//roi를 screen기준으로만 저장하면 이미지 scroll, resize 등을 할때마다 항상 보정해줘야 하므로
 	//roi가 설정된 순간에 image_roi를 계산해서 저장해 놓고
 	//위치, 크기 변경시에 image_roi를 screen_roi로 변경하여 표시한다.
-	CRect			m_image_roi;		//영상의 실제 ROI
-	CRect			m_screen_roi;		//디스플레이되고 있는 화면상의 ROI
+	Gdiplus::RectF	m_image_roi;					//영상의 실제 ROI
+	Gdiplus::RectF	m_screen_roi;					//디스플레이되고 있는 화면상의 ROI
 
-	int				m_handle_index = -1;//이동 및 크기 조정을 위해 마우스가 위치하거나 클릭된 핸들 인덱스
-	CRect			m_roi_handle[9];	//이동 및 크기 조정을 위한 작은 사각형
+	int				m_handle_index = -1;			//이동 및 크기 조정을 위해 마우스가 위치하거나 클릭된 핸들 인덱스
+	CRect			m_roi_handle[MAX_RECT_HANDLE];	//사각형 개체의 이동 및 크기 조정을 위한 작은 사각형 9개
 
 //픽셀값을 dc에 그릴지, CSCStatic으로 할지?
 	//dc에 그리면 처음엔 심플하지만 font, draw style(multiline vcenter)등 CSCStatic 구현 시 했던 번거로움이 그대로 발생한다.
@@ -131,4 +133,5 @@ public:
 	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
 	afx_msg void OnMouseLeave();
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 };

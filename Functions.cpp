@@ -6092,7 +6092,7 @@ CRect draw_text(Gdiplus::Graphics &g,
 		float ratio = 0.4f;
 		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 		g_shadow.SetTransform(&mx);
-		g_shadow.DrawString(CStringW(text), -1, &font, CRectTogpRectF(rTarget), &sf, &shadow_brush);
+		g_shadow.DrawString(CStringW(text), -1, &font, CRect2GpRectF(rTarget), &sf, &shadow_brush);
 
 		g.DrawImage(&shadow_bitmap, (Gdiplus::REAL)shadow_depth, (Gdiplus::REAL)shadow_depth,
 			(Gdiplus::REAL)(shadow_bitmap.GetWidth()) / ratio, (Gdiplus::REAL)(shadow_bitmap.GetHeight()) / ratio);
@@ -6212,12 +6212,12 @@ void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdipl
 	Gdiplus::SolidBrush br(cr_fill);
 
 	if (cr_fill.GetValue() != Gdiplus::Color::Transparent)
-		g.FillRectangle(&br, CRectTogpRect(r));
+		g.FillRectangle(&br, CRect2GpRect(r));
 
 	//DrawRectangle()로 그리면 right, bottom까지 그리는데 영역을 벗어나게 된다.
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
 	r.DeflateRect(0, 0, 1, 1);
-	g.DrawRectangle(&pen, CRectTogpRect(r));
+	g.DrawRectangle(&pen, CRect2GpRect(r));
 }
 
 void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
@@ -6244,8 +6244,8 @@ void draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_f
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
 
-	g.FillEllipse(&br, CRectTogpRect(r));
-	g.DrawEllipse(&pen, CRectTogpRect(r));
+	g.FillEllipse(&br, CRect2GpRect(r));
+	g.DrawEllipse(&pen, CRect2GpRect(r));
 }
 
 void draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed, COLORREF crLine, int nWidth, int nPenStyle, int nDrawMode)
@@ -6579,14 +6579,40 @@ CRect gpRectToCRect(Gdiplus::Rect r)
 	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
 }
 
-Gdiplus::Rect CRectTogpRect(CRect r)
+CRect GpRectF2CRect(Gdiplus::RectF r)
+{
+	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+}
+
+Gdiplus::Rect CRect2GpRect(CRect r)
 {
 	return Gdiplus::Rect(r.left, r.top, r.Width(), r.Height());
 }
 
-Gdiplus::RectF CRectTogpRectF(CRect r)
+Gdiplus::RectF CRect2GpRectF(CRect r)
 {
 	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
+}
+
+//Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
+//따라서 left만 바꾸고 싶어도 Width까지 같이 변경해줘야 한다. 이러한 이유로 set_left(), set_top() 함수를 추가함.
+void set_left(Gdiplus::RectF& r, Gdiplus::REAL left)
+{
+	Gdiplus::REAL right = r.X + r.Width;
+	r.X = left;
+	r.Width = right - left;
+}
+
+void set_top(Gdiplus::RectF& r, Gdiplus::REAL top)
+{
+	Gdiplus::REAL bottom = r.Y + r.Height;
+	r.Y = top;
+	r.Height = bottom - top;
+}
+
+Gdiplus::PointF center(Gdiplus::RectF& r)
+{
+	return Gdiplus::PointF(r.X + r.Width / 2.0, r.Y + r.Height / 2.0);
 }
 
 void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
@@ -11704,6 +11730,13 @@ void get_resizable_handle(CRect src, CRect handle[], int sz)
 	handle[corner_bottomright]	= CRect(src.right - sz, src.bottom - sz, src.right + sz, src.bottom + sz);
 }
 
+//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 중 pt가 위치한 사각형의 인덱스를 리턴한다.
+//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
+//int	get_handle_index(CRect src, CPoint pt, int sz)
+//{
+//
+//}
+
 BOOL IsWow64()
 {
 	BOOL bIsWow64 = FALSE;
@@ -12684,9 +12717,9 @@ CString get_rect_info_string(CRect r, int nFormat)
 	CString str;
 
 	if (nFormat == 1)
-		str.Format(_T("(%d,%d)~(%d,%d)"), r.left, r.top, r.right, r.bottom);
+		str.Format(_T("(%d, %d)~(%d, %d)"), r.left, r.top, r.right, r.bottom);
 	else if (nFormat == 2)
-		str.Format(_T("(%d,%d)~(%d,%d) (%dx%d)"), r.left, r.top, r.right, r.bottom, r.Width(), r.Height());
+		str.Format(_T("(%d, %d)~(%d, %d) (%d x %d)"), r.left, r.top, r.right, r.bottom, r.Width(), r.Height());
 	else if (nFormat == 3)
 		str.Format(_T("l = %d, t = %d, r = %d, b = %d"), r.left, r.top, r.right, r.bottom);
 	else
@@ -12695,8 +12728,36 @@ CString get_rect_info_string(CRect r, int nFormat)
 	return str;
 }
 
+CString get_rect_info_string(Gdiplus::Rect r, int nFormat)
+{
+	CString str;
+	if (nFormat == 1)
+		str.Format(_T("(%d, %d)~(%d, %d)"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	else if (nFormat == 2)
+		str.Format(_T("(%d, %d)~(%d, %d) (%d x %d)"), r.X, r.Y, r.X + r.Width, r.Y + r.Height, r.Width, r.Height);
+	else if (nFormat == 3)
+		str.Format(_T("l = %d, t = %d, r = %d, b = %d"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	else
+		str.Format(_T("%d, %d, %d, %d"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	return str;
+}
 
-void adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize)
+CString get_rect_info_string(Gdiplus::RectF r, int nFormat)
+{
+	CString str;
+	if (nFormat == 1)
+		str.Format(_T("(%f, %f)~(%f, %f)"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	else if (nFormat == 2)
+		str.Format(_T("(%f, %f)~(%f, %f) (%f x %f)"), r.X, r.Y, r.X + r.Width, r.Y + r.Height, r.Width, r.Height);
+	else if (nFormat == 3)
+		str.Format(_T("l = %f, t = %f, r = %f, b = %f"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	else
+		str.Format(_T("%f, %f, %f, %f"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	return str;
+}
+
+
+void adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize, bool includeBottomRight)
 {
 	if (*l < minx)
 	{
@@ -12790,13 +12851,13 @@ void adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize, bool include
 	//adjust_rect_range(rect, rLimit.left, rLimit.top, rLimit.right, rLimit.bottom, bRetainSize);
 }
 
-void adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize)
+void adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize, bool includeBottomRight)
 {
 	int32_t l = rect.left;
 	int32_t t = rect.top;
 	int32_t r = rect.right;
 	int32_t b = rect.bottom;
-	adjust_rect_range(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize);
+	adjust_rect_range(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize, includeBottomRight);
 	rect = CRect(l, t, r, b);
 }
 
@@ -12816,6 +12877,21 @@ void adjust_with_monitor_attached(CRect rOld, CRect &rNew)
 		rNew.MoveToY(g_monitors[0].rMonitor.bottom - nh);
 }
 
+void normalize_rect(Gdiplus::RectF& r)
+{
+	if (r.X > r.X + r.Width)
+	{
+		float tmp = r.X;
+		r.X = r.X + r.Width;
+		r.Width = tmp - r.X;
+	}
+	if (r.Y > r.Y + r.Height)
+	{
+		float tmp = r.Y;
+		r.Y = r.Y + r.Height;
+		r.Height = tmp - r.Y;
+	}
+}
 
 //rTarget에 접하는 dRatio인 최대 사각형을 구한다.
 //attach_left 등의 옵션을 줄 필요가 있다.
@@ -15947,8 +16023,8 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, C
 	double dy = (double)pt_src.y;
 
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, dx, dy, &dx, &dy);
-	pt_dst->x = (long)dx;
-	pt_dst->y = (long)dy;
+	pt_dst->x = dx;
+	pt_dst->y = dy;
 }
 
 void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst)
@@ -15961,10 +16037,26 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, C
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
 
-	r_dst->left = (long)(x1);
-	r_dst->top = (long)(y1);
-	r_dst->right = (long)(x2);
-	r_dst->bottom = (long)(y2);
+	r_dst->left = x1;
+	r_dst->top = y1;
+	r_dst->right = x2;
+	r_dst->bottom = y2;
+}
+
+void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst)
+{
+	double x1 = (double)(r_src.X);
+	double y1 = (double)(r_src.Y);
+	double x2 = (double)(r_src.GetRight());
+	double y2 = (double)(r_src.GetBottom());
+
+	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
+	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
+
+	r_dst->X = x1;
+	r_dst->Y = y1;
+	r_dst->Width = x2 - x1;
+	r_dst->Height = y2 - y1;
 }
 
 void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double* dx, double* dy)
@@ -15992,8 +16084,8 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, C
 	double y = (double)pt_src.y;
 
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x, y, &x, &y);
-	pt_dst->x = (long)x;
-	pt_dst->y = (long)y;
+	pt_dst->x = x;
+	pt_dst->y = y;
 }
 
 void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect* r_dst)
@@ -16006,10 +16098,26 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, C
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
 
-	r_dst->left = (long)(x1);
-	r_dst->top = (long)(y1);
-	r_dst->right = (long)(x2);
-	r_dst->bottom = (long)(y2);
+	r_dst->left = x1;
+	r_dst->top = y1;
+	r_dst->right = x2;
+	r_dst->bottom = y2;
+}
+
+void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst)
+{
+	double x1 = (double)(r_src.X);
+	double y1 = (double)(r_src.Y);
+	double x2 = (double)(r_src.GetRight());
+	double y2 = (double)(r_src.GetBottom());
+
+	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
+	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
+
+	r_dst->X = x1;
+	r_dst->Y = y1;
+	r_dst->Width = x2 - x1;
+	r_dst->Height = y2 - y1;
 }
 
 //str의 from 위치 이후에 있는 숫자 영역값을 num에 넣어주고 숫자 시작위치를 return한다.

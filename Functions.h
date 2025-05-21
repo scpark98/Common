@@ -1653,11 +1653,13 @@ void		SetWallPaper(CString sfile);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst);
 
 	//이미지가 표시되고 있는 영역 정보와 이미지 상의 좌표를 주면 화면상의 좌표를 리턴한다.
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy);
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst);
 
 
 //직선, Line 관련 함수
@@ -1708,14 +1710,24 @@ void		SetWallPaper(CString sfile);
 	//2 : "(1,2) ~ (4,8) (2x6)"
 	//3 : "l = 1, t = 2, r = 3, b = 4"
 	CString		get_rect_info_string(CRect r, int nFormat = 2);
+	CString		get_rect_info_string(Gdiplus::Rect r, int nFormat = 2);
+	CString		get_rect_info_string(Gdiplus::RectF r, int nFormat = 2);
 
 	void		make_rect(CRect &Rect, int x, int y, int w, int h);
 	CRect		make_rect(int x, int y, int w, int h);
 	CRect		make_center_rect(int cx, int cy, int w, int h);
 	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
-	CRect		gpRectToCRect(Gdiplus::Rect);
-	Gdiplus::Rect	CRectTogpRect(CRect r);
-	Gdiplus::RectF	CRectTogpRectF(CRect r);
+	CRect		GpRect2CRect(Gdiplus::Rect r);
+	CRect		GpRectF2CRect(Gdiplus::RectF r);
+	Gdiplus::Rect	CRect2GpRect(CRect r);
+	Gdiplus::RectF	CRect2GpRectF(CRect r);
+
+	//Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
+	//따라서 left만 바꾸고 싶어도 Width까지 같이 변경해줘야 한다. 이러한 이유로 set_left(), set_top() 함수를 추가함.
+	void		set_left(Gdiplus::RectF& r, Gdiplus::REAL left);
+	void		set_top(Gdiplus::RectF& r, Gdiplus::REAL top);
+	Gdiplus::PointF center(Gdiplus::RectF& r);
+
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
 	void		draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
@@ -1725,10 +1737,12 @@ void		SetWallPaper(CString sfile);
 	CPoint		vertex(CRect r, int index, bool rb_cut = false);	
 
 	//주어진 사각형 범위를 벗어나지 않도록 보정해준다.
-	void		adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize);
-	//이미지의 경우 includeBottomRight은 false로 해야 끝점 좌표가 유효하다.
+	void		adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize, bool includeBottomRight = false);
+	//이미지의 경우 includeBottomRight은 false로 해야 끝점 좌표가 유효하다.(도형일 경우는 true)
 	void		adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize = true, bool includeBottomRight = false);
-	void		adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true);
+	void		adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true, bool includeBottomRight = false);
+
+	void		normalize_rect(Gdiplus::RectF& r);
 
 	//모니터의 한쪽에 붙은 사각형을 새로운 크기로 변경할 경우 붙은 상태를 유지하고 변경할 필요가 있을 경우 사용.
 	void		adjust_with_monitor_attached(CRect rOld, CRect &rNew);
@@ -1784,8 +1798,13 @@ void		SetWallPaper(CString sfile);
 	//시작점을 주면 정사각형을 이루는 끝점 좌표를 리턴한다.
 	void		getSquareEndPoint(int sx, int sy, int& ex, int& ey);
 
-	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다. sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
-	void		get_resizable_handle(CRect src, CRect handle[], int sz = 2);
+	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다.
+	//handle[]은 CRect handle[9] 변수를 넘겨받는다.
+	//sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
+	void		get_resizable_handle(CRect src, CRect handle[], int sz = 4);
+	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 중 pt가 위치한 사각형의 인덱스를 리턴한다.
+	//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
+	//int			get_handle_index(CRect src, CPoint pt, int sz);
 
 //다각형 polygon 관련
 	//임의 점이 다각형 내에 존재하는지 판별.

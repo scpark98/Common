@@ -34,13 +34,17 @@ CRect CSCParagraphStatic::set_text(CString text)
 	CSCParagraph::build_paragraph_str(text, m_para, &m_lf, m_cr_text, m_cr_back);
 
 	//"<b><cr = Red>This</b></cr > is a <cr =Blue><i>sample</i> <b>paragraph</b>."
-	recalc_text_size();
+	CClientDC dc(this);
+	CRect rc;
+	GetClientRect(&rc);
+	::calc_text_size(rc, &dc, m_para, &m_lf, DT_LEFT | DT_CENTER);
 	Invalidate();
 
 	return m_rect_text;
 }
 
-CRect CSCParagraphStatic::recalc_text_size()
+#if 0
+CRect CSCParagraphStatic::calc_text_size()
 {
 	if (m_para.empty())
 	{
@@ -76,7 +80,7 @@ CRect CSCParagraphStatic::recalc_text_size()
 		{
 			CSize sz;
 #if 1
-			pOldFont = select_paragraph_font(i, j, &dc, &font);
+			pOldFont = ::select_paragraph_font(m_para, i, j, &dc, &m_lf, &font);
 
 			//GetTextExtent()와 DrawText(DT_CALCRECT)로 구한 크기는 동일하며 italic은 약간 잘림.
 			sz = dc.GetTextExtent(m_para[i][j].text);
@@ -259,15 +263,6 @@ CRect CSCParagraphStatic::recalc_text_size()
 	return m_rect_text;
 }
 
-//마우스가 hover된 음절에 사각형 표시
-void CSCParagraphStatic::draw_word_hover_rect(bool draw, Gdiplus::Color cr_rect)
-{
-	m_draw_word_hover_rect = draw;
-
-	if (cr_rect.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_word_hover_rect = cr_rect;
-}
-
 CFont* CSCParagraphStatic::select_paragraph_font(int line, int index, CDC* pDC, CFont* font)
 {
 	font->DeleteObject();
@@ -286,39 +281,15 @@ CFont* CSCParagraphStatic::select_paragraph_font(int line, int index, CDC* pDC, 
 	font->CreateFontIndirect(&lf);
 	return (CFont*)pDC->SelectObject(font);
 }
+#endif
 
-void CSCParagraphStatic::get_paragraph_font(int line, int index, Gdiplus::Graphics &g, Gdiplus::Font** font)
+//마우스가 hover된 음절에 사각형 표시
+void CSCParagraphStatic::draw_word_hover_rect(bool draw, Gdiplus::Color cr_rect)
 {
-	Gdiplus::Unit unit = g.GetPageUnit();
-	float fDpiX = g.GetDpiX();
-	float fDpiY = g.GetDpiY();
+	m_draw_word_hover_rect = draw;
 
-	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
-	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
-	float emSize = fDpiY * m_para[line][index].size / 96.0;
-
-	Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(m_para[line][index].name));
-	if (!fontFamily->IsAvailable())
-	{
-		delete fontFamily;
-		fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
-	}
-
-	int font_style = 0;
-	if (m_para[line][index].bold)
-		font_style |= Gdiplus::FontStyleBold;
-	if (m_para[line][index].italic)
-		font_style |= Gdiplus::FontStyleItalic;
-	if (m_para[line][index].underline)
-		font_style |= Gdiplus::FontStyleUnderline;
-	if (m_para[line][index].strike)
-		font_style |= Gdiplus::FontStyleStrikeout;
-
-	Gdiplus::Font ff(fontFamily, emSize, font_style);
-	*font = ff.Clone();
-
-	if (fontFamily)
-		delete fontFamily;
+	if (cr_rect.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_word_hover_rect = cr_rect;
 }
 
 void CSCParagraphStatic::OnPaint()
@@ -331,6 +302,12 @@ void CSCParagraphStatic::OnPaint()
 
 	GetClientRect(&rc);
 	CMemoryDC dc(&dc1, &rc);
+
+	//draw_rectangle(dc, rc, Gdiplus::Color::Transparent, m_cr_back);
+	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+
+	draw_text(&dc, m_para, &m_lf);
+	/*
 	CFont font, *pOldFont = NULL;
 
 	Gdiplus::Graphics g(dc.m_hDC, rc);
@@ -363,7 +340,7 @@ void CSCParagraphStatic::OnPaint()
 		for (j = 0; j < m_para[i].size(); j++)
 		{
 #if 1
-			pOldFont = select_paragraph_font(i, j, &dc, &font);
+			pOldFont = select_paragraph_font(m_para, i, j, &dc, &m_lf, &font);
 
 			//text 배경색을 칠하고
 			if (m_para[i][j].cr_back.GetValue() != Gdiplus::Color::Transparent)
@@ -403,6 +380,7 @@ void CSCParagraphStatic::OnPaint()
 
 	font.DeleteObject();
 	dc.SelectObject(pOldFont);
+	*/
 }
 
 void CSCParagraphStatic::PreSubclassWindow()
@@ -417,7 +395,9 @@ void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)
 	CSCStatic::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	recalc_text_size();
+	CRect rc;
+	GetClientRect(rc);
+	calc_text_size(rc, GetDC(), m_para, &m_lf, DT_LEFT | DT_VCENTER);
 }
 
 void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)

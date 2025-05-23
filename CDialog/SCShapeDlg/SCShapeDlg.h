@@ -23,6 +23,7 @@
 */
 
 #include "../../GdiplusBitmap.h"
+#include "../../data_structure/SCParagraph/SCParagraph.h"
 
 static const UINT Message_CSCShapeDlg = ::RegisterWindowMessage(_T("MessageString_CSCShapeDlg"));
 
@@ -161,6 +162,8 @@ public:
 
 protected:
 	CWnd*			m_parent = NULL;
+
+	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 음절
 
 	CGdiplusBitmap	m_img;
 	//0 : 투명, 255 : 불투명

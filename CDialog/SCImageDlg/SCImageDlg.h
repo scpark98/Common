@@ -45,12 +45,17 @@ public:
 	CString			get_filename() { return m_filename; }
 
 	bool			get_show_filename() { return true; }
+	void			set_show_filename(bool show);
+
 	bool			get_show_pixel() { return m_show_pixel; }
 	void			set_show_pixel(bool show);
 
 	bool			copy_to_clipbard();
 
 	Gdiplus::RectF	get_image_roi();
+	void			set_image_roi(Gdiplus::RectF roi) { m_image_roi = roi; Invalidate(); }
+	bool			get_show_roi_info() { return m_show_roi_info; }
+	void			set_show_roi_info(bool show) { m_show_roi_info = show; Invalidate(); }
 
 	//mode : 1(zoom in), -1(zoom out), 0(reset)
 	void			zoom(int mode);
@@ -92,12 +97,16 @@ protected:
 	CPoint			m_ptClicked = CPoint(0, 0);
 	HCURSOR			m_hCursor;
 
+//전체화면일 때 파일명 표시
+	bool			m_show_filename = true;
+
 	//roi 관련(선택영역)
 	//roi를 screen기준으로만 저장하면 이미지 scroll, resize 등을 할때마다 항상 보정해줘야 하므로
 	//roi가 설정된 순간에 image_roi를 계산해서 저장해 놓고
 	//위치, 크기 변경시에 image_roi를 screen_roi로 변경하여 표시한다.
 	Gdiplus::RectF	m_image_roi;					//영상의 실제 ROI
 	Gdiplus::RectF	m_screen_roi;					//디스플레이되고 있는 화면상의 ROI
+	bool			m_show_roi_info = true;			//roi 좌표 정보 표시 여부
 
 	int				m_handle_index = -1;			//이동 및 크기 조정을 위해 마우스가 위치하거나 클릭된 핸들 인덱스
 	CRect			m_roi_handle[MAX_RECT_HANDLE];	//사각형 개체의 이동 및 크기 조정을 위한 작은 사각형 9개

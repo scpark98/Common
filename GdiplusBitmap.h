@@ -228,9 +228,15 @@ public:
 	//투명 png의 l, t, r, b의 투명한 영역 크기를 구한다.
 	CRect	get_transparent_rect();
 
+	//현재 이미지의 일부분을 이 객체 이미지로 재설정한다.
+	//즉, 원본 이미지를 가진 객체에서 sub_image()를 호출하면 이 객체는 crop된 이미지로 변경된다.
+	//따라서 A이미지의 r 영역을 B이미지 할당하고자 할 경우는 다음 두 단계를 거친다.
+	//A.deep_copy(&B);
+	//B.sub_image(r);
 	void	sub_image(int x, int y, int w, int h);
 	void	sub_image(CRect r);
 	void	sub_image(Gdiplus::Rect r);
+	void	sub_image(Gdiplus::RectF r);
 	void	fit_to_image(Gdiplus::Color remove_back_color = Gdiplus::Color::Transparent);
 	void	set_colorkey(Gdiplus::Color low, Gdiplus::Color high);
 	bool	is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel = 3);

@@ -764,7 +764,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	get_round_rect_path(&roundPath, CRectTogpRect(rc), m_round);
+	get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round);
 
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
@@ -1121,12 +1121,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round <= 0)
 			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 		else
-			draw_round_rect(&g, CRectTogpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
+			draw_round_rect(&g, CRect2GpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
 	}
 	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
 	{
 		if (m_round > 0)
-			draw_round_rect(&g, CRectTogpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
+			draw_round_rect(&g, CRect2GpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
 			draw_rectangle(g, rc, m_gcr_border);
 	}
@@ -1134,7 +1134,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRectTogpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			draw_round_rect(&g, CRect2GpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
 			draw_rectangle(g, rc, m_gcr_border);
 	}

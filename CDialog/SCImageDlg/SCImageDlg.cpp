@@ -145,6 +145,14 @@ void CSCImageDlg::OnPaint()
 		Clamp(m_offset.x, (long)(rc.Width() - nw), (long)0);
 		Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
 
+		TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
+		//if (m_screen_roi.IsEmptyArea() == false)
+		//{
+		//	Gdiplus::RectF screen_roi = m_screen_roi;
+		//	screen_roi.Offset(m_offset.x, m_offset.y);
+		//	m_screen_roi = screen_roi;
+		//}
+
 		int sx = m_offset.x;
 		int sy = m_offset.y;
 
@@ -161,6 +169,24 @@ void CSCImageDlg::OnPaint()
 #endif
 	}
 
+	//파일명 표시
+	if (m_show_filename && m_parent->IsZoomed())
+	{
+		CAutoFont af(_T("맑은 고딕"));
+		af.SetHeight(32);
+		CFont* pOldFont = dc.SelectObject(&af);
+		CString filename = get_part(m_filename, fn_name);
+		CSize sz = dc.GetTextExtent(filename);
+		DrawShadowText(dc.GetSafeHdc(), filename, filename.GetLength(),
+			make_rect(8, 8, sz.cx + 2, sz.cy + 1),
+			DT_NOCLIP | DT_RIGHT | DT_BOTTOM, beige, black, 2, 1);
+
+		//dc.SetBkMode(TRANSPARENT);
+		//dc.SetTextColor(white);
+		//dc.DrawText(m_filename, CRect(rc.left + 4, rc.top + 2, rc.left + 4 + sz.cx + 2, rc.top + 2 + sz.cy), DT_NOCLIP | DT_LEFT | DT_TOP);
+		dc.SelectObject(pOldFont);
+	}
+
 	//CRect screen_roi;
 	//CRect image_roi = GpRectF2CRect(m_image_roi);
 
@@ -174,14 +200,19 @@ void CSCImageDlg::OnPaint()
 	}
 	else if (m_image_roi.IsEmptyArea() == false)
 	{
+		//이미지 확대 축소 등에 의해 m_displayed가 변경되면 그에 따라 m_screen_roi도 다시 계산해줘야 한다.
 		get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+		//m_screen_roi.Offset(m_offset.x, m_offset.y);
+		screen_roi = GpRectF2CRect(m_screen_roi);
+		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
+		//screen_roi.OffsetRect(m_offset);
 		draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 	}
 
 	if (screen_roi.IsRectEmpty() == false)
 	{
 		Gdiplus::RectF image_roi;
-		get_real_coord_from_screen_coord(m_displayed, m_img.width, m_screen_roi, &image_roi);
+		get_real_coord_from_screen_coord(m_displayed, m_img.width, CRect2GpRectF(screen_roi), &image_roi);
 		get_resizable_handle(screen_roi, m_roi_handle, 4);
 
 		//image_roi 역시 normalize_rect을 해줘야 한다. 그렇지 않으면 뒤집어 그릴 경우 x1,y1이 x2, y2보다 큰 좌표로 표시된다.
@@ -192,39 +223,42 @@ void CSCImageDlg::OnPaint()
 			//draw_rectangle(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
 			draw_rectangle(g, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 64, 0));
 
-		CAutoFont af(_T("Arial"));
-		af.SetHeight(14);
+		if (m_show_roi_info)
+		{
+			CAutoFont af(_T("Arial"));
+			af.SetHeight(14);
 
-		CFont* pOldFont = dc.SelectObject(&af);
+			CFont* pOldFont = dc.SelectObject(&af);
 
-		CSize sz = dc.GetTextExtent(_T("A"));
-		dc.SetBkMode(TRANSPARENT);
+			CSize sz = dc.GetTextExtent(_T("A"));
+			dc.SetBkMode(TRANSPARENT);
 
-		//start
-		dc.SetTextColor(yellow);
-		str.Format(_T("%.1f, %.1f"), image_roi.X, image_roi.Y);
-		sz = dc.GetTextExtent(str);
-		//dc.DrawText(str, CRect(m_screen_roi.X + 4, m_screen_roi.Y + 2, m_screen_roi.X + 10, m_screen_roi.Y + 10), DT_NOCLIP | DT_LEFT | DT_TOP);
-		DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
-			CRect(screen_roi.left + 4, screen_roi.top + 2, screen_roi.left + 4 + sz.cx + 2, screen_roi.top + 2 + sz.cy),
-			DT_NOCLIP | DT_LEFT | DT_TOP, white, black, 2, 1);
+			//roi 영역 정보를 표시한다. 비록 image_roi는 변환식에 의해 소수점이지만 실제 이미지 픽셀은 정수로 표현해준다.
+			//start
+			dc.SetTextColor(yellow);
+			str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
+			sz = dc.GetTextExtent(str);
+			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
+				CRect(screen_roi.left + 4, screen_roi.top + 2, screen_roi.left + 4 + sz.cx + 2, screen_roi.top + 2 + sz.cy),
+				DT_NOCLIP | DT_LEFT | DT_TOP, white, black, 2, 1);
 
-		//end
-		str.Format(_T("%.1f, %.1f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
-		sz = dc.GetTextExtent(str);
-		//dc.DrawText(str, CRect(m_screen_roi.X + m_screen_roi.Width - 2, m_screen_roi.Y + m_screen_roi.Height - sz.cy - 2, m_screen_roi.X + m_screen_roi.Width - 10, m_screen_roi.Y + m_screen_roi.Height), DT_NOCLIP | DT_RIGHT | DT_BOTTOM);
-		DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
-			CRect(screen_roi.left + screen_roi.Width() - 2 - sz.cx, screen_roi.top + screen_roi.Height() - sz.cy - 2, screen_roi.left + screen_roi.Width() - 2, screen_roi.top + screen_roi.Height()),
-			DT_NOCLIP | DT_RIGHT | DT_BOTTOM, white, black, 2, 1);
+			//end
+			str.Format(_T("%.0f, %.00f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
+			sz = dc.GetTextExtent(str);
+			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
+				CRect(screen_roi.left + screen_roi.Width() - 2 - sz.cx, screen_roi.top + screen_roi.Height() - sz.cy - 2, screen_roi.left + screen_roi.Width() - 2, screen_roi.top + screen_roi.Height()),
+				DT_NOCLIP | DT_RIGHT | DT_BOTTOM, white, black, 2, 1);
 
-		//size and distance
-		dc.SetTextColor(green);
-		str.Format(_T("%.1f x %.1f"), image_roi.Width, image_roi.Height);
-		sz = dc.GetTextExtent(str);
-		//dc.DrawText(str, CRect(m_screen_roi.X + m_screen_roi.Width / 2, m_screen_roi.Y + m_screen_roi.Height / 2 + 12, m_screen_roi.X + m_screen_roi.Width / 2, m_screen_roi.Y + m_screen_roi.Height / 2 + 12), DT_NOCLIP | DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
-			CRect(screen_roi.CenterPoint().x - sz.cx / 2, screen_roi.CenterPoint().y + 2, screen_roi.CenterPoint().x + sz.cx / 2, screen_roi.CenterPoint().y + 2 + sz.cy),
-			DT_NOCLIP | DT_CENTER | DT_TOP, yellow, black, 2, 1);
+			//size and distance
+			dc.SetTextColor(green);
+			str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
+			sz = dc.GetTextExtent(str);
+			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
+				CRect(screen_roi.CenterPoint().x - sz.cx / 2, screen_roi.CenterPoint().y + 2, screen_roi.CenterPoint().x + sz.cx / 2, screen_roi.CenterPoint().y + 2 + sz.cy),
+				DT_NOCLIP | DT_CENTER | DT_TOP, yellow, black, 2, 1);
+
+			dc.SelectObject(pOldFont);
+		}
 	}
 
 	dc.SelectClipRgn(NULL);
@@ -235,6 +269,9 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_KEYDOWN)
 	{
+		bool is_ctrl_pressed = IsCtrlPressed();
+		double interval = (IsCtrlPressed() ? 5.0 : 1.0);
+
 		switch (pMsg->wParam)
 		{
 			case VK_RETURN :
@@ -254,8 +291,8 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_ADD :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
-					m_image_roi.Inflate(Gdiplus::PointF(1.0, 1.0));
-					get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+					m_image_roi.Inflate(Gdiplus::PointF(interval, interval));
+					//get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
 					Invalidate();
 					return TRUE;
 				}
@@ -264,8 +301,8 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_SUBTRACT :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
-					m_image_roi.Inflate(Gdiplus::PointF(-1.0, -1.0));
-					get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+					m_image_roi.Inflate(Gdiplus::PointF(-interval, -interval));
+					//get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
 					Invalidate();
 					return TRUE;
 				}
@@ -281,8 +318,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_UP :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
-					m_image_roi.Y--;
-					get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+					m_image_roi.Y -= interval;
 					Invalidate();
 					return TRUE;
 				}
@@ -290,8 +326,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_DOWN:
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
-					m_image_roi.Y++;
-					get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+					m_image_roi.Y += interval;
 					Invalidate();
 					return TRUE;
 				}
@@ -299,8 +334,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_LEFT:
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
-					m_image_roi.X--;
-					get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+					m_image_roi.X -= interval;
 					Invalidate();
 					return TRUE;
 				}
@@ -308,8 +342,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_RIGHT:
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
-					m_image_roi.X++;
-					get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+					m_image_roi.X += interval;
 					Invalidate();
 					return TRUE;
 				}
@@ -371,6 +404,12 @@ bool CSCImageDlg::load(UINT id)
 	return load(_T("PNG"), id);
 }
 
+void CSCImageDlg::set_show_filename(bool show)
+{
+	m_show_filename = show;
+	Invalidate();
+}
+
 void CSCImageDlg::set_show_pixel(bool show)
 {
 	m_show_pixel = show;
@@ -379,13 +418,22 @@ void CSCImageDlg::set_show_pixel(bool show)
 
 bool CSCImageDlg::copy_to_clipbard()
 {
+	//roi가 있으면 그 영역만, 그렇지 않다면 전체 이미지를 복사한다.
+	if (m_image_roi.IsEmptyArea() == false)
+	{
+		CGdiplusBitmap roi_img;
+		m_img.deep_copy(&roi_img);
+		roi_img.sub_image(m_image_roi);
+		roi_img.copy_to_clipbard();
+		return true;
+	}
 	return m_img.copy_to_clipbard();
 }
 
 Gdiplus::RectF CSCImageDlg::get_image_roi()
 {
-	if (m_image_roi.IsEmptyArea())
-		return Gdiplus::RectF(0, 0, m_img.width, m_img.height);
+	//if (m_image_roi.IsEmptyArea())
+	//	return Gdiplus::RectF(0, 0, m_img.width, m_img.height);
 
 	return m_image_roi;
 }
@@ -421,7 +469,8 @@ void CSCImageDlg::zoom(int mode)
 	m_fit2ctrl = false;
 
 	Clamp(m_zoom, 0.1, 20.0);
-
+	//get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
+	//Wait(1);
 	Invalidate();
 }
 
@@ -488,19 +537,16 @@ void CSCImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
-
-			if (abs(m_screen_roi.Width) < 20 || abs(m_screen_roi.Height) < 20)
-			{
-				m_screen_roi = Gdiplus::RectF();
-				m_image_roi = Gdiplus::RectF();
-				Invalidate();
-				return;
-			}
-
-			//Wait(10);
-			//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CImageStaticMessage(this, WM_LBUTTONUP), 0);
 		}
-		
+
+		if (abs(m_screen_roi.Width) < 20 || abs(m_screen_roi.Height) < 20)
+		{
+			m_screen_roi = Gdiplus::RectF();
+			m_image_roi = Gdiplus::RectF();
+			Invalidate();
+			return;
+		}
+
 		//roi가 모두 그려지면, 또는 이동, 크기조정이 완료되면 m_image_roi로 변환해준다.
 		normalize_rect(m_screen_roi);
 		get_real_coord_from_screen_coord(m_displayed, m_img.width, m_screen_roi, &m_image_roi);
@@ -582,6 +628,22 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			m_offset.x += (point.x - m_ptClicked.x);
 			m_offset.y += (point.y - m_ptClicked.y);
 
+			//int nw = m_img.width * m_zoom;
+			//int nh = m_img.height * m_zoom;
+
+			//CRect rc;
+			//GetClientRect(rc);
+			//Clamp(m_offset.x, (long)(rc.Width() - nw), (long)0);
+			//Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
+
+			////마우스로 이미지를 이동해서 offset이 변경됐다면 roi도 같이 이동시켜줘야 한다.
+			//if (m_screen_roi.IsEmptyArea() == false)
+			//{
+			//	m_screen_roi.X += m_offset.x;
+			//	m_screen_roi.Y += m_offset.y;
+			//	//m_screen_roi.Offset(-m_offset.x, -m_offset.y);
+			//}
+
 			Invalidate();
 			m_ptClicked = point;
 		}
@@ -600,7 +662,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		if (pt.x < 0 || pt.x >= m_img.width || pt.y < 0 || pt.y >= m_img.height)
 		{
 			//m_static_pixel.ShowWindow(SW_HIDE);
-			m_static_pixel.set_text(_T("-,-\nA -\nR -\nG -\nB -"));
+			m_static_pixel.set_text(_T("(-,-)\nA -\nR -\nG -\nB -"));
 			return;
 		}
 
@@ -621,7 +683,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		//m_static_pixel.SetWindowPos(NULL, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 		CString str;
 
-		str.Format(_T("%d,%d\nA %3d\nR %3d\nG %3d\nB %3d"), pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+		str.Format(_T("(%d,%d)\nA %3d\nR %3d\nG %3d\nB %3d"), pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
 
 		if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
 		{
@@ -714,7 +776,4 @@ void CSCImageDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CDialog::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	//Wait()를 주지 않으면 전체화면 전환/복귀 시 screen_roi가 제대로 갱신되지 않는 현상이 있음
-	Wait(1);
-	Invalidate();
 }

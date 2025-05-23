@@ -75,6 +75,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	m_parent = parent;
 
 	DWORD dwStyle = WS_POPUP;
+	//DWORD dwStyle = WS_CHILD | WS_VISIBLE;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
@@ -141,8 +142,12 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 {
 	bool res = false;
 
-	//m_auto_color = true이면 배경색에 따라 cr_text를 변경시키도록 한다.
-	cr_text = Gdiplus::Color::Gray;
+	if (text.IsEmpty())
+		return false;
+
+	m_para.clear();
+
+	LOGFONT lf;
 
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
@@ -152,7 +157,6 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	if (font_name.IsEmpty())
 	{
 		CFont* font = m_parent->GetFont();
-		LOGFONT lf;
 
 		memset(&lf, 0, sizeof(LOGFONT));
 
@@ -161,8 +165,61 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 		else
 			GetObject(GetStockObject(SYSTEM_FONT), sizeof(lf), &lf);
 
-		m_text_setting.font_name = font_name = lf.lfFaceName;
+		font_name = lf.lfFaceName;
 	}
+
+	_tcscpy_s(lf.lfFaceName, countof(lf.lfFaceName), font_name);
+	lf.lfHeight = -MulDiv(font_size, GetDeviceCaps(::GetDC(m_parent->GetSafeHwnd()), LOGPIXELSY), 72);
+
+
+	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
+	CRect r(0, 0, 100, 100);
+
+	if (m_img.is_empty())
+		m_img.create(100, 100, PixelFormat32bppARGB, cr_back);
+	else
+		m_img.clear(cr_back);
+
+	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back);
+
+	if (!m_hWnd)
+		res = create(parent, 0, 0, r.Width(), r.Height());
+
+	CClientDC dc(this);
+	r = ::calc_text_size(r, &dc, m_para, &lf, DT_LEFT | DT_CENTER);
+
+	//캔버스 크기가 실제 텍스트 출력크기와 다르면
+	if (r.Width() != m_img.width || r.Height() != m_img.height)
+	{
+		//resize하거나 실제 크기로 다시 생성한다.
+		m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
+		r = CRect(0, 0, r.Width(), r.Height());
+		r = ::calc_text_size(r, &dc, m_para, &lf, DT_LEFT | DT_CENTER);
+	}
+
+	//해당 캔버스에
+	Gdiplus::Graphics g(m_img.m_pBitmap);
+
+	//글자를 출력하고
+	//r = draw_text(g, r, text,
+	//	font_size, font_style, shadow_depth, thickness, font_name,
+	//	cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
+
+	//CDC* pDC = CDC::FromHandle(g.GetHDC());	//이 코드를 써서 CDC에 draw_text()하려 했으나 이렇게 하면 g에 아무것도 그려지지 않음
+	draw_text(g, m_para, &lf);
+
+	Gdiplus::Pen pen(Gdiplus::Color::Blue, 3.0F);
+	g.DrawLine(&pen, 2, 2, 20, 20);
+
+	set_image(parent, &m_img, false);
+	m_img.save(_T("d:\\SCShapeDlg.png"));
+	return true;
+
+	/*
+
+	//m_auto_color = true이면 배경색에 따라 cr_text를 변경시키도록 한다.
+	//cr_text = Gdiplus::Color::Gray;
+
 
 	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_style, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
 
@@ -222,6 +279,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	set_image(parent, &m_img, false);
 
 	return res;
+	*/
 }
 
 void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)

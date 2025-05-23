@@ -6596,6 +6596,7 @@ Gdiplus::RectF CRect2GpRectF(CRect r)
 
 //Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
 //따라서 left만 바꾸고 싶어도 Width까지 같이 변경해줘야 한다. 이러한 이유로 set_left(), set_top() 함수를 추가함.
+//CRect는 left를 변경하면 Width()가 변경되지만 Gdiplus::Rect는 X를 변경해도 Width는 변경되지 않는다.
 void set_left(Gdiplus::RectF& r, Gdiplus::REAL left)
 {
 	Gdiplus::REAL right = r.X + r.Width;
@@ -18433,6 +18434,367 @@ bool save(Gdiplus::Bitmap* bitmap, CString filename)
 		return true;
 
 	return false;
+}
+
+//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
+CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align)
+{
+	if (para.empty())
+		return CRect();
+
+	int i, j;
+	int sx = 0;
+	int sy = 0;				//각 라인의 시작 위치(높이값 누적)
+	int total_text_height;
+	CRect rect_text;
+	CFont font, * pOldFont;
+	LOGFONT lf_origin;
+
+	Gdiplus::Graphics g(pDC->m_hDC);
+
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+	Gdiplus::StringFormat sf;
+
+	sf.SetAlignment(Gdiplus::StringAlignmentNear);
+	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
+	//sf.SetFormatFlags(Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
+
+	int max_width = 0;
+	int max_width_line = 0;
+
+	memcpy(&lf_origin, lf, sizeof(LOGFONT));
+
+	for (i = 0; i < para.size(); i++)
+	{
+		CSize sz_text = CSize(0, 0);
+
+		for (j = 0; j < para[i].size(); j++)
+		{
+			CSize sz;
+#if 0
+			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
+
+			//GetTextExtent()와 DrawText(DT_CALCRECT)로 구한 크기는 동일하며 italic은 약간 잘림.
+			sz = pDC->GetTextExtent(para[i][j].text);
+			//GetTextExtentExPoint(dc.m_hDC, m_paragraph[i].text, m_paragraph[i].text.GetLength(), 0, NULL, NULL, &sz);
+
+			//if (para[i][j].italic)
+			//{
+			//	TEXTMETRIC tm;
+			//	GetTextMetrics(pDC->m_hDC, &tm);
+			//	if (tm.tmOverhang > 0)
+			//		sz.cx += tm.tmOverhang;
+			//	else
+			//		sz.cx += (pDC->GetTextExtent(_T("M")).cx / 4);
+			//}
+
+			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+#else
+			Gdiplus::Font* font = NULL;
+			get_paragraph_font(g, para, i, j, &font);
+			Gdiplus::RectF boundRect;
+			//g.MeasureString(CStringW(m_para[i][j].text), -1, font, Gdiplus::PointF(0, 0), &boundRect);
+			g.MeasureString(CStringW(para[i][j].text), -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect);
+			//Gdiplus::Region rgn[] = Gdiplus::Region[1];
+			//g.MeasureCharacterRanges(CStringW(para[i][j].text), -1, font, boundRect, &sf, 1, &rgn);
+			//boundRect = rgn[0].GetBounds(g);
+			sz.cx = boundRect.Width;
+			sz.cy = boundRect.Height;
+			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+#endif
+			TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
+			sz_text.cx += sz.cx;
+
+			//한 라인에서 가장 cy가 큰 값을 기억시킨다.
+			sz_text.cy = std::max(sz_text.cy, sz.cy);
+		}
+
+		//각 라인들 중에서 최대 너비를 구한다.
+		if (sz_text.cx > max_width)
+		{
+			max_width = sz_text.cx;
+			max_width_line = i;
+		}
+
+		//각 라인 시작 위치는 누적된다.
+		sy += sz_text.cy;
+	}
+
+	total_text_height = sy;
+
+	font.DeleteObject();
+
+	//한 라인내에서 height가 가장 높은 항목으로 통일시키느냐? 아니면 각자의 높이를 그대로 유지하느냐...
+	//for (i = 0; i < m_paragraph.size(); i++)
+	//{
+	//	m_paragraph[i].r.bottom = m_paragraph[i].r.top + m_sz_text.cy;
+	//}
+
+	//align 옵션에 따른 보정
+	/*
+	DWORD dwStyle = GetStyle();
+	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
+
+	if (m_dwStyle == 0)
+	{
+		MAP_STYLE(SS_LEFT, DT_LEFT);
+		MAP_STYLE(SS_RIGHT, DT_RIGHT);
+		MAP_STYLE(SS_CENTER, DT_CENTER);
+		MAP_STYLE(SS_NOPREFIX, DT_NOPREFIX);
+		MAP_STYLE(SS_WORDELLIPSIS, DT_WORD_ELLIPSIS);
+		MAP_STYLE(SS_ENDELLIPSIS, DT_END_ELLIPSIS);
+		MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
+	}
+	*/
+
+	CRect margin;
+
+	//align에 따른 보정
+	if (align & DT_CENTER)
+	{
+		//각 라인마다 total_width를 구하고
+		for (i = 0; i < para.size(); i++)
+		{
+			int total_width = 0;
+			for (j = 0; j < para[i].size(); j++)
+				total_width += para[i][j].r.Width();
+
+			//아이콘을 포함하여 center에 표시할 지, 텍스트만 center에 표시할 지...
+			//if (m_hIcon)
+			//	total_width -= (m_sz_icon.cx + 4);
+
+			//cx에서 total_width/2를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
+			sx = rc.CenterPoint().x - total_width / 2;
+			for (j = 0; j < para[i].size(); j++)
+				para[i][j].r.OffsetRect(sx, 0);
+		}
+	}
+	else if (align & DT_RIGHT)
+	{
+		//각 라인마다 total_width를 구하고
+		for (i = 0; i < para.size(); i++)
+		{
+			int total_width = 0;
+			for (j = 0; j < para[i].size(); j++)
+				total_width += para[i][j].r.Width();
+
+			//rc.right에서 total_width를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
+			sx = rc.right - margin.right - total_width;
+			for (j = 0; j < para[i].size(); j++)
+				para[i][j].r.OffsetRect(sx, 0);
+		}
+	}
+	else //SS_LEFT (default)
+	{
+		if (false)//m_hIcon)
+		{
+			for (i = 0; i < para.size(); i++)
+			{
+				for (j = 0; j < para[i].size(); j++)
+				{
+					//para[i][j].r.OffsetRect(m_margin.left + m_sz_icon.cx + 4, 0);
+				}
+			}
+		}
+	}
+
+	if (align & DT_VCENTER)// SS_CENTERIMAGE)
+	{
+		//전체 높이에서 전체 텍스트 높이 합계를 뺀 1/2 만큼 shift 시킨다.
+		sy = (rc.Height() - total_text_height) / 2;
+		for (i = 0; i < para.size(); i++)
+		{
+			for (j = 0; j < para[i].size(); j++)
+			{
+				para[i][j].r.OffsetRect(0, sy);
+			}
+		}
+	}
+	else //top align
+	{
+		for (i = 0; i < para.size(); i++)
+		{
+			for (j = 0; j < para[i].size(); j++)
+			{
+				para[i][j].r.OffsetRect(0, 0);// m_margin.top);
+			}
+		}
+	}
+
+
+	if (para.size() > 0)
+	{
+		//m_pt_icon.x = m_para[m_max_width_line][0].r.left - m_sz_icon.cx - 4;
+		//아이콘을 top 정렬하느냐, 모든 라인의 vcenter에 정렬하느냐...
+		//m_pt_icon.y = m_para[0][0].r.top;
+
+		rect_text.left = para[max_width_line][0].r.left;	//최대 넓이 라인의 0번 아이템의 left
+		rect_text.top = para[0][0].r.top;					//최상단 항목의 top
+		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//최대 넓이 라인의 마지막 항목의 right
+		rect_text.bottom = para[0][0].r.top + total_text_height;	//최상단 항목의 top + 전체 텍스트 높이
+	}
+	else
+	{
+		//m_pt_icon.x = sx - m_sz_icon.cx;
+		//m_pt_icon.y = sy - m_sz_icon.cy / 2;
+
+		//m_rect_text = make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_icon.cx, m_sz_icon.cy);
+	}
+
+	//text 크기에 맞춰 컨트롤의 크기를 조정하는 것은 해당 윈도우에서 처리할 일이다.
+	/*
+	if (false)//m_auto_ctrl_size)
+	{
+		if (rect_text.Width() > rc.Width() || rect_text.Height() > rc.Height())
+		{
+			//MoveWindow(m_rect_text);
+			SetWindowPos(NULL, 0, 0, rect_text.Width(), rect_text.Height(), SWP_NOMOVE | SWP_NOZORDER);
+		}
+	}
+	*/
+
+	return rect_text;
+}
+
+//현재는 calc_text_size()에서만 사용되는 함수로 주어진 폰트로 설정하고 pOldFont를 리턴한다.
+CFont* select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, LOGFONT* lf_origin, CFont* font)
+{
+	font->DeleteObject();
+
+	LOGFONT lf;
+	memcpy(&lf, lf_origin, sizeof(LOGFONT));
+
+	_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), para[line][index].name);
+
+	lf.lfHeight = get_pixel_size_from_font_size(NULL, para[line][index].size);
+	lf.lfWeight = para[line][index].bold ? FW_BOLD : FW_NORMAL;
+	lf.lfItalic = para[line][index].italic;
+	lf.lfUnderline = para[line][index].underline;
+	lf.lfStrikeOut = para[line][index].strike;
+
+	font->CreateFontIndirect(&lf);
+	return (CFont*)pDC->SelectObject(font);
+}
+
+void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font)
+{
+	Gdiplus::Unit unit = g.GetPageUnit();
+	float fDpiX = g.GetDpiX();
+	float fDpiY = g.GetDpiY();
+
+	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
+	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
+	float emSize = fDpiY * para[line][index].size / 96.0;
+
+	Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[line][index].name));
+	if (!fontFamily->IsAvailable())
+	{
+		delete fontFamily;
+		fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
+	}
+
+	int font_style = 0;
+	if (para[line][index].bold)
+		font_style |= Gdiplus::FontStyleBold;
+	if (para[line][index].italic)
+		font_style |= Gdiplus::FontStyleItalic;
+	if (para[line][index].underline)
+		font_style |= Gdiplus::FontStyleUnderline;
+	if (para[line][index].strike)
+		font_style |= Gdiplus::FontStyleStrikeout;
+
+	Gdiplus::Font ff(fontFamily, emSize, font_style);
+	*font = ff.Clone();
+
+	if (fontFamily)
+		delete fontFamily;
+}
+
+//#define USING_HDC
+void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf)
+{
+	int i, j;
+	CFont font, * pOldFont = NULL;
+
+	Gdiplus::StringFormat sf;
+
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+	//g를 이용해서 pDC를 구해서 사용하는 경우는 g.ReleaseHDC(hdc);를 호출하기 전까지는 g의 어떤 함수 사용도 하지 않아야 한다.
+	// Make GDI calls, but don't call any methods
+	// on g until after the call to ReleaseHDC.
+#ifdef USING_HDC
+	HDC hdc = g.GetHDC();
+	CDC* pDC = CDC::FromHandle(hdc);
+	pDC->SetBkMode(TRANSPARENT);
+#endif
+	sf.SetAlignment(Gdiplus::StringAlignmentNear);
+	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
+
+	//dc.SetBkColor()로 지정된 배경색을 설정하면 편하지만
+	//글자 속성에 따라 그 높낮이가 다른 경우도 있다.
+	//따라서 recalc_text_size()에서 max height를 모든 paragraph에 적용했으며
+	//여기서도 배경색으로 칠한 뒤 텍스트를 표시한다.
+
+	for (i = 0; i < para.size(); i++)
+	{
+		for (j = 0; j < para[i].size(); j++)
+		{
+#ifdef USING_HDC
+			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
+
+			//text 배경색을 칠하고
+			if (para[i][j].cr_back.GetA() != 0)
+				pDC->FillSolidRect(para[i][j].r, para[i][j].cr_back.ToCOLORREF());
+
+			//text를 출력한다.
+			pDC->SetTextColor(para[i][j].cr_text.ToCOLORREF());
+			pDC->DrawText(para[i][j].text, para[i][j].r, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
+			//draw_text(g, m_para[i][j].r, m_para[i][j].cr_text, m_para[i][j].text, m_para[i][j].size, m_para[i][j].);
+			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
+			pDC->SelectObject(pOldFont);
+#else
+			Gdiplus::Font* font;
+			get_paragraph_font(g, para, i, j, &font);
+
+			//text 배경색을 칠하고
+			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].cr_back);
+
+			//text를 출력한다.
+			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
+			g.DrawString(CStringW(para[i][j].text), para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+#endif
+
+			//if (m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)
+			//{
+			//	draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Red, Gdiplus::Color(96, 255, 255, 255));
+			//}
+		}
+	}
+
+	//텍스트 출력 영역 확인용
+#ifdef _DEBUG
+	//draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
+#endif
+	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
+
+#ifdef USING_HDC
+	font.DeleteObject();
+	pDC->SelectObject(pOldFont);
+
+	g.ReleaseHDC(hdc);
+#endif
+}
+
+void draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf)
+{
+	Gdiplus::Graphics g(pDC->m_hDC);
+	draw_text(g, para, lf);
 }
 
 CString json_value(CString json, CString key)

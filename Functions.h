@@ -1630,6 +1630,14 @@ void		SetWallPaper(CString sfile);
 	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);
 
+	//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
+	CRect		calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align);
+	//CRect		calc_text_size(CWnd* wnd, Gdiplus::Graphics* g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align);
+	//현재는 calc_text_size()에서만 사용되는 함수로 주어진 폰트로 설정하고 pOldFont를 리턴한다.
+	CFont*		select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, LOGFONT* lf_origin, CFont* font);
+	void		get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font);
+	void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf);
+	void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf);
 
 //gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 //종료될 때 해제시켜주는 함수도 반드시 호출해줘야 한다.
@@ -1724,7 +1732,9 @@ void		SetWallPaper(CString sfile);
 
 	//Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
 	//따라서 left만 바꾸고 싶어도 Width까지 같이 변경해줘야 한다. 이러한 이유로 set_left(), set_top() 함수를 추가함.
+	//CRect는 left를 변경하면 Width()가 변경되지만 Gdiplus::Rect는 X를 변경해도 Width는 변경되지 않는다.
 	void		set_left(Gdiplus::RectF& r, Gdiplus::REAL left);
+	//CRect는 top을 변경하면 Height()가 변경되지만 Gdiplus::Rect는 Y를 변경해도 Height는 변경되지 않는다.
 	void		set_top(Gdiplus::RectF& r, Gdiplus::REAL top);
 	Gdiplus::PointF center(Gdiplus::RectF& r);
 

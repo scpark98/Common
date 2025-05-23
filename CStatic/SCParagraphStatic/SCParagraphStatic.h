@@ -68,10 +68,10 @@ public:
 protected:
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 음절
 
-	CRect			recalc_text_size();
+	//CRect			calc_text_size();
 
 	//m_para[line][index]의 설정값대로 font를 SelectObject()하고 pOldFont를 리턴한다.
-	CFont*			select_paragraph_font(int line, int index, CDC* pDC, CFont* font);
+	//CFont*			select_paragraph_font(int line, int index, CDC* pDC, CFont* font);
 	void			get_paragraph_font(int line, int index, Gdiplus::Graphics& g, Gdiplus::Font** font);
 
 	int				m_max_width;			//각 라인들 중 최대 너비

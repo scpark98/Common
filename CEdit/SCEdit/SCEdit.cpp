@@ -652,7 +652,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 			int size = 12;
 			r = make_center_rect(cp.x, cp.y, size, size);
 			r.OffsetRect(-2, -2);
-			g.DrawEllipse(&pen, CRectTogpRect(r));
+			g.DrawEllipse(&pen, CRect2GpRect(r));
 			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
 		}
 	}

@@ -1227,6 +1227,11 @@ void CGdiplusBitmap::sub_image(Gdiplus::Rect r)
 	sub_image(r.X, r.Y, r.Width, r.Height);
 }
 
+void CGdiplusBitmap::sub_image(Gdiplus::RectF r)
+{
+	sub_image(r.X, r.Y, r.Width, r.Height);
+}
+
 void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(w, h);
@@ -2047,8 +2052,8 @@ bool CGdiplusBitmap::save(LPCTSTR filepath, ...)
 
 bool CGdiplusBitmap::copy_to_clipbard()
 {
-	//32bit PNG는 투명처리 안됨
-#if 0
+	//복사는 잘 되지만 32bit PNG는 투명처리 안됨
+#if 1
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(0, &hbitmap);
 	if (status != Gdiplus::Ok)
@@ -2071,7 +2076,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 		DeleteObject(hbitmap_ddb);
 	}
 	DeleteObject(hbitmap);
-#elif 1
+#elif 0
 	bool res = false;
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);

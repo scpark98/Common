@@ -245,7 +245,7 @@ void CSCSliderCtrl::OnPaint()
 				else
 				{
 					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-					g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(m_steps[i].r));
+					g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(m_steps[i].r));
 
 					//pos 미만은 파란색 원에 체크 표시를
 					if (i < pos)
@@ -257,13 +257,13 @@ void CSCSliderCtrl::OnPaint()
 					{
 						CRect rthumb_small = m_steps[i].r;
 						rthumb_small.DeflateRect(2, 2);
-						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect2GpRect(rthumb_small));
 					}
 					else
 					{
 						CRect rthumb_small = m_steps[i].r;
 						rthumb_small.DeflateRect(1, 1);
-						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRectTogpRect(rthumb_small));
+						g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect2GpRect(rthumb_small));
 					}
 				}
 			}
@@ -298,10 +298,10 @@ void CSCSliderCtrl::OnPaint()
 				else
 				{
 					//g.DrawEllipse(&pen_thumb, CRect2GpRect(m_steps[i].r));
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRectTogpRect(m_steps[i].r));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(62, 134, 193)), CRect2GpRect(m_steps[i].r));
 					CRect rthumb_small = m_steps[i].r;
 					rthumb_small.DeflateRect(4, 4);
-					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRectTogpRect(rthumb_small));
+					g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color(255, 255, 255)), CRect2GpRect(rthumb_small));
 				}
 			}
 
@@ -454,14 +454,14 @@ void CSCSliderCtrl::OnPaint()
 
 		if (m_step_completed)
 		{
-			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(m_steps[pos].r));
+			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(m_steps[pos].r));
 			draw_line(&dc, r.CenterPoint().x - 3, r.CenterPoint().y - 0, r.CenterPoint().x - 1, r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
 			draw_line(&dc, r.CenterPoint().x - 1, r.CenterPoint().y + 2, r.CenterPoint().x + 3, r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
 		}
 		else
 		{
 			r.DeflateRect(4, 4);
-			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(r));
+			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(r));
 		}
 	}
 #endif
@@ -498,7 +498,7 @@ void CSCSliderCtrl::OnPaint()
 			{
 				tic_pos = Pos2Pixel(tic);
 				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
-				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rtic));
+				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(rtic));
 
 				if (m_tic_show_text)
 				{
@@ -528,7 +528,7 @@ void CSCSliderCtrl::OnPaint()
 				tic = upper;
 				tic_pos = Pos2Pixel(upper);
 				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
-				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRectTogpRect(rtic));
+				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(rtic));
 
 				if (m_tic_show_text)
 				{

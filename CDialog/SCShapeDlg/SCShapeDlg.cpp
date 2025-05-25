@@ -148,6 +148,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	m_para.clear();
 
 	LOGFONT lf;
+	memset(&lf, 0, sizeof(LOGFONT));
 
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
@@ -158,8 +159,6 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	{
 		CFont* font = m_parent->GetFont();
 
-		memset(&lf, 0, sizeof(LOGFONT));
-
 		if (font != NULL)
 			font->GetObject(sizeof(lf), &lf);
 		else
@@ -169,8 +168,19 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	}
 
 	_tcscpy_s(lf.lfFaceName, countof(lf.lfFaceName), font_name);
-	lf.lfHeight = -MulDiv(font_size, GetDeviceCaps(::GetDC(m_parent->GetSafeHwnd()), LOGPIXELSY), 72);
+	lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, font_size);
+		//-MulDiv(font_size, GetDeviceCaps(::GetDC(m_parent->GetSafeHwnd()), LOGPIXELSY), 72);
 
+	if (font_style & Gdiplus::FontStyleBold)
+		lf.lfWeight = FW_BOLD;
+	if (font_style & Gdiplus::FontStyleItalic)
+		lf.lfItalic = true;
+	if (font_style & Gdiplus::FontStyleUnderline)
+		lf.lfUnderline = true;
+	if (font_style & Gdiplus::FontStyleStrikeout)
+		lf.lfStrikeOut = true;
+
+	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_style, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
 
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
@@ -180,13 +190,14 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	else
 		m_img.clear(cr_back);
 
-	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back);
+	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back, cr_stroke, cr_shadow);
 
 	if (!m_hWnd)
 		res = create(parent, 0, 0, r.Width(), r.Height());
 
 	CClientDC dc(this);
 	r = ::calc_text_size(r, &dc, m_para, &lf, DT_LEFT | DT_CENTER);
+	r.InflateRect(1, 1);
 
 	//캔버스 크기가 실제 텍스트 출력크기와 다르면
 	if (r.Width() != m_img.width || r.Height() != m_img.height)
@@ -206,13 +217,13 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	//	cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
 
 	//CDC* pDC = CDC::FromHandle(g.GetHDC());	//이 코드를 써서 CDC에 draw_text()하려 했으나 이렇게 하면 g에 아무것도 그려지지 않음
+
 	draw_text(g, m_para, &lf);
 
-	Gdiplus::Pen pen(Gdiplus::Color::Blue, 3.0F);
-	g.DrawLine(&pen, 2, 2, 20, 20);
-
 	set_image(parent, &m_img, false);
-	m_img.save(_T("d:\\SCShapeDlg.png"));
+#ifdef _DEBUG
+	//m_img.save(_T("d:\\SCShapeDlg.png"));
+#endif
 	return true;
 
 	/*

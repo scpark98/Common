@@ -12,7 +12,11 @@ CSCParagraph::~CSCParagraph()
 
 //text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
 //cr_text, cr_back은 글자, 배경 기본값
-void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, Gdiplus::Color cr_text, Gdiplus::Color cr_back)
+void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf,
+										Gdiplus::Color cr_text,
+										Gdiplus::Color cr_back,
+										Gdiplus::Color cr_stroke,
+										Gdiplus::Color cr_shadow)
 {
 	int i;
 	CString cr_str;
@@ -32,6 +36,8 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 	basic_para.underline = lf->lfUnderline;
 	basic_para.cr_text = cr_text;
 	basic_para.cr_back = cr_back;
+	basic_para.cr_stroke = cr_stroke;
+	basic_para.cr_shadow = cr_shadow;
 
 	para_temp = basic_para;
 

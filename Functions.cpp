@@ -18689,12 +18689,14 @@ void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph
 	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
 	float emSize = fDpiY * para[line][index].size / 96.0;
 
-	Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[line][index].name));
-	if (!fontFamily->IsAvailable())
-	{
-		delete fontFamily;
-		fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
-	}
+	//if (fontFamily == NULL)
+	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(para[line][index].name));
+
+	//if (!fontFamily->IsAvailable())
+	//{
+	//	delete fontFamily;
+	//	fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
+	//}
 
 	int font_style = 0;
 	if (para[line][index].bold)
@@ -18706,11 +18708,11 @@ void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph
 	if (para[line][index].strike)
 		font_style |= Gdiplus::FontStyleStrikeout;
 
-	Gdiplus::Font ff(fontFamily, emSize, font_style);
+	Gdiplus::Font ff(&fontFamily, emSize, font_style);
 	*font = ff.Clone();
 
-	if (fontFamily)
-		delete fontFamily;
+	//if (fontFamily)
+		//delete fontFamily;
 }
 
 //#define USING_HDC
@@ -18724,6 +18726,13 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+	Gdiplus::Unit unit = g.GetPageUnit();
+	float fDpiX = g.GetDpiX();
+	float fDpiY = g.GetDpiY();
+
+	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
+	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
 
 	//g를 이용해서 pDC를 구해서 사용하는 경우는 g.ReleaseHDC(hdc);를 호출하기 전까지는 g의 어떤 함수 사용도 하지 않아야 한다.
 	// Make GDI calls, but don't call any methods
@@ -18759,15 +18768,49 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
 			pDC->SelectObject(pOldFont);
 #else
-			Gdiplus::Font* font;
-			get_paragraph_font(g, para, i, j, &font);
+			//Gdiplus::Font* font;
+			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].name));
+
+			int font_style = 0;
+			if (para[i][j].bold)
+				font_style |= Gdiplus::FontStyleBold;
+
+			//get_paragraph_font(g, para, i, j, &font);
+			float emSize = fDpiY * para[i][j].size / 96.0;
+			Gdiplus::Font font(&ff, emSize, font_style);
+
 
 			//text 배경색을 칠하고
 			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].cr_back);
 
 			//text를 출력한다.
 			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
-			g.DrawString(CStringW(para[i][j].text), para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+
+
+			if (false)//para[i][j].thickness > 0.0)
+			{
+				Gdiplus::GraphicsPath str_path;
+
+				//emSize
+				//fontsize=
+				//CSCShapeDlg에서는 96주면 넘쳐나서 안그려지고 68을 주면 DrawString()과 유사.
+				//MiniClock은 fontsize=14일 때 16.5이하여야 그려진다. 이 변환식은?
+				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
+					font_style, 18, CRect2GpRectF(para[i][j].r), sf.GenericTypographic());
+
+				Gdiplus::Pen   gp(para[i][j].cr_stroke, 5.0f);// thickness);
+				//gp.SetLineJoin(Gdiplus::LineJoinMiter);
+				Gdiplus::SolidBrush gb(para[i][j].cr_text);
+
+				g.DrawPath(&gp, &str_path);
+				g.FillPath(&gb, &str_path);
+			}
+			else
+			{
+				g.DrawString(CStringW(para[i][j].text),
+					para[i][j].text.GetLength(), &font,
+					Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+			}
 #endif
 
 			//if (m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)

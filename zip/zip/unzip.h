@@ -67,6 +67,11 @@ ZRESULT FindZipItem(HZIP hz, const TCHAR *name, bool ic, int *index, ZIPENTRY *z
 // If nothing was found, then index is set to -1 and the function returns
 // an error code.
 
+//20250529 scpark.
+//A.zip이라는 파일내에 여러 파일과 하위 폴더들이 들어있을 경우
+//A라는 폴더에 각 item을 모두 unzip해줘야하므로 함수로 추가함.
+ZRESULT UnzipFolder(HZIP hz);
+
 ZRESULT UnzipItem(HZIP hz, int index, const TCHAR *fn);
 ZRESULT UnzipItem(HZIP hz, int index, void *z,unsigned int len);
 ZRESULT UnzipItemHandle(HZIP hz, int index, HANDLE h);

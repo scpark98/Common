@@ -158,6 +158,7 @@ public:
 
 	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
 	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
+	//index = 0(local), 1(remote)
 	bool		is_protected(int index, CString folder);
 
 

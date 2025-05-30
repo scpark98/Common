@@ -611,7 +611,7 @@ protected:
 	int				m_font_size;
 	void			reconstruct_font();
 
-	bool			m_show_progress_text = true;
+	bool			m_show_progress_text = true;	//default = true
 
 	//마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;

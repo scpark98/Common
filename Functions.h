@@ -516,8 +516,6 @@ struct	NETWORK_INFO
 //프로세스 관련
 	//fullpath가 ""이면 현재 실행파일로, strFlag는 기본 파일버전을 얻어온다.
 	CString		get_file_property(CString fullpath = _T(""), CString strFlag = _T("FileVersion"));
-	//파일 or 폴더 or 드라이브 or "내 PC"의 속성창을 표시한다.
-	bool		show_property_window(std::deque<CString> fullpath);
 	CString		get_exe_directory(bool includeSlash = false);
 	CString		get_exe_parent_directory();
 	CString		get_exe_filename(bool fullpath = false);
@@ -527,6 +525,8 @@ struct	NETWORK_INFO
 	ULONG		ProcIDFromWnd(HWND hwnd);
 	HWND		get_hwnd_by_pid(ULONG pid);
 #ifndef _USING_V110_SDK71_
+	//파일 or 폴더 or 드라이브 or "내 PC"의 속성창을 표시한다.
+	bool		show_property_window(std::deque<CString> fullpath);
 	CString		GetProcessNameByPID(const DWORD pid);
 #endif
 	//해당 프로세스 파일이 실행중인 인스턴스 카운트를 리턴.
@@ -1016,7 +1016,7 @@ struct	NETWORK_INFO
 	//"C:\\", "C:\\Temp"와 같이 루트일때와 일반 폴더일 경우 끝에 역슬래시 유무가 다르므로 필요.
 	bool		is_drive_root(CString path);
 	//src 폴더 경로에 sub 폴더 경로를 붙여주는 단순한 함수지만 드라이브 루트일때와 아닐때 등의 처리때문에 검사하여 결합해주는 목적으로 추가.
-	CString		concat_path(CString src, CString sub);
+	CString		concat_path(CString src, CString sub, TCHAR path_sep = '\\');
 
 	//새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
 	//zero_prefix가 2이면 001, 002로 된 인덱스가 붙은 파일/폴더들만 대상으로 하려 했으나 아직 미구현.
@@ -1137,7 +1137,7 @@ struct	NETWORK_INFO
 	bool		isFolder(char *sfile);
 	//파일명이나 폴더명에 '\\', '/' 혼용일 경우가 있으므로 CString의 '==' 연산자로 비교해선 안된다. 
 	bool		IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive = false);
-	CString		GetParentDirectory(CString sFolder);	//현재 폴더의 상위 폴더명을 리턴한다.
+	CString		get_parent_dir(CString path, TCHAR path_sep = '\\');	//현재 폴더의 상위 폴더명을 리턴한다.
 
 	//compare_only_filename : fullpath로 정렬할지, 파일명만 추출해서 정렬할지. default = false;
 	void		sort_like_explorer(std::deque<CString> *dq, bool compare_only_filename = false);
@@ -1459,7 +1459,7 @@ h		: 복사할 height 크기(pixel)
 
 //지정한 이미지를 바탕화면에 표시한다.
 #ifndef _USING_V110_SDK71_
-void		SetWallPaper(CString sfile);
+	void		set_wallpaper(CString sfile);
 #endif
 
 //단축아이콘을 만들어준다.

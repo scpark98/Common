@@ -81,6 +81,8 @@ public:
 	void	set_logo(UINT png_id) { m_img_logo.load(png_id); }
 	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
 
+	void	set_titlebar_movable(bool movable) { m_titlebar_movable = movable; }
+
 	//WS_THICKFRAME이 있어야만 윈도우 테두리에 그림자가 생기고 모니터 자동 레이아웃도 지원된다.
 	//이 속성을 주면 resize가 가능해지는데 만약 이를 막고 싶다면 set_use_resizable(false)를 호출한다.
 	void	set_use_resizable(bool use_resizable = true) { m_use_resizable = use_resizable; }
@@ -118,23 +120,15 @@ public:
 	void	set_back_image(CString img_path, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
 	void	set_back_image(UINT resource_id, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
 
+	void	set_draw_border(bool draw, int width = 1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border = cr; }
-
-	//enum COLOR_THEMES
-	//{
-	//	color_theme_default = 0,
-	//	color_theme_visualstudio,
-	//	color_theme_gray,
-	//	color_theme_linkmemine,
-	//	color_theme_linkmemine_se,
-	//	color_theme_helpu,
-	//	color_theme_anysupport,
-	//	color_theme_pcanypro,
-	//	color_theme_custom,
-	//};
 
 	void	set_color_theme(int theme);
 	void	enable_resize(bool resizable);
+
+	//init_shadow()를 CSCThemeDlg::OnInitDialog()에서 호출하지 않고 실행한 후에 하려니 적용되지 않는다.
+	//init_shadow();는 우선 호출해두고 동적으로 그림자 효과를 해제하거나 적용하려면 다음 함수를 호출한다.
+	void	set_use_shadow(bool use_shadow = true);
 
 	virtual BOOL OnInitDialog();
 	virtual INT_PTR DoModal();
@@ -145,21 +139,22 @@ protected:
 	//CSCThemeDlg를 상속받아 만든 dlg들에서도 TIMER_ID를 지정할 수 있고 일반적으로 0번부터 지정하므로
 	//여기서 0번부터 타이머 ID를 주면 위험하다. 다른 파생 dlg에서 사용하지 않을 법한 id부터 시작하자.
 
-	//bool				m_use_shadow = true;	//default = true
-	//CWndShadow			m_shadow;
-	//void				init_shadow();
+	bool				m_use_shadow = true;	//default = true
+	CWndShadow			m_shadow;
+	void				init_shadow();
 
 	HICON				m_hIcon = NULL;
 
-	CRect				m_border_thickness;		//resize를 위한 기본 윈도우 테두리 두께
+	CRect				m_border_thickness;		//resize 처리를 위한 기본 윈도우 테두리 두께. OnPaint()에서 그리는 테두리는 m_border_width.
 	//이 변수는 DwmExtendFrameIntoClientArea()과 관련된 변수로 true/false에 따라 동작하게 하려 했으나 false일 경우는 부작용이 많다. 우선 true로 고정한다.
 	//메인에서 WS_THICKFRAME을 주면 
 	bool				m_has_thickframe = true;
 
 	bool				m_use_resizable = true;
 
-	int					m_titlebar_height = GetSystemMetrics(SM_CYCAPTION);
+	int					m_titlebar_height = 32;// GetSystemMetrics(SM_CYCAPTION);
 	bool				m_titlebar_bold = false;
+	bool				m_titlebar_movable = true;
 
 	CSCColorTheme		m_theme = CSCColorTheme(this);
 	//Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
@@ -169,7 +164,8 @@ protected:
 	//Gdiplus::Color		m_cr_back;
 
 	//Gdiplus::Color		m_cr_border = Gdiplus::Color::DimGray;
-	int					m_border_width = 1;		//그려질 테두리 두께
+	bool				m_draw_border = false;
+	int					m_border_width = 1;
 
 
 	//프로그램 로고 아이콘 표시 여부. 기본값 true

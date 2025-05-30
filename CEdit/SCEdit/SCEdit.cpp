@@ -492,20 +492,33 @@ void CSCEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSCEdit::OnNcPaint()
 {
-	return;
-	Default();
+	//return;
+	//Default();
 
-	if (m_transparent && m_draw_border)
+	if (/*m_transparent && */m_draw_border)
 	{
 		CClientDC dc(this);
 		CRect rc;
 
 		GetClientRect(rc);
-		CPen pen(PS_SOLID, 1, RGB(128, 128, 128));
+
+		CPen pen(PS_SOLID, m_border_width, m_cr_border.ToCOLORREF());
 		CPen* pOldPen = (CPen*)(m_draw_border ? dc.SelectObject(&pen) : dc.SelectStockObject(NULL_PEN));
 		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 
-		//dc.Rectangle(rc);
+		if (m_border_type == border_type_sunken)
+		{
+			dc.DrawEdge(rc, BDR_SUNKENOUTER, BF_RECT);
+		}
+		else if (m_border_type == border_type_raised)
+		{
+			dc.DrawEdge(rc, BDR_RAISEDOUTER, BF_RECT);
+		}
+		else
+		{
+			dc.DrawEdge(rc, BDR_OUTER, BF_RECT);
+		}
+		dc.Rectangle(rc);
 		//dc.Draw3dRect(rc, RGB(128, 128, 128), RGB(128, 128, 128));
 
 		dc.SelectObject(pOldPen);
@@ -791,4 +804,18 @@ CSCEdit& CSCEdit::set_dim_text(CString dim_text, Gdiplus::Color cr)
 		m_cr_dim_text = cr;
 
 	return *this;
+}
+
+void CSCEdit::set_draw_border(bool draw, int border_width, int border_type, Gdiplus::Color cr_border)
+{
+	m_draw_border = draw;
+	m_border_width = border_width;
+	m_border_type = border_type;
+
+	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_border = cr_border;
+
+	Invalidate();
+	RedrawWindow();
+	UpdateWindow();
 }

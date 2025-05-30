@@ -1,4 +1,4 @@
-#include "StdAfx.h"
+//#include "StdAfx.h"
 #include "FtpThread.h"
 
 CFtpThread::CFtpThread()
@@ -15,17 +15,17 @@ CFtpThread::~CFtpThread()
 
 BOOL CFtpThread::Connect( CString sServerIP, CString sID, CString sPass, int nPort /*= 21*/, BOOL bPassive /*= FALSE*/ )
 {
-	m_hInternet = InternetOpen(NULL, INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, NULL);
+	m_hInternet = InternetOpen(NULL, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, NULL);
 	
-	if ( NULL == m_hInternet ) 
+	if (NULL == m_hInternet)
 	{
 		//AfxMessageBox("InternetOpen Error");
 		return FALSE;
 	}
 
-	m_hConnect = InternetConnect( m_hInternet, sServerIP, INTERNET_DEFAULT_FTP_PORT, sID, sPass, INTERNET_SERVICE_FTP, 0, 0);
+	m_hConnect = InternetConnect(m_hInternet, sServerIP, nPort, sID, sPass, INTERNET_SERVICE_FTP, INTERNET_FLAG_PASSIVE | INTERNET_FLAG_ASYNC, 0);
 
-	if ( NULL == m_hConnect ) 
+	if (NULL == m_hConnect)
 	{
 		//AfxMessageBox("InternetConnect Error");
 		return FALSE;

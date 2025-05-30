@@ -569,7 +569,7 @@ bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 	m_column_text_align.resize(column);
 	m_column_text_align.assign(column, LVCFMT_LEFT);
 
-	modify_style();
+	//modify_style();
 
 	if (m_HeaderCtrlEx && m_HeaderCtrlEx.m_hWnd)
 	{
@@ -1265,10 +1265,9 @@ void CVtListCtrlEx::PreSubclassWindow()
 	//동적으로 생성할 경우 PreSubclassWindow()함수내에서
 	//GetHeaderCtrl()은 항상 NULL을 리턴한다.
 	//이를 보완하기 위해 타이머, SendMessage등의 방법을 사용해봤으나 쉽지 않다.
-
-
-
 	CListCtrl::PreSubclassWindow();
+
+	modify_style();
 }
 
 void CVtListCtrlEx::modify_style()
@@ -1342,7 +1341,7 @@ void CVtListCtrlEx::move_parent_folder()
 		//일반 폴더라면 상위폴더로 이동
 		else
 		{
-			path = GetParentDirectory(path);
+			path = get_parent_dir(path);
 		}
 
 		if (m_is_local)
@@ -1420,7 +1419,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 					new_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 				//그렇지 않으면 상위 디렉토리로 이동
 				else
-					new_path = GetParentDirectory(m_path);
+					new_path = get_parent_dir(m_path);
 
 				set_path(new_path);
 				

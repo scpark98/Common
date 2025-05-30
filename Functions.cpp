@@ -895,7 +895,7 @@ bool is_drive_root(CString path)
 }
 
 //src 폴더 경로에 sub 폴더 경로를 붙여주는 단순한 함수지만 드라이브 루트일때와 아닐때 등의 처리때문에 검사하여 결합해주는 목적으로 추가.
-CString	concat_path(CString src, CString sub)
+CString	concat_path(CString src, CString sub, TCHAR path_sep)
 {
 	if (src.IsEmpty())
 		return sub;
@@ -903,10 +903,10 @@ CString	concat_path(CString src, CString sub)
 	if (sub.IsEmpty())
 		return src;
 
-	if (is_drive_root(src) || (src.Right(1) == '\\'))
+	if (is_drive_root(src) || (src.Right(1) == path_sep))
 		return src + sub;
 
-	return src + _T("\\") + sub;
+	return src + path_sep + sub;
 }
 
 //새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
@@ -6938,6 +6938,7 @@ CString get_file_property(CString fullpath, CString strFlag)
 	return strReturn;
 } 
 
+#ifndef _USING_V110_SDK71_
 bool show_property_window(std::deque<CString> fullpath)
 {
 	HRESULT hr = CoInitialize(NULL);
@@ -7083,6 +7084,7 @@ bool show_property_window(std::deque<CString> fullpath)
 
 	return true;
 }
+#endif
 
 //명시된 FileVersion 또는 ProductVersion을 얻어온다.
 CString	GetFileProperty(CString sFilePath, CString sProperty)
@@ -8139,7 +8141,7 @@ double ptimer_get_time(int instance)
 }
 
 #ifndef _USING_V110_SDK71_
-void SetWallPaper(CString sfile)
+void set_wallpaper(CString sfile)
 {
 	::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -8881,33 +8883,30 @@ SIZE_T GetCurrentMemUsage()
 //c:\\folder1\\				=> c:\\
 //c:\\folder1				=> c:\\
 
-CString	GetParentDirectory(CString sFolder)
+CString	get_parent_dir(CString path, TCHAR path_sep)
 {
-	//"/"와 "\\"가 혼용된 경우 통일시킨다.
-	sFolder.Replace(_T("/"), _T("\\"));
-
-	//sFolder 끝에 "\\"가 붙었다면 제거해준다.
-	if (sFolder.Right(1) == _T("\\"))
-		sFolder = sFolder.Left(sFolder.GetLength() - 1);
+	//path 끝에 path 구분자가 붙었다면 제거해준다.
+	if (path.Right(1) == path_sep)
+		path = path.Left(path.GetLength() - 1);
 
 	//만약 구해진 폴더가 "c:"와 같이 드라이브 루트라면 끝에 "\\"를 다시 붙여줘야한다.
-	if (sFolder.GetLength() == 2 && sFolder.GetAt(1) == ':')
+	if (path.GetLength() == 2 && path.GetAt(1) == ':')
 	{
-		sFolder += "\\";
-		return sFolder;
+		path += path_sep;
+		return path;
 	}
 
 	//해당 폴더의 parent 폴더명을 구한다.
-	sFolder = sFolder.Left(sFolder.ReverseFind('\\'));
+	path = path.Left(path.ReverseFind(path_sep));
 
 	//다시 구해진 폴더가 "c:"와 같이 드라이브 루트라면 끝에 "\\"를 다시 붙여줘야한다.
-	if (sFolder.GetLength() == 2 && sFolder.GetAt(1) == ':')
+	if (path.GetLength() == 2 && path.GetAt(1) == ':')
 	{
-		sFolder += "\\";
-		return sFolder;
+		path += path_sep;
+		return path;
 	}
 
-	return sFolder;
+	return path;
 }
 
 //MAX_COMPUTERNAME_LENGTH(15) 길이까지만 리턴됨에 주의.
@@ -18787,7 +18786,7 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
 
 
-			if (false)//para[i][j].thickness > 0.0)
+			if (true)//para[i][j].thickness > 0.0)
 			{
 				Gdiplus::GraphicsPath str_path;
 
@@ -18796,7 +18795,7 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 				//CSCShapeDlg에서는 96주면 넘쳐나서 안그려지고 68을 주면 DrawString()과 유사.
 				//MiniClock은 fontsize=14일 때 16.5이하여야 그려진다. 이 변환식은?
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-					font_style, 18, CRect2GpRectF(para[i][j].r), sf.GenericTypographic());
+					font_style, 68, CRect2GpRectF(para[i][j].r), sf.GenericTypographic());
 
 				Gdiplus::Pen   gp(para[i][j].cr_stroke, 5.0f);// thickness);
 				//gp.SetLineJoin(Gdiplus::LineJoinMiter);

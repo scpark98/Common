@@ -745,8 +745,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_title_text = gRGB(13, 41, 71);
-			cr_title_back = gRGB(48, 154, 192); 
+			cr_title_text = gRGB(255, 255, 255);
+			cr_title_back = gRGB(59, 69, 91); 
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 

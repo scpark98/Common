@@ -59,6 +59,8 @@ public:
 public:
 	virtual ~CWndShadow(void);
 
+	HWND m_hWnd = NULL;
+
 protected:
 
 	// Instance handle, used to register window class and create window 
@@ -80,8 +82,6 @@ protected:
 	static bool s_bVista;	// Whether running on Win Vista
 	typedef HRESULT (WINAPI *pfnDwmIsCompositionEnabled)(BOOL *pfEnabled);
 	static pfnDwmIsCompositionEnabled s_DwmIsCompositionEnabled;
-
-	HWND m_hWnd;
 
 	LONG m_OriParentProc;	// Original WndProc of parent window
 

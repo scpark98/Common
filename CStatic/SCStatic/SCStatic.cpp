@@ -577,13 +577,17 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 
 	if (m_img_back.is_animated_gif())
 		m_img_back.set_animation(m_hWnd, CRect(), false);
-	//CBitmap	Bitmap;
+}
 
-	//Bitmap.LoadBitmap(nIDBack);
-	//m_ImageBack.Create(2, 23, ILC_COLORDDB|ILC_MASK, 1, 0);
-	//m_ImageBack.Add(&Bitmap, RGB(0,255,0));
-	//m_ImageBack.SetBkColor(CLR_NONE);
-	//Bitmap.DeleteObject();
+void CSCStatic::set_back_image(CGdiplusBitmap& img, Gdiplus::Color cr_back)
+{
+	img.deep_copy(&m_img_back);
+	m_cr_back = cr_back;
+	//m_transparent = true;
+	m_img_back.set_back_color(m_cr_back);
+
+	if (m_img_back.is_animated_gif())
+		m_img_back.set_animation(m_hWnd, CRect(), false);
 }
 
 //배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.

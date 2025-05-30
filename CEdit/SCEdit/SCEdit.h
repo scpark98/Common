@@ -101,7 +101,15 @@ public:
 	//이 함수를 호출할 때 Gdiplus::Color::Transparent라는 값일 경우는 dim_text 파라미터만 변경하고자 하는 의미일 것이다.
 	virtual CSCEdit&		set_dim_text(CString dim_text, Gdiplus::Color cr_dim_text = Gdiplus::Color::Transparent);
 
-	void					set_draw_border(bool draw = true) { m_draw_border = draw; }
+	enum BORDER_TYPE
+	{
+		border_type_none = 0,
+		border_type_sunken,	//default
+		border_type_raised,
+		border_type_flat,
+		border_type_bevel,
+	};
+	void					set_draw_border(bool draw = true, int border_width = 1, int border_type = border_type_sunken, Gdiplus::Color cr_border = Gdiplus::Color::Transparent);
 
 	// Generated message map functions
 protected:
@@ -109,6 +117,9 @@ protected:
 
 //border
 	bool			m_draw_border = true;
+	int				m_border_width = 1;	//border width
+	int				m_border_type = border_type_sunken;	//border radius
+	Gdiplus::Color	m_cr_border = Gdiplus::Color::DimGray;	//border color
 
 	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
 	//ex)돋보기 그림을 그려주고 클릭하면 검색으로 사용

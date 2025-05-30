@@ -229,6 +229,9 @@ public:
 	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
 
+	CSize		get_img_size(int index = 0);
+	CSize		get_img_origin_size() { return m_sz_img_origin; }
+
 	//텍스트 버튼인 경우 텍스트 앞에 이미지를 표시한다.
 	//이미지의 높이는 rc.Height()에 대한 비율로 결정되며 이미지 ratio에 맞게 width도 자동 조정된다.
 	//align에 따라 이미지와 텍스트가 정렬되며 align flag는 CDC::DrawText()에서 사용하는 DT_ 정의를 사용한다.
@@ -408,7 +411,7 @@ protected:
 	bool		m_fit2image = false;
 
 	//이미지 원본 크기
-	CSize		m_img_origin;
+	CSize		m_sz_img_origin;
 
 	//컨트롤의 원래 크기 정보
 	CRect		m_rOrigin = 0;

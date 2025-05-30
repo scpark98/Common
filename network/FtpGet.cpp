@@ -18,13 +18,13 @@ me the change and explain them.
 
 // FtpGet.cpp: implementation of the CFtpGet class.
 
-#include "stdafx.h"
+//#include "stdafx.h"
 // from my program
 // #include "http.h"
 //
 #include "FtpGet.h"
 //#include "resource.h"
-#include "Functions.h"
+//#include "Functions.h"
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -40,7 +40,7 @@ static char THIS_FILE[]=__FILE__;
 CFtpGet::CFtpGet()
 {
 	// get the name of the app
-	m_sAppName.LoadString(AFX_IDS_APP_TITLE);
+	//m_sAppName.LoadString(AFX_IDS_APP_TITLE);
 
 
 	// create an internet session
@@ -99,9 +99,7 @@ BOOL CFtpGet::Connect( HWND hParentWnd, CString sServerIP, CString sID, CString 
 		return FALSE;// return 1 but previous error box have been showed
 	}
 
-
 	return 1;
-
 }
 
 BOOL CFtpGet::CloseConnection()
@@ -162,11 +160,12 @@ BOOL CFtpGet::GetFile( CString remoteFile, CString localFile )
 
 		//TRACE( "GetFile-before download\n" );
 
-		FILE*	fp = fopen( localFile, "wb" );
+		FILE* fp;
+		_tfopen_s(&fp, localFile, _T("wb"));
 
 		if ( !fp )
 		{
-			TRACE( "can't create %s\n", localFile );
+			TRACE(_T("can't create %s\n"), localFile);
 			return FALSE;
 		}
 
@@ -425,8 +424,6 @@ BOOL CFtpGet::GetFileList( CString remoteFolder, CString sWildcard )
 	return TRUE;
 }
 
-FILE*	fp1 = fopen( "c:\\test.txt", "w" );
-
 void CFtpGet::FindDirectoryFiles( CString strPath, CStringArray& arFile, CDWordArray& arSize )
 {
 	DWORD			nSize;
@@ -434,7 +431,7 @@ void CFtpGet::FindDirectoryFiles( CString strPath, CStringArray& arFile, CDWordA
 	CStringArray	arFolder;
 	CFtpFileFind	finder( m_pFtpConnection );
 
-	BOOL bWorking = finder.FindFile( strPath + "/*.*" );
+	BOOL bWorking = finder.FindFile(strPath + _T("/*.*"));
 
 	while ( bWorking )
 	{
@@ -470,8 +467,6 @@ BOOL CFtpGet::FindAllFiles( CString strPath, CStringArray& arFile, CDWordArray& 
 		return FALSE;
 
 	FindDirectoryFiles( strPath, arFile, arSize );
-
-	fclose( fp1 );
 
 	return TRUE;
 }
@@ -509,7 +504,7 @@ BOOL CFtpGet::GetFolderList( CString sRootFolder )
 	if ( sRootFolder.GetAt( sRootFolder.GetLength() - 1 ) != '/' )
 		sRootFolder += '/';
 	
-	BOOL bContinue = ftpFind.FindFile( "*.*" );
+	BOOL bContinue = ftpFind.FindFile(_T("*.*"));
 
 	if ( !bContinue )
 	{
@@ -618,7 +613,7 @@ BOOL CFtpGet::CheckFTPFileIsExist( CString sRemoteFile )
 	CFtpFileFind	finder( m_pFtpConnection );
 	CString			sFoundFile;
 	
-	if ( sRemoteFile.Find( "\\" ) > 0 )
+	if ( sRemoteFile.Find(_T("\\")) > 0 )
 		chPathMark = '\\';
 
 	sFolder		= sRemoteFile.Left( sRemoteFile.ReverseFind( chPathMark ) );

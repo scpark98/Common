@@ -2711,7 +2711,7 @@ void CSCTreeCtrl::edit_end(bool valid)
 	//shell tree의 label이 변경되면 실제 폴더명도 변경해줘야 한다.
 	if (m_is_shell_treectrl)
 	{
-		CString parent_path = GetParentDirectory(get_path(m_edit_item));
+		CString parent_path = get_parent_dir(get_path(m_edit_item));
 		parent_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, parent_path);
 		BOOL res = FALSE;
 

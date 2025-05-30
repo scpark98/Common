@@ -30,7 +30,7 @@ CGdiButton::CGdiButton()
 	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
 	m_cr_back.push_back(get_color(m_cr_back[0], 16));
 	m_cr_back.push_back(get_color(m_cr_back[0], -16));
-	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNSHADOW)));
+	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
@@ -210,7 +210,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	if (btn->img[0].is_empty())
 		return false;
 
-	m_img_origin = CSize(btn->img[0].width, btn->img[0].height);
+	m_sz_img_origin = CSize(btn->img[0].width, btn->img[0].height);
 
 	if (over > 0)
 	{
@@ -313,6 +313,14 @@ void CGdiButton::use_normal_image_on_disabled(bool use)
 	}
 }
 
+CSize CGdiButton::get_img_size(int index)
+{
+	if (index < 0 || index >= m_image.size())
+		return CSize();
+
+	return m_image[index]->img[0].size();
+}
+
 void CGdiButton::fit_to_image(bool fit)
 {
 	if (m_image.size() == 0)
@@ -322,7 +330,7 @@ void CGdiButton::fit_to_image(bool fit)
 
 	if (m_fit2image)
 	{
-		SetWindowPos(NULL, 0, 0, m_img_origin.cx, m_img_origin.cy, SWP_NOMOVE | SWP_NOZORDER);
+		SetWindowPos(NULL, 0, 0, m_sz_img_origin.cx, m_sz_img_origin.cy, SWP_NOMOVE | SWP_NOZORDER);
 	}
 	else
 	{
@@ -1248,7 +1256,7 @@ void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//SendMessage(TTM_TRACKPOSITION, 0, (LPARAM)MAKELPARAM(point.x, point.y));
-	TRACE(_T("mouse move\n"));
+	//TRACE(_T("mouse move\n"));
 	if (m_use_hover && !m_is_hover)//m_bIsTracking)
 	{
 		TRACKMOUSEEVENT tme;

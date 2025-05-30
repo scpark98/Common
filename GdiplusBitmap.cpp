@@ -716,6 +716,22 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
+CRect CGdiplusBitmap::draw(CDC* pDC, CRect targetRect, int draw_mode)
+{
+	Gdiplus::Graphics g(pDC->GetSafeHdc());
+	return draw(g, targetRect, draw_mode);
+}
+
+CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
+{
+	if (dw <= 0)
+		dw = width;
+	if (dh <= 0)
+		dh = height;
+
+	return draw(pDC, CRect(dx, dy, dx + dw, dy + dh), draw_mode_stretch);
+}
+
 //CGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
 CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 {
@@ -731,6 +747,47 @@ CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 	g.DrawImage(img->m_pBitmap, dst.left, dst.top, dst.Width(), dst.Height());
 
 	return dst;
+}
+
+//4채널의 투명 픽셀을 포함한 이미지인지 판별. 간단하게 4 corner의 투명도 값으로 비교한다.
+bool CGdiplusBitmap::has_transparent_pixel()
+{
+	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
+	return Gdiplus::IsAlphaPixelFormat(fmt);
+
+	if (channel != 4)
+		return false;
+
+	if (get_pixel(0, 0).GetA() == 255)
+		return false;
+	if (get_pixel(width - 1, 0).GetA() == 255)
+		return false;
+	if (get_pixel(width - 1, height - 1).GetA() == 255)
+		return false;
+	if (get_pixel(0, height - 1).GetA() == 255)
+		return false;
+
+	return true;
+}
+
+std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0, Gdiplus::Color cr1)
+{
+	auto tile = std::make_unique<Gdiplus::Bitmap>(sz_tile, sz_tile, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(tile.get());
+	g.Clear(cr0);
+
+	// Draw two black blocks per row, offset every other row
+	Gdiplus::SolidBrush br_alt(cr1);
+
+	for (int by = 0; by < sz_tile; by += sz_tile / 2)
+	{
+		bool offset = (by / (sz_tile / 2)) % 2;
+		int x0 = offset ? sz_tile / 2 : 0;
+		// each block is (sz/4) high × (sz/2) wide
+		g.FillRectangle(&br_alt, x0, by, sz_tile / 2, sz_tile / 2);
+	}
+
+	return std::make_unique<Gdiplus::TextureBrush>(tile.get(), Gdiplus::WrapModeTile);
 }
 
 CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode)
@@ -807,6 +864,24 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, int dx, int dy, int dw, int dh)
 	//TRACE(_T("clock = %d\n"), clock() - t0);
 	return CRect(dx, dy, dx + dw, dy + dh);
 
+}
+
+//그림을 그리지 않고 표시될 영역 정보만 얻는다.
+CRect CGdiplusBitmap::calc_rect(CRect targetRect, int draw_mode)
+{
+	CRect r;
+
+	if (draw_mode == draw_mode_stretch)
+		r = targetRect;
+	else if (draw_mode == draw_mode_zoom)
+		r = get_ratio_max_rect(targetRect, (double)width / (double)height);
+	else
+	{
+		r = CRect(0, 0, width, height);
+		r.OffsetRect(targetRect.left + (targetRect.Width() - width) / 2, targetRect.top + (targetRect.Height() - height) / 2);
+	}
+
+	return r;
 }
 
 //Clone은 shallow copy라 하여 아래 deep_copy 함수도 추가했으나

@@ -141,12 +141,13 @@ BOOL CSCThemeDlg::OnInitDialog()
 
 	reconstruct_title_font();
 
+	set_color_theme(CSCColorTheme::color_theme_default);
 	//init_shadow();
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 				  // 예외: OCX 속성 페이지는 FALSE를 반환해야 합니다.
 }
-/*
+
 void CSCThemeDlg::init_shadow()
 {
 	CWndShadow::Initialize(AfxGetInstanceHandle());
@@ -157,7 +158,12 @@ void CSCThemeDlg::init_shadow()
 	m_shadow.SetPosition(0, 0);	// -19 ~ 19
 	m_shadow.SetColor(RGB(0, 0, 0));
 }
-*/
+
+void CSCThemeDlg::set_use_shadow(bool use_shadow)
+{
+	m_shadow.SetSize(use_shadow ? 8 : 0);
+}
+
 void CSCThemeDlg::reconstruct_title_font()
 {
 	m_title_font.DeleteObject();
@@ -210,7 +216,7 @@ BOOL CSCThemeDlg::OnEraseBkgnd(CDC* pDC)
 void CSCThemeDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (point.y < m_titlebar_height)
+	if (m_titlebar_movable && point.y < m_titlebar_height)
 		DefWindowProc(WM_NCLBUTTONDOWN, HTCAPTION, MAKEWORD(point.x, point.y));
 	else if (!m_use_resizable)
 		return;
@@ -451,8 +457,11 @@ void CSCThemeDlg::OnPaint()
 	*/
 
 	//border
-	GetClientRect(rc);
-	draw_rectangle(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent, m_border_width);
+	if (m_draw_border && m_border_width > 0)
+	{
+		GetClientRect(rc);
+		draw_rectangle(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent, m_border_width);
+	}
 }
 
 
@@ -467,7 +476,6 @@ void CSCThemeDlg::set_color_theme(int theme)
 	{
 	case CSCColorTheme::color_theme_linkmemine :
 		SetWindowText(_T("LinkMeMine"));
-		m_titlebar_height = 32;
 
 		m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
@@ -482,7 +490,6 @@ void CSCThemeDlg::set_color_theme(int theme)
 		break;
 	case CSCColorTheme::color_theme_linkmemine_se:
 		SetWindowText(_T("LinkMeMine 3.0 SE"));
-		m_titlebar_height = 32;
 
 		m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
@@ -496,7 +503,6 @@ void CSCThemeDlg::set_color_theme(int theme)
 		break;
 	case CSCColorTheme::color_theme_helpu:
 		SetWindowText(_T("HelpU"));
-		m_titlebar_height = 32;
 
 		m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
@@ -510,7 +516,6 @@ void CSCThemeDlg::set_color_theme(int theme)
 		break;
 	case CSCColorTheme::color_theme_anysupport:
 		SetWindowText(_T("AnySupport"));
-		m_titlebar_height = 32;
 
 		m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
@@ -524,8 +529,18 @@ void CSCThemeDlg::set_color_theme(int theme)
 		break;
 	case CSCColorTheme::color_theme_pcanypro:
 		SetWindowText(_T("PCAnyPro"));
-		m_titlebar_height = 32;
 
+		m_sys_buttons.set_text_color(m_theme.cr_title_text);
+
+		m_sys_buttons.set_back_color(m_theme.cr_title_back);
+		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+
+		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_title_font();
+		break;
+	case CSCColorTheme::color_theme_default:
 		m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
 		m_sys_buttons.set_back_color(m_theme.cr_title_back);
@@ -775,4 +790,13 @@ BOOL CSCThemeDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		return TRUE;
 	}
 	return CDialogEx::OnSetCursor(pWnd, nHitTest, message);
+}
+
+void CSCThemeDlg::set_draw_border(bool draw, int width, Gdiplus::Color cr)
+{
+	m_draw_border = draw;
+	m_border_width = width;
+	m_theme.cr_border = cr;
+	Invalidate();
+	RedrawWindow();
 }

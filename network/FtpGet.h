@@ -47,7 +47,7 @@ public:// function
 	int			m_nFileCount;
 	CString		m_sFileName[500];
 
-	BOOL		GetFileList( CString remoteFolder, CString sWildcard = "*.*" );
+	BOOL		GetFileList( CString remoteFolder, CString sWildcard = _T("*.*") );
 	BOOL		GetFileList( CString remoteFolder, CStringArray& arFileList );
 
 	BOOL		CheckFTPFileIsExist( CString sFile );

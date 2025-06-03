@@ -153,8 +153,8 @@ public:
 	int				channels();
 	CSize			size() { return CSize(width, height); }
 
-	//4채널의 투명 픽셀을 포함한 이미지인지 판별. 간단하게 4 corner의 투명도 값으로 비교한다.
-	bool			has_transparent_pixel();
+	//alpha 픽셀을 포함한 이미지인지 판별
+	bool			is_pixelformat_alpha();
 
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
 	std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));

@@ -1310,7 +1310,7 @@ struct	NETWORK_INFO
 	HINSTANCE	FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult);
 
 	LONG		IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey);
-//#ifndef _USING_V110_SDK71_
+
 	//HKEY_LOCAL_MACHINE\\SOFTWARE\\MyCompany 에서 읽어올 경우 x64이면 실제 그 경로에서 읽어오지만
 	//32bit이면 HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\MyCompany 에서 읽어온다.
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
@@ -1321,7 +1321,11 @@ struct	NETWORK_INFO
 	LONG		set_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD value);
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		set_registry_str(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
-//#endif
+
+	//reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
+	//"count"에 갯수가, 숫자 인덱스 항목들에 각 항목이 저장된 구조에만 사용 가능하다.
+	//추가된 인덱스를 리턴한다.
+	int			add_registry(CWinApp* pApp, CString reg_path, CString value);
 
 	//Windows visual effect registry
 	bool		set_windows_visual_effects();
@@ -1758,8 +1762,9 @@ h		: 복사할 height 크기(pixel)
 	void		adjust_with_monitor_attached(CRect rOld, CRect &rNew);
 
 	//rTarget에 접하는 dRatio를 유지하는 최대 사각형을 구한다.
-	CRect		get_ratio_max_rect(CRect rTarget, double dRatio, int attach = attach_hcenter | attach_vcenter);
-	CRect		get_ratio_max_rect(CRect rTarget, int w, int h, int attach = attach_hcenter | attach_vcenter);
+	//stretch = false로 주면 확대하지 않지만 큰 경우에는 축소한다.
+	CRect		get_ratio_rect(CRect rTarget, double dRatio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
+	CRect		get_ratio_rect(CRect rTarget, int w, int h, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 	//w x h 사각형을 target안에 넣을 때 중앙에 표시되게 하는 사각형 영역을 리턴한다.
 	//w, h보다 target이 적을때는 target보다 큰 영역이 리턴될 것이다.
 	CRect		get_center_rect(CRect target, int w, int h);

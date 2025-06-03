@@ -194,13 +194,18 @@ bool CGdiplusBitmap::load(CString file)
 	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
 	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
 	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
-	bool use_copied_open = (get_part(file, fn_ext).MakeLower() == _T("gif") ? false : true);
+	bool use_copied_open = false;
+	
+	if (get_part(file, fn_ext).MakeLower() == _T("gif"))
+		true;
 
 #ifdef UNICODE
 	if (use_copied_open)
 		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(file);// Gdiplus::Bitmap(sFile);
 	else
 		m_pBitmap = Gdiplus::Bitmap::FromFile(file); //new Gdiplus::Bitmap(sFile);
+
+	//GdipLoadImageFromFile()
 #else
 	CA2W wFile(file);
 	if (use_copied_open)
@@ -216,7 +221,7 @@ bool CGdiplusBitmap::load(CString file)
 		if (temp.m_pBitmap)
 			open_success = true;
 	}
-	else if (m_pBitmap && m_pBitmap->GetLastStatus() == Gdiplus::Ok)
+	else if (m_pBitmap && (m_pBitmap->GetLastStatus() == Gdiplus::Ok))
 	{
 		open_success = true;
 	}
@@ -224,7 +229,7 @@ bool CGdiplusBitmap::load(CString file)
 	if (open_success)
 	{
 		if (use_copied_open)
-		temp.deep_copy(this);
+			temp.deep_copy(this);
 
 		resolution();
 
@@ -577,6 +582,16 @@ void CGdiplusBitmap::resolution()
 	if (stride < 0)
 		stride = -stride;
 
+	//GUID guid;
+	//m_pBitmap->GetRawFormat(&guid);
+	//Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
+
+	//bool has_alpha = false;
+	//if (pf & PixelFormatAlpha)
+	//	has_alpha = true;
+
+	//TRACE(_T("has_alpha = %d\n"), has_alpha);
+
 	check_animate_gif();
 }
 
@@ -704,7 +719,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	//temp.m_pBitmap->UnlockBits(&bmData_dst);
 	//save(&mask, _T("d:\\temp\\mask.bmp"));
 
-	CRect r = get_ratio_max_rect(targetRect, (double)width / (double)height);
+	CRect r = get_ratio_rect(targetRect, (double)width / (double)height);
 
 	g.DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
 	g.DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
@@ -749,25 +764,11 @@ CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 	return dst;
 }
 
-//4채널의 투명 픽셀을 포함한 이미지인지 판별. 간단하게 4 corner의 투명도 값으로 비교한다.
-bool CGdiplusBitmap::has_transparent_pixel()
+//alpha 픽셀을 포함한 이미지인지 판별
+bool CGdiplusBitmap::is_pixelformat_alpha()
 {
 	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
 	return Gdiplus::IsAlphaPixelFormat(fmt);
-
-	if (channel != 4)
-		return false;
-
-	if (get_pixel(0, 0).GetA() == 255)
-		return false;
-	if (get_pixel(width - 1, 0).GetA() == 255)
-		return false;
-	if (get_pixel(width - 1, height - 1).GetA() == 255)
-		return false;
-	if (get_pixel(0, height - 1).GetA() == 255)
-		return false;
-
-	return true;
 }
 
 std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0, Gdiplus::Color cr1)
@@ -797,7 +798,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode
 	if (draw_mode == draw_mode_stretch)
 		r = targetRect;
 	else if (draw_mode == draw_mode_zoom)
-		r = get_ratio_max_rect(targetRect, (double)width / (double)height);
+		r = get_ratio_rect(targetRect, (double)width / (double)height);
 	else
 	{
 		r = CRect(0, 0, width, height);
@@ -874,7 +875,7 @@ CRect CGdiplusBitmap::calc_rect(CRect targetRect, int draw_mode)
 	if (draw_mode == draw_mode_stretch)
 		r = targetRect;
 	else if (draw_mode == draw_mode_zoom)
-		r = get_ratio_max_rect(targetRect, (double)width / (double)height);
+		r = get_ratio_rect(targetRect, (double)width / (double)height);
 	else
 	{
 		r = CRect(0, 0, width, height);
@@ -2440,7 +2441,7 @@ void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
 	int w = (r.Width() > 0 ? r.Width() : width);
 	int h = (r.Height() > 0 ? r.Height() : height);
 
-	CRect fit = get_ratio_max_rect(CRect(r.left, r.top, r.left + w, r.top + h), width, height);
+	CRect fit = get_ratio_rect(CRect(r.left, r.top, r.left + w, r.top + h), width, height);
 	set_animation(hWnd, fit.left, fit.top, fit.Width(), fit.Height(), start);
 }
 
@@ -2455,7 +2456,7 @@ void CGdiplusBitmap::move_gif(int x, int y, int w, int h)
 
 void CGdiplusBitmap::move_gif(CRect r)
 {
-	CRect fit = get_ratio_max_rect(CRect(r.left, r.top, r.left + r.Width(), r.top + r.Height()), width, height);
+	CRect fit = get_ratio_rect(CRect(r.left, r.top, r.left + r.Width(), r.top + r.Height()), width, height);
 	move_gif(fit.left, fit.top, fit.Width(), fit.Height());
 }
 
@@ -2556,6 +2557,15 @@ void CGdiplusBitmap::thread_gif_animation()
 
 	bool mirror_applied = false;
 
+	CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
+	CMemoryDC dc(pDC, &r);
+	Gdiplus::Graphics g(dc.GetSafeHdc());
+
+	auto br_zigzag = get_zigzag_pattern(32);
+
+	long t0 = clock();
+	long t1;
+
 	while (m_run_thread_animation)
 	{
 		GUID   pageGuid = Gdiplus::FrameDimensionTime;
@@ -2564,10 +2574,12 @@ void CGdiplusBitmap::thread_gif_animation()
 		{
 			CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
 			CMemoryDC dc(pDC, &r);
-			Gdiplus::Graphics g(dc.m_hDC);
+			Gdiplus::Graphics g(dc.GetSafeHdc());
+
+			g.FillRectangle(br_zigzag.get(), CRect2GpRect(r));
 
 			//if (m_cr_back.GetValue() != 
-			g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
+			//g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
 
 			//CGdiButton과 같이 배경이 투명하게 표시하려 했으나 뭔가 다르다.
 			/*
@@ -2631,8 +2643,15 @@ void CGdiplusBitmap::thread_gif_animation()
 
 		//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
+		//delay는 해당 프레임에 설정된 delay를 그대로 주면 안되고
+		//전 프레임부터 현 프레임까지 재생하는데 걸린 시간은 빼줘야 한다.
+		t1 = clock();
+		long display_delay = t1 - t0;
 		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
-		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+
+		if (delay > display_delay)
+			std::this_thread::sleep_for(std::chrono::milliseconds((delay - display_delay)));
+		t0 = clock();
 	}
 
 	::ReleaseDC(m_target_hwnd, hDC);
@@ -2840,6 +2859,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 }
 
 //data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
+//단, indexed 8bit 이미지에 대한 처리는 아직 구현되지 않음.
 Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 {
 	//data가 불려지지 않은 상태에서 get_pixel()이 호출되면 raw_data를 추출한다.

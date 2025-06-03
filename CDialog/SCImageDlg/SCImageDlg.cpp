@@ -87,6 +87,24 @@ void CSCImageDlg::OnPaint()
 
 	GetClientRect(rc);
 
+
+	//수정 필요. gif도 stretch mode에 따라 꽉차게 또는 원래 크기로 표시한다. 아직 미구현이며 현재는 zoom 표시됨.	
+	if (m_img.is_valid() && m_img.is_animated_gif())
+	{
+		CRect r = get_ratio_rect(rc, m_img.width, m_img.height, 0, false);
+		CRgn rgn_rc;
+		CRgn rgn_img;
+		CRgn rgn_exclude;
+		rgn_rc.CreateRectRgnIndirect(&rc);
+		rgn_img.CreateRectRgnIndirect(&r);
+		rgn_exclude.CreateRectRgn(0, 0, 1, 1);
+		rgn_exclude.CombineRgn(&rgn_rc, &rgn_img, RGN_XOR);
+		dc1.SelectClipRgn(&rgn_exclude);
+		dc1.FillSolidRect(rc, GRAY32);
+		return;
+	}
+
+	//이 코드를 위의 gif 이미지일때의 처리 위에 하면 깜빡임이 발생하거나 의도대로 그려지지 않게 된다.
 	CMemoryDC dc(&dc1, &rc);
 
 	//기본 배경색으로 rc를 채우고
@@ -109,6 +127,14 @@ void CSCImageDlg::OnPaint()
 	if (m_img.is_empty())
 	{
 		dc.SelectClipRgn(NULL);
+
+		CRect rText;
+		CString msg = _T("No images to display.");
+		dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
+
+		DrawShadowText(dc.GetSafeHdc(), msg, msg.GetLength(), rText,
+			DT_CENTER | DT_VCENTER | DT_SINGLELINE, beige, black, 2, 1);
+
 		return;
 	}
 
@@ -150,7 +176,7 @@ void CSCImageDlg::OnPaint()
 		Clamp(m_offset.x, (long)(rc.Width() - nw), (long)0);
 		Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
 
-		TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
+		//TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
 		//if (m_screen_roi.IsEmptyArea() == false)
 		//{
 		//	Gdiplus::RectF screen_roi = m_screen_roi;
@@ -175,7 +201,7 @@ void CSCImageDlg::OnPaint()
 	}
 
 	//만약 투명 픽셀이 포함된 이미지라면 지그재그 격자를 그려준 후
-	if (m_img.has_transparent_pixel())
+	if (m_img.is_pixelformat_alpha())
 	{
 		g.FillRectangle(m_br_zigzag.get(), CRect2GpRect(m_r_display));
 	}
@@ -188,17 +214,17 @@ void CSCImageDlg::OnPaint()
 	if (m_show_info)// && m_parent->IsZoomed())
 	{
 		CAutoFont af(_T("맑은 고딕"));
-		af.SetHeight(20);
+		af.SetHeight(24);
 
 		CFont* pOldFont = dc.SelectObject(&af);
 		CString filename = get_part(m_filename, fn_name);
 		CString info;
 
-		info.Format(_T("파일 이름 : %s\n파일 크기 : %s\n수정 날짜 : %s\n이미지 정보 : %dx%d\n확대 배율 : %.0f%%"),
-					filename,
+		info.Format(_T("파일 이름 : %s\n파일 크기 : %s\n수정 날짜 : %s\n이미지 정보 : %dx%dx%d\n확대 배율 : %.0f%%"),
+					filename + m_alt_info,
 					get_file_size_str(m_filename),
 					get_datetime_str(GetFileLastModifiedTime(m_filename)),
-					m_img.width, m_img.height,
+					m_img.width, m_img.height, m_img.channel * 8,
 					m_zoom * 100.0);
 
 		//dc.GetTextExtend(info)는 멀티라인 정보를 얻을 수 없다.
@@ -293,9 +319,21 @@ void CSCImageDlg::OnPaint()
 	dc.SelectClipRgn(NULL);
 }
 
+//이 컨트롤에서 자체 처리할 메시지와 반드시 parent에서 처리할 메시지를 명확히 해야 한다.
+//여기서 바로 처리할 수 밖에 없는 메시지라면 모를까 모두 여기서 처리하면
+//범용성이 떨어질 수 있다.
 BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
+	//parent에서 처리해야 하는 메시지 일 경우 return FALSE;를 해줘야 한다.
+	switch (pMsg->message)
+	{
+		case WM_SYSKEYDOWN :
+		case WM_MBUTTONDOWN :
+			return FALSE;
+	}
+
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		bool is_ctrl_pressed = IsCtrlPressed();
@@ -351,7 +389,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 					Invalidate();
 					return TRUE;
 				}
-				break;
+				return FALSE;
 			case VK_DOWN:
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
@@ -359,7 +397,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 					Invalidate();
 					return TRUE;
 				}
-				break;
+				return FALSE;
 			case VK_LEFT:
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
@@ -379,11 +417,6 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			default :
 				return FALSE;
 		}
-	}
-	else if (pMsg->message == WM_SYSKEYDOWN)
-	{
-		//WM_SYSKEYDOWN일 경우 return FALSE;를 해줘야 parent에서 처리 가능하다.
-		return FALSE;
 	}
 
 	return CDialog::PreTranslateMessage(pMsg);
@@ -412,7 +445,17 @@ bool CSCImageDlg::load(CString sFile)
 
 	AfxGetApp()->WriteProfileString(_T("setting\\SCImageDlg"), _T("recent file"), sFile);
 	bool res = m_img.load(sFile);
-	Invalidate();
+
+	if (m_img.is_animated_gif())
+	{
+		CRect rc;
+		GetClientRect(rc);
+		m_img.set_animation(m_hWnd, rc);
+	}
+	else
+	{
+		Invalidate();
+	}
 
 	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
 
@@ -527,7 +570,16 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 	if (m_static_pixel.m_hWnd == NULL)
 		return;
 
-	Invalidate();
+	if (m_img.is_animated_gif())
+	{
+		CRect rc;
+		GetClientRect(rc);
+		m_img.move_gif(rc);
+	}
+	//else
+	{
+		Invalidate();
+	}
 
 	if (m_show_pixel)
 	{
@@ -708,39 +760,41 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			//m_static_pixel.ShowWindow(SW_HIDE);
 			m_static_pixel.set_text(_T("(-,-)\nA -\nR -\nG -\nB -"));
-			return;
 		}
-
-		//if (m_static_pixel.IsWindowVisible() == false)
-			//m_static_pixel.ShowWindow(SW_SHOW);
-
-		m_cr_pixel = m_img.get_pixel(pt.x, pt.y);
-		//TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
-
-		//픽셀 정보 표시창을 커서	위치에 맞춰서 이동시킨다. rc를 벗어나지 않도록 보정까지 한다.
-		CRect r = make_rect(point.x + 24, point.y, PIXEL_INFO_CX, PIXEL_INFO_CY);
-
-		CRect rc;
-		GetClientRect(rc);
-
-		adjust_rect_range(r, rc, true);
-		//m_static_pixel.MoveWindow(r);
-		//m_static_pixel.SetWindowPos(NULL, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-		CString str;
-
-		str.Format(_T("(%d,%d)\nA %3d\nR %3d\nG %3d\nB %3d"), pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
-
-		if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
+		else
 		{
-			m_static_pixel.set_back_color(m_cr_pixel);
-			m_static_pixel.set_text_color(get_distinct_gcolor(m_cr_pixel));
-			m_static_pixel.set_text(str);
-			//m_static_pixel.set_textf(Gdiplus::Color::RoyalBlue, str);
-			m_cr_pixel_old = m_cr_pixel;
+			//if (m_static_pixel.IsWindowVisible() == false)
+				//m_static_pixel.ShowWindow(SW_SHOW);
+
+			m_cr_pixel = m_img.get_pixel(pt.x, pt.y);
+			//TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+
+			//픽셀 정보 표시창을 커서	위치에 맞춰서 이동시킨다. rc를 벗어나지 않도록 보정까지 한다.
+			CRect r = make_rect(point.x + 24, point.y, PIXEL_INFO_CX, PIXEL_INFO_CY);
+
+			CRect rc;
+			GetClientRect(rc);
+
+			adjust_rect_range(r, rc, true);
+			//m_static_pixel.MoveWindow(r);
+			//m_static_pixel.SetWindowPos(NULL, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+			CString str;
+
+			str.Format(_T("(%d,%d)\nA %3d\nR %3d\nG %3d\nB %3d"), pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+
+			if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
+			{
+				m_static_pixel.set_back_color(m_cr_pixel);
+				m_static_pixel.set_text_color(get_distinct_gcolor(m_cr_pixel));
+				m_static_pixel.set_text(str);
+				//m_static_pixel.set_textf(Gdiplus::Color::RoyalBlue, str);
+				m_cr_pixel_old = m_cr_pixel;
+			}
 		}
 	}
 
 	::SendMessage(m_parent->m_hWnd, WM_MOUSEMOVE, 0, MAKELONG(point.x, point.y));
+
 	CDialog::OnMouseMove(nFlags, point);
 }
 

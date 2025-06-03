@@ -222,7 +222,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 	set_image(parent, &m_img, false);
 #ifdef _DEBUG
-	//m_img.save(_T("d:\\SCShapeDlg.png"));
+	m_img.save(_T("d:\\SCShapeDlg.png"));
 #endif
 	return true;
 

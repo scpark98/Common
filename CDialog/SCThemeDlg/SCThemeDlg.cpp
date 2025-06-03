@@ -135,11 +135,11 @@ BOOL CSCThemeDlg::OnInitDialog()
 	CFont* font = GetFont();
 
 	if (font != NULL)
-		font->GetObject(sizeof(m_title_lf), &m_title_lf);
+		font->GetObject(sizeof(m_titlebar_lf), &m_titlebar_lf);
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_title_lf), &m_title_lf);
+		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_titlebar_lf), &m_titlebar_lf);
 
-	reconstruct_title_font();
+	reconstruct_titlebar_font();
 
 	set_color_theme(CSCColorTheme::color_theme_default);
 	//init_shadow();
@@ -164,40 +164,40 @@ void CSCThemeDlg::set_use_shadow(bool use_shadow)
 	m_shadow.SetSize(use_shadow ? 8 : 0);
 }
 
-void CSCThemeDlg::reconstruct_title_font()
+void CSCThemeDlg::reconstruct_titlebar_font()
 {
-	m_title_font.DeleteObject();
-	m_title_font.CreateFontIndirect(&m_title_lf);
+	m_titlebar_font.DeleteObject();
+	m_titlebar_font.CreateFontIndirect(&m_titlebar_lf);
 	Invalidate();
 }
 
-void CSCThemeDlg::set_title_font_name(LPCTSTR sFontname, BYTE byCharSet)
+void CSCThemeDlg::set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
-	m_title_lf.lfCharSet = byCharSet;
-	_tcscpy_s(m_title_lf.lfFaceName, _countof(m_title_lf.lfFaceName), sFontname);
-	reconstruct_title_font();
+	m_titlebar_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_titlebar_lf.lfFaceName, _countof(m_titlebar_lf.lfFaceName), sFontname);
+	reconstruct_titlebar_font();
 }
 
-void CSCThemeDlg::set_title_icon(UINT icon_id, int cx, int cy)
+void CSCThemeDlg::set_titlebar_icon(UINT icon_id, int cx, int cy)
 {
 	m_hIcon = load_icon(NULL, icon_id, cx, cy);
 }
 
-void CSCThemeDlg::set_title_icon(HICON hIcon)
+void CSCThemeDlg::set_titlebar_icon(HICON hIcon)
 {
 	m_hIcon = hIcon;
 }
 
-void CSCThemeDlg::set_title_font_size(int size)
+void CSCThemeDlg::set_titlebar_font_size(int size)
 {
-	m_title_lf.lfHeight = -MulDiv(size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
-	reconstruct_title_font();
+	m_titlebar_lf.lfHeight = -MulDiv(size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	reconstruct_titlebar_font();
 }
 
-void CSCThemeDlg::set_title_bold(bool bold)
+void CSCThemeDlg::set_titlebar_bold(bool bold)
 {
-	m_title_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
-	reconstruct_title_font();
+	m_titlebar_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL);
+	reconstruct_titlebar_font();
 }
 
 INT_PTR CSCThemeDlg::DoModal()
@@ -235,7 +235,7 @@ void CSCThemeDlg::show_default_titlebar(bool titlebar)
 }
 */
 
-void CSCThemeDlg::set_title_height(int height)
+void CSCThemeDlg::set_titlebar_height(int height)
 {
 	m_titlebar_height = height;
 	m_sys_buttons.set_button_height(height);
@@ -431,7 +431,7 @@ void CSCThemeDlg::OnPaint()
 		CString title;
 		GetWindowText(title);
 
-		CFont* pOldFont = (CFont*)dc.SelectObject(&m_title_font);
+		CFont* pOldFont = (CFont*)dc.SelectObject(&m_titlebar_font);
 		dc.DrawText(title, rTitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 		dc.SelectObject(pOldFont);
 	}
@@ -469,9 +469,11 @@ void CSCThemeDlg::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
 	m_sys_buttons.set_color_theme(theme);
+	//m_sys_buttons.set_button_height(m_titlebar_height);
 
 	//m_theme.set_color_theme(theme);에서는 cr_text, cr_back 등 일반적인 색상값들을 세팅한다.
-	//CSCThemeDlg::set_color_theme(int theme) 에서는 m_sys_buttons 등 CSCThemeDlg를 상속받은 클래스에서 필요로하는 부가적인 세팅이 필요하다.
+	//CSCThemeDlg::set_color_theme(int theme) 에서는 m_sys_buttons 등
+	//CSCThemeDlg를 상속받은 클래스에서 필요로하는 부가적인 세팅이 필요하다.
 	switch (theme)
 	{
 	case CSCColorTheme::color_theme_linkmemine :
@@ -484,9 +486,9 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_title_font();
+		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_titlebar_font();
 		break;
 	case CSCColorTheme::color_theme_linkmemine_se:
 		SetWindowText(_T("LinkMeMine 3.0 SE"));
@@ -497,9 +499,9 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_title_font();
+		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_titlebar_font();
 		break;
 	case CSCColorTheme::color_theme_helpu:
 		SetWindowText(_T("HelpU"));
@@ -510,9 +512,9 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_title_font();
+		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_titlebar_font();
 		break;
 	case CSCColorTheme::color_theme_anysupport:
 		SetWindowText(_T("AnySupport"));
@@ -523,9 +525,9 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_title_font();
+		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_titlebar_font();
 		break;
 	case CSCColorTheme::color_theme_pcanypro:
 		SetWindowText(_T("PCAnyPro"));
@@ -536,21 +538,21 @@ void CSCThemeDlg::set_color_theme(int theme)
 		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_title_font();
+		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+		reconstruct_titlebar_font();
 		break;
-	case CSCColorTheme::color_theme_default:
-		m_sys_buttons.set_text_color(m_theme.cr_title_text);
+	//case CSCColorTheme::color_theme_default:
+	//	m_sys_buttons.set_text_color(m_theme.cr_title_text);
 
-		m_sys_buttons.set_back_color(m_theme.cr_title_back);
-		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+	//	//m_sys_buttons.set_back_color(m_theme.cr_title_back);
+	//	//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+	//	//m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_title_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_title_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_title_font();
-		break;
+	//	m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+	//	m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+	//	reconstruct_titlebar_font();
+	//	break;
 	}
 }
 
@@ -572,13 +574,13 @@ void CSCThemeDlg::OnSize(UINT nType, int cx, int cy)
 	Invalidate();
 }
 
-void CSCThemeDlg::set_title_text_color(Gdiplus::Color cr)
+void CSCThemeDlg::set_titlebar_text_color(Gdiplus::Color cr)
 {
 	m_theme.cr_title_text = cr;
 	m_sys_buttons.set_text_color(cr);
 }
 
-void CSCThemeDlg::set_title_back_color(Gdiplus::Color cr)
+void CSCThemeDlg::set_titlebar_back_color(Gdiplus::Color cr)
 {
 	m_theme.cr_title_back = cr;
 	m_sys_buttons.set_back_color(cr);

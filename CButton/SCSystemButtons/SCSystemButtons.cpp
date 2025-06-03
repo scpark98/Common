@@ -138,7 +138,7 @@ void CSCSystemButtons::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+	dc.FillSolidRect(rc, m_theme.cr_title_back.ToCOLORREF());
 
 	for (size_t i = 0; i < m_button.size(); i++)
 	{
@@ -252,10 +252,14 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 		case SC_CLOSE:
 			::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, m_button[m_over_index].cmd, 0);
 			break;
+		//SC_MAXIMIZE 버튼이 클릭되면 여기서 GetParent()->IsZoomed()를 판단해서 주면 안된다.
+		//ASee의 경우는 mainDlg에서 titleDlg를 띠우고 그 안에 SystemButton이 있으므로
+		//titleDlg->IsZoomed()로 판별하는게 아닌 mainDlg->IsZoomed()로 판별해야 한다.
+		//따라서 여기서는 그냥 parent에게 SC_MAXIMIZE 명령만 보내고 실제 적용할 윈도우에서 판단해서 실행한다.
 		case SC_MAXIMIZE:
-			if (GetParent()->IsZoomed())
-				::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_RESTORE, 0);
-			else
+			//if (GetParent()->IsZoomed())
+			//	::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_RESTORE, 0);
+			//else
 				::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_MAXIMIZE, 0);
 		}
 	}
@@ -291,23 +295,6 @@ void CSCSystemButtons::OnMouseMove(UINT nFlags, CPoint point)
 void CSCSystemButtons::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
-	/*
-	switch (theme)
-	{
-	case color_theme_window:
-		m_cr_back = ::GetSysColor(COLOR_3DFACE);
-		break;
-	case color_theme_visualstudio:
-		m_cr_back = RGB(31, 31, 31);
-		m_cr_over = RGB(61, 61, 61);
-		m_cr_down = RGB(56, 56, 56);
-		m_cr_pen = RGB(192, 192, 192);
-		break;
-	case color_theme_gray:
-		m_cr_back = ::GetSysColor(COLOR_3DFACE);
-		break;
-	}
-	*/
 }
 
 

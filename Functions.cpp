@@ -3410,7 +3410,29 @@ LONG set_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString str
 }
 //#endif
 
-bool	LoadBitmapFromFile(CBitmap &bmp, CString strFile)
+//reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
+//"count"에 갯수가, 숫자 인덱스 항목들에 각 항목이 저장된 구조에만 사용 가능하다.
+//추가된 인덱스를 리턴한다.
+int add_registry(CWinApp* pApp, CString reg_path, CString value)
+{
+	CString item;
+	int count = pApp->GetProfileInt(reg_path, _T("count"), 0);
+
+	for (int i = 0; i < count; i++)
+	{
+		item = pApp->GetProfileString(reg_path, i2S(i), _T(""));
+		if (value.CompareNoCase(item) == 0)
+			return -1;
+	}
+
+	//존재하지 않는다면 추가한다.
+	pApp->WriteProfileString(reg_path, i2S(count), value);
+	pApp->WriteProfileInt(reg_path, _T("count"), count + 1);
+
+	return count;
+}
+
+bool LoadBitmapFromFile(CBitmap &bmp, CString strFile)
 {
 	bmp.Detach();
 	
@@ -12895,13 +12917,13 @@ void normalize_rect(Gdiplus::RectF& r)
 
 //rTarget에 접하는 dRatio인 최대 사각형을 구한다.
 //attach_left 등의 옵션을 줄 필요가 있다.
-CRect get_ratio_max_rect(CRect rTarget, int w, int h, int attach)
+CRect get_ratio_rect(CRect rTarget, int w, int h, int attach, bool stretch)
 {
-	return get_ratio_max_rect(rTarget, (double)w / (double)h, attach);
+	return get_ratio_rect(rTarget, (double)w / (double)h, attach, stretch);
 }
 
 //rTarget에 접하는 dRatio인 최대 사각형을 구한다.
-CRect get_ratio_max_rect(CRect rTarget, double dRatio, int attach)
+CRect get_ratio_rect(CRect rTarget, double dRatio, int attach, bool stretch)
 {
 	int		w = rTarget.Width();
 	int		h = rTarget.Height();
@@ -18786,7 +18808,7 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
 
 
-			if (true)//para[i][j].thickness > 0.0)
+			if (false)//para[i][j].thickness > 0.0)
 			{
 				Gdiplus::GraphicsPath str_path;
 

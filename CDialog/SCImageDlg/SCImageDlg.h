@@ -2,7 +2,16 @@
 * 20250519 scpark
 * ASee, TesseractOcrDlg 등과 같이 이미지를 디스플레이하고 +, -키로 확대 축소, 드래그로 이동, 선택영역 처리 등
 * 이러한 용도의 전용 클래스 필요성에 의해 제작함.
-* parent의 child로 동적 생성하며 마우스, 키보드까지 모두 처리하기 위해 CStatic이 아닌 CDialog로 제작함.
+* create()을 이용해서 parent의 child로 동적 생성하며
+* 마우스, 키보드까지 모두 처리하기 위해 CStatic이 아닌 CDialog로 제작함.
+* 
+* [이미지 로딩 관련]
+* - 한 이미지를 로딩하고 표시하면서 그 이미지가 포함된 폴더내의 모든 이미지 목록을 유지는 것은
+*   이 클래스에서? 메인에서?
+*   ASee, TesseractOcrDlg와 같은 프로젝트라면 이 클래스에서 목록을 가져도 문제없지만
+*   범용적으로는 이 클래스에서 목록을 가질 경우 목록 변경과 같은 이벤트마다
+*   항상 메인에 이를 메시지로 통보해야 하므로 범용성을 잃을 수 있다.
+*   우선 이 클래스에서는 하나의 이미지를 표시하는 범위로만 구현한다.
 */
 
 #pragma once
@@ -46,6 +55,7 @@ public:
 
 	bool			get_show_info() { return m_show_info; }
 	void			set_show_info(bool show);
+	void			set_alt_info(CString alt_info) { m_alt_info = alt_info; Invalidate(); }
 
 	bool			get_show_pixel() { return m_show_pixel; }
 	void			set_show_pixel(bool show);
@@ -71,7 +81,7 @@ public:
 	CRect			get_displayed_rect() { return m_r_display; }
 
 	CPoint			get_offset() { return m_offset; }
-	void			set_offset(int offset_x, int offset_y) {};
+	void			set_offset(int offset_x, int offset_y) { m_offset = CPoint(offset_x, offset_y); };
 	int				get_offset_size() { return m_offset_size; }
 
 	//이미지 부드럽게 보정
@@ -113,6 +123,8 @@ protected:
 
 //이미지 정보 표시
 	bool			m_show_info = true;
+	//파일명 뒤에 인덱스 정보등의 추가 정보를 표시하고자 할 경우 설정한다.
+	CString			m_alt_info;
 
 	//roi 관련(선택영역)
 	//roi를 screen기준으로만 저장하면 이미지 scroll, resize 등을 할때마다 항상 보정해줘야 하므로

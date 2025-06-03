@@ -62,22 +62,22 @@ public:
 	//윈도우 기본 타이틀바가 있는 dlg일 경우는 타이틀바와 관계된 모든 옵션은 무시된다.
 	//void	SetWindowText(CString title) { set_title(title); }
 	//void	SetWindowText(CString title) { CWnd::SetWindowText(title); m_title = title; Invalidate(); }
-	void	set_title_bold(bool bold = true);
-	bool	get_title_bold() { return (m_title_lf.lfWeight == FW_BOLD); }
+	void	set_titlebar_bold(bool bold = true);
+	bool	get_titlebar_bold() { return (m_titlebar_lf.lfWeight == FW_BOLD); }
 
-	void	set_title_height(int height);
-	int		get_title_height() { return m_titlebar_height; }
+	void	set_titlebar_height(int height);
+	int		get_titlebar_height() { return m_titlebar_height; }
 
-	void	set_title_text_color(Gdiplus::Color cr);
-	Gdiplus::Color get_title_text_color() { return m_theme.cr_title_text; }
-	void	set_title_back_color(Gdiplus::Color cr);
-	Gdiplus::Color get_title_back_color() { return m_theme.cr_title_back; }
-	void	set_title_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void	set_title_font_size(int size);
-	void	set_title_font_bold(bool bold) { m_titlebar_bold = bold; m_title_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL); }
+	void	set_titlebar_text_color(Gdiplus::Color cr);
+	Gdiplus::Color get_titlebar_text_color() { return m_theme.cr_title_text; }
+	void	set_titlebar_back_color(Gdiplus::Color cr);
+	Gdiplus::Color get_titlebar_back_color() { return m_theme.cr_title_back; }
+	void	set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void	set_titlebar_font_size(int size);
+	void	set_titlebar_font_bold(bool bold) { m_titlebar_bold = bold; m_titlebar_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL); }
 	//
-	void	set_title_icon(UINT icon_id, int cx = 16, int cy = 16);
-	void	set_title_icon(HICON hIcon);
+	void	set_titlebar_icon(UINT icon_id, int cx = 16, int cy = 16);
+	void	set_titlebar_icon(HICON hIcon);
 	void	set_logo(UINT png_id) { m_img_logo.load(png_id); }
 	void	show_titlebar_logo(bool show_logo = true) { m_show_logo = show_logo; Invalidate(); }
 
@@ -173,9 +173,9 @@ protected:
 	//프로그램 로고(png만 허용, 이 값이 없다면 기본 앱 아이콘을 사용한다)
 	CGdiplusBitmap		m_img_logo;
 
-	LOGFONT				m_title_lf;
-	CFont				m_title_font;
-	void				reconstruct_title_font();
+	LOGFONT				m_titlebar_lf;
+	CFont				m_titlebar_font;
+	void				reconstruct_titlebar_font();
 
 	CGdiplusBitmap		m_img_back;
 	int					m_img_back_draw_mode = CGdiplusBitmap::draw_mode_stretch;	//default = CGdiplusBitmap::draw_mode_stretch

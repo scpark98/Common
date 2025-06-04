@@ -12779,7 +12779,7 @@ CString get_rect_info_string(Gdiplus::RectF r, int nFormat)
 }
 
 
-void adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize, bool includeBottomRight)
+void adjust_rect_range(float*l, float*t, float*r, float*b, float minx, float miny, float maxx, float maxy, bool retainSize, bool includeBottomRight)
 {
 	if (*l < minx)
 	{
@@ -12812,7 +12812,7 @@ void adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t m
 				*l = minx;
 		}
 
-		*r = maxx - 1;
+		*r = maxx - (includeBottomRight ? 1 : 0);
 	}
 
 	if (*b >= maxy)
@@ -12824,7 +12824,7 @@ void adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t m
 				*t = miny;
 		}
 
-		*b = maxy - 1;
+		*b = maxy - (includeBottomRight ? 1 : 0);
 	}
 }
 
@@ -12875,12 +12875,25 @@ void adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize, bool include
 
 void adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize, bool includeBottomRight)
 {
-	int32_t l = rect.left;
-	int32_t t = rect.top;
-	int32_t r = rect.right;
-	int32_t b = rect.bottom;
+	float l = rect.left;
+	float t = rect.top;
+	float r = rect.right;
+	float b = rect.bottom;
 	adjust_rect_range(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize, includeBottomRight);
 	rect = CRect(l, t, r, b);
+}
+
+void adjust_rect_range(Gdiplus::RectF& rect, Gdiplus::RectF rLimit, bool bRetainSize, bool includeBottomRight)
+{
+	float l = rect.X;
+	float t = rect.Y;
+	float r = rect.X + rect.Width;
+	float b = rect.Y + rect.Height;
+	adjust_rect_range(&l, &t, &r, &b, rLimit.X, rLimit.Y, rLimit.X + rLimit.Width, rLimit.Y + rLimit.Height, bRetainSize, includeBottomRight);
+	rect.X = l;
+	rect.Y = t;
+	rect.Width = r - l;
+	rect.Height = b - t;
 }
 
 //모니터의 한쪽에 붙은 사각형을 새로운 크기로 변경할 경우 붙은 상태를 유지하고 변경할 필요가 있을 경우 사용.

@@ -599,7 +599,7 @@ bool CGdiplusBitmap::get_raw_data()
 {
 	SAFE_DELETE_ARRAY(data);
 
-	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
+	Gdiplus::Rect rect(0, 0, width, height); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
 	//붙여넣기한 이미지가 24비트인데도 32비트로 입력되는 오류가 있다.
@@ -612,10 +612,13 @@ bool CGdiplusBitmap::get_raw_data()
 	//else
 	//	format = PixelFormat24bppRGB;
 
+	//픽셀포맷 형식에따라 이미지 접근 권한 취득.
+	//clipboard에서 읽어온 이미지일 경우 아래 코드에서 에러 발생.
+	//이 경우 24bpp로 변경해주면 에러는 발생하지 않으나 해결책이 아님.
 	if (m_pBitmap->LockBits(&rect,
 		Gdiplus::ImageLockModeRead,
-		format/*m_pBitmap->GetPixelFormat()*/, &bmpData) == Gdiplus::Ok) { //픽셀포맷형식에따라 이미지접근권한 취득
-
+		format, &bmpData) == Gdiplus::Ok)
+	{
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
 		memcpy(data, bmpData.Scan0, len); //복사

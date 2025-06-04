@@ -51,7 +51,7 @@ public :
 	enum SC_COLOR_THEMES
 	{
 		color_theme_default = 0,		//기본 윈도우 테마를 따름
-		color_theme_white,				//기존 윈도우의 3D
+		color_theme_white,				//기존 윈도우의 바탕색을 dlg의 3DFACE가 아닌 white로 함
 		color_theme_gray,
 		color_theme_dark_gray,
 		color_theme_dark,

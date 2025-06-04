@@ -681,6 +681,11 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 				case corner_inside :
 					m_screen_roi.X = point.x - m_screen_roi.Width / 2;
 					m_screen_roi.Y = point.y - m_screen_roi.Height / 2;
+					adjust_rect_range(m_screen_roi, CRect2GpRectF(m_r_display));
+					//if (m_screen_roi.X < m_r_display.left)
+					//	m_screen_roi.X = m_r_display.left;
+					//if (m_screen_roi.Y < m_r_display.top)
+					//	m_screen_roi.Y = m_r_display.top;
 					break;
 				case corner_left :
 					set_left(m_screen_roi, point.x);
@@ -758,16 +763,19 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		get_real_coord_from_screen_coord(m_r_display, m_img.width, point, &pt);
 		if (pt.x < 0 || pt.x >= m_img.width || pt.y < 0 || pt.y >= m_img.height)
 		{
-			//m_static_pixel.ShowWindow(SW_HIDE);
-			m_static_pixel.set_text(_T("(-,-)\nA -\nR -\nG -\nB -"));
+			if (m_static_pixel.IsWindowVisible())
+				m_static_pixel.ShowWindow(SW_HIDE);
+			//m_static_pixel.set_text(_T("(-,-)\nA -\nR -\nG -\nB -"));
+			TRACE(_T("out of range. %ld\n"), GetTickCount());
+			return;
 		}
 		else
 		{
-			//if (m_static_pixel.IsWindowVisible() == false)
-				//m_static_pixel.ShowWindow(SW_SHOW);
+			if (m_static_pixel.IsWindowVisible() == false)
+				m_static_pixel.ShowWindow(SW_SHOW);
 
 			m_cr_pixel = m_img.get_pixel(pt.x, pt.y);
-			//TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
+			TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
 
 			//픽셀 정보 표시창을 커서	위치에 맞춰서 이동시킨다. rc를 벗어나지 않도록 보정까지 한다.
 			CRect r = make_rect(point.x + 24, point.y, PIXEL_INFO_CX, PIXEL_INFO_CY);
@@ -776,7 +784,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			GetClientRect(rc);
 
 			adjust_rect_range(r, rc, true);
-			//m_static_pixel.MoveWindow(r);
+			m_static_pixel.MoveWindow(r);
 			//m_static_pixel.SetWindowPos(NULL, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 			CString str;
 
@@ -801,8 +809,6 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 void CSCImageDlg::OnMouseHover(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_show_pixel && m_static_pixel.IsWindowVisible() == false)
-		m_static_pixel.ShowWindow(SW_SHOW);
 
 	CDialog::OnMouseHover(nFlags, point);
 }
@@ -867,6 +873,16 @@ BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		}
 		return TRUE;
 	}
+
+	if (m_show_pixel && m_dropper_cur_id > 0)
+	{
+		HCURSOR hCursor = AfxGetApp()->LoadCursor(m_dropper_cur_id);
+		SetCursor(hCursor);
+		return TRUE;
+	}
+
+	SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+	return TRUE;
 
 	return CDialog::OnSetCursor(pWnd, nHitTest, message);
 }

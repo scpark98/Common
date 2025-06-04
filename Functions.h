@@ -1751,10 +1751,11 @@ h		: 복사할 height 크기(pixel)
 	CPoint		vertex(CRect r, int index, bool rb_cut = false);	
 
 	//주어진 사각형 범위를 벗어나지 않도록 보정해준다.
-	void		adjust_rect_range(int32_t *l, int32_t *t, int32_t *r, int32_t *b, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool retainSize, bool includeBottomRight = false);
+	void		adjust_rect_range(float *l, float*t, float*r, float*b, float minx, float miny, float maxx, float maxy, bool retainSize, bool includeBottomRight = false);
 	//이미지의 경우 includeBottomRight은 false로 해야 끝점 좌표가 유효하다.(도형일 경우는 true)
 	void		adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize = true, bool includeBottomRight = false);
 	void		adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true, bool includeBottomRight = false);
+	void		adjust_rect_range(Gdiplus::RectF& rect, Gdiplus::RectF rLimit, bool bRetainSize = true, bool includeBottomRight = false);
 
 	void		normalize_rect(Gdiplus::RectF& r);
 

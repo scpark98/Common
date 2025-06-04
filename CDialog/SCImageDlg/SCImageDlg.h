@@ -52,6 +52,7 @@ public:
 	bool			load(UINT id);
 
 	CString			get_filename() { return m_filename; }
+	void			set_filename(CString filename) { m_filename = filename; }
 
 	bool			get_show_info() { return m_show_info; }
 	void			set_show_info(bool show);
@@ -61,6 +62,7 @@ public:
 	void			set_show_pixel(bool show);
 
 	bool			copy_to_clipbard();
+	//void			paste_from_clipboard();
 
 	Gdiplus::RectF	get_image_roi();
 	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF()) { m_image_roi = roi; Invalidate(); }
@@ -84,6 +86,9 @@ public:
 	void			set_offset(int offset_x, int offset_y) { m_offset = CPoint(offset_x, offset_y); };
 	int				get_offset_size() { return m_offset_size; }
 
+	//dropper(spuit) cursor 지정
+	void			set_dropper_cursor(UINT nID) { m_dropper_cur_id = nID; }
+
 	//이미지 부드럽게 보정
 	enum INTERPOLATION_TYPE
 	{
@@ -101,6 +106,8 @@ protected:
 	CWnd*			m_parent = NULL;
 	CString			m_filename;
 	CRect			m_r_display;
+
+	UINT			m_dropper_cur_id = 0;
 
 	//투명 png일 경우 배경에 표시할 zigzag 패턴 브러시
 	std::unique_ptr<Gdiplus::TextureBrush> m_br_zigzag;

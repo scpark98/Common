@@ -2895,6 +2895,8 @@ ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::d
 	ZRESULT zr = ZR_OK;
 
 	hz = CreateZip(zip_path, 0);
+	if (hz == NULL)
+		return ZR_FAILED;
 
 	CString		file;
 	CString		folder_in_zip;
@@ -2924,7 +2926,10 @@ ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::d
 
 		if (folder_in_zip == _T(""))
 		{
-			zr = ZipAdd(hz, file, dq[i]);
+			if (!folder_name_in_zip.IsEmpty())
+			{
+				file = folder_name_in_zip + _T("\\") + file;
+			}
 		}
 		else
 		{
@@ -2937,9 +2942,9 @@ ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::d
 			{
 				zr = ZipAddFolder(hz, folder_in_zip);
 			}
-
-			zr = ZipAdd(hz, file, dq[i]);
 		}
+
+		zr = ZipAdd(hz, file, dq[i]);
 	}
 
 	zr = CloseZip(hz);

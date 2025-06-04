@@ -52,6 +52,8 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_static_pixel.set_font_size(7);
 
 	m_br_zigzag = m_img.get_zigzag_pattern(32);
+
+	return true;
 }
 
 void CSCImageDlg::DoDataExchange(CDataExchange* pDX)
@@ -670,6 +672,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			//Ctrl키를 눌러서 roi가 그려지는 동안에는 이미지 확대/축소에 무관하게
 			//마우스 위치가 그대로 그려져야 한다.
+			//InvalidateRect(GpRectF2CRect(m_screen_roi));
 			Invalidate();
 		}
 		//그려진 roi의 크기, 위치를 조절하는 경우

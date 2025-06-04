@@ -2261,8 +2261,8 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	SetClipboardData(fmt, gift);
 
 	CloseClipboard();
-	return true;
 #endif
+	return true;
 }
 
 bool CGdiplusBitmap::paste_from_clipboard()

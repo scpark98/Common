@@ -29,10 +29,11 @@
 
 [draw_shadow 관련]
 - 이미지로 표현되는 버튼의 경우는 그림자를 생성해서 표현하는 것은 간단하나
-  기본 MFC CButton 처럼 일반 버튼으로 그려지는 버튼의 경우는
-  그림자 영역만큼 버튼 크기를 확장하느냐, 버튼 크기를 줄일 것이냐에 대한 결정이 필요하다.
-  예를 들어 +1, +1의 그림자가 추가된다면 실제 보여지는 버튼의 모습은 그림자 영역을 제외한 영역에 맞게
-  border, text align등이 표현되어야 한다.
+  이미지를 지정하지 않고 기본 CButton 처럼 일반 버튼 모양으로 그려지는 버튼의 경우는
+  WM_NCPAINT에서 그림자를 그려주면 된다.
+  만약 그림이 '<'과 같은 투명 배경에 도형만 있는 경우라면 drop_shadow를 그려주고
+  기본 CButton과 같이 사각형 형태로 그려지는 버튼이라면 back_shadow를 그려준다.
+  이 두 shadow를 별도로 세팅 및 처리하느냐, 하나의 변수로 처리하느냐는 아직 미정임.
 
 [기본값 설정 기준]
 - png를 주로 사용하기 위한 클래스를 목적으로 제작되었지만
@@ -473,11 +474,13 @@ protected:
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
 	//투명 버튼의 경우 그림자를 표시한다.
-	bool		m_draw_shadow = false;
+	bool		m_draw_shadow = true;
 	//m_shadow_weight
 	float		m_shadow_weight = 1.0f;
 	//m_blur_sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
 	float		m_blur_sigma = 5.0f;
+
+	//
 
 	bool		m_draw_border = false;
 	Gdiplus::Color m_gcr_border = Gdiplus::Color::DimGray;
@@ -522,4 +525,5 @@ public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnNcPaint();
 };

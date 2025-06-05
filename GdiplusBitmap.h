@@ -76,14 +76,18 @@ protected:
 class CGdiplusBitmapMessage
 {
 public:
-	CGdiplusBitmapMessage(Gdiplus::Bitmap* _this, int _message)
+	CGdiplusBitmapMessage(Gdiplus::Bitmap* _this, int _message, int _frame_index, int _total_frames)
 	{
 		pThis = _this;
 		message = _message;
+		frame_index = _frame_index;
+		total_frames = _total_frames;
 	}
 
 	Gdiplus::Bitmap* pThis = NULL;
 	int		message;
+	int		frame_index = -1;
+	int		total_frames = -1;
 };
 
 class CGdiplusBitmap
@@ -231,6 +235,14 @@ public:
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함
 	//InterpolationModeHighQualityBicubic	: 속도는 느리지만 최고 품질 모드
+	enum INTERPOLATION_TYPE
+	{
+		interpolation_none = Gdiplus::InterpolationModeNearestNeighbor,
+		interpolation_bilinear = Gdiplus::InterpolationModeHighQualityBilinear,
+		interpolation_bicubic = Gdiplus::InterpolationModeHighQualityBicubic,
+		interpolation_lanczos,
+	};
+
 	//cx 또는 cy가 0인 경우는 가로/세로 비율을 유지하여 resize된다.
 	void			resize(int cx, int cy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 	void			resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);

@@ -194,10 +194,10 @@ bool CGdiplusBitmap::load(CString file)
 	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
 	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
 	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
-	bool use_copied_open = false;
+	bool use_copied_open = true;
 	
 	if (get_part(file, fn_ext).MakeLower() == _T("gif"))
-		true;
+		use_copied_open = false;
 
 #ifdef UNICODE
 	if (use_copied_open)
@@ -615,9 +615,7 @@ bool CGdiplusBitmap::get_raw_data()
 	//픽셀포맷 형식에따라 이미지 접근 권한 취득.
 	//clipboard에서 읽어온 이미지일 경우 아래 코드에서 에러 발생.
 	//이 경우 24bpp로 변경해주면 에러는 발생하지 않으나 해결책이 아님.
-	if (m_pBitmap->LockBits(&rect,
-		Gdiplus::ImageLockModeRead,
-		format, &bmpData) == Gdiplus::Ok)
+	if (m_pBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, format, &bmpData) == Gdiplus::Ok)
 	{
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
@@ -2533,13 +2531,23 @@ void CGdiplusBitmap::goto_frame(int pos, bool pause)
 		return;
 
 	if (pos >= m_frame_count)
-		m_frame_count = 0;
+		m_frame_index = 0;
 
 	m_frame_index = pos;
 	m_paused = pause;
 
 	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+
+	if (m_paused)
+	{
+		RECT r;
+		r.left = m_ani_sx;
+		r.top = m_ani_sy;
+		r.right = r.left + m_ani_width;
+		r.bottom = r.top + m_ani_height;
+		::InvalidateRect(m_target_hwnd, &r, TRUE);
+	}
 }
 
 //지정 % 위치의 프레임으로 이동
@@ -2625,7 +2633,6 @@ void CGdiplusBitmap::thread_gif_animation()
 
 			//save(_T("d:\\copy.png"));
 			g.DrawImage(pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-			::SendMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
 
 			//clone된 경우는 반드시 release해줘야 한다.
 			if (pBitmap != m_pBitmap)
@@ -2637,6 +2644,8 @@ void CGdiplusBitmap::thread_gif_animation()
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 			continue;
 		}
+
+		::PostMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
 
 		m_frame_index++;
 		if (m_frame_index >= m_frame_count)
@@ -2706,7 +2715,7 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 		}
 
 		g.DrawImage(m_pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-		::SendMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed), (LPARAM)m_frame_index);
+		::SendMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
 	}
 
 	::ReleaseDC(m_target_hwnd, hDC);

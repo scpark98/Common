@@ -127,6 +127,7 @@ BEGIN_MESSAGE_MAP(CGdiButton, CButton)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_NCPAINT()
 END_MESSAGE_MAP()
 
 
@@ -910,6 +911,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//중간 느낌
 		//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
+		/*
 		//이미지를 그리기 전에 shadow를 먼저 그려준다.
 		if (m_draw_shadow)
 		{
@@ -938,6 +940,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			//m_down_offset = CPoint(1, 3);
 		}
+		*/
 
 		if (m_bAsStatic)
 		{
@@ -2041,4 +2044,45 @@ void CGdiButton::set_header_image(UINT id, float ratio, UINT align)
 void CGdiButton::set_header_image_gap(int gap)
 {
 	m_img_header_gap = gap;
+}
+
+//기능 구현 중
+void CGdiButton::OnNcPaint()
+{
+	//if (!m_draw_shadow)
+		return;
+
+	CClientDC  dc(this);
+	CRect rc;
+
+	GetClientRect(rc);
+	rc.InflateRect(20, 20);
+
+	Gdiplus::Graphics g(dc.m_hDC, rc);
+	dc.FillSolidRect(rc, red);
+	//return;
+
+	if (m_image.size() == 0)
+		return;
+
+	//m_down_offset = CPoint(1, 1);
+	CGdiplusBitmap img_shadow;
+	m_image[0]->img[0].deep_copy(&img_shadow);
+#ifdef _DEBUG
+	img_shadow.save(_T("d:\\0.origin.png"));
+#endif
+	//img_shadow.resize(rc.Width(), rc.Height());
+	//img_shadow.blur(20, TRUE);
+	img_shadow.blur(m_blur_sigma);
+#ifdef _DEBUG
+	img_shadow.save(_T("d:\\1.blur.png"));
+#endif
+	img_shadow.gray(m_shadow_weight);
+	//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
+#ifdef _DEBUG
+	img_shadow.save(_T("d:\\2.gray.png"));
+#endif
+	CRect rc_shadow = rc;
+	rc_shadow.OffsetRect(20, 20);
+	img_shadow.draw(g, rc_shadow, CGdiplusBitmap::draw_mode_zoom);
 }

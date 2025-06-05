@@ -69,8 +69,10 @@ ZRESULT FindZipItem(HZIP hz, const TCHAR *name, bool ic, int *index, ZIPENTRY *z
 
 //20250529 scpark.
 //A.zip이라는 파일내에 여러 파일과 하위 폴더들이 들어있을 경우
-//A라는 폴더에 각 item을 모두 unzip해줘야하므로 함수로 추가함.
-ZRESULT UnzipFolder(HZIP hz);
+//A라는 폴더내에 각 item을 모두 unzip 해줘야 하므로 함수로 추가함.
+//base_folder가 NULL이라면 A라는 폴더내에 풀고
+//base_folder == "B"로 지정되면 B라는 폴더내에 풀게 된다.
+ZRESULT UnzipFolder(HZIP hz, const TCHAR* base_folder = NULL);
 
 ZRESULT UnzipItem(HZIP hz, int index, const TCHAR *fn);
 ZRESULT UnzipItem(HZIP hz, int index, void *z,unsigned int len);

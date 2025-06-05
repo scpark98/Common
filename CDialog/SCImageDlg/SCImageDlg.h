@@ -12,6 +12,11 @@
 *   범용적으로는 이 클래스에서 목록을 가질 경우 목록 변경과 같은 이벤트마다
 *   항상 메인에 이를 메시지로 통보해야 하므로 범용성을 잃을 수 있다.
 *   우선 이 클래스에서는 하나의 이미지를 표시하는 범위로만 구현한다.
+* 
+* [animated gif 관련]
+* - thread_gif()를 CGdiplusBitmap에 구현하고 CGdiplusBitmap::set_animation() 함수를 통해 재생시킬 윈도우를 지정하여 손쉽게 사용할 수 있으나
+*   이 함수에서 화면 갱신까지 처리되므로 CSCImageDlg에서 그린 roi 정보 등이 표시되지 않고 CSCImageDlg 내의 다른 컨트롤이 깜빡이는 현상도 발생한다.
+*   CSCImageDlg에서 thread_gif()를 자체 구현하는 것이 맞는 듯 하다.
 */
 
 #pragma once
@@ -19,7 +24,8 @@
 
 #include "../../GdiplusBitmap.h"
 #include "../../CStatic/SCStatic/SCStatic.h"
-#include "../../CToolTipCtrl/RichToolTipCtrl.h"
+#include "../../CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
+//#include "../../CToolTipCtrl/RichToolTipCtrl.h"
 //#include "../../CToolTipCtrl/XInfoTip.h"
 
 #define PIXEL_INFO_CX		72
@@ -36,6 +42,10 @@ class CSCImageDlg : public CDialog
 public:
 	CSCImageDlg(CWnd* parent = nullptr);   // 표준 생성자입니다.
 	virtual ~CSCImageDlg();
+
+	//원칙적으로는 protected 멤버변수로 선언해야 하나 CGdiplusBitmap의 method를 이용할 경우
+	//CSCImageDlg에도 매번 관련 멤버함수를 추가해야 하는 번거로움이 있다.
+	CGdiplusBitmap	m_img;
 
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
@@ -87,32 +97,25 @@ public:
 	int				get_offset_size() { return m_offset_size; }
 
 	//dropper(spuit) cursor 지정
-	void			set_dropper_cursor(UINT nID) { m_dropper_cur_id = nID; }
+	void			set_dropper_cursor(UINT nID);
 
-	//이미지 부드럽게 보정
-	enum INTERPOLATION_TYPE
-	{
-		interpolation_none = Gdiplus::InterpolationModeNearestNeighbor,
-		interpolation_bilinear = Gdiplus::InterpolationModeHighQualityBilinear,
-		interpolation_bicubic = Gdiplus::InterpolationModeHighQualityBicubic,
-		interpolation_lanczos,
-	};
 	int				get_smooth_interpolation();
 	void			set_smooth_interpolation(int type);
 
-	CGdiplusBitmap	m_img;
+	LRESULT			on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam);
+
 
 protected:
 	CWnd*			m_parent = NULL;
 	CString			m_filename;
 	CRect			m_r_display;
-
-	UINT			m_dropper_cur_id = 0;
+	
+	HCURSOR			m_cursor_dropper;
 
 	//투명 png일 경우 배경에 표시할 zigzag 패턴 브러시
 	std::unique_ptr<Gdiplus::TextureBrush> m_br_zigzag;
 
-	Gdiplus::InterpolationMode m_interplationMode = Gdiplus::InterpolationModeHighQualityBicubic;
+	Gdiplus::InterpolationMode m_interplationMode = (Gdiplus::InterpolationMode)CGdiplusBitmap::interpolation_bicubic;// Gdiplus::InterpolationModeHighQualityBicubic;
 
 //확대, 축소 배율을 사용하지 않고 창 크기에 맞춤
 	bool			m_fit2ctrl = true;
@@ -153,11 +156,9 @@ protected:
 	Gdiplus::Color	m_cr_pixel_old = Gdiplus::Color::Black;
 	CSCStatic		m_static_pixel;
 
-	CToolTipCtrl	m_tooltip;
-
-//pixel info font
-	//CFont			m_font_pixel;
-	//CFont			m_font_title;
+//animated gif
+	CSCSliderCtrl	m_slider_gif;
+	LRESULT			on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.

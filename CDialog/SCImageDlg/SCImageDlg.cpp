@@ -51,6 +51,13 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_static_pixel.set_font_name(_T("Consolas"));
 	m_static_pixel.set_font_size(7);
 
+	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - 10, 120, 10), this, 0);
+	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
+	m_slider_gif.set_font_name(_T("Arial"));
+	m_slider_gif.set_font_size(7);
+	m_slider_gif.set_back_color(gGRAY(32));
+	m_slider_gif.set_use_slide();
+
 	m_br_zigzag = m_img.get_zigzag_pattern(32);
 
 	return true;
@@ -74,6 +81,8 @@ BEGIN_MESSAGE_MAP(CSCImageDlg, CDialog)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETCURSOR()
 	ON_WM_WINDOWPOSCHANGED()
+	ON_REGISTERED_MESSAGE(Message_CGdiplusBitmap, &CSCImageDlg::on_message_from_GdiplusBitmap)
+	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCImageDlg::on_message_from_CSCSliderCtrl)
 END_MESSAGE_MAP()
 
 
@@ -346,7 +355,13 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_RETURN :
 			case VK_ESCAPE :
 				return FALSE;
-
+			case VK_SPACE :
+				if (m_img.is_animated_gif())
+				{
+					m_img.pause_gif(-1);
+					return TRUE;
+				}
+				break;
 			case VK_DIVIDE :
 				fit2ctrl(false);
 				m_zoom = 1.0;
@@ -452,10 +467,15 @@ bool CSCImageDlg::load(CString sFile)
 	{
 		CRect rc;
 		GetClientRect(rc);
+		m_slider_gif.set_range(0, m_img.get_frame_count() - 1);
+		m_slider_gif.set_pos(0);
+		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - 10, 120, 10);
+		m_slider_gif.ShowWindow(SW_SHOW);
 		m_img.set_animation(m_hWnd, rc);
 	}
 	else
 	{
+		m_slider_gif.ShowWindow(SW_HIDE);
 		Invalidate();
 	}
 
@@ -577,6 +597,8 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 		CRect rc;
 		GetClientRect(rc);
 		m_img.move_gif(rc);
+
+		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - 10, 120, 10);
 	}
 	//else
 	{
@@ -667,6 +689,8 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		//roi 설정중인 경우
 		if (IsCtrlPressed())
 		{
+			m_static_pixel.ShowWindow(SW_HIDE);
+
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
 
@@ -769,7 +793,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			if (m_static_pixel.IsWindowVisible())
 				m_static_pixel.ShowWindow(SW_HIDE);
 			//m_static_pixel.set_text(_T("(-,-)\nA -\nR -\nG -\nB -"));
-			TRACE(_T("out of range. %ld\n"), GetTickCount());
+			//TRACE(_T("out of range. %ld\n"), GetTickCount());
 			return;
 		}
 		else
@@ -827,6 +851,15 @@ void CSCImageDlg::OnMouseLeave()
 BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	//roi를 그리기 위해 Ctrl키를 누른 상태라면 cross 커서로
+	if (IsCtrlPressed())
+	{
+		SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+		return TRUE;
+	}
+
+	//roi가 그려진 상태라면 roi의 move, resize 위치에 맞는 커서로 변경한다.
 	if (m_screen_roi.IsEmptyArea() == false)
 	{
 		CPoint pt;
@@ -848,46 +881,59 @@ BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 			}
 		}
 
-		if (m_handle_index == -1)
-			return CDialog::OnSetCursor(pWnd, nHitTest, message);
-
-		//마우스 커서 모양을 변경한다.
-		switch (m_handle_index)
+		if (m_handle_index != -1)
 		{
-			case corner_inside :
-				SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZEALL));
-				break;
-			case corner_left :
-			case corner_right :
-				SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZEWE));
-				break;
-			case corner_top :
-			case corner_bottom :
-				SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZENS));
-				break;
-			case corner_topleft :
-			case corner_bottomright :
-				SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZENWSE));
-				break;
-			case corner_topright :
-			case corner_bottomleft :
-				SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZENESW));
-				break;
+			//마우스 커서 모양을 변경한다.
+			switch (m_handle_index)
+			{
+				case corner_inside :
+					SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZEALL));
+					break;
+				case corner_left :
+				case corner_right :
+					SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZEWE));
+					break;
+				case corner_top :
+				case corner_bottom :
+					SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZENS));
+					break;
+				case corner_topleft :
+				case corner_bottomright :
+					SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZENWSE));
+					break;
+				case corner_topright :
+				case corner_bottomleft :
+					SetCursor(AfxGetApp()->LoadStandardCursor(IDC_SIZENESW));
+					break;
+			}
+
+			return TRUE;
 		}
-		return TRUE;
 	}
 
-	if (m_show_pixel && m_dropper_cur_id > 0)
+	//ctrl키가 눌려진 것도 아니고 픽셀 정보 표시 메뉴가 check 상태라면
+	if (m_show_pixel && m_cursor_dropper)
 	{
-		HCURSOR hCursor = AfxGetApp()->LoadCursor(m_dropper_cur_id);
-		SetCursor(hCursor);
+		SetCursor(m_cursor_dropper);
 		return TRUE;
 	}
 
-	SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
-	return TRUE;
+	CPoint pt;
+	GetCursorPos(&pt);
+
+	if (WindowFromPoint(pt) == this)
+	{
+		SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+		return TRUE;
+	}
 
 	return CDialog::OnSetCursor(pWnd, nHitTest, message);
+}
+
+//dropper(spuit) cursor 지정
+void CSCImageDlg::set_dropper_cursor(UINT nID)
+{
+	m_cursor_dropper = AfxGetApp()->LoadCursor(nID);
 }
 
 void CSCImageDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
@@ -895,4 +941,29 @@ void CSCImageDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CDialog::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+}
+
+LRESULT CSCImageDlg::on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam)
+{
+	CGdiplusBitmapMessage* msg = (CGdiplusBitmapMessage*)wParam;
+	if (!msg)
+		return 0;
+
+	if (msg->message == CGdiplusBitmap::message_gif_frame_changed)
+	{
+		TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
+		m_slider_gif.set_pos(msg->frame_index);
+	}
+
+	return 0;
+}
+
+LRESULT CSCImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
+{
+	CSCSliderCtrlMsg* msg = (CSCSliderCtrlMsg*)wParam;
+	if (msg->msg == CSCSliderCtrlMsg::msg_thumb_move)
+	{
+		m_img.goto_frame(msg->pos, true);
+	}
+	return 0;
 }

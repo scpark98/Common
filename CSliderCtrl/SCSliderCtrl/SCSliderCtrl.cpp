@@ -1228,11 +1228,23 @@ void CSCSliderCtrl::set_thumb_color(Gdiplus::Color cr_thumb)
 
 BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 {
-	if (m_use_tooltip)
+	if (m_use_tooltip && m_tooltip.m_hWnd)
 		m_tooltip.RelayEvent(pMsg);
 	// TODO: Add your specialized code here and/or call the base class 
-	if (pMsg->wParam == WM_KEYDOWN)
+	if (pMsg->message == WM_KEYDOWN)
 	{
+		switch (pMsg->wParam)
+		{
+			case VK_LEFT :
+				step(-1);
+				Invalidate();
+				return TRUE;
+			case VK_RIGHT :
+				step(1);
+				Invalidate();
+				return TRUE;
+		}
+
 		return false;
 	}
 
@@ -1476,7 +1488,8 @@ void CSCSliderCtrl::set_bookmark_current_color(Gdiplus::Color cr)
 void CSCSliderCtrl::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
-	
+	CSliderCtrl::PreSubclassWindow();
+
 	CWnd* pWnd = GetParent();
 	CFont* font = NULL;
 
@@ -1488,8 +1501,14 @@ void CSCSliderCtrl::PreSubclassWindow()
 	else
 		font->GetObject(sizeof(m_lf), &m_lf);
 
+	//CSCSliderCtrl을 동적으로 생성하면 font = NULL이고 m_lf는 기본값으로 채워지는데 이 때 lfWidth가 8로 정해진다.
+	//이럴 경우 lfHeight를 바꿔도 lfWidth가 변경되지 않아 8이하의 작은 글꼴은 넓은 글자로 표시된다.
+	//이 값을 0으로 강제 고정해야 lfHeight에 따라 글자의 width가 자동 계산되어 그려진다.
+	m_lf.lfWidth = 0;
+
 	reconstruct_font();
 
+	/*
 	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
 	m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
 	m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
@@ -1497,8 +1516,7 @@ void CSCSliderCtrl::PreSubclassWindow()
 	m_tooltip.SetMaxTipWidth(400); 
 	m_tooltip.AddTool(this, _T(""));
 	m_tooltip.Activate(TRUE);
-
-	CSliderCtrl::PreSubclassWindow();
+	*/
 }
 
 void CSCSliderCtrl::reconstruct_font()
@@ -1741,8 +1759,9 @@ void CSCSliderCtrl::set_font_italic(bool italic)
 //step 단위 증감
 int32_t CSCSliderCtrl::step(int step)
 {
-	int pos = GetPos();
-	SetPos(pos + step);
+	int pos = GetPos() + step;
+	SetPos(pos);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 	return GetPos();
 }
 

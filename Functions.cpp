@@ -3411,7 +3411,7 @@ LONG set_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString str
 //#endif
 
 //reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
-//"count"에 갯수가, 숫자 인덱스 항목들에 각 항목이 저장된 구조에만 사용 가능하다.
+//레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성되어 있다.
 //추가된 인덱스를 리턴한다.
 int add_registry(CWinApp* pApp, CString reg_path, CString value)
 {
@@ -10947,6 +10947,11 @@ HWND get_hwnd_by_exe_file(CString target_exe_file)
 				CloseHandle(hProcess);
 			}
 		}
+		else
+		{
+			_tcscpy_s(sFilePath, _countof(sFilePath), exe_name);
+		}
+
 
 		if (_tcsicmp(sFilePath, target_exe_file) == 0)
 		{
@@ -18821,7 +18826,7 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
 
 
-			if (false)//para[i][j].thickness > 0.0)
+			if (true)//para[i][j].thickness > 0.0)
 			{
 				Gdiplus::GraphicsPath str_path;
 

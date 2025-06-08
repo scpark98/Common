@@ -48,8 +48,8 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
 	m_static_pixel.create(_T("A 0\nR 0\nG 0\nB 0"), WS_CHILD | SS_CENTER | SS_CENTERIMAGE, r_pixel, this);
 	m_static_pixel.sunken();
-	m_static_pixel.set_font_name(_T("Consolas"));
-	m_static_pixel.set_font_size(7);
+	//m_static_pixel.set_font_name(_T("Consolas"));
+	m_static_pixel.set_font_size(8);
 
 	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - 10, 120, 10), this, 0);
 	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
@@ -457,8 +457,8 @@ bool CSCImageDlg::load(CString sFile)
 {
 	m_filename = sFile;
 
-	m_image_roi = Gdiplus::RectF();
-	m_screen_roi = Gdiplus::RectF();
+	//m_image_roi = Gdiplus::RectF();
+	//m_screen_roi = Gdiplus::RectF();
 
 	AfxGetApp()->WriteProfileString(_T("setting\\SCImageDlg"), _T("recent file"), sFile);
 	bool res = m_img.load(sFile);

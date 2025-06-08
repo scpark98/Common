@@ -10,6 +10,8 @@
 #include <shlwapi.h>				 // for PathMatchSpec
 #pragma comment( lib, "shlwapi.lib") // function
 
+#pragma warning(disable : 4996)		// disable bogus deprecation warning
+
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -746,7 +748,7 @@ BOOL CDelayedDirectoryChangeHandler::InitializePatterns(LPCTSTR szIncludeFilter,
 		if( !IsEmptyString(szIncludeFilter) )
 		{
 			TCHAR * szTmpFilter = _tcsdup(szIncludeFilter);
-			TCHAR * pTok = _tcstok( szTmpFilter, _T(";"));
+			TCHAR * pTok = _tcstok(szTmpFilter, _T(";"));
 			while( pTok )
 			{
 				m_nNumIncludeFilterSpecs++;

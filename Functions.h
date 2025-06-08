@@ -1323,7 +1323,7 @@ struct	NETWORK_INFO
 	LONG		set_registry_str(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 
 	//reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
-	//"count"에 갯수가, 숫자 인덱스 항목들에 각 항목이 저장된 구조에만 사용 가능하다.
+	//레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성되어 있다.
 	//추가된 인덱스를 리턴한다.
 	int			add_registry(CWinApp* pApp, CString reg_path, CString value);
 

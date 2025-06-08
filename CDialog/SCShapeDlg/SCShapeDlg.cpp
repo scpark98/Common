@@ -142,8 +142,8 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 {
 	bool res = false;
 
-	if (text.IsEmpty())
-		return false;
+	//if (text.IsEmpty())
+	//	return false;
 
 	m_para.clear();
 
@@ -185,10 +185,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
 
-	if (m_img.is_empty())
-		m_img.create(100, 100, PixelFormat32bppARGB, cr_back);
-	else
-		m_img.clear(cr_back);
+	m_img.release();
 
 	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back, cr_stroke, cr_shadow);
 
@@ -196,17 +193,12 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 		res = create(parent, 0, 0, r.Width(), r.Height());
 
 	CClientDC dc(this);
-	r = ::calc_text_size(r, &dc, m_para, &lf, DT_LEFT | DT_CENTER);
+	r = ::calc_text_size(r, &dc, m_para, &lf, DT_CENTER | DT_VCENTER);
 	r.InflateRect(1, 1);
 
-	//캔버스 크기가 실제 텍스트 출력크기와 다르면
-	if (r.Width() != m_img.width || r.Height() != m_img.height)
-	{
-		//resize하거나 실제 크기로 다시 생성한다.
-		m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
-		r = CRect(0, 0, r.Width(), r.Height());
-		r = ::calc_text_size(r, &dc, m_para, &lf, DT_LEFT | DT_CENTER);
-	}
+	m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
+	r = CRect(0, 0, r.Width(), r.Height());
+	r = ::calc_text_size(r, &dc, m_para, &lf, DT_CENTER | DT_VCENTER);
 
 	//해당 캔버스에
 	Gdiplus::Graphics g(m_img.m_pBitmap);
@@ -222,7 +214,7 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 	set_image(parent, &m_img, false);
 #ifdef _DEBUG
-	m_img.save(_T("d:\\SCShapeDlg.png"));
+	//m_img.save(_T("d:\\SCShapeDlg.png"));
 #endif
 	return true;
 
@@ -612,7 +604,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 
 	while (m_fadeinout_ing)
 	{
-		_alpha += (fadein ? 5 : -5);
+		_alpha += (fadein ? 25 : -25);
 
 		if (_alpha < 0 || _alpha > 255)
 			break;

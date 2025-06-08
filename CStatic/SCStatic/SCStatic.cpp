@@ -100,7 +100,7 @@ void CSCStatic::PreSubclassWindow()
 	ModifyStyle(0, BS_ICON);
 
 	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
-	CWnd* pWnd = GetParent();
+	CWnd* pWnd = AfxGetApp()->GetMainWnd();// GetParent();
 	CFont* font = NULL;
 
 	if (pWnd)
@@ -117,9 +117,10 @@ void CSCStatic::PreSubclassWindow()
 void CSCStatic::reconstruct_font()
 {
 	m_font.DeleteObject();
-	//m_lf.lfQuality = PROOF_QUALITY;// CLEARTYPE_QUALITY;
-	TRACE(_T("m_lf.lfQuality = %d\n"), m_lf.lfQuality);// ANTIALIASED_QUALITY
+
+	//TRACE(_T("m_lf.lfQuality = %d\n"), m_lf.lfQuality);// ANTIALIASED_QUALITY
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+
 	Invalidate();
 }
 

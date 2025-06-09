@@ -11,6 +11,9 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 - 20221217. animatedGif 추가
 	//다른 이미지 포맷과는 달리 내부 쓰레드에서 parent의 DC에 디스플레이 함.
+	//간편한 장점도 있으나 parent DC에 디스플레이하면서 parent의 다른 child들과 간섭이 발생하므로
+	//CGdiplusBitmap에서 디스플레이 할 지
+	//parent에서 직접 디스플레이 할 지를 옵션으로 처리해야 한다.
 
 	//헤더에 include 및 멤버변수 선언
 	#include "../../Common/GdiplusBitmap.h"
@@ -30,6 +33,11 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	//save_gif_frames()를 이용하여 각 프레임을 저장 가능.
 
 	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 변경할 예정
+
+- 20250609 animated gif 재생방식 분리
+	CGdiplusBitmap에서 직접 gif를 재생하면 편리하지만 parent의 다른 child들과 간섭 발생 등 단점이 많아 이를 옵션으로 처리함.
+	load("test.gif", true)로 호출하면 CGdiplusBitmap에서 자동 재생되고
+	load("test.gif", false)로 호출하면 load하는 윈도우에서 직접 재생하게 된다.
 */
 
 //gdiplus 1.1을 사용하기 위해 pch.h, framework.h등에 이 define을 추가했으나 적용되지 않았다.
@@ -129,12 +137,12 @@ public:
 	void			release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
-	bool			load(CString sFile);
+	bool			load(CString sFile, bool gif_play_in_this = true);
 	//다음 예시와 같이 리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
 	//m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
-	bool			load(CString sType, UINT id);
+	bool			load(CString sType, UINT id, bool gif_play_in_this);
 	//png일 경우는 sType을 생략할 수 있다.
-	bool			load(UINT id);
+	bool			load(UINT id, bool gif_play_in_this = true);
 	bool			load_icon(UINT id, int size = 32);
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
@@ -157,8 +165,11 @@ public:
 	int				channels();
 	CSize			size() { return CSize(width, height); }
 
-	//alpha 픽셀을 포함한 이미지인지 판별
-	bool			is_pixelformat_alpha();
+	//alpha 픽셀을 포함한 이미지인지 판별.
+	//-1 : 아직 판별되지 않은 상태이므로 판별 시작
+	// 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우
+	// 1 : 한 점이라도 alpha < 255인 경우
+	int				has_alpha_pixel();
 
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
 	std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));
@@ -271,10 +282,10 @@ public:
 	void			set_alpha(int alpha);
 
 	//Gdiplus::Bitmap::GetPixel()이므로 data를 추출하지 않고도 구할 수 있으나 속도가 느림
-	Gdiplus::Color get_color(int x, int y);
+	Gdiplus::Color	get_color(int x, int y);
 
 	//data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
-	Gdiplus::Color get_pixel(int x, int y);
+	Gdiplus::Color	get_pixel(int x, int y);
 
 
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
@@ -365,6 +376,7 @@ public:
 	int				stride = 0;
 
 //animated Gif 관련
+	bool			m_gif_play_in_this = true;	//gif 재생코드를 이 클래스에서 실행할 지, parent에서 직접 실행할 지
 	int				m_frame_count;
 	int				m_frame_index;
 	Gdiplus::PropertyItem* m_pPropertyItem = NULL;
@@ -408,11 +420,14 @@ public:
 protected:
 	CString			m_filename = _T("untitled");
 
+	//-1 : 아직 판별되지 않은 상태이므로 판별 시작
+	// 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우
+	// 1 : 한 점이라도 alpha < 255인 경우
+	int				m_has_alpha_pixel = -1;	
 	void			resolution();
 	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
 
 //animatedGif
-	bool			m_bIsInitialized;
 	bool			m_paused = false;
 
 	//ani gif 표시 윈도우

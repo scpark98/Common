@@ -173,7 +173,7 @@ void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
 	}
 }
 
-bool CGdiplusBitmap::load(CString file)
+bool CGdiplusBitmap::load(CString file, bool gif_play_in_this)
 {
 	if (!PathFileExists(file))
 		return false;
@@ -197,7 +197,10 @@ bool CGdiplusBitmap::load(CString file)
 	bool use_copied_open = true;
 	
 	if (get_part(file, fn_ext).MakeLower() == _T("gif"))
+	{
+		m_gif_play_in_this = gif_play_in_this;
 		use_copied_open = false;
+	}
 
 #ifdef UNICODE
 	if (use_copied_open)
@@ -244,15 +247,15 @@ bool CGdiplusBitmap::load(CString file)
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-bool CGdiplusBitmap::load(UINT id)
+bool CGdiplusBitmap::load(UINT id, bool gif_play_in_this)
 {
 	if (id <= 0)
 		return false;
 
-	return load(_T("PNG"), id);
+	return load(_T("PNG"), id, gif_play_in_this);
 }
 
-bool CGdiplusBitmap::load(CString sType, UINT id)
+bool CGdiplusBitmap::load(CString sType, UINT id, bool gif_play_in_this)
 {
 	release();
 
@@ -263,6 +266,7 @@ bool CGdiplusBitmap::load(CString sType, UINT id)
 
 	if (sType == _T("png") || sType == _T("jpg") || sType == _T("gif"))
 	{
+		m_gif_play_in_this = gif_play_in_this;
 		m_pBitmap = GetImageFromResource(sType, id);
 	}
 	else
@@ -525,6 +529,7 @@ void CGdiplusBitmap::release()
 
 	SAFE_DELETE_ARRAY(data);
 	width = height = channel = stride = 0;
+	m_has_alpha_pixel = -1;
 	m_filename.Empty();
 }
 
@@ -570,6 +575,7 @@ void CGdiplusBitmap::resolution()
 	height = 0;
 	channel = 0;
 	stride = 0;
+	m_has_alpha_pixel = -1;
 
 	if (!m_pBitmap)
 		return;
@@ -765,11 +771,50 @@ CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 	return dst;
 }
 
-//alpha 픽셀을 포함한 이미지인지 판별
-bool CGdiplusBitmap::is_pixelformat_alpha()
+//alpha 픽셀을 포함한 이미지인지 판별.
+//-1 : 아직 판별되지 않은 상태이므로 판별 시작
+// 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우
+// 1 : 한 점이라도 alpha < 255인 경우
+int CGdiplusBitmap::has_alpha_pixel()
 {
-	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
-	return Gdiplus::IsAlphaPixelFormat(fmt);
+	//Gdiplus::IsAlphaPixelFormat() 은 PixelFormat32bppARGB 과 같은 Gdiplus::PixelFormat을 구해서 A 채널을 가졌는지를 판별하므로
+	//실제 모든 픽셀의 alpha가 255라고 해도 true가 된다.
+	//즉, 픽셀을 보고 판별하는 것이 아닌 PixelFormat 값만으로 판별하므로 실제 255가 아닌 alpha값 픽셀이 있는지는 판별하지 않는다.
+	if (m_has_alpha_pixel == -1)
+	{
+		Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
+		m_has_alpha_pixel = (Gdiplus::IsAlphaPixelFormat(fmt) == TRUE);
+	}
+
+	return m_has_alpha_pixel;
+
+	//4코너 등과 같은 특정 위치의 픽셀의 alpha값이 255인지 아닌지로 판별하는 것은 좋은 방법은 아니다.
+	//alpha 채널의 값을 모두 더해서 그 값이 255 * width * height와 같다면 반투명 이미지가 아니고
+	//위 값보다 작다면 반투명 픽셀을 포함하는 이미지라고 판별해야 한다.
+	//단, animated gif의 경우는 각 프레임에 대해 get_raw_data()를 해야하므로 좀 복잡해진다.
+	//우선 위와 같은 방식대로 한다.
+	/*
+	if (m_has_alpha_pixel == -1)
+	{
+		int x, y;
+		uint64_t total = 0;
+
+		if (!data)
+			get_raw_data();
+
+		for (y = 0; y < height; y++)
+		{
+			for (x = 0; x < width; x++)
+			{
+				total += *(data + y * width * channel + x * channel + 3);
+			}
+		}
+
+		m_has_alpha_pixel = (total < width * height * 255);
+	}
+
+	return m_has_alpha_pixel;
+	*/
 }
 
 std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0, Gdiplus::Color cr1)
@@ -2463,6 +2508,9 @@ void CGdiplusBitmap::move_gif(CRect r)
 
 void CGdiplusBitmap::play_gif()
 {
+	if (!m_gif_play_in_this)
+		return;
+
 	if (m_run_thread_animation)
 	{
 		if (m_paused)
@@ -2491,6 +2539,9 @@ void CGdiplusBitmap::play_gif()
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
 void CGdiplusBitmap::pause_gif(int pos)
 {
+	if (!m_gif_play_in_this)
+		return;
+
 	if (m_frame_count < 2 || !m_run_thread_animation)
 		return;
 

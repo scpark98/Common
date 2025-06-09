@@ -325,7 +325,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
 {
-	bool res = m_img.load(id);
+	bool res = m_img.load(id, true);
 	if (res)
 		set_image(parent, &m_img, false);
 	return res;
@@ -333,7 +333,7 @@ bool CSCShapeDlg::load(CWnd* parent, UINT id)
 
 bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 {
-	bool res = m_img.load(sType, id);
+	bool res = m_img.load(sType, id, true);
 
 	if (res)
 		set_image(parent, &m_img, false);
@@ -343,7 +343,7 @@ bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 
 bool CSCShapeDlg::load(CWnd* parent, CString sFile)
 {
-	bool res = m_img.load(sFile);
+	bool res = m_img.load(sFile, true);
 	if (res)
 		set_image(parent, &m_img, false);
 	return res;

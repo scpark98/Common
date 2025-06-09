@@ -14,9 +14,9 @@
 *   우선 이 클래스에서는 하나의 이미지를 표시하는 범위로만 구현한다.
 * 
 * [animated gif 관련]
-* - thread_gif()를 CGdiplusBitmap에 구현하고 CGdiplusBitmap::set_animation() 함수를 통해 재생시킬 윈도우를 지정하여 손쉽게 사용할 수 있으나
+* - CGdiplusBitmap에 구현된 thread_gif()를 이용하면 간단하고 편하지만
 *   이 함수에서 화면 갱신까지 처리되므로 CSCImageDlg에서 그린 roi 정보 등이 표시되지 않고 CSCImageDlg 내의 다른 컨트롤이 깜빡이는 현상도 발생한다.
-*   CSCImageDlg에서 thread_gif()를 자체 구현하는 것이 맞는 듯 하다.
+*   CSCImageDlg에서 thread_gif()를 추가하고 직접 재생하도록 수정함.
 */
 
 #pragma once
@@ -30,6 +30,9 @@
 
 #define PIXEL_INFO_CX		80
 #define PIXEL_INFO_CY		72
+
+#define GIF_SLIDER_WIDTH	120
+#define GIF_SLIDER_HEIGHT	12
 
 #define MAX_RECT_HANDLE		9
 
@@ -72,7 +75,7 @@ public:
 	void			set_show_pixel(bool show);
 
 	bool			copy_to_clipbard();
-	//void			paste_from_clipboard();
+	bool			paste_from_clipboard();
 
 	Gdiplus::RectF	get_image_roi();
 	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF()) { m_image_roi = roi; Invalidate(); }
@@ -103,6 +106,15 @@ public:
 	void			set_smooth_interpolation(int type);
 
 	LRESULT			on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam);
+
+//animated gif 관련 public member
+	void			play_gif();
+	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
+	void			pause_gif(int pos = 0);
+	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
+	void			stop_gif();
+	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
+	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
 
 
 protected:
@@ -157,6 +169,14 @@ protected:
 	CSCStatic		m_static_pixel;
 
 //animated gif
+	bool			m_paused = false;
+	int				m_frame_index;
+	CRect			m_r_gif;
+	bool			m_run_thread_animation = false;
+	bool			m_thread_animation_terminated = true;
+	bool			m_is_gif_mirror = false;
+	void			thread_gif_animation();
+
 	CSCSliderCtrl	m_slider_gif;
 	LRESULT			on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);
 

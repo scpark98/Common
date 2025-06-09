@@ -4,6 +4,7 @@
 //#include "afxdialogex.h"
 #include "SCImageDlg.h"
 
+#include <thread>
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../AutoFont.h"
@@ -24,13 +25,14 @@ CSCImageDlg::CSCImageDlg(CWnd* parent)
 
 CSCImageDlg::~CSCImageDlg()
 {
+	stop_gif();
 }
 
 bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 {
 	m_parent = parent;
 
-	LONG_PTR dwStyle = WS_CHILD | WS_VISIBLE;
+	LONG_PTR dwStyle = WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
@@ -51,11 +53,13 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	//m_static_pixel.set_font_name(_T("Consolas"));
 	m_static_pixel.set_font_size(8);
 
-	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - 10, 120, 10), this, 0);
+	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
 	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
+	//m_slider_gif.set_track_height(20);
 	m_slider_gif.set_font_name(_T("Arial"));
 	m_slider_gif.set_font_size(7);
 	m_slider_gif.set_back_color(gGRAY(32));
+	//m_slider_gif.draw_progress_border();
 	m_slider_gif.set_use_slide();
 
 	m_br_zigzag = m_img.get_zigzag_pattern(32);
@@ -100,20 +104,20 @@ void CSCImageDlg::OnPaint()
 
 
 	//수정 필요. gif도 stretch mode에 따라 꽉차게 또는 원래 크기로 표시한다. 아직 미구현이며 현재는 zoom 표시됨.	
-	if (m_img.is_valid() && m_img.is_animated_gif())
-	{
-		CRect r = get_ratio_rect(rc, m_img.width, m_img.height, 0, false);
-		CRgn rgn_rc;
-		CRgn rgn_img;
-		CRgn rgn_exclude;
-		rgn_rc.CreateRectRgnIndirect(&rc);
-		rgn_img.CreateRectRgnIndirect(&r);
-		rgn_exclude.CreateRectRgn(0, 0, 1, 1);
-		rgn_exclude.CombineRgn(&rgn_rc, &rgn_img, RGN_XOR);
-		dc1.SelectClipRgn(&rgn_exclude);
-		dc1.FillSolidRect(rc, GRAY32);
-		return;
-	}
+	//if (m_img.is_valid() && m_img.is_animated_gif())
+	//{
+	//	CRect r = get_ratio_rect(rc, m_img.width, m_img.height, 0, false);
+	//	CRgn rgn_rc;
+	//	CRgn rgn_img;
+	//	CRgn rgn_exclude;
+	//	rgn_rc.CreateRectRgnIndirect(&rc);
+	//	rgn_img.CreateRectRgnIndirect(&r);
+	//	rgn_exclude.CreateRectRgn(0, 0, 1, 1);
+	//	rgn_exclude.CombineRgn(&rgn_rc, &rgn_img, RGN_XOR);
+	//	dc1.SelectClipRgn(&rgn_exclude);
+	//	dc1.FillSolidRect(rc, GRAY32);
+	//	return;
+	//}
 
 	//이 코드를 위의 gif 이미지일때의 처리 위에 하면 깜빡임이 발생하거나 의도대로 그려지지 않게 된다.
 	CMemoryDC dc(&dc1, &rc);
@@ -212,7 +216,7 @@ void CSCImageDlg::OnPaint()
 	}
 
 	//만약 투명 픽셀이 포함된 이미지라면 지그재그 격자를 그려준 후
-	if (m_img.is_pixelformat_alpha())
+	if (m_img.has_alpha_pixel() == 1)
 	{
 		g.FillRectangle(m_br_zigzag.get(), CRect2GpRect(m_r_display));
 	}
@@ -358,7 +362,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_SPACE :
 				if (m_img.is_animated_gif())
 				{
-					m_img.pause_gif(-1);
+					pause_gif(-1);
 					return TRUE;
 				}
 				break;
@@ -455,13 +459,16 @@ bool CSCImageDlg::load()
 
 bool CSCImageDlg::load(CString sFile)
 {
+	//다른 이미지를 로딩하기 전에 이전 이미지가 animated gif였다면 재생하는 thread를 중지시켜야 한다.
+	stop_gif();
+
 	m_filename = sFile;
 
 	//m_image_roi = Gdiplus::RectF();
 	//m_screen_roi = Gdiplus::RectF();
 
 	AfxGetApp()->WriteProfileString(_T("setting\\SCImageDlg"), _T("recent file"), sFile);
-	bool res = m_img.load(sFile);
+	bool res = m_img.load(sFile, false);
 
 	if (m_img.is_animated_gif())
 	{
@@ -469,9 +476,11 @@ bool CSCImageDlg::load(CString sFile)
 		GetClientRect(rc);
 		m_slider_gif.set_range(0, m_img.get_frame_count() - 1);
 		m_slider_gif.set_pos(0);
-		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - 10, 120, 10);
+		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 		m_slider_gif.ShowWindow(SW_SHOW);
-		m_img.set_animation(m_hWnd, rc);
+		//m_img.set_animation(m_hWnd, rc);
+		std::thread t(&CSCImageDlg::thread_gif_animation, this);
+		t.detach();
 	}
 	else
 	{
@@ -491,7 +500,7 @@ bool CSCImageDlg::load(CString sType, UINT id)
 	m_image_roi = Gdiplus::RectF();
 	m_screen_roi = Gdiplus::RectF();
 
-	bool res = m_img.load(sType, id);// , show_error);
+	bool res = m_img.load(sType, id, false);
 	Invalidate();
 
 	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CImageStatic, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
@@ -529,6 +538,22 @@ bool CSCImageDlg::copy_to_clipbard()
 		return true;
 	}
 	return m_img.copy_to_clipbard();
+}
+
+bool CSCImageDlg::paste_from_clipboard()
+{
+	stop_gif();
+
+	if (m_img.paste_from_clipboard())
+	{
+		m_slider_gif.ShowWindow(SW_HIDE);
+		set_filename(_T("image from clipboard"));
+		set_alt_info(_T(""));
+		Invalidate();
+		return true;
+	}
+
+	return false;
 }
 
 Gdiplus::RectF CSCImageDlg::get_image_roi()
@@ -598,7 +623,7 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 		GetClientRect(rc);
 		m_img.move_gif(rc);
 
-		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - 10, 120, 10);
+		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 	}
 	//else
 	{
@@ -817,7 +842,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			str.Format(_T("(%d,%d)\nA %3d\nR %3d\nG %3d\nB %3d"), pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
 
-			if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
+			//if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
 			{
 				m_static_pixel.set_back_color(m_cr_pixel);
 				m_static_pixel.set_text_color(get_distinct_gcolor(m_cr_pixel));
@@ -911,22 +936,25 @@ BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		}
 	}
 
-	//ctrl키가 눌려진 것도 아니고 픽셀 정보 표시 메뉴가 check 상태라면
-	if (m_show_pixel && m_cursor_dropper)
-	{
-		SetCursor(m_cursor_dropper);
-		return TRUE;
-	}
-
 	CPoint pt;
 	GetCursorPos(&pt);
 
-	if (WindowFromPoint(pt) == this)
+	CPoint client_pt = pt;
+	ScreenToClient(&client_pt);
+
+	//CSCImageDlg이고 이미지 표시 영역에 한해
+	if (WindowFromPoint(pt) == this && m_r_display.PtInRect(client_pt))
 	{
-		SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+		//픽셀 정보 표시라면 스포이트를
+		if (m_show_pixel && m_cursor_dropper)
+			SetCursor(m_cursor_dropper);
+		//그렇지 않다면 십자 커서를 표시한다.
+		else
+			SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
 		return TRUE;
 	}
 
+	//기타 다른 컨트롤 또는 이미지 영역밖은 기본 커서로 표시한다.
 	return CDialog::OnSetCursor(pWnd, nHitTest, message);
 }
 
@@ -963,7 +991,127 @@ LRESULT CSCImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 	CSCSliderCtrlMsg* msg = (CSCSliderCtrlMsg*)wParam;
 	if (msg->msg == CSCSliderCtrlMsg::msg_thumb_move)
 	{
-		m_img.goto_frame(msg->pos, true);
+		TRACE(_T("%ld, pos = %d\n"), GetTickCount(), msg->pos);
+		goto_frame(msg->pos, true);
 	}
 	return 0;
+}
+
+//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
+void CSCImageDlg::pause_gif(int pos)
+{
+	if (m_img.m_gif_play_in_this)
+		return;
+
+	if (m_img.get_frame_count() < 2 || !m_run_thread_animation)
+		return;
+
+	//m_frame_count가 UINT이고 pos = -1일 경우 아래 if문은 true가 된다.
+	//if (-1 >= (UINT)20) => true
+	//취약하므로 m_frame_count의 type을 UINT에서 int로 변경한다.
+	if (pos >= m_img.get_frame_count())
+		pos = 0;
+
+	if (pos < 0)
+	{
+		m_paused = !m_paused;
+	}
+	else
+	{
+		goto_frame(pos, true);
+	}
+}
+
+void CSCImageDlg::stop_gif()
+{
+	if (m_img.get_frame_count() < 2)
+		return;
+
+	m_paused = false;
+	m_run_thread_animation = false;
+	while (!m_thread_animation_terminated)
+		Wait(100);
+
+	if (m_hWnd)
+		Invalidate();
+}
+
+void CSCImageDlg::goto_frame(int pos, bool pause)
+{
+	if (m_img.get_frame_count() < 2)
+		return;
+
+	if (pos >= m_img.get_frame_count())
+		m_frame_index = 0;
+
+	m_frame_index = pos;
+	m_paused = pause;
+
+	GUID   pageGuid = Gdiplus::FrameDimensionTime;	//for TIFF : Gdiplus::FrameDimensionPage
+	long t0 = clock();
+	m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+	TRACE(_T("elapse = %ld\n"), clock() - t0);
+
+	if (m_paused)
+		Invalidate();
+}
+
+//지정 % 위치의 프레임으로 이동
+void CSCImageDlg::goto_frame_percent(int pos, bool pause)
+{
+	double dpos = ((double)pos / (double)m_img.get_frame_count()) * 100.0;
+	goto_frame((int)dpos, pause);
+}
+
+void CSCImageDlg::thread_gif_animation()
+{
+	if (m_img.get_frame_count() < 2)
+		return;
+
+	m_frame_index = 0;
+	m_run_thread_animation = true;
+	m_thread_animation_terminated = false;
+
+	long t0 = clock();
+	long t1 = t0;
+
+	while (m_run_thread_animation)
+	{
+		GUID   pageGuid = Gdiplus::FrameDimensionTime;
+
+		if (m_paused)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue;
+		}
+
+		if (!m_run_thread_animation)
+			break;
+
+		m_slider_gif.set_pos(m_frame_index);
+
+		m_frame_index++;
+		if (m_frame_index >= m_img.get_frame_count())
+			m_frame_index = 0;
+
+		m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+
+		if (!m_run_thread_animation)
+			break;
+
+		Invalidate();
+
+		//delay는 해당 프레임에 설정된 delay를 그대로 주면 안되고
+		//전 프레임부터 현 프레임까지 재생하는데 걸린 시간은 빼줘야 한다.
+		t1 = clock();
+		long display_delay = t1 - t0;
+		long delay = ((long*)(m_img.m_pPropertyItem->value))[m_frame_index] * 10;
+
+		if (delay > display_delay)
+			std::this_thread::sleep_for(std::chrono::milliseconds((delay - display_delay)));
+		t0 = clock();
+	}
+
+	m_run_thread_animation = false;
+	m_thread_animation_terminated = true;
 }

@@ -1014,36 +1014,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 	if (m_lbuttondown && IsWindowEnabled())
 	{
-		/*
-		// 범위를 벗어났는지 검사한다
-		if(m_is_vertical)
-		{
-			nPixel = point.y - m_nMouseOffset;
-
-			if(nPixel > m_rc.Height() - m_margin.bottom - (m_style <= style_value ? m_thumb.cy/2 : 0))
-				nPixel = m_rc.Height() - m_margin.bottom - (m_style<= style_value ? m_thumb.cy/2 : 0);
-
-			if(nPixel < m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0))
-				nPixel = m_margin.top + (m_style <= style_value ? m_thumb.cy/2 : 0);
-		}
-		else
-		{
-			nPixel = point.x - m_nMouseOffset;
-
-			if(nPixel < m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0))
-				nPixel = m_margin.left + (m_style <= style_value ? m_thumb.cx/2 : 0);
-
-			if(nPixel > m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0))
-				nPixel = m_rc.Width() - m_margin.right - (m_style <= style_value ? m_thumb.cx/2 : 0);
-		}
-
-
-		pos = Pixel2Pos(point.x);
-		//pos = (int)((double)point.x * (double)(upper - lower) / (double)Rect.right) + lower;
-		*/
-		//TRACE(_T("point.x = %d, nPos = %d, point.x = %d\n"), point.x, pos, Pos2Pixel(pos));
 		SetPos(pos);
-		//Invalidate(false);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 	}
 
@@ -1649,11 +1620,20 @@ int CSCSliderCtrl::GetPos()
 */
 void CSCSliderCtrl::set_pos(int pos)
 {
+	//CSCImageDlg에서 animated gif를 재생하다가 종료시키면 간혹 이 set_pos()를 호출하여 에러가 발생한다.
+	//이미 이 슬라이더의 m_hWnd가 NULL인 상태에서는 아래 코드를 처리하지 않아야 한다.
+	if (!m_hWnd)
+		return;
+
 	//style_step일 때 SetPos()를 호출한다는 얘기는 아직 처리중이고 pos == upper인 경우라도 맨 마지막 스텝을 처리중이라는 뜻이므로
 	//SetPos()에서는 m_step_completed는 항상 false이며 parent에서 모든 처리가 완료된 시점에 이 값을 true로 세팅해줘야 한다.
 	m_step_completed = false;
 	m_thumb_hide = false;
 	CSliderCtrl::SetPos(pos);
+
+	if (!m_hWnd)
+		return;
+
 	Invalidate();
 }
 

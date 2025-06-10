@@ -2232,7 +2232,7 @@ bool IsInteger(LPCTSTR lpszValue)
 }
 
 //start부터 시작해서 처음 만나는 숫자 영역을 추출해서 숫자로 리턴한다.
-bool get_number_from_string(CString str, int &num, int start)
+int get_number_from_string(CString str, int &num, int start)
 {
 	int i = start;
 
@@ -2255,12 +2255,12 @@ bool get_number_from_string(CString str, int &num, int start)
 	}
 
 	if (i == start)
-		return false;
+		return -1;
 
 	CString num_str = str.Mid(start, i - start);
 	num = _ttoi(num_str);
 
-	return true;
+	return i;
 }
 
 //문자열에 포함된 숫자문자를 숫자로 간주하여 비교한다.
@@ -18500,6 +18500,7 @@ CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& p
 	sf.SetAlignment(Gdiplus::StringAlignmentNear);
 	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
 	//sf.SetFormatFlags(Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
+	sf.SetTrimming(Gdiplus::StringTrimmingNone);
 
 	int max_width = 0;
 	int max_width_line = 0;
@@ -18535,16 +18536,28 @@ CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& p
 			Gdiplus::Font* font = NULL;
 			get_paragraph_font(g, para, i, j, &font);
 			Gdiplus::RectF boundRect;
-			//g.MeasureString(CStringW(m_para[i][j].text), -1, font, Gdiplus::PointF(0, 0), &boundRect);
-			g.MeasureString(CStringW(para[i][j].text), -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect);
-			//Gdiplus::Region rgn[] = Gdiplus::Region[1];
-			//g.MeasureCharacterRanges(CStringW(para[i][j].text), -1, font, boundRect, &sf, 1, &rgn);
-			//boundRect = rgn[0].GetBounds(g);
-			sz.cx = boundRect.Width;
-			sz.cy = boundRect.Height;
+			Gdiplus::RectF boundRect_temp;
+
+			//"text...    "와 같이 뒤에 공백이 있을 경우 공백이 무시된다.
+			//방법1. 맨 끝에 "|"와 같은 문자를 넣어 계산한 후 "|"의 width를 뺸다.
+			//방법2. SetMeasurableCharacterRanges(), MeasureCharacterRanges() 등을 이용하는 것이 더 좋음
+			//우선 간단하게 1번 방식을 사용한다.
+			g.MeasureString(CStringW(para[i][j].text + _T("M")), -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect);
+			g.MeasureString(L"M", -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect_temp);
+
+			if (boundRect.IsEmptyArea())
+			{
+				boundRect.Width = 1;
+				boundRect.Height = 40;
+			}
+
+			//stroke 두께까지 포함한 크기여야 한다.
+			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].thickness;// *2.0f;
+			sz.cy = boundRect.Height + para[i][j].thickness;// *2.0f;
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+			//para[i][j].r.InflateRect(0, 0, para[i][j].thickness * 2.0f, para[i][j].thickness * 2.0f);
 #endif
-			TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
+			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
 			sz_text.cx += sz.cx;
 
 			//한 라인에서 가장 cy가 큰 값을 기억시킨다.
@@ -18709,7 +18722,7 @@ CFont* select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& par
 	_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), para[line][index].name);
 
 	lf.lfHeight = get_pixel_size_from_font_size(NULL, para[line][index].size);
-	lf.lfWeight = para[line][index].bold ? FW_BOLD : FW_NORMAL;
+	lf.lfWeight = para[line][index].weight;
 	lf.lfItalic = para[line][index].italic;
 	lf.lfUnderline = para[line][index].underline;
 	lf.lfStrikeOut = para[line][index].strike;
@@ -18738,7 +18751,7 @@ void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph
 	//}
 
 	int font_style = 0;
-	if (para[line][index].bold)
+	if (para[line][index].weight == FW_BOLD)
 		font_style |= Gdiplus::FontStyleBold;
 	if (para[line][index].italic)
 		font_style |= Gdiplus::FontStyleItalic;
@@ -18811,11 +18824,18 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].name));
 
 			int font_style = 0;
-			if (para[i][j].bold)
+			if (para[i][j].weight == FW_BOLD)
 				font_style |= Gdiplus::FontStyleBold;
+			if (para[i][j].italic)
+				font_style |= Gdiplus::FontStyleItalic;
+			if (para[i][j].strike)
+				font_style |= Gdiplus::FontStyleStrikeout;
+			if (para[i][j].underline)
+				font_style |= Gdiplus::FontStyleUnderline;
+
 
 			//get_paragraph_font(g, para, i, j, &font);
-			float emSize = fDpiY * para[i][j].size / 96.0;
+			float emSize = fDpiY * para[i][j].size / 72.0;
 			Gdiplus::Font font(&ff, emSize, font_style);
 
 
@@ -18824,38 +18844,46 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 
 			//text를 출력한다.
 			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
+			Gdiplus::GraphicsPath str_path;
 
+			//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
+			str_path.SetFillMode(Gdiplus::FillModeWinding);
 
-			if (true)//para[i][j].thickness > 0.0)
-			{
-				Gdiplus::GraphicsPath str_path;
+			//stroke가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
+			//r을 정확히 계산하는 것이 정석이나 우선 약간 넓혀서 글자가 잘리지 않도록 한다.
+			CRect r = para[i][j].r;
+			r.InflateRect(0, 0, 1, 1);
+			str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
+								font_style, emSize, CRect2GpRectF(r), sf.GenericTypographic());
 
-				//emSize
-				//fontsize=
-				//CSCShapeDlg에서는 96주면 넘쳐나서 안그려지고 68을 주면 DrawString()과 유사.
-				//MiniClock은 fontsize=14일 때 16.5이하여야 그려진다. 이 변환식은?
-				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-					font_style, 68, CRect2GpRectF(para[i][j].r), sf.GenericTypographic());
+			Gdiplus::Pen   gp(para[i][j].cr_stroke, para[i][j].thickness);
+			gp.SetLineJoin(Gdiplus::LineJoinMiter);
+			Gdiplus::SolidBrush gb(para[i][j].cr_text);
 
-				Gdiplus::Pen   gp(para[i][j].cr_stroke, 5.0f);// thickness);
-				//gp.SetLineJoin(Gdiplus::LineJoinMiter);
-				Gdiplus::SolidBrush gb(para[i][j].cr_text);
-
+			//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
+			//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
+			if (para[i][j].thickness > 0.0f)
 				g.DrawPath(&gp, &str_path);
-				g.FillPath(&gb, &str_path);
-			}
-			else
-			{
-				g.DrawString(CStringW(para[i][j].text),
-					para[i][j].text.GetLength(), &font,
-					Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
-			}
+
+			g.FillPath(&gb, &str_path);
+			//}
+			//else
+			//{
+			//	g.DrawString(CStringW(para[i][j].text),
+			//		para[i][j].text.GetLength(), &font,
+			//		Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+			//}
 #endif
 
-			//if (m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)
-			//{
-			//	draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Red, Gdiplus::Color(96, 255, 255, 255));
-			//}
+			//각 para 영역 확인용 코드
+#ifdef _DEBUG
+			if (true)//m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)
+			{
+				//"\n"에 의한 공백 라인은 영역 사각형을 굳이 표시하지 않는다.
+				if (para[i][j].r.Width() > 2)
+					draw_rectangle(g, para[i][j].r, Gdiplus::Color::Red);// , Gdiplus::Color(255, 255, 0, 0));
+			}
+#endif
 		}
 	}
 

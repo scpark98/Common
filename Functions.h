@@ -627,8 +627,9 @@ struct	NETWORK_INFO
 	//음수를 허용하는 정수값 문자열인지
 	bool		IsInteger(LPCTSTR lpszValue);
 	//start부터 시작해서 처음 만나는 숫자 영역을 추출해서 num에 넘겨준다.
+	//숫자 영역의 끝 인덱스를 리턴한다.
 	//숫자 영역이 없으면 false를 리턴한다.
-	bool		get_number_from_string(CString str, int &num, int start = 0);
+	int			get_number_from_string(CString str, int &num, int start = 0);
 	//문자열에 포함된 숫자문자를 숫자로 간주하여 비교한다. "a5"는 "a12"보다 작다.
 	bool		is_greater_with_numeric(CString str0, CString str1);
 	//주어진 문자열이 알파벳과 숫자로만 구성된 문자열인지 검사한다.

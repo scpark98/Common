@@ -109,7 +109,7 @@ public:
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
 	//default는 hide 상태로 시작함.
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
-	bool			set_text(CWnd* parent, CString text,
+	CSCShapeDlgTextSetting*	set_text(CWnd* parent, CString text,
 							float font_size,
 							int font_style,
 							int shadow_depth = 2,
@@ -119,8 +119,14 @@ public:
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DimGray,
 							Gdiplus::Color cr_back = Gdiplus::Color(1, 0, 0, 0));
-	bool			set_text(CSCShapeDlgTextSetting* setting = NULL);
-	bool			set_text(CString str);
+	CSCShapeDlgTextSetting* set_text(CString str);
+	CSCShapeDlgTextSetting*	set_text(CSCShapeDlgTextSetting* setting = NULL);
+
+	void			set_text_color(Gdiplus::Color cr) { m_text_setting.cr_text = cr; set_text(&m_text_setting); }
+	void			set_stroke_color(Gdiplus::Color cr) { m_text_setting.cr_stroke = cr; set_text(&m_text_setting); }
+	void			set_shadow_color(Gdiplus::Color cr) { m_text_setting.cr_shadow = cr; set_text(&m_text_setting); }
+	void			set_back_color(Gdiplus::Color cr) { m_text_setting.cr_back = cr; set_text(&m_text_setting); }
+	void			set_thickness(float thickness) { m_text_setting.thickness = thickness; set_text(&m_text_setting); }
 
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);
@@ -131,14 +137,13 @@ public:
 	//hide_after_ms, fadeout 파라미터는 fade_in에서만 사용된다.
 	void			fade_in(int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
 	void			fade_out();
-
+	bool			is_fadeinout_ing() { return m_fadeinout_ing; }
 	void			thread_fadeinout(bool fadein, int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
 
 	//
 	CSCShapeDlgTextSetting	m_text_setting;
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
 	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
-	void			set_text_color(Gdiplus::Color cr_text) { m_text_setting.cr_text = cr_text; set_text(&m_text_setting); }
 
 	void			get_logfont(LOGFONT *lf);
 

@@ -771,6 +771,90 @@ CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 	return dst;
 }
 
+CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simple)
+{
+	if (fmt == -1)
+		fmt = m_pBitmap->GetPixelFormat();
+
+	CString str_fmt = _T("Unknown PixelFormat");
+
+	switch (fmt)
+	{
+		case PixelFormat1bppIndexed :
+			str_fmt =  _T("PixelFormat1bppIndexed");
+			break;
+		case PixelFormat4bppIndexed:
+			str_fmt = _T("PixelFormat4bppIndexed");
+			break;
+		case PixelFormat8bppIndexed:
+			str_fmt = _T("PixelFormat8bppIndexed");
+			break;
+		case PixelFormat16bppGrayScale:
+			str_fmt = _T("PixelFormat16bppGrayScale");
+			break;
+		case PixelFormat16bppRGB555:
+			str_fmt = _T("PixelFormat16bppRGB555");
+			break;
+		case PixelFormat16bppRGB565:
+			str_fmt = _T("PixelFormat16bppRGB565");
+			break;
+		case PixelFormat16bppARGB1555:
+			str_fmt = _T("PixelFormat16bppARGB1555");
+			break;
+		case PixelFormat24bppRGB:
+			str_fmt = _T("PixelFormat24bppRGB");
+			break;
+		case PixelFormat32bppRGB:
+			str_fmt = _T("PixelFormat32bppRGB");
+			break;
+		case PixelFormat32bppARGB:
+			str_fmt = _T("PixelFormat32bppARGB");
+			break;
+		case PixelFormat32bppPARGB:
+			str_fmt = _T("PixelFormat32bppPARGB");
+			break;
+		case PixelFormat48bppRGB:
+			str_fmt = _T("PixelFormat48bppRGB");
+			break;
+		case PixelFormat64bppARGB:
+			str_fmt = _T("PixelFormat64bppARGB");
+			break;
+		case PixelFormat64bppPARGB:
+			str_fmt = _T("PixelFormat64bppPARGB");
+			break;
+		case PixelFormat32bppCMYK:
+			str_fmt = _T("PixelFormat32bppCMYK");
+			break;
+		case PixelFormatMax:
+			str_fmt = _T("PixelFormatMax");
+			break;
+	}
+
+	if (simple && (str_fmt.Find(_T("Unknown")) < 0))
+	{
+		str_fmt.Replace(_T("PixelFormat"), _T(""));
+		str_fmt.Replace(_T("bpp"), _T(""));
+		int bits = 0;
+		int bits_pos = get_number_from_string(str_fmt, bits);
+		str_fmt.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos), bits);
+		TRACE(_T("str_fmt = %s\n"), str_fmt);
+	}
+
+	return str_fmt;
+}
+
+//이미지 비율은 보통 width/height지만 반대 비율을 원할 경우는 wh = false로 준다.
+float CGdiplusBitmap::get_ratio(bool wh)
+{
+	if (width == 0 || height == 0)
+		return 0.0f;
+
+	if (!wh)
+		return (float)height / (float)width;
+
+	return (float)width / (float)height;
+}
+
 //alpha 픽셀을 포함한 이미지인지 판별.
 //-1 : 아직 판별되지 않은 상태이므로 판별 시작
 // 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우
@@ -783,6 +867,7 @@ int CGdiplusBitmap::has_alpha_pixel()
 	if (m_has_alpha_pixel == -1)
 	{
 		Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
+		TRACE(_T("fmt = %d, %s\n"), fmt, get_pixel_format_str(fmt));
 		m_has_alpha_pixel = (Gdiplus::IsAlphaPixelFormat(fmt) == TRUE);
 	}
 

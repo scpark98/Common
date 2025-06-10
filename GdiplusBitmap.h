@@ -165,14 +165,22 @@ public:
 	int				channels();
 	CSize			size() { return CSize(width, height); }
 
+	//이미지 비율은 보통 width/height지만 반대 비율을 원할 경우는 wh = false로 준다.
+	float			get_ratio(bool wh = true);
+
 	//alpha 픽셀을 포함한 이미지인지 판별.
 	//-1 : 아직 판별되지 않은 상태이므로 판별 시작
 	// 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우
 	// 1 : 한 점이라도 alpha < 255인 경우
 	int				has_alpha_pixel();
 
+	//PixelFormat24bppRGB과 같이 정의된 값을 문자열로 리턴하며 simple = true일 경우는 "RGB (24bit)"와 같이 리턴한다.
+	//fmt가 주어지지 않으면 현재 이미지의 PixelFormat을 구하여 결과를 리턴한다.
+	CString			get_pixel_format_str(Gdiplus::PixelFormat fmt = -1, bool simple = true);
+
+
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
-	std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));
+	static std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));
 
 	//targetRect를 주면 대상 영역에 비율을 유지하여 그린다.
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.

@@ -16,7 +16,8 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 										Gdiplus::Color cr_text,
 										Gdiplus::Color cr_back,
 										Gdiplus::Color cr_stroke,
-										Gdiplus::Color cr_shadow)
+										Gdiplus::Color cr_shadow,
+										float thickness)
 {
 	int i;
 	CString cr_str;
@@ -29,7 +30,7 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 
 	CSCParagraph basic_para, para_temp;
 	basic_para.name = lf->lfFaceName;
-	basic_para.bold = (lf->lfWeight == FW_BOLD);
+	basic_para.weight = lf->lfWeight;
 	basic_para.size = get_font_size_from_pixel_size(NULL, lf->lfHeight);
 	basic_para.italic = lf->lfItalic;
 	basic_para.strike = lf->lfStrikeOut;
@@ -38,6 +39,7 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 	basic_para.cr_back = cr_back;
 	basic_para.cr_stroke = cr_stroke;
 	basic_para.cr_shadow = cr_shadow;
+	basic_para.thickness = thickness;
 
 	para_temp = basic_para;
 
@@ -50,11 +52,11 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 	{
 		if (tags[i] == _T("<b>"))
 		{
-			para_temp.bold = true;
+			para_temp.weight = FW_BOLD;
 		}
 		else if (tags[i] == _T("</b>"))
 		{
-			para_temp.bold = basic_para.bold;
+			para_temp.weight = basic_para.weight;
 		}
 		else if (tags[i] == _T("<i>"))
 		{
@@ -143,6 +145,12 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 		}
 		else if (tags[i] == _T("<br>"))
 		{
+			//<br>에 의해 공백 라인이 추가된 경우
+			if (para_line.size() == 0)
+			{
+				para_line.push_back(basic_para);
+			}
+
 			para.push_back(para_line);
 			para_line.clear();
 			line++;

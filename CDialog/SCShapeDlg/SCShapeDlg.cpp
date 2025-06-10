@@ -55,7 +55,8 @@ BOOL CSCShapeDlg::PreTranslateMessage(MSG* pMsg)
 		//ex. VK_ESCAPE키를 눌렀을 때 mainDlg에서 OnBnClickedCancel()가 자동 호출되리라 예상했으나
 		//자동 호출되지 않으므로 처리코드를 추가해야 한다.
 		//Traceln(_T(""));
-		return false;
+		//::SendMessage(m_parent->m_hWnd, WM_KEYDOWN, pMsg->wParam, pMsg->lParam);
+		return FALSE;
 	}
 
 	return CDialogEx::PreTranslateMessage(pMsg);
@@ -102,13 +103,13 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	return res;
 }
 
-bool CSCShapeDlg::set_text(CString str)
+CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CString str)
 {
 	m_text_setting.text = str;
 	return set_text();
 }
 
-bool CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
+CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 {
 	if (setting != NULL)
 		memcpy(&m_text_setting, setting, sizeof(CSCShapeDlgTextSetting));
@@ -128,7 +129,7 @@ bool CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 }
 
 //gdiplus를 이용한 text 출력용 dlg 생성
-bool CSCShapeDlg::set_text(CWnd* parent,
+CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent,
 						CString text,
 						float font_size,
 						int font_style,
@@ -140,11 +141,6 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 						Gdiplus::Color cr_shadow/* = Gdiplus::Color::HotPink*/,
 						Gdiplus::Color cr_back/* = Gdiplus::Color(1, 0, 0, 0)*/)
 {
-	bool res = false;
-
-	//if (text.IsEmpty())
-	//	return false;
-
 	m_para.clear();
 
 	LOGFONT lf;
@@ -187,10 +183,14 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 	m_img.release();
 
-	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back, cr_stroke, cr_shadow);
+	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back, cr_stroke, cr_shadow, thickness);
 
 	if (!m_hWnd)
-		res = create(parent, 0, 0, r.Width(), r.Height());
+	{
+		bool success = create(parent, 0, 0, r.Width(), r.Height());
+		if (!success)
+			return &CSCShapeDlgTextSetting();
+	}
 
 	CClientDC dc(this);
 	r = ::calc_text_size(r, &dc, m_para, &lf, DT_CENTER | DT_VCENTER);
@@ -214,9 +214,9 @@ bool CSCShapeDlg::set_text(CWnd* parent,
 
 	set_image(parent, &m_img, false);
 #ifdef _DEBUG
-	//m_img.save(_T("d:\\SCShapeDlg.png"));
+	m_img.save(_T("d:\\SCShapeDlg.png"));
 #endif
-	return true;
+	return &m_text_setting;
 
 	/*
 
@@ -567,9 +567,13 @@ void CSCShapeDlg::fade_in(int delay_ms, int hide_after_ms, bool fadeout)
 {
 	if (m_fadeinout_ing)
 	{
-		m_fadeinout_ing = false;
-		Wait(100);
+		TRACE(_T("m_fadeinout_ing = %d\n"), m_fadeinout_ing);
+		return;
 	}
+	//{
+	//	m_fadeinout_ing = false;
+	//	Wait(100);
+	//}
 
 	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true, delay_ms, hide_after_ms, fadeout);
 	t.detach();
@@ -578,10 +582,11 @@ void CSCShapeDlg::fade_in(int delay_ms, int hide_after_ms, bool fadeout)
 void CSCShapeDlg::fade_out()
 {
 	if (m_fadeinout_ing)
-	{
-		m_fadeinout_ing = false;
-		Wait(100);
-	}
+		return;
+	//{
+	//	m_fadeinout_ing = false;
+	//	Wait(100);
+	//}
 
 	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false, 0, 0, false);
 	t.detach();
@@ -592,6 +597,8 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 	if (m_fadeinout_ing)
 		return;
 
+	m_fadeinout_ing = true;
+
 	set_alpha(fadein ? 0 : 255);
 	ShowWindow(SW_SHOW);
 
@@ -599,8 +606,6 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 
 	if (delay_ms <= 0)
 		delay_ms = 50;
-
-	m_fadeinout_ing = true;
 
 	while (m_fadeinout_ing)
 	{
@@ -630,7 +635,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 		if (delay_ms <= 0)
 			delay_ms = 50;
 
-		m_fadeinout_ing = true;
+		//m_fadeinout_ing = true;
 		while (m_fadeinout_ing)
 		{
 			_alpha -= 5;

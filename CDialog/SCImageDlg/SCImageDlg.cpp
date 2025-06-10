@@ -62,7 +62,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	//m_slider_gif.draw_progress_border();
 	m_slider_gif.set_use_slide();
 
-	m_br_zigzag = m_img.get_zigzag_pattern(32);
+	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32);
 
 	return true;
 }
@@ -235,11 +235,13 @@ void CSCImageDlg::OnPaint()
 		CString filename = get_part(m_filename, fn_name);
 		CString info;
 
-		info.Format(_T("파일 이름 : %s\n파일 크기 : %s\n수정 날짜 : %s\n이미지 정보 : %dx%dx%d\n확대 배율 : %.0f%%"),
+		info.Format(_T("파일 이름 : %s\n파일 크기 : %s\n수정 날짜 : %s\n이미지 정보 : %dx%dx%d (%s)\n이미지 비율 : %.3f : 1\n확대 배율 : %.0f%%"),
 					filename + m_alt_info,
 					get_file_size_str(m_filename),
 					get_datetime_str(GetFileLastModifiedTime(m_filename)),
 					m_img.width, m_img.height, m_img.channel * 8,
+					m_img.get_pixel_format_str(),
+					m_img.get_ratio(),
 					m_zoom * 100.0);
 
 		//dc.GetTextExtend(info)는 멀티라인 정보를 얻을 수 없다.
@@ -247,9 +249,8 @@ void CSCImageDlg::OnPaint()
 		dc.DrawText(info, rText, DT_LEFT | DT_TOP | DT_CALCRECT);
 		rText.OffsetRect(8, 8);
 
-		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(),
-			rText,
-			DT_NOCLIP | DT_LEFT | DT_TOP, beige, black, 2, 1);
+		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(),	rText,
+						DT_NOCLIP | DT_LEFT | DT_TOP, beige, black, 2, 1);
 
 		//dc.SetBkMode(TRANSPARENT);
 		//dc.SetTextColor(white);
@@ -1015,6 +1016,10 @@ void CSCImageDlg::pause_gif(int pos)
 	if (pos < 0)
 	{
 		m_paused = !m_paused;
+
+		//gif가 일시정지 된 상태라면 그 때의 m_pBitmap에 대한 픽셀정보를 다시 추출해줘야 한다.
+		if (m_paused && m_show_pixel)
+			m_img.get_raw_data();
 	}
 	else
 	{
@@ -1052,8 +1057,15 @@ void CSCImageDlg::goto_frame(int pos, bool pause)
 	m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
 	TRACE(_T("elapse = %ld\n"), clock() - t0);
 
+	//paused 상태라면 Invalidate()을 해줘야 하고
+	//픽셀 정보를 표시중이라면 현재 프레임에 대한 data도 다시 추출해줘야 한다.
 	if (m_paused)
+	{
+		if (m_show_pixel)
+			m_img.get_raw_data();
+
 		Invalidate();
+	}
 }
 
 //지정 % 위치의 프레임으로 이동

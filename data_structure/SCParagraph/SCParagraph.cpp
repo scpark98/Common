@@ -12,12 +12,7 @@ CSCParagraph::~CSCParagraph()
 
 //text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
 //cr_text, cr_back은 글자, 배경 기본값
-void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf,
-										Gdiplus::Color cr_text,
-										Gdiplus::Color cr_back,
-										Gdiplus::Color cr_stroke,
-										Gdiplus::Color cr_shadow,
-										float thickness)
+void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCParagraph>>& para, CSCLogFont* lf)
 {
 	int i;
 	CString cr_str;
@@ -29,18 +24,7 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 	get_tag_str(text, tags);
 
 	CSCParagraph basic_para, para_temp;
-	basic_para.name = lf->lfFaceName;
-	basic_para.weight = lf->lfWeight;
-	basic_para.size = get_font_size_from_pixel_size(NULL, lf->lfHeight);
-	basic_para.italic = lf->lfItalic;
-	basic_para.strike = lf->lfStrikeOut;
-	basic_para.underline = lf->lfUnderline;
-	basic_para.cr_text = cr_text;
-	basic_para.cr_back = cr_back;
-	basic_para.cr_stroke = cr_stroke;
-	basic_para.cr_shadow = cr_shadow;
-	basic_para.thickness = thickness;
-
+	basic_para.lf = *lf;
 	para_temp = basic_para;
 
 	std::deque<CSCParagraph> para_line;
@@ -52,96 +36,96 @@ void CSCParagraph::build_paragraph_str(CString text, std::deque<std::deque<CSCPa
 	{
 		if (tags[i] == _T("<b>"))
 		{
-			para_temp.weight = FW_BOLD;
+			para_temp.lf.style |= Gdiplus::FontStyleBold;
 		}
 		else if (tags[i] == _T("</b>"))
 		{
-			para_temp.weight = basic_para.weight;
+			para_temp.lf.style &= ~Gdiplus::FontStyleBold;
 		}
 		else if (tags[i] == _T("<i>"))
 		{
-			para_temp.italic = true;
+			para_temp.lf.style |= Gdiplus::FontStyleItalic;
 		}
 		else if (tags[i] == _T("</i>"))
 		{
-			para_temp.italic = basic_para.italic;
+			para_temp.lf.style &= ~Gdiplus::FontStyleItalic;
 		}
 		else if (tags[i] == _T("<u>"))
 		{
-			para_temp.underline = true;
+			para_temp.lf.style |= Gdiplus::FontStyleUnderline;
 		}
 		else if (tags[i] == _T("</u>"))
 		{
-			para_temp.underline = basic_para.underline;
+			para_temp.lf.style &= ~Gdiplus::FontStyleUnderline;
 		}
 		else if (tags[i] == _T("<s>"))
 		{
-			para_temp.strike = true;
+			para_temp.lf.style |= Gdiplus::FontStyleStrikeout;
 		}
 		else if (tags[i] == _T("</s>"))
 		{
-			para_temp.strike = basic_para.strike;
+			para_temp.lf.style &= ~Gdiplus::FontStyleStrikeout;
 		}
 		else if (tags[i].Find(_T("<cr=")) >= 0 || tags[i].Find(_T("<ct=")) >= 0)
 		{
 			cr_str = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.cr_text = get_color(cr_str);
+			para_temp.lf.cr_text = get_color(cr_str);
 		}
 		else if (tags[i].Find(_T("</cr>")) >= 0 || tags[i].Find(_T("</ct>")) >= 0)
 		{
-			para_temp.cr_text = basic_para.cr_text;
+			para_temp.lf.cr_text = basic_para.lf.cr_text;
 		}
 		else if (tags[i].Find(_T("<cb=")) >= 0)
 		{
 			cr_str = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.cr_back = get_color(cr_str);
+			para_temp.lf.cr_back = get_color(cr_str);
 		}
 		else if (tags[i].Find(_T("<crb=")) >= 0)
 		{
 			cr_str = tags[i].Mid(5, tags[i].GetLength() - 6);
-			para_temp.cr_back = get_color(cr_str);
+			para_temp.lf.cr_back = get_color(cr_str);
 		}
 		else if (tags[i].Find(_T("</cb>")) >= 0 || tags[i].Find(_T("</crb>")) >= 0)
 		{
-			para_temp.cr_back = basic_para.cr_back;
+			para_temp.lf.cr_back = basic_para.lf.cr_back;
 		}
 		else if (tags[i].Find(_T("<f=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(3, tags[i].GetLength() - 4);
-			para_temp.name = str_font;
+			para_temp.lf.name = str_font;
 		}
 		else if (tags[i].Find(_T("<font=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.name = str_font;
+			para_temp.lf.name = str_font;
 		}
 		else if (tags[i].Find(_T("<fontname=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(10, tags[i].GetLength() - 11);
-			para_temp.name = str_font;
+			para_temp.lf.name = str_font;
 		}
 		else if (tags[i].Find(_T("</f>")) >= 0 || tags[i].Find(_T("</font>")) >= 0 || tags[i].Find(_T("</fontname>")) >= 0)
 		{
-			para_temp.name = basic_para.name;
+			para_temp.lf.name = basic_para.lf.name;
 		}
 		else if (tags[i].Find(_T("<sz=")) >= 0)
 		{
 			CString str_size = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.size = _ttoi(str_size);
+			para_temp.lf.size = _ttoi(str_size);
 		}
 		else if (tags[i].Find(_T("<size=")) >= 0)
 		{
 			CString str_size = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.size = _ttoi(str_size);
+			para_temp.lf.size = _ttoi(str_size);
 		}
 		else if (tags[i].Find(_T("<fontsize=")) >= 0)
 		{
 			CString str_size = tags[i].Mid(10, tags[i].GetLength() - 11);
-			para_temp.size = _ttoi(str_size);
+			para_temp.lf.size = _ttoi(str_size);
 		}
 		else if (tags[i].Find(_T("</sz>")) >= 0 || tags[i].Find(_T("</size>")) >= 0 || tags[i].Find(_T("</fontsize>")) >= 0)
 		{
-			para_temp.size = basic_para.size;
+			para_temp.lf.size = basic_para.lf.size;
 		}
 		else if (tags[i] == _T("<br>"))
 		{

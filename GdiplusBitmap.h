@@ -137,13 +137,21 @@ public:
 	void			release();
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
-	bool			load(CString sFile, bool gif_play_in_this = true);
+	//외부 이미지 파일 로딩
+	bool			load(CString sFile);
 	//다음 예시와 같이 리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
 	//m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
-	bool			load(CString sType, UINT id, bool gif_play_in_this);
+	bool			load(CString sType, UINT id);
 	//png일 경우는 sType을 생략할 수 있다.
-	bool			load(UINT id, bool gif_play_in_this = true);
+	bool			load(UINT id);
 	bool			load_icon(UINT id, int size = 32);
+
+	//animated gif를 load한 경우 재생을 CGdiplusBitmap에서 자체적으로 하느냐(기본값),
+	//load하는 메인 클래스에서 직접 thread로 재생하느냐를 설정
+	//일반적으로는 특정 dlg에서 gif를 로딩하여 CGdiplusBitmap 자체에서 바로 재생하도록 하면 편하지만
+	//ASee.exe와 같이 roi 설정, 기타 child ctrl들이 존재하여 그들과의 간섭이 문제가 될 경우는 CGdiplusBitmap에서 재생시키지 않고
+	//CSCImageDlg에서 직접 재생시켜야 하는 경우도 있다.
+	void			gif_play_itself(bool play_itself = true) { m_gif_play_in_this = play_itself; }
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 
@@ -384,7 +392,6 @@ public:
 	int				stride = 0;
 
 //animated Gif 관련
-	bool			m_gif_play_in_this = true;	//gif 재생코드를 이 클래스에서 실행할 지, parent에서 직접 실행할 지
 	int				m_frame_count;
 	int				m_frame_index;
 	Gdiplus::PropertyItem* m_pPropertyItem = NULL;
@@ -437,6 +444,7 @@ protected:
 
 //animatedGif
 	bool			m_paused = false;
+	bool			m_gif_play_in_this = true;	//gif 재생코드를 이 클래스에서 자체 실행할 지, parent에서 직접 실행할 지
 
 	//ani gif 표시 윈도우
 	HWND			m_target_hwnd;

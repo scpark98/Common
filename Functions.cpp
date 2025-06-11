@@ -18476,7 +18476,7 @@ bool save(Gdiplus::Bitmap* bitmap, CString filename)
 }
 
 //paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align)
+CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, CSCLogFont* lf, DWORD align)
 {
 	if (para.empty())
 		return CRect();
@@ -18487,7 +18487,7 @@ CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& p
 	int total_text_height;
 	CRect rect_text;
 	CFont font, * pOldFont;
-	LOGFONT lf_origin;
+	//LOGFONT lf_origin;
 
 	Gdiplus::Graphics g(pDC->m_hDC);
 
@@ -18505,7 +18505,7 @@ CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& p
 	int max_width = 0;
 	int max_width_line = 0;
 
-	memcpy(&lf_origin, lf, sizeof(LOGFONT));
+	//memcpy(&lf_origin, lf, sizeof(LOGFONT));
 
 	for (i = 0; i < para.size(); i++)
 	{
@@ -18552,8 +18552,8 @@ CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& p
 			}
 
 			//stroke 두께까지 포함한 크기여야 한다.
-			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].thickness;// *2.0f;
-			sz.cy = boundRect.Height + para[i][j].thickness;// *2.0f;
+			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].lf.thickness;// *2.0f;
+			sz.cy = boundRect.Height + para[i][j].lf.thickness;// *2.0f;
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
 			//para[i][j].r.InflateRect(0, 0, para[i][j].thickness * 2.0f, para[i][j].thickness * 2.0f);
 #endif
@@ -18711,6 +18711,7 @@ CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& p
 	return rect_text;
 }
 
+/*
 //현재는 calc_text_size()에서만 사용되는 함수로 주어진 폰트로 설정하고 pOldFont를 리턴한다.
 CFont* select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, LOGFONT* lf_origin, CFont* font)
 {
@@ -18730,6 +18731,7 @@ CFont* select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& par
 	font->CreateFontIndirect(&lf);
 	return (CFont*)pDC->SelectObject(font);
 }
+*/
 
 void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font)
 {
@@ -18738,37 +18740,17 @@ void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph
 	float fDpiY = g.GetDpiY();
 
 	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
-	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
-	float emSize = fDpiY * para[line][index].size / 96.0;
+	float emSize = fDpiY * para[line][index].lf.size / 96.0;
 
-	//if (fontFamily == NULL)
-	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(para[line][index].name));
+	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(para[line][index].lf.name));
 
-	//if (!fontFamily->IsAvailable())
-	//{
-	//	delete fontFamily;
-	//	fontFamily = new Gdiplus::FontFamily(CStringW("Arial"));
-	//}
-
-	int font_style = 0;
-	if (para[line][index].weight == FW_BOLD)
-		font_style |= Gdiplus::FontStyleBold;
-	if (para[line][index].italic)
-		font_style |= Gdiplus::FontStyleItalic;
-	if (para[line][index].underline)
-		font_style |= Gdiplus::FontStyleUnderline;
-	if (para[line][index].strike)
-		font_style |= Gdiplus::FontStyleStrikeout;
-
-	Gdiplus::Font ff(&fontFamily, emSize, font_style);
+	Gdiplus::Font ff(&fontFamily, emSize, para[line][index].lf.style);
 	*font = ff.Clone();
-
-	//if (fontFamily)
-		//delete fontFamily;
 }
 
+#include <algorithm>
 //#define USING_HDC
-void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf)
+void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 {
 	int i, j;
 	CFont font, * pOldFont = NULL;
@@ -18821,51 +18803,52 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 			pDC->SelectObject(pOldFont);
 #else
 			//Gdiplus::Font* font;
-			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].name));
-
-			int font_style = 0;
-			if (para[i][j].weight == FW_BOLD)
-				font_style |= Gdiplus::FontStyleBold;
-			if (para[i][j].italic)
-				font_style |= Gdiplus::FontStyleItalic;
-			if (para[i][j].strike)
-				font_style |= Gdiplus::FontStyleStrikeout;
-			if (para[i][j].underline)
-				font_style |= Gdiplus::FontStyleUnderline;
-
+			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].lf.name));
 
 			//get_paragraph_font(g, para, i, j, &font);
-			float emSize = fDpiY * para[i][j].size / 72.0;
-			Gdiplus::Font font(&ff, emSize, font_style);
+			float emSize = fDpiY * para[i][j].lf.size / 72.0;
+			Gdiplus::Font font(&ff, emSize, para[i][j].lf.style);
 
 
 			//text 배경색을 칠하고
-			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].cr_back);
+			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].lf.cr_back);
 
 			//text를 출력한다.
-			Gdiplus::SolidBrush text_brush(para[i][j].cr_text);
-			Gdiplus::GraphicsPath str_path;
+			Gdiplus::SolidBrush text_brush(para[i][j].lf.cr_text);
+			Gdiplus::GraphicsPath str_path, shadow_path;
 
 			//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
 			str_path.SetFillMode(Gdiplus::FillModeWinding);
+			shadow_path.SetFillMode(Gdiplus::FillModeWinding);
 
 			//stroke가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
 			//r을 정확히 계산하는 것이 정석이나 우선 약간 넓혀서 글자가 잘리지 않도록 한다.
 			CRect r = para[i][j].r;
 			r.InflateRect(0, 0, 1, 1);
 			str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-								font_style, emSize, CRect2GpRectF(r), sf.GenericTypographic());
+								para[i][j].lf.style, emSize, CRect2GpRectF(r), sf.GenericTypographic());
 
-			Gdiplus::Pen   gp(para[i][j].cr_stroke, para[i][j].thickness);
-			gp.SetLineJoin(Gdiplus::LineJoinMiter);
-			Gdiplus::SolidBrush gb(para[i][j].cr_text);
+			//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
+			Gdiplus::SolidBrush br_shadow(para[0][0].lf.cr_shadow);
+			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness }));
+			TRACE(_T("pt_shadow_offset.x = %d\n"), pt_shadow_offset.x);
+			r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
+
+			shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
+				para[i][j].lf.style, emSize, CRect2GpRectF(r), sf.GenericTypographic());
+
+			Gdiplus::Pen   pen(para[i][j].lf.cr_stroke, para[i][j].lf.thickness);
+			pen.SetLineJoin(Gdiplus::LineJoinMiter);
+			Gdiplus::SolidBrush brush(para[i][j].lf.cr_text);
+
+			g.FillPath(&br_shadow, &shadow_path);
 
 			//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
 			//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
-			if (para[i][j].thickness > 0.0f)
-				g.DrawPath(&gp, &str_path);
+			if (para[i][j].lf.thickness > 0.0f)
+				g.DrawPath(&pen, &str_path);
 
-			g.FillPath(&gb, &str_path);
+			g.FillPath(&brush, &str_path);
 			//}
 			//else
 			//{
@@ -18901,10 +18884,10 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para,
 #endif
 }
 
-void draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf)
+void draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
-	draw_text(g, para, lf);
+	draw_text(g, para);
 }
 
 CString json_value(CString json, CString key)

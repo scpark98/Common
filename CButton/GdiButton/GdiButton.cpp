@@ -760,7 +760,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	GetClientRect(rc);
 	GetWindowText(text);
-
+	
+	//for test
 	if (text == _T("진단 시작"))
 		text = _T("진단 시작");
 
@@ -911,9 +912,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//중간 느낌
 		//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-		/*
 		//이미지를 그리기 전에 shadow를 먼저 그려준다.
-		if (m_draw_shadow)
+		if (m_draw_drop_shadow)
 		{
 			//m_down_offset = CPoint(1, 1);
 			CGdiplusBitmap img_shadow;
@@ -923,11 +923,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 #endif
 			//img_shadow.resize(rc.Width(), rc.Height());
 			//img_shadow.blur(20, TRUE);
-			img_shadow.blur(m_blur_sigma);
+			img_shadow.blur(m_drop_shadow_blur_sigma);
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\1.blur.png"));
 #endif
-			img_shadow.gray(m_shadow_weight);
+			img_shadow.gray(m_drop_shadow_weight);
 			//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\2.gray.png"));
@@ -940,7 +940,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			//m_down_offset = CPoint(1, 3);
 		}
-		*/
 
 		if (m_bAsStatic)
 		{
@@ -1738,15 +1737,29 @@ void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr)
 //만약 draw_shadow()를 단 한번만 호출하는 경우라면 문제없으나
 //옵션값에 따라 shadow정도를 보기위함 등 여러번 호출할 경우
 //
-void CGdiButton::draw_shadow(bool draw, float shadow_weight, float blur_sigma)
+void CGdiButton::draw_drop_shadow(bool draw, float shadow_weight, float blur_sigma)
 {
-	m_draw_shadow = draw;
+	m_draw_drop_shadow = draw;
 
 	if (shadow_weight >= 0.0f)
-		m_shadow_weight = shadow_weight;
+		m_drop_shadow_weight = shadow_weight;
 
 	if (blur_sigma >= 0.0f)
-		m_blur_sigma = blur_sigma;
+		m_drop_shadow_blur_sigma = blur_sigma;
+
+	Invalidate();
+	//RedrawWindow();
+}
+
+void CGdiButton::draw_back_shadow(bool draw, float shadow_weight, float blur_sigma)
+{
+	m_draw_back_shadow = draw;
+
+	if (shadow_weight >= 0.0f)
+		m_back_shadow_weight = shadow_weight;
+
+	if (blur_sigma >= 0.0f)
+		m_back_shadow_blur_sigma = blur_sigma;
 
 	//Invalidate();
 	RedrawWindow();
@@ -2049,40 +2062,57 @@ void CGdiButton::set_header_image_gap(int gap)
 //기능 구현 중
 void CGdiButton::OnNcPaint()
 {
-	//if (!m_draw_shadow)
+	if (!m_draw_back_shadow)
 		return;
 
-	CClientDC  dc(this);
+	Gdiplus::SolidBrush br(Gdiplus::Color::Blue);
+
+	CString text;
+	GetWindowText(text);
+
+	//dc(this)라고 선언하고 g(dc)를 구해서 g에 그리면 이 버튼 영역 외에는 그림이 그려지지 않는다.
+	//dc(this)라고 선언했어도 dc.FillSolidRect(r);로 그리면 r이 이 버튼 영역을 벗어나도 그림이 그려진다.
+	//따라서 back shadow는 이 버튼 영역 밖이므로 dc(GetParent())로 구하고
+	//실제 그릴때는 parent 기준의 이 버튼 좌표 영역에 그려줘야 한다.
+	CClientDC  dc(GetParent());
 	CRect rc;
 
 	GetClientRect(rc);
-	rc.InflateRect(20, 20);
+	Gdiplus::Graphics g(dc);
 
-	Gdiplus::Graphics g(dc.m_hDC, rc);
-	dc.FillSolidRect(rc, red);
-	//return;
-
-	if (m_image.size() == 0)
-		return;
-
-	//m_down_offset = CPoint(1, 1);
+	//버튼 이미지가 있다면 이미지 모양대로 back shadow를 만들어야 하고
+	//버튼 이미지가 없어서 Gdi로 그려진 버튼이라면 기본 사각형을 바탕으로 back shadow를 만들어준다.
 	CGdiplusBitmap img_shadow;
-	m_image[0]->img[0].deep_copy(&img_shadow);
+
+	if (m_image.size() && m_image[0]->img[0].is_valid())
+	{
+		m_image[0]->img[0].deep_copy(&img_shadow);
+	}
+	else
+	{
+		img_shadow.create(rc.Width(), rc.Height());
+		Gdiplus::Graphics g(img_shadow.m_pBitmap);
+		g.FillRectangle(&br, Gdiplus::Rect(4, 4, rc.Width() - 8, rc.Height() - 8));
+	}
 #ifdef _DEBUG
-	img_shadow.save(_T("d:\\0.origin.png"));
+	img_shadow.save(_T("d:\\0.back_shadow_origin.png"));
 #endif
 	//img_shadow.resize(rc.Width(), rc.Height());
 	//img_shadow.blur(20, TRUE);
-	img_shadow.blur(m_blur_sigma);
+	img_shadow.blur(m_back_shadow_blur_sigma);
 #ifdef _DEBUG
-	img_shadow.save(_T("d:\\1.blur.png"));
+	img_shadow.save(_T("d:\\1.back_shadow_blur.png"));
 #endif
-	img_shadow.gray(m_shadow_weight);
+	img_shadow.gray(m_back_shadow_weight);
 	//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
 #ifdef _DEBUG
-	img_shadow.save(_T("d:\\2.gray.png"));
+	img_shadow.save(_T("d:\\2.back_shadow_gray.png"));
 #endif
-	CRect rc_shadow = rc;
-	rc_shadow.OffsetRect(20, 20);
-	img_shadow.draw(g, rc_shadow, CGdiplusBitmap::draw_mode_zoom);
+
+	//parent의 dc를 구해서 그리는 것이므로 좌표 또한 parent 기준의 상대좌표로 그려줘야 한다.
+	CRect rw;
+	GetWindowRect(rw);
+	GetParent()->ScreenToClient(rw);
+
+	img_shadow.draw(&dc, rw.left + 4, rw.top + 4);
 }

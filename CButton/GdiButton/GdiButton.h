@@ -35,6 +35,15 @@
   기본 CButton과 같이 사각형 형태로 그려지는 버튼이라면 back_shadow를 그려준다.
   이 두 shadow를 별도로 세팅 및 처리하느냐, 하나의 변수로 처리하느냐는 아직 미정임.
 
+	그림자는 다음과 같이 2가지가 존재한다.
+	1. 일반 사각형 버튼의 우측 하단에 표시하는 그림자
+	2. "<" 모양의 투명 PNG 이미지를 그릴 때 그림자
+	즉, 이미지의 모양에 따라 그림자의 종류가 달라지므로 정의 및 구현 또한 별도로 한다.
+	1번 그림자는 back shadow (OnNcPaint에서 그림)
+	2번 그림자는 drop shadow (DrawItem에서 그림)
+	둘 다 우측 하단에 그려지지만 구현되는 함수 위치가 다르다.
+
+
 [기본값 설정 기준]
 - png를 주로 사용하기 위한 클래스를 목적으로 제작되었지만
   이미지를 사용하지 않고 CButton과 유사하게 표현하여 사용하는 경우도 많다.
@@ -344,7 +353,10 @@ public:
 	//blur_sigma가 크면 클수록 그림자의 blur가 강해짐
 	//0.0f보다 작은 음수일 경우는 해당 멤버변수값을 갱신하지 않는다.
 	//draw_shadow(true, 5.0f, -1.0f);라고 주면 m_shadow_weight는 갱신되지만 m_blur_sigma값은 변경되지 않는다.
-	void		draw_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 4.0f);
+	//이 두 옵션값은 이미지 모양에 따라 적절한 옵션값이 달라지므로 이미지에 맞게 적정값을 찾아야 함.
+	void		draw_drop_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 4.0f);
+
+	void		draw_back_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 4.0f);
 
 //blink
 	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown
@@ -473,14 +485,19 @@ protected:
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
-	//투명 버튼의 경우 그림자를 표시한다.
-	bool		m_draw_shadow = true;
-	//m_shadow_weight
-	float		m_shadow_weight = 1.0f;
-	//m_blur_sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
-	float		m_blur_sigma = 5.0f;
 
-	//
+	//버튼의 배경 그림자를 표시한다.
+	bool		m_draw_back_shadow = false;
+	float		m_back_shadow_weight = 1.0f;
+	//blur sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
+	float		m_back_shadow_blur_sigma = 4.0f;
+
+	//투명 이미지 버튼의 경우 그림자를 표시한다.
+	bool		m_draw_drop_shadow = false;
+	float		m_drop_shadow_weight = 1.0f;
+	//blur sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
+	float		m_drop_shadow_blur_sigma = 5.0f;
+
 
 	bool		m_draw_border = false;
 	Gdiplus::Color m_gcr_border = Gdiplus::Color::DimGray;

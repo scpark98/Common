@@ -28,6 +28,7 @@ void CSCShapeDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CSCShapeDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_WINDOWPOSCHANGED()
+	ON_WM_MOUSEMOVE()
 END_MESSAGE_MAP()
 
 
@@ -114,37 +115,25 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 	if (setting != NULL)
 		memcpy(&m_text_setting, setting, sizeof(CSCShapeDlgTextSetting));
 
-	return set_text(m_parent,
-					m_text_setting.text,
-					m_text_setting.font_size,
-					m_text_setting.font_style,
-					m_text_setting.shadow_depth,
-					m_text_setting.thickness,
-					m_text_setting.font_name,
-					m_text_setting.cr_text,
-					m_text_setting.cr_stroke,
-					m_text_setting.cr_shadow,
-					m_text_setting.cr_back
-	);
+	return set_text(m_parent, m_text_setting.text, m_text_setting.lf.size, m_text_setting.lf.style, m_text_setting.lf.shadow_depth, m_text_setting.lf.thickness,
+					m_text_setting.lf.name, m_text_setting.lf.cr_text, m_text_setting.lf.cr_stroke, m_text_setting.lf.cr_shadow, m_text_setting.lf.cr_back);
 }
 
 //gdiplus를 이용한 text 출력용 dlg 생성
-CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent,
-						CString text,
+CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text, 
 						float font_size,
 						int font_style,
-						int shadow_depth/* = 2*/,
-						float thickness/* = 2*/,
-						CString font_name/* = _T("")*/,
-						Gdiplus::Color cr_text/* = Gdiplus::Color::Black*/,
-						Gdiplus::Color cr_stroke/* = Gdiplus::Color::DarkGray*/,
-						Gdiplus::Color cr_shadow/* = Gdiplus::Color::HotPink*/,
-						Gdiplus::Color cr_back/* = Gdiplus::Color(1, 0, 0, 0)*/)
+						float shadow_depth,
+						float thickness,
+						CString font_name,
+						Gdiplus::Color cr_text,
+						Gdiplus::Color cr_stroke,
+						Gdiplus::Color cr_shadow,
+						Gdiplus::Color cr_back)
 {
 	m_para.clear();
 
-	LOGFONT lf;
-	memset(&lf, 0, sizeof(LOGFONT));
+	CSCLogFont lf;
 
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
@@ -153,7 +142,10 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent,
 
 	if (font_name.IsEmpty())
 	{
-		CFont* font = m_parent->GetFont();
+		CFont* font = AfxGetApp()->GetMainWnd()->GetFont();
+		LOGFONT lf;
+
+		memset(&lf, 0, sizeof(lf));
 
 		if (font != NULL)
 			font->GetObject(sizeof(lf), &lf);
@@ -163,27 +155,24 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent,
 		font_name = lf.lfFaceName;
 	}
 
-	_tcscpy_s(lf.lfFaceName, countof(lf.lfFaceName), font_name);
-	lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, font_size);
-		//-MulDiv(font_size, GetDeviceCaps(::GetDC(m_parent->GetSafeHwnd()), LOGPIXELSY), 72);
+	lf.name = font_name;
+	lf.size = font_size;
+	lf.style = font_style;
+	lf.cr_text = cr_text;
+	lf.cr_stroke = cr_stroke;
+	lf.cr_shadow = cr_shadow;
+	lf.cr_back = cr_back;
+	lf.shadow_depth = shadow_depth;
+	lf.thickness = thickness;
 
-	if (font_style & Gdiplus::FontStyleBold)
-		lf.lfWeight = FW_BOLD;
-	if (font_style & Gdiplus::FontStyleItalic)
-		lf.lfItalic = true;
-	if (font_style & Gdiplus::FontStyleUnderline)
-		lf.lfUnderline = true;
-	if (font_style & Gdiplus::FontStyleStrikeout)
-		lf.lfStrikeOut = true;
-
-	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_style, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
+	m_text_setting = CSCShapeDlgTextSetting(text, lf);
 
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
 
 	m_img.release();
 
-	CSCParagraph::build_paragraph_str(text, m_para, &lf, cr_text, cr_back, cr_stroke, cr_shadow, thickness);
+	CSCParagraph::build_paragraph_str(text, m_para, &lf);
 
 	if (!m_hWnd)
 	{
@@ -210,7 +199,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent,
 
 	//CDC* pDC = CDC::FromHandle(g.GetHDC());	//이 코드를 써서 CDC에 draw_text()하려 했으나 이렇게 하면 g에 아무것도 그려지지 않음
 
-	draw_text(g, m_para, &lf);
+	draw_text(g, m_para);
 
 	set_image(parent, &m_img, false);
 #ifdef _DEBUG
@@ -325,7 +314,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
 {
-	bool res = m_img.load(id, true);
+	bool res = m_img.load(id);
 	if (res)
 		set_image(parent, &m_img, false);
 	return res;
@@ -333,7 +322,7 @@ bool CSCShapeDlg::load(CWnd* parent, UINT id)
 
 bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 {
-	bool res = m_img.load(sType, id, true);
+	bool res = m_img.load(sType, id);
 
 	if (res)
 		set_image(parent, &m_img, false);
@@ -343,7 +332,7 @@ bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 
 bool CSCShapeDlg::load(CWnd* parent, CString sFile)
 {
-	bool res = m_img.load(sFile, true);
+	bool res = m_img.load(sFile);
 	if (res)
 		set_image(parent, &m_img, false);
 	return res;
@@ -666,7 +655,7 @@ void CSCShapeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
-
+/*
 void CSCShapeDlg::get_logfont(LOGFONT *lf)
 {
 	memset(lf, 0, sizeof(LOGFONT));
@@ -680,4 +669,35 @@ void CSCShapeDlg::get_logfont(LOGFONT *lf)
 	lf->lfWeight = (m_text_setting.font_style & Gdiplus::FontStyleBold) ? FW_BOLD : FW_NORMAL;
 	lf->lfItalic = (m_text_setting.font_style & Gdiplus::FontStyleItalic) ? true : false;
 	lf->lfStrikeOut = (m_text_setting.font_style & Gdiplus::FontStyleStrikeout) ? true : false;
+}
+*/
+
+//커서가 위치한 음절을 parent에게 메시지로 전달할 수 있다.
+//팟플레이어에서 자막의 어떤 단어에 마우스를 올리면 포커싱되고 클릭하면 웹검색이 열리는 기능처럼 활용할 수 있다.
+void CSCShapeDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (!m_send_hover_info)
+		return;
+
+	int i, j;
+	bool found = false;
+
+	for (i = 0; i < m_para.size(); i++)
+	{
+		for (j = 0; j < m_para[i].size(); j++)
+		{
+			if (m_para[i][j].r.PtInRect(point))
+			{
+				TRACE(_T("i = %d, j = %d, text = %s\n"), i, j, m_para[i][j].text);
+				found = true;
+				break;
+			}
+		}
+		
+		if (found)
+			break;
+	}
+
+	CDialogEx::OnMouseMove(nFlags, point);
 }

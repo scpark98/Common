@@ -1011,16 +1011,19 @@ void CSCStatic::set_font_antialiased(bool bAntiAliased)
 	update_surface();
 }
 
-void CSCStatic::set_text_color(Gdiplus::Color crTextColor)
+void CSCStatic::set_text_color(Gdiplus::Color cr_text)
 {
-	m_cr_text = crTextColor;
+	if (cr_text.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_text = cr_text;
+
 	update_surface();
 	Invalidate();
 }
 
 void CSCStatic::set_back_color(Gdiplus::Color cr_back)
 {
-	m_cr_back = cr_back;
+	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_back = cr_back;
 
 	if (m_round <= 0)
 		m_transparent = false;

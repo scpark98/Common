@@ -4,22 +4,16 @@
 #include <afxdialogex.h>
 
 /*
-* png, gif 등의 이미지 또는 CGdiplusBitmap 이미지 모양대로 dlg를 표시한다.
-* 위 목적의 dlg를 생성한 후 CDialogEx 대신 CSCShapeDlg를 상속받는다.
-* class CPopupDlg : public CSCShapeDlg
-* {
-*		...
-* }
-* 
-* => 불필요한 중간 dlg를 생략하고 create으로 직접 생성해서 사용하자!
+* png, gif 등의 이미지 또는 CGdiplusBitmap 이미지 모양대로 dlg를 생성하여 표시한다.
+* create()으로 직접 생성하므로 IDD_DIALOG와 같은 리소스가 불필요하다.
 * 
 * //OnInitDialog()에서 이미지를 지정한다.
 * load(_T("Z:\\내 드라이브\\media\\test_image\\progress\\checking.gif"));
 * 
-* 또는 CGdiplusBitmap 이미지를 생성한 후 render(Gdiplus::Bitmap* img)함수를 호출하여
-* 이미지를 설정한다.
+* 또는 CGdiplusBitmap 이미지를 생성한 후 set_image() 함수를 호출하여
+* 이미지를 설정할 수 있다.
 * 
-* set_text()를 사용하면 이미지 대신 텍스트가 표시되는 shapeDlg를 표시할 수 있다.
+* set_text()를 사용하면 이미지 대신 텍스트를 출력한다.
 */
 
 #include "../../GdiplusBitmap.h"
@@ -46,39 +40,14 @@ class CSCShapeDlgTextSetting
 {
 public:
 	CSCShapeDlgTextSetting() {};
-	CSCShapeDlgTextSetting(CString _text,
-		float _font_size = 40,
-		int _font_style = Gdiplus::FontStyleBold,
-		int _shadow_depth = 2,
-		float _thickness = 2,
-		CString _font_name = _T("Arial"),
-		Gdiplus::Color _cr_text = Gdiplus::Color::RoyalBlue,
-		Gdiplus::Color _cr_stroke = Gdiplus::Color::LightGray,
-		Gdiplus::Color _cr_shadow = Gdiplus::Color::DarkGray,
-		Gdiplus::Color _cr_back = Gdiplus::Color(1, 0, 0, 0))	//alpha=0이면 투명 영역은 클릭되지 않는다.
+	CSCShapeDlgTextSetting(CString _text, CSCLogFont _lf)	//alpha=0이면 투명 영역은 클릭되지 않는다.
 	{
 		text = _text;
-		font_name = _font_name;
-		font_size = _font_size;
-		font_style = _font_style;
-		shadow_depth = _shadow_depth;
-		thickness = _thickness;
-		cr_text = _cr_text;
-		cr_stroke = _cr_stroke;
-		cr_shadow = _cr_shadow;
-		cr_back = _cr_back;
+		lf = _lf;
 	}
 
 	CString text;
-	CString font_name;
-	float	font_size;
-	int		font_style;
-	int		shadow_depth;
-	float	thickness;
-	Gdiplus::Color cr_text;
-	Gdiplus::Color cr_stroke;
-	Gdiplus::Color cr_shadow;
-	Gdiplus::Color cr_back;
+	CSCLogFont	lf;
 };
 
 //CSCShapeDlg
@@ -100,33 +69,34 @@ public:
 	bool			load(CWnd* parent, CString sType, UINT id);
 	bool			load(CWnd* parent, CString sFile);
 
-	//keyboard, mouse 이벤트 처리 여부.
+	//keyboard, mouse 이벤트 처리 여부. false이면 모든 마우스, 키보드 이벤트가 무시된다.
 	void			use_control(bool use);
 
 	//0 : 투명, 255 : 불투명
 	void			set_alpha(int alpha);
 
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
-	//default는 hide 상태로 시작함.
+	//default는 hide 상태로 시작되므로 set_text()로 세팅한 후 ShowWindow(SW_SHOW)를 호출해야 함.
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
+	//shadow_depth는 출력되는 텍스트의 height에 대한 비율이지만 현재는 자동 조정되므로 사용되지 않음.
 	CSCShapeDlgTextSetting*	set_text(CWnd* parent, CString text,
 							float font_size,
 							int font_style,
-							int shadow_depth = 2,
-							float thickness = 2.0f,
+							float shadow_depth = 0.0f,
+							float thickness = 0.0f,
 							CString font_name = _T("맑은 고딕"),
 							Gdiplus::Color cr_text = Gdiplus::Color::RoyalBlue,
-							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+							Gdiplus::Color cr_stroke = Gdiplus::Color::Blue,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DimGray,
-							Gdiplus::Color cr_back = Gdiplus::Color(1, 0, 0, 0));
+							Gdiplus::Color cr_back = Gdiplus::Color(0, 0, 0, 0));
 	CSCShapeDlgTextSetting* set_text(CString str);
 	CSCShapeDlgTextSetting*	set_text(CSCShapeDlgTextSetting* setting = NULL);
 
-	void			set_text_color(Gdiplus::Color cr) { m_text_setting.cr_text = cr; set_text(&m_text_setting); }
-	void			set_stroke_color(Gdiplus::Color cr) { m_text_setting.cr_stroke = cr; set_text(&m_text_setting); }
-	void			set_shadow_color(Gdiplus::Color cr) { m_text_setting.cr_shadow = cr; set_text(&m_text_setting); }
-	void			set_back_color(Gdiplus::Color cr) { m_text_setting.cr_back = cr; set_text(&m_text_setting); }
-	void			set_thickness(float thickness) { m_text_setting.thickness = thickness; set_text(&m_text_setting); }
+	void			set_text_color(Gdiplus::Color cr) { m_text_setting.lf.cr_text = cr; set_text(&m_text_setting); }
+	void			set_stroke_color(Gdiplus::Color cr) { m_text_setting.lf.cr_stroke = cr; set_text(&m_text_setting); }
+	void			set_shadow_color(Gdiplus::Color cr) { m_text_setting.lf.cr_shadow = cr; set_text(&m_text_setting); }
+	void			set_back_color(Gdiplus::Color cr) { m_text_setting.lf.cr_back = cr; set_text(&m_text_setting); }
+	void			set_thickness(float thickness) { m_text_setting.lf.thickness = thickness; set_text(&m_text_setting); }
 
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);
@@ -138,14 +108,13 @@ public:
 	void			fade_in(int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
 	void			fade_out();
 	bool			is_fadeinout_ing() { return m_fadeinout_ing; }
-	void			thread_fadeinout(bool fadein, int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
 
 	//
 	CSCShapeDlgTextSetting	m_text_setting;
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
 	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
 
-	void			get_logfont(LOGFONT *lf);
+	CSCLogFont*		get_logfont() { &m_text_setting.lf;}
 
 	//animated gif인 경우
 	enum GIF_PLAY_STATE
@@ -176,6 +145,10 @@ protected:
 	void			render(Gdiplus::Bitmap* img);
 
 	bool			m_fadeinout_ing = false;
+	void			thread_fadeinout(bool fadein, int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
+
+	//m_para 항목 중 마우스 커서가 올라간 음절 정보를 parent에게 메시지로 전달한다.
+	bool			m_send_hover_info = false;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
@@ -187,4 +160,5 @@ public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	virtual void PreSubclassWindow();
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 };

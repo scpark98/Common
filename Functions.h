@@ -125,7 +125,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 */
 
 #ifdef GDIPVER
-#undef GDIPVER
+	#undef GDIPVER
 #endif
 
 #define		GDIPVER 0x0110
@@ -1636,13 +1636,13 @@ h		: 복사할 height 크기(pixel)
 	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);
 
 	//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-	CRect		calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align);
+	CRect		calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, CSCLogFont* lf, DWORD align);
 	//CRect		calc_text_size(CWnd* wnd, Gdiplus::Graphics* g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align);
 	//현재는 calc_text_size()에서만 사용되는 함수로 주어진 폰트로 설정하고 pOldFont를 리턴한다.
-	CFont*		select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, LOGFONT* lf_origin, CFont* font);
+	//CFont*		select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, CSCLogFont* lf_origin, CFont* font);
 	void		get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font);
-	void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf);
-	void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf);
+	void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
+	void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para);
 
 //gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 //종료될 때 해제시켜주는 함수도 반드시 호출해줘야 한다.
@@ -2026,6 +2026,12 @@ template<class T> void Swap(T& x, T& y)
 	x		= y;
 	y		= temp;
 }
+
+//template<typename ... T> inline T get_max(T ... args)
+//{
+//	int n = sizeof...(args);
+//	int arg[] = { args... };
+//}
 
 int compareInteger (const void * a, const void * b);
 int compareChar(const void *arg1, const void *arg2);

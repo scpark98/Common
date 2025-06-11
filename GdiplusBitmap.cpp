@@ -173,7 +173,7 @@ void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
 	}
 }
 
-bool CGdiplusBitmap::load(CString file, bool gif_play_in_this)
+bool CGdiplusBitmap::load(CString file)
 {
 	if (!PathFileExists(file))
 		return false;
@@ -198,7 +198,6 @@ bool CGdiplusBitmap::load(CString file, bool gif_play_in_this)
 	
 	if (get_part(file, fn_ext).MakeLower() == _T("gif"))
 	{
-		m_gif_play_in_this = gif_play_in_this;
 		use_copied_open = false;
 	}
 
@@ -247,15 +246,15 @@ bool CGdiplusBitmap::load(CString file, bool gif_play_in_this)
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-bool CGdiplusBitmap::load(UINT id, bool gif_play_in_this)
+bool CGdiplusBitmap::load(UINT id)
 {
 	if (id <= 0)
 		return false;
 
-	return load(_T("PNG"), id, gif_play_in_this);
+	return load(_T("PNG"), id);
 }
 
-bool CGdiplusBitmap::load(CString sType, UINT id, bool gif_play_in_this)
+bool CGdiplusBitmap::load(CString sType, UINT id)
 {
 	release();
 
@@ -266,7 +265,6 @@ bool CGdiplusBitmap::load(CString sType, UINT id, bool gif_play_in_this)
 
 	if (sType == _T("png") || sType == _T("jpg") || sType == _T("gif"))
 	{
-		m_gif_play_in_this = gif_play_in_this;
 		m_pBitmap = GetImageFromResource(sType, id);
 	}
 	else
@@ -2723,7 +2721,13 @@ void CGdiplusBitmap::thread_gif_animation()
 			CMemoryDC dc(pDC, &r);
 			Gdiplus::Graphics g(dc.GetSafeHdc());
 
-			g.FillRectangle(br_zigzag.get(), CRect2GpRect(r));
+			if (m_has_alpha_pixel)
+			{
+				if (m_cr_back.GetValue() == Gdiplus::Color::Transparent)
+					g.FillRectangle(br_zigzag.get(), CRect2GpRect(r));
+				else
+					g.FillRectangle(&Gdiplus::SolidBrush(m_cr_back), CRect2GpRect(r));
+			}
 
 			//if (m_cr_back.GetValue() != 
 			//g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);

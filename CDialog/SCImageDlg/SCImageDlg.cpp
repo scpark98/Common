@@ -143,12 +143,11 @@ void CSCImageDlg::OnPaint()
 	{
 		dc.SelectClipRgn(NULL);
 
-		CRect rText;
-		CString msg = _T("No images to display.");
-		dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
+		//CRect rText = rc;
+		CString msg = _T("No images to display in this folder.");
+		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
 
-		DrawShadowText(dc.GetSafeHdc(), msg, msg.GetLength(), rText,
-			DT_CENTER | DT_VCENTER | DT_SINGLELINE, beige, black, 2, 1);
+		DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, beige, black, 2, 1);
 
 		return;
 	}
@@ -469,7 +468,7 @@ bool CSCImageDlg::load(CString sFile)
 	//m_screen_roi = Gdiplus::RectF();
 
 	AfxGetApp()->WriteProfileString(_T("setting\\SCImageDlg"), _T("recent file"), sFile);
-	bool res = m_img.load(sFile, false);
+	bool res = m_img.load(sFile);
 
 	if (m_img.is_animated_gif())
 	{
@@ -501,7 +500,7 @@ bool CSCImageDlg::load(CString sType, UINT id)
 	m_image_roi = Gdiplus::RectF();
 	m_screen_roi = Gdiplus::RectF();
 
-	bool res = m_img.load(sType, id, false);
+	bool res = m_img.load(sType, id);
 	Invalidate();
 
 	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CImageStatic, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
@@ -1001,7 +1000,7 @@ LRESULT CSCImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
 void CSCImageDlg::pause_gif(int pos)
 {
-	if (m_img.m_gif_play_in_this)
+	if (m_img.is_gif_play_itself())
 		return;
 
 	if (m_img.get_frame_count() < 2 || !m_run_thread_animation)

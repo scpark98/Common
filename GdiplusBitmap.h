@@ -152,6 +152,7 @@ public:
 	//ASee.exe와 같이 roi 설정, 기타 child ctrl들이 존재하여 그들과의 간섭이 문제가 될 경우는 CGdiplusBitmap에서 재생시키지 않고
 	//CSCImageDlg에서 직접 재생시켜야 하는 경우도 있다.
 	void			gif_play_itself(bool play_itself = true) { m_gif_play_in_this = play_itself; }
+	bool			is_gif_play_itself() { return m_gif_play_in_this; }
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 

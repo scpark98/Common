@@ -18860,12 +18860,9 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 
 			//각 para 영역 확인용 코드
 #ifdef _DEBUG
-			if (true)//m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)
-			{
-				//"\n"에 의한 공백 라인은 영역 사각형을 굳이 표시하지 않는다.
-				if (para[i][j].r.Width() > 2)
-					draw_rectangle(g, para[i][j].r, Gdiplus::Color::Red);// , Gdiplus::Color(255, 255, 0, 0));
-			}
+			//"\n"에 의한 공백 라인은 영역 사각형을 굳이 표시하지 않는다.
+			if (para[i][j].r.Width() > 2)
+				draw_rectangle(g, para[i][j].r, Gdiplus::Color::Red);// , Gdiplus::Color(255, 255, 0, 0));
 #endif
 		}
 	}

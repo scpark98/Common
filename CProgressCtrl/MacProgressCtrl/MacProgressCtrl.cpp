@@ -766,6 +766,9 @@ void CMacProgressCtrl::thread_indeterminate()
 
 	while (m_bIndeterminate)
 	{
+		if (!m_hWnd)
+			break;
+
 		CRect rc;
 		GetClientRect(rc);
 

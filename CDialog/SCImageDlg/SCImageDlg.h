@@ -32,9 +32,9 @@
 #define PIXEL_INFO_CY		72
 
 #define GIF_SLIDER_WIDTH	120
-#define GIF_SLIDER_HEIGHT	12
+#define GIF_SLIDER_HEIGHT	14
 
-#define MAX_RECT_HANDLE		9
+#define MAX_ROI_RECT_HANDLE	9		//roi의 크기 조정 및 이동을 위한 조정 핸들 개수
 
 // CSCImageDlg 대화 상자
 
@@ -157,7 +157,7 @@ protected:
 	bool			m_show_roi_info = true;			//roi 좌표 정보 표시 여부
 
 	int				m_handle_index = -1;			//이동 및 크기 조정을 위해 마우스가 위치하거나 클릭된 핸들 인덱스
-	CRect			m_roi_handle[MAX_RECT_HANDLE];	//사각형 개체의 이동 및 크기 조정을 위한 작은 사각형 9개
+	CRect			m_roi_handle[MAX_ROI_RECT_HANDLE];	//사각형 개체의 이동 및 크기 조정을 위한 작은 사각형 9개
 
 //픽셀값을 dc에 그릴지, CSCStatic으로 할지?
 	//dc에 그리면 처음엔 심플하지만 font, draw style(multiline vcenter)등 CSCStatic 구현 시 했던 번거로움이 그대로 발생한다.

@@ -719,7 +719,7 @@ void CSCSliderCtrl::OnPaint()
 	if (m_draw_progress_border)
 	{
 		rtrack.left = 0;
-		rtrack.right = m_rc.right - 1;
+		rtrack.right = m_rc.right;
 		draw_rectangle(&dc, rtrack, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 

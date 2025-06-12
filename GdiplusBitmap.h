@@ -151,7 +151,7 @@ public:
 	//일반적으로는 특정 dlg에서 gif를 로딩하여 CGdiplusBitmap 자체에서 바로 재생하도록 하면 편하지만
 	//ASee.exe와 같이 roi 설정, 기타 child ctrl들이 존재하여 그들과의 간섭이 문제가 될 경우는 CGdiplusBitmap에서 재생시키지 않고
 	//CSCImageDlg에서 직접 재생시켜야 하는 경우도 있다.
-	void			gif_play_itself(bool play_itself = true) { m_gif_play_in_this = play_itself; }
+	void			set_gif_play_itself(bool play_itself = true) { m_gif_play_in_this = play_itself; }
 	bool			is_gif_play_itself() { return m_gif_play_in_this; }
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
@@ -166,6 +166,10 @@ public:
 	//data 값을 변경한 후 다시 이미지에 적용시키려면 반드시 set_raw_data()를 호출해야 유지된다.
 	bool			set_raw_data();
 	uint8_t*		data = NULL;
+
+//palette
+	Gdiplus::ColorPalette* m_palette = NULL;
+	bool			get_palette();
 
 
 	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
@@ -185,7 +189,8 @@ public:
 
 	//PixelFormat24bppRGB과 같이 정의된 값을 문자열로 리턴하며 simple = true일 경우는 "RGB (24bit)"와 같이 리턴한다.
 	//fmt가 주어지지 않으면 현재 이미지의 PixelFormat을 구하여 결과를 리턴한다.
-	CString			get_pixel_format_str(Gdiplus::PixelFormat fmt = -1, bool simple = true);
+	//한번 구한 후에는 m_pixel_format_str 변수에 저장되고 이를 리턴하지만 다시 구해야 할 경우는 reset = true로 호출한다.
+	CString			get_pixel_format_str(Gdiplus::PixelFormat fmt = -1, bool simple = true, bool reset = false);
 
 
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
@@ -442,6 +447,8 @@ protected:
 	int				m_has_alpha_pixel = -1;	
 	void			resolution();
 	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
+
+	CString			m_pixel_format_str;
 
 //animatedGif
 	bool			m_paused = false;

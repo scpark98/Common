@@ -9,7 +9,6 @@
 
 #include "image_processing/fast_gaussian_blur/fast_gaussian_blur_template.h"
 
-
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
 
 CGdiplusBitmap::CGdiplusBitmap()
@@ -195,7 +194,7 @@ bool CGdiplusBitmap::load(CString file)
 	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
 	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
 	bool use_copied_open = true;
-	
+
 	if (get_part(file, fn_ext).MakeLower() == _T("gif"))
 	{
 		use_copied_open = false;
@@ -206,8 +205,6 @@ bool CGdiplusBitmap::load(CString file)
 		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(file);// Gdiplus::Bitmap(sFile);
 	else
 		m_pBitmap = Gdiplus::Bitmap::FromFile(file); //new Gdiplus::Bitmap(sFile);
-
-	//GdipLoadImageFromFile()
 #else
 	CA2W wFile(file);
 	if (use_copied_open)
@@ -513,9 +510,11 @@ void CGdiplusBitmap::release()
 		Wait(500);
 	}
 
-	//int palSize = m_pBitmap->GetPaletteSize();
-	//ColorPalette* palette = (ColorPalette*)malloc(palSize);
-	//bitmap->GetPalette(palette, palSize);
+	if (m_palette)
+	{
+		free(m_palette);
+		m_palette = NULL;
+	}
 
 	SAFE_DELETE(m_pBitmap);
 
@@ -585,17 +584,27 @@ void CGdiplusBitmap::resolution()
 
 	if (stride < 0)
 		stride = -stride;
+	/*
+	//indexed 8bpp bmp 이미지 일 경우 팔레트가 존재하는데
+	//색상이 다르게 표시되어 디버깅해보니 0번 팔레트에 들어갈 색이 40번부터 들어가 있다.
+	//40번부터 0번으로 당겨봤으나 여전히 올바른 색상으로 표시되지 않는다.
+	TRACE(_T("%s\n"), get_pixel_format_str());
+	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+	{
+		get_palette();
 
-	//GUID guid;
-	//m_pBitmap->GetRawFormat(&guid);
-	//Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
+		for (int i = 0; i < m_palette->Count; i++)
+		{
+			if (i <= 215)
+				m_palette->Entries[i] = m_palette->Entries[i + 40];
+			else
+				m_palette->Entries[i] = m_palette->Entries[i - 216];
+			//m_palette->Entries[i] = Gdiplus::Color::MakeARGB((BYTE)255, i, i, i);
+		}
 
-	//bool has_alpha = false;
-	//if (pf & PixelFormatAlpha)
-	//	has_alpha = true;
-
-	//TRACE(_T("has_alpha = %d\n"), has_alpha);
-
+		m_pBitmap->SetPalette(m_palette);
+	}
+	*/
 	check_animate_gif();
 }
 
@@ -610,7 +619,8 @@ bool CGdiplusBitmap::get_raw_data()
 	//8비트는 8비트지만 32비트도 24비트로 처리해야
 	//우선은 SeetaFace가 동작한다.
 	//수정 필요한 부분임.
-	Gdiplus::PixelFormat format = m_pBitmap->GetPixelFormat();
+	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
+	TRACE(_T("fmt = %s\n"), get_pixel_format_str(fmt));
 	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
 	//	format = PixelFormat8bppIndexed;
 	//else
@@ -619,7 +629,7 @@ bool CGdiplusBitmap::get_raw_data()
 	//픽셀포맷 형식에따라 이미지 접근 권한 취득.
 	//clipboard에서 읽어온 이미지일 경우 아래 코드에서 에러 발생.
 	//이 경우 24bpp로 변경해주면 에러는 발생하지 않으나 해결책이 아님.
-	if (m_pBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, format, &bmpData) == Gdiplus::Ok)
+	if (m_pBitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, fmt, &bmpData) == Gdiplus::Ok)
 	{
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
@@ -684,8 +694,8 @@ int CGdiplusBitmap::channels()
 CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect targetRect)
 {
 	CGdiplusBitmap temp;
-	temp.load(_T("d:\\temp\\mask.bmp"));
-	temp.convert2gray();
+	//temp.load(_T("d:\\temp\\mask.bmp"));
+	//temp.convert2gray();
 
 	/*
 	temp.get_raw_data();
@@ -769,8 +779,14 @@ CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 	return dst;
 }
 
-CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simple)
+CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simple, bool reset)
 {
+	if (reset)
+		m_pixel_format_str.Empty();
+
+	if (!m_pixel_format_str.IsEmpty())
+		return m_pixel_format_str;
+
 	if (fmt == -1)
 		fmt = m_pBitmap->GetPixelFormat();
 
@@ -838,7 +854,9 @@ CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simp
 		TRACE(_T("str_fmt = %s\n"), str_fmt);
 	}
 
-	return str_fmt;
+	m_pixel_format_str = str_fmt;
+
+	return m_pixel_format_str;
 }
 
 //이미지 비율은 보통 width/height지만 반대 비율을 원할 경우는 wh = false로 준다.
@@ -862,6 +880,7 @@ int CGdiplusBitmap::has_alpha_pixel()
 	//Gdiplus::IsAlphaPixelFormat() 은 PixelFormat32bppARGB 과 같은 Gdiplus::PixelFormat을 구해서 A 채널을 가졌는지를 판별하므로
 	//실제 모든 픽셀의 alpha가 255라고 해도 true가 된다.
 	//즉, 픽셀을 보고 판별하는 것이 아닌 PixelFormat 값만으로 판별하므로 실제 255가 아닌 alpha값 픽셀이 있는지는 판별하지 않는다.
+	/*
 	if (m_has_alpha_pixel == -1)
 	{
 		Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
@@ -870,13 +889,13 @@ int CGdiplusBitmap::has_alpha_pixel()
 	}
 
 	return m_has_alpha_pixel;
+	*/
 
 	//4코너 등과 같은 특정 위치의 픽셀의 alpha값이 255인지 아닌지로 판별하는 것은 좋은 방법은 아니다.
 	//alpha 채널의 값을 모두 더해서 그 값이 255 * width * height와 같다면 반투명 이미지가 아니고
 	//위 값보다 작다면 반투명 픽셀을 포함하는 이미지라고 판별해야 한다.
 	//단, animated gif의 경우는 각 프레임에 대해 get_raw_data()를 해야하므로 좀 복잡해진다.
 	//우선 위와 같은 방식대로 한다.
-	/*
 	if (m_has_alpha_pixel == -1)
 	{
 		int x, y;
@@ -884,6 +903,9 @@ int CGdiplusBitmap::has_alpha_pixel()
 
 		if (!data)
 			get_raw_data();
+
+		if (!data)
+			return 0;
 
 		for (y = 0; y < height; y++)
 		{
@@ -897,7 +919,6 @@ int CGdiplusBitmap::has_alpha_pixel()
 	}
 
 	return m_has_alpha_pixel;
-	*/
 }
 
 std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0, Gdiplus::Color cr1)
@@ -1793,7 +1814,7 @@ void CGdiplusBitmap::blur(float sigma, int order)
 	set_raw_data();
 
 #ifdef _DEBUG
-	save(_T("d:\\fast_blur (sigma=%.1f, order=%d).png"), sigma, order);
+	//save(_T("d:\\fast_blur (sigma=%.1f, order=%d).png"), sigma, order);
 #endif
 }
 
@@ -2086,7 +2107,31 @@ void CGdiplusBitmap::convert2gray()
 	resolution();
 
 	free(palette);
+#ifdef _DEBUG
 	save(_T("d:\\temp\\gray.bmp"));
+#endif
+}
+
+bool CGdiplusBitmap::get_palette()
+{
+	if (m_palette)
+	{
+		free(m_palette);
+		m_palette = NULL;
+	}
+
+	int palSize = m_pBitmap->GetPaletteSize();
+	m_palette = (Gdiplus::ColorPalette*)malloc(palSize);
+	m_pBitmap->GetPalette(m_palette, palSize);
+	
+	Gdiplus::Color cr;
+
+	for (int i = 0; i < m_palette->Count; i++)
+	{
+		cr = Gdiplus::Color(m_palette->Entries[i]);
+		TRACE(_T("palette[%d] = %d, %d, %d, %d\n"), i, cr.GetA(), cr.GetR(), cr.GetG(), cr.GetB());
+	}
+	return true;
 }
 
 void CGdiplusBitmap::cvtColor(Gdiplus::PixelFormat old_format, Gdiplus::PixelFormat new_format)
@@ -3018,16 +3063,29 @@ Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 	if (data == NULL)
 		get_raw_data();
 
-	if (x < 0 || x >= width || y < 0 || y >= height)
+	if (!data || x < 0 || x >= width || y < 0 || y >= height)
 		return Gdiplus::Color(0, 0, 0, 0);
 
 	if (channel == 1)
-		return Gdiplus::Color(*(data + y * width * channel + x * channel));
+	{
+		if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+		{
+			if (m_palette == NULL)
+				get_palette();
 
+			int pal_index = *(data + y * width * channel + x * channel);
+			TRACE(_T("pal_index = %d\n"), pal_index);
+			return m_palette->Entries[pal_index];
+		}
+
+		return Gdiplus::Color(*(data + y * width * channel + x * channel));
+	}
 	else if (channel == 3)
-		return Gdiplus::Color(	*(data + y * width * channel + x * channel + 2),
-								*(data + y * width * channel + x * channel + 1),
-								*(data + y * width * channel + x * channel + 0));
+	{
+		return Gdiplus::Color(*(data + y * width * channel + x * channel + 2),
+							*(data + y * width * channel + x * channel + 1),
+							*(data + y * width * channel + x * channel + 0));
+	}
 
 	return Gdiplus::Color(	*(data + y * width * channel + x * channel + 3),
 							*(data + y * width * channel + x * channel + 2),

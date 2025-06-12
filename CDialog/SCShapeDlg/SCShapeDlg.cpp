@@ -178,7 +178,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	{
 		bool success = create(parent, 0, 0, r.Width(), r.Height());
 		if (!success)
-			return &CSCShapeDlgTextSetting();
+			return &m_text_setting;
 	}
 
 	CClientDC dc(this);

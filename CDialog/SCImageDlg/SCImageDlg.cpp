@@ -55,11 +55,12 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 
 	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
 	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
-	//m_slider_gif.set_track_height(20);
+	m_slider_gif.set_track_height(GIF_SLIDER_HEIGHT);
 	m_slider_gif.set_font_name(_T("Arial"));
-	m_slider_gif.set_font_size(7);
-	m_slider_gif.set_back_color(gGRAY(32));
-	//m_slider_gif.draw_progress_border();
+	m_slider_gif.set_font_size(8);
+	//m_slider_gif.set_back_color(gGRAY(32));
+	m_slider_gif.draw_progress_border();
+	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
 	m_slider_gif.set_use_slide();
 
 	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32);
@@ -144,10 +145,10 @@ void CSCImageDlg::OnPaint()
 		dc.SelectClipRgn(NULL);
 
 		//CRect rText = rc;
-		CString msg = _T("No images to display in this folder.");
+		CString msg = _T("Fail to open this image file.");
 		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
 
-		DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, beige, black, 2, 1);
+		DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, maroon, black, 2, 1);
 
 		return;
 	}
@@ -233,14 +234,21 @@ void CSCImageDlg::OnPaint()
 		CFont* pOldFont = dc.SelectObject(&af);
 		CString filename = get_part(m_filename, fn_name);
 		CString info;
+		CString ratio_str;
+		float ratio = m_img.get_ratio();
 
-		info.Format(_T("파일 이름 : %s\n파일 크기 : %s\n수정 날짜 : %s\n이미지 정보 : %dx%dx%d (%s)\n이미지 비율 : %.3f : 1\n확대 배율 : %.0f%%"),
+		if (m_img.width == m_img.height)
+			ratio_str = _T("1 : 1");
+		else
+			ratio_str.Format(_T("%.3f : 1"), ratio);
+
+		info.Format(_T("파일 이름 : %s\n파일 크기: %s\n수정 날짜: %s\n이미지 정보: %dx%dx%d (%s)\n이미지 비율: %s\n확대 배율: %.0f%%"),
 					filename + m_alt_info,
 					get_file_size_str(m_filename),
 					get_datetime_str(GetFileLastModifiedTime(m_filename)),
 					m_img.width, m_img.height, m_img.channel * 8,
 					m_img.get_pixel_format_str(),
-					m_img.get_ratio(),
+					ratio_str,
 					m_zoom * 100.0);
 
 		//dc.GetTextExtend(info)는 멀티라인 정보를 얻을 수 없다.
@@ -366,16 +374,6 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				break;
-			case VK_DIVIDE :
-				fit2ctrl(false);
-				m_zoom = 1.0;
-				Invalidate();
-				return TRUE;
-			case VK_MULTIPLY :
-				fit2ctrl(true);
-				Invalidate();
-				return TRUE;
-
 			case VK_ADD :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
@@ -478,7 +476,11 @@ bool CSCImageDlg::load(CString sFile)
 		m_slider_gif.set_pos(0);
 		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 		m_slider_gif.ShowWindow(SW_SHOW);
-		//m_img.set_animation(m_hWnd, rc);
+		
+		//원래 CGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
+		//하지만 CSCImageDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
+		m_img.set_gif_play_itself(false);
+
 		std::thread t(&CSCImageDlg::thread_gif_animation, this);
 		t.detach();
 	}
@@ -897,7 +899,7 @@ BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 
 		m_handle_index = -1;
 
-		for (int i = 0; i < MAX_RECT_HANDLE; i++)
+		for (int i = 0; i < MAX_ROI_RECT_HANDLE; i++)
 		{
 			if (m_roi_handle[i].PtInRect(pt))
 			{

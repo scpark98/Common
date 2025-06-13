@@ -8496,7 +8496,7 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 //"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
 //위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
 //"\r", "\n"과 같은 line break는 모두 <br>로 변경한다.
-void get_tag_str(CString src, std::deque<CString>& tags)
+void get_tag_str(CString& src, std::deque<CString>& tags)
 {
 	int		i;
 	CString str;
@@ -18475,279 +18475,6 @@ bool save(Gdiplus::Bitmap* bitmap, CString filename)
 	return false;
 }
 
-//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-CRect calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, CSCLogFont* lf, DWORD align)
-{
-	if (para.empty())
-		return CRect();
-
-	int i, j;
-	int sx = 0;
-	int sy = 0;				//각 라인의 시작 위치(높이값 누적)
-	int total_text_height;
-	CRect rect_text;
-	CFont font, * pOldFont;
-	//LOGFONT lf_origin;
-
-	Gdiplus::Graphics g(pDC->m_hDC);
-
-	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
-
-	Gdiplus::StringFormat sf;
-
-	sf.SetAlignment(Gdiplus::StringAlignmentNear);
-	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
-	//sf.SetFormatFlags(Gdiplus::StringFormatFlagsMeasureTrailingSpaces);
-	sf.SetTrimming(Gdiplus::StringTrimmingNone);
-
-	int max_width = 0;
-	int max_width_line = 0;
-
-	//memcpy(&lf_origin, lf, sizeof(LOGFONT));
-
-	for (i = 0; i < para.size(); i++)
-	{
-		CSize sz_text = CSize(0, 0);
-
-		for (j = 0; j < para[i].size(); j++)
-		{
-			CSize sz;
-#if 0
-			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
-
-			//GetTextExtent()와 DrawText(DT_CALCRECT)로 구한 크기는 동일하며 italic은 약간 잘림.
-			sz = pDC->GetTextExtent(para[i][j].text);
-			//GetTextExtentExPoint(dc.m_hDC, m_paragraph[i].text, m_paragraph[i].text.GetLength(), 0, NULL, NULL, &sz);
-
-			//if (para[i][j].italic)
-			//{
-			//	TEXTMETRIC tm;
-			//	GetTextMetrics(pDC->m_hDC, &tm);
-			//	if (tm.tmOverhang > 0)
-			//		sz.cx += tm.tmOverhang;
-			//	else
-			//		sz.cx += (pDC->GetTextExtent(_T("M")).cx / 4);
-			//}
-
-			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
-#else
-			Gdiplus::Font* font = NULL;
-			get_paragraph_font(g, para, i, j, &font);
-			Gdiplus::RectF boundRect;
-			Gdiplus::RectF boundRect_temp;
-
-			//"text...    "와 같이 뒤에 공백이 있을 경우 공백이 무시된다.
-			//방법1. 맨 끝에 "|"와 같은 문자를 넣어 계산한 후 "|"의 width를 뺸다.
-			//방법2. SetMeasurableCharacterRanges(), MeasureCharacterRanges() 등을 이용하는 것이 더 좋음
-			//우선 간단하게 1번 방식을 사용한다.
-			g.MeasureString(CStringW(para[i][j].text + _T("M")), -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect);
-			g.MeasureString(L"M", -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect_temp);
-
-			if (boundRect.IsEmptyArea())
-			{
-				boundRect.Width = 1;
-				boundRect.Height = 40;
-			}
-
-			//stroke 두께까지 포함한 크기여야 한다.
-			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].lf.thickness;// *2.0f;
-			sz.cy = boundRect.Height + para[i][j].lf.thickness;// *2.0f;
-			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
-			//para[i][j].r.InflateRect(0, 0, para[i][j].thickness * 2.0f, para[i][j].thickness * 2.0f);
-#endif
-			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
-			sz_text.cx += sz.cx;
-
-			//한 라인에서 가장 cy가 큰 값을 기억시킨다.
-			sz_text.cy = std::max(sz_text.cy, sz.cy);
-		}
-
-		//각 라인들 중에서 최대 너비를 구한다.
-		if (sz_text.cx > max_width)
-		{
-			max_width = sz_text.cx;
-			max_width_line = i;
-		}
-
-		//각 라인 시작 위치는 누적된다.
-		sy += sz_text.cy;
-	}
-
-	total_text_height = sy;
-
-	font.DeleteObject();
-
-	//한 라인내에서 height가 가장 높은 항목으로 통일시키느냐? 아니면 각자의 높이를 그대로 유지하느냐...
-	//for (i = 0; i < m_paragraph.size(); i++)
-	//{
-	//	m_paragraph[i].r.bottom = m_paragraph[i].r.top + m_sz_text.cy;
-	//}
-
-	//align 옵션에 따른 보정
-	/*
-	DWORD dwStyle = GetStyle();
-	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
-
-	if (m_dwStyle == 0)
-	{
-		MAP_STYLE(SS_LEFT, DT_LEFT);
-		MAP_STYLE(SS_RIGHT, DT_RIGHT);
-		MAP_STYLE(SS_CENTER, DT_CENTER);
-		MAP_STYLE(SS_NOPREFIX, DT_NOPREFIX);
-		MAP_STYLE(SS_WORDELLIPSIS, DT_WORD_ELLIPSIS);
-		MAP_STYLE(SS_ENDELLIPSIS, DT_END_ELLIPSIS);
-		MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
-	}
-	*/
-
-	CRect margin;
-
-	//align에 따른 보정
-	if (align & DT_CENTER)
-	{
-		//각 라인마다 total_width를 구하고
-		for (i = 0; i < para.size(); i++)
-		{
-			int total_width = 0;
-			for (j = 0; j < para[i].size(); j++)
-				total_width += para[i][j].r.Width();
-
-			//아이콘을 포함하여 center에 표시할 지, 텍스트만 center에 표시할 지...
-			//if (m_hIcon)
-			//	total_width -= (m_sz_icon.cx + 4);
-
-			//cx에서 total_width/2를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
-			sx = rc.CenterPoint().x - total_width / 2;
-			for (j = 0; j < para[i].size(); j++)
-				para[i][j].r.OffsetRect(sx, 0);
-		}
-	}
-	else if (align & DT_RIGHT)
-	{
-		//각 라인마다 total_width를 구하고
-		for (i = 0; i < para.size(); i++)
-		{
-			int total_width = 0;
-			for (j = 0; j < para[i].size(); j++)
-				total_width += para[i][j].r.Width();
-
-			//rc.right에서 total_width를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
-			sx = rc.right - margin.right - total_width;
-			for (j = 0; j < para[i].size(); j++)
-				para[i][j].r.OffsetRect(sx, 0);
-		}
-	}
-	else //SS_LEFT (default)
-	{
-		if (false)//m_hIcon)
-		{
-			for (i = 0; i < para.size(); i++)
-			{
-				for (j = 0; j < para[i].size(); j++)
-				{
-					//para[i][j].r.OffsetRect(m_margin.left + m_sz_icon.cx + 4, 0);
-				}
-			}
-		}
-	}
-
-	if (align & DT_VCENTER)// SS_CENTERIMAGE)
-	{
-		//전체 높이에서 전체 텍스트 높이 합계를 뺀 1/2 만큼 shift 시킨다.
-		sy = (rc.Height() - total_text_height) / 2;
-		for (i = 0; i < para.size(); i++)
-		{
-			for (j = 0; j < para[i].size(); j++)
-			{
-				para[i][j].r.OffsetRect(0, sy);
-			}
-		}
-	}
-	else //top align
-	{
-		for (i = 0; i < para.size(); i++)
-		{
-			for (j = 0; j < para[i].size(); j++)
-			{
-				para[i][j].r.OffsetRect(0, 0);// m_margin.top);
-			}
-		}
-	}
-
-
-	if (para.size() > 0)
-	{
-		//m_pt_icon.x = m_para[m_max_width_line][0].r.left - m_sz_icon.cx - 4;
-		//아이콘을 top 정렬하느냐, 모든 라인의 vcenter에 정렬하느냐...
-		//m_pt_icon.y = m_para[0][0].r.top;
-
-		rect_text.left = para[max_width_line][0].r.left;	//최대 넓이 라인의 0번 아이템의 left
-		rect_text.top = para[0][0].r.top;					//최상단 항목의 top
-		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//최대 넓이 라인의 마지막 항목의 right
-		rect_text.bottom = para[0][0].r.top + total_text_height;	//최상단 항목의 top + 전체 텍스트 높이
-	}
-	else
-	{
-		//m_pt_icon.x = sx - m_sz_icon.cx;
-		//m_pt_icon.y = sy - m_sz_icon.cy / 2;
-
-		//m_rect_text = make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_icon.cx, m_sz_icon.cy);
-	}
-
-	//text 크기에 맞춰 컨트롤의 크기를 조정하는 것은 해당 윈도우에서 처리할 일이다.
-	/*
-	if (false)//m_auto_ctrl_size)
-	{
-		if (rect_text.Width() > rc.Width() || rect_text.Height() > rc.Height())
-		{
-			//MoveWindow(m_rect_text);
-			SetWindowPos(NULL, 0, 0, rect_text.Width(), rect_text.Height(), SWP_NOMOVE | SWP_NOZORDER);
-		}
-	}
-	*/
-
-	return rect_text;
-}
-
-/*
-//현재는 calc_text_size()에서만 사용되는 함수로 주어진 폰트로 설정하고 pOldFont를 리턴한다.
-CFont* select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, LOGFONT* lf_origin, CFont* font)
-{
-	font->DeleteObject();
-
-	LOGFONT lf;
-	memcpy(&lf, lf_origin, sizeof(LOGFONT));
-
-	_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), para[line][index].name);
-
-	lf.lfHeight = get_pixel_size_from_font_size(NULL, para[line][index].size);
-	lf.lfWeight = para[line][index].weight;
-	lf.lfItalic = para[line][index].italic;
-	lf.lfUnderline = para[line][index].underline;
-	lf.lfStrikeOut = para[line][index].strike;
-
-	font->CreateFontIndirect(&lf);
-	return (CFont*)pDC->SelectObject(font);
-}
-*/
-
-void get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font)
-{
-	Gdiplus::Unit unit = g.GetPageUnit();
-	float fDpiX = g.GetDpiX();
-	float fDpiY = g.GetDpiY();
-
-	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
-	float emSize = fDpiY * para[line][index].lf.size / 96.0;
-
-	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(para[line][index].lf.name));
-
-	Gdiplus::Font ff(&fontFamily, emSize, para[line][index].lf.style);
-	*font = ff.Clone();
-}
-
 #include <algorithm>
 //#define USING_HDC
 void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
@@ -18781,12 +18508,14 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 
 	//dc.SetBkColor()로 지정된 배경색을 설정하면 편하지만
 	//글자 속성에 따라 그 높낮이가 다른 경우도 있다.
-	//따라서 recalc_text_size()에서 max height를 모든 paragraph에 적용했으며
+	//따라서 calc_text_rect()에서 max height를 모든 paragraph에 적용했으며
 	//여기서도 배경색으로 칠한 뒤 텍스트를 표시한다.
 
 	for (i = 0; i < para.size(); i++)
 	{
-		for (j = 0; j < para[i].size(); j++)
+		//각 항목을 출력하되 뒤에서부터 출력시킨다.
+		//이는 italic인 경우 다음 항목에 의해 일부 가려지는 현상을 방지하기 위함이다.
+		for (j = para[i].size() - 1; j >= 0; j--)
 		{
 #ifdef USING_HDC
 			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
@@ -18821,25 +18550,26 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 			str_path.SetFillMode(Gdiplus::FillModeWinding);
 			shadow_path.SetFillMode(Gdiplus::FillModeWinding);
 
-			//stroke가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
-			//r을 정확히 계산하는 것이 정석이나 우선 약간 넓혀서 글자가 잘리지 않도록 한다.
+			//AddString() 파라미터 중 출력위치를 줄 때 Gdiplus::Rect() 또는 Gdiplus::Point()로 줄 수 있는데
+			//stroke 또는 shadow가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
+			//r을 정확히 계산하는 것이 정석이나 굳이 r을 주지 않고 Gdiplus::Point()로 주면 문제되지 않는다.
 			CRect r = para[i][j].r;
-			r.InflateRect(0, 0, 1, 1);
 			str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-								para[i][j].lf.style, emSize, CRect2GpRectF(r), sf.GenericTypographic());
+								para[i][j].lf.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
 			//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
 			Gdiplus::SolidBrush br_shadow(para[0][0].lf.cr_shadow);
-			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness }));
-			TRACE(_T("pt_shadow_offset.x = %d\n"), pt_shadow_offset.x);
+			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness / 1.4f }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness / 1.4f}));
 			r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
 
 			shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-				para[i][j].lf.style, emSize, CRect2GpRectF(r), sf.GenericTypographic());
+				para[i][j].lf.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
 			Gdiplus::Pen   pen(para[i][j].lf.cr_stroke, para[i][j].lf.thickness);
-			pen.SetLineJoin(Gdiplus::LineJoinMiter);
 			Gdiplus::SolidBrush brush(para[i][j].lf.cr_text);
+
+			//pen.SetLineJoin(Gdiplus::LineJoinMiter);
+			pen.SetLineJoin(Gdiplus::LineJoinRound);
 
 			g.FillPath(&br_shadow, &shadow_path);
 
@@ -18861,8 +18591,8 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 			//각 para 영역 확인용 코드
 #ifdef _DEBUG
 			//"\n"에 의한 공백 라인은 영역 사각형을 굳이 표시하지 않는다.
-			if (para[i][j].r.Width() > 2)
-				draw_rectangle(g, para[i][j].r, Gdiplus::Color::Red);// , Gdiplus::Color(255, 255, 0, 0));
+			//if (para[i][j].r.Width() > 2)
+				//draw_rectangle(g, para[i][j].r, Gdiplus::Color::Blue);// , Gdiplus::Color(255, 255, 0, 0));
 #endif
 		}
 	}

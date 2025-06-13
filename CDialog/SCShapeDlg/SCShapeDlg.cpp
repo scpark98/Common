@@ -165,14 +165,13 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	lf.shadow_depth = shadow_depth;
 	lf.thickness = thickness;
 
-	m_text_setting = CSCShapeDlgTextSetting(text, lf);
-
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
 
 	m_img.release();
 
 	CSCParagraph::build_paragraph_str(text, m_para, &lf);
+	m_text_setting = CSCShapeDlgTextSetting(text, lf);
 
 	if (!m_hWnd)
 	{
@@ -182,12 +181,12 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	}
 
 	CClientDC dc(this);
-	r = ::calc_text_size(r, &dc, m_para, &lf, DT_CENTER | DT_VCENTER);
+	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 	r.InflateRect(1, 1);
 
 	m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
 	r = CRect(0, 0, r.Width(), r.Height());
-	r = ::calc_text_size(r, &dc, m_para, &lf, DT_CENTER | DT_VCENTER);
+	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 
 	//해당 캔버스에
 	Gdiplus::Graphics g(m_img.m_pBitmap);
@@ -199,79 +198,83 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 
 	//CDC* pDC = CDC::FromHandle(g.GetHDC());	//이 코드를 써서 CDC에 draw_text()하려 했으나 이렇게 하면 g에 아무것도 그려지지 않음
 
-	draw_text(g, m_para);
-
-	set_image(parent, &m_img, false);
-#ifdef _DEBUG
-	m_img.save(_T("d:\\SCShapeDlg.png"));
-#endif
-	return &m_text_setting;
-
-	/*
-
-	//m_auto_color = true이면 배경색에 따라 cr_text를 변경시키도록 한다.
-	//cr_text = Gdiplus::Color::Gray;
-
-
-	m_text_setting = CSCShapeDlgTextSetting(text, font_size, font_style, shadow_depth, thickness, font_name, cr_text, cr_stroke, cr_shadow, cr_back);
-
-	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
-	CRect r;
-	
-	if (m_img.is_empty())
-		m_img.create(100, 100, PixelFormat32bppARGB, cr_back);
-	else
-		m_img.clear(cr_back);
-
-	//TRACE(_T("img rect = (%d,%d)\n"), img.width, img.height);
-
-	//해당 캔버스에
-	Gdiplus::Graphics g(m_img.m_pBitmap);
-
-	//글자를 출력하고
-	r = draw_text(g, r, text,
-		font_size, font_style, shadow_depth, thickness, font_name,
-		cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
-
-	//출력
-
-	if (m_hWnd)
+	if (m_text_align == DT_CENTER)
 	{
-		res = true;
+		draw_text(g, m_para);
+		set_image(parent, &m_img, false);
 	}
 	else
 	{
-		res = create(parent, 0, 0, r.Width(), r.Height());
-	}
-
-	SetWindowPos(NULL, 0, 0, r.Width(), r.Height(), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-
-	//캔버스 크기가 실제 텍스트 출력크기와 다르면
-	if (r.Width() != m_img.width || r.Height() != m_img.height)
-	{
-		//resize하거나 실제 크기로 다시 생성한다.
-		m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
-
-		//해당 캔버스에
-		Gdiplus::Graphics g(m_img.m_pBitmap);
-
-		//글자를 출력하고
-		r = draw_text(g, r, text,
-			font_size, font_style, shadow_depth, thickness, font_name,
-			cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
+		set_text_align(m_text_align);
 	}
 
 #ifdef _DEBUG
 	//m_img.save(_T("d:\\SCShapeDlg.png"));
 #endif
+	return &m_text_setting;
+}
 
-	if (!res)
-		return res;
+//기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
+void CSCShapeDlg::set_text_align(int align)
+{
+	int i, j;
 
-	set_image(parent, &m_img, false);
+	m_text_align = align;
 
-	return res;
-	*/
+	if (m_text_align == DT_CENTER)
+	{
+		//이미 set_text()에서 기본적으로 중앙 정렬하므로 그냥 set_text()를 다시 호출해주면 된다.
+		set_text(&m_text_setting);
+		return;
+	}
+	else if (m_text_align == DT_LEFT)
+	{
+		int min_left = 99999;
+
+		//find min_left
+		for (i = 0; i < m_para.size(); i++)
+		{
+			if (m_para[i][0].r.left < min_left)
+				min_left = m_para[i][0].r.left;
+		}
+
+		//move all paragraph
+		for (i = 0; i < m_para.size(); i++)
+		{
+			int offset = min_left - m_para[i][0].r.left;
+			for (j = 0; j < m_para[i].size(); j++)
+			{
+				m_para[i][j].r.OffsetRect(offset, 0);
+			}
+		}
+	}
+	else if (m_text_align == DT_RIGHT)
+	{
+		int max_right = 0;
+
+		//find max_right
+		for (i = 0; i < m_para.size(); i++)
+		{
+			if (m_para[i].back().r.right > max_right)
+				max_right = m_para[i].back().r.right;
+		}
+
+		//move all paragraph
+		for (i = 0; i < m_para.size(); i++)
+		{
+			int offset = max_right - m_para[i].back().r.right;
+			for (j = 0; j < m_para[i].size(); j++)
+			{
+				m_para[i][j].r.OffsetRect(offset, 0);
+			}
+		}
+	}
+
+	//해당 캔버스에
+	Gdiplus::Graphics g(m_img.m_pBitmap);
+	g.Clear(m_text_setting.lf.cr_back);
+	draw_text(g, m_para);
+	set_image(m_parent, &m_img, false);
 }
 
 void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)

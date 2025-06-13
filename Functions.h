@@ -680,7 +680,7 @@ struct	NETWORK_INFO
 
 	//"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
 	//위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
-	void		get_tag_str(CString src, std::deque<CString>& tags);
+	void		get_tag_str(CString& src, std::deque<CString>& tags);
 
 	//간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
 	CString		get_unescape_string(CString src);
@@ -904,6 +904,43 @@ struct	NETWORK_INFO
 
 	int			get_char_count(CString sStr, TCHAR ch, bool stop_at_first_mismatch = false, bool forward = true);
 	CString		get_mac_address_format(CString src, TCHAR separator = ':');
+
+	// templated version of str_icmp so it could work with both char and wchar_t
+	template<typename T>
+	struct str_icmp {
+		str_icmp(const std::locale& loc) : loc_(loc) {}
+		bool operator()(T ch1, T ch2) {
+			return std::toupper(ch1, loc_) == std::toupper(ch2, loc_);
+		}
+	private:
+		const std::locale& loc_;
+	};
+
+	// find substring (case insensitive)
+	template<typename T> int find_substr(const T& str1, const T& str2, const std::locale& loc = std::locale())
+	{
+		typename T::const_iterator it = std::search(str1.begin(), str1.end(), str2.begin(), str2.end(), str_icmp<typename T::value_type>(loc));
+		if (it != str1.end())
+			return it - str1.begin();
+		return -1; // not found
+	}
+
+	struct std_stricmp
+	{
+		// case-independent (ci) compare_less binary function
+		struct nocase_compare
+		{
+			bool operator() (const unsigned char& c1, const unsigned char& c2) const {
+				return tolower(c1) < tolower(c2);
+			}
+		};
+		bool operator() (const std::string& s1, const std::string& s2) const {
+			return std::lexicographical_compare
+			(s1.begin(), s1.end(),   // source range
+				s2.begin(), s2.end(),   // dest range
+				nocase_compare());  // comparison
+		}
+	};
 
 //데이터 변환
 	CString		i2S(int64_t nValue, bool bComma = false, bool fill_zero = false, int digits = 0);
@@ -1635,11 +1672,6 @@ h		: 복사할 height 크기(pixel)
 	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);
 
-	//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-	CRect		calc_text_size(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, CSCLogFont* lf, DWORD align);
-	//CRect		calc_text_size(CWnd* wnd, Gdiplus::Graphics* g, std::deque<std::deque<CSCParagraph>>& para, LOGFONT* lf, DWORD align);
-	//현재는 calc_text_size()에서만 사용되는 함수로 주어진 폰트로 설정하고 pOldFont를 리턴한다.
-	//CFont*		select_paragraph_font(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, int line, int index, CSCLogFont* lf_origin, CFont* font);
 	void		get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font);
 	void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
 	void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para);

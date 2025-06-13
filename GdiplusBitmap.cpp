@@ -528,6 +528,7 @@ void CGdiplusBitmap::release()
 	width = height = channel = stride = 0;
 	m_has_alpha_pixel = -1;
 	m_filename.Empty();
+	m_pixel_format_str.Empty();
 }
 
 //---------------------------------------------------------------

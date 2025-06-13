@@ -121,9 +121,18 @@ public:
 
 	static Gdiplus::Color get_color(std::string name)
 	{
-		m_cr_map::iterator it = get_color_map().find(name);
+		//m_cr_map::iterator it = get_color_map().find(name);
+		//위와 같이 map.find()를 쓰면 대소문자 구분을 하므로, 대소문자 구분없이 검색하기 위해 std::find_if와 _stricmp()를 사용한다.
+		m_cr_map::iterator it = std::find_if(get_color_map().begin(), get_color_map().end(),
+			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
+			bool
+			{
+				return (_stricmp(element.first.c_str(), name.c_str()) == 0);
+			});
+
 		if (it == get_color_map().end())
 			return Gdiplus::Color::Black;
+
 		return it->second;
 	}
 
@@ -135,6 +144,22 @@ public:
 private:
 	Gdiplus::Color cr;
 	std::string name;
+
+	//struct CaseInsensitiveComparator
+	//{
+	//	bool operator()(const std::string& a, const std::string& b) const noexcept
+	//	{
+	//		return (_stricmp(a.c_str(), b.c_str()) < 0);
+	//	}
+	//};
+
+	//bool caseInsensitiveCompare(const std::string& a, const std::string& b) {
+	//	std::string aLower = a;
+	//	std::string bLower = b;
+	//	std::transform(aLower.begin(), aLower.end(), aLower.begin(), [](unsigned char c) { return std::tolower(c); });
+	//	std::transform(bLower.begin(), bLower.end(), bLower.begin(), [](unsigned char c) { return std::tolower(c); });
+	//	return aLower < bLower;
+	//};
 
 	typedef std::unordered_map<std::string, Gdiplus::Color> m_cr_map;
 	static m_cr_map& get_color_map()
@@ -654,8 +679,11 @@ Gdiplus::Color	get_color(Gdiplus::Color crOrigin, int nOffset);
 COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
 Gdiplus::Color	get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio);
 Gdiplus::Color	get_color(COLORREF rgb);
-Gdiplus::Color	get_color(std::string cr_name);
+
+//컬러 이름으로 Gdiplus::Color를 리턴한다. 대소문자를 구분하지 않으며 이름이 없으면 검정색을 리턴한다.
+//get_color("red") 또는 get_color(_T("Red")) -> Gdiplus::Color(255, 255, 0, 0);
 Gdiplus::Color	get_color(CString cr_str);
+Gdiplus::Color	get_color(std::string cr_name);
 
 //#RRGGBB와 같은 16진수 컬러 문자열을 COLORREF로 변환
 COLORREF		get_color_from_hexadecimal(CString cr);
@@ -708,7 +736,7 @@ COLORREF		get_color(int hue_start, int hue_end, int percent, float saturation = 
 int				get_hue(COLORREF cr);
 
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
-CString			get_color_name_of_closest(COLORREF cr, COLORREF *cr_closest = NULL);
+CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = NULL);
 
 Gdiplus::Color	get_sys_color(int index);
 

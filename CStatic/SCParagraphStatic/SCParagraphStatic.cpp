@@ -31,13 +31,20 @@ END_MESSAGE_MAP()
 CRect CSCParagraphStatic::set_text(CString text)
 {
 	m_para.clear();
-	CSCParagraph::build_paragraph_str(text, m_para, &m_lf, m_cr_text, m_cr_back);
+
+	//m_sc_font는 PreSubclassWindow()에서 초기화되었는데
+	//그 후 이 set_text()를 호출하기 전에 색상, 폰트관련 설정이 변경되었을 수 있으므로
+	//설정값을 m_sc_font에 갱신시켜줘야 한다.
+	update_sc_font();
+
+
+	CSCParagraph::build_paragraph_str(text, m_para, &m_sc_font);
 
 	//"<b><cr = Red>This</b></cr > is a <cr =Blue><i>sample</i> <b>paragraph</b>."
 	CClientDC dc(this);
 	CRect rc;
 	GetClientRect(&rc);
-	::calc_text_size(rc, &dc, m_para, &m_lf, DT_LEFT | DT_CENTER);
+	CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_LEFT | DT_CENTER);
 	Invalidate();
 
 	return m_rect_text;
@@ -306,81 +313,8 @@ void CSCParagraphStatic::OnPaint()
 	//draw_rectangle(dc, rc, Gdiplus::Color::Transparent, m_cr_back);
 	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
-	draw_text(&dc, m_para, &m_lf);
-	/*
-	CFont font, *pOldFont = NULL;
-
-	Gdiplus::Graphics g(dc.m_hDC, rc);
-	Gdiplus::StringFormat sf;
-
-	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
-
-	sf.SetAlignment(Gdiplus::StringAlignmentNear);
-	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
-
-	//dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
-	draw_rectangle(g, rc, Gdiplus::Color::Transparent, m_cr_back);
-
-	//dc.SetBkColor()로 지정된 배경색을 설정하면 편하지만
-	//글자 속성에 따라 그 높낮이가 다른 경우도 있다.
-	//따라서 recalc_text_size()에서 max height를 모든 paragraph에 적용했으며
-	//여기서도 배경색으로 칠한 뒤 텍스트를 표시한다.
-	dc.SetBkMode(TRANSPARENT);
-
-	if (m_hIcon)
-	{
-		draw_icon(&dc, m_hIcon, make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_icon.cx, m_sz_icon.cy));
-	}
-
-	
-	for (i = 0; i < m_para.size(); i++)
-	{
-		for (j = 0; j < m_para[i].size(); j++)
-		{
-#if 1
-			pOldFont = select_paragraph_font(m_para, i, j, &dc, &m_lf, &font);
-
-			//text 배경색을 칠하고
-			if (m_para[i][j].cr_back.GetValue() != Gdiplus::Color::Transparent)
-				//dc.FillSolidRect(m_para[i][j].r, m_para[i][j].cr_back.ToCOLORREF());
-				draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Transparent, m_para[i][j].cr_back);
-
-			//text를 출력한다.
-			dc.SetTextColor(m_para[i][j].cr_text.ToCOLORREF());
-			dc.DrawText(m_para[i][j].text, m_para[i][j].r, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
-			//draw_text(g, m_para[i][j].r, m_para[i][j].cr_text, m_para[i][j].text, m_para[i][j].size, m_para[i][j].);
-			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
-			dc.SelectObject(pOldFont);
-#else
-			Gdiplus::Font* font;
-			get_paragraph_font(i, j, g, &font);
-
-			//text 배경색을 칠하고
-			draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Transparent, m_para[i][j].cr_back);
-
-			//text를 출력한다.
-			Gdiplus::SolidBrush text_brush(m_para[i][j].cr_text);
-			g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf, &text_brush);
-#endif
-
-			if (m_draw_word_hover_rect && CPoint(i, j) == m_pos_word_hover)
-			{
-				draw_rectangle(g, m_para[i][j].r, Gdiplus::Color::Red, Gdiplus::Color(96, 255, 255, 255));
-			}
-		}
-	}
-
-	//텍스트 출력 영역 확인용
-#ifdef _DEBUG
-	//draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
-#endif
-	TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
-
-	font.DeleteObject();
-	dc.SelectObject(pOldFont);
-	*/
+	Gdiplus::Graphics g(dc);
+	draw_text(g, m_para);
 }
 
 void CSCParagraphStatic::PreSubclassWindow()
@@ -388,6 +322,26 @@ void CSCParagraphStatic::PreSubclassWindow()
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
 	CSCStatic::PreSubclassWindow();
+
+	update_sc_font();
+}
+
+void CSCParagraphStatic::update_sc_font()
+{
+	m_sc_font.name = m_lf.lfFaceName;
+	m_sc_font.size = -MulDiv(m_lf.lfHeight, GetDeviceCaps(GetDC()->m_hDC, LOGPIXELSY), 72);
+
+	if (m_lf.lfWeight >= FW_BOLD)
+		m_sc_font.style |= Gdiplus::FontStyleBold;
+	if (m_lf.lfItalic)
+		m_sc_font.style |= Gdiplus::FontStyleItalic;
+	if (m_lf.lfUnderline)
+		m_sc_font.style |= Gdiplus::FontStyleUnderline;
+	if (m_lf.lfStrikeOut)
+		m_sc_font.style |= Gdiplus::FontStyleStrikeout;
+
+	m_sc_font.cr_text = m_cr_text;
+	m_sc_font.cr_back = m_cr_back;
 }
 
 void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)
@@ -397,7 +351,7 @@ void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	CRect rc;
 	GetClientRect(rc);
-	calc_text_size(rc, GetDC(), m_para, &m_lf, DT_LEFT | DT_VCENTER);
+	CSCParagraph::calc_text_rect(rc, GetDC(), m_para, DT_CENTER | DT_VCENTER);
 }
 
 void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)
@@ -412,7 +366,7 @@ void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)
 				if (m_para[i][j].r.PtInRect(point))
 				{
 					m_pos_word_hover = CPoint(i, j);
-					TRACE(_T("m_pos_word_hover = %d, %d\n"), i, j);
+					TRACE(_T("m_pos_word_hover = %d, %d, %s\n"), i, j, m_para[i][j].text);
 					Invalidate();
 					return;
 				}

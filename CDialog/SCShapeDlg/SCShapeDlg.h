@@ -13,10 +13,13 @@
 * 또는 CGdiplusBitmap 이미지를 생성한 후 set_image() 함수를 호출하여
 * 이미지를 설정할 수 있다.
 * 
-* set_text()를 사용하면 이미지 대신 텍스트를 출력한다.
+[텍스트 출력]
+- set_text()를 사용하면 이미지 대신 텍스트를 출력한다.
+- 기본 정렬은 DT_CENTER지만 set_text_align()으로 텍스트 정렬을 변경할 수 있다.
 
 [자막 이펙트 프리셋
 - 한 문장의 한 글자씩 컬러로 표시되는 등의 text effect 들을 구현할 수 있다.
+  CEffectSetting 클래스가 필요할 수 있다.
 - 한 글자씩 alpha와 위치 변경
 
 */
@@ -83,7 +86,7 @@ public:
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
 	//default는 hide 상태로 시작되므로 set_text()로 세팅한 후 ShowWindow(SW_SHOW)를 호출해야 함.
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
-	//shadow_depth는 출력되는 텍스트의 height에 대한 비율이지만 현재는 자동 조정되므로 사용되지 않음.
+	//shadow_depth는 출력되는 텍스트의 height에 대한 비율이지만 font_size에 비례하여 자동 조정되므로 지금은 사용되지 않음.
 	CSCShapeDlgTextSetting*	set_text(CWnd* parent, CString text,
 							float font_size,
 							int font_style,
@@ -102,6 +105,10 @@ public:
 	void			set_shadow_color(Gdiplus::Color cr) { m_text_setting.lf.cr_shadow = cr; set_text(&m_text_setting); }
 	void			set_back_color(Gdiplus::Color cr) { m_text_setting.lf.cr_back = cr; set_text(&m_text_setting); }
 	void			set_thickness(float thickness) { m_text_setting.lf.thickness = thickness; set_text(&m_text_setting); }
+
+	//기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
+	void			set_text_align(int align);
+	int				get_text_align() { return m_text_align; }	
 
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);
@@ -139,15 +146,20 @@ public:
 	void			gif_stop();
 	void			gif_goto(int pos, bool pause = false);
 
+	//원래 protected로 선언되는게 일반적이지만 Gdiplus관련 멤버함수 등을 원활히 사용하기 위해 public으로 변경한다.
+	CGdiplusBitmap	m_img;
+
 protected:
 	CWnd*			m_parent = NULL;
 
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 음절
 
-	CGdiplusBitmap	m_img;
 	//0 : 투명, 255 : 불투명
 	int				m_alpha = 255;
 	void			render(Gdiplus::Bitmap* img);
+
+	//DT_LEFT, DT_RIGHT, DT_CENTER 가로	정렬만 지원된다.
+	int				m_text_align = DT_CENTER;
 
 	bool			m_fadeinout_ing = false;
 	void			thread_fadeinout(bool fadein, int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);

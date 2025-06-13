@@ -310,7 +310,7 @@ Gdiplus::Color get_color(CString cr_str)
 			cr = Gdiplus::Color(_ttoi(token[0]), _ttoi(token[1]), _ttoi(token[2]), _ttoi(token[3]));
 		}
 	}
-	else //cr_str == _T("Red")라면 Gdiplus::Color::Red 값을 리턴한다.
+	else //cr_str == _T("Red")라면 Gdiplus::Color::Red 라는 컬러값을 리턴한다.
 	{
 		cr = CSCColorMap::get_color(CString2string(cr_str));
 	}
@@ -609,7 +609,7 @@ Gdiplus::Color get_color(Gdiplus::Color cr, int argb, BYTE value)
 //https://en.wikipedia.org/wiki/Web_colors
 //RGB(255, 190, 200)과 가장 유사한 색은 Pink(255, 192, 203)이라고 보이지만
 //LightPink(255, 182, 193)를 리턴한다. 계산식이 잘못인지 확인 필요.
-CString	get_color_name_of_closest(COLORREF cr_src, COLORREF* cr_closest)
+CString	get_nearest_color_name(COLORREF cr_src, COLORREF* cr_nearest)
 {
 	CString result;
 
@@ -642,8 +642,8 @@ CString	get_color_name_of_closest(COLORREF cr_src, COLORREF* cr_closest)
 		{
 			dclrmax = dclr;
 			result = cr.first;
-			if (cr_closest)
-				*cr_closest = cr.second;
+			if (cr_nearest)
+				*cr_nearest = cr.second;
 		}
 	}
 
@@ -657,7 +657,11 @@ std::deque<CString>  CSCColorTheme::get_color_theme_list()
 	dq.push_back(_T("gray"));
 	dq.push_back(_T("dark_gray"));
 	dq.push_back(_T("dark"));
-
+	dq.push_back(_T("linkmemine"));
+	dq.push_back(_T("linkmemine_se"));
+	dq.push_back(_T("anysupport"));
+	dq.push_back(_T("helpu"));
+	dq.push_back(_T("pcanypro"));
 	return dq;
 }
 

@@ -50,8 +50,8 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
 	m_static_pixel.create(_T("A 0\nR 0\nG 0\nB 0"), WS_CHILD | SS_CENTER | SS_CENTERIMAGE, r_pixel, this);
 	m_static_pixel.sunken();
-	//m_static_pixel.set_font_name(_T("Consolas"));
-	m_static_pixel.set_font_size(8);
+	m_static_pixel.set_font_name(_T("Consolas"));
+	m_static_pixel.set_font_size(10);
 
 	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
 	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
@@ -63,7 +63,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
 	m_slider_gif.set_use_slide();
 
-	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32);
+	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32);// , Gdiplus::Color::Blue, Gdiplus::Color::Red);
 
 	return true;
 }
@@ -846,8 +846,8 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			//if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
 			{
-				m_static_pixel.set_back_color(m_cr_pixel);
-				m_static_pixel.set_text_color(get_distinct_gcolor(m_cr_pixel));
+				m_static_pixel.set_back_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::White : m_cr_pixel);
+				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_gcolor(m_cr_pixel));
 				m_static_pixel.set_text(str);
 				//m_static_pixel.set_textf(Gdiplus::Color::RoyalBlue, str);
 				m_cr_pixel_old = m_cr_pixel;

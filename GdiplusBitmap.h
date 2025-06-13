@@ -194,7 +194,8 @@ public:
 
 
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
-	static std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));
+	//sz_tile : 32로 주면 16x16 크기의 타일로 반복되는 지그재그 패턴이 생성된다. 즉, 16x16 zigzag 한 셀 4개가 32x32 크기의 타일로 반복됨.
+	static std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile = 32, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));
 
 	//targetRect를 주면 대상 영역에 비율을 유지하여 그린다.
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.

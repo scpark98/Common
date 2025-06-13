@@ -269,7 +269,7 @@ void CSCStatic::OnPaint()
 	m_rect_text = rc;
 
 	//아이콘 또는 헤더 이미지와 텍스트 사이의 갭 크기지만 이미지의 여백, 크기 정도에 따라 갭은 비율로 조정되도록 수정되어야 한다.
-	int gap = 8;
+	int gap = 4;
 
 	//아이콘이 있으면 아이콘을 그려준다.
 	if (m_hIcon != NULL)

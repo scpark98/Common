@@ -29,7 +29,7 @@
 //#include "../../CToolTipCtrl/XInfoTip.h"
 
 #define PIXEL_INFO_CX		80
-#define PIXEL_INFO_CY		72
+#define PIXEL_INFO_CY		80
 
 #define GIF_SLIDER_WIDTH	120
 #define GIF_SLIDER_HEIGHT	14

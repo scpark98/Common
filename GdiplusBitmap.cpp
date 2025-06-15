@@ -899,6 +899,12 @@ int CGdiplusBitmap::has_alpha_pixel()
 	//우선 위와 같은 방식대로 한다.
 	if (m_has_alpha_pixel == -1)
 	{
+		if (channel != 4)
+		{
+			m_has_alpha_pixel = 0;
+			return m_has_alpha_pixel;
+		}
+
 		int x, y;
 		uint64_t total = 0;
 

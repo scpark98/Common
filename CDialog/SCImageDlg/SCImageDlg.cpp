@@ -274,7 +274,8 @@ void CSCImageDlg::OnPaint()
 
 	if (m_lbutton_down)// IsCtrlPressed())
 	{
-		draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);// , Gdiplus::DashStyle::DashStyleDash, Gdiplus::CompositingMode::CompositingModeSourceCopy);
 	}
 	else if (m_image_roi.IsEmptyArea() == false)
 	{
@@ -284,7 +285,8 @@ void CSCImageDlg::OnPaint()
 		screen_roi = GpRectF2CRect(m_screen_roi);
 		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
 		//screen_roi.OffsetRect(m_offset);
-		draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);// , Gdiplus::DashStyle::DashStyleDash, Gdiplus::CompositingMode::CompositingModeSourceCopy);
 	}
 
 	if (screen_roi.IsRectEmpty() == false)

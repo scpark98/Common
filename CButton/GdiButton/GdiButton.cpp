@@ -1152,8 +1152,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 
 	//이미지 버튼이면 텍스트는 출력하지 않는다.
-	if (m_image.size() > 0 || text.IsEmpty())
-		return;
+	//if (m_image.size() > 0 || text.IsEmpty())
+	//	return;
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	CFont* pOldFont = dc.SelectObject(&m_font);
@@ -1216,15 +1216,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			x = (rc.Width() - (img_width + gap + sz_text.cx)) / 2;
 		else if (m_img_header_align & DT_RIGHT)
 			x = rc.right - margin - img_width - gap - img_width;
-		else// if (m_img_header_align & DT_LEFT == DT_LEFT)
-			x = rc.left + margin;
+		else
+			x = rc.left + gap;
 
-		if (m_img_header_align & DT_TOP)
-			y = rc.top + 4;
+		if (m_img_header_align & DT_VCENTER)
+			y = (rc.Height() - img_height) / 2;
 		else if (m_img_header_align & DT_BOTTOM)
 			y = rc.bottom - 4 - img_height;
-		else//if (m_img_header_align & DT_VCENTER == DT_VCENTER)
-			y = (rc.Height() - img_height) / 2;
+		else
+			y = rc.top + 4;
 
 
 		m_img_header.draw(g, x, y, img_width, img_height);
@@ -1278,7 +1278,7 @@ void CGdiButton::OnMouseMove(UINT nFlags, CPoint point)
 void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TRACE(_T("mouse hover\n"));
+	//TRACE(_T("mouse hover\n"));
 
 	if (!m_use_hover)
 		return;
@@ -1297,7 +1297,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 void CGdiButton::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TRACE(_T("mouse leave\n"));
+	//TRACE(_T("mouse leave\n"));
 
 	if (!m_use_hover || !m_is_hover)
 		return;
@@ -2086,27 +2086,16 @@ void CGdiButton::OnNcPaint()
 
 	if (m_image.size() && m_image[0]->img[0].is_valid())
 	{
-		m_image[0]->img[0].deep_copy(&img_shadow);
+		m_image[0]->img[0].create_back_shadow_image(&img_shadow, 2.0f);
 	}
 	else
 	{
 		img_shadow.create(rc.Width(), rc.Height());
 		Gdiplus::Graphics g(img_shadow.m_pBitmap);
-		g.FillRectangle(&br, Gdiplus::Rect(4, 4, rc.Width() - 8, rc.Height() - 8));
+		g.FillEllipse(&br, Gdiplus::Rect(4, 4, rc.Width() - 8, rc.Height() - 8));
 	}
 #ifdef _DEBUG
-	img_shadow.save(_T("d:\\0.back_shadow_origin.png"));
-#endif
-	//img_shadow.resize(rc.Width(), rc.Height());
-	//img_shadow.blur(20, TRUE);
-	img_shadow.blur(m_back_shadow_blur_sigma);
-#ifdef _DEBUG
-	img_shadow.save(_T("d:\\1.back_shadow_blur.png"));
-#endif
-	img_shadow.gray(m_back_shadow_weight);
-	//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
-#ifdef _DEBUG
-	img_shadow.save(_T("d:\\2.back_shadow_gray.png"));
+	img_shadow.save(_T("d:\\back_shadow.png"));
 #endif
 
 	//parent의 dc를 구해서 그리는 것이므로 좌표 또한 parent 기준의 상대좌표로 그려줘야 한다.
@@ -2114,5 +2103,6 @@ void CGdiButton::OnNcPaint()
 	GetWindowRect(rw);
 	GetParent()->ScreenToClient(rw);
 
-	img_shadow.draw(&dc, rw.left + 4, rw.top + 4);
+	//GetParent()->InvalidateRect(rw);
+	img_shadow.draw(&dc, rw.left + 14, rw.top - 0);
 }

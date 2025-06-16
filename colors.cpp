@@ -445,12 +445,21 @@ Gdiplus::Color	gray_color(Gdiplus::Color cr)
 	return Gdiplus::Color(cr.GetA(), gray, gray, gray);
 }
 
-double color_similarity_distance(COLORREF c1, COLORREF c2)
+double get_distance(COLORREF c1, COLORREF c2)
 {
 	return sqrt(
 		(GetRValue(c1)-GetRValue(c2))*(GetRValue(c1)-GetRValue(c2)) +
 		(GetGValue(c1)-GetGValue(c2))*(GetGValue(c1)-GetGValue(c2)) +
 		(GetGValue(c1)-GetGValue(c2))*(GetGValue(c1)-GetGValue(c2))
+	);
+}
+
+double get_distance(Gdiplus::Color c1, Gdiplus::Color c2)
+{
+	return sqrt(
+		(c1.GetR() - c2.GetR()) * (c1.GetR() - c2.GetR()) +
+		(c1.GetG() - c2.GetG()) * (c1.GetG() - c2.GetG()) +
+		(c1.GetB() - c2.GetB()) * (c1.GetB() - c2.GetB())
 	);
 }
 

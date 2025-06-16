@@ -8,6 +8,7 @@
 #include <deque>
 #include <unordered_map>
 #include <string>
+#include <algorithm>
 
 /*
 * 2024.8.30
@@ -136,9 +137,44 @@ public:
 		return it->second;
 	}
 
-	//get color name by color value. 미구현
-	static std::string get_color_name(Gdiplus::Color cr)
+	//get color name by (r, g, b) value. alpha는 무시한다.
+	//exactly : true이면 정확히 일치하는 색상만 찾고, false이면 가장 유사한 색상의 이름을 리턴한다.
+	static std::string get_color_name(Gdiplus::Color cr, bool exactly = true)
 	{
+		double distance = 99999999.0;
+		std::string nearest_color_name;
+
+		m_cr_map::iterator it = std::find_if(get_color_map().begin(), get_color_map().end(),
+			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
+			bool
+			{
+				if (exactly)
+				{
+					return (element.second.GetR() == cr.GetR() &&
+							element.second.GetG() == cr.GetG() &&
+							element.second.GetB() == cr.GetB());
+				}
+
+				double dist = sqrt( (element.second.GetR() - cr.GetR()) * (element.second.GetR() - cr.GetR()) +
+									(element.second.GetG() - cr.GetG()) * (element.second.GetG() - cr.GetG()) +
+									(element.second.GetB() - cr.GetB()) * (element.second.GetB() - cr.GetB()));
+
+				if (dist < distance)
+				{
+					distance = dist;
+					nearest_color_name = element.first;
+				}
+				return false; // continue searching
+			});
+
+		if (it == get_color_map().end())
+		{
+			if (!exactly)
+				return nearest_color_name;
+			return "Unknown Color";
+		}
+
+		return it->first;
 	}
 
 private:
@@ -713,7 +749,9 @@ uint8_t			gray_value(Gdiplus::Color cr);
 COLORREF		gray_color(COLORREF cr);
 Gdiplus::Color	gray_color(Gdiplus::Color cr);
 
-double			color_similarity_distance(COLORREF c1, COLORREF c2);
+double			get_distance(COLORREF c1, COLORREF c2);
+double			get_distance(Gdiplus::Color c1, Gdiplus::Color c2);
+
 COLORREF		get_default_color(int index);
 COLORREF		get_random_color();
 Gdiplus::Color	get_random_gcolor(bool use_alpha = false);

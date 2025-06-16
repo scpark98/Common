@@ -621,7 +621,7 @@ bool CGdiplusBitmap::get_raw_data()
 	//우선은 SeetaFace가 동작한다.
 	//수정 필요한 부분임.
 	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
-	TRACE(_T("fmt = %s\n"), get_pixel_format_str(fmt));
+	//TRACE(_T("fmt = %s\n"), get_pixel_format_str(fmt));
 	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
 	//	format = PixelFormat8bppIndexed;
 	//else
@@ -852,7 +852,7 @@ CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simp
 		int bits = 0;
 		int bits_pos = get_number_from_string(str_fmt, bits);
 		str_fmt.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos), bits);
-		TRACE(_T("str_fmt = %s\n"), str_fmt);
+		//TRACE(_T("str_fmt = %s\n"), str_fmt);
 	}
 
 	m_pixel_format_str = str_fmt;
@@ -1433,14 +1433,27 @@ void CGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
 }
 
 //이미지 캔버스 크기를 조정한다.
-void CGdiplusBitmap::canvas_size(int cx, int cy, Gdiplus::Color cr_fill)
+void CGdiplusBitmap::canvas_size(int cx, int cy, int align, Gdiplus::Color cr_fill)
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(cx, cy);
 	Gdiplus::Graphics g(result);
 	g.Clear(cr_fill);
 
-	int x = (cx - width) / 2;
-	int y = (cy - height) / 2;
+	int x = 0;// (cx - width) / 2;
+	int y = 0;// (cy - height) / 2;
+
+	if (align & ALIGN_LEFT)
+		x = 0;
+	if (align & ALIGN_CENTER)
+		x = (cx - width) / 2;
+	else if (align & ALIGN_RIGHT)
+		x = cx - width;
+
+	if (align & ALIGN_VCENTER)
+		y = (cy - height) / 2;
+	else if (align & ALIGN_BOTTOM)
+		y = cy - height;
+
 	g.DrawImage(m_pBitmap, x, y);
 
 	delete m_pBitmap;
@@ -3098,4 +3111,14 @@ Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 							*(data + y * width * channel + x * channel + 2),
 							*(data + y * width * channel + x * channel + 1),
 							*(data + y * width * channel + x * channel + 0));
+}
+
+//배경 그림자 이미지를 생성한다.
+void CGdiplusBitmap::create_back_shadow_image(CGdiplusBitmap* shadow, float sigma, int type, int depth)
+{
+	deep_copy(shadow);
+	shadow->gray();
+	shadow->canvas_size(width + depth, height + depth);
+	//shadow->save(_T("d:\\shadow.png"));
+	shadow->blur(sigma);
 }

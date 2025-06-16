@@ -43,6 +43,10 @@
 	2번 그림자는 drop shadow (DrawItem에서 그림)
 	둘 다 우측 하단에 그려지지만 구현되는 함수 위치가 다르다.
 
+- 버튼 모양의 이미지를 사용하는 경우의 back_shadow를 표시하기 위해서는 전처리가 필요하다.
+  버튼 이미지가 꽉 찬 이미지는 blur가 제대로 나타나지 않는다.
+  따라서 
+
 
 [기본값 설정 기준]
 - png를 주로 사용하기 위한 클래스를 목적으로 제작되었지만
@@ -448,7 +452,7 @@ protected:
 	CGdiplusBitmap	m_img_header;
 	UINT			m_img_header_align = DT_CENTER;
 	float			m_img_header_ratio = 0.6f;
-	int				m_img_header_gap = 4;
+	int				m_img_header_gap = 2;
 
 	//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
 	CGdiplusBitmap	m_back_img;
@@ -486,13 +490,13 @@ protected:
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
 
-	//버튼의 배경 그림자를 표시한다.
+	//버튼의 배경 그림자를 표시한다. default = false
 	bool		m_draw_back_shadow = false;
 	float		m_back_shadow_weight = 1.0f;
 	//blur sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
 	float		m_back_shadow_blur_sigma = 4.0f;
 
-	//투명 이미지 버튼의 경우 그림자를 표시한다.
+	//투명 이미지 버튼의 경우 그림자를 표시한다. default = false
 	bool		m_draw_drop_shadow = false;
 	float		m_drop_shadow_weight = 1.0f;
 	//blur sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f

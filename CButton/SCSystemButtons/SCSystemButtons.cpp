@@ -39,6 +39,8 @@ END_MESSAGE_MAP()
 
 void CSCSystemButtons::create(CWnd* parent, int top, int right_end, int width, int height)
 {
+	m_target = parent;
+
 	m_button.clear();
 
 	m_top = top + 1;
@@ -162,11 +164,14 @@ void CSCSystemButtons::OnPaint()
 		{
 			Gdiplus::Pen pen(m_theme.cr_text, 1.5F);
 			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0F);
+			Gdiplus::Pen pen_pin_gray(gGRAY(160), 17.0F);
 			Gdiplus::SolidBrush br_back(m_theme.cr_back);
 			Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
 
 			pen_pin.SetStartCap(Gdiplus::LineCapRound);
 			pen_pin.SetEndCap(Gdiplus::LineCapRound);
+			pen_pin_gray.SetStartCap(Gdiplus::LineCapRound);
+			pen_pin_gray.SetEndCap(Gdiplus::LineCapRound);
 
 			CPoint cp = m_button[i].r.CenterPoint();
 
@@ -176,7 +181,7 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_MAXIMIZE)
 			{
-				if (GetParent()->IsZoomed())
+				if (m_target->IsZoomed())
 				{
 					g.DrawRectangle(&pen, cp.x - 3, cp.y - 5, 8, 8);
 					g.FillRectangle(&br_back, cp.x - 6, cp.y - 2, 8, 8);
@@ -194,8 +199,8 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_PIN)
 			{
-				g.DrawLine(&pen_pin, cp.x - 7, cp.y, cp.x + 7, cp.y);
-				g.FillEllipse(&br_pin, cp.x + (is_top_most(GetParent()->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
+				g.DrawLine(is_top_most(m_target->GetSafeHwnd()) ? &pen_pin : &pen_pin_gray, cp.x - 7, cp.y, cp.x + 7, cp.y);
+				g.FillEllipse(&br_pin, cp.x + (is_top_most(m_target->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{
@@ -240,27 +245,27 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 		case SC_HELP:
 			//AfxMessageBox(_T("도움말 또는 CAboutDlg 표시 영역"));
-			::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_HELP, 0);
+			::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, SC_HELP, 0);
 			break;
 		case SC_PIN:
-			if (is_top_most(GetParent()->GetSafeHwnd()))
-				GetParent()->SetWindowPos(&wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+			if (is_top_most(m_target->GetSafeHwnd()))
+				m_target->SetWindowPos(&wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
 			else
-				GetParent()->SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+				m_target->SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
 			break;
 		case SC_MINIMIZE:
 		case SC_CLOSE:
-			::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, m_button[m_over_index].cmd, 0);
+			::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, m_button[m_over_index].cmd, 0);
 			break;
 		//SC_MAXIMIZE 버튼이 클릭되면 여기서 GetParent()->IsZoomed()를 판단해서 주면 안된다.
 		//ASee의 경우는 mainDlg에서 titleDlg를 띠우고 그 안에 SystemButton이 있으므로
 		//titleDlg->IsZoomed()로 판별하는게 아닌 mainDlg->IsZoomed()로 판별해야 한다.
 		//따라서 여기서는 그냥 parent에게 SC_MAXIMIZE 명령만 보내고 실제 적용할 윈도우에서 판단해서 실행한다.
 		case SC_MAXIMIZE:
-			//if (GetParent()->IsZoomed())
-			//	::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_RESTORE, 0);
-			//else
-				::PostMessage(GetParent()->GetSafeHwnd(), WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+			if (m_target->IsZoomed())
+				::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, SC_RESTORE, 0);
+			else
+				::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, SC_MAXIMIZE, 0);
 		}
 	}
 

@@ -170,7 +170,7 @@ public:
 	void	set_button_height(int height);
 
 protected:
-
+	CWnd*	m_target = nullptr;	//SC_MINIMIZE, SC_MAXIMIZE 등 버튼 액션을 수행할 대상 윈도우. 일반적으로는 parent dlg가 되지만 간혹 다른 윈도우가 될 수도 있다.
 	std::deque<CSCSystemButtonProperty> m_button;
 	int		m_button_width = 44;
 	int		m_button_height = 32;

@@ -2103,6 +2103,8 @@ void CGdiButton::OnNcPaint()
 	GetWindowRect(rw);
 	GetParent()->ScreenToClient(rw);
 
-	//GetParent()->InvalidateRect(rw);
+	//버튼 영역이 모니터를 나갔다가 다시 들어올 때 제대로 갱신되지 않는다.
+	//GetParent()->InvalidateRect(rw);	//이 코드를 쓰면 계속 그리는 현상 발생
+	Invalidate();						//이 코드를 쓰면 잔상은 덜하나 여전히 발생
 	img_shadow.draw(&dc, rw.left + 14, rw.top - 0);
 }

@@ -179,7 +179,14 @@ public:
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
 
+	//resource editor에서 버튼의 caption을 입력하면 그대로 출력된다.
+	//단, 이미지가 있을 경우는 caption은 추가로 표시하지 않았으나 공용 버튼 이미지를 사용한다면 지정된 텍스트를 출력해줘야 한다.
+	//버튼의 caption은 resource editor 또는 set_text() 또는 SetWindowText()로 설정할 수 있다.
+	//이미지가 있음에도 텍스트를 출력하고자 한다면 다음 함수를 호출하여 m_draw_own_text를 설정해야 한다.
+	void		set_draw_own_text(bool draw = true) { m_draw_own_text = draw; Invalidate(); }
+
 	void		set_text(CString text) { SetWindowText(text); }
+	void		set_text_empty() { SetWindowText(_T("")); }
 
 	void		set_3state(bool tri_state = true) { m_is_3state = tri_state; }
 	bool		is_3state() { return m_is_3state; }
@@ -489,6 +496,9 @@ protected:
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
+	//이미지를 사용하는 버튼이라도 자신에게 세팅된 텍스트를 표시해줘야 할 경우도 존재한다.
+	//ex. 공용 버튼 이미지를 사용하는 경우
+	bool		m_draw_own_text = false;
 
 	//버튼의 배경 그림자를 표시한다. default = false
 	bool		m_draw_back_shadow = false;

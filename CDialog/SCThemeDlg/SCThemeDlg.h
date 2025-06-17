@@ -93,14 +93,18 @@ public:
 	//필요한 시스템 버튼들을 추가해준다. 이 함수를 호출하지 않으면 기본 닫기 버튼만 사용된다.
 	//set_system_buttons(SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);	//항상 위에 버튼까지 필요한 경우
 	//set_system_buttons(SC_CLOSE);	//닫기 버튼만 필요한 경우
-	template <typename ... Types> void	set_system_buttons(Types... args)
+	//pTargetWnd는 보통은 parent dlg가 되지만 ASee와 같이 mainDlg에 TitleDlg가 있고 이 TitleDlg에 시스템 버튼이 있는 경우는
+	//mainDlg가 pTargetWnd가 되야 한다.
+	//titleDlg를 parent로 하여 생성하지만 정작 mainDlg의 IsZoomed()로 판단해야 한다.
+	//즉, 생성을 위한 parent와 실제 액션을 위핸 target이 다른 경우이다.
+	template <typename ... Types> void	set_system_buttons(CWnd* pTargetWnd, Types... args)
 	{
 		int button_width = -1;
 		if (m_sys_buttons.m_hWnd)
 		{
 			button_width = m_sys_buttons.get_button_width();
 			m_sys_buttons.DestroyWindow();
-			m_sys_buttons.create(this);
+			m_sys_buttons.create(pTargetWnd);
 		}
 
 		int n = sizeof...(args);

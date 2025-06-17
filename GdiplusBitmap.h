@@ -56,16 +56,17 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 static const UINT Message_CGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CGdiplusBitmap"));
 
-//CDC::DrawText()에서 사용하는 align mode와 동일한 값으로 정의함.
 //주의할 점은 TOP, LEFT는 0이므로 먼저 비교하면 안되고 CENTER, RIGHT인지 검사한 후 아니면 LEFT라고 판단해야 한다.
 //align = ALIGN_LEFT | ALIGN_BOTTOM 을 주면 8이 되는데 이렇게 호출하면
 //if (align & ALIGN_LEFT) //이 비교 결과는 0이 되므로 실행되지 않는다.
-#define ALIGN_TOP        0x00000000
-#define ALIGN_LEFT       0x00000000
-#define ALIGN_CENTER     0x00000001
-#define ALIGN_RIGHT      0x00000002
-#define ALIGN_VCENTER    0x00000004
-#define ALIGN_BOTTOM     0x00000008
+//=> CGdiplusBitmap::canvas_size()를 호출할 때 이미지 위치를 지정할 때 사용하기 위해 정의했으나
+//이미 afxbutton.h에 정의되어 중복된다. DrawText()에서 사용되는 align을 그냥 이용한다.
+//#define ALIGN_TOP        0x00000000
+//#define ALIGN_LEFT       0x00000000
+//#define ALIGN_CENTER     0x00000001
+//#define ALIGN_RIGHT      0x00000002
+//#define ALIGN_VCENTER    0x00000004
+//#define ALIGN_BOTTOM     0x00000008
 
 //Gdiplus 초기화 과정을 자동으로 하기 위해 CGdiplusDummyForInitialization 클래스를 선언하고
 //GdiplusBitmap.cpp의 맨 위에서 static 인스턴스를 선언함.
@@ -293,7 +294,8 @@ public:
 	void			resize(float fx, float fy, Gdiplus::InterpolationMode mode = Gdiplus::InterpolationModeHighQualityBicubic);
 
 	//이미지 캔버스 크기를 조정한다. 남는 공간은 cr_fill로 채운다. cr_fill이 투명이 아닌 경우 주의할 것.
-	void			canvas_size(int cx, int cy, int align = ALIGN_CENTER | ALIGN_VCENTER, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
+	//align 상수값은 DT_CENTER | DT_VCENTER와 같이 DrawText()에서 사용하는 align 상수값을 빌려 사용한다.
+	void			canvas_size(int cx, int cy, int align = DT_CENTER | DT_VCENTER, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
 
 	//투명 png의 l, t, r, b의 투명한 영역 크기를 구한다.
 	CRect			get_transparent_rect();

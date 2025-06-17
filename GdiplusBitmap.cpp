@@ -1442,16 +1442,16 @@ void CGdiplusBitmap::canvas_size(int cx, int cy, int align, Gdiplus::Color cr_fi
 	int x = 0;// (cx - width) / 2;
 	int y = 0;// (cy - height) / 2;
 
-	if (align & ALIGN_LEFT)
+	if (align & DT_LEFT)
 		x = 0;
-	if (align & ALIGN_CENTER)
+	if (align & DT_CENTER)
 		x = (cx - width) / 2;
-	else if (align & ALIGN_RIGHT)
+	else if (align & DT_RIGHT)
 		x = cx - width;
 
-	if (align & ALIGN_VCENTER)
+	if (align & DT_VCENTER)
 		y = (cy - height) / 2;
-	else if (align & ALIGN_BOTTOM)
+	else if (align & DT_BOTTOM)
 		y = cy - height;
 
 	g.DrawImage(m_pBitmap, x, y);

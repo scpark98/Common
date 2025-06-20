@@ -718,7 +718,8 @@ COLORREF		get_color_from_hexadecimal(CString cr);
 Gdiplus::Color	get_gcolor_from_hexadecimal(CString cr);
 
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
-CString			get_color_string(COLORREF cr);
+//#FF0000과 같이 리턴받고자 한다면 prefix = _T("#")으로 호출한다.
+CString			get_color_string(COLORREF cr, bool upper_case = true, CString prefix = _T(""));
 
 //보색
 COLORREF		get_complementary_color(COLORREF cr);

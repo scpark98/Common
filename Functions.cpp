@@ -14117,6 +14117,8 @@ int	get_monitor_index(CRect r, bool entire_included)
 {
 	enum_display_monitors();
 
+	CRect rTemp;
+
 	for (int i = 0; i < g_monitors.size(); i++)
 	{
 		if (entire_included)
@@ -14124,9 +14126,11 @@ int	get_monitor_index(CRect r, bool entire_included)
 			if (RectInRect(g_monitors[i].rMonitor, r))
 				return i;
 		}
-		else if (r.IntersectRect(r, g_monitors[i].rMonitor))
+		else
 		{
-			return i;
+			rTemp.IntersectRect(r, g_monitors[i].rMonitor);
+			if (rTemp.IsRectEmpty() == false)
+				return i;
 		}
 	}
 
@@ -15421,8 +15425,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 		if (!resize_window)
 			flag |= SWP_NOSIZE;
 
-		enum_display_monitors();
-
+		//창의 복원 위치가 모니터 영역을 벗어나면 CenterWindow() 시킨다.
 		int index = get_monitor_index(rc);
 
 		if (index < 0)

@@ -106,32 +106,187 @@ protected:
 };
 
 //color name으로 Gdiplus::Color 값을 구하기 위해 정의.
-//반대로 Gdiplus::Color 값으로 그 이름을 구하는 경우는 많지 않을 듯 하여 first key를 name으로 정함.
-class CSCColorMap
+//get_color(cr_str)과 같이 호출하고자 정의함.
+//map이나 unordered_map은 insert order를 보장하지 않으므로 추가된 순서로 팔레트를 표현할 수 없는 단점이 있다.
+//std::vector<CString, Gdiplus::Color> 와 같이 구현하면 순서를 보장하며
+//map의 가장 큰 장점이 first 키값으로 second를 구하는 것인데 이는 std::find()로 구현 가능하다.
+class CSCColorList
 {
 public:
-	CSCColorMap(std::string _name, Gdiplus::Color _cr)
+	CSCColorList()
 	{
-		name = _name;
-		cr = _cr;
-		get_color_map()[name] = cr;
+		get_color_list().emplace_back("MediumVioletRed", Gdiplus::Color::MediumVioletRed);
+		get_color_list().emplace_back("DeepPink", Gdiplus::Color::DeepPink);
+		get_color_list().emplace_back("PaleVioletRed", Gdiplus::Color::PaleVioletRed);
+		get_color_list().emplace_back("HotPink", Gdiplus::Color::HotPink);
+		get_color_list().emplace_back("LightPink", Gdiplus::Color::LightPink);
+		get_color_list().emplace_back("Pink", Gdiplus::Color::Pink);
+
+		get_color_list().emplace_back("DarkRed", Gdiplus::Color::DarkRed);
+		get_color_list().emplace_back("Red", Gdiplus::Color::Red);
+		get_color_list().emplace_back("Firebrick", Gdiplus::Color::Firebrick);
+		get_color_list().emplace_back("Crimson", Gdiplus::Color::Crimson);
+		get_color_list().emplace_back("IndianRed", Gdiplus::Color::IndianRed);
+		get_color_list().emplace_back("LightCoral", Gdiplus::Color::LightCoral);
+		get_color_list().emplace_back("Salmon", Gdiplus::Color::Salmon);
+		get_color_list().emplace_back("DarkSalmon", Gdiplus::Color::DarkSalmon);
+		get_color_list().emplace_back("LightSalmon", Gdiplus::Color::LightSalmon);
+
+		get_color_list().emplace_back("OrangeRed", Gdiplus::Color::OrangeRed);
+		get_color_list().emplace_back("Tomato", Gdiplus::Color::Tomato);
+		get_color_list().emplace_back("DarkOrange", Gdiplus::Color::DarkOrange);
+		get_color_list().emplace_back("Coral", Gdiplus::Color::Coral);
+		get_color_list().emplace_back("Orange", Gdiplus::Color::Orange);
+
+		get_color_list().emplace_back("DarkKhaki", Gdiplus::Color::DarkKhaki);
+		get_color_list().emplace_back("Gold", Gdiplus::Color::Gold);
+		get_color_list().emplace_back("Khaki", Gdiplus::Color::Khaki);
+		get_color_list().emplace_back("PeachPuff", Gdiplus::Color::PeachPuff);
+		get_color_list().emplace_back("Yellow", Gdiplus::Color::Yellow);
+		get_color_list().emplace_back("PaleGoldenrod", Gdiplus::Color::PaleGoldenrod);
+		get_color_list().emplace_back("Moccasin", Gdiplus::Color::Moccasin);
+		get_color_list().emplace_back("PapayaWhip", Gdiplus::Color::PapayaWhip);
+		get_color_list().emplace_back("LightGoldenrodYellow", Gdiplus::Color::LightGoldenrodYellow);
+		get_color_list().emplace_back("LemonChiffon", Gdiplus::Color::LemonChiffon);
+		get_color_list().emplace_back("LightYellow", Gdiplus::Color::LightYellow);
+
+		get_color_list().emplace_back("Maroon", Gdiplus::Color::Maroon);
+		get_color_list().emplace_back("Brown", Gdiplus::Color::Brown);
+		get_color_list().emplace_back("SaddleBrown", Gdiplus::Color::SaddleBrown);
+		get_color_list().emplace_back("Sienna", Gdiplus::Color::Sienna);
+		get_color_list().emplace_back("Chocolate", Gdiplus::Color::Chocolate);
+		get_color_list().emplace_back("DarkGoldenrod", Gdiplus::Color::DarkGoldenrod);
+		get_color_list().emplace_back("Peru", Gdiplus::Color::Peru);
+		get_color_list().emplace_back("RosyBrown", Gdiplus::Color::RosyBrown);
+		get_color_list().emplace_back("Goldenrod", Gdiplus::Color::Goldenrod);
+		get_color_list().emplace_back("SandyBrown", Gdiplus::Color::SandyBrown);
+		get_color_list().emplace_back("Tan", Gdiplus::Color::Tan);
+		get_color_list().emplace_back("BurlyWood", Gdiplus::Color::BurlyWood);
+		get_color_list().emplace_back("Wheat", Gdiplus::Color::Wheat);
+		get_color_list().emplace_back("NavajoWhite", Gdiplus::Color::NavajoWhite);
+		get_color_list().emplace_back("Bisque", Gdiplus::Color::Bisque);
+		get_color_list().emplace_back("BlanchedAlmond", Gdiplus::Color::BlanchedAlmond);
+		get_color_list().emplace_back("Cornsilk", Gdiplus::Color::Cornsilk);
+
+		get_color_list().emplace_back("Indigo", Gdiplus::Color::Indigo);
+		get_color_list().emplace_back("Purple", Gdiplus::Color::Purple);
+		get_color_list().emplace_back("DarkMagenta", Gdiplus::Color::DarkMagenta);
+		get_color_list().emplace_back("DarkViolet", Gdiplus::Color::DarkViolet);
+		get_color_list().emplace_back("DarkSlateBlue", Gdiplus::Color::DarkSlateBlue);
+		get_color_list().emplace_back("BlueViolet", Gdiplus::Color::BlueViolet);
+		get_color_list().emplace_back("DarkOrchid", Gdiplus::Color::DarkOrchid);
+		get_color_list().emplace_back("Fuchsia", Gdiplus::Color::Fuchsia);
+		get_color_list().emplace_back("Magenta", Gdiplus::Color::Magenta);
+		get_color_list().emplace_back("SlateBlue", Gdiplus::Color::SlateBlue);
+		get_color_list().emplace_back("MediumSlateBlue", Gdiplus::Color::MediumSlateBlue);
+		get_color_list().emplace_back("MediumOrchid", Gdiplus::Color::MediumOrchid);
+		get_color_list().emplace_back("MediumPurple", Gdiplus::Color::MediumPurple);
+		get_color_list().emplace_back("Orchid", Gdiplus::Color::Orchid);
+		get_color_list().emplace_back("Violet", Gdiplus::Color::Violet);
+		get_color_list().emplace_back("Plum", Gdiplus::Color::Plum);
+		get_color_list().emplace_back("Thistle", Gdiplus::Color::Thistle);
+		get_color_list().emplace_back("Lavender", Gdiplus::Color::Lavender);
+
+		get_color_list().emplace_back("MidnightBlue", Gdiplus::Color::MidnightBlue);
+		get_color_list().emplace_back("Navy", Gdiplus::Color::Navy);
+		get_color_list().emplace_back("DarkBlue", Gdiplus::Color::DarkBlue);
+		get_color_list().emplace_back("MediumBlue", Gdiplus::Color::MediumBlue);
+		get_color_list().emplace_back("Blue", Gdiplus::Color::Blue);
+		get_color_list().emplace_back("RoyalBlue", Gdiplus::Color::RoyalBlue);
+		get_color_list().emplace_back("SteelBlue", Gdiplus::Color::SteelBlue);
+		get_color_list().emplace_back("DodgerBlue", Gdiplus::Color::DodgerBlue);
+		get_color_list().emplace_back("DeepSkyBlue", Gdiplus::Color::DeepSkyBlue);
+		get_color_list().emplace_back("CornflowerBlue", Gdiplus::Color::CornflowerBlue);
+		get_color_list().emplace_back("SkyBlue", Gdiplus::Color::SkyBlue);
+		get_color_list().emplace_back("LightSkyBlue", Gdiplus::Color::LightSkyBlue);
+		get_color_list().emplace_back("LightSteelBlue", Gdiplus::Color::LightSteelBlue);
+		get_color_list().emplace_back("LightBlue", Gdiplus::Color::LightBlue);
+		get_color_list().emplace_back("PowderBlue", Gdiplus::Color::PowderBlue);
+
+		get_color_list().emplace_back("Teal", Gdiplus::Color::Teal);
+		get_color_list().emplace_back("DarkCyan", Gdiplus::Color::DarkCyan);
+		get_color_list().emplace_back("LightSeaGreen", Gdiplus::Color::LightSeaGreen);
+		get_color_list().emplace_back("CadetBlue", Gdiplus::Color::CadetBlue);
+		get_color_list().emplace_back("DarkTurquoise", Gdiplus::Color::DarkTurquoise);
+		get_color_list().emplace_back("MediumTurquoise", Gdiplus::Color::MediumTurquoise);
+		get_color_list().emplace_back("Turquoise", Gdiplus::Color::Turquoise);
+		get_color_list().emplace_back("Aqua", Gdiplus::Color::Aqua);
+		get_color_list().emplace_back("Cyan", Gdiplus::Color::Cyan);
+		get_color_list().emplace_back("Aquamarine", Gdiplus::Color::Aquamarine);
+		get_color_list().emplace_back("PaleTurquoise", Gdiplus::Color::PaleTurquoise);
+		get_color_list().emplace_back("LightCyan", Gdiplus::Color::LightCyan);
+
+		get_color_list().emplace_back("DarkGreen", Gdiplus::Color::DarkGreen);
+		get_color_list().emplace_back("Green", Gdiplus::Color::Green);
+		get_color_list().emplace_back("DarkOliveGreen", Gdiplus::Color::DarkOliveGreen);
+		get_color_list().emplace_back("ForestGreen", Gdiplus::Color::ForestGreen);
+		get_color_list().emplace_back("SeaGreen", Gdiplus::Color::SeaGreen);
+		get_color_list().emplace_back("Olive", Gdiplus::Color::Olive);
+		get_color_list().emplace_back("OliveDrab", Gdiplus::Color::OliveDrab);
+		get_color_list().emplace_back("MediumSeaGreen", Gdiplus::Color::MediumSeaGreen);
+		get_color_list().emplace_back("LimeGreen", Gdiplus::Color::LimeGreen);
+		get_color_list().emplace_back("Lime", Gdiplus::Color::Lime);
+		get_color_list().emplace_back("SpringGreen", Gdiplus::Color::SpringGreen);
+		get_color_list().emplace_back("MediumSpringGreen", Gdiplus::Color::MediumSpringGreen);
+		get_color_list().emplace_back("DarkSeaGreen", Gdiplus::Color::DarkSeaGreen);
+		get_color_list().emplace_back("MediumAquamarine", Gdiplus::Color::MediumAquamarine);
+		get_color_list().emplace_back("YellowGreen", Gdiplus::Color::YellowGreen);
+		get_color_list().emplace_back("LawnGreen", Gdiplus::Color::LawnGreen);
+		get_color_list().emplace_back("Chartreuse", Gdiplus::Color::Chartreuse);
+		get_color_list().emplace_back("LightGreen", Gdiplus::Color::LightGreen);
+		get_color_list().emplace_back("GreenYellow", Gdiplus::Color::GreenYellow);
+		get_color_list().emplace_back("PaleGreen", Gdiplus::Color::PaleGreen);
+
+		get_color_list().emplace_back("MistyRose", Gdiplus::Color::MistyRose);
+		get_color_list().emplace_back("AntiqueWhite", Gdiplus::Color::AntiqueWhite);
+		get_color_list().emplace_back("Linen", Gdiplus::Color::Linen);
+		get_color_list().emplace_back("Beige", Gdiplus::Color::Beige);
+		get_color_list().emplace_back("WhiteSmoke", Gdiplus::Color::WhiteSmoke);
+		get_color_list().emplace_back("LavenderBlush", Gdiplus::Color::LavenderBlush);
+		get_color_list().emplace_back("OldLace", Gdiplus::Color::OldLace);
+		get_color_list().emplace_back("AliceBlue", Gdiplus::Color::AliceBlue);
+		get_color_list().emplace_back("SeaShell", Gdiplus::Color::SeaShell);
+		get_color_list().emplace_back("GhostWhite", Gdiplus::Color::GhostWhite);
+		get_color_list().emplace_back("Honeydew", Gdiplus::Color::Honeydew);
+		get_color_list().emplace_back("FloralWhite", Gdiplus::Color::FloralWhite);
+		get_color_list().emplace_back("Azure", Gdiplus::Color::Azure);
+		get_color_list().emplace_back("MintCream", Gdiplus::Color::MintCream);
+		get_color_list().emplace_back("Snow", Gdiplus::Color::Snow);
+		get_color_list().emplace_back("Ivory", Gdiplus::Color::Ivory);
+		get_color_list().emplace_back("White", Gdiplus::Color::White);
+
+		get_color_list().emplace_back("Black", Gdiplus::Color::Black);
+		get_color_list().emplace_back("DarkSlateGray", Gdiplus::Color::DarkSlateGray);
+		get_color_list().emplace_back("DimGray", Gdiplus::Color::DimGray);
+		get_color_list().emplace_back("SlateGray", Gdiplus::Color::SlateGray);
+		get_color_list().emplace_back("Gray", Gdiplus::Color::Gray);
+		get_color_list().emplace_back("LightSlateGray", Gdiplus::Color::LightSlateGray);
+		get_color_list().emplace_back("DarkGray", Gdiplus::Color::DarkGray);
+		get_color_list().emplace_back("Silver", Gdiplus::Color::Silver);
+		get_color_list().emplace_back("LightGray", Gdiplus::Color::LightGray);
+		get_color_list().emplace_back("Gainsboro", Gdiplus::Color::Gainsboro);
 	}
 
 	// auto-cast Error to integer error code
-	operator Gdiplus::Color() { return cr; }
+	//operator Gdiplus::Color() { return cr; }
+
+	//static std::unordered_map<std::string, Gdiplus::Color> get_color_map()
+	//{
+	//	return get_color_map();
+	//}
 
 	static Gdiplus::Color get_color(std::string name)
 	{
 		//m_cr_map::iterator it = get_color_map().find(name);
 		//위와 같이 map.find()를 쓰면 대소문자 구분을 하므로, 대소문자 구분없이 검색하기 위해 std::find_if와 _stricmp()를 사용한다.
-		m_cr_map::iterator it = std::find_if(get_color_map().begin(), get_color_map().end(),
+		std::vector<std::pair<std::string, Gdiplus::Color>>::iterator it = std::find_if(get_color_list().begin(), get_color_list().end(),
 			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
 			bool
 			{
 				return (_stricmp(element.first.c_str(), name.c_str()) == 0);
 			});
 
-		if (it == get_color_map().end())
+		if (it == get_color_list().end())
 			return Gdiplus::Color::Black;
 
 		return it->second;
@@ -139,12 +294,12 @@ public:
 
 	//get color name by (r, g, b) value. alpha는 무시한다.
 	//exactly : true이면 정확히 일치하는 색상만 찾고, false이면 가장 유사한 색상의 이름을 리턴한다.
-	static std::string get_color_name(Gdiplus::Color cr, bool exactly = true)
+	static std::string get_color_name(Gdiplus::Color cr, bool exactly = false)
 	{
 		double distance = 99999999.0;
 		std::string nearest_color_name;
 
-		m_cr_map::iterator it = std::find_if(get_color_map().begin(), get_color_map().end(),
+		std::vector<std::pair<std::string, Gdiplus::Color>>::iterator it = std::find_if(get_color_list().begin(), get_color_list().end(),
 			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
 			bool
 			{
@@ -167,7 +322,7 @@ public:
 				return false; // continue searching
 			});
 
-		if (it == get_color_map().end())
+		if (it == get_color_list().end())
 		{
 			if (!exactly)
 				return nearest_color_name;
@@ -177,184 +332,20 @@ public:
 		return it->first;
 	}
 
-private:
-	Gdiplus::Color cr;
-	std::string name;
-
-	//struct CaseInsensitiveComparator
-	//{
-	//	bool operator()(const std::string& a, const std::string& b) const noexcept
-	//	{
-	//		return (_stricmp(a.c_str(), b.c_str()) < 0);
-	//	}
-	//};
-
-	//bool caseInsensitiveCompare(const std::string& a, const std::string& b) {
-	//	std::string aLower = a;
-	//	std::string bLower = b;
-	//	std::transform(aLower.begin(), aLower.end(), aLower.begin(), [](unsigned char c) { return std::tolower(c); });
-	//	std::transform(bLower.begin(), bLower.end(), bLower.begin(), [](unsigned char c) { return std::tolower(c); });
-	//	return aLower < bLower;
-	//};
-
-	typedef std::unordered_map<std::string, Gdiplus::Color> m_cr_map;
-	static m_cr_map& get_color_map()
+	static std::vector<std::pair<std::string, Gdiplus::Color>>& get_color_list()
 	{
-		static m_cr_map cr_map;
-		return cr_map;
+		static std::vector<std::pair<std::string, Gdiplus::Color>> m_cr_list;
+		return m_cr_list;
 	}
+
+protected:
+	//static std::vector<std::pair<std::string, Gdiplus::Color>> m_cr_list;
+
+	//Gdiplus::Color cr;
+	//std::string name;
 };
 
-static CSCColorMap MediumVioletRed	("MediumVioletRed",		Gdiplus::Color::MediumVioletRed);
-static CSCColorMap DeepPink			("DeepPink",			Gdiplus::Color::DeepPink);
-static CSCColorMap PaleVioletRed	("PaleVioletRed",		Gdiplus::Color::PaleVioletRed);
-static CSCColorMap HotPink			("HotPink",				Gdiplus::Color::HotPink);
-static CSCColorMap LightPink		("LightPink",			Gdiplus::Color::LightPink);
-static CSCColorMap Pink				("Pink",				Gdiplus::Color::Pink);
 
-static CSCColorMap DarkRed			("DarkRed",				Gdiplus::Color::DarkRed);
-static CSCColorMap Red				("Red",					Gdiplus::Color::Red);
-static CSCColorMap Firebrick		("Firebrick",			Gdiplus::Color::Firebrick);
-static CSCColorMap Crimson			("Crimson",				Gdiplus::Color::Crimson);
-static CSCColorMap IndianRed		("IndianRed",			Gdiplus::Color::IndianRed);
-static CSCColorMap LightCoral		("LightCoral",			Gdiplus::Color::LightCoral);
-static CSCColorMap Salmon			("Salmon",				Gdiplus::Color::Salmon);
-static CSCColorMap DarkSalmon		("DarkSalmon",			Gdiplus::Color::DarkSalmon);
-static CSCColorMap LightSalmon		("LightSalmon",			Gdiplus::Color::LightSalmon);
-
-static CSCColorMap OrangeRed		("OrangeRed",			Gdiplus::Color::OrangeRed);
-static CSCColorMap Tomato			("Tomato",				Gdiplus::Color::Tomato);
-static CSCColorMap DarkOrange		("DarkOrange",			Gdiplus::Color::DarkOrange);
-static CSCColorMap Coral			("Coral",				Gdiplus::Color::Coral);
-static CSCColorMap Orange			("Orange",				Gdiplus::Color::Orange);
-
-static CSCColorMap DarkKhaki		("DarkKhaki",			Gdiplus::Color::DarkKhaki);
-static CSCColorMap Gold				("Gold",				Gdiplus::Color::Gold);
-static CSCColorMap Khaki			("Khaki",				Gdiplus::Color::Khaki);
-static CSCColorMap PeachPuff		("PeachPuff",			Gdiplus::Color::PeachPuff);
-static CSCColorMap Yellow			("Yellow",				Gdiplus::Color::Yellow);
-static CSCColorMap PaleGoldenrod	("PaleGoldenrod",		Gdiplus::Color::PaleGoldenrod);
-static CSCColorMap Moccasin			("Moccasin",			Gdiplus::Color::Moccasin);
-static CSCColorMap PapayaWhip		("PapayaWhip",			Gdiplus::Color::PapayaWhip);
-static CSCColorMap LightGoldenrodYellow("LightGoldenrodYellow", Gdiplus::Color::LightGoldenrodYellow);
-static CSCColorMap LemonChiffon		("LemonChiffon",		Gdiplus::Color::LemonChiffon);
-static CSCColorMap LightYellow		("LightYellow",			Gdiplus::Color::LightYellow);
-
-static CSCColorMap Maroon			("Maroon",				Gdiplus::Color::Maroon);
-static CSCColorMap Brown			("Brown",				Gdiplus::Color::Brown);
-static CSCColorMap SaddleBrown		("SaddleBrown",			Gdiplus::Color::SaddleBrown);
-static CSCColorMap Sienna			("Sienna",				Gdiplus::Color::Sienna);
-static CSCColorMap Chocolate		("Chocolate",			Gdiplus::Color::Chocolate);
-static CSCColorMap DarkGoldenrod	("DarkGoldenrod",		Gdiplus::Color::DarkGoldenrod);
-static CSCColorMap Peru				("Peru",				Gdiplus::Color::Peru);
-static CSCColorMap RosyBrown		("RosyBrown",			Gdiplus::Color::RosyBrown);
-static CSCColorMap Goldenrod		("Goldenrod",			Gdiplus::Color::Goldenrod);
-static CSCColorMap SandyBrown		("SandyBrown",			Gdiplus::Color::SandyBrown);
-static CSCColorMap Tan				("Tan",					Gdiplus::Color::Tan);
-static CSCColorMap BurlyWood		("BurlyWood",			Gdiplus::Color::BurlyWood);
-static CSCColorMap Wheat			("Wheat",				Gdiplus::Color::Wheat);
-static CSCColorMap NavajoWhite		("NavajoWhite",			Gdiplus::Color::NavajoWhite);
-static CSCColorMap Bisque			("Bisque",				Gdiplus::Color::Bisque);
-static CSCColorMap BlanchedAlmond	("BlanchedAlmond",		Gdiplus::Color::BlanchedAlmond);
-static CSCColorMap Cornsilk			("Cornsilk",			Gdiplus::Color::Cornsilk);
-
-static CSCColorMap Indigo			("Indigo",				Gdiplus::Color::Indigo);
-static CSCColorMap Purple			("Purple",				Gdiplus::Color::Purple);
-static CSCColorMap DarkMagenta		("DarkMagenta",			Gdiplus::Color::DarkMagenta);
-static CSCColorMap DarkViolet		("DarkViolet",			Gdiplus::Color::DarkViolet);
-static CSCColorMap DarkSlateBlue	("DarkSlateBlue",		Gdiplus::Color::DarkSlateBlue);
-static CSCColorMap BlueViolet		("BlueViolet",			Gdiplus::Color::BlueViolet);
-static CSCColorMap DarkOrchid		("DarkOrchid",			Gdiplus::Color::DarkOrchid);
-static CSCColorMap Fuchsia			("Fuchsia",				Gdiplus::Color::Fuchsia);
-static CSCColorMap Magenta			("Magenta",				Gdiplus::Color::Magenta);
-static CSCColorMap SlateBlue		("SlateBlue",			Gdiplus::Color::SlateBlue);
-static CSCColorMap MediumSlateBlue	("MediumSlateBlue",		Gdiplus::Color::MediumSlateBlue);
-static CSCColorMap MediumOrchid		("MediumOrchid",		Gdiplus::Color::MediumOrchid);
-static CSCColorMap MediumPurple		("MediumPurple",		Gdiplus::Color::MediumPurple);
-static CSCColorMap Orchid			("Orchid",				Gdiplus::Color::Orchid);
-static CSCColorMap Violet			("Violet",				Gdiplus::Color::Violet);
-static CSCColorMap Plum				("Plum",				Gdiplus::Color::Plum);
-static CSCColorMap Thistle			("Thistle",				Gdiplus::Color::Thistle);
-static CSCColorMap Lavender			("Lavender",			Gdiplus::Color::Lavender);
-
-static CSCColorMap MidnightBlue		("MidnightBlue",		Gdiplus::Color::MidnightBlue);
-static CSCColorMap Navy				("Navy",				Gdiplus::Color::Navy);
-static CSCColorMap DarkBlue			("DarkBlue",			Gdiplus::Color::DarkBlue);
-static CSCColorMap MediumBlue		("MediumBlue",			Gdiplus::Color::MediumBlue);
-static CSCColorMap Blue				("Blue",				Gdiplus::Color::Blue);
-static CSCColorMap RoyalBlue		("RoyalBlue",			Gdiplus::Color::RoyalBlue);
-static CSCColorMap SteelBlue		("SteelBlue",			Gdiplus::Color::SteelBlue);
-static CSCColorMap DodgerBlue		("DodgerBlue",			Gdiplus::Color::DodgerBlue);
-static CSCColorMap DeepSkyBlue		("DeepSkyBlue",			Gdiplus::Color::DeepSkyBlue);
-static CSCColorMap CornflowerBlue	("CornflowerBlue",		Gdiplus::Color::CornflowerBlue);
-static CSCColorMap SkyBlue			("SkyBlue",				Gdiplus::Color::SkyBlue);
-static CSCColorMap LightSkyBlue		("LightSkyBlue",		Gdiplus::Color::LightSkyBlue);
-static CSCColorMap LightSteelBlue	("LightSteelBlue",		Gdiplus::Color::LightSteelBlue);
-static CSCColorMap LightBlue		("LightBlue",			Gdiplus::Color::LightBlue);
-static CSCColorMap PowderBlue		("PowderBlue",			Gdiplus::Color::PowderBlue);
-
-static CSCColorMap Teal				("Teal",				Gdiplus::Color::Teal);
-static CSCColorMap DarkCyan			("DarkCyan",			Gdiplus::Color::DarkCyan);
-static CSCColorMap LightSeaGreen	("LightSeaGreen",		Gdiplus::Color::LightSeaGreen);
-static CSCColorMap CadetBlue		("CadetBlue",			Gdiplus::Color::CadetBlue);
-static CSCColorMap DarkTurquoise	("DarkTurquoise",		Gdiplus::Color::DarkTurquoise);
-static CSCColorMap MediumTurquoise	("MediumTurquoise",		Gdiplus::Color::MediumTurquoise);
-static CSCColorMap Turquoise		("Turquoise",			Gdiplus::Color::Turquoise);
-static CSCColorMap Aqua				("Aqua",				Gdiplus::Color::Aqua);
-static CSCColorMap Cyan				("Cyan",				Gdiplus::Color::Cyan);
-static CSCColorMap Aquamarine		("Aquamarine",			Gdiplus::Color::Aquamarine);
-static CSCColorMap PaleTurquoise	("PaleTurquoise",		Gdiplus::Color::PaleTurquoise);
-static CSCColorMap LightCyan		("LightCyan",			Gdiplus::Color::LightCyan);
-
-static CSCColorMap DarkGreen		("DarkGreen",			Gdiplus::Color::DarkGreen);
-static CSCColorMap Green			("Green",				Gdiplus::Color::Green);
-static CSCColorMap DarkOliveGreen	("DarkOliveGreen",		Gdiplus::Color::DarkOliveGreen);
-static CSCColorMap ForestGreen		("ForestGreen",			Gdiplus::Color::ForestGreen);
-static CSCColorMap SeaGreen			("SeaGreen",			Gdiplus::Color::SeaGreen);
-static CSCColorMap Olive			("Olive",				Gdiplus::Color::Olive);
-static CSCColorMap OliveDrab		("OliveDrab",			Gdiplus::Color::OliveDrab);
-static CSCColorMap MediumSeaGreen	("MediumSeaGreen",		Gdiplus::Color::MediumSeaGreen);
-static CSCColorMap LimeGreen		("LimeGreen",			Gdiplus::Color::LimeGreen);
-static CSCColorMap Lime				("Lime",				Gdiplus::Color::Lime);
-static CSCColorMap SpringGreen		("SpringGreen",			Gdiplus::Color::SpringGreen);
-static CSCColorMap MediumSpringGreen("MediumSpringGreen",	Gdiplus::Color::MediumSpringGreen);
-static CSCColorMap DarkSeaGreen		("DarkSeaGreen",		Gdiplus::Color::DarkSeaGreen);
-static CSCColorMap MediumAquamarine	("MediumAquamarine",	Gdiplus::Color::MediumAquamarine);
-static CSCColorMap YellowGreen		("YellowGreen",			Gdiplus::Color::YellowGreen);
-static CSCColorMap LawnGreen		("LawnGreen",			Gdiplus::Color::LawnGreen);
-static CSCColorMap Chartreuse		("Chartreuse",			Gdiplus::Color::Chartreuse);
-static CSCColorMap LightGreen		("LightGreen",			Gdiplus::Color::LightGreen);
-static CSCColorMap GreenYellow		("GreenYellow",			Gdiplus::Color::GreenYellow);
-static CSCColorMap PaleGreen		("PaleGreen",			Gdiplus::Color::PaleGreen);
-
-static CSCColorMap MistyRose		("MistyRose",			Gdiplus::Color::MistyRose);
-static CSCColorMap AntiqueWhite		("AntiqueWhite",		Gdiplus::Color::AntiqueWhite);
-static CSCColorMap Linen			("Linen",				Gdiplus::Color::Linen);
-static CSCColorMap Beige			("Beige",				Gdiplus::Color::Beige);
-static CSCColorMap WhiteSmoke		("WhiteSmoke",			Gdiplus::Color::WhiteSmoke);
-static CSCColorMap LavenderBlush	("LavenderBlush",		Gdiplus::Color::LavenderBlush);
-static CSCColorMap OldLace			("OldLace",				Gdiplus::Color::OldLace);
-static CSCColorMap AliceBlue		("AliceBlue",			Gdiplus::Color::AliceBlue);
-static CSCColorMap SeaShell			("SeaShell",			Gdiplus::Color::SeaShell);
-static CSCColorMap GhostWhite		("GhostWhite",			Gdiplus::Color::GhostWhite);
-static CSCColorMap Honeydew			("Honeydew",			Gdiplus::Color::Honeydew);
-static CSCColorMap FloralWhite		("FloralWhite",			Gdiplus::Color::FloralWhite);
-static CSCColorMap Azure			("Azure",				Gdiplus::Color::Azure);
-static CSCColorMap MintCream		("MintCream",			Gdiplus::Color::MintCream);
-static CSCColorMap Snow				("Snow",				Gdiplus::Color::Snow);
-static CSCColorMap Ivory			("Ivory",				Gdiplus::Color::Ivory);
-static CSCColorMap White			("White",				Gdiplus::Color::White);
-
-static CSCColorMap Black			("Black",				Gdiplus::Color::Black);
-static CSCColorMap DarkSlateGray	("DarkSlateGray",		Gdiplus::Color::DarkSlateGray);
-static CSCColorMap DimGray			("DimGray",				Gdiplus::Color::DimGray);
-static CSCColorMap SlateGray		("SlateGray",			Gdiplus::Color::SlateGray);
-static CSCColorMap Gray				("Gray",				Gdiplus::Color::Gray);
-static CSCColorMap LightSlateGray	("LightSlateGray",		Gdiplus::Color::LightSlateGray);
-static CSCColorMap DarkGray			("DarkGray",			Gdiplus::Color::DarkGray);
-static CSCColorMap Silver			("Silver",				Gdiplus::Color::Silver);
-static CSCColorMap LightGray		("LightGray",			Gdiplus::Color::LightGray);
-static CSCColorMap Gainsboro		("Gainsboro",			Gdiplus::Color::Gainsboro);
 
 // RGB -> YUV(YCbCr)
 #define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)

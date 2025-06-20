@@ -1361,15 +1361,17 @@ struct	NETWORK_INFO
 	LONG		set_registry_str(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 
 	//reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
-	//레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성되어 있다.
+	//레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성된다.
 	//추가된 인덱스를 리턴한다.
 	int			add_registry(CWinApp* pApp, CString reg_path, CString value);
+	//"count"에 항목의 갯수가 저장되어 있고 각 숫자 인덱스 항목에 값이 저장되어 있는 구조인 경우 그 목록을 리턴한다.
+	int			get_registry_list(CWinApp* pApp, CString reg_path, std::deque<CString>& dqlist);
 
 	//Windows visual effect registry
 	bool		set_windows_visual_effects();
 
 
-	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default);
+	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default_value);
 	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
 
 	//int			GetSystemImageListIcon(CString szFile, BOOL bDrive);

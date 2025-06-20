@@ -2,6 +2,7 @@
 
 #include "Functions.h"
 
+static CSCColorList init_color_list_dummy;
 
 //regathered from https://www.colordic.org/
 /*
@@ -281,7 +282,7 @@ Gdiplus::Color get_color(COLORREF rgb)
 
 Gdiplus::Color get_color(std::string cr_name)
 {
-	return CSCColorMap::get_color(cr_name);
+	return CSCColorList::get_color(cr_name);
 }
 
 Gdiplus::Color get_color(CString cr_str)
@@ -312,7 +313,7 @@ Gdiplus::Color get_color(CString cr_str)
 	}
 	else //cr_str == _T("Red")라면 Gdiplus::Color::Red 라는 컬러값을 리턴한다.
 	{
-		cr = CSCColorMap::get_color(CString2string(cr_str));
+		cr = CSCColorList::get_color(CString2string(cr_str));
 	}
 
 	return cr;
@@ -939,7 +940,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_selected_inactive = gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
-			cr_back_alternate		= get_color(cr_back, -16);
+			cr_back_alternate		= get_color(cr_back, -12);
 
 			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);

@@ -81,10 +81,22 @@ void CReadDirectoryChanges::AddDirectory(LPCTSTR szDirectory, bool bWatchSubtree
 }
 
 //scpark add
-void CReadDirectoryChanges::StopWatchingDirectory(LPCTSTR wszDirectory)
+void CReadDirectoryChanges::stop_watching_directory(LPCTSTR wszDirectory)
 {
-
+    m_pServer.get()->stop(wszDirectory);
 }
+
+int CReadDirectoryChanges::get_watching_count()
+{
+    return m_pServer.get()->get_watching_count();
+}
+
+bool CReadDirectoryChanges::is_watching(LPCTSTR wszDirectory)
+{
+    return m_pServer.get()->is_watching(wszDirectory);
+}
+
+
 
 void CReadDirectoryChanges::Push(DWORD dwAction, std::wstring& wstrFilename)
 {

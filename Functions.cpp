@@ -3432,6 +3432,22 @@ int add_registry(CWinApp* pApp, CString reg_path, CString value)
 	return count;
 }
 
+//"count"에 항목의 갯수가 저장되어 있고 각 숫자 인덱스 항목에 값이 저장되어 있는 구조인 경우 그 목록을 리턴한다.
+int get_registry_list(CWinApp* pApp, CString reg_path, std::deque<CString>& dqlist)
+{
+	dqlist.clear();
+
+	CString item;
+	int count = pApp->GetProfileInt(reg_path, _T("count"), 0);
+	for (int i = 0; i < count; i++)
+	{
+		item = pApp->GetProfileString(reg_path, i2S(i), _T(""));
+		if (!item.IsEmpty())
+			dqlist.push_back(item);
+	}
+	return dqlist.size();
+}
+
 bool LoadBitmapFromFile(CBitmap &bmp, CString strFile)
 {
 	bmp.Detach();
@@ -12561,12 +12577,12 @@ void RGB2HSL(int R, int G, int B, int& h, int& s, int& l)
 */
 }
 
-double GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default)
+double GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default_value)
 {
 	CString sDefault;
 	CString sValue;
 
-	sDefault.Format(_T("%f"), default);
+	sDefault.Format(_T("%f"), default_value);
 	sValue = pApp->GetProfileString(lpszSection, lpszEntry, sDefault);
 
 	return _tstof(sValue);
@@ -15405,8 +15421,14 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 		if (!resize_window)
 			flag |= SWP_NOSIZE;
 
-		SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), flag);
-		//pWnd->MoveWindow(rc);
+		enum_display_monitors();
+
+		int index = get_monitor_index(rc);
+
+		if (index < 0)
+			pWnd->CenterWindow();
+		else
+			SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), flag);
 	}
 	else
 	{
@@ -15427,7 +15449,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pWnd || !pWnd->m_hWnd || pWnd->IsWindowVisible() == false || pWnd->IsIconic())
 	{
-		TRACE(_T("[warning] SaveWindowPosition() just return because pWnd is invalid.\n"));
+		TRACE(_T("[warning] SaveWindowPosition() just return because pWnd = %p.isVisible = %d\n"), pWnd, pWnd->IsWindowVisible());
 		return;
 	}
 

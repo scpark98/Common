@@ -9,7 +9,7 @@ CSCDirWatcher::~CSCDirWatcher()
 	if (m_is_thread_running)
 	{
 		m_is_thread_running = false;
-		while (!m_is_thread_stopped)
+		while (!m_is_thread_terminated)
 			std::this_thread::sleep_for(std::chrono::seconds(1)); // Simulate work
 	}
 }
@@ -24,28 +24,54 @@ void CSCDirWatcher::init(CWnd* parent)
 
 void CSCDirWatcher::add(CString folder, bool watch_sub_dir)
 {
+	add(std::deque<CString>{ folder }, watch_sub_dir);
+}
+
+void CSCDirWatcher::add(std::deque<CString> folder, bool watch_sub_dir)
+{
     if (!m_is_thread_running)
         TRACE(_T("warning : thread_directory_change_watcher() is not running. call init() member with parent parameter.\n"));
 
-    m_watcher.AddDirectory(folder, watch_sub_dir, dwNotificationFlags);
+    for (int i = 0; i < folder.size(); i++)
+    {
+        if (m_watcher.is_watching(folder[i]))
+            continue;
+
+        if (PathFileExists(folder[i]))
+        {
+            if (PathIsDirectory(folder[i]))
+                m_watcher.AddDirectory(folder[i], watch_sub_dir, dwNotificationFlags);
+            else
+                TRACE(_T("%s is not directory.\n"), folder[i]);
+        }
+        else
+        {
+            TRACE(_T("%s is not exist.\n"), folder[i]);
+        }
+    }
 }
 
 //모니터링 중인 특정 폴더만 중지시킨다. 구현중...
 void CSCDirWatcher::stop(CString folder)
 {
-    m_watcher.StopWatchingDirectory(folder);
+    if (folder.IsEmpty())
+    {
+        m_watcher.AddDirectory(_T(""), false, dwNotificationFlags);
+        return;
+	}
+
+    m_watcher.stop_watching_directory(folder);
 }
 
-//모든 모니터링을 중지한다.
-void CSCDirWatcher::stop_all()
+bool CSCDirWatcher::is_watching(CString folder)
 {
-    m_watcher.AddDirectory(_T(""), false, dwNotificationFlags);
+    return m_watcher.is_watching(folder);
 }
 
 void CSCDirWatcher::thread_directory_change_watcher()
 {
 	m_is_thread_running = true;
-    m_is_thread_stopped = false;
+    m_is_thread_terminated = false;
 
     const HANDLE hStdIn = ::GetStdHandle(STD_INPUT_HANDLE);
     const HANDLE handles[] = { hStdIn, m_watcher.GetWaitHandle() };
@@ -55,7 +81,7 @@ void CSCDirWatcher::thread_directory_change_watcher()
 	while (m_is_thread_running)
 	{
 		// Watch directory logic here
-		//TRACE(_T("%ld, Watching directory...\n"), GetTickCount());
+		TRACE(_T("watching %d directories...\n"), m_watcher.get_watching_count());
 
 		//WaitForMultipleObjectsEx()를 사용하면 Invalid Handle 에러가 발생하여 WaitForSingleObject()로 변경함.
         //이 waiting을 중지시키기 위한 이벤트를 발생시켜야 하는데 찾지 못하여 우선 1초 간격으로 while문을 실행함.
@@ -70,7 +96,7 @@ void CSCDirWatcher::thread_directory_change_watcher()
             // hStdIn was signaled. This can happen due to mouse input, focus change,
             // Shift keys, and more.  Delegate to TryGetKeyboardInput().
             // TryGetKeyboardInput sets bTerminate to true if the user hits Esc.
-            //if (TryGetKeyboardInput(hStdIn, m_is_thread_stopped, buf))
+            //if (TryGetKeyboardInput(hStdIn, m_is_thread_terminated, buf))
             //    m_changes.AddDirectory(buf.c_str(), false, dwNotificationFlags);
             //break;
         case WAIT_OBJECT_0 + 1: // We've received a notification in the queue.
@@ -110,6 +136,6 @@ void CSCDirWatcher::thread_directory_change_watcher()
 	}
 
 	m_is_thread_running = false;
-	m_is_thread_stopped = true;
-	TRACE("thread_watch() stoppped.\n");
+	m_is_thread_terminated = true;
+	TRACE("thread_directory_change_watcher() terminated.\n");
 }

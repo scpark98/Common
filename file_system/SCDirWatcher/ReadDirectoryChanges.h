@@ -124,7 +124,9 @@ public:
     void AddDirectory(LPCTSTR wszDirectory, bool bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize = 16384);
 
     //scpark add
-	void StopWatchingDirectory(LPCTSTR wszDirectory);
+	void    stop_watching_directory(LPCTSTR wszDirectory);
+    int     get_watching_count();
+    bool    is_watching(LPCTSTR wszDirectory);
 
     /// <summary>
     /// Return a handle for the Win32 Wait... functions that will be

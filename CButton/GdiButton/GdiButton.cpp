@@ -1152,8 +1152,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 
 	//이미지 버튼이면 텍스트는 출력하지 않는다.
-	//if (m_image.size() > 0 || text.IsEmpty())
-	//	return;
+	if (!m_draw_own_text && (m_image.size() > 0 || text.IsEmpty()))
+		return;
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	CFont* pOldFont = dc.SelectObject(&m_font);

@@ -148,6 +148,9 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 		CString text;
 
 		//Which column?
+		if (pItem->iItem < 0 || pItem->iItem >= m_list_db.size() || pItem->iSubItem < 0 || pItem->iSubItem >= m_list_db[pItem->iItem].text.size())
+			return;
+
 		text = m_list_db[pItem->iItem].text[pItem->iSubItem];
 
 		//Copy the text to the LV_ITEM structure
@@ -184,12 +187,31 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 }
 
-
+//virtual listctrl인 경우는 FindItem() 사용 시 무조건 0을 리턴하게 된다.
+//따라서 이 이벤트 핸들러 함수를 다음과 같이 수정함.
 void CVtListCtrlEx::OnLvnOdfinditem(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLVFINDITEM pFindInfo = reinterpret_cast<LPNMLVFINDITEM>(pNMHDR);
 	// TODO: Add your control notification handler code here
-	*pResult = 0;
+	*pResult = -1;
+
+	if ((pFindInfo->lvfi.flags & LVFI_STRING) == 0)
+		return;
+
+	CString searchText = pFindInfo->lvfi.psz;
+	int find_index = -1;
+
+	std::deque<CListCtrlData>::iterator it = std::find_if(m_list_db.begin(), m_list_db.end(),
+		[&](const CListCtrlData& item) ->
+		bool
+		{
+			return (searchText.CompareNoCase(item.text[0]) == 0);
+		});
+
+	if (it == m_list_db.end())
+		*pResult = -1;
+	else
+		*pResult = std::distance(m_list_db.begin(), it);
 }
 
 
@@ -996,6 +1018,10 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 	}
 	else
 	{
+		//20250619 정상 동작하던 정렬 코드였으나 Debug모드에서 갑자기 에러 발생함.
+		//0번 컬럼은 정상적으로 정렬되나 1번 컬럼부터는 오류가 발생하는데
+		//이 때 m_list_db를 보면 특정 항목의 text가 empty로 변하여 std::sort에서 오류가 발생함.
+		//1번 또는 11번 항목이 empty.
 		std::sort(m_list_db.begin(), m_list_db.end(),
 			[sort_asc, iSub, data_type, include_null](CListCtrlData a, CListCtrlData b)
 			{
@@ -1532,7 +1558,7 @@ void CVtListCtrlEx::OnPaint()
 
 	if (m_list_db.size() == 0 && !m_text_on_empty.IsEmpty())
 	{
-		draw_text(g, rc, m_text_on_empty, 10, false, 0, 0, _T("맑은 고딕"));
+		draw_text(g, rc, m_text_on_empty, m_text_on_empty_size, false, 0, 0, _T("맑은 고딕"), m_text_on_empty_color);
 	}
 
 	//CListCtrl::OnPaint();
@@ -1805,6 +1831,14 @@ Gdiplus::Color CVtListCtrlEx::get_back_color(int item, int subItem)
 	return cr;
 }
 
+void CVtListCtrlEx::set_back_alternate_color(bool use, Gdiplus::Color cr)
+{
+	m_use_alternate_back_color = use;
+
+	if (cr.GetValue() != Gdiplus::Color::Transparent)
+		m_theme.cr_back_alternate = cr;
+}
+
 void CVtListCtrlEx::set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase, bool invalidate)
 {
 	int i, j;
@@ -1969,6 +2003,21 @@ void CVtListCtrlEx::set_progress_color(Gdiplus::Color crProgress)
 int CVtListCtrlEx::add_item(CString text, int image_index, bool ensureVisible, bool invalidate)
 {
 	return insert_item(-1, text, image_index, ensureVisible, invalidate);
+}
+
+int CVtListCtrlEx::add_item(std::deque<CString> dqText, int image_index, bool ensureVisible, bool invalidate)
+{
+	int last_index = 0;
+
+	for (int i = 0; i < dqText.size(); i++)
+	{
+		if (dqText[i].IsEmpty())
+			continue;
+
+		last_index = insert_item(-1, dqText[i], image_index, ensureVisible, invalidate);
+	}
+
+	return last_index;
 }
 
 int CVtListCtrlEx::insert_line(int index, CString line_string, CString separator, int image_index, bool ensureVisible, bool invalidate)
@@ -2435,6 +2484,9 @@ void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 
 CString CVtListCtrlEx::get_text(int item, int subItem)
 {
+	if (item < 0 || item >= m_list_db.size() || subItem < 0 || subItem >= m_list_db[item].text.size())
+		return _T("");
+
 	return m_list_db[item].text[subItem];
 }
 
@@ -2544,6 +2596,16 @@ void CVtListCtrlEx::get_line_text_list(std::vector<CString>* vt)
 {
 
 }
+
+//리스트에 표시할 항목이 없을 경우 표시할 텍스트 설정
+void CVtListCtrlEx::set_text_on_empty(CString text, int font_size, Gdiplus::Color cr)
+{
+	m_text_on_empty = text;
+	m_text_on_empty_size = font_size;
+	m_text_on_empty_color = cr;
+
+	Invalidate();
+};
 
 //shell_listctrl일 때 윈도우 탐색기에서 파일/폴더의 레이블을 변경하는 이벤트가 발생하면
 //main에서 이 함수를 호출하여 레이블을 변경한다.
@@ -4718,7 +4780,7 @@ LRESULT CVtListCtrlEx::OnNcHitTest(CPoint point)
 void CVtListCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TRACE(_T("CVtListCtrlEx::OnHScroll\n"));
+	//TRACE(_T("CVtListCtrlEx::OnHScroll\n"));
 	if (m_in_editing)
 		edit_end();
 	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);

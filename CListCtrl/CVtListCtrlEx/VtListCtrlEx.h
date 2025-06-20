@@ -269,6 +269,7 @@ public:
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
 	int			add_item(CString text = _T(""), int image_index = -1, bool ensureVisible = true, bool invalidate = true);
+	int			add_item(std::deque<CString> dqText, int image_index = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, CString text = _T(""), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, std::deque<CString> dqText, int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, WIN32_FIND_DATA data, bool ensureVisible = true, bool invalidate = true);
@@ -341,7 +342,7 @@ public:
 	void		get_line_text_list(std::vector<CString> *vt);
 
 	//리스트에 표시할 항목이 없을 경우 표시할 텍스트 설정
-	void		set_text_on_empty(CString text) { m_text_on_empty = text; Invalidate(); };
+	void		set_text_on_empty(CString text, int font_size = 9, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 
 	//shell_listctrl일 때 윈도우 탐색기에서 파일/폴더의 레이블을 변경하는 이벤트가 발생하면
 	//main에서 이 함수를 호출하여 레이블을 변경한다.
@@ -390,10 +391,10 @@ public:
 		sort_descending,
 		sort_ascending,
 	};
-	void		allow_sort(bool allow);
-	void		sort(int column, int ascending);
-	void		sort_by_text_color(int column, int ascending, bool text_sort_on_same_color = true);
-	int			cur_sorted_column_index() { return m_cur_sort_column; }
+	void			allow_sort(bool allow);
+	void			sort(int column, int ascending);
+	void			sort_by_text_color(int column, int ascending, bool text_sort_on_same_color = true);
+	int				cur_sorted_column_index() { return m_cur_sort_column; }
 
 //컬러 관련
 	void			set_color_theme(int theme, bool apply_now = true);
@@ -402,7 +403,7 @@ public:
 	//특정 셀이 아닌 기본 배경색을 리턴.
 	Gdiplus::Color	get_back_color() { return m_theme.cr_back; }
 	Gdiplus::Color	get_back_alternate_color(int item, int subItem) { return m_theme.cr_back_alternate; }
-	void			set_back_alternate_color(bool use, Gdiplus::Color cr) { m_use_alternate_back_color = use; m_theme.cr_back_alternate = cr; }
+	void			set_back_alternate_color(bool use = true, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	//item이 -1이면 모든 라인에, subItem이 -1이면 모든 컬럼에 적용.
@@ -574,6 +575,8 @@ protected:
 	std::deque<CListCtrlData> m_list_db;
 	
 	CString			m_text_on_empty;
+	int				m_text_on_empty_size = 9;
+	Gdiplus::Color	m_text_on_empty_color = Gdiplus::Color::DimGray;
 
 //컬럼 관련
 	CHeaderCtrlEx	m_HeaderCtrlEx;

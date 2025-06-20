@@ -583,7 +583,7 @@ void CSCEdit::update_ctrl()
 
 BOOL CSCEdit::OnEnKillfocus()
 {
-	TRACE(_T("OnEnKillfocus\n"));
+	//TRACE(_T("OnEnKillfocus\n"));
 	update_ctrl();
 	draw_dim_text();
 	::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
@@ -616,7 +616,7 @@ HBRUSH CSCEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 
 BOOL CSCEdit::OnEnSetfocus()
 {
-	TRACE(_T("OnEnSetfocus\n"));
+	//TRACE(_T("OnEnSetfocus\n"));
 	update_ctrl();
 	return FALSE;
 }

@@ -25,11 +25,8 @@ public:
 
 // Attributes
 public:
-	Gdiplus::Color	m_cr_text;
-	Gdiplus::Color	m_cr_back;
-	Gdiplus::Color	m_cr_separator;
-
-	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gdiplus::Color cr_separator = Gdiplus::Color::Transparent);
+	//여러개의 파라미터를 설정할 수 있는데 만약 그 값이 Gdiplus::Color::Transparent라면 그 항목은 변경하지 않는다.
+	void			set_color(Gdiplus::Color cr_text = Gdiplus::Color::Transparent, Gdiplus::Color cr_back = Gdiplus::Color::Transparent, Gdiplus::Color cr_separator = Gdiplus::Color::Transparent);
 	void			set_text_color(Gdiplus::Color cr_text);
 	void			set_back_color(Gdiplus::Color cr_back);
 
@@ -41,7 +38,7 @@ public:
 	void			set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_sort_arrow = Gdiplus::Color::Transparent);
 	void			allow_sort(bool allow) { m_allow_sort = allow; }
 
-	//pt가 separator 위치인지 판별
+	//pt가 separator 위치인지 판별, (-2px ~ +2px)
 	bool			is_separator(CPoint pt);
 
 // Operations
@@ -78,6 +75,10 @@ protected:
 	int				m_cur_sort_column = -1;
 	bool			m_cur_sort_asc = true;
 	Gdiplus::Color	m_cr_sort_arrow = Gdiplus::Color::DarkGray;
+
+	Gdiplus::Color	m_cr_text = Gdiplus::Color(32, 32, 32);
+	Gdiplus::Color	m_cr_back = Gdiplus::Color(255, 247, 225);
+	Gdiplus::Color	m_cr_separator = Gdiplus::Color::DimGray;
 
 //폰트 관련
 	LOGFONT			m_lf;

@@ -121,7 +121,8 @@ namespace ReadDirectoryChangesPrivate
 
         // Can't use sizeof(FILE_NOTIFY_INFORMATION) because
         // the structure is padded to 16 bytes.
-        _ASSERTE(dwNumberOfBytesTransfered >= offsetof(FILE_NOTIFY_INFORMATION, FileName) + sizeof(WCHAR));
+		// scpark edit: 원래 이 문장이 있었으나 watching중인 폴더를 목록에서 삭제할 경우 ASSERT가 발생하여 주석처리 함.
+       // _ASSERTE(dwNumberOfBytesTransfered >= offsetof(FILE_NOTIFY_INFORMATION, FileName) + sizeof(WCHAR));
 
         // This might mean overflow? Not sure.
         if (!dwNumberOfBytesTransfered)

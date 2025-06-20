@@ -68,6 +68,7 @@ namespace ReadDirectoryChangesPrivate
         }
 
         CReadChangesServer* const m_pServer;
+        std::wstring get_directory_name() { return m_wstrDirectory; }
 
     protected:
 
@@ -83,10 +84,10 @@ namespace ReadDirectoryChangesPrivate
         std::wstring	m_wstrDirectory;
 
         // Result of calling CreateFile().
-        HANDLE		m_hDirectory{};
+        HANDLE		    m_hDirectory{};
 
         // Required parameter for ReadDirectoryChangesW().
-        OVERLAPPED	m_Overlapped{};
+        OVERLAPPED	    m_Overlapped{};
 
         // Data buffer for the request.
         // Since the memory is allocated by malloc, it will always
@@ -134,6 +135,31 @@ namespace ReadDirectoryChangesPrivate
             pRequest->m_pServer->AddDirectory(pRequest);
         }
 
+        void stop(std::wstring dir)
+        {
+            StopDirectory(dir);
+		}
+
+        int get_watching_count()
+        {
+            return m_pBlocks.size();
+		}
+
+        bool is_watching(std::wstring dir)
+        {
+            for (int i = 0; i < m_pBlocks.size(); i++)
+            {
+                if (m_pBlocks[i]->get_directory_name() == dir)
+					return true;
+            }
+            //for (const auto& block : m_pBlocks)
+            //{
+            //    if (block->get_directory_name() == dir)
+            //        return true;
+            //}
+            return false;
+		}
+
         void Run()
         {
             while (m_nOutstandingRequests || !m_bTerminate)
@@ -158,6 +184,24 @@ namespace ReadDirectoryChangesPrivate
             }
             else
                 delete pBlock;
+        }
+
+        //scpark add
+        void StopDirectory(std::wstring dir)
+        {
+            for (DWORD i = 0; i < m_pBlocks.size(); ++i)
+            {
+                // Each Request object will delete itself.
+                std::wstring dir_name = m_pBlocks[i]->get_directory_name();
+                if (dir_name == dir)
+                {
+                    m_pBlocks[i]->RequestTermination();
+                    ::InterlockedDecrement(&m_nOutstandingRequests);
+                    delete m_pBlocks[i];
+                    m_pBlocks.erase(m_pBlocks.begin() + i);
+                    --i; // Adjust index after removal.
+				}
+            }
         }
 
         void RequestTermination()

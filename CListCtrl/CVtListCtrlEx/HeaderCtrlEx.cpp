@@ -19,8 +19,8 @@ static char THIS_FILE[] = __FILE__;
 
 CHeaderCtrlEx::CHeaderCtrlEx()
 {
-	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
-	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+	//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
+	//m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
 
 	if (gray_value(m_cr_back) < 128)
 		m_cr_separator = get_color(m_cr_back, 32);
@@ -98,7 +98,6 @@ void CHeaderCtrlEx::OnPaint()
 	CMemoryDC dc(&dc1, &rc);
 
 	dc.SelectObject(GetFont());
-
 
 	//if (m_flat_style)
 	//	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));
@@ -453,8 +452,11 @@ void CHeaderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CHeaderCtrlEx::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gdiplus::Color cr_separator)
 {
-	m_cr_text = cr_text;
-	m_cr_back = cr_back;
+	if (cr_text.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_text = cr_text;
+
+	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_back = cr_back;
 
 	if (m_cr_separator.GetValue() == Gdiplus::Color::Transparent)
 	{

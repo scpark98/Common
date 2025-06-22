@@ -4823,12 +4823,25 @@ void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 	CListCtrl::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (!m_button_scroll_to_end)
-		return;
-
 	CRect rc;
 	GetClientRect(rc);
-	m_button_scroll_to_end->MoveWindow(CRect(rc.right - 5 - m_auto_scroll_button_size, rc.bottom - 5 - m_auto_scroll_button_size, rc.right - 5, rc.bottom - 5));
+
+	if (m_button_scroll_to_end)
+	{
+		m_button_scroll_to_end->MoveWindow(CRect(rc.right - 5 - m_auto_scroll_button_size, rc.bottom - 5 - m_auto_scroll_button_size, rc.right - 5, rc.bottom - 5));
+	}
+
+	//특정 컬럼 너비를 가변 처리
+	/*
+	std::vector<int> width(get_column_count());
+	int total_column_width = 0;
+	for (int i = 0; i < get_column_count(); i++)
+	{
+		if (i != 1)
+			total_column_width += GetColumnWidth(i);
+	}
+	set_column_width(1, rc.Width() - total_column_width);
+	*/
 }
 
 void CVtListCtrlEx::show_auto_scroll_button(bool show)

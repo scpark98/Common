@@ -42,8 +42,8 @@
 */
 
 //기존 LOGFONT는 GDI용이고 fontsize가 int만 지원되거나, lfFaceName이 TCHAR [] 등
-//불편한 점이 많으므로 Gdi+에서도 사용할 수 있도록 CSCLogFont를 정의함.
-class CSCLogFont
+//불편한 점이 많으므로 Gdi+에서도 사용할 수 있도록 CSCTextInfo를 정의함.
+class CSCTextInfo
 {
 public:
 	CString		name = _T("Arial");
@@ -64,13 +64,13 @@ public:
 	~CSCParagraph();
 
 	CString			text;
-	CSCLogFont		lf;
+	CSCTextInfo		ti;
 	CRect			r;						//이 텍스트가 그려질 위치(절대좌표가 아닌 0,0을 기준으로 상대좌표)
 
 	//text의 태그를 파싱하여 각 음절의 속성을 설정한 후 para에 저장한다.
-	//lf에는 font name, size, style, color 등이 세팅되어 있고
-	//특별한 태그가 없으면 lf에 설정된 기본값을 사용한다.
-	static void		build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCLogFont* lf);
+	//ti에는 font name, size, style, color 등이 세팅되어 있고
+	//특별한 태그가 없으면 ti에 설정된 기본값을 사용한다.
+	static void		build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextInfo* ti);
 
 	//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
 	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align);

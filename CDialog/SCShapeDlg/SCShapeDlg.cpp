@@ -133,13 +133,15 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 {
 	m_para.clear();
 
-	CSCLogFont lf;
+	CSCTextInfo ti;
 
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
 	else
 		m_parent = parent;
 
+	//font_name이 ""이라면 main의 LOGFONT를 구해서 lfFaceName값으로 채워준다.
+	//main이 아닌 GetParent()를 통해 font를 구하면 그 parent가 동적생성된 경우에는 제대로 가져오지 못하므로 mainWnd()를 구해서 가져올 것!
 	if (font_name.IsEmpty())
 	{
 		CFont* font = AfxGetApp()->GetMainWnd()->GetFont();
@@ -155,23 +157,23 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 		font_name = lf.lfFaceName;
 	}
 
-	lf.name = font_name;
-	lf.size = font_size;
-	lf.style = font_style;
-	lf.cr_text = cr_text;
-	lf.cr_stroke = cr_stroke;
-	lf.cr_shadow = cr_shadow;
-	lf.cr_back = cr_back;
-	lf.shadow_depth = shadow_depth;
-	lf.thickness = thickness;
+	ti.name = font_name;
+	ti.size = font_size;
+	ti.style = font_style;
+	ti.cr_text = cr_text;
+	ti.cr_stroke = cr_stroke;
+	ti.cr_shadow = cr_shadow;
+	ti.cr_back = cr_back;
+	ti.shadow_depth = shadow_depth;
+	ti.thickness = thickness;
 
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
 
 	m_img.release();
 
-	CSCParagraph::build_paragraph_str(text, m_para, &lf);
-	m_text_setting = CSCShapeDlgTextSetting(text, lf);
+	CSCParagraph::build_paragraph_str(text, m_para, &ti);
+	m_text_setting = CSCShapeDlgTextSetting(text, ti);
 
 	if (!m_hWnd)
 	{
@@ -198,6 +200,8 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 
 	//CDC* pDC = CDC::FromHandle(g.GetHDC());	//이 코드를 써서 CDC에 draw_text()하려 했으나 이렇게 하면 g에 아무것도 그려지지 않음
 
+	//기본적으로 m_para는 DT_CENTER로 가정하고 계산하므로 DT_CENTER이면 여기서 바로 그려주고
+	//DT_LEFT, DT_RIGHT라면 set_text_align()을 한 후 그 함수 안에서 다시 그려준다.
 	if (m_text_align == DT_CENTER)
 	{
 		draw_text(g, m_para);
@@ -270,7 +274,7 @@ void CSCShapeDlg::set_text_align(int align)
 		}
 	}
 
-	//해당 캔버스에
+	//해당 캔버스에 다시 그려준다.
 	Gdiplus::Graphics g(m_img.m_pBitmap);
 	g.Clear(m_text_setting.lf.cr_back);
 	draw_text(g, m_para);

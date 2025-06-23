@@ -48,14 +48,14 @@ class CSCShapeDlgTextSetting
 {
 public:
 	CSCShapeDlgTextSetting() {};
-	CSCShapeDlgTextSetting(CString _text, CSCLogFont _lf)	//alpha=0이면 투명 영역은 클릭되지 않는다.
+	CSCShapeDlgTextSetting(CString _text, CSCTextInfo _lf)	//alpha=0이면 투명 영역은 클릭되지 않는다.
 	{
 		text = _text;
 		lf = _lf;
 	}
 
 	CString text;
-	CSCLogFont	lf;
+	CSCTextInfo	lf;
 };
 
 //CSCShapeDlg
@@ -126,7 +126,7 @@ public:
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
 	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
 
-	CSCLogFont*		get_logfont() { &m_text_setting.lf;}
+	CSCTextInfo*		get_logfont() { &m_text_setting.lf;}
 
 	//animated gif인 경우
 	enum GIF_PLAY_STATE

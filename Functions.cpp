@@ -15452,7 +15452,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pWnd || !pWnd->m_hWnd || pWnd->IsWindowVisible() == false || pWnd->IsIconic())
 	{
-		TRACE(_T("[warning] SaveWindowPosition() just return because pWnd = %p.isVisible = %d\n"), pWnd, pWnd->IsWindowVisible());
+		TRACE(_T("[warning] SaveWindowPosition() just return because pWnd = %p, pWnd->hWnd = %p\n"), pWnd, (pWnd && pWnd->m_hWnd ? pWnd->m_hWnd : nullptr));
 		return;
 	}
 
@@ -18557,18 +18557,18 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 			pDC->SelectObject(pOldFont);
 #else
 			//Gdiplus::Font* font;
-			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].lf.name));
+			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].ti.name));
 
 			//get_paragraph_font(g, para, i, j, &font);
-			float emSize = fDpiY * para[i][j].lf.size / 72.0;
-			Gdiplus::Font font(&ff, emSize, para[i][j].lf.style);
+			float emSize = fDpiY * para[i][j].ti.size / 72.0;
+			Gdiplus::Font font(&ff, emSize, para[i][j].ti.style);
 
 
 			//text 배경색을 칠하고
-			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].lf.cr_back);
+			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].ti.cr_back);
 
 			//text를 출력한다.
-			Gdiplus::SolidBrush text_brush(para[i][j].lf.cr_text);
+			Gdiplus::SolidBrush text_brush(para[i][j].ti.cr_text);
 			Gdiplus::GraphicsPath str_path, shadow_path;
 
 			//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
@@ -18580,18 +18580,18 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 			//r을 정확히 계산하는 것이 정석이나 굳이 r을 주지 않고 Gdiplus::Point()로 주면 문제되지 않는다.
 			CRect r = para[i][j].r;
 			str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-								para[i][j].lf.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
+								para[i][j].ti.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
 			//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
-			Gdiplus::SolidBrush br_shadow(para[0][0].lf.cr_shadow);
-			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness / 1.4f }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].lf.thickness / 1.4f}));
+			Gdiplus::SolidBrush br_shadow(para[0][0].ti.cr_shadow);
+			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].ti.thickness / 1.4f }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].ti.thickness / 1.4f}));
 			r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
 
 			shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-				para[i][j].lf.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
+				para[i][j].ti.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-			Gdiplus::Pen   pen(para[i][j].lf.cr_stroke, para[i][j].lf.thickness);
-			Gdiplus::SolidBrush brush(para[i][j].lf.cr_text);
+			Gdiplus::Pen   pen(para[i][j].ti.cr_stroke, para[i][j].ti.thickness);
+			Gdiplus::SolidBrush brush(para[i][j].ti.cr_text);
 
 			//pen.SetLineJoin(Gdiplus::LineJoinMiter);
 			pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -18600,7 +18600,7 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 
 			//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
 			//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
-			if (para[i][j].lf.thickness > 0.0f)
+			if (para[i][j].ti.thickness > 0.0f)
 				g.DrawPath(&pen, &str_path);
 
 			g.FillPath(&brush, &str_path);

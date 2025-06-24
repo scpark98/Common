@@ -48,7 +48,8 @@ public:
 	};
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }
-	void					set_text(CString text) { CEdit::SetWindowText(text); }
+	void					set_text(CString text) { CEdit::SetWindowText(text); set_line_align(m_align); }
+	void					SetWindowText(CString text) { set_text(text); }
 
 // Overrides
 	// ClassWizard generated virtual function overrides
@@ -73,7 +74,7 @@ public:
 	//차이점은 전자의 경우 parent가 순수 CDialog를 상속받은 dlg이고
 	//후자는 SCThemeDlg를 상속받은 dlg라는 점이다. 수정 필요.
 	virtual CSCEdit&		set_transparent(bool transparent = true);
-
+	virtual CSCEdit&		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
 	virtual CSCEdit&		set_text_color(Gdiplus::Color crText); // This Function is to set the Color for the Text.
 	virtual CSCEdit&		set_back_color(Gdiplus::Color crBack); // This Function is to set the BackGround Color for the Text and the Edit Box.
 	//아직 set_text_color_disabled()는 효과가 적용되고 있지 않다. 수정 필요.
@@ -114,6 +115,9 @@ public:
 	// Generated message map functions
 protected:
 	bool			m_transparent = false;
+
+//align
+	DWORD			m_align = DT_VCENTER;
 
 //border
 	bool			m_draw_border = true;

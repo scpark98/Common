@@ -233,10 +233,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CRect		textRect;
 	bool		is_show_selection_always = (GetStyle() & LVS_SHOWSELALWAYS);
 	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
-	bool		is_selected = GetItemState(iItem, LVIS_SELECTED);
+	bool		is_selected = (GetItemState(iItem, LVIS_SELECTED) & LVIS_SELECTED);
 	bool		is_drophilited = GetItemState(iItem, LVIS_DROPHILITED);
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
+
+
+	//TRACE(_T("iItem = %d, is_selected = % d\n"), iItem, is_selected);
 
 	GetItemRect(iItem, &rowRect, LVIR_BOUNDS);
 
@@ -526,10 +529,16 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_draw_selected_border && !m_in_editing && m_has_focus && is_selected)
+	if (m_draw_selected_border && !m_in_editing && (m_has_focus || is_show_selection_always) && is_selected)
 	{
 		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
-		draw_rectangle(pDC, rowRect, m_theme.cr_selected_border);
+		//선택된 항목을 표시하는 사각형을 그릴때는 반드시 PenAlignmentInset으로 그려줘야 한다.
+		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
+		//선택 사각형은 반드시 inset으로 그려져야 한다.
+		if (m_use_distinct_border_color)
+			draw_rectangle(pDC, rowRect, get_distinct_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
+		else
+			draw_rectangle(pDC, rowRect, m_theme.cr_selected_border, Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 	}
 
 	if (m_draw_top_line)
@@ -889,6 +898,22 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 	}
 
 	return false;
+}
+
+void CVtListCtrlEx::set_draw_selected_border(bool draw, Gdiplus::Color cr_border, int selected_border_width, int pen_style)
+{
+	m_draw_selected_border = draw;
+	
+	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
+		m_theme.cr_selected_border = cr_border;
+
+	if (selected_border_width > 0)
+		m_selected_border_width = selected_border_width;
+
+	if (pen_style >= 0)
+		m_selected_border_style = pen_style;
+
+	Invalidate();
 }
 
 void CVtListCtrlEx::allow_sort(bool allow)
@@ -2101,7 +2126,7 @@ int CVtListCtrlEx::insert_item(int index, WIN32_FIND_DATA data, bool ensureVisib
 
 	//기존에 존재하는 파일이라면 크기, 수정한 날짜를 갱신해주고
 	//없다면 리스트에 추가한다.
-	int old_index = find_string(filename, 0, true);
+	int old_index = find(filename, 0, true);
 	if (old_index < 0)
 	{
 		index = insert_item(index, filename, img_idx, ensureVisible, invalidate);
@@ -2778,7 +2803,7 @@ int CVtListCtrlEx::get_selected_items(std::deque<WIN32_FIND_DATA>* dq)
 	return selected_index.size();
 }
 
-void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_unselect, bool make_visible)
+void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_unselect, bool insure_visible)
 {
 	if (after_unselect)
 		unselect_selected_item();
@@ -2786,8 +2811,9 @@ void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_
 	SetItemState(nIndex, bSelect ? LVIS_SELECTED : 0, LVIS_SELECTED);
 	SetItemState(nIndex, bSelect ? LVIS_FOCUSED : 0, LVIS_FOCUSED);
 
-	if (make_visible)
-		ensure_visible(nIndex, visible_last);
+	if (insure_visible)
+		EnsureVisible(nIndex, FALSE);
+		//ensure_visible(nIndex, visible_last);
 }
 
 void CVtListCtrlEx::unselect_selected_item()
@@ -2842,18 +2868,18 @@ int CVtListCtrlEx::set_items_with_state(UINT state, UINT mask, std::deque<int>* 
 	return 0;
 }
 
-//0번 컬럼에서만 데이터를 찾는다.
-int CVtListCtrlEx::find_string(CString str, int start, bool bWholeWord, bool bCaseSensitive)
+//기본 검색함수인 FindItem()을 이용해서 0번 컬럼에서만 데이터를 찾는다. virtual list이므로 OnLvnOdfinditem() 함수 수정 필수.
+int CVtListCtrlEx::find(CString str, int start, bool bWholeWord, bool bCaseSensitive)
 {
-	/*
 	LVFINDINFO info;
 
 	info.flags = (bWholeWord ? LVFI_STRING : LVFI_PARTIAL|LVFI_STRING);
 	info.psz = str;
 
 	// Delete all of the items that begin with the string.
-	return FindItem(&info, indexFrom);
-	*/
+	return FindItem(&info, start);
+
+	/*
 	//virtual list가 아니라면 위 코드가 동작하겠지만
 	//virtual list라면 OnLvnOdfinditem()함수가 다시 호출되고
 	//거기서 결국 찾는 코드가 들어가야 한다.
@@ -2883,6 +2909,7 @@ int CVtListCtrlEx::find_string(CString str, int start, bool bWholeWord, bool bCa
 	}
 
 	return -1;
+	*/
 }
 
 //CListCtrl의 FindItem으로도 모든 라인의 모든 컬럼을 검사할 수 있지만
@@ -2895,7 +2922,7 @@ int CVtListCtrlEx::find_string(CString str, int start, bool bWholeWord, bool bCa
 //'&'로 구분하면 각 단어가 모두 들어간 목록을(AND)
 //구분 기호가 없으면 wholeword로 검색한다.
 //작품명의 경우 영문대문자-숫자인 패턴이 많으므로 '-'가 없다면 숫자 앞에 자동 넣어준다.
-int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
+int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 								int start_idx, int end_idx,
 								std::deque<int>* dqColumn, bool stop_first_found)
 {
@@ -2904,6 +2931,7 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
 	CString sText;
 	std::deque<CString> dqTarget;	//separator가 ""이 아닐 경우는 토큰으로 분리하여 모두 찾는다.
 	std::deque<int> dq_columns;
+	std::deque<int> find_result;
 
 	if (start_idx < 0)
 		start_idx = 0;
@@ -2939,9 +2967,9 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
-		if (find_dqstring(dqLine, dqTarget, op) >= 0)
+		if (find_dqstring(dqLine, dqTarget, op, true, true) >= 0)
 		{
-			result->push_back(cur_idx);
+			find_result.push_back(cur_idx);
 
 			if (stop_first_found)
 			{
@@ -2954,14 +2982,14 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
 		{
 			cur_idx++;
 			if (cur_idx > end_idx)
-				return result->size();
+				break;
 		}
-		else
-		{
-			cur_idx--;
-			if (cur_idx < end_idx)
-				return result->size();
-		}
+		//else
+		//{
+		//	cur_idx--;
+		//	if (cur_idx < end_idx)
+		//		return result->size();
+		//}
 
 		/*
 		//한 라인의 데이터를 하나의 스트링 리스트로 얻어와서 비교
@@ -2977,7 +3005,17 @@ int CVtListCtrlEx::find_string(CString find_target, std::deque<int>* result,
 		*/
 	}
 
-	return result->size();
+	if (result)
+	{
+		result->clear();
+		result->assign(find_result.begin(), find_result.end());
+		return result->at(0);
+	}
+
+	if (find_result.size() == 0)
+		return -1;
+
+	return find_result[0];
 }
 
 BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
@@ -4831,17 +4869,18 @@ void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 		m_button_scroll_to_end->MoveWindow(CRect(rc.right - 5 - m_auto_scroll_button_size, rc.bottom - 5 - m_auto_scroll_button_size, rc.right - 5, rc.bottom - 5));
 	}
 
-	//특정 컬럼 너비를 가변 처리
-	/*
-	std::vector<int> width(get_column_count());
-	int total_column_width = 0;
-	for (int i = 0; i < get_column_count(); i++)
+	//특정 컬럼 너비를 고정 처리
+	if (m_fixed_width_column >= 0 && m_fixed_width_column < get_column_count())
 	{
-		if (i != 1)
-			total_column_width += GetColumnWidth(i);
+		std::vector<int> width(get_column_count());
+		int total_column_width = 0;
+		for (int i = 0; i < get_column_count(); i++)
+		{
+			if (i != m_fixed_width_column)
+				total_column_width += GetColumnWidth(i);
+		}
+		set_column_width(m_fixed_width_column, rc.Width() - total_column_width - 2);
 	}
-	set_column_width(1, rc.Width() - total_column_width);
-	*/
 }
 
 void CVtListCtrlEx::show_auto_scroll_button(bool show)

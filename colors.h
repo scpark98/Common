@@ -34,319 +34,6 @@
 - 지원되는 color theme 리스트를 얻기 위해서는 get_color_theme_list()의 리턴값을 이용한다.
 */
 
-enum COLOR_THEME_MEMBER_INDEX
-{
-	cri_text = 0,
-
-};
-
-class CSCColorTheme
-{
-public :
-	CSCColorTheme(CWnd* pWnd, int theme = color_theme_default)
-	{
-		m_parent = pWnd;
-		set_color_theme(color_theme_default);
-	};
-
-	enum SC_COLOR_THEMES
-	{
-		color_theme_default = 0,		//기본 윈도우 테마를 따름
-		color_theme_white,				//기존 윈도우의 바탕색을 dlg의 3DFACE가 아닌 white로 함
-		color_theme_gray,
-		color_theme_dark_gray,
-		color_theme_dark,
-		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
-		color_theme_linkmemine,
-		color_theme_linkmemine_se,
-		color_theme_anysupport,
-		color_theme_helpu,
-		color_theme_pcanypro,
-		color_theme_custom,
-	};
-
-	//현재 설정된 color theme 인덱스를 리턴
-	int		get_color_theme() { return m_cur_theme; }
-	void	set_color_theme(int color_theme);
-	static std::deque<CString> get_color_theme_list();
-
-	Gdiplus::Color	cr_text;
-	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목
-	Gdiplus::Color	cr_text_hover;
-	Gdiplus::Color	cr_text_dropHilited;
-	Gdiplus::Color	cr_text_selected;
-	Gdiplus::Color	cr_text_selected_inactive;
-
-	Gdiplus::Color	cr_back;						//BTNFACE	: for CDialog, CButton, CStatic...
-	Gdiplus::Color	cr_back_hover;					//= hover = over = track_select... 다양한 같은 의미가 있으나 hover로 통일하자.
-	Gdiplus::Color	cr_back_dropHilited;
-	Gdiplus::Color	cr_back_selected;
-	Gdiplus::Color	cr_back_selected_inactive;
-	Gdiplus::Color	cr_back_alternate;				//list의 경우 짝수라인, 홀수라인 번갈아 색상을 표시하는 목적
-
-	Gdiplus::Color	cr_selected_border;
-	Gdiplus::Color	cr_border;
-
-	//caption이 없는 dialog based에서 사용
-	Gdiplus::Color	cr_title_text;
-	Gdiplus::Color	cr_title_back;
-	Gdiplus::Color	cr_sys_buttons_hover_back;
-	Gdiplus::Color	cr_sys_buttons_down_back;
-
-	//CListCtrl에서만 사용될것으로 예상.
-	Gdiplus::Color	cr_header_text;
-	Gdiplus::Color	cr_header_back;
-	std::deque<Gdiplus::Color> cr_percentage_bar;	//percentage bar graph color
-	Gdiplus::Color	cr_progress;					//progress bar
-	//Gdiplus::Color	cr_progress_text;				//progress text
-
-protected:
-	CWnd*			m_parent = NULL;
-	int				m_cur_theme = color_theme_default;
-};
-
-//color name으로 Gdiplus::Color 값을 구하기 위해 정의.
-//get_color(cr_str)과 같이 호출하고자 정의함.
-//map이나 unordered_map은 insert order를 보장하지 않으므로 추가된 순서로 팔레트를 표현할 수 없는 단점이 있다.
-//std::vector<CString, Gdiplus::Color> 와 같이 구현하면 순서를 보장하며
-//map의 가장 큰 장점이 first 키값으로 second를 구하는 것인데 이는 std::find()로 구현 가능하다.
-class CSCColorList
-{
-public:
-	CSCColorList()
-	{
-		get_color_list().emplace_back("MediumVioletRed", Gdiplus::Color::MediumVioletRed);
-		get_color_list().emplace_back("DeepPink", Gdiplus::Color::DeepPink);
-		get_color_list().emplace_back("PaleVioletRed", Gdiplus::Color::PaleVioletRed);
-		get_color_list().emplace_back("HotPink", Gdiplus::Color::HotPink);
-		get_color_list().emplace_back("LightPink", Gdiplus::Color::LightPink);
-		get_color_list().emplace_back("Pink", Gdiplus::Color::Pink);
-
-		get_color_list().emplace_back("DarkRed", Gdiplus::Color::DarkRed);
-		get_color_list().emplace_back("Red", Gdiplus::Color::Red);
-		get_color_list().emplace_back("Firebrick", Gdiplus::Color::Firebrick);
-		get_color_list().emplace_back("Crimson", Gdiplus::Color::Crimson);
-		get_color_list().emplace_back("IndianRed", Gdiplus::Color::IndianRed);
-		get_color_list().emplace_back("LightCoral", Gdiplus::Color::LightCoral);
-		get_color_list().emplace_back("Salmon", Gdiplus::Color::Salmon);
-		get_color_list().emplace_back("DarkSalmon", Gdiplus::Color::DarkSalmon);
-		get_color_list().emplace_back("LightSalmon", Gdiplus::Color::LightSalmon);
-
-		get_color_list().emplace_back("OrangeRed", Gdiplus::Color::OrangeRed);
-		get_color_list().emplace_back("Tomato", Gdiplus::Color::Tomato);
-		get_color_list().emplace_back("DarkOrange", Gdiplus::Color::DarkOrange);
-		get_color_list().emplace_back("Coral", Gdiplus::Color::Coral);
-		get_color_list().emplace_back("Orange", Gdiplus::Color::Orange);
-
-		get_color_list().emplace_back("DarkKhaki", Gdiplus::Color::DarkKhaki);
-		get_color_list().emplace_back("Gold", Gdiplus::Color::Gold);
-		get_color_list().emplace_back("Khaki", Gdiplus::Color::Khaki);
-		get_color_list().emplace_back("PeachPuff", Gdiplus::Color::PeachPuff);
-		get_color_list().emplace_back("Yellow", Gdiplus::Color::Yellow);
-		get_color_list().emplace_back("PaleGoldenrod", Gdiplus::Color::PaleGoldenrod);
-		get_color_list().emplace_back("Moccasin", Gdiplus::Color::Moccasin);
-		get_color_list().emplace_back("PapayaWhip", Gdiplus::Color::PapayaWhip);
-		get_color_list().emplace_back("LightGoldenrodYellow", Gdiplus::Color::LightGoldenrodYellow);
-		get_color_list().emplace_back("LemonChiffon", Gdiplus::Color::LemonChiffon);
-		get_color_list().emplace_back("LightYellow", Gdiplus::Color::LightYellow);
-
-		get_color_list().emplace_back("Maroon", Gdiplus::Color::Maroon);
-		get_color_list().emplace_back("Brown", Gdiplus::Color::Brown);
-		get_color_list().emplace_back("SaddleBrown", Gdiplus::Color::SaddleBrown);
-		get_color_list().emplace_back("Sienna", Gdiplus::Color::Sienna);
-		get_color_list().emplace_back("Chocolate", Gdiplus::Color::Chocolate);
-		get_color_list().emplace_back("DarkGoldenrod", Gdiplus::Color::DarkGoldenrod);
-		get_color_list().emplace_back("Peru", Gdiplus::Color::Peru);
-		get_color_list().emplace_back("RosyBrown", Gdiplus::Color::RosyBrown);
-		get_color_list().emplace_back("Goldenrod", Gdiplus::Color::Goldenrod);
-		get_color_list().emplace_back("SandyBrown", Gdiplus::Color::SandyBrown);
-		get_color_list().emplace_back("Tan", Gdiplus::Color::Tan);
-		get_color_list().emplace_back("BurlyWood", Gdiplus::Color::BurlyWood);
-		get_color_list().emplace_back("Wheat", Gdiplus::Color::Wheat);
-		get_color_list().emplace_back("NavajoWhite", Gdiplus::Color::NavajoWhite);
-		get_color_list().emplace_back("Bisque", Gdiplus::Color::Bisque);
-		get_color_list().emplace_back("BlanchedAlmond", Gdiplus::Color::BlanchedAlmond);
-		get_color_list().emplace_back("Cornsilk", Gdiplus::Color::Cornsilk);
-
-		get_color_list().emplace_back("Indigo", Gdiplus::Color::Indigo);
-		get_color_list().emplace_back("Purple", Gdiplus::Color::Purple);
-		get_color_list().emplace_back("DarkMagenta", Gdiplus::Color::DarkMagenta);
-		get_color_list().emplace_back("DarkViolet", Gdiplus::Color::DarkViolet);
-		get_color_list().emplace_back("DarkSlateBlue", Gdiplus::Color::DarkSlateBlue);
-		get_color_list().emplace_back("BlueViolet", Gdiplus::Color::BlueViolet);
-		get_color_list().emplace_back("DarkOrchid", Gdiplus::Color::DarkOrchid);
-		get_color_list().emplace_back("Fuchsia", Gdiplus::Color::Fuchsia);
-		get_color_list().emplace_back("Magenta", Gdiplus::Color::Magenta);
-		get_color_list().emplace_back("SlateBlue", Gdiplus::Color::SlateBlue);
-		get_color_list().emplace_back("MediumSlateBlue", Gdiplus::Color::MediumSlateBlue);
-		get_color_list().emplace_back("MediumOrchid", Gdiplus::Color::MediumOrchid);
-		get_color_list().emplace_back("MediumPurple", Gdiplus::Color::MediumPurple);
-		get_color_list().emplace_back("Orchid", Gdiplus::Color::Orchid);
-		get_color_list().emplace_back("Violet", Gdiplus::Color::Violet);
-		get_color_list().emplace_back("Plum", Gdiplus::Color::Plum);
-		get_color_list().emplace_back("Thistle", Gdiplus::Color::Thistle);
-		get_color_list().emplace_back("Lavender", Gdiplus::Color::Lavender);
-
-		get_color_list().emplace_back("MidnightBlue", Gdiplus::Color::MidnightBlue);
-		get_color_list().emplace_back("Navy", Gdiplus::Color::Navy);
-		get_color_list().emplace_back("DarkBlue", Gdiplus::Color::DarkBlue);
-		get_color_list().emplace_back("MediumBlue", Gdiplus::Color::MediumBlue);
-		get_color_list().emplace_back("Blue", Gdiplus::Color::Blue);
-		get_color_list().emplace_back("RoyalBlue", Gdiplus::Color::RoyalBlue);
-		get_color_list().emplace_back("SteelBlue", Gdiplus::Color::SteelBlue);
-		get_color_list().emplace_back("DodgerBlue", Gdiplus::Color::DodgerBlue);
-		get_color_list().emplace_back("DeepSkyBlue", Gdiplus::Color::DeepSkyBlue);
-		get_color_list().emplace_back("CornflowerBlue", Gdiplus::Color::CornflowerBlue);
-		get_color_list().emplace_back("SkyBlue", Gdiplus::Color::SkyBlue);
-		get_color_list().emplace_back("LightSkyBlue", Gdiplus::Color::LightSkyBlue);
-		get_color_list().emplace_back("LightSteelBlue", Gdiplus::Color::LightSteelBlue);
-		get_color_list().emplace_back("LightBlue", Gdiplus::Color::LightBlue);
-		get_color_list().emplace_back("PowderBlue", Gdiplus::Color::PowderBlue);
-
-		get_color_list().emplace_back("Teal", Gdiplus::Color::Teal);
-		get_color_list().emplace_back("DarkCyan", Gdiplus::Color::DarkCyan);
-		get_color_list().emplace_back("LightSeaGreen", Gdiplus::Color::LightSeaGreen);
-		get_color_list().emplace_back("CadetBlue", Gdiplus::Color::CadetBlue);
-		get_color_list().emplace_back("DarkTurquoise", Gdiplus::Color::DarkTurquoise);
-		get_color_list().emplace_back("MediumTurquoise", Gdiplus::Color::MediumTurquoise);
-		get_color_list().emplace_back("Turquoise", Gdiplus::Color::Turquoise);
-		get_color_list().emplace_back("Aqua", Gdiplus::Color::Aqua);
-		get_color_list().emplace_back("Cyan", Gdiplus::Color::Cyan);
-		get_color_list().emplace_back("Aquamarine", Gdiplus::Color::Aquamarine);
-		get_color_list().emplace_back("PaleTurquoise", Gdiplus::Color::PaleTurquoise);
-		get_color_list().emplace_back("LightCyan", Gdiplus::Color::LightCyan);
-
-		get_color_list().emplace_back("DarkGreen", Gdiplus::Color::DarkGreen);
-		get_color_list().emplace_back("Green", Gdiplus::Color::Green);
-		get_color_list().emplace_back("DarkOliveGreen", Gdiplus::Color::DarkOliveGreen);
-		get_color_list().emplace_back("ForestGreen", Gdiplus::Color::ForestGreen);
-		get_color_list().emplace_back("SeaGreen", Gdiplus::Color::SeaGreen);
-		get_color_list().emplace_back("Olive", Gdiplus::Color::Olive);
-		get_color_list().emplace_back("OliveDrab", Gdiplus::Color::OliveDrab);
-		get_color_list().emplace_back("MediumSeaGreen", Gdiplus::Color::MediumSeaGreen);
-		get_color_list().emplace_back("LimeGreen", Gdiplus::Color::LimeGreen);
-		get_color_list().emplace_back("Lime", Gdiplus::Color::Lime);
-		get_color_list().emplace_back("SpringGreen", Gdiplus::Color::SpringGreen);
-		get_color_list().emplace_back("MediumSpringGreen", Gdiplus::Color::MediumSpringGreen);
-		get_color_list().emplace_back("DarkSeaGreen", Gdiplus::Color::DarkSeaGreen);
-		get_color_list().emplace_back("MediumAquamarine", Gdiplus::Color::MediumAquamarine);
-		get_color_list().emplace_back("YellowGreen", Gdiplus::Color::YellowGreen);
-		get_color_list().emplace_back("LawnGreen", Gdiplus::Color::LawnGreen);
-		get_color_list().emplace_back("Chartreuse", Gdiplus::Color::Chartreuse);
-		get_color_list().emplace_back("LightGreen", Gdiplus::Color::LightGreen);
-		get_color_list().emplace_back("GreenYellow", Gdiplus::Color::GreenYellow);
-		get_color_list().emplace_back("PaleGreen", Gdiplus::Color::PaleGreen);
-
-		get_color_list().emplace_back("MistyRose", Gdiplus::Color::MistyRose);
-		get_color_list().emplace_back("AntiqueWhite", Gdiplus::Color::AntiqueWhite);
-		get_color_list().emplace_back("Linen", Gdiplus::Color::Linen);
-		get_color_list().emplace_back("Beige", Gdiplus::Color::Beige);
-		get_color_list().emplace_back("WhiteSmoke", Gdiplus::Color::WhiteSmoke);
-		get_color_list().emplace_back("LavenderBlush", Gdiplus::Color::LavenderBlush);
-		get_color_list().emplace_back("OldLace", Gdiplus::Color::OldLace);
-		get_color_list().emplace_back("AliceBlue", Gdiplus::Color::AliceBlue);
-		get_color_list().emplace_back("SeaShell", Gdiplus::Color::SeaShell);
-		get_color_list().emplace_back("GhostWhite", Gdiplus::Color::GhostWhite);
-		get_color_list().emplace_back("Honeydew", Gdiplus::Color::Honeydew);
-		get_color_list().emplace_back("FloralWhite", Gdiplus::Color::FloralWhite);
-		get_color_list().emplace_back("Azure", Gdiplus::Color::Azure);
-		get_color_list().emplace_back("MintCream", Gdiplus::Color::MintCream);
-		get_color_list().emplace_back("Snow", Gdiplus::Color::Snow);
-		get_color_list().emplace_back("Ivory", Gdiplus::Color::Ivory);
-		get_color_list().emplace_back("White", Gdiplus::Color::White);
-
-		get_color_list().emplace_back("Black", Gdiplus::Color::Black);
-		get_color_list().emplace_back("DarkSlateGray", Gdiplus::Color::DarkSlateGray);
-		get_color_list().emplace_back("DimGray", Gdiplus::Color::DimGray);
-		get_color_list().emplace_back("SlateGray", Gdiplus::Color::SlateGray);
-		get_color_list().emplace_back("Gray", Gdiplus::Color::Gray);
-		get_color_list().emplace_back("LightSlateGray", Gdiplus::Color::LightSlateGray);
-		get_color_list().emplace_back("DarkGray", Gdiplus::Color::DarkGray);
-		get_color_list().emplace_back("Silver", Gdiplus::Color::Silver);
-		get_color_list().emplace_back("LightGray", Gdiplus::Color::LightGray);
-		get_color_list().emplace_back("Gainsboro", Gdiplus::Color::Gainsboro);
-	}
-
-	// auto-cast Error to integer error code
-	//operator Gdiplus::Color() { return cr; }
-
-	//static std::unordered_map<std::string, Gdiplus::Color> get_color_map()
-	//{
-	//	return get_color_map();
-	//}
-
-	static Gdiplus::Color get_color(std::string name)
-	{
-		//m_cr_map::iterator it = get_color_map().find(name);
-		//위와 같이 map.find()를 쓰면 대소문자 구분을 하므로, 대소문자 구분없이 검색하기 위해 std::find_if와 _stricmp()를 사용한다.
-		std::vector<std::pair<std::string, Gdiplus::Color>>::iterator it = std::find_if(get_color_list().begin(), get_color_list().end(),
-			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
-			bool
-			{
-				return (_stricmp(element.first.c_str(), name.c_str()) == 0);
-			});
-
-		if (it == get_color_list().end())
-			return Gdiplus::Color::Black;
-
-		return it->second;
-	}
-
-	//get color name by (r, g, b) value. alpha는 무시한다.
-	//exactly : true이면 정확히 일치하는 색상만 찾고, false이면 가장 유사한 색상의 이름을 리턴한다.
-	static std::string get_color_name(Gdiplus::Color cr, bool exactly = false)
-	{
-		double distance = 99999999.0;
-		std::string nearest_color_name;
-
-		std::vector<std::pair<std::string, Gdiplus::Color>>::iterator it = std::find_if(get_color_list().begin(), get_color_list().end(),
-			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
-			bool
-			{
-				if (exactly)
-				{
-					return (element.second.GetR() == cr.GetR() &&
-							element.second.GetG() == cr.GetG() &&
-							element.second.GetB() == cr.GetB());
-				}
-
-				double dist = sqrt( (element.second.GetR() - cr.GetR()) * (element.second.GetR() - cr.GetR()) +
-									(element.second.GetG() - cr.GetG()) * (element.second.GetG() - cr.GetG()) +
-									(element.second.GetB() - cr.GetB()) * (element.second.GetB() - cr.GetB()));
-
-				if (dist < distance)
-				{
-					distance = dist;
-					nearest_color_name = element.first;
-				}
-				return false; // continue searching
-			});
-
-		if (it == get_color_list().end())
-		{
-			if (!exactly)
-				return nearest_color_name;
-			return "Unknown Color";
-		}
-
-		return it->first;
-	}
-
-	static std::vector<std::pair<std::string, Gdiplus::Color>>& get_color_list()
-	{
-		static std::vector<std::pair<std::string, Gdiplus::Color>> m_cr_list;
-		return m_cr_list;
-	}
-
-protected:
-	//static std::vector<std::pair<std::string, Gdiplus::Color>> m_cr_list;
-
-	//Gdiplus::Color cr;
-	//std::string name;
-};
-
-
-
 // RGB -> YUV(YCbCr)
 #define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
 #define		RGB2U(R, G, B) CLIP(((-38 * (R) -  74 * (G) + 112 * (B) + 128) >> 8) + 128)
@@ -730,7 +417,7 @@ Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr);
 COLORREF		get_distinct_color(COLORREF cr);
 //보색과는 달리 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
-Gdiplus::Color	get_distinct_gcolor(Gdiplus::Color cr);
+Gdiplus::Color	get_distinct_color(Gdiplus::Color cr);
 
 //rgb 평균값 리턴
 uint8_t			gray_value(uint8_t r, uint8_t g, uint8_t b);
@@ -771,4 +458,316 @@ CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = NULL);
 Gdiplus::Color	get_sys_color(int index);
 
 extern COLORREF g_default_color[16];
+
+
+class CSCColorTheme
+{
+public:
+	CSCColorTheme(CWnd* pWnd, int theme = color_theme_default)
+	{
+		m_parent = pWnd;
+		set_color_theme(color_theme_default);
+	};
+
+	enum SC_COLOR_THEMES
+	{
+		color_theme_default = 0,		//기본 윈도우 테마를 따름
+		color_theme_white,				//기존 윈도우의 바탕색을 dlg의 3DFACE가 아닌 white로 함
+		color_theme_gray,
+		color_theme_dark_gray,
+		color_theme_dark,
+		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
+		color_theme_linkmemine,
+		color_theme_linkmemine_se,
+		color_theme_anysupport,
+		color_theme_helpu,
+		color_theme_pcanypro,
+		color_theme_custom,
+	};
+
+	//현재 설정된 color theme 인덱스를 리턴
+	int		get_color_theme() { return m_cur_theme; }
+	void	set_color_theme(int color_theme);
+	static std::deque<CString> get_color_theme_list();
+
+	Gdiplus::Color	cr_text;
+	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목
+	Gdiplus::Color	cr_text_hover;
+	Gdiplus::Color	cr_text_dropHilited;
+	Gdiplus::Color	cr_text_selected;
+	Gdiplus::Color	cr_text_selected_inactive;
+
+	Gdiplus::Color	cr_back;						//BTNFACE	: for CDialog, CButton, CStatic...
+	Gdiplus::Color	cr_back_hover;					//= hover = over = track_select... 다양한 같은 의미가 있으나 hover로 통일하자.
+	Gdiplus::Color	cr_back_dropHilited;
+	Gdiplus::Color	cr_back_selected;
+	Gdiplus::Color	cr_back_selected_inactive;
+	Gdiplus::Color	cr_back_alternate;				//list의 경우 짝수라인, 홀수라인 번갈아 색상을 표시하는 목적
+
+	Gdiplus::Color	cr_selected_border;
+	Gdiplus::Color	cr_border;
+
+	//caption이 없는 dialog based에서 사용
+	Gdiplus::Color	cr_title_text;
+	Gdiplus::Color	cr_title_back;
+	Gdiplus::Color	cr_sys_buttons_hover_back;
+	Gdiplus::Color	cr_sys_buttons_down_back;
+
+	//CListCtrl에서만 사용될것으로 예상.
+	Gdiplus::Color	cr_header_text;
+	Gdiplus::Color	cr_header_back;
+	std::deque<Gdiplus::Color> cr_percentage_bar;	//percentage bar graph color
+	Gdiplus::Color	cr_progress;					//progress bar
+	//Gdiplus::Color	cr_progress_text;				//progress text
+
+protected:
+	CWnd* m_parent = NULL;
+	int				m_cur_theme = color_theme_default;
+};
+
+//color name으로 Gdiplus::Color 값을 구하기 위해 정의.
+//get_color(cr_str)과 같이 호출하고자 정의함.
+//map이나 unordered_map은 insert order를 보장하지 않으므로 추가된 순서로 팔레트를 표현할 수 없는 단점이 있다.
+//std::vector<CString, Gdiplus::Color> 와 같이 구현하면 순서를 보장하며
+//map의 가장 큰 장점이 first 키값으로 second를 구하는 것인데 이는 std::find()로 구현 가능하다.
+class CSCColorList
+{
+public:
+	CSCColorList()
+	{
+		get_color_list().emplace_back("MediumVioletRed", Gdiplus::Color::MediumVioletRed);
+		get_color_list().emplace_back("DeepPink", Gdiplus::Color::DeepPink);
+		get_color_list().emplace_back("PaleVioletRed", Gdiplus::Color::PaleVioletRed);
+		get_color_list().emplace_back("HotPink", Gdiplus::Color::HotPink);
+		get_color_list().emplace_back("LightPink", Gdiplus::Color::LightPink);
+		get_color_list().emplace_back("Pink", Gdiplus::Color::Pink);
+
+		get_color_list().emplace_back("DarkRed", Gdiplus::Color::DarkRed);
+		get_color_list().emplace_back("Red", Gdiplus::Color::Red);
+		get_color_list().emplace_back("Firebrick", Gdiplus::Color::Firebrick);
+		get_color_list().emplace_back("Crimson", Gdiplus::Color::Crimson);
+		get_color_list().emplace_back("IndianRed", Gdiplus::Color::IndianRed);
+		get_color_list().emplace_back("LightCoral", Gdiplus::Color::LightCoral);
+		get_color_list().emplace_back("Salmon", Gdiplus::Color::Salmon);
+		get_color_list().emplace_back("DarkSalmon", Gdiplus::Color::DarkSalmon);
+		get_color_list().emplace_back("LightSalmon", Gdiplus::Color::LightSalmon);
+
+		get_color_list().emplace_back("OrangeRed", Gdiplus::Color::OrangeRed);
+		get_color_list().emplace_back("Tomato", Gdiplus::Color::Tomato);
+		get_color_list().emplace_back("DarkOrange", Gdiplus::Color::DarkOrange);
+		get_color_list().emplace_back("Coral", Gdiplus::Color::Coral);
+		get_color_list().emplace_back("Orange", Gdiplus::Color::Orange);
+
+		get_color_list().emplace_back("DarkKhaki", Gdiplus::Color::DarkKhaki);
+		get_color_list().emplace_back("Gold", Gdiplus::Color::Gold);
+		get_color_list().emplace_back("Khaki", Gdiplus::Color::Khaki);
+		get_color_list().emplace_back("PeachPuff", Gdiplus::Color::PeachPuff);
+		get_color_list().emplace_back("Yellow", Gdiplus::Color::Yellow);
+		get_color_list().emplace_back("PaleGoldenrod", Gdiplus::Color::PaleGoldenrod);
+		get_color_list().emplace_back("Moccasin", Gdiplus::Color::Moccasin);
+		get_color_list().emplace_back("PapayaWhip", Gdiplus::Color::PapayaWhip);
+		get_color_list().emplace_back("LightGoldenrodYellow", Gdiplus::Color::LightGoldenrodYellow);
+		get_color_list().emplace_back("LemonChiffon", Gdiplus::Color::LemonChiffon);
+		get_color_list().emplace_back("LightYellow", Gdiplus::Color::LightYellow);
+
+		get_color_list().emplace_back("Maroon", Gdiplus::Color::Maroon);
+		get_color_list().emplace_back("Brown", Gdiplus::Color::Brown);
+		get_color_list().emplace_back("SaddleBrown", Gdiplus::Color::SaddleBrown);
+		get_color_list().emplace_back("Sienna", Gdiplus::Color::Sienna);
+		get_color_list().emplace_back("Chocolate", Gdiplus::Color::Chocolate);
+		get_color_list().emplace_back("DarkGoldenrod", Gdiplus::Color::DarkGoldenrod);
+		get_color_list().emplace_back("Peru", Gdiplus::Color::Peru);
+		get_color_list().emplace_back("RosyBrown", Gdiplus::Color::RosyBrown);
+		get_color_list().emplace_back("Goldenrod", Gdiplus::Color::Goldenrod);
+		get_color_list().emplace_back("SandyBrown", Gdiplus::Color::SandyBrown);
+		get_color_list().emplace_back("Tan", Gdiplus::Color::Tan);
+		get_color_list().emplace_back("BurlyWood", Gdiplus::Color::BurlyWood);
+		get_color_list().emplace_back("Wheat", Gdiplus::Color::Wheat);
+		get_color_list().emplace_back("NavajoWhite", Gdiplus::Color::NavajoWhite);
+		get_color_list().emplace_back("Bisque", Gdiplus::Color::Bisque);
+		get_color_list().emplace_back("BlanchedAlmond", Gdiplus::Color::BlanchedAlmond);
+		get_color_list().emplace_back("Cornsilk", Gdiplus::Color::Cornsilk);
+
+		get_color_list().emplace_back("Indigo", Gdiplus::Color::Indigo);
+		get_color_list().emplace_back("Purple", Gdiplus::Color::Purple);
+		get_color_list().emplace_back("DarkMagenta", Gdiplus::Color::DarkMagenta);
+		get_color_list().emplace_back("DarkViolet", Gdiplus::Color::DarkViolet);
+		get_color_list().emplace_back("DarkSlateBlue", Gdiplus::Color::DarkSlateBlue);
+		get_color_list().emplace_back("BlueViolet", Gdiplus::Color::BlueViolet);
+		get_color_list().emplace_back("DarkOrchid", Gdiplus::Color::DarkOrchid);
+		get_color_list().emplace_back("Fuchsia", Gdiplus::Color::Fuchsia);
+		get_color_list().emplace_back("Magenta", Gdiplus::Color::Magenta);
+		get_color_list().emplace_back("SlateBlue", Gdiplus::Color::SlateBlue);
+		get_color_list().emplace_back("MediumSlateBlue", Gdiplus::Color::MediumSlateBlue);
+		get_color_list().emplace_back("MediumOrchid", Gdiplus::Color::MediumOrchid);
+		get_color_list().emplace_back("MediumPurple", Gdiplus::Color::MediumPurple);
+		get_color_list().emplace_back("Orchid", Gdiplus::Color::Orchid);
+		get_color_list().emplace_back("Violet", Gdiplus::Color::Violet);
+		get_color_list().emplace_back("Plum", Gdiplus::Color::Plum);
+		get_color_list().emplace_back("Thistle", Gdiplus::Color::Thistle);
+		get_color_list().emplace_back("Lavender", Gdiplus::Color::Lavender);
+
+		get_color_list().emplace_back("MidnightBlue", Gdiplus::Color::MidnightBlue);
+		get_color_list().emplace_back("Navy", Gdiplus::Color::Navy);
+		get_color_list().emplace_back("DarkBlue", Gdiplus::Color::DarkBlue);
+		get_color_list().emplace_back("MediumBlue", Gdiplus::Color::MediumBlue);
+		get_color_list().emplace_back("Blue", Gdiplus::Color::Blue);
+		get_color_list().emplace_back("RoyalBlue", Gdiplus::Color::RoyalBlue);
+		get_color_list().emplace_back("SteelBlue", Gdiplus::Color::SteelBlue);
+		get_color_list().emplace_back("DodgerBlue", Gdiplus::Color::DodgerBlue);
+		get_color_list().emplace_back("DeepSkyBlue", Gdiplus::Color::DeepSkyBlue);
+		get_color_list().emplace_back("CornflowerBlue", Gdiplus::Color::CornflowerBlue);
+		get_color_list().emplace_back("SkyBlue", Gdiplus::Color::SkyBlue);
+		get_color_list().emplace_back("LightSkyBlue", Gdiplus::Color::LightSkyBlue);
+		get_color_list().emplace_back("LightSteelBlue", Gdiplus::Color::LightSteelBlue);
+		get_color_list().emplace_back("LightBlue", Gdiplus::Color::LightBlue);
+		get_color_list().emplace_back("PowderBlue", Gdiplus::Color::PowderBlue);
+
+		get_color_list().emplace_back("Teal", Gdiplus::Color::Teal);
+		get_color_list().emplace_back("DarkCyan", Gdiplus::Color::DarkCyan);
+		get_color_list().emplace_back("LightSeaGreen", Gdiplus::Color::LightSeaGreen);
+		get_color_list().emplace_back("CadetBlue", Gdiplus::Color::CadetBlue);
+		get_color_list().emplace_back("DarkTurquoise", Gdiplus::Color::DarkTurquoise);
+		get_color_list().emplace_back("MediumTurquoise", Gdiplus::Color::MediumTurquoise);
+		get_color_list().emplace_back("Turquoise", Gdiplus::Color::Turquoise);
+		get_color_list().emplace_back("Aqua", Gdiplus::Color::Aqua);
+		get_color_list().emplace_back("Cyan", Gdiplus::Color::Cyan);
+		get_color_list().emplace_back("Aquamarine", Gdiplus::Color::Aquamarine);
+		get_color_list().emplace_back("PaleTurquoise", Gdiplus::Color::PaleTurquoise);
+		get_color_list().emplace_back("LightCyan", Gdiplus::Color::LightCyan);
+
+		get_color_list().emplace_back("DarkGreen", Gdiplus::Color::DarkGreen);
+		get_color_list().emplace_back("Green", Gdiplus::Color::Green);
+		get_color_list().emplace_back("DarkOliveGreen", Gdiplus::Color::DarkOliveGreen);
+		get_color_list().emplace_back("ForestGreen", Gdiplus::Color::ForestGreen);
+		get_color_list().emplace_back("SeaGreen", Gdiplus::Color::SeaGreen);
+		get_color_list().emplace_back("Olive", Gdiplus::Color::Olive);
+		get_color_list().emplace_back("OliveDrab", Gdiplus::Color::OliveDrab);
+		get_color_list().emplace_back("MediumSeaGreen", Gdiplus::Color::MediumSeaGreen);
+		get_color_list().emplace_back("LimeGreen", Gdiplus::Color::LimeGreen);
+		get_color_list().emplace_back("Lime", Gdiplus::Color::Lime);
+		get_color_list().emplace_back("SpringGreen", Gdiplus::Color::SpringGreen);
+		get_color_list().emplace_back("MediumSpringGreen", Gdiplus::Color::MediumSpringGreen);
+		get_color_list().emplace_back("DarkSeaGreen", Gdiplus::Color::DarkSeaGreen);
+		get_color_list().emplace_back("MediumAquamarine", Gdiplus::Color::MediumAquamarine);
+		get_color_list().emplace_back("YellowGreen", Gdiplus::Color::YellowGreen);
+		get_color_list().emplace_back("LawnGreen", Gdiplus::Color::LawnGreen);
+		get_color_list().emplace_back("Chartreuse", Gdiplus::Color::Chartreuse);
+		get_color_list().emplace_back("LightGreen", Gdiplus::Color::LightGreen);
+		get_color_list().emplace_back("GreenYellow", Gdiplus::Color::GreenYellow);
+		get_color_list().emplace_back("PaleGreen", Gdiplus::Color::PaleGreen);
+
+		get_color_list().emplace_back("MistyRose", Gdiplus::Color::MistyRose);
+		get_color_list().emplace_back("AntiqueWhite", Gdiplus::Color::AntiqueWhite);
+		get_color_list().emplace_back("Linen", Gdiplus::Color::Linen);
+		get_color_list().emplace_back("Beige", Gdiplus::Color::Beige);
+		get_color_list().emplace_back("WhiteSmoke", Gdiplus::Color::WhiteSmoke);
+		get_color_list().emplace_back("LavenderBlush", Gdiplus::Color::LavenderBlush);
+		get_color_list().emplace_back("OldLace", Gdiplus::Color::OldLace);
+		get_color_list().emplace_back("AliceBlue", Gdiplus::Color::AliceBlue);
+		get_color_list().emplace_back("SeaShell", Gdiplus::Color::SeaShell);
+		get_color_list().emplace_back("GhostWhite", Gdiplus::Color::GhostWhite);
+		get_color_list().emplace_back("Honeydew", Gdiplus::Color::Honeydew);
+		get_color_list().emplace_back("FloralWhite", Gdiplus::Color::FloralWhite);
+		get_color_list().emplace_back("Azure", Gdiplus::Color::Azure);
+		get_color_list().emplace_back("MintCream", Gdiplus::Color::MintCream);
+		get_color_list().emplace_back("Snow", Gdiplus::Color::Snow);
+		get_color_list().emplace_back("Ivory", Gdiplus::Color::Ivory);
+		get_color_list().emplace_back("White", Gdiplus::Color::White);
+
+		get_color_list().emplace_back("Black", Gdiplus::Color::Black);
+		get_color_list().emplace_back("DarkSlateGray", Gdiplus::Color::DarkSlateGray);
+		get_color_list().emplace_back("DimGray", Gdiplus::Color::DimGray);
+		get_color_list().emplace_back("SlateGray", Gdiplus::Color::SlateGray);
+		get_color_list().emplace_back("Gray", Gdiplus::Color::Gray);
+		get_color_list().emplace_back("LightSlateGray", Gdiplus::Color::LightSlateGray);
+		get_color_list().emplace_back("DarkGray", Gdiplus::Color::DarkGray);
+		get_color_list().emplace_back("Silver", Gdiplus::Color::Silver);
+		get_color_list().emplace_back("LightGray", Gdiplus::Color::LightGray);
+		get_color_list().emplace_back("Gainsboro", Gdiplus::Color::Gainsboro);
+	}
+
+	// auto-cast Error to integer error code
+	//operator Gdiplus::Color() { return cr; }
+
+	//static std::unordered_map<std::string, Gdiplus::Color> get_color_map()
+	//{
+	//	return get_color_map();
+	//}
+
+	static Gdiplus::Color get_color(std::string name)
+	{
+		//m_cr_map::iterator it = get_color_map().find(name);
+		//위와 같이 map.find()를 쓰면 대소문자 구분을 하므로, 대소문자 구분없이 검색하기 위해 std::find_if와 _stricmp()를 사용한다.
+		std::vector<std::pair<std::string, Gdiplus::Color>>::iterator it = std::find_if(get_color_list().begin(), get_color_list().end(),
+			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
+			bool
+			{
+				return (_stricmp(element.first.c_str(), name.c_str()) == 0);
+			});
+
+		if (it == get_color_list().end())
+			return Gdiplus::Color::Black;
+
+		return it->second;
+	}
+
+	//get color name by (r, g, b) value. alpha는 무시한다.
+	//exactly : true이면 정확히 일치하는 색상만 찾고, false이면 가장 유사한 색상의 이름을 "near = "을 붙여서 리턴한다.
+	static std::string get_color_name(Gdiplus::Color cr, bool exactly = false)
+	{
+		double distance = 99999999.0;
+		std::string color_name;
+
+		std::vector<std::pair<std::string, Gdiplus::Color>>::iterator it = std::find_if(get_color_list().begin(), get_color_list().end(),
+			[&](const std::pair<std::string, Gdiplus::Color>& element) ->
+			bool
+			{
+				if (exactly)
+				{
+					return (element.second.GetR() == cr.GetR() &&
+						element.second.GetG() == cr.GetG() &&
+						element.second.GetB() == cr.GetB());
+				}
+
+				double dist = get_distance(element.second, cr);
+				//sqrt( (element.second.GetR() - cr.GetR()) * (element.second.GetR() - cr.GetR()) +
+				//				(element.second.GetG() - cr.GetG()) * (element.second.GetG() - cr.GetG()) +
+				//				(element.second.GetB() - cr.GetB()) * (element.second.GetB() - cr.GetB()));
+
+				if (dist < distance)
+				{
+					distance = dist;
+					color_name = element.first;
+				}
+				return false; // continue searching
+			});
+
+		if (it != get_color_list().end())
+			return it->first;
+
+		if (!exactly)
+		{
+			if (distance == 0.0f)
+				return color_name;
+			else
+				return "near = " + color_name;
+		}
+
+		return "Unknown Color";
+	}
+
+	static std::vector<std::pair<std::string, Gdiplus::Color>>& get_color_list()
+	{
+		static std::vector<std::pair<std::string, Gdiplus::Color>> m_cr_list;
+		return m_cr_list;
+	}
+
+protected:
+	//static std::vector<std::pair<std::string, Gdiplus::Color>> m_cr_list;
+
+	//Gdiplus::Color cr;
+	//std::string name;
+};
+
 #endif

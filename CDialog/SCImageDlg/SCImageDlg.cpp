@@ -849,7 +849,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			//if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
 			{
 				m_static_pixel.set_back_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::White : m_cr_pixel);
-				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_gcolor(m_cr_pixel));
+				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_color(m_cr_pixel));
 				m_static_pixel.set_text(str);
 				//m_static_pixel.set_textf(Gdiplus::Color::RoyalBlue, str);
 				m_cr_pixel_old = m_cr_pixel;

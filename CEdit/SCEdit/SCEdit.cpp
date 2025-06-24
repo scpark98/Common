@@ -71,13 +71,13 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_WM_SIZE()
 	ON_WM_PAINT()
 	ON_WM_NCCALCSIZE()
-	ON_WM_NCPAINT()
+	//ON_WM_NCPAINT()
 	ON_CONTROL_REFLECT_EX(EN_SETFOCUS, &CSCEdit::OnEnSetfocus)
 	ON_CONTROL_REFLECT_EX(EN_KILLFOCUS, &CSCEdit::OnEnKillfocus)
 	ON_CONTROL_REFLECT_EX(EN_UPDATE, &CSCEdit::OnEnUpdate)
 	ON_WM_WINDOWPOSCHANGED()
 	//}}AFX_MSG_MAP
-	ON_WM_ERASEBKGND()
+	//ON_WM_ERASEBKGND()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_SETCURSOR()
@@ -138,16 +138,37 @@ int CSCEdit::get_font_size(bool pixel_size)
 //CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
 CSCEdit& CSCEdit::set_line_align(DWORD align)
 {
-	CRect rc;
+	CRect rr, rc;
 
-	GetRect(rc);
+	GetRect(rr);
+	//GetClientRect(rr);
 
-	if (align == DT_VCENTER)
-		rc.top = rc.top + (rc.Height() - get_font_size(true)) / 2 - 1;
-	else if (align == DT_BOTTOM)
-		rc.top = rc.bottom - get_font_size(true) - 50;
+	m_align = align;
 
-	SetRect(rc);
+	if (align & DT_VCENTER)
+	{
+		rr.top = rr.top + (rr.Height() - get_font_size(true)) / 2;
+		rr.bottom = rr.top + get_font_size(true);
+	}
+	else if (align & DT_BOTTOM)
+	{
+		rr.top = rr.bottom - get_font_size(true);
+	}
+
+	SetRect(rr);
+
+	return *this;
+}
+
+CSCEdit& CSCEdit::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
+{
+	m_cr_text = cr_text;
+
+	m_cr_back = cr_back; // Passing the value passed by the dialog to the member varaible for Backgound Color
+	m_br_back.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
+	m_br_back.CreateSolidBrush(cr_back.ToCOLORREF()); // Creating the Brush Color For the Edit Box Background
+
+	RedrawWindow();
 
 	return *this;
 }
@@ -210,7 +231,9 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	else if (GetStyle() & ES_READONLY)
 	{
 		pDC->SetTextColor(m_cr_text.ToCOLORREF());
-		pDC->SetBkColor(::GetSysColor(COLOR_3DFACE));
+		//pDC->SetBkColor(::GetSysColor(COLOR_3DFACE));
+		//readonly일 경우에도 배경색을 기본 읽기전용 색으로 바꾸지 않고 지정된 배경색을 유지시켜준다.
+		pDC->SetBkColor(m_cr_back.ToCOLORREF());
 	}
 	//else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
 	//{
@@ -670,15 +693,15 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 		}
 	}
 
-	if (m_draw_border)
-	{
-		GetClientRect(r);
-		//draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Blue : Gdiplus::Color::Gray);
-		draw_rectangle(g, r, Gdiplus::Color::Transparent, IsWindowEnabled() ? m_cr_back : Gdiplus::Color::Gray);
-	}
+	//if (m_draw_border)
+	//{
+	//	GetClientRect(r);
+	//	//draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Blue : Gdiplus::Color::Gray);
+	//	draw_rectangle(g, r, Gdiplus::Color::Transparent, IsWindowEnabled() ? m_cr_back : Gdiplus::Color::Gray);
+	//}
 
-	return FALSE;
-	//return CEdit::OnEraseBkgnd(pDC);
+	//return FALSE;
+	return CEdit::OnEraseBkgnd(pDC);
 }
 
 

@@ -405,7 +405,7 @@ COLORREF get_distinct_color(COLORREF cr)
 
 //보색과는 달리 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
-Gdiplus::Color get_distinct_gcolor(Gdiplus::Color cr)
+Gdiplus::Color get_distinct_color(Gdiplus::Color cr)
 {
 	int gray = gray_value(cr);
 
@@ -465,11 +465,39 @@ double get_distance(COLORREF c1, COLORREF c2)
 
 double get_distance(Gdiplus::Color c1, Gdiplus::Color c2)
 {
+	long rmean = (c1.GetR() + c2.GetR()) / 2;
+	long r = c1.GetR() - c2.GetR();
+	long g = c1.GetG() - c2.GetG();
+	long b = c1.GetB() - c2.GetB();
+	return sqrt((((512 + rmean) * r * r) >> 8) + 4 * g * g + (((767 - rmean) * b * b) >> 8));
+	/*
 	return sqrt(
 		(c1.GetR() - c2.GetR()) * (c1.GetR() - c2.GetR()) +
 		(c1.GetG() - c2.GetG()) * (c1.GetG() - c2.GetG()) +
 		(c1.GetB() - c2.GetB()) * (c1.GetB() - c2.GetB())
 	);
+	*/
+
+	double twoPiOver240 = 2.0F * 3.1415926 / 240.0F;
+
+	int dH, dL, dS;		// deltas in HLS coords
+	WORD tHH, tLL, tSS;	// test color in HLS coords
+	WORD iHH, iLL, iSS;	// input color in HLS coords
+	COLORREF crTest;
+
+	::ColorRGBToHLS(c1.ToCOLORREF(), &iHH, &iLL, &iSS);
+
+	crTest = c2.ToCOLORREF();
+	::ColorRGBToHLS(crTest, &tHH, &tLL, &tSS);
+
+	// compute color difference in HLS space (which are cylindrical coords)
+	//dc = s1^2 + s2^2 - 2*s1*s2*cos(h1-h2) + (l1-l2)^2
+
+	dH = iHH - tHH;
+	dL = iLL - tLL;
+	dS = iSS * iSS + tSS * tSS;
+
+	return (double)dS - 2.0 * iSS * tSS * cos(twoPiOver240 * dH) + (double)dL * dL;
 }
 
 void rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV)

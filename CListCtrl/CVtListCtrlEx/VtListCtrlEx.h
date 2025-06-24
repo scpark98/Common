@@ -245,6 +245,9 @@ public:
 	void		set_header_text_align(int header, int format = HDF_LEFT);
 	int			get_header_text_align(int header);
 
+	//WM_SIZE시에 특정 컬럼은 그 너비를 가변으로 처리한다.
+	void		set_fixed_width_column(int column) { m_fixed_width_column = column; }
+
 	enum
 	{
 		column_data_type_unknown = 0,
@@ -363,7 +366,7 @@ public:
 	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq = NULL);
 
 	//index = -1 : 전체선택
-	void		select_item(int index, bool select = true, bool after_unselect = false, bool make_visible = true);
+	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
 	void		unselect_selected_item();
 
 	//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
@@ -376,13 +379,25 @@ public:
 	int			set_items_with_state(UINT state, UINT mask, std::deque<int>* dq = NULL);
 
 //검색 관련
-	//0번 컬럼에서만 데이터를 찾는다.
-	int			find_string(CString str, int start = -1, bool bWholeWord = false, bool bCaseSensitive = false);
+	//기본 검색함수인 FindItem()을 이용해서 0번 컬럼에서만 데이터를 찾는다. virtual list이므로 OnLvnOdfinditem() 함수 수정 필수.
+	int			find(CString str, int start = -1, bool bWholeWord = false, bool bCaseSensitive = false);
 	//separator가 ""이 아닌 공백 또는 다른 문자열일 경우는
 	//str을 분리해서 모두 찾는다.
-	int			find_string(CString find_target, std::deque<int>* result,
-							int start_idx = 0, int end_idx = -1,
-							std::deque<int>* dqColumn = NULL, bool stop_first_found = false);
+	int			find(CString find_target, std::deque<int>* result,
+					 int start_idx = 0, int end_idx = -1,
+					 std::deque<int>* dqColumn = NULL, bool stop_first_found = false);
+	//target_columns에 검색 대상 컬럼들을 나열해준다.
+	template <typename ... T> int find(CString find_target, std::deque<int>* result, int start_idx = 0, int end_idx = -1, T... target_columns)
+	{
+		int n = sizeof...(target_columns);
+		int arg[] = { target_columns... };
+
+		std::deque<int> dqColumn;
+		for (auto column : arg)
+			dqColumn.push_back(column);
+
+		return find(find_target, result, start_idx, end_idx, &dqColumn);
+	}
 
 //정렬 관련
 	enum listctrlex_sort_type
@@ -508,7 +523,12 @@ public:
 	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
 	//void		set_progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }
 
-	void		set_draw_selected_border(bool draw) { m_draw_selected_border = draw; }
+	//cr_border가 Transparent라면 cr_border의 값을 적용하지 않는다는 의미다. 기본 m_theme.cr_selected_border 색상을 사용한다.
+	//단, set_use_distinct_border_color(true);로 설정되면 지정된 cr_border를 무시하고 해당 아이템의 배경색과 구분되는 색으로 그린다.(black or white)
+	//selected_border_width <= 0이면 m_selected_border_width를 변경하지 않는다는 의미다. 기본 m_selected_border_width 값이 사용된다.
+	void		set_draw_selected_border(bool draw, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, int selected_border_width = 0, int pen_style = -1);
+	//border color를 특정색이 아닌 배경색과 구분되는 색으로 그린다.
+	void		set_use_distinct_border_color(bool use_distinct = true) { m_use_distinct_border_color = use_distinct; }
 
 	//한 라인에 대한 상단 라인 표시 여부 설정. m_draw_top_line
 	void		draw_top_line(bool draw, Gdiplus::Color cr = Gdiplus::Color::LightGray) { m_draw_top_line = draw; m_cr_top_line = cr; }
@@ -582,7 +602,7 @@ protected:
 	CHeaderCtrlEx	m_HeaderCtrlEx;
 	std::deque<int> m_column_data_type;
 	std::deque<int> m_column_text_align;
-
+	int				m_fixed_width_column = -1;
 	int				m_line_height = 16;
 
 //정렬 관련
@@ -637,6 +657,9 @@ protected:
 	bool			m_use_indent_from_prefix_space = false;
 
 	bool			m_draw_selected_border = true;
+	bool			m_use_distinct_border_color = false;
+	int				m_selected_border_width = 1;
+	int				m_selected_border_style = Gdiplus::DashStyleSolid;
 
 	bool			m_has_focus = false;
 

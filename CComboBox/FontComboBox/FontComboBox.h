@@ -46,13 +46,13 @@
 #include <afxwin.h>
 
 /////////////////////////////////////////////////////////////////////////////
-// CFontPreviewCombo window
+// CFontComboBox window
 
-class CFontPreviewCombo : public CComboBox
+class CFontComboBox : public CComboBox
 {
 // Construction
 public:
-	CFontPreviewCombo();
+	CFontComboBox();
 
 // Attributes
 public:
@@ -90,7 +90,7 @@ public:
 
 // Overrides
 	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CFontPreviewCombo)
+	//{{AFX_VIRTUAL(CFontComboBox)
 	public:
 	virtual void DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct);
 	virtual void MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct);
@@ -98,7 +98,7 @@ public:
 
 // Implementation
 public:
-	virtual ~CFontPreviewCombo();
+	virtual ~CFontComboBox();
 	
 protected:
 	//CImageList m_img;	
@@ -107,7 +107,7 @@ protected:
 	int m_iMaxSampleWidth;
 
 	// Generated message map functions
-	//{{AFX_MSG(CFontPreviewCombo)
+	//{{AFX_MSG(CFontComboBox)
 	afx_msg void OnDropdown();
 	//}}AFX_MSG
 

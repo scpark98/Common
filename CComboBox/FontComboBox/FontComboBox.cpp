@@ -32,7 +32,7 @@
 **********************************************************************/
 
 //#include "stdafx.h"
-#include "FontPreviewCombo.h"
+#include "FontComboBox.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -40,14 +40,14 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-static CFontPreviewCombo *m_pComboBox = 0;
+static CFontComboBox *m_pComboBox = 0;
 #define SPACING      10
 #define GLYPH_WIDTH  15
 
 /////////////////////////////////////////////////////////////////////////////
-// CFontPreviewCombo
+// CFontComboBox
 
-CFontPreviewCombo::CFontPreviewCombo()
+CFontComboBox::CFontComboBox()
 {
 	m_iFontHeight = 20;
 	m_iMaxNameWidth = 0;
@@ -58,25 +58,25 @@ CFontPreviewCombo::CFontPreviewCombo()
 	m_clrSample = RGB(60,0,0);
 }
 
-CFontPreviewCombo::~CFontPreviewCombo()
+CFontComboBox::~CFontComboBox()
 {
 }
 
 
-BEGIN_MESSAGE_MAP(CFontPreviewCombo, CComboBox)
-	//{{AFX_MSG_MAP(CFontPreviewCombo)
+BEGIN_MESSAGE_MAP(CFontComboBox, CComboBox)
+	//{{AFX_MSG_MAP(CFontComboBox)
 	ON_WM_MEASUREITEM()
 	ON_CONTROL_REFLECT(CBN_DROPDOWN, OnDropdown)
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CFontPreviewCombo message handlers
+// CFontComboBox message handlers
 
 
-static BOOL CALLBACK EnumFontProc (LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwType, LPARAM lpData)	
+static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwType, LPARAM lpData)	
 {	
-	CFontPreviewCombo *pThis = reinterpret_cast<CFontPreviewCombo*>(lpData);
+	CFontComboBox *pThis = reinterpret_cast<CFontComboBox*>(lpData);
 	
 	int index;
 	
@@ -96,30 +96,30 @@ static BOOL CALLBACK EnumFontProc (LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTy
 
 /////////////////////////////////////////////////////////////////////////////
 #include "../../Functions.h"
-void CFontPreviewCombo::Init()
+void CFontComboBox::Init()
 {		
 	//m_img.Create(IDB_TTF_BMP, GLYPH_WIDTH, 1, RGB(255,255,255));
 	//DWORD dwStyle = GetStyle();
 
-	ModifyStyle(0, CBS_OWNERDRAWFIXED);
-	ModifyStyle(0, CBS_HASSTRINGS);
-	ModifyStyle(0, CBS_DROPDOWNLIST);
-	ModifyStyle(0, WS_VSCROLL);
-
-	//resource editor에서 위의 속성을 주지 않고도 동적으로 변경하려
-	//recreate_combobox()를 호출하는 방법을 사용했으나
-	recreate_combobox(this);
+	//resource editor에서 이 클래스의 필수 속성을 주지 않고도 동적으로 설정하려
+	//recreate_combobox()를 호출하는 방법을 사용했으나 매개변수가 틀리다는 등의 오류가 발생하여
+	//우선 그냥 resource editor에서 설정하여 사용한다.
+	//ModifyStyle(0, CBS_OWNERDRAWFIXED);
+	//ModifyStyle(0, CBS_HASSTRINGS);
+	//ModifyStyle(0, CBS_DROPDOWNLIST);
+	//ModifyStyle(0, WS_VSCROLL);
+	//recreate_combobox(this);
 
 	CClientDC dc(this);
 
-	EnumFonts (dc, 0,(FONTENUMPROC) EnumFontProc,(LPARAM)this); //Enumerate font
+	EnumFonts(dc, 0, (FONTENUMPROC)EnumFontProc, (LPARAM)this); //Enumerate font
 
 	SetCurSel(0);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 
-void CFontPreviewCombo::DrawItem(LPDRAWITEMSTRUCT lpDIS) 
+void CFontComboBox::DrawItem(LPDRAWITEMSTRUCT lpDIS) 
 {
 	ASSERT(lpDIS->CtlType == ODT_COMBOBOX); 
 	
@@ -270,7 +270,7 @@ void CFontPreviewCombo::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 /////////////////////////////////////////////////////////////////////////////
 
-void CFontPreviewCombo::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct) 
+void CFontComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct) 
 {
 	// ok, how big is this ?
 
@@ -318,7 +318,7 @@ void CFontPreviewCombo::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 
 /////////////////////////////////////////////////////////////////////////////
 
-void CFontPreviewCombo::OnDropdown() 
+void CFontComboBox::OnDropdown() 
 {
 	m_pComboBox = this;
 

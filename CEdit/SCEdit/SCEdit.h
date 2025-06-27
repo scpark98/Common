@@ -1,4 +1,3 @@
-// This file was created on March 21st 2001. By Robert Brault
 // scpark. 20240103.
 // DimEditCtrl, EditTrans 기능 추가 진행 중...
 //
@@ -33,6 +32,8 @@ public:
 // CSCEdit window
 //color, font
 
+//ES_MULTILINE 속성이 있어야만 정상 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
+//ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이므로 리소스 에디터에서 설정해야 한다.
 class CSCEdit : public CEdit
 {
 // Construction
@@ -48,7 +49,7 @@ public:
 	};
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }
-	void					set_text(CString text) { CEdit::SetWindowText(text); set_line_align(m_align); }
+	void					set_text(CString text) { CEdit::SetWindowText(text); /*set_line_align(m_valign);*/ }
 	void					SetWindowText(CString text) { set_text(text); }
 
 // Overrides
@@ -96,7 +97,7 @@ public:
 	//(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
 	//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
 	virtual CSCEdit&		set_line_align(DWORD align = DT_VCENTER);
-
+	int						get_line_align() { return m_valign; }
 //dim text
 	//m_cr_dim_text의 기본값은 Gdiplus::Color::LightGray이며
 	//이 함수를 호출할 때 Gdiplus::Color::Transparent라는 값일 경우는 dim_text 파라미터만 변경하고자 하는 의미일 것이다.
@@ -104,26 +105,36 @@ public:
 
 	enum BORDER_TYPE
 	{
-		border_type_none = 0,
+		border_type_disregard = -1,
+		border_type_none,
 		border_type_sunken,	//default
 		border_type_raised,
 		border_type_flat,
 		border_type_bevel,
 	};
-	void					set_draw_border(bool draw = true, int border_width = 1, int border_type = border_type_sunken, Gdiplus::Color cr_border = Gdiplus::Color::Transparent);
+
+	//border를 설정할 때 set_draw_border();를 호출하면 모든 설정값은 기본 멤버변수값대로 설정된다.
+	//즉, border width는 m_border_width 값이 사용된다.
+	//border를 해제하기 위해 set_draw_border(false);를 호출하면 border를 그리지 않을 뿐 기본 설정값들은 유지된다.
+	//다시 border를 그리기 위해 set_draw_border();를 호출하면 전에 설정된 세팅값대로 그릴 수 있다.
+	void			set_draw_border(bool draw = true, int border_width = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, int border_type = border_type_disregard);
+	bool			get_draw_border() { return m_draw_border; }
+	int				get_border_width() { return m_border_width; }
+	Gdiplus::Color	get_border_color() { return m_cr_border; }
+	int				get_border_type() { return m_border_type; }
 
 	// Generated message map functions
 protected:
 	bool			m_transparent = false;
 
-//align
-	DWORD			m_align = DT_VCENTER;
+//vertical align
+	DWORD			m_valign = DT_VCENTER;	//vertical align이므로 DT_CENTER가 아닌 DT_VCENTER로 줘야 한다.
 
 //border
-	bool			m_draw_border = true;
+	bool			m_draw_border = false;
 	int				m_border_width = 1;	//border width
 	int				m_border_type = border_type_sunken;	//border radius
-	Gdiplus::Color	m_cr_border = Gdiplus::Color::DimGray;	//border color
+	Gdiplus::Color	m_cr_border = Gdiplus::Color::LightGray;	//border color
 
 	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
 	//ex)돋보기 그림을 그려주고 클릭하면 검색으로 사용
@@ -148,7 +159,7 @@ protected:
 	Gdiplus::Color	m_cr_text;
 	Gdiplus::Color	m_cr_back;
 	Gdiplus::Color	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
-	Gdiplus::Color	m_cr_back_disabled;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
+	Gdiplus::Color	m_cr_back_disabled = Gdiplus::Color::LightGray;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
 	CBrush			m_br_back;
 	CBrush			m_br_back_disabled;
 

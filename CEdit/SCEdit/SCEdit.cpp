@@ -1,27 +1,3 @@
-// This file was created on March 21st 2001 by Robert Brault.
-// I created this Class to be able change the Color of your Edit Box
-// as well as your Edit Box Text. This is Derived from CEdit so you
-// do not have all the overhead of a CRichEditCtrl.
-//
-// There are three functions available Currently:
-// SetBkColor(COLORREF crColor)
-// set_text_color(COLORREF crColor)
-// set_read_only(BOOL flag = TRUE)
-//
-// How To Use:
-// Add three files to your project
-// SCEdit.cpp, SCEdit.h and Color.h
-// Color.h has (#define)'s for different colors (add any color you desire).
-//
-// Add #include "SCEdit.h" to your Dialogs Header file.
-// Declare an instance of CSCEdit for each edit box being modified.
-// Ex. CSCEdit m_ebName;
-//
-// In your OnInitDialog() add a SubclassDlgItem for each CSCEdit member variable.
-// Ex. m_ebName.SubclassDlgItem(IDC_EB_NAME, this);
-// In this same function initialize your color for each box unless you want the default.
-
-
 // SCEdit.cpp : implementation file
 //
 
@@ -45,7 +21,7 @@ CSCEdit::CSCEdit()
 	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_WINDOWTEXT));
 	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
 	m_cr_text_disabled.SetFromCOLORREF(::GetSysColor(COLOR_GRAYTEXT));
-	m_cr_back_disabled.SetFromCOLORREF(GetSysColor(COLOR_3DSHADOW));
+	//m_cr_back_disabled.SetFromCOLORREF(GetSysColor(COLOR_3DSHADOW));
 
 	m_cr_button_back = Gdiplus::Color(0, 255, 0);
 	m_cr_button_back_hover = Gdiplus::Color(64, 255, 64);
@@ -77,7 +53,7 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_CONTROL_REFLECT_EX(EN_UPDATE, &CSCEdit::OnEnUpdate)
 	ON_WM_WINDOWPOSCHANGED()
 	//}}AFX_MSG_MAP
-	//ON_WM_ERASEBKGND()
+	ON_WM_ERASEBKGND()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_SETCURSOR()
@@ -103,6 +79,42 @@ void CSCEdit::PreSubclassWindow()
 
 	m_default_height = m_lf.lfHeight;
 	reconstruct_font();
+
+	//border를 자체적으로 그리고 있으므로 resource editor에서 WS_BORDER는 해제시켜야 한다.
+	//이 때 WS_BORDER만 제거하면 안되고 WS_EX_CLIENTEDGE까지 함께 제거시켜야 한다.
+	if ((GetStyle() & WS_BORDER) ||
+		(GetExStyle() & WS_EX_CLIENTEDGE) ||
+		(GetExStyle() & WS_EX_STATICEDGE))
+	{
+		m_draw_border = true;
+		ModifyStyle(WS_BORDER, 0);
+		ModifyStyleEx(WS_EX_CLIENTEDGE, 0);
+		ModifyStyleEx(WS_EX_STATICEDGE, 0);
+	}
+
+	//ModifyStyle(0, ES_MULTILINE);
+
+	//style을 변경했음에도 불구하고 스타일이 기대와 다르게 표시된다.
+	//뭔가 resize된 CSCEdit은 기대한대로 표시되는데
+	//크기가 동일하고 resize되지 않는 CSCEdit은 스타일이 다르게 표시된다.
+	//아래 코드를 통해 인위적으로 크기조정 코드를 실행하니 스타일이 원하는대로 표시된다.
+	//뭔가 근본적인 해결 방법을 찾는중...
+	CRect rc;
+	GetWindowRect(rc);
+	rc.right++;
+	GetParent()->ScreenToClient(rc);
+	MoveWindow(rc);
+	rc.right--;
+	MoveWindow(rc);
+
+	//parent에서 이 함수를 직접 호출하여 세팅하지 않을 경우
+	//기본적으로 set_line_align() 함수를 호출해줘야만 m_valign의 기본값이 적용된다.
+	//동적 생성하는 CSCEdit의 경우에도 잘 적용되는지 확인이 필요하다.
+	//CString text = get_text();
+	set_line_align(m_valign);
+
+	//RedrawWindow();
+	//UpdateWindow();
 }
 
 void CSCEdit::reconstruct_font()
@@ -111,6 +123,8 @@ void CSCEdit::reconstruct_font()
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	SetFont( &m_font, true );
+
+	set_line_align(m_valign);
 
 	ASSERT(bCreated);
 }
@@ -141,21 +155,60 @@ CSCEdit& CSCEdit::set_line_align(DWORD align)
 	CRect rr, rc;
 
 	GetRect(rr);
-	//GetClientRect(rr);
+	GetClientRect(rc);
 
-	m_align = align;
+	CClientDC dc(this);
+	CFont* pOldFont = dc.SelectObject(&m_font);
+	CRect rtext;
+	CString text = get_text();
+
+	//text가 있어야 DT_CALCRECT에 의해 기본 valign이 계산되므로 없다면 임시 text로 계산해서 SetRect()시켜줘야 한다.
+	//그래야 기본 m_valign값에 따라 정렬이 적용된다.
+	if (text.IsEmpty())
+		text = _T("Test text");
+
+	dc.DrawText(text, rtext, DT_CALCRECT);
+
+	rr = rc;
+
+	m_valign = align;
 
 	if (align & DT_VCENTER)
 	{
-		rr.top = rr.top + (rr.Height() - get_font_size(true)) / 2;
-		rr.bottom = rr.top + get_font_size(true);
+		rr.top = (rr.Height() - rtext.Height()) / 2 - 1;
+		TRACE(_T("%s vcenter\n"), text);
 	}
 	else if (align & DT_BOTTOM)
 	{
-		rr.top = rr.bottom - get_font_size(true);
+		TRACE(_T("%s bottom\n"), text);
+		//-4를 해주지 않으면 DT_TOP과 같이 표시되고 커서도 보이지 않게 되는데
+		//이는 실제 텍스트를 출력할 공간의 크기가 적어서 top에 표시하고 커서도 보이지 않게 되는 현상이므로
+		//height를 좀 더 크게 잡아주면 bottom에 맞춰 표시된다.
+		rr.top = rr.bottom - rtext.Height() - m_border_width;
+	}
+	else
+	{
+		rr.top = m_border_width;
+		TRACE(_T("%s top\n"), text);
 	}
 
+	//font에 따라 약간 다르지만 top--해줘야 자연스럽다.
+	//rr.top--;
+	//rr.top += m_border_width;
+	rr.bottom -= m_border_width;
+
+	DWORD margin = GetMargins();
+	rr.left += (LOWORD(margin) + m_border_width);
+	rr.right -= (HIWORD(margin) + m_border_width);
+
+	TRACE(_T("ltrl = %d, %d, %d, %d\n"), rr.left, rr.top, rr.right, rr.bottom);
 	SetRect(rr);
+
+	//Invalidate();
+	//RedrawWindow();
+	//UpdateWindow();
+
+	dc.SelectObject(pOldFont);
 
 	return *this;
 }
@@ -219,8 +272,8 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 
 	HBRUSH hbr = (HBRUSH)m_br_back; // Passing a Handle to the Brush
 
-	CRect r;
-	GetClientRect(r);
+	CRect rc;
+	GetClientRect(rc);
 
 	if (m_transparent)
 	{
@@ -235,29 +288,42 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		//readonly일 경우에도 배경색을 기본 읽기전용 색으로 바꾸지 않고 지정된 배경색을 유지시켜준다.
 		pDC->SetBkColor(m_cr_back.ToCOLORREF());
 	}
-	//else if (!IsWindowEnabled() || nCtlColor == CTLCOLOR_STATIC)
-	//{
-	//	pDC->SetTextColor(m_cr_text_disabled);
-	//	pDC->SetBkColor(m_cr_back_disabled);
-	//	m_br_back_disabled.DeleteObject();
-	//	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled);
-	//	hbr = (HBRUSH)m_br_back_disabled;
-	//}
+	else if (!IsWindowEnabled())// || nCtlColor == CTLCOLOR_STATIC)
+	{
+		pDC->SetTextColor(m_cr_text_disabled.ToCOLORREF());
+		pDC->SetBkColor(m_cr_back_disabled.ToCOLORREF());
+		m_br_back_disabled.DeleteObject();
+		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
+		hbr = (HBRUSH)m_br_back_disabled;
+	}
 	else
 	{
 		pDC->SetTextColor(m_cr_text.ToCOLORREF());
 		pDC->SetBkColor(m_cr_back.ToCOLORREF());
  		m_br_back.DeleteObject();
  		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
-		//r.DeflateRect(2, 2);
-		//ExcludeClipRect(pDC->m_hDC, r.left + 1, r.top, r.left + 1, r.bottom);
+
 		hbr = (HBRUSH)m_br_back;
+	}
+
+	//ExcludeClipRect()를 해주지 않으면 텍스트 출력 영역에 의해 테두리가 지워진다.
+	if (m_draw_border)
+	{
+		ExcludeClipRect(pDC->m_hDC, rc.left, rc.top, rc.left + m_border_width, rc.bottom);		//left
+		ExcludeClipRect(pDC->m_hDC, rc.left, rc.top, rc.right, rc.top + m_border_width);		//top
+		ExcludeClipRect(pDC->m_hDC, rc.right - m_border_width, rc.top, rc.right, rc.bottom);	//right
+		ExcludeClipRect(pDC->m_hDC, rc.left, rc.bottom - m_border_width, rc.right, rc.bottom);	//bottom
+	}
+	else
+	{
+		//ExcludeClipRect(pDC->m_hDC, 0, 0, 0, 0);	//이 코드를 사용하면 border를 그렸다가 해제했을 때 잔상이 남음. SelectClipRgn()로 대체하여 해결됨.
+		SelectClipRgn(pDC->m_hDC, NULL);
 	}
 
 	if (m_action_button)
 	{
-		r.left = r.right - m_sz_action_button.cx;
-		ExcludeClipRect(pDC->m_hDC, r.left, r.top, r.right, r.bottom);
+		rc.left = rc.right - m_sz_action_button.cx;
+		ExcludeClipRect(pDC->m_hDC, rc.left, rc.top, rc.right, rc.bottom);
 	}
 
 	return hbr;
@@ -397,6 +463,9 @@ void CSCEdit::OnSize(UINT nType, int cx, int cy)
 	//WM_SIZE를 사용해도 된다.
 	if (m_auto_resize_font)
 		recalc_font_size();
+
+	//resize되면 vcenter 정렬이 해제되는 현상이 있다. 일단 다시 세팅해준다.
+	set_line_align(m_valign);
 }
 
 /*
@@ -649,35 +718,35 @@ BOOL CSCEdit::OnEnSetfocus()
 BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	CRect r;
+	CRect rc;
 
-	GetClientRect(r);
+	GetClientRect(rc);
 	Gdiplus::Graphics g(pDC->GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
 	if (m_action_button)
 	{
-		r.left = r.right - m_sz_action_button.cx;
+		rc.left = rc.right - m_sz_action_button.cx;
 
-		CMemoryDC dc(pDC, &r);
+		CMemoryDC dc(pDC, &rc);
 		pDC = &dc;
 
 		if (!IsWindowEnabled())
 		{
-			pDC->FillSolidRect(r, RGB(192, 192, 192));
+			pDC->FillSolidRect(rc, RGB(192, 192, 192));
 		}
 		else if (m_action_button_down)
 		{
-			pDC->FillSolidRect(r, m_cr_button_back_down.ToCOLORREF());
+			pDC->FillSolidRect(rc, m_cr_button_back_down.ToCOLORREF());
 		}
 		else
 		{
-			pDC->FillSolidRect(r, m_cr_button_back.ToCOLORREF());
+			pDC->FillSolidRect(rc, m_cr_button_back.ToCOLORREF());
 		}
 
 		Gdiplus::Pen pen(IsWindowEnabled() ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::Gray, 2.0F);
 
-		CPoint cp = r.CenterPoint();
+		CPoint cp = rc.CenterPoint();
 
 		//검색일 경우 돋보기 이미지를 그려준다.
 		if (m_action_button == action_find)
@@ -686,21 +755,18 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 				cp.Offset(1, 1);
 
 			int size = 12;
-			r = make_center_rect(cp.x, cp.y, size, size);
+			CRect r = make_center_rect(cp.x, cp.y, size, size);
 			r.OffsetRect(-2, -2);
 			g.DrawEllipse(&pen, CRect2GpRect(r));
 			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
 		}
 	}
 
-	//if (m_draw_border)
-	//{
-	//	GetClientRect(r);
-	//	//draw_rectangle(g, r, IsWindowEnabled() ? Gdiplus::Color::Blue : Gdiplus::Color::Gray);
-	//	draw_rectangle(g, r, Gdiplus::Color::Transparent, IsWindowEnabled() ? m_cr_back : Gdiplus::Color::Gray);
-	//}
+	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
+	//또한 IsWindowEnabled()에 따라 배경색이 달라진다.
+	draw_rectangle(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), IsWindowEnabled() ? m_cr_back : m_cr_back_disabled, m_border_width);
 
-	//return FALSE;
+	return FALSE;
 	return CEdit::OnEraseBkgnd(pDC);
 }
 
@@ -789,6 +855,9 @@ void CSCEdit::draw_dim_text()
 	//pDC = &dc;
 	GetClientRect(&rc);							// Get Drawing Area
 
+	if (m_draw_border)
+		rc.DeflateRect(m_border_width, m_border_width);
+
 	if (m_action_button)
 		rc.right -= m_sz_action_button.cx;
 
@@ -815,7 +884,8 @@ void CSCEdit::draw_dim_text()
 		//MAP_STYLE(ES_PATHELLIPSIS, DT_PATH_ELLIPSIS);
 	}
 
-	dc.DrawText(_T(" ") + m_dim_text, -1, &rc, dwText | DT_SINGLELINE | DT_VCENTER);
+	//dimtext도 m_valign 설정값의 영향을 받는다.
+	dc.DrawText(_T(" ") + m_dim_text, -1, &rc, dwText | DT_SINGLELINE | m_valign);
 	dc.RestoreDC(iState);								// Restore The DC State
 }
 
@@ -829,16 +899,26 @@ CSCEdit& CSCEdit::set_dim_text(CString dim_text, Gdiplus::Color cr)
 	return *this;
 }
 
-void CSCEdit::set_draw_border(bool draw, int border_width, int border_type, Gdiplus::Color cr_border)
+//border를 설정할 때 set_draw_border();를 호출하면 모든 설정값은 기본 멤버변수값대로 설정된다.
+//즉, border width는 m_border_width 값이 사용된다.
+//border를 해제하기 위해 set_draw_border(false);를 호출하면 border를 그리지 않을 뿐 기본 설정값들은 유지된다.
+//다시 border를 그리기 위해 set_draw_border();를 호출하면 전에 설정된 세팅값대로 그릴 수 있다.
+void CSCEdit::set_draw_border(bool draw, int border_width, Gdiplus::Color cr_border, int border_type)
 {
 	m_draw_border = draw;
-	m_border_width = border_width;
-	m_border_type = border_type;
+
+	if (border_width > 0)
+		m_border_width = border_width;
+
+	if (border_type > border_type_disregard)
+		m_border_type = border_type;
 
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 		m_cr_border = cr_border;
 
-	Invalidate();
-	RedrawWindow();
-	UpdateWindow();
+	set_line_align(m_valign);
+
+	//Invalidate();
+	//RedrawWindow();
+	//UpdateWindow();
 }

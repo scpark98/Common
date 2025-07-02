@@ -2967,14 +2967,20 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
-		if (find_dqstring(dqLine, dqTarget, op, true, true) >= 0)
+		if (find_dqstring(dqLine, dqTarget, op) >= 0)
 		{
 			find_result.push_back(cur_idx);
 
 			if (stop_first_found)
 			{
 				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM)&CVtListCtrlExMessage(this, message_progress_pos), (LPARAM)-1);
-				return 1;
+				if (result)
+				{
+					result->clear();
+					result->assign(find_result.begin(), find_result.end());
+					return result->at(0);
+				}
+				return cur_idx;
 			}
 		}
 
@@ -3005,15 +3011,15 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 		*/
 	}
 
+	if (find_result.size() == 0)
+		return -1;
+
 	if (result)
 	{
 		result->clear();
 		result->assign(find_result.begin(), find_result.end());
 		return result->at(0);
 	}
-
-	if (find_result.size() == 0)
-		return -1;
 
 	return find_result[0];
 }

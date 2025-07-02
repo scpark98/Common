@@ -1601,7 +1601,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		{
 			//scvDrawImage(&dc, m_dqThumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_cr_back_thumb, -1.0);
 			//scvDrawImage(&dc, m_dqThumb[i].mat, rect, m_cr_back_thumb, -1.0);
-			fit = get_ratio_max_rect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
+			fit = get_ratio_rect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
 			if (draw && !skip)
 			{
 				//입체감있는 프레임을 그려주는 코드인데 배경이 짙은 회색 계열이면 잘 표시가 안나서 일단 스킵.
@@ -1841,8 +1841,8 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 				r = make_center_rect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
 
-				g.DrawEllipse(&pen, CRectTogpRectF(r));
-				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRectTogpRectF(r), &format);
+				g.DrawEllipse(&pen, CRect2GpRectF(r));
+				path.AddString(CStringW(i2S(i+1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect2GpRectF(r), &format);
 				for (int j = 0; j < 4; ++j)
 				{
 					Gdiplus::Pen pen(Gdiplus::Color(128, 64, 64, 64), j);		//윤곽선

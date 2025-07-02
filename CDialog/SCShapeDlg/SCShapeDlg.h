@@ -117,8 +117,8 @@ public:
 	//ShowWindow()시키거나 fadein()으로 보여지게 한다.
 	//0 ~ 255까지 5간격으로 alpha를 변경한다.
 	//hide_after_ms, fadeout 파라미터는 fade_in에서만 사용된다.
-	void			fade_in(int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
-	void			fade_out();
+	void			fade_in(int fade_in_delay_ms = 10, int hide_after_ms = 0, bool fadeout = false, int fade_out_delay_ms = 10);
+	void			fade_out(int fade_out_delay_ms = 10);
 	bool			is_fadeinout_ing() { return m_fadeinout_ing; }
 
 	//
@@ -162,7 +162,11 @@ protected:
 	int				m_text_align = DT_CENTER;
 
 	bool			m_fadeinout_ing = false;
-	void			thread_fadeinout(bool fadein, int delay_ms = 50, int hide_after_ms = 0, bool fadeout = false);
+	//fade_in(), fade_out() 함수에서 호출하며
+	//이미 이 thread가 돌고 있는중에 다시 fade_in(), fade_out()이 호출되면
+	//이 thread는 즉시 중단되고 text를 변경한 후 다시 이 thread가 호출된다.
+	//이 때 hide시키지 않고 text만 변경시킨다. 그렇지 않으면 사라졌다가 나타나므로 깜빡이게 된다.
+	void			thread_fadeinout(bool fadein, int fadein_delay_ms = 10, int hide_after_ms = 0, bool fadeout = false, int fadeout_delay_ms = 10);
 
 	//m_para 항목 중 마우스 커서가 올라간 음절 정보를 parent에게 메시지로 전달한다.
 	bool			m_send_hover_info = false;

@@ -32,19 +32,36 @@ CRect CSCParagraphStatic::set_text(CString text)
 {
 	m_para.clear();
 
-	//m_sc_font는 PreSubclassWindow()에서 초기화되었는데
+	//m_text_prop는 PreSubclassWindow()에서 초기화되었는데
 	//그 후 이 set_text()를 호출하기 전에 색상, 폰트관련 설정이 변경되었을 수 있으므로
-	//설정값을 m_sc_font에 갱신시켜줘야 한다.
-	update_sc_font();
+	//설정값을 m_text_prop에 갱신시켜줘야 한다.
+	update_text_property();
 
 
-	CSCParagraph::build_paragraph_str(text, m_para, &m_sc_font);
+	CSCParagraph::build_paragraph_str(text, m_para, &m_text_prop);
 
 	//"<b><cr = Red>This</b></cr > is a <cr =Blue><i>sample</i> <b>paragraph</b>."
 	CClientDC dc(this);
 	CRect rc;
 	GetClientRect(&rc);
-	CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_LEFT | DT_CENTER);
+
+	//align 옵션에 따른 보정
+	DWORD dwStyle = GetStyle();
+	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
+
+	if (m_dwStyle == 0)
+	{
+		MAP_STYLE(SS_LEFT, DT_LEFT);
+		MAP_STYLE(SS_RIGHT, DT_RIGHT);
+		MAP_STYLE(SS_CENTER, DT_CENTER);
+		MAP_STYLE(SS_CENTERIMAGE, DT_VCENTER);
+		MAP_STYLE(SS_NOPREFIX, DT_NOPREFIX);
+		MAP_STYLE(SS_WORDELLIPSIS, DT_WORD_ELLIPSIS);
+		MAP_STYLE(SS_ENDELLIPSIS, DT_END_ELLIPSIS);
+		MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
+	}
+
+	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, dwText);
 	Invalidate();
 
 	return m_rect_text;
@@ -323,25 +340,26 @@ void CSCParagraphStatic::PreSubclassWindow()
 
 	CSCStatic::PreSubclassWindow();
 
-	update_sc_font();
+	update_text_property();
 }
 
-void CSCParagraphStatic::update_sc_font()
+void CSCParagraphStatic::update_text_property()
 {
-	m_sc_font.name = m_lf.lfFaceName;
-	m_sc_font.size = -MulDiv(m_lf.lfHeight, GetDeviceCaps(GetDC()->m_hDC, LOGPIXELSY), 72);
+	m_text_prop.name = m_lf.lfFaceName;
+	m_text_prop.size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
+	//m_text_prop.size = -MulDiv(m_lf.lfHeight, GetDeviceCaps(GetDC()->m_hDC, LOGPIXELSY), 72);
 
 	if (m_lf.lfWeight >= FW_BOLD)
-		m_sc_font.style |= Gdiplus::FontStyleBold;
+		m_text_prop.style |= Gdiplus::FontStyleBold;
 	if (m_lf.lfItalic)
-		m_sc_font.style |= Gdiplus::FontStyleItalic;
+		m_text_prop.style |= Gdiplus::FontStyleItalic;
 	if (m_lf.lfUnderline)
-		m_sc_font.style |= Gdiplus::FontStyleUnderline;
+		m_text_prop.style |= Gdiplus::FontStyleUnderline;
 	if (m_lf.lfStrikeOut)
-		m_sc_font.style |= Gdiplus::FontStyleStrikeout;
+		m_text_prop.style |= Gdiplus::FontStyleStrikeout;
 
-	m_sc_font.cr_text = m_cr_text;
-	m_sc_font.cr_back = m_cr_back;
+	m_text_prop.cr_text = m_cr_text;
+	m_text_prop.cr_back = m_cr_back;
 }
 
 void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)

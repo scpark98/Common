@@ -57,7 +57,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
 	m_slider_gif.set_use_slide();
 
-	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32);// , Gdiplus::Color::Blue, Gdiplus::Color::Red);
+	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
 
 	return true;
 }
@@ -215,8 +215,16 @@ void CSCImageDlg::OnPaint()
 		g.FillRectangle(m_br_zigzag.get(), CRect2GpRect(m_r_display));
 	}
 
+	TRACE(_T("m_r_display = %s\n"), get_rect_info_string(m_r_display));
+
 	//실제 이미지를 그려준다.
-	m_img.draw(g, m_r_display);
+	//m_img.draw(g, m_r_display);
+
+	//SetPixelOffsetMode()를 Half로 세팅하지 않으면
+	//0,0에 그리라고 해도 (-0.5, -0.5) ~ (0.5, 0.5), 즉 중점이 0,0인 위치에 그리게 되므로
+	//이미지가 약간 왼쪽 상단으로 밀려서 그려지게 된다.
+	g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+	g.DrawImage(m_img, CRect2GpRect(m_r_display));
 
 
 	//이미지 정보 표시
@@ -245,7 +253,7 @@ void CSCImageDlg::OnPaint()
 					ratio_str,
 					m_zoom * 100.0);
 
-		//dc.GetTextExtend(info)는 멀티라인 정보를 얻을 수 없다.
+		//dc.GetTextExtend(info)는 멀티라인 정보를 얻을 수 없으므로 DT_CALCRECT를 이용해야 한다.
 		CRect rText;
 		dc.DrawText(info, rText, DT_LEFT | DT_TOP | DT_CALCRECT);
 		rText.OffsetRect(8, 8);
@@ -253,14 +261,10 @@ void CSCImageDlg::OnPaint()
 		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(),	rText,
 						DT_NOCLIP | DT_LEFT | DT_TOP, beige, black, 2, 1);
 
-		//dc.SetBkMode(TRANSPARENT);
-		//dc.SetTextColor(white);
-		//dc.DrawText(m_filename, CRect(rc.left + 4, rc.top + 2, rc.left + 4 + sz.cx + 2, rc.top + 2 + sz.cy), DT_NOCLIP | DT_LEFT | DT_TOP);
 		dc.SelectObject(pOldFont);
 	}
 
-	//CRect screen_roi;
-	//CRect image_roi = GpRectF2CRect(m_image_roi);
+
 
 	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
 	CRect screen_roi = GpRectF2CRect(m_screen_roi);
@@ -269,7 +273,7 @@ void CSCImageDlg::OnPaint()
 	if (m_lbutton_down)// IsCtrlPressed())
 	{
 		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
-		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);// , Gdiplus::DashStyle::DashStyleDash, Gdiplus::CompositingMode::CompositingModeSourceCopy);
+		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
 	else if (m_image_roi.IsEmptyArea() == false)
 	{
@@ -280,7 +284,7 @@ void CSCImageDlg::OnPaint()
 		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
 		//screen_roi.OffsetRect(m_offset);
 		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
-		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);// , Gdiplus::DashStyle::DashStyleDash, Gdiplus::CompositingMode::CompositingModeSourceCopy);
+		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
 
 	if (screen_roi.IsRectEmpty() == false)
@@ -370,6 +374,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				break;
+			/*
 			case VK_ADD :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
@@ -390,6 +395,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 				}
 				zoom(-1);
 				return TRUE;
+			*/
 			case 'C' :
 				if (IsCtrlPressed())
 				{
@@ -593,7 +599,7 @@ void CSCImageDlg::zoom(int mode)
 
 	m_fit2ctrl = false;
 
-	Clamp(m_zoom, 0.1, 20.0);
+	Clamp(m_zoom, 0.1, 40.0);
 	//get_screen_coord_from_real_coord(m_r_display, m_img.width, m_image_roi, &m_screen_roi);
 	//Wait(1);
 	Invalidate();
@@ -603,7 +609,7 @@ void CSCImageDlg::zoom(double ratio)
 {
 	m_fit2ctrl = false;
 	m_zoom = ratio;
-	Clamp(m_zoom, 0.1, 20.0);
+	Clamp(m_zoom, 0.1, 40.0);
 	Invalidate();
 }
 
@@ -655,6 +661,15 @@ void CSCImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	if (IsCtrlPressed())
 	{
 		m_screen_roi = Gdiplus::RectF(point.x, point.y, 0, 0);
+		
+		//실제 이미지에서 1픽셀 단위로 선택되어야 하므로 float이 아닌 int로 변경한 후
+		//해당 픽셀의 크기를 다시 screen_roi로 넣어줘야 픽셀 단위로 선택된다.
+		Gdiplus::RectF img_roi;
+		get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
+		img_roi.X = (int)img_roi.X;
+		img_roi.Y = (int)img_roi.Y;
+		get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
+
 		return;
 	}
 	//roi의 크기를 변경중
@@ -681,6 +696,14 @@ void CSCImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
+
+			//실제 이미지에서 1픽셀 단위로 선택되어야 하므로 float이 아닌 int로 변경한 후
+			//해당 픽셀의 크기를 다시 screen_roi로 넣어줘야 픽셀 단위로 선택된다.
+			Gdiplus::RectF img_roi;
+			get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
+			img_roi.Width = (int)img_roi.Width;
+			img_roi.Height = (int)img_roi.Height;
+			get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
 		}
 
 		if (abs(m_screen_roi.Width) < 20 || abs(m_screen_roi.Height) < 20)
@@ -716,6 +739,14 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
+
+			//실제 이미지에서 1픽셀 단위로 선택되어야 하므로 float이 아닌 int로 변경한 후
+			//해당 픽셀의 크기를 다시 screen_roi로 넣어줘야 픽셀 단위로 선택된다.
+			Gdiplus::RectF img_roi;
+			get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
+			img_roi.Width = (int)img_roi.Width;
+			img_roi.Height = (int)img_roi.Height;
+			get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
 
 			//Ctrl키를 눌러서 roi가 그려지는 동안에는 이미지 확대/축소에 무관하게
 			//마우스 위치가 그대로 그려져야 한다.
@@ -977,7 +1008,7 @@ LRESULT CSCImageDlg::on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam)
 
 	if (msg->message == CGdiplusBitmap::message_gif_frame_changed)
 	{
-		TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
+		//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
 		m_slider_gif.set_pos(msg->frame_index);
 	}
 
@@ -989,7 +1020,7 @@ LRESULT CSCImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 	CSCSliderCtrlMsg* msg = (CSCSliderCtrlMsg*)wParam;
 	if (msg->msg == CSCSliderCtrlMsg::msg_thumb_move)
 	{
-		TRACE(_T("%ld, pos = %d\n"), GetTickCount(), msg->pos);
+		//TRACE(_T("%ld, pos = %d\n"), GetTickCount(), msg->pos);
 		goto_frame(msg->pos, true);
 	}
 	return 0;
@@ -1123,4 +1154,12 @@ void CSCImageDlg::thread_gif_animation()
 
 	m_run_thread_animation = false;
 	m_thread_animation_terminated = true;
+}
+
+void CSCImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
+{
+	m_br_zigzag.release();
+
+	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, cr_back, cr_fore);
+	Invalidate();
 }

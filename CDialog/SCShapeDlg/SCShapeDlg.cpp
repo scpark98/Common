@@ -559,49 +559,49 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 #if 1
 //set_image(), set_text()를 호출해도 아직 hide상태다.
 //ShowWindow()시키거나 fadein()으로 보여지게 한다.
-void CSCShapeDlg::fade_in(int delay_ms, int hide_after_ms, bool fadeout)
+//0 ~ 255까지 25간격으로 alpha를 변경한다.
+//hide_after_ms, fadeout 파라미터는 fade_in에서만 사용된다.
+void CSCShapeDlg::fade_in(int fade_in_delay_ms, int hide_after_ms, bool fadeout, int fade_out_delay_ms)
 {
 	if (m_fadeinout_ing)
 	{
-		TRACE(_T("m_fadeinout_ing = %d\n"), m_fadeinout_ing);
-		return;
+		TRACE(_T("m_fadeinout_ing = 1. stop...\n"));
+		m_fadeinout_ing = false;
+		Wait(100);
 	}
-	//{
-	//	m_fadeinout_ing = false;
-	//	Wait(100);
-	//}
 
-	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true, delay_ms, hide_after_ms, fadeout);
+	std::thread t(&CSCShapeDlg::thread_fadeinout, this, true, fade_in_delay_ms, hide_after_ms, fadeout, fade_out_delay_ms);
 	t.detach();
 }
 
-void CSCShapeDlg::fade_out()
+void CSCShapeDlg::fade_out(int fade_out_delay_ms)
 {
 	if (m_fadeinout_ing)
-		return;
-	//{
-	//	m_fadeinout_ing = false;
-	//	Wait(100);
-	//}
+	{
+		TRACE(_T("m_fadeinout_ing. stop...\n"));
+		m_fadeinout_ing = false;
+		Wait(100);
+	}
 
-	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false, 0, 0, false);
+	std::thread t(&CSCShapeDlg::thread_fadeinout, this, false, 0, 0, false, fade_out_delay_ms);
 	t.detach();
 }
 
-void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms, bool fadeout)
+//fade_in(), fade_out() 함수에서 호출하며
+//이미 이 thread가 돌고 있는중에 다시 fade_in(), fade_out()이 호출되면
+//이 thread는 즉시 중단되고 text를 변경한 후 다시 이 thread가 호출된다.
+//이 때 hide시키지 않고 text만 변경시킨다. 그렇지 않으면 사라졌다가 나타나므로 깜빡이게 된다.
+void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_after_ms, bool fadeout, int fadeout_delay_ms)
 {
-	if (m_fadeinout_ing)
-		return;
-
 	m_fadeinout_ing = true;
 
-	set_alpha(fadein ? 0 : 255);
+	set_alpha((fadein && fadein_delay_ms > 0) ? 0 : 255);
 	ShowWindow(SW_SHOW);
 
 	int _alpha = m_alpha;
 
-	if (delay_ms <= 0)
-		delay_ms = 50;
+	if (fadein_delay_ms < 0)
+		fadein_delay_ms = 10;
 
 	while (m_fadeinout_ing)
 	{
@@ -612,47 +612,76 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int delay_ms, int hide_after_ms,
 		
 		set_alpha(_alpha);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+		//예를 들어 delay_ms가 10초라고 하면 그 중간에 m_fadeinout_ing이 false가 되어도
+		//10초가 모두 지나기 전에는 이 루프를 종료할 수 없게 된다.
+		//따라서 짧은 간격으로 딜레이를 수정하고 m_fadeinout_ing = false이면
+		//이 thread를 종료시켜줘야 한다.
+		int delayed_total = 0;
+		while (delayed_total < fadein_delay_ms)
+		{
+			TRACE(_T("delayed_total = %d\n"), delayed_total);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			delayed_total += 10;
+			if (!m_fadeinout_ing)
+				break;
+		}
 	}
 
 	if (!m_fadeinout_ing)
 		return;
 
 	if (hide_after_ms > 0)
-		std::this_thread::sleep_for(std::chrono::milliseconds(hide_after_ms));
+	{
+		int hide_after_delayed_total = 0;
+		while (hide_after_delayed_total < hide_after_ms)
+		{
+			TRACE(_T("hide_after_delayed_total = %d\n"), hide_after_delayed_total);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			hide_after_delayed_total += 10;
+			if (!m_fadeinout_ing)
+				break;
+		}
+	}
 	else
+	{
 		return;
+	}
 
 	if (fadeout)
 	{
 		set_alpha(255);
 		int _alpha = m_alpha;
 
-		if (delay_ms <= 0)
-			delay_ms = 50;
+		if (fadeout_delay_ms < 0)
+			fadeout_delay_ms = 10;
 
-		//m_fadeinout_ing = true;
 		while (m_fadeinout_ing)
 		{
 			_alpha -= 5;
 
 			if (_alpha < 0 || _alpha > 255)
+			{
+				ShowWindow(SW_HIDE);
 				break;
+			}
 
 			set_alpha(_alpha);
 
-			std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+			int delayed_total = 0;
+			while (delayed_total < fadeout_delay_ms)
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				delayed_total += 10;
+				if (!m_fadeinout_ing)
+					break;
+			}
 		}
 
-		ShowWindow(SW_HIDE);
 		set_alpha(255);
-	}
-	else
-	{
-		ShowWindow(SW_HIDE);
 	}
 
 	m_fadeinout_ing = false;
+	TRACE(_T("thread_fadeinout stopped.\n"));
 }
 #endif
 

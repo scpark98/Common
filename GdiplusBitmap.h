@@ -117,7 +117,8 @@ public:
 
 	enum CGdiplusBitmapMsgs
 	{
-		message_gif_frame_changed = 0,
+		message_image_modified = 0,
+		message_gif_frame_changed,
 	};
 
 public:
@@ -207,7 +208,9 @@ public:
 
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
 	//sz_tile : 32로 주면 16x16 크기의 타일로 반복되는 지그재그 패턴이 생성된다. 즉, 16x16 zigzag 한 셀 4개가 32x32 크기의 타일로 반복됨.
-	static std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile = 32, Gdiplus::Color cr0 = Gdiplus::Color::White, Gdiplus::Color cr1 = Gdiplus::Color(200, 200, 200));
+	static std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile = 32, Gdiplus::Color cr_back = Gdiplus::Color::White, Gdiplus::Color cr_fore = Gdiplus::Color(200, 200, 200));
+	static Gdiplus::Color m_cr_zigzag_back;
+	static Gdiplus::Color m_cr_zigzag_fore;
 
 	//targetRect를 주면 대상 영역에 비율을 유지하여 그린다.
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.
@@ -241,6 +244,7 @@ public:
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
 	void			clone(CGdiplusBitmap* dst);
 	void			deep_copy(CGdiplusBitmap* dst);
+	static void		deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src);
 	void			rotate(Gdiplus::RotateFlipType type);
 	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
 	//그럴 경우는 auto_resize를 true로 주고 불필요한 배경이 생겼을 경우는
@@ -340,9 +344,25 @@ public:
 	//void add_rgb_loop(int red, int green, int blue, COLORREF crExcept);
 
 //조정
-	void			adjust_bright(int bright);
-	//contrast = 255이면 원본과 동일.
-	void			adjust_contrast(int contrast);
+	//bright, constrast 등을 변경할 경우 원본에 적용할지, 현재 이미지에 적용할지에 대한 정책을 정해야 한다.
+	//1.원본에 적용할 경우
+	//	- m_origin을 항상 유지하므로 메모리가 낭비될 수 있다.
+	//	- 맨 처음 이미지 변경이 일어나는 경우에만 동적할당해주면 낭비를 최소화 할 수 있다.
+	//	- bright, contrast, hsl, rgba 등 adjust가 붙은 경우에만 이러한 처리를 하도록 한다.
+	//2.현재 이미지에 적용할 경우
+	//	- adjust_bright(255)를 하고 adjust_bright(-255)를 해도 원래대로 돌아올 수 없다. 원본에 대해 1회성으로만 적용 가능하다.
+	//bright = 0% ~ 400% 범위의 percentage값이며 100%가 원본과 동일하다.
+	int				adjust_bright(int bright, bool adjust_others = true);
+	//contrast = 0% ~ 400% 범위의 percentage값이며 100%가 원본과 동일하다.
+	int				adjust_contrast(int contrast, bool adjust_others = true);
+
+	int				get_bright() { return m_bright; }
+	int				get_contrast() { return m_contrast; }
+
+	int				increase_bright(int interval);
+	int				increase_contrast(int interval);
+
+	void			reset_adjust();
 
 	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
 	void			adjust_hsl(int hue, int sat = 0, int light = 0);
@@ -465,6 +485,10 @@ protected:
 	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
 
 	CString			m_pixel_format_str;
+
+	Gdiplus::Bitmap*m_pOrigin = NULL;
+	int				m_bright = 100;		//100%가 기본값
+	int				m_contrast = 100;	//100%가 기본값
 
 //animatedGif
 	bool			m_paused = false;

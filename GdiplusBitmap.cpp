@@ -11,6 +11,9 @@
 
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
 
+Gdiplus::Color CGdiplusBitmap::m_cr_zigzag_back = Gdiplus::Color::White;
+Gdiplus::Color CGdiplusBitmap::m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
+
 CGdiplusBitmap::CGdiplusBitmap()
 {
 	release();
@@ -517,6 +520,11 @@ void CGdiplusBitmap::release()
 	}
 
 	SAFE_DELETE(m_pBitmap);
+	SAFE_DELETE(m_pOrigin);
+	//if (m_pOrigin)
+	//{
+	//	m_origin->release();
+	//}
 
 	if (m_pPropertyItem != NULL)
 	{
@@ -928,14 +936,17 @@ int CGdiplusBitmap::has_alpha_pixel()
 	return m_has_alpha_pixel;
 }
 
-std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr0, Gdiplus::Color cr1)
+std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
 {
+	m_cr_zigzag_back = cr_back;
+	m_cr_zigzag_fore = cr_fore;
+
 	auto tile = std::make_unique<Gdiplus::Bitmap>(sz_tile, sz_tile, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(tile.get());
-	g.Clear(cr0);
+	g.Clear(cr_back);
 
 	// Draw two black blocks per row, offset every other row
-	Gdiplus::SolidBrush br_alt(cr1);
+	Gdiplus::SolidBrush br_alt(cr_fore);
 
 	for (int by = 0; by < sz_tile; by += sz_tile / 2)
 	{
@@ -1055,7 +1066,8 @@ void CGdiplusBitmap::clone(CGdiplusBitmap* dst)
 
 void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 {
-	dst->release();
+	if (dst != NULL)
+		dst->release();
 
 	/*https://still.tistory.com/211
 	* 이 코드 블록은 그리기로 복사하는 방식인데 속도가 느리므로
@@ -1086,6 +1098,21 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 	}
 
 	dst->resolution();
+}
+
+void CGdiplusBitmap::deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src)
+{
+	if (*dst)
+		delete *dst;
+
+	*dst = new Gdiplus::Bitmap(src->GetWidth(), src->GetHeight(), src->GetPixelFormat());
+	Gdiplus::Rect rect(0, 0, src->GetWidth(), src->GetHeight());
+	Gdiplus::BitmapData bmpData;
+	(*dst)->LockBits(&rect, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, (*dst)->GetPixelFormat(), &bmpData);
+	src->LockBits(&rect, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeUserInputBuf, (*dst)->GetPixelFormat(), &bmpData);
+
+	src->UnlockBits(&bmpData);
+	(*dst)->UnlockBits(&bmpData);
 }
 
 //좌우대칭
@@ -1705,24 +1732,50 @@ void CGdiplusBitmap::black_and_white(float red, float green, float blue)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::adjust_bright(int bright)
+int CGdiplusBitmap::adjust_bright(int bright, bool adjust_others)
 {
-	float fb = (float)bright / 255.0f;
+	Clamp(bright, 0, 400);
+	//TRACE(_T("bright = %d%%\n"), bright);
+
+	m_bright = bright;
+
+	float fb = (float)bright * 2.55 / 255.0f;
 	Gdiplus::ColorMatrix cm = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 								0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-								fb, fb, fb, 0.0f, 1.0f
+								(fb - 1.0f), (fb - 1.0f), (fb - 1.0f), 0.0f, 1.0f
 	};
 
 	Gdiplus::ColorMatrixEffect cmEffect;
 	cmEffect.SetParameters(&cm);
+
+	//bright, contrast, hsl, rgba를 조정할 경우 원본을 백업해두고 조정해야 한다.
+	//조정값이 변하면 원본을 복사해서 적용해야 한다.
+	if (m_pOrigin == NULL)
+	{
+		CGdiplusBitmap::deep_copy(&m_pOrigin, m_pBitmap);
+	}
+	else
+	{
+		CGdiplusBitmap::deep_copy(&m_pBitmap, m_pOrigin);
+		if (adjust_others)
+			adjust_contrast(m_contrast, false);
+	}
+
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+
+	return bright;
 }
 
-void CGdiplusBitmap::adjust_contrast(int contrast)
+int CGdiplusBitmap::adjust_contrast(int contrast, bool adjust_others)
 {
-	float fc = (float)contrast / 255.0f;
+	Clamp(contrast, 0, 400);
+	//TRACE(_T("contrast = %d%%\n"), contrast);
+
+	m_contrast = contrast;
+
+	float fc = (float)m_contrast * 2.55 / 255.0f;
 	float ft = (1.0 - fc) / 2.0;
 	Gdiplus::ColorMatrix cm = { fc, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, fc, 0.0f, 0.0f, 0.0f,
@@ -1733,7 +1786,43 @@ void CGdiplusBitmap::adjust_contrast(int contrast)
 
 	Gdiplus::ColorMatrixEffect cmEffect;
 	cmEffect.SetParameters(&cm);
+
+	//bright, contrast, hsl, rgba를 조정할 경우 원본을 백업해두고 조정해야 한다.
+	//조정값이 변하면 원본을 복사해서 적용해야 한다.
+	if (m_pOrigin == NULL)
+	{
+		CGdiplusBitmap::deep_copy(&m_pOrigin, m_pBitmap);
+	}
+	else
+	{
+		CGdiplusBitmap::deep_copy(&m_pBitmap, m_pOrigin);
+		if (adjust_others)
+			adjust_bright(m_bright, false);
+	}
+
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
+
+	return m_contrast;
+}
+
+int CGdiplusBitmap::increase_bright(int interval)
+{
+	m_bright += interval;
+	return adjust_bright(m_bright);
+}
+
+int CGdiplusBitmap::increase_contrast(int interval)
+{
+	m_contrast += interval;
+	return adjust_contrast(m_contrast);
+}
+
+void CGdiplusBitmap::reset_adjust()
+{
+	adjust_bright(100);
+	adjust_contrast(100);
+
+	SAFE_DELETE(m_pOrigin);
 }
 
 void CGdiplusBitmap::sepia()
@@ -1796,11 +1885,11 @@ void CGdiplusBitmap::adjust_hsl(int hue, int sat, int light)
 void CGdiplusBitmap::adjust_rgba(float r, float g, float b, float a)
 {
 	Gdiplus::ColorMatrix cm = {	r, 0.0f, 0.0f, 0.0f, 0.0f,
-						0.0f, g, 0.0f, 0.0f, 0.0f,
-						0.0f, 0.0f, b, 0.0f, 0.0f,
-						0.0f, 0.0f, 0.0f, a, 0.0f,
-						0.0f, 0.0f, 0.0f, 0.0f, 1.0f
-					 };
+								0.0f, g, 0.0f, 0.0f, 0.0f,
+								0.0f, 0.0f, b, 0.0f, 0.0f,
+								0.0f, 0.0f, 0.0f, a, 0.0f,
+								0.0f, 0.0f, 0.0f, 0.0f, 1.0f
+							  };
 
 	Gdiplus::ColorMatrixEffect cmEffect;
 	cmEffect.SetParameters(&cm);
@@ -2323,7 +2412,7 @@ bool CGdiplusBitmap::save(LPCTSTR filepath, ...)
 bool CGdiplusBitmap::copy_to_clipbard()
 {
 	//복사는 잘 되지만 32bit PNG는 투명처리 안됨
-#if 1
+#if 0
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(0, &hbitmap);
 	if (status != Gdiplus::Ok)
@@ -2346,7 +2435,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 		DeleteObject(hbitmap_ddb);
 	}
 	DeleteObject(hbitmap);
-#elif 0
+#elif 1
 	bool res = false;
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
@@ -2358,9 +2447,9 @@ bool CGdiplusBitmap::copy_to_clipbard()
 
 	GetObject(hbitmap, sizeof(bm), &bm);
 
-	uint64_t bufSize = width * height * 4;
+	uint64_t bufSize = width * height * channel;
 
-	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_PNG };
+	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
 
 	BITMAPV5HEADER header;
 	header.bV5Size = sizeof(BITMAPV5HEADER);
@@ -2368,7 +2457,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	header.bV5Height = height;
 	header.bV5Planes = 1;
 	header.bV5BitCount = 0;
-	header.bV5Compression = BI_PNG;
+	header.bV5Compression = BI_RGB;
 	header.bV5SizeImage = bufSize;
 	header.bV5XPelsPerMeter = 0;
 	header.bV5YPelsPerMeter = 0;
@@ -2388,26 +2477,28 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	header.bV5ProfileSize = 0;
 	header.bV5Reserved = 0;
 
-	std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
-	HDC hDC = GetDC(NULL);
-	GetDIBits(hDC, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
-	::DeleteDC(hDC);
-
-	HGLOBAL hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof(header) + bufSize);
-	void* buffer = (BYTE*)GlobalLock(hmem);
-	memcpy(buffer, &header, sizeof(BITMAPV5HEADER));
-	//memcpy((char*)buffer + sizeof(BITMAPV5HEADER), vec.data(), vec.size());
+	//std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
+	//HDC hDC = GetDC(NULL);
+	//GetDIBits(hDC, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
+	//::DeleteDC(hDC);
 
 	get_raw_data();
+
+	HGLOBAL hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof(header) + bufSize);
+	if (hmem == NULL)
+		return false;
+
+	void* buffer = (BYTE*)GlobalLock(hmem);
+	memcpy(buffer, &header, sizeof(BITMAPV5HEADER));
 	memcpy((char*)buffer + sizeof(BITMAPV5HEADER), data, bufSize);
 	GlobalUnlock(hmem);
 
 	if (OpenClipboard(NULL))
 	{
 		EmptyClipboard();
-		auto fmt = RegisterClipboardFormat(_T("PNG"));
-		SetClipboardData(fmt, hmem);
-		//SetClipboardData(CF_DIBV5, hmem);
+		//auto fmt = RegisterClipboardFormat(_T("PNG"));
+		//SetClipboardData(fmt, hmem);
+		SetClipboardData(CF_DIBV5, hmem);
 		//SetClipboardData(CF_BITMAP, hbitmap);
 		CloseClipboard();
 		MessageBeep(0);
@@ -2423,10 +2514,17 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	return res;
 #elif 0
 	//  this section is my code for creating a png file
-	StreamWrite stream = StreamWrite::asBufferCreate();
-	in.savePng(stream);
-	uint64 bufSize = 0;
-	char* buf = stream._takeBuffer(bufSize, false);
+	//StreamWrite stream = StreamWrite::asBufferCreate();
+	//in.savePng(stream);
+
+	//이 예제는 png로 저장하고 그 파일 데이터를 그대로 클립보드에 넣는 방식인데
+	//office는 이를 받아들이지만 대부분의 앱에서는 클립보드 데이터로 인식하지 않는다.
+	save(_T("d:\\temp.png"));
+	uint64_t bufSize = get_file_size(_T("d:\\temp.png"));
+	char* buf = new char[bufSize];
+	read_raw(_T("d:\\temp.png"), (uint8_t*)buf, bufSize);
+	//get_raw_data();
+	//char* buf = (char*)data;// stream._takeBuffer(bufSize, false);
 	// "buf"      <-- contains the PNG payload
 	// "bufSize"  <-- is the size of this payload
 
@@ -2434,11 +2532,13 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	if (gift == NULL)
 		return false;
 
-	HWND win = window.getWindowHandle();
-	if (!OpenClipboard(win)) {
+	//HWND win = window.getWindowHandle();
+	if (!OpenClipboard(NULL))//win))
+	{
 		GlobalFree(gift);
 		return false;
 	}
+
 	EmptyClipboard();
 
 	auto fmt = RegisterClipboardFormat(_T("PNG")); // or `L"PNG", as applicable

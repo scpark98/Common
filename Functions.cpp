@@ -6255,8 +6255,8 @@ void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdipl
 	//DrawRectangle()로 그리면 right, bottom까지 그리는데 영역을 벗어나게 된다.
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
 	//단, r의 안쪽으로 그려지는 PenAlignmentInset이라면 줄이지 않아도 된다.
-	if (pen_align != Gdiplus::PenAlignmentInset)
-		r.DeflateRect(0, 0, 1, 1);
+	//if (pen_align != Gdiplus::PenAlignmentInset)
+	//	r.DeflateRect(0, 0, 1, 1);
 
 	pen.SetAlignment((Gdiplus::PenAlignment)pen_align);
 	pen.SetDashStyle((Gdiplus::DashStyle)pen_style);
@@ -18514,9 +18514,9 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 
 	Gdiplus::StringFormat sf;
 
-	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	//g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
 
 	Gdiplus::Unit unit = g.GetPageUnit();
 	float fDpiX = g.GetDpiX();
@@ -18561,19 +18561,22 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
 			pDC->SelectObject(pOldFont);
 #else
-			//Gdiplus::Font* font;
-			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].ti.name));
-
-			//get_paragraph_font(g, para, i, j, &font);
-			float emSize = fDpiY * para[i][j].ti.size / 72.0;
-			Gdiplus::Font font(&ff, emSize, para[i][j].ti.style);
-
+			//GraphicsPath를 이용하면 stroke, shadow 등 다양한 효과를 구현할 수 있지만
+			//DrawString()보다 글자가 선명하게 보이지 않는 단점이 있다.
+			//만약 stroke, shadow를 아예 사용하지 않을 경우는 분기처리를 고민해봐야 한다.
 
 			//text 배경색을 칠하고
-			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].ti.cr_back);
+			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
+
+			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
+
+			//get_paragraph_font(g, para, i, j, &font);
+			float emSize = fDpiY * para[i][j].text_prop.size / 72.0;
+			Gdiplus::Font font(&ff, emSize, para[i][j].text_prop.style);
+
 
 			//text를 출력한다.
-			Gdiplus::SolidBrush text_brush(para[i][j].ti.cr_text);
+			Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
 			Gdiplus::GraphicsPath str_path, shadow_path;
 
 			//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
@@ -18585,18 +18588,18 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 			//r을 정확히 계산하는 것이 정석이나 굳이 r을 주지 않고 Gdiplus::Point()로 주면 문제되지 않는다.
 			CRect r = para[i][j].r;
 			str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-								para[i][j].ti.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
+								para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
 			//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
-			Gdiplus::SolidBrush br_shadow(para[0][0].ti.cr_shadow);
-			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].ti.thickness / 1.4f }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].ti.thickness / 1.4f}));
+			Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
+			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].text_prop.thickness / 1.4f }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].text_prop.thickness / 1.4f}));
 			r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
 
 			shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-				para[i][j].ti.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
+				para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-			Gdiplus::Pen   pen(para[i][j].ti.cr_stroke, para[i][j].ti.thickness);
-			Gdiplus::SolidBrush brush(para[i][j].ti.cr_text);
+			Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
+			Gdiplus::SolidBrush brush(para[i][j].text_prop.cr_text);
 
 			//pen.SetLineJoin(Gdiplus::LineJoinMiter);
 			pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -18605,17 +18608,20 @@ void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
 
 			//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
 			//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
-			if (para[i][j].ti.thickness > 0.0f)
+			if (para[i][j].text_prop.thickness > 0.0f)
 				g.DrawPath(&pen, &str_path);
 
 			g.FillPath(&brush, &str_path);
-			//}
-			//else
-			//{
-			//	g.DrawString(CStringW(para[i][j].text),
-			//		para[i][j].text.GetLength(), &font,
-			//		Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
-			//}
+
+			/*
+			Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
+			Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
+
+			//g.DrawString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &font,
+			//			 Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+			g.DrawString(CStringW(para[i][j].text), -1, &font,
+				Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+			*/
 #endif
 
 			//각 para 영역 확인용 코드

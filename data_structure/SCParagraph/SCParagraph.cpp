@@ -12,7 +12,7 @@ CSCParagraph::~CSCParagraph()
 
 //text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
 //cr_text, cr_back은 글자, 배경 기본값
-void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextInfo* ti)
+void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextProperty* text_prop)
 {
 	int i;
 	CString cr_str;
@@ -24,7 +24,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 	get_tag_str(text, tags);
 
 	CSCParagraph basic_para, para_temp;
-	basic_para.ti = *ti;
+	basic_para.text_prop = *text_prop;
 	para_temp = basic_para;
 
 	std::deque<CSCParagraph> para_line;
@@ -36,96 +36,96 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 	{
 		if (tags[i] == _T("<b>"))
 		{
-			para_temp.ti.style |= Gdiplus::FontStyleBold;
+			para_temp.text_prop.style |= Gdiplus::FontStyleBold;
 		}
 		else if (tags[i] == _T("</b>"))
 		{
-			para_temp.ti.style &= ~Gdiplus::FontStyleBold;
+			para_temp.text_prop.style &= ~Gdiplus::FontStyleBold;
 		}
 		else if (tags[i] == _T("<i>"))
 		{
-			para_temp.ti.style |= Gdiplus::FontStyleItalic;
+			para_temp.text_prop.style |= Gdiplus::FontStyleItalic;
 		}
 		else if (tags[i] == _T("</i>"))
 		{
-			para_temp.ti.style &= ~Gdiplus::FontStyleItalic;
+			para_temp.text_prop.style &= ~Gdiplus::FontStyleItalic;
 		}
 		else if (tags[i] == _T("<u>"))
 		{
-			para_temp.ti.style |= Gdiplus::FontStyleUnderline;
+			para_temp.text_prop.style |= Gdiplus::FontStyleUnderline;
 		}
 		else if (tags[i] == _T("</u>"))
 		{
-			para_temp.ti.style &= ~Gdiplus::FontStyleUnderline;
+			para_temp.text_prop.style &= ~Gdiplus::FontStyleUnderline;
 		}
 		else if (tags[i] == _T("<s>"))
 		{
-			para_temp.ti.style |= Gdiplus::FontStyleStrikeout;
+			para_temp.text_prop.style |= Gdiplus::FontStyleStrikeout;
 		}
 		else if (tags[i] == _T("</s>"))
 		{
-			para_temp.ti.style &= ~Gdiplus::FontStyleStrikeout;
+			para_temp.text_prop.style &= ~Gdiplus::FontStyleStrikeout;
 		}
 		else if (tags[i].Find(_T("<cr=")) >= 0 || tags[i].Find(_T("<ct=")) >= 0)
 		{
 			cr_str = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.ti.cr_text = get_color(cr_str);
+			para_temp.text_prop.cr_text = get_color(cr_str);
 		}
 		else if (tags[i].Find(_T("</cr>")) >= 0 || tags[i].Find(_T("</ct>")) >= 0)
 		{
-			para_temp.ti.cr_text = basic_para.ti.cr_text;
+			para_temp.text_prop.cr_text = basic_para.text_prop.cr_text;
 		}
 		else if (tags[i].Find(_T("<cb=")) >= 0)
 		{
 			cr_str = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.ti.cr_back = get_color(cr_str);
+			para_temp.text_prop.cr_back = get_color(cr_str);
 		}
 		else if (tags[i].Find(_T("<crb=")) >= 0)
 		{
 			cr_str = tags[i].Mid(5, tags[i].GetLength() - 6);
-			para_temp.ti.cr_back = get_color(cr_str);
+			para_temp.text_prop.cr_back = get_color(cr_str);
 		}
 		else if (tags[i].Find(_T("</cb>")) >= 0 || tags[i].Find(_T("</crb>")) >= 0)
 		{
-			para_temp.ti.cr_back = basic_para.ti.cr_back;
+			para_temp.text_prop.cr_back = basic_para.text_prop.cr_back;
 		}
 		else if (tags[i].Find(_T("<f=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(3, tags[i].GetLength() - 4);
-			para_temp.ti.name = str_font;
+			para_temp.text_prop.name = str_font;
 		}
 		else if (tags[i].Find(_T("<font=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.ti.name = str_font;
+			para_temp.text_prop.name = str_font;
 		}
 		else if (tags[i].Find(_T("<fontname=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(10, tags[i].GetLength() - 11);
-			para_temp.ti.name = str_font;
+			para_temp.text_prop.name = str_font;
 		}
 		else if (tags[i].Find(_T("</f>")) >= 0 || tags[i].Find(_T("</font>")) >= 0 || tags[i].Find(_T("</fontname>")) >= 0)
 		{
-			para_temp.ti.name = basic_para.ti.name;
+			para_temp.text_prop.name = basic_para.text_prop.name;
 		}
 		else if (tags[i].Find(_T("<sz=")) >= 0)
 		{
 			CString str_size = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.ti.size = _ttoi(str_size);
+			para_temp.text_prop.size = _ttoi(str_size);
 		}
 		else if (tags[i].Find(_T("<size=")) >= 0)
 		{
 			CString str_size = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.ti.size = _ttoi(str_size);
+			para_temp.text_prop.size = _ttoi(str_size);
 		}
 		else if (tags[i].Find(_T("<fontsize=")) >= 0)
 		{
 			CString str_size = tags[i].Mid(10, tags[i].GetLength() - 11);
-			para_temp.ti.size = _ttoi(str_size);
+			para_temp.text_prop.size = _ttoi(str_size);
 		}
 		else if (tags[i].Find(_T("</sz>")) >= 0 || tags[i].Find(_T("</size>")) >= 0 || tags[i].Find(_T("</fontsize>")) >= 0)
 		{
-			para_temp.ti.size = basic_para.ti.size;
+			para_temp.text_prop.size = basic_para.text_prop.size;
 		}
 		else if (tags[i] == _T("<br>"))
 		{
@@ -145,8 +145,8 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 
 			//전체 배경색인 cr_back이 Transparent가 아닐 때 색상이 별도로 지정되지 않은 para[][].cr_back에 cr_back을 줄 경우 중복으로 그려지게 된다.
 			//cr_back이 불투명이면 덮어써서 그려져서 표가 나지 않지만 반투명이면 겹쳐져 그려지게 된다.
-			if (para_temp.ti.cr_back.GetValue() == basic_para.ti.cr_back.GetValue())
-				para_temp.ti.cr_back = Gdiplus::Color::Transparent;
+			if (para_temp.text_prop.cr_back.GetValue() == basic_para.text_prop.cr_back.GetValue())
+				para_temp.text_prop.cr_back = Gdiplus::Color::Transparent;
 
 			para_line.push_back(para_temp);
 		}
@@ -229,8 +229,8 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			}
 
 			//stroke 두께까지 포함한 크기여야 한다.
-			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].ti.thickness;// *2.0f;
-			sz.cy = boundRect.Height + para[i][j].ti.thickness;// *2.0f;
+			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].text_prop.thickness;// *2.0f;
+			sz.cy = boundRect.Height + para[i][j].text_prop.thickness;// *2.0f;
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
 #endif
 			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
@@ -394,11 +394,11 @@ void CSCParagraph::get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font
 	float fDpiY = g.GetDpiY();
 
 	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
-	float emSize = fDpiY * ti.size / 96.0;
+	float emSize = fDpiY * text_prop.size / 96.0;
 
-	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(ti.name));
+	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(text_prop.name));
 
-	Gdiplus::Font ff(&fontFamily, emSize, ti.style);
+	Gdiplus::Font ff(&fontFamily, emSize, text_prop.style);
 	*font = ff.Clone();
 }
 

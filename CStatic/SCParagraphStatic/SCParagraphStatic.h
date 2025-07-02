@@ -28,8 +28,8 @@ public:
 
 protected:
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 음절
-	CSCLogFont		m_sc_font;						//기본 폰트 설정
-	void			update_sc_font();				//설정 변경값을 m_sc_font에 적용
+	CSCTextProperty	m_text_prop;					//기본 폰트 설정
+	void			update_text_property();			//설정 변경값을 m_text_prop에 적용
 
 	//m_para[line][index]의 설정값대로 font를 SelectObject()하고 pOldFont를 리턴한다.
 	//CFont*			select_paragraph_font(int line, int index, CDC* pDC, CFont* font);

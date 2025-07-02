@@ -81,7 +81,7 @@ void CSCDirWatcher::thread_directory_change_watcher()
 	while (m_is_thread_running)
 	{
 		// Watch directory logic here
-		TRACE(_T("watching %d directories...\n"), m_watcher.get_watching_count());
+		//TRACE(_T("watching %d directories...\n"), m_watcher.get_watching_count());
 
 		//WaitForMultipleObjectsEx()를 사용하면 Invalid Handle 에러가 발생하여 WaitForSingleObject()로 변경함.
         //이 waiting을 중지시키기 위한 이벤트를 발생시켜야 하는데 찾지 못하여 우선 1초 간격으로 while문을 실행함.

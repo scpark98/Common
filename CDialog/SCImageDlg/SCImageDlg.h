@@ -107,6 +107,8 @@ public:
 
 	LRESULT			on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam);
 
+	void			set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore);
+
 //animated gif 관련 public member
 	void			play_gif();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
@@ -126,6 +128,8 @@ protected:
 
 	//투명 png일 경우 배경에 표시할 zigzag 패턴 브러시
 	std::unique_ptr<Gdiplus::TextureBrush> m_br_zigzag;
+	Gdiplus::Color	m_cr_zigzag_back = Gdiplus::Color::White;
+	Gdiplus::Color	m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
 
 	Gdiplus::InterpolationMode m_interplationMode = (Gdiplus::InterpolationMode)CGdiplusBitmap::interpolation_bicubic;// Gdiplus::InterpolationModeHighQualityBicubic;
 

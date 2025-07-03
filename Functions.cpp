@@ -8554,8 +8554,10 @@ void get_tag_str(CString& src, std::deque<CString>& tags)
 			}
 
 			//태그가 저장된다. 공백, 하이픈, 언더바는 모두 제거된다.
-			//컬러명은 Red로 주면 Gdiplus::Color::Red를 사용하므로 대소문자를 구분한다.
-			str.Replace(_T(" "), _T(""));
+			//컬러명은 red로 주면 Gdiplus::Color::Red를 사용하며 대소문자를 구분하지 않는다.
+			//fontname은 공백을 제거해서는 안된다.
+			if (!find_one_of(str, _T("<f="), _T("<font="), _T("<name="), _T("<fontname=")))
+				str.Replace(_T(" "), _T(""));
 			str.Replace(_T("_"), _T(""));
 			str.Replace(_T("-"), _T(""));
 			tags.push_back(str);
@@ -18505,153 +18507,6 @@ bool save(Gdiplus::Bitmap* bitmap, CString filename)
 	return false;
 }
 
-#include <algorithm>
-//#define USING_HDC
-void draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
-{
-	int i, j;
-	CFont font, * pOldFont = NULL;
-
-	Gdiplus::StringFormat sf;
-
-	//g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-	//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
-
-	Gdiplus::Unit unit = g.GetPageUnit();
-	float fDpiX = g.GetDpiX();
-	float fDpiY = g.GetDpiY();
-
-	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
-	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
-
-	//g를 이용해서 pDC를 구해서 사용하는 경우는 g.ReleaseHDC(hdc);를 호출하기 전까지는 g의 어떤 함수 사용도 하지 않아야 한다.
-	// Make GDI calls, but don't call any methods
-	// on g until after the call to ReleaseHDC.
-#ifdef USING_HDC
-	HDC hdc = g.GetHDC();
-	CDC* pDC = CDC::FromHandle(hdc);
-	pDC->SetBkMode(TRANSPARENT);
-#endif
-	sf.SetAlignment(Gdiplus::StringAlignmentNear);
-	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
-
-	//dc.SetBkColor()로 지정된 배경색을 설정하면 편하지만
-	//글자 속성에 따라 그 높낮이가 다른 경우도 있다.
-	//따라서 calc_text_rect()에서 max height를 모든 paragraph에 적용했으며
-	//여기서도 배경색으로 칠한 뒤 텍스트를 표시한다.
-
-	for (i = 0; i < para.size(); i++)
-	{
-		//각 항목을 출력하되 뒤에서부터 출력시킨다.
-		//이는 italic인 경우 다음 항목에 의해 일부 가려지는 현상을 방지하기 위함이다.
-		for (j = para[i].size() - 1; j >= 0; j--)
-		{
-#ifdef USING_HDC
-			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
-
-			//text 배경색을 칠하고
-			if (para[i][j].cr_back.GetA() != 0)
-				pDC->FillSolidRect(para[i][j].r, para[i][j].cr_back.ToCOLORREF());
-
-			//text를 출력한다.
-			pDC->SetTextColor(para[i][j].cr_text.ToCOLORREF());
-			pDC->DrawText(para[i][j].text, para[i][j].r, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
-			//draw_text(g, m_para[i][j].r, m_para[i][j].cr_text, m_para[i][j].text, m_para[i][j].size, m_para[i][j].);
-			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
-			pDC->SelectObject(pOldFont);
-#else
-			//GraphicsPath를 이용하면 stroke, shadow 등 다양한 효과를 구현할 수 있지만
-			//DrawString()보다 글자가 선명하게 보이지 않는 단점이 있다.
-			//만약 stroke, shadow를 아예 사용하지 않을 경우는 분기처리를 고민해봐야 한다.
-
-			//text 배경색을 칠하고
-			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
-
-			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
-
-			//get_paragraph_font(g, para, i, j, &font);
-			float emSize = fDpiY * para[i][j].text_prop.size / 72.0;
-			Gdiplus::Font font(&ff, emSize, para[i][j].text_prop.style);
-
-
-			//text를 출력한다.
-			Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
-			Gdiplus::GraphicsPath str_path, shadow_path;
-
-			//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
-			str_path.SetFillMode(Gdiplus::FillModeWinding);
-			shadow_path.SetFillMode(Gdiplus::FillModeWinding);
-
-			//AddString() 파라미터 중 출력위치를 줄 때 Gdiplus::Rect() 또는 Gdiplus::Point()로 줄 수 있는데
-			//stroke 또는 shadow가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
-			//r을 정확히 계산하는 것이 정석이나 굳이 r을 주지 않고 Gdiplus::Point()로 주면 문제되지 않는다.
-			CRect r = para[i][j].r;
-			str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-								para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
-
-			//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
-			Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
-			CPoint pt_shadow_offset(std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].text_prop.thickness / 1.4f }), std::max({ (float)(para[i][j].r.Height()) / 30.0f, 2.0f, para[i][j].text_prop.thickness / 1.4f}));
-			r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
-
-			shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
-				para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
-
-			Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
-			Gdiplus::SolidBrush brush(para[i][j].text_prop.cr_text);
-
-			//pen.SetLineJoin(Gdiplus::LineJoinMiter);
-			pen.SetLineJoin(Gdiplus::LineJoinRound);
-
-			g.FillPath(&br_shadow, &shadow_path);
-
-			//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
-			//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
-			if (para[i][j].text_prop.thickness > 0.0f)
-				g.DrawPath(&pen, &str_path);
-
-			g.FillPath(&brush, &str_path);
-
-			/*
-			Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
-			Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
-
-			//g.DrawString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &font,
-			//			 Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
-			g.DrawString(CStringW(para[i][j].text), -1, &font,
-				Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
-			*/
-#endif
-
-			//각 para 영역 확인용 코드
-#ifdef _DEBUG
-			//"\n"에 의한 공백 라인은 영역 사각형을 굳이 표시하지 않는다.
-			//if (para[i][j].r.Width() > 2)
-				//draw_rectangle(g, para[i][j].r, Gdiplus::Color::Blue);// , Gdiplus::Color(255, 255, 0, 0));
-#endif
-		}
-	}
-
-	//텍스트 출력 영역 확인용
-#ifdef _DEBUG
-	//draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
-#endif
-	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
-
-#ifdef USING_HDC
-	font.DeleteObject();
-	pDC->SelectObject(pOldFont);
-
-	g.ReleaseHDC(hdc);
-#endif
-}
-
-void draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para)
-{
-	Gdiplus::Graphics g(pDC->m_hDC);
-	draw_text(g, para);
-}
 
 CString json_value(CString json, CString key)
 {

@@ -1054,35 +1054,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 				{
 					if (data_type == column_data_type_text)
 					{
-						if (iSub != 0)
-						{
-							if (!include_null)
-							{
-								if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-									return true;
-								else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-									return false;
-								else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-									return true;
-							}
-
-							if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-								return false;
-							else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-								return true;
-							else
-							{
-								if (a.text[0].MakeLower() > b.text[0].MakeLower())
-									return false;
-								else
-									return true;
-							}
-						}
-						else
-						{
-							return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
-						}
-						return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
+						return (a.text[iSub].CompareNoCase(b.text[iSub]) > 0);
 					}
 					else if (data_type == column_data_type_text_ip)
 					{
@@ -1090,42 +1062,22 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 						{
 							if (!include_null)
 							{
-								return (compare_string(a.text[iSub], b.text[iSub]) == 1);
-								//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								//	return true;
-								//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-								//	return false;
-								//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								//	return true;
+								return (compare_string(a.text[iSub], b.text[iSub]) > 0);
 							}
 							else
 							{
-								return (compare_string(a.text[iSub], b.text[iSub]) == 1);
-								//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-								//	return false;
-								//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-								//	return true;
-								//else
-								//{
-								//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
-								//		return false;
-								//	else
-								//		return true;
-								//}
+								return (compare_string(a.text[iSub], b.text[iSub]) > 0);
 							}
 						}
 						else
 						{
-							//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
-							return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+							return (compare_string(a.text[iSub], b.text[iSub]) > 0);
 						}
 
-						//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
-						return (compare_string(a.text[iSub], b.text[iSub]) == 1);
+						return (compare_string(a.text[iSub], b.text[iSub]) > 0);
 					}
 					else
 					{
-						//a.text[iSub].Replace(_T(","), _T(""));
 						a.text[iSub].Remove(',');
 						b.text[iSub].Remove(',');
 						return (_ttof(a.text[iSub]) < _ttof(b.text[iSub]));
@@ -1135,35 +1087,7 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 				{
 					if (data_type == column_data_type_text)
 					{
-						if (iSub != 0)
-						{
-							if (!include_null)
-							{
-								if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-									return true;
-								else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-									return false;
-								else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-									return true;
-							}
-
-							if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-								return true;
-							else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-								return false;
-							else
-							{
-								if (a.text[0].MakeLower() > b.text[0].MakeLower())
-									return true;
-								else
-									return false;
-							}
-						}
-						else
-						{
-							return (a.text[iSub].MakeLower() > b.text[iSub].MakeLower());
-						}
-						return (_ttof(a.text[iSub].MakeLower()) > _ttof(b.text[iSub].MakeLower()));
+						return (a.text[iSub].CompareNoCase(b.text[iSub]) < 0);
 					}
 					else if (data_type == column_data_type_text_ip)
 					{
@@ -1172,36 +1096,17 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 							if (!include_null)
 							{
 								return (compare_string(a.text[iSub], b.text[iSub]) == -1);
-								//if (a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								//	return true;
-								//else if (a.text[iSub].IsEmpty() && !b.text[iSub].IsEmpty())
-								//	return false;
-								//else if (!a.text[iSub].IsEmpty() && b.text[iSub].IsEmpty())
-								//	return true;
 							}
 							else
 							{
 								return (compare_string(a.text[iSub], b.text[iSub]) == -1);
-								//if (a.text[iSub].MakeLower() > b.text[iSub].MakeLower())
-								//	return false;
-								//else if (a.text[iSub].MakeLower() < b.text[iSub].MakeLower())
-								//	return true;
-								//else
-								//{
-								//	if (a.text[0].MakeLower() > b.text[0].MakeLower())
-								//		return false;
-								//	else
-								//		return true;
-								//}
 							}
 						}
 						else
 						{
-							//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
 						}
 
-						//return (a.text[iSub].MakeLower() < b.text[iSub].MakeLower());
 						return (compare_string(a.text[iSub], b.text[iSub]) == -1);
 					}
 					else

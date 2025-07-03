@@ -713,7 +713,7 @@ public:
 	}
 
 	//get color name by (r, g, b) value. alpha는 무시한다.
-	//exactly : true이면 정확히 일치하는 색상만 찾고, false이면 가장 유사한 색상의 이름을 "near = "을 붙여서 리턴한다.
+	//exactly : true이면 정확히 일치하는 색상만 찾고, false이면 가장 유사한 색상의 이름을 "near : "을 붙여서 리턴한다.
 	static std::string get_color_name(Gdiplus::Color cr, bool exactly = false)
 	{
 		double distance = 99999999.0;
@@ -751,7 +751,7 @@ public:
 			if (distance == 0.0f)
 				return color_name;
 			else
-				return "near = " + color_name;
+				return "near : " + color_name;
 		}
 
 		return "Unknown Color";

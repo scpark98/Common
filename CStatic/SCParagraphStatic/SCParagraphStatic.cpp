@@ -61,7 +61,8 @@ CRect CSCParagraphStatic::set_text(CString text)
 		MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
 	}
 
-	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, dwText);
+	m_static_option = dwText;
+	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, m_static_option);
 	Invalidate();
 
 	return m_rect_text;
@@ -331,7 +332,7 @@ void CSCParagraphStatic::OnPaint()
 	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
 
 	Gdiplus::Graphics g(dc);
-	draw_text(g, m_para);
+	CSCParagraph::draw_text(g, m_para);
 }
 
 void CSCParagraphStatic::PreSubclassWindow()
@@ -347,7 +348,6 @@ void CSCParagraphStatic::update_text_property()
 {
 	m_text_prop.name = m_lf.lfFaceName;
 	m_text_prop.size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
-	//m_text_prop.size = -MulDiv(m_lf.lfHeight, GetDeviceCaps(GetDC()->m_hDC, LOGPIXELSY), 72);
 
 	if (m_lf.lfWeight >= FW_BOLD)
 		m_text_prop.style |= Gdiplus::FontStyleBold;
@@ -369,7 +369,7 @@ void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	CRect rc;
 	GetClientRect(rc);
-	CSCParagraph::calc_text_rect(rc, GetDC(), m_para, DT_CENTER | DT_VCENTER);
+	CSCParagraph::calc_text_rect(rc, GetDC(), m_para, m_static_option);
 }
 
 void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)

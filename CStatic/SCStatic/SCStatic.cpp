@@ -99,6 +99,9 @@ void CSCStatic::PreSubclassWindow()
 	//modified the style to avoid text overlap when press tab 
 	ModifyStyle(0, BS_ICON);
 
+	m_halign = get_halign();
+	m_valign = get_valign();
+
 	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
 	CWnd* pWnd = AfxGetApp()->GetMainWnd();// GetParent();
 	CFont* font = NULL;
@@ -566,6 +569,36 @@ DWORD CSCStatic::get_text_align()
 		dwText |= DT_TOP;
 
 	return dwText;
+}
+
+int CSCStatic::get_halign()
+{
+	DWORD dwStyle = GetStyle();
+	if (dwStyle & SS_CENTER)
+		return DT_CENTER;
+	else if (dwStyle & DT_RIGHT)
+		return DT_RIGHT;
+
+	return DT_LEFT;
+}
+
+int CSCStatic::get_valign()
+{
+	DWORD dwStyle = GetStyle();
+	if (dwStyle & SS_CENTERIMAGE)
+		return DT_VCENTER;
+
+	return DT_TOP;
+}
+
+void CSCStatic::set_halign()
+{
+
+}
+
+void CSCStatic::set_valign()
+{
+
 }
 
 void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back)

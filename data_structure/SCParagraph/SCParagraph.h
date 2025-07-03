@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <afxwin.h>
 #include <gdiplus.h>
 #include <deque>
@@ -14,8 +15,8 @@
 	태그명에 공백, 하이픈, underscore는 모두 무시된다.
 	지원하는 태그는 다음과 같다.
 
-	<f=굴림> = <font=굴림> = <font name=굴림> = <font_name=굴림>
-	<sz=10> = <size=10> = <font size=10> = <font_size=10>
+	<f=굴림> = <font=굴림> = <name=굴림> = <font_name=굴림>
+	<sz=10> = <size=10> = <font_size=10>
 	<b>						//bold
 	<i>						//italic
 	<u>						//underline
@@ -67,15 +68,32 @@ public:
 	CSCTextProperty	text_prop;
 	CRect			r;						//이 텍스트가 그려질 위치(절대좌표가 아닌 0,0을 기준으로 상대좌표)
 
+	//이 paragraph의 CSCTextProperty 설정에 맞는 Gdiplus::Font를 구한다.
+	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
+
+
+	//아래 static 함수들은 하나의 CSCParagraph에 대해 수행되는 함수들이 아니고
+	//std::deque<std::deque<CSCParagraph>> 구조의 paragraph에 대해 수행해야 하므로
+	//CSCParagraph의 멤버함수가 아닌 static으로 선언한다.
+
 	//text의 태그를 파싱하여 각 음절의 속성을 설정한 후 para에 저장한다.
 	//ti에는 font name, size, style, color 등이 세팅되어 있고
 	//특별한 태그가 없으면 ti에 설정된 기본값을 사용한다.
 	static void		build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextProperty* text_prop);
 
 	//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
+	//모든 para가 출력되는 최대 사각형을 리턴한다.
 	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align);
+	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
 
-	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
+	//static void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
+	static void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para);
+
+	//calc_text_rect()에서 이미 각 paragraph의 r이 align에 따라 정해지지만 이를 동적으로 변경하고자 할 경우 호출.
+	static CRect	set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>>& para, DWORD align);
+
+	//출력 위치를 이동시킨다.
+	static CRect	offset(int x, int y);
 
 protected:
 };

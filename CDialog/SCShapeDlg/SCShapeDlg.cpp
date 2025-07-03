@@ -115,8 +115,8 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CSCShapeDlgTextSetting* setting)
 	if (setting != NULL)
 		memcpy(&m_text_setting, setting, sizeof(CSCShapeDlgTextSetting));
 
-	return set_text(m_parent, m_text_setting.text, m_text_setting.lf.size, m_text_setting.lf.style, m_text_setting.lf.shadow_depth, m_text_setting.lf.thickness,
-					m_text_setting.lf.name, m_text_setting.lf.cr_text, m_text_setting.lf.cr_stroke, m_text_setting.lf.cr_shadow, m_text_setting.lf.cr_back);
+	return set_text(m_parent, m_text_setting.text, m_text_setting.text_prop.size, m_text_setting.text_prop.style, m_text_setting.text_prop.shadow_depth, m_text_setting.text_prop.thickness,
+					m_text_setting.text_prop.name, m_text_setting.text_prop.cr_text, m_text_setting.text_prop.cr_stroke, m_text_setting.text_prop.cr_shadow, m_text_setting.text_prop.cr_back);
 }
 
 //gdiplus를 이용한 text 출력용 dlg 생성
@@ -133,7 +133,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 {
 	m_para.clear();
 
-	CSCTextInfo ti;
+	CSCTextProperty text_prop;
 
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
@@ -157,23 +157,23 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 		font_name = lf.lfFaceName;
 	}
 
-	ti.name = font_name;
-	ti.size = font_size;
-	ti.style = font_style;
-	ti.cr_text = cr_text;
-	ti.cr_stroke = cr_stroke;
-	ti.cr_shadow = cr_shadow;
-	ti.cr_back = cr_back;
-	ti.shadow_depth = shadow_depth;
-	ti.thickness = thickness;
+	text_prop.name = font_name;
+	text_prop.size = font_size;
+	text_prop.style = font_style;
+	text_prop.cr_text = cr_text;
+	text_prop.cr_stroke = cr_stroke;
+	text_prop.cr_shadow = cr_shadow;
+	text_prop.cr_back = cr_back;
+	text_prop.shadow_depth = shadow_depth;
+	text_prop.thickness = thickness;
 
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
 
 	m_img.release();
 
-	CSCParagraph::build_paragraph_str(text, m_para, &ti);
-	m_text_setting = CSCShapeDlgTextSetting(text, ti);
+	CSCParagraph::build_paragraph_str(text, m_para, &text_prop);
+	m_text_setting = CSCShapeDlgTextSetting(text, text_prop);
 
 	if (!m_hWnd)
 	{
@@ -193,18 +193,16 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	//해당 캔버스에
 	Gdiplus::Graphics g(m_img.m_pBitmap);
 
-	//글자를 출력하고
-	//r = draw_text(g, r, text,
-	//	font_size, font_style, shadow_depth, thickness, font_name,
-	//	cr_text, cr_stroke, cr_shadow, DT_LEFT | DT_TOP);
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	//CDC* pDC = CDC::FromHandle(g.GetHDC());	//이 코드를 써서 CDC에 draw_text()하려 했으나 이렇게 하면 g에 아무것도 그려지지 않음
 
 	//기본적으로 m_para는 DT_CENTER로 가정하고 계산하므로 DT_CENTER이면 여기서 바로 그려주고
 	//DT_LEFT, DT_RIGHT라면 set_text_align()을 한 후 그 함수 안에서 다시 그려준다.
 	if (m_text_align == DT_CENTER)
 	{
-		draw_text(g, m_para);
+		CSCParagraph::draw_text(g, m_para);
 		set_image(parent, &m_img, false);
 	}
 	else
@@ -276,8 +274,8 @@ void CSCShapeDlg::set_text_align(int align)
 
 	//해당 캔버스에 다시 그려준다.
 	Gdiplus::Graphics g(m_img.m_pBitmap);
-	g.Clear(m_text_setting.lf.cr_back);
-	draw_text(g, m_para);
+	g.Clear(m_text_setting.text_prop.cr_back);
+	CSCParagraph::draw_text(g, m_para);
 	set_image(m_parent, &m_img, false);
 }
 

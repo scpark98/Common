@@ -53,7 +53,7 @@ static const UINT Message_CThumbCtrl = ::RegisterWindowMessage(_T("MessageString
 #define MAX_THREAD			100
 #define MIN_TILE_SIZE		100
 #define MAX_TILE_SIZE		400
-#define MIN_GAP				10
+#define MIN_GAP				20
 
 class CThumbCtrlMsg
 {

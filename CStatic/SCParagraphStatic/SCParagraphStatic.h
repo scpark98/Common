@@ -31,13 +31,9 @@ protected:
 	CSCTextProperty	m_text_prop;					//기본 폰트 설정
 	void			update_text_property();			//설정 변경값을 m_text_prop에 적용
 
-	//m_para[line][index]의 설정값대로 font를 SelectObject()하고 pOldFont를 리턴한다.
-	//CFont*			select_paragraph_font(int line, int index, CDC* pDC, CFont* font);
-	void			get_paragraph_font(int line, int index, Gdiplus::Graphics& g, Gdiplus::Font** font);
-
-
-	int				m_max_width;			//각 라인들 중 최대 너비
-	int				m_max_width_line;		//각 라인들 중 최대 너비인 라인 번호
+	DWORD			m_static_option;				//SS_LEFT -> DT_LEFT 등 옵션값 저장
+	int				m_max_width;					//각 라인들 중 최대 너비
+	int				m_max_width_line;				//각 라인들 중 최대 너비인 라인 번호
 	CPoint			m_pt_icon;
 
 	bool			m_auto_ctrl_size = true;//출력될 텍스트의 크기가 컨트롤의 크기보다 클 경우 컨트롤의 크기를 자동으로 늘려준다. default = true

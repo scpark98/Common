@@ -160,13 +160,13 @@ void CHeaderCtrlEx::OnPaint()
 
 			if (m_cur_sort_asc)
 			{
-				draw_line(&dc, rArrow.left, rArrow.bottom - 1, rArrow.CenterPoint().x, rArrow.top, m_cr_sort_arrow);
-				draw_line(&dc, rArrow.CenterPoint().x, rArrow.top, rArrow.right - 1, rArrow.bottom - 1, m_cr_sort_arrow);
+				draw_line(&dc, rArrow.left, rArrow.top + 1, rArrow.CenterPoint().x, rArrow.bottom, m_cr_sort_arrow);
+				draw_line(&dc, rArrow.CenterPoint().x, rArrow.bottom, rArrow.right - 1, rArrow.top + 1, m_cr_sort_arrow);
 			}
 			else
 			{
-				draw_line(&dc, rArrow.left, rArrow.top + 1, rArrow.CenterPoint().x, rArrow.bottom, m_cr_sort_arrow);
-				draw_line(&dc, rArrow.CenterPoint().x, rArrow.bottom, rArrow.right - 1, rArrow.top + 1, m_cr_sort_arrow);
+				draw_line(&dc, rArrow.left, rArrow.bottom - 1, rArrow.CenterPoint().x, rArrow.top, m_cr_sort_arrow);
+				draw_line(&dc, rArrow.CenterPoint().x, rArrow.top, rArrow.right - 1, rArrow.bottom - 1, m_cr_sort_arrow);
 			}
 		}
 	}

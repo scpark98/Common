@@ -753,6 +753,23 @@ struct	NETWORK_INFO
 		return false;
 	}
 
+	template <typename ... Types> bool find_one_of(CString src, Types... args)
+	{
+		if (src.IsEmpty())
+			return false;
+
+		int n = sizeof...(args);
+		CString arg[] = { args... };
+
+		for (auto element : arg)
+		{
+			if (src.Find(element) >= 0)
+				return true;
+		}
+
+		return false;
+	}
+
 
 	//src 문자열에 set_of_keyword에 나열된 단어가 있는지 검사.
 	//set_of_keyword는 세미콜론으로 구분해서 여러 문자 또는 문자열을 넣을 수 있다.
@@ -1673,10 +1690,6 @@ h		: 복사할 height 크기(pixel)
 
 	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);
-
-	void		get_paragraph_font(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int line, int index, Gdiplus::Font** font);
-	void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
-	void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para);
 
 //gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 //종료될 때 해제시켜주는 함수도 반드시 호출해줘야 한다.

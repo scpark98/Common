@@ -48,14 +48,14 @@ class CSCShapeDlgTextSetting
 {
 public:
 	CSCShapeDlgTextSetting() {};
-	CSCShapeDlgTextSetting(CString _text, CSCTextInfo _lf)	//alpha=0이면 투명 영역은 클릭되지 않는다.
+	CSCShapeDlgTextSetting(CString _text, CSCTextProperty _text_prop)	//alpha=0이면 투명 영역은 클릭되지 않는다.
 	{
 		text = _text;
-		lf = _lf;
+		text_prop = _text_prop;
 	}
 
 	CString text;
-	CSCTextInfo	lf;
+	CSCTextProperty	text_prop;
 };
 
 //CSCShapeDlg
@@ -100,11 +100,11 @@ public:
 	CSCShapeDlgTextSetting* set_text(CString str);
 	CSCShapeDlgTextSetting*	set_text(CSCShapeDlgTextSetting* setting = NULL);
 
-	void			set_text_color(Gdiplus::Color cr) { m_text_setting.lf.cr_text = cr; set_text(&m_text_setting); }
-	void			set_stroke_color(Gdiplus::Color cr) { m_text_setting.lf.cr_stroke = cr; set_text(&m_text_setting); }
-	void			set_shadow_color(Gdiplus::Color cr) { m_text_setting.lf.cr_shadow = cr; set_text(&m_text_setting); }
-	void			set_back_color(Gdiplus::Color cr) { m_text_setting.lf.cr_back = cr; set_text(&m_text_setting); }
-	void			set_thickness(float thickness) { m_text_setting.lf.thickness = thickness; set_text(&m_text_setting); }
+	void			set_text_color(Gdiplus::Color cr) { m_text_setting.text_prop.cr_text = cr; set_text(&m_text_setting); }
+	void			set_stroke_color(Gdiplus::Color cr) { m_text_setting.text_prop.cr_stroke = cr; set_text(&m_text_setting); }
+	void			set_shadow_color(Gdiplus::Color cr) { m_text_setting.text_prop.cr_shadow = cr; set_text(&m_text_setting); }
+	void			set_back_color(Gdiplus::Color cr) { m_text_setting.text_prop.cr_back = cr; set_text(&m_text_setting); }
+	void			set_thickness(float thickness) { m_text_setting.text_prop.thickness = thickness; set_text(&m_text_setting); }
 
 	//기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
 	void			set_text_align(int align);
@@ -126,7 +126,7 @@ public:
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
 	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
 
-	CSCTextInfo*		get_logfont() { &m_text_setting.lf;}
+	CSCTextProperty*		get_logfont() { &m_text_setting.text_prop;}
 
 	//animated gif인 경우
 	enum GIF_PLAY_STATE

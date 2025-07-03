@@ -35,7 +35,7 @@ CThumbCtrl::CThumbCtrl()
 	m_max_thumbs = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), 0);
 	m_szTile = CSize(128, 128);
 	m_szMargin = CSize(20, 20);
-	m_szGap = CSize(10, 20);
+	m_szGap = CSize(50, 20);
 
 	m_show_title = true;
 	m_show_resolution = true;
@@ -1472,7 +1472,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 	//매번 계산하는 것이 다소 부담되지만 시간은 거의 0ms다.
 	//계산된 값을 토대로 스크롤 사이즈가 결정된다.
 	m_per_line = 1;
-	m_szGap.cx = MIN_GAP;
+	//m_szGap.cx = MIN_GAP;
 
 	//long t0 = getClock();
 	while (true)
@@ -1605,19 +1605,17 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			if (draw && !skip)
 			{
 				//입체감있는 프레임을 그려주는 코드인데 배경이 짙은 회색 계열이면 잘 표시가 안나서 일단 스킵.
-				/*
-				rShadow = fit;
-				rShadow.top = rect.bottom - fit.Height();
-				rShadow.bottom = rShadow.top + fit.Height();
-				rShadow.InflateRect(13, 13, 11, 12);
+				rShadow = rTile;// fit;
+				//rShadow.top = rect.bottom - fit.Height();
+				//rShadow.bottom = rShadow.top + fit.Height();
+				//rShadow.InflateRect(13, 13, 0, 0);
 				_shadow.Paint(
 					*pDC, rShadow,
-					CExtWndShadow::DEF_SHADOW_SIZE,
-					0,//CExtWndShadow::DEF_BRIGHTNESS_MIN,
-					100,//CExtWndShadow::DEF_BRIGHTNESS_MAX,
+					5,//CExtWndShadow::DEF_SHADOW_SIZE,
+					85,//CExtWndShadow::DEF_BRIGHTNESS_MIN,
+					CExtWndShadow::DEF_BRIGHTNESS_MAX,
 					false
 				);
-				*/
 #if USE_OPENCV
 				cv_draw(pDC, m_dqThumb[i].img, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #else
@@ -1677,7 +1675,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 			if (draw && !skip)
 			{
-				str.Format(_T("%dx%dx%d"), m_dqThumb[i].width, m_dqThumb[i].height, m_dqThumb[i].channel);
+				str.Format(_T("%d x %d x %d"), m_dqThumb[i].width, m_dqThumb[i].height, m_dqThumb[i].channel * 8);
 				//str.Format(_T("%d/%d"), m_scroll_pos, m_scroll_total);
 				pDC->DrawText(str, resRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 			}
@@ -1828,7 +1826,8 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		for (i = 0; i < m_selected.size(); i++)
 		{
 			CRect r = m_dqThumb[m_selected[i]].rect;
-			r.top -= 4;
+			//r.top -= 4;
+			r.InflateRect(8, 4, 8, 0);
 
 			if (m_img_selection_mark.is_valid())
 			{
@@ -1855,7 +1854,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			}
 			else
 			{
-				draw_rectangle(pDC, r, gRGB(0, 128, 255), NULL_BRUSH, 3);
+				draw_rectangle(g, r, Gdiplus::Color(153, 209, 255), Gdiplus::Color(64, 204, 232, 255));
 			}
 		}
 	}

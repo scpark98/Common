@@ -95,8 +95,14 @@ public:
 	//-1 비교가 제대로 되지 않아 우선 제거함.
 	void			set_textf(LPCTSTR format, ...);
 
-	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등의
+	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등으로 치환하여 리턴
 	DWORD			get_text_align();
+
+	//VALIGN이 SS_CENTERIMAGE가 아니면 상단정렬 둘 뿐이므로 DT_TOP, DT_VCENTER, DT_BOTTOM으로 정렬할 수 있도록 확장한다.
+	int				get_halign();
+	int				get_valign();
+	void			set_halign();
+	void			set_valign();
 
 	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 흡사하다.
 	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
@@ -306,6 +312,8 @@ protected:
 	int				m_nPrefixSpace;
 	CGdiplusBitmap	m_img_back;
 
+	int				m_halign = -1;
+	int				m_valign = -1;
 
 	LOGFONT			m_lf;
 	CFont			m_font;

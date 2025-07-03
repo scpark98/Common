@@ -157,7 +157,8 @@ void CSCThumbCtrl::OnPaint()
 		}
 	}
 
-	m_scroll_total = rItem.bottom + 20;
+	m_scroll_total = rItem.bottom - m_scroll_pos + m_szMargin.cy;
+	TRACE(_T("m_scroll_total = %d\n"), m_scroll_total);
 }
 
 BOOL CSCThumbCtrl::OnEraseBkgnd(CDC* pDC)
@@ -453,11 +454,7 @@ void CSCThumbCtrl::scroll_up(bool up)
 		return;
 
 	int pos = m_scroll_pos;
-
-	if (up)
-		pos += (m_szTile.cy + m_szGap.cy);
-	else
-		pos -= (m_szTile.cy + m_szGap.cy);
+	pos += (up ? 1 : -1) * (m_szTile.cy + m_szGap.cy);
 
 	/*
 	if (up)

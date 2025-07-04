@@ -3,13 +3,15 @@
 #include <afxdialogex.h>
 
 #include <deque>
+#include "../colors.h"
 #include "../GdiplusBitmap.h"
 #include "../thread/thread_manager.h"
+#include "../CEdit/SCEdit/SCEdit.h"
 
 
-#define MIN_TILE_SIZE		100
+#define MIN_TILE_SIZE		40
 #define MAX_TILE_SIZE		400
-#define MIN_GAP				20
+#define MIN_GAP				12
 
 static const UINT Message_CSCThumbCtrl = ::RegisterWindowMessage(_T("MessageString_CSCThumbCtrl"));
 
@@ -44,14 +46,14 @@ class CThumbImage
 {
 public:
 	CGdiplusBitmap img;
-	CString		title;
+	CString		title;			//파일명 또는 지정된 타이틀
 	bool		key_thumb;		//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
 	CString		info[4];		//info text 표시용. 0(lt info) ~ 3(rb info)
 	CString		full_path;
 	int			width;			//원래 이미지의 크기 정보
 	int			height;
 	int			channel;
-	CRect		r;				//thumb+text가 실제 그려진 좌표값을 저장해둔다.
+	CRect		r;				//이미지가 그려지는 thumb 영역이 아닌 thumb+title+여백까지 포함된 타일 영역
 	int			thumb_bottom;	//thumb image의 하단 좌표, 타이틀 편집시 사용
 	int			line_index;		//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
 	float		score = 0.0;
@@ -79,6 +81,18 @@ public:
 	int				size() { return m_thumb.size(); }
 	CGdiplusBitmap	get_img(int index);
 
+//크기 조정
+	CSize			get_tile_size() { return m_sz_tile; }
+	void			set_tile_size(CSize szTile) { m_sz_tile = szTile; recalc_tile_rect(); }
+
+	CSize			get_margin_size() { return m_sz_margin; }
+	void			set_margin_size(CSize szMargin) { m_sz_margin = szMargin; recalc_tile_rect(); }
+
+	CSize			get_gap_size() { return m_sz_gap; }
+	void			set_gap_size(CSize szGap) { m_sz_gap = szGap; recalc_tile_rect(); }
+
+	void			enlarge_size(bool enlarge);
+
 //선택 관련
 	std::deque<int> m_selected;
 	bool			m_use_multi_selection = false;	//default = false
@@ -93,15 +107,67 @@ public:
 	bool			m_use_circle_number = false;
 	void			use_circle_number(bool use) { m_use_circle_number = use; Invalidate(); }
 
+	CGdiplusBitmap	m_img_selection_mark;
+	void			set_selection_mark_image(CString image_path, int w = 0, int h = 0);
+	void			set_selection_mark_image(CString sType, UINT id, int w = 0, int h = 0);
+
+	int				get_index_from_point(CPoint pt);
+
+	//index = -1 : 전체선택
+	void			select_item(int index, bool select = true, bool make_ensure_visible = true);
+	void			ensure_visible(int index);
+
+//검색 관련
+	//show_inputbox가 true이면 입력박스가 표시되고 text는 갱신된다. false이면 text 값으로 검색.
+	std::deque<int> find_text(bool show_inputbox, CString text, bool select);
+	std::deque<int> find_text(bool show_inputbox, bool select);
+
+//타이틀 편집 관련
+	void			edit_begin(int index);
+	void			edit_end(bool valid = true);
+	bool			is_editing() { return m_in_editing; }
+	CString			get_old_title() { return m_old_title; }
+	void			set_title(int index, CString title);
+	int				find_by_title(CString title, bool bWholeWord = false);
+
+//옵션
+	void			show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
+
+//color theme
+	void			set_color_theme(int theme);
+
 protected:
 	CWnd*			m_parent = NULL;
 
-	//썸네일이 올려질 타일의 크기
-	CSize			m_szTile = CSize(128, 128);
-	//썸네일의 시작 여백
-	CSize			m_szMargin = CSize(20, 20);;
-	//썸네일 간격
-	CSize			m_szGap = CSize(20, 20);;
+	//thumb 크기를 기준으로 tile 크기를 계산해야 한다. 그래야 이미지를 로드할 때 thumb 크기 비율로 resize 할 수 있다.
+	CSize			m_sz_thumb = CSize(100, 120);
+
+	//썸네일이 올려질 타일의 크기(타일 = 내부마진 + 썸네일크기 + 타이틀표시영역)
+	CSize			m_sz_tile;	//m_sz_thumb의 크기에 따라 자동 계산되므로 직접 입력하지 말것!
+
+	//타일과 썸네일의 상하좌우 여백
+	CRect			m_r_inner = CRect(8, 4, 8, 4);
+
+	int				m_title_height = 14;
+	int				m_thumb_title_gap = 4;	//thumb와 title 사이 갭
+	CRect			m_r_title;				//title 표시 영역. 자동 계산
+
+	//이 컨트롤과 썸네일들이 표시되는 영역의 상하좌우 여백
+	CSize			m_sz_margin = CSize(12, 12);
+
+	//썸네일 사이의 간격
+	CSize			m_sz_gap = CSize(12, 12);
+
+	//타일 크기, 마진, 간격, 스크롤, 컨트롤 크기조정 등에 따라 각 썸네일이 표시되는 r이 재계산된다.
+	//이러한 변화에 대해 재계산하고 OnPaint()에서는 r에 표시만 하면 된다.
+	void			recalc_tile_rect();
+
+//옵션
+	bool			m_show_index = true;		//썸네일의 인덱스 번호를 표시할지
+	bool			m_show_title = true;		//썸네일 아래 타이틀 문자열을 표시할지...
+	bool			m_show_resolution = false;
+	bool			m_show_extension = true;
+
 
 
 //스크롤 기능 관련
@@ -112,7 +178,6 @@ protected:
 	std::deque<int> m_line_height;	//각 라인마다 타이틀의 길이에 따라 라인의 높이가 다름.
 
 	void			set_scroll_pos(int pos);
-	void			recalculate_scroll_size();
 	void			scroll_up(bool up);
 
 	bool			m_scroll_drag;
@@ -122,13 +187,27 @@ protected:
 	double			m_scroll_trans;
 
 
-	//로딩 관련
+//로딩 관련
 	bool			m_loading_completed = false;
 	CThreadManager	m_thread;
 	static void		loading_function(int idx, int start, int end);
 	static void		loading_completed_callback();
 	void			on_loading_completed();
 
+//폰트 관련
+	LOGFONT			m_lf;
+	CFont			m_font;
+	void			reconstruct_font();
+
+//타이틀 편집 관련
+	CSCEdit*		m_pEdit;
+	bool			m_in_editing;
+	int				m_editing_index;
+	CString			m_old_title;
+	long			m_last_clicked;
+
+//color theme
+	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
@@ -141,4 +220,12 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	virtual void PreSubclassWindow();
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnRButtonDblClk(UINT nFlags, CPoint point);
 };

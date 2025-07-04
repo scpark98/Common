@@ -1731,7 +1731,7 @@ LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-void CVtListCtrlEx::set_color_theme(int theme, bool apply_now)
+void CVtListCtrlEx::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
 

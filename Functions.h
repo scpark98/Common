@@ -1819,12 +1819,12 @@ h		: 복사할 height 크기(pixel)
 	CRect		get_center_rect(CRect target, int w, int h);
 
 	//rSub가 rMain에 완전히 속해있으면 true를 리턴한다.
-	bool		RectInRect(CRect rMain, CRect rSub);
+	bool		rect_in_rect(CRect main, CRect sub);
 	//r에서 except영역을 제외하고 cr컬러로 채운다.
 	void		fill_except_rect(CDC* pDC, CRect r, CRect except, COLORREF cr);
 	//두 사각형의 겹치는 영역을 리턴한다.
-	CRect		getIntersectionRect(CRect r1, CRect r2);
-	CRect		getIntersectionRect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
+	CRect		get_intersect_rect(CRect r1, CRect r2);
+	CRect		get_intersect_rect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
 
 	//두 사각형이 겹치는 정도를 r1을 기준으로 계산해서 리턴한다.
 	double		getOverlappedRatio(CRect r1, CRect r2);

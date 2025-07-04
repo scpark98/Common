@@ -6256,7 +6256,7 @@ void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdipl
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
 	//단, r의 안쪽으로 그려지는 PenAlignmentInset이라면 줄이지 않아도 된다.
 	//if (pen_align != Gdiplus::PenAlignmentInset)
-	//	r.DeflateRect(0, 0, 1, 1);
+		r.DeflateRect(0, 0, 1, 1);
 
 	pen.SetAlignment((Gdiplus::PenAlignment)pen_align);
 	pen.SetDashStyle((Gdiplus::DashStyle)pen_style);
@@ -11660,13 +11660,13 @@ bool kill_service(CString service_name, CString process_name)
 }
 */
 
-bool RectInRect(CRect rMain, CRect rSub)
+bool rect_in_rect(CRect main, CRect sub)
 {
 	CRect	rUnion;
 
-	rUnion.UnionRect(&rMain, &rSub);
+	rUnion.UnionRect(&main, &sub);
 
-	if (rUnion == rMain)
+	if (rUnion == main)
 		return true;
 
 	return false;
@@ -14130,7 +14130,7 @@ int	get_monitor_index(CRect r, bool entire_included)
 	{
 		if (entire_included)
 		{
-			if (RectInRect(g_monitors[i].rMonitor, r))
+			if (rect_in_rect(g_monitors[i].rMonitor, r))
 				return i;
 		}
 		else
@@ -14909,42 +14909,20 @@ CRect get_real_from_screen_coord(CRect sr, CRect displayed, CSize real, CSize re
 	return r;
 }
 
-CRect getIntersectionRect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
+CRect get_intersect_rect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
 {
-	CRect r;
-
-	r.SetRectEmpty();
-
-	if (x1 > x2 + w2) return r;
-    if (x1 + w1 < x2) return r;
-    if (y1 > y2 + h2) return r;
-    if (y1 + h1 < y2) return r;
-
-	r.left = MAX(x1, x2);
-    r.top = MAX(y1, y2);
-    r.right = MIN(x1 + w1, x2 + w2);
-    r.bottom = MIN(y1 + h1, y2 + h2);
-
-	return r;
+	return get_intersect_rect(make_rect(x1, y1, w1, h1), make_rect(x2, y2, w2, h2));
 }
 
 //두 사각형의 겹치는 영역을 리턴한다.
-CRect getIntersectionRect(CRect r1, CRect r2)
+CRect get_intersect_rect(CRect r1, CRect r2)
 {
-	CRect	r(0, 0, 0, 0);
-	
-	if (r1.left > r2.left + r2.Width()) return r;
-    if (r1.left + r1.Width() < r2.left) return r;
-    if (r1.top > r2.top + r2.Height()) return r;
-    if (r1.top + r1.Height() < r2.top) return r;
+	CRect temp;
 
-	r.left = MAX(r1.left, r2.left);
-    r.top = MAX(r1.top, r2.top);
-    r.right = MIN(r1.left + r1.Width(), r2.left + r2.Width());
-    r.bottom = MIN(r1.top + r1.Height(), r2.top + r2.Height());
-
-	return r;
+	temp.IntersectRect(r1, r2);
+	return temp;
 }
+
 
 double tangentfunc(double x, double y)
 {

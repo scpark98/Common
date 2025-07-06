@@ -45,6 +45,11 @@ public:
 class CThumbImage
 {
 public:
+	//CThumbImage(CThumbImage& _img)
+	//{
+	//	img.deep_copy(&(_img.img));
+	//}
+
 	CGdiplusBitmap img;
 	CString		title;			//파일명 또는 지정된 타이틀
 	bool		key_thumb;		//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
@@ -78,12 +83,12 @@ public:
 	std::deque<CString> m_files;
 
 	std::deque<CThumbImage> m_thumb;
-	int				size() { return m_thumb.size(); }
 	CGdiplusBitmap	get_img(int index);
+	bool			is_loading_completed() { return m_loading_completed; }
 
 //크기 조정
-	CSize			get_tile_size() { return m_sz_tile; }
-	void			set_tile_size(CSize szTile) { m_sz_tile = szTile; recalc_tile_rect(); }
+	CSize			get_thumb_size() { return m_sz_thumb; }
+	void			set_thumb_size(CSize sz_thumb);
 
 	CSize			get_margin_size() { return m_sz_margin; }
 	void			set_margin_size(CSize szMargin) { m_sz_margin = szMargin; recalc_tile_rect(); }
@@ -112,6 +117,8 @@ public:
 	void			set_selection_mark_image(CString sType, UINT id, int w = 0, int h = 0);
 
 	int				get_index_from_point(CPoint pt);
+	void			on_key_down(int key);
+
 
 	//index = -1 : 전체선택
 	void			select_item(int index, bool select = true, bool make_ensure_visible = true);
@@ -129,12 +136,28 @@ public:
 	CString			get_old_title() { return m_old_title; }
 	void			set_title(int index, CString title);
 	int				find_by_title(CString title, bool bWholeWord = false);
+	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+
+//정렬 관련
+	void			sort_by_title();
+	void			sort_by_info(int idx);	//info text를 기준으로 리스트를 정렬시킨다.
+	void			sort_by_score();
 
 //옵션
 	void			show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
 
 //color theme
 	void			set_color_theme(int theme);
+
+//정보 텍스트 표시
+	bool			m_show_info_text[4];
+	COLORREF		m_crInfoText[4];
+	void			set_info_text(int thumb_index, int idx, CString sInfo, bool refresh);
+
+//폰트 관련
+	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);
+	void			set_font_size(int nSize);
+	void			set_font_bold(bool bBold = true);
 
 protected:
 	CWnd*			m_parent = NULL;
@@ -159,7 +182,7 @@ protected:
 	CSize			m_sz_gap = CSize(12, 12);
 
 	//타일 크기, 마진, 간격, 스크롤, 컨트롤 크기조정 등에 따라 각 썸네일이 표시되는 r이 재계산된다.
-	//이러한 변화에 대해 재계산하고 OnPaint()에서는 r에 표시만 하면 된다.
+	//이러한 변화에 대해 재계산하고 Invalidate()까지 수행하므로 OnPaint()에서는 r에 표시만 하면 된다.
 	void			recalc_tile_rect();
 
 //옵션
@@ -173,9 +196,9 @@ protected:
 //스크롤 기능 관련
 	int				m_scroll_pos = 0;
 	int				m_scroll_total = 0;
-	int				m_per_line;		//한 라인에 표시되는 썸네일 개수
-	int				m_max_line;		//총 표시해야 될 라인 수
-	std::deque<int> m_line_height;	//각 라인마다 타이틀의 길이에 따라 라인의 높이가 다름.
+	int				m_per_line = 0;				//한 라인에 표시되는 썸네일 개수
+	int				m_max_line = 0;				//총 표시해야 될 라인 수
+	//std::deque<int> m_line_height;			//각 라인마다 타이틀의 길이에 따라 라인의 높이가 다름.
 
 	void			set_scroll_pos(int pos);
 	void			scroll_up(bool up);
@@ -200,8 +223,8 @@ protected:
 	void			reconstruct_font();
 
 //타이틀 편집 관련
-	CSCEdit*		m_pEdit;
-	bool			m_in_editing;
+	CSCEdit*		m_pEdit = NULL;
+	bool			m_in_editing = false;
 	int				m_editing_index;
 	CString			m_old_title;
 	long			m_last_clicked;

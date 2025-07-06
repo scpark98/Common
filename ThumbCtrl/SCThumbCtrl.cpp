@@ -16,6 +16,10 @@ CSCThumbCtrl::CSCThumbCtrl()
 
 CSCThumbCtrl::~CSCThumbCtrl()
 {
+	for (int i = 0; i < m_thumb.size(); i++)
+		SAFE_DELETE_ARRAY(m_thumb[i].feature);
+
+	m_thumb.clear();
 }
 
 void CSCThumbCtrl::DoDataExchange(CDataExchange* pDX)
@@ -72,13 +76,14 @@ BEGIN_MESSAGE_MAP(CSCThumbCtrl, CDialogEx)
 	ON_WM_RBUTTONDOWN()
 	ON_WM_RBUTTONUP()
 	ON_WM_RBUTTONDBLCLK()
+	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCThumbCtrl::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 
 // CSCThumbCtrl 메시지 처리기
 
 //타일 크기, 마진, 간격, 스크롤, 컨트롤 크기조정 등에 따라 각 썸네일이 표시되는 r이 재계산된다.
-//이러한 변화에 대해 재계산하고 OnPaint()에서는 r에 표시만 하면 된다.
+//이러한 변화에 대해 재계산하고 Invalidate()까지 수행하므로 OnPaint()에서는 r에 표시만 하면 된다.
 void CSCThumbCtrl::recalc_tile_rect()
 {
 	int		i;
@@ -94,6 +99,8 @@ void CSCThumbCtrl::recalc_tile_rect()
 	//맨 첫번째 항목의 위치를 잡고 인덱스가 증가하면 그 위치를 조정해준다.
 	rTile = make_rect(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_tile.cx, m_sz_tile.cy);
 
+	m_per_line = -1;
+
 	for (i = 0; i < m_thumb.size(); i++)
 	{
 		m_thumb[i].r = rTile;
@@ -103,6 +110,9 @@ void CSCThumbCtrl::recalc_tile_rect()
 
 		if ((rTile.right + m_sz_margin.cx > rc.right))
 		{
+			if (m_per_line == -1)
+				m_per_line = i + 1;
+
 			rTile.left = m_sz_margin.cx;
 			rTile.top = rTile.bottom + m_sz_gap.cy;
 			rTile.right = rTile.left + m_sz_tile.cx;
@@ -136,6 +146,7 @@ void CSCThumbCtrl::OnPaint()
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	dc.SetBkMode(TRANSPARENT);
+	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
@@ -171,7 +182,8 @@ void CSCThumbCtrl::OnPaint()
 
 		//선택된 항목이면
 		if (find_index(m_selected, i) >= 0)
-			draw_rectangle(g, rThumb, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
+			//draw_rectangle(g, rThumb, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
+			draw_rectangle(g, rThumb, m_theme.cr_selected_border, m_theme.cr_back_selected);
 
 		rThumb.DeflateRect(m_r_inner);
 		rThumb.bottom -= (m_thumb_title_gap + m_title_height);
@@ -338,8 +350,14 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 	if (reset)
 	{
+		m_files.clear();
 		m_selected.clear();
 		m_thumb.clear();
+		m_files.assign(files.begin(), files.end());
+	}
+	else
+	{
+		m_files.insert(m_files.end(), files.begin(), files.end());
 	}
 
 	if (files.size() == 0)
@@ -351,17 +369,8 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 		return;
 	}
 
-	m_thumb.resize(files.size());
-	m_thread.job(files.size(), loading_function, loading_completed_callback);
-
-	//for (int i = 0; i < files.size(); i++)
-	//{
-	//	m_thumb[i].img.load(files[i]);
-	//	m_thumb[i].img.resize(100, 100);
-	//	m_thumb[i].title = get_part(files[i], fn_name);
-	//}
-
-
+	m_thumb.resize(m_files.size());
+	m_thread.job(m_files.size(), loading_function, loading_completed_callback);
 
 	Invalidate();
 }
@@ -449,8 +458,8 @@ void CSCThumbCtrl::on_loading_completed()
 
 	//recalculate_scroll_size();
 
-	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
-	//	(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+		(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
 }
 
 BOOL CSCThumbCtrl::PreTranslateMessage(MSG* pMsg)
@@ -463,11 +472,47 @@ BOOL CSCThumbCtrl::PreTranslateMessage(MSG* pMsg)
 
 		switch (pMsg->wParam)
 		{
+			case VK_RETURN:
+			{
+				if (m_in_editing)
+				{
+					edit_end(true);
+					return TRUE;
+				}
+				return false;
+			}
+			case VK_ESCAPE:
+			{
+				if (m_in_editing)
+				{
+					edit_end(false);
+					return TRUE;
+				}
+				return false;
+			}
 			case VK_F2:
 				if (m_in_editing)
 					return true;
 				edit_begin(-1);
 				return true;
+			case VK_LEFT:
+			case VK_RIGHT:
+			case VK_UP:
+			case VK_DOWN:
+			case VK_HOME:
+			case VK_END:
+			case VK_PRIOR:
+			case VK_NEXT:
+				if (m_in_editing)
+					return false;
+				//{
+				//	::SendMessage(m_pEdit->m_hWnd, pMsg->message, pMsg->wParam, pMsg->lParam);
+				//	return true;
+				//}
+				else
+					on_key_down(pMsg->wParam);
+				return true;
+
 			default :
 				return FALSE;
 		}
@@ -498,8 +543,8 @@ void CSCThumbCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 BOOL CSCThumbCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	//if (is_editing())
-	//	edit_end();
+	if (is_editing())
+		edit_end();
 
 	if (IsCtrlPressed())
 	{
@@ -573,6 +618,9 @@ void CSCThumbCtrl::PreSubclassWindow()
 
 	reconstruct_font();
 
+	m_sz_thumb.cx = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("thumb size cx"), 100);
+	m_sz_thumb.cy = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("thumb size cy"), 120);
+
 	CDialogEx::PreSubclassWindow();
 }
 
@@ -584,6 +632,14 @@ void CSCThumbCtrl::reconstruct_font()
 	m_font.CreateFontIndirect(&m_lf);
 
 	SetFont(&m_font, true);
+
+	CClientDC dc(this);
+	CFont* pOldFont = dc.SelectObject(&m_font);
+	CRect textRect;
+
+	dc.DrawText(_T("Title Sample"), textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
+	m_title_height = textRect.Height();
+	recalc_tile_rect();
 }
 
 //m_sz_thumb의 크기를 기준으로 tile의 크기가 자동 계산되므로 thumb의 크기를 변경해준다.
@@ -786,6 +842,11 @@ void CSCThumbCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 void CSCThumbCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_selected.size())
+	{
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+			(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_dbclicked, m_selected[0]), 0);
+	}
 
 	CDialogEx::OnLButtonDblClk(nFlags, point);
 }
@@ -861,8 +922,8 @@ void CSCThumbCtrl::edit_begin(int index)
 	CRect r = m_thumb[index].r;
 	//r.right--;
 	//r.InflateRect(5, 5);
-	r.top = m_thumb[index].thumb_bottom + 10;
-	r.bottom = r.top + 32;
+	r.top = m_thumb[index].thumb_bottom + m_thumb_title_gap;
+	r.bottom = r.top + m_title_height;
 
 	if (m_pEdit == NULL)
 	{
@@ -870,33 +931,35 @@ void CSCThumbCtrl::edit_begin(int index)
 		m_pEdit->Create(dwStyle, r, this, IDC_EDIT_CELL);
 		m_pEdit->SetFont(&m_font);
 		//DWORD margin = m_pEdit->GetMargins();
-		m_pEdit->SetMargins(0, 0);
-		m_pEdit->set_line_align(DT_VCENTER);
+		//m_pEdit->SetMargins(0, 0);
 	}
 
-	CDC* pDC = m_pEdit->GetDC();
+	//CDC* pDC = m_pEdit->GetDC();
+	CClientDC dc(this);
+	CFont* pOldFont = dc.SelectObject(&m_font);
 	CRect textRect = r;
 
-	pDC->DrawText(m_thumb[index].title, textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
+	dc.DrawText(m_thumb[index].title, textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
 
 	m_in_editing = true;
 	m_editing_index = index;
 	m_old_title = m_thumb[index].title;
 
 	m_pEdit->SetWindowText(m_thumb[index].title);
+	m_pEdit->set_line_align(DT_VCENTER);
 
 	//텍스트 출력 높이를 위에서 계산해서 해봤으나 DrawText와 CEdit의 텍스트가 그려지는 모양이 다르다. 그냥 이방법이 정확하다.
 	//다만 폰트의 높이에 따라 다를 수 있으나 아직 확인하진 않았다.
 	int lc = m_pEdit->GetLineCount();
-	r.bottom = r.top + (textRect.Height() + (lc == 1 ? 8 : 8)) * lc;
+	r.bottom = r.top + textRect.Height() + 4;
 
 	//if (textRect.Width() > r.Width())
 	//	r.InflateRect((textRect.Width() - r.Width()) / 2, 0);
 
-	if (m_show_resolution)
-		r.OffsetRect(0, textRect.Height() - 6);
-	else
-		r.OffsetRect(0, -9);
+	//if (m_show_resolution)
+	//	r.OffsetRect(0, textRect.Height() - 6);
+	//else
+	//	r.OffsetRect(0, -9);
 	m_pEdit->MoveWindow(r);
 	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetFocus();
@@ -1080,4 +1143,210 @@ void CSCThumbCtrl::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
 	Invalidate();
+}
+
+void CSCThumbCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+{
+	m_lf.lfCharSet = byCharSet;
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
+	reconstruct_font();
+}
+
+void CSCThumbCtrl::set_font_size(int nSize)
+{
+	//For the MM_TEXT mapping mode,
+	//you can use the following formula to specify 
+	//a height for a font with a specified point size:
+	//m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, nSize);
+	reconstruct_font();
+}
+
+void CSCThumbCtrl::set_font_bold(bool bBold)
+{
+	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
+	reconstruct_font();
+}
+
+LRESULT CSCThumbCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+{
+	CSCEdit* pEdit = (CSCEdit*)wParam;
+	int	msg = (int)lParam;
+
+	if (!pEdit->IsWindowVisible())
+		return 0;
+
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
+	if (msg == WM_KILLFOCUS)
+		edit_end();
+
+	Invalidate();
+
+	return 0;
+}
+
+void CSCThumbCtrl::set_title(int index, CString title)
+{
+	if (index < 0 || index > m_thumb.size() - 1)
+		return;
+	m_thumb[index].title = title;
+	Invalidate();
+}
+
+void CSCThumbCtrl::sort_by_title()
+{
+	std::sort(m_thumb.begin(), m_thumb.end(),
+		[](CThumbImage& a, CThumbImage& b)
+		{
+			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
+			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
+			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
+			a.img.m_referenced_variable = true;
+			b.img.m_referenced_variable = true;
+
+			CString str0 = a.title;
+			CString str1 = b.title;
+			return !is_greater_with_numeric(str0, str1);
+		}
+	);
+
+	//sort되면 각 thumb.r도 변경되므로 recalc_tile_rect()해야 한다.
+	recalc_tile_rect();
+}
+
+//info text를 기준으로 리스트를 정렬시킨다.
+void CSCThumbCtrl::sort_by_info(int idx)
+{
+	std::sort(m_thumb.begin(), m_thumb.end(),
+		[idx](CThumbImage& a, CThumbImage& b)
+		{
+			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
+			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
+			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
+			a.img.m_referenced_variable = true;
+			b.img.m_referenced_variable = true;
+			return (a.info[idx] > b.info[idx]);
+		}
+	);
+
+	//sort되면 각 thumb.r도 변경되므로 recalc_tile_rect()해야 한다.
+	recalc_tile_rect();
+}
+
+void CSCThumbCtrl::sort_by_score()
+{
+	std::sort(m_thumb.begin(), m_thumb.end(),
+		[](CThumbImage& a, CThumbImage& b)
+		{
+			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
+			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
+			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
+			a.img.m_referenced_variable = true;
+			b.img.m_referenced_variable = true;
+			return (a.score > b.score);
+		}
+	);
+
+	//sort되면 각 thumb.r도 변경되므로 recalc_tile_rect()해야 한다.
+	recalc_tile_rect();
+}
+
+int	 CSCThumbCtrl::find_by_title(CString title, bool bWholeWord)
+{
+	if (title.IsEmpty())
+		return -1;
+
+	for (int i = 0; i < m_thumb.size(); i++)
+	{
+		if (bWholeWord)
+		{
+			if (m_thumb[i].title == title)
+				return i;
+		}
+		else
+		{
+			if (m_thumb[i].title.Find(title) >= 0)
+				return i;
+		}
+	}
+
+	return -1;
+}
+
+void CSCThumbCtrl::set_thumb_size(CSize sz_thumb)
+{
+	m_sz_thumb = sz_thumb;
+	recalc_tile_rect();
+
+	AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("thumb size cx"), m_sz_thumb.cx);
+	AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("thumb size cy"), m_sz_thumb.cy);
+}
+
+void CSCThumbCtrl::on_key_down(int key)
+{
+	if (m_thumb.size() == 0)
+		return;
+
+	int selected = get_selected_item();
+	if (selected < 0)
+	{
+		select_item(0);
+		return;
+	}
+
+	if (key == VK_LEFT && selected > 0)
+	{
+		selected--;
+	}
+	else if (key == VK_RIGHT && selected < m_thumb.size() - 1)
+	{
+		selected++;
+	}
+	else if (key == VK_UP && selected >= m_per_line)
+	{
+		selected -= m_per_line;
+	}
+	else if (key == VK_DOWN && selected <= m_thumb.size() - 1 - m_per_line)
+	{
+		selected += m_per_line;
+		//if (selected > m_dqThumb.size() - 1)
+		//	selected = m_dqThumb.size() - 1;
+	}
+	else if (key == VK_HOME && selected > 0)
+	{
+		selected = 0;
+	}
+	else if (key == VK_END && selected < m_thumb.size() - 1)
+	{
+		selected = m_thumb.size() - 1;
+	}
+	else if (key == VK_PRIOR && selected >= m_per_line * 3)
+	{
+		selected -= m_per_line * 3;
+		//if (selected < 0)
+		//	selected = 0;
+	}
+	else if (key == VK_NEXT && selected <= m_thumb.size() - 1 - m_per_line * 3)
+	{
+		selected += m_per_line * 3;
+		//if (selected > m_dqThumb.size() - 1)
+		//	selected = m_dqThumb.size() - 1;
+	}
+
+	select_item(selected);
+}
+
+void CSCThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool refresh)
+{
+	if (thumb_index < 0 || thumb_index >= m_thumb.size())
+		return;
+
+	if (idx < 0 || idx >= 4)
+		return;
+
+	m_show_info_text[idx] = true;
+	m_thumb[thumb_index].info[idx] = info;
+
+	if (refresh)
+		Invalidate();
 }

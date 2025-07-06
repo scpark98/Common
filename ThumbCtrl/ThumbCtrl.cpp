@@ -73,18 +73,18 @@ CThumbCtrl::~CThumbCtrl()
 
 void CThumbCtrl::release(int index)
 {
-	for (int i = 0; i < m_dqThumb.size(); i++)
+	for (int i = 0; i < m_thumb.size(); i++)
 	{
-		if (m_dqThumb[i].img->is_valid())
+		if (m_thumb[i].img->is_valid())
 		{
-			m_dqThumb[i].img->release();
-			delete m_dqThumb[i].img;
+			m_thumb[i].img->release();
+			delete m_thumb[i].img;
 		}
 
-		SAFE_DELETE_ARRAY(m_dqThumb[i].feature);
+		SAFE_DELETE_ARRAY(m_thumb[i].feature);
 	}
 
-	m_dqThumb.clear();
+	m_thumb.clear();
 }
 
 //index == -1이면 전체 삭제
@@ -95,13 +95,13 @@ void CThumbCtrl::remove(int index, bool bRepaint /*= false*/)
 
 	if (index < 0)
 	{
-		m_dqThumb.clear();
+		m_thumb.clear();
 	}
 	else
 	{
-		if (m_dqThumb[index].full_path.IsEmpty() == false)
-			DeleteFile(m_dqThumb[index].full_path);
-		m_dqThumb.erase(m_dqThumb.begin() + index);
+		if (m_thumb[index].full_path.IsEmpty() == false)
+			DeleteFile(m_thumb[index].full_path);
+		m_thumb.erase(m_thumb.begin() + index);
 	}
 
 
@@ -228,7 +228,7 @@ void CThumbCtrl::OnPaint()
 		dc.FillSolidRect(r, green);
 		return;
 	}
-	else if (m_dqThumb.size() == 0)
+	else if (m_thumb.size() == 0)
 	{
 		str = _T("표시할 이미지가 없습니다.");
 		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -331,11 +331,11 @@ void CThumbCtrl::add_files(std::deque<CString> files, bool reset)
 		return;
 	}
 
-	m_dqThumb.resize(files.size());
+	m_thumb.resize(files.size());
 	for (int i = 0; i < files.size(); i++)
 	{
-		//m_dqThumb[i] = new CThumbImage;
-		m_dqThumb[i].title = get_part(files[i], fn_name);
+		//m_thumb[i] = new CThumbImage;
+		m_thumb[i].title = get_part(files[i], fn_name);
 	}
 
 	Invalidate();
@@ -443,12 +443,12 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 
 	if (index < 0)
 	{
-		m_dqThumb.push_back(thumb);
-		index = m_dqThumb.size() - 1;
+		m_thumb.push_back(thumb);
+		index = m_thumb.size() - 1;
 	}
 	else
 	{
-		m_dqThumb[index] = thumb;
+		m_thumb[index] = thumb;
 	}
 
 	if (invalidate)
@@ -465,13 +465,13 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 int CThumbCtrl::insert(int index, uint8_t* src, int width, int height, int channel, CString sTitle /*= NULL*/, bool key_thumb /*= false*/, bool bModifiedFlag /*= true*/)
 {
 	//if ( index < 0 )
-	//	index = m_dqThumb.size();
+	//	index = m_thumb.size();
 	/*
 	//썸네일에 표시할 최대 개수가 넘으면 맨 마지막 썸네일을 지우고 추가해준다.
-	if ( m_dqThumb.size() >= m_max_thumbs )
+	if ( m_thumb.size() >= m_max_thumbs )
 	{
-		while ( m_dqThumb.size() >= m_max_thumbs )
-			m_dqThumb.pop_front();
+		while ( m_thumb.size() >= m_max_thumbs )
+			m_thumb.pop_front();
 	}
 	*/
 	int x, y, c;
@@ -519,13 +519,13 @@ int CThumbCtrl::insert(int index, uint8_t* src, int width, int height, int chann
 
 	if (index < 0)
 	{
-		m_dqThumb.push_back(thumb);
+		m_thumb.push_back(thumb);
 	}
 	else
 	{
-		if (m_dqThumb.max_size() <= index)
-			m_dqThumb.resize(m_dqThumb.max_size() + 8);
-		m_dqThumb.insert(m_dqThumb.begin() + index, thumb);
+		if (m_thumb.max_size() <= index)
+			m_thumb.resize(m_thumb.max_size() + 8);
+		m_thumb.insert(m_thumb.begin() + index, thumb);
 	}
 
 	Invalidate();
@@ -576,7 +576,7 @@ void CThumbCtrl::recalculate_scroll_size()
 	draw_function(NULL, false);
 	TRACE(_T("draw_function(NULL, false) = %ld\n"), clock() - t0);
 
-	if (m_dqThumb.size() == 0)
+	if (m_thumb.size() == 0)
 		return;
 
 	GetClientRect(rc);
@@ -700,7 +700,7 @@ void CThumbCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 			break;
 		case SB_PAGERIGHT:
 		case SB_LINERIGHT:	//스크롤 바의 오른쪽 화살표를 클릭한 경우
-			if (m_index <= m_dqThumb.size() - 4)
+			if (m_index <= m_thumb.size() - 4)
 			{
 				m_index++;
 				si.nPos = m_index;
@@ -750,7 +750,7 @@ void CThumbCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 
 		SetScrollPos(SB_VERT, si.nPos);
 		Invalidate(false);
-		TRACE(_T("thumb rect 0 cy = %d\n"), m_dqThumb[0].rect.CenterPoint().y);// GetRectInfoString(m_dqThumb[0].rect, 1));
+		TRACE(_T("thumb rect 0 cy = %d\n"), m_thumb[0].rect.CenterPoint().y);// GetRectInfoString(m_thumb[0].rect, 1));
 
 	}
 
@@ -860,9 +860,9 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 
-	for (i = 0; i < m_dqThumb.size(); i++)
+	for (i = 0; i < m_thumb.size(); i++)
 	{
-		if (m_dqThumb[i].rect.PtInRect(point))
+		if (m_thumb[i].rect.PtInRect(point))
 		{
 			int selected_index = find_index(m_selected, i);
 
@@ -956,10 +956,10 @@ void CThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			}
 
 			//선택된 항목이 rc안에 다 안들어오고 일부만 보이면 다 보이도록 스크롤 시켜준다.
-			if (RectInRect(rc, m_dqThumb[i].rect) == false)
+			if (rect_in_rect(rc, m_thumb[i].rect) == false)
 			{
-				//int max_height = m_line_height[m_dqThumb[i].line_index];
-				//SetScrollPos(SB_VERT, m_dqThumb[i].rect.CenterPoint().y - m_dqThumb[0].rect.CenterPoint().y - rc.Height() / 2);
+				//int max_height = m_line_height[m_thumb[i].line_index];
+				//SetScrollPos(SB_VERT, m_thumb[i].rect.CenterPoint().y - m_thumb[0].rect.CenterPoint().y - rc.Height() / 2);
 				ensure_visible(i);
 			}
 
@@ -1013,8 +1013,8 @@ void CThumbCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		return;
 
 	//name영역이 눌려지고
-	CRect r = m_dqThumb[index].rect;
-	r.top = m_dqThumb[index].thumb_bottom;
+	CRect r = m_thumb[index].rect;
+	r.top = m_thumb[index].thumb_bottom;
 	if (r.PtInRect(point) == false)
 		return;
 
@@ -1130,7 +1130,7 @@ void CThumbCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 	CMenu	menu;
 	menu.CreatePopupMenu();
 
-	menu.AppendMenu(MF_STRING, idTotalCount, _T("총 ") + i2S(m_dqThumb.size()) + _T("개의 썸네일"));
+	menu.AppendMenu(MF_STRING, idTotalCount, _T("총 ") + i2S(m_thumb.size()) + _T("개의 썸네일"));
 	menu.EnableMenuItem(idTotalCount, MF_GRAYED);
 	menu.AppendMenu(MF_SEPARATOR);
 
@@ -1230,10 +1230,10 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 	case idReloadSelected:
 		{
 			int index = get_selected_item();
-			if (index < 0 || index >= m_dqThumb.size())
+			if (index < 0 || index >= m_thumb.size())
 				return;
-			m_dqThumb[index].reload();
-			InvalidateRect(m_dqThumb[index].rect);
+			m_thumb[index].reload();
+			InvalidateRect(m_thumb[index].rect);
 			::SendMessage(GetParent()->GetSafeHwnd(), Message_CThumbCtrl,
 				(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
 		}
@@ -1243,13 +1243,13 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 		sort_by_title();
 		break;
 	case idCopyToClipboard :
-		if (m_dqThumb.size() == 0)
+		if (m_thumb.size() == 0)
 			break;
 		{
 			int index = get_selected_item();
 			if (index >= 0)
 			{
-				m_dqThumb[index].img->copy_to_clipbard();
+				m_thumb[index].img->copy_to_clipbard();
 			}
 		}
 		break;
@@ -1276,10 +1276,10 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 		m_max_thumbs = n;
 
 		//썸네일에 표시할 최대 개수가 넘으면 맨 마지막 썸네일을 지우고 추가해준다.
-		if (m_max_thumbs && (m_dqThumb.size() >= m_max_thumbs))
+		if (m_max_thumbs && (m_thumb.size() >= m_max_thumbs))
 		{
-			while (m_dqThumb.size() > m_max_thumbs)
-				m_dqThumb.pop_front();
+			while (m_thumb.size() > m_max_thumbs)
+				m_thumb.pop_front();
 
 			Invalidate();
 		}
@@ -1292,14 +1292,14 @@ void CThumbCtrl::OnPopupMenu(UINT nMenuID)
 
 void CThumbCtrl::info_text(int thumb_index, int idx, CString info, bool refresh)
 {
-	if (thumb_index < 0 || thumb_index >= m_dqThumb.size())
+	if (thumb_index < 0 || thumb_index >= m_thumb.size())
 		return;
 
 	if (idx < 0 || idx >= 4)
 		return;
 
 	m_show_info_text[idx] = true;
-	m_dqThumb[thumb_index].info[idx] = info;
+	m_thumb[thumb_index].info[idx] = info;
 
 	if (refresh)
 		Invalidate();
@@ -1570,7 +1570,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		}
 	}
 
-	for (i = 0; i < m_dqThumb.size(); i++)
+	for (i = 0; i < m_thumb.size(); i++)
 	{
 		//trace(_T("draw? = %d (%3d)"), draw, i);
 
@@ -1588,7 +1588,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		//rTile.InflateRect( 1, 1 );
 		//DrawRectangle( &dc, rTile, get_color(m_cr_back, 48), NULL_BRUSH );
 
-		if (m_dqThumb[i].img == NULL || m_dqThumb[i].img->is_empty())
+		if (m_thumb[i].img == NULL || m_thumb[i].img->is_empty())
 		{
 			fit = rTile;
 			if (draw && !skip)
@@ -1599,9 +1599,9 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		}
 		else
 		{
-			//scvDrawImage(&dc, m_dqThumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_cr_back_thumb, -1.0);
-			//scvDrawImage(&dc, m_dqThumb[i].mat, rect, m_cr_back_thumb, -1.0);
-			fit = get_ratio_rect(rect, (double)m_dqThumb[i].img->width / (double)m_dqThumb[i].img->height);
+			//scvDrawImage(&dc, m_thumb[i].mat, rect.left, rect.top, 0, 0, NULL, m_cr_back_thumb, -1.0);
+			//scvDrawImage(&dc, m_thumb[i].mat, rect, m_cr_back_thumb, -1.0);
+			fit = get_ratio_rect(rect, (double)m_thumb[i].img->width / (double)m_thumb[i].img->height);
 			if (draw && !skip)
 			{
 				//입체감있는 프레임을 그려주는 코드인데 배경이 짙은 회색 계열이면 잘 표시가 안나서 일단 스킵.
@@ -1617,9 +1617,9 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 					false
 				);
 #if USE_OPENCV
-				cv_draw(pDC, m_dqThumb[i].img, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
+				cv_draw(pDC, m_thumb[i].img, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #else
-				m_dqThumb[i].img->draw(g, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
+				m_thumb[i].img->draw(g, fit.left, rect.bottom - fit.Height(), fit.Width(), fit.Height());
 #endif
 			}
 			//DrawSunkenRect(&dc, rect, true, get_color(m_cr_back, -16), get_color(m_cr_back, +16));
@@ -1675,7 +1675,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 			if (draw && !skip)
 			{
-				str.Format(_T("%d x %d x %d"), m_dqThumb[i].width, m_dqThumb[i].height, m_dqThumb[i].channel * 8);
+				str.Format(_T("%d x %d x %d"), m_thumb[i].width, m_thumb[i].height, m_thumb[i].channel * 8);
 				//str.Format(_T("%d/%d"), m_scroll_pos, m_scroll_total);
 				pDC->DrawText(str, resRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 			}
@@ -1683,12 +1683,12 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			height = height + resRect.Height();
 		}
 
-		if (m_show_title && m_dqThumb[i].title.GetLength())
+		if (m_show_title && m_thumb[i].title.GetLength())
 		{
 			pDC->SetTextColor(m_cr_title.ToCOLORREF());
-			//DrawShadowText(pDC->GetSafeHdc(), m_dqThumb[i].title, _tcslen(m_dqThumb[i].title), rTitle,
+			//DrawShadowText(pDC->GetSafeHdc(), m_thumb[i].title, _tcslen(m_thumb[i].title), rTitle,
 			//				DT_CENTER | DT_VCENTER, RGB(255, 0, 0), GetComplementaryColor(m_cr_back), 2, 1);
-			pDC->DrawText(m_dqThumb[i].title, rTitle, DT_CALCRECT | DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
+			pDC->DrawText(m_thumb[i].title, rTitle, DT_CALCRECT | DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
 			int text_max_height = MIN(48, rTitle.Height());
 
 			rTitle.left = rect.left;
@@ -1704,7 +1704,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			}
 			*/
 			if (draw && !skip)
-				pDC->DrawText(m_dqThumb[i].title, rTitle, DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
+				pDC->DrawText(m_thumb[i].title, rTitle, DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_END_ELLIPSIS);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
 			//DrawTextShadow(&dc, thumb.title, rTitle, DT_CENTER | DT_WORDBREAK|DT_EDITCONTROL);//DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
 			//DrawTextShadow( &dc, rTitle, CString(thumb.title), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP );
 			//pDC->FillSolidRect( rTitle, RGB(255,0,0) );
@@ -1712,15 +1712,15 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			height = height + text_max_height;
 		}
 
-		m_dqThumb[i].rect = rect;
-		m_dqThumb[i].rect.bottom = rect.bottom + height + 2;
-		m_dqThumb[i].rect.InflateRect(2, 2);
-		m_dqThumb[i].thumb_bottom = rect.bottom;
-		m_dqThumb[i].line_index = nLineCount;
+		m_thumb[i].rect = rect;
+		m_thumb[i].rect.bottom = rect.bottom + height + 2;
+		m_thumb[i].rect.InflateRect(2, 2);
+		m_thumb[i].thumb_bottom = rect.bottom;
+		m_thumb[i].line_index = nLineCount;
 
 
 		//특정 keythumbnail의 경우 그 왼쪽에 점선으로 구분선을 표시해주자. T1같은 경우.
-		if (draw && !skip && (m_dqThumb[i].key_thumb && (i > 0)))
+		if (draw && !skip && (m_thumb[i].key_thumb && (i > 0)))
 		{
 			pDC->MoveTo(rect.left - (int)(m_szMargin.cx / 2.0), rc.top);
 			pDC->LineTo(rect.left - (int)(m_szMargin.cx / 2.0), rc.bottom);
@@ -1738,7 +1738,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 		for (int j = 0; j < 4; j++)
 		{
-			if (m_show_info_text[j] == false || m_dqThumb[i].info[j].GetLength() == 0)
+			if (m_show_info_text[j] == false || m_thumb[i].info[j].GetLength() == 0)
 				continue;
 
 			nFormat = 0;
@@ -1765,7 +1765,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 			}
 
 			pDC->SetTextAlign(nFormat);
-			//draw_text(&g, cpText.x, cpText.y, CString(m_dqThumb[i].info[j]), m_crInfoText[j]);
+			//draw_text(&g, cpText.x, cpText.y, CString(m_thumb[i].info[j]), m_crInfoText[j]);
 		}
 
 		//이전 text align값을 기억했다가 복원해줘야 한다.
@@ -1791,7 +1791,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 		}
 	}
 
-	if (dqOneLineHeight.size() && (nLineCount * m_per_line < m_dqThumb.size()))
+	if (dqOneLineHeight.size() && (nLineCount * m_per_line < m_thumb.size()))
 	{
 		std::deque<int>::iterator result = std::max_element(dqOneLineHeight.begin(), dqOneLineHeight.end());
 		rect.left = m_szMargin.cx;
@@ -1805,7 +1805,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 	m_max_line = nLineCount;
 
-	if (m_max_line == 1 && (dqOneLineHeight.size() <= m_dqThumb.size()))
+	if (m_max_line == 1 && (dqOneLineHeight.size() <= m_thumb.size()))
 		m_per_line = dqOneLineHeight.size();
 
 	//선택 항목 표시
@@ -1825,7 +1825,7 @@ void CThumbCtrl::draw_function(CDC* pDC, bool draw)
 
 		for (i = 0; i < m_selected.size(); i++)
 		{
-			CRect r = m_dqThumb[m_selected[i]].rect;
+			CRect r = m_thumb[m_selected[i]].rect;
 			//r.top -= 4;
 			r.InflateRect(8, 4, 8, 0);
 
@@ -1872,9 +1872,9 @@ int CThumbCtrl::get_selected_item()
 
 int	CThumbCtrl::get_index_from_point(CPoint pt)
 {
-	for (int i = 0; i < m_dqThumb.size(); i++)
+	for (int i = 0; i < m_thumb.size(); i++)
 	{
-		if (m_dqThumb[i].rect.PtInRect(pt))
+		if (m_thumb[i].rect.PtInRect(pt))
 			return i;
 	}
 	return -1;
@@ -1899,7 +1899,7 @@ void CThumbCtrl::select_item(int index, bool select, bool make_ensure_visible)
 #else
 	//로딩중이라면 해당 인덱스는 아직 안들어왔을 수 있다.
 	//로딩이 끝나면 선택시켜야 한다.
-	if ((index >= (int)m_dqThumb.size()) && (index > m_loading_index))
+	if ((index >= (int)m_thumb.size()) && (index > m_loading_index))
 #endif
 	{
 		m_index_select_after_loading = index;
@@ -1913,12 +1913,12 @@ void CThumbCtrl::select_item(int index, bool select, bool make_ensure_visible)
 	{
 		if (select)
 		{
-			if (m_selected.size() < m_dqThumb.size())
-				m_selected.resize(m_dqThumb.size());
+			if (m_selected.size() < m_thumb.size())
+				m_selected.resize(m_thumb.size());
 
 			m_selected.clear();
 
-			for (i = 0; i < m_dqThumb.size(); i++)
+			for (i = 0; i < m_thumb.size(); i++)
 				m_selected.push_back(i);
 		}
 		else
@@ -1988,9 +1988,9 @@ std::deque<int> CThumbCtrl::find_text(bool show_inputbox, CString text, bool sel
 	}
 
 
-	for (i = 0; i < m_dqThumb.size(); i++)
+	for (i = 0; i < m_thumb.size(); i++)
 	{
-		if (m_dqThumb[i].full_path.Find(text) >= 0)
+		if (m_thumb[i].full_path.Find(text) >= 0)
 			dqFound.push_back(i);
 	}
 
@@ -2011,23 +2011,23 @@ std::deque<int> CThumbCtrl::find_text(bool show_inputbox, CString text, bool sel
 
 void CThumbCtrl::ensure_visible(int index)
 {
-	if (m_dqThumb.size() == 0 || index < 0 || index >= m_dqThumb.size())
+	if (m_thumb.size() == 0 || index < 0 || index >= m_thumb.size())
 		return;
 
 	CRect rc;
 	GetClientRect(rc);
 
-	//TRACE(_T("thumb rect = %s\n"), GetRectInfoString(m_dqThumb[index].rect, 1));
+	//TRACE(_T("thumb rect = %s\n"), GetRectInfoString(m_thumb[index].rect, 1));
 	//썸네일의 rect가 rc 영역에 들어와있지 않으면 스크롤시킨다.
-	if (RectInRect(rc, m_dqThumb[index].rect) == false)
+	if (rect_in_rect(rc, m_thumb[index].rect) == false)
 	{
-		set_scroll_pos(-(m_dqThumb[index].thumb_bottom - m_dqThumb[0].thumb_bottom - rc.Height() / 2 + m_dqThumb[index].rect.Height() / 2));
+		set_scroll_pos(-(m_thumb[index].thumb_bottom - m_thumb[0].thumb_bottom - rc.Height() / 2 + m_thumb[index].rect.Height() / 2));
 	}
 }
 
 void CThumbCtrl::on_key_down(int key)
 {
-	if (m_dqThumb.size() == 0)
+	if (m_thumb.size() == 0)
 		return;
 
 	int selected = get_selected_item();
@@ -2041,7 +2041,7 @@ void CThumbCtrl::on_key_down(int key)
 	{
 		selected--;
 	}
-	else if (key == VK_RIGHT && selected < m_dqThumb.size() - 1)
+	else if (key == VK_RIGHT && selected < m_thumb.size() - 1)
 	{
 		selected++;
 	}
@@ -2049,19 +2049,19 @@ void CThumbCtrl::on_key_down(int key)
 	{
 		selected -= m_per_line;
 	}
-	else if (key == VK_DOWN && selected <= m_dqThumb.size() - 1 - m_per_line)
+	else if (key == VK_DOWN && selected <= m_thumb.size() - 1 - m_per_line)
 	{
 		selected += m_per_line;
-		//if (selected > m_dqThumb.size() - 1)
-		//	selected = m_dqThumb.size() - 1;
+		//if (selected > m_thumb.size() - 1)
+		//	selected = m_thumb.size() - 1;
 	}
 	else if (key == VK_HOME && selected > 0)
 	{
 		selected = 0;
 	}
-	else if (key == VK_END && selected < m_dqThumb.size() - 1)
+	else if (key == VK_END && selected < m_thumb.size() - 1)
 	{
-		selected = m_dqThumb.size() - 1;
+		selected = m_thumb.size() - 1;
 	}
 	else if (key == VK_PRIOR && selected >= m_per_line * 3)
 	{
@@ -2069,11 +2069,11 @@ void CThumbCtrl::on_key_down(int key)
 		//if (selected < 0)
 		//	selected = 0;
 	}
-	else if (key == VK_NEXT && selected <= m_dqThumb.size() - 1 - m_per_line * 3)
+	else if (key == VK_NEXT && selected <= m_thumb.size() - 1 - m_per_line * 3)
 	{
 		selected += m_per_line * 3;
-		//if (selected > m_dqThumb.size() - 1)
-		//	selected = m_dqThumb.size() - 1;
+		//if (selected > m_thumb.size() - 1)
+		//	selected = m_thumb.size() - 1;
 	}
 
 	select_item(selected);
@@ -2177,7 +2177,7 @@ BOOL CThumbCtrl::PreTranslateMessage(MSG* pMsg)
 			{
 				if (m_in_editing)
 				{
-					m_pEdit->SetSel(0, m_dqThumb[m_editing_index].title.GetLength() - 4);
+					m_pEdit->SetSel(0, m_thumb[m_editing_index].title.GetLength() - 4);
 				}
 				else
 				{
@@ -2230,10 +2230,10 @@ void CThumbCtrl::edit_begin(int index)
 	}
 
 	DWORD dwStyle = ES_CENTER | WS_BORDER | WS_CHILD | WS_VISIBLE /*| ES_AUTOHSCROLL */ | ES_AUTOVSCROLL | ES_MULTILINE;
-	CRect r = m_dqThumb[index].rect;
+	CRect r = m_thumb[index].rect;
 	//r.right--;
 	//r.InflateRect(5, 5);
-	r.top = m_dqThumb[index].thumb_bottom + 10;
+	r.top = m_thumb[index].thumb_bottom + 10;
 	r.bottom = r.top + 800;
 
 	if (m_pEdit == NULL)
@@ -2248,13 +2248,13 @@ void CThumbCtrl::edit_begin(int index)
 	CDC* pDC = m_pEdit->GetDC();
 	CRect textRect = r;
 
-	pDC->DrawText(m_dqThumb[index].title, textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
+	pDC->DrawText(m_thumb[index].title, textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
 
 	m_in_editing = true;
 	m_editing_index = index;
-	m_old_title = m_dqThumb[index].title;
+	m_old_title = m_thumb[index].title;
 
-	m_pEdit->SetWindowText(m_dqThumb[index].title);
+	m_pEdit->SetWindowText(m_thumb[index].title);
 
 	//텍스트 출력 높이를 위에서 계산해서 해봤으나 DrawText와 CEdit의 텍스트가 그려지는 모양이 다르다. 그냥 이방법이 정확하다.
 	//다만 폰트의 높이에 따라 다를 수 있으나 아직 확인하진 않았다.
@@ -2274,7 +2274,7 @@ void CThumbCtrl::edit_begin(int index)
 	//m_pEdit->GetRect(r);
 	//r.InflateRect(6, 0);
 	//m_pEdit->SetRect(r);
-	m_pEdit->SetSel(0, m_dqThumb[index].title.ReverseFind('.'));
+	m_pEdit->SetSel(0, m_thumb[index].title.ReverseFind('.'));
 }
 
 void CThumbCtrl::edit_end(bool valid)
@@ -2300,7 +2300,7 @@ void CThumbCtrl::edit_end(bool valid)
 		if (sText.IsEmpty())
 			return;
 
-		m_dqThumb[m_editing_index].title = sText;
+		m_thumb[m_editing_index].title = sText;
 		Invalidate();
 
 		//썸네일의 이름을 변경하는 것은 파일명인지 무엇인지를 이 컨트롤에서 처리하면 안된다.
@@ -2312,16 +2312,16 @@ void CThumbCtrl::edit_end(bool valid)
 
 void CThumbCtrl::set_title(int index, CString title)
 {
-	if (index < 0 || index > m_dqThumb.size() - 1)
+	if (index < 0 || index > m_thumb.size() - 1)
 		return;
-	m_dqThumb[index].title = title;
+	m_thumb[index].title = title;
 	Invalidate();
 }
 
 //info text를 기준으로 리스트를 정렬시킨다.
 void CThumbCtrl::sort_by_info(int idx)
 {
-	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
+	std::sort(m_thumb.begin(), m_thumb.end(),
 		[idx](const CThumbImage a, const CThumbImage b)
 		{
 			//문자열인지 숫자인지에 따라 수정되야 한다.
@@ -2335,7 +2335,7 @@ void CThumbCtrl::sort_by_info(int idx)
 
 void CThumbCtrl::sort_by_title()
 {
-	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
+	std::sort(m_thumb.begin(), m_thumb.end(),
 		[](CThumbImage a, CThumbImage b)
 		{
 			CString str0 = a.title;
@@ -2354,10 +2354,10 @@ void CThumbCtrl::sort_by_title()
 
 void CThumbCtrl::sort_by_score()
 {
-	if (m_dqThumb.size() == 0)
+	if (m_thumb.size() == 0)
 		return;
 
-	std::sort(m_dqThumb.begin(), m_dqThumb.end(),
+	std::sort(m_thumb.begin(), m_thumb.end(),
 		[](const CThumbImage a, const CThumbImage b)
 		{
 			//문자열인지 숫자인지에 따라 수정되야 한다.
@@ -2374,16 +2374,16 @@ int	 CThumbCtrl::find_by_title(CString title, bool bWholeWord)
 	if (title.IsEmpty())
 		return -1;
 
-	for (int i = 0; i < m_dqThumb.size(); i++)
+	for (int i = 0; i < m_thumb.size(); i++)
 	{
 		if (bWholeWord)
 		{
-			if (m_dqThumb[i].title == title)
+			if (m_thumb[i].title == title)
 				return i;
 		}
 		else
 		{
-			if (m_dqThumb[i].title.Find(title) >= 0)
+			if (m_thumb[i].title.Find(title) >= 0)
 				return i;
 		}
 	}
@@ -2394,18 +2394,18 @@ int	 CThumbCtrl::find_by_title(CString title, bool bWholeWord)
 #if USE_OPENCV
 cv::Mat CThumbCtrl::get_img(int index)
 {
-	if (index < 0 || index >= m_dqThumb.size())
+	if (index < 0 || index >= m_thumb.size())
 		return cv::Mat();
 
-	return m_dqThumb[index].img;
+	return m_thumb[index].img;
 }
 #else
 CGdiplusBitmap CThumbCtrl::get_img(int index)
 {
-	if (index < 0 || index >= m_dqThumb.size())
+	if (index < 0 || index >= m_thumb.size())
 		return CGdiplusBitmap();
 
-	return m_dqThumb[index].img;
+	return m_thumb[index].img;
 }
 #endif
 void CThumbCtrl::set_selection_mark_image(CString image_path, int w, int h)

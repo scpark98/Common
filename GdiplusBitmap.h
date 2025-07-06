@@ -142,6 +142,8 @@ public:
 
 	virtual ~CGdiplusBitmap();
 
+	bool			m_referenced_variable = false;
+
 	void			create(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
@@ -418,10 +420,9 @@ public:
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.
 	//현재 resource에서 읽어들인 이미지는 제대로 변환되지 않는 문제 있음(1/3만 로딩되는 현상)
 	void			convert2gray();
-	//미구현
-	void			cvtColor(Gdiplus::PixelFormat old_format, Gdiplus::PixelFormat new_format);
-	//현재 이미지를 32bit로 변경한다.
-	void			cvtColor32ARGB();
+
+	//new_format은 PixelFormat32bppARGB 과 같은 타입으로 호출한다.
+	void			convert(Gdiplus::PixelFormat new_format);
 
 	//printf()처럼 save(_T("D:\\test_%d.png"), i);와 같이 사용할 수 있다.
 	bool			save(LPCTSTR filepath, ...);

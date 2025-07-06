@@ -119,11 +119,11 @@ public:
 	}
 
 	//절대로 소멸자에서 data라는 메모리 주소의 공간을 delete해서는 안된다.
-	//메모리를 할당받고 데이터를 담아서 이를 m_dqThumb에 저장하는 방식이므로
+	//메모리를 할당받고 데이터를 담아서 이를 m_thumb에 저장하는 방식이므로
 	//local에서 CThumbImage의 instance인 img를 선언하여
 	//data라는 번지에 메모리를 동적 할당받고 이를 push_back()한 상태에서
 	//위의 img라는 로컬 변수가 자동 소멸되는 시점이 되면
-	//m_dqThumb는 시작 포인터만 가지고 있을 뿐 실제 데이터 영역은 delete되기 때문이다.
+	//m_thumb는 시작 포인터만 가지고 있을 뿐 실제 데이터 영역은 delete되기 때문이다.
 	//remove_all 또는 프로그램이 종료되는 시점에서 수동으로 delete시켜줘야 한다.
 	void		reload()
 	{
@@ -166,8 +166,8 @@ public:
 	CThreadManager m_thread;
 
 
-	std::deque<CThumbImage> m_dqThumb;
-	int size() { return m_dqThumb.size(); }
+	std::deque<CThumbImage> m_thumb;
+	int size() { return m_thumb.size(); }
 	void release(int index);
 
 #if USE_OPENCV

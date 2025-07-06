@@ -507,6 +507,9 @@ CGdiplusBitmap::~CGdiplusBitmap()
 
 void CGdiplusBitmap::release()
 {
+	if (m_pBitmap == NULL || m_referenced_variable)
+		return;
+
 	if (m_run_thread_animation)
 	{
 		m_run_thread_animation = false;
@@ -521,10 +524,6 @@ void CGdiplusBitmap::release()
 
 	SAFE_DELETE(m_pBitmap);
 	SAFE_DELETE(m_pOrigin);
-	//if (m_pOrigin)
-	//{
-	//	m_origin->release();
-	//}
 
 	if (m_pPropertyItem != NULL)
 	{
@@ -1066,7 +1065,7 @@ void CGdiplusBitmap::clone(CGdiplusBitmap* dst)
 
 void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 {
-	if (dst != NULL)
+	if (dst != NULL && dst->m_pBitmap != NULL)
 		dst->release();
 
 	/*https://still.tistory.com/211
@@ -1098,6 +1097,7 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 	}
 
 	dst->resolution();
+	dst->m_referenced_variable = false;
 }
 
 void CGdiplusBitmap::deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src)
@@ -1991,7 +1991,7 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_si
 void CGdiplusBitmap::round_corner(float radius, float factor, float position, bool tl, bool tr, bool br, bool bl)
 {
 	if (channel != 4)
-		cvtColor32ARGB();
+		convert(PixelFormat32bppARGB);
 
 	Gdiplus::GraphicsPath path;
 	float ratio = 0.0f;// ((float)width / (float)height);
@@ -2243,27 +2243,23 @@ bool CGdiplusBitmap::get_palette()
 	return true;
 }
 
-void CGdiplusBitmap::cvtColor(Gdiplus::PixelFormat old_format, Gdiplus::PixelFormat new_format)
+void CGdiplusBitmap::convert(Gdiplus::PixelFormat new_format)
 {
+	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, new_format);
+	Gdiplus::Graphics g(result);
 
+	g.DrawImage(m_pBitmap, 0, 0, width, height);
+
+	delete m_pBitmap;
+	m_pBitmap = result->Clone(0, 0, width, height, PixelFormatDontCare);
+	delete result;
+
+	resolution();
 }
 
+/*
 void CGdiplusBitmap::cvtColor32ARGB()
 {
-	/*
-	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
-	clone(&temp);
-
-	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
-	Graphics g(m_pBitmap);
-	g.Clear(Color(0, 0, 0, 0));
-
-	//사본을 ia처리하여 캔버스에 그려준다.
-	g.DrawImage(temp, 0, 0, width, height);
-	resolution();
-	*/
-	
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(result);
 
@@ -2277,6 +2273,7 @@ void CGdiplusBitmap::cvtColor32ARGB()
 
 	resolution();
 }
+*/
 
 void CGdiplusBitmap::set_matrix(Gdiplus::ColorMatrix* colorMatrix, Gdiplus::ColorMatrix* grayMatrix)
 {

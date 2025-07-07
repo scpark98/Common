@@ -59,6 +59,9 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 
 	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
 
+	m_thumb.create(this);
+	m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
+
 	return true;
 }
 
@@ -82,6 +85,7 @@ BEGIN_MESSAGE_MAP(CSCImageDlg, CDialog)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_REGISTERED_MESSAGE(Message_CGdiplusBitmap, &CSCImageDlg::on_message_from_GdiplusBitmap)
 	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCImageDlg::on_message_from_CSCSliderCtrl)
+	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCImageDlg::on_message_CSCThumbCtrl)
 END_MESSAGE_MAP()
 
 
@@ -89,6 +93,9 @@ END_MESSAGE_MAP()
 
 void CSCImageDlg::OnPaint()
 {
+	if (m_show_thumb)
+		return;
+
 	CPaintDC dc1(this); // device context for painting
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	// 그리기 메시지에 대해서는 CStatic::OnPaint()을(를) 호출하지 마십시오.
@@ -374,7 +381,11 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				break;
-			/*
+			case 'B':
+				m_show_thumb = !m_show_thumb;
+				m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
+				break;
+				/*
 			case VK_ADD :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
@@ -435,9 +446,9 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				break;
-			default :
-				return FALSE;
 		}
+
+		return FALSE;
 	}
 
 	return CDialog::PreTranslateMessage(pMsg);
@@ -457,7 +468,7 @@ bool CSCImageDlg::load()
 	return load(recent);
 }
 
-bool CSCImageDlg::load(CString sFile)
+bool CSCImageDlg::load(CString sFile, bool load_thumbs)
 {
 	//다른 이미지를 로딩하기 전에 이전 이미지가 animated gif였다면 재생하는 thread를 중지시켜야 한다.
 	stop_gif();
@@ -492,6 +503,8 @@ bool CSCImageDlg::load(CString sFile)
 		Invalidate();
 	}
 
+	if (load_thumbs)
+		m_thumb.set_path(get_part(sFile, fn_folder));
 	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
 
 	return res;
@@ -621,12 +634,14 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 	if (m_static_pixel.m_hWnd == NULL)
 		return;
 
+	CRect rc;
+	GetClientRect(rc);
+
+	m_thumb.MoveWindow(rc);
+
 	if (m_img.is_animated_gif())
 	{
-		CRect rc;
-		GetClientRect(rc);
 		m_img.move_gif(rc);
-
 		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 	}
 	//else
@@ -636,9 +651,6 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 
 	if (m_show_pixel)
 	{
-		CRect rc;
-		GetClientRect(rc);
-
 		CRect r_pixel = make_rect(rc.left + 8, rc.bottom - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
 		m_static_pixel.MoveWindow(r_pixel);
 	}
@@ -1162,4 +1174,90 @@ void CSCImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_for
 
 	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, cr_back, cr_fore);
 	Invalidate();
+}
+
+LRESULT CSCImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
+{
+	CString str;
+	CSCThumbCtrlMsg* msg = (CSCThumbCtrlMsg*)wParam;
+
+	if (msg->msg == CSCThumbCtrlMsg::message_thumb_lbutton_dbclicked)
+	{
+		//AfxMessageBox(i2S(msg->index) + _T(" dbclicked"));
+		//ShellExecute(m_hWnd, _T("open"), m_thumb.m_thumb[msg->index].full_path, 0, 0, SW_SHOWNORMAL);
+		m_show_thumb = false;
+		m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
+		load(m_thumb.m_thumb[msg->index].full_path, false);
+	}
+	else if (msg->msg == CSCThumbCtrlMsg::message_thumb_loading_completed)
+	{
+		TRACE(_T("loading completed. %ldms\n"), m_thumb.get_loading_elapsed());
+	}
+	else if (msg->msg == CSCThumbCtrlMsg::message_thumb_rename)
+	{
+		CString folder = get_part(m_thumb.m_thumb[msg->index].full_path, fn_folder);
+		CString ext = get_part(m_thumb.m_thumb[msg->index].full_path, fn_ext);
+		CString oldName;
+		CString newName;
+		bool filename_error = false;
+
+		if (m_thumb.m_thumb[msg->index].title.FindOneOf(FILENAME_NOT_ALLOWED_CHAR) >= 0)
+		{
+			str.Format(_T("파일 이름에는 다음 문자를 사용할 수 없습니다.\n\n\\ : * ? \" < > |"));
+			filename_error = true;
+		}
+
+		oldName.Format(_T("%s\\%s"), folder, m_thumb.get_old_title());
+		newName.Format(_T("%s\\%s"), folder, m_thumb.m_thumb[msg->index].title);
+
+		//확장자를 표시하고 있지 않았다면 title에 확장자를 붙여서 rename해야 한다.
+		if (!m_thumb.get_show_file_extension())
+		{
+			oldName = oldName + _T(".") + ext;
+			newName = newName + _T(".") + ext;
+		}
+
+		if (PathFileExists(newName))
+		{
+			str.Format(_T("%s\n\n동일한 이름의 파일이 이미 존재합니다."), newName);
+			filename_error = true;
+		}
+
+		if (filename_error)
+		{
+			AfxMessageBox(str, MB_ICONEXCLAMATION);
+			m_thumb.set_title(msg->index, m_thumb.get_old_title());
+			return 0;
+		}
+
+		str.Format(_T("%s\n=>\n%s 로 변경합니다."), oldName, newName);
+		int res = AfxMessageBox(str, MB_ICONQUESTION | MB_OKCANCEL);
+		if (res == IDOK)
+		{
+			if (MoveFile(oldName, newName))
+			{
+				m_thumb.select_item(-1, false, false);
+				str = m_thumb.m_thumb[msg->index].title;
+				m_thumb.sort_by_title();
+				Wait(50);
+				int index = m_thumb.find_by_title(str);
+				m_thumb.select_item(index);
+				return 0;
+			}
+			else
+			{
+				str.Format(_T("%s\n\n위 파일 이름으로 변경하지 못했습니다."), newName);
+				AfxMessageBox(str, MB_ICONEXCLAMATION);
+			}
+		}
+
+		m_thumb.set_title(msg->index, m_thumb.get_old_title());
+	}
+	else if (msg->msg == CSCThumbCtrlMsg::message_thumb_reload)
+	{
+		CString recent_folder = AfxGetApp()->GetProfileString(_T("setting"), _T("recent folder"), _T(""));
+		m_thumb.set_path(recent_folder);
+	}
+
+	return 0;
 }

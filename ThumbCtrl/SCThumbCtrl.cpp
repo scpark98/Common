@@ -4,6 +4,7 @@
 #include "SCThumbCtrl.h"
 #include "../MemoryDC.h"
 #include "../Functions.h"
+#include "../messagebox/Win32InputBox/Win32InputBox.h"
 
 // CSCThumbCtrl 대화 상자
 
@@ -12,14 +13,56 @@ IMPLEMENT_DYNAMIC(CSCThumbCtrl, CDialogEx)
 CSCThumbCtrl::CSCThumbCtrl()
 {
 	memset(&m_lf, 0, sizeof(LOGFONT));
+
+	m_max_thumbs = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), 0);
 }
 
 CSCThumbCtrl::~CSCThumbCtrl()
 {
-	for (int i = 0; i < m_thumb.size(); i++)
-		SAFE_DELETE_ARRAY(m_thumb[i].feature);
+	release(-1);
+
+	if (m_pEdit)
+	{
+		m_pEdit->DestroyWindow();
+		delete m_pEdit;
+	}
 
 	m_thumb.clear();
+}
+
+void CSCThumbCtrl::release(int index)
+{
+	int i;
+	int start = 0;
+	int end = m_thumb.size();
+
+	if (index >= (int)m_thumb.size())
+	{
+		return;
+	}
+	else if (index >= 0)
+	{
+		start = index;
+		end = index + 1;
+	}
+
+	for (i = start; i < end; i++)
+	{
+		if (m_thumb[i].img->is_valid())
+		{
+			//delete만 호출해도 CGdiplusBitmap의 소멸자에서 이미 release를 하므로 별도로 img->release()를 호출할 필요가 없다.
+			//m_thumb[i].img->release();
+
+			//여기서 m_thumb.erase(m_thumb.begin() + i);를 호출하면 이는 release()가 아닌 remove가 되므로 정리가 필요하다.
+			delete m_thumb[i].img;
+			m_thumb[i].img = NULL;
+		}
+
+		SAFE_DELETE_ARRAY(m_thumb[i].feature);
+	}
+
+	if (index < 0)
+		m_thumb.clear();
 }
 
 void CSCThumbCtrl::DoDataExchange(CDataExchange* pDX)
@@ -77,6 +120,8 @@ BEGIN_MESSAGE_MAP(CSCThumbCtrl, CDialogEx)
 	ON_WM_RBUTTONUP()
 	ON_WM_RBUTTONDBLCLK()
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCThumbCtrl::on_message_CSCEdit)
+	ON_WM_CONTEXTMENU()
+	ON_COMMAND_RANGE(idTotalCount, idRemoveAll, on_context_menu)
 END_MESSAGE_MAP()
 
 
@@ -86,6 +131,13 @@ END_MESSAGE_MAP()
 //이러한 변화에 대해 재계산하고 Invalidate()까지 수행하므로 OnPaint()에서는 r에 표시만 하면 된다.
 void CSCThumbCtrl::recalc_tile_rect()
 {
+	if (m_thumb.size() == 0)
+	{
+		m_scroll_pos = 0;
+		m_scroll_total = 0;
+		return;
+	}
+
 	int		i;
 	CRect	rc;
 	CRect	rTile;
@@ -97,34 +149,85 @@ void CSCThumbCtrl::recalc_tile_rect()
 	m_sz_tile.cy = m_r_inner.top + m_sz_thumb.cy + m_thumb_title_gap + m_title_height + m_r_inner.bottom;
 
 	//맨 첫번째 항목의 위치를 잡고 인덱스가 증가하면 그 위치를 조정해준다.
-	rTile = make_rect(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_tile.cx, m_sz_tile.cy);
-
-	m_per_line = -1;
-
-	for (i = 0; i < m_thumb.size(); i++)
+	while (true)
 	{
-		m_thumb[i].r = rTile;
-		m_thumb[i].thumb_bottom = rTile.top + m_r_inner.top + m_sz_thumb.cy;
+		rTile = make_rect(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_tile.cx, m_sz_tile.cy);
 
-		rTile.OffsetRect(rTile.Width() + m_sz_gap.cx, 0);
+		m_per_line = -1;
 
-		if ((rTile.right + m_sz_margin.cx > rc.right))
+		for (i = 0; i < m_thumb.size(); i++)
 		{
-			if (m_per_line == -1)
-				m_per_line = i + 1;
+			m_thumb[i].r = rTile;
+			m_thumb[i].thumb_bottom = rTile.top + m_r_inner.top + m_sz_thumb.cy;
 
-			rTile.left = m_sz_margin.cx;
-			rTile.top = rTile.bottom + m_sz_gap.cy;
-			rTile.right = rTile.left + m_sz_tile.cx;
-			rTile.bottom = rTile.top + m_sz_tile.cy;
+			rTile.OffsetRect(rTile.Width() + m_sz_gap.cx, 0);
+
+			//다음 thumb를 표시할 위치가 rc.right를 벗어난다면 다음줄로 내려준다.
+			//단, i가 마지막 항목일 경우는 이 체크를 하지 않아야 한다.
+			if (i < m_thumb.size() - 1 && (rTile.right + m_sz_margin.cx > rc.right))
+			{
+				if (m_per_line == -1)
+					m_per_line = i + 1;
+
+				rTile.left = m_sz_margin.cx;
+				rTile.top = rTile.bottom + m_sz_gap.cy;
+				rTile.right = rTile.left + m_sz_tile.cx;
+				rTile.bottom = rTile.top + m_sz_tile.cy;
+			}
+		}
+
+		m_scroll_total = rTile.bottom - m_scroll_pos + m_sz_margin.cy;
+
+		//맨 아래로 스크롤한 후 창 크기를 늘리거나 썸네일 크기를 줄이거나 썸네일을 제거하면
+		//하단에 공백이 생기므로 m_scroll_pos를 보정한 후 다시 계산해줘야 한다.
+		if ((m_scroll_pos != 0) && (m_scroll_pos < -m_scroll_total + rc.Height()))
+		{
+			m_scroll_pos = -m_scroll_total + rc.Height();
+			if (m_scroll_pos > 0)
+				m_scroll_pos = 0;
+		}
+		else
+		{
+			break;
 		}
 	}
+	/*
+	//여러 thumb들을 삭제할 경우 현재의 m_scroll_pos는 m_scroll_total보다 불필요하게 큰 값인 경우가 있다.
+	//이럴 경우는 m_scroll_pos를 0으로 리셋한 후 다시 계산해줘야 한다.
+	if (m_scroll_total > rc.Height() || m_scroll_total < abs(m_scroll_pos))
+	{
+		Clamp(m_scroll_pos, -m_scroll_total + rc.Height(), 0);
 
-	m_scroll_total = rTile.bottom - m_scroll_pos + m_sz_margin.cy;
-	TRACE(_T("m_scroll_total = %d\n"), m_scroll_total);
+		//맨 첫번째 항목의 위치를 잡고 인덱스가 증가하면 그 위치를 조정해준다.
+		rTile = make_rect(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_tile.cx, m_sz_tile.cy);
 
-	//맨 아래로 스크롤한 후 창 크기를 늘리거나 썸네일 크기를 줄이면 하단에 공백이 생기므로 m_scroll_pos를 보정해줘야 한다.
-	Clamp(m_scroll_pos, -m_scroll_total + rc.Height(), 0);
+		m_per_line = -1;
+
+		for (i = 0; i < m_thumb.size(); i++)
+		{
+			m_thumb[i].r = rTile;
+			m_thumb[i].thumb_bottom = rTile.top + m_r_inner.top + m_sz_thumb.cy;
+
+			rTile.OffsetRect(rTile.Width() + m_sz_gap.cx, 0);
+
+			//다음 thumb를 표시할 위치가 rc.right를 벗어난다면 다음줄로 내려준다.
+			//단, i가 마지막 항목일 경우는 이 체크를 하지 않아야 한다.
+			if (i < m_thumb.size() - 1 && (rTile.right + m_sz_margin.cx > rc.right))
+			{
+				if (m_per_line == -1)
+					m_per_line = i + 1;
+
+				rTile.left = m_sz_margin.cx;
+				rTile.top = rTile.bottom + m_sz_gap.cy;
+				rTile.right = rTile.left + m_sz_tile.cx;
+				rTile.bottom = rTile.top + m_sz_tile.cy;
+			}
+		}
+	}
+	*/
+
+
+	TRACE(_T("m_scroll_total = %d, m_scroll_pos = %d\n"), m_scroll_total, m_scroll_pos);
 
 	Invalidate();
 }
@@ -160,7 +263,7 @@ void CSCThumbCtrl::OnPaint()
 		dc.FillSolidRect(r, green);
 		return;
 	}
-	else if (m_thumb.size() == 0)
+	else if (m_loading_completed && m_thumb.size() == 0)
 	{
 		CString str = _T("표시할 이미지가 없습니다.");
 		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -187,15 +290,15 @@ void CSCThumbCtrl::OnPaint()
 
 		rThumb.DeflateRect(m_r_inner);
 		rThumb.bottom -= (m_thumb_title_gap + m_title_height);
-		CRect rImage = get_ratio_rect(rThumb, m_thumb[i].img.width, m_thumb[i].img.height, DT_BOTTOM);
+		CRect rImage = get_ratio_rect(rThumb, m_thumb[i].img->width, m_thumb[i].img->height, DT_BOTTOM);
 
-		if (m_thumb[i].img.is_empty())
+		if (m_thumb[i].img->is_empty())
 		{
 			DrawShadowText(dc.GetSafeHdc(), _T("X"), -1, rThumb,
 				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, RGB(255, 0, 0), 0, 2, 1);
 		}
 
-		g.DrawImage(m_thumb[i].img, CRect2GpRect(rImage));
+		g.DrawImage(*m_thumb[i].img, CRect2GpRect(rImage));
 
 		CRect rTitle = rThumb;
 		rTitle.top = rThumb.bottom + m_thumb_title_gap;
@@ -348,6 +451,8 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 {
 	pThisWnd = this;
 
+	m_tloading_start = clock();
+
 	if (reset)
 	{
 		m_files.clear();
@@ -377,13 +482,14 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_thumb, bool invalidate)
 {
-	m_thumb[index].img.load(full_path);
-	m_thumb[index].width = m_thumb[index].img.width;
-	m_thumb[index].height = m_thumb[index].img.height;
-	m_thumb[index].channel = m_thumb[index].img.channel;
+	m_thumb[index].img = new CGdiplusBitmap();
+	m_thumb[index].img->load(full_path);
+	m_thumb[index].width = m_thumb[index].img->width;
+	m_thumb[index].height = m_thumb[index].img->height;
+	m_thumb[index].channel = m_thumb[index].img->channel;
 
-	CRect r = get_ratio_rect(CRect(0, 0, m_sz_thumb.cx, m_sz_thumb.cy), m_thumb[index].img.width, m_thumb[index].img.height);
-	m_thumb[index].img.resize(r.Width(), r.Height());
+	CRect r = get_ratio_rect(CRect(0, 0, m_sz_thumb.cx, m_sz_thumb.cy), m_thumb[index].img->width, m_thumb[index].img->height);
+	m_thumb[index].img->resize(r.Width(), r.Height());
 	m_thumb[index].title = title;
 	m_thumb[index].full_path = full_path;
 	m_thumb[index].score = 0.0;
@@ -451,7 +557,9 @@ void CSCThumbCtrl::loading_completed_callback()
 
 void CSCThumbCtrl::on_loading_completed()
 {
+	m_tloading_end = clock();
 	m_loading_completed = true;
+
 	recalc_tile_rect();
 	//if (m_index_select_after_loading >= 0)
 	//	m_selected.push_back(m_index_select_after_loading);
@@ -592,7 +700,7 @@ void CSCThumbCtrl::scroll_up(bool up)
 		return;
 
 	int pos = m_scroll_pos;
-	pos += (up ? 1 : -1) * (m_sz_tile.cy + m_sz_gap.cy);
+	pos += (up ? 1 : -1) * (m_sz_tile.cy + m_sz_gap.cy) / 4.0;
 
 	/*
 	if (up)
@@ -844,6 +952,7 @@ void CSCThumbCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_selected.size())
 	{
+		//dbclick 했을때의 액션은 parent에서 처리한다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
 			(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_dbclicked, m_selected[0]), 0);
 	}
@@ -930,36 +1039,27 @@ void CSCThumbCtrl::edit_begin(int index)
 		m_pEdit = new CSCEdit();
 		m_pEdit->Create(dwStyle, r, this, IDC_EDIT_CELL);
 		m_pEdit->SetFont(&m_font);
-		//DWORD margin = m_pEdit->GetMargins();
-		//m_pEdit->SetMargins(0, 0);
+		m_pEdit->set_line_align(DT_TOP);
 	}
 
-	//CDC* pDC = m_pEdit->GetDC();
 	CClientDC dc(this);
 	CFont* pOldFont = dc.SelectObject(&m_font);
 	CRect textRect = r;
 
-	dc.DrawText(m_thumb[index].title, textRect, DT_CALCRECT/*| DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL*/);
+	//1 line이라 가정하고 height만 구한다.
+	dc.DrawText(_T("for height"), textRect, DT_CALCRECT);// | DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL);
+	dc.SelectObject(&pOldFont);
 
 	m_in_editing = true;
 	m_editing_index = index;
 	m_old_title = m_thumb[index].title;
 
 	m_pEdit->SetWindowText(m_thumb[index].title);
-	m_pEdit->set_line_align(DT_VCENTER);
-
-	//텍스트 출력 높이를 위에서 계산해서 해봤으나 DrawText와 CEdit의 텍스트가 그려지는 모양이 다르다. 그냥 이방법이 정확하다.
-	//다만 폰트의 높이에 따라 다를 수 있으나 아직 확인하진 않았다.
 	int lc = m_pEdit->GetLineCount();
-	r.bottom = r.top + textRect.Height() + 4;
+	r.bottom = r.top + lc * textRect.Height() + 4;
 
-	//if (textRect.Width() > r.Width())
-	//	r.InflateRect((textRect.Width() - r.Width()) / 2, 0);
-
-	//if (m_show_resolution)
-	//	r.OffsetRect(0, textRect.Height() - 6);
-	//else
-	//	r.OffsetRect(0, -9);
+	m_pEdit->set_text_color(m_theme.cr_text);
+	m_pEdit->set_back_color(m_theme.cr_back);
 	m_pEdit->MoveWindow(r);
 	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetFocus();
@@ -1016,7 +1116,8 @@ int	CSCThumbCtrl::get_index_from_point(CPoint pt)
 	return -1;
 }
 
-//dqSelected를 NULL로 주고 선택 개수만 리턴받아 쓰기도 한다.
+//선택된 항목들은 이미 m_selected에 저장되어 있으므로 이를 dqSelected로 복사한다.
+//dqSelected가 null이면 그냥 선택 갯수를 리턴한다.
 int CSCThumbCtrl::get_selected_items(std::deque<int>* dqSelected)
 {
 	if (dqSelected)
@@ -1109,7 +1210,7 @@ std::deque<int> CSCThumbCtrl::find_text(bool show_inputbox, CString text, bool s
 	if (show_inputbox)
 	{
 		_stprintf_s(msg, _countof(msg), _T("검색어를 입력하세요."));
-		int res = 0;// CWin32InputBox::InputBox(_T("검색어 입력"), msg, buf, 200, false);
+		int res = CWin32InputBox::InputBox(_T("검색어 입력"), msg, buf, 200, false);
 
 		if (res == IDCANCEL)
 			return dqFound;
@@ -1120,7 +1221,7 @@ std::deque<int> CSCThumbCtrl::find_text(bool show_inputbox, CString text, bool s
 
 	for (i = 0; i < m_thumb.size(); i++)
 	{
-		if (m_thumb[i].full_path.Find(text) >= 0)
+		if (find(m_thumb[i].title, text) >= 0)
 			dqFound.push_back(i);
 	}
 
@@ -1201,8 +1302,8 @@ void CSCThumbCtrl::sort_by_title()
 			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
 			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
 			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
-			a.img.m_referenced_variable = true;
-			b.img.m_referenced_variable = true;
+			a.img->m_referenced_variable = true;
+			b.img->m_referenced_variable = true;
 
 			CString str0 = a.title;
 			CString str1 = b.title;
@@ -1223,8 +1324,8 @@ void CSCThumbCtrl::sort_by_info(int idx)
 			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
 			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
 			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
-			a.img.m_referenced_variable = true;
-			b.img.m_referenced_variable = true;
+			a.img->m_referenced_variable = true;
+			b.img->m_referenced_variable = true;
 			return (a.info[idx] > b.info[idx]);
 		}
 	);
@@ -1241,8 +1342,8 @@ void CSCThumbCtrl::sort_by_score()
 			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
 			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
 			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
-			a.img.m_referenced_variable = true;
-			b.img.m_referenced_variable = true;
+			a.img->m_referenced_variable = true;
+			b.img->m_referenced_variable = true;
 			return (a.score > b.score);
 		}
 	);
@@ -1349,4 +1450,226 @@ void CSCThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool re
 
 	if (refresh)
 		Invalidate();
+}
+
+//point는 screen coord.
+void CSCThumbCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
+{
+	if (get_selected_items() <= 1)
+	{
+		CPoint pt = point;
+		ScreenToClient(&pt);
+
+		int index = get_index_from_point(pt);
+		if (index >= 0)
+			select_item(index);
+	}
+
+	int selected_count = get_selected_items();
+
+	CMenu	menu;
+	menu.CreatePopupMenu();
+
+	menu.AppendMenu(MF_STRING, idTotalCount, _T("총 ") + i2S(m_thumb.size()) + _T("개의 썸네일"));
+	menu.EnableMenuItem(idTotalCount, MF_GRAYED);
+	menu.AppendMenu(MF_SEPARATOR);
+
+	menu.AppendMenu(MF_STRING, idFind, _T("찾기...(&F)"));
+	menu.AppendMenu(MF_STRING, idReload, _T("새로 고침(&R)"));
+	menu.AppendMenu(MF_STRING, idReloadSelected, _T("선택 항목만 새로 고침"));
+	menu.AppendMenu(MF_STRING, idSortByTitle, _T("타이틀로 정렬(&S)"));
+	menu.AppendMenu(MF_SEPARATOR);
+
+	menu.AppendMenu(MF_STRING, idCopyToClipboard, _T("복사(&C)"));
+	menu.AppendMenu(MF_SEPARATOR);
+
+	menu.AppendMenu(MF_STRING, idToggleIndex, _T("인덱스 표시"));
+	menu.AppendMenu(MF_STRING, idToggleTitle, _T("타이틀 표시"));
+	menu.AppendMenu(MF_STRING, idToggleResolution, _T("해상도 정보 표시"));
+	//menu.AppendMenu(MF_STRING, idPromptMaxThumb, _T("Set max thumbnails(&A)(0 : no limits)..."));
+	menu.AppendMenu(MF_SEPARATOR);
+
+	menu.AppendMenu(MF_STRING, idDeleteThumb, _T("선택 항목을 리스트에서 삭제(&D)"));
+	//menu.AppendMenu(MF_SEPARATOR);
+	//menu.AppendMenu(MF_STRING, idRemoveAll, _T("모든 썸네일 삭제...(&R)"));
+
+	menu.EnableMenuItem(idFind, m_thumb.size() ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(idReloadSelected, selected_count ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(idSortByTitle, m_thumb.size() ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(idCopyToClipboard, selected_count ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(idDeleteThumb, selected_count ? MF_ENABLED : MF_DISABLED);
+
+	menu.CheckMenuItem(idToggleIndex, m_show_index ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(idToggleTitle, m_show_title ? MF_CHECKED : MF_UNCHECKED);
+	menu.CheckMenuItem(idToggleResolution, m_show_resolution ? MF_CHECKED : MF_UNCHECKED);
+
+	menu.TrackPopupMenu(TPM_LEFTALIGN, point.x, point.y, this);
+
+	menu.DestroyMenu();
+}
+
+void CSCThumbCtrl::on_context_menu(UINT nMenuID)
+{
+	switch (nMenuID)
+	{
+		case idToggleIndex:
+			m_show_index = !m_show_index;
+			AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("show index"), m_show_index);
+			Invalidate();
+			break;
+
+		case idToggleTitle:
+			m_show_title = !m_show_title;
+			AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("show title"), m_show_title);
+			Invalidate();
+			break;
+
+		case idToggleResolution:
+			m_show_resolution = !m_show_resolution;
+			AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("show resolution"), m_show_resolution);
+			Invalidate();
+			break;
+
+		case idFind:
+		{
+			find_text(true, true);
+			break;
+		}
+
+		//loading은 main에서 호출하므로 메인에게 메시지만 전달한다.
+		case idReload:
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+				(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_reload, 0), 0);
+			break;
+		case idReloadSelected:
+		{
+			int index = get_selected_item();
+			if (index < 0 || index >= m_thumb.size())
+				return;
+			m_thumb[index].reload();
+			InvalidateRect(m_thumb[index].r);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+				(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
+		}
+		break;
+
+		case idSortByTitle:
+			sort_by_title();
+			break;
+		case idCopyToClipboard:
+			if (m_thumb.size() == 0)
+				break;
+			{
+				int index = get_selected_item();
+				if (index >= 0)
+				{
+					CGdiplusBitmap img(m_thumb[index].full_path);
+					img.copy_to_clipbard();
+				}
+			}
+			break;
+		case idDeleteThumb:
+			on_menu_delete();
+			break;
+
+		case idPromptMaxThumb:
+		{
+			TCHAR buf[200] = { 0 };
+			TCHAR msg[200] = { 0 };
+
+			_stprintf_s(msg, _countof(msg), _T("표시할 썸네일의 최대 개수를 입력하세요(0:제한없음).\n현재 설정값 = %d"), m_max_thumbs);
+			int res = CWin32InputBox::InputBox(_T("썸네일 최대 개수"), msg, buf, 200, false);
+
+			if (res == IDCANCEL)
+				return;
+
+			int n = _ttoi(buf);
+
+			if (n <= 0)
+				return;
+
+			m_max_thumbs = n;
+
+			//썸네일에 표시할 최대 개수가 넘으면 맨 마지막 썸네일을 지우고 추가해준다.
+			if (m_max_thumbs && (m_thumb.size() >= m_max_thumbs))
+			{
+				while (m_thumb.size() > m_max_thumbs)
+					m_thumb.pop_front();
+
+				Invalidate();
+			}
+
+			AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), m_max_thumbs);
+		}
+		break;
+	}
+}
+
+void CSCThumbCtrl::on_menu_delete()
+{
+	int count = get_selected_items();
+	CString str;
+
+	if (count == 1)
+		str.Format(_T("선택된 항목을 삭제합니다."));
+	else if (count > 1)
+		str.Format(_T("선택된 %d개의 썸네일을 삭제합니다."), count);
+
+	if (AfxMessageBox(str, MB_OKCANCEL) == IDCANCEL)
+		return;
+
+	remove_selected(true);
+}
+
+//index == -1이면 전체 삭제
+//이 함수는 파일삭제인듯한데 뭔가 코드 미완성된듯하므로 우선 스킵한다.
+void CSCThumbCtrl::remove(int index, bool refresh)
+{
+	if (index < 0)
+	{
+		release(-1);
+		m_selected.clear();
+	}
+	else
+	{
+		//if (m_thumb[index].full_path.IsEmpty() == false)
+		//	DeleteFile(m_thumb[index].full_path);
+		release(index);
+		m_thumb.erase(m_thumb.begin() + index);
+	}
+
+
+	if (refresh)
+		recalc_tile_rect();
+
+	//m_modified = true;
+
+	//실제적인 삭제는 여기서 이루어지지만 삭제를 묻는 질문은 메인에서 해야 한다.
+	//따라서 메시지도 보낼 필요가 없다.
+	//::SendMessage( GetParent()->GetSafeHwnd(),	Message_CThumbCtrl,
+	//	(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_remove, index), 0 );
+}
+
+void CSCThumbCtrl::remove_selected(bool refresh)
+{
+	int i;
+	std::deque<int> selected;
+
+	get_selected_items(&selected);
+
+	for (i = selected.size() - 1; i >= 0; i--)
+	{
+		remove(selected[i], false);
+	}
+
+	m_selected.clear();
+	recalc_tile_rect();
+}
+
+CGdiplusBitmap* CSCThumbCtrl::get_img(int index)
+{
+	if (index < 0 || index >= m_thumb.size())
+		return NULL;
+
+	return m_thumb[index].img;
 }

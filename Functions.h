@@ -87,6 +87,10 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define Traceln(fmt, ...) trace_output(false, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 #define Trace_only(fmt, ...) trace_output(true, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
+//trace(m_num);으로 호출하면 TRACE(_T("m_num = %d\n"));로 치환된다.
+//m_num이 CString이면 else절에 의해 %s로 출력된다.
+#define trace(n) { if (typeid(n) == typeid(int)) TRACE(_T("%S = %d\n"), #n, n); else TRACE(_T("%S = %s\n"), #n, n); }
+
 #ifdef __GNUG__
 #include <cxxabi.h>
 #include <execinfo.h>
@@ -307,6 +311,15 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 
 void printf_string(const char* psz, ...);
 void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
+
+//trace(m_input);을 호출하면 TRACE(_T("m_input = %d\n"));과 같이 동작한다.
+//template <typename T> void trace(T args)
+//{
+//	CString name;
+//	//= ENUM_TO_CSTRING(args);
+//	ID2String(args, name);
+//	TRACE(_T("%s = %d\n"), name, args);
+//}
 
 template < typename T > class AutoEraser
 {

@@ -50,7 +50,10 @@ public:
 	//	img.deep_copy(&(_img.img));
 	//}
 
-	CGdiplusBitmap img;
+	//img를 동적변수로 선언하는 이유.
+	//img는 그림파일마다 그 크기가 다양한데 이를 정적으로 잡는 것이 맞는가?
+	//img.load()에서 m_pBitmap이 동적할당되는가?
+	CGdiplusBitmap* img;
 	CString		title;			//파일명 또는 지정된 타이틀
 	bool		key_thumb;		//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
 	CString		info[4];		//info text 표시용. 0(lt info) ~ 3(rb info)
@@ -63,6 +66,28 @@ public:
 	int			line_index;		//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
 	float		score = 0.0;
 	float*		feature = NULL;
+
+	CThumbImage()
+	{
+		img = NULL;
+		key_thumb = false;
+		feature = NULL;
+	}
+	~CThumbImage()
+	{
+	}
+
+	//절대로 소멸자에서 data라는 메모리 주소의 공간을 delete해서는 안된다.
+	//메모리를 할당받고 데이터를 담아서 이를 m_thumb에 저장하는 방식이므로
+	//local에서 CThumbImage의 instance인 img를 선언하여
+	//data라는 번지에 메모리를 동적 할당받고 이를 push_back()한 상태에서
+	//위의 img라는 로컬 변수가 자동 소멸되는 시점이 되면
+	//m_thumb는 시작 포인터만 가지고 있을 뿐 실제 데이터 영역은 delete되기 때문이다.
+	//remove_all 또는 프로그램이 종료되는 시점에서 수동으로 delete시켜줘야 한다.
+	void reload()
+	{
+		img->load(full_path);
+	}
 };
 
 class CSCThumbCtrl : public CDialogEx
@@ -80,11 +105,19 @@ public:
 	void			add_files(std::deque<CString> files, bool reset = true);
 	int				insert(int index, CString full_path, CString sTitle = _T("\0"), bool bKeyThumb = false, bool invalidate = true);
 
-	std::deque<CString> m_files;
+	//index == -1이면 전체 삭제
+	void			remove(int index, bool refresh = true);
+	void			remove_selected(bool refresh = true);
 
+	void			release(int index);
+
+	std::deque<CString> m_files;
 	std::deque<CThumbImage> m_thumb;
-	CGdiplusBitmap	get_img(int index);
+	CGdiplusBitmap*	get_img(int index);
+
+
 	bool			is_loading_completed() { return m_loading_completed; }
+	long			get_loading_elapsed() { return (m_tloading_end - m_tloading_start); }
 
 //크기 조정
 	CSize			get_thumb_size() { return m_sz_thumb; }
@@ -106,7 +139,8 @@ public:
 	void			use_multi_selection(bool multi_select = true) { m_use_multi_selection = multi_select; }
 	//선택된 첫번째 항목의 인덱스를 리턴.
 	int				get_selected_item();
-	//선택된 항목들을 dqSelected에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
+	//선택된 항목들은 이미 m_selected에 저장되어 있으므로 이를 dqSelected로 복사한다.
+	//dqSelected가 null이면 그냥 선택 갯수를 리턴한다.
 	int				get_selected_items(std::deque<int>* dqSelected = NULL);
 
 	bool			m_use_circle_number = false;
@@ -144,7 +178,9 @@ public:
 	void			sort_by_score();
 
 //옵션
-	void			show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
+	bool			get_show_file_extension() { return m_show_extension; }
+	void			set_show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
+
 
 //color theme
 	void			set_color_theme(int theme);
@@ -181,6 +217,12 @@ protected:
 	//썸네일 사이의 간격
 	CSize			m_sz_gap = CSize(12, 12);
 
+	//계속 thumb를 추가하는 형태로 사용하는 앱에서 thumb가 계속 증가하면 메모리도 계속 증가된다.
+	//제한을 둬야 할 경우도 있다. -1이면 제한없음.
+	//m_max_thumbs를 초과할 경우 추가 불가? 순환?
+	int				m_max_thumbs = -1;
+
+
 	//타일 크기, 마진, 간격, 스크롤, 컨트롤 크기조정 등에 따라 각 썸네일이 표시되는 r이 재계산된다.
 	//이러한 변화에 대해 재계산하고 Invalidate()까지 수행하므로 OnPaint()에서는 r에 표시만 하면 된다.
 	void			recalc_tile_rect();
@@ -191,6 +233,27 @@ protected:
 	bool			m_show_resolution = false;
 	bool			m_show_extension = true;
 
+//Context Menu
+	enum CONTEXT_MENU
+	{
+		idTotalCount = WM_USER + 1234,
+		idFind,
+		idReload,
+		idReloadSelected,
+		idSortByTitle,
+		idCopyToClipboard,
+		idToggleIndex,
+		idToggleTitle,
+		idToggleResolution,
+		idPromptMaxThumb,
+		idDeleteThumb,
+		idRemoveAll,
+	};
+	bool			m_use_context_menu;
+	void			use_context_menu(bool use) { m_use_context_menu = use; }
+	void			on_context_menu(UINT nID);
+
+	void			on_menu_delete();
 
 
 //스크롤 기능 관련
@@ -213,6 +276,8 @@ protected:
 //로딩 관련
 	bool			m_loading_completed = false;
 	CThreadManager	m_thread;
+	long			m_tloading_start = 0;
+	long			m_tloading_end = 0;
 	static void		loading_function(int idx, int start, int end);
 	static void		loading_completed_callback();
 	void			on_loading_completed();
@@ -251,4 +316,5 @@ public:
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 };

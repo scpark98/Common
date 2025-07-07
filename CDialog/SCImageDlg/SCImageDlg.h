@@ -23,6 +23,7 @@
 #include "afxdialogex.h"
 
 #include "../../GdiplusBitmap.h"
+#include "../../ThumbCtrl/SCThumbCtrl.h"
 #include "../../CStatic/SCStatic/SCStatic.h"
 #include "../../CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
 //#include "../../CToolTipCtrl/RichToolTipCtrl.h"
@@ -52,11 +53,17 @@ public:
 
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
+	bool			m_show_thumb = false;
+	CSCThumbCtrl	m_thumb;
+	LRESULT			on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam);
+
+
+
 	//레지스트리에 저장된 recent file 정보가 있다면 로딩한다.
 	bool			load();
 
 	//외부 파일 로딩
-	bool			load(CString sFile);
+	bool			load(CString sFile, bool load_thumbs = true);
 
 	//리소스의 JPG or PNG 파일 로딩
 	bool			load(CString sType, UINT id);

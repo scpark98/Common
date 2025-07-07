@@ -507,7 +507,7 @@ CGdiplusBitmap::~CGdiplusBitmap()
 
 void CGdiplusBitmap::release()
 {
-	if (m_pBitmap == NULL || m_referenced_variable)
+	if (this == NULL || m_pBitmap == NULL || m_referenced_variable)
 		return;
 
 	if (m_run_thread_animation)
@@ -2409,7 +2409,7 @@ bool CGdiplusBitmap::save(LPCTSTR filepath, ...)
 bool CGdiplusBitmap::copy_to_clipbard()
 {
 	//복사는 잘 되지만 32bit PNG는 투명처리 안됨
-#if 0
+#if 1
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(0, &hbitmap);
 	if (status != Gdiplus::Ok)
@@ -2432,7 +2432,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 		DeleteObject(hbitmap_ddb);
 	}
 	DeleteObject(hbitmap);
-#elif 1
+#elif 0
 	bool res = false;
 	HBITMAP hbitmap;
 	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);

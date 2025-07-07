@@ -488,7 +488,9 @@ int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_t
 	m_thumb[index].height = m_thumb[index].img->height;
 	m_thumb[index].channel = m_thumb[index].img->channel;
 
-	CRect r = get_ratio_rect(CRect(0, 0, m_sz_thumb.cx, m_sz_thumb.cy), m_thumb[index].img->width, m_thumb[index].img->height);
+	//현재 m_sz_thumb가 작을 경우 이 크기로 resize해서 불러오면 나중에 m_sz_thumb를 키웠을 때 흐릿해진다.
+	//MAX_TILE_SIZE 크기로 축소해야 한다.
+	CRect r = get_ratio_rect(CRect(0, 0, MAX_TILE_SIZE, MAX_TILE_SIZE), m_thumb[index].img->width, m_thumb[index].img->height);
 	m_thumb[index].img->resize(r.Width(), r.Height());
 	m_thumb[index].title = title;
 	m_thumb[index].full_path = full_path;
@@ -662,6 +664,7 @@ BOOL CSCThumbCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	else
 	{
 		scroll_up(zDelta > 0);
+		return TRUE;
 	}
 
 	return CDialogEx::OnMouseWheel(nFlags, zDelta, pt);
@@ -1193,6 +1196,20 @@ void CSCThumbCtrl::select_item(int index, bool select, bool make_ensure_visible)
 		ensure_visible(index);
 
 	Invalidate();
+}
+
+void CSCThumbCtrl::select_item(CString fullpath)
+{
+	int i;
+
+	for (i = 0; i < m_thumb.size(); i++)
+	{
+		if (find(m_thumb[i].full_path, fullpath) >= 0)
+		{
+			select_item(i);
+			return;
+		}
+	}
 }
 
 std::deque<int> CSCThumbCtrl::find_text(bool show_inputbox, bool select)

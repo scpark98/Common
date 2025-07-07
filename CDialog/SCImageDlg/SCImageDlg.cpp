@@ -60,6 +60,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
 
 	m_thumb.create(this);
+	m_thumb.set_color_theme(CSCColorTheme::color_theme_dark_gray);
 	m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
 
 	return true;
@@ -93,8 +94,8 @@ END_MESSAGE_MAP()
 
 void CSCImageDlg::OnPaint()
 {
-	if (m_show_thumb)
-		return;
+	//if (m_show_thumb)
+	//	return;
 
 	CPaintDC dc1(this); // device context for painting
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
@@ -383,8 +384,9 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 				break;
 			case 'B':
 				m_show_thumb = !m_show_thumb;
+				m_thumb.select_item(m_filename);
 				m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
-				break;
+				return TRUE;
 				/*
 			case VK_ADD :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
@@ -503,9 +505,10 @@ bool CSCImageDlg::load(CString sFile, bool load_thumbs)
 		Invalidate();
 	}
 
-	if (load_thumbs)
+	if (m_thumb.size() == 0 || load_thumbs)
 		m_thumb.set_path(get_part(sFile, fn_folder));
-	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
+
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CSCImageDlgMessage(this, message_image_loaded), (LPARAM)&sFile);
 
 	return res;
 }

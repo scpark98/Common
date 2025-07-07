@@ -113,6 +113,7 @@ public:
 
 	std::deque<CString> m_files;
 	std::deque<CThumbImage> m_thumb;
+	int				size() { return m_thumb.size(); }
 	CGdiplusBitmap*	get_img(int index);
 
 
@@ -156,6 +157,7 @@ public:
 
 	//index = -1 : 전체선택
 	void			select_item(int index, bool select = true, bool make_ensure_visible = true);
+	void			select_item(CString fullpath);
 	void			ensure_visible(int index);
 
 //검색 관련

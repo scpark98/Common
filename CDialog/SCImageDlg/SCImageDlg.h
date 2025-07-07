@@ -39,6 +39,22 @@
 
 // CSCImageDlg 대화 상자
 
+static const UINT Message_CSCImageDlg = ::RegisterWindowMessage(_T("MessageString_CSCImageDlg"));
+
+class CSCImageDlgMessage
+{
+public:
+	CSCImageDlgMessage(CWnd* _pThis, int _msg)
+		: pThis(_pThis), msg(_msg)
+	{
+	}
+
+	CWnd*	pThis = NULL;
+	int		msg;
+	int		index;
+};
+
+
 class CSCImageDlg : public CDialog
 {
 	DECLARE_DYNAMIC(CSCImageDlg)
@@ -56,6 +72,12 @@ public:
 	bool			m_show_thumb = false;
 	CSCThumbCtrl	m_thumb;
 	LRESULT			on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam);
+
+	enum ENUM_CSCImageDlgMessage
+	{
+		message_image_loaded = 0,
+	};
+
 
 
 

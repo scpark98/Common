@@ -617,7 +617,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 		int delayed_total = 0;
 		while (delayed_total < fadein_delay_ms)
 		{
-			TRACE(_T("delayed_total = %d\n"), delayed_total);
+			//TRACE(_T("delayed_total = %d\n"), delayed_total);
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 			delayed_total += 10;
 			if (!m_fadeinout_ing)
@@ -633,7 +633,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 		int hide_after_delayed_total = 0;
 		while (hide_after_delayed_total < hide_after_ms)
 		{
-			TRACE(_T("hide_after_delayed_total = %d\n"), hide_after_delayed_total);
+			//TRACE(_T("hide_after_delayed_total = %d\n"), hide_after_delayed_total);
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 			hide_after_delayed_total += 10;
 			if (!m_fadeinout_ing)

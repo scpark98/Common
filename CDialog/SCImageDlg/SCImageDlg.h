@@ -44,8 +44,8 @@ static const UINT Message_CSCImageDlg = ::RegisterWindowMessage(_T("MessageStrin
 class CSCImageDlgMessage
 {
 public:
-	CSCImageDlgMessage(CWnd* _pThis, int _msg)
-		: pThis(_pThis), msg(_msg)
+	CSCImageDlgMessage(CWnd* _pThis, int _msg, int _index = -1)
+		: pThis(_pThis), msg(_msg), index(_index)
 	{
 	}
 
@@ -76,6 +76,7 @@ public:
 	enum ENUM_CSCImageDlgMessage
 	{
 		message_image_loaded = 0,
+		message_load_image,
 	};
 
 

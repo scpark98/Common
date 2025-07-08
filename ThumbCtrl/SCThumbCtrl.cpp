@@ -19,18 +19,17 @@ CSCThumbCtrl::CSCThumbCtrl()
 
 CSCThumbCtrl::~CSCThumbCtrl()
 {
-	release(-1);
+	//로딩중에 프로그램을 종료시킬 경우 로딩 쓰레드들을 정상 중지시켜준 후 종료시켜야 한다.
+	release_thumb(-1);
 
 	if (m_pEdit)
 	{
 		m_pEdit->DestroyWindow();
 		delete m_pEdit;
 	}
-
-	m_thumb.clear();
 }
 
-void CSCThumbCtrl::release(int index)
+void CSCThumbCtrl::release_thumb(int index)
 {
 	int i;
 	int start = 0;
@@ -48,7 +47,7 @@ void CSCThumbCtrl::release(int index)
 
 	for (i = start; i < end; i++)
 	{
-		if (m_thumb[i].img->is_valid())
+		if (m_thumb[i].img != NULL)
 		{
 			//delete만 호출해도 CGdiplusBitmap의 소멸자에서 이미 release를 하므로 별도로 img->release()를 호출할 필요가 없다.
 			//m_thumb[i].img->release();
@@ -121,7 +120,7 @@ BEGIN_MESSAGE_MAP(CSCThumbCtrl, CDialogEx)
 	ON_WM_RBUTTONDBLCLK()
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCThumbCtrl::on_message_CSCEdit)
 	ON_WM_CONTEXTMENU()
-	ON_COMMAND_RANGE(idTotalCount, idRemoveAll, on_context_menu)
+	ON_COMMAND_RANGE(idTotalCount, idProperty, on_context_menu)
 END_MESSAGE_MAP()
 
 
@@ -227,7 +226,7 @@ void CSCThumbCtrl::recalc_tile_rect()
 	*/
 
 
-	TRACE(_T("m_scroll_total = %d, m_scroll_pos = %d\n"), m_scroll_total, m_scroll_pos);
+	//TRACE(_T("m_scroll_total = %d, m_scroll_pos = %d\n"), m_scroll_total, m_scroll_pos);
 
 	Invalidate();
 }
@@ -254,8 +253,9 @@ void CSCThumbCtrl::OnPaint()
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
-	if (m_files.size() > 0 && !m_loading_completed)
+	/*if (m_files.size() > 0 && !m_loading_completed)
 	{
+		TRACE(_T("loading...\n"));
 		CRect r = make_center_rect(rc.CenterPoint().x, rc.CenterPoint().y, rc.Width() / 2, 16);
 		draw_sunken_rect(&dc, r, true, Gdiplus::Color::DimGray, Gdiplus::Color::DarkGray);
 		r.DeflateRect(1, 1);
@@ -263,7 +263,7 @@ void CSCThumbCtrl::OnPaint()
 		dc.FillSolidRect(r, green);
 		return;
 	}
-	else if (m_loading_completed && m_thumb.size() == 0)
+	else */if (m_loading_completed && m_thumb.size() == 0)
 	{
 		CString str = _T("표시할 이미지가 없습니다.");
 		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -290,15 +290,22 @@ void CSCThumbCtrl::OnPaint()
 
 		rThumb.DeflateRect(m_r_inner);
 		rThumb.bottom -= (m_thumb_title_gap + m_title_height);
-		CRect rImage = get_ratio_rect(rThumb, m_thumb[i].img->width, m_thumb[i].img->height, DT_BOTTOM);
 
-		if (m_thumb[i].img->is_empty())
+		if (m_thumb[i].load_completed == false)
+		{
+			DrawShadowText(dc.GetSafeHdc(), _T("loading..."), -1, rThumb,
+				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, m_theme.cr_text.ToCOLORREF(), 0, 2, 1);
+		}
+		else if (m_thumb[i].img == NULL || m_thumb[i].img->is_empty())
 		{
 			DrawShadowText(dc.GetSafeHdc(), _T("X"), -1, rThumb,
 				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, RGB(255, 0, 0), 0, 2, 1);
 		}
-
-		g.DrawImage(*m_thumb[i].img, CRect2GpRect(rImage));
+		else
+		{
+			CRect rImage = get_ratio_rect(rThumb, m_thumb[i].img->width, m_thumb[i].img->height, DT_BOTTOM);
+			g.DrawImage(*m_thumb[i].img, CRect2GpRect(rImage));
+		}
 
 		CRect rTitle = rThumb;
 		rTitle.top = rThumb.bottom + m_thumb_title_gap;
@@ -437,16 +444,68 @@ BOOL CSCThumbCtrl::OnEraseBkgnd(CDC* pDC)
 	return CDialogEx::OnEraseBkgnd(pDC);
 }
 
+#include <mutex>
+std::mutex mtx;
+CSCThumbCtrl* pThisWnd;	//add_files() 함수에서 할당됨
+
+void CSCThumbCtrl::loading_function(int idx, int start, int end)
+{
+	int i;
+	CString str;
+
+	if (end - start == 1)
+		str.Format(_T("%d job started..."), start);
+	else
+		str.Format(_T("%d ~ %d job started..."), start, end - 1);
+	TRACE(_T("%s\n"), str);
+
+	for (i = start; i < end; i++)
+	{
+		if (pThisWnd->m_stop_loading)
+			break;
+
+		pThisWnd->insert(i, pThisWnd->m_files[i], get_part(pThisWnd->m_files[i], fn_name), false, false);
+		trace(i);
+	}
+
+	if ((end - start) == 1)
+		str.Format(_T("job completed : %d"), start);
+	else
+		str.Format(_T("job completed : %d ~ %d"), start, end - 1);
+	TRACE(_T("%s\n"), str);
+
+	mtx.lock();
+	pThisWnd->m_thread.set_thread_completed(idx);
+	mtx.unlock();
+}
+
+void CSCThumbCtrl::loading_completed_callback()
+{
+	pThisWnd->on_loading_completed();
+}
+
+void CSCThumbCtrl::on_loading_completed()
+{
+	m_tloading_end = clock();
+	TRACE(_T("total loading completed. elapsed = %ld ms\n"), m_tloading_end - m_tloading_start);
+
+	m_loading_completed = true;
+	recalc_tile_rect();
+
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+		(WPARAM)&CSCThumbCtrlMessage(this, CSCThumbCtrl::message_thumb_loading_completed, 0), 0);
+}
+
 void CSCThumbCtrl::set_path(CString path)
 {
-	m_files.clear();
+	stop_loading();
 
+	m_files.clear();
 	m_files = find_all_files(path, _T(""), FILE_EXTENSION_IMAGE, _T(""), false);
 
 	add_files(m_files);
 }
 
-CSCThumbCtrl* pThisWnd;
 void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 {
 	pThisWnd = this;
@@ -455,9 +514,10 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 	if (reset)
 	{
+		release_thumb(-1);
+
 		m_files.clear();
 		m_selected.clear();
-		m_thumb.clear();
 		m_files.assign(files.begin(), files.end());
 	}
 	else
@@ -469,12 +529,13 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 	{
 		m_loading_completed = true;
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-			(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
+			(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_loading_completed, 0), 0);
 		Invalidate();
 		return;
 	}
 
 	m_thumb.resize(m_files.size());
+
 	m_thread.job(m_files.size(), loading_function, loading_completed_callback);
 
 	Invalidate();
@@ -491,94 +552,38 @@ int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_t
 	//현재 m_sz_thumb가 작을 경우 이 크기로 resize해서 불러오면 나중에 m_sz_thumb를 키웠을 때 흐릿해진다.
 	//MAX_TILE_SIZE 크기로 축소해야 한다.
 	CRect r = get_ratio_rect(CRect(0, 0, MAX_TILE_SIZE, MAX_TILE_SIZE), m_thumb[index].img->width, m_thumb[index].img->height);
+
 	m_thumb[index].img->resize(r.Width(), r.Height());
 	m_thumb[index].title = title;
 	m_thumb[index].full_path = full_path;
 	m_thumb[index].score = 0.0;
 	m_thumb[index].feature = NULL;
 
+	m_thumb[index].load_completed = true;
+
 	if (invalidate)
 	{
-		//recalculate_scroll_size();
-		Invalidate();
+		recalc_tile_rect();
+		//Invalidate();
 	}
 
 	return index;
 }
 
-#include <mutex>
-std::mutex mtx;
-
-void CSCThumbCtrl::loading_function(int idx, int start, int end)
-{
-	int i;
-	CString str;
-
-	if (end - start == 1)
-		str.Format(_T("%d job started..."), start);
-	else
-		str.Format(_T("%d ~ %d job started..."), start, end - 1);
-	TRACE(_T("%s\n"), str);
-
-	for (i = start; i < end; i++)
-	{
-		if (pThisWnd->m_files[i].Right(3).MakeLower() == _T("gif"))
-		{
-			//CGifEx gif;
-			//gif.Load(m_loading_files[i], m_hWnd, true);
-			//mat = HBITMAP2Mat(gif.get_hBitmap());
-		}
-		else
-		{
-			//img->Load(m_loading_files[i]);
-		}
-
-		pThisWnd->insert(i, pThisWnd->m_files[i], get_part(pThisWnd->m_files[i], fn_name), false, false);
-	}
-
-	if ((end - start) == 1)
-		str.Format(_T("job completed : %d"), start);
-	else
-		str.Format(_T("job completed : %d ~ %d"), start, end - 1);
-	TRACE(_T("%s\n"), str);
-
-	mtx.lock();
-	pThisWnd->m_thread.thread_ended.push_back(idx);
-	mtx.unlock();
-}
-
-void CSCThumbCtrl::loading_completed_callback()
-{
-	pThisWnd->on_loading_completed();
-	//pWnd->m_loading_completed = true;
-	//if (pWnd->m_index_select_after_loading >= 0)
-	//	pWnd->m_selected.push_back(pWnd->m_index_select_after_loading);
-
-	//pWnd->recalculate_scroll_size();
-}
-
-void CSCThumbCtrl::on_loading_completed()
-{
-	m_tloading_end = clock();
-	m_loading_completed = true;
-
-	recalc_tile_rect();
-	//if (m_index_select_after_loading >= 0)
-	//	m_selected.push_back(m_index_select_after_loading);
-
-	//recalculate_scroll_size();
-
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-		(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_loading_completed, 0), 0);
-}
-
 BOOL CSCThumbCtrl::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	switch (pMsg->message)
+	{
+		case WM_SYSKEYDOWN:
+		case WM_MBUTTONDOWN:
+			return FALSE;
+	}
+
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		if (!IsWindowVisible())
-			return false;
+		//if (!IsWindowVisible())
+		//	return false;
 
 		switch (pMsg->wParam)
 		{
@@ -638,6 +643,9 @@ void CSCThumbCtrl::OnSize(UINT nType, int cx, int cy)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	if (!m_hWnd)
 		return;
+
+	if (is_editing())
+		edit_end();
 
 	recalc_tile_rect();
 }
@@ -827,7 +835,7 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 					{
 						m_selected.erase(m_selected.begin() + selected_index);
 						::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-							(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_unselected, selected_index), 0);
+							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_unselected, selected_index), 0);
 					}
 				}
 				//선택되지 않은 항목이라면 선택리스트에 추가한다.
@@ -851,14 +859,14 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 						{
 							m_selected.push_back(j);
 							::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-								(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
+								(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
 						}
 					}
 					else
 					{
 						m_selected.push_back(i);
 						::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-							(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
+							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
 					}
 				}
 			}
@@ -877,14 +885,14 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				{
 					m_selected.erase(m_selected.begin() + selected_index);
 					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-						(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_unselected, selected_index), 0);
+						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_unselected, selected_index), 0);
 				}
 				else
 				{
 					if (find_index(m_selected, i) < 0)
 						m_selected.push_back(i);
 					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-						(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_selected, i), 0);
+						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
 				}
 			}
 
@@ -957,7 +965,7 @@ void CSCThumbCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
 	{
 		//dbclick 했을때의 액션은 parent에서 처리한다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-			(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_lbutton_dbclicked, m_selected[0]), 0);
+			(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_dbclicked, m_selected[0]), 0);
 	}
 
 	CDialogEx::OnLButtonDblClk(nFlags, point);
@@ -1098,7 +1106,7 @@ void CSCThumbCtrl::edit_end(bool valid)
 		//썸네일의 이름을 변경하는 것은 파일명인지 무엇인지를 이 컨트롤에서 처리하면 안된다.
 		//용도에 맞게 메인에서 어떤 변경인지에 따라 처리한다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-			(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_rename, m_editing_index), 0);
+			(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_rename, m_editing_index), 0);
 	}
 }
 
@@ -1494,27 +1502,30 @@ void CSCThumbCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.AppendMenu(MF_STRING, idFind, _T("찾기...(&F)"));
 	menu.AppendMenu(MF_STRING, idReload, _T("새로 고침(&R)"));
 	menu.AppendMenu(MF_STRING, idReloadSelected, _T("선택 항목만 새로 고침"));
-	menu.AppendMenu(MF_STRING, idSortByTitle, _T("타이틀로 정렬(&S)"));
+	menu.AppendMenu(MF_STRING, idSortByTitle, _T("파일이름으로 정렬(&S)"));
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, idCopyToClipboard, _T("복사(&C)"));
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, idToggleIndex, _T("인덱스 표시"));
-	menu.AppendMenu(MF_STRING, idToggleTitle, _T("타이틀 표시"));
-	menu.AppendMenu(MF_STRING, idToggleResolution, _T("해상도 정보 표시"));
+	menu.AppendMenu(MF_STRING, idToggleTitle, _T("파일이름 표시"));
+	//menu.AppendMenu(MF_STRING, idToggleResolution, _T("해상도 정보 표시"));
 	//menu.AppendMenu(MF_STRING, idPromptMaxThumb, _T("Set max thumbnails(&A)(0 : no limits)..."));
 	menu.AppendMenu(MF_SEPARATOR);
 
 	menu.AppendMenu(MF_STRING, idDeleteThumb, _T("선택 항목을 리스트에서 삭제(&D)"));
 	//menu.AppendMenu(MF_SEPARATOR);
 	//menu.AppendMenu(MF_STRING, idRemoveAll, _T("모든 썸네일 삭제...(&R)"));
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, idProperty, _T("속성(&R)"));
 
 	menu.EnableMenuItem(idFind, m_thumb.size() ? MF_ENABLED : MF_DISABLED);
 	menu.EnableMenuItem(idReloadSelected, selected_count ? MF_ENABLED : MF_DISABLED);
 	menu.EnableMenuItem(idSortByTitle, m_thumb.size() ? MF_ENABLED : MF_DISABLED);
 	menu.EnableMenuItem(idCopyToClipboard, selected_count ? MF_ENABLED : MF_DISABLED);
 	menu.EnableMenuItem(idDeleteThumb, selected_count ? MF_ENABLED : MF_DISABLED);
+	menu.EnableMenuItem(idProperty, selected_count ? MF_ENABLED : MF_DISABLED);
 
 	menu.CheckMenuItem(idToggleIndex, m_show_index ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(idToggleTitle, m_show_title ? MF_CHECKED : MF_UNCHECKED);
@@ -1548,15 +1559,13 @@ void CSCThumbCtrl::on_context_menu(UINT nMenuID)
 			break;
 
 		case idFind:
-		{
 			find_text(true, true);
 			break;
-		}
 
 		//loading은 main에서 호출하므로 메인에게 메시지만 전달한다.
 		case idReload:
 			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-				(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_reload, 0), 0);
+				(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_reload, 0), 0);
 			break;
 		case idReloadSelected:
 		{
@@ -1566,7 +1575,7 @@ void CSCThumbCtrl::on_context_menu(UINT nMenuID)
 			m_thumb[index].reload();
 			InvalidateRect(m_thumb[index].r);
 			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-				(WPARAM)&CSCThumbCtrlMsg(GetDlgCtrlID(), CSCThumbCtrlMsg::message_thumb_reload_selected, 0), 0);
+				(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_reload_selected, 0), 0);
 		}
 		break;
 
@@ -1619,6 +1628,10 @@ void CSCThumbCtrl::on_context_menu(UINT nMenuID)
 			AfxGetApp()->WriteProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), m_max_thumbs);
 		}
 		break;
+		case idProperty:
+			show_property_window(std::deque<CString> { m_thumb[get_selected_item()].full_path });
+			break;
+		break;
 	}
 }
 
@@ -1644,27 +1657,30 @@ void CSCThumbCtrl::remove(int index, bool refresh)
 {
 	if (index < 0)
 	{
-		release(-1);
+		//실제적인 삭제는 여기서 이루어지지만 삭제를 묻는 질문은 메인에서 해야 한다.
+		int res = 0;
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+			(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_remove, index), (LPARAM)&res);
+
+		if (res == 0)
+			return;
+
+		release_thumb(-1);
+		m_files.clear();
 		m_selected.clear();
 	}
 	else
 	{
 		//if (m_thumb[index].full_path.IsEmpty() == false)
 		//	DeleteFile(m_thumb[index].full_path);
-		release(index);
+		release_thumb(index);
 		m_thumb.erase(m_thumb.begin() + index);
+		m_files.erase(m_files.begin() + index);
 	}
 
 
 	if (refresh)
 		recalc_tile_rect();
-
-	//m_modified = true;
-
-	//실제적인 삭제는 여기서 이루어지지만 삭제를 묻는 질문은 메인에서 해야 한다.
-	//따라서 메시지도 보낼 필요가 없다.
-	//::SendMessage( GetParent()->GetSafeHwnd(),	Message_CThumbCtrl,
-	//	(WPARAM)&CThumbCtrlMsg(GetDlgCtrlID(), CThumbCtrlMsg::message_thumb_remove, index), 0 );
 }
 
 void CSCThumbCtrl::remove_selected(bool refresh)
@@ -1672,11 +1688,21 @@ void CSCThumbCtrl::remove_selected(bool refresh)
 	int i;
 	std::deque<int> selected;
 
-	get_selected_items(&selected);
+	//get_selected_items(&selected);
+	//if (selected.size() == 0)
+	//	return;
 
-	for (i = selected.size() - 1; i >= 0; i--)
+	////실제적인 삭제는 여기서 이루어지지만 삭제를 묻는 질문은 메인에서 해야 한다.
+	//int res = 0;
+	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+	//	(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_remove_selected, selected.size()), (LPARAM)&res);
+
+	//if (res == 0)
+	//	return;
+
+	for (i = m_selected.size() - 1; i >= 0; i--)
 	{
-		remove(selected[i], false);
+		remove(m_selected[i], false);
 	}
 
 	m_selected.clear();
@@ -1689,4 +1715,19 @@ CGdiplusBitmap* CSCThumbCtrl::get_img(int index)
 		return NULL;
 
 	return m_thumb[index].img;
+}
+
+void CSCThumbCtrl::stop_loading()
+{
+	//if (!m_loading_completed)
+	{
+		m_stop_loading = true;
+
+		while (!m_thread.is_all_thread_completed())
+		{
+			Wait(10);
+		}
+
+		m_stop_loading = false;
+	}
 }

@@ -539,6 +539,7 @@ struct	NETWORK_INFO
 	HWND		get_hwnd_by_pid(ULONG pid);
 #ifndef _USING_V110_SDK71_
 	//파일 or 폴더 or 드라이브 or "내 PC"의 속성창을 표시한다.
+	//단일 파일을 주고자 할 경우는 show_property_window(std::deque<CString> {path});와 같이 호출하면 된다.
 	bool		show_property_window(std::deque<CString> fullpath);
 	CString		GetProcessNameByPID(const DWORD pid);
 #endif

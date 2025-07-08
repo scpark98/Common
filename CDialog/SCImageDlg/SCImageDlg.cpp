@@ -223,7 +223,7 @@ void CSCImageDlg::OnPaint()
 		g.FillRectangle(m_br_zigzag.get(), CRect2GpRect(m_r_display));
 	}
 
-	TRACE(_T("m_r_display = %s\n"), get_rect_info_string(m_r_display));
+	//TRACE(_T("m_r_display = %s\n"), get_rect_info_string(m_r_display));
 
 	//실제 이미지를 그려준다.
 	//m_img.draw(g, m_r_display);
@@ -374,6 +374,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_RETURN :
 			case VK_ESCAPE :
+				m_thumb.stop_loading();
 				return FALSE;
 			case VK_SPACE :
 				if (m_img.is_animated_gif())
@@ -385,6 +386,8 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 			case 'B':
 				m_show_thumb = !m_show_thumb;
 				m_thumb.select_item(m_filename);
+				m_static_pixel.ShowWindow(m_show_thumb || !m_show_pixel ? SW_HIDE : SW_SHOW);
+				m_slider_gif.ShowWindow(m_show_thumb || !m_img.is_animated_gif() ? SW_HIDE : SW_SHOW);
 				m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
 				return TRUE;
 				/*
@@ -920,6 +923,8 @@ void CSCImageDlg::OnMouseLeave()
 BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_show_thumb)
+		return CDialog::OnSetCursor(pWnd, nHitTest, message);
 
 	//roi를 그리기 위해 Ctrl키를 누른 상태라면 cross 커서로
 	if (IsCtrlPressed())
@@ -1182,21 +1187,26 @@ void CSCImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_for
 LRESULT CSCImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 {
 	CString str;
-	CSCThumbCtrlMsg* msg = (CSCThumbCtrlMsg*)wParam;
+	CSCThumbCtrlMessage* msg = (CSCThumbCtrlMessage*)wParam;
 
-	if (msg->msg == CSCThumbCtrlMsg::message_thumb_lbutton_dbclicked)
+	if (msg->msg == CSCThumbCtrl::message_thumb_lbutton_dbclicked)
 	{
 		//AfxMessageBox(i2S(msg->index) + _T(" dbclicked"));
 		//ShellExecute(m_hWnd, _T("open"), m_thumb.m_thumb[msg->index].full_path, 0, 0, SW_SHOWNORMAL);
+
+
 		m_show_thumb = false;
 		m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
-		load(m_thumb.m_thumb[msg->index].full_path, false);
+
+		//thumb를 ldbclick하면 해당 이미지를 바로 여는게 아니라 CASeeDlg에서 해당 이미지의 인덱스를 display시켜야 한다.
+		//load(m_thumb.m_thumb[msg->index].full_path, false);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CSCImageDlgMessage(this, message_load_image, msg->index), 0);
 	}
-	else if (msg->msg == CSCThumbCtrlMsg::message_thumb_loading_completed)
+	else if (msg->msg == CSCThumbCtrl::message_thumb_loading_completed)
 	{
-		TRACE(_T("loading completed. %ldms\n"), m_thumb.get_loading_elapsed());
+		//TRACE(_T("loading completed. %ldms\n"), m_thumb.get_loading_elapsed());
 	}
-	else if (msg->msg == CSCThumbCtrlMsg::message_thumb_rename)
+	else if (msg->msg == CSCThumbCtrl::message_thumb_rename)
 	{
 		CString folder = get_part(m_thumb.m_thumb[msg->index].full_path, fn_folder);
 		CString ext = get_part(m_thumb.m_thumb[msg->index].full_path, fn_ext);
@@ -1233,9 +1243,9 @@ LRESULT CSCImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 			return 0;
 		}
 
-		str.Format(_T("%s\n=>\n%s 로 변경합니다."), oldName, newName);
-		int res = AfxMessageBox(str, MB_ICONQUESTION | MB_OKCANCEL);
-		if (res == IDOK)
+		//str.Format(_T("%s\n=>\n%s 로 변경합니다."), oldName, newName);
+		//int res = AfxMessageBox(str, MB_ICONQUESTION | MB_OKCANCEL);
+		//if (res == IDOK)
 		{
 			if (MoveFile(oldName, newName))
 			{
@@ -1256,7 +1266,7 @@ LRESULT CSCImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 
 		m_thumb.set_title(msg->index, m_thumb.get_old_title());
 	}
-	else if (msg->msg == CSCThumbCtrlMsg::message_thumb_reload)
+	else if (msg->msg == CSCThumbCtrl::message_thumb_reload)
 	{
 		CString recent_folder = AfxGetApp()->GetProfileString(_T("setting"), _T("recent folder"), _T(""));
 		m_thumb.set_path(recent_folder);

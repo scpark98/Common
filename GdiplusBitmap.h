@@ -190,7 +190,7 @@ public:
 	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
 	bool			is_empty();
 	bool			is_valid();
-	int				channels();
+	int				get_channel();
 	CSize			size() { return CSize(width, height); }
 
 	//이미지 비율은 보통 width/height지만 반대 비율을 원할 경우는 wh = false로 준다.

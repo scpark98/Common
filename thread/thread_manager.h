@@ -63,7 +63,28 @@ class CThreadManager
 public:
 	CThreadManager() {};
 
-	//처리할 총 횟수, thread로 처리할 함수, thread가 끝나면 호출되는 함수
-	void job(int count, ThreadJobFunc thread_func, ThreadEndFunc end_func);
-	std::vector<int> thread_ended;
+	//처리할 총 횟수, thread로 처리할 함수, thread가 끝나면 호출되는 함수 지정를 지정하면 알아서 multi thread로 실행한다.
+	//detach : 각 thread를 동시에 처리해도 data racing이 일어나지 않는다면 true, 순차적으로 처리해야 한다면 false로 준다.
+	void	job(int count, ThreadJobFunc thread_func, ThreadEndFunc end_func, bool detach = true);
+
+	//모든 thread가 완료되었는지 확인.
+	//job() 호출 시 thread_func에서 set_thread_completed(n)으로 세팅해줘야 한다.
+	bool	is_all_thread_completed();
+
+	//총 thread 갯수
+	int		get_workers_size() { return m_workers.size(); }
+
+	//총 thread 중 완료된 thread count
+	int		get_thread_completed_count();
+
+	//해당 thread의 처리가 완료되었음을 세팅.
+	void	set_thread_completed(int index);
+
+protected:
+	ThreadEndFunc	m_end_function;
+
+	std::vector<std::thread> m_workers;
+	std::vector<int> m_thread_completed;
+
+	void	check_all_thread_completed();
 };

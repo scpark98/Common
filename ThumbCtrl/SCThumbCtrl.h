@@ -1,5 +1,10 @@
 ﻿#pragma once
 
+/*
+- set_path(folder); 또는 add_files()를 호출하면 파일들을 thumb로 만들어서 표시한다.
+- m_thread_manager를 이용해서 병렬적으로 load되며 loading 도중에 앱이 종료되어도 안전하게 종료되도록 수정함.
+*/
+
 #include <afxdialogex.h>
 
 #include <deque>
@@ -15,27 +20,15 @@
 
 static const UINT Message_CSCThumbCtrl = ::RegisterWindowMessage(_T("MessageString_CSCThumbCtrl"));
 
-class CSCThumbCtrlMsg
+class CSCThumbCtrlMessage
 {
 public:
-	CSCThumbCtrlMsg(int _ctrl_id, int _msg, int _index)
-		: ctrl_id(_ctrl_id), msg(_msg), index(_index) {
+	CSCThumbCtrlMessage(CWnd* _pThis, int _msg, int _index = 0)
+		: pThis(_pThis), msg(_msg), index(_index)
+	{
 	}
 
-	enum ENUM_SCThumbCtrlMsgs
-	{
-		message_thumb_insert = 0,
-		message_thumb_loading_completed,
-		message_thumb_reload,
-		message_thumb_reload_selected,
-		message_thumb_lbutton_selected,
-		message_thumb_lbutton_unselected,
-		message_thumb_lbutton_dbclicked,
-		message_thumb_rename,
-		message_thumb_keydown,
-	};
-
-	int		ctrl_id;
+	CWnd*	pThis;
 	int		msg;
 	int		index;
 };
@@ -53,17 +46,18 @@ public:
 	//img를 동적변수로 선언하는 이유.
 	//img는 그림파일마다 그 크기가 다양한데 이를 정적으로 잡는 것이 맞는가?
 	//img.load()에서 m_pBitmap이 동적할당되는가?
-	CGdiplusBitmap* img;
-	CString		title;			//파일명 또는 지정된 타이틀
-	bool		key_thumb;		//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
-	CString		info[4];		//info text 표시용. 0(lt info) ~ 3(rb info)
+	CGdiplusBitmap* img = NULL;
+	bool		load_completed = false;
+	CString		title;						//파일명 또는 지정된 타이틀
+	bool		key_thumb = false;			//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
+	CString		info[4];					//info text 표시용. 0(lt info) ~ 3(rb info)
 	CString		full_path;
-	int			width;			//원래 이미지의 크기 정보
-	int			height;
-	int			channel;
-	CRect		r;				//이미지가 그려지는 thumb 영역이 아닌 thumb+title+여백까지 포함된 타일 영역
-	int			thumb_bottom;	//thumb image의 하단 좌표, 타이틀 편집시 사용
-	int			line_index;		//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
+	int			width = 0;					//원래 이미지의 크기 정보
+	int			height = 0;
+	int			channel = 0;
+	CRect		r;							//이미지가 그려지는 thumb 영역이 아닌 thumb+title+여백까지 포함된 타일 영역
+	int			thumb_bottom;				//thumb image의 하단 좌표, 타이틀 편집시 사용
+	int			line_index;					//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
 	float		score = 0.0;
 	float*		feature = NULL;
 
@@ -99,17 +93,37 @@ public:
 	virtual ~CSCThumbCtrl();
 
 public:
+	enum ENUM_SCThumbCtrlMessages
+	{
+		message_thumb_insert = 0,
+		message_thumb_remove,
+		message_thumb_remove_selected,
+		message_thumb_loading_completed,
+		message_thumb_reload,
+		message_thumb_reload_selected,
+		message_thumb_lbutton_selected,
+		message_thumb_lbutton_unselected,
+		message_thumb_lbutton_dbclicked,
+		message_thumb_rename,
+		message_thumb_keydown,
+	};
+
 	bool			create(CWnd* parent, int left = 0, int top = 0, int right = 0, int bottom = 0);
 	void			set_path(CString path);
 
 	void			add_files(std::deque<CString> files, bool reset = true);
 	int				insert(int index, CString full_path, CString sTitle = _T("\0"), bool bKeyThumb = false, bool invalidate = true);
 
+	//loading중에 앱을 종료시키면 m_thumb를 release하면서 충돌이 발생한다. 모든 thread를 정상 중지시킨 후 앱을 종료시켜야 한다.
+	void			stop_loading();
+
 	//index == -1이면 전체 삭제
 	void			remove(int index, bool refresh = true);
 	void			remove_selected(bool refresh = true);
 
-	void			release(int index);
+	//m_thumb와 관련된 메모리만 release시킨다. -1이면 모든 thumb release.
+	//m_files, m_selected는 필요한 경우 별도로 clear 시켜야 한다.
+	void			release_thumb(int index);
 
 	std::deque<CString> m_files;
 	std::deque<CThumbImage> m_thumb;
@@ -207,7 +221,7 @@ protected:
 	CSize			m_sz_tile;	//m_sz_thumb의 크기에 따라 자동 계산되므로 직접 입력하지 말것!
 
 	//타일과 썸네일의 상하좌우 여백
-	CRect			m_r_inner = CRect(8, 4, 8, 4);
+	CRect			m_r_inner = CRect(16, 8, 16, 8);
 
 	int				m_title_height = 14;
 	int				m_thumb_title_gap = 4;	//thumb와 title 사이 갭
@@ -250,6 +264,7 @@ protected:
 		idPromptMaxThumb,
 		idDeleteThumb,
 		idRemoveAll,
+		idProperty,
 	};
 	bool			m_use_context_menu;
 	void			use_context_menu(bool use) { m_use_context_menu = use; }
@@ -283,6 +298,8 @@ protected:
 	static void		loading_function(int idx, int start, int end);
 	static void		loading_completed_callback();
 	void			on_loading_completed();
+
+	bool			m_stop_loading = false;			//loading thread를 강제로 종료시킬 경우(loading중에 앱을 종료시키는 경우)
 
 //폰트 관련
 	LOGFONT			m_lf;

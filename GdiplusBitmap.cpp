@@ -587,7 +587,7 @@ void CGdiplusBitmap::resolution()
 
 	width = m_pBitmap->GetWidth();
 	height = m_pBitmap->GetHeight();
-	channel = channels();
+	channel = get_channel();
 	stride = width * channel;
 
 	if (stride < 0)
@@ -630,9 +630,12 @@ bool CGdiplusBitmap::get_raw_data()
 	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
 	//TRACE(_T("fmt = %s\n"), get_pixel_format_str(fmt));
 	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
-	//	format = PixelFormat8bppIndexed;
+	//	fmt = PixelFormat8bppIndexed;
 	//else
-	//	format = PixelFormat24bppRGB;
+	//	fmt = PixelFormat24bppRGB;
+
+	if (m_filename == _T("image from clipboard"))
+		fmt = PixelFormat24bppRGB;
 
 	//픽셀포맷 형식에따라 이미지 접근 권한 취득.
 	//clipboard에서 읽어온 이미지일 경우 아래 코드에서 에러 발생.
@@ -641,6 +644,7 @@ bool CGdiplusBitmap::get_raw_data()
 	{
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
+		memset(data, 0, len);
 		memcpy(data, bmpData.Scan0, len); //복사
 		stride = std::abs(bmpData.Stride);
 		m_pBitmap->UnlockBits(&bmpData); //락 풀기
@@ -677,6 +681,9 @@ bool CGdiplusBitmap::set_raw_data()
 
 bool CGdiplusBitmap::is_empty()
 {
+	if (this == NULL)
+		return false;
+
 	return (m_pBitmap == NULL || width <= 0 || height <= 0);
 }
 
@@ -685,7 +692,7 @@ bool CGdiplusBitmap::is_valid()
 	return !is_empty();
 }
 
-int CGdiplusBitmap::channels()
+int CGdiplusBitmap::get_channel()
 {
 	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
 
@@ -2585,6 +2592,11 @@ bool CGdiplusBitmap::paste_from_clipboard()
 	}
 
 	resolution();
+	m_filename = _T("image from clipboard");
+
+	//clipboard에서 가져온 이미지는 PixelFormat32bppRGB format인데 32bit지만 3channel이다.
+	//24bppRGB로 보정해준다.
+	convert(PixelFormat24bppRGB);
 
 	return true;
 }

@@ -906,6 +906,21 @@ struct	NETWORK_INFO
 	void		SortStringArray(CStringArray* pArray);
 	bool		StringArrayCompareAndSwap(CStringArray* pArray, int pos); //called at SortStringArray function.
 
+	template<typename T> CString format_str(T var)
+	{
+		CString str;
+		if (typeid(T) == typeid(int))
+			str.Format(_T("%d"), var);
+		else if (typeid(T) == typeid(char))
+			str.Format(_T("%c"), var);
+		else if (typeid(T) == typeid(CString))
+			str.Format(_T("%s"), var);
+		else if (typeid(T) == typeid(void*))
+			str.Format(_T("%p"), var);
+
+		return str;
+	}
+	
 	CString		FormattedString(LPCTSTR lpszFormat, ...);
 	int			GetTrimLength(CString str);
 	//str에서 앞뒤 문자열 사이에 있는 서브 문자열을 리턴한다. 없으면 "" 리턴.
@@ -972,6 +987,9 @@ struct	NETWORK_INFO
 				nocase_compare());  // comparison
 		}
 	};
+
+//메시지 박스
+	void		msgbox(LPCTSTR format, ...);
 
 //데이터 변환
 	CString		i2S(int64_t nValue, bool bComma = false, bool fill_zero = false, int digits = 0);
@@ -1372,7 +1390,7 @@ struct	NETWORK_INFO
 
 	//좀 더 테스트 필요!
 	//실행파일명으로부터 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
-	HWND		get_hwnd_by_exe_file(CString target_exe_file);
+	HWND		get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid = 0);
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
 
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE);

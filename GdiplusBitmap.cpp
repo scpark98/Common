@@ -623,10 +623,6 @@ bool CGdiplusBitmap::get_raw_data()
 	Gdiplus::Rect rect(0, 0, width, height); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
 
-	//붙여넣기한 이미지가 24비트인데도 32비트로 입력되는 오류가 있다.
-	//8비트는 8비트지만 32비트도 24비트로 처리해야
-	//우선은 SeetaFace가 동작한다.
-	//수정 필요한 부분임.
 	Gdiplus::PixelFormat fmt = m_pBitmap->GetPixelFormat();
 	//TRACE(_T("fmt = %s\n"), get_pixel_format_str(fmt));
 	//if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
@@ -634,6 +630,10 @@ bool CGdiplusBitmap::get_raw_data()
 	//else
 	//	fmt = PixelFormat24bppRGB;
 
+	//붙여넣기한 이미지가 24비트인데도 32비트로 입력되는 오류가 있다.
+	//8비트는 8비트지만 32비트도 24비트로 처리해야
+	//우선은 SeetaFace가 동작한다.
+	//수정 필요한 부분임.
 	if (m_filename == _T("image from clipboard"))
 		fmt = PixelFormat24bppRGB;
 
@@ -1512,15 +1512,20 @@ void CGdiplusBitmap::sub_image(Gdiplus::RectF r)
 	sub_image(r.X, r.Y, r.Width, r.Height);
 }
 
-void CGdiplusBitmap::sub_image(int x, int y, int w, int h)
+void CGdiplusBitmap::sub_image(float x, float y, float w, float h)
 {
+	x = ROUND(x, 0);
+	y = ROUND(y, 0);
+	w = ROUND(w, 0);
+	h = ROUND(h, 0);
+
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(w, h);
 	Gdiplus::Graphics g(result);
 
 	g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, w, h), x, y, w, h, Gdiplus::UnitPixel);
 
 	delete m_pBitmap;
-	m_pBitmap = result->Clone(0, 0, w, h, PixelFormatDontCare);
+	m_pBitmap = result->Clone(0, 0, (int)w, (int)h, PixelFormatDontCare);
 	delete result;
 
 	resolution();

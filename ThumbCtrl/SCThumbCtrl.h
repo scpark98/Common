@@ -281,14 +281,19 @@ protected:
 	//std::deque<int> m_line_height;			//각 라인마다 타이틀의 길이에 따라 라인의 높이가 다름.
 
 	void			set_scroll_pos(int pos);
-	void			scroll_up(bool up);
+	//offset = 0일 경우는 (tile+gap)/4 크기만큼 scroll시킨다.
+	void			scroll_up(bool up, int offset = 0);
 
-	bool			m_scroll_drag;
-	int				m_scroll_grip_size = 40;
-	CRect			m_rScroll;
-	Gdiplus::Color	m_cr_scroll;
-	double			m_scroll_trans;
+	//직접 그린 scrollbar 제어
+	bool			m_scrollbar_drag;
+	int				m_scrollbar_grip_size = 40;
+	CRect			m_r_scrollbar;
+	Gdiplus::Color	m_cr_scrollbar;
+	double			m_scrollbar_trans;
 
+//drag에 의한 scroll
+	bool			m_lbutton_down = false;
+	CPoint			m_pt_old;
 
 //로딩 관련
 	bool			m_loading_completed = false;

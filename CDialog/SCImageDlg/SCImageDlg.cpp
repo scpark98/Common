@@ -276,26 +276,28 @@ void CSCImageDlg::OnPaint()
 
 	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
 	CRect screen_roi = GpRectF2CRect(m_screen_roi);
+	screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 	screen_roi.NormalizeRect();
 
-	if (m_lbutton_down)// IsCtrlPressed())
+	if (m_lbutton_down)// && m_drawing_roi)
 	{
 		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
-	else if (m_image_roi.IsEmptyArea() == false)
+	else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
 	{
 		//이미지 확대 축소 등에 의해 m_r_display가 변경되면 그에 따라 m_screen_roi도 다시 계산해줘야 한다.
 		get_screen_coord_from_real_coord(m_r_display, m_img.width, m_image_roi, &m_screen_roi);
 		//m_screen_roi.Offset(m_offset.x, m_offset.y);
 		screen_roi = GpRectF2CRect(m_screen_roi);
+		screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
 		//screen_roi.OffsetRect(m_offset);
 		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
 
-	if (screen_roi.IsRectEmpty() == false)
+	if (!m_screen_roi.IsEmptyArea())
 	{
 		Gdiplus::RectF image_roi;
 		get_real_coord_from_screen_coord(m_r_display, m_img.width, CRect2GpRectF(screen_roi), &image_roi);
@@ -384,11 +386,7 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 				}
 				break;
 			case 'B':
-				m_show_thumb = !m_show_thumb;
-				m_thumb.select_item(m_filename);
-				m_static_pixel.ShowWindow(m_show_thumb || !m_show_pixel ? SW_HIDE : SW_SHOW);
-				m_slider_gif.ShowWindow(m_show_thumb || !m_img.is_animated_gif() ? SW_HIDE : SW_SHOW);
-				m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
+				set_view_mode(view_mode_toggle);
 				return TRUE;
 				/*
 			case VK_ADD :
@@ -537,6 +535,23 @@ bool CSCImageDlg::load(UINT id)
 	return load(_T("PNG"), id);
 }
 
+void CSCImageDlg::set_filename(CString filename)
+{
+	m_filename = filename;
+
+	if (m_filename.IsEmpty())
+	{
+		release();
+	}
+}
+
+void CSCImageDlg::release()
+{
+	m_img.release();
+	m_thumb.release_thumb(-1);
+	Invalidate();
+}
+
 void CSCImageDlg::set_show_info(bool show)
 {
 	m_show_info = show;
@@ -572,6 +587,7 @@ bool CSCImageDlg::paste_from_clipboard()
 		m_slider_gif.ShowWindow(SW_HIDE);
 		set_filename(_T("image from clipboard"));
 		set_alt_info(_T(""));
+		set_view_mode(view_mode_image);
 		Invalidate();
 		return true;
 	}
@@ -610,15 +626,15 @@ void CSCImageDlg::fit2ctrl(bool fit)
 void CSCImageDlg::zoom(int mode)
 {
 	if (mode > 0)
-		m_zoom += 0.1;
+		m_zoom += 0.2;
 	else if (mode < 0)
-		m_zoom -= 0.1;
+		m_zoom -= 0.2;
 	else
 		m_zoom = 1.0;
 
 	m_fit2ctrl = false;
 
-	Clamp(m_zoom, 0.1, 40.0);
+	Clamp(m_zoom, 0.2, 40.0);
 	//get_screen_coord_from_real_coord(m_r_display, m_img.width, m_image_roi, &m_screen_roi);
 	//Wait(1);
 	Invalidate();
@@ -678,6 +694,7 @@ void CSCImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	//roi 설정중
 	if (IsCtrlPressed())
 	{
+		m_drawing_roi = true;
 		m_screen_roi = Gdiplus::RectF(point.x, point.y, 0, 0);
 		
 		//실제 이미지에서 1픽셀 단위로 선택되어야 하므로 float이 아닌 int로 변경한 후
@@ -693,7 +710,7 @@ void CSCImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	//roi의 크기를 변경중
 	else if (m_handle_index >= 0)
 	{
-
+		m_drawing_roi = false;
 	}
 
 	CDialog::OnLButtonDown(nFlags, point);
@@ -704,14 +721,16 @@ void CSCImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_lbutton_down)
 	{
-		m_lbutton_down = false;
 		ReleaseCapture();
+		m_lbutton_down = false;
 
 		//Clamp(point.x, m_r_display.left, m_r_display.right);
 		//Clamp(point.y, m_r_display.top, m_r_display.bottom);
 
-		if (IsCtrlPressed())
+		if (m_drawing_roi)
 		{
+			m_drawing_roi = false;
+
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
 
@@ -719,17 +738,20 @@ void CSCImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			//해당 픽셀의 크기를 다시 screen_roi로 넣어줘야 픽셀 단위로 선택된다.
 			Gdiplus::RectF img_roi;
 			get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
-			img_roi.Width = (int)img_roi.Width;
-			img_roi.Height = (int)img_roi.Height;
+			img_roi.X = ROUND(img_roi.X, 0);
+			img_roi.Y = ROUND(img_roi.Y, 0);
+			img_roi.Width = ROUND(img_roi.Width, 0);
+			img_roi.Height = ROUND(img_roi.Height, 0);
 			get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
-		}
 
-		if (abs(m_screen_roi.Width) < 20 || abs(m_screen_roi.Height) < 20)
-		{
-			m_screen_roi = Gdiplus::RectF();
-			m_image_roi = Gdiplus::RectF();
-			Invalidate();
-			return;
+			//5x5 미만일 경우는 roi를 그리지 않는다.
+			if (fabs(img_roi.Width) < 5.0 || fabs(img_roi.Height) < 5.0)
+			{
+				m_screen_roi = Gdiplus::RectF();
+				m_image_roi = Gdiplus::RectF();
+				Invalidate();
+				return;
+			}
 		}
 
 		//roi가 모두 그려지면, 또는 이동, 크기조정이 완료되면 m_image_roi로 변환해준다.
@@ -751,7 +773,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		Clamp(point.y, m_r_display.top, m_r_display.bottom);
 
 		//roi 설정중인 경우
-		if (IsCtrlPressed())
+		if (m_drawing_roi)
 		{
 			m_static_pixel.ShowWindow(SW_HIDE);
 
@@ -762,8 +784,8 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			//해당 픽셀의 크기를 다시 screen_roi로 넣어줘야 픽셀 단위로 선택된다.
 			Gdiplus::RectF img_roi;
 			get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
-			img_roi.Width = (int)img_roi.Width;
-			img_roi.Height = (int)img_roi.Height;
+			img_roi.Width = ROUND(img_roi.Width, 0);
+			img_roi.Height = ROUND(img_roi.Height, 0);
 			get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
 
 			//Ctrl키를 눌러서 roi가 그려지는 동안에는 이미지 확대/축소에 무관하게
@@ -781,10 +803,6 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 					m_screen_roi.X = point.x - m_screen_roi.Width / 2;
 					m_screen_roi.Y = point.y - m_screen_roi.Height / 2;
 					adjust_rect_range(m_screen_roi, CRect2GpRectF(m_r_display));
-					//if (m_screen_roi.X < m_r_display.left)
-					//	m_screen_roi.X = m_r_display.left;
-					//if (m_screen_roi.Y < m_r_display.top)
-					//	m_screen_roi.Y = m_r_display.top;
 					break;
 				case corner_left :
 					set_left(m_screen_roi, point.x);
@@ -816,11 +834,14 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 					break;
 			}
 
-			//m_screen_roi는 m_r_display를 벗어나지 않도록 보정한다.
-			//단, 보정 할 때, corner_inside일때는 크기를 유지시키지만 그 외의 경우는 크기를 유지하지 않도록 파라미터를 줘야 한다.
-			//adjust_rect_range(m_screen_roi, m_r_display, (m_handle_index == corner_inside), true);
-			//get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &m_image_roi);
-			//TRACE(_T("roif = %s\n"), get_rect_info_string(m_screen_roi));
+			Gdiplus::RectF img_roi;
+			get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
+			img_roi.X = ROUND(img_roi.X, 0);
+			img_roi.Y = ROUND(img_roi.Y, 0);
+			img_roi.Width = ROUND(img_roi.Width, 0);
+			img_roi.Height = ROUND(img_roi.Height, 0);
+			get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
+
 			Invalidate();
 		}
 		//이미지 이동을 위한 단순 드래그인 경우
@@ -844,6 +865,14 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			//	m_screen_roi.Y += m_offset.y;
 			//	//m_screen_roi.Offset(-m_offset.x, -m_offset.y);
 			//}
+
+			Gdiplus::RectF img_roi;
+			get_real_coord_from_screen_coord(m_r_display, m_img.width, m_screen_roi, &img_roi);
+			img_roi.X = ROUND(img_roi.X, 0);
+			img_roi.Y = ROUND(img_roi.Y, 0);
+			img_roi.Width = ROUND(img_roi.Width, 0);
+			img_roi.Height = ROUND(img_roi.Height, 0);
+			get_screen_coord_from_real_coord(m_r_display, m_img.width, img_roi, &m_screen_roi);
 
 			Invalidate();
 			m_ptClicked = point;
@@ -1273,4 +1302,21 @@ LRESULT CSCImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 	}
 
 	return 0;
+}
+
+void CSCImageDlg::set_view_mode(int view_mode)
+{
+	if (view_mode == view_mode_toggle)
+		m_show_thumb = !m_show_thumb;
+	else if (view_mode == view_mode_image)
+		m_show_thumb = false;
+	else if (view_mode == view_mode_thumb)
+		m_show_thumb = true;
+	else
+		return;
+
+	m_thumb.select_item(m_filename);
+	m_static_pixel.ShowWindow(m_show_thumb || !m_show_pixel ? SW_HIDE : SW_SHOW);
+	m_slider_gif.ShowWindow(m_show_thumb || !m_img.is_animated_gif() ? SW_HIDE : SW_SHOW);
+	m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
 }

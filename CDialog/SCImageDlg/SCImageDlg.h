@@ -69,6 +69,14 @@ public:
 
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
+	enum ENUM_VIEW_MODE
+	{
+		view_mode_toggle = -1,
+		view_mode_image,
+		view_mode_thumb,
+	};
+	void			set_view_mode(int view_mode);
+
 	bool			m_show_thumb = false;
 	CSCThumbCtrl	m_thumb;
 	LRESULT			on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam);
@@ -78,9 +86,6 @@ public:
 		message_image_loaded = 0,
 		message_load_image,
 	};
-
-
-
 
 	//레지스트리에 저장된 recent file 정보가 있다면 로딩한다.
 	bool			load();
@@ -95,7 +100,9 @@ public:
 	bool			load(UINT id);
 
 	CString			get_filename() { return m_filename; }
-	void			set_filename(CString filename) { m_filename = filename; }
+	void			set_filename(CString filename);
+
+	void			release();
 
 	bool			get_show_info() { return m_show_info; }
 	void			set_show_info(bool show);
@@ -188,6 +195,7 @@ protected:
 	//위치, 크기 변경시에 image_roi를 screen_roi로 변경하여 표시한다.
 	Gdiplus::RectF	m_image_roi;					//영상의 실제 ROI
 	Gdiplus::RectF	m_screen_roi;					//디스플레이되고 있는 화면상의 ROI
+	bool			m_drawing_roi = false;			//roi를 그리는 중인지
 	bool			m_show_roi_info = true;			//roi 좌표 정보 표시 여부
 
 	int				m_handle_index = -1;			//이동 및 크기 조정을 위해 마우스가 위치하거나 클릭된 핸들 인덱스

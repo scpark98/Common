@@ -311,7 +311,7 @@ public:
 	//따라서 A이미지의 r 영역을 B이미지 할당하고자 할 경우는 다음 두 단계를 거친다.
 	//A.deep_copy(&B);
 	//B.sub_image(r);
-	void			sub_image(int x, int y, int w, int h);
+	void			sub_image(float x, float y, float w, float h);
 	void			sub_image(CRect r);
 	void			sub_image(Gdiplus::Rect r);
 	void			sub_image(Gdiplus::RectF r);

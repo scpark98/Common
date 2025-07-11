@@ -689,20 +689,21 @@ void CSCThumbCtrl::set_scroll_pos(int pos)
 		pos = 0;
 
 	m_scroll_pos = pos;
+	//trace(m_scroll_pos);
 	//TRACE(_T("current = %d / %d\n"), m_scroll_pos, m_scroll_total);
-	m_scroll_trans = 0.0;
+	m_scrollbar_trans = 0.0;
 	recalc_tile_rect();
 
-	CPoint pt;
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
+	//CPoint pt;
+	//GetCursorPos(&pt);
+	//ScreenToClient(&pt);
 
 	//커서가 스크롤바 영역 밖이라면 스크롤바를 숨겨준다.
-	//if ((rc.PtInRect(pt) == false) || !m_rScroll.PtInRect(pt))
+	//if ((rc.PtInRect(pt) == false) || !m_r_scrollbar.PtInRect(pt))
 	//	SetTimer(timer_scroll_bar_disappear, 2000, NULL);
 }
 
-void CSCThumbCtrl::scroll_up(bool up)
+void CSCThumbCtrl::scroll_up(bool up, int offset)
 {
 	CRect rc;
 	GetClientRect(rc);
@@ -711,14 +712,12 @@ void CSCThumbCtrl::scroll_up(bool up)
 		return;
 
 	int pos = m_scroll_pos;
-	pos += (up ? 1 : -1) * (m_sz_tile.cy + m_sz_gap.cy) / 4.0;
 
-	/*
-	if (up)
-		pos += ((m_sz_tile.cy + 20 + m_sz_gap.cy) >> 2) * 3;
+	//trace(offset);
+	if (offset == 0)
+		pos += (up ? 1 : -1) * (m_sz_tile.cy + m_sz_gap.cy) / 4.0;
 	else
-		pos -= ((m_sz_tile.cy + 20 + m_sz_gap.cy) >> 2) * 3;
-	*/
+		pos += offset;
 
 	set_scroll_pos(pos);
 }
@@ -791,13 +790,13 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	CRect rc;
 	GetClientRect(rc);
 
-	if (m_rScroll.PtInRect(point))
+	if (m_r_scrollbar.PtInRect(point))
 	{
-		m_scroll_drag = true;
+		m_scrollbar_drag = true;
 		SetCapture();
 		CRect rc;
 		GetClientRect(rc);
-		set_scroll_pos(-(double)(point.y - m_scroll_grip_size / 2) / (double)(rc.Height() - m_scroll_grip_size) * (double)(m_scroll_total - rc.Height()));
+		set_scroll_pos(-(double)(point.y - m_scrollbar_grip_size / 2) / (double)(rc.Height() - m_scrollbar_grip_size) * (double)(m_scroll_total - rc.Height()));
 		return;
 	}
 
@@ -910,15 +909,20 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			Trace(_T("\n"));
 #endif
 			Invalidate();
-			return;
+			break;
 		}
 	}
 
 	//클릭된 곳이 썸네일 영역이 아니면 선택을 해제시켜준다.
-	if (!m_use_multi_selection)
+	if (!m_use_multi_selection && (i == m_thumb.size()))
+	{
 		m_selected.clear();
+		Invalidate();
+	}
 
-	Invalidate();
+	m_lbutton_down = true;
+	m_pt_old = point;
+	SetCapture();
 
 	CDialogEx::OnLButtonDown(nFlags, point);
 }
@@ -926,13 +930,15 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 void CSCThumbCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_scroll_drag)
+	m_lbutton_down = false;
+	ReleaseCapture();
+
+	if (m_scrollbar_drag)
 	{
-		ReleaseCapture();
-		m_scroll_drag = false;
+		m_scrollbar_drag = false;
 		CRect rc;
 		GetClientRect(rc);
-		set_scroll_pos(-(double)(point.y - m_scroll_grip_size / 2) / (double)(rc.Height() - m_scroll_grip_size) * (double)(m_scroll_total - rc.Height()));
+		set_scroll_pos(-(double)(point.y - m_scrollbar_grip_size / 2) / (double)(rc.Height() - m_scrollbar_grip_size) * (double)(m_scroll_total - rc.Height()));
 		return;
 	}
 
@@ -974,6 +980,12 @@ void CSCThumbCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
 void CSCThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_lbutton_down)
+	{
+		//TRACE(_T("point.y = %d, m_pt_old.y = %d\n"), point.y, m_pt_old.y);
+		scroll_up(true, point.y - m_pt_old.y);
+		m_pt_old.y = point.y;
+	}
 
 	CDialogEx::OnMouseMove(nFlags, point);
 }
@@ -1067,7 +1079,10 @@ void CSCThumbCtrl::edit_begin(int index)
 
 	m_pEdit->SetWindowText(m_thumb[index].title);
 	int lc = m_pEdit->GetLineCount();
-	r.bottom = r.top + lc * textRect.Height() + 4;
+	if (lc == 1)
+		r.bottom = m_thumb[index].r.bottom;
+	else
+		r.bottom = r.top + lc * textRect.Height() + 4;
 
 	m_pEdit->set_text_color(m_theme.cr_text);
 	m_pEdit->set_back_color(m_theme.cr_back);

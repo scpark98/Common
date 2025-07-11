@@ -4282,8 +4282,10 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		sCaptionString.TrimRight();
 		//sCaptionString.MakeLower();
 
-		TRACE(_T("caption = %s\n"), sText);
-		
+		TRACE(_T("caption = %s, visible = %d\n"), sText, pWnd->IsWindowVisible());
+		if (sText.IsEmpty() || !pWnd->IsWindowVisible())
+			continue;
+
 		if (bMatchWholeWord)
 		{
 			if (sCaptionString == sCaption)
@@ -4437,6 +4439,17 @@ CString	GetCommaString(CString sString, CString sComma)
 		  
 			return szOut;
 	*/
+}
+
+void msgbox(LPCTSTR format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	CString msg;
+
+	msg.FormatV(format, args);
+	AfxMessageBox(msg);
 }
 
 //value가 3자리이고 total_digits가 7이면 4개의 0을 앞에 붙여서 리턴한다.
@@ -6625,6 +6638,8 @@ CRect gpRectToCRect(Gdiplus::Rect r)
 CRect GpRectF2CRect(Gdiplus::RectF r)
 {
 	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
+	//return CRect(floor(r.X + 0.5), floor(r.Y + 0.5), floor(r.X + r.Width + 0.5), floor(r.Y + r.Height + 0.5));
+	//return CRect(ROUND(r.X + 0.5, 0), ROUND(r.Y + 0.5, 0), ROUND(r.X + r.Width + 0.5, 0), ROUND(r.Y + r.Height + 0.5, 0));
 }
 
 Gdiplus::Rect CRect2GpRect(CRect r)
@@ -10818,7 +10833,7 @@ HWND get_hwnd_by_pid(ULONG pid)
 
 	while(tempHwnd != NULL)   
 	{   
-		TRACE("tempHwnd = %p, pid = %u\n", tempHwnd, ProcIDFromWnd(tempHwnd));
+		//TRACE("tempHwnd = %p, pid = %u\n", tempHwnd, ProcIDFromWnd(tempHwnd));
 
 		if (::GetParent(tempHwnd) == NULL) // 최상위 핸들인지 체크, 버튼 등도 핸들을 가질 수 있으므로 무시하기 위해   
 		{
@@ -10926,7 +10941,7 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 }
 
 //실행파일명으로부터 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
-HWND get_hwnd_by_exe_file(CString target_exe_file)
+HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 {
 	HANDLE			hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL); 
 	PROCESSENTRY32	pe32 = { 0, };
@@ -10949,8 +10964,8 @@ HWND get_hwnd_by_exe_file(CString target_exe_file)
 	do 
 	{
 		exe_name = pe32.szExeFile;
-		exe_name.MakeLower();
-		target_exe_file.MakeLower();
+		//exe_name.MakeLower();
+		//target_exe_file.MakeLower();
 
 		TCHAR sFilePath[MAX_PATH] = { 0, };
 		DWORD bufLen = MAX_PATH;
@@ -10958,7 +10973,7 @@ HWND get_hwnd_by_exe_file(CString target_exe_file)
 		//target_exe_file이 실행 파일명만 있다면 exe 파일명만 비교하고
 		//전체 경로라면 fullpath를 구해서 비교한다.
 		//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
-		if (PathFileExists(target_exe_file))
+		if (false)//PathFileExists(target_exe_file))
 		{
 			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
 
@@ -10976,14 +10991,25 @@ HWND get_hwnd_by_exe_file(CString target_exe_file)
 		}
 
 
-		if (_tcsicmp(sFilePath, target_exe_file) == 0)
+		if (true)//_tcsicmp(sFilePath, target_exe_file) == 0)
 		{
 			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
 			if (hProcess != NULL)
 			{
 				hWnd = get_hwnd_by_pid(pe32.th32ProcessID);
+				TCHAR caption[MAX_PATH] = { 0, };
+				::GetWindowText(hWnd, caption, MAX_PATH);
+				TRACE(_T("caption = %s, pid = %d, hWnd = %p\n"), caption, pe32.th32ProcessID, hWnd);
+				if (except_pid > 0)
+				{
+					if (pe32.th32ProcessID == except_pid)
+						hWnd = NULL;
+				}
+
 				CloseHandle(hProcess);
-				break;
+
+				//if (hWnd != NULL && (CString(caption).Find(_T("GDI+ Window")) < 0))
+				//	break;
 			}
 		}
 	}
@@ -11099,7 +11125,7 @@ int get_process_running_count(CString processname)
 			//processname이 실행파일명만 있다면 exe 파일명만 비교하고
 			//전체 경로라면 fullpath를 구해서 비교한다.
 			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
-			if (PathFileExists(processname))
+			if (processname.Find(_T("\\")) > 0 && PathFileExists(processname))
 			{
 				//HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
 				HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);

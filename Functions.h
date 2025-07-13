@@ -213,7 +213,7 @@ enum RATIO_RECT_ATTACH
 #define		FILE_EXTENSION_VIDEO			_T("avi;mpg;mp4;mpeg;mkv;mov;wmv;wma;asf;ts;m2ts;3gp")
 #define		FILE_EXTENSION_SOUND			_T("mp3;m4a;wav")
 #define		FILE_EXTENSION_MEDIA			CString(FILE_EXTENSION_VIDEO) + _T(";") + CString(FILE_EXTENSION_SOUND)
-#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;raw")
+#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;raw;jfif")
 #define		FILE_EXTENSION_SUBTITLE			_T("smi;srt")
 
 #define		FILENAME_NOT_ALLOWED_CHAR		_T("\\:*?\"<>|")

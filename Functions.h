@@ -210,10 +210,10 @@ enum RATIO_RECT_ATTACH
 	attach_bottom	= 0x00000008,	//0001 0000
 };
 
-#define		FILE_EXTENSION_VIDEO			_T("avi;mpg;mp4;mpeg;mkv;mov;wmv;wma;asf;ts;m2ts;3gp")
+#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;raw;jfif;avif")
 #define		FILE_EXTENSION_SOUND			_T("mp3;m4a;wav")
-#define		FILE_EXTENSION_MEDIA			CString(FILE_EXTENSION_VIDEO) + _T(";") + CString(FILE_EXTENSION_SOUND)
-#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;raw;jfif")
+#define		FILE_EXTENSION_VIDEO			_T("avi;mpg;mp4;mpeg;mkv;mov;wmv;wma;asf;ts;m2ts;3gp")
+#define		FILE_EXTENSION_MEDIA			CString(FILE_EXTENSION_VIDEO) + _T(";") + CString(FILE_EXTENSION_IMAGE) + _T(";") + CString(FILE_EXTENSION_SOUND)
 #define		FILE_EXTENSION_SUBTITLE			_T("smi;srt")
 
 #define		FILENAME_NOT_ALLOWED_CHAR		_T("\\:*?\"<>|")
@@ -612,8 +612,8 @@ struct	NETWORK_INFO
 	int			get_monitor_index(CRect r, bool entire_included = false);
 	//x, y가 속해있는 모니터 인덱스를 리턴
 	int			get_monitor_index(int x, int y);
-	//멀티모니터 전체 영역 사각형 리턴
-	CRect		get_entire_monitor_rect();
+	//멀티모니터 전체 영역 사각형 리턴. -1이면 전체 모니터 영역을 리턴.
+	CRect		get_monitor_rect(int index = -1);
 
 	//::SetForegroundWindow()가 Win98이후부터는 지원되지 않아 수정된 코드.
 	void		SetForegroundWindowForce(HWND hWnd, bool makeTopMost = false);

@@ -14170,10 +14170,15 @@ int	get_monitor_index(CRect r, bool entire_included)
 	return -1;
 }
 
-//멀티모니터 전체 영역 사각형 리턴
-CRect get_entire_monitor_rect()
+//멀티모니터 전체 영역 사각형 리턴. -1이면 전체 모니터 영역을 리턴.
+CRect get_monitor_rect(int index)
 {
 	enum_display_monitors();
+
+	if (index >= 0 && index < g_monitors.size())
+		return g_monitors[index].rMonitor;
+
+	//전체 모니터 영역을 리턴한다.
 	CRect rEntire(0, 0, 0, 0);
 
 	for (int i = 0; i < g_monitors.size(); i++)

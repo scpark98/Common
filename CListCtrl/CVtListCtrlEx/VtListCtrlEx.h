@@ -125,6 +125,10 @@ public:
 	CVtListCtrlEx();
 	virtual ~CVtListCtrlEx();
 
+	//virtual list 기능을 사용하기 위해 Owner Data, Owner Draw Fixed를 모두 true로 설정해야 한다.
+	//이 옵션은 동적으로 변경 불가.
+	void			set_use_virtual_list(bool use_virtual = true) { m_use_virtual_list = use_virtual; }
+
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	void			modify_style();
@@ -369,6 +373,10 @@ public:
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
 	void		unselect_selected_item();
 
+	//index = -1 : 전체선택
+	void		check_item(int index, bool check = true);
+	void		check_item(std::deque<int> indices, bool check);
+
 	//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
 	//LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
 	//drag 도중에 마우스가 다른 앱 영역으로 나가서 WM_LBUTTONUP 될 경우 drophilited 상태로 아이템이 남는 문제를 제거하기 위해.
@@ -590,6 +598,7 @@ public:
 	CHeaderCtrlEx*	get_header_ctrl() { return &m_HeaderCtrlEx; }
 
 protected:
+	bool			m_use_virtual_list = true;
 
 //메인 데이터
 	std::deque<CListCtrlData> m_list_db;

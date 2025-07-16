@@ -133,6 +133,11 @@ void CVtListCtrlEx::HideScrollBars(int Type, int Which)
 
 void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 {
+	*pResult = 0;
+
+	//if (!m_use_virtual_list)
+	//	return;
+
 	//NMLVDISPINFO *pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
 	// TODO: Add your control notification handler code here
 	LV_DISPINFO* pDispInfo = (LV_DISPINFO*)pNMHDR;
@@ -157,21 +162,21 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 		//Maximum number of characters is in pItem->cchTextMax
 		lstrcpyn(pItem->pszText, text, pItem->cchTextMax);
 	}
-	/*
+
 	//Do the list need image information?
-	if(pItem->mask & LVIF_IMAGE) 
+	if(true)//pItem->mask & LVIF_IMAGE) 
 	{
 		//Set which image to use
-		pItem->iImage=*m_list_db[itemid].m_image;
+		//pItem->iImage = m_list_db[pItem->iItem].img_idx;
 
 		//Show check box?
-		if(IsCheckBoxesVisible())
+		if(true)//pItem->mask & LVIF_STATE)
 		{
 			//To enable check box, we have to enable state mask...
 			pItem->mask |= LVIF_STATE;
 			pItem->stateMask = LVIS_STATEIMAGEMASK;
 
-			if(m_database[itemid].m_checked)
+			if(GetCheck(pItem->iItem))//m_list_db[pItem->iItem].checked)
 			{
 				//Turn check box on..
 				pItem->state = INDEXTOSTATEIMAGEMASK(2);
@@ -183,7 +188,7 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 			}
 		}
 	}
-	*/
+
 	*pResult = 0;
 }
 
@@ -225,6 +230,9 @@ void CVtListCtrlEx::OnLvnOdcachehint(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 {
+	if (!m_use_virtual_list)
+		return;
+
 	int			iItem		= (int)lpDIS->itemID;
 	int			iSubItem;
 	CDC			*pDC		= CDC::FromHandle(lpDIS->hDC);
@@ -237,6 +245,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool		is_drophilited = GetItemState(iItem, LVIS_DROPHILITED);
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
+	//Gdiplus::Graphics	g(pDC->m_hDC);
 
 
 	//TRACE(_T("iItem = %d, is_selected = % d\n"), iItem, is_selected);
@@ -252,13 +261,45 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//먼저 선택 여부, focus여부 등에 따라 셀이 그려질 글자색, 배경색을 골라주고...
 
-		//LVIR_BOUNDS로 구할 경우 0번 컬럼은 한 라인의 사각형 영역을 리턴한다.
-		//0번 컬럼 이후부터는 해당 셀의 사각형 영역만을 리턴한다.
 		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, itemRect);
 
 		if (iSubItem == 0)
 		{
+			//LVIR_BOUNDS로 구할 경우 0번 컬럼은 한 라인의 사각형 영역을 리턴한다.
+			//따라서 right값을 보정해줘야 한다.
+			//1번 컬럼부터는 해당 셀의 사각형 영역만을 리턴한다.
+			//itemRect = get_item_rect(iItem, iSubItem);
 			itemRect.right = itemRect.left + GetColumnWidth(0);
+
+			if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
+			{
+				CRect r = itemRect;
+				r.left = 1;
+				r.right = r.left + 16;
+				//pDC->DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONCHECK);
+
+				//Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
+
+				int check_state = GetCheck(iItem);
+
+				if (check_state == BST_CHECKED)
+				{
+					//g.DrawLine(&pen, r.left + 1, r.CenterPoint().y - 1, r.left + 4, r.CenterPoint().y + 3);
+					//g.DrawLine(&pen, r.left + 4, r.CenterPoint().y + 3, r.right - 3, r.top + 3);
+					pDC->MoveTo(r.left + 1, r.CenterPoint().y - 1);
+					pDC->LineTo(r.left + 4, r.CenterPoint().y + 3);
+					pDC->MoveTo(r.left + 4, r.CenterPoint().y + 3);
+					pDC->LineTo(r.right - 3, r.top + 3);
+				}
+				else if (check_state == BST_INDETERMINATE)
+				{
+					CRect inner = r;
+					inner.DeflateRect(3, 3);
+					//draw_rectangle(pDC, inner, inner, m_theme.cr_text);
+				}
+
+				itemRect.left = r.right + 2;
+			}
 		}
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
@@ -528,10 +569,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
+	rowRect.bottom--;
+
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
 	if (m_draw_selected_border && !m_in_editing && (m_has_focus || is_show_selection_always) && is_selected)
 	{
 		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
+		//rowRect = get_item_rect(iItem, 0);
 		//선택된 항목을 표시하는 사각형을 그릴때는 반드시 PenAlignmentInset으로 그려줘야 한다.
 		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
 		//선택 사각형은 반드시 inset으로 그려져야 한다.
@@ -829,8 +873,9 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 
 	if (subItem == 0)
 	{
-		//DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
-
+		DWORD dwExStyle = ListView_GetExtendedListViewStyle(GetSafeHwnd());
+		DWORD dwExStyle1 = GetExtendedStyle();
+		//if (dwExStyle & LVS_EX_CHECKBOXES)
 		if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
 			Rect.left += 18;
 
@@ -881,6 +926,13 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 				{
 					//0번 컬럼의 width로 보정해주고
 					itemRect.right = itemRect.left + GetColumnWidth(0);
+
+					if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
+					{
+						if (pt.x < 18)
+							return false;
+					}
+
 					//imagelist를 사용한다면 이미지 영역만큼 다시 보정해줘야 한다.
 					if (!include_icon && m_use_own_imagelist)
 						itemRect.left += 22;
@@ -1241,13 +1293,6 @@ void CVtListCtrlEx::modify_style()
 		font->GetObject(sizeof(m_lf), &m_lf);
 
 	//헤더컨트롤을 제어할 일이 있는지 확인 필요.
-#if 1
-	// get original view style
-	//LVS_OWNERDATA는 동적으로 설정되지 않는듯하다. resource editor에서 주고 시작하자.
-	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
-	//ModifyStyle(LVS_TYPEMASK, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA | LVS_NOSORTHEADER);
-	BOOL b = ModifyStyle(0, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA | LVS_NOSORTHEADER);
-
 	// if view style is other than LVS_REPORT 
 	// returned pointer will be NULL
 	CHeaderCtrl* pHeader = GetHeaderCtrl();
@@ -1257,6 +1302,14 @@ void CVtListCtrlEx::modify_style()
 		// voila!
 		m_HeaderCtrlEx.SubclassWindow(pHeader->m_hWnd);
 	}
+
+#if 1
+	// get original view style
+	//LVS_OWNERDATA는 동적으로 설정되지 않는듯하다. resource editor에서 주고 시작하자.
+	//DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
+	//ModifyStyle(LVS_TYPEMASK, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA | LVS_NOSORTHEADER);
+	//BOOL b = ModifyStyle(0, dwStyle | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_OWNERDATA | LVS_NOSORTHEADER);
+
 
 	//위에서 스타일을 변경하므로 여기서는 제거.
 	/*
@@ -1269,6 +1322,7 @@ void CVtListCtrlEx::modify_style()
 
 	//ASSERT(pHeader->m_hWnd != NULL);
 #endif
+
 	//위에서 headerCtrl까지 구한 후 font 세팅을 해야 헤더에도 동일하게 적용된다.
 	reconstruct_font();
 }
@@ -1771,6 +1825,9 @@ void CVtListCtrlEx::set_back_alternate_color(bool use, Gdiplus::Color cr)
 
 void CVtListCtrlEx::set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase, bool invalidate)
 {
+	if (!m_use_virtual_list)
+		return;
+
 	int i, j;
 
 	if (item < 0)
@@ -1983,11 +2040,27 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 		image_index = m_pShellImageList->GetSystemImageListIcon(!m_is_local, text, false);
 	}
 
-	m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
+	if (m_use_virtual_list)
+	{
+		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
 
-	//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
-	//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
-	SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
+		//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
+		//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
+		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
+	}
+	else
+	{
+		LV_ITEM item;
+		item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
+		item.iItem = index;
+		item.iSubItem = 0;
+		item.pszText = (LPTSTR)(LPCTSTR)text;
+		item.iImage = image_index;
+		item.state = 0;
+		item.stateMask = 0;
+		item.mask |= LVIF_STATE;
+		index = InsertItem(&item);
+	}
 
 	//ensureVisible이면 Invalidate()을 생략해도 된다.
 	//TRACE(_T("m_auto_scroll = %d, ensureVisible = %d\n"), m_auto_scroll, ensureVisible);
@@ -2267,7 +2340,7 @@ int CVtListCtrlEx::insert_item(int index, LPCTSTR pszText, ...)
 
 int CVtListCtrlEx::size()
 {
-	return m_list_db.size();
+	return (m_use_virtual_list ? m_list_db.size() : GetItemCount());
 }
 
 //지우기 전 확인창은 호출루틴에서 처리해야 함
@@ -2414,10 +2487,13 @@ void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 
 CString CVtListCtrlEx::get_text(int item, int subItem)
 {
-	if (item < 0 || item >= m_list_db.size() || subItem < 0 || subItem >= m_list_db[item].text.size())
+	if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 		return _T("");
 
-	return m_list_db[item].text[subItem];
+	if (m_use_virtual_list)
+		return m_list_db[item].text[subItem];
+
+	return GetItemText(item, subItem);
 }
 
 void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidate)
@@ -2431,12 +2507,20 @@ void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidat
 	if (m_is_shell_listctrl && !m_pShellImageList)
 		return;
 
-	//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
-	//원인을 파악중이며 우선 임시로 처리한다.
-	if (m_list_db.size() > 10000)
-		return;
+	if (m_use_virtual_list)
+	{
+		//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
+		//원인을 파악중이며 우선 임시로 처리한다.
+		if (m_list_db.size() > 10000)
+			return;
 
-	m_list_db[item].text[subItem] = text;
+		m_list_db[item].text[subItem] = text;
+	}
+	else
+	{
+		SetItemText(item, subItem, text);
+	}
+
 	if (invalidate)
 		InvalidateRect(get_item_rect(item, subItem), false);
 }
@@ -2719,6 +2803,42 @@ void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_
 	if (insure_visible)
 		EnsureVisible(nIndex, FALSE);
 		//ensure_visible(nIndex, visible_last);
+}
+
+//index = -1 : 전체선택
+void CVtListCtrlEx::check_item(int index, bool check)
+{
+	if (index < 0)
+	{
+		for (int i = 0; i < size(); i++)
+		{
+			SetCheck(i, check);
+			if (m_use_virtual_list)
+				m_list_db[i].checked = check;
+		}
+	}
+	else
+	{
+		if (index >= size())
+			return;
+
+		SetCheck(index, check);
+		if (m_use_virtual_list)
+			m_list_db[index].checked = check;
+	}
+}
+
+void CVtListCtrlEx::check_item(std::deque<int> indices, bool check)
+{
+	for (const auto& index : indices)
+	{
+		if (index < 0 || index >= size())
+			continue;
+
+		SetCheck(index, check);
+		if (m_use_virtual_list)
+			m_list_db[index].checked = check;
+	}
 }
 
 void CVtListCtrlEx::unselect_selected_item()
@@ -3365,8 +3485,8 @@ BOOL CVtListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, false) ||
 		item < 0 || subItem < 0)
 	{
-		*pResult = 1;
-		return TRUE;
+		*pResult = 0;
+		return FALSE;
 	}
 
 	//TRACE(_T("%d, %d\n"), item, subItem);
@@ -4536,6 +4656,23 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 		&& (pNMListView->uNewState & LVIS_SELECTED))
 	{
 		set_auto_scroll(false);
+
+		if (m_use_virtual_list)
+		{
+			m_list_db[pNMListView->iItem].checked = !m_list_db[pNMListView->iItem].checked;
+			TRACE(_T("list item changed: %d, checked = %d\n"), pNMListView->iItem, m_list_db[pNMListView->iItem].checked);
+		}
+		else
+		{
+			if ((pNMListView->uNewState & LVIS_STATEIMAGEMASK) == 0x1000)
+			{
+				//SetCheck(pNMListView->iItem, false);
+			}
+			else if ((pNMListView->uNewState & LVIS_STATEIMAGEMASK) == 0x2000)
+			{
+				//SetCheck(pNMListView->iItem, true);
+			}
+		}
 	}
 
 	return FALSE;
@@ -4697,23 +4834,6 @@ void CVtListCtrlEx::get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data
 void CVtListCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	UINT uFlags = 0;
-	//int item = HitTest(point, &uFlags);
-
-	int item = -1;// = pNMItemActivate->iItem;
-	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
-
-	//include_icon = false로 주면 아이콘을 클릭해도 해당 항목이 선택되지 않는다.
-	get_index_from_point(point, item, subItem, true);
-
-	//TRACE(_T("%d, %d, uFlags = %d\n"), item, subItem, uFlags);
-
-	if (item >= 0 && subItem < 0)
-		return;
-
-	//if (uFlags == 14)
-	//	//nFlags = 1;
-	//	return; LVHT_ONITEMLABEL
 	CListCtrl::OnLButtonDown(nFlags, point);
 }
 
@@ -4721,7 +4841,6 @@ void CVtListCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 LRESULT CVtListCtrlEx::OnNcHitTest(CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	//TRACE(_T("OnNcHitTest\n"));
 	return CListCtrl::OnNcHitTest(point);
 }
 

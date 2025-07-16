@@ -644,7 +644,7 @@ bool CGdiplusBitmap::get_raw_data()
 	{
 		int len = bmpData.Height * std::abs(bmpData.Stride); //이미지 전체크기
 		data = new BYTE[len]; //할당
-		memset(data, 0, len);
+		//memset(data, 0, len);
 		memcpy(data, bmpData.Scan0, len); //복사
 		stride = std::abs(bmpData.Stride);
 		m_pBitmap->UnlockBits(&bmpData); //락 풀기

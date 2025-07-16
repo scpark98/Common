@@ -10973,7 +10973,7 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 		//target_exe_file이 실행 파일명만 있다면 exe 파일명만 비교하고
 		//전체 경로라면 fullpath를 구해서 비교한다.
 		//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
-		if (false)//PathFileExists(target_exe_file))
+		if (target_exe_file.Find('\\') > 0 && PathFileExists(target_exe_file))
 		{
 			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
 
@@ -10991,7 +10991,7 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 		}
 
 
-		if (true)//_tcsicmp(sFilePath, target_exe_file) == 0)
+		if (_tcsicmp(sFilePath, target_exe_file) == 0)
 		{
 			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
 			if (hProcess != NULL)
@@ -10999,7 +10999,7 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 				hWnd = get_hwnd_by_pid(pe32.th32ProcessID);
 				TCHAR caption[MAX_PATH] = { 0, };
 				::GetWindowText(hWnd, caption, MAX_PATH);
-				TRACE(_T("caption = %s, pid = %d, hWnd = %p\n"), caption, pe32.th32ProcessID, hWnd);
+				TRACE(_T("path = %s, caption = %s, pid = %d, hWnd = %p\n"), sFilePath, caption, pe32.th32ProcessID, hWnd);
 				if (except_pid > 0)
 				{
 					if (pe32.th32ProcessID == except_pid)
@@ -11008,8 +11008,8 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 
 				CloseHandle(hProcess);
 
-				//if (hWnd != NULL && (CString(caption).Find(_T("GDI+ Window")) < 0))
-				//	break;
+				if (hWnd != NULL && (CString(caption).Find(_T("GDI+ Window")) < 0))
+					break;
 			}
 		}
 	}

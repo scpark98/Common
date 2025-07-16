@@ -2945,6 +2945,20 @@ ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::d
 		}
 
 		zr = ZipAdd(hz, file, dq[i]);
+
+		//20250716 scpark. LMMAgentService.log, LMMViewer의 viewer.log 등의 파일과 같이
+		//이미 다른 프로세스에 의해 열려있는 파일은 zr = ZR_NOFILE(512)를 리턴하게 된다.
+		//TZip::Add()의 open_file((const TCHAR*)src);에서 CreateFile()이 실패하기 때문이다.
+		//단, 열려 있더라도 복사는 가능하므로 임시로 복사하여 해당 파일을 압축하도록 한다.
+		if (zr == ZR_NOFILE)
+		{
+			CString temp_file;
+			CString zip_path_folder = zip_path.Left(zip_path.ReverseFind('\\'));
+			temp_file.Format(_T("%s\\%s"), zip_path_folder, _T("_temp_zip_file_.tmp"));
+			CopyFile(dq[i], temp_file, FALSE);
+			zr = ZipAdd(hz, file, temp_file);
+			DeleteFile(temp_file);
+		}
 	}
 
 	zr = CloseZip(hz);

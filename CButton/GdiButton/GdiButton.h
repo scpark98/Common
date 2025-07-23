@@ -277,6 +277,8 @@ public:
 
 	void		set_transparent(bool trans = true, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
+	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
+
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		set_text_color(Gdiplus::Color normal);
 	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
@@ -339,6 +341,7 @@ public:
 	void		Inflate(int l, int t, int r, int b);
 
 	//gcr_border, gcr_parent_back은 Gdiplus::Color::Transparent가 아닐 경우에만 적용된다.
+	//round = radius
 	void		set_round(int round, Gdiplus::Color gcr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
 
 	//포커스 사각형 관련
@@ -348,13 +351,13 @@ public:
 
 	void		use_hover(bool use = true);
 	//thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
-	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
+	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 	void		set_hover_rect_thick(int thick);
 	void		set_hover_rect_color(Gdiplus::Color cr);
 	void		set_down_offset(int ox, int oy) { m_down_offset = CPoint(ox, oy); Invalidate(); }
 
 //border. thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
-	void		draw_border(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
+	void		draw_border(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent);
 
 //3D, sunken 
 	void		use_3D_rect(bool use = true) { m_b3DRect = use; Invalidate(); }
@@ -492,7 +495,7 @@ protected:
 	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::DimGray;	//색상
 	int			m_focus_rect_width = 1;					//두께
 
-	bool		m_b3DRect = true;						//입체 느낌의 3D, 누르면 sunken. default = true;
+	bool		m_b3DRect = false;						//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
 
@@ -513,8 +516,11 @@ protected:
 	float		m_drop_shadow_blur_sigma = 5.0f;
 
 
+	//default = false
 	bool		m_draw_border = false;
-	Gdiplus::Color m_gcr_border = Gdiplus::Color::DimGray;
+	//default = LightGray
+	Gdiplus::Color m_cr_border = Gdiplus::Color::LightGray;
+	//default = 1
 	int			m_border_thick = 1;
 
 	bool		m_blink = false;

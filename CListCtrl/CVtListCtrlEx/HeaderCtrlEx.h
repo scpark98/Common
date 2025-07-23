@@ -13,11 +13,12 @@
 
 #include <gdiplus.h>
 
+static const UINT Message_CHeaderCtrlEx = ::RegisterWindowMessage(_T("MessageString_CHeaderCtrlEx"));
 
 /////////////////////////////////////////////////////////////////////////////
 // CHeaderCtrlEx window
 
-class CHeaderCtrlEx : public CMFCHeaderCtrl
+class CHeaderCtrlEx : public CHeaderCtrl
 {
 // Construction
 public:
@@ -25,6 +26,11 @@ public:
 
 // Attributes
 public:
+	enum ENUM_HEADERCTRLEX_MESSAGE
+	{
+		message_header_dbclicked = 0,
+	};
+
 	//여러개의 파라미터를 설정할 수 있는데 만약 그 값이 Gdiplus::Color::Transparent라면 그 항목은 변경하지 않는다.
 	void			set_color(Gdiplus::Color cr_text = Gdiplus::Color::Transparent, Gdiplus::Color cr_back = Gdiplus::Color::Transparent, Gdiplus::Color cr_separator = Gdiplus::Color::Transparent);
 	void			set_text_color(Gdiplus::Color cr_text);
@@ -38,8 +44,8 @@ public:
 	void			set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_sort_arrow = Gdiplus::Color::Transparent);
 	void			allow_sort(bool allow) { m_allow_sort = allow; }
 
-	//pt가 separator 위치인지 판별, (-2px ~ +2px)
-	bool			is_separator(CPoint pt);
+	//pt가 separator 위치인지 판별하고(-4px ~ +4px) 그 header index를 리턴한다.
+	int				is_separator(CPoint pt);
 
 // Operations
 	CString			get_header_text(int column);
@@ -70,6 +76,9 @@ public:
 protected:
 	HDLAYOUT		m_HDLayout;
 	bool			m_use_header_separator = true;
+
+	//separator를 dbclick 했을 때 column text까지 포함해서 width가 자동 조정되도록 하기 위해 기억.
+	std::deque<CRect> m_r_header_text;
 
 	bool			m_allow_sort = true;
 	int				m_cur_sort_column = -1;
@@ -111,6 +120,7 @@ protected:
 public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 };
 
 /////////////////////////////////////////////////////////////////////////////

@@ -34,9 +34,15 @@ void CSCDirWatcher::add(std::deque<CString> folder, bool watch_sub_dir)
 
     for (int i = 0; i < folder.size(); i++)
     {
+        if (folder[i].GetLength() > 0 && folder[i].Right(1) == _T('\\'))
+			folder[i].Delete(folder[i].GetLength() - 1, 1); // Remove trailing backslash
+
         if (m_watcher.is_watching(folder[i]))
             continue;
 
+        //folder가 존재하지 않으면 add watching이 될 수 없다.
+        //그렇다고 이 클래스에서 해당 폴더를 생성하여 watching을 하는 것도 범위를 넘을 수 있다.
+        //이 클래스를 사용하는 곳에서 watching을 하고자 하는 폴더가 없다면 생성한 후 add watching을 하는 것이 맞다.
         if (PathFileExists(folder[i]))
         {
             if (PathIsDirectory(folder[i]))

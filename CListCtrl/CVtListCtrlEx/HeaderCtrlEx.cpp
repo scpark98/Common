@@ -3,7 +3,7 @@
 
 //#include "stdafx.h"
 #include "HeaderCtrlEx.h"
-#include "VtListCtrlEx.h"
+//#include "VtListCtrlEx.h"
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
@@ -45,6 +45,7 @@ BEGIN_MESSAGE_MAP(CHeaderCtrlEx, CHeaderCtrl)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_MESSAGE(HDM_LAYOUT, &CHeaderCtrlEx::OnLayout)
+	ON_WM_LBUTTONDBLCLK()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -113,6 +114,10 @@ void CHeaderCtrlEx::OnPaint()
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
 	int header_count = GetItemCount();
+
+	m_r_header_text.resize(header_count);
+	m_r_header_text.clear();
+
 	for (int i = 0; i < GetItemCount(); i++)
 	{
 		GetItemRect(i, rItem);
@@ -147,7 +152,12 @@ void CHeaderCtrlEx::OnPaint()
 			dwFormat |= DT_RIGHT;
 
 		rItem.DeflateRect(6, 0);
+
+		CRect rcalc = rItem;
+		dc.DrawText(get_header_text(i), rcalc, dwFormat | DT_CALCRECT);
 		dc.DrawText(get_header_text(i), rItem, dwFormat);
+
+		m_r_header_text.push_back(rcalc);
 
 		//7x4 크기의 화살표를 그린다.
 		if (i == m_cur_sort_column)
@@ -408,27 +418,29 @@ void CHeaderCtrlEx::set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_
 }
 
 //pt가 separator 위치인지 판별
-bool CHeaderCtrlEx::is_separator(CPoint pt)
+int CHeaderCtrlEx::is_separator(CPoint pt)
 {
-	int margin = 2;
+	int margin = 4;
 	CRect rItem;
 
 	for (int i = 0; i < GetItemCount(); i++)
 	{
 		GetItemRect(i, rItem);
-		if (pt.x > rItem.left + margin && pt.x < rItem.right - margin)
+		rItem.left = rItem.right;
+		rItem.InflateRect(margin, 0);
+		if (rItem.PtInRect(pt))
 		{
-			return false;
+			return i;
 		}
 	}
 
-	return true;
+	return -1;
 }
 
 void CHeaderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
-	if (!m_allow_sort && !is_separator(point))
+	if (!m_allow_sort && is_separator(point) < 0)
 		return;
 
 	m_header_is_clicked = true;
@@ -440,7 +452,7 @@ void CHeaderCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CHeaderCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	if ((!m_allow_sort || !m_header_is_clicked) && !is_separator(point))
+	if ((!m_allow_sort || !m_header_is_clicked) && is_separator(point) < 0)
 		return;
 
 	// TODO: Add your message handler code here and/or call default
@@ -578,3 +590,22 @@ void CHeaderCtrlEx::set_font_italic(bool italic)
 	reconstruct_font();
 }
 
+//보통 header의 separator를 더블클릭하면 width를 최소 크기로 조정해주는데
+//header text를 고려하지 않거나 checkbox가 있는 등의 경우에는 올바르게 동작하지 않는다.
+//따라서 이를 수동으로 조정해주도록 한다.
+void CHeaderCtrlEx::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	//separator를 dbclick하면 width를 자동 조정해줘야 하는데 오류가 있다. 이를 메인에서 계산하여 조정하도록 함.
+	int index = is_separator(point);
+
+	if (index < 0 || index >= GetItemCount())
+	{
+		//CHeaderCtrl::OnLButtonDblClk(nFlags, point);
+		return;
+	}
+
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CHeaderCtrlEx, index, m_r_header_text[index].Width());
+
+	//기본 핸들러를 호출하지 않도록 한다.
+	//CHeaderCtrl::OnLButtonDblClk(nFlags, point);
+}

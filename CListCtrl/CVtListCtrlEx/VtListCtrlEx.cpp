@@ -76,6 +76,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT(LVN_ENDSCROLL, &CVtListCtrlEx::OnLvnEndScroll)
 	ON_WM_SIZE()
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CVtListCtrlEx::on_message_CGdiButton)
+	ON_REGISTERED_MESSAGE(Message_CHeaderCtrlEx, &CVtListCtrlEx::on_message_CHeaderCtrlEx)
 END_MESSAGE_MAP()
 
 
@@ -164,27 +165,34 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	//Do the list need image information?
-	if(true)//pItem->mask & LVIF_IMAGE) 
+	if(pItem->mask & LVIF_IMAGE) 
 	{
 		//Set which image to use
 		//pItem->iImage = m_list_db[pItem->iItem].img_idx;
 
 		//Show check box?
-		if(true)//pItem->mask & LVIF_STATE)
+		if(pItem->mask & LVIF_STATE)
 		{
 			//To enable check box, we have to enable state mask...
 			pItem->mask |= LVIF_STATE;
 			pItem->stateMask = LVIS_STATEIMAGEMASK;
 
-			if(GetCheck(pItem->iItem))//m_list_db[pItem->iItem].checked)
+			//m_list_db[pItem->iItem].checked = !m_list_db[pItem->iItem].checked;
+			//TRACE(_T("onGetDispInfo() iItem = %d, checked = %d\n"), pItem->iItem, m_list_db[pItem->iItem].checked);
+			//if(GetCheck(pItem->iItem))
+			if (m_list_db[pItem->iItem].checked)
 			{
+				SetCheck(pItem->iItem, m_list_db[pItem->iItem].checked);
 				//Turn check box on..
 				pItem->state = INDEXTOSTATEIMAGEMASK(2);
+				//SetItemState(pItem->iItem, INDEXTOSTATEIMAGEMASK(2), LVIS_STATEIMAGEMASK);
 			}
 			else
 			{
+				SetCheck(pItem->iItem, m_list_db[pItem->iItem].checked);
 				//Turn check box off
 				pItem->state = INDEXTOSTATEIMAGEMASK(1);
+				//SetItemState(pItem->iItem, INDEXTOSTATEIMAGEMASK(1), LVIS_STATEIMAGEMASK);
 			}
 		}
 	}
@@ -254,7 +262,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
-		//TRACE(_T("in DrawItem. %d, %d\n"), iItem, iSubItem);
+		//TRACE(_T("%d, %d\n"), iItem, iSubItem);
 
 		crText = m_list_db[iItem].crText[iSubItem];
 		crBack = m_list_db[iItem].crBack[iSubItem];
@@ -270,36 +278,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//1번 컬럼부터는 해당 셀의 사각형 영역만을 리턴한다.
 			//itemRect = get_item_rect(iItem, iSubItem);
 			itemRect.right = itemRect.left + GetColumnWidth(0);
-
-			if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
-			{
-				CRect r = itemRect;
-				r.left = 1;
-				r.right = r.left + 16;
-				//pDC->DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONCHECK);
-
-				//Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
-
-				int check_state = GetCheck(iItem);
-
-				if (check_state == BST_CHECKED)
-				{
-					//g.DrawLine(&pen, r.left + 1, r.CenterPoint().y - 1, r.left + 4, r.CenterPoint().y + 3);
-					//g.DrawLine(&pen, r.left + 4, r.CenterPoint().y + 3, r.right - 3, r.top + 3);
-					pDC->MoveTo(r.left + 1, r.CenterPoint().y - 1);
-					pDC->LineTo(r.left + 4, r.CenterPoint().y + 3);
-					pDC->MoveTo(r.left + 4, r.CenterPoint().y + 3);
-					pDC->LineTo(r.right - 3, r.top + 3);
-				}
-				else if (check_state == BST_INDETERMINATE)
-				{
-					CRect inner = r;
-					inner.DeflateRect(3, 3);
-					//draw_rectangle(pDC, inner, inner, m_theme.cr_text);
-				}
-
-				itemRect.left = r.right + 2;
-			}
 		}
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
@@ -351,6 +329,48 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			crBack = m_list_db[iItem].crBack[iSubItem];
 	
 		pDC->FillSolidRect(itemRect, crBack.ToCOLORREF());
+
+		if ((iSubItem == 0) && (GetExtendedStyle() & LVS_EX_CHECKBOXES))
+		{
+			//checkbox는 좌우 4 여백을 두고 크기는 14x14이다.
+			CRect r = itemRect;
+			r.left += 4;
+			r.right = r.left + 14;
+			r.top = r.CenterPoint().y - 7;
+			r.bottom = r.top + 14;
+			draw_rectangle(pDC, r, m_theme.cr_text);
+			//pDC->DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONCHECK);
+
+			//Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
+
+			int check_state = m_list_db[iItem].checked;// GetCheck(iItem);
+			//TRACE(_T("%d check_state = %d\n"), iItem, check_state);
+			//int check_state = GetCheck(iItem);
+
+			if (check_state == BST_CHECKED)
+			{
+				//1은 얇고 2는 두껍다. Gdiplus::Pen으로 그려야하는데 DrawItem()에서 Gdiplus::Graphics를 사용하면 문제가 있다.
+				//Gdiplus::Pen 설정 시 width를 1.5로 해도 적용되지 않는다. 
+				draw_line(pDC, r.left + 2, r.CenterPoint().y - 1, r.left + 5, r.CenterPoint().y + 2, m_theme.cr_text, 2.0);
+				draw_line(pDC, r.left + 5, r.CenterPoint().y + 2, r.left + 5 + 6, r.CenterPoint().y + 2 - 6, m_theme.cr_text, 2.0);
+
+				//CPen pen(PS_SOLID, 2, m_theme.cr_text.ToCOLORREF());
+				//CPen* pOldPen = pDC->SelectObject(&pen);
+				//pDC->MoveTo(r.left + 2, r.CenterPoint().y - 1);
+				//pDC->LineTo(r.left + 5, r.CenterPoint().y + 2);
+				////pDC->MoveTo(r.left + 4, r.CenterPoint().y + 2);
+				//pDC->LineTo(r.left + 5 + 6, r.CenterPoint().y + 2 - 6);
+				//pDC->SelectObject(pOldPen);
+			}
+			else if (check_state == BST_INDETERMINATE)
+			{
+				CRect inner = r;
+				inner.DeflateRect(3, 3);
+				draw_rectangle(pDC, inner, Gdiplus::Color::Transparent, m_theme.cr_text);
+			}
+
+			itemRect.left = r.right + 2;
+		}
 
 		//percentage 타입이면 바그래프 형태로 그려주고
 		if (get_column_data_type(iSubItem) == column_data_type_percentage_bar)
@@ -890,7 +910,7 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 }
 
 //클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
-bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon)
+int CVtListCtrlEx::hit_test(CPoint pt, int& item, int& subItem, bool include_icon)
 {
 	CRect rc;
 	CRect itemRect;
@@ -901,10 +921,11 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 	GetClientRect(&rc);
 
 	if (!rc.PtInRect(pt))
-		return false;
+		return LVHT_NOWHERE;
 
 	int first = GetTopIndex();
 	int last = MIN(size(), first + GetCountPerPage());
+
 	for (int i = first; i < last; i++)
 	{
 		//LVIR_BOUNDS로 itemRect를 구하면 맨 끝 컬럼의 우측 클릭 시 범위안에 들어오지 않으므로
@@ -929,27 +950,48 @@ bool CVtListCtrlEx::get_index_from_point(CPoint pt, int& item, int& subItem, boo
 
 					if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
 					{
-						if (pt.x < 18)
-							return false;
+						//DrawItem()에서 체크박스를 그려주는데 그 크기는 좌우 4 여백을 두고 크기는 14x14이다.
+						if (pt.x > itemRect.left + 4 && pt.x < itemRect.left + 4 + 14)
+						{
+							subItem = 0;
+							return LVHT_ONITEMSTATEICON;
+						}
+
+						itemRect.left += 18; //checkbox가 있는 경우는 left를 18만큼 보정해준다.
 					}
 
 					//imagelist를 사용한다면 이미지 영역만큼 다시 보정해줘야 한다.
-					if (!include_icon && m_use_own_imagelist)
-						itemRect.left += 22;
+					if (m_use_own_imagelist)
+					{
+						if (include_icon)
+						{
+							if (itemRect.PtInRect(pt))
+							{
+								subItem = 0;
+								return LVHT_ONITEMLABEL;
+							}
+							itemRect.left += 22;
+						}
+						else
+						{
+							subItem = 0;
+							return LVHT_ONITEMICON;
+						}
+					}
 				}
 
 				if (itemRect.PtInRect(pt))
 				{
 					subItem = j;
-					return true;
+					return LVHT_ONITEMICON;
 				}
 			}
 
-			return true;
+			return LVHT_ONITEMICON;
 		}
 	}
 
-	return false;
+	return LVHT_NOWHERE;
 }
 
 void CVtListCtrlEx::set_draw_selected_border(bool draw, Gdiplus::Color cr_border, int selected_border_width, int pen_style)
@@ -1406,6 +1448,25 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 			if (m_in_editing)
 			{
 				edit_end(false);
+				return TRUE;
+			}
+			break;
+		}
+		case VK_SPACE:
+		{
+			if (!m_use_virtual_list)
+				break;
+
+			if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
+			{
+				int selected = get_selected_index();
+				if (selected < 0 || selected >= size())
+					return FALSE;
+
+				m_list_db[selected].checked = !m_list_db[selected].checked;
+				TRACE(_T("checkbox toggle by spacebar. m_list_db[%d].checked = %d\n"), selected, m_list_db[selected].checked);
+				Invalidate();
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_checked_item, NULL)), selected);
 				return TRUE;
 			}
 			break;
@@ -2805,40 +2866,81 @@ void CVtListCtrlEx::select_item(int nIndex, bool bSelect /*= true*/, bool after_
 		//ensure_visible(nIndex, visible_last);
 }
 
+int CVtListCtrlEx::get_check(int index)
+{
+	if (index < 0 || index >= size())
+		return 0;
+
+	if (m_use_virtual_list)
+		return m_list_db[index].checked;
+
+	return GetCheck(index);
+}
+
 //index = -1 : 전체선택
-void CVtListCtrlEx::check_item(int index, bool check)
+void CVtListCtrlEx::set_check(int index, bool check)
 {
 	if (index < 0)
 	{
 		for (int i = 0; i < size(); i++)
 		{
-			SetCheck(i, check);
+			CListCtrl::SetCheck(i, check);
 			if (m_use_virtual_list)
 				m_list_db[i].checked = check;
 		}
+
+		Invalidate();
 	}
 	else
 	{
 		if (index >= size())
 			return;
 
-		SetCheck(index, check);
+		CListCtrl::SetCheck(index, check);
 		if (m_use_virtual_list)
 			m_list_db[index].checked = check;
 	}
 }
 
-void CVtListCtrlEx::check_item(std::deque<int> indices, bool check)
+void CVtListCtrlEx::set_check(std::deque<int> indices, bool check)
 {
 	for (const auto& index : indices)
 	{
 		if (index < 0 || index >= size())
 			continue;
 
-		SetCheck(index, check);
+		CListCtrl::SetCheck(index, check);
 		if (m_use_virtual_list)
 			m_list_db[index].checked = check;
 	}
+}
+
+//check된 항목 리스트를 dq에 담고 체크된 항목의 개수를 리턴한다.
+int CVtListCtrlEx::get_checked_items(std::deque<int>* dq)
+{
+	std::deque<int> checked;
+
+	for (int i = 0; i < size(); i++)
+	{
+		if (m_use_virtual_list)
+		{
+			if (m_list_db[i].checked)
+				checked.push_back(i);
+		}
+		else
+		{
+			if (GetCheck(i))
+				checked.push_back(i);
+		}
+	}
+
+	if (dq != NULL)
+	{
+		dq->clear();
+		dq->assign(checked.begin(), checked.end());
+	}
+
+	return checked.size();
 }
 
 void CVtListCtrlEx::unselect_selected_item()
@@ -3072,7 +3174,7 @@ BOOL CVtListCtrlEx::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		CString new_path;
 
-		if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, true) ||
+		if (hit_test(pNMItemActivate->ptAction, item, subItem, true) == LVHT_NOWHERE ||
 			item < 0 || subItem < 0)
 		{
 			move_parent_folder();
@@ -3481,12 +3583,25 @@ BOOL CVtListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	int item = -1;// = pNMItemActivate->iItem;
 	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
+	int ht = LVHT_NOWHERE;
+	*pResult = 0;
 
-	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, false) ||
+	if (((ht = hit_test(pNMItemActivate->ptAction, item, subItem, false)) == LVHT_NOWHERE) ||
 		item < 0 || subItem < 0)
 	{
-		*pResult = 0;
 		return FALSE;
+	}
+
+	if (m_use_virtual_list)
+	{
+		if (ht == LVHT_ONITEMSTATEICON)
+		{
+			m_list_db[item].checked = !m_list_db[item].checked;
+			TRACE(_T("checkbox clicked. m_list_db[%d].checked = %d\n"), item, m_list_db[item].checked);
+			Invalidate();
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_checked_item, NULL)), item);
+			return FALSE;
+		}
 	}
 
 	//TRACE(_T("%d, %d\n"), item, subItem);
@@ -3534,7 +3649,6 @@ BOOL CVtListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	return FALSE;
-	*pResult = 0;
 }
 
 //m_is_shell_list라면 이름 변경은 굳이 main이 아닌 여기서 처리해도 될듯하다.
@@ -4272,7 +4386,7 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	int item = -1;// = pNMItemActivate->iItem;
 	int subItem = -1;// = pNMItemActivate->iSubItem;	<== invalid index returned when user clicked out of columns
 
-	if (!get_index_from_point(pNMItemActivate->ptAction, item, subItem, false) ||
+	if (hit_test(pNMItemActivate->ptAction, item, subItem, false) == LVHT_NOWHERE ||
 		item < 0 || subItem < 0)
 		return;
 
@@ -4652,25 +4766,45 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
 
-	if ((pNMListView->uChanged & LVIF_STATE)
-		&& (pNMListView->uNewState & LVIS_SELECTED))
-	{
+	if (pNMListView->uNewState & LVIS_SELECTED)
 		set_auto_scroll(false);
 
+	//trace(pNMListView->iItem);
+
+	if (pNMListView->iItem < 0)
+		return FALSE;
+
+	//if (!m_use_virtual_list)
+	//	return FALSE;
+
+	if (pNMListView->uChanged & LVIF_STATE)
+	{
+		//체크박스 상태가 변경된 경우에만 처리하기 위해.
+		UINT old_check = pNMLV->uOldState & LVIS_STATEIMAGEMASK;
+		UINT new_check = pNMLV->uNewState & LVIS_STATEIMAGEMASK;
+		//TRACE(_T("pNMListView->uChanged = %d, old = %d, new = %d\n"), pNMListView->uChanged, old_check, new_check);
+
+		/*
 		if (m_use_virtual_list)
 		{
 			m_list_db[pNMListView->iItem].checked = !m_list_db[pNMListView->iItem].checked;
+			//Invalidate();
 			TRACE(_T("list item changed: %d, checked = %d\n"), pNMListView->iItem, m_list_db[pNMListView->iItem].checked);
 		}
-		else
+		else 
+		*/
+		//if (old_check && new_check && old_check != new_check)
 		{
-			if ((pNMListView->uNewState & LVIS_STATEIMAGEMASK) == 0x1000)
+			//else
 			{
-				//SetCheck(pNMListView->iItem, false);
-			}
-			else if ((pNMListView->uNewState & LVIS_STATEIMAGEMASK) == 0x2000)
-			{
-				//SetCheck(pNMListView->iItem, true);
+				if ((pNMListView->uNewState & LVIS_STATEIMAGEMASK) == 0x1000)
+				{
+					SetCheck(pNMListView->iItem, false);
+				}
+				else if ((pNMListView->uNewState & LVIS_STATEIMAGEMASK) == 0x2000)
+				{
+					SetCheck(pNMListView->iItem, true);
+				}
 			}
 		}
 	}
@@ -4968,4 +5102,32 @@ void CVtListCtrlEx::init_auto_scroll_button()
 	m_button_scroll_to_end = new CGdiButton();
 	m_button_scroll_to_end->create(_T("end"), WS_CHILD | BS_PUSHLIKE, CRect(0, 0, m_auto_scroll_button_size, m_auto_scroll_button_size), this, WM_USER + 3872);
 	m_button_scroll_to_end->add_image(&img);
+}
+
+LRESULT	CVtListCtrlEx::on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam)
+{
+	TRACE(_T("dbclicked column[%d] width = %d\n"), (int)wParam, (int)lParam);
+
+	int column = (int)wParam;
+	int max_width = (int)lParam;
+
+	CClientDC dc(this);
+	CFont* pOldFont = dc.SelectObject(&m_font);
+	CRect r;
+
+	for (int i = 0; i < size(); i++)
+	{
+		int width = GetStringWidth(get_text(i, column));
+		dc.DrawText(get_text(i, column), r, DT_CALCRECT);
+
+		if (column == 0 && (GetExtendedStyle() & LVS_EX_CHECKBOXES))
+			width += 20; //체크박스가 있는 경우 체크박스 너비를 더해준다.
+
+		if (width > max_width)
+			max_width = width;
+	}
+
+	set_column_width(column, max_width + 12);
+
+	return 0;
 }

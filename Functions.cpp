@@ -6217,8 +6217,13 @@ void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width
 void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
+
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
 	Gdiplus::Pen pen(cr, thick);
 	pen.SetDashStyle(pen_style);
+
 	g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
@@ -6687,7 +6692,7 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 
 	radius = MIN(radius, MIN(r.Width, r.Height) / 2.0);
 
-	float diameter = radius;// *2.0F;
+	float diameter = radius * 2.0F;
 
 	Gdiplus::RectF arc(r.X, r.Y, diameter, diameter);
 
@@ -6721,10 +6726,10 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 
 void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width)
 {
-	int dia = 2 * radius;
+	//int dia = 2 * radius;
 
 	// set to pixel mode
-	int oldPageUnit = g->SetPageUnit(Gdiplus::UnitPixel);
+	//int oldPageUnit = g->SetPageUnit(Gdiplus::UnitPixel);
 
 	// define the pen
 	Gdiplus::Pen pen(gcr_stroke, 1);
@@ -6736,7 +6741,7 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_s
 	Gdiplus::GraphicsPath path;
 
 	// get path
-	get_round_rect_path(&path, r, dia);
+	get_round_rect_path(&path, r, radius);
 
 	//fill the round rect
 	g->FillPath(&br, &path);
@@ -6750,7 +6755,7 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_s
 		// left stroke
 		r.Inflate(-1, 0);
 		// get the path
-		get_round_rect_path(&path, r, dia);
+		get_round_rect_path(&path, r, radius);
 
 		// draw the round rect
 		g->DrawPath(&pen, &path);
@@ -6759,14 +6764,14 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_s
 		r.Inflate(0, -1);
 
 		// get the path
-		get_round_rect_path(&path, r, dia);
+		get_round_rect_path(&path, r, radius);
 
 		// draw the round rect
 		g->DrawPath(&pen, &path);
 	}
 
 	// restore page unit
-	g->SetPageUnit((Gdiplus::Unit)oldPageUnit);
+	//g->SetPageUnit((Gdiplus::Unit)oldPageUnit);
 }
 
 CRect get_zoom_rect(CRect rect, double zoom)
@@ -8635,7 +8640,7 @@ CString	get_unescape_string(CString src)
 // lfrf는 라인분리문자열이고 보통 "\n"이거나 "\r\n" 등이 있고
 // separator는 ':' 이름과 값을 구분하는 구분자이다.
 // return value : 항목의 개수
-int	get_map_string(CString src, std::map<CString, CString>& map, CString lfrf, CString separator)
+int	get_map_str(CString src, std::map<CString, CString>& map, CString lfrf, CString separator)
 {
 	map.clear();
 

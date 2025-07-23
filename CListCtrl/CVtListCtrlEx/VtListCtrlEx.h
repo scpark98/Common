@@ -125,8 +125,12 @@ public:
 	CVtListCtrlEx();
 	virtual ~CVtListCtrlEx();
 
-	//virtual list 기능을 사용하기 위해 Owner Data, Owner Draw Fixed를 모두 true로 설정해야 한다.
-	//이 옵션은 동적으로 변경 불가.
+	//virtual list 기능을 사용하기 위해서는 Owner Data, Owner Draw Fixed를 모두 true로 설정해야 한다.
+	//이 옵션은 동적으로 변경 불가하고 WM_DRAWITEM 핸들러인 OnDrawItem()에서 그리게 된다.
+	//단, virtual list에서 checkbox가 올바르게 표시되지 않는 문제가 있었으나 check = !check로 m_list_db에서 처리하고
+	//OnDrawItem()에서 체크여부에 따라 직접 그리도록 수정하였다.
+	//간혹 OnDrawItem()으로 직접 그리는 등의 세세한 기능들을 사용하지 않고 기본 CListCtrl과 같이 동작시키고 싶다면
+	//Owner Data, Owner Draw Fixed를 모두 false로 설정하고 왠만한 method는 공통적으로 사용 가능하다.
 	void			set_use_virtual_list(bool use_virtual = true) { m_use_virtual_list = use_virtual; }
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
@@ -142,6 +146,13 @@ public:
 	enum CVtListCtrlExMsgs
 	{
 		message_progress_pos = 0,
+
+		//OnLvnGetdispinfo(), OnLvnItemchanged() 등에서 뭔가 세팅만 해주면
+		//virtual list일때도 OnLvnItemChanged()에서 체크가 변경될때만 이벤트를 처리할 수 있을듯한데
+		//아직은 그 해결책을 찾지 못했다.
+		//우선 체크 변경 시 사용자 정의 메시지로 parent에 알린다.
+		message_checked_item,
+
 		message_drag_and_drop,
 		message_path_changed,
 		message_rename_duplicated,
@@ -373,9 +384,19 @@ public:
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
 	void		unselect_selected_item();
 
+	int			get_check(int index);
+	//CListCtrl::GetCheck() override.
+	int			GetCheck(int index) { return get_check(index); }
+
 	//index = -1 : 전체선택
-	void		check_item(int index, bool check = true);
-	void		check_item(std::deque<int> indices, bool check);
+	void		set_check(int index, bool check = true);
+	void		set_check(std::deque<int> indices, bool check);
+	//CListCtrl::SetCheck() override.
+	void		SetCheck(int index, BOOL bCheck) { set_check(index, bCheck); }
+
+
+	//check된 항목 리스트를 dq에 담고 체크된 항목의 개수를 리턴한다.
+	int			get_checked_items(std::deque<int>* dq = NULL);
 
 	//아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
 	//LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
@@ -507,6 +528,8 @@ public:
 	//=> SetFont()를 통해서 header의 height를 변경한다.
 	void		set_header_height(int height);
 
+	LRESULT		on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam);
+
 	//line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과
 	//(실제 사용할 이미지리스트가 있는 경우는 위 방법을 사용할 수 없다)
 	//MeasureItem을 이용하는 방법(OwnerDrawFixed only)이 있다.
@@ -526,7 +549,8 @@ public:
 	void		save_column_width(CWinApp* pApp, CString sSection);
 	CRect		get_item_rect(int item, int subItem);
 	//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
-	bool		get_index_from_point(CPoint pt, int& item, int& subItem, bool include_icon);
+	//return value : checkbox 클릭 시 LVHT_ONITEMSTATEICON, 이미지 클릭 시 LVHT_ONITEMICON, 그 외에는 LVHT_ONITEMLABEL을 리턴한다.
+	int			hit_test(CPoint pt, int& item, int& subItem, bool include_icon);
 
 	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
 	//void		set_progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }

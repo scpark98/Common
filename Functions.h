@@ -706,7 +706,46 @@ struct	NETWORK_INFO
 	// lfrf는 라인분리문자열이고 보통 "\n"이거나 "\r\n" 등이 있고
 	// separator는 ':' 이름과 값을 구분하는 구분자이다.
 	// return value : 항목의 개수
-	int			get_map_string(CString src, std::map<CString, CString>& map, CString lfrf = _T("\n"), CString separator = _T(":"));
+	int			get_map_str(CString src, std::map<CString, CString>& map, CString lfrf = _T("\n"), CString separator = _T(":"));
+
+	//list 항목들을 ','로 나열한 문자열을 리턴한다.
+	template <class T> inline CString get_list_str(std::deque<T>& list)
+	{
+		CString res;
+
+		for (size_t i = 0; i < list.size(); i++)
+		{
+			if (typeid(T) == typeid(CString))
+			{
+				if (i > 0)
+					res += _T(",");
+
+				//list가 std::deque<CString> 타입이라도 아래와 같은 문장은 오류가 발생한다.
+				//반드시 str을 선언하고 Format()을 이용하여 값을 세팅한 후 더해줘야 한다.
+				//res += list[i];	//error
+				//res += CString(list[i]);	//error
+
+				CString str;
+				str.Format(_T("%s"), list[i]);
+				res += str;
+			}
+			else if (typeid(T) == typeid(int))
+			{
+				if (i > 0)
+					res += _T(",");
+
+				CString str;
+				str.Format(_T("%d"), list[i]);
+				res += str;
+			}
+			else
+			{
+				ASSERT(FALSE); //지원하지 않는 타입
+			}
+		}
+
+		return res;
+	}
 
 	//dq항목을 하나의 문자열로 합쳐준다.
 	CString		get_concat_string(std::deque<CString> dq, CString separator = _T("|"));

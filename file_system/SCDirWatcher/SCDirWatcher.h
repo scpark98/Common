@@ -7,7 +7,7 @@
   add(), stop(), is_watching() 등을 통해 모니터링 할 수 있다.
 
 - 모니터링 중인 폴더 및 파일들의 변경 사항은 CSCDirWatcherMessage 메시지로 전달된다.
-  parent에서 ON_REGISTERED_MESSAGE(Message_CSCDirWatcher, &CASeeDlg::on_message_CSCDirWatcher) 로 수신하고 다음과 같이 처리한다.
+  parent에서 ON_REGISTERED_MESSAGE(Message_CSCDirWatcher, &CParentDlg::on_message_CSCDirWatcher) 로 수신하고 다음과 같이 처리한다.
 		CSCDirWatcherMessage* msg = (CSCDirWatcherMessage*)wParam;
 		TRACE(_T("action: %d, path0: %s, path1: %s\n"), msg->action, msg->path0, msg->path1);
 

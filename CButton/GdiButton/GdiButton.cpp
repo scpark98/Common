@@ -470,6 +470,12 @@ void CGdiButton::set_transparent(bool trans, Gdiplus::Color cr_parent_back)
 	redraw_window();
 }
 
+void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
+{
+	set_text_color(cr_text);// , cr_text, normal, gray_color(normal));
+	set_back_color(cr_back);//
+}
+
 void CGdiButton::set_text_color(Gdiplus::Color normal)
 {
 	set_text_color(normal, normal, normal, gray_color(normal));
@@ -705,7 +711,7 @@ void CGdiButton::reconstruct_font()
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	SetFont(&m_font, true);
+	//SetFont(&m_font, true);
 
 	ASSERT(bCreated);
 }
@@ -1138,15 +1144,17 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round > 0)
 			draw_round_rect(&g, CRect2GpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
-			draw_rectangle(g, rc, m_gcr_border);
+			draw_rectangle(g, rc, m_cr_border);
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
 		TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRect2GpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			//draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			//draw_round_rect(&g, CRect2GpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			g.DrawPath(&Gdiplus::Pen(m_cr_border), &roundPath);
 		else
-			draw_rectangle(g, rc, m_gcr_border);
+			draw_rectangle(g, rc, m_cr_border);
 	}
 
 
@@ -1459,17 +1467,17 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	redraw_window();
 }
 
-void CGdiButton::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	gcr_parent_back)
+void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color	gcr_parent_back)
 {
 	if (round < 0)
 		round = 0;
 
 	m_round = round;
 
-	if (gcr_border.GetValue() != Gdiplus::Color::Transparent)
+	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
-		m_gcr_border = gcr_border;
+		m_cr_border = cr_border;
 	}
 
 	if (m_round > 0)
@@ -1689,7 +1697,9 @@ void CGdiButton::draw_hover_rect(bool draw, int thick, int round, Gdiplus::Color
 {
 	m_use_hover = true;
 	m_draw_hover_rect = true;
-	m_hover_rect_color = cr;
+
+	if (cr.GetValue() != Gdiplus::Color::Transparent)
+		m_hover_rect_color = cr;
 
 	if (thick > 0)
 		m_hover_rect_thick = thick;
@@ -1715,10 +1725,12 @@ void CGdiButton::set_hover_rect_color(Gdiplus::Color cr)
 }
 
 //border
-void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr)
+void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr_border)
 {
 	m_draw_border = draw;
-	m_gcr_border = cr;
+
+	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_border = cr_border;
 
 	if (thick > 0)
 		m_border_thick = thick;

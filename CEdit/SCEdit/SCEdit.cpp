@@ -176,11 +176,11 @@ CSCEdit& CSCEdit::set_line_align(DWORD align)
 	if (align & DT_VCENTER)
 	{
 		rr.top = (rr.Height() - rtext.Height()) / 2 - 1;
-		TRACE(_T("%s vcenter\n"), text);
+		//TRACE(_T("%s vcenter\n"), text);
 	}
 	else if (align & DT_BOTTOM)
 	{
-		TRACE(_T("%s bottom\n"), text);
+		//TRACE(_T("%s bottom\n"), text);
 		//-4를 해주지 않으면 DT_TOP과 같이 표시되고 커서도 보이지 않게 되는데
 		//이는 실제 텍스트를 출력할 공간의 크기가 적어서 top에 표시하고 커서도 보이지 않게 되는 현상이므로
 		//height를 좀 더 크게 잡아주면 bottom에 맞춰 표시된다.
@@ -189,7 +189,7 @@ CSCEdit& CSCEdit::set_line_align(DWORD align)
 	else
 	{
 		rr.top = m_border_width;
-		TRACE(_T("%s top\n"), text);
+		//TRACE(_T("%s top\n"), text);
 	}
 
 	//font에 따라 약간 다르지만 top--해줘야 자연스럽다.
@@ -201,7 +201,7 @@ CSCEdit& CSCEdit::set_line_align(DWORD align)
 	rr.left += (LOWORD(margin) + m_border_width);
 	rr.right -= (HIWORD(margin) + m_border_width);
 
-	TRACE(_T("ltrl = %d, %d, %d, %d\n"), rr.left, rr.top, rr.right, rr.bottom);
+	//TRACE(_T("ltrl = %d, %d, %d, %d\n"), rr.left, rr.top, rr.right, rr.bottom);
 	SetRect(rr);
 
 	//Invalidate();

@@ -4282,7 +4282,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		sCaptionString.TrimRight();
 		//sCaptionString.MakeLower();
 
-		TRACE(_T("caption = %s, visible = %d\n"), sText, pWnd->IsWindowVisible());
+		TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
 		if (sText.IsEmpty() || !pWnd->IsWindowVisible())
 			continue;
 

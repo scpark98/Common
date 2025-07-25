@@ -592,7 +592,7 @@ void CGdiplusBitmap::resolution()
 
 	if (stride < 0)
 		stride = -stride;
-	/*
+
 	//indexed 8bpp bmp 이미지 일 경우 팔레트가 존재하는데
 	//색상이 다르게 표시되어 디버깅해보니 0번 팔레트에 들어갈 색이 40번부터 들어가 있다.
 	//40번부터 0번으로 당겨봤으나 여전히 올바른 색상으로 표시되지 않는다.
@@ -612,7 +612,7 @@ void CGdiplusBitmap::resolution()
 
 		m_pBitmap->SetPalette(m_palette);
 	}
-	*/
+
 	check_animate_gif();
 }
 

@@ -5,10 +5,11 @@
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
 //#include "../../GdiplusBitmap.h"
-#include "../../CButton/GdiButton/GdiButton.h"
-#include "../../Functions.h"
-#include "../../colors.h"
-#include "../../system/ShellImageList/ShellImageList.h"
+#include "CButton/GdiButton/GdiButton.h"
+#include "Functions.h"
+#include "colors.h"
+#include "system/ShellImageList/ShellImageList.h"
+#include "CEdit/SCEdit/SCEdit.h"
 
 /*
 * CVtListCtrlEx를 사용하기 위해 프로젝트에 추가해야 하는 소스들
@@ -641,7 +642,7 @@ protected:
 //정렬 관련
 	bool			m_allow_sort = true;
 	std::deque<int> m_column_sort_type;				//asceding or descending
-	int				m_cur_sort_column = 0;		//정렬된 컬럼 인덱스(색상 정렬은 제외)
+	int				m_cur_sort_column = 0;			//정렬된 컬럼 인덱스(색상 정렬은 제외)
 
 //컬러 관련
 	bool			m_use_alternate_back_color = false;
@@ -657,7 +658,7 @@ protected:
 	bool			m_edit_readonly = false;		//편집모드로는 들어가지만 편집해서는 안되는 데이터인 경우 set_edit_readonly(true);를 호출한다.
 	CString			m_edit_old_text;				//편집 전 텍스트
 	CString			m_edit_new_text;				//편집 후 텍스트
-	CEdit*			m_pEdit = NULL;
+	CSCEdit*		m_pEdit = NULL;
 	long			m_last_clicked_time = 0;		//one_click으로 편집모드 진입 시 마지막 클릭 시각
 	int				m_last_clicked_index = -1;		//one_click으로 편집모드 진입 시 마지막 클릭 인덱스
 

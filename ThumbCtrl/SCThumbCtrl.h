@@ -297,6 +297,7 @@ protected:
 
 //로딩 관련
 	bool			m_loading_completed = false;
+	int				m_loading_completed_count = 0;
 	CThreadManager	m_thread;
 	long			m_tloading_start = 0;
 	long			m_tloading_end = 0;

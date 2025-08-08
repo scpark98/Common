@@ -195,13 +195,63 @@ bool CGdiplusBitmap::load(CString file)
 	//단점은 animatedGif 파일일 경우 그와 관련된 정보를 얻을 수 없다.
 	//deep_copy()함수로도 모든 정보가 복사되진 않는다.
 	//우선은 gif인 경우만 직접 열고 그 외의 포맷은 copy방식으로 열도록 한다.
+	//무엇보다 palette를 가진 indexed image인 경우는 copy방식으로 열면 팔레트 정보 또한 사라진다.
+	//반드시 copy방식의 장점을 살리고자 한다면 직접 열고 palette 정보를 추출한 후 copy방식으로 열어야 하지만
+	//우선은 copy방식을 사용하지 않도록 한다.
 	//(이 규칙은 외부 파일 로딩일 경우에만 해당됨)
-	bool use_copied_open = true;
 
-	if (get_part(file, fn_ext).MakeLower() == _T("gif"))
+	//수정 방향
+	/*
+	* 1. 복사방식이 아닌 직접 파일을 연다.
+	* 2. !gif이고 8bit indexed이면 m_palette를 추출한 후 다시 복사 방식으로 열고 SetPalette(m_palette)해준다.
+	* 이렇게 처리해야 파일 삭제, 이름변경 등이 가능하다.
+	*/
+	m_pBitmap = Gdiplus::Bitmap::FromFile(file);
+	int palSize = m_pBitmap->GetPaletteSize();
+	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
+
+	if (get_part(file, fn_ext).MakeLower() != _T("gif"))
 	{
-		use_copied_open = false;
+		Gdiplus::ColorPalette* palette = NULL;
+
+		if (pf == PixelFormat8bppIndexed)
+		{
+			get_palette();
+	
+			palette = (Gdiplus::ColorPalette*)malloc(palSize);
+			memcpy(palette, m_palette, palSize);
+			free(m_palette);
+			m_palette = NULL;
+		}
+
+		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(file);
+		if (temp.m_pBitmap)
+			temp.deep_copy(this);
+
+		if (pf == PixelFormat8bppIndexed)
+		{
+			m_palette = (Gdiplus::ColorPalette*)malloc(palSize);
+			memcpy(m_palette, palette, palSize);
+			m_pBitmap->SetPalette(m_palette);
+			free(palette);
+		}
 	}
+
+	m_filename = file;
+	resolution();
+
+	if (width == 0 || height == 0)
+		return false;
+
+	return true;
+
+	/*
+	bool use_copied_open = false;
+
+	//if (get_part(file, fn_ext).MakeLower() == _T("gif"))
+	//{
+	//	use_copied_open = false;
+	//}
 
 #ifdef UNICODE
 	if (use_copied_open)
@@ -238,11 +288,11 @@ bool CGdiplusBitmap::load(CString file)
 		if (width == 0 || height == 0)
 			return false;
 
-		m_filename = file;
 		return true;
 	}
 
 	return false;
+	*/
 }
 
 //png일 경우는 sType을 생략할 수 있다.
@@ -315,6 +365,14 @@ bool CGdiplusBitmap::load_icon(UINT id, int size)
 
 	save(_T("d:\\ico.png"));
 	return true;
+}
+
+CString CGdiplusBitmap::get_filename(bool fullpath)
+{
+	if (!fullpath)
+		return get_part(m_filename, fn_name);
+
+	return m_filename;
 }
 
 Gdiplus::Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
@@ -507,6 +565,8 @@ CGdiplusBitmap::~CGdiplusBitmap()
 
 void CGdiplusBitmap::release()
 {
+	m_palette_adjusted = false;
+
 	if (this == NULL || m_pBitmap == NULL || m_referenced_variable)
 		return;
 
@@ -596,29 +656,40 @@ void CGdiplusBitmap::resolution()
 	//indexed 8bpp bmp 이미지 일 경우 팔레트가 존재하는데
 	//색상이 다르게 표시되어 디버깅해보니 0번 팔레트에 들어갈 색이 40번부터 들어가 있다.
 	//40번부터 0번으로 당겨봤으나 여전히 올바른 색상으로 표시되지 않는다.
-	TRACE(_T("%s\n"), get_pixel_format_str());
-	if (m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed)
+	//원인 : load()에서 copied open을 사용함으로써 팔레트 정보가 손실된 것이 원인임.
+#if 0
+	//TRACE(_T("%s\n"), get_pixel_format_str());
+	if ((m_pBitmap->GetPixelFormat() == PixelFormat8bppIndexed) && !m_palette_adjusted)
 	{
 		get_palette();
-
+		/*
 		for (int i = 0; i < m_palette->Count; i++)
 		{
 			if (i <= 215)
 				m_palette->Entries[i] = m_palette->Entries[i + 40];
 			else
 				m_palette->Entries[i] = m_palette->Entries[i - 216];
+
+			Gdiplus::ARGB argb = m_palette->Entries[i];
+			TRACE(_T("new palette[%d] = %d, %d, %d, %d\n"), i, (argb >> 24 & 0xFF), (argb >> 16 & 0xFF), (argb >> 8 & 0xFF), (argb & 0xFF));
+
+			//256 gray scale로 팔레트 설정 테스트 코드
 			//m_palette->Entries[i] = Gdiplus::Color::MakeARGB((BYTE)255, i, i, i);
 		}
 
 		m_pBitmap->SetPalette(m_palette);
+		*/
+		m_palette_adjusted = true;
 	}
-
+#endif
 	check_animate_gif();
 }
 
 bool CGdiplusBitmap::get_raw_data()
 {
 	SAFE_DELETE_ARRAY(data);
+	
+	//int nw = MAKE_MULTIPLY_UP(width, 4);
 
 	Gdiplus::Rect rect(0, 0, width, height); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
@@ -2243,15 +2314,17 @@ bool CGdiplusBitmap::get_palette()
 
 	int palSize = m_pBitmap->GetPaletteSize();
 	m_palette = (Gdiplus::ColorPalette*)malloc(palSize);
-	m_pBitmap->GetPalette(m_palette, palSize);
+	memset(m_palette, 0, palSize);
+	Gdiplus::Status status = m_pBitmap->GetPalette(m_palette, palSize);
 	
-	Gdiplus::Color cr;
+	//for (int i = 0; i < m_palette->Count; i++)
+	//{
+	//	Gdiplus::ARGB argb = m_palette->Entries[i];
+	//	TRACE(_T("palette[%d] = %d, %d, %d, %d\n"), i, (argb >> 24 & 0xFF), (argb >> 16 & 0xFF), (argb >> 8 & 0xFF), (argb & 0xFF));
+	//}
 
-	for (int i = 0; i < m_palette->Count; i++)
-	{
-		cr = Gdiplus::Color(m_palette->Entries[i]);
-		TRACE(_T("palette[%d] = %d, %d, %d, %d\n"), i, cr.GetA(), cr.GetR(), cr.GetG(), cr.GetB());
-	}
+	//m_pBitmap->UnlockBits(&bitmapData);
+
 	return true;
 }
 
@@ -3190,7 +3263,6 @@ CRect CGdiplusBitmap::get_transparent_rect()
 }
 
 //data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
-//단, indexed 8bit 이미지에 대한 처리는 아직 구현되지 않음.
 Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 {
 	//data가 불려지지 않은 상태에서 get_pixel()이 호출되면 raw_data를 추출한다.
@@ -3207,7 +3279,9 @@ Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 			if (m_palette == NULL)
 				get_palette();
 
-			int pal_index = *(data + y * width * channel + x * channel);
+			//width가 4의 배수가 아닐 경우 4의 배수로 로드되므로 width보다 큰 4의 배수로 pal_index를 구해야한다.
+			int nw = MAKE_MULTIPLY_UP(width, 4);
+			int pal_index = *(data + y * nw * channel + x * channel);
 			TRACE(_T("pal_index = %d\n"), pal_index);
 			return m_palette->Entries[pal_index];
 		}

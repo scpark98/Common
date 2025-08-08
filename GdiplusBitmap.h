@@ -161,6 +161,8 @@ public:
 	bool			load(UINT id);
 	bool			load_icon(UINT id, int size = 32);
 
+	CString			get_filename(bool fullpath = true);
+
 	//animated gif를 load한 경우 재생을 CGdiplusBitmap에서 자체적으로 하느냐(기본값),
 	//load하는 메인 클래스에서 직접 thread로 재생하느냐를 설정
 	//일반적으로는 특정 dlg에서 gif를 로딩하여 CGdiplusBitmap 자체에서 바로 재생하도록 하면 편하지만
@@ -185,7 +187,8 @@ public:
 //palette
 	Gdiplus::ColorPalette* m_palette = NULL;
 	bool			get_palette();
-
+	//8bit indexed 이미지의 팔레트 보정 여부. 최초 로딩 후 1회만 해야 한다.
+	bool			m_palette_adjusted = false;
 
 	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
 	bool			is_empty();

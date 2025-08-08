@@ -9,9 +9,8 @@
 
 #include <locale>
 
-#include "../../colors.h"
-#include "../../MemoryDC.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "colors.h"
+#include "MemoryDC.h"
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -251,6 +250,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//TRACE(_T("is_show_selection_always = %d\n"), is_show_selection_always);
 	bool		is_selected = (GetItemState(iItem, LVIS_SELECTED) & LVIS_SELECTED);
 	bool		is_drophilited = GetItemState(iItem, LVIS_DROPHILITED);
+	bool		is_full_row_selection = (GetExtendedStyle() & LVS_EX_FULLROWSELECT);
+
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
 	//Gdiplus::Graphics	g(pDC->m_hDC);
@@ -278,6 +279,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//1번 컬럼부터는 해당 셀의 사각형 영역만을 리턴한다.
 			//itemRect = get_item_rect(iItem, iSubItem);
 			itemRect.right = itemRect.left + GetColumnWidth(0);
+		}
+		//0번 컬럼만 선택상태로 표시한다.
+		else if (!is_full_row_selection)
+		{
+			is_selected = false;
 		}
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
@@ -1454,7 +1460,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		}
 		case VK_SPACE:
 		{
-			if (!m_use_virtual_list)
+			if (!m_use_virtual_list || m_in_editing)
 				break;
 
 			if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
@@ -1548,7 +1554,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 								return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
 							}
 							return false;
-		/*
+			/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
 		case VK_DELETE	:	if (m_bInEditing)
 								return false;
@@ -1772,7 +1778,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CSCEdit;
-		m_pEdit->Create(dwStyle | WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL /* | ES_MULTILINE*/, r, this, IDC_EDIT_CELL);
+		m_pEdit->Create(dwStyle | WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, IDC_EDIT_CELL);
 	}
 
 	//ES_MULTILINE, ES_LEFT, ES_CENTER, ES_RIGHT 등은 동적변경이 불가능한 스타일이므로
@@ -1782,6 +1788,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	m_pEdit->SetRect(&r);
 	m_pEdit->SetFont(&m_font, true);
 	m_pEdit->SetWindowText(m_edit_old_text);
+	m_pEdit->set_line_align(DT_VCENTER);
 
 	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetSel(0, -1);

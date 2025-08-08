@@ -22,6 +22,7 @@
 #pragma once
 #include "afxdialogex.h"
 
+#include <mutex>
 #include "../../GdiplusBitmap.h"
 #include "../../ThumbCtrl/SCThumbCtrl.h"
 #include "../../CStatic/SCStatic/SCStatic.h"
@@ -63,10 +64,6 @@ public:
 	CSCImageDlg(CWnd* parent = nullptr);   // 표준 생성자입니다.
 	virtual ~CSCImageDlg();
 
-	//원칙적으로는 protected 멤버변수로 선언해야 하나 CGdiplusBitmap의 method를 이용할 경우
-	//CSCImageDlg에도 매번 관련 멤버함수를 추가해야 하는 번거로움이 있다.
-	CGdiplusBitmap	m_img;
-
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
 	enum ENUM_VIEW_MODE
@@ -75,7 +72,7 @@ public:
 		view_mode_image,
 		view_mode_thumb,
 	};
-	void			set_view_mode(int view_mode);
+	void			set_view_mode(int view_mode = view_mode_toggle);
 
 	bool			m_show_thumb = false;
 	CSCThumbCtrl	m_thumb;
@@ -83,8 +80,10 @@ public:
 
 	enum ENUM_CSCImageDlgMessage
 	{
-		message_image_loaded = 0,
-		message_load_image,
+		message_image_changed = 0,	//현재 표시되는 이미지가 변경된 경우
+		message_hide_message,
+		message_first_image,		//맨 처음 이미지 표시 중 이전 이미지를 표시하려 한 경우
+		message_last_image,			
 	};
 
 	//레지스트리에 저장된 recent file 정보가 있다면 로딩한다.
@@ -99,11 +98,33 @@ public:
 	//png일 경우는 sType을 생략할 수 있다.
 	bool			load(UINT id);
 
-	CString			get_filename() { return m_filename; }
-	void			set_filename(CString filename);
+	CString			get_filename(bool fullpath = true);
 
 	void			release();
 
+	std::deque<CString> m_files;
+	int				m_index;
+	void			display_image(int index, bool scan_folder = false);
+	void			display_image(CString filepath, bool scan_folder = false);
+	//index = 0 (goto first image), index = -1 (goto last image)
+	void			goto_index(int index);
+	int				get_image_count() { return m_files.size(); }
+	int				get_cur_index() { return m_index; }
+
+	void			save(CString filepath);
+
+	//현재 파일을 비롯해서 폴더를 다시 검사한다.
+	void			reload_image();
+
+//슬라이드 쇼 관련
+	bool			m_slide_show = false;
+	bool			m_slide_show_repeat = false;
+	//단위 = 초
+	int				m_slide_show_interval = 3;
+	//start : 1(start), 0(stop), -1(toggle)
+	void			start_slide_show(int start = 1);
+
+	CSize			get_img_size();
 	bool			get_show_info() { return m_show_info; }
 	void			set_show_info(bool show);
 	void			set_alt_info(CString alt_info) { m_alt_info = alt_info; Invalidate(); }
@@ -124,7 +145,7 @@ public:
 	void			zoom(double ratio);
 	double			get_zoom_ratio() { return m_zoom; }
 
-	void			rotate(Gdiplus::RotateFlipType type) { m_img.rotate(type); Invalidate(); }
+	void			rotate(Gdiplus::RotateFlipType type);
 
 	//true일 경우 이 컨트롤의 크기에 맞춰서 이미지를 stretch한다.
 	void			fit2ctrl(bool fit);
@@ -135,6 +156,7 @@ public:
 	CPoint			get_offset() { return m_offset; }
 	void			set_offset(int offset_x, int offset_y) { m_offset = CPoint(offset_x, offset_y); };
 	int				get_offset_size() { return m_offset_size; }
+	void			scroll(int offset_x, int offset_y);
 
 	//dropper(spuit) cursor 지정
 	void			set_dropper_cursor(UINT nID);
@@ -157,8 +179,31 @@ public:
 
 
 protected:
+	enum TIMER_ID
+	{
+		timer_slide_show = 0,
+		timer_thread_buffering,
+	};
+
+	std::mutex		m_mutex;
+
+	//n개의 이미지를 버퍼링하기 위해 deque로 생성(-2, -1, 0, 1, 2)
+	//0이 cur? n개 미만인 경우는 어떻게 저장할 지, 어떤 index가 현재 표시중인 이미지인지 정하기 애매해진다.
+	//대개 image viewer는 순방향 또는 역방향으로 계속 보는 편이 많으므로
+	//아래와 같이 forward/backward가 전환되면 순방향, 역방향의 이미지들을 버퍼링하는 방식으로 한다.
+	//forward면 0(cur), 1, 2, 3, 4
+	//backward면 0(cur), -1, -2, -3, -4
+	//이미지만 미리 버퍼링 해 놓을 경우 표시는 빨라지지만 그 이미지 파일명, 파일속성등은? m_files에서 해당 파일 인덱스를 찾아서 처리해도 될 듯함.
+	std::deque<CGdiplusBitmap>	m_img;
+	int				m_buffer_max = 5;
+	bool			m_is_forward = true;
+
+	bool			m_thread_buffering = false;
+	void			thread_buffering();
+
 	CWnd*			m_parent = NULL;
-	CString			m_filename;
+	CString			m_filename;						//실제 파일경로 또는 클립보드에서 또는 리소스 이미지인지에 따라 저장되는 문자열이 다르다.
+	//bool			m_image_from_clipboard = false;	//클립보드에서 붙여넣은 이미지인지(파일명 표시 목적)
 	CRect			m_r_display;
 	
 	HCURSOR			m_cursor_dropper;
@@ -239,4 +284,5 @@ public:
 	afx_msg void OnMouseLeave();
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

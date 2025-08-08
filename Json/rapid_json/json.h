@@ -108,6 +108,17 @@ public:
 		if (!doc.HasMember(member))
 			return default_value;
 
+		if constexpr (std::is_same_v<T, CString>)
+			return doc[member].GetCString();
+		else if constexpr (std::is_same_v<T, std::string>)
+			return doc[member].GetString();
+		else if constexpr (std::is_same_v<T, bool>)
+			return doc[member].GetBool();
+		else if constexpr (std::is_same_v<T, int>)
+			return doc[member].GetInt();
+		else if constexpr (std::is_same_v<T, double>)
+			return doc[member].GetDouble();
+		/*
 		switch (doc[member].GetType())
 		{
 			//case rapidjson::kStringType:
@@ -123,7 +134,7 @@ public:
 				return (T)doc[member].GetInt();
 			}
 		}
-		
+		*/
 		/*
 		if (typeid(T) == typeid(int))
 			return doc[member].GetInt();

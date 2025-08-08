@@ -457,7 +457,7 @@ void CSCThumbCtrl::loading_function(int idx, int start, int end)
 		str.Format(_T("%d job started..."), start);
 	else
 		str.Format(_T("%d ~ %d job started..."), start, end - 1);
-	TRACE(_T("%s\n"), str);
+	//TRACE(_T("%s\n"), str);
 
 	for (i = start; i < end; i++)
 	{
@@ -465,16 +465,23 @@ void CSCThumbCtrl::loading_function(int idx, int start, int end)
 			break;
 
 		pThisWnd->insert(i, pThisWnd->m_files[i], get_part(pThisWnd->m_files[i], fn_name), false, false);
-		trace(i);
+		//trace(i);
+
+		mtx.lock();
+		pThisWnd->m_loading_completed_count ++;
+		trace(pThisWnd->m_loading_completed_count);
+		mtx.unlock();
 	}
 
 	if ((end - start) == 1)
 		str.Format(_T("job completed : %d"), start);
 	else
 		str.Format(_T("job completed : %d ~ %d"), start, end - 1);
-	TRACE(_T("%s\n"), str);
+	//TRACE(_T("%s\n"), str);
 
 	mtx.lock();
+	//pThisWnd->m_loading_completed_count += (end - start);
+	//trace(pThisWnd->m_loading_completed_count);
 	pThisWnd->m_thread.set_thread_completed(idx);
 	mtx.unlock();
 }
@@ -502,6 +509,7 @@ void CSCThumbCtrl::set_path(CString path)
 
 	m_files.clear();
 	m_files = find_all_files(path, _T(""), FILE_EXTENSION_IMAGE, _T(""), false);
+	//find_all_files(path, &m_files, FILE_EXTENSION_IMAGE);
 
 	add_files(m_files);
 }
@@ -536,6 +544,7 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 	m_thumb.resize(m_files.size());
 
+	m_loading_completed_count = 0;
 	m_thread.job(m_files.size(), loading_function, loading_completed_callback);
 
 	Invalidate();
@@ -593,6 +602,19 @@ BOOL CSCThumbCtrl::PreTranslateMessage(MSG* pMsg)
 				{
 					edit_end(true);
 					return TRUE;
+				}
+				else
+				{
+					//thumb가 선택된 상태에서 enter키를 누르면 parent에서 해당 이미지를 보여주는 등의 액션을 처리한다.
+					//이미지를 보여주든 다른 액션을 취하든 그 액션은 parent에서 처리하는 것이 맞다.
+					//enter or dbclick은 동일한 동작으로 처리한다.
+					if (m_selected.size())
+					{
+						//dbclick 했을때의 액션은 parent에서 처리한다.
+						::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_dbclicked, m_selected[0]), 0);
+						return true;
+					}
 				}
 				return false;
 			}

@@ -372,14 +372,19 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	GetWindowRect(rc);
 	POINT ptSrc = { 0, 0 };
 	POINT ptWinPos = { rc.left, rc.top };
-	SIZE sz = { img->GetWidth(), img->GetHeight() };
+	SIZE sz;
 	BLENDFUNCTION stBlend = { AC_SRC_OVER, 0, m_alpha, AC_SRC_ALPHA };
 
-	if (img->GetWidth() == 0 || img->GetHeight() == 0)
-	{
-		TRACE(_T("image width or height is invalid. m_alpha = %d\n"), m_alpha);
-		return;
-	}
+	if (img == NULL)
+		sz = CSize(1, 1);
+	else
+		sz = CSize(img->GetWidth(), img->GetHeight());
+
+	//if (img->GetWidth() == 0 || img->GetHeight() == 0)
+	//{
+	//	TRACE(_T("image width or height is invalid. m_alpha = %d\n"), m_alpha);
+	//	return;
+	//}
 
 	HDC hDC = ::GetDC(m_hWnd);
 	HDC hdcMemory = ::CreateCompatibleDC(hDC);
@@ -401,7 +406,7 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 		return;
 	//ASSERT(hbmpMem != NULL);
 
-	memset(pvBits, 0, sz.cx * 4 * sz.cy);
+	memset(pvBits, 0, sz.cx * sz.cy * 4);
 	if (hbmpMem)
 	{
 		HGDIOBJ hbmpOld = ::SelectObject(hdcMemory, hbmpMem);
@@ -411,7 +416,7 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 		g.SetPageUnit(Gdiplus::UnitPixel);
 		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
-		g.DrawImage(img, 0, 0, sz.cx - 1, sz.cy - 1);
+		g.DrawImage(img, 0, 0, sz.cx, sz.cy);
 		//Draw customized figures
 		//g.DrawRectangle(&Pen(Color(255, 255, 0, 0), 1.0f), Gdiplus::Rect(0, 0, sz.cx - 1, sz.cy - 1));
 

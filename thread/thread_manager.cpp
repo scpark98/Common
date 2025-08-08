@@ -65,7 +65,7 @@ void CThreadManager::job(int count, ThreadJobFunc thread_func, ThreadEndFunc end
 		}
 	}
 
-	TRACE(_T("%d threads start...\n"), thread_num);
+	//TRACE(_T("%d threads start...\n"), thread_num);
 
 	m_thread_completed.resize(thread_num);
 

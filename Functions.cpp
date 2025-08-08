@@ -829,15 +829,16 @@ int	GetFileTypeFromExtension(CString sExt)
 {
 	sExt.MakeLower();
 
-	if (is_exist_keyword(sExt, FILE_EXTENSION_VIDEO))
+	//대소문자는 구분하지 않으나 whole word로 비교해야 한다.
+	if (is_exist_keyword(sExt, FILE_EXTENSION_VIDEO, false, true))
 		return FILE_TYPE_VIDEO;
 	else if (is_exist_keyword(sExt, _T("bin")))
 		return FILE_TYPE_VIDEO_BIN;
-	else if (is_exist_keyword(sExt, FILE_EXTENSION_IMAGE))
+	else if (is_exist_keyword(sExt, FILE_EXTENSION_IMAGE, false, true))
 		return FILE_TYPE_IMAGE;
-	else if (is_exist_keyword(sExt, FILE_EXTENSION_SOUND))
+	else if (is_exist_keyword(sExt, FILE_EXTENSION_SOUND, false, true))
 		return FILE_TYPE_SOUND;
-	else if (is_exist_keyword(sExt, FILE_EXTENSION_SUBTITLE))
+	else if (is_exist_keyword(sExt, FILE_EXTENSION_SUBTITLE, false, true))
 		return FILE_TYPE_SUBTITLE;
 	else
 		return FILE_TYPE_UNKNOWN;
@@ -3615,7 +3616,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 	bmpInfo.bmiHeader.biClrImportant  = 0;
 
 	// Set a default window size.
-	bmpInfo.bmiHeader.biWidth			= MAKE_MULTIPLY_U(w, 4);
+	bmpInfo.bmiHeader.biWidth			= MAKE_MULTIPLY_UP(w, 4);
 	bmpInfo.bmiHeader.biHeight			= -h;
 	bmpInfo.bmiHeader.biBitCount		= 8 * ch;
 	bmpInfo.bmiHeader.biSizeImage		= sizeof(BYTE) * w * h * ch;
@@ -12221,7 +12222,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	}
 
 	int nw = rct.Width();
-	nw = MAKE_MULTIPLY_U(nw, 4);
+	nw = MAKE_MULTIPLY_UP(nw, 4);
 	rct.right = rct.left + nw;
 
 	HBITMAP hBitmap = NULL;
@@ -12613,25 +12614,6 @@ void RGB2HSL(int R, int G, int B, int& h, int& s, int& l)
 	s = rs;
 	v = rv;
 */
-}
-
-double GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default_value)
-{
-	CString sDefault;
-	CString sValue;
-
-	sDefault.Format(_T("%f"), default_value);
-	sValue = pApp->GetProfileString(lpszSection, lpszEntry, sDefault);
-
-	return _tstof(sValue);
-}
-
-bool WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value)
-{
-	CString sValue;
-
-	sValue.Format(_T("%f"), value);
-	return pApp->WriteProfileString(lpszSection, lpszEntry, sValue);
 }
 
 /*
@@ -15428,10 +15410,14 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	if (sSubSection != "")
 		sSection = sSubSection + "\\screen";	//슬래시가 아닌 역슬래시를 써야 한다.
 
+#if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
+	rc = get_profile_value(sSection, _T("position"), CRect());
+#else
 	rc.left		= pApp->GetProfileInt(sSection, _T("left"), 0);
 	rc.top		= pApp->GetProfileInt(sSection, _T("top"), 0);
 	rc.right	= pApp->GetProfileInt(sSection, _T("right"), 0);
 	rc.bottom	= pApp->GetProfileInt(sSection, _T("bottom"), 0);
+#endif
 
 	if (rc.IsRectNull())
 	{
@@ -15488,10 +15474,14 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 	
 	if (!(pWnd->IsZoomed()) && !(pWnd->IsIconic()))
 	{
+#if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
+		write_profile_value(pApp, sSection, _T("position"), rc);
+#else
 		pApp->WriteProfileInt(sSection, _T("left"), rc.left);
 		pApp->WriteProfileInt(sSection, _T("top"), rc.top);
 		pApp->WriteProfileInt(sSection, _T("right"), rc.right);
 		pApp->WriteProfileInt(sSection, _T("bottom"), rc.bottom);
+#endif
 	}
 }
 

@@ -260,9 +260,9 @@ enum RATIO_RECT_ATTACH
 #endif
 
 //num보다 큰 n의 배수로 만들어준다.	//old : MAKE4WIDTH_D()도 MAKE_MULTIPLY_U()를 이용할 것!
-#define		MAKE_MULTIPLY_U(num, n)		(((num) + ((n)-1)) & ~((n)-1))
+#define		MAKE_MULTIPLY_UP(num, n)		(((num) + ((n)-1)) & ~((n)-1))
 //num보다 작은 n의 배수로 만들어준다.
-#define		MAKE_MULTIPLY_D(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))
+#define		MAKE_MULTIPLY_DOWN(num, n)		(((num) - ((n)-1)) & ~((n)-1) | (n))
 
 extern		int			g_nDaysOfMonth[12];
 
@@ -1459,8 +1459,95 @@ struct	NETWORK_INFO
 	bool		set_windows_visual_effects();
 
 
-	double		GetProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double default_value);
-	bool		WriteProfileDouble(CWinApp* pApp, LPCTSTR lpszSection, LPCTSTR lpszEntry, double value);
+	double		GetProfileDouble(CWinApp* pApp, CString section, CString entry, double default_value);
+	bool		WriteProfileDouble(CWinApp* pApp, CString section, CString entry, double value);
+
+//#if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
+	//프로젝트 속성에서 std:c++14를 선택하고 빌드하면 'if constexpr'은 C++17 언어 확장입니다.'라는 warning이 발생하는데
+	//실제 사용코드를 돌려보면 정상적으로 동작한다.
+	template <class T> inline T get_profile_value(CString section, CString entry, T default_value)
+	{
+		CWinApp* pApp = AfxGetApp();
+
+		if constexpr (std::is_same_v<T, int>)
+		//if (typeid(T) == typeid(int))			//compile error. C++17 이전 버전에서는 if constexpr를 사용할 수 없으므로 typeid로 타입을 검사한다.
+		//if (std::is_integral<T>)				//compile error.
+		//if (std::is_same_v<decltype(default_value), int>)		//compile error.
+		{
+			return pApp->GetProfileInt(section, entry, default_value);
+		}
+		else if constexpr (std::is_same_v<T, float>)
+		{
+			return pApp->GetProfileInt(section, entry, default_value);
+		}
+		else if constexpr (std::is_same_v<T, double>)
+		{
+			double* d;
+			double res;
+			UINT size = sizeof(double);
+			pApp->GetProfileBinary(section, entry, reinterpret_cast<LPBYTE*>(&d), &size);
+
+			if (d == NULL || size != sizeof(double))
+				res = default_value;
+			else
+				res = *d;
+
+			delete d;
+			return res;
+		}
+		else if constexpr (std::is_same_v<T, CString>)
+		{
+			return pApp->GetProfileString(section, entry, default_value);
+		}
+		else if constexpr (std::is_same_v<T, CRect>)
+		{
+			CRect* r;
+			CRect res;
+			UINT size = sizeof(CRect);
+			pApp->GetProfileBinary(section, entry, reinterpret_cast<LPBYTE*>(&r), &size);
+
+			if (r == NULL || size != sizeof(CRect))
+				res = default_value;
+			else
+				res = *r;
+
+			delete r;
+			return res;
+		}
+	}
+
+
+	template <class T> inline void write_profile_value(CWinApp* pApp, CString section, CString entry, T value)
+	{
+		CString str;
+
+		if constexpr (std::is_same_v<T, int>)	//if constexpr은 C++17부터 지원되는 기능으로 T의 타입이 결정된 시점에 따라 분기처리할 수 있다.
+		//if (typeid(T) == typeid(int))			//T의 타입이 int가 아닐 경우는 컴파일 에러 발생. 그러나 get_list_str(std::deque<T>& list)에서는 에러로 처리되지 않는점이 이상하다.
+		{
+			pApp->WriteProfileInt(section, entry, value);
+		}
+		else if constexpr (std::is_same_v<T, float>)
+		{
+			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(float));
+		}
+		else if constexpr (std::is_same_v<T, double>)
+		{
+			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(double));
+		}
+		else if constexpr (std::is_same_v<T, CString>)
+		{
+			pApp->WriteProfileString(section, entry, value);
+		}
+		else if constexpr (std::is_same_v<T, CRect>)
+		{
+			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(CRect));
+		}
+		else
+		{
+			static_assert(false, "Unsupported type for write_profile_value");
+		}
+	}
+//#endif
 
 	//int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
 

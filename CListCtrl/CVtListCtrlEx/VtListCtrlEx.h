@@ -5,11 +5,11 @@
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
 //#include "../../GdiplusBitmap.h"
-#include "CButton/GdiButton/GdiButton.h"
-#include "Functions.h"
-#include "colors.h"
-#include "system/ShellImageList/ShellImageList.h"
-#include "CEdit/SCEdit/SCEdit.h"
+#include "../../CButton/GdiButton/GdiButton.h"
+#include "../../Functions.h"
+#include "../../colors.h"
+#include "../../system/ShellImageList/ShellImageList.h"
+#include "../../CEdit/SCEdit/SCEdit.h"
 
 /*
 * CVtListCtrlEx를 사용하기 위해 프로젝트에 추가해야 하는 소스들

@@ -825,20 +825,20 @@ int	GetFileTypeFromFilename(CString filename)
 	return GetFileTypeFromExtension(get_part(filename, fn_ext));
 }
 
-int	GetFileTypeFromExtension(CString sExt)
+int	GetFileTypeFromExtension(CString ext)
 {
-	sExt.MakeLower();
+	ext.MakeLower();
 
 	//대소문자는 구분하지 않으나 whole word로 비교해야 한다.
-	if (is_exist_keyword(sExt, FILE_EXTENSION_VIDEO, false, true))
+	if (is_exist_keyword(ext, FILE_EXTENSION_VIDEO, false, true))
 		return FILE_TYPE_VIDEO;
-	else if (is_exist_keyword(sExt, _T("bin")))
+	else if (is_exist_keyword(ext, _T("bin")))
 		return FILE_TYPE_VIDEO_BIN;
-	else if (is_exist_keyword(sExt, FILE_EXTENSION_IMAGE, false, true))
+	else if (is_exist_keyword(ext, FILE_EXTENSION_IMAGE, false, true))
 		return FILE_TYPE_IMAGE;
-	else if (is_exist_keyword(sExt, FILE_EXTENSION_SOUND, false, true))
+	else if (is_exist_keyword(ext, FILE_EXTENSION_SOUND, false, true))
 		return FILE_TYPE_SOUND;
-	else if (is_exist_keyword(sExt, FILE_EXTENSION_SUBTITLE, false, true))
+	else if (is_exist_keyword(ext, FILE_EXTENSION_SUBTITLE, false, true))
 		return FILE_TYPE_SUBTITLE;
 	else
 		return FILE_TYPE_UNKNOWN;

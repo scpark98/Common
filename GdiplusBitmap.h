@@ -153,13 +153,14 @@ public:
 
 	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
 	//외부 이미지 파일 로딩
-	bool			load(CString sFile);
+	bool			load(CString sfile);
 	//다음 예시와 같이 리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
 	//m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
 	bool			load(CString sType, UINT id);
 	//png일 경우는 sType을 생략할 수 있다.
 	bool			load(UINT id);
 	bool			load_icon(UINT id, int size = 32);
+	bool			load_webp(CString sfile);
 
 	CString			get_filename(bool fullpath = true);
 

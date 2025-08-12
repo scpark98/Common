@@ -202,7 +202,7 @@ enum Colors
 	darkred = 0x0000008b,
 	brown = 0x002a2aa5,
 	firebrick = 0x002222b2,
-	indianre = 0x005c5ccd,
+	indianred = 0x005c5ccd,
 	rosybrown = 0x008f8fbc,
 	darksalmon = 0x007a96e9,
 	lightcoral = 0x008080f0,

@@ -1462,7 +1462,7 @@ struct	NETWORK_INFO
 	double		GetProfileDouble(CWinApp* pApp, CString section, CString entry, double default_value);
 	bool		WriteProfileDouble(CWinApp* pApp, CString section, CString entry, double value);
 
-//#if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
+#if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
 	//프로젝트 속성에서 std:c++14를 선택하고 빌드하면 'if constexpr'은 C++17 언어 확장입니다.'라는 warning이 발생하는데
 	//실제 사용코드를 돌려보면 정상적으로 동작한다.
 	template <class T> inline T get_profile_value(CString section, CString entry, T default_value)
@@ -1517,8 +1517,10 @@ struct	NETWORK_INFO
 	}
 
 
-	template <class T> inline void write_profile_value(CWinApp* pApp, CString section, CString entry, T value)
+	template <class T> inline void write_profile_value(CString section, CString entry, T value)
 	{
+		CWinApp* pApp = AfxGetApp();
+
 		CString str;
 
 		if constexpr (std::is_same_v<T, int>)	//if constexpr은 C++17부터 지원되는 기능으로 T의 타입이 결정된 시점에 따라 분기처리할 수 있다.
@@ -1547,7 +1549,7 @@ struct	NETWORK_INFO
 			static_assert(false, "Unsupported type for write_profile_value");
 		}
 	}
-//#endif
+#endif
 
 	//int			GetSystemImageListIcon(CString szFile, BOOL bDrive);
 

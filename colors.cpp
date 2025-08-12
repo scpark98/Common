@@ -1,5 +1,4 @@
 #include "colors.h"
-
 #include "Functions.h"
 
 static CSCColorList init_color_list_dummy;

@@ -589,7 +589,9 @@ public:
 	bool			m_auto_scroll = true;
 	bool			m_show_auto_scroll_button = false;
 	void			show_auto_scroll_button(bool show = true);
-	void			set_auto_scroll(bool auto_scroll);
+	bool			get_auto_scroll() { return m_auto_scroll; }
+	//0:auto scroll off, 1:auto scroll on, -1:toggle auto scroll
+	void			set_auto_scroll(int auto_scroll);
 	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
 
 	//리스트 항목들을 무작위로 섞는다.

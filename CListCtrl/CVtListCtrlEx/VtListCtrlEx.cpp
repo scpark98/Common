@@ -5064,9 +5064,12 @@ void CVtListCtrlEx::show_auto_scroll_button(bool show)
 	}
 }
 
-void CVtListCtrlEx::set_auto_scroll(bool auto_scroll)
+void CVtListCtrlEx::set_auto_scroll(int auto_scroll)
 {
-	m_auto_scroll = auto_scroll;
+	if (auto_scroll == -1)
+		m_auto_scroll = !m_auto_scroll;
+	else
+		m_auto_scroll = auto_scroll;
 
 	if (m_button_scroll_to_end)
 		m_button_scroll_to_end->ShowWindow(m_auto_scroll ? SW_HIDE: SW_SHOW);

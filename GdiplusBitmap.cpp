@@ -210,7 +210,13 @@ bool CGdiplusBitmap::load(CString file)
 	int palSize = m_pBitmap->GetPaletteSize();
 	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
 
-	if (get_part(file, fn_ext).MakeLower() != _T("gif"))
+	//gif가 아닌 일반 이미지라면 직접 로드한 후 팔레트를 백업해두고
+	//copy 방식으로 연 후 팔레트 정보를 복원시켜준다.
+	if (get_part(file, fn_ext).MakeLower() == _T("webp"))
+	{
+		load_webp(file);
+	}
+	else if (get_part(file, fn_ext).MakeLower() != _T("gif"))
 	{
 		Gdiplus::ColorPalette* palette = NULL;
 
@@ -293,6 +299,68 @@ bool CGdiplusBitmap::load(CString file)
 
 	return false;
 	*/
+}
+
+#include <wincodec.h>
+#include <gdiplusimagecodec.h>
+#include <gdiplusflat.h>
+#pragma comment(lib, "windowscodecs.lib")
+
+typedef Gdiplus::GpStatus WINGDIPAPI GdipCreateBitmapFromWicBitmapFunc(
+	IWICBitmapSource* wicBitmap,
+	GDIPCONST WICPixelFormatGUID* pixelFormat,
+	Gdiplus::GpBitmap** bitmap
+	);
+
+inline Gdiplus::Bitmap* BitmapFromGpBitmap(Gdiplus::GpBitmap* native) {
+	return reinterpret_cast<Gdiplus::Bitmap*>(native);
+}
+
+bool CGdiplusBitmap::load_webp(CString sfile)
+{
+	bool res = true;
+
+	// Init WIC
+	IWICImagingFactory* pFactory = nullptr;
+	CoInitialize(NULL);
+	CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+		IID_PPV_ARGS(&pFactory));
+
+	IWICBitmapDecoder* pDecoder = nullptr;
+	pFactory->CreateDecoderFromFilename(
+		sfile, nullptr, GENERIC_READ,
+		WICDecodeMetadataCacheOnLoad, &pDecoder);
+
+	IWICBitmapFrameDecode* pFrame = nullptr;
+	pDecoder->GetFrame(0, &pFrame);
+
+	Gdiplus::GpBitmap* gpBitmap = nullptr;
+
+
+	GdipCreateBitmapFromWicBitmapFunc* myGdipCreateBitmapFromWicBitmap = nullptr;
+
+	HMODULE gdip = LoadLibraryW(L"gdiplus.dll");
+	if (gdip)
+	{
+		myGdipCreateBitmapFromWicBitmap =
+			(GdipCreateBitmapFromWicBitmapFunc*)GetProcAddress(
+				gdip, "GdipCreateBitmapFromWicBitmap"
+			);
+	}
+
+	if (myGdipCreateBitmapFromWicBitmap)
+	{
+		myGdipCreateBitmapFromWicBitmap(pFrame, NULL, &gpBitmap);
+		m_pBitmap = BitmapFromGpBitmap(gpBitmap);
+	}
+	else
+	{
+		res = false;
+	}
+
+	CoUninitialize();
+
+	return res;
 }
 
 //png일 경우는 sType을 생략할 수 있다.

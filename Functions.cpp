@@ -15475,7 +15475,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 	if (!(pWnd->IsZoomed()) && !(pWnd->IsIconic()))
 	{
 #if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
-		write_profile_value(pApp, sSection, _T("position"), rc);
+		write_profile_value(sSection, _T("position"), rc);
 #else
 		pApp->WriteProfileInt(sSection, _T("left"), rc.left);
 		pApp->WriteProfileInt(sSection, _T("top"), rc.top);

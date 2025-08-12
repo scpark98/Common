@@ -157,10 +157,14 @@ void CSCImageDlg::OnPaint()
 		dc.SelectClipRgn(NULL);
 
 		//CRect rText = rc;
-		//CString msg = _T("Fail to open this image file.");
-		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
+		CString msg = _T("Fail to open this image file.");
+		CString ext = get_part(m_img[0].get_filename(), fn_ext).MakeLower();
 
-		//DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, maroon, black, 2, 1);
+		if (is_one_of(ext, _T("avif"), _T("webp"), _T("bpg")))
+			msg.Format(_T("%s image is not supported yet."), ext);
+
+		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
+		DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, indianred, black, 2, 1);
 
 		return;
 	}
@@ -268,7 +272,7 @@ void CSCImageDlg::OnPaint()
 			ratio_str.Format(_T("%.3f : 1"), ratio);
 
 		info.Format(_T("파일 이름 : %s\n파일 크기: %s\n수정 날짜: %s\n이미지 정보: %dx%dx%d (%s)\n이미지 비율: %s\n확대 배율: %.0f%%"),
-					m_filename + m_alt_info,
+					get_part(m_filename, fn_name) + m_alt_info,
 					get_file_size_str(m_img[0].get_filename()),
 					get_datetime_str(GetFileLastModifiedTime(m_img[0].get_filename())),
 					m_img[0].width, m_img[0].height, m_img[0].channel * 8,
@@ -276,13 +280,11 @@ void CSCImageDlg::OnPaint()
 					ratio_str,
 					m_zoom * 100.0);
 
-		//dc.GetTextExtend(info)는 멀티라인 정보를 얻을 수 없으므로 DT_CALCRECT를 이용해야 한다.
-		CRect rText;
-		dc.DrawText(info, rText, DT_LEFT | DT_TOP | DT_CALCRECT);
-		rText.OffsetRect(8, 8);
+		CRect rText = rc;
+		rText.DeflateRect(8, 8);
 
-		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(),	rText,
-						DT_NOCLIP | DT_LEFT | DT_TOP, beige, black, 2, 1);
+		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(), rText,
+						DT_NOCLIP | DT_LEFT | DT_TOP | DT_WORDBREAK, beige, black, 2, 1);
 
 		dc.SelectObject(pOldFont);
 	}
@@ -556,16 +558,6 @@ CString CSCImageDlg::get_filename(bool fullpath)
 
 	return m_img[0].get_filename(fullpath);
 }
-
-//void CSCImageDlg::set_file_title(CString file_title)
-//{
-//	m_filename = file_title;
-//
-//	if (m_filename.IsEmpty())
-//	{
-//		release();
-//	}
-//}
 
 void CSCImageDlg::release()
 {
@@ -1215,7 +1207,8 @@ void CSCImageDlg::thread_gif_animation()
 		if (!m_run_thread_animation)
 			break;
 
-		m_slider_gif.set_pos(m_frame_index);
+		trace(m_frame_index);
+		m_slider_gif.set_pos(m_frame_index + 1);
 
 		m_frame_index++;
 		if (m_frame_index >= m_img[0].get_frame_count())
@@ -1493,6 +1486,7 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 
 	//update_title();
 
+	AfxGetApp()->WriteProfileString(_T("setting\\CSCImageDlg"), _T("recent file"), m_filename);
 	add_registry(AfxGetApp(), _T("setting\\CSCImageDlg\\recent folders"), folder);
 
 	//m_dir_watcher.stop();

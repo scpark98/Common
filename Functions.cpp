@@ -6275,6 +6275,7 @@ void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdipl
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
 	//단, r의 안쪽으로 그려지는 PenAlignmentInset이라면 줄이지 않아도 된다.
 	//if (pen_align != Gdiplus::PenAlignmentInset)
+	if (width <= 1)
 		r.DeflateRect(0, 0, 1, 1);
 
 	pen.SetAlignment((Gdiplus::PenAlignment)pen_align);

@@ -332,6 +332,7 @@ public:
 
 	//data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
 	Gdiplus::Color	get_pixel(int x, int y);
+	void			set_pixel(int x, int y, Gdiplus::Color cr);
 
 
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.

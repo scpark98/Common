@@ -263,12 +263,12 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
-		//TRACE(_T("%d, %d\n"), iItem, iSubItem);
+		TRACE(_T("%d, %d\n"), iItem, iSubItem);
+		if (iItem == 1)
+			iItem = 1;
 
 		crText = m_list_db[iItem].crText[iSubItem];
 		crBack = m_list_db[iItem].crBack[iSubItem];
-
-		//먼저 선택 여부, focus여부 등에 따라 셀이 그려질 글자색, 배경색을 골라주고...
 
 		GetSubItemRect(iItem, iSubItem, LVIR_BOUNDS, itemRect);
 
@@ -281,10 +281,10 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			itemRect.right = itemRect.left + GetColumnWidth(0);
 		}
 		//0번 컬럼만 선택상태로 표시한다.
-		else if (!is_full_row_selection)
-		{
-			is_selected = false;
-		}
+		//else if (!is_full_row_selection)
+		//{
+		//	is_selected = false;
+		//}
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
 		//포커스를 가졌거나 Always Show Selection이라면 선택 항목의 색상을 표시해주고
@@ -294,14 +294,19 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				//TRACE(_T("active\n"));
 				crText = m_theme.cr_text_selected;
-				crBack = m_theme.cr_back_selected;
+				if (is_full_row_selection || iSubItem == 0)
+					crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
 				//TRACE(_T("inactive\n"));
 				crText = m_theme.cr_text_selected_inactive;
-				crBack = m_theme.cr_back_selected_inactive;
+				if (is_full_row_selection || iSubItem == 0)
+					crBack = m_theme.cr_back_selected_inactive;
 			}
+
+			//if (!is_full_row_selection && iSubItem != 0)
+			//	crBack = m_list_db[iItem].crBack[iSubItem];
 		}
 		//drophilited라면 active에 관계없이 drop hilited 색상으로 표시한다.
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
@@ -329,12 +334,19 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
 		//지정된 색이 있다면 그 색을 우선으로 해야 한다.
-		if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
-			crText = m_list_db[iItem].crText[iSubItem];
-		if (m_list_db[iItem].crBack[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
-			crBack = m_list_db[iItem].crBack[iSubItem];
+		//if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
+		//	crText = m_list_db[iItem].crText[iSubItem];
+		//if (m_list_db[iItem].crBack[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
+		//	crBack = m_list_db[iItem].crBack[iSubItem];
 	
-		pDC->FillSolidRect(itemRect, crBack.ToCOLORREF());
+		if (crBack.GetValue() != listctrlex_unused_color.GetValue())
+		{
+			pDC->FillSolidRect(itemRect, crBack.ToCOLORREF());
+		}
+		else if (m_use_alternate_back_color && (iItem % 2))
+		{
+			pDC->FillSolidRect(itemRect, m_theme.cr_back_alternate.ToCOLORREF());
+		}
 
 		if ((iSubItem == 0) && (GetExtendedStyle() & LVS_EX_CHECKBOXES))
 		{
@@ -595,21 +607,25 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	rowRect.bottom--;
+	//rowRect.bottom--;
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
 	if (m_draw_selected_border && !m_in_editing && (m_has_focus || is_show_selection_always) && is_selected)
 	{
 		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
-		//rowRect = get_item_rect(iItem, 0);
+		if (!is_full_row_selection)
+			rowRect.right = rowRect.left + GetColumnWidth(0);
+
 		//선택된 항목을 표시하는 사각형을 그릴때는 반드시 PenAlignmentInset으로 그려줘야 한다.
 		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
 		//선택 사각형은 반드시 inset으로 그려져야 한다.
 		if (m_use_distinct_border_color)
 			draw_rectangle(pDC, rowRect, get_distinct_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 		else
-			draw_rectangle(pDC, rowRect, m_theme.cr_selected_border, Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
+			draw_rectangle(pDC, rowRect, (m_has_focus ? m_theme.cr_selected_border : m_theme.cr_selected_border_inactive), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 	}
+
+	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
 
 	if (m_draw_top_line)
 	{
@@ -802,6 +818,13 @@ void CVtListCtrlEx::set_column_data_type(int column, int nType, bool invalidate)
 
 	if (invalidate)
 		Invalidate();
+}
+
+int CVtListCtrlEx::get_header_height()
+{
+	if (m_HeaderCtrlEx.m_hWnd != NULL)
+		return m_HeaderCtrlEx.get_header_height();
+	return 0;
 }
 
 void CVtListCtrlEx::set_header_height(int height)
@@ -3003,11 +3026,11 @@ int CVtListCtrlEx::set_items_with_state(UINT state, UINT mask, std::deque<int>* 
 }
 
 //기본 검색함수인 FindItem()을 이용해서 0번 컬럼에서만 데이터를 찾는다. virtual list이므로 OnLvnOdfinditem() 함수 수정 필수.
-int CVtListCtrlEx::find(CString str, int start, bool bWholeWord, bool bCaseSensitive)
+int CVtListCtrlEx::find(CString str, int start, bool whole_word_olny, bool case_sensitive)
 {
 	LVFINDINFO info;
 
-	info.flags = (bWholeWord ? LVFI_STRING : LVFI_PARTIAL|LVFI_STRING);
+	info.flags = (whole_word_olny ? LVFI_STRING : LVFI_PARTIAL|LVFI_STRING);
 	info.psz = str;
 
 	// Delete all of the items that begin with the string.
@@ -3058,7 +3081,8 @@ int CVtListCtrlEx::find(CString str, int start, bool bWholeWord, bool bCaseSensi
 //작품명의 경우 영문대문자-숫자인 패턴이 많으므로 '-'가 없다면 숫자 앞에 자동 넣어준다.
 int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 								int start_idx, int end_idx,
-								std::deque<int>* dqColumn, bool stop_first_found)
+								std::deque<int>* dqColumn, bool stop_first_found,
+								bool whole_word_olny, bool case_sensitive)
 {
 	int		i;
 	TCHAR	op;
@@ -3101,7 +3125,7 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 
 		std::deque<CString> dqLine = get_line_text_list(cur_idx, dqColumn);
 		//sline 문자열에서 dqTarget 문자열들이 존재하는지 op방식에 따라 검색.
-		if (find_dqstring(dqLine, dqTarget, op) >= 0)
+		if (find_dqstring(dqLine, dqTarget, op, whole_word_olny, case_sensitive) >= 0)
 		{
 			find_result.push_back(cur_idx);
 
@@ -3810,7 +3834,8 @@ void CVtListCtrlEx::OnDropFiles(HDROP hDropInfo)
 	::PostMessage(GetParent()->GetSafeHwnd(), WM_DROPFILES, (WPARAM)hDropInfo, (LPARAM)0);
 }
 
-DWORD CVtListCtrlEx::index_from_point(int x, int y)
+//x, y위치의 item, sub_item 인덱스를 구할 수 있다. item의 인덱스만을 필요로 할 경우는 리턴값만 이용하면 된다.
+int CVtListCtrlEx::index_from_point(int x, int y, int* item, int* sub_item)
 {
 	int first = GetTopIndex();
 	int last = first + GetCountPerPage();
@@ -3828,12 +3853,16 @@ DWORD CVtListCtrlEx::index_from_point(int x, int y)
 
 			if (rItem.PtInRect(CPoint(x, y)))
 			{
-				return MAKELONG(j, first);
+				if (item)
+					*item = first;
+				if (sub_item)
+					*sub_item = j;
+				return first;
 			}
 		}
 	}
 
-	return MAKELONG(-1, -1);
+	return -1;
 }
 
 
@@ -3849,6 +3878,8 @@ void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool
 	m_is_shell_listctrl = true;
 	m_is_local = is_local;
 	m_use_own_imagelist = true;
+
+	SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_FLATSB);
 
 	m_pShellImageList = pShellImageList;
 	//이 설정을 해줘야 다른 클래스에서 CListCtrl* 타입으로도 GetImageList()를 통해 참조할 수 있다.

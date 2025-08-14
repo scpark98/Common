@@ -738,6 +738,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
@@ -769,6 +770,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
@@ -800,6 +802,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
@@ -831,6 +834,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
@@ -862,6 +866,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
@@ -893,6 +898,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text			= get_color(cr_text, -16);
 			cr_header_back			= get_color(cr_back, -16);
@@ -922,6 +928,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
 
 			cr_selected_border		= cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_back			= get_color(cr_back, 16);
 			cr_header_text			= get_color(cr_text, -32);
@@ -945,6 +952,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover			= Gdiplus::Color(255, 195, 222, 245);
 
 			cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
+			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_border				= Gdiplus::Color::DimGray;
 			break;
@@ -990,7 +998,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(gGRAY(192));
 			cr_progress				= Gdiplus::Color(255, 49, 108, 244);
 
-			cr_selected_border		= gRGB(153, 209, 255);//get_color(cr_back_selected, -32);
+			cr_selected_border		= gRGB(153, 209, 255);
+			cr_selected_border_inactive	= cr_back_selected_inactive;
 
 			cr_border				= Gdiplus::Color::DimGray;
 	}

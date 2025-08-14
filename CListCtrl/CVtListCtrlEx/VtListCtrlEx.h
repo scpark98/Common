@@ -374,12 +374,13 @@ public:
 	int			get_selected_index(int start = 0);
 	//맨 끝에서부터 선택된 한 항목의 인덱스를 리턴한다.
 	int			get_last_selected_item();
+	int			get_selected_count() { return GetSelectedCount(); }
 	//선택된 항목들을 dq에 담는다. dqSelected가 null이면 그냥 선택 갯수를 리턴받아 사용한다.
-	int			get_selected_items(std::deque<int> *dq = NULL);
+	int			get_selected_items(std::deque<int> *dq);
 	//선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 is_fullpath = true이면 각 항목의 전체경로를 담는다.
-	int			get_selected_items(std::deque<CString>* dq = NULL, bool is_fullpath = false);
+	int			get_selected_items(std::deque<CString>* dq, bool is_fullpath = false);
 	//선택된 항목들의 목록을 dq에 담는다. shelllist에서만 사용되며 cFileName은 이미 전체경로를 가지고 있다.
-	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq = NULL);
+	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq);
 
 	//index = -1 : 전체선택
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
@@ -410,14 +411,16 @@ public:
 
 //검색 관련
 	//기본 검색함수인 FindItem()을 이용해서 0번 컬럼에서만 데이터를 찾는다. virtual list이므로 OnLvnOdfinditem() 함수 수정 필수.
-	int			find(CString str, int start = -1, bool bWholeWord = false, bool bCaseSensitive = false);
+	int			find(CString str, int start = -1, bool whole_word_olny = false, bool case_sensitive = false);
 	//separator가 ""이 아닌 공백 또는 다른 문자열일 경우는
 	//str을 분리해서 모두 찾는다.
 	int			find(CString find_target, std::deque<int>* result,
 					 int start_idx = 0, int end_idx = -1,
-					 std::deque<int>* dqColumn = NULL, bool stop_first_found = false);
+					 std::deque<int>* dqColumn = NULL, bool stop_first_found = false, bool whole_word_olny = false, bool case_sensitive = false);
 	//target_columns에 검색 대상 컬럼들을 나열해준다.
-	template <typename ... T> int find(CString find_target, std::deque<int>* result, int start_idx = 0, int end_idx = -1, T... target_columns)
+	template <typename ... T> int find(CString find_target, std::deque<int>* result, int start_idx = 0, int end_idx = -1,
+					bool stop_first_found = false, bool whole_word_olny = false, bool case_sensitive = false,
+					T... target_columns)
 	{
 		int n = sizeof...(target_columns);
 		int arg[] = { target_columns... };
@@ -426,7 +429,7 @@ public:
 		for (auto column : arg)
 			dqColumn.push_back(column);
 
-		return find(find_target, result, start_idx, end_idx, &dqColumn);
+		return find(find_target, result, start_idx, end_idx, &dqColumn, stop_first_found, whole_word_olny, case_sensitive);
 	}
 
 //정렬 관련
@@ -452,6 +455,7 @@ public:
 
 	//특정 항목의 글자색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	//item이 -1이면 모든 라인에, subItem이 -1이면 모든 컬럼에 적용.
+	//set_default_text_color(), set_default_back_color()를 통해 기본 글자색과 배경색을 설정할 수 있다.
 	void		set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase = false, bool invalidate = true);
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	void		set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase = false);
@@ -523,6 +527,7 @@ public:
 	bool		load(CString sfile, TCHAR separator = '|', bool add_index = false, bool match_column_count = true, bool reset_before_load = true);
 
 //기타 레이아웃 관련
+	int			get_header_height();
 	//header_height는 헤더클래스에서 HDM_LAYOUT 메시지가 발생해야 적용되는데
 	//그렇게 되기 위해서는 SetFont / MoveWindow / SetWindowPos 등이 필요하므로
 	//VtListCtrlEx에게 set_font_name() 호출시에 헤더도 SetFont를 적용하여 해결함.
@@ -597,7 +602,8 @@ public:
 	//리스트 항목들을 무작위로 섞는다.
 	void			shuffle();
 
-	DWORD			index_from_point(int x, int y);
+	//x, y위치의 item, sub_item 인덱스를 구할 수 있다. item의 인덱스만을 필요로 할 경우는 리턴값만 이용하면 된다.
+	int				index_from_point(int x, int y, int* item = NULL, int* sub_item = NULL);
 
 	//Drag&Drop 드래깅 관련
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)

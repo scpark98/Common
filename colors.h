@@ -505,6 +505,7 @@ public:
 	Gdiplus::Color	cr_back_alternate;				//list의 경우 짝수라인, 홀수라인 번갈아 색상을 표시하는 목적
 
 	Gdiplus::Color	cr_selected_border;
+	Gdiplus::Color	cr_selected_border_inactive;
 	Gdiplus::Color	cr_border;
 
 	//caption이 없는 dialog based에서 사용

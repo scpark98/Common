@@ -3369,6 +3369,33 @@ Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 							*(data + y * width * channel + x * channel + 0));
 }
 
+void CGdiplusBitmap::set_pixel(int x, int y, Gdiplus::Color cr)
+{
+	//data가 불려지지 않은 상태에서 set_pixel()이 호출되면 raw_data를 추출한다.
+	if (data == NULL)
+		get_raw_data();
+
+	if (!data || x < 0 || x >= width || y < 0 || y >= height)
+		return;
+
+	if (channel == 3)
+	{
+		BYTE r = cr.GetRed();
+		BYTE g = cr.GetGreen();
+		BYTE b = cr.GetBlue();
+		*(data + y * width * channel + x * channel + 2) = r;
+		*(data + y * width * channel + x * channel + 1) = g;
+		*(data + y * width * channel + x * channel + 0) = b;
+	}
+	else if (channel == 4)
+	{
+		*(data + y * width * channel + x * channel + 3) = cr.GetAlpha();
+		*(data + y * width * channel + x * channel + 2) = cr.GetRed();
+		*(data + y * width * channel + x * channel + 1) = cr.GetGreen();
+		*(data + y * width * channel + x * channel + 0) = cr.GetBlue();
+	}
+}
+
 //배경 그림자 이미지를 생성한다.
 void CGdiplusBitmap::create_back_shadow_image(CGdiplusBitmap* shadow, float sigma, int type, int depth)
 {

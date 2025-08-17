@@ -699,8 +699,21 @@ bool CVtListCtrlEx::set_headings(const CString& strHeadings)
 	return TRUE;
 }
 
+//column = -1이면 전체 헤더의 텍스트를 '|'로 구분자로 하여 리턴한다.
 CString	CVtListCtrlEx::get_header_text(int column)
 {
+	if (column < 0)
+	{
+		CString sText;
+		for (int i = 0; i < get_column_count(); i++)
+		{
+			if (i > 0)
+				sText += _T("|");
+			sText += m_HeaderCtrlEx.get_header_text(i);
+		}
+		return sText;
+	}
+
 	return m_HeaderCtrlEx.get_header_text(column);
 }
 
@@ -2831,8 +2844,24 @@ int CVtListCtrlEx::get_selected_items(std::deque<int> *dq)
 //선택된 항목들의 목록을 dq에 담는다. shelllist일 경우 fullpath = true이면 각 항목의 전체경로를 담는다.
 int CVtListCtrlEx::get_selected_items(std::deque<CString>* dq, bool is_fullpath)
 {
+	if (dq)
+		dq->clear();
+
 	std::deque<int> dq_index;
 	get_selected_items(&dq_index);
+
+	if (dq_index.size() == 0)
+		return -1;
+
+	if (!m_is_shell_listctrl)
+	{
+		for (auto item : dq_index)
+		{
+			dq->push_back(get_line_text(item, 0, -1));
+		}
+
+		return dq_index[0];
+	}
 
 	CString folder = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path());//convert_special_folder_to_real_path(get_path(), m_pShellImageList, !m_is_local);
 	CString fullpath;

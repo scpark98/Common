@@ -255,7 +255,8 @@ public:
 	//해당 컬럼에서 출력시에 width 최대값을 리턴.(미구현)
 	int			get_column_max_text_width(int column);
 
-	CString		get_header_text(int column);
+	//column = -1이면 전체 헤더의 텍스트를 '|'로 구분자로 하여 리턴한다.
+	CString		get_header_text(int column = -1);
 	void		set_header_text(int column, CString text);
 	//default = HDF_LEFT
 	void		set_header_text_align(int header, int format = HDF_LEFT);

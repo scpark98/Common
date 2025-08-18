@@ -6,7 +6,7 @@
 #include <gdiplus.h>
 
 #include "../../colors.h"
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 
 //using namespace Gdiplus;
 
@@ -148,7 +148,7 @@ class CGdiButtonImage
 public:
 	CGdiButtonImage() {};
 
-	CGdiplusBitmap img[4];	//normal, over, down, disabled
+	CSCGdiplusBitmap img[4];	//normal, over, down, disabled
 };
 
 class CGdiButtonParagragh
@@ -161,7 +161,7 @@ public:
 
 // CGdiButton
 
-class CGdiButton : public CButton//, CGdiplusBitmap
+class CGdiButton : public CButton//, CSCGdiplusBitmap
 {
 	DECLARE_DYNAMIC(CGdiButton)
 
@@ -246,7 +246,7 @@ public:
 	//기본 이미지를 설정할 때 resize한 후 설정
 	bool		add_image_resize(UINT normal, float ratio = 1.0f);
 	bool		add_image(CString normal, CString over = _T(""), CString down = _T(""), CString disabled = _T(""));
-	bool		add_image(CGdiplusBitmap *img);
+	bool		add_image(CSCGdiplusBitmap *img);
 	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
 
@@ -384,7 +384,7 @@ public:
 	void		set_auto_repeat(bool use = true);
 	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
 
-	//public으로 하여 CGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
+	//public으로 하여 CSCGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
 	//하나의 버튼에는 n개의 이미지를 담을 수 있고 각 이미지는 4개의 state image를 각각 설정할 수 있다.
 	std::deque<CGdiButtonImage*> m_image;
 
@@ -450,7 +450,7 @@ protected:
 	//parent의 배경에 사용된 이미지를 설정해야 투명 png를 올바르게 표시할 수 있다.
 	//parent가 resize가 가능한 경우는 처리가 매우 복잡해진다. 그때는 어쩔수없이 redraw_window()로 갱신해야 한다.
 	//만약 parent가 resize를 사용하지 않거나 배경이 단색이라면 깜빡임 없이 그릴 수 있다.
-	CGdiplusBitmap* m_img_parent = NULL;
+	CSCGdiplusBitmap* m_img_parent = NULL;
 	Gdiplus::Color	m_cr_parent_back = Gdiplus::Color::Transparent;
 
 	//배경이 투명인 경우는 parent의 배경까지 Invalidate()해줘야 하므로 그냥 Invalidate()만으로는 안된다.
@@ -459,14 +459,14 @@ protected:
 
 
 	//버튼 텍스트 앞에 그려질 이미지. 이미지 버튼이 아닌 기본 MFC 버튼 형태일 경우 앞에 이미지를 추가할 경우 사용.
-	CGdiplusBitmap	m_img_header;
+	CSCGdiplusBitmap	m_img_header;
 	UINT			m_img_header_align = DT_CENTER;
 	float			m_img_header_ratio = 0.6f;
 	int				m_img_header_gap = 2;
 
 	//버튼의 배경 이미지, NULL이면 m_cr_back이 배경색
-	CGdiplusBitmap	m_back_img;
-	CGdiplusBitmap	m_back_img_origin;
+	CSCGdiplusBitmap	m_back_img;
+	CSCGdiplusBitmap	m_back_img_origin;
 
 	CString		m_text = _T("");
 	std::deque <Gdiplus::Color>	m_cr_text;

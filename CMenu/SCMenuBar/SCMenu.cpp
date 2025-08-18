@@ -18,8 +18,8 @@ CSCMenuMessage::CSCMenuMessage(CWnd* _this, int message, CSCMenuItem* menu_item,
 
 CSCMenuSubButton::CSCMenuSubButton(UINT _id, int menu_height)
 {
-	m_button_image[0] = new CGdiplusBitmap(_T("PNG"), _id);	//normal
-	m_button_image[1] = new CGdiplusBitmap(_T("PNG"), _id);	//selected
+	m_button_image[0] = new CSCGdiplusBitmap(_T("PNG"), _id);	//normal
+	m_button_image[1] = new CSCGdiplusBitmap(_T("PNG"), _id);	//selected
 	m_button_image[0]->gray();
 
 	//기존 버튼 이미지 컬러톤이 cyan 톤이었으나 코드상에서 다른 색상 톤으로 변경 가능
@@ -694,7 +694,7 @@ void CSCMenu::OnPaint()
 				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), gcr_over_stroke, gcr_over_fill, 0);
 				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), Gdiplus::Color(255,225,0,0), gcr_over_fill, 2);
 
-				//CGdiplusBitmap img;
+				//CSCGdiplusBitmap img;
 				//img.round_shadow_rect(m_items[i]->r.Width(), m_items[i]->r.Height(), 4);
 				//img.draw(&g, m_items[i]->r, true);
 			}
@@ -759,7 +759,7 @@ void CSCMenu::OnPaint()
 	dc.SelectObject(pOldFont);
 }
 
-void CSCMenu::set_back_image(CGdiplusBitmap* img)
+void CSCMenu::set_back_image(CSCGdiplusBitmap* img)
 {
 	m_img_back.release();
 	if (img == NULL)

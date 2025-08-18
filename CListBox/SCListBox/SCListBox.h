@@ -40,7 +40,7 @@
 #include <deque>
 #include "../../Functions.h"
 #include "../../system/ShellImageList/ShellImageList.h"
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 #include "../../colors.h"
 
 
@@ -229,7 +229,7 @@ public:
 		//그냥 하나를 추가한다면 add_header_image()를 사용한다.
 		for (int i = 0; i < m_imagelist.size(); i++)
 		{
-			CGdiplusBitmap* img = m_imagelist[i];
+			CSCGdiplusBitmap* img = m_imagelist[i];
 			delete img;
 		}
 
@@ -312,7 +312,7 @@ protected:
 	void		save_selected_to_file();
 	void		save_all_to_file();
 
-	std::deque<CGdiplusBitmap*> m_imagelist;
+	std::deque<CSCGdiplusBitmap*> m_imagelist;
 
 // Overrides
 	// ClassWizard generated virtual function overrides

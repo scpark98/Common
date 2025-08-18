@@ -84,7 +84,7 @@ void CSCToolBar::insert(int index, CString caption, UINT resource_id, int button
 	CGdiButton* btn = new CGdiButton;
 	
 	btn->create(caption, WS_CHILD | WS_VISIBLE | BS_PUSHLIKE | BS_FLAT, r, this, SCTOOLBAR_BUTTON_ID);
-	btn->set_tooltip_text(caption);
+	//btn->set_tooltip_text(caption);
 
 	//빈 버튼 영역 또는 분리기호인 경우
 	if (caption.IsEmpty() || resource_id <= 0 || button_type < 0)
@@ -105,7 +105,7 @@ void CSCToolBar::insert(int index, CString caption, UINT resource_id, int button
 	{
 		btn->SetButtonStyle(button_type);
 
-		CGdiplusBitmap img(_T("PNG"), resource_id), img1;
+		CSCGdiplusBitmap img(_T("PNG"), resource_id), img1;
 		img.canvas_size(m_width, m_height);
 
 		img.deep_copy(&img1);

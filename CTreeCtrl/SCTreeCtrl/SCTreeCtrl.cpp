@@ -5,7 +5,7 @@
 #include <thread>
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
-#include "../../GdiPlusBitmap.h"
+#include "../../SCGdiPlusBitmap.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 
 
@@ -1698,7 +1698,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
 
 	bool sub_folder_exist = has_sub_folders(path);
-	CGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
+	CSCGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 
 	if (m_pDragImage && m_pDragImage->GetSafeHandle())
 	{

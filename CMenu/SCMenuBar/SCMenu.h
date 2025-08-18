@@ -36,7 +36,7 @@ public:
 	CSCMenuSubButton(UINT _id, int menu_height);
 	~CSCMenuSubButton();
 
-	CGdiplusBitmap* m_button_image[2] = { NULL, };	//0:unselect, 1:select, (2:over, 3:down 추가 예정??)
+	CSCGdiplusBitmap* m_button_image[2] = { NULL, };	//0:unselect, 1:select, (2:over, 3:down 추가 예정??)
 	CRect	m_r = CRect(0, 0, 0, 0);
 	//radio로 한다면 group 속성까지도 고려해야하지만 그렇게까지 메뉴를 복잡하게 구성하진 말자.
 	//정 필요하다면 메뉴 항목을 나누자.
@@ -83,7 +83,7 @@ public:
 	//icon 이미지는 투명 png로 제작하고 m_line_height의 높이와 동일한 정사각형 크기로 제작해야 한다.
 	//그 크기가 32x32라면 실제 이미지는 그 안에 작게 표시될 정도로 그려진 이미지이어야 한다.
 	//32x32 크기에 꽉차게 그려진 이미지를 사용해서는 안된다.
-	CGdiplusBitmap	m_icon;
+	CSCGdiplusBitmap	m_icon;
 	std::deque<CSCMenuSubButton*> m_buttons;
 
 	void			set_icon(UINT icon_id);
@@ -176,7 +176,7 @@ public:
 	void			use_over(bool use = true) { m_use_over = use; }
 	int				get_over_item() { return (m_use_over ? m_over_item : -1); }
 
-	void			set_back_image(CGdiplusBitmap* img);
+	void			set_back_image(CSCGdiplusBitmap* img);
 
 	virtual			CSCMenu& set_font(LOGFONT& lf);
 	virtual			CSCMenu& set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
@@ -189,7 +189,7 @@ protected:
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	CWnd*			m_parent = NULL;
-	CGdiplusBitmap	m_img_back;
+	CSCGdiplusBitmap	m_img_back;
 	std::deque<CSCMenuItem*> m_items;
 
 	bool		m_use_over = true;			//hover hilighted

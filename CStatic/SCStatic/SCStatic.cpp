@@ -54,7 +54,7 @@ CSCStatic::~CSCStatic()
 
 	for (int i = 0; i < m_header_images.size(); i++)
 	{
-		CGdiplusBitmap* img = m_header_images[i];
+		CSCGdiplusBitmap* img = m_header_images[i];
 		delete img;
 	}
 
@@ -185,7 +185,7 @@ void CSCStatic::OnPaint()
 	if (m_img_back.is_valid() && !m_img_back.is_animated_gif())
 	{
 		// 배경 그림을 그린다.
-		m_img_back.draw(g, rc, CGdiplusBitmap::draw_mode_stretch);
+		m_img_back.draw(g, rc, CSCGdiplusBitmap::draw_mode_stretch);
 		//m_img_back.save(_T("d:\\copy.png"));
 	}
 	else
@@ -613,7 +613,7 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 		m_img_back.set_animation(m_hWnd, CRect(), false);
 }
 
-void CSCStatic::set_back_image(CGdiplusBitmap& img, Gdiplus::Color cr_back)
+void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)
 {
 	img.deep_copy(&m_img_back);
 	m_cr_back = cr_back;
@@ -1204,7 +1204,7 @@ void CSCStatic::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 void CSCStatic::add_header_image(UINT id, bool left_align_fix)
 {
-	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
+	CSCGdiplusBitmap* img = new CSCGdiplusBitmap(_T("PNG"), (UINT)id);
 	m_header_images.push_back(img);
 	m_image_left_align_fix = left_align_fix;
 	//RedrawWindow();

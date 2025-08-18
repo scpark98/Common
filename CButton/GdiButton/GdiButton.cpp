@@ -6,7 +6,7 @@
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
-#include "../../GdiPlusBitmap.h"
+#include "../../SCGdiPlusBitmap.h"
 
 #pragma warning(disable: 4305)	//'argument': truncation from 'double' to 'Gdiplus::REAL'
 
@@ -34,7 +34,7 @@ CGdiButton::CGdiButton()
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
-	//매트릭스는 CGdiplusBitmap으로 이동할것!
+	//매트릭스는 CSCGdiplusBitmap으로 이동할것!
 	m_grayMatrix = {
 		0.299f, 0.299f, 0.299f, 0.00f, 0.00f,
 		0.587f, 0.587f, 0.587f, 0.00f, 0.00f,
@@ -255,7 +255,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	return true;
 }
 
-bool CGdiButton::add_image(CGdiplusBitmap *img)
+bool CGdiButton::add_image(CSCGdiplusBitmap *img)
 {
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
@@ -757,7 +757,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CRect		rc;
 	CRect		rText;
 	CPoint		pt(0, 0);
-	CGdiplusBitmap*	pImage = NULL;
+	CSCGdiplusBitmap*	pImage = NULL;
 	CString		text;
 	Gdiplus::Color	cr_text = ::GetSysColor(COLOR_BTNTEXT);
 	Gdiplus::Color	cr_back = ::GetSysColor(COLOR_3DFACE);
@@ -845,7 +845,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pDC, Rect.left, Rect.top, SRCCOPY);
 		dc.BitBlt(0, 0, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
 #ifdef _DEBUG
-		save(CGdiplusBitmap((HBITMAP)bmp.GetSafeHandle()), _T("d:\\parent_bmp.bmp"));
+		save(CSCGdiplusBitmap((HBITMAP)bmp.GetSafeHandle()), _T("d:\\parent_bmp.bmp"));
 #endif
 		MemDC.SelectObject(pOldBmp);
 		pParent->ReleaseDC(pDC);
@@ -922,7 +922,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_draw_drop_shadow)
 		{
 			//m_down_offset = CPoint(1, 1);
-			CGdiplusBitmap img_shadow;
+			CSCGdiplusBitmap img_shadow;
 			m_image[idx]->img[0].deep_copy(&img_shadow);
 #ifdef _DEBUG
 			img_shadow.save(_T("d:\\0.origin.png"));
@@ -940,7 +940,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 #endif
 			CRect rc_shadow = rc;
 			rc_shadow.OffsetRect(2, 2);
-			img_shadow.draw(g, rc_shadow, CGdiplusBitmap::draw_mode_zoom);
+			img_shadow.draw(g, rc_shadow, CSCGdiplusBitmap::draw_mode_zoom);
 		}
 		else
 		{
@@ -985,7 +985,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 
 		//down 효과없이 그릴 경우
-		pImage->draw(g, rc, CGdiplusBitmap::draw_mode_origin);
+		pImage->draw(g, rc, CSCGdiplusBitmap::draw_mode_origin);
 	}
 	//설정된 이미지가 없는 경우 버튼의 이미지를 그려주고
 	//기본 텍스트도 출력한다.
@@ -2094,7 +2094,7 @@ void CGdiButton::OnNcPaint()
 
 	//버튼 이미지가 있다면 이미지 모양대로 back shadow를 만들어야 하고
 	//버튼 이미지가 없어서 Gdi로 그려진 버튼이라면 기본 사각형을 바탕으로 back shadow를 만들어준다.
-	CGdiplusBitmap img_shadow;
+	CSCGdiplusBitmap img_shadow;
 
 	if (m_image.size() && m_image[0]->img[0].is_valid())
 	{

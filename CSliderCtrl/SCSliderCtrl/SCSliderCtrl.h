@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "../../colors.h"
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 
 /*
 [¡÷¿«]
@@ -109,7 +109,7 @@ public:
 	CSCSliderCtrlSteps() {};
 
 	CRect	r;
-	CGdiplusBitmap m_img;
+	CSCGdiplusBitmap m_img;
 };
 
 class CSCSliderCtrl : public CSliderCtrl

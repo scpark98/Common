@@ -279,7 +279,7 @@ void CSCShapeDlg::set_text_align(int align)
 	set_image(m_parent, &m_img, false);
 }
 
-void CSCShapeDlg::set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy)
+void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 {
 	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
 	if (m_img.is_animated_gif() && m_gif_state == state_play)

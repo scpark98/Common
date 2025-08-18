@@ -2,7 +2,7 @@
 
 /*
 scpark.
-기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CSCGdiplusBitmap이라는 하나의 클래스로 합치고
+기존 CSCGdiPlusBitmap 및 CGdiPlusBitmapResource를 CSCGdiplusBitmap이라는 하나의 클래스로 합치고
 Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 * Gdiplus를 자동 초기화, 해제하기 위해 CGdiplusDummyForInitialization 클래스를 추가하고

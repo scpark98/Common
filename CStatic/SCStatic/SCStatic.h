@@ -11,7 +11,7 @@
 #include <deque>
 
 //.ico가 아닌 png 이미지들을 앞에 그려주고 필요에 따라 변경되도록 하기 위해 사용.
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 
 /*
 //scpark
@@ -164,7 +164,7 @@ public:
 	//만약 원본 크기가 static ctrl의 크기보다 클 경우는 보이지 않게 되므로
 	//m_static_copy.fit_to_back_image(false);를 호출해서 이미지 출력 크기를 컨트롤에 맞춰서 출력되도록 해야 한다.
 	void			set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
-	void			set_back_image(CGdiplusBitmap& img, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+	void			set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 	//배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.
 	void			set_back_image_mirror(bool is_mirror);
@@ -226,7 +226,7 @@ public:
 		//그냥 하나를 추가한다면 add_header_image()를 사용한다.
 		for (int i = 0; i < m_header_images.size(); i++)
 		{
-			CGdiplusBitmap* img = m_header_images[i];
+			CSCGdiplusBitmap* img = m_header_images[i];
 			delete img;
 		}
 
@@ -310,7 +310,7 @@ protected:
 
 	DWORD			m_dwStyle;
 	int				m_nPrefixSpace;
-	CGdiplusBitmap	m_img_back;
+	CSCGdiplusBitmap	m_img_back;
 
 	int				m_halign = -1;
 	int				m_valign = -1;
@@ -323,7 +323,7 @@ protected:
 	CRect			m_margin;			//텍스트의 여백을 설정한다. 기본값은 CStatic과 동일하게 0.
 
 	//label의 앞에 그려질 이미지이며 만약 2개 이상일 경우 타이머에 의해 alt되기도 한다.
-	std::deque<CGdiplusBitmap*> m_header_images;
+	std::deque<CSCGdiplusBitmap*> m_header_images;
 	int				m_header_image_index;
 
 	//텍스트 앞에 표시되는 아이콘 또는 헤더 이미지를 텍스트와 별개로 무조건 왼쪽에 그려줄 경우

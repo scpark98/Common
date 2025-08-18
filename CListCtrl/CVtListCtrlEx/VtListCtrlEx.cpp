@@ -4479,7 +4479,7 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//	m_pDragImage = NULL;
 	//}
 
-	CGdiplusBitmap bmpRes;// (64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
+	CSCGdiplusBitmap bmpRes;// (64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
 	
 	//drag_image가 없다면 노드 자체 아이콘 및 레이블을 이용한다.
 	//GDI를 이용해서 create_drag_image()를 사용했으나 아이콘과 함께 레이블을 출력할 때 오동작함. 수정 필요.
@@ -4881,7 +4881,7 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	*pResult = 0;
 }
 /*
-void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
+void CVtListCtrlEx::capture_selected_items_to_bitmap(CSCGdiplusBitmap* bmp)
 {
 	int i;
 	CRect r, rc;
@@ -4924,7 +4924,7 @@ void CVtListCtrlEx::capture_selected_items_to_bitmap(CGdiplusBitmap* bmp)
 		r = rItem[i];
 		ClientToScreen(r);
 		HBITMAP hBitmap = capture_screen_to_bitmap(r);
-		CGdiplusBitmap sub(hBitmap);
+		CSCGdiplusBitmap sub(hBitmap);
 
 		rItem[i].OffsetRect(offset);
 		bmp->draw(&sub, &rItem[i]);
@@ -5157,7 +5157,7 @@ void CVtListCtrlEx::init_auto_scroll_button()
 	CRect r(0, 0, m_auto_scroll_button_size, m_auto_scroll_button_size);
 	r.DeflateRect(4, 4);
 
-	CGdiplusBitmap img(m_auto_scroll_button_size, m_auto_scroll_button_size);
+	CSCGdiplusBitmap img(m_auto_scroll_button_size, m_auto_scroll_button_size);
 	Gdiplus::Graphics g(img.m_pBitmap);
 	Gdiplus::Pen pen(Gdiplus::Color::RoyalBlue, 2.0f);
 	pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);

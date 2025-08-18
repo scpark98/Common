@@ -24,7 +24,7 @@
 
 */
 
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 #include "../../data_structure/SCParagraph/SCParagraph.h"
 
 static const UINT Message_CSCShapeDlg = ::RegisterWindowMessage(_T("MessageString_CSCShapeDlg"));
@@ -72,7 +72,7 @@ public:
 
 	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
-	void			set_image(CWnd* parent, CGdiplusBitmap* img, bool deep_copy = true);
+	void			set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy = true);
 	bool			load(CWnd* parent, UINT id);
 	bool			load(CWnd* parent, CString sType, UINT id);
 	bool			load(CWnd* parent, CString sFile);
@@ -147,7 +147,7 @@ public:
 	void			gif_goto(int pos, bool pause = false);
 
 	//원래 protected로 선언되는게 일반적이지만 Gdiplus관련 멤버함수 등을 원활히 사용하기 위해 public으로 변경한다.
-	CGdiplusBitmap	m_img;
+	CSCGdiplusBitmap	m_img;
 
 protected:
 	CWnd*			m_parent = NULL;

@@ -63,7 +63,7 @@ CSCListBox::~CSCListBox()
 
 	for (int i = 0; i < m_imagelist.size(); i++)
 	{
-		CGdiplusBitmap* img = m_imagelist[i];
+		CSCGdiplusBitmap* img = m_imagelist[i];
 		delete img;
 	}
 }
@@ -1342,7 +1342,7 @@ void CSCListBox::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CSCListBox::add_to_imagelist(UINT id)
 {
-	CGdiplusBitmap* img = new CGdiplusBitmap(_T("PNG"), (UINT)id);
+	CSCGdiplusBitmap* img = new CSCGdiplusBitmap(_T("PNG"), (UINT)id);
 	m_imagelist.push_back(img);
 }
 

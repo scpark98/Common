@@ -206,7 +206,7 @@ bool CSCGdiplusBitmap::load(CString file)
 	* 2. !gif이고 8bit indexed이면 m_palette를 추출한 후 다시 복사 방식으로 열고 SetPalette(m_palette)해준다.
 	* 이렇게 처리해야 파일 삭제, 이름변경 등이 가능하다.
 	*/
-	m_pBitmap = Gdiplus::Bitmap::FromFile(file);
+	m_pBitmap = Gdiplus::Bitmap::FromFile(CStringW(file));
 	int palSize = m_pBitmap->GetPaletteSize();
 	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
 
@@ -230,7 +230,7 @@ bool CSCGdiplusBitmap::load(CString file)
 			m_palette = NULL;
 		}
 
-		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(file);
+		temp.m_pBitmap = Gdiplus::Bitmap::FromFile(CStringW(file));
 		if (temp.m_pBitmap)
 			temp.deep_copy(this);
 
@@ -328,7 +328,7 @@ bool CSCGdiplusBitmap::load_webp(CString sfile)
 
 	IWICBitmapDecoder* pDecoder = nullptr;
 	pFactory->CreateDecoderFromFilename(
-		sfile, nullptr, GENERIC_READ,
+		CStringW(sfile), nullptr, GENERIC_READ,
 		WICDecodeMetadataCacheOnLoad, &pDecoder);
 
 	IWICBitmapFrameDecode* pFrame = nullptr;

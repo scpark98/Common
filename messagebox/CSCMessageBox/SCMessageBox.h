@@ -40,9 +40,9 @@
 
 #include "afxdialogex.h"
 
-#include "../../colors.h"
-#include "../../CButton/GdiButton/GdiButton.h"
-#include "../../CStatic/SCStatic/SCStatic.h"
+#include "Common/colors.h"
+#include "Common/CButton/GdiButton/GdiButton.h"
+#include "Common/CStatic/SCStatic/SCStatic.h"
 
 //modeless로 생성한 경우 클릭된 버튼의 응답결과를 parent로 전달하기 위한 메시지
 static const UINT Message_CSCMessageBox = ::RegisterWindowMessage(_T("MessageString_CSCMessageBox"));

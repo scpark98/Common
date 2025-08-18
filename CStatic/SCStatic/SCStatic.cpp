@@ -102,19 +102,97 @@ void CSCStatic::PreSubclassWindow()
 	m_halign = get_halign();
 	m_valign = get_valign();
 
-	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
-	CWnd* pWnd = AfxGetApp()->GetMainWnd();// GetParent();
+	//Resource Editor에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로
+	//pWnd = NULL일 수 있다.
+	CWnd* pWnd = GetParent();
+
+	if (pWnd == NULL)
+		pWnd = AfxGetApp()->GetMainWnd();
+
 	CFont* font = NULL;
 
 	if (pWnd)
 		font = pWnd->GetFont();
 
 	if (font == NULL)
+	{
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+		//SYSTEM_FONT를 얻어오면 m_lf.lfWidth가 8로 세팅되는데
+		//이후 font_size, font_name을 변경해도 이 값이 그대로이므로
+		//가로로 넓어진 글꼴로 표시된다.
+		//따라서 m_lf.lfWidth를 0으로 초기화해줘야만 lfHeight에 따라 자동으로 조절된 글꼴로 올바르게 표시된다.
+		//의도적으로 넓이를 지정하지 않는 한 이 값은 0으로 설정해야 한다.
+		m_lf.lfWidth = 0; // 0 means default width
+	}
 	else
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
+
+	//CStatic에서 tooltip, mouse event등을 처리하려면 반드시 SS_NOTIFY 스타일을 추가해야 한다.
+	ModifyStyle(0, SS_NOTIFY);
 
 	reconstruct_font();
+}
+
+void CSCStatic::prepare_tooltip()
+{
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
+	m_tooltip = new CToolTipCtrl();
+
+	try
+	{
+		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	}
+	catch (CException*)
+	{
+		CString str = get_error_str(GetLastError());
+	}
+
+	//m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);
+	//m_tooltip->SetDelayTime(TTDT_INITIAL, 0);
+	//m_tooltip->SetDelayTime(TTDT_RESHOW, 0);
+	m_tooltip->SetMaxTipWidth(400);
+	m_tooltip->AddTool(this, _T(""));
+	m_tooltip->Activate(TRUE);
+	EnableToolTips(TRUE);
+	EnableTrackingToolTips(TRUE);
+
+	//TOOLINFO ti;
+	//ti.cbSize = TTTOOLINFOW_V2_SIZE;// sizeof(TOOLINFO);
+	//ti.uFlags = TTF_IDISHWND | TTF_TRACK | TTF_ABSOLUTE;
+	//ti.rect.left = ti.rect.top = ti.rect.bottom = ti.rect.right = 0;
+	//ti.hwnd = GetParent()->GetSafeHwnd();
+	//ti.uId = (UINT)GetSafeHwnd();
+	//ti.hinst = AfxGetInstanceHandle();
+	//ti.lpszText = (LPTSTR)_T("skldfjkl");
+
+	//SendMessage(TTM_ADDTOOL, 0, (LPARAM)&ti);
+	//SendMessage(TTM_TRACKACTIVATE, TRUE, (LPARAM)&ti);
+
+	//EnableTrackingToolTips(TRUE);
+	//m_tooltip->Activate(true);
+}
+
+void CSCStatic::set_tooltip_text(CString text)
+{
+	m_tooltip_text = text;
+
+	if (!text.IsEmpty())
+		m_use_tooltip = true;
+
+	if (!m_tooltip)
+		prepare_tooltip();
+
+	m_tooltip->UpdateTipText(m_tooltip_text, this);
+	m_tooltip->AddTool(this, m_tooltip_text);
 }
 
 void CSCStatic::reconstruct_font()
@@ -831,6 +909,27 @@ void CSCStatic::update_surface()
 BOOL CSCStatic::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: Add your specialized code here and/or call the base class
+
+	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
+	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
+	//이 코드는 main에 있어야만 disable 상태일때도 잘 표시된다.
+	if (m_use_tooltip && m_tooltip && m_tooltip->m_hWnd)
+	{
+		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
+		MSG msg = *pMsg;
+		msg.hwnd = (HWND)m_tooltip->SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
+
+		CPoint pt = msg.pt;
+
+		if (msg.message >= WM_MOUSEFIRST && msg.message <= WM_MOUSELAST)
+			::ScreenToClient(msg.hwnd, &pt);
+
+		msg.lParam = MAKELONG(pt.x, pt.y);
+
+		// relay mouse event before deleting old tool 
+		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
+	}
+
 /*
 	if (pMsg->message == WM_KEYDOWN)
 	{

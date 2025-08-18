@@ -14,7 +14,7 @@
 
 #include <afxwin.h>
 #include <deque>
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 #include "../../colors.h"
 
 #define DEFAULT_SYSTEM_BUTTON_WIDTH 44
@@ -41,7 +41,7 @@ public:
 
 	int		cmd = -1;
 	CRect	r;
-	CGdiplusBitmap	img;
+	CSCGdiplusBitmap	img;
 };
 
 // CSCSystemButtons

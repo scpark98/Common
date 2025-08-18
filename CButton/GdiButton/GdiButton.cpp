@@ -63,6 +63,9 @@ CGdiButton::CGdiButton()
 
 CGdiButton::~CGdiButton()
 {
+	if (m_tooltip)
+		delete m_tooltip;
+
 	release_all();
 }
 
@@ -705,6 +708,63 @@ void CGdiButton::PreSubclassWindow()
 	CButton::PreSubclassWindow();
 }
 
+void CGdiButton::prepare_tooltip()
+{
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
+	m_tooltip = new CToolTipCtrl();
+
+	try
+	{
+		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	}
+	catch (CException*)
+	{
+		CString str = get_error_str(GetLastError());
+	}
+
+	//m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);
+	//m_tooltip->SetDelayTime(TTDT_INITIAL, 0);
+	//m_tooltip->SetDelayTime(TTDT_RESHOW, 0);
+	m_tooltip->SetMaxTipWidth(400);
+	m_tooltip->AddTool(this, _T(""));
+	m_tooltip->Activate(TRUE);
+	EnableToolTips(TRUE);
+	EnableTrackingToolTips(TRUE);
+
+	//TOOLINFO ti;
+	//ti.cbSize = TTTOOLINFOW_V2_SIZE;// sizeof(TOOLINFO);
+	//ti.uFlags = TTF_IDISHWND | TTF_TRACK | TTF_ABSOLUTE;
+	//ti.rect.left = ti.rect.top = ti.rect.bottom = ti.rect.right = 0;
+	//ti.hwnd = GetParent()->GetSafeHwnd();
+	//ti.uId = (UINT)GetSafeHwnd();
+	//ti.hinst = AfxGetInstanceHandle();
+	//ti.lpszText = (LPTSTR)_T("skldfjkl");
+
+	//SendMessage(TTM_ADDTOOL, 0, (LPARAM)&ti);
+	//SendMessage(TTM_TRACKACTIVATE, TRUE, (LPARAM)&ti);
+
+	//EnableTrackingToolTips(TRUE);
+	//m_tooltip->Activate(true);
+}
+
+void CGdiButton::set_tooltip_text(CString text)
+{
+	m_tooltip_text = text;
+
+	if (!text.IsEmpty())
+		m_use_tooltip = true;
+
+	if (!m_tooltip)
+		prepare_tooltip();
+
+	m_tooltip->UpdateTipText(m_tooltip_text, this);
+	m_tooltip->AddTool(this, m_tooltip_text);
+}
 
 void CGdiButton::reconstruct_font()
 {
@@ -720,6 +780,27 @@ void CGdiButton::reconstruct_font()
 BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
+	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
+	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
+	//이 코드는 main에 있어야만 disable 상태일때도 잘 표시된다.
+	if (m_use_tooltip && m_tooltip && m_tooltip->m_hWnd)
+	{
+		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
+		MSG msg = *pMsg;
+		msg.hwnd = (HWND)m_tooltip->SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
+
+		CPoint pt = msg.pt;
+
+		if (msg.message >= WM_MOUSEFIRST && msg.message <= WM_MOUSELAST)
+			::ScreenToClient(msg.hwnd, &pt);
+
+		msg.lParam = MAKELONG(pt.x, pt.y);
+
+		// relay mouse event before deleting old tool 
+		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
+	}
+
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		switch (pMsg->wParam)

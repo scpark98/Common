@@ -43,7 +43,7 @@
 #include <afxwin.h>
 #include <afxdialogex.h>
 
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 #include "../../CButton/SCSystemButtons/SCSystemButtons.h"
 #include "../../CWnd/WndShadow/WndShadow.h"
 
@@ -120,9 +120,9 @@ public:
 	void	set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; }
 
 	//배경에 그림 표시, zoom? stretch? original size?, 
-	void	set_back_image(CString imgType, UINT nResourceID, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
-	void	set_back_image(CString img_path, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
-	void	set_back_image(UINT resource_id, int draw_mode = CGdiplusBitmap::draw_mode_stretch);
+	void	set_back_image(CString imgType, UINT nResourceID, int draw_mode = CSCGdiplusBitmap::draw_mode_stretch);
+	void	set_back_image(CString img_path, int draw_mode = CSCGdiplusBitmap::draw_mode_stretch);
+	void	set_back_image(UINT resource_id, int draw_mode = CSCGdiplusBitmap::draw_mode_stretch);
 
 	void	set_draw_border(bool draw, int width = 1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border = cr; }
@@ -175,14 +175,14 @@ protected:
 	//프로그램 로고 아이콘 표시 여부. 기본값 true
 	bool				m_show_logo = true;
 	//프로그램 로고(png만 허용, 이 값이 없다면 기본 앱 아이콘을 사용한다)
-	CGdiplusBitmap		m_img_logo;
+	CSCGdiplusBitmap	m_img_logo;
 
 	LOGFONT				m_titlebar_lf;
 	CFont				m_titlebar_font;
 	void				reconstruct_titlebar_font();
 
-	CGdiplusBitmap		m_img_back;
-	int					m_img_back_draw_mode = CGdiplusBitmap::draw_mode_stretch;	//default = CGdiplusBitmap::draw_mode_stretch
+	CSCGdiplusBitmap	m_img_back;
+	int					m_img_back_draw_mode = CSCGdiplusBitmap::draw_mode_stretch;	//default = CSCGdiplusBitmap::draw_mode_stretch
 	Gdiplus::Color		m_cr_out_of_back_img;		//배경 이미지를 zoom or origin크기로 그릴 경우 남은 영역의 색 채우기
 
 	CSCSystemButtons	m_sys_buttons;

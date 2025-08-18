@@ -9,8 +9,8 @@
 
 #include <locale>
 
-#include "colors.h"
-#include "MemoryDC.h"
+#include "Common/colors.h"
+#include "Common/MemoryDC.h"
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001

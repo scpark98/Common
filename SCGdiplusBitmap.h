@@ -2,7 +2,7 @@
 
 /*
 scpark.
-기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CGdiplusBitmap이라는 하나의 클래스로 합치고
+기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CSCGdiplusBitmap이라는 하나의 클래스로 합치고
 Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 * Gdiplus를 자동 초기화, 해제하기 위해 CGdiplusDummyForInitialization 클래스를 추가하고
@@ -12,13 +12,13 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 - 20221217. animatedGif 추가
 	//다른 이미지 포맷과는 달리 내부 쓰레드에서 parent의 DC에 디스플레이 함.
 	//간편한 장점도 있으나 parent DC에 디스플레이하면서 parent의 다른 child들과 간섭이 발생하므로
-	//CGdiplusBitmap에서 디스플레이 할 지
+	//CSCGdiplusBitmap에서 디스플레이 할 지
 	//parent에서 직접 디스플레이 할 지를 옵션으로 처리해야 한다.
 
 	//헤더에 include 및 멤버변수 선언
 	#include "../../Common/GdiplusBitmap.h"
 	...
-	CGdiplusBitmap m_gif;
+	CSCGdiplusBitmap m_gif;
 
 	//외부 파일 로딩 방법
 	m_gif.load(_T("D:\\media\\test_image\\test.gif"));
@@ -35,8 +35,8 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 변경할 예정
 
 - 20250609 animated gif 재생방식 분리
-	CGdiplusBitmap에서 직접 gif를 재생하면 편리하지만 parent의 다른 child들과 간섭 발생 등 단점이 많아 이를 옵션으로 처리함.
-	load("test.gif", true)로 호출하면 CGdiplusBitmap에서 자동 재생되고
+	CSCGdiplusBitmap에서 직접 gif를 재생하면 편리하지만 parent의 다른 child들과 간섭 발생 등 단점이 많아 이를 옵션으로 처리함.
+	load("test.gif", true)로 호출하면 CSCGdiplusBitmap에서 자동 재생되고
 	load("test.gif", false)로 호출하면 load하는 윈도우에서 직접 재생하게 된다.
 */
 
@@ -54,12 +54,12 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 #include <vector>
 #include <memory>
 
-static const UINT Message_CGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CGdiplusBitmap"));
+static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CSCGdiplusBitmap"));
 
 //주의할 점은 TOP, LEFT는 0이므로 먼저 비교하면 안되고 CENTER, RIGHT인지 검사한 후 아니면 LEFT라고 판단해야 한다.
 //align = ALIGN_LEFT | ALIGN_BOTTOM 을 주면 8이 되는데 이렇게 호출하면
 //if (align & ALIGN_LEFT) //이 비교 결과는 0이 되므로 실행되지 않는다.
-//=> CGdiplusBitmap::canvas_size()를 호출할 때 이미지 위치를 지정할 때 사용하기 위해 정의했으나
+//=> CSCGdiplusBitmap::canvas_size()를 호출할 때 이미지 위치를 지정할 때 사용하기 위해 정의했으나
 //이미 afxbutton.h에 정의되어 중복된다. DrawText()에서 사용되는 align을 그냥 이용한다.
 //#define ALIGN_TOP        0x00000000
 //#define ALIGN_LEFT       0x00000000
@@ -93,10 +93,10 @@ protected:
 	ULONG_PTR gdiplusToken;
 };
 
-class CGdiplusBitmapMessage
+class CSCGdiplusBitmapMessage
 {
 public:
-	CGdiplusBitmapMessage(Gdiplus::Bitmap* _this, int _message, int _frame_index, int _total_frames)
+	CSCGdiplusBitmapMessage(Gdiplus::Bitmap* _this, int _message, int _frame_index, int _total_frames)
 	{
 		pThis = _this;
 		message = _message;
@@ -110,28 +110,28 @@ public:
 	int		total_frames = -1;
 };
 
-class CGdiplusBitmap
+class CSCGdiplusBitmap
 {
 public:
 	Gdiplus::Bitmap* m_pBitmap = NULL;
 
-	enum CGdiplusBitmapMsgs
+	enum CSCGdiplusBitmapMsgs
 	{
 		message_image_modified = 0,
 		message_gif_frame_changed,
 	};
 
 public:
-	CGdiplusBitmap();
-	CGdiplusBitmap(Gdiplus::Bitmap* src);
-	CGdiplusBitmap(HBITMAP hBitmap);
-	CGdiplusBitmap(IStream* pStream);
-	CGdiplusBitmap(CString pFile);
-	CGdiplusBitmap(CGdiplusBitmap* src);
+	CSCGdiplusBitmap();
+	CSCGdiplusBitmap(Gdiplus::Bitmap* src);
+	CSCGdiplusBitmap(HBITMAP hBitmap);
+	CSCGdiplusBitmap(IStream* pStream);
+	CSCGdiplusBitmap(CString pFile);
+	CSCGdiplusBitmap(CSCGdiplusBitmap* src);
 	//sType은 "png", "jpg", "gif"를 대표적으로 지원하며 "tiff", "webp" 등 다른 포맷도 지원하지만 우선 배제함.
 	//"ico" 파일은 크기 파라미터도 중요하므로 load_icon()을 사용하도록 한다.
-	CGdiplusBitmap(CString sType, UINT id);
-	CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
+	CSCGdiplusBitmap(CString sType, UINT id);
+	CSCGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//not tested.
 	IStream* CreateStreamOnFile(LPCTSTR pszPathName);
@@ -140,7 +140,7 @@ public:
 
 	Gdiplus::Graphics* get_graphics() { Gdiplus::Graphics g(m_pBitmap); return &g; }
 
-	virtual ~CGdiplusBitmap();
+	virtual ~CSCGdiplusBitmap();
 
 	bool			m_referenced_variable = false;
 
@@ -151,7 +151,7 @@ public:
 
 	void			release();
 
-	//CGdiplusBitmap과 CGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
+	//CSCGdiplusBitmap과 CSCGdiplusBitmapResource 두 개의 클래스가 있었으나 통합함.
 	//외부 이미지 파일 로딩
 	bool			load(CString sfile);
 	//다음 예시와 같이 리소스 ID앞에 UINT로 명시해야 load()함수의 모호함이 없어진다.
@@ -164,10 +164,10 @@ public:
 
 	CString			get_filename(bool fullpath = true);
 
-	//animated gif를 load한 경우 재생을 CGdiplusBitmap에서 자체적으로 하느냐(기본값),
+	//animated gif를 load한 경우 재생을 CSCGdiplusBitmap에서 자체적으로 하느냐(기본값),
 	//load하는 메인 클래스에서 직접 thread로 재생하느냐를 설정
-	//일반적으로는 특정 dlg에서 gif를 로딩하여 CGdiplusBitmap 자체에서 바로 재생하도록 하면 편하지만
-	//ASee.exe와 같이 roi 설정, 기타 child ctrl들이 존재하여 그들과의 간섭이 문제가 될 경우는 CGdiplusBitmap에서 재생시키지 않고
+	//일반적으로는 특정 dlg에서 gif를 로딩하여 CSCGdiplusBitmap 자체에서 바로 재생하도록 하면 편하지만
+	//ASee.exe와 같이 roi 설정, 기타 child ctrl들이 존재하여 그들과의 간섭이 문제가 될 경우는 CSCGdiplusBitmap에서 재생시키지 않고
 	//CSCImageDlg에서 직접 재생시켜야 하는 경우도 있다.
 	void			set_gif_play_itself(bool play_itself = true) { m_gif_play_in_this = play_itself; }
 	bool			is_gif_play_itself() { return m_gif_play_in_this; }
@@ -228,12 +228,12 @@ public:
 	//draw_mode = draw_mode_origin(as image original 1:1 size),
 	CRect			draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode = draw_mode_zoom);
 	CRect			draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
-	CRect			draw(Gdiplus::Graphics& g, CGdiplusBitmap mask, CRect targetRect);
+	CRect			draw(Gdiplus::Graphics& g, CSCGdiplusBitmap mask, CRect targetRect);
 	CRect			draw(CDC* pDC, CRect targetRect, int draw_mode = draw_mode_zoom);
 	CRect			draw(CDC* pDC, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 
-	//CGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
-	CRect			draw(CGdiplusBitmap *img, CRect* targetRect = NULL);
+	//CSCGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
+	CRect			draw(CSCGdiplusBitmap *img, CRect* targetRect = NULL);
 
 	//그림을 그리지 않고 표시될 영역 정보만 얻는다.
 	CRect			calc_rect(CRect targetRect, int draw_mode = draw_mode_zoom);
@@ -248,8 +248,8 @@ public:
 	};
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.
-	void			clone(CGdiplusBitmap* dst);
-	void			deep_copy(CGdiplusBitmap* dst);
+	void			clone(CSCGdiplusBitmap* dst);
+	void			deep_copy(CSCGdiplusBitmap* dst);
 	static void		deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src);
 	void			rotate(Gdiplus::RotateFlipType type);
 	//회전시키면 w, h가 달라지므로 이미지의 크기를 보정해줘야만 하는 경우도 있다.
@@ -419,7 +419,7 @@ public:
 
 
 	//배경 그림자 이미지를 생성한다.
-	void			create_back_shadow_image(CGdiplusBitmap* shadow, float sigma = 10.0f, int type = 0, int depth = 10);
+	void			create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma = 10.0f, int type = 0, int depth = 10);
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.

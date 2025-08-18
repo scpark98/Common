@@ -1,4 +1,4 @@
-﻿#include "GdiplusBitmap.h"
+﻿#include "SCGdiplusBitmap.h"
 
 
 #include "Functions.h"
@@ -11,15 +11,15 @@
 
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
 
-Gdiplus::Color CGdiplusBitmap::m_cr_zigzag_back = Gdiplus::Color::White;
-Gdiplus::Color CGdiplusBitmap::m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
+Gdiplus::Color CSCGdiplusBitmap::m_cr_zigzag_back = Gdiplus::Color::White;
+Gdiplus::Color CSCGdiplusBitmap::m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
 
-CGdiplusBitmap::CGdiplusBitmap()
+CSCGdiplusBitmap::CSCGdiplusBitmap()
 {
 	release();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(Gdiplus::Bitmap* src)
+CSCGdiplusBitmap::CSCGdiplusBitmap(Gdiplus::Bitmap* src)
 {
 	release();
 
@@ -35,7 +35,7 @@ CGdiplusBitmap::CGdiplusBitmap(Gdiplus::Bitmap* src)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
+CSCGdiplusBitmap::CSCGdiplusBitmap(HBITMAP hBitmap)
 {
 	release();
 
@@ -89,7 +89,7 @@ CGdiplusBitmap::CGdiplusBitmap(HBITMAP hBitmap)
 //gif이미지를 각 프레임별로 stream을 구하고 이를 로딩하려 했으나
 //gdiplus에서는 한번에 gif를 로딩하는 api를 제공하므로
 //이 함수를 사용하지 않는다.
-CGdiplusBitmap::CGdiplusBitmap(IStream* pStream)
+CSCGdiplusBitmap::CSCGdiplusBitmap(IStream* pStream)
 {
 	release();
 
@@ -109,23 +109,23 @@ CGdiplusBitmap::CGdiplusBitmap(IStream* pStream)
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(CString sFile)
+CSCGdiplusBitmap::CSCGdiplusBitmap(CString sFile)
 {
 	load(sFile);
 }
 
-CGdiplusBitmap::CGdiplusBitmap(CGdiplusBitmap* src)
+CSCGdiplusBitmap::CSCGdiplusBitmap(CSCGdiplusBitmap* src)
 {
 	src->deep_copy(this);
 	resolution();
 }
 
-CGdiplusBitmap::CGdiplusBitmap(CString lpType, UINT id)
+CSCGdiplusBitmap::CSCGdiplusBitmap(CString lpType, UINT id)
 {
 	load(lpType, id);
 }
 
-CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
+CSCGdiplusBitmap::CSCGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
 {
 	release();
 
@@ -135,7 +135,7 @@ CGdiplusBitmap::CGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdip
 	resolution();
 }
 
-void CGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
+void CSCGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
 {
 	release();
 
@@ -146,7 +146,7 @@ void CGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus
 }
 
 //CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
-void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
+void CSCGdiplusBitmap::create_drag_image(CWnd* pWnd)
 {
 	release();
 
@@ -175,14 +175,14 @@ void CGdiplusBitmap::create_drag_image(CWnd* pWnd)
 	}
 }
 
-bool CGdiplusBitmap::load(CString file)
+bool CSCGdiplusBitmap::load(CString file)
 {
 	if (!PathFileExists(file))
 		return false;
 
 	release();
 
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	
 	//멀티바이트 환경에서 CString2LPCWSTR()를 써서
 	//LPCWSTR로 바꿨으나 일부 파일 열기 실패하는 현상 발생.
@@ -316,7 +316,7 @@ inline Gdiplus::Bitmap* BitmapFromGpBitmap(Gdiplus::GpBitmap* native) {
 	return reinterpret_cast<Gdiplus::Bitmap*>(native);
 }
 
-bool CGdiplusBitmap::load_webp(CString sfile)
+bool CSCGdiplusBitmap::load_webp(CString sfile)
 {
 	bool res = true;
 
@@ -364,7 +364,7 @@ bool CGdiplusBitmap::load_webp(CString sfile)
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-bool CGdiplusBitmap::load(UINT id)
+bool CSCGdiplusBitmap::load(UINT id)
 {
 	if (id <= 0)
 		return false;
@@ -372,7 +372,7 @@ bool CGdiplusBitmap::load(UINT id)
 	return load(_T("PNG"), id);
 }
 
-bool CGdiplusBitmap::load(CString sType, UINT id)
+bool CSCGdiplusBitmap::load(CString sType, UINT id)
 {
 	release();
 
@@ -398,7 +398,7 @@ bool CGdiplusBitmap::load(CString sType, UINT id)
 	return true;
 }
 
-bool CGdiplusBitmap::load_icon(UINT id, int size)
+bool CSCGdiplusBitmap::load_icon(UINT id, int size)
 {
 	release();
 
@@ -435,7 +435,7 @@ bool CGdiplusBitmap::load_icon(UINT id, int size)
 	return true;
 }
 
-CString CGdiplusBitmap::get_filename(bool fullpath)
+CString CSCGdiplusBitmap::get_filename(bool fullpath)
 {
 	if (!fullpath)
 		return get_part(m_filename, fn_name);
@@ -443,7 +443,7 @@ CString CGdiplusBitmap::get_filename(bool fullpath)
 	return m_filename;
 }
 
-Gdiplus::Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
+Gdiplus::Bitmap* CSCGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 {
 	HRSRC hResource;
 
@@ -484,7 +484,7 @@ Gdiplus::Bitmap* CGdiplusBitmap::GetImageFromResource(CString sType, UINT id)
 	return pBitmap;
 }
 
-IStream* CGdiplusBitmap::CreateStreamOnFile(LPCTSTR pszPathName)
+IStream* CSCGdiplusBitmap::CreateStreamOnFile(LPCTSTR pszPathName)
 {
 	HANDLE hFile = ::CreateFile(pszPathName,
 		FILE_READ_DATA,
@@ -534,7 +534,7 @@ IStream* CGdiplusBitmap::CreateStreamOnFile(LPCTSTR pszPathName)
 	return pStream;
 }
 
-IStream* CGdiplusBitmap::CreateStreamOnResource(LPCTSTR lpName, LPCTSTR lpType)
+IStream* CSCGdiplusBitmap::CreateStreamOnResource(LPCTSTR lpName, LPCTSTR lpType)
 {
 	// initialize return value
 	IStream* ipStream = NULL;
@@ -583,7 +583,7 @@ IStream* CGdiplusBitmap::CreateStreamOnResource(LPCTSTR lpName, LPCTSTR lpType)
 	return ipStream;
 }
 
-IWICBitmapSource* CGdiplusBitmap::LoadBitmapFromStream(IStream* ipImageStream)
+IWICBitmapSource* CSCGdiplusBitmap::LoadBitmapFromStream(IStream* ipImageStream)
 {
 	// initialize return value
 	IWICBitmapSource* ipBitmap = NULL;
@@ -626,12 +626,12 @@ IWICBitmapSource* CGdiplusBitmap::LoadBitmapFromStream(IStream* ipImageStream)
 	return ipBitmap;
 }
 
-CGdiplusBitmap::~CGdiplusBitmap()
+CSCGdiplusBitmap::~CSCGdiplusBitmap()
 {
 	release();
 }
 
-void CGdiplusBitmap::release()
+void CSCGdiplusBitmap::release()
 {
 	m_palette_adjusted = false;
 
@@ -669,7 +669,7 @@ void CGdiplusBitmap::release()
 //---------------------------------------------------------------
 // Create a 32bpp ARGB Gdiplus::Bitmap from a DIBSECTION
 //---------------------------------------------------------------
-Gdiplus::Bitmap* CGdiplusBitmap::CreateARGBBitmapFromDIB(const DIBSECTION& dib)
+Gdiplus::Bitmap* CSCGdiplusBitmap::CreateARGBBitmapFromDIB(const DIBSECTION& dib)
 {
 	int width = dib.dsBmih.biWidth;
 	int pitch = dib.dsBm.bmWidthBytes;
@@ -695,7 +695,7 @@ Gdiplus::Bitmap* CGdiplusBitmap::CreateARGBBitmapFromDIB(const DIBSECTION& dib)
 #pragma pop_macro("new")
 }
 
-void CGdiplusBitmap::resolution()
+void CSCGdiplusBitmap::resolution()
 {
 	//이미지 데이터를 추출한 인스턴스라면 변경 후 재추출해준다?
 	//data 주소가 변경되므로 위험하다. 좀 더 검토 후 변경할 것!
@@ -753,7 +753,7 @@ void CGdiplusBitmap::resolution()
 	check_animate_gif();
 }
 
-bool CGdiplusBitmap::get_raw_data()
+bool CSCGdiplusBitmap::get_raw_data()
 {
 	SAFE_DELETE_ARRAY(data);
 	
@@ -793,7 +793,7 @@ bool CGdiplusBitmap::get_raw_data()
 	return false;
 }
 
-bool CGdiplusBitmap::set_raw_data()
+bool CSCGdiplusBitmap::set_raw_data()
 {
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight()); //크기구하기
 	Gdiplus::BitmapData bmpData; //비트맵데이터 객체
@@ -818,7 +818,7 @@ bool CGdiplusBitmap::set_raw_data()
 	return false;
 }
 
-bool CGdiplusBitmap::is_empty()
+bool CSCGdiplusBitmap::is_empty()
 {
 	if (this == NULL)
 		return false;
@@ -826,12 +826,12 @@ bool CGdiplusBitmap::is_empty()
 	return (m_pBitmap == NULL || width <= 0 || height <= 0);
 }
 
-bool CGdiplusBitmap::is_valid()
+bool CSCGdiplusBitmap::is_valid()
 {
 	return !is_empty();
 }
 
-int CGdiplusBitmap::get_channel()
+int CSCGdiplusBitmap::get_channel()
 {
 	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
 
@@ -845,9 +845,9 @@ int CGdiplusBitmap::get_channel()
 	return 3;
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect targetRect)
+CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CSCGdiplusBitmap mask1, CRect targetRect)
 {
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	//temp.load(_T("d:\\temp\\mask.bmp"));
 	//temp.convert2gray();
 
@@ -900,13 +900,13 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CGdiplusBitmap mask1, CRect tar
 	return r;
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, CRect targetRect, int draw_mode)
+CRect CSCGdiplusBitmap::draw(CDC* pDC, CRect targetRect, int draw_mode)
 {
 	Gdiplus::Graphics g(pDC->GetSafeHdc());
 	return draw(g, targetRect, draw_mode);
 }
 
-CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
+CRect CSCGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
 {
 	if (dw <= 0)
 		dw = width;
@@ -916,8 +916,8 @@ CRect CGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
 	return draw(pDC, CRect(dx, dy, dx + dw, dy + dh), draw_mode_stretch);
 }
 
-//CGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
-CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
+//CSCGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
+CRect CSCGdiplusBitmap::draw(CSCGdiplusBitmap *img, CRect* targetRect)
 {
 	Gdiplus::Graphics g(m_pBitmap);
 
@@ -933,7 +933,7 @@ CRect CGdiplusBitmap::draw(CGdiplusBitmap *img, CRect* targetRect)
 	return dst;
 }
 
-CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simple, bool reset)
+CString CSCGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simple, bool reset)
 {
 	if (reset)
 		m_pixel_format_str.Empty();
@@ -1014,7 +1014,7 @@ CString CGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool simp
 }
 
 //이미지 비율은 보통 width/height지만 반대 비율을 원할 경우는 wh = false로 준다.
-float CGdiplusBitmap::get_ratio(bool wh)
+float CSCGdiplusBitmap::get_ratio(bool wh)
 {
 	if (width == 0 || height == 0)
 		return 0.0f;
@@ -1029,7 +1029,7 @@ float CGdiplusBitmap::get_ratio(bool wh)
 //-1 : 아직 판별되지 않은 상태이므로 판별 시작
 // 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우
 // 1 : 한 점이라도 alpha < 255인 경우
-int CGdiplusBitmap::has_alpha_pixel()
+int CSCGdiplusBitmap::has_alpha_pixel()
 {
 	//Gdiplus::IsAlphaPixelFormat() 은 PixelFormat32bppARGB 과 같은 Gdiplus::PixelFormat을 구해서 A 채널을 가졌는지를 판별하므로
 	//실제 모든 픽셀의 alpha가 255라고 해도 true가 된다.
@@ -1081,7 +1081,7 @@ int CGdiplusBitmap::has_alpha_pixel()
 	return m_has_alpha_pixel;
 }
 
-std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
+std::unique_ptr<Gdiplus::TextureBrush> CSCGdiplusBitmap::get_zigzag_pattern(int sz_tile, Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
 {
 	m_cr_zigzag_back = cr_back;
 	m_cr_zigzag_fore = cr_fore;
@@ -1104,7 +1104,7 @@ std::unique_ptr<Gdiplus::TextureBrush> CGdiplusBitmap::get_zigzag_pattern(int sz
 	return std::make_unique<Gdiplus::TextureBrush>(tile.get(), Gdiplus::WrapModeTile);
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode)
+CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode)
 {
 	CRect r;
 	
@@ -1121,7 +1121,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode
 	return draw(g, r.left, r.top, r.Width(), r.Height());
 }
 
-CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, int dx, int dy, int dw, int dh)
+CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, int dx, int dy, int dw, int dh)
 {
 	if (dw <= 0)
 		dw = width;
@@ -1181,7 +1181,7 @@ CRect CGdiplusBitmap::draw(Gdiplus::Graphics& g, int dx, int dy, int dw, int dh)
 }
 
 //그림을 그리지 않고 표시될 영역 정보만 얻는다.
-CRect CGdiplusBitmap::calc_rect(CRect targetRect, int draw_mode)
+CRect CSCGdiplusBitmap::calc_rect(CRect targetRect, int draw_mode)
 {
 	CRect r;
 
@@ -1202,14 +1202,14 @@ CRect CGdiplusBitmap::calc_rect(CRect targetRect, int draw_mode)
 //좀 더 확인이 필요하다.
 //파일을 그냥 열면 탐색기 등에서 해당 파일을 지우거나 변경할 수 없는데
 //temp로 열고 deep_copy를 하니 그런 문제가 사라짐.
-void CGdiplusBitmap::clone(CGdiplusBitmap* dst)
+void CSCGdiplusBitmap::clone(CSCGdiplusBitmap* dst)
 {
 	dst->release();
 	dst->m_pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
 	dst->resolution();
 }
 
-void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
+void CSCGdiplusBitmap::deep_copy(CSCGdiplusBitmap* dst)
 {
 	if (dst != NULL && dst->m_pBitmap != NULL)
 		dst->release();
@@ -1225,7 +1225,7 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 
 	//메모리 복사 방식
 	if (dst == NULL)
-		dst = new CGdiplusBitmap();
+		dst = new CSCGdiplusBitmap();
 
 	dst->m_pBitmap = new Gdiplus::Bitmap(m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
 	Gdiplus::Rect rect(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight());
@@ -1246,7 +1246,7 @@ void CGdiplusBitmap::deep_copy(CGdiplusBitmap* dst)
 	dst->m_referenced_variable = false;
 }
 
-void CGdiplusBitmap::deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src)
+void CSCGdiplusBitmap::deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src)
 {
 	if (*dst)
 		delete *dst;
@@ -1262,7 +1262,7 @@ void CGdiplusBitmap::deep_copy(Gdiplus::Bitmap** dst, Gdiplus::Bitmap* src)
 }
 
 //좌우대칭
-void CGdiplusBitmap::mirror()
+void CSCGdiplusBitmap::mirror()
 {
 	bool has_data = false;
 	if (data)
@@ -1278,7 +1278,7 @@ void CGdiplusBitmap::mirror()
 }
 
 //상하대칭
-void CGdiplusBitmap::flip()
+void CSCGdiplusBitmap::flip()
 {
 	bool has_data = false;
 	if (data)
@@ -1293,7 +1293,7 @@ void CGdiplusBitmap::flip()
 		get_raw_data();
 }
 
-void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
+void CSCGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 {
 	SAFE_DELETE_ARRAY(data);
 
@@ -1301,7 +1301,7 @@ void CGdiplusBitmap::rotate(Gdiplus::RotateFlipType type)
 	resolution();
 }
 
-void CGdiplusBitmap::rotate(float degree, bool auto_resize, Gdiplus::Color remove_back_color)
+void CSCGdiplusBitmap::rotate(float degree, bool auto_resize, Gdiplus::Color remove_back_color)
 {
 	int originw = width;
 	int originh = height;
@@ -1364,7 +1364,7 @@ void CGdiplusBitmap::rotate(float degree, bool auto_resize, Gdiplus::Color remov
 	//save(_T("d:\\temp\\rotated_fit.png"));
 }
 
-CRect CGdiplusBitmap::draw_text(int x, int y, int w, int h,
+CRect CSCGdiplusBitmap::draw_text(int x, int y, int w, int h,
 							CString text,
 							float font_size,
 							int font_style,
@@ -1383,7 +1383,7 @@ CRect CGdiplusBitmap::draw_text(int x, int y, int w, int h,
 		cr_text, cr_stroke, cr_shadow, cr_back, align);
 }
 
-CRect CGdiplusBitmap::draw_text(CRect rTarget,
+CRect CSCGdiplusBitmap::draw_text(CRect rTarget,
 							CString text,
 							float font_size,
 							int font_style,
@@ -1446,7 +1446,7 @@ CRect CGdiplusBitmap::draw_text(CRect rTarget,
 	*/
 }
 
-void CGdiplusBitmap::fit_to_image(Gdiplus::Color remove_back_color)
+void CSCGdiplusBitmap::fit_to_image(Gdiplus::Color remove_back_color)
 {
 	int x, y;
 	CRect r(0, 0, width, height);
@@ -1567,7 +1567,7 @@ void CGdiplusBitmap::fit_to_image(Gdiplus::Color remove_back_color)
 	sub_image(r);
 }
 
-void CGdiplusBitmap::resize(int cx, int cy, Gdiplus::InterpolationMode mode)
+void CSCGdiplusBitmap::resize(int cx, int cy, Gdiplus::InterpolationMode mode)
 {
 	if (cx <= 0 && cy <= 0)
 		return;
@@ -1598,7 +1598,7 @@ void CGdiplusBitmap::resize(int cx, int cy, Gdiplus::InterpolationMode mode)
 	resolution();
 }
 
-void CGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
+void CSCGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
 {
 	int nw = (float)width * fx;
 	int nh = (float)height * fy;
@@ -1606,7 +1606,7 @@ void CGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mode)
 }
 
 //이미지 캔버스 크기를 조정한다.
-void CGdiplusBitmap::canvas_size(int cx, int cy, int align, Gdiplus::Color cr_fill)
+void CSCGdiplusBitmap::canvas_size(int cx, int cy, int align, Gdiplus::Color cr_fill)
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(cx, cy);
 	Gdiplus::Graphics g(result);
@@ -1636,22 +1636,22 @@ void CGdiplusBitmap::canvas_size(int cx, int cy, int align, Gdiplus::Color cr_fi
 	resolution();
 }
 
-void CGdiplusBitmap::sub_image(CRect r)
+void CSCGdiplusBitmap::sub_image(CRect r)
 {
 	sub_image(r.left, r.top, r.Width(), r.Height());
 }
 
-void CGdiplusBitmap::sub_image(Gdiplus::Rect r)
+void CSCGdiplusBitmap::sub_image(Gdiplus::Rect r)
 {
 	sub_image(r.X, r.Y, r.Width, r.Height);
 }
 
-void CGdiplusBitmap::sub_image(Gdiplus::RectF r)
+void CSCGdiplusBitmap::sub_image(Gdiplus::RectF r)
 {
 	sub_image(r.X, r.Y, r.Width, r.Height);
 }
 
-void CGdiplusBitmap::sub_image(float x, float y, float w, float h)
+void CSCGdiplusBitmap::sub_image(float x, float y, float w, float h)
 {
 	x = ROUND(x, 0);
 	y = ROUND(y, 0);
@@ -1672,7 +1672,7 @@ void CGdiplusBitmap::sub_image(float x, float y, float w, float h)
 
 //회색톤으로 변경만 할 뿐 실제 픽셀포맷은 변경되지 않는다.
 //weight가 1.0f이면 original gray이미지로 변경되지만 1.0f보다 크면 밝아지고 작으면 어두워짐.
-void CGdiplusBitmap::gray(float weight)
+void CSCGdiplusBitmap::gray(float weight)
 {
 
 	Gdiplus::ColorMatrix colorMatrix = { 0.299f * weight, 0.299f * weight, 0.299f * weight, 0.0f, 0.0f,		//red
@@ -1682,7 +1682,7 @@ void CGdiplusBitmap::gray(float weight)
 										 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -1696,7 +1696,7 @@ void CGdiplusBitmap::gray(float weight)
 	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
-void CGdiplusBitmap::negative()
+void CSCGdiplusBitmap::negative()
 {
 	Gdiplus::ColorMatrix colorMatrix = { -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
@@ -1705,7 +1705,7 @@ void CGdiplusBitmap::negative()
 								1.0f, 1.0f, 1.0f, 0.0f, 1.0f };
 
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -1719,24 +1719,24 @@ void CGdiplusBitmap::negative()
 	g.DrawImage(temp, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
-Gdiplus::Color  CGdiplusBitmap::get_color(int x, int y)
+Gdiplus::Color  CSCGdiplusBitmap::get_color(int x, int y)
 {
 	Gdiplus::Color cr;
 	m_pBitmap->GetPixel(x, y, &cr);
 	return cr;
 }
 
-void CGdiplusBitmap::replace_color(int tx, int ty, Gdiplus::Color dst)
+void CSCGdiplusBitmap::replace_color(int tx, int ty, Gdiplus::Color dst)
 {
 	Gdiplus::Color cr;
 	m_pBitmap->GetPixel(tx, ty, &cr);
 	replace_color(cr, dst);
 }
 
-void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
+void CSCGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 {
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -1755,7 +1755,7 @@ void CGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 }
 
 //투명 png의 배경색을 변경한다. undo는 지원되지 않는다.
-void CGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
+void CSCGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
 {
 	m_cr_back = cr_back;
 	if (is_animated_gif())
@@ -1773,7 +1773,7 @@ void CGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
 }
 
 //지정된 색으로 채운다.
-void CGdiplusBitmap::clear(Gdiplus::Color cr)
+void CSCGdiplusBitmap::clear(Gdiplus::Color cr)
 {
 	if (is_empty())
 		return;
@@ -1785,7 +1785,7 @@ void CGdiplusBitmap::clear(Gdiplus::Color cr)
 //현재 이미지에 더해지는 것이므로 계속 누적될 것이다.
 //즉, red를 +255늘린 후 다시 -255해도 원본이 될 수 없다.
 //원본에 적용하는 것이 정석이나 구조 수정이 필요하다.
-void CGdiplusBitmap::add_rgb(int red, int green, int blue)
+void CSCGdiplusBitmap::add_rgb(int red, int green, int blue)
 {
 	float fr = (float)red / 255.0f;
 	float fg = (float)green / 255.0f;
@@ -1798,7 +1798,7 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue)
 								  fr,   fg,   fb, 0.0f, 1.0f };
 
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -1815,7 +1815,7 @@ void CGdiplusBitmap::add_rgb(int red, int green, int blue)
 }
 
 /*
-void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcept)
+void CSCGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcept)
 {
 	int x, y;
 	int a, r, g, b;
@@ -1869,7 +1869,7 @@ void CGdiplusBitmap::add_rgb_loop(int red, int green, int blue, COLORREF crExcep
 	m_pBitmap->UnlockBits(&bmData);
 }
 */
-void CGdiplusBitmap::black_and_white(float red, float green, float blue)
+void CSCGdiplusBitmap::black_and_white(float red, float green, float blue)
 {
 	Gdiplus::ColorMatrix cm = { 1.5f, 1.5f, 1.5f, 0.0f, 0.0f,
 								1.5f, 1.5f, 1.5f, 0.0f, 0.0f,
@@ -1883,7 +1883,7 @@ void CGdiplusBitmap::black_and_white(float red, float green, float blue)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-int CGdiplusBitmap::adjust_bright(int bright, bool adjust_others)
+int CSCGdiplusBitmap::adjust_bright(int bright, bool adjust_others)
 {
 	Clamp(bright, 0, 400);
 	//TRACE(_T("bright = %d%%\n"), bright);
@@ -1905,11 +1905,11 @@ int CGdiplusBitmap::adjust_bright(int bright, bool adjust_others)
 	//조정값이 변하면 원본을 복사해서 적용해야 한다.
 	if (m_pOrigin == NULL)
 	{
-		CGdiplusBitmap::deep_copy(&m_pOrigin, m_pBitmap);
+		CSCGdiplusBitmap::deep_copy(&m_pOrigin, m_pBitmap);
 	}
 	else
 	{
-		CGdiplusBitmap::deep_copy(&m_pBitmap, m_pOrigin);
+		CSCGdiplusBitmap::deep_copy(&m_pBitmap, m_pOrigin);
 		if (adjust_others)
 			adjust_contrast(m_contrast, false);
 	}
@@ -1919,7 +1919,7 @@ int CGdiplusBitmap::adjust_bright(int bright, bool adjust_others)
 	return bright;
 }
 
-int CGdiplusBitmap::adjust_contrast(int contrast, bool adjust_others)
+int CSCGdiplusBitmap::adjust_contrast(int contrast, bool adjust_others)
 {
 	Clamp(contrast, 0, 400);
 	//TRACE(_T("contrast = %d%%\n"), contrast);
@@ -1942,11 +1942,11 @@ int CGdiplusBitmap::adjust_contrast(int contrast, bool adjust_others)
 	//조정값이 변하면 원본을 복사해서 적용해야 한다.
 	if (m_pOrigin == NULL)
 	{
-		CGdiplusBitmap::deep_copy(&m_pOrigin, m_pBitmap);
+		CSCGdiplusBitmap::deep_copy(&m_pOrigin, m_pBitmap);
 	}
 	else
 	{
-		CGdiplusBitmap::deep_copy(&m_pBitmap, m_pOrigin);
+		CSCGdiplusBitmap::deep_copy(&m_pBitmap, m_pOrigin);
 		if (adjust_others)
 			adjust_bright(m_bright, false);
 	}
@@ -1956,19 +1956,19 @@ int CGdiplusBitmap::adjust_contrast(int contrast, bool adjust_others)
 	return m_contrast;
 }
 
-int CGdiplusBitmap::increase_bright(int interval)
+int CSCGdiplusBitmap::increase_bright(int interval)
 {
 	m_bright += interval;
 	return adjust_bright(m_bright);
 }
 
-int CGdiplusBitmap::increase_contrast(int interval)
+int CSCGdiplusBitmap::increase_contrast(int interval)
 {
 	m_contrast += interval;
 	return adjust_contrast(m_contrast);
 }
 
-void CGdiplusBitmap::reset_adjust()
+void CSCGdiplusBitmap::reset_adjust()
 {
 	adjust_bright(100);
 	adjust_contrast(100);
@@ -1976,7 +1976,7 @@ void CGdiplusBitmap::reset_adjust()
 	SAFE_DELETE(m_pOrigin);
 }
 
-void CGdiplusBitmap::sepia()
+void CSCGdiplusBitmap::sepia()
 {
 	Gdiplus::ColorMatrix cm = { 0.393f, 0.349f, 0.272f, 0.0f, 0.0f,
 								0.769f, 0.686f, 0.534f, 0.0f, 0.0f,
@@ -1990,7 +1990,7 @@ void CGdiplusBitmap::sepia()
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::polaroid()
+void CSCGdiplusBitmap::polaroid()
 {
 	Gdiplus::ColorMatrix cm = { 1.439, -0.062f, -0.062f, 0.0f, 0.0f,
 								-0.122f, 1.378f, -0.122f, 0.0f, 0.0f,
@@ -2004,7 +2004,7 @@ void CGdiplusBitmap::polaroid()
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::rgb_to_bgr()
+void CSCGdiplusBitmap::rgb_to_bgr()
 {
 	Gdiplus::ColorMatrix cm = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
@@ -2018,7 +2018,7 @@ void CGdiplusBitmap::rgb_to_bgr()
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::adjust_hsl(int hue, int sat, int light)
+void CSCGdiplusBitmap::adjust_hsl(int hue, int sat, int light)
 {
 	Gdiplus::HueSaturationLightness hsl;
 	Gdiplus::HueSaturationLightnessParams hslParam;
@@ -2033,7 +2033,7 @@ void CGdiplusBitmap::adjust_hsl(int hue, int sat, int light)
 	m_pBitmap->ApplyEffect(&hsl, NULL);
 }
 
-void CGdiplusBitmap::adjust_rgba(float r, float g, float b, float a)
+void CSCGdiplusBitmap::adjust_rgba(float r, float g, float b, float a)
 {
 	Gdiplus::ColorMatrix cm = {	r, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, g, 0.0f, 0.0f, 0.0f,
@@ -2045,14 +2045,14 @@ void CGdiplusBitmap::adjust_rgba(float r, float g, float b, float a)
 	Gdiplus::ColorMatrixEffect cmEffect;
 	cmEffect.SetParameters(&cm);
 
-	//CGdiplusBitmap* temp;
+	//CSCGdiplusBitmap* temp;
 	//deep_copy(temp);
 	
 	//Gdiplus::Bitmap::ApplyEffect(&m_pBitmap, 1, &cmEffect, NULL, NULL, &m_pBitmap);
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
-void CGdiplusBitmap::gdip_blur(float radius, BOOL expandEdge)
+void CSCGdiplusBitmap::gdip_blur(float radius, BOOL expandEdge)
 {
 	Gdiplus::Blur gdi_blur;
 	Gdiplus::BlurParams param;
@@ -2062,9 +2062,9 @@ void CGdiplusBitmap::gdip_blur(float radius, BOOL expandEdge)
 	m_pBitmap->ApplyEffect(&gdi_blur, NULL);
 }
 
-void CGdiplusBitmap::blur(float sigma, int order)
+void CSCGdiplusBitmap::blur(float sigma, int order)
 {
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	deep_copy(&temp);
 	temp.get_raw_data();
 
@@ -2078,7 +2078,7 @@ void CGdiplusBitmap::blur(float sigma, int order)
 #endif
 }
 
-void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_sigma, Gdiplus::Color cr_shadow)
+void CSCGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_sigma, Gdiplus::Color cr_shadow)
 {
 	release();
 
@@ -2095,7 +2095,7 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_si
 	//apply_effect_blur(20.0f, FALSE);
 	
 	Gdiplus::Matrix matrix(1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-	CGdiplusBitmap shadow(w, h, PixelFormat32bppARGB, cr_shadow);
+	CSCGdiplusBitmap shadow(w, h, PixelFormat32bppARGB, cr_shadow);
 #ifdef _DEBUG
 	shadow.save(_T("d:\\temp\\shadow_1default.png"));
 #endif
@@ -2139,7 +2139,7 @@ void CGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_si
 	*/
 }
 
-void CGdiplusBitmap::round_corner(float radius, float factor, float position, bool tl, bool tr, bool br, bool bl)
+void CSCGdiplusBitmap::round_corner(float radius, float factor, float position, bool tl, bool tr, bool br, bool bl)
 {
 	if (channel != 4)
 		convert(PixelFormat32bppARGB);
@@ -2162,7 +2162,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 	if (factor <= 0.0f || position <= 0.0f)
 	{
 		//원본을 복사해 둘 이미지를 준비하고
-		CGdiplusBitmap temp;
+		CSCGdiplusBitmap temp;
 		clone(&temp);
 
 		//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -2202,7 +2202,7 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 	Gdiplus::Color colors[] = { Gdiplus::Color(Gdiplus::Color::Transparent) };
 	pgb.SetSurroundColors(colors, &in_out_count);
 
-	//mask를 CGdiplusBitmap 타입으로 정적 생성하니 오류발생하여 동적 생성함.
+	//mask를 CSCGdiplusBitmap 타입으로 정적 생성하니 오류발생하여 동적 생성함.
 	Gdiplus::Bitmap *mask = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 	Gdiplus::Graphics gMask(mask);
 	gMask.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::Transparent), Gdiplus::Rect(0, 0, width, height));
@@ -2220,24 +2220,24 @@ void CGdiplusBitmap::round_corner(float radius, float factor, float position, bo
 	delete mask;
 }
 
-void CGdiplusBitmap::replace_channel(CString type, UINT srcID, int src_bgra_index, int dst_bgra_index)
+void CSCGdiplusBitmap::replace_channel(CString type, UINT srcID, int src_bgra_index, int dst_bgra_index)
 {
-	CGdiplusBitmap src(type, srcID);
+	CSCGdiplusBitmap src(type, srcID);
 	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
 }
 
-void CGdiplusBitmap::replace_channel(CString src_file, int src_bgra_index, int dst_bgra_index)
+void CSCGdiplusBitmap::replace_channel(CString src_file, int src_bgra_index, int dst_bgra_index)
 {
-	CGdiplusBitmap src(src_file);
+	CSCGdiplusBitmap src(src_file);
 	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
 }
 
-void CGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, int src_bgra_index, int dst_bgra_index)
+void CSCGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, int src_bgra_index, int dst_bgra_index)
 {
 	replace_channel(src, m_pBitmap, src_bgra_index, dst_bgra_index);
 }
 
-void CGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, Gdiplus::Bitmap* dst, int src_bgra_index, int dst_bgra_index)
+void CSCGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, Gdiplus::Bitmap* dst, int src_bgra_index, int dst_bgra_index)
 {
 	//이미지 크기는 동일해야 한다.
 	if ((src->GetWidth() != dst->GetWidth()) || (src->GetHeight() != dst->GetHeight()))
@@ -2279,7 +2279,7 @@ void CGdiplusBitmap::replace_channel(Gdiplus::Bitmap* src, Gdiplus::Bitmap* dst,
 }
 
 //실제 8bit(256color) gray이미지로 변경해준다.
-void CGdiplusBitmap::convert2gray()
+void CSCGdiplusBitmap::convert2gray()
 {
 	//뭔가 이 방식은 문제가 있어서 일단 보류
 	/*
@@ -2372,7 +2372,7 @@ void CGdiplusBitmap::convert2gray()
 #endif
 }
 
-bool CGdiplusBitmap::get_palette()
+bool CSCGdiplusBitmap::get_palette()
 {
 	if (m_palette)
 	{
@@ -2396,7 +2396,7 @@ bool CGdiplusBitmap::get_palette()
 	return true;
 }
 
-void CGdiplusBitmap::convert(Gdiplus::PixelFormat new_format)
+void CSCGdiplusBitmap::convert(Gdiplus::PixelFormat new_format)
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, new_format);
 	Gdiplus::Graphics g(result);
@@ -2411,7 +2411,7 @@ void CGdiplusBitmap::convert(Gdiplus::PixelFormat new_format)
 }
 
 /*
-void CGdiplusBitmap::cvtColor32ARGB()
+void CSCGdiplusBitmap::cvtColor32ARGB()
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(result);
@@ -2428,10 +2428,10 @@ void CGdiplusBitmap::cvtColor32ARGB()
 }
 */
 
-void CGdiplusBitmap::set_matrix(Gdiplus::ColorMatrix* colorMatrix, Gdiplus::ColorMatrix* grayMatrix)
+void CSCGdiplusBitmap::set_matrix(Gdiplus::ColorMatrix* colorMatrix, Gdiplus::ColorMatrix* grayMatrix)
 {
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -2450,7 +2450,7 @@ void CGdiplusBitmap::set_matrix(Gdiplus::ColorMatrix* colorMatrix, Gdiplus::Colo
 }
 
 //0(transparent) ~ 255(opaque)
-void CGdiplusBitmap::set_alpha(int alpha)
+void CSCGdiplusBitmap::set_alpha(int alpha)
 {
 	Gdiplus::ColorMatrix colorMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 								0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
@@ -2483,7 +2483,7 @@ void CGdiplusBitmap::set_alpha(int alpha)
 	delete result;
 #else
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	deep_copy(&temp);
 
 	//m_pBitmap->ConvertFormat();
@@ -2500,10 +2500,10 @@ void CGdiplusBitmap::set_alpha(int alpha)
 #endif
 }
 
-void CGdiplusBitmap::set_colorkey(Gdiplus::Color low, Gdiplus::Color high)
+void CSCGdiplusBitmap::set_colorkey(Gdiplus::Color low, Gdiplus::Color high)
 {
 	//원본을 복사해 둘 이미지를 준비하고
-	CGdiplusBitmap temp;
+	CSCGdiplusBitmap temp;
 	clone(&temp);
 
 	//원래의 이미지로 캔버스를 준비하고 투명하게 비워둔 후
@@ -2517,7 +2517,7 @@ void CGdiplusBitmap::set_colorkey(Gdiplus::Color low, Gdiplus::Color high)
 	g.DrawImage(m_pBitmap, Gdiplus::Rect(0, 0, width, height), 0, 0, width, height, Gdiplus::UnitPixel, &ia);
 }
 
-bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel)
+bool CSCGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channel)
 {
 	return (cr0.GetValue() == cr1.GetValue());
 
@@ -2548,7 +2548,7 @@ bool CGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int channe
 }
 
 
-bool CGdiplusBitmap::save(LPCTSTR filepath, ...)
+bool CSCGdiplusBitmap::save(LPCTSTR filepath, ...)
 {
 	va_list args;
 	va_start(args, filepath);
@@ -2559,7 +2559,7 @@ bool CGdiplusBitmap::save(LPCTSTR filepath, ...)
 	return ::save(m_pBitmap, filename);
 }
 
-bool CGdiplusBitmap::copy_to_clipbard()
+bool CSCGdiplusBitmap::copy_to_clipbard()
 {
 	//복사는 잘 되지만 32bit PNG는 투명처리 안됨
 #if 1
@@ -2706,7 +2706,7 @@ bool CGdiplusBitmap::copy_to_clipbard()
 	return true;
 }
 
-bool CGdiplusBitmap::paste_from_clipboard()
+bool CSCGdiplusBitmap::paste_from_clipboard()
 {
 	HBITMAP bitmap;
 	if (OpenClipboard(NULL) == false)
@@ -2747,7 +2747,7 @@ bool CGdiplusBitmap::paste_from_clipboard()
 	return true;
 }
 
-void CGdiplusBitmap::check_animate_gif()
+void CSCGdiplusBitmap::check_animate_gif()
 {
 	m_run_thread_animation = false;
 	m_frame_index = 0;
@@ -2780,7 +2780,7 @@ void CGdiplusBitmap::check_animate_gif()
 }
 
 //gif 프레임 이미지들을 저장
-bool CGdiplusBitmap::save_gif_frames(CString folder)
+bool CSCGdiplusBitmap::save_gif_frames(CString folder)
 {
 	//현재 재생중이었다면 재생 정보를 기억해놓는다.
 	bool is_playing = !m_paused;
@@ -2815,7 +2815,7 @@ bool CGdiplusBitmap::save_gif_frames(CString folder)
 	return true;
 }
 
-void CGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std::vector<long>& dqDelay)
+void CSCGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std::vector<long>& dqDelay)
 {
 	if (m_frame_count < 2)
 		return;
@@ -2854,7 +2854,7 @@ void CGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, std
 }
 
 //총 재생시간을 ms단위로 리턴한다.
-int CGdiplusBitmap::get_total_duration()
+int CSCGdiplusBitmap::get_total_duration()
 {
 	if (m_frame_count < 2)
 		return 0;
@@ -2869,7 +2869,7 @@ int CGdiplusBitmap::get_total_duration()
 	return (int)total_duration;
 }
 
-void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool auto_play)
+void CSCGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool auto_play)
 {
 	if (m_frame_count < 2)
 		return;
@@ -2885,7 +2885,7 @@ void CGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool a
 	play_gif();
 }
 
-void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
+void CSCGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
 {
 	int w = (r.Width() > 0 ? r.Width() : width);
 	int h = (r.Height() > 0 ? r.Height() : height);
@@ -2895,7 +2895,7 @@ void CGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
 }
 
 
-void CGdiplusBitmap::move_gif(int x, int y, int w, int h)
+void CSCGdiplusBitmap::move_gif(int x, int y, int w, int h)
 {
 	m_ani_sx = x;
 	m_ani_sy = y;
@@ -2903,13 +2903,13 @@ void CGdiplusBitmap::move_gif(int x, int y, int w, int h)
 	m_ani_height = (h == 0 ? height : h);
 }
 
-void CGdiplusBitmap::move_gif(CRect r)
+void CSCGdiplusBitmap::move_gif(CRect r)
 {
 	CRect fit = get_ratio_rect(CRect(r.left, r.top, r.left + r.Width(), r.top + r.Height()), width, height);
 	move_gif(fit.left, fit.top, fit.Width(), fit.Height());
 }
 
-void CGdiplusBitmap::play_gif()
+void CSCGdiplusBitmap::play_gif()
 {
 	if (!m_gif_play_in_this)
 		return;
@@ -2935,12 +2935,12 @@ void CGdiplusBitmap::play_gif()
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
 	//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
-	std::thread t(&CGdiplusBitmap::thread_gif_animation, this);
+	std::thread t(&CSCGdiplusBitmap::thread_gif_animation, this);
 	t.detach();
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CGdiplusBitmap::pause_gif(int pos)
+void CSCGdiplusBitmap::pause_gif(int pos)
 {
 	if (!m_gif_play_in_this)
 		return;
@@ -2964,7 +2964,7 @@ void CGdiplusBitmap::pause_gif(int pos)
 	}
 }
 
-void CGdiplusBitmap::stop_gif()
+void CSCGdiplusBitmap::stop_gif()
 {
 	if (m_frame_count < 2)
 		return;
@@ -2979,7 +2979,7 @@ void CGdiplusBitmap::stop_gif()
 	::InvalidateRect(m_target_hwnd, &r, TRUE);
 }
 
-void CGdiplusBitmap::goto_frame(int pos, bool pause)
+void CSCGdiplusBitmap::goto_frame(int pos, bool pause)
 {
 	if (m_frame_count < 2)
 		return;
@@ -3005,13 +3005,13 @@ void CGdiplusBitmap::goto_frame(int pos, bool pause)
 }
 
 //지정 % 위치의 프레임으로 이동
-void CGdiplusBitmap::goto_frame_percent(int pos, bool pause)
+void CSCGdiplusBitmap::goto_frame_percent(int pos, bool pause)
 {
 	double dpos = ((double)pos / (double)m_frame_count) * 100.0;
 	goto_frame((int)dpos, pause);
 }
 
-void CGdiplusBitmap::thread_gif_animation()
+void CSCGdiplusBitmap::thread_gif_animation()
 {
 	if (m_frame_count < 2)
 		return;
@@ -3105,7 +3105,7 @@ void CGdiplusBitmap::thread_gif_animation()
 			continue;
 		}
 
-		::PostMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
+		::PostMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&CSCGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
 
 		m_frame_index++;
 		if (m_frame_index >= m_frame_count)
@@ -3129,7 +3129,7 @@ void CGdiplusBitmap::thread_gif_animation()
 	::ReleaseDC(m_target_hwnd, hDC);
 }
 
-void CGdiplusBitmap::goto_gif_frame(int frame)
+void CSCGdiplusBitmap::goto_gif_frame(int frame)
 {
 	if (m_frame_count < 2 || frame >= m_frame_count)
 		return;
@@ -3175,13 +3175,13 @@ void CGdiplusBitmap::goto_gif_frame(int frame)
 		}
 
 		g.DrawImage(m_pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-		::SendMessage(m_target_hwnd, Message_CGdiplusBitmap, (WPARAM)&CGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
+		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&CSCGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
 	}
 
 	::ReleaseDC(m_target_hwnd, hDC);
 }
 
-void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap)
+void CSCGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap)
 {
 	std::vector<Gdiplus::Bitmap*> dq;
 	std::vector<long> delay;
@@ -3258,7 +3258,7 @@ void CGdiplusBitmap::save_multi_image()//std::vector<Gdiplus::Bitmap*>& dqBitmap
 }
 
 //투명 png의 l, t, r, b의 투명한 영역 크기를 구한다.
-CRect CGdiplusBitmap::get_transparent_rect()
+CRect CSCGdiplusBitmap::get_transparent_rect()
 {
 	CRect r;
 
@@ -3268,7 +3268,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 	//이미지가 큰 경우 탐색시간이 길어지므로 작게 줄여서 검사한다. 미완성!
 	double ratio = 1.0;
 
-	CGdiplusBitmap	temp;
+	CSCGdiplusBitmap	temp;
 	deep_copy(&temp);
 	//temp.save(_T("d:\\temp.png"));
 	//if (width > height)
@@ -3331,7 +3331,7 @@ CRect CGdiplusBitmap::get_transparent_rect()
 }
 
 //data를 추출하여 주소값으로 구하므로 속도가 빠름. get_raw_data()를 호출하여 data를 추출한 경우에만 사용할 것!
-Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
+Gdiplus::Color CSCGdiplusBitmap::get_pixel(int x, int y)
 {
 	//data가 불려지지 않은 상태에서 get_pixel()이 호출되면 raw_data를 추출한다.
 	if (data == NULL)
@@ -3369,7 +3369,7 @@ Gdiplus::Color CGdiplusBitmap::get_pixel(int x, int y)
 							*(data + y * width * channel + x * channel + 0));
 }
 
-void CGdiplusBitmap::set_pixel(int x, int y, Gdiplus::Color cr)
+void CSCGdiplusBitmap::set_pixel(int x, int y, Gdiplus::Color cr)
 {
 	//data가 불려지지 않은 상태에서 set_pixel()이 호출되면 raw_data를 추출한다.
 	if (data == NULL)
@@ -3397,7 +3397,7 @@ void CGdiplusBitmap::set_pixel(int x, int y, Gdiplus::Color cr)
 }
 
 //배경 그림자 이미지를 생성한다.
-void CGdiplusBitmap::create_back_shadow_image(CGdiplusBitmap* shadow, float sigma, int type, int depth)
+void CSCGdiplusBitmap::create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma, int type, int depth)
 {
 	deep_copy(shadow);
 	shadow->gray();

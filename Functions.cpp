@@ -6121,7 +6121,7 @@ CRect draw_text(Gdiplus::Graphics &g,
 	{
 		//blur를 이용한 방법. 간단하지만 속도가 매우 느림
 		/*
-		CGdiplusBitmap shadow(rTarget.Width(), rTarget.Height());
+		CSCGdiplusBitmap shadow(rTarget.Width(), rTarget.Height());
 		Gdiplus::Graphics g_shadow(shadow.m_pBitmap);
 
 		g_shadow.DrawString(CStringW(text), -1, &font, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), &sf, &shadow_brush);

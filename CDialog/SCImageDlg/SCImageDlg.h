@@ -14,7 +14,7 @@
 *   우선 이 클래스에서는 하나의 이미지를 표시하는 범위로만 구현한다.
 * 
 * [animated gif 관련]
-* - CGdiplusBitmap에 구현된 thread_gif()를 이용하면 간단하고 편하지만
+* - CSCGdiplusBitmap에 구현된 thread_gif()를 이용하면 간단하고 편하지만
 *   이 함수에서 화면 갱신까지 처리되므로 CSCImageDlg에서 그린 roi 정보 등이 표시되지 않고 CSCImageDlg 내의 다른 컨트롤이 깜빡이는 현상도 발생한다.
 *   CSCImageDlg에서 thread_gif()를 추가하고 직접 재생하도록 수정함.
 */
@@ -23,10 +23,10 @@
 #include "afxdialogex.h"
 
 #include <mutex>
-#include "../../GdiplusBitmap.h"
-#include "../../ThumbCtrl/SCThumbCtrl.h"
-#include "../../CStatic/SCStatic/SCStatic.h"
-#include "../../CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
+#include "Common/SCGdiplusBitmap.h"
+#include "Common/ThumbCtrl/SCThumbCtrl.h"
+#include "Common/CStatic/SCStatic/SCStatic.h"
+#include "Common/CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
 //#include "../../CToolTipCtrl/RichToolTipCtrl.h"
 //#include "../../CToolTipCtrl/XInfoTip.h"
 
@@ -194,7 +194,7 @@ protected:
 	//forward면 0(cur), 1, 2, 3, 4
 	//backward면 0(cur), -1, -2, -3, -4
 	//이미지만 미리 버퍼링 해 놓을 경우 표시는 빨라지지만 그 이미지 파일명, 파일속성등은? m_files에서 해당 파일 인덱스를 찾아서 처리해도 될 듯함.
-	std::deque<CGdiplusBitmap>	m_img;
+	std::deque<CSCGdiplusBitmap>	m_img;
 	int				m_buffer_max = 5;
 	bool			m_is_forward = true;
 
@@ -213,7 +213,7 @@ protected:
 	Gdiplus::Color	m_cr_zigzag_back = Gdiplus::Color::White;
 	Gdiplus::Color	m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
 
-	Gdiplus::InterpolationMode m_interplationMode = (Gdiplus::InterpolationMode)CGdiplusBitmap::interpolation_bicubic;// Gdiplus::InterpolationModeHighQualityBicubic;
+	Gdiplus::InterpolationMode m_interplationMode = (Gdiplus::InterpolationMode)CSCGdiplusBitmap::interpolation_bicubic;// Gdiplus::InterpolationModeHighQualityBicubic;
 
 //확대, 축소 배율을 사용하지 않고 창 크기에 맞춤
 	bool			m_fit2ctrl = true;

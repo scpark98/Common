@@ -8,10 +8,10 @@
 #include <afxdialogex.h>
 
 #include <deque>
-#include "../colors.h"
-#include "../GdiplusBitmap.h"
-#include "../thread/thread_manager.h"
-#include "../CEdit/SCEdit/SCEdit.h"
+#include "Common/colors.h"
+#include "Common/SCGdiplusBitmap.h"
+#include "Common/thread/thread_manager.h"
+#include "Common/CEdit/SCEdit/SCEdit.h"
 
 
 #define MIN_TILE_SIZE		40
@@ -46,7 +46,7 @@ public:
 	//img를 동적변수로 선언하는 이유.
 	//img는 그림파일마다 그 크기가 다양한데 이를 정적으로 잡는 것이 맞는가?
 	//img.load()에서 m_pBitmap이 동적할당되는가?
-	CGdiplusBitmap* img = NULL;
+	CSCGdiplusBitmap* img = NULL;
 	bool		load_completed = false;
 	CString		title;						//파일명 또는 지정된 타이틀
 	bool		key_thumb = false;			//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
@@ -128,7 +128,7 @@ public:
 	std::deque<CString> m_files;
 	std::deque<CThumbImage> m_thumb;
 	int				size() { return m_thumb.size(); }
-	CGdiplusBitmap*	get_img(int index);
+	CSCGdiplusBitmap*	get_img(int index);
 
 
 	bool			is_loading_completed() { return m_loading_completed; }
@@ -161,7 +161,7 @@ public:
 	bool			m_use_circle_number = false;
 	void			use_circle_number(bool use) { m_use_circle_number = use; Invalidate(); }
 
-	CGdiplusBitmap	m_img_selection_mark;
+	CSCGdiplusBitmap	m_img_selection_mark;
 	void			set_selection_mark_image(CString image_path, int w = 0, int h = 0);
 	void			set_selection_mark_image(CString sType, UINT id, int w = 0, int h = 0);
 

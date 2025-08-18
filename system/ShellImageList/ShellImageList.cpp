@@ -460,7 +460,12 @@ CString CShellImageList::convert_special_folder_to_real_path(int index, CString 
 
 	//실제 존재한다고 판별되면 이는 real_path이므로 그대로 리턴.
 	if (special_folder.IsEmpty() || PathFileExists(special_folder))
+	{
+		//"c:\\program files"로 넘어와도 실제 폴더명인 "C:\\Program Files"로 변환한다.
+		if (PathFileExists(special_folder))
+			special_folder = get_original_path(special_folder);
 		return special_folder;
+	}
 
 	CString myPC_label;
 
@@ -543,6 +548,14 @@ CString	CShellImageList::convert_real_path_to_special_folder(int index, CString 
 {
 	if (index >= (int)m_volume.size())
 		return _T("");
+
+	//real_path는 local에서는(index = 0일 경우) 실제로 존재해야 하는 경로이므로
+	//"c:\\program files"라고 넘어와도 "C:\\Program Files"로 변환해서 비교해줘야 한다.
+	if (index == 0 && PathFileExists(real_path))
+	{
+		//로컬이 아닌 경우는 존재여부를 검사할 수 없으므로 변환하지 않는다.
+		real_path = get_original_path(real_path);
+	}
 
 	if (real_path == m_volume[index].get_path(CSIDL_DESKTOP))
 		return m_volume[index].get_label(CSIDL_DESKTOP);

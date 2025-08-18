@@ -49,7 +49,7 @@ void CSCThumbCtrl::release_thumb(int index)
 	{
 		if (m_thumb[i].img != NULL)
 		{
-			//delete만 호출해도 CGdiplusBitmap의 소멸자에서 이미 release를 하므로 별도로 img->release()를 호출할 필요가 없다.
+			//delete만 호출해도 CSCGdiplusBitmap의 소멸자에서 이미 release를 하므로 별도로 img->release()를 호출할 필요가 없다.
 			//m_thumb[i].img->release();
 
 			//여기서 m_thumb.erase(m_thumb.begin() + i);를 호출하면 이는 release()가 아닌 remove가 되므로 정리가 필요하다.
@@ -552,7 +552,7 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_thumb, bool invalidate)
 {
-	m_thumb[index].img = new CGdiplusBitmap();
+	m_thumb[index].img = new CSCGdiplusBitmap();
 	m_thumb[index].img->load(full_path);
 	m_thumb[index].width = m_thumb[index].img->width;
 	m_thumb[index].height = m_thumb[index].img->height;
@@ -1362,7 +1362,7 @@ void CSCThumbCtrl::sort_by_title()
 		[](CThumbImage& a, CThumbImage& b)
 		{
 			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
-			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
+			//CSCGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
 			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
 			a.img->m_referenced_variable = true;
 			b.img->m_referenced_variable = true;
@@ -1384,7 +1384,7 @@ void CSCThumbCtrl::sort_by_info(int idx)
 		[idx](CThumbImage& a, CThumbImage& b)
 		{
 			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
-			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
+			//CSCGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
 			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
 			a.img->m_referenced_variable = true;
 			b.img->m_referenced_variable = true;
@@ -1402,7 +1402,7 @@ void CSCThumbCtrl::sort_by_score()
 		[](CThumbImage& a, CThumbImage& b)
 		{
 			//CThumbImage의 img가 참조생성자에 의해 a로 생성되고 사용된 후
-			//CGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
+			//CSCGdiplusBitmap()의 소멸자에서 release()에 의해 메모리에서 제거되려 하므로 오류가 발생한다.
 			//참조에 의해 생성된 a의 img 역시 참조임을 명시하고 release()시키지 않아야 한다.
 			a.img->m_referenced_variable = true;
 			b.img->m_referenced_variable = true;
@@ -1626,7 +1626,7 @@ void CSCThumbCtrl::on_context_menu(UINT nMenuID)
 				int index = get_selected_item();
 				if (index >= 0)
 				{
-					CGdiplusBitmap img(m_thumb[index].full_path);
+					CSCGdiplusBitmap img(m_thumb[index].full_path);
 					img.copy_to_clipbard();
 				}
 			}
@@ -1746,7 +1746,7 @@ void CSCThumbCtrl::remove_selected(bool refresh)
 	recalc_tile_rect();
 }
 
-CGdiplusBitmap* CSCThumbCtrl::get_img(int index)
+CSCGdiplusBitmap* CSCThumbCtrl::get_img(int index)
 {
 	if (index < 0 || index >= m_thumb.size())
 		return NULL;

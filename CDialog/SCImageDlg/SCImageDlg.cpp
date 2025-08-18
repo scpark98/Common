@@ -58,7 +58,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
 	m_slider_gif.set_use_slide();
 
-	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
+	m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
 
 	m_thumb.create(this);
 	m_thumb.set_color_theme(CSCColorTheme::color_theme_dark_gray);
@@ -67,7 +67,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("show pixel"), false));
 	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("show info"), false));
 	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("fit to ctrl"), true));
-	set_smooth_interpolation(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("smooth interpolation"), CGdiplusBitmap::interpolation_bicubic));
+	set_smooth_interpolation(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("smooth interpolation"), CSCGdiplusBitmap::interpolation_bicubic));
 
 	if (!get_fit2ctrl())
 		zoom(get_profile_value(_T("setting\\CSCImageDlg"), _T("zoom"), 1.0));
@@ -93,7 +93,7 @@ BEGIN_MESSAGE_MAP(CSCImageDlg, CDialog)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETCURSOR()
 	ON_WM_WINDOWPOSCHANGED()
-	ON_REGISTERED_MESSAGE(Message_CGdiplusBitmap, &CSCImageDlg::on_message_from_GdiplusBitmap)
+	ON_REGISTERED_MESSAGE(Message_CSCGdiplusBitmap, &CSCImageDlg::on_message_from_GdiplusBitmap)
 	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCImageDlg::on_message_from_CSCSliderCtrl)
 	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCImageDlg::on_message_CSCThumbCtrl)
 	ON_WM_TIMER()
@@ -194,7 +194,7 @@ void CSCImageDlg::OnPaint()
 		Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
 		TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
 
-		CGdiplusBitmap img;
+		CSCGdiplusBitmap img;
 		m_img.deep_copy(&img);
 		img.sub_image(-m_offset.x, -m_offset.y, nw, nh);
 		//g.DrawImage(img, 0, 0, rc.Width(), rc.Height());
@@ -511,7 +511,7 @@ bool CSCImageDlg::load(CString sFile, bool load_thumbs)
 		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 		m_slider_gif.ShowWindow(SW_SHOW);
 		
-		//원래 CGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
+		//원래 CSCGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
 		//하지만 CSCImageDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
 		m_img[0].set_gif_play_itself(false);
 
@@ -586,7 +586,7 @@ bool CSCImageDlg::copy_to_clipbard()
 	//roi가 있으면 그 영역만, 그렇지 않다면 전체 이미지를 복사한다.
 	if (m_image_roi.IsEmptyArea() == false)
 	{
-		CGdiplusBitmap roi_img;
+		CSCGdiplusBitmap roi_img;
 		m_img[0].deep_copy(&roi_img);
 		roi_img.sub_image(m_image_roi);
 		roi_img.copy_to_clipbard();
@@ -1078,11 +1078,11 @@ void CSCImageDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 LRESULT CSCImageDlg::on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam)
 {
-	CGdiplusBitmapMessage* msg = (CGdiplusBitmapMessage*)wParam;
+	CSCGdiplusBitmapMessage* msg = (CSCGdiplusBitmapMessage*)wParam;
 	if (!msg)
 		return 0;
 
-	if (msg->message == CGdiplusBitmap::message_gif_frame_changed)
+	if (msg->message == CSCGdiplusBitmap::message_gif_frame_changed)
 	{
 		//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
 		m_slider_gif.set_pos(msg->frame_index);
@@ -1240,7 +1240,7 @@ void CSCImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_for
 {
 	m_br_zigzag.release();
 
-	m_br_zigzag = CGdiplusBitmap::get_zigzag_pattern(32, cr_back, cr_fore);
+	m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, cr_back, cr_fore);
 	Invalidate();
 }
 
@@ -1484,13 +1484,8 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 		m_index = find_index(m_files, cur_file);
 	}
 
-	//update_title();
-
 	AfxGetApp()->WriteProfileString(_T("setting\\CSCImageDlg"), _T("recent file"), m_filename);
 	add_registry(AfxGetApp(), _T("setting\\CSCImageDlg\\recent folders"), folder);
-
-	//m_dir_watcher.stop();
-	//m_dir_watcher.add(get_part(m_files[m_index], fn_folder), false);
 
 	//현재 이미지를 시작으로 forward or backward 버퍼링을 시작한다.
 	//버퍼링 중이었다면 버퍼링을 중지시킨 후 해야 한다.

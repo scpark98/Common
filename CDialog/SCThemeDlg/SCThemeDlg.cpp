@@ -442,8 +442,8 @@ void CSCThemeDlg::OnPaint()
 	rclient.top += m_titlebar_height;
 	if (m_img_back.is_valid())
 	{
-		if (m_img_back_draw_mode == CGdiplusBitmap::draw_mode_zoom ||
-			m_img_back_draw_mode == CGdiplusBitmap::draw_mode_origin)
+		if (m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_zoom ||
+			m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_origin)
 		{
 			dc.FillSolidRect(rclient, m_cr_out_of_back_img.ToCOLORREF());
 		}

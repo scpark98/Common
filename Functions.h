@@ -692,6 +692,11 @@ struct	NETWORK_INFO
 	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
 	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
 
+	//대부분의 경우는 get_token_string()을 사용하지만 separator가 문자열 내에 포함된 경우도 있을 수 있다.
+	//"내 PC\\연구소문서2(\\\\192.168.1.103) (X:)" 문자열을 '\\'로 구분할 경우 잘못 추출되므로
+	//이 경우는 get_exact_token_string()을 사용해서 실제 '\\'인 경우에만 추출하도록 해야 한다.
+	int			get_exact_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"));
+
 	//"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
 	//위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
 	void		get_tag_str(CString& src, std::deque<CString>& tags);
@@ -1331,8 +1336,6 @@ struct	NETWORK_INFO
 	//반드시 생성하고자 하는 폴더명을 사용할것.
 	bool		make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa = NULL);
 	bool		recursive_make_full_directory(LPCTSTR sFolder);
-
-	CString		normalized_path(CString& path);
 
 	//폴더내의 특정 문자열이 들어간 파일들을 지운다. 하위폴더 지원안함.
 	void		DeleteFilesBySubString(CString sFolder, CString filenameSubStr, bool bMatchWholeWordOnly = FALSE, bool bMatchCase = FALSE);

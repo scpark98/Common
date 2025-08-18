@@ -4,13 +4,13 @@
 #include <afxdialogex.h>
 
 /*
-* png, gif 등의 이미지 또는 CGdiplusBitmap 이미지 모양대로 dlg를 생성하여 표시한다.
+* png, gif 등의 이미지 또는 CSCGdiplusBitmap 이미지 모양대로 dlg를 생성하여 표시한다.
 * create()으로 직접 생성하므로 IDD_DIALOG와 같은 리소스가 불필요하다.
 * 
 * //OnInitDialog()에서 이미지를 지정한다.
 * load(_T("Z:\\내 드라이브\\media\\test_image\\progress\\checking.gif"));
 * 
-* 또는 CGdiplusBitmap 이미지를 생성한 후 set_image() 함수를 호출하여
+* 또는 CSCGdiplusBitmap 이미지를 생성한 후 set_image() 함수를 호출하여
 * 이미지를 설정할 수 있다.
 * 
 [텍스트 출력]
@@ -70,7 +70,7 @@ public:
 	//default : SW_HIDE
 	bool			create(CWnd* parent, int left, int top, int right, int bottom);
 
-	//set_image()로 CGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
+	//set_image()로 CSCGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
 	void			set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy = true);
 	bool			load(CWnd* parent, UINT id);

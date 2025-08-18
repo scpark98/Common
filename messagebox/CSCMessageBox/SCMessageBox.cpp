@@ -312,7 +312,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		m_button[IDNO].ShowWindow(SW_SHOW);
 
 		//for common test for tootip text. 툴팁 정상 표시 확인됨.
-		m_button[IDYES].set_tooltip_text(_T("This is IDYES button"));
+		//m_button[IDYES].set_tooltip_text(_T("This is IDYES button"));
 	}
 	else if ((m_type & MB_RETRYCANCEL) == MB_RETRYCANCEL)
 	{
@@ -413,7 +413,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	m_static_message.ShowWindow(SW_SHOW);
 
 	//for common test for tootip text. 툴팁 정상 표시 확인됨.
-	m_static_message.set_tooltip_text(_T("This is CSCStatic tootip."));
+	//m_static_message.set_tooltip_text(_T("This is CSCStatic tootip."));
 
 	Invalidate();
 

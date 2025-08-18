@@ -8536,6 +8536,40 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 	return nToken;
 }
 
+//대부분의 경우는 get_token_string()을 사용하지만 separator가 문자열 내에 포함된 경우도 있을 수 있다.
+//"내 PC\\연구소문서2(\\\\192.168.1.103) (X:)" 문자열을 '\\'로 구분할 경우 잘못 추출되므로
+//이 경우는 get_exact_token_string()을 사용해서 정확히 '\\'인 경우에만 추출하도록 해야 한다.
+int get_exact_token_string(CString src, std::deque<CString>& dqToken, CString separator)
+{
+	get_token_string(src, dqToken, separator, true);
+
+	int empty_count = 0;
+
+	int i = 1;
+
+	while (i < dqToken.size())
+	{
+		//empty라면 전 항목에 separator를 붙이고 삭제한다.
+		if (dqToken[i].IsEmpty())
+		{
+			dqToken[i - 1] += separator;
+			dqToken.erase(dqToken.begin() + i);
+		}
+		//empty가 아니고 전 항목의 끝이 separator로 끝나면 separator와 함께 붙이고 삭제한다.
+		else if (dqToken[i - 1].Right(separator.GetLength()) == separator)
+		{
+			dqToken[i - 1] += (separator + dqToken[i]);
+			dqToken.erase(dqToken.begin() + i);
+		}
+		else
+		{
+			i++;
+		}
+	}
+
+	return dqToken.size();
+}
+
 //"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
 //위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
 //"\r", "\n"과 같은 line break는 모두 <br>로 변경한다.

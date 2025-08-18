@@ -3,10 +3,10 @@
 
 #include "SCTreeCtrl.h"
 #include <thread>
-#include "../../Functions.h"
-#include "../../MemoryDC.h"
-#include "../../SCGdiPlusBitmap.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "Common/Functions.h"
+#include "Common/MemoryDC.h"
+#include "Common/SCGdiPlusBitmap.h"
+#include "Common/CEdit/SCEdit/SCEdit.h"
 
 
 // CSCTreeCtrl
@@ -1283,15 +1283,19 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 
 	//"작업 디스크 (D:)\\temp"
 	fullpath = m_pShellImageList->convert_real_path_to_special_folder(!m_is_local, fullpath);
+	if (fullpath.GetLength() > 0 && fullpath.Right(1) == '\\')
+		truncate(fullpath, 1);
 
 	//"내 PC\\작업 디스크 (D:)\\temp"
 	//':)' 기호가 있는 디스크 드라이브 경로인 경우에는 맨 앞에 '내 PC'를 붙여준다.
 	if (fullpath.Find(_T(":)")) > 0)
 		fullpath = concat_path(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES), fullpath);
 
-	//각 토큰 분리
+	//'\\'로 각 경로를 분리해야 하는데 "내 PC\\작업 디스크 (D:)\\temp"와 같은 경우는 3개로 잘 분리되지만
+	//네트워크 드라이브 인 경우는 fullpath가 "내 PC\\연구소문서2(\\\\192.168.1.103) (X:)"와 같이 되므로
+	//get_token_string()으로 간단히 분리하면 안된다.
 	std::deque<CString> dq;
-	get_token_string(fullpath, dq, '\\', false);
+	get_exact_token_string(fullpath, dq, '\\');
 
 	if (dq.size() == 0)
 		dq.push_back(m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES));
@@ -1333,6 +1337,7 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 			Expand(item, TVE_EXPAND);
 	}
 
+	TRACE(_T("text = %s\n"), GetItemText(item));
 	if (item)
 		SelectItem(item);
 }

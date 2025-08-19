@@ -997,6 +997,7 @@ void CPathCtrl::edit_end(bool valid)
 
 	bool res = false;
 
+	//입력한 경로가 실제로 존재하는지 확인한 후 경로를 변경해줘야 한다.
 	::SendMessage(GetParent()->m_hWnd, Message_CPathCtrl, (WPARAM)&CPathCtrlMessage(this, message_pathctrl_path_changed, m_edit_new_text), (LPARAM)&res);
 
 	if (!res)

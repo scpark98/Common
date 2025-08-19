@@ -140,7 +140,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_button_quit.use_hover();
 
 	m_static_message.create(_T("message"), WS_CHILD | WS_VISIBLE, CRect(0, m_title_height, cx, rc.bottom - 20 - 8 - m_sz_button.cy), this, 0);
-	m_static_message.set_back_color(m_theme.cr_back);
+	m_static_message.set_back_color(Gdiplus::Color::White);
 	m_static_message.set_font(&m_font);
 
 	return res;

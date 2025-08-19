@@ -101,10 +101,11 @@ public:
 	//VALIGN이 SS_CENTERIMAGE가 아니면 상단정렬 둘 뿐이므로 DT_TOP, DT_VCENTER, DT_BOTTOM으로 정렬할 수 있도록 확장한다.
 	int				get_halign();
 	int				get_valign();
-	void			set_halign();
-	void			set_valign();
+	//아직 미구현
+	//void			set_halign();
+	//void			set_valign();
 
-	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 흡사하다.
+	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 동일한 값이 리턴된다.
 	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
 	CRect			get_text_rect() { return m_rect_text; }
 	//텍스트의 너비, 높이를 알고자 할 경우 사용.

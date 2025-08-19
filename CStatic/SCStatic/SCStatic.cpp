@@ -558,7 +558,13 @@ void CSCStatic::OnPaint()
 
 		if (!m_bBlinkStatus)
 		{
-			dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
+			//CStatic은 기본적으로 WORDBREAK(WORDWRAP) 스타일이 적용되지 않으나
+			//이 CSCStatic을 CMessageBox에서 사용하니 WORDBREAK 옵션이 적용되어야만 한다.
+			//m_use_word_wrap = true;과 같은 옵션을 추가할 수도 있으나 좀 더 일반적인 방법으로 변경해야 한다.
+			//DT_WORDBREAK를 기본 제외시켰던 이유는 CStatic이 기본 WORDBREAK 스타일을 사용하지 않기 때문이기도 하고
+			//m_rect_text를 정확히 계산하기 위함도 있었으나 m_rect_text이 실제 텍스트가 출력되는 영역으로 세팅되는지는
+			//다시 확인이 필요하다.
+			dc.DrawText(sSpace + m_text, m_rect_text, dwText | DT_WORDBREAK);
 			//DrawShadowText(dc.GetSafeHdc(), sSpace + m_text, CString(sSpace + m_text).GetLength(), m_rect_text,
 			//	DT_CENTER | DT_TOP | DT_NOCLIP, m_cr_text.ToCOLORREF(), 0, 2, 1);
 		}
@@ -669,6 +675,7 @@ int CSCStatic::get_valign()
 	return DT_TOP;
 }
 
+/*
 void CSCStatic::set_halign()
 {
 
@@ -678,6 +685,7 @@ void CSCStatic::set_valign()
 {
 
 }
+*/
 
 void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back)
 {

@@ -134,7 +134,7 @@ void CHeaderCtrlEx::OnPaint()
 			if (m_flat_style)
 			{
 				if (m_use_header_separator)
-					draw_line(&dc, rItem.right, rItem.top + 3, rItem.right, rItem.bottom - 3, crSunkenDark);
+					draw_line(&dc, rItem.right, rItem.top + 2, rItem.right, rItem.bottom - 2, crSunkenDark);
 			}
 			else
 			{

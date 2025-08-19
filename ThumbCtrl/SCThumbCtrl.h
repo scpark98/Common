@@ -8,10 +8,10 @@
 #include <afxdialogex.h>
 
 #include <deque>
-#include "Common/colors.h"
-#include "Common/SCGdiplusBitmap.h"
-#include "Common/thread/thread_manager.h"
-#include "Common/CEdit/SCEdit/SCEdit.h"
+#include "../colors.h"
+#include "../SCGdiplusBitmap.h"
+#include "../thread/thread_manager.h"
+#include "../CEdit/SCEdit/SCEdit.h"
 
 
 #define MIN_TILE_SIZE		40

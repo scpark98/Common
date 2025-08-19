@@ -2,8 +2,8 @@
 //
 
 #include "TableCtrl.h"
-#include "../Common/Functions.h"
-#include "../Common/MemoryDC.h"
+#include "Functions.h"
+#include "MemoryDC.h"
 
 #define CTABLECONTROL_CLASSNAME _T("CTableCtrl")
 

@@ -806,6 +806,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
+
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color(255, 32, 32, 255);
@@ -838,6 +839,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
+
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color(255, 32, 32, 255);
@@ -870,6 +872,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_header_text = get_color(cr_text, -16);
 			cr_header_back = get_color(cr_back, -16);
+
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color(255, 32, 32, 255);
@@ -902,6 +905,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_header_text			= get_color(cr_text, -16);
 			cr_header_back			= get_color(cr_back, -16);
+
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
@@ -932,6 +936,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_header_back			= get_color(cr_back, 16);
 			cr_header_text			= get_color(cr_text, -32);
+
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
@@ -981,7 +986,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back_selected		= gRGB(204, 235, 255);//RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_selected_inactive = gray_color(cr_back_selected);
-			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_dropHilited		= get_sys_color(COLOR_HIGHLIGHT);
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternate		= get_color(cr_back, -12);
 
@@ -992,8 +997,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_title_back			= Gdiplus::Color::LightGray;
 
 			//CVtListCtrlEx에서 사용되는 컬러
-			cr_header_text			= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
-			cr_header_back			= RGB2gpColor(::GetSysColor(COLOR_3DFACE));
+			cr_header_text			= get_sys_color(COLOR_BTNTEXT);
+			cr_header_back			= get_sys_color(COLOR_3DFACE);
+
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(gGRAY(192));
 			cr_progress				= Gdiplus::Color(255, 49, 108, 244);

@@ -4,7 +4,7 @@
 
 #include <deque>
 
-#include "../../Common/Functions.h"
+#include "../Functions.h"
 
 #define BRACKET_OPEN	_T("<")
 #define BRACKET_CLOSE	_T(">")

@@ -16,7 +16,7 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	//parent에서 직접 디스플레이 할 지를 옵션으로 처리해야 한다.
 
 	//헤더에 include 및 멤버변수 선언
-	#include "../../Common/GdiplusBitmap.h"
+	#include "Common/GdiplusBitmap.h"
 	...
 	CSCGdiplusBitmap m_gif;
 

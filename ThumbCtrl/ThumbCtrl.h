@@ -40,9 +40,9 @@
 #define USE_OPENCV			false
 
 #if USE_OPENCV
-#include "../../Common/OpenCVFunctions.h"
+#include "../OpenCVFunctions.h"
 #else
-#include "../GdiPlusBitmap.h"
+#include "../SCGdiPlusBitmap.h"
 #endif
 
 

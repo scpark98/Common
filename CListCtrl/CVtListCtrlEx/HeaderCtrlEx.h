@@ -86,7 +86,7 @@ protected:
 	Gdiplus::Color	m_cr_sort_arrow = Gdiplus::Color::DarkGray;
 
 	Gdiplus::Color	m_cr_text = Gdiplus::Color(32, 32, 32);
-	Gdiplus::Color	m_cr_back = Gdiplus::Color(255, 247, 225);
+	Gdiplus::Color	m_cr_back = Gdiplus::Color(242, 242, 242);// Gdiplus::Color(255, 247, 225);
 	Gdiplus::Color	m_cr_separator = Gdiplus::Color::DimGray;
 
 //폰트 관련

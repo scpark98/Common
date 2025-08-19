@@ -168,7 +168,9 @@ protected:
 	//Gdiplus::Color		m_cr_back;
 
 	//Gdiplus::Color		m_cr_border = Gdiplus::Color::DimGray;
+	//default = true
 	bool				m_draw_border = true;
+	//default = 1
 	int					m_border_width = 1;
 
 

@@ -5,9 +5,9 @@
 #include "ThumbCtrl.h"
 
 #include <thread>
-#include "../../Common/Functions.h"
-#include "../../Common/MemoryDC.h"
-#include "../../Common/GifEx.h"
+#include "../Functions.h"
+#include "../MemoryDC.h"
+#include "../GifEx.h"
 #include "../messagebox/Win32InputBox/Win32InputBox.h"
 
 #define CTHUMBNAILCONTROL_CLASSNAME _T("CThumbCtrl")

@@ -1,9 +1,11 @@
 ﻿#include "dshow.h"
 #include <gdiplus.h>
 
-#include "TextDesigner/OutlineText.h"
 
 #pragma comment(lib, "strmiids.lib")
+
+/*
+#include "TextDesigner/OutlineText.h"
 
 #ifdef _DEBUG
 #pragma comment(lib, "d:/1.project/Common/DirectShow/TextDesigner/TextDesignerd.lib")
@@ -12,7 +14,7 @@
 #else
 #pragma comment(lib, "d:/1.project/Common/DirectShow/TextDesigner/TextDesigner.lib")
 #endif
-
+*/
 
 #define REGISTER_FILTERGRAPH
 
@@ -1541,8 +1543,8 @@ HRESULT CDShow::update_osd_subtitle()
 			Gdiplus::SolidBrush brush(Gdiplus::Color(m_subCfg.alpha[0], 253, 238, 193));
 			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
 			{
-				COLORREF crText = get_color(m_cur_subtitle.sentences[i].color);
-				brush.SetColor(Gdiplus::Color(/*m_subCfg.alpha[0]*/128, GetRValue(crText), GetGValue(crText), GetBValue(crText)));
+				Gdiplus::Color crText = get_color(m_cur_subtitle.sentences[i].color);
+				brush.SetColor(crText);
 			}
 			gr.FillPath(&brush, path_text);
 
@@ -1644,7 +1646,7 @@ int CDShow::subtitle_font_enlarge(int enlarge)
 
 	Clamp(m_subCfg.font_size, 10, 100);
 
-	m_subCfg.lf->lfHeight = get_logical_size_from_font_size(m_pParent->m_hWnd, m_subCfg.font_size);
+	m_subCfg.lf->lfHeight = get_pixel_size_from_font_size(m_pParent->m_hWnd, m_subCfg.font_size);
 	update_osd_subtitle();
 
 	return m_subCfg.font_size;

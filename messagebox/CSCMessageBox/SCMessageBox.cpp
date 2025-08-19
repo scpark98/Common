@@ -124,7 +124,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	{
 		m_button[i].create(m_button_caption[i], WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, SC_BUTTON_ID + i);
 		m_button[i].use_hover();
-		m_button[i].set_round(8, Gdiplus::Color::LightGray);
+		m_button[i].set_round(4, Gdiplus::Color::LightGray);
 		//m_button[i].draw_focus_rect(true, Gdiplus::Color::Red);
 	}
 

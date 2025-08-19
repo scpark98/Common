@@ -96,7 +96,8 @@ void CPathCtrl::PreSubclassWindow()
 	m_pEdit = new CSCEdit();// (this, item, subItem, GetItemText(item, subItem));
 	m_pEdit->Create(dwStyle, rc, this, 0);
 	m_pEdit->SetFont(&m_font, true);
-	((CSCEdit*)m_pEdit)->set_draw_border(false);
+	((CSCEdit*)m_pEdit)->set_line_align(DT_VCENTER);
+	//((CSCEdit*)m_pEdit)->set_draw_border(false);
 
 	repos_edit();
 
@@ -112,7 +113,7 @@ void CPathCtrl::repos_edit()
 	rc.DeflateRect(1, 1);
 	rc.left = ROOT_WIDTH;
 	m_pEdit->MoveWindow(rc);
-
+	/*
 	CRect margin = rc;
 	CSize szText;
 	CClientDC dc(m_pEdit);
@@ -125,6 +126,7 @@ void CPathCtrl::repos_edit()
 
 	m_pEdit->SetRect(&margin);
 	TRACE(_T("rc = %s\n"), get_rect_info_string(margin, 2));
+	*/
 }
 
 void CPathCtrl::ReconstructFont()

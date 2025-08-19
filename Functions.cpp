@@ -2853,7 +2853,10 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
-	if (params->status != HTTP_STATUS_OK)
+	//20250819 scpark. status가 200이 아니라도 api에서 result에 세부 에러를 담아서 리턴하는 경우도 있으므로
+	//여기서 무조건 리턴해서는 안된다.
+	//단, 300번대와 500번대는 internet error로 간주하고 400번대만 위와 같은 처리를 하도록 한다.
+	if (params->status != HTTP_STATUS_OK && ((params->status >= 300 && params->status < 400) || (params->status >= 500)))
 	{
 		SAFE_DELETE_ARRAY(jsonData);
 		SAFE_DELETE_ARRAY(buffer);

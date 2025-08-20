@@ -430,7 +430,9 @@ public:
 	void			convert(Gdiplus::PixelFormat new_format);
 
 	//printf()처럼 save(_T("D:\\test_%d.png"), i);와 같이 사용할 수 있다.
-	bool			save(LPCTSTR filepath, ...);
+	bool			savef(LPCTSTR filepath, ...);
+	bool			save(Gdiplus::Bitmap* bitmap, CString filename, int quality = 100);
+	bool			save(CString filename, int quality = 100);
 	bool			copy_to_clipbard();
 	bool			paste_from_clipboard();
 

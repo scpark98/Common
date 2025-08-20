@@ -1,3 +1,42 @@
+/*
+* 20250816 Koino HelpUManager에서 OTP 관련 기능을 위해 도입했으며 사용법은 아래와 같다.
+* gitHub에서 가져온 심플한 클래스로서 text를 QR 코드의 2차원 배열로 생성해준다.
+* 다만 직접 이미지로 변환하거나 저장해주는 코드는 없으므로
+* qr.getModule(x, y)로 각 모듈의 on/off 값을 얻어와서 CSCGdiplusBitmap으로 이미지화 할 수 있다.
+* 이 이미지를 OnPaint()에서 그리거나 save할 수 있다.
+* 
+	const char* text = "otpauth://totp/helpu.jp?secret=BXKPLCWT27E2IC2S43OMLVMR6JZNTRTZLE6536DSDO5EMOVMOYQNTPYRDHTW2RPRCIVZQPJNXX7QCLGEL4MIHY7XNRKAH7ZINQHZ6YA=&issuer=id[SUPPORTER]";              // User-supplied text
+	const QrCode::Ecc errCorLvl = QrCode::Ecc::LOW;  // Error correction level
+
+	// Make and print the QR Code symbol
+	const QrCode qr = QrCode::encodeText(text, errCorLvl);
+
+	//dot size = 4px, margin = 4px for 4 multipled
+	CSize sz_cell(4, 4); // size of each module in pixels
+	CSize sz_margin(8, 8); // margin around the QR code in pixels
+	int w = qr.getSize() * sz_cell.cx + sz_margin.cx * 2;
+	int h = qr.getSize() * sz_cell.cy + sz_margin.cy * 2;
+
+	m_img.create(w, h, PixelFormat24bppRGB);
+	Gdiplus::Graphics g(m_img);
+	Gdiplus::SolidBrush br(Gdiplus::Color::Black);
+
+	g.Clear(Gdiplus::Color::White); // 배경을 흰색으로 설정
+
+	for (int y = 0; y < m_img.height; y += sz_cell.cy)
+	{
+		for (int x = 0; x < m_img.width; x += sz_cell.cx)
+		{
+			TRACE(_T("%d, %d = %d\n"), x, y, qr.getModule((x - sz_margin.cx) / sz_cell.cx, (y - sz_margin.cy) / sz_cell.cy));
+			if (qr.getModule((x - sz_margin.cx) / sz_cell.cx, (y - sz_margin.cy) / sz_cell.cy))
+				g.FillRectangle(&br, x, y, sz_cell.cx, sz_cell.cy);
+		}
+	}
+
+	m_img.save(_T("D:\\Test_QRCode.bmp"));
+
+*/
+
 /* 
  * QR Code generator library (C++)
  * 

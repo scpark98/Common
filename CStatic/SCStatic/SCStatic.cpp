@@ -320,11 +320,14 @@ void CSCStatic::OnPaint()
 		MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
 		MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
 
-		//NMAP_STYLE(	SS_LEFTNOWORDWRAP |
-		//			//SS_CENTERIMAGE |
-		//			SS_WORDELLIPSIS |
-		//			SS_ENDELLIPSIS |
-		//			SS_PATHELLIPSIS,	DT_WORDBREAK);
+		//SS_LEFTNOWORDWRAP 스타일은 DT_WORDBREAK와 함께 사용하면 안된다.
+		//즉, SS_LEFTNOWORDWRAP이면 텍스트는 자동으로 SS_LEFT가 되고 자동 줄바꿈 되지 않는다.
+		//다만 SS_CENTERIMAGE까지 포함되면 스타일이 너무 제한되므로 SS_CENTERIMAGE는 체크 대상에서 제외시킨다.
+		NMAP_STYLE(	SS_LEFTNOWORDWRAP |
+					//SS_CENTERIMAGE |
+					SS_WORDELLIPSIS |
+					SS_ENDELLIPSIS |
+					SS_PATHELLIPSIS,	DT_WORDBREAK);
 	}
 
 	//텍스트 출력 루틴
@@ -340,8 +343,9 @@ void CSCStatic::OnPaint()
 	//텍스트의 출력 크기를 구한다.
 	CSize szText;
 
-	//m_rect_text.SetRectEmpty();
-	dc.DrawText(sSpace + m_text, &m_rect_text, DT_CALCRECT);// | DT_WORDBREAK);
+	//20250820 scpark. DT_CALCRECT 시에도 dwText를 반영해주는 것이 정석이지만
+	//여러가지 다양한 스타일을 지원하기 위해서는 dwText를 제외하고 DT_CALCRECT해야만 지원 가능하다.
+	dc.DrawText(sSpace + m_text, &m_rect_text, /*dwText | */DT_CALCRECT);
 	m_text_extent = m_rect_text.Width();
 	//TRACE(_T("width = %d (%s)\n"), m_rect_text.Width(), m_text);
 	szText.cx = m_rect_text.Width();// + m_nOutlineWidth * 2;
@@ -564,7 +568,7 @@ void CSCStatic::OnPaint()
 			//DT_WORDBREAK를 기본 제외시켰던 이유는 CStatic이 기본 WORDBREAK 스타일을 사용하지 않기 때문이기도 하고
 			//m_rect_text를 정확히 계산하기 위함도 있었으나 m_rect_text이 실제 텍스트가 출력되는 영역으로 세팅되는지는
 			//다시 확인이 필요하다.
-			dc.DrawText(sSpace + m_text, m_rect_text, dwText | DT_WORDBREAK);
+			dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
 			//DrawShadowText(dc.GetSafeHdc(), sSpace + m_text, CString(sSpace + m_text).GetLength(), m_rect_text,
 			//	DT_CENTER | DT_TOP | DT_NOCLIP, m_cr_text.ToCOLORREF(), 0, 2, 1);
 		}

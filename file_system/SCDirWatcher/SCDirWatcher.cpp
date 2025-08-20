@@ -34,8 +34,9 @@ void CSCDirWatcher::add(std::deque<CString> folder, bool watch_sub_dir)
 
     for (int i = 0; i < folder.size(); i++)
     {
-        if (folder[i].GetLength() > 0 && folder[i].Right(1) == _T('\\'))
-			folder[i].Delete(folder[i].GetLength() - 1, 1); // Remove trailing backslash
+		//폴더명 맨 끝에 '\\'가 있으면 제거한다. 단, 드라이브 루트는 제거하지 않아야 하므로 길이가 3 초과인 경우만 제거한다.
+        if (folder[i].GetLength() > 3 && folder[i].Right(1) == _T('\\'))
+			folder[i].Delete(folder[i].GetLength() - 1, 1);
 
         if (m_watcher.is_watching(folder[i]))
             continue;
@@ -87,7 +88,7 @@ void CSCDirWatcher::thread_directory_change_watcher()
 	while (m_is_thread_running)
 	{
 		// Watch directory logic here
-		TRACE(_T("watching %d directories...\n"), m_watcher.get_watching_count());
+		//TRACE(_T("watching %d directories...\n"), m_watcher.get_watching_count());
 
 		//WaitForMultipleObjectsEx()를 사용하면 Invalid Handle 에러가 발생하여 WaitForSingleObject()로 변경함.
         //이 waiting을 중지시키기 위한 이벤트를 발생시켜야 하는데 찾지 못하여 우선 1초 간격으로 while문을 실행함.

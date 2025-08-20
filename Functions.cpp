@@ -18508,48 +18508,6 @@ int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 	return -1;  // Failure
 }
 
-bool save(Gdiplus::Bitmap* bitmap, CString filename)
-{
-	if (!bitmap)
-		return false;
-
-	CLSID				encoderClsid;
-
-	CString ext = filename.Right(3).MakeLower();//GetFileExtension(filename).MakeLower();
-
-	if (ext == _T("jpg") || ext == _T("jpeg"))
-		GetEncoderClsid(L"image/jpeg", &encoderClsid);
-	else if (ext == _T("png"))
-		GetEncoderClsid(L"image/png", &encoderClsid);
-	else if (ext == _T("gif"))
-		GetEncoderClsid(L"image/gif", &encoderClsid);
-	else if (ext == _T("bmp"))
-		GetEncoderClsid(L"image/bmp", &encoderClsid);
-	else
-	{
-		AfxMessageBox(_T("처리 코드가 추가되지 않은 포맷. 코드 수정 필요"));
-		return false;
-	}
-	/*
-	encoderParameters.Count = 1;
-	encoderParameters.Parameter[0].Guid = EncoderQuality;
-	encoderParameters.Parameter[0].Type = EncoderParameterValueTypeLong;
-	encoderParameters.Parameter[0].NumberOfValues = 1;
-
-	// Save the image as a JPEG with quality level 0.
-	encoderParameters.Parameter[0].Value = &quality;
-	*/
-	Gdiplus::Status s;
-
-	s = bitmap->Save(CStringW(filename), &encoderClsid);// , & encoderParameters);
-
-	if (s == Gdiplus::Ok)
-		return true;
-
-	return false;
-}
-
-
 CString json_value(CString json, CString key)
 {
 	bool isFindToken = false;

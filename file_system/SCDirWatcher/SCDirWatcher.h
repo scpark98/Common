@@ -31,8 +31,8 @@ public:
 
 	//FILE_ACTION_ADDED(1), FILE_ACTION_REMOVED(2), FILE_ACTION_MODIFIED(3), FILE_ACTION_RENAMED_OLD_NAME(4), FILE_ACTION_RENAMED_NEW_NAME(5)
 	int		action = 0; 
-	CString	path0;
-	CString path1; //rename 시에만 사용됨
+	CString	path0;	//rename 시에는 변경된 파일명을 의미함
+	CString path1;	//rename 시에만 사용되며 rename 전의 원래 파일명을 의미함
 };
 
 class CSCDirWatcher

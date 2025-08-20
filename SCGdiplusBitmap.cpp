@@ -431,7 +431,6 @@ bool CSCGdiplusBitmap::load_icon(UINT id, int size)
 	m_filename = _T("resource ico image.");
 	resolution();
 
-	save(_T("d:\\ico.png"));
 	return true;
 }
 
@@ -2210,9 +2209,7 @@ void CSCGdiplusBitmap::round_corner(float radius, float factor, float position, 
 	gMask.FillPath(&pgb, &path);
 
 #ifdef _DEBUG
-	CString str;
-	str.Format(_T("z:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
-	::save(mask, str);
+	savef(_T("z:\\내 드라이브\\media\\test_image\\temp\\mask_%.2f_%.2f.png"), blendFactor[1], blendPosition[1]);
 #endif
 
 	replace_channel(mask, m_pBitmap, 3, 3);
@@ -2547,8 +2544,55 @@ bool CSCGdiplusBitmap::is_equal(Gdiplus::Color cr0, Gdiplus::Color cr1, int chan
 	return false;
 }
 
+bool CSCGdiplusBitmap::save(Gdiplus::Bitmap* bitmap, CString filename, int quality)
+{
+	if (!bitmap)
+		return false;
 
-bool CSCGdiplusBitmap::save(LPCTSTR filepath, ...)
+	CLSID				encoderClsid;
+
+	CString ext = filename.Right(3).MakeLower();//GetFileExtension(filename).MakeLower();
+
+	if (ext == _T("jpg") || ext == _T("jpeg"))
+		GetEncoderClsid(L"image/jpeg", &encoderClsid);
+	else if (ext == _T("png"))
+		GetEncoderClsid(L"image/png", &encoderClsid);
+	else if (ext == _T("gif"))
+		GetEncoderClsid(L"image/gif", &encoderClsid);
+	else if (ext == _T("bmp"))
+		GetEncoderClsid(L"image/bmp", &encoderClsid);
+	else
+	{
+		AfxMessageBox(_T("처리 코드가 추가되지 않은 포맷. 코드 수정 필요"));
+		return false;
+	}
+
+	Gdiplus::EncoderParameters encoderParameters;
+	encoderParameters.Count = 1;
+	encoderParameters.Parameter[0].Guid = Gdiplus::EncoderQuality;
+	encoderParameters.Parameter[0].Type = Gdiplus::EncoderParameterValueTypeLong;
+	encoderParameters.Parameter[0].NumberOfValues = 1;
+
+	// Save the image as a JPEG with quality level 0.
+	//ULONG quality = 100; // 0 ~ 100, 100이 최고 품질
+	encoderParameters.Parameter[0].Value = &quality;
+
+	Gdiplus::Status s;
+
+	s = bitmap->Save(CStringW(filename), &encoderClsid, &encoderParameters);
+
+	if (s == Gdiplus::Ok)
+		return true;
+
+	return false;
+}
+
+bool CSCGdiplusBitmap::save(CString filename, int quality)
+{
+	return save(m_pBitmap, filename, quality);
+}
+
+bool CSCGdiplusBitmap::savef(LPCTSTR filepath, ...)
 {
 	va_list args;
 	va_start(args, filepath);
@@ -2556,7 +2600,7 @@ bool CSCGdiplusBitmap::save(LPCTSTR filepath, ...)
 	CString filename;
 	filename.FormatV(filepath, args);
 
-	return ::save(m_pBitmap, filename);
+	return save(m_pBitmap, filename);
 }
 
 bool CSCGdiplusBitmap::copy_to_clipbard()
@@ -2802,8 +2846,7 @@ bool CSCGdiplusBitmap::save_gif_frames(CString folder)
 	for (size_t i = 0; i < m_frame_count; i++)
 	{
 		m_pBitmap->SelectActiveFrame(&pageGuid, i);
-		str.Format(_T("%s\\%s_%04d.png"), folder, get_part(m_filename, fn_name), i);
-		save(str);
+		savef(_T("%s\\%s_%04d.png"), folder, get_part(m_filename, fn_name), i);
 	}
 
 	if (is_playing)

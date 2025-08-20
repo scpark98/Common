@@ -1852,7 +1852,8 @@ h		: 복사할 height 크기(pixel)
 	LONG		get_font_size_from_pixel_size(HWND hWnd, int logical_size);
 
 	int			GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
-	bool		save(Gdiplus::Bitmap* bitmap, CString filepath);
+	//jpg로 저장할 경우 quality를 지정할 수 있다. 0~100 사이의 값으로 지정하며, 100이 가장 품질이 높다.
+	bool		save(Gdiplus::Bitmap* bitmap, CString filepath, int quality = 0);
 
 //gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 //종료될 때 해제시켜주는 함수도 반드시 호출해줘야 한다.

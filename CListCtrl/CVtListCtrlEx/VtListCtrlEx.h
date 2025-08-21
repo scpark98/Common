@@ -429,6 +429,7 @@ public:
 	int			find(CString find_target, std::deque<int>* result,
 					 int start_idx = 0, int end_idx = -1,
 					 std::deque<int>* dqColumn = NULL, bool stop_first_found = false, bool whole_word_olny = false, bool case_sensitive = false);
+#if 1
 	//target_columns에 검색 대상 컬럼들을 나열해준다.
 	template <typename ... T> int find(CString find_target, std::deque<int>* result, int start_idx = 0, int end_idx = -1,
 					bool stop_first_found = false, bool whole_word_olny = false, bool case_sensitive = false,
@@ -443,6 +444,7 @@ public:
 
 		return find(find_target, result, start_idx, end_idx, &dqColumn, stop_first_found, whole_word_olny, case_sensitive);
 	}
+#endif
 
 //정렬 관련
 	enum listctrlex_sort_type

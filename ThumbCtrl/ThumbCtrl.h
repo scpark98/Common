@@ -93,7 +93,7 @@ public:
 #if USE_OPENCV
 	cv::Mat		img;
 #else
-	CGdiplusBitmap*	img = NULL;
+	CSCGdiplusBitmap*	img = NULL;
 #endif
 	CString		title;
 	bool		key_thumb;	//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
@@ -173,7 +173,7 @@ public:
 #if USE_OPENCV
 	cv::Mat			get_img(int index);
 #else
-	CGdiplusBitmap	get_img(int index);
+	CSCGdiplusBitmap	get_img(int index);
 #endif
 
 	//정해진 개수를 넘어가면 맨 뒤부터(?) 지워준다.
@@ -226,7 +226,7 @@ public:
 	bool			m_use_circle_number = false;
 	void			use_circle_number(bool use) { m_use_circle_number = use; Invalidate(); }
 
-	CGdiplusBitmap	m_img_selection_mark;
+	CSCGdiplusBitmap	m_img_selection_mark;
 	void			set_selection_mark_image(CString image_path, int w = 0, int h = 0);
 	void			set_selection_mark_image(CString sType, UINT id, int w = 0, int h = 0);
 

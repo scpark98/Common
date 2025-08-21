@@ -288,19 +288,23 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 		//if(lpDIS->itemState & ODS_SELECTED) //ok
 		//포커스를 가졌거나 Always Show Selection이라면 선택 항목의 색상을 표시해주고
+		//주의. fullrowselection & is_selected라도 해당 셀의 색상이 기본색이 아닌 별도 색으로 지정되어 있다면
+		//그 색상 그대로 표시되어야 한다.
 		if ((m_has_focus || is_show_selection_always) && is_selected) //ok
 		{
 			if (m_has_focus)
 			{
 				//TRACE(_T("active\n"));
-				crText = m_theme.cr_text_selected;
-				if (is_full_row_selection || iSubItem == 0)
+				if (crText.GetValue() == listctrlex_unused_color.GetValue())
+					crText = m_theme.cr_text_selected;
+				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
 				//TRACE(_T("inactive\n"));
-				crText = m_theme.cr_text_selected_inactive;
+				if (crText.GetValue() == listctrlex_unused_color.GetValue())
+					crText = m_theme.cr_text_selected_inactive;
 				if (is_full_row_selection || iSubItem == 0)
 					crBack = m_theme.cr_back_selected_inactive;
 			}
@@ -341,6 +345,9 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	
 		if (crBack.GetValue() != listctrlex_unused_color.GetValue())
 		{
+			if (crBack.GetValue() == Gdiplus::Color::Transparent)
+				crBack = m_list_db[iItem].crBack[iSubItem];
+
 			pDC->FillSolidRect(itemRect, crBack.ToCOLORREF());
 		}
 		else if (m_use_alternate_back_color && (iItem % 2))

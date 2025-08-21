@@ -1,6 +1,15 @@
-// scpark. 20240103.
-// DimEditCtrl, EditTrans 기능 추가 진행 중...
-//
+/* scpark.
+[수정 내용]
+- 20250821 text, back, border, readonly, disabled 등 설정 모두 가능
+
+[수정 예정]
+- readonly일 경우는 기본	대화상자의 배경색인 COLOR_3DFACE로 설정되지만
+  다른 색상으로 설정할 수 있도록 set_back_color_readonly() 추가.
+  또는 set_use_readonly_default_color(false)를 호출하여 readonly일 때도 배경색을 변경하지 않도록 할 수 있다.
+- set_round(8)
+- DimEditCtrl, EditTrans 기능 추가 진행 중...
+*/
+
 #if !defined(AFX_SCEdit_H__E889B47D_AF6B_4066_B055_967508314A88__INCLUDED_)
 #define AFX_SCEdit_H__E889B47D_AF6B_4066_B055_967508314A88__INCLUDED_
 
@@ -11,6 +20,7 @@
 //
 
 #include <Afxwin.h>
+#include "../../colors.h"
 #include "../../SCGdiplusBitmap.h"
 
 static const UINT Message_CSCEdit = ::RegisterWindowMessage(_T("MessageString_CSCEdit"));
@@ -57,8 +67,6 @@ public:
 	//{{AFX_VIRTUAL(CSCEdit)
 	//}}AFX_VIRTUAL
 
-	bool					set_read_only(bool readonly = true);
-
 	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
 	//ex)action_find : 돋보기 그림을 그려주고 클릭하면 검색으로 사용
 	//클릭되면 parent에게 message_scedit_action_button_down 혹은 up 메시지를 전송한다.
@@ -76,11 +84,18 @@ public:
 	//후자는 SCThemeDlg를 상속받은 dlg라는 점이다. 수정 필요.
 	virtual CSCEdit&		set_transparent(bool transparent = true);
 	virtual CSCEdit&		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
-	virtual CSCEdit&		set_text_color(Gdiplus::Color crText); // This Function is to set the Color for the Text.
-	virtual CSCEdit&		set_back_color(Gdiplus::Color crBack); // This Function is to set the BackGround Color for the Text and the Edit Box.
+	Gdiplus::Color			get_text_color() { return m_cr_text; }
+	virtual CSCEdit&		set_text_color(Gdiplus::Color cr_text); // This Function is to set the Color for the Text.
+	Gdiplus::Color			get_back_color() { return m_cr_back; }
+	virtual CSCEdit&		set_back_color(Gdiplus::Color cr_back); // This Function is to set the BackGround Color for the Text and the Edit Box.
 	//아직 set_text_color_disabled()는 효과가 적용되고 있지 않다. 수정 필요.
 	virtual CSCEdit&		set_text_color_disabled(Gdiplus::Color cr_text_disabled);
 	virtual CSCEdit&		set_back_color_disabled(Gdiplus::Color cr_back_disabled);
+
+	//read only일 때 배경색을 변경할 수 있다. 파라미터를 주지 않으면 윈도우 기본 readonly 배경색(COLOR_3DFACE)으로 설정된다.
+	virtual CSCEdit&		set_back_color_readonly(Gdiplus::Color cr_back_readonly = get_sys_color(COLOR_3DFACE));
+	//readonly일 때 전용 배경색인 m_cr_back_readonly를 사용할 지, 무관하게 m_cr_back을 사용할 지.
+	void					set_use_readonly_color(bool use_default = true);
 
 	virtual	CSCEdit&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CSCEdit&		set_font_size(int nSize);
@@ -156,12 +171,21 @@ protected:
 	//마우스가 액션버튼내에 있는지 판별
 	bool			mouse_in_action_button(CPoint pt = CPoint(0, 0));
 
+
 	Gdiplus::Color	m_cr_text;
 	Gdiplus::Color	m_cr_back;
 	Gdiplus::Color	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
 	Gdiplus::Color	m_cr_back_disabled = Gdiplus::Color::LightGray;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
+
+	//readonly일 때 m_cr_back_readonly를 사용할 지 지정된 배경인 m_cr_back을 사용할 지.
+	//때로는 readonly일 때도 m_cr_back으로 표현해야 하는 경우도 있다.
+	//default = true
+	bool			m_use_readonly_color = true;
+	Gdiplus::Color	m_cr_back_readonly = get_sys_color(COLOR_3DFACE);
+
 	CBrush			m_br_back;
 	CBrush			m_br_back_disabled;
+
 
 	LOGFONT			m_lf;
 	CFont			m_font;

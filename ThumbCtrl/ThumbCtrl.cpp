@@ -423,7 +423,7 @@ int CThumbCtrl::insert(int index, CString full_path, CString title, bool key_thu
 #if USE_OPENCV
 	thumb.img = loadMat(full_path);
 #else
-	thumb.img = new CGdiplusBitmap();
+	thumb.img = new CSCGdiplusBitmap();
 
 	if (!thumb.img)
 	{
@@ -2400,10 +2400,10 @@ cv::Mat CThumbCtrl::get_img(int index)
 	return m_thumb[index].img;
 }
 #else
-CGdiplusBitmap CThumbCtrl::get_img(int index)
+CSCGdiplusBitmap CThumbCtrl::get_img(int index)
 {
 	if (index < 0 || index >= m_thumb.size())
-		return CGdiplusBitmap();
+		return CSCGdiplusBitmap();
 
 	return m_thumb[index].img;
 }

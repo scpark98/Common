@@ -263,6 +263,30 @@ CSCEdit& CSCEdit::set_back_color_disabled(Gdiplus::Color cr_back_disabled)
 	return *this;
 }
 
+//read only일 때 배경색을 변경할 수 있다. 파라미터를 주지 않으면 윈도우 기본 readonly 배경색(COLOR_3DFACE)으로 설정된다.
+CSCEdit& CSCEdit::set_back_color_readonly(Gdiplus::Color cr_back_readonly)
+{
+	m_cr_back_readonly = cr_back_readonly; // Passing the value passed by the dialog to the member varaible for ReadOnly Background Color
+	RedrawWindow();
+	return *this;
+}
+
+void CSCEdit::set_use_readonly_color(bool use_default)
+{
+	m_use_readonly_color = use_default;
+
+	if (use_default)
+	{
+		//m_cr_back_readonly.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
+	}
+	else
+	{
+		//m_cr_back_readonly.SetFromCOLORREF(m_cr_back.ToCOLORREF());
+	}
+
+	Invalidate();
+}
+
 HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 {
 	//if (m_rect_NCtop.IsRectEmpty())
@@ -286,12 +310,29 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		pDC->SetTextColor(m_cr_text.ToCOLORREF());
 		//pDC->SetBkColor(::GetSysColor(COLOR_3DFACE));
 		//readonly일 경우에도 배경색을 기본 읽기전용 색으로 바꾸지 않고 지정된 배경색을 유지시켜준다.
-		pDC->SetBkColor(m_cr_back.ToCOLORREF());
+		//pDC->SetBkColor(m_cr_back.ToCOLORREF());
+
+		if (IsWindowEnabled())
+		{
+			pDC->SetBkColor(m_use_readonly_color ? m_cr_back_readonly.ToCOLORREF() : m_cr_back.ToCOLORREF());
+			m_br_back.DeleteObject();
+			m_br_back.CreateSolidBrush(m_use_readonly_color ? m_cr_back_readonly.ToCOLORREF() : m_cr_back.ToCOLORREF());
+			hbr = (HBRUSH)m_br_back;
+		}
+		else
+		{
+			pDC->SetBkColor(m_cr_back_disabled.ToCOLORREF());
+			m_br_back_disabled.DeleteObject();
+			m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
+			hbr = (HBRUSH)m_br_back_disabled;
+		}
 	}
 	else if (!IsWindowEnabled())// || nCtlColor == CTLCOLOR_STATIC)
 	{
 		pDC->SetTextColor(m_cr_text_disabled.ToCOLORREF());
 		pDC->SetBkColor(m_cr_back_disabled.ToCOLORREF());
+		m_br_back.DeleteObject();
+		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
 		m_br_back_disabled.DeleteObject();
 		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
 		hbr = (HBRUSH)m_br_back_disabled;
@@ -350,23 +391,6 @@ CSCEdit& CSCEdit::set_transparent(bool transparent)
 	update_ctrl();
 
 	return *this;
-}
-
-bool CSCEdit::set_read_only(bool bReadOnly)
-{
-	//readonly일 때 set_back_color를 호출하면 원래 m_cr_backColor이 덮어써지므로
-	//그 변수값은 변경하지 말고 직접 배경색을 변경해준다.
-	if (bReadOnly)
-	{
-		m_br_back.DeleteObject();
-		m_br_back.CreateSolidBrush(::GetSysColor(COLOR_3DFACE));
-	}
-	else
-	{
-		set_back_color(m_cr_back);
-	}
-
-	return CEdit::SetReadOnly(bReadOnly);
 }
 
 void CSCEdit::set_action_button(int action)
@@ -721,7 +745,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	CRect rc;
-	Gdiplus::Color cr_back = Gdiplus::Color::Red;// m_cr_back;
+	Gdiplus::Color cr_back = m_cr_back;
 	Gdiplus::Color cr_border = m_cr_border;
 
 	GetClientRect(rc);
@@ -730,11 +754,14 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 
 	if (!IsWindowEnabled())
 	{
-		cr_back = gRGB(192, 192, 192);
+		cr_back = m_cr_back_disabled;// gRGB(192, 192, 192);
 	}
 	else if (GetStyle() & ES_READONLY)
 	{
-		cr_back = gRGB(255, 192, 192);
+		if (m_use_readonly_color)
+			cr_back = m_cr_back_readonly;
+		else
+			cr_back = m_cr_back;
 	}
 	else if (m_action_button_down)
 	{
@@ -782,7 +809,8 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	*/
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
 	//또한 IsWindowEnabled()에 따라 배경색이 달라진다.
-	draw_rectangle(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), IsWindowEnabled() ? m_cr_back : m_cr_back_disabled, m_border_width);
+	//draw_rectangle(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), IsWindowEnabled() ? m_cr_back : m_cr_back_disabled, m_border_width);
+	draw_rectangle(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
 
 	return FALSE;
 	return CEdit::OnEraseBkgnd(pDC);
@@ -992,9 +1020,9 @@ void CSCEdit::set_draw_border(bool draw, int border_width, Gdiplus::Color cr_bor
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 		m_cr_border = cr_border;
 
-	set_line_align(m_valign);
+	//set_line_align(m_valign);
 
-	//Invalidate();
+	Invalidate();
 	//RedrawWindow();
 	//UpdateWindow();
 }

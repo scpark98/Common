@@ -2622,8 +2622,10 @@ void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidat
 	{
 		//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
 		//원인을 파악중이며 우선 임시로 처리한다.
-		if (m_list_db.size() > 10000)
-			return;
+		//20250822. dispatch info 등 민감한 핸들러에서 뭔가 잘못 처리되어 m_list_db의 메모리 영역을 침범한 듯 하다.
+		//현재로서는 문제없으므로 아래 제한을 두었던 코드는 주석처리함.
+		//if (m_list_db.size() > 10000)
+		//	return;
 
 		m_list_db[item].text[subItem] = text;
 	}
@@ -3011,10 +3013,12 @@ int CVtListCtrlEx::get_checked_items(std::deque<int>* dq)
 
 void CVtListCtrlEx::unselect_selected_item()
 {
-	std::deque<int> dqSelected;
-	get_selected_items(&dqSelected);
-	for (int i = 0; i < dqSelected.size(); i++)
-		select_item(dqSelected[i], false);
+	SetItemState(-1, 0, LVIS_SELECTED);
+
+	//std::deque<int> dqSelected;
+	//get_selected_items(&dqSelected);
+	//for (int i = 0; i < dqSelected.size(); i++)
+	//	select_item(dqSelected[i], false);
 }
 
 //아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기

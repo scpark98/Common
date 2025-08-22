@@ -65,6 +65,7 @@ m_list.set_header_height(24);
 		2레벨
 			3레벨
 - 각 레벨에 따라 체크박스도 같이 들여쓰기 할 지, 체크박스는 항상 맨 왼쪽에만 표시할지는 검토 필요.
+- 상위 레벨과 하위 레벨은 ㄴ 과 같이 선으로 그려준다.
 - DrawItem()에서 level에 따라 들여쓰기를 적용한다.
 
 <수정될 내용>
@@ -424,13 +425,17 @@ public:
 //검색 관련
 	//기본 검색함수인 FindItem()을 이용해서 0번 컬럼에서만 데이터를 찾는다. virtual list이므로 OnLvnOdfinditem() 함수 수정 필수.
 	int			find(CString str, int start = -1, bool whole_word_olny = false, bool case_sensitive = false);
+
 	//separator가 ""이 아닌 공백 또는 다른 문자열일 경우는
 	//str을 분리해서 모두 찾는다.
 	int			find(CString find_target, std::deque<int>* result,
 					 int start_idx = 0, int end_idx = -1,
 					 std::deque<int>* dqColumn = NULL, bool stop_first_found = false, bool whole_word_olny = false, bool case_sensitive = false);
-#if 1
+
 	//target_columns에 검색 대상 컬럼들을 나열해준다.
+	//위의 find()함수와 std::deque<int>* dqColumn 유무와 끝의 T... target_columns 파라미터 때문에
+	//int arg[] = { target_columns... }; 문장에서 컴파일 타임에 에러가 표시되기도 한다.
+	//이는 이 템플릿 함수를 호출하며 파라미터가 일부 생략됐을 때 발생하므로 이럴 경우는 파라미터를 정확히 명시해야 한다.
 	template <typename ... T> int find(CString find_target, std::deque<int>* result, int start_idx = 0, int end_idx = -1,
 					bool stop_first_found = false, bool whole_word_olny = false, bool case_sensitive = false,
 					T... target_columns)
@@ -444,7 +449,6 @@ public:
 
 		return find(find_target, result, start_idx, end_idx, &dqColumn, stop_first_found, whole_word_olny, case_sensitive);
 	}
-#endif
 
 //정렬 관련
 	enum listctrlex_sort_type

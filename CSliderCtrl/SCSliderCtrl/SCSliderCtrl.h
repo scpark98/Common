@@ -197,6 +197,7 @@ public:
 	void	set_active_color(Gdiplus::Color cr_active);
 	void	set_inactive_color(Gdiplus::Color cr_inactive);
 	void	set_thumb_color(Gdiplus::Color cr_thumb);
+	void	set_tic_color(Gdiplus::Color cr_tic);
 
 	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	void	set_text_style(int text_style) { m_text_style = text_style; Invalidate(); }
@@ -347,18 +348,19 @@ protected:
 	Gdiplus::Color	m_cr_active;			//processed area
 	Gdiplus::Color	m_cr_inactive;			//not processed area
 	int				m_track_height = 14;	//rc.CenterPoint().y +- m_track_height / 2. ex) 6 and 7 is equal height
-	CPen			m_penThumb;
-	CPen			m_penThumbLight;
-	CPen			m_penThumbLighter;
-	CPen			m_penThumbDark;
-	CPen			m_penThumbDarker;
+	//CPen			m_penThumb;
+	//CPen			m_penThumbLight;
+	//CPen			m_penThumbLighter;
+	//CPen			m_penThumbDark;
+	//CPen			m_penThumbDarker;
 	Gdiplus::Color	m_cr_thumb;
-	Gdiplus::Color	m_cr_thumbLight;
-	Gdiplus::Color	m_cr_thumbLighter;
-	Gdiplus::Color	m_cr_thumbDark;
-	Gdiplus::Color	m_cr_thumbDarker;
-	Gdiplus::Color	m_crBookmark;
-	Gdiplus::Color	m_crBookmarkCurrent = gRGB(0, 255, 0);
+	Gdiplus::Color	m_cr_tic;
+	Gdiplus::Color	m_cr_thumb_light;
+	Gdiplus::Color	m_cr_thumb_lighter;
+	Gdiplus::Color	m_cr_thumb_dark;
+	Gdiplus::Color	m_cr_thumb_darker;
+	Gdiplus::Color	m_cr_bookmark;
+	Gdiplus::Color	m_cr_bookmark_current = gRGB(0, 255, 0);
 
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
 	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 64);

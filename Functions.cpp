@@ -3359,7 +3359,7 @@ LONG get_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString *st
 						(LPTSTR) &lpMsgBuf,
 						0,
 						NULL);
-		//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
+		TRACE(_T("%s\n"), (LPCTSTR)lpMsgBuf);
 		LocalFree(lpMsgBuf);
 	}
 	

@@ -29,11 +29,11 @@ CSCSliderCtrl::CSCSliderCtrl()
 
 CSCSliderCtrl::~CSCSliderCtrl()
 {
-	m_penThumb.DeleteObject();
-	m_penThumbLight.DeleteObject();
-	m_penThumbLighter.DeleteObject();
-	m_penThumbDark.DeleteObject();
-	m_penThumbDarker.DeleteObject();
+	//m_penThumb.DeleteObject();
+	//m_penThumbLight.DeleteObject();
+	//m_penThumbLighter.DeleteObject();
+	//m_penThumbDark.DeleteObject();
+	//m_penThumbDarker.DeleteObject();
 }
 
 
@@ -83,6 +83,7 @@ void CSCSliderCtrl::OnPaint()
 	Gdiplus::Color	cr_inactive = enable_color(m_cr_inactive, 32);
 	Gdiplus::Color	cr_text = enable_color(m_theme.cr_text);
 	Gdiplus::Color	cr_thumb = enable_color(m_cr_thumb);
+	Gdiplus::Color	cr_tic = enable_color(m_cr_tic);
 
 	// TODO: Add your message handler code here
 	GetClientRect(m_rc);
@@ -498,7 +499,7 @@ void CSCSliderCtrl::OnPaint()
 			{
 				tic_pos = Pos2Pixel(tic);
 				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
-				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(rtic));
+				g.FillEllipse(&Gdiplus::SolidBrush(cr_tic), CRect2GpRect(rtic));
 
 				if (m_tic_show_text)
 				{
@@ -549,7 +550,7 @@ void CSCSliderCtrl::OnPaint()
 #if 1
 	if (!m_thumb_hide && m_style <= style_value)
 	{
-		CRect	rThumb = make_center_rect(pxpos, rtrack.CenterPoint().y - 1, m_thumb.cx, m_thumb.cy);
+		CRect	rThumb = make_center_rect(pxpos, rtrack.CenterPoint().y, m_thumb.cx, m_thumb.cy);
 
 		if (false)//!IsWindowEnabled())
 		{
@@ -558,29 +559,33 @@ void CSCSliderCtrl::OnPaint()
 		{
 			CBrush br(cr_thumb.ToCOLORREF());
 
-			int		n = 4;										//라인 개수
+			int		n = 4;										//세로 라인 개수
 			double	dx = (double)m_thumb.cx * 0.84 / double(n + 1);	//라인 간격
 			double	sx = pxpos - 0.5 * double(n - 1) * dx;		//수직 라인 표시 시작 좌표
 
-			pOldPen = (CPen*)dc.SelectObject(&m_penThumbDarker);//NULL_PEN);
+			CPen pen(PS_SOLID, 1, m_cr_thumb_darker.ToCOLORREF());
+			pOldPen = (CPen*)dc.SelectObject(&pen);//NULL_PEN);
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
 
 			dc.RoundRect(rThumb, CPoint(6, 6));
 
 			for (i = 0; i < n; i++)
 			{
-				dc.SelectObject(&m_penThumbDarker);
-				dc.MoveTo(sx + (double)i * dx + 1, cy - 3);
-				dc.LineTo(sx + (double)i * dx + 1, cy + 4);
+				//dc.SelectObject(&m_penThumbDarker);
+				//dc.MoveTo(sx + (double)i * dx + 1, cy - 3);
+				//dc.LineTo(sx + (double)i * dx + 1, cy + 4);
+				draw_line(&dc, (int)(sx + (double)i * dx + 1), cy - 4, (int)(sx + (double)i * dx + 1), cy + 3, m_cr_thumb_darker, 1.0f);
 
-				dc.SelectObject(&m_penThumbLighter);
-				dc.MoveTo(sx + (double)i * dx, cy - 3);
-				dc.LineTo(sx + (double)i * dx, cy + 4);
+				//dc.SelectObject(&m_penThumbLighter);
+				//dc.MoveTo(sx + (double)i * dx, cy - 3);
+				//dc.LineTo(sx + (double)i * dx, cy + 4);
+				draw_line(&dc, (int)(sx + (double)i * dx), cy - 4, (int)(sx + (double)i * dx), cy + 3, m_cr_thumb_lighter, 1.0f);
 			}
 
 			dc.SelectObject(pOldPen);
 			dc.SelectObject(pOldBrush);
 			br.DeleteObject();
+			pen.DeleteObject();
 		}
 		else if (m_style == style_thumb_round)
 		{
@@ -603,7 +608,8 @@ void CSCSliderCtrl::OnPaint()
 		{
 			CBrush br(cr_thumb.ToCOLORREF());
 			pOldBrush = (CBrush*)dc.SelectObject(&br);
-			pOldPen = (CPen*)dc.SelectObject(&m_penThumbDarker);//NULL_PEN);
+			CPen pen(PS_SOLID, 1, m_cr_thumb_darker.ToCOLORREF());
+			pOldPen = (CPen*)dc.SelectObject(&pen);//NULL_PEN);
 
 			rThumb.top = m_rc.top;
 			rThumb.bottom = m_rc.bottom;
@@ -650,6 +656,7 @@ void CSCSliderCtrl::OnPaint()
 			dc.SelectObject(pOldPen);
 			dc.SelectObject(pOldBrush);
 			br.DeleteObject();
+			pen.DeleteObject();
 		}
 	}
 	//트랙의 북마크를 그린다.
@@ -661,9 +668,9 @@ void CSCSliderCtrl::OnPaint()
 			{
 				pxpos = Pos2Pixel(m_bookmark[i].pos);
 				//dc.FillSolidRect(pxpos-2, cy-8, 4, 4, (i == m_cur_bookmark ? m_crBookmarkCurrent : m_crBookmark));
-				CPen pen(PS_SOLID, 1, (i == m_cur_bookmark ? enable_color(m_crBookmarkCurrent).ToCOLORREF() : enable_color(m_crBookmark).ToCOLORREF()));
+				CPen pen(PS_SOLID, 1, (i == m_cur_bookmark ? enable_color(m_cr_bookmark_current).ToCOLORREF() : enable_color(m_cr_bookmark).ToCOLORREF()));
 				CPen* pOldPen = (CPen*)dc.SelectObject(&pen);
-				dc.SetPixel(pxpos, cy - 5, (i == m_cur_bookmark ? enable_color(m_crBookmarkCurrent).ToCOLORREF() : enable_color(m_crBookmark).ToCOLORREF()));
+				dc.SetPixel(pxpos, cy - 5, (i == m_cur_bookmark ? enable_color(m_cr_bookmark_current).ToCOLORREF() : enable_color(m_cr_bookmark).ToCOLORREF()));
 
 				for (int j = 1; j < 5; j++)
 				{
@@ -1177,25 +1184,19 @@ void CSCSliderCtrl::set_thumb_color(Gdiplus::Color cr_thumb)
 {
 	int nMultiple = 32;
 
-	m_cr_thumb		= cr_thumb;
-	m_cr_thumbLight	= get_color(m_cr_thumb, nMultiple);
-	m_cr_thumbLighter= get_color(m_cr_thumb, nMultiple * 2);
-	m_cr_thumbDark	= get_color(m_cr_thumb, -nMultiple);
-	m_cr_thumbDarker = get_color(m_cr_thumb, -nMultiple * 2);
-
-	m_penThumb.DeleteObject();
-	m_penThumbLight.DeleteObject();
-	m_penThumbLighter.DeleteObject();
-	m_penThumbDark.DeleteObject();
-	m_penThumbDarker.DeleteObject();
-
-	m_penThumb.CreatePen(PS_SOLID, 1, m_cr_thumb.ToCOLORREF());
-	m_penThumbLight.CreatePen(PS_SOLID, 1, m_cr_thumbLight.ToCOLORREF());
-	m_penThumbLighter.CreatePen(PS_SOLID, 1, m_cr_thumbLighter.ToCOLORREF());
-	m_penThumbDark.CreatePen(PS_SOLID, 1, m_cr_thumbDark.ToCOLORREF());
-	m_penThumbDarker.CreatePen(PS_SOLID, 1, m_cr_thumbDarker.ToCOLORREF());
+	m_cr_thumb			= cr_thumb;
+	m_cr_thumb_light	= get_color(m_cr_thumb, nMultiple);
+	m_cr_thumb_lighter	= get_color(m_cr_thumb, nMultiple * 2);
+	m_cr_thumb_dark		= get_color(m_cr_thumb, -nMultiple);
+	m_cr_thumb_darker	= get_color(m_cr_thumb, -nMultiple * 2);
+	Invalidate();
 }
 
+void CSCSliderCtrl::set_tic_color(Gdiplus::Color cr_tic)
+{
+	m_cr_tic = cr_tic;
+	Invalidate();
+}
 
 BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 {
@@ -1446,13 +1447,13 @@ int CSCSliderCtrl::get_near_bookmark(int pos, bool forward)
 
 void CSCSliderCtrl::set_bookmark_color(Gdiplus::Color cr)
 {
-	m_crBookmark = cr;
+	m_cr_bookmark = cr;
 	Invalidate();
 }
 
 void CSCSliderCtrl::set_bookmark_current_color(Gdiplus::Color cr)
 {
-	m_crBookmarkCurrent = cr;
+	m_cr_bookmark_current = cr;
 	Invalidate();
 }
 
@@ -1750,7 +1751,9 @@ void CSCSliderCtrl::set_color_theme(int theme)
 	m_theme.set_color_theme(theme);
 	m_cr_inactive = get_color(m_theme.cr_back, -64);
 
-	//기본 m_theme에서 보유하지 않은 다른 컬러들에 대한 세팅 추가
+	//기본 m_theme에는 없지만 CSCSlider에서 필요한 다른 컬러들에 대한 색상 설정
 	m_cr_active = gRGB(64, 80, 181);//RGB(128, 192, 255);
+	m_cr_inactive = gray_color(m_cr_active);
 	m_cr_thumb = gRGB(64, 80, 181); //RGB(124, 192, 232);
+	m_cr_tic = gray_color(m_cr_thumb);
 }

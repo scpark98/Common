@@ -2622,7 +2622,8 @@ void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidat
 	{
 		//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
 		//원인을 파악중이며 우선 임시로 처리한다.
-		//20250822. dispatch info 등 민감한 핸들러에서 뭔가 잘못 처리되어 m_list_db의 메모리 영역을 침범한 듯 하다.
+		//20250822. dispatch info 등 민감한 핸들러에서 뭔가 잘못 처리되어
+		//m_list_db의 메모리 영역을 침범한 듯 하다.
 		//현재로서는 문제없으므로 아래 제한을 두었던 코드는 주석처리함.
 		//if (m_list_db.size() > 10000)
 		//	return;

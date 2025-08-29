@@ -341,15 +341,17 @@ protected:
 //tooltip
 	//enable상태일때는 잘 표시되나 disable일때는 표시되지 않는다.
 	//이를 해결하려면 parent의 PreTranslateMessage()에서 처리해야 한다.
-	CToolTipCtrl* m_tooltip = NULL;
+	//pointer 타입으로 선언한 이유는 동적생성시에도 툴팁을 적용하기 위해.
+	CToolTipCtrl*	m_tooltip = NULL;
 	//default = true
-	bool		m_use_tooltip = true;
-	CString		m_tooltip_text = _T("");
+	bool			m_use_tooltip = true;
+	CString			m_tooltip_text = _T("");
+
 	//정적으로 만든 컨트롤은 문제없으나 동적으로 컨트롤을 생성하여 사용하는 경우
 	//PreSubclassWindow()에서 툴팁을 초기화하려니 예외가 발생함.
 	//그래서 Create()후에 별도로 prepare_tooltip()을 호출하여 준비되도록 수정.
 	//동적 생성한 컨트롤에서도 정상 표시됨을 확인함.
-	void		prepare_tooltip();
+	void			prepare_tooltip();
 
 
 protected:

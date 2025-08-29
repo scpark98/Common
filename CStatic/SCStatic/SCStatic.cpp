@@ -49,6 +49,12 @@ CSCStatic::CSCStatic()
 
 CSCStatic::~CSCStatic()
 {
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
 	if (m_hIcon)
 		DestroyIcon(m_hIcon);
 

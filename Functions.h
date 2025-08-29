@@ -860,7 +860,7 @@ struct	NETWORK_INFO
 	int	compare_string(CString str0, CString str1, TCHAR separator = '.');
 
 	//src를 n번 연결한 문자열 리턴. n개의 공백, 탭이 필요할 경우 사용
-	CString make_string(CString src, int n);
+	CString duplicate_str(CString src, int n);
 
 	//http://yeobi27.tistory.com/280
 	//A2W, A2T 및 그 반대 매크로들은 스택을 사용하므로 문제 소지가 있고 크기 제한도 있으므로

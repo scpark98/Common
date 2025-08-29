@@ -18,6 +18,12 @@ CSCComboBox::CSCComboBox()
 
 CSCComboBox::~CSCComboBox()
 {
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
 	m_font.DeleteObject();
 
 	if (m_pEdit)
@@ -40,11 +46,12 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_ERASEBKGND()
 	ON_CONTROL_REFLECT(CBN_SETFOCUS, &CSCComboBox::OnCbnSetfocus)
 	ON_CONTROL_REFLECT(CBN_KILLFOCUS, &CSCComboBox::OnCbnKillfocus)
-	ON_CONTROL_REFLECT(CBN_SELCHANGE, &CSCComboBox::OnCbnSelchange)
+	ON_CONTROL_REFLECT_EX(CBN_SELCHANGE, &CSCComboBox::OnCbnSelchange)
 	ON_CONTROL_REFLECT(CBN_SELENDOK, &CSCComboBox::OnCbnSelendok)
 	ON_CONTROL_REFLECT(CBN_SELENDCANCEL, &CSCComboBox::OnCbnSelendcancel)
 	//ON_WM_CTLCOLOR_REFLECT()
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
+	ON_WM_NCPAINT()
 END_MESSAGE_MAP()
 
 
@@ -125,7 +132,10 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	dc.SetTextColor(cr_text);
 
-	//TRACE(_T("%s\n"), strData);
+	CRect rtext;
+	dc.DrawText(strData, rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_CALCRECT);
+	TRACE(_T("width = %d\n"), rtext.Width());
+
 	dc.DrawText(strData, &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
 
 	dc.Detach();
@@ -412,8 +422,6 @@ void CSCComboBox::PreSubclassWindow()
 
 	reconstruct_font();
 
-	//repos_edit();
-
 	CComboBox::PreSubclassWindow();
 }
 
@@ -552,10 +560,10 @@ void CSCComboBox::OnCbnKillfocus()
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 }
 
-
-void CSCComboBox::OnCbnSelchange()
+//자주 사용되는 event hanlder이므로 parent에서도 이벤트를 처리할 수 있도록 함
+BOOL CSCComboBox::OnCbnSelchange()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	return FALSE;
 }
 
 
@@ -633,6 +641,26 @@ LRESULT CSCComboBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	//이 코드를 넣어줘야 disabled에서도 툴팁이 동작하는데
+	//이 코드를 컨트롤 클래스에 넣어줘도 소용없다.
+	//이 코드는 main에 있어야만 disable 상태일때도 잘 표시된다.
+	if (m_use_tooltip && m_tooltip && m_tooltip->m_hWnd)
+	{
+		//msg를 따로 선언해서 사용하지 않고 *pMsg를 그대로 이용하면 이상한 현상이 발생한다.
+		MSG msg = *pMsg;
+		msg.hwnd = (HWND)m_tooltip->SendMessage(TTM_WINDOWFROMPOINT, 0, (LPARAM) & (msg.pt));
+
+		CPoint pt = msg.pt;
+
+		if (msg.message >= WM_MOUSEFIRST && msg.message <= WM_MOUSELAST)
+			::ScreenToClient(msg.hwnd, &pt);
+
+		msg.lParam = MAKELONG(pt.x, pt.y);
+
+		// relay mouse event before deleting old tool 
+		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
+	}
+
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		bool	is_exist = false;
@@ -692,4 +720,63 @@ int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 void CSCComboBox::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
+}
+
+//이걸해도 테두리 색상이 변경되지 않는다. 역시 GPT
+void CSCComboBox::OnNcPaint()
+{
+	// 기본 테두리 그리기 막기
+	CWindowDC dc(this);
+
+	CRect rect;
+	GetWindowRect(&rect);
+	ScreenToClient(&rect);
+
+	// 원하는 색상으로 테두리 그리기
+	CRect rc;
+	GetWindowRect(&rc);
+	rc.OffsetRect(-rc.TopLeft());
+	dc.Draw3dRect(rc, RGB(255, 0, 0), RGB(255, 0, 255)); // 파란색 테두리}
+}
+
+void CSCComboBox::prepare_tooltip()
+{
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
+	m_tooltip = new CToolTipCtrl();
+
+	try
+	{
+		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+	}
+	catch (CException*)
+	{
+		CString str = get_error_str(GetLastError());
+	}
+
+	//m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);	//optional. 툴팁 표시 지속시간 설정.
+	m_tooltip->SetDelayTime(TTDT_INITIAL, 500);		//optional. 툴팁을 표시하기 위해 마우스가 머물러야 할 최소 시간.
+	//m_tooltip->SetDelayTime(TTDT_RESHOW, 0);		//optional. 포인터가 한 도구에서 다른 도구로 이동할 때 후속 도구 설명 창이 표시되는 데 걸리는 시간.
+	m_tooltip->SetMaxTipWidth(400);					//optional. 툴팁창의 최대 너비로서 여러줄의 툴팁을 표시할 경우 필수. ‘\n’ 문자로 멀티라인 표현 가능.
+	m_tooltip->Activate(TRUE);
+	//EnableToolTips(TRUE);
+	//EnableTrackingToolTips(TRUE);
+}
+
+void CSCComboBox::set_tooltip_text(CString text)
+{
+	m_tooltip_text = text;
+
+	if (!text.IsEmpty())
+		m_use_tooltip = true;
+
+	if (!m_tooltip)
+		prepare_tooltip();
+
+	m_tooltip->UpdateTipText(m_tooltip_text, this);
+	m_tooltip->AddTool(this, m_tooltip_text);
 }

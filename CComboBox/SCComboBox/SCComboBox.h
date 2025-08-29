@@ -16,7 +16,7 @@ class CSCComboBox : public CComboBox
 
 public:
 	CSCComboBox();
-	virtual ~CSCComboBox();
+	~CSCComboBox();
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void			set_color_theme(int theme);
@@ -50,6 +50,11 @@ public:
 	void			edit_end(bool valid);
 	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
+//tooltip
+	//기본적인 툴팁은 이 컨트롤 내에서 지원하지만
+	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.
+	void		use_tooltip(bool use) { m_use_tooltip = use; }
+	void		set_tooltip_text(CString text);
 
 protected:
 //design
@@ -72,6 +77,19 @@ protected:
 //즐겨찾기 관련
 	CString			m_reg_section;		//load or save할 때 넘어온 section값을 기억해놓는다.
 
+//tooltip 관련
+	//pointer 타입으로 선언한 이유는 동적생성시에도 툴팁을 적용하기 위해.
+	CToolTipCtrl*	m_tooltip = NULL;
+	//default = true
+	bool			m_use_tooltip = true;
+	CString			m_tooltip_text = _T("");
+
+	//정적으로 만든 컨트롤은 문제없으나 동적으로 컨트롤을 생성하여 사용하는 경우
+	//PreSubclassWindow()에서 툴팁을 초기화하려니 예외가 발생함.
+	//그래서 Create()후에 별도로 prepare_tooltip()을 호출하여 준비되도록 수정.
+	//동적 생성한 컨트롤에서도 정상 표시됨을 확인함.
+	void		prepare_tooltip();
+
 	DECLARE_MESSAGE_MAP()
 public:
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
@@ -88,11 +106,12 @@ public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnCbnSetfocus();
 	afx_msg void OnCbnKillfocus();
-	afx_msg void OnCbnSelchange();
+	afx_msg BOOL OnCbnSelchange();
 	afx_msg void OnCbnSelendok();
 	afx_msg void OnCbnSelendcancel();
 	afx_msg HBRUSH CtlColor(CDC* /*pDC*/, UINT /*nCtlColor*/);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	afx_msg void OnNcPaint();
 };
 
 

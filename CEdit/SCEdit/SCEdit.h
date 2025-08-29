@@ -1,12 +1,12 @@
 /* scpark.
 [수정 내용]
 - 20250821 text, back, border, readonly, disabled 등 설정 모두 가능
-
-[수정 예정]
 - readonly일 경우는 기본	대화상자의 배경색인 COLOR_3DFACE로 설정되지만
   다른 색상으로 설정할 수 있도록 set_back_color_readonly() 추가.
   또는 set_use_readonly_default_color(false)를 호출하여 readonly일 때도 배경색을 변경하지 않도록 할 수 있다.
-- set_round(8)
+
+[수정 예정]
+- set_round(8) 너무 많은 부분을 수정해야 하므로 우선 보류한다.
 - DimEditCtrl, EditTrans 기능 추가 진행 중...
 */
 

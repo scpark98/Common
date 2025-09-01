@@ -860,6 +860,7 @@ struct	NETWORK_INFO
 	int	compare_string(CString str0, CString str1, TCHAR separator = '.');
 
 	//src를 n번 연결한 문자열 리턴. n개의 공백, 탭이 필요할 경우 사용
+	//20250829 기존 make_string() 함수의 이름을 duplicate_str()으로 변경함.
 	CString duplicate_str(CString src, int n);
 
 	//http://yeobi27.tistory.com/280

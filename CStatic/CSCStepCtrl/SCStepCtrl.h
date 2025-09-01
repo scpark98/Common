@@ -4,7 +4,7 @@
 #include <deque>
 
 #include "../../colors.h"
-#include "../../GdiplusBitmap.h"
+#include "../../SCGdiplusBitmap.h"
 
 // CSCStepCtrl
 /*

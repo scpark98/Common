@@ -1992,7 +1992,7 @@ void CVtListCtrlEx::set_text_color(int item, int subItem, Gdiplus::Color crText,
 		Invalidate();
 }
 
-void CVtListCtrlEx::set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase)
+void CVtListCtrlEx::set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase, bool invalidate)
 {
 	int i, j;
 
@@ -2043,7 +2043,8 @@ void CVtListCtrlEx::set_back_color(int item, int subItem, Gdiplus::Color crBack,
 		}
 	}
 
-	Invalidate();
+	if (invalidate)
+		Invalidate();
 }
 
 void CVtListCtrlEx::set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack)

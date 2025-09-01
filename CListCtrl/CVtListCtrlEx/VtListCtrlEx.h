@@ -17,7 +17,7 @@
 * Common/Functions.*
 * Common/colors.*
 * Common/system/ShellImageList.*
-* Common/GdiPlusBitmap.*
+* Common/SCGdiPlusBitmap.*
 */
 
 /*
@@ -300,6 +300,10 @@ public:
 
 //추가 관련
 	//index 위치에 0번 컬럼이 text인 라인을 추가한다.(-1이면 맨 마지막에 추가)
+	//실행 후 UI가 모두 표시되기 전에 insert_item() 또는 Invalidate(), EnsureVisible() 등이 호출되면
+	//간혹 리스트의 top item이 반칸 정도 잘린 상태로 표시되는 경우가 있는데
+	//set_line_height(), set_header_height() 등이 영향을 줬을 수 있다.
+	//일단, UI가 화면에 표시되기 전까지는 Invalidate()이 되지 않도록 하니 이러한 현상은 사라짐.
 	int			add_item(CString text = _T(""), int image_index = -1, bool ensureVisible = true, bool invalidate = true);
 	int			add_item(std::deque<CString> dqText, int image_index = -1, bool ensureVisible = true, bool invalidate = true);
 	int			insert_item(int index, CString text = _T(""), int img_idx = -1, bool ensureVisible = true, bool invalidate = true);
@@ -320,6 +324,10 @@ public:
 	int			get_file_index(CString path, CString new_folder_title);
 
 	//여러개의 인자를 args에 주니 모두 기록되지 않는 현상이 있다. 확인 필요!!
+	//또한 실행 후 UI가 모두 표시되기 전에 insert_item() 또는 Invalidate(), EnsureVisible() 등이 호출되면
+	//간혹 리스트의 top item이 반칸 정도 잘린 상태로 표시되는 경우가 있는데
+	//set_line_height(), set_header_height() 등이 영향을 줬을 수 있다.
+	//일단, UI가 화면에 표시되기 전까지는 Invalidate()이 되지 않도록 하니 이러한 현상은 사라짐.
 	template <typename ... Types> int insert_item(int index, int img_idx, Types... args)
 	{
 		int n = sizeof...(args);
@@ -476,7 +484,7 @@ public:
 	//set_default_text_color(), set_default_back_color()를 통해 기본 글자색과 배경색을 설정할 수 있다.
 	void		set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase = false, bool invalidate = true);
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
-	void		set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase = false);
+	void		set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase = false, bool invalidate = true);
 	//글자색과 배경색 동시 변경
 	void		set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack);
 

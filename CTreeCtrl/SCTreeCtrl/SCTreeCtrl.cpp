@@ -1379,7 +1379,7 @@ void CSCTreeCtrl::iterate_tree_in_order(HTREEITEM hItem)
 	{
 		label = GetItemText(hItem);
 		
-		Trace_only(make_string(_T("\t"), tab_count));
+		Trace_only(duplicate_str(_T("\t"), tab_count));
 
 		Trace_only(_T("%s\n"), label);
 

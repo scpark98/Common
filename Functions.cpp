@@ -15457,7 +15457,9 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	rc.bottom	= pApp->GetProfileInt(sSection, _T("bottom"), 0);
 #endif
 
-	if (rc.IsRectNull())
+	int monitor_index = get_monitor_index(rc);
+
+	if (rc.IsRectNull() || monitor_index != 0)
 	{
 		pWnd->CenterWindow();
 		return;

@@ -509,12 +509,12 @@ void CSCShapeDlg::gif_thread()
 		if (!m_img.is_valid() ||
 			m_img.m_pBitmap == NULL ||
 			m_gif_index > m_img.get_frame_count() ||
-			m_img.m_pPropertyItem == NULL)
+			m_img.m_property_item == NULL)
 			break;
 
 		m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_gif_index);
 		render(m_img.m_pBitmap);
-		long delay = ((long*)m_img.m_pPropertyItem->value)[m_gif_index] * 10;
+		long delay = ((long*)m_img.m_frame_delay->value)[m_gif_index] * 10;
 		//if (delay < 10)
 		//	delay = 10;
 		//TRACE(_T("gif_thread %3d = %ld ms\n"), m_gif_index, delay);

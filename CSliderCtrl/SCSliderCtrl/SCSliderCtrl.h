@@ -192,10 +192,12 @@ public:
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
 	void	DrawFocusRect(BOOL bDraw = TRUE, BOOL bRedraw = FALSE);
 
+	//set_track_color()는 active 영역과 inactive 영역을 지정하므로
 	void	set_track_color(Gdiplus::Color cr_active, Gdiplus::Color cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
-	void	set_back_color(Gdiplus::Color cr_back);
 	void	set_active_color(Gdiplus::Color cr_active);
 	void	set_inactive_color(Gdiplus::Color cr_inactive);
+	//set_back_color()는 굳이 불필요하다.
+	//void	set_back_color(Gdiplus::Color cr_back);
 	void	set_thumb_color(Gdiplus::Color cr_thumb);
 	void	set_tic_color(Gdiplus::Color cr_tic);
 

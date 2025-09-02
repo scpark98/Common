@@ -183,6 +183,7 @@ bool CSCGdiplusBitmap::load(CString file)
 	release();
 
 	CSCGdiplusBitmap temp;
+	short rotated = 0;
 	
 	//멀티바이트 환경에서 CString2LPCWSTR()를 써서
 	//LPCWSTR로 바꿨으나 일부 파일 열기 실패하는 현상 발생.
@@ -210,14 +211,51 @@ bool CSCGdiplusBitmap::load(CString file)
 	int palSize = m_pBitmap->GetPaletteSize();
 	Gdiplus::PixelFormat pf = m_pBitmap->GetPixelFormat();
 
-	//gif가 아닌 일반 이미지라면 직접 로드한 후 팔레트를 백업해두고
-	//copy 방식으로 연 후 팔레트 정보를 복원시켜준다.
+	//회전여부 판단등을 위해 속성정보 추출
+	UINT total_buffer_size, num_properties;
+	m_pBitmap->GetPropertySize(&total_buffer_size, &num_properties);
+
+	if (m_property_item != NULL)
+	{
+		free(m_property_item);
+		m_property_item = NULL;
+	}
+
+	m_property_item = (Gdiplus::PropertyItem*)malloc(total_buffer_size);
+	m_pBitmap->GetAllPropertyItems(total_buffer_size, num_properties, m_property_item);
+
+	for (int i = 0; i < num_properties; i++)
+	{
+		if (m_property_item[i].id == 0x0112)
+		{
+			memcpy(&rotated, m_property_item[i].value, sizeof(rotated));
+			break;
+		}
+	}
+
+	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
+	if (nSize > 0)
+	{
+		m_frame_delay = (Gdiplus::PropertyItem*)malloc(nSize);
+		m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_frame_delay);
+	}
+	else
+	{
+		if (m_frame_delay != NULL)
+		{
+			free(m_frame_delay);
+			m_frame_delay = NULL;
+		}
+	}
+
 	if (get_part(file, fn_ext).MakeLower() == _T("webp"))
 	{
 		load_webp(file);
 	}
 	else if (get_part(file, fn_ext).MakeLower() != _T("gif"))
 	{
+		//gif가 아닌 일반 이미지라면 직접 로드한 후 팔레트를 백업해두고
+		//copy 방식으로 연 후 팔레트 정보를 복원시켜준다.
 		Gdiplus::ColorPalette* palette = NULL;
 
 		if (pf == PixelFormat8bppIndexed)
@@ -241,6 +279,18 @@ bool CSCGdiplusBitmap::load(CString file)
 			m_pBitmap->SetPalette(m_palette);
 			free(palette);
 		}
+	}
+
+	if (rotated != 0)
+	{
+		save(_T("d:\\rotate_before.jpg"));
+		if (rotated == 3)
+			m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipXY);
+		else if (rotated == 6)
+			m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipXY);
+		else if (rotated == 8)
+			m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipXY);
+		save(_T("d:\\rotate_after.jpg"));
 	}
 
 	m_filename = file;
@@ -652,10 +702,16 @@ void CSCGdiplusBitmap::release()
 	SAFE_DELETE(m_pBitmap);
 	SAFE_DELETE(m_pOrigin);
 
-	if (m_pPropertyItem != NULL)
+	if (m_property_item != NULL)
 	{
-		free(m_pPropertyItem);
-		m_pPropertyItem = NULL;
+		free(m_property_item);
+		m_property_item = NULL;
+	}
+
+	if (m_frame_delay != NULL)
+	{
+		free(m_frame_delay);
+		m_frame_delay = NULL;
 	}
 
 	SAFE_DELETE_ARRAY(data);
@@ -2804,11 +2860,12 @@ void CSCGdiplusBitmap::check_animate_gif()
 
 	// Get the number of frames in the first dimension.
 	m_frame_count = m_pBitmap->GetFrameCount(&pDimensionIDs[0]);
-	//TRACE(_T("m_frame_count = %d\n"), m_frame_count);
+	TRACE(_T("m_frame_count = %d\n"), m_frame_count);
 
 	// Assume that the image has a property item of type PropertyItemEquipMake.
 	// Get the size of that property item.
-	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
+	/*
+	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
 	if (nSize == 0)
 	{
 		delete[]pDimensionIDs;
@@ -2819,7 +2876,7 @@ void CSCGdiplusBitmap::check_animate_gif()
 	m_pPropertyItem = (Gdiplus::PropertyItem*)malloc(nSize);
 
 	m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_pPropertyItem);
-
+	*/
 	delete []pDimensionIDs;
 }
 
@@ -2885,7 +2942,7 @@ void CSCGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, s
 		Gdiplus::Graphics g(img);
 		g.DrawImage(m_pBitmap, 0, 0, width, height);
 		dqBitmap.push_back(img);
-		dqDelay.push_back(((long*)m_pPropertyItem->value)[i] * 10);
+		dqDelay.push_back(((long*)m_frame_delay->value)[i] * 10);
 	}
 
 	//일시정지된 재생을 다시 재개시킨다.
@@ -2906,7 +2963,7 @@ int CSCGdiplusBitmap::get_total_duration()
 
 	for (size_t i = 0; i < m_frame_count; i++)
 	{
-		total_duration += ((long*)m_pPropertyItem->value)[i] * 10;
+		total_duration += ((long*)m_frame_delay->value)[i] * 10;
 	}
 
 	return (int)total_duration;
@@ -3162,7 +3219,7 @@ void CSCGdiplusBitmap::thread_gif_animation()
 		//전 프레임부터 현 프레임까지 재생하는데 걸린 시간은 빼줘야 한다.
 		t1 = clock();
 		long display_delay = t1 - t0;
-		long delay = ((long*)m_pPropertyItem->value)[m_frame_index] * 10;
+		long delay = ((long*)m_frame_delay->value)[m_frame_index] * 10;
 
 		if (delay > display_delay)
 			std::this_thread::sleep_for(std::chrono::milliseconds((delay - display_delay)));

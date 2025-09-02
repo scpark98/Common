@@ -53,7 +53,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_slider_gif.set_track_height(GIF_SLIDER_HEIGHT);
 	m_slider_gif.set_font_name(_T("Arial"));
 	m_slider_gif.set_font_size(8);
-	//m_slider_gif.set_back_color(gGRAY(32));
+	m_slider_gif.set_inactive_color(gGRAY(192));
 	m_slider_gif.draw_progress_border();
 	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
 	m_slider_gif.set_use_slide();
@@ -1225,7 +1225,7 @@ void CSCImageDlg::thread_gif_animation()
 		//전 프레임부터 현 프레임까지 재생하는데 걸린 시간은 빼줘야 한다.
 		t1 = clock();
 		long display_delay = t1 - t0;
-		long delay = ((long*)(m_img[0].m_pPropertyItem->value))[m_frame_index] * 10;
+		long delay = ((long*)(m_img[0].m_frame_delay->value))[m_frame_index] * 10;
 
 		if (delay > display_delay)
 			std::this_thread::sleep_for(std::chrono::milliseconds((delay - display_delay)));

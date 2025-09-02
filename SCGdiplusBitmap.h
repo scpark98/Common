@@ -34,10 +34,16 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 
 	=> 특정 프레임만 표시, 투명 표시 등등의 편의성을 고려할 때 CStatic을 상속받아 변경할 예정
 
-- 20250609 animated gif 재생방식 분리
+[20250902]
+- 회전된 이미지인 경우 이를 감지하여 자동 회전되도록 수정.
+- 그 외 Gdiplus::PropertyItem*을 얻어왔으므로 이를 
+
+[20250609]
+- animated gif 재생방식 분리
 	CSCGdiplusBitmap에서 직접 gif를 재생하면 편리하지만 parent의 다른 child들과 간섭 발생 등 단점이 많아 이를 옵션으로 처리함.
 	load("test.gif", true)로 호출하면 CSCGdiplusBitmap에서 자동 재생되고
 	load("test.gif", false)로 호출하면 load하는 윈도우에서 직접 재생하게 된다.
+
 */
 
 //gdiplus 1.1을 사용하기 위해 pch.h, framework.h등에 이 define을 추가했으나 적용되지 않았다.
@@ -444,7 +450,12 @@ public:
 //animated Gif 관련
 	int				m_frame_count;
 	int				m_frame_index;
-	Gdiplus::PropertyItem* m_pPropertyItem = NULL;
+	//PropertyItem 정보 (orientation, GpsLongitude, GpsAltitude, GpsSpeed, ImageDescription, Orientation...)
+	//https://www.devhut.net/getting-a-specific-image-property-using-the-gdi-api/
+	Gdiplus::PropertyItem* m_property_item = NULL;
+	//m_frame_delay도 m_property_item에 속해있는데 뭔가 추가적으로 frame_delay를 얻어오기 위해서는 별도로 malloc을 해야하는 듯하다.
+	//일단 해당 항목은 별도 변수로 구해서 사용한다.
+	Gdiplus::PropertyItem* m_frame_delay = NULL;
 	bool			is_animated_gif() { return (is_valid() && (m_frame_count > 1)); }
 	int				get_frame_count() { return m_frame_count; }
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
@@ -484,6 +495,7 @@ public:
 
 protected:
 	CString			m_filename = _T("untitled");
+
 
 	//-1 : 아직 판별되지 않은 상태이므로 판별 시작
 	// 0 : 3채널이거나 4채널의 모든 픽셀의 alpha = 255인 경우

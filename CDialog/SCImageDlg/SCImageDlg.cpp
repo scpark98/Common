@@ -280,11 +280,16 @@ void CSCImageDlg::OnPaint()
 					ratio_str,
 					m_zoom * 100.0);
 
+		if (m_img[0].get_exif_str().GetLength())
+		{
+			info.Format(_T("%s\n\n%s"), info, m_img[0].get_exif_str());
+		}
+
 		CRect rText = rc;
 		rText.DeflateRect(8, 8);
 
 		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(), rText,
-						DT_NOCLIP | DT_LEFT | DT_TOP | DT_WORDBREAK, beige, black, 2, 1);
+						DT_NOCLIP | DT_LEFT | DT_TOP | DT_WORDBREAK, ivory, black, 2, 1);
 
 		dc.SelectObject(pOldFont);
 	}
@@ -1356,9 +1361,12 @@ void CSCImageDlg::display_image(CString filepath, bool scan_folder)
 {
 	stop_gif();
 
+	m_mutex.lock();
 	m_files.clear();
 	m_img.clear();
 	m_img.resize(m_buffer_max);
+	m_mutex.unlock();
+
 	CString path = filepath;
 
 	if (PathFileExists(filepath))
@@ -1387,10 +1395,7 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CSCImageDlgMessage(this, message_hide_message), 0);
 
 	if (m_files.size() == 0)
-	{
-		//update_title();
 		return;
-	}
 
 	//animated gif를 재생중이었다면 stop시켜야 한다.
 	//그렇지 않으면 m_img.clear(), m_img.pop_front()에서 에러가 발생한다.
@@ -1490,7 +1495,8 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 	//현재 이미지를 시작으로 forward or backward 버퍼링을 시작한다.
 	//버퍼링 중이었다면 버퍼링을 중지시킨 후 해야 한다.
 	//단, 빠른 전환시에는 문제될 수 있으므로 일정 시간후에 thread를 구동한다.
-	SetTimer(timer_thread_buffering, 100, NULL);
+	if (m_buffer_max > 1)
+		SetTimer(timer_thread_buffering, 100, NULL);
 }
 
 void CSCImageDlg::goto_index(int index)
@@ -1513,6 +1519,9 @@ void CSCImageDlg::goto_index(int index)
 	display_image(index);
 }
 
+//테스트 목적으로 파일을 저장하여 확인할 경우는 주의해야 한다.
+//ASee 프로젝트에서는 CDirWatcher에 의해 현재 이미지가 속한 폴더를 모니터링하고 있으므로
+//계속 refresh하게 되어 thread_buffering()에서 계속 오류가 발생한 적이 있다.
 void CSCImageDlg::thread_buffering()
 {
 	TRACE(_T("thread_buffering start...\n"));

@@ -183,6 +183,7 @@ bool CSCGdiplusBitmap::load(CString file)
 	release();
 
 	CSCGdiplusBitmap temp;
+	Gdiplus::Status status = Gdiplus::Ok;
 	short rotated = 0;
 	
 	//멀티바이트 환경에서 CString2LPCWSTR()를 써서
@@ -213,7 +214,7 @@ bool CSCGdiplusBitmap::load(CString file)
 
 	//회전여부 판단등을 위해 속성정보 추출
 	UINT total_buffer_size, num_properties;
-	m_pBitmap->GetPropertySize(&total_buffer_size, &num_properties);
+	status = m_pBitmap->GetPropertySize(&total_buffer_size, &num_properties);
 
 	if (m_property_item != NULL)
 	{
@@ -221,30 +222,119 @@ bool CSCGdiplusBitmap::load(CString file)
 		m_property_item = NULL;
 	}
 
-	m_property_item = (Gdiplus::PropertyItem*)malloc(total_buffer_size);
-	m_pBitmap->GetAllPropertyItems(total_buffer_size, num_properties, m_property_item);
-
-	for (int i = 0; i < num_properties; i++)
+	if (status == Gdiplus::Ok)
 	{
-		if (m_property_item[i].id == 0x0112)
+		m_property_item = (Gdiplus::PropertyItem*)malloc(total_buffer_size);
+		status = m_pBitmap->GetAllPropertyItems(total_buffer_size, num_properties, m_property_item);
+
+		m_exif_info = CSCEXIFInfo();
+
+		if (status == Gdiplus::Ok)
 		{
-			memcpy(&rotated, m_property_item[i].value, sizeof(rotated));
-			break;
+			for (int i = 0; i < num_properties; i++)
+			{
+				UINT size = 0;
+				char tstr[255] = { 0, };
+				Gdiplus::PropertyItem* propertyItem = NULL;
+				long* plong = NULL;
+
+				switch (m_property_item[i].id)
+				{
+					case PropertyTagEquipMake:
+						//size = m_pBitmap->GetPropertyItemSize(m_property_item[i].id);
+						//strncpy(tstr, (char*)(m_property_item[i].value), sizeof(size) * 2);
+						//propertyItem = (Gdiplus::PropertyItem*)malloc(size);
+						//TRACE(_T("camera_make = %S\n"), m_property_item[i].value);
+						m_exif_info.camera_make = (LPSTR)m_property_item[i].value;
+						break;
+					case PropertyTagEquipModel:
+						//size = m_pBitmap->GetPropertyItemSize(m_property_item[i].id);
+						//strncpy(tstr, (char*)(m_property_item[i].value), sizeof(size) * 2);
+						//propertyItem = (Gdiplus::PropertyItem*)malloc(size);
+						//TRACE(_T("camera_model = %S\n"), m_property_item[i].value);
+						m_exif_info.camera_model = (LPSTR)m_property_item[i].value;
+						break;
+					case PropertyTagSoftwareUsed:
+						m_exif_info.software = (LPSTR)m_property_item[i].value;
+						break;
+					case PropertyTagImageDescription:
+						m_exif_info.image_description = (LPSTR)m_property_item[i].value;
+						break;
+					case PropertyTagCopyright:
+						m_exif_info.image_copyright = (LPSTR)m_property_item[i].value;
+						break;
+					case PropertyTagDateTime:
+						m_exif_info.original_datetime = (LPSTR)m_property_item[i].value;
+						break;
+					case PropertyTagExifExposureTime:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.exposure_time = (double)plong[0] / (double)plong[1];
+						break;
+					case PropertyTagExifExposureBias:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.exposure_bias = (double)plong[0] / (double)plong[1];
+						break;
+					case PropertyTagExifFNumber:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.f_number = (double)plong[0] / (double)plong[1];
+						break;
+					case PropertyTagExifISOSpeed:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.iso_speed = (unsigned short)plong[0];
+						break;
+					case PropertyTagExifFocalLength:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.focal_length = (double)plong[0] / (double)plong[1];
+						break;
+					case PropertyTagExifFocalLengthIn35mmFilm:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.focal_length_in_35mm = (char)plong[0];
+						break;
+					case PropertyTagGpsAltitude:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.gps_altitude = (double)plong[0] / (double)plong[1];
+						break;
+					case PropertyTagGpsLatitude:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						TRACE(_T("property_type = %d, %d, %d, %d, %d, %d\n"), plong[0], plong[1], plong[2], plong[3], plong[4], plong[5]);
+						m_exif_info.gps_latitude.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
+						break;
+					case PropertyTagGpsLongitude:
+						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						plong = (long*)(m_property_item[i].value);
+						m_exif_info.gps_longitude.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
+						break;
+					case PropertyTagOrientation:
+						memcpy(&rotated, m_property_item[i].value, sizeof(rotated));
+						break;
+				}
+
+				free(propertyItem);
+			}
 		}
-	}
 
-	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
-	if (nSize > 0)
-	{
-		m_frame_delay = (Gdiplus::PropertyItem*)malloc(nSize);
-		m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_frame_delay);
-	}
-	else
-	{
-		if (m_frame_delay != NULL)
+		TRACE(_T("exif : \n%s"), m_exif_info.get_exif_str());
+		int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
+		if (status == Gdiplus::Ok && nSize > 0)
 		{
-			free(m_frame_delay);
-			m_frame_delay = NULL;
+			m_frame_delay = (Gdiplus::PropertyItem*)malloc(nSize);
+			m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_frame_delay);
+		}
+		else
+		{
+			if (m_frame_delay != NULL)
+			{
+				free(m_frame_delay);
+				m_frame_delay = NULL;
+			}
 		}
 	}
 
@@ -283,14 +373,35 @@ bool CSCGdiplusBitmap::load(CString file)
 
 	if (rotated != 0)
 	{
-		save(_T("d:\\rotate_before.jpg"));
-		if (rotated == 3)
-			m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipXY);
-		else if (rotated == 6)
-			m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipXY);
-		else if (rotated == 8)
-			m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipXY);
-		save(_T("d:\\rotate_after.jpg"));
+		TRACE(_T("rotated = %d, %s\n"), rotated, file);
+		//테스트 목적으로 파일을 저장하여 확인할 경우는 주의해야 한다.
+		//CDirWatcher에 의해 D드라이브를 모니터링하고 있으므로 계속 refresh하게 된다.
+		//save(_T("d:\\rotate_before.jpg"));
+		switch (rotated)
+		{
+			case 2:
+				m_pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
+				break;
+			case 3:
+				m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipNone);
+				break;
+			case 4:
+				m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipX);
+				break;
+			case 5:
+				m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipY);
+				break;
+			case 6:
+				m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipNone);	//90 CCW
+				break;
+			case 7:
+				m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipY);
+				break;
+			case 8:
+				m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipNone);
+				break;
+		}
+		//save(_T("d:\\rotate_after.jpg"));
 	}
 
 	m_filename = file;
@@ -2860,7 +2971,7 @@ void CSCGdiplusBitmap::check_animate_gif()
 
 	// Get the number of frames in the first dimension.
 	m_frame_count = m_pBitmap->GetFrameCount(&pDimensionIDs[0]);
-	TRACE(_T("m_frame_count = %d\n"), m_frame_count);
+	//TRACE(_T("m_frame_count = %d\n"), m_frame_count);
 
 	// Assume that the image has a property item of type PropertyItemEquipMake.
 	// Get the size of that property item.
@@ -3504,4 +3615,11 @@ void CSCGdiplusBitmap::create_back_shadow_image(CSCGdiplusBitmap* shadow, float 
 	shadow->canvas_size(width + depth, height + depth);
 	//shadow->save(_T("d:\\shadow.png"));
 	shadow->blur(sigma);
+}
+
+CString CSCGdiplusBitmap::get_exif_str()
+{
+	if (m_exif_info.camera_make.IsEmpty() && m_exif_info.camera_model.IsEmpty())
+		return _T("");
+	return m_exif_info.get_exif_str();
 }

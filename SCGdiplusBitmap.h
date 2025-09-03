@@ -59,6 +59,7 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 #include <algorithm>
 #include <vector>
 #include <memory>
+#include <cmath>
 
 static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CSCGdiplusBitmap"));
 
@@ -97,6 +98,52 @@ public:
 protected:
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
+};
+
+//https://exiv2.org/tags.html
+class CSCEXIFInfo
+{
+public:
+	CString camera_make;
+	CString camera_model;
+	CString software;
+	CString image_description;
+	CString image_copyright;
+	CString original_datetime;
+	double exposure_time = 1.0;
+	double exposure_bias = 0.0;
+	double f_number = 0.0;				//"
+	unsigned short iso_speed = 0;
+	char flash = 0;
+	double focal_length = 0.0;
+	double focal_length_in_35mm = 0.0;
+	double gps_altitude;
+	CString gps_latitude;
+	CString gps_longitude;
+	CString rotated_str;
+
+	CString get_exif_str()
+	{
+		CString res;
+		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
+			_T("노출 시간 : 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: N %s, E %s, %.0fm"),
+			camera_make,
+			camera_model,
+			software,
+			original_datetime,
+			flash ? _T("on") : _T("off"),
+			focal_length,
+			focal_length_in_35mm,
+			(unsigned)round(1.0 / exposure_time),
+			exposure_bias,
+			f_number,
+			iso_speed,
+			rotated_str,
+			gps_latitude,
+			gps_longitude,
+			gps_altitude);
+		return res;
+	}
 };
 
 class CSCGdiplusBitmapMessage
@@ -438,6 +485,9 @@ public:
 	//printf()처럼 save(_T("D:\\test_%d.png"), i);와 같이 사용할 수 있다.
 	bool			savef(LPCTSTR filepath, ...);
 	bool			save(Gdiplus::Bitmap* bitmap, CString filename, int quality = 100);
+	//테스트 목적으로 파일을 저장하여 확인할 경우는 주의해야 한다.
+	//ASee 프로젝트에서는 CDirWatcher에 의해 현재 이미지가 속한 폴더를 모니터링하고 있으므로
+	//계속 refresh하게 되어 thread_buffering()에서 계속 오류가 발생한 적이 있다.
 	bool			save(CString filename, int quality = 100);
 	bool			copy_to_clipbard();
 	bool			paste_from_clipboard();
@@ -456,6 +506,13 @@ public:
 	//m_frame_delay도 m_property_item에 속해있는데 뭔가 추가적으로 frame_delay를 얻어오기 위해서는 별도로 malloc을 해야하는 듯하다.
 	//일단 해당 항목은 별도 변수로 구해서 사용한다.
 	Gdiplus::PropertyItem* m_frame_delay = NULL;
+
+	//카메라로 촬영된 사진의 경우는 exif 정보를 필요로 할 수 있다.
+	//property의 갯수는 사진마다 다르지만 주요 정보만 미리 정해서 필요할 경우 출력시킨다.
+	//Common\image_processing\exif를 이용해서 쉽게 추출할 수 있으나 dependency가 발생하므로
+	//m_property_item을 이용해서 간단히 추출하는 것이 좋을듯하다.
+
+
 	bool			is_animated_gif() { return (is_valid() && (m_frame_count > 1)); }
 	int				get_frame_count() { return m_frame_count; }
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
@@ -493,6 +550,9 @@ public:
 
 	void			save_multi_image();// std::vector<Gdiplus::Bitmap*>& dqBitmap);
 
+//exif
+	CString			get_exif_str();
+
 protected:
 	CString			m_filename = _T("untitled");
 
@@ -505,6 +565,8 @@ protected:
 	Gdiplus::Bitmap* GetImageFromResource(CString lpType, UINT id);
 
 	CString			m_pixel_format_str;
+
+	CSCEXIFInfo		m_exif_info;
 
 	Gdiplus::Bitmap*m_pOrigin = NULL;
 	int				m_bright = 100;		//100%가 기본값

@@ -118,9 +118,12 @@ public:
 	double focal_length = 0.0;
 	double focal_length_in_35mm = 0.0;
 	double gps_altitude;
-	CString gps_latitude;
-	CString gps_longitude;
-	CString rotated_str;
+	double gps_latitude = 0.0;
+	double gps_longitude = 0.0;
+	int orientation = 0;
+	CString gps_latitude_str;
+	CString gps_longitude_str;
+	CString orientation_str;
 
 	CString get_exif_str()
 	{
@@ -138,9 +141,9 @@ public:
 			exposure_bias,
 			f_number,
 			iso_speed,
-			rotated_str,
-			gps_latitude,
-			gps_longitude,
+			orientation_str,
+			gps_latitude_str,
+			gps_longitude_str,
 			gps_altitude);
 		return res;
 	}
@@ -551,6 +554,7 @@ public:
 	void			save_multi_image();// std::vector<Gdiplus::Bitmap*>& dqBitmap);
 
 //exif
+	CSCEXIFInfo		get_exif() { return m_exif_info; }
 	CString			get_exif_str();
 
 protected:
@@ -566,6 +570,7 @@ protected:
 
 	CString			m_pixel_format_str;
 
+	//촬영된 이미지의 경우 exif 정보를 추출한다.
 	CSCEXIFInfo		m_exif_info;
 
 	Gdiplus::Bitmap*m_pOrigin = NULL;

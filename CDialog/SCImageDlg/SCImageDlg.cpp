@@ -280,6 +280,7 @@ void CSCImageDlg::OnPaint()
 					ratio_str,
 					m_zoom * 100.0);
 
+		//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
 		if (m_img[0].get_exif_str().GetLength())
 		{
 			info.Format(_T("%s\n\n%s"), info, m_img[0].get_exif_str());
@@ -1681,3 +1682,21 @@ void CSCImageDlg::scroll(int offset_x, int offset_y)
 	m_offset.y += offset_y;
 	Invalidate();
 }
+
+//exif
+double CSCImageDlg::get_gps_latitude()
+{
+	if (m_img.size() == 0 || !m_img[0].is_valid())
+		return 0.0;
+
+	return m_img[0].get_exif().gps_latitude;
+}
+
+double CSCImageDlg::get_gps_longitude()
+{
+	if (m_img.size() == 0 || !m_img[0].is_valid())
+		return 0.0;
+
+	return m_img[0].get_exif().gps_longitude;
+}
+

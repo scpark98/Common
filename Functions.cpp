@@ -10776,12 +10776,12 @@ double random(double minimum, double maximum)
 }
 */
 //지도 좌표 <-> 도분초 변환
-double		convert_gps_coord(int d, int m, double s)
+double gps_to_double(int d, int m, double s)
 {
 	return (d + (double)m/60.0 + s/3600.0);
 }
 
-void		convert_gps_coord(double gps, int &d, int &m, double &s)
+void double_to_gps(double gps, int &d, int &m, double &s)
 {
 	d = int(gps);
 	m = int((gps-d)*60.0);

@@ -2272,8 +2272,8 @@ void		get_rotated(int cx, int cy, int* tx, int* ty, double degree);
 std::vector<CPoint>	get_rotated(int cx, int cy, CRect* r, double degree);
 
 //지도 좌표 <-> 도분초 변환
-double		convert_gps_coord(int d, int m, double s);
-void		convert_gps_coord(double gps, int &d, int &m, double &s);
+double		gps_to_double(int d, int m, double s);
+void		double_to_gps(double gps, int &d, int &m, double &s);
 
 //src내의 모든 문자에 대해 digits자릿수의 조합 생성
 void		combination(std::vector<TCHAR> src, CString temp, std::vector<CString>& result, int depth);
@@ -2353,7 +2353,7 @@ void		resize_image(uint8_t *source_ptr,
 //void		resize_bilinear_c3(const unsigned char* src, int srcw, int srch, unsigned char* dst, int w, int h);
 //void		resize_bilinear_c4(const unsigned char* src, int srcw, int srch, unsigned char* dst, int w, int h);
 //void		resize_bilinear_image(uint8_t *src, int sw, int sh, uint8_t *dst, int w, int h);
-void resize11(int* input, int* output, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
+void		resize11(int* input, int* output, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
 
 void		gaussian_blur(uint8_t *image, int width, int height);
 

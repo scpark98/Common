@@ -182,6 +182,9 @@ public:
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
 
+//exif
+	double			get_gps_latitude();
+	double			get_gps_longitude();
 
 protected:
 	enum TIMER_ID

@@ -241,17 +241,9 @@ bool CSCGdiplusBitmap::load(CString file)
 				switch (m_property_item[i].id)
 				{
 					case PropertyTagEquipMake:
-						//size = m_pBitmap->GetPropertyItemSize(m_property_item[i].id);
-						//strncpy(tstr, (char*)(m_property_item[i].value), sizeof(size) * 2);
-						//propertyItem = (Gdiplus::PropertyItem*)malloc(size);
-						//TRACE(_T("camera_make = %S\n"), m_property_item[i].value);
 						m_exif_info.camera_make = (LPSTR)m_property_item[i].value;
 						break;
 					case PropertyTagEquipModel:
-						//size = m_pBitmap->GetPropertyItemSize(m_property_item[i].id);
-						//strncpy(tstr, (char*)(m_property_item[i].value), sizeof(size) * 2);
-						//propertyItem = (Gdiplus::PropertyItem*)malloc(size);
-						//TRACE(_T("camera_model = %S\n"), m_property_item[i].value);
 						m_exif_info.camera_model = (LPSTR)m_property_item[i].value;
 						break;
 					case PropertyTagSoftwareUsed:
@@ -267,7 +259,7 @@ bool CSCGdiplusBitmap::load(CString file)
 						m_exif_info.original_datetime = (LPSTR)m_property_item[i].value;
 						break;
 					case PropertyTagExifExposureTime:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+					TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.exposure_time = (double)plong[0] / (double)plong[1];
 						break;
@@ -305,12 +297,14 @@ bool CSCGdiplusBitmap::load(CString file)
 						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						TRACE(_T("property_type = %d, %d, %d, %d, %d, %d\n"), plong[0], plong[1], plong[2], plong[3], plong[4], plong[5]);
-						m_exif_info.gps_latitude.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
+						m_exif_info.gps_latitude_str.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
+						m_exif_info.gps_latitude = gps_to_double(plong[0], plong[2], (double)plong[4] / (double)plong[5]);
 						break;
 					case PropertyTagGpsLongitude:
 						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
-						m_exif_info.gps_longitude.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
+						m_exif_info.gps_longitude_str.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
+						m_exif_info.gps_longitude = gps_to_double(plong[0], plong[2], (double)plong[4] / (double)plong[5]);
 						break;
 					case PropertyTagOrientation:
 						memcpy(&rotated, m_property_item[i].value, sizeof(rotated));
@@ -381,24 +375,31 @@ bool CSCGdiplusBitmap::load(CString file)
 		{
 			case 2:
 				m_pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
+				m_exif_info.orientation_str = _T("FlipX");
 				break;
 			case 3:
 				m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipNone);
+				m_exif_info.orientation_str = _T("180° CW");
 				break;
 			case 4:
 				m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipX);
+				m_exif_info.orientation_str = _T("180° FlipX");
 				break;
 			case 5:
 				m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipY);
+				m_exif_info.orientation_str = _T("270° FlipY");
 				break;
 			case 6:
 				m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipNone);	//90 CCW
+				m_exif_info.orientation_str = _T("90° CCW");
 				break;
 			case 7:
 				m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipY);
+				m_exif_info.orientation_str = _T("90° FlipY");
 				break;
 			case 8:
 				m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipNone);
+				m_exif_info.orientation_str = _T("90° CW");
 				break;
 		}
 		//save(_T("d:\\rotate_after.jpg"));
@@ -3621,5 +3622,6 @@ CString CSCGdiplusBitmap::get_exif_str()
 {
 	if (m_exif_info.camera_make.IsEmpty() && m_exif_info.camera_model.IsEmpty())
 		return _T("");
+
 	return m_exif_info.get_exif_str();
 }

@@ -492,7 +492,7 @@ public:
 	//ASee 프로젝트에서는 CDirWatcher에 의해 현재 이미지가 속한 폴더를 모니터링하고 있으므로
 	//계속 refresh하게 되어 thread_buffering()에서 계속 오류가 발생한 적이 있다.
 	bool			save(CString filename, int quality = 100);
-	bool			copy_to_clipbard();
+	bool			copy_to_clipboard();
 	bool			paste_from_clipboard();
 
 	int				width = 0;

@@ -10,7 +10,8 @@
 	//json.h와 json.cpp에서 참조하는 rapid_json/include 폴더의 파일들을 상대경로로 include했으므로
 	//프로젝트 속성에서 굳이 추가 포함 디렉토리에 include 폴더를 추가할 필요는 없다.
 
-	#include "../../Common/Json/rapid_json/json.h"
+	//프로젝트의 include directory에 Common의 parent 경로를 추가하고(ex. D:\1.Projects_C++;)
+	#include "Common/Json/rapid_json/json.h"
 	...
 	//real json data
 	{
@@ -100,7 +101,10 @@ public:
 
 	//어떤 멤버값을 읽어올 때 해당 멤버가 존재하지 않으면 exception이 발생하므로 이럴 경우 default_value를 리턴하도록 함수 추가.
 	int			get_int(std::string member, int default_value = 0);
+	int64_t		get_int64(std::string member, int64_t default_value = 0);
+	uint64_t	get_uint64(std::string member, uint64_t default_value = 0);
 	CString		get_CString(std::string member, CString default_value = _T(""));
+
 
 	//위와 같이 모든 타입에 대해 wrapper 함수를 추가하지 않고 template을 쓰려했으나 컴파일 에러 발생함. 수정 중...
 	template<typename T> T get(std::string member, T default_value)
@@ -116,6 +120,10 @@ public:
 			return doc[member].GetBool();
 		else if constexpr (std::is_same_v<T, int>)
 			return doc[member].GetInt();
+		else if constexpr (std::is_same_v<T, int64_t>)
+			return doc[member].GetInt64();
+		else if constexpr (std::is_same_v<T, uint64_t>)
+			return doc[member].GetUint64();
 		else if constexpr (std::is_same_v<T, double>)
 			return doc[member].GetDouble();
 		/*

@@ -1596,7 +1596,26 @@ struct	NETWORK_INFO
 	BOOL		IsWow64();
 	BOOL		IsXpOr2000();
 	BOOL		Is64BitWindows();
-	void		ClickMouse(int x, int y);
+
+	//MOUSEEVENTF에는 DBLCLK이 없고
+	//윈도우 기본 메시지에는 DBLCLK은 있으나 CLICK은 없다.
+	//따라서 event를 새로 정의하여 사용한다.
+	enum SC_MOUSE_EVENT
+	{
+		mouse_event_ldown,
+		mouse_event_lup,
+		mouse_event_lclick,
+		mouse_event_ldbclick,
+		mouse_event_rdown,
+		mouse_event_rup,
+		mouse_event_rclick,
+		mouse_event_rdbclick,
+		mouse_event_mdown,
+		mouse_event_mup,
+		mouse_event_mclick,
+		mouse_event_mdbclick,
+	};
+	void		sc_mouse_event(DWORD event, int x = -1, int y = -1);
 
 	//app의 위치와 크기를 레지스트리에 저장하고 실행 시 다시 복원시킨다.
 	//resize가 안되는 다이얼로그의 경우는 resize시키지 않고 원래 크기로 표시해야 한다.
@@ -2071,7 +2090,7 @@ h		: 복사할 height 크기(pixel)
 	void		save_bitmap(HBITMAP bitmap, LPCTSTR filename);
 
 //키보드 언어를 그 나라 기본언어로 변경한다.
-void		IME_Convert_To_NativeCode(HWND hWnd, bool bNative);
+void		ime_convert(HWND hWnd, bool bNative);
 
 
 //문자입력창을 숨긴다.

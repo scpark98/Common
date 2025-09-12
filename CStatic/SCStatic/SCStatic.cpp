@@ -1034,8 +1034,13 @@ void CSCStatic::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	g
 		m_gcr_border = gcr_border;
 	}
 
+	if (gcr_parent_back.GetValue() != Gdiplus::Color::Transparent)
+	{
+		m_cr_parent_back = gcr_parent_back;
+	}
+
 	if (m_round > 0)
-		set_transparent(true, gcr_parent_back);
+		set_transparent(true, m_cr_parent_back);
 	else
 		Invalidate();
 }

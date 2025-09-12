@@ -263,7 +263,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
-		TRACE(_T("%d, %d\n"), iItem, iSubItem);
+		//TRACE(_T("%d, %d\n"), iItem, iSubItem);
 		if (iItem == 1)
 			iItem = 1;
 
@@ -3720,6 +3720,9 @@ BOOL CVtListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 		m_edit_item = item;
 		m_edit_subItem = subItem;
 	}
+
+	//edit mode까지 들어가지 않고 단순 클릭이라면 해당 셀에 설정된 action control이 있다면 표시해준다.
+
 
 	return FALSE;
 }

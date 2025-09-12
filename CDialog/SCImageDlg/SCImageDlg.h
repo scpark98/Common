@@ -1,4 +1,8 @@
 ﻿/*
+[수정할 내용]
+- ROI를 그린 후 확대된 이미지를 드래그 할 때 ROI 또한 같이 이동되어야 한다.
+
+[수정한 내용]
 * 20250902
 - 회전된 사진의 경우 이를 감지하여 자동 회전하도록 CSCGdiplusBitmap 수정.
   단, 이럴 경우는 자동 회전되었음을 알도록 우측 하단에 회전된 정보 아이콘을 표시해줘야 한다.
@@ -111,6 +115,8 @@ public:
 	int				m_index;
 	void			display_image(int index, bool scan_folder = false);
 	void			display_image(CString filepath, bool scan_folder = false);
+	void			build_image_info_str();
+
 	//index = 0 (goto first image), index = -1 (goto last image)
 	void			goto_index(int index);
 	int				get_image_count() { return m_files.size(); }
@@ -137,7 +143,13 @@ public:
 	bool			get_show_pixel() { return m_show_pixel; }
 	void			set_show_pixel(bool show);
 
-	bool			copy_to_clipbard();
+	enum ENUM_COPY_TO_CLIPBOARD
+	{
+		copy_auto = 0,		//roi가 있으면 roi 영역을, 없다면 이미지 전체를 클립보드로 복사
+		copy_whole_image,	//roi 여부와 관계없이 이미지 전체를 클립보드로 복사
+		copy_photo_exif,	//사진의 메타정보 텍스트를 클립보드로 복사
+	};
+	bool			copy_to_clipboard(int type = copy_auto);
 	bool			paste_from_clipboard();
 
 	Gdiplus::RectF	get_image_roi();
@@ -241,6 +253,9 @@ protected:
 	bool			m_show_info = true;
 	//파일명 뒤에 인덱스 정보등의 추가 정보를 표시하고자 할 경우 설정한다.
 	CString			m_alt_info;
+	//파일명부터 exif 정보까지...tab을 누르면 표시되는 정보를 저장해두고
+	//클립보드에 복사 명령 시 활용한다.
+	CString			m_info_str;
 
 	//roi 관련(선택영역)
 	//roi를 screen기준으로만 저장하면 이미지 scroll, resize 등을 할때마다 항상 보정해줘야 하므로

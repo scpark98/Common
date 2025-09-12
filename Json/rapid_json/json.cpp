@@ -377,6 +377,22 @@ int	Json::get_int(std::string member, int default_value)
 	return doc[member].GetInt();
 }
 
+int64_t	Json::get_int64(std::string member, int64_t default_value)
+{
+	if (!doc.HasMember(member))
+		return default_value;
+
+	return doc[member].GetInt64();
+}
+
+uint64_t Json::Json::get_uint64(std::string member, uint64_t default_value)
+{
+	if (!doc.HasMember(member))
+		return default_value;
+
+	return doc[member].GetUint64();
+}
+
 CString	Json::get_CString(std::string member, CString default_value)
 {
 	if (!doc.HasMember(member))

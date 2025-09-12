@@ -116,7 +116,7 @@ void CShellVolumeList::set_drive_list(std::deque<CDiskDriveInfo>* drive_list)
 	{
 		m_drives.assign(drive_list->begin(), drive_list->end());
 	}
-	//local인 경우는 직접 얻어와서 채워줘야 한다.
+	//local인 경우는(drive_list == NULL) 로컬의 드라이브 리스트를 직접 얻어와서 채워준다.
 	else
 	{
 		DWORD dwError = 0;

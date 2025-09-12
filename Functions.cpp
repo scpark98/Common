@@ -4732,7 +4732,7 @@ int getSignedFromUnsigned(unsigned value, int bit_length)
 //OnInitDialog()에 넣으면 적용되지 않는다.
 //SetTimer나 UI 버튼을 추가하여 변경하면 잘 동작함.
 //단, OnInitDialog()에서 타이머를 100ms와 같이 너무 짧게 주면 변경 안됨. 넉넉히 500ms 이상 줄 것.
-void IME_Convert_To_NativeCode(HWND hWnd, bool bNative)
+void ime_convert(HWND hWnd, bool bNative)
 {
 	//아래 주석처리된 블럭은 이전 방식이고
 	//맨 아래 3줄은 간략히 수정된 방식. 둘 다 정상 동작함.
@@ -9779,11 +9779,51 @@ CString	get_original_path(CString path)
 	return CString(long_path);
 }
 
-void ClickMouse(int x, int y)
+//MOUSEEVENTF에는 DBLCLK이 없고
+//윈도우 기본 메시지에는 DBLCLK은 있으나 CLICK은 없다.
+//따라서 event를 새로 정의하여 사용한다.
+void sc_mouse_event(DWORD event, int x, int y)
 {
-	SetCursorPos(x, y);
-	mouse_event(MOUSEEVENTF_LEFTDOWN, x, y, 0, 0);
-	mouse_event(MOUSEEVENTF_LEFTUP,   x, y, 0, 0);
+	if (x >= 0 && y >= 0)
+		SetCursorPos(x, y);
+
+	switch (event)
+	{
+		case mouse_event_ldown:
+			mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+			break;
+		case mouse_event_lup:
+			mouse_event(MOUSEEVENTF_LEFTUP,   0, 0, 0, 0);
+			break;
+		case mouse_event_lclick:
+			mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+			mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+			break;
+		case mouse_event_ldbclick:
+			mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+			mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+			Wait(10);
+			mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+			mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+			break;
+		case mouse_event_rdown:
+			mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+			break;
+		case mouse_event_rup:
+			mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+			break;
+		case mouse_event_rclick:
+			mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+			mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+			break;
+		case mouse_event_rdbclick:
+			mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+			mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+			Wait(10);
+			mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+			mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+			break;
+	}
 }
 
 std::wstring CString2wstring(const char* str)

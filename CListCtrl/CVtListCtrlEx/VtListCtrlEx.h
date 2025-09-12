@@ -69,7 +69,14 @@ m_list.set_header_height(24);
 - DrawItem()에서 level에 따라 들여쓰기를 적용한다.
 
 <수정될 내용>
--어떤 컬럼이 이미지만 표시할 경우가 있으므로 column type을 추가하고 sort도 그에 맞게 처리되어야 한다.
+- 어떤 컬럼이 이미지만 표시할 경우가 있으므로 column type을 추가하고 sort도 그에 맞게 처리되어야 한다.
+
+- 특정 셀에는 특정 액션을 수행하는 컨트롤을 표시할 수 있도록 한다.
+  예를 들어 파일 또는 폴더 선택 버튼을 표시하는데 항상 표시하는 것이 아니라
+  해당 셀이 선택되면 컨트롤을 표시해준다. (button, combobox 등)
+  이러한 컨트롤들은 하나만 동적으로 생성하고 선택 상태에 따라 show/hide 시킨다.
+  m_list.set_control(int item, int subItem, ctrl_folder_browse);
+  m_list.set_control(int item, int subItem, ctrl_file_browse);
 */
 // CVtListCtrlEx
 
@@ -655,6 +662,14 @@ public:
 	BOOL			SetItemData(int index, DWORD_PTR dwData);
 
 	CHeaderCtrlEx*	get_header_ctrl() { return &m_HeaderCtrlEx; }
+
+//cell action
+	enum CELL_ACTION
+	{
+		cell_action_browse_folder,
+		cell_action_browse_file,
+	};
+	void			set_action(int item, int subItem, int action);
 
 protected:
 	bool			m_use_virtual_list = true;

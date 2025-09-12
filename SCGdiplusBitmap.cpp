@@ -2771,7 +2771,7 @@ bool CSCGdiplusBitmap::savef(LPCTSTR filepath, ...)
 	return save(m_pBitmap, filename);
 }
 
-bool CSCGdiplusBitmap::copy_to_clipbard()
+bool CSCGdiplusBitmap::copy_to_clipboard()
 {
 	//복사는 잘 되지만 32bit PNG는 투명처리 안됨
 #if 1
@@ -2779,6 +2779,7 @@ bool CSCGdiplusBitmap::copy_to_clipbard()
 	auto status = m_pBitmap->GetHBITMAP(0, &hbitmap);
 	if (status != Gdiplus::Ok)
 		return false;
+
 	BITMAP bm;
 	GetObject(hbitmap, sizeof bm, &bm);
 	DIBSECTION ds;

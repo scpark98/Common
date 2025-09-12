@@ -1627,7 +1627,7 @@ void CSCThumbCtrl::on_context_menu(UINT nMenuID)
 				if (index >= 0)
 				{
 					CSCGdiplusBitmap img(m_thumb[index].full_path);
-					img.copy_to_clipbard();
+					img.copy_to_clipboard();
 				}
 			}
 			break;

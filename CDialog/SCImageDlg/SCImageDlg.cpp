@@ -256,40 +256,10 @@ void CSCImageDlg::OnPaint()
 		af.SetHeight(20);
 
 		CFont* pOldFont = dc.SelectObject(&af);
-		//CString filename;
-		CString info;
-		CString ratio_str;
-		float ratio = m_img[0].get_ratio();
-
-		//if (m_image_from_clipboard)
-		//	filename = _T("paste image from clipboard");
-		//else
-		//	filename = get_part(m_img[0].get_filename(), fn_name);
-
-		if (m_img[0].width == m_img[0].height)
-			ratio_str = _T("1 : 1");
-		else
-			ratio_str.Format(_T("%.3f : 1"), ratio);
-
-		info.Format(_T("파일 이름 : %s\n파일 크기: %s\n수정 날짜: %s\n이미지 정보: %dx%dx%d (%s)\n이미지 비율: %s\n확대 배율: %.0f%%"),
-					get_part(m_filename, fn_name) + m_alt_info,
-					get_file_size_str(m_img[0].get_filename()),
-					get_datetime_str(GetFileLastModifiedTime(m_img[0].get_filename())),
-					m_img[0].width, m_img[0].height, m_img[0].channel * 8,
-					m_img[0].get_pixel_format_str(),
-					ratio_str,
-					m_zoom * 100.0);
-
-		//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
-		if (m_img[0].get_exif_str().GetLength())
-		{
-			info.Format(_T("%s\n\n%s"), info, m_img[0].get_exif_str());
-		}
-
 		CRect rText = rc;
 		rText.DeflateRect(8, 8);
 
-		DrawShadowText(dc.GetSafeHdc(), info, info.GetLength(), rText,
+		DrawShadowText(dc.GetSafeHdc(), m_info_str, m_info_str.GetLength(), rText,
 						DT_NOCLIP | DT_LEFT | DT_TOP | DT_WORDBREAK, ivory, black, 2, 1);
 
 		dc.SelectObject(pOldFont);
@@ -433,13 +403,6 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 				zoom(-1);
 				return TRUE;
 			*/
-			case 'C' :
-				if (IsCtrlPressed())
-				{
-					copy_to_clipbard();
-					return TRUE;
-				}
-				break;
 			case VK_UP :
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
 				{
@@ -587,18 +550,22 @@ void CSCImageDlg::set_show_pixel(bool show)
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImageDlg"), _T("show pixel"), m_show_pixel);
 }
 
-bool CSCImageDlg::copy_to_clipbard()
+bool CSCImageDlg::copy_to_clipboard(int type)
 {
 	//roi가 있으면 그 영역만, 그렇지 않다면 전체 이미지를 복사한다.
-	if (m_image_roi.IsEmptyArea() == false)
+	if ((type == copy_auto) && (m_image_roi.IsEmptyArea() == false))
 	{
 		CSCGdiplusBitmap roi_img;
 		m_img[0].deep_copy(&roi_img);
 		roi_img.sub_image(m_image_roi);
-		roi_img.copy_to_clipbard();
-		return true;
+		return roi_img.copy_to_clipboard();
 	}
-	return m_img[0].copy_to_clipbard();
+	else if (type == copy_photo_exif)
+	{
+		return ::copy_to_clipboard(m_hWnd, m_info_str);
+	}
+
+	return m_img[0].copy_to_clipboard();
 }
 
 bool CSCImageDlg::paste_from_clipboard()
@@ -891,22 +858,24 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			//Clamp(m_offset.x, (long)(rc.Width() - nw), (long)0);
 			//Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
 
-			////마우스로 이미지를 이동해서 offset이 변경됐다면 roi도 같이 이동시켜줘야 한다.
-			//if (m_screen_roi.IsEmptyArea() == false)
-			//{
-			//	m_screen_roi.X += m_offset.x;
-			//	m_screen_roi.Y += m_offset.y;
-			//	//m_screen_roi.Offset(-m_offset.x, -m_offset.y);
-			//}
-
-			Gdiplus::RectF img_roi;
-			get_real_coord_from_screen_coord(m_r_display, m_img[0].width, m_screen_roi, &img_roi);
-			img_roi.X = ROUND(img_roi.X, 0);
-			img_roi.Y = ROUND(img_roi.Y, 0);
-			img_roi.Width = ROUND(img_roi.Width, 0);
-			img_roi.Height = ROUND(img_roi.Height, 0);
-			get_screen_coord_from_real_coord(m_r_display, m_img[0].width, img_roi, &m_screen_roi);
-
+			//확대한 이미지를 마우스로 이동해서 offset이 변경됐다면 roi 위치도 같이 이동시켜줘야 한다.
+			if (m_screen_roi.IsEmptyArea() == false)
+			{
+				//m_screen_roi.X += m_offset.x;
+				//m_screen_roi.Y += m_offset.y;
+				//m_screen_roi.X += (point.x - m_ptClicked.x);
+				//m_screen_roi.Y += (point.y - m_ptClicked.y);
+				//m_screen_roi.Offset(m_offset.x, m_offset.y);
+			}
+			
+			//Gdiplus::RectF img_roi;
+			//get_real_coord_from_screen_coord(m_r_display, m_img[0].width, m_screen_roi, &img_roi);
+			//img_roi.X = ROUND(img_roi.X, 0);
+			//img_roi.Y = ROUND(img_roi.Y, 0);
+			//img_roi.Width = ROUND(img_roi.Width, 0);
+			//img_roi.Height = ROUND(img_roi.Height, 0);
+			//get_screen_coord_from_real_coord(m_r_display, m_img[0].width, img_roi, &m_screen_roi);
+			
 			Invalidate();
 			m_ptClicked = point;
 		}
@@ -1477,6 +1446,8 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 	if (!m_img[0].is_animated_gif())
 		m_slider_gif.ShowWindow(SW_HIDE);
 
+	build_image_info_str();
+
 	Invalidate();
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImageDlg, (WPARAM)&CSCImageDlgMessage(this, message_image_changed), 0);
 
@@ -1498,6 +1469,37 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 	//단, 빠른 전환시에는 문제될 수 있으므로 일정 시간후에 thread를 구동한다.
 	if (m_buffer_max > 1)
 		SetTimer(timer_thread_buffering, 100, NULL);
+}
+
+void CSCImageDlg::build_image_info_str()
+{
+	CString ratio_str;
+	float ratio = m_img[0].get_ratio();
+
+	//if (m_image_from_clipboard)
+	//	filename = _T("paste image from clipboard");
+	//else
+	//	filename = get_part(m_img[0].get_filename(), fn_name);
+
+	if (m_img[0].width == m_img[0].height)
+		ratio_str = _T("1 : 1");
+	else
+		ratio_str.Format(_T("%.3f : 1"), ratio);
+
+	m_info_str.Format(_T("파일 이름 : %s\n파일 크기: %s\n수정 날짜: %s\n이미지 정보: %dx%dx%d (%s)\n이미지 비율: %s\n확대 배율: %.0f%%"),
+		m_filename + m_alt_info,
+		get_file_size_str(m_img[0].get_filename()),
+		get_datetime_str(GetFileLastModifiedTime(m_img[0].get_filename())),
+		m_img[0].width, m_img[0].height, m_img[0].channel * 8,
+		m_img[0].get_pixel_format_str(),
+		ratio_str,
+		m_zoom * 100.0);
+
+	//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
+	if (m_img[0].get_exif_str().GetLength())
+	{
+		m_info_str.Format(_T("%s\n\n%s"), m_info_str, m_img[0].get_exif_str());
+	}
 }
 
 void CSCImageDlg::goto_index(int index)

@@ -1,7 +1,6 @@
 // BitmapSlider.cpp : implementation file
 //
 
-#include "stdafx.h"
 #include "BitmapSlider.h"
 
 #ifdef _DEBUG

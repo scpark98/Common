@@ -1,7 +1,6 @@
 // StaticRange.cpp : implementation file
 //
 
-#include "stdafx.h"
 #include "StaticRange.h"
 
 #ifdef _DEBUG
@@ -10,7 +9,7 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-#include "../MemoryDC.h"
+#include "../../MemoryDC.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // CStaticRange

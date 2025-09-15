@@ -15,7 +15,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 
-#include "MemoryDC.h" // "Flicker Free Drawing In MFC" by Keith Rule
+#include <afxwin.h>
+#include "Common/MemoryDC.h" // "Flicker Free Drawing In MFC" by Keith Rule
 
 #define WM_BITMAPSLIDER_DOWN		WM_USER + 9424
 #define WM_BITMAPSLIDER_MOVING		WM_USER + 9425

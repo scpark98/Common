@@ -1266,7 +1266,8 @@ HRESULT CDShow::HandleGraphEvent(WPARAM wParam,LPARAM lparam)
 	if (m_pME == NULL)
 		return E_ABORT;
 
-	LONG lEvent = 0, lParam1 = 0, lParam2 = 0, msTimeOut = 0;
+	long lEvent = 0;
+	LONG_PTR lParam1 = 0, lParam2 = 0, msTimeOut = 0;
 
 	while (SUCCEEDED(m_pME->GetEvent(&lEvent, &lParam1, &lParam2, msTimeOut)))
 	{

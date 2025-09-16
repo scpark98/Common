@@ -42,7 +42,7 @@ bool CSubtitle::load_smi(CString sfile)
 		if (header_part)
 		{
 			//<BODY>를 만나기 전까지는 모두 header로 저장한다.
-			if (find_string(sLine, _T("<body>")) >= 0)
+			if (find(sLine, _T("<body>")) >= 0)
 				header_part = false;
 
 			if (m_unicode)
@@ -54,7 +54,7 @@ bool CSubtitle::load_smi(CString sfile)
 		}
 
 		//sync를 만나면 그 전까지 저장해 둔 문자열이 있다면 파싱을 시작하고
-		if (find_string(sLine, _T("<sync start")) >= 0)
+		if (find(sLine, _T("<sync start")) >= 0)
 		{
 			//저장해 둔 문자열이 없으면 일단 저장하고
 			if (sSync.IsEmpty())
@@ -63,7 +63,7 @@ bool CSubtitle::load_smi(CString sfile)
 			}
 			//자막끝 표시 문자열을 만나면 현재까지 저장해두었던 sSync를 파싱하고
 			//그 자막의 end값으로 넣어준다.
-			else if (find_string(sLine, _T("&nbsp;")) > 0)
+			else if (find(sLine, _T("&nbsp;")) > 0)
 			{
 				parse_subtltle(sSync);
 				sSync.Empty();
@@ -80,7 +80,7 @@ bool CSubtitle::load_smi(CString sfile)
 			}
 		}
 		//바디의 끝 테그를 만나면 더 이상 파싱할 게 없을것이다.
-		else if (find_string(sLine, _T("</body>")) >= 0)
+		else if (find(sLine, _T("</body>")) >= 0)
 		{
 			parse_subtltle(sSync);
 			break;
@@ -194,9 +194,9 @@ bool CSubtitle::load_smi(CString sfile)
 
 	fclose(m_fp);
 
-	if (find_string(m_header, _T(".encc")) >= 0)
+	if (find(m_header, _T(".encc")) >= 0)
 		m_sLanguage = _T("ENCC");
-	else if (find_string(m_header, _T(".jpcc")) >= 0)
+	else if (find(m_header, _T(".jpcc")) >= 0)
 		m_sLanguage = _T("JPCC");
 	else
 		m_sLanguage = _T("KRCC");
@@ -263,7 +263,7 @@ bool CSubtitle::load_srt(CString sfile)
 			else
 			{
 				//색생값이 있으면 추출해준다.
-				if (find_string(sLine, _T("<font color")) >= 0)
+				if (find(sLine, _T("<font color")) >= 0)
 				{
 					pos1 = sLine.Find(_T("=")) + 1;
 					pos2 = sLine.Find(_T(">"));
@@ -273,11 +273,11 @@ bool CSubtitle::load_srt(CString sfile)
 					sLine = sLine.Mid(pos2 + 1);
 
 					//현재 라인에 컬러끝 태그가 있다면 그냥 삭제시켜주면 된다.
-					if (find_string(sLine, _T("</font>")) >= 0)
+					if (find(sLine, _T("</font>")) >= 0)
 						sLine.Replace(_T("</font>"), _T(""));
 				}
 				//컬러끝 태그가 있다면 바로 전 캡션의 색상을 계속 유지하는 경우다.
-				else if (find_string(sLine, _T("</font>")) >= 0)
+				else if (find(sLine, _T("</font>")) >= 0)
 				{
 					if (caption.sentences.size() > 0)
 						color = caption.sentences[caption.sentences.size() - 1].color;
@@ -374,17 +374,17 @@ void CSubtitle::parse_subtltle(CString src)
 			//현재까지 추출된 태그를 파싱하여 정보를 추출한다.
 
 			//시작시간인 경우
-			if (find_string(sToken, _T("<sync start")) >= 0)
+			if (find(sToken, _T("<sync start")) >= 0)
 			{
 				pos1 = sToken.Find(_T("=")) + 1;
 				caption.start = _ttoi(sToken.Mid(pos1));
 				sToken.Empty();
 			}
-			else if (find_string(sToken, _T("<p class")) >= 0)
+			else if (find(sToken, _T("<p class")) >= 0)
 			{
 				sToken.Empty();
 			}
-			else if (find_string(sToken, _T("<font color")) >= 0)
+			else if (find(sToken, _T("<font color")) >= 0)
 			{
 				pos1 = sToken.Find(_T("=")) + 1;
 				color = sToken.Mid(pos1);
@@ -392,7 +392,7 @@ void CSubtitle::parse_subtltle(CString src)
 				sToken.Empty();
 			}
 			//한 문장의 끝에 <br>이 붙어있다면 제거하고 넣어준다.
-			else if (find_string(sToken, _T("<br")) >= 0)
+			else if (find(sToken, _T("<br")) >= 0)
 			{
 				//sToken += src[i];
 				sToken = sToken.Left(sToken.GetLength() - 3);
@@ -400,7 +400,7 @@ void CSubtitle::parse_subtltle(CString src)
 				sToken.Empty();
 				color.Empty();
 			}
-			else if (find_string(sToken, _T("</font")) >= 0)
+			else if (find(sToken, _T("</font")) >= 0)
 			{
 				sToken.Empty();
 			}

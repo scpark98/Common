@@ -1,7 +1,7 @@
 /*
 * scpark 20240118
 * -MyApp.exe -p1 text1 text2 -p2 "this is a big argument" -opt1 -55 -opt2
-   위의 명령줄과 같이 옵션명(switch)과 옵션값(value)가 나열된 파라미터를 map으로 구성하여
+   위의 명령줄과 같이 옵션명(switch)과 옵션값(value)으로 나열된 파라미터를 map으로 구성하여
    사용하기 쉽게 하기 위한 클래스이므로 SplitLine(argc, argv);과 같이 파싱하면 되지만
    위 파라미터들이 __argv[1]에 하나의 문자열로 합쳐져서 넘어오는 경우 이를 파싱해서 사용할 수 있도록
    SplitLine(CString params)함수를 추가함.
@@ -10,6 +10,17 @@
    이를 복호화한 후 각 스위치 옵션별로 분리해야 하는데
    이 클래스에서는 처음부터 __argc, __argv로 넘어온 경우의 파싱만 지원하므로
    SplitLine(CString params)함수를 새로 추가함.
+
+- usage :
+    CString params = _T("-i 3.38.18.113 -p 7002 -sn 1122 -fr 1572807 -id 1 -t 0 -rh 133534 -rd 10001 -gi None -gp 0 -tn 0 -p2p 0 -p2pi None -p2pp 0 -sizex 0 -sizey 0 -wm 1 -wms None -dm 1 -ra 1");
+    CCmdLine cmdLine(params);
+
+    //CCmdLine의 second는 CString을 vector로 가지는 m_strings 멤버변수가 있다.
+    for (const auto& param : cmdLine)
+    {
+        TRACE(_T("%s = %s\n"), param.first, param.second.m_strings[0]);
+    }
+
 */
 
 /*------------------------------------------------------
@@ -155,6 +166,7 @@ struct CCmdParam
 typedef map<StringType, CCmdParam> _CCmdLine;
 
 // the command line parser class
+
 class CCmdLine : public _CCmdLine
 {
 public:

@@ -13,7 +13,7 @@ extern "C" {
 #pragma comment (lib, "libavutil.a")
 #pragma comment (lib, "libswresample.a")
 #pragma comment (lib, "libswscale.a")
-#pragma comment (lib, "libx264.lib")
+#pragma comment (lib, "libx264_142.a")
 #pragma comment (lib, "secur32.lib")
 
 #include <afxmt.h>

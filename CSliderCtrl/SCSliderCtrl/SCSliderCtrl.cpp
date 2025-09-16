@@ -78,7 +78,7 @@ void CSCSliderCtrl::OnPaint()
 	CBrush*		pOldBrush = NULL;
 	CString		str, str_dual;
 
-	//Gdiplus::Color	cr_back = (m_forced_gray_include_back ? enable_color(m_theme.cr_back) : m_theme.cr_back);
+	Gdiplus::Color	cr_back = (m_forced_gray_include_back ? enable_color(m_theme.cr_back) : m_theme.cr_back);
 	Gdiplus::Color	cr_active = enable_color(m_cr_active);
 	Gdiplus::Color	cr_inactive = enable_color(m_cr_inactive, 32);
 	Gdiplus::Color	cr_text = enable_color(m_theme.cr_text);
@@ -136,7 +136,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else
 	{
-		//dc.FillSolidRect(m_rc, cr_back.ToCOLORREF());
+		dc.FillSolidRect(m_rc, cr_back.ToCOLORREF());
 	}
 
 
@@ -1161,13 +1161,13 @@ void CSCSliderCtrl::OnKillFocus(CWnd* pNewWnd)
 	Invalidate();
 	//TRACE("KillFocus\n");
 }
-/*
+
 void CSCSliderCtrl::set_back_color(Gdiplus::Color crBack)
 {
 	m_theme.cr_back = crBack;
 	Invalidate();
 }
-*/
+
 void CSCSliderCtrl::set_active_color(Gdiplus::Color cr_active)
 {
 	m_cr_active = cr_active;

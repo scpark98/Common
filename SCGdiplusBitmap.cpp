@@ -317,19 +317,8 @@ bool CSCGdiplusBitmap::load(CString file)
 
 		TRACE(_T("exif : \n%s"), m_exif_info.get_exif_str());
 		int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
-		if (status == Gdiplus::Ok && nSize > 0)
-		{
-			m_frame_delay = (Gdiplus::PropertyItem*)malloc(nSize);
-			m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_frame_delay);
-		}
-		else
-		{
-			if (m_frame_delay != NULL)
-			{
-				free(m_frame_delay);
-				m_frame_delay = NULL;
-			}
-		}
+		if (status == Gdiplus::Ok)
+			get_frame_delay();
 	}
 
 	if (get_part(file, fn_ext).MakeLower() == _T("webp"))
@@ -554,6 +543,8 @@ bool CSCGdiplusBitmap::load(CString sType, UINT id)
 
 	if (!m_pBitmap)
 		return false;
+
+	get_frame_delay();
 
 	m_filename = _T("resource_image.") + sType;
 	resolution();
@@ -2956,6 +2947,33 @@ bool CSCGdiplusBitmap::paste_from_clipboard()
 	//clipboard에서 가져온 이미지는 PixelFormat32bppRGB format인데 32bit지만 3channel이다.
 	//24bppRGB로 보정해준다.
 	convert(PixelFormat24bppRGB);
+
+	return true;
+}
+
+bool CSCGdiplusBitmap::get_frame_delay()
+{
+	if (m_pBitmap == NULL)
+		return false;
+
+	//gif가 외부 파일일 경우는 미리 frameDelay, pallette 등을 추출하고 copy 방식으로 열도록 구현되어 있으나
+	//리소스로 등록된 gif일 경우는 바로 여기서 그 property를 추출해야 하므로 여기서 해준다.
+	//animated gif가 아닌 일반 이미지일 경우는 nSize가 0이므로 무시된다.
+	int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
+
+	if (nSize > 0)
+	{
+		m_frame_delay = (Gdiplus::PropertyItem*)malloc(nSize);
+		m_pBitmap->GetPropertyItem(PropertyTagFrameDelay, nSize, m_frame_delay);
+	}
+	else
+	{
+		if (m_frame_delay != NULL)
+		{
+			free(m_frame_delay);
+			m_frame_delay = NULL;
+		}
+	}
 
 	return true;
 }

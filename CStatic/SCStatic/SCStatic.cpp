@@ -138,7 +138,7 @@ void CSCStatic::PreSubclassWindow()
 	}
 
 	//CStatic에서 tooltip, mouse event등을 처리하려면 반드시 SS_NOTIFY 스타일을 추가해야 한다.
-	ModifyStyle(0, SS_NOTIFY);
+	//ModifyStyle(0, SS_NOTIFY);
 
 	reconstruct_font();
 }

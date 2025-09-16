@@ -1127,7 +1127,7 @@ CString		get_size_str(ULONGLONG size, int unit, int floats, bool unit_string, bo
 		//단, bytes 단위라면 소숫점 자리수는 0이다.
 		if (unit == 0)
 			floats = 0;
-		TRACE(_T("floats = %d\n"), floats);
+		//TRACE(_T("floats = %d\n"), floats);
 		//if (dsize < 10)
 		//	floats = 2;
 		//else

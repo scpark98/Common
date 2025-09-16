@@ -196,8 +196,7 @@ public:
 	void	set_track_color(Gdiplus::Color cr_active, Gdiplus::Color cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
 	void	set_active_color(Gdiplus::Color cr_active);
 	void	set_inactive_color(Gdiplus::Color cr_inactive);
-	//set_back_color()는 굳이 불필요하다.
-	//void	set_back_color(Gdiplus::Color cr_back);
+	void	set_back_color(Gdiplus::Color cr_back);
 	void	set_thumb_color(Gdiplus::Color cr_thumb);
 	void	set_tic_color(Gdiplus::Color cr_tic);
 

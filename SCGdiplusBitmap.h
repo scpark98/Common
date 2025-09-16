@@ -509,6 +509,8 @@ public:
 	//m_frame_delay도 m_property_item에 속해있는데 뭔가 추가적으로 frame_delay를 얻어오기 위해서는 별도로 malloc을 해야하는 듯하다.
 	//일단 해당 항목은 별도 변수로 구해서 사용한다.
 	Gdiplus::PropertyItem* m_frame_delay = NULL;
+	//PropertyTagFrameDelay property에서 gif frame delay 정보를 추출하여 m_frame_delay에 저장한다.
+	bool			get_frame_delay();
 
 	//카메라로 촬영된 사진의 경우는 exif 정보를 필요로 할 수 있다.
 	//property의 갯수는 사진마다 다르지만 주요 정보만 미리 정해서 필요할 경우 출력시킨다.

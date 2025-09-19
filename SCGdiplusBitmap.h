@@ -28,6 +28,8 @@ Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
 	m_gif.load(_T("GIF"), UINT(IDR_GIF_CAT_LOADING));
 
 	//로딩 후 parent의 DC 및 좌표를 넘겨주면 자동 재생됨.
+	//단, 이 방식의 단점은 parent의 다른 child들과 간섭이 발생할 수 있고 깜빡임도 발생할 수 있다.
+	//따라서 단순히 animated gif만 표시하고자 한다면 CSCStatic을 사용하여 gif를 표시하는 것이 독립적이므로 좋다.
 	m_gif.set_animation(m_hWnd);// , 0, 0, 150, 130, true);
 
 	//save_gif_frames()를 이용하여 각 프레임을 저장 가능.

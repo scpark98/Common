@@ -4286,7 +4286,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		sCaptionString.TrimRight();
 		//sCaptionString.MakeLower();
 
-		TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
+		//TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
 		if (sText.IsEmpty() || !pWnd->IsWindowVisible())
 			continue;
 
@@ -18958,10 +18958,17 @@ bool is_gui_application(CString fullPath)
 	//fullPath에서 실행파일명 또는 cmd를 추출한다.
 	CString cmd = fullPath;
 
+	//실행파일 경로에 ""이 붙어있다면 제거하고 실행파일 경로
+	//"D:\1.Projects_C++\CodeSign\mt.exe" - manifest "D:\1.Projects_C++\CodeSign\manifest\LMMAgent.exe.manifest" - outputresource:"D:\1.Projects_C++\LMM_Koino_service\servicesetup_new\bin\Agent\LMMAgent.exe"
 	if (fullPath[0] == '\"')
-		cmd = fullPath;
-	else if (fullPath.Find(' ') > 0)
+	{
 		cmd = fullPath.Left(fullPath.Find(' '));
+		cmd.Replace(_T("\""), _T(""));
+	}
+	else if (fullPath.Find(' ') > 0)
+	{
+		cmd = fullPath.Left(fullPath.Find(' '));
+	}
 
 	if (PathFileExists(cmd) == FALSE)
 	{
@@ -18976,7 +18983,7 @@ bool is_gui_application(CString fullPath)
 		fullPath = filename;
 	}
 
-	std::string filePath = CString2string(fullPath);
+	std::string filePath = CString2string(cmd);
 
 	std::ifstream file(filePath, std::ios::binary);
 
@@ -18984,7 +18991,7 @@ bool is_gui_application(CString fullPath)
 	{
 		LPTSTR lpFilePart;
 		TCHAR filename[MAX_PATH] = { 0, };
-		if (!SearchPath(NULL, fullPath, _T(""), MAX_PATH, filename, &lpFilePart))
+		if (!SearchPath(NULL, cmd, _T(""), MAX_PATH, filename, &lpFilePart))
 		{
 			TRACE(_T("Unable to open file: %s\n"), filePath);
 			return false;
@@ -19011,10 +19018,16 @@ bool is_gui_application(CString fullPath)
 
 	//파일정보만 가지고 해당 파일이 console에서 실행하는 명령어인지,
 	//GUI를 가지고 실행되는 앱인지를 판별하는게 아직은 명확하지 않다.
-	//우선 직접 명시해준다.
+	//우선 명확하지만 제대로 판별되지 않거나 SafeNet과 같이 간접적으로 호출되는 명령들에 대해서는 직접 명시해준다.
 	cmd.MakeLower();
-	if (cmd == _T("powershell.exe"))
+	if (cmd.Find(_T("powershell.exe")) >= 0)
 		return false;
+
+	if (cmd.Find(_T("signtool.exe")) >= 0)
+		return true;
+
+	if (cmd.Find(_T("mt.exe")) >= 0)
+		return true;
 
 	if (peSignature == IMAGE_NT_SIGNATURE)//0x00004550) { // "PE\0\0" in little-endian
 	{

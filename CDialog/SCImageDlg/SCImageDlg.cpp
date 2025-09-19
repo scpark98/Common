@@ -615,11 +615,13 @@ void CSCImageDlg::rotate(Gdiplus::RotateFlipType type)
 	Invalidate();
 }
 
-void CSCImageDlg::fit2ctrl(bool fit)
+void CSCImageDlg::fit2ctrl(bool fit, bool invalidate)
 {
 	m_fit2ctrl = fit;
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImageDlg"), _T("fit to ctrl"), m_fit2ctrl);
-	Invalidate();
+
+	if (invalidate)
+		Invalidate();
 }
 
 //mode : 1(zoom in), -1(zoom out), 0(reset)
@@ -632,7 +634,10 @@ void CSCImageDlg::zoom(int mode)
 	else
 		m_zoom = 1.0;
 
-	m_fit2ctrl = false;
+	//m_fit2ctrl의 값을 직접 변경하지 말고 fit2ctrl() 함수를 호출해야만
+	//registry에 설정이 저장된다.
+	//m_fit2ctrl = false;
+	fit2ctrl(false, false);
 
 	Clamp(m_zoom, 0.2, 40.0);
 	//get_screen_coord_from_real_coord(m_r_display, m_img.width, m_image_roi, &m_screen_roi);
@@ -642,7 +647,7 @@ void CSCImageDlg::zoom(int mode)
 
 void CSCImageDlg::zoom(double ratio)
 {
-	m_fit2ctrl = false;
+	fit2ctrl(false, false);
 	m_zoom = ratio;
 	Clamp(m_zoom, 0.1, 40.0);
 	Invalidate();
@@ -1486,9 +1491,10 @@ void CSCImageDlg::build_image_info_str()
 	else
 		ratio_str.Format(_T("%.3f : 1"), ratio);
 
-	m_info_str.Format(_T("파일 이름 : %s\n파일 크기: %s\n수정 날짜: %s\n이미지 정보: %dx%dx%d (%s)\n이미지 비율: %s\n확대 배율: %.0f%%"),
+	m_info_str.Format(_T("파일 이름 : %s\n파일 크기: %s (%s)\n수정 날짜: %s\n이미지 정보: %dx%dx%d (%s)\n이미지 비율: %s\n확대 배율: %.0f%%"),
 		m_filename + m_alt_info,
-		get_file_size_str(m_img[0].get_filename()),
+		get_file_size_str(m_img[0].get_filename()),		//KB 단위
+		get_file_size_str(m_img[0].get_filename(), 0),	//byte 단위
 		get_datetime_str(GetFileLastModifiedTime(m_img[0].get_filename())),
 		m_img[0].width, m_img[0].height, m_img[0].channel * 8,
 		m_img[0].get_pixel_format_str(),

@@ -62,7 +62,10 @@ int m_nNumOfJong = 28;// m_astrJongHangle.Length;
 
 CSCKeyInput::CSCKeyInput(CString str)
 {
-	add(str);
+    std::thread th(&CSCKeyInput::thread_function, this);
+    th.detach();
+
+    input(str);
 }
 
 CSCKeyInput::~CSCKeyInput()
@@ -70,21 +73,25 @@ CSCKeyInput::~CSCKeyInput()
 
 }
 
-void CSCKeyInput::add(CString str)
+void CSCKeyInput::input(CString str)
 {
 	for (int i = 0; i < str.GetLength(); i++)
-		add(str[i]);
+        input(str[i]);
 }
 
-void CSCKeyInput::add(TCHAR ch)
+void CSCKeyInput::input(TCHAR ch)
 {
+    m_mutex.lock();
 	m_key.push_back(ch);
+	m_mutex.unlock();
+}
 
-    if (!m_thread_running)
-    {
-        std::thread th(&CSCKeyInput::thread_function, this);
-        th.detach();
-    }
+int	CSCKeyInput::get_key_count()
+{
+    m_mutex.lock();
+    int count = m_key.size();
+    m_mutex.unlock();
+    return count;
 }
 
 //키입력 thread를 정상 종료시킨다.
@@ -104,10 +111,19 @@ void CSCKeyInput::thread_function()
 
 	while (m_thread_running)
 	{
-		if (m_key.size())
+        int size = 0;
+
+        m_mutex.lock();
+        size = m_key.size();
+		m_mutex.unlock();
+
+		if (size > 0)
 		{
-			TCHAR ch = m_key[0];
+            TCHAR ch = m_key[0];
+            TRACE(_T("size = %d, ch = %c\n"), m_key.size(), ch);
+			m_mutex.lock();
 			m_key.pop_front();
+			m_mutex.unlock();
             PressKey(ch, 10);
 			TRACE(_T("ch = %c\n"), ch);
             if (!m_thread_running)
@@ -115,7 +131,8 @@ void CSCKeyInput::thread_function()
 		}
         else
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            TRACE(_T("m_key.size() = 0\n"));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
 	}
 

@@ -706,7 +706,7 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 	m_img_back.set_back_color(m_cr_back);
 
 	if (m_img_back.is_animated_gif())
-		m_img_back.set_animation(m_hWnd, CRect(), false);
+		m_img_back.set_animation(m_hWnd, CRect(), true);
 }
 
 void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)

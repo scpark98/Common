@@ -2960,24 +2960,26 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			
 			//CDIS_DROPHILITED 의 우선순위가 가장 높다. > CDIS_HOT > CDIS_SELECTED
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
-			if (hItem == GetDropHilightItem())// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
+			if (m_use_drag_and_drop && m_bDragging && (hItem == GetDropHilightItem()))// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
 			{
+				//TRACE(_T("%s, CDIS_DROPHILITED\n"), GetItemText(hItem));
 				//drop을 위해 폴더위에 머무를 경우 해당 폴더가 expand가 아니면 expand시켜준다.
 				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 
 				//TRACE(_T("CDIS_DROPHILITED\n"));
+
 				crText = m_theme.cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
 				crBack = m_theme.cr_back_dropHilited;
 			}
 			else if (pNMCustomDraw->uItemState & CDIS_HOT)
 			{
-				//TRACE(_T("CDIS_HOT\n"));
+				//TRACE(_T("%s, CDIS_HOT\n"), GetItemText(hItem));
 				//crText = m_cr_text_selected;
 				crBack = m_theme.cr_back_hover;
 			}
 			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
-				//TRACE(_T("CDIS_SELECTED\n"));
+				//TRACE(_T("%s, CDIS_SELECTED\n"), GetItemText(hItem));
 				if (GetFocus() == this)
 				{
 					crText = m_theme.cr_text_selected;
@@ -2996,20 +2998,23 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//	crBack = m_cr_back_selected;
 			//}
 
-			if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			
+			//if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
-				//TRACE(_T("CDIS_SELECTED\n"));
+				//TRACE(_T("%s, CDIS_SELECTED\n"), GetItemText(hItem));
 				//배경색으로 그려주지 않으면 기본 텍스트 출력 + 커스텀 출력 텍스트가 중복되서 표시되므로
 				//배경색을 칠해서 기본 텍스트 출력을 가리고 커스텀 출력을 해줘야 한다.
-				if (GetFocus() == this)
+				if (GetFocus() == this && (pNMCustomDraw->uItemState & CDIS_SELECTED))
 					draw_rectangle(&dc, rcItem, m_theme.cr_selected_border, crBack);
 				else
 					draw_rectangle(&dc, rcItem, crBack, crBack);
 			}
+			/*
 			else
 			{
 				dc.FillSolidRect(&rcItem, crBack.ToCOLORREF());
 			}
+			*/
 
 			if (pNMCustomDraw->uItemState & CDIS_FOCUS)
 			{

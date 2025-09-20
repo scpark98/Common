@@ -3113,7 +3113,8 @@ void CSCGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool
 
 	m_paused = !auto_play;
 
-	play_gif();
+	if (auto_play)
+		play_gif();
 }
 
 void CSCGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)

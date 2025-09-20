@@ -165,7 +165,7 @@ public:
 	void			rotate(Gdiplus::RotateFlipType type);
 
 	//true일 경우 이 컨트롤의 크기에 맞춰서 이미지를 stretch한다.
-	void			fit2ctrl(bool fit);
+	void			fit2ctrl(bool fit, bool invalidate = true);
 	bool			get_fit2ctrl() { return m_fit2ctrl; }
 
 	CRect			get_displayed_rect() { return m_r_display; }

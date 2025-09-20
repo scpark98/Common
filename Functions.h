@@ -89,7 +89,15 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 //trace(m_num);으로 호출하면 TRACE(_T("m_num = %d\n"));로 치환된다.
 //m_num이 CString이면 else절에 의해 %s로 출력된다.
-#define trace(n) { if (typeid(n) == typeid(int)) TRACE(_T("%S = %d\n"), #n, n); else TRACE(_T("%S = %s\n"), #n, n); }
+#define trace(n)\
+{\
+	if (typeid(n) == typeid(int) || typeid(n) == typeid(long) || typeid(n) == typeid(bool) || typeid(n) == typeid(BOOL))\
+		TRACE(_T("%S = %d\n"), #n, n);\
+	else if (typeid(n) == typeid(int))\
+		TRACE(_T("%S = %d\n"), #n, n);\
+	else\
+		TRACE(_T("%S = %s\n"), #n, n);\
+}
 
 #ifdef __GNUG__
 #include <cxxabi.h>

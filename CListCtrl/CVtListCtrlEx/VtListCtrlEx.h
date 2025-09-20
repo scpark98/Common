@@ -490,8 +490,12 @@ public:
 	//item이 -1이면 모든 라인에, subItem이 -1이면 모든 컬럼에 적용.
 	//set_default_text_color(), set_default_back_color()를 통해 기본 글자색과 배경색을 설정할 수 있다.
 	void		set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase = false, bool invalidate = true);
+	//default text color로 되돌린다.
+	void		reset_text_color(int item, int subItem) { set_text_color(item, subItem, 0, true); }
 	//특정 항목의 배경색 설정. erase가 true이면 crText 인자를 무시하고 기본 글자색으로 되돌린다.
 	void		set_back_color(int item, int subItem, Gdiplus::Color crBack, bool erase = false, bool invalidate = true);
+	//default back color로 되돌린다.
+	void		reset_back_color(int item, int subItem) { set_back_color(item, subItem, 0, true); }
 	//글자색과 배경색 동시 변경
 	void		set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack);
 

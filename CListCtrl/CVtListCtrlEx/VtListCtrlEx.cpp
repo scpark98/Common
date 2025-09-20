@@ -1480,7 +1480,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 	}
 	else if (pMsg->message == WM_KEYDOWN)
 	{
-		//TRACE(_T("listctrl key = %d\n"), pMsg->wParam);
+		TRACE(_T("VtListCtrl key = %d\n"), pMsg->wParam);
 		switch (pMsg->wParam)
 		{
 		case VK_RETURN:
@@ -1520,7 +1520,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 			}
 			break;
 		}
-		case VK_BACK	:
+		case VK_BACK:
 		{
 			if (m_in_editing)
 				break;
@@ -1551,7 +1551,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 			break;
 		}
 
-		case 220		:	return true;	//'\'키를 누르면 리스트 맨 처음으로 이동되는 현상 방지.
+		//case 220		:	return true;	//'\'키를 누르면 리스트 맨 처음으로 이동되는 현상 방지.
 		case 'A'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
 							{
 								select_item(-1);

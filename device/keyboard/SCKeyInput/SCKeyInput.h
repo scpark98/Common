@@ -11,6 +11,7 @@
 
 #include <afxwin.h>
 #include <deque>
+#include <mutex>
 
 class CSCKeyInput
 {
@@ -18,8 +19,9 @@ public:
 	CSCKeyInput(CString str = _T(""));
 	~CSCKeyInput();
 
-	void	add(CString str);
-	void	add(TCHAR ch);
+	void	input(CString str);
+	void	input(TCHAR ch);
+	int		get_key_count();
 
 	//키입력 thread를 정상 종료시킨다.
 	void	stop();
@@ -27,6 +29,7 @@ public:
 protected:
 	std::deque<TCHAR> m_key;
 
+	std::mutex m_mutex;
 	bool	m_thread_running = false;
 	bool	m_thread_terminated = true;
 	void	thread_function();

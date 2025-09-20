@@ -70,6 +70,7 @@ void CSCSliderCtrl::OnPaint()
 	int pos = GetPos();
 	//TRACE(_T("GetPos() OnPaint() = %d\n"), pos);
 
+	//style_step일 경우는 upper, lower에 따라 m_steps의 크기가 결정된다.
 	if (m_style == style_step && m_steps.size() < upper - lower)
 		m_steps.resize(upper - lower + 1);
 
@@ -95,7 +96,7 @@ void CSCSliderCtrl::OnPaint()
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
-	//실제 그려지는 게이지 영역은 thumb_size/2씩 양쪽에서 빼야 한다.
+	//실제 그려지는 게이지 영역은 thumb_size/2씩 좌우에서 빼야 한다.
 	CRect rtrack = m_rc;
 
 	if (m_style <= style_thumb_round)
@@ -177,7 +178,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		rtrack = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2);
+		rtrack = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2 + 1);
 		dc.FillSolidRect(rtrack, cr_inactive.ToCOLORREF());
 	}
 	else if (m_style == style_progress_line)
@@ -351,7 +352,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		rtrack = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2);
+		rtrack = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2 + 1);
 		dc.FillSolidRect(rtrack, cr_active.ToCOLORREF());
 
 		//m_crValueText = RGB(12, 162, 255);
@@ -362,18 +363,33 @@ void CSCSliderCtrl::OnPaint()
 			dc.SetBkMode(TRANSPARENT);
 
 			if (m_text_style == text_style_value)
+			{
 				str.Format(_T("%ld / %ld"), pos, (upper > 0 ? upper : 0));
+			}
+			else if (m_text_style == text_style_percentage)
+			{
+				if (upper == lower)
+					str = _T("0%");
+				else
+					str.Format(_T("%.0f%%"), (double)(pos - lower) / (double)(upper - lower) * 100.0);
+			}
 			else if (m_text_style == text_style_user_defined)
+			{
 				str = m_text;
+			}
 			else if (m_text_style == text_style_dual_text)
 			{
 				str = m_text;
 				str_dual = m_text_dual;
 			}
 			else if (upper == lower)
+			{
 				str = _T("0.0%");
+			}
 			else
+			{
 				str.Format(_T("%.1f%%"), (double)(pos - lower) / (double)(upper - lower) * 100.0);
+			}
 			//dc.DrawText(str, m_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 		}
 

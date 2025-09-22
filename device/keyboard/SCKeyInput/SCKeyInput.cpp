@@ -131,7 +131,7 @@ void CSCKeyInput::thread_function()
 		}
         else
         {
-            TRACE(_T("m_key.size() = 0\n"));
+            //TRACE(_T("m_key.size() = 0\n"));
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
 	}

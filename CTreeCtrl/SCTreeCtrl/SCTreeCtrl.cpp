@@ -1058,6 +1058,9 @@ HTREEITEM CSCTreeCtrl::find_children_item(const CString& label, HTREEITEM hParen
 	CString cur_label;
 	HTREEITEM hItem = GetChildItem(hParentItem);
 
+	if (hItem == NULL)
+		hItem = GetNextSiblingItem(hItem);
+
 	while (hItem)
 	{
 		cur_label = GetItemText(hItem);
@@ -1113,6 +1116,70 @@ void CSCTreeCtrl::select_item(HTREEITEM hItem)
 	}
 
 	SelectItem(hItem);
+}
+
+//hRoot의 하위 폴더들중에서 먼저 발견되는 label의 노드를 찾아서 선택상태로 표시한다.
+HTREEITEM CSCTreeCtrl::select_item(CString find_label, HTREEITEM hItem)
+{
+	if (hItem == NULL)
+		hItem = GetRootItem();
+
+	int tab_count = 0;
+	CString label;
+
+	while (hItem)
+	{
+		label = GetItemText(hItem);
+		if (label.CompareNoCase(find_label) == 0)
+		{
+			select_item(hItem);
+			return hItem;
+		}
+
+		Trace_only(duplicate_str(_T("\t"), tab_count));
+		Trace_only(_T("%s\n"), label);
+
+		//child가 있다면 child로 이동하고
+		if (ItemHasChildren(hItem))
+		{
+			tab_count++;
+			hItem = GetChildItem(hItem);
+			continue;
+		}
+		//child가 없다면 현재 node의 sibling으로 이동한다.
+		else
+		{
+			HTREEITEM hSiblingItem = GetNextSiblingItem(hItem);
+			if (hSiblingItem)
+			{
+				hItem = hSiblingItem;
+				continue;
+			}
+			else
+			{
+				//만약 sibling도 없다면 parent의 sibling부터 다시 탐색한다.
+				while (true)
+				{
+					tab_count--;
+					hItem = GetParentItem(hItem);
+
+					//parent가 NULL인 경우는 최상위 node들인 경우이므로 모든 탐색을 중지한다.
+					if (hItem == NULL)
+						return NULL;
+
+					//sibling이 있으면 그 node부터 다시 탐색을 시작하고 없다면 다시 parent의 sibling을 찾는다.
+					hSiblingItem = GetNextSiblingItem(hItem);
+					if (hSiblingItem)
+					{
+						hItem = hSiblingItem;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	return NULL;
 }
 
 //해당 아이템이 축소되서 보이지 않는 상태인지(height가 음수로 리턴된다.)

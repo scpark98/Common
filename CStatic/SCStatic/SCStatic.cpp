@@ -137,9 +137,6 @@ void CSCStatic::PreSubclassWindow()
 		font->GetObject(sizeof(m_lf), &m_lf);
 	}
 
-	//CStatic에서 tooltip, mouse event등을 처리하려면 반드시 SS_NOTIFY 스타일을 추가해야 한다.
-	//ModifyStyle(0, SS_NOTIFY);
-
 	reconstruct_font();
 }
 
@@ -189,6 +186,9 @@ void CSCStatic::prepare_tooltip()
 
 void CSCStatic::set_tooltip_text(CString text)
 {
+	//CStatic에서 tooltip, mouse event등을 처리하려면 반드시 SS_NOTIFY 스타일을 추가해야 한다.
+	ModifyStyle(0, SS_NOTIFY);
+
 	m_tooltip_text = text;
 
 	if (!text.IsEmpty())

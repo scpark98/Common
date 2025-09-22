@@ -1316,6 +1316,13 @@ void CSCSliderCtrl::set_style(int nStyle)
 	else if (m_style == style_progress)
 	{
 		m_use_slide = false;
+
+		CRect rc;
+		GetClientRect(rc);
+
+		//기본 m_track_height = 14지만 rc의 height가 그보다 작을 경우는 rc.Height()로 줄여준다.
+		if (rc.Height() < m_track_height)
+			m_track_height = rc.Height();
 	}
 	else if (m_style == style_step)
 	{

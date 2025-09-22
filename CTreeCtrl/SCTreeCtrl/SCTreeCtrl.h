@@ -205,6 +205,8 @@ public:
 	//hItem = NULL인 경우는 모든 노드를 unselect로 만드는데 사용된다.
 	//NULL이 아닌 어떤 노드를 select상태로 만들지만 기존 selected 노드에는 영향을 주지 않는다.
 	void		select_item(HTREEITEM hItem = NULL);
+	//hItem의 하위 폴더들중에서 먼저 발견되는 label의 노드를 찾아서 선택상태로 표시한다.
+	HTREEITEM	select_item(CString find_label, HTREEITEM hItem = NULL);
 
 	//폴더 펼침 이벤트가 발생한 노드 아이템 리턴
 	HTREEITEM	get_expanding_item() { return m_expanding_item; }

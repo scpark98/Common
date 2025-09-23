@@ -92,11 +92,11 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define trace(n)\
 {\
 	if (typeid(n) == typeid(int) || typeid(n) == typeid(long) || typeid(n) == typeid(bool) || typeid(n) == typeid(BOOL))\
-		TRACE(_T("%S = %d\n"), #n, n);\
+		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(int))\
-		TRACE(_T("%S = %d\n"), #n, n);\
+		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else\
-		TRACE(_T("%S = %s\n"), #n, n);\
+		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
 }
 
 #ifdef __GNUG__

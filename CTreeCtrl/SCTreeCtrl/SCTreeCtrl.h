@@ -36,6 +36,8 @@
 #include "../../ui/theme/theme.h"
 #include "../../CMenu/SCMenuBar/SCMenu.h"
 #include "../../colors.h"
+#include "../../CEdit/SCEdit/SCEdit.h"
+
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
 
@@ -385,7 +387,7 @@ protected:
 //편집 관련
 	bool			m_allow_edit = true;
 	bool			m_in_editing = false;		//편집중인지
-	CEdit*			m_pEdit = NULL;
+	CSCEdit*		m_pEdit = NULL;
 	CString			m_edit_old_text;
 	CString			m_edit_new_text;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
@@ -408,6 +410,7 @@ public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnPaint();
+	afx_msg BOOL OnTvnSelchanging(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult);

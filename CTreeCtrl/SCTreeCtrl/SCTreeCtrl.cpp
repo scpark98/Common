@@ -6,7 +6,6 @@
 #include "Common/Functions.h"
 #include "Common/MemoryDC.h"
 #include "Common/SCGdiPlusBitmap.h"
-#include "Common/CEdit/SCEdit/SCEdit.h"
 
 
 // CSCTreeCtrl
@@ -33,6 +32,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_ERASEBKGND()
 	ON_WM_KEYDOWN()
 	//ON_WM_PAINT()
+	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGING, &CSCTreeCtrl::OnTvnSelchanging)
 	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGED, &CSCTreeCtrl::OnTvnSelchanged)
 	ON_WM_WINDOWPOSCHANGED()
 	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDING, &CSCTreeCtrl::OnTvnItemexpanding)
@@ -609,17 +609,29 @@ void CSCTreeCtrl::OnPaint()
 	dc.SelectObject(pFontDC);
 }
 */
+
+//아직 CSCTreeCtrl::OnTvnSelchanging(), OnTvnSelchanged() 함수는 별도의 코드는 처리하고 있지 않으나
+//parent에서 자주 처리되는 이벤트이므로 ON_COMMAND_REFLECT_EX()로 선언하여
+//parent에서도 처리할 수 있도록 한다.
+//또한 아래와 같은 문제에 대한 처리를 위해서 함수 바디를 추가해 놓음.
+// 
+//리스트 항목을 편집을 완료하지 않고 트리의 제품 항목을 선택하면
+//OnTvnSelChangedTree() 함수에서 새로 선택된 트리 항목이 선택되고
+//편집된 항목의 값이 새 제품의 필드에 들어가는 오류가 발생한다.
+//따라서 트리의 선택이 바뀌기 전에 parent::OnTvnSelchanging()에서 리스트의 편집을 종료시켜 줘야 한다.
+BOOL CSCTreeCtrl::OnTvnSelchanging(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	*pResult = 0;
+	return FALSE;
+}
+
 BOOL CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	//HWND hWnd = GetParent()->GetSafeHwnd();
-	//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
-	//			(WPARAM)&CSCTreeCtrlMessage(this, message_selchanged),
-	//			(LPARAM)&CString(get_path(GetSelectedItem())));
-
 	*pResult = 0;
-
 	return FALSE;
 }
 
@@ -2748,6 +2760,8 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	m_pEdit->GetFont()->GetLogFont(&lf);
 	//new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 1;
 	m_pEdit->SetRect(&new_rect);
+	m_pEdit->set_line_align(DT_VCENTER);
+
 
 	m_pEdit->SetWindowText(m_edit_old_text);
 
@@ -2837,6 +2851,10 @@ void CSCTreeCtrl::edit_end(bool valid)
 			//undo_edit_label();
 			edit_item(m_edit_item);
 		}
+	}
+	else
+	{
+		SetItemText(m_edit_item, m_edit_new_text);
 	}
 	
 	//실제 변경 유무와 관계없이 후처리는 main에 맞겨야 한다.

@@ -38,6 +38,12 @@ CVtListCtrlEx::~CVtListCtrlEx()
 	m_font.DeleteObject();
 	safe_release_gradient_rect_handle();
 
+	if (m_pEdit)
+	{
+		m_pEdit->DestroyWindow();
+		delete m_pEdit;
+	}
+
 	CoUninitialize();
 }
 
@@ -50,8 +56,8 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT(LVN_ODSTATECHANGED, &CVtListCtrlEx::OnLvnOdstatechanged)
 	ON_WM_ERASEBKGND()
 	ON_WM_PAINT()
-	ON_NOTIFY_REFLECT(LVN_BEGINLABELEDIT, &CVtListCtrlEx::OnLvnBeginlabeledit)
-	ON_NOTIFY_REFLECT_EX(LVN_ENDLABELEDIT, &CVtListCtrlEx::OnLvnEndlabeledit)
+	ON_NOTIFY_REFLECT_EX(LVN_BEGINLABELEDIT, &CVtListCtrlEx::OnLvnBeginLabelEdit)
+	ON_NOTIFY_REFLECT_EX(LVN_ENDLABELEDIT, &CVtListCtrlEx::OnLvnEndLabelEdit)
 	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CVtListCtrlEx::OnNMDblclk)
 	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CVtListCtrlEx::OnNMClick)
 	ON_WM_DROPFILES()
@@ -1660,15 +1666,16 @@ void CVtListCtrlEx::OnPaint()
 }
 
 
-void CVtListCtrlEx::OnLvnBeginlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
+BOOL CVtListCtrlEx::OnLvnBeginLabelEdit(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	NMLVDISPINFO *pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
 	// TODO: Add your control notification handler code here
-	*pResult = 0;
+	//*pResult = 0;
+	return FALSE;
 }
 
 
-BOOL CVtListCtrlEx::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
+BOOL CVtListCtrlEx::OnLvnEndLabelEdit(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	//이미 edit_end()에서 필요한 모든 처리를 마친 상태이므로 여기서는 별도 처리없이
 	//return FALSE;하여 main dlg에서 LVN_ENDLABELEDIT에 대한 메시지를 처리하도록 하면 된다.
@@ -1781,7 +1788,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	CRect r = get_item_rect(item, subItem);
 	CRect rc;
 
-	r.OffsetRect(0, 1);
+	//r.OffsetRect(0, 1);
 
 	GetClientRect(rc);
 
@@ -1794,20 +1801,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		dwStyle = ES_RIGHT;
 
 	TRACE(_T("subItem = %d, dwStyle = %d\n"), subItem, dwStyle);
-	/*
-	LV_COLUMN	lvCol;
-
-	lvCol.mask = LVCF_FMT;
-	GetColumn (subItem, &lvCol);
-
-
-	if ((lvCol.fmt & LVCFMT_JUSTIFYMASK) == LVCFMT_LEFT)
-		dwStyle = ES_LEFT;
-	else if ((lvCol.fmt & LVCFMT_JUSTIFYMASK) == LVCFMT_RIGHT)
-		dwStyle = ES_RIGHT;
-	else
-		dwStyle = ES_CENTER;
-	*/
 
 	if (r.right > rc.right)
 		r.right = rc.right;
@@ -1817,7 +1810,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	//edit을 동적으로 생성할 때 ES_MULTILINE 속성이 있을 경우
 	//edit의 높이는 1줄이고 너비가 텍스트 길이보다 작을 경우 word wrap되어 일부 텍스트가 다음줄로 넘어가서 보이지 않게 된다.
 	//따라서 SetRect를 이용해서 세로 중앙에 표시하는 등 ES_MULTILINE이 반드시 필요한 경우에만 명시한다.
-	//이 CVtListCtrlEx는 single line을 기본으로 하므로 ES_MULTILINE을 생략한다.
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CSCEdit;
@@ -1828,10 +1820,11 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	//edit_end()에서 기존에는 hide시켰으나 delete으로 변경함.
 	//BOOL res = m_pEdit->ModifyStyle(0, dwStyle);
 	m_pEdit->MoveWindow(r);
-	m_pEdit->SetRect(&r);
+	//m_pEdit->SetRect(&r);
 	m_pEdit->SetFont(&m_font, true);
 	m_pEdit->SetWindowText(m_edit_old_text);
 	m_pEdit->set_line_align(DT_VCENTER);
+	int a = m_pEdit->get_line_align();
 
 	m_pEdit->ShowWindow(SW_SHOW);
 	m_pEdit->SetSel(0, -1);

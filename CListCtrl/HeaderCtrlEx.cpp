@@ -69,12 +69,12 @@ void CHeaderCtrlEx::OnPaint()
 
 		if ( i == m_nColumnClicked )
 		{
-			DrawSunkenRect( &dc, rItem, true, crSunkenDark, crSunkenLight );
+			draw_sunken_rect( &dc, rItem, true, crSunkenDark, crSunkenLight );
 			rItem.OffsetRect( 1, 1 );
 		}
 		else
 		{
-			DrawSunkenRect( &dc, rItem, false, crSunkenDark, crSunkenLight );
+			draw_sunken_rect( &dc, rItem, false, crSunkenDark, crSunkenLight );
 		}
 
 		DWORD dwAlign = GetColumnTextAlign(i);

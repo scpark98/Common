@@ -774,8 +774,8 @@ public:
 	afx_msg void OnLvnOdstatechanged(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnPaint();
-	afx_msg void OnLvnBeginlabeledit(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg BOOL OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg BOOL OnLvnBeginLabelEdit(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg BOOL OnLvnEndLabelEdit(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg BOOL OnNMClick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult);
 	//afx_msg void OnLButtonDown(UINT nFlags, CPoint point);

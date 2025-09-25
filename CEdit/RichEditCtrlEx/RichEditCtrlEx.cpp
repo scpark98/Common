@@ -245,9 +245,9 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		LineScroll(1 - nVisible);
 	}
 	*/
-#if 0
-	//if (!m_auto_scroll)
-	//	return 0;
+#if 1
+	if (!m_auto_scroll)
+		return new_text;
 
 	int nVisible = GetNumVisibleLines();
 
@@ -263,7 +263,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		LineScroll(1 - nVisible);
 	}
 
-	return;
+	return new_text;
 
 	CRect rc;
 	GetClientRect(rc);

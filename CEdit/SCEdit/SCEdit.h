@@ -110,7 +110,7 @@ public:
 	//https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally
 	//생성후에도 SetWindowLong()을 이용하여 변경할 수 있는 속성들
 	//(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
-	//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
+	//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER (DT_CENTER가 아님에 주의), DT_BOTTOM)
 	virtual CSCEdit&		set_line_align(DWORD align = DT_VCENTER);
 	int						get_line_align() { return m_valign; }
 //dim text

@@ -604,10 +604,9 @@ void CSCStatic::set_transparent(bool transparent, Gdiplus::Color cr_parent_back)
 	Invalidate();
 }
 
-CRect CSCStatic::set_text(CString sText, Gdiplus::Color cr_text_color /*-1*/)
+CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color /*-1*/)
 {
-	m_text = sText;
-	//CStatic::SetWindowText(sText);
+	m_text = text;
 
 	//-1이면 기본 설정된 글자색 사용
  	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)

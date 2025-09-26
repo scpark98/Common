@@ -7,7 +7,7 @@
 
 /*
 [태그된 텍스트 지원]
-	- rich text를 지원하기 위해 제작.
+	- html과 같이 tagged text를 지원하기 위해 제작.
 	- CSCShapeDlg, CSCParagraphStatic 등에서 사용되며 html, smi 등의 tagged text를 표현할 수 있다.
 
 	태그는 소문자로, 컬러값은 Gdiplus::Color에 정의된 이름(web color와 naming이 동일함)을 사용해야 한다.

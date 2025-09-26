@@ -12,6 +12,7 @@
 
 //.ico가 아닌 png 이미지들을 앞에 그려주고 필요에 따라 변경되도록 하기 위해 사용.
 #include "../../SCGdiplusBitmap.h"
+#include "../../data_structure/SCParagraph/SCParagraph.h"
 
 /*
 //scpark
@@ -88,7 +89,9 @@ public:
 	
 	void			set_transparent(bool bTransparent = true, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 	void			SetWindowText(CString sText) { set_text(sText); }
-	CRect			set_text(CString sText, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
+
+	//text는 일반 문자열 또는 tag가 포함된 문자열이 될 수 있다.
+	CRect			set_text(CString text, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
 
 	//printf()와 같이 변수값을 바로 문자열로 세팅할 수 있다.
 	//초기 버전에서는 첫번째 파라미터로 컬러를 주고 그 값이 -1이면 default text color를 사용하도록 구현했었으나

@@ -885,7 +885,7 @@ void CVtListCtrlEx::set_column_width(int nCol, int cx)
 	SetColumnWidth(nCol, cx);
 }
 
-void CVtListCtrlEx::load_column_width(CWinApp* pApp, CString sSection)
+void CVtListCtrlEx::restore_column_width(CWinApp* pApp, CString sSection)
 {
 	int		i, width;
 	CString str;

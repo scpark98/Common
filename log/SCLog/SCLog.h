@@ -25,11 +25,18 @@
   
 
 [set Log folder path]
-	//set()함수를 통해 로그파일 저장폴더, 로그파일 타이틀, 로그 레벨을 설정할 수 있다.
+	//로그파일이 저장되는 위치는 기본적으로 실행파일 폴더의 "Log" 폴더 아래 "실행파일 타이틀_yyyymmdd.log" 파일에 기록되지만
+	//set()함수를 통해 로그 저장폴더, 로그파일 타이틀, 로그 레벨을 설정할 수 있다.
 	//만약 로그파일의 경로를 특정하고자 하면 아래와 같이 set()하면 해당 폴더아래 Log 폴더에 로그파일 생성.
 	//로그파일명 형식은 projectName_yyyymmdd.log
 	gLog.set(_T("../../custom log folder/folder1/folder2"), _T("TestLogFileName"), SCLOG_LEVEL_DEBUG);
 	기본 로그 레벨이 SCLOG_LEVEL_RELEASE이므로 이 경우 logWriteD()를 호출할 경우는 로그 기록이 스킵된다.
+
+[시작 및 종료 로그]
+	프로그램이 시작될 때 CSCLog::CSCLog() 생성자에서 자동으로 시작로그를 기록하도록 했으나
+	set()에 의해 로그경로, 로그파일명 등이 달라지면 불필요한 로그가 생기므로 반드시
+	실제 사용하는 프로젝트의 InitInstance()에서 gLog.write_start_log(); 을 호출할 것.
+	반면 end_log()는 CSCLog::~CSCLog() 소멸자 합수에서 자동 호출되므로 중복 호출하지 말 것.
 
 [show or not the function name or line number]
 	//어떤 프로젝트의 경우에는 함수명이 노출되서는 안되는 경우도 있다. 함수명과 라인번호 표시 유무를 옵션처리.

@@ -293,7 +293,6 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 
 		release();
 		m_mutex.unlock();
-		//theCSLog.Unlock();
 	}
 	catch (...)
 	{

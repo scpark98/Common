@@ -588,7 +588,9 @@ public:
 	void		set_line_height(int height);
 
 	void		set_column_width(int nCol, int cx);
-	void		load_column_width(CWinApp* pApp, CString sSection);
+	//레지스트리에 저장된 각 컬럼너비를 복원한다.
+	void		restore_column_width(CWinApp* pApp, CString sSection);
+	//각 컬럼너비를 레지스트리에 저장한다. 프로그램이 시작될 때 restore_column_width()를 통해 그 너비대로 복원할 수 있다.
 	void		save_column_width(CWinApp* pApp, CString sSection);
 	CRect		get_item_rect(int item, int subItem);
 	//클릭위치에 따라 item은 올바르게 판별되나 subItem은 그렇지 않아서(마우스 이벤트 핸들러 함수에서) 새로 추가함.
@@ -760,6 +762,16 @@ protected:
 	CGdiButton*		m_button_scroll_to_end = NULL;
 	int				m_auto_scroll_button_size = 24;
 	void			init_auto_scroll_button();
+
+//popup(context) menu (구현중)
+	//프로그램마다 리스트에 대한 팝업메뉴가 다를 수 있으므로 우선 보류.
+	bool			m_use_popup_menu = false;
+	enum CVTLISTCTRLEX_POPUP_MENU
+	{
+		menu_delete,
+		menu_rename,
+		menu_clear_all,
+	};
 
 protected:
 	DECLARE_MESSAGE_MAP()

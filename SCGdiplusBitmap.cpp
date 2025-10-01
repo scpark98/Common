@@ -538,7 +538,8 @@ bool CSCGdiplusBitmap::load(CString sType, UINT id)
 	}
 	else
 	{
-		m_pBitmap = Gdiplus::Bitmap::FromResource(NULL, (WCHAR*)MAKEINTRESOURCE(id));
+		//FromResource()의 첫번째 파라미터를 무시하고 그냥 NULL로 줄 경우 BMP는 로딩 실패한다.
+		m_pBitmap = Gdiplus::Bitmap::FromResource(GetModuleHandle(NULL), MAKEINTRESOURCE(id));
 	}
 
 	if (!m_pBitmap)

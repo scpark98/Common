@@ -1266,17 +1266,41 @@ bool CheckFileIsURL(CString sURL)
 //check_prefix가 true이면 http, https까지 체크한다. 뭔가 취약점이 있는듯하여 우선 사용금지.(https://mathiasbynens.be/demo/url-regex)
 bool is_valid_url(CString url, bool check_prefix)
 {
+	if (url.Left(7) != _T("http://") && url.Left(8) != _T("https://"))
+	{
+		if (check_prefix)
+			return false;
+
+		//prefix가 없으면 앞에 https://를 붙여서 검사한다.
+		url = _T("https://") + url;
+	}
+
 	std::string pattern;
-	
-	if (check_prefix)
-		pattern = "https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)";
-	else //확인 필요!!
-		pattern = "[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)";
+	pattern = R"(^https?://[0-9a-z\.-]+(:[1-9][0-9]*)?(/[^\s]*)*$)";
+	//pattern = R"((http|https)://)(www.)?[a-zA-Z0-9@:%._\+~#?&//=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%._\+~#?&//=]*)";
+	//pattern = "((http|https)://)(www.)?[a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)";
 
-	std::regex url_regex(pattern);
+	int counter = 0;
+	std::regex url_regex(pattern, std::regex::extended);
+	std::smatch url_match_result;
 	std::string stdurl = std::string(CT2CA(url));
+	TRACE(_T("Checking: %s\n"), url);
 
-	return std::regex_match(stdurl, url_regex);
+	if (std::regex_match(stdurl, url_match_result, url_regex))
+	{
+		for (const auto& res : url_match_result)
+		{
+			TRACE(_T("%d: %S\n"), counter++, res.str().c_str());
+		}
+
+		return true;
+	}
+	else
+	{
+		TRACE(_T("Malformed url : %s\n"), url);
+	}
+
+	return false;
 }
 
 bool IsFolder(CString sfile)
@@ -4081,25 +4105,6 @@ bool GetNICAdapterList(IP_ADAPTER_INFO* pAdapters, int& nTotal, int nMax /*= 10*
 	free(AdapterInfo);
 	
 	return true;
-/*
-	for (int i = 0; i < nTotal; i++)
-	{
-		sDesc	= Adapters[i].Description;
-		sIP		= m_Adapters[i].IpAddressList.IpAddress.String;
-		sMac.Format("%02X-%02X-%02X-%02X-%02X-%02X",
-			m_Adapters[i].Address[0], m_Adapters[i].Address[1],
-			m_Adapters[i].Address[2], m_Adapters[i].Address[3],
-			m_Adapters[i].Address[4], m_Adapters[i].Address[5]);
-
-
-		//if (sIP != "0.0.0.0")
-
-		//if (sDesc.Find(""))
-
-		m_List.AddItem(I2S(i), sDesc, sIP, sMac, NULL);
-
-	}
-*/
 }
 
 void EncryptString(CString& ToCode, TCHAR* key)

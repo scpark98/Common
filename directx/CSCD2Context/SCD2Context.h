@@ -21,6 +21,8 @@ public:
 	ID2D1DeviceContext*			get_d2dc() { return m_d2context.Get(); }
 	IDXGISwapChain*				get_swapchain() { return m_swapchain.Get(); }
 
+	D2D1_SIZE_F					get_size() { return m_d2context->GetSize(); }
+
 protected:
 	HWND						m_hWnd;
 	ComPtr<ID2D1Factory1>       m_d2factory;

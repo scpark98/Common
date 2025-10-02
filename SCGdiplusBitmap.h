@@ -283,7 +283,8 @@ public:
 	//간혹 Gdiplus::Graphics를 사용하지 않고 간단히 dc에도 그리는 경우도 존재하므로 모두 지원해야 한다.
 	//draw_mode = draw_mode_zoom(maintain ratio, resize to fit),
 	//draw_mode = draw_mode_stretch,
-	//draw_mode = draw_mode_origin(as image original 1:1 size),
+	//draw_mode = draw_mode_original(as image original 1:1 size),
+	//draw_mode = draw_mode_original_center(as center image original 1:1 size),
 	CRect			draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode = draw_mode_zoom);
 	CRect			draw(Gdiplus::Graphics& g, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 	CRect			draw(Gdiplus::Graphics& g, CSCGdiplusBitmap mask, CRect targetRect);
@@ -298,11 +299,14 @@ public:
 
 	//이 차례는 3state button의 차례와 동일하게 정의함.
 	//BST_UNCHECKED, BST_CHECKED, BST_INDETERMINATE
+
+
 	enum GDIP_DRAW_MODE
 	{
-		draw_mode_origin = 0,	//targetRect의 중앙에 원본 크기로 그림
-		draw_mode_stretch,		//targetRect에 꽉차게 그림(non ratio)
-		draw_mode_zoom,			//targetRect에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
+		draw_mode_original = 0,		//targetRect의 left, top에 원본 크기로 그림
+		draw_mode_original_center,	//targetRect의 중앙에 원본 크기로 그림
+		draw_mode_stretch,			//targetRect에 꽉차게 그림(non ratio)
+		draw_mode_zoom,				//targetRect에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
 	};
 
 	//Gdiplus::Bitmap::Clone은 shallow copy이므로 완전한 복사를 위해서는 deep_copy를 사용해야 한다.

@@ -443,7 +443,7 @@ void CSCThemeDlg::OnPaint()
 	if (m_img_back.is_valid())
 	{
 		if (m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_zoom ||
-			m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_origin)
+			m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_original)
 		{
 			dc.FillSolidRect(rclient, m_cr_out_of_back_img.ToCOLORREF());
 		}

@@ -139,7 +139,6 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2
 	IWICStream* pStream = NULL;
 	IWICBitmapDecoder* pDecoder = NULL;
 	//IWICBitmapFrameDecode* pIDecoderFrame = NULL;
-	ComPtr<IWICBitmapFrameDecode> pSource;
 	ComPtr<IWICFormatConverter> pConverter;
 	ComPtr<IWICBitmapScaler> pScaler;
 
@@ -197,15 +196,14 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2
 	if (FAILED(hr))
 		return hr;
 
-	hr = pDecoder->GetFrame(0, &pSource);
-
-	return load(WICfactory, d2context, pSource.Get());
+	return load(WICfactory, d2context, pDecoder);
+	//hr = pDecoder->GetFrame(0, &pSource);
+	//return load(WICfactory, d2context, pSource.Get());
 }
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path)
 {
 	ComPtr<IWICBitmapDecoder> pDecoder;
-	ComPtr<IWICBitmapFrameDecode> pSource;
 	ComPtr<IWICStream> pStream;
 
 	if (!WICfactory)
@@ -225,39 +223,66 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2
 	if (FAILED(hr))
 		return hr;
 
-	hr = pDecoder->GetFrame(0, &pSource);
+	return load(WICfactory, d2context, pDecoder.Get());
 
+	/*
+	hr = pDecoder->GetFrame(0, &pSource);
 	if (FAILED(hr))
 		return hr;
 
 	return load(WICfactory, d2context, pSource.Get());
+	*/
 }
 
-HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapFrameDecode* source)
+HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder)
 {
-	ComPtr<IWICFormatConverter> pConverter;
-	ComPtr<IWICBitmapScaler> pScaler;
 
-	HRESULT hr = WICfactory->CreateFormatConverter(&pConverter);
+	m_frame_index = 0;
+	m_img.clear();
+
+	UINT frame_count = 1;
+	HRESULT	hr = pDecoder->GetFrameCount(&frame_count);
 
 	if (FAILED(hr))
-		return false;
+		return hr;
 
-	hr = pConverter->Initialize(
-		source,
-		GUID_WICPixelFormat32bppPBGRA,
-		WICBitmapDitherTypeNone,
-		NULL,
-		0.f,
-		WICBitmapPaletteTypeMedianCut
+
+	if (FAILED(hr))
+		return hr;
+
+	for (int i = 0; i < frame_count; i++)
+	{
+		ComPtr<IWICFormatConverter> pConverter;
+		ComPtr<IWICBitmapFrameDecode> pSource;
+		//ComPtr<IWICBitmapScaler> pScaler;
+
+		TRACE(_T("%d frame\n"), i);
+
+		hr = WICfactory->CreateFormatConverter(&pConverter);
+		hr = pDecoder->GetFrame(i, &pSource);
+
+		hr = pConverter->Initialize(
+			pSource.Get(),
+			GUID_WICPixelFormat32bppPBGRA,
+			WICBitmapDitherTypeNone,
+			NULL,
+			0.f,
+			WICBitmapPaletteTypeMedianCut
 		);
 
-	if (FAILED(hr))
-		return false;
+		if (FAILED(hr))
+			return hr;
 
-	hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, &m_img);
+		ComPtr<ID2D1Bitmap> img;
+		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, &img);
+		m_img.push_back(std::move(img));
+	}
 
-	return true;
+	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+	m_width = sz.width;
+	m_height = sz.height;
+
+	return hr;
 }
 /*
 HRESULT CSCD2Image::render()
@@ -345,4 +370,131 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 	if (SUCCEEDED(hr)) {
 		d2context->SetTarget(bitmap.Get());
 	}
+}
+
+D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw_mode)
+{
+	D2D1_SIZE_F sz = d2dc->GetSize();
+	return draw(d2dc, D2D1::RectF(0, 0, sz.width, sz.height), draw_mode);
+}
+
+//dx, dy 좌표에 그려준다.
+D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy)
+{
+	return draw(d2dc, D2D1::RectF(dx, dy, dx + m_width, dy + m_height));
+}
+
+D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_POINT_2F pt)
+{
+	return draw(d2dc, D2D1::RectF(pt.x, pt.y, pt.x + m_width, pt.y + m_height));
+}
+
+D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2Image_DRAW_MODE draw_mode)
+{
+	D2D1_RECT_F r;
+
+	if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_stretch)
+		r = target;
+	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_zoom)
+		r = get_ratio_rect(target, m_width / m_height);
+	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_original)
+	{
+		r = target;
+		r.right = r.left + m_width;
+		r.bottom = r.top + m_height;
+	}
+	else //eSCD2Image_DRAW_MODE::draw_mode_original_center
+	{
+		r = D2D1::RectF(0, 0, m_width, m_height);
+		r.left = target.left + (target.right - target.left - m_width) / 2.0;
+		r.top = target.top + (target.bottom - target.top - m_height) / 2.0;
+	}
+
+	d2dc->DrawBitmap(m_img[m_frame_index].Get(), r);
+	return r;
+}
+
+D2D1_RECT_F CSCD2Image::get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)
+{
+	if (height == 0.0f)
+		return D2D1_RECT_F();
+
+	return get_ratio_rect(target, width / height, attach, stretch);
+}
+
+D2D1_RECT_F CSCD2Image::get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool stretch)
+{
+	int		w = target.right - target.left;
+	int		h = target.bottom - target.top;
+	int		nNewW;
+	int		nNewH;
+	double	dTargetRatio = double(w) / double(h);
+
+	D2D1_RECT_F	result;
+
+	if (w == 0 || h == 0)
+		return D2D1_RECT_F();
+
+	bool bResizeWidth;
+
+	if (ratio > 1.0)
+	{
+		if (dTargetRatio < ratio)
+			bResizeWidth = false;
+		else
+			bResizeWidth = true;
+	}
+	else
+	{
+		if (dTargetRatio > ratio)
+			bResizeWidth = true;
+		else
+			bResizeWidth = false;
+	}
+
+
+	if (bResizeWidth)
+	{
+		result.top = target.top;
+		result.bottom = target.bottom;
+
+		nNewW = (double)(h) * ratio;
+		if (attach & attach_left)
+			result.left = target.left;
+		else if (attach & attach_right)
+			result.left = target.right - nNewW;
+		else
+			result.left = target.left + (w - nNewW) / 2.0;
+
+		result.right = result.left + nNewW;
+	}
+	else
+	{
+		result.left = target.left;
+		result.right = target.right;
+
+		nNewH = (double)(w) / ratio;
+
+		if (attach & attach_top)
+			result.top = target.top;
+		else if (attach & attach_bottom)
+			result.top = target.bottom - nNewH;
+		else
+			result.top = target.top + (h - nNewH) / 2.0;
+
+		result.bottom = result.top + nNewH;
+	}
+
+	return result;
+}
+
+//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
+int CSCD2Image::goto_frame(int index)
+{
+	if (index >= m_img.size())
+		index = 0;
+
+	m_frame_index = index;
+
+	return m_frame_index;
 }

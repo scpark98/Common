@@ -13056,6 +13056,9 @@ void normalize_rect(Gdiplus::RectF& r)
 //attach_left 등의 옵션을 줄 필요가 있다.
 CRect get_ratio_rect(CRect rTarget, int w, int h, int attach, bool stretch)
 {
+	if (h == 0)
+		return CRect();
+
 	return get_ratio_rect(rTarget, (double)w / (double)h, attach, stretch);
 }
 
@@ -13066,7 +13069,7 @@ CRect get_ratio_rect(CRect rTarget, double dRatio, int attach, bool stretch)
 	int		h = rTarget.Height();
 	int		nNewW;
 	int		nNewH;
-	double	dTargetRatio = (double)rTarget.Width() / (double)rTarget.Height();
+	double	dTargetRatio = (double)w / (double)h;
 
 	CRect	rResult;
 

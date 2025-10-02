@@ -1271,7 +1271,13 @@ CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mo
 		r = targetRect;
 	else if (draw_mode == draw_mode_zoom)
 		r = get_ratio_rect(targetRect, (double)width / (double)height);
-	else
+	else if (draw_mode == draw_mode_original)
+	{
+		r = targetRect;
+		r.right = r.left + width;
+		r.bottom = r.top + height;
+	}
+	else //draw_mode_original_center
 	{
 		r = CRect(0, 0, width, height);
 		r.OffsetRect(targetRect.left + (targetRect.Width() - width) / 2, targetRect.top + (targetRect.Height() - height) / 2);

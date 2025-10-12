@@ -1066,7 +1066,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 
 		//down 효과없이 그릴 경우
-		pImage->draw(g, rc, CSCGdiplusBitmap::draw_mode_origin);
+		pImage->draw(g, rc, CSCGdiplusBitmap::draw_mode_original_center);
 	}
 	//설정된 이미지가 없는 경우 버튼의 이미지를 그려주고
 	//기본 텍스트도 출력한다.

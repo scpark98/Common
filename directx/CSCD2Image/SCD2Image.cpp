@@ -1,5 +1,7 @@
 #include "SCD2Image.h"
 
+#include <thread>
+
 CSCD2Image::CSCD2Image()
 {
 	//CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -234,35 +236,62 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2
 	*/
 }
 
+//일부 animated gif의 경우 이전 프레임 이미지에서 변경된 이미지만 저장하고 있는 경우도 있으므로
+//아래 코드를 참조하여 보완 필요.
+//https://github.com/microsoft/DirectXTex/blob/main/Texassemble/AnimatedGif.cpp
 HRESULT CSCD2Image::load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder)
 {
-
 	m_frame_index = 0;
 	m_img.clear();
+	m_frame_delay.clear();
 
 	UINT frame_count = 1;
 	HRESULT	hr = pDecoder->GetFrameCount(&frame_count);
+	PROPVARIANT propValue;
+
+	//이 초기화를 해주지 않으면 아래 frame delay를 구하는 코드에서 올바른 값이 들어가지 않는다.
+	PropVariantClear(&propValue);
 
 	if (FAILED(hr))
 		return hr;
 
-
-	if (FAILED(hr))
-		return hr;
+	TRACE(_T("total %d frames.\n"), frame_count);
 
 	for (int i = 0; i < frame_count; i++)
 	{
 		ComPtr<IWICFormatConverter> pConverter;
-		ComPtr<IWICBitmapFrameDecode> pSource;
-		//ComPtr<IWICBitmapScaler> pScaler;
-
-		TRACE(_T("%d frame\n"), i);
+		ComPtr<IWICBitmapFrameDecode> pFrameDecode;
+		ComPtr<IWICMetadataQueryReader > pMetadataReader;
 
 		hr = WICfactory->CreateFormatConverter(&pConverter);
-		hr = pDecoder->GetFrame(i, &pSource);
+		hr = pDecoder->GetFrame(i, &pFrameDecode);
+
+		pFrameDecode->GetMetadataQueryReader(&pMetadataReader);
+
+		if (pMetadataReader)
+		{
+			hr = pMetadataReader->GetMetadataByName(L"/grctlext/Delay", &propValue);
+
+			if (SUCCEEDED(hr))
+			{
+				if (propValue.vt == VT_UI2)
+				{
+					// Frame delay in 1/100 second units.
+					UINT delay = propValue.uiVal * 10;
+					//if (delay < 20) delay = 100; // GIF frame delays less than 20ms are not honored.
+					m_frame_delay.push_back(delay);
+					TRACE(_T("%2dth frame. delay = %d ms\n"), i, delay);
+				}
+				PropVariantClear(&propValue);
+			}
+			else
+			{
+				m_frame_delay.push_back(100); // default 100ms
+			}
+		}
 
 		hr = pConverter->Initialize(
-			pSource.Get(),
+			pFrameDecode.Get(),
 			GUID_WICPixelFormat32bppPBGRA,
 			WICBitmapDitherTypeNone,
 			NULL,
@@ -379,9 +408,24 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw
 }
 
 //dx, dy 좌표에 그려준다.
-D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy)
+D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, int dh)
 {
-	return draw(d2dc, D2D1::RectF(dx, dy, dx + m_width, dy + m_height));
+	//dw, dh가 0이하이면 원본 크기로 그려준다.
+	if (dw <= 0 && dh > 0)
+	{
+		dw = (int)(m_width * dh / m_height);
+	}
+	else if (dw > 0 && dh <= 0)
+	{
+		dh = (int)(m_height * dw / m_width);
+	}
+	else if (dw <= 0 && dh <= 0)
+	{
+		dw = (int)m_width;
+		dh = (int)m_height;
+	}
+
+	return draw(d2dc, D2D1::RectF(dx, dy, dx + dw, dy + dh));
 }
 
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_POINT_2F pt)
@@ -497,4 +541,66 @@ int CSCD2Image::goto_frame(int index)
 	m_frame_index = index;
 
 	return m_frame_index;
+}
+
+void CSCD2Image::play()
+{
+	if (m_img.size() <= 1)
+		return;
+	//thread를 이용하여 현재 프레임의 delay가 지나면 m_frame_index를 증가시키고
+	//parent에게 이를 알려 re-rendering하도록 한다.
+	if (m_run_thread_animation)
+	{
+		m_ani_paused = !m_ani_paused;
+		return;
+	}
+
+	std::thread t(&CSCD2Image::thread_animation, this);
+	t.detach();
+}
+
+void CSCD2Image::pause(int pos)
+{
+	if (m_img.size() <= 1 || !m_run_thread_animation)
+		return;
+	
+	if (pos >= m_img.size())
+		pos = 0;
+
+	m_frame_index = pos;
+	m_ani_paused = true;
+}
+
+void CSCD2Image::stop()
+{
+	if (m_img.size() <= 1)
+		return;
+	pause(0);
+}
+
+void CSCD2Image::thread_animation()
+{
+	m_run_thread_animation = true;
+	m_ani_paused = false;
+
+	while (m_run_thread_animation)
+	{
+		if (m_ani_paused)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			continue;
+		}
+
+		m_frame_index++;
+		if (m_frame_index >= m_img.size())
+			m_frame_index = 0;
+
+		//TRACE(_T("frame index = %d\n"), m_frame_index);
+		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)0, m_frame_index);
+
+		int delay = m_frame_delay[m_frame_index];
+		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+	}
+
+	m_run_thread_animation = false;
 }

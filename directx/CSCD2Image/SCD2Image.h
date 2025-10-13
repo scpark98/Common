@@ -13,6 +13,8 @@
 
 using namespace Microsoft::WRL;
 
+static const UINT Message_CSCD2Image = ::RegisterWindowMessage(_T("MessageString_CSCD2Image"));
+
 enum class eSCD2Image_DRAW_MODE
 {
 	draw_mode_original = 0,		//target의 left, top에 원본 크기로 그림
@@ -42,8 +44,10 @@ public:
 	D2D1_SIZE_F				get_size() { return D2D1::SizeF(m_width, m_height); }
 
 
-	//dx, dy 좌표에 그려준다.
-	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, int dx = 0, int dy = 0);
+	//dx, dy 좌표에 dw, dh 크기로 그려준다.
+	//dw 또는 dh 중 1개가 1 이상이라면 나머지 1개는 비율에 맞게 자동 조정된다.
+	//둘 다 0이하이면 원본 크기로 그려준다.
+	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 
 	//pt 좌표에 그려준다.
 	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, D2D1_POINT_2F pt = D2D1::Point2F());
@@ -59,12 +63,26 @@ public:
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
 	int						goto_frame(int index);
 
+//animated gif
+	void					set_parent(HWND hWnd) { m_parent = hWnd; }
+	void					play();
+	void					pause(int pos = 0);
+	void					stop();
+
 protected:
-	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성된다.
+	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 처리한다.
 	std::deque<ComPtr<ID2D1Bitmap>>		m_img;
 	int						m_frame_index = 0;
 	float					m_width;
 	float					m_height;
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder);
-};
 
+//animated gif
+	HWND					m_parent = NULL; //animation이 진행될 때 parent에게 메시지를 보내기 위해 필요
+	std::deque<int>			m_frame_delay; //in milliseconds
+	bool					m_run_thread_animation = false;
+	bool					m_ani_paused = false;
+	bool					m_ani_mirror = false;
+
+	void					thread_animation();
+};

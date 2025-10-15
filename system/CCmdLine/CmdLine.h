@@ -1,18 +1,22 @@
 /*
-* scpark 20240118
-* -MyApp.exe -p1 text1 text2 -p2 "this is a big argument" -opt1 -55 -opt2
-   위의 명령줄과 같이 옵션명(switch)과 옵션값(value)으로 나열된 파라미터를 map으로 구성하여
-   사용하기 쉽게 하기 위한 클래스이므로 SplitLine(argc, argv);과 같이 파싱하면 되지만
-   위 파라미터들이 __argv[1]에 하나의 문자열로 합쳐져서 넘어오는 경우 이를 파싱해서 사용할 수 있도록
-   SplitLine(CString params)함수를 추가함.
-   예를 들어 파라미터를 encrypt+base64_encode하여 전달받을 경우 __argc는 2가 되고
-   __argv[1]에 전체 파라미터가 포함된 암호화된 문자열이 담기게 된다.
-   이를 복호화한 후 각 스위치 옵션별로 분리해야 하는데
-   이 클래스에서는 처음부터 __argc, __argv로 넘어온 경우의 파싱만 지원하므로
-   SplitLine(CString params)함수를 새로 추가함.
+[20251015]
+- 문자열 파라미터 값에 공백, 하이픈 등이 있을 경우 제대로 파싱되지 않는 오류 수정.
+  겹따옴표로 묶인 문자열 값이 정상적으로 파싱되도록 수정.
+
+[20240118]
+- MyApp.exe -p1 text1 text2 -p2 "this is a big argument" -opt1 -55 -opt2
+  위의 명령줄과 같이 옵션명(switch)과 옵션값(value)으로 나열된 파라미터를 map으로 구성하여
+  사용하기 쉽게 하기 위한 클래스이므로 SplitLine(argc, argv);과 같이 파싱하면 되지만
+  위 파라미터들이 __argv[1]에 하나의 문자열로 합쳐져서 넘어오는 경우 이를 파싱해서 사용할 수 있도록
+  SplitLine(CString params)함수를 추가함.
+  예를 들어 파라미터를 encrypt+base64_encode하여 전달받을 경우 __argc는 2가 되고
+  __argv[1]에 전체 파라미터가 포함된 암호화된 문자열이 담기게 된다.
+  이를 복호화한 후 각 스위치 옵션별로 분리해야 하는데
+  이 클래스에서는 처음부터 __argc, __argv로 넘어온 경우의 파싱만 지원하므로
+  SplitLine(CString params)함수를 새로 추가함.
 
 - usage :
-    CString params = _T("-i 3.38.18.113 -p 7002 -sn 1122 -fr 1572807 -id 1 -t 0 -rh 133534 -rd 10001 -gi None -gp 0 -tn 0 -p2p 0 -p2pi None -p2pp 0 -sizex 0 -sizey 0 -wm 1 -wms None -dm 1 -ra 1");
+    CString params = _T("-i 70.117.80.127 -p 7002 -sn 171675 -fr 1572807 -id 1 -t 0 -rh 136902 -rd 10001 -gi None -gp 0 -pn \"구미 -&nbsp PC\" -pi 70.117.80.120 -un inoh.seo -ui 70.117.129.85 -tn 0 -p2p 1 -p2pi 70.117.80.120 -p2pp 7002 -sizex 0 -sizey 0 -wm 1 -wms \"water -mark -str\" -dm 0 -ra 1");
     CCmdLine cmdLine(params);
 
     //CCmdLine의 second는 CString을 vector로 가지는 m_strings 멤버변수가 있다.

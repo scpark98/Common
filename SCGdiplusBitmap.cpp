@@ -3155,12 +3155,7 @@ void CSCGdiplusBitmap::play_gif()
 
 	if (m_run_thread_animation)
 	{
-		if (m_paused)
-		{
-			m_paused = false;
-			return;
-		}
-
+		m_paused = !m_paused;
 		return;
 	}
 

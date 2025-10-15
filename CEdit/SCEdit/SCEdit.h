@@ -1,4 +1,8 @@
 /* scpark.
+- vertical align을 설정하기 위해서는 ES_MULTILINE 속성이 있어야 한다.
+  ES_MULTILINE 속성은 생성후에는 변경할 수 없으므로 리소스 에디터에서 설정해야 한다.
+  set_line_align(DT_VCENTER); 와 같이 호출하여 수직 정렬을 설정할 수 있다.
+
 [수정 내용]
 - 20250821 text, back, border, readonly, disabled 등 설정 모두 가능
 - readonly일 경우는 기본	대화상자의 배경색인 COLOR_3DFACE로 설정되지만

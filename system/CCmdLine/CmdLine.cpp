@@ -110,7 +110,7 @@ int CCmdLine::SplitLine(int argc, TCHAR **argv)
 
 //scpark add
 //encrypt+base64_encode되어 넘어온 파라미터를 base64_decode+decrypt하면
-//"-i 3.38.18.113 -p 7002 -sn 1122 -fr 1572807 -id 1 -t 0 -rh 133534 -rd 10001 -gi None -gp 0 -tn 0 -p2p 0 -p2pi None -p2pp 0 -sizex 0 -sizey 0 -wm 1 -wms None -dm 1 -ra 1"
+//"-i 70.117.80.127 -p 7002 -sn 171675 -fr 1572807 -id 1 -t 0 -rh 136902 -rd 10001 -gi None -gp 0 -pn "GUMI&nbspPC -pi 70.117.80.120 -un inoh.seo -ui 70.117.129.85 -tn 0 -p2p 1 -p2pi 70.117.80.120 -p2pp 7002 -sizex 0 -sizey 0 -wm 1 -wms &nbsp -dm 0 -ra 1"
 //위와 같이 하나의 문자열이 되는데 이를 옵션이름(switch)와 옵션값(value)로 분리하여 map에 넣어줌.
 int CCmdLine::SplitLine(CString params)
 {
@@ -119,10 +119,15 @@ int CCmdLine::SplitLine(CString params)
     //우선 각 파라미터들을 공백으로 분리한다.
     std::vector<CString> ar;
 
+    int i;
     int curPos = 0;
     CString token, arg;
     CString curSwitch;
 
+    //Tokenize() 함수를 이용해서 공백으로 토큰을 분리했으나 값에 공백이 있는 경우는 파싱 오류가 발생할 것이다. (-pn GUMI PC)
+    //따라서 문자열 값은 공백등의 다른 문자에 관계없이 반드시 겹따옴로 묶어서 전달하는 것을 원칙으로 하고
+    //Tokenize() 함수를 사용하지 않고 직접 토큰을 분리한다.
+    /*
     while (true)
     {
         //공백이 연속될 경우에도 잘 추출됨을 확인 완료!
@@ -131,9 +136,40 @@ int CCmdLine::SplitLine(CString params)
             break;
         ar.push_back(token);
     }
+    */
+
+    bool dquote_started = false;
+
+    //-i 70.117.80.127 -p 7002 -sn 171675 -fr 1572807 -id 1 -t 0 -rh 136902 -rd 10001 -gi None -gp 0 -pn \"구미 -&nbsp PC\" -pi 70.117.80.120 -un inoh.seo -ui 70.117.129.85 -tn 0 -p2p 1 -p2pi 70.117.80.120 -p2pp 7002 -sizex 0 -sizey 0 -wm 1 -wms \"water -mark -str\" -dm 0 -ra 1
+    //겹따옴표가 시작되면 그 안의 공백, 하이픈 등 모든 문자는 그냥 값의 일부분으로 처리되어야 한다.
+    for (i = 0; i < params.GetLength(); i++)
+    {
+        if (params[i] == ' ')
+        {
+            //겹따옴표 안에 있는 공백은 그냥 문자로 처리
+            if (dquote_started)
+            {
+                token += params[i];
+            }
+            //겹따옴표 밖의 공백은 토큰 분리로 처리
+            else
+            {
+                ar.push_back(token);
+                token.Empty();
+            }
+        }
+        else if (params[i] == '\"')
+        {
+            dquote_started = !dquote_started;
+        }
+        else
+        {
+            token += params[i];
+        }
+    }
 
     //분리된 각 파라미터를 스위치와 값으로 map에 넣는다.
-    for (int i = 0; i < ar.size(); i++)
+    for (i = 0; i < ar.size(); i++)
     {
         //현재 값이 스위치라면
         if (IsSwitch(ar[i]))

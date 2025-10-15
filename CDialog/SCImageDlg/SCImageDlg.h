@@ -140,6 +140,9 @@ public:
 	void			set_show_info(bool show);
 	void			set_alt_info(CString alt_info) { m_alt_info = alt_info; Invalidate(); }
 
+	bool			get_show_pixel_pos() { return m_show_pixel_pos; }
+	void			set_show_pixel_pos(bool show);
+
 	bool			get_show_pixel() { return m_show_pixel; }
 	void			set_show_pixel(bool show);
 
@@ -273,6 +276,9 @@ protected:
 	//dc에 그리면 처음엔 심플하지만 font, draw style(multiline vcenter)등 CSCStatic 구현 시 했던 번거로움이 그대로 발생한다.
 	//CSCStatic으로 하면 생성 등 처음엔 복잡하지만 결국 더 편한 방법이 된다.
 	bool			m_show_pixel = false;
+	bool			m_show_pixel_pos = true;
+	CString			m_pixel_pos;
+
 	//CRect			m_r_pixel;
 	Gdiplus::Color	m_cr_pixel = Gdiplus::Color::Black;
 	Gdiplus::Color	m_cr_pixel_old = Gdiplus::Color::Black;

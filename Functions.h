@@ -91,7 +91,10 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 //m_num이 CString이면 else절에 의해 %s로 출력된다.
 #define trace(n)\
 {\
-	if (typeid(n) == typeid(int) || typeid(n) == typeid(long) || typeid(n) == typeid(bool) || typeid(n) == typeid(BOOL))\
+	if (typeid(n) == typeid(int) || typeid(n) == typeid(long) || typeid(n) == typeid(bool) || typeid(n) == typeid(BOOL) ||\
+		typeid(n) == typeid(short) || typeid(n) == typeid(unsigned int) || typeid(n) == typeid(unsigned long) ||\
+		typeid(n) == typeid(unsigned short) || typeid(n) == typeid(char) || typeid(n) == typeid(unsigned char) ||\
+		typeid(n) == typeid(INT) || typeid(n) == typeid(UINT))\
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(int))\
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\

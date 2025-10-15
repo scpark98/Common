@@ -538,7 +538,7 @@ public:
 	void			set_gif_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
 	void			play_gif();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void			pause_gif(int pos = 0);
+	void			pause_gif(int pos = -1);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
 	void			stop_gif();
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동

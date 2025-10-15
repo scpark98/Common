@@ -65,6 +65,7 @@ bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
 
 	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("show pixel"), false));
+	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("show pixel_pos"), true));
 	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("show info"), false));
 	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("fit to ctrl"), true));
 	set_smooth_interpolation(AfxGetApp()->GetProfileInt(_T("setting\\CSCImageDlg"), _T("smooth interpolation"), CSCGdiplusBitmap::interpolation_bicubic));
@@ -265,7 +266,22 @@ void CSCImageDlg::OnPaint()
 		dc.SelectObject(pOldFont);
 	}
 
+	if (m_show_pixel_pos && !m_pixel_pos.IsEmpty())
+	{
+		CAutoFont af(_T("맑은 고딕"));
+		af.SetHeight(14);
 
+		CFont* pOldFont = dc.SelectObject(&af);
+		CRect r_pixel_pos = rc;
+		r_pixel_pos.DeflateRect(4, 2);
+		r_pixel_pos.right = 100;
+		r_pixel_pos.top = r_pixel_pos.bottom - 16;
+
+		DrawShadowText(dc.GetSafeHdc(), m_pixel_pos, m_pixel_pos.GetLength(), r_pixel_pos,
+			DT_NOCLIP | DT_LEFT | DT_TOP | DT_WORDBREAK, ivory, black, 2, 1);
+
+		dc.SelectObject(pOldFont);
+	}
 
 	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
 	CRect screen_roi = GpRectF2CRect(m_screen_roi);
@@ -548,6 +564,12 @@ void CSCImageDlg::set_show_pixel(bool show)
 {
 	m_show_pixel = show;
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImageDlg"), _T("show pixel"), m_show_pixel);
+}
+
+void CSCImageDlg::set_show_pixel_pos(bool show)
+{
+	m_show_pixel_pos = show;
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImageDlg"), _T("show pixel_pos"), m_show_pixel_pos);
 }
 
 bool CSCImageDlg::copy_to_clipboard(int type)
@@ -900,9 +922,6 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			if (m_static_pixel.IsWindowVisible())
 				m_static_pixel.ShowWindow(SW_HIDE);
-			//m_static_pixel.set_text(_T("(-,-)\nA -\nR -\nG -\nB -"));
-			//TRACE(_T("out of range. %ld\n"), GetTickCount());
-			return;
 		}
 		else
 		{
@@ -910,7 +929,6 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 				m_static_pixel.ShowWindow(SW_SHOW);
 
 			m_cr_pixel = m_img[0].get_pixel(pt.x, pt.y);
-			//TRACE(_T("screen_pt = %d, %d  real_pt = %d, %d (%d, %d, %d, %d)\n"), point.x, point.y, pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
 
 			//픽셀 정보 표시창을 커서	위치에 맞춰서 이동시킨다. rc를 벗어나지 않도록 보정까지 한다.
 			CRect r = make_rect(point.x + 24, point.y, PIXEL_INFO_CX, PIXEL_INFO_CY);
@@ -920,20 +938,38 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			adjust_rect_range(r, rc, true);
 			m_static_pixel.MoveWindow(r);
-			//m_static_pixel.SetWindowPos(NULL, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
 			CString str;
 
 			str.Format(_T("(%d,%d)\nA %3d\nR %3d\nG %3d\nB %3d"), pt.x, pt.y, m_cr_pixel.GetA(), m_cr_pixel.GetR(), m_cr_pixel.GetG(), m_cr_pixel.GetB());
 
-			//if (m_cr_pixel.GetValue() != m_cr_pixel_old.GetValue())
 			{
 				m_static_pixel.set_back_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::White : m_cr_pixel);
 				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_color(m_cr_pixel));
 				m_static_pixel.set_text(str);
-				//m_static_pixel.set_textf(Gdiplus::Color::RoyalBlue, str);
 				m_cr_pixel_old = m_cr_pixel;
 			}
 		}
+	}
+
+	if (m_show_pixel_pos)
+	{
+		TRACKMOUSEEVENT tme;
+		tme.cbSize = sizeof(tme);
+		tme.hwndTrack = m_hWnd;
+		tme.dwFlags = TME_LEAVE | TME_HOVER;
+		tme.dwHoverTime = 1;
+		_TrackMouseEvent(&tme);
+
+		CPoint pt;
+		get_real_coord_from_screen_coord(m_r_display, m_img[0].width, point, &pt);
+
+		if (pt.x < 0 || pt.x >= m_img[0].width || pt.y < 0 || pt.y >= m_img[0].height)
+			m_pixel_pos.Empty();
+		else
+			m_pixel_pos.Format(_T("%d, %d"), pt.x, pt.y);
+
+		Invalidate();
 	}
 
 	::SendMessage(m_parent->m_hWnd, WM_MOUSEMOVE, 0, MAKELONG(point.x, point.y));

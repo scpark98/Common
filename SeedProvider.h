@@ -11,10 +11,12 @@
 SeedProvider	m_sp;
 m_sp.SetHeader( "K-RIVER" );
 m_sp.SetKey( "&!^@&#*$^&*!&@#^" );
+
 //string encryption
 char str[1024] = "void CTest_EncryptDlg::OnSysCommand(UINT nID, LPARAM lParam)\0";
 m_sp.Encrypt( str, true );
 m_sp.Decrypt( str, false );
+
 //file encryption
 m_sp.EncryptFileWithHeader( "d:\\untitled.png", false, "d:\\untitled_enc.png" );
 m_sp.DecryptFileWithHeader( "d:\\untitled_enc.png", false, "d:\\untitled_dec.png" );

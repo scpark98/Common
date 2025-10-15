@@ -1,9 +1,18 @@
+/*
+[animated gif, webp 등 여러 프레임을 담은 이미지 처리]
+- play()가 호출되면 각 프레임 delay마다 m_frame_index를 증가시키는 thread가 구동되고
+  parent window에게 메시지를 보내서 Invalidate()을 통해 화면이 갱신된다.
+  이 방법은 mfc control이 없고 순수 이미지 표시 방식의 앱에서는 괜찮지만
+  화면상에 mfc control이 있다면 깜빡임이 많이 발생할 수 있다.
+*/
+
 #pragma once
 
 #include <afxwin.h>
 //#include <d2d1.h>
 #include <d2d1_1.h>
 #include <d2d1helper.h>
+//#include <d2d1effects.h>
 #include <d2d1effects_2.h>
 #include <d3d11.h>
 #include <wincodec.h>
@@ -14,6 +23,14 @@
 using namespace Microsoft::WRL;
 
 static const UINT Message_CSCD2Image = ::RegisterWindowMessage(_T("MessageString_CSCD2Image"));
+
+enum
+{
+	DM_UNDEFINED = 0,
+	DM_NONE = 1,
+	DM_BACKGROUND = 2,
+	DM_PREVIOUS = 3
+};
 
 enum class eSCD2Image_DRAW_MODE
 {
@@ -60,6 +77,14 @@ public:
 	D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 	D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 
+	//data멤버에 픽셀 데이터를 가리키도록 한다. 구현중...
+	void					get_raw_data();
+
+	void					blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* blend_img, int dx, int dy, int sx, int sy, int sw, int sh);
+	void					copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst);
+	void					save(CString path);
+	void					save(ID2D1Bitmap* img, LPCTSTR path, ...);
+
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
 	int						goto_frame(int index);
 
@@ -70,8 +95,12 @@ public:
 	void					stop();
 
 protected:
+	IWICImagingFactory2*	m_pWICFactory = NULL;
+	ID2D1DeviceContext*		m_d2dc = NULL;
+
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 처리한다.
 	std::deque<ComPtr<ID2D1Bitmap>>		m_img;
+	uint8_t*				data = NULL;
 	int						m_frame_index = 0;
 	float					m_width;
 	float					m_height;

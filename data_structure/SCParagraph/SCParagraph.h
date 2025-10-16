@@ -95,5 +95,7 @@ public:
 	//출력 위치를 이동시킨다.
 	static CRect	offset(int x, int y);
 
+	//para의 정보를 문자열로 리턴한다.
+	static CString	get_paragraph_info_string(std::deque<std::deque<CSCParagraph>>& para);
 protected:
 };

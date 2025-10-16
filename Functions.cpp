@@ -8926,6 +8926,25 @@ double get_double(CString& src, CString sep)
 	return((double)ret);
 }
 
+//src에서 prefix와 postfix 사이에 있는 문자열을 추출한다.
+CString	extract_sub_str(CString src, CString prefix, CString postfix)
+{
+	int	start, end;
+
+	start = src.Find(prefix);
+
+	if (start < 0)
+		return _T("");
+
+	start += prefix.GetLength();
+	end = src.Find(postfix, start);
+
+	if (end < 0)
+		return _T("");
+
+	return src.Mid(start, end - start);
+}
+
 //resource string table의 문자열을 리턴한다.
 CString	load_string(UINT nID)
 {

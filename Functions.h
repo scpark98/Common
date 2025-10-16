@@ -788,6 +788,9 @@ struct	NETWORK_INFO
 	int			get_int(CString& src, CString sep = _T("|"));
 	double		get_double(CString& src, CString sep = _T("|"));
 
+	//src에서 prefix와 postfix 사이에 있는 문자열을 추출한다.
+	CString		extract_sub_str(CString src, CString prefix, CString postfix);
+
 	//resource string table의 문자열을 리턴한다.
 	extern CString load_string(UINT nID);
 

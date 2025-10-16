@@ -1075,6 +1075,23 @@ CRect CSCGdiplusBitmap::draw(CDC* pDC, int dx, int dy, int dw, int dh)
 	return draw(pDC, CRect(dx, dy, dx + dw, dy + dh), draw_mode_stretch);
 }
 
+CRect CSCGdiplusBitmap::draw(CSCGdiplusBitmap* img, int dx, int dy, int dw, int dh)
+{
+	CRect r;
+	r.left = dx;
+	r.top = dy;
+
+	if (dw <= 0)
+		dw = img->width;
+	if (dh <= 0)
+		dh = img->height;
+
+	r.right = r.left + dw;
+	r.bottom = r.top + dh;
+
+	return draw(img, &r);
+}
+
 //CSCGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
 CRect CSCGdiplusBitmap::draw(CSCGdiplusBitmap *img, CRect* targetRect)
 {
@@ -2243,6 +2260,22 @@ void CSCGdiplusBitmap::blur(float sigma, int order)
 #endif
 }
 
+void CSCGdiplusBitmap::create_round_rect(int w, int h, float radious, Gdiplus::Color cr_back, Gdiplus::Color cr_stroke, float stroke_width)
+{
+	release();
+
+	m_pBitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
+	resolution();
+
+	Gdiplus::Graphics g(m_pBitmap);
+	g.Clear(Gdiplus::Color::Transparent);
+
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);	//부드럽게 보정 or 실제 픽셀
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+
+	draw_round_rect(&g, Gdiplus::Rect(4.0f, 4.0f, (float)w - 8, (float)h - 8), cr_stroke, cr_back, radious, stroke_width);
+}
+
 void CSCGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_sigma, Gdiplus::Color cr_shadow)
 {
 	release();
@@ -2276,6 +2309,7 @@ void CSCGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_
 #endif
 
 	g.DrawImage(shadow, 0, 0, shadow.width, shadow.height);
+	
 	/*
 	Gdiplus::BlurParams myBlurParams;
 	myBlurParams.expandEdge = true;

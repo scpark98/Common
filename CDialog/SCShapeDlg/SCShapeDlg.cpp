@@ -154,7 +154,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 		else
 			GetObject(GetStockObject(SYSTEM_FONT), sizeof(lf), &lf);
 
-		font_name = lf.lfFaceName;
+		font_name = _T("굴림");// lf.lfFaceName;
 	}
 
 	text_prop.name = font_name;
@@ -190,6 +190,9 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	r = CRect(0, 0, r.Width(), r.Height());
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 
+	//CSCParagraph::get_paragraph_info_string(m_para);
+
+
 	//해당 캔버스에
 	Gdiplus::Graphics g(m_img.m_pBitmap);
 
@@ -204,6 +207,8 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	{
 		CSCParagraph::draw_text(g, m_para);
 		set_image(parent, &m_img, false);
+
+		//m_img.save(_T("d:\\SCShapeDlg.png"));
 	}
 	else
 	{

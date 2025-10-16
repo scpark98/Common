@@ -293,6 +293,7 @@ public:
 
 	//CSCGdiplusBitmap 이미지를 현재 이미지의 targetRect에 그린다.
 	CRect			draw(CSCGdiplusBitmap *img, CRect* targetRect = NULL);
+	CRect			draw(CSCGdiplusBitmap* img, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
 
 	//그림을 그리지 않고 표시될 영역 정보만 얻는다.
 	CRect			calc_rect(CRect targetRect, int draw_mode = draw_mode_zoom);
@@ -446,6 +447,7 @@ public:
 	//Gdiplus에서 제공하는 GaussianBlur 방식이지만 radius가 작을 경우는 좌우로만 흐려지는 등의 문제가 있다.
 	void			gdip_blur(float radius, BOOL expandEdge);
 
+	void			create_round_rect(int w, int h, float radious, Gdiplus::Color cr_back, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, float stroke_width = 1.0f);
 	//round shadow rect 이미지로 생성
 	void			round_shadow_rect(int w, int h, float radius, float blur_sigma = 5.0f, Gdiplus::Color cr_shadow = Gdiplus::Color::Gray);
 

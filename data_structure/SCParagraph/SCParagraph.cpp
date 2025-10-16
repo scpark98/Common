@@ -426,8 +426,14 @@ void CSCParagraph::get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font
 
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(text_prop.name));
 
-	Gdiplus::Font ff(&fontFamily, emSize, text_prop.style);
-	*font = ff.Clone();
+	std::unique_ptr<Gdiplus::Font> ff;
+
+	if (fontFamily.IsAvailable())
+		ff = std::make_unique<Gdiplus::Font>(&fontFamily, emSize, text_prop.style);
+	else
+		ff = std::make_unique<Gdiplus::Font>(Gdiplus::FontFamily::GenericSansSerif(), emSize, text_prop.style);
+
+	*font = ff->Clone();
 }
 
 /*
@@ -540,7 +546,14 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			//text 배경색을 칠하고
 			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
-			Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
+			Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
+
+			//시스템에 등록되지 않은 폰트를 설정할 경우 ff는 null이므로 기본 폰트로라도 대체시켜야 한다.
+			if (!fontFamily->IsAvailable())
+			{
+				delete fontFamily;
+				fontFamily = Gdiplus::FontFamily::GenericSansSerif()->Clone();
+			}
 
 			Gdiplus::Font* font = NULL;
 			para[i][j].get_paragraph_font(g, &font);
@@ -573,7 +586,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 				//stroke 또는 shadow가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
 				//r을 정확히 계산하는 것이 정석이나 굳이 r을 주지 않고 Gdiplus::Point()로 주면 문제되지 않는다.
 				CRect r = para[i][j].r;
-				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
+				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
 				//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
@@ -587,7 +600,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 				pt_shadow_offset.y = max(pt_shadow_offset.y, para[i][j].text_prop.thickness / 1.4f);
 				r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
 
-				shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), &ff,
+				shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
 				Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
@@ -622,6 +635,11 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			//if (para[i][j].r.Width() > 2)
 				//draw_rectangle(g, para[i][j].r, Gdiplus::Color::Blue);// , Gdiplus::Color(255, 255, 0, 0));
 #endif
+			if (font)
+				delete font;
+
+			if (fontFamily)
+				delete fontFamily;
 		}
 	}
 
@@ -730,4 +748,31 @@ CRect CSCParagraph::set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>
 	}
 
 	return rect_text;
+}
+
+//para의 정보를 문자열로 리턴한다.
+CString	CSCParagraph::get_paragraph_info_string(std::deque<std::deque<CSCParagraph>>& para)
+{
+	int i, j;
+	CString str;
+	CString info;
+
+	for (i = 0; i < para.size(); i++)
+	{
+		for (j = 0; j < para[i].size(); j++)
+		{
+			str.Format(_T("(%d, %d) : text = %s, r = %s, name = %s, size = %.1f, style = %d\n"),
+				i, j,
+				para[i][j].text,
+				get_rect_info_string(para[i][j].r),
+				para[i][j].text_prop.name,
+				para[i][j].text_prop.size,
+				para[i][j].text_prop.style);
+
+			info += str;
+		}
+	}
+
+	TRACE(_T("%s\n"), info);
+	return info;
 }

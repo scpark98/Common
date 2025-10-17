@@ -47,14 +47,34 @@ void CImageStatic::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, GRAY32);
-
 	if (m_img.is_empty())
 		return;
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 
 	g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정
+
+	//배경색이 투명이 아닌 특정색으로 지정되어 있다면 배경색을 칠해주고
+	if (m_cr_back.GetValue() != Gdiplus::Color::Transparent)
+	{
+		Gdiplus::SolidBrush br_back(m_cr_back);
+		g.FillRectangle(&br_back, rc.left, rc.top, rc.Width(), rc.Height());
+	}
+	//배경색이 지정되어 있지 않고 alpha 채널이 있는 png일 경우
+	else if (m_img.has_alpha_pixel())
+	{
+		//투명 png일 경우 배경에 zigzag 패턴을 깔아준다.
+		// 
+		//zigzag 패턴 브러시 생성
+		if (m_br_zigzag == NULL)
+			m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
+
+		g.FillRectangle(m_br_zigzag.get(), rc.left, rc.top, rc.Width(), rc.Height());
+	}
+	else
+	{
+		dc.FillSolidRect(rc, ::GetSysColor(COLOR_3DFACE));
+	}
 
 	if (m_fit2ctrl)
 	{
@@ -367,7 +387,7 @@ bool CImageStatic::load(UINT id)
 
 bool CImageStatic::copy_to_clipbard()
 {
-	return m_img.copy_to_clipbard();
+	return m_img.copy_to_clipboard();
 }
 
 CRect CImageStatic::get_image_roi()
@@ -385,4 +405,16 @@ void CImageStatic::set_smooth_interpolation(bool use)
 		m_interplationMode = Gdiplus::InterpolationModeHighQualityBicubic;	//부드럽게 보정
 	else
 		m_interplationMode = Gdiplus::InterpolationModeNearestNeighbor;	//보정 최소화
+}
+
+void CImageStatic::set_back_color(Gdiplus::Color cr_back)
+{
+	m_cr_back = cr_back;
+	Invalidate();
+}
+
+void CImageStatic::set_image(CSCGdiplusBitmap& img)
+{
+	img.deep_copy(&m_img);
+	Invalidate();
 }

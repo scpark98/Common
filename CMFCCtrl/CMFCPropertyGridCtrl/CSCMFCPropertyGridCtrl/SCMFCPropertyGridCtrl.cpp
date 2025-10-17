@@ -328,10 +328,25 @@ bool CSCMFCPropertyGridCtrl::AddFolderSelect(	CMFCPropertyGridProperty* pParent,
 	return true;
 }
 
-bool CSCMFCPropertyGridCtrl::AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, int min, int max, int value, DWORD dwData)
+bool CSCMFCPropertyGridCtrl::AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, float value, DWORD id, float min, float max, CString desc)
 {
-	CPropGridSlider* prop = new CPropGridSlider(sName, value, sName, min, max, max - min, dwData);
+	CPropGridSlider* prop = new CPropGridSlider(sName, value, sName, min, max, 1.0f, id);
 	return pParent->AddSubItem(prop);
+}
+
+void CSCMFCPropertyGridCtrl::set_slider_range(DWORD dwData, float min, float max)
+{
+	CMFCPropertyGridProperty* pProp = GetItemProperty(dwData);
+
+	if (pProp == nullptr)
+		return;
+
+	CPropGridSlider* pSlider = dynamic_cast<CPropGridSlider*>(pProp);
+
+	if (pSlider == nullptr)
+		return;
+
+	pSlider->set_range(min, max);
 }
 
 bool CSCMFCPropertyGridCtrl::AddFontSelect(CMFCPropertyGridProperty* parent, CString name, LOGFONT lf, DWORD id, CString desc, bool enable)

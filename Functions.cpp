@@ -6734,7 +6734,7 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 	path->CloseFigure();
 }
 
-void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width)
+void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width)
 {
 	//int dia = 2 * radius;
 
@@ -6742,8 +6742,8 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_s
 	//int oldPageUnit = g->SetPageUnit(Gdiplus::UnitPixel);
 
 	// define the pen
-	Gdiplus::Pen pen(gcr_stroke, 1);
-	Gdiplus::SolidBrush br(gcr_fill);
+	Gdiplus::Pen pen(cr_stroke, 1);
+	Gdiplus::SolidBrush br(cr_fill);
 
 	pen.SetAlignment(Gdiplus::PenAlignmentCenter);
 
@@ -6755,6 +6755,9 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_s
 
 	//fill the round rect
 	g->FillPath(&br, &path);
+
+	if (width <= 0)
+		return;
 
 	// draw the round rect
 	g->DrawPath(&pen, &path);
@@ -13075,77 +13078,77 @@ void normalize_rect(Gdiplus::RectF& r)
 //attach_left 등의 옵션을 줄 필요가 있다.
 CRect get_ratio_rect(CRect rTarget, int w, int h, int attach, bool stretch)
 {
-	if (h == 0)
+	if (rTarget.IsRectEmpty() || w == 0 || h == 0)
 		return CRect();
 
-	return get_ratio_rect(rTarget, (double)w / (double)h, attach, stretch);
-}
+	int		nw;
+	int		nh;
+	double  imageRatio = (double)w / (double)h;
+	double	targetRatio = (double)rTarget.Width() / (double)rTarget.Height();
+	CRect	result;
 
-//rTarget에 접하는 dRatio인 최대 사각형을 구한다.
-CRect get_ratio_rect(CRect rTarget, double dRatio, int attach, bool stretch)
-{
-	int		w = rTarget.Width();
-	int		h = rTarget.Height();
-	int		nNewW;
-	int		nNewH;
-	double	dTargetRatio = (double)w / (double)h;
-
-	CRect	rResult;
-
-	if (rTarget.IsRectEmpty())
-		return CRect();
-
-	bool bResizeWidth;
-
-	if (dRatio > 1.0)
+	if (stretch)
 	{
-		if (dTargetRatio < dRatio)
-			bResizeWidth = false;
+		bool bResizeWidth;
+
+		if (imageRatio > 1.0)
+		{
+			if (targetRatio < imageRatio)
+				bResizeWidth = false;
+			else
+				bResizeWidth = true;
+		}
 		else
-			bResizeWidth = true;
-	}
-	else
-	{
-		if (dTargetRatio > dRatio)
-			bResizeWidth = true;
+		{
+			if (targetRatio > imageRatio)
+				bResizeWidth = true;
+			else
+				bResizeWidth = false;
+		}
+
+
+		if (bResizeWidth)
+		{
+			result.top = rTarget.top;
+			result.bottom = rTarget.bottom;
+
+			nw = (double)(rTarget.Height()) * imageRatio;
+			if (attach & attach_left)
+				result.left = rTarget.left;
+			else if (attach & attach_right)
+				result.left = rTarget.right - nw;
+			else
+				result.left = rTarget.left + (rTarget.Width() - nw) / 2.0;
+
+			result.right = result.left + nw;
+		}
 		else
-			bResizeWidth = false;
-	}
+		{
+			result.left = rTarget.left;
+			result.right = rTarget.right;
 
+			nh = (double)(rTarget.Width()) / imageRatio;
 
-	if (bResizeWidth)
-	{
-		rResult.top = rTarget.top;
-		rResult.bottom = rTarget.bottom;
+			if (attach & attach_top)
+				result.top = rTarget.top;
+			else if (attach & attach_bottom)
+				result.top = rTarget.bottom - nh;
+			else
+				result.top = rTarget.top + (rTarget.Height() - nh) / 2.0;
 
-		nNewW = (double)(rTarget.Height()) * dRatio;
-		if (attach & attach_left)
-			rResult.left = rTarget.left;
-		else if (attach & attach_right)
-			rResult.left = rTarget.right - nNewW;
-		else
-			rResult.left = rTarget.left + (rTarget.Width() - nNewW) / 2.0;
-
-		rResult.right = rResult.left + nNewW;
-	}
-	else
-	{
-		rResult.left	= rTarget.left;
-		rResult.right	= rTarget.right;
-
-		nNewH = (double)(rTarget.Width()) / dRatio;
-
-		if (attach & attach_top)
-			rResult.top = rTarget.top;
-		else if (attach & attach_bottom)
-			rResult.top = rTarget.bottom - nNewH;
-		else
-			rResult.top = rTarget.top + (rTarget.Height() - nNewH) / 2.0;
-
-		rResult.bottom	= rResult.top + nNewH;
+			result.bottom = result.top + nh;
+		}
 	}
 
-	return rResult;
+	//stretch가 아닐 경우는 실제 크기로 맞춘다.
+	if (!stretch)
+	{
+		int x = (rTarget.Width() - w) / 2;
+		int y = (rTarget.Height() - h) / 2;
+		result = make_rect(rTarget.left + x, rTarget.top + y, w, h);
+	}
+
+	return result;
 }
 
 //w x h 사각형을 target안에 넣을 때 중앙에 표시되게 하는 사각형 영역을 리턴한다.
@@ -15526,7 +15529,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 
 	int monitor_index = get_monitor_index(rc);
 
-	if (rc.IsRectNull() || monitor_index != 0)
+	if (rc.IsRectNull())// || monitor_index != 0)
 	{
 		pWnd->CenterWindow();
 		return;

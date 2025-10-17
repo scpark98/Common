@@ -26,6 +26,9 @@ BOOL CPropSlider::PreTranslateMessage(MSG* pMsg)
 		case WM_MOUSEWHEEL:
 			OnUpdateValue();
 			break;
+		case WM_KEYDOWN:
+			OnUpdateValue();
+			break;
 	}
 
 	return CSliderCtrl::PreTranslateMessage(pMsg);
@@ -43,7 +46,7 @@ void CPropSlider::OnUpdateValue()
 void CPropGridSlider::OnSliderPosChanged()
 {
 	int pos = m_pSlider->GetPos();
-	float ratio = ((float)pos) / ((float)m_iSliderStep);
+	float ratio = ((float)pos / (m_fMax - m_fMin));
 	float value = (m_fMax - m_fMin) * ratio + m_fMin;
 	SetValue((float)value);
 	m_pWndList->OnPropertyChanged(this);
@@ -60,7 +63,7 @@ void CPropGridSlider::SetSliderPos()
 	COleVariant value = GetValue();
 	float fval = value.fltVal;
 	float ratio = (fval - m_fMin) / (m_fMax - m_fMin);
-	int pos = (int)(ratio * ((float)m_iSliderStep));
+	int pos = (int)(ratio * m_step);
 
 	m_pSlider->SetPos(pos);
 }
@@ -85,7 +88,7 @@ void CPropGridSlider::OnDrawValue(CDC* pDC, CRect rect)
 		//원래는 TBS_BOTH였으나 약간 위로 밀리고 thumb도 작게 표시되어 TBS_TOP으로 변경함.
 		DWORD style = WS_VISIBLE | WS_CHILD | TBS_TOP | TBS_NOTICKS;
 		m_pSlider->Create(style, rt, m_pWndList, 5);
-		m_pSlider->SetRange(0, m_iSliderStep);
+		m_pSlider->SetRange(0, 100);
 		m_pSlider->ShowWindow(SW_SHOW);
 		SetSliderPos();
 	}

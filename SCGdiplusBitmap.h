@@ -1,9 +1,9 @@
 #pragma once
 
 /*
-scpark.
-기존 CSCGdiPlusBitmap 및 CGdiPlusBitmapResource를 CSCGdiplusBitmap이라는 하나의 클래스로 합치고
-Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
+* 기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CGdiplusBitmap이라는 하나의 클래스로 합치고
+  Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
+  202509 : CGdiplusBitmap 클래스 이름 충돌이 발생하여 CSCGdiplusBitmap으로 변경함.
 
 * Gdiplus를 자동 초기화, 해제하기 위해 CGdiplusDummyForInitialization 클래스를 추가하고
   GdiplusBitmap.cpp의 맨 위에서 static 인스턴스를 선언함.
@@ -189,7 +189,7 @@ public:
 	//sType은 "png", "jpg", "gif"를 대표적으로 지원하며 "tiff", "webp" 등 다른 포맷도 지원하지만 우선 배제함.
 	//"ico" 파일은 크기 파라미터도 중요하므로 load_icon()을 사용하도록 한다.
 	CSCGdiplusBitmap(CString sType, UINT id);
-	CSCGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
+	CSCGdiplusBitmap(int cx, int cy, Gdiplus::Color cr = Gdiplus::Color::Transparent, Gdiplus::PixelFormat format = PixelFormat32bppARGB);
 
 	//not tested.
 	IStream* CreateStreamOnFile(LPCTSTR pszPathName);
@@ -202,7 +202,7 @@ public:
 
 	bool			m_referenced_variable = false;
 
-	void			create(int cx, int cy, Gdiplus::PixelFormat format = PixelFormat32bppARGB, Gdiplus::Color cr = Gdiplus::Color::Transparent);
+	void			create(int cx, int cy, Gdiplus::Color cr = Gdiplus::Color::Transparent, Gdiplus::PixelFormat format = PixelFormat32bppARGB);
 
 	//CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
 	void			create_drag_image(CWnd* pWnd);
@@ -368,7 +368,7 @@ public:
 
 	//이미지 캔버스 크기를 조정한다. 남는 공간은 cr_fill로 채운다. cr_fill이 투명이 아닌 경우 주의할 것.
 	//align 상수값은 DT_CENTER | DT_VCENTER와 같이 DrawText()에서 사용하는 align 상수값을 빌려 사용한다.
-	void			canvas_size(int cx, int cy, int align = DT_CENTER | DT_VCENTER, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
+	void			resize_canvas(int nw, int nh, int align = DT_CENTER | DT_VCENTER, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
 
 	//투명 png의 l, t, r, b의 투명한 영역 크기를 구한다.
 	CRect			get_transparent_rect();
@@ -447,7 +447,7 @@ public:
 	//Gdiplus에서 제공하는 GaussianBlur 방식이지만 radius가 작을 경우는 좌우로만 흐려지는 등의 문제가 있다.
 	void			gdip_blur(float radius, BOOL expandEdge);
 
-	void			create_round_rect(int w, int h, float radious, Gdiplus::Color cr_back, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, float stroke_width = 1.0f);
+	void			create_round_rect(int w, int h, float radious, Gdiplus::Color cr_fill, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, float stroke_width = 1.0f);
 	//round shadow rect 이미지로 생성
 	void			round_shadow_rect(int w, int h, float radius, float blur_sigma = 5.0f, Gdiplus::Color cr_shadow = Gdiplus::Color::Gray);
 
@@ -482,8 +482,16 @@ public:
 	Gdiplus::PathGradientBrush* createFluffyBrush(Gdiplus::GraphicsPath* gp, float* blendFactors, float* blendPositions, INT count, INT* in_out_count);
 
 
-	//배경 그림자 이미지를 생성한다.
-	void			create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma = 10.0f, int type = 0, int depth = 10);
+	enum SHADOW_TYPE
+	{
+		shadow_type_outer = 0x0000,
+		shadow_type_left = 0x0001,
+		shadow_type_top	= 0x0002,
+		shadow_type_right = 0x0004,
+		shadow_type_bottom = 0x0008,
+	};
+	//배경 그림자 이미지를 생성한다. shadow_type은 조합 가능하다.
+	void			create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma = 10.0f, int shadow_type = shadow_type_bottom, int depth = 10, Gdiplus::Color cr_shadow = Gdiplus::Color::Gray);
 
 	//ColorMatrix를 이용하여 간단히 흑백이미지를 만들 수 있지만
 	//그건 3채널의 흑백톤의 이미지이므로 1채널 256 gray이미지가 아니다.

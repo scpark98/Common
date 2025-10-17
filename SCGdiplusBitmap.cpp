@@ -125,7 +125,7 @@ CSCGdiplusBitmap::CSCGdiplusBitmap(CString lpType, UINT id)
 	load(lpType, id);
 }
 
-CSCGdiplusBitmap::CSCGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
+CSCGdiplusBitmap::CSCGdiplusBitmap(int cx, int cy, Gdiplus::Color cr, Gdiplus::PixelFormat format)
 {
 	release();
 
@@ -135,7 +135,7 @@ CSCGdiplusBitmap::CSCGdiplusBitmap(int cx, int cy, Gdiplus::PixelFormat format, 
 	resolution();
 }
 
-void CSCGdiplusBitmap::create(int cx, int cy, Gdiplus::PixelFormat format, Gdiplus::Color cr)
+void CSCGdiplusBitmap::create(int cx, int cy, Gdiplus::Color cr, Gdiplus::PixelFormat format)
 {
 	release();
 
@@ -1047,7 +1047,7 @@ CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CSCGdiplusBitmap mask1, CRect
 	//temp.m_pBitmap->UnlockBits(&bmData_dst);
 	//save(&mask, _T("d:\\temp\\mask.bmp"));
 
-	CRect r = get_ratio_rect(targetRect, (double)width / (double)height);
+	CRect r = get_ratio_rect(targetRect, width, height);
 
 	g.DrawImage(m_pBitmap, r.left, r.top, r.Width(), r.Height());
 	g.DrawImage(&mask, r.left, r.top, r.Width(), r.Height());
@@ -1287,7 +1287,7 @@ CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mo
 	if (draw_mode == draw_mode_stretch)
 		r = targetRect;
 	else if (draw_mode == draw_mode_zoom)
-		r = get_ratio_rect(targetRect, (double)width / (double)height);
+		r = get_ratio_rect(targetRect, (double)width, (double)height);
 	else if (draw_mode == draw_mode_original)
 	{
 		r = targetRect;
@@ -1298,6 +1298,10 @@ CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mo
 	{
 		r = CRect(0, 0, width, height);
 		r.OffsetRect(targetRect.left + (targetRect.Width() - width) / 2, targetRect.top + (targetRect.Height() - height) / 2);
+
+		//targetRect보다 클 경우 targetRect에 맞춰서 축소하여 그려준다.
+		if (!rect_in_rect(targetRect, r))
+			r = get_ratio_rect(targetRect, (double)width, (double)height);
 	}
 
 	return draw(g, r.left, r.top, r.Width(), r.Height());
@@ -1370,7 +1374,7 @@ CRect CSCGdiplusBitmap::calc_rect(CRect targetRect, int draw_mode)
 	if (draw_mode == draw_mode_stretch)
 		r = targetRect;
 	else if (draw_mode == draw_mode_zoom)
-		r = get_ratio_rect(targetRect, (double)width / (double)height);
+		r = get_ratio_rect(targetRect, (double)width, (double)height);
 	else
 	{
 		r = CRect(0, 0, width, height);
@@ -1788,7 +1792,7 @@ void CSCGdiplusBitmap::resize(float fx, float fy, Gdiplus::InterpolationMode mod
 }
 
 //이미지 캔버스 크기를 조정한다.
-void CSCGdiplusBitmap::canvas_size(int cx, int cy, int align, Gdiplus::Color cr_fill)
+void CSCGdiplusBitmap::resize_canvas(int cx, int cy, int align, Gdiplus::Color cr_fill)
 {
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(cx, cy);
 	Gdiplus::Graphics g(result);
@@ -2260,7 +2264,7 @@ void CSCGdiplusBitmap::blur(float sigma, int order)
 #endif
 }
 
-void CSCGdiplusBitmap::create_round_rect(int w, int h, float radious, Gdiplus::Color cr_back, Gdiplus::Color cr_stroke, float stroke_width)
+void CSCGdiplusBitmap::create_round_rect(int w, int h, float radious, Gdiplus::Color cr_fill, Gdiplus::Color cr_stroke, float stroke_width)
 {
 	release();
 
@@ -2273,7 +2277,7 @@ void CSCGdiplusBitmap::create_round_rect(int w, int h, float radious, Gdiplus::C
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);	//부드럽게 보정 or 실제 픽셀
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 
-	draw_round_rect(&g, Gdiplus::Rect(4.0f, 4.0f, (float)w - 8, (float)h - 8), cr_stroke, cr_back, radious, stroke_width);
+	draw_round_rect(&g, Gdiplus::Rect(4.0f, 4.0f, (float)w - 8, (float)h - 8), cr_stroke, cr_fill, radious, stroke_width);
 }
 
 void CSCGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_sigma, Gdiplus::Color cr_shadow)
@@ -2293,7 +2297,7 @@ void CSCGdiplusBitmap::round_shadow_rect(int w, int h, float radius, float blur_
 	//apply_effect_blur(20.0f, FALSE);
 	
 	Gdiplus::Matrix matrix(1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-	CSCGdiplusBitmap shadow(w, h, PixelFormat32bppARGB, cr_shadow);
+	CSCGdiplusBitmap shadow(w, h, cr_shadow, PixelFormat32bppARGB);
 #ifdef _DEBUG
 	shadow.save(_T("d:\\temp\\shadow_1default.png"));
 #endif
@@ -3664,13 +3668,12 @@ void CSCGdiplusBitmap::set_pixel(int x, int y, Gdiplus::Color cr)
 	}
 }
 
-//배경 그림자 이미지를 생성한다.
-void CSCGdiplusBitmap::create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma, int type, int depth)
+//현재 이미지를 이용해서 배경 그림자로 사용할 이미지를 생성한다.
+void CSCGdiplusBitmap::create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma, int shadow_type, int depth, Gdiplus::Color cr_shadow)
 {
 	deep_copy(shadow);
 	shadow->gray();
-	shadow->canvas_size(width + depth, height + depth);
-	//shadow->save(_T("d:\\shadow.png"));
+	shadow->resize_canvas(width + depth, height + depth);
 	shadow->blur(sigma);
 }
 

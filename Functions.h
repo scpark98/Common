@@ -1989,7 +1989,7 @@ h		: 복사할 height 크기(pixel)
 	Gdiplus::PointF center(Gdiplus::RectF& r);
 
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius);
-	void		draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color gcr_stroke, Gdiplus::Color gcr_fill, int radius, int width = 1);
+	void		draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
 	CRect		get_zoom_rect(CRect rect, double zoom);
 
@@ -2010,7 +2010,7 @@ h		: 복사할 height 크기(pixel)
 
 	//rTarget에 접하는 dRatio를 유지하는 최대 사각형을 구한다.
 	//stretch = false로 주면 확대하지 않지만 큰 경우에는 축소한다.
-	CRect		get_ratio_rect(CRect rTarget, double dRatio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
+	//CRect		get_ratio_rect(CRect rTarget, double dRatio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 	CRect		get_ratio_rect(CRect rTarget, int w, int h, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 	//w x h 사각형을 target안에 넣을 때 중앙에 표시되게 하는 사각형 영역을 리턴한다.
 	//w, h보다 target이 적을때는 target보다 큰 영역이 리턴될 것이다.

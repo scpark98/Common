@@ -4,6 +4,7 @@
 #include <afxdialogex.h>
 
 /*
+* https://github.com/scpark98/Test_SCShapeDlg.git
 * png, gif 등의 이미지 또는 CSCGdiplusBitmap 이미지 모양대로 dlg를 생성하여 표시한다.
 * create()으로 직접 생성하므로 IDD_DIALOG와 같은 리소스가 불필요하다.
 * 

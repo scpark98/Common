@@ -11,6 +11,7 @@
 //using namespace Gdiplus;
 
 /*
+* https://github.com/scpark98/Test_GdiButton.git
 - gdi+를 이용한 버튼 클래스
 - 투명 png 이미지를 사용할 경우 이미지 모양으로 버튼이 표시됨.
 - 사용 방법에 따라 일반 push button, toggle button(as a checkbox) 등으로 사용할 수 있음.

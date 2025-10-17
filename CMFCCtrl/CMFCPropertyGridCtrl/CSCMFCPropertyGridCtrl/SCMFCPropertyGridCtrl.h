@@ -121,11 +121,13 @@ public:
 		return pParent->AddSubItem(pProp);
 	}
 
-	bool	AddFileSelect( CMFCPropertyGridProperty* pParent, CString sName, const _variant_t& varValue, TCHAR* sFilter, CString sDescription = _T(""), DWORD dwID = NULL );
-	bool	AddFolderSelect( CMFCPropertyGridProperty* pParent, CString sName, CString sInitialFolder, CString sDescription = _T(""), bool bEnable = true, DWORD dwID = NULL );
-	bool	AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, int min, int max, int value, DWORD dwData);
+	bool	AddFileSelect( CMFCPropertyGridProperty* pParent, CString sName, const _variant_t& varValue, TCHAR* sFilter, CString sDescription = _T(""), DWORD id = NULL );
+	bool	AddFolderSelect( CMFCPropertyGridProperty* pParent, CString sName, CString sInitialFolder, CString desc = _T(""), bool bEnable = true, DWORD id = NULL );
+	bool	AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, float value, DWORD id, float min = 0, float max = 100, CString desc = _T(""));
 	bool	AddFontSelect(CMFCPropertyGridProperty* parent, CString name, LOGFONT lf, DWORD id, CString desc = _T(""), bool enable = true);
 	bool	AddColorSelect(CMFCPropertyGridProperty* parent, CString name, COLORREF crDefault, DWORD id, CString desc = _T(""), bool enable = true);
+
+	void	set_slider_range(DWORD dwData, float min, float max);
 
 	//bool	addProperty_File(char* strTitle, char* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, char* strFilter, CString* strOut)
 	//bool	addProperty_File(wchar_t* strTitle, wchar_t* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, wchar_t* strFilter, CString* strOut)
@@ -134,9 +136,9 @@ public:
 
 
 	//컬럼의 너비를 직접 세팅하는 함수가 지원되지 않으므로 직접 선언하여 사용했다.
-	void	SetLeftColumnWidth( int cx );
+	void	SetLeftColumnWidth(int cx);
 
-	void	SetControlColor( COLORREF clrText, COLORREF clrBackground )
+	void	SetControlColor(COLORREF clrText, COLORREF clrBackground)
 	{
 		m_clrText		= clrText;
 		m_clrBackground	= clrBackground;

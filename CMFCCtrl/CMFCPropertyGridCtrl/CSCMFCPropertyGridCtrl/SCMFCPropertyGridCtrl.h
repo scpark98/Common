@@ -127,6 +127,7 @@ public:
 	bool	AddFontSelect(CMFCPropertyGridProperty* parent, CString name, LOGFONT lf, DWORD id, CString desc = _T(""), bool enable = true);
 	bool	AddColorSelect(CMFCPropertyGridProperty* parent, CString name, COLORREF crDefault, DWORD id, CString desc = _T(""), bool enable = true);
 
+	void	set_value(DWORD dwData, float value);
 	void	set_slider_range(DWORD dwData, float min, float max);
 
 	//bool	addProperty_File(char* strTitle, char* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, char* strFilter, CString* strOut)

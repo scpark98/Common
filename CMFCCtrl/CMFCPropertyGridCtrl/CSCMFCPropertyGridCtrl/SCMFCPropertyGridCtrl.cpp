@@ -330,8 +330,17 @@ bool CSCMFCPropertyGridCtrl::AddFolderSelect(	CMFCPropertyGridProperty* pParent,
 
 bool CSCMFCPropertyGridCtrl::AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, float value, DWORD id, float min, float max, CString desc)
 {
-	CPropGridSlider* prop = new CPropGridSlider(sName, value, sName, min, max, 1.0f, id);
+	CPropGridSlider* prop = new CPropGridSlider(sName, value, sName, min, max, max - min, id);
 	return pParent->AddSubItem(prop);
+}
+
+void CSCMFCPropertyGridCtrl::set_value(DWORD dwData, float value)
+{
+	CMFCPropertyGridProperty* pProp = GetItemProperty(dwData);
+	if (pProp == nullptr)
+		return;
+
+	pProp->SetValue(value);
 }
 
 void CSCMFCPropertyGridCtrl::set_slider_range(DWORD dwData, float min, float max)

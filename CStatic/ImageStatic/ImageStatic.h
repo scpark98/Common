@@ -13,6 +13,9 @@
 
 #include "../../SCGdiplusBitmap.h"
 
+#define ZOOM_MIN_RATIO	0.2
+#define ZOOM_MAX_RATIO	5.0
+
 // CImageStatic
 static const UINT Message_CImageStatic = ::RegisterWindowMessage(_T("MessageString_CImageStatic"));
 
@@ -66,7 +69,12 @@ public:
 	//bool		paste_from_clipboard();
 	CRect			get_image_roi();
 
-	void			zoom(int mode);
+	void			zoom(int mode, float interval = 0.1f);
+	double			get_zoom_min() { return ZOOM_MIN_RATIO; }
+	double			get_zoom_max() { return ZOOM_MAX_RATIO; }
+	double			get_zoom_ratio() { return m_zoom; }
+	void			set_zoom_ratio(double zoom);
+
 	void			fit2ctrl(bool fit);
 	bool			get_fit2ctrl() { return m_fit2ctrl; }
 

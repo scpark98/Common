@@ -145,22 +145,29 @@ void CImageStatic::OnPaint()
 }
 
 //mode : 1(zoom in), -1(zoom out), 0(reset)
-void CImageStatic::zoom(int mode)
+void CImageStatic::zoom(int mode, float interval)
 {
 	if (mode > 0)
-		m_zoom += 0.1;
+		m_zoom += interval;
 	else if (mode < 0)
-		m_zoom -= 0.1;
+		m_zoom -= interval;
 	else
 		m_zoom = 1.0;
 
 	m_fit2ctrl = false;
 
-	Clamp(m_zoom, 0.1, 20.0);
+	Clamp(m_zoom, ZOOM_MIN_RATIO, ZOOM_MAX_RATIO);
 
 	Invalidate();
 }
 
+void CImageStatic::set_zoom_ratio(double zoom)
+{
+	m_zoom = zoom;
+	m_fit2ctrl = false;
+	Clamp(m_zoom, ZOOM_MIN_RATIO, ZOOM_MAX_RATIO);
+	Invalidate();
+}
 
 void CImageStatic::OnSize(UINT nType, int cx, int cy)
 {

@@ -683,14 +683,14 @@ void CSCMenu::OnPaint()
 				dc.SetTextColor(m_theme.cr_text_hover.ToCOLORREF());
 				dc.FillSolidRect(m_items[i]->m_r, m_theme.cr_back_hover.ToCOLORREF());
 
-				//Gdiplus::Color gcr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
-				//Gdiplus::Color gcr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
-				Gdiplus::Color gcr_over_stroke = m_theme.cr_selected_border;
-				Gdiplus::Color gcr_over_fill = m_theme.cr_back_hover;
+				//Gdiplus::Color cr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
+				//Gdiplus::Color cr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
+				Gdiplus::Color cr_over_stroke = m_theme.cr_selected_border;
+				Gdiplus::Color cr_over_fill = m_theme.cr_back_hover;
 
-				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
-				//gcr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
-				//gcr_over_fill.SetFromCOLORREF(m_cr_back_over);
+				//cr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
+				//cr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
+				//cr_over_fill.SetFromCOLORREF(m_cr_back_over);
 				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), gcr_over_stroke, gcr_over_fill, 0);
 				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), Gdiplus::Color(255,225,0,0), gcr_over_fill, 2);
 

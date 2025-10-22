@@ -274,9 +274,9 @@ Gdiplus::Color get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio)
 
 Gdiplus::Color get_color(COLORREF rgb)
 {
-	Gdiplus::Color gcr;
-	gcr.SetFromCOLORREF(rgb);
-	return gcr;
+	Gdiplus::Color cr;
+	cr.SetFromCOLORREF(rgb);
+	return cr;
 }
 
 Gdiplus::Color get_color(std::string cr_name)
@@ -1013,7 +1013,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 Gdiplus::Color get_sys_color(int index)
 {
-	Gdiplus::Color gcr;
-	gcr.SetFromCOLORREF(::GetSysColor(index));
-	return gcr;
+	Gdiplus::Color cr;
+	cr.SetFromCOLORREF(::GetSysColor(index));
+	return cr;
 }

@@ -35,15 +35,15 @@ public:
 
 protected:
 	CPropSlider *m_pSlider;
-	float m_fMin, m_fMax;
+	int m_min, m_max;
 	int m_step;
 	int m_iEditCtrlWidth;
 
 public:
-	CPropGridSlider(CString name, float val, CString tip, float min, float max, int step, DWORD dwData, int edit_ctrl_width=-2 ) :
-		CMFCPropertyGridProperty(name, val, tip, dwData) {
-		m_fMin = min;
-		m_fMax = max;
+	CPropGridSlider(CString name, int value, CString tip, int min, int max, int step, DWORD dwData, int edit_ctrl_width=-2 ) :
+		CMFCPropertyGridProperty(name, (_variant_t)(value), tip, dwData) {
+		m_min = min;
+		m_max = max;
 		m_step = step;
 		m_pSlider = NULL;
 		m_iEditCtrlWidth = edit_ctrl_width;
@@ -55,10 +55,10 @@ public:
 			delete m_pSlider;
 	}
 
-	void set_range(float min, float max)
+	void set_range(int min, int max)
 	{
-		m_fMin = min;
-		m_fMax = max;
+		m_min = min;
+		m_max = max;
 		SetSliderPos();
 	}
 

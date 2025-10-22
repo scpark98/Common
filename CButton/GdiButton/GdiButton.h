@@ -341,9 +341,9 @@ public:
 	void		Inflate(int cx, int cy);
 	void		Inflate(int l, int t, int r, int b);
 
-	//gcr_border, gcr_parent_back은 Gdiplus::Color::Transparent가 아닐 경우에만 적용된다.
+	//cr_border, cr_parent_back은 Gdiplus::Color::Transparent가 아닐 경우에만 적용된다.
 	//round = radius
-	void		set_round(int round, Gdiplus::Color gcr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
+	void		set_round(int round, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
 	//포커스 사각형 관련
 	void		draw_focus_rect(bool draw = true, Gdiplus::Color cr_focus = Gdiplus::Color::LightGray) { m_draw_focus_rect = draw; m_cr_focus_rect = cr_focus; Invalidate(); }

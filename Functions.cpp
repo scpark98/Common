@@ -3268,13 +3268,18 @@ CString	get_default_browser_info(CString* pPath, CString* pVersion)
 	return browser;
 }
 
-LONG IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey)
+bool is_exist_registry_key(HKEY hKeyRoot, CString sSubKey)
 {
 	HKEY hkey = NULL;
-	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_READ, &hkey);
-	RegCloseKey(hkey);
+	LONG res = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_READ, &hkey);
 
-	return nError;
+	if (res == ERROR_SUCCESS)
+	{
+		RegCloseKey(hkey);
+		return true;
+	}
+
+	return false;
 }
 
 //#ifndef _USING_V110_SDK71_
@@ -3474,6 +3479,94 @@ int get_registry_list(CWinApp* pApp, CString reg_path, std::deque<CString>& dqli
 			dqlist.push_back(item);
 	}
 	return dqlist.size();
+}
+
+std::deque<CString> get_registry_subkeys(HKEY hKeyRoot, CString key_root)
+{
+	HKEY hKey;
+	std::deque<CString> result;
+	LONG res = RegOpenKeyEx(hKeyRoot, key_root, 0, KEY_ALL_ACCESS, &hKey);
+
+	if (res != ERROR_SUCCESS)
+		return result;
+
+	TCHAR achKey[MAX_REG_KEY_LENGTH];
+	DWORD cbName;
+	TCHAR achClass[MAX_PATH] = { 0, };
+	DWORD cchClassName = MAX_PATH;
+	DWORD cSubKeys = 0;
+	DWORD cbMaxSubKey;
+	DWORD cchMaxClass;
+	DWORD cValues;
+	DWORD cchMaxValue;
+	DWORD cbMaxValueData;
+	DWORD cbSecurityDescriptor;
+	FILETIME ftLastWriteTime;
+
+
+	RegQueryInfoKey(hKey, achClass, &cchClassName, NULL, &cSubKeys, &cbMaxSubKey, &cchMaxClass, &cValues, &cchMaxValue, &cbMaxValueData, &cbSecurityDescriptor, &ftLastWriteTime);
+
+	for (int i = 0; i < cSubKeys; i++)
+	{
+		cbName = MAX_REG_KEY_LENGTH;
+		res = RegEnumKeyEx(hKey, i, achKey, &cbName, NULL, NULL, NULL, &ftLastWriteTime);
+		if (res == ERROR_SUCCESS)
+			result.push_back(achKey);
+	}
+
+	RegCloseKey(hKey);
+
+	return result;
+}
+
+//재귀방식
+void enum_registry_subkeys(HKEY hKeyRoot, CString key_root, std::deque<CString>& result)
+{
+	HKEY hKey;
+	LONG lResult = RegOpenKeyEx(
+		hKeyRoot,
+		key_root,
+		0,
+		KEY_READ,
+		&hKey
+	);
+
+	if (lResult == ERROR_SUCCESS)
+	{
+		DWORD dwIndex = 0;
+		WCHAR szSubkeyName[256]; // Maximum key name length
+		DWORD dwSize = sizeof(szSubkeyName) / sizeof(WCHAR);
+
+		//TRACE(L"Subkeys of: %s\n", key_root);
+
+		while (RegEnumKeyEx(
+			hKey,
+			dwIndex,
+			szSubkeyName,
+			&dwSize,
+			NULL,
+			NULL,
+			NULL,
+			NULL
+		) == ERROR_SUCCESS)
+		{
+			//TRACE(_T("szSubkeyName = %s\n"), szSubkeyName);
+			//"key_root + _T("\\") + "를 포함시켜야만 fullpath가 기록된다.
+			//szSubkeyName만 저장하면 누구의 subkey인지 구분이 어려워진다.
+			result.push_back(key_root + _T("\\") + szSubkeyName);
+
+			// Recursively enumerate subkeys of the current subkey
+			enum_registry_subkeys(hKeyRoot, key_root + _T("\\") + szSubkeyName, result);
+
+			dwIndex++;
+			dwSize = sizeof(szSubkeyName) / sizeof(WCHAR); // Reset size for next iteration
+		}
+		RegCloseKey(hKey);
+	}
+	else
+	{
+		TRACE(_T("Error opening key (%s). error = %d\n"), key_root, lResult);
+	}
 }
 
 bool LoadBitmapFromFile(CBitmap &bmp, CString strFile)
@@ -4009,6 +4102,22 @@ bool GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo
 		free(pAdapterInfo);
 
 	return result;
+}
+
+ULONG get_S_addr_from_domain_or_ip_str(CString domain_or_ip_str)
+{
+	addrinfo hints = {};
+	hints.ai_family = AF_UNSPEC; // Allow IPv4 or IPv6
+	hints.ai_socktype = SOCK_STREAM; // Stream socket (TCP)
+	hints.ai_protocol = IPPROTO_TCP;
+
+	addrinfo* result = nullptr;
+	int res = getaddrinfo(CStringA(domain_or_ip_str), nullptr, &hints, &result);
+	if (res != 0)
+		return 0;
+
+	sockaddr_in* ipv4 = reinterpret_cast<sockaddr_in*>(result->ai_addr);
+	return ipv4->sin_addr.S_un.S_addr;
 }
 
 CString get_my_ip()
@@ -6742,10 +6851,11 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_st
 	//int oldPageUnit = g->SetPageUnit(Gdiplus::UnitPixel);
 
 	// define the pen
-	Gdiplus::Pen pen(cr_stroke, 1);
+	Gdiplus::Pen pen(cr_stroke, width);
 	Gdiplus::SolidBrush br(cr_fill);
 
-	pen.SetAlignment(Gdiplus::PenAlignmentCenter);
+	//PenAlignmentCenter로 하고 DrawPath()를 하면 stroke가 빗나가는 현상이 발생한다.
+	//pen.SetAlignment(Gdiplus::PenAlignmentCenter);
 
 	// get the corner path
 	Gdiplus::GraphicsPath path;
@@ -6762,6 +6872,7 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_st
 	// draw the round rect
 	g->DrawPath(&pen, &path);
 
+	/*
 	// if width > 1
 	for (int i = 1; i < width; i++)
 	{
@@ -6782,7 +6893,7 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_st
 		// draw the round rect
 		g->DrawPath(&pen, &path);
 	}
-
+	*/
 	// restore page unit
 	//g->SetPageUnit((Gdiplus::Unit)oldPageUnit);
 }
@@ -18420,29 +18531,29 @@ bool is_WebView2Runtime_installed()
 	//VS에서 이 프로젝트를 실행하여 WebView2를 설치하면 HKEY_CURRENT_USER에 기록이 반영되고
 	//urlscheme을 통해서 KoinoAVCSupporter.exe -> WebView2를 설치하면 HKEY_LOCAL_MACHINE에 기록이 남는다.
 	//webview2를 uninstall하면(Microsoft Edge WebView2 런타임) 두 곳 모두 제거된다.
-	LONG result1 = IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
-	LONG result2 = IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+	bool result1 = is_exist_registry_key(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+	bool result2 = is_exist_registry_key(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
 
-	if (result1 != ERROR_SUCCESS && result2 != ERROR_SUCCESS)
+	if (!result1 && !result2)
 		return false;
 	return true;
 }
 
 bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 {
-	LONG result1 = -1;// IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
-	LONG result2 = -1;// IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+	bool result1 = false;// is_exist_registry_key(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+	bool result2 = false;// is_exist_registry_key(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
 
 	if (!PathFileExists(runtimeExePath))
 		return false;
 
 	ShellExecute(NULL, _T("open"), runtimeExePath, (silentInstall ? _T("/silent /install") : NULL), NULL, SW_SHOWNORMAL);
 
-	while (result1 != ERROR_SUCCESS && result2 != ERROR_SUCCESS)
+	while (!result1 && !result2)
 	{
 		Wait(1000);
-		result1 = IsExistRegistryKey(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
-		result2 = IsExistRegistryKey(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+		result1 = is_exist_registry_key(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
+		result2 = is_exist_registry_key(HKEY_CURRENT_USER, _T("SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
 		TRACE(_T("waiting for installation to complete WebView2 Runtime...\n"));
 	}
 	TRACE(_T("WebView2 Runtime installed successfully.\n"));
@@ -19737,3 +19848,26 @@ bool is_VMWare()
 }
 #endif
 
+//Set Privilege
+bool set_privilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
+{
+	TOKEN_PRIVILEGES tp;
+	LUID luid;
+	HANDLE hToken;
+
+	OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
+	if (!LookupPrivilegeValue(NULL, lpszPrivilege, &luid))
+		return false;
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+
+	if (bEnablePrivilege)
+		tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+	else
+		tp.Privileges[0].Attributes = 0;
+
+	AdjustTokenPrivileges(hToken, FALSE, &tp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
+
+	return ((GetLastError() != ERROR_SUCCESS) ? false : true);
+}

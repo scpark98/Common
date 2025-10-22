@@ -37,7 +37,8 @@ BOOL CPropSlider::PreTranslateMessage(MSG* pMsg)
 void CPropSlider::OnUpdateValue()
 {
 	int pos = GetPos();
-	if (pos != m_iPrevPos) {
+	if (pos != m_iPrevPos)
+	{
 		m_iPrevPos = pos;
 		m_pParentProp->OnSliderPosChanged();
 	}
@@ -47,22 +48,22 @@ void CPropGridSlider::OnSliderPosChanged()
 {
 	int pos = m_pSlider->GetPos();
 	float ratio = ((float)pos / float(m_step));
-	float value = (m_fMax - m_fMin) * ratio + m_fMin;
-	SetValue((float)value);
+	int value = (int)(float(m_max - m_min) * ratio + m_min);
+	SetValue((_variant_t)(int)value);
 	m_pWndList->OnPropertyChanged(this);
 }
 
 void CPropGridSlider::SetSliderPos()
 {
-	if (m_fMax == m_fMin)
+	if (m_max == m_min)
 	{
 		m_pSlider->SetPos(0);
 		return;
 	}
 
 	COleVariant value = GetValue();
-	float fval = value.fltVal;
-	float ratio = (fval - m_fMin) / (m_fMax - m_fMin);
+	int ival = value.intVal;
+	float ratio = float(ival - m_min) / float(m_max - m_min);
 	int pos = (int)(ratio * float(m_step));
 
 	m_pSlider->SetPos(pos);
@@ -83,7 +84,8 @@ void CPropGridSlider::OnDrawValue(CDC* pDC, CRect rect)
 		+ (m_iEditCtrlWidth < 0 ? w / (-m_iEditCtrlWidth) : m_iEditCtrlWidth);
 	rt.left = rect.right;
 
-	if (!m_pSlider) {
+	if (!m_pSlider)
+	{
 		m_pSlider = new CPropSlider(this);
 		//원래는 TBS_BOTH였으나 약간 위로 밀리고 thumb도 작게 표시되어 TBS_TOP으로 변경함.
 		DWORD style = WS_VISIBLE | WS_CHILD | TBS_TOP | TBS_NOTICKS;

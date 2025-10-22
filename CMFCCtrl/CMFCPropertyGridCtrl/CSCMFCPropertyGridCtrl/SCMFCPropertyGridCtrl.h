@@ -123,12 +123,12 @@ public:
 
 	bool	AddFileSelect( CMFCPropertyGridProperty* pParent, CString sName, const _variant_t& varValue, TCHAR* sFilter, CString sDescription = _T(""), DWORD id = NULL );
 	bool	AddFolderSelect( CMFCPropertyGridProperty* pParent, CString sName, CString sInitialFolder, CString desc = _T(""), bool bEnable = true, DWORD id = NULL );
-	bool	AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, float value, DWORD id, float min = 0, float max = 100, CString desc = _T(""));
+	bool	AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, int value, DWORD id, int min = 0, int max = 100, CString desc = _T(""));
 	bool	AddFontSelect(CMFCPropertyGridProperty* parent, CString name, LOGFONT lf, DWORD id, CString desc = _T(""), bool enable = true);
 	bool	AddColorSelect(CMFCPropertyGridProperty* parent, CString name, COLORREF crDefault, DWORD id, CString desc = _T(""), bool enable = true);
 
-	void	set_value(DWORD dwData, float value);
-	void	set_slider_range(DWORD dwData, float min, float max);
+	void	set_value(DWORD dwData, int value);
+	void	set_slider_range(DWORD dwData, int min, int max);
 
 	//bool	addProperty_File(char* strTitle, char* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, char* strFilter, CString* strOut)
 	//bool	addProperty_File(wchar_t* strTitle, wchar_t* strDesc, DWORD dwID, CMFCPropertyGridProperty* pParent, wchar_t* strFilter, CString* strOut)

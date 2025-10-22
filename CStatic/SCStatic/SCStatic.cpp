@@ -162,7 +162,7 @@ void CSCStatic::prepare_tooltip()
 	//m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);
 	//m_tooltip->SetDelayTime(TTDT_INITIAL, 0);
 	//m_tooltip->SetDelayTime(TTDT_RESHOW, 0);
-	m_tooltip->SetMaxTipWidth(400);
+	m_tooltip->SetMaxTipWidth(240);
 	m_tooltip->AddTool(this, _T(""));
 	m_tooltip->Activate(TRUE);
 	EnableToolTips(TRUE);
@@ -584,9 +584,9 @@ void CSCStatic::OnPaint()
 	{
 		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRect2GpRect(rc), m_gcr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
-			draw_rectangle(g, rc, m_gcr_border);
+			draw_rectangle(g, rc, m_cr_border);
 	}
 
 	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
@@ -1020,22 +1020,22 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize, bool left_align_fix)
 	set_icon(m_hIcon, nSize, left_align_fix);
 }
 
-void CSCStatic::set_round(int round, Gdiplus::Color gcr_border, Gdiplus::Color	gcr_parent_back)
+void CSCStatic::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color cr_parent_back)
 {
 	if (round < 0)
 		round = 0;
 
 	m_round = round;
 
-	if (gcr_border.GetValue() != Gdiplus::Color::Transparent)
+	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
-		m_gcr_border = gcr_border;
+		m_cr_border = cr_border;
 	}
 
-	if (gcr_parent_back.GetValue() != Gdiplus::Color::Transparent)
+	if (cr_parent_back.GetValue() != Gdiplus::Color::Transparent)
 	{
-		m_cr_parent_back = gcr_parent_back;
+		m_cr_parent_back = cr_parent_back;
 	}
 
 	if (m_round > 0)

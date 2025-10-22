@@ -180,7 +180,7 @@ public:
 	bool			m_fit_to_back_image = false;
 
 	int				m_round = 0;				//round rect
-	void			set_round(int round, Gdiplus::Color gcr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
+	void			set_round(int round, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
 
 	void			get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf);
 
@@ -199,7 +199,7 @@ public:
 	void			set_font(CFont* font);
 
 	void			set_border_thick(int thick) { m_border_thick = thick; Invalidate(); }
-	void			draw_border(bool draw, int thick, Gdiplus::Color gcr_outline) { m_draw_border = draw; m_border_thick = thick; m_gcr_border = gcr_outline; Invalidate(); }
+	void			draw_border(bool draw, int thick, Gdiplus::Color cr_outline) { m_draw_border = draw; m_border_thick = thick; m_cr_border = cr_outline; Invalidate(); }
 
 	void			set_blink_time(int nTime0 = 400, int nTime1 = 1200);
 	void			set_blink(BOOL bBlink = TRUE);
@@ -301,8 +301,8 @@ protected:
 
 
 	bool			m_draw_border = false;
- 	int				m_border_thick;
-	Gdiplus::Color	m_gcr_border;
+ 	int				m_border_thick = 1;
+	Gdiplus::Color	m_cr_border = Gdiplus::Color::DimGray;
 
 	bool			m_bSunken;			//default = false;
 

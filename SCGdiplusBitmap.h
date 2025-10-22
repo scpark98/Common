@@ -271,7 +271,7 @@ public:
 
 
 	//두 색이 교차하는 지그재그 패턴 브러쉬를 생성한다.
-	//sz_tile : 32로 주면 16x16 크기의 타일로 반복되는 지그재그 패턴이 생성된다. 즉, 16x16 zigzag 한 셀 4개가 32x32 크기의 타일로 반복됨.
+	//sz_tile : 32로 주면 16x16 크기의 타일로 반복되는 지그재그 패턴이 생성된다. 즉, 16x16 셀 4개로 이루어진 32x32 크기의 타일로 반복됨.
 	static std::unique_ptr<Gdiplus::TextureBrush> get_zigzag_pattern(int sz_tile = 32, Gdiplus::Color cr_back = Gdiplus::Color::White, Gdiplus::Color cr_fore = Gdiplus::Color(200, 200, 200));
 	static Gdiplus::Color m_cr_zigzag_back;
 	static Gdiplus::Color m_cr_zigzag_fore;

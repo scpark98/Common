@@ -111,6 +111,7 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 			{
 				//편집을 컨트롤 내부에서 처리하는게 편할수도 있지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
 				//실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능 등...
+				//아래와 같이 SendMessage()를 통해서 이벤트를 전달해도 되고 메인에서 직접 F2키에 대한 처리를 추가해도 된다.
 				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM)&(CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
 				return FALSE;
 			}
@@ -1106,7 +1107,9 @@ CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
 		if (hItem == NULL)
 			break;
 
-		label = GetItemText(hItem) + _T("/") + label;
+		//파일경로일때는 "\\" = "/" 모두 정상 처리되지만
+		//레지스트리 등 일부 경로에서는 "\\"만 유효하게 처리되므로 "\\"로 통일한다.
+		label = GetItemText(hItem) + _T("\\") + label;
 	}
 
 	return label;
@@ -1131,25 +1134,49 @@ void CSCTreeCtrl::select_item(HTREEITEM hItem)
 }
 
 //hRoot의 하위 폴더들중에서 먼저 발견되는 label의 노드를 찾아서 선택상태로 표시한다.
-HTREEITEM CSCTreeCtrl::select_item(CString find_label, HTREEITEM hItem)
+//만약 find_label = "item1\\item2"와 같이 full 경로로 전달된다면 recursive하게 경로를 찾아간다.
+//단, 이 방식은 top부터 순차적으로 label을 비교해서 찾게 되므로 서로 다른 위치에 동일한 label이 있을 경우에 대해서도
+//테스트가 필요하다.
+HTREEITEM CSCTreeCtrl::select_item(CString find_label, HTREEITEM hItem, CString sep)
 {
 	if (hItem == NULL)
 		hItem = GetRootItem();
 
 	int tab_count = 0;
-	CString label;
+	CString cur_label;
+
+	//다단계 경로인지 확인하고
+	int pos = find_label.Find(sep);
+	CString find_path;
+	
+	//다단계라면 우선 '\\' 전까지의 경로를 찾아간다.
+	if (pos > 0)
+		find_path = find_label.Left(pos);
+	else
+		find_path = find_label;
 
 	while (hItem)
 	{
-		label = GetItemText(hItem);
-		if (label.CompareNoCase(find_label) == 0)
+		cur_label = GetItemText(hItem);
+
+		//현재 label이 찾고자 하는 label인 경우...
+		if (cur_label.CompareNoCase(find_path) == 0)
 		{
-			select_item(hItem);
-			return hItem;
+			//더 이상 '\\'가 발견되지 않으면 해당 항목을 선택항목으로 만들고 리턴하면 되고
+			if (pos <= 0)
+			{
+				select_item(hItem);
+				return hItem;
+			}
+			//아직 다단계 경로라면 재귀호출로 다음 경로를 찾아간다.
+			else
+			{
+				select_item(find_label.Mid(pos + 1), hItem, sep);
+			}
 		}
 
 		Trace_only(duplicate_str(_T("\t"), tab_count));
-		Trace_only(_T("%s\n"), label);
+		Trace_only(_T("%s\n"), find_label);
 
 		//child가 있다면 child로 이동하고
 		if (ItemHasChildren(hItem))
@@ -1782,7 +1809,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
 
 	bool sub_folder_exist = has_sub_folders(path);
-	CSCGdiplusBitmap bmpRes(64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
+	CSCGdiplusBitmap bmpRes(64, 64, Gdiplus::Color(128, 255, 0, 0), PixelFormat32bppARGB);
 
 	if (m_pDragImage && m_pDragImage->GetSafeHandle())
 	{
@@ -3354,7 +3381,7 @@ CString CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_in
 	if (hParent == NULL)
 		hParent = GetSelectedItem();
 	if (hParent == NULL)
-		return _T("");
+		hParent = NULL;
 
 	HTREEITEM hItem = NULL;
 
@@ -3427,6 +3454,7 @@ CString CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_in
 	else
 	{
 		hItem = InsertItem(label.IsEmpty() ? _T("새 항목") : label, hParent);
+		SelectItem(hItem);
 	}
 
 

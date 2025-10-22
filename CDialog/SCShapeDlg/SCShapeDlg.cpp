@@ -186,7 +186,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 	r.InflateRect(1, 1);
 
-	m_img.create(r.Width(), r.Height(), PixelFormat32bppARGB, cr_back);
+	m_img.create(r.Width(), r.Height(), cr_back, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 

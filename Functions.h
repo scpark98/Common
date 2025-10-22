@@ -306,6 +306,9 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 //////////////////////////////////////////////////////////////////////////////////
 #define SHELL_OPEN(String)	ShellExecute(NULL, TEXT("open"), String, NULL, NULL, SW_SHOWNORMAL);
 
+#define MAX_REG_KEY_LENGTH	255
+#define MAX_REG_VALUE_NAME	16383
+
 #define MAP_STYLE(src, dest) if(dwStyle & (src)) dwText |= (dest)
 #define NMAP_STYLE(src, dest) if(!(dwStyle & (src))) dwText |= (dest)
 
@@ -1384,6 +1387,10 @@ struct	NETWORK_INFO
 	bool		GetNetworkInformation(CString sTargetDeviceDescription, NETWORK_INFO* pInfo);
 	bool		CheckInternetIsOnline();
 	bool		IsAvailableEMail(CString sEMail);
+
+	//domain or ip 문자열을 sockaddr_in.sin_addr.S_un.S_addr 또는 in_addr.addr.S_un.S_addr 값으로 리턴한다.
+	//실패 시 0을 리턴한다.
+	ULONG		get_S_addr_from_domain_or_ip_str(CString domain_or_ip_str);
 	CString		get_my_ip();
 	CString		get_mac_addres(bool include_colon = true);
 	CString		get_ip_error_string(DWORD error_code);
@@ -1453,7 +1460,10 @@ struct	NETWORK_INFO
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE);
 	HINSTANCE	FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult);
 
-	LONG		IsExistRegistryKey(HKEY hKeyRoot, CString sSubKey);
+	//Set Privilege
+	bool		set_privilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege);
+
+	bool		is_exist_registry_key(HKEY hKeyRoot, CString sSubKey);
 
 	//HKEY_LOCAL_MACHINE\\SOFTWARE\\MyCompany 에서 읽어올 경우 x64이면 실제 그 경로에서 읽어오지만
 	//32bit이면 HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\MyCompany 에서 읽어온다.
@@ -1476,9 +1486,15 @@ struct	NETWORK_INFO
 	//Windows visual effect registry
 	bool		set_windows_visual_effects();
 
-
 	double		GetProfileDouble(CWinApp* pApp, CString section, CString entry, double default_value);
 	bool		WriteProfileDouble(CWinApp* pApp, CString section, CString entry, double value);
+
+	//비재귀방식, key_root의 하위와 그 하위까지만 검색된다.
+	std::deque<CString> get_registry_subkeys(HKEY hKeyRoot, CString key_root);
+
+	//재귀방식으로 모든 하위 키항목이 result로 리턴된다.
+	void		enum_registry_subkeys(HKEY hKeyRoot, CString key_root, std::deque<CString>& result);
+
 
 #if (_MSVC_LANG >= _std_cpp17)	//__cplusplus 매크로를 사용하려면 C/C++의 고급창에서 /Zc:__cplusplus를 추가시켜야 한다.
 	//프로젝트 속성에서 std:c++14를 선택하고 빌드하면 'if constexpr'은 C++17 언어 확장입니다.'라는 warning이 발생하는데

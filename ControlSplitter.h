@@ -73,7 +73,8 @@ public:
 	virtual ~CControlSplitter();
 
 	//CS_VERT이고 AddToBottomOrRightCtrls()로 추가할 때 SPF_LEFT만 주면 그 컨트롤은 width를 유지한 채 splitter에 붙어 이동한다.
-	//right 위치를 고정한 채 left만 splitter에 따라 이동하려면 "SPF_LEFT | SPF_RIGHT"를 준다.
+	//right를 고정한 채 left만 splitter에 따라 이동하려면 "SPF_LEFT | SPF_RIGHT"를 준다.
+	//width를 고정한 채 이동시키려면 SPF_LEFT만 준다.
 	void AddToBottomOrRightCtrls(CControlItem ctrl);
 	void AddToBottomOrRightCtrls(UINT id, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
 

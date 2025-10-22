@@ -433,7 +433,6 @@ void CResizeCtrl::Resize(int cx, int cy)
 				{
 					RECT rcItem;
 
-
 					::GetWindowRect(items->handle, & rcItem);
 					::MapWindowPoints(HWND_DESKTOP, m_hWndParent, (LPPOINT)(RECT*)&rcItem, 2);
 					rcItem.right  -= rcItem.left;

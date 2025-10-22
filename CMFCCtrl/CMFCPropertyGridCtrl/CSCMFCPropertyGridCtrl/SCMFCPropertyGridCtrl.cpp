@@ -328,22 +328,22 @@ bool CSCMFCPropertyGridCtrl::AddFolderSelect(	CMFCPropertyGridProperty* pParent,
 	return true;
 }
 
-bool CSCMFCPropertyGridCtrl::AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, float value, DWORD id, float min, float max, CString desc)
+bool CSCMFCPropertyGridCtrl::AddSliderItem(CMFCPropertyGridProperty* pParent, CString sName, int value, DWORD id, int min, int max, CString desc)
 {
 	CPropGridSlider* prop = new CPropGridSlider(sName, value, sName, min, max, max - min, id);
 	return pParent->AddSubItem(prop);
 }
 
-void CSCMFCPropertyGridCtrl::set_value(DWORD dwData, float value)
+void CSCMFCPropertyGridCtrl::set_value(DWORD dwData, int value)
 {
 	CMFCPropertyGridProperty* pProp = GetItemProperty(dwData);
 	if (pProp == nullptr)
 		return;
 
-	pProp->SetValue(value);
+	pProp->SetValue((_variant_t)(int)value);
 }
 
-void CSCMFCPropertyGridCtrl::set_slider_range(DWORD dwData, float min, float max)
+void CSCMFCPropertyGridCtrl::set_slider_range(DWORD dwData, int min, int max)
 {
 	CMFCPropertyGridProperty* pProp = GetItemProperty(dwData);
 
@@ -368,6 +368,8 @@ bool CSCMFCPropertyGridCtrl::AddFontSelect(CMFCPropertyGridProperty* parent, CSt
 bool CSCMFCPropertyGridCtrl::AddColorSelect(CMFCPropertyGridProperty* parent, CString name, COLORREF crDefault, DWORD id, CString desc, bool enable)
 {
 	CMFCPropertyGridColorProperty* prop = new CMFCPropertyGridColorProperty(name, crDefault, NULL, desc, id);
+	prop->EnableOtherButton(_T("Etc..."));
+	prop->EnableAutomaticButton(_T("Normal"), crDefault);
 	prop->Enable(enable);
 	return parent->AddSubItem(prop);
 }

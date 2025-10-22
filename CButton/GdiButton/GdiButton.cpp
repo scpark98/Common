@@ -1229,7 +1229,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
-		TRACE(_T("draw_border\n"));
+		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
 			//draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 			//draw_round_rect(&g, CRect2GpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Transparent, m_round, m_border_thick);
@@ -1548,7 +1548,7 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	redraw_window();
 }
 
-void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color	gcr_parent_back)
+void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color	cr_parent_back)
 {
 	if (round < 0)
 		round = 0;
@@ -1562,7 +1562,7 @@ void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color	g
 	}
 
 	if (m_round > 0)
-		set_transparent(true, gcr_parent_back);
+		set_transparent(true, cr_parent_back);
 	else
 		redraw_window();
 }

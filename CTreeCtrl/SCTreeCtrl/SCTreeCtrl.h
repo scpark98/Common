@@ -166,7 +166,7 @@ public:
 	//auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
 	//새로 추가된 항목의 label을 리턴한다.
 	CString		add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
-	//주어진 항목의 label을 변경한다.
+	//주어진 항목의 label을 변경한다. hItem == NULL이면 현재 선택된 항목을, new_label이 공백이면 편집모드로 표시한다.
 	void		rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
 	//현재 선택된 노드의 하위 노드들 중에서 old_label을 찾아서 new_label로 이름을 변경한다.
 	void		rename_child_item(HTREEITEM hParent, CString old_label, CString new_label);
@@ -208,7 +208,8 @@ public:
 	//NULL이 아닌 어떤 노드를 select상태로 만들지만 기존 selected 노드에는 영향을 주지 않는다.
 	void		select_item(HTREEITEM hItem = NULL);
 	//hItem의 하위 폴더들중에서 먼저 발견되는 label의 노드를 찾아서 선택상태로 표시한다.
-	HTREEITEM	select_item(CString find_label, HTREEITEM hItem = NULL);
+	//만약 find_label = "item1\\item2"와 같이 full 경로로 전달된다면 recursive하게 경로를 찾아간다.
+	HTREEITEM	select_item(CString find_label, HTREEITEM hItem = NULL, CString sep = _T("\\"));
 
 	//폴더 펼침 이벤트가 발생한 노드 아이템 리턴
 	HTREEITEM	get_expanding_item() { return m_expanding_item; }

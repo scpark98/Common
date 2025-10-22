@@ -67,7 +67,7 @@ void CImageStatic::OnPaint()
 		// 
 		//zigzag 패턴 브러시 생성
 		if (m_br_zigzag == NULL)
-			m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
+			m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(24, m_cr_zigzag_back, m_cr_zigzag_fore);
 
 		g.FillRectangle(m_br_zigzag.get(), rc.left, rc.top, rc.Width(), rc.Height());
 	}

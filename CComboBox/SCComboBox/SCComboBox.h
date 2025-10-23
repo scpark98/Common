@@ -1,7 +1,7 @@
 #pragma once
 
 /*
-- 리소스 속성에서 Owner Draw = Fixed, Has String = true로 변경.
+- 색상을 지원하려면 리소스 속성에서 Owner Draw = Fixed, Has String = true로 변경할 것.
 */
 
 #include <afxwin.h>
@@ -21,7 +21,7 @@ public:
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void			set_color_theme(int theme);
 
-	CString			get_cur_text() { CString text; GetLBText(GetCurSel(), text); return text; }
+	CString			get_text();
 
 	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 	//색상을 별도로 지정하지 않으면 기본 cr_text를 사용한다.
@@ -47,14 +47,14 @@ public:
 	int				find_string(CString src);
 
 //편집 관련
-	void			edit_end(bool valid);
-	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+	//void			edit_end(bool valid);
+	//LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 //tooltip
 	//기본적인 툴팁은 이 컨트롤 내에서 지원하지만
 	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.
-	void		use_tooltip(bool use) { m_use_tooltip = use; }
-	void		set_tooltip_text(CString text);
+	void			use_tooltip(bool use) { m_use_tooltip = use; }
+	void			set_tooltip_text(CString text);
 
 protected:
 //design
@@ -68,11 +68,11 @@ protected:
 	void			reconstruct_font();
 
 //편집 관련
-	bool			m_use_edit = true;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
-	CEdit*			m_pEdit = NULL;
-	CString			m_old_text;				//편집되기 전의 원본 텍스트
-	CRect			m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
-	void			repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
+	//bool			m_use_edit = false;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
+	//CEdit*			m_pEdit = NULL;
+	//CString			m_old_text;				//편집되기 전의 원본 텍스트
+	//CRect			m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
+	//void			repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
 
 //즐겨찾기 관련
 	CString			m_reg_section;		//load or save할 때 넘어온 section값을 기억해놓는다.

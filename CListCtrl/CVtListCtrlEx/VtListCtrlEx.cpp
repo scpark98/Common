@@ -3132,7 +3132,7 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 	if (end_idx < 0 || end_idx >= size())
 		end_idx = size() - 1;
 	if (end_idx < 0)
-		return 0;
+		return -1;
 
 	//찾은 항목을 선택으로 표시하는 경우 먼저 기존 선택된 항목들을 초기화시켜준다.
 	//if (select)

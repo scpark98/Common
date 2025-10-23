@@ -26,11 +26,11 @@ CSCComboBox::~CSCComboBox()
 
 	m_font.DeleteObject();
 
-	if (m_pEdit)
-	{
-		m_pEdit->DestroyWindow();
-		delete m_pEdit;
-	}
+	//if (m_pEdit)
+	//{
+	//	m_pEdit->DestroyWindow();
+	//	delete m_pEdit;
+	//}
 }
 
 
@@ -50,7 +50,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_CONTROL_REFLECT(CBN_SELENDOK, &CSCComboBox::OnCbnSelendok)
 	ON_CONTROL_REFLECT(CBN_SELENDCANCEL, &CSCComboBox::OnCbnSelendcancel)
 	//ON_WM_CTLCOLOR_REFLECT()
-	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
+	//ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
 	ON_WM_NCPAINT()
 END_MESSAGE_MAP()
 
@@ -132,11 +132,12 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	dc.SetTextColor(cr_text);
 
-	CRect rtext;
-	dc.DrawText(strData, rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_CALCRECT);
-	TRACE(_T("width = %d\n"), rtext.Width());
-
-	dc.DrawText(strData, &lpDrawItemStruct->rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
+	CRect rtext = rItem;
+	//dc.DrawText(strData, rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_CALCRECT);
+	//TRACE(_T("width = %d\n"), rtext.Width());
+	
+	rtext.DeflateRect(4, 0);
+	dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
 
 	dc.Detach();
 }
@@ -429,6 +430,8 @@ void CSCComboBox::load_history(CWinApp* app, CString section)
 {
 	ResetContent();
 
+	m_reg_section = section;
+
 	int count = app->GetProfileInt(section, _T("history count"), 0);
 	int index = app->GetProfileInt(section, _T("current index"), 0);
 
@@ -453,6 +456,8 @@ void CSCComboBox::load_history(CWinApp* app, CString section)
 
 void CSCComboBox::save_history(CWinApp* app, CString section)
 {
+	m_reg_section = section;
+
 	app->WriteProfileInt(section, _T("history count"), GetCount());
 	app->WriteProfileInt(section, _T("current index"), GetCurSel());
 
@@ -520,6 +525,7 @@ BOOL CSCComboBox::OnEraseBkgnd(CDC* pDC)
 
 void CSCComboBox::OnCbnSetfocus()
 {
+	/*
 	if (false)//m_use_edit)
 	{
 		//repos_edit();
@@ -532,8 +538,9 @@ void CSCComboBox::OnCbnSetfocus()
 		m_pEdit->SetSel(0, -1);
 		m_pEdit->SetFocus();
 	}
+	*/
 }
-
+/*
 void CSCComboBox::edit_end(bool valid)
 {
 	if (!m_pEdit || !m_pEdit->IsWindowVisible() || (GetFocus() != m_pEdit))
@@ -553,7 +560,7 @@ void CSCComboBox::edit_end(bool valid)
 	SetWindowText(text);
 	AddString(text);
 }
-
+*/
 
 void CSCComboBox::OnCbnKillfocus()
 {
@@ -588,6 +595,7 @@ HBRUSH CSCComboBox::CtlColor(CDC* /*pDC*/, UINT /*nCtlColor*/)
 }
 
 //resize를 하면 여백이 리셋되므로 다시 여백 설정
+/*
 void CSCComboBox::repos_edit()
 {
 	CRect rc;
@@ -637,7 +645,7 @@ LRESULT CSCComboBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 	return 0;
 }
-
+*/
 BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
@@ -668,10 +676,14 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 
 		switch (pMsg->wParam)
 		{
+			/*
 			case VK_RETURN:
-				edit_end(true);
-				return true;
-
+				if (m_use_edit)
+				{
+					edit_end(true);
+					return true;
+				}
+				break;
 			case VK_ESCAPE:
 				if (!m_pEdit || !m_pEdit->IsWindowVisible() || (GetFocus() != m_pEdit))
 					break;
@@ -680,10 +692,19 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 				m_pEdit->ShowWindow(SW_HIDE);
 				SetWindowText(m_old_text);
 				return true;
+			*/
 		}
 	}
 
 	return CComboBox::PreTranslateMessage(pMsg);
+}
+
+CString CSCComboBox::get_text()
+{
+	CString text;
+	//GetLBText(GetCurSel(), text);
+	GetWindowText(text);
+	return text;
 }
 
 //현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.

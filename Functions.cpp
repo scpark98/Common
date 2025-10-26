@@ -12506,7 +12506,6 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	return hBitmap;
 }
 
-#define _M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
 void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 {
 	PICTDESC pictdesc = {};

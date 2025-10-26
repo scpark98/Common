@@ -95,11 +95,12 @@ public:
 	void					stop();
 
 protected:
+	//load or draw시에 파라미터로 받아서 참조하여 사용하기 위해 선언했을 뿐이고 이 클래스에서 직접 생성하는 것이 아님.
 	IWICImagingFactory2*	m_pWICFactory = NULL;
 	ID2D1DeviceContext*		m_d2dc = NULL;
 
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 처리한다.
-	std::deque<ComPtr<ID2D1Bitmap>>		m_img;
+	std::deque<ComPtr<ID2D1Bitmap>>		m_img = std::deque<ComPtr<ID2D1Bitmap>>{ NULL, };
 	uint8_t*				data = NULL;
 	int						m_frame_index = 0;
 	float					m_width;

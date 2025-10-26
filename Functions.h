@@ -167,6 +167,9 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
 #define		check_range_return(x, lower, upper) {if ((x) < (lower) || (x) > (upper)) return;}
 
+//HRESULT를 결과로 리턴받는 함수들에 사용.
+#define		_M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
+
 typedef void (WINAPI* PGNSI)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI* PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 

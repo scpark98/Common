@@ -2,15 +2,26 @@
 
 #include <thread>
 
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "Windowscodecs.lib")
+#pragma comment(lib, "d3d11.lib")
+
 CSCD2Image::CSCD2Image()
 {
-	//CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 }
 
 CSCD2Image::~CSCD2Image()
 {
-	//CoUninitialize();
+	//while (m_img.size() > 0)
+	//{
+	//	m_img.clear();
+	//	Wait(100);
+	//}
+
+	CoUninitialize();
 }
+
 /*
 HRESULT CSCD2Image::create_factory()
 {
@@ -141,8 +152,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	IWICStream* pStream = NULL;
 	IWICBitmapDecoder* pDecoder = NULL;
 	//IWICBitmapFrameDecode* pIDecoderFrame = NULL;
-	ComPtr<IWICFormatConverter> pConverter;
-	ComPtr<IWICBitmapScaler> pScaler;
+	//ComPtr<IWICFormatConverter> pConverter;
+	//ComPtr<IWICBitmapScaler> pScaler;
 
 	// Resource management.
 	HRSRC imageResHandle = NULL;
@@ -219,7 +230,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		NULL,
 		GENERIC_READ,
 		WICDecodeMetadataCacheOnLoad,
-		&pDecoder
+		pDecoder.GetAddressOf()
 	);
 
 	if (FAILED(hr))
@@ -261,7 +272,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 
 	ComPtr<IWICMetadataQueryReader> metareader;
-	hr = pDecoder->GetMetadataQueryReader(&metareader);
+	hr = pDecoder->GetMetadataQueryReader(metareader.GetAddressOf());
 
 	// Get palette
 	WICColor rgbColors[256] = {};
@@ -269,7 +280,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (frame_count > 1)
 	{
 		ComPtr<IWICPalette> palette;
-		hr = pWICFactory->CreatePalette(&palette);
+		hr = pWICFactory->CreatePalette(palette.GetAddressOf());
 		if (FAILED(hr))
 			return hr;
 
@@ -326,11 +337,11 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		ComPtr<IWICBitmapFrameDecode> pFrameDecode;
 		ComPtr<IWICMetadataQueryReader> pMetadataReader;
 
-		hr = pWICFactory->CreateFormatConverter(&pConverter);
-		hr = pDecoder->GetFrame(i, &pFrameDecode);
+		hr = pWICFactory->CreateFormatConverter(pConverter.GetAddressOf());
+		hr = pDecoder->GetFrame(i, pFrameDecode.GetAddressOf());
 		RECT rt = { 0, 0, 0, 0 };
 
-		pFrameDecode->GetMetadataQueryReader(&pMetadataReader);
+		pFrameDecode->GetMetadataQueryReader(pMetadataReader.GetAddressOf());
 
 		if (pMetadataReader)
 		{
@@ -427,7 +438,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			return hr;
 
 		ComPtr<ID2D1Bitmap> img;
-		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, &img);
+		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
 
 		if (i == 0)
 			img_size = img->GetPixelSize();
@@ -438,7 +449,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 			ComPtr<ID2D1Bitmap1> blendedBitmap;
 			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, img->GetPixelFormat());
-			hr = d2context->CreateBitmap(img_size, nullptr, 0, properties, &blendedBitmap);
+			hr = d2context->CreateBitmap(img_size, nullptr, 0, properties, blendedBitmap.GetAddressOf());
 
 			D2D1_POINT_2U pt = { 0, 0 };
 			D2D_RECT_U r = { 0, 0, img_size.width, img_size.height };
@@ -481,8 +492,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			d2context->DrawBitmap(img.Get(), D2D1::RectF((FLOAT)rt.left, (FLOAT)rt.top, (FLOAT)(rt.left + size.width), (FLOAT)(rt.top + size.height)));// , 1.0f, D2D1_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, (FLOAT)size.width, (FLOAT)size.height));
 			hr = d2context->EndDraw();
 			d2context->SetTarget(nullptr);
-			save(img.Get(), _T("d:\\gif\\img\\%02d img (%d, %d).png"), i, rt.left, rt.top);
-			save(blendedBitmap.Get(), _T("d:\\gif\\blended\\%02d blendedBitmap.png"), i);
+			//save(img.Get(), _T("d:\\gif\\img\\%02d img (%d, %d).png"), i, rt.left, rt.top);
+			//save(blendedBitmap.Get(), _T("d:\\gif\\blended\\%02d blendedBitmap.png"), i);
 #endif
 
 			img->CopyFromBitmap(&pt, blendedBitmap.Get(), &r);
@@ -522,14 +533,14 @@ void CSCD2Image::blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* 
 	Microsoft::WRL::ComPtr<ID2D1Effect> compositeEffect;
 
 	// Load bitmap into effects
-	d2dc->CreateEffect(CLSID_D2D1BitmapSource, &bitmapEffectA);
+	d2dc->CreateEffect(CLSID_D2D1BitmapSource, bitmapEffectA.GetAddressOf());
 	bitmapEffectA->SetInput(0, src);
 
-	d2dc->CreateEffect(CLSID_D2D1BitmapSource, &bitmapEffectB);
+	d2dc->CreateEffect(CLSID_D2D1BitmapSource, bitmapEffectB.GetAddressOf());
 	bitmapEffectB->SetInput(0, blend_img);
 
 	// Offset BitmapB using transform effect
-	d2dc->CreateEffect(CLSID_D2D12DAffineTransform, &transformEffectB);
+	d2dc->CreateEffect(CLSID_D2D12DAffineTransform, transformEffectB.GetAddressOf());
 	transformEffectB->SetInputEffect(0, bitmapEffectB.Get());
 
 	D2D1_MATRIX_3X2_F offsetMatrix = D2D1::Matrix3x2F::Translation(dx, dy);
@@ -541,7 +552,7 @@ void CSCD2Image::blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* 
 	//compositeEffect->SetInputEffect(1, transformEffectB.Get());
 
 	ComPtr<ID2D1Effect> blendEffect;
-	HRESULT hr = d2dc->CreateEffect(CLSID_D2D1Blend, &blendEffect);
+	HRESULT hr = d2dc->CreateEffect(CLSID_D2D1Blend, blendEffect.GetAddressOf());
 	blendEffect->SetInputEffect(0, bitmapEffectA.Get());
 	blendEffect->SetInputEffect(1, transformEffectB.Get());
 	blendEffect->SetValue(D2D1_BLEND_PROP_MODE, D2D1_BLEND_MODE_MULTIPLY);
@@ -580,7 +591,7 @@ void CSCD2Image::save(ID2D1Bitmap* img, LPCTSTR path, ...)
 
 	// Create a file stream
 	ComPtr<IWICStream> pStream;
-	HRESULT hr = m_pWICFactory->CreateStream(&pStream);
+	HRESULT hr = m_pWICFactory->CreateStream(pStream.GetAddressOf());
 	if (SUCCEEDED(hr))
 	{
 		hr = pStream->InitializeFromFilename(filename, GENERIC_WRITE);
@@ -590,13 +601,13 @@ void CSCD2Image::save(ID2D1Bitmap* img, LPCTSTR path, ...)
 	ComPtr<IWICBitmapEncoder> pEncoder;
 	GUID wicFormat = GUID_ContainerFormatPng;
 
-	hr = m_pWICFactory->CreateEncoder(wicFormat, nullptr, &pEncoder);
+	hr = m_pWICFactory->CreateEncoder(wicFormat, nullptr, pEncoder.GetAddressOf());
 
 	hr = pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache);
 
 	// Create a new frame
 	ComPtr<IWICBitmapFrameEncode> pFrameEncode;
-	hr = pEncoder->CreateNewFrame(&pFrameEncode, nullptr);
+	hr = pEncoder->CreateNewFrame(pFrameEncode.GetAddressOf(), nullptr);
 
 	if (!pFrameEncode)
 		return;
@@ -609,7 +620,7 @@ void CSCD2Image::save(ID2D1Bitmap* img, LPCTSTR path, ...)
 	{
 		CComPtr<ID2D1Device> d2dDevice;
 		m_d2dc->GetDevice(&d2dDevice);
-		hr = m_pWICFactory->CreateImageEncoder(d2dDevice, &pImageEncoder);
+		hr = m_pWICFactory->CreateImageEncoder(d2dDevice, pImageEncoder.GetAddressOf());
 	}
 
 	// Write the Direct2D bitmap to the WIC frame
@@ -687,7 +698,7 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 	if (SUCCEEDED(hr)) {
 		hr = swapchain->GetBuffer(
 			0,
-			IID_PPV_ARGS(&surface)
+			IID_PPV_ARGS(surface.GetAddressOf())
 		);
 	}
 
@@ -708,13 +719,15 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 		hr = d2context->CreateBitmapFromDxgiSurface(
 			surface.Get(),
 			&properties,
-			&bitmap
+			bitmap.GetAddressOf()
 		);
 	}
 
 	if (SUCCEEDED(hr)) {
 		d2context->SetTarget(bitmap.Get());
 	}
+
+	return S_OK;
 }
 
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw_mode)

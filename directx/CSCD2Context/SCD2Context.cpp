@@ -1,8 +1,11 @@
 #include "SCD2Context.h"
 
+#pragma comment(lib, "d2d1.lib")
+
 CSCD2Context::CSCD2Context()
 {
 	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	//CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 }
 
 CSCD2Context::~CSCD2Context()
@@ -22,11 +25,11 @@ HRESULT CSCD2Context::create_factory()
 {
 	HRESULT hr = S_OK;
 
-	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, IID_PPV_ARGS(&m_d2factory));
+	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, IID_PPV_ARGS(m_d2factory.GetAddressOf()));
 
 	if (SUCCEEDED(hr))
 	{
-		hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_WICFactory));
+		hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(m_WICFactory.GetAddressOf()));
 	}
 
 	return hr;
@@ -43,7 +46,7 @@ HRESULT CSCD2Context::create_device_resources()
 		if (SUCCEEDED(hr)) {
 			hr = m_swapchain->GetBuffer(
 				0,
-				IID_PPV_ARGS(&surface)
+				IID_PPV_ARGS(surface.GetAddressOf())
 			);
 		}
 		ComPtr<ID2D1Bitmap1> bitmap = nullptr;
@@ -116,8 +119,8 @@ HRESULT CSCD2Context::create_device_context()
 			0,
 			D3D11_SDK_VERSION,
 			&swapDescription,
-			&m_swapchain,
-			&d3dDevice,
+			m_swapchain.GetAddressOf(),
+			d3dDevice.GetAddressOf(),
 			nullptr,
 			nullptr
 		);
@@ -130,13 +133,13 @@ HRESULT CSCD2Context::create_device_context()
 
 	ComPtr<IDXGIDevice> dxgiDevice;
 	if (SUCCEEDED(hr))
-		hr = d3dDevice->QueryInterface(IID_PPV_ARGS(&dxgiDevice));
+		hr = d3dDevice->QueryInterface(IID_PPV_ARGS(dxgiDevice.GetAddressOf()));
 
 	if (SUCCEEDED(hr))
-		hr = m_d2factory->CreateDevice(dxgiDevice.Get(), &m_d2device);
+		hr = m_d2factory->CreateDevice(dxgiDevice.Get(), m_d2device.GetAddressOf());
 
 	if (SUCCEEDED(hr))
-		hr = m_d2device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &m_d2context);
+		hr = m_d2device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, m_d2context.GetAddressOf());
 
 	return hr;
 }

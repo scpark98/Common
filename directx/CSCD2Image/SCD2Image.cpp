@@ -149,6 +149,8 @@ HRESULT CSCD2Image::create_device_context()
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type)
 {
+	m_filename.Format(_T("Resource Image(id:%d)"), resource_id);
+
 	IWICStream* pStream = NULL;
 	IWICBitmapDecoder* pDecoder = NULL;
 	//IWICBitmapFrameDecode* pIDecoderFrame = NULL;
@@ -216,6 +218,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path)
 {
+	m_filename = path;
+
 	ComPtr<IWICBitmapDecoder> pDecoder;
 	ComPtr<IWICStream> pStream;
 
@@ -730,6 +734,41 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 	return S_OK;
 }
 
+float CSCD2Image::get_ratio()
+{
+	if (m_height <= 0.0f)
+		return 0.0f;
+	return m_width / m_height;
+}
+
+//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
+bool CSCD2Image::is_empty(int index)
+{
+	if (this == NULL)
+		return true;
+
+	if (index < 0 || index >= m_img.size())
+		return true;
+
+	if (m_width <= 0.0f || m_height <= 0.0f)
+		return true;
+
+	return false;
+}
+
+bool CSCD2Image::is_valid(int index)
+{
+	return !is_empty(index);
+}
+
+CString CSCD2Image::get_filename(bool fullpath)
+{
+	if (!fullpath)
+		return get_part(m_filename, fn_name);
+
+	return m_filename;
+}
+
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw_mode)
 {
 	D2D1_SIZE_F sz = d2dc->GetSize();
@@ -788,6 +827,36 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 
 	d2dc->DrawBitmap(m_img[m_frame_index].Get(), r);
 	return r;
+}
+
+//그림을 그리지 않고 표시될 영역 정보만 얻는다.
+CRect CSCD2Image::calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode)
+{
+	CRect result;
+	D2D1_RECT_F d2target = { targetRect.left, targetRect.top, targetRect.right, targetRect.bottom };
+
+	if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_stretch)
+		result = targetRect;
+	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_zoom)
+		result = convert(get_ratio_rect(d2target, m_width, m_height));
+	else
+	{
+		result = CRect(0, 0, m_width, m_height);
+		result.OffsetRect(targetRect.left + (targetRect.Width() - m_width) / 2, targetRect.top + (targetRect.Height() - m_height) / 2);
+	}
+
+	return result;
+}
+
+CRect CSCD2Image::convert(D2D1_RECT_F d2r)
+{
+	return CRect(d2r.left, d2r.top, d2r.right, d2r.bottom);
+}
+
+D2D1_RECT_F CSCD2Image::convert(CRect r)
+{
+	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
+	return d2r;
 }
 
 D2D1_RECT_F CSCD2Image::get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)

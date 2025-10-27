@@ -1,4 +1,10 @@
 /*
+- 기존 Gdiplus를 이용한 이미지 표시 및 그리기는 이미지가 크면 클수록 속도가 크게 저하된다.
+  Direct2D를 이용해서 이미지를 표시하기 위해 제작함.
+  단, Gdiplus를 이용한 CSCGdiplusBitmap은 이미지 정보를 이 클래스에서 저장하고 parent의 CDC로 그렸으나
+  CSCD2Image는 CDC에 그리는 것이 아닌 ID2D1DeviceContext에 그려야하므로 CSCD2Context로 만들어진
+  ID2D1DeviceContext에 그려야하므로 CSCD2Image와 CSCD3Context는 함께 사용되어야 한다.
+
 [animated gif, webp 등 여러 프레임을 담은 이미지 처리]
 - play()가 호출되면 각 프레임 delay마다 m_frame_index를 증가시키는 thread가 구동되고
   parent window에게 메시지를 보내서 Invalidate()을 통해 화면이 갱신된다.
@@ -58,7 +64,16 @@ public:
 	ID2D1Bitmap*			get() { return m_img[m_frame_index].Get(); }
 
 	//get original image demension
+	float					get_width() { return m_width; }
+	float					get_height() { return m_height; }
 	D2D1_SIZE_F				get_size() { return D2D1::SizeF(m_width, m_height); }
+	float					get_ratio();
+
+	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
+	bool					is_empty(int index = 0);
+	bool					is_valid(int index = 0);
+
+	CString					get_filename(bool fullpath = true);
 
 
 	//dx, dy 좌표에 dw, dh 크기로 그려준다.
@@ -73,7 +88,12 @@ public:
 	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw_mode = eSCD2Image_DRAW_MODE::draw_mode_zoom);
 	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2Image_DRAW_MODE draw_mode = eSCD2Image_DRAW_MODE::draw_mode_zoom);
 
+	//그림을 그리지 않고 표시될 영역 정보만 얻는다.
+	CRect					calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode = eSCD2Image_DRAW_MODE::draw_mode_zoom);
+
 	//Functions.h에 있는 일반 함수와 동일한 기능을 수행하는 함수이며 추후 D2Functions로 별도 분리해야 한다.
+	CRect					convert(D2D1_RECT_F d2r);
+	D2D1_RECT_F				convert(CRect r);
 	D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 	D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 
@@ -85,16 +105,19 @@ public:
 	void					save(CString path);
 	void					save(ID2D1Bitmap* img, LPCTSTR path, ...);
 
-	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
-	int						goto_frame(int index);
-
 //animated gif
+	bool					is_animated_image() { return (m_img.size() > 1); }
+	int						get_frame_count() { return m_img.size(); }
 	void					set_parent(HWND hWnd) { m_parent = hWnd; }
 	void					play();
 	void					pause(int pos = 0);
 	void					stop();
+	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
+	int						goto_frame(int index);
 
 protected:
+	CString					m_filename = _T("untitled");
+
 	//load or draw시에 파라미터로 받아서 참조하여 사용하기 위해 선언했을 뿐이고 이 클래스에서 직접 생성하는 것이 아님.
 	IWICImagingFactory2*	m_pWICFactory = NULL;
 	ID2D1DeviceContext*		m_d2dc = NULL;
@@ -103,8 +126,8 @@ protected:
 	std::deque<ComPtr<ID2D1Bitmap>>		m_img = std::deque<ComPtr<ID2D1Bitmap>>{ NULL, };
 	uint8_t*				data = NULL;
 	int						m_frame_index = 0;
-	float					m_width;
-	float					m_height;
+	float					m_width = 0.0f;
+	float					m_height = 0.0f;
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder);
 
 //animated gif

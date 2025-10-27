@@ -1652,7 +1652,10 @@ struct	NETWORK_INFO
 
 	//app의 위치와 크기를 레지스트리에 저장하고 실행 시 다시 복원시킨다.
 	//resize가 안되는 다이얼로그의 경우는 resize시키지 않고 원래 크기로 표시해야 한다.
-	void		RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection = _T(""), bool use_maximize = true, bool resize_window = true);
+	//간혹 모니터를 끌 경우 앱들의 위치가 멀티모니터 위치로 이동되는 경우가 있는데
+	//이럴 경우 이 함수를 호출할 때 force_primary_monitor = true로 하면
+	//무조건 primary monitor에 표시되도록 보정된다.
+	void		RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection = _T(""), bool use_maximize = true, bool resize_window = true, bool force_primary_monitor = false);
 	void		SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection = _T(""));
 
 

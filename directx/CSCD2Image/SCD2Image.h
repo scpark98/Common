@@ -116,7 +116,7 @@ public:
 	int						goto_frame(int index);
 
 protected:
-	CString					m_filename = _T("untitled");
+	CString					m_filename;// = _T("untitled");
 
 	//load or draw시에 파라미터로 받아서 참조하여 사용하기 위해 선언했을 뿐이고 이 클래스에서 직접 생성하는 것이 아님.
 	IWICImagingFactory2*	m_pWICFactory = NULL;

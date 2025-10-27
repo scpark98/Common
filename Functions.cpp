@@ -6513,7 +6513,7 @@ bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFold
 	bi.lParam		= (LPARAM)strStartFolder;
 	bi.lpfn			= BrowseCallbackProc;
 
-	::OleInitialize(NULL);
+	//::OleInitialize(NULL);
 
 	TCHAR	sBuffer[MAX_PATH];
 	LPITEMIDLIST pIDL = ::SHBrowseForFolder(&bi);
@@ -6526,7 +6526,7 @@ bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFold
 			strSelectedFolder.Format(_T("%s"), sBuffer);
 		}
 
-		::OleUninitialize();
+		//::OleUninitialize();
 	}
 
 	return bSuccess;
@@ -15617,7 +15617,7 @@ template<class T> void quicksort(T& v, int end, int start, bool bAscending)
 //기억된 좌표대로 복원하여 표시한다.
 //단, 그 크기가 모니터 밖이면 CenterWindow()를,
 //크기가 invalid하다면 원래 크기로 표시한다.
-void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool use_maximize, bool resize_window)
+void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool use_maximize, bool resize_window, bool force_primary_monitor)
 {
 	CRect	rc;
 	CString sSection = _T("screen");
@@ -15659,6 +15659,12 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 			pWnd->CenterWindow();
 		else
 			SetWindowPos(pWnd->m_hWnd, NULL, rc.left, rc.top, rc.Width(), rc.Height(), flag);
+
+		if (force_primary_monitor)
+		{
+			CRect r = g_monitors[0].rMonitor;
+			SetWindowPos(pWnd->m_hWnd, NULL, r.CenterPoint().x, r.CenterPoint().y, rc.Width(), rc.Height(), flag);
+		}
 	}
 	else
 	{

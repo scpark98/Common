@@ -181,15 +181,29 @@ void CSCImage2dDlg::OnPaint()
 	{
 		dc.SelectClipRgn(NULL);
 
-		//CRect rText = rc;
-		CString msg = _T("Fail to open this image file.");
-		CString ext = get_part(m_img[0].get_filename(), fn_ext).MakeLower();
+		CString msg;
 
-		if (is_one_of(ext, _T("avif"), _T("webp"), _T("bpg")))
-			msg.Format(_T("%s image is not supported yet."), ext);
+		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
+		if (m_img[0].get_filename().IsEmpty())
+		{
+			msg = _T("Drag&Drop으로 이미지 파일을 열 수 있습니다.");
+		}
+		else
+		{
+			msg.Format(_T("%s\n\n위 파일이 존재하지 않습니다."), m_img[0].get_filename());
+		}
 		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
-		DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, indianred, black, 2, 1);
+		//DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, indianred, black, 2, 1);
+
+		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
+		d2dc->DrawText(msg, msg.GetLength(), m_WriteFormat, m_img[0].convert(rc), m_brush);
+
+		HRESULT hr = d2dc->EndDraw();
+
+		if (SUCCEEDED(hr))
+			hr = m_d2dc.get_swapchain()->Present(0, 0);
 
 		return;
 	}
@@ -417,7 +431,7 @@ void CSCImage2dDlg::OnPaint()
 	if (SUCCEEDED(hr))
 		hr = m_d2dc.get_swapchain()->Present(0, 0);
 
-	//dc.SelectClipRgn(NULL);
+	dc.SelectClipRgn(NULL);
 }
 
 //이 컨트롤에서 자체 처리할 메시지와 반드시 parent에서 처리할 메시지를 명확히 해야 한다.

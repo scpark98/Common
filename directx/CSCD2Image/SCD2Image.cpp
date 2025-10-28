@@ -914,7 +914,8 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 		r.top = target.top + (target.bottom - target.top - m_height) / 2.0;
 	}
 
-	d2dc->DrawBitmap(m_img[m_frame_index].Get(), r, 1.0f, m_interpolation_mode);
+	//d2dc->DrawBitmap(m_img[m_frame_index].Get(), r, 1.0f, m_interpolation_mode);
+	d2dc->DrawBitmap(m_img[m_frame_index].Get(), r, 1.0f, (D2D1_BITMAP_INTERPOLATION_MODE)m_interpolation_mode);
 	return r;
 }
 

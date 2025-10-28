@@ -83,7 +83,7 @@ protected:
 	typedef HRESULT (WINAPI *pfnDwmIsCompositionEnabled)(BOOL *pfEnabled);
 	static pfnDwmIsCompositionEnabled s_DwmIsCompositionEnabled;
 
-	LONG m_OriParentProc;	// Original WndProc of parent window
+	LONG_PTR m_OriParentProc;	// Original WndProc of parent window
 
 	enum ShadowStatus
 	{

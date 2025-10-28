@@ -81,7 +81,8 @@ bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel_pos"), true));
 	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show info"), false));
 	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), true));
-	set_interpolation_mode(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), CSCGdiplusBitmap::interpolation_bicubic));
+
+	m_interpolation_mode = (D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 
 	if (!get_fit2ctrl())
 		zoom(get_profile_value(_T("setting\\CSCImage2dDlg"), _T("zoom"), 1.0));
@@ -108,7 +109,7 @@ BEGIN_MESSAGE_MAP(CSCImage2dDlg, CDialog)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETCURSOR()
 	ON_WM_WINDOWPOSCHANGED()
-	ON_REGISTERED_MESSAGE(Message_CSCGdiplusBitmap, &CSCImage2dDlg::on_message_from_GdiplusBitmap)
+	ON_REGISTERED_MESSAGE(Message_CSCD2Image, &CSCImage2dDlg::on_message_from_CSCD2Image)
 	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCImage2dDlg::on_message_from_CSCSliderCtrl)
 	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCImage2dDlg::on_message_CSCThumbCtrl)
 	ON_WM_TIMER()
@@ -222,8 +223,6 @@ void CSCImage2dDlg::OnPaint()
 	//g.SetInterpolationMode(m_interplationMode);	//부드럽게 보정 or 실제 픽셀
 	//TRACE(_T("m_interplationMode = %d\n"), m_interplationMode);
 
-	D2D1_BITMAP_INTERPOLATION_MODE interpolation_mode = m_d2dc.get_interpolation_mode();
-
 	//확대 모드에 따른 이미지가 표시될 실제 영역을 구한다.
 	if (m_fit2ctrl)
 	{
@@ -298,7 +297,7 @@ void CSCImage2dDlg::OnPaint()
 	if (m_img[0].get_channel() == 4)
 		d2dc->FillRectangle(convert(m_r_display), m_d2dc.get_zigzag_brush().Get());
 
-	m_img[0].set_interpolation_mode(m_d2dc.get_interpolation_mode());
+	m_img[0].set_interpolation_mode(m_interpolation_mode);
 	m_img[0].draw(d2dc, convert(m_r_display));
 
 	//d2dc->DrawImage(gaussianBlurEffect.Get());
@@ -554,7 +553,7 @@ bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 		m_img.resize(m_buffer_max);
 	//m_mutex.unlock();
 
-	bool res = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile);
+	HRESULT res = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile);
 
 	if (false)//m_img[0].is_animated_gif())
 	{
@@ -583,7 +582,7 @@ bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 	if (m_thumb.size() == 0 || load_thumbs)
 		m_thumb.set_path(get_part(sFile, fn_folder));
 
-	return res;
+	return (res == S_OK);
 }
 
 bool CSCImage2dDlg::load(CString sType, UINT id)
@@ -691,15 +690,15 @@ Gdiplus::RectF CSCImage2dDlg::get_image_roi()
 	return m_image_roi;
 }
 
-int CSCImage2dDlg::get_interpolation_mode()
+D2D1_BITMAP_INTERPOLATION_MODE CSCImage2dDlg::get_interpolation_mode()
 {
-	return m_d2dc.get_interpolation_mode();
+	return m_interpolation_mode;
 }
 
 //이미지 부드럽게 보정
-void CSCImage2dDlg::set_interpolation_mode(int mode)
+void CSCImage2dDlg::set_interpolation_mode(D2D1_BITMAP_INTERPOLATION_MODE mode)
 {
-	m_d2dc.set_interpolation_mode((D2D1_BITMAP_INTERPOLATION_MODE)mode);
+	m_interpolation_mode = mode;
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), mode);
 	Invalidate();
 }
@@ -1186,17 +1185,17 @@ void CSCImage2dDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
 
-LRESULT CSCImage2dDlg::on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam)
+LRESULT CSCImage2dDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
 {
-	CSCGdiplusBitmapMessage* msg = (CSCGdiplusBitmapMessage*)wParam;
-	if (!msg)
-		return 0;
+	//CSCGdiplusBitmapMessage* msg = (CSCGdiplusBitmapMessage*)wParam;
+	//if (!msg)
+	//	return 0;
 
-	if (msg->message == CSCGdiplusBitmap::message_gif_frame_changed)
-	{
-		//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
-		m_slider_gif.set_pos(msg->frame_index);
-	}
+	//if (msg->message == CSCD2Image::message_gif_frame_changed)
+	//{
+	//	//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
+	//	m_slider_gif.set_pos(msg->frame_index);
+	//}
 
 	return 0;
 }

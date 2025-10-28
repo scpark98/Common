@@ -32,7 +32,7 @@
 #include "afxdialogex.h"
 
 #include <mutex>
-#include "Common/SCGdiplusBitmap.h"
+//#include "Common/SCGdiplusBitmap.h"
 #include "Common/ThumbCtrl/SCThumbCtrl.h"
 #include "Common/CStatic/SCStatic/SCStatic.h"
 #include "Common/CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
@@ -185,10 +185,10 @@ public:
 	//dropper(spuit) cursor 지정
 	void			set_dropper_cursor(UINT nID);
 
-	int				get_interpolation_mode();
-	void			set_interpolation_mode(int mode);
+	D2D1_BITMAP_INTERPOLATION_MODE	get_interpolation_mode();
+	void			set_interpolation_mode(D2D1_BITMAP_INTERPOLATION_MODE mode);
 
-	LRESULT			on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam);
+	LRESULT			on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam);
 
 	void			set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore);
 
@@ -239,6 +239,9 @@ protected:
 	CRect			m_r_display;
 	
 	HCURSOR			m_cursor_dropper;
+
+	D2D1_BITMAP_INTERPOLATION_MODE	m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
+
 
 	//투명 png일 경우 배경에 표시할 zigzag 패턴 브러시
 	//std::unique_ptr<Gdiplus::TextureBrush> m_br_zigzag;

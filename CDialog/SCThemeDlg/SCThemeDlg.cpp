@@ -59,7 +59,7 @@ bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
 	m_parent = parent;
 
-	DWORD dwStyle = WS_POPUP;
+	LONG_PTR dwStyle = WS_POPUP;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);

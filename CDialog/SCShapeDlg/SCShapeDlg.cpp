@@ -76,7 +76,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
 	m_parent = parent;
 
-	DWORD dwStyle = WS_POPUP;
+	LONG_PTR dwStyle = WS_POPUP;
 	//DWORD dwStyle = WS_CHILD | WS_VISIBLE;
 
 	WNDCLASS wc = {};

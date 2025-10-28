@@ -28,6 +28,10 @@ public:
 	IDXGISwapChain*				get_swapchain() { return m_swapchain.Get(); }
 
 	D2D1_SIZE_F					get_size() { return m_d2context->GetSize(); }
+	ComPtr<ID2D1BitmapBrush>	get_zigzag_brush() { return m_br_zigzag; }
+
+	void							set_interpolation_mode(D2D1_BITMAP_INTERPOLATION_MODE mode) { m_interpolation_mode = mode; }
+	D2D1_BITMAP_INTERPOLATION_MODE	get_interpolation_mode() { return m_interpolation_mode; }
 
 protected:
 	HWND						m_hWnd;
@@ -40,5 +44,10 @@ protected:
 	HRESULT						create_factory();
 	HRESULT						create_device_resources();
 	HRESULT						create_device_context();
+
+	D2D1_BITMAP_INTERPOLATION_MODE	m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
+
+	ComPtr<ID2D1BitmapBrush>	m_br_zigzag;
+	ComPtr<ID2D1BitmapBrush>	create_zigzag_brush(float cell_size = 8.f, byte fore = 200, byte back = 255);
 };
 

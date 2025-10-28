@@ -185,8 +185,8 @@ public:
 	//dropper(spuit) cursor 지정
 	void			set_dropper_cursor(UINT nID);
 
-	int				get_smooth_interpolation();
-	void			set_smooth_interpolation(int type);
+	int				get_interpolation_mode();
+	void			set_interpolation_mode(int mode);
 
 	LRESULT			on_message_from_GdiplusBitmap(WPARAM wParam, LPARAM lParam);
 
@@ -241,11 +241,11 @@ protected:
 	HCURSOR			m_cursor_dropper;
 
 	//투명 png일 경우 배경에 표시할 zigzag 패턴 브러시
-	std::unique_ptr<Gdiplus::TextureBrush> m_br_zigzag;
-	Gdiplus::Color	m_cr_zigzag_back = Gdiplus::Color::White;
-	Gdiplus::Color	m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
-
-	Gdiplus::InterpolationMode m_interplationMode = (Gdiplus::InterpolationMode)CSCGdiplusBitmap::interpolation_bicubic;// Gdiplus::InterpolationModeHighQualityBicubic;
+	//std::unique_ptr<Gdiplus::TextureBrush> m_br_zigzag;
+	//Gdiplus::Color	m_cr_zigzag_back = Gdiplus::Color::White;
+	//Gdiplus::Color	m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
+	//Gdiplus::Color		m_cr_zigzag_back = Gdiplus::Color::White;
+	//Gdiplus::Color		m_cr_zigzag_fore = Gdiplus::Color(200, 200, 200);
 
 //확대, 축소 배율을 사용하지 않고 창 크기에 맞춤
 	bool			m_fit2ctrl = true;

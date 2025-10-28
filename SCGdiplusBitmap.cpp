@@ -315,7 +315,7 @@ bool CSCGdiplusBitmap::load(CString file)
 			}
 		}
 
-		TRACE(_T("exif : \n%s"), m_exif_info.get_exif_str());
+		//TRACE(_T("exif : \n%s"), m_exif_info.get_exif_str());
 		int nSize = m_pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);	//0x5100 = 20736 = FrameDelay
 		if (status == Gdiplus::Ok)
 			get_frame_delay();
@@ -975,6 +975,27 @@ bool CSCGdiplusBitmap::set_raw_data()
 	}
 
 	return false;
+}
+
+//순수 raw 이미지 데이터를 파일로 저장한다.
+bool CSCGdiplusBitmap::save_raw_data(CString path)
+{
+	bool res;
+
+	if (!data)
+	{
+		res = get_raw_data();
+		if (!res)
+			return res;
+	}
+
+	CString raw_path = path;
+	if (raw_path.IsEmpty())
+		raw_path = m_filename;
+
+	change_extension(raw_path, _T("raw"), false);
+
+	return save2raw(raw_path, data, width * height * channel);
 }
 
 bool CSCGdiplusBitmap::is_empty()

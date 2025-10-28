@@ -844,16 +844,16 @@ int	GetFileTypeFromExtension(CString ext)
 		return FILE_TYPE_UNKNOWN;
 }
 
-//파일명에서 확장자를 newExt로 변경한다.
-//applyRealFile이 true이면 실제 파일명도 변경시킨다.
-bool change_extension(CString& filepath, CString newExt, bool applyRealFile)
+//파일명에서 확장자를 new_ext로 변경한다.
+//apply_real_file이 false이면 filepath 문자열의 확장자만 변경하지만 true이면 실제 파일명도 변경시킨다.
+bool change_extension(CString& filepath, CString new_ext, bool apply_real_file)
 {
 	CString sOldExt = get_part(filepath, fn_ext);
-	CString sNewFullPath = filepath.Left(filepath.GetLength() - sOldExt.GetLength()) + newExt;
+	CString sNewFullPath = filepath.Left(filepath.GetLength() - sOldExt.GetLength()) + new_ext;
 
 	bool changeSuccess = false;
 
-	if (applyRealFile)
+	if (apply_real_file)
 	{
 		//실제 파일 확장자를 변경했을때만 filepath도 변경시켜준다.
 		changeSuccess = MoveFile(filepath, sNewFullPath);
@@ -7336,12 +7336,15 @@ CString get_file_time_str(FILETIME filetime)
 
 size_t read_raw(CString sfile, uint8_t *dst, size_t size)
 {
+	if (dst == NULL)
+		return 0;
+
 	FILE *fp = _tfopen(sfile, _T("rb"));
 
 	if (fp == NULL)
 		return false;
 
-	size_t read_size = fread(dst, size, 1, fp);
+	size_t read_size = fread(dst, 1, size, fp);
 	fclose(fp);
 
 	return read_size;
@@ -19875,4 +19878,89 @@ bool set_privilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
 	AdjustTokenPrivileges(hToken, FALSE, &tp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
 
 	return ((GetLastError() != ERROR_SUCCESS) ? false : true);
+}
+
+CRect convert(D2D1_RECT_F d2r)
+{
+	return CRect(d2r.left, d2r.top, d2r.right, d2r.bottom);
+}
+
+D2D1_RECT_F convert(CRect r)
+{
+	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
+	return d2r;
+}
+
+D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)
+{
+	if (height == 0.0f)
+		return D2D1_RECT_F();
+
+	return get_ratio_rect(target, width / height, attach, stretch);
+}
+
+D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool stretch)
+{
+	int		w = target.right - target.left;
+	int		h = target.bottom - target.top;
+	int		nNewW;
+	int		nNewH;
+	double	dTargetRatio = double(w) / double(h);
+
+	D2D1_RECT_F	result;
+
+	if (w == 0 || h == 0)
+		return D2D1_RECT_F();
+
+	bool bResizeWidth;
+
+	if (ratio > 1.0)
+	{
+		if (dTargetRatio < ratio)
+			bResizeWidth = false;
+		else
+			bResizeWidth = true;
+	}
+	else
+	{
+		if (dTargetRatio > ratio)
+			bResizeWidth = true;
+		else
+			bResizeWidth = false;
+	}
+
+
+	if (bResizeWidth)
+	{
+		result.top = target.top;
+		result.bottom = target.bottom;
+
+		nNewW = (double)(h)*ratio;
+		if (attach & attach_left)
+			result.left = target.left;
+		else if (attach & attach_right)
+			result.left = target.right - nNewW;
+		else
+			result.left = target.left + (w - nNewW) / 2.0;
+
+		result.right = result.left + nNewW;
+	}
+	else
+	{
+		result.left = target.left;
+		result.right = target.right;
+
+		nNewH = (double)(w) / ratio;
+
+		if (attach & attach_top)
+			result.top = target.top;
+		else if (attach & attach_bottom)
+			result.top = target.bottom - nNewH;
+		else
+			result.top = target.top + (h - nNewH) / 2.0;
+
+		result.bottom = result.top + nNewH;
+	}
+
+	return result;
 }

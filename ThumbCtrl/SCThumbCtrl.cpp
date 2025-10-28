@@ -469,7 +469,7 @@ void CSCThumbCtrl::loading_function(int idx, int start, int end)
 
 		mtx.lock();
 		pThisWnd->m_loading_completed_count ++;
-		trace(pThisWnd->m_loading_completed_count);
+		//trace(pThisWnd->m_loading_completed_count);
 		mtx.unlock();
 	}
 
@@ -494,7 +494,7 @@ void CSCThumbCtrl::loading_completed_callback()
 void CSCThumbCtrl::on_loading_completed()
 {
 	m_tloading_end = clock();
-	TRACE(_T("total loading completed. elapsed = %ld ms\n"), m_tloading_end - m_tloading_start);
+	//TRACE(_T("total loading completed. elapsed = %ld ms\n"), m_tloading_end - m_tloading_start);
 
 	m_loading_completed = true;
 	recalc_tile_rect();

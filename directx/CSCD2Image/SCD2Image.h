@@ -58,6 +58,9 @@ public:
 	//load resource image
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type = _T("PNG"));
 
+	//load from raw data
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel);
+
 	//must call when the parent window was resized
 	HRESULT					on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy);
 
@@ -68,6 +71,13 @@ public:
 	float					get_height() { return m_height; }
 	D2D1_SIZE_F				get_size() { return D2D1::SizeF(m_width, m_height); }
 	float					get_ratio();
+	int						get_channel() { return m_channel; }
+	
+	//PixelFormat24bppRGB과 같이 정의된 값을 문자열로 리턴하며 simple = true일 경우는 "RGB (24bit)"와 같이 리턴한다.
+	//fmt가 주어지지 않으면 현재 이미지의 PixelFormat을 구하여 결과를 리턴한다.
+	//한번 구한 후에는 m_pixel_format_str 변수에 저장되고 이를 리턴하지만 다시 구해야 할 경우는 reset = true로 호출한다.
+	CString					get_pixel_format_str(WICPixelFormatGUID *pf = NULL, bool simple = true, bool reset = false);
+
 
 	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
 	bool					is_empty(int index = 0);
@@ -75,11 +85,16 @@ public:
 
 	CString					get_filename(bool fullpath = true);
 
+	int						get_interpolation_mode() { return m_interpolation_mode; }
+	void					set_interpolation_mode(int mode);
+
 
 	//dx, dy 좌표에 dw, dh 크기로 그려준다.
 	//dw 또는 dh 중 1개가 1 이상이라면 나머지 1개는 비율에 맞게 자동 조정된다.
 	//둘 다 0이하이면 원본 크기로 그려준다.
-	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, int dx = 0, int dy = 0, int dw = 0, int dh = 0);
+	//dw, dh가 모두 0이면 dwr, dhr 비율로 조정한 후 그려준다.
+	//dwr = 0이면 dhr을 기준으로, dhr=0이면 dwr기준으로 비율을 유지해서 그려준다.
+	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, int dx = 0, int dy = 0, int dw = 0, int dh = 0, float dwr = 0.f, float dhr = 0.f);
 
 	//pt 좌표에 그려준다.
 	D2D1_RECT_F				draw(ID2D1DeviceContext* d2dc, D2D1_POINT_2F pt = D2D1::Point2F());
@@ -91,11 +106,6 @@ public:
 	//그림을 그리지 않고 표시될 영역 정보만 얻는다.
 	CRect					calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode = eSCD2Image_DRAW_MODE::draw_mode_zoom);
 
-	//Functions.h에 있는 일반 함수와 동일한 기능을 수행하는 함수이며 추후 D2Functions로 별도 분리해야 한다.
-	CRect					convert(D2D1_RECT_F d2r);
-	D2D1_RECT_F				convert(CRect r);
-	D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
-	D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 
 	//data멤버에 픽셀 데이터를 가리키도록 한다. 구현중...
 	void					get_raw_data();
@@ -128,7 +138,12 @@ protected:
 	int						m_frame_index = 0;
 	float					m_width = 0.0f;
 	float					m_height = 0.0f;
+	int						m_channel = 0;
+	CString					m_pixel_format_str;
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder);
+
+	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
+
 
 //animated gif
 	HWND					m_parent = NULL; //animation이 진행될 때 parent에게 메시지를 보내기 위해 필요

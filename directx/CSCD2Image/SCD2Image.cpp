@@ -251,6 +251,69 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	*/
 }
 
+//load from raw data
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel)
+{
+	HRESULT	hr = S_FALSE;
+
+	m_pWICFactory = pWICFactory;
+	m_d2dc = d2context;
+
+	m_frame_index = 0;
+	m_img.clear();
+	m_frame_delay.clear();
+
+	IWICBitmap* pWicBitmap = NULL;
+	IWICFormatConverter* pFormatConverter = NULL;
+	ComPtr<ID2D1Bitmap1> img;
+
+	//투명 png를 GUID_WICPixelFormat32bppBGRA가 아닌 PBGRA로 읽으면 알파채널이 올바르게 표시되지 않는다.
+	WICPixelFormatGUID guid = GUID_WICPixelFormat32bppBGRA;
+
+	switch (channel)
+	{
+		case 1:
+			guid = GUID_WICPixelFormat8bppIndexed;
+			break;
+		case 2:
+			guid = GUID_WICPixelFormat16bppBGR565;
+			break;
+		case 3:
+			guid = GUID_WICPixelFormat24bppBGR;
+			break;
+	}
+
+	_M(m_pWICFactory->CreateBitmapFromMemory(width, height, guid, width * channel, width * height * channel, (BYTE*)data, &pWicBitmap));
+	_M(d2context->CreateBitmapFromWicBitmap(pWicBitmap, 0, &img));
+
+	if (!img)
+	{
+		//pFormatConverter->Release();
+		m_pWICFactory->CreateFormatConverter(&pFormatConverter);
+		if (pFormatConverter)
+		{
+			pFormatConverter->Initialize(pWicBitmap, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0f, WICBitmapPaletteTypeMedianCut);
+			_M(d2context->CreateBitmapFromWicBitmap(pFormatConverter, 0, &img));
+		}
+	}
+
+	if (img)
+	{
+		m_img.push_back(std::move(img));
+
+		D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+		m_width = sz.width;
+		m_height = sz.height;
+	}
+	else
+	{
+		m_width = 0.f;
+		m_height = 0.f;
+	}
+
+	return hr;
+}
+
 //일부 animated gif의 경우 이전 프레임 이미지에서 변경된 이미지만 저장하고 있는 경우도 있으므로
 //아래 코드를 참조하여 보완 필요.
 //https://github.com/microsoft/DirectXTex/blob/main/Texassemble/AnimatedGif.cpp
@@ -340,6 +403,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		ComPtr<IWICFormatConverter> pConverter;
 		ComPtr<IWICBitmapFrameDecode> pFrameDecode;
 		ComPtr<IWICMetadataQueryReader> pMetadataReader;
+		WICPixelFormatGUID pf;
 
 		hr = pWICFactory->CreateFormatConverter(pConverter.GetAddressOf());
 		hr = pDecoder->GetFrame(i, pFrameDecode.GetAddressOf());
@@ -445,7 +509,12 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
 
 		if (i == 0)
+		{
 			img_size = img->GetPixelSize();
+			pFrameDecode->GetPixelFormat(&pf);
+
+			get_pixel_format_str(&pf);
+		}
 
 		if (i > 0 && disposal == DM_NONE)
 		{
@@ -769,6 +838,11 @@ CString CSCD2Image::get_filename(bool fullpath)
 	return m_filename;
 }
 
+void CSCD2Image::set_interpolation_mode(int mode)
+{
+	m_interpolation_mode = ((D2D1_BITMAP_INTERPOLATION_MODE)mode);
+}
+
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw_mode)
 {
 	D2D1_SIZE_F sz = d2dc->GetSize();
@@ -776,21 +850,36 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw
 }
 
 //dx, dy 좌표에 그려준다.
-D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, int dh)
+D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, int dh, float dwr, float dhr)
 {
-	//dw, dh가 0이하이면 원본 크기로 그려준다.
+	//dh가 주어진 경우
 	if (dw <= 0 && dh > 0)
 	{
 		dw = (int)(m_width * dh / m_height);
 	}
+	//dw가 주어진 경우
 	else if (dw > 0 && dh <= 0)
 	{
 		dh = (int)(m_height * dw / m_width);
 	}
+	//dwr or dwh가 주어진 경우
 	else if (dw <= 0 && dh <= 0)
 	{
-		dw = (int)m_width;
-		dh = (int)m_height;
+		if (dwr <= 0.f && dhr > 0.f)
+		{
+			dw = m_width * dhr;
+			dh = m_height * dhr;
+		}
+		else if (dwr > 0.f && dhr <= 0.f)
+		{
+			dw = m_width * dwr;
+			dh = m_height * dwr;
+		}
+		else
+		{
+			dw = m_width * dwr;
+			dh = m_height * dhr;
+		}
 	}
 
 	return draw(d2dc, D2D1::RectF(dx, dy, dx + dw, dy + dh));
@@ -825,7 +914,7 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 		r.top = target.top + (target.bottom - target.top - m_height) / 2.0;
 	}
 
-	d2dc->DrawBitmap(m_img[m_frame_index].Get(), r);
+	d2dc->DrawBitmap(m_img[m_frame_index].Get(), r, 1.0f, m_interpolation_mode);
 	return r;
 }
 
@@ -843,91 +932,6 @@ CRect CSCD2Image::calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode)
 	{
 		result = CRect(0, 0, m_width, m_height);
 		result.OffsetRect(targetRect.left + (targetRect.Width() - m_width) / 2, targetRect.top + (targetRect.Height() - m_height) / 2);
-	}
-
-	return result;
-}
-
-CRect CSCD2Image::convert(D2D1_RECT_F d2r)
-{
-	return CRect(d2r.left, d2r.top, d2r.right, d2r.bottom);
-}
-
-D2D1_RECT_F CSCD2Image::convert(CRect r)
-{
-	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
-	return d2r;
-}
-
-D2D1_RECT_F CSCD2Image::get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)
-{
-	if (height == 0.0f)
-		return D2D1_RECT_F();
-
-	return get_ratio_rect(target, width / height, attach, stretch);
-}
-
-D2D1_RECT_F CSCD2Image::get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool stretch)
-{
-	int		w = target.right - target.left;
-	int		h = target.bottom - target.top;
-	int		nNewW;
-	int		nNewH;
-	double	dTargetRatio = double(w) / double(h);
-
-	D2D1_RECT_F	result;
-
-	if (w == 0 || h == 0)
-		return D2D1_RECT_F();
-
-	bool bResizeWidth;
-
-	if (ratio > 1.0)
-	{
-		if (dTargetRatio < ratio)
-			bResizeWidth = false;
-		else
-			bResizeWidth = true;
-	}
-	else
-	{
-		if (dTargetRatio > ratio)
-			bResizeWidth = true;
-		else
-			bResizeWidth = false;
-	}
-
-
-	if (bResizeWidth)
-	{
-		result.top = target.top;
-		result.bottom = target.bottom;
-
-		nNewW = (double)(h) * ratio;
-		if (attach & attach_left)
-			result.left = target.left;
-		else if (attach & attach_right)
-			result.left = target.right - nNewW;
-		else
-			result.left = target.left + (w - nNewW) / 2.0;
-
-		result.right = result.left + nNewW;
-	}
-	else
-	{
-		result.left = target.left;
-		result.right = target.right;
-
-		nNewH = (double)(w) / ratio;
-
-		if (attach & attach_top)
-			result.top = target.top;
-		else if (attach & attach_bottom)
-			result.top = target.bottom - nNewH;
-		else
-			result.top = target.top + (h - nNewH) / 2.0;
-
-		result.bottom = result.top + nNewH;
 	}
 
 	return result;
@@ -999,6 +1003,9 @@ void CSCD2Image::thread_animation()
 		//TRACE(_T("frame index = %d\n"), m_frame_index);
 		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)0, m_frame_index);
 
+		if (m_frame_delay.size() == 0)
+			break;
+
 		int delay = m_frame_delay[m_frame_index];
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 	}
@@ -1020,4 +1027,73 @@ void CSCD2Image::get_raw_data()
 
 	HRESULT hr = S_OK;
 
+}
+
+CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bool reset)
+{
+	if (reset)
+		m_pixel_format_str.Empty();
+
+	if (!m_pixel_format_str.IsEmpty())
+		return m_pixel_format_str;
+
+	CString str_fmt = _T("Unknown PixelFormat");
+
+	if (pf == NULL)
+		return str_fmt;
+
+	if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppBGRA))
+	{
+		m_channel = 4;
+		str_fmt = _T("GUID_WICPixelFormat32bppBGRA");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppRGBA))
+	{
+		m_channel = 4;
+		str_fmt = _T("GUID_WICPixelFormat32bppRGBA");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppPRGBA))
+	{
+		m_channel = 4;
+		str_fmt = _T("GUID_WICPixelFormat32bppPBGRA");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppCMYK))
+	{
+		m_channel = 4;
+		str_fmt = _T("GUID_WICPixelFormat32bppCMYK");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat24bppBGR))
+	{
+		m_channel = 3;
+		str_fmt = _T("GUID_WICPixelFormat24bppBGR");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat24bppRGB))
+	{
+		m_channel = 3;
+		str_fmt = _T("GUID_WICPixelFormat24bppRGB");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat8bppGray))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat8bppGray");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat8bppIndexed))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat8bppIndexed");
+	}
+
+	if (simple && (str_fmt.Find(_T("Unknown")) < 0))
+	{
+		str_fmt.Replace(_T("GUID_WICPixelFormat"), _T(""));
+		str_fmt.Replace(_T("bpp"), _T(""));
+		int bits = 0;
+		int bits_pos = get_number_from_string(str_fmt, bits);
+		str_fmt.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos), bits);
+		TRACE(_T("str_fmt = %s\n"), str_fmt);
+	}
+
+	m_pixel_format_str = str_fmt;
+
+	return m_pixel_format_str;
 }

@@ -243,6 +243,9 @@ public:
 	bool			set_raw_data();
 	uint8_t*		data = NULL;
 
+	//순수 raw 이미지 데이터를 파일로 저장한다. path = ""이면 확장자가 raw인 파일명으로 저장한다.
+	bool			save_raw_data(CString path = _T(""));
+
 //palette
 	Gdiplus::ColorPalette* m_palette = NULL;
 	bool			get_palette();

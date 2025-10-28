@@ -1162,7 +1162,10 @@ struct	NETWORK_INFO
 #endif
 	int			GetFileTypeFromFilename(CString filename);
 	int			GetFileTypeFromExtension(CString sExt);
-	bool		change_extension(CString& filepath, CString newExt, bool applyRealFile);
+
+	//파일명에서 확장자를 new_ext로 변경한다.
+	//apply_real_file이 false이면 filepath 문자열의 확장자만 변경하지만 true이면 실제 파일명도 변경시킨다.
+	bool		change_extension(CString& filepath, CString new_ext, bool apply_real_file);
 	CString		normalize_path(CString& filepath);
 
 	//"C:\\", "C:\\Temp"와 같이 루트일때와 일반 폴더일 경우 끝에 역슬래시 유무가 다르므로 필요.
@@ -1209,6 +1212,7 @@ struct	NETWORK_INFO
 	//확인 필요
 	//CString		set_file_property(CString sFilePath, CString sProperty, CString value);
 
+	//binary file data를 읽어들인다. dst는 크기만큼 미리 할당된 상태로 호출되어야 한다.
 	size_t		read_raw(CString sfile, uint8_t *dst, size_t size);
 	bool		save2raw(CString sfile, uint8_t *data, size_t size);
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
@@ -2537,3 +2541,9 @@ std::basic_string<CharT> GetSystemErrorMesssage(const DWORD errorCode)
 	}
 	return result;
 }
+
+//directx data type
+CRect					convert(D2D1_RECT_F d2r);
+D2D1_RECT_F				convert(CRect r);
+D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
+D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);

@@ -141,8 +141,43 @@ HRESULT CSCD2Context::create_device_context()
 	if (SUCCEEDED(hr))
 		hr = m_d2device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, m_d2context.GetAddressOf());
 
+	m_br_zigzag = create_zigzag_brush();
+
 	return hr;
 }
+
+ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(float cell_size, byte fore, byte back)
+{
+	const UINT w = 2, h = 2, stride = w * 4;
+	BYTE pixels[stride * h];
+	auto px = [&](UINT x, UINT y, BYTE B, BYTE G, BYTE R, BYTE A) {
+		BYTE* p = pixels + y * stride + x * 4; p[0] = B; p[1] = G; p[2] = R; p[3] = A;
+		};
+	// W B / B W
+	px(0, 0, fore, fore, fore, 255); px(1, 0, back, back, back, 255);
+	px(0, 1, back, back, back, 255);       px(1, 1, fore, fore, fore, 255);
+
+	D2D1_BITMAP_PROPERTIES props =
+		D2D1::BitmapProperties(
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			96.0f, 96.0f);
+
+	ComPtr<ID2D1Bitmap> bmp;
+	if (FAILED(m_d2context->CreateBitmap(D2D1::SizeU(w, h), pixels, stride, &props, &bmp))) return nullptr;
+
+	D2D1_BITMAP_BRUSH_PROPERTIES bbp =
+		D2D1::BitmapBrushProperties(D2D1_EXTEND_MODE_WRAP,
+			D2D1_EXTEND_MODE_WRAP,
+			D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+
+	ComPtr<ID2D1BitmapBrush> brush;
+	if (FAILED(m_d2context->CreateBitmapBrush(bmp.Get(), bbp, &brush))) return nullptr;
+
+	// Each source pixel becomes one checker cell of size 'cell'
+	brush->SetTransform(D2D1::Matrix3x2F::Scale(cell_size, cell_size));
+	return brush;
+}
+
 /*
 bool CSCD2Context::load(HWND hWnd, CString path)
 {

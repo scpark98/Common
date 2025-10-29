@@ -121,13 +121,13 @@ int CThreadManager::get_thread_completed_count()
 
 void CThreadManager::set_thread_completed(int index)
 {
-	if (index >= m_workers.size())
+	if (index >= (int)m_workers.size())
 	{
 		TRACE(_T("index >= m_workers.size()\n"));
 		return;
 	}
 
-	if (index >= m_thread_completed.size())
+	if (index >= (int)m_thread_completed.size())
 	{
 		TRACE(_T("index >= m_thread_completed.size()\n"));
 		return;

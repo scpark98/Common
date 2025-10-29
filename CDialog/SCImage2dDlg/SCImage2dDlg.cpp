@@ -20,7 +20,7 @@ CSCImage2dDlg::CSCImage2dDlg(CWnd* parent)
 
 CSCImage2dDlg::~CSCImage2dDlg()
 {
-	stop_gif();
+	stop();
 }
 
 bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
@@ -212,11 +212,6 @@ void CSCImage2dDlg::OnPaint()
 
 		return;
 	}
-	else
-	{
-		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-	}
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 
@@ -318,6 +313,9 @@ void CSCImage2dDlg::OnPaint()
 		CRect rText = rc;
 		rText.DeflateRect(8, 8);
 
+		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+
 		//shadow나 stroke 효과 적용방법을 아직 모르므로 우선 검은색으로 그리고 전경색으로 그린다.
 		rText.OffsetRect(1, 1);
 		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
@@ -330,6 +328,9 @@ void CSCImage2dDlg::OnPaint()
 
 	if (m_show_pixel_pos)
 	{
+		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+
 		CRect r = m_r_pixel_pos;
 		r.OffsetRect(1, 1);
 		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
@@ -449,6 +450,8 @@ BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
 		bool is_ctrl_pressed = IsCtrlPressed();
 		double interval = (IsCtrlPressed() ? 5.0 : 1.0);
 
+		TRACE(_T("%s, %d\n"), __function__, pMsg->wParam);
+
 		switch (pMsg->wParam)
 		{
 			case VK_RETURN :
@@ -456,9 +459,9 @@ BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
 				m_thumb.stop_loading();
 				return FALSE;
 			case VK_SPACE :
-				if (false)//m_img[0].is_animated_gif())
+ 				if (m_img[0].is_animated_image())
 				{
-					pause_gif(-1);
+					pause(-1);
 					return TRUE;
 				}
 				break;
@@ -510,6 +513,20 @@ BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
 					Invalidate();
 					return TRUE;
 				}
+				//창에 맞게 크기조절이 아니고 확대/축소되고 이미지 표시 영역이 rc를 벗어났다면 스크롤 처리
+				else if (!m_fit2ctrl && !rect_in_rect(get_rc(m_hWnd), m_r_display))
+				{
+					scroll(is_ctrl_pressed ? interval * 8 : 8, 0);
+					return true;
+				}
+				else if (m_img.size() > 0 && m_img[0].is_animated_image())
+				{
+					m_img[0].step(-1);
+				}
+				else
+				{
+					display_image(-2);
+				}
 				break;
 			case VK_RIGHT:
 				if (IsShiftPressed() && !m_image_roi.IsEmptyArea())
@@ -517,6 +534,20 @@ BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
 					m_image_roi.X += interval;
 					Invalidate();
 					return TRUE;
+				}
+				//창에 맞게 크기조절이 아니고 확대/축소되고 이미지 표시 영역이 rc를 벗어났다면 스크롤 처리
+				else if (!m_fit2ctrl && !rect_in_rect(get_rc(m_hWnd), m_r_display))
+				{
+					scroll(is_ctrl_pressed ? interval * -8 : -8, 0);
+					return true;
+				}
+				else if (m_img.size() > 0 && m_img[0].is_animated_image())
+				{
+					m_img[0].step(1);
+				}
+				else
+				{
+					display_image(-2);
 				}
 				break;
 		}
@@ -543,9 +574,6 @@ bool CSCImage2dDlg::load()
 
 bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 {
-	//다른 이미지를 로딩하기 전에 이전 이미지가 animated gif였다면 재생하는 thread를 중지시켜야 한다.
-	stop_gif();
-
 	AfxGetApp()->WriteProfileString(_T("setting\\CSCImage2dDlg"), _T("recent file"), sFile);
 
 	//m_mutex.lock();
@@ -555,9 +583,10 @@ bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 
 	HRESULT res = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile);
 
-	if (false)//m_img[0].is_animated_gif())
+	if (m_img[0].is_animated_image())
 	{
-		/*
+		m_img[0].set_parent(m_hWnd);
+
 		CRect rc;
 		GetClientRect(rc);
 		m_slider_gif.set_range(0, m_img[0].get_frame_count() - 1);
@@ -567,11 +596,10 @@ bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 		
 		//원래 CSCGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
 		//하지만 CSCImage2dDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
-		m_img[0].set_gif_play_itself(false);
+		//m_img[0].set_gif_play_itself(false);
 
-		std::thread t(&CSCImage2dDlg::thread_gif_animation, this);
-		t.detach();
-		*/
+		//std::thread t(&CSCImage2dDlg::thread_gif_animation, this);
+		//t.detach();
 	}
 	else
 	{
@@ -762,20 +790,13 @@ void CSCImage2dDlg::OnSize(UINT nType, int cx, int cy)
 	GetClientRect(rc);
 
 	m_thumb.MoveWindow(rc);
-
-	/*
-	if (m_img[0].is_animated_gif())
-	{
-		m_img[0].move_gif(rc);
-		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
-	}
-	*/
+	m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 
 	m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), cx, cy);
 
 	m_r_pixel_pos = rc;
-	m_r_pixel_pos.DeflateRect(4, 2);
-	m_r_pixel_pos.right = 100;
+	m_r_pixel_pos.DeflateRect(4, 4);
+	m_r_pixel_pos.left = m_r_pixel_pos.right - 100;
 	m_r_pixel_pos.top = m_r_pixel_pos.bottom - 16;
 
 	Invalidate();
@@ -1056,8 +1077,8 @@ void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 			CRect rc;
 			GetClientRect(rc);
 			m_r_pixel_pos = rc;
-			m_r_pixel_pos.DeflateRect(4, 2);
-			m_r_pixel_pos.right = 100;
+			m_r_pixel_pos.DeflateRect(4, 4);
+			m_r_pixel_pos.left = m_r_pixel_pos.right - 100;
 			m_r_pixel_pos.top = m_r_pixel_pos.bottom - 16;
 		}
 
@@ -1187,15 +1208,16 @@ void CSCImage2dDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 
 LRESULT CSCImage2dDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
 {
-	//CSCGdiplusBitmapMessage* msg = (CSCGdiplusBitmapMessage*)wParam;
-	//if (!msg)
-	//	return 0;
+	CSCD2ImageMessage* msg = (CSCD2ImageMessage*)wParam;
+	if (!msg)
+		return 0;
 
-	//if (msg->message == CSCD2Image::message_gif_frame_changed)
-	//{
-	//	//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
-	//	m_slider_gif.set_pos(msg->frame_index);
-	//}
+	if (msg->message == CSCD2Image::message_frame_changed)
+	{
+		//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
+		m_slider_gif.set_pos(msg->frame_index);
+		Invalidate();
+	}
 
 	return 0;
 }
@@ -1205,89 +1227,35 @@ LRESULT CSCImage2dDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lPara
 	CSCSliderCtrlMsg* msg = (CSCSliderCtrlMsg*)wParam;
 	if (msg->msg == CSCSliderCtrlMsg::msg_thumb_move)
 	{
-		//TRACE(_T("%ld, pos = %d\n"), GetTickCount(), msg->pos);
+		TRACE(_T("%ld, pos = %d\n"), GetTickCount(), msg->pos);
 		goto_frame(msg->pos, true);
 	}
 	return 0;
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCImage2dDlg::pause_gif(int pos)
+void CSCImage2dDlg::pause(int pos)
 {
-	/*
-	if (m_img[0].is_gif_play_itself())
-		return;
-
-	if (m_img[0].get_frame_count() < 2 || !m_run_thread_animation)
-		return;
-
-	//m_frame_count가 UINT이고 pos = -1일 경우 아래 if문은 true가 된다.
-	//if (-1 >= (UINT)20) => true
-	//취약하므로 m_frame_count의 type을 UINT에서 int로 변경한다.
-	if (pos >= m_img[0].get_frame_count())
-		pos = 0;
-
-	if (pos < 0)
-	{
-		m_paused = !m_paused;
-
-		//gif가 일시정지 된 상태라면 그 때의 m_pBitmap에 대한 픽셀정보를 다시 추출해줘야 한다.
-		if (m_paused && m_show_pixel)
-			m_img[0].get_raw_data();
-	}
-	else
-	{
-		goto_frame(pos, true);
-	}
-	*/
-}
-
-void CSCImage2dDlg::stop_gif()
-{
-	/*
 	if (m_img.size() == 0)
 		return;
 
-	if (m_img[0].get_frame_count() < 2)
+	m_img[0].pause(pos);
+}
+
+void CSCImage2dDlg::stop()
+{
+	if (m_img.size() == 0)
 		return;
 
-	m_paused = false;
-	m_run_thread_animation = false;
-	while (!m_thread_animation_terminated)
-		Wait(10);
-
-	if (m_hWnd)
-		Invalidate();
-	*/
+	m_img[0].stop();
 }
 
 void CSCImage2dDlg::goto_frame(int pos, bool pause)
 {
-	/*
-	if (m_img[0].get_frame_count() < 2)
+	if (m_img.size() == 0)
 		return;
 
-	if (pos >= m_img[0].get_frame_count())
-		m_frame_index = 0;
-
-	m_frame_index = pos;
-	m_paused = pause;
-
-	GUID   pageGuid = Gdiplus::FrameDimensionTime;	//for TIFF : Gdiplus::FrameDimensionPage
-	long t0 = clock();
-	m_img[0].m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-	TRACE(_T("elapse = %ld\n"), clock() - t0);
-
-	//paused 상태라면 Invalidate()을 해줘야 하고
-	//픽셀 정보를 표시중이라면 현재 프레임에 대한 data도 다시 추출해줘야 한다.
-	if (m_paused)
-	{
-		if (m_show_pixel)
-			m_img[0].get_raw_data();
-
-		Invalidate();
-	}
-	*/
+	m_img[0].goto_frame(pos, pause);
 }
 
 //지정 % 위치의 프레임으로 이동
@@ -1297,9 +1265,9 @@ void CSCImage2dDlg::goto_frame_percent(int pos, bool pause)
 	goto_frame((int)dpos, pause);
 }
 
+/*
 void CSCImage2dDlg::thread_gif_animation()
 {
-	/*
 	if (m_img[0].get_frame_count() < 2)
 		return;
 
@@ -1350,8 +1318,8 @@ void CSCImage2dDlg::thread_gif_animation()
 
 	m_run_thread_animation = false;
 	m_thread_animation_terminated = true;
-	*/
 }
+*/
 
 void CSCImage2dDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
 {
@@ -1470,8 +1438,6 @@ void CSCImage2dDlg::set_view_mode(int view_mode)
 
 void CSCImage2dDlg::display_image(CString filepath, bool scan_folder)
 {
-	stop_gif();
-
 	m_mutex.lock();
 	m_files.clear();
 	m_img.clear();
@@ -1510,7 +1476,7 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 
 	//animated gif를 재생중이었다면 stop시켜야 한다.
 	//그렇지 않으면 m_img.clear(), m_img.pop_front()에서 에러가 발생한다.
-	stop_gif();
+	stop();
 
 	//next image
 	if (index == -1)
@@ -1628,6 +1594,8 @@ void CSCImage2dDlg::build_image_info_str()
 
 	if (m_img[0].get_width() == m_img[0].get_height())
 		ratio_str = _T("1 : 1");
+	else if ((int)(ratio * 1000) % 1000 == 0)
+		ratio_str.Format(_T("%.0f : 1"), ratio);
 	else
 		ratio_str.Format(_T("%.3f : 1"), ratio);
 

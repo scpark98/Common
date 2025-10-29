@@ -1486,14 +1486,10 @@ void CSCThumbCtrl::on_key_down(int key)
 	else if (key == VK_PRIOR && selected >= m_per_line * 3)
 	{
 		selected -= m_per_line * 3;
-		//if (selected < 0)
-		//	selected = 0;
 	}
 	else if (key == VK_NEXT && selected <= m_thumb.size() - 1 - m_per_line * 3)
 	{
 		selected += m_per_line * 3;
-		//if (selected > m_dqThumb.size() - 1)
-		//	selected = m_dqThumb.size() - 1;
 	}
 
 	select_item(selected);
@@ -1501,7 +1497,7 @@ void CSCThumbCtrl::on_key_down(int key)
 
 void CSCThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool refresh)
 {
-	if (thumb_index < 0 || thumb_index >= m_thumb.size())
+	if (thumb_index < 0 || thumb_index >= (int)m_thumb.size())
 		return;
 
 	if (idx < 0 || idx >= 4)
@@ -1607,7 +1603,7 @@ void CSCThumbCtrl::on_context_menu(UINT nMenuID)
 		case idReloadSelected:
 		{
 			int index = get_selected_item();
-			if (index < 0 || index >= m_thumb.size())
+			if (index < 0 || index >= (int)m_thumb.size())
 				return;
 			m_thumb[index].reload();
 			InvalidateRect(m_thumb[index].r);

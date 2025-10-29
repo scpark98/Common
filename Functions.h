@@ -224,7 +224,7 @@ enum RATIO_RECT_ATTACH
 	attach_bottom	= 0x00000008,	//0001 0000
 };
 
-#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;raw;jfif;avif")
+#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;jfif;avif")
 #define		FILE_EXTENSION_SOUND			_T("mp3;m4a;wav")
 #define		FILE_EXTENSION_VIDEO			_T("avi;mpg;mp4;mpeg;mkv;mov;wmv;wma;asf;ts;m2ts;3gp")
 #define		FILE_EXTENSION_MEDIA			CString(FILE_EXTENSION_VIDEO) + _T(";") + CString(FILE_EXTENSION_IMAGE) + _T(";") + CString(FILE_EXTENSION_SOUND)
@@ -2042,6 +2042,8 @@ h		: 복사할 height 크기(pixel)
 	//w, h보다 target이 적을때는 target보다 큰 영역이 리턴될 것이다.
 	CRect		get_center_rect(CRect target, int w, int h);
 
+	CRect		get_rc(HWND hWnd);
+
 	//rSub가 rMain에 완전히 속해있으면 true를 리턴한다.
 	bool		rect_in_rect(CRect main, CRect sub);
 	//r에서 except영역을 제외하고 cr컬러로 채운다.
@@ -2307,7 +2309,6 @@ template<class T> void Swap(T& x, T& y)
 int compareInteger (const void * a, const void * b);
 int compareChar(const void *arg1, const void *arg2);
 int compareString (const void * a, const void * b);
-
 
 //////////////////////////////////////////////////////////////////////////
 //수학

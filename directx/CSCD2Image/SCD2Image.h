@@ -1,15 +1,33 @@
 /*
 - 기존 Gdiplus를 이용한 이미지 표시 및 그리기는 이미지가 크면 클수록 속도가 크게 저하된다.
   Direct2D를 이용해서 이미지를 표시하기 위해 제작함.
-  단, Gdiplus를 이용한 CSCGdiplusBitmap은 이미지 정보를 이 클래스에서 저장하고 parent의 CDC로 그렸으나
-  CSCD2Image는 CDC에 그리는 것이 아닌 ID2D1DeviceContext에 그려야하므로 CSCD2Context로 만들어진
-  ID2D1DeviceContext에 그려야하므로 CSCD2Image와 CSCD3Context는 함께 사용되어야 한다.
+  단, Gdiplus를 이용한 CSCGdiplusBitmap은 이미지 정보를 이 클래스에서 저장하고 parent의 CDC에 그렸으나
+  CSCD2Image는 CDC에 그리는 것이 아닌 ID2D1DeviceContext에 그려야 하므로
+  CSCD2Context를 추가하고 m_d2dc.init(m_hWnd);을 호출하여 그려질 대상 윈도우의 ID2D1DeviceContext를 생성한 후
+  그 d2dc에 그려야하므로 CSCD2Image와 CSCD3Context는 함께 사용되어야 한다.
+
+  in .h
+	CSCD2Context				m_d2dc;
+	CSCD2Image					m_d2back;
+
+  in .cpp
+    m_d2dc.init(m_hWnd);
+	m_d2back.load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), IDR_JPG_LOBBY, _T("JPG"));
+	m_d2back.load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), IDR_PNG_IMAGE);
+	or
+	m_d2back.load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), _T("d:\\back.jpg"));
+
 
 [animated gif, webp 등 여러 프레임을 담은 이미지 처리]
-- play()가 호출되면 각 프레임 delay마다 m_frame_index를 증가시키는 thread가 구동되고
+- load가 끝나고 total_frame > 1이면 play()가 자동 호출되고
+  각 프레임 delay마다 m_frame_index를 증가시키는 thread가 구동되어
   parent window에게 메시지를 보내서 Invalidate()을 통해 화면이 갱신된다.
-  이 방법은 mfc control이 없고 순수 이미지 표시 방식의 앱에서는 괜찮지만
-  화면상에 mfc control이 있다면 깜빡임이 많이 발생할 수 있다.
+
+	m_d2gif.load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), IDR_GIF_NHQV06, _T("GIF"));
+	m_d2gif.set_parent(m_hWnd);	//메시지를 받기 위해 parent를 꼭 지정해줘야 한다.
+
+
+
 */
 
 #pragma once
@@ -46,11 +64,36 @@ enum class eSCD2Image_DRAW_MODE
 	draw_mode_zoom,				//target에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
 };
 
+class CSCD2Image;
+
+class CSCD2ImageMessage
+{
+public:
+	CSCD2ImageMessage(CSCD2Image* _this, int _message, int _frame_index, int _total_frames)
+	{
+		pThis = _this;
+		message = _message;
+		frame_index = _frame_index;
+		total_frames = _total_frames;
+	}
+
+	CSCD2Image* pThis = NULL;
+	int		message;
+	int		frame_index = -1;
+	int		total_frames = -1;
+};
+
 class CSCD2Image
 {
 public:
 	CSCD2Image();
 	~CSCD2Image();
+
+	enum ENUM_CSCD2ImageMessages
+	{
+		message_image_modified = 0,
+		message_frame_changed,
+	};
 
 	//load external image
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path);
@@ -120,10 +163,11 @@ public:
 	int						get_frame_count() { return m_img.size(); }
 	void					set_parent(HWND hWnd) { m_parent = hWnd; }
 	void					play();
-	void					pause(int pos = 0);
-	void					stop();
+	void					pause(int pos = -1);
+	bool					stop();
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
-	int						goto_frame(int index);
+	int						goto_frame(int index, bool pause = false);
+	void					step(int interval = 1);
 
 protected:
 	CString					m_filename;// = _T("untitled");
@@ -149,6 +193,7 @@ protected:
 	HWND					m_parent = NULL; //animation이 진행될 때 parent에게 메시지를 보내기 위해 필요
 	std::deque<int>			m_frame_delay; //in milliseconds
 	bool					m_run_thread_animation = false;
+	bool					m_thread_animation_terminated = true;
 	bool					m_ani_paused = false;
 	bool					m_ani_mirror = false;
 

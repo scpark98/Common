@@ -3398,7 +3398,7 @@ void CSCGdiplusBitmap::thread_gif_animation()
 			continue;
 		}
 
-		::PostMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&CSCGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
+		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&CSCGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
 
 		m_frame_index++;
 		if (m_frame_index >= m_frame_count)

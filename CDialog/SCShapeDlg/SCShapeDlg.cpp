@@ -76,7 +76,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
 	m_parent = parent;
 
-	LONG_PTR dwStyle = WS_POPUP;
+	LONG_PTR dwStyle = WS_POPUP;// | WS_EX_NOACTIVATE;
 	//DWORD dwStyle = WS_CHILD | WS_VISIBLE;
 
 	WNDCLASS wc = {};
@@ -689,7 +689,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 	}
 
 	m_fadeinout_ing = false;
-	TRACE(_T("thread_fadeinout stopped.\n"));
+	//TRACE(_T("thread_fadeinout stopped.\n"));
 }
 #endif
 

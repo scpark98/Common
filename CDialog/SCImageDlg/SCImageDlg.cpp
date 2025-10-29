@@ -1657,7 +1657,7 @@ void CSCImageDlg::reload_image()
 		else
 			index = 0;
 	}
-	else if (index >= m_files.size())
+	else if (index >= (int)m_files.size())
 	{
 		index = m_files.size() - 1;
 	}

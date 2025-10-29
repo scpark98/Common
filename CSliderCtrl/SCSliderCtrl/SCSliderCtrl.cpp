@@ -1608,7 +1608,7 @@ void CSCSliderCtrl::set_step_image(int pos, int id)
 		return;
 	}
 
-	if (pos >= m_steps.size())
+	if (pos >= (int)m_steps.size())
 	{
 		TRACE(_T("invalid index = %d\n"), pos);
 		return;

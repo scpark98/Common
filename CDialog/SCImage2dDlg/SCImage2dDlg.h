@@ -193,11 +193,11 @@ public:
 	void			set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore);
 
 //animated gif 관련 public member
-	void			play_gif();
+	void			play();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void			pause_gif(int pos = 0);
+	void			pause(int pos = 0);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-	void			stop_gif();
+	void			stop();
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
 
@@ -227,7 +227,7 @@ protected:
 	//backward면 0(cur), -1, -2, -3, -4
 	//이미지만 미리 버퍼링 해 놓을 경우 표시는 빨라지지만 그 이미지 파일명, 파일속성등은? m_files에서 해당 파일 인덱스를 찾아서 처리해도 될 듯함.
 	std::deque<CSCD2Image>	m_img;
-	int				m_buffer_max = 5;
+	int				m_buffer_max = 1;		//buffering 관련 test가 아니라면 debugging에 방해되므로 임시로 1로 변경. default=5
 	bool			m_is_forward = true;
 
 	bool			m_thread_buffering = false;
@@ -298,13 +298,13 @@ protected:
 	CSCStatic		m_static_pixel;
 
 //animated gif
-	bool			m_paused = false;
-	int				m_frame_index;
-	CRect			m_r_gif;
-	bool			m_run_thread_animation = false;
-	bool			m_thread_animation_terminated = true;
-	bool			m_is_gif_mirror = false;
-	void			thread_gif_animation();
+	//bool			m_paused = false;
+	//int				m_frame_index;
+	//CRect			m_r_gif;
+	//bool			m_run_thread_animation = false;
+	//bool			m_thread_animation_terminated = true;
+	//bool			m_is_gif_mirror = false;
+	//void			thread_gif_animation();
 
 	CSCSliderCtrl	m_slider_gif;
 	LRESULT			on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);

@@ -13271,6 +13271,13 @@ CRect get_center_rect(CRect target, int w, int h)
 	return CRect(target.left + (target.Width() - w) / 2, target.top + (target.Height() - h) / 2, w, h);
 }
 
+CRect get_rc(HWND hWnd)
+{
+	CRect r;
+	::GetClientRect(hWnd, &r);
+	return r;
+}
+
 //주어진 점들을 포함하는 최대 사각형을 구한다.
 CRect get_max_rect(CPoint *pt, int nPoints)
 {

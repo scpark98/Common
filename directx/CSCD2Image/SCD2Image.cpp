@@ -13,11 +13,8 @@ CSCD2Image::CSCD2Image()
 
 CSCD2Image::~CSCD2Image()
 {
-	//while (m_img.size() > 0)
-	//{
-	//	m_img.clear();
-	//	Wait(100);
-	//}
+	while (!stop())
+		Wait(10);
 
 	CoUninitialize();
 }
@@ -149,6 +146,9 @@ HRESULT CSCD2Image::create_device_context()
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type)
 {
+	while (!stop())
+		Wait(10);
+
 	m_filename.Format(_T("Resource Image(id:%d)"), resource_id);
 
 	IWICStream* pStream = NULL;
@@ -218,6 +218,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path)
 {
+	while (!stop())
+		Wait(10);
+
 	m_filename = path;
 
 	ComPtr<IWICBitmapDecoder> pDecoder;
@@ -326,6 +329,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	m_img.clear();
 	m_frame_delay.clear();
 
+	D2D1_SIZE_U img_size = { 0, 0 };
 	UINT frame_count = 1;
 	HRESULT	hr = pDecoder->GetFrameCount(&frame_count);
 
@@ -339,7 +343,21 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 
 	ComPtr<IWICMetadataQueryReader> metareader;
-	hr = pDecoder->GetMetadataQueryReader(metareader.GetAddressOf());
+	_M(pDecoder->GetMetadataQueryReader(metareader.GetAddressOf()));
+
+	//여기서 이미지의 크기를 먼저 구한다.
+	if (metareader)
+	{
+		hr = metareader->GetMetadataByName(L"/logscrdesc/Width", &propValue);
+		if (SUCCEEDED(hr) && (propValue.vt == VT_UI2))
+			img_size.width = propValue.uiVal;
+		PropVariantClear(&propValue);
+
+		hr = metareader->GetMetadataByName(L"/logscrdesc/Height", &propValue);
+		if (SUCCEEDED(hr) && (propValue.vt == VT_UI2))
+			img_size.height = propValue.uiVal;
+		PropVariantClear(&propValue);
+	}
 
 	// Get palette
 	WICColor rgbColors[256] = {};
@@ -347,16 +365,11 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (frame_count > 1)
 	{
 		ComPtr<IWICPalette> palette;
-		hr = pWICFactory->CreatePalette(palette.GetAddressOf());
-		if (FAILED(hr))
-			return hr;
+		_M(pWICFactory->CreatePalette(palette.GetAddressOf()));
 
 		//webp의 경우는 팔레트를 사용할 수 없다.
-		hr = pDecoder->CopyPalette(palette.Get());
-		if (SUCCEEDED(hr))
-		{
-			hr = palette->GetColors(static_cast<UINT>(std::size(rgbColors)), rgbColors, &actualColors);
-		}
+		_M(pDecoder->CopyPalette(palette.Get()));
+		_M(palette->GetColors(static_cast<UINT>(std::size(rgbColors)), rgbColors, &actualColors));
 	}
 
 	// Get background color
@@ -365,36 +378,31 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (usebgcolor && metareader)
 	{
 		// Most browsers just ignore the background color metadata and always use transparency
-		hr = metareader->GetMetadataByName(L"/logscrdesc/GlobalColorTableFlag", &propValue);
-		if (SUCCEEDED(hr))
+		_M(metareader->GetMetadataByName(L"/logscrdesc/GlobalColorTableFlag", &propValue));
+
+		const bool hasTable = (propValue.vt == VT_BOOL && propValue.boolVal);
+		PropVariantClear(&propValue);
+
+		if (hasTable)
 		{
-			const bool hasTable = (propValue.vt == VT_BOOL && propValue.boolVal);
-			PropVariantClear(&propValue);
+			_M(metareader->GetMetadataByName(L"/logscrdesc/BackgroundColorIndex", &propValue));
 
-			if (hasTable)
+			if (propValue.vt == VT_UI1)
 			{
-				hr = metareader->GetMetadataByName(L"/logscrdesc/BackgroundColorIndex", &propValue);
-				if (SUCCEEDED(hr))
-				{
-					if (propValue.vt == VT_UI1)
-					{
-						const uint8_t index = propValue.bVal;
+				const uint8_t index = propValue.bVal;
 
-						if (index < actualColors)
-						{
-							bgColor = rgbColors[index];
-						}
-					}
-					PropVariantClear(&propValue);
+				if (index < actualColors)
+				{
+					bgColor = rgbColors[index];
 				}
 			}
+			PropVariantClear(&propValue);
 		}
 	}
 
 
 	UINT previousFrame = 0;
 	UINT disposal = DM_UNDEFINED;
-	D2D1_SIZE_U img_size = { 0, 0 };
 
 	for (int i = 0; i < frame_count; i++)
 	{
@@ -405,11 +413,14 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		ComPtr<IWICMetadataQueryReader> pMetadataReader;
 		WICPixelFormatGUID pf;
 
-		hr = pWICFactory->CreateFormatConverter(pConverter.GetAddressOf());
-		hr = pDecoder->GetFrame(i, pFrameDecode.GetAddressOf());
+		_M(pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
+		_M(pDecoder->GetFrame(i, pFrameDecode.GetAddressOf()));
+
+		ComPtr<ID2D1Bitmap> frame_img;
+
 		RECT rt = { 0, 0, 0, 0 };
 
-		pFrameDecode->GetMetadataQueryReader(pMetadataReader.GetAddressOf());
+		_M(pFrameDecode->GetMetadataQueryReader(pMetadataReader.GetAddressOf()));
 
 		if (pMetadataReader)
 		{
@@ -423,13 +434,14 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 					UINT delay = propValue.uiVal * 10;
 					//if (delay < 20) delay = 100; // GIF frame delays less than 20ms are not honored.
 					m_frame_delay.push_back(delay);
-					TRACE(_T("%2dth frame. delay = %d ms\n"), i, delay);
+					TRACE(_T("#%dth frame. delay = %d ms\n"), i, delay);
 				}
 				PropVariantClear(&propValue);
 			}
 			else
 			{
-				m_frame_delay.push_back(100); // default 100ms
+				TRACE(_T("#%dth frame. delay not fount. assume 30 ms\n"), i);
+				m_frame_delay.push_back(30); // default 30ms
 			}
 
 			//calling.gif와 같이 1번 프레임부터 변경된 이미지 정보만 저장된 gif의 경우는 disposal 값은 DM_NONE로 추출된다.
@@ -443,7 +455,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				if (SUCCEEDED(hr))
 				{
 					disposal = propValue.bVal;
-					trace(disposal);
+					//trace(disposal);
 				}
 				PropVariantClear(&propValue);
 			}
@@ -491,6 +503,28 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				}
 				PropVariantClear(&propValue);
 			}
+
+			hr = pMetadataReader->GetMetadataByName(L"/imgdesc/Width", &propValue);
+			if (SUCCEEDED(hr))
+			{
+				hr = (propValue.vt == VT_UI2 ? S_OK : E_FAIL);
+				if (SUCCEEDED(hr))
+				{
+					rt.right = rt.left + static_cast<long>(propValue.uiVal);
+				}
+				PropVariantClear(&propValue);
+			}
+
+			hr = pMetadataReader->GetMetadataByName(L"/imgdesc/Height", &propValue);
+			if (SUCCEEDED(hr))
+			{
+				hr = (propValue.vt == VT_UI2 ? S_OK : E_FAIL);
+				if (SUCCEEDED(hr))
+				{
+					rt.bottom = rt.top + static_cast<long>(propValue.uiVal);
+				}
+				PropVariantClear(&propValue);
+			}
 		}
 
 		hr = pConverter->Initialize(
@@ -505,29 +539,45 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		if (FAILED(hr))
 			return hr;
 
-		ComPtr<ID2D1Bitmap> img;
-		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
+		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, frame_img.GetAddressOf());
 
 		if (i == 0)
 		{
-			img_size = img->GetPixelSize();
-			pFrameDecode->GetPixelFormat(&pf);
+			//어떤 gif는 위의 "/logscrdesc/Width"로 가져오지 못하는 경우가 있다.
+			//이런 경우는 0번 프레임의 크기로 설정한다.
+			if (img_size.width == 0 || img_size.height == 0)
+			{
+				img_size.width = frame_img->GetSize().width;
+				img_size.height = frame_img->GetSize().height;
+			}
 
+			pFrameDecode->GetPixelFormat(&pf);
 			get_pixel_format_str(&pf);
 		}
 
-		if (i > 0 && disposal == DM_NONE)
+		//webp의 경우 위에서 rt정보를 얻을 수 없다. empty라면 기본 이미지 크기로 채워준다.
+		if (rt.right == 0 || rt.bottom == 0)
 		{
-			TRACE(_T("rt = %d, %d\n"), rt.left, rt.top);
+			rt.right = img_size.width;
+			rt.bottom = img_size.height;
+		}
 
+		TRACE(_T("#%03d. rt = %s\n"), i, get_rect_info_string(rt));
+
+		//어떤 gif는 전 프레임 이미지에 변경된 정보만 가진 gif도 존재한다.
+		//이럴 경우는 이전 프레임에 현재 이미지를 blend하여 m_img에 push해야 한다.
+		if (disposal == DM_NONE || ((rt.right - rt.left) < img_size.width) || ((rt.bottom - rt.top) < img_size.height))
+		{
+			//이전 프레임 이미지를 복사하여 새 이미지를 생성한다.
 			ComPtr<ID2D1Bitmap1> blendedBitmap;
-			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, img->GetPixelFormat());
+			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, frame_img->GetPixelFormat());
 			hr = d2context->CreateBitmap(img_size, nullptr, 0, properties, blendedBitmap.GetAddressOf());
 
 			D2D1_POINT_2U pt = { 0, 0 };
 			D2D_RECT_U r = { 0, 0, img_size.width, img_size.height };
-			D2D1_SIZE_U size = img->GetPixelSize();
-			blendedBitmap->CopyFromBitmap(&pt, m_img[previousFrame].Get(), &r);
+			D2D1_SIZE_U size = frame_img->GetPixelSize();
+			if (i > 0)// && transparentIndex != 255)
+				blendedBitmap->CopyFromBitmap(&pt, m_img[previousFrame].Get(), &r);
 
 #if 0
 
@@ -558,18 +608,22 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			save(L"d:\\img.png", img.Get());
 			save(L"d:\\blended.png", blendedBitmap.Get());
 #else
+			//이전 프레임 이미지위에
 			d2context->SetTarget(blendedBitmap.Get());
 			d2context->BeginDraw();
 			//d2context->DrawBitmap(m_img[i - 1].Get());// , D2D1::RectF(0, 0, (FLOAT)img_size.width, (FLOAT)img_size.height), 1.0f, D2D1_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, (FLOAT)img_size.width, (FLOAT)img_size.height));
 			//D2D1_SIZE_U size = img->GetPixelSize();
-			d2context->DrawBitmap(img.Get(), D2D1::RectF((FLOAT)rt.left, (FLOAT)rt.top, (FLOAT)(rt.left + size.width), (FLOAT)(rt.top + size.height)));// , 1.0f, D2D1_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, (FLOAT)size.width, (FLOAT)size.height));
+			//현재 프레임의 이미지를 그려준다.
+			d2context->DrawBitmap(frame_img.Get(), D2D1::RectF((FLOAT)rt.left, (FLOAT)rt.top, (FLOAT)(rt.right), (FLOAT)(rt.bottom)));// , 1.0f, D2D1_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, (FLOAT)size.width, (FLOAT)size.height));
 			hr = d2context->EndDraw();
 			d2context->SetTarget(nullptr);
+
+			m_img.push_back(std::move(blendedBitmap));
 			//save(img.Get(), _T("d:\\gif\\img\\%02d img (%d, %d).png"), i, rt.left, rt.top);
 			//save(blendedBitmap.Get(), _T("d:\\gif\\blended\\%02d blendedBitmap.png"), i);
 #endif
-
-			img->CopyFromBitmap(&pt, blendedBitmap.Get(), &r);
+			//blend 된 이미지를 img로 복사하여 m_img에 push한다.
+			//img->CopyFromBitmap(&pt, blendedBitmap.Get(), &r);
 			/*
 			//이전 프레임을 복사한다.
 			//DM_NONE인 경우는 이전 프레임을 그대로 사용하는 것이므로
@@ -586,13 +640,18 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			}
 			*/
 		}
-
-		m_img.push_back(std::move(img));
+		else
+		{
+			m_img.push_back(std::move(frame_img));
+		}
 	}
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
 	m_width = sz.width;
 	m_height = sz.height;
+
+	if (frame_count > 1)
+		play();
 
 	return hr;
 }
@@ -816,7 +875,7 @@ bool CSCD2Image::is_empty(int index)
 	if (this == NULL)
 		return true;
 
-	if (index < 0 || index >= m_img.size())
+	if (index < 0 || index >= (int)m_img.size())
 		return true;
 
 	if (m_width <= 0.0f || m_height <= 0.0f)
@@ -894,7 +953,7 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 {
 	D2D1_RECT_F r = { 0, 0, 0, 0 };
 
-	if (m_frame_index >= m_img.size())
+	if (m_frame_index >= (int)m_img.size())
 		return r;
 
 	if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_stretch)
@@ -939,20 +998,42 @@ CRect CSCD2Image::calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode)
 }
 
 //n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
-int CSCD2Image::goto_frame(int index)
+int CSCD2Image::goto_frame(int index, bool pause)
 {
 	if (index >= m_img.size())
 		index = 0;
 
 	m_frame_index = index;
+	if (pause)
+	{
+		m_ani_paused = true;
+		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&CSCD2ImageMessage(this, message_frame_changed, m_frame_index, m_img.size()), 0);
+	}
 
 	return m_frame_index;
+}
+
+void CSCD2Image::step(int interval)
+{
+	m_ani_paused = true;
+
+	if (m_img.size() <= 1)
+		return;
+
+	m_frame_index += interval;
+	if (m_frame_index < 0)
+		m_frame_index = 0;
+	if (m_frame_index >= (int)m_img.size())
+		m_frame_index = m_img.size() - 1;
+
+	::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&CSCD2ImageMessage(this, message_frame_changed, m_frame_index, m_img.size()), 0);
 }
 
 void CSCD2Image::play()
 {
 	if (m_img.size() <= 1)
 		return;
+
 	//thread를 이용하여 현재 프레임의 delay가 지나면 m_frame_index를 증가시키고
 	//parent에게 이를 알려 re-rendering하도록 한다.
 	if (m_run_thread_animation)
@@ -970,39 +1051,59 @@ void CSCD2Image::pause(int pos)
 	if (m_img.size() <= 1 || !m_run_thread_animation)
 		return;
 	
-	if (pos >= m_img.size())
+	if (pos >= (int)m_img.size())
 		pos = 0;
+
+	if (pos < 0)
+	{
+		play();
+		return;
+	}
 
 	m_frame_index = pos;
 	m_ani_paused = true;
 }
 
-void CSCD2Image::stop()
+bool CSCD2Image::stop()
 {
 	if (m_img.size() <= 1)
-		return;
-	pause(0);
+		return true;
+
+	if (m_run_thread_animation)
+	{
+		m_run_thread_animation = false;
+		while (!m_thread_animation_terminated)
+			Wait(10);
+	}
+
+	return true;
 }
 
 void CSCD2Image::thread_animation()
 {
-	m_run_thread_animation = true;
 	m_ani_paused = false;
+
+	m_run_thread_animation = true;
+	m_thread_animation_terminated = false;
 
 	while (m_run_thread_animation)
 	{
 		if (m_ani_paused)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			if (!m_run_thread_animation)
+				break;
+
+			//TRACE(_T("paused\n"));
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
 
 		m_frame_index++;
-		if (m_frame_index >= m_img.size())
+		if (m_frame_index >= (int)m_img.size())
 			m_frame_index = 0;
 
 		//TRACE(_T("frame index = %d\n"), m_frame_index);
-		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)0, m_frame_index);
+		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&CSCD2ImageMessage(this, message_frame_changed, m_frame_index, m_img.size()), 0);
 
 		if (m_frame_delay.size() == 0)
 			break;
@@ -1012,6 +1113,8 @@ void CSCD2Image::thread_animation()
 	}
 
 	m_run_thread_animation = false;
+	m_thread_animation_terminated = true;
+	TRACE(_T("%s terminated.\n"), __function__);
 }
 
 //data멤버에 픽셀 데이터를 가리키도록 한다.
@@ -1082,6 +1185,13 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 	{
 		m_channel = 1;
 		str_fmt = _T("GUID_WICPixelFormat8bppIndexed");
+	}
+	else
+	{
+		CString str;
+		str.Format(_T("not defiend pixel format. %d"), *pf);
+		TRACE(_T("%s\n"), str);
+		AfxMessageBox(str);
 	}
 
 	if (simple && (str_fmt.Find(_T("Unknown")) < 0))

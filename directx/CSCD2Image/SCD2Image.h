@@ -24,10 +24,7 @@
   parent window에게 메시지를 보내서 Invalidate()을 통해 화면이 갱신된다.
 
 	m_d2gif.load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), IDR_GIF_NHQV06, _T("GIF"));
-	m_d2gif.set_parent(m_hWnd);	//메시지를 받기 위해 parent를 꼭 지정해줘야 한다.
-
-
-
+	m_d2gif.set_parent(m_hWnd);	//frame_changed 메시지를 받기 위해 parent를 꼭 지정해줘야 한다.
 */
 
 #pragma once
@@ -63,6 +60,7 @@ enum class eSCD2Image_DRAW_MODE
 	draw_mode_stretch,			//target에 꽉차게 그림(non ratio)
 	draw_mode_zoom,				//target에 ratio를 유지하여 그림(가로 또는 세로에 꽉참)
 };
+
 
 class CSCD2Image;
 
@@ -169,6 +167,10 @@ public:
 	int						goto_frame(int index, bool pause = false);
 	void					step(int interval = 1);
 
+//exif
+	CSCEXIFInfo				get_exif() { return m_exif_info; }
+	CString					get_exif_str();
+
 protected:
 	CString					m_filename;// = _T("untitled");
 
@@ -184,9 +186,14 @@ protected:
 	float					m_height = 0.0f;
 	int						m_channel = 0;
 	CString					m_pixel_format_str;
+	//촬영된 이미지의 경우 exif 정보를 추출한다.
+	CSCEXIFInfo				m_exif_info;
+	HRESULT					extract_exif_info(IWICBitmapDecoder* pDecoder);
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder);
 
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
+
+
 
 
 //animated gif

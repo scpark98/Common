@@ -318,7 +318,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 		render(m_img.m_pBitmap);
 	}
 
-	set_alpha(255);
+	//set_alpha(255);
 	ShowWindow(SW_SHOW);
 }
 
@@ -603,7 +603,12 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 {
 	m_fadeinout_ing = true;
 
-	set_alpha((fadein && fadein_delay_ms > 0) ? 0 : 255);
+	//fade in/out을 하면서 전체 투명도인 m_alpha를 계속 변경시키면서 렌러링하는 방식이므로
+	//이를 백업해두고 이 thread를 종료시킬 때 다시 복원시켜줘야 한다.
+	//fade in/out의 범위는 0 ~ 255가 아니라 0 ~ alpha_origin이 되어야 한다.
+	int alpha_origin = m_alpha;
+
+	set_alpha((fadein && fadein_delay_ms > 0) ? 0 : alpha_origin);
 	ShowWindow(SW_SHOW);
 
 	int _alpha = m_alpha;
@@ -615,7 +620,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 	{
 		_alpha += (fadein ? 25 : -25);
 
-		if (_alpha < 0 || _alpha > 255)
+		if (_alpha < 0 || _alpha > alpha_origin)
 			break;
 		
 		set_alpha(_alpha);
@@ -636,7 +641,10 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 	}
 
 	if (!m_fadeinout_ing)
+	{
+		set_alpha(alpha_origin);
 		return;
+	}
 
 	if (hide_after_ms > 0)
 	{
@@ -650,14 +658,15 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 				break;
 		}
 	}
-	else
-	{
-		return;
-	}
+	//else
+	//{
+	//	set_alpha(alpha_origin);
+	//	return;
+	//}
 
 	if (fadeout)
 	{
-		set_alpha(255);
+		set_alpha(m_alpha);
 		int _alpha = m_alpha;
 
 		if (fadeout_delay_ms < 0)
@@ -667,7 +676,7 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 		{
 			_alpha -= 5;
 
-			if (_alpha < 0 || _alpha > 255)
+			if (_alpha < 0 || _alpha > alpha_origin)
 			{
 				ShowWindow(SW_HIDE);
 				break;
@@ -685,9 +694,10 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 			}
 		}
 
-		set_alpha(255);
+		//set_alpha(alpha_origin);
 	}
 
+	set_alpha(alpha_origin);
 	m_fadeinout_ing = false;
 	//TRACE(_T("thread_fadeinout stopped.\n"));
 }

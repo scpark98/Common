@@ -289,7 +289,7 @@ void CSCImage2dDlg::OnPaint()
 	//gaussianBlurEffect->SetInput(0, m_img[0].get());
 
 	//실제 이미지를 그려준다.
-	if (m_img[0].get_channel() == 4)
+	if (m_img[0].get_channel() == 4 || (m_img[0].get_channel() == 1 && get_part(m_img[0].get_filename(), fn_ext) == _T("gif")))
 		d2dc->FillRectangle(convert(m_r_display), m_d2dc.get_zigzag_brush().Get());
 
 	m_img[0].set_interpolation_mode(m_interpolation_mode);
@@ -347,12 +347,15 @@ void CSCImage2dDlg::OnPaint()
 	screen_roi.NormalizeRect();
 
 	ID2D1SolidColorBrush *br_red = NULL;
-	d2dc->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Red), &br_red);
+	d2dc->CreateSolidColorBrush(D2D1::ColorF(1.0f, 0.25f, 0.0f, 0.8f), &br_red);
+
+	ID2D1SolidColorBrush* br_roi;
+	d2dc->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.12f, 1.0f, 0.25f), &br_roi);
 
 	if (m_lbutton_down)// && m_drawing_roi)
 	{
 		//d2dc->DrawRectangle(convert(screen_roi), br_red);
-		d2dc->FillRectangle(convert(screen_roi), br_red);
+		d2dc->FillRectangle(convert(screen_roi), br_roi);
 		//draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
 	else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
@@ -366,7 +369,7 @@ void CSCImage2dDlg::OnPaint()
 		//screen_roi.OffsetRect(m_offset);
 		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 		//draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
-		d2dc->FillRectangle(convert(screen_roi), br_red);
+		d2dc->FillRectangle(convert(screen_roi), br_roi);
 	}
 
 	if (!m_screen_roi.IsEmptyArea())
@@ -378,14 +381,42 @@ void CSCImage2dDlg::OnPaint()
 		//image_roi 역시 normalize_rect을 해줘야 한다. 그렇지 않으면 뒤집어 그릴 경우 x1,y1이 x2, y2보다 큰 좌표로 표시된다.
 		normalize_rect(image_roi);
 
+
+
 		//9군데 조절 핸들을 그려준다.
 		for (int i = 0; i < 9; i++)
 			//draw_rectangle(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
 			//draw_rectangle(g, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 64, 0));
-			d2dc->FillRectangle(convert(m_roi_handle[i]), br_red);
+			d2dc->FillRectangle(convert(m_roi_handle[i]), br_red);// ->SetColor(D2D1::ColorF(1.0f, 0, 1.0f, 0.8f)));
 
 		if (m_show_roi_info)
 		{
+			str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
+			CSize sz = dc.GetTextExtent(str);
+			m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
+
+			//lt
+			m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+			m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+			d2dc->DrawText(str, str.GetLength(), m_WriteFormat,
+				D2D1::RectF(screen_roi.left + 4, screen_roi.top + 2, screen_roi.left + 4 + sz.cx + 2, screen_roi.top + 2 + sz.cy), m_brush);
+
+			//rb
+			m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+			m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+			str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
+			sz = dc.GetTextExtent(str);
+			d2dc->DrawText(str, str.GetLength(), m_WriteFormat,
+				D2D1::RectF(screen_roi.left + screen_roi.Width() - 2 - sz.cx, screen_roi.top + screen_roi.Height() - sz.cy - 2, screen_roi.left + screen_roi.Width() - 2, screen_roi.top + screen_roi.Height()), m_brush);
+
+			//size
+			m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+			m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+			str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
+			sz = dc.GetTextExtent(str);
+			d2dc->DrawText(str, str.GetLength(), m_WriteFormat,
+				D2D1::RectF(screen_roi.CenterPoint().x - sz.cx / 2, screen_roi.CenterPoint().y + 2, screen_roi.CenterPoint().x + sz.cx / 2, screen_roi.CenterPoint().y + 2 + sz.cy), m_brush);
+			/*
 			CAutoFont af(_T("Arial"));
 			af.SetHeight(14);
 
@@ -404,7 +435,7 @@ void CSCImage2dDlg::OnPaint()
 				DT_NOCLIP | DT_LEFT | DT_TOP, white, black, 2, 1);
 
 			//end
-			str.Format(_T("%.0f, %.00f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
+			str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
 			sz = dc.GetTextExtent(str);
 			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
 				CRect(screen_roi.left + screen_roi.Width() - 2 - sz.cx, screen_roi.top + screen_roi.Height() - sz.cy - 2, screen_roi.left + screen_roi.Width() - 2, screen_roi.top + screen_roi.Height()),
@@ -419,6 +450,7 @@ void CSCImage2dDlg::OnPaint()
 				DT_NOCLIP | DT_CENTER | DT_TOP, yellow, black, 2, 1);
 
 			dc.SelectObject(pOldFont);
+			*/
 		}
 	}
 
@@ -1609,13 +1641,11 @@ void CSCImage2dDlg::build_image_info_str()
 		m_img[0].get_pixel_format_str(),
 		ratio_str);
 
-	/*
 	//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
 	if (m_img[0].get_exif_str().GetLength())
 	{
 		m_info_str.Format(_T("%s\n\n%s"), m_info_str, m_img[0].get_exif_str());
 	}
-	*/
 }
 
 void CSCImage2dDlg::goto_index(int index)

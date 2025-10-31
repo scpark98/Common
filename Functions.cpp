@@ -6498,7 +6498,7 @@ int CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpDa
 	return 0;
 }
 
-bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFolder, const TCHAR* strStartFolder /*= NULL*/, bool bNewFolderButton)
+bool BrowseForFolder(HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFolder, const TCHAR* strStartFolder /*= NULL*/, bool bNewFolderButton)
 {
 	bool		bSuccess = false;
 	BROWSEINFO	bi;
@@ -6507,7 +6507,7 @@ bool BrowseForFolder(	HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFold
 
 	bi.hwndOwner	= hwndOwner;
 	bi.lpszTitle	= lpszTitle;
-	bi.ulFlags		= BIF_RETURNONLYFSDIRS | BIF_USENEWUI;
+	bi.ulFlags		= BIF_NEWDIALOGSTYLE | BIF_EDITBOX | BIF_RETURNONLYFSDIRS;
 	if (bNewFolderButton == false)
 		bi.ulFlags	|= BIF_NONEWFOLDERBUTTON;
 	bi.lParam		= (LPARAM)strStartFolder;

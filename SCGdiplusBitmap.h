@@ -63,6 +63,8 @@
 #include <memory>
 #include <cmath>
 
+#include "Functions.h"
+
 static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CSCGdiplusBitmap"));
 
 //주의할 점은 TOP, LEFT는 0이므로 먼저 비교하면 안되고 CENTER, RIGHT인지 검사한 후 아니면 LEFT라고 판단해야 한다.
@@ -100,55 +102,6 @@ public:
 protected:
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
-};
-
-//https://exiv2.org/tags.html
-class CSCEXIFInfo
-{
-public:
-	CString camera_make;
-	CString camera_model;
-	CString software;
-	CString image_description;
-	CString image_copyright;
-	CString original_datetime;
-	double exposure_time = 1.0;
-	double exposure_bias = 0.0;
-	double f_number = 0.0;				//"
-	unsigned short iso_speed = 0;
-	char flash = 0;
-	double focal_length = 0.0;
-	double focal_length_in_35mm = 0.0;
-	double gps_altitude;
-	double gps_latitude = 0.0;
-	double gps_longitude = 0.0;
-	int orientation = 0;
-	CString gps_latitude_str;
-	CString gps_longitude_str;
-	CString orientation_str;
-
-	CString get_exif_str()
-	{
-		CString res;
-		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
-			_T("노출 시간 : 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: N %s, E %s, %.0fm"),
-			camera_make,
-			camera_model,
-			software,
-			original_datetime,
-			flash ? _T("on") : _T("off"),
-			focal_length,
-			focal_length_in_35mm,
-			(unsigned)round(1.0 / exposure_time),
-			exposure_bias,
-			f_number,
-			iso_speed,
-			orientation_str,
-			gps_latitude_str,
-			gps_longitude_str,
-			gps_altitude);
-		return res;
-	}
 };
 
 class CSCGdiplusBitmapMessage

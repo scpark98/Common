@@ -259,49 +259,49 @@ bool CSCGdiplusBitmap::load(CString file)
 						m_exif_info.original_datetime = (LPSTR)m_property_item[i].value;
 						break;
 					case PropertyTagExifExposureTime:
-					TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.exposure_time = (double)plong[0] / (double)plong[1];
 						break;
 					case PropertyTagExifExposureBias:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.exposure_bias = (double)plong[0] / (double)plong[1];
 						break;
 					case PropertyTagExifFNumber:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.f_number = (double)plong[0] / (double)plong[1];
 						break;
 					case PropertyTagExifISOSpeed:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.iso_speed = (unsigned short)plong[0];
 						break;
 					case PropertyTagExifFocalLength:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.focal_length = (double)plong[0] / (double)plong[1];
 						break;
 					case PropertyTagExifFocalLengthIn35mmFilm:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.focal_length_in_35mm = (char)plong[0];
 						break;
 					case PropertyTagGpsAltitude:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.gps_altitude = (double)plong[0] / (double)plong[1];
 						break;
 					case PropertyTagGpsLatitude:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
-						TRACE(_T("property_type = %d, %d, %d, %d, %d, %d\n"), plong[0], plong[1], plong[2], plong[3], plong[4], plong[5]);
+						//TRACE(_T("property_type = %d, %d, %d, %d, %d, %d\n"), plong[0], plong[1], plong[2], plong[3], plong[4], plong[5]);
 						m_exif_info.gps_latitude_str.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
 						m_exif_info.gps_latitude = gps_to_double(plong[0], plong[2], (double)plong[4] / (double)plong[5]);
 						break;
 					case PropertyTagGpsLongitude:
-						TRACE(_T("property_type = %d\n"), m_property_item[i].type);
+						//TRACE(_T("property_type = %d\n"), m_property_item[i].type);
 						plong = (long*)(m_property_item[i].value);
 						m_exif_info.gps_longitude_str.Format(_T("%d° %d' %.6f\""), plong[0], plong[2], (double)plong[4] / (double)plong[5]);
 						m_exif_info.gps_longitude = gps_to_double(plong[0], plong[2], (double)plong[4] / (double)plong[5]);

@@ -290,8 +290,8 @@ void CSCImageDlg::OnPaint()
 
 	if (m_lbutton_down)// && m_drawing_roi)
 	{
-		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
-		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+		//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
 	else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
 	{
@@ -302,8 +302,8 @@ void CSCImageDlg::OnPaint()
 		screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
 		//screen_roi.OffsetRect(m_offset);
-		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
-		draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+		//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 	}
 
 	if (!m_screen_roi.IsEmptyArea())
@@ -317,8 +317,8 @@ void CSCImageDlg::OnPaint()
 
 		//9군데 조절 핸들을 그려준다.
 		for (int i = 0; i < 9; i++)
-			//draw_rectangle(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
-			draw_rectangle(g, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 64, 0));
+			//draw_rect(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
+			draw_rect(g, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 64, 0));
 
 		if (m_show_roi_info)
 		{
@@ -1016,7 +1016,7 @@ BOOL CSCImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 
 		m_handle_index = -1;
 
-		for (int i = 0; i < MAX_ROI_RECT_HANDLE; i++)
+		for (int i = 0; i < ROI_RECT_HANDLE_COUNT; i++)
 		{
 			if (m_roi_handle[i].PtInRect(pt))
 			{

@@ -270,7 +270,7 @@ void CSCThumbCtrl::OnPaint()
 		//DrawTextShadow(&dc, str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, GRAY64, red);
 		//DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), rc,
 		//	DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, 0, red, 2, 4);
-		draw_rectangle(&dc, rc, GRAY192);
+		draw_rect(&dc, rc, GRAY192);
 		dc.SelectObject(pOldFont);
 		return;
 	}
@@ -285,8 +285,8 @@ void CSCThumbCtrl::OnPaint()
 
 		//선택된 항목이면
 		if (find_index(m_selected, i) >= 0)
-			//draw_rectangle(g, rThumb, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
-			draw_rectangle(g, rThumb, m_theme.cr_selected_border, m_theme.cr_back_selected);
+			//draw_rect(g, rThumb, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
+			draw_rect(g, rThumb, m_theme.cr_selected_border, m_theme.cr_back_selected);
 
 		rThumb.DeflateRect(m_r_inner);
 		rThumb.bottom -= (m_thumb_title_gap + m_title_height);
@@ -313,7 +313,7 @@ void CSCThumbCtrl::OnPaint()
 
 		CString title = (m_show_extension ? m_thumb[i].title : get_part(m_thumb[i].title, fn_title));
 		dc.DrawText(title, rTitle, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-		//draw_rectangle(g, rTitle, Gdiplus::Color::Blue);
+		//draw_rect(g, rTitle, Gdiplus::Color::Blue);
 
 		//항목 인덱스 표시
 		if (m_show_index)
@@ -375,7 +375,7 @@ void CSCThumbCtrl::OnPaint()
 		}
 		else
 		{
-			draw_rectangle(g, r, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
+			draw_rect(g, r, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
 		}
 	}
 	*/

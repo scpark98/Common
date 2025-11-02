@@ -6147,7 +6147,7 @@ CRect draw_text(Gdiplus::Graphics &g,
 	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
 
 	//배경색을 rTarget 크기로 그려서는 안된다. 실제 텍스트가 그려질 boundRect 영역만 그려져야 한다.
-	draw_rectangle(g, rTarget, Gdiplus::Color::Transparent, cr_back);
+	draw_rect(g, rTarget, Gdiplus::Color::Transparent, cr_back);
 
 	//큰 글씨는 AntiAlias를 해주는게 좋지만 작은 글씨는 오히려 뭉개지므로 안하는게 좋다.
 	//파라미터로 처리해야 한다.
@@ -6345,7 +6345,7 @@ void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, floa
 	g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
-void draw_rectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill, int nWidth, int nPenStyle, int nDrawMode)
+void draw_rect(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill, int nWidth, int nPenStyle, int nDrawMode)
 {
 	LOGBRUSH lb;
 
@@ -6374,13 +6374,13 @@ void draw_rectangle(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COL
 	pDC->SetROP2(nOldDrawMode);
 }
 
-void draw_rectangle(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
+void draw_rect(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
-	draw_rectangle(g, r, cr_line, cr_fill, width, pen_align, pen_style);
+	draw_rect(g, r, cr_line, cr_fill, width, pen_align, pen_style);
 }
 
-void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
+void draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
 {
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
@@ -6398,6 +6398,49 @@ void draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdipl
 	pen.SetAlignment((Gdiplus::PenAlignment)pen_align);
 	pen.SetDashStyle((Gdiplus::DashStyle)pen_style);
 	g.DrawRectangle(&pen, CRect2GpRect(r));
+}
+
+void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+{
+	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, width);
+}
+
+void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+{
+	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, width);
+}
+
+void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+{
+	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, width);
+}
+void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+{
+	ID2D1SolidColorBrush* br_stroke;
+	ID2D1SolidColorBrush* br_fill;
+	D2D1_COLOR_F d2cr_stroke = { 0.0f, 0.0f, 0.0f, 0.0f };
+	D2D1_COLOR_F d2cr_fill = { 0.0f, 0.0f, 0.0f, 0.0f };
+	//D2D1::ColorF d2cr;
+	
+	d2cr_stroke.a = (float)cr_stroke.GetA() / 255.0f;
+	d2cr_stroke.g = (float)cr_stroke.GetG() / 255.0f;
+	d2cr_stroke.r = (float)cr_stroke.GetR() / 255.0f;
+	d2cr_stroke.b = (float)cr_stroke.GetB() / 255.0f;
+
+	d2dc->CreateSolidColorBrush(d2cr_stroke, &br_stroke);
+
+	d2cr_fill.a = (float)cr_fill.GetA() / 255.0f;
+	d2cr_fill.r = (float)cr_fill.GetR() / 255.0f;
+	d2cr_fill.g = (float)cr_fill.GetG() / 255.0f;
+	d2cr_fill.b = (float)cr_fill.GetB() / 255.0f;
+
+	d2dc->CreateSolidColorBrush(d2cr_fill, &br_fill);
+
+	d2dc->FillRectangle(r, br_fill);
+	d2dc->DrawRectangle(r, br_stroke);
 }
 
 void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
@@ -12013,6 +12056,11 @@ void getSquareEndPoint(int sx, int sy, int& ex, int& ey)
 	}
 }
 
+void get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz)
+{
+	get_resizable_handle(GpRectF2CRect(src), handle, sz);
+}
+
 //src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다. sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
 void get_resizable_handle(CRect src, CRect handle[], int sz)
 {
@@ -12509,7 +12557,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 	return hBitmap;
 }
 
-void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
+HRESULT save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 {
 	PICTDESC pictdesc = {};
 	pictdesc.cbSizeofstruct = sizeof(pictdesc);
@@ -12531,8 +12579,7 @@ void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 	CComPtr<IPictureDisp> disp;
 	_M(picture->QueryInterface(&disp));
 	_M(OleSavePictureFile(disp, CComBSTR(filename)));
-	return;
-
+/*
 	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
 	BITMAP bmp; 
 	PBITMAPINFO pbmi; 
@@ -12663,6 +12710,7 @@ void save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 
 	// Free memory. 
 	GlobalFree((HGLOBAL)lpBits);
+*/
 }
 
 bool GetLockKeyState(uint8_t nLockKey)

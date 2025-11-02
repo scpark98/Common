@@ -460,7 +460,7 @@ void CSCThemeDlg::OnPaint()
 	if (m_draw_border && m_border_width > 0)
 	{
 		GetClientRect(rc);
-		draw_rectangle(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent, m_border_width);
+		draw_rect(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent, m_border_width);
 	}
 }
 

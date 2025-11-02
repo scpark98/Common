@@ -45,6 +45,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <algorithm>
 #include <set>
 
+#include <d2d1_1.h>
+//#include <d2d1helper.h>
+
 #include "GdiplusBitmap.h"
 
 #include "colors.h"
@@ -167,8 +170,41 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
 #define		check_range_return(x, lower, upper) {if ((x) < (lower) || (x) > (upper)) return;}
 
+
+#define lengthof(rg) (sizeof(rg)/sizeof(*rg))
+
+inline const TCHAR* StringFromError(TCHAR* szErr, long nSize, long nErr)
+{
+	_ASSERTE(szErr);
+	*szErr = 0;
+	DWORD cb = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, nErr, 0, szErr, nSize, 0);
+	TCHAR szUnk[] = _T("<unknown>");
+	if (!cb && nSize >= lengthof(szUnk)) lstrcpy(szErr, szUnk);
+	return szErr;
+}
+
+inline HRESULT TraceHR(const TCHAR* pszFile, long nLine, HRESULT hr)
+{
+	if (FAILED(hr))
+	{
+		TCHAR szErr[128];
+		TCHAR sz[_MAX_PATH + lengthof(szErr) + 64];
+		wsprintf(sz, _T("%s(%d) : error 0x%x: %s\n"), pszFile, nLine, hr,
+			StringFromError(szErr, lengthof(szErr), hr));
+		OutputDebugString(sz);
+	}
+	return hr;
+}
+
+#ifdef _DEBUG
+#define TRACEHR(_hr) TraceHR(__function__, __LINE__, _hr)
+#else
+#define TRACEHR(_hr) _hr
+#endif
+
 //HRESULT를 결과로 리턴받는 함수들에 사용.
-#define		_M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
+//#define		_M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
+#define		_M(exp) { HRESULT _hr = (exp); if (FAILED(_hr)) return TRACEHR(_hr), _hr; }
 
 typedef void (WINAPI* PGNSI)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI* PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
@@ -366,6 +402,7 @@ public:
 	CString image_description;
 	CString image_copyright;
 	CString original_datetime;
+	CString last_modified_datetime;
 	double exposure_time = 1.0;
 	double exposure_bias = 0.0;
 	double f_number = 0.0;				//"
@@ -1606,6 +1643,36 @@ struct	NETWORK_INFO
 			delete r;
 			return res;
 		}
+		else if constexpr (std::is_same_v<T, Gdiplus::Rect>)
+		{
+			Gdiplus::Rect* r;
+			Gdiplus::Rect res;
+			UINT size = sizeof(Gdiplus::Rect);
+			pApp->GetProfileBinary(section, entry, reinterpret_cast<LPBYTE*>(&r), &size);
+
+			if (r == NULL || size != sizeof(Gdiplus::Rect))
+				res = default_value;
+			else
+				res = *r;
+
+			delete r;
+			return res;
+		}
+		else if constexpr (std::is_same_v<T, Gdiplus::RectF>)
+		{
+			Gdiplus::RectF* r;
+			Gdiplus::RectF res;
+			UINT size = sizeof(Gdiplus::RectF);
+			pApp->GetProfileBinary(section, entry, reinterpret_cast<LPBYTE*>(&r), &size);
+
+			if (r == NULL || size != sizeof(Gdiplus::RectF))
+				res = default_value;
+			else
+				res = *r;
+
+			delete r;
+			return res;
+		}
 	}
 
 
@@ -1631,6 +1698,14 @@ struct	NETWORK_INFO
 		else if constexpr (std::is_same_v<T, CString>)
 		{
 			pApp->WriteProfileString(section, entry, value);
+		}
+		else if constexpr (std::is_same_v<T, Gdiplus::Rect>)
+		{
+			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(Gdiplus::Rect));
+		}
+		else if constexpr (std::is_same_v<T, Gdiplus::RectF>)
+		{
+			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(Gdiplus::RectF));
 		}
 		else if constexpr (std::is_same_v<T, CRect>)
 		{
@@ -1938,9 +2013,13 @@ h		: 복사할 height 크기(pixel)
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
 	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, float thick = 1.0f, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int nDrawMode = R2_COPYPEN);
 	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int draw_mode = R2_COPYPEN);
-	void		draw_rectangle(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		draw_rectangle(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
-	void		draw_rectangle(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
+	void		draw_rect(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
+	void		draw_rect(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
+	void		draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
+	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);
 	void		draw_ellipse(CDC* pDC, int cx, int cy, int rx, int ry, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);
@@ -2143,6 +2222,7 @@ h		: 복사할 height 크기(pixel)
 	//handle[]은 CRect handle[9] 변수를 넘겨받는다.
 	//sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
 	void		get_resizable_handle(CRect src, CRect handle[], int sz = 4);
+	void		get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz = 4);
 	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 중 pt가 위치한 사각형의 인덱스를 리턴한다.
 	//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
 	//int			get_handle_index(CRect src, CPoint pt, int sz);
@@ -2180,7 +2260,7 @@ h		: 복사할 height 크기(pixel)
 
 //HBITMAP
 	void		draw_bitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
-	void		save_bitmap(HBITMAP bitmap, LPCTSTR filename);
+	HRESULT		save_bitmap(HBITMAP bitmap, LPCTSTR filename);
 
 //키보드 언어를 그 나라 기본언어로 변경한다.
 void		ime_convert(HWND hWnd, bool bNative);

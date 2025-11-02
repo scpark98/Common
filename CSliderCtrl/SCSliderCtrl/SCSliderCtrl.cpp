@@ -743,7 +743,7 @@ void CSCSliderCtrl::OnPaint()
 	{
 		rtrack.left = 0;
 		rtrack.right = m_rc.right;
-		draw_rectangle(&dc, rtrack, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
+		draw_rect(&dc, rtrack, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 
 	dc.SelectObject(pOldFont);
@@ -751,7 +751,7 @@ void CSCSliderCtrl::OnPaint()
 	dc.SelectObject(pOldPen);
 
 	//영역 확인용
-	//draw_rectangle(g, m_rc, Gdiplus::Color::Blue);
+	//draw_rect(g, m_rc, Gdiplus::Color::Blue);
 
 	// Do not call CSliderCtrl::OnPaint() for painting messages
 }

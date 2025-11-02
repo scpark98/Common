@@ -586,7 +586,7 @@ void CSCStatic::OnPaint()
 		if (m_round > 0)
 			draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
-			draw_rectangle(g, rc, m_cr_border);
+			draw_rect(g, rc, m_cr_border);
 	}
 
 	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));

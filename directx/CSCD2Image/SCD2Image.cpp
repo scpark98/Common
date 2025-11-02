@@ -324,14 +324,16 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	
 	//JPG, TIFF 등의 exif 정보가 다르므로 Ifd, exif reader를 별도로 구해서 얻어온다.
 	ComPtr<IWICMetadataQueryReader> pRootQueryReader;
-	pBitmapFrameDecode->GetMetadataQueryReader(&pRootQueryReader);
+	_M(pBitmapFrameDecode->GetMetadataQueryReader(&pRootQueryReader));
+	if (!pRootQueryReader)
+		return hr;
 
 	//get IFD query reader
 	ComPtr<IWICMetadataQueryReader> pIfdQueryReader;
 	LPTSTR sIFDPath = _T("/ifd");
 
 	GUID guidFormat = { 0 };
-	hr = pDecoder->GetContainerFormat(&guidFormat);
+	_M(pDecoder->GetContainerFormat(&guidFormat));
 	if (IsEqualGUID(guidFormat, GUID_ContainerFormatJpeg))
 		sIFDPath = _T("/app1/ifd");
 
@@ -381,6 +383,22 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 		m_exif_info.software = value.pszVal;
 	PropVariantClear(&value);
 
+	hr = pIfdQueryReader->GetMetadataByName(L"/{ushort=306}", &value);
+	if (SUCCEEDED(hr) && (value.vt == VT_LPSTR))
+		m_exif_info.last_modified_datetime = value.pszVal;
+	PropVariantClear(&value);
+	if (m_exif_info.last_modified_datetime.GetLength() > 8)
+	{
+		int pos = m_exif_info.last_modified_datetime.Find(':');
+		if (pos > 0)
+		{
+			m_exif_info.last_modified_datetime.SetAt(pos, '/');
+			pos = m_exif_info.last_modified_datetime.Find(':');
+			if (pos > 0)
+				m_exif_info.last_modified_datetime.SetAt(pos, '/');
+		}
+	}
+
 	hr = pIfdQueryReader->GetMetadataByName(L"/{ushort=270}", &value);
 	if (SUCCEEDED(hr) && (value.vt == VT_LPSTR))
 		m_exif_info.image_description = value.pszVal;
@@ -395,6 +413,18 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	if (SUCCEEDED(hr) && (value.vt == VT_LPSTR))
 		m_exif_info.original_datetime = value.pszVal;
 	PropVariantClear(&value);
+	if (m_exif_info.original_datetime.GetLength() > 8)
+	{
+		int pos = m_exif_info.original_datetime.Find(':');
+		if (pos > 0)
+		{
+			m_exif_info.original_datetime.SetAt(pos, '/');
+			pos = m_exif_info.original_datetime.Find(':');
+			if (pos > 0)
+				m_exif_info.original_datetime.SetAt(pos, '/');
+		}
+	}
+
 
 	long* plong = NULL;
 	hr = pExifQueryReader->GetMetadataByName(L"/{ushort=33434}", &value);
@@ -505,9 +535,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		if (SUCCEEDED(hr) && (propValue.vt == VT_UI2))
 			img_size.height = propValue.uiVal;
 		PropVariantClear(&propValue);
-
-		extract_exif_info(pDecoder);
 	}
+
+	extract_exif_info(pDecoder);
 
 	// Get palette
 	WICColor rgbColors[256] = {};

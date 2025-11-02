@@ -22,6 +22,8 @@
 - load가 끝나고 total_frame > 1이면 play()가 자동 호출되고
   각 프레임 delay마다 m_frame_index를 증가시키는 thread가 구동되어
   parent window에게 메시지를 보내서 Invalidate()을 통해 화면이 갱신된다.
+  m_d2dc를 알고 있으므로 이 클래스에서 직접 렌더할 수도 있지만 그럴 경우
+  parent에서 배경을 그리므로 배경위에 gif가 자연스럽게 렌더시키기 애매해진다.
 
 	m_d2gif.load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), IDR_GIF_NHQV06, _T("GIF"));
 	m_d2gif.set_parent(m_hWnd);	//frame_changed 메시지를 받기 위해 parent를 꼭 지정해줘야 한다.

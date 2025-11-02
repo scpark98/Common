@@ -808,7 +808,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	}
 	*/
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
-	draw_rectangle(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
+	draw_rect(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
 	//draw_round_rect(&g, CRect2GpRect(rc), (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, rc.Height()/2, m_border_width);
 
 	//pDC->SetBkMode(TRANSPARENT);
@@ -869,7 +869,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
 	//또한 IsWindowEnabled(), ES_READONLY에 따라 배경색이 달라진다.
-	draw_rectangle(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
+	draw_rect(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
 
 	return FALSE;
 	return CEdit::OnEraseBkgnd(pDC);

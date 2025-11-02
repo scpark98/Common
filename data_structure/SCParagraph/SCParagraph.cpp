@@ -544,7 +544,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			pDC->SelectObject(pOldFont);
 #else
 			//text 배경색을 칠하고
-			draw_rectangle(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
+			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
 			Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
 
@@ -633,7 +633,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 #ifdef _DEBUG
 			//"\n"에 의한 공백 라인은 영역 사각형을 굳이 표시하지 않는다.
 			//if (para[i][j].r.Width() > 2)
-				//draw_rectangle(g, para[i][j].r, Gdiplus::Color::Blue);// , Gdiplus::Color(255, 255, 0, 0));
+				//draw_rect(g, para[i][j].r, Gdiplus::Color::Blue);// , Gdiplus::Color(255, 255, 0, 0));
 #endif
 			if (font)
 				delete font;
@@ -645,7 +645,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 
 	//텍스트 출력 영역 확인용
 #ifdef _DEBUG
-	//draw_rectangle(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
+	//draw_rect(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
 #endif
 	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
 

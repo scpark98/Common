@@ -75,17 +75,19 @@ bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 	}
 
+	m_image_roi = get_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), Gdiplus::RectF());
+
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Ivory), &m_brush);
 
 	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel"), false));
 	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel_pos"), true));
 	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show info"), false));
-	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), true));
+	m_fit2ctrl = AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), true);
 
 	m_interpolation_mode = (D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 
-	if (!get_fit2ctrl())
-		zoom(get_profile_value(_T("setting\\CSCImage2dDlg"), _T("zoom"), 1.0));
+	if (!m_fit2ctrl)
+		zoom(get_profile_value(_T("setting\\CSCImage2dDlg"), _T("zoom ratio"), 1.0));
 
 
 	return true;
@@ -197,7 +199,7 @@ void CSCImage2dDlg::OnPaint()
 		}
 		else
 		{
-			msg.Format(_T("%s\n\n파일이 손상되었거나 지원하지 않는 형식입니다."), m_img[0].get_filename());
+			msg.Format(_T("%s\n파일이 손상되었거나 지원하지 않는 형식입니다."), m_img[0].get_filename());
 		}
 		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
 		//DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, indianred, black, 2, 1);
@@ -288,11 +290,10 @@ void CSCImage2dDlg::OnPaint()
 	//gaussianBlurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, 3.0f);
 	//gaussianBlurEffect->SetInput(0, m_img[0].get());
 
-	//실제 이미지를 그려준다.
+	//실제 이미지를 그려준다. 투명이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
 	if (m_img[0].get_channel() == 4 || (m_img[0].get_channel() == 1 && get_part(m_img[0].get_filename(), fn_ext) == _T("gif")))
 		d2dc->FillRectangle(convert(m_r_display), m_d2dc.get_zigzag_brush().Get());
 
-	m_img[0].set_interpolation_mode(m_interpolation_mode);
 	m_img[0].draw(d2dc, convert(m_r_display));
 
 	//d2dc->DrawImage(gaussianBlurEffect.Get());
@@ -342,21 +343,25 @@ void CSCImage2dDlg::OnPaint()
 	}
 
 	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
+	if (!m_image_roi.IsEmptyArea() && m_screen_roi.IsEmptyArea())
+		get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
+
 	CRect screen_roi = GpRectF2CRect(m_screen_roi);
 	screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 	screen_roi.NormalizeRect();
 
-	ID2D1SolidColorBrush *br_red = NULL;
-	d2dc->CreateSolidColorBrush(D2D1::ColorF(1.0f, 0.25f, 0.0f, 0.8f), &br_red);
+	//ID2D1SolidColorBrush *br_red = NULL;
+	//d2dc->CreateSolidColorBrush(D2D1::ColorF(1.0f, 0.25f, 0.0f, 0.8f), &br_red);
 
-	ID2D1SolidColorBrush* br_roi;
-	d2dc->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.12f, 1.0f, 0.25f), &br_roi);
+	//ID2D1SolidColorBrush* br_roi;
+	//d2dc->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.12f, 1.0f, 0.25f), &br_roi);
 
 	if (m_lbutton_down)// && m_drawing_roi)
 	{
 		//d2dc->DrawRectangle(convert(screen_roi), br_red);
-		d2dc->FillRectangle(convert(screen_roi), br_roi);
-		//draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+		//d2dc->FillRectangle(convert(screen_roi), br_roi);
+		//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(64, 0, 32, 255));
 	}
 	else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
 	{
@@ -367,9 +372,10 @@ void CSCImage2dDlg::OnPaint()
 		screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
 		//screen_roi.OffsetRect(m_offset);
-		//draw_rectangle(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
-		//draw_rectangle(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
-		d2dc->FillRectangle(convert(screen_roi), br_roi);
+		//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+		//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+		//d2dc->FillRectangle(convert(screen_roi), br_roi);
+		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(64, 0, 32, 255));
 	}
 
 	if (!m_screen_roi.IsEmptyArea())
@@ -385,9 +391,10 @@ void CSCImage2dDlg::OnPaint()
 
 		//9군데 조절 핸들을 그려준다.
 		for (int i = 0; i < 9; i++)
-			//draw_rectangle(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
-			//draw_rectangle(g, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 64, 0));
-			d2dc->FillRectangle(convert(m_roi_handle[i]), br_red);// ->SetColor(D2D1::ColorF(1.0f, 0, 1.0f, 0.8f)));
+			//draw_rect(&dc, m_roi_handle[i], red, NULL_BRUSH, 0, PS_SOLID);
+			//draw_rect(g, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 64, 0));
+			//d2dc->FillRectangle(convert(m_roi_handle[i]), br_red);// ->SetColor(D2D1::ColorF(1.0f, 0, 1.0f, 0.8f)));
+			draw_rect(d2dc, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 32, 0));
 
 		if (m_show_roi_info)
 		{
@@ -759,6 +766,7 @@ D2D1_BITMAP_INTERPOLATION_MODE CSCImage2dDlg::get_interpolation_mode()
 void CSCImage2dDlg::set_interpolation_mode(D2D1_BITMAP_INTERPOLATION_MODE mode)
 {
 	m_interpolation_mode = mode;
+	m_img[0].set_interpolation_mode(m_interpolation_mode);
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), mode);
 	Invalidate();
 }
@@ -776,6 +784,7 @@ void CSCImage2dDlg::fit2ctrl(bool fit, bool invalidate)
 {
 	m_fit2ctrl = fit;
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), m_fit2ctrl);
+	write_profile_value(_T("setting\\CSCImage2dDlg"), _T("zoom ratio"), m_zoom);
 
 	if (invalidate)
 		Invalidate();
@@ -791,12 +800,13 @@ void CSCImage2dDlg::zoom(int mode)
 	else
 		m_zoom = 1.0;
 
+	Clamp(m_zoom, 0.2, 40.0);
+
 	//m_fit2ctrl의 값을 직접 변경하지 말고 fit2ctrl() 함수를 호출해야만
 	//registry에 설정이 저장된다.
 	//m_fit2ctrl = false;
 	fit2ctrl(false, false);
 
-	Clamp(m_zoom, 0.2, 40.0);
 	//get_screen_coord_from_real_coord(m_r_display, m_img.width, m_image_roi, &m_screen_roi);
 	//Wait(1);
 	Invalidate();
@@ -804,9 +814,9 @@ void CSCImage2dDlg::zoom(int mode)
 
 void CSCImage2dDlg::zoom(double ratio)
 {
-	fit2ctrl(false, false);
 	m_zoom = ratio;
-	Clamp(m_zoom, 0.1, 40.0);
+	Clamp(m_zoom, 0.2, 40.0);
+	fit2ctrl(false, false);
 	Invalidate();
 }
 
@@ -919,6 +929,7 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 		//roi가 모두 그려지면, 또는 이동, 크기조정이 완료되면 m_image_roi로 변환해준다.
 		normalize_rect(m_screen_roi);
 		get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &m_image_roi);
+		write_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), m_image_roi);
 		TRACE(_T("roi completed.\n"));
 		Invalidate();
 	}
@@ -949,7 +960,6 @@ void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 			img_roi.Width = ROUND(img_roi.Width, 0);
 			img_roi.Height = ROUND(img_roi.Height, 0);
 			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), img_roi, &m_screen_roi);
-
 			//Ctrl키를 눌러서 roi가 그려지는 동안에는 이미지 확대/축소에 무관하게
 			//마우스 위치가 그대로 그려져야 한다.
 			//InvalidateRect(GpRectF2CRect(m_screen_roi));
@@ -1003,7 +1013,6 @@ void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 			img_roi.Width = ROUND(img_roi.Width, 0);
 			img_roi.Height = ROUND(img_roi.Height, 0);
 			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), img_roi, &m_screen_roi);
-
 			Invalidate();
 		}
 		//이미지 이동을 위한 단순 드래그인 경우
@@ -1164,7 +1173,7 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 
 		m_handle_index = -1;
 
-		for (int i = 0; i < MAX_ROI_RECT_HANDLE; i++)
+		for (int i = 0; i < ROI_RECT_HANDLE_COUNT; i++)
 		{
 			if (m_roi_handle[i].PtInRect(pt))
 			{
@@ -1172,6 +1181,8 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 				break;
 			}
 		}
+
+
 
 		if (m_handle_index != -1)
 		{
@@ -1590,6 +1601,8 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 	CRect rc;
 	GetClientRect(rc);
 	m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), rc.Width(), rc.Height());
+
+	m_img[0].set_interpolation_mode(m_interpolation_mode);
 
 	Invalidate();
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_image_changed), 0);

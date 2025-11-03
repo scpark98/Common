@@ -606,6 +606,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	}
 	else if (frame_count > 1)
 	{
+		//gif의 bgColor 정보를 추출하기 위한 코드들인데 webp인 경우는 에러가 발생하므로 우선 주석처리함.
+		/*
 		ComPtr<IWICPalette> palette;
 		_M(pWICFactory->CreatePalette(palette.GetAddressOf()));
 
@@ -640,7 +642,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				PropVariantClear(&propValue);
 			}
 		}
-
+		*/
 
 		UINT previousFrame = 0;
 		UINT disposal = DM_UNDEFINED;
@@ -686,7 +688,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			}
 
 			if (save_img_for_debug)
-				save(frame_img.Get(), _T("d:\\direct2d_test\\frame_img.png"));
+				save(frame_img.Get(), 1.0f, _T("d:\\direct2d_test\\frame_img.png"));
 
 			//특정 배경색을 사용하는 경우의 처리인데 일단 불필요하여 주석처리 함.
 			/*
@@ -732,7 +734,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				else
 				{
 					TRACE(_T("#%dth frame. delay not fount. assume 30 ms\n"), i);
-					m_frame_delay.push_back(30); // default 30ms
+					m_frame_delay.push_back(100); // default 30ms
 				}
 
 				//calling.gif와 같이 1번 프레임부터 변경된 이미지 정보만 저장된 gif의 경우는 disposal 값은 DM_NONE로 추출된다.
@@ -854,8 +856,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 			if (save_img_for_debug)
 			{
-				save(img.Get(), _T("d:\\direct2d_test\\img.png"));
-				save(frame_img.Get(), _T("d:\\direct2d_test\\frame_img.png"));
+				save(img.Get(), 1.0f, _T("d:\\direct2d_test\\img.png"));
+				save(frame_img.Get(), 1.0f, _T("d:\\direct2d_test\\frame_img.png"));
 			}
 
 			m_img.push_back(std::move(frame_img));
@@ -978,12 +980,12 @@ void CSCD2Image::copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* d
 
 }
 
-void CSCD2Image::save(CString path)
+HRESULT CSCD2Image::save(CString path, float quality)
 {
-	save(m_img[m_frame_index].Get(), path);
+	return save(m_img[m_frame_index].Get(), quality, path);
 }
 
-void CSCD2Image::save(ID2D1Bitmap* img, LPCTSTR path, ...)
+HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 {
 	va_list args;
 	va_start(args, path);
@@ -991,58 +993,71 @@ void CSCD2Image::save(ID2D1Bitmap* img, LPCTSTR path, ...)
 	CString filename;
 	filename.FormatV(path, args);
 
+	CString ext = get_part(filename, fn_ext).MakeLower();
 	CString folder = get_part(filename, fn_folder);
 	make_full_directory(folder);
 
 	// Create a file stream
 	ComPtr<IWICStream> pStream;
-	HRESULT hr = m_pWICFactory->CreateStream(pStream.GetAddressOf());
-	if (SUCCEEDED(hr))
-	{
-		hr = pStream->InitializeFromFilename(filename, GENERIC_WRITE);
-	}
+	_M(m_pWICFactory->CreateStream(pStream.GetAddressOf()));
+	_M(pStream->InitializeFromFilename(filename, GENERIC_WRITE));
+
+	PROPBAG2 name = { 0 };
+	name.dwType = PROPBAG2_TYPE_DATA;
+	name.vt = VT_R4;
+	name.pstrName = L"ImageQuality";
 
 	// Create WIC encoder
 	ComPtr<IWICBitmapEncoder> pEncoder;
-	GUID wicFormat = GUID_ContainerFormatPng;
+	GUID wicFormat = GUID_ContainerFormatRaw;
 
-	hr = m_pWICFactory->CreateEncoder(wicFormat, nullptr, pEncoder.GetAddressOf());
+	//wicFormat = CLSID_WICPngEncoder;
+	if (ext == _T("png"))
+	{
+		wicFormat = GUID_ContainerFormatPng;
+		name.vt = VT_I2;
+		name.pstrName = _T("CompressionLevel");
+	}
+	else if (ext == _T("jpg"))
+		wicFormat = GUID_ContainerFormatJpeg;
+	else if (ext == _T("bmp"))
+		wicFormat = GUID_ContainerFormatBmp;
+	else if (ext == _T("raw"))
+		wicFormat = GUID_ContainerFormatRaw;
+		//wicFormat = CLSID_WICRAWDecoder;
 
-	hr = pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache);
+	_M(m_pWICFactory->CreateEncoder(wicFormat, nullptr, pEncoder.GetAddressOf()));
+	_M(pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache));
 
 	// Create a new frame
 	ComPtr<IWICBitmapFrameEncode> pFrameEncode;
-	hr = pEncoder->CreateNewFrame(pFrameEncode.GetAddressOf(), nullptr);
+	CComPtr<IPropertyBag2> properties;
 
-	if (!pFrameEncode)
-		return;
+	_M(pEncoder->CreateNewFrame(pFrameEncode.GetAddressOf(), &properties));
 
-	hr = pFrameEncode->Initialize(nullptr);
+	if (ext == _T("jpg"))
+	{
+		CComVariant value(quality);
+		_M(properties->Write(1, &name, &value));
+		_M(pFrameEncode->Initialize(properties));
+	}
+	else
+	{
+		_M(pFrameEncode->Initialize(nullptr));
+	}
 
 	// Get IWICImageEncoder
 	ComPtr<IWICImageEncoder> pImageEncoder;
-	if (SUCCEEDED(hr))
-	{
-		CComPtr<ID2D1Device> d2dDevice;
-		m_d2dc->GetDevice(&d2dDevice);
-		hr = m_pWICFactory->CreateImageEncoder(d2dDevice, pImageEncoder.GetAddressOf());
-	}
+	CComPtr<ID2D1Device> d2dDevice;
+	m_d2dc->GetDevice(&d2dDevice);
+	_M(m_pWICFactory->CreateImageEncoder(d2dDevice, pImageEncoder.GetAddressOf()));
 
 	// Write the Direct2D bitmap to the WIC frame
-	if (SUCCEEDED(hr))
-	{
-		hr = pImageEncoder->WriteFrame(img, pFrameEncode.Get(), nullptr);
-	}
+	_M(pImageEncoder->WriteFrame(img, pFrameEncode.Get(), nullptr));
 
 	// Commit the frame and encoder
-	if (SUCCEEDED(hr))
-	{
-		hr = pFrameEncode->Commit();
-	}
-	if (SUCCEEDED(hr))
-	{
-		hr = pEncoder->Commit();
-	}
+	_M(pFrameEncode->Commit());
+	_M(pEncoder->Commit());
 }
 
 /*
@@ -1443,6 +1458,11 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 	{
 		m_channel = 4;
 		str_fmt = _T("GUID_WICPixelFormat32bppCMYK");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppBGR))
+	{
+		m_channel = 3;
+		str_fmt = _T("GUID_WICPixelFormat32bppBGR");
 	}
 	else if (IsEqualGUID(*pf, GUID_WICPixelFormat24bppBGR))
 	{

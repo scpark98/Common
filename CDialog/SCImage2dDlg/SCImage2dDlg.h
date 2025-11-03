@@ -126,7 +126,8 @@ public:
 	int				get_image_count() { return m_files.size(); }
 	int				get_cur_index() { return m_index; }
 
-	void			save(CString filepath);
+	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
+	HRESULT			save(CString filepath, float quality);
 
 	//현재 파일을 비롯해서 폴더를 다시 검사한다.
 	void			reload_image();
@@ -143,6 +144,8 @@ public:
 	bool			get_show_info() { return m_show_info; }
 	void			set_show_info(bool show);
 	void			set_alt_info(CString alt_info) { m_alt_info = alt_info; Invalidate(); }
+
+	int				get_channel();
 
 	bool			get_show_pixel_pos() { return m_show_pixel_pos; }
 	void			set_show_pixel_pos(bool show);

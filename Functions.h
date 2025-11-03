@@ -189,7 +189,7 @@ inline HRESULT TraceHR(const TCHAR* pszFile, long nLine, HRESULT hr)
 	{
 		TCHAR szErr[128];
 		TCHAR sz[_MAX_PATH + lengthof(szErr) + 64];
-		wsprintf(sz, _T("%s(%d) : error 0x%x: %s\n"), pszFile, nLine, hr,
+		wsprintf(sz, _T("error ==> %s(%d) : 0x%x: %s\n"), pszFile, nLine, hr,
 			StringFromError(szErr, lengthof(szErr), hr));
 		OutputDebugString(sz);
 	}

@@ -155,8 +155,12 @@ public:
 
 	void					blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* blend_img, int dx, int dy, int sx, int sy, int sw, int sh);
 	void					copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst);
-	void					save(CString path);
-	void					save(ID2D1Bitmap* img, LPCTSTR path, ...);
+
+	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
+	//현재는 jpg만 품질옵션이 적용된다.
+	HRESULT					save(CString path, float quality);
+	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
+	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
 
 //animated gif
 	bool					is_animated_image() { return (m_img.size() > 1); }

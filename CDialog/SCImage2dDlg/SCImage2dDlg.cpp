@@ -921,6 +921,7 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			{
 				m_screen_roi = Gdiplus::RectF();
 				m_image_roi = Gdiplus::RectF();
+				write_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), m_image_roi);
 				Invalidate();
 				return;
 			}
@@ -1784,12 +1785,12 @@ void CSCImage2dDlg::reload_image()
 	display_image(index, false);
 }
 
-void CSCImage2dDlg::save(CString filepath)
+HRESULT CSCImage2dDlg::save(CString filepath, float quality)
 {
 	if (m_img[0].is_empty())
-		return;
+		return S_FALSE;
 
-	m_img[0].save(filepath);
+	return m_img[0].save(filepath, quality);
 }
 
 CSize CSCImage2dDlg::get_img_size()
@@ -1798,6 +1799,14 @@ CSize CSCImage2dDlg::get_img_size()
 		return CSize();
 
 	return CSize(m_img[0].get_width(), m_img[0].get_height());
+}
+
+int CSCImage2dDlg::get_channel()
+{
+	if (m_img.size() == 0 || m_img[0].is_empty())
+		return 0;
+
+	return m_img[0].get_channel();
 }
 
 //start : 1(start), 0(stop), -1(toggle)

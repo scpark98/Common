@@ -369,7 +369,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + 14;
 			r.top = r.CenterPoint().y - 7;
 			r.bottom = r.top + 14;
-			draw_rectangle(pDC, r, m_theme.cr_text);
+			draw_rect(pDC, r, m_theme.cr_text);
 			//pDC->DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONCHECK);
 
 			//Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
@@ -397,7 +397,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				CRect inner = r;
 				inner.DeflateRect(3, 3);
-				draw_rectangle(pDC, inner, Gdiplus::Color::Transparent, m_theme.cr_text);
+				draw_rect(pDC, inner, Gdiplus::Color::Transparent, m_theme.cr_text);
 			}
 
 			itemRect.left = r.right + 2;
@@ -633,9 +633,9 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
 		//선택 사각형은 반드시 inset으로 그려져야 한다.
 		if (m_use_distinct_border_color)
-			draw_rectangle(pDC, rowRect, get_distinct_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
+			draw_rect(pDC, rowRect, get_distinct_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 		else
-			draw_rectangle(pDC, rowRect, (m_has_focus ? m_theme.cr_selected_border : m_theme.cr_selected_border_inactive), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
+			draw_rect(pDC, rowRect, (m_has_focus ? m_theme.cr_selected_border : m_theme.cr_selected_border_inactive), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 	}
 
 	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);

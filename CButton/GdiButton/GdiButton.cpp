@@ -1081,7 +1081,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.right = r.left + size * 2 + 1;
 			r.top = r.CenterPoint().y - size - 1;
 			r.bottom = r.top + size * 2 + 1;
-			draw_rectangle(&dc, r, cr_text, Gdiplus::Color::White);
+			draw_rect(&dc, r, cr_text, Gdiplus::Color::White);
 
 			Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
 
@@ -1096,7 +1096,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				CRect inner = r;
 				inner.DeflateRect(3, 3);
-				draw_rectangle(&dc, inner, cr_text, cr_text);
+				draw_rect(&dc, inner, cr_text, cr_text);
 			}
 
 			rText = r;
@@ -1225,7 +1225,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round > 0)
 			draw_round_rect(&g, CRect2GpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
-			draw_rectangle(g, rc, m_cr_border);
+			draw_rect(g, rc, m_cr_border);
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
@@ -1235,7 +1235,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//draw_round_rect(&g, CRect2GpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Transparent, m_round, m_border_thick);
 			g.DrawPath(&Gdiplus::Pen(m_cr_border), &roundPath);
 		else
-			draw_rectangle(g, rc, m_cr_border);
+			draw_rect(g, rc, m_cr_border);
 	}
 
 

@@ -6400,6 +6400,7 @@ void draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdiplus::C
 	g.DrawRectangle(&pen, CRect2GpRect(r));
 }
 
+#ifndef _USING_V110_SDK71_
 void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
 {
 	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
@@ -6442,7 +6443,7 @@ void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke
 	d2dc->FillRectangle(r, br_fill);
 	d2dc->DrawRectangle(r, br_stroke);
 }
-
+#endif
 void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
 {
 	draw_sunken_rect(pDC, r, bSunken, RGB2gpColor(cr1), RGB2gpColor(cr2), width);

@@ -620,7 +620,7 @@ void CSCMessageBox::OnPaint()
 
 
 	//draw border
-	draw_rectangle(g, rc, Gdiplus::Color::DimGray);
+	draw_rect(g, rc, Gdiplus::Color::DimGray);
 }
 
 void CSCMessageBox::OnLButtonDown(UINT nFlags, CPoint point)

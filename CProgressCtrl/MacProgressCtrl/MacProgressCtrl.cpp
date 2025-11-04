@@ -297,7 +297,7 @@ void CMacProgressCtrl::OnPaint()
 
 	if (m_draw_border)
 	{
-		draw_rectangle(&dc, rc, RGB2gpColor(m_border_color));// , NULL_BRUSH, m_border_width, m_border_pen_style);
+		draw_rect(&dc, rc, RGB2gpColor(m_border_color));// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 
 	dc.SelectObject(pOldFont);

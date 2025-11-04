@@ -87,6 +87,8 @@ public:
 	//이 속성을 주면 resize가 가능해지는데 만약 이를 막고 싶다면 set_use_resizable(false)를 호출한다.
 	void	set_use_resizable(bool use_resizable = true) { m_use_resizable = use_resizable; }
 
+	//void	set_target_wnd(CWnd* pTarget) { m_target_wnd = pTarget; }
+
 	//parent창이 resize 될 때 호출해줘야만 m_sys_buttons가 위치를 바로잡는다.
 	void	adjust_sys_buttons();
 
@@ -97,14 +99,16 @@ public:
 	//mainDlg가 pTargetWnd가 되야 한다.
 	//titleDlg를 parent로 하여 생성하지만 정작 mainDlg의 IsZoomed()로 판단해야 한다.
 	//즉, 생성을 위한 parent와 실제 액션을 위핸 target이 다른 경우이다.
-	template <typename ... Types> void	set_system_buttons(CWnd* pTargetWnd, Types... args)
+	template <typename ... Types> void	set_system_buttons(CWnd* parent, Types... args)
 	{
+		//m_parent = parent;
+
 		int button_width = -1;
 		if (m_sys_buttons.m_hWnd)
 		{
 			button_width = m_sys_buttons.get_button_width();
 			m_sys_buttons.DestroyWindow();
-			m_sys_buttons.create(pTargetWnd);
+			m_sys_buttons.create(parent);
 		}
 
 		int n = sizeof...(args);
@@ -136,8 +140,8 @@ public:
 
 	virtual BOOL OnInitDialog();
 	virtual INT_PTR DoModal();
-	virtual void OnOK() {};
-	virtual void OnCancel() {};
+	//virtual void OnOK() {};
+	//virtual void OnCancel() {};
 
 protected:
 	//CSCThemeDlg를 상속받아 만든 dlg들에서도 TIMER_ID를 지정할 수 있고 일반적으로 0번부터 지정하므로
@@ -189,9 +193,12 @@ protected:
 
 	CSCSystemButtons	m_sys_buttons;
 
-	//IDD 리소스를 사용하지 않고 동적 생성할 경우
-	CWnd*				m_parent = NULL;
+	//IDD 리소스를 사용하지 않고 동적 생성할 경우 직접 create한다.
+	//CWnd*				m_parent = NULL;
 	bool				create(CWnd* parent, int left, int top, int right, int bottom);
+	//만약 이 클래스를 상속받은 CTitleDlg가 있을 경우 minimize, maximize, quit 등을 적용할 윈도우는
+	//이 클래스를 상속받은 dlg
+	//CWnd*				m_target_wnd = NULL;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
@@ -206,9 +213,9 @@ public:
 	afx_msg void OnPaint();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	//afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
-	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+	//afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	//afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);

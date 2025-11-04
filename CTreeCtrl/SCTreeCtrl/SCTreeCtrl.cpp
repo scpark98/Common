@@ -3117,9 +3117,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//배경색으로 그려주지 않으면 기본 텍스트 출력 + 커스텀 출력 텍스트가 중복되서 표시되므로
 				//배경색을 칠해서 기본 텍스트 출력을 가리고 커스텀 출력을 해줘야 한다.
 				if (GetFocus() == this && (pNMCustomDraw->uItemState & CDIS_SELECTED))
-					draw_rectangle(&dc, rcItem, m_theme.cr_selected_border, crBack);
+					draw_rect(&dc, rcItem, m_theme.cr_selected_border, crBack);
 				else
-					draw_rectangle(&dc, rcItem, crBack, crBack);
+					draw_rect(&dc, rcItem, crBack, crBack);
 			}
 			/*
 			else

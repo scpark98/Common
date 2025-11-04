@@ -25,6 +25,7 @@ enum SCSYSTEM_BUTTON_CUSTOM
 	//SC_HELP가 다른 시스템 명령과 겹치는 듯하여 WM_USER + 0x1001로 수정함.
 	//SC_SEPARATOR가 WinUser.h파일에서 보면 SC_로 시작되는 #define들 중에 가장 마지막 값이 아니므로
 	//뭔가 다른 값이 겹칠 가능성이 높기 때문에 WM_USER로 변경함.
+	//그 외 SC_MINIMIZE, SC_MAXIMIZE, SC_RESTORE는 건드리지 않는다.
 	SC_PIN = WM_USER + 0x1001,	//add new sc command for always on top
 	SC_HELP,
 };
@@ -170,7 +171,7 @@ public:
 	void	set_button_height(int height);
 
 protected:
-	CWnd*	m_target = nullptr;	//SC_MINIMIZE, SC_MAXIMIZE 등 버튼 액션을 수행할 대상 윈도우. 일반적으로는 parent dlg가 되지만 간혹 다른 윈도우가 될 수도 있다.
+	//CWnd*	m_parent = nullptr;	//SC_MINIMIZE, SC_MAXIMIZE 등 버튼 액션을 수행할 대상 윈도우. 일반적으로는 parent dlg가 되지만 간혹 다른 윈도우가 될 수도 있다.
 	std::deque<CSCSystemButtonProperty> m_button;
 	int		m_button_width = 44;
 	int		m_button_height = 32;

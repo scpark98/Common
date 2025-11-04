@@ -283,13 +283,13 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	//CBrush brush(cr_back);
 	//dc.FillRect(&rect, &brush);
-	draw_rectangle(pDC, rect, cr_back, cr_back, 1);
+	draw_rect(pDC, rect, cr_back, cr_back, 1);
 
 	if (lpDIS->itemState & ODS_SELECTED)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_text_selected;
-		draw_rectangle(pDC, rect, GetFocus() ? m_theme.cr_selected_border : cr_back, cr_back, 1);
+		draw_rect(pDC, rect, GetFocus() ? m_theme.cr_selected_border : cr_back, cr_back, 1);
 	}
 	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
@@ -690,7 +690,7 @@ void CSCListBox::OnPaint()
 
 	//DrawItem()에서 각 아이템을 모두 그린 후 OnPaint()에서 border를 그리려 했으나
 	//DrawItem()에서 그려진 내용이 모두 가려진다. 우선 WM_PAINT는 주석처리한다.
-	draw_rectangle(&dc, rc, m_theme.cr_border);
+	draw_rect(&dc, rc, m_theme.cr_border);
 }
 
 BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)

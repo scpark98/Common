@@ -46,7 +46,7 @@ void CSCStepCtrl::OnPaint()
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
 	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
-	//draw_rectangle(g, rc, Gdiplus::Color::Red, m_cr_back);
+	//draw_rect(g, rc, Gdiplus::Color::Red, m_cr_back);
 
 	if (m_step.size() == 0)
 		return;
@@ -126,7 +126,7 @@ void CSCStepCtrl::OnPaint()
 			rthumb_small.DeflateRect(2, 2);
 			if (thumb_style == thumb_style_rect)
 				//g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(rthumb_small));
-				draw_rectangle(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
+				draw_rect(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
 			else if (thumb_style == thumb_style_diamond)
 				;// draw_diamond(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
 			else if (thumb_style == thumb_style_circle)
@@ -181,7 +181,7 @@ void CSCStepCtrl::OnPaint()
 
 			dc.DrawText(m_step[i].text, rtext, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 #ifdef _DEBUG
-			//draw_rectangle(g, rtext, Gdiplus::Color::Red);	//text 영역 확인용
+			//draw_rect(g, rtext, Gdiplus::Color::Red);	//text 영역 확인용
 #endif
 			dc.SelectObject(pOldFont);
 		}

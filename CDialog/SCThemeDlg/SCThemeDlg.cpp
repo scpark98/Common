@@ -20,12 +20,7 @@ CSCThemeDlg::CSCThemeDlg(UINT nResourceID, CWnd* pParent /*=nullptr*/)
 	: CDialogEx(nResourceID, pParent)
 {
 }
-/*
-CSCThemeDlg::CSCThemeDlg(CString message, CString headline)
-{
 
-}
-*/
 CSCThemeDlg::~CSCThemeDlg()
 {
 }
@@ -44,9 +39,9 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_NCCALCSIZE()
 	ON_WM_PAINT()
 	ON_WM_SIZE()
-	ON_WM_LBUTTONDBLCLK()
+	//ON_WM_LBUTTONDBLCLK()
 	ON_WM_CTLCOLOR()
-	ON_WM_SYSCOMMAND()
+	//ON_WM_SYSCOMMAND()
 	ON_WM_TIMER()
 	ON_WM_KILLFOCUS()
 	//ON_WM_ACTIVATE()
@@ -57,9 +52,9 @@ END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
-	m_parent = parent;
+	//m_parent = parent;
 
-	LONG_PTR dwStyle = WS_POPUP;
+	LONG_PTR dwStyle = WS_POPUP | WS_VISIBLE;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
@@ -90,9 +85,9 @@ bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	if (left == 0 && top == 0)
-		CenterWindow(m_parent);
+		CenterWindow(parent);
 
-	ShowWindow(SW_SHOW);
+	//ShowWindow(SW_SHOW);
 	return res;
 }
 
@@ -218,8 +213,8 @@ void CSCThemeDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_titlebar_movable && point.y < m_titlebar_height)
 		DefWindowProc(WM_NCLBUTTONDOWN, HTCAPTION, MAKEWORD(point.x, point.y));
-	else if (!m_use_resizable)
-		return;
+	//else if (!m_use_resizable)
+	//	return;
 
 	CDialogEx::OnLButtonDown(nFlags, point);
 }
@@ -605,13 +600,16 @@ BOOL CSCThemeDlg::PreTranslateMessage(MSG* pMsg)
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		TRACE(_T("keydown on CSCThemeDlg\n"));
-		return FALSE;
+		//return FALSE;
 	}
 
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
 
-
+/*
+//만약 CSCThemeDlg를 상속받은 CTitleDlg에서 dblclk을 할 경우
+//minimize, maximize 처리도 해야하지만 CTitleDlg를 show/hide해야하는 처리도 필요하므로
+//이 클래스에서 이 핸들러를 처리하면 복잡해진다. 실제 클래스에서 처리하자.
 void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
@@ -624,13 +622,19 @@ void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 			return;
 		}
 
-		if (IsZoomed())
+		if (m_target_wnd)
 		{
-			ShowWindow(SW_RESTORE);
+			if (m_target_wnd->IsZoomed())
+				m_target_wnd->ShowWindow(SW_RESTORE);
+			else
+				m_target_wnd->ShowWindow(SW_MAXIMIZE);
 		}
 		else
 		{
-			ShowWindow(SW_MAXIMIZE);
+			if (IsZoomed())
+				ShowWindow(SW_RESTORE);
+			else
+				ShowWindow(SW_MAXIMIZE);
 		}
 
 		m_sys_buttons.Invalidate();
@@ -638,6 +642,7 @@ void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 
 	CDialogEx::OnLButtonDblClk(nFlags, point);
 }
+*/
 
 void CSCThemeDlg::set_back_image(CString imgType, UINT nResourceID, int draw_mode)
 {
@@ -678,20 +683,32 @@ HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
 	return hbr;
 }
-
-
+/*
 void CSCThemeDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	TRACE(_T("CSCThemeDlg::OnSysCommand. nID = %d, lParam = %ld\n"), nID, lParam);
-	CDialogEx::OnSysCommand(nID, lParam);
 
+	//SC_CLOSE(61536)으로 넘어올 때 CDialogEx::OnSysCommand(nID, lParam);를 호출하면
+	//종료될 것으로 예상했으나 if ((nID & 0xFFF0) == SC_CLOSE)과 같은 처리를 해줘야만 동작한다.
+	//if ((nID & 0xFFF0) == SC_CLOSE)
+	//{
+	//	EndDialog(IDCANCEL);
+	//}
+	//else if ((nID & 0xFFF0) == SC_MINIMIZE)
+	//{
+	//	ShowWindow(SW_MINIMIZE);
+	//}
+	//else
+	{
+		CDialogEx::OnSysCommand(nID, lParam);
+	}
 	//UINT id = (nID & 0xFFF0);
 	//if ((nID & 0xFFF0) == SC_MOVE)
 	//	m_sys_buttons.Invalidate();
 	//	SetTimer(0, 1000, NULL);
 }
-
+*/
 /*
 void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 {

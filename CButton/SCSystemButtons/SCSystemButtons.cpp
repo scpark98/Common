@@ -39,7 +39,7 @@ END_MESSAGE_MAP()
 
 void CSCSystemButtons::create(CWnd* parent, int top, int right_end, int width, int height)
 {
-	m_target = parent;
+	//m_parent = parent;
 
 	m_button.clear();
 
@@ -179,9 +179,14 @@ void CSCSystemButtons::OnPaint()
 			{
 				g.DrawLine(&pen, cp.x - 5, cp.y + 3, cp.x + 5, cp.y + 3);
 			}
+			//대상 윈도우가 zoomed인지 아닌지에 따라 그려지는 모양이 다른데
+			//그렇다고 이 클래스에서 대상 윈도우 포인터를 직접 가지게 하면 번거로워진다.
+			//대상 윈도우는 parent일수도 있고 parent의 parent일수도 있다.
+			//(CASeeDlg에서 CTitleDlg를 가지고 있고 그 CTitleDlg가 CSCThemeDlg를 상속받은 클래스 일 경우)
+			//대상 윈도우가 zoomed인지 아닌지도 물어 물어 확인해서 그리도록 한다.
 			else if (m_button[i].cmd == SC_MAXIMIZE)
 			{
-				if (m_target->IsZoomed())
+				if (false)//m_target->IsZoomed())
 				{
 					g.DrawRectangle(&pen, cp.x - 3, cp.y - 5, 8, 8);
 					g.FillRectangle(&br_back, cp.x - 6, cp.y - 2, 8, 8);
@@ -199,8 +204,8 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_PIN)
 			{
-				g.DrawLine(is_top_most(m_target->GetSafeHwnd()) ? &pen_pin : &pen_pin_gray, cp.x - 7, cp.y, cp.x + 7, cp.y);
-				g.FillEllipse(&br_pin, cp.x + (is_top_most(m_target->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
+				//g.DrawLine(is_top_most(m_target->GetSafeHwnd()) ? &pen_pin : &pen_pin_gray, cp.x - 7, cp.y, cp.x + 7, cp.y);
+				//g.FillEllipse(&br_pin, cp.x + (is_top_most(m_target->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{
@@ -239,34 +244,53 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 	//RedrawWindow();
 	Invalidate();
 
+	CPoint pt;
+	GetCursorPos(&pt);
+
 	if (m_over_index >= 0)
 	{
-		switch (m_button[m_over_index].cmd)
+		//해당 명령은 무조건 parent로 보낸다. parent든, parent의 parent든 실제 해당 명령을 처리해야 할 윈도우까지 전달되어야 한다.
+		//ex. Test_CSCThemeDlg에서는 CTestCSCThemeDlgDlg에서 처리해야 하고
+		//CASeeDlg에서는 CASeeDlg에서 처리해야 하므로 CSCSystemButtons -> CTitleDlg -> CASeeDlg로 전달되어야 한다.
+		//즉, 중간에 있는 CTitleDlg는 이 메시지를 직접 처리해야 하는 주체가 아니므로 이를 parent인 CASeeDlg로 전달해야 한다.
+		//SendMessage()로 보낼 경우 CASeeDlg는 정상동작하나 CTestCSCThemeDlgDlg()에서는 동작하지 않았다.
+		GetParent()->PostMessage(WM_SYSCOMMAND, m_button[m_over_index].cmd, MAKELPARAM(pt.x, pt.y));
+
+		//최종적으로 적용할 윈도우의 OnSysCommand() 핸들러 함수에서는 다음과 같이 처리해야 한다.
+		/*
+		if ((nID & 0xFFF0) == IDM_ABOUTBOX)
 		{
-		case SC_HELP:
-			//AfxMessageBox(_T("도움말 또는 CAboutDlg 표시 영역"));
-			::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, SC_HELP, 0);
-			break;
-		case SC_PIN:
-			if (is_top_most(m_target->GetSafeHwnd()))
-				m_target->SetWindowPos(&wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
-			else
-				m_target->SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
-			break;
-		case SC_MINIMIZE:
-		case SC_CLOSE:
-			::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, m_button[m_over_index].cmd, 0);
-			break;
-		//SC_MAXIMIZE 버튼이 클릭되면 여기서 GetParent()->IsZoomed()를 판단해서 주면 안된다.
-		//ASee의 경우는 mainDlg에서 titleDlg를 띠우고 그 안에 SystemButton이 있으므로
-		//titleDlg->IsZoomed()로 판별하는게 아닌 mainDlg->IsZoomed()로 판별해야 한다.
-		//따라서 여기서는 그냥 parent에게 SC_MAXIMIZE 명령만 보내고 실제 적용할 윈도우에서 판단해서 실행한다.
-		case SC_MAXIMIZE:
-			if (m_target->IsZoomed())
-				::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, SC_RESTORE, 0);
-			else
-				::PostMessage(m_target->GetSafeHwnd(), WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+			CAboutDlg dlgAbout;
+			dlgAbout.DoModal();
 		}
+		else
+		{
+			if ((nID & 0xFFF0) == SC_MAXIMIZE)
+			{
+				if (IsZoomed())
+				{
+					PostMessage(WM_SYSCOMMAND, SC_RESTORE);
+					return;
+				}
+
+				TRACE(_T("SC_MAXIMIZE\n"));
+			}
+			else if ((nID & 0xFFF0) == SC_MINIMIZE)
+			{
+				TRACE(_T("SC_MINIMIZE\n"));
+			}
+			else if ((nID & 0xFFF0) == SC_CLOSE)
+			{
+				TRACE(_T("SC_CLOSE\n"));
+			}
+			else if ((nID & 0xFFF0) == SC_RESTORE)
+			{
+				TRACE(_T("SC_RESTORE\n"));
+			}
+
+			CDialogEx::OnSysCommand(nID, lParam);
+		}
+		*/
 	}
 
 	CButton::OnLButtonUp(nFlags, point);

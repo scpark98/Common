@@ -50,9 +50,11 @@ HRESULT CSCD2Context::create_device_resources()
 			);
 		}
 		ComPtr<ID2D1Bitmap1> bitmap = nullptr;
-		if (SUCCEEDED(hr)) {
+		if (SUCCEEDED(hr))
+		{
 			FLOAT dpiX, dpiY;
 			dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+			//dpiX = 96.0f;// (FLOAT)GetSystemMetricsForDpi(SM_MOUSEPRESENT);
 			dpiY = dpiX;
 
 			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
@@ -67,6 +69,9 @@ HRESULT CSCD2Context::create_device_resources()
 		}
 		if (SUCCEEDED(hr)) {
 			m_d2context->SetTarget(bitmap.Get());
+			//D2D1_ANTIALIAS_MODE_ALIASED로 하지 않고 수평 라인을 그리면 stroke width가 1.0, 2.0의 두께가 동일하게 표시된다.
+			//1.0이 2.0보다는 약간 옅은색으로 표시되나 thickness가 동일하게 표시된다. 이 세팅을 해줘야 실제 1 pixel 두께로 그려진다.
+			m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 		}
 	}
 

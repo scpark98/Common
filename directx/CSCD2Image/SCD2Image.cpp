@@ -16,131 +16,6 @@ CSCD2Image::~CSCD2Image()
 		Wait(10);
 }
 
-/*
-HRESULT CSCD2Image::create_factory()
-{
-	HRESULT hr = S_OK;
-
-	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, IID_PPV_ARGS(&m_d2factory));
-
-	if (SUCCEEDED(hr))
-	{
-		hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_WICFactory));
-	}
-
-	return hr;
-}
-
-HRESULT CSCD2Image::create_device_resources()
-{
-	HRESULT hr = S_OK;
-
-	if (!m_d2context) {
-		hr = create_device_context();
-
-		ComPtr<IDXGISurface> surface = nullptr;
-		if (SUCCEEDED(hr)) {
-			hr = m_swapchain->GetBuffer(
-				0,
-				IID_PPV_ARGS(&surface)
-			);
-		}
-		ComPtr<ID2D1Bitmap1> bitmap = nullptr;
-		if (SUCCEEDED(hr)) {
-			FLOAT dpiX, dpiY;
-			dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
-			dpiY = dpiX;
-
-			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-				D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), dpiX, dpiY);
-
-			hr = m_d2context->CreateBitmapFromDxgiSurface(
-				surface.Get(),
-				&properties,
-				&bitmap
-			);
-		}
-		if (SUCCEEDED(hr)) {
-			m_d2context->SetTarget(bitmap.Get());
-		}
-	}
-
-	return hr;
-}
-
-HRESULT CSCD2Image::create_device_context()
-{
-	HRESULT hr = S_OK;
-
-	RECT rc;
-	::GetClientRect(m_hWnd, &rc);
-
-	D2D1_SIZE_U size;
-	size.width = rc.right;
-	size.height = rc.bottom;
-
-	UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-
-	D3D_DRIVER_TYPE driverTypes[] =
-	{
-		D3D_DRIVER_TYPE_HARDWARE,
-		D3D_DRIVER_TYPE_WARP,
-	};
-	UINT countOfDriverTypes = ARRAYSIZE(driverTypes);
-
-	DXGI_SWAP_CHAIN_DESC swapDescription;
-	ZeroMemory(&swapDescription, sizeof(swapDescription));
-	swapDescription.BufferDesc.Width = size.width;
-	swapDescription.BufferDesc.Height = size.height;
-	swapDescription.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-	swapDescription.BufferDesc.RefreshRate.Numerator = 60;
-	swapDescription.BufferDesc.RefreshRate.Denominator = 1;
-	swapDescription.SampleDesc.Count = 1;
-	swapDescription.SampleDesc.Quality = 0;
-	swapDescription.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapDescription.BufferCount = 1;
-	swapDescription.OutputWindow = m_hWnd;
-	swapDescription.Windowed = TRUE;
-
-	ComPtr<ID3D11Device> d3dDevice;
-	for (UINT driverTypeIndex = 0; driverTypeIndex < countOfDriverTypes; driverTypeIndex++)
-	{
-		hr = D3D11CreateDeviceAndSwapChain(
-			nullptr,
-			driverTypes[driverTypeIndex],
-			nullptr,
-			createDeviceFlags,
-			nullptr,
-			0,
-			D3D11_SDK_VERSION,
-			&swapDescription,
-			&m_swapchain,
-			&d3dDevice,
-			nullptr,
-			nullptr
-		);
-
-		if (SUCCEEDED(hr))
-		{
-			break;
-		}
-	}
-
-	ComPtr<IDXGIDevice> dxgiDevice;
-	if (SUCCEEDED(hr))
-		hr = d3dDevice->QueryInterface(IID_PPV_ARGS(&dxgiDevice));
-
-	if (SUCCEEDED(hr))
-		hr = m_d2factory->CreateDevice(dxgiDevice.Get(), &m_d2device);
-
-	if (SUCCEEDED(hr))
-		hr = m_d2device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &m_d2context);
-
-	return hr;
-}
-*/
-
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type)
 {
 	while (!stop())
@@ -150,9 +25,6 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	IWICStream* pStream = NULL;
 	IWICBitmapDecoder* pDecoder = NULL;
-	//IWICBitmapFrameDecode* pIDecoderFrame = NULL;
-	//ComPtr<IWICFormatConverter> pConverter;
-	//ComPtr<IWICBitmapScaler> pScaler;
 
 	// Resource management.
 	HRSRC imageResHandle = NULL;
@@ -1125,7 +997,7 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 	ComPtr<ID2D1Bitmap1> bitmap = nullptr;
 	if (SUCCEEDED(hr)) {
 		FLOAT dpiX, dpiY;
-		dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+		dpiX = 96.0f;// (FLOAT)GetDpiForWindow(::GetDesktopWindow());
 		dpiY = dpiX;
 		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
 			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
@@ -1212,7 +1084,12 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, i
 	//dwr or dwh가 주어진 경우
 	else if (dw <= 0 && dh <= 0)
 	{
-		if (dwr <= 0.f && dhr > 0.f)
+		if (dwr > 0.f && dhr > 0.f)
+		{
+			dw = m_width * dwr;
+			dh = m_height * dhr;
+		}
+		else if (dwr <= 0.f && dhr > 0.f)
 		{
 			dw = m_width * dhr;
 			dh = m_height * dhr;
@@ -1224,8 +1101,8 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, i
 		}
 		else
 		{
-			dw = m_width * dwr;
-			dh = m_height * dhr;
+			dw = m_width;
+			dh = m_height;
 		}
 	}
 

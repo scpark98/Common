@@ -121,6 +121,10 @@ public:
 		m_sys_buttons.set_button_height(m_titlebar_height - 2);
 	}
 
+	//parent가 maximize되거나 restore되면 CSCSystemButtons의 버튼 모양이 달라지므로
+	//parent에서 호출하여 이를 CSCSystemButtons에게 알려야 한다.
+	void	parent_maximized(bool maximized) { m_sys_buttons.parent_maximized(maximized); }
+
 	void	set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; }
 
 	//배경에 그림 표시, zoom? stretch? original size?, 
@@ -164,14 +168,10 @@ protected:
 	bool				m_titlebar_bold = false;
 	bool				m_titlebar_movable = true;
 
-	CSCColorTheme		m_theme = CSCColorTheme(this);
-	//Gdiplus::Color		m_cr_titlebar_text = ::GetSysColor(COLOR_CAPTIONTEXT);
-	//Gdiplus::Color		m_cr_titlebar_back = gRGB(31, 31, 31);// ::GetSysColor(COLOR_ACTIVECAPTION);
-	//Gdiplus::Color		m_cr_sys_buttons_back_hover;
-	//Gdiplus::Color		m_cr_text;
-	//Gdiplus::Color		m_cr_back;
+	bool				m_parent_maximized = false;
 
-	//Gdiplus::Color		m_cr_border = Gdiplus::Color::DimGray;
+	CSCColorTheme		m_theme = CSCColorTheme(this);
+
 	//default = true
 	bool				m_draw_border = true;
 	//default = 1

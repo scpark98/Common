@@ -24,6 +24,7 @@ public:
 
 	HRESULT						init(HWND hWnd);
 	IWICImagingFactory2*		get_WICFactory() { return m_WICFactory.Get(); }
+	ID2D1Factory1*				get_factory() { return m_d2factory.Get(); }
 	ID2D1DeviceContext*			get_d2dc() { return m_d2context.Get(); }
 	IDXGISwapChain*				get_swapchain() { return m_swapchain.Get(); }
 

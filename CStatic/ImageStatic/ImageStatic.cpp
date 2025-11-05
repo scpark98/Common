@@ -134,7 +134,7 @@ void CImageStatic::OnPaint()
 		get_screen_coord_from_real_coord(m_displayed, m_img.width, m_image_roi, &m_screen_roi);
 	}
 
-	draw_rectangle(&dc, m_screen_roi, red, NULL_BRUSH, 1);
+	draw_rect(&dc, m_screen_roi, red, NULL_BRUSH, 1);
 	
 
 	//TRACE(_T("before = %s\n"), get_rect_info_string(m_screen_roi, 2));

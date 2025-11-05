@@ -204,7 +204,7 @@ INT_PTR CSCThemeDlg::DoModal()
 BOOL CSCThemeDlg::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	return TRUE;
+	return FALSE;
 }
 
 
@@ -383,14 +383,15 @@ void CSCThemeDlg::OnPaint()
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	//dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
-
 	//타이틀바 영역
 	if (m_titlebar_height > 0)
 	{
 		CRect rTitle = rc;
+
+		//윈도우11에서 타이틀바 양쪽에 1픽셀 정도가 모자르게 그려지는데 여기서 InflateRect(1, 0)를 해줘도 그려지지 않는다.
+		//rTitle.InflateRect(10, 0);
+
 		rTitle.bottom = m_titlebar_height;
-		//dc.FillSolidRect(rTitle, m_cr_titlebar_back.ToCOLORREF());
 		dc.FillSolidRect(rTitle, m_theme.cr_title_back.ToCOLORREF());
 
 		//프로그램 아이콘 표시. 

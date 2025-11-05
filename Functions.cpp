@@ -6842,11 +6842,9 @@ Gdiplus::PointF center(Gdiplus::RectF& r)
 	return Gdiplus::PointF(r.X + r.Width / 2.0, r.Y + r.Height / 2.0);
 }
 
-void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radius)
+void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius)
 {
-	//path->SetFillMode(Gdiplus::FillModeWinding);
-
-	if (radius <= 0)
+	if (radius <= 0.0f)
 	{
 		path->AddRectangle(r);
 		path->CloseFigure();
@@ -6855,39 +6853,82 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, int radiu
 
 	radius = MIN(radius, MIN(r.Width, r.Height) / 2.0);
 
-	float diameter = radius * 2.0F;
-
+	//반지름의 2배를 한변의 크기로 하는 4개의 사각형을 대상으로 lt, rt, rb, lb 순서로 호를 그린다.
+	float diameter = radius * 2.0f;
 	Gdiplus::RectF arc(r.X, r.Y, diameter, diameter);
 
 	//https://www.codeproject.com/Articles/1010822/RoundedButton-Control-Demystifying-DrawArc
-	//Arc를 그리는 차례는 tl-bl-br-tr가 아니면 round rect가 그려지지 않는다.
-	//top-left round corder. 180도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
-	if (true)
-	{
-		path->AddArc(arc, 180.0, 90.0);
-	}
-	else
-	{
-		//path->AddLine(r.X + );
-	}
+	//Arc를 그릴 때 시작 각도는 왼쪽이 0도, 상단이 아닌 하단이 90이며 상단은 270도이고 시계방향으로 그려진다.
 
-	//bottom-left round corder. 270도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
-	arc.X = r.GetRight() - diameter - 1;
-	path->AddArc(arc, 270.0, 90.0);
+	//lt
+	path->AddArc(arc, 180.0f, 90.0f);
 
-	//bottom-right round corder. 0도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
-	arc.Y = r.GetBottom() - diameter - 1;
-	path->AddArc(arc, 0.0, 90.0);
+	//rt
+	arc.X = r.GetRight() - radius * 2.0f;
+	path->AddArc(arc, 270.0f, 90.0f);
 
-	//top-right round corder. 90도 위치에서 시계방향으로 90도 만큼의 호를 그린다.
-	arc.X = r.GetLeft();
-	path->AddArc(arc, 90.0, 90.0);
+	//rb
+	arc.Y = r.GetBottom() - diameter;
+	path->AddArc(arc, 0.0f, 90.0f);
+
+	//lb
+	arc.X = r.X;
+	path->AddArc(arc, 90.0f, 90.0f);
+
 
 	//그려진 네귀퉁이의 호를 연결시킨다.
 	path->CloseFigure();
 }
 
-void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width)
+void get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_radius, float bottom_radius)
+{
+	if (bottom_radius <= 0.0f)
+		bottom_radius = top_radius;
+
+	if (top_radius <= 0.0f && bottom_radius <= 0.0f)
+	{
+		path->AddRectangle(r);
+		path->CloseFigure();
+		return;
+	}
+
+	//radius는 width, height 어느것의 1/2을 넘어서는 안된다.
+	top_radius = MIN(top_radius, MIN(r.Width, r.Height) / 2.0);
+	bottom_radius = MIN(bottom_radius, MIN(r.Width, r.Height) / 2.0);
+
+	//반지름의 2배인 지름을 한변의 크기로 하는 사각형 4개대상으로 호를 그린다.
+	//float diameter = radius * 2.0f;
+	Gdiplus::RectF arc(r.X - top_radius, r.Y, top_radius * 2, top_radius * 2);
+
+	//https://www.codeproject.com/Articles/1010822/RoundedButton-Control-Demystifying-DrawArc
+	//Arc를 그릴 때 시작 각도는 왼쪽이 0도, 상단이 아닌 하단이 90이며 상단은 270도이고 시계방향으로 그려진다.
+
+	//lt
+	path->AddArc(arc, 270.0f, 90.0f);
+
+	//lb
+	arc.X += top_radius * 2;
+	arc.Width = bottom_radius * 2.0f;
+	arc.Y = r.GetBottom() - bottom_radius * 2.0f;
+	path->AddArc(arc, 180.0f, -90.0f);
+
+	//rb
+	arc.X = r.GetRight() - top_radius - bottom_radius * 2.0f;
+	path->AddArc(arc, 90.0f, -90.0f);
+
+	//rt
+	arc.X = r.GetRight() - top_radius;
+	arc.Width = top_radius * 2.0f;
+	arc.Y = r.Y;
+	arc.Height = top_radius * 2.0f;
+	path->AddArc(arc, 180.0f, 90.0f);
+
+
+	//그려진 네귀퉁이의 호를 연결시킨다.
+	path->CloseFigure();
+}
+
+Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width)
 {
 	//int dia = 2 * radius;
 
@@ -6911,35 +6952,11 @@ void draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_st
 	g->FillPath(&br, &path);
 
 	if (width <= 0)
-		return;
+		return &path;
 
 	// draw the round rect
 	g->DrawPath(&pen, &path);
-
-	/*
-	// if width > 1
-	for (int i = 1; i < width; i++)
-	{
-		// left stroke
-		r.Inflate(-1, 0);
-		// get the path
-		get_round_rect_path(&path, r, radius);
-
-		// draw the round rect
-		g->DrawPath(&pen, &path);
-
-		// up stroke
-		r.Inflate(0, -1);
-
-		// get the path
-		get_round_rect_path(&path, r, radius);
-
-		// draw the round rect
-		g->DrawPath(&pen, &path);
-	}
-	*/
-	// restore page unit
-	//g->SetPageUnit((Gdiplus::Unit)oldPageUnit);
+	return &path;
 }
 
 CRect get_zoom_rect(CRect rect, double zoom)

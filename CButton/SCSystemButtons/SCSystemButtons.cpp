@@ -181,12 +181,15 @@ void CSCSystemButtons::OnPaint()
 			}
 			//대상 윈도우가 zoomed인지 아닌지에 따라 그려지는 모양이 다른데
 			//그렇다고 이 클래스에서 대상 윈도우 포인터를 직접 가지게 하면 번거로워진다.
-			//대상 윈도우는 parent일수도 있고 parent의 parent일수도 있다.
-			//(CASeeDlg에서 CTitleDlg를 가지고 있고 그 CTitleDlg가 CSCThemeDlg를 상속받은 클래스 일 경우)
-			//대상 윈도우가 zoomed인지 아닌지도 물어 물어 확인해서 그리도록 한다.
+			//대상 윈도우는 parent일수도 있고 parent의 parent일수도 있기 때문이다.
+			//(CASeeDlg에서 CTitleDlg를 가지고 있고 그 CTitleDlg가 CSCThemeDlg를 상속받은 클래스 일 경우는 두번의 전달이 필요해진다)
+			//1.대상 윈도우가 zoomed인지 아닌지도 물어 물어 확인해서 그리거나
+			//2.확인하는 콜백함수를 여기에 정의하고 그릴 때 콜백함수를 호출해서 확인하거나
+			//3.메인에서 maximized / restore 할 때 버튼 모양을 다시 그릴 수 있게 이 클래스의 설정함수를 호출하는 방식이 있다.
+			//우선 3번 방식으로 구현한다.
 			else if (m_button[i].cmd == SC_MAXIMIZE)
 			{
-				if (false)//m_target->IsZoomed())
+				if (m_parent_maximized)
 				{
 					g.DrawRectangle(&pen, cp.x - 3, cp.y - 5, 8, 8);
 					g.FillRectangle(&br_back, cp.x - 6, cp.y - 2, 8, 8);
@@ -265,6 +268,7 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 		}
 		else
 		{
+			//system button의 maximize, restore 버튼은 토글로 동작하므로 상황에 맞게 변경
 			if ((nID & 0xFFF0) == SC_MAXIMIZE)
 			{
 				if (IsZoomed())

@@ -170,6 +170,9 @@ public:
 	int		get_button_height() { return m_button_height; }
 	void	set_button_height(int height);
 
+	//parent가 maximize되거나 restore되면 시스템버튼의 모양이 달라지므로 parent에 의해 호출되며 이를 CSCSystemButtons에게 알려야 한다.
+	void	parent_maximized(bool maximized) { m_parent_maximized = maximized; Invalidate(); }
+
 protected:
 	//CWnd*	m_parent = nullptr;	//SC_MINIMIZE, SC_MAXIMIZE 등 버튼 액션을 수행할 대상 윈도우. 일반적으로는 parent dlg가 되지만 간혹 다른 윈도우가 될 수도 있다.
 	std::deque<CSCSystemButtonProperty> m_button;
@@ -183,6 +186,8 @@ protected:
 	bool	m_mouse_track = false;
 	int		m_over_index = -1;		//마우스 오버 또는 다운 인덱스
 	bool	m_down_state = false;
+
+	bool	m_parent_maximized = false;
 
 	int		get_button_index(CPoint pt);
 

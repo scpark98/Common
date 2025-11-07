@@ -102,6 +102,8 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(int))\
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
+	else if (typeid(n) == typeid(char*))\
+		TRACE(_T("%s(%d) %S = %S\n"), __function__, __LINE__, #n, n);\
 	else\
 		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
 }
@@ -1993,6 +1995,7 @@ h		: 복사할 height 크기(pixel)
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
 							UINT align = DT_CENTER | DT_VCENTER);
+
 	CRect		draw_text(Gdiplus::Graphics &g,
 							CRect rTarget,
 							CString text,

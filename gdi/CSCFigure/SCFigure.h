@@ -11,12 +11,13 @@
 
 #include <afxwin.h>
 #include "../../SCGdiplusBitmap.h"
-
+#include "../../Json/rapid_json/json.h"
 
 enum SCFIGURE_TYPES
 {
 	figure_type_line,
 	figure_type_rect,
+	figure_type_bowl_rect,
 	figure_type_ellipse,
 	figure_type_polygon,
 };
@@ -27,11 +28,16 @@ public:
 	CSCFigure();
 	~CSCFigure();
 
+	Json			json;
+
+	void			load(CString fig_file);
+	void			save(CString fig_file);
+
 	//타깃에 현재 도형의 속성대로 그려준다.
 	void			draw(Gdiplus::Graphics& g);
 	void			draw(CSCGdiplusBitmap* img, bool draw_fore = true, bool draw_shadow = true);
 
-	int				type;
+	int				type = figure_type_rect;
 	Gdiplus::Rect	r;					//도형은 자기 스스로의 위치를 기억할 수 있어야 하므로 w, h가 아닌 Rect로 정의함.
 
 	//사격형의 경우 각 코너를 각각 라운드 처리 선택할 수 있다. round[0] = 10인 경우 lt 코너를 10라운드 처리한다.

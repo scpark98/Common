@@ -64,6 +64,7 @@
 #include <cmath>
 
 #include "Functions.h"
+#include "data_structure/SCParagraph/SCParagraph.h"
 
 static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CSCGdiplusBitmap"));
 

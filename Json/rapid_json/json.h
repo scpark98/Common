@@ -36,7 +36,7 @@
 	json.parse(src);
 
 	//checking a member exists
-	json.doc["asdfsd"]; => assert fail
+	json.doc["asdfsd"]; => assert fail when "asdfsd" member does not exist.
 	bool is_member = json.doc.HasMember("asdfsd");
 	if (!is_member)
 		TRACE(_T("asdfsd member not found.\n"));
@@ -66,14 +66,64 @@
 
 #define RAPIDJSON_HAS_STDSTRING 1
 
+#include <afxwin.h>
+#include <iostream>
+#include <sstream>
+#include <string>
 #include <vector>
 #include <map>
-#include <string>
-#include <afxwin.h>
-#include "string.h"
+//#include "string.h"
 #include "include/document.h"
 #include "include/rapidjson.h"
 
+//변수이름과 변수값을 json으로 저장하기 위해 정의.
+//int a = 3;
+//CString str = _T("abc");
+//json.add_member(a);
+//위와 같이 호출하면 json에 { "a": 3, }과 같이 입력된다.
+//json.add_member(a, str);과 같이 가변인자로 구현하려 했으나
+//가변인자로 줄 경우는 #v가 변수명으로 치환될 수 없으므로 개별적으로 하나 하나 추가해야 한다.
+#define add_member(v) add_member_func(#v, v)
+
+#define STREAMOUT(a)  #a << "(" << a << ")" << " "
+
+
+
+#define PRINT1(a1) { std::stringstream stream;  \
+stream << STREAMOUT(a1) << std::endl;\
+TRACE(_T("%S"), stream.str().c_str());\
+}
+
+#define PRINT2(a1, a2) { std::stringstream stream;   \
+stream << STREAMOUT(a1) << STREAMOUT(a2) << std::endl; \
+TRACE(_T("%S"), stream.str().c_str());\
+}
+
+#define PRINT3(a1, a2, a3) { std::stringstream stream;    \
+ stream << STREAMOUT(a1) << STREAMOUT(a2) << STREAMOUT(a3) << std::endl; \
+TRACE(_T("%S"), stream.str().c_str());\
+}
+
+#define PRINT4(a1, a2, a3, a4) { std::stringstream stream;    \
+ stream << STREAMOUT(a1) << STREAMOUT(a2) << STREAMOUT(a3) << STREAMOUT(a4) << std::endl; \
+TRACE(_T("%S"), stream.str().c_str());\
+}
+
+#define PRINT5(a1, a2, a3, a4, a5) { std::stringstream stream;    \
+ stream << STREAMOUT(a1) << STREAMOUT(a2) << STREAMOUT(a3) << STREAMOUT(a4) << STREAMOUT(a5) << std::endl; \
+TRACE(_T("%S"), stream.str().c_str());\
+}
+
+#define EXPAND(X)  X
+
+#define PP_NARG(...)   EXPAND( PP_NARG_(__VA_ARGS__, PP_RSEQ_N()) )
+#define PP_NARG_(...)  EXPAND( PP_ARG_N(__VA_ARGS__) )
+#define PP_ARG_N(_1, _2, _3, _4, _5, N, ...)  N
+#define PP_RSEQ_N()    5, 4, 3, 2, 1, 0
+#define FOO_(N)     PRINT##N
+#define FOO_EVAL(N)  FOO_(N)
+#define PRINT(...)  EXPAND( FOO_EVAL(EXPAND( PP_NARG(__VA_ARGS__) ))(__VA_ARGS__) )
+ 
 class Json
 {
 public:
@@ -81,14 +131,22 @@ public:
 	//using SizeType = rapidjson::SizeType;
 	//using Value = rapidjson::Value;
 
-	Json() {}
-	~Json() { doc.RemoveAllMembers(); }
+	//생성자에서 비어있는 구분이라도 넣어서 parse()해 줘야 doc가 생성되고 멤버를 넣는 작업이 가능해진다.
+	Json()
+	{
+		parse(_T("{}"));
+	}
+
+	~Json()
+	{
+		doc.RemoveAllMembers();
+	}
 
 	bool		parse(std::string sstr);
 	bool		parse(CString str);
 
 	//bool		read(std::string input_json);
-	bool		load(CString input_json);
+	bool		load(CString input_json_file);
 
 	//bool		write(std::string output_json);
 	bool		save(CString output_json_file);
@@ -156,9 +214,69 @@ public:
 		return default_value;
 	}
 
+	template<typename T> void parse_args(CString var_name, const T& arg)
+	{
+		if constexpr (std::is_same_v<T, int>)
+			to_json_result.Format(_T("%s, %d, "), var_name, arg);
+		else if constexpr (std::is_same_v<T, DWORD>)
+			to_json_result.Format(_T("%s, %d, "), var_name, arg);
+	}
+
+	CString to_json_result;
+	
+	template<typename T> void add_member_func(std::string name, T value)
+	{
+		if constexpr (std::is_same_v<T, Gdiplus::Color>)
+		{
+			UINT cr = ((Gdiplus::Color)(value)).GetValue();
+			doc.AddMember(rapidjson::Value(name, doc.GetAllocator()).Move(), cr, doc.GetAllocator());
+		}
+		else if constexpr (std::is_same_v<T, Gdiplus::Rect>)
+		{
+			Gdiplus::Rect r = (Gdiplus::Rect)value;
+			rapidjson::Value ar(rapidjson::kArrayType);
+			ar.PushBack(r.X, doc.GetAllocator());
+			ar.PushBack(r.Y, doc.GetAllocator());
+			ar.PushBack(r.Width, doc.GetAllocator());
+			ar.PushBack(r.Height, doc.GetAllocator());
+			doc.AddMember(rapidjson::Value(name, doc.GetAllocator()).Move(), ar, doc.GetAllocator());
+		}
+		else if constexpr (std::is_same_v<T, Gdiplus::RectF>)
+		{
+			Gdiplus::RectF r = (Gdiplus::RectF)value;
+			rapidjson::Value ar(rapidjson::kArrayType);
+			ar.PushBack(r.X, doc.GetAllocator());
+			ar.PushBack(r.Y, doc.GetAllocator());
+			ar.PushBack(r.Width, doc.GetAllocator());
+			ar.PushBack(r.Height, doc.GetAllocator());
+			doc.AddMember(rapidjson::Value(name, doc.GetAllocator()).Move(), ar, doc.GetAllocator());
+		}
+		else
+		{
+			doc.AddMember(rapidjson::Value(name, doc.GetAllocator()).Move(), value, doc.GetAllocator());
+		}
+	}
+
+	template<typename... Args> CString to_json(Args... args)
+	{
+		//to_json_result.clear();
+		(PARSE_ARGS(args), ...);
+		return to_json_result;
+		//이 코드는 심플하지만 기본 타입들만 가능한 듯 하다.
+		/*
+		std::ostringstream os;
+		os << "[";
+		((os << "\"" << args << "\"" << ","), ...);
+		std::string s = os.str();
+		if (s.back() == ',') s.pop_back();
+		os.str("");
+		return s + "]";
+		*/
+	}
+
 	//array2:[{"name": "peter", "age": 21}, {"name": "mike", "age":24}]과 같이 항목과 값이 pair로 존재하는 array를
 	//map으로 변환해준다. 단, 모든 필드값은 무조건 CString으로 강제 변환한다.
-	//koino 프로젝트에서 사용한 Api::JsonToArray() 대체용
+	//koino 프로젝트에서 사용한 Api::JsonToArray() 대체용.
 	//src는 CString, arr_name은 std::string으로 한 이유는 다음과 같다.
 	//src는 request후에 params.result라는 CString 타입의 json 데이터이며
 	//arr_name은 "objects" 또는 "data"와 같이 추출할 json 필드명이므로 호출할 때는 다음과 같이 호출하면 된다.

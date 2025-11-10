@@ -154,6 +154,41 @@ void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 	m_button_type = nStyle;
 }
 
+//하나의 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
+//text는 제외된다.
+void CGdiButton::copy_properties(const CGdiButton& src)
+{
+	m_is_3state = src.m_is_3state;
+	m_fit2image = src.m_fit2image;
+	m_transparent = src.m_transparent;
+	m_cr_parent_back = src.m_cr_parent_back;
+	m_round = src.m_round;
+
+	m_use_hover = src.m_use_hover;
+	m_draw_hover_rect = src.m_draw_hover_rect;
+	m_hover_rect_thick = src.m_hover_rect_thick;
+	m_hover_rect_color = src.m_hover_rect_color;
+
+	m_draw_focus_rect = src.m_draw_focus_rect;
+	m_cr_focus_rect = src.m_cr_focus_rect;
+	m_focus_rect_width = src.m_focus_rect_width;
+
+	m_down_offset = src.m_down_offset;
+	m_use_normal_image_on_disabled = src.m_use_normal_image_on_disabled;
+
+	m_draw_own_text = src.m_draw_own_text;
+
+	m_draw_border = src.m_draw_border;
+	m_cr_border = src.m_cr_border;
+	m_border_thick = src.m_border_thick;
+
+	m_cr_text.assign(src.m_cr_text.begin(), src.m_cr_text.end());
+	m_cr_back.assign(src.m_cr_back.begin(), src.m_cr_back.end());
+
+	memcpy(&m_lf, &src.m_lf, sizeof(LOGFONT));
+	reconstruct_font();
+}
+
 //기본 이미지를 설정할 때 resize한 후 설정
 bool CGdiButton::add_image_resize(UINT normal, float ratio)
 {
@@ -524,6 +559,13 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	redraw_window();
 }
 
+//투명 png를 그리거나 round button일 경우는 parent back으로 칠해주고 그려줘야 한다. 그래야 깜빡임을 없앨 수 있다.
+void CGdiButton::set_parent_back_color(Gdiplus::Color cr_parent_back)
+{
+	m_cr_parent_back = cr_parent_back;
+	Invalidate();
+}
+
 void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
 {
 	if (m_cr_back.size() < 2)
@@ -532,11 +574,27 @@ void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
 	m_cr_back[1] = hover_back;
 }
 
-void CGdiButton::set_hover_color_matrix(float fScale)	//1.0f = no effect.
+//text, back color를 기준으로 hover, down 색상들을 자동 설정해준다.
+//m_use_hover = true로 자동 설정된다.
+//hover는 약간 밝게, down은 약간 어둡게?
+void CGdiButton::set_auto_hover_down_color()
 {
-	m_hoverMatrix.m[0][0] = fScale;
-	m_hoverMatrix.m[1][1] = fScale;
-	m_hoverMatrix.m[2][2] = fScale;
+	//pushbutton과는 달리 check, radio는 hover기능을 사용하면 산만해진다.
+	if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE))
+		m_use_hover = false;
+	else
+		m_use_hover = true;
+	bool is_light_mode = (gray_value(m_cr_text[0]) < gray_value(m_cr_back[0]));
+	m_cr_back[1] = get_color(m_cr_text[0], 104);
+	m_cr_back[2] = m_cr_text[0];
+	m_cr_text[2] = m_cr_back[0];
+}
+
+void CGdiButton::set_hover_color_matrix(float fr, float fg, float fb)	//1.0f = no effect.
+{
+	m_hoverMatrix.m[0][0] = fr;
+	m_hoverMatrix.m[1][1] = (fg <= 0.0f ? fr : fg);
+	m_hoverMatrix.m[2][2] = (fb <= 0.0f ? fr : fb);
 
 	if (m_image.size())
 		m_image[0]->img[1].set_matrix(&m_hoverMatrix);
@@ -847,10 +905,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	GetClientRect(rc);
 	GetWindowText(text);
-	
+
 	//for test
-	if (text == _T("진단 시작"))
-		text = _T("진단 시작");
+	if (text == _T("새로고침"))
+		text = _T("새로고침");
 
 	rText = rc;
 
@@ -861,7 +919,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
-	get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round);
+	get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round, m_border_thick);
 
 	bool is_down = lpDIS->itemState & ODS_SELECTED;
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
@@ -878,12 +936,16 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//
 	if (m_transparent)
 	{
+		if (m_image.size() < 0 || m_round > 0)
+			dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
+
+		/*
 		//버튼의 위치를 얻어온다.
 		CRect rbutton;
 		GetWindowRect(&rbutton);
 		CWnd* pParent = GetParent();
 		ASSERT(pParent);
-		pParent->ScreenToClient(&rbutton);  //convert our corrdinates to our parents
+		pParent->ScreenToClient(&rbutton);  //convert our coordinates to our parents
 
 		//투명 png button일 경우 또는 round 버튼일 경우는 그 배경이 parent의 배경 이미지 또는 parent의 배경색으로 먼저 칠해져야 한다.
 		if (m_img_parent != NULL && m_img_parent->is_valid())
@@ -891,7 +953,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else if (m_image.size() > 0)
 		{
-			//dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
 			CDC* pDC = pParent->GetDC();
 			CDC MemDC;
 			CBitmap bmp;
@@ -904,10 +965,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			pParent->ReleaseDC(pDC);
 			MemDC.DeleteDC();
 		}
-		else if (m_round > 0)
-		{
-			dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
-		}
+		*/
+
 		/*
 		cr_back = Gdiplus::Color::Transparent;
 
@@ -945,24 +1004,45 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (is_disabled)
 			cr_text = m_cr_text[3];
 		else if (is_down)
-			cr_text = m_cr_text[2];
+		{
+			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+				cr_text = m_cr_text[0];
+			else
+				cr_text = m_cr_text[2];
+		}
 		else if (m_use_hover && m_is_hover)
 			cr_text = m_cr_text[1];
 		else
-			cr_text = m_cr_text[0];
+		{
+			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+				cr_text = m_cr_text[2];
+			else
+				cr_text = m_cr_text[0];
+		}
 	}
 	//글자색과는 달리 배경색은 세팅되면 그리지만
 	//세팅되지 않으면 그리지 않는다.
 	if (m_cr_back.size() == 4)
 	{
+		//check이고 push-like라면 
 		if (is_disabled)
 			cr_back = m_cr_back[3];
 		else if (is_down)
-			cr_back = m_cr_back[2];
+		{
+			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+				cr_back = m_cr_back[0];
+			else
+				cr_back = m_cr_back[2];
+		}
 		else if (m_use_hover && m_is_hover)
 			cr_back = m_cr_back[1];
 		else
-			cr_back = m_cr_back[0];
+		{
+			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+				cr_back = m_cr_back[2];
+			else
+				cr_back = m_cr_back[0];
+		}
 
 		if (m_round == 0)
 		{
@@ -1075,7 +1155,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		int		size = 6;
 		CRect	r = rc;
 
-		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX))
+		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
 		{
 			r.left += 2;
 			r.right = r.left + size * 2 + 1;
@@ -1105,7 +1185,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			rText.right = rc.right;
 			//rText.bottom -= 1;
 		}
-		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
+		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && !is_button_style(BS_PUSHLIKE))
 		{
 			if (is_button_style(BS_PUSHLIKE))
 			{
@@ -1231,11 +1311,24 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
+		{
 			//draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 			//draw_round_rect(&g, CRect2GpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Transparent, m_round, m_border_thick);
-			g.DrawPath(&Gdiplus::Pen(m_cr_border), &roundPath);
+
+			Gdiplus::Pen pen(m_cr_border, m_border_thick);
+			Gdiplus::Pen pen_gray(gray_color(m_cr_border), m_border_thick);
+
+			pen.SetAlignment(Gdiplus::PenAlignmentInset);
+
+			if (IsWindowEnabled())
+				g.DrawPath(&pen, &roundPath);
+			else
+				g.DrawPath(&pen_gray, &roundPath);
+		}
 		else
+		{
 			draw_rect(g, rc, m_cr_border);
+		}
 	}
 
 
@@ -1548,10 +1641,15 @@ void CGdiButton::Inflate(int l, int t, int r, int b)
 	redraw_window();
 }
 
-void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color	cr_parent_back)
+void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color cr_parent_back)
 {
+	//round < 0 이라면 height의 1/2을 설정해준다. 이는 트랙모양으로 그려진다.
 	if (round < 0)
-		round = 0;
+	{
+		CRect rc;
+		GetClientRect(rc);
+		round = rc.Height() / 2;
+	}
 
 	m_round = round;
 

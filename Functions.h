@@ -2150,7 +2150,8 @@ h		: 복사할 height 크기(pixel)
 	void		set_top(Gdiplus::RectF& r, Gdiplus::REAL top);
 	Gdiplus::PointF center(Gdiplus::RectF& r);
 
-	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius);
+	//stroke thick를 무시하고 r에 꽉찬 path를 구하면 right, bottom이 잘리므로 stroke_thick를 고려해서 구해야 한다.
+	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius, int stroke_thick = 1);
 	void		get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_radius, float bottom_radius = -1.0f);
 	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);

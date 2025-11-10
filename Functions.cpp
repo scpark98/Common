@@ -6842,7 +6842,7 @@ Gdiplus::PointF center(Gdiplus::RectF& r)
 	return Gdiplus::PointF(r.X + r.Width / 2.0, r.Y + r.Height / 2.0);
 }
 
-void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius)
+void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius, int stroke_thick)
 {
 	if (radius <= 0.0f)
 	{
@@ -6850,6 +6850,10 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float rad
 		path->CloseFigure();
 		return;
 	}
+
+	//right, bottom을 줄이지 않으면 stroke가 잘려서 그려지게 된다.
+	r.Width -= (stroke_thick);
+	r.Height -= (stroke_thick);
 
 	radius = MIN(radius, MIN(r.Width, r.Height) / 2.0);
 

@@ -180,6 +180,10 @@ public:
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
 
+	//하나의 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
+	//text는 제외된다.
+	void		copy_properties(const CGdiButton& src);
+
 	//resource editor에서 버튼의 caption을 입력하면 그대로 출력된다.
 	//단, 이미지가 있을 경우는 caption은 추가로 표시하지 않았으나 공용 버튼 이미지를 사용한다면 지정된 텍스트를 출력해줘야 한다.
 	//버튼의 caption은 resource editor 또는 set_text() 또는 SetWindowText()로 설정할 수 있다.
@@ -283,12 +287,18 @@ public:
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		set_text_color(Gdiplus::Color normal);
 	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+	void		set_hover_text_color(Gdiplus::Color hover_back);
+
 	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
 	//(NH 프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
 	void		set_back_color(Gdiplus::Color normal, bool auto_set_color = true);
 	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
 	void		set_hover_back_color(Gdiplus::Color hover_back);
+
+	//text, back color를 기준으로 hover, down 색상들을 자동 설정해준다.
+	//m_use_hover = true로 자동 설정된다.
+	void		set_auto_hover_down_color();
 
 	//투명 png를 그리거나 round button일 경우는 parent back으로 칠해주고 그려줘야 한다. 그래야 깜빡임을 없앨 수 있다.
 	void		set_parent_back_color(Gdiplus::Color cr_parent_back);
@@ -297,7 +307,7 @@ public:
 	//CGdiButton& back_color() { m_cr_back.clear(); }
 	//reassign [0,0] [1,1] [2,2]
 	//hover, down일 경우 색상 변화를 주고자 할 경우 사용.(fScale을 1.0보다 크게주면 밝게, 작게주면 어둡게 변경된다.
-	void		set_hover_color_matrix(float fScale);	//1.0f = no effect.
+	void		set_hover_color_matrix(float fr, float fg = 0.0f, float fb = 0.0f);	//1.0f = no effect.
 	void		set_down_color_matrix(float fScale);	//1.0f = no effect.
 
 	//n번째 이미지의 m번째 상태 이미지의 x, y 픽셀 컬러를 변경한다. 단, disable은 제외된다.
@@ -341,9 +351,11 @@ public:
 	void		Inflate(int cx, int cy);
 	void		Inflate(int l, int t, int r, int b);
 
-	//cr_border, cr_parent_back은 Gdiplus::Color::Transparent가 아닐 경우에만 적용된다.
-	//round = radius
-	void		set_round(int round, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
+	//cr_border, cr_parent_back은 그 값이 Gdiplus::Color::Transparent가 아닐 경우에만 유효하다.
+	//round = radius. 음수일 경우는 height의 1/2로 세팅되고 트랙 모양의 버튼이 된다.
+	void		set_round(int round,
+							Gdiplus::Color cr_border = Gdiplus::Color::Transparent,
+							Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
 	//포커스 사각형 관련
 	void		draw_focus_rect(bool draw = true, Gdiplus::Color cr_focus = Gdiplus::Color::LightGray) { m_draw_focus_rect = draw; m_cr_focus_rect = cr_focus; Invalidate(); }

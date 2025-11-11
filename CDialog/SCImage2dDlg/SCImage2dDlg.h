@@ -163,9 +163,13 @@ public:
 	bool			paste_from_clipboard();
 
 	Gdiplus::RectF	get_image_roi();
-	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF()) { m_image_roi = roi; Invalidate(); }
+	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF());
 	bool			get_show_roi_info() { return m_show_roi_info; }
 	void			set_show_roi_info(bool show) { m_show_roi_info = show; Invalidate(); }
+
+	//마우스를 클릭하여 이미지 오프셋을 변경하거나, roi를 그리거나 변경할때는
+	//parent에서 마우스 액션을 무시해야하므로 추가.
+	bool			is_lbutton_down() { return m_lbutton_down; }
 
 	//mode : 1(zoom in), -1(zoom out), 0(reset)
 	void			zoom(int mode);

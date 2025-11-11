@@ -63,8 +63,26 @@ public:
 	};
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }
-	void					set_text(CString text) { CEdit::SetWindowText(text); /*set_line_align(m_valign);*/ }
 	void					SetWindowText(CString text) { set_text(text); }
+
+	template<class T> void set_text(T v)
+	{
+		CString text;
+
+		if (typeid(v) == typeid(int) || typeid(v) == typeid(long) || typeid(v) == typeid(bool) || typeid(v) == typeid(BOOL) ||
+			typeid(v) == typeid(short) || typeid(v) == typeid(unsigned int) || typeid(v) == typeid(unsigned long) ||
+			typeid(v) == typeid(unsigned short) || typeid(v) == typeid(INT) || typeid(v) == typeid(UINT))
+			text.Format(_T("%d"), v);
+		else if (typeid(v) == typeid(float) || typeid(v) == typeid(double))// || typeid(v) == typeid(Gdiplus::REAL))
+			text.Format(_T("%f"), v);
+		else if (typeid(v) == typeid(CString))
+			text.Format(_T("%s"), v);
+		else
+			TRACE(_T("warning. not defined type.\n"));
+
+		CEdit::SetWindowText(text);
+		/*set_line_align(m_valign);*/
+	}
 
 // Overrides
 	// ClassWizard generated virtual function overrides

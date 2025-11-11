@@ -87,6 +87,10 @@ class CSCD2Image
 {
 public:
 	CSCD2Image();
+	CSCD2Image(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height)
+	{
+		create(WICfactory, d2context, width, height);
+	}
 	~CSCD2Image();
 
 	enum ENUM_CSCD2ImageMessages
@@ -94,6 +98,8 @@ public:
 		message_image_modified = 0,
 		message_frame_changed,
 	};
+
+	HRESULT					create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height);
 
 	//load external image
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path);
@@ -108,6 +114,7 @@ public:
 	HRESULT					on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy);
 
 	ID2D1Bitmap*			get() { return m_img[m_frame_index].Get(); }
+	IWICImagingFactory2*	get_WICFactory2() { return m_pWICFactory;}
 
 	//get original image demension
 	float					get_width() { return m_width; }
@@ -156,9 +163,12 @@ public:
 	void					blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* blend_img, int dx, int dy, int sx, int sy, int sw, int sh);
 	void					copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst);
 
+	HRESULT					get_sub_img(CRect r, CSCD2Image *dest);
+	HRESULT					get_sub_img(D2D1_RECT_U r, CSCD2Image* dest);
+
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	//현재는 jpg만 품질옵션이 적용된다.
-	HRESULT					save(CString path, float quality);
+	HRESULT					save(CString path, float quality = 80);
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
 

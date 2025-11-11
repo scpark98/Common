@@ -156,7 +156,7 @@ public:
 	bool			paste_from_clipboard();
 
 	Gdiplus::RectF	get_image_roi();
-	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF()) { m_image_roi = roi; Invalidate(); }
+	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF());
 	bool			get_show_roi_info() { return m_show_roi_info; }
 	void			set_show_roi_info(bool show) { m_show_roi_info = show; Invalidate(); }
 

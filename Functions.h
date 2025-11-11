@@ -100,8 +100,6 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 		typeid(n) == typeid(unsigned short) || typeid(n) == typeid(char) || typeid(n) == typeid(unsigned char) ||\
 		typeid(n) == typeid(INT) || typeid(n) == typeid(UINT))\
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
-	else if (typeid(n) == typeid(int))\
-		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(char*))\
 		TRACE(_T("%s(%d) %S = %S\n"), __function__, __LINE__, #n, n);\
 	else\
@@ -207,7 +205,8 @@ inline HRESULT TraceHR(const TCHAR* pszFile, long nLine, HRESULT hr)
 
 //HRESULT를 결과로 리턴받는 함수들에 사용.
 //#define		_M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
-#define		_M(exp) { HRESULT _hr = (exp); if (FAILED(_hr)) return TRACEHR(_hr), _hr; }
+//hr과 함수식을 넘겨주면 hr에 그 처리결과가 들어가고 에러일 경우 에러를 표시한다.
+#define		_M(hr, exp) { if (FAILED(hr = (exp))) TRACEHR(hr); }
 
 typedef void (WINAPI* PGNSI)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI* PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);

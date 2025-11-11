@@ -12586,21 +12586,23 @@ HRESULT save_bitmap(HBITMAP bitmap, LPCTSTR filename)
 	pictdesc.picType = PICTYPE_BITMAP;
 	pictdesc.bmp.hbitmap = bitmap;
 
+	HRESULT hr = S_OK;
 	CComPtr<IPicture> picture;
-	_M(OleCreatePictureIndirect(&pictdesc, __uuidof(IPicture), FALSE, (LPVOID*)&picture));
+	_M(hr, OleCreatePictureIndirect(&pictdesc, __uuidof(IPicture), FALSE, (LPVOID*)&picture));
 
 	// Save to a stream
-
 	CComPtr<IStream> stream;
-	_M(CreateStreamOnHGlobal(NULL, TRUE, &stream));
+	_M(hr, CreateStreamOnHGlobal(NULL, TRUE, &stream));
 	LONG cbSize = 0;
-	_M(picture->SaveAsFile(stream, TRUE, &cbSize));
+	_M(hr, picture->SaveAsFile(stream, TRUE, &cbSize));
 
 	// Or save to a file
 
 	CComPtr<IPictureDisp> disp;
-	_M(picture->QueryInterface(&disp));
-	_M(OleSavePictureFile(disp, CComBSTR(filename)));
+	_M(hr, picture->QueryInterface(&disp));
+	_M(hr, OleSavePictureFile(disp, CComBSTR(filename)));
+
+	return hr;
 /*
 	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
 	BITMAP bmp; 

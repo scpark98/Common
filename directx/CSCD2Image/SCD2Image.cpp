@@ -16,6 +16,23 @@ CSCD2Image::~CSCD2Image()
 		Wait(10);
 }
 
+HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height)
+{
+	m_img.clear();
+
+	m_pWICFactory = WICfactory;
+	m_d2dc = d2context;
+
+	ComPtr<ID2D1Bitmap1> img;
+	D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+	HRESULT hr;
+	hr = d2context->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, properties, img.GetAddressOf());
+
+	m_img.push_back(img);
+
+	return hr;
+}
+
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type)
 {
 	while (!stop())
@@ -155,8 +172,12 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			break;
 	}
 
-	_M(m_pWICFactory->CreateBitmapFromMemory(width, height, guid, width * channel, width * height * channel, (BYTE*)data, &pWicBitmap));
-	_M(d2context->CreateBitmapFromWicBitmap(pWicBitmap, 0, &img));
+	{
+		//if ((((HRESULT)(HRESULT _hr = (m_pWICFactory->CreateBitmapFromMemory(width, height, guid, width * channel, width * height * channel, (BYTE*)data, &pWicBitmap)))) < 0)) TraceHR(__LPREFIX(__FUNCTION__), 158, _hr); _hr;
+	}
+
+	_M(hr, m_pWICFactory->CreateBitmapFromMemory(width, height, guid, width * channel, width * height * channel, (BYTE*)data, &pWicBitmap));
+	_M(hr, d2context->CreateBitmapFromWicBitmap(pWicBitmap, 0, &img));
 
 	if (!img)
 	{
@@ -165,7 +186,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		if (pFormatConverter)
 		{
 			pFormatConverter->Initialize(pWicBitmap, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0f, WICBitmapPaletteTypeMedianCut);
-			_M(d2context->CreateBitmapFromWicBitmap(pFormatConverter, 0, &img));
+			_M(hr, d2context->CreateBitmapFromWicBitmap(pFormatConverter, 0, &img));
 		}
 	}
 
@@ -196,7 +217,7 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	
 	//JPG, TIFF 등의 exif 정보가 다르므로 Ifd, exif reader를 별도로 구해서 얻어온다.
 	ComPtr<IWICMetadataQueryReader> pRootQueryReader;
-	_M(pBitmapFrameDecode->GetMetadataQueryReader(&pRootQueryReader));
+	_M(hr, pBitmapFrameDecode->GetMetadataQueryReader(&pRootQueryReader));
 	if (!pRootQueryReader)
 		return hr;
 
@@ -205,7 +226,7 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	LPTSTR sIFDPath = _T("/ifd");
 
 	GUID guidFormat = { 0 };
-	_M(pDecoder->GetContainerFormat(&guidFormat));
+	_M(hr, pDecoder->GetContainerFormat(&guidFormat));
 	if (IsEqualGUID(guidFormat, GUID_ContainerFormatJpeg))
 		sIFDPath = _T("/app1/ifd");
 
@@ -423,8 +444,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	//frame_count = 1인 일반 이미지들도 아래의 for문으로 공통 처리하려니 예외적인 경우가 많아 별도 처리함.
 	if (frame_count == 1)
 	{
-		_M(pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
-		_M(pDecoder->GetFrame(0, pFrameDecode.GetAddressOf()));
+		_M(hr, pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
+		_M(hr, pDecoder->GetFrame(0, pFrameDecode.GetAddressOf()));
 
 		pFrameDecode->GetSize(&img_size.width, &img_size.height);
 
@@ -529,9 +550,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 			ComPtr<IWICMetadataQueryReader> pMetadataReader;
 
-			_M(pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
-			_M(pDecoder->GetFrame(i, pFrameDecode.GetAddressOf()));
-			_M(pFrameDecode->GetMetadataQueryReader(pMetadataReader.GetAddressOf()));
+			_M(hr, pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
+			_M(hr, pDecoder->GetFrame(i, pFrameDecode.GetAddressOf()));
+			_M(hr, pFrameDecode->GetMetadataQueryReader(pMetadataReader.GetAddressOf()));
 
 			if (i == 0)
 			{
@@ -852,6 +873,18 @@ void CSCD2Image::copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* d
 
 }
 
+HRESULT CSCD2Image::get_sub_img(CRect r, CSCD2Image* dest)
+{
+	D2D1_RECT_U rsrc = { r.left, r.top, r.right, r.bottom };
+	return get_sub_img(rsrc, dest);
+}
+
+HRESULT CSCD2Image::get_sub_img(D2D1_RECT_U r, CSCD2Image* dest)
+{
+	D2D1_POINT_2U pt = { 0, 0 };
+	return dest->get()->CopyFromBitmap(&pt, m_img[0].Get(), &r);
+}
+
 HRESULT CSCD2Image::save(CString path, float quality)
 {
 	return save(m_img[m_frame_index].Get(), quality, path);
@@ -859,6 +892,8 @@ HRESULT CSCD2Image::save(CString path, float quality)
 
 HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 {
+	HRESULT hr = S_OK;
+
 	va_list args;
 	va_start(args, path);
 
@@ -871,8 +906,8 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 
 	// Create a file stream
 	ComPtr<IWICStream> pStream;
-	_M(m_pWICFactory->CreateStream(pStream.GetAddressOf()));
-	_M(pStream->InitializeFromFilename(filename, GENERIC_WRITE));
+	_M(hr, m_pWICFactory->CreateStream(pStream.GetAddressOf()));
+	_M(hr, pStream->InitializeFromFilename(filename, GENERIC_WRITE));
 
 	PROPBAG2 name = { 0 };
 	name.dwType = PROPBAG2_TYPE_DATA;
@@ -898,38 +933,40 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 		wicFormat = GUID_ContainerFormatRaw;
 		//wicFormat = CLSID_WICRAWDecoder;
 
-	_M(m_pWICFactory->CreateEncoder(wicFormat, nullptr, pEncoder.GetAddressOf()));
-	_M(pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache));
+	_M(hr, m_pWICFactory->CreateEncoder(wicFormat, nullptr, pEncoder.GetAddressOf()));
+	_M(hr, pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache));
 
 	// Create a new frame
 	ComPtr<IWICBitmapFrameEncode> pFrameEncode;
 	CComPtr<IPropertyBag2> properties;
 
-	_M(pEncoder->CreateNewFrame(pFrameEncode.GetAddressOf(), &properties));
+	_M(hr, pEncoder->CreateNewFrame(pFrameEncode.GetAddressOf(), &properties));
 
 	if (ext == _T("jpg"))
 	{
 		CComVariant value(quality);
-		_M(properties->Write(1, &name, &value));
-		_M(pFrameEncode->Initialize(properties));
+		_M(hr, properties->Write(1, &name, &value));
+		_M(hr, pFrameEncode->Initialize(properties));
 	}
 	else
 	{
-		_M(pFrameEncode->Initialize(nullptr));
+		_M(hr, pFrameEncode->Initialize(nullptr));
 	}
 
 	// Get IWICImageEncoder
 	ComPtr<IWICImageEncoder> pImageEncoder;
-	CComPtr<ID2D1Device> d2dDevice;
-	m_d2dc->GetDevice(&d2dDevice);
-	_M(m_pWICFactory->CreateImageEncoder(d2dDevice, pImageEncoder.GetAddressOf()));
+	ComPtr<ID2D1Device> d2dDevice;
+	m_d2dc->GetDevice(d2dDevice.GetAddressOf());
+	_M(hr, m_pWICFactory->CreateImageEncoder(d2dDevice.Get(), pImageEncoder.GetAddressOf()));
 
 	// Write the Direct2D bitmap to the WIC frame
-	_M(pImageEncoder->WriteFrame(img, pFrameEncode.Get(), nullptr));
+	_M(hr, pImageEncoder->WriteFrame(img, pFrameEncode.Get(), nullptr));
 
 	// Commit the frame and encoder
-	_M(pFrameEncode->Commit());
-	_M(pEncoder->Commit());
+	_M(hr, pFrameEncode->Commit());
+	_M(hr, pEncoder->Commit());
+
+	return hr;
 }
 
 /*

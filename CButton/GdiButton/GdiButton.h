@@ -187,7 +187,7 @@ public:
 	//resource editor에서 버튼의 caption을 입력하면 그대로 출력된다.
 	//단, 이미지가 있을 경우는 caption은 추가로 표시하지 않았으나 공용 버튼 이미지를 사용한다면 지정된 텍스트를 출력해줘야 한다.
 	//버튼의 caption은 resource editor 또는 set_text() 또는 SetWindowText()로 설정할 수 있다.
-	//이미지가 있음에도 텍스트를 출력하고자 한다면 다음 함수를 호출하여 m_draw_own_text를 설정해야 한다.
+	//이미지가 있음에도 텍스트를 출력하고자 한다면 set_draw_own_text() 함수를 호출하여 m_draw_own_text를 true로 설정해야 한다.
 	void		set_draw_own_text(bool draw = true) { m_draw_own_text = draw; Invalidate(); }
 
 	void		set_text(CString text) { SetWindowText(text); }

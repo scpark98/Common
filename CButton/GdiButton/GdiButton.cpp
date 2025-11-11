@@ -906,9 +906,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	GetClientRect(rc);
 	GetWindowText(text);
 
-	//for test
-	if (text == _T("새로고침"))
-		text = _T("새로고침");
+	//for test for breakpoint
+	if (text == _T("확인"))
+		text = text;
 
 	rText = rc;
 
@@ -936,7 +936,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//
 	if (m_transparent)
 	{
-		if (m_image.size() < 0 || m_round > 0)
+		//이미지가 설정되지 않았거나 라운드라면 parent back으로 칠해준다.
+		//if (m_image.size() <= 0 || m_round > 0)
 			dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
 
 		/*

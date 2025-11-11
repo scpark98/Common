@@ -290,12 +290,13 @@ void CSCImage2dDlg::OnPaint()
 	//gaussianBlurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, 3.0f);
 	//gaussianBlurEffect->SetInput(0, m_img[0].get());
 
-	//실제 이미지를 그려준다. 투명이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
+	//실제 이미지를 그려준다. 투명 이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
 	if (m_img[0].get_channel() == 4 || (m_img[0].get_channel() == 1 && get_part(m_img[0].get_filename(), fn_ext) == _T("gif")))
 		d2dc->FillRectangle(convert(m_r_display), m_d2dc.get_zigzag_brush().Get());
 
 	m_img[0].draw(d2dc, convert(m_r_display));
 
+	//for blur test
 	//d2dc->DrawImage(gaussianBlurEffect.Get());
 
 	//SetPixelOffsetMode()를 Half로 세팅하지 않으면
@@ -712,23 +713,27 @@ void CSCImage2dDlg::set_show_pixel_pos(bool show)
 
 bool CSCImage2dDlg::copy_to_clipboard(int type)
 {
-	/*
-	//roi가 있으면 그 영역만, 그렇지 않다면 전체 이미지를 복사한다.
+	D2D1_RECT_U r;
+	D2D1_SIZE_F sz = m_img[0].get_size();
+	D2D1_POINT_2U pt{ 0, 0 };
+
 	if ((type == copy_auto) && (m_image_roi.IsEmptyArea() == false))
 	{
-		CSCGdiplusBitmap roi_img;
-		m_img[0].deep_copy(&roi_img);
-		roi_img.sub_image(m_image_roi);
-		return roi_img.copy_to_clipboard();
+		r = D2D1::RectU(m_image_roi.X, m_image_roi.Y, m_image_roi.GetRight(), m_image_roi.GetBottom());
 	}
-	else if (type == copy_photo_exif)
+	else
 	{
-		return ::copy_to_clipboard(m_hWnd, m_info_str);
+		r = D2D1::RectU(0, 0, sz.width, sz.height);
 	}
+	
+	//ID2D1Bitmap1* img;
+	CSCD2Image img(m_img[0].get_WICFactory2(), m_d2dc.get_d2dc(), r.right - r.left, r.bottom - r.top);
 
-	return m_img[0].copy_to_clipboard();
-	*/
-	return false;
+	//CSCD2Image img;
+	m_img[0].get_sub_img(r, &img);
+	img.save(_T("d:\\sub.png"));
+
+	return true;
 }
 
 bool CSCImage2dDlg::paste_from_clipboard()
@@ -755,6 +760,13 @@ Gdiplus::RectF CSCImage2dDlg::get_image_roi()
 	//	return Gdiplus::RectF(0, 0, m_img.width, m_img.height);
 
 	return m_image_roi;
+}
+
+void CSCImage2dDlg::set_image_roi(Gdiplus::RectF roi)
+{
+	m_image_roi = roi;
+	get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
+	Invalidate();
 }
 
 D2D1_BITMAP_INTERPOLATION_MODE CSCImage2dDlg::get_interpolation_mode()

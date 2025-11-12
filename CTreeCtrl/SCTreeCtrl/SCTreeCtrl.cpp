@@ -32,18 +32,25 @@ void CSCTreeCtrl::OnDestroy()
 	}
 
 	//각 노드에 동적 할당된 데이터가 있다면 해제시켜야 한다.
-	release_iterator(GetRootItem());
+	//release_iterator(GetRootItem());
 
 	CTreeCtrl::OnDestroy();
 }
 
+//하위 노드까지 재귀적으로 순회하면서 각 노드에 동적 할당된 데이터를 해제시키고자 아래 함수를 추가했으나
+//정상적으로 해제되지 않는다.
+//할당을 parent에서 하고 해제를 여기서 해서 그런건지는 확인이 필요하다.
+//parent에서의 해제는 정상적으로 동작한다.
 void CSCTreeCtrl::release_iterator(HTREEITEM hItem)
 {
 	for (HTREEITEM hNext = hItem; hNext; hNext = GetNextItem(hNext, TVGN_NEXT))
 	{
 		DWORD* item = (DWORD*)GetItemData(hNext);
 		if (item)
-			delete item;
+		{
+			//item
+				delete item;
+		}
 
 		release_iterator(GetChildItem(hNext));
 	}

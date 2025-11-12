@@ -1320,7 +1320,7 @@ struct	NETWORK_INFO
 	//return value : text_encoding_ansi / text_encoding_utf8 / ....
 	int			file_open(FILE** fp, CString mode, CString file);
 
-	//text 파일을 열어서 dqList에 넣어준다.
+	//text 파일을 열어서 라인별로 읽은 후 dqList에 넣어준다.
 	bool		read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
@@ -2019,6 +2019,7 @@ h		: 복사할 height 크기(pixel)
 	void		draw_rect(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		draw_rect(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 	void		draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
+	void		draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 #ifndef _USING_V110_SDK71_
 	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
 	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
@@ -2127,10 +2128,18 @@ h		: 복사할 height 크기(pixel)
 	//0 : "1 2 3 4"
 	//1 : "(1,2) ~ (4,8)"
 	//2 : "(1,2) ~ (4,8) (2x6)"
-	//3 : "l = 1, t = 2, r = 3, b = 4"
-	CString		get_rect_info_string(CRect r, int nFormat = 2);
-	CString		get_rect_info_string(Gdiplus::Rect r, int nFormat = 2);
-	CString		get_rect_info_string(Gdiplus::RectF r, int nFormat = 2);
+	//3 : "1, 2, 3, 4"
+	enum RECT_INFO_FORMAT
+	{
+		rect_info_format_comma = -1,
+		rect_info_format_simple,
+		rect_info_format_point,
+		rect_info_format_point_size,
+		rect_info_format_ltrb,
+	};
+	CString		get_rect_info_string(CRect r, int nFormat = rect_info_format_point_size);
+	CString		get_rect_info_string(Gdiplus::Rect r, int nFormat = rect_info_format_point_size);
+	CString		get_rect_info_string(Gdiplus::RectF r, int nFormat = rect_info_format_point_size);
 
 	void		make_rect(CRect &Rect, int x, int y, int w, int h);
 	CRect		make_rect(int x, int y, int w, int h);

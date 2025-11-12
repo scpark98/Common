@@ -5824,7 +5824,7 @@ bool read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8)
 	while (_fgetts(tline, sizeof(tline), fp) != NULL)
 	{
 		sline = tline;
-		sline.Trim();
+		//sline.Trim();
 		dqList->push_back(sline);
 	}
 
@@ -6380,24 +6380,32 @@ void draw_rect(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill
 	draw_rect(g, r, cr_line, cr_fill, width, pen_align, pen_style);
 }
 
-void draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
+void draw_rect(Gdiplus::Graphics& g, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
+{
+	draw_rect(g, Gdiplus::RectF(r.left, r.top, r.Width(), r.Height()), cr_line, cr_fill, width, pen_align, pen_style);
+}
+
+void draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
 {
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
 
 	if (cr_fill.GetValue() != Gdiplus::Color::Transparent)
-		g.FillRectangle(&br, CRect2GpRect(r));
+		g.FillRectangle(&br, r);
 
 	//DrawRectangle()로 그리면 right, bottom까지 그리는데 영역을 벗어나게 된다.
 	//즉, (left, top) ~ (right - 1, bottom - 1)까지 그려줘야 영역을 벗어나지 않게 된다.
 	//단, r의 안쪽으로 그려지는 PenAlignmentInset이라면 줄이지 않아도 된다.
 	//if (pen_align != Gdiplus::PenAlignmentInset)
 	if (width <= 1)
-		r.DeflateRect(0, 0, 1, 1);
+	{
+		r.Width--;
+		r.Height--;
+	}
 
 	pen.SetAlignment((Gdiplus::PenAlignment)pen_align);
 	pen.SetDashStyle((Gdiplus::DashStyle)pen_style);
-	g.DrawRectangle(&pen, CRect2GpRect(r));
+	g.DrawRectangle(&pen, r);
 }
 
 #ifndef _USING_V110_SDK71_

@@ -34,7 +34,7 @@
 
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
-#include "../../CMenu/SCMenuBar/SCMenu.h"
+#include "../../CMenu/CSCMenuBar/SCMenu.h"
 #include "../../colors.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 
@@ -164,15 +164,22 @@ public:
 	//hParent 항목 아래 하위 항목을 추가한다. NULL이면 현재 선택된 항목이 hParent가 된다.
 	//label이 ""이면 기본 "새 폴더"명으로 추가한 후 edit_item() 호출.
 	//auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
-	//새로 추가된 항목의 label을 리턴한다.
-	CString		add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
+	//새로 추가된 항목을 리턴한다.
+	HTREEITEM	add_new_item(HTREEITEM hParent = NULL, CString label = _T(""), bool auto_index = false, bool edit_mode = false);
 	//주어진 항목의 label을 변경한다. hItem == NULL이면 현재 선택된 항목을, new_label이 공백이면 편집모드로 표시한다.
 	void		rename_item(HTREEITEM hItem = NULL, CString new_label = _T(""));
 	//현재 선택된 노드의 하위 노드들 중에서 old_label을 찾아서 new_label로 이름을 변경한다.
 	void		rename_child_item(HTREEITEM hParent, CString old_label, CString new_label);
 
+	//hItem과 하위 노드들까지 삭제한다.
+	//해당 노드에 메모리가 할당되었다면 해제후에 삭제시킨다.
 	//only_children이 true이면 해당 노드의 자식들만 제거한다.
 	void		delete_item(HTREEITEM hItem = NULL, bool only_children = false, bool confirm = false);
+
+	void		delete_all_items(bool confirm = false);
+	//CTreeCtrl::DeleteAllItems() override.
+	void		DeleteAllItems(bool confirm = false);
+
 	//현재 폴더에서 "새 폴더" 생성 시 인덱스를 구한다. ex. "새 폴더 (2)"
 	int			get_file_index(CString path, CString new_folder_title);
 
@@ -402,6 +409,11 @@ protected:
 		rect_label,
 	};
 
+//Serialize 관련
+	void			serialize_item(CArchive& ar, HTREEITEM hItem = NULL);
+
+	void			release_iterator(HTREEITEM hItem = NULL);
+
 protected:
 	DECLARE_MESSAGE_MAP()
 	virtual void PreSubclassWindow();
@@ -434,6 +446,8 @@ public:
 	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
 	afx_msg void OnMouseLeave();
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
+	virtual void Serialize(CArchive& ar);
+	afx_msg void OnDestroy();
 };
 
 

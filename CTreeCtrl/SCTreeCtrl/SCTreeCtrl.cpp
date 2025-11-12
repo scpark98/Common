@@ -19,13 +19,35 @@ CSCTreeCtrl::CSCTreeCtrl()
 
 CSCTreeCtrl::~CSCTreeCtrl()
 {
+}
+
+void CSCTreeCtrl::OnDestroy()
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	if (m_pEdit)
 	{
 		m_pEdit->DestroyWindow();
 		delete m_pEdit;
+		m_pEdit = NULL;
 	}
+
+	//각 노드에 동적 할당된 데이터가 있다면 해제시켜야 한다.
+	release_iterator(GetRootItem());
+
+	CTreeCtrl::OnDestroy();
 }
 
+void CSCTreeCtrl::release_iterator(HTREEITEM hItem)
+{
+	for (HTREEITEM hNext = hItem; hNext; hNext = GetNextItem(hNext, TVGN_NEXT))
+	{
+		DWORD* item = (DWORD*)GetItemData(hNext);
+		if (item)
+			delete item;
+
+		release_iterator(GetChildItem(hNext));
+	}
+}
 
 BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_ACTIVATE()
@@ -58,6 +80,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_GETMINMAXINFO()
 	ON_COMMAND_RANGE(menu_add_item, menu_favorite, &CSCTreeCtrl::OnPopupMenu)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCTreeCtrl::on_message_CSCEdit)
+	ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
 
@@ -2197,105 +2220,7 @@ void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 //file의 내용을 읽어서 load_from_string()를 호출한다.
 bool CSCTreeCtrl::load(CString file)
 {
-	/*
-	FILE* fp = NULL;
-	CTreeItem item(_T("top"));
-
-	TCHAR	chLine[1000];
-	CString sline;
-
-	//encoding 방식을 읽어온다.
-	int	text_encoding = get_text_encoding(sfile);
-	if (text_encoding < 0)
-		return false;
-
-	//encoding 방식을 판별하여 read/write했으나
-	//utf8만 다루도록 통일한다.
-
-	fp = _tfopen(sfile, _T("rt")CHARSET);
-	//m_unicode_file = true;
-//}
-
-	if (fp == NULL)
-		return false;
-
-	m_tr.clear();
-
-
-	tree<CTreeItem>::iterator top = m_tr.set_head(item);
-	tree<CTreeItem>::iterator it;
-	int prev_indent, tabCount;
-
-	while (_fgetts(chLine, 1000, fp) != NULL)
-	{
-		sline = chLine;
-		sline.TrimRight();
-
-		//빈 라인이 있을 경우는 패스
-		if (sline.GetLength() == 0)
-			continue;
-
-		//맨 처음 노드이면 루트로 추가
-		if (it == NULL)
-		{
-			item = CTreeItem(sline);
-			it = m_tr.append_child(top, item);
-			prev_indent = 0;
-			continue;
-		}
-
-		//읽어온 문자열이 몇 탭 들어간 항목인지 세고
-		tabCount = 0;
-		while (sline[tabCount] == '\t')
-			tabCount++;
-
-		sline.Trim();
-		//prev_indent와 비교하여 레벨에 맞게 추가시킨다.
-
-		item = CTreeItem(sline);
-
-		//전보다 1개 많으면 child이고
-		if (tabCount == prev_indent + 1)
-		{
-			it = m_tr.append_child(it, item);
-			prev_indent = tabCount;
-		}
-		//전과 같으면 sibling이고
-		else if (tabCount == prev_indent)
-		{
-			it = m_tr.parent(it);
-			it = m_tr.append_child(it, item);
-		}
-		//전보다 적으면 (prev_index-tabCount) * parent의 sibling이다.
-		else if (tabCount < prev_indent)
-		{
-			while (prev_indent >= tabCount)
-			{
-				it = m_tr.parent(it);
-				prev_indent--;
-			}
-
-			if (it == NULL)
-			{
-				it = m_tr.insert(m_tr.begin(), item);
-			}
-			else
-			{
-				it = m_tr.append_child(it, item);
-			}
-			prev_indent++;
-		}
-		else
-		{
-			AfxMessageBox(sline + _T("\ntext 파일 입력 오류"));
-			break;
-		}
-	}
-
-	int res = fclose(fp);
-	recalculate_scroll_size();
-	Invalidate();
-	*/
+	load_from_string(read(file));
 	return true;
 }
 
@@ -3376,7 +3301,7 @@ LRESULT CSCTreeCtrl::OnMessageCSCMenu(WPARAM wParam, LPARAM lParam)
 //hParent 항목 아래 하위 항목을 추가한다. NULL이면 현재 선택된 항목이 hParent가 된다.
 //label이 ""이면 기본 "새 폴더"명으로 추가한 후 edit_item() 호출.
 //auto_index = true라면 새 폴더, 새 항목이 이미 존재할 경우 뒤에 숫자를 증가시켜 붙여줘야 한다.
-CString CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index, bool edit_mode)
+HTREEITEM CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_index, bool edit_mode)
 {
 	if (hParent == NULL)
 		hParent = GetSelectedItem();
@@ -3484,7 +3409,7 @@ CString CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_in
 			edit_item(hItem);
 	}
 
-	return label;
+	return hItem;
 }
 
 //주어진 항목의 label을 변경한다.
@@ -3551,6 +3476,13 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 	//현재 노드 포함 모든 하위 노드까지 삭제
 	if (!only_children)
 	{
+		DWORD* pData = (DWORD*)GetItemData(hItem);
+		if (pData)
+		{
+			delete pData;
+			SetItemData(hItem, NULL);
+		}
+
 		DeleteItem(hItem);
 		return;
 	}
@@ -3562,6 +3494,13 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 
 	while (hChildItem)
 	{
+		DWORD* pData = (DWORD*)GetItemData(hItem);
+		if (pData)
+		{
+			delete pData;
+			SetItemData(hItem, NULL);
+		}
+
 		DeleteItem(hChildItem);
 		hChildItem = GetNextItem(hItem, TVGN_CHILD);
 	}
@@ -3576,6 +3515,17 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 	tvItem.hItem = hItem;
 	tvItem.cChildren = 0;
 	SetItem(&tvItem);
+}
+
+void CSCTreeCtrl::delete_all_items(bool confirm)
+{
+	delete_item(GetRootItem(), false, confirm);
+}
+
+//CTreeCtrl::DeleteAllItems() override.
+void CSCTreeCtrl::DeleteAllItems(bool confirm)
+{
+	delete_all_items(confirm);
 }
 
 
@@ -3699,4 +3649,57 @@ int CSCTreeCtrl::get_indent_level(HTREEITEM hItem)
 		indent++;
 
 	return indent;
+}
+
+void CSCTreeCtrl::Serialize(CArchive& ar)
+{
+	serialize_item(ar, GetRootItem());
+}
+void CSCTreeCtrl::serialize_item(CArchive& ar, HTREEITEM hItem)
+{
+	if (ar.IsStoring())
+	{
+		// Count items on this level
+		DWORD dwCnt = 0;
+		for (HTREEITEM hNext = hItem; hNext; hNext = GetNextItem(hNext, TVGN_NEXT))
+			++dwCnt;
+		ar << dwCnt;
+
+		// Store each item on this level
+		for (HTREEITEM hNext = hItem; hNext; hNext = GetNextItem(hNext, TVGN_NEXT))
+		{
+			// Output data of this node
+			//OutputDataOfNode(tree, hNext, ar);
+
+			CString label = GetItemText(hNext);
+			ar << label;
+			int indent = get_indent_level(hNext);
+			TRACE(_T("%s %s\n"), CString(' ', indent * 2), label);
+			// Stream children of this node
+			//if (GetChildItem(hNext) != NULL)
+				serialize_item(ar, GetChildItem(hNext));
+		}
+	}
+	else
+	{
+		// Get number of nodes on this level
+		DWORD dwCnt;
+		ar >> dwCnt;
+		while (dwCnt--)
+		{
+			// Insert a new node
+
+			HTREEITEM hNext = InsertItem(_T(""), hItem ? hItem : TVI_ROOT);
+
+			// Read data of node into the new node hNext
+			//ReadDataOfNode(tree, hNext, ar);
+			CString label;
+			ar >> label;
+			trace(label);
+			SetItemText(hNext, label);
+			
+			// Now read all children
+			serialize_item(ar, GetChildItem(hNext));
+		}
+	}
 }

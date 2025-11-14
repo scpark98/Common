@@ -154,39 +154,39 @@ void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 	m_button_type = nStyle;
 }
 
-//하나의 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
+//현재 설정된 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
 //text는 제외된다.
-void CGdiButton::copy_properties(const CGdiButton& src)
+void CGdiButton::copy_properties(CGdiButton& dst)
 {
-	m_is_3state = src.m_is_3state;
-	m_fit2image = src.m_fit2image;
-	m_transparent = src.m_transparent;
-	m_cr_parent_back = src.m_cr_parent_back;
-	m_round = src.m_round;
+	dst.m_is_3state = m_is_3state;
+	dst.m_fit2image = m_fit2image;
+	dst.m_transparent = m_transparent;
+	dst.m_cr_parent_back = m_cr_parent_back;
+	dst.m_round = m_round;
 
-	m_use_hover = src.m_use_hover;
-	m_draw_hover_rect = src.m_draw_hover_rect;
-	m_hover_rect_thick = src.m_hover_rect_thick;
-	m_hover_rect_color = src.m_hover_rect_color;
+	dst.m_use_hover = m_use_hover;
+	dst.m_draw_hover_rect = m_draw_hover_rect;
+	dst.m_hover_rect_thick = m_hover_rect_thick;
+	dst.m_hover_rect_color = m_hover_rect_color;
 
-	m_draw_focus_rect = src.m_draw_focus_rect;
-	m_cr_focus_rect = src.m_cr_focus_rect;
-	m_focus_rect_width = src.m_focus_rect_width;
+	dst.m_draw_focus_rect = m_draw_focus_rect;
+	dst.m_cr_focus_rect = m_cr_focus_rect;
+	dst.m_focus_rect_width = m_focus_rect_width;
 
-	m_down_offset = src.m_down_offset;
-	m_use_normal_image_on_disabled = src.m_use_normal_image_on_disabled;
+	dst.m_down_offset = m_down_offset;
+	dst.m_use_normal_image_on_disabled = m_use_normal_image_on_disabled;
 
-	m_draw_own_text = src.m_draw_own_text;
+	dst.m_draw_own_text = m_draw_own_text;
 
-	m_draw_border = src.m_draw_border;
-	m_cr_border = src.m_cr_border;
-	m_border_thick = src.m_border_thick;
+	dst.m_draw_border = m_draw_border;
+	dst.m_cr_border = m_cr_border;
+	dst.m_border_thick = m_border_thick;
 
-	m_cr_text.assign(src.m_cr_text.begin(), src.m_cr_text.end());
-	m_cr_back.assign(src.m_cr_back.begin(), src.m_cr_back.end());
+	dst.m_cr_text.assign(m_cr_text.begin(), m_cr_text.end());
+	dst.m_cr_back.assign(m_cr_back.begin(), m_cr_back.end());
 
-	memcpy(&m_lf, &src.m_lf, sizeof(LOGFONT));
-	reconstruct_font();
+	memcpy(&dst.m_lf, &m_lf, sizeof(LOGFONT));
+	dst.reconstruct_font();
 }
 
 //기본 이미지를 설정할 때 resize한 후 설정
@@ -554,7 +554,12 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_back.push_back(normal);
 	m_cr_back.push_back(over);
 	m_cr_back.push_back(down);
+
+	if (disabled.GetValue() == Gdiplus::Color::Transparent)
+		disabled = gray_color(normal);
 	m_cr_back.push_back(disabled);
+
+	m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
 
 	redraw_window();
 }
@@ -564,6 +569,25 @@ void CGdiButton::set_parent_back_color(Gdiplus::Color cr_parent_back)
 {
 	m_cr_parent_back = cr_parent_back;
 	Invalidate();
+}
+
+//border color는 기본적으로 m_cr_back과 동일하게 설정되지만 별도로 지정할 수 있다.
+//3개의 색상은 지정하지만 disabled는 기본 disable color를 쓰고자 할 경우에는 Transparent로 호출한다.
+void CGdiButton::set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled)
+{
+	m_cr_border.clear();
+	m_cr_border.push_back(normal);
+	m_cr_border.push_back(hover);
+	m_cr_border.push_back(down);
+
+	if (disabled.GetValue() == Gdiplus::Color::Transparent)
+		disabled = gray_color(normal);
+	m_cr_border.push_back(disabled);
+}
+
+void CGdiButton::set_border_color(Gdiplus::Color normal, bool auto_set_color)
+{
+
 }
 
 void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
@@ -900,6 +924,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CString		text;
 	Gdiplus::Color	cr_text = ::GetSysColor(COLOR_BTNTEXT);
 	Gdiplus::Color	cr_back = ::GetSysColor(COLOR_3DFACE);
+	Gdiplus::Color	cr_border = Gdiplus::Color::Transparent;
 	DWORD		dwStyle = GetStyle();
 	DWORD		dwText = 0;
 
@@ -1003,12 +1028,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (m_cr_text.size() == 4)
 	{
 		if (is_disabled)
+		{
 			cr_text = m_cr_text[3];
+			cr_border = m_cr_border[3];
+		}
 		else if (is_down)
 		{
-			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
-				cr_text = m_cr_text[0];
-			else
+			//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+			//	cr_text = m_cr_text[0];
+			//else
 				cr_text = m_cr_text[2];
 		}
 		else if (m_use_hover && m_is_hover)
@@ -1306,7 +1334,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round > 0)
 			draw_round_rect(&g, CRect2GpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
-			draw_rect(g, rc, m_cr_border);
+			draw_rect(g, rc, m_cr_border[1]);
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
@@ -1316,8 +1344,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 			//draw_round_rect(&g, CRect2GpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Transparent, m_round, m_border_thick);
 
-			Gdiplus::Pen pen(m_cr_border, m_border_thick);
-			Gdiplus::Pen pen_gray(gray_color(m_cr_border), m_border_thick);
+			Gdiplus::Pen pen(m_cr_border[0], m_border_thick);
+			Gdiplus::Pen pen_gray(gray_color(m_cr_border[0]), m_border_thick);
 
 			pen.SetAlignment(Gdiplus::PenAlignmentInset);
 
@@ -1328,7 +1356,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			draw_rect(g, rc, m_cr_border);
+			draw_rect(g, rc, cr_border);
 		}
 	}
 
@@ -1657,7 +1685,7 @@ void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color c
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
-		m_cr_border = cr_border;
+		//m_cr_border = cr_border;
 	}
 
 	if (m_round > 0)

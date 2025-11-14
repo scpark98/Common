@@ -20,14 +20,12 @@ public:
 	void	set(CRect r, CString label = _T(""));
 	void	set(Gdiplus::RectF r, CString label = _T(""));
 
-
-	Gdiplus::RectF	get_rect() const { return m_r; }
-	void			set_rect(Gdiplus::RectF r) { m_r = r; }
-
-	CString			get_label() const { return m_label; }
-	void			set_label(CString label) { m_label = label; }
-
-protected:
 	Gdiplus::RectF	m_r;
+	int				m_round = 0;
 	CString			m_label;
+	bool			m_label_visible = true;
+	UINT			m_label_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::LightGray;
+	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;
+protected:
 };

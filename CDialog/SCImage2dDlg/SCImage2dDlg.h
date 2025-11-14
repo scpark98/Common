@@ -153,6 +153,16 @@ public:
 	bool			get_show_pixel() { return m_show_pixel; }
 	void			set_show_pixel(bool show);
 
+	//d2dc에 Direct2D를 그리고 CDC를 이용해서 부득이하게 그려야 할 경우
+	//OnPaint()에서 swapchain()후에 dc를 이용하여 그림을 그리도록 했는데
+	//OnSize()에서는 잘 그려지지만 OnMouseMove()에서는 Invalidate()만 하니 깜빡이며 사라진다.
+	//OnSize()와 OnMouseMove()에서의 차이는
+	//m_d2back.on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), sz.width, sz.height);와 같이
+	//배경 이미지에 대한 on_resize() 호출이 차이가 있다.
+	//따라서 부득이하게 dc를 이용해서 그림을 그리는 코드가 OnPaint()에 포함되어 있다면
+	//기본 함수인 Invalidate() 대신 이 함수를 호출하여 on_resize() 호출후에 Invalidate()를 호출하도록 해야 한다.
+	void			rerender();
+
 	enum ENUM_COPY_TO_CLIPBOARD
 	{
 		copy_auto = 0,		//roi가 있으면 roi 영역을, 없다면 이미지 전체를 클립보드로 복사
@@ -296,8 +306,10 @@ protected:
 	//CSCStatic으로 하면 생성 등 처음엔 복잡하지만 결국 더 편한 방법이 된다.
 	bool			m_show_pixel = false;
 	bool			m_show_pixel_pos = true;
-	CString			m_pixel_pos;
+	bool			m_show_guide_line = true;
+	Gdiplus::PointF	m_pixel_pos;
 	CRect			m_r_pixel_pos;
+	ID2D1SolidColorBrush* m_brush_pixel_guide = NULL;
 
 	//CRect			m_r_pixel;
 	Gdiplus::Color	m_cr_pixel = Gdiplus::Color::Black;

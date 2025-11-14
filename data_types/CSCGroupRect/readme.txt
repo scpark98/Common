@@ -23,3 +23,9 @@ Root (전체 영역)
 		상담대기자	: 125, 21, 195, 41
 		상담중		: 235, 21, 278, 41
 
+
+CSCUIElement
+{
+	Gdiplus::RectF r;
+	CString label;
+}

@@ -1161,7 +1161,19 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 	if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_stretch)
 		r = target;
 	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_zoom)
+	{
 		r = get_ratio_rect(target, m_width / m_height);
+
+		if ((m_width <= (target.right - target.left)) && (m_height <= (target.bottom - target.top)))
+		{
+			float w = r.right - r.left;
+			float h = r.bottom - r.top;
+			r.left = target.left;
+			r.top = target.top;
+			r.right = r.left + w;
+			r.bottom = r.top + h;
+		}
+	}
 	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_original)
 	{
 		r = target;

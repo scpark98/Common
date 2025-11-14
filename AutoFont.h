@@ -6,7 +6,7 @@
 
 //Usage:
 /*
-CAutoFont Font("Arial");
+CAutoFont Font(_T("Arial"));
 Font.SetHeight(30);
 Font.SetBold(true);
 CFont* pOldFont = (CFont*)dc.SelectObject(&Font);

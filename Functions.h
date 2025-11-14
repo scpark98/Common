@@ -1974,6 +1974,7 @@ h		: 복사할 height 크기(pixel)
 
 //////////////////////////////////////////////////////////////////////////
 //GDI
+	void		draw_text(CDC* pDC, int x, int y, CString text, COLORREF cr_text);
 	void		draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect);
 
 	//Gdiplus
@@ -2014,6 +2015,7 @@ h		: 복사할 height 크기(pixel)
 	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);
 
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
+	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr = RGB(0, 0, 0), int thick = 1, int style = PS_SOLID, int nDrawMode = R2_COPYPEN);
 	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr = Gdiplus::Color::Black, float thick = 1.0f, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int nDrawMode = R2_COPYPEN);
 	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int draw_mode = R2_COPYPEN);
 	void		draw_rect(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
@@ -2070,13 +2072,13 @@ h		: 복사할 height 크기(pixel)
 
 //이미지가 표시되고 있는 영역 정보와 화면상의 좌표를 주면 이미지상의 실제 좌표를 리턴한다.
 //단, 계산된 이미지상의 실제 좌표가 이미지 크기를 벗어나면 결과 변수에는 -1값을 채워서 리턴한다.
-	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float*dx, float*dy);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst);
 
 	//이미지가 표시되고 있는 영역 정보와 이미지 상의 좌표를 주면 화면상의 좌표를 리턴한다.
-	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float*dx, float*dy);
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst);

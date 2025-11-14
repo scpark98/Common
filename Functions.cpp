@@ -6052,6 +6052,13 @@ bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL
 	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, (LPCTSTR)folder, lpsa));
 }
 
+void draw_text(CDC* pDC, int x, int y, CString text, COLORREF cr_text)
+{
+	COLORREF cr_old = pDC->SetTextColor(cr_text);
+	pDC->TextOut(x, y, text);
+	pDC->SetTextColor(cr_old);
+}
+
 void draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect)
 {
 	CRect rcSavedRect = rcRect;
@@ -6330,6 +6337,26 @@ int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width, Gdiplus::DashStyle pen_style, int draw_mode)
 {
 	draw_line(pDC, pt1.x, pt1.y, pt2.x, pt2.y, cr, width, pen_style, draw_mode);
+}
+
+void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick, int style, int nDrawMode)
+{
+	LOGBRUSH lb;
+
+	lb.lbStyle = BS_SOLID;
+	lb.lbColor = cr;
+
+	CPen	Pen(PS_GEOMETRIC | style, thick, &lb);
+	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
+	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
+
+	pDC->MoveTo(x1, y1);
+	pDC->LineTo(x2, y2);
+
+	pDC->SelectObject(pOldPen);
+	Pen.DeleteObject();
+
+	pDC->SetROP2(nOldDrawMode);
 }
 
 void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode)
@@ -16390,12 +16417,12 @@ void printMessage(std::string msg, uint8_t bNewLine)
 #endif
 }
 
-void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double *dx, double *dy)
+void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float*dx, float*dy)
 {
 	if (srcWidth <= 0)
 		return;
 
-	double dZoom = (double)rDisplayedImageRect.Width() / (double)(srcWidth);
+	float dZoom = (float)rDisplayedImageRect.Width() / (float)(srcWidth);
 
 	*dx = sx;
 	*dy = sy;
@@ -16411,8 +16438,8 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, d
 
 void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst)
 {
-	double dx = (double)pt_src.x;
-	double dy = (double)pt_src.y;
+	float dx = (float)pt_src.x;
+	float dy = (float)pt_src.y;
 
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, dx, dy, &dx, &dy);
 	pt_dst->x = dx;
@@ -16421,10 +16448,10 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, C
 
 void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst)
 {
-	double x1 = (double)(r_src.left);
-	double y1 = (double)(r_src.top);
-	double x2 = (double)(r_src.right);
-	double y2 = (double)(r_src.bottom);
+	float x1 = (float)(r_src.left);
+	float y1 = (float)(r_src.top);
+	float x2 = (float)(r_src.right);
+	float y2 = (float)(r_src.bottom);
 
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
@@ -16437,10 +16464,10 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, C
 
 void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst)
 {
-	double x1 = (double)(r_src.X);
-	double y1 = (double)(r_src.Y);
-	double x2 = (double)(r_src.GetRight());
-	double y2 = (double)(r_src.GetBottom());
+	float x1 = (float)(r_src.X);
+	float y1 = (float)(r_src.Y);
+	float x2 = (float)(r_src.GetRight());
+	float y2 = (float)(r_src.GetBottom());
 
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
 	get_real_coord_from_screen_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
@@ -16451,12 +16478,12 @@ void get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, G
 	r_dst->Height = y2 - y1;
 }
 
-void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, double sx, double sy, double* dx, double* dy)
+void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float* dx, float* dy)
 {
 	if (srcWidth <= 0)
 		return;
 
-	double dZoom = (double)rDisplayedImageRect.Width() / (double)(srcWidth);
+	float dZoom = (float)rDisplayedImageRect.Width() / (float)(srcWidth);
 
 	*dx = sx;
 	*dy = sy;
@@ -16472,8 +16499,8 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, d
 
 void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint* pt_dst)
 {
-	double x = (double)pt_src.x;
-	double y = (double)pt_src.y;
+	float x = (float)pt_src.x;
+	float y = (float)pt_src.y;
 
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x, y, &x, &y);
 	pt_dst->x = x;
@@ -16482,10 +16509,10 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, C
 
 void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect* r_dst)
 {
-	double x1 = (double)(r_src.left);
-	double y1 = (double)(r_src.top);
-	double x2 = (double)(r_src.right);
-	double y2 = (double)(r_src.bottom);
+	float x1 = (float)(r_src.left);
+	float y1 = (float)(r_src.top);
+	float x2 = (float)(r_src.right);
+	float y2 = (float)(r_src.bottom);
 
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
@@ -16498,10 +16525,10 @@ void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, C
 
 void get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst)
 {
-	double x1 = (double)(r_src.X);
-	double y1 = (double)(r_src.Y);
-	double x2 = (double)(r_src.GetRight());
-	double y2 = (double)(r_src.GetBottom());
+	float x1 = (float)(r_src.X);
+	float y1 = (float)(r_src.Y);
+	float x2 = (float)(r_src.GetRight());
+	float y2 = (float)(r_src.GetBottom());
 
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x1, y1, &x1, &y1);
 	get_screen_coord_from_real_coord(rDisplayedImageRect, srcWidth, x2, y2, &x2, &y2);
@@ -19988,20 +20015,20 @@ D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float width, float height, int at
 
 D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool stretch)
 {
-	int		w = target.right - target.left;
-	int		h = target.bottom - target.top;
-	int		nNewW;
-	int		nNewH;
-	double	dTargetRatio = double(w) / double(h);
+	float w = target.right - target.left;
+	float h = target.bottom - target.top;
+	float nNewW;
+	float nNewH;
+	float dTargetRatio = float(w) / float(h);
 
 	D2D1_RECT_F	result;
 
-	if (w == 0 || h == 0)
+	if (w == 0.f || h == 0.f)
 		return D2D1_RECT_F();
 
 	bool bResizeWidth;
 
-	if (ratio > 1.0)
+	if (ratio > 1.0f)
 	{
 		if (dTargetRatio < ratio)
 			bResizeWidth = false;
@@ -20022,13 +20049,13 @@ D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool str
 		result.top = target.top;
 		result.bottom = target.bottom;
 
-		nNewW = (double)(h)*ratio;
+		nNewW = h * ratio;
 		if (attach & attach_left)
 			result.left = target.left;
 		else if (attach & attach_right)
 			result.left = target.right - nNewW;
 		else
-			result.left = target.left + (w - nNewW) / 2.0;
+			result.left = target.left + (w - nNewW) / 2.0f;
 
 		result.right = result.left + nNewW;
 	}
@@ -20037,14 +20064,14 @@ D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool str
 		result.left = target.left;
 		result.right = target.right;
 
-		nNewH = (double)(w) / ratio;
+		nNewH = w / ratio;
 
 		if (attach & attach_top)
 			result.top = target.top;
 		else if (attach & attach_bottom)
 			result.top = target.bottom - nNewH;
 		else
-			result.top = target.top + (h - nNewH) / 2.0;
+			result.top = target.top + (h - nNewH) / 2.0f;
 
 		result.bottom = result.top + nNewH;
 	}

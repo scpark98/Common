@@ -180,9 +180,9 @@ public:
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
 
-	//하나의 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
+	//현재 설정된 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
 	//text는 제외된다.
-	void		copy_properties(const CGdiButton& src);
+	void		copy_properties(CGdiButton& dst);
 
 	//resource editor에서 버튼의 caption을 입력하면 그대로 출력된다.
 	//단, 이미지가 있을 경우는 caption은 추가로 표시하지 않았으나 공용 버튼 이미지를 사용한다면 지정된 텍스트를 출력해줘야 한다.
@@ -293,7 +293,9 @@ public:
 	//(NH 프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_set_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
 	void		set_back_color(Gdiplus::Color normal, bool auto_set_color = true);
-	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled);
+
+	//3개의 색상은 지정하지만 disabled는 기본 disable color를 쓰고자 할 경우에는 Transparent로 호출한다.
+	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled = Gdiplus::Color::Transparent);
 	void		set_hover_back_color(Gdiplus::Color hover_back);
 
 	//text, back color를 기준으로 hover, down 색상들을 자동 설정해준다.
@@ -302,6 +304,11 @@ public:
 
 	//투명 png를 그리거나 round button일 경우는 parent back으로 칠해주고 그려줘야 한다. 그래야 깜빡임을 없앨 수 있다.
 	void		set_parent_back_color(Gdiplus::Color cr_parent_back);
+
+	//border color는 기본적으로 m_cr_back과 동일하게 설정되지만 별도로 지정할 수 있다.
+	//3개의 색상은 지정하지만 disabled는 기본 disable color를 쓰고자 할 경우에는 Transparent로 호출한다.
+	void		set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled = Gdiplus::Color::Transparent);
+	void		set_border_color(Gdiplus::Color normal, bool auto_set_color = true);
 
 	//CGdiButton& text_color() { m_cr_text.clear(); }
 	//CGdiButton& back_color() { m_cr_back.clear(); }
@@ -486,6 +493,7 @@ protected:
 	CString		m_text = _T("");
 	std::deque <Gdiplus::Color>	m_cr_text;
 	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경색이 그려진다.
+	std::deque <Gdiplus::Color> m_cr_border;	//border의 색상은 기본적으로 m_cr_back과 동일하게 세팅되지만 개별 설정도 가능하다.
 
 	//int			m_width = 0;
 	//int			m_height = 0;
@@ -534,7 +542,7 @@ protected:
 	//default = false
 	bool		m_draw_border = false;
 	//default = LightGray
-	Gdiplus::Color m_cr_border = Gdiplus::Color::LightGray;
+	//Gdiplus::Color m_cr_border = Gdiplus::Color::LightGray;
 	//default = 1
 	int			m_border_thick = 1;
 

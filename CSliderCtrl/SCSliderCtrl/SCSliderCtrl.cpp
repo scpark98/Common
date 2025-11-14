@@ -252,8 +252,8 @@ void CSCSliderCtrl::OnPaint()
 					//pos 미만은 파란색 원에 체크 표시를
 					if (i < pos)
 					{
-						draw_line(&dc, m_steps[i].r.CenterPoint().x - 3, m_steps[i].r.CenterPoint().y - 0, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
-						draw_line(&dc, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, m_steps[i].r.CenterPoint().x + 3, m_steps[i].r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
+						draw_line(&dc, m_steps[i].r.CenterPoint().x - 3, m_steps[i].r.CenterPoint().y - 0, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, (Gdiplus::Color)Gdiplus::Color::White, (float)1.0f);
+						draw_line(&dc, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, m_steps[i].r.CenterPoint().x + 3, m_steps[i].r.CenterPoint().y - 2, (Gdiplus::Color)Gdiplus::Color::White, (float)1.0f);
 					}
 					else if (i == pos)
 					{
@@ -472,8 +472,8 @@ void CSCSliderCtrl::OnPaint()
 		if (m_step_completed)
 		{
 			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(m_steps[pos].r));
-			draw_line(&dc, r.CenterPoint().x - 3, r.CenterPoint().y - 0, r.CenterPoint().x - 1, r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
-			draw_line(&dc, r.CenterPoint().x - 1, r.CenterPoint().y + 2, r.CenterPoint().x + 3, r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
+			draw_line(&dc, r.CenterPoint().x - 3, r.CenterPoint().y - 0, r.CenterPoint().x - 1, r.CenterPoint().y + 2, (Gdiplus::Color)Gdiplus::Color::White, 1.0f);
+			draw_line(&dc, r.CenterPoint().x - 1, r.CenterPoint().y + 2, r.CenterPoint().x + 3, r.CenterPoint().y - 2, (Gdiplus::Color)Gdiplus::Color::White, 1.0f);
 		}
 		else
 		{

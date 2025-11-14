@@ -268,13 +268,11 @@ public:
 	void			edit_end(bool valid = true);
 	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
 	CString			get_edit_old_text() { return m_edit_old_text; }		//편집 후 텍스트
-	CString			get_edit_new_text() { return m_edit_new_text; }	//편집 후 텍스트
+	CString			get_edit_new_text() { return m_edit_new_text; }		//편집 후 텍스트
 	void			undo_edit_label();									//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 	//CTreeCtrl::GetEditControl()을 override.
 	CEdit*			GetEditControl() { return get_edit_control(); }
 	CEdit*			get_edit_control() { return m_pEdit; }
-	long			m_last_clicked_time = 0;
-	HTREEITEM		m_last_clicked_item;
 	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 
@@ -399,6 +397,9 @@ protected:
 	CString			m_edit_old_text;
 	CString			m_edit_new_text;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
+
+	long			m_last_clicked_time = 0;
+	HTREEITEM		m_last_clicked_item;
 
 	enum ROW_ITEM_RECT
 	{

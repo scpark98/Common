@@ -153,6 +153,10 @@ public:
 	bool			get_show_pixel() { return m_show_pixel; }
 	void			set_show_pixel(bool show);
 
+	bool			get_show_cursor_guide_line() { return m_show_cursor_guide_line; }
+	//1:show, 0:hide, -1:toggle
+	void			set_show_cursor_guide_line(int show);
+
 	//d2dc에 Direct2D를 그리고 CDC를 이용해서 부득이하게 그려야 할 경우
 	//OnPaint()에서 swapchain()후에 dc를 이용하여 그림을 그리도록 했는데
 	//OnSize()에서는 잘 그려지지만 OnMouseMove()에서는 Invalidate()만 하니 깜빡이며 사라진다.
@@ -222,6 +226,8 @@ public:
 	double			get_gps_latitude();
 	double			get_gps_longitude();
 
+	void			set_cross_cursor(UINT nID);
+
 protected:
 	enum TIMER_ID
 	{
@@ -255,7 +261,8 @@ protected:
 	//bool			m_image_from_clipboard = false;	//클립보드에서 붙여넣은 이미지인지(파일명 표시 목적)
 	CRect			m_r_display;
 	
-	HCURSOR			m_cursor_dropper;
+	HCURSOR			m_cursor_cross = NULL;
+	HCURSOR			m_cursor_dropper = NULL;
 
 	D2D1_BITMAP_INTERPOLATION_MODE	m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 
@@ -306,10 +313,11 @@ protected:
 	//CSCStatic으로 하면 생성 등 처음엔 복잡하지만 결국 더 편한 방법이 된다.
 	bool			m_show_pixel = false;
 	bool			m_show_pixel_pos = true;
-	bool			m_show_guide_line = true;
 	Gdiplus::PointF	m_pixel_pos;
 	CRect			m_r_pixel_pos;
 	ID2D1SolidColorBrush* m_brush_pixel_guide = NULL;
+
+	bool			m_show_cursor_guide_line = false;
 
 	//CRect			m_r_pixel;
 	Gdiplus::Color	m_cr_pixel = Gdiplus::Color::Black;

@@ -32,6 +32,8 @@ CGdiButton::CGdiButton()
 	m_cr_back.push_back(get_color(m_cr_back[0], -16));
 	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
 
+	m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
+
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	//매트릭스는 CSCGdiplusBitmap으로 이동할것!
@@ -179,11 +181,11 @@ void CGdiButton::copy_properties(CGdiButton& dst)
 	dst.m_draw_own_text = m_draw_own_text;
 
 	dst.m_draw_border = m_draw_border;
-	dst.m_cr_border = m_cr_border;
 	dst.m_border_thick = m_border_thick;
 
 	dst.m_cr_text.assign(m_cr_text.begin(), m_cr_text.end());
 	dst.m_cr_back.assign(m_cr_back.begin(), m_cr_back.end());
+	dst.m_cr_border.assign(m_cr_border.begin(), m_cr_border.end());
 
 	memcpy(&dst.m_lf, &m_lf, sizeof(LOGFONT));
 	dst.reconstruct_font();
@@ -502,8 +504,11 @@ void CGdiButton::set_transparent(bool trans, Gdiplus::Color cr_parent_back)
 		m_cr_parent_back = cr_parent_back;
 
 	//radiobutton 또는 checkbox가 m_img도 없을 경우는 배경이 투명해야 하므로 그때만 m_cr_back을 clear()한다.
-	if (m_image.size() == 0 && (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))))
-		m_cr_back.clear();
+	//=> 배경을 투명하게 하여 바탕에 이미지가 있더라도 보여지도록 하려 했지만 완전 투명처리를 하기 위해서는
+	//많이 복잡해진다.
+	//우선은 일반적인 앱을 위해 완전 투명처리가 아닌 정해진 배경색으로 칠해주기 위해 아래 코드를 주석처리 한다.
+	//if (m_image.size() == 0 && (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))))
+	//	m_cr_back.clear();
 
 	redraw_window();
 }
@@ -1038,15 +1043,20 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//	cr_text = m_cr_text[0];
 			//else
 				cr_text = m_cr_text[2];
+				cr_border = m_cr_border[2];
 		}
 		else if (m_use_hover && m_is_hover)
+		{
 			cr_text = m_cr_text[1];
+			cr_border = m_cr_border[1];
+		}
 		else
 		{
-			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
-				cr_text = m_cr_text[2];
-			else
+			//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+			//	cr_text = m_cr_text[2];
+			//else
 				cr_text = m_cr_text[0];
+				cr_border = m_cr_border[0];
 		}
 	}
 	//글자색과는 달리 배경색은 세팅되면 그리지만
@@ -1685,7 +1695,8 @@ void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color c
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
-		//m_cr_border = cr_border;
+		if (m_cr_border.size() == 0)
+			m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
 	}
 
 	if (m_round > 0)
@@ -1938,7 +1949,12 @@ void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr_
 	m_draw_border = draw;
 
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_border = cr_border;
+	{
+		if (m_cr_border.size() == 0)
+			m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
+
+		m_cr_border[0] = cr_border;
+	}
 
 	if (thick > 0)
 		m_border_thick = thick;

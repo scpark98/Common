@@ -84,6 +84,7 @@ bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel_pos"), true));
 	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show info"), false));
 	m_fit2ctrl = AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), true);
+	m_show_cursor_guide_line = AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show cursor guide line"), false);
 
 	m_interpolation_mode = (D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 
@@ -456,53 +457,31 @@ void CSCImage2dDlg::OnPaint()
 	if (SUCCEEDED(hr))
 		hr = m_d2dc.get_swapchain()->Present(0, 0);
 
-
+	//원래 d2dc를 이용해서 그렸으나 cursor guide line을 R2_XORPEN으로 그려야 시각적으로 구분되므로
+	//GDI DC를 이용해서 그려준다.
 	if (m_show_pixel_pos)
 	{
-		//draw_line(&dc, 0, 0, 100, 100, red, 1, PS_SOLID, R2_XORPEN);
-
-		//m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-		//m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-
-		//CRect r = m_r_pixel_pos;
-		//r.OffsetRect(1, 1);
-		//m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
-
 		CAutoFont af(_T("Arial"));
 		af.SetHeight(14);
 
 		CFont* pOldFont = dc.SelectObject(&af);
-
-		//CSize sz = dc.GetTextExtent(_T("A"));
-
 		CString pixel_pos;
 		//15.5도 15로 표시되어야 하는데 16으로 반올림되므로 원하는 결과가 아니다.
 		//int로 캐스팅하여 정수로 출력시켜야 한다.
 		//pixel_pos.Format(_T("%.f, %.f"), m_pixel_pos.X, m_pixel_pos.Y);
 		pixel_pos.Format(_T("(%d, %d)"), (int)m_pixel_pos.X, (int)m_pixel_pos.Y);
 
-		//d2dc->DrawText(pixel_pos, pixel_pos.GetLength(), m_WriteFormat, convert(r), m_brush);
-		//dc.DrawText(pixel_pos, r, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 		DrawShadowText(dc.GetSafeHdc(), pixel_pos, -1, m_r_pixel_pos, DT_RIGHT | DT_VCENTER | DT_SINGLELINE, lightgray, black, 2, 1);
-
-		//r.OffsetRect(-1, -1);
-		//m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
-		//d2dc->DrawText(pixel_pos, pixel_pos.GetLength(), m_WriteFormat, convert(r), m_brush);
-
-		if (m_show_guide_line && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
-		{
-			float x, y;
-			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), (float)m_pixel_pos.X, (float)m_pixel_pos.Y, &x, &y);
-			//d2dc->DrawLine(D2D1::Point2F(m_r_display.left, y), D2D1::Point2F(m_r_display.right, y), m_brush_pixel_guide);
-			//d2dc->DrawLine(D2D1::Point2F(x, m_r_display.top), D2D1::Point2F(x, m_r_display.bottom), m_brush_pixel_guide);
-			draw_line(&dc, m_r_display.left, y, m_r_display.right, y, lightgray, 1, PS_SOLID, R2_XORPEN);
-			draw_line(&dc, x, m_r_display.top, x, m_r_display.bottom, lightgray, 1, PS_SOLID, R2_XORPEN);
-		}
-
 		dc.SelectObject(pOldFont);
 	}
 
-	//dc.SelectClipRgn(NULL);
+	if (m_show_cursor_guide_line && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
+	{
+		float x, y;
+		get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), (float)m_pixel_pos.X, (float)m_pixel_pos.Y, &x, &y);
+		draw_line(&dc, m_r_display.left, y, m_r_display.right, y, lightgray, 1, PS_SOLID, R2_XORPEN);
+		draw_line(&dc, x, m_r_display.top, x, m_r_display.bottom, lightgray, 1, PS_SOLID, R2_XORPEN);
+	}
 }
 
 //이 컨트롤에서 자체 처리할 메시지와 반드시 parent에서 처리할 메시지를 명확히 해야 한다.
@@ -741,6 +720,17 @@ void CSCImage2dDlg::set_show_pixel(bool show)
 {
 	m_show_pixel = show;
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel"), m_show_pixel);
+}
+
+//1:show, 0:hide, -1:toggle
+void CSCImage2dDlg::set_show_cursor_guide_line(int show)
+{
+	if (show == -1)
+		m_show_cursor_guide_line = !m_show_cursor_guide_line;
+	else
+		m_show_cursor_guide_line = (show == 1);
+
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("show cursor guide line"), m_show_cursor_guide_line);
 }
 
 void CSCImage2dDlg::set_show_pixel_pos(bool show)
@@ -1218,7 +1208,8 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 	//roi를 그리기 위해 Ctrl키를 누른 상태라면 cross 커서로
 	if (IsCtrlPressed())
 	{
-		SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+		//SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+		SetCursor(m_cursor_cross);
 		return TRUE;
 	}
 
@@ -1274,6 +1265,11 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 
 			return TRUE;
 		}
+		else
+		{
+			SetCursor(m_cursor_cross);
+			return TRUE;
+		}
 	}
 
 	CPoint pt;
@@ -1290,12 +1286,18 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 			SetCursor(m_cursor_dropper);
 		//그렇지 않다면 십자 커서를 표시한다.
 		else
-			SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+			//SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
+			SetCursor(m_cursor_cross);
 		return TRUE;
 	}
 
 	//기타 다른 컨트롤 또는 이미지 영역밖은 기본 커서로 표시한다.
 	return CDialog::OnSetCursor(pWnd, nHitTest, message);
+}
+
+void CSCImage2dDlg::set_cross_cursor(UINT nID)
+{
+	m_cursor_cross = AfxGetApp()->LoadCursor(nID);
 }
 
 //dropper(spuit) cursor 지정

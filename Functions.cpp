@@ -6391,7 +6391,8 @@ void draw_rect(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF
 		pOldBrush = (CBrush*)pDC->SelectObject(&brBrush);
 
 	//Rect.NormalizeRect();
-	pDC->Rectangle(Rect);
+	if (crColor != NULL_PEN && nWidth >= 1)
+		pDC->Rectangle(Rect);
 
 	pDC->SelectObject(pOldPen);
 	pDC->SelectObject(pOldBrush);
@@ -6983,6 +6984,9 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 
 	// get the corner path
 	Gdiplus::GraphicsPath path;
+
+	if (radius < 0)
+		radius = r.Height / 2;
 
 	// get path
 	get_round_rect_path(&path, r, radius);

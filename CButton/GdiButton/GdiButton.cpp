@@ -513,15 +513,18 @@ void CGdiButton::set_transparent(bool trans, Gdiplus::Color cr_parent_back)
 	redraw_window();
 }
 
-void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
+void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool auto_color)
 {
-	set_text_color(cr_text);// , cr_text, normal, gray_color(normal));
-	set_back_color(cr_back);//
+	set_text_color(cr_text, auto_color);
+	set_back_color(cr_back, auto_color);
 }
 
-void CGdiButton::set_text_color(Gdiplus::Color normal)
+void CGdiButton::set_text_color(Gdiplus::Color normal, bool auto_color)
 {
-	set_text_color(normal, normal, normal, gray_color(normal));
+	if (auto_color)
+		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
+	else
+		set_text_color(normal, normal, normal, gray_color(normal));
 }
 
 void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
@@ -531,15 +534,19 @@ void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_text.push_back(normal);
 	m_cr_text.push_back(over);
 	m_cr_text.push_back(down);
+
+	if (disabled.GetValue() == Gdiplus::Color::Transparent)
+		disabled = gray_color(normal);
+
 	m_cr_text.push_back(disabled);
 
 	redraw_window();
 }
 
-void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_set_color)
+void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_color)
 {
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
-	if (auto_set_color)
+	if (auto_color)
 		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
 	else
 		set_back_color(normal, normal, normal, gray_color(normal));
@@ -592,7 +599,11 @@ void CGdiButton::set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, G
 
 void CGdiButton::set_border_color(Gdiplus::Color normal, bool auto_set_color)
 {
-
+	m_cr_border.clear();
+	m_cr_border.push_back(normal);
+	m_cr_border.push_back(normal);
+	m_cr_border.push_back(normal);
+	m_cr_border.push_back(gray_color(normal));
 }
 
 void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
@@ -936,10 +947,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	GetClientRect(rc);
 	GetWindowText(text);
 
-	//for test for breakpoint
-	if (text == _T("확인"))
-		text = text;
-
 	rText = rc;
 
 	CMemoryDC				dc(pDC1, &rc);
@@ -948,13 +955,22 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHint::TextRenderingHintAntiAliasGridFit);
 
 	get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round, m_border_thick);
 
-	bool is_down = lpDIS->itemState & ODS_SELECTED;
+	bool is_down = ((lpDIS->itemState & ODS_SELECTED) || (GetCheck() == BST_CHECKED));
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
-	//TRACE(_T("%s\n"), __function__);
+	//for test for breakpoint
+	if (text == _T("대기"))
+	{
+		text = text;
+		trace(is_down);
+	}
+
+	//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
+	//	is_down = (GetCheck() == BST_CHECKED);
 
 	int idx = MIN(m_idx, m_image.size()-1);
 	if (idx < 0)
@@ -1065,21 +1081,25 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		//check이고 push-like라면 
 		if (is_disabled)
+		{
 			cr_back = m_cr_back[3];
+		}
 		else if (is_down)
 		{
-			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
-				cr_back = m_cr_back[0];
-			else
+			//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+			//	cr_back = m_cr_back[0];
+			//else
 				cr_back = m_cr_back[2];
 		}
 		else if (m_use_hover && m_is_hover)
+		{
 			cr_back = m_cr_back[1];
+		}
 		else
 		{
-			if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
-				cr_back = m_cr_back[2];
-			else
+			//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && is_button_style(BS_PUSHLIKE) && GetCheck() == BST_CHECKED)
+			//	cr_back = m_cr_back[2];
+			//else
 				cr_back = m_cr_back[0];
 		}
 
@@ -1344,18 +1364,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round > 0)
 			draw_round_rect(&g, CRect2GpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
-			draw_rect(g, rc, m_cr_border[1]);
+			draw_rect(g, rc, cr_border);
 	}
 	else if (m_draw_border)// && !m_is_hover)
 	{
 		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
 		{
-			//draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
-			//draw_round_rect(&g, CRect2GpRect(rc), Gdiplus::Color::Red, Gdiplus::Color::Transparent, m_round, m_border_thick);
-
-			Gdiplus::Pen pen(m_cr_border[0], m_border_thick);
-			Gdiplus::Pen pen_gray(gray_color(m_cr_border[0]), m_border_thick);
+			Gdiplus::Pen pen(cr_border, m_border_thick);
+			Gdiplus::Pen pen_gray(gray_color(cr_border), m_border_thick);
 
 			pen.SetAlignment(Gdiplus::PenAlignmentInset);
 
@@ -1369,7 +1386,6 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			draw_rect(g, rc, cr_border);
 		}
 	}
-
 
 
 	//이미지 버튼이면 텍스트는 출력하지 않는다.
@@ -1453,12 +1469,14 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		dwText = DT_LEFT | DT_VCENTER | DT_SINGLELINE;
 	}
 
-//#ifdef _UNICODE
-//	DrawShadowText(dc.GetSafeHdc(), text, text.GetLength(), rText,
-//		DT_CENTER | DT_TOP | DT_NOCLIP, cr_text.ToCOLORREF(), 0, 2, 1);
-//#else
+	if (text == _T("내화면공유"))
+	{
+		text = text;
+	}
+	if (is_down)
+		rText.OffsetRect(m_down_offset);
+
 	dc.DrawText(text, rText, dwText);
-//#endif
 	dc.SelectObject(pOldFont);
 }
 

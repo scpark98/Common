@@ -382,8 +382,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				//1은 얇고 2는 두껍다. Gdiplus::Pen으로 그려야하는데 DrawItem()에서 Gdiplus::Graphics를 사용하면 문제가 있다.
 				//Gdiplus::Pen 설정 시 width를 1.5로 해도 적용되지 않는다. 
-				draw_line(pDC, r.left + 2, r.CenterPoint().y - 1, r.left + 5, r.CenterPoint().y + 2, m_theme.cr_text, 2.0);
-				draw_line(pDC, r.left + 5, r.CenterPoint().y + 2, r.left + 5 + 6, r.CenterPoint().y + 2 - 6, m_theme.cr_text, 2.0);
+				draw_line(pDC, r.left + 2, r.CenterPoint().y - 1, r.left + 5, r.CenterPoint().y + 2, m_theme.cr_text.ToCOLORREF(), 2);
+				draw_line(pDC, r.left + 5, r.CenterPoint().y + 2, r.left + 5 + 6, r.CenterPoint().y + 2 - 6, m_theme.cr_text.ToCOLORREF(), 2);
 
 				//CPen pen(PS_SOLID, 2, m_theme.cr_text.ToCOLORREF());
 				//CPen* pOldPen = pDC->SelectObject(&pen);
@@ -642,13 +642,13 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	if (m_draw_top_line)
 	{
-		draw_line(pDC, rowRect.left, rowRect.top, rowRect.right, rowRect.top, m_cr_top_line);
+		draw_line(pDC, rowRect.left, rowRect.top, rowRect.right, rowRect.top, m_cr_top_line.ToCOLORREF());
 	}
 
 	if (m_draw_bottom_line)
 	{
 		//rowRect.bottom으로 써주면 아이템 영역밖이므로 그려지지 않는다. 반드시 -1을 해야 함.
-		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_cr_bottom_line);
+		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_cr_bottom_line.ToCOLORREF());
 	}
 }
 

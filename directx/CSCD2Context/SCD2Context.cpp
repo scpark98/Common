@@ -4,13 +4,10 @@
 
 CSCD2Context::CSCD2Context()
 {
-	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-	//CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 }
 
 CSCD2Context::~CSCD2Context()
 {
-	CoUninitialize();
 }
 
 HRESULT CSCD2Context::init(HWND hWnd)
@@ -69,9 +66,13 @@ HRESULT CSCD2Context::create_device_resources()
 		}
 		if (SUCCEEDED(hr)) {
 			m_d2context->SetTarget(bitmap.Get());
+
+			m_d2context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
+
 			//D2D1_ANTIALIAS_MODE_ALIASED로 하지 않고 수평 라인을 그리면 stroke width가 1.0, 2.0의 두께가 동일하게 표시된다.
 			//1.0이 2.0보다는 약간 옅은색으로 표시되나 thickness가 동일하게 표시된다. 이 세팅을 해줘야 실제 1 pixel 두께로 그려진다.
-			m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+			//단, 이 모드로 세팅하면 대각선이 antialias처리되지 않고 그대로 계단현상이 표시된다.
+			//m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 		}
 	}
 

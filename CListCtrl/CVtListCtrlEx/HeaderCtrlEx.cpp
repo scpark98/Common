@@ -97,6 +97,7 @@ void CHeaderCtrlEx::OnPaint()
 	GetClientRect(rc);
 
 	CMemoryDC dc(&dc1, &rc);
+	Gdiplus::Graphics g(dc);
 
 	dc.SelectObject(GetFont());
 
@@ -134,7 +135,7 @@ void CHeaderCtrlEx::OnPaint()
 			if (m_flat_style)
 			{
 				if (m_use_header_separator)
-					draw_line(&dc, rItem.right, rItem.top + 2, rItem.right, rItem.bottom - 2, crSunkenDark);
+					draw_line(g, rItem.right, rItem.top + 2, rItem.right, rItem.bottom - 2, crSunkenDark);
 			}
 			else
 			{
@@ -170,13 +171,13 @@ void CHeaderCtrlEx::OnPaint()
 
 			if (m_cur_sort_asc)
 			{
-				draw_line(&dc, rArrow.left, rArrow.top + 1, rArrow.CenterPoint().x, rArrow.bottom, m_cr_sort_arrow);
-				draw_line(&dc, rArrow.CenterPoint().x, rArrow.bottom, rArrow.right - 1, rArrow.top + 1, m_cr_sort_arrow);
+				draw_line(g, rArrow.left, rArrow.top + 1, rArrow.CenterPoint().x, rArrow.bottom, m_cr_sort_arrow);
+				draw_line(g, rArrow.CenterPoint().x, rArrow.bottom, rArrow.right - 1, rArrow.top + 1, m_cr_sort_arrow);
 			}
 			else
 			{
-				draw_line(&dc, rArrow.left, rArrow.bottom - 1, rArrow.CenterPoint().x, rArrow.top, m_cr_sort_arrow);
-				draw_line(&dc, rArrow.CenterPoint().x, rArrow.top, rArrow.right - 1, rArrow.bottom - 1, m_cr_sort_arrow);
+				draw_line(g, rArrow.left, rArrow.bottom - 1, rArrow.CenterPoint().x, rArrow.top, m_cr_sort_arrow);
+				draw_line(g, rArrow.CenterPoint().x, rArrow.top, rArrow.right - 1, rArrow.bottom - 1, m_cr_sort_arrow);
 			}
 		}
 	}

@@ -252,8 +252,8 @@ void CSCSliderCtrl::OnPaint()
 					//pos 미만은 파란색 원에 체크 표시를
 					if (i < pos)
 					{
-						draw_line(&dc, m_steps[i].r.CenterPoint().x - 3, m_steps[i].r.CenterPoint().y - 0, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, (Gdiplus::Color)Gdiplus::Color::White, (float)1.0f);
-						draw_line(&dc, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, m_steps[i].r.CenterPoint().x + 3, m_steps[i].r.CenterPoint().y - 2, (Gdiplus::Color)Gdiplus::Color::White, (float)1.0f);
+						draw_line(g, m_steps[i].r.CenterPoint().x - 3, m_steps[i].r.CenterPoint().y - 0, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
+						draw_line(g, m_steps[i].r.CenterPoint().x - 1, m_steps[i].r.CenterPoint().y + 2, m_steps[i].r.CenterPoint().x + 3, m_steps[i].r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
 					}
 					else if (i == pos)
 					{
@@ -472,8 +472,8 @@ void CSCSliderCtrl::OnPaint()
 		if (m_step_completed)
 		{
 			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(m_steps[pos].r));
-			draw_line(&dc, r.CenterPoint().x - 3, r.CenterPoint().y - 0, r.CenterPoint().x - 1, r.CenterPoint().y + 2, (Gdiplus::Color)Gdiplus::Color::White, 1.0f);
-			draw_line(&dc, r.CenterPoint().x - 1, r.CenterPoint().y + 2, r.CenterPoint().x + 3, r.CenterPoint().y - 2, (Gdiplus::Color)Gdiplus::Color::White, 1.0f);
+			draw_line(g, r.CenterPoint().x - 3, r.CenterPoint().y - 0, r.CenterPoint().x - 1, r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
+			draw_line(g, r.CenterPoint().x - 1, r.CenterPoint().y + 2, r.CenterPoint().x + 3, r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
 		}
 		else
 		{
@@ -590,12 +590,12 @@ void CSCSliderCtrl::OnPaint()
 				//dc.SelectObject(&m_penThumbDarker);
 				//dc.MoveTo(sx + (double)i * dx + 1, cy - 3);
 				//dc.LineTo(sx + (double)i * dx + 1, cy + 4);
-				draw_line(&dc, (int)(sx + (double)i * dx + 1), cy - 4, (int)(sx + (double)i * dx + 1), cy + 3, m_cr_thumb_darker, 1.0f);
+				draw_line(g, (int)(sx + (double)i * dx + 1), cy - 4, (int)(sx + (double)i * dx + 1), cy + 3, m_cr_thumb_darker, 1.0f);
 
 				//dc.SelectObject(&m_penThumbLighter);
 				//dc.MoveTo(sx + (double)i * dx, cy - 3);
 				//dc.LineTo(sx + (double)i * dx, cy + 4);
-				draw_line(&dc, (int)(sx + (double)i * dx), cy - 4, (int)(sx + (double)i * dx), cy + 3, m_cr_thumb_lighter, 1.0f);
+				draw_line(g, (int)(sx + (double)i * dx), cy - 4, (int)(sx + (double)i * dx), cy + 3, m_cr_thumb_lighter, 1.0f);
 			}
 
 			dc.SelectObject(pOldPen);

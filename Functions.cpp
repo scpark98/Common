@@ -6336,7 +6336,8 @@ int	get_ellipsis_pos(CDC* pDC, CString text, int max_width)
 
 void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width, Gdiplus::DashStyle pen_style, int draw_mode)
 {
-	draw_line(pDC, pt1.x, pt1.y, pt2.x, pt2.y, cr, width, pen_style, draw_mode);
+	Gdiplus::Graphics g(pDC->m_hDC);
+	draw_line(g, pt1.x, pt1.y, pt2.x, pt2.y, cr, width, pen_style, draw_mode);
 }
 
 void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick, int style, int nDrawMode)
@@ -6359,9 +6360,9 @@ void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick,
 	pDC->SetROP2(nOldDrawMode);
 }
 
-void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode)
+void draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode)
 {
-	Gdiplus::Graphics g(pDC->m_hDC);
+	//Gdiplus::Graphics g(pDC->m_hDC);
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);

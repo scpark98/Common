@@ -16,7 +16,7 @@
 	- resource의 제목표시줄 유무, 테두리 속성등에 무관하게 동작되도록 구현해야 하지만
 	  뭔가 모든 경우의 수에 대한 처리가 되지 않은 듯하다.
 	  따라서 우선 속성을 제목표시줄 = 없음, 테두리 = Resizing 으로 설정할 것.
-	  만약 resize를 지원하지 않는 dlg일 경우는 테두리 = Dialog Frame, 제목표시줄 = 없음 으로 설정.
+	  만약 resize를 지원하지 않는 dlg일 경우는 제목표시줄 = 없음, 테두리 = Dialog Frame 으로 설정.
 
 	  또한 main dlg의 OnInitDialog()에서 다음의 코드를 추가해줘야 한다.
 		//이 코드를 넣어야 작업표시줄에서 클릭하여 minimize, restore된다.

@@ -373,11 +373,11 @@ void CSCThemeDlg::OnPaint()
 	//아래의 기본 그리기 코드들을 OnEraseBkgnd()에 넣었었으나
 	//deactive상태가 될 때 컨트롤들이 제대로 표시되지 않는 현상이 있었고
 	//OnPaint()에 넣으니 정상 동작함.
-	CPaintDC dc1(this);
+	CPaintDC dc(this);
 	CRect rc;
 	GetClientRect(rc);
 
-	CMemoryDC dc(&dc1, &rc);
+	//CMemoryDC dc(&dc1, &rc);
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);

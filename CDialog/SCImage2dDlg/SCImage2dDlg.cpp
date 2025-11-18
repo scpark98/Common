@@ -137,7 +137,7 @@ void CSCImage2dDlg::OnPaint()
 
 	ID2D1DeviceContext* d2dc = m_d2dc.get_d2dc();
 
-	D2D1_SIZE_F dc_size = m_d2dc.get_size();
+	D2D1_SIZE_F sz_dc = m_d2dc.get_size();
 
 	d2dc->BeginDraw();
 	d2dc->SetTransform(D2D1::Matrix3x2F::Identity());
@@ -451,6 +451,30 @@ void CSCImage2dDlg::OnPaint()
 			*/
 		}
 	}
+
+	//for test line thickness and antialias
+	/*
+	d2dc->DrawLine(
+		D2D1::Point2F(0.0f, 10.0f),
+		D2D1::Point2F(200, 10),
+		m_brush,
+		1.0f
+	);
+
+	d2dc->DrawLine(
+		D2D1::Point2F(0.0f, 20.0f),
+		D2D1::Point2F(200, 20),
+		m_brush,
+		2.0f
+	);
+
+	d2dc->DrawLine(
+		D2D1::Point2F(0.0f, 0.0f),
+		D2D1::Point2F(sz_dc.width, sz_dc.height),
+		m_brush,
+		2.0f
+	);
+	*/
 
 	HRESULT hr = d2dc->EndDraw();
 
@@ -992,6 +1016,13 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACKMOUSEEVENT tme;
+	tme.cbSize = sizeof(tme);
+	tme.hwndTrack = m_hWnd;
+	tme.dwFlags = TME_LEAVE | TME_HOVER;
+	tme.dwHoverTime = 1;
+	_TrackMouseEvent(&tme);
+
 	if (m_lbutton_down)
 	{
 		Clamp(point.x, m_r_display.left, m_r_display.right);
@@ -1105,13 +1136,6 @@ void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 	}
 	else if (m_show_pixel)
 	{
-		TRACKMOUSEEVENT tme;
-		tme.cbSize = sizeof(tme);
-		tme.hwndTrack = m_hWnd;
-		tme.dwFlags = TME_LEAVE | TME_HOVER;
-		tme.dwHoverTime = 1;
-		_TrackMouseEvent(&tme);
-
 		CPoint pt;
 		get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), point, &pt);
 		if (pt.x < 0 || pt.x >= m_img[0].get_width() || pt.y < 0 || pt.y >= m_img[0].get_height())

@@ -35,3 +35,11 @@ void CSCUIElement::set(Gdiplus::RectF r, CString label)
 	m_r = r;
 	m_label = label;
 }
+
+bool CSCUIElement::pt_in_rect(float x, float y)
+{
+	if (x >= m_r.X && x <= m_r.GetRight() && y >= m_r.Y && y <= m_r.GetBottom())
+		return true;
+
+	return false;
+}

@@ -51,11 +51,10 @@ HRESULT CSCD2Context::create_device_resources()
 		{
 			FLOAT dpiX, dpiY;
 			dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
-			//dpiX = 96.0f;// (FLOAT)GetSystemMetricsForDpi(SM_MOUSEPRESENT);
 			dpiY = dpiX;
 
 			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-				D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+				D2D1_BITMAP_OPTIONS_NONE | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
 				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), dpiX, dpiY);
 
 			hr = m_d2context->CreateBitmapFromDxgiSurface(
@@ -64,20 +63,68 @@ HRESULT CSCD2Context::create_device_resources()
 				&bitmap
 			);
 		}
+
+		// create GDI-compatible window render target
+		//D2D1_RENDER_TARGET_PROPERTIES rtProps = D2D1::RenderTargetProperties();
+		//rtProps.usage = D2D1_RENDER_TARGET_USAGE_GDI_COMPATIBLE;
+		//rtProps.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		//rtProps.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+
+		//ID2D1HwndRenderTarget* pHwndRenderTarget = NULL;
+		//HRESULT hr = m_d2factory->CreateHwndRenderTarget(
+		//	&rtProps,
+		//	&D2D1::HwndRenderTargetProperties(m_hWnd, CD2DSizeU()),
+		//	&pHwndRenderTarget);
+		//if (FAILED(hr))
+		//	return -1;
+
+		// Create a DC render target.
+		/*
+		D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+			D2D1_RENDER_TARGET_TYPE_DEFAULT,
+			D2D1::PixelFormat(
+				DXGI_FORMAT_B8G8R8A8_UNORM,
+				D2D1_ALPHA_MODE_IGNORE),
+			0,
+			0,
+			D2D1_RENDER_TARGET_USAGE_NONE,
+			D2D1_FEATURE_LEVEL_DEFAULT
+		);
+		hr = m_d2factory->CreateDCRenderTarget(&props, m_pDCRT.GetAddressOf());
+		*/
+		// instantiate new CHwndRenderTarget and attach the GDI-compatible render target
+		//CHwndRenderTarget* pRenderTarget = new CHwndRenderTarget;
+		//GetRenderTarget()->Attach(pHwndRenderTarget);
+
+		//// create ID2D1GdiInteropRenderTarget instance
+		//m_spGdiInteropRenderTarget = pHwndRenderTarget;
+
+
+
+
+
 		if (SUCCEEDED(hr)) {
 			m_d2context->SetTarget(bitmap.Get());
-
+			//m_spGdiInteropRenderTarget = bitmap.Get();
 			m_d2context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
 
 			//D2D1_ANTIALIAS_MODE_ALIASED로 하지 않고 수평 라인을 그리면 stroke width가 1.0, 2.0의 두께가 동일하게 표시된다.
-			//1.0이 2.0보다는 약간 옅은색으로 표시되나 thickness가 동일하게 표시된다. 이 세팅을 해줘야 실제 1 pixel 두께로 그려진다.
-			//단, 이 모드로 세팅하면 대각선이 antialias처리되지 않고 그대로 계단현상이 표시된다.
-			//m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+			//1.0이 2.0보다는 약간 옅은색으로 표시되나 thickness가 동일하게 표시된다.
+			//이 세팅을 해줘야 실제 1 pixel 두께로 그려진다.
+			//단, 이 모드로 세팅하면 대각선이 antialias 처리되지 않고 그대로 계단 현상이 표시된다.
+			m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 		}
 	}
 
 	return hr;
 }
+
+/*
+void CSCD2Context::get_d2DC(HDC* hDC)
+{
+	m_spGdiInteropRenderTarget->GetDC(D2D1_DC_INITIALIZE_MODE_COPY, hDC);
+}
+*/
 
 HRESULT CSCD2Context::create_device_context()
 {
@@ -184,6 +231,60 @@ ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(float cell_size, byte
 	return brush;
 }
 
+HRESULT CSCD2Context::on_size_changed(int cx, int cy)
+{
+	HRESULT hr = S_FALSE;
+
+	if (!m_d2context)
+		return hr;
+
+	m_d2context->SetTarget(nullptr);
+
+	if (SUCCEEDED(hr)) {
+		hr = m_swapchain->ResizeBuffers(
+			0,
+			cx,
+			cy,
+			DXGI_FORMAT_B8G8R8A8_UNORM,
+			0
+		);
+	}
+
+	ComPtr<IDXGISurface> surface = nullptr;
+	if (SUCCEEDED(hr)) {
+		hr = m_swapchain->GetBuffer(
+			0,
+			IID_PPV_ARGS(&surface)
+		);
+	}
+
+	ComPtr<ID2D1Bitmap1> bitmap = nullptr;
+	if (SUCCEEDED(hr)) {
+		FLOAT dpiX, dpiY;
+		dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+		dpiY = dpiX;
+		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+			D2D1::PixelFormat(
+				DXGI_FORMAT_B8G8R8A8_UNORM,
+				D2D1_ALPHA_MODE_IGNORE
+			),
+			dpiX,
+			dpiY
+		);
+		hr = m_d2context->CreateBitmapFromDxgiSurface(
+			surface.Get(),
+			&properties,
+			&bitmap
+		);
+	}
+
+	if (SUCCEEDED(hr)) {
+		m_d2context->SetTarget(bitmap.Get());
+	}
+
+	//render();
+}
 /*
 bool CSCD2Context::load(HWND hWnd, CString path)
 {
@@ -284,58 +385,5 @@ HRESULT CSCD2Context::render()
 	return hr;
 }
 
-HRESULT CSCD2Context::on_resize(int cx, int cy)
-{
-	HRESULT hr = S_FALSE;
 
-	if (!m_d2context)
-		return hr;
-
-	m_d2context->SetTarget(nullptr);
-
-	if (SUCCEEDED(hr)) {
-		hr = m_swapchain->ResizeBuffers(
-			0,
-			cx,
-			cy,
-			DXGI_FORMAT_B8G8R8A8_UNORM,
-			0
-		);
-	}
-
-	ComPtr<IDXGISurface> surface = nullptr;
-	if (SUCCEEDED(hr)) {
-		hr = m_swapchain->GetBuffer(
-			0,
-			IID_PPV_ARGS(&surface)
-		);
-	}
-
-	ComPtr<ID2D1Bitmap1> bitmap = nullptr;
-	if (SUCCEEDED(hr)) {
-		FLOAT dpiX, dpiY;
-		dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
-		dpiY = dpiX;
-		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-			D2D1::PixelFormat(
-				DXGI_FORMAT_B8G8R8A8_UNORM,
-				D2D1_ALPHA_MODE_IGNORE
-			),
-			dpiX,
-			dpiY
-		);
-		hr = m_d2context->CreateBitmapFromDxgiSurface(
-			surface.Get(),
-			&properties,
-			&bitmap
-		);
-	}
-
-	if (SUCCEEDED(hr)) {
-		m_d2context->SetTarget(bitmap.Get());
-	}
-
-	//render();
-}
 */

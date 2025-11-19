@@ -111,7 +111,7 @@ public:
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel);
 
 	//must call when the parent window was resized
-	HRESULT					on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy);
+	//HRESULT					on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy);
 
 	ID2D1Bitmap*			get() { return m_img[m_frame_index].Get(); }
 	IWICImagingFactory2*	get_WICFactory2() { return m_pWICFactory;}

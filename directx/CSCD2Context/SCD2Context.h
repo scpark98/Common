@@ -26,10 +26,13 @@ public:
 	IWICImagingFactory2*		get_WICFactory() { return m_WICFactory.Get(); }
 	ID2D1Factory1*				get_factory() { return m_d2factory.Get(); }
 	ID2D1DeviceContext*			get_d2dc() { return m_d2context.Get(); }
+	//ID2D1DCRenderTarget*		get_d2DC() { return m_pDCRT.Get(); }
 	IDXGISwapChain*				get_swapchain() { return m_swapchain.Get(); }
 
 	D2D1_SIZE_F					get_size() { return m_d2context->GetSize(); }
 	ComPtr<ID2D1BitmapBrush>	get_zigzag_brush() { return m_br_zigzag; }
+
+	HRESULT						on_size_changed(int cx, int cy);
 
 protected:
 	HWND						m_hWnd;
@@ -38,6 +41,8 @@ protected:
 	ComPtr<ID2D1Device>         m_d2device;
 	ComPtr<ID2D1DeviceContext>  m_d2context;
 	ComPtr<IDXGISwapChain>      m_swapchain;
+	//ComPtr<ID2D1DCRenderTarget>	m_pDCRT;
+	//CComQIPtr<ID2D1GdiInteropRenderTarget> m_spGdiInteropRenderTarget;
 
 	HRESULT						create_factory();
 	HRESULT						create_device_resources();

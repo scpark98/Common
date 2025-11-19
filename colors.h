@@ -399,10 +399,15 @@ Gdiplus::Color	get_color(COLORREF rgb);
 Gdiplus::Color	get_color(CString cr_str);
 Gdiplus::Color	get_color(std::string cr_name);
 
+D2D1::ColorF	get_d2color(Gdiplus::Color cr);
+
+
 //#RRGGBB와 같은 16진수 컬러 문자열을 COLORREF로 변환
 COLORREF		get_color_from_hexadecimal(CString cr);
 //#RRGGBB 또는 #AARRGGBB와 같은 16진수 컬러 문자열을 Gdiplus::Color로 변환
 Gdiplus::Color	get_gcolor_from_hexadecimal(CString cr);
+
+
 
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 //#FF0000과 같이 리턴받고자 한다면 prefix = _T("#")으로 호출한다.

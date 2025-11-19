@@ -171,6 +171,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
 #define		check_range_return(x, lower, upper) {if ((x) < (lower) || (x) > (upper)) return;}
 
+#define		RECT_RESIZE_HANDLE_COUNT	9
 
 #define lengthof(rg) (sizeof(rg)/sizeof(*rg))
 
@@ -2015,7 +2016,8 @@ h		: 복사할 height 크기(pixel)
 	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);
 
 	//20220914 DrawLine과 DrawLinePt를 같은 이름으로 하니 모호하다는 에러가 발생하여 DrawLinePt로 변경.
-	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick = 1, int style = PS_SOLID, int nDrawMode = R2_COPYPEN);
+	void		draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick = 1, int style = PS_SOLID, int draw_mode = R2_COPYPEN);
+	void		draw_line(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF cr, int thick = 1, int style = PS_SOLID, int draw_mode = R2_COPYPEN);
 	void		draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick = 1.0f, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int nDrawMode = R2_COPYPEN);
 	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int draw_mode = R2_COPYPEN);
 	void		draw_rect(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
@@ -2191,6 +2193,9 @@ h		: 복사할 height 크기(pixel)
 	CRect		get_center_rect(CRect target, int w, int h);
 
 	CRect		get_rc(HWND hWnd);
+
+	bool		pt_in_rect(CRect r, CPoint pt);
+	bool		pt_in_rect(Gdiplus::RectF r, CPoint pt);
 
 	//rSub가 rMain에 완전히 속해있으면 true를 리턴한다.
 	bool		rect_in_rect(CRect main, CRect sub);

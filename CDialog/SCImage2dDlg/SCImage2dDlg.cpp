@@ -770,7 +770,7 @@ void CSCImage2dDlg::rerender()
 		return;
 
 	D2D1_SIZE_F sz = m_d2dc.get_size();
-	m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), sz.width, sz.height);
+	m_d2dc.on_size_changed(sz.width, sz.height);
 	Invalidate();
 }
 
@@ -909,7 +909,8 @@ void CSCImage2dDlg::OnSize(UINT nType, int cx, int cy)
 	m_thumb.MoveWindow(rc);
 	m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 
-	m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), cx, cy);
+	//m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), cx, cy);
+	m_d2dc.on_size_changed(cx, cy);
 
 	m_r_pixel_pos = rc;
 	m_r_pixel_pos.DeflateRect(4, 4);
@@ -1688,7 +1689,7 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 
 	CRect rc;
 	GetClientRect(rc);
-	m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), rc.Width(), rc.Height());
+	//m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), rc.Width(), rc.Height());
 
 	m_img[0].set_interpolation_mode(m_interpolation_mode);
 

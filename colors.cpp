@@ -284,6 +284,11 @@ Gdiplus::Color get_color(std::string cr_name)
 	return CSCColorList::get_color(cr_name);
 }
 
+D2D1::ColorF get_d2color(Gdiplus::Color cr)
+{
+	return D2D1::ColorF((float)cr.GetR() / 255.0f, (float)cr.GetG() / 255.0f, (float)cr.GetB() / 255.0f, (float)cr.GetA() / 255.0f);
+}
+
 Gdiplus::Color get_color(CString cr_str)
 {
 	Gdiplus::Color cr = Gdiplus::Color::Black;

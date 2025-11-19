@@ -20,12 +20,16 @@ public:
 	void	set(CRect r, CString label = _T(""));
 	void	set(Gdiplus::RectF r, CString label = _T(""));
 
+	bool	pt_in_rect(float x, float y);
+
 	Gdiplus::RectF	m_r;
 	int				m_round = 0;
 	CString			m_label;
 	bool			m_label_visible = true;
 	UINT			m_label_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
-	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::LightGray;
-	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;
+	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::RoyalBlue;// LightGray;
+	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;// Transparent;
+
+	bool			m_selected = false;
 protected:
 };

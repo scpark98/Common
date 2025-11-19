@@ -6340,7 +6340,12 @@ void draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr, int width
 	draw_line(g, pt1.x, pt1.y, pt2.x, pt2.y, cr, width, pen_style, draw_mode);
 }
 
-void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick, int style, int nDrawMode)
+void draw_line(CDC* pDC, CPoint pt1, CPoint pt2, COLORREF cr, int thick, int style, int draw_mode)
+{
+	draw_line(pDC, pt1.x, pt1.y, pt2.x, pt2.y, cr, thick, style, draw_mode);
+}
+
+void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick, int style, int draw_mode)
 {
 	LOGBRUSH lb;
 
@@ -6349,7 +6354,7 @@ void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick,
 
 	CPen	Pen(PS_GEOMETRIC | style, thick, &lb);
 	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
-	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
+	int		nOldDrawMode = pDC->SetROP2(draw_mode);
 
 	pDC->MoveTo(x1, y1);
 	pDC->LineTo(x2, y2);
@@ -12016,6 +12021,19 @@ bool kill_service(CString service_name, CString process_name)
 }
 */
 
+bool pt_in_rect(CRect r, CPoint pt)
+{
+	return pt_in_rect(Gdiplus::RectF(r.left, r.top, r.Width(), r.Height()), pt);
+}
+
+bool pt_in_rect(Gdiplus::RectF r, CPoint pt)
+{
+	if (pt.x >= r.X && pt.y >= r.Y && pt.x <= r.GetRight() && pt.y <= r.GetBottom())
+		return true;
+
+	return false;
+}
+
 bool rect_in_rect(CRect main, CRect sub)
 {
 	CRect	rUnion;
@@ -12127,10 +12145,10 @@ void get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz)
 void get_resizable_handle(CRect src, CRect handle[], int sz)
 {
 	//right, bottom을 -1씩 줄여줘야 정확하다.
-	src.DeflateRect(0, 0, 1, 1);
+	//src.DeflateRect(0, 0, 1, 1);
 	// 
 	//순번은 CORNER_INDEX와 일관되게 처리한다.
-	handle[corner_inside]		= CRect(src.CenterPoint().x - sz, src.CenterPoint().y - sz, src.CenterPoint().x + sz, src.CenterPoint().y + sz);
+	handle[corner_inside]		= src;//CRect(src.CenterPoint().x - sz, src.CenterPoint().y - sz, src.CenterPoint().x + sz, src.CenterPoint().y + sz);
 	handle[corner_left]			= CRect(src.left - sz, src.CenterPoint().y - sz, src.left + sz, src.CenterPoint().y + sz);
 	handle[corner_right]		= CRect(src.right - sz, src.CenterPoint().y - sz, src.right + sz, src.CenterPoint().y + sz);
 	handle[corner_top]			= CRect(src.CenterPoint().x - sz, src.top - sz, src.CenterPoint().x + sz, src.top + sz);

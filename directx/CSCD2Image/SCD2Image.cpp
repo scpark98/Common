@@ -1004,6 +1004,7 @@ HRESULT CSCD2Image::render()
 	return hr;
 }
 */
+/*
 HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy)
 {
 	HRESULT hr = S_FALSE;
@@ -1058,7 +1059,7 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 
 	return S_OK;
 }
-
+*/
 float CSCD2Image::get_ratio()
 {
 	if (m_height <= 0.0f)

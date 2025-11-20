@@ -292,6 +292,7 @@ rapidjson::Value& Json::get_array1(std::string array_name)
 }
 
 //arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
+/*
 rapidjson::Value* Json::get_array_member(std::string arr_name, int n, std::string member)
 {
 	if (!doc[arr_name].IsArray())
@@ -305,13 +306,16 @@ rapidjson::Value* Json::get_array_member(std::string arr_name, int n, std::strin
 
 	return &doc[arr_name][n][member];
 }
+*/
 
+/*
 bool Json::get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value)
 {
 	value = get_array_member(arr_name, n, member);
 
 	return (value != NULL);
 }
+*/
 
 //array2:[{"name": "peter", "age": 21}, {"name": "mike", "age":24}]과 같이 항목과 값이 pair로 존재하는 array를
 //map으로 변환해준다. 단, 모든 필드값은 무조건 CString으로 강제 변환한다.

@@ -22,6 +22,8 @@ public:
 
 	bool	pt_in_rect(float x, float y);
 
+
+	int				m_type = 0;
 	Gdiplus::RectF	m_r;
 	int				m_round = 0;
 	CString			m_label;
@@ -31,5 +33,6 @@ public:
 	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;// Transparent;
 
 	bool			m_selected = false;
+
 protected:
 };

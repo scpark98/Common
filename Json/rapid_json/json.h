@@ -312,7 +312,31 @@ public:
 	rapidjson::Value& get_array1(std::string array_name);
 
 	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
-	rapidjson::Value* get_array_member(std::string arr_name, int n, std::string member);
+	template <class T> T get_array_member(std::string arr_name, int n, std::string member, T default)
+	{
+		//if (typeid(T) == typeid(int))
+		//	return doc[arr_name][n][member].GetInt();
+		//else if (typeid(T) == typeid(CString))
+		//	return doc[arr_name][n][member].GetCString();
+		if (!doc[arr_name][n].HasMember(member))
+			return default;
+
+		if constexpr (std::is_same_v<T, int>)
+			return doc[arr_name][n][member].GetInt();
+		else if constexpr (std::is_same_v<T, bool>)
+		{
+			return doc[arr_name][n][member].GetBool();
+		}
+		else if constexpr (std::is_same_v<T, CString>)
+			return doc[arr_name][n][member].GetCString();
+		else if constexpr (std::is_same_v<T, UINT>)
+		{
+			return doc[arr_name][n][member].GetUint();
+		}
+
+		return NULL;
+	}
+
 	bool		get_array_member(std::string arr_name, int n, std::string member, rapidjson::Value* value);
 
 	void		traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CString& result);

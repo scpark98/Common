@@ -112,7 +112,7 @@ HRESULT CSCD2Context::create_device_resources()
 			//1.0이 2.0보다는 약간 옅은색으로 표시되나 thickness가 동일하게 표시된다.
 			//이 세팅을 해줘야 실제 1 pixel 두께로 그려진다.
 			//단, 이 모드로 세팅하면 대각선이 antialias 처리되지 않고 그대로 계단 현상이 표시된다.
-			m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+			//m_d2context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 		}
 	}
 
@@ -370,7 +370,7 @@ HRESULT CSCD2Context::render()
 	//	//m_d2context->DrawImage(affineTransformEffect.Get());
 	//	D2D1_SIZE_F sz_img = m_img_back->GetSize();
 	//	CRect r = get_ratio_rect(CRect(0, 0, width * 2, height * 2), (int)(sz_img.width), (int)(sz_img.height));
-	//	TRACE(_T("rc = %dx%d, sz_img = %.0fx%.0f, r = %s\n"), width, height, sz_img.width, sz_img.height, get_rect_info_string(r));
+	//	TRACE(_T("rc = %dx%d, sz_img = %.0fx%.0f, r = %s\n"), width, height, sz_img.width, sz_img.height, get_rect_info_str(r));
 	m_d2context->DrawBitmap(m_img.Get(), D2D1::RectF(0.0f, 0.0f, rtSize.width, rtSize.height));
 	//m_d2context->DrawBitmap(m_img_back.Get(), D2D1::RectF(r.left, r.top, r.right, r.bottom));
 

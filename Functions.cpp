@@ -6268,7 +6268,7 @@ CRect draw_text(Gdiplus::Graphics &g,
 		float ratio = 0.4f;
 		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 		g_shadow.SetTransform(&mx);
-		g_shadow.DrawString(CStringW(text), -1, &font, CRect2GpRectF(rTarget), &sf, &shadow_brush);
+		g_shadow.DrawString(CStringW(text), -1, &font, CRect_to_gpRectF(rTarget), &sf, &shadow_brush);
 
 		g.DrawImage(&shadow_bitmap, (Gdiplus::REAL)shadow_depth, (Gdiplus::REAL)shadow_depth,
 			(Gdiplus::REAL)(shadow_bitmap.GetWidth()) / ratio, (Gdiplus::REAL)(shadow_bitmap.GetHeight()) / ratio);
@@ -6443,24 +6443,24 @@ void draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line, G
 }
 
 #ifndef _USING_V110_SDK71_
-void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, width);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick);
 }
 
-void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, width);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick);
 }
 
-void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, width);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick);
 }
-void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float width)
+void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	ID2D1SolidColorBrush* br_stroke;
 	ID2D1SolidColorBrush* br_fill;
@@ -6482,10 +6482,26 @@ void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke
 
 	d2dc->CreateSolidColorBrush(d2cr_fill, &br_fill);
 
-	d2dc->FillRectangle(r, br_fill);
-	d2dc->DrawRectangle(r, br_stroke);
+	if (round > 0.0f)
+	{
+		d2dc->FillRoundedRectangle(D2D1::RoundedRect(r, round, round), br_fill);
+	}
+	else
+	{
+		d2dc->FillRectangle(r, br_fill);
+	}
+
+	if (round > 0.0f)
+	{
+		d2dc->DrawRoundedRectangle(D2D1::RoundedRect(r, round, round), br_stroke, thick);
+	}
+	else
+	{
+		d2dc->DrawRectangle(r, br_stroke, thick);
+	}
 }
 #endif
+
 void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
 {
 	draw_sunken_rect(pDC, r, bSunken, RGB2gpColor(cr1), RGB2gpColor(cr2), width);
@@ -6510,8 +6526,8 @@ void draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_f
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
 
-	g.FillEllipse(&br, CRect2GpRect(r));
-	g.DrawEllipse(&pen, CRect2GpRect(r));
+	g.FillEllipse(&br, CRect_to_gpRect(r));
+	g.DrawEllipse(&pen, CRect_to_gpRect(r));
 }
 
 void draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed, COLORREF crLine, int nWidth, int nPenStyle, int nDrawMode)
@@ -6840,26 +6856,32 @@ CRect getCenterRect(int cx, int cy, int w, int h)
 	return r;
 }
 
-CRect gpRectToCRect(Gdiplus::Rect r)
+CRect gpRect_to_CRect(Gdiplus::Rect r)
 {
 	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
 }
 
-CRect GpRectF2CRect(Gdiplus::RectF r)
+CRect gpRectF_to_CRect(Gdiplus::RectF r)
 {
 	return CRect(r.X, r.Y, r.X + r.Width, r.Y + r.Height);
 	//return CRect(floor(r.X + 0.5), floor(r.Y + 0.5), floor(r.X + r.Width + 0.5), floor(r.Y + r.Height + 0.5));
 	//return CRect(ROUND(r.X + 0.5, 0), ROUND(r.Y + 0.5, 0), ROUND(r.X + r.Width + 0.5, 0), ROUND(r.Y + r.Height + 0.5, 0));
 }
 
-Gdiplus::Rect CRect2GpRect(CRect r)
+Gdiplus::Rect CRect_to_gpRect(CRect r)
 {
 	return Gdiplus::Rect(r.left, r.top, r.Width(), r.Height());
 }
 
-Gdiplus::RectF CRect2GpRectF(CRect r)
+Gdiplus::RectF CRect_to_gpRectF(CRect r)
 {
 	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
+}
+
+D2D1_RECT_F	CRect_to_d2Rect(CRect r)
+{
+	D2D1_RECT_F rf = { r.left, r.top, r.right, r.bottom };
+	return rf;
 }
 
 //Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
@@ -12034,6 +12056,32 @@ bool pt_in_rect(Gdiplus::RectF r, CPoint pt)
 	return false;
 }
 
+bool pt_in_rect_border(CRect r, CPoint pt, int sz)
+{
+	return pt_in_rect_border(Gdiplus::RectF(r.left, r.top, r.Width(), r.Height()), pt, sz);
+}
+
+bool pt_in_rect_border(Gdiplus::RectF r, CPoint pt, int sz)
+{
+	//left
+	if ((pt.x >= r.X - sz) && (pt.x <= r.X + sz) && (pt.y >= r.Y) && (pt.y <= r.GetBottom()))
+		return true;
+
+	//right
+	if (pt.x >= r.GetRight() - sz && pt.x <= r.GetRight() + sz && pt.y >= r.Y && pt.y <= r.GetBottom())
+		return true;
+
+	//top
+	if (pt.x >= r.X && pt.x <= r.GetRight() && pt.y >= r.Y - sz && pt.y <= r.Y + sz)
+		return true;
+
+	//bottom
+	if (pt.x >= r.X && pt.x <= r.GetRight() && pt.y >= r.GetBottom() - sz && pt.y <= r.GetBottom() + sz)
+		return true;
+
+	return false;
+}
+
 bool rect_in_rect(CRect main, CRect sub)
 {
 	CRect	rUnion;
@@ -12138,7 +12186,7 @@ void getSquareEndPoint(int sx, int sy, int& ex, int& ey)
 
 void get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz)
 {
-	get_resizable_handle(GpRectF2CRect(src), handle, sz);
+	get_resizable_handle(gpRectF_to_CRect(src), handle, sz);
 }
 
 //src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다. sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
@@ -12148,7 +12196,11 @@ void get_resizable_handle(CRect src, CRect handle[], int sz)
 	//src.DeflateRect(0, 0, 1, 1);
 	// 
 	//순번은 CORNER_INDEX와 일관되게 처리한다.
-	handle[corner_inside]		= src;//CRect(src.CenterPoint().x - sz, src.CenterPoint().y - sz, src.CenterPoint().x + sz, src.CenterPoint().y + sz);
+
+	//inside의 경우 sz만큼 줄여줘야 코너와 inside 근처에서 반응이 명확해진다.
+	CRect deflate_src = src;
+	deflate_src.DeflateRect(sz, sz);
+	handle[corner_inside]		= deflate_src;//CRect(src.CenterPoint().x - sz, src.CenterPoint().y - sz, src.CenterPoint().x + sz, src.CenterPoint().y + sz);
 	handle[corner_left]			= CRect(src.left - sz, src.CenterPoint().y - sz, src.left + sz, src.CenterPoint().y + sz);
 	handle[corner_right]		= CRect(src.right - sz, src.CenterPoint().y - sz, src.right + sz, src.CenterPoint().y + sz);
 	handle[corner_top]			= CRect(src.CenterPoint().x - sz, src.top - sz, src.CenterPoint().x + sz, src.top + sz);
@@ -13123,7 +13175,8 @@ void safe_release_gradient_rect_handle()
 //1 : "(1,2)~(4,8)"
 //2 : "(1,2)~(4,8) (2x6)"
 //3 : "l = 1, t = 2, r = 3, b = 4"
-CString get_rect_info_string(CRect r, int nFormat)
+/*
+CString get_rect_info_str(CRect r, int nFormat)
 {
 	CString str;
 
@@ -13139,7 +13192,7 @@ CString get_rect_info_string(CRect r, int nFormat)
 	return str;
 }
 
-CString get_rect_info_string(Gdiplus::Rect r, int nFormat)
+CString get_rect_info_str(Gdiplus::Rect r, int nFormat)
 {
 	CString str;
 	if (nFormat == 1)
@@ -13153,7 +13206,7 @@ CString get_rect_info_string(Gdiplus::Rect r, int nFormat)
 	return str;
 }
 
-CString get_rect_info_string(Gdiplus::RectF r, int nFormat)
+CString get_rect_info_str(Gdiplus::RectF r, int nFormat)
 {
 	CString str;
 	if (nFormat == 1)
@@ -13166,7 +13219,7 @@ CString get_rect_info_string(Gdiplus::RectF r, int nFormat)
 		str.Format(_T("%f, %f, %f, %f"), r.X, r.Y, r.X + r.Width, r.Y + r.Height);
 	return str;
 }
-
+*/
 
 void adjust_rect_range(float*l, float*t, float*r, float*b, float minx, float miny, float maxx, float maxy, bool retainSize, bool includeBottomRight)
 {
@@ -14460,14 +14513,14 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 	if (mi.dwFlags & MONITORINFOF_PRIMARY) 
 	{
 		str.Format(_T("hMonitor = %X, name = %s, rcMonitor = %s, rcWork = %s, <Primary-Monitor> %s"), 
-					hMonitor, mi.szDevice, get_rect_info_string(mi.rcMonitor), get_rect_info_string(mi.rcWork), mi.szDevice);
+					hMonitor, mi.szDevice, get_rect_info_str(mi.rcMonitor), get_rect_info_str(mi.rcWork), mi.szDevice);
 
 		g_monitors.push_front(CSCMonitorInfo(&mi, hMonitor));
 	}
 	else
 	{
 		str.Format(_T("hMonitor = %X, name = %s, rcMonitor = %s, rcWork = %s, %s"), 
-					hMonitor, mi.szDevice, get_rect_info_string(mi.rcMonitor), get_rect_info_string(mi.rcWork), mi.szDevice);
+					hMonitor, mi.szDevice, get_rect_info_str(mi.rcMonitor), get_rect_info_str(mi.rcWork), mi.szDevice);
 		g_monitors.push_back(CSCMonitorInfo(&mi, hMonitor));
 	}
 
@@ -20017,15 +20070,14 @@ bool set_privilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
 	return ((GetLastError() != ERROR_SUCCESS) ? false : true);
 }
 
-CRect convert(D2D1_RECT_F d2r)
+D2D1_RECT_F gpRectF_to_d2Rect(Gdiplus::RectF r)
 {
-	return CRect(d2r.left, d2r.top, d2r.right, d2r.bottom);
+	return D2D1::RectF(r.X, r.Y, r.GetRight(), r.GetBottom());
 }
 
-D2D1_RECT_F convert(CRect r)
+CRect d2RectF_to_CRect(D2D1_RECT_F r)
 {
-	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
-	return d2r;
+	return CRect(r.left, r.top, r.right, r.bottom);
 }
 
 D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)

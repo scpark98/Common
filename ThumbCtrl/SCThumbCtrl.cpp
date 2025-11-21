@@ -304,7 +304,7 @@ void CSCThumbCtrl::OnPaint()
 		else
 		{
 			CRect rImage = get_ratio_rect(rThumb, m_thumb[i].img->width, m_thumb[i].img->height, DT_BOTTOM);
-			g.DrawImage(*m_thumb[i].img, CRect2GpRect(rImage));
+			g.DrawImage(*m_thumb[i].img, CRect_to_gpRect(rImage));
 		}
 
 		CRect rTitle = rThumb;
@@ -357,12 +357,12 @@ void CSCThumbCtrl::OnPaint()
 		}
 		else if (m_use_circle_number)
 		{
-			//g.DrawString(CStringW(i2S(i)), -1, &font, CRect2GpRectF(r), &format, &br_text);
+			//g.DrawString(CStringW(i2S(i)), -1, &font, CRect_to_gpRectF(r), &format, &br_text);
 
 			r = make_center_rect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
 
-			g.DrawEllipse(&pen, CRect2GpRectF(r));
-			path.AddString(CStringW(i2S(i + 1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect2GpRectF(r), &format);
+			g.DrawEllipse(&pen, CRect_to_gpRectF(r));
+			path.AddString(CStringW(i2S(i + 1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect_to_gpRectF(r), &format);
 			for (int j = 0; j < 4; ++j)
 			{
 				Gdiplus::Pen pen(Gdiplus::Color(128, 64, 64, 64), j);		//윤곽선

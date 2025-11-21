@@ -802,14 +802,14 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 			int size = 12;
 			CRect r = make_center_rect(cp.x, cp.y, size, size);
 			r.OffsetRect(-2, -2);
-			g.DrawEllipse(&pen, CRect2GpRect(r));
+			g.DrawEllipse(&pen, CRect_to_gpRect(r));
 			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
 		}
 	}
 	*/
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
 	draw_rect(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
-	//draw_round_rect(&g, CRect2GpRect(rc), (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, rc.Height()/2, m_border_width);
+	//draw_round_rect(&g, CRect_to_gpRect(rc), (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, rc.Height()/2, m_border_width);
 
 	//pDC->SetBkMode(TRANSPARENT);
 
@@ -862,7 +862,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 			int size = 12;
 			CRect r = make_center_rect(cp.x, cp.y, size, size);
 			r.OffsetRect(-2, -2);
-			g.DrawEllipse(&pen, CRect2GpRect(r));
+			g.DrawEllipse(&pen, CRect_to_gpRect(r));
 			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
 		}
 	}

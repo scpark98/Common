@@ -776,7 +776,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				rt.bottom = img_size.height;
 			}
 
-			TRACE(_T("#%03d. rt = %s\n"), i, get_rect_info_string(rt));
+			TRACE(_T("#%03d. rt = %s\n"), i, get_rect_info_str(rt));
 
 			//어떤 gif는 전 프레임 이미지에 변경된 정보만 가진 gif도 존재한다.
 			//이럴 경우는 이전 프레임에 현재 이미지를 blend하여 m_img에 push해야 한다.
@@ -989,7 +989,7 @@ HRESULT CSCD2Image::render()
 	//	//m_d2context->DrawImage(affineTransformEffect.Get());
 	//	D2D1_SIZE_F sz_img = m_img_back->GetSize();
 	//	CRect r = get_ratio_rect(CRect(0, 0, width * 2, height * 2), (int)(sz_img.width), (int)(sz_img.height));
-	//	TRACE(_T("rc = %dx%d, sz_img = %.0fx%.0f, r = %s\n"), width, height, sz_img.width, sz_img.height, get_rect_info_string(r));
+	//	TRACE(_T("rc = %dx%d, sz_img = %.0fx%.0f, r = %s\n"), width, height, sz_img.width, sz_img.height, get_rect_info_str(r));
 	m_d2context->DrawBitmap(m_img.Get(), D2D1::RectF(0.0f, 0.0f, rtSize.width, rtSize.height));
 	//m_d2context->DrawBitmap(m_img_back.Get(), D2D1::RectF(r.left, r.top, r.right, r.bottom));
 
@@ -1205,7 +1205,7 @@ CRect CSCD2Image::calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode)
 	if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_stretch)
 		result = targetRect;
 	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_zoom)
-		result = convert(get_ratio_rect(d2target, m_width, m_height));
+		result = d2RectF_to_CRect(get_ratio_rect(d2target, m_width, m_height));
 	else
 	{
 		result = CRect(0, 0, m_width, m_height);

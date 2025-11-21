@@ -235,7 +235,7 @@ void CSCImageDlg::OnPaint()
 	//만약 투명 픽셀이 포함된 이미지라면 지그재그 격자를 그려준 후
 	if (m_img[0].has_alpha_pixel() == 1)
 	{
-		g.FillRectangle(m_br_zigzag.get(), CRect2GpRect(m_r_display));
+		g.FillRectangle(m_br_zigzag.get(), CRect_to_gpRect(m_r_display));
 	}
 
 	//TRACE(_T("m_r_display = %s\n"), get_rect_info_string(m_r_display));
@@ -247,7 +247,7 @@ void CSCImageDlg::OnPaint()
 	//0,0에 그리라고 해도 (-0.5, -0.5) ~ (0.5, 0.5), 즉 중점이 0,0인 위치에 그리게 되므로
 	//이미지가 약간 왼쪽 상단으로 밀려서 그려지게 된다.
 	g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-	g.DrawImage(m_img[0], CRect2GpRect(m_r_display));
+	g.DrawImage(m_img[0], CRect_to_gpRect(m_r_display));
 
 
 	//이미지 정보 표시
@@ -284,7 +284,7 @@ void CSCImageDlg::OnPaint()
 	}
 
 	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
-	CRect screen_roi = GpRectF2CRect(m_screen_roi);
+	CRect screen_roi = gpRectF_to_CRect(m_screen_roi);
 	screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 	screen_roi.NormalizeRect();
 
@@ -298,7 +298,7 @@ void CSCImageDlg::OnPaint()
 		//이미지 확대 축소 등에 의해 m_r_display가 변경되면 그에 따라 m_screen_roi도 다시 계산해줘야 한다.
 		get_screen_coord_from_real_coord(m_r_display, m_img[0].width, m_image_roi, &m_screen_roi);
 		//m_screen_roi.Offset(m_offset.x, m_offset.y);
-		screen_roi = GpRectF2CRect(m_screen_roi);
+		screen_roi = gpRectF_to_CRect(m_screen_roi);
 		screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
 		//screen_roi.OffsetRect(m_offset);
@@ -309,7 +309,7 @@ void CSCImageDlg::OnPaint()
 	if (!m_screen_roi.IsEmptyArea())
 	{
 		Gdiplus::RectF image_roi;
-		get_real_coord_from_screen_coord(m_r_display, m_img[0].width, CRect2GpRectF(screen_roi), &image_roi);
+		get_real_coord_from_screen_coord(m_r_display, m_img[0].width, CRect_to_gpRectF(screen_roi), &image_roi);
 		get_resizable_handle(screen_roi, m_roi_handle, 4);
 
 		//image_roi 역시 normalize_rect을 해줘야 한다. 그렇지 않으면 뒤집어 그릴 경우 x1,y1이 x2, y2보다 큰 좌표로 표시된다.
@@ -827,7 +827,7 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 				case corner_inside :
 					m_screen_roi.X = point.x - m_screen_roi.Width / 2;
 					m_screen_roi.Y = point.y - m_screen_roi.Height / 2;
-					adjust_rect_range(m_screen_roi, CRect2GpRectF(m_r_display));
+					adjust_rect_range(m_screen_roi, CRect_to_gpRectF(m_r_display));
 					break;
 				case corner_left :
 					set_left(m_screen_roi, point.x);

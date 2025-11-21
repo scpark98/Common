@@ -99,7 +99,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, dwStyle);
 
 	GetClientRect(rc);
-	TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
+	TRACE(_T("rc = %s\n"), get_rect_info_str(rc));
 
 	return res;
 }

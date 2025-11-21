@@ -172,6 +172,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 #define		check_range_return(x, lower, upper) {if ((x) < (lower) || (x) > (upper)) return;}
 
 #define		RECT_RESIZE_HANDLE_COUNT	9
+#define		RECT_RESIZE_HANDLE_SIZE		3
 
 #define lengthof(rg) (sizeof(rg)/sizeof(*rg))
 
@@ -2025,10 +2026,10 @@ h		: 복사할 height 크기(pixel)
 	void		draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 	void		draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 #ifndef _USING_V110_SDK71_
-	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
-	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
-	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
-	void		draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float width = 1.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
 #endif
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);
@@ -2141,18 +2142,80 @@ h		: 복사할 height 크기(pixel)
 		rect_info_format_point_size,
 		rect_info_format_ltrb,
 	};
-	CString		get_rect_info_string(CRect r, int nFormat = rect_info_format_point_size);
-	CString		get_rect_info_string(Gdiplus::Rect r, int nFormat = rect_info_format_point_size);
-	CString		get_rect_info_string(Gdiplus::RectF r, int nFormat = rect_info_format_point_size);
+	//CString		get_rect_info_str(CRect r, int nFormat = rect_info_format_point_size);
+	//CString		get_rect_info_str(Gdiplus::Rect r, int nFormat = rect_info_format_point_size);
+	//CString		get_rect_info_str(Gdiplus::RectF r, int nFormat = rect_info_format_point_size);
 
-	void		make_rect(CRect &Rect, int x, int y, int w, int h);
-	CRect		make_rect(int x, int y, int w, int h);
-	CRect		make_center_rect(int cx, int cy, int w, int h);
-	Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h);
-	CRect		GpRect2CRect(Gdiplus::Rect r);
-	CRect		GpRectF2CRect(Gdiplus::RectF r);
-	Gdiplus::Rect	CRect2GpRect(CRect r);
-	Gdiplus::RectF	CRect2GpRectF(CRect r);
+	template <typename T> CString get_rect_info_str(T rr, int format = rect_info_format_point_size)
+	{
+		CString str;
+		//CString fs = _T("%%d");
+
+		if (typeid(T) == typeid(CRect))
+		{
+			CRect* r = reinterpret_cast<CRect*>(&rr);
+			if (format == rect_info_format_point)
+				str.Format(_T("(%d, %d)~(%d, %d)"), r->left, r->top, r->right, r->bottom);
+			else if (format == rect_info_format_point_size)
+				str.Format(_T("(%d, %d)~(%d, %d) (%d x %d)"), r->left, r->top, r->right, r->bottom, r->Width(), r->Height());
+			else if (format == rect_info_format_ltrb)
+				str.Format(_T("l = %d, t = %d, r = %d, b = %d"), r->left, r->top, r->right, r->bottom);
+			else
+				str.Format(_T("%d, %d, %d, %d"), r->left, r->top, r->right, r->bottom);
+		}
+		else if (typeid(T) == typeid(Gdiplus::Rect))
+		{
+			Gdiplus::Rect* r = reinterpret_cast<Gdiplus::Rect*>(&rr);
+			if (format == rect_info_format_point)
+				str.Format(_T("(%d, %d)~(%d, %d)"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
+			else if (format == rect_info_format_point_size)
+				str.Format(_T("(%d, %d)~(%d, %d) (%d x %d)"), r->X, r->Y, r->X + r->Width, r->Y + r->Height, r->Width, r->Height);
+			else if (format == rect_info_format_ltrb)
+				str.Format(_T("l = %d, t = %d, r = %d, b = %d"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
+			else
+				str.Format(_T("%d, %d, %d, %d"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
+		}
+		else if (typeid(T) == typeid(Gdiplus::RectF))
+		{
+			Gdiplus::RectF* r = reinterpret_cast<Gdiplus::RectF*>(&rr);
+			if (format == rect_info_format_point)
+				str.Format(_T("(%f, %f)~(%f, %f)"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
+			else if (format == rect_info_format_point_size)
+				str.Format(_T("(%f, %f)~(%f, %f) (%f x %f)"), r->X, r->Y, r->X + r->Width, r->Y + r->Height, r->Width, r->Height);
+			else if (format == rect_info_format_ltrb)
+				str.Format(_T("l = %f, t = %f, r = %f, b = %f"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
+			else
+				str.Format(_T("%f, %f, %f, %f"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
+		}
+		else if (typeid(T) == typeid(D2D1_RECT_F))
+		{
+			//D2D1::RectF* r = reinterpret_cast<D2D1::RectF*>(&rr);
+			D2D1_RECT_F* r = reinterpret_cast<D2D1_RECT_F*>(&rr);
+			if (format == rect_info_format_point)
+				str.Format(_T("(%f, %f)~(%f, %f)"), r->left, r->top, r->right, r->bottom);
+			else if (format == rect_info_format_point_size)
+				str.Format(_T("(%f, %f)~(%f, %f) (%f x %f)"), r->left, r->top, r->right, r->bottom, r->right - r->left, r->bottom - r->top);
+			else if (format == rect_info_format_ltrb)
+				str.Format(_T("l = %f, t = %f, r = %f, b = %f"), r->left, r->top, r->right, r->bottom);
+			else
+				str.Format(_T("%f, %f, %f, %f"), r->left, r->top, r->right, r->bottom);
+		}
+
+		return str;
+	}
+
+	void			make_rect(CRect &Rect, int x, int y, int w, int h);
+	CRect			make_rect(int x, int y, int w, int h);
+	CRect			make_center_rect(int cx, int cy, int w, int h);
+	Gdiplus::Rect	make_center_gprect(int cx, int cy, int w, int h);
+	CRect			gpRect_to_CRect(Gdiplus::Rect r);
+	CRect			gpRectF_to_CRect(Gdiplus::RectF r);
+	Gdiplus::Rect	CRect_to_gpRect(CRect r);
+	Gdiplus::RectF	CRect_to_gpRectF(CRect r);
+	D2D1_RECT_F		CRect_to_d2Rect(CRect r);
+	CRect			d2RectF_to_CRect(D2D1_RECT_F r);
+	D2D1_RECT_F		gpRectF_to_d2Rect(Gdiplus::RectF r);
+
 
 	//Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
 	//따라서 left만 바꾸고 싶어도 Width까지 같이 변경해줘야 한다. 이러한 이유로 set_left(), set_top() 함수를 추가함.
@@ -2196,6 +2259,8 @@ h		: 복사할 height 크기(pixel)
 
 	bool		pt_in_rect(CRect r, CPoint pt);
 	bool		pt_in_rect(Gdiplus::RectF r, CPoint pt);
+	bool		pt_in_rect_border(CRect r, CPoint pt, int sz = 0);
+	bool		pt_in_rect_border(Gdiplus::RectF r, CPoint pt, int sz = 0);
 
 	//rSub가 rMain에 완전히 속해있으면 true를 리턴한다.
 	bool		rect_in_rect(CRect main, CRect sub);
@@ -2244,8 +2309,8 @@ h		: 복사할 height 크기(pixel)
 	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다.
 	//handle[]은 CRect handle[9] 변수를 넘겨받는다.
 	//sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
-	void		get_resizable_handle(CRect src, CRect handle[], int sz = 4);
-	void		get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz = 4);
+	void		get_resizable_handle(CRect src, CRect handle[], int sz = RECT_RESIZE_HANDLE_SIZE);
+	void		get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz = RECT_RESIZE_HANDLE_SIZE);
 	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 중 pt가 위치한 사각형의 인덱스를 리턴한다.
 	//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
 	//int			get_handle_index(CRect src, CPoint pt, int sz);
@@ -2697,8 +2762,5 @@ std::basic_string<CharT> GetSystemErrorMesssage(const DWORD errorCode)
 	return result;
 }
 
-//directx data type
-CRect					convert(D2D1_RECT_F d2r);
-D2D1_RECT_F				convert(CRect r);
 D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
 D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);

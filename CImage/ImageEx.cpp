@@ -1,4 +1,3 @@
-#include "StdAfx.h"
 #include "ImageEx.h"
 #include <math.h>
 #include "../Functions.h"

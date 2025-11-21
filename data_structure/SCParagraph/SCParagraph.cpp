@@ -764,7 +764,7 @@ CString	CSCParagraph::get_paragraph_info_string(std::deque<std::deque<CSCParagra
 			str.Format(_T("(%d, %d) : text = %s, r = %s, name = %s, size = %.1f, style = %d\n"),
 				i, j,
 				para[i][j].text,
-				get_rect_info_string(para[i][j].r),
+				get_rect_info_str(para[i][j].r),
 				para[i][j].text_prop.name,
 				para[i][j].text_prop.size,
 				para[i][j].text_prop.style);

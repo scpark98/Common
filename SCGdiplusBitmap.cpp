@@ -3337,9 +3337,9 @@ void CSCGdiplusBitmap::thread_gif_animation()
 			if (m_has_alpha_pixel)
 			{
 				if (m_cr_back.GetValue() == Gdiplus::Color::Transparent)
-					g.FillRectangle(br_zigzag.get(), CRect2GpRect(r));
+					g.FillRectangle(br_zigzag.get(), CRect_to_gpRect(r));
 				else
-					g.FillRectangle(&Gdiplus::SolidBrush(m_cr_back), CRect2GpRect(r));
+					g.FillRectangle(&Gdiplus::SolidBrush(m_cr_back), CRect_to_gpRect(r));
 			}
 
 			//if (m_cr_back.GetValue() != 

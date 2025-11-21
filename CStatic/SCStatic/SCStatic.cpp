@@ -236,7 +236,7 @@ void CSCStatic::OnPaint()
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
 	if (m_round > 0)
-		get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round);
+		get_round_rect_path(&roundPath, CRect_to_gpRect(rc), m_round);
 
 	//투명 모드이면 배경도 안칠하고 글자도 배경색 없이 출력된다.
 	dc.SetBkMode(TRANSPARENT);
@@ -584,7 +584,7 @@ void CSCStatic::OnPaint()
 	{
 		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRect2GpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			draw_round_rect(&g, CRect_to_gpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
 			draw_rect(g, rc, m_cr_border);
 	}

@@ -43,3 +43,15 @@ bool CSCUIElement::pt_in_rect(float x, float y)
 
 	return false;
 }
+
+void CSCUIElement::copy(CSCUIElement* dst)
+{
+	dst->m_type = m_type;
+	dst->m_r = m_r;
+	dst->m_round = m_round;
+	dst->m_label = m_label;
+	dst->m_label_visible = m_label_visible;
+	dst->m_label_align = m_label_align;
+	dst->m_cr_stroke = m_cr_stroke;
+	dst->m_cr_fill = m_cr_fill;
+}

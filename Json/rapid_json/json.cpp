@@ -44,7 +44,7 @@ bool Json::load(CString input_json_file)
 	//std::string sstr = CT2CA(input_json);
 	//return read(sstr);
 
-	FILE* fp = _tfopen(input_json_file, _T("rb")CHARSET);
+	FILE* fp = _tfopen(input_json_file, _T("rb"));
 	if (!fp)
 		return false;
 
@@ -54,7 +54,10 @@ bool Json::load(CString input_json_file)
 
 	char* readBuffer = new char[size];
 	FileReadStream readStream(fp, readBuffer, size);
-	bool result = !doc.ParseStream(readStream).HasParseError();
+	AutoUTFInputStream<unsigned, FileReadStream> eis(readStream);  // wraps bis into eis
+
+	//EncodedInputStream<UTF16LE<>, FileReadStream> eis(readStream);
+	bool result = !doc.ParseStream(eis).HasParseError();
 
 	delete[] readBuffer;
 	fclose(fp);
@@ -86,12 +89,14 @@ bool Json::read(std::string input_json)
 */
 bool Json::save(CString output_json_file)
 {
-	FILE* fp = _tfopen(output_json_file, _T("wb")CHARSET);
+	FILE* fp = _tfopen(output_json_file, _T("wb"));
 	if (!fp)
 		return false;
 
 	char writeBuffer[10240];
-	FileWriteStream writeStream(fp, writeBuffer, _countof(writeBuffer));
+	FileWriteStream writeStream(fp, writeBuffer, sizeof(writeBuffer));
+	typedef AutoUTFOutputStream<unsigned, FileWriteStream> OutputStream;
+	OutputStream(writeStream, UTFType::kUTF8, false);
 	PrettyWriter<FileWriteStream> writer(writeStream);
 	doc.Accept(writer);
 

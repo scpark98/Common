@@ -321,14 +321,32 @@ public:
 		if (!doc[arr_name][n].HasMember(member))
 			return default;
 
+		TRACE(_T("typename = %S\n"), typeid(T).name());
+
 		if constexpr (std::is_same_v<T, int>)
+		{
 			return doc[arr_name][n][member].GetInt();
+		}
 		else if constexpr (std::is_same_v<T, bool>)
 		{
 			return doc[arr_name][n][member].GetBool();
 		}
 		else if constexpr (std::is_same_v<T, CString>)
+		{
 			return doc[arr_name][n][member].GetCString();
+		}
+		else if constexpr (std::is_same_v<T, const TCHAR*>)
+		{
+			return doc[arr_name][n][member].GetCString();
+		}
+		else if constexpr (std::is_same_v<T, std::string>)
+		{
+			return doc[arr_name][n][member].GetString();
+		}
+		else if constexpr (std::is_same_v<T, const char*>)
+		{
+			return doc[arr_name][n][member].GetString();
+		}
 		else if constexpr (std::is_same_v<T, UINT>)
 		{
 			return doc[arr_name][n][member].GetUint();

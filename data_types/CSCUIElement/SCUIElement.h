@@ -22,13 +22,24 @@ public:
 
 	bool	pt_in_rect(float x, float y);
 
+	void	copy(CSCUIElement* dst);
+
 
 	int				m_type = 0;
 	Gdiplus::RectF	m_r;
 	int				m_round = 0;
+
 	CString			m_label;
-	bool			m_label_visible = true;
 	UINT			m_label_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+	bool			m_label_visible = true;
+
+	CString			m_font_name = _T("Arial");
+	int				m_font_size = 10;
+	int				m_font_weight = FW_NORMAL;
+	Gdiplus::Color	m_cr_label = Gdiplus::Color::Black;
+	Gdiplus::Color	m_cr_label_back = Gdiplus::Color::Transparent;
+
+
 	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::RoyalBlue;// LightGray;
 	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;// Transparent;
 

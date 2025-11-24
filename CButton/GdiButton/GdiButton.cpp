@@ -957,7 +957,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHint::TextRenderingHintAntiAliasGridFit);
 
-	get_round_rect_path(&roundPath, CRect2GpRect(rc), m_round, m_border_thick);
+	get_round_rect_path(&roundPath, CRect_to_gpRect(rc), m_round, m_border_thick);
 
 	bool is_down = ((lpDIS->itemState & ODS_SELECTED) || (GetCheck() == BST_CHECKED));
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
@@ -1357,12 +1357,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_round <= 0)
 			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
 		else
-			draw_round_rect(&g, CRect2GpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
+			draw_round_rect(&g, CRect_to_gpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
 	}
 	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
 	{
 		if (m_round > 0)
-			draw_round_rect(&g, CRect2GpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
+			draw_round_rect(&g, CRect_to_gpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
 		else
 			draw_rect(g, rc, cr_border);
 	}

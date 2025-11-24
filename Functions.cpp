@@ -3534,7 +3534,7 @@ void enum_registry_subkeys(HKEY hKeyRoot, CString key_root, std::deque<CString>&
 	if (lResult == ERROR_SUCCESS)
 	{
 		DWORD dwIndex = 0;
-		WCHAR szSubkeyName[256]; // Maximum key name length
+		TCHAR szSubkeyName[256]; // Maximum key name length
 		DWORD dwSize = sizeof(szSubkeyName) / sizeof(WCHAR);
 
 		//TRACE(L"Subkeys of: %s\n", key_root);

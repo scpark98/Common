@@ -134,7 +134,7 @@ public:
 	//생성자에서 비어있는 구분이라도 넣어서 parse()해 줘야 doc가 생성되고 멤버를 넣는 작업이 가능해진다.
 	Json()
 	{
-		parse(_T("{}"));
+		parse(std::string("{}"));
 	}
 
 	~Json()

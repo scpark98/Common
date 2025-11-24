@@ -522,7 +522,7 @@ void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool 
 void CGdiButton::set_text_color(Gdiplus::Color normal, bool auto_color)
 {
 	if (auto_color)
-		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
+		set_text_color(normal, get_color(normal, 16), get_color(normal, -16), gray_color(normal));
 	else
 		set_text_color(normal, normal, normal, gray_color(normal));
 }
@@ -963,7 +963,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
 	//for test for breakpoint
-	if (text == _T("대기"))
+	if (text == _T("환경설정"))
 	{
 		text = text;
 		trace(is_down);

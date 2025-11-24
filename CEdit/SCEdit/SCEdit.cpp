@@ -40,6 +40,13 @@ CSCEdit::~CSCEdit()
 {
 }
 
+bool CSCEdit::create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
+{
+	bool res = CEdit::Create(dwStyle, rect, pParentWnd, nID);
+	m_lf.lfWidth = 0;
+	return res;
+}
+
 
 BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	//{{AFX_MSG_MAP(CSCEdit)

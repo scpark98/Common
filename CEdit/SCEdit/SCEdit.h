@@ -62,6 +62,11 @@ public:
 		message_scedit_action_button_up,
 	};
 
+	//동적 생성 시 호출
+	bool					create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
+	//기본 CEdit::Create() override. 동적 생성 시 font width가 
+	BOOL					Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
+
 	CString					get_text() { CString text; GetWindowText(text); return text; }
 	void					SetWindowText(CString text) { set_text(text); }
 

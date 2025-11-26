@@ -69,7 +69,7 @@ public:
 
 	//동적 생성 시 호출
 	bool					create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
-	//기본 CEdit::Create() override. 동적 생성 시 font width가 
+	//기본 CEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
 	BOOL					Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }

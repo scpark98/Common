@@ -48,6 +48,11 @@ bool CSCEdit::create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID
 	return res;
 }
 
+//기본 CEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
+BOOL CSCEdit::Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
+{
+	return create(dwStyle, rect, pParentWnd, nID);
+}
 
 BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	//{{AFX_MSG_MAP(CSCEdit)

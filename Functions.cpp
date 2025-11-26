@@ -6446,19 +6446,19 @@ void draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line, G
 void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round);
 }
 
 void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round);
 }
 
 void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {
 	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round);
 }
 void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
 {

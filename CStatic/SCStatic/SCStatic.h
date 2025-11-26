@@ -160,10 +160,9 @@ public:
 	CRect			get_rect();
 
 	//글자색, 배경색 동시 설정
-	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
 
-	//글자색만 변경할 경우. 이 값이 Transparent이면 기본 글자색으로 리셋한다는 의미로 사용된다.
-	void			set_text_color(Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
+	void			set_text_color(Gdiplus::Color cr_text);
 
 	Gdiplus::Color	get_text_color() { return m_cr_text; }
 	Gdiplus::Color	get_back_color() { return m_cr_back; }

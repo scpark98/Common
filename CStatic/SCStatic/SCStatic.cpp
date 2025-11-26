@@ -631,7 +631,7 @@ void CSCStatic::OnPaint()
 				rcolor.right = rcolor.left + 12;
 				rcolor.top = rcolor.CenterPoint().y - 6;
 				rcolor.bottom = rcolor.top + 12;
-				draw_round_rect(&g, CRect_to_gpRect(rcolor), Gdiplus::Color::Transparent, m_cr_text, 1);
+				draw_round_rect(&g, CRect_to_gpRect(rcolor), Gdiplus::Color::Gray, m_cr_text, 1);
 				//dc.FillSolidRect(rcolor, m_cr_text.ToCOLORREF());
 				m_text_extent = rcolor.right;
 			}

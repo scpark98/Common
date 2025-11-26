@@ -38,7 +38,12 @@ public:
 		message = _message;
 	}
 
-	CWnd* pThis = NULL;
+	enum CSCStaticMsgs
+	{
+		
+	};
+
+	CWnd*	pThis = NULL;
 	int		message;
 };
 

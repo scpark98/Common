@@ -102,8 +102,10 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(char*))\
 		TRACE(_T("%s(%d) %S = %S\n"), __function__, __LINE__, #n, n);\
-	else\
+	else if (typeid(n) == typeid(CString))\
 		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
+	else\
+		TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount());\
 }
 
 #ifdef __GNUG__

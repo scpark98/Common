@@ -351,6 +351,14 @@ public:
 		{
 			return doc[arr_name][n][member].GetUint();
 		}
+		else if constexpr (std::is_same_v<T, float>)
+		{
+			return doc[arr_name][n][member].GetFloat();
+		}
+		else if constexpr (std::is_same_v<T, double>)
+		{
+			return doc[arr_name][n][member].GetDouble();
+		}
 
 		return NULL;
 	}

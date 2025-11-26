@@ -510,8 +510,8 @@ void CSCComboBox::OnPaint()
 	CPoint cp = r.CenterPoint();
 	cp.Offset(-1, 2);
 	int sz = 4;
-	draw_line(&dc, cp.x - sz, cp.y - sz, cp.x, cp.y, gGRAY(128), 2);
-	draw_line(&dc, cp.x + sz, cp.y - sz, cp.x, cp.y, gGRAY(128), 2);
+	draw_line(&dc, cp.x - sz, cp.y - sz, cp.x, cp.y, GRAY(128), 2);
+	draw_line(&dc, cp.x + sz, cp.y - sz, cp.x, cp.y, GRAY(128), 2);
 }
 
 

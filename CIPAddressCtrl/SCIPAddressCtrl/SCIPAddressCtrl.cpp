@@ -38,7 +38,7 @@ BOOL CSCIPAddressCtrl::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_RETURN :
 				TRACE(_T("return on CSCIPAddressCtrl::PreTranslateMessage\n"));
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCIPAddressCtrl, WM_KEYDOWN, VK_RETURN);
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCIPAddressCtrl, WM_KEYDOWN, pMsg->wParam);
 				return TRUE;
 		}
 	}

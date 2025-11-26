@@ -368,7 +368,7 @@ Gdiplus::Color get_gcolor_from_hexadecimal(CString cr_str)
 }
 
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
-CString		get_color_string(COLORREF cr, bool upper_case, CString prefix)
+CString	get_color_hexa_str(COLORREF cr, bool upper_case, CString prefix)
 {
 	CString str;
 
@@ -379,6 +379,18 @@ CString		get_color_string(COLORREF cr, bool upper_case, CString prefix)
 
 	if (!prefix.IsEmpty())
 		str = prefix + str;
+
+	return str;
+}
+
+CString	get_color_hexa_str(Gdiplus::Color cr, bool upper_case, bool include_alpha)
+{
+	CString str;
+
+	if (upper_case)
+		str.Format(_T("%02X%02X%02X"), cr.GetR(), cr.GetG(), cr.GetB());
+	else
+		str.Format(_T("%02x%02x%02x"), cr.GetR(), cr.GetG(), cr.GetB());
 
 	return str;
 }
@@ -637,7 +649,7 @@ Gdiplus::Color RGB2gpColor(COLORREF cr, BYTE alpha)
 	return Gdiplus::Color(alpha, GetRValue(cr), GetGValue(cr), GetBValue(cr));
 }
 
-//cr컬러에서 a,r,g,b 중 한 색을 value로 변경한다.
+//cr컬러에서 a(0), r(1), g(2), b(3) 중 한 색을 value로 변경한다.
 void set_color(Gdiplus::Color &cr, int argb, BYTE value)
 {
 	BYTE a = (argb == 0 ? value : cr.GetA());

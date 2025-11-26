@@ -44,6 +44,7 @@ bool CSCEdit::create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID
 {
 	bool res = CEdit::Create(dwStyle, rect, pParentWnd, nID);
 	m_lf.lfWidth = 0;
+	PreSubclassWindow();
 	return res;
 }
 
@@ -525,16 +526,27 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
-	//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
-	switch (pMsg->message)
+	if (pMsg->message == WM_KEYDOWN)
 	{
-		case WM_KEYDOWN :
-			//TRACE(_T("keydown on CSCEdit. key = %d\n"), (int)pMsg->wParam);
-			break;
-		case WM_LBUTTONDOWN:
-			//투명일 경우에는 캐럿 이동이나 단어 블록 선택 후 마우스 클릭시에도 화면갱신이 필요하다.
-			update_ctrl();
-			break;
+		//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
+		switch (pMsg->wParam)
+		{
+			//WANT_RETURN이 아니라면 입력 완료 리턴 메시지를 parent에게 전달한다.
+			case VK_RETURN:
+				if (!(GetStyle() & ES_WANTRETURN))
+				{
+					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&CSCEditMessage(this, WM_KILLFOCUS), 0);
+					return false;
+				}
+				break;
+			//case WM_KEYDOWN:
+			//	//TRACE(_T("keydown on CSCEdit. key = %d\n"), (int)pMsg->wParam);
+			//	break;
+			//case WM_LBUTTONDOWN:
+			//	//투명일 경우에는 캐럿 이동이나 단어 블록 선택 후 마우스 클릭시에도 화면갱신이 필요하다.
+			//	update_ctrl();
+			//	break;
+		}
 	}
 
 	return CEdit::PreTranslateMessage(pMsg);
@@ -708,10 +720,11 @@ void CSCEdit::update_ctrl()
 
 BOOL CSCEdit::OnEnKillfocus()
 {
-	//TRACE(_T("OnEnKillfocus\n"));
+	TRACE(_T("OnEnKillfocus\n"));
 	update_ctrl();
 	draw_dim_text();
-	::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
+	//::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
+	::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&(CSCEditMessage(this, WM_KILLFOCUS)), 0);
 	return FALSE;
 }
 

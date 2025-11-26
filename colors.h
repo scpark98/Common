@@ -411,7 +411,10 @@ Gdiplus::Color	get_gcolor_from_hexadecimal(CString cr);
 
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 //#FF0000과 같이 리턴받고자 한다면 prefix = _T("#")으로 호출한다.
-CString			get_color_string(COLORREF cr, bool upper_case = true, CString prefix = _T(""));
+CString			get_color_hexa_str(COLORREF cr, bool upper_case = true, CString prefix = _T(""));
+
+//include_alpha = true이면 16진수 RRGGGBBAA, false이면 RRGGGBB
+CString			get_color_hexa_str(Gdiplus::Color cr, bool upper_case = true, bool include_alpha = true);
 
 //보색
 COLORREF		get_complementary_color(COLORREF cr);
@@ -468,6 +471,11 @@ extern COLORREF g_default_color[16];
 class CSCColorTheme
 {
 public:
+	CSCColorTheme()
+	{
+		CSCColorTheme(NULL);
+	}
+
 	CSCColorTheme(CWnd* pWnd, int theme = color_theme_default)
 	{
 		m_parent = pWnd;
@@ -754,7 +762,8 @@ public:
 
 		if (!exactly)
 		{
-			if (distance == 0.0f)
+			//alpha가 255면 완전히 해당 색상과 일치하지만 255가 아니라면 near라고 표시해줘야 한다.
+			if (distance == 0.0f && cr.GetA() == 255)
 				return color_name;
 			else
 				return "near : " + color_name;

@@ -27,7 +27,7 @@ public:
 
 	int				m_type = 0;
 	Gdiplus::RectF	m_r;
-	int				m_round = 0;
+	float			m_round[4] = { 0.f, 0.f, 0.f, 0.f };
 
 	CString			m_label;
 	UINT			m_label_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
@@ -39,7 +39,7 @@ public:
 	Gdiplus::Color	m_cr_label = Gdiplus::Color::Black;
 	Gdiplus::Color	m_cr_label_back = Gdiplus::Color::Transparent;
 
-
+	float			m_stroke_thickness = 1.0f;
 	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::RoyalBlue;// LightGray;
 	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;// Transparent;
 

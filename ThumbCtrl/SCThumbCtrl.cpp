@@ -1333,14 +1333,13 @@ void CSCThumbCtrl::set_font_bold(bool bBold)
 
 LRESULT CSCThumbCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 {
-	CSCEdit* pEdit = (CSCEdit*)wParam;
-	int	msg = (int)lParam;
+	CSCEditMessage* msg = (CSCEditMessage*)wParam;
 
-	if (!pEdit->IsWindowVisible())
+	if (!msg->pThis->IsWindowVisible())
 		return 0;
-
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
-	if (msg == WM_KILLFOCUS)
+	
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
+	if (msg->message == WM_KILLFOCUS)
 		edit_end();
 
 	Invalidate();

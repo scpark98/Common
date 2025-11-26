@@ -13,7 +13,7 @@
 //.ico가 아닌 png 이미지들을 앞에 그려주고 필요에 따라 변경되도록 하기 위해 사용.
 #include "../../SCGdiplusBitmap.h"
 #include "../../data_structure/SCParagraph/SCParagraph.h"
-
+#include "../../CEdit/SCEdit/SCEdit.h"
 /*
 //scpark
 
@@ -74,6 +74,31 @@ m_static1.set_gradient_color(RED);
 
 typedef UINT (CALLBACK* LPFNDLLFUNC1)(HDC,CONST PTRIVERTEX,DWORD,CONST PVOID,DWORD,DWORD);
 
+static const UINT Message_CSCStatic = ::RegisterWindowMessage(_T("MessageString_CSCStatic"));
+
+class CSCStatic;
+
+class CSCStaticMsg
+{
+public:
+	CSCStaticMsg(int _msg, CSCStatic* _this, CString  _sValue = _T(""), int _nValue = 0)
+	{
+		pThis = _this;
+		msg = _msg;
+		sValue = _sValue;
+		nValue = _nValue;
+	}
+
+	enum CSCStaticMsgs
+	{
+		msg_text_value_changed,
+	};
+
+	CSCStatic* pThis = NULL;
+	int		msg;
+	CString	sValue;
+	int		nValue;
+};
 
 class CSCStatic : public CStatic
 {
@@ -87,6 +112,9 @@ public:
 	//동적생성시에 사용
 	BOOL			create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID = 0xffff);
 	
+	//설정된 속성들을 동일한 종류의 대상 컨트롤에 그대로 적용할 때 사용된다. text는 제외된다.
+	void			copy_properties(CSCStatic& dst);
+
 	void			set_transparent(bool bTransparent = true, Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 	void			SetWindowText(CString sText) { set_text(sText); }
 
@@ -97,6 +125,20 @@ public:
 	//초기 버전에서는 첫번째 파라미터로 컬러를 주고 그 값이 -1이면 default text color를 사용하도록 구현했었으나
 	//-1 비교가 제대로 되지 않아 우선 제거함.
 	void			set_textf(LPCTSTR format, ...);
+
+
+//자체 편집 기능
+	//편집 기능 허용. click으로 편집시작, esc, return, 다른 항목 클릭으로 편집 종료된다.
+	void			set_use_edit(bool use = true);
+	void			set_text_value(CString text_value = _T(""));
+
+	//label + value로 표시하는 경우 value 편집할 때 CEdit의 색상을 지정한다.
+	void			set_edit_text_color(Gdiplus::Color cr_edit_text = Gdiplus::Color::Transparent);
+	void			set_edit_back_color(Gdiplus::Color cr_edit_back = Gdiplus::Color::Transparent);
+	void			edit_begin();
+	void			edit_end(bool valid);
+	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+
 
 	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등으로 치환하여 리턴
 	DWORD			get_text_align();
@@ -194,8 +236,8 @@ public:
 	void			set_font_italic(bool italic = true);
 	void			set_font_antialiased(bool antiAliased = true);
 
-	void			set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
-	bool			is_bold() { return m_bFontBold; }
+	//void			set_font_width(int nFontWidth) { m_nFontWidth = nFontWidth; Invalidate(); }
+	//bool			is_bold() { return m_bFontBold; }
 	void			set_font(CFont* font);
 
 	void			set_border_thick(int thick) { m_border_thick = thick; Invalidate(); }
@@ -259,8 +301,8 @@ public:
 //tooltip
 	//기본적인 툴팁은 이 컨트롤 내에서 지원하지만
 	//disabled인 컨트롤은 main의 PreTranslateMessage()에서 처리하지 않으면 나타나지 않는다.
-	void		use_tooltip(bool use) { m_use_tooltip = use; }
-	void		set_tooltip_text(CString text);
+	void			use_tooltip(bool use) { m_use_tooltip = use; }
+	void			set_tooltip_text(CString text);
 
 
 protected:
@@ -275,6 +317,10 @@ protected:
 	CRect			m_rect_text;
 	int				m_text_extent = 0;	//텍스트의 크기
 
+	CSCEdit			m_edit;
+	bool			m_use_edit = false;
+	CString			m_text_value;		//m_use_edit = true이면 label + value로 표시되는데 이 때 value의 내용이 저장된다.
+
 	enum ENUM_TIMER
 	{
 		TIMER_BLINK = 0,
@@ -282,13 +328,16 @@ protected:
 	};
 
 	CBitmap			m_Bmp;
-	CString			m_sFontName;
-	int				m_nFontSize;
+
 	bool			m_auto_font_size = false;
-	int				m_nFontWidth;
-	bool			m_bFontBold;
-	bool			m_bFontUnderline;
-	bool			m_bFontAntiAliased;
+	
+	//font관련 변수는 모두 m_lf로 대체함.
+	//CString			m_sFontName;
+	//int				m_nFontSize;
+	//int				m_nFontWidth;
+	//bool			m_bFontBold;
+	//bool			m_bFontUnderline;
+	//bool			m_bFontAntiAliased;
 
 	//gradient background fill
 	std::deque<Gdiplus::Color> m_crGradient;
@@ -308,6 +357,8 @@ protected:
 
 	Gdiplus::Color	m_cr_text = Gdiplus::Color::Black;
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::White;
+	Gdiplus::Color	m_cr_edit_text = gGRAY(32);	//편집모드일때 edit의 text color
+	Gdiplus::Color	m_cr_edit_back = m_cr_back;	//편집모드일때 edit의 back color. 기본값은 m_cr_back과 동일하다.
 	bool			m_transparent;		//default = false
 	Gdiplus::Color	m_cr_parent_back = Gdiplus::Color::Transparent;
 

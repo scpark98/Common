@@ -1813,7 +1813,7 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CSCEdit;
-		m_pEdit->Create(dwStyle | WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, IDC_EDIT_CELL);
+		m_pEdit->create(dwStyle | WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, IDC_EDIT_CELL);
 	}
 
 	//ES_MULTILINE, ES_LEFT, ES_CENTER, ES_RIGHT 등은 동적변경이 불가능한 스타일이므로

@@ -1745,15 +1745,15 @@ cv::Rect	inflateRect( int x, int y, int w, int h, int offsetX, int offsetY )
 
 void cvAdjustRectRange(cv::Rect &rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize)
 {
-	int32_t l = rect.x;
-	int32_t t = rect.y;
-	int32_t r = rect.x + rect.width;
-	int32_t b = rect.y + rect.height;
+	float l = rect.x;
+	float t = rect.y;
+	float r = rect.x + rect.width;
+	float b = rect.y + rect.height;
 	adjust_rect_range(&l, &t, &r, &b, minx, miny, maxx, maxy, bRetainSize);
-	rect.x = l;
-	rect.y = t;
-	rect.width = r - l;
-	rect.height = b - t;
+	rect.x = (int)l;
+	rect.y = (int)t;
+	rect.width = (int)(r - l);
+	rect.height = (int)(b - t);
 }
 
 void cvRectSetNull(cv::Rect &r)

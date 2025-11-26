@@ -48,7 +48,7 @@ void CSCUIElement::copy(CSCUIElement* dst)
 {
 	dst->m_type = m_type;
 	dst->m_r = m_r;
-	dst->m_round = m_round;
+	memcpy(&dst->m_round, &m_round, sizeof(float) * 4);
 	dst->m_label = m_label;
 	dst->m_label_visible = m_label_visible;
 	dst->m_label_align = m_label_align;

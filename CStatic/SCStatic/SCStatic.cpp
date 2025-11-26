@@ -6,6 +6,8 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 
+#include <afxdlgs.h>
+#include <afxcolordialog.h>
 // CSCStatic
 
 IMPLEMENT_DYNAMIC(CSCStatic, CStatic)
@@ -29,11 +31,11 @@ CSCStatic::CSCStatic()
 	}
 	*/
 
-	m_sFontName		= _T("");
-	m_nFontSize		= 0;
-	m_nFontWidth	= 0;
-	m_bFontBold		= false;
-	m_bFontUnderline= false;
+	//m_sFontName		= _T("");
+	//m_nFontSize		= 0;
+	//m_nFontWidth	= 0;
+	//m_bFontBold		= false;
+	//m_bFontUnderline= false;
 
 	m_bBlink		= FALSE;
 	m_bBlinkStatus	= FALSE;
@@ -77,10 +79,11 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 	ON_WM_ERASEBKGND()
 	ON_WM_TIMER()
 	//}}AFX_MSG_MAP
-ON_WM_WINDOWPOSCHANGED()
-ON_WM_SIZE()
-ON_WM_LBUTTONDOWN()
-ON_WM_SETCURSOR()
+	ON_WM_WINDOWPOSCHANGED()
+	ON_WM_SIZE()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_SETCURSOR()
+	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCStatic::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
@@ -90,6 +93,51 @@ BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* 
 	reconstruct_font();
 
 	return res;
+}
+
+//설정된 속성들을 동일한 종류의 대상 컨트롤에 그대로 적용할 때 사용된다. text는 제외된다.
+void CSCStatic::copy_properties(CSCStatic& dst)
+{
+	memcpy(&dst.m_lf, &m_lf, sizeof(LOGFONT));
+	dst.reconstruct_font();
+
+	dst.m_auto_font_size = m_auto_font_size;
+	dst.m_crGradient.assign(m_crGradient.begin(), m_crGradient.end());
+	dst.m_bGradient = m_bGradient;
+	dst.m_bVertical = m_bVertical;
+	dst.m_draw_border;
+	dst.m_border_thick;
+	dst.m_cr_border;
+	dst.m_bSunken;
+	dst.m_cr_text = m_cr_text;
+	dst.m_cr_back = m_cr_back;
+	dst.m_cr_edit_text = m_cr_edit_text;
+	dst.m_cr_edit_back = m_cr_edit_back;
+	dst.m_transparent = m_transparent;
+
+	dst.m_round = m_round;
+	dst.m_cr_border = m_cr_border;
+	dst.m_cr_parent_back = m_cr_parent_back;
+	dst.set_round(dst.m_round, dst.m_cr_border, dst.m_cr_parent_back);
+
+	dst.m_cr_parent_back = m_cr_parent_back;
+
+	dst.m_cr_link = m_cr_link;
+	dst.m_dwStyle = m_dwStyle;
+	dst.ModifyStyle(0, m_dwStyle);
+	dst.m_nPrefixSpace = m_nPrefixSpace;
+	dst.m_halign = m_halign;
+	dst.m_valign = m_valign;
+
+	dst.m_margin = m_margin;
+
+	dst.m_header_images.assign(m_header_images.begin(), m_header_images.end());
+
+	dst.m_image_left_align_fix = m_image_left_align_fix;
+	dst.m_use_tooltip = m_use_tooltip;
+
+	dst.m_use_edit = m_use_edit;
+	dst.set_use_edit(dst.m_use_edit);
 }
 
 void CSCStatic::PreSubclassWindow() 
@@ -574,9 +622,32 @@ void CSCStatic::OnPaint()
 			//DT_WORDBREAK를 기본 제외시켰던 이유는 CStatic이 기본 WORDBREAK 스타일을 사용하지 않기 때문이기도 하고
 			//m_rect_text를 정확히 계산하기 위함도 있었으나 m_rect_text이 실제 텍스트가 출력되는 영역으로 세팅되는지는
 			//다시 확인이 필요하다.
-			dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
-			//DrawShadowText(dc.GetSafeHdc(), sSpace + m_text, CString(sSpace + m_text).GetLength(), m_rect_text,
-			//	DT_CENTER | DT_TOP | DT_NOCLIP, m_cr_text.ToCOLORREF(), 0, 2, 1);
+
+			//text가 "color picker"일 경우는 해당 색상을 사각형으로 표시하고 필드값은 색상값을 표시하는 형태로 동작한다.
+			if (m_text == _T("color picker"))
+			{
+				CRect rcolor = rc;
+				rcolor.left = 4;
+				rcolor.right = rcolor.left + 12;
+				rcolor.top = rcolor.CenterPoint().y - 6;
+				rcolor.bottom = rcolor.top + 12;
+				draw_round_rect(&g, CRect_to_gpRect(rcolor), Gdiplus::Color::Transparent, m_cr_text, 1);
+				//dc.FillSolidRect(rcolor, m_cr_text.ToCOLORREF());
+				m_text_extent = rcolor.right;
+			}
+			else
+			{
+				dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
+			}
+
+			//m_text_value가 있다면 출력해준다.
+			if (m_use_edit && !m_text_value.IsEmpty())
+			{
+				CRect rvalue = rc;
+				rvalue.left += (m_text_extent + 8);
+				dc.SetTextColor(m_cr_edit_text.ToCOLORREF());
+				dc.DrawText(m_text_value, rvalue, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+			}
 		}
 	}
 
@@ -634,6 +705,63 @@ void CSCStatic::set_textf(LPCTSTR format, ...)
 	text.FormatV(format, args);
 
 	set_text(text);
+}
+
+//편집 기능 허용. click으로 편집시작, esc, return, 다른 항목 클릭으로 편집 종료된다.
+void CSCStatic::set_use_edit(bool use)
+{
+	m_use_edit = use;
+
+	if (m_use_edit)
+	{
+		if (m_edit.m_hWnd == NULL)
+		{
+			DWORD dwStyle = ES_LEFT | /*WS_BORDER |*/ WS_CHILD | /*| ES_AUTOHSCROLL |  ES_AUTOVSCROLL |*/ ES_MULTILINE;
+			m_edit.create(dwStyle, CRect(0, 0, 1, 1), this, 0);
+			m_edit.set_font_name(m_lf.lfFaceName);
+			m_edit.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));
+			m_edit.set_font_bold(m_lf.lfWeight);
+		}
+	}
+	else
+	{
+		m_edit.DestroyWindow();
+	}
+}
+
+void CSCStatic::set_text_value(CString text_value)
+{
+	m_text_value = text_value;
+	Invalidate();
+}
+
+void CSCStatic::edit_begin()
+{
+	CRect rc;
+	GetClientRect(rc);
+	CRect r(m_text_extent + 4, 3, rc.right - 2, rc.bottom - 2);
+	m_edit.MoveWindow(r);
+
+	m_edit.set_text_color(m_cr_edit_text);
+	m_edit.set_back_color(m_cr_edit_back);
+	m_edit.set_text(m_text_value);
+
+	m_edit.ShowWindow(SW_SHOW);
+	m_edit.SetSel(0, -1);
+	m_edit.SetFocus();
+}
+
+void CSCStatic::edit_end(bool valid)
+{
+	m_edit.ShowWindow(SW_HIDE);
+
+	if (!valid)
+		return;
+
+	m_text_value = m_edit.get_text();
+	Invalidate();
+
+	::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&CSCStaticMsg(CSCStaticMsg::msg_text_value_changed, this, m_text_value), 0);
 }
 
 DWORD CSCStatic::get_text_align()
@@ -947,6 +1075,29 @@ BOOL CSCStatic::PreTranslateMessage(MSG* pMsg)
 		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
 	}
 
+	if (pMsg->message == WM_KEYDOWN)
+	{
+		/*
+		switch (pMsg->wParam)
+		{
+			case VK_RETURN:
+				if (GetFocus() == &m_edit)
+				{
+					edit_end(true);
+					return TRUE;
+				}
+				break;
+			case VK_ESCAPE:
+				if (GetFocus() == &m_edit)
+				{
+					edit_end(false);
+					return TRUE;
+				}
+				break;
+		}
+		*/
+	}
+
 /*
 	if (pMsg->message == WM_KEYDOWN)
 	{
@@ -1130,10 +1281,10 @@ void CSCStatic::set_auto_font_size(bool auto_font_size)
 		get_auto_font_size(this, rc, m_text, &m_lf);
 		reconstruct_font();
 	}
-	else
-	{
-		set_font_size(m_nFontSize);
-	}
+	//else
+	//{
+	//	set_font_size(m_nFontSize);
+	//}
 }
 
 void CSCStatic::set_font_bold(int weight)
@@ -1159,8 +1310,8 @@ void CSCStatic::set_font_italic(bool italic)
 
 void CSCStatic::set_font_antialiased(bool bAntiAliased)
 {
-	m_bFontAntiAliased = bAntiAliased;
-	m_lf.lfQuality = (m_bFontAntiAliased ? ANTIALIASED_QUALITY : DEFAULT_QUALITY);
+	//m_bFontAntiAliased = bAntiAliased;
+	m_lf.lfQuality = (bAntiAliased ? ANTIALIASED_QUALITY : DEFAULT_QUALITY);
 	reconstruct_font();
 	update_surface();
 }
@@ -1177,12 +1328,27 @@ void CSCStatic::set_text_color(Gdiplus::Color cr_text)
 void CSCStatic::set_back_color(Gdiplus::Color cr_back)
 {
 	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
+	{
 		m_cr_back = cr_back;
+		m_cr_edit_back = cr_back;
+	}
 
 	if (m_round <= 0)
 		m_transparent = false;
 
 	Invalidate();
+}
+
+//label + value로 표시하는 경우 value 편집할 때 CEdit의 색상을 지정한다.
+void CSCStatic::set_edit_text_color(Gdiplus::Color cr_edit_text)
+{
+	if (cr_edit_text.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_edit_text = cr_edit_text;
+}
+void CSCStatic::set_edit_back_color(Gdiplus::Color cr_edit_back)
+{
+	if (cr_edit_back.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_edit_back = cr_edit_back;
 }
 
 void CSCStatic::set_gradient(bool bGradient)
@@ -1388,6 +1554,26 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		ShellExecute(NULL, _T("open"), m_link_url, 0, 0, SW_SHOWNORMAL);
 	}
+	else if (m_use_edit)
+	{
+		if (m_text == _T("color picker") && (point.x < 20))
+		{
+			COLORREF cr = RGB(m_cr_text.GetR(), m_cr_text.GetG(), m_cr_text.GetB());
+			CMFCColorDialog dlg(cr, 0, this);
+			if (dlg.DoModal() == IDOK)
+			{
+				cr = dlg.GetColor();
+				m_cr_text.SetFromCOLORREF(cr);
+				m_text_value.Format(_T("%d, %d, %d"), GetRValue(cr), GetGValue(cr), GetBValue(cr));
+				Invalidate();
+				::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&CSCStaticMsg(CSCStaticMsg::msg_text_value_changed, this, m_text_value), 0);
+			}
+		}
+		else
+		{
+			edit_begin();
+		}
+	}
 
 	CStatic::OnLButtonDown(nFlags, point);
 }
@@ -1432,4 +1618,20 @@ CRect CSCStatic::get_rect()
 	parent->ScreenToClient(r);
 
 	return r;
+}
+
+LRESULT CSCStatic::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+{
+	CSCEditMessage* msg = (CSCEditMessage*)wParam;
+
+	if (!msg->pThis->IsWindowVisible())
+		return 0;
+
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
+	if (msg->message == WM_KILLFOCUS)
+		edit_end(true);
+
+	Invalidate();
+
+	return 0;
 }

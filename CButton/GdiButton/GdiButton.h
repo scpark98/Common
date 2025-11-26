@@ -180,8 +180,7 @@ public:
 	//기존 CButton::SetButtonStyle 함수를 overriding하여 OWNER_DRAW를 추가시켜줘야 한다.
 	void		SetButtonStyle(UINT nStyle, BOOL bRedraw = 1);
 
-	//현재 설정된 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
-	//text는 제외된다.
+	//설정된 속성들을 동일한 종류의 대상 컨트롤에 그대로 적용할 때 사용된다. text는 제외된다.
 	void		copy_properties(CGdiButton& dst);
 
 	//resource editor에서 버튼의 caption을 입력하면 그대로 출력된다.

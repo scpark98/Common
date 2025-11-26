@@ -156,8 +156,7 @@ void CGdiButton::SetButtonStyle(UINT nStyle, BOOL bRedraw)
 	m_button_type = nStyle;
 }
 
-//현재 설정된 GdiButton의 속성들을 모두 세팅한 후 다른 버튼들에도 그대로 적용할 때 사용된다.
-//text는 제외된다.
+//설정된 속성들을 동일한 종류의 대상 컨트롤에 그대로 적용할 때 사용된다. text는 제외된다.
 void CGdiButton::copy_properties(CGdiButton& dst)
 {
 	dst.m_is_3state = m_is_3state;

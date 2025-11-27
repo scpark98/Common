@@ -11272,18 +11272,20 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 		_tcscpy(sFilePath, pe32.szExeFile);
 
 		//전체경로로 검색하는 경우
+#ifndef _USING_V110_SDK71_
 		if (PathFileExists(szFilename))
 		{
 			hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
 
 			if (hProcess != NULL)
 			{
-				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
 			}
 		}
+#endif
 
 		if (_tcsicmp(sFilePath, szFilename) == 0)
 		{
@@ -11330,19 +11332,21 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 		//target_exe_file이 실행 파일명만 있다면 exe 파일명만 비교하고
 		//전체 경로라면 fullpath를 구해서 비교한다.
 		//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
+#ifndef _USING_V110_SDK71_
 		if (target_exe_file.Find('\\') > 0 && PathFileExists(target_exe_file))
 		{
 			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
 
 			if (hProcess)
 			{
-				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
 			}
 		}
 		else
+#endif
 		{
 			_tcscpy_s(sFilePath, _countof(sFilePath), exe_name);
 		}
@@ -11413,8 +11417,10 @@ int	kill_process_by_fullpath(CString fullpath)
 
 			if (hProcess)
 			{
-				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+#ifndef _USING_V110_SDK71_
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
+#endif
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
 
@@ -11449,7 +11455,6 @@ bool is_running(CString processname)
 //권한문제인지 현재 PC에서는 잘 얻어오지만
 //다른 PC에서는 아예 실행조차되지 않는다.
 //우선 보류한다.
-#if 1
 int get_process_running_count(CString processname)
 {
 	if (processname.IsEmpty())
@@ -11482,6 +11487,7 @@ int get_process_running_count(CString processname)
 			//processname이 실행파일명만 있다면 exe 파일명만 비교하고
 			//전체 경로라면 fullpath를 구해서 비교한다.
 			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
+#ifndef _USING_V110_SDK71_
 			if (processname.Find(_T("\\")) > 0 && PathFileExists(processname))
 			{
 				//HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
@@ -11489,8 +11495,8 @@ int get_process_running_count(CString processname)
 
 				if (hProcess)
 				{
-					//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 					::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
+					//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
 					//TRACE(_T("%s\n"), sFilePath);
 					CloseHandle(hProcess);
 				}
@@ -11499,6 +11505,7 @@ int get_process_running_count(CString processname)
 					TRACE(_T("fail to get OpenProcess(). %s\n"), get_error_str(false));
 				}
 			}
+#endif
 
 			if (_tcsicmp(sFilePath, processname) == 0)
 				running_count++;
@@ -11509,57 +11516,6 @@ int get_process_running_count(CString processname)
 
 	return running_count;
 } 
-#else
-
-int get_process_running_count(CString processname)
-{
-	DWORD dwSize = 250;
-	HANDLE hSnapShot;
-	PROCESSENTRY32 pEntry;
-	BOOL bCrrent = FALSE;
-
-	hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
-
-	pEntry.dwSize = sizeof(pEntry);
-	// 실행중인 프로세스들의 첫번재 정보를 가져온다.
-	Process32First(hSnapShot, &pEntry);
-
-	int procCount = 0;
-	// Process 가 실행중인지 확인
-	while (1)
-	{
-		// 다음번 프로세스의 정보를 가져온다.
-		BOOL hRes = Process32Next(hSnapShot, &pEntry);
-
-		if (hRes == FALSE)
-			break;
-
-		//권한이 없을 경우 특정 프로세스들은 OpenProcess()가 NULL을 리턴한다.
-		//간단히 해당 프로세스 카운트만 얻어온다면 OpenProcess()를 호출하지 말자.
-		//권한을 주고 얻어와야 한다면 AdjustTokenPrivileges 등을 이용해야 한다.
-		//if (pEntry.th32ProcessID != 0)
-		//{
-		//	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pEntry.th32ProcessID);
-		//	DbgOutA(_T("hProcess = %p, process = %s, id = %d"), hProcess, pEntry.szExeFile, pEntry.th32ProcessID);
-
-		//}
-		//else
-		//{
-		//}
-
-		if (_tcscmp(pEntry.szExeFile, processname) == 0)
-		{
-			//CloseHandle(hSnapShot);
-			//return TRUE;
-			procCount++;
-		}
-	}
-
-	CloseHandle(hSnapShot);
-	return procCount;
-}
-#endif
-
 
 bool KillProcess(CString szFilename)
 {

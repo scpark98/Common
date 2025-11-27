@@ -41,7 +41,7 @@ public:
 
 	float			m_stroke_thickness = 1.0f;
 	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::RoyalBlue;// LightGray;
-	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;// Transparent;
+	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Gray;// Transparent;
 
 	bool			m_selected = false;
 

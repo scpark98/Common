@@ -119,9 +119,9 @@ void CSCLog::set_log_level(int log_level)
 	logWrite(_T("set_log_level = %d"), m_log_level);
 }
 
-//프로그램 시작 시 일반적인 정보를 로그에 기록하면서 시작한다.
-//소멸자에서는 write_end_log()가 자동으로 불려지지만
-//생성자에서는 아직
+//프로그램 시작 시 일반적인 정보를 로그에 기록한다.
+//시작 단락 표시, exe path, file version, built time을 기록한다.
+//write_end_log()는 소멸자에서 자동으로 불려지므로 수동 호출하지 말 것!
 void CSCLog::write_start_log()
 {
 	logWrite(_T("\n==================== Program Start ===================="));

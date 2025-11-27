@@ -100,8 +100,9 @@ public:
 	bool		set(CString log_folder = _T(""), CString file_title = _T(""), int show_log_level = SCLOG_LEVEL_RELEASE);
 	void		set_log_level(int log_level = SCLOG_LEVEL_RELEASE);
 
-	//프로그램 시작 시 일반적인 정보를 로그에 기록하면서 시작한다.
+	//프로그램 시작 시 일반적인 정보를 로그에 기록한다.
 	//시작 단락 표시, exe path, file version, built time을 기록한다.
+	//write_end_log()는 소멸자에서 자동으로 불려지므로 수동 호출하지 말 것!
 	void		write_start_log();
 
 	//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.

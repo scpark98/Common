@@ -105,10 +105,8 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 	dst.m_crGradient.assign(m_crGradient.begin(), m_crGradient.end());
 	dst.m_bGradient = m_bGradient;
 	dst.m_bVertical = m_bVertical;
-	dst.m_draw_border;
-	dst.m_border_thick;
-	dst.m_cr_border;
-	dst.m_bSunken;
+
+	dst.m_bSunken = m_bSunken;
 	dst.m_cr_text = m_cr_text;
 	dst.m_cr_back = m_cr_back;
 	dst.m_cr_edit_text = m_cr_edit_text;
@@ -116,11 +114,14 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 	dst.m_transparent = m_transparent;
 
 	dst.m_round = m_round;
-	dst.m_cr_border = m_cr_border;
+	dst.m_cr_parent_back = m_cr_parent_back;
 	dst.m_cr_parent_back = m_cr_parent_back;
 	dst.set_round(dst.m_round, dst.m_cr_border, dst.m_cr_parent_back);
 
-	dst.m_cr_parent_back = m_cr_parent_back;
+
+	dst.m_draw_border = m_draw_border;
+	dst.m_border_thick = m_border_thick;
+	dst.m_cr_border = m_cr_border;
 
 	dst.m_cr_link = m_cr_link;
 	dst.m_dwStyle = m_dwStyle;
@@ -673,6 +674,13 @@ void CSCStatic::set_transparent(bool transparent, Gdiplus::Color cr_parent_back)
 		m_cr_parent_back = cr_parent_back;
 
 	Invalidate();
+}
+
+CString CSCStatic::get_text()
+{
+	CString text;
+	GetWindowText(text);
+	return text;
 }
 
 CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color /*-1*/)

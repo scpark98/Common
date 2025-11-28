@@ -33,7 +33,7 @@ void CSCUIElement::set(CRect r, CString label)
 void CSCUIElement::set(Gdiplus::RectF r, CString label)
 {
 	m_r = r;
-	m_label = label;
+	m_text = label;
 }
 
 bool CSCUIElement::pt_in_rect(float x, float y)
@@ -49,9 +49,18 @@ void CSCUIElement::copy(CSCUIElement* dst)
 	dst->m_type = m_type;
 	dst->m_r = m_r;
 	memcpy(&dst->m_round, &m_round, sizeof(float) * 4);
-	dst->m_label = m_label;
-	dst->m_label_visible = m_label_visible;
-	dst->m_label_align = m_label_align;
+
+	dst->m_text = m_text;
+	dst->m_text_visible = m_text_visible;
+	dst->m_text_align = m_text_align;
+	dst->m_cr_text = m_cr_text;
+	dst->m_cr_back = m_cr_back;
+
+	dst->m_font_name = m_font_name;
+	dst->m_font_size = m_font_size;
+	dst->m_font_bold = m_font_bold;
+
+	dst->m_stroke_thickness = m_stroke_thickness;
 	dst->m_cr_stroke = m_cr_stroke;
 	dst->m_cr_fill = m_cr_fill;
 }

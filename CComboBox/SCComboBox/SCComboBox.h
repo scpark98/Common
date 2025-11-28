@@ -21,6 +21,10 @@ public:
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void			set_color_theme(int theme);
 
+
+	//font combo로 동작한다. add, delete, 기본 font 변경등은 모두 무시된다.
+	void			set_font_combo();
+
 	CString			get_text();
 
 	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
@@ -61,11 +65,15 @@ protected:
 	//-1이면 폰트크기에 따라 자동 조정
 	int				m_line_height = -1;
 
+	CBrush			m_br_back;
+
 //폰트 관련
 	LOGFONT			m_lf;
 	CFont			m_font;
 	int				m_font_size;
 	void			reconstruct_font();
+
+	bool			m_is_font_combo = false;
 
 //편집 관련
 	//bool			m_use_edit = false;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
@@ -88,7 +96,7 @@ protected:
 	//PreSubclassWindow()에서 툴팁을 초기화하려니 예외가 발생함.
 	//그래서 Create()후에 별도로 prepare_tooltip()을 호출하여 준비되도록 수정.
 	//동적 생성한 컨트롤에서도 정상 표시됨을 확인함.
-	void		prepare_tooltip();
+	void			prepare_tooltip();
 
 	DECLARE_MESSAGE_MAP()
 public:
@@ -110,6 +118,7 @@ public:
 	afx_msg void OnCbnSelendok();
 	afx_msg void OnCbnSelendcancel();
 	afx_msg HBRUSH CtlColor(CDC* /*pDC*/, UINT /*nCtlColor*/);
+	HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnNcPaint();
 };

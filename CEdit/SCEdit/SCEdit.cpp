@@ -442,7 +442,7 @@ CSCEdit& CSCEdit::set_font_size( int nSize )
 	return *this;
 }
 
-CSCEdit& CSCEdit::set_font_bold(int weight)
+CSCEdit& CSCEdit::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
 	reconstruct_font();
@@ -533,6 +533,9 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 
 	if (pMsg->message == WM_KEYDOWN)
 	{
+		if (!IsWindowVisible())
+			return false;
+
 		//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
 		switch (pMsg->wParam)
 		{

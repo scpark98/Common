@@ -131,7 +131,7 @@ public:
 
 	virtual	CSCEdit&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	virtual CSCEdit&		set_font_size(int nSize);
-	virtual CSCEdit&		set_font_bold(int weight = FW_BOLD);
+	virtual CSCEdit&		set_font_weight(int weight = FW_BOLD);
 	virtual CSCEdit&		set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
 	void					recalc_font_size();						//recalculate font height when control size is changed.
 	int						get_font_size(bool pixel_size = false);

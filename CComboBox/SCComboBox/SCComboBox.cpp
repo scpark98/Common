@@ -49,54 +49,47 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_CONTROL_REFLECT_EX(CBN_SELCHANGE, &CSCComboBox::OnCbnSelchange)
 	ON_CONTROL_REFLECT(CBN_SELENDOK, &CSCComboBox::OnCbnSelendok)
 	ON_CONTROL_REFLECT(CBN_SELENDCANCEL, &CSCComboBox::OnCbnSelendcancel)
-	//ON_WM_CTLCOLOR_REFLECT()
 	//ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
 	ON_WM_NCPAINT()
+	ON_WM_CTLCOLOR()
+	ON_WM_CTLCOLOR_REFLECT()
 END_MESSAGE_MAP()
 
 
 
 // CColorComboBox 메시지 처리기입니다.
-
-
-
-
-/*
-HBRUSH CColorComboBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+HBRUSH CSCComboBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
-	HBRUSH hbr = CComboBox::OnCtlColor(pDC, pWnd, nCtlColor);
+	return CtlColor(pDC, nCtlColor);
+}
 
+HBRUSH CSCComboBox::CtlColor(CDC* pDC, UINT nCtlColor)
+{
 	// TODO:  여기서 DC의 특성을 변경합니다.
-	//CTLCOLOR_LISTBOX
-
 	pDC->SetBkMode(TRANSPARENT);
 
-	if ( nCtlColor == CTLCOLOR_EDIT )
+	//if (nCtlColor == CTLCOLOR_EDIT)
+	//{
+	//	pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
+	//	pDC->SetDCBrushColor(m_theme.cr_back.ToCOLORREF());
+	//}
+	//else
 	{
-		pDC->SetTextColor( RGB(255, 255, 255) );
-		pDC->SetDCBrushColor( RGB(255, 0, 255) );
-
+		pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
+		pDC->SetDCBrushColor(m_theme.cr_back.ToCOLORREF());
 	}
-	else
-	{
-		pDC->SetTextColor( m_crText );
-		pDC->SetDCBrushColor( m_crBack );
-		pDC->SetBkMode(TRANSPARENT);
-	}
-
 	return (HBRUSH)GetStockObject(DC_BRUSH);
 
-
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
-	return hbr;
+	//return hbr;
 }
-*/
 
 void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 {
 	ASSERT(lpDrawItemStruct->CtlType == ODT_COMBOBOX);
 
-	if( lpDrawItemStruct->itemID == -1 ) return;
+	if (lpDrawItemStruct->itemID == -1)
+		return;
 
 	CDC dc;
 	CString    strData;
@@ -109,9 +102,12 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	CRect rItem = lpDrawItemStruct->rcItem;
 
-	Gdiplus::Color cr = GetItemData(lpDrawItemStruct->itemID);
-	if (cr.GetValue() != Gdiplus::Color::Transparent)
-		cr_text = cr.ToCOLORREF();
+	if (!m_is_font_combo)
+	{
+		Gdiplus::Color cr = (Gdiplus::Color)(DWORD)GetItemData(lpDrawItemStruct->itemID);
+		if (cr.GetValue() != Gdiplus::Color::Transparent)
+			cr_text = cr.ToCOLORREF();
+	}
 
 
 	if (lpDrawItemStruct->itemState & ODS_SELECTED)
@@ -129,7 +125,6 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	}
 
 	dc.FillSolidRect(rItem, cr_back);
-
 	dc.SetTextColor(cr_text);
 
 	CRect rtext = rItem;
@@ -137,7 +132,28 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	//TRACE(_T("width = %d\n"), rtext.Width());
 	
 	rtext.DeflateRect(4, 0);
-	dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER );
+
+	if (m_is_font_combo)
+	{
+		// i feel bad creating this font on each draw. but i can't think of a better way (other than creating ALL fonts at once and saving them - yuck
+		CFont cf;
+		if (true)//m_style != NAME_GUI_FONT)
+		{
+			if (!cf.CreateFont(m_font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, strData))
+			{
+				ASSERT(0);
+				return;
+			}
+		}
+
+		HFONT hf = (HFONT)dc.SelectObject(cf);
+		dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+		dc.SelectObject(hf);
+	}
+	else
+	{
+		dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+	}
 
 	dc.Detach();
 }
@@ -342,8 +358,12 @@ void CSCComboBox::set_line_height(int height_logical_unit)
 
 void CSCComboBox::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
+	if (m_is_font_combo)
+		return;
+
 	if (sFontname == _T(""))
 		return;
+
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	reconstruct_font();
@@ -352,6 +372,9 @@ void CSCComboBox::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 //-1 : reduce, +1 : enlarge
 void CSCComboBox::set_font_size(int font_size)
 {
+	if (m_is_font_combo)
+		return;
+
 	if (font_size == 0)
 		return;
 
@@ -371,6 +394,9 @@ void CSCComboBox::set_font_size(int font_size)
 
 void CSCComboBox::set_font_bold(int weight)
 {
+	if (m_is_font_combo)
+		return;
+
 	m_lf.lfWeight = weight;
 	reconstruct_font();
 }
@@ -428,6 +454,9 @@ void CSCComboBox::PreSubclassWindow()
 
 void CSCComboBox::load_history(CWinApp* app, CString section)
 {
+	if (m_is_font_combo)
+		return;
+
 	ResetContent();
 
 	m_reg_section = section;
@@ -456,6 +485,9 @@ void CSCComboBox::load_history(CWinApp* app, CString section)
 
 void CSCComboBox::save_history(CWinApp* app, CString section)
 {
+	if (m_is_font_combo)
+		return;
+
 	m_reg_section = section;
 
 	app->WriteProfileInt(section, _T("history count"), GetCount());
@@ -585,15 +617,6 @@ void CSCComboBox::OnCbnSelendcancel()
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 }
 
-
-HBRUSH CSCComboBox::CtlColor(CDC* /*pDC*/, UINT /*nCtlColor*/)
-{
-	// TODO:  여기서 DC의 특성을 변경합니다.
-
-	// TODO:  부모 처리기가 호출되지 않을 경우 Null이 아닌 브러시를 반환합니다.
-	return NULL;
-}
-
 //resize를 하면 여백이 리셋되므로 다시 여백 설정
 /*
 void CSCComboBox::repos_edit()
@@ -710,6 +733,9 @@ CString CSCComboBox::get_text()
 //현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 {
+	if (m_is_font_combo)
+		return -1;
+
 	int index = -1;
 
 	if (text.IsEmpty())
@@ -722,7 +748,7 @@ int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 	{
 		index = AddString(text);
 		if (cr_text.GetValue() != Gdiplus::Color::Transparent)
-			SetItemData(index, cr_text.GetValue());
+			SetItemData(index, (DWORD)cr_text.GetValue());
 
 		if (!m_reg_section.IsEmpty())
 		{
@@ -800,4 +826,34 @@ void CSCComboBox::set_tooltip_text(CString text)
 
 	m_tooltip->UpdateTipText(m_tooltip_text, this);
 	m_tooltip->AddTool(this, m_tooltip_text);
+}
+
+static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwType, LPARAM lpData)
+{
+	CSCComboBox* pThis = reinterpret_cast<CSCComboBox*>(lpData);
+
+	int index;
+
+	if ((lplf->lfFaceName[0] == '@') || (dwType != TRUETYPE_FONTTYPE))
+		return TRUE;
+	else
+		index = pThis->AddString(lplf->lfFaceName);
+	ASSERT(index != -1);
+
+	//int maxLen = lptm->tmMaxCharWidth * _tcslen(lplf->lfFaceName);
+	//int ret = pThis->SetItemData(index, dwType);
+
+	//ASSERT(ret != -1);
+
+	return TRUE;
+}
+
+//font combo로 동작
+void CSCComboBox::set_font_combo()
+{
+	m_is_font_combo = true;
+
+	CClientDC dc(this);
+
+	EnumFonts(dc, 0, (FONTENUMPROC)EnumFontProc, (LPARAM)this); //Enumerate font
 }

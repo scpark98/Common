@@ -29,15 +29,16 @@ public:
 	Gdiplus::RectF	m_r;
 	float			m_round[4] = { 0.f, 0.f, 0.f, 0.f };
 
-	CString			m_label;
-	UINT			m_label_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
-	bool			m_label_visible = true;
+	CString			m_text;
+	UINT			m_text_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+	bool			m_text_visible = true;
+	Gdiplus::Color	m_cr_text = Gdiplus::Color::Black;
+	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;
 
 	CString			m_font_name = _T("Arial");
 	int				m_font_size = 10;
-	int				m_font_weight = FW_NORMAL;
-	Gdiplus::Color	m_cr_label = Gdiplus::Color::Black;
-	Gdiplus::Color	m_cr_label_back = Gdiplus::Color::Transparent;
+	bool			m_font_bold = false;
+	bool			m_font_italic = false;
 
 	float			m_stroke_thickness = 1.0f;
 	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::RoyalBlue;// LightGray;

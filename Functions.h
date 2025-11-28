@@ -2315,7 +2315,7 @@ h		: 복사할 height 크기(pixel)
 	void		get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz = RECT_RESIZE_HANDLE_SIZE);
 	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 중 pt가 위치한 사각형의 인덱스를 리턴한다.
 	//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
-	//int			get_handle_index(CRect src, CPoint pt, int sz);
+	int			get_handle_index(CRect src, CPoint pt, int sz);
 
 //다각형 polygon 관련
 	//임의 점이 다각형 내에 존재하는지 판별.

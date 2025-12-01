@@ -317,6 +317,7 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		m_br_back.DeleteObject();
 		m_br_back.CreateStockObject(HOLLOW_BRUSH);
 		pDC->SetBkMode(TRANSPARENT);
+		return m_br_back;
 	}
 	else if (GetStyle() & ES_READONLY)
 	{
@@ -772,6 +773,11 @@ BOOL CSCEdit::OnEnSetfocus()
 BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_transparent)
+	{
+		return CEdit::OnEraseBkgnd(pDC);
+	}
+
 	CRect rc;
 	Gdiplus::Color cr_back = m_cr_back;
 	Gdiplus::Color cr_border = m_cr_border;

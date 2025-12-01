@@ -649,24 +649,26 @@ Gdiplus::Color RGB2gpColor(COLORREF cr, BYTE alpha)
 	return Gdiplus::Color(alpha, GetRValue(cr), GetGValue(cr), GetBValue(cr));
 }
 
-//cr컬러에서 a(0), r(1), g(2), b(3) 중 한 색을 value로 변경한다.
-void set_color(Gdiplus::Color &cr, int argb, BYTE value)
+//cr컬러에서 a(0), r(1), g(2), b(3) 중 한 색을 value 값으로 변경하고 그 값도 리턴한다.
+Gdiplus::Color set_color(Gdiplus::Color &cr, int argb_index, BYTE value)
 {
-	BYTE a = (argb == 0 ? value : cr.GetA());
-	BYTE r = (argb == 1 ? value : cr.GetR());
-	BYTE g = (argb == 2 ? value : cr.GetG());
-	BYTE b = (argb == 3 ? value : cr.GetB());
+	BYTE a = (argb_index == 0 ? value : cr.GetA());
+	BYTE r = (argb_index == 1 ? value : cr.GetR());
+	BYTE g = (argb_index == 2 ? value : cr.GetG());
+	BYTE b = (argb_index == 3 ? value : cr.GetB());
 
 	cr = Gdiplus::Color(a, r, g, b);
+	return cr;
 }
-
-Gdiplus::Color get_color(Gdiplus::Color cr, int argb, BYTE value)
+/*
+//cr컬러에서 a(0), r(1), g(2), b(3) 중 한 색을 value 값으로 변경한 값을 리턴해준다.
+Gdiplus::Color get_color(Gdiplus::Color cr, int argb_index, BYTE value)
 {
 	Gdiplus::Color cr_new = cr;
-	set_color(cr_new, argb, value);
+	set_color(cr_new, argb_index, value);
 	return cr_new;
 }
-
+*/
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
 //https://en.wikipedia.org/wiki/Web_colors
 //RGB(255, 190, 200)과 가장 유사한 색은 Pink(255, 192, 203)이라고 보이지만

@@ -321,7 +321,7 @@ public:
 		if (!doc[arr_name][n].HasMember(member))
 			return default;
 
-		TRACE(_T("typename = %S\n"), typeid(T).name());
+		//TRACE(_T("typename = %S\n"), typeid(T).name());
 
 		if constexpr (std::is_same_v<T, int>)
 		{

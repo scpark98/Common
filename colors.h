@@ -451,9 +451,8 @@ COLORREF		hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
 
 Gdiplus::Color	RGB2gpColor(COLORREF cr, BYTE alpha = 255);
 
-//cr컬러에서 a,r,g,b 중 한 색을 value로 변경한다.
-void			set_color(Gdiplus::Color &cr, int argb, BYTE value);
-Gdiplus::Color	get_color(Gdiplus::Color cr, int argb, BYTE value);
+//cr컬러에서 a(0), r(1), g(2), b(3) 중 한 색을 value 값으로 변경하고 그 값도 리턴한다.
+Gdiplus::Color	set_color(Gdiplus::Color &cr, int argb_index, BYTE value);
 
 //red ~ green 범위에서 37%일때의 색상은? get_color(0, 120, 37); (0:red, 120:green of hue)
 //hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)

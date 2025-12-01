@@ -835,9 +835,14 @@ static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTyp
 	int index;
 
 	if ((lplf->lfFaceName[0] == '@') || (dwType != TRUETYPE_FONTTYPE))
+	{
 		return TRUE;
+	}
 	else
+	{
 		index = pThis->AddString(lplf->lfFaceName);
+		TRACE(_T("%s\n"), lplf->lfFaceName);
+	}
 	ASSERT(index != -1);
 
 	//int maxLen = lptm->tmMaxCharWidth * _tcslen(lplf->lfFaceName);

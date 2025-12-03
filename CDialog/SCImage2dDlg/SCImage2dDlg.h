@@ -96,7 +96,8 @@ public:
 		message_image_changed = 0,	//현재 표시되는 이미지가 변경된 경우
 		message_hide_message,
 		message_first_image,		//맨 처음 이미지 표시 중 이전 이미지를 표시하려 한 경우
-		message_last_image,			
+		message_last_image,
+		message_lbuttondown,
 	};
 
 	//레지스트리에 저장된 recent file 정보가 있다면 로딩한다.

@@ -464,6 +464,20 @@ BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
 		case WM_SYSKEYDOWN :
 		case WM_MBUTTONDOWN :
 			return FALSE;
+		/*
+		case WM_LBUTTONDOWN:
+			if (m_fit2ctrl)
+			{
+				return FALSE;
+			}
+			return TRUE;
+		case WM_LBUTTONUP:
+			if (m_fit2ctrl)
+			{
+				return FALSE;
+			}
+			return TRUE;
+		*/
 	}
 
 	if (pMsg->message == WM_KEYDOWN)
@@ -902,6 +916,12 @@ void CSCImage2dDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	else if (m_handle_index >= 0)
 	{
 		m_drawing_roi = false;
+	}
+	else if (m_fit2ctrl)
+	{
+		//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_lbuttondown), 0);
+		::DefWindowProc(GetParent()->GetSafeHwnd(), WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
+		//GetParent()->PostMessage(WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
 	}
 
 	CDialog::OnLButtonDown(nFlags, point);

@@ -102,6 +102,11 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(char*))\
 		TRACE(_T("%s(%d) %S = %S\n"), __function__, __LINE__, #n, n);\
+	else if (typeid(n) == typeid(CPoint))\
+	{\
+		CPoint pt = n;\
+		TRACE(_T("%s(%d) %S = %d, %d\n"), __function__, __LINE__, #n, pt.x, pt.y);\
+	}\
 	else if (typeid(n) == typeid(CString))\
 		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
 	else\
@@ -2090,6 +2095,14 @@ h		: 복사할 height 크기(pixel)
 
 
 //직선, Line 관련 함수
+	//lower >= src <= upper 인지 판별
+	template <class T> bool is_in_range(T src, T lower, T upper)
+	{
+		if (src >= lower && src <= upper)
+			return true;
+
+		return false;
+	}
 
 	//원점에서 벡터 b가 벡터 a의 반시계 방향이면 양수, 시계방향이면 음수, 평행이면 0을 반환 한다.
 	double ccw(vector2 a, vector2 b);

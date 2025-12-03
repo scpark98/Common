@@ -133,7 +133,8 @@ public:
 	//편집 기능 허용. click으로 편집시작, esc, return, 다른 항목 클릭으로 편집 종료된다.
 	void			set_use_edit(bool use = true);
 	CString			get_text_value() { return m_text_value; }
-	void			set_text_value(CString text_value = _T(""));
+	void			set_text_value(CString value = _T(""));
+	void			set_text_value(LPCTSTR format, ...);
 
 	//label + value로 표시하는 경우 value 편집할 때 CEdit의 색상을 지정한다.
 	void			set_edit_text_color(Gdiplus::Color cr_edit_text = Gdiplus::Color::Transparent);

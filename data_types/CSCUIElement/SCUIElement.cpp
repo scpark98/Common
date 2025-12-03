@@ -38,7 +38,10 @@ void CSCUIElement::set(Gdiplus::RectF r, CString label)
 
 bool CSCUIElement::pt_in_rect(float x, float y)
 {
-	if (x >= m_r.X && x <= m_r.GetRight() && y >= m_r.Y && y <= m_r.GetBottom())
+	float r = x <= m_r.GetRight();
+	float b = x <= m_r.GetBottom();
+
+	if ((x >= m_r.X) && (x <= m_r.GetRight()) && (y >= m_r.Y) && (y <= m_r.GetBottom()))
 		return true;
 
 	return false;
@@ -53,6 +56,7 @@ void CSCUIElement::copy(CSCUIElement* dst)
 	dst->m_text = m_text;
 	dst->m_text_visible = m_text_visible;
 	dst->m_text_align = m_text_align;
+	dst->m_text_valign = m_text_valign;
 	dst->m_cr_text = m_cr_text;
 	dst->m_cr_back = m_cr_back;
 

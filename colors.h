@@ -408,6 +408,11 @@ COLORREF		get_color_from_hexadecimal(CString cr);
 Gdiplus::Color	get_gcolor_from_hexadecimal(CString cr);
 
 
+//argb 순서로 "255, 123, 12, 255" 형태의 문자열을 리턴.
+CString			get_RGB_str(Gdiplus::Color cr, CString sep = _T(", "), bool include_alpha = false);
+
+//str = _T("255, 128, 0") 일 경우 token = ", "으로 하여 argb 컬러값을 얻을 수 있다.
+Gdiplus::Color	get_color_from_token_str(CString str, CString separator);
 
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 //#FF0000과 같이 리턴받고자 한다면 prefix = _T("#")으로 호출한다.

@@ -367,6 +367,34 @@ Gdiplus::Color get_gcolor_from_hexadecimal(CString cr_str)
 	return Gdiplus::Color(a, r, g, b);
 }
 
+//argb 순서로 "255, 123, 12, 255" 형태의 문자열을 리턴.
+CString	get_RGB_str(Gdiplus::Color cr, CString sep, bool include_alpha)
+{
+	CString str;
+
+	str.Format(_T("%d%s%d%s%d"), cr.GetR(), sep, cr.GetG(), sep, cr.GetB());
+
+	if (include_alpha)
+		str.Format(_T("%d%s%s"), cr.GetA(), sep, str );
+
+	return str;
+}
+
+//rgb str = _T("255, 128, 0") 또는
+//argb str = _T("255, 255, 128, 0") 일 경우 token = ", "으로 하여 argb 컬러값을 얻을 수 있다.
+Gdiplus::Color get_color_from_token_str(CString str, CString separator)
+{
+	std::deque<CString> token;
+	get_token_string(str, token, separator, false);
+
+	if (token.size() == 3)
+		return Gdiplus::Color(255, _ttoi(token[0]), _ttoi(token[1]), _ttoi(token[2]));
+	else if (token.size() == 4)
+		return Gdiplus::Color(_ttoi(token[0]), _ttoi(token[1]), _ttoi(token[2]), _ttoi(token[3]));
+
+	return Gdiplus::Color();
+}
+
 //컬러값을 "FF0000"과 같은 문자열로 리턴한다.
 CString	get_color_hexa_str(COLORREF cr, bool upper_case, CString prefix)
 {

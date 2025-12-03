@@ -737,9 +737,21 @@ void CSCStatic::set_use_edit(bool use)
 	}
 }
 
-void CSCStatic::set_text_value(CString text_value)
+void CSCStatic::set_text_value(CString text)
 {
-	m_text_value = text_value;
+	m_text_value = text;
+	Invalidate();
+}
+
+void CSCStatic::set_text_value(LPCTSTR format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	CString text;
+
+	text.FormatV(format, args);
+	m_text_value = text;
 	Invalidate();
 }
 

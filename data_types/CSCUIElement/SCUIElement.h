@@ -30,7 +30,8 @@ public:
 	float			m_round[4] = { 0.f, 0.f, 0.f, 0.f };
 
 	CString			m_text;
-	UINT			m_text_align = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+	int				m_text_align = DWRITE_TEXT_ALIGNMENT_CENTER;
+	int				m_text_valign = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
 	bool			m_text_visible = true;
 	Gdiplus::Color	m_cr_text = Gdiplus::Color::Black;
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;

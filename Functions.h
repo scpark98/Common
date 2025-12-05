@@ -2326,6 +2326,7 @@ h		: 복사할 height 크기(pixel)
 	//sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
 	void		get_resizable_handle(CRect src, CRect handle[], int sz = RECT_RESIZE_HANDLE_SIZE);
 	void		get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz = RECT_RESIZE_HANDLE_SIZE);
+	void		get_resizable_handle(Gdiplus::RectF src, std::vector<CRect>* handle, int sz = RECT_RESIZE_HANDLE_SIZE);
 	//src 사각형의 크기조정 및 이동을 위한 9개의 사각형 중 pt가 위치한 사각형의 인덱스를 리턴한다.
 	//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
 	int			get_handle_index(CRect src, CPoint pt, int sz);

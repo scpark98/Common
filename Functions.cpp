@@ -12145,6 +12145,15 @@ void get_resizable_handle(Gdiplus::RectF src, CRect handle[], int sz)
 	get_resizable_handle(gpRectF_to_CRect(src), handle, sz);
 }
 
+void get_resizable_handle(Gdiplus::RectF src, std::vector<CRect>* handle, int sz)
+{
+	handle->clear();
+	CRect r[9];
+	get_resizable_handle(src, r, sz);
+	for (int i = 0; i < RECT_RESIZE_HANDLE_COUNT; i++)
+		handle->push_back(r[i]);
+}
+
 //src 사각형의 크기조정 및 이동을 위한 9개의 사각형 값을 리턴한다. sz는 핸들 크기 한 변의 길이가 아닌 1/2을 의미한다.
 void get_resizable_handle(CRect src, CRect handle[], int sz)
 {

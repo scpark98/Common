@@ -62,7 +62,7 @@ void CSCUIElement::copy(CSCUIElement* dst)
 
 	dst->m_font_name = m_font_name;
 	dst->m_font_size = m_font_size;
-	dst->m_font_bold = m_font_bold;
+	dst->m_font_weight = m_font_weight;
 
 	dst->m_stroke_thickness = m_stroke_thickness;
 	dst->m_cr_stroke = m_cr_stroke;

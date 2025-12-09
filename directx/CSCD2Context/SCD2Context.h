@@ -38,6 +38,8 @@ public:
 
 	HRESULT						on_size_changed(int cx, int cy);
 
+	//ID2D1PathGeometry*			create_round_rect(int x, int y, int width, int height, int leftTop, int rightTop, int rightBottom, int leftBottom);
+
 protected:
 	HWND						m_hWnd;
 	ComPtr<ID2D1Factory1>       m_d2factory;

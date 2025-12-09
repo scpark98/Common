@@ -38,7 +38,7 @@ public:
 
 	CString			m_font_name = _T("Arial");
 	int				m_font_size = 10;
-	bool			m_font_bold = false;
+	int				m_font_weight = DWRITE_FONT_WEIGHT_BOLD;
 	bool			m_font_italic = false;
 
 	float			m_stroke_thickness = 1.0f;
@@ -46,6 +46,5 @@ public:
 	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Gray;// Transparent;
 
 	bool			m_selected = false;
-
 protected:
 };

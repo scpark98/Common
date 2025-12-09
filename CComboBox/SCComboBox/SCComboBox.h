@@ -23,7 +23,7 @@ public:
 
 
 	//font combo로 동작한다. add, delete, 기본 font 변경등은 모두 무시된다.
-	void			set_font_combo();
+	void			set_as_font_combo();
 
 	CString			get_text();
 

@@ -697,9 +697,9 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 		bool	is_exist = false;
 		CString text;
 
+		/*
 		switch (pMsg->wParam)
 		{
-			/*
 			case VK_RETURN:
 				if (m_use_edit)
 				{
@@ -715,8 +715,8 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 				m_pEdit->ShowWindow(SW_HIDE);
 				SetWindowText(m_old_text);
 				return true;
-			*/
 		}
+		*/
 	}
 
 	return CComboBox::PreTranslateMessage(pMsg);
@@ -854,7 +854,7 @@ static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTyp
 }
 
 //font combo∑Œ µø¿€
-void CSCComboBox::set_font_combo()
+void CSCComboBox::set_as_font_combo()
 {
 	m_is_font_combo = true;
 

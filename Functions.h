@@ -110,7 +110,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 	else if (typeid(n) == typeid(CString))\
 		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
 	else\
-		TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount());\
+		TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());\
 }
 
 #ifdef __GNUG__
@@ -156,8 +156,8 @@ t2 c, d; // c is 'int*' and d is 'int'
 
 #define		GDIPVER 0x0110
 
-#define		ENUM_TO_STRING(a) #a
-#define		ENUM_TO_CSTRING(a) CString(#a)
+#define		VAR_TO_STRING(a) #a
+#define		VAR_TO_CSTRING(a) CString(#a)
 #define		ID2String(ID, sID) sID.Format("%s", #ID)	
 
 #define		Swap32BE(x) ((((x) & 0xff000000) >> 24) | (((x) & 0xff0000) >> 8) | (((x) & 0xff00) << 8) | (((x) & 0xff) << 24))
@@ -2033,10 +2033,15 @@ h		: 복사할 height 크기(pixel)
 	void		draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 	void		draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 #ifndef _USING_V110_SDK71_
-	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
-	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
-	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
-	void		draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round = 0.0f);
+	ID2D1PathGeometry* create_round_path(ID2D1DeviceContext* d2dc, float x, float y, float right, float bottom, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
+
+	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
+	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
+
+	//lt, rt, lb, rb 의 round를 각각 줄 수 있는데 lt이외의 값들 중 그 값이 음수이면 lt와 동일한 값으로 그려진다.
+	void		draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
+
 #endif
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, Gdiplus::Color cr1 = gGRAY(96), Gdiplus::Color cr2 = gGRAY(128), int width = 1);
@@ -2223,6 +2228,7 @@ h		: 복사할 height 크기(pixel)
 	CRect			make_rect(int x, int y, int w, int h);
 	CRect			make_center_rect(int cx, int cy, int w, int h);
 	Gdiplus::Rect	make_center_gprect(int cx, int cy, int w, int h);
+	D2D1_RECT_F		make_center_d2rect(float cx, float cy, float w, float h);
 	CRect			gpRect_to_CRect(Gdiplus::Rect r);
 	CRect			gpRectF_to_CRect(Gdiplus::RectF r);
 	Gdiplus::Rect	CRect_to_gpRect(CRect r);

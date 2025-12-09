@@ -286,104 +286,74 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 	//render();
 }
 /*
-bool CSCD2Context::load(HWND hWnd, CString path)
+ID2D1PathGeometry* CSCD2Context::create_round_rect(int x, int y, int width, int height, int leftTop, int rightTop, int rightBottom, int leftBottom)
 {
-	m_hWnd = hWnd;
+	ID2D1GeometrySink* sink = nullptr;
+	ID2D1PathGeometry* path = nullptr;
 
-	if (m_img)
-		m_img->Release();
+	m_d2factory->CreatePathGeometry(&path);
+	path->Open(&sink);
 
-	if (!m_d2factory || !m_WICFactory)
-		create_factory();
+	D2D1_POINT_2F p[2];
 
-	if (!m_d2context)
-		create_device_resources();
+	p[0].x = x + leftTop;
+	p[0].y = y;
+	sink->BeginFigure(p[0], D2D1_FIGURE_BEGIN::D2D1_FIGURE_BEGIN_FILLED);
+	p[1].x = x + width - rightTop;
+	p[1].y = y;
+	sink->AddLines(p, 2);
 
-	ComPtr<IWICBitmapDecoder> pDecoder;
-	ComPtr<IWICBitmapFrameDecode> pSource;
-	ComPtr<IWICStream> pStream;
-	ComPtr<IWICFormatConverter> pConverter;
-	ComPtr<IWICBitmapScaler> pScaler;
+	p[0].x = x + width;
+	p[0].y = y + rightTop;
 
-	if (!m_WICFactory)
-		return S_FALSE;// CreateDeviceIndependentResources();
+	if (rightTop)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(rightTop, rightTop), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
 
-	if (!m_d2context)
-		return S_FALSE; //CreateDeviceContext();
+	p[1].x = x + width;
+	p[1].y = y + height - rightBottom;
+	sink->AddLines(p, 2);
 
-	HRESULT hr = m_WICFactory->CreateDecoderFromFilename(
-		path,
-		NULL,
-		GENERIC_READ,
-		WICDecodeMetadataCacheOnLoad,
-		&pDecoder
-	);
+	p[0].x = x + width - rightBottom;
+	p[0].y = y + height;
 
-	if (FAILED(hr))
-		return false;
+	if (rightBottom)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(rightBottom, rightBottom), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
 
-	hr = pDecoder->GetFrame(0, &pSource);
+	p[1].x = x + leftBottom;
+	p[1].y = y + height;
+	sink->AddLines(p, 2);
 
-	if (FAILED(hr))
-		return false;
+	p[0].x = x;
+	p[0].y = y + height - leftBottom;
+	if (leftBottom)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(leftBottom, leftBottom), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
 
-	hr = m_WICFactory->CreateFormatConverter(&pConverter);
 
-	if (FAILED(hr))
-		return false;
+	p[1].x = x;
+	p[1].y = y + leftTop;
+	sink->AddLines(p, 2);
+	p[0].x = x + leftTop;
+	p[0].y = y;
+	if (leftTop)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(leftTop, leftTop), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
 
-	hr = pConverter->Initialize(
-		pSource.Get(),
-		GUID_WICPixelFormat32bppPBGRA,
-		WICBitmapDitherTypeNone,
-		NULL,
-		0.f,
-		WICBitmapPaletteTypeMedianCut
-		);
+	sink->EndFigure(D2D1_FIGURE_END::D2D1_FIGURE_END_CLOSED);
+	sink->Close();
+	//SafeRelease(&sink);
+	sink->Release();
 
-	if (FAILED(hr))
-		return false;
-
-	hr = m_d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, &m_img);
-
-	render();
-
-	return true;
+	return path;
 }
-
-HRESULT CSCD2Context::render()
-{
-	HRESULT hr = S_FALSE;
-
-	if (!m_d2context || !m_img)
-		return hr;
-
-	m_d2context->BeginDraw();
-	m_d2context->SetTransform(D2D1::Matrix3x2F::Identity());
-
-	D2D1_SIZE_F rtSize = m_d2context->GetSize();
-
-	int width = static_cast<int>(rtSize.width);
-	int height = static_cast<int>(rtSize.height);
-
-	//{
-	//	//m_d2context->DrawImage(affineTransformEffect.Get());
-	//	D2D1_SIZE_F sz_img = m_img_back->GetSize();
-	//	CRect r = get_ratio_rect(CRect(0, 0, width * 2, height * 2), (int)(sz_img.width), (int)(sz_img.height));
-	//	TRACE(_T("rc = %dx%d, sz_img = %.0fx%.0f, r = %s\n"), width, height, sz_img.width, sz_img.height, get_rect_info_str(r));
-	m_d2context->DrawBitmap(m_img.Get(), D2D1::RectF(0.0f, 0.0f, rtSize.width, rtSize.height));
-	//m_d2context->DrawBitmap(m_img_back.Get(), D2D1::RectF(r.left, r.top, r.right, r.bottom));
-
-	hr = m_d2context->EndDraw();
-
-	if (SUCCEEDED(hr))
-		hr = m_swapchain->Present(0, 0);
-
-	if (hr == D2DERR_RECREATE_TARGET)
-		hr = S_OK;
-
-	return hr;
-}
-
-
 */

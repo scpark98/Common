@@ -21,6 +21,8 @@
 #include <LM.h>
 #pragma comment(lib, "netapi32.lib")
 
+#pragma comment(lib, "D2d1.lib")
+
 //get_proxy_info()를 위해 추가했으나 HTTP_VERSION_INFO 재정의 등 충돌 발생하여 우선 주석처리함. (XP호환이 원인)
 //#include <winhttp.h>
 //#pragma comment(lib, "Winhttp.lib")
@@ -6443,24 +6445,26 @@ void draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line, G
 }
 
 #ifndef _USING_V110_SDK71_
-void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
+void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
 {
 	D2D1_RECT_F d2r = { r.left, r.top, r.right, r.bottom };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round_lt, round_rt, round_lb, round_rb);
 }
 
-void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
+void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
 {
 	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round_lt, round_rt, round_lb, round_rb);
 }
 
-void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
+void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
 {
 	D2D1_RECT_F d2r = { r.X, r.Y, r.X + r.Width, r.Y + r.Height };
-	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round);
+	draw_rect(d2dc, d2r, cr_stroke, cr_fill, thick, round_lt, round_rt, round_lb, round_rb);
 }
-void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round)
+
+//lt, rt, lb, rb 의 round를 각각 줄 수 있는데 lt이외의 값들 중 그 값이 음수이면 lt와 동일한 값으로 그려진다.
+void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
 {
 	ID2D1SolidColorBrush* br_stroke;
 	ID2D1SolidColorBrush* br_fill;
@@ -6482,24 +6486,93 @@ void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke
 
 	d2dc->CreateSolidColorBrush(d2cr_fill, &br_fill);
 
-	if (round > 0.0f)
+	//rt, lb, rb가 음수이면 lt와 동일하게 설정된다.
+	if (round_lt >= 0.0f)
 	{
-		d2dc->FillRoundedRectangle(D2D1::RoundedRect(r, round, round), br_fill);
-	}
-	else
-	{
-		d2dc->FillRectangle(r, br_fill);
+		round_rt = (round_rt < 0.0f ? round_lt : round_rt);
+		round_lb = (round_lb < 0.0f ? round_lt : round_lb);
+		round_rb = (round_rb < 0.0f ? round_lt : round_rb);
 	}
 
-	if (round > 0.0f)
-	{
-		d2dc->DrawRoundedRectangle(D2D1::RoundedRect(r, round, round), br_stroke, thick);
-	}
-	else
-	{
-		d2dc->DrawRectangle(r, br_stroke, thick);
-	}
+	ID2D1PathGeometry* rr = create_round_path(d2dc, r.left, r.top, r.right, r.bottom, round_lt, round_rt, round_lb, round_rb);
+
+	d2dc->FillGeometry(rr, br_fill);
+	d2dc->DrawGeometry(rr, br_stroke, thick);
 }
+
+ID2D1PathGeometry* create_round_path(ID2D1DeviceContext* d2dc, float left, float top, float right, float bottom, float lt, float rt, float lb, float rb)
+{
+	ID2D1GeometrySink* sink = nullptr;
+	ID2D1PathGeometry* path = nullptr;
+
+	ID2D1Factory* factory = NULL;
+	d2dc->GetFactory(&factory);
+
+	factory->CreatePathGeometry(&path);
+	path->Open(&sink);
+
+	D2D1_POINT_2F p[2];
+
+	p[0].x = left + lt;
+	p[0].y = top;
+	sink->BeginFigure(p[0], D2D1_FIGURE_BEGIN::D2D1_FIGURE_BEGIN_FILLED);
+	p[1].x = right - rt;
+	p[1].y = top;
+	sink->AddLines(p, 2);
+
+	p[0].x = right;
+	p[0].y = top + rt;
+
+	if (rt)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(rt, rt), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
+
+	p[1].x = right;
+	p[1].y = bottom - rb;
+	sink->AddLines(p, 2);
+
+	p[0].x = right - rb;
+	p[0].y = bottom;
+
+	if (rb)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(rb, rb), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
+
+	p[1].x = left + lb;
+	p[1].y = bottom;
+	sink->AddLines(p, 2);
+
+	p[0].x = left;
+	p[0].y = bottom - lb;
+	if (lb)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(lb, lb), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
+
+
+	p[1].x = left;
+	p[1].y = top + lt;
+	sink->AddLines(p, 2);
+	p[0].x = left + lt;
+	p[0].y = top;
+	if (lt)
+	{
+		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
+		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(lt, lt), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+	}
+
+	sink->EndFigure(D2D1_FIGURE_END::D2D1_FIGURE_END_CLOSED);
+	sink->Close();
+	sink->Release();
+
+	return path;
+}
+
 #endif
 
 void draw_sunken_rect(CDC* pDC, CRect r, bool bSunken, COLORREF cr1, COLORREF cr2, int width)
@@ -6835,7 +6908,7 @@ CRect make_center_rect(int cx, int cy, int w, int h)
 	return result;
 }
 
-Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h)
+Gdiplus::Rect make_center_gprect(int cx, int cy, int w, int h)
 {
 	Gdiplus::Rect result;
 	result.X = cx - w / 2;
@@ -6843,6 +6916,16 @@ Gdiplus::Rect makeCenterGpRect(int cx, int cy, int w, int h)
 	result.Width = w;
 	result.Height = h;
 	return result;
+}
+
+D2D1_RECT_F	make_center_d2rect(float cx, float cy, float w, float h)
+{
+	D2D1_RECT_F r;
+	r.left = cx - w / 2.0f;
+	r.top = cy - h / 2.0f;
+	r.right = cx + w;
+	r.bottom = cy + h;
+	return r;
 }
 
 CRect getCenterRect(int cx, int cy, int w, int h)
@@ -12163,8 +12246,12 @@ void get_resizable_handle(CRect src, CRect handle[], int sz)
 	//순번은 CORNER_INDEX와 일관되게 처리한다.
 
 	//inside의 경우 sz만큼 줄여줘야 코너와 inside 근처에서 반응이 명확해진다.
+	//단, src의 height가 sz*2보다 큰 경우에만 이렇게 처리한다.
 	CRect deflate_src = src;
-	deflate_src.DeflateRect(sz, sz);
+
+	if (src.Height() >= sz * 2)
+		deflate_src.DeflateRect(sz, sz);
+
 	handle[corner_inside]		= deflate_src;//CRect(src.CenterPoint().x - sz, src.CenterPoint().y - sz, src.CenterPoint().x + sz, src.CenterPoint().y + sz);
 	handle[corner_left]			= CRect(src.left - sz, src.CenterPoint().y - sz, src.left + sz, src.CenterPoint().y + sz);
 	handle[corner_right]		= CRect(src.right - sz, src.CenterPoint().y - sz, src.right + sz, src.CenterPoint().y + sz);
@@ -14481,12 +14568,23 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 					hMonitor, mi.szDevice, get_rect_info_str(mi.rcMonitor), get_rect_info_str(mi.rcWork), mi.szDevice);
 
 		g_monitors.push_front(CSCMonitorInfo(&mi, hMonitor));
+		if (dwData != 0)
+		{
+			std::deque<CRect>* dq = reinterpret_cast<std::deque<CRect>*>(dwData);
+			dq->push_front(mi.rcMonitor);
+		}
 	}
 	else
 	{
 		str.Format(_T("hMonitor = %X, name = %s, rcMonitor = %s, rcWork = %s, %s"), 
 					hMonitor, mi.szDevice, get_rect_info_str(mi.rcMonitor), get_rect_info_str(mi.rcWork), mi.szDevice);
 		g_monitors.push_back(CSCMonitorInfo(&mi, hMonitor));
+
+		if (dwData != 0)
+		{
+			std::deque<CRect>* dq = reinterpret_cast<std::deque<CRect>*>(dwData);
+			dq->push_front(mi.rcMonitor);
+		}
 	}
 
 	//TRACE(_T("%s\n"), str);

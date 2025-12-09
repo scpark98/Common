@@ -180,7 +180,7 @@ void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CStr
 			}
 			else if (oRoot.IsUint())
 			{
-				sDebugStr.Format(_T("[%s]=%d\n"), (LPCTSTR)sKey, oRoot.GetUint());
+				sDebugStr.Format(_T("[%s]=%u\n"), (LPCTSTR)sKey, oRoot.GetUint());
 				OutputDebugString(sDebugStr);
 				result += sDebugStr;
 			}
@@ -192,9 +192,15 @@ void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CStr
 			}
 			else if (oRoot.IsInt64())
 			{
+				sDebugStr.Format(_T("[%s]=%I64d\n"), (LPCTSTR)sKey, oRoot.GetInt64());
+				OutputDebugString(sDebugStr);
+				result += sDebugStr;
 			}
 			else if (oRoot.IsUint64())
 			{
+				sDebugStr.Format(_T("[%s]=%I64u\n"), (LPCTSTR)sKey, oRoot.GetUint64());
+				OutputDebugString(sDebugStr);
+				result += sDebugStr;
 			}
 		}
 		break;

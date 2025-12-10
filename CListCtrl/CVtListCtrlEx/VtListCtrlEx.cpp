@@ -1874,14 +1874,13 @@ void CVtListCtrlEx::undo_edit_label()
 
 LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 {
-	CSCEdit* pEdit = (CSCEdit*)wParam;
-	int	msg = (int)lParam;
+	CSCEditMessage* msg = (CSCEditMessage*)wParam;
 
-	if (!pEdit->IsWindowVisible())
+	if (!msg->pThis->IsWindowVisible())
 		return 0;
 
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
-	if (msg == WM_KILLFOCUS)
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), msg->message, msg->pThis);
+	if (msg->message == WM_KILLFOCUS)
 		edit_end();
 
 	Invalidate();
@@ -3731,7 +3730,8 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_last_clicked_time = 0;
 	m_pEdit->GetWindowText(m_edit_new_text);
 	//m_pEdit->ShowWindow(SW_HIDE);
-	m_pEdit->DestroyWindow();
+	if (m_pEdit->m_hWnd)
+		m_pEdit->DestroyWindow();
 	delete m_pEdit;
 	m_pEdit = NULL;
 

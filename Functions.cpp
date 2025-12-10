@@ -6048,10 +6048,13 @@ bool recursive_make_full_directory(LPCTSTR sFolder)
 
 bool make_full_directory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
 {
-	if (PathFileExists(lpPathName))
-		return true;
 	CString folder(lpPathName);
-	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, (LPCTSTR)folder, lpsa));
+
+	folder.Trim();
+
+	if (PathFileExists(folder))
+		return true;
+	return (ERROR_SUCCESS == SHCreateDirectoryEx(NULL, folder, lpsa));
 }
 
 void draw_text(CDC* pDC, int x, int y, CString text, COLORREF cr_text)
@@ -12453,8 +12456,6 @@ CImage* capture_window(CRect r, CString filename)
 		format = Gdiplus::ImageFormatBMP;
 	else if (ext == _T("png"))
 		format = Gdiplus::ImageFormatPNG;
-	else
-		//jpeg
 
 	imgCapture->Save(filename, format);
 	::DeleteDC(hDC);

@@ -733,7 +733,9 @@ BOOL CSCEdit::OnEnKillfocus()
 	update_ctrl();
 	draw_dim_text();
 	//::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
-	::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&(CSCEditMessage(this, WM_KILLFOCUS)), 0);
+	CWnd* parent = GetParent();
+	if (parent && parent->m_hWnd)
+		::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&(CSCEditMessage(this, WM_KILLFOCUS)), 0);
 	return FALSE;
 }
 

@@ -513,8 +513,8 @@ void CSCShapeDlg::gif_thread()
 
 		if (!m_img.is_valid() ||
 			m_img.m_pBitmap == NULL ||
-			m_gif_index > m_img.get_frame_count() ||
-			m_img.m_property_item == NULL)
+			m_gif_index > m_img.get_frame_count()/* ||
+			m_img.m_property_item == NULL*/)
 			break;
 
 		m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_gif_index);

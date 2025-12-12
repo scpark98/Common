@@ -12435,20 +12435,14 @@ bool CheckProcessUsingProcessName(LPCTSTR processName) // unsigned long = DWORD
 }
 
 
-CImage* capture_window(CRect r, CString filename)
+bool capture_window(CRect r, CString filename)
 {
 	HDC hDC = CreateDC(_T("DISPLAY"), NULL, NULL, NULL);
 	CImage *imgCapture = new ATL::CImage();
 	imgCapture->Create(r.Width(), r.Height(), GetDeviceCaps(hDC, BITSPIXEL), 0);
 
 	::BitBlt(imgCapture->GetDC(), 0, 0, r.Width(), r.Height(), hDC, r.left, r.top, SRCCOPY);
-	/*
-	CTime t = CTime::GetCurrentTime();
-	CString tName;
-	tName.Format(_T("%04d-%02d-%02d_%02d%02d%02d"),
-		t.GetYear(), t.GetMonth(), t.GetDay(),
-		t.GetHour(), t.GetMinute(), t.GetSecond());
-	*/
+
 	CString ext = get_part(filename, fn_ext).MakeLower();
 	GUID format = Gdiplus::ImageFormatJPEG;
 
@@ -12457,10 +12451,12 @@ CImage* capture_window(CRect r, CString filename)
 	else if (ext == _T("png"))
 		format = Gdiplus::ImageFormatPNG;
 
-	imgCapture->Save(filename, format);
+	HRESULT hr = imgCapture->Save(filename, format);
+	imgCapture->ReleaseDC();
+	delete imgCapture;
 	::DeleteDC(hDC);
 
-	return imgCapture;
+	return (hr == S_OK);
 }
 
 void draw_bitmap(HDC hdc, int x, int y, HBITMAP hBitmap)

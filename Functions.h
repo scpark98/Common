@@ -91,6 +91,8 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define Traceln(fmt, ...) trace_output(false, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 #define Trace_only(fmt, ...) trace_output(true, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 
+#define traceonly TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());
+
 //trace(m_num);으로 호출하면 TRACE(_T("m_num = %d\n"));로 치환된다.
 //m_num이 CString이면 else절에 의해 %s로 출력된다.
 #define trace(n)\
@@ -380,7 +382,7 @@ void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR 
 //template <typename T> void trace(T args)
 //{
 //	CString name;
-//	//= ENUM_TO_CSTRING(args);
+//	//= VAR_TO_CSTRING(args);
 //	ID2String(args, name);
 //	TRACE(_T("%s = %d\n"), name, args);
 //}
@@ -2357,8 +2359,8 @@ h		: 복사할 height 크기(pixel)
 	HRGN		CreateRgnFromBitmap(HBITMAP hBmp, COLORREF color);
 
 //캡쳐 기능
-	//r은 윈도우 좌표계.
-	CImage*		capture_window(CRect r, CString filename);
+	//r은 윈도우 좌표계. jpg, png, bmp만 현재 지원.
+	bool		capture_window(CRect r, CString filename);
 	//특정 영역을 캡처하여 HBITMAP으로 리턴한다.
 	//resourceID를 주면 해당 이미지를 overlay하여 리턴한다.(watermark와 같은 용도로 사용시)
 	HBITMAP		capture_screen_to_bitmap(LPRECT pRect, UINT id = 0, int dx = 0, int dy = 0, bool show_cursor = false);

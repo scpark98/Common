@@ -3,6 +3,7 @@
 
 //#include "stdafx.h"
 #include "RichEditCtrlEx.h"
+#include "../../Functions.h"
 
 //#include <stdarg.h>
 #include <strsafe.h>	//for StringCchCopyN
@@ -38,6 +39,9 @@ BEGIN_MESSAGE_MAP(CRichEditCtrlEx, CRichEditCtrl)
 	ON_WM_TIMER()
 	ON_COMMAND_RANGE(id_menu_richedit_toggle_log, id_menu_richedit_toggle_time, OnPopupMenu)
 	ON_WM_MOUSEHWHEEL()
+	ON_WM_HSCROLL()
+	ON_WM_VSCROLL()
+	ON_WM_MOUSEWHEEL()
 END_MESSAGE_MAP()
 
 
@@ -944,17 +948,6 @@ COLORREF CRichEditCtrlEx::GetComplementaryColor(COLORREF crColor)
 	return RGB(r, g, b);
 }
 
-
-void CRichEditCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
-{
-	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
-	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TRACE("wheel on richedit omh: %d\n", zDelta);
-	CRichEditCtrl::OnMouseHWheel(nFlags, zDelta, pt);
-}
-
-
 BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
@@ -965,7 +958,27 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 			LineScroll(-m_nScrollSize);
 		else
 			LineScroll(m_nScrollSize);
-		return true;
+		//TRACE(_T("CRichEditCtrlEx::PreTranslateMessage(). WM_MOUSEWHEEL\n"));
+		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_MOUSEWHEEL), 0);
+		return FALSE;
+	}
+	else if (pMsg->message == WM_MOUSEHWHEEL)
+	{
+		//TRACE(_T("CRichEditCtrlEx::PreTranslateMessage(). WM_MOUSEHWHEEL\n"));
+		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_MOUSEHWHEEL), 0);
+		return FALSE;
+	}
+	else if (pMsg->message == WM_HSCROLL)
+	{
+		//TRACE(_T("CRichEditCtrlEx::PreTranslateMessage(). WM_HSCROLL\n"));
+		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_HSCROLL), 0);
+		return FALSE;
+	}
+	else if (pMsg->message == WM_VSCROLL)
+	{
+		//TRACE(_T("CRichEditCtrlEx::PreTranslateMessage(). WM_VSCROLL\n"));
+		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_VSCROLL), 0);
+		return FALSE;
 	}
 
 	return CRichEditCtrl::PreTranslateMessage(pMsg);
@@ -1026,4 +1039,48 @@ CRichEditCtrlEx& CRichEditCtrlEx::SetFontBold(bool bBold)
 void CRichEditCtrlEx::set_align(int align)
 {
 	m_align = align;
+}
+
+bool CRichEditCtrlEx::load(CString path)
+{
+	ClearAll();
+
+	CString str = read(path);
+	add(-1, str);
+
+	return true;
+}
+
+void CRichEditCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//GetParent()->SendMessage(WM_HSCROLL, MAKEWPARAM(nSBCode, nPos), (LPARAM)pScrollBar->GetSafeHwnd());
+	//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_HSCROLL), 0);
+	CRichEditCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+}
+
+void CRichEditCtrlEx::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//GetParent()->SendMessage(WM_VSCROLL, MAKEWPARAM(nSBCode, nPos), (LPARAM)pScrollBar->GetSafeHwnd());
+	//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_VSCROLL), 0);
+	CRichEditCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+}
+
+
+void CRichEditCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
+	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	TRACE("wheel on richedit omh: %d\n", zDelta);
+	CRichEditCtrl::OnMouseHWheel(nFlags, zDelta, pt);
+}
+
+BOOL CRichEditCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//GetParent()->SendMessage(WM_VSCROLL, MAKEWPARAM(nSBCode, nPos), (LPARAM)pScrollBar->GetSafeHwnd());
+
+	return CRichEditCtrl::OnMouseWheel(nFlags, zDelta, pt);
 }

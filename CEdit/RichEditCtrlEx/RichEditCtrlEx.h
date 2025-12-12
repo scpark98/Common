@@ -13,8 +13,29 @@
 //scpark.
 //call AfxInitRichEdit2() at App()::InitInstance() for using RECHED20.dll
 
-// CRichEditCtrlEx
 
+static const UINT Message_CRichEditCtrlEx = ::RegisterWindowMessage(_T("MessageString_CRichEditCtrlEx"));
+
+class CRichEditCtrlExMessage
+{
+public:
+	CRichEditCtrlExMessage(CWnd* _this, int _message)
+	{
+		pThis = _this;
+		message = _message;
+	}
+
+	enum ENUM_MESSAGES
+	{
+		msg_hscroll = 0,
+		msg_vscroll,
+	};
+
+	CWnd* pThis = NULL;
+	int		message;
+};
+
+// CRichEditCtrlEx
 class CRichEditCtrlEx : public CRichEditCtrl
 {
 	DECLARE_DYNAMIC(CRichEditCtrlEx)
@@ -85,6 +106,9 @@ public:
 	virtual		CRichEditCtrlEx& SetFontSize(int nSize);
 	virtual		CRichEditCtrlEx& SetFontBold(bool bBold = true);
 
+//file
+	bool		load(CString path);
+
 protected:
 	COLORREF	m_crText;
 	COLORREF	m_crBack;
@@ -118,4 +142,7 @@ public:
 	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	virtual void PreSubclassWindow();
+	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 };

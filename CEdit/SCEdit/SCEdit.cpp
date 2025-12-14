@@ -133,9 +133,10 @@ void CSCEdit::PreSubclassWindow()
 void CSCEdit::reconstruct_font()
 {
 	m_font.DeleteObject();
+	m_lf.lfCharSet = DEFAULT_CHARSET;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	SetFont( &m_font, true );
+	CEdit::SetFont(&m_font, TRUE);
 
 	set_line_align(m_valign);
 
@@ -422,36 +423,37 @@ void CSCEdit::set_action_button(int action)
 	SetRect(&r);
 }
 
-CSCEdit& CSCEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+void CSCEdit::SetFont(CFont* font, BOOL bRedraw)
+{
+	font->GetObject(sizeof(m_lf), &m_lf);
+	reconstruct_font();
+}
+
+void CSCEdit::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	reconstruct_font();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_font_size( int nSize )
+void CSCEdit::set_font_size( int nSize )
 {
 	m_font_size = nSize;
 	//For the MM_TEXT mapping mode,
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
-	m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
+	//	-MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 	reconstruct_font();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_font_weight(int weight)
+void CSCEdit::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
 	reconstruct_font();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_auto_font_size(bool bAuto, double ratio)
+void CSCEdit::set_auto_font_size(bool bAuto, double ratio)
 {
 	CRect	r;
 	GetClientRect( r );
@@ -471,8 +473,6 @@ CSCEdit& CSCEdit::set_auto_font_size(bool bAuto, double ratio)
 	//m_lf.lfHeight = -MulDiv(m_font_size, GetDeviceCaps(::GetDC(GetParent()->GetSafeHwnd()), LOGPIXELSY), 72);
 
 	reconstruct_font();
-
-	return *this;
 }
 
 void CSCEdit::recalc_font_size()

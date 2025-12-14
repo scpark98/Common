@@ -2,6 +2,7 @@
 
 #include <Afxwin.h>
 #include <afxcmn.h>
+#include <deque>
 
 /*
 * 시간표시를 하지 않는 경우는 관계없으나 시간표시를 하는 경우는
@@ -89,6 +90,8 @@ public:
 	void		Append(COLORREF cr, LPCTSTR lpszFormat, ...);
 	int			AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);
 
+	//한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
+	void		set_text(std::deque<CString>* dqlist);
 
 
 	int			GetNumVisibleLines();
@@ -102,12 +105,15 @@ public:
 	//PFA_LEFT(1), PFA_RIGHT(2), PFA_CENTER(3)
 	void		set_align(int align);
 
-	virtual		CRichEditCtrlEx& SetFontName(TCHAR *sfontname);
-	virtual		CRichEditCtrlEx& SetFontSize(int nSize);
-	virtual		CRichEditCtrlEx& SetFontBold(bool bBold = true);
+	//기본 CWnd::SetFont() override
+	void		SetFont(CFont* font, BOOL bRedraw = TRUE);
+	void		set_font_name(TCHAR *sfontname);
+	void		set_font_size(int nSize);
+	void		set_font_weight(int weight);
 
 //file
 	bool		load(CString path);
+	bool		save(CString path);
 
 protected:
 	COLORREF	m_crText;
@@ -129,7 +135,7 @@ protected:
 	CFont		m_font;
 	int			m_nDefaultHeight;
 	void		UpdateSurface();
-	void		ReconstructFont();
+	void		reconstruct_font();
 
 
 protected:

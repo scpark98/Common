@@ -1686,6 +1686,23 @@ struct	NETWORK_INFO
 			delete r;
 			return res;
 		}
+		else if constexpr (std::is_same_v<T, SYSTEMTIME>)
+		{
+			SYSTEMTIME* t;
+			SYSTEMTIME res;
+			UINT size = sizeof(SYSTEMTIME);
+			pApp->GetProfileBinary(section, entry, reinterpret_cast<LPBYTE*>(&t), &size);
+
+			if (t == NULL || size != sizeof(SYSTEMTIME))
+				res = default_value;
+			else
+				res = *t;
+
+			delete t;
+			return res;
+		}
+
+		return T();
 	}
 
 
@@ -1723,6 +1740,10 @@ struct	NETWORK_INFO
 		else if constexpr (std::is_same_v<T, CRect>)
 		{
 			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(CRect));
+		}
+		else if constexpr (std::is_same_v<T, SYSTEMTIME>)
+		{
+			pApp->WriteProfileBinary(section, entry, (LPBYTE)&value, sizeof(SYSTEMTIME));
 		}
 		else
 		{
@@ -1928,6 +1949,10 @@ h		: 복사할 height 크기(pixel)
 	//2003-04-16 18:01:00.120
 	CString		GetCurrentTimeString(bool bSeparator = true, bool msec = false);
 	CTime		get_CTime_from_datetime_str(CString date, CString time = _T("00:00:00"));
+	SYSTEMTIME	get_SYSTEMTIME_from_datetime_str(CString datetime, CString separator = _T(" "));
+	SYSTEMTIME	diff_SYSTEMTIME(SYSTEMTIME stStart, SYSTEMTIME stEnd);
+	SYSTEMTIME operator-(const SYSTEMTIME& pSr, const SYSTEMTIME& pSl);
+	SYSTEMTIME operator+(const SYSTEMTIME& pSr, const SYSTEMTIME& pSl);
 	CTimeSpan	GetTimeSpanFromTimeString(CString sTime);
 	//CString		GetDateTimeStringFromTime(CTime t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);
 	//CString		GetDateTimeStringFromTime(SYSTEMTIME t, bool bSeparator = true, bool h24 = true, bool include_seconds = true, bool bHasMilliSec = false);

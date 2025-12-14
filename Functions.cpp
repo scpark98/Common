@@ -219,8 +219,17 @@ CString	get_datetime_str(__timeb32 tb, int type, bool sep, CString mid, bool h24
 
 CString	get_datetime_str(SYSTEMTIME st, int type, bool sep, CString mid, bool h24, bool sec, bool msec)
 {
-	CString sDate = (sep ? get_date_str(st) : get_date_str(st, _T("")));
-	CString sTime = (sep ? get_time_str(st, _T(":"), h24, sec, msec) : get_time_str(st, _T(""), h24, sec, msec));
+	CString sDate;// = (sep ? get_date_str(st) : get_date_str(st, _T("")));
+	CString sTime;// = (sep ? get_time_str(st, _T(":"), h24, sec, msec) : get_time_str(st, _T(""), h24, sec, msec));
+
+	CString str_sep = (sep ? _T("/") : _T(""));
+	sDate.Format(_T("%04d%s%02d%s%02d"), st.wYear, str_sep, st.wMonth, str_sep, st.wDay);
+
+	str_sep = (sep ? _T(":") : _T(""));
+	sTime.Format(_T("%02d%s%02d%s%02d"), st.wHour, str_sep, st.wMinute, str_sep, st.wSecond);
+
+	if (msec)
+		sTime = sTime + _T(".") + i2S(st.wMilliseconds, false, true, 3);
 
 	if (type == 0)
 		return sDate;
@@ -373,6 +382,225 @@ CTime get_CTime_from_datetime_str(CString date, CString time)
 			 _tstoi((TCHAR*)(LPCTSTR)(time.Left(2))), _tstoi((TCHAR*)(LPCTSTR)(time.Mid(2, 2))), _tstoi((TCHAR*)(LPCTSTR)(time.Right(2))));
 
 	return t;
+}
+
+//2025/09/24 09:12:09.299
+SYSTEMTIME	get_SYSTEMTIME_from_datetime_str(CString datetime, CString separator)
+{
+	datetime.Remove('-');
+	datetime.Remove('/');
+	datetime.Remove(' ');
+	datetime.Remove(':');
+
+	SYSTEMTIME t;
+	ZeroMemory(&t, sizeof(SYSTEMTIME));
+
+	t.wYear = _ttoi(datetime.Left(4));
+	t.wMonth = _ttoi(datetime.Mid(4, 2));
+	t.wDay = _ttoi(datetime.Mid(6, 2));
+	t.wHour = _ttoi(datetime.Mid(8, 2));
+	t.wMinute = _ttoi(datetime.Mid(10, 2));
+	t.wSecond = _ttoi(datetime.Mid(12, 2));
+
+	int dot_pos = datetime.Find('.');
+	if (dot_pos > 0)
+	{
+		t.wMilliseconds = _ttoi(datetime.Mid(dot_pos + 1));
+	}
+
+	return t;
+}
+
+SYSTEMTIME iAddSecondsToSystemTime(SYSTEMTIME timeIn, double tfSeconds)
+{
+	const double clfSecondsPer100ns = 100. * 1.E-9;
+	__int64 day = (__int64)10000000 * 60 * 60 * 24; //1 day in 100 ns intervals
+
+	union
+	{
+		ULARGE_INTEGER li;
+		FILETIME       ft;
+	};
+
+	// Convert timeIn to filetime
+	SystemTimeToFileTime(&timeIn, &ft);
+
+	// Add in the seconds
+	li.QuadPart += tfSeconds / clfSecondsPer100ns;
+
+	// Add in the day
+	li.QuadPart += day;
+
+	// Convert back to systemtime
+	SYSTEMTIME t_res;
+	FileTimeToSystemTime(&ft, &t_res);
+
+	return t_res;
+}
+
+
+SYSTEMTIME operator+(const SYSTEMTIME& pSr, const SYSTEMTIME& pSl)
+{
+	SYSTEMTIME t_res;
+
+	int year = pSr.wYear + pSl.wYear;
+	int month = pSr.wMonth + pSl.wMonth;
+	int day = pSr.wDay + pSl.wDay;
+	int hour = pSr.wHour + pSl.wHour;
+	int minute = pSr.wMinute + pSl.wMinute;
+	int second = pSr.wSecond + pSl.wSecond;
+	int milliseconds = pSr.wMilliseconds + pSl.wMilliseconds;
+
+	if (milliseconds >= 1000)
+	{
+		second += (milliseconds / 1000);
+		milliseconds %= 1000;
+	}
+
+	if (second >= 60)
+	{
+		minute += (second / 60);
+		second %= 60;
+	}
+
+	if (minute >= 60)
+	{
+		hour += (minute / 60);
+		minute %= 60;
+	}
+
+	if (hour >= 24)
+	{
+		day += (hour / 24);
+		hour %= 24;
+	}
+
+	int max_days = GetDaysOfMonth(year, month);
+	while (day > max_days)
+	{
+		month += (day / max_days);
+		day %= max_days;
+		max_days = GetDaysOfMonth(year, month);
+	}
+
+	if (month > 12)
+	{
+		year += (year / 12);
+		hour %= 12;
+
+		int max_days = GetDaysOfMonth(year, month);
+		while (day > max_days)
+		{
+			month += (day / max_days);
+			day %= max_days;
+			max_days = GetDaysOfMonth(year, month);
+		}
+	}
+
+	t_res.wYear = year;
+	t_res.wMonth = month;
+	t_res.wDay = day;
+	t_res.wHour = hour;
+	t_res.wMinute = minute;
+	t_res.wSecond = second;
+	t_res.wMilliseconds = milliseconds;
+
+	return t_res;
+
+	/*
+	SYSTEMTIME t_res;
+	FILETIME v_ftime;
+	ULARGE_INTEGER v_ui;
+	__int64 v_right, v_left, v_res;
+	SystemTimeToFileTime(&pSr, &v_ftime);
+	v_ui.LowPart = v_ftime.dwLowDateTime;
+	v_ui.HighPart = v_ftime.dwHighDateTime;
+	v_right = v_ui.QuadPart;
+
+	SystemTimeToFileTime(&pSl, &v_ftime);
+	v_ui.LowPart = v_ftime.dwLowDateTime;
+	v_ui.HighPart = v_ftime.dwHighDateTime;
+	v_left = v_ui.QuadPart;
+
+	v_res = v_right + v_left;
+
+	v_ui.QuadPart = v_res;
+	v_ftime.dwLowDateTime = v_ui.LowPart;
+	v_ftime.dwHighDateTime = v_ui.HighPart;
+	FileTimeToSystemTime(&v_ftime, &t_res);
+
+	//두 시간값의 차이이므로 FILETILE의 최소값인 1601.1.1 날짜값을 빼줘야한다.
+	t_res.wYear -= 1601;
+	t_res.wMonth -= 1;
+	t_res.wDay -= 1;
+
+	return t_res;
+	*/
+}
+
+SYSTEMTIME operator-(const SYSTEMTIME& pSr, const SYSTEMTIME& pSl)
+{
+	SYSTEMTIME t_res;
+	FILETIME v_ftime;
+	ULARGE_INTEGER v_ui;
+	__int64 v_right, v_left, v_res;
+	SystemTimeToFileTime(&pSr, &v_ftime);
+	v_ui.LowPart = v_ftime.dwLowDateTime;
+	v_ui.HighPart = v_ftime.dwHighDateTime;
+	v_right = v_ui.QuadPart;
+
+	SystemTimeToFileTime(&pSl, &v_ftime);
+	v_ui.LowPart = v_ftime.dwLowDateTime;
+	v_ui.HighPart = v_ftime.dwHighDateTime;
+	v_left = v_ui.QuadPart;
+
+	v_res = v_right - v_left;
+
+	v_ui.QuadPart = v_res;
+	v_ftime.dwLowDateTime = v_ui.LowPart;
+	v_ftime.dwHighDateTime = v_ui.HighPart;
+	FileTimeToSystemTime(&v_ftime, &t_res);
+
+	//두 시간값의 차이이므로 FILETILE의 최소값인 1601.1.1 날짜값도 제거한다.
+	t_res.wYear -= 1601;
+	t_res.wMonth -= 1;
+	t_res.wDay -= 1;
+
+	return t_res;
+}
+
+SYSTEMTIME diff_SYSTEMTIME(SYSTEMTIME pSr, SYSTEMTIME pSl)
+{
+	SYSTEMTIME t_res;
+	FILETIME v_ftime;
+	ULARGE_INTEGER v_ui;
+	__int64 v_right, v_left, v_res;
+
+	ZeroMemory(&t_res, sizeof(t_res));
+
+	SystemTimeToFileTime(&pSr, &v_ftime);
+	v_ui.LowPart = v_ftime.dwLowDateTime;
+	v_ui.HighPart = v_ftime.dwHighDateTime;
+	v_right = v_ui.QuadPart;
+
+	SystemTimeToFileTime(&pSl, &v_ftime);
+	v_ui.LowPart = v_ftime.dwLowDateTime;
+	v_ui.HighPart = v_ftime.dwHighDateTime;
+	v_left = v_ui.QuadPart;
+
+	v_res = v_right - v_left;
+
+	v_ui.QuadPart = v_res;
+	v_ftime.dwLowDateTime = v_ui.LowPart;
+	v_ftime.dwHighDateTime = v_ui.HighPart;
+	FileTimeToSystemTime(&v_ftime, &t_res);
+
+	//두 시간값의 차이이므로 FILETILE의 최소값인 1601.1.1 날짜값도 제거한다.
+	t_res.wYear -= 1601;
+	t_res.wMonth -= 1;
+	t_res.wDay -= 1;
+
+	return t_res;
 }
 
 CTimeSpan GetTimeSpanFromTimeString(CString time)

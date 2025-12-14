@@ -218,7 +218,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	//SetRedraw(TRUE);
 
 #ifdef _DEBUG
-	TRACE(new_text);
+	//TRACE(new_text);
 #endif
 
 	//여기서부터의 코드는 맨 마지막 라인으로 스크롤시킬지 말지를 결정.
@@ -301,6 +301,26 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	return new_text;
 }
 
+//한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
+void CRichEditCtrlEx::set_text(std::deque<CString>* dqlist)
+{
+	if (!dqlist)
+		return;
+
+	SetRedraw(FALSE);
+
+	ClearAll();
+
+	//str으로 합쳐서 한번에 넣으면 좋지만 간혹 dqlist의 합이 64K를 넘으면 CString에 담을 수 없다.
+	//한줄씩 넣어야 한다.
+	//CString str;
+
+	for (int i = 0; i < dqlist->size(); i++)
+		add(-1, dqlist->at(i));
+
+	SetRedraw(TRUE);
+	Invalidate();
+}
 
 
 //=============================================================================
@@ -1000,40 +1020,39 @@ void CRichEditCtrlEx::PreSubclassWindow()
 	CRichEditCtrl::PreSubclassWindow();
 }
 
-void CRichEditCtrlEx::ReconstructFont()
+void CRichEditCtrlEx::reconstruct_font()
 {
 	m_font.DeleteObject();
+	m_lf.lfCharSet = DEFAULT_CHARSET;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	SetFont(&m_font, true);
+	CRichEditCtrl::SetFont(&m_font, true);
 
 	ASSERT(bCreated);
 }
 
-CRichEditCtrlEx& CRichEditCtrlEx::SetFontName(TCHAR *sfontname)
+void CRichEditCtrlEx::SetFont(CFont* font, BOOL bRedraw)
+{
+	font->GetObject(sizeof(m_lf), &m_lf);
+	reconstruct_font();
+}
+
+void CRichEditCtrlEx::set_font_name(TCHAR *sfontname)
 {
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sfontname);
-	ReconstructFont();
-
-	return *this;
+	reconstruct_font();
 }
 
-CRichEditCtrlEx& CRichEditCtrlEx::SetFontSize(int nSize)
+void CRichEditCtrlEx::set_font_size(int nSize)
 {
-	HDC hDC = GetDC()->GetSafeHdc();
-	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(hDC, LOGPIXELSY), 72);
-	::ReleaseDC(m_hWnd, hDC);
-	ReconstructFont();
-
-	return *this;
+	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, nSize);
+	reconstruct_font();
 }
 
-CRichEditCtrlEx& CRichEditCtrlEx::SetFontBold(bool bBold)
+void CRichEditCtrlEx::set_font_weight(int weight)
 {
-	m_lf.lfWeight = (bBold ? FW_BOLD : FW_NORMAL);
-	ReconstructFont();
-
-	return *this;
+	m_lf.lfWeight = weight;
+	reconstruct_font();
 }
 
 void CRichEditCtrlEx::set_align(int align)
@@ -1049,6 +1068,16 @@ bool CRichEditCtrlEx::load(CString path)
 	add(-1, str);
 
 	return true;
+}
+
+bool CRichEditCtrlEx::save(CString path)
+{
+	CString str;
+	GetWindowText(str);
+
+	str.Replace(_T("\r\n"), _T("\n"));
+
+	return ::save(path, str);
 }
 
 void CRichEditCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)

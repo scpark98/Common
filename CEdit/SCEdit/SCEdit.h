@@ -129,10 +129,12 @@ public:
 	//readonly일 때 전용 배경색인 m_cr_back_readonly를 사용할 지, 무관하게 m_cr_back을 사용할 지.
 	void					set_use_readonly_color(bool use_default = true);
 
-	virtual	CSCEdit&		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual CSCEdit&		set_font_size(int nSize);
-	virtual CSCEdit&		set_font_weight(int weight = FW_BOLD);
-	virtual CSCEdit&		set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
+	//기본 CWnd::SetFont() override
+	void					SetFont(CFont* font, BOOL bRedraw = TRUE);
+	void					set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void					set_font_size(int nSize);
+	void					set_font_weight(int weight = FW_BOLD);
+	void					set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
 	void					recalc_font_size();						//recalculate font height when control size is changed.
 	int						get_font_size(bool pixel_size = false);
 
@@ -168,6 +170,7 @@ public:
 	bool			get_draw_border() { return m_draw_border; }
 	int				get_border_width() { return m_border_width; }
 	Gdiplus::Color	get_border_color() { return m_cr_border; }
+	void			set_border_color(Gdiplus::Color cr_border) { m_cr_border = cr_border; }
 	int				get_border_type() { return m_border_type; }
 
 	// Generated message map functions

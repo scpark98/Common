@@ -258,6 +258,22 @@ bool CSCTime::operator>=(const CSCTime& t) const
 	return milliseconds >= t.milliseconds;
 }
 
+bool CSCTime::operator==(const CSCTime& t)
+{
+	CSCTime subtract = *this - t;
+	if (subtract.is_empty())
+		return true;
+	return false;
+}
+
+bool CSCTime::operator!=(const CSCTime& t)
+{
+	CSCTime subtract = *this - t;
+	if (subtract.is_empty())
+		return false;
+	return true;
+}
+
 bool CSCTime::is_empty()
 {
 	return (year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && second == 0 && milliseconds == 0);

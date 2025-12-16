@@ -645,7 +645,7 @@ time_t _mkgmtime(const struct tm *tm)
     return rt < 0 ? -1 : rt;
 }
 
-int	find(CString target, CString find_string, bool case_sensitive)
+int	find(CString target, CString find_string, bool case_sensitive, bool whole_word)
 {
 	if (!case_sensitive)
 	{
@@ -653,7 +653,29 @@ int	find(CString target, CString find_string, bool case_sensitive)
 		find_string.MakeLower();
 	}
 	
-	return target.Find(find_string);
+	int pos = target.Find(find_string);
+
+	//whole_word라면 그 양쪽에 구두점이 아닌 다른 문자가 있어서는 안된다.
+	if (pos >= 0 && whole_word)
+	{
+		//해당 문자의 앞과 뒤가 구둣점인지 검사
+		bool prefix_punc = true;
+		bool suffix_punc = true;
+		
+		if (pos > 0 && !is_punctuation(target[pos - 1]))
+			prefix_punc = false;
+
+		if (pos >= 0 && pos < target.GetLength() - 1 - find_string.GetLength() &&
+			!is_punctuation(target[pos + find_string.GetLength()]))
+			suffix_punc = false;
+
+		if (prefix_punc && suffix_punc)
+			return pos;
+		else
+			return -1;
+	}
+
+	return pos;
 }
 
 int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, bool bCaseSensitive)
@@ -5832,7 +5854,7 @@ bool delete_file(CString fullpath, bool bTrashCan)
 
 int	get_text_encoding(CString sfile)
 {
-	int text_encoding = text_encoding_ansi;
+	int text_encoding = text_encoding_unknown;
 
 	unsigned char buf[4096] = { 0, };
 
@@ -5843,12 +5865,13 @@ int	get_text_encoding(CString sfile)
 	size_t dwRead = fread(buf, 1, 4096, fp);
 	fclose(fp);
 
+	//BOM 검사
 	if (dwRead >= 3 && buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf)
 		text_encoding = text_encoding_utf8bom;
 	else if (dwRead >= 2 && buf[0] == 0xfe && buf[1] == 0xff)
 		text_encoding = text_encoding_utf16be;
 	else if (dwRead >= 2 && buf[0] == 0xff && buf[1] == 0xfe)
-		text_encoding = text_encoding_utf16be;
+		text_encoding = text_encoding_utf16le;
 	else if (dwRead >= 4 && buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0xfe && buf[3] == 0xff)
 		text_encoding = text_encoding_utf32be;
 	else if (dwRead >= 4 && buf[0] == 0xff && buf[1] == 0xfe && buf[2] == 0x00 && buf[3] == 0x00)
@@ -5857,6 +5880,9 @@ int	get_text_encoding(CString sfile)
 		text_encoding = text_encoding_utf7;
 	else if (dwRead >= 4 && buf[0] == 0x2b && buf[1] == 0x2f && buf[2] == 0x76 && buf[3] == 0x39)
 		text_encoding = text_encoding_utf7;
+
+	//BOM이 없을 경우 판별
+	if (text_encoding == text_encoding_unknown)
 	{
 		//BOM이 없는 일반 파일의 경우 아래와 같이 utf8 문자 범위를 검사하여 utf8인지 euc-kr인지 판별한다.
 		//출처: https://dev-drive.tistory.com/10 [Dev Drive:티스토리]
@@ -5910,6 +5936,22 @@ int	get_text_encoding(CString sfile)
 			text_encoding = text_encoding_utf8;
 		else
 			text_encoding = text_encoding_ansi;
+
+		//utf16-le인데 ansi라고 잘못 판별했다는 가정하에
+		//utf16-le은 홀수 byte가 무조건 0이다.
+		if (text_encoding == text_encoding_ansi)
+		{
+			int i = 1;
+
+			for (i = 1; i < MIN(100, dwRead); i += 2)
+			{
+				if (buf[i] != 0x00)
+					break;
+			}
+
+			if (i >= MIN(100, dwRead))
+				text_encoding = text_encoding_utf16le;
+		}
 	}
 
 	return text_encoding;
@@ -5935,6 +5977,7 @@ CString read(CString filepath, int max_length, int encoding)
 	if (filesize == 0)
 		return result;
 
+	/*
 	if (encoding < 0)
 	{
 		if (text_encoding == text_encoding_ansi)
@@ -5946,14 +5989,19 @@ CString read(CString filepath, int max_length, int encoding)
 	{
 		encoding = CP_UTF8;
 	}
+	*/
 
 	FILE* fp = NULL;
 	
-	if (encoding == CP_UTF8)
+	if (text_encoding >= text_encoding_utf8)
 	{
 		TCHAR* data = new TCHAR[max_length * 2 + 1];
 		memset(data, 0, sizeof(TCHAR) * (max_length * 2 + 1));
-		fp = _tfopen(filepath, _T("rt")CHARSET);
+
+		if (text_encoding == text_encoding_utf8 || text_encoding == text_encoding_utf8bom)
+			_tfopen_s(&fp, filepath, _T("rt")CHARSET);
+		else if (text_encoding)
+			_tfopen_s(&fp, filepath, _T("rb"));
 		fread(data, 1, max_length * 2, fp);
 		result = CString(data);
 		delete[] data;
@@ -5962,7 +6010,7 @@ CString read(CString filepath, int max_length, int encoding)
 	{
 		char* data = new char[max_length + 1];
 		memset(data, 0, sizeof(char) * (max_length + 1));
-		_tfopen_s(&fp, filepath, _T("rt"));
+		_tfopen_s(&fp, filepath, _T("rb"));
 		fread(data, 1, max_length, fp);
 		result = CString(data);
 		delete[] data;
@@ -6033,32 +6081,29 @@ int file_open(FILE** fp, CString mode, CString file)
 	if (text_encoding <= text_encoding_ansi)
 		_tfopen_s(fp, file, mode);
 	else if (text_encoding != text_encoding_unknown)
-		_tfopen_s(fp, file, mode + CHARSET);
+		_tfopen_s(fp, file, mode+CHARSET);
 
 	return text_encoding;
 }
 
-//text 파일을 열어서 dqList에 넣어준다.
-bool read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8)
+//text 파일을 열어서 line단위로 분리한 후 dqList에 넣어준다.
+//라인 단위이므로 맨 끝에는 '\n'을 다시 붙여줘야 한다.
+bool read_file(CString filepath, std::deque<CString> *dqList)
 {
 	dqList->clear();
 
-	FILE* fp;
-	TCHAR tline[2048];
-	CString sline;
-
-	_tfopen_s(&fp, filepath, (using_utf8 ? _T("rt")CHARSET : _T("rt")));
-	if (!fp)
+	if (PathFileExists(filepath) == false)
 		return false;
 
-	while (_fgetts(tline, sizeof(tline), fp) != NULL)
-	{
-		sline = tline;
-		//sline.Trim();
-		dqList->push_back(sline);
-	}
+	CString str = read(filepath);
 
-	fclose(fp);
+	str.Replace(_T("\r\n"), _T("\n"));
+
+	get_token_string(str, *dqList, _T("\n"));
+
+	for (int i = 0; i < dqList->size(); i++)
+		dqList->at(i) += _T("\n");
+
 	return true;
 }
 

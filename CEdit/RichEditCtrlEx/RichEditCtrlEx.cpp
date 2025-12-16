@@ -42,6 +42,13 @@ BEGIN_MESSAGE_MAP(CRichEditCtrlEx, CRichEditCtrl)
 	ON_WM_HSCROLL()
 	ON_WM_VSCROLL()
 	ON_WM_MOUSEWHEEL()
+	//ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONUP()
+	//ON_WM_KEYDOWN()
+	//ON_WM_PAINT()
+	//ON_WM_ERASEBKGND()
+	ON_WM_KEYUP()
+	ON_NOTIFY_REFLECT(EN_SELCHANGE, &CRichEditCtrlEx::OnEnSelchange)
 END_MESSAGE_MAP()
 
 
@@ -142,6 +149,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 
 	CHARFORMAT	cf;
+	ZeroMemory(&cf, sizeof(cf));
 
 	CPoint pt = GetCaretPos();
 	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
@@ -152,7 +160,6 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	si.cbSize = sizeof(SCROLLINFO);
 	ZeroMemory(&si, si.cbSize);
 	GetScrollInfo(SB_VERT, &si);
-
 
 
 	nOldLines = GetLineCount();
@@ -176,8 +183,8 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		sTime.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
 		cf.cbSize = sizeof(CHARFORMAT);
-		cf.dwMask = CFM_COLOR;
-		cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
+		//cf.dwMask = CFM_COLOR;
+		//cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
 		cf.crTextColor = RGB(128, 128, 128);
 		SetSelectionCharFormat(cf);
 
@@ -189,8 +196,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 	// Initialize character format structure
 	cf.cbSize = sizeof(CHARFORMAT);
-	cf.dwMask = CFM_COLOR;
-	cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
+	cf.dwMask = CFM_COLOR | CFM_BOLD | CFM_ITALIC | CFM_UNDERLINE | CFM_STRIKEOUT;
 
 	if (cr == -1)
 		cf.crTextColor = m_crText;
@@ -205,16 +211,59 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		ReplaceSel(_T(""));
 	}
 
-	nInsertionPoint = -1;
-	SetSel(nInsertionPoint, -1);
-
-	//  Set the character format
+	//텍스트를 추가하고
+	nInsertionPoint = GetWindowTextLength();
+	SetSel(nInsertionPoint, nInsertionPoint);
 	SetSelectionCharFormat(cf);
+	ReplaceSel(new_text);
+
+	//조건에 따라 텍스트 일부 색상을 변경한다.
+	//라인이 추가되면서 pos의 위치가 하나씩 밀리는 현상이 왜 발생하는지 모르겠으나
+	//total_lines 변수를 이용해서 보정한다.
+
+	int total_lines = GetLineCount() - 2;
+
+	for (int i = 0; i < m_keyword_formats.size(); i++)
+	{
+		int pos = find(new_text, m_keyword_formats[i].keyword, false, true);
+		if (pos >= 0)
+		{
+			cf.crTextColor = m_keyword_formats[i].cr;
+			cf.dwEffects = 0;
+			if (m_keyword_formats[i].bold)
+				cf.dwEffects |= CFE_BOLD;
+			if (m_keyword_formats[i].italic)
+				cf.dwEffects |= CFE_ITALIC;
+			if (m_keyword_formats[i].underline)
+				cf.dwEffects |= CFE_UNDERLINE;
+			if (m_keyword_formats[i].strikeout)
+				cf.dwEffects |= CFE_STRIKEOUT;
+			SetSel(nInsertionPoint + pos - total_lines, nInsertionPoint + pos - total_lines + m_keyword_formats[i].keyword.GetLength());
+			SetSelectionCharFormat(cf);
+		}
+	}
+
+	/*
+	CString find_str = _T("][");
+	int pos = new_text.Find(find_str);
+	if (pos >= 0)
+	{
+		cf.crTextColor = RGB(255, 0, 0);
+		SetSel(nInsertionPoint + pos - total_lines, nInsertionPoint + pos - total_lines + find_str.GetLength());
+		SetSelectionCharFormat(cf);
+	}
+
+	cf.crTextColor = m_crText;
+	if (pos >= 0)
+		SetSel(nInsertionPoint + pos - total_lines + find_str.GetLength(), GetWindowTextLength());
+	else
+		SetSel(nInsertionPoint, GetWindowTextLength());
+	SetSelectionCharFormat(cf);
+	*/
 
 	// Replace selection. Because we have nothing selected, this will simply insert
 	// the string at the current caret position.
 	//SetRedraw(FALSE);
-	ReplaceSel(new_text);
 	//SetRedraw(TRUE);
 
 #ifdef _DEBUG
@@ -1112,4 +1161,123 @@ BOOL CRichEditCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	//GetParent()->SendMessage(WM_VSCROLL, MAKEWPARAM(nSBCode, nPos), (LPARAM)pScrollBar->GetSafeHwnd());
 
 	return CRichEditCtrl::OnMouseWheel(nFlags, zDelta, pt);
+}
+
+void CRichEditCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//Trace_func();
+	//CPoint pt = GetCaretPos();
+	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
+
+
+	CRichEditCtrl::OnLButtonDown(nFlags, point);
+}
+
+void CRichEditCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	highlight_current_line();
+
+	CRichEditCtrl::OnLButtonUp(nFlags, point);
+}
+
+void CRichEditCtrlEx::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CRichEditCtrl::OnKeyDown(nChar, nRepCnt, nFlags);
+}
+
+void CRichEditCtrlEx::OnPaint()
+{
+	CRichEditCtrl::OnPaint();
+
+	/*
+	CPaintDC dc(this); // device context for painting
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	// 그리기 메시지에 대해서는 CRichEditCtrl::OnPaint()을(를) 호출하지 마십시오.
+	CRect rc;
+	GetClientRect(rc);
+
+	dc.FillSolidRect(0, 0, 100, 100, red);
+	*/
+}
+
+BOOL CRichEditCtrlEx::OnEraseBkgnd(CDC* pDC)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	return CRichEditCtrl::OnEraseBkgnd(pDC);
+}
+
+void CRichEditCtrlEx::highlight_current_line()
+{
+	return;
+	int line = LineFromChar(LineIndex(-1));
+	int begin = LineIndex(line);
+	int length = LineLength(begin);
+	TRACE(_T("line = %d, begin = %d, length = %d\n"), line, begin, length);
+
+	SetRedraw(FALSE);
+
+	//원래색으로 복원하고
+	//SetSel(0, -1);	//이럴 경우 맨위로 스크롤되는	문제가 있다.
+
+	CHARFORMAT2 cf;
+	ZeroMemory(&cf, sizeof(cf));
+	cf.cbSize = sizeof(cf);
+	cf.dwMask = CFM_COLOR | CFM_BACKCOLOR;
+	//cf.crBackColor = m_crBack;
+	//cf.dwEffects &= ~CFE_AUTOBACKCOLOR;
+	//SetSelectionCharFormat(cf);
+
+
+	SetSel(begin, begin + length);
+	cf.crTextColor = white;
+	cf.crBackColor = royalblue;
+	cf.dwEffects &= ~CFE_AUTOBACKCOLOR;
+	SetSelectionCharFormat(cf);
+
+	SetSel(begin, begin);
+
+	SetRedraw(TRUE);
+
+	Invalidate();
+}
+
+void CRichEditCtrlEx::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	highlight_current_line();
+
+	CRichEditCtrl::OnKeyUp(nChar, nRepCnt, nFlags);
+}
+
+void CRichEditCtrlEx::OnEnSelchange(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	SELCHANGE* pSelChange = reinterpret_cast<SELCHANGE*>(pNMHDR);
+	// TODO:  컨트롤은 IParam 마스크와 OR 연산하여 설정된 ENM_CORRECTTEXT 플래그를 사용하여
+	// EM_SETEVENTMASK 메시지를 컨트롤로 보내도록 CRichEditCtrl::OnInitDialog() 함수를 재지정하지 않으면
+	// ENM_SELCHANGE가 있는 컨트롤에는 IParam 마스크에 ORed를 플래그합니다.
+
+	// TODO:  여기에 컨트롤 알림 처리기 코드를 추가합니다.
+
+	*pResult = 0;
+}
+
+void CRichEditCtrlEx::select_line(int line)
+{
+	int lineIdx = LineIndex(line);
+	int lineLen = LineLength(lineIdx);
+	SetSel(lineIdx, lineIdx + lineLen);
+}
+
+void CRichEditCtrlEx::add_keyword_format(CSCKeywordFormat kf)
+{
+	m_keyword_formats.push_back(kf);
+}
+
+void CRichEditCtrlEx::clear_keyword_format()
+{
+	m_keyword_formats.clear();
 }

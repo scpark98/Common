@@ -28,8 +28,8 @@ public:
 	bool operator<=(const CSCTime& t) const;
 	bool operator>(const CSCTime& t) const;
 	bool operator>=(const CSCTime& t) const;
-	bool operator==(const CSCTime& t) const;
-	bool operator!=(const CSCTime& t) const;
+	bool operator==(const CSCTime& t);
+	bool operator!=(const CSCTime& t);
 	SYSTEMTIME	to_SYSTEMTIME() const;
 	void		get_time(CDateTimeCtrl& datetime_ctrl);
 

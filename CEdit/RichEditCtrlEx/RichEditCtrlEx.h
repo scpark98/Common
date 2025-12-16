@@ -17,6 +17,34 @@
 
 static const UINT Message_CRichEditCtrlEx = ::RegisterWindowMessage(_T("MessageString_CRichEditCtrlEx"));
 
+class CSCKeywordFormat
+{
+public:
+	CSCKeywordFormat()
+	{
+
+	}
+
+	CSCKeywordFormat(CString _keyword, COLORREF _cr, bool _bold = false, bool _italic = false, bool _underline = false, bool _strikeout = false, bool _whole_word = false)
+	{
+		keyword = _keyword;
+		cr = _cr;
+		bold = _bold;
+		italic = _italic;
+		underline = _underline;
+		strikeout = _strikeout;
+		whole_word = _whole_word;
+	}
+
+	CString		keyword;
+	COLORREF	cr;
+	bool		bold = false;
+	bool		italic = false;
+	bool		underline = false;
+	bool		strikeout = false;
+	bool		whole_word = false;
+};
+
 class CRichEditCtrlExMessage
 {
 public:
@@ -111,9 +139,16 @@ public:
 	void		set_font_size(int nSize);
 	void		set_font_weight(int weight);
 
+	void		highlight_current_line();
+	void		select_line(int line);
+
 //file
 	bool		load(CString path);
 	bool		save(CString path);
+
+//keyword highlight
+	void		add_keyword_format(CSCKeywordFormat kf);
+	void		clear_keyword_format();
 
 protected:
 	COLORREF	m_crText;
@@ -137,6 +172,7 @@ protected:
 	void		UpdateSurface();
 	void		reconstruct_font();
 
+	std::deque<CSCKeywordFormat> m_keyword_formats;
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -151,4 +187,11 @@ public:
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	afx_msg void OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg void OnEnSelchange(NMHDR* pNMHDR, LRESULT* pResult);
 };

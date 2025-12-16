@@ -90,6 +90,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define Trace(fmt, ...) trace_output(false, __function__, __LINE__, false, fmt, ##__VA_ARGS__)
 #define Traceln(fmt, ...) trace_output(false, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 #define Trace_only(fmt, ...) trace_output(true, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
+#define Trace_func() trace_output(false, __function__, __LINE__, false, _T("%s\n"), __function__)
 
 #define traceonly TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());
 
@@ -743,7 +744,10 @@ struct	NETWORK_INFO
 //////////////////////////////////////////////////////////////////////////
 //문자열
 	bool		Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase);
-	int			find(CString target, CString find_string, bool case_sensitive = false);
+	//target에서 맨 처음 매칭되는 항목만 찾아 그 시작위치를 리턴한다.
+	int			find(CString target, CString find_string, bool case_sensitive = false, bool whole_word = false);
+	int			find_all(std::deque<int>& result, CString target, CString find_string, bool case_sensitive = false, bool whole_word = false);
+
 	//dqSrc에 dqFind가 있는지 검사하여 인덱스를 리턴. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
 	int			find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord = false, bool bCaseSensitive = false);
 	int			find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR op = '&', bool bWholeWord = false, bool bCaseSensitive = false);
@@ -1332,7 +1336,7 @@ struct	NETWORK_INFO
 	int			file_open(FILE** fp, CString mode, CString file);
 
 	//text 파일을 열어서 라인별로 읽은 후 dqList에 넣어준다.
-	bool		read_file(CString filepath, std::deque<CString> *dqList, bool using_utf8);
+	bool		read_file(CString filepath, std::deque<CString> *dqList);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
 	//MOBIS 프로젝트 저장 MP4는 mdat 필드의 0x40번지부터 28 bytes가

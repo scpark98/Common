@@ -1597,12 +1597,22 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 
 							refresh_list();
 							return true;
-		case VK_END :		if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
+		case VK_HOME:		if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000))
+							{
+								//set_auto_scroll(true);
+								//return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
+							}
+							return false;
+		case VK_END :		if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000))
 							{
 								set_auto_scroll(true);
 								return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
 							}
 							return false;
+		case VK_PRIOR:
+							if (m_in_editing)
+								return FALSE;
+
 			/*
 		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
 		case VK_DELETE	:	if (m_bInEditing)
@@ -1876,7 +1886,7 @@ LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 {
 	CSCEditMessage* msg = (CSCEditMessage*)wParam;
 
-	if (!msg->pThis->IsWindowVisible())
+	if (msg && msg->pThis && !msg->pThis->IsWindowVisible())
 		return 0;
 
 	TRACE(_T("message(%d) from CSCEdit(%p)\n"), msg->message, msg->pThis);

@@ -223,23 +223,30 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 
 	int total_lines = GetLineCount() - 2;
 
+	//우선 add()함수에서 이를 for루프로 처리하고 있으나 속도를 개선하기 위해 thread로 분리시켜야 한다.
 	for (int i = 0; i < m_keyword_formats.size(); i++)
 	{
-		int pos = find(new_text, m_keyword_formats[i].keyword, false, true);
-		if (pos >= 0)
+		std::deque<int> results;
+		find_all(results, new_text, m_keyword_formats[i].keyword, false, true);
+
+		for (int j = 0; j < results.size(); j++)
 		{
-			cf.crTextColor = m_keyword_formats[i].cr;
-			cf.dwEffects = 0;
-			if (m_keyword_formats[i].bold)
-				cf.dwEffects |= CFE_BOLD;
-			if (m_keyword_formats[i].italic)
-				cf.dwEffects |= CFE_ITALIC;
-			if (m_keyword_formats[i].underline)
-				cf.dwEffects |= CFE_UNDERLINE;
-			if (m_keyword_formats[i].strikeout)
-				cf.dwEffects |= CFE_STRIKEOUT;
-			SetSel(nInsertionPoint + pos - total_lines, nInsertionPoint + pos - total_lines + m_keyword_formats[i].keyword.GetLength());
-			SetSelectionCharFormat(cf);
+			int pos = results[j];
+			if (pos >= 0)
+			{
+				cf.crTextColor = m_keyword_formats[i].cr;
+				cf.dwEffects = 0;
+				if (m_keyword_formats[i].bold)
+					cf.dwEffects |= CFE_BOLD;
+				if (m_keyword_formats[i].italic)
+					cf.dwEffects |= CFE_ITALIC;
+				if (m_keyword_formats[i].underline)
+					cf.dwEffects |= CFE_UNDERLINE;
+				if (m_keyword_formats[i].strikeout)
+					cf.dwEffects |= CFE_STRIKEOUT;
+				SetSel(nInsertionPoint + pos - total_lines, nInsertionPoint + pos - total_lines + m_keyword_formats[i].keyword.GetLength());
+				SetSelectionCharFormat(cf);
+			}
 		}
 	}
 

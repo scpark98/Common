@@ -645,7 +645,7 @@ time_t _mkgmtime(const struct tm *tm)
     return rt < 0 ? -1 : rt;
 }
 
-int	find(CString target, CString find_string, bool case_sensitive, bool whole_word)
+int	find(CString target, CString find_string, int start, bool case_sensitive, bool whole_word)
 {
 	if (!case_sensitive)
 	{
@@ -653,7 +653,7 @@ int	find(CString target, CString find_string, bool case_sensitive, bool whole_wo
 		find_string.MakeLower();
 	}
 	
-	int pos = target.Find(find_string);
+	int pos = target.Find(find_string, start);
 
 	//whole_word라면 그 양쪽에 구두점이 아닌 다른 문자가 있어서는 안된다.
 	if (pos >= 0 && whole_word)
@@ -676,6 +676,22 @@ int	find(CString target, CString find_string, bool case_sensitive, bool whole_wo
 	}
 
 	return pos;
+}
+
+int	find_all(std::deque<int>& result, CString target, CString find_string, bool case_sensitive, bool whole_word)
+{
+	result.clear();
+	int pos = find(target, find_string, 0, case_sensitive, whole_word);
+	while (pos >= 0)
+	{
+		result.push_back(pos);
+		pos = find(target, find_string, pos + find_string.GetLength(), case_sensitive, whole_word);
+	}
+
+	if (result.size() > 0)
+		return result[0];
+
+	return -1;
 }
 
 int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, bool bCaseSensitive)
@@ -5937,15 +5953,15 @@ int	get_text_encoding(CString sfile)
 		else
 			text_encoding = text_encoding_ansi;
 
-		//utf16-le인데 ansi라고 잘못 판별했다는 가정하에
-		//utf16-le은 홀수 byte가 무조건 0이다.
-		if (text_encoding == text_encoding_ansi)
+		//utf16-le인데 BOM이 없어서 utf8 or ansi라고 잘못 판별했다는 가정하에
+		//utf16-le는 홀수 byte가 무조건 0이다. 만약 중간에 한글이 있다면?
+		//if (true)//text_encoding == text_encoding_ansi)
 		{
 			int i = 1;
 
 			for (i = 1; i < MIN(100, dwRead); i += 2)
 			{
-				if (buf[i] != 0x00)
+				if (!is_hangul(CString((char*)buf[i])) && buf[i] != 0x00)
 					break;
 			}
 

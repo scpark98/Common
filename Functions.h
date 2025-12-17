@@ -745,7 +745,8 @@ struct	NETWORK_INFO
 //문자열
 	bool		Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase);
 	//target에서 맨 처음 매칭되는 항목만 찾아 그 시작위치를 리턴한다.
-	int			find(CString target, CString find_string, bool case_sensitive = false, bool whole_word = false);
+	int			find(CString target, CString find_string, int start = 0, bool case_sensitive = false, bool whole_word = false);
+	//target에서 매칭되는 모든 항목의 시작위치를 result deque에 담고 첫번째 매칭 위치를 리턴한다.
 	int			find_all(std::deque<int>& result, CString target, CString find_string, bool case_sensitive = false, bool whole_word = false);
 
 	//dqSrc에 dqFind가 있는지 검사하여 인덱스를 리턴. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.

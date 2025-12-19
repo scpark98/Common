@@ -403,9 +403,9 @@ D2D1::ColorF	get_d2color(Gdiplus::Color cr);
 
 
 //#RRGGBB와 같은 16진수 컬러 문자열을 COLORREF로 변환
-COLORREF		get_color_from_hexadecimal(CString cr);
+COLORREF		get_color_from_hexa_str(CString hexa_str);
 //#RRGGBB 또는 #AARRGGBB와 같은 16진수 컬러 문자열을 Gdiplus::Color로 변환
-Gdiplus::Color	get_gcolor_from_hexadecimal(CString cr);
+Gdiplus::Color	get_gcolor_from_hexa_str(CString hexa_str);
 
 
 //argb 순서로 "255, 123, 12, 255" 형태의 문자열을 리턴.

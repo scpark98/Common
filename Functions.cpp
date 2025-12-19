@@ -654,7 +654,7 @@ int	find(CString target, CString find_string, int start, bool case_sensitive, bo
 	}
 	
 	int pos = target.Find(find_string, start);
-
+	TRACE(_T("start = %d, pos = %d\n"), start, pos);
 	//whole_word라면 그 양쪽에 구두점이 아닌 다른 문자가 있어서는 안된다.
 	if (pos >= 0 && whole_word)
 	{
@@ -5883,15 +5883,15 @@ int	get_text_encoding(CString sfile)
 
 	//BOM 검사
 	if (dwRead >= 3 && buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf)
-		text_encoding = text_encoding_utf8bom;
+		text_encoding = text_encoding_utf8_bom;
 	else if (dwRead >= 2 && buf[0] == 0xfe && buf[1] == 0xff)
-		text_encoding = text_encoding_utf16be;
+		text_encoding = text_encoding_utf16be_bom;
 	else if (dwRead >= 2 && buf[0] == 0xff && buf[1] == 0xfe)
-		text_encoding = text_encoding_utf16le;
+		text_encoding = text_encoding_utf16le_bom;
 	else if (dwRead >= 4 && buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0xfe && buf[3] == 0xff)
-		text_encoding = text_encoding_utf32be;
+		text_encoding = text_encoding_utf32be_bom;
 	else if (dwRead >= 4 && buf[0] == 0xff && buf[1] == 0xfe && buf[2] == 0x00 && buf[3] == 0x00)
-		text_encoding = text_encoding_utf32le;
+		text_encoding = text_encoding_utf32le_bom;
 	else if (dwRead >= 4 && buf[0] == 0x2b && buf[1] == 0x2f && buf[2] == 0x76 && buf[3] == 0x38)
 		text_encoding = text_encoding_utf7;
 	else if (dwRead >= 4 && buf[0] == 0x2b && buf[1] == 0x2f && buf[2] == 0x76 && buf[3] == 0x39)
@@ -5959,13 +5959,13 @@ int	get_text_encoding(CString sfile)
 		{
 			int i = 1;
 
-			for (i = 1; i < MIN(100, dwRead); i += 2)
+			for (i = 1; i < dwRead; i += 2)
 			{
 				if (!is_hangul(CString((char*)buf[i])) && buf[i] != 0x00)
 					break;
 			}
 
-			if (i >= MIN(100, dwRead))
+			if (i >= dwRead)
 				text_encoding = text_encoding_utf16le;
 		}
 	}
@@ -5982,6 +5982,137 @@ CString read(CString filepath, int max_length, int encoding)
 	if (PathFileExists(filepath) == false)
 		return result;
 
+#if 0
+	CFile file;
+	
+	if (!file.Open(filepath, CFile::modeRead))
+		return result;
+
+	const auto nFileSize = file.GetLength();
+
+	const auto nFileSizeForLoader{ static_cast<int>(nFileSize) };
+
+	if (nFileSize != static_cast<ULONGLONG>(nFileSizeForLoader))
+	{
+		AfxMessageBox(_T("fail to open. Document too large."), MB_ICONEXCLAMATION);
+		return result;
+	}
+
+	UINT buffer_size = 4096;
+
+	std::vector<BYTE> byteBuffer(4096);// { buffer_size, std::allocator<BYTE>{} };
+	int nBytesRead{ 0 };
+	int encoding_type = text_encoding_unknown;
+	bool detected_BOM = false;
+
+	do
+	{
+#pragma warning(suppress: 26472)
+		nBytesRead = file.Read(byteBuffer.data(), static_cast<UINT>(byteBuffer.size()));
+
+		if (nBytesRead)
+		{
+			int nSkip{ 0 };
+			if (!detected_BOM)
+			{
+				detected_BOM = true;
+				int nUniTest = IS_TEXT_UNICODE_STATISTICS;
+				//detect UTF-16BE with BOM
+#pragma warning(suppress: 26446)
+				if ((nBytesRead > 1) && ((nFileSize % 2) == 0) && ((nBytesRead % 2) == 0) && (byteBuffer[0] == 0xFE) && (byteBuffer[1] == 0xFF))
+				{
+					encoding_type = text_encoding_utf16be_bom;
+					nSkip = 2;
+				}
+				//detect UTF-16LE with BOM
+#pragma warning(suppress: 26446)
+				else if ((nBytesRead > 1) && ((nFileSize % 2) == 0) && ((nBytesRead % 2) == 0) && (byteBuffer[0] == 0xFF) && (byteBuffer[1] == 0xFE))
+				{
+					encoding_type = text_encoding_utf16le_bom;
+					nSkip = 2;
+				}
+				//detect UTF-8 with BOM
+#pragma warning(suppress: 26446)
+				else if ((nBytesRead > 2) && (byteBuffer[0] == 0xEF) && (byteBuffer[1] == 0xBB) && (byteBuffer[2] == 0xBF))
+				{
+					encoding_type = text_encoding_utf8_bom;
+					nSkip = 3;
+				}
+				//detect UTF-16LE without BOM (Note IS_TEXT_UNICODE_STATISTICS implies Little Endian for all versions of supported Windows platforms i.e. x86, x64, ARM & ARM64)
+#pragma warning(suppress: 26446)
+				else if ((nBytesRead > 1) && ((nFileSize % 2) == 0) && ((nBytesRead % 2) == 0) && (byteBuffer[0] != 0) && (byteBuffer[1] == 0) && IsTextUnicode(byteBuffer.data(), nBytesRead, &nUniTest))
+				{
+					encoding_type = text_encoding_utf16le;
+					nSkip = 0;
+				}
+			}
+
+			//Work out the data to pass to ILoader->AddData
+			const char* pLoadData{ nullptr };
+			int nBytesToLoad{ 0 };
+			CStringA sUTF8Data;
+
+			if ((encoding_type == text_encoding_utf16le) || (encoding_type == text_encoding_utf16le_bom))
+			{
+				//Handle conversion from UTF16LE to UTF8
+#pragma warning(suppress: 26481 26490)
+				/*
+				sUTF8Data = CScintillaCtrl::W2UTF8(reinterpret_cast<const wchar_t*>(byteBuffer.data() + nSkip), (nBytesRead - nSkip) / 2);
+				pLoadData = sUTF8Data;
+				nBytesToLoad = sUTF8Data.GetLength();
+				*/
+				//sUTF8Data = W2UTF8(reinterpret_cast<const wchar_t*>(byteBuffer.data() + nSkip), (nBytesRead - nSkip) / 2);
+			}
+			else if (encoding_type == text_encoding_utf16be)
+			{
+				//Handle conversion from UTF16BE to UTF8
+				/*
+#pragma warning(suppress: 26429 26481)
+				BYTE* p = byBuffer.data() + nSkip;
+				const int nUTF16CharsRead = (nBytesRead - nSkip) / 2;
+				for (int i = 0; i < nUTF16CharsRead; i++)
+				{
+					const BYTE t{ *p };
+#pragma warning(suppress: 26481)
+					* p = p[1];
+#pragma warning(suppress: 26481)
+					p[1] = t;
+#pragma warning(suppress: 26481)
+					p += 2;
+				}
+#pragma warning(suppress: 26481 26490)
+				sUTF8Data = CScintillaCtrl::W2UTF8(reinterpret_cast<const wchar_t*>(byBuffer.data() + nSkip), (nBytesRead - nSkip) / 2);
+				pLoadData = sUTF8Data;
+				nBytesToLoad = sUTF8Data.GetLength();
+				*/
+			}
+			else
+			{
+#pragma warning(suppress: 26481 26490)
+				/*
+				pLoadData = reinterpret_cast<const char*>(byBuffer.data()) + nSkip;
+				nBytesToLoad = nBytesRead - nSkip;
+				*/
+				result += CString(byteBuffer.data());
+			}
+			/*
+			ASSERT(pLoadData != nullptr);
+			const auto nAddDataError{ pLoader->AddData(pLoadData, nBytesToLoad) };
+			if (nAddDataError != SC_STATUS_OK)
+			{
+				pLoader->Release();
+				CString sError;
+				sError.Format(_T("%d"), nAddDataError);
+				CString sMsg;
+				AfxFormatString1(sMsg, IDP_FAIL_SCINTILLA_ADDDATA_DURING_LOAD, sError);
+				AfxMessageBox(sMsg, MB_ICONEXCLAMATION);
+				AfxThrowUserException();
+			}
+			*/
+		}
+	} while (nBytesRead);
+
+#elif 1
 	int text_encoding = get_text_encoding(filepath);
 	uint64_t filesize = get_file_size(filepath);
 
@@ -5993,20 +6124,6 @@ CString read(CString filepath, int max_length, int encoding)
 	if (filesize == 0)
 		return result;
 
-	/*
-	if (encoding < 0)
-	{
-		if (text_encoding == text_encoding_ansi)
-			encoding = CP_ACP;
-		else
-			encoding = CP_UTF8;
-	}
-	else if (encoding != CP_ACP && encoding != CP_UTF8)
-	{
-		encoding = CP_UTF8;
-	}
-	*/
-
 	FILE* fp = NULL;
 	
 	if (text_encoding >= text_encoding_utf8)
@@ -6014,7 +6131,7 @@ CString read(CString filepath, int max_length, int encoding)
 		TCHAR* data = new TCHAR[max_length * 2 + 1];
 		memset(data, 0, sizeof(TCHAR) * (max_length * 2 + 1));
 
-		if (text_encoding == text_encoding_utf8 || text_encoding == text_encoding_utf8bom)
+		if (text_encoding == text_encoding_utf8 || text_encoding == text_encoding_utf8_bom)
 			_tfopen_s(&fp, filepath, _T("rt")CHARSET);
 		else if (text_encoding)
 			_tfopen_s(&fp, filepath, _T("rb"));
@@ -6033,6 +6150,7 @@ CString read(CString filepath, int max_length, int encoding)
 	}
 
 	fclose(fp);
+#endif
 
 	return result;
 }
@@ -8101,234 +8219,62 @@ std::string CStringToUtf8(CString inputtext)
 }
 
 /*
-char* Utf8Encode(IN LPCTSTR szText)
+CStringA W2UTF8(_In_NLS_string_(nLength) const wchar_t* pszText, _In_ int nLength)
 {
-	USES_CONVERSION;
-	// str이 Unicode인지 Ansi 인지 따질 필요없게 T2CW로 변환    
-	const WCHAR* wStr = T2CW(szText);    
-	
-	// 길이는 -1로 주어 널NULL 문자도 변환되도록
-	//WCHAR -> UTF-8
-	
-	int nUTF8codeSize = WideCharToMultiByte(CP_UTF8, 0, wStr, -1, NULL, 0, NULL, NULL); //wStr의 크기를 구함
-	char *utf8Str = new char[nUTF8codeSize];
-	ZeroMemory(utf8Str, nUTF8codeSize);
-	
-	WideCharToMultiByte(CP_UTF8, 0, wStr, -1, utf8Str, nUTF8codeSize, 0, 0);    
-	
-	return utf8Str;
+	//First call the function to determine how much space we need to allocate
+	int nUTF8Length{ WideCharToMultiByte(CP_UTF8, 0, pszText, nLength, nullptr, 0, nullptr, nullptr) };
+
+	//If the calculated length is zero, then ensure we have at least room for a null terminator
+	if (nUTF8Length == 0)
+		nUTF8Length = 1;
+
+	//Now recall with the buffer to get the converted text
+	CStringA sUTF;
+#pragma warning(suppress: 26429)
+	char* const pszUTF8Text{ sUTF.GetBuffer(nUTF8Length + 1) }; //include an extra byte because we may be null terminating the string ourselves
+	int nCharsWritten{ WideCharToMultiByte(CP_UTF8, 0, pszText, nLength, pszUTF8Text, nUTF8Length, nullptr, nullptr) };
+
+	//Ensure we null terminate the text if WideCharToMultiByte doesn't do it for us
+	if (nLength != -1)
+	{
+#pragma warning(suppress: 26477 26496)
+		ATLASSUME(nCharsWritten <= nUTF8Length);
+#pragma warning(suppress: 26481)
+		pszUTF8Text[nCharsWritten] = '\0';
+	}
+	sUTF.ReleaseBuffer();
+
+	return sUTF;
 }
 
-void Utf8Decode(IN OUT BYTE* pbyData, IN OUT int& nSize)
+CStringW UTF82W(_In_NLS_string_(nLength) const char* pszText, _In_ int nLength)
 {
-	char* szMsg = new char[nSize + 1];
-	CopyMemory(szMsg, pbyData, nSize);
-	szMsg[nSize] = '\0';
-	
-	int size = MultiByteToWideChar(CP_UTF8, 0,  szMsg, -1, NULL, 0);
-	LPWSTR wStr = new WCHAR[size];
-	ZeroMemory(wStr, sizeof(WCHAR) * size);
-	
-	MultiByteToWideChar(CP_UTF8, 0,  szMsg, -1, wStr, size); 
-	
-	USES_CONVERSION;
-	LPSTR str = W2A(wStr);
-	
-	nSize = strlen(str);
-	CopyMemory(pbyData, str, nSize);
-	
-	delete[] szMsg;
-	delete[] wStr;
-}
-*/
+	//First call the function to determine how much space we need to allocate
+	int nWideLength{ MultiByteToWideChar(CP_UTF8, 0, pszText, nLength, nullptr, 0) };
 
+	//If the calculated length is zero, then ensure we have at least room for a null terminator
+	if (nWideLength == 0)
+		nWideLength = 1;
 
-/*
-//Enable DEBUG privilege
-bool EnableDebugPrivilege(void)
-{
-	HANDLE hToken;
-	LUID sedebugnameValue;
-	TOKEN_PRIVILEGES tkp;
+	//Now recall with the buffer to get the converted text
+	CStringW sWideString;
+#pragma warning(suppress: 26429)
+	wchar_t* pszWText{ sWideString.GetBuffer(nWideLength + 1) }; //include an extra byte because we may be null terminating the string ourselves
+	int nCharsWritten{ MultiByteToWideChar(CP_UTF8, 0, pszText, nLength, pszWText, nWideLength) };
 
-	// enable the SeDebugPrivilege
-	if (! OpenProcessToken(GetCurrentProcess(),
-		TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+	//Ensure we null terminate the text if MultiByteToWideChar doesn't do it for us
+	if (nLength != -1)
 	{
-		_tprintf(_T("OpenProcessToken() failed, Error = %d SeDebugPrivilege is not available.\n"), GetLastError());
-		return FALSE;
+#pragma warning(suppress: 26477 26496)
+		ATLASSUME(nCharsWritten <= nWideLength);
+#pragma warning(suppress: 26481)
+		pszWText[nCharsWritten] = '\0';
 	}
+	sWideString.ReleaseBuffer();
 
-	if (! LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &sedebugnameValue))
-	{
-		_tprintf(_T("LookupPrivilegeValue() failed, Error = %d SeDebugPrivilege is not available.\n"), GetLastError());
-		CloseHandle(hToken);
-		return FALSE;
-	}
-
-	tkp.PrivilegeCount = 1;
-	tkp.Privileges[0].Luid = sedebugnameValue;
-	tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-	if (! AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof tkp, NULL, NULL))
-		_tprintf(_T("AdjustTokenPrivileges() failed, Error = %d SeDebugPrivilege is not available.\n"), GetLastError());
-		
-	return CloseHandle(hToken);
-}
-
-//Closes the file handles in the processes which are using this file
-bool CloseRemoteFileHandles(LPCTSTR lpFileName)
-{
-	CString deviceFileName;
-	CString fsFilePath;
-	CString name;
-	CString processName;
-	SystemHandleInformation hi;
-	SystemProcessInformation pi;
-	SystemProcessInformation::SYSTEM_PROCESS_INFORMATION* pPi;
-	
-	//Convert it to device file name
-	if (!SystemInfoUtils::GetDeviceFileName(lpFileName, deviceFileName))
-	{
-		_tprintf(_T("GetDeviceFileName() failed.\n"));
-		return FALSE;
-	}
-	
-	//Query every file handle (system wide)
-	if (!hi.SetFilter(_T("File"), TRUE))
-	{
-		_tprintf(_T("SystemHandleInformation::SetFilter() failed.\n"));
-		return FALSE;
-	}
-
-	if (!pi.Refresh())
-	{
-		_tprintf(_T("SystemProcessInformation::Refresh() failed.\n"));
-		return FALSE;
-	}
-
-	//Iterate through the found file handles
-	for (POSITION pos = hi.m_HandleInfos.GetHeadPosition(); pos != NULL;)
-	{
-		SystemHandleInformation::SYSTEM_HANDLE& h = hi.m_HandleInfos.GetNext(pos);
-
-		if (!pi.m_ProcessInfos.Lookup(h.ProcessID, pPi))
-			continue;
-
-		if (pPi == NULL)
-			continue;
-
-		//Get the process name
-		SystemInfoUtils::Unicode2CString(&pPi->usName, processName);
-
-		//NT4 Stupid thing if I query the name of a file in services.exe
-		//Messengr service brings up a message dialog ??? :(
-		if (INtDll::dwNTMajorVersion == 4 && _tcsicmp(processName, _T("services.exe")) == 0)
-			continue;
-		
-		//what's the file name for this given handle?
-		hi.GetName((HANDLE)h.HandleNumber, name, h.ProcessID);
-
-		//This is what we want to delete, so close the handle
-		if (_tcsicmp(name, deviceFileName) == 0)
-			CloseRemoteHandle(processName, h.ProcessID, (HANDLE)h.HandleNumber);
-	}
-
-	return TRUE;
-}
-
-//Close a handle in a remote process
-DWORD CloseRemoteHandle(LPCTSTR lpProcessName, DWORD processID, HANDLE handle)
-{
-	HANDLE ht = 0;
-	DWORD rc = 0;
-	
-	_tprintf(_T("Closing handle in process #%d (%s) ... "), processID, lpProcessName);
-
-	// open the process
-	HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION |
-			PROCESS_VM_WRITE | PROCESS_VM_READ, FALSE, processID);
-	
-	if (hProcess == NULL)
-	{
-		rc = GetLastError();
-		_tprintf(_T("OpenProcess() failed\n"));
-		return rc;
-	}
-
-	// load kernel32.dll
-	HMODULE hKernel32 = LoadLibrary(_T("kernel32.dll"));
-
-	// CreateRemoteThread()
-	ht = CreateRemoteThread(
-			hProcess, 
-			0, 
-			0, 
-			(DWORD (__stdcall *)(void *))GetProcAddress(hKernel32, "CloseHandle"),
-			handle, 
-			0, 
-			&rc);
-	
-	if (ht == NULL)
-	{
-		//Something is wrong with the privileges, or the process doesn't like us
-		rc = GetLastError();
-		_tprintf(_T("CreateRemoteThread() failed\n"));
-		goto cleanup;
-	}
-
-	switch (WaitForSingleObject(ht, 2000))
-	{
-	case WAIT_OBJECT_0:
-		//Well done
-		rc = 0;
-		_tprintf(_T("Ok\n"), rc);
-		
-		break;
-	
-	default:
-		//Oooops, shouldn't be here
-		rc = GetLastError();
-		_tprintf(_T("WaitForSingleObject() failed\n"));
-		goto cleanup;
-
-		break;
-	}
-
-cleanup:
-
-	//Closes the remote thread handle
-	CloseHandle(ht);
-
-	//Free up the kernel32.dll
-	if (hKernel32 != NULL)
-		FreeLibrary(hKernel32);
-
-	//Close the process handle
-	CloseHandle(hProcess);
-		
-	return rc;
-}
-
-//Deletes the file
-bool DeleteTheFile(LPCTSTR lpFileName)
-{
-	//Deletes the file
-	bool rc = ::DeleteFile(lpFileName);
-	
-	if (rc)
-		_tprintf(_T("Successfully deleted.\n"));
-	else
-		_tprintf(_T("Couldn't delete. Error = %d\n"), GetLastError());
-
-	return rc;
+	return sWideString;
 }
 */
-
-
-
-
-
 //
 //	BitmapToRegion :	Create a region from the "non-transparent" pixels of a bitmap
 //	Author :			Jean-Edouard Lachand-Robert (http://www.geocities.com/Paris/LeftBank/1160/resume.htm), June 1998.

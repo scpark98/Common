@@ -295,7 +295,7 @@ Gdiplus::Color get_color(CString cr_str)
 
 	if (cr_str[0] == '#')
 	{
-		cr = get_gcolor_from_hexadecimal(cr_str);
+		cr = get_gcolor_from_hexa_str(cr_str);
 	}
 	else if (cr_str[0] == 'h')
 	{
@@ -324,13 +324,13 @@ Gdiplus::Color get_color(CString cr_str)
 }
 
 //"FF0000"과 같은 컬러 문자열을 COLORREF로 변환
-COLORREF	get_color_from_hexadecimal(CString cr_str)
+COLORREF	get_color_from_hexa_str(CString hexa_str)
 {
-	if (cr_str.GetLength() == 7 && cr_str[0] == '#')
-		cr_str = cr_str.Mid(1);
+	if (hexa_str.GetLength() == 7 && hexa_str[0] == '#')
+		hexa_str = hexa_str.Mid(1);
 
 	COLORREF color;
-	if ((color = _tcstol(cr_str, NULL, 16)) == 0)
+	if ((color = _tcstol(hexa_str, NULL, 16)) == 0)
 		color = 0xFFFFFFFF;  // default is white
 	else
 		color = rgb_bgr(color);
@@ -338,30 +338,30 @@ COLORREF	get_color_from_hexadecimal(CString cr_str)
 	return color;
 }
 
-Gdiplus::Color get_gcolor_from_hexadecimal(CString cr_str)
+Gdiplus::Color get_gcolor_from_hexa_str(CString hexa_str)
 {
-	if (cr_str.GetLength() < 6)
+	if (hexa_str.GetLength() < 6)
 		return Gdiplus::Color();
 
-	if (cr_str[0] == '#')
-		cr_str = cr_str.Mid(1);
+	if (hexa_str[0] == '#')
+		hexa_str = hexa_str.Mid(1);
 
 	int a = 0, r = 0, g = 0, b = 0;
 
-	if (cr_str.GetLength() == 6)
+	if (hexa_str.GetLength() == 6)
 	{
 		a = 255;
-		CString str = cr_str.Mid(0, 2);
-		r = _tcstol(cr_str.Mid(0, 2), NULL, 16);
-		g = _tcstol(cr_str.Mid(2, 2), NULL, 16);
-		b = _tcstol(cr_str.Mid(4, 2), NULL, 16);
+		CString str = hexa_str.Mid(0, 2);
+		r = _tcstol(hexa_str.Mid(0, 2), NULL, 16);
+		g = _tcstol(hexa_str.Mid(2, 2), NULL, 16);
+		b = _tcstol(hexa_str.Mid(4, 2), NULL, 16);
 	}
-	else if (cr_str.GetLength() == 8)
+	else if (hexa_str.GetLength() == 8)
 	{
-		a = _tcstol(cr_str.Mid(0, 2), NULL, 16);
-		r = _tcstol(cr_str.Mid(2, 2), NULL, 16);
-		g = _tcstol(cr_str.Mid(4, 2), NULL, 16);
-		b = _tcstol(cr_str.Mid(6, 2), NULL, 16);
+		a = _tcstol(hexa_str.Mid(0, 2), NULL, 16);
+		r = _tcstol(hexa_str.Mid(2, 2), NULL, 16);
+		g = _tcstol(hexa_str.Mid(4, 2), NULL, 16);
+		b = _tcstol(hexa_str.Mid(6, 2), NULL, 16);
 	}
 
 	return Gdiplus::Color(a, r, g, b);

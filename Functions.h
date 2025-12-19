@@ -55,6 +55,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include "data_structure/SCParagraph/SCParagraph.h"
 
 #include <WinInet.h>
+#include <specstrings.h>
 
 #define _std_cpp11 201103L
 #define _std_cpp14 201402L
@@ -257,11 +258,15 @@ enum TEXT_ENCODING
 	text_encoding_ansi = CP_ACP,	//= EUC-KR
 	text_encoding_utf7 = CP_UTF7,
 	text_encoding_utf8 = CP_UTF8,
-	text_encoding_utf8bom,
+	text_encoding_utf8_bom,
 	text_encoding_utf16be,
+	text_encoding_utf16be_bom,
 	text_encoding_utf16le,
+	text_encoding_utf16le_bom,
 	text_encoding_utf32be,
+	text_encoding_utf32be_bom,
 	text_encoding_utf32le,
+	text_encoding_utf32le_bom,
 };
 
 enum RATIO_RECT_ATTACH
@@ -745,8 +750,14 @@ struct	NETWORK_INFO
 //문자열
 	bool		Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase);
 	//target에서 맨 처음 매칭되는 항목만 찾아 그 시작위치를 리턴한다.
+	//단, case_sensitive가 false일 경우 text의 길이가 매우 크다면 매번 MakeLower()를 호출하므로 느려질 수 있다.
+	//while문 등에서 이 함수를 지속적으로 호출할 경우는 미리 MakeLower()로 변경 후 호출해야한다.
+	//즉, 간단한 문자열일 경우에만 이 함수를 사용하고 길이가 매우 크다면 문자열을 가공한 후 CString::Find()를 이용해야 한다.
 	int			find(CString target, CString find_string, int start = 0, bool case_sensitive = false, bool whole_word = false);
 	//target에서 매칭되는 모든 항목의 시작위치를 result deque에 담고 첫번째 매칭 위치를 리턴한다.
+	//단, case_sensitive가 false일 경우 text의 길이가 매우 크다면 매번 MakeLower()를 호출하므로 느려질 수 있다.
+	//while문 등에서 이 함수를 지속적으로 호출할 경우는 미리 MakeLower()로 변경 후 호출해야한다.
+	//즉, 간단한 문자열일 경우에만 이 함수를 사용하고 길이가 매우 크다면 문자열을 가공한 후 CString::Find()를 이용해야 한다.
 	int			find_all(std::deque<int>& result, CString target, CString find_string, bool case_sensitive = false, bool whole_word = false);
 
 	//dqSrc에 dqFind가 있는지 검사하여 인덱스를 리턴. 현재는 AND 연산이므로 dqFind의 모든 원소가 dqSrc에 포함되어 있어야 함.
@@ -1035,6 +1046,9 @@ struct	NETWORK_INFO
 	std::string utf8ToMultibyte(std::string inputtext);
 
 	std::string	CStringToUtf8(CString inputtext);
+
+	//[[nodiscard]] static CStringA W2UTF8(_In_NLS_string_(nLength) const wchar_t* pszText, _In_ int nLength);
+	//[[nodiscard]] static CStringW UTF82W(_In_NLS_string_(nLength) const char* pszText, _In_ int nLength);
 
 	//return받은 char*는 반드시 사용 후 free()해줘야 함.
 	TCHAR*		replace(TCHAR* src, const TCHAR* olds, const TCHAR* news);

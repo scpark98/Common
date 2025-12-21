@@ -1080,14 +1080,15 @@ namespace Scintilla
 #endif //#ifdef _AFX
 
 		//Member variables
-		FunctionDirect m_DirectStatusFunction;
-		sptr_t m_DirectPointer;
-		Status m_LastStatus;
-		DWORD m_dwOwnerThreadID;
-		bool m_bDoneInitialSetup;
+		FunctionDirect	m_DirectStatusFunction;
+		sptr_t			m_DirectPointer;
+		Status			m_LastStatus;
+		DWORD			m_dwOwnerThreadID;
+		bool			m_bDoneInitialSetup;
 		
 		//scpark add
-		bool m_initial_loading_completed = false;
+		bool			m_initial_loading_completed = false;
+
 	public:
 		virtual BOOL PreTranslateMessage(MSG* pMsg);
 	};

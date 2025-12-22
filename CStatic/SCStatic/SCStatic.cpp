@@ -253,9 +253,10 @@ void CSCStatic::set_tooltip_text(CString text)
 void CSCStatic::reconstruct_font()
 {
 	m_font.DeleteObject();
-
+	m_lf.lfCharSet = DEFAULT_CHARSET;
 	//TRACE(_T("m_lf.lfQuality = %d\n"), m_lf.lfQuality);// ANTIALIASED_QUALITY
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
+	CStatic::SetFont(&m_font, true);
 
 	Invalidate();
 }
@@ -1213,6 +1214,12 @@ void CSCStatic::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color cr
 		set_transparent(true, m_cr_parent_back);
 	else
 		Invalidate();
+}
+
+void CSCStatic::SetFont(CFont* font, BOOL bRedraw)
+{
+	font->GetObject(sizeof(m_lf), &m_lf);
+	reconstruct_font();
 }
 
 void CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)

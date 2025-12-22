@@ -1067,11 +1067,15 @@ namespace Scintilla
 		[[nodiscard]] Bidirectional GetBidirectional();
 		void SetBidirectional(_In_ Bidirectional bidirectional);
 
-		//scpark add
+	//scpark add
 		bool	is_initial_loading_completed() { return m_initial_loading_completed; }
 		void	initial_loading_completed(bool completed) { m_initial_loading_completed = completed; }
 
-
+		//functions.h의 read(), save()를 이용했었으나 해당 파일의 m_BOM 등을 그대로 유지해야 하므로
+		//ScintillaDemo 프로젝트의 CScintillaView::Serialize() 함수를 참조하여
+		//read_file()과 save_file() 함수를 추가함.
+		bool	read_file(CString filepath);
+		bool	save_file(CString filepath);
 
 
 	protected:
@@ -1088,6 +1092,17 @@ namespace Scintilla
 		
 		//scpark add
 		bool			m_initial_loading_completed = false;
+
+		enum class BOM
+		{
+			Unknown,
+			UTF8,
+			UTF16BE,
+			UTF16LE,
+			UTF16LE_NOBOM
+		};
+
+		BOM				m_BOM; //The BOM which applies to this control
 
 	public:
 		virtual BOOL PreTranslateMessage(MSG* pMsg);

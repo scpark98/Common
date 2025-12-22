@@ -5980,7 +5980,10 @@ CString read(CString filepath, int max_length, int encoding)
 	CString result;
 
 	if (PathFileExists(filepath) == false)
+	{
+		AfxMessageBox(filepath + _T("\n\n위 파일이 존재하지 않습니다."));
 		return result;
+	}
 
 #if 0
 	CFile file;
@@ -6135,6 +6138,13 @@ CString read(CString filepath, int max_length, int encoding)
 			_tfopen_s(&fp, filepath, _T("rt")CHARSET);
 		else if (text_encoding)
 			_tfopen_s(&fp, filepath, _T("rb"));
+
+		if (fp == NULL)
+		{
+			AfxMessageBox(filepath + _T("\n\n위 파일을 열 수 없습니다. 다른 프로세스에 의해 사용중일 수 있습니다."));
+			return result;
+		}
+
 		fread(data, 1, max_length * 2, fp);
 		result = CString(data);
 		delete[] data;

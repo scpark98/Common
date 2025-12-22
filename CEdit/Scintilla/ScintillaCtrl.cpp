@@ -354,6 +354,8 @@ to maintain a single distribution point for the source code.
 
 //#include "stdafx.h"
 #include "ScintillaCtrl.h"
+#include "Scintilla.h"
+#include <vector>
 
 #ifndef SCINTILLAMESSAGES_H
 #pragma message("To avoid this message, please put ScintillaMessages.h in your pre compiled header (normally stdafx.h)")
@@ -5810,7 +5812,7 @@ void CScintillaCtrl::SetBidirectional(_In_ Bidirectional bidirectional)
 }
 #pragma warning(pop)
 
-BOOL Scintilla::CScintillaCtrl::PreTranslateMessage(MSG * pMsg)
+BOOL CScintillaCtrl::PreTranslateMessage(MSG * pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_KEYDOWN)
@@ -5823,4 +5825,254 @@ BOOL Scintilla::CScintillaCtrl::PreTranslateMessage(MSG * pMsg)
 	}
 
 	return CWnd::PreTranslateMessage(pMsg);
+}
+
+bool CScintillaCtrl::read_file(CString filepath)
+{
+	CFile file;
+	if (!file.Open(filepath, CFile::modeReadWrite))
+		return false;
+
+	const auto nFileSize = file.GetLength();
+#pragma warning(suppress: 26472)
+	const auto nFileSizeForLoader{ static_cast<Position>(nFileSize) };
+
+	Cancel();
+
+#pragma warning(suppress: 26472)
+	if (nFileSize != static_cast<ULONGLONG>(nFileSizeForLoader))
+	{
+		AfxMessageBox(_T("Fail to open. Document is too large."), MB_ICONEXCLAMATION);
+		AfxThrowUserException();
+	}
+
+	//Create an ILoader instance
+	auto pLoader = static_cast<Scintilla::ILoader*>(CreateLoader(nFileSizeForLoader, DocumentOption::Default));
+	if (pLoader == nullptr)
+	{
+		AfxMessageBox(_T("Fail to create ILoader., MB_ICONEXCLAMATION"));
+		AfxThrowUserException();
+	}
+
+	UINT m_nLoadSaveBufferSize = 4096;
+
+	//Read the data in from the file in blocks
+	std::vector<BYTE> byBuffer{ m_nLoadSaveBufferSize, std::allocator<BYTE>{} };
+	int nBytesRead{ 0 };
+	m_BOM = BOM::Unknown;
+	bool bDetectedBOM{ false };
+	do
+	{
+#pragma warning(suppress: 26472)
+		nBytesRead = file.Read(byBuffer.data(), static_cast<UINT>(byBuffer.size()));
+		if (nBytesRead)
+		{
+			int nSkip{ 0 };
+			if (!bDetectedBOM)
+			{
+				bDetectedBOM = true;
+				int nUniTest = IS_TEXT_UNICODE_STATISTICS;
+				//detect UTF-16BE with BOM
+#pragma warning(suppress: 26446)
+				if ((nBytesRead > 1) && ((nFileSize % 2) == 0) && ((nBytesRead % 2) == 0) && (byBuffer[0] == 0xFE) && (byBuffer[1] == 0xFF))
+				{
+					m_BOM = BOM::UTF16BE;
+					nSkip = 2;
+				}
+				//detect UTF-16LE with BOM
+#pragma warning(suppress: 26446)
+				else if ((nBytesRead > 1) && ((nFileSize % 2) == 0) && ((nBytesRead % 2) == 0) && (byBuffer[0] == 0xFF) && (byBuffer[1] == 0xFE))
+				{
+					m_BOM = BOM::UTF16LE;
+					nSkip = 2;
+				}
+				//detect UTF-8 with BOM
+#pragma warning(suppress: 26446)
+				else if ((nBytesRead > 2) && (byBuffer[0] == 0xEF) && (byBuffer[1] == 0xBB) && (byBuffer[2] == 0xBF))
+				{
+					m_BOM = BOM::UTF8;
+					nSkip = 3;
+				}
+				//detect UTF-16LE without BOM (Note IS_TEXT_UNICODE_STATISTICS implies Little Endian for all versions of supported Windows platforms i.e. x86, x64, ARM & ARM64)
+#pragma warning(suppress: 26446)
+				else if ((nBytesRead > 1) && ((nFileSize % 2) == 0) && ((nBytesRead % 2) == 0) && (byBuffer[0] != 0) && (byBuffer[1] == 0) && IsTextUnicode(byBuffer.data(), nBytesRead, &nUniTest))
+				{
+					m_BOM = BOM::UTF16LE_NOBOM;
+					nSkip = 0;
+				}
+			}
+
+			//Work out the data to pass to ILoader->AddData
+			const char* pLoadData{ nullptr };
+			int nBytesToLoad{ 0 };
+			CScintillaCtrl::StringA sUTF8Data;
+			if ((m_BOM == BOM::UTF16LE_NOBOM) || (m_BOM == BOM::UTF16LE))
+			{
+				//Handle conversion from UTF16LE to UTF8
+#pragma warning(suppress: 26481 26490)
+				sUTF8Data = CScintillaCtrl::W2UTF8(reinterpret_cast<const wchar_t*>(byBuffer.data() + nSkip), (nBytesRead - nSkip) / 2);
+				pLoadData = sUTF8Data;
+				nBytesToLoad = sUTF8Data.GetLength();
+			}
+			else if (m_BOM == BOM::UTF16BE)
+			{
+				//Handle conversion from UTF16BE to UTF8
+#pragma warning(suppress: 26429 26481)
+				BYTE* p = byBuffer.data() + nSkip;
+				const int nUTF16CharsRead = (nBytesRead - nSkip) / 2;
+				for (int i = 0; i < nUTF16CharsRead; i++)
+				{
+					const BYTE t{ *p };
+#pragma warning(suppress: 26481)
+					* p = p[1];
+#pragma warning(suppress: 26481)
+					p[1] = t;
+#pragma warning(suppress: 26481)
+					p += 2;
+				}
+#pragma warning(suppress: 26481 26490)
+				sUTF8Data = CScintillaCtrl::W2UTF8(reinterpret_cast<const wchar_t*>(byBuffer.data() + nSkip), (nBytesRead - nSkip) / 2);
+				pLoadData = sUTF8Data;
+				nBytesToLoad = sUTF8Data.GetLength();
+			}
+			else
+			{
+#pragma warning(suppress: 26481 26490)
+				pLoadData = reinterpret_cast<const char*>(byBuffer.data()) + nSkip;
+				nBytesToLoad = nBytesRead - nSkip;
+			}
+			ASSERT(pLoadData != nullptr);
+			const auto nAddDataError{ pLoader->AddData(pLoadData, nBytesToLoad) };
+			if (nAddDataError != SC_STATUS_OK)
+			{
+				pLoader->Release();
+				CString sError;
+				sError.Format(_T("%d"), nAddDataError);
+				CString sMsg;
+				sMsg.Format(_T("Failed to load document, Error:%1"), sError);
+				AfxMessageBox(sMsg, MB_ICONEXCLAMATION);
+				AfxThrowUserException();
+			}
+		}
+	} while (nBytesRead);
+
+	//Set the document pointer to the loaded content
+	SetDocPointer(static_cast<IDocumentEditable*>(pLoader->ConvertToDocument())); //NOLINT(clang-analyzer-core.CallAndMessage)
+
+	//If we detected UTF data, then use the UTF8 codepage else disable multi-byte support
+	if (m_BOM == BOM::Unknown)
+		SetCodePage(0);
+	else
+		SetCodePage(CpUtf8);
+
+	//Set the read only state if required
+	if ((GetFileAttributes(file.GetFilePath()) & FILE_ATTRIBUTE_READONLY) == FILE_ATTRIBUTE_READONLY)
+		SetReadOnly(TRUE);
+	else
+		SetReadOnly(FALSE);
+
+	//Reinitialize the control settings
+	SetUndoCollection(TRUE);
+	EmptyUndoBuffer();
+	SetSavePoint();
+	GotoPos(0);
+
+	return true;
+}
+
+bool CScintillaCtrl::save_file(CString filepath)
+{
+	CFile file;
+
+	if (!file.Open(filepath, CFile::modeReadWrite))
+		return false;
+
+	Position nBytesToWrite{ GetLength() };
+	const char* CharacterPointer = GetCharacterPointer();
+	bool bHandledBOM{ false };
+
+	while (nBytesToWrite > 0)
+	{
+		Position nDataToWrite{ nBytesToWrite };
+		if (nDataToWrite > UINT_MAX)
+			nDataToWrite = UINT_MAX;
+
+		//Handle writing the BOM if necessary
+		if (!bHandledBOM)
+		{
+			bHandledBOM = true;
+			switch (m_BOM)
+			{
+			case BOM::UTF8:
+			{
+				file.Write("\xEF\xBB\xBF", 3);
+				break;
+			}
+			case BOM::UTF16BE:
+			{
+				file.Write("\xFE\xFF", 2);
+				break;
+			}
+			case BOM::UTF16LE:
+			{
+				file.Write("\xFF\xFE", 2);
+				break;
+			}
+			default:
+			{
+				break;
+			}
+			}
+		}
+
+		//Work out the data to save to file
+		const void* pSaveData{ nullptr };
+		UINT nBytesToSave{ 0 };
+		CScintillaCtrl::StringW sUTF16Data;
+		if ((m_BOM == BOM::UTF16LE_NOBOM) || ((m_BOM == BOM::UTF16LE)))
+		{
+			//Handle conversion from UTF8 to UTF16LE
+#pragma warning(suppress: 26472)
+			sUTF16Data = CScintillaCtrl::UTF82W(CharacterPointer, static_cast<int>(nDataToWrite));
+			pSaveData = sUTF16Data.GetString();
+			nBytesToSave = sUTF16Data.GetLength() * sizeof(wchar_t);
+		}
+		else if (m_BOM == BOM::UTF16BE)
+		{
+			//Handle conversion from UTF8 to UTF16BE
+#pragma warning(suppress: 26472)
+			sUTF16Data = CScintillaCtrl::UTF82W(CharacterPointer, static_cast<int>(nDataToWrite));
+#pragma warning(suppress: 26429 26490)
+			BYTE* p = reinterpret_cast<BYTE*>(sUTF16Data.GetBuffer());
+			const int nUTF16CharsWrite = sUTF16Data.GetLength();
+			for (int i = 0; i < nUTF16CharsWrite; i++)
+			{
+				const BYTE t{ *p };
+#pragma warning(suppress: 26481)
+				* p = p[1];
+#pragma warning(suppress: 26481)
+				p[1] = t;
+#pragma warning(suppress: 26481)
+				p += 2;
+			}
+			sUTF16Data.ReleaseBuffer();
+			pSaveData = sUTF16Data.GetString();
+			nBytesToSave = sUTF16Data.GetLength() * sizeof(wchar_t);
+		}
+		else
+		{
+			pSaveData = CharacterPointer;
+#pragma warning(suppress: 26472)
+			nBytesToSave = static_cast<UINT>(nDataToWrite);
+		}
+
+		//Write the data to file
+		ASSERT(pSaveData != nullptr);
+		file.Write(pSaveData, nBytesToSave);
+
+		//Prepare for the next loop around
+#pragma warning(suppress: 26481)
+		CharacterPointer += nDataToWrite;
+		nBytesToWrite -= nDataToWrite;
+	}
 }

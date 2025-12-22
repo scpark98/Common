@@ -229,6 +229,8 @@ public:
 
 	void			get_auto_font_size(CWnd* pWnd, CRect r, CString text, LOGFONT *lf);
 
+	//±âº» CWnd::SetFont() override
+	void			SetFont(CFont* font, BOOL bRedraw = TRUE);
 	void			set_font_name(const CString& strFont, BYTE byCharSet = DEFAULT_CHARSET);
 	void			set_font_size(int nFontSize);
 	void			enlarge_font_size(bool enlarge);

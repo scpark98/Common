@@ -1338,6 +1338,8 @@ struct	NETWORK_INFO
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
 	bool		delete_file(CString fullpath, bool bTrashCan = false);
 	int			get_text_encoding(CString sfile);
+	bool		is_utf8_encoding(CString filepath);
+	bool		is_utf8_encoding_old(CString filepath);
 	//파일을 읽어서 CString으로 리턴한다. max_length < 0이면 전체 파일을 읽어서 리턴한다.
 	//encoding < 0이면 encoding 방식을 자동 판별하여 읽어온다.
 	CString		read(CString filepath, int max_length = -1, int encoding = -1);

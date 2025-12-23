@@ -1074,9 +1074,13 @@ namespace Scintilla
 		//functions.h의 read(), save()를 이용했었으나 해당 파일의 m_BOM 등을 그대로 유지해야 하므로
 		//ScintillaDemo 프로젝트의 CScintillaView::Serialize() 함수를 참조하여
 		//read_file()과 save_file() 함수를 추가함.
-		bool	read_file(CString filepath);
-		bool	save_file(CString filepath);
+		bool		read_file(CString filepath);
+		bool		save_file(CString filepath);
 
+		//BOM이 없을 경우는 ansi와 utf8을 구분하지 못하는 버그가 있다.
+		//텍스트 내용을 기반으로 판별하는 함수 추가.
+		//bool		is_utf8_encoding(CString filepath);
+		CString		get_encoding_str() { return m_encoding_str; }
 
 	protected:
 #ifdef _AFX
@@ -1103,6 +1107,7 @@ namespace Scintilla
 		};
 
 		BOM				m_BOM; //The BOM which applies to this control
+		CString			m_encoding_str;
 
 	public:
 		virtual BOOL PreTranslateMessage(MSG* pMsg);

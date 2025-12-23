@@ -357,6 +357,8 @@ to maintain a single distribution point for the source code.
 #include "Scintilla.h"
 #include <vector>
 
+#include "../../Functions.h"
+
 #ifndef SCINTILLAMESSAGES_H
 #pragma message("To avoid this message, please put ScintillaMessages.h in your pre compiled header (normally stdafx.h)")
 #include <ScintillaMessages.h>
@@ -5829,7 +5831,10 @@ BOOL CScintillaCtrl::PreTranslateMessage(MSG * pMsg)
 
 bool CScintillaCtrl::read_file(CString filepath)
 {
+	m_encoding_str.Empty();
+
 	CFile file;
+
 	if (!file.Open(filepath, CFile::modeReadWrite))
 		return false;
 
@@ -5861,6 +5866,7 @@ bool CScintillaCtrl::read_file(CString filepath)
 	int nBytesRead{ 0 };
 	m_BOM = BOM::Unknown;
 	bool bDetectedBOM{ false };
+
 	do
 	{
 #pragma warning(suppress: 26472)
@@ -5878,6 +5884,7 @@ bool CScintillaCtrl::read_file(CString filepath)
 				{
 					m_BOM = BOM::UTF16BE;
 					nSkip = 2;
+					m_encoding_str = _T("UTF-16 BE BOM");
 				}
 				//detect UTF-16LE with BOM
 #pragma warning(suppress: 26446)
@@ -5885,6 +5892,7 @@ bool CScintillaCtrl::read_file(CString filepath)
 				{
 					m_BOM = BOM::UTF16LE;
 					nSkip = 2;
+					m_encoding_str = _T("UTF-16 LE BOM");
 				}
 				//detect UTF-8 with BOM
 #pragma warning(suppress: 26446)
@@ -5892,6 +5900,7 @@ bool CScintillaCtrl::read_file(CString filepath)
 				{
 					m_BOM = BOM::UTF8;
 					nSkip = 3;
+					m_encoding_str = _T("UTF-8 BOM");
 				}
 				//detect UTF-16LE without BOM (Note IS_TEXT_UNICODE_STATISTICS implies Little Endian for all versions of supported Windows platforms i.e. x86, x64, ARM & ARM64)
 #pragma warning(suppress: 26446)
@@ -5899,6 +5908,7 @@ bool CScintillaCtrl::read_file(CString filepath)
 				{
 					m_BOM = BOM::UTF16LE_NOBOM;
 					nSkip = 0;
+					m_encoding_str = _T("UTF-16 LE");
 				}
 			}
 
@@ -5941,8 +5951,10 @@ bool CScintillaCtrl::read_file(CString filepath)
 				pLoadData = reinterpret_cast<const char*>(byBuffer.data()) + nSkip;
 				nBytesToLoad = nBytesRead - nSkip;
 			}
+
 			ASSERT(pLoadData != nullptr);
 			const auto nAddDataError{ pLoader->AddData(pLoadData, nBytesToLoad) };
+
 			if (nAddDataError != SC_STATUS_OK)
 			{
 				pLoader->Release();
@@ -5959,11 +5971,30 @@ bool CScintillaCtrl::read_file(CString filepath)
 	//Set the document pointer to the loaded content
 	SetDocPointer(static_cast<IDocumentEditable*>(pLoader->ConvertToDocument())); //NOLINT(clang-analyzer-core.CallAndMessage)
 
+	file.Close();
+
 	//If we detected UTF data, then use the UTF8 codepage else disable multi-byte support
+	//20251223 scpark add. utf8 no BOM일 경우 ansi로 설정되는 오류로 인해 is_utf8_encoding()으로 다시 검사하도록 수정
 	if (m_BOM == BOM::Unknown)
-		SetCodePage(0);
+	{
+		//bool check1 = is_utf8_encoding1(filepath);
+
+		if (is_utf8_encoding(filepath))
+		{
+			SetCodePage(CpUtf8);	//utf8
+			m_encoding_str = _T("UTF-8");
+		}
+		else
+		{
+			SetCodePage(0);			//ansi or utf8 no bom
+			m_encoding_str = _T("EUC-KR");
+		}
+	}
 	else
-		SetCodePage(CpUtf8);
+	{
+		SetCodePage(CpUtf8);	//utf8
+	}
+
 
 	//Set the read only state if required
 	if ((GetFileAttributes(file.GetFilePath()) & FILE_ATTRIBUTE_READONLY) == FILE_ATTRIBUTE_READONLY)
@@ -5979,6 +6010,112 @@ bool CScintillaCtrl::read_file(CString filepath)
 
 	return true;
 }
+
+#if 0
+//BOM이 없는 일반 파일의 경우 아래와 같이 utf8 문자 범위를 검사하여 utf8인지 euc-kr인지 판별한다.
+//출처: https://dev-drive.tistory.com/10 [Dev Drive:티스토리]
+//단, 용량이 0바이트이면 판별이 불가하므로 utf8로 간주한다.
+bool CScintillaCtrl::is_utf8_encoding(CString filepath)
+{
+	bool is_utf8 = true;
+
+	unsigned char buf[4096] = { 0, };
+
+	FILE* fp = NULL;
+
+	_tfopen_s(&fp, filepath, _T("rb"));
+
+	if (fp == NULL)
+		return is_utf8;
+
+	size_t dwRead = fread(buf, 1, 4096, fp);
+	fclose(fp);
+
+	unsigned char* start = (unsigned char*)buf;
+	unsigned char* end = (unsigned char*)buf + dwRead;
+	bool not_discerned = false;
+
+	for (size_t i = 0; i < dwRead; ++i)
+	{
+		if (buf[i] < 0x80) // ASCII (1 byte)
+		{
+			continue;
+		}
+		else if ((buf[i] & 0xE0) == 0xC0) // 2-byte sequence start (110xxxxx)
+		{
+			if (i + 1 >= dwRead || (buf[i + 1] & 0xC0) != 0x80)
+				return false; // Check continuation byte
+			i++;
+		}
+		else if ((buf[i] & 0xF0) == 0E0) // 3-byte sequence start (1110xxxx)
+		{
+			if (i + 2 >= dwRead || (buf[i + 1] & 0xC0) != 0x80 || (buf[i + 2] & 0xC0) != 0x80)
+				return false;
+			i += 2;
+		}
+		else if ((buf[i] & 0xF8) == 0xF0) // 4-byte sequence start (11110xxx)
+		{
+			if (i + 3 >= dwRead || (buf[i + 1] & 0xC0) != 0x80 || (buf[i + 2] & 0xC0) != 0x80 || (buf[i + 3] & 0xC0) != 0x80)
+				return false;
+			i += 3;
+		}
+		else
+		{
+			//return false; // Invalid start byte
+		}
+	}
+	/*
+	while (start < end)
+	{
+		if (*start < 0x80) // (10000000)[output][/output]
+		{
+			start++;
+		}
+		else if (*start < (0xC0)) // (11000000)
+		{
+			is_utf8 = false;
+			break;
+		}
+		else if (*start < (0xE0)) // (11100000)
+		{
+			if (start >= end - 1)
+				break;
+			if ((start[1] & (0xC0)) != 0x80)
+			{
+				is_utf8 = false;
+				break;
+			}
+			start += 2;
+		}
+		else if (*start < (0xF0)) // (11110000)
+		{
+			if (start >= end - 2)
+				break;
+			if ((start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80)
+			{
+				is_utf8 = false;
+				break;
+			}
+			start += 3;
+		}
+		else
+		{
+			is_utf8 = false;
+			break;
+		}
+
+		if (start >= end)
+			not_discerned = true;
+	}
+	*/
+
+	int nUniTest = IS_TEXT_UNICODE_STATISTICS;
+	if (is_utf8 || IsTextUnicode(buf, dwRead, &nUniTest))
+		return true;
+	
+	return false;
+}
+#endif
 
 bool CScintillaCtrl::save_file(CString filepath)
 {

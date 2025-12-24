@@ -121,7 +121,11 @@ void CSCLog::set_log_level(int log_level)
 
 //프로그램 시작 시 일반적인 정보를 로그에 기록한다.
 //시작 단락 표시, exe path, file version, built time을 기록한다.
-//write_end_log()는 소멸자에서 자동으로 불려지므로 수동 호출하지 말 것!
+//CSCLog의 생성자에서 이 함수를 자동으로 호출해서는 안되며
+//반드시 사용하는 프로젝트의 CWinApp 클래스의 InitInstance() 함수에서 호출해줘야 한다.
+//set()을 통해 로그 경로, 로그 파일명이 달리 설정될 수 있는데
+//이를 생성자에서 호출하면 기본 "Log" 폴더가 생성되고 로그파일명도 기본값으로 생성된다.
+//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지므로 수동 호출하지 말 것!
 void CSCLog::write_start_log()
 {
 	logWrite(_T("\n==================== Program Start ===================="));
@@ -137,6 +141,7 @@ void CSCLog::write_start_log()
 }
 
 //프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.
+//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지므로 수동 호출해서는 안되므로 protected로 이동시킴.
 void CSCLog::write_end_log()
 {
 	logWrite(_T("==================== Program Exit ====================\n"));

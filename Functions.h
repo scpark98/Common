@@ -1608,9 +1608,12 @@ struct	NETWORK_INFO
 	//reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
 	//레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성된다.
 	//추가된 인덱스를 리턴한다.
-	int			add_registry(CWinApp* pApp, CString reg_path, CString value);
+	//이 함수를 호출하기 전에 반드시 "count"를 리셋시켜 준 후 add_registry_str()를 호출해야 한다.
+	//ex. theApp.WriteProfileInt(_T("setting\\recent files"), _T("count"), 0);
+	int			add_registry_str(CWinApp* pApp, CString reg_path, CString str);
 	//"count"에 항목의 갯수가 저장되어 있고 각 숫자 인덱스 항목에 값이 저장되어 있는 구조인 경우 그 목록을 리턴한다.
-	int			get_registry_list(CWinApp* pApp, CString reg_path, std::deque<CString>& dqlist);
+	//항목을 추가할때는 add_registry_str() 함수를 이용한다.
+	int			get_registry_str_list(CWinApp* pApp, CString reg_path, std::deque<CString>& dqlist);
 
 	//Windows visual effect registry
 	bool		set_windows_visual_effects();

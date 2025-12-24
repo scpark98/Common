@@ -28,6 +28,14 @@ DEALINGS IN THE SOFTWARE.
 #ifndef UTF8_FOR_CPP_CHECKED_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
 #define UTF8_FOR_CPP_CHECKED_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
 
+#ifndef _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+#define _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+#endif
+
+#ifndef _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
+#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
+#endif
+
 #include "core.h"
 #include <stdexcept>
 
@@ -265,7 +273,94 @@ namespace utf8
 
     // The iterator class
     template <typename octet_iterator>
-    class iterator : public std::iterator <std::bidirectional_iterator_tag, uint32_t> {
+    class iterator
+    {
+        octet_iterator it;
+        octet_iterator range_start;
+        octet_iterator range_end;
+
+    public:
+        // ===== iterator traits (C++17+ 필수) =====
+        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = uint32_t;          // 반드시 non-const
+        using difference_type = std::ptrdiff_t;
+        using pointer = value_type*;       // 실사용 안 해도 정의 필요
+        using reference = value_type;         // 값 반환 iterator이므로 value
+
+        // ===== constructors =====
+        iterator() = default;
+
+        explicit iterator(const octet_iterator& octet_it,
+            const octet_iterator& rangestart,
+            const octet_iterator& rangeend)
+            : it(octet_it)
+            , range_start(rangestart)
+            , range_end(rangeend)
+        {
+            if (it < range_start || it > range_end)
+                throw std::out_of_range("Invalid utf-8 iterator position");
+        }
+
+        // ===== base iterator =====
+        octet_iterator base() const { return it; }
+
+        // ===== dereference =====
+        value_type operator*() const
+        {
+            octet_iterator temp = it;
+            return utf8::next(temp, range_end);
+        }
+
+        // ===== comparison =====
+        bool operator==(const iterator& rhs) const
+        {
+            if (range_start != rhs.range_start || range_end != rhs.range_end)
+                throw std::logic_error(
+                    "Comparing utf-8 iterators defined with different ranges"
+                );
+            return it == rhs.it;
+        }
+
+        bool operator!=(const iterator& rhs) const
+        {
+            return !(*this == rhs);
+        }
+
+        // ===== increment =====
+        iterator& operator++()
+        {
+            utf8::next(it, range_end);
+            return *this;
+        }
+
+        iterator operator++(int)
+        {
+            iterator temp(*this);
+            utf8::next(it, range_end);
+            return temp;
+        }
+
+        // ===== decrement =====
+        iterator& operator--()
+        {
+            utf8::prior(it, range_start);
+            return *this;
+        }
+
+        iterator operator--(int)
+        {
+            iterator temp(*this);
+            utf8::prior(it, range_start);
+            return temp;
+        }
+    };
+
+    /*
+    //scpark. std::iterator 기반 클래스는 C++17부터 deprecated이므로 위와 같이 수정함.
+    // The iterator class
+    template <typename octet_iterator>
+    class iterator : public std::iterator <std::bidirectional_iterator_tag, uint32_t>
+    {
       octet_iterator it;
       octet_iterator range_start;
       octet_iterator range_end;
@@ -319,6 +414,7 @@ namespace utf8
           return temp;
       }
     }; // class iterator
+    */
 
 } // namespace utf8
 

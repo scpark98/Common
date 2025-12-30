@@ -1668,7 +1668,7 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 	}
 
 	AfxGetApp()->WriteProfileString(_T("setting\\CSCImage2dDlg"), _T("recent file"), m_filename);
-	add_registry(AfxGetApp(), _T("setting\\CSCImage2dDlg\\recent folders"), folder);
+	add_registry_str(AfxGetApp(), _T("setting\\CSCImage2dDlg\\recent folders"), folder);
 
 	//현재 이미지를 시작으로 forward or backward 버퍼링을 시작한다.
 	//버퍼링 중이었다면 버퍼링을 중지시킨 후 해야 한다.

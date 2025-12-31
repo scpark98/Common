@@ -730,7 +730,7 @@ void CSCThumbCtrl::scroll_up(bool up, int offset)
 	CRect rc;
 	GetClientRect(rc);
 
-	if (rc.Height() >= m_scroll_total)
+	if ((rc.Height() >= m_scroll_total) || (offset == 0))
 		return;
 
 	int pos = m_scroll_pos;
@@ -1004,9 +1004,13 @@ void CSCThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_lbutton_down)
 	{
-		//TRACE(_T("point.y = %d, m_pt_old.y = %d\n"), point.y, m_pt_old.y);
-		scroll_up(true, point.y - m_pt_old.y);
-		m_pt_old.y = point.y;
+		//m_lbutton_down으로 스크롤 기능 구현
+		TRACE(_T("point.y = %d, m_pt_old.y = %d\n"), point.y, m_pt_old.y);
+		if (point.y != m_pt_old.y)
+		{
+			scroll_up(true, point.y - m_pt_old.y);
+			m_pt_old.y = point.y;
+		}
 	}
 
 	CDialogEx::OnMouseMove(nFlags, point);

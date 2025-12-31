@@ -113,13 +113,14 @@ public:
 	//must call when the parent window was resized
 	//HRESULT					on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy);
 
-	ID2D1Bitmap*			get() { return m_img[m_frame_index].Get(); }
 	IWICImagingFactory2*	get_WICFactory2() { return m_pWICFactory;}
+	ID2D1DeviceContext*		get_d2dc() { return m_d2dc;}
+	ID2D1Bitmap*			get() { return m_img[m_frame_index].Get(); }
 
 	//get original image demension
-	float					get_width() { return m_width; }
-	float					get_height() { return m_height; }
-	D2D1_SIZE_F				get_size() { return D2D1::SizeF(m_width, m_height); }
+	float					get_width();
+	float					get_height();
+	D2D1_SIZE_F				get_size();
 	float					get_ratio();
 	int						get_channel() { return m_channel; }
 	
@@ -161,7 +162,11 @@ public:
 	void					get_raw_data();
 
 	void					blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* blend_img, int dx, int dy, int sx, int sy, int sw, int sh);
-	void					copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst);
+	//void					copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst);
+
+	//반드시 new 또는 정적으로 메모리가 할당된 상태의 dst를 넘겨줘야 한다.
+	//null의 dst를 넘기고 copy()에서 new로 할당해도 되지만 new와 delete이 서로 다른 thread에서 수행될 수 없으므로 문제가 될 수 있다.
+	void					copy(CSCD2Image* dst);
 
 	HRESULT					get_sub_img(CRect r, CSCD2Image *dest);
 	HRESULT					get_sub_img(D2D1_RECT_U r, CSCD2Image* dest);
@@ -198,8 +203,8 @@ protected:
 	std::deque<ComPtr<ID2D1Bitmap>>		m_img = std::deque<ComPtr<ID2D1Bitmap>>{ NULL, };
 	uint8_t*				data = NULL;
 	int						m_frame_index = 0;
-	float					m_width = 0.0f;
-	float					m_height = 0.0f;
+	//float					m_width = 0.0f;
+	//float					m_height = 0.0f;
 	int						m_channel = 0;
 	CString					m_pixel_format_str;
 	//촬영된 이미지의 경우 exif 정보를 추출한다.

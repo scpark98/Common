@@ -625,8 +625,8 @@ void CSCStatic::OnPaint()
 			//m_rect_text를 정확히 계산하기 위함도 있었으나 m_rect_text이 실제 텍스트가 출력되는 영역으로 세팅되는지는
 			//다시 확인이 필요하다.
 
-			//text가 "color picker"일 경우는 해당 색상을 사각형으로 표시하고 필드값은 색상값을 표시하는 형태로 동작한다.
-			if (m_text == _T("color picker"))
+			//text가 "_color picker_"일 경우는 해당 색상을 사각형으로 표시하고 필드값은 색상값을 표시하는 형태로 동작한다.
+			if (m_text == _T("_color picker_"))
 			{
 				CRect rcolor = rc;
 				rcolor.left = 4;
@@ -1583,7 +1583,7 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	else if (m_use_edit)
 	{
-		if (m_text == _T("color picker") && (point.x < 20))
+		if (m_text == _T("_color picker_") && (point.x < 20))
 		{
 			COLORREF cr = RGB(m_cr_text.GetR(), m_cr_text.GetG(), m_cr_text.GetB());
 			CMFCColorDialog dlg(cr, 0, this);

@@ -1280,8 +1280,8 @@ struct	NETWORK_INFO
 	CString		GetFileTitle(CString fullpath);
 	CString		GetFileExtension(CString filename, bool dot = false);
 #endif
-	int			GetFileTypeFromFilename(CString filename);
-	int			GetFileTypeFromExtension(CString sExt);
+	int			get_filetype_from_filename(CString filename);
+	int			get_filetype_from_extension(CString sExt);
 
 	//파일명에서 확장자를 new_ext로 변경한다.
 	//apply_real_file이 false이면 filepath 문자열의 확장자만 변경하지만 true이면 실제 파일명도 변경시킨다.
@@ -2091,7 +2091,7 @@ h		: 복사할 height 크기(pixel)
 	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
 
 	//lt, rt, lb, rb 의 round를 각각 줄 수 있는데 lt이외의 값들 중 그 값이 음수이면 lt와 동일한 값으로 그려진다.
-	void		draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
+	ID2D1PathGeometry* draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
 
 #endif
 	void		draw_sunken_rect(CDC* pDC, CRect rect, bool bSunken = true, COLORREF cr1 = GRAY(96), COLORREF cr2 = GRAY(128), int width = 1);

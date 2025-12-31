@@ -15,6 +15,12 @@ CSCUIElement::CSCUIElement(CString label)
 	set(Gdiplus::RectF(0, 0, 0, 0), label);
 }
 
+CSCUIElement::~CSCUIElement()
+{
+	if (m_image)
+		delete m_image;
+}
+
 void CSCUIElement::set(float left, float top, float right, float bottom, CString label)
 {
 	set(Gdiplus::RectF(left, top, right - left, bottom - top), label);
@@ -54,6 +60,14 @@ void CSCUIElement::copy(CSCUIElement* dst)
 	memcpy(&dst->m_round, &m_round, sizeof(float) * 4);
 
 	dst->m_text = m_text;
+	dst->m_image_path = m_image_path;
+
+	if (m_image)
+	{
+		dst->m_image = new CSCD2Image;
+		m_image->copy(dst->m_image);
+	}
+
 	dst->m_text_visible = m_text_visible;
 	dst->m_text_align = m_text_align;
 	dst->m_text_valign = m_text_valign;
@@ -67,4 +81,19 @@ void CSCUIElement::copy(CSCUIElement* dst)
 	dst->m_stroke_thickness = m_stroke_thickness;
 	dst->m_cr_stroke = m_cr_stroke;
 	dst->m_cr_fill = m_cr_fill;
+}
+
+//m_image_path가 유효한 경우 해당 이미지를 불러온다.
+HRESULT CSCUIElement::load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context)
+{
+	HRESULT hr = S_FALSE;
+
+	if (m_image_path.IsEmpty() || !PathFileExists(m_image_path))
+		return hr;
+
+	if (m_image)
+		delete m_image;
+
+	m_image = new CSCD2Image;
+	m_image->load(WICfactory, d2context, m_image_path);
 }

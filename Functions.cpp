@@ -655,7 +655,7 @@ int	find(CString target, CString find_string, int start, bool case_sensitive, bo
 	}
 	
 	int pos = target.Find(find_string, start);
-	TRACE(_T("start = %d, pos = %d\n"), start, pos);
+	//TRACE(_T("start = %d, pos = %d\n"), start, pos);
 	//whole_word라면 그 양쪽에 구두점이 아닌 다른 문자가 있어서는 안된다.
 	if (pos >= 0 && whole_word)
 	{
@@ -1089,12 +1089,12 @@ CString	GetFileExtension(CString sFullPath, bool dot)
 }
 #endif
 
-int	GetFileTypeFromFilename(CString filename)
+int	get_filetype_from_filename(CString filename)
 {
-	return GetFileTypeFromExtension(get_part(filename, fn_ext));
+	return get_filetype_from_extension(get_part(filename, fn_ext));
 }
 
-int	GetFileTypeFromExtension(CString ext)
+int	get_filetype_from_extension(CString ext)
 {
 	ext.MakeLower();
 
@@ -4671,7 +4671,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		sCaptionString.TrimRight();
 		//sCaptionString.MakeLower();
 
-		//TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
+		TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
 		if (sText.IsEmpty() || !pWnd->IsWindowVisible())
 			continue;
 
@@ -6924,7 +6924,7 @@ void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_str
 }
 
 //lt, rt, lb, rb 의 round를 각각 줄 수 있는데 lt이외의 값들 중 그 값이 음수이면 lt와 동일한 값으로 그려진다.
-void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
+ID2D1PathGeometry* draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
 {
 	ID2D1SolidColorBrush* br_stroke;
 	ID2D1SolidColorBrush* br_fill;
@@ -6958,6 +6958,8 @@ void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke
 
 	d2dc->FillGeometry(rr, br_fill);
 	d2dc->DrawGeometry(rr, br_stroke, thick);
+
+	return rr;
 }
 
 ID2D1PathGeometry* create_round_path(ID2D1DeviceContext* d2dc, float left, float top, float right, float bottom, float lt, float rt, float lb, float rb)

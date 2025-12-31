@@ -193,15 +193,6 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (img)
 	{
 		m_img.push_back(std::move(img));
-
-		D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
-		m_width = sz.width;
-		m_height = sz.height;
-	}
-	else
-	{
-		m_width = 0.f;
-		m_height = 0.f;
 	}
 
 	return hr;
@@ -620,13 +611,13 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 						UINT delay = propValue.uiVal * 10;
 						//if (delay < 20) delay = 100; // GIF frame delays less than 20ms are not honored.
 						m_frame_delay.push_back(delay);
-						TRACE(_T("#%dth frame. delay = %d ms\n"), i, delay);
+						//TRACE(_T("#%dth frame. delay = %d ms\n"), i, delay);
 					}
 					PropVariantClear(&propValue);
 				}
 				else
 				{
-					TRACE(_T("#%dth frame. delay not fount. assume 30 ms\n"), i);
+					//TRACE(_T("#%dth frame. delay not fount. assume 30 ms\n"), i);
 					m_frame_delay.push_back(100); // default 30ms
 				}
 
@@ -653,7 +644,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 					hr = (propValue.vt == VT_BOOL ? S_OK : E_FAIL);
 					if (SUCCEEDED(hr) && propValue.boolVal)
 					{
-						TRACE(_T("is transparent frame = %d\n"), propValue.boolVal);
+						//TRACE(_T("is transparent frame = %d\n"), propValue.boolVal);
 						PropVariantClear(&propValue);
 						hr = pMetadataReader->GetMetadataByName(L"/grctlext/TransparentColorIndex", &propValue);
 						if (SUCCEEDED(hr))
@@ -815,8 +806,6 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	}
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
-	m_width = sz.width;
-	m_height = sz.height;
 
 	if (frame_count > 1)
 		play();
@@ -868,9 +857,33 @@ void CSCD2Image::blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* 
 	//save(L"d:\\blended_transformed.png", blend_img);
 }
 
-void CSCD2Image::copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst)
-{
+//void CSCD2Image::copy(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* dst)
+//{
+//
+//}
 
+//copy는 deep copy이며 이미지 자체 뿐 만 아니라 CSCD2Image의 속성값들도 모두 복사해줘야 한다.
+void CSCD2Image::copy(CSCD2Image* dst)
+{
+	//dst->create(get_WICFactory2(), get_d2dc(), get_width(), get_height());
+	//D2D1_POINT_2U pt = { 0, 0 };
+	//D2D1_RECT_U rsrc = { 0, 0, get_width(), get_height() };
+	//dst->get()->CopyFromBitmap(&pt, get(), &rsrc);
+	dst->m_img.clear();
+	dst->m_img.assign(m_img.begin(), m_img.end());
+
+	dst->m_filename = m_filename;
+	dst->m_pWICFactory = m_pWICFactory;
+	dst->m_d2dc = m_d2dc;
+	dst->m_frame_index = m_frame_index;
+	dst->m_channel = m_channel;
+	dst->m_pixel_format_str = m_pixel_format_str;
+	memcpy(&(dst->m_exif_info), &m_exif_info, sizeof(CSCEXIFInfo));
+	dst->m_interpolation_mode = m_interpolation_mode;
+	dst->m_parent = m_parent;
+	dst->m_frame_delay.clear();
+	dst->m_frame_delay.assign(m_frame_delay.begin(), m_frame_delay.end());
+	dst->m_ani_mirror = m_ani_mirror;
 }
 
 HRESULT CSCD2Image::get_sub_img(CRect r, CSCD2Image* dest)
@@ -1060,11 +1073,39 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 	return S_OK;
 }
 */
+
+float CSCD2Image::get_width()
+{
+	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
+		return 0.0f;
+
+	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+	return sz.width;
+}
+
+float CSCD2Image::get_height()
+{
+	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
+		return 0.0f;
+
+	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+	return sz.height;
+}
+
+D2D1_SIZE_F CSCD2Image::get_size()
+{
+	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
+		return D2D1::SizeF();
+
+	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+	return sz;
+}
+
 float CSCD2Image::get_ratio()
 {
-	if (m_height <= 0.0f)
+	if (get_height() <= 0.0f)
 		return 0.0f;
-	return m_width / m_height;
+	return get_width() / get_height();
 }
 
 //m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
@@ -1076,7 +1117,7 @@ bool CSCD2Image::is_empty(int index)
 	if (index < 0 || index >= (int)m_img.size())
 		return true;
 
-	if (m_width <= 0.0f || m_height <= 0.0f)
+	if (get_width() <= 0.0f || get_height() <= 0.0f)
 		return true;
 
 	return false;
@@ -1112,35 +1153,35 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, i
 	//dh가 주어진 경우
 	if (dw <= 0 && dh > 0)
 	{
-		dw = (int)(m_width * dh / m_height);
+		dw = (int)(get_width() * dh / get_height());
 	}
 	//dw가 주어진 경우
 	else if (dw > 0 && dh <= 0)
 	{
-		dh = (int)(m_height * dw / m_width);
+		dh = (int)(get_height() * dw / get_width());
 	}
 	//dwr or dwh가 주어진 경우
 	else if (dw <= 0 && dh <= 0)
 	{
 		if (dwr > 0.f && dhr > 0.f)
 		{
-			dw = m_width * dwr;
-			dh = m_height * dhr;
+			dw = get_width() * dwr;
+			dh = get_height() * dhr;
 		}
 		else if (dwr <= 0.f && dhr > 0.f)
 		{
-			dw = m_width * dhr;
-			dh = m_height * dhr;
+			dw = get_width() * dhr;
+			dh = get_height() * dhr;
 		}
 		else if (dwr > 0.f && dhr <= 0.f)
 		{
-			dw = m_width * dwr;
-			dh = m_height * dwr;
+			dw = get_width() * dwr;
+			dh = get_height() * dwr;
 		}
 		else
 		{
-			dw = m_width;
-			dh = m_height;
+			dw = get_width();
+			dh = get_height();
 		}
 	}
 
@@ -1149,7 +1190,7 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, int dx, int dy, int dw, i
 
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_POINT_2F pt)
 {
-	return draw(d2dc, D2D1::RectF(pt.x, pt.y, pt.x + m_width, pt.y + m_height));
+	return draw(d2dc, D2D1::RectF(pt.x, pt.y, pt.x + get_width(), pt.y + get_height()));
 }
 
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2Image_DRAW_MODE draw_mode)
@@ -1163,9 +1204,9 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 		r = target;
 	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_zoom)
 	{
-		r = get_ratio_rect(target, m_width / m_height);
+		r = get_ratio_rect(target, get_width() / get_height());
 
-		if ((m_width <= (target.right - target.left)) && (m_height <= (target.bottom - target.top)))
+		if ((get_width() <= (target.right - target.left)) && (get_height() <= (target.bottom - target.top)))
 		{
 			float w = r.right - r.left;
 			float h = r.bottom - r.top;
@@ -1178,14 +1219,14 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2
 	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_original)
 	{
 		r = target;
-		r.right = r.left + m_width;
-		r.bottom = r.top + m_height;
+		r.right = r.left + get_width();
+		r.bottom = r.top + get_height();
 	}
 	else //eSCD2Image_DRAW_MODE::draw_mode_original_center
 	{
-		r = D2D1::RectF(0, 0, m_width, m_height);
-		r.left = target.left + (target.right - target.left - m_width) / 2.0;
-		r.top = target.top + (target.bottom - target.top - m_height) / 2.0;
+		r = D2D1::RectF(0, 0, get_width(), get_height());
+		r.left = target.left + (target.right - target.left - get_width()) / 2.0;
+		r.top = target.top + (target.bottom - target.top - get_height()) / 2.0;
 	}
 
 	//D2D1_POINT_2F cp = { (r.right - r.left) / 2.0f, (r.bottom - r.top) / 2.0f };
@@ -1205,11 +1246,11 @@ CRect CSCD2Image::calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode)
 	if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_stretch)
 		result = targetRect;
 	else if (draw_mode == eSCD2Image_DRAW_MODE::draw_mode_zoom)
-		result = d2RectF_to_CRect(get_ratio_rect(d2target, m_width, m_height));
+		result = d2RectF_to_CRect(get_ratio_rect(d2target, get_width(), get_height()));
 	else
 	{
-		result = CRect(0, 0, m_width, m_height);
-		result.OffsetRect(targetRect.left + (targetRect.Width() - m_width) / 2, targetRect.top + (targetRect.Height() - m_height) / 2);
+		result = CRect(0, 0, get_width(), get_height());
+		result.OffsetRect(targetRect.left + (targetRect.Width() - get_width()) / 2, targetRect.top + (targetRect.Height() - get_height()) / 2);
 	}
 
 	return result;
@@ -1343,10 +1384,10 @@ void CSCD2Image::get_raw_data()
 	if (data)
 		delete[] data;
 
-	data = new uint8_t[(int)(m_width * m_height * 4)];
+	data = new uint8_t[(int)(get_width() * get_height() * 4)];
 
 	WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
-	WICRect rcLock = { 0, 0, (INT)m_width, (INT)m_height };
+	WICRect rcLock = { 0, 0, (INT)get_width(), (INT)get_height() };
 	IWICBitmapLock* pLock = NULL;
 
 	HRESULT hr = S_OK;
@@ -1410,6 +1451,36 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 	{
 		m_channel = 1;
 		str_fmt = _T("GUID_WICPixelFormat8bppIndexed");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat4bppGray))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat4bppGray");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat4bppIndexed))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat4bppIndexed");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat2bppGray))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat2bppGray");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat2bppIndexed))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat2bppIndexed");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormatBlackWhite))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormatBlackWhite");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat1bppIndexed))
+	{
+		m_channel = 1;
+		str_fmt = _T("GUID_WICPixelFormat1bppIndexed");
 	}
 	else
 	{

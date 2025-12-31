@@ -10,8 +10,10 @@ CSCD2Context::~CSCD2Context()
 {
 }
 
-HRESULT CSCD2Context::init(HWND hWnd)
+HRESULT CSCD2Context::init(HWND hWnd, int cx, int cy)
 {
+	m_sz.width = cx;
+	m_sz.height = cy;
 	m_hWnd = hWnd;
 	create_factory();
 	create_device_resources();
@@ -36,17 +38,22 @@ HRESULT CSCD2Context::create_device_resources()
 {
 	HRESULT hr = S_OK;
 
-	if (!m_d2context) {
+	if (!m_d2context)
+	{
 		hr = create_device_context();
 
 		ComPtr<IDXGISurface> surface = nullptr;
-		if (SUCCEEDED(hr)) {
+		if (SUCCEEDED(hr))
+		{
 			hr = m_swapchain->GetBuffer(
 				0,
 				IID_PPV_ARGS(surface.GetAddressOf())
 			);
 		}
-		ComPtr<ID2D1Bitmap1> bitmap = nullptr;
+
+		//ComPtr<ID2D1Bitmap1> bitmap = nullptr;
+		m_target_bitmap = nullptr;
+
 		if (SUCCEEDED(hr))
 		{
 			FLOAT dpiX, dpiY;
@@ -54,57 +61,29 @@ HRESULT CSCD2Context::create_device_resources()
 			dpiY = dpiX;
 
 			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-				D2D1_BITMAP_OPTIONS_NONE | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), dpiX, dpiY);
+				D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), dpiX, dpiY);
 
+			hr = m_d2context->CreateBitmap(
+				D2D1::SizeU(m_sz.width, m_sz.height),
+				nullptr,
+				0,
+				&properties,
+				&m_target_bitmap
+			);
+			/*
 			hr = m_d2context->CreateBitmapFromDxgiSurface(
 				surface.Get(),
 				&properties,
-				&bitmap
+				&m_target_bitmap
 			);
+			*/
 		}
 
-		// create GDI-compatible window render target
-		//D2D1_RENDER_TARGET_PROPERTIES rtProps = D2D1::RenderTargetProperties();
-		//rtProps.usage = D2D1_RENDER_TARGET_USAGE_GDI_COMPATIBLE;
-		//rtProps.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		//rtProps.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
 
-		//ID2D1HwndRenderTarget* pHwndRenderTarget = NULL;
-		//HRESULT hr = m_d2factory->CreateHwndRenderTarget(
-		//	&rtProps,
-		//	&D2D1::HwndRenderTargetProperties(m_hWnd, CD2DSizeU()),
-		//	&pHwndRenderTarget);
-		//if (FAILED(hr))
-		//	return -1;
-
-		// Create a DC render target.
-		/*
-		D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
-			D2D1_RENDER_TARGET_TYPE_DEFAULT,
-			D2D1::PixelFormat(
-				DXGI_FORMAT_B8G8R8A8_UNORM,
-				D2D1_ALPHA_MODE_IGNORE),
-			0,
-			0,
-			D2D1_RENDER_TARGET_USAGE_NONE,
-			D2D1_FEATURE_LEVEL_DEFAULT
-		);
-		hr = m_d2factory->CreateDCRenderTarget(&props, m_pDCRT.GetAddressOf());
-		*/
-		// instantiate new CHwndRenderTarget and attach the GDI-compatible render target
-		//CHwndRenderTarget* pRenderTarget = new CHwndRenderTarget;
-		//GetRenderTarget()->Attach(pHwndRenderTarget);
-
-		//// create ID2D1GdiInteropRenderTarget instance
-		//m_spGdiInteropRenderTarget = pHwndRenderTarget;
-
-
-
-
-
-		if (SUCCEEDED(hr)) {
-			m_d2context->SetTarget(bitmap.Get());
+		if (SUCCEEDED(hr))
+		{
+			m_d2context->SetTarget(m_target_bitmap.Get());
 			//m_spGdiInteropRenderTarget = bitmap.Get();
 			m_d2context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
 
@@ -119,13 +98,6 @@ HRESULT CSCD2Context::create_device_resources()
 	return hr;
 }
 
-/*
-void CSCD2Context::get_d2DC(HDC* hDC)
-{
-	m_spGdiInteropRenderTarget->GetDC(D2D1_DC_INITIALIZE_MODE_COPY, hDC);
-}
-*/
-
 HRESULT CSCD2Context::create_device_context()
 {
 	HRESULT hr = S_OK;
@@ -134,8 +106,8 @@ HRESULT CSCD2Context::create_device_context()
 	::GetClientRect(m_hWnd, &rc);
 
 	D2D1_SIZE_U size;
-	size.width = rc.right;
-	size.height = rc.bottom;
+	size.width = m_sz.width;// rc.right;
+	size.height = m_sz.height;// rc.bottom;
 
 	UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 
@@ -233,127 +205,146 @@ ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(float cell_size, byte
 
 HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 {
-	HRESULT hr = S_FALSE;
+	HRESULT hr = S_OK;
 
 	if (!m_d2context)
 		return hr;
 
 	m_d2context->SetTarget(nullptr);
 
-	if (SUCCEEDED(hr)) {
+	if (SUCCEEDED(hr))
+	{
 		hr = m_swapchain->ResizeBuffers(
 			0,
-			cx,
-			cy,
+			m_sz.width,// cx,
+			m_sz.height,//cy,
 			DXGI_FORMAT_B8G8R8A8_UNORM,
 			0
 		);
 	}
 
 	ComPtr<IDXGISurface> surface = nullptr;
-	if (SUCCEEDED(hr)) {
+	if (SUCCEEDED(hr))
+	{
 		hr = m_swapchain->GetBuffer(
 			0,
 			IID_PPV_ARGS(&surface)
 		);
 	}
 
-	ComPtr<ID2D1Bitmap1> bitmap = nullptr;
-	if (SUCCEEDED(hr)) {
+	//ComPtr<ID2D1Bitmap1> bitmap = nullptr;
+	m_target_bitmap = nullptr;
+	if (SUCCEEDED(hr))
+	{
 		FLOAT dpiX, dpiY;
 		dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
 		dpiY = dpiX;
 		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
 			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-			D2D1::PixelFormat(
-				DXGI_FORMAT_B8G8R8A8_UNORM,
-				D2D1_ALPHA_MODE_IGNORE
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED
 			),
 			dpiX,
 			dpiY
 		);
+
+		hr = m_d2context->CreateBitmap(
+			D2D1::SizeU(m_sz.width, m_sz.height),
+			nullptr,
+			0,
+			&properties,
+			&m_target_bitmap
+		);
+		/*
 		hr = m_d2context->CreateBitmapFromDxgiSurface(
 			surface.Get(),
 			&properties,
-			&bitmap
+			&m_target_bitmap
 		);
+		*/
 	}
 
-	if (SUCCEEDED(hr)) {
-		m_d2context->SetTarget(bitmap.Get());
+	if (SUCCEEDED(hr))
+	{
+		m_d2context->SetTarget(m_target_bitmap.Get());
 	}
 
+	//m_d2context->InvalidateEffectInputRectangle()
 	//render();
 }
-/*
-ID2D1PathGeometry* CSCD2Context::create_round_rect(int x, int y, int width, int height, int leftTop, int rightTop, int rightBottom, int leftBottom)
+
+HRESULT	CSCD2Context::save(CString path)
 {
-	ID2D1GeometrySink* sink = nullptr;
-	ID2D1PathGeometry* path = nullptr;
+	HRESULT res = S_OK;
 
-	m_d2factory->CreatePathGeometry(&path);
-	path->Open(&sink);
+	ComPtr<ID2D1Bitmap1> cpuBitmap;
 
-	D2D1_POINT_2F p[2];
+	D2D1_BITMAP_PROPERTIES1 props = {};
+	props.pixelFormat = D2D1::PixelFormat(
+		DXGI_FORMAT_B8G8R8A8_UNORM,
+		D2D1_ALPHA_MODE_PREMULTIPLIED
+	);
+	props.bitmapOptions =
+		D2D1_BITMAP_OPTIONS_TARGET |
+		D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
 
-	p[0].x = x + leftTop;
-	p[0].y = y;
-	sink->BeginFigure(p[0], D2D1_FIGURE_BEGIN::D2D1_FIGURE_BEGIN_FILLED);
-	p[1].x = x + width - rightTop;
-	p[1].y = y;
-	sink->AddLines(p, 2);
+	D2D1_BITMAP_PROPERTIES1 cpuProps = props;
+	cpuProps.bitmapOptions = D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
 
-	p[0].x = x + width;
-	p[0].y = y + rightTop;
+	D2D1_SIZE_U sz1 = m_target_bitmap.Get()->GetPixelSize();
+	D2D1_SIZE_F sz2 = m_target_bitmap.Get()->GetSize();
 
-	if (rightTop)
-	{
-		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
-		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(rightTop, rightTop), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
-	}
+	D2D1_SIZE_U sz = { m_d2context->GetSize().width, m_d2context->GetSize().height };
+	
+	res = m_d2context->CreateBitmap(
+		sz,
+		nullptr,
+		0,
+		&cpuProps,
+		&cpuBitmap
+	);
 
-	p[1].x = x + width;
-	p[1].y = y + height - rightBottom;
-	sink->AddLines(p, 2);
+	cpuBitmap->CopyFromBitmap(nullptr, m_target_bitmap.Get(), nullptr);
 
-	p[0].x = x + width - rightBottom;
-	p[0].y = y + height;
+	D2D1_MAPPED_RECT mapped = {};
+	cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped);
 
-	if (rightBottom)
-	{
-		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
-		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(rightBottom, rightBottom), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
-	}
+	ComPtr<IWICImagingFactory> wicFactory;
+	CoCreateInstance(
+		CLSID_WICImagingFactory,
+		nullptr,
+		CLSCTX_INPROC_SERVER,
+		IID_PPV_ARGS(&wicFactory)
+	);
 
-	p[1].x = x + leftBottom;
-	p[1].y = y + height;
-	sink->AddLines(p, 2);
+	ComPtr<IWICBitmapEncoder> encoder;
+	wicFactory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
 
-	p[0].x = x;
-	p[0].y = y + height - leftBottom;
-	if (leftBottom)
-	{
-		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
-		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(leftBottom, leftBottom), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
-	}
+	ComPtr<IWICStream> stream;
+	wicFactory->CreateStream(&stream);
 
+	stream->InitializeFromFilename(path, GENERIC_WRITE);
+	encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
 
-	p[1].x = x;
-	p[1].y = y + leftTop;
-	sink->AddLines(p, 2);
-	p[0].x = x + leftTop;
-	p[0].y = y;
-	if (leftTop)
-	{
-		D2D1_POINT_2F p2 = D2D1::Matrix3x2F::Rotation(0, p[1]).TransformPoint(p[0]);
-		sink->AddArc(D2D1::ArcSegment(p2, D2D1::SizeF(leftTop, leftTop), 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
-	}
+	ComPtr<IWICBitmapFrameEncode> frame;
+	encoder->CreateNewFrame(&frame, nullptr);
 
-	sink->EndFigure(D2D1_FIGURE_END::D2D1_FIGURE_END_CLOSED);
-	sink->Close();
-	//SafeRelease(&sink);
-	sink->Release();
+	frame->Initialize(nullptr);
+	frame->SetSize(sz.width, sz.height);
 
-	return path;
+	WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+	frame->SetPixelFormat(&format);
+
+	frame->WritePixels(
+		sz.height,
+		mapped.pitch,
+		mapped.pitch * sz.height,
+		mapped.bits
+	);
+
+	frame->Commit();
+	encoder->Commit();
+
+	cpuBitmap->Unmap();
+
+	return res;
 }
-*/

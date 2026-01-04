@@ -12,9 +12,18 @@ CSCD2Context::~CSCD2Context()
 
 HRESULT CSCD2Context::init(HWND hWnd, int cx, int cy)
 {
+	m_hWnd = hWnd;
+
+	CRect rc;
+	::GetClientRect(m_hWnd, &rc);
+
+	if (cx <= 0)
+		cx = rc.Width();
+	if (cy <= 0)
+		cy = rc.Height();
+
 	m_sz.width = cx;
 	m_sz.height = cy;
-	m_hWnd = hWnd;
 	create_factory();
 	create_device_resources();
 	return S_OK;
@@ -51,8 +60,8 @@ HRESULT CSCD2Context::create_device_resources()
 			);
 		}
 
-		//ComPtr<ID2D1Bitmap1> bitmap = nullptr;
-		m_target_bitmap = nullptr;
+		ComPtr<ID2D1Bitmap1> bitmap = nullptr;
+		//m_target_bitmap = nullptr;
 
 		if (SUCCEEDED(hr))
 		{
@@ -64,27 +73,27 @@ HRESULT CSCD2Context::create_device_resources()
 				D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
 				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), dpiX, dpiY);
 
+			/*
 			hr = m_d2context->CreateBitmap(
 				D2D1::SizeU(m_sz.width, m_sz.height),
 				nullptr,
 				0,
 				&properties,
-				&m_target_bitmap
+				&bitmap
+				//&m_target_bitmap
 			);
-			/*
+			*/
 			hr = m_d2context->CreateBitmapFromDxgiSurface(
 				surface.Get(),
 				&properties,
-				&m_target_bitmap
+				&bitmap
 			);
-			*/
 		}
 
 
 		if (SUCCEEDED(hr))
 		{
-			m_d2context->SetTarget(m_target_bitmap.Get());
-			//m_spGdiInteropRenderTarget = bitmap.Get();
+			m_d2context->SetTarget(bitmap.Get());
 			m_d2context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
 
 			//D2D1_ANTIALIAS_MODE_ALIASED로 하지 않고 수평 라인을 그리면 stroke width가 1.0, 2.0의 두께가 동일하게 표시된다.
@@ -106,8 +115,10 @@ HRESULT CSCD2Context::create_device_context()
 	::GetClientRect(m_hWnd, &rc);
 
 	D2D1_SIZE_U size;
-	size.width = m_sz.width;// rc.right;
-	size.height = m_sz.height;// rc.bottom;
+	//size.width = m_sz.width;
+	//size.height = m_sz.height;
+	size.width = rc.right;
+	size.height = rc.bottom;
 
 	UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 
@@ -216,8 +227,10 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 	{
 		hr = m_swapchain->ResizeBuffers(
 			0,
-			m_sz.width,// cx,
-			m_sz.height,//cy,
+			cx,
+			cy,
+			//m_sz.width,
+			//m_sz.height,
 			DXGI_FORMAT_B8G8R8A8_UNORM,
 			0
 		);
@@ -232,8 +245,8 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 		);
 	}
 
-	//ComPtr<ID2D1Bitmap1> bitmap = nullptr;
-	m_target_bitmap = nullptr;
+	ComPtr<ID2D1Bitmap1> bitmap = nullptr;
+	//m_target_bitmap = nullptr;
 	if (SUCCEEDED(hr))
 	{
 		FLOAT dpiX, dpiY;
@@ -247,6 +260,7 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 			dpiY
 		);
 
+		/*
 		hr = m_d2context->CreateBitmap(
 			D2D1::SizeU(m_sz.width, m_sz.height),
 			nullptr,
@@ -254,18 +268,18 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 			&properties,
 			&m_target_bitmap
 		);
-		/*
+		*/
 		hr = m_d2context->CreateBitmapFromDxgiSurface(
 			surface.Get(),
 			&properties,
-			&m_target_bitmap
+			&bitmap
 		);
-		*/
 	}
 
 	if (SUCCEEDED(hr))
 	{
-		m_d2context->SetTarget(m_target_bitmap.Get());
+		m_d2context->SetTarget(bitmap.Get());
+		//m_d2context->SetTarget(m_target_bitmap.Get());
 	}
 
 	//m_d2context->InvalidateEffectInputRectangle()
@@ -290,8 +304,8 @@ HRESULT	CSCD2Context::save(CString path)
 	D2D1_BITMAP_PROPERTIES1 cpuProps = props;
 	cpuProps.bitmapOptions = D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
 
-	D2D1_SIZE_U sz1 = m_target_bitmap.Get()->GetPixelSize();
-	D2D1_SIZE_F sz2 = m_target_bitmap.Get()->GetSize();
+	//D2D1_SIZE_U sz1 = m_target_bitmap.Get()->GetPixelSize();
+	//D2D1_SIZE_F sz2 = m_target_bitmap.Get()->GetSize();
 
 	D2D1_SIZE_U sz = { m_d2context->GetSize().width, m_d2context->GetSize().height };
 	
@@ -303,7 +317,7 @@ HRESULT	CSCD2Context::save(CString path)
 		&cpuBitmap
 	);
 
-	cpuBitmap->CopyFromBitmap(nullptr, m_target_bitmap.Get(), nullptr);
+	//cpuBitmap->CopyFromBitmap(nullptr, m_target_bitmap.Get(), nullptr);
 
 	D2D1_MAPPED_RECT mapped = {};
 	cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped);

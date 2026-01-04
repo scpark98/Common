@@ -1117,6 +1117,9 @@ bool CSCD2Image::is_empty(int index)
 	if (index < 0 || index >= (int)m_img.size())
 		return true;
 
+	if (m_img[index].Get() == NULL)
+		return true;
+
 	if (get_width() <= 0.0f || get_height() <= 0.0f)
 		return true;
 

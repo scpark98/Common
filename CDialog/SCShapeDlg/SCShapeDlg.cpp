@@ -95,7 +95,7 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	dwStyle &= ~(WS_CAPTION);
 	SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
 
-	dwStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED;
+	dwStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED | WS_EX_NOACTIVATE;
 	SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, dwStyle);
 
 	GetClientRect(rc);

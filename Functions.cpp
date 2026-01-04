@@ -19235,7 +19235,40 @@ int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 	free(pImageCodecInfo);
 	return -1;  // Failure
 }
+/*
+void save(ID2D1DeviceContext* deviceContext, CString filepath)
+{
+	// GDI+ 초기화
+	//Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	//ULONG_PTR gdiplusToken;
+	//Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
 
+	// PNG 파일로 저장을 위한 Bitmap 객체 생성
+	D2D1_SIZE_F size = deviceContext->GetSize();
+	Gdiplus::Bitmap bitmap((INT)size.width, (INT)size.height, PixelFormat32bppARGB);
+
+	// GDI+ Graphics 객체 생성
+	Gdiplus::Graphics graphics(&bitmap);
+
+	// ID2D1DeviceContext의 현재 내용 복사
+	//deviceContext->EndDraw(); // 현재 그리기 작업 종료
+	ID2D1Bitmap* d2dBitmap = nullptr;
+	//deviceContext->CreateBitmap(D2D1::SizeU((UINT32)size.width, (UINT32)size.height), nullptr, 0, nullptr, &d2dBitmap);
+	deviceContext->CreateCompatibleBitmap(nullptr, D2D1::SizeU((UINT32)size.width, (UINT32)size.height), &d2dBitmap);
+
+	// GDI+ Bitmap에 Direct2D 내용 그리기
+	graphics.DrawImage(Gdiplus::Bitmap(d2dBitmap), 0, 0);
+
+	// PNG 파일로 저장
+	CLSID clsid;
+	CLSIDFromString(L"{557CF400-1A04-11D3-9A73-0000F81EF32E}", &clsid); // CLSID for PNG
+	bitmap.Save(filepath, &clsid, nullptr);
+
+	// 리소스 해제
+	d2dBitmap->Release();
+	//Gdiplus::GdiplusShutdown(gdiplusToken);
+}
+*/
 CString json_value(CString json, CString key)
 {
 	bool isFindToken = false;

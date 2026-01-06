@@ -637,7 +637,7 @@ void CMacProgressCtrl::GetColors()
 
 //-------------------------------------------------------------------
 //
-void CMacProgressCtrl::SetColor(COLORREF crColor,
+void CMacProgressCtrl::set_color(COLORREF crColor,
 								COLORREF crBackColor)
 //
 // Return Value:	None.

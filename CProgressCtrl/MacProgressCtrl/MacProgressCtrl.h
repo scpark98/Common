@@ -59,7 +59,7 @@ public:
 	int			get_upper() { return m_upper; }
 	BOOL		GetIndeterminate();
 	void		SetIndeterminate(BOOL bIndeterminate = TRUE);
-	void		SetColor(COLORREF crColor, COLORREF crBackColor = -1);
+	void		set_color(COLORREF crColor, COLORREF crBackColor = -1);
 	void		set_track_color(COLORREF cr) { m_cr_track = cr; }
 	void		set_back_color(COLORREF cr_back);
 	void		set_back_track_color(COLORREF cr_back);

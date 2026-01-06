@@ -72,7 +72,7 @@
 #include <string>
 #include <vector>
 #include <map>
-//#include "string.h"
+#include <gdiplus.h>
 #include "include/document.h"
 #include "include/rapidjson.h"
 
@@ -309,17 +309,17 @@ public:
 	//Debug모드에서는 해당 array가 존재하지 않으면 assert_fail이 발생하므로
 	//먼저 해당 array가 존재하는지 확인한 후 리턴하도록 함수 추가
 	rapidjson::Value* get_array(std::string array_name);
-	rapidjson::Value& get_array1(std::string array_name);
+	//rapidjson::Value& get_array1(std::string array_name);
 
 	//arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
-	template <class T> T get_array_member(std::string arr_name, int n, std::string member, T default)
+	template <class T> T get_array_member(std::string arr_name, int n, std::string member, T default_value)
 	{
 		//if (typeid(T) == typeid(int))
 		//	return doc[arr_name][n][member].GetInt();
 		//else if (typeid(T) == typeid(CString))
 		//	return doc[arr_name][n][member].GetCString();
 		if (!doc[arr_name][n].HasMember(member))
-			return default;
+			return default_value;
 
 		//TRACE(_T("typename = %S\n"), typeid(T).name());
 

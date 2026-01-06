@@ -544,7 +544,8 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 			case VK_RETURN:
 				if (!(GetStyle() & ES_WANTRETURN))
 				{
-					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&CSCEditMessage(this, WM_KILLFOCUS), 0);
+					CSCEditMessage msg(this, WM_KILLFOCUS);
+					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, 0);
 					return false;
 				}
 				break;
@@ -735,7 +736,11 @@ BOOL CSCEdit::OnEnKillfocus()
 	//::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
 	CWnd* parent = GetParent();
 	if (parent && parent->m_hWnd)
-		::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&(CSCEditMessage(this, WM_KILLFOCUS)), 0);
+	{
+		CSCEditMessage msg(this, WM_KILLFOCUS);
+		::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, 0);
+	}
+
 	return FALSE;
 }
 

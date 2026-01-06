@@ -87,7 +87,7 @@
 //정확히 검색하기 위해서는 find()를 이용해야 한다.
 //데이터 추가 시 unordered_map을 이용해도 순서가 보장되지 않는다.
 //https://80000coding.oopy.io/8af406a3-b3b1-4f3f-b190-2937b23684ed
-extern std::unordered_map<char*, COLORREF> g_cr;
+extern std::unordered_map<const char*, COLORREF> g_cr;
 
 //enum으로 컬러 표현
 //참조 방법 : cr = white

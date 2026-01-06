@@ -905,7 +905,8 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 			case VK_SPACE :
 				redraw_window();
 				Wait(50);
-				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONDOWN)), 0);
+				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN);
+				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				break;
 		}
 	}
@@ -916,7 +917,8 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 			case VK_SPACE:
 				redraw_window();
 				Wait(50);
-				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
+				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP);
+				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				break;
 		}
 	}
@@ -1227,8 +1229,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			if (check_state == BST_CHECKED)
 			{
-				g.DrawLine(&pen, r.left + 1, r.CenterPoint().y - 1, r.left + 4, r.CenterPoint().y + 3);
-				g.DrawLine(&pen, r.left + 4, r.CenterPoint().y + 3, r.right - 3, r.top + 3);
+				g.DrawLine(&pen, Gdiplus::Point(r.left + 1, r.CenterPoint().y - 1), Gdiplus::Point(r.left + 4, r.CenterPoint().y + 3));
+				g.DrawLine(&pen, Gdiplus::Point(r.left + 4, r.CenterPoint().y + 3), Gdiplus::Point(r.right - 3, r.top + 3));
 			}
 			else if (check_state == BST_INDETERMINATE)
 			{
@@ -1309,7 +1311,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				switch (m_button_cmd)
 				{
 					case SC_MINIMIZE :
-						g.DrawLine(&pen, cp.x - 5, cp.y + 3, cp.x + 5, cp.y + 3);
+						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y + 3), Gdiplus::Point(cp.x + 5, cp.y + 3));
 						break;
 					case SC_MAXIMIZE :
 						if (GetParent()->IsZoomed())
@@ -1324,8 +1326,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 						}
 						break;
 					case SC_CLOSE:
-						g.DrawLine(&pen, cp.x - 5, cp.y - 6, cp.x + 5, cp.y + 4);
-						g.DrawLine(&pen, cp.x - 5, cp.y + 4, cp.x + 5, cp.y - 6);
+						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y - 6), Gdiplus::Point(cp.x + 5, cp.y + 4));
+						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y + 4), Gdiplus::Point(cp.x + 5, cp.y - 6));
 						break;
 					//case SC_PIN :
 					//	g.DrawLine(&pen_pin, cp.x - 7, cp.y, cp.x + 7, cp.y);
@@ -1526,7 +1528,8 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 
 	//TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSEHOVER)), 0);
+	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_MOUSEHOVER);
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
 	CButton::OnMouseHover(nFlags, point);
 }
@@ -1546,7 +1549,8 @@ void CGdiButton::OnMouseLeave()
 
 	//TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&(CGdiButtonMessage(this, GetDlgCtrlID(), WM_MOUSELEAVE)), 0);
+	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_MOUSELEAVE);
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
 	CButton::OnMouseLeave();
 }
@@ -1881,7 +1885,8 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 		}
 
 		SetCapture();
-		::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONDOWN)), 0);
+		CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN);
+		::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 	}
 
 	CButton::OnLButtonDown(nFlags, point);
@@ -1915,9 +1920,10 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 				SetCheck((m_idx = 1));
 			}
 
-			//TRACE(_T("GetDlgCtrlID() = %d\n"), GetDlgCtrlID());
 			GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
-			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM) & (CGdiButtonMessage(this, GetDlgCtrlID(), WM_LBUTTONUP)), 0);
+
+			CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP);
+			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 		}
 	}
 

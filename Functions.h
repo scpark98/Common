@@ -822,21 +822,26 @@ struct	NETWORK_INFO
 	//두번째 토큰은 " 1601-01-01 9"가 되지만(실제 기대값은 " 1601-01-01 9:00:00"일 것이다)
 	//include_rest를 true로 주면 dqToken[1] = " 1601-01-01 9:00:00"이 된다.
 	//즉, 최대 토큰 개수가 정해져 있을 때 마지막 토큰을 어디까지로 처리할 것인가에 대한 옵션이다.
-	int			get_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1, bool include_rest = false);
-	int			get_token_string(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
-	int			get_token_string(char *src, char *separator, char **sToken, int nMaxToken);
+	int			get_token_str(CString src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1, bool include_rest = false);
+	int			get_token_str(std::string src, std::deque<CString>& dqToken, CString separator = _T("|"), bool allowEmpty = true, int nMaxToken = -1, bool include_rest = false);
+	int			get_token_str(TCHAR *src, TCHAR *separator, CString *sToken, int nMaxToken);
+	int			get_token_str(char *src, char *separator, char **sToken, int nMaxToken);
 
-	//대부분의 경우는 get_token_string()을 사용하지만 separator가 문자열 내에 포함된 경우도 있을 수 있다.
+	//대부분의 경우는 get_token_str()을 사용하지만 separator가 문자열 내에 포함된 경우도 있을 수 있다.
 	//"내 PC\\연구소문서2(\\\\192.168.1.103) (X:)" 문자열을 '\\'로 구분할 경우 잘못 추출되므로
 	//이 경우는 get_exact_token_string()을 사용해서 실제 '\\'인 경우에만 추출하도록 해야 한다.
-	int			get_exact_token_string(CString src, std::deque<CString>& dqToken, CString separator = _T("|"));
+	int			get_exact_token_str(CString src, std::deque<CString>& dqToken, CString separator = _T("|"));
 
 	//"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
 	//위와 같은 형식일 때 태그와 텍스트를 분리한다. 태그내의 공백은 제거된다.
 	void		get_tag_str(CString& src, std::deque<CString>& tags);
 
 	//간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
-	CString		get_unescape_string(CString src);
+	CString		get_unescape_str(CString src);
+
+	//엑셀의 컬럼과 같이 n=0이면 "A"를, n=25이면 "Z"를, n=26이면 "AA"를, n=27이면 "AB"를 리턴한다.
+	//CString		get_excel_column(int n);
+	std::string	get_excel_column(int n);
 
 	// a_value : 1.1.24050
 	// b_value : Normal
@@ -974,7 +979,8 @@ struct	NETWORK_INFO
 	//dqList에서 element값과 일치하는 항목의 index를 리턴한다. 없으면 -1을 리턴.
 	template <typename T> int find_index(std::deque <T> &dqList, T element)
 	{
-		std::deque<T>::iterator it = std::find(dqList.begin(), dqList.end(), element);
+		auto it = std::find(dqList.begin(), dqList.end(), element);
+		//typename T::iterator it = std::find(dqList.begin(), dqList.end(), element);
 		if (it != dqList.end())
 		{
 			return std::distance(dqList.begin(), it);
@@ -2579,10 +2585,10 @@ template<class T> void Cycle(T& n, T min, T max)
 }
 
 //범위를 벗어나면 default값으로 세팅
-template<class T> void Validate(T& n, T min, T max, T default)
+template<class T> void Validate(T& n, T min, T max, T default_value)
 {
 	if (n < min || n > max)
-		n = default;
+		n = default_value;
 }
 
 //치환 함수
@@ -2673,6 +2679,8 @@ template<typename T> T random19937(T min, T max)
 	return rand();
 }
 */
+
+#include <numeric>
 template<typename T> double standardDeviation(std::deque<T> v) 
 {
 	T sum = std::accumulate(v.begin(), v.end(), 0.0);

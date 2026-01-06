@@ -214,7 +214,7 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 
 	//get IFD query reader
 	ComPtr<IWICMetadataQueryReader> pIfdQueryReader;
-	LPTSTR sIFDPath = _T("/ifd");
+	CString sIFDPath = _T("/ifd");
 
 	GUID guidFormat = { 0 };
 	_M(hr, pDecoder->GetContainerFormat(&guidFormat));
@@ -925,7 +925,8 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 	PROPBAG2 name = { 0 };
 	name.dwType = PROPBAG2_TYPE_DATA;
 	name.vt = VT_R4;
-	name.pstrName = L"ImageQuality";
+	wchar_t propName[] = L"ImageQuality";
+	name.pstrName = propName;
 
 	// Create WIC encoder
 	ComPtr<IWICBitmapEncoder> pEncoder;
@@ -936,7 +937,8 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 	{
 		wicFormat = GUID_ContainerFormatPng;
 		name.vt = VT_I2;
-		name.pstrName = _T("CompressionLevel");
+		wchar_t propName[] = L"CompressionLevel";
+		name.pstrName = propName;
 	}
 	else if (ext == _T("jpg"))
 		wicFormat = GUID_ContainerFormatJpeg;
@@ -1269,7 +1271,8 @@ int CSCD2Image::goto_frame(int index, bool pause)
 	if (pause)
 	{
 		m_ani_paused = true;
-		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&CSCD2ImageMessage(this, message_frame_changed, m_frame_index, m_img.size()), 0);
+		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
+		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 	}
 
 	return m_frame_index;
@@ -1290,7 +1293,8 @@ void CSCD2Image::step(int interval)
 	if (m_frame_index >= (int)m_img.size())
 		m_frame_index = 0;
 
-	::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&CSCD2ImageMessage(this, message_frame_changed, m_frame_index, m_img.size()), 0);
+	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
+	::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 }
 
 void CSCD2Image::play()
@@ -1367,7 +1371,8 @@ void CSCD2Image::thread_animation()
 			m_frame_index = 0;
 
 		//TRACE(_T("frame index = %d\n"), m_frame_index);
-		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&CSCD2ImageMessage(this, message_frame_changed, m_frame_index, m_img.size()), 0);
+		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
+		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 
 		if (m_frame_delay.size() == 0)
 			break;

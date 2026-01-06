@@ -282,8 +282,7 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 		//m_d2context->SetTarget(m_target_bitmap.Get());
 	}
 
-	//m_d2context->InvalidateEffectInputRectangle()
-	//render();
+	return hr;
 }
 
 HRESULT	CSCD2Context::save(CString path)

@@ -2429,7 +2429,8 @@ void CSCGdiplusBitmap::round_corner(float radius, float factor, float position, 
 	//mask를 CSCGdiplusBitmap 타입으로 정적 생성하니 오류발생하여 동적 생성함.
 	Gdiplus::Bitmap *mask = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 	Gdiplus::Graphics gMask(mask);
-	gMask.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::Transparent), Gdiplus::Rect(0, 0, width, height));
+	Gdiplus::SolidBrush brush(Gdiplus::Color::Transparent);
+	gMask.FillRectangle(&brush, Gdiplus::Rect(0, 0, width, height));
 	gMask.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeHighQuality);
 	gMask.FillPath(&pgb, &path);
 
@@ -3339,7 +3340,10 @@ void CSCGdiplusBitmap::thread_gif_animation()
 				if (m_cr_back.GetValue() == Gdiplus::Color::Transparent)
 					g.FillRectangle(br_zigzag.get(), CRect_to_gpRect(r));
 				else
-					g.FillRectangle(&Gdiplus::SolidBrush(m_cr_back), CRect_to_gpRect(r));
+				{
+					Gdiplus::SolidBrush br(m_cr_back);
+					g.FillRectangle(&br, CRect_to_gpRect(r));
+				}
 			}
 
 			//if (m_cr_back.GetValue() != 
@@ -3398,7 +3402,8 @@ void CSCGdiplusBitmap::thread_gif_animation()
 			continue;
 		}
 
-		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&CSCGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
+		CSCGdiplusBitmapMessage msg(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count);
+		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&msg, 0);
 
 		m_frame_index++;
 		if (m_frame_index >= m_frame_count)
@@ -3468,7 +3473,8 @@ void CSCGdiplusBitmap::goto_gif_frame(int frame)
 		}
 
 		g.DrawImage(m_pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&CSCGdiplusBitmapMessage(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count), 0);
+		CSCGdiplusBitmapMessage msg(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count);
+		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&msg, 0);
 	}
 
 	::ReleaseDC(m_target_hwnd, hDC);

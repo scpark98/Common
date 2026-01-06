@@ -96,4 +96,6 @@ HRESULT CSCUIElement::load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceCon
 
 	m_image = new CSCD2Image;
 	m_image->load(WICfactory, d2context, m_image_path);
+
+	return S_OK;
 }

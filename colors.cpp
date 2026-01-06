@@ -30,7 +30,7 @@ COLORREF g_default_color[16] = {
 		blanchedalmond,
 	};
 
-std::unordered_map<char*, COLORREF> g_cr =
+std::unordered_map<const char*, COLORREF> g_cr =
 {
 	{"aliceblue",		(COLORREF)0x00FFF8F0},
 	{"antiquewhite",	(COLORREF)0x00D7EBFA},
@@ -305,7 +305,7 @@ Gdiplus::Color get_color(CString cr_str)
 	else if (get_char_count(cr_str, ',') >= 2)
 	{
 		std::deque<CString> token;
-		get_token_string(cr_str, token, _T(","), false);
+		get_token_str(cr_str, token, _T(","), false);
 		if (token.size() == 3)
 		{
 			cr = Gdiplus::Color(_ttoi(token[0]), _ttoi(token[1]), _ttoi(token[2]));
@@ -385,7 +385,7 @@ CString	get_color_str(Gdiplus::Color cr, bool include_alpha, CString sep)
 Gdiplus::Color get_color_from_token_str(CString str, CString separator)
 {
 	std::deque<CString> token;
-	get_token_string(str, token, separator, false);
+	get_token_str(str, token, separator, false);
 
 	if (token.size() == 3)
 		return Gdiplus::Color(255, _ttoi(token[0]), _ttoi(token[1]), _ttoi(token[2]));

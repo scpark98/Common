@@ -500,7 +500,7 @@ CString CShellImageList::convert_special_folder_to_real_path(int index, CString 
 	else
 	{
 		std::deque<CString> token;
-		get_token_string(special_folder, token, _T("\\"), false);
+		get_token_str(special_folder, token, _T("\\"), false);
 		drive_prefix = token[0];
 	}
 

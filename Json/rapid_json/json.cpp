@@ -5,6 +5,7 @@
 #include "include/filereadstream.h"
 #include "include/filewritestream.h"
 #include "include/prettywriter.h"
+#include "../../Functions.h"
 
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
@@ -26,7 +27,7 @@ using namespace rapidjson;
 
 bool Json::parse(CString str)
 {
-	std::string sstr = CT2CA(str);
+	std::string sstr = CString2string(str);
 	return parse(sstr);
 }
 
@@ -294,13 +295,15 @@ rapidjson::Value* Json::get_array(std::string array_name)
 	return &doc[array_name];
 }
 
+/*
 rapidjson::Value& Json::get_array1(std::string array_name)
 {
 	if (!doc.HasMember(array_name))
-		return rapidjson::Value();
+		return rapidjson::Value;
 
 	return doc[array_name];
 }
+*/
 
 //arr_name이라는 배열의 n번째 항목에서 member의 값을 리턴한다.
 /*

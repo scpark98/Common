@@ -190,7 +190,7 @@ CString	get_time_str(SYSTEMTIME st, CString sep, bool h24, bool sec, bool msec)
 {
 	CString str;
 	CTime t(st);
-	str.Format(_T("%s%s%s"), get_time_str(t, sep, h24, sec), (msec ? _T(".") : _T("")), (msec ? i2S(st.wMilliseconds, false, true, 3) : _T("")));
+	str.Format(_T("%s%s%s"), get_time_str(t, sep, h24, sec), (msec ? _T(".") : _T("")), (msec ? i2S(st.wMilliseconds, false, true, 3) : CString()));
 	return str;
 }
 
@@ -703,12 +703,12 @@ int find_dqstring(std::deque<CString> dqSrc, CString strFind, bool bWholeWord, b
 	if (strFind.Find(_T("&")) >= 0)
 	{
 		op = '&';
-		get_token_string(strFind, dqFind, '&');
+		get_token_str(strFind, dqFind, '&');
 	}
 	else if (strFind.Find(_T("|")) >= 0)
 	{
 		op = '|';
-		get_token_string(strFind, dqFind, '|');
+		get_token_str(strFind, dqFind, '|');
 	}
 	else
 	{
@@ -1249,7 +1249,7 @@ CString	get_filter_string(CString extension_group, bool simple)
 {
 	CString filter;
 	std::deque<CString> token;
-	get_token_string(extension_group, token, _T(";"), false);
+	get_token_str(extension_group, token, _T(";"), false);
 
 	return filter;
 }
@@ -1909,7 +1909,7 @@ int	GetSecondsFromTimeString(CString timeString)
 	}
 
 	std::deque<CString> dqToken;
-	get_token_string(timeString, dqToken, ':');
+	get_token_str(timeString, dqToken, ':');
 	int hour = _ttoi(dqToken[0]);
 	int minute = _ttoi(dqToken[1]);
 	int second = _ttoi(dqToken[2]);
@@ -2195,7 +2195,7 @@ void SystemShutdownNT(int nMode /* = 2 */)
 	// Display the shutdown dialog box and start the time-out countdown. 
 	fResult = InitiateSystemShutdown(
 		NULL,					// shut down local computer 
-		_T("System rebooting."),	// message to user 
+		(LPWSTR)_T("System rebooting."),	// message to user 
 		0,						// time-out period (<- 여기를 20 이라고 쓰면 20초 후 에 리부팅한다.)
 		FALSE,					// ask user to close apps 
 		bReboot);				// reboot after shutdown 
@@ -2339,7 +2339,7 @@ bool IsAlphaNumeric(CString str, CString excepts)
 
 	if (excepts.IsEmpty() == false)
 	{
-		get_token_string(excepts, dqExcepts, ';');
+		get_token_str(excepts, dqExcepts, ';');
 		for (i = 0; i < dqExcepts.size(); i++)
 			str.Replace(dqExcepts[i], _T(""));
 	}
@@ -4901,7 +4901,7 @@ CString d2S(double dValue, bool bComma, int nfDigit)
 uint32_t IP2int(CString IP)
 {
 	std::deque<CString> token;
-	get_token_string(IP, token, '.', false);
+	get_token_str(IP, token, '.', false);
 
 	if (token.size() != 4)
 	{
@@ -5828,7 +5828,7 @@ std::deque<CString>	FindFilesWithExtensions(CString folder, CString fileTitle, C
 	extensions.Replace(_T("*"), _T(""));
 	extensions.Replace(_T("."), _T(""));
 
-	get_token_string(extensions, dqToken, ';');
+	get_token_str(extensions, dqToken, ';');
 
 	//폴더내의 파일들을 찾아서 비교하는게 아니라
 	//조건에 맞는 파일이 존재하는지로 검사한다.
@@ -6283,7 +6283,7 @@ bool read_file(CString filepath, std::deque<CString> *dqList)
 
 	str.Replace(_T("\r\n"), _T("\n"));
 
-	get_token_string(str, *dqList, _T("\n"));
+	get_token_str(str, *dqList, _T("\n"));
 
 	for (int i = 0; i < dqList->size(); i++)
 		dqList->at(i) += _T("\n");
@@ -7048,11 +7048,11 @@ void draw_sunken_rect(CDC* pDC, CRect r, bool sunken, Gdiplus::Color cr1, Gdiplu
 	Gdiplus::Pen pen1(cr1, width);
 	Gdiplus::Pen pen2(cr2, width);
 
-	g.DrawLine(sunken ? &pen1 : &pen2, r.left, r.bottom - 1, r.left, r.top);
-	g.DrawLine(sunken ? &pen1 : &pen2, r.left, r.top, r.right - 1, r.top);
+	g.DrawLine(sunken ? &pen1 : &pen2, Gdiplus::Point(r.left, r.bottom - 1), Gdiplus::Point(r.left, r.top));
+	g.DrawLine(sunken ? &pen1 : &pen2, Gdiplus::Point(r.left, r.top), Gdiplus::Point(r.right - 1, r.top));
 
-	g.DrawLine(sunken ? &pen2 : &pen1, r.right - 1, r.top, r.right - 1, r.bottom - 1);
-	g.DrawLine(sunken ? &pen2 : &pen1, r.right - 1, r.bottom - 1, r.left, r.bottom - 1);
+	g.DrawLine(sunken ? &pen2 : &pen1, Gdiplus::Point(r.right - 1, r.top), Gdiplus::Point(r.right - 1, r.bottom - 1));
+	g.DrawLine(sunken ? &pen2 : &pen1, Gdiplus::Point(r.right - 1, r.bottom - 1), Gdiplus::Point(r.left, r.bottom - 1));
 }
 
 void draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int pen_style, int width, int draw_mode)
@@ -9050,7 +9050,7 @@ CString GetToken(CString src, CString separator, int index)
 //Tokenize를 이용하면 공백인 토큰은 처리되지 않고 무시되므로 원하는 개수만큼 추출되지 않는다.
 //따라서 아래 함수는 사용하지 않는다.
 /*
-std::deque<CString>	get_token_string(CString src, CString separator)
+std::deque<CString>	get_token_str(CString src, CString separator)
 {
 	int i = 0;
 	std::deque<CString> dq;
@@ -9060,7 +9060,7 @@ std::deque<CString>	get_token_string(CString src, CString separator)
 	return dq;
 }
 */
-int get_token_string(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken, bool include_rest)
+int get_token_str(CString src, std::deque<CString> &dqToken, CString separator, bool allowEmpty, int nMaxToken, bool include_rest)
 {
 	CString token;
 
@@ -9114,7 +9114,7 @@ int get_token_string(CString src, std::deque<CString> &dqToken, CString separato
 //(seps = " ,\t\n" 과 같이 분리기호들로 이루어진 스트링 데이터)
 //strtok_s 함수는 연속 공백이나 연속 쉼표 등 중복된 분리자는 모두 하나의 구분자로 취급된다.
 //ex. "1,, ,,2" = "1,2"
-int get_token_string(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
+int get_token_str(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
 {
 	int		nToken = 0;
 	TCHAR	*token = NULL;
@@ -9138,7 +9138,7 @@ int get_token_string(TCHAR *src, TCHAR *seps, CString *sToken, int nMaxToken)
 	return nToken;
 }
 
-int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
+int get_token_str(char *src, char *seps, char **sToken, int nMaxToken)
 {
 	int		i;
 	int		nToken = 0;
@@ -9166,12 +9166,12 @@ int get_token_string(char *src, char *seps, char **sToken, int nMaxToken)
 	return nToken;
 }
 
-//대부분의 경우는 get_token_string()을 사용하지만 separator가 문자열 내에 포함된 경우도 있을 수 있다.
+//대부분의 경우는 get_token_str()을 사용하지만 separator가 문자열 내에 포함된 경우도 있을 수 있다.
 //"내 PC\\연구소문서2(\\\\192.168.1.103) (X:)" 문자열을 '\\'로 구분할 경우 잘못 추출되므로
 //이 경우는 get_exact_token_string()을 사용해서 정확히 '\\'인 경우에만 추출하도록 해야 한다.
-int get_exact_token_string(CString src, std::deque<CString>& dqToken, CString separator)
+int get_exact_token_str(CString src, std::deque<CString>& dqToken, CString separator)
 {
-	get_token_string(src, dqToken, separator, true);
+	get_token_str(src, dqToken, separator, true);
 
 	int empty_count = 0;
 
@@ -9261,7 +9261,7 @@ void get_tag_str(CString& src, std::deque<CString>& tags)
 }
 
 //간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.
-CString	get_unescape_string(CString src)
+CString	get_unescape_str(CString src)
 {
 	CString result = _T("");
 
@@ -9299,6 +9299,22 @@ CString	get_unescape_string(CString src)
 	return result;
 }
 
+//엑셀의 컬럼과 같이 n=0이면 "A"를, n=25이면 "Z"를, n=26이면 "AA"를, n=27이면 "AB"를 리턴한다.
+std::string	get_excel_column(int n)
+{
+	if (n < 0)
+		return "";
+
+	std::string res;
+	while (n >= 0)
+	{
+		int rem = static_cast<int>(n % 26);          // 0..25
+		res.insert(res.begin(), static_cast<char>('A' + rem));
+		n = (n / 26) - 1;                            // 핵심: Excel은 1-based 자릿수라 -1 보정
+	}
+	return res;
+}
+
 // a_value : 1.1.24050
 // b_value : Normal
 // c_value : True
@@ -9311,13 +9327,13 @@ int	get_map_str(CString src, std::map<CString, CString>& map, CString lfrf, CStr
 	map.clear();
 
 	std::deque<CString> dqLines;
-	get_token_string(src, dqLines, lfrf, false);
+	get_token_str(src, dqLines, lfrf, false);
 
 	std::deque<CString> dqToken;
 
 	for (auto line : dqLines)
 	{
-		get_token_string(line, dqToken, separator, true, 2, true);
+		get_token_str(line, dqToken, separator, true, 2, true);
 		
 		for (int i = 0; i < dqToken.size(); i++)
 			dqToken[i].Trim();
@@ -9583,7 +9599,7 @@ bool is_exist_keyword(CString src, CString set_of_keyword, bool case_sensitive, 
 {
 	std::deque<CString> dqKeyword;
 
-	get_token_string(set_of_keyword, dqKeyword, ';');
+	get_token_str(set_of_keyword, dqKeyword, ';');
 
 	if (!case_sensitive)
 		src.MakeLower();
@@ -10285,7 +10301,7 @@ CString	convert_special_folder_to_real_path(CString special_folder, CShellImageL
 	else
 	{
 		std::deque<CString> token;
-		get_token_string(special_folder, token, _T("\\"), false);
+		get_token_str(special_folder, token, _T("\\"), false);
 		drive_prefix = token[0];
 	}
 
@@ -12248,7 +12264,7 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 				*detail = _T("not defined error.");
 		}
 
-		TRACE(_T("detail = %s\n"), (detail ? *detail : _T("")));
+		TRACE(_T("detail = %s\n"), (detail ? *detail : CString()));
 		CloseServiceHandle(hManager);
 		return res;
 	}
@@ -17017,7 +17033,7 @@ int extract_digit_number(char *str, int from, double *num)
 bool valid_version_string(CString versionStr, int digits)
 {
 	std::deque<CString> token;
-	get_token_string(versionStr, token, '.');
+	get_token_str(versionStr, token, '.');
 	if (token.size() == digits)
 		return true;
 
@@ -17052,8 +17068,8 @@ int	compare_string(CString str0, CString str1, TCHAR separator)
 	std::deque<int> num0;
 	std::deque<int> num1;
 
-	get_token_string(str0, token0, separator);
-	get_token_string(str1, token1, separator);
+	get_token_str(str0, token0, separator);
+	get_token_str(str1, token1, separator);
 
 	num0.resize(token0.size());
 	num1.resize(token1.size());
@@ -17339,7 +17355,7 @@ void normalize_datetime(CString &src)
 		return;
 
 	CString sub = src.Left(src.Find(' '));
-	get_token_string(sub, token, '/');
+	get_token_str(sub, token, '/');
 	if (token.size() != 3)
 		return;
 
@@ -17351,7 +17367,7 @@ void normalize_datetime(CString &src)
 
 
 	sub = src.Mid(src.Find(' ') + 1);
-	get_token_string(sub, token, ':');
+	get_token_str(sub, token, ':');
 	if (token.size() != 3)
 		return;
 
@@ -18840,7 +18856,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 						bRes = true;
 					}
 				}
-				catch (CInternetException* pclsException)
+				catch (CInternetException*)// pclsException)
 				{
 					// 웹서버 연결에 실패하면 CInternetException 이 발생한다.
 				}
@@ -19477,7 +19493,7 @@ CString base64_encode(CString in)
 {
 	USES_CONVERSION;
 
-	std::string sstr = CT2CA(in);
+	std::string sstr = CString2string(in);// CT2CA(in);
 	sstr = base64_encode(sstr);
 	CString str = CString(sstr.c_str());
 	return str;
@@ -19485,7 +19501,7 @@ CString base64_encode(CString in)
 
 CString base64_decode(CString in)
 {
-	std::string sstr = CT2CA(in);
+	std::string sstr = CString2string(in);
 	sstr = base64_decode(sstr);
 	CString str = CString(sstr.c_str());
 	return str;
@@ -20054,7 +20070,7 @@ void get_proxy_info(bool& proxy_enable, CString& ip, int& port, CString& bypass,
 	if (ip.GetLength() > 3 && ip.Find(_T(":")) > 0)
 	{
 		std::deque<CString> token;
-		get_token_string(ip, token, _T(":"), false);
+		get_token_str(ip, token, _T(":"), false);
 		if (token.size() == 2)
 		{
 			ip = token[0];
@@ -20271,7 +20287,7 @@ NEXT:
 			if (ip.Find(_T(":") > 0))
 			{
 				std::deque<CString> chunks;
-				get_token_string(ip, chunks, _T(":"), false);
+				get_token_str(ip, chunks, _T(":"), false);
 				ip = chunks[0];
 				port = _ttoi(chunks[1]);
 

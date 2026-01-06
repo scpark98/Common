@@ -172,7 +172,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	int sy = 0;				//각 라인의 시작 위치(높이값 누적)
 	int total_text_height;
 	CRect rect_text;
-	CFont font, * pOldFont;
+	CFont font;
 
 	Gdiplus::Graphics g(pDC->m_hDC);
 

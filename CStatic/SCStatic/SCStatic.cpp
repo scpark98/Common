@@ -782,7 +782,8 @@ void CSCStatic::edit_end(bool valid)
 	m_text_value = m_edit.get_text();
 	Invalidate();
 
-	::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&CSCStaticMsg(CSCStaticMsg::msg_text_value_changed, this, m_text_value), 0);
+	CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
+	::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);
 }
 
 DWORD CSCStatic::get_text_align()
@@ -1593,7 +1594,8 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 				m_cr_text.SetFromCOLORREF(cr);
 				m_text_value.Format(_T("%d, %d, %d"), GetRValue(cr), GetGValue(cr), GetBValue(cr));
 				Invalidate();
-				::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&CSCStaticMsg(CSCStaticMsg::msg_text_value_changed, this, m_text_value), 0);
+				CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
+				::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);
 			}
 		}
 		else

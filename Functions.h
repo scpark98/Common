@@ -2551,7 +2551,7 @@ template<class T> void SWAP(T& x, T& y)
 }
 #endif
 
-//클리핑 함수. 클리핑이 일어나면 true를 리턴한다.
+//클리핑 함수. 클리핑이 일어나면 true를 리턴한다. std::clamp() 권장.
 template<class T> bool Clamp(T &n, T min, T max)
 {
 	if (max < min)
@@ -2602,6 +2602,16 @@ template<class T> void Swap(T& x, T& y)
 int compareInteger (const void * a, const void * b);
 int compareChar(const void *arg1, const void *arg2);
 int compareString (const void * a, const void * b);
+
+template<typename T> void move_item(std::deque<T>& dq, size_t from, size_t to)
+{
+	if (from == to || from >= dq.size() || to >= dq.size())
+		return;
+
+	auto value = std::move(dq[from]);
+	dq.erase(dq.begin() + from);
+	dq.insert(dq.begin() + to, std::move(value));
+}
 
 //////////////////////////////////////////////////////////////////////////
 //수학

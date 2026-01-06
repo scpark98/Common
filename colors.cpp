@@ -368,7 +368,7 @@ Gdiplus::Color get_gcolor_from_hexa_str(CString hexa_str)
 }
 
 //argb 순서로 "255, 123, 12, 255" 형태의 문자열을 리턴.
-CString	get_RGB_str(Gdiplus::Color cr, CString sep, bool include_alpha)
+CString	get_color_str(Gdiplus::Color cr, bool include_alpha, CString sep)
 {
 	CString str;
 

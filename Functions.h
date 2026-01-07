@@ -106,13 +106,13 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(char*))\
 		TRACE(_T("%s(%d) %S = %S\n"), __function__, __LINE__, #n, n);\
+	else if (typeid(n) == typeid(CString))\
+		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
 	else if (typeid(n) == typeid(CPoint))\
 	{\
 		CPoint pt = n;\
 		TRACE(_T("%s(%d) %S = %d, %d\n"), __function__, __LINE__, #n, pt.x, pt.y);\
 	}\
-	else if (typeid(n) == typeid(CString))\
-		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
 	else\
 		TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());\
 }
@@ -1359,7 +1359,7 @@ struct	NETWORK_INFO
 	int			file_open(FILE** fp, CString mode, CString file);
 
 	//text 파일을 열어서 라인별로 읽은 후 dqList에 넣어준다.
-	bool		read_file(CString filepath, std::deque<CString> *dqList);
+	bool		read_lines(CString filepath, std::deque<CString> *dqList);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
 	//MOBIS 프로젝트 저장 MP4는 mdat 필드의 0x40번지부터 28 bytes가

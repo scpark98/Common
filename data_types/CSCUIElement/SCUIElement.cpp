@@ -83,6 +83,26 @@ void CSCUIElement::copy(CSCUIElement* dst)
 	dst->m_cr_fill = m_cr_fill;
 }
 
+void CSCUIElement::copy_style(CSCUIElement* dst)
+{
+	dst->m_type = m_type;
+	memcpy(&dst->m_round, &m_round, sizeof(float) * 4);
+
+	dst->m_text_visible = m_text_visible;
+	dst->m_text_align = m_text_align;
+	dst->m_text_valign = m_text_valign;
+	dst->m_cr_text = m_cr_text;
+	dst->m_cr_back = m_cr_back;
+
+	dst->m_font_name = m_font_name;
+	dst->m_font_size = m_font_size;
+	dst->m_font_weight = m_font_weight;
+
+	dst->m_stroke_thickness = m_stroke_thickness;
+	dst->m_cr_stroke = m_cr_stroke;
+	dst->m_cr_fill = m_cr_fill;
+}
+
 //m_image_path가 유효한 경우 해당 이미지를 불러온다.
 HRESULT CSCUIElement::load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context)
 {

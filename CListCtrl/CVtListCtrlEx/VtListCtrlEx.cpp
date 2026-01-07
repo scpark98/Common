@@ -2124,7 +2124,7 @@ int CVtListCtrlEx::add_item(std::deque<CString> dqText, int image_index, bool en
 int CVtListCtrlEx::insert_line(int index, CString line_string, CString separator, int image_index, bool ensureVisible, bool invalidate)
 {
 	std::deque<CString> dq;
-	get_token_string(line_string, dq, separator);
+	get_token_str(line_string, dq, separator);
 	return insert_item(index, dq, image_index, ensureVisible, invalidate);
 }
 
@@ -2653,7 +2653,7 @@ void CVtListCtrlEx::set_text(int index, CString text, CString separator, bool re
 	}
 
 	std::deque<CString> dqlines;
-	get_token_string(text, dqlines, _T("\n"));
+	get_token_str(text, dqlines, _T("\n"));
 
 	for (int i = 0; i < dqlines.size(); i++)
 	{
@@ -3152,7 +3152,7 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 	else
 		op = '|';
 
-	get_token_string(find_target, dqTarget, op, false);
+	get_token_str(find_target, dqTarget, op, false);
 	trim(&dqTarget);
 
 	if (dqColumn == NULL || dqColumn->size() == 0)

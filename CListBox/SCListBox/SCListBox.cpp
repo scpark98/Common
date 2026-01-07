@@ -149,39 +149,31 @@ void CSCListBox::ReconstructFont()
 	ASSERT(bCreated);
 }
 
-CSCListBox& CSCListBox::set_font(LOGFONT& lf)
+void CSCListBox::set_font(LOGFONT& lf)
 {
 	memcpy(&m_lf, &lf, sizeof(LOGFONT));
 	ReconstructFont();
-
-	return *this;
 }
 
-CSCListBox& CSCListBox::set_font_name(CString sFontname, BYTE byCharSet)
+void CSCListBox::set_font_name(CString sFontname, BYTE byCharSet)
 {
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
 	ReconstructFont();
-
-	return *this;
 }
 
-CSCListBox& CSCListBox::set_font_size(int nSize)
+void CSCListBox::set_font_size(int nSize)
 {
 	HDC hDC = GetDC()->GetSafeHdc();
 	m_lf.lfHeight = -MulDiv(nSize, GetDeviceCaps(hDC, LOGPIXELSY), 72);
 	::ReleaseDC(m_hWnd, hDC);
 	ReconstructFont();
-
-	return *this;
 }
 
-CSCListBox& CSCListBox::set_font_bold(int weight)
+void CSCListBox::set_font_bold(int weight)
 {
 	m_lf.lfWeight = weight;
 	ReconstructFont();
-
-	return *this;
 }
 
 //-------------------------------------------------------------------
@@ -595,7 +587,8 @@ int CSCListBox::insert_string(int nIndex, CString text, Gdiplus::Color rgb)
 	{
 		if (rgb.GetValue() == Gdiplus::Color::Transparent)
 			rgb = m_theme.cr_text;
-		SetItemData(index, rgb.ToCOLORREF());
+		//COLORREF rgb_value = rgb.ToCOLORREF();
+		SetItemData(index, rgb.GetValue());
 		RedrawWindow();
 
 		if (m_auto_scroll)
@@ -691,6 +684,7 @@ void CSCListBox::OnPaint()
 	//DrawItem()에서 각 아이템을 모두 그린 후 OnPaint()에서 border를 그리려 했으나
 	//DrawItem()에서 그려진 내용이 모두 가려진다. 우선 WM_PAINT는 주석처리한다.
 	draw_rect(&dc, rc, m_theme.cr_border);
+	//dc.FillSolidRect(rc, red);
 }
 
 BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
@@ -698,9 +692,10 @@ BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: Add your message handler code here and/or call default
 
 	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
-	//CRect rc;
-	//GetClientRect(rc);
-	//pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+	CRect rc;
+	GetClientRect(rc);
+	//pDC->FillSolidRect(rc, red);
+	pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 	//draw_line(pDC, 0, 0, 100, 100);
 
 	return FALSE;
@@ -795,6 +790,10 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 			}
 			break;
 		case VK_DELETE:
+			if (m_use_edit && m_in_editing)
+			{
+				return false;
+			}
 			delete_items();
 			return true;
 		}
@@ -803,14 +802,14 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 	{
 		TRACE(_T("%d, %d\n"), pMsg->wParam, pMsg->lParam);
 	}
-	else if (pMsg->message == WM_LBUTTONDBLCLK)
-	{
-		if (m_use_edit && !m_in_editing)
-		{
-			edit();
-			return true;
-		}
-	}
+	//else if (pMsg->message == WM_LBUTTONDBLCLK)
+	//{
+	//	if (m_use_edit && !m_in_editing)
+	//	{
+	//		edit();
+	//		return true;
+	//	}
+	//}
 
 	return CListBox::PreTranslateMessage(pMsg);
 }
@@ -962,13 +961,14 @@ BOOL CSCListBox::OnLbnSelchange()
 		else
 			GetText(index, text);
 
-		if (m_hParentWnd)
-		{
-			if (m_as_popup)
-				ShowWindow(SW_HIDE);
+		if (m_hParentWnd == NULL)
+			m_hParentWnd = GetParent()->GetSafeHwnd();
 
-			::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&CSCListBoxMessage(this, message_sclistbox_selchanged), (LPARAM)&text);
-		}
+		if (m_as_popup)
+			ShowWindow(SW_HIDE);
+
+		CSCListBoxMessage msg(this, message_selchanged);
+		::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&msg, (LPARAM)&text);
 	}
 
 	return FALSE;
@@ -1278,14 +1278,16 @@ void CSCListBox::edit(int index)
 	CString text;
 	GetText(index, text);
 
+	CFont* font = GetFont();
 	CClientDC dc(this);
+	dc.SelectObject(font);
 	CSize sz = dc.GetTextExtent(text);
-	//rItem.top = (rItem.Height() - sz.cy) / 2;
+	rItem.top += 1;// ((rItem.Height() - sz.cy) / 2 + 1);
 
 	if (!m_pEdit)
 	{
 		DWORD dwStyle = WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | (m_edit_readonly ? ES_READONLY : 0);
-		m_pEdit = new CEdit();
+		m_pEdit = new CSCEdit();
 		m_pEdit->Create(dwStyle, rItem, this, IDC_EDIT_CELL);
 		m_pEdit->SetFont(&m_font);
 		m_pEdit->SetMargins(0, 20);	//이건 적용되지 않는다. 세로로 중앙정렬하고 싶다면 text height를 구해서 보정해야 함.
@@ -1316,9 +1318,33 @@ void CSCListBox::edit_end(bool modify)
 		m_pEdit->GetWindowText(text);
 		TRACE(_T("index = %d\n"), m_edit_index);
 
-		cr = GetItemData(m_edit_index);
-		DeleteString(m_edit_index);
-		insert_string(m_edit_index, text, cr);
+		CString old_text = get_text(m_edit_index);
+		if (text == old_text)
+		{
+			m_in_editing = false;
+			return;
+		}
+
+		if (text.IsEmpty() == false || m_accept_empty_edit_str)
+		{
+			SetRedraw(FALSE);
+			cr = GetItemData(m_edit_index);
+			DeleteString(m_edit_index);
+			insert_string(m_edit_index, text, cr);
+			SetRedraw(TRUE);
+			SetCurSel(m_edit_index);
+		}
+		else if (text.IsEmpty() && !m_accept_empty_edit_str)
+		{
+			DeleteString(m_edit_index);
+			m_edit_index = -1;
+		}
+
+		if (m_hParentWnd == NULL)
+			m_hParentWnd = GetParent()->GetSafeHwnd();
+
+		CSCListBoxMessage msg(this, message_edit_end);
+		::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&msg, (LPARAM)m_edit_index);
 	}
 
 	m_in_editing = false;

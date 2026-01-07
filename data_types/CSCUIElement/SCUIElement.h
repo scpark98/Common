@@ -24,6 +24,7 @@ public:
 	bool	pt_in_rect(float x, float y);
 
 	void	copy(CSCUIElement* dst);
+	void	copy_style(CSCUIElement* dst);
 
 	//m_image_path가 유효한 경우 해당 이미지를 불러온다.
 	HRESULT			load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context);
@@ -48,7 +49,7 @@ public:
 
 	float			m_stroke_thickness = 1.0f;
 	Gdiplus::Color	m_cr_stroke = Gdiplus::Color::RoyalBlue;// LightGray;
-	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Gray;// Transparent;
+	Gdiplus::Color	m_cr_fill = Gdiplus::Color::Transparent;
 
 	bool			m_selected = false;
 

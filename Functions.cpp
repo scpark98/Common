@@ -5910,12 +5910,12 @@ int	get_text_encoding(CString sfile)
 
 		if (is_utf8)
 			text_encoding = text_encoding_utf8;
-		else
-			text_encoding = text_encoding_ansi;
+		//else
+			//text_encoding = text_encoding_ansi;
 
-		//utf16-le인데 BOM이 없어서 utf8 or ansi라고 잘못 판별했다는 가정하에
+		//utf16-le인데 BOM이 없어서 unknown으로 판별했다는 가정하에
 		//utf16-le는 홀수 byte가 무조건 0이다. 만약 중간에 한글이 있다면?
-		//if (true)//text_encoding == text_encoding_ansi)
+		if (text_encoding == text_encoding_unknown)
 		{
 			int i = 1;
 
@@ -6272,7 +6272,7 @@ int file_open(FILE** fp, CString mode, CString file)
 
 //text 파일을 열어서 line단위로 분리한 후 dqList에 넣어준다.
 //라인 단위이므로 맨 끝에는 '\n'을 다시 붙여줘야 한다.
-bool read_file(CString filepath, std::deque<CString> *dqList)
+bool read_lines(CString filepath, std::deque<CString> *dqList)
 {
 	dqList->clear();
 

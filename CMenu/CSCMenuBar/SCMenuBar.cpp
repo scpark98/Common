@@ -71,7 +71,7 @@ void CSCMenuBar::iterate_menu(HMENU hMenu, CSCMenuButton* menu_button)
 		if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
 		{
 			std::deque<CString> token;
-			get_token_string(menu_caption, token, _T("\t"));
+			get_token_str(menu_caption, token, _T("\t"));
 			if (token.size() >= 2)
 				menu_button->add(menu_id, token[0], 0, token[1]);
 			else

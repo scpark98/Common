@@ -725,7 +725,7 @@ void CSCStatic::set_use_edit(bool use)
 	{
 		if (m_edit.m_hWnd == NULL)
 		{
-			DWORD dwStyle = ES_LEFT | /*WS_BORDER |*/ WS_CHILD | /*| ES_AUTOHSCROLL |  ES_AUTOVSCROLL |*/ ES_MULTILINE;
+			DWORD dwStyle = ES_LEFT | /*WS_BORDER |*/ WS_CHILD | ES_AUTOHSCROLL | /*ES_AUTOVSCROLL |*/ ES_MULTILINE;
 			m_edit.create(dwStyle, CRect(0, 0, 1, 1), this, 0);
 			m_edit.set_font_name(m_lf.lfFaceName);
 			m_edit.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));

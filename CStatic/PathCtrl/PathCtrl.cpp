@@ -88,7 +88,7 @@ void CPathCtrl::PreSubclassWindow()
 
 	CRect rc;
 	GetClientRect(rc);
-	TRACE(_T("rc = %s\n"), get_rect_info_string(rc, 2));
+	TRACE(_T("rc = %s\n"), get_rect_info_str(rc, 2));
 
 	rc.DeflateRect(1, 1);
 	rc.left = ROOT_WIDTH;
@@ -263,24 +263,24 @@ void CPathCtrl::OnPaint()
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)
 			{
-				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, gGRAY(192), 1);
-				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, gGRAY(192), 1);
-				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, gGRAY(192), 1);
-				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, gGRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY(192), 1);
 			}
 			else
 			{
 				//아래로 향한 화살표 표시
 				if (m_down && i == m_index)
 				{
-					draw_line(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, gGRAY(192), arrow_width);
-					draw_line(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, gGRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, GRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, GRAY(192), arrow_width);
 				}
 				//일반상태의 > 화살표 표시
 				else
 				{
-					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, gGRAY(192), arrow_width);
-					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, gGRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, GRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, GRAY(192), arrow_width);
 				}
 			}
 		}
@@ -288,7 +288,7 @@ void CPathCtrl::OnPaint()
 
 	if (m_pEdit->IsWindowVisible())
 	{
-		draw_rectangle(&dc, rc, Gdiplus::Color(0, 120, 215));
+		draw_rect(&dc, rc, Gdiplus::Color(0, 120, 215));
 	}
 
 	dc.SelectObject(pOldFont);

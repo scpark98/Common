@@ -42,6 +42,7 @@
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../SCGdiplusBitmap.h"
 #include "../../colors.h"
+#include "../../CEdit/SCEdit/SCEdit.h"
 
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
@@ -102,7 +103,8 @@ public:
 
 	enum MESSAGES
 	{
-		message_sclistbox_selchanged = 0,
+		message_selchanged = 0,
+		message_edit_end,
 	};
 
 // Attributes
@@ -194,10 +196,10 @@ public:
 	int			set_folder_list(std::deque<CString>* lists = NULL, CString selected_text = _T(""));
 
 
-	virtual		CSCListBox&	set_font(LOGFONT& lf);
-	virtual		CSCListBox&	set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	virtual		CSCListBox&	set_font_size(int nSize);
-	virtual		CSCListBox&	set_font_bold(int weight = FW_BOLD);
+	void		set_font(LOGFONT& lf);
+	void		set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void		set_font_size(int nSize);
+	void		set_font_bold(int weight = FW_BOLD);
 
 	void		set_color_theme(int theme);
 
@@ -215,6 +217,9 @@ public:
 	void		edit(int index = -1);
 	//modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
 	void		edit_end(bool modify = true);
+	//편집된 데이터가 empty이어도 정상 데이터로 처리할 지...
+	//false일 경우는 해당 라인을 제거한다.
+	void		set_accept_empty_edit_str(bool accept = true) { m_accept_empty_edit_str = accept; }
 
 	//use own imagelist
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
@@ -266,7 +271,7 @@ protected:
 
 	bool		m_show_log = true;
 	bool		m_show_date = false;
-	bool		m_show_time = true;
+	bool		m_show_time = false;
 	bool		m_dim_time_str = true;				//시간 문자열은 연한 회색으로 비강조되도록 표시
 
 	bool		m_draw_border = true;				//border
@@ -281,12 +286,15 @@ protected:
 	//해당 함수를 통해 설정하자.
 	int			m_line_height;
 
-	//편집 관련
+//편집 관련
 	bool		m_use_edit = false;
 	bool		m_in_editing = false;
 	bool		m_edit_readonly = false;
 	int			m_edit_index = -1;
-	CEdit*		m_pEdit = NULL;
+	//편집된 데이터가 empty이어도 정상 데이터로 처리할 지...
+	//false일 경우는 해당 라인을 제거한다.
+	bool		m_accept_empty_edit_str = true;
+	CSCEdit*	m_pEdit = NULL;
 
 	//선택 관련
 	//std::deque<int>	 m_selected;

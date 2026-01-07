@@ -415,9 +415,9 @@ void CSCMenu::load(UINT resource_id, int menu_index)
 		if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
 		{
 			std::deque<CString> token;
-			get_token_string(menu_caption, token, _T("\t"));
+			get_token_str(menu_caption, token, _T("\t"));
 
-			add(menu_id, menu_caption, 0, (token.size() == 2 ? token[1] : _T("")));
+			add(menu_id, menu_caption, 0, (token.size() == 2 ? token[1] : CString()));
 		}
 	}
 }
@@ -672,7 +672,7 @@ void CSCMenu::OnPaint()
 		//separator의 경우
 		if (m_items[i]->m_id <= 0)
 		{
-			draw_line(&dc, m_items[i]->m_r.left, m_items[i]->m_r.CenterPoint().y, m_items[i]->m_r.right, m_items[i]->m_r.CenterPoint().y, gGRAY(214));
+			draw_line(&dc, m_items[i]->m_r.left, m_items[i]->m_r.CenterPoint().y, m_items[i]->m_r.right, m_items[i]->m_r.CenterPoint().y, GRAY(214));
 		}
 		//일반 메뉴 항목인 경우
 		else

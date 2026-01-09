@@ -1196,7 +1196,11 @@ void CSCStatic::set_icon(UINT nIDResource, int nSize, bool left_align_fix)
 void CSCStatic::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color cr_parent_back)
 {
 	if (round < 0)
-		round = 0;
+	{
+		CRect rc;
+		GetClientRect(rc);
+		round = rc.Height() / 2;
+	}
 
 	m_round = round;
 

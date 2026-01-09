@@ -134,6 +134,7 @@ void CSCEdit::reconstruct_font()
 {
 	m_font.DeleteObject();
 	m_lf.lfCharSet = DEFAULT_CHARSET;
+	m_lf.lfQuality = ANTIALIASED_QUALITY;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	CEdit::SetFont(&m_font, TRUE);

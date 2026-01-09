@@ -146,6 +146,7 @@ public:
 	//선택 관련
 	//선택된 항목 리스트 및 선택된 개수를 리턴
 	int			get_selected_items(std::deque<int>* selected = NULL);
+	void		set_show_selection_always(bool always_show) { m_show_selection_always = always_show; }
 
 	//팝업 메뉴. 맨 처음/끝 항목이 변경되면 반드시 아래의 명령범위 코드도 변경시켜줘야 한다.
 	//ON_COMMAND_RANGE(menu_selected_count, menu_delete_selected, OnPopupMenu)
@@ -276,6 +277,9 @@ protected:
 
 	bool		m_draw_border = true;				//border
 
+	//LBS_SHOWSELALWAYS 라는 속성이 없으므로 직접 추가
+	bool		m_show_selection_always = true;
+
 	LOGFONT		m_lf;
 	CFont		m_font;
 	void		ReconstructFont();
@@ -295,6 +299,7 @@ protected:
 	//false일 경우는 해당 라인을 제거한다.
 	bool		m_accept_empty_edit_str = true;
 	CSCEdit*	m_pEdit = NULL;
+	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 	//선택 관련
 	//std::deque<int>	 m_selected;

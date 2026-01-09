@@ -769,6 +769,18 @@ void CSCComboBox::set_color_theme(int theme)
 	m_theme.set_color_theme(theme);
 }
 
+void CSCComboBox::set_text_color(Gdiplus::Color cr_text)
+{
+	m_theme.cr_text = cr_text;
+	Invalidate();
+}
+
+void CSCComboBox::set_back_color(Gdiplus::Color cr_back)
+{
+	m_theme.cr_back = cr_back;
+	Invalidate();
+}
+
 //이걸해도 테두리 색상이 변경되지 않는다. 역시 GPT
 void CSCComboBox::OnNcPaint()
 {

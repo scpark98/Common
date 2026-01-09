@@ -216,6 +216,20 @@ inline HRESULT TraceHR(const TCHAR* pszFile, long nLine, HRESULT hr)
 #define TRACEHR(_hr) _hr
 #endif
 
+struct CStringHash
+{
+	size_t operator() (const CString&s) const noexcept
+	{
+#ifdef _UNICODE
+		return std::hash<std::wstring>{}(std::wstring(s.GetString()));
+#else
+		return std::hash<std::string>{}(std::string(s.GetString()));
+#endif
+	}
+};
+
+
+
 //HRESULT를 결과로 리턴받는 함수들에 사용.
 //#define		_M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
 //hr과 함수식을 넘겨주면 hr에 그 처리결과가 들어가고 에러일 경우 에러를 표시한다.
@@ -2307,7 +2321,8 @@ h		: 복사할 height 크기(pixel)
 	//stroke thick를 무시하고 r에 꽉찬 path를 구하면 right, bottom이 잘리므로 stroke_thick를 고려해서 구해야 한다.
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius, int stroke_thick = 1);
 	void		get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_radius, float bottom_radius = -1.0f);
-	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width = 1);
+	//radius = -1이면 height/2크기로 설정되고 이는 양 끝이 둥근 운동장 트랙 모양으로 그려진다.
+	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius = -1, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
 	CRect		get_zoom_rect(CRect rect, double zoom);
 

@@ -89,6 +89,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_WINDOWPOSCHANGED()
 	//ON_WM_NCPAINT()
 	//ON_WM_CTLCOLOR()
+	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCListBox::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -139,6 +140,8 @@ void CSCListBox::PreSubclassWindow()
 void CSCListBox::ReconstructFont()
 {
 	m_font.DeleteObject();
+	m_lf.lfCharSet = DEFAULT_CHARSET;
+	m_lf.lfQuality = ANTIALIASED_QUALITY;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	SetFont(&m_font, true);
@@ -264,7 +267,12 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
 		{
-			cr_back = m_theme.cr_back_selected;
+			if (lpDIS->itemState & ODS_FOCUS)
+				cr_back = m_theme.cr_back_selected;
+			else if (m_show_selection_always)
+				cr_back = m_theme.cr_back_selected_inactive;
+			else
+				cr_back = m_theme.cr_back;
 		}
 		else
 		{
@@ -275,15 +283,24 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	//CBrush brush(cr_back);
 	//dc.FillRect(&rect, &brush);
-	draw_rect(pDC, rect, cr_back, cr_back, 1);
+	//draw_rect(pDC, rect, cr_back, cr_back, 1);
 
 	if (lpDIS->itemState & ODS_SELECTED)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_text_selected;
-		draw_rect(pDC, rect, GetFocus() ? m_theme.cr_selected_border : cr_back, cr_back, 1);
+		TRACE(_T("ODS_SELECTED\n"));
+		if (lpDIS->itemState & ODS_FOCUS)
+			draw_rect(pDC, rect, m_theme.cr_selected_border, cr_back, 1);
+		else if (m_show_selection_always)
+			draw_rect(pDC, rect, m_theme.cr_selected_border_inactive, cr_back, 1);
 	}
-	else if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
+	else
+	{
+		draw_rect(pDC, rect, cr_back, cr_back, 1);
+	}
+
+	if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
 		cr_text = RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT));
 	}
@@ -876,11 +893,14 @@ void CSCListBox::OnKillFocus(CWnd* pNewWnd)
 	CListBox::OnKillFocus(pNewWnd);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	TRACE(_T("CSCListBox::OnKillFocus"));
 	if (m_as_popup)
 		ShowWindow(SW_HIDE);
 
 	if (m_use_edit && m_in_editing)
 		edit_end();
+
+	Invalidate();
 }
 
 int CSCListBox::set_path(CString root, CString selected_text)
@@ -1282,15 +1302,17 @@ void CSCListBox::edit(int index)
 	CClientDC dc(this);
 	dc.SelectObject(font);
 	CSize sz = dc.GetTextExtent(text);
-	rItem.top += 1;// ((rItem.Height() - sz.cy) / 2 + 1);
+	//rItem.top += 1;// ((rItem.Height() - sz.cy) / 2 + 1);
+	//rItem.DeflateRect(3, 1);
 
 	if (!m_pEdit)
 	{
-		DWORD dwStyle = WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | (m_edit_readonly ? ES_READONLY : 0);
+		DWORD dwStyle = WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE | (m_edit_readonly ? ES_READONLY : 0);
 		m_pEdit = new CSCEdit();
-		m_pEdit->Create(dwStyle, rItem, this, IDC_EDIT_CELL);
+		m_pEdit->create(dwStyle, rItem, this, IDC_EDIT_CELL);
 		m_pEdit->SetFont(&m_font);
-		m_pEdit->SetMargins(0, 20);	//이건 적용되지 않는다. 세로로 중앙정렬하고 싶다면 text height를 구해서 보정해야 함.
+		DWORD margin = m_pEdit->GetMargins();
+		m_pEdit->SetMargins(4, 4);
 	}
 
 	m_pEdit->SetWindowText(text);
@@ -1475,4 +1497,16 @@ HBRUSH CSCListBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 	// TODO:  여기서 DC의 특성을 변경합니다.
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
 	return hbr;
+}
+
+LRESULT CSCListBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+{
+	auto msg = (CSCEditMessage*)wParam;
+	if (msg->pThis != m_pEdit)
+		return 0;
+
+	if (msg->message == WM_KILLFOCUS)
+		edit_end();
+
+	return 0;
 }

@@ -441,7 +441,7 @@ Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr)
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 COLORREF get_distinct_color(COLORREF cr)
 {
-	if (gray_value(cr) > 128)
+	if (get_gray_value(cr) > 128)
 		return RGB(0, 0, 0);
 
 	return RGB(255, 255, 255);
@@ -451,7 +451,7 @@ COLORREF get_distinct_color(COLORREF cr)
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 Gdiplus::Color get_distinct_color(Gdiplus::Color cr)
 {
-	int gray = gray_value(cr);
+	int gray = get_gray_value(cr);
 
 	if (gray == 25)
 		gray = gray;
@@ -466,7 +466,7 @@ Gdiplus::Color get_distinct_color(Gdiplus::Color cr)
 //=>0.2989 * 2^14 = 4897.1776; 
 //출처: http://kipl.tistory.com/80 [Geometry & Recognition]
 //rgb가 175인 값이 넘어오면 >> 14 한 후의 값이 xxx.9~로 나온다. 반올림을 해보자.
-uint8_t gray_value(uint8_t r, uint8_t g, uint8_t b)
+uint8_t get_gray_value(uint8_t r, uint8_t g, uint8_t b)
 {
 	int cr = r * 4897 + g * 9617 + b * 1868;
 	//float crf = cr >> 14;	//shift연산의 결과는 정수이므로 이 식은 부정확하다.
@@ -475,26 +475,26 @@ uint8_t gray_value(uint8_t r, uint8_t g, uint8_t b)
 	return gray;
 }
 
-uint8_t	gray_value(COLORREF cr)
+uint8_t	get_gray_value(COLORREF cr)
 {
-	return gray_value(GetRValue(cr), GetGValue(cr), GetBValue(cr));
+	return get_gray_value(GetRValue(cr), GetGValue(cr), GetBValue(cr));
 }
 
-uint8_t	gray_value(Gdiplus::Color cr)
+uint8_t	get_gray_value(Gdiplus::Color cr)
 {
 	//TRACE(_T("%d, %d, %d, %d gray value = %d\n"), cr.GetA(), cr.GetR(), cr.GetG(), cr.GetB(), gray_value(cr.GetR(), cr.GetG(), cr.GetB()));
-	return gray_value(cr.GetR(), cr.GetG(), cr.GetB());
+	return get_gray_value(cr.GetR(), cr.GetG(), cr.GetB());
 }
 
-COLORREF gray_color(COLORREF cr)
+COLORREF get_gray_color(COLORREF cr)
 {
-	uint8_t gray = gray_value(GetRValue(cr), GetGValue(cr), GetBValue(cr));
+	uint8_t gray = get_gray_value(GetRValue(cr), GetGValue(cr), GetBValue(cr));
 	return RGB(gray, gray, gray);
 }
 
-Gdiplus::Color	gray_color(Gdiplus::Color cr)
+Gdiplus::Color get_gray_color(Gdiplus::Color cr)
 {
-	uint8_t gray = gray_value(cr.GetR(), cr.GetG(), cr.GetB());
+	uint8_t gray = get_gray_value(cr.GetR(), cr.GetG(), cr.GetB());
 	return Gdiplus::Color(cr.GetA(), gray, gray, gray);
 }
 
@@ -774,7 +774,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back = Gdiplus::Color::White;
 			cr_back_selected = get_color(cr_back, -32);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = get_color(cr_back, -16);
 			cr_back_alternate = get_color(cr_back, 8);
@@ -806,7 +806,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back = Gdiplus::Color::White;
 			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
@@ -838,7 +838,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back = Gdiplus::Color::White;
 			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
@@ -871,7 +871,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back = Gdiplus::Color::White;
 			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
@@ -904,7 +904,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back = Gdiplus::Color::White;
 			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
@@ -937,7 +937,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back					= Gdiplus::Color(255, 64, 64, 64);
 			cr_back_selected		= get_color(cr_back, -16);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= cr_back_selected;
 			cr_back_alternate		= get_color(cr_back, 8);
@@ -970,7 +970,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back					= Gdiplus::Color(255, 37, 37, 38);
 			cr_back_selected		= Gdiplus::Color(255, 0, 120, 215);
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= get_color(cr_back_selected, 48);
 			cr_back_alternate		= get_color(cr_back, 8);
@@ -1032,7 +1032,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			}
 
 			cr_back_selected		= gRGB(204, 235, 255);//RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_selected_inactive = gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited		= get_sys_color(COLOR_HIGHLIGHT);
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternate		= get_color(cr_back, -12);

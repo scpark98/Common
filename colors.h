@@ -433,13 +433,13 @@ COLORREF		get_distinct_color(COLORREF cr);
 Gdiplus::Color	get_distinct_color(Gdiplus::Color cr);
 
 //rgb 평균값 리턴
-uint8_t			gray_value(uint8_t r, uint8_t g, uint8_t b);
+uint8_t			get_gray_value(uint8_t r, uint8_t g, uint8_t b);
 //rgb 평균값 리턴
-uint8_t			gray_value(COLORREF cr);
-uint8_t			gray_value(Gdiplus::Color cr);
+uint8_t			get_gray_value(COLORREF cr);
+uint8_t			get_gray_value(Gdiplus::Color cr);
 //rgb 평균인 컬러값 리턴
-COLORREF		gray_color(COLORREF cr);
-Gdiplus::Color	gray_color(Gdiplus::Color cr);
+COLORREF		get_gray_color(COLORREF cr);
+Gdiplus::Color	get_gray_color(Gdiplus::Color cr);
 
 double			get_distance(COLORREF c1, COLORREF c2);
 double			get_distance(Gdiplus::Color c1, Gdiplus::Color c2);

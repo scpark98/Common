@@ -22,7 +22,7 @@ CHeaderCtrlEx::CHeaderCtrlEx()
 	//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 	//m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
 
-	if (gray_value(m_cr_back) < 128)
+	if (get_gray_value(m_cr_back) < 128)
 		m_cr_separator = get_color(m_cr_back, 32);
 	else
 		m_cr_separator = get_color(m_cr_back, -32);
@@ -473,7 +473,7 @@ void CHeaderCtrlEx::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gd
 
 	if (m_cr_separator.GetValue() == Gdiplus::Color::Transparent)
 	{
-		if (gray_value(m_cr_back) < 128)
+		if (get_gray_value(m_cr_back) < 128)
 			m_cr_separator = get_color(m_cr_back, 32);
 		else
 			m_cr_separator = get_color(m_cr_back, -32);

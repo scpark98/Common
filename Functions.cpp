@@ -7058,11 +7058,21 @@ void draw_sunken_rect(CDC* pDC, CRect r, bool sunken, Gdiplus::Color cr1, Gdiplu
 void draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int pen_style, int width, int draw_mode)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);
+	draw_ellipse(g, r, cr_line, cr_fill, pen_style, width, draw_mode);
+}
+
+void draw_ellipse(Gdiplus::Graphics& g, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int pen_style, int width, int draw_mode)
+{
+	draw_ellipse(g, r.CenterPoint().x, r.CenterPoint().y, r.Width() / 2.0f, cr_line, cr_fill, pen_style, width, draw_mode);
+}
+
+void draw_ellipse(Gdiplus::Graphics& g, float cx, float cy, float radius, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int pen_style, int width, int draw_mode)
+{
 	Gdiplus::Pen pen(cr_line, width);
 	Gdiplus::SolidBrush br(cr_fill);
-
-	g.FillEllipse(&br, CRect_to_gpRect(r));
-	g.DrawEllipse(&pen, CRect_to_gpRect(r));
+	Gdiplus::RectF r(cx - radius, cy - radius, radius * 2.0f, radius * 2.0f);
+	g.FillEllipse(&br, r);
+	g.DrawEllipse(&pen, r);
 }
 
 void draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed, COLORREF crLine, int nWidth, int nPenStyle, int nDrawMode)

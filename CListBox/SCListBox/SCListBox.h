@@ -147,6 +147,7 @@ public:
 	//선택된 항목 리스트 및 선택된 개수를 리턴
 	int			get_selected_items(std::deque<int>* selected = NULL);
 	void		set_show_selection_always(bool always_show) { m_show_selection_always = always_show; }
+	int			get_item_from_pos(int x, int y);
 
 	//팝업 메뉴. 맨 처음/끝 항목이 변경되면 반드시 아래의 명령범위 코드도 변경시켜줘야 한다.
 	//ON_COMMAND_RANGE(menu_selected_count, menu_delete_selected, OnPopupMenu)
@@ -251,7 +252,8 @@ public:
 		}
 	}
 
-	void		delete_items(bool only_selected = true);
+	//for_selected = true : 선택된 항목들을 삭제, false : 전체 항목 삭제
+	void		delete_items(bool for_selected = true);
 
 	//항목 추가/삭제시에 가로 스크롤바를 재계산해준다.
 	//추가시에는 추가된 항목과 최대크기 항목을 비교하고 삭제시에는 모든 항목을 재계산해야 한다.

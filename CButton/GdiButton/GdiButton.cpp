@@ -206,6 +206,8 @@ bool CGdiButton::add_image_resize(UINT normal, float ratio)
 	if (btn->img[0].is_empty())
 		return false;
 
+	m_sz_img_origin = CSize(btn->img[0].width, btn->img[0].height);
+
 	btn->img[0].resize(ratio, ratio);
 
 	btn->img[0].deep_copy(&btn->img[1]);
@@ -294,7 +296,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 	return true;
 }
 
-bool CGdiButton::add_image(CSCGdiplusBitmap *img)
+bool CGdiButton::add_image(CSCGdiplusBitmap *img, bool add_auto_state_images)
 {
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
@@ -309,17 +311,18 @@ bool CGdiButton::add_image(CSCGdiplusBitmap *img)
 	if (btn->img[0].is_empty())
 		return false;
 
-	//m_width = btn->img[0].width;
-	//m_height = btn->img[0].height;
+	m_sz_img_origin = CSize(btn->img[0].width, btn->img[0].height);
 
 	btn->img[0].deep_copy(&btn->img[1]);
-	btn->img[1].set_matrix(&m_hoverMatrix);
+	if (add_auto_state_images)
+		btn->img[1].set_matrix(&m_hoverMatrix);
 
 	btn->img[0].deep_copy(&btn->img[2]);
-	btn->img[2].set_matrix(&m_downMatrix);
+	if (add_auto_state_images)
+		btn->img[2].set_matrix(&m_downMatrix);
 
 	btn->img[0].deep_copy(&btn->img[3]);
-	if (!m_use_normal_image_on_disabled)
+	if (!m_use_normal_image_on_disabled || add_auto_state_images)
 		btn->img[3].set_matrix(&m_grayMatrix);
 
 	m_image.push_back(btn);
@@ -602,7 +605,11 @@ void CGdiButton::set_border_color(Gdiplus::Color normal, bool auto_set_color)
 	m_cr_border.push_back(normal);
 	m_cr_border.push_back(normal);
 	m_cr_border.push_back(normal);
-	m_cr_border.push_back(get_gray_color(normal));
+
+	if (auto_set_color)
+		m_cr_border.push_back(get_gray_color(normal));
+	else
+		m_cr_border.push_back(normal);
 }
 
 void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
@@ -868,7 +875,7 @@ void CGdiButton::reconstruct_font()
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	//SetFont(&m_font, true);
+	SetFont(&m_font, true);
 
 	ASSERT(bCreated);
 }
@@ -980,7 +987,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	//만약 parent에 배경색이나 배경 그림이 있고
 	//그려지는 이미지가 배경이 투명한 PNG라면 투명하게 그리기 위해.
-	//
+	//resize시에 깜빡임이 발생해서 아직 온전히 사용할 수 없다.
+	//round > 0인 경우 기본 m_transparent = true로 설정되므로 여기서 투명처리 코드를 살리면 다른 프로젝트에도 영향을 줄 수 있다.
 	if (m_transparent)
 	{
 		//이미지가 설정되지 않았거나 라운드라면 parent back으로 칠해준다.
@@ -1848,9 +1856,15 @@ void CGdiButton::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 	reconstruct_font();
 }
 
-void CGdiButton::set_font_bold(int weight)
+void CGdiButton::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
+	reconstruct_font();
+}
+
+void CGdiButton::set_font_antialias(bool antialias)
+{
+	m_lf.lfQuality = (antialias ? ANTIALIASED_QUALITY : DEFAULT_QUALITY);
 	reconstruct_font();
 }
 

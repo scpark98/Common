@@ -1301,6 +1301,40 @@ std::unique_ptr<Gdiplus::TextureBrush> CSCGdiplusBitmap::get_zigzag_pattern(int 
 	return std::make_unique<Gdiplus::TextureBrush>(tile.get(), Gdiplus::WrapModeTile);
 }
 
+//rgb 3원색의 3개원을 겹치게 그리는 이미지를 생성한다. Koino UCTogether 그리기 색상 선택 버튼과 유사
+void CSCGdiplusBitmap::create_rgb_color_wheel(int width, int height,
+											Gdiplus::Color cr_border, Gdiplus::Color cr_back,
+											float radius, float overlap)
+{
+	create(width, height, cr_back);
+	Gdiplus::Graphics g(m_pBitmap);
+	Gdiplus::Pen pen(cr_border);
+	g.DrawRectangle(&pen, Gdiplus::Rect(0, 0, width - 1, height - 1));
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+
+	float dist = 2.0f * radius * (1.0f - overlap);// center-to-center distance
+	float triangle_height = dist / std::sqrt(3.0f);                  // triangle height
+	std::deque<Gdiplus::PointF> pts;
+	std::deque<Gdiplus::Color> colors;
+	Gdiplus::PointF cp(30, 30);
+	pts.push_back(Gdiplus::PointF(cp.X - dist * 0.5f, cp.Y + triangle_height * 0.5f));
+	pts.push_back(Gdiplus::PointF(cp.X + dist * 0.5f, cp.Y + triangle_height * 0.5f));
+	pts.push_back(Gdiplus::PointF(cp.X, cp.Y - triangle_height));
+
+	int pastel = 16;
+	int alpha = 160;
+	colors.push_back(Gdiplus::Color(alpha, pastel, 255, pastel));
+	colors.push_back(Gdiplus::Color(alpha, pastel, pastel, 255));
+	colors.push_back(Gdiplus::Color(alpha, 255, pastel, pastel));
+
+	for (int i = 0; i < pts.size(); i++)
+		draw_ellipse(g, pts[i].X, pts[i].Y, radius, Gdiplus::Color::Transparent, colors[i]);
+
+	for (int i = 0; i < pts.size(); i++)
+		draw_ellipse(g, pts[i].X, pts[i].Y, radius, Gdiplus::Color(128, 0, 0, 0));
+}
+
 CRect CSCGdiplusBitmap::draw(Gdiplus::Graphics& g, CRect targetRect, int draw_mode)
 {
 	CRect r;

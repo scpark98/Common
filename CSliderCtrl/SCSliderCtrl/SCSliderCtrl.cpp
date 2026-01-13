@@ -1535,7 +1535,7 @@ Gdiplus::Color CSCSliderCtrl::enable_color(Gdiplus::Color cr, int offset)
 	if (IsWindowEnabled() && !m_forced_gray)
 		return cr;
 
-	return get_color(gray_color(cr), offset);
+	return get_color(get_gray_color(cr), offset);
 }
 
 void CSCSliderCtrl::set_repeat_range(int start, int end)
@@ -1776,7 +1776,7 @@ void CSCSliderCtrl::set_color_theme(int theme)
 
 	//기본 m_theme에는 없지만 CSCSlider에서 필요한 다른 컬러들에 대한 색상 설정
 	m_cr_active = gRGB(64, 80, 181);//RGB(128, 192, 255);
-	m_cr_inactive = gray_color(m_cr_active);
+	m_cr_inactive = get_gray_color(m_cr_active);
 	m_cr_thumb = gRGB(64, 80, 181); //RGB(124, 192, 232);
-	m_cr_tic = gray_color(m_cr_thumb);
+	m_cr_tic = get_gray_color(m_cr_thumb);
 }

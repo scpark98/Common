@@ -233,6 +233,14 @@ public:
 	static Gdiplus::Color m_cr_zigzag_back;
 	static Gdiplus::Color m_cr_zigzag_fore;
 
+	//rgb 3원색의 3개원을 겹치게 그리는 이미지를 생성한다. Koino UCTogether 그리기 색상 선택 버튼과 유사
+	void			create_rgb_color_wheel(int width = 60, int height = 60,
+										Gdiplus::Color cr_border = Gdiplus::Color(255, 221, 221, 221), Gdiplus::Color cr_back = Gdiplus::Color::White,
+										float radius = 9.0f, float overlap = 0.4f);
+
+
+
+
 	//targetRect를 주면 대상 영역에 비율을 유지하여 그린다.
 	//targetRect가 NULL이면 0,0에 이미지 크기대로 그린다.
 	//draw시에 CDC를 넘기느냐 Gdiplus::Graphics를 넘기느냐 고민했으나 Gdiplus::Graphics에 설정코드가 적용된채로 사용하는 경우가 많으므로

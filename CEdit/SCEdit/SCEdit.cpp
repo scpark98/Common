@@ -134,7 +134,10 @@ void CSCEdit::reconstruct_font()
 {
 	m_font.DeleteObject();
 	m_lf.lfCharSet = DEFAULT_CHARSET;
-	m_lf.lfQuality = ANTIALIASED_QUALITY;
+	//ANTIALIASED_QUALITY를 무조건 적용하면 작은 글씨일 경우에는 뭉개져보이는 단점이 있다.
+	//따라서 고정시켜서는 안된다.
+	//m_lf.lfQuality = DEFAULT_QUALITY;
+	//m_lf.lfQuality = ANTIALIASED_QUALITY;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	CEdit::SetFont(&m_font, TRUE);
@@ -451,6 +454,12 @@ void CSCEdit::set_font_size( int nSize )
 void CSCEdit::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
+	reconstruct_font();
+}
+
+void CSCEdit::set_font_antialias(bool antialias)
+{
+	m_lf.lfQuality = (antialias ? ANTIALIASED_QUALITY : DEFAULT_QUALITY);
 	reconstruct_font();
 }
 

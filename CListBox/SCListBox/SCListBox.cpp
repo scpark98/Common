@@ -815,6 +815,11 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 			return true;
 		}
 	}
+	else if (pMsg->message == WM_CONTEXTMENU)
+	{
+		if (!m_use_popup_menu)
+			return FALSE;
+	}
 	else if (pMsg->message == WM_KILLFOCUS)
 	{
 		TRACE(_T("%d, %d\n"), pMsg->wParam, pMsg->lParam);
@@ -997,29 +1002,67 @@ BOOL CSCListBox::OnLbnSelchange()
 //선택된 항목 리스트 또는 선택된 개수를 리턴
 int CSCListBox::get_selected_items(std::deque<int>* selected)
 {
-	int selected_count = GetSelCount();
-
 	if (selected)
 		selected->clear();
 
-	if (selected_count > 0)
+	//single selection인 경우와 multiple selection인 경우를 구분해서 처리해야 한다.
+	if ((GetStyle() & (LBS_MULTIPLESEL | LBS_EXTENDEDSEL)) != 0)
 	{
-		CArray<int, int> aryListBoxSel;
-		aryListBoxSel.SetSize(selected_count);
-		GetSelItems(selected_count, aryListBoxSel.GetData());
+		int selected_count = GetSelCount();
 
-		for (int i = 0; i < aryListBoxSel.GetCount(); i++)
-			selected->push_back(aryListBoxSel[i]);
+		if (selected_count > 0)
+		{
+			CArray<int, int> aryListBoxSel;
+			aryListBoxSel.SetSize(selected_count);
+			GetSelItems(selected_count, aryListBoxSel.GetData());
+
+			if (selected)
+			{
+				for (int i = 0; i < aryListBoxSel.GetCount(); i++)
+					selected->push_back(aryListBoxSel[i]);
+			}
+		}
+	
+		return selected_count;
 	}
+	else
+	{
+		int index = GetCurSel();
+		if (index < 0 || index >= GetCount())
+			return 0;
 		
-	return selected_count;
+		if (selected)
+			selected->push_back(index);
+		return 1;
+	}
+	
+	return 0;
 }
 
+int CSCListBox::get_item_from_pos(int x, int y)
+{
+	BOOL bOutside;
+	CPoint pt(x, y);
+	ScreenToClient(&pt);
+
+	int rclicked_index = ItemFromPoint(pt, bOutside);
+	TRACE(_T("rclicked_index = %d, bOutside = %d\n"), rclicked_index, bOutside);
+
+	if (bOutside)
+		return -1;
+
+	return rclicked_index;
+}
 
 void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 {
+	edit_end();
+
 	if (!m_use_popup_menu)
+	{
+		::PostMessage(GetParent()->GetSafeHwnd(), WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(point.x, point.y));
 		return;
+	}
 
 	//만약 선택되지 않은 항목에 우클릭했다면
 	//다른 선택항목들은 모두 선택 해제시키고 해당 항목을 선택으로 만든 후에 팝업메뉴를 띠워줘야 한다.
@@ -1407,26 +1450,19 @@ void CSCListBox::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	//UpdateWindow();
 }
 
-void CSCListBox::delete_items(bool only_selected)
+void CSCListBox::delete_items(bool for_selected)
 {
-	if (!only_selected)
+	if (!for_selected)
 	{
 		ResetContent();
 	}
 	else
 	{
-		int count = GetSelCount();
+		std::deque<int> sel_list;
+		get_selected_items(&sel_list);
 
-		if (count == 0)
-			return;
-		
-		int* sel_list = new int[count];
-		GetSelItems(count, sel_list);
-
-		for (int i = count - 1; i >= 0; i--)
-		{
+		for (int i = sel_list.size() - 1; i >= 0; i--)
 			DeleteString(sel_list[i]);
-		}
 	}
 
 	Invalidate();

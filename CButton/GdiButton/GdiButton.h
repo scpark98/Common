@@ -250,7 +250,7 @@ public:
 	//기본 이미지를 설정할 때 resize한 후 설정
 	bool		add_image_resize(UINT normal, float ratio = 1.0f);
 	bool		add_image(CString normal, CString over = _T(""), CString down = _T(""), CString disabled = _T(""));
-	bool		add_image(CSCGdiplusBitmap *img);
+	bool		add_image(CSCGdiplusBitmap *normal, bool add_auto_state_images = true);
 	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
 
@@ -330,7 +330,8 @@ public:
 
 	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void		set_font_size(int size);
-	void		set_font_bold(int weight = FW_BOLD);
+	void		set_font_weight(int weight = FW_BOLD);
+	void		set_font_antialias(bool antialias = true);
 	void		set_font(CFont* font);
 
 	int			GetCheck();
@@ -521,7 +522,7 @@ protected:
 
 	bool		m_b3DRect = false;						//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
-	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다.
+	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다. default = false;
 
 	//이미지를 사용하는 버튼이라도 자신에게 세팅된 텍스트를 표시해줘야 할 경우도 존재한다.
 	//ex. 공용 버튼 이미지를 사용하는 경우

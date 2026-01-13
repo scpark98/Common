@@ -134,6 +134,7 @@ public:
 	void					set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void					set_font_size(int nSize);
 	void					set_font_weight(int weight = FW_BOLD);
+	void					set_font_antialias(bool antialias = true);
 	void					set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
 	void					recalc_font_size();						//recalculate font height when control size is changed.
 	int						get_font_size(bool pixel_size = false);

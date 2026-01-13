@@ -107,6 +107,9 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 		Gdiplus::Color cr = (Gdiplus::Color)(DWORD)GetItemData(lpDrawItemStruct->itemID);
 		if (cr.GetValue() != Gdiplus::Color::Transparent)
 			cr_text = cr.ToCOLORREF();
+
+		if (!IsWindowEnabled())
+			cr_text = get_gray_color(cr_text);
 	}
 
 

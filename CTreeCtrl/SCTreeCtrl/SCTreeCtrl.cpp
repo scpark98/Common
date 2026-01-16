@@ -3702,7 +3702,7 @@ void CSCTreeCtrl::serialize_item(CArchive& ar, HTREEITEM hItem)
 			//ReadDataOfNode(tree, hNext, ar);
 			CString label;
 			ar >> label;
-			trace(label);
+			TRACE(_T("%s\n"), label);
 			SetItemText(hNext, label);
 			
 			// Now read all children

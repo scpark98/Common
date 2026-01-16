@@ -493,13 +493,13 @@ public:
 		color_theme_gray,
 		color_theme_dark_gray,
 		color_theme_dark,
-		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
 		color_theme_linkmemine,
 		color_theme_linkmemine_se,
 		color_theme_anysupport,
 		color_theme_helpu,
 		color_theme_pcanypro,
 		color_theme_custom,
+		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
 	};
 
 	//현재 설정된 color theme 인덱스를 리턴
@@ -527,7 +527,8 @@ public:
 
 	//caption이 없는 dialog based에서 사용
 	Gdiplus::Color	cr_title_text;
-	Gdiplus::Color	cr_title_back;
+	Gdiplus::Color	cr_title_back_active;
+	Gdiplus::Color	cr_title_back_inactive;
 	Gdiplus::Color	cr_sys_buttons_hover_back;
 	Gdiplus::Color	cr_sys_buttons_down_back;
 

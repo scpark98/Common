@@ -161,7 +161,7 @@ public:
 	CSize	get_size() { return CSize(m_button_width * m_button.size(), m_button_height); }
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
-	void	set_color_theme(int theme);
+	void	set_color_theme(int theme, bool invalidate = false);
 	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
 	void	set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; }
 	void	set_back_hover_color(Gdiplus::Color cr_back_hover) { m_theme.cr_back_hover = cr_back_hover; }

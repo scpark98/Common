@@ -742,10 +742,12 @@ CString	get_nearest_color_name(COLORREF cr_src, COLORREF* cr_nearest)
 	return result;
 }
 
+//여기서 리턴하는 이름은 colors.h의 enum SC_COLOR_THEMES 에 정의된 순서와 동일해야 한다.
 std::deque<CString>  CSCColorTheme::get_color_theme_list()
 {
 	std::deque<CString> dq;
 	dq.push_back(_T("default"));
+	dq.push_back(_T("white"));
 	dq.push_back(_T("gray"));
 	dq.push_back(_T("dark_gray"));
 	dq.push_back(_T("dark"));
@@ -780,9 +782,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = Gdiplus::Color::White;
-			cr_title_back = gRGB(97, 132, 180);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_back_active = gRGB(97, 132, 180);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -796,6 +798,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
+
 		case color_theme_linkmemine_se:
 			cr_text = Gdiplus::Color::Black;
 			cr_text_dim = Gdiplus::Color::DimGray;
@@ -812,9 +815,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = Gdiplus::Color::White; //gRGB(253, 126, 20);
-			cr_title_back = gRGB(186, 89, 18);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_back_active = gRGB(186, 89, 18);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -828,6 +831,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
+
 		case color_theme_anysupport :
 			cr_text = Gdiplus::Color::Black;
 			cr_text_dim = Gdiplus::Color::DimGray;
@@ -844,9 +848,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = gRGB(255, 255, 255);
-			cr_title_back = gRGB(59, 69, 91); 
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_back_active = gRGB(59, 69, 91); 
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -861,6 +865,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
+
 		case color_theme_helpu:
 			cr_text = Gdiplus::Color::Black;
 			cr_text_dim = Gdiplus::Color::DimGray;
@@ -877,9 +882,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = gRGB(18, 24, 58);
-			cr_title_back = gRGB(32, 178, 174);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_back_active = gRGB(32, 178, 174);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -894,6 +899,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
+
 		case color_theme_pcanypro:
 			cr_text = Gdiplus::Color::Black;
 			cr_text_dim = Gdiplus::Color::DimGray;
@@ -910,9 +916,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_title_text = Gdiplus::Color::White;// gRGB(18, 24, 58);
-			cr_title_back = gRGB(214, 129, 8);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_back_active = gRGB(214, 129, 8);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -927,6 +933,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
+
 		case color_theme_dark_gray :
 			cr_text					= Gdiplus::Color(255, 164, 164, 164);
 			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
@@ -943,9 +950,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_alternate		= get_color(cr_back, 8);
 
 			cr_title_text			= Gdiplus::Color::LightGray;
-			cr_title_back			= gGRAY(16);
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_back_active	= gGRAY(16);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -960,6 +967,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border				= Gdiplus::Color::DarkGray;
 			break;
+
 		case color_theme_dark :
 			cr_text					= Gdiplus::Color(255, 212, 212, 212);
 			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
@@ -975,8 +983,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover			= get_color(cr_back_selected, 48);
 			cr_back_alternate		= get_color(cr_back, 8);
 
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_text			= Gdiplus::Color::LightGray;
+			cr_title_back_active	= gGRAY(16);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border		= cr_back_selected;
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -1009,6 +1019,76 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_border				= Gdiplus::Color::DimGray;
 			break;
 
+		case color_theme_white :
+			cr_text = RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
+			cr_text_dim = get_color(cr_text, 32);
+			cr_text_hover = cr_text;
+			cr_text_selected = cr_text;// RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
+			cr_text_selected_inactive = cr_text_selected;
+			cr_text_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+
+			//컨트롤 종류에 따라 기본 배경색이 다르다.
+			cr_back = Gdiplus::Color::White;
+
+			cr_back_selected = gRGB(204, 235, 255);//RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = get_sys_color(COLOR_HIGHLIGHT);
+			cr_back_hover = Gdiplus::Color(255, 229, 243, 255);
+			cr_back_alternate = get_color(cr_back, -12);
+
+			cr_title_text = Gdiplus::Color::Black;
+			cr_title_back_active = Gdiplus::Color::LightGray;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+
+			//CVtListCtrlEx에서 사용되는 컬러
+			cr_header_text = get_sys_color(COLOR_BTNTEXT);
+			cr_header_back = get_sys_color(COLOR_3DFACE);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(gGRAY(192));
+			cr_progress = Gdiplus::Color(255, 49, 108, 244);
+
+			cr_selected_border = gRGB(153, 209, 255);
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_border = Gdiplus::Color::DimGray;
+			break;
+
+		case color_theme_gray:
+			cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+			cr_text_dim = get_color(cr_text, 32);
+			cr_text_hover = cr_text;
+			cr_text_selected = cr_text;
+			cr_text_selected_inactive = cr_text_selected;
+			cr_text_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+
+			cr_back = Gdiplus::Color::White;
+			cr_back_selected = gRGB(204, 235, 255);//RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = get_sys_color(COLOR_HIGHLIGHT);
+			cr_back_hover = Gdiplus::Color(255, 229, 243, 255);
+			cr_back_alternate = get_color(cr_back, -12);
+
+			cr_title_text = Gdiplus::Color::Black;
+			cr_title_back_active = Gdiplus::Color::LightGray;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+
+			//CVtListCtrlEx에서 사용되는 컬러
+			cr_header_text = get_sys_color(COLOR_BTNTEXT);
+			cr_header_back = get_sys_color(COLOR_3DFACE);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(gGRAY(192));
+			cr_progress = Gdiplus::Color(255, 49, 108, 244);
+
+			cr_selected_border = gRGB(153, 209, 255);
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_border = Gdiplus::Color::DimGray;
+			break;
+
 		default : //case color_theme_default :
 			cr_text					= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
 			cr_text_dim				= get_color(cr_text, 32);
@@ -1037,11 +1117,12 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternate		= get_color(cr_back, -12);
 
-			cr_sys_buttons_hover_back = get_color(cr_title_back, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back, -16);
+			cr_title_text			= get_sys_color(COLOR_CAPTIONTEXT);
+			cr_title_back_active	= get_sys_color(COLOR_ACTIVECAPTION);
+			cr_title_back_inactive	= get_sys_color(COLOR_INACTIVECAPTION);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
-			cr_title_text			= Gdiplus::Color::Black;
-			cr_title_back			= Gdiplus::Color::LightGray;
 
 			//CVtListCtrlEx에서 사용되는 컬러
 			cr_header_text			= get_sys_color(COLOR_BTNTEXT);

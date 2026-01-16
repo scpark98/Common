@@ -92,7 +92,7 @@ license you like.
 // //////////////////////////////////////////////////////////////////////
 
 
-
+#pragma execution_character_set("utf-8")
 
 
 #ifndef JSON_AMALGATED_H_INCLUDED

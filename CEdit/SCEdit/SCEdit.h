@@ -73,8 +73,14 @@ public:
 	BOOL					Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }
+	void					set_text(CString text = _T("")) { CEdit::SetWindowText(text); }
+	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CEdit::SetWindowText(text); }
 	void					SetWindowText(CString text) { set_text(text); }
 
+	//아래와 같이 템플릿으로 구현하려 했으나 typeid()가 제대로 동작하지 않는 문제가 있어 사용할 수 없음.
+	//L"test string"을 인자로 넘기면 CString으로 기대했으나 typeid()가 const wchar_t[12]로 인식하는 등
+	//모든 타입을 열거해 줄 수 없으므로 사용할 수 없음.
+	/*
 	template<class T> void set_text(T v)
 	{
 		CString text;
@@ -91,8 +97,8 @@ public:
 			TRACE(_T("warning. not defined type.\n"));
 
 		CEdit::SetWindowText(text);
-		/*set_line_align(m_valign);*/
 	}
+	*/
 
 // Overrides
 	// ClassWizard generated virtual function overrides

@@ -259,6 +259,13 @@ public:
 	//추가시에는 추가된 항목과 최대크기 항목을 비교하고 삭제시에는 모든 항목을 재계산해야 한다.
 	void		recalc_horizontal_extent(CString added_text = _T(""));
 
+	//항목 이동. single selection이고 auto sort가 아닐 경우에만 정상 동작함.
+	void		move_item(int from_index, int to_index);
+	void		move_item_up(int index);
+	void		move_item_down(int index);
+	bool		is_available_move_item_up(int index);
+	bool		is_available_move_item_down(int index);
+
 protected:
 	//동적생성한 경우 GetParent등으로도 parent가 구해지지 않고 OnNotify()도 동작하지 않아서 수동으로 세팅하기 위함.
 	HWND		m_hParentWnd = NULL;

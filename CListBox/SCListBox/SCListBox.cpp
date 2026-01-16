@@ -817,6 +817,7 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 	}
 	else if (pMsg->message == WM_CONTEXTMENU)
 	{
+		//return FALSE를 해줘야만 parent에서 이 메시지를 처리할 수 있다.
 		if (!m_use_popup_menu)
 			return FALSE;
 	}
@@ -1506,6 +1507,52 @@ void CSCListBox::recalc_horizontal_extent(CString added_text)
 	ReleaseDC(pDC);
 
 	SetHorizontalExtent(m_max_horizontal_extent + GetSystemMetrics(SM_CXVSCROLL));
+}
+
+//항목 이동. single selection이고 auto sort가 아닐 경우에만 정상 동작함.
+void CSCListBox::move_item(int from_index, int to_index)
+{
+	if (from_index < 0 || from_index >= GetCount())
+		return;
+	if (to_index < 0 || to_index >= GetCount())
+		return;
+	if (from_index == to_index)
+		return;
+
+	CString text;
+	Gdiplus::Color cr;
+	GetText(from_index, text);
+	cr = get_item_color(from_index);
+	SetRedraw(FALSE);
+	DeleteString(from_index);
+	insert_string(to_index, text, cr);
+	SetRedraw(TRUE);
+	SetCurSel(to_index);
+	UpdateWindow();
+}
+
+void CSCListBox::move_item_up(int index)
+{
+	if (index <= 0)
+		return;
+	move_item(index, index - 1);
+}
+
+void CSCListBox::move_item_down(int index)
+{
+	if (index < 0 || index >= GetCount() - 1)
+		return;
+	move_item(index, index + 1);
+}
+
+bool CSCListBox::is_available_move_item_up(int index)
+{
+	return (index > 0);
+}
+
+bool CSCListBox::is_available_move_item_down(int index)
+{
+	return (index >= 0 && index < GetCount() - 1);
 }
 
 void CSCListBox::set_color_theme(int theme)

@@ -71,7 +71,7 @@ public:
 	void	set_titlebar_text_color(Gdiplus::Color cr);
 	Gdiplus::Color get_titlebar_text_color() { return m_theme.cr_title_text; }
 	void	set_titlebar_back_color(Gdiplus::Color cr);
-	Gdiplus::Color get_titlebar_back_color() { return m_theme.cr_title_back; }
+	Gdiplus::Color get_titlebar_back_color() { return m_theme.cr_title_back_active; }
 	void	set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void	set_titlebar_font_size(int size);
 	void	set_titlebar_font_bold(bool bold) { m_titlebar_bold = bold; m_titlebar_lf.lfWeight = (bold ? FW_BOLD : FW_NORMAL); }
@@ -135,7 +135,7 @@ public:
 	void	set_draw_border(bool draw, int width = 1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border = cr; }
 
-	void	set_color_theme(int theme);
+	void	set_color_theme(int theme, bool invalidate = false);
 	void	enable_resize(bool resizable);
 
 	//init_shadow()를 CSCThemeDlg::OnInitDialog()에서 호출하지 않고 실행한 후에 하려니 적용되지 않는다.
@@ -222,4 +222,6 @@ public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
+	afx_msg void OnSetFocus(CWnd* pOldWnd);
 };

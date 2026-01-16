@@ -3294,7 +3294,18 @@ void CScintillaCtrl::Clear()
 
 void CScintillaCtrl::SetText(_In_z_ const char* text)
 {
+	//20260114 scpark read only이면 SetText가 적용되지 않는것이 맞다?
+	//코드에서 SetText()를 호출하는데 read only라고 안써진다면...
+	//일단 해결책으로 읽기전용모드를 해제후 SetText를 수행하고 다시 읽기전용모드로 복원하는 방식으로 처리
+	bool is_read_only = GetReadOnly();
+	
+	if (is_read_only)
+		SetReadOnly(FALSE);
+
 	Call(static_cast<UINT>(Message::SetText), 0, reinterpret_cast<LPARAM>(text));
+
+	if (is_read_only)
+		SetReadOnly(TRUE);
 }
 
 Position CScintillaCtrl::GetText(_In_ Position length, _Inout_updates_opt_(length + 1) char* text)
@@ -5971,8 +5982,6 @@ bool CScintillaCtrl::read_file(CString filepath)
 	//Set the document pointer to the loaded content
 	SetDocPointer(static_cast<IDocumentEditable*>(pLoader->ConvertToDocument())); //NOLINT(clang-analyzer-core.CallAndMessage)
 
-	file.Close();
-
 	//If we detected UTF data, then use the UTF8 codepage else disable multi-byte support
 	//20251223 scpark add. utf8 no BOM일 경우 ansi로 설정되는 오류로 인해 is_utf8_encoding()으로 다시 검사하도록 수정
 	if (m_BOM == BOM::Unknown)
@@ -6001,6 +6010,8 @@ bool CScintillaCtrl::read_file(CString filepath)
 		SetReadOnly(TRUE);
 	else
 		SetReadOnly(FALSE);
+
+	file.Close();
 
 	//Reinitialize the control settings
 	SetUndoCollection(TRUE);

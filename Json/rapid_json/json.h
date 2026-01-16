@@ -144,6 +144,7 @@ public:
 
 	bool		parse(std::string sstr);
 	bool		parse(CString str);
+	bool		parse(char* str);
 
 	//bool		read(std::string input_json);
 	bool		load(CString input_json_file);

@@ -25,6 +25,12 @@ using rapidjson::PrettyWriter;
 
 using namespace rapidjson;
 
+bool Json::parse(char* str)
+{
+	doc.Parse<UTFType::kUTF8>(str);
+	return !doc.HasParseError();
+}
+
 bool Json::parse(CString str)
 {
 	std::string sstr = CString2string(str);

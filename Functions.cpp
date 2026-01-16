@@ -2195,7 +2195,7 @@ void SystemShutdownNT(int nMode /* = 2 */)
 	// Display the shutdown dialog box and start the time-out countdown. 
 	fResult = InitiateSystemShutdown(
 		NULL,					// shut down local computer 
-		(LPWSTR)_T("System rebooting."),	// message to user 
+		(LPTSTR)_T("System rebooting."),	// message to user 
 		0,						// time-out period (<- 여기를 20 이라고 쓰면 20초 후 에 리부팅한다.)
 		FALSE,					// ask user to close apps 
 		bReboot);				// reboot after shutdown 
@@ -2814,7 +2814,7 @@ bool ReadURLFile(LPCTSTR pUrl, CString &strBuffer)
 		return TRUE; 
 } 
 
-std::wstring multibyteToUnicode(std::string inputtext)
+std::wstring multibyte2Unicode(std::string inputtext)
 {
 	int length = MultiByteToWideChar(CP_ACP, 0, &inputtext[0], inputtext.size(), NULL, NULL);
 	std::wstring outputtext(length + 1, 0);
@@ -2822,7 +2822,7 @@ std::wstring multibyteToUnicode(std::string inputtext)
 	return outputtext;
 }
 
-std::string unicodeToMultibyte(std::wstring inputtext)
+std::string unicode2Multibyte(std::wstring inputtext)
 {
 	int length = WideCharToMultiByte(CP_ACP, 0, &inputtext[0], -1, NULL, 0, NULL, NULL);
 	std::string outputtext(length + 1, 0);
@@ -2838,7 +2838,7 @@ std::wstring utf8ToUnicode(std::string inputtext)
 	return outputtext;
 }
 
-std::string unicodeToUtf8(std::wstring inputtext)
+std::string unicode2Utf8(std::wstring inputtext)
 {
 	int length = WideCharToMultiByte(CP_UTF8, 0, &inputtext[0], -1, NULL, 0, NULL, NULL);
 	std::string outputtext(length + 1, 0);
@@ -2848,12 +2848,12 @@ std::string unicodeToUtf8(std::wstring inputtext)
 
 std::string multibyteToUtf8(std::string inputtext)
 {
-	return (unicodeToUtf8(multibyteToUnicode(inputtext)));
+	return (unicode2Utf8(multibyte2Unicode(inputtext)));
 }
 
-std::string utf8ToMultibyte(std::string inputtext)
+std::string utf82Multibyte(std::string inputtext)
 {
-	return (unicodeToMultibyte(utf8ToUnicode(inputtext)));
+	return (unicode2Multibyte(utf8ToUnicode(inputtext)));
 }
 
 //http://localhost:4300/test_doc_favorite/test.avi
@@ -8262,19 +8262,19 @@ char* ANSItoUTF8(char* pszCode)
 	return pszUTFCode;
 }
 
-CString utf8ToCString(std::string inputtext)
+CString utf82CString(std::string inputtext)
 {
 #ifdef _UNICODE
 	return CString(utf8ToUnicode(inputtext).c_str());
 #else
-	return CString(utf8ToMultibyte(inputtext).c_str());
+	return CString(utf82Multibyte(inputtext).c_str());
 #endif // _UNICODE
 }
 
-std::string CStringToUtf8(CString inputtext)
+std::string CString2Utf8(CString inputtext)
 {
 #ifdef _UNICODE
-	return unicodeToUtf8(inputtext.operator LPCWSTR());
+	return unicode2Utf8(inputtext.operator LPCWSTR());
 #else
 	return multibyteToUtf8(inputtext.operator LPCSTR());
 #endif
@@ -10586,8 +10586,7 @@ WCHAR* CString2WCHAR(CString str)
 //
 std::string CString2string(CString str)
 {
-	return std::string(CT2CA(str));
-	/*
+	//return std::string(CT2CA(str));
 	std::string stdStr;
 	char* szStr = CString2char(str);
 	if (szStr)
@@ -10597,7 +10596,6 @@ std::string CString2string(CString str)
 	}
 
 	return stdStr;
-	*/
 }
 
 //cstr의 유효한 길이를 이미 알고 있다면 length를 지정해줘야 정확하다.
@@ -19295,11 +19293,14 @@ void save(ID2D1DeviceContext* deviceContext, CString filepath)
 	//Gdiplus::GdiplusShutdown(gdiplusToken);
 }
 */
-CString json_value(CString json, CString key)
+CString json_str(CString json, CString key)
 {
-	bool isFindToken = false;
+	bool found_key = false;
 	CString result;
 	CString temp;
+	bool key_end = false;
+	bool double_quote_start = false;
+	bool double_quote_end = false;
 
 	int i;
 	int index = json.Find(key);
@@ -19311,28 +19312,55 @@ CString json_value(CString json, CString key)
 	{
 		wchar_t ch = json.GetAt(i);
 
-		if (isFindToken)
-		{
+		if (found_key)
 			temp += ch;
-		}
 
-		if (ch == ':')
+		if (!found_key && ch == ':')
 		{
-			isFindToken = TRUE;
+			found_key = true;
+			continue;
 		}
 
+		//':' 다음에 숫자가 온다면 숫자값인 필드이고 '\"' 기호가 온다면 문자열 값인 필드다.
+
+		//':' 다음에 오는 값이 문자열일 경우를 위해 쌍따옴표(")의 시작과 끝을 체크한다.
+		if (ch == '\"' && found_key)
+		{
+			if (double_quote_start)
+			{
+				double_quote_start = false;
+				break;
+			}
+			else
+			{
+				double_quote_start = true;
+				double_quote_end = false;
+			}
+		}
+
+		//숫자값인 필드일 경우 ',' 또는 '}' 가 나오면 해당 필드의 값이 끝난다.
+		//문자열인 경우는 겹따움표로 시작되는데 이미 위에서 break 될 것이다.
 		if (ch == ',' || ch == '}')
 		{
+			if (temp.Find('\"') >= 0)
+				continue;
 			break;
 		}
 	}
 
-	result.Format(_T("%s"), temp);
+	temp.Trim();
 
-	result.Replace(_T("]"), _T(""));
-	result.Replace(_T("}"), _T(""));
+	//문자열이 아닌 경우는 ','나 '}'와 같이 끝에 붙은 json 기호들을 모두 제거해준다.
+	if (temp.Find('\"') < 0)
+	{
+		temp.Replace(_T("]"), _T(""));
+		temp.Replace(_T("}"), _T(""));
+		temp.Replace(_T(","), _T(""));
+	}
+
+	result.Format(_T("%s"), temp);
 	result.Replace(_T("\""), _T(""));
-	result.Replace(_T(","), _T(""));
+
 	result.Trim();
 
 	return result;

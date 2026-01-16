@@ -44,17 +44,18 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	//ON_WM_SYSCOMMAND()
 	ON_WM_TIMER()
 	ON_WM_KILLFOCUS()
-	//ON_WM_ACTIVATE()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_GETMINMAXINFO()
 	ON_WM_SETCURSOR()
+	ON_WM_ACTIVATE()
+	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
 
 bool CSCThemeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
 	//m_parent = parent;
 
-	LONG_PTR dwStyle = WS_POPUP | WS_VISIBLE;
+	LONG_PTR dwStyle = WS_POPUP | WS_VISIBLE | WS_TABSTOP;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
@@ -392,7 +393,7 @@ void CSCThemeDlg::OnPaint()
 		//rTitle.InflateRect(10, 0);
 
 		rTitle.bottom = m_titlebar_height;
-		dc.FillSolidRect(rTitle, m_theme.cr_title_back.ToCOLORREF());
+		dc.FillSolidRect(rTitle, (::GetActiveWindow() == m_hWnd ? m_theme.cr_title_back_active.ToCOLORREF() : m_theme.cr_title_back_inactive.ToCOLORREF()));
 
 		//프로그램 아이콘 표시. 
 		if (m_show_logo)
@@ -432,8 +433,7 @@ void CSCThemeDlg::OnPaint()
 		dc.SelectObject(pOldFont);
 	}
 
-	/*
-	//클라이언트 영역 칠하기
+	//클라이언트 영역 칠하기. 배경이미지가 있다면 이미지를 표시
 	CRect rclient = rc;
 	rclient.top += m_titlebar_height;
 	if (m_img_back.is_valid())
@@ -448,9 +448,8 @@ void CSCThemeDlg::OnPaint()
 	}
 	else
 	{
-		dc.FillSolidRect(rclient, m_cr_back.ToCOLORREF());
+		dc.FillSolidRect(rclient, m_theme.cr_back.ToCOLORREF());
 	}
-	*/
 
 	//border
 	if (m_draw_border && m_border_width > 0)
@@ -461,7 +460,7 @@ void CSCThemeDlg::OnPaint()
 }
 
 
-void CSCThemeDlg::set_color_theme(int theme)
+void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 	m_sys_buttons.set_color_theme(theme);
@@ -472,84 +471,87 @@ void CSCThemeDlg::set_color_theme(int theme)
 	//CSCThemeDlg를 상속받은 클래스에서 필요로하는 부가적인 세팅이 필요하다.
 	switch (theme)
 	{
-	case CSCColorTheme::color_theme_linkmemine :
-		SetWindowText(_T("LinkMeMine"));
+		case CSCColorTheme::color_theme_linkmemine :
+			SetWindowText(_T("color_theme_linkmemine"));
 
-		m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
+			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		//m_cr_sys_buttons_back_hover = get_color(m_cr_titlebar_back, 30);
-		m_sys_buttons.set_back_color(m_theme.cr_title_back);
-		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
+		case CSCColorTheme::color_theme_linkmemine_se:
+			SetWindowText(_T("color_theme_linkmemine_se"));
 
-		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_titlebar_font();
-		break;
-	case CSCColorTheme::color_theme_linkmemine_se:
-		SetWindowText(_T("LinkMeMine 3.0 SE"));
+			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
+			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
+		case CSCColorTheme::color_theme_helpu:
+			SetWindowText(_T("color_theme_helpu"));
 
-		m_sys_buttons.set_back_color(m_theme.cr_title_back);
-		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
+			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_titlebar_font();
-		break;
-	case CSCColorTheme::color_theme_helpu:
-		SetWindowText(_T("HelpU"));
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
+		case CSCColorTheme::color_theme_anysupport:
+			SetWindowText(_T("color_theme_anysupport"));
 
-		m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
+			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_sys_buttons.set_back_color(m_theme.cr_title_back);
-		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
+		case CSCColorTheme::color_theme_pcanypro:
+			SetWindowText(_T("color_theme_pcanypro"));
 
-		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_titlebar_font();
-		break;
-	case CSCColorTheme::color_theme_anysupport:
-		SetWindowText(_T("AnySupport"));
+			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
+			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
+			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
+			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
 
-		m_sys_buttons.set_text_color(m_theme.cr_title_text);
-
-		m_sys_buttons.set_back_color(m_theme.cr_title_back);
-		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
-		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_titlebar_font();
-		break;
-	case CSCColorTheme::color_theme_pcanypro:
-		SetWindowText(_T("PCAnyPro"));
-
-		m_sys_buttons.set_text_color(m_theme.cr_title_text);
-
-		m_sys_buttons.set_back_color(m_theme.cr_title_back);
-		m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
-		m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-		m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-		reconstruct_titlebar_font();
-		break;
-	//case CSCColorTheme::color_theme_default:
-	//	m_sys_buttons.set_text_color(m_theme.cr_title_text);
-
-	//	//m_sys_buttons.set_back_color(m_theme.cr_title_back);
-	//	//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-	//	//m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
-	//	m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
-	//	m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
-	//	reconstruct_titlebar_font();
-	//	break;
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
+		case CSCColorTheme::color_theme_default:
+			SetWindowText(_T("color_theme_default"));
+			break;
+		case CSCColorTheme::color_theme_white:
+			SetWindowText(_T("color_theme_white"));
+			break;
+		case CSCColorTheme::color_theme_gray:
+			SetWindowText(_T("color_theme_gray"));
+			break;
+		case CSCColorTheme::color_theme_dark_gray:
+			SetWindowText(_T("color_theme_dark_gray"));
+			break;
+		case CSCColorTheme::color_theme_dark:
+			SetWindowText(_T("color_theme_dark"));
+			break;
+		default:
+			SetWindowText(_T("not defined color_theme"));
 	}
+
+	if (invalidate)
+		Invalidate();
 }
 
 //CSCThemeDlg를 상속받은 클래스가 크기 변경 가능한 dlg라면
@@ -578,7 +580,7 @@ void CSCThemeDlg::set_titlebar_text_color(Gdiplus::Color cr)
 
 void CSCThemeDlg::set_titlebar_back_color(Gdiplus::Color cr)
 {
-	m_theme.cr_title_back = cr;
+	m_theme.cr_title_back_active = cr;
 	m_sys_buttons.set_back_color(cr);
 }
 
@@ -740,16 +742,6 @@ void CSCThemeDlg::OnTimer(UINT_PTR nIDEvent)
 	CDialogEx::OnTimer(nIDEvent);
 }
 
-void CSCThemeDlg::OnKillFocus(CWnd* pNewWnd)
-{
-	CDialogEx::OnKillFocus(pNewWnd);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	//Invalidate();
-	//RedrawWindow();
-}
-
-
 void CSCThemeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CDialogEx::OnWindowPosChanged(lpwndpos);
@@ -819,4 +811,31 @@ void CSCThemeDlg::set_draw_border(bool draw, int width, Gdiplus::Color cr)
 	m_theme.cr_border = cr;
 	Invalidate();
 	RedrawWindow();
+}
+void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+{
+	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	TRACE(_T("CSCThemeDlg::OnActivate. nState = %d\n"), nState);
+	Invalidate();
+}
+
+void CSCThemeDlg::OnSetFocus(CWnd* pOldWnd)
+{
+	CDialogEx::OnSetFocus(pOldWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	TRACE(_T("CSCThemeDlg::OnSetFocus\n"));
+	Invalidate();
+}
+
+void CSCThemeDlg::OnKillFocus(CWnd* pNewWnd)
+{
+	CDialogEx::OnKillFocus(pNewWnd);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	TRACE(_T("CSCThemeDlg::OnKillFocus\n"));
+	Invalidate();
+	//RedrawWindow();
 }

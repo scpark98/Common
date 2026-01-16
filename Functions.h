@@ -1055,17 +1055,17 @@ struct	NETWORK_INFO
 	CString		UTF8toCString(char* pszCode);
 	char*		UTF8toANSI(char* pszCode);
 	char*		ANSItoUTF8(char* pszCode);
-	CString		utf8ToCString(std::string inputtext);
+	CString		utf82CString(std::string inputtext);
 	std::string	multibyteToUtf8(std::string inputtext);
-	std::string	utf8ToMultibyte(std::string inputtext);
-	std::wstring multibyteToUnicode(std::string inputtext);
-	std::string unicodeToMultibyte(std::wstring inputtext);
+	std::string	utf82Multibyte(std::string inputtext);
+	std::wstring multibyte2Unicode(std::string inputtext);
+	std::string unicode2Multibyte(std::wstring inputtext);
 	std::wstring utf8ToUnicode(std::string inputtext);
-	std::string unicodeToUtf8(std::wstring inputtext);
+	std::string unicode2Utf8(std::wstring inputtext);
 	std::string multibyteToUtf8(std::string inputtext);
-	std::string utf8ToMultibyte(std::string inputtext);
+	std::string utf82Multibyte(std::string inputtext);
 
-	std::string	CStringToUtf8(CString inputtext);
+	std::string	CString2Utf8(CString inputtext);
 
 	//[[nodiscard]] static CStringA W2UTF8(_In_NLS_string_(nLength) const wchar_t* pszText, _In_ int nLength);
 	//[[nodiscard]] static CStringW UTF82W(_In_NLS_string_(nLength) const char* pszText, _In_ int nLength);
@@ -1149,9 +1149,11 @@ struct	NETWORK_INFO
 
 	//simple json parser.
 	//이전 Koino 개발자가 간단히 만든 코드이나 대괄호 처리 등 취약점이 많음.
+	//또한 숫자형의 필드값들도 모두 CString으로만 return하는 단점이 있다.
 	//심플한 json에 대해서는 정상 동작하므로 기존 코드와의 호환성때문에 우선 사용하지만
 	//Common/json/rapid_json 로 대체되어야 함.
-	CString		json_value(CString json, CString key);
+	//우선 수정하여 문자열 필드값에 ',', '}' 등이 포함되어도 정상 파싱되도록 수정은 한 상태.
+	CString		json_str(CString json, CString key);
 
 	int			get_char_count(CString sStr, TCHAR ch, bool stop_at_first_mismatch = false, bool forward = true);
 	CString		get_mac_address_format(CString src, TCHAR separator = ':');

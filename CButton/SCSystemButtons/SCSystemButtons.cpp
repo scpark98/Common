@@ -140,7 +140,7 @@ void CSCSystemButtons::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, m_theme.cr_title_back.ToCOLORREF());
+	dc.FillSolidRect(rc, (GetFocus() == this ? m_theme.cr_title_back_active.ToCOLORREF() : m_theme.cr_title_back_inactive.ToCOLORREF()));
 
 	for (size_t i = 0; i < m_button.size(); i++)
 	{
@@ -325,9 +325,11 @@ void CSCSystemButtons::OnMouseMove(UINT nFlags, CPoint point)
 	CButton::OnMouseMove(nFlags, point);
 }
 
-void CSCSystemButtons::set_color_theme(int theme)
+void CSCSystemButtons::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
+	if (invalidate)
+		Invalidate();
 }
 
 

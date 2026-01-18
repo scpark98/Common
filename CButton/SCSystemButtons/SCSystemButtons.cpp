@@ -140,7 +140,10 @@ void CSCSystemButtons::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, (GetFocus() == this ? m_theme.cr_title_back_active.ToCOLORREF() : m_theme.cr_title_back_inactive.ToCOLORREF()));
+	//if (m_is_activated)
+		dc.FillSolidRect(rc, m_theme.cr_title_back_active.ToCOLORREF());
+	//else
+	//	dc.FillSolidRect(rc, m_theme.cr_title_back_inactive.ToCOLORREF());
 
 	for (size_t i = 0; i < m_button.size(); i++)
 	{

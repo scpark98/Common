@@ -1,9 +1,7 @@
 // SkinHeaderCtrl.cpp : implementation file
 //
 
-//#include "stdafx.h"
 #include "HeaderCtrlEx.h"
-//#include "VtListCtrlEx.h"
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"

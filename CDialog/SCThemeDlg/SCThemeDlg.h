@@ -45,7 +45,7 @@
 
 #include "../../SCGdiplusBitmap.h"
 #include "../../CButton/SCSystemButtons/SCSystemButtons.h"
-#include "../../CWnd/WndShadow/WndShadow.h"
+//#include "../../CWnd/WndShadow/WndShadow.h"
 
 // CSCThemeDlg 대화 상자
 class CSCThemeDlg : public CDialogEx
@@ -138,9 +138,11 @@ public:
 	void	set_color_theme(int theme, bool invalidate = false);
 	void	enable_resize(bool resizable);
 
+	//void	refresh_activate_status(bool is_activated);
+
 	//init_shadow()를 CSCThemeDlg::OnInitDialog()에서 호출하지 않고 실행한 후에 하려니 적용되지 않는다.
 	//init_shadow();는 우선 호출해두고 동적으로 그림자 효과를 해제하거나 적용하려면 다음 함수를 호출한다.
-	void	set_use_shadow(bool use_shadow = true);
+	//void	set_use_shadow(bool use_shadow = true);
 
 	virtual BOOL OnInitDialog();
 	virtual INT_PTR DoModal();
@@ -151,9 +153,11 @@ protected:
 	//CSCThemeDlg를 상속받아 만든 dlg들에서도 TIMER_ID를 지정할 수 있고 일반적으로 0번부터 지정하므로
 	//여기서 0번부터 타이머 ID를 주면 위험하다. 다른 파생 dlg에서 사용하지 않을 법한 id부터 시작하자.
 
+	//bool				m_is_activated = false;
+
 	bool				m_use_shadow = true;	//default = true
-	CWndShadow			m_shadow;
-	void				init_shadow();
+	//CWndShadow			m_shadow;
+	//void				init_shadow();
 
 	HICON				m_hIcon = NULL;
 
@@ -172,8 +176,8 @@ protected:
 
 	CSCColorTheme		m_theme = CSCColorTheme(this);
 
-	//default = true
-	bool				m_draw_border = true;
+	//default = false
+	bool				m_draw_border = false;
 	//default = 1
 	int					m_border_width = 1;
 

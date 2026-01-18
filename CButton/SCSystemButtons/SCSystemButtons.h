@@ -170,6 +170,8 @@ public:
 	int		get_button_height() { return m_button_height; }
 	void	set_button_height(int height);
 
+	//void	refresh_activate_status(bool is_activated) { m_is_activated = is_activated; Invalidate(); }
+
 	//parent가 maximize되거나 restore되면 시스템버튼의 모양이 달라지므로 parent에 의해 호출되며 이를 CSCSystemButtons에게 알려야 한다.
 	void	parent_maximized(bool maximized) { m_parent_maximized = maximized; Invalidate(); }
 
@@ -186,6 +188,8 @@ protected:
 	bool	m_mouse_track = false;
 	int		m_over_index = -1;		//마우스 오버 또는 다운 인덱스
 	bool	m_down_state = false;
+
+	//bool	m_is_activated = false;
 
 	bool	m_parent_maximized = false;
 

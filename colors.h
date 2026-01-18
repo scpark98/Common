@@ -527,8 +527,10 @@ public:
 
 	//caption이 없는 dialog based에서 사용
 	Gdiplus::Color	cr_title_text;
+	//active 상태와 inactive 상태에 따라 색상을 구분하려 했으나 CSCSystemButtons에도 영향을 주고
+	//여러가지 영향받는 부분이 많다보니 우선은 active 컬러만 사용하도록 한다.
 	Gdiplus::Color	cr_title_back_active;
-	Gdiplus::Color	cr_title_back_inactive;
+	Gdiplus::Color	cr_title_back_inactive;			//사용하지 않음.	
 	Gdiplus::Color	cr_sys_buttons_hover_back;
 	Gdiplus::Color	cr_sys_buttons_down_back;
 

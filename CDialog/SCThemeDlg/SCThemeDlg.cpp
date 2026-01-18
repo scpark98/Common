@@ -144,6 +144,7 @@ BOOL CSCThemeDlg::OnInitDialog()
 				  // 예외: OCX 속성 페이지는 FALSE를 반환해야 합니다.
 }
 
+/*
 void CSCThemeDlg::init_shadow()
 {
 	CWndShadow::Initialize(AfxGetInstanceHandle());
@@ -159,6 +160,7 @@ void CSCThemeDlg::set_use_shadow(bool use_shadow)
 {
 	m_shadow.SetSize(use_shadow ? 8 : 0);
 }
+*/
 
 void CSCThemeDlg::reconstruct_titlebar_font()
 {
@@ -393,7 +395,13 @@ void CSCThemeDlg::OnPaint()
 		//rTitle.InflateRect(10, 0);
 
 		rTitle.bottom = m_titlebar_height;
-		dc.FillSolidRect(rTitle, (::GetActiveWindow() == m_hWnd ? m_theme.cr_title_back_active.ToCOLORREF() : m_theme.cr_title_back_inactive.ToCOLORREF()));
+
+		//active 상태와 inactive 상태에 따라 색상을 구분하려 했으나 CSCSystemButtons에도 영향을 주고
+		//여러가지 영향받는 부분이 많다보니 우선은 active 컬러만 사용하도록 한다.
+		//if (m_is_activated || (::GetActiveWindow() == m_hWnd))
+			dc.FillSolidRect(rTitle, m_theme.cr_title_back_active.ToCOLORREF());
+		//else
+			//dc.FillSolidRect(rTitle, m_theme.cr_title_back_inactive.ToCOLORREF());
 
 		//프로그램 아이콘 표시. 
 		if (m_show_logo)
@@ -412,7 +420,7 @@ void CSCThemeDlg::OnPaint()
 			}
 			else
 			{
-				
+				rTitle.left += 6;
 			}
 		}
 		else
@@ -812,12 +820,24 @@ void CSCThemeDlg::set_draw_border(bool draw, int width, Gdiplus::Color cr)
 	Invalidate();
 	RedrawWindow();
 }
+
+/*
+void CSCThemeDlg::refresh_activate_status(bool is_activated)
+{
+	//m_is_activated = is_activated;
+	//m_sys_buttons.refresh_activate_status(m_is_activated);
+	//Invalidate();
+}
+*/
+
 void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 {
 	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	TRACE(_T("CSCThemeDlg::OnActivate. nState = %d\n"), nState);
+	//m_is_activated = (nState == 2);
+	//m_sys_buttons.refresh_activate_status(m_is_activated);
 	Invalidate();
 }
 
@@ -826,8 +846,8 @@ void CSCThemeDlg::OnSetFocus(CWnd* pOldWnd)
 	CDialogEx::OnSetFocus(pOldWnd);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	TRACE(_T("CSCThemeDlg::OnSetFocus\n"));
-	Invalidate();
+	//TRACE(_T("CSCThemeDlg::OnSetFocus\n"));
+	//Invalidate();
 }
 
 void CSCThemeDlg::OnKillFocus(CWnd* pNewWnd)
@@ -835,7 +855,6 @@ void CSCThemeDlg::OnKillFocus(CWnd* pNewWnd)
 	CDialogEx::OnKillFocus(pNewWnd);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	TRACE(_T("CSCThemeDlg::OnKillFocus\n"));
-	Invalidate();
-	//RedrawWindow();
+	//TRACE(_T("CSCThemeDlg::OnKillFocus\n"));
+	//Invalidate();
 }

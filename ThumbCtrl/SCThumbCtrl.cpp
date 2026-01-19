@@ -730,7 +730,7 @@ void CSCThumbCtrl::scroll_up(bool up, int offset)
 	CRect rc;
 	GetClientRect(rc);
 
-	if ((rc.Height() >= m_scroll_total) || (offset == 0))
+	if ((rc.Height() >= m_scroll_total))// || (offset == 0))
 		return;
 
 	int pos = m_scroll_pos;

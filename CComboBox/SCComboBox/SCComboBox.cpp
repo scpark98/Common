@@ -18,19 +18,6 @@ CSCComboBox::CSCComboBox()
 
 CSCComboBox::~CSCComboBox()
 {
-	if (m_tooltip)
-	{
-		m_tooltip->DestroyWindow();
-		delete m_tooltip;
-	}
-
-	m_font.DeleteObject();
-
-	//if (m_pEdit)
-	//{
-	//	m_pEdit->DestroyWindow();
-	//	delete m_pEdit;
-	//}
 }
 
 
@@ -53,6 +40,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_NCPAINT()
 	ON_WM_CTLCOLOR()
 	ON_WM_CTLCOLOR_REFLECT()
+	ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
 
@@ -104,9 +92,9 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	if (!m_is_font_combo)
 	{
-		Gdiplus::Color cr = (Gdiplus::Color)(DWORD)GetItemData(lpDrawItemStruct->itemID);
-		if (cr.GetValue() != Gdiplus::Color::Transparent)
-			cr_text = cr.ToCOLORREF();
+		CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(lpDrawItemStruct->itemID);
+		if (cr && (cr->cr_text.GetValue() != m_theme.cr_text.GetValue()) && (cr->cr_text.GetValue() != Gdiplus::Color::Transparent))
+			cr_text = cr->cr_text.ToCOLORREF();
 
 		if (!IsWindowEnabled())
 			cr_text = get_gray_color(cr_text);
@@ -751,7 +739,10 @@ int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 	{
 		index = AddString(text);
 		if (cr_text.GetValue() != Gdiplus::Color::Transparent)
-			SetItemData(index, (DWORD)cr_text.GetValue());
+		{
+			CSCComboBoxColor* cr = new CSCComboBoxColor(cr_text);
+			SetItemData(index, (DWORD_PTR)cr);
+		}
 
 		if (!m_reg_section.IsEmpty())
 		{
@@ -876,4 +867,25 @@ void CSCComboBox::set_as_font_combo()
 	CClientDC dc(this);
 
 	EnumFonts(dc, 0, (FONTENUMPROC)EnumFontProc, (LPARAM)this); //Enumerate font
+}
+
+void CSCComboBox::OnDestroy()
+{
+	CComboBox::OnDestroy();
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
+	m_font.DeleteObject();
+
+	for (int i = 0; i < GetCount(); i++)
+	{
+		CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(i);
+		if (cr)
+			delete cr;
+	}
 }

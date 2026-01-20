@@ -116,34 +116,37 @@ public:
 		action_find,
 	};
 
+	CSCColorTheme		m_theme = CSCColorTheme(this);
+	void				set_color_theme(int color_theme, bool invalidate = false); //apply current m_theme colors to the control.
+
 	//Test_GdiButton 프로젝트에서는 CSCEdit이 투명하게 잘 표시되나
 	//Test_SCThemeDialog 프로젝트에서는 투명하게 표시되지 않는다.
 	//차이점은 전자의 경우 parent가 순수 CDialog를 상속받은 dlg이고
 	//후자는 SCThemeDlg를 상속받은 dlg라는 점이다. 수정 필요.
-	virtual CSCEdit&		set_transparent(bool transparent = true);
-	virtual CSCEdit&		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
-	Gdiplus::Color			get_text_color() { return m_cr_text; }
-	virtual CSCEdit&		set_text_color(Gdiplus::Color cr_text); // This Function is to set the Color for the Text.
-	Gdiplus::Color			get_back_color() { return m_cr_back; }
-	virtual CSCEdit&		set_back_color(Gdiplus::Color cr_back); // This Function is to set the BackGround Color for the Text and the Edit Box.
+	void				set_transparent(bool transparent = true);
+	void				set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
+	Gdiplus::Color		get_text_color() { return m_theme.cr_text; }
+	void				set_text_color(Gdiplus::Color cr_text); // This Function is to set the Color for the Text.
+	Gdiplus::Color		get_back_color() { return m_theme.cr_back; }
+	void				set_back_color(Gdiplus::Color cr_back); // This Function is to set the BackGround Color for the Text and the Edit Box.
 	//아직 set_text_color_disabled()는 효과가 적용되고 있지 않다. 수정 필요.
-	virtual CSCEdit&		set_text_color_disabled(Gdiplus::Color cr_text_disabled);
-	virtual CSCEdit&		set_back_color_disabled(Gdiplus::Color cr_back_disabled);
+	void				set_text_color_disabled(Gdiplus::Color cr_text_disabled);
+	void				set_back_color_disabled(Gdiplus::Color cr_back_disabled);
 
 	//read only일 때 배경색을 변경할 수 있다. 파라미터를 주지 않으면 윈도우 기본 readonly 배경색(COLOR_3DFACE)으로 설정된다.
-	virtual CSCEdit&		set_back_color_readonly(Gdiplus::Color cr_back_readonly = get_sys_color(COLOR_3DFACE));
+	void				set_back_color_readonly(Gdiplus::Color cr_back_readonly = get_sys_color(COLOR_3DFACE));
 	//readonly일 때 전용 배경색인 m_cr_back_readonly를 사용할 지, 무관하게 m_cr_back을 사용할 지.
-	void					set_use_readonly_color(bool use_default = true);
+	void				set_use_readonly_color(bool use_default = true);
 
 	//기본 CWnd::SetFont() override
-	void					SetFont(CFont* font, BOOL bRedraw = TRUE);
-	void					set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
-	void					set_font_size(int nSize);
-	void					set_font_weight(int weight = FW_BOLD);
-	void					set_font_antialias(bool antialias = true);
-	void					set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
-	void					recalc_font_size();						//recalculate font height when control size is changed.
-	int						get_font_size(bool pixel_size = false);
+	void				SetFont(CFont* font, BOOL bRedraw = TRUE);
+	void				set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void				set_font_size(int nSize);
+	void				set_font_weight(int weight = FW_BOLD);
+	void				set_font_antialias(bool antialias = true);
+	void				set_auto_font_size(bool bAuto = true, double ratio = 0.6);	//resize font depending on control's height, not width.
+	void				recalc_font_size();						//recalculate font height when control size is changed.
+	int					get_font_size(bool pixel_size = false);
 
 	//CEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
 	//ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
@@ -152,12 +155,12 @@ public:
 	//생성후에도 SetWindowLong()을 이용하여 변경할 수 있는 속성들
 	//(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
 	//CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER (DT_CENTER가 아님에 주의), DT_BOTTOM)
-	virtual CSCEdit&		set_line_align(DWORD align = DT_VCENTER);
-	int						get_line_align() { return m_valign; }
+	void				set_line_align(DWORD align = DT_VCENTER);
+	int					get_line_align() { return m_valign; }
 //dim text
 	//m_cr_dim_text의 기본값은 Gdiplus::Color::LightGray이며
 	//이 함수를 호출할 때 Gdiplus::Color::Transparent라는 값일 경우는 dim_text 파라미터만 변경하고자 하는 의미일 것이다.
-	virtual CSCEdit&		set_dim_text(CString dim_text, Gdiplus::Color cr_dim_text = Gdiplus::Color::Transparent);
+	void				set_dim_text(CString dim_text, Gdiplus::Color cr_dim_text = Gdiplus::Color::Transparent);
 
 	enum BORDER_TYPE
 	{
@@ -176,8 +179,8 @@ public:
 	void			set_draw_border(bool draw = true, int border_width = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, int border_type = border_type_disregard);
 	bool			get_draw_border() { return m_draw_border; }
 	int				get_border_width() { return m_border_width; }
-	Gdiplus::Color	get_border_color() { return m_cr_border; }
-	void			set_border_color(Gdiplus::Color cr_border) { m_cr_border = cr_border; }
+	Gdiplus::Color	get_border_color() { return m_theme.cr_border; }
+	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; }
 	int				get_border_type() { return m_border_type; }
 
 	// Generated message map functions
@@ -191,7 +194,7 @@ protected:
 	bool			m_draw_border = false;
 	int				m_border_width = 1;	//border width
 	int				m_border_type = border_type_sunken;	//border radius
-	Gdiplus::Color	m_cr_border = Gdiplus::Color::LightGray;	//border color
+	//Gdiplus::Color	m_cr_border = Gdiplus::Color::LightGray;	//border color
 
 	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
 	//ex)돋보기 그림을 그려주고 클릭하면 검색으로 사용
@@ -214,8 +217,8 @@ protected:
 	bool			mouse_in_action_button(CPoint pt = CPoint(0, 0));
 
 
-	Gdiplus::Color	m_cr_text;
-	Gdiplus::Color	m_cr_back;
+	//Gdiplus::Color	m_cr_text;
+	//Gdiplus::Color	m_cr_back;
 	Gdiplus::Color	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
 	Gdiplus::Color	m_cr_back_disabled = Gdiplus::Color::LightGray;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
 

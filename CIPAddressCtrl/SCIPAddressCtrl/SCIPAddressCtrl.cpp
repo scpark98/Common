@@ -27,8 +27,6 @@ END_MESSAGE_MAP()
 
 // CSCIPAddressCtrl 메시지 처리기
 
-
-
 BOOL CSCIPAddressCtrl::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
@@ -60,4 +58,14 @@ void CSCIPAddressCtrl::OnKillFocus(CWnd* pNewWnd)
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCIPAddressCtrl, WM_KILLFOCUS, 0);
+}
+
+CString CSCIPAddressCtrl::get_text()
+{
+	BYTE ip[4];
+	GetAddress(ip[0], ip[1], ip[2], ip[3]);
+
+	CString text;
+	text.Format(_T("%d, %d, %d, %d"), ip[0], ip[1], ip[2], ip[3]);
+	return text;
 }

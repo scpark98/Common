@@ -15,8 +15,8 @@ CSCStatic::CSCStatic()
 {
 	m_transparent	= false;
 
-	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_BTNFACE));
+	//m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+	//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_BTNFACE));
 
 	m_bGradient		= false;
 	m_bSunken		= false;
@@ -51,26 +51,6 @@ CSCStatic::CSCStatic()
 
 CSCStatic::~CSCStatic()
 {
-	if (m_tooltip)
-	{
-		m_tooltip->DestroyWindow();
-		delete m_tooltip;
-	}
-
-	if (m_hIcon)
-		DestroyIcon(m_hIcon);
-
-	for (int i = 0; i < m_header_images.size(); i++)
-	{
-		CSCGdiplusBitmap* img = m_header_images[i];
-		delete img;
-	}
-
-	//functions.h에 gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
-	//종료될 때 해제시켜주자.
-	//일단 이 클래스에서 사용하므로 이 클래스의 소멸자에서 해제 함수를 호출해주고 있으나
-	//공통 글로벌 변수라서 뭔가 부작용이 있을수도 있다.
-	safe_release_gradient_rect_handle();
 }
 
 BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
@@ -84,6 +64,7 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_SETCURSOR()
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCStatic::on_message_CSCEdit)
+	ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
@@ -107,21 +88,23 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 	dst.m_bVertical = m_bVertical;
 
 	dst.m_bSunken = m_bSunken;
-	dst.m_cr_text = m_cr_text;
-	dst.m_cr_back = m_cr_back;
-	dst.m_cr_edit_text = m_cr_edit_text;
-	dst.m_cr_edit_back = m_cr_edit_back;
+
+	memcpy(&dst.m_theme, &m_theme, sizeof(CSCColorTheme));
+	//dst.m_cr_text = m_cr_text;
+	//dst.m_cr_back = m_cr_back;
+	//dst.m_cr_edit_text = m_cr_edit_text;
+	//dst.m_cr_edit_back = m_cr_edit_back;
 	dst.m_transparent = m_transparent;
 
 	dst.m_round = m_round;
-	dst.m_cr_parent_back = m_cr_parent_back;
-	dst.m_cr_parent_back = m_cr_parent_back;
-	dst.set_round(dst.m_round, dst.m_cr_border, dst.m_cr_parent_back);
+	//dst.m_cr_parent_back = m_cr_parent_back;
+	//dst.m_cr_parent_back = m_cr_parent_back;
+	dst.set_round(dst.m_round, dst.m_theme.cr_border, dst.m_theme.cr_parent_back);
 
 
 	dst.m_draw_border = m_draw_border;
 	dst.m_border_thick = m_border_thick;
-	dst.m_cr_border = m_cr_border;
+	//dst.m_cr_border = m_cr_border;
 
 	dst.m_cr_link = m_cr_link;
 	dst.m_dwStyle = m_dwStyle;
@@ -293,7 +276,7 @@ void CSCStatic::OnPaint()
 
 	if (m_round > 0 || m_transparent)
 	{
-		dc.FillSolidRect(rc, m_cr_parent_back.ToCOLORREF());
+		dc.FillSolidRect(rc, m_theme.cr_parent_back.ToCOLORREF());
 		/*
 		CRect Rect;
 		GetWindowRect(&Rect);
@@ -341,12 +324,12 @@ void CSCStatic::OnPaint()
 		{
 			if (m_transparent || m_round > 0)
 			{
-				Gdiplus::SolidBrush brush(m_cr_back);
+				Gdiplus::SolidBrush brush(m_theme.cr_back);
 				g.FillPath(&brush, &roundPath);
 			}
 			else
 			{
-				dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+				dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 			}
 
 			if (m_bSunken)
@@ -585,7 +568,7 @@ void CSCStatic::OnPaint()
 		if (IsWindowEnabled())
 		{
 			if (m_link_url.IsEmpty())
-				dc.SetTextColor(m_cr_text.ToCOLORREF());
+				dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 			else
 				dc.SetTextColor(m_cr_link.ToCOLORREF());
 		}
@@ -633,7 +616,7 @@ void CSCStatic::OnPaint()
 				rcolor.right = rcolor.left + 12;
 				rcolor.top = rcolor.CenterPoint().y - 6;
 				rcolor.bottom = rcolor.top + 12;
-				draw_round_rect(&g, CRect_to_gpRect(rcolor), Gdiplus::Color::Gray, m_cr_text, 1);
+				draw_round_rect(&g, CRect_to_gpRect(rcolor), Gdiplus::Color::Gray, m_theme.cr_text, 1);
 				//dc.FillSolidRect(rcolor, m_cr_text.ToCOLORREF());
 				m_text_extent = rcolor.right;
 			}
@@ -647,7 +630,7 @@ void CSCStatic::OnPaint()
 			{
 				CRect rvalue = rc;
 				rvalue.left += (m_text_extent + 8);
-				dc.SetTextColor(m_cr_edit_text.ToCOLORREF());
+				dc.SetTextColor(m_theme.cr_edit_text.ToCOLORREF());
 				dc.DrawText(m_text_value, rvalue, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 			}
 		}
@@ -657,9 +640,9 @@ void CSCStatic::OnPaint()
 	{
 		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRect_to_gpRect(rc), m_cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			draw_round_rect(&g, CRect_to_gpRect(rc), m_theme.cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
-			draw_rect(g, rc, m_cr_border);
+			draw_rect(g, rc, m_theme.cr_border);
 	}
 
 	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
@@ -672,7 +655,7 @@ void CSCStatic::set_transparent(bool transparent, Gdiplus::Color cr_parent_back)
 	m_transparent = transparent;
 
 	if (cr_parent_back.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_parent_back = cr_parent_back;
+		m_theme.cr_parent_back = cr_parent_back;
 
 	Invalidate();
 }
@@ -690,7 +673,7 @@ CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color /*-1*/)
 
 	//-1이면 기본 설정된 글자색 사용
  	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)
- 		m_cr_text = cr_text_color;
+ 		m_theme.cr_text = cr_text_color;
 	
 	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
 
@@ -763,8 +746,8 @@ void CSCStatic::edit_begin()
 	CRect r(m_text_extent + 4, 3, rc.right - 2, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
-	m_edit.set_text_color(m_cr_edit_text);
-	m_edit.set_back_color(m_cr_edit_back);
+	m_edit.set_text_color(m_theme.cr_edit_text);
+	m_edit.set_back_color(m_theme.cr_edit_back);
 	m_edit.set_text(m_text_value);
 
 	m_edit.ShowWindow(SW_SHOW);
@@ -849,10 +832,10 @@ void CSCStatic::set_valign()
 void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back)
 {
 	m_img_back.load(type, nIDBack);
-	m_cr_back = cr_back;
+	m_theme.cr_back = cr_back;
 
 	//m_transparent = true;
-	m_img_back.set_back_color(m_cr_back);
+	m_img_back.set_back_color(m_theme.cr_back);
 
 	if (m_img_back.is_animated_gif())
 		m_img_back.set_animation(m_hWnd, CRect(), true);
@@ -861,9 +844,9 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)
 {
 	img.deep_copy(&m_img_back);
-	m_cr_back = cr_back;
+	m_theme.cr_back = cr_back;
 	//m_transparent = true;
-	m_img_back.set_back_color(m_cr_back);
+	m_img_back.set_back_color(m_theme.cr_back);
 
 	if (m_img_back.is_animated_gif())
 		m_img_back.set_animation(m_hWnd, CRect(), false);
@@ -1207,16 +1190,16 @@ void CSCStatic::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color cr
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
-		m_cr_border = cr_border;
+		m_theme.cr_border = cr_border;
 	}
 
 	if (cr_parent_back.GetValue() != Gdiplus::Color::Transparent)
 	{
-		m_cr_parent_back = cr_parent_back;
+		m_theme.cr_parent_back = cr_parent_back;
 	}
 
 	if (m_round > 0)
-		set_transparent(true, m_cr_parent_back);
+		set_transparent(true, m_theme.cr_parent_back);
 	else
 		Invalidate();
 }
@@ -1351,7 +1334,7 @@ void CSCStatic::set_font_antialiased(bool bAntiAliased)
 void CSCStatic::set_text_color(Gdiplus::Color cr_text)
 {
 	if (cr_text.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_text = cr_text;
+		m_theme.cr_text = cr_text;
 
 	update_surface();
 	Invalidate();
@@ -1361,8 +1344,8 @@ void CSCStatic::set_back_color(Gdiplus::Color cr_back)
 {
 	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
 	{
-		m_cr_back = cr_back;
-		m_cr_edit_back = cr_back;
+		m_theme.cr_back = cr_back;
+		m_theme.cr_edit_back = cr_back;
 	}
 
 	if (m_round <= 0)
@@ -1375,12 +1358,12 @@ void CSCStatic::set_back_color(Gdiplus::Color cr_back)
 void CSCStatic::set_edit_text_color(Gdiplus::Color cr_edit_text)
 {
 	if (cr_edit_text.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_edit_text = cr_edit_text;
+		m_theme.cr_edit_text = cr_edit_text;
 }
 void CSCStatic::set_edit_back_color(Gdiplus::Color cr_edit_back)
 {
 	if (cr_edit_back.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_edit_back = cr_edit_back;
+		m_theme.cr_edit_back = cr_edit_back;
 }
 
 void CSCStatic::set_gradient(bool bGradient)
@@ -1565,13 +1548,20 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 	}
 }
 
+void CSCStatic::set_color_theme(int theme, bool invalidate)
+{
+	m_theme.set_color_theme(theme);
+	if (invalidate)
+		Invalidate();
+}
+
 void CSCStatic::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
 {
-	m_cr_text = cr_text;
+	m_theme.cr_text = cr_text;
 
 	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
 	{
-		m_cr_back = cr_back;
+		m_theme.cr_back = cr_back;
 		m_transparent = false;
 	}
 
@@ -1590,12 +1580,13 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		if (m_text == _T("_color picker_") && (point.x < 20))
 		{
-			COLORREF cr = RGB(m_cr_text.GetR(), m_cr_text.GetG(), m_cr_text.GetB());
+			//COLORREF cr = RGB(m_theme.cr_text.GetR(), m_theme.cr_text.GetG(), m_theme.cr_text.GetB());
+			COLORREF cr = m_theme.cr_text.ToCOLORREF();
 			CMFCColorDialog dlg(cr, 0, this);
 			if (dlg.DoModal() == IDOK)
 			{
 				cr = dlg.GetColor();
-				m_cr_text.SetFromCOLORREF(cr);
+				m_theme.cr_text.SetFromCOLORREF(cr);
 				m_text_value.Format(_T("%d, %d, %d"), GetRValue(cr), GetGValue(cr), GetBValue(cr));
 				Invalidate();
 				CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
@@ -1667,4 +1658,31 @@ LRESULT CSCStatic::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 	Invalidate();
 
 	return 0;
+}
+
+void CSCStatic::OnDestroy()
+{
+	CStatic::OnDestroy();
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+	}
+
+	if (m_hIcon)
+		DestroyIcon(m_hIcon);
+
+	for (int i = 0; i < m_header_images.size(); i++)
+	{
+		CSCGdiplusBitmap* img = m_header_images[i];
+		delete img;
+	}
+
+	//functions.h에 gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
+	//종료될 때 해제시켜주자.
+	//일단 이 클래스에서 사용하므로 이 클래스의 소멸자에서 해제 함수를 호출해주고 있으나
+	//공통 글로벌 변수라서 뭔가 부작용이 있을수도 있다.
+	safe_release_gradient_rect_handle();
 }

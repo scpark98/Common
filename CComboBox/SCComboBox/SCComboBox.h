@@ -10,6 +10,18 @@
 
 // CColorComboBox
 
+class CSCComboBoxColor
+{
+public:
+	CSCComboBoxColor(Gdiplus::Color _cr_text = Gdiplus::Color::Transparent, Gdiplus::Color _cr_back = Gdiplus::Color::Transparent)
+	{
+		cr_text = _cr_text;
+		cr_back = _cr_back;
+	}
+	Gdiplus::Color	cr_text = Gdiplus::Color::Transparent;
+	Gdiplus::Color	cr_back = Gdiplus::Color::Transparent;
+};
+
 class CSCComboBox : public CComboBox
 {
 	DECLARE_DYNAMIC(CSCComboBox)
@@ -122,6 +134,7 @@ public:
 	HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnNcPaint();
+	afx_msg void OnDestroy();
 };
 
 

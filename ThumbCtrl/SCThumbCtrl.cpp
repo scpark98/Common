@@ -1005,7 +1005,7 @@ void CSCThumbCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	if (m_lbutton_down)
 	{
 		//m_lbutton_down으로 스크롤 기능 구현
-		TRACE(_T("point.y = %d, m_pt_old.y = %d\n"), point.y, m_pt_old.y);
+		//TRACE(_T("point.y = %d, m_pt_old.y = %d\n"), point.y, m_pt_old.y);
 		if (point.y != m_pt_old.y)
 		{
 			scroll_up(true, point.y - m_pt_old.y);

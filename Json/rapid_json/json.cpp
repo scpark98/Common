@@ -33,7 +33,8 @@ bool Json::parse(char* str)
 
 bool Json::parse(CString str)
 {
-	std::string sstr = CString2string(str);
+	std::string sstr = CT2CA(str);
+	//std::string sstr = CString2string(str);
 	return parse(sstr);
 }
 

@@ -19,6 +19,8 @@ public:
 	CSCIPAddressCtrl();
 	virtual ~CSCIPAddressCtrl();
 
+	CString		get_text();
+
 protected:
 	DECLARE_MESSAGE_MAP()
 public:

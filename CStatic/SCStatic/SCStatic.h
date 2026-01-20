@@ -163,14 +163,15 @@ public:
 	//parent에서 현재 이 static의 위치를 리턴.
 	CRect			get_rect();
 
+	//color theme 설정
+	CSCColorTheme	m_theme = CSCColorTheme(this);
+	void			set_color_theme(int theme, bool invalidate = false);
+
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
-
 	void			set_text_color(Gdiplus::Color cr_text);
-
-	Gdiplus::Color	get_text_color() { return m_cr_text; }
-	Gdiplus::Color	get_back_color() { return m_cr_back; }
-
+	Gdiplus::Color	get_text_color() { return m_theme.cr_text; }
+	Gdiplus::Color	get_back_color() { return m_theme.cr_back; }
 	void			set_back_color(Gdiplus::Color cr_back);
 
 	//gradient
@@ -246,7 +247,7 @@ public:
 	void			set_font(CFont* font);
 
 	void			set_border_thick(int thick) { m_border_thick = thick; Invalidate(); }
-	void			draw_border(bool draw, int thick, Gdiplus::Color cr_outline) { m_draw_border = draw; m_border_thick = thick; m_cr_border = cr_outline; Invalidate(); }
+	void			draw_border(bool draw, int thick, Gdiplus::Color cr_outline) { m_draw_border = draw; m_border_thick = thick; m_theme.cr_border = cr_outline; Invalidate(); }
 
 	void			set_blink_time(int nTime0 = 400, int nTime1 = 1200);
 	void			set_blink(BOOL bBlink = TRUE);
@@ -356,16 +357,16 @@ protected:
 
 	bool			m_draw_border = false;
  	int				m_border_thick = 1;
-	Gdiplus::Color	m_cr_border = Gdiplus::Color::DimGray;
+	//Gdiplus::Color	m_cr_border = Gdiplus::Color::DimGray;
 
 	bool			m_bSunken;			//default = false;
 
-	Gdiplus::Color	m_cr_text = Gdiplus::Color::Black;
-	Gdiplus::Color	m_cr_back = Gdiplus::Color::White;
-	Gdiplus::Color	m_cr_edit_text = gGRAY(32);	//편집모드일때 edit의 text color
-	Gdiplus::Color	m_cr_edit_back = m_cr_back;	//편집모드일때 edit의 back color. 기본값은 m_cr_back과 동일하다.
+	//Gdiplus::Color	m_cr_text = Gdiplus::Color::Black;
+	//Gdiplus::Color	m_cr_back = Gdiplus::Color::White;
+	//Gdiplus::Color	m_cr_edit_text = gGRAY(32);	//편집모드일때 edit의 text color
+	//Gdiplus::Color	m_cr_edit_back = m_cr_back;	//편집모드일때 edit의 back color. 기본값은 m_cr_back과 동일하다.
 	bool			m_transparent;		//default = false
-	Gdiplus::Color	m_cr_parent_back = Gdiplus::Color::Transparent;
+	//Gdiplus::Color	m_cr_parent_back = Gdiplus::Color::Transparent;
 
 	BOOL			m_bBlink;
 	BOOL			m_bBlinkStatus;
@@ -429,5 +430,6 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
+	afx_msg void OnDestroy();
 };
 #endif

@@ -47,7 +47,7 @@
 #define PIXEL_INFO_CY			80
 
 #define GIF_SLIDER_WIDTH		120
-#define GIF_SLIDER_HEIGHT		14
+#define GIF_SLIDER_HEIGHT		12
 
 #define ROI_RECT_HANDLE_COUNT	9		//roi의 크기 조정 및 이동을 위한 조정 핸들 개수
 

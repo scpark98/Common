@@ -436,7 +436,8 @@ void CSCImage2dDlg::OnPaint()
 		//15.5도 15로 표시되어야 하는데 16으로 반올림되므로 원하는 결과가 아니다.
 		//int로 캐스팅하여 정수로 출력시켜야 한다.
 		//pixel_pos.Format(_T("%.f, %.f"), m_pixel_pos.X, m_pixel_pos.Y);
-		pixel_pos.Format(_T("(%d, %d)"), (int)m_pixel_pos.X, (int)m_pixel_pos.Y);
+		if (m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
+			pixel_pos.Format(_T("(%d, %d)"), (int)m_pixel_pos.X, (int)m_pixel_pos.Y);
 
 		DrawShadowText(dc.GetSafeHdc(), pixel_pos, -1, m_r_pixel_pos, DT_RIGHT | DT_VCENTER | DT_SINGLELINE, lightgray, black, 2, 1);
 		dc.SelectObject(pOldFont);

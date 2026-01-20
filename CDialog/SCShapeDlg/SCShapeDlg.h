@@ -23,6 +23,25 @@
   CEffectSetting 클래스가 필요할 수 있다.
 - 한 글자씩 alpha와 위치 변경
 
+[Usage]
+- .h에 #include "Common/CDialog/SCShapeDlg/SCShapeDlg.h"
+- CSCShapeDlg		m_message;
+- .cpp의 OnInitDialog()에 다음과 같이 초기화
+  	m_message.set_text(this, _T(""), 40, Gdiplus::FontStyleBold, 4.0f, 2.4f);
+	m_message.set_stroke_color(Gdiplus::Color::Black);
+	m_message.set_alpha(192);
+	m_message.use_control(false);
+- m_message.set_text(_T("표시할 텍스트")); 와 같이 호출하거나
+  아래와 같이 세부적인 설정을 한 후 표시할 수 있다.
+	CSCShapeDlgTextSetting* setting = m_message.get_text_setting();
+	setting->text = message;
+	setting->text_prop.size = rc.Height() / 26.18f;		//rc 높이에 비례하는 글자 크기로 자동 조정
+	Clamp(setting->text_prop.size, 16.0f, 44.0f);
+
+	m_message.set_text(setting);
+	m_message.CenterWindow();
+	m_message.fade_in(0, 1000, true);					//표시한 후 1초 후 fade_out
+
 */
 
 #include "../../SCGdiplusBitmap.h"

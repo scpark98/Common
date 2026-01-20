@@ -7958,6 +7958,11 @@ bool show_property_window(std::deque<CString> fullpath)
 
 	return true;
 }
+#else
+bool show_property_window(std::deque<CString> fullpath)
+{
+	return false;
+}
 #endif
 
 //명시된 FileVersion 또는 ProductVersion을 얻어온다.

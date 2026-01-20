@@ -44,6 +44,8 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <map>
 #include <algorithm>
 #include <set>
+#include <ostream>
+#include <sstream>
 
 #ifndef _USING_V110_SDK71_
 	#include <d2d1_1.h>
@@ -95,27 +97,39 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 #define traceonly TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());
 
-//trace(m_num);으로 호출하면 TRACE(_T("m_num = %d\n"));로 치환된다.
-//m_num이 CString이면 else절에 의해 %s로 출력된다.
-#define trace(n)\
-{\
-	if (typeid(n) == typeid(int) || typeid(n) == typeid(long) || typeid(n) == typeid(bool) || typeid(n) == typeid(BOOL) ||\
-		typeid(n) == typeid(short) || typeid(n) == typeid(unsigned int) || typeid(n) == typeid(unsigned long) ||\
-		typeid(n) == typeid(unsigned short) || typeid(n) == typeid(char) || typeid(n) == typeid(unsigned char) ||\
-		typeid(n) == typeid(INT) || typeid(n) == typeid(UINT))\
-		TRACE(_T("%s(%d) %S = %d\n"), __function__, __LINE__, #n, n);\
-	else if (typeid(n) == typeid(char*))\
-		TRACE(_T("%s(%d) %S = %S\n"), __function__, __LINE__, #n, n);\
-	else if (typeid(n) == typeid(CString))\
-		TRACE(_T("%s(%d) %S = %s\n"), __function__, __LINE__, #n, n);\
-	else if (typeid(n) == typeid(CPoint))\
-	{\
-		CPoint pt = n;\
-		TRACE(_T("%s(%d) %S = %d, %d\n"), __function__, __LINE__, #n, pt.x, pt.y);\
-	}\
-	else\
-		TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());\
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CString& s)
+{
+	return os << (LPCTSTR)s;
 }
+
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, LPCTSTR s)
+{
+	if (!s)
+		return os << _T("(null)");
+	return os.write(s, _tcslen(s));
+}
+
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CPoint& pt)
+{
+	return os << _T("(") << pt.x << L", " << pt.y << _T(")");
+}
+
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CRect& r)
+{
+	return os << _T("(") << r.left << _T(", ") << r.top << _T(", ") << r.right << _T(", ") << r.bottom << L")";
+}
+
+template<typename T> void trace_impl(const TCHAR* func, int line, const TCHAR* var_name, const T& value)
+{
+	std::basic_ostringstream<TCHAR> oss;
+
+	oss << func << _T("(") << line << _T(")") << _T(" ") << var_name << L" = " << value;
+	TRACE(_T("%s\n"), oss.str().c_str());
+}
+
+//trace(n);으로 호출하면 "n = %d\n"를 출력한다. 타입에 따라 %d, %f, %s 등이 자동으로 결정된다.
+//정수, 실수, 문자열, CPoint, CRect를 지원하며 그 외 타입은 << 연산자를 오버로딩해서 지원할 수 있다.
+#define trace(n) trace_impl(__function__, __LINE__, L#n, n)
 
 #ifdef __GNUG__
 #include <cxxabi.h>
@@ -680,6 +694,8 @@ struct	NETWORK_INFO
 	//단일 파일을 주고자 할 경우는 show_property_window(std::deque<CString> {path});와 같이 호출하면 된다.
 	bool		show_property_window(std::deque<CString> fullpath);
 	CString		GetProcessNameByPID(const DWORD pid);
+#else
+	bool		show_property_window(std::deque<CString> fullpath);
 #endif
 	//해당 프로세스 파일이 실행중인 인스턴스 카운트를 리턴.
 	//실행 파일명만 주면 파일명만 비교하지만 전체 경로를 주면 경로까지 맞아야 카운트 됨.

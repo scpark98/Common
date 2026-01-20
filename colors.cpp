@@ -743,20 +743,19 @@ CString	get_nearest_color_name(COLORREF cr_src, COLORREF* cr_nearest)
 }
 
 //여기서 리턴하는 이름은 colors.h의 enum SC_COLOR_THEMES 에 정의된 순서와 동일해야 한다.
-std::deque<CString>  CSCColorTheme::get_color_theme_list()
+void CSCColorTheme::get_color_theme_list(std::deque<CString>& theme_list)
 {
-	std::deque<CString> dq;
-	dq.push_back(_T("default"));
-	dq.push_back(_T("white"));
-	dq.push_back(_T("gray"));
-	dq.push_back(_T("dark_gray"));
-	dq.push_back(_T("dark"));
-	dq.push_back(_T("linkmemine"));
-	dq.push_back(_T("linkmemine_se"));
-	dq.push_back(_T("anysupport"));
-	dq.push_back(_T("helpu"));
-	dq.push_back(_T("pcanypro"));
-	return dq;
+	theme_list.clear();
+	theme_list.push_back(_T("default"));
+	theme_list.push_back(_T("white"));
+	theme_list.push_back(_T("gray"));
+	theme_list.push_back(_T("dark_gray"));
+	theme_list.push_back(_T("dark"));
+	theme_list.push_back(_T("linkmemine"));
+	theme_list.push_back(_T("linkmemine_se"));
+	theme_list.push_back(_T("anysupport"));
+	theme_list.push_back(_T("helpu"));
+	theme_list.push_back(_T("pcanypro"));
 }
 
 void CSCColorTheme::set_color_theme(int color_theme)
@@ -909,7 +908,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_dropHilited = white;
 
 			cr_back = Gdiplus::Color::White;
-			cr_back_selected = get_color(cr_back, 16);
+			cr_back_selected = get_color(cr_back, -16);
 			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = cr_back_selected;
@@ -1057,7 +1056,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		case color_theme_gray:
-			cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
+			cr_text = gRGB(64, 64, 64);
 			cr_text_dim = get_color(cr_text, 32);
 			cr_text_hover = cr_text;
 			cr_text_selected = cr_text;
@@ -1065,10 +1064,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
 
 			cr_back = Gdiplus::Color::White;
-			cr_back_selected = gRGB(204, 235, 255);//RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_selected = get_color(cr_back, -24);
 			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited = get_sys_color(COLOR_HIGHLIGHT);
-			cr_back_hover = Gdiplus::Color(255, 229, 243, 255);
+			cr_back_hover = get_color(cr_back, -16);
 			cr_back_alternate = get_color(cr_back, -12);
 
 			cr_title_text = Gdiplus::Color::Black;

@@ -505,7 +505,7 @@ public:
 	//현재 설정된 color theme 인덱스를 리턴
 	int		get_color_theme() { return m_cur_theme; }
 	void	set_color_theme(int color_theme);
-	static std::deque<CString> get_color_theme_list();
+	static void get_color_theme_list(std::deque<CString> &theme_list);
 
 	Gdiplus::Color	cr_text;
 	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목
@@ -520,6 +520,13 @@ public:
 	Gdiplus::Color	cr_back_selected;
 	Gdiplus::Color	cr_back_selected_inactive;
 	Gdiplus::Color	cr_back_alternate;				//list의 경우 짝수라인, 홀수라인 번갈아 색상을 표시하는 목적
+
+	Gdiplus::Color	cr_parent_back;					//round가 적용된 컨트롤의 경우 parent back 색상으로 칠한 후 round가 그려져야 한다.
+
+	//CSCStatic, CSCTreeCtrl, CVtListCtrlEx 등 일부 컨트롤은 편집기능을 지원하는데
+	//이때 edit의 색상을	지정할 수 있다. (기본적으로는 cr_text, cr_back와 대부분 동일)
+	Gdiplus::Color	cr_edit_text;
+	Gdiplus::Color	cr_edit_back;
 
 	Gdiplus::Color	cr_selected_border;
 	Gdiplus::Color	cr_selected_border_inactive;
@@ -542,7 +549,7 @@ public:
 	//Gdiplus::Color	cr_progress_text;				//progress text
 
 protected:
-	CWnd* m_parent = NULL;
+	CWnd*			m_parent = NULL;
 	int				m_cur_theme = color_theme_default;
 };
 

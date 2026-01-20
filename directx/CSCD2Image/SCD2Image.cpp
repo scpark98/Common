@@ -1415,12 +1415,14 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 	if (pf == NULL)
 		return str_fmt;
 
-	if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppBGRA))
+	if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppBGRA) ||
+		IsEqualGUID(*pf, GUID_WICPixelFormat64bppBGRA))
 	{
 		m_channel = 4;
 		str_fmt = _T("GUID_WICPixelFormat32bppBGRA");
 	}
-	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppRGBA))
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppRGBA) ||
+			 IsEqualGUID(*pf, GUID_WICPixelFormat64bppRGBA))
 	{
 		m_channel = 4;
 		str_fmt = _T("GUID_WICPixelFormat32bppRGBA");

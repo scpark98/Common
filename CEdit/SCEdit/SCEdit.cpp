@@ -18,8 +18,6 @@ CSCEdit::CSCEdit()
 	: m_rect_NCbottom(0, 0, 0, 0)
 	, m_rect_NCtop(0, 0, 0, 0)
 {
-	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_WINDOWTEXT));
-	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
 	m_cr_text_disabled.SetFromCOLORREF(::GetSysColor(COLOR_GRAYTEXT));
 	//m_cr_back_disabled.SetFromCOLORREF(GetSysColor(COLOR_3DSHADOW));
 
@@ -27,7 +25,7 @@ CSCEdit::CSCEdit()
 	m_cr_button_back_hover = Gdiplus::Color(64, 255, 64);
 	m_cr_button_back_down = Gdiplus::Color(0, 192, 0);
 
-	m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
+	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
 
 	m_auto_resize_font = false;
@@ -168,7 +166,7 @@ int CSCEdit::get_font_size(bool pixel_size)
 //생성후에도 SetWindowLong()을 이용하여 변경할 수 있는 속성들
 //(ES_LOWERCASE, ES_NUMBER, ES_OEMCONVERT, ES_UPPERCASE, ES_WANTRETURN)
 //CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
-CSCEdit& CSCEdit::set_line_align(DWORD align)
+void CSCEdit::set_line_align(DWORD align)
 {
 	CRect rr, rc;
 
@@ -227,66 +225,53 @@ CSCEdit& CSCEdit::set_line_align(DWORD align)
 	//UpdateWindow();
 
 	dc.SelectObject(pOldFont);
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
+void CSCEdit::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back)
 {
-	m_cr_text = cr_text;
+	m_theme.cr_text = cr_text;
 
-	m_cr_back = cr_back; // Passing the value passed by the dialog to the member varaible for Backgound Color
+	m_theme.cr_back = cr_back; // Passing the value passed by the dialog to the member varaible for Backgound Color
 	m_br_back.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
 	m_br_back.CreateSolidBrush(cr_back.ToCOLORREF()); // Creating the Brush Color For the Edit Box Background
 
 	RedrawWindow();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_text_color(Gdiplus::Color crColor)
+void CSCEdit::set_text_color(Gdiplus::Color crColor)
 {
-	m_cr_text = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
+	m_theme.cr_text = crColor; // Passing the value passed by the dialog to the member varaible for Text Color
 	RedrawWindow();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_back_color(Gdiplus::Color crColor)
+void CSCEdit::set_back_color(Gdiplus::Color crColor)
 {
-	m_cr_back = crColor; // Passing the value passed by the dialog to the member varaible for Backgound Color
+	m_theme.cr_back = crColor; // Passing the value passed by the dialog to the member varaible for Backgound Color
 	m_br_back.DeleteObject(); // Deleting any Previous Brush Colors if any existed.
 	m_br_back.CreateSolidBrush(crColor.ToCOLORREF()); // Creating the Brush Color For the Edit Box Background
 	//m_br_back.CreateSolidBrush(HOLLOW_BRUSH);
 	RedrawWindow();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_text_color_disabled(Gdiplus::Color cr_text_disabled)
+void CSCEdit::set_text_color_disabled(Gdiplus::Color cr_text_disabled)
 {
 	m_cr_text_disabled = cr_text_disabled;
 	RedrawWindow();
-
-	return *this;
 }
 
-CSCEdit& CSCEdit::set_back_color_disabled(Gdiplus::Color cr_back_disabled)
+void CSCEdit::set_back_color_disabled(Gdiplus::Color cr_back_disabled)
 {
 	m_cr_back_disabled = cr_back_disabled;
 	m_br_back_disabled.DeleteObject();
 	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
 	RedrawWindow();
-
-	return *this;
 }
 
 //read only일 때 배경색을 변경할 수 있다. 파라미터를 주지 않으면 윈도우 기본 readonly 배경색(COLOR_3DFACE)으로 설정된다.
-CSCEdit& CSCEdit::set_back_color_readonly(Gdiplus::Color cr_back_readonly)
+void CSCEdit::set_back_color_readonly(Gdiplus::Color cr_back_readonly)
 {
 	m_cr_back_readonly = cr_back_readonly; // Passing the value passed by the dialog to the member varaible for ReadOnly Background Color
 	RedrawWindow();
-	return *this;
 }
 
 void CSCEdit::set_use_readonly_color(bool use_default)
@@ -326,16 +311,16 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	}
 	else if (GetStyle() & ES_READONLY)
 	{
-		pDC->SetTextColor(m_cr_text.ToCOLORREF());
+		pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
 		//pDC->SetBkColor(::GetSysColor(COLOR_3DFACE));
 		//readonly일 경우에도 배경색을 기본 읽기전용 색으로 바꾸지 않고 지정된 배경색을 유지시켜준다.
 		//pDC->SetBkColor(m_cr_back.ToCOLORREF());
 
 		if (IsWindowEnabled())
 		{
-			pDC->SetBkColor(m_use_readonly_color ? m_cr_back_readonly.ToCOLORREF() : m_cr_back.ToCOLORREF());
+			pDC->SetBkColor(m_use_readonly_color ? m_cr_back_readonly.ToCOLORREF() : m_theme.cr_back.ToCOLORREF());
 			m_br_back.DeleteObject();
-			m_br_back.CreateSolidBrush(m_use_readonly_color ? m_cr_back_readonly.ToCOLORREF() : m_cr_back.ToCOLORREF());
+			m_br_back.CreateSolidBrush(m_use_readonly_color ? m_cr_back_readonly.ToCOLORREF() : m_theme.cr_back.ToCOLORREF());
 			hbr = (HBRUSH)m_br_back;
 		}
 		else
@@ -351,17 +336,17 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		pDC->SetTextColor(m_cr_text_disabled.ToCOLORREF());
 		pDC->SetBkColor(m_cr_back_disabled.ToCOLORREF());
 		m_br_back.DeleteObject();
-		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
+		m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 		m_br_back_disabled.DeleteObject();
 		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
 		hbr = (HBRUSH)m_br_back_disabled;
 	}
 	else
 	{
-		pDC->SetTextColor(m_cr_text.ToCOLORREF());
-		pDC->SetBkColor(m_cr_back.ToCOLORREF());
+		pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
+		pDC->SetBkColor(m_theme.cr_back.ToCOLORREF());
  		m_br_back.DeleteObject();
- 		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
+ 		m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 		//Gdiplus::Color cr_back = Gdiplus::Color::Yellow;
 		//m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
 
@@ -391,8 +376,17 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	return hbr;
 }
 
+void CSCEdit::set_color_theme(int color_theme, bool invalidate)
+{
+	m_theme.set_color_theme(color_theme);
+	m_br_back.DeleteObject();
+	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 
-CSCEdit& CSCEdit::set_transparent(bool transparent)
+	if (invalidate)
+		Invalidate();// RedrawWindow();
+}
+
+void CSCEdit::set_transparent(bool transparent)
 {
 	m_transparent = transparent;
 
@@ -404,12 +398,10 @@ CSCEdit& CSCEdit::set_transparent(bool transparent)
 	}
 	else
 	{
-		m_br_back.CreateSolidBrush(m_cr_back.ToCOLORREF());
+		m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 	}
 
 	update_ctrl();
-
-	return *this;
 }
 
 void CSCEdit::set_action_button(int action)
@@ -659,7 +651,7 @@ void CSCEdit::OnNcPaint()
 
 		GetClientRect(rc);
 
-		CPen pen(PS_SOLID, m_border_width, m_cr_border.ToCOLORREF());
+		CPen pen(PS_SOLID, m_border_width, m_theme.cr_border.ToCOLORREF());
 		CPen* pOldPen = (CPen*)(m_draw_border ? dc.SelectObject(&pen) : dc.SelectStockObject(NULL_PEN));
 		CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
 
@@ -796,8 +788,8 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	}
 
 	CRect rc;
-	Gdiplus::Color cr_back = m_cr_back;
-	Gdiplus::Color cr_border = m_cr_border;
+	Gdiplus::Color cr_back = m_theme.cr_back;
+	Gdiplus::Color cr_border = m_theme.cr_border;
 
 	GetClientRect(rc);
 	Gdiplus::Graphics g(pDC->GetSafeHdc());
@@ -812,7 +804,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 		if (m_use_readonly_color)
 			cr_back = m_cr_back_readonly;
 		else
-			cr_back = m_cr_back;
+			cr_back = m_theme.cr_back;
 	}
 	else if (m_action_button_down)
 	{
@@ -859,7 +851,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	}
 	*/
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
-	draw_rect(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
+	draw_rect(g, rc, (m_draw_border ? m_theme.cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
 	//draw_round_rect(&g, CRect_to_gpRect(rc), (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, rc.Height()/2, m_border_width);
 
 	//pDC->SetBkMode(TRANSPARENT);
@@ -1017,7 +1009,7 @@ void CSCEdit::draw_dim_text()
 	if (m_action_button)
 		rc.right -= m_sz_action_button.cx;
 
-	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 	//rRect.OffsetRect( 1, 1 );							// Add Sanity Space
 
 	dc.SelectObject((*GetFont()));					// Use The Control's Current Font
@@ -1045,14 +1037,12 @@ void CSCEdit::draw_dim_text()
 	dc.RestoreDC(iState);								// Restore The DC State
 }
 
-CSCEdit& CSCEdit::set_dim_text(CString dim_text, Gdiplus::Color cr)
+void CSCEdit::set_dim_text(CString dim_text, Gdiplus::Color cr)
 {
 	m_dim_text = dim_text;
 
 	if (cr.GetValue() != Gdiplus::Color::Transparent)
 		m_cr_dim_text = cr;
-
-	return *this;
 }
 
 //border를 설정할 때 set_draw_border();를 호출하면 모든 설정값은 기본 멤버변수값대로 설정된다.
@@ -1070,7 +1060,7 @@ void CSCEdit::set_draw_border(bool draw, int border_width, Gdiplus::Color cr_bor
 		m_border_type = border_type;
 
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_border = cr_border;
+		m_theme.cr_border = cr_border;
 
 	//set_line_align(m_valign);
 

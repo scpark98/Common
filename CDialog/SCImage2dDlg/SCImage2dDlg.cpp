@@ -159,7 +159,7 @@ void CSCImage2dDlg::OnPaint()
 		dc.SelectClipRgn(&rgn_target);
 	}
 
-	if (m_img[0].is_empty())
+	if (m_img.size() == 0 || m_img[0].is_empty())
 	{
 		dc.SelectClipRgn(NULL);
 

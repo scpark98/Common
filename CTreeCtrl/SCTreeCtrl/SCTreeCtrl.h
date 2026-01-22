@@ -449,6 +449,7 @@ public:
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 	virtual void Serialize(CArchive& ar);
 	afx_msg void OnDestroy();
+	afx_msg void OnNcPaint();
 };
 
 

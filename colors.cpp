@@ -832,24 +832,24 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		case color_theme_anysupport :
+			cr_title_text = gRGB(255, 255, 255);
+			cr_title_back_active = gRGB(59, 69, 91);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+
 			cr_text = Gdiplus::Color::Black;
 			cr_text_dim = Gdiplus::Color::DimGray;
 			cr_text_hover = cr_text;
-			cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
-			cr_text_selected_inactive = cr_text_selected;
+			cr_text_selected = cr_title_text;
+			cr_text_selected_inactive = cr_text_dim;
 			cr_text_dropHilited = white;
 
 			cr_back = Gdiplus::Color::White;
-			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_selected = get_color(cr_title_back_active, 16);
+			cr_back_selected_inactive = get_color(cr_back_selected, 160);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = cr_back_selected;
 			cr_back_alternate = get_color(cr_back, 8);
-
-			cr_title_text = gRGB(255, 255, 255);
-			cr_title_back_active = gRGB(59, 69, 91); 
-			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -866,24 +866,24 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		case color_theme_helpu:
-			cr_text = Gdiplus::Color::Black;
-			cr_text_dim = Gdiplus::Color::DimGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
-			cr_text_selected_inactive = cr_text_selected;
-			cr_text_dropHilited = white;
-
-			cr_back = Gdiplus::Color::White;
-			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = get_gray_color(cr_back_selected);
-			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
-			cr_back_alternate = get_color(cr_back, 8);
-
 			cr_title_text = gRGB(18, 24, 58);
 			cr_title_back_active = gRGB(32, 178, 174);
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+
+			cr_text = cr_title_text;
+			cr_text_dim = Gdiplus::Color::DimGray;
+			cr_text_hover = cr_text;
+			cr_text_selected = cr_text;// Gdiplus::Color(255, 241, 241, 241);
+			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_dropHilited = white;
+
+			cr_back = Gdiplus::Color::White;
+			cr_back_selected = get_color(cr_title_back_active, 16);
+			cr_back_selected_inactive = get_color(cr_back_selected, 160);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = cr_back_selected;
+			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -900,24 +900,24 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		case color_theme_pcanypro:
-			cr_text = Gdiplus::Color::Black;
-			cr_text_dim = Gdiplus::Color::DimGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
-			cr_text_selected_inactive = cr_text_selected;
-			cr_text_dropHilited = white;
-
-			cr_back = Gdiplus::Color::White;
-			cr_back_selected = get_color(cr_back, -16);
-			cr_back_selected_inactive = get_gray_color(cr_back_selected);
-			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
-			cr_back_alternate = get_color(cr_back, 8);
-
 			cr_title_text = Gdiplus::Color::White;// gRGB(18, 24, 58);
 			cr_title_back_active = gRGB(214, 129, 8);
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+
+			cr_text = Gdiplus::Color::Black;
+			cr_text_dim = Gdiplus::Color::DimGray;
+			cr_text_hover = cr_text;
+			cr_text_selected = cr_title_text;
+			cr_text_selected_inactive = cr_text_dim;
+			cr_text_dropHilited = white;
+
+			cr_back = Gdiplus::Color::White;
+			cr_back_selected = get_color(cr_title_back_active, 16);
+			cr_back_selected_inactive = get_gray_color(get_color(cr_back_selected, 128));
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = cr_back_selected;
+			cr_back_alternate = get_color(cr_back, 8);
 
 			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -951,8 +951,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_title_text			= Gdiplus::Color::LightGray;
 			cr_title_back_active	= gGRAY(16);
 			cr_title_back_inactive	= gGRAY(16);
-			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -985,8 +985,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text			= Gdiplus::Color::LightGray;
 			cr_title_back_active	= gGRAY(16);
-			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_selected_border		= cr_back_selected;
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -999,7 +999,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
 			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
 
-			cr_border				= Gdiplus::Color::Black;
+			cr_border				= Gdiplus::Color::Gray;
 			break;
 
 		case color_theme_popup_folder_list:

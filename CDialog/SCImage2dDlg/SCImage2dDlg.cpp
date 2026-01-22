@@ -263,7 +263,7 @@ void CSCImage2dDlg::OnPaint()
 	if (m_show_info)// && m_parent->IsZoomed())
 	{
 		CString info_str;
-		info_str.Format(_T("%s\n확대 배율 : %.0f%%"), m_info_str, m_zoom * 100.0);
+		info_str.Format(_T("%s\n확대 배율 : %.0f%% (%d x %d)"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
 
 		CRect rText = rc;
 		rText.DeflateRect(8, 8);
@@ -936,9 +936,6 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 		ReleaseCapture();
 		m_lbutton_down = false;
 
-		//Clamp(point.x, m_r_display.left, m_r_display.right);
-		//Clamp(point.y, m_r_display.top, m_r_display.bottom);
-
 		if (m_drawing_roi)
 		{
 			m_drawing_roi = false;
@@ -965,14 +962,14 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 				rerender();
 				return;
 			}
-		}
 
-		//roi가 모두 그려지면, 또는 이동, 크기조정이 완료되면 m_image_roi로 변환해준다.
-		normalize_rect(m_screen_roi);
-		get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &m_image_roi);
-		write_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), m_image_roi);
-		TRACE(_T("roi completed.\n"));
-		rerender();
+			//roi가 모두 그려지면, 또는 이동, 크기조정이 완료되면 m_image_roi로 변환해준다.
+			normalize_rect(m_screen_roi);
+			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &m_image_roi);
+			write_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), m_image_roi);
+			TRACE(_T("roi completed.\n"));
+			rerender();
+		}
 	}
 
 	CDialog::OnLButtonUp(nFlags, point);
@@ -1908,17 +1905,17 @@ void CSCImage2dDlg::scroll(int offset_x, int offset_y)
 //exif
 double CSCImage2dDlg::get_gps_latitude()
 {
-	if (m_img.size() == 0 || !m_img[0].is_valid())
+	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_latitude == 0.0f)
 		return 0.0;
 
-	//return m_img[0].get_exif().gps_latitude;
+	return m_img[0].get_exif().gps_latitude;
 }
 
 double CSCImage2dDlg::get_gps_longitude()
 {
-	if (m_img.size() == 0 || !m_img[0].is_valid())
+	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_longitude)
 		return 0.0;
 
-	//return m_img[0].get_exif().gps_longitude;
+	return m_img[0].get_exif().gps_longitude;
 }
 

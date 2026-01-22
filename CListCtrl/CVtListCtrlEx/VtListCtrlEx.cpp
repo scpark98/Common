@@ -82,6 +82,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_SIZE()
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CVtListCtrlEx::on_message_CGdiButton)
 	ON_REGISTERED_MESSAGE(Message_CHeaderCtrlEx, &CVtListCtrlEx::on_message_CHeaderCtrlEx)
+	ON_WM_NCPAINT()
 END_MESSAGE_MAP()
 
 
@@ -5219,4 +5220,25 @@ LRESULT	CVtListCtrlEx::on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam)
 	set_column_width(column, max_width + 12);
 
 	return 0;
+}
+
+void CVtListCtrlEx::OnNcPaint()
+{
+	// 기본 테두리 그리기를 무시하고 설정된 테두리 색으로그린다.
+	CWindowDC dc(this);
+
+	CRect rect;
+	GetWindowRect(&rect);
+	ScreenToClient(&rect);
+
+	// 원하는 색상으로 테두리 그리기
+	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
+	//exStyle까지 함께 체크하니 리소스 에디터에서 테두리 설정 여부에 따라 정상 동작한다.
+	if ((GetStyle() & WS_BORDER) || (GetExStyle() & WS_EX_CLIENTEDGE))
+	{
+		CRect rc;
+		GetWindowRect(&rc);
+		rc.OffsetRect(-rc.TopLeft());
+		draw_rect(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent);
+	}
 }

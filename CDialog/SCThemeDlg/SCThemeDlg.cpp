@@ -39,9 +39,9 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_NCCALCSIZE()
 	ON_WM_PAINT()
 	ON_WM_SIZE()
-	//ON_WM_LBUTTONDBLCLK()
+	ON_WM_LBUTTONDBLCLK()
 	ON_WM_CTLCOLOR()
-	//ON_WM_SYSCOMMAND()
+	ON_WM_SYSCOMMAND()
 	ON_WM_TIMER()
 	ON_WM_KILLFOCUS()
 	ON_WM_WINDOWPOSCHANGED()
@@ -98,9 +98,6 @@ BOOL CSCThemeDlg::OnInitDialog()
 	CDialogEx::OnInitDialog();
 
 	//기본 타이틀바 제거
-	//DWORD dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
-	//dwStyle &= ~(WS_CAPTION);
-	//SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
 
 	//find border thickness
 	m_has_thickframe = GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME;
@@ -123,12 +120,9 @@ BOOL CSCThemeDlg::OnInitDialog()
 		m_sys_buttons.create(this);
 		m_sys_buttons.set_color_theme(m_theme.get_color_theme());
 		m_sys_buttons.set_buttons_cmd(SC_CLOSE);
-		//m_sys_buttons.set_text_color(m_cr_titlebar_text);
-		//m_sys_buttons.set_back_color(m_cr_titlebar_back);
-		//m_sys_buttons.set_button_height(m_titlebar_height);
 	}
 
-	CFont* font = GetFont();
+	CFont const* font = GetFont();
 
 	if (font != NULL)
 		font->GetObject(sizeof(m_titlebar_lf), &m_titlebar_lf);
@@ -341,7 +335,7 @@ BOOL CSCThemeDlg::OnNcActivate(BOOL bActive)
 		//또한 여기서 Invalidate()을 해주지 않으면 상단 잔상이 생긴다.
 		Invalidate();
 		RedrawWindow();
-		return TRUE;// FALSE;
+		return TRUE;
 	}
 
 	return CDialogEx::OnNcActivate(bActive);
@@ -376,11 +370,11 @@ void CSCThemeDlg::OnPaint()
 	//아래의 기본 그리기 코드들을 OnEraseBkgnd()에 넣었었으나
 	//deactive상태가 될 때 컨트롤들이 제대로 표시되지 않는 현상이 있었고
 	//OnPaint()에 넣으니 정상 동작함.
-	CPaintDC dc(this);
+	CPaintDC dc1(this);
 	CRect rc;
 	GetClientRect(rc);
 
-	//CMemoryDC dc(&dc1, &rc);
+	CMemoryDC dc(&dc1, &rc);
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -472,7 +466,6 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 	m_sys_buttons.set_color_theme(theme);
-	//m_sys_buttons.set_button_height(m_titlebar_height);
 
 	//m_theme.set_color_theme(theme);에서는 cr_text, cr_back 등 일반적인 색상값들을 세팅한다.
 	//CSCThemeDlg::set_color_theme(int theme) 에서는 m_sys_buttons 등
@@ -481,60 +474,30 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 	{
 		case CSCColorTheme::color_theme_linkmemine :
 			SetWindowText(_T("color_theme_linkmemine"));
-
-			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
-			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
-			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_linkmemine_se:
 			SetWindowText(_T("color_theme_linkmemine_se"));
-
-			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
-			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
-			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_helpu:
 			SetWindowText(_T("color_theme_helpu"));
-
-			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
-			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
-			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_anysupport:
 			SetWindowText(_T("color_theme_anysupport"));
-
-			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
-			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
-			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_pcanypro:
 			SetWindowText(_T("color_theme_pcanypro"));
-
-			//m_sys_buttons.set_text_color(m_theme.cr_title_text);
-			//m_sys_buttons.set_back_color(m_theme.cr_title_back);
-			//m_sys_buttons.set_back_hover_color(m_theme.cr_sys_buttons_hover_back);
-			//m_sys_buttons.set_button_height(m_titlebar_height - 2);
-
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
@@ -600,10 +563,8 @@ void CSCThemeDlg::adjust_sys_buttons()
 
 	CRect r;
 	GetClientRect(r);
-	//TRACE(_T("CSCThemeDlg::adjust_sys_buttons(). r.w = %d, r.h = %d\n"), r.Width(), r.Height());
 	m_sys_buttons.adjust(r.top, r.right);
 }
-
 
 BOOL CSCThemeDlg::PreTranslateMessage(MSG* pMsg)
 {
@@ -611,49 +572,48 @@ BOOL CSCThemeDlg::PreTranslateMessage(MSG* pMsg)
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		TRACE(_T("keydown on CSCThemeDlg\n"));
-		//return FALSE;
 	}
 
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
 
-/*
-//만약 CSCThemeDlg를 상속받은 CTitleDlg에서 dblclk을 할 경우
-//minimize, maximize 처리도 해야하지만 CTitleDlg를 show/hide해야하는 처리도 필요하므로
+//만약 CSCThemeDlg를 상속받은 CMainDlg에 타이틀바가 표시되는 구조라면 여기서 처리해도 되지만
+//ASeeDlg 프로젝트와 같이 MainDlg가 있고 타이틀바가 별도로 구현된 경우, CTitleDlg에서 dblclk을 할 경우
+//minimize, maximize 처리도 해야하지만 CTitleDlg를 show/hide 해야하는 등의 처리도 필요하므로
 //이 클래스에서 이 핸들러를 처리하면 복잡해진다. 실제 클래스에서 처리하자.
+//GetParent() == AfxGetApp()->GetMainWnd()라면 CTitleDlg와 같은 별도 구현된 타이틀바가 있는 경우이므로
+//이는 CTitleDlg에서 처리?
+//GetParent() != AfxGetApp()->GetMainWnd()인 경우라면 바로 메시지를 처래해도 될 듯하다.
 void CSCThemeDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_sys_buttons.has_button(SC_MAXIMIZE) && (point.y < m_titlebar_height))
 	{
+		CWnd* target_wnd = this;
+		CWnd* parent = GetParent();
+		CWnd* mainWnd = AfxGetApp()->GetMainWnd();
+		if (parent == nullptr || parent == AfxGetApp()->GetMainWnd())
+			target_wnd = AfxGetApp()->GetMainWnd();
+
 		//프로그램 아이콘을 더블클릭한 경우
 		if (point.x < 32)
 		{
-			PostMessage(WM_SYSCOMMAND, SC_CLOSE);
+			target_wnd->PostMessage(WM_SYSCOMMAND, SC_CLOSE);
 			return;
 		}
 
-		if (m_target_wnd)
-		{
-			if (m_target_wnd->IsZoomed())
-				m_target_wnd->ShowWindow(SW_RESTORE);
-			else
-				m_target_wnd->ShowWindow(SW_MAXIMIZE);
-		}
+		if (target_wnd->IsZoomed())
+			target_wnd->PostMessage(WM_SYSCOMMAND, SC_RESTORE);
 		else
-		{
-			if (IsZoomed())
-				ShowWindow(SW_RESTORE);
-			else
-				ShowWindow(SW_MAXIMIZE);
-		}
+			target_wnd->PostMessage(WM_SYSCOMMAND, SC_MAXIMIZE);
 
-		m_sys_buttons.Invalidate();
+		m_sys_buttons.parent_maximized(target_wnd->IsZoomed() ? false : true);
+		//m_sys_buttons.Invalidate();
 	}
 
 	CDialogEx::OnLButtonDblClk(nFlags, point);
 }
-*/
+
 
 void CSCThemeDlg::set_back_image(CString imgType, UINT nResourceID, int draw_mode)
 {
@@ -694,7 +654,7 @@ HBRUSH CSCThemeDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
 	return hbr;
 }
-/*
+
 void CSCThemeDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
@@ -719,7 +679,7 @@ void CSCThemeDlg::OnSysCommand(UINT nID, LPARAM lParam)
 	//	m_sys_buttons.Invalidate();
 	//	SetTimer(0, 1000, NULL);
 }
-*/
+
 /*
 void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 {

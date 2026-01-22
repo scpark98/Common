@@ -139,9 +139,9 @@ void CSCSystemButtons::OnPaint()
 	GetClientRect(rc);
 
 	CMemoryDC dc(&dc1, &rc);
-
+	Gdiplus::Color cr_back = m_theme.cr_title_back_active;
 	//if (m_is_activated)
-		dc.FillSolidRect(rc, m_theme.cr_title_back_active.ToCOLORREF());
+		dc.FillSolidRect(rc, cr_back.ToCOLORREF());
 	//else
 	//	dc.FillSolidRect(rc, m_theme.cr_title_back_inactive.ToCOLORREF());
 
@@ -150,9 +150,12 @@ void CSCSystemButtons::OnPaint()
 		if (i == m_over_index)
 		{
 			if (m_down_state)
-				dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_sys_buttons_down_back.ToCOLORREF());
+				cr_back = (m_button[i].cmd == SC_CLOSE ? gRGB(232, 17, 35) : m_theme.cr_sys_buttons_down_back);
+			//dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_sys_buttons_down_back.ToCOLORREF());
 			else
-				dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_sys_buttons_hover_back.ToCOLORREF());
+				cr_back = (m_button[i].cmd == SC_CLOSE ? gRGB(232, 17, 35) : m_theme.cr_sys_buttons_hover_back);
+				//dc.FillSolidRect(m_button[i].r, m_button[i].cmd == SC_CLOSE ? RGB(232, 17, 35) : m_theme.cr_sys_buttons_hover_back.ToCOLORREF());
+			dc.FillSolidRect(m_button[i].r, cr_back.ToCOLORREF());
 		}
 
 		//각 버튼을 그려준다.
@@ -165,9 +168,9 @@ void CSCSystemButtons::OnPaint()
 		}
 		else
 		{
-			Gdiplus::Pen pen(m_theme.cr_text, 1.5F);
-			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0F);
-			Gdiplus::Pen pen_pin_gray(gGRAY(160), 17.0F);
+			Gdiplus::Pen pen(m_theme.cr_title_text, 1.0f);
+			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0f);
+			Gdiplus::Pen pen_pin_gray(gGRAY(160), 17.0f);
 			Gdiplus::SolidBrush br_back(m_theme.cr_back);
 			Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
 
@@ -194,9 +197,10 @@ void CSCSystemButtons::OnPaint()
 			{
 				if (m_parent_maximized)
 				{
-					g.DrawRectangle(&pen, cp.x - 3, cp.y - 5, 8, 8);
-					g.FillRectangle(&br_back, cp.x - 6, cp.y - 2, 8, 8);
-					g.DrawRectangle(&pen, cp.x - 6, cp.y - 2, 8, 8);
+					CRect r = make_rect(cp.x - 6, cp.y - 6, 9, 9);
+					draw_rect(g, r, m_theme.cr_title_text, cr_back);
+					r.OffsetRect(-3, 3);
+					draw_rect(g, r, m_theme.cr_title_text, cr_back);
 				}
 				else
 				{

@@ -88,6 +88,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_COMMAND_RANGE(menu_add_item, menu_favorite, &CSCTreeCtrl::OnPopupMenu)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCTreeCtrl::on_message_CSCEdit)
 	ON_WM_DESTROY()
+	ON_WM_NCPAINT()
 END_MESSAGE_MAP()
 
 
@@ -98,13 +99,13 @@ void CSCTreeCtrl::PreSubclassWindow()
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
 	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
-	CWnd* pWnd = GetParent();
-	CFont* font = NULL;
+	CWnd const* pWnd = GetParent();
+	CFont* font = nullptr;
 
 	if (pWnd)
 		font = pWnd->GetFont();
 
-	if (font == NULL)
+	if (font == nullptr)
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 	else
 		font->GetObject(sizeof(m_lf), &m_lf);
@@ -195,15 +196,19 @@ void CSCTreeCtrl::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 BOOL CSCTreeCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	//아래 코드가 있어야만 배경색이 표시된다.
 	CBrush backBrush(m_theme.cr_back.ToCOLORREF());
-	//CBrush backBrush(RGB(255, 0, 0));
 	CBrush* pPrevBrush = pDC->SelectObject(&backBrush);
 	CRect rect;
 	pDC->GetClipBox(&rect);
 	pDC->PatBlt(rect.left, rect.top, rect.Width(), rect.Height(),
 		PATCOPY);
-	pDC->SelectObject(backBrush);
+	pDC->SelectObject(pPrevBrush);
+	
+	//draw_rect(pDC, rect, red, NULL_BRUSH, 1);
 	return TRUE;
+
 	return CTreeCtrl::OnEraseBkgnd(pDC);
 }
 
@@ -3708,5 +3713,30 @@ void CSCTreeCtrl::serialize_item(CArchive& ar, HTREEITEM hItem)
 			// Now read all children
 			serialize_item(ar, GetChildItem(hNext));
 		}
+	}
+}
+
+void CSCTreeCtrl::OnNcPaint()
+{
+	// 기본 테두리 그리기를 무시하고 설정된 테두리 색으로그린다.
+	CWindowDC dc(this);
+
+	CRect rect;
+	GetWindowRect(&rect);
+	ScreenToClient(&rect);
+
+	// 원하는 색상으로 테두리 그리기
+	DWORD dwStyle = GetStyle();
+	DWORD exStyle = GetExStyle();
+
+	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
+	//exStyle까지 함께 체크하니 리소스 에디터에서 테두리 설정 여부에 따라 정상 동작한다.
+	if ((GetStyle() & WS_BORDER) || (exStyle & WS_EX_CLIENTEDGE))
+	{
+		CRect rc;
+		GetWindowRect(&rc);
+		rc.OffsetRect(-rc.TopLeft());
+		draw_rect(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent);
+		//dc.Draw3dRect(rc, RGB(255, 0, 0), RGB(255, 0, 255)); // 파란색 테두리}
 	}
 }

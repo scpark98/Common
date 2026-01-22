@@ -813,6 +813,7 @@ public:
 	afx_msg void OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnNcPaint();
 };
 
 

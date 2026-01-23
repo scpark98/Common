@@ -70,7 +70,7 @@ bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&m_WriteFactory));
 	if (SUCCEEDED(hr))
 	{
-		m_WriteFactory->CreateTextFormat(_T("맑은 고딕"), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 14.0f, _T("ko-kr"), &m_WriteFormat);
+		m_WriteFactory->CreateTextFormat(_T("맑은 고딕"), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12.0f, _T("ko-kr"), &m_WriteFormat);
 		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 	}
@@ -263,10 +263,14 @@ void CSCImage2dDlg::OnPaint()
 	if (m_show_info)// && m_parent->IsZoomed())
 	{
 		CString info_str;
-		info_str.Format(_T("%s\n확대 배율 : %.0f%% (%d x %d)"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
+		info_str.Format(_T("%s\n확대 배율 : %.0f%%\n표시 크기 : %d x %d"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
 
 		CRect rText = rc;
 		rText.DeflateRect(8, 8);
+
+		//draw_text()를 사용하면 간편할수는 있으나 이 함수안에서는 계속 객체를 생성, 해제하는 액션을 수행하므로 부담을 줄 수 있다.
+		//기존처럼 이미 만들어진 인스턴스들에 대해 속성만 변경한 후 사용하는 것이 더 경제적이다.
+		//draw_text(d2dc, rText, info_str, 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Red, DT_LEFT | DT_TOP);
 
 		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
@@ -280,6 +284,34 @@ void CSCImage2dDlg::OnPaint()
 		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
 		d2dc->DrawText(info_str, info_str.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
 	}
+
+	//dc에 그릴 경우 d2devicecontext가 그려지고 dc에 그려지므로 깜빡임이 발생한다.
+	//반드시 CDC로 그려야 하는 경우가 아니라면 d2dc에 그려야 한다.
+	if (m_show_pixel_pos && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
+	{
+		CString pixel_pos;
+		pixel_pos.Format(_T("(%.f, %.f)"), m_pixel_pos.X, m_pixel_pos.Y);
+
+		CRect rText = rc;
+		rText.DeflateRect(8, 8);
+		rText.top = rText.bottom - 14;
+
+		//shadow 파라미터까지 추가된 함수 이용 코드
+		//draw_text(d2dc, rText, pixel_pos, 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Red, DT_RIGHT | DT_TOP);
+
+		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+
+		//shadow나 stroke 효과 적용방법을 아직 모르므로 우선 검은색으로 그리고 전경색으로 그린다.
+		rText.OffsetRect(1, 1);
+		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
+		d2dc->DrawText(pixel_pos, pixel_pos.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
+
+		rText.OffsetRect(-1, -1);
+		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
+		d2dc->DrawText(pixel_pos, pixel_pos.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
+	}
+
 
 	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
 	if (!m_image_roi.IsEmptyArea() && m_screen_roi.IsEmptyArea())
@@ -426,23 +458,6 @@ void CSCImage2dDlg::OnPaint()
 
 	//원래 d2dc를 이용해서 그렸으나 cursor guide line을 R2_XORPEN으로 그려야 시각적으로 구분되므로
 	//GDI DC를 이용해서 그려준다.
-	if (m_show_pixel_pos)
-	{
-		CAutoFont af(_T("Arial"));
-		af.SetHeight(14);
-
-		CFont* pOldFont = dc.SelectObject(&af);
-		CString pixel_pos;
-		//15.5도 15로 표시되어야 하는데 16으로 반올림되므로 원하는 결과가 아니다.
-		//int로 캐스팅하여 정수로 출력시켜야 한다.
-		//pixel_pos.Format(_T("%.f, %.f"), m_pixel_pos.X, m_pixel_pos.Y);
-		if (m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
-			pixel_pos.Format(_T("(%d, %d)"), (int)m_pixel_pos.X, (int)m_pixel_pos.Y);
-
-		DrawShadowText(dc.GetSafeHdc(), pixel_pos, -1, m_r_pixel_pos, DT_RIGHT | DT_VCENTER | DT_SINGLELINE, lightgray, black, 2, 1);
-		dc.SelectObject(pOldFont);
-	}
-
 	if (m_show_cursor_guide_line && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
 	{
 		float x, y;

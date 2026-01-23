@@ -2108,6 +2108,24 @@ h		: 복사할 height 크기(pixel)
 							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
 							UINT align = DT_CENTER | DT_VCENTER);
 
+	CRect		draw_text(ID2D1DeviceContext* d2dc,
+							CRect rTarget,
+							CString text,
+							IDWriteTextFormat* dWriteTextFormat,
+							ID2D1Brush* brush,
+							int shadow_depth = 0,
+							float thickness = 0.0f
+							);
+
+	CRect		draw_text(ID2D1DeviceContext* d2dc,
+							CRect rTarget,
+							CString text,
+							float font_size,
+							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
+							Gdiplus::Color cr_text = Gdiplus::Color::Black,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							UINT align = DT_CENTER | DT_VCENTER);
+
 	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 	//이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!
 	int			get_ellipsis_pos(CDC* pDC, CString text, int max_width);

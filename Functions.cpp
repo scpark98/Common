@@ -24,6 +24,9 @@
 
 #pragma comment(lib, "D2d1.lib")
 
+#include <dwrite.h>
+#pragma comment(lib, "dwrite")
+
 //get_proxy_info()를 위해 추가했으나 HTTP_VERSION_INFO 재정의 등 충돌 발생하여 우선 주석처리함. (XP호환이 원인)
 //#include <winhttp.h>
 //#pragma comment(lib, "Winhttp.lib")
@@ -6764,6 +6767,105 @@ CRect draw_text(Gdiplus::Graphics &g,
 
 	return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 }
+
+CRect draw_text(ID2D1DeviceContext* d2dc,
+				CRect rTarget,
+				CString text,
+				IDWriteTextFormat* dWriteTextFormat,
+				ID2D1Brush* brush,
+				int shadow_depth,
+				float thickness)
+{
+	d2dc->DrawText(text, text.GetLength(), dWriteTextFormat, CRect_to_d2Rect(rTarget), brush);
+	return CRect();
+}
+
+CRect draw_text(ID2D1DeviceContext* d2dc,
+				CRect rTarget,
+				CString text,
+				float font_size,
+				int font_weight,
+				Gdiplus::Color cr_text,
+				Gdiplus::Color cr_shadow,
+				UINT align)
+{
+	IDWriteFactory*			write_factory = NULL;
+	IDWriteTextFormat*		write_format = NULL;
+	IDWriteTextLayout*		text_layout = NULL;
+	ID2D1SolidColorBrush*	text_brush = NULL;
+	ID2D1SolidColorBrush*	shadow_brush = NULL;
+
+	d2dc->CreateSolidColorBrush(get_d2color(cr_text), &text_brush);
+	d2dc->CreateSolidColorBrush(get_d2color(cr_shadow), &shadow_brush);
+
+	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&write_factory));
+	write_factory->CreateTextFormat(_T("맑은 고딕"), nullptr, (DWRITE_FONT_WEIGHT)font_weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, _T("ko-kr"), &write_format);
+
+	//CDC와는 다르게 뭔가 갱신할 때 write_format 생성이 실패할때가 있다.
+	if (write_format == NULL)
+		return CRect();
+
+	write_format->SetTextAlignment(
+		(align & DT_CENTER) ? DWRITE_TEXT_ALIGNMENT_CENTER :
+		(align & DT_RIGHT) ? DWRITE_TEXT_ALIGNMENT_TRAILING :
+		DWRITE_TEXT_ALIGNMENT_LEADING
+	);
+
+	write_format->SetParagraphAlignment(
+		(align & DT_VCENTER) ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER :
+		(align & DT_BOTTOM) ? DWRITE_PARAGRAPH_ALIGNMENT_FAR :
+		DWRITE_PARAGRAPH_ALIGNMENT_NEAR
+	);
+
+	write_factory->CreateTextLayout(text, text.GetLength(), write_format, (FLOAT)rTarget.Width(), (FLOAT)rTarget.Height(), &text_layout);
+	if (text_layout)
+		text_layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, font_size * 1.5f, font_size * 1.2f);
+
+	/*
+	ID2D1Bitmap1* offscreenBitmap;
+
+	FLOAT dpiX, dpiY;
+	dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+	dpiY = dpiX;
+
+	D2D1_BITMAP_PROPERTIES1 bitmapProps =
+		D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+			D2D1::PixelFormat(
+				DXGI_FORMAT_B8G8R8A8_UNORM,
+				D2D1_ALPHA_MODE_PREMULTIPLIED
+			),
+			dpiX,
+			dpiY
+		);
+
+	ID2D1Image* originalTarget = nullptr;
+	d2dc->GetTarget(&originalTarget);
+
+	d2dc->CreateBitmap(D2D1::SizeU(rTarget.Width(), rTarget.Height()), nullptr, 0, bitmapProps, &offscreenBitmap);
+	d2dc->SetTarget(offscreenBitmap);
+
+	//d2dc->DrawText(text, text.GetLength(), write_format, CRect_to_d2Rect(rTarget), text_brush);
+	*/
+
+	d2dc->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left + 4.0f, (FLOAT)rTarget.top + 4.0f), text_layout, shadow_brush);
+	d2dc->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left, (FLOAT)rTarget.top), text_layout, text_brush);
+
+	/*
+	d2dc->EndDraw();
+	ID2D1Effect* shadow;
+	d2dc->CreateEffect(CLSID_D2D1Shadow, &shadow);
+	shadow->SetInput(0, offscreenBitmap);
+	shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 4.0f);
+	shadow->SetValue(D2D1_SHADOW_PROP_COLOR,
+		D2D1::Vector4F(0, 0, 0, 0.5f));
+
+	d2dc->SetTarget(originalTarget);
+	d2dc->DrawImage(shadow, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC);// rTaraget.left, rTarget.top
+	*/
+	return CRect();
+}
+
 
 //text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 //이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!

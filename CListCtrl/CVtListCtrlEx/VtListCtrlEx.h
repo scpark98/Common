@@ -545,16 +545,16 @@ public:
 	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 //폰트 관련. 반드시 set_headings() 후에 호출할것.
-	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
+	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET, bool invalidate = false);
 	//-1 : reduce, +1 : enlarge
 	int			get_font_size();
 	//반드시 set_headings() 후에 호출할것.
-	void		set_font_size(int font_size);
-	void		enlarge_font_size(bool enlarge);
-	void		set_font_bold(int weight = FW_BOLD);
-	void		set_font_italic(bool italic = true);
+	void		set_font_size(int font_size, bool invalidate = false);
+	void		enlarge_font_size(bool enlarge, bool invalidate = false);
+	void		set_font_bold(int weight = FW_BOLD, bool invalidate = false);
+	void		set_font_italic(bool italic = true, bool invalidate = false);
 	LOGFONT		get_log_font() { return m_lf; }
-	void		set_log_font(LOGFONT lf);
+	void		set_log_font(LOGFONT lf, bool invalidate = false);
 
 //파일, 클립보드 관련
 	//Ctrl+C키로 선택된 항목을 클립보드로 복사할 수 있다. shift를 조합하면 헤더까지 포함된다.
@@ -569,7 +569,7 @@ public:
 	//그렇게 되기 위해서는 SetFont / MoveWindow / SetWindowPos 등이 필요하므로
 	//VtListCtrlEx에게 set_font_name() 호출시에 헤더도 SetFont를 적용하여 해결함.
 	//=> SetFont()를 통해서 header의 height를 변경한다.
-	void		set_header_height(int height);
+	void		set_header_height(int height, bool invalidate = false);
 
 	LRESULT		on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam);
 
@@ -585,11 +585,11 @@ public:
 	void		set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
 
 	int			get_line_height() { return m_line_height; }
-	void		set_line_height(int height);
+	void		set_line_height(int height, bool invalidate = false);
 
-	void		set_column_width(int nCol, int cx);
+	void		set_column_width(int nCol, int cx, bool invalidate = false);
 	//레지스트리에 저장된 각 컬럼너비를 복원한다.
-	void		restore_column_width(CWinApp* pApp, CString sSection);
+	void		restore_column_width(CWinApp* pApp, CString sSection, bool invalidate = false);
 	//각 컬럼너비를 레지스트리에 저장한다. 프로그램이 시작될 때 restore_column_width()를 통해 그 너비대로 복원할 수 있다.
 	void		save_column_width(CWinApp* pApp, CString sSection);
 	CRect		get_item_rect(int item, int subItem);
@@ -721,7 +721,7 @@ protected:
 	LOGFONT			m_lf;
 	CFont			m_font;
 	int				m_font_size;
-	void			reconstruct_font();
+	void			reconstruct_font(bool invalidate = false);
 
 	bool			m_show_progress_text = true;	//default = true
 

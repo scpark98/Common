@@ -854,13 +854,16 @@ int CVtListCtrlEx::get_header_height()
 	return 0;
 }
 
-void CVtListCtrlEx::set_header_height(int height)
+void CVtListCtrlEx::set_header_height(int height, bool invalidate)
 {
 	if (m_HeaderCtrlEx.m_hWnd != NULL)
 		m_HeaderCtrlEx.set_header_height(height);
+
+	if (invalidate)
+		Invalidate();
 }
 
-void CVtListCtrlEx::set_line_height(int height)
+void CVtListCtrlEx::set_line_height(int height, bool invalidate)
 {
 	m_line_height = height;
 	//reconstruct_font();
@@ -876,17 +879,23 @@ void CVtListCtrlEx::set_line_height(int height)
 		gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
 		SetImageList(&gapImage, LVSIL_SMALL);
 	}
+
+	if (invalidate)
+		Invalidate();
 }
 
-void CVtListCtrlEx::set_column_width(int nCol, int cx)
+void CVtListCtrlEx::set_column_width(int nCol, int cx, bool invalidate)
 {
 	if (nCol >= get_column_count())
 		return;
 
 	SetColumnWidth(nCol, cx);
+
+	if (invalidate)
+		Invalidate();
 }
 
-void CVtListCtrlEx::restore_column_width(CWinApp* pApp, CString sSection)
+void CVtListCtrlEx::restore_column_width(CWinApp* pApp, CString sSection, bool invalidate)
 {
 	int		i, width;
 	CString str;
@@ -897,6 +906,9 @@ void CVtListCtrlEx::restore_column_width(CWinApp* pApp, CString sSection)
 		if (width > 0)
 			SetColumnWidth(i, width);
 	}
+
+	if (invalidate)
+		Invalidate();
 }
 
 void CVtListCtrlEx::save_column_width(CWinApp* pApp, CString sSection)
@@ -1490,138 +1502,138 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		TRACE(_T("VtListCtrl key = %d\n"), pMsg->wParam);
 		switch (pMsg->wParam)
 		{
-		case VK_RETURN:
-		{
-			if (m_in_editing)
+			case VK_RETURN:
 			{
-				edit_end(true);
-				return TRUE;
-			}
-			break;
-		}
-		case VK_ESCAPE:
-		{
-			if (m_in_editing)
-			{
-				edit_end(false);
-				return TRUE;
-			}
-			break;
-		}
-		case VK_SPACE:
-		{
-			if (!m_use_virtual_list || m_in_editing)
+				if (m_in_editing)
+				{
+					edit_end(true);
+					return TRUE;
+				}
 				break;
-
-			if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
-			{
-				int selected = get_selected_index();
-				if (selected < 0 || selected >= size())
-					return FALSE;
-
-				m_list_db[selected].checked = !m_list_db[selected].checked;
-				TRACE(_T("checkbox toggle by spacebar. m_list_db[%d].checked = %d\n"), selected, m_list_db[selected].checked);
-				Invalidate();
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_checked_item, NULL)), selected);
-				return TRUE;
 			}
-			break;
-		}
-		case VK_BACK:
-		{
-			if (m_in_editing)
+			case VK_ESCAPE:
+			{
+				if (m_in_editing)
+				{
+					edit_end(false);
+					return TRUE;
+				}
 				break;
-
-			//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
-			//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
-			if (m_is_shell_listctrl)
-			{
-				if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
-					return true;
-
-				CString new_path;
-
-				//드라이브면 내 PC로 가고
-				if (is_drive_root(m_path))
-					new_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
-				//그렇지 않으면 상위 디렉토리로 이동
-				else
-					new_path = get_parent_dir(m_path);
-
-				set_path(new_path);
-				
-				//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
-				//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&new_path);
 			}
+			case VK_SPACE:
+			{
+				if (!m_use_virtual_list || m_in_editing)
+					break;
+
+				if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
+				{
+					int selected = get_selected_index();
+					if (selected < 0 || selected >= size())
+						return FALSE;
+
+					m_list_db[selected].checked = !m_list_db[selected].checked;
+					TRACE(_T("checkbox toggle by spacebar. m_list_db[%d].checked = %d\n"), selected, m_list_db[selected].checked);
+					Invalidate();
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_checked_item, NULL)), selected);
+					return TRUE;
+				}
+				break;
+			}
+			case VK_BACK:
+			{
+				if (m_in_editing)
+					break;
+
+				//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
+				//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
+				if (m_is_shell_listctrl)
+				{
+					if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
+						return true;
+
+					CString new_path;
+
+					//드라이브면 내 PC로 가고
+					if (is_drive_root(m_path))
+						new_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
+					//그렇지 않으면 상위 디렉토리로 이동
+					else
+						new_path = get_parent_dir(m_path);
+
+					set_path(new_path);
 				
-			break;
-		}
+					//VtListCtrlEx 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
+					//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_path_changed, NULL)), (LPARAM)&new_path);
+				}
+				
+				break;
+			}
 
-		//case 220		:	return true;	//'\'키를 누르면 리스트 맨 처음으로 이동되는 현상 방지.
-		case 'A'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
-							{
-								select_item(-1);
-							}
-							break;
-		case 'C'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
-							{
-								//CopyToClipboard(_T("|"));
-								MessageBeep(MB_ICONINFORMATION);
+			//case 220		:	return true;	//'\'키를 누르면 리스트 맨 처음으로 이동되는 현상 방지.
+			case 'A'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
+								{
+									select_item(-1);
+								}
+								break;
+			case 'C'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
+								{
+									//CopyToClipboard(_T("|"));
+									MessageBeep(MB_ICONINFORMATION);
+									return true;
+								}
+								break;
+			case 'V'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
+								{
+									//PasteInsertFromClipboard();
+									//MessageBeep(MB_ICONINFORMATION);
+									return false;
+								}
+								break;
+			case VK_F2		:	if (m_in_editing)
+								{
+									return true;
+								}
+								else
+								{
+									//현재 경로가 "내 PC"인 경우는 우선 편집을 보류한다.
+									if (!m_is_shell_listctrl || get_path() != m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES))
+										edit_item(get_selected_index(), m_edit_subItem);
+									return true;
+								}
+								break;
+			case VK_F5		:	
+								//editing일 경우는 F5키가 CEdit에서 발생하므로 여기 오지 않는다.
+								//CEdit을 파생해서 F5 이벤트가 발생하면 편집을 종료시키고 새로고침 해줘야 한다.
+								if (m_in_editing)
+									edit_end();
+
+								refresh_list();
 								return true;
-							}
-							break;
-		case 'V'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
-							{
-								//PasteInsertFromClipboard();
-								//MessageBeep(MB_ICONINFORMATION);
+			case VK_HOME:		if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000))
+								{
+									//set_auto_scroll(true);
+									//return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
+								}
 								return false;
-							}
-							break;
-		case VK_F2		:	if (m_in_editing)
-							{
-								return true;
-							}
-							else
-							{
-								//현재 경로가 "내 PC"인 경우는 우선 편집을 보류한다.
-								if (!m_is_shell_listctrl || get_path() != m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES))
-									edit_item(get_selected_index(), m_edit_subItem);
-								return true;
-							}
-							break;
-		case VK_F5		:	
-							//editing일 경우는 F5키가 CEdit에서 발생하므로 여기 오지 않는다.
-							//CEdit을 파생해서 F5 이벤트가 발생하면 편집을 종료시키고 새로고침 해줘야 한다.
-							if (m_in_editing)
-								edit_end();
-
-							refresh_list();
-							return true;
-		case VK_HOME:		if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000))
-							{
-								//set_auto_scroll(true);
-								//return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
-							}
-							return false;
-		case VK_END :		if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000))
-							{
-								set_auto_scroll(true);
-								return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
-							}
-							return false;
-		case VK_PRIOR:
-							if (m_in_editing)
-								return FALSE;
-
-			/*
-		//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
-		case VK_DELETE	:	if (m_bInEditing)
+			case VK_END :		if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000))
+								{
+									set_auto_scroll(true);
+									return true;	//여기서 true를 리턴하지 않으면 CListCtrl의 기본 end 키 처리가 수행되고 현재 화면에서 맨 아래 항목이 선택되어 m_auto_scroll이 다시 false로 변한다.
+								}
 								return false;
-							else
-								DeleteSelectedItems();
-			break;
-		*/
+			case VK_PRIOR:
+								if (m_in_editing)
+									return FALSE;
+
+				/*
+			//키보드에 의한 항목 삭제 처리는 메인에서 해야 안전하다.
+			case VK_DELETE	:	if (m_bInEditing)
+									return false;
+								else
+									DeleteSelectedItems();
+				break;
+			*/
 		}
 	}
 	return CListCtrl::PreTranslateMessage(pMsg);
@@ -3558,7 +3570,7 @@ bool CVtListCtrlEx::save(CString sfile, TCHAR separator, bool selected_only /*= 
 //따라서 스크롤 크기 등을 계산할때는 m_font_size를 이용하는게 아니라
 //m_lf.lfHeight값을 이용해야 정확한 스크롤 크기가 계산된다.
 //m_font_size는 단지 사용자에게 일반적인 폰트 크기 설정 수치로 쓰이는 직관적인 수치이다.
-void CVtListCtrlEx::reconstruct_font()
+void CVtListCtrlEx::reconstruct_font(bool invalidate)
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
@@ -3568,12 +3580,9 @@ void CVtListCtrlEx::reconstruct_font()
 		m_HeaderCtrlEx.set_font(&m_lf);
 
 	m_font_size = get_font_size();
-	
-	//set_line_height(4-m_lf.lfHeight);
-	//if (m_auto_line_height)
-		//recalculate_line_height();k
-	
-	ASSERT(bCreated);
+
+	if (invalidate)
+		Invalidate();
 }
 
 int CVtListCtrlEx::get_font_size()
@@ -3583,7 +3592,7 @@ int CVtListCtrlEx::get_font_size()
 }
 
 //-1 : reduce, +1 : enlarge
-void CVtListCtrlEx::set_font_size(int font_size)
+void CVtListCtrlEx::set_font_size(int font_size, bool invalidate)
 {
 	if (font_size == 0)
 		return;
@@ -3606,10 +3615,10 @@ void CVtListCtrlEx::set_font_size(int font_size)
 	//a height for a font with a specified point size:
 	m_lf.lfHeight = get_pixel_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
 
-	reconstruct_font();
+	reconstruct_font(invalidate);
 }
 
-void CVtListCtrlEx::enlarge_font_size(bool enlarge)
+void CVtListCtrlEx::enlarge_font_size(bool enlarge, bool invalidate)
 {
 	m_font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 	enlarge ? m_font_size++ : m_font_size--;
@@ -3621,35 +3630,34 @@ void CVtListCtrlEx::enlarge_font_size(bool enlarge)
 
 	m_lf.lfHeight = get_pixel_size_from_font_size(GetParent()->GetSafeHwnd(), m_font_size);
 
-	reconstruct_font();
+	reconstruct_font(invalidate);
 }
 
-void CVtListCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
+void CVtListCtrlEx::set_font_name(LPCTSTR sFontname, BYTE byCharSet, bool invalidate)
 {
 	if (sFontname == _T(""))
 		return;
 	m_lf.lfCharSet = byCharSet;
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), sFontname);
-	reconstruct_font();
+	reconstruct_font(invalidate);
 }
 
-void CVtListCtrlEx::set_font_bold(int weight)
+void CVtListCtrlEx::set_font_bold(int weight, bool invalidate)
 {
 	m_lf.lfWeight = weight;
-	reconstruct_font();
+	reconstruct_font(invalidate);
 }
 
-void CVtListCtrlEx::set_font_italic(bool italic)
+void CVtListCtrlEx::set_font_italic(bool italic, bool invalidate)
 {
 	m_lf.lfItalic = italic;
-	reconstruct_font();
+	reconstruct_font(invalidate);
 }
 
-void CVtListCtrlEx::set_log_font(LOGFONT lf)
+void CVtListCtrlEx::set_log_font(LOGFONT lf, bool invalidate)
 {
 	memcpy(&m_lf, &lf, sizeof(LOGFONT));
-	reconstruct_font();
-	Invalidate();
+	reconstruct_font(invalidate);
 }
 
 //어떤 항목을 클릭한 후 단축키 F2를 누르면 해당 텍스트를 편집하는 용도이므로

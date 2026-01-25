@@ -197,7 +197,7 @@ void CSCSystemButtons::OnPaint()
 			{
 				if (m_parent_maximized)
 				{
-					CRect r = make_rect(cp.x - 6, cp.y - 6, 9, 9);
+					CRect r = make_rect(cp.x - 3, cp.y - 6, 9, 9);
 					draw_rect(g, r, m_theme.cr_title_text, cr_back);
 					r.OffsetRect(-3, 3);
 					draw_rect(g, r, m_theme.cr_title_text, cr_back);

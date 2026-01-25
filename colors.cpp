@@ -934,6 +934,12 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		case color_theme_dark_gray :
+			cr_title_text = Gdiplus::Color::Gray;
+			cr_title_back_active = gGRAY(24);
+			cr_title_back_inactive = gGRAY(24);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
 			cr_text					= Gdiplus::Color(255, 164, 164, 164);
 			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
 			cr_text_hover			= cr_text;
@@ -947,12 +953,6 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= cr_back_selected;
 			cr_back_alternate		= get_color(cr_back, 8);
-
-			cr_title_text			= Gdiplus::Color::LightGray;
-			cr_title_back_active	= gGRAY(16);
-			cr_title_back_inactive	= gGRAY(16);
-			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
-			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);
 			cr_selected_border_inactive = cr_back_selected_inactive;

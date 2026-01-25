@@ -38,7 +38,7 @@ public:
 
 	std::deque<CString> text;
 	int img_idx = -1;
-	int max_column;
+	int max_column = 0;
 	bool checked = false;
 	int selected = false;
 	//HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 Get/SetItemData() 함수를 사용할 수 없다.

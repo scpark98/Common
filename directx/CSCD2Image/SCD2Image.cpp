@@ -453,6 +453,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		);
 
 		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
+		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, m_img_origin.GetAddressOf());
 		/*
 		switch (m_exif_info.orientation)
 		{
@@ -559,6 +560,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			ComPtr<ID2D1Bitmap1> frame_img;
 			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
 			hr = d2context->CreateBitmap(img_size, nullptr, 0, properties, frame_img.GetAddressOf());
+
+			if (i == 0)
+				d2context->CreateBitmap(img_size, nullptr, 0, properties, m_img_origin.GetAddressOf());
 
 			//프레임 구성에 따라 전 프레임을 복사하는 경우도 있고, 특정 키프레임을 복사하는 경우도 있다.
 			//둘 다 아니라면 투명 배경을 가진 이미지로 시작한다.
@@ -807,6 +811,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
 
+	//save(m_img_origin.Get(), 1.0f, _T("d:\\origin.png"));
+
 	if (frame_count > 1)
 		play();
 
@@ -896,6 +902,47 @@ HRESULT CSCD2Image::get_sub_img(D2D1_RECT_U r, CSCD2Image* dest)
 {
 	D2D1_POINT_2U pt = { 0, 0 };
 	return dest->get()->CopyFromBitmap(&pt, m_img[0].Get(), &r);
+}
+
+void CSCD2Image::restore_original_image()
+{
+	D2D1_POINT_2U pt = { 0, 0 };
+	D2D1_RECT_U r = { 0, 0, get_width(), get_height()};
+	m_img[0].Get()->CopyFromBitmap(&pt, m_img_origin.Get(), &r);
+}
+
+void CSCD2Image::blur_effect(float dev)
+{
+	restore_original_image();
+
+	Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> rt;
+	Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+	Microsoft::WRL::ComPtr<ID2D1Effect> blurEffect;
+	Microsoft::WRL::ComPtr<ID2D1Effect> compositeEffect;
+
+	//m_d2dc->CreateCompatibleRenderTarget(m_d2dc->GetSize(), &rt);
+	//rt->BeginDraw();
+	//rt->Clear(D2D1::ColorF(0, 0, 0, 0));
+
+	//rt->DrawBitmap(m_img[0].Get());
+	//rt->EndDraw();
+
+	m_d2dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect);
+	blurEffect->SetInput(0, m_img[0].Get());
+	blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, dev);
+	//blurEffect->GetOutput()
+
+	ComPtr<ID2D1Image> swapChainImageBuffer;
+	m_d2dc->GetTarget(swapChainImageBuffer.GetAddressOf());
+	m_d2dc->SetTarget(m_img[0].Get());
+	m_d2dc->BeginDraw();
+	m_d2dc->Clear(D2D1::ColorF(0, 0, 0, 1.0f));
+	m_d2dc->DrawImage(blurEffect.Get(), D2D1::Point2F(0, 0));
+	m_d2dc->EndDraw();
+	m_d2dc->SetTarget(swapChainImageBuffer.Get());
+	swapChainImageBuffer = nullptr;
+
+
 }
 
 HRESULT CSCD2Image::save(CString path, float quality)
@@ -1148,6 +1195,9 @@ void CSCD2Image::set_interpolation_mode(int mode)
 
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, eSCD2Image_DRAW_MODE draw_mode)
 {
+	if (is_empty())
+		return D2D1::RectF();
+
 	D2D1_SIZE_F sz = d2dc->GetSize();
 	return draw(d2dc, D2D1::RectF(0, 0, sz.width, sz.height), draw_mode);
 }

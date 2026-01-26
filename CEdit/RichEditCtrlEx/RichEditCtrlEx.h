@@ -126,7 +126,7 @@ public:
 
 	COLORREF	GetComplementaryColor(COLORREF crColor);
 
-	void		auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
+	void		set_auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
 	void		SetScrollSize(int nLines) { m_nScrollSize = nLines; }
 
 	int			get_align() { return m_align; }
@@ -160,7 +160,7 @@ protected:
 	int			m_nClearLogInterval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
 	int			m_nMaxCharLimit;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
 	int			m_nScrollSize;
-	bool		m_auto_scroll = true;
+	bool		m_auto_scroll = true;	//default = true;
 
 	int			m_align = PFA_LEFT;
 

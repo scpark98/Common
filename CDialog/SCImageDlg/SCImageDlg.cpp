@@ -1536,10 +1536,10 @@ void CSCImageDlg::build_image_info_str()
 		m_zoom * 100.0);
 
 	//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
-	if (m_img[0].get_exif_str().GetLength())
-	{
-		m_info_str.Format(_T("%s\n\n%s"), m_info_str, m_img[0].get_exif_str());
-	}
+	//if (m_img[0].get_exif_str().GetLength())
+	//{
+	//	m_info_str.Format(_T("%s\n\n%s"), m_info_str, m_img[0].get_exif_str());
+	//}
 }
 
 void CSCImageDlg::goto_index(int index)

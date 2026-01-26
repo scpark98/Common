@@ -265,17 +265,22 @@ void CSCImage2dDlg::OnPaint()
 		CString info_str;
 		info_str.Format(_T("%s\n확대 배율 : %.0f%%\n표시 크기 : %d x %d"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
 
+		//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
+		if (m_img[0].get_exif_str().GetLength())
+			info_str.Format(_T("%s\n\n%s"), info_str, m_img[0].get_exif_str());
+
 		CRect rText = rc;
 		rText.DeflateRect(8, 8);
 
-		//draw_text()를 사용하면 간편할수는 있으나 이 함수안에서는 계속 객체를 생성, 해제하는 액션을 수행하므로 부담을 줄 수 있다.
-		//기존처럼 이미 만들어진 인스턴스들에 대해 속성만 변경한 후 사용하는 것이 더 경제적이다.
-		//draw_text(d2dc, rText, info_str, 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Red, DT_LEFT | DT_TOP);
-
+		//draw_text()를 사용하면 간편할수는 있으나 이 함수안에서는 OnPaint()가 호출될 때마다 계속 객체를 생성, 해제하는 액션을 수행하므로 부담을 줄 수 있다.
+		//기존처럼 이미 만들어진 인스턴스들에 대해 속성만 변경한 후 사용하는 것이 더 경제적일 수 있다.
+		//대신 draw_text에서는 라인 간격도 조정 가능하다.
+		draw_text(d2dc, rText, info_str, 14.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
+		/*
 		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 
-		//shadow나 stroke 효과 적용방법을 아직 모르므로 우선 검은색으로 그리고 전경색으로 그린다.
+		//shadow나 stroke 효과 적용방법을 아직 적용하지 않았으므로 우선 검은색으로 그리고 전경색으로 그린다.
 		rText.OffsetRect(1, 1);
 		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
 		d2dc->DrawText(info_str, info_str.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
@@ -283,6 +288,7 @@ void CSCImage2dDlg::OnPaint()
 		rText.OffsetRect(-1, -1);
 		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
 		d2dc->DrawText(info_str, info_str.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
+		*/
 	}
 
 	//dc에 그릴 경우 d2devicecontext가 그려지고 dc에 그려지므로 깜빡임이 발생한다.
@@ -1719,11 +1725,11 @@ void CSCImage2dDlg::build_image_info_str()
 		m_img[0].get_pixel_format_str(),
 		ratio_str);
 
-	//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
-	if (m_img[0].get_exif_str().GetLength())
-	{
-		m_info_str.Format(_T("%s\n\n%s"), m_info_str, m_img[0].get_exif_str());
-	}
+	////촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
+	//if (m_img[0].get_exif_str().GetLength())
+	//{
+	//	m_info_str.Format(_T("%s\n\n%s"), m_info_str, m_img[0].get_exif_str());
+	//}
 }
 
 void CSCImage2dDlg::goto_index(int index)

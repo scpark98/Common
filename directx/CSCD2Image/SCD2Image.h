@@ -171,6 +171,9 @@ public:
 	HRESULT					get_sub_img(CRect r, CSCD2Image *dest);
 	HRESULT					get_sub_img(D2D1_RECT_U r, CSCD2Image* dest);
 
+	void					restore_original_image();
+	void					blur_effect(float dev = 3.0f);
+
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	//현재는 jpg만 품질옵션이 적용된다.
 	HRESULT					save(CString path, float quality = 80);
@@ -196,12 +199,13 @@ protected:
 	CString					m_filename;// = _T("untitled");
 
 	//load or draw시에 파라미터로 받아서 참조하여 사용하기 위해 선언했을 뿐이고 이 클래스에서 직접 생성하는 것이 아님.
-	IWICImagingFactory2*	m_pWICFactory = NULL;
-	ID2D1DeviceContext*		m_d2dc = NULL;
+	IWICImagingFactory2*	m_pWICFactory = nullptr;
+	ID2D1DeviceContext*		m_d2dc = nullptr;
 
-	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 처리한다.
-	std::deque<ComPtr<ID2D1Bitmap>>		m_img = std::deque<ComPtr<ID2D1Bitmap>>{ NULL, };
-	uint8_t*				data = NULL;
+	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 선언한다.
+	std::deque<ComPtr<ID2D1Bitmap1>>		m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
+	ComPtr<ID2D1Bitmap1>		m_img_origin;
+	uint8_t*				data = nullptr;
 	int						m_frame_index = 0;
 	//float					m_width = 0.0f;
 	//float					m_height = 0.0f;

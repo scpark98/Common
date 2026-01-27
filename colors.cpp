@@ -934,9 +934,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		case color_theme_dark_gray :
-			cr_title_text = Gdiplus::Color::Gray;
-			cr_title_back_active = gGRAY(24);
-			cr_title_back_inactive = gGRAY(24);
+			cr_title_text			= Gdiplus::Color::LightGray;
+			cr_title_back_active	= gGRAY(24);
+			cr_title_back_inactive	= gGRAY(24);
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 

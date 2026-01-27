@@ -132,16 +132,18 @@ static const UINT Message_CGdiButton = ::RegisterWindowMessage(_T("MessageString
 class CGdiButtonMessage
 {
 public:
-	CGdiButtonMessage(CWnd* _this, UINT _ctrl_id, int _msg)
+	CGdiButtonMessage(CWnd* _this, UINT _ctrl_id, int _message, CPoint _pt = CPoint(-1, -1))
 	{
-		pWnd = _this;
+		pThis = _this;
 		ctrl_id = _ctrl_id;
-		msg = _msg;
+		message = _message;
+		pt = _pt;
 	}
 
-	CWnd*		pWnd = NULL;
+	CWnd*		pThis = NULL;
 	UINT		ctrl_id;
-	int			msg;
+	int			message;
+	CPoint		pt;
 };
 
 class CGdiButtonImage
@@ -602,4 +604,6 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnNcPaint();
+	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 };

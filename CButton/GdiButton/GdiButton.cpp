@@ -133,6 +133,8 @@ BEGIN_MESSAGE_MAP(CGdiButton, CButton)
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_NCPAINT()
+	ON_WM_RBUTTONDOWN()
+	ON_WM_RBUTTONUP()
 END_MESSAGE_MAP()
 
 
@@ -912,7 +914,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 			case VK_SPACE :
 				redraw_window();
 				Wait(50);
-				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN);
+				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN, pMsg->pt);
 				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				break;
 		}
@@ -924,7 +926,7 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 			case VK_SPACE:
 				redraw_window();
 				Wait(50);
-				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP);
+				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP, pMsg->pt);
 				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				break;
 		}
@@ -1536,7 +1538,7 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 
 	//TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
-	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_MOUSEHOVER);
+	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_MOUSEHOVER, point);
 	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
 	CButton::OnMouseHover(nFlags, point);
@@ -1936,7 +1938,7 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 
 			GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 
-			CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP);
+			CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP, point);
 			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 		}
 	}
@@ -2380,4 +2382,20 @@ void CGdiButton::OnNcPaint()
 	//GetParent()->InvalidateRect(rw);	//이 코드를 쓰면 계속 그리는 현상 발생
 	Invalidate();						//이 코드를 쓰면 잔상은 덜하나 여전히 발생
 	img_shadow.draw(&dc, rw.left + 14, rw.top - 0);
+}
+
+void CGdiButton::OnRButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CButton::OnRButtonDown(nFlags, point);
+}
+
+void CGdiButton::OnRButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_RBUTTONUP, point);
+	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+
+	CButton::OnRButtonUp(nFlags, point);
 }

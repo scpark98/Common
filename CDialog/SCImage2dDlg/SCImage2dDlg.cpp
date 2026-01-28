@@ -124,8 +124,13 @@ END_MESSAGE_MAP()
 
 void CSCImage2dDlg::OnPaint()
 {
-	//if (m_show_thumb)
+	//if (m_skip_repaint)
+	//{
+	//	CDialog::OnPaint();
 	//	return;
+	//}
+
+	//TRACE(_T("CSCImage2dDlg::OnPaint. %ld\n"), GetTickCount64());
 
 	CPaintDC dc(this); // device context for painting
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.

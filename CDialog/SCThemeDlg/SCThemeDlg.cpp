@@ -798,7 +798,7 @@ void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 	TRACE(_T("CSCThemeDlg::OnActivate. nState = %d\n"), nState);
 	//m_is_activated = (nState == 2);
 	//m_sys_buttons.refresh_activate_status(m_is_activated);
-	Invalidate();
+	//Invalidate();
 }
 
 void CSCThemeDlg::OnSetFocus(CWnd* pOldWnd)

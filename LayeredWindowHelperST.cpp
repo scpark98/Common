@@ -38,8 +38,10 @@ CLayeredWindowHelperST::~CLayeredWindowHelperST()
 //
 LONG CLayeredWindowHelperST::AddLayeredStyle(HWND hWnd)
 {
-
-	return ::SetWindowLongPtr(hWnd, GWL_EXSTYLE, ::GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+	LONG res = ::SetWindowLongPtr(hWnd, GWL_EXSTYLE, ::GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+	if (!res)
+		TRACE(_T("fail to CLayeredWindowHelperST::AddLayeredStyle. This window maybe has WS_CHILD property.\n"));
+	return res;
 } // End of AddLayeredStyle
 
 // This function sets the opacity and transparency color key of a layered window.
@@ -104,9 +106,13 @@ BOOL CLayeredWindowHelperST::SetTransparent(HWND hWnd, BYTE alpha_percentage)
 	if (alpha_percentage > 100)
 		alpha_percentage = 100;
 
+	//TRACE(_T("alpha_percentage = %d\n"), alpha_percentage);
 	m_alpha_percentage = alpha_percentage;
 
 	//return SetLayeredWindowAttributes(hWnd, RGB( 26, 25, 17 ), 255, LWA_COLORKEY | LWA_ALPHA);
-	return SetLayeredWindowAttributes(hWnd, 0, 255 - 255 * m_alpha_percentage/100, LWA_ALPHA);
-	
+	BOOL res = SetLayeredWindowAttributes(hWnd, 0, 255 - 255 * m_alpha_percentage/100, LWA_ALPHA);
+	if (!res)
+		TRACE(_T("fail to CLayeredWindowHelperST::SetTransparent\n"));
+
+	return res;
 } // End of SetTransparentPercentage

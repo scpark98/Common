@@ -229,6 +229,7 @@ public:
 
 	void			set_cross_cursor(UINT nID);
 
+	bool			m_skip_repaint = false;
 protected:
 	enum TIMER_ID
 	{

@@ -5167,9 +5167,9 @@ LRESULT CVtListCtrlEx::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 {
 	auto msg = (CGdiButtonMessage*)wParam;
 
-	if (msg->msg == WM_LBUTTONUP)
+	if (msg->message == WM_LBUTTONUP)
 	{
-		if (msg->pWnd == m_button_scroll_to_end)
+		if (msg->pThis == m_button_scroll_to_end)
 		{
 			ensure_visible(m_list_db.size() - 1, visible_last);
 			set_auto_scroll(true);

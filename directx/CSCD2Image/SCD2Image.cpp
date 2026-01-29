@@ -14,6 +14,9 @@ CSCD2Image::~CSCD2Image()
 {
 	while (!stop())
 		Wait(10);
+
+	if (m_data)
+		delete[] m_data;
 }
 
 HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height)
@@ -109,35 +112,54 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	m_filename = path;
 
+	HRESULT hr = S_FALSE;
 	ComPtr<IWICBitmapDecoder> pDecoder;
-	ComPtr<IWICStream> pStream;
 
 	if (!pWICFactory)
-		return S_FALSE;// CreateDeviceIndependentResources();
+		return S_FALSE;
 
 	if (!d2context)
-		return S_FALSE; //CreateDeviceContext();
+		return S_FALSE;
 
+	/*
 	HRESULT hr = pWICFactory->CreateDecoderFromFilename(
 		path,
 		NULL,
 		GENERIC_READ,
-		WICDecodeMetadataCacheOnDemand,
+		WICDecodeMetadataCacheOnLoad,
 		pDecoder.GetAddressOf()
+	);
+	*/
+
+	//20260129 scpark 위와 같이 외부 파일을 CreateDecoderFromFilename()로 열면 잠겨져서 파일명 변경, 삭제, 이동 등 아무것도 할 수 없다.
+	//아래와 같이 stream으로 읽어서 해결함.
+	ULONGLONG file_size = get_file_size(path);
+	uint8_t* data = new uint8_t[file_size];
+	read_raw(path, data, file_size);
+
+	ComPtr<IWICStream> stream;
+	pWICFactory->CreateStream(&stream);
+
+	stream->InitializeFromMemory(
+		data,
+		static_cast<DWORD>(file_size)
+	);
+
+	pWICFactory->CreateDecoderFromStream(
+		stream.Get(),
+		nullptr,
+		WICDecodeMetadataCacheOnLoad,
+		&pDecoder
 	);
 
 	if (FAILED(hr))
 		return hr;
 
-	return load(pWICFactory, d2context, pDecoder.Get());
+	hr = load(pWICFactory, d2context, pDecoder.Get());
 
-	/*
-	hr = pDecoder->GetFrame(0, &pSource);
-	if (FAILED(hr))
-		return hr;
+	delete[] data;
 
-	return load(pWICFactory, d2context, pSource.Get());
-	*/
+	return hr;
 }
 
 //load from raw data
@@ -429,6 +451,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	ComPtr<IWICFormatConverter> pConverter;
 	ComPtr<ID2D1Bitmap1> img;
+	ComPtr<IWICBitmap> wicBitmap;
 	WICPixelFormatGUID pf;
 	D2D_RECT_U r = { 0, 0, img_size.width, img_size.height };
 
@@ -454,6 +477,35 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
 		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, m_img_origin.GetAddressOf());
+
+
+		//pixel data loading start.
+		pWICFactory->CreateBitmapFromSource(
+			pConverter.Get(),
+			WICBitmapCacheOnLoad,
+			&wicBitmap
+		);
+
+		UINT stride;
+		WICRect rc = { 0, 0, img_size.width, img_size.height };
+		ComPtr<IWICBitmapLock> lock;
+		wicBitmap->Lock(&rc, WICBitmapLockRead, &lock);
+
+		lock->GetStride(&stride);
+
+		UINT bufferSize = 0;
+		BYTE* pixels = nullptr;
+		lock->GetDataPointer(&bufferSize, &pixels);
+
+		if (m_data)
+			delete[] m_data;
+
+		m_data = new uint8_t[bufferSize];
+		memcpy(m_data, pixels, bufferSize);
+		lock.Reset();
+		wicBitmap.Reset();
+		//pixel data loading end.
+
 		/*
 		switch (m_exif_info.orientation)
 		{
@@ -562,7 +614,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			hr = d2context->CreateBitmap(img_size, nullptr, 0, properties, frame_img.GetAddressOf());
 
 			if (i == 0)
+			{
 				d2context->CreateBitmap(img_size, nullptr, 0, properties, m_img_origin.GetAddressOf());
+			}
 
 			//프레임 구성에 따라 전 프레임을 복사하는 경우도 있고, 특정 키프레임을 복사하는 경우도 있다.
 			//둘 다 아니라면 투명 배경을 가진 이미지로 시작한다.
@@ -724,6 +778,43 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			//ComPtr<ID2D1Bitmap1> img;
 			hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
 
+
+			if (i == 0)
+			{
+				//pixel data loading start.
+				pWICFactory->CreateBitmapFromSource(
+					pConverter.Get(),
+					WICBitmapCacheOnLoad,
+					&wicBitmap
+				);
+
+				//webp인 경우는 rt값이 0으로 넘어오므로 img_size를 사용해야 한다.
+				WICRect rc = { 0, 0, rt.right - rt.left, rt.bottom - rt.top };
+				if (rt.right == 0 || rt.bottom == 0)
+				{
+					rc.Width = img_size.width;
+					rc.Height = img_size.height;
+				}
+
+				ComPtr<IWICBitmapLock> lock;
+				wicBitmap->Lock(&rc, WICBitmapLockRead, &lock);
+
+				lock->GetStride(&m_stride);
+				m_channel = m_stride / rc.Width;
+
+				UINT bufferSize = 0;
+				BYTE* pixels = nullptr;
+				lock->GetDataPointer(&bufferSize, &pixels);
+
+				if (m_data)
+					delete[] m_data;
+
+				m_data = new uint8_t[bufferSize];
+				memcpy(m_data, pixels, bufferSize);
+				lock.Reset();
+				//pixel data loading end.
+			}
+
 			d2context->SetTarget(frame_img.Get());
 			d2context->BeginDraw();
 			if ((rt.right - rt.left <= 0) || (rt.bottom - rt.top <= 0))//false)//i == 0 || transparentIndex == -1)
@@ -811,7 +902,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
 
-	//save(m_img_origin.Get(), 1.0f, _T("d:\\origin.png"));
+	TRACE(_T("before reset meta_reader\n"));
+	meta_reader.Reset();
+	TRACE(_T("after reset meta_reader\n"));
 
 	if (frame_count > 1)
 		play();
@@ -1128,8 +1221,13 @@ float CSCD2Image::get_width()
 	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
 		return 0.0f;
 
-	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
-	return sz.width;
+	if (m_img[m_frame_index])
+	{
+		D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+		return sz.width;
+	}
+
+	return 0.0f;
 }
 
 float CSCD2Image::get_height()
@@ -1137,8 +1235,13 @@ float CSCD2Image::get_height()
 	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
 		return 0.0f;
 
-	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
-	return sz.height;
+	if (m_img[m_frame_index])
+	{
+		D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
+		return sz.height;
+	}
+
+	return 0.0f;
 }
 
 D2D1_SIZE_F CSCD2Image::get_size()
@@ -1439,8 +1542,9 @@ void CSCD2Image::thread_animation()
 //data멤버에 픽셀 데이터를 가리키도록 한다.
 void CSCD2Image::get_raw_data()
 {
-	if (data)
-		delete[] data;
+	/*
+	if (m_data)
+		delete[] m_data;
 
 	data = new uint8_t[(int)(get_width() * get_height() * 4)];
 
@@ -1449,7 +1553,34 @@ void CSCD2Image::get_raw_data()
 	IWICBitmapLock* pLock = NULL;
 
 	HRESULT hr = S_OK;
+	*/
+}
 
+Gdiplus::Color CSCD2Image::get_pixel(int x, int y)
+{
+	if (m_data == nullptr)
+		return Gdiplus::Color();
+
+	byte r, g, b, a;
+	r = g = b = a = 0;
+	int width = (int)get_width();
+	int height = (int)get_height();
+
+	b = *(m_data + y * m_stride + x * m_channel + 0);
+	g = *(m_data + y * m_stride + x * m_channel + 1);
+	r = *(m_data + y * m_stride + x * m_channel + 2);
+
+	if (m_channel == 1)
+	{
+		return Gdiplus::Color();
+	}
+	else if (m_channel == 3)
+	{
+		return Gdiplus::Color(255, r, g, b);
+	}
+
+	a = *(m_data + y * m_stride + x * m_channel + 3);
+	return Gdiplus::Color(a, r, g, b);
 }
 
 CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bool reset)

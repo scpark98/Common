@@ -150,19 +150,6 @@ void CSCImage2dDlg::OnPaint()
 	//black으로 칠한 후
 	d2dc->Clear(D2D1::ColorF(0.125f, 0.125f, 0.125f));
 
-	//pixel info SCStatic이 깜빡이지 않도록 clip영역을 줬으나 여전히 깜빡거림. OnMouseMove에서 이전값과 다르면 갱신하도록 수정함.
-	CRgn rgn_pixel_info;
-	CRect rc_pixel_info = m_static_pixel.get_rect();
-	if (m_static_pixel.IsWindowVisible() && rgn_pixel_info.CreateRectRgnIndirect(&rc_pixel_info))
-	{
-		CRgn rgn, rgn_target;
-		rgn.CreateRectRgnIndirect(&rc);
-
-		rgn_target.CreateRectRgnIndirect(&rc);
-		rgn_target.CombineRgn(&rgn, &rgn_pixel_info, RGN_XOR);
-
-		dc.SelectClipRgn(&rgn_target);
-	}
 
 	if (m_img.size() == 0 || m_img[0].is_empty())
 	{
@@ -227,20 +214,12 @@ void CSCImage2dDlg::OnPaint()
 		//g.DrawImage(img, 0, 0, rc.Width(), rc.Height());
 		img.draw(&dc, 0, 0, rc.Width(), rc.Height());
 #else
-				//nw | nh가 rc보다 작으면 센터에 오도록 그려준다.
+		//nw | nh가 rc보다 작으면 센터에 오도록 그려준다.
 		int nw = m_img[0].get_width() * m_zoom;
 		int nh = m_img[0].get_height() * m_zoom;
 
 		Clamp(m_offset.x, (long)(rc.Width() - nw), (long)0);
 		Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
-
-		//TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
-		//if (m_screen_roi.IsEmptyArea() == false)
-		//{
-		//	Gdiplus::RectF screen_roi = m_screen_roi;
-		//	screen_roi.Offset(m_offset.x, m_offset.y);
-		//	m_screen_roi = screen_roi;
-		//}
 
 		int sx = m_offset.x;
 		int sy = m_offset.y;
@@ -254,7 +233,7 @@ void CSCImage2dDlg::OnPaint()
 			sy = (rc.Height() - nh) / 2;
 		}
 
-		m_r_display = make_rect(sx, sy, nw, nh);//m_img.draw(g, sx, sy, nw, nh);
+		m_r_display = make_rect(sx, sy, nw, nh);
 #endif
 	}
 
@@ -1136,7 +1115,7 @@ void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 			if (m_static_pixel.IsWindowVisible() == false)
 				m_static_pixel.ShowWindow(SW_SHOW);
 
-			//m_cr_pixel = m_img[0].get_pixel(pt.x, pt.y);
+			m_cr_pixel = m_img[0].get_pixel(pt.x, pt.y);
 
 			//픽셀 정보 표시창을 커서	위치에 맞춰서 이동시킨다. rc를 벗어나지 않도록 보정까지 한다.
 			CRect r = make_rect(point.x + 24, point.y, PIXEL_INFO_CX, PIXEL_INFO_CY);

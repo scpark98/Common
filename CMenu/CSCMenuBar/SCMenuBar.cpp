@@ -237,22 +237,22 @@ LRESULT	CSCMenuBar::on_message_SCMenu(WPARAM wParam, LPARAM lParam)
 LRESULT	CSCMenuBar::on_message_GdiButton(WPARAM wParam, LPARAM lParam)
 {
 	CGdiButtonMessage* msg = (CGdiButtonMessage*)wParam;
-	TRACE(_T("btn = %p, msg = %d\n"), msg->pWnd, msg->msg);
+	TRACE(_T("btn = %p, msg = %d\n"), msg->pThis, msg->message);
 
-	if (m_cur_menu >= 0 && msg->msg == WM_MOUSEHOVER)
+	if (m_cur_menu >= 0 && msg->message == WM_MOUSEHOVER)
 	{
 		TRACE(_T("hover\n"));
 
-		int new_menu = get_menu_button_index_by_instance(msg->pWnd);
+		int new_menu = get_menu_button_index_by_instance(msg->pThis);
 		if (new_menu == m_cur_menu)
 			return 0;
 
 		m_menu_button[m_cur_menu]->popup_hide();
 
-		m_cur_menu = get_menu_button_index_by_instance(msg->pWnd);
-		((CSCMenuButton*)(msg->pWnd))->popup_menu();
+		m_cur_menu = get_menu_button_index_by_instance(msg->pThis);
+		((CSCMenuButton*)(msg->pThis))->popup_menu();
 	}
-	else if (msg->msg == WM_LBUTTONUP)
+	else if (msg->message == WM_LBUTTONUP)
 	{
 		TRACE(_T("m_cur_menu = %d, id = %d, MENU_BUTTON_ID = %d, id - MENU_BUTTON_ID = %d\n"), m_cur_menu, msg->ctrl_id, MENU_BUTTON_ID, msg->ctrl_id - MENU_BUTTON_ID);
 		//메뉴버튼이 눌려지면 on_menu_button_clicked()에서 처리하므로

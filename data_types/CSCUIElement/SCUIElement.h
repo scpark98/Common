@@ -15,21 +15,22 @@ public:
 
 	~CSCUIElement();
 
-	void	set(float left, float top, float right, float bottom, CString label = _T(""));
-	void	setwh(float left, float top, float width, float height, CString label = _T(""));
+	void			set(float left, float top, float right, float bottom, CString label = _T(""));
+	void			setwh(float left, float top, float width, float height, CString label = _T(""));
 
-	void	set(CRect r, CString label = _T(""));
-	void	set(Gdiplus::RectF r, CString label = _T(""));
+	void			set(CRect r, CString label = _T(""));
+	void			set(Gdiplus::RectF r, CString label = _T(""));
 
-	bool	pt_in_rect(float x, float y);
+	bool			pt_in_rect(float x, float y);
 
-	void	copy(CSCUIElement* dst);
-	void	copy_style(CSCUIElement* dst);
+	void			copy(CSCUIElement* dst);
+	void			copy_style(CSCUIElement* dst);
 
 	//m_image_path가 유효한 경우 해당 이미지를 불러온다.
 	HRESULT			load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context);
 
 	int				m_type = 0;
+	int				m_parent_index = -1;		//어떤 항목이 속해 있는 항목의 인덱스도 기억해야 한다.
 	Gdiplus::RectF	m_r;
 	float			m_round[4] = { 0.f, 0.f, 0.f, 0.f };
 

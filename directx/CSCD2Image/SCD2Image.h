@@ -124,6 +124,8 @@ public:
 	float					get_ratio();
 	int						get_channel() { return m_channel; }
 	
+	Gdiplus::Color			get_pixel(int x, int y);
+
 	//PixelFormat24bppRGB과 같이 정의된 값을 문자열로 리턴하며 simple = true일 경우는 "RGB (24bit)"와 같이 리턴한다.
 	//fmt가 주어지지 않으면 현재 이미지의 PixelFormat을 구하여 결과를 리턴한다.
 	//한번 구한 후에는 m_pixel_format_str 변수에 저장되고 이를 리턴하지만 다시 구해야 할 경우는 reset = true로 호출한다.
@@ -205,15 +207,19 @@ protected:
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 선언한다.
 	std::deque<ComPtr<ID2D1Bitmap1>>		m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
 	ComPtr<ID2D1Bitmap1>		m_img_origin;
-	uint8_t*				data = nullptr;
-	int						m_frame_index = 0;
-	//float					m_width = 0.0f;
-	//float					m_height = 0.0f;
+
+	uint8_t*				m_data = nullptr;
+	UINT					m_stride = 0;
 	int						m_channel = 0;
+
+	int						m_frame_index = 0;
 	CString					m_pixel_format_str;
+
 	//촬영된 이미지의 경우 exif 정보를 추출한다.
 	CSCEXIFInfo				m_exif_info;
 	HRESULT					extract_exif_info(IWICBitmapDecoder* pDecoder);
+
+
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder);
 
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;

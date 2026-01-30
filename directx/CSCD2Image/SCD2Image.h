@@ -100,6 +100,7 @@ public:
 	};
 
 	HRESULT					create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height);
+	void					release();
 
 	//load external image
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path);
@@ -132,7 +133,7 @@ public:
 	CString					get_pixel_format_str(WICPixelFormatGUID *pf = NULL, bool simple = true, bool reset = false);
 
 
-	//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
+	//index 위치의 이미지가 nullptr이 아니고, width, height 모두 0보다 커야 한다.
 	bool					is_empty(int index = 0);
 	bool					is_valid(int index = 0);
 

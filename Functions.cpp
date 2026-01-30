@@ -6786,6 +6786,20 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 CRect draw_text(ID2D1DeviceContext* d2dc,
 				CRect rTarget,
 				CString text,
+				CString font_name,
+				float font_size,
+				int font_weight,
+				Gdiplus::Color cr_text,
+				Gdiplus::Color cr_shadow,
+				UINT align)
+{
+	return draw_text(d2dc, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), text, font_name, font_size, font_weight, cr_text, cr_shadow, align);
+}
+
+CRect draw_text(ID2D1DeviceContext* d2dc,
+				Gdiplus::RectF rTarget,
+				CString text,
+				CString font_name,
 				float font_size,
 				int font_weight,
 				Gdiplus::Color cr_text,
@@ -6797,37 +6811,79 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	IDWriteTextLayout*		text_layout = NULL;
 	ID2D1SolidColorBrush*	text_brush = NULL;
 	ID2D1SolidColorBrush*	shadow_brush = NULL;
-	DWRITE_TEXT_METRICS		textMetrics;
+	DWRITE_TEXT_METRICS		tm;
 
+	text.Replace(_T("\\n"), _T("\n"));
 	d2dc->CreateSolidColorBrush(get_d2color(cr_text), &text_brush);
 	d2dc->CreateSolidColorBrush(get_d2color(cr_shadow), &shadow_brush);
 
 	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&write_factory));
-	write_factory->CreateTextFormat(_T("맑은 고딕"), nullptr, (DWRITE_FONT_WEIGHT)font_weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, _T("ko-kr"), &write_format);
+	write_factory->CreateTextFormat(font_name, nullptr, (DWRITE_FONT_WEIGHT)font_weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, _T("ko-kr"), &write_format);
 
 	//CDC와는 다르게 뭔가 갱신할 때 write_format 생성이 실패할때가 있다.
 	if (write_format == NULL)
 		return CRect();
 
-	write_format->SetTextAlignment(
-		(align & DT_CENTER) ? DWRITE_TEXT_ALIGNMENT_CENTER :
-		(align & DT_RIGHT) ? DWRITE_TEXT_ALIGNMENT_TRAILING :
-		DWRITE_TEXT_ALIGNMENT_LEADING
-	);
+	//align 설정 함수를 사용하지 않고 직접 출력 위치를 계산하기 위해 아래 코드 스킵.
+	//write_format->SetTextAlignment(
+	//	(align & DT_CENTER) ? DWRITE_TEXT_ALIGNMENT_CENTER :
+	//	(align & DT_RIGHT) ? DWRITE_TEXT_ALIGNMENT_TRAILING :
+	//	DWRITE_TEXT_ALIGNMENT_LEADING
+	//);
 
-	write_format->SetParagraphAlignment(
-		(align & DT_VCENTER) ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER :
-		(align & DT_BOTTOM) ? DWRITE_PARAGRAPH_ALIGNMENT_FAR :
-		DWRITE_PARAGRAPH_ALIGNMENT_NEAR
-	);
+	//write_format->SetParagraphAlignment(
+	//	(align & DT_VCENTER) ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER :
+	//	(align & DT_BOTTOM) ? DWRITE_PARAGRAPH_ALIGNMENT_FAR :
+	//	DWRITE_PARAGRAPH_ALIGNMENT_NEAR
+	//);
 
-	write_factory->CreateTextLayout(text, text.GetLength(), write_format, (FLOAT)rTarget.Width(), (FLOAT)rTarget.Height(), &text_layout);
+	float line_spacing = 1.5f;
+	write_factory->CreateTextLayout(text, text.GetLength(), write_format, rTarget.Width, rTarget.Height, &text_layout);
 	if (text_layout)
-		text_layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, font_size * 1.5f, font_size * 1.2f);
+		text_layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, font_size * line_spacing, font_size * line_spacing * 0.8f);// font_size * 3.6f); A reasonable ratio to lineSpacing is 80%.
 
-	text_layout->GetMetrics(&textMetrics);
+	//metrics도 정확히 계산되지만 왜 출력하면 글자가 약간 왼쪽 하단에 표시되는 것인가? 폰트에 따라 다른가...
+	//맑은 고딕일때는 -1, +1 위치에 표시되지만 Consolas일때는 정중앙에 표시된다.
+	text_layout->GetMetrics(&tm);
 
-	CRect text_rect(textMetrics.left, textMetrics.top, textMetrics.left + textMetrics.width, textMetrics.top + textMetrics.height);
+	UINT32 lineCount = 0;
+	text_layout->GetLineMetrics(nullptr, 0, &lineCount);
+	
+	//DWRITE_LINE_METRICS lm = {};
+	std::vector<DWRITE_LINE_METRICS> lines(lineCount);
+	text_layout->GetLineMetrics(lines.data(), lineCount, &lineCount);
+
+	float x = rTarget.X;
+	float y = rTarget.Y;
+
+	if (align & DT_RIGHT)
+		x = rTarget.GetRight() - tm.widthIncludingTrailingWhitespace;
+	else if (align & DT_CENTER)
+		x = rTarget.X + (rTarget.Width - tm.widthIncludingTrailingWhitespace) * 0.5f;
+
+	if (align & DT_BOTTOM)
+		y = rTarget.GetBottom() - tm.height;
+	else if (align & DT_VCENTER)
+		y = rTarget.Y + (rTarget.Height - tm.height) * 0.5f;// +(lines[0].height - lines[0].baseline);
+	/*
+	text_layout->Release();
+	write_factory->CreateTextLayout(text, text.GetLength(), write_format, tm.widthIncludingTrailingWhitespace, tm.height, &text_layout);
+
+	//om.top : glyph가 논리 영역 위로 튀어나간 픽셀
+	//om.bottom : 아래로 튀어나간 픽셀
+	//뭔가 올바르게 구해지지 않는다.
+	DWRITE_OVERHANG_METRICS om;
+	text_layout->GetOverhangMetrics(&om);
+	float visualHeight = tm.height + om.top + om.bottom;
+	float x = rTarget.X + (rTarget.GetRight() - rTarget.X - tm.width) * 0.5f;
+	float y = rTarget.Y + (rTarget.Height - visualHeight) * 0.5f - om.top;
+
+	//text_layout->GetClusterMetrics()
+	*/
+
+	//textMetrics의 widthIncludingTrailingWhitespace = 12.9687500
+	//CRect text_rect(textMetrics.left, textMetrics.top, textMetrics.left + textMetrics.width, textMetrics.top + textMetrics.height);
+	CRect text_rect(x, y, x + tm.widthIncludingTrailingWhitespace, y + tm.height);
 
 	bool using_shadow = true;
 	if (using_shadow)
@@ -6842,7 +6898,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		textRenderTarget->BeginDraw();
 		textRenderTarget->Clear(D2D1::ColorF(0, 0, 0, 0));
 
-		textRenderTarget->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left, (FLOAT)rTarget.top), text_layout, shadow_brush);
+		textRenderTarget->DrawTextLayout(D2D1::Point2F(x, y - (lines[0].height - lines[0].baseline) * 0.5f), text_layout, shadow_brush);
 		//textRenderTarget->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left, (FLOAT)rTarget.top), text_layout, text_brush);
 		textRenderTarget->EndDraw();
 		textRenderTarget->GetBitmap(&textBitmap);
@@ -6911,10 +6967,12 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	}
 	else
 	{
-		d2dc->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left + 1.0f, (FLOAT)rTarget.top + 1.0f), text_layout, shadow_brush);
+		d2dc->DrawTextLayout(D2D1::Point2F(x + 1.0f, y + 1.0f), text_layout, shadow_brush);
 	}
 
-	d2dc->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left - 1, (FLOAT)rTarget.top - 1), text_layout, text_brush);
+	//d2dc->DrawTextLayout(D2D1::Point2F(rTarget.X - 1, rTarget.Y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);
+	d2dc->DrawTextLayout(D2D1::Point2F(x - 1, y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);
+	//d2dc->DrawText(text, text.GetLength(), write_format, D2D1::RectF(x, y, x + tm.width, y + tm.height), text_brush);
 
 	return text_rect;
 }

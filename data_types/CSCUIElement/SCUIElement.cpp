@@ -108,11 +108,14 @@ HRESULT CSCUIElement::load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceCon
 {
 	HRESULT hr = S_FALSE;
 
+	if (m_image)
+	{
+		delete m_image;
+		m_image = NULL;
+	}
+
 	if (m_image_path.IsEmpty() || !PathFileExists(m_image_path))
 		return hr;
-
-	if (m_image)
-		delete m_image;
 
 	m_image = new CSCD2Image;
 	m_image->load(WICfactory, d2context, m_image_path);

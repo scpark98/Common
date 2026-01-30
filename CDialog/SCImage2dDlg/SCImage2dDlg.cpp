@@ -259,20 +259,7 @@ void CSCImage2dDlg::OnPaint()
 		//draw_text()를 사용하면 간편할수는 있으나 이 함수안에서는 OnPaint()가 호출될 때마다 계속 객체를 생성, 해제하는 액션을 수행하므로 부담을 줄 수 있다.
 		//기존처럼 이미 만들어진 인스턴스들에 대해 속성만 변경한 후 사용하는 것이 더 경제적일 수 있다.
 		//대신 draw_text에서는 라인 간격도 조정 가능하다.
-		draw_text(d2dc, rText, info_str, 14.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
-		/*
-		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-
-		//shadow나 stroke 효과 적용방법을 아직 적용하지 않았으므로 우선 검은색으로 그리고 전경색으로 그린다.
-		rText.OffsetRect(1, 1);
-		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
-		d2dc->DrawText(info_str, info_str.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
-
-		rText.OffsetRect(-1, -1);
-		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
-		d2dc->DrawText(info_str, info_str.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
-		*/
+		draw_text(d2dc, rText, info_str, _T("맑은 고딕"), 14.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
 	}
 
 	//dc에 그릴 경우 d2devicecontext가 그려지고 dc에 그려지므로 깜빡임이 발생한다.

@@ -454,6 +454,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	ComPtr<IWICBitmap> wicBitmap;
 	WICPixelFormatGUID pf;
 	D2D_RECT_U r = { 0, 0, img_size.width, img_size.height };
+	UINT stride;
 
 	//frame_count = 1인 일반 이미지들도 아래의 for문으로 공통 처리하려니 예외적인 경우가 많아 별도 처리함.
 	if (frame_count == 1)
@@ -465,6 +466,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 		pFrameDecode->GetPixelFormat(&pf);
 		get_pixel_format_str(&pf);
+		m_stride = m_channel * img_size.width;
 
 		hr = pConverter->Initialize(
 			pFrameDecode.Get(),
@@ -486,7 +488,6 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			&wicBitmap
 		);
 
-		UINT stride;
 		WICRect rc = { 0, 0, img_size.width, img_size.height };
 		ComPtr<IWICBitmapLock> lock;
 		wicBitmap->Lock(&rc, WICBitmapLockRead, &lock);
@@ -607,6 +608,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				//일부 gif이미지는 각 프레임마다 크기가 다를 수 있으므로 매번 구해서는 안된다.
 				if (img_size.width == 0 || img_size.height == 0)
 					pFrameDecode->GetSize(&img_size.width, &img_size.height);
+
+				m_stride = m_channel * img_size.width;
 			}
 
 			ComPtr<ID2D1Bitmap1> frame_img;
@@ -799,8 +802,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				ComPtr<IWICBitmapLock> lock;
 				wicBitmap->Lock(&rc, WICBitmapLockRead, &lock);
 
-				lock->GetStride(&m_stride);
-				m_channel = m_stride / rc.Width;
+				lock->GetStride(&stride);
+				//m_channel = m_stride / rc.Width;
 
 				UINT bufferSize = 0;
 				BYTE* pixels = nullptr;
@@ -993,12 +996,18 @@ HRESULT CSCD2Image::get_sub_img(CRect r, CSCD2Image* dest)
 
 HRESULT CSCD2Image::get_sub_img(D2D1_RECT_U r, CSCD2Image* dest)
 {
+	if (m_img.size() == 0 || m_img[0] == nullptr)
+		return S_FALSE;
+
 	D2D1_POINT_2U pt = { 0, 0 };
 	return dest->get()->CopyFromBitmap(&pt, m_img[0].Get(), &r);
 }
 
 void CSCD2Image::restore_original_image()
 {
+	if (m_img.size() == 0 || m_img[0] == nullptr)
+		return;
+
 	D2D1_POINT_2U pt = { 0, 0 };
 	D2D1_RECT_U r = { 0, 0, get_width(), get_height()};
 	m_img[0].Get()->CopyFromBitmap(&pt, m_img_origin.Get(), &r);
@@ -1045,6 +1054,10 @@ HRESULT CSCD2Image::save(CString path, float quality)
 
 HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 {
+	//이미지가 정상적으로 로딩되어있지 않은 경우
+	if (m_pWICFactory == nullptr)
+		return S_FALSE;
+
 	HRESULT hr = S_OK;
 
 	va_list args;
@@ -1260,7 +1273,7 @@ float CSCD2Image::get_ratio()
 	return get_width() / get_height();
 }
 
-//m_pBitmap이 유효하고, width, height 모두 0보다 커야 한다.
+//index 위치의 이미지가 nullptr이 아니고, width, height 모두 0보다 커야 한다.
 bool CSCD2Image::is_empty(int index)
 {
 	if (this == NULL)
@@ -1566,6 +1579,15 @@ Gdiplus::Color CSCD2Image::get_pixel(int x, int y)
 	int width = (int)get_width();
 	int height = (int)get_height();
 
+	//실제 이미지는 1, 3, 4채널일 수 있지만 load()에서 무조건 32BitPRGBA 포맷으로 읽고 m_data도 출력하므로 4채널로 계산해야 한다.
+	int channel = 4;
+	int stride = channel * width;
+	b = *(m_data + y * stride + x * channel + 0);
+	g = *(m_data + y * stride + x * channel + 1);
+	r = *(m_data + y * stride + x * channel + 2);
+	a = *(m_data + y * stride + x * channel + 3);
+
+/*
 	b = *(m_data + y * m_stride + x * m_channel + 0);
 	g = *(m_data + y * m_stride + x * m_channel + 1);
 	r = *(m_data + y * m_stride + x * m_channel + 2);
@@ -1580,6 +1602,7 @@ Gdiplus::Color CSCD2Image::get_pixel(int x, int y)
 	}
 
 	a = *(m_data + y * m_stride + x * m_channel + 3);
+*/
 	return Gdiplus::Color(a, r, g, b);
 }
 
@@ -1595,6 +1618,8 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 
 	if (pf == NULL)
 		return str_fmt;
+
+	m_stride = m_channel = 0;
 
 	if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppBGRA) ||
 		IsEqualGUID(*pf, GUID_WICPixelFormat64bppBGRA))
@@ -1690,8 +1715,6 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 		str_fmt.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos), bits);
 		TRACE(_T("str_fmt = %s\n"), str_fmt);
 	}
-
-	m_pixel_format_str = str_fmt;
 
 	return m_pixel_format_str;
 }

@@ -132,6 +132,9 @@ public:
 	//한번 구한 후에는 m_pixel_format_str 변수에 저장되고 이를 리턴하지만 다시 구해야 할 경우는 reset = true로 호출한다.
 	CString					get_pixel_format_str(WICPixelFormatGUID *pf = NULL, bool simple = true, bool reset = false);
 
+	//alpha pixel들의 count를 구한다. (m_alpha_pixel_count < 0 || recount = true)이면 새로 계산한다. 그렇지 않으면 이미 구해놓은 정보를 리턴한다.
+	int						get_alpha_pixel_count(bool recount = false);
+
 
 	//index 위치의 이미지가 nullptr이 아니고, width, height 모두 0보다 커야 한다.
 	bool					is_empty(int index = 0);
@@ -214,7 +217,9 @@ protected:
 	int						m_channel = 0;
 
 	int						m_frame_index = 0;
+
 	CString					m_pixel_format_str;
+	int						m_alpha_pixel_count = -1;
 
 	//촬영된 이미지의 경우 exif 정보를 추출한다.
 	CSCEXIFInfo				m_exif_info;

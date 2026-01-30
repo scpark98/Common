@@ -134,6 +134,10 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	//20260129 scpark 위와 같이 외부 파일을 CreateDecoderFromFilename()로 열면 잠겨져서 파일명 변경, 삭제, 이동 등 아무것도 할 수 없다.
 	//아래와 같이 stream으로 읽어서 해결함.
 	ULONGLONG file_size = get_file_size(path);
+
+	if (file_size == 0)
+		return S_FALSE;
+
 	uint8_t* data = new uint8_t[file_size];
 	read_raw(path, data, file_size);
 
@@ -152,7 +156,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		&pDecoder
 	);
 
-	if (FAILED(hr))
+	if (FAILED(hr) || !pDecoder)
 		return hr;
 
 	hr = load(pWICFactory, d2context, pDecoder.Get());
@@ -1716,5 +1720,37 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 		TRACE(_T("str_fmt = %s\n"), str_fmt);
 	}
 
+	m_pixel_format_str = str_fmt;
 	return m_pixel_format_str;
+}
+
+//alpha pixel들의 count를 구한다. (m_alpha_pixel_count < 0 || recount = true)이면 새로 계산한다. 그렇지 않으면 이미 구해놓은 정보를 리턴한다.
+int CSCD2Image::get_alpha_pixel_count(bool recount)
+{
+	if (m_alpha_pixel_count >= 0 && !recount)
+		return m_alpha_pixel_count;
+
+	byte a;
+	int width = (int)get_width();
+	int height = (int)get_height();
+
+	//실제 이미지는 1, 3, 4채널일 수 있지만 load()에서 무조건 32BitPRGBA 포맷으로 읽고 m_data도 추출하므로 4채널로 계산해야 한다.
+	int channel = 4;
+	int stride = channel * width;
+
+	m_alpha_pixel_count = 0;
+
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			a = *(m_data + y * stride + x * channel + 3);
+
+			//1ch, 3ch, 4ch 모두 4ch 포맷으로 로딩하므로 a값은 항상 0 ~ 255 사이의 값을 가진다. 255 미만인 픽셀만 카운트한다.
+			if (a < 255)
+				m_alpha_pixel_count++;
+		}
+	}
+
+	return m_alpha_pixel_count;
 }

@@ -472,7 +472,7 @@ public:
 	{
 		CString res;
 		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
-			_T("노출 시간 : 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: N %s, E %s, %.0fm"),
+			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: N %s, E %s, %.0fm"),
 			camera_make,
 			camera_model,
 			software,

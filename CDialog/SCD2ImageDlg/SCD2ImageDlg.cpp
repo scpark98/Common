@@ -2,28 +2,28 @@
 //
 
 //#include "afxdialogex.h"
-#include "SCImage2dDlg.h"
+#include "SCD2ImageDlg.h"
 
 #include <thread>
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../AutoFont.h"
 
-// CSCImage2dDlg 대화 상자
+// CSCD2ImageDlg 대화 상자
 
-IMPLEMENT_DYNAMIC(CSCImage2dDlg, CDialog)
+IMPLEMENT_DYNAMIC(CSCD2ImageDlg, CDialog)
 
-CSCImage2dDlg::CSCImage2dDlg(CWnd* parent)
+CSCD2ImageDlg::CSCD2ImageDlg(CWnd* parent)
 {
 	m_img.resize(m_buffer_max);
 }
 
-CSCImage2dDlg::~CSCImage2dDlg()
+CSCD2ImageDlg::~CSCD2ImageDlg()
 {
 	stop();
 }
 
-bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
+bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 {
 	m_parent = parent;
 
@@ -31,10 +31,10 @@ bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
-	wc.lpszClassName = _T("CSCImage2dDlg");
+	wc.lpszClassName = _T("CSCD2ImageDlg");
 	AfxRegisterClass(&wc);
 
-	bool res = CreateEx(NULL, wc.lpszClassName, _T("CSCImage2dDlg"), (DWORD)dwStyle, CRect(x, y, x + cx, y + cy), parent, 0);
+	bool res = CreateEx(NULL, wc.lpszClassName, _T("CSCD2ImageDlg"), (DWORD)dwStyle, CRect(x, y, x + cx, y + cy), parent, 0);
 	if (!res)
 		return false;
 
@@ -75,33 +75,33 @@ bool CSCImage2dDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 	}
 
-	m_image_roi = get_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), Gdiplus::RectF());
+	m_image_roi = get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), Gdiplus::RectF());
 
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Ivory), &m_brush);
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(1.f, 1.f, 1.f, 0.2f), &m_brush_pixel_guide);
 
-	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel"), false));
-	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel_pos"), true));
-	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show info"), false));
-	m_fit2ctrl = AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), true);
-	m_show_cursor_guide_line = AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("show cursor guide line"), false);
+	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel"), false));
+	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel_pos"), true));
+	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show info"), false));
+	m_fit2ctrl = AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), true);
+	m_show_cursor_guide_line = AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show cursor guide line"), false);
 
-	m_interpolation_mode = (D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+	m_interpolation_mode = (D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 
 	if (!m_fit2ctrl)
-		zoom(get_profile_value(_T("setting\\CSCImage2dDlg"), _T("zoom ratio"), 1.0));
+		zoom(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), 1.0));
 
 
 	return true;
 }
 
-void CSCImage2dDlg::DoDataExchange(CDataExchange* pDX)
+void CSCD2ImageDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 }
 
 
-BEGIN_MESSAGE_MAP(CSCImage2dDlg, CDialog)
+BEGIN_MESSAGE_MAP(CSCD2ImageDlg, CDialog)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
@@ -113,16 +113,16 @@ BEGIN_MESSAGE_MAP(CSCImage2dDlg, CDialog)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETCURSOR()
 	ON_WM_WINDOWPOSCHANGED()
-	ON_REGISTERED_MESSAGE(Message_CSCD2Image, &CSCImage2dDlg::on_message_from_CSCD2Image)
-	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCImage2dDlg::on_message_from_CSCSliderCtrl)
-	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCImage2dDlg::on_message_CSCThumbCtrl)
+	ON_REGISTERED_MESSAGE(Message_CSCD2Image, &CSCD2ImageDlg::on_message_from_CSCD2Image)
+	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCD2ImageDlg::on_message_from_CSCSliderCtrl)
+	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCD2ImageDlg::on_message_CSCThumbCtrl)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
-// CSCImage2dDlg 메시지 처리기
+// CSCD2ImageDlg 메시지 처리기
 
-void CSCImage2dDlg::OnPaint()
+void CSCD2ImageDlg::OnPaint()
 {
 	//if (m_skip_repaint)
 	//{
@@ -130,7 +130,7 @@ void CSCImage2dDlg::OnPaint()
 	//	return;
 	//}
 
-	//TRACE(_T("CSCImage2dDlg::OnPaint. %ld\n"), GetTickCount64());
+	//TRACE(_T("CSCD2ImageDlg::OnPaint. %ld\n"), GetTickCount64());
 
 	CPaintDC dc(this); // device context for painting
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
@@ -168,9 +168,13 @@ void CSCImage2dDlg::OnPaint()
 		{
 			msg.Format(_T("%s\n\n위 파일이 존재하지 않습니다."), m_img[0].get_filename());
 		}
+		else if (get_file_size(m_img[0].get_filename()) == 0)
+		{
+			msg.Format(_T("%s\n\n파일 크기가 0 바이트입니다."), m_img[0].get_filename());
+		}
 		else
 		{
-			msg.Format(_T("%s\n파일이 손상되었거나 지원하지 않는 형식입니다."), m_img[0].get_filename());
+			msg.Format(_T("%s\n\n파일이 손상되었거나 지원하지 않는 형식입니다."), m_img[0].get_filename());
 		}
 		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
 		//DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, indianred, black, 2, 1);
@@ -238,7 +242,8 @@ void CSCImage2dDlg::OnPaint()
 	}
 
 	//실제 이미지를 그려준다. 투명 이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
-	if (m_img[0].get_channel() == 4 || (m_img[0].get_channel() == 1 && get_part(m_img[0].get_filename(), fn_ext) == _T("gif")))
+	//if (m_img[0].get_channel() == 4 || (m_img[0].get_channel() == 1 && get_part(m_img[0].get_filename(), fn_ext) == _T("gif")))
+	if (m_img[0].get_alpha_pixel_count() > 0)
 		d2dc->FillRectangle(CRect_to_d2Rect(m_r_display), m_d2dc.get_zigzag_brush().Get());
 
 	m_img[0].draw(d2dc, CRect_to_d2Rect(m_r_display));
@@ -247,7 +252,7 @@ void CSCImage2dDlg::OnPaint()
 	if (m_show_info)// && m_parent->IsZoomed())
 	{
 		CString info_str;
-		info_str.Format(_T("%s\n확대 배율 : %.0f%%\n표시 크기 : %d x %d"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
+		info_str.Format(_T("%s\n확대 배율: %.0f%%\n표시 크기: %d x %d"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
 
 		//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
 		if (m_img[0].get_exif_str().GetLength())
@@ -447,7 +452,7 @@ void CSCImage2dDlg::OnPaint()
 //이 컨트롤에서 자체 처리할 메시지와 반드시 parent에서 처리할 메시지를 명확히 해야 한다.
 //여기서 바로 처리할 수 밖에 없는 메시지라면 모를까 모두 여기서 처리하면
 //범용성이 떨어질 수 있다.
-BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
+BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
@@ -586,7 +591,7 @@ BOOL CSCImage2dDlg::PreTranslateMessage(MSG* pMsg)
 	return CDialog::PreTranslateMessage(pMsg);
 }
 
-BOOL CSCImage2dDlg::OnEraseBkgnd(CDC* pDC)
+BOOL CSCD2ImageDlg::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	return FALSE;
@@ -594,25 +599,31 @@ BOOL CSCImage2dDlg::OnEraseBkgnd(CDC* pDC)
 }
 
 //레지스트리에 저장된 recent file 정보가 있다면 로딩한다.
-bool CSCImage2dDlg::load()
+bool CSCD2ImageDlg::load()
 {
-	CString recent = AfxGetApp()->GetProfileString(_T("setting\\SCImage2dDlg"), _T("recent file"), _T(""));
+	CString recent = AfxGetApp()->GetProfileString(_T("setting\\CSC2DImageDlg"), _T("recent file"), _T(""));
 	return load(recent);
 }
 
-bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
+bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs)
 {
 	m_pixel_pos.X = -1.0f;
 	m_pixel_pos.Y = -1.0f;
 
-	AfxGetApp()->WriteProfileString(_T("setting\\CSCImage2dDlg"), _T("recent file"), sFile);
+	AfxGetApp()->WriteProfileString(_T("setting\\CSCD2ImageDlg"), _T("recent file"), sFile);
 
 	//m_mutex.lock();
 	if (m_img.size() < m_buffer_max)
 		m_img.resize(m_buffer_max);
 	//m_mutex.unlock();
 
-	HRESULT res = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile);
+	HRESULT hr = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile);
+
+	if (hr != S_OK)
+	{
+		Invalidate();
+		return false;
+	}
 
 	if (m_img[0].is_animated_image())
 	{
@@ -626,10 +637,10 @@ bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 		m_slider_gif.ShowWindow(SW_SHOW);
 		
 		//원래 CSCGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
-		//하지만 CSCImage2dDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
+		//하지만 CSCD2ImageDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
 		//m_img[0].set_gif_play_itself(false);
 
-		//std::thread t(&CSCImage2dDlg::thread_gif_animation, this);
+		//std::thread t(&CSCD2ImageDlg::thread_gif_animation, this);
 		//t.detach();
 	}
 	else
@@ -641,10 +652,10 @@ bool CSCImage2dDlg::load(CString sFile, bool load_thumbs)
 	if (m_thumb.size() == 0 || load_thumbs)
 		m_thumb.set_path(get_part(sFile, fn_folder));
 
-	return (res == S_OK);
+	return (hr == S_OK);
 }
 
-bool CSCImage2dDlg::load(CString sType, UINT id)
+bool CSCD2ImageDlg::load(CString sType, UINT id)
 {
 
 	m_filename.Format(_T("Resource Image(id:%d)"), id);
@@ -661,12 +672,12 @@ bool CSCImage2dDlg::load(CString sType, UINT id)
 }
 
 //png일 경우는 sType을 생략할 수 있다.
-bool CSCImage2dDlg::load(UINT id)
+bool CSCD2ImageDlg::load(UINT id)
 {
 	return load(_T("PNG"), id);
 }
 
-CString CSCImage2dDlg::get_filename(bool fullpath)
+CString CSCD2ImageDlg::get_filename(bool fullpath)
 {
 	if (m_index < 0 || m_index >= m_files.size() || m_img.size() == 0)
 		return _T("");
@@ -674,7 +685,7 @@ CString CSCImage2dDlg::get_filename(bool fullpath)
 	return m_img[0].get_filename(fullpath);
 }
 
-void CSCImage2dDlg::release()
+void CSCD2ImageDlg::release()
 {
 	//for (auto img : m_img)
 	//	img.release();
@@ -683,38 +694,38 @@ void CSCImage2dDlg::release()
 	rerender();
 }
 
-void CSCImage2dDlg::set_show_info(bool show)
+void CSCD2ImageDlg::set_show_info(bool show)
 {
 	m_show_info = show;
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("show info"), show);
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show info"), show);
 	rerender();
 }
 
-void CSCImage2dDlg::set_show_pixel(bool show)
+void CSCD2ImageDlg::set_show_pixel(bool show)
 {
 	m_show_pixel = show;
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel"), m_show_pixel);
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel"), m_show_pixel);
 }
 
 //1:show, 0:hide, -1:toggle
-void CSCImage2dDlg::set_show_cursor_guide_line(int show)
+void CSCD2ImageDlg::set_show_cursor_guide_line(int show)
 {
 	if (show == -1)
 		m_show_cursor_guide_line = !m_show_cursor_guide_line;
 	else
 		m_show_cursor_guide_line = (show == 1);
 
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("show cursor guide line"), m_show_cursor_guide_line);
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show cursor guide line"), m_show_cursor_guide_line);
 }
 
-void CSCImage2dDlg::set_show_pixel_pos(bool show)
+void CSCD2ImageDlg::set_show_pixel_pos(bool show)
 {
 	m_show_pixel_pos = show;
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("show pixel pos"), m_show_pixel_pos);
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel pos"), m_show_pixel_pos);
 	rerender();
 }
 
-void CSCImage2dDlg::rerender()
+void CSCD2ImageDlg::rerender()
 {
 	if (m_img.size() == 0)
 		return;
@@ -724,7 +735,7 @@ void CSCImage2dDlg::rerender()
 	Invalidate();
 }
 
-bool CSCImage2dDlg::copy_to_clipboard(int type)
+bool CSCD2ImageDlg::copy_to_clipboard(int type)
 {
 	D2D1_RECT_U r;
 	D2D1_SIZE_F sz = m_img[0].get_size();
@@ -749,7 +760,7 @@ bool CSCImage2dDlg::copy_to_clipboard(int type)
 	return true;
 }
 
-bool CSCImage2dDlg::paste_from_clipboard()
+bool CSCD2ImageDlg::paste_from_clipboard()
 {
 	/*
 	stop_gif();
@@ -767,7 +778,7 @@ bool CSCImage2dDlg::paste_from_clipboard()
 	return false;
 }
 
-Gdiplus::RectF CSCImage2dDlg::get_image_roi()
+Gdiplus::RectF CSCD2ImageDlg::get_image_roi()
 {
 	//if (m_image_roi.IsEmptyArea())
 	//	return Gdiplus::RectF(0, 0, m_img.width, m_img.height);
@@ -775,28 +786,28 @@ Gdiplus::RectF CSCImage2dDlg::get_image_roi()
 	return m_image_roi;
 }
 
-void CSCImage2dDlg::set_image_roi(Gdiplus::RectF roi)
+void CSCD2ImageDlg::set_image_roi(Gdiplus::RectF roi)
 {
 	m_image_roi = roi;
 	get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
 	rerender();
 }
 
-D2D1_BITMAP_INTERPOLATION_MODE CSCImage2dDlg::get_interpolation_mode()
+D2D1_BITMAP_INTERPOLATION_MODE CSCD2ImageDlg::get_interpolation_mode()
 {
 	return m_interpolation_mode;
 }
 
 //이미지 부드럽게 보정
-void CSCImage2dDlg::set_interpolation_mode(D2D1_BITMAP_INTERPOLATION_MODE mode)
+void CSCD2ImageDlg::set_interpolation_mode(D2D1_BITMAP_INTERPOLATION_MODE mode)
 {
 	m_interpolation_mode = mode;
 	m_img[0].set_interpolation_mode(m_interpolation_mode);
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("interpolation mode"), mode);
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), mode);
 	rerender();
 }
 
-void CSCImage2dDlg::rotate(Gdiplus::RotateFlipType type)
+void CSCD2ImageDlg::rotate(Gdiplus::RotateFlipType type)
 {
 	if (m_img[0].is_empty())
 		return;
@@ -805,18 +816,18 @@ void CSCImage2dDlg::rotate(Gdiplus::RotateFlipType type)
 	rerender();
 }
 
-void CSCImage2dDlg::fit2ctrl(bool fit, bool invalidate)
+void CSCD2ImageDlg::fit2ctrl(bool fit, bool invalidate)
 {
 	m_fit2ctrl = fit;
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCImage2dDlg"), _T("fit to ctrl"), m_fit2ctrl);
-	write_profile_value(_T("setting\\CSCImage2dDlg"), _T("zoom ratio"), m_zoom);
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), m_fit2ctrl);
+	write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
 
 	if (invalidate)
 		rerender();
 }
 
 //mode : 1(zoom in), -1(zoom out), 0(reset)
-void CSCImage2dDlg::zoom(int mode)
+void CSCD2ImageDlg::zoom(int mode)
 {
 	if (mode > 0)
 		m_zoom += 0.2;
@@ -837,7 +848,7 @@ void CSCImage2dDlg::zoom(int mode)
 	rerender();
 }
 
-void CSCImage2dDlg::zoom(double ratio)
+void CSCD2ImageDlg::zoom(double ratio)
 {
 	m_zoom = ratio;
 	Clamp(m_zoom, 0.2, 40.0);
@@ -845,7 +856,7 @@ void CSCImage2dDlg::zoom(double ratio)
 	rerender();
 }
 
-void CSCImage2dDlg::OnSize(UINT nType, int cx, int cy)
+void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 {
 	CDialog::OnSize(nType, cx, cy);
 
@@ -876,7 +887,7 @@ void CSCImage2dDlg::OnSize(UINT nType, int cx, int cy)
 	}
 }
 
-void CSCImage2dDlg::OnLButtonDown(UINT nFlags, CPoint point)
+void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	Clamp(point.x, m_r_display.left, m_r_display.right);
@@ -912,7 +923,7 @@ void CSCImage2dDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	else if (m_fit2ctrl)
 	{
-		//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_lbuttondown), 0);
+		//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_lbuttondown), 0);
 		::DefWindowProc(GetParent()->GetSafeHwnd(), WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
 		//GetParent()->PostMessage(WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
 	}
@@ -920,7 +931,7 @@ void CSCImage2dDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	CDialog::OnLButtonDown(nFlags, point);
 }
 
-void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
+void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_lbutton_down)
@@ -950,7 +961,7 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			{
 				m_screen_roi = Gdiplus::RectF();
 				m_image_roi = Gdiplus::RectF();
-				write_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), m_image_roi);
+				write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), m_image_roi);
 				rerender();
 				return;
 			}
@@ -958,7 +969,7 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			//roi가 모두 그려지면, 또는 이동, 크기조정이 완료되면 m_image_roi로 변환해준다.
 			normalize_rect(m_screen_roi);
 			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &m_image_roi);
-			write_profile_value(_T("setting\\CSCImage2dDlg"), _T("image roi"), m_image_roi);
+			write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), m_image_roi);
 			TRACE(_T("roi completed.\n"));
 			rerender();
 		}
@@ -967,7 +978,7 @@ void CSCImage2dDlg::OnLButtonUp(UINT nFlags, CPoint point)
 	CDialog::OnLButtonUp(nFlags, point);
 }
 
-void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
+void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	TRACKMOUSEEVENT tme;
@@ -1162,14 +1173,14 @@ void CSCImage2dDlg::OnMouseMove(UINT nFlags, CPoint point)
 	CDialog::OnMouseMove(nFlags, point);
 }
 
-void CSCImage2dDlg::OnMouseHover(UINT nFlags, CPoint point)
+void CSCD2ImageDlg::OnMouseHover(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 
 	CDialog::OnMouseHover(nFlags, point);
 }
 
-void CSCImage2dDlg::OnMouseLeave()
+void CSCD2ImageDlg::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	m_static_pixel.ShowWindow(SW_HIDE);
@@ -1177,7 +1188,7 @@ void CSCImage2dDlg::OnMouseLeave()
 	CDialog::OnMouseLeave();
 }
 
-BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+BOOL CSCD2ImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_show_thumb)
@@ -1256,7 +1267,7 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 	CPoint client_pt = pt;
 	ScreenToClient(&client_pt);
 
-	//CSCImage2dDlg이고 이미지 표시 영역에 한해
+	//CSCD2ImageDlg이고 이미지 표시 영역에 한해
 	if (WindowFromPoint(pt) == this && m_r_display.PtInRect(client_pt))
 	{
 		//픽셀 정보 표시라면 스포이트를
@@ -1273,25 +1284,25 @@ BOOL CSCImage2dDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 	return CDialog::OnSetCursor(pWnd, nHitTest, message);
 }
 
-void CSCImage2dDlg::set_cross_cursor(UINT nID)
+void CSCD2ImageDlg::set_cross_cursor(UINT nID)
 {
 	m_cursor_cross = AfxGetApp()->LoadCursor(nID);
 }
 
 //dropper(spuit) cursor 지정
-void CSCImage2dDlg::set_dropper_cursor(UINT nID)
+void CSCD2ImageDlg::set_dropper_cursor(UINT nID)
 {
 	m_cursor_dropper = AfxGetApp()->LoadCursor(nID);
 }
 
-void CSCImage2dDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+void CSCD2ImageDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CDialog::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
 
-LRESULT CSCImage2dDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
+LRESULT CSCD2ImageDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
 {
 	CSCD2ImageMessage* msg = (CSCD2ImageMessage*)wParam;
 	if (!msg)
@@ -1307,7 +1318,7 @@ LRESULT CSCImage2dDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-LRESULT CSCImage2dDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
+LRESULT CSCD2ImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 {
 	CSCSliderCtrlMsg* msg = (CSCSliderCtrlMsg*)wParam;
 	if (msg->msg == CSCSliderCtrlMsg::msg_thumb_move)
@@ -1319,7 +1330,7 @@ LRESULT CSCImage2dDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lPara
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCImage2dDlg::pause(int pos)
+void CSCD2ImageDlg::pause(int pos)
 {
 	if (m_img.size() == 0)
 		return;
@@ -1327,7 +1338,7 @@ void CSCImage2dDlg::pause(int pos)
 	m_img[0].pause(pos);
 }
 
-void CSCImage2dDlg::stop()
+void CSCD2ImageDlg::stop()
 {
 	if (m_img.size() == 0)
 		return;
@@ -1335,7 +1346,7 @@ void CSCImage2dDlg::stop()
 	m_img[0].stop();
 }
 
-void CSCImage2dDlg::goto_frame(int pos, bool pause)
+void CSCD2ImageDlg::goto_frame(int pos, bool pause)
 {
 	if (m_img.size() == 0)
 		return;
@@ -1344,14 +1355,14 @@ void CSCImage2dDlg::goto_frame(int pos, bool pause)
 }
 
 //지정 % 위치의 프레임으로 이동
-void CSCImage2dDlg::goto_frame_percent(int pos, bool pause)
+void CSCD2ImageDlg::goto_frame_percent(int pos, bool pause)
 {
 	double dpos = ((double)pos / (double)m_img[0].get_frame_count()) * 100.0;
 	goto_frame((int)dpos, pause);
 }
 
 /*
-void CSCImage2dDlg::thread_gif_animation()
+void CSCD2ImageDlg::thread_gif_animation()
 {
 	if (m_img[0].get_frame_count() < 2)
 		return;
@@ -1406,14 +1417,14 @@ void CSCImage2dDlg::thread_gif_animation()
 }
 */
 
-void CSCImage2dDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
+void CSCD2ImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
 {
 	//m_br_zigzag.release();
 	//m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, cr_back, cr_fore);
 	rerender();
 }
 
-LRESULT CSCImage2dDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
+LRESULT CSCD2ImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 {
 	CString str;
 	CSCThumbCtrlMessage* msg = (CSCThumbCtrlMessage*)wParam;
@@ -1494,14 +1505,14 @@ LRESULT CSCImage2dDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 	}
 	else if (msg->msg == CSCThumbCtrl::message_thumb_reload)
 	{
-		//CString recent_folder = AfxGetApp()->GetProfileString(_T("setting\\CSCImage2dDlg"), _T("recent folder"), _T(""));
+		//CString recent_folder = AfxGetApp()->GetProfileString(_T("setting\\CSCD2ImageDlg"), _T("recent folder"), _T(""));
 		//m_thumb.set_path(recent_folder);
 	}
 
 	return 0;
 }
 
-void CSCImage2dDlg::set_view_mode(int view_mode)
+void CSCD2ImageDlg::set_view_mode(int view_mode)
 {
 	if (view_mode == view_mode_toggle)
 		m_show_thumb = !m_show_thumb;
@@ -1521,7 +1532,7 @@ void CSCImage2dDlg::set_view_mode(int view_mode)
 		m_thumb.SetFocus();
 }
 
-void CSCImage2dDlg::display_image(CString filepath, bool scan_folder)
+void CSCD2ImageDlg::display_image(CString filepath, bool scan_folder)
 {
 	m_mutex.lock();
 	m_files.clear();
@@ -1552,9 +1563,9 @@ void CSCImage2dDlg::display_image(CString filepath, bool scan_folder)
 }
 
 //index : -1(next), -2(previous)
-void CSCImage2dDlg::display_image(int index, bool scan_folder)
+void CSCD2ImageDlg::display_image(int index, bool scan_folder)
 {
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_hide_message), 0);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_hide_message), 0);
 
 	if (m_files.size() == 0)
 		return;
@@ -1569,7 +1580,7 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 		if (m_index >= m_files.size() - 1)
 		{
 			//show_message(_T("맨 마지막 이미지"));
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_last_image), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_last_image), 0);
 			return;
 		}
 		m_index++;
@@ -1595,7 +1606,7 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 		if (m_index == 0)
 		{
 			//show_message(_T("맨 처음 이미지"));
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_first_image), 0);
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_first_image), 0);
 			return;
 		}
 		m_index--;
@@ -1623,8 +1634,8 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 	//m_notice.ShowWindow(SW_HIDE);
 
 	CString folder = get_part(m_files[m_index], fn_folder);
-	CString recent_folder = AfxGetApp()->GetProfileString(_T("setting\\CSCImage2dDlg"), _T("recent folder"), _T(""));
-	AfxGetApp()->WriteProfileString(_T("setting\\CSCImage2dDlg"), _T("recent folder"), folder);
+	CString recent_folder = AfxGetApp()->GetProfileString(_T("setting\\CSCD2ImageDlg"), _T("recent folder"), _T(""));
+	AfxGetApp()->WriteProfileString(_T("setting\\CSCD2ImageDlg"), _T("recent folder"), folder);
 
 	//cur image가 아직 load되지 않았다면 파일을 로딩하지만
 	//미리 버퍼링 된 이미지가 있다면 화면만 갱신하면 된다.
@@ -1637,8 +1648,6 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 	m_filename = m_img[0].get_filename();
 	if (!m_img[0].is_animated_image())
 		m_slider_gif.ShowWindow(SW_HIDE);
-
-	build_image_info_str();
 
 	CRect rc;
 	GetClientRect(rc);
@@ -1657,8 +1666,8 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 		m_index = find_index(m_files, cur_file);
 	}
 
-	AfxGetApp()->WriteProfileString(_T("setting\\CSCImage2dDlg"), _T("recent file"), m_filename);
-	add_registry_str(AfxGetApp(), _T("setting\\CSCImage2dDlg\\recent folders"), folder);
+	AfxGetApp()->WriteProfileString(_T("setting\\CSCD2ImageDlg"), _T("recent file"), m_filename);
+	add_registry_str(AfxGetApp(), _T("setting\\CSCD2ImageDlg\\recent folders"), folder);
 
 	//현재 이미지를 시작으로 forward or backward 버퍼링을 시작한다.
 	//버퍼링 중이었다면 버퍼링을 중지시킨 후 해야 한다.
@@ -1666,10 +1675,12 @@ void CSCImage2dDlg::display_image(int index, bool scan_folder)
 	if (m_buffer_max > 1)
 		SetTimer(timer_thread_buffering, 100, NULL);
 
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCImage2dDlg, (WPARAM)&CSCImage2dDlgMessage(this, message_image_changed), 0);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_image_changed), 0);
+
+	build_image_info_str();
 }
 
-void CSCImage2dDlg::build_image_info_str()
+void CSCD2ImageDlg::build_image_info_str()
 {
 	CString ratio_str;
 	float ratio = m_img[0].get_ratio();
@@ -1686,7 +1697,7 @@ void CSCImage2dDlg::build_image_info_str()
 	else
 		ratio_str.Format(_T("%.3f : 1"), ratio);
 
-	m_info_str.Format(_T("파일 이름 : %s\n파일 크기: %s (%s)\n수정 날짜: %s\n이미지 정보: %.0fx%.0fx%d (%s)\n이미지 비율: %s"),
+	m_info_str.Format(_T("파일 이름: %s\n파일 크기: %s (%s)\n수정 날짜: %s\n이미지 정보: %.0fx%.0fx%d (%s)\n이미지 비율: %s"),
 		m_filename + m_alt_info,
 		get_file_size_str(m_img[0].get_filename()),		//KB 단위
 		get_file_size_str(m_img[0].get_filename(), 0),	//byte 단위
@@ -1703,7 +1714,7 @@ void CSCImage2dDlg::build_image_info_str()
 	//}
 }
 
-void CSCImage2dDlg::goto_index(int index)
+void CSCD2ImageDlg::goto_index(int index)
 {
 	m_mutex.lock();
 	m_img.clear();
@@ -1726,7 +1737,7 @@ void CSCImage2dDlg::goto_index(int index)
 //테스트 목적으로 파일을 저장하여 확인할 경우는 주의해야 한다.
 //ASee 프로젝트에서는 CDirWatcher에 의해 현재 이미지가 속한 폴더를 모니터링하고 있으므로
 //계속 refresh하게 되어 thread_buffering()에서 계속 오류가 발생한 적이 있다.
-void CSCImage2dDlg::thread_buffering()
+void CSCD2ImageDlg::thread_buffering()
 {
 	TRACE(_T("thread_buffering start...\n"));
 
@@ -1789,7 +1800,7 @@ void CSCImage2dDlg::thread_buffering()
 }
 
 //현재 파일을 비롯해서 폴더를 다시 검사한다.
-void CSCImage2dDlg::reload_image()
+void CSCD2ImageDlg::reload_image()
 {
 	//현재 파일의 인덱스와 파일명을 기억해두고
 	int old_index = m_index;
@@ -1826,7 +1837,7 @@ void CSCImage2dDlg::reload_image()
 	display_image(index, false);
 }
 
-HRESULT CSCImage2dDlg::save(CString filepath, float quality)
+HRESULT CSCD2ImageDlg::save(CString filepath, float quality)
 {
 	if (m_img[0].is_empty())
 		return S_FALSE;
@@ -1834,7 +1845,7 @@ HRESULT CSCImage2dDlg::save(CString filepath, float quality)
 	return m_img[0].save(filepath, quality);
 }
 
-CSize CSCImage2dDlg::get_img_size()
+CSize CSCD2ImageDlg::get_img_size()
 {
 	if (m_img[0].is_empty())
 		return CSize();
@@ -1842,7 +1853,7 @@ CSize CSCImage2dDlg::get_img_size()
 	return CSize(m_img[0].get_width(), m_img[0].get_height());
 }
 
-int CSCImage2dDlg::get_channel()
+int CSCD2ImageDlg::get_channel()
 {
 	if (m_img.size() == 0 || m_img[0].is_empty())
 		return 0;
@@ -1851,7 +1862,7 @@ int CSCImage2dDlg::get_channel()
 }
 
 //start : 1(start), 0(stop), -1(toggle)
-void CSCImage2dDlg::start_slide_show(int start)
+void CSCD2ImageDlg::start_slide_show(int start)
 {
 	if (start == -1)
 		m_slide_show = !m_slide_show;
@@ -1874,20 +1885,20 @@ void CSCImage2dDlg::start_slide_show(int start)
 		KillTimer(timer_slide_show);
 	}
 }
-void CSCImage2dDlg::OnTimer(UINT_PTR nIDEvent)
+void CSCD2ImageDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (nIDEvent == timer_thread_buffering)
 	{
 		KillTimer(timer_thread_buffering);
-		std::thread t(&CSCImage2dDlg::thread_buffering, this);
+		std::thread t(&CSCD2ImageDlg::thread_buffering, this);
 		t.detach();
 	}
 
 	CDialog::OnTimer(nIDEvent);
 }
 
-void CSCImage2dDlg::scroll(int offset_x, int offset_y)
+void CSCD2ImageDlg::scroll(int offset_x, int offset_y)
 {
 	m_offset.x += offset_x;
 	m_offset.y += offset_y;
@@ -1895,7 +1906,7 @@ void CSCImage2dDlg::scroll(int offset_x, int offset_y)
 }
 
 //exif
-double CSCImage2dDlg::get_gps_latitude()
+double CSCD2ImageDlg::get_gps_latitude()
 {
 	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_latitude == 0.0f)
 		return 0.0;
@@ -1903,7 +1914,7 @@ double CSCImage2dDlg::get_gps_latitude()
 	return m_img[0].get_exif().gps_latitude;
 }
 
-double CSCImage2dDlg::get_gps_longitude()
+double CSCD2ImageDlg::get_gps_longitude()
 {
 	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_longitude)
 		return 0.0;

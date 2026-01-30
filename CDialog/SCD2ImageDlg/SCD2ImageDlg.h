@@ -24,8 +24,8 @@
 
 [animated gif 관련]
 - CSCGdiplusBitmap에 구현된 thread_gif()를 이용하면 간단하고 편하지만
-  이 함수에서 화면 갱신까지 처리되므로 CSCImage2dDlg에서 그린 roi 정보 등이 표시되지 않고 CSCImage2dDlg 내의 다른 컨트롤이 깜빡이는 현상도 발생한다.
-  CSCImage2dDlg에서 thread_gif()를 추가하고 직접 재생하도록 수정함.
+  이 함수에서 화면 갱신까지 처리되므로 CSCD2ImageDlg에서 그린 roi 정보 등이 표시되지 않고 CSCD2ImageDlg 내의 다른 컨트롤이 깜빡이는 현상도 발생한다.
+  CSCD2ImageDlg에서 thread_gif()를 추가하고 직접 재생하도록 수정함.
 */
 
 #pragma once
@@ -51,14 +51,14 @@
 
 #define ROI_RECT_HANDLE_COUNT	9		//roi의 크기 조정 및 이동을 위한 조정 핸들 개수
 
-// CSCImage2dDlg 대화 상자
+// CSCD2ImageDlg 대화 상자
 
-static const UINT Message_CSCImage2dDlg = ::RegisterWindowMessage(_T("MessageString_CSCImage2dDlg"));
+static const UINT Message_CSCD2ImageDlg = ::RegisterWindowMessage(_T("MessageString_CSCD2ImageDlg"));
 
-class CSCImage2dDlgMessage
+class CSCD2ImageDlgMessage
 {
 public:
-	CSCImage2dDlgMessage(CWnd* _pThis, int _msg, int _index = -1)
+	CSCD2ImageDlgMessage(CWnd* _pThis, int _msg, int _index = -1)
 		: pThis(_pThis), msg(_msg), index(_index)
 	{
 	}
@@ -69,13 +69,13 @@ public:
 };
 
 
-class CSCImage2dDlg : public CDialog
+class CSCD2ImageDlg : public CDialog
 {
-	DECLARE_DYNAMIC(CSCImage2dDlg)
+	DECLARE_DYNAMIC(CSCD2ImageDlg)
 
 public:
-	CSCImage2dDlg(CWnd* parent = nullptr);   // 표준 생성자입니다.
-	virtual ~CSCImage2dDlg();
+	CSCD2ImageDlg(CWnd* parent = nullptr);   // 표준 생성자입니다.
+	virtual ~CSCD2ImageDlg();
 
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
@@ -91,7 +91,7 @@ public:
 	CSCThumbCtrl	m_thumb;
 	LRESULT			on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam);
 
-	enum ENUM_CSCImage2dDlgMessage
+	enum ENUM_CSCD2ImageDlgMessage
 	{
 		message_image_changed = 0,	//현재 표시되는 이미지가 변경된 경우
 		message_hide_message,

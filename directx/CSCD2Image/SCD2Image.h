@@ -34,6 +34,7 @@
 #include <afxwin.h>
 //#include <d2d1.h>
 #include <d2d1_1.h>
+#include <dxgi1_2.h>
 #include <d2d1helper.h>
 //#include <d2d1effects.h>
 #include <d2d1effects_2.h>
@@ -70,14 +71,11 @@ class CSCD2ImageMessage
 {
 public:
 	CSCD2ImageMessage(CSCD2Image* _this, int _message, int _frame_index, int _total_frames)
+		: pThis(_this), message(_message), frame_index(_frame_index), total_frames(_total_frames)
 	{
-		pThis = _this;
-		message = _message;
-		frame_index = _frame_index;
-		total_frames = _total_frames;
 	}
 
-	CSCD2Image* pThis = NULL;
+	CSCD2Image* pThis = nullptr;
 	int		message;
 	int		frame_index = -1;
 	int		total_frames = -1;
@@ -87,6 +85,12 @@ class CSCD2Image
 {
 public:
 	CSCD2Image();
+	CSCD2Image(const CSCD2Image&) = delete;  // 복사 금지
+	CSCD2Image& operator=(const CSCD2Image&) = delete;  // 복사 할당 금지
+
+	CSCD2Image(CSCD2Image&& other) noexcept;  // 이동 생성자
+	CSCD2Image& operator=(CSCD2Image&& other) noexcept;  // 이동 할당 연산자
+
 	CSCD2Image(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height)
 	{
 		create(WICfactory, d2context, width, height);
@@ -186,6 +190,8 @@ public:
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
 
+	bool					copy_to_clipboard();
+
 //animated gif
 	bool					is_animated_image() { return (m_img.size() > 1); }
 	int						get_frame_count() { return m_img.size(); }
@@ -210,7 +216,7 @@ protected:
 
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 선언한다.
 	std::deque<ComPtr<ID2D1Bitmap1>>		m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
-	ComPtr<ID2D1Bitmap1>		m_img_origin;
+	ComPtr<ID2D1Bitmap1>	m_img_origin;
 
 	uint8_t*				m_data = nullptr;
 	UINT					m_stride = 0;

@@ -1,22 +1,140 @@
 #include "SCD2Image.h"
 
 #include <thread>
+#include "../../SCGdiplusBitmap.h"
 
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "Windowscodecs.lib")
+#pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
+
 
 CSCD2Image::CSCD2Image()
 {
 }
 
+CSCD2Image::CSCD2Image(CSCD2Image&& other) noexcept  // 이동 생성자
+: m_filename(std::move(other.m_filename))
+, m_pWICFactory(other.m_pWICFactory)
+, m_d2dc(other.m_d2dc)
+, m_img(std::move(other.m_img))
+, m_img_origin(other.m_img_origin)
+, m_data(other.m_data)
+, m_stride(other.m_stride)
+, m_channel(other.m_channel)
+, m_frame_index(other.m_frame_index)
+, m_pixel_format_str(std::move(other.m_pixel_format_str))
+, m_alpha_pixel_count(other.m_alpha_pixel_count)
+, m_exif_info(other.m_exif_info)
+, m_interpolation_mode(other.m_interpolation_mode)
+, m_parent(other.m_parent)
+, m_frame_delay(std::move(other.m_frame_delay))
+, m_ani_mirror(other.m_ani_mirror)
+, m_run_thread_animation(other.m_run_thread_animation)
+, m_thread_animation_terminated(other.m_thread_animation_terminated)
+, m_ani_paused(other.m_ani_paused)
+{
+	other.m_data = nullptr;
+	other.m_pWICFactory = nullptr;
+	other.m_d2dc = nullptr;
+	other.m_parent = NULL;
+	other.m_frame_index = 0;
+	other.m_stride = 0;
+	other.m_channel = 0;
+}
+
+CSCD2Image& CSCD2Image::operator=(CSCD2Image&& other) noexcept
+{
+	if (this != &other)
+	{
+		release();
+
+		m_filename = std::move(other.m_filename);
+		m_pWICFactory = other.m_pWICFactory;
+		m_d2dc = other.m_d2dc;
+		m_img = std::move(other.m_img);
+		m_img_origin = other.m_img_origin;
+		m_data = other.m_data;
+		m_stride = other.m_stride;
+		m_channel = other.m_channel;
+		m_frame_index = other.m_frame_index;
+		m_pixel_format_str = std::move(other.m_pixel_format_str);
+		m_alpha_pixel_count = other.m_alpha_pixel_count;
+		m_exif_info = other.m_exif_info;
+		m_interpolation_mode = other.m_interpolation_mode;
+		m_parent = other.m_parent;
+		m_frame_delay = std::move(other.m_frame_delay);
+		m_ani_mirror = other.m_ani_mirror;
+		m_run_thread_animation = other.m_run_thread_animation;
+		m_thread_animation_terminated = other.m_thread_animation_terminated;
+		m_ani_paused = other.m_ani_paused;
+
+		other.m_data = nullptr;
+		other.m_pWICFactory = nullptr;
+		other.m_d2dc = nullptr;
+		other.m_parent = NULL;
+		other.m_frame_index = 0;
+		other.m_stride = 0;
+		other.m_channel = 0;
+	}
+	return *this;
+}
+
 CSCD2Image::~CSCD2Image()
 {
-	while (!stop())
-		Wait(10);
+	release();
+}
 
-	if (m_data)
+void CSCD2Image::release()
+{
+	// 1. 애니메이션 스레드 안전하게 종료
+	if (m_run_thread_animation)
+	{
+		m_run_thread_animation = false;
+
+		// 타임아웃 설정: 최대 500ms 대기
+		int timeout_count = 0;
+		const int MAX_TIMEOUT = 50;  // 50 * 10ms = 500ms
+
+		while (!m_thread_animation_terminated && timeout_count < MAX_TIMEOUT)
+		{
+			Wait(10);
+			timeout_count++;
+		}
+
+		// 타임아웃 발생 시 경고 로그
+		if (!m_thread_animation_terminated)
+		{
+			TRACE(_T("Warning: Animation thread did not terminate within timeout at line %d\n"), __LINE__);
+			// 스레드가 종료될 때까지 무한 대기하지 않고 계속 진행
+		}
+	}
+
+	// 2. m_data 메모리 정리
+	if (m_data != nullptr)
+	{
 		delete[] m_data;
+		m_data = nullptr;
+	}
+
+	// 3. 이미지 deque 정리 (ComPtr 자동 정리됨)
+	m_img.clear();
+	m_img_origin.Reset();
+
+	// 4. 프레임 딜레이 정리
+	m_frame_delay.clear();
+
+	// 5. 참조 포인터 NULL 처리
+	m_pWICFactory = nullptr;
+	m_d2dc = nullptr;
+	m_parent = NULL;
+
+	// 6. 상태 초기화
+	m_frame_index = 0;
+	m_stride = 0;
+	m_channel = 0;
+	m_run_thread_animation = false;
+	m_thread_animation_terminated = true;
 }
 
 HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height)
@@ -43,7 +161,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	m_filename.Format(_T("Resource Image(id:%d)"), resource_id);
 
-	IWICStream* pStream = NULL;
+	ComPtr<IWICStream> pStream;
 	IWICBitmapDecoder* pDecoder = NULL;
 
 	// Resource management.
@@ -91,18 +209,19 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 
 	hr = pWICFactory->CreateDecoderFromStream(
-		pStream,                   // The stream to use to create the decoder
+		pStream.Get(),                   // The stream to use to create the decoder
 		NULL,                          // Do not prefer a particular vendor
 		WICDecodeMetadataCacheOnLoad,  // Cache metadata when needed
 		&pDecoder);                   // Pointer to the decoder
 
 	// Retrieve the first bitmap frame.
-	if (FAILED(hr))
+	if (FAILED(hr) || !pDecoder)
+	{
+		pStream->Release();
 		return hr;
+	}
 
 	return load(pWICFactory, d2context, pDecoder);
-	//hr = pDecoder->GetFrame(0, &pSource);
-	//return load(pWICFactory, d2context, pSource.Get());
 }
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path)
@@ -138,14 +257,14 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (file_size == 0)
 		return S_FALSE;
 
-	uint8_t* data = new uint8_t[file_size];
-	read_raw(path, data, file_size);
+	std::vector<uint8_t> data(file_size);
+	read_raw(path, data.data(), file_size);
 
 	ComPtr<IWICStream> stream;
 	pWICFactory->CreateStream(&stream);
 
 	stream->InitializeFromMemory(
-		data,
+		data.data(),
 		static_cast<DWORD>(file_size)
 	);
 
@@ -160,8 +279,6 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 
 	hr = load(pWICFactory, d2context, pDecoder.Get());
-
-	delete[] data;
 
 	return hr;
 }
@@ -418,7 +535,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	UINT frame_count = 1;
 	HRESULT	hr = pDecoder->GetFrameCount(&frame_count);
 
-	TRACE(_T("total %d frames.\n"), frame_count);
+	//TRACE(_T("total %d frames.\n"), frame_count);
 
 	PROPVARIANT propValue;
 	//이 초기화를 해주지 않으면 아래 frame delay를 구하는 코드에서 올바른 값이 들어가지 않는다.
@@ -774,7 +891,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				pFrameDecode.Get(),
 				GUID_WICPixelFormat32bppPBGRA,
 				WICBitmapDitherTypeNone,
-				NULL,
+				nullptr,
 				0.f,
 				WICBitmapPaletteTypeMedianCut
 			);
@@ -782,10 +899,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			if (FAILED(hr))
 				return hr;
 
-			//ComPtr<ID2D1Bitmap1> img;
-			hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
+			hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), nullptr, img.GetAddressOf());
 
-
+			//여러장의 이미지를 담고 있는 이미지일 경우 0번 이미지의 색상정보만 유지한다.
 			if (i == 0)
 			{
 				//pixel data loading start.
@@ -814,7 +930,10 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				lock->GetDataPointer(&bufferSize, &pixels);
 
 				if (m_data)
+				{
 					delete[] m_data;
+					m_data = nullptr;
+				}
 
 				m_data = new uint8_t[bufferSize];
 				memcpy(m_data, pixels, bufferSize);
@@ -909,9 +1028,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
 
-	TRACE(_T("before reset meta_reader\n"));
+	//TRACE(_T("before reset meta_reader\n"));
 	meta_reader.Reset();
-	TRACE(_T("after reset meta_reader\n"));
+	//TRACE(_T("after reset meta_reader\n"));
 
 	if (frame_count > 1)
 		play();
@@ -1000,11 +1119,11 @@ HRESULT CSCD2Image::get_sub_img(CRect r, CSCD2Image* dest)
 
 HRESULT CSCD2Image::get_sub_img(D2D1_RECT_U r, CSCD2Image* dest)
 {
-	if (m_img.size() == 0 || m_img[0] == nullptr)
+	if (m_img.size() == 0 || m_img[m_frame_index] == nullptr)
 		return S_FALSE;
 
 	D2D1_POINT_2U pt = { 0, 0 };
-	return dest->get()->CopyFromBitmap(&pt, m_img[0].Get(), &r);
+	return dest->get()->CopyFromBitmap(&pt, m_img[m_frame_index].Get(), &r);
 }
 
 void CSCD2Image::restore_original_image()
@@ -1717,7 +1836,7 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 		int bits = 0;
 		int bits_pos = get_number_from_string(str_fmt, bits);
 		str_fmt.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos), bits);
-		TRACE(_T("str_fmt = %s\n"), str_fmt);
+		//TRACE(_T("str_fmt = %s\n"), str_fmt);
 	}
 
 	m_pixel_format_str = str_fmt;
@@ -1753,4 +1872,259 @@ int CSCD2Image::get_alpha_pixel_count(bool recount)
 	}
 
 	return m_alpha_pixel_count;
+}
+
+bool ConvertPBGRAtoBGRA(
+	IWICImagingFactory* factory,
+	IWICBitmap* src,
+	IWICBitmap** outBgraBitmap
+)
+{
+	UINT w = 0, h = 0;
+	src->GetSize(&w, &h);
+
+	ComPtr<IWICFormatConverter> conv;
+	if (FAILED(factory->CreateFormatConverter(&conv)))
+		return false;
+
+	if (FAILED(conv->Initialize(
+		src,
+		GUID_WICPixelFormat32bppBGRA,
+		WICBitmapDitherTypeNone,
+		nullptr,
+		0.0,
+		WICBitmapPaletteTypeCustom)))
+		return false;
+
+	if (FAILED(factory->CreateBitmap(
+		w, h,
+		GUID_WICPixelFormat32bppBGRA,
+		WICBitmapCacheOnLoad,
+		outBgraBitmap)))
+		return false;
+
+	WICRect rc = { 0, 0, (INT)w, (INT)h };
+	std::vector<BYTE> buffer(w * h * 4);
+
+	if (FAILED(conv->CopyPixels(&rc, w * 4, (UINT)buffer.size(), buffer.data())))
+		return false;
+
+	(*outBgraBitmap)->CopyPixels(&rc, w * 4, (UINT)buffer.size(), buffer.data());
+
+	return true;
+}
+
+bool CSCD2Image::copy_to_clipboard()
+{
+	if (!m_img[m_frame_index])
+		return false;
+
+	//20260203 GPT에 물어보며 아래와 같은 방법으로 구현해봤으나 계속 검은 화면만 클립보드로 복사된다.
+	//CSCGdiplusBitmap으로 임시 저장한 후 클립보드에 복사하는 방법으로 우선 우회한다.
+	CString temp_file;
+	
+	temp_file.Format(_T("%s\\__asee_temp__.png"), get_known_folder(CSIDL_APPDATA));
+	HRESULT hr = save(temp_file);
+
+	if (FAILED(hr))
+		return false;
+
+	CSCGdiplusBitmap img(temp_file);
+	return img.copy_to_clipboard();
+
+#if 0
+	// 0) 크기 정보
+	ComPtr<IDXGISurface> surface;
+	if (FAILED(m_img[m_frame_index]->GetSurface(&surface)))
+		return false;
+
+	DXGI_SURFACE_DESC desc = {};
+	surface->GetDesc(&desc);
+
+	const UINT width = desc.Width;
+	const UINT height = desc.Height;
+
+	// 1) CPU 읽기 가능한 D2D bitmap 생성
+	D2D1_BITMAP_PROPERTIES1 cpuProps = {};
+	cpuProps.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	cpuProps.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+	cpuProps.bitmapOptions =
+		D2D1_BITMAP_OPTIONS_CPU_READ |
+		D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+
+	ComPtr<ID2D1Bitmap1> cpuBitmap;
+	if (FAILED(m_d2dc->CreateBitmap(
+		D2D1::SizeU(width, height),
+		nullptr,
+		0,
+		&cpuProps,
+		&cpuBitmap)))
+		return false;
+
+	// 2) GPU → CPU 복사 (필수)
+	if (FAILED(cpuBitmap->CopyFromBitmap(
+		nullptr,
+		m_img[m_frame_index].Get(),
+		nullptr)))
+		return false;
+
+	// 3) Map 해서 실제 픽셀 얻기
+	D2D1_MAPPED_RECT mapped = {};
+	if (FAILED(cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped)))
+		return false;
+
+	for (int y = 20; y < 40; y++)
+	{
+		BYTE* row = mapped.bits + y * 2427;
+
+		for (int x = 20; x < 80; x++)
+		{
+			BYTE* px = row + x * 4;
+
+			BYTE b = px[0];
+			BYTE g = px[1];
+			BYTE r = px[2];
+			BYTE a = px[3];
+
+			TRACE(_T("%d, %d = %d, %d, %d, %d\n"),
+				x, y, a, r, g, b);
+		}
+	}
+
+
+	// 4) WICBitmap(PBGRA) 생성
+	ComPtr<IWICBitmap> wicPbgra;
+	if (FAILED(m_pWICFactory->CreateBitmap(
+		width,
+		height,
+		GUID_WICPixelFormat32bppPBGRA,
+		WICBitmapCacheOnLoad,
+		&wicPbgra)))
+	{
+		cpuBitmap->Unmap();
+		return false;
+	}
+
+	// 5) WICBitmap에 "쓰기" (중요)
+	{
+		WICRect rc = { 0, 0, (INT)width, (INT)height };
+		ComPtr<IWICBitmapLock> wicLock;
+
+		if (FAILED(wicPbgra->Lock(&rc, WICBitmapLockWrite, &wicLock)))
+		{
+			cpuBitmap->Unmap();
+			return false;
+		}
+
+		BYTE* wicBits = nullptr;
+		UINT  wicStride = 0;
+		UINT  wicSize = 0;
+
+		wicLock->GetDataPointer(&wicSize, &wicBits);
+		wicLock->GetStride(&wicStride);
+
+		for (UINT y = 0; y < height; ++y)
+		{
+			memcpy(
+				wicBits + y * wicStride,
+				mapped.bits + y * mapped.pitch,
+				width * 4
+			);
+		}
+	}
+
+	cpuBitmap->Unmap();
+
+	// 6) PBGRA → BGRA (Straight Alpha)
+	ComPtr<IWICBitmap> wicBgra;
+	if (!ConvertPBGRAtoBGRA(
+		m_pWICFactory,
+		wicPbgra.Get(),
+		&wicBgra))
+		return false;
+
+	// 7) BGRA Lock
+	WICRect rc = { 0, 0, (INT)width, (INT)height };
+	ComPtr<IWICBitmapLock> lock;
+
+	if (FAILED(wicBgra->Lock(&rc, WICBitmapLockRead, &lock)))
+		return false;
+
+	BYTE* pixels = nullptr;
+	UINT  stride = 0;
+	UINT  bufSize = 0;
+
+	lock->GetDataPointer(&bufSize, &pixels);
+	lock->GetStride(&stride);
+	/*
+	for (int y = 20; y < 40; y++)
+	{
+		BYTE* row = pixels + y * stride;
+
+		for (int x = 20; x < 80; x++)
+		{
+			BYTE* px = row + x * 4;
+
+			BYTE b = px[0];
+			BYTE g = px[1];
+			BYTE r = px[2];
+			BYTE a = px[3];
+
+			TRACE(_T("%d, %d = %d, %d, %d, %d\n"),
+				x, y, a, r, g, b);
+		}
+	}
+	*/
+
+	// 8) CF_DIBV5 메모리 구성
+	const UINT imageSize = height * stride;
+	const UINT totalSize = sizeof(BITMAPV5HEADER) + imageSize;
+
+	HGLOBAL hMem = GlobalAlloc(GHND, totalSize);
+	if (!hMem)
+		return false;
+
+	BYTE* pData = (BYTE*)GlobalLock(hMem);
+	if (!pData)
+	{
+		GlobalFree(hMem);
+		return false;
+	}
+
+	BITMAPV5HEADER* pbv5 = (BITMAPV5HEADER*)pData;
+	ZeroMemory(pbv5, sizeof(*pbv5));
+
+	pbv5->bV5Size = sizeof(*pbv5);
+	pbv5->bV5Width = width;
+	pbv5->bV5Height = -((LONG)height); // top-down
+	pbv5->bV5Planes = 1;
+	pbv5->bV5BitCount = 32;
+	pbv5->bV5Compression = BI_BITFIELDS;
+	pbv5->bV5RedMask = 0x00FF0000;
+	pbv5->bV5GreenMask = 0x0000FF00;
+	pbv5->bV5BlueMask = 0x000000FF;
+	pbv5->bV5AlphaMask = 0xFF000000;
+	pbv5->bV5CSType = LCS_sRGB;
+
+	memcpy(
+		pData + sizeof(BITMAPV5HEADER),
+		pixels,
+		imageSize
+	);
+
+	GlobalUnlock(hMem);
+
+	// 9) 클립보드 등록
+	if (!OpenClipboard(nullptr))
+	{
+		GlobalFree(hMem);
+		return false;
+	}
+
+	EmptyClipboard();
+	SetClipboardData(CF_DIBV5, hMem); // 소유권 시스템 이전
+	CloseClipboard();
+
+	return true;
+#endif
 }

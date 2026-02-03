@@ -41,6 +41,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_CTLCOLOR()
 	ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_DESTROY()
+	ON_CONTROL_REFLECT(CBN_EDITCHANGE, &CSCComboBox::OnCbnEditchange)
 END_MESSAGE_MAP()
 
 
@@ -721,6 +722,15 @@ CString CSCComboBox::get_text()
 	return text;
 }
 
+bool CSCComboBox::set_cur_sel(int index)
+{
+	if (index < 0 || index >= GetCount())
+		return false;
+
+	CComboBox::SetCurSel(index);
+	return true;
+}
+
 //현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 {
@@ -846,6 +856,7 @@ static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTyp
 	}
 	else
 	{
+		pThis->add_font_list(lplf->lfFaceName);
 		index = pThis->AddString(lplf->lfFaceName);
 		TRACE(_T("%s\n"), lplf->lfFaceName);
 	}
@@ -863,7 +874,7 @@ static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTyp
 void CSCComboBox::set_as_font_combo()
 {
 	m_is_font_combo = true;
-
+	m_font_list.clear();
 	CClientDC dc(this);
 
 	EnumFonts(dc, 0, (FONTENUMPROC)EnumFontProc, (LPARAM)this); //Enumerate font
@@ -888,4 +899,55 @@ void CSCComboBox::OnDestroy()
 		if (cr)
 			delete cr;
 	}
+}
+
+void CSCComboBox::OnCbnEditchange()
+{
+	if (!m_use_input_filtering)
+		return;
+
+	//입력 타이핑에 따라 필터된 항목들이 리스트박스에 표시
+
+	//온전한 한글이 입력되기 전까지는 필터링해서는 안됨
+	if (is_ime_composing(m_hWnd))
+		return;
+
+	CString input;
+	GetWindowText(input);
+	input.MakeLower();
+	trace(input);
+
+	// 현재 커서 위치 보관
+	int start, end;
+	DWORD pos = GetEditSel();
+	start = LOWORD(pos);
+	end = HIWORD(pos);
+
+	SetRedraw(FALSE);
+
+	// 리스트 재구성
+	ResetContent();
+
+	for (const auto& item : m_font_list)
+	{
+		CString text = item;
+		text.MakeLower();
+
+		if (input.IsEmpty() || text.Find(input) != -1)
+		{
+			AddString(item);
+		}
+	}
+
+	SetRedraw(TRUE);
+
+	// 드롭다운 열기
+	if (GetCount() > 0)
+		ShowDropDown(TRUE);
+
+	// Edit 텍스트 복구
+	SetWindowText(input);
+
+	// 커서 위치 복구
+	SetEditSel(start, end);
 }

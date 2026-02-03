@@ -188,7 +188,10 @@ protected:
 	bool			m_transparent = false;
 
 //vertical align
-	DWORD			m_valign = DT_VCENTER;	//vertical align이므로 DT_CENTER가 아닌 DT_VCENTER로 줘야 한다.
+	//vertical align이므로 DT_CENTER가 아닌 DT_VCENTER로 줘야 한다.
+	//단, 한줄이 아닌 여러줄을 입력하기 위한 CEdit일 경우는 DT_TOP으로 시작되어야 한다.
+	//여러줄이고 DT_VCENTER일 경우 어디가 입력필드이고 어디가 여백인지가 애매하다.
+	DWORD			m_valign = DT_TOP;
 
 //border
 	bool			m_draw_border = false;

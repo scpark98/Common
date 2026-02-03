@@ -5,7 +5,7 @@
 */
 
 #include <afxwin.h>
-
+#include <vector>
 #include "../../colors.h"
 
 // CColorComboBox
@@ -40,6 +40,9 @@ public:
 
 	CString			get_text();
 
+	bool			SetCurSel(int index) { return set_cur_sel(index); }
+	bool			set_cur_sel(int index);
+
 	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 	//색상을 별도로 지정하지 않으면 기본 cr_text를 사용한다.
 	int				add(CString text = _T(""), Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
@@ -73,6 +76,7 @@ public:
 	void			use_tooltip(bool use) { m_use_tooltip = use; }
 	void			set_tooltip_text(CString text);
 
+	void			add_font_list(CString font_name) { m_font_list.push_back(font_name); }
 protected:
 //design
 	//-1이면 폰트크기에 따라 자동 조정
@@ -87,6 +91,7 @@ protected:
 	void			reconstruct_font();
 
 	bool			m_is_font_combo = false;
+	std::vector<CString> m_font_list;
 
 //편집 관련
 	//bool			m_use_edit = false;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지
@@ -110,6 +115,10 @@ protected:
 	//그래서 Create()후에 별도로 prepare_tooltip()을 호출하여 준비되도록 수정.
 	//동적 생성한 컨트롤에서도 정상 표시됨을 확인함.
 	void			prepare_tooltip();
+
+//입력 시 동적 필터링 기능
+	//우선 default로 false로 한다. 이 처리를 하지 않아도 listbox를 펼쳐놓은 상태에서는 이미 자동 필터링된다.
+	bool			m_use_input_filtering = false;
 
 	DECLARE_MESSAGE_MAP()
 public:
@@ -135,6 +144,7 @@ public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnNcPaint();
 	afx_msg void OnDestroy();
+	afx_msg void OnCbnEditchange();
 };
 
 

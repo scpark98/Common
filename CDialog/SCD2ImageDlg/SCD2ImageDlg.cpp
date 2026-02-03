@@ -259,7 +259,7 @@ void CSCD2ImageDlg::OnPaint()
 			info_str.Format(_T("%s\n\n%s"), info_str, m_img[0].get_exif_str());
 
 		CRect rText = rc;
-		rText.DeflateRect(8, 8);
+		rText.DeflateRect(8, 10);
 
 		//draw_text()를 사용하면 간편할수는 있으나 이 함수안에서는 OnPaint()가 호출될 때마다 계속 객체를 생성, 해제하는 액션을 수행하므로 부담을 줄 수 있다.
 		//기존처럼 이미 만들어진 인스턴스들에 대해 속성만 변경한 후 사용하는 것이 더 경제적일 수 있다.
@@ -483,7 +483,7 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 		bool is_ctrl_pressed = IsCtrlPressed();
 		double interval = (IsCtrlPressed() ? 5.0 : 1.0);
 
-		TRACE(_T("%s, %d\n"), __function__, pMsg->wParam);
+		//TRACE(_T("%s, %d\n"), __function__, pMsg->wParam);
 
 		switch (pMsg->wParam)
 		{
@@ -752,12 +752,14 @@ bool CSCD2ImageDlg::copy_to_clipboard(int type)
 	
 	//ID2D1Bitmap1* img;
 	CSCD2Image img(m_img[0].get_WICFactory2(), m_d2dc.get_d2dc(), r.right - r.left, r.bottom - r.top);
-
-	//CSCD2Image img;
 	m_img[0].get_sub_img(r, &img);
-	img.save(_T("d:\\sub.png"));
 
-	return true;
+#ifdef _DEBUG
+	//img.save(_T("d:\\sub.png"));
+#endif
+
+	bool res = img.copy_to_clipboard();
+	return res;
 }
 
 bool CSCD2ImageDlg::paste_from_clipboard()

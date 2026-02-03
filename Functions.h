@@ -1394,6 +1394,7 @@ struct	NETWORK_INFO
 	int			file_open(FILE** fp, CString mode, CString file);
 
 	//text 파일을 열어서 라인별로 읽은 후 dqList에 넣어준다.
+	//각 라인의 끝에 있는 '\n' 기호는 구분자이므로 deque에 들어갈 때는 포함되지 않음에 주의.
 	bool		read_lines(CString filepath, std::deque<CString> *dqList);
 
 	//mp4 파일의 특정 태그 데이터 중 원하는 위치의 데이터를 추출한다.
@@ -2129,7 +2130,9 @@ h		: 복사할 height 크기(pixel)
 							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
 							Gdiplus::Color cr_text = Gdiplus::Color::Black,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							UINT align = DT_CENTER | DT_VCENTER);
+							UINT align = DT_CENTER | DT_VCENTER,
+							bool show_text = true,
+							bool show_shadow = true);
 
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
 							Gdiplus::RectF rTarget,
@@ -2139,8 +2142,12 @@ h		: 복사할 height 크기(pixel)
 							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
 							Gdiplus::Color cr_text = Gdiplus::Color::Black,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							UINT align = DT_CENTER | DT_VCENTER);
+							UINT align = DT_CENTER | DT_VCENTER,
+							bool show_text = true,
+							bool show_shadow = true);
 #endif
+
+	void		unpremultiply(BYTE* p, UINT pixelCount);
 
 	//text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 	//이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!
@@ -2501,7 +2508,8 @@ h		: 복사할 height 크기(pixel)
 
 //키보드 언어를 그 나라 기본언어로 변경한다.
 void		ime_convert(HWND hWnd, bool bNative);
-
+//현재 한글 입력중인지
+bool		is_ime_composing(HWND hWnd);
 
 //문자입력창을 숨긴다.
 void		HideIMM(HWND hwnd);

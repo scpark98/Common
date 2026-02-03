@@ -1145,3 +1145,10 @@ Gdiplus::Color get_sys_color(int index)
 	cr.SetFromCOLORREF(::GetSysColor(index));
 	return cr;
 }
+
+D2D1_COLOR_F get_sys_d2color(int index, int alpha)
+{
+	COLORREF cr = GetSysColor(index);
+	D2D1::ColorF d2cr{ GetRValue(cr) / 255.0f, GetGValue(cr) / 255.0f, GetBValue(cr) / 255.f, (float)alpha / 255.0f };
+	return d2cr;
+}

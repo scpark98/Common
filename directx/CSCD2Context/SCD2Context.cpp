@@ -37,7 +37,18 @@ HRESULT CSCD2Context::create_factory()
 
 	if (SUCCEEDED(hr))
 	{
-		hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(m_WICFactory.GetAddressOf()));
+		//CoInitialize()를 호출하지 않은 경우 아래 m_WICFactory를 얻어오지 못한다.
+		//그렇다고 CSCD2Context 클래스에서 매번 호출하는 것은 부적절하다.
+		//가장 적절한 위치는 해당 스레드의 시작 지점이고 MFC UI 스레드 기준으로는 CWinApp::InitInstance()에서 수행시켜야 한다.
+		//또한 아래 주석과 같이 옵션에 따라 부작용이 발생할 수 있으므로 정확한 옵션으로 실행해야 한다.
+		//CWinApp::InitInstance()에서 CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);를 호출할 것.
+
+		//CoInitializeEx()를 호출하지 않거나 COINIT_MULTITHREADED로 실행할 경우 ::SHBrowseForFolder() api가 응답하지 않음.
+		//기존 프로젝트들에서는 이를 호출하지 않아도 폴더선택창이 제대로 열렸으나
+		//Direct2D를 이용하는 이 프로젝트에서는 문제가 발생했다.
+		//CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+		hr = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(m_WICFactory.GetAddressOf()));
 	}
 
 	return hr;

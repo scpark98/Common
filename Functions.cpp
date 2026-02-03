@@ -6276,7 +6276,7 @@ int file_open(FILE** fp, CString mode, CString file)
 }
 
 //text 파일을 열어서 line단위로 분리한 후 dqList에 넣어준다.
-//라인 단위이므로 맨 끝에는 '\n'을 다시 붙여줘야 한다.
+//각 라인의 끝에 있는 '\n' 기호는 구분자이므로 deque에 들어갈 때는 포함되지 않음에 주의.
 bool read_lines(CString filepath, std::deque<CString> *dqList)
 {
 	dqList->clear();
@@ -6289,9 +6289,6 @@ bool read_lines(CString filepath, std::deque<CString> *dqList)
 	str.Replace(_T("\r\n"), _T("\n"));
 
 	get_token_str(str, *dqList, _T("\n"));
-
-	for (int i = 0; i < dqList->size(); i++)
-		dqList->at(i) += _T("\n");
 
 	return true;
 }
@@ -6791,9 +6788,11 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				int font_weight,
 				Gdiplus::Color cr_text,
 				Gdiplus::Color cr_shadow,
-				UINT align)
+				UINT align,
+				bool show_text,
+				bool show_shadow)
 {
-	return draw_text(d2dc, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), text, font_name, font_size, font_weight, cr_text, cr_shadow, align);
+	return draw_text(d2dc, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), text, font_name, font_size, font_weight, cr_text, cr_shadow, align, show_text, show_shadow);
 }
 
 CRect draw_text(ID2D1DeviceContext* d2dc,
@@ -6804,7 +6803,9 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				int font_weight,
 				Gdiplus::Color cr_text,
 				Gdiplus::Color cr_shadow,
-				UINT align)
+				UINT align,
+				bool show_text,
+				bool show_shadow)
 {
 	IDWriteFactory*			write_factory = NULL;
 	IDWriteTextFormat*		write_format = NULL;
@@ -6839,6 +6840,10 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 
 	float line_spacing = 1.5f;
 	write_factory->CreateTextLayout(text, text.GetLength(), write_format, rTarget.Width, rTarget.Height, &text_layout);
+
+	if (text_layout == nullptr)
+		return CRect();
+
 	if (text_layout)
 		text_layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, font_size * line_spacing, font_size * line_spacing * 0.8f);// font_size * 3.6f); A reasonable ratio to lineSpacing is 80%.
 
@@ -6885,8 +6890,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	//CRect text_rect(textMetrics.left, textMetrics.top, textMetrics.left + textMetrics.width, textMetrics.top + textMetrics.height);
 	CRect text_rect(x, y, x + tm.widthIncludingTrailingWhitespace, y + tm.height);
 
-	bool using_shadow = true;
-	if (using_shadow)
+	if (show_shadow)
 	{
 		//ID2D1BitmapRenderTarget* textRenderTarget;
 		Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> textRenderTarget;
@@ -6895,88 +6899,64 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		Microsoft::WRL::ComPtr<ID2D1Effect> compositeEffect;
 
 		d2dc->CreateCompatibleRenderTarget(d2dc->GetSize(), &textRenderTarget);
+
+		if (textRenderTarget == nullptr)
+			return CRect();
+
 		textRenderTarget->BeginDraw();
 		textRenderTarget->Clear(D2D1::ColorF(0, 0, 0, 0));
 
 		textRenderTarget->DrawTextLayout(D2D1::Point2F(x, y - (lines[0].height - lines[0].baseline) * 0.5f), text_layout, shadow_brush);
-		//textRenderTarget->DrawTextLayout(D2D1::Point2F((FLOAT)rTarget.left, (FLOAT)rTarget.top), text_layout, text_brush);
 		textRenderTarget->EndDraw();
 		textRenderTarget->GetBitmap(&textBitmap);
 
-		/*
-		Microsoft::WRL::ComPtr<ID2D1Effect> highlightsAndShadowsEffect;
-		d2dc->CreateEffect(CLSID_D2D1HighlightsShadows, &highlightsAndShadowsEffect);
-
-		highlightsAndShadowsEffect->SetInput(0, textBitmap.Get());
-		highlightsAndShadowsEffect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_HIGHLIGHTS, -1.0f);
-		highlightsAndShadowsEffect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_SHADOWS, -1.0f);
-		highlightsAndShadowsEffect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_CLARITY, -0.2f);
-		highlightsAndShadowsEffect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_INPUT_GAMMA, D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_LINEAR);
-		highlightsAndShadowsEffect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_MASK_BLUR_RADIUS, 0.0f);
-		d2dc->DrawImage(highlightsAndShadowsEffect.Get());
-		*/
-
-		d2dc->CreateEffect(CLSID_D2D1GaussianBlur, &shadowEffect);
-		shadowEffect->SetInput(0, textBitmap.Get());
-		// 그림자 속성 설정 (블러, 색상 등)
-		shadowEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, 1.5f); // 블러 반경
-		shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, get_d2color(cr_shadow)); // 그림자 색
-		// 5. 그림자와 텍스트 합성 (Composite Effect)
-		//d2dc->CreateEffect(CLSID_D2D1Composite, &compositeEffect);
-		// 입력을 순서대로 설정: [0] 그림자, [1] 원본 텍스트
-		//compositeEffect->SetInputEffect(0, shadowEffect.Get());
-		//compositeEffect->SetInput(1, textBitmap.Get());
-		d2dc->DrawImage(shadowEffect.Get());
-
-		/*
-		ID2D1Bitmap1* offscreenBitmap;
-
-		FLOAT dpiX, dpiY;
-		dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
-		dpiY = dpiX;
-
-		D2D1_BITMAP_PROPERTIES1 bitmapProps =
-			D2D1::BitmapProperties1(
-				D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-				D2D1::PixelFormat(
-					DXGI_FORMAT_B8G8R8A8_UNORM,
-					D2D1_ALPHA_MODE_PREMULTIPLIED
-				),
-				dpiX,
-				dpiY
-			);
-
-		ID2D1Image* originalTarget = nullptr;
-		d2dc->GetTarget(&originalTarget);
-
-		d2dc->CreateBitmap(D2D1::SizeU(rTarget.Width(), rTarget.Height()), nullptr, 0, bitmapProps, &offscreenBitmap);
-		d2dc->SetTarget(offscreenBitmap);
-		d2dc->DrawText(text, text.GetLength(), write_format, CRect_to_d2Rect(rTarget), text_brush);
 
 
-		d2dc->EndDraw();
-		ID2D1Effect* shadow;
+		Microsoft::WRL::ComPtr<ID2D1Effect> shadow;
 		d2dc->CreateEffect(CLSID_D2D1Shadow, &shadow);
-		shadow->SetInput(0, offscreenBitmap);
-		shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 4.0f);
-		shadow->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1::Vector4F(0, 0, 0, 0.5f));
 
-		d2dc->SetTarget(originalTarget);
-		d2dc->DrawImage(shadow, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC);// rTaraget.left, rTarget.top
-		*/
-	}
-	else
-	{
-		d2dc->DrawTextLayout(D2D1::Point2F(x + 1.0f, y + 1.0f), text_layout, shadow_brush);
-	}
+		shadow->SetInput(0, textBitmap.Get());
+		shadow->SetValue(D2D1_SHADOW_PROP_COLOR, get_d2color(cr_shadow));
 
-	//d2dc->DrawTextLayout(D2D1::Point2F(rTarget.X - 1, rTarget.Y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);
-	d2dc->DrawTextLayout(D2D1::Point2F(x - 1, y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);
-	//d2dc->DrawText(text, text.GetLength(), write_format, D2D1::RectF(x, y, x + tm.width, y + tm.height), text_brush);
+		//한번 사용해서는 흐릿하고 얊은 그림자가 그려져서 크게 표시나지 않는다.
+		//알파 누적시켜서 좀 더 진한 그림자를 만든다.
+		for (int i = 0; i < 3; i++)
+		{
+			//설정값은 폰트 크기나 종류에 따라 달라져야만 최적의 그림자 효과가 적용될 듯 함.
+			shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 0.5f + i * 1.6f);
+			d2dc->DrawImage(shadow.Get());
+		}
+	}
+	//else
+	//{
+	//	d2dc->DrawTextLayout(D2D1::Point2F(x + 1.0f, y + 1.0f), text_layout, shadow_brush);
+	//}
+
+	if (show_text)
+		d2dc->DrawTextLayout(D2D1::Point2F(x - 1, y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);
 
 	return text_rect;
 }
 #endif
+
+void unpremultiply(BYTE* p, UINT pixelCount)
+{
+	for (UINT i = 0; i < pixelCount; ++i)
+	{
+		BYTE* px = p + i * 4;
+		BYTE a = px[3];
+
+		if (a == 0)
+		{
+			px[0] = px[1] = px[2] = 0;
+			continue;
+		}
+
+		px[0] = (BYTE)MIN(255, (px[0] * 255) / a); // B
+		px[1] = (BYTE)MIN(255, (px[1] * 255) / a); // G
+		px[2] = (BYTE)MIN(255, (px[2] * 255) / a); // R
+	}
+}
 
 //text의 출력픽셀 너비가 max_width를 넘을 경우 ...와 함께 표시될 문자위치를 리턴.
 //이 함수는 DrawText시에 DT_END_ELLIPSIS를 줘서 사용하므로 우선 사용 보류!
@@ -20808,4 +20788,23 @@ D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool str
 	}
 
 	return result;
+}
+
+//현재 한글 입력중인지
+bool is_ime_composing(HWND hWnd)
+{
+	HIMC hIMC = ImmGetContext(hWnd);
+	if (!hIMC)
+		return false;
+
+	DWORD dwSize = ImmGetCompositionStringW(
+		hIMC,
+		GCS_COMPSTR,
+		nullptr,
+		0
+	);
+
+	ImmReleaseContext(hWnd, hIMC);
+
+	return dwSize > 0; // 조합 중
 }

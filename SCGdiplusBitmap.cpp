@@ -2865,149 +2865,96 @@ bool CSCGdiplusBitmap::savef(LPCTSTR filepath, ...)
 
 bool CSCGdiplusBitmap::copy_to_clipboard()
 {
-	//복사는 잘 되지만 32bit PNG는 투명처리 안됨
-#if 1
-	HBITMAP hbitmap;
-	auto status = m_pBitmap->GetHBITMAP(0, &hbitmap);
-	if (status != Gdiplus::Ok)
+	if (!m_pBitmap)
 		return false;
 
-	BITMAP bm;
-	GetObject(hbitmap, sizeof bm, &bm);
-	DIBSECTION ds;
-	if (sizeof ds == GetObject(hbitmap, sizeof ds, &ds))
+	const UINT width = m_pBitmap->GetWidth();
+	const UINT height = m_pBitmap->GetHeight();
+
+	// 1) GDI+ Bitmap 픽셀 Lock (ARGB, straight alpha)
+	Gdiplus::BitmapData bd = {};
+	Gdiplus::Rect rc(0, 0, width, height);
+
+	if (m_pBitmap->LockBits(
+		&rc,
+		Gdiplus::ImageLockModeRead,
+		PixelFormat32bppARGB,
+		&bd) != Gdiplus::Ok)
 	{
-		HDC hdc = GetDC(NULL);
-		HBITMAP hbitmap_ddb = CreateDIBitmap(hdc, &ds.dsBmih, CBM_INIT,
-			ds.dsBm.bmBits, (BITMAPINFO*)&ds.dsBmih, DIB_RGB_COLORS);
-		ReleaseDC(NULL, hdc);
-		if (OpenClipboard(NULL))
-		{
-			EmptyClipboard();
-			SetClipboardData(CF_BITMAP, hbitmap_ddb);
-			CloseClipboard();
-		}
-		DeleteObject(hbitmap_ddb);
+		return false;
 	}
-	DeleteObject(hbitmap);
-#elif 0
-	bool res = false;
-	HBITMAP hbitmap;
-	auto status = m_pBitmap->GetHBITMAP(NULL, &hbitmap);
 
-	if (status != Gdiplus::Ok)
-		return false;
+	// 2) CF_DIBV5 메모리 확보
+	const UINT stride = bd.Stride;               // bytes per row
+	const UINT imageSize = stride * height;
+	const UINT totalSize = sizeof(BITMAPV5HEADER) + imageSize;
 
-	BITMAP bm;
-
-	GetObject(hbitmap, sizeof(bm), &bm);
-
-	uint64_t bufSize = width * height * channel;
-
-	BITMAPINFOHEADER bi = { sizeof bi, bm.bmWidth, bm.bmHeight, 1, bm.bmBitsPixel, BI_RGB };
-
-	BITMAPV5HEADER header;
-	header.bV5Size = sizeof(BITMAPV5HEADER);
-	header.bV5Width = width; // <-- size of the bitmap in pixels, width and height
-	header.bV5Height = height;
-	header.bV5Planes = 1;
-	header.bV5BitCount = 0;
-	header.bV5Compression = BI_RGB;
-	header.bV5SizeImage = bufSize;
-	header.bV5XPelsPerMeter = 0;
-	header.bV5YPelsPerMeter = 0;
-	header.bV5ClrUsed = 0;
-	header.bV5ClrImportant = 0;
-	header.bV5RedMask = 0xFF000000;
-	header.bV5GreenMask = 0x00FF0000;
-	header.bV5BlueMask = 0x0000FF00;
-	header.bV5AlphaMask = 0x000000FF;
-	header.bV5CSType = LCS_sRGB;
-	header.bV5Endpoints;    // ignored
-	header.bV5GammaRed = 0;
-	header.bV5GammaGreen = 0;
-	header.bV5GammaBlue = 0;
-	header.bV5Intent = 0;
-	header.bV5ProfileData = 0;
-	header.bV5ProfileSize = 0;
-	header.bV5Reserved = 0;
-
-	//std::vector<BYTE> vec(bm.bmWidthBytes * bm.bmHeight);
-	//HDC hDC = GetDC(NULL);
-	//GetDIBits(hDC, hbitmap, 0, bi.biHeight, vec.data(), (BITMAPINFO*)&bi, 0);
-	//::DeleteDC(hDC);
-
-	get_raw_data();
-
-	HGLOBAL hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof(header) + bufSize);
-	if (hmem == NULL)
-		return false;
-
-	void* buffer = (BYTE*)GlobalLock(hmem);
-	memcpy(buffer, &header, sizeof(BITMAPV5HEADER));
-	memcpy((char*)buffer + sizeof(BITMAPV5HEADER), data, bufSize);
-	GlobalUnlock(hmem);
-
-	if (OpenClipboard(NULL))
+	HGLOBAL hMem = GlobalAlloc(GHND, totalSize);
+	if (!hMem)
 	{
-		EmptyClipboard();
-		//auto fmt = RegisterClipboardFormat(_T("PNG"));
-		//SetClipboardData(fmt, hmem);
-		SetClipboardData(CF_DIBV5, hmem);
-		//SetClipboardData(CF_BITMAP, hbitmap);
-		CloseClipboard();
-		MessageBeep(0);
-		res = true;
-	}
-	else
-	{
-		GlobalFree(hmem);
-	}
-
-	DeleteObject(hbitmap);
-	TRACE(_T("copied to clipboard.\n"));
-	return res;
-#elif 0
-	//  this section is my code for creating a png file
-	//StreamWrite stream = StreamWrite::asBufferCreate();
-	//in.savePng(stream);
-
-	//이 예제는 png로 저장하고 그 파일 데이터를 그대로 클립보드에 넣는 방식인데
-	//office는 이를 받아들이지만 대부분의 앱에서는 클립보드 데이터로 인식하지 않는다.
-	save(_T("d:\\temp.png"));
-	uint64_t bufSize = get_file_size(_T("d:\\temp.png"));
-	char* buf = new char[bufSize];
-	read_raw(_T("d:\\temp.png"), (uint8_t*)buf, bufSize);
-	//get_raw_data();
-	//char* buf = (char*)data;// stream._takeBuffer(bufSize, false);
-	// "buf"      <-- contains the PNG payload
-	// "bufSize"  <-- is the size of this payload
-
-	HGLOBAL gift = GlobalAlloc(GMEM_MOVEABLE, bufSize);
-	if (gift == NULL)
-		return false;
-
-	//HWND win = window.getWindowHandle();
-	if (!OpenClipboard(NULL))//win))
-	{
-		GlobalFree(gift);
+		m_pBitmap->UnlockBits(&bd);
 		return false;
 	}
 
-	EmptyClipboard();
+	BYTE* pData = static_cast<BYTE*>(GlobalLock(hMem));
+	BITMAPV5HEADER* pbv5 = reinterpret_cast<BITMAPV5HEADER*>(pData);
+	ZeroMemory(pbv5, sizeof(*pbv5));
 
-	auto fmt = RegisterClipboardFormat(_T("PNG")); // or `L"PNG", as applicable
+	// 3) BITMAPV5HEADER 설정 (중요)
+	pbv5->bV5Size = sizeof(BITMAPV5HEADER);
+	pbv5->bV5Width = width;
+	pbv5->bV5Height = -((LONG)height); // top-down
+	pbv5->bV5Planes = 1;
+	pbv5->bV5BitCount = 32;
+	pbv5->bV5Compression = BI_BITFIELDS;
 
-	void* giftLocked = GlobalLock(gift);
-	if (giftLocked) {
-		memcpy((char*)giftLocked, buf, bufSize);
+	// BGRA 마스크 (GDI+ ARGB == 메모리상 BGRA)
+	pbv5->bV5RedMask = 0x00FF0000;
+	pbv5->bV5GreenMask = 0x0000FF00;
+	pbv5->bV5BlueMask = 0x000000FF;
+	pbv5->bV5AlphaMask = 0xFF000000;
+	pbv5->bV5CSType = LCS_sRGB;
+
+	// 4) 픽셀 데이터 복사 (stride 기준)
+	BYTE* dst = pData + sizeof(BITMAPV5HEADER);
+	BYTE* src = static_cast<BYTE*>(bd.Scan0);
+
+	for (UINT y = 0; y < height; ++y)
+	{
+		memcpy(
+			dst + y * stride,
+			src + y * bd.Stride,
+			width * 4
+		);
 	}
-	GlobalUnlock(gift);
 
-	SetClipboardData(fmt, gift);
+	GlobalUnlock(hMem);
+	m_pBitmap->UnlockBits(&bd);
 
-	CloseClipboard();
-#endif
+	HGLOBAL hGlobal = nullptr;
+
+	if (!create_png_hglobal(&hGlobal))
+	{
+		GlobalFree(hMem);
+		return false;
+	}
+
+	SIZE_T sz = GlobalSize(hGlobal);
+	TRACE(_T("PNG GlobalSize = %llu\n"), (unsigned long long)sz);
+	
+	ImageDataObject* obj = new ImageDataObject(hMem, hGlobal);
+	HRESULT hr = OleSetClipboard(obj);
+
+	if (FAILED(hr))
+	{
+		delete obj;              // 또는 Release 전에 수동 정리
+		return false;
+	}
+
+	obj->Release();
+
+	OleFlushClipboard();
+
 	return true;
 }
 
@@ -3744,4 +3691,76 @@ CString CSCGdiplusBitmap::get_exif_str()
 		return _T("");
 
 	return m_exif_info.get_exif_str();
+}
+
+bool CSCGdiplusBitmap::create_png_hglobal(HGLOBAL* outHGlobal)
+{
+	if (!outHGlobal)
+		return false;
+
+	*outHGlobal = nullptr;
+
+	// 1) PNG encoder CLSID
+	CLSID pngClsid;
+	UINT num = 0, size = 0;
+	Gdiplus::GetImageEncodersSize(&num, &size);
+	if (!size) return false;
+
+	std::vector<BYTE> buf(size);
+	auto encoders = (Gdiplus::ImageCodecInfo*)buf.data();
+	Gdiplus::GetImageEncoders(num, size, encoders);
+
+	for (UINT i = 0; i < num; ++i)
+		if (wcscmp(encoders[i].MimeType, L"image/png") == 0)
+			pngClsid = encoders[i].Clsid;
+
+	// 2) COM Stream에 PNG 저장
+	IStream* stream = nullptr;
+	if (FAILED(CreateStreamOnHGlobal(nullptr, TRUE, &stream)))
+		return false;
+
+	if (m_pBitmap->Save(stream, &pngClsid) != Gdiplus::Ok)
+	{
+		stream->Release();
+		return false;
+	}
+
+	// 3) 스트림 크기 구하기
+	STATSTG st = {};
+	stream->Stat(&st, STATFLAG_NONAME);
+	SIZE_T pngSize = (SIZE_T)st.cbSize.QuadPart;
+
+	if (pngSize == 0)
+	{
+		stream->Release();
+		return false;
+	}
+
+	// 4) Win32 HGLOBAL 새로 생성
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, pngSize);
+	if (!hMem)
+	{
+		stream->Release();
+		return false;
+	}
+
+	// 5) 스트림 → HGLOBAL 복사
+	LARGE_INTEGER zero = {};
+	stream->Seek(zero, STREAM_SEEK_SET, nullptr);
+
+	BYTE* dst = (BYTE*)GlobalLock(hMem);
+	ULONG read = 0;
+	stream->Read(dst, (ULONG)pngSize, &read);
+	GlobalUnlock(hMem);
+
+	stream->Release();
+
+	if (read != pngSize)
+	{
+		GlobalFree(hMem);
+		return false;
+	}
+
+	*outHGlobal = hMem;
+	return true;
 }

@@ -329,7 +329,7 @@ void CSCParagraphStatic::OnPaint()
 	CMemoryDC dc(&dc1, &rc);
 
 	//draw_rectangle(dc, rc, Gdiplus::Color::Transparent, m_cr_back);
-	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	Gdiplus::Graphics g(dc);
 	CSCParagraph::draw_text(g, m_para);
@@ -358,8 +358,8 @@ void CSCParagraphStatic::update_text_property()
 	if (m_lf.lfStrikeOut)
 		m_text_prop.style |= Gdiplus::FontStyleStrikeout;
 
-	m_text_prop.cr_text = m_cr_text;
-	m_text_prop.cr_back = m_cr_back;
+	m_text_prop.cr_text = m_theme.cr_text;
+	m_text_prop.cr_back = m_theme.cr_back;
 }
 
 void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)

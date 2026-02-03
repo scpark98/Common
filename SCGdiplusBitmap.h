@@ -1,6 +1,10 @@
 #pragma once
 
 /*
+* Functions 등 대부분의 Common 코드에서 Gdiplus를 사용하므로 CGdiplusBitmap를 꼭 이용하지 않더라도
+  프로젝트에 포함시켜줘야 Gdiplus 관련 API들이 정상 동작함!!!
+
+
 * 기존 CGdiPlusBitmap 및 CGdiPlusBitmapResource를 CGdiplusBitmap이라는 하나의 클래스로 합치고
   Gdiplus에서 제공하는 다양한 이미지 효과를 추가함.
   202509 : CGdiplusBitmap 클래스 이름 충돌이 발생하여 CSCGdiplusBitmap으로 변경함.
@@ -536,9 +540,12 @@ public:
 
 	void			save_multi_image();// std::vector<Gdiplus::Bitmap*>& dqBitmap);
 
+	bool			create_png_hglobal(HGLOBAL* outHGlobal);
+
 //exif
 	CSCEXIFInfo		get_exif() { return m_exif_info; }
 	CString			get_exif_str();
+
 
 protected:
 	CString			m_filename = _T("untitled");
@@ -579,4 +586,231 @@ protected:
 	void			check_animate_gif();
 	void			thread_gif_animation();
 	void			goto_gif_frame(int frame);
+};
+
+//CEnumFormatEtc, ImageDataObject는 투명png까지 클립보드로 복사하기 위해 추가된 클래스임.
+//copy_to_clipboard()에서 사용.
+class CEnumFormatEtc : public IEnumFORMATETC
+{
+	LONG m_ref = 1;
+	std::vector<FORMATETC> m_formats;
+	ULONG m_index = 0;
+
+public:
+	CEnumFormatEtc(const std::vector<FORMATETC>& fmts)
+		: m_formats(fmts)
+	{
+	}
+
+	// IUnknown
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override
+	{
+		if (riid == IID_IUnknown || riid == IID_IEnumFORMATETC)
+		{
+			*ppv = this;
+			AddRef();
+			return S_OK;
+		}
+		*ppv = nullptr;
+		return E_NOINTERFACE;
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef() override
+	{
+		return InterlockedIncrement(&m_ref);
+	}
+
+	ULONG STDMETHODCALLTYPE Release() override
+	{
+		ULONG r = InterlockedDecrement(&m_ref);
+		if (r == 0) delete this;
+		return r;
+	}
+
+	// IEnumFORMATETC
+	HRESULT STDMETHODCALLTYPE Next(ULONG celt, FORMATETC* rgelt, ULONG* pceltFetched) override
+	{
+		ULONG fetched = 0;
+		while (m_index < m_formats.size() && fetched < celt)
+		{
+			rgelt[fetched++] = m_formats[m_index++];
+			rgelt[fetched].ptd = nullptr;
+		}
+		if (pceltFetched) *pceltFetched = fetched;
+		return fetched == celt ? S_OK : S_FALSE;
+	}
+
+	HRESULT STDMETHODCALLTYPE Skip(ULONG celt) override
+	{
+		m_index = min(m_index + celt, (ULONG)m_formats.size());
+		return m_index < m_formats.size() ? S_OK : S_FALSE;
+	}
+
+	HRESULT STDMETHODCALLTYPE Reset() override
+	{
+		m_index = 0;
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE Clone(IEnumFORMATETC** ppEnum) override
+	{
+		auto* e = new CEnumFormatEtc(m_formats);
+		e->m_index = m_index;
+		*ppEnum = e;
+		return S_OK;
+	}
+};
+
+
+class ImageDataObject : public IDataObject
+{
+	LONG m_ref = 1;
+
+	struct Entry
+	{
+		FORMATETC fmt;
+		STGMEDIUM stg;
+	};
+
+	std::vector<Entry> m_entries;
+
+public:
+	ImageDataObject(HGLOBAL hDibV5, HGLOBAL hPng)
+	{
+		// PNG
+		{
+			UINT cfPNG = RegisterClipboardFormat(L"PNG");
+
+			Entry e = {};
+			e.fmt.cfFormat = (CLIPFORMAT)cfPNG;
+			e.fmt.dwAspect = DVASPECT_CONTENT;
+			e.fmt.lindex = -1;
+			e.fmt.tymed = TYMED_HGLOBAL;
+
+			e.stg.tymed = TYMED_HGLOBAL;
+			e.stg.hGlobal = hPng;
+			e.stg.pUnkForRelease = nullptr;
+			m_entries.push_back(e);
+		}
+
+		// CF_DIBV5
+		{
+			Entry e = {};
+			e.fmt.cfFormat = CF_DIBV5;
+			e.fmt.dwAspect = DVASPECT_CONTENT;
+			e.fmt.lindex = -1;
+			e.fmt.tymed = TYMED_HGLOBAL;
+			e.stg.tymed = TYMED_HGLOBAL;
+			e.stg.hGlobal = hDibV5;
+			e.stg.pUnkForRelease = nullptr;
+			m_entries.push_back(e);
+		}
+	}
+	~ImageDataObject()
+	{
+		for (auto& e : m_entries)
+		{
+			if (e.stg.tymed == TYMED_HGLOBAL && e.stg.hGlobal)
+				GlobalFree(e.stg.hGlobal);
+		}
+	}
+
+	// IUnknown
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override
+	{
+		if (riid == IID_IUnknown || riid == IID_IDataObject)
+		{
+			*ppv = this;
+			AddRef();
+			return S_OK;
+		}
+		*ppv = nullptr;
+		return E_NOINTERFACE;
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef() override
+	{
+		return InterlockedIncrement(&m_ref);
+	}
+
+	ULONG STDMETHODCALLTYPE Release() override
+	{
+		ULONG r = InterlockedDecrement(&m_ref);
+		if (r == 0) delete this;
+		return r;
+	}
+
+	// IDataObject
+	HRESULT STDMETHODCALLTYPE GetData(FORMATETC* pFmt, STGMEDIUM* pMed) override
+	{
+		for (auto& e : m_entries)
+		{
+			if (pFmt->cfFormat == e.fmt.cfFormat &&
+				(pFmt->tymed & e.fmt.tymed))
+			{
+				*pMed = e.stg; // 소유권 유지
+				return S_OK;
+			}
+		}
+		return DV_E_FORMATETC;
+	}
+
+	HRESULT STDMETHODCALLTYPE QueryGetData(FORMATETC* pFmt) override
+	{
+		for (auto& e : m_entries)
+			if (pFmt->cfFormat == e.fmt.cfFormat)
+				return S_OK;
+		return DV_E_FORMATETC;
+	}
+
+	HRESULT STDMETHODCALLTYPE GetDataHere(FORMATETC*, STGMEDIUM*) override
+	{
+		return E_NOTIMPL;
+	}
+	HRESULT STDMETHODCALLTYPE SetData(FORMATETC*, STGMEDIUM*, BOOL) override
+	{
+		return E_NOTIMPL;
+	}
+	HRESULT STDMETHODCALLTYPE EnumFormatEtc(DWORD dwDirection, IEnumFORMATETC** ppEnum) override
+	{
+		if (dwDirection != DATADIR_GET)
+			return E_NOTIMPL;
+
+		std::vector<FORMATETC> formats;
+
+		for (auto& e : m_entries)
+		{
+			formats.push_back(e.fmt);
+		}
+
+		*ppEnum = new CEnumFormatEtc(formats);
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE DAdvise(FORMATETC*, DWORD, IAdviseSink*, DWORD*) override
+	{
+		return OLE_E_ADVISENOTSUPPORTED;
+	}
+	HRESULT STDMETHODCALLTYPE DUnadvise(DWORD) override
+	{
+		return OLE_E_ADVISENOTSUPPORTED;
+	}
+	HRESULT STDMETHODCALLTYPE EnumDAdvise(IEnumSTATDATA**) override
+	{
+		return OLE_E_ADVISENOTSUPPORTED;
+	}
+
+	HRESULT STDMETHODCALLTYPE GetCanonicalFormatEtc(
+		FORMATETC* pFmtIn,
+		FORMATETC* pFmtOut) override
+	{
+		if (!pFmtOut)
+			return E_POINTER;
+
+		// Canonical form 없음 → 입력 그대로 사용
+		*pFmtOut = *pFmtIn;
+		pFmtOut->ptd = nullptr;
+
+		return DATA_S_SAMEFORMATETC;
+	}
 };

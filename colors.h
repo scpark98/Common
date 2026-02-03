@@ -475,6 +475,7 @@ int				get_hue(COLORREF cr);
 CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = NULL);
 
 Gdiplus::Color	get_sys_color(int index);
+D2D1_COLOR_F	get_sys_d2color(int index, int alpha = 255);
 
 extern COLORREF g_default_color[16];
 

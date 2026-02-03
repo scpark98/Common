@@ -628,14 +628,37 @@ public:
 	}
 
 	// IEnumFORMATETC
+	/*
 	HRESULT STDMETHODCALLTYPE Next(ULONG celt, FORMATETC* rgelt, ULONG* pceltFetched) override
 	{
 		ULONG fetched = 0;
 		while (m_index < m_formats.size() && fetched < celt)
 		{
 			rgelt[fetched++] = m_formats[m_index++];
-			rgelt[fetched].ptd = nullptr;
+			//rgelt[fetched].ptd = nullptr;
 		}
+		if (pceltFetched) *pceltFetched = fetched;
+		return fetched == celt ? S_OK : S_FALSE;
+	}
+	*/
+	HRESULT STDMETHODCALLTYPE Next(
+		ULONG celt,
+		FORMATETC* rgelt,
+		ULONG* pceltFetched) override
+	{
+		if (!rgelt) return E_POINTER;
+		if (celt > 1 && !pceltFetched) return E_INVALIDARG;
+
+		ULONG fetched = 0;
+
+		while (m_index < m_formats.size() && fetched < celt)
+		{
+			rgelt[fetched] = m_formats[m_index];
+			rgelt[fetched].ptd = nullptr;   //°°Àº ÀÎµ¦½º
+			++fetched;
+			++m_index;
+		}
+
 		if (pceltFetched) *pceltFetched = fetched;
 		return fetched == celt ? S_OK : S_FALSE;
 	}
@@ -682,14 +705,19 @@ public:
 			UINT cfPNG = RegisterClipboardFormat(L"PNG");
 
 			Entry e = {};
+			memset(&e.fmt, 0, sizeof(FORMATETC));
+			memset(&e.stg, 0, sizeof(STGMEDIUM));
+
 			e.fmt.cfFormat = (CLIPFORMAT)cfPNG;
 			e.fmt.dwAspect = DVASPECT_CONTENT;
 			e.fmt.lindex = -1;
 			e.fmt.tymed = TYMED_HGLOBAL;
+			e.fmt.ptd = nullptr;
 
 			e.stg.tymed = TYMED_HGLOBAL;
 			e.stg.hGlobal = hPng;
 			e.stg.pUnkForRelease = nullptr;
+			
 			m_entries.push_back(e);
 		}
 
@@ -700,6 +728,7 @@ public:
 			e.fmt.dwAspect = DVASPECT_CONTENT;
 			e.fmt.lindex = -1;
 			e.fmt.tymed = TYMED_HGLOBAL;
+			e.fmt.ptd = nullptr;
 			e.stg.tymed = TYMED_HGLOBAL;
 			e.stg.hGlobal = hDibV5;
 			e.stg.pUnkForRelease = nullptr;
@@ -741,6 +770,7 @@ public:
 	}
 
 	// IDataObject
+	/*
 	HRESULT STDMETHODCALLTYPE GetData(FORMATETC* pFmt, STGMEDIUM* pMed) override
 	{
 		for (auto& e : m_entries)
@@ -754,12 +784,48 @@ public:
 		}
 		return DV_E_FORMATETC;
 	}
+	*/
+	HRESULT STDMETHODCALLTYPE GetData(FORMATETC* pFmt, STGMEDIUM* pMed) override
+	{
+		if (!pFmt || !pMed) return E_POINTER;
+
+		for (auto& e : m_entries)
+		{
+			if (pFmt->cfFormat == e.fmt.cfFormat &&
+				(pFmt->tymed & e.fmt.tymed))
+			{
+				SIZE_T size = GlobalSize(e.stg.hGlobal);
+				HGLOBAL hCopy = GlobalAlloc(GMEM_MOVEABLE, size);
+				if (!hCopy) return E_OUTOFMEMORY;
+
+				void* src = GlobalLock(e.stg.hGlobal);
+				void* dst = GlobalLock(hCopy);
+				memcpy(dst, src, size);
+				GlobalUnlock(hCopy);
+				GlobalUnlock(e.stg.hGlobal);
+
+				pMed->tymed = TYMED_HGLOBAL;
+				pMed->hGlobal = hCopy;
+				pMed->pUnkForRelease = nullptr;
+				return S_OK;
+			}
+		}
+		return DV_E_FORMATETC;
+	}
 
 	HRESULT STDMETHODCALLTYPE QueryGetData(FORMATETC* pFmt) override
 	{
 		for (auto& e : m_entries)
+		{
+			/*
 			if (pFmt->cfFormat == e.fmt.cfFormat)
 				return S_OK;
+			*/
+			if (pFmt->cfFormat == e.fmt.cfFormat &&
+				(pFmt->tymed & e.fmt.tymed) &&
+				pFmt->dwAspect == DVASPECT_CONTENT)
+				return S_OK;
+		}
 		return DV_E_FORMATETC;
 	}
 

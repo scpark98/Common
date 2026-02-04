@@ -75,22 +75,20 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 	}
 
-	m_image_roi = get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), Gdiplus::RectF());
-
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Ivory), &m_brush);
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(1.f, 1.f, 1.f, 0.2f), &m_brush_pixel_guide);
 
+	set_image_roi(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), Gdiplus::RectF()));
+	set_show_roi_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show roi info"), m_show_roi_info));
 	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel"), false));
 	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel_pos"), true));
 	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show info"), false));
-	m_fit2ctrl = AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), true);
-	m_show_cursor_guide_line = AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show cursor guide line"), false);
-
-	m_interpolation_mode = (D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), true));
+	set_show_cursor_guide_line(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show cursor guide line"), false));
+	set_interpolation_mode((D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR));
 
 	if (!m_fit2ctrl)
 		zoom(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), 1.0));
-
 
 	return true;
 }
@@ -176,8 +174,6 @@ void CSCD2ImageDlg::OnPaint()
 		{
 			msg.Format(_T("%s\n\n파일이 손상되었거나 지원하지 않는 형식입니다."), m_img[0].get_filename());
 		}
-		//dc.DrawText(msg, rText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
-		//DrawShadowText(dc.GetSafeHdc(), msg, -1, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, indianred, black, 2, 1);
 
 		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
 		d2dc->DrawText(msg, msg.GetLength(), m_WriteFormat, CRect_to_d2Rect(rc), m_brush);
@@ -314,7 +310,7 @@ void CSCD2ImageDlg::OnPaint()
 		//d2dc->DrawRectangle(convert(screen_roi), br_red);
 		//d2dc->FillRectangle(convert(screen_roi), br_roi);
 		//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
-		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(64, 0, 32, 255));
+		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(48, 0, 32, 255));
 	}
 	else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
 	{
@@ -328,7 +324,7 @@ void CSCD2ImageDlg::OnPaint()
 		//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 		//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 		//d2dc->FillRectangle(convert(screen_roi), br_roi);
-		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(64, 0, 32, 255));
+		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(48, 0, 32, 255));
 	}
 
 	if (!m_screen_roi.IsEmptyArea())
@@ -340,98 +336,25 @@ void CSCD2ImageDlg::OnPaint()
 		//image_roi 역시 normalize_rect을 해줘야 한다. 그렇지 않으면 뒤집어 그릴 경우 x1,y1이 x2, y2보다 큰 좌표로 표시된다.
 		normalize_rect(image_roi);
 
-		//9군데 조절 핸들을 그려준다.
-		for (int i = 1; i < RECT_RESIZE_HANDLE_COUNT; i++)
-			draw_rect(d2dc, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(128, 255, 32, 0));
-
 		if (m_show_roi_info)
 		{
+			//9군데 조절 핸들을 그려준다.
+			for (int i = 1; i < RECT_RESIZE_HANDLE_COUNT; i++)
+				draw_rect(d2dc, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(64, 255, 32, 0));
+
+			//lt coord
 			str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
-			CSize sz = dc.GetTextExtent(str);
-			m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
+			draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
 
-			//lt
-			m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-			m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-			d2dc->DrawText(str, str.GetLength(), m_WriteFormat,
-				D2D1::RectF(screen_roi.left + 4, screen_roi.top + 2, screen_roi.left + 4 + sz.cx + 2, screen_roi.top + 2 + sz.cy), m_brush);
-
-			//rb
-			m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-			m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+			//rb coord
 			str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
-			sz = dc.GetTextExtent(str);
-			d2dc->DrawText(str, str.GetLength(), m_WriteFormat,
-				D2D1::RectF(screen_roi.left + screen_roi.Width() - 2 - sz.cx, screen_roi.top + screen_roi.Height() - sz.cy - 2, screen_roi.left + screen_roi.Width() - 2, screen_roi.top + screen_roi.Height()), m_brush);
+			draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_RIGHT | DT_BOTTOM);
 
-			//size
-			m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-			m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+			//size info
 			str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
-			sz = dc.GetTextExtent(str);
-			d2dc->DrawText(str, str.GetLength(), m_WriteFormat,
-				D2D1::RectF(screen_roi.CenterPoint().x - sz.cx / 2, screen_roi.CenterPoint().y + 2, screen_roi.CenterPoint().x + sz.cx / 2, screen_roi.CenterPoint().y + 2 + sz.cy), m_brush);
-			/*
-			CAutoFont af(_T("Arial"));
-			af.SetHeight(14);
-
-			CFont* pOldFont = dc.SelectObject(&af);
-
-			CSize sz = dc.GetTextExtent(_T("A"));
-			dc.SetBkMode(TRANSPARENT);
-
-			//roi 영역 정보를 표시한다. 비록 image_roi는 변환식에 의해 소수점이지만 실제 이미지 픽셀은 정수로 표현해준다.
-			//start
-			dc.SetTextColor(yellow);
-			str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
-			sz = dc.GetTextExtent(str);
-			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
-				CRect(screen_roi.left + 4, screen_roi.top + 2, screen_roi.left + 4 + sz.cx + 2, screen_roi.top + 2 + sz.cy),
-				DT_NOCLIP | DT_LEFT | DT_TOP, white, black, 2, 1);
-
-			//end
-			str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
-			sz = dc.GetTextExtent(str);
-			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
-				CRect(screen_roi.left + screen_roi.Width() - 2 - sz.cx, screen_roi.top + screen_roi.Height() - sz.cy - 2, screen_roi.left + screen_roi.Width() - 2, screen_roi.top + screen_roi.Height()),
-				DT_NOCLIP | DT_RIGHT | DT_BOTTOM, white, black, 2, 1);
-
-			//size and distance
-			dc.SetTextColor(green);
-			str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
-			sz = dc.GetTextExtent(str);
-			DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(),
-				CRect(screen_roi.CenterPoint().x - sz.cx / 2, screen_roi.CenterPoint().y + 2, screen_roi.CenterPoint().x + sz.cx / 2, screen_roi.CenterPoint().y + 2 + sz.cy),
-				DT_NOCLIP | DT_CENTER | DT_TOP, yellow, black, 2, 1);
-
-			dc.SelectObject(pOldFont);
-			*/
+			draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_CENTER | DT_VCENTER);
 		}
 	}
-
-	//for test line thickness and antialias
-	/*
-	d2dc->DrawLine(
-		D2D1::Point2F(0.0f, 10.0f),
-		D2D1::Point2F(200, 10),
-		m_brush,
-		1.0f
-	);
-
-	d2dc->DrawLine(
-		D2D1::Point2F(0.0f, 20.0f),
-		D2D1::Point2F(200, 20),
-		m_brush,
-		2.0f
-	);
-
-	d2dc->DrawLine(
-		D2D1::Point2F(0.0f, 0.0f),
-		D2D1::Point2F(sz_dc.width, sz_dc.height),
-		m_brush,
-		2.0f
-	);
-	*/
 
 	HRESULT hr = d2dc->EndDraw();
 
@@ -558,7 +481,7 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 				}
 				else
 				{
-					display_image(-2);
+					//display_image(-2);
 				}
 				break;
 			case VK_RIGHT:
@@ -580,7 +503,7 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 				}
 				else
 				{
-					display_image(-2);
+					//display_image(-2);
 				}
 				break;
 		}
@@ -794,6 +717,13 @@ void CSCD2ImageDlg::set_image_roi(Gdiplus::RectF roi)
 	rerender();
 }
 
+void CSCD2ImageDlg::set_show_roi_info(bool show)
+{
+	m_show_roi_info = show;
+	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show_roi_info"), m_show_roi_info);
+	Invalidate();
+}
+
 D2D1_BITMAP_INTERPOLATION_MODE CSCD2ImageDlg::get_interpolation_mode()
 {
 	return m_interpolation_mode;
@@ -898,7 +828,7 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	//	return;
 
 	m_lbutton_down = true;
-	m_ptClicked = point;
+	m_pt_lbuttondown = point;
 	SetCapture();
 
 	//roi 설정중
@@ -974,6 +904,23 @@ void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			TRACE(_T("roi completed.\n"));
 			rerender();
 		}
+		else if (m_handle_index >= 0)
+		{
+			//임시 변수로 옮긴 후 정수 좌표 보정을 시킨다.
+			Gdiplus::RectF img_roi;
+			//trace(m_screen_roi);
+			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &img_roi);
+			//trace(img_roi);
+			img_roi.X = ROUND(img_roi.X, 0);
+			img_roi.Y = ROUND(img_roi.Y, 0);
+			img_roi.Width = ROUND(img_roi.Width, 0);
+			img_roi.Height = ROUND(img_roi.Height, 0);
+			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), img_roi, &m_screen_roi);
+			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &m_image_roi);
+			write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), m_image_roi);
+			//trace(m_screen_roi);
+			rerender();
+		}
 	}
 
 	CDialog::OnLButtonUp(nFlags, point);
@@ -994,11 +941,11 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		Clamp(point.x, m_r_display.left, m_r_display.right);
 		Clamp(point.y, m_r_display.top, m_r_display.bottom);
 
+		m_static_pixel.ShowWindow(SW_HIDE);
+
 		//roi 설정중인 경우
 		if (m_drawing_roi)
 		{
-			m_static_pixel.ShowWindow(SW_HIDE);
-
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
 
@@ -1017,12 +964,15 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		//그려진 roi의 크기, 위치를 조절하는 경우
 		else if (m_handle_index >= 0)
 		{
-			TRACE(_T("m_handle_index = %d\n"), m_handle_index);
+			//TRACE(_T("m_handle_index = %d\n"), m_handle_index);
 			switch (m_handle_index)
 			{
 				case corner_inside :
-					m_screen_roi.X = point.x - m_screen_roi.Width / 2;
-					m_screen_roi.Y = point.y - m_screen_roi.Height / 2;
+					//m_screen_roi.X = point.x - m_screen_roi.Width / 2;
+					//m_screen_roi.Y = point.y - m_screen_roi.Height / 2;
+					m_screen_roi.X += (point.x - m_pt_lbuttondown.x);
+					m_screen_roi.Y += (point.y - m_pt_lbuttondown.y);
+					trace(m_screen_roi);
 					adjust_rect_range(m_screen_roi, CRect_to_gpRectF(m_r_display));
 					break;
 				case corner_left :
@@ -1055,20 +1005,26 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 					break;
 			}
 
-			Gdiplus::RectF img_roi;
-			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &img_roi);
-			img_roi.X = ROUND(img_roi.X, 0);
-			img_roi.Y = ROUND(img_roi.Y, 0);
-			img_roi.Width = ROUND(img_roi.Width, 0);
-			img_roi.Height = ROUND(img_roi.Height, 0);
-			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), img_roi, &m_screen_roi);
+			m_pt_lbuttondown = point;
+
+			//Gdiplus::RectF img_roi;
+			//trace(m_screen_roi);
+			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), m_screen_roi, &m_image_roi);
+			trace(m_image_roi);
+			//Gdiplus::Rect에서는 x를 바꿔도 width는 바뀌지 않는다.
+			m_image_roi.X = ROUND(m_image_roi.X, 0);
+			m_image_roi.Y = ROUND(m_image_roi.Y, 0);
+			m_image_roi.Width = ROUND(m_image_roi.Width, 0);
+			m_image_roi.Height = ROUND(m_image_roi.Height, 0);
+			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
+			//trace(m_screen_roi);
 			rerender();
 		}
 		//이미지 이동을 위한 단순 드래그인 경우
 		else
 		{
-			m_offset.x += (point.x - m_ptClicked.x);
-			m_offset.y += (point.y - m_ptClicked.y);
+			m_offset.x += (point.x - m_pt_lbuttondown.x);
+			m_offset.y += (point.y - m_pt_lbuttondown.y);
 
 			//int nw = m_img.width * m_zoom;
 			//int nh = m_img.height * m_zoom;
@@ -1083,8 +1039,8 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			{
 				//m_screen_roi.X += m_offset.x;
 				//m_screen_roi.Y += m_offset.y;
-				//m_screen_roi.X += (point.x - m_ptClicked.x);
-				//m_screen_roi.Y += (point.y - m_ptClicked.y);
+				//m_screen_roi.X += (point.x - m_pt_lbuttondown.x);
+				//m_screen_roi.Y += (point.y - m_pt_lbuttondown.y);
 				//m_screen_roi.Offset(m_offset.x, m_offset.y);
 			}
 			
@@ -1097,7 +1053,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			//get_screen_coord_from_real_coord(m_r_display, m_img[0].width, img_roi, &m_screen_roi);
 			
 			rerender();
-			m_ptClicked = point;
+			m_pt_lbuttondown = point;
 		}
 	}
 	else if (m_show_pixel)
@@ -1910,15 +1866,15 @@ void CSCD2ImageDlg::scroll(int offset_x, int offset_y)
 double CSCD2ImageDlg::get_gps_latitude()
 {
 	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_latitude == 0.0f)
-		return 0.0;
+		return 0.0f;
 
 	return m_img[0].get_exif().gps_latitude;
 }
 
 double CSCD2ImageDlg::get_gps_longitude()
 {
-	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_longitude)
-		return 0.0;
+	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_longitude == 0.0f)
+		return 0.0f;
 
 	return m_img[0].get_exif().gps_longitude;
 }

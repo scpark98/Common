@@ -66,9 +66,10 @@ public:
 	LONG AddLayeredStyle(HWND hWnd);
 	BOOL SetLayeredWindowAttributes(HWND hWnd, COLORREF crKey, BYTE bAlpha, DWORD dwFlags);
 
-	//alpha : 100(transparent), 0(opaque)
-	BOOL SetTransparent(HWND hWnd, BYTE alpha_percentage);
-	BYTE GetTransparent() { return m_alpha_percentage; }
+	//alpha : 0(transparent), 255(opaque)
+	//언뜻보면 alpha = 255일때가 완전 투명처럼 생각되지만 SetLayeredWindowAttributes() API의 bAlpha 정의와 일관되게 처리하기 위함.
+	BOOL SetTransparent(HWND hWnd, BYTE alpha);
+	BYTE GetTransparent() { return m_alpha; }
 
 	static short GetVersionI()		{return 10;}
 	static LPCTSTR GetVersionC()	{return (LPCTSTR)_T("1.0");}
@@ -76,7 +77,8 @@ public:
 private:
 	typedef BOOL (WINAPI* lpfnSetLayeredWindowAttributes)(HWND hWnd, COLORREF crKey, BYTE bAlpha, DWORD dwFlags);
 
-	BYTE		m_alpha_percentage;
+	//alpha : 0(transparent), 255(opaque)
+	BYTE		m_alpha;
 	HMODULE		m_hDll;
 };
 

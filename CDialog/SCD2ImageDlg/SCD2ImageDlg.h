@@ -180,7 +180,7 @@ public:
 	Gdiplus::RectF	get_image_roi();
 	void			set_image_roi(Gdiplus::RectF roi = Gdiplus::RectF());
 	bool			get_show_roi_info() { return m_show_roi_info; }
-	void			set_show_roi_info(bool show) { m_show_roi_info = show; Invalidate(); }
+	void			set_show_roi_info(bool show);
 
 	//마우스를 클릭하여 이미지 오프셋을 변경하거나, roi를 그리거나 변경할때는
 	//parent에서 마우스 액션을 무시해야하므로 추가.
@@ -287,7 +287,7 @@ protected:
 
 //마우스 드래그
 	bool			m_lbutton_down = false;
-	CPoint			m_ptClicked = CPoint(0, 0);
+	CPoint			m_pt_lbuttondown = CPoint(0, 0);
 	HCURSOR			m_hCursor;
 
 //이미지 정보 표시

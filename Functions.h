@@ -104,22 +104,27 @@ inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, cons
 {
 	return os << (LPCTSTR)s;
 }
-
 inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, LPCTSTR s)
 {
 	if (!s)
 		return os << _T("(null)");
 	return os.write(s, _tcslen(s));
 }
-
 inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CPoint& pt)
 {
 	return os << _T("(") << pt.x << L", " << pt.y << _T(")");
 }
-
 inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CRect& r)
 {
 	return os << _T("(") << r.left << _T(", ") << r.top << _T(", ") << r.right << _T(", ") << r.bottom << L")";
+}
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const Gdiplus::Rect& r)
+{
+	return os << _T("(") << r.X << _T(", ") << r.Y << _T(", ") << r.GetRight() << _T(", ") << r.GetBottom() << L")";
+}
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const Gdiplus::RectF& r)
+{
+	return os << _T("(") << r.X << _T(", ") << r.Y << _T(", ") << r.GetRight() << _T(", ") << r.GetBottom() << L")";
 }
 
 template<typename T> void trace_impl(const TCHAR* func, int line, const TCHAR* var_name, const T& value)
@@ -472,7 +477,7 @@ public:
 	{
 		CString res;
 		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
-			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: N %s, E %s, %.0fm"),
+			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: %s, %s, %.0fm"),
 			camera_make,
 			camera_model,
 			software,
@@ -769,6 +774,8 @@ struct	NETWORK_INFO
 	int			get_monitor_index(CRect r, bool entire_included = false);
 	//x, y가 속해있는 모니터 인덱스를 리턴
 	int			get_monitor_index(int x, int y);
+	//특정 윈도우가 속해있는 모니터 인덱스를 리턴
+	int			get_monitor_index(HWND hWnd);
 	//멀티모니터 전체 영역 사각형 리턴. -1이면 전체 모니터 영역을 리턴.
 	CRect		get_monitor_rect(int index = -1);
 
@@ -2719,7 +2726,7 @@ std::vector<CPoint>	get_rotated(int cx, int cy, CRect* r, double degree);
 
 //지도 좌표 <-> 도분초 변환
 double		gps_to_double(int d, int m, double s);
-void		double_to_gps(double gps, int &d, int &m, double &s);
+CString		double_to_gps(double gps, bool is_latitude, int *d = nullptr, int *m = nullptr, double *s = nullptr);
 
 //src내의 모든 문자에 대해 digits자릿수의 조합 생성
 void		combination(std::vector<TCHAR> src, CString temp, std::vector<CString>& result, int depth);

@@ -11696,11 +11696,36 @@ double gps_to_double(int d, int m, double s)
 	return (d + (double)m/60.0 + s/3600.0);
 }
 
-void double_to_gps(double gps, int &d, int &m, double &s)
+CString double_to_gps(double gps, bool is_latitude, int* d, int* m, double* s)
 {
-	d = int(gps);
-	m = int((gps-d)*60.0);
-	s = ((gps-d)*60.0 - m) * 60.0;
+	int res_d, res_m;
+	double res_s;
+
+	// 반구 참조 결정 (N/S for latitude, E/W for longitude)
+	CString ref;
+	if (is_latitude)
+		ref = (gps >= 0) ? _T("N") : _T("S");
+	else
+		ref = (gps >= 0) ? _T("E") : _T("W");
+
+	// 음수인 경우 양수로 변환
+	gps = fabs(gps);
+
+	res_d = int(gps);
+	res_m = int((gps - res_d) * 60.0);
+	res_s = ((gps - res_d) * 60.0 - res_m) * 60.0;
+
+	if (d != nullptr)
+		*d = res_d;
+	if (m != nullptr)
+		*m = res_m;
+	if (s != nullptr)
+		*s = res_s;
+
+	CString result;
+	result.Format(_T("%s %d° %d' %.2f\""), ref, res_d, res_m, res_s);
+
+	return result;
 }
 
 double Rounding(double x, int digit)
@@ -15142,6 +15167,14 @@ int	get_monitor_index(CRect r, bool entire_included)
 	}
 
 	return -1;
+}
+
+//특정 윈도우가 속해있는 모니터 인덱스를 리턴
+int get_monitor_index(HWND hWnd)
+{
+	CRect rw;
+	::GetWindowRect(hWnd, rw);
+	return get_monitor_index(rw.CenterPoint().x, rw.CenterPoint().y);
 }
 
 //멀티모니터 전체 영역 사각형 리턴. -1이면 전체 모니터 영역을 리턴.

@@ -494,6 +494,7 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	}
 	PropVariantClear(&value);
 
+	/*
 	hr = pExifQueryReader->GetMetadataByName(L"/{ushort=4}", &value);
 	if (SUCCEEDED(hr) && (value.vt == VT_UI8))
 	{
@@ -507,6 +508,125 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 		m_exif_info.gps_altitude = double(value.cyVal.Lo) / double(value.cyVal.Hi);
 	}
 	PropVariantClear(&value);
+	*/
+	// ===== GPS 정보 추출 (보완) =====
+	// GPS 정보는 IFD 레벨에 있으므로 pIfdQueryReader에서 찾음
+	ComPtr<IWICMetadataQueryReader> pGpsQueryReader;
+	hr = pIfdQueryReader->GetMetadataByName(_T("/gps"), &value);
+
+	if (SUCCEEDED(hr) && value.vt == VT_UNKNOWN)
+	{
+		value.punkVal->QueryInterface(IID_IWICMetadataQueryReader, &pGpsQueryReader);
+		PropVariantClear(&value);
+
+		if (pGpsQueryReader)
+		{
+			// ===== GPS Latitude (ushort=2) =====
+			// GPSLatitudeRef (N/S)
+			hr = pGpsQueryReader->GetMetadataByName(L"/{ushort=1}", &value);
+			CString gps_lat_ref;
+			if (SUCCEEDED(hr) && (value.vt == VT_LPSTR))
+				gps_lat_ref = value.pszVal;
+			PropVariantClear(&value);
+
+			// GPSLatitude (3개의 Rational: 도/분/초)
+			hr = pGpsQueryReader->GetMetadataByName(L"/{ushort=2}", &value);
+			double gps_latitude = 0.0;
+			if (SUCCEEDED(hr) && (value.vt == (VT_VECTOR | VT_UI8)))
+			{
+				// Rational 배열: [도의분자/분모, 분의분자/분모, 초의분자/분모]
+				if (value.capropvar.cElems >= 3 && value.capropvar.pElems != nullptr)
+				{
+					// DWORD 배열로 캐스팅 (더 명확함)
+					DWORD* pRationals = reinterpret_cast<DWORD*>(value.capropvar.pElems);
+
+					// 각 Rational: [분자0, 분모0, 분자1, 분모1, 분자2, 분모2]
+					double degrees = (double)pRationals[0] / (double)pRationals[1];
+					double minutes = (double)pRationals[2] / (double)pRationals[3];
+					double seconds = (double)pRationals[4] / (double)pRationals[5];
+
+					gps_latitude = degrees + minutes / 60.0 + seconds / 3600.0;
+
+					// 남반구는 음수
+					if (gps_lat_ref == "S")
+						gps_latitude = -gps_latitude;
+
+					m_exif_info.gps_latitude = gps_latitude;
+					m_exif_info.gps_latitude_str = double_to_gps(gps_latitude, true);
+					TRACE(_T("GPS Latitude: %.6f (%s)\n"), gps_latitude, gps_lat_ref);
+				}
+			}
+			PropVariantClear(&value);
+
+			// GPSLongitudeRef (E/W)
+			hr = pGpsQueryReader->GetMetadataByName(L"/{ushort=3}", &value);
+			CString gps_lon_ref;
+			if (SUCCEEDED(hr) && (value.vt == VT_LPSTR))
+				gps_lon_ref = value.pszVal;
+			PropVariantClear(&value);
+
+			// GPSLongitude (3개의 Rational)
+			hr = pGpsQueryReader->GetMetadataByName(L"/{ushort=4}", &value);
+			double gps_longitude = 0.0;
+			if (SUCCEEDED(hr) && (value.vt == (VT_VECTOR | VT_UI8)))
+			{
+				if (value.capropvar.cElems >= 3 && value.capropvar.pElems != nullptr)
+				{
+					DWORD* pRationals = reinterpret_cast<DWORD*>(value.capropvar.pElems);
+
+					double degrees = (double)pRationals[0] / (double)pRationals[1];
+					double minutes = (double)pRationals[2] / (double)pRationals[3];
+					double seconds = (double)pRationals[4] / (double)pRationals[5];
+
+					gps_longitude = degrees + minutes / 60.0 + seconds / 3600.0;
+
+					// 서반구는 음수
+					if (gps_lon_ref == "W")
+						gps_longitude = -gps_longitude;
+
+					m_exif_info.gps_longitude = gps_longitude;
+					m_exif_info.gps_longitude_str = double_to_gps(gps_longitude, false);
+					TRACE(_T("GPS Longitude: %.6f (%s)\n"), gps_longitude, gps_lon_ref);
+				}
+			}
+			PropVariantClear(&value);
+
+			// ===== GPS Altitude (ushort=6) =====
+			// GPSAltitudeRef (0=위, 1=아래)
+			hr = pGpsQueryReader->GetMetadataByName(L"/{ushort=5}", &value);
+			int gps_alt_ref = 0;
+			if (SUCCEEDED(hr) && (value.vt == VT_UI1))
+				gps_alt_ref = value.bVal;
+			PropVariantClear(&value);
+
+			// GPSAltitude (1개의 Rational)
+			hr = pGpsQueryReader->GetMetadataByName(L"/{ushort=6}", &value);
+			double gps_altitude = 0.0;
+			if (SUCCEEDED(hr) && (value.vt == VT_UI8))
+			{
+				// Rational: 분자/분모
+				double numerator = (double)(value.cyVal.Lo);
+				double denominator = (double)(value.cyVal.Hi);
+
+				if (denominator != 0.0)
+				{
+					gps_altitude = numerator / denominator;
+
+					// 아래(음수)면 부호 반전
+					if (gps_alt_ref == 1)
+						gps_altitude = -gps_altitude;
+
+					m_exif_info.gps_altitude = gps_altitude;
+					TRACE(_T("GPS Altitude: %.2f m\n"), gps_altitude);
+				}
+			}
+			PropVariantClear(&value);
+		}
+	}
+	else
+	{
+		PropVariantClear(&value);
+	}
 
 	return hr;
 }

@@ -376,7 +376,7 @@ BOOL CSCSystemButtons::PreTranslateMessage(MSG* pMsg)
 		pMsg->message == WM_KEYUP ||
 		pMsg->message == WM_NCHITTEST)
 	{
-		TRACE(_T("msg(%d) on CSCSystemButtons\n"), pMsg->message);
+		//TRACE(_T("msg(%d) on CSCSystemButtons\n"), pMsg->message);
 		return FALSE;
 	}
 

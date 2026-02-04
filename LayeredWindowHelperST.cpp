@@ -100,17 +100,18 @@ BOOL CLayeredWindowHelperST::SetLayeredWindowAttributes(HWND hWnd, COLORREF crKe
 //		FALSE
 //			Function failed. To get extended error information, call ::GetLastError().
 //
-BOOL CLayeredWindowHelperST::SetTransparent(HWND hWnd, BYTE alpha_percentage)
+BOOL CLayeredWindowHelperST::SetTransparent(HWND hWnd, BYTE alpha)
 {
-	// Do not accept values greater than 100%
-	if (alpha_percentage > 100)
-		alpha_percentage = 100;
+	// Do not accept values greater than 255
+	if (alpha < 0)
+		alpha = 0;
+	if (alpha > 255)
+		alpha = 255;
 
-	//TRACE(_T("alpha_percentage = %d\n"), alpha_percentage);
-	m_alpha_percentage = alpha_percentage;
+	m_alpha = alpha;
 
-	//return SetLayeredWindowAttributes(hWnd, RGB( 26, 25, 17 ), 255, LWA_COLORKEY | LWA_ALPHA);
-	BOOL res = SetLayeredWindowAttributes(hWnd, 0, 255 - 255 * m_alpha_percentage/100, LWA_ALPHA);
+	BOOL res = SetLayeredWindowAttributes(hWnd, 0, m_alpha, LWA_ALPHA);
+	//TRACE(_T("GetLastError() = %d\n"), GetLastError());
 	if (!res)
 		TRACE(_T("fail to CLayeredWindowHelperST::SetTransparent\n"));
 

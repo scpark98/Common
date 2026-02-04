@@ -750,7 +750,6 @@ bool CSCD2ImageDlg::copy_to_clipboard(int type)
 		r = D2D1::RectU(0, 0, sz.width, sz.height);
 	}
 	
-	//ID2D1Bitmap1* img;
 	CSCD2Image img(m_img[0].get_WICFactory2(), m_d2dc.get_d2dc(), r.right - r.left, r.bottom - r.top);
 	m_img[0].get_sub_img(r, &img);
 

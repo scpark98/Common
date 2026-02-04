@@ -589,7 +589,9 @@ protected:
 };
 
 //CEnumFormatEtc, ImageDataObject는 투명png까지 클립보드로 복사하기 위해 추가된 클래스임.
-//copy_to_clipboard()에서 사용.
+//copy_to_clipboard()에서 사용하기 위해 추가했으나 Release mode에서 오류가 발생하여
+//다른 방식으로 변경 구현함. 현재 사용되진 않으나 참조를 위해 우선 코드는 주석처리 함.
+#if 0
 class CEnumFormatEtc : public IEnumFORMATETC
 {
 	LONG m_ref = 1;
@@ -880,3 +882,4 @@ public:
 		return DATA_S_SAMEFORMATETC;
 	}
 };
+#endif

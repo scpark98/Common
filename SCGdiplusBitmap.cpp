@@ -2871,90 +2871,101 @@ bool CSCGdiplusBitmap::copy_to_clipboard()
 	const UINT width = m_pBitmap->GetWidth();
 	const UINT height = m_pBitmap->GetHeight();
 
-	// 1) GDI+ Bitmap 픽셀 Lock (ARGB, straight alpha)
+	// CF_DIBV5 생성 (기존 코드)
 	Gdiplus::BitmapData bd = {};
 	Gdiplus::Rect rc(0, 0, width, height);
 
-	if (m_pBitmap->LockBits(
-		&rc,
-		Gdiplus::ImageLockModeRead,
-		PixelFormat32bppARGB,
-		&bd) != Gdiplus::Ok)
-	{
+	if (m_pBitmap->LockBits(&rc, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
 		return false;
-	}
 
-	// 2) CF_DIBV5 메모리 확보
-	const UINT stride = bd.Stride;               // bytes per row
+	const UINT stride = bd.Stride;
 	const UINT imageSize = stride * height;
 	const UINT totalSize = sizeof(BITMAPV5HEADER) + imageSize;
 
-	HGLOBAL hMem = GlobalAlloc(GHND, totalSize);
-	if (!hMem)
+	// 오버플로우 체크
+	if (imageSize / stride != height || totalSize < imageSize)
 	{
 		m_pBitmap->UnlockBits(&bd);
 		return false;
 	}
 
-	BYTE* pData = static_cast<BYTE*>(GlobalLock(hMem));
-	BITMAPV5HEADER* pbv5 = reinterpret_cast<BITMAPV5HEADER*>(pData);
+	HGLOBAL hDibv5 = GlobalAlloc(GHND, totalSize);
+	if (!hDibv5)
+	{
+		m_pBitmap->UnlockBits(&bd);
+		return false;
+	}
+
+	BYTE* pData = (BYTE*)GlobalLock(hDibv5);
+	BITMAPV5HEADER* pbv5 = (BITMAPV5HEADER*)pData;
 	ZeroMemory(pbv5, sizeof(*pbv5));
 
-	// 3) BITMAPV5HEADER 설정 (중요)
 	pbv5->bV5Size = sizeof(BITMAPV5HEADER);
 	pbv5->bV5Width = width;
-	pbv5->bV5Height = -((LONG)height); // top-down
+	pbv5->bV5Height = -(LONG)height;
 	pbv5->bV5Planes = 1;
 	pbv5->bV5BitCount = 32;
 	pbv5->bV5Compression = BI_BITFIELDS;
-
-	// BGRA 마스크 (GDI+ ARGB == 메모리상 BGRA)
 	pbv5->bV5RedMask = 0x00FF0000;
 	pbv5->bV5GreenMask = 0x0000FF00;
 	pbv5->bV5BlueMask = 0x000000FF;
 	pbv5->bV5AlphaMask = 0xFF000000;
 	pbv5->bV5CSType = LCS_sRGB;
 
-	// 4) 픽셀 데이터 복사 (stride 기준)
 	BYTE* dst = pData + sizeof(BITMAPV5HEADER);
-	BYTE* src = static_cast<BYTE*>(bd.Scan0);
+	BYTE* src = (BYTE*)bd.Scan0;
 
 	for (UINT y = 0; y < height; ++y)
 	{
-		memcpy(
-			dst + y * stride,
-			src + y * bd.Stride,
-			width * 4
-		);
+		memcpy(dst + y * stride, src + y * bd.Stride, width * 4);
 	}
 
-	GlobalUnlock(hMem);
+	GlobalUnlock(hDibv5);
 	m_pBitmap->UnlockBits(&bd);
 
-	HGLOBAL hGlobal = nullptr;
-
-	if (!create_png_hglobal(&hGlobal))
+	// PNG 생성 (alpha 채널 보존)
+	HGLOBAL hPng = nullptr;
+	if (!create_png_hglobal(&hPng))
 	{
-		GlobalFree(hMem);
+		GlobalFree(hDibv5);
 		return false;
 	}
 
-	SIZE_T sz = GlobalSize(hGlobal);
-	TRACE(_T("PNG GlobalSize = %llu\n"), (unsigned long long)sz);
-	
-	ImageDataObject* obj = new ImageDataObject(hMem, hGlobal);
-	HRESULT hr = OleSetClipboard(obj);
-
-	if (FAILED(hr))
+	// ===== 핵심 FIX: 안전한 데이터 객체 구현 =====
+	if (!OpenClipboard(nullptr))
 	{
-		delete obj;              // 또는 Release 전에 수동 정리
+		GlobalFree(hDibv5);
+		GlobalFree(hPng);
 		return false;
 	}
 
-	obj->Release();
+	EmptyClipboard();
 
-	OleFlushClipboard();
+	// 1) CF_DIBV5 설정 (보조 형식, 호환성)
+	if (!SetClipboardData(CF_DIBV5, hDibv5))
+	{
+		GlobalFree(hDibv5);
+		GlobalFree(hPng);
+		CloseClipboard();
+		return false;
+	}
 
+	// 2) PNG 설정 (메인 형식, alpha 보존)
+	// 커스텀 형식 등록
+	static UINT cfPng = 0;
+	if (cfPng == 0)
+		cfPng = RegisterClipboardFormat(_T("PNG"));
+
+	if (!SetClipboardData(cfPng, hPng))
+	{
+		GlobalFree(hPng);
+		CloseClipboard();
+		return false;
+	}
+
+	CloseClipboard();
+
+	// 성공: 클립보드가 두 메모리 모두 소유
 	return true;
 }
 

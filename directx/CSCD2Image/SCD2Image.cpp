@@ -1920,7 +1920,7 @@ bool CSCD2Image::copy_to_clipboard()
 		return false;
 
 	//20260203 GPT에 물어보며 아래와 같은 방법으로 구현해봤으나 계속 검은 화면만 클립보드로 복사된다.
-	//CSCGdiplusBitmap으로 임시 저장한 후 클립보드에 복사하는 방법으로 우선 우회한다.
+	//CSCGdiplusBitmap으로 임시 폴더에 저장한 후 그 파일을 다시 열어서 클립보드에 복사하는 방법으로 우선 구현한다.
 	CString temp_file;
 	
 	temp_file.Format(_T("%s\\__asee_temp__.png"), get_known_folder(CSIDL_APPDATA));

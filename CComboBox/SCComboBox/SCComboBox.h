@@ -38,7 +38,9 @@ public:
 	//font combo로 동작한다. add, delete, 기본 font 변경등은 모두 무시된다.
 	void			set_as_font_combo();
 
-	CString			get_text();
+	//edit에 직접 입력된 text는 GetWindowText()로 구해야하고
+	//select에 의한 text는 GetCurSel()로 구한 후 GetLBText()로 구해야 맞다.
+	CString			get_cur_sel_text();
 
 	bool			SetCurSel(int index) { return set_cur_sel(index); }
 	bool			set_cur_sel(int index);

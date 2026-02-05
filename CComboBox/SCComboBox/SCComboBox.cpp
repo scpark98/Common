@@ -714,11 +714,17 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 	return CComboBox::PreTranslateMessage(pMsg);
 }
 
-CString CSCComboBox::get_text()
+CString CSCComboBox::get_cur_sel_text()
 {
+	int index = GetCurSel();
+	if (index < 0 || index >= GetCount())
+		return CString();
+
 	CString text;
-	//GetLBText(GetCurSel(), text);
-	GetWindowText(text);
+
+	GetLBText(index, text);
+	//TRACE(_T("GetCurSel() = %d, text = %s\n"), index, text);
+
 	return text;
 }
 

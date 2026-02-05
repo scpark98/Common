@@ -1727,7 +1727,10 @@ void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color c
 	{
 		m_draw_border = true;
 		if (m_cr_border.size() == 0)
-			m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
+			m_cr_border.resize(4);
+
+		for (size_t i = 0; i < m_cr_border.size(); i++)
+			m_cr_border[i] = cr_border;
 	}
 
 	if (m_round > 0)

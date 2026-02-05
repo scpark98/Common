@@ -186,7 +186,7 @@ public:
 
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	//현재는 jpg만 품질옵션이 적용된다.
-	HRESULT					save(CString path, float quality = 80);
+	HRESULT					save(CString path, float quality = 1.0f);
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
 
@@ -206,6 +206,10 @@ public:
 //exif
 	CSCEXIFInfo				get_exif() { return m_exif_info; }
 	CString					get_exif_str();
+	void					apply_orientation_transform();  // EXIF Orientation 적용
+	WICBitmapTransformOptions ExifOrientationToWicTransform(USHORT orientation);
+
+	HRESULT					extract_raw_data_from_bitmap(ID2D1DeviceContext* d2dc, ID2D1Bitmap1* src, uint8_t* data, UINT& out_stride);
 
 protected:
 	CString					m_filename;// = _T("untitled");

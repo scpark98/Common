@@ -89,22 +89,21 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 
 	dst.m_bSunken = m_bSunken;
 
-	memcpy(&dst.m_theme, &m_theme, sizeof(CSCColorTheme));
-	//dst.m_cr_text = m_cr_text;
-	//dst.m_cr_back = m_cr_back;
-	//dst.m_cr_edit_text = m_cr_edit_text;
-	//dst.m_cr_edit_back = m_cr_edit_back;
+	//CSCColorTheme 안에는 std::deque<Gdiplus::Color> cr_percentage_bar; 가 멤버로 있다.
+	//즉, memcpy로 C++ 표준 라이브러리 컨테이너를 통째로 바이트 복사하면서,
+	//deque 내부 포인터 / 디버그 프록시가 두 객체에서 공유 / 꼬이게 되고,
+	//이후 소멸 시점에 한쪽이 먼저 정리되면 다른 쪽 deque가
+	//이미 파괴된 프록시 / 이터레이터 체인을 건드리며 지금 같은 크래시 발생.
+	//CSCColorTheme의 생성자 함수를 복사 가능하게 수정하고 아래 memcpy를 제거함.
+	//memcpy(&dst.m_theme, &m_theme, sizeof(CSCColorTheme));
+	dst.m_theme = m_theme;
 	dst.m_transparent = m_transparent;
 
 	dst.m_round = m_round;
-	//dst.m_cr_parent_back = m_cr_parent_back;
-	//dst.m_cr_parent_back = m_cr_parent_back;
 	dst.set_round(dst.m_round, dst.m_theme.cr_border, dst.m_theme.cr_parent_back);
-
 
 	dst.m_draw_border = m_draw_border;
 	dst.m_border_thick = m_border_thick;
-	//dst.m_cr_border = m_cr_border;
 
 	dst.m_cr_link = m_cr_link;
 	dst.m_dwStyle = m_dwStyle;
@@ -713,6 +712,8 @@ void CSCStatic::set_use_edit(bool use)
 			m_edit.set_font_name(m_lf.lfFaceName);
 			m_edit.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));
 			m_edit.set_font_weight(m_lf.lfWeight);
+			m_edit.set_text_color(m_theme.cr_text);
+			m_edit.set_back_color(m_theme.cr_back);
 		}
 	}
 	else
@@ -746,8 +747,8 @@ void CSCStatic::edit_begin()
 	CRect r(m_text_extent + 4, 3, rc.right - 2, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
-	m_edit.set_text_color(m_theme.cr_edit_text);
-	m_edit.set_back_color(m_theme.cr_edit_back);
+	//m_edit.set_text_color(m_theme.cr_edit_text);
+	//m_edit.set_back_color(m_theme.cr_edit_back);
 	m_edit.set_text(m_text_value);
 
 	m_edit.ShowWindow(SW_SHOW);
@@ -1651,7 +1652,7 @@ LRESULT CSCStatic::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 	if (!msg->pThis->IsWindowVisible())
 		return 0;
 
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
+	//TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
 	if (msg->message == WM_KILLFOCUS)
 		edit_end(true);
 

@@ -103,15 +103,15 @@ void CSCStepCtrl::OnPaint()
 		}
 
 		if (thumb_style == thumb_style_rect)
-			g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(m_step[i].r));
+			g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(m_step[i].r));
 		else
-			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(m_step[i].r));
+			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(m_step[i].r));
 
 		//pos 미만은 파란색 원에 체크 표시를
 		if (i < m_pos)
 		{
-			draw_line(&dc, m_step[i].r.CenterPoint().x - 3, m_step[i].r.CenterPoint().y - 0, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
-			draw_line(&dc, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
+			draw_line(g, m_step[i].r.CenterPoint().x - 3, m_step[i].r.CenterPoint().y - 0, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
+			draw_line(g, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
 		}
 		else if (i == m_pos)
 		{
@@ -119,18 +119,18 @@ void CSCStepCtrl::OnPaint()
 
 			rthumb_small.DeflateRect(2, 2);
 			if (thumb_style == thumb_style_rect)
-				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect2GpRect(rthumb_small));
+				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
 			else
-				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect2GpRect(rthumb_small));
+				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
 
 			rthumb_small.DeflateRect(2, 2);
 			if (thumb_style == thumb_style_rect)
-				//g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(rthumb_small));
+				//g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(rthumb_small));
 				draw_rect(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
 			else if (thumb_style == thumb_style_diamond)
 				;// draw_diamond(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
 			else if (thumb_style == thumb_style_circle)
-				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect2GpRect(rthumb_small));
+				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(rthumb_small));
 				//draw_ellipse(&dc,)
 		}
 		else
@@ -139,9 +139,9 @@ void CSCStepCtrl::OnPaint()
 
 			rthumb_small.DeflateRect(1, 1);
 			if (thumb_style == thumb_style_rect)
-				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect2GpRect(rthumb_small));
+				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
 			else
-				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect2GpRect(rthumb_small));
+				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
 		}
 
 		//draw text

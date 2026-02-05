@@ -18,7 +18,7 @@
 - set_text()를 사용하면 이미지 대신 텍스트를 출력한다.
 - 기본 정렬은 DT_CENTER지만 set_text_align()으로 텍스트 정렬을 변경할 수 있다.
 
-[자막 이펙트 프리셋
+[자막 이펙트 프리셋]
 - 한 문장의 한 글자씩 컬러로 표시되는 등의 text effect 들을 구현할 수 있다.
   CEffectSetting 클래스가 필요할 수 있다.
 - 한 글자씩 alpha와 위치 변경
@@ -26,12 +26,14 @@
 [Usage]
 - .h에 #include "Common/CDialog/SCShapeDlg/SCShapeDlg.h"
 - CSCShapeDlg		m_message;
-- .cpp의 OnInitDialog()에 다음과 같이 초기화
+
+- .cpp의 OnInitDialog()에 다음과 같이 초기화 (텍스트 출력 예시)
   	m_message.set_text(this, _T(""), 40, Gdiplus::FontStyleBold, 4.0f, 2.4f);
 	m_message.set_stroke_color(Gdiplus::Color::Black);
 	m_message.set_alpha(192);
 	m_message.use_control(false);
-- m_message.set_text(_T("표시할 텍스트")); 와 같이 호출하거나
+
+- 텍스트 변경 시 m_message.set_text(_T("표시할 텍스트")); 와 같이 호출하거나
   아래와 같이 세부적인 설정을 한 후 표시할 수 있다.
 	CSCShapeDlgTextSetting* setting = m_message.get_text_setting();
 	setting->text = message;
@@ -68,7 +70,7 @@ class CSCShapeDlgTextSetting
 {
 public:
 	CSCShapeDlgTextSetting() {};
-	CSCShapeDlgTextSetting(CString _text, CSCTextProperty _text_prop)	//alpha=0이면 투명 영역은 클릭되지 않는다.
+	CSCShapeDlgTextSetting(CString _text, CSCTextProperty _text_prop)	//alpha = 0이면 투명 영역은 클릭되지 않는다.
 	{
 		text = _text;
 		text_prop = _text_prop;
@@ -146,7 +148,7 @@ public:
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
 	CSCShapeDlgTextSetting*	get_text_setting() { return &m_text_setting; }
 
-	CSCTextProperty*		get_logfont() { &m_text_setting.text_prop;}
+	CSCTextProperty*		get_logfont() { return &m_text_setting.text_prop; }
 
 	//animated gif인 경우
 	enum GIF_PLAY_STATE
@@ -172,7 +174,7 @@ public:
 protected:
 	CWnd*			m_parent = NULL;
 
-	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스 음절
+	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스의 구절
 
 	//0 : 투명, 255 : 불투명
 	int				m_alpha = 255;
@@ -187,6 +189,10 @@ protected:
 	//이 thread는 즉시 중단되고 text를 변경한 후 다시 이 thread가 호출된다.
 	//이 때 hide시키지 않고 text만 변경시킨다. 그렇지 않으면 사라졌다가 나타나므로 깜빡이게 된다.
 	void			thread_fadeinout(bool fadein, int fadein_delay_ms = 10, int hide_after_ms = 0, bool fadeout = false, int fadeout_delay_ms = 10);
+
+	//effect를 종류별로 thread로 돌리면 분명 충돌이 일어날 수 있다.
+	//그렇다고 하나의 thread를 만들어서 모든 effect를 처리하게 하면
+	//각 effect마다 range, interval이 모두 다를 수 있으므로 처리가 어렵다.
 
 	//m_para 항목 중 마우스 커서가 올라간 음절 정보를 parent에게 메시지로 전달한다.
 	bool			m_send_hover_info = false;

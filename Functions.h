@@ -477,7 +477,7 @@ public:
 	{
 		CString res;
 		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
-			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d\n회전 정보: %s\nGPS 정보: %s, %s, %.0fm"),
+			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d"),
 			camera_make,
 			camera_model,
 			software,
@@ -488,11 +488,22 @@ public:
 			(unsigned)round(1.0 / exposure_time),
 			exposure_bias,
 			f_number,
-			iso_speed,
-			orientation_str,
-			gps_latitude_str,
-			gps_longitude_str,
-			gps_altitude);
+			iso_speed);
+
+		CString orientation_info;
+		if (!orientation_str.IsEmpty())
+		{
+			orientation_info.Format(_T("\n회전 정보: %s"), orientation_str);
+			res += orientation_info;
+		}
+
+		CString gps_info;
+		if (!gps_latitude_str.IsEmpty() || !gps_longitude_str.IsEmpty())
+		{
+			gps_info.Format(_T("\nGPS 정보: %s, %s, %.0fm"), gps_latitude_str, gps_longitude_str, gps_altitude);
+			res += gps_info;
+		}
+
 		return res;
 	}
 };
@@ -572,6 +583,8 @@ public:
 	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
 	bool		is_https = true;
 	CString		body;					//post data(json format)
+
+	//default = 30초
 	int			timeout_ms = 30000;
 
 	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);

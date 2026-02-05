@@ -483,16 +483,18 @@ extern COLORREF g_default_color[16];
 class CSCColorTheme
 {
 public:
-	CSCColorTheme()
-	{
-		CSCColorTheme(NULL);
-	}
-
+	CSCColorTheme() = default;
+	CSCColorTheme(const CSCColorTheme&) = default;
+	CSCColorTheme& operator=(const CSCColorTheme&) = default;
+	CSCColorTheme(CSCColorTheme&&) noexcept = default;
+	CSCColorTheme& operator=(CSCColorTheme&&) noexcept = default;
 	CSCColorTheme(CWnd* pWnd, int theme = color_theme_default)
 	{
 		m_parent = pWnd;
-		set_color_theme(color_theme_default);
+		set_color_theme(theme);
 	};
+
+	~CSCColorTheme() = default;
 
 	enum SC_COLOR_THEMES
 	{

@@ -226,6 +226,8 @@ public:
 //exif
 	double			get_gps_latitude();
 	double			get_gps_longitude();
+	CString			get_gps_latitude_str();
+	CString			get_gps_longitude_str();
 
 	void			set_cross_cursor(UINT nID);
 

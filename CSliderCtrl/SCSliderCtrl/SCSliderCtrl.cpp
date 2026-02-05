@@ -828,6 +828,8 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 
 void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point) 
 {
+	SetFocus();
+
 	if (m_style == style_normal)
 	{
 		CSliderCtrl::OnLButtonDown(nFlags, point);
@@ -863,7 +865,6 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	m_lbuttondown = true;
 	OnMouseMove(nFlags, point);
 	SetCapture();
-	//SetFocus();
 
 #if 0
 	// 손잡이를 마우스로 클릭했을 때
@@ -1223,13 +1224,13 @@ BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 	{
 		switch (pMsg->wParam)
 		{
-			case VK_LEFT :
+			case VK_LEFT:
+			case VK_DOWN:
 				step(-1);
-				Invalidate();
 				return TRUE;
-			case VK_RIGHT :
+			case VK_RIGHT:
+			case VK_UP:
 				step(1);
-				Invalidate();
 				return TRUE;
 		}
 
@@ -1765,6 +1766,7 @@ int32_t CSCSliderCtrl::step(int step)
 {
 	int pos = GetPos() + step;
 	SetPos(pos);
+	Invalidate();
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 	return GetPos();
 }

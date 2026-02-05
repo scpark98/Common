@@ -196,24 +196,6 @@ void CSCD2ImageDlg::OnPaint()
 	}
 	else
 	{
-		//크게 확대해서 offset을 옮겨 그려주는 방식과
-		//확대할 부분을 잘라 확대해서 그려주는 방식은
-		//이론적으로는 후자가 더 효율적이지만 속도에 큰 차이가 느껴지진 않는다.
-#if 0
-		int nw = (double)rc.Width() / m_zoom;
-		int nh = (double)rc.Height() / m_zoom;
-
-		TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
-		Clamp(m_offset.x, (long)(rc.Width() - nw), (long)0);
-		Clamp(m_offset.y, (long)(rc.Height() - nh), (long)0);
-		TRACE(_T("offset %d, %d\n"), m_offset.x, m_offset.y);
-
-		CSCGdiplusBitmap img;
-		m_img.deep_copy(&img);
-		img.sub_image(-m_offset.x, -m_offset.y, nw, nh);
-		//g.DrawImage(img, 0, 0, rc.Width(), rc.Height());
-		img.draw(&dc, 0, 0, rc.Width(), rc.Height());
-#else
 		//nw | nh가 rc보다 작으면 센터에 오도록 그려준다.
 		int nw = m_img[0].get_width() * m_zoom;
 		int nh = m_img[0].get_height() * m_zoom;
@@ -234,7 +216,6 @@ void CSCD2ImageDlg::OnPaint()
 		}
 
 		m_r_display = make_rect(sx, sy, nw, nh);
-#endif
 	}
 
 	//실제 이미지를 그려준다. 투명 이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
@@ -275,19 +256,7 @@ void CSCD2ImageDlg::OnPaint()
 		rText.top = rText.bottom - 14;
 
 		//shadow 파라미터까지 추가된 함수 이용 코드
-		//draw_text(d2dc, rText, pixel_pos, 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Red, DT_RIGHT | DT_TOP);
-
-		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-
-		//shadow나 stroke 효과 적용방법을 아직 모르므로 우선 검은색으로 그리고 전경색으로 그린다.
-		rText.OffsetRect(1, 1);
-		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
-		d2dc->DrawText(pixel_pos, pixel_pos.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
-
-		rText.OffsetRect(-1, -1);
-		m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Ivory));
-		d2dc->DrawText(pixel_pos, pixel_pos.GetLength(), m_WriteFormat, CRect_to_d2Rect(rText), m_brush);
+		draw_text(d2dc, rText, pixel_pos, _T("맑은 고딕"), 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_RIGHT | DT_TOP);
 	}
 
 
@@ -1879,3 +1848,18 @@ double CSCD2ImageDlg::get_gps_longitude()
 	return m_img[0].get_exif().gps_longitude;
 }
 
+CString CSCD2ImageDlg::get_gps_latitude_str()
+{
+	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_latitude_str.IsEmpty())
+		return CString();
+
+	return m_img[0].get_exif().gps_latitude_str;
+}
+
+CString CSCD2ImageDlg::get_gps_longitude_str()
+{
+	if (m_img.size() == 0 || !m_img[0].is_valid() || m_img[0].get_exif().gps_longitude_str.IsEmpty())
+		return CString();
+
+	return m_img[0].get_exif().gps_longitude_str;
+}

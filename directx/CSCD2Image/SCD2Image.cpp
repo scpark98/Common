@@ -1,6 +1,7 @@
 #include "SCD2Image.h"
 
 #include <thread>
+#include <mutex>
 #include "../../SCGdiplusBitmap.h"
 
 #pragma comment(lib, "dxguid.lib")
@@ -8,6 +9,7 @@
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
 
+static std::recursive_mutex g_d2d_dc_mutex;
 
 CSCD2Image::CSCD2Image()
 {
@@ -403,7 +405,40 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	hr = pIfdQueryReader->GetMetadataByName(L"/{ushort=274}", &value);
 	if (SUCCEEDED(hr) && (value.vt == VT_UI2))
 		m_exif_info.orientation = value.uiVal;
+
+	// Orientation을 문자열로 변환
+	switch (m_exif_info.orientation)
+	{
+		case 1:
+			m_exif_info.orientation_str = _T("Normal)");
+			break;
+		case 2:
+			m_exif_info.orientation_str = _T("FlipX");
+			break;
+		case 3:
+			m_exif_info.orientation_str = _T("Rotate 180°");
+			break;
+		case 4:
+			m_exif_info.orientation_str = _T("FlipY");
+			break;
+		case 5:
+			m_exif_info.orientation_str = _T("Rotate 90° CCW + FlipY");
+			break;
+		case 6:
+			m_exif_info.orientation_str = _T("Rotate 90° CW");
+			break;
+		case 7:
+			m_exif_info.orientation_str = _T("Rotate 90° CW + FlipY");
+			break;
+		case 8:
+			m_exif_info.orientation_str = _T("90° CCW");
+			break;
+		default:
+			m_exif_info.orientation_str = _T("Unknown");
+			break;
+	}
 	PropVariantClear(&value);
+
 
 	hr = pIfdQueryReader->GetMetadataByName(L"/{ushort=305}", &value);
 	if (SUCCEEDED(hr) && (value.vt == VT_LPSTR))
@@ -644,6 +679,8 @@ CString CSCD2Image::get_exif_str()
 //https://github.com/microsoft/DirectXTex/blob/main/Texassemble/AnimatedGif.cpp
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder)
 {
+	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+
 	m_pWICFactory = pWICFactory;
 	m_d2dc = d2context;
 
@@ -703,6 +740,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		_M(hr, pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
 		_M(hr, pDecoder->GetFrame(0, pFrameDecode.GetAddressOf()));
 
+		if (FAILED(hr) || !pFrameDecode)
+			return hr;
+
 		pFrameDecode->GetSize(&img_size.width, &img_size.height);
 
 		pFrameDecode->GetPixelFormat(&pf);
@@ -713,75 +753,64 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			pFrameDecode.Get(),
 			GUID_WICPixelFormat32bppPBGRA,
 			WICBitmapDitherTypeNone,
-			NULL,
+			nullptr,
 			0.f,
 			WICBitmapPaletteTypeMedianCut
 		);
 
-		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, img.GetAddressOf());
-		hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), NULL, m_img_origin.GetAddressOf());
+		if (FAILED(hr))
+		{
+			TRACE(_T("FormatConverter Initialize failed: 0x%08X\n"), hr);
+			return hr;
+		}
 
+		// 5) D2D bitmap 생성 (여기서 멈춘다면 hr를 출력해야 함)
+		_M(hr, d2context->CreateBitmapFromWicBitmap(pConverter.Get(), nullptr, img.GetAddressOf()));
+		if (FAILED(hr) || !img)
+		{
+			TRACE(_T("CreateBitmapFromWicBitmap(img) failed: 0x%08X\n"), hr);
+			return hr;
+		}
+
+		_M(hr, d2context->CreateBitmapFromWicBitmap(pConverter.Get(), nullptr, m_img_origin.GetAddressOf()));
+		if (FAILED(hr) || !m_img_origin)
+		{
+			TRACE(_T("CreateBitmapFromWicBitmap(origin) failed: 0x%08X\n"), hr);
+			return hr;
+		}
 
 		//pixel data loading start.
-		pWICFactory->CreateBitmapFromSource(
-			pConverter.Get(),
-			WICBitmapCacheOnLoad,
-			&wicBitmap
-		);
+		//회전된 이미지는 apply_orientation_transform()에서 처리함.
+		if (m_exif_info.orientation <= 1 || m_exif_info.orientation > 8)
+		{
+			pWICFactory->CreateBitmapFromSource(
+				pConverter.Get(),
+				WICBitmapCacheOnLoad,
+				&wicBitmap
+			);
 
-		WICRect rc = { 0, 0, img_size.width, img_size.height };
-		ComPtr<IWICBitmapLock> lock;
-		wicBitmap->Lock(&rc, WICBitmapLockRead, &lock);
+			WICRect rc = { 0, 0, img_size.width, img_size.height };
+			ComPtr<IWICBitmapLock> lock;
+			wicBitmap->Lock(&rc, WICBitmapLockRead, &lock);
 
-		lock->GetStride(&stride);
+			lock->GetStride(&stride);
 
-		UINT bufferSize = 0;
-		BYTE* pixels = nullptr;
-		lock->GetDataPointer(&bufferSize, &pixels);
+			UINT bufferSize = 0;
+			BYTE* pixels = nullptr;
+			lock->GetDataPointer(&bufferSize, &pixels);
 
-		if (m_data)
-			delete[] m_data;
+			if (m_data)
+				delete[] m_data;
 
-		m_data = new uint8_t[bufferSize];
-		memcpy(m_data, pixels, bufferSize);
-		lock.Reset();
-		wicBitmap.Reset();
+			m_data = new uint8_t[bufferSize];
+			memcpy(m_data, pixels, bufferSize);
+			lock.Reset();
+			wicBitmap.Reset();
+		}
 		//pixel data loading end.
 
-		/*
-		switch (m_exif_info.orientation)
-		{
-		case 2:
-			m_pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
-			m_exif_info.orientation_str = _T("FlipX");
-			break;
-		case 3:
-			m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipNone);
-			m_exif_info.orientation_str = _T("180° CW");
-			break;
-		case 4:
-			m_pBitmap->RotateFlip(Gdiplus::Rotate180FlipX);
-			m_exif_info.orientation_str = _T("180° FlipX");
-			break;
-		case 5:
-			m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipY);
-			m_exif_info.orientation_str = _T("270° FlipY");
-			break;
-		case 6:
-			m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipNone);	//90 CCW
-			m_exif_info.orientation_str = _T("90° CCW");
-			break;
-		case 7:
-			m_pBitmap->RotateFlip(Gdiplus::Rotate90FlipY);
-			m_exif_info.orientation_str = _T("90° FlipY");
-			break;
-		case 8:
-			m_pBitmap->RotateFlip(Gdiplus::Rotate270FlipNone);
-			m_exif_info.orientation_str = _T("90° CW");
-			break;
-		}
-		*/
 		m_img.push_back(std::move(img));
+		apply_orientation_transform();
 	}
 	else if (frame_count > 1)
 	{
@@ -1609,6 +1638,8 @@ D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_POINT_2F pt)
 
 D2D1_RECT_F CSCD2Image::draw(ID2D1DeviceContext* d2dc, D2D1_RECT_F target, eSCD2Image_DRAW_MODE draw_mode)
 {
+	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+
 	D2D1_RECT_F r = { 0, 0, 0, 0 };
 
 	if (m_frame_index >= (int)m_img.size())
@@ -1985,7 +2016,8 @@ int CSCD2Image::get_alpha_pixel_count(bool recount)
 		{
 			a = *(m_data + y * stride + x * channel + 3);
 
-			//1ch, 3ch, 4ch 모두 4ch 포맷으로 로딩하므로 a값은 항상 0 ~ 255 사이의 값을 가진다. 255 미만인 픽셀만 카운트한다.
+			//1ch, 3ch, 4ch 모두 4ch 포맷으로 로딩하므로 설령 1ch, 3ch의 이미지라도
+			//a값은 항상 0 ~ 255 사이의 값을 가진다. 255 미만인 픽셀만 카운트하면 된다.
 			if (a < 255)
 				m_alpha_pixel_count++;
 		}
@@ -2247,4 +2279,232 @@ bool CSCD2Image::copy_to_clipboard()
 
 	return true;
 #endif
+}
+
+WICBitmapTransformOptions CSCD2Image::ExifOrientationToWicTransform(USHORT orientation)
+{
+	switch (orientation)
+	{
+	case 2: return WICBitmapTransformFlipHorizontal;
+	case 3: return WICBitmapTransformRotate180;
+	case 4: return WICBitmapTransformFlipVertical;
+	case 5: return (WICBitmapTransformOptions)(WICBitmapTransformRotate270 | WICBitmapTransformFlipHorizontal); // transpose 계열
+	case 6: return WICBitmapTransformRotate90;
+	case 7: return (WICBitmapTransformOptions)(WICBitmapTransformRotate90 | WICBitmapTransformFlipHorizontal);
+	case 8: return WICBitmapTransformRotate270;
+	case 1:
+	default: return WICBitmapTransformRotate0;
+	}
+}
+
+void CSCD2Image::apply_orientation_transform()
+{
+	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+
+	if (m_exif_info.orientation <= 1 || m_exif_info.orientation > 8)
+		return;
+
+	if (m_img.size() == 0 || !m_img[0] || !m_d2dc)
+		return;
+
+	ComPtr<ID2D1Bitmap1> src = m_img[0];
+
+	const D2D1_SIZE_U srcPx = src->GetPixelSize();
+	if (srcPx.width == 0 || srcPx.height == 0)
+		return;
+
+	const bool swapWH = (m_exif_info.orientation >= 5 && m_exif_info.orientation <= 8);
+	const UINT dstW = swapWH ? srcPx.height : srcPx.width;
+	const UINT dstH = swapWH ? srcPx.width : srcPx.height;
+
+	// 출력 비트맵(타겟 가능해야 DrawImage로 렌더 가능)
+	D2D1_BITMAP_PROPERTIES1 dstProps =
+		D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_TARGET,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+
+	ComPtr<ID2D1Bitmap1> dst;
+	HRESULT hr = m_d2dc->CreateBitmap(D2D1::SizeU(dstW, dstH), nullptr, 0, &dstProps, dst.GetAddressOf());
+	if (FAILED(hr) || !dst)
+	{
+		TRACE(_T("apply_orientation_transform: CreateBitmap failed 0x%08X\n"), hr);
+		return;
+	}
+
+	// orientation -> 변환행렬 계산 (dst 좌표계 기준으로 src를 배치)
+	// 주의: D2D1_MATRIX_3X2_F는 "출력 좌표 -> 입력 좌표" 개념이 아니라
+	// 일반적인 2D affine이며, 여기서는 "src를 dst로 옮기는" 변환으로 구성.
+	D2D1_MATRIX_3X2_F m = D2D1::Matrix3x2F::Identity();
+	const float w = (float)srcPx.width;
+	const float h = (float)srcPx.height;
+
+	switch (m_exif_info.orientation)
+	{
+	case 2: // Mirror horizontal
+		// x' = w - x
+		m = D2D1::Matrix3x2F::Scale(-1.0f, 1.0f) * D2D1::Matrix3x2F::Translation(w, 0.0f);
+		break;
+
+	case 3: // Rotate 180
+		// (x,y)->(-x,-y) then translate
+		m = D2D1::Matrix3x2F::Rotation(180.0f) * D2D1::Matrix3x2F::Translation(w, h);
+		break;
+
+	case 4: // Mirror vertical
+		m = D2D1::Matrix3x2F::Scale(1.0f, -1.0f) * D2D1::Matrix3x2F::Translation(0.0f, h);
+		break;
+
+	case 5: // Transpose (대각 반사: x<->y) = Rotate 90 + FlipH (근사)
+		// 구현: rotate 90 CW 후 mirror horizontal을 섞는 것보다
+		// 여기서는 (x,y)->(y,x) 형태로 만들기 위해 회전/이동 조합
+		// D2D에서 transpose는 직접 행렬로 가능:
+		// [0 1; 1 0] (x<->y)
+		m = D2D1::Matrix3x2F(0, 1, 1, 0, 0, 0);
+		break;
+
+	case 6: // Rotate 90 CW
+		// dst(x,y) = src(y, h - x) 개념
+		// 행렬: rotate 90 then translate
+		m = D2D1::Matrix3x2F::Rotation(90.0f) * D2D1::Matrix3x2F::Translation(h, 0.0f);
+		break;
+
+	case 7: // Transverse (대각 반사 + 180) = (x,y)->(h - y, w - x) with swap
+		// [0 -1; -1 0] + translate
+		m = D2D1::Matrix3x2F(0, -1, -1, 0, h, w);
+		break;
+
+	case 8: // Rotate 90 CCW
+		m = D2D1::Matrix3x2F::Rotation(-90.0f) * D2D1::Matrix3x2F::Translation(0.0f, w);
+		break;
+
+	default:
+		return;
+	}
+
+	// 원래 상태 백업
+	ComPtr<ID2D1Image> prevTarget;
+	m_d2dc->GetTarget(prevTarget.GetAddressOf());
+
+	D2D1_MATRIX_3X2_F prevTransform;
+	m_d2dc->GetTransform(&prevTransform);
+
+	// 렌더
+	m_d2dc->SetTarget(dst.Get());
+	m_d2dc->BeginDraw();
+	m_d2dc->Clear(D2D1::ColorF(0, 0, 0, 0));
+	m_d2dc->SetTransform(D2D1::Matrix3x2F::Identity());
+
+	ComPtr<ID2D1Effect> affine;
+	hr = m_d2dc->CreateEffect(CLSID_D2D12DAffineTransform, affine.GetAddressOf());
+	if (FAILED(hr) || !affine)
+	{
+		TRACE(_T("apply_orientation_transform: CreateEffect(Affine) failed 0x%08X\n"), hr);
+		m_d2dc->EndDraw();
+		m_d2dc->SetTarget(prevTarget.Get());
+		m_d2dc->SetTransform(prevTransform);
+		return;
+	}
+
+	// 입력: bitmap
+	affine->SetInput(0, src.Get());
+
+	// 변환행렬
+	affine->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, m);
+
+	// 경계 밖은 투명 처리(기본이지만 명시)
+	affine->SetValue(D2D1_2DAFFINETRANSFORM_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
+
+	// 품질(보간) - 필요시 LINEAR
+	affine->SetValue(D2D1_2DAFFINETRANSFORM_PROP_INTERPOLATION_MODE, D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_LINEAR);
+
+	m_d2dc->DrawImage(affine.Get(), D2D1::Point2F(0, 0));
+
+	hr = m_d2dc->EndDraw();
+
+	// 원복
+	m_d2dc->SetTarget(prevTarget.Get());
+	m_d2dc->SetTransform(prevTransform);
+
+	if (FAILED(hr))
+	{
+		TRACE(_T("apply_orientation_transform: EndDraw failed 0x%08X\n"), hr);
+		return;
+	}
+
+	// 결과 반영
+	m_img[0] = dst;
+	m_img_origin = dst;
+
+	UINT stride = 0;
+	const auto px = m_img[0]->GetPixelSize();
+	const size_t size = (size_t)(px.height) * (size_t)(px.width) * 4; // 이 값은 "최소" 크기라 pitch가 더 크면 부족함!
+
+	// 안전하게 하려면 1) data=nullptr로 out_stride 얻고 2) out_stride*height로 할당하세요.
+	extract_raw_data_from_bitmap(m_d2dc, m_img[0].Get(), nullptr, stride);
+	const size_t bufSize = (size_t)stride * (size_t)px.height;
+
+	delete[] m_data;
+	m_data = new uint8_t[bufSize];
+
+	extract_raw_data_from_bitmap(m_d2dc, m_img[0].Get(), m_data, stride);
+	//m_channel = 4;
+	m_stride = (int)stride; 
+}
+
+HRESULT CSCD2Image::extract_raw_data_from_bitmap(
+	ID2D1DeviceContext* d2dc,
+	ID2D1Bitmap1* src,
+	uint8_t* data,
+	UINT& out_stride)
+{
+	out_stride = 0;
+
+	if (!d2dc || !src)
+		return E_INVALIDARG;
+
+	const D2D1_SIZE_U px = src->GetPixelSize();
+	if (px.width == 0 || px.height == 0)
+		return E_FAIL;
+
+	// 우리가 원하는 최종 stride는 width*4 (packed BGRA)
+	const UINT packedStride = px.width * 4;
+	out_stride = packedStride;
+
+	// 호출자가 버퍼 준비 안 했으면 size 계산용으로 종료
+	if (data == nullptr)
+		return S_FALSE;
+
+	// CPU 읽기 가능한 bitmap 생성
+	D2D1_BITMAP_PROPERTIES1 cpuProps =
+		D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+
+	ComPtr<ID2D1Bitmap1> cpuBmp;
+	HRESULT hr = d2dc->CreateBitmap(px, nullptr, 0, &cpuProps, cpuBmp.GetAddressOf());
+	if (FAILED(hr) || !cpuBmp)
+		return FAILED(hr) ? hr : E_FAIL;
+
+	// GPU -> CPU 복사
+	hr = cpuBmp->CopyFromBitmap(nullptr, src, nullptr);
+	if (FAILED(hr))
+		return hr;
+
+	// Map
+	D2D1_MAPPED_RECT mapped = {};
+	hr = cpuBmp->Map(D2D1_MAP_OPTIONS_READ, &mapped);
+	if (FAILED(hr))
+		return hr;
+
+	// 행 단위로 packedStride만 복사해서 padding 제거
+	for (UINT y = 0; y < px.height; ++y)
+	{
+		memcpy(
+			data + (size_t)y * packedStride,
+			mapped.bits + (size_t)y * mapped.pitch,
+			packedStride);
+	}
+
+	cpuBmp->Unmap();
+	return S_OK;
 }

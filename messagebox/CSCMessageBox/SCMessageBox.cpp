@@ -135,7 +135,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 						CRect(rc.right - 2 - m_title_height, rc.top + 2, rc.right - 2, m_title_height - 1), this, SC_BUTTON_ID + IDCANCEL);
 	m_button_quit.set_button_cmd(SC_CLOSE);
 	m_button_quit.set_text_color(m_theme.cr_title_text);
-	m_button_quit.set_back_color(m_theme.cr_title_back);
+	m_button_quit.set_back_color(m_theme.cr_title_back_active);
 	m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
 	m_button_quit.use_hover();
 
@@ -355,25 +355,25 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	{
 		m_icon_index = 0;
 		if (m_use_typed_title_back_color)
-			m_theme.cr_title_back = gRGB(242, 222, 222);
+			m_theme.cr_title_back_active = gRGB(242, 222, 222);
 	}
 	else if ((m_type & MB_ICONMASK) == MB_ICONQUESTION)
 	{
 		m_icon_index = 1;
 		if (m_use_typed_title_back_color)
-			m_theme.cr_title_back = gRGB(223, 240, 216);
+			m_theme.cr_title_back_active = gRGB(223, 240, 216);
 	}
 	else if ((m_type & MB_ICONMASK) == MB_ICONEXCLAMATION)
 	{
 		m_icon_index = 2;
 		if (m_use_typed_title_back_color)
-			m_theme.cr_title_back = gRGB(254, 219, 156);
+			m_theme.cr_title_back_active = gRGB(254, 219, 156);
 	}
 	else if ((m_type & MB_ICONMASK) == MB_ICONINFORMATION)
 	{
 		m_icon_index = 3;
 		if (m_use_typed_title_back_color)
-			m_theme.cr_title_back = gRGB(217, 237, 247);
+			m_theme.cr_title_back_active = gRGB(217, 237, 247);
 	}
 	else
 	{
@@ -388,13 +388,13 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		//버튼 색상도 타이틀바 색상과 동일하게 하려 했으나 우선 포커스 색상만 동일하게 한다.
 		for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
 		{
-			m_button[i].draw_focus_rect(true, m_theme.cr_title_back);
+			m_button[i].draw_focus_rect(true, m_theme.cr_title_back_active);
 			//m_button[i].set_text_color(m_theme.cr_title_text);
 			//m_button[i].set_back_color(m_theme.cr_title_back);
 		}
 
 		m_button_quit.set_text_color(m_theme.cr_title_text);
-		m_button_quit.set_back_color(m_theme.cr_title_back);
+		m_button_quit.set_back_color(m_theme.cr_title_back_active);
 		m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
 	}
 
@@ -440,14 +440,14 @@ void CSCMessageBox::set_color_theme(int theme)
 	m_static_message.set_back_color(m_theme.cr_back);
 
 	m_button_quit.set_text_color(m_theme.cr_title_text);
-	m_button_quit.set_back_color(m_theme.cr_title_back);
+	m_button_quit.set_back_color(m_theme.cr_title_back_active);
 	m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
 }
 
 LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 {
 	auto msg = (CGdiButtonMessage*)wParam;
-	if (msg->msg == WM_LBUTTONUP)
+	if (msg->message == WM_LBUTTONUP)
 	{
 		TRACE(_T("on_message_CGdiButton, WM_LBUTTONUP = %s\n"), m_button_caption[msg->ctrl_id - SC_BUTTON_ID]);
 		m_response = msg->ctrl_id - SC_BUTTON_ID;
@@ -579,7 +579,7 @@ void CSCMessageBox::OnPaint()
 	//draw titlebar
 	rtitle = rc;
 	rtitle.bottom = rtitle.top + m_title_height;
-	dc.FillSolidRect(rtitle, m_theme.cr_title_back.ToCOLORREF());
+	dc.FillSolidRect(rtitle, m_theme.cr_title_back_active.ToCOLORREF());
 
 	rtitle.left += 8;
 

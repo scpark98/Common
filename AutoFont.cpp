@@ -384,7 +384,7 @@ void CAutoFont::GetFontFromDialog(CFont *f, DWORD *color,
 				CDC *pPrinterDC, CWnd *pParentWnd)
 {
 	LOGFONT tlf;
-	if (f==NULL)
+	if (f==nullptr)
 		tlf=lf;
 	else
 		f->GetLogFont(&tlf);
@@ -407,7 +407,7 @@ void CAutoFont::GetFontFromDialog(CFont *f, DWORD *color,
 void CAutoFont::SetFontColor(COLORREF color)
 {
 	fontColor=color;
-	if (hDC!=NULL)
+	if (hDC!=nullptr)
 		::SetTextColor(hDC, color);
 }
 

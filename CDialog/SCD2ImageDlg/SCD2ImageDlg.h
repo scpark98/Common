@@ -63,7 +63,7 @@ public:
 	{
 	}
 
-	CWnd*	pThis = NULL;
+	CWnd*	pThis = nullptr;
 	int		msg;
 	int		index;
 };
@@ -260,13 +260,13 @@ protected:
 	bool			m_thread_buffering = false;
 	void			thread_buffering();
 
-	CWnd*			m_parent = NULL;
+	CWnd*			m_parent = nullptr;
 	CString			m_filename;						//실제 파일경로 또는 클립보드에서 또는 리소스 이미지인지에 따라 저장되는 문자열이 다르다.
 	//bool			m_image_from_clipboard = false;	//클립보드에서 붙여넣은 이미지인지(파일명 표시 목적)
 	CRect			m_r_display;
 	
-	HCURSOR			m_cursor_cross = NULL;
-	HCURSOR			m_cursor_dropper = NULL;
+	HCURSOR			m_cursor_cross = nullptr;
+	HCURSOR			m_cursor_dropper = nullptr;
 
 	D2D1_BITMAP_INTERPOLATION_MODE	m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 
@@ -319,7 +319,7 @@ protected:
 	bool			m_show_pixel_pos = true;
 	Gdiplus::PointF	m_pixel_pos;
 	CRect			m_r_pixel_pos;
-	ID2D1SolidColorBrush* m_brush_pixel_guide = NULL;
+	ID2D1SolidColorBrush* m_brush_pixel_guide = nullptr;
 
 	bool			m_show_cursor_guide_line = false;
 
@@ -358,4 +358,5 @@ public:
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
 };

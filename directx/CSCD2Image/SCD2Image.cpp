@@ -410,7 +410,7 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	switch (m_exif_info.orientation)
 	{
 		case 1:
-			m_exif_info.orientation_str = _T("Normal)");
+			m_exif_info.orientation_str = _T("Normal");
 			break;
 		case 2:
 			m_exif_info.orientation_str = _T("FlipX");

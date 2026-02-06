@@ -83,7 +83,7 @@ void CSCEdit::PreSubclassWindow()
 	//dlg의 parent의 font를 얻어와야 한다.
 	CFont* font = GetParent()->GetFont();
 
-	if (font != NULL)
+	if (font != nullptr)
 		font->GetObject(sizeof(m_lf), &m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
@@ -294,7 +294,7 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 {
 	//if (m_rect_NCtop.IsRectEmpty())
 	//{
-	//	SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED);
+	//	SetWindowPos(nullptr, 0, 0, 0, 0, SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED);
 	//}
 
 	HBRUSH hbr = (HBRUSH)m_br_back; // Passing a Handle to the Brush
@@ -364,7 +364,7 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	else
 	{
 		//ExcludeClipRect(pDC->m_hDC, 0, 0, 0, 0);	//이 코드를 사용하면 border를 그렸다가 해제했을 때 잔상이 남음. SelectClipRgn()로 대체하여 해결됨.
-		SelectClipRgn(pDC->m_hDC, NULL);
+		SelectClipRgn(pDC->m_hDC, nullptr);
 	}
 
 	if (m_action_button)
@@ -516,7 +516,7 @@ void CSCEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CEdit::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if ( m_hWnd == NULL )
+	if ( m_hWnd == nullptr )
 		return;
 
 	if ( !m_bAutoResizeFont )

@@ -115,6 +115,7 @@ BEGIN_MESSAGE_MAP(CSCD2ImageDlg, CDialog)
 	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCD2ImageDlg::on_message_from_CSCSliderCtrl)
 	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCD2ImageDlg::on_message_CSCThumbCtrl)
 	ON_WM_TIMER()
+	ON_WM_MOUSEHWHEEL()
 END_MESSAGE_MAP()
 
 
@@ -151,7 +152,7 @@ void CSCD2ImageDlg::OnPaint()
 
 	if (m_img.size() == 0 || m_img[0].is_empty())
 	{
-		dc.SelectClipRgn(NULL);
+		dc.SelectClipRgn(nullptr);
 
 		CString msg;
 
@@ -268,7 +269,7 @@ void CSCD2ImageDlg::OnPaint()
 	screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
 	screen_roi.NormalizeRect();
 
-	//ID2D1SolidColorBrush *br_red = NULL;
+	//ID2D1SolidColorBrush *br_red = nullptr;
 	//d2dc->CreateSolidColorBrush(D2D1::ColorF(1.0f, 0.25f, 0.0f, 0.8f), &br_red);
 
 	//ID2D1SolidColorBrush* br_roi;
@@ -761,7 +762,7 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 	CDialog::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (m_static_pixel.m_hWnd == NULL)
+	if (m_static_pixel.m_hWnd == nullptr)
 		return;
 
 	CRect rc;
@@ -1599,7 +1600,7 @@ void CSCD2ImageDlg::display_image(int index, bool scan_folder)
 	//버퍼링 중이었다면 버퍼링을 중지시킨 후 해야 한다.
 	//단, 빠른 전환시에는 문제될 수 있으므로 일정 시간후에 thread를 구동한다.
 	if (m_buffer_max > 1)
-		SetTimer(timer_thread_buffering, 100, NULL);
+		SetTimer(timer_thread_buffering, 100, nullptr);
 
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_image_changed), 0);
 
@@ -1799,11 +1800,11 @@ void CSCD2ImageDlg::start_slide_show(int start)
 	{
 		if (m_slide_show_interval < 0)
 		{
-			SetTimer(timer_slide_show, -m_slide_show_interval, NULL);
+			SetTimer(timer_slide_show, -m_slide_show_interval, nullptr);
 		}
 		else
 		{
-			SetTimer(timer_slide_show, m_slide_show_interval * 1000, NULL);
+			SetTimer(timer_slide_show, m_slide_show_interval * 1000, nullptr);
 		}
 	}
 	else
@@ -1862,4 +1863,13 @@ CString CSCD2ImageDlg::get_gps_longitude_str()
 		return CString();
 
 	return m_img[0].get_exif().gps_longitude_str;
+}
+
+void CSCD2ImageDlg::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
+	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	trace(zDelta);
+	CDialog::OnMouseHWheel(nFlags, zDelta, pt);
 }

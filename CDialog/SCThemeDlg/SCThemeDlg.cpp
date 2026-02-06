@@ -113,7 +113,7 @@ BOOL CSCThemeDlg::OnInitDialog()
 	}
 
 	MARGINS margins = { 0 };
-	DwmExtendFrameIntoClientArea(m_hWnd, &margins);
+	//DwmExtendFrameIntoClientArea(m_hWnd, &margins);
 
 	if (m_titlebar_height > 0)
 	{

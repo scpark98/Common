@@ -19,7 +19,7 @@ CLayeredWindowHelperST::~CLayeredWindowHelperST()
 	if (m_hDll)
 		::FreeLibrary(m_hDll);
 
-	m_hDll = NULL;
+	m_hDll = nullptr;
 }
 
 // This function add the WS_EX_LAYERED style to the specified window.
@@ -38,10 +38,28 @@ CLayeredWindowHelperST::~CLayeredWindowHelperST()
 //
 LONG CLayeredWindowHelperST::AddLayeredStyle(HWND hWnd)
 {
+	::SetLastError(0);
+
+	LONG_PTR oldEx = ::GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+	LONG_PTR newEx = oldEx | WS_EX_LAYERED;
+
+	::SetWindowLongPtr(hWnd, GWL_EXSTYLE, newEx);
+
+	DWORD gle = ::GetLastError();
+	if (gle != 0)
+	{
+		TRACE(_T("AddLayeredStyle failed. gle=%lu oldEx=0x%08llX newEx=0x%08llX\n"),
+			gle, (unsigned long long)oldEx, (unsigned long long)newEx);
+		return 0;
+	}
+
+	return (LONG)oldEx; // 성공 시 이전값 리턴
+	/*
 	LONG res = ::SetWindowLongPtr(hWnd, GWL_EXSTYLE, ::GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
 	if (!res)
 		TRACE(_T("fail to CLayeredWindowHelperST::AddLayeredStyle. This window maybe has WS_CHILD property.\n"));
 	return res;
+	*/
 } // End of AddLayeredStyle
 
 // This function sets the opacity and transparency color key of a layered window.
@@ -74,7 +92,7 @@ BOOL CLayeredWindowHelperST::SetLayeredWindowAttributes(HWND hWnd, COLORREF crKe
 
 	if (m_hDll)
 	{
-		lpfnSetLayeredWindowAttributes pFn = NULL;
+		lpfnSetLayeredWindowAttributes pFn = nullptr;
 		pFn = (lpfnSetLayeredWindowAttributes)GetProcAddress(m_hDll, "SetLayeredWindowAttributes");
 		if (pFn)
 		{
@@ -113,7 +131,19 @@ BOOL CLayeredWindowHelperST::SetTransparent(HWND hWnd, BYTE alpha)
 	BOOL res = SetLayeredWindowAttributes(hWnd, 0, m_alpha, LWA_ALPHA);
 	//TRACE(_T("GetLastError() = %d\n"), GetLastError());
 	if (!res)
-		TRACE(_T("fail to CLayeredWindowHelperST::SetTransparent\n"));
+		TRACE(_T("fail to CLayeredWindowHelperST::SetTransparent. GetLastError() = %d\n"), GetLastError());
+
+	COLORREF key = 0;
+	//BYTE alpha = 0;
+	DWORD flags = 0;
+
+	BOOL ok = ::GetLayeredWindowAttributes(hWnd, &key, &alpha, &flags);
+	DWORD gle = ::GetLastError();
+
+	LONG_PTR ex = ::GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+
+	TRACE(_T("Layered: ok=%d gle=%lu ex=0x%08llX flags=0x%08X alpha=%u expected=%d\n"),
+		ok, gle, (unsigned long long)ex, flags, (unsigned)alpha, m_alpha);
 
 	return res;
 } // End of SetTransparentPercentage

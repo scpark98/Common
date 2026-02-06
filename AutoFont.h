@@ -87,8 +87,8 @@ public:
 	//pParentWnd: parent window of dialog, if needed
 	//
 	//The new font is returned through f, the new color through color
-	void GetFontFromDialog(CFont *f=NULL, DWORD *color=0,
-		CDC *pPrinterDC=NULL, CWnd *pParentWnd=NULL);
+	void GetFontFromDialog(CFont *f=nullptr, DWORD *color=0,
+		CDC *pPrinterDC=nullptr, CWnd *pParentWnd=nullptr);
 };
 
 #endif

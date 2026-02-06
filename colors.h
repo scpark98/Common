@@ -243,155 +243,6 @@ enum Colors
 	mediumpurple = 0x00db7093,
 	slateblue = 0x00cd5a6a,
 	mediumslateblue = 0x00ee687b,
-
-	/*
-	// gathered from http://www.netwave.or.jp/~shikai/shikai/shcolor.htm
-	{_T("white"), 0xffffff, 0},
-	{_T("whitesmoke"), 0xf5f5f5, 0},
-	{_T("ghostwhite"), 0xf8f8ff, 0},
-	{_T("snow"), 0xfffafa, 0},
-	{_T("gainsboro"), 0xdcdcdc, 0},
-	{_T("lightgrey"), 0xd3d3d3, 0},
-	{_T("silver"), 0xc0c0c0, 0},
-	{_T("darkgray"), 0xa9a9a9, 0},
-	{_T("gray"), 0x808080, 0},
-	{_T("dimgray"), 0x696969, 0},
-	{_T("lightslategray"), 0x778899, 0},
-	{_T("slategray"), 0x708090, 0},
-	{_T("darkslategray"), 0x2f4f4f, 0},
-	{_T("black"), 0x000000, 0},
-
-	{_T("azure"), 0xf0ffff, 1},
-	{_T("aliceblue"), 0xf0f8ff, 1},
-	{_T("mintcream"), 0xf5fffa, 1},
-	{_T("honeydew"), 0xf0fff0, 1},
-	{_T("lightcyan"), 0xe0ffff, 1},
-	{_T("paleturqoise"), 0xafeeee, 1},
-	{_T("powderblue"), 0xb0e0e6, 1},
-	{_T("lightblue"), 0xadd8ed, 1},
-	{_T("lightsteelblue"), 0xb0c4de, 1},
-	{_T("skyblue"), 0x87ceeb, 1},
-	{_T("lightskyblue"), 0x87cefa, 1},
-	{_T("cyan"), 0x00ffff, 1},
-
-	{_T("aqua"), 0x00ff80, 2},
-	{_T("deepskyblue"), 0x00bfff, 2},
-	{_T("aquamarine"), 0x7fffd4, 2},
-	{_T("turquoise"), 0x40e0d0, 2},
-	{_T("darkturquoise"), 0x00ced1, 2},
-	{_T("lightseagreen"), 0x20b2aa, 2},
-	{_T("mediumturquoise"), 0x40e0dd, 2},
-	{_T("mediumaquamarine"), 0x66cdaa, 2},
-	{_T("cadetblue"), 0x5f9ea0, 2},
-	{_T("teal"), 0x008080, 2},
-	{_T("darkcyan"), 0x008b8b, 2},
-	{_T("comflowerblue"), 0x6495ed, 2},
-	{_T("dodgerblue"), 0x1e90ff, 2},
-	{_T("steelblue"), 0x4682b4, 2},
-	{_T("royalblue"), 0x4169e1, 2},
-	{_T("blue"), 0x0000ff, 3},
-	{_T("mediumblue"), 0x0000cd, 3},
-	{_T("mediumslateblue"), 0x7b68ee, 3},
-	{_T("slateblue"), 0x6a5acd, 3},
-	{_T("darkslateblue"), 0x483d8b, 3},
-	{_T("darkblue"), 0x00008b, 3},
-	{_T("midnightblue"), 0x191970, 3},
-	{_T("navy"), 0x000080, 3},
-
-	{_T("palegreen"), 0x98fb98, 4},
-	{_T("lightgreen"), 0x90ee90, 4},
-	{_T("mediumspringgreen"), 0x00fa9a, 4},
-	{_T("springgreen"), 0x00ff7f, 4},
-	{_T("chartreuse"), 0x7fff00, 4},
-	{_T("lawngreen"), 0x7cfc00, 4},
-	{_T("lime"), 0x00ff00, 4},
-	{_T("limegreen"), 0x32cd32, 4},
-	{_T("greenyellow"), 0xadff2f, 4},
-	{_T("yellowgreen"), 0x9acd32, 4},
-	{_T("darkseagreen"), 0x8fbc8f, 4},
-	{_T("mediumseagreen"), 0x3cb371, 4},
-	{_T("seagreen"), 0x2e8b57, 4},
-	{_T("olivedrab"), 0x6b8e23, 4},
-	{_T("forestgreen"), 0x228b22, 4},
-	{_T("green"), 0x008000, 4},
-	{_T("darkkhaki"), 0xbdb76b, 4},
-	{_T("olive"), 0x808000, 4},
-	{_T("darkolivegreen"), 0x556b2f, 4},
-	{_T("darkgreen"), 0x006400, 4},
-
-	{_T("floralwhite"), 0xfffaf0, 5},
-	{_T("seashell"), 0xfff5ee, 5},
-	{_T("ivory"), 0xfffff0, 5},
-	{_T("beige"), 0xf5f5dc, 5},
-	{_T("cornsilk"), 0xfff8dc, 5},
-	{_T("lemonchiffon"), 0xfffacd, 5},
-	{_T("lightyellow"), 0xffffe0, 5},
-	{_T("lightgoldenrodyellow"), 0xfafad2, 5},
-	{_T("papayawhip"), 0xffefd5, 5},
-	{_T("blanchedalmond"), 0xffedcd, 5},
-	{_T("palegoldenrod"), 0xeee8aa, 5},
-	{_T("khaki"), 0xf0eb8c, 5},
-	{_T("bisque"), 0xffe4c4, 5},
-	{_T("moccasin"), 0xffe4b5, 5},
-	{_T("navajowhite"), 0xffdead, 5},
-	{_T("peachpuff"), 0xffdab9, 5},
-	{_T("yellow"), 0xffff00, 5},
-	{_T("gold"), 0xffd700, 5},
-	{_T("wheat"), 0xf5deb3, 5},
-	{_T("orange"), 0xffa500, 5},
-	{_T("darkorange"), 0xff8c00, 5},
-
-	{_T("oldlace"), 0xfdf5e6, 6},
-	{_T("linen"), 0xfaf0e6, 6},
-	{_T("antiquewhite"), 0xfaebd7, 6},
-	{_T("lightsalmon"), 0xffa07a, 6},
-	{_T("darksalmon"), 0xe9967a, 6},
-	{_T("salmon"), 0xfa8072, 6},
-	{_T("lightcoral"), 0xf08080, 6},
-	{_T("indianred"), 0xcd5c5c, 6},
-	{_T("coral"), 0xff7f50, 6},
-	{_T("tomato"), 0xff6347, 6},
-	{_T("orangered"), 0xff4500, 6},
-	{_T("red"), 0xff0000, 6},
-	{_T("crimson"), 0xdc143c, 6},
-	{_T("firebrick"), 0xb22222, 6},
-	{_T("maroon"), 0x800000, 6},
-	{_T("darkred"), 0x8b0000, 6},
-
-	{_T("lavender"), 0xe6e6fe, 7},
-	{_T("lavenderblush"), 0xfff0f5, 7},
-	{_T("mistyrose"), 0xffe4e1,			7},
-	{_T("thistle"), 0xd8bfd8,			7},
-	{_T("pink"), 0xffc0cb,				7},
-	{_T("lightpink"), 0xffb6c1,			7},
-	{_T("palevioletred"), 0xdb7093,		7},
-	{_T("hotpink"), 0xff69b4,			7},
-	{_T("fuchsia"), 0xff00ee,			7},
-	{_T("magenta"), 0xff00ff,			7},
-	{_T("mediumvioletred"), 0xc71585,	7},
-	{_T("deeppink"), 0xff1493,			7},
-	{_T("plum"), 0xdda0dd,				7},
-	{_T("violet"), 0xee82ee,			7},
-	{_T("orchid"), 0xda70d6,			7},
-	{_T("mediumorchid"), 0xba55d3,		7},
-	{_T("mediumpurple"), 0x9370db,		7},
-	{_T("purple"), 0x9370db,			7},
-	{_T("blueviolet"), 0x8a2be2,		7},
-	{_T("darkviolet"), 0x9400d3,		7},
-	{_T("darkorchid"), 0x9932cc,		7},
-
-	{_T("tan"), 0xd2b48c,				8},
-	{_T("burlywood"), 0xdeb887,			8},
-	{_T("sandybrown"), 0xf4a460,		8},
-	{_T("peru"), 0xcd853f,				8},
-	{_T("goldenrod"), 0xdaa520,			8},
-	{_T("darkgoldenrod"), 0xb8860b,		8},
-	{_T("chocolate"), 0xd2691e,			8},
-	{_T("rosybrown"), 0xbc8f8f,			8},
-	{_T("sienna"), 0xa0522d,			8},
-	{_T("saddlebrown"), 0x8b4513,		8},
-	{_T("brown"), 0xa52a2a,				8},
-	*/
 };
 
 COLORREF		get_color(COLORREF crOrigin, int nOffset);
@@ -428,9 +279,11 @@ CString			get_color_hexa_str(COLORREF cr, bool upper_case = true, CString prefix
 //include_alpha = true이면 16진수 RRGGGBBAA, false이면 RRGGGBB
 CString			get_color_hexa_str(Gdiplus::Color cr, bool upper_case = true, bool include_alpha = true);
 
-//보색
+//보색. color_complementary() 매크로와 동일
 COLORREF		get_complementary_color(COLORREF cr);
+//보색. color_complementary() 매크로와 동일
 Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr);
+COLORREF		get_complementary_color(COLORREF cr_color, COLORREF cr_back);
 
 //보색과는 달리 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
@@ -472,7 +325,7 @@ COLORREF		get_color(int hue_start, int hue_end, int percent, float saturation = 
 int				get_hue(COLORREF cr);
 
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
-CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = NULL);
+CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = nullptr);
 
 Gdiplus::Color	get_sys_color(int index);
 D2D1_COLOR_F	get_sys_d2color(int index, int alpha = 255);
@@ -559,7 +412,7 @@ public:
 	//Gdiplus::Color	cr_progress_text;				//progress text
 
 protected:
-	CWnd*			m_parent = NULL;
+	CWnd*			m_parent = nullptr;
 	int				m_cur_theme = color_theme_default;
 };
 

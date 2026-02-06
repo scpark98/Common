@@ -2,8 +2,8 @@
 
 /*
 * 참조 : https://modoocode.com/285
-* 실제 thread로 처리할 함수는 main에 있고
-* ThreadPool에 넣어주면 알아서 해당 함수를 thread로 동작시킨다.
+* 실제 thread로 처리하는 함수는 main에 있고
+* ThreadPool에 넣어주면 알아서 해당 함수를 multi-thread로 동작시킨다.
 * main에 있는 함수가 thread로 동작하므로 UI 갱신, 메시지 전달등이 수월해진다.
 */
 

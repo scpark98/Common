@@ -437,6 +437,19 @@ Gdiplus::Color	get_complementary_gcolor(Gdiplus::Color cr)
 	return Gdiplus::Color(cr.GetA(), 255 - cr.GetR(), 255 - cr.GetG(), 255 - cr.GetB());
 }
 
+COLORREF get_complementary_color(COLORREF crColor, COLORREF crBack)
+{
+	int	r = abs(GetRValue(crBack) - GetRValue(crColor));
+	int	g = abs(GetGValue(crBack) - GetGValue(crColor));
+	int	b = abs(GetBValue(crBack) - GetBValue(crColor));
+
+	Clamp(r, 0, 255);
+	Clamp(g, 0, 255);
+	Clamp(b, 0, 255);
+
+	return RGB(r, g, b);
+}
+
 //보색과는 달리 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 COLORREF get_distinct_color(COLORREF cr)

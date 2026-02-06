@@ -16,13 +16,11 @@ IMPLEMENT_DYNAMIC(CRichEditCtrlEx, CRichEditCtrl)
 
 CRichEditCtrlEx::CRichEditCtrlEx()
 {
-	m_crText			= ::GetSysColor(COLOR_GRAYTEXT);
-	m_crBack			= RGB(255, 255, 255);
 	m_show_log			= true;
 	m_show_time			= AfxGetApp()->GetProfileInt(_T("setting\\rich_edit"), _T("show time"), true);
-	m_nClearLogInterval	= 0;
-	m_nMaxCharLimit		= 0;
-	m_nScrollSize		= 2;
+	m_clear_log_interval	= 0;
+	m_max_length		= 0;
+	m_scroll_size		= 2;
 
 	memset(&m_lf, 0, sizeof(LOGFONT));
 }
@@ -69,14 +67,14 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 {
 	CString ret;
 
-	if (m_hWnd == NULL)
+	if (m_hWnd == nullptr)
 		return ret;
 
 	if (!m_show_log)
 		return ret;
 
 	if (cr == -1)
-		cr = m_crText;
+		cr = m_theme.cr_text.ToCOLORREF();
 
 	//CString으로 변환
 	CString new_text;
@@ -183,7 +181,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		sTime.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
 		cf.cbSize = sizeof(CHARFORMAT);
-		//cf.dwMask = CFM_COLOR;
+		cf.dwMask = CFM_COLOR;
 		//cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
 		cf.crTextColor = RGB(128, 128, 128);
 		SetSelectionCharFormat(cf);
@@ -199,12 +197,12 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	cf.dwMask = CFM_COLOR | CFM_BOLD | CFM_ITALIC | CFM_UNDERLINE | CFM_STRIKEOUT;
 
 	if (cr == -1)
-		cf.crTextColor = m_crText;
+		cf.crTextColor = m_theme.cr_text.ToCOLORREF();
 	else
 		cf.crTextColor = cr;
 
 	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
-	if (m_nMaxCharLimit > 0 && nInsertionPoint >= m_nMaxCharLimit)
+	if (m_max_length > 0 && nInsertionPoint >= m_max_length)
 	{
 		//clear
 		SetSel(0, -1);
@@ -260,7 +258,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 		SetSelectionCharFormat(cf);
 	}
 
-	cf.crTextColor = m_crText;
+	cf.crTextColor = m_theme.cr_text;
 	if (pos >= 0)
 		SetSel(nInsertionPoint + pos - total_lines + find_str.GetLength(), GetWindowTextLength());
 	else
@@ -365,7 +363,7 @@ void CRichEditCtrlEx::set_text(std::deque<CString>* dqlist)
 
 	SetRedraw(FALSE);
 
-	ClearAll();
+	clear_all();
 
 	//str으로 합쳐서 한번에 넣으면 좋지만 간혹 dqlist의 합이 64K를 넘으면 CString에 담을 수 없다.
 	//한줄씩 넣어야 한다.
@@ -430,7 +428,7 @@ void CRichEditCtrlEx::set_text(std::deque<CString>* dqlist)
 */
 int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/)
 {
-	if (m_hWnd == NULL)
+	if (m_hWnd == nullptr)
 		return 0;
 
 	if (!m_show_log)
@@ -494,7 +492,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	nOldLines = GetLineCount();
 	nInsertionPoint = GetWindowTextLength();
 
-	if (m_hWnd == NULL)
+	if (m_hWnd == nullptr)
 		return 0;
 
 	SetSel(nInsertionPoint, nInsertionPoint);
@@ -535,7 +533,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	cf.dwEffects	= 0;	// To disable CFE_AUTOCOLOR
 
 	if (color == -1)
-		cf.crTextColor	= m_crText;
+		cf.crTextColor	= m_theme.cr_text.ToCOLORREF();
 	else
 		cf.crTextColor	= color;
 
@@ -560,7 +558,7 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	nInsertionPoint = GetWindowTextLength();
 	
 	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
-	if (m_nMaxCharLimit > 0 && nInsertionPoint >= m_nMaxCharLimit)
+	if (m_max_length > 0 && nInsertionPoint >= m_max_length)
 	{
 		//clear
 		SetSel(0, -1);
@@ -623,7 +621,7 @@ void CRichEditCtrlEx::Append(LPCTSTR lpszFormat, ...)
 	size_t cb = 0;
 	va_list args;
 	va_start(args, lpszFormat);
-	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
+	::StringCchVPrintfEx(szBuffer, 512, nullptr, &cb, 0, lpszFormat, args);
 	va_end(args);
 
 	//시간 표시가 true라고 하더라도 라인의 맨 처음 컬럼이 아니면 시간표시를 생략시킨다.
@@ -637,17 +635,17 @@ void CRichEditCtrlEx::Append(LPCTSTR lpszFormat, ...)
 		if (len > 0)
 		{
 			m_show_time = false;
-			AppendToLog(szBuffer, m_crText, false);
+			AppendToLog(szBuffer, m_theme.cr_text.ToCOLORREF(), false);
 			m_show_time = true;
 		}
 		else
 		{
-			AppendToLog(szBuffer, m_crText, false);
+			AppendToLog(szBuffer, m_theme.cr_text.ToCOLORREF(), false);
 		}
 	}
 	else
 	{
-		AppendToLog(szBuffer, m_crText, false);
+		AppendToLog(szBuffer, m_theme.cr_text.ToCOLORREF(), false);
 	}
 }
 
@@ -658,7 +656,7 @@ void CRichEditCtrlEx::Append(COLORREF cr, LPCTSTR lpszFormat, ...)
 	size_t cb = 0;
 	va_list args;
 	va_start(args, lpszFormat);
-	::StringCchVPrintfEx(szBuffer, 512, NULL, &cb, 0, lpszFormat, args);
+	::StringCchVPrintfEx(szBuffer, 512, nullptr, &cb, 0, lpszFormat, args);
 	va_end(args);
 
 	//시간 표시가 true라고 하더라도 라인의 맨 처음 컬럼이 아니면 시간표시를 생략시킨다.
@@ -744,7 +742,7 @@ void CRichEditCtrlEx::Append(COLORREF cr, LPCTSTR lpszFormat, ...)
 //-----------------------------------------------------------------------------
 int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/)
 {
-	if (m_hWnd == NULL)
+	if (m_hWnd == nullptr)
 		return 0;
 
 	if (!m_show_log)
@@ -763,7 +761,7 @@ int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, 
 	cf.dwEffects = 0; // To disable CFE_AUTOCOLOR
 
 	if (color == -1)
-		cf.crTextColor = m_crText;
+		cf.crTextColor = m_theme.cr_text.ToCOLORREF();
 	else
 		cf.crTextColor = color;
 
@@ -905,33 +903,33 @@ void CRichEditCtrlEx::OnRButtonDblClk(UINT nFlags, CPoint point)
 	CRichEditCtrl::OnRButtonDblClk(nFlags, point);
 }
 
-void CRichEditCtrlEx::ClearAll()
+void CRichEditCtrlEx::clear_all()
 {
 	//SetSel(0, -1);
 	//ReplaceSel("");
 	SetWindowText(_T(""));
 }
 
-void CRichEditCtrlEx::ToggleShowLog()
+void CRichEditCtrlEx::toggle_show_log()
 {
 	m_show_log = !m_show_log;
 
 	if (m_show_log)
 	{
 		AppendToLog(_T("\n"));
-		AppendToLog(_T("로그를 디스플레이합니다."), GetComplementaryColor(m_crBack));
+		AppendToLog(_T("로그를 디스플레이합니다."), color_complementary(m_theme.cr_back.ToCOLORREF()));
 	}
 	else
 	{
 		m_show_log = true;
 		AppendToLog(_T("\n"));
-		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), GetComplementaryColor(m_crBack));
-		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), GetComplementaryColor(m_crBack));
+		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), color_complementary(m_theme.cr_back.ToCOLORREF()));
+		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), color_complementary(m_theme.cr_back.ToCOLORREF()));
 		m_show_log = false;
 	}
 }
 
-void CRichEditCtrlEx::ToggleShowTime()
+void CRichEditCtrlEx::toggle_show_time()
 {
 	m_show_time = !m_show_time;
 	AfxGetApp()->WriteProfileInt(_T("setting\\rich_edit"), _T("show time"), m_show_time);
@@ -942,24 +940,24 @@ void CRichEditCtrlEx::OnPopupMenu(UINT menuID)
 	switch (menuID)
 	{
 		case id_menu_richedit_toggle_log :
-			ToggleShowLog();
+			toggle_show_log();
 			break;
 		case id_menu_richedit_clearl_log:
-			ClearAll();
+			clear_all();
 			break;
 		case id_menu_richedit_toggle_time:
-			ToggleShowTime();
+			toggle_show_time();
 			break;
 		case id_menu_richedit_line_space10 :
 		case id_menu_richedit_line_space15 :
 		case id_menu_richedit_line_space20 :
-			SetLineSpacing(menuID - id_menu_richedit_line_space10);
+			set_line_spacing(menuID - id_menu_richedit_line_space10);
 			break;
 	}
 }
 
 //줄간격. 0=1줄, 1=1.5줄, 2=2.0줄
-void CRichEditCtrlEx::SetLineSpacing(UINT nLineSpace)
+void CRichEditCtrlEx::set_line_spacing(UINT nLineSpace)
 {
 	PARAFORMAT2	paraFormat;
 
@@ -972,7 +970,7 @@ void CRichEditCtrlEx::SetLineSpacing(UINT nLineSpace)
 	SetSel(-1, -1);
 }
 
-UINT CRichEditCtrlEx::GetLineSpacing()
+UINT CRichEditCtrlEx::get_line_spacing()
 {
 	PARAFORMAT2	paraFormat;
 
@@ -981,22 +979,22 @@ UINT CRichEditCtrlEx::GetLineSpacing()
 	return paraFormat.bLineSpacingRule;
 }
 
-void CRichEditCtrlEx::SetBackColor(COLORREF crBack)
+void CRichEditCtrlEx::set_back_color(Gdiplus::Color cr_back)
 {
 	//bSysColor = false일때만 crBack값이 유효하다.
-	SetBackgroundColor(false, crBack);
+	SetBackgroundColor(false, cr_back.ToCOLORREF());
 
-	m_crBack = crBack;
+	m_theme.cr_back = cr_back;
 }
 
-void CRichEditCtrlEx::SetClearLogInterval(int nInterval)
+void CRichEditCtrlEx::set_clear_log_interval(int interval)
 {
 	KillTimer(TIMER_CLEAR_LOG);
 
-	if (nInterval > 0)
+	if (interval > 0)
 	{
-		m_nClearLogInterval = nInterval;
-		SetTimer(TIMER_CLEAR_LOG, m_nClearLogInterval * 1000, NULL);
+		m_clear_log_interval = interval;
+		SetTimer(TIMER_CLEAR_LOG, m_clear_log_interval * 1000, nullptr);
 	}
 }
 
@@ -1004,24 +1002,9 @@ void CRichEditCtrlEx::OnTimer(UINT_PTR nIDEvent)
 {
 	if (nIDEvent == TIMER_CLEAR_LOG)
 	{
-		ClearAll();
-		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), GetComplementaryColor(m_crBack));
+		clear_all();
+		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), color_complementary(m_theme.cr_back.ToCOLORREF()));
 	}
-}
-
-COLORREF CRichEditCtrlEx::GetComplementaryColor(COLORREF crColor)
-{
-	int	r = 255 - GetRValue(crColor);
-	int	g = 255 - GetGValue(crColor);
-	int	b = 255 - GetBValue(crColor);
-
-/*
-	Clamp(r, 0, 255);
-	Clamp(g, 0, 255);
-	Clamp(b, 0, 255);
-*/
-
-	return RGB(r, g, b);
 }
 
 BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
@@ -1031,9 +1014,9 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 	{
 		//TRACE("wheel on richedit ptm: %d\n", pMsg->wParam);
 		if ((int)(pMsg->wParam) > 0)
-			LineScroll(-m_nScrollSize);
+			LineScroll(-m_scroll_size);
 		else
-			LineScroll(m_nScrollSize);
+			LineScroll(m_scroll_size);
 		//TRACE(_T("CRichEditCtrlEx::PreTranslateMessage(). WM_MOUSEWHEEL\n"));
 		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_MOUSEWHEEL), 0);
 		return FALSE;
@@ -1065,10 +1048,10 @@ void CRichEditCtrlEx::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
 	CFont* font = GetFont();
-	if (font == NULL)
+	if (font == nullptr)
 		font = GetParent()->GetFont();
 
-	if (font != NULL)
+	if (font != nullptr)
 		font->GetObject(sizeof(m_lf), &m_lf);
 	else
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
@@ -1118,7 +1101,7 @@ void CRichEditCtrlEx::set_align(int align)
 
 bool CRichEditCtrlEx::load(CString path)
 {
-	ClearAll();
+	clear_all();
 
 	CString str = read(path);
 	add(-1, str);
@@ -1287,4 +1270,14 @@ void CRichEditCtrlEx::add_keyword_format(CSCKeywordFormat kf)
 void CRichEditCtrlEx::clear_keyword_format()
 {
 	m_keyword_formats.clear();
+}
+
+void CRichEditCtrlEx::set_color_theme(int color_theme, bool invalidate)
+{
+	m_theme.set_color_theme(color_theme);
+
+	SetBackgroundColor(false, m_theme.cr_back.ToCOLORREF());
+
+	if (invalidate)
+		Invalidate();// RedrawWindow();
 }

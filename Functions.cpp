@@ -851,58 +851,6 @@ bool Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase)
 	
 	return (str1 == str2);
 }
-#if 0
-COLORREF get_color(COLORREF crOrigin, int nOffset)
-{
-	int r	= GetRValue(crOrigin) + nOffset;
-	int g	= GetGValue(crOrigin) + nOffset;
-	int b	= GetBValue(crOrigin) + nOffset;
-	
-	if (r < 0) r = 0; else if (r > 255) r = 255;
-	if (g < 0) g = 0; else if (g > 255) g = 255;
-	if (b < 0) b = 0; else if (b > 255) b = 255;
-	
-	return RGB(r, g, b);
-}
-
-COLORREF	GetDefaultColor(int idx)
-{
-	idx %= 10;
-
-	switch (idx)
-	{
-		case 0 : return RGB(237, 125,  49);
-		case 1 : return RGB(91, 155, 213);
-		case 2 : return RGB(165, 255, 165);
-		case 3 : return RGB(255, 192,   0);
-		case 4 : return RGB(68, 114, 196);
-		case 5 : return RGB(112, 173,  71);
-		case 6 : return RGB(37,  94, 255);
-		case 7 : return RGB(158,  72,  14);
-		case 8 : return RGB(99,  99, 199);
-		case 9 : return RGB(153, 115,   0);
-	}
-}
-
-//random19937을 이용하여 랜덤 컬러를 리턴한다.
-COLORREF	get_random_color()
-{
-	return RGB(random19937(0, 255), random19937(0, 255), random19937(0, 255));
-}
-
-COLORREF	GetComplementaryColor(COLORREF crColor, COLORREF crBack)
-{
-	int	r = abs(GetRValue(crBack) - GetRValue(crColor));
-	int	g = abs(GetGValue(crBack) - GetGValue(crColor));
-	int	b = abs(GetBValue(crBack) - GetBValue(crColor));
-
-	Clamp(r, 0, 255);
-	Clamp(g, 0, 255);
-	Clamp(b, 0, 255);
-
-	return RGB(r, g, b);
-}
-#endif
 
 CString	get_exe_directory(bool includeSlash)
 {

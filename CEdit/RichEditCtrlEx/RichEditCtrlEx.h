@@ -4,6 +4,8 @@
 #include <afxcmn.h>
 #include <deque>
 
+#include "../../colors.h"
+
 /*
 * 시간표시를 하지 않는 경우는 관계없으나 시간표시를 하는 경우는
   text의 앞 또는 뒤에 \n이 있을 경우 부가적인 처리가 필요하다.
@@ -60,7 +62,7 @@ public:
 		msg_vscroll,
 	};
 
-	CWnd* pThis = NULL;
+	CWnd* pThis = nullptr;
 	int		message;
 };
 
@@ -83,83 +85,83 @@ public:
 		id_menu_richedit_toggle_time,
 	};
 
-	void		SetDefaultTextColor(COLORREF crText) { m_crText = crText; }
+	CSCColorTheme		m_theme = CSCColorTheme(this);
+	void				set_color_theme(int color_theme, bool invalidate = false); //apply current m_theme colors to the control.
+
+	void				set_default_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
 
 	//back color를 변경한다.
-	void		SetBackColor(COLORREF crBack);
-	void		SetClearLogInterval(int nInterval);
-	void		SetMaxCharLimit(int nMaxChar) { m_nMaxCharLimit = nMaxChar; }
+	void				set_back_color(Gdiplus::Color cr_back);
+	void				set_clear_log_interval(int interval);
+	void				set_max_length_limit(int max_length) { m_max_length = max_length; }
 
-	void		ClearAll();
+	void				clear_all();
 
-	void		ToggleShowLog();
-	void		ShowLog(bool bShow = true) { m_show_log = bShow; }
-	bool		IsShowLog() { return m_show_log; }
+	void				toggle_show_log();
+	void				show_log(bool bShow = true) { m_show_log = bShow; }
+	bool				is_show_log() { return m_show_log; }
 
-	void		ToggleShowTime();
-	void		ShowTimeInfo(bool bShow = true) { m_show_time = bShow; }
-	bool		IsShowTime() { return m_show_time; }
+	void				toggle_show_time();
+	void				show_time_info(bool bShow = true) { m_show_time = bShow; }
+	bool				is_show_time() { return m_show_time; }
 
-	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
+	void				use_popup_menu(bool use) { m_use_popup_menu = use; }
 
-	UINT		GetLineSpacing();
+	UINT				get_line_spacing();
 	//줄간격. 0=1줄, 1=1.5줄, 2=2.0줄
-	void		SetLineSpacing(UINT nLineSpace);
+	void				set_line_spacing(UINT nLineSpace);
 
 	//20231004. Append~로 시작되는 4개의 함수를 1개로 간소화한다.
 	//맨 끝에 "\n"을 자동으로 붙여주지 않으므로 필요하다면 addl()함수를 사용한다.
 	//간혹 한 라인에 추가적인 로그를 표시할 필요가 있으므로 add(), addl()를 분리함.
-	CString		add(COLORREF cr, LPCTSTR lpszFormat, ...);
+	CString				add(COLORREF cr, LPCTSTR lpszFormat, ...);
 	//addl은 add line의 약자로 맨 끝에 "\n"을 추가할 뿐 add와 동일하다.
-	CString		addl(COLORREF cr, LPCTSTR lpszFormat, ...);
+	//단, resource의 속성에서 multiline이 체크되어 있어야 한다.
+	CString				addl(COLORREF cr, LPCTSTR lpszFormat, ...);
 
-	int			AppendToLog(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
-	void		Append(LPCTSTR lpszFormat, ...);
-	void		Append(COLORREF cr, LPCTSTR lpszFormat, ...);
-	int			AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);
+	int					AppendToLog(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
+	void				Append(LPCTSTR lpszFormat, ...);
+	void				Append(COLORREF cr, LPCTSTR lpszFormat, ...);
+	int					AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);
 
 	//한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
-	void		set_text(std::deque<CString>* dqlist);
+	void				set_text(std::deque<CString>* dqlist);
 
 
-	int			GetNumVisibleLines();
+	int					GetNumVisibleLines();
 
-	COLORREF	GetComplementaryColor(COLORREF crColor);
+	void				set_auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
+	void				set_scroll_size(int nLines) { m_scroll_size = nLines; }
 
-	void		set_auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
-	void		SetScrollSize(int nLines) { m_nScrollSize = nLines; }
-
-	int			get_align() { return m_align; }
+	int					get_align() { return m_align; }
 	//PFA_LEFT(1), PFA_RIGHT(2), PFA_CENTER(3)
-	void		set_align(int align);
+	void				set_align(int align);
 
 	//기본 CWnd::SetFont() override
-	void		SetFont(CFont* font, BOOL bRedraw = TRUE);
-	void		set_font_name(TCHAR *sfontname);
-	void		set_font_size(int nSize);
-	void		set_font_weight(int weight);
+	void				SetFont(CFont* font, BOOL bRedraw = TRUE);
+	void				set_font_name(TCHAR *sfontname);
+	void				set_font_size(int nSize);
+	void				set_font_weight(int weight);
 
-	void		highlight_current_line();
-	void		select_line(int line);
+	void				highlight_current_line();
+	void				select_line(int line);
 
 //file
-	bool		load(CString path);
-	bool		save(CString path);
+	bool				load(CString path);
+	bool				save(CString path);
 
 //keyword highlight
-	void		add_keyword_format(CSCKeywordFormat kf);
-	void		clear_keyword_format();
+	void				add_keyword_format(CSCKeywordFormat kf);
+	void				clear_keyword_format();
 
 protected:
-	COLORREF	m_crText;
-	COLORREF	m_crBack;
 	bool		m_show_log;
 	bool		m_show_time;
 	bool		m_use_popup_menu = true;
 
-	int			m_nClearLogInterval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
-	int			m_nMaxCharLimit;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
-	int			m_nScrollSize;
+	int			m_clear_log_interval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
+	int			m_max_length;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
+	int			m_scroll_size;
 	bool		m_auto_scroll = true;	//default = true;
 
 	int			m_align = PFA_LEFT;

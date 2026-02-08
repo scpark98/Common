@@ -3748,11 +3748,12 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_in_editing = false;
 	m_last_clicked_time = 0;
 	m_pEdit->GetWindowText(m_edit_new_text);
-	//m_pEdit->ShowWindow(SW_HIDE);
-	if (m_pEdit->m_hWnd)
-		m_pEdit->DestroyWindow();
-	delete m_pEdit;
-	m_pEdit = NULL;
+	m_pEdit->ShowWindow(SW_HIDE);
+
+	//if (m_pEdit->m_hWnd)
+	//	m_pEdit->DestroyWindow();
+	//delete m_pEdit;
+	//m_pEdit = NULL;
 
 	//if (m_edit_new_text == m_edit_old_text)
 	//	return;
@@ -3984,6 +3985,7 @@ CString CVtListCtrlEx::get_path(int index)
 }
 
 //현재 선택된 항목이 폴더이면 해당 경로까지의 fullpath를, 파일이라면 현재 리스트의 경로를 리턴한다.
+//m_is_shell_listctrl로 동작할때만 동작한다.
 CString	CVtListCtrlEx::get_selected_path()
 {
 	CString path;

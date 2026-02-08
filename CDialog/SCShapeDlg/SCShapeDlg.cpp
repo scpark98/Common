@@ -76,6 +76,8 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 {
 	m_parent = parent;
 
+	//WS_EX_NOACTIVATE을 주면 클릭으로 창이동을 시킬수없다.
+	//실행 시 기본 포커스를 가지지 않도록 하기 위해서라면 다른 방법으로 수정해야 한다.
 	LONG_PTR dwStyle = WS_POPUP;// | WS_EX_NOACTIVATE;
 	//DWORD dwStyle = WS_CHILD | WS_VISIBLE;
 
@@ -319,7 +321,8 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 	}
 
 	//set_alpha(255);
-	ShowWindow(SW_SHOW);
+	//ShowWindow(SW_SHOW);
+	ShowWindow(SW_SHOWNOACTIVATE);
 }
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
@@ -551,7 +554,8 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 {
 	if (timeout <= 0)
 	{
-		ShowWindow(SW_SHOW);
+		//ShowWindow(SW_SHOW);
+		ShowWindow(SW_SHOWNOACTIVATE);
 		return;
 	}
 
@@ -609,7 +613,8 @@ void CSCShapeDlg::thread_fadeinout(bool fadein, int fadein_delay_ms, int hide_af
 	int alpha_origin = m_alpha;
 
 	set_alpha((fadein && fadein_delay_ms > 0) ? 0 : alpha_origin);
-	ShowWindow(SW_SHOW);
+	//ShowWindow(SW_SHOW);
+	ShowWindow(SW_SHOWNOACTIVATE);
 
 	int _alpha = m_alpha;
 

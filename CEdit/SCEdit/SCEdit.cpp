@@ -548,7 +548,8 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 				{
 					CSCEditMessage msg(this, WM_KILLFOCUS);
 					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, 0);
-					return false;
+					//WM_KILLFOCUS를 전달하고 그 안에서 edit_end()를 처리하므로 VK_RETURN에 대한 추가적인 처리는 하지 않아야하므로 TRUE를 리턴한다.
+					return TRUE;
 				}
 				break;
 			//case WM_KEYDOWN:

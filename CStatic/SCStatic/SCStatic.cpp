@@ -718,7 +718,7 @@ void CSCStatic::set_use_edit(bool use)
 	}
 	else
 	{
-		m_edit.DestroyWindow();
+		//m_edit.DestroyWindow();
 	}
 }
 

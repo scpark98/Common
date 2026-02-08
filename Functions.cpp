@@ -16435,7 +16435,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pWnd || !pWnd->m_hWnd || pWnd->IsWindowVisible() == false || pWnd->IsIconic())
 	{
-		TRACE(_T("[warning] SaveWindowPosition() just return because pWnd = %p, pWnd->hWnd = %p\n"), pWnd, (pWnd && pWnd->m_hWnd ? pWnd->m_hWnd : nullptr));
+		//TRACE(_T("[warning] SaveWindowPosition() just return because pWnd = %p, pWnd->hWnd = %p\n"), pWnd, (pWnd && pWnd->m_hWnd ? pWnd->m_hWnd : nullptr));
 		return;
 	}
 

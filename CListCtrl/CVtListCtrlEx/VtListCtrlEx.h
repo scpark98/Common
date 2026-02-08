@@ -201,6 +201,7 @@ public:
 	CString		get_path(int index = -1);
 
 	//현재 선택된 항목이 폴더이면 해당 경로까지의 fullpath를, 파일이라면 현재 리스트의 경로를 리턴한다.('\' 포함)
+	//m_is_shell_listctrl로 동작할때만 동작한다.
 	CString		get_selected_path();
 
 	//해당 인덱스의 파일/폴더의 WIN32_FIND_DATA 값을 리턴한다.

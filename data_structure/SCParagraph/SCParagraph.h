@@ -60,6 +60,9 @@ public:
 	Gdiplus::Color cr_shadow = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_round = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_round_stroke = Gdiplus::Color::Transparent;
+
+	//배경색을 칠할 경우 텍스트와	배경 사각형 사이의 여백
+	float		margin = 20.0f;
 };
 
 class CSCParagraph

@@ -7711,7 +7711,7 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 	Gdiplus::SolidBrush br(cr_fill);
 
 	//PenAlignmentCenter로 하고 DrawPath()를 하면 stroke가 빗나가는 현상이 발생한다.
-	//pen.SetAlignment(Gdiplus::PenAlignmentCenter);
+	pen.SetAlignment(Gdiplus::PenAlignmentInset);
 
 	// get the corner path
 	Gdiplus::GraphicsPath path;

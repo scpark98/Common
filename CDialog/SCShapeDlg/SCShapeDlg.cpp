@@ -189,7 +189,12 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 	r.InflateRect(1, 1);
 
-	//배경을 그린다면 r은 더 크게 잡아줘야 한다.
+	//배경을 그린다면 r은 더 크게 잡아줘야 한다. margin만큼 더 크게 키워준다.
+	if (m_text_setting.text_prop.cr_back.GetValue() != Gdiplus::Color::Transparent)
+	{
+		r.InflateRect(m_text_setting.text_prop.margin, m_text_setting.text_prop.margin);
+		r.InflateRect((int)m_text_setting.text_prop.round_thickness + 2, (int)m_text_setting.text_prop.round_thickness + 2);
+	}
 
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
@@ -200,6 +205,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 
 	//해당 캔버스에
 	Gdiplus::Graphics g(m_img.m_pBitmap);
+	g.Clear(Gdiplus::Color::Transparent);
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -250,6 +256,14 @@ void CSCShapeDlg::set_round_stroke(float round_stroke, bool invalidate)
 void CSCShapeDlg::set_round_stroke_color(Gdiplus::Color cr_round_stroke, bool invalidate)
 {
 	m_text_setting.text_prop.cr_round_stroke = cr_round_stroke;
+	if (invalidate)
+		set_text();
+}
+
+//배경을 그릴 경우 텍스트와 배경 사각형 사이의 여백
+void CSCShapeDlg::set_margin(float margin, bool invalidate)
+{
+	m_text_setting.text_prop.margin = margin;
 	if (invalidate)
 		set_text();
 }

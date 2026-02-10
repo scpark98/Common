@@ -134,6 +134,11 @@ public:
 	void			set_round_stroke(float round_stroke, bool invalidate = true);
 	void			set_round_stroke_color(Gdiplus::Color cr_round_stroke, bool invalidate = true);
 
+	//배경을 그릴 경우 텍스트와 배경 사각형 사이의 여백. margin이 0이면 텍스트와 배경이 딱 붙어서 그려진다. margin이 10이면 텍스트와 배경 사이에 10픽셀의 여백이 생긴다.
+	//left, top, right, bottom을 각각 지정하려 했으나 margin만큼 커진 사각형에 center에 그리는 방식이므로 현재로서는 의미없다.
+	//추후 각각을 준 경우 텍스트와 배경 사이의 여백이 각각 달라지는 방식으로 구현이 필요하다.
+	void			set_margin(float margin, bool invalidate = true);
+
 	//기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
 	void			set_text_align(int align, bool invalidate = true);
 	int				get_text_align() { return m_text_align; }	

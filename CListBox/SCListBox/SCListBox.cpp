@@ -1385,7 +1385,7 @@ void CSCListBox::edit_end(bool modify)
 		TRACE(_T("index = %d\n"), m_edit_index);
 
 		CString old_text = get_text(m_edit_index);
-		if (text == old_text)
+		if (!text.IsEmpty() && (text == old_text))
 		{
 			m_in_editing = false;
 			return;

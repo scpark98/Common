@@ -13,7 +13,7 @@ class CSCThread
 public:
 	using thread_function = std::function<void(CSCThread&)>;
 
-	enum class State
+	enum class CSCThreadState
 	{
 		Stopped,
 		Running,
@@ -45,7 +45,7 @@ public:
 		m_work = std::move(work);
 		m_stop_requested.store(false, std::memory_order_release);
 		m_paused.store(false, std::memory_order_release);
-		m_state.store(State::Running, std::memory_order_release);
+		m_state.store(CSCThreadState::Running, std::memory_order_release);
 
 		m_thread = std::thread([this]
 			{
@@ -59,7 +59,7 @@ public:
 				}
 
 				m_paused.store(false, std::memory_order_release);
-				m_state.store(State::Stopped, std::memory_order_release);
+				m_state.store(CSCThreadState::Stopped, std::memory_order_release);
 			});
 	}
 
@@ -67,14 +67,14 @@ public:
 	{
 		m_paused.store(true, std::memory_order_release);
 		if (!m_stop_requested.load(std::memory_order_acquire))
-			m_state.store(State::Paused, std::memory_order_release);
+			m_state.store(CSCThreadState::Paused, std::memory_order_release);
 	}
 
 	void resume()
 	{
 		m_paused.store(false, std::memory_order_release);
 		if (!m_stop_requested.load(std::memory_order_acquire))
-			m_state.store(State::Running, std::memory_order_release);
+			m_state.store(CSCThreadState::Running, std::memory_order_release);
 		m_cv.notify_one();
 	}
 
@@ -82,31 +82,31 @@ public:
 	{
 		m_stop_requested.store(true, std::memory_order_release);
 		m_paused.store(false, std::memory_order_release);
-		m_state.store(State::Stopping, std::memory_order_release);
+		m_state.store(CSCThreadState::Stopping, std::memory_order_release);
 		m_cv.notify_one();
 
 		if (m_thread.joinable())
 			m_thread.join();
 
-		m_state.store(State::Stopped, std::memory_order_release);
+		m_state.store(CSCThreadState::Stopped, std::memory_order_release);
 	}
 
 	bool is_running() const
 	{
-		return m_state.load(std::memory_order_acquire) == State::Running;
+		return m_state.load(std::memory_order_acquire) == CSCThreadState::Running;
 	}
 
 	bool is_stopped() const
 	{
-		return m_state.load(std::memory_order_acquire) == State::Stopped;
+		return m_state.load(std::memory_order_acquire) == CSCThreadState::Stopped;
 	}
 
 	bool is_paused() const
 	{
-		return m_state.load(std::memory_order_acquire) == State::Paused;
+		return m_state.load(std::memory_order_acquire) == CSCThreadState::Paused;
 	}
 
-	State state() const
+	CSCThreadState state() const
 	{
 		return m_state.load(std::memory_order_acquire);
 	}
@@ -136,7 +136,7 @@ private:
 
 	std::atomic<bool> m_stop_requested{ false };
 	std::atomic<bool> m_paused{ false };
-	std::atomic<State> m_state{ State::Stopped };
+	std::atomic<CSCThreadState> m_state{ CSCThreadState::Stopped };
 
 	std::mutex m_mtx;
 	std::condition_variable m_cv;

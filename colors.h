@@ -411,6 +411,14 @@ public:
 	Gdiplus::Color	cr_progress;					//progress bar
 	//Gdiplus::Color	cr_progress_text;				//progress text
 
+	//로그, 상태등의 텍스트	표시용 컬러. 컬러 테마마다 약간씩 다를 수 있으므로
+	//필요한 경우 해당 테마에서 아래 값들을 수정해 줄 필요도 있다.
+	Gdiplus::Color	cr_success = Gdiplus::Color::RoyalBlue;
+	Gdiplus::Color	cr_info = Gdiplus::Color::DimGray;
+	Gdiplus::Color	cr_warning = Gdiplus::Color::Crimson;
+	Gdiplus::Color	cr_error = Gdiplus::Color::Red;
+
+
 protected:
 	CWnd*			m_parent = nullptr;
 	int				m_cur_theme = color_theme_default;

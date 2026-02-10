@@ -52,10 +52,14 @@ public:
 	int			style = Gdiplus::FontStyleRegular;	//bold, italic, underline, strikeout
 	float		shadow_depth = 0.0f;
 	float		thickness = 0.0f;
+	float		round = 0.0f;
+	float		round_thickness = 0.0f;
 	Gdiplus::Color cr_text = Gdiplus::Color::Black;
 	Gdiplus::Color cr_back = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_shadow = Gdiplus::Color::Transparent;
+	Gdiplus::Color cr_round = Gdiplus::Color::Transparent;
+	Gdiplus::Color cr_round_stroke = Gdiplus::Color::Transparent;
 };
 
 class CSCParagraph

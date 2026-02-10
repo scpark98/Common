@@ -1911,13 +1911,13 @@ LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-void CVtListCtrlEx::set_color_theme(int theme)
+void CVtListCtrlEx::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
 
-	if (m_hWnd)
+	if (m_hWnd && invalidate)
 		Invalidate();
 }
 

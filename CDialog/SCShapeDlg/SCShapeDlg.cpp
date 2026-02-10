@@ -135,7 +135,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 {
 	m_para.clear();
 
-	CSCTextProperty text_prop;
+	//CSCTextProperty text_prop;
 
 	if (parent == NULL)
 		m_parent = parent = AfxGetApp()->GetMainWnd();
@@ -159,23 +159,24 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 		font_name = _T("굴림");// lf.lfFaceName;
 	}
 
-	text_prop.name = font_name;
-	text_prop.size = font_size;
-	text_prop.style = font_style;
-	text_prop.cr_text = cr_text;
-	text_prop.cr_stroke = cr_stroke;
-	text_prop.cr_shadow = cr_shadow;
-	text_prop.cr_back = cr_back;
-	text_prop.shadow_depth = shadow_depth;
-	text_prop.thickness = thickness;
+	m_text_setting.text = text;
+	m_text_setting.text_prop.name = font_name;
+	m_text_setting.text_prop.size = font_size;
+	m_text_setting.text_prop.style = font_style;
+	m_text_setting.text_prop.cr_text = cr_text;
+	m_text_setting.text_prop.cr_stroke = cr_stroke;
+	m_text_setting.text_prop.cr_shadow = cr_shadow;
+	m_text_setting.text_prop.cr_back = cr_back;
+	m_text_setting.text_prop.shadow_depth = shadow_depth;
+	m_text_setting.text_prop.thickness = thickness;
 
 	//아직 윈도우 생성 전이라면 텍스트 출력 크기를 알 수 없으므로 100x100으로 가정한다.
 	CRect r(0, 0, 100, 100);
 
 	m_img.release();
 
-	CSCParagraph::build_paragraph_str(text, m_para, &text_prop);
-	m_text_setting = CSCShapeDlgTextSetting(text, text_prop);
+	CSCParagraph::build_paragraph_str(m_text_setting.text, m_para, &m_text_setting.text_prop);
+	//m_text_setting = CSCShapeDlgTextSetting(text, m_text_setting.text_prop);
 
 	if (!m_hWnd)
 	{
@@ -188,7 +189,9 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 	r.InflateRect(1, 1);
 
-	m_img.create(r.Width(), r.Height(), cr_back, PixelFormat32bppARGB);
+	//배경을 그린다면 r은 더 크게 잡아줘야 한다.
+
+	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 
@@ -202,6 +205,10 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
+	//배경 그리기
+	draw_round_rect(&g, Gdiplus::Rect(0.0f, 0.0f, (float)m_img.width, (float)m_img.height),
+		m_text_setting.text_prop.cr_round_stroke, m_text_setting.text_prop.cr_back,
+		(int)(m_text_setting.text_prop.round), m_text_setting.text_prop.round_thickness);
 
 	//기본적으로 m_para는 DT_CENTER로 가정하고 계산하므로 DT_CENTER이면 여기서 바로 그려주고
 	//DT_LEFT, DT_RIGHT라면 set_text_align()을 한 후 그 함수 안에서 다시 그려준다.
@@ -223,8 +230,32 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	return &m_text_setting;
 }
 
+//배경을 둥근 모서리 모양으로 칠해준다. cr_back = Gdiplus::Color::Transparent인 경우는 투명 배경으로 변경하는 의미가 아니라
+//cr_back 파라미터가 유효한 설정값이 아니라는 의미이며 기존 설정된 배경색을 유지한다는 의미이다.
+void CSCShapeDlg::set_round(float round, bool invalidate)
+{
+	m_text_setting.text_prop.round = round;
+	if (invalidate)
+		set_text();
+}
+
+//둥근 모서리 선의 두께
+void CSCShapeDlg::set_round_stroke(float round_stroke, bool invalidate)
+{
+	m_text_setting.text_prop.round_thickness = round_stroke;
+	if (invalidate)
+		set_text();
+}
+
+void CSCShapeDlg::set_round_stroke_color(Gdiplus::Color cr_round_stroke, bool invalidate)
+{
+	m_text_setting.text_prop.cr_round_stroke = cr_round_stroke;
+	if (invalidate)
+		set_text();
+}
+
 //기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
-void CSCShapeDlg::set_text_align(int align)
+void CSCShapeDlg::set_text_align(int align, bool invalidate)
 {
 	int i, j;
 

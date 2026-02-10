@@ -128,8 +128,14 @@ public:
 	void			set_back_color(Gdiplus::Color cr) { m_text_setting.text_prop.cr_back = cr; set_text(&m_text_setting); }
 	void			set_thickness(float thickness) { m_text_setting.text_prop.thickness = thickness; set_text(&m_text_setting); }
 
+	//배경을 둥근 모서리 모양으로 그려준다.
+	void			set_round(float round, bool invalidate = true);
+	//둥근 모서리 선의 두께
+	void			set_round_stroke(float round_stroke, bool invalidate = true);
+	void			set_round_stroke_color(Gdiplus::Color cr_round_stroke, bool invalidate = true);
+
 	//기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
-	void			set_text_align(int align);
+	void			set_text_align(int align, bool invalidate = true);
 	int				get_text_align() { return m_text_align; }	
 
 	//show상태로 만들고 time후에 hide된다.

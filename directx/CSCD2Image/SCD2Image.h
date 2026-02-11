@@ -120,7 +120,8 @@ public:
 
 	IWICImagingFactory2*	get_WICFactory2() { return m_pWICFactory;}
 	ID2D1DeviceContext*		get_d2dc() { return m_d2dc;}
-	ID2D1Bitmap*			get() { return m_img[m_frame_index].Get(); }
+	ID2D1Bitmap1*			get_cur_img() { return m_img[m_frame_index].Get(); }
+	ID2D1Bitmap1*			get_frame_img(int index);
 
 	//get original image demension
 	float					get_width();
@@ -189,6 +190,9 @@ public:
 	HRESULT					save(CString path, float quality = 1.0f);
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
+	HRESULT					save_webp(LPCTSTR path, ...);
+
+	void					convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride);
 
 	bool					copy_to_clipboard();
 

@@ -86,11 +86,11 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	wc.lpszClassName = _T("CSCShapeDlg");
 	AfxRegisterClass(&wc);
 
-	bool res = CreateEx(NULL, wc.lpszClassName, _T("SCShapeDlg"), dwStyle, CRect(left, top, right, bottom), parent, 0);
+	bool res = CreateEx(WS_EX_LAYERED | WS_EX_NOACTIVATE, wc.lpszClassName, _T("SCShapeDlg"), dwStyle, CRect(left, top, right, bottom), parent, 0);
 
 	//TRACE(_T("create. rect = (%d,%d) (%d,%d)\n"), left, top, right, bottom);
-	CRect rc;
-	GetClientRect(rc);
+	//CRect rc;
+	//GetClientRect(rc);
 	//TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
@@ -100,8 +100,11 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	dwStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED | WS_EX_NOACTIVATE;
 	SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, dwStyle);
 
-	GetClientRect(rc);
-	TRACE(_T("rc = %s\n"), get_rect_info_str(rc));
+	//GetClientRect(rc);
+	//TRACE(_T("rc = %s\n"), get_rect_info_str(rc));
+
+	if (res)
+		TRACE(_T("ShapeDlg created successfully. Default is hide state. To show call ShowWindow(SW_SHOW) or ShowWindow(SW_NOACTIVATE)\n"));
 
 	return res;
 }
@@ -367,7 +370,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 
 	//set_alpha(255);
 	//ShowWindow(SW_SHOW);
-	ShowWindow(SW_SHOWNOACTIVATE);
+	//ShowWindow(SW_SHOWNOACTIVATE);
 }
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
@@ -561,12 +564,17 @@ void CSCShapeDlg::gif_thread()
 
 		if (!m_img.is_valid() ||
 			m_img.m_pBitmap == NULL ||
-			m_gif_index > m_img.get_frame_count()/* ||
-			m_img.m_property_item == NULL*/)
+			m_gif_index > m_img.get_frame_count())
 			break;
 
 		m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_gif_index);
 		render(m_img.m_pBitmap);
+
+		if (!m_img.is_valid() ||
+			m_img.m_pBitmap == NULL ||
+			m_gif_index > m_img.get_frame_count())
+			break;
+
 		long delay = ((long*)m_img.m_frame_delay->value)[m_gif_index] * 10;
 		//if (delay < 10)
 		//	delay = 10;

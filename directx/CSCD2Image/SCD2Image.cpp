@@ -1272,7 +1272,7 @@ HRESULT CSCD2Image::get_sub_img(D2D1_RECT_U r, CSCD2Image* dest)
 		return S_FALSE;
 
 	D2D1_POINT_2U pt = { 0, 0 };
-	return dest->get()->CopyFromBitmap(&pt, m_img[m_frame_index].Get(), &r);
+	return dest->get_cur_img()->CopyFromBitmap(&pt, m_img[m_frame_index].Get(), &r);
 }
 
 void CSCD2Image::restore_original_image()
@@ -1324,6 +1324,134 @@ HRESULT CSCD2Image::save(CString path, float quality)
 	return save(m_img[m_frame_index].Get(), quality, path);
 }
 
+void CSCD2Image::convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride)
+{
+	for (UINT y = 0; y < height; ++y)
+	{
+		BYTE* row = pixels + y * stride;
+
+		for (UINT x = 0; x < width; ++x)
+		{
+			BYTE* px = row + x * 4;
+
+			BYTE b = px[0];
+			BYTE g = px[1];
+			BYTE r = px[2];
+			BYTE a = px[3];
+
+			if (a != 0)
+			{
+				r = (BYTE)(min(255, (r * 255) / a));
+				g = (BYTE)(min(255, (g * 255) / a));
+				b = (BYTE)(min(255, (b * 255) / a));
+			}
+
+			px[0] = r;
+			px[1] = g;
+			px[2] = b;
+			px[3] = a;
+		}
+	}
+}
+
+#include <webp/mux.h>
+#include <webp/encode.h>
+HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
+{
+	//이미지가 정상적으로 로딩되어있지 않은 경우
+	if (m_pWICFactory == nullptr)
+		return S_FALSE;
+
+	HRESULT hr = S_OK;
+
+	va_list args;
+	va_start(args, path);
+
+	CString filename;
+	filename.FormatV(path, args);
+
+	int width = get_width();
+	int height = get_height();
+	WebPAnimEncoderOptions enc_options;
+	WebPAnimEncoderOptionsInit(&enc_options);
+
+	WebPAnimEncoder* enc = WebPAnimEncoderNew(width, height, &enc_options);
+
+	int timestamp = 0;
+
+	for (int i = 0; i < get_frame_count(); ++i)
+	{
+		D2D1_BITMAP_PROPERTIES1 props =
+		{
+			{ DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED },
+			96.0f,
+			96.0f,
+			D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW
+		};
+
+		ComPtr<ID2D1Bitmap1> cpuBitmap;
+		m_d2dc->CreateBitmap(
+			D2D1::SizeU(width, height),
+			nullptr,
+			0,
+			&props,
+			&cpuBitmap
+		);
+
+		cpuBitmap->CopyFromBitmap(nullptr, m_img[i].Get(), nullptr);
+
+		D2D1_MAPPED_RECT mapped;
+		cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped);
+
+		BYTE* pixels = mapped.bits;
+		UINT stride = mapped.pitch;
+
+		convert_PBGRA_to_RGBA(pixels, width, height, stride);
+
+		WebPPicture pic;
+		WebPPictureInit(&pic);
+
+		pic.width = width;
+		pic.height = height;
+		pic.use_argb = 1;
+
+		WebPPictureImportRGBA(&pic, pixels, stride);
+
+		WebPAnimEncoderAdd(enc, &pic, timestamp, nullptr);
+
+		timestamp += m_frame_delay[i];
+
+		WebPPictureFree(&pic);
+	}
+
+	// 마지막 프레임 flush
+	WebPAnimEncoderAdd(enc, nullptr, timestamp, nullptr);
+
+	WebPData webp_data;
+	WebPDataInit(&webp_data);
+
+	WebPAnimEncoderAssemble(enc, &webp_data);
+
+	FILE* fp = NULL;
+	_tfopen_s(&fp, filename, _T("wb"));
+
+	if (fp == NULL)
+	{
+		TRACE(_T("can't create file : %s\n"), filename);
+	}
+	else
+	{
+		fwrite(webp_data.bytes, webp_data.size, 1, fp);
+		fclose(fp);
+		hr = S_FALSE;
+	}
+
+	WebPDataClear(&webp_data);
+	WebPAnimEncoderDelete(enc);
+
+	return hr;
+}
+
 HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 {
 	//이미지가 정상적으로 로딩되어있지 않은 경우
@@ -1341,6 +1469,13 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 	CString ext = get_part(filename, fn_ext).MakeLower();
 	CString folder = get_part(filename, fn_folder);
 	make_full_directory(folder);
+
+	//webp일 경우는 별도 처리한다.
+	if (ext == _T("webp"))
+	{
+		hr = save_webp(filename);
+		return hr;
+	}
 
 	// Create a file stream
 	ComPtr<IWICStream> pStream;
@@ -1371,7 +1506,6 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 		wicFormat = GUID_ContainerFormatBmp;
 	else if (ext == _T("raw"))
 		wicFormat = GUID_ContainerFormatRaw;
-		//wicFormat = CLSID_WICRAWDecoder;
 
 	_M(hr, m_pWICFactory->CreateEncoder(wicFormat, nullptr, pEncoder.GetAddressOf()));
 	_M(hr, pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache));
@@ -1500,6 +1634,14 @@ HRESULT CSCD2Image::on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swa
 	return S_OK;
 }
 */
+
+ID2D1Bitmap1* CSCD2Image::get_frame_img(int index)
+{
+	if (m_img.size() == 0 || index < 0 || index >= m_img.size())
+		return nullptr;
+
+	return m_img[index].Get();
+}
 
 float CSCD2Image::get_width()
 {

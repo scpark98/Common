@@ -16367,6 +16367,96 @@ template<class T> void quicksort(T& v, int end, int start, bool bAscending)
 //기억된 좌표대로 복원하여 표시한다.
 //단, 그 크기가 모니터 밖이면 CenterWindow()를,
 //크기가 invalid하다면 원래 크기로 표시한다.
+//20260211 scpark
+//::SetWindowPos() / MoveWindow() / CenterWindow() 혼용, main에서 SWP_NOACTIVATE을 사용해도 유지되지 않는 문제 등
+//여러가지 문제로 인해 WINDOWPLACEMENT 구조체를 이용해서 복원되도록 변경.
+void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool use_maximize, bool resize_window, bool force_primary_monitor)
+{
+	if (!pApp || !pWnd || !pWnd->GetSafeHwnd())
+		return;
+
+	CString sSection = sSubSection.IsEmpty() ? _T("screen") : sSubSection + _T("\\screen");
+
+	// WINDOWPLACEMENT 구조체 복원
+	WINDOWPLACEMENT wp = {};
+	wp.length = sizeof(WINDOWPLACEMENT);
+
+	// 현재 창의 placement를 기본값으로 가져옴
+	pWnd->GetWindowPlacement(&wp);
+
+	// 레지스트리에서 저장된 좌표 읽기
+	CRect rc;
+#if (_MSVC_LANG >= _std_cpp17)
+	rc = get_profile_value(sSection, _T("position"), CRect());
+#else
+	rc.left = pApp->GetProfileInt(sSection, _T("left"), 0);
+	rc.top = pApp->GetProfileInt(sSection, _T("top"), 0);
+	rc.right = pApp->GetProfileInt(sSection, _T("right"), 0);
+	rc.bottom = pApp->GetProfileInt(sSection, _T("bottom"), 0);
+#endif
+
+	// 저장된 값이 없으면 (모두 0) 중앙 표시
+	if (rc.IsRectNull())
+	{
+		pWnd->CenterWindow();
+		return;
+	}
+
+	// 유효한 사각형인지 확인 (최소 10x10)
+	if (rc.IsRectEmpty() || rc.Width() <= 10 || rc.Height() <= 10)
+	{
+		pWnd->CenterWindow();
+		return;
+	}
+
+	// force_primary_monitor : 주 모니터 작업 영역 내로 강제 이동
+	if (force_primary_monitor)
+	{
+		enum_display_monitors();
+		if (!g_monitors.empty())
+		{
+			CRect rWork = g_monitors[0].rMonitor;
+			// 창 크기 유지하면서 주 모니터 중앙에 배치
+			int x = rWork.left + (rWork.Width() - rc.Width()) / 2;
+			int y = rWork.top + (rWork.Height() - rc.Height()) / 2;
+			rc.MoveToXY(x, y);
+		}
+	}
+	else
+	{
+		// 창의 복원 위치가 어떤 모니터에도 걸쳐있지 않으면 중앙 표시
+		int index = get_monitor_index(rc);
+		if (index < 0)
+		{
+			pWnd->CenterWindow();
+			return;
+		}
+	}
+
+	// WINDOWPLACEMENT로 일괄 복원
+	// resize_window가 false이면 현재 창 크기 유지 (저장된 위치만 적용)
+	if (!resize_window)
+	{
+		CRect rcCurrent;
+		pWnd->GetWindowRect(&rcCurrent);
+		rc.right = rc.left + rcCurrent.Width();
+		rc.bottom = rc.top + rcCurrent.Height();
+	}
+
+	wp.rcNormalPosition = rc;
+	wp.flags = 0;
+
+	// maximized 복원 여부
+	if (use_maximize && pApp->GetProfileInt(sSection, _T("maximized"), FALSE))
+		wp.showCmd = SW_SHOWMAXIMIZED;
+	else
+		wp.showCmd = SW_SHOWNORMAL;
+
+	// SetWindowPlacement는 모니터 밖 좌표를 자동 보정하고,
+	// maximized/minimized 상태까지 한 번에 처리한다.
+	pWnd->SetWindowPlacement(&wp);
+}
+/*
 void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool use_maximize, bool resize_window, bool force_primary_monitor)
 {
 	CRect	rc;
@@ -16425,12 +16515,38 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	if (use_maximize && pApp->GetProfileInt(sSection, _T("maximized"), false))
 		pWnd->ShowWindow(SW_SHOWMAXIMIZED);
 }
-
+*/
 //OnBnClickedCancel()과 같이 프로그램이 종료될 때 호출한다.
 //OnWindowPosChanged()에서 매번 호출했었으나 
 //OnInitDialog에서 RestoreWindowPosition를 호출할 때
 //OnWindowPosChanged가 호출되면서 maximized 정보가 false로 초기화되어 버린다.
 //sSubSection이 존재하면 그 이름에 "\\screen"을 붙여서 저장한다.
+void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
+{
+	if (!pApp || !pWnd || !pWnd->GetSafeHwnd() || !pWnd->IsWindowVisible() || pWnd->IsIconic())
+		return;
+
+	CString sSection = sSubSection.IsEmpty() ? _T("screen") : sSubSection + _T("\\screen");
+
+	// WINDOWPLACEMENT 한 번으로 모든 정보 획득
+	WINDOWPLACEMENT wp = {};
+	wp.length = sizeof(WINDOWPLACEMENT);
+	pWnd->GetWindowPlacement(&wp);
+
+	// maximized 상태인 경우에도 rcNormalPosition에는 복원 시의 위치가 들어있다.
+	// 따라서 IsZoomed() 체크 없이 항상 저장 가능.
+	pApp->WriteProfileInt(sSection, _T("maximized"), (wp.showCmd == SW_SHOWMAXIMIZED));
+
+#if (_MSVC_LANG >= _std_cpp17)
+	write_profile_value(sSection, _T("position"), CRect(wp.rcNormalPosition));
+#else
+	pApp->WriteProfileInt(sSection, _T("left"), wp.rcNormalPosition.left);
+	pApp->WriteProfileInt(sSection, _T("top"), wp.rcNormalPosition.top);
+	pApp->WriteProfileInt(sSection, _T("right"), wp.rcNormalPosition.right);
+	pApp->WriteProfileInt(sSection, _T("bottom"), wp.rcNormalPosition.bottom);
+#endif
+}
+/*
 void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pWnd || !pWnd->m_hWnd || pWnd->IsWindowVisible() == false || pWnd->IsIconic())
@@ -16460,8 +16576,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 #endif
 	}
 }
-
-
+*/
 double YY[256], BU[256], GV[256], GU[256], RV[256];
 unsigned char YUV_B[256][256];
 unsigned char YUV_R[256][256];

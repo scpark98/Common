@@ -1879,6 +1879,17 @@ void CSCD2Image::step(int interval)
 	::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 }
 
+int CSCD2Image::get_frame_delay(int index)
+{
+	if (m_img.size() <= 1)
+		return 0;
+
+	if (index >= m_img.size())
+		return -1;
+
+	return m_frame_delay[index];
+}
+
 void CSCD2Image::play()
 {
 	if (m_img.size() <= 1)
@@ -2208,9 +2219,12 @@ bool ConvertPBGRAtoBGRA(
 	return true;
 }
 
-bool CSCD2Image::copy_to_clipboard()
+bool CSCD2Image::copy_to_clipboard(int index)
 {
-	if (!m_img[m_frame_index])
+	if (index < 0 || index >= get_frame_count())
+		index = m_frame_index;
+
+	if (!m_img[index])
 		return false;
 
 	//20260203 GPT에 물어보며 아래와 같은 방법으로 구현해봤으나 계속 검은 화면만 클립보드로 복사된다.
@@ -2218,7 +2232,7 @@ bool CSCD2Image::copy_to_clipboard()
 	CString temp_file;
 	
 	temp_file.Format(_T("%s\\__asee_temp__.png"), get_known_folder(CSIDL_APPDATA));
-	HRESULT hr = save(temp_file);
+	HRESULT hr = save(m_img[index].Get(), 1.0f, temp_file);
 
 	if (FAILED(hr))
 		return false;

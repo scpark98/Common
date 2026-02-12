@@ -10,7 +10,7 @@
 #include <deque>
 #include "../colors.h"
 #include "../SCGdiplusBitmap.h"
-#include "../thread/thread_manager.h"
+#include "../thread/ThreadManager.h"
 #include "../CEdit/SCEdit/SCEdit.h"
 
 

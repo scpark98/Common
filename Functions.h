@@ -1706,7 +1706,18 @@ struct	NETWORK_INFO
 		}
 		else if constexpr (std::is_same_v<T, float>)
 		{
-			return pApp->GetProfileInt(section, entry, default_value);
+			float* f;
+			float res;
+			UINT size = sizeof(float);
+			pApp->GetProfileBinary(section, entry, reinterpret_cast<LPBYTE*>(&f), &size);
+
+			if (f == NULL || size != sizeof(float))
+				res = default_value;
+			else
+				res = *f;
+
+			delete f;
+			return res;
 		}
 		else if constexpr (std::is_same_v<T, double>)
 		{
@@ -2165,6 +2176,17 @@ h		: 복사할 height 크기(pixel)
 							UINT align = DT_CENTER | DT_VCENTER,
 							bool show_text = true,
 							bool show_shadow = true);
+	CRect		draw_text(ID2D1DeviceContext* d2dc,
+							D2D1_RECT_F rTarget,
+							CString text,
+							CString font_name = _T("맑은 고딕"),
+							float font_size = 12.0f,
+							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
+							Gdiplus::Color cr_text = Gdiplus::Color::Black,
+							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+							UINT align = DT_CENTER | DT_VCENTER,
+							bool show_text = true,
+							bool show_shadow = true);
 #endif
 
 	void		unpremultiply(BYTE* p, UINT pixelCount);
@@ -2382,12 +2404,14 @@ h		: 복사할 height 크기(pixel)
 	CRect			make_center_rect(int cx, int cy, int w, int h);
 	Gdiplus::Rect	make_center_gprect(int cx, int cy, int w, int h);
 	D2D1_RECT_F		make_center_d2rect(float cx, float cy, float w, float h);
+	void			inflate_rect(D2D1_RECT_F& r, float x, float y);
 	CRect			gpRect_to_CRect(Gdiplus::Rect r);
 	CRect			gpRectF_to_CRect(Gdiplus::RectF r);
 	Gdiplus::Rect	CRect_to_gpRect(CRect r);
 	Gdiplus::RectF	CRect_to_gpRectF(CRect r);
 	D2D1_RECT_F		CRect_to_d2Rect(CRect r);
 	CRect			d2RectF_to_CRect(D2D1_RECT_F r);
+	Gdiplus::RectF	d2RectF_to_gpRectF(D2D1_RECT_F r);
 	D2D1_RECT_F		gpRectF_to_d2Rect(Gdiplus::RectF r);
 
 

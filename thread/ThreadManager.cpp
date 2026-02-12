@@ -1,4 +1,4 @@
-#include "thread_manager.h"
+#include "ThreadManager.h"
 
 #define MAX_THREAD 40
 

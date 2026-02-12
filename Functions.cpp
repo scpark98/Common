@@ -6740,11 +6740,26 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				bool show_text,
 				bool show_shadow)
 {
-	return draw_text(d2dc, Gdiplus::RectF(rTarget.left, rTarget.top, rTarget.Width(), rTarget.Height()), text, font_name, font_size, font_weight, cr_text, cr_shadow, align, show_text, show_shadow);
+	return draw_text(d2dc, D2D1::RectF(rTarget.left, rTarget.top, rTarget.right, rTarget.bottom), text, font_name, font_size, font_weight, cr_text, cr_shadow, align, show_text, show_shadow);
 }
 
 CRect draw_text(ID2D1DeviceContext* d2dc,
 				Gdiplus::RectF rTarget,
+				CString text,
+				CString font_name,
+				float font_size,
+				int font_weight,
+				Gdiplus::Color cr_text,
+				Gdiplus::Color cr_shadow,
+				UINT align,
+				bool show_text,
+				bool show_shadow)
+{
+	return draw_text(d2dc, D2D1::RectF(rTarget.X, rTarget.Y, rTarget.GetRight(), rTarget.GetBottom()), text, font_name, font_size, font_weight, cr_text, cr_shadow, align, show_text, show_shadow);
+}
+
+CRect draw_text(ID2D1DeviceContext* d2dc,
+				D2D1_RECT_F rTarget,
 				CString text,
 				CString font_name,
 				float font_size,
@@ -6787,7 +6802,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	//);
 
 	float line_spacing = 1.5f;
-	write_factory->CreateTextLayout(text, text.GetLength(), write_format, rTarget.Width, rTarget.Height, &text_layout);
+	write_factory->CreateTextLayout(text, text.GetLength(), write_format, rTarget.right - rTarget.left, rTarget.bottom - rTarget.top, &text_layout);
 
 	if (text_layout == nullptr)
 		return CRect();
@@ -6806,18 +6821,18 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	std::vector<DWRITE_LINE_METRICS> lines(lineCount);
 	text_layout->GetLineMetrics(lines.data(), lineCount, &lineCount);
 
-	float x = rTarget.X;
-	float y = rTarget.Y;
+	float x = rTarget.left;
+	float y = rTarget.top;
 
 	if (align & DT_RIGHT)
-		x = rTarget.GetRight() - tm.widthIncludingTrailingWhitespace;
+		x = rTarget.right - tm.widthIncludingTrailingWhitespace;
 	else if (align & DT_CENTER)
-		x = rTarget.X + (rTarget.Width - tm.widthIncludingTrailingWhitespace) * 0.5f;
+		x = rTarget.left + ((rTarget.right - rTarget.left) - tm.widthIncludingTrailingWhitespace) * 0.5f;
 
 	if (align & DT_BOTTOM)
-		y = rTarget.GetBottom() - tm.height;
+		y = rTarget.bottom- tm.height;
 	else if (align & DT_VCENTER)
-		y = rTarget.Y + (rTarget.Height - tm.height) * 0.5f;// +(lines[0].height - lines[0].baseline);
+		y = rTarget.top + ((rTarget.bottom - rTarget.top) - tm.height) * 0.5f;// +(lines[0].height - lines[0].baseline);
 	/*
 	text_layout->Release();
 	write_factory->CreateTextLayout(text, text.GetLength(), write_format, tm.widthIncludingTrailingWhitespace, tm.height, &text_layout);
@@ -7546,6 +7561,14 @@ D2D1_RECT_F	make_center_d2rect(float cx, float cy, float w, float h)
 	r.right = cx + w;
 	r.bottom = cy + h;
 	return r;
+}
+
+void inflate_rect(D2D1_RECT_F& r, float x, float y)
+{
+	r.left -= x;
+	r.right += x;
+	r.top -= y;
+	r.bottom += y;
 }
 
 CRect getCenterRect(int cx, int cy, int w, int h)
@@ -20800,6 +20823,11 @@ bool set_privilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
 	AdjustTokenPrivileges(hToken, FALSE, &tp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
 
 	return ((GetLastError() != ERROR_SUCCESS) ? false : true);
+}
+
+Gdiplus::RectF	d2RectF_to_gpRectF(D2D1_RECT_F r)
+{
+	return Gdiplus::RectF(r.left, r.top, r.right, r.bottom);
 }
 
 D2D1_RECT_F gpRectF_to_d2Rect(Gdiplus::RectF r)

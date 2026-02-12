@@ -194,11 +194,13 @@ public:
 
 	void					convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride);
 
-	bool					copy_to_clipboard();
+	//index 위치의 이미지를 클립보드로 복사한다. 0보다 작으면 현재 프레임 이미지를 클립보드로 복사한다.
+	bool					copy_to_clipboard(int index = -1);
 
 //animated gif
 	bool					is_animated_image() { return (m_img.size() > 1); }
 	int						get_frame_count() { return m_img.size(); }
+	int						get_frame_delay(int index);
 	void					set_parent(HWND hWnd) { m_parent = hWnd; }
 	void					play();
 	void					pause(int pos = -1);

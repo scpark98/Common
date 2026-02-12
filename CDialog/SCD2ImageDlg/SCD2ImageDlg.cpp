@@ -42,28 +42,30 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	dwStyle &= ~(WS_CAPTION);
 	SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
 
-	CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
-	m_static_pixel.create(_T("A 0\nR 0\nG 0\nB 0"), WS_CHILD | SS_CENTER | SS_CENTERIMAGE, r_pixel, this);
-	m_static_pixel.sunken();
-	m_static_pixel.set_font_name(_T("Consolas"));
-	m_static_pixel.set_font_size(10);
+	if (!m_simple_mode)
+	{
+		CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
+		m_static_pixel.create(_T("A 0\nR 0\nG 0\nB 0"), WS_CHILD | SS_CENTER | SS_CENTERIMAGE, r_pixel, this);
+		m_static_pixel.sunken();
+		m_static_pixel.set_font_name(_T("Consolas"));
+		m_static_pixel.set_font_size(10);
 
-	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
-	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
-	m_slider_gif.set_track_height(GIF_SLIDER_HEIGHT);
-	m_slider_gif.set_font_name(_T("Arial"));
-	m_slider_gif.set_font_size(8);
-	m_slider_gif.set_inactive_color(gGRAY(192));
-	m_slider_gif.draw_progress_border();
-	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
-	m_slider_gif.set_use_slide();
+		res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
+		m_slider_gif.set_style(CSCSliderCtrl::style_progress);
+		m_slider_gif.set_track_height(GIF_SLIDER_HEIGHT);
+		m_slider_gif.set_font_name(_T("Arial"));
+		m_slider_gif.set_font_size(8);
+		m_slider_gif.set_inactive_color(gGRAY(192));
+		m_slider_gif.draw_progress_border();
+		m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
+		m_slider_gif.set_use_slide();
 
-	//m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
+		//m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
 
-	m_thumb.create(this);
-	m_thumb.set_color_theme(CSCColorTheme::color_theme_dark_gray);
-	m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
-
+		m_thumb.create(this);
+		m_thumb.set_color_theme(CSCColorTheme::color_theme_dark_gray);
+		m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
+	}
 
 	m_d2dc.init(m_hWnd);
 
@@ -78,14 +80,18 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Ivory), &m_brush);
 	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(1.f, 1.f, 1.f, 0.2f), &m_brush_pixel_guide);
 
-	set_image_roi(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), Gdiplus::RectF()));
-	set_show_roi_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show roi info"), m_show_roi_info));
-	set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel"), false));
-	set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel_pos"), true));
-	set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show info"), false));
+	if (!m_simple_mode)
+	{
+		set_image_roi(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), Gdiplus::RectF()));
+		set_show_roi_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show roi info"), m_show_roi_info));
+		set_show_pixel(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel"), false));
+		set_show_pixel_pos(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show pixel_pos"), true));
+		set_show_info(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show info"), false));
+		set_show_cursor_guide_line(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show cursor guide line"), false));
+		set_interpolation_mode((D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR));
+	}
+
 	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), true));
-	set_show_cursor_guide_line(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("show cursor guide line"), false));
-	set_interpolation_mode((D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR));
 
 	if (!m_fit2ctrl)
 		zoom(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), 1.0));
@@ -152,7 +158,18 @@ void CSCD2ImageDlg::OnPaint()
 
 	if (m_img.size() == 0 || m_img[0].is_empty())
 	{
-		dc.SelectClipRgn(nullptr);
+		if (m_simple_mode)
+		{
+			HRESULT hr = d2dc->EndDraw();
+
+			if (SUCCEEDED(hr))
+				hr = m_d2dc.get_swapchain()->Present(0, 0);
+
+			return;
+		}
+
+		//dc.SelectClipRgn(nullptr);
+
 
 		CString msg;
 
@@ -765,6 +782,12 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 	if (m_static_pixel.m_hWnd == nullptr)
 		return;
 
+	m_d2dc.on_size_changed(cx, cy);
+	Invalidate();
+
+	if (m_simple_mode)
+		return;
+
 	CRect rc;
 	GetClientRect(rc);
 
@@ -772,14 +795,11 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 	m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 
 	//m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), cx, cy);
-	m_d2dc.on_size_changed(cx, cy);
 
 	m_r_pixel_pos = rc;
 	m_r_pixel_pos.DeflateRect(4, 4);
 	m_r_pixel_pos.left = m_r_pixel_pos.right - 100;
 	m_r_pixel_pos.top = m_r_pixel_pos.bottom - 16;
-
-	Invalidate();
 
 	if (m_show_pixel)
 	{
@@ -790,7 +810,12 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 
 void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_simple_mode)
+	{
+		CDialog::OnLButtonDown(nFlags, point);
+		return;
+	}
+
 	Clamp(point.x, m_r_display.left, m_r_display.right);
 	Clamp(point.y, m_r_display.top, m_r_display.bottom);
 
@@ -834,7 +859,12 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_simple_mode)
+	{
+		CDialog::OnLButtonUp(nFlags, point);
+		return;
+	}
+
 	if (m_lbutton_down)
 	{
 		ReleaseCapture();
@@ -898,7 +928,12 @@ void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (m_simple_mode)
+	{
+		CDialog::OnMouseMove(nFlags, point);
+		return;
+	}
+
 	TRACKMOUSEEVENT tme;
 	tme.cbSize = sizeof(tme);
 	tme.hwndTrack = m_hWnd;

@@ -1,5 +1,16 @@
 ﻿/*
-[수정할 내용]
+* 20250519 scpark
+- ASee, TesseractOcrDlg 등과 같이 이미지를 디스플레이하고 +, -키로 확대 축소, 드래그로 이동, 선택영역 처리 등
+  이러한 용도의 전용 클래스 필요성에 의해 제작함.
+  create()을 이용해서 parent의 child로 동적 생성하며
+  마우스, 키보드까지 모두 처리하기 위해 CStatic이 아닌 CDialog로 제작함.
+
+- HoneyView나 BandiView와 같이 이미지 파일 브라우저 목적으로 시작했으며
+  폴더 파일 검색, 이미지 목록 유지, 썸네일 뷰 스위칭, ROI 설정, 픽셀정보, 사진정보 추출 등 부가 기능이 많아지므로
+  단일 이미지를 표시하는 용도로 사용할 경우는 set_simple_mode(true)로 설정하여 사용한다.
+  simple mode에서는 이미지 표시 및 확대 축소, animated image play만 처리한다.
+
+  [수정할 내용]
 - ROI를 그린 후 확대된 이미지를 드래그 할 때 ROI 또한 같이 이동되어야 한다.
 
 [수정한 내용]
@@ -8,12 +19,7 @@
   단, 이럴 경우는 자동 회전되었음을 알도록 우측 하단에 회전된 정보 아이콘을 표시해줘야 한다.
 - 카메라 촬영 정보 관련 exif 정보 표시, 위도경도 정보를 이용한 지도 열기 추가할 것
 
-* 20250519 scpark
-- ASee, TesseractOcrDlg 등과 같이 이미지를 디스플레이하고 +, -키로 확대 축소, 드래그로 이동, 선택영역 처리 등
-  이러한 용도의 전용 클래스 필요성에 의해 제작함.
-  create()을 이용해서 parent의 child로 동적 생성하며
-  마우스, 키보드까지 모두 처리하기 위해 CStatic이 아닌 CDialog로 제작함.
-	
+
 * [이미지 로딩 관련]
 - 한 이미지를 로딩하고 표시하면서 그 이미지가 포함된 폴더내의 모든 이미지 목록을 유지는 것은
   이 클래스에서? 메인에서?
@@ -77,6 +83,9 @@ public:
 	CSCD2ImageDlg(CWnd* parent = nullptr);   // 표준 생성자입니다.
 	virtual ~CSCD2ImageDlg();
 
+	//create() 호출 전에 미리 설정해야 한다. create() 호출 후에는 적용되지 않는다.
+	//default로 simple_mode로 동작되므로 BandiView와 같은 이미지 브라우저로 동작시킬 경우는 set_simple_mode(false)로 설정해야 한다.
+	void			set_simple_mode(bool simple = true) { m_simple_mode = simple; }
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
 	enum ENUM_VIEW_MODE
@@ -238,6 +247,8 @@ protected:
 		timer_slide_show = 0,
 		timer_thread_buffering,
 	};
+
+	bool					m_simple_mode = true;
 
 	std::mutex				m_mutex;
 

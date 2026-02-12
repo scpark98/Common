@@ -16375,7 +16375,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	if (!pApp || !pWnd || !pWnd->GetSafeHwnd())
 		return;
 
-	CString sSection = sSubSection.IsEmpty() ? _T("screen") : sSubSection + _T("\\screen");
+	CString sSection = sSubSection.IsEmpty() ? CString("screen") : sSubSection + CString("\\screen");
 
 	// WINDOWPLACEMENT 구조체 복원
 	WINDOWPLACEMENT wp = {};
@@ -16526,7 +16526,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 	if (!pApp || !pWnd || !pWnd->GetSafeHwnd() || !pWnd->IsWindowVisible() || pWnd->IsIconic())
 		return;
 
-	CString sSection = sSubSection.IsEmpty() ? _T("screen") : sSubSection + _T("\\screen");
+	CString sSection = sSubSection.IsEmpty() ? CString("screen") : sSubSection + CString("\\screen");
 
 	// WINDOWPLACEMENT 한 번으로 모든 정보 획득
 	WINDOWPLACEMENT wp = {};

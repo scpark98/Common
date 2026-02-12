@@ -227,7 +227,7 @@ void CMacProgressCtrl::OnPaint()
 				{
 					Gdiplus::Pen pen(RGB2gpColor(m_cr_back_track), rtrack.Height());
 					pen.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
-					g.DrawLine(&pen, rc.left + rtrack.Height() / 2, rtrack.CenterPoint().y, rc.right - rtrack.Height() / 2 - 1, rtrack.CenterPoint().y);
+					g.DrawLine(&pen, (INT)(rc.left + rtrack.Height() / 2), (INT)(rtrack.CenterPoint().y), (INT)(rc.right - rtrack.Height() / 2 - 1), (INT)(rtrack.CenterPoint().y));
 				}
 				else
 				{

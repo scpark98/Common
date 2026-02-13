@@ -42,6 +42,16 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	dwStyle &= ~(WS_CAPTION);
 	SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
 
+	res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
+	m_slider_gif.set_style(CSCSliderCtrl::style_progress);
+	m_slider_gif.set_track_height(GIF_SLIDER_HEIGHT);
+	m_slider_gif.set_font_name(_T("Arial"));
+	m_slider_gif.set_font_size(8);
+	m_slider_gif.set_inactive_color(gGRAY(192));
+	m_slider_gif.draw_progress_border();
+	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
+	m_slider_gif.set_use_slide();
+
 	if (!m_simple_mode)
 	{
 		CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
@@ -49,16 +59,6 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 		m_static_pixel.sunken();
 		m_static_pixel.set_font_name(_T("Consolas"));
 		m_static_pixel.set_font_size(10);
-
-		res = m_slider_gif.Create(WS_CHILD, make_rect(x + 8, y + cy - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT), this, 0);
-		m_slider_gif.set_style(CSCSliderCtrl::style_progress);
-		m_slider_gif.set_track_height(GIF_SLIDER_HEIGHT);
-		m_slider_gif.set_font_name(_T("Arial"));
-		m_slider_gif.set_font_size(8);
-		m_slider_gif.set_inactive_color(gGRAY(192));
-		m_slider_gif.draw_progress_border();
-		m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
-		m_slider_gif.set_use_slide();
 
 		//m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
 
@@ -244,7 +244,7 @@ void CSCD2ImageDlg::OnPaint()
 	m_img[0].draw(d2dc, CRect_to_d2Rect(m_r_display));
 
 	//이미지 정보 표시
-	if (m_show_info)// && m_parent->IsZoomed())
+	if (!m_simple_mode && m_show_info)// && m_parent->IsZoomed())
 	{
 		CString info_str;
 		info_str.Format(_T("%s\n확대 배율: %.0f%%\n표시 크기: %d x %d"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
@@ -264,7 +264,7 @@ void CSCD2ImageDlg::OnPaint()
 
 	//dc에 그릴 경우 d2devicecontext가 그려지고 dc에 그려지므로 깜빡임이 발생한다.
 	//반드시 CDC로 그려야 하는 경우가 아니라면 d2dc에 그려야 한다.
-	if (m_show_pixel_pos && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
+	if (!m_simple_mode && m_show_pixel_pos && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
 	{
 		CString pixel_pos;
 		pixel_pos.Format(_T("(%.f, %.f)"), m_pixel_pos.X, m_pixel_pos.Y);
@@ -277,69 +277,71 @@ void CSCD2ImageDlg::OnPaint()
 		draw_text(d2dc, rText, pixel_pos, _T("맑은 고딕"), 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_RIGHT | DT_TOP);
 	}
 
-
-	//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
-	if (!m_image_roi.IsEmptyArea() && m_screen_roi.IsEmptyArea())
-		get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
-
-	CRect screen_roi = gpRectF_to_CRect(m_screen_roi);
-	screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
-	screen_roi.NormalizeRect();
-
-	//ID2D1SolidColorBrush *br_red = nullptr;
-	//d2dc->CreateSolidColorBrush(D2D1::ColorF(1.0f, 0.25f, 0.0f, 0.8f), &br_red);
-
-	//ID2D1SolidColorBrush* br_roi;
-	//d2dc->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.12f, 1.0f, 0.25f), &br_roi);
-
-	if (m_lbutton_down)// && m_drawing_roi)
+	if (!m_simple_mode)
 	{
-		//d2dc->DrawRectangle(convert(screen_roi), br_red);
-		//d2dc->FillRectangle(convert(screen_roi), br_roi);
-		//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
-		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(48, 0, 32, 255));
-	}
-	else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
-	{
-		//이미지 확대 축소 등에 의해 m_r_display가 변경되면 그에 따라 m_screen_roi도 다시 계산해줘야 한다.
-		get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
-		m_screen_roi.Offset(m_offset.x, m_offset.y);
-		screen_roi = gpRectF_to_CRect(m_screen_roi);
+		//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
+		if (!m_image_roi.IsEmptyArea() && m_screen_roi.IsEmptyArea())
+			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
+
+		CRect screen_roi = gpRectF_to_CRect(m_screen_roi);
 		screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
-		//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
-		//screen_roi.OffsetRect(m_offset);
-		//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
-		//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
-		//d2dc->FillRectangle(convert(screen_roi), br_roi);
-		draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(48, 0, 32, 255));
-	}
+		screen_roi.NormalizeRect();
 
-	if (!m_screen_roi.IsEmptyArea())
-	{
-		Gdiplus::RectF image_roi;
-		get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), CRect_to_gpRectF(screen_roi), &image_roi);
-		get_resizable_handle(screen_roi, m_roi_handle, 4);
+		//ID2D1SolidColorBrush *br_red = nullptr;
+		//d2dc->CreateSolidColorBrush(D2D1::ColorF(1.0f, 0.25f, 0.0f, 0.8f), &br_red);
 
-		//image_roi 역시 normalize_rect을 해줘야 한다. 그렇지 않으면 뒤집어 그릴 경우 x1,y1이 x2, y2보다 큰 좌표로 표시된다.
-		normalize_rect(image_roi);
+		//ID2D1SolidColorBrush* br_roi;
+		//d2dc->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.12f, 1.0f, 0.25f), &br_roi);
 
-		if (m_show_roi_info)
+		if (m_lbutton_down)// && m_drawing_roi)
 		{
-			//9군데 조절 핸들을 그려준다.
-			for (int i = 1; i < RECT_RESIZE_HANDLE_COUNT; i++)
-				draw_rect(d2dc, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(64, 255, 32, 0));
+			//d2dc->DrawRectangle(convert(screen_roi), br_red);
+			//d2dc->FillRectangle(convert(screen_roi), br_roi);
+			//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+			draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(48, 0, 32, 255));
+		}
+		else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
+		{
+			//이미지 확대 축소 등에 의해 m_r_display가 변경되면 그에 따라 m_screen_roi도 다시 계산해줘야 한다.
+			get_screen_coord_from_real_coord(m_r_display, m_img[0].get_width(), m_image_roi, &m_screen_roi);
+			m_screen_roi.Offset(m_offset.x, m_offset.y);
+			screen_roi = gpRectF_to_CRect(m_screen_roi);
+			screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
+			//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
+			//screen_roi.OffsetRect(m_offset);
+			//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
+			//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
+			//d2dc->FillRectangle(convert(screen_roi), br_roi);
+			draw_rect(d2dc, screen_roi, Gdiplus::Color(0, 120, 212), Gdiplus::Color(48, 0, 32, 255));
+		}
 
-			//lt coord
-			str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
-			draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
+		if (!m_screen_roi.IsEmptyArea())
+		{
+			Gdiplus::RectF image_roi;
+			get_real_coord_from_screen_coord(m_r_display, m_img[0].get_width(), CRect_to_gpRectF(screen_roi), &image_roi);
+			get_resizable_handle(screen_roi, m_roi_handle, 4);
 
-			//rb coord
-			str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
-			draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_RIGHT | DT_BOTTOM);
+			//image_roi 역시 normalize_rect을 해줘야 한다. 그렇지 않으면 뒤집어 그릴 경우 x1,y1이 x2, y2보다 큰 좌표로 표시된다.
+			normalize_rect(image_roi);
 
-			//size info
-			str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
-			draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_CENTER | DT_VCENTER);
+			if (m_show_roi_info)
+			{
+				//9군데 조절 핸들을 그려준다.
+				for (int i = 1; i < RECT_RESIZE_HANDLE_COUNT; i++)
+					draw_rect(d2dc, m_roi_handle[i], Gdiplus::Color::Red, Gdiplus::Color(64, 255, 32, 0));
+
+				//lt coord
+				str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
+				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
+
+				//rb coord
+				str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
+				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_RIGHT | DT_BOTTOM);
+
+				//size info
+				str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
+				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_CENTER | DT_VCENTER);
+			}
 		}
 	}
 
@@ -399,7 +401,8 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_RETURN :
 			case VK_ESCAPE :
-				m_thumb.stop_loading();
+				if (m_thumb.GetSafeHwnd())
+					m_thumb.stop_loading();
 				return FALSE;
 			case VK_SPACE :
  				if (m_img[0].is_animated_image())
@@ -559,7 +562,7 @@ bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs)
 		rerender();
 	}
 
-	if (m_thumb.size() == 0 || load_thumbs)
+	if (!m_simple_mode && m_thumb.GetSafeHwnd() && (m_thumb.size() == 0 || load_thumbs))
 		m_thumb.set_path(get_part(sFile, fn_folder));
 
 	return (hr == S_OK);
@@ -600,7 +603,9 @@ void CSCD2ImageDlg::release()
 	//for (auto img : m_img)
 	//	img.release();
 
-	m_thumb.release_thumb(-1);
+	if (m_thumb.GetSafeHwnd())
+		m_thumb.release_thumb(-1);
+
 	rerender();
 }
 
@@ -779,22 +784,25 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 	CDialog::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (m_static_pixel.m_hWnd == nullptr)
+	if (m_d2dc.get_d2dc() == nullptr)
 		return;
 
 	m_d2dc.on_size_changed(cx, cy);
 	Invalidate();
 
-	if (m_simple_mode)
-		return;
-
 	CRect rc;
 	GetClientRect(rc);
 
-	m_thumb.MoveWindow(rc);
+	if (m_thumb.GetSafeHwnd())
+		m_thumb.MoveWindow(rc);
+
 	m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 
-	//m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), cx, cy);
+	if (m_simple_mode)
+		return;
+
+	if (m_static_pixel.m_hWnd == nullptr)
+		return;
 
 	m_r_pixel_pos = rc;
 	m_r_pixel_pos.DeflateRect(4, 4);
@@ -1272,7 +1280,7 @@ LRESULT CSCD2ImageDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
 
 	if (msg->message == CSCD2Image::message_frame_changed)
 	{
-		//TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
+		TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
 		m_slider_gif.set_pos(msg->frame_index);
 		rerender();
 	}
@@ -1476,6 +1484,9 @@ LRESULT CSCD2ImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 
 void CSCD2ImageDlg::set_view_mode(int view_mode)
 {
+	if (m_simple_mode)
+		return;
+
 	if (view_mode == view_mode_toggle)
 		m_show_thumb = !m_show_thumb;
 	else if (view_mode == view_mode_image)
@@ -1907,4 +1918,38 @@ void CSCD2ImageDlg::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	trace(zDelta);
 	CDialog::OnMouseHWheel(nFlags, zDelta, pt);
+}
+
+//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할수도, 이미 불러온 CSCD2Image를 표시할수도 있다.
+void CSCD2ImageDlg::set_image(CSCD2Image* pImage)
+{
+	if (!pImage || pImage->is_empty())
+		return;
+
+	m_mutex.lock();
+	m_img.clear();
+	m_img.resize(1);
+
+	pImage->set_parent(m_hWnd);
+	pImage->copy(&m_img[0]);
+	m_mutex.unlock();
+
+	CRect rc;
+	GetClientRect(rc);
+	m_d2dc.on_size_changed(rc.Width(), rc.Height());
+
+	if (m_img[0].get_frame_count() > 1)
+		m_img[0].play();
+	else
+		Invalidate();
+	/*
+	m_filename = m_img[0].get_filename();
+	CRect rc;
+	GetClientRect(rc);
+	//m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), rc.Width(), rc.Height());
+	m_img[0].set_interpolation_mode(m_interpolation_mode);
+	rerender();
+	build_image_info_str();
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_image_changed), 0);
+	*/
 }

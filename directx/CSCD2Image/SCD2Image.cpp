@@ -2,12 +2,21 @@
 
 #include <thread>
 #include <mutex>
+#include <webp/mux.h>
+#include <webp/demux.h>
+#include <webp/encode.h>
+#include <webp/decode.h>
+
 #include "../../SCGdiplusBitmap.h"
 
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "Windowscodecs.lib")
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
+
+#pragma comment(lib, "libwebp.lib")
+#pragma comment(lib, "libwebpmux.lib")
+#pragma comment(lib, "libwebpdemux.lib")
 
 static std::recursive_mutex g_d2d_dc_mutex;
 
@@ -281,6 +290,14 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 
 	hr = load(pWICFactory, d2context, pDecoder.Get());
+
+	// WebP인 경우 실제 프레임 딜레이를 덮어쓴다
+	if (SUCCEEDED(hr))
+	{
+		CString ext = get_part(path, fn_ext).MakeLower();
+		if (ext == _T("webp"))
+			read_webp_frame_delay(path);
+	}
 
 	return hr;
 }
@@ -948,8 +965,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				}
 				else
 				{
-					//TRACE(_T("#%dth frame. delay not fount. assume 30 ms\n"), i);
-					m_frame_delay.push_back(100); // default 30ms
+					//webp는 위 방식으로 읽을 수 없고 파일 로딩 후 read_webp_frame_delay() 함수를 호출해서 다시 불러오도록 구현되어 있다.
+					m_frame_delay.push_back(10);
 				}
 
 				//calling.gif와 같이 1번 프레임부터 변경된 이미지 정보만 저장된 gif의 경우는 disposal 값은 DM_NONE로 추출된다.
@@ -1354,8 +1371,29 @@ void CSCD2Image::convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int 
 	}
 }
 
-#include <webp/mux.h>
-#include <webp/encode.h>
+// un-premultiply만 수행, 채널 순서(BGRA)는 유지
+void CSCD2Image::convert_PBGRA_to_BGRA(byte* pixels, int width, int height, int stride)
+{
+	for (UINT y = 0; y < height; ++y)
+	{
+		BYTE* row = pixels + y * stride;
+
+		for (UINT x = 0; x < width; ++x)
+		{
+			BYTE* px = row + x * 4;
+			BYTE a = px[3];
+
+			if (a > 0 && a < 255)
+			{
+				px[0] = (BYTE)(min(255, px[0] * 255 / a));  // B
+				px[1] = (BYTE)(min(255, px[1] * 255 / a));  // G
+				px[2] = (BYTE)(min(255, px[2] * 255 / a));  // R
+			}
+			// a==0 또는 a==255이면 변환 불필요
+		}
+	}
+}
+
 HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 {
 	//이미지가 정상적으로 로딩되어있지 않은 경우
@@ -1366,6 +1404,7 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 
 	va_list args;
 	va_start(args, path);
+	va_end(args);
 
 	CString filename;
 	filename.FormatV(path, args);
@@ -1374,6 +1413,11 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 	int height = get_height();
 	WebPAnimEncoderOptions enc_options;
 	WebPAnimEncoderOptionsInit(&enc_options);
+
+	// 키프레임 관련 설정: 모든 프레임을 독립적으로 인코딩
+	enc_options.kmin = 0;
+	enc_options.kmax = 0;
+	enc_options.allow_mixed = 1;
 
 	WebPAnimEncoder* enc = WebPAnimEncoderNew(width, height, &enc_options);
 
@@ -1417,11 +1461,18 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 
 		WebPPictureImportRGBA(&pic, pixels, stride);
 
-		WebPAnimEncoderAdd(enc, &pic, timestamp, nullptr);
+		// 프레임별 인코딩 품질 설정
+		WebPConfig config;
+		WebPConfigInit(&config);
+		config.lossless = 1;       // 무손실 (필요 시 0으로 변경)
+		config.quality = 100.0f;
+
+		WebPAnimEncoderAdd(enc, &pic, timestamp, &config);
 
 		timestamp += m_frame_delay[i];
 
 		WebPPictureFree(&pic);
+		cpuBitmap->Unmap();
 	}
 
 	// 마지막 프레임 flush
@@ -1438,12 +1489,12 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 	if (fp == NULL)
 	{
 		TRACE(_T("can't create file : %s\n"), filename);
+		hr = S_FALSE;
 	}
 	else
 	{
 		fwrite(webp_data.bytes, webp_data.size, 1, fp);
 		fclose(fp);
-		hr = S_FALSE;
 	}
 
 	WebPDataClear(&webp_data);
@@ -1947,8 +1998,13 @@ void CSCD2Image::thread_animation()
 	m_run_thread_animation = true;
 	m_thread_animation_terminated = false;
 
+	long t0;
+	long t1;
+
 	while (m_run_thread_animation)
 	{
+		t0 = clock();
+
 		if (m_ani_paused)
 		{
 			if (!m_run_thread_animation)
@@ -1970,8 +2026,9 @@ void CSCD2Image::thread_animation()
 		if (m_frame_delay.size() == 0)
 			break;
 
-		int delay = m_frame_delay[m_frame_index];
-		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+		int elapsed = clock() - t0;
+		int delay = m_frame_delay[m_frame_index] - elapsed;
+		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
 	}
 
 	m_run_thread_animation = false;
@@ -2153,6 +2210,9 @@ int CSCD2Image::get_alpha_pixel_count(bool recount)
 	if (m_alpha_pixel_count >= 0 && !recount)
 		return m_alpha_pixel_count;
 
+	if (m_data == nullptr)
+		return 0;
+
 	byte a;
 	int width = (int)get_width();
 	int height = (int)get_height();
@@ -2224,6 +2284,174 @@ bool CSCD2Image::copy_to_clipboard(int index)
 	if (index < 0 || index >= get_frame_count())
 		index = m_frame_index;
 
+	if (!m_img[index] || !m_d2dc || !m_pWICFactory)
+		return false;
+
+	// 1) 비트맵 크기 (GetSurface 대신 직접 취득)
+	D2D1_SIZE_U px = m_img[index]->GetPixelSize();
+	const UINT width = px.width;
+	const UINT height = px.height;
+	if (width == 0 || height == 0)
+		return false;
+
+	// 2) CPU 읽기 가능한 비트맵 생성
+	D2D1_BITMAP_PROPERTIES1 cpuProps = D2D1::BitmapProperties1(
+		D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+		D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+
+	ComPtr<ID2D1Bitmap1> cpuBitmap;
+	HRESULT hr = m_d2dc->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, &cpuProps, &cpuBitmap);
+	if (FAILED(hr))
+		return false;
+
+	// 3) GPU → CPU 복사
+	hr = cpuBitmap->CopyFromBitmap(nullptr, m_img[index].Get(), nullptr);
+	if (FAILED(hr))
+		return false;
+
+	// 4) Map
+	D2D1_MAPPED_RECT mapped = {};
+	hr = cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped);
+	if (FAILED(hr))
+		return false;
+
+	const UINT stride = width * 4;
+	const UINT imageSize = stride * height;
+
+	// 5) Premultiplied Alpha → Straight Alpha 변환 (BGRA 채널 순서 유지)
+	std::vector<BYTE> pixels(imageSize);
+	for (UINT y = 0; y < height; ++y)
+	{
+		memcpy(pixels.data() + y * stride, mapped.bits + y * mapped.pitch, stride);
+	}
+	convert_PBGRA_to_BGRA(pixels.data(), width, height, stride);
+
+	cpuBitmap->Unmap();
+
+	// 6) CF_DIBV5 생성
+	const UINT totalSize = sizeof(BITMAPV5HEADER) + imageSize;
+	HGLOBAL hDibv5 = GlobalAlloc(GHND, totalSize);
+	if (!hDibv5)
+		return false;
+
+	{
+		BYTE* pData = (BYTE*)GlobalLock(hDibv5);
+		BITMAPV5HEADER* pbv5 = (BITMAPV5HEADER*)pData;
+		ZeroMemory(pbv5, sizeof(*pbv5));
+
+		pbv5->bV5Size = sizeof(BITMAPV5HEADER);
+		pbv5->bV5Width = width;
+		pbv5->bV5Height = -(LONG)height;   // top-down
+		pbv5->bV5Planes = 1;
+		pbv5->bV5BitCount = 32;
+		pbv5->bV5Compression = BI_BITFIELDS;
+		pbv5->bV5SizeImage = imageSize;
+		pbv5->bV5RedMask = 0x00FF0000;
+		pbv5->bV5GreenMask = 0x0000FF00;
+		pbv5->bV5BlueMask = 0x000000FF;
+		pbv5->bV5AlphaMask = 0xFF000000;
+		pbv5->bV5CSType = LCS_sRGB;
+		pbv5->bV5Intent = LCS_GM_IMAGES;
+
+		memcpy(pData + sizeof(BITMAPV5HEADER), pixels.data(), imageSize);
+		GlobalUnlock(hDibv5);
+	}
+
+	// 7) PNG 생성 (alpha 보존의 핵심 ? 많은 앱이 CF_DIBV5 alpha를 무시함)
+	HGLOBAL hPng = nullptr;
+	{
+		ComPtr<IWICBitmap> wicBmp;
+		hr = m_pWICFactory->CreateBitmapFromMemory(
+			width, height,
+			GUID_WICPixelFormat32bppBGRA,
+			stride, imageSize,
+			pixels.data(),
+			&wicBmp);
+
+		if (SUCCEEDED(hr))
+		{
+			ComPtr<IStream> stream;
+			CreateStreamOnHGlobal(nullptr, TRUE, &stream);
+
+			ComPtr<IWICBitmapEncoder> encoder;
+			hr = m_pWICFactory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+
+			if (SUCCEEDED(hr))
+			{
+				encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+
+				ComPtr<IWICBitmapFrameEncode> frame;
+				encoder->CreateNewFrame(&frame, nullptr);
+				frame->Initialize(nullptr);
+				frame->SetSize(width, height);
+
+				WICPixelFormatGUID fmt = GUID_WICPixelFormat32bppBGRA;
+				frame->SetPixelFormat(&fmt);
+				frame->WriteSource(wicBmp.Get(), nullptr);
+				frame->Commit();
+				encoder->Commit();
+
+				// 스트림에서 PNG 데이터를 별도 HGLOBAL에 복사
+				HGLOBAL hStreamMem = nullptr;
+				GetHGlobalFromStream(stream.Get(), &hStreamMem);
+
+				if (hStreamMem)
+				{
+					STATSTG st = {};
+					stream->Stat(&st, STATFLAG_NONAME);
+					SIZE_T pngSize = (SIZE_T)st.cbSize.QuadPart;
+
+					if (pngSize > 0)
+					{
+						hPng = GlobalAlloc(GMEM_MOVEABLE, pngSize);
+						if (hPng)
+						{
+							void* pSrc = GlobalLock(hStreamMem);
+							void* pDst = GlobalLock(hPng);
+							memcpy(pDst, pSrc, pngSize);
+							GlobalUnlock(hPng);
+							GlobalUnlock(hStreamMem);
+						}
+					}
+				}
+			}
+		}
+		// stream 소멸 시 fDeleteOnRelease=TRUE이므로 hStreamMem 자동 해제
+	}
+
+	// 8) 클립보드 등록
+	if (!OpenClipboard(nullptr))
+	{
+		GlobalFree(hDibv5);
+		if (hPng) GlobalFree(hPng);
+		return false;
+	}
+
+	EmptyClipboard();
+
+	// CF_DIBV5 등록
+	if (!SetClipboardData(CF_DIBV5, hDibv5))
+	{
+		GlobalFree(hDibv5);
+		if (hPng) GlobalFree(hPng);
+		CloseClipboard();
+		return false;
+	}
+
+	// PNG 등록 (Photoshop, Chrome 등에서 alpha 인식)
+	if (hPng)
+	{
+		static UINT cfPng = RegisterClipboardFormat(_T("PNG"));
+		if (!SetClipboardData(cfPng, hPng))
+			GlobalFree(hPng);
+	}
+
+	CloseClipboard();
+	return true;
+#if 0
+	if (index < 0 || index >= get_frame_count())
+		index = m_frame_index;
+
 	if (!m_img[index])
 		return false;
 
@@ -2239,6 +2467,7 @@ bool CSCD2Image::copy_to_clipboard(int index)
 
 	CSCGdiplusBitmap img(temp_file);
 	return img.copy_to_clipboard();
+#endif
 
 #if 0
 	// 0) 크기 정보
@@ -2451,6 +2680,46 @@ WICBitmapTransformOptions CSCD2Image::ExifOrientationToWicTransform(USHORT orien
 	case 1:
 	default: return WICBitmapTransformRotate0;
 	}
+}
+
+bool CSCD2Image::read_webp_frame_delay(const CString& path)
+{
+	ULONGLONG file_size = get_file_size(path);
+	if (file_size == 0)
+		return false;
+
+	std::vector<uint8_t> data(file_size);
+	read_raw(path, data.data(), file_size);
+
+	WebPData webp_data;
+	webp_data.bytes = data.data();
+	webp_data.size = data.size();
+
+	WebPDemuxer* demux = WebPDemux(&webp_data);
+	if (!demux)
+		return false;
+
+	uint32_t frame_count = WebPDemuxGetI(demux, WEBP_FF_FRAME_COUNT);
+	if (frame_count <= 1)
+	{
+		WebPDemuxDelete(demux);
+		return false;
+	}
+
+	m_frame_delay.clear();
+
+	WebPIterator iter;
+	if (WebPDemuxGetFrame(demux, 1, &iter))  // 1-based index
+	{
+		do {
+			m_frame_delay.push_back(iter.duration);  // 이미 밀리초 단위
+		} while (WebPDemuxNextFrame(&iter));
+
+		WebPDemuxReleaseIterator(&iter);
+	}
+
+	WebPDemuxDelete(demux);
+	return !m_frame_delay.empty();
 }
 
 void CSCD2Image::apply_orientation_transform()

@@ -192,7 +192,11 @@ public:
 	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
 	HRESULT					save_webp(LPCTSTR path, ...);
 
+	//PBGRA 포맷의 픽셀 데이터를 RGBA 포맷으로 변환한다. un-premultiply와 동시에 B↔R 채널을 교환합니다:
 	void					convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride);
+
+	// un-premultiply만 수행, 채널 순서(BGRA)는 유지
+	void					convert_PBGRA_to_BGRA(byte* pixels, int width, int height, int stride);
 
 	//index 위치의 이미지를 클립보드로 복사한다. 0보다 작으면 현재 프레임 이미지를 클립보드로 복사한다.
 	bool					copy_to_clipboard(int index = -1);
@@ -214,6 +218,9 @@ public:
 	CString					get_exif_str();
 	void					apply_orientation_transform();  // EXIF Orientation 적용
 	WICBitmapTransformOptions ExifOrientationToWicTransform(USHORT orientation);
+
+	bool					read_webp_frame_delay(const CString& path);
+
 
 	HRESULT					extract_raw_data_from_bitmap(ID2D1DeviceContext* d2dc, ID2D1Bitmap1* src, uint8_t* data, UINT& out_stride);
 

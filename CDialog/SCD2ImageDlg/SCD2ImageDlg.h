@@ -86,6 +86,11 @@ public:
 	//create() 호출 전에 미리 설정해야 한다. create() 호출 후에는 적용되지 않는다.
 	//default로 simple_mode로 동작되므로 BandiView와 같은 이미지 브라우저로 동작시킬 경우는 set_simple_mode(false)로 설정해야 한다.
 	void			set_simple_mode(bool simple = true) { m_simple_mode = simple; }
+	//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할수도, 이미 불러온 CSCD2Image를 표시할수도 있다.
+	void			set_image(CSCD2Image* pImage);
+
+
+
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
 	enum ENUM_VIEW_MODE
@@ -94,6 +99,7 @@ public:
 		view_mode_image,
 		view_mode_thumb,
 	};
+
 	void			set_view_mode(int view_mode = view_mode_toggle);
 
 	bool			m_show_thumb = false;

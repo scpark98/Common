@@ -1219,8 +1219,9 @@ BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 {
 	if (m_use_tooltip && m_tooltip.m_hWnd)
 		m_tooltip.RelayEvent(pMsg);
+
 	// TODO: Add your specialized code here and/or call the base class 
-	if (pMsg->message == WM_KEYDOWN)
+	if (pMsg->message == WM_KEYDOWN && IsWindowVisible())
 	{
 		switch (pMsg->wParam)
 		{

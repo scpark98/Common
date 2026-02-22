@@ -1165,7 +1165,7 @@ BOOL CSCD2ImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		return CDialog::OnSetCursor(pWnd, nHitTest, message);
 
 	//roi를 그리기 위해 Ctrl키를 누른 상태라면 cross 커서로
-	if (IsCtrlPressed())
+	if (m_cursor_cross && IsCtrlPressed())
 	{
 		//SetCursor(AfxGetApp()->LoadStandardCursor(IDC_CROSS));
 		SetCursor(m_cursor_cross);
@@ -1238,7 +1238,7 @@ BOOL CSCD2ImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 	ScreenToClient(&client_pt);
 
 	//CSCD2ImageDlg이고 이미지 표시 영역에 한해
-	if (WindowFromPoint(pt) == this && m_r_display.PtInRect(client_pt))
+	if (!m_simple_mode && WindowFromPoint(pt) == this && m_r_display.PtInRect(client_pt))
 	{
 		//픽셀 정보 표시라면 스포이트를
 		if (m_show_pixel && m_cursor_dropper)
@@ -1777,6 +1777,13 @@ void CSCD2ImageDlg::reload_image()
 {
 	//현재 파일의 인덱스와 파일명을 기억해두고
 	int old_index = m_index;
+
+	if (m_files.size() == 0)
+	{
+		rerender();
+		return;
+	}
+
 	CString sfile = m_files[m_index];
 
 	m_files.clear();
@@ -1788,12 +1795,6 @@ void CSCD2ImageDlg::reload_image()
 
 	//검색된 파일들에서 현재 이미지의 인덱스를 찾고
 	int index = find_dqstring(m_files, sfile);
-
-	if (m_files.size() == 0)
-	{
-		rerender();
-		return;
-	}
 
 	if (index < 0)
 	{

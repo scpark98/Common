@@ -11,6 +11,12 @@
 		CSCDirWatcherMessage* msg = (CSCDirWatcherMessage*)wParam;
 		TRACE(_T("action: %d, path0: %s, path1: %s\n"), msg->action, msg->path0, msg->path1);
 
+- 파일이 변경되었을 때 FILE_ACTION_MODIFIED 메시지가 2번 호출되는 현상에 대해 알아보니 이건 정상이라고 함.
+  2번 처리해도 무관하지만 추천해준대로 타이머로 처리함. SetTimer(timer_reload_snapshot_image, 500, NULL);
+  이것은 Windows ReadDirectoryChangesW API의 알려진 동작입니다.파일이 수정되면 OS가 두 번 알림을 보냅니다 :
+	1.	파일 내용 기록 시
+	2.	파일 메타데이터(타임스탬프, 크기 등) 갱신 시
+
 */
 
 #include <afxwin.h>

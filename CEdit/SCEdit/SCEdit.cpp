@@ -539,6 +539,8 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 		if (!IsWindowVisible())
 			return false;
 
+		TRACE(_T("keydown on CSCEdit. key = %d\n"), (int)pMsg->wParam);
+
 		//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
 		switch (pMsg->wParam)
 		{
@@ -552,13 +554,13 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				break;
-			//case WM_KEYDOWN:
-			//	//TRACE(_T("keydown on CSCEdit. key = %d\n"), (int)pMsg->wParam);
-			//	break;
-			//case WM_LBUTTONDOWN:
-			//	//투명일 경우에는 캐럿 이동이나 단어 블록 선택 후 마우스 클릭시에도 화면갱신이 필요하다.
-			//	update_ctrl();
-			//	break;
+			case VK_ESCAPE:
+				{
+					CSCEditMessage msg(this, WM_KEYDOWN);
+					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, VK_ESCAPE);
+					return TRUE;
+				}
+				break;
 		}
 	}
 

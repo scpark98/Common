@@ -843,6 +843,10 @@ void CVtListCtrlEx::set_column_data_type(int column, int nType, bool invalidate)
 
 	m_column_data_type[column] = nType;
 
+	//data type이 progress type이라면 text align은 무조건 center 정렬방식으로 설정한다.
+	if (m_column_data_type[column] == column_data_type_progress)
+		m_column_text_align[column] = HDF_CENTER;
+
 	if (invalidate)
 		Invalidate();
 }
@@ -1497,7 +1501,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		Invalidate();
 		*/
 	}
-	else if (pMsg->message == WM_KEYDOWN)
+	else if (pMsg->message == WM_KEYDOWN && !m_in_editing)
 	{
 		TRACE(_T("VtListCtrl key = %d\n"), pMsg->wParam);
 		switch (pMsg->wParam)
@@ -1791,8 +1795,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	if (subItem >= nColumnCount || GetColumnWidth(subItem) < 5)
 		return NULL;
 
-
-
 	if (!m_allow_edit_column[subItem])
 		return NULL;
 	// The returned pointer should not be saved
@@ -1829,6 +1831,18 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		r.right = rc.right;
 
 	m_edit_old_text = GetItemText(item, subItem);
+
+	//20260214 scpark.
+	//edit_end()에서 DestroyWindow() 및 delete을 했었으나 타이밍이 맞지 않으면 double delete이 발생하므로
+	//edit_end()에서는 우선 hide 시키고 edit_item()에서 DestroyWindow() 및 delete을 하도록 수정한다.
+	//매번 새로 생성하는 이유는 ES_MULTILINE, ES_LEFT, ES_CENTER, ES_RIGHT 등은 동적변경이 불가능한 스타일이기 때문이다.
+	if (m_pEdit)
+	{
+		if (m_pEdit->m_hWnd)
+			m_pEdit->DestroyWindow();
+		delete m_pEdit;
+		m_pEdit = NULL;
+	}
 
 	//edit을 동적으로 생성할 때 ES_MULTILINE 속성이 있을 경우
 	//edit의 높이는 1줄이고 너비가 텍스트 길이보다 작을 경우 word wrap되어 일부 텍스트가 다음줄로 넘어가서 보이지 않게 된다.
@@ -1904,7 +1918,21 @@ LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 	TRACE(_T("message(%d) from CSCEdit(%p)\n"), msg->message, msg->pThis);
 	if (msg->message == WM_KILLFOCUS)
+	{
 		edit_end();
+	}
+	else if (msg->message == WM_KEYDOWN)
+	{
+		switch ((int)lParam)
+		{
+			case VK_RETURN:
+				edit_end();
+				break;
+			case VK_ESCAPE:
+				edit_end(false);
+				break;
+		}
+	}
 
 	Invalidate();
 
@@ -3749,11 +3777,6 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_last_clicked_time = 0;
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
-
-	//if (m_pEdit->m_hWnd)
-	//	m_pEdit->DestroyWindow();
-	//delete m_pEdit;
-	//m_pEdit = NULL;
 
 	//if (m_edit_new_text == m_edit_old_text)
 	//	return;

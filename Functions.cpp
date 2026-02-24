@@ -16472,6 +16472,8 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	// maximized 복원 여부
 	if (use_maximize && pApp->GetProfileInt(sSection, _T("maximized"), FALSE))
 		wp.showCmd = SW_SHOWMAXIMIZED;
+	else if (pWnd->IsWindowVisible() == FALSE)
+		wp.showCmd = SW_HIDE;
 	else
 		wp.showCmd = SW_SHOWNORMAL;
 

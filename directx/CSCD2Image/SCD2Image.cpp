@@ -165,7 +165,7 @@ HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* 
 	return hr;
 }
 
-HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type)
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type, bool auto_play)
 {
 	while (!stop())
 		Wait(10);
@@ -232,10 +232,10 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 	}
 
-	return load(pWICFactory, d2context, pDecoder);
+	return load(pWICFactory, d2context, pDecoder, auto_play);
 }
 
-HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path)
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play)
 {
 	while (!stop())
 		Wait(10);
@@ -289,7 +289,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (FAILED(hr) || !pDecoder)
 		return hr;
 
-	hr = load(pWICFactory, d2context, pDecoder.Get());
+	hr = load(pWICFactory, d2context, pDecoder.Get(), auto_play);
 
 	// WebP인 경우 실제 프레임 딜레이를 덮어쓴다
 	if (SUCCEEDED(hr))
@@ -694,7 +694,7 @@ CString CSCD2Image::get_exif_str()
 //일부 animated gif의 경우 이전 프레임 이미지에서 변경된 이미지만 저장하고 있는 경우도 있으므로
 //아래 코드를 참조하여 보완 필요.
 //https://github.com/microsoft/DirectXTex/blob/main/Texassemble/AnimatedGif.cpp
-HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder)
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play)
 {
 	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
 
@@ -1198,7 +1198,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	meta_reader.Reset();
 	//TRACE(_T("after reset meta_reader\n"));
 
-	if (frame_count > 1)
+	if (frame_count > 1 && auto_play)
 		play();
 
 	return hr;
@@ -2019,7 +2019,7 @@ void CSCD2Image::thread_animation()
 		if (m_frame_index >= (int)m_img.size())
 			m_frame_index = 0;
 
-		//TRACE(_T("frame index = %d\n"), m_frame_index);
+		TRACE(_T("frame index = %d\n"), m_frame_index);
 		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
 		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 

@@ -29,6 +29,100 @@ HRESULT CSCD2Context::init(HWND hWnd, int cx, int cy)
 	return S_OK;
 }
 
+HRESULT CSCD2Context::init(HWND hWnd, CSCD2Context* pShared, int cx, int cy)
+{
+	if (!pShared || !pShared->m_d2device)
+		return E_INVALIDARG;
+
+	m_hWnd = hWnd;
+
+	CRect rc;
+	::GetClientRect(m_hWnd, &rc);
+	if (cx <= 0) cx = rc.Width();
+	if (cy <= 0) cy = rc.Height();
+	m_sz.width = (float)cx;
+	m_sz.height = (float)cy;
+
+	// 팩토리/디바이스 공유 (ComPtr 참조 카운트 증가)
+	m_d2factory = pShared->m_d2factory;
+	m_WICFactory = pShared->m_WICFactory;
+	m_d2device = pShared->m_d2device;
+
+	HRESULT hr = S_OK;
+
+	if (!m_d2context)
+	{
+		// 공유 디바이스로부터 새 디바이스 컨텍스트 생성
+		hr = m_d2device->CreateDeviceContext(
+			D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+			m_d2context.GetAddressOf());
+		if (FAILED(hr)) return hr;
+
+		// 이 HWND 전용 스왑체인 생성을 위한 DXGI 디바이스 획득
+		ComPtr<IDXGIDevice> dxgiDevice;
+		ComPtr<IDXGIAdapter> dxgiAdapter;
+		ComPtr<IDXGIFactory> dxgiFactory;
+
+		// D3D11 디바이스 생성
+		ComPtr<ID3D11Device> d3dDevice;
+		UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+		D3D_DRIVER_TYPE types[] = { D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP };
+		for (auto type : types)
+		{
+			hr = D3D11CreateDevice(nullptr, type, nullptr, flags,
+				nullptr, 0, D3D11_SDK_VERSION,
+				d3dDevice.GetAddressOf(), nullptr, nullptr);
+			if (SUCCEEDED(hr)) break;
+		}
+		if (FAILED(hr)) return hr;
+
+		hr = d3dDevice.As(&dxgiDevice);
+		if (FAILED(hr)) return hr;
+
+		hr = dxgiDevice->GetAdapter(&dxgiAdapter);
+		if (FAILED(hr)) return hr;
+
+		hr = dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory));
+		if (FAILED(hr)) return hr;
+
+		// 스왑체인 생성
+		DXGI_SWAP_CHAIN_DESC sd = {};
+		sd.BufferDesc.Width = cx;
+		sd.BufferDesc.Height = cy;
+		sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		sd.BufferDesc.RefreshRate = { 60, 1 };
+		sd.SampleDesc = { 1, 0 };
+		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		sd.BufferCount = 1;
+		sd.OutputWindow = m_hWnd;
+		sd.Windowed = TRUE;
+
+		hr = dxgiFactory->CreateSwapChain(dxgiDevice.Get(), &sd, m_swapchain.GetAddressOf());
+		if (FAILED(hr)) return hr;
+
+		// 렌더 타겟 설정
+		ComPtr<IDXGISurface> surface;
+		hr = m_swapchain->GetBuffer(0, IID_PPV_ARGS(&surface));
+		if (FAILED(hr)) return hr;
+
+		ComPtr<ID2D1Bitmap1> bitmap;
+		FLOAT dpi = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+		D2D1_BITMAP_PROPERTIES1 props = D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			dpi, dpi);
+		hr = m_d2context->CreateBitmapFromDxgiSurface(surface.Get(), &props, &bitmap);
+		if (FAILED(hr)) return hr;
+
+		m_d2context->SetTarget(bitmap.Get());
+		m_d2context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
+
+		m_br_zigzag = create_zigzag_brush();
+	}
+
+	return hr;
+}
+
 HRESULT CSCD2Context::create_factory()
 {
 	HRESULT hr = S_OK;

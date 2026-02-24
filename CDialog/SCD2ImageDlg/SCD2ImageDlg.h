@@ -86,10 +86,15 @@ public:
 	//create() 호출 전에 미리 설정해야 한다. create() 호출 후에는 적용되지 않는다.
 	//default로 simple_mode로 동작되므로 BandiView와 같은 이미지 브라우저로 동작시킬 경우는 set_simple_mode(false)로 설정해야 한다.
 	void			set_simple_mode(bool simple = true) { m_simple_mode = simple; }
+
+
+
 	//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할수도, 이미 불러온 CSCD2Image를 표시할수도 있다.
 	void			set_image(CSCD2Image* pImage);
 
 
+	// create() 호출 전에 설정하면 이 D2D 컨텍스트의 Factory/Device를 공유한다.
+	void			set_shared_d2dc(CSCD2Context* pShared) { m_pSharedD2DC = pShared; }
 
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
@@ -119,7 +124,7 @@ public:
 	bool			load();
 
 	//외부 파일 로딩
-	bool			load(CString sFile, bool load_thumbs = true);
+	bool			load(CString sFile, bool load_thumbs = true, bool auto_play = true);
 
 	//리소스의 JPG or PNG 파일 로딩
 	bool			load(CString sType, UINT id);
@@ -258,6 +263,7 @@ protected:
 
 	std::mutex				m_mutex;
 
+	CSCD2Context*			m_pSharedD2DC = nullptr;
 	CSCD2Context			m_d2dc;
 	ID2D1SolidColorBrush*	m_brush;
 	IDWriteFactory*			m_WriteFactory;

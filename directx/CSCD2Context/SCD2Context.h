@@ -76,6 +76,8 @@ public:
 	~CSCD2Context();
 
 	HRESULT						init(HWND hWnd, int cx = 0, int cy = 0);
+	HRESULT						init(HWND hWnd, CSCD2Context* pShared, int cx = 0, int cy = 0);
+
 	IWICImagingFactory2*		get_WICFactory() { return m_WICFactory.Get(); }
 	ID2D1Factory1*				get_factory() { return m_d2factory.Get(); }
 	ID2D1DeviceContext*			get_d2dc() { return m_d2context.Get(); }
@@ -93,7 +95,7 @@ protected:
 	HWND						m_hWnd;
 	ComPtr<ID2D1Factory1>       m_d2factory;
 	ComPtr<IWICImagingFactory2> m_WICFactory;
-	ComPtr<ID2D1Device>         m_d2device;
+	ComPtr<ID2D1Device>        m_d2device;
 	ComPtr<ID2D1DeviceContext>  m_d2context;
 	ComPtr<IDXGISwapChain>      m_swapchain;
 	//ComPtr<ID2D1Bitmap1>		m_target_bitmap;

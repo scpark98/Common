@@ -107,10 +107,10 @@ public:
 	void					release();
 
 	//load external image
-	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path);
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path, bool auto_play = true);
 
 	//load resource image
-	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type = _T("PNG"));
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type = _T("PNG"), bool auto_play = true);
 
 	//load from raw data
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel);
@@ -249,7 +249,7 @@ protected:
 	HRESULT					extract_exif_info(IWICBitmapDecoder* pDecoder);
 
 
-	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder);
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play = true);
 
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 

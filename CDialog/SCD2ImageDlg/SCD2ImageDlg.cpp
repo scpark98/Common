@@ -67,7 +67,10 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 		m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
 	}
 
-	m_d2dc.init(m_hWnd);
+	if (m_pSharedD2DC)
+		m_d2dc.init(m_hWnd, m_pSharedD2DC);
+	else
+		m_d2dc.init(m_hWnd);
 
 	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&m_WriteFactory));
 	if (SUCCEEDED(hr))
@@ -515,10 +518,10 @@ BOOL CSCD2ImageDlg::OnEraseBkgnd(CDC* pDC)
 bool CSCD2ImageDlg::load()
 {
 	CString recent = AfxGetApp()->GetProfileString(_T("setting\\CSC2DImageDlg"), _T("recent file"), _T(""));
-	return load(recent);
+	return load(recent, true, true);
 }
 
-bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs)
+bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs, bool auto_play)
 {
 	m_pixel_pos.X = -1.0f;
 	m_pixel_pos.Y = -1.0f;
@@ -530,7 +533,7 @@ bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs)
 		m_img.resize(m_buffer_max);
 	//m_mutex.unlock();
 
-	HRESULT hr = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile);
+	HRESULT hr = m_img[0].load(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc(), sFile, auto_play);
 
 	if (hr != S_OK)
 	{
@@ -645,8 +648,8 @@ void CSCD2ImageDlg::rerender()
 	if (m_img.size() == 0)
 		return;
 
-	D2D1_SIZE_F sz = m_d2dc.get_size();
-	m_d2dc.on_size_changed(sz.width, sz.height);
+	//D2D1_SIZE_F sz = m_d2dc.get_size();
+	//m_d2dc.on_size_changed(sz.width, sz.height);
 	Invalidate();
 }
 
@@ -1297,6 +1300,14 @@ LRESULT CSCD2ImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lPara
 		goto_frame(msg->pos, true);
 	}
 	return 0;
+}
+
+void CSCD2ImageDlg::play()
+{
+	if (m_img.size() == 0)
+		return;
+
+	m_img[0].play();
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.

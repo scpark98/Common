@@ -89,7 +89,12 @@ public:
 
 
 
-	//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할수도, 이미 불러온 CSCD2Image를 표시할수도 있다.
+	//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할 수도, 이미 불러온 CSCD2Image를 표시하기 위해 사용할수도 있다.
+	//ex. ASee는 이미지 뷰어이므로 simple mode가 아니고 load()를 사용하여 이미지를 불러오지만
+	//AniMaker는 gif, webp 등 애니메이션 이미지의 각 프레임을 표시하기 위해 load()를 사용하여 이미지를 불러오고
+	//PreviewDlg에서는 불러온 이미지 데이터를 set_image()를 이용하여 이미지 데이터 변수에 넣게 된다.
+	//set_image()는 load()와 같이 각 프레임 이미지를 기억하도록 하고 있지만 load()와는 달리 자동으로 play()시키지는 않으므로
+	//play()가 필요하다면 직접 호출해줘야 한다.
 	void			set_image(CSCD2Image* pImage);
 
 
@@ -259,6 +264,9 @@ protected:
 		timer_thread_buffering,
 	};
 
+	//이미지 표시 및 확대 축소, animated image play만 처리하는 simple mode로 동작한다.
+	//ASee, BandiView와 같이 이미지 브라우저로 사용할 경우는 false로 설정하고 create()해야 한다.
+	//default = true
 	bool					m_simple_mode = true;
 
 	std::mutex				m_mutex;

@@ -98,6 +98,8 @@ protected:
 	ComPtr<ID2D1Device>        m_d2device;
 	ComPtr<ID2D1DeviceContext>  m_d2context;
 	ComPtr<IDXGISwapChain>      m_swapchain;
+	ComPtr<IDXGIDevice>         m_dxgiDevice;   // 추가: 스왑체인 공유용
+
 	//ComPtr<ID2D1Bitmap1>		m_target_bitmap;
 	//ComPtr<ID2D1DCRenderTarget>	m_pDCRT;
 	//CComQIPtr<ID2D1GdiInteropRenderTarget> m_spGdiInteropRenderTarget;

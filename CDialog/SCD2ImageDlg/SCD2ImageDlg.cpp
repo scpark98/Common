@@ -648,8 +648,8 @@ void CSCD2ImageDlg::rerender()
 	if (m_img.size() == 0)
 		return;
 
-	//D2D1_SIZE_F sz = m_d2dc.get_size();
-	//m_d2dc.on_size_changed(sz.width, sz.height);
+	D2D1_SIZE_F sz = m_d2dc.get_size();
+	m_d2dc.on_size_changed(sz.width, sz.height);
 	Invalidate();
 }
 
@@ -1283,7 +1283,7 @@ LRESULT CSCD2ImageDlg::on_message_from_CSCD2Image(WPARAM wParam, LPARAM lParam)
 
 	if (msg->message == CSCD2Image::message_frame_changed)
 	{
-		TRACE(_T("%d / %d\n"), msg->frame_index, msg->total_frames);
+		TRACE(_T("CSCD2ImageDlg::on_message_from_CSCD2Image() : %d / %d\n"), msg->frame_index, msg->total_frames);
 		m_slider_gif.set_pos(msg->frame_index);
 		rerender();
 	}
@@ -1938,12 +1938,19 @@ void CSCD2ImageDlg::set_image(CSCD2Image* pImage)
 	if (!pImage || pImage->is_empty())
 		return;
 
+	//기존 애니메이션 중지
+	if (m_img.size() > 0)
+		m_img[0].stop();
+
+	//원본 애니메이션도 중지 (스레드가 돌고 있을 수 있으므로)
+	pImage->stop();
+
 	m_mutex.lock();
 	m_img.clear();
 	m_img.resize(1);
 
-	pImage->set_parent(m_hWnd);
 	pImage->copy(&m_img[0]);
+	m_img[0].set_parent(m_hWnd);
 	m_mutex.unlock();
 
 	CRect rc;
@@ -1951,17 +1958,14 @@ void CSCD2ImageDlg::set_image(CSCD2Image* pImage)
 	m_d2dc.on_size_changed(rc.Width(), rc.Height());
 
 	if (m_img[0].get_frame_count() > 1)
-		m_img[0].play();
+	{
+		m_slider_gif.set_range(0, m_img[0].get_frame_count() - 1);
+		m_slider_gif.set_pos(0);
+		m_slider_gif.ShowWindow(SW_SHOW);
+	}
 	else
+	{
+		m_slider_gif.ShowWindow(SW_HIDE);
 		Invalidate();
-	/*
-	m_filename = m_img[0].get_filename();
-	CRect rc;
-	GetClientRect(rc);
-	//m_img[0].on_resize(m_d2dc.get_d2dc(), m_d2dc.get_swapchain(), rc.Width(), rc.Height());
-	m_img[0].set_interpolation_mode(m_interpolation_mode);
-	rerender();
-	build_image_info_str();
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_image_changed), 0);
-	*/
+	}
 }

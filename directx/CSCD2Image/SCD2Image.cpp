@@ -371,7 +371,7 @@ HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 	//JPG, TIFF 등의 exif 정보가 다르므로 Ifd, exif reader를 별도로 구해서 얻어온다.
 	ComPtr<IWICMetadataQueryReader> pRootQueryReader;
 	_M(hr, pBitmapFrameDecode->GetMetadataQueryReader(&pRootQueryReader));
-	if (!pRootQueryReader)
+	if (hr != S_OK || !pRootQueryReader)
 		return hr;
 
 	//get IFD query reader
@@ -1954,6 +1954,11 @@ void CSCD2Image::play()
 		return;
 	}
 
+	// 스레드 생성 전에 플래그를 먼저 설정하여 중복 생성 방지
+	m_run_thread_animation = true;
+	m_thread_animation_terminated = false;
+	m_ani_paused = false;
+
 	std::thread t(&CSCD2Image::thread_animation, this);
 	t.detach();
 }
@@ -1993,13 +1998,10 @@ bool CSCD2Image::stop()
 
 void CSCD2Image::thread_animation()
 {
-	m_ani_paused = false;
-
-	m_run_thread_animation = true;
-	m_thread_animation_terminated = false;
-
 	long t0;
 	long t1;
+
+	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
 
 	while (m_run_thread_animation)
 	{
@@ -2019,15 +2021,15 @@ void CSCD2Image::thread_animation()
 		if (m_frame_index >= (int)m_img.size())
 			m_frame_index = 0;
 
-		TRACE(_T("frame index = %d\n"), m_frame_index);
-		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
-		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
+		msg.frame_index = m_frame_index;
+		TRACE(_T("frame index = %d\n"), msg.frame_index);
+		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 
 		if (m_frame_delay.size() == 0)
 			break;
 
-		int elapsed = clock() - t0;
-		int delay = m_frame_delay[m_frame_index] - elapsed;
+		//int elapsed = clock() - t0;
+		int delay = m_frame_delay[m_frame_index];// -elapsed;
 		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
 	}
 

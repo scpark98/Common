@@ -47,6 +47,7 @@ HRESULT CSCD2Context::init(HWND hWnd, CSCD2Context* pShared, int cx, int cy)
 	m_d2factory = pShared->m_d2factory;
 	m_WICFactory = pShared->m_WICFactory;
 	m_d2device = pShared->m_d2device;
+	m_dxgiDevice = pShared->m_dxgiDevice;
 
 	HRESULT hr = S_OK;
 
@@ -58,34 +59,16 @@ HRESULT CSCD2Context::init(HWND hWnd, CSCD2Context* pShared, int cx, int cy)
 			m_d2context.GetAddressOf());
 		if (FAILED(hr)) return hr;
 
-		// 이 HWND 전용 스왑체인 생성을 위한 DXGI 디바이스 획득
-		ComPtr<IDXGIDevice> dxgiDevice;
+		// 공유된 DXGI 디바이스로 스왑체인 생성 (새 D3D11 디바이스 생성 X)
 		ComPtr<IDXGIAdapter> dxgiAdapter;
 		ComPtr<IDXGIFactory> dxgiFactory;
 
-		// D3D11 디바이스 생성
-		ComPtr<ID3D11Device> d3dDevice;
-		UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-		D3D_DRIVER_TYPE types[] = { D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP };
-		for (auto type : types)
-		{
-			hr = D3D11CreateDevice(nullptr, type, nullptr, flags,
-				nullptr, 0, D3D11_SDK_VERSION,
-				d3dDevice.GetAddressOf(), nullptr, nullptr);
-			if (SUCCEEDED(hr)) break;
-		}
-		if (FAILED(hr)) return hr;
-
-		hr = d3dDevice.As(&dxgiDevice);
-		if (FAILED(hr)) return hr;
-
-		hr = dxgiDevice->GetAdapter(&dxgiAdapter);
+		hr = m_dxgiDevice->GetAdapter(&dxgiAdapter);
 		if (FAILED(hr)) return hr;
 
 		hr = dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory));
 		if (FAILED(hr)) return hr;
 
-		// 스왑체인 생성
 		DXGI_SWAP_CHAIN_DESC sd = {};
 		sd.BufferDesc.Width = cx;
 		sd.BufferDesc.Height = cy;
@@ -97,7 +80,7 @@ HRESULT CSCD2Context::init(HWND hWnd, CSCD2Context* pShared, int cx, int cy)
 		sd.OutputWindow = m_hWnd;
 		sd.Windowed = TRUE;
 
-		hr = dxgiFactory->CreateSwapChain(dxgiDevice.Get(), &sd, m_swapchain.GetAddressOf());
+		hr = dxgiFactory->CreateSwapChain(m_dxgiDevice.Get(), &sd, m_swapchain.GetAddressOf());
 		if (FAILED(hr)) return hr;
 
 		// 렌더 타겟 설정
@@ -272,12 +255,12 @@ HRESULT CSCD2Context::create_device_context()
 		}
 	}
 
-	ComPtr<IDXGIDevice> dxgiDevice;
+	// DXGI 디바이스 저장 (공유 init에서 사용)
 	if (SUCCEEDED(hr))
-		hr = d3dDevice->QueryInterface(IID_PPV_ARGS(dxgiDevice.GetAddressOf()));
+		hr = d3dDevice->QueryInterface(IID_PPV_ARGS(m_dxgiDevice.GetAddressOf()));
 
 	if (SUCCEEDED(hr))
-		hr = m_d2factory->CreateDevice(dxgiDevice.Get(), m_d2device.GetAddressOf());
+		hr = m_d2factory->CreateDevice(m_dxgiDevice.Get(), m_d2device.GetAddressOf());
 
 	if (SUCCEEDED(hr))
 		hr = m_d2device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, m_d2context.GetAddressOf());

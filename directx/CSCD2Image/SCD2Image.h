@@ -123,6 +123,9 @@ public:
 	ID2D1Bitmap1*			get_cur_img() { return m_img[m_frame_index].Get(); }
 	ID2D1Bitmap1*			get_frame_img(int index);
 
+	std::deque<ComPtr<ID2D1Bitmap1>>* get_img_list() { return &m_img; };
+	std::deque<int>*		get_frame_delay_list() { return &m_frame_delay; }
+
 	//get original image demension
 	float					get_width();
 	float					get_height();
@@ -178,6 +181,8 @@ public:
 	//반드시 new 또는 정적으로 메모리가 할당된 상태의 dst를 넘겨줘야 한다.
 	//null의 dst를 넘기고 copy()에서 new로 할당해도 되지만 new와 delete이 서로 다른 thread에서 수행될 수 없으므로 문제가 될 수 있다.
 	void					copy(CSCD2Image* dst);
+	//m_img의 특정 인덱스 이미지를 dst에 복사한다.
+	HRESULT					copy(int src_index, ID2D1Bitmap1* dst);
 
 	HRESULT					get_sub_img(CRect r, CSCD2Image *dest);
 	HRESULT					get_sub_img(D2D1_RECT_U r, CSCD2Image* dest);
@@ -232,7 +237,7 @@ protected:
 	ID2D1DeviceContext*		m_d2dc = nullptr;
 
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 선언한다.
-	std::deque<ComPtr<ID2D1Bitmap1>>		m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
+	std::deque<ComPtr<ID2D1Bitmap1>> m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
 	ComPtr<ID2D1Bitmap1>	m_img_origin;
 
 	uint8_t*				m_data = nullptr;

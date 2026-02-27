@@ -284,7 +284,8 @@ protected:
 	//forward면 0(cur), 1, 2, 3, 4
 	//backward면 0(cur), -1, -2, -3, -4
 	//이미지만 미리 버퍼링 해 놓을 경우 표시는 빨라지지만 그 이미지 파일명, 파일속성등은? m_files에서 해당 파일 인덱스를 찾아서 처리해도 될 듯함.
-	std::deque<CSCD2Image>	m_img;
+	//20260226 scpark CSCD2Image의 m_img와 변수명이 동일하여 혼동될 수 있으므로 m_images로 변경한다.
+	std::deque<CSCD2Image>	m_images;
 	int				m_buffer_max = 1;		//buffering 관련 test가 아니라면 debugging에 방해되므로 임시로 1로 변경. default=5
 	bool			m_is_forward = true;
 

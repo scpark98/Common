@@ -270,8 +270,11 @@ HRESULT CSCD2Context::create_device_context()
 	return hr;
 }
 
-ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(float cell_size, byte fore, byte back)
+ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(byte fore, byte back)
 {
+	if (m_zigzag_size <= 0.0f)
+		m_zigzag_size = 8.0f;
+
 	const UINT w = 2, h = 2, stride = w * 4;
 	BYTE pixels[stride * h];
 	auto px = [&](UINT x, UINT y, BYTE B, BYTE G, BYTE R, BYTE A) {
@@ -295,10 +298,11 @@ ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(float cell_size, byte
 			D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
 
 	ComPtr<ID2D1BitmapBrush> brush;
-	if (FAILED(m_d2context->CreateBitmapBrush(bmp.Get(), bbp, &brush))) return nullptr;
+	if (FAILED(m_d2context->CreateBitmapBrush(bmp.Get(), bbp, &brush)))
+		return nullptr;
 
 	// Each source pixel becomes one checker cell of size 'cell'
-	brush->SetTransform(D2D1::Matrix3x2F::Scale(cell_size, cell_size));
+	brush->SetTransform(D2D1::Matrix3x2F::Scale(m_zigzag_size, m_zigzag_size));
 	return brush;
 }
 

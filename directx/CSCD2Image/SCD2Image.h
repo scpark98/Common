@@ -122,9 +122,11 @@ public:
 	ID2D1DeviceContext*		get_d2dc() { return m_d2dc;}
 	ID2D1Bitmap1*			get_cur_img() { return m_img[m_frame_index].Get(); }
 	ID2D1Bitmap1*			get_frame_img(int index);
+	HRESULT					set_frame_img(ID2D1Bitmap1* img);
 
 	std::deque<ComPtr<ID2D1Bitmap1>>* get_img_list() { return &m_img; };
 	std::deque<int>*		get_frame_delay_list() { return &m_frame_delay; }
+	bool					set_frame_delay(int index, int delay_ms);
 
 	//get original image demension
 	float					get_width();
@@ -196,6 +198,7 @@ public:
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	HRESULT					save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...);
 	HRESULT					save_webp(LPCTSTR path, ...);
+	HRESULT					save_gif(LPCTSTR path, ...);
 
 	//PBGRA 포맷의 픽셀 데이터를 RGBA 포맷으로 변환한다. un-premultiply와 동시에 B↔R 채널을 교환합니다:
 	void					convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride);
@@ -227,7 +230,7 @@ public:
 	bool					read_webp_frame_delay(const CString& path);
 
 
-	HRESULT					extract_raw_data_from_bitmap(ID2D1DeviceContext* d2dc, ID2D1Bitmap1* src, uint8_t* data, UINT& out_stride);
+	HRESULT					extract_raw_data_from_bitmap(ID2D1DeviceContext* d2dc, ID2D1Bitmap1* src, uint8_t** data);
 
 protected:
 	CString					m_filename;// = _T("untitled");

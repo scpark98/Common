@@ -84,6 +84,9 @@ public:
 	IDXGISwapChain*				get_swapchain() { return m_swapchain.Get(); }
 
 	D2D1_SIZE_F					get_size() { return m_d2context->GetSize(); }
+
+	float						get_zigzag_size() { return m_zigzag_size; }
+	HRESULT						set_zigzag_size(float new_size);
 	ComPtr<ID2D1BitmapBrush>	get_zigzag_brush() { return m_br_zigzag; }
 
 	HRESULT						on_size_changed(int cx, int cy);
@@ -108,7 +111,8 @@ protected:
 	HRESULT						create_device_resources();
 	HRESULT						create_device_context();
 
+	float						m_zigzag_size = 8.0f;
 	ComPtr<ID2D1BitmapBrush>	m_br_zigzag;
-	ComPtr<ID2D1BitmapBrush>	create_zigzag_brush(float cell_size = 8.f, byte fore = 200, byte back = 255);
+	ComPtr<ID2D1BitmapBrush>	create_zigzag_brush(byte fore = 200, byte back = 255);
 };
 

@@ -1254,23 +1254,27 @@ void CSCD2Image::blend(ID2D1DeviceContext* d2dc, ID2D1Bitmap* src, ID2D1Bitmap* 
 //}
 
 //copy는 deep copy이며 이미지 자체 뿐 만 아니라 CSCD2Image의 속성값들도 모두 복사해줘야 한다.
+//protected에 나열된 순서대로 필요 항목들을 복사해준다.
 void CSCD2Image::copy(CSCD2Image* dst)
 {
-	//dst->create(get_WICFactory2(), get_d2dc(), get_width(), get_height());
-	//D2D1_POINT_2U pt = { 0, 0 };
-	//D2D1_RECT_U rsrc = { 0, 0, get_width(), get_height() };
-	//dst->get()->CopyFromBitmap(&pt, get(), &rsrc);
+	dst->m_filename = m_filename;
+
+	dst->m_pWICFactory = m_pWICFactory;
+	dst->m_d2dc = m_d2dc;
+
 	dst->m_img.clear();
 	dst->m_img.assign(m_img.begin(), m_img.end());
 
-	dst->m_filename = m_filename;
-	dst->m_pWICFactory = m_pWICFactory;
-	dst->m_d2dc = m_d2dc;
-	dst->m_frame_index = m_frame_index;
 	dst->m_channel = m_channel;
+	dst->m_stride = m_stride;
+
 	dst->m_pixel_format_str = m_pixel_format_str;
+	dst->m_alpha_pixel_count = m_alpha_pixel_count;
+
 	memcpy(&(dst->m_exif_info), &m_exif_info, sizeof(CSCEXIFInfo));
+
 	dst->m_interpolation_mode = m_interpolation_mode;
+
 	dst->m_parent = m_parent;
 	dst->m_frame_delay.clear();
 	dst->m_frame_delay.assign(m_frame_delay.begin(), m_frame_delay.end());
@@ -1334,11 +1338,6 @@ void CSCD2Image::blur_effect(float dev)
 	swapChainImageBuffer = nullptr;
 
 
-}
-
-HRESULT CSCD2Image::save(CString path, float quality)
-{
-	return save(m_img[m_frame_index].Get(), quality, path);
 }
 
 void CSCD2Image::convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride)
@@ -1503,6 +1502,198 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 	return hr;
 }
 
+HRESULT CSCD2Image::save_gif(LPCTSTR path, ...)
+{
+	if (m_pWICFactory == nullptr)
+		return S_FALSE;
+
+	HRESULT hr = S_OK;
+
+	va_list args;
+	va_start(args, path);
+	va_end(args);
+
+	CString filename;
+	filename.FormatV(path, args);
+
+	int width = (int)get_width();
+	int height = (int)get_height();
+	int frame_count = get_frame_count();
+
+	if (width <= 0 || height <= 0 || frame_count <= 0)
+		return S_FALSE;
+
+	// GIF 인코더 생성
+	ComPtr<IWICStream> pStream;
+	_M(hr, m_pWICFactory->CreateStream(pStream.GetAddressOf()));
+	_M(hr, pStream->InitializeFromFilename(CStringW(filename), GENERIC_WRITE));
+	if (FAILED(hr)) return hr;
+
+	ComPtr<IWICBitmapEncoder> pEncoder;
+	_M(hr, m_pWICFactory->CreateEncoder(GUID_ContainerFormatGif, nullptr, pEncoder.GetAddressOf()));
+	_M(hr, pEncoder->Initialize(pStream.Get(), WICBitmapEncoderNoCache));
+	if (FAILED(hr)) return hr;
+
+	// 애니메이션 GIF: NETSCAPE2.0 루프 확장 설정 (무한 반복)
+	if (frame_count > 1)
+	{
+		ComPtr<IWICMetadataQueryWriter> pGlobalMeta;
+		hr = pEncoder->GetMetadataQueryWriter(&pGlobalMeta);
+		if (SUCCEEDED(hr) && pGlobalMeta)
+		{
+			PROPVARIANT propValue;
+			PropVariantInit(&propValue);
+
+			// Application: "NETSCAPE2.0"
+			propValue.vt = VT_UI1 | VT_VECTOR;
+			propValue.caub.cElems = 11;
+			BYTE appId[] = "NETSCAPE2.0";
+			propValue.caub.pElems = appId;
+			pGlobalMeta->SetMetadataByName(L"/appext/Application", &propValue);
+			//PropVariantInit(&propValue);
+
+			// Data: [sub-block size=3, ID=1, loopLo=0, loopHi=0] → 무한 반복
+			BYTE appData[] = { 3, 1, 0, 0 };
+			propValue.caub.cElems = 4;
+			propValue.caub.pElems = appData;
+			pGlobalMeta->SetMetadataByName(L"/appext/Data", &propValue);
+			PropVariantInit(&propValue);
+		}
+	}
+
+	bool hasAlpha = (m_alpha_pixel_count > 0);
+
+	for (int i = 0; i < frame_count; ++i)
+	{
+		// D2D 비트맵 → CPU 읽기 가능한 비트맵 복사
+		D2D1_BITMAP_PROPERTIES1 cpuProps = {
+			{ DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED },
+			96.0f, 96.0f,
+			D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW
+		};
+
+		ComPtr<ID2D1Bitmap1> cpuBitmap;
+		_M(hr, m_d2dc->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, &cpuProps, &cpuBitmap));
+		if (FAILED(hr)) return hr;
+
+		_M(hr, cpuBitmap->CopyFromBitmap(nullptr, m_img[i].Get(), nullptr));
+		if (FAILED(hr)) return hr;
+
+		D2D1_MAPPED_RECT mapped;
+		_M(hr, cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped));
+		if (FAILED(hr)) return hr;
+
+		// Premultiplied Alpha → Straight Alpha (BGRA 채널 순서 유지)
+		UINT stride = width * 4;
+		UINT imageSize = stride * height;
+		std::vector<BYTE> pixels(imageSize);
+		for (UINT y = 0; y < (UINT)height; ++y)
+			memcpy(pixels.data() + y * stride, mapped.bits + y * mapped.pitch, stride);
+
+		cpuBitmap->Unmap();
+
+		convert_PBGRA_to_BGRA(pixels.data(), width, height, stride);
+
+		// WIC 비트맵 생성 (BGRA 32bit)
+		ComPtr<IWICBitmap> wicBitmap;
+		_M(hr, m_pWICFactory->CreateBitmapFromMemory(
+			width, height, GUID_WICPixelFormat32bppBGRA,
+			stride, imageSize, pixels.data(), &wicBitmap));
+		if (FAILED(hr)) return hr;
+
+		// 팔레트 생성 (GIF는 8bpp 인덱스 컬러 필수)
+		ComPtr<IWICPalette> pPalette;
+		_M(hr, m_pWICFactory->CreatePalette(&pPalette));
+
+		// 투명 픽셀이 있으면 255색 + 투명 1색, 없으면 256색
+		if (hasAlpha)
+		{
+			_M(hr, pPalette->InitializeFromBitmap(wicBitmap.Get(), 255, TRUE));
+		}
+		else
+		{
+			_M(hr, pPalette->InitializeFromBitmap(wicBitmap.Get(), 256, FALSE));
+		}
+
+		if (FAILED(hr))
+			return hr;
+
+		// 32bpp BGRA → 8bpp Indexed 변환
+		ComPtr<IWICFormatConverter> pConverter;
+		_M(hr, m_pWICFactory->CreateFormatConverter(&pConverter));
+		_M(hr, pConverter->Initialize(
+			wicBitmap.Get(),
+			GUID_WICPixelFormat8bppIndexed,
+			WICBitmapDitherTypeErrorDiffusion,
+			pPalette.Get(),
+			hasAlpha ? 50.0 : 0.0,
+			WICBitmapPaletteTypeCustom));
+		if (FAILED(hr)) return hr;
+
+		// 프레임 인코딩
+		ComPtr<IWICBitmapFrameEncode> pFrameEncode;
+		CComPtr<IPropertyBag2> pProperties;
+		_M(hr, pEncoder->CreateNewFrame(&pFrameEncode, &pProperties));
+		_M(hr, pFrameEncode->Initialize(nullptr));
+		_M(hr, pFrameEncode->SetSize(width, height));
+
+		WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat8bppIndexed;
+		_M(hr, pFrameEncode->SetPixelFormat(&pixelFormat));
+		_M(hr, pFrameEncode->SetPalette(pPalette.Get()));
+
+		// 프레임 메타데이터: delay, disposal, transparency
+		if (frame_count > 1 && i < (int)m_frame_delay.size())
+		{
+			ComPtr<IWICMetadataQueryWriter> pFrameMeta;
+			hr = pFrameEncode->GetMetadataQueryWriter(&pFrameMeta);
+			if (SUCCEEDED(hr) && pFrameMeta)
+			{
+				PROPVARIANT propValue;
+				PropVariantInit(&propValue);
+
+				// 프레임 딜레이 (GIF는 1/100초 단위, m_frame_delay는 ms 단위)
+				propValue.vt = VT_UI2;
+				propValue.uiVal = (USHORT)(m_frame_delay[i] / 10);
+				pFrameMeta->SetMetadataByName(L"/grctlext/Delay", &propValue);
+
+				// Disposal: 2 = restore to background
+				propValue.vt = VT_UI1;
+				propValue.bVal = 2;
+				pFrameMeta->SetMetadataByName(L"/grctlext/Disposal", &propValue);
+
+				if (hasAlpha)
+				{
+					// 투명 플래그 활성화
+					propValue.vt = VT_BOOL;
+					propValue.boolVal = VARIANT_TRUE;
+					pFrameMeta->SetMetadataByName(L"/grctlext/TransparencyFlag", &propValue);
+
+					// 투명 색상 인덱스 (팔레트의 마지막 엔트리)
+					UINT colorCount = 0;
+					pPalette->GetColorCount(&colorCount);
+					propValue.vt = VT_UI1;
+					propValue.bVal = (BYTE)(colorCount > 0 ? colorCount - 1 : 0);
+					pFrameMeta->SetMetadataByName(L"/grctlext/TransparentColorIndex", &propValue);
+				}
+
+				PropVariantClear(&propValue);
+			}
+		}
+
+		_M(hr, pFrameEncode->WriteSource(pConverter.Get(), nullptr));
+		_M(hr, pFrameEncode->Commit());
+	}
+
+	_M(hr, pEncoder->Commit());
+
+	return hr;
+}
+
+HRESULT CSCD2Image::save(CString path, float quality)
+{
+	return save(m_img[m_frame_index].Get(), quality, path);
+}
+
 HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 {
 	//이미지가 정상적으로 로딩되어있지 않은 경우
@@ -1525,6 +1716,11 @@ HRESULT CSCD2Image::save(ID2D1Bitmap* img, float quality, LPCTSTR path, ...)
 	if (ext == _T("webp"))
 	{
 		hr = save_webp(filename);
+		return hr;
+	}
+	else if (ext == _T("gif"))
+	{
+		hr = save_gif(filename);
 		return hr;
 	}
 
@@ -1932,11 +2128,8 @@ void CSCD2Image::step(int interval)
 
 int CSCD2Image::get_frame_delay(int index)
 {
-	if (m_img.size() <= 1)
+	if (index >= m_img.size() || index >= m_frame_delay.size())
 		return 0;
-
-	if (index >= m_img.size())
-		return -1;
 
 	return m_frame_delay[index];
 }
@@ -2022,7 +2215,7 @@ void CSCD2Image::thread_animation()
 			m_frame_index = 0;
 
 		msg.frame_index = m_frame_index;
-		TRACE(_T("frame index = %d\n"), msg.frame_index);
+		//TRACE(_T("frame index = %d\n"), msg.frame_index);
 		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 
 		if (m_frame_delay.size() == 0)
@@ -2866,26 +3059,14 @@ void CSCD2Image::apply_orientation_transform()
 	const auto px = m_img[0]->GetPixelSize();
 	const size_t size = (size_t)(px.height) * (size_t)(px.width) * 4; // 이 값은 "최소" 크기라 pitch가 더 크면 부족함!
 
-	// 안전하게 하려면 1) data=nullptr로 out_stride 얻고 2) out_stride*height로 할당하세요.
-	extract_raw_data_from_bitmap(m_d2dc, m_img[0].Get(), nullptr, stride);
-	const size_t bufSize = (size_t)stride * (size_t)px.height;
-
-	delete[] m_data;
-	m_data = new uint8_t[bufSize];
-
-	extract_raw_data_from_bitmap(m_d2dc, m_img[0].Get(), m_data, stride);
-	//m_channel = 4;
-	m_stride = (int)stride; 
+	extract_raw_data_from_bitmap(m_d2dc, m_img[0].Get(), &m_data);
 }
 
 HRESULT CSCD2Image::extract_raw_data_from_bitmap(
 	ID2D1DeviceContext* d2dc,
 	ID2D1Bitmap1* src,
-	uint8_t* data,
-	UINT& out_stride)
+	uint8_t** data)
 {
-	out_stride = 0;
-
 	if (!d2dc || !src)
 		return E_INVALIDARG;
 
@@ -2895,11 +3076,12 @@ HRESULT CSCD2Image::extract_raw_data_from_bitmap(
 
 	// 우리가 원하는 최종 stride는 width*4 (packed BGRA)
 	const UINT packedStride = px.width * 4;
-	out_stride = packedStride;
+	const size_t bufSize = (size_t)packedStride * (size_t)px.height;
 
-	// 호출자가 버퍼 준비 안 했으면 size 계산용으로 종료
-	if (data == nullptr)
-		return S_FALSE;
+	if (*data != nullptr)
+		delete[] *data;
+
+	*data = new uint8_t[bufSize];
 
 	// CPU 읽기 가능한 bitmap 생성
 	D2D1_BITMAP_PROPERTIES1 cpuProps =
@@ -2927,11 +3109,24 @@ HRESULT CSCD2Image::extract_raw_data_from_bitmap(
 	for (UINT y = 0; y < px.height; ++y)
 	{
 		memcpy(
-			data + (size_t)y * packedStride,
+			*data + (size_t)y * packedStride,
 			mapped.bits + (size_t)y * mapped.pitch,
 			packedStride);
 	}
 
 	cpuBmp->Unmap();
+	m_stride = packedStride;
 	return S_OK;
+}
+
+bool CSCD2Image::set_frame_delay(int index, int delay_ms)
+{
+	if ((index < 0) || (index >= m_img.size()) || (delay_ms <= 0))
+		return false;
+
+	if (m_frame_delay.size() <= index)
+		m_frame_delay.resize(index + 1);
+
+	m_frame_delay[index] = delay_ms;
+	return true;
 }

@@ -255,7 +255,7 @@ struct CStringHash
 //HRESULT를 결과로 리턴받는 함수들에 사용.
 //#define		_M(exp) (([](HRESULT hr) { if (FAILED(hr)) /*_com_raise_error(hr);*/ return hr; })(exp));
 //hr과 함수식을 넘겨주면 hr에 그 처리결과가 들어가고 에러일 경우 에러를 표시한다.
-#define		_M(hr, exp) { if (FAILED(hr = (exp))) TRACEHR(hr); }
+#define		_M(hr, exp) {{ if (FAILED(hr = (exp))) TRACEHR(hr); }}
 
 typedef void (WINAPI* PGNSI)(LPSYSTEM_INFO);
 typedef BOOL(WINAPI* PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);

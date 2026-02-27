@@ -42,6 +42,7 @@ bool CSCEdit::create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID
 {
 	bool res = CEdit::Create(dwStyle, rect, pParentWnd, nID);
 	m_lf.lfWidth = 0;
+	m_is_dynamic_control = true;
 	PreSubclassWindow();
 	return res;
 }
@@ -541,6 +542,11 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 
 		TRACE(_T("keydown on CSCEdit. key = %d\n"), (int)pMsg->wParam);
 
+		//동적 생성한 후 어떤 메시지들을 직접 처리해야 하는 경우가 아니라면
+		//기본 메시지 처리되어야 한다.
+		if (!m_is_dynamic_control)
+			return CEdit::PreTranslateMessage(pMsg);
+
 		//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
 		switch (pMsg->wParam)
 		{
@@ -551,6 +557,9 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 					CSCEditMessage msg(this, WM_KILLFOCUS);
 					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, 0);
 					//WM_KILLFOCUS를 전달하고 그 안에서 edit_end()를 처리하므로 VK_RETURN에 대한 추가적인 처리는 하지 않아야하므로 TRUE를 리턴한다.
+					//20260226 scpark 이렇게 처리하면 dlg에서 값을 입력하고 enter를 쳐도 해당 dlg에서 OnOK()가 호출되지 않게 된다.
+					//동적으로 생성된 경우만 이렇게 처리하고 dlg에서 정적으로 생성된 경우는 기본 메시지 처리에 맡겨야 한다.
+					//이 목적으로 동적 생성한 컨트롤인지, dlg에서 정적으로 만들어지는 컨트롤인지 구분하기 위해 m_is_dynamic_control 플래그 추가.
 					return TRUE;
 				}
 				break;

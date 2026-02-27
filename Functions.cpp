@@ -6858,26 +6858,33 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		//ID2D1BitmapRenderTarget* textRenderTarget;
 		Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> textRenderTarget;
 		Microsoft::WRL::ComPtr<ID2D1Bitmap> textBitmap;
-		Microsoft::WRL::ComPtr<ID2D1Effect> shadowEffect;
-		Microsoft::WRL::ComPtr<ID2D1Effect> compositeEffect;
+		Microsoft::WRL::ComPtr<ID2D1Effect> shadow;
 
-		d2dc->CreateCompatibleRenderTarget(d2dc->GetSize(), &textRenderTarget);
+		// shadow blur 여유 공간
+		float padding = font_size;
+		float rtW = tm.widthIncludingTrailingWhitespace + padding * 2;
+		float rtH = tm.height + padding * 2;
+
+		// 텍스트 크기만큼만 생성 (윈도우 크기가 아닌)
+		d2dc->CreateCompatibleRenderTarget(D2D1::SizeF(rtW, rtH), &textRenderTarget);
 
 		if (textRenderTarget == nullptr)
 			return CRect();
 
+		// 로컬 좌표 (0+padding, 0+padding) 기준으로 그리기
+		float localY = padding - (lines[0].height - lines[0].baseline) * 0.5f;
+
 		textRenderTarget->BeginDraw();
 		textRenderTarget->Clear(D2D1::ColorF(0, 0, 0, 0));
-
-		textRenderTarget->DrawTextLayout(D2D1::Point2F(x, y - (lines[0].height - lines[0].baseline) * 0.5f), text_layout, shadow_brush);
+		//아래와 같이 x, y를 기준으로 할 경우 textRenderTarget 밖에 그려져서 shadow가 클리핑되는 문제가 발생했다.
+		//textRenderTarget->DrawTextLayout(D2D1::Point2F(x, y - (lines[0].height - lines[0].baseline) * 0.5f), text_layout, shadow_brush);
+		//따라서 이를 텍스트 크기만큼의 로컬 렌더 타겟을 생성하고 원점 기준으로 그리기 방식으로 변경하고
+		//위에서는 CreateCompatibleRenderTarget()에서 그 크기를 윈도우 크기가 아닌 텍스트 크기로 생성함.
+		textRenderTarget->DrawTextLayout(D2D1::Point2F(padding, localY), text_layout, shadow_brush);
 		textRenderTarget->EndDraw();
 		textRenderTarget->GetBitmap(&textBitmap);
 
-
-
-		Microsoft::WRL::ComPtr<ID2D1Effect> shadow;
 		d2dc->CreateEffect(CLSID_D2D1Shadow, &shadow);
-
 		shadow->SetInput(0, textBitmap.Get());
 		shadow->SetValue(D2D1_SHADOW_PROP_COLOR, get_d2color(cr_shadow));
 
@@ -6887,13 +6894,10 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		{
 			//설정값은 폰트 크기나 종류에 따라 달라져야만 최적의 그림자 효과가 적용될 듯 함.
 			shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 0.5f + i * 1.6f);
-			d2dc->DrawImage(shadow.Get());
+			// 실제 월드 좌표에 padding 오프셋을 빼서 정확한 위치에 배치
+			d2dc->DrawImage(shadow.Get(), D2D1::Point2F(x - padding, y - padding));
 		}
 	}
-	//else
-	//{
-	//	d2dc->DrawTextLayout(D2D1::Point2F(x + 1.0f, y + 1.0f), text_layout, shadow_brush);
-	//}
 
 	if (show_text)
 		d2dc->DrawTextLayout(D2D1::Point2F(x - 1, y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);

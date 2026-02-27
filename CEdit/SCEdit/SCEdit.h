@@ -187,6 +187,10 @@ public:
 protected:
 	bool			m_transparent = false;
 
+	//create()으로 동적 생성했는지, 일반 dlg 등에서 정적으로 생성했는지에 따라
+	//일부 메시지(ex. VK_RETURN)의 처리방식이 달라지므로 이를 구분하기 위한 플래그.
+	bool			m_is_dynamic_control = false;
+
 //vertical align
 	//vertical align이므로 DT_CENTER가 아닌 DT_VCENTER로 줘야 한다.
 	//단, 한줄이 아닌 여러줄을 입력하기 위한 CEdit일 경우는 DT_TOP으로 시작되어야 한다.

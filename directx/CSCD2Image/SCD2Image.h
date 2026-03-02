@@ -208,6 +208,8 @@ public:
 
 	//index 위치의 이미지를 클립보드로 복사한다. 0보다 작으면 현재 프레임 이미지를 클립보드로 복사한다.
 	bool					copy_to_clipboard(int index = -1);
+	//클립보드에 이미지가 있다면 클립보드의 이미지를 index 위치에 붙여넣는다. 0보다 작으면 현재 프레임 이미지에 붙여넣는다.
+	bool					paste_from_clipboard(int index = -1);
 
 //animated gif
 	bool					is_animated_image() { return (m_img.size() > 1); }

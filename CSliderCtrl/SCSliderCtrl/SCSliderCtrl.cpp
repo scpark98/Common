@@ -1766,9 +1766,13 @@ void CSCSliderCtrl::set_font_italic(bool italic)
 int32_t CSCSliderCtrl::step(int step)
 {
 	int pos = GetPos() + step;
+	Clamp(pos, get_lower(), get_upper());
+
 	SetPos(pos);
 	Invalidate();
+
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
+
 	return GetPos();
 }
 

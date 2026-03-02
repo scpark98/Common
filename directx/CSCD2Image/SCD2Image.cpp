@@ -2210,20 +2210,18 @@ void CSCD2Image::thread_animation()
 			continue;
 		}
 
+		msg.frame_index = m_frame_index;
+		TRACE(_T("frame index = %d\n"), msg.frame_index);
+		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
+
+		int delay = 100;
+		if (m_frame_delay.size() != 0 && m_frame_index < m_frame_delay.size())
+			delay = m_frame_delay[m_frame_index];// -elapsed;
+		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
+
 		m_frame_index++;
 		if (m_frame_index >= (int)m_img.size())
 			m_frame_index = 0;
-
-		msg.frame_index = m_frame_index;
-		//TRACE(_T("frame index = %d\n"), msg.frame_index);
-		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
-
-		if (m_frame_delay.size() == 0)
-			break;
-
-		//int elapsed = clock() - t0;
-		int delay = m_frame_delay[m_frame_index];// -elapsed;
-		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
 	}
 
 	m_run_thread_animation = false;
@@ -2859,6 +2857,189 @@ bool CSCD2Image::copy_to_clipboard(int index)
 
 	return true;
 #endif
+}
+
+//클립보드에 이미지가 있다면 클립보드의 이미지를 index 위치에 붙여넣는다. 0보다 작으면 현재 프레임 이미지에 붙여넣는다.
+bool CSCD2Image::paste_from_clipboard(int index)
+{
+	if (!m_d2dc || !m_pWICFactory)
+		return false;
+
+	if (index < 0)
+		index = m_frame_index;
+
+	if (index < 0 || index >= (int)m_img.size() || !m_img[index])
+		return false;
+
+	if (!OpenClipboard(nullptr))
+		return false;
+
+	ComPtr<IWICBitmapSource> wicSource;
+	HRESULT hr = E_FAIL;
+
+	// 1) PNG 포맷 시도 (alpha 보존)
+	static UINT cfPng = RegisterClipboardFormat(_T("PNG"));
+	HANDLE hPng = GetClipboardData(cfPng);
+	if (hPng)
+	{
+		SIZE_T size = GlobalSize(hPng);
+		void* pData = GlobalLock(hPng);
+		if (pData && size > 0)
+		{
+			ComPtr<IWICStream> stream;
+			hr = m_pWICFactory->CreateStream(&stream);
+			if (SUCCEEDED(hr))
+				hr = stream->InitializeFromMemory(reinterpret_cast<BYTE*>(pData), static_cast<DWORD>(size));
+
+			ComPtr<IWICBitmapDecoder> decoder;
+			if (SUCCEEDED(hr))
+				hr = m_pWICFactory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder);
+
+			ComPtr<IWICBitmapFrameDecode> frame;
+			if (SUCCEEDED(hr))
+				hr = decoder->GetFrame(0, &frame);
+
+			if (SUCCEEDED(hr))
+				wicSource = frame;
+
+			GlobalUnlock(hPng);
+		}
+	}
+
+	// 2) CF_DIBV5 시도
+	if (!wicSource)
+	{
+		HANDLE hDibv5 = GetClipboardData(CF_DIBV5);
+		if (hDibv5)
+		{
+			SIZE_T size = GlobalSize(hDibv5);
+			BYTE* pData = (BYTE*)GlobalLock(hDibv5);
+			if (pData && size > sizeof(BITMAPV5HEADER))
+			{
+				BITMAPV5HEADER* pbv5 = (BITMAPV5HEADER*)pData;
+				UINT w = abs((int)pbv5->bV5Width);
+				UINT h = abs((int)pbv5->bV5Height);
+				BYTE* pixels = pData + pbv5->bV5Size;
+				UINT stride = w * 4;
+
+				// top-down이면 그대로, bottom-up이면 뒤집기
+				std::vector<BYTE> flipped;
+				if (pbv5->bV5Height > 0)
+				{
+					flipped.resize(stride * h);
+					for (UINT y = 0; y < h; y++)
+						memcpy(flipped.data() + y * stride, pixels + (h - 1 - y) * stride, stride);
+					pixels = flipped.data();
+				}
+
+				ComPtr<IWICBitmap> wicBmp;
+				hr = m_pWICFactory->CreateBitmapFromMemory(w, h, GUID_WICPixelFormat32bppBGRA, stride, stride * h, pixels, &wicBmp);
+				if (SUCCEEDED(hr))
+					wicSource = wicBmp;
+			}
+			GlobalUnlock(hDibv5);
+		}
+	}
+
+	// 3) CF_DIB 시도 (alpha 없음)
+	if (!wicSource)
+	{
+		HANDLE hDib = GetClipboardData(CF_DIB);
+		if (hDib)
+		{
+			SIZE_T size = GlobalSize(hDib);
+			BYTE* pData = (BYTE*)GlobalLock(hDib);
+			if (pData && size > sizeof(BITMAPINFOHEADER))
+			{
+				BITMAPINFOHEADER* pbi = (BITMAPINFOHEADER*)pData;
+				UINT w = abs((int)pbi->biWidth);
+				UINT h = abs((int)pbi->biHeight);
+				UINT bpp = pbi->biBitCount;
+				UINT srcStride = ((w * bpp + 31) / 32) * 4;
+				BYTE* pixels = pData + pbi->biSize;
+
+				// 팔레트가 있으면 건너뛰기
+				if (bpp <= 8)
+				{
+					UINT paletteSize = pbi->biClrUsed ? pbi->biClrUsed : (1u << bpp);
+					pixels += paletteSize * sizeof(RGBQUAD);
+				}
+
+				// WIC 비트맵으로 변환
+				WICPixelFormatGUID srcFormat;
+				if (bpp == 32)      srcFormat = GUID_WICPixelFormat32bppBGRA;
+				else if (bpp == 24) srcFormat = GUID_WICPixelFormat24bppBGR;
+				else
+				{
+					GlobalUnlock(hDib);
+					CloseClipboard();
+					return false;
+				}
+
+				// bottom-up → top-down 변환
+				std::vector<BYTE> flipped(srcStride * h);
+				if (pbi->biHeight > 0)
+				{
+					for (UINT y = 0; y < h; y++)
+						memcpy(flipped.data() + y * srcStride, pixels + (h - 1 - y) * srcStride, srcStride);
+				}
+				else
+				{
+					memcpy(flipped.data(), pixels, srcStride * h);
+				}
+
+				ComPtr<IWICBitmap> wicBmp;
+				hr = m_pWICFactory->CreateBitmapFromMemory(w, h, srcFormat, srcStride, srcStride * h, flipped.data(), &wicBmp);
+				if (SUCCEEDED(hr))
+					wicSource = wicBmp;
+			}
+			GlobalUnlock(hDib);
+		}
+	}
+
+	CloseClipboard();
+
+	if (!wicSource)
+		return false;
+
+	// PBGRA로 변환
+	ComPtr<IWICFormatConverter> converter;
+	hr = m_pWICFactory->CreateFormatConverter(&converter);
+	if (FAILED(hr))
+		return false;
+
+	hr = converter->Initialize(wicSource.Get(), GUID_WICPixelFormat32bppPBGRA,
+		WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeMedianCut);
+	if (FAILED(hr))
+		return false;
+
+	// D2D 비트맵 생성
+	ComPtr<ID2D1Bitmap1> srcBitmap;
+	hr = m_d2dc->CreateBitmapFromWicBitmap(converter.Get(), nullptr, &srcBitmap);
+	if (FAILED(hr) || !srcBitmap)
+		return false;
+
+	// 대상 프레임에 복사 (크기가 다를 수 있으므로 DrawBitmap으로 리사이즈)
+	D2D1_SIZE_U dstSize = m_img[index]->GetPixelSize();
+	D2D1_SIZE_F srcSize = srcBitmap->GetSize();
+
+	ComPtr<ID2D1Image> prevTarget;
+	m_d2dc->GetTarget(&prevTarget);
+
+	m_d2dc->SetTarget(m_img[index].Get());
+	m_d2dc->BeginDraw();
+	m_d2dc->Clear(D2D1::ColorF(0, 0, 0, 0));
+
+	D2D1_RECT_F dstRect = get_ratio_rect(
+		D2D1::RectF(0, 0, (float)dstSize.width, (float)dstSize.height),
+		srcSize.width, srcSize.height);
+
+	m_d2dc->DrawBitmap(srcBitmap.Get(), dstRect);
+	hr = m_d2dc->EndDraw();
+
+	m_d2dc->SetTarget(prevTarget.Get());
+
+	return SUCCEEDED(hr);
 }
 
 WICBitmapTransformOptions CSCD2Image::ExifOrientationToWicTransform(USHORT orientation)

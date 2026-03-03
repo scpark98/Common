@@ -143,7 +143,19 @@ public:
 	CString					get_pixel_format_str(WICPixelFormatGUID *pf = NULL, bool simple = true, bool reset = false);
 
 	//alpha pixel들의 count를 구한다. (m_alpha_pixel_count < 0 || recount = true)이면 새로 계산한다. 그렇지 않으면 이미 구해놓은 정보를 리턴한다.
+	//현재는 gif, webp라도 0번 이미지에 대한 m_data를 대상으로 한다.
 	int						get_alpha_pixel_count(bool recount = false);
+
+	//index 위치의 이미지에서 배경 색상을 transparent 색상으로 변경한다.
+	//내부적으로는 make_back_transparent()를 호출하지만
+	//set_back_transparency()는 현재 이미지의 원본을 보존하면서 투명하게 만들고자 하는 경우에 사용한다. make_back_transparent()는 현재 이미지 자체를 변경한다.
+	void					set_back_transparency(int index, float inner_threshold = 30.f, float outer_threshold = 120.f);
+
+	//배경 색상을 자동 탐지하여 transparent 색상으로 변경한다.
+	//index = -1이면 모든 프레임에 대해 적용한다.
+	//inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
+	//outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)
+	void					make_back_transparent(int index, float inner_threshold = 30.f, float outer_threshold = 120.f);
 
 
 	//index 위치의 이미지가 nullptr이 아니고, width, height 모두 0보다 커야 한다.
@@ -184,6 +196,8 @@ public:
 	//null의 dst를 넘기고 copy()에서 new로 할당해도 되지만 new와 delete이 서로 다른 thread에서 수행될 수 없으므로 문제가 될 수 있다.
 	void					copy(CSCD2Image* dst);
 	//m_img의 특정 인덱스 이미지를 dst에 복사한다.
+	//반드시 new 또는 정적으로 메모리가 할당된 상태의 dst를 넘겨줘야 한다.
+	//null의 dst를 넘기고 copy()에서 new로 할당해도 되지만 new와 delete이 서로 다른 thread에서 수행될 수 없으므로 문제가 될 수 있다.
 	HRESULT					copy(int src_index, ID2D1Bitmap1* dst);
 
 	HRESULT					get_sub_img(CRect r, CSCD2Image *dest);
@@ -244,6 +258,7 @@ protected:
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 선언한다.
 	std::deque<ComPtr<ID2D1Bitmap1>> m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
 	ComPtr<ID2D1Bitmap1>	m_img_origin;
+	ComPtr<ID2D1Bitmap1>	m_img_origin_for_back_transparency;
 
 	uint8_t*				m_data = nullptr;
 	UINT					m_stride = 0;

@@ -257,6 +257,8 @@ public:
 	void			set_cross_cursor(UINT nID);
 
 	bool			m_skip_repaint = false;
+
+	void			set_back_transparency(int inner_threshold, int outer_threshold);
 protected:
 	enum TIMER_ID
 	{

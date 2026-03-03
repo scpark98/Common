@@ -1380,9 +1380,8 @@ void CSCD2ImageDlg::thread_gif_animation()
 
 void CSCD2ImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
 {
-	//m_br_zigzag.release();
-	//m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, cr_back, cr_fore);
-	rerender();
+	m_d2dc.set_zigzag_color(cr_back, cr_fore);
+	Invalidate();
 }
 
 LRESULT CSCD2ImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
@@ -1941,4 +1940,9 @@ void CSCD2ImageDlg::set_image(CSCD2Image* pImage)
 		m_slider_gif.ShowWindow(SW_HIDE);
 		Invalidate();
 	}
+}
+
+void CSCD2ImageDlg::set_back_transparency(int inner_threshold, int outer_threshold)
+{
+	m_images[0].set_back_transparency(inner_threshold, outer_threshold);
 }

@@ -155,9 +155,9 @@ HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* 
 	m_pWICFactory = WICfactory;
 	m_d2dc = d2context;
 
+	HRESULT hr;
 	ComPtr<ID2D1Bitmap1> img;
 	D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
-	HRESULT hr;
 	hr = d2context->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, properties, img.GetAddressOf());
 
 	m_img.push_back(img);
@@ -1281,6 +1281,15 @@ void CSCD2Image::copy(CSCD2Image* dst)
 	dst->m_ani_mirror = m_ani_mirror;
 }
 
+//m_img의 특정 인덱스 이미지를 dst에 복사한다.
+//반드시 new 또는 정적으로 메모리가 할당된 상태의 dst를 넘겨줘야 한다.
+//null의 dst를 넘기고 copy()에서 new로 할당해도 되지만 new와 delete이 서로 다른 thread에서 수행될 수 없으므로 문제가 될 수 있다.
+HRESULT CSCD2Image::copy(int src_index, ID2D1Bitmap1* dst)
+{
+	HRESULT hr = dst->CopyFromBitmap(nullptr, m_img[src_index].Get(), nullptr);
+	return hr;
+}
+
 HRESULT CSCD2Image::get_sub_img(CRect r, CSCD2Image* dest)
 {
 	D2D1_RECT_U rsrc = { r.left, r.top, r.right, r.bottom };
@@ -2398,6 +2407,7 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 }
 
 //alpha pixel들의 count를 구한다. (m_alpha_pixel_count < 0 || recount = true)이면 새로 계산한다. 그렇지 않으면 이미 구해놓은 정보를 리턴한다.
+//현재는 gif, webp라도 0번 이미지에 대한 m_data를 대상으로 한다.
 int CSCD2Image::get_alpha_pixel_count(bool recount)
 {
 	if (m_alpha_pixel_count >= 0 && !recount)
@@ -2430,6 +2440,288 @@ int CSCD2Image::get_alpha_pixel_count(bool recount)
 	}
 
 	return m_alpha_pixel_count;
+}
+
+//index 위치의 이미지에서 배경 색상을 transparent 색상으로 변경한다.
+//내부적으로는 make_back_transparent()를 호출하지만
+//set_back_transparency()는 현재 이미지의 원본을 보존하면서 투명하게 만들고자 하는 경우에 사용한다. make_back_transparent()는 현재 이미지 자체를 변경한다.
+void CSCD2Image::set_back_transparency(int index, float inner_threshold, float outer_threshold)
+{
+	if (m_img_origin_for_back_transparency == nullptr)
+	{
+		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+		get_d2dc()->CreateBitmap(D2D1::SizeU(get_width(), get_height()), nullptr, 0, properties, m_img_origin_for_back_transparency.GetAddressOf());
+		copy(index, m_img_origin_for_back_transparency.Get());
+	}
+	else
+	{
+		m_img[index].Get()->CopyFromBitmap(nullptr, m_img_origin_for_back_transparency.Get(), nullptr);
+	}
+
+	make_back_transparent(index, inner_threshold, outer_threshold);
+}
+
+
+//배경 색상을 자동 탐지하여 transparent 색상으로 변경한다.
+//index = -1이면 모든 프레임에 대해 적용한다.
+//inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
+//outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)
+void CSCD2Image::make_back_transparent(int index, float inner_threshold, float outer_threshold)
+{
+	if (!m_d2dc || m_img.empty())
+		return;
+
+	// threshold 유효성 보정
+	if (inner_threshold < 0.f) inner_threshold = 0.f;
+	if (outer_threshold <= inner_threshold) outer_threshold = inner_threshold + 1.f;
+
+	int from = index;
+	int to = index;
+
+	if (index < 0)
+	{
+		from = 0;
+		to = get_frame_count() - 1;
+	}
+
+	for (int i = from; i <= to; i++)
+	{
+		if (!m_img[i])
+			continue;
+
+		D2D1_SIZE_U px = m_img[i]->GetPixelSize();
+		UINT width = px.width;
+		UINT height = px.height;
+		if (width == 0 || height == 0)
+			continue;
+
+		// ── 1) GPU → CPU: 읽기 가능한 비트맵 생성 및 복사 ──
+		D2D1_BITMAP_PROPERTIES1 cpuProps = D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+
+		ComPtr<ID2D1Bitmap1> cpuBitmap;
+		HRESULT hr = m_d2dc->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, &cpuProps, &cpuBitmap);
+		if (FAILED(hr))
+			continue;
+
+		hr = cpuBitmap->CopyFromBitmap(nullptr, m_img[i].Get(), nullptr);
+		if (FAILED(hr))
+			continue;
+
+		D2D1_MAPPED_RECT mapped = {};
+		hr = cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped);
+		if (FAILED(hr))
+			continue;
+
+		// ── 2) 패딩 제거하며 로컬 버퍼로 복사 ──
+		UINT stride = width * 4;
+		UINT bufSize = stride * height;
+		std::vector<BYTE> pixels(bufSize);
+
+		for (UINT y = 0; y < height; ++y)
+			memcpy(pixels.data() + y * stride, mapped.bits + y * mapped.pitch, stride);
+
+		cpuBitmap->Unmap();
+
+
+		// ── 3) 배경색 자동 탐지: n픽셀 두께의 border 영역 전체 샘플링 ──
+		// 이미지 외곽 border_size 픽셀 두께의 테두리를 구성하는 모든 픽셀을
+		// un-premultiply 후 평균 RGB를 구한다.
+		const UINT border_size = max(1, min(4, min(width, height) / 8));
+		float sumR = 0.f;
+		float sumG = 0.f;
+		float sumB = 0.f;
+		int sampleCount = 0;
+
+		// 테두리 픽셀인지 판별하는 람다
+		// 4개의 strip으로 순회하면 중복 없이 효율적으로 처리할 수 있다.
+		// ┌────────────────────┐
+		// │  Top strip         │  y: [0, border_size)           x: [0, width)
+		// ├──┬──────────┬──┤
+		// │L │          │R │  y: [border_size, height-border)  x: [0, border) or [width-border, width)
+		// ├──┴──────────┴──┤
+		// │  Bottom strip      │  y: [height-border, height)    x: [0, width)
+		// └────────────────────┘
+
+		auto sample_pixel = [&](UINT x, UINT y)
+			{
+				BYTE* p = pixels.data() + y * stride + x * 4;
+				BYTE pB = p[0];
+				BYTE pG = p[1];
+				BYTE pR = p[2];
+				BYTE pA = p[3];
+
+				// 완전 투명 픽셀은 배경색 후보에서 제외
+				if (pA == 0)
+					return;
+
+				// un-premultiply
+				float fR, fG, fB;
+				if (pA == 255)
+				{
+					fR = (float)pR;
+					fG = (float)pG;
+					fB = (float)pB;
+				}
+				else
+				{
+					float invA = 255.0f / (float)pA;
+					fR = min(255.0f, pR * invA);
+					fG = min(255.0f, pG * invA);
+					fB = min(255.0f, pB * invA);
+				}
+
+				sumR += fR;
+				sumG += fG;
+				sumB += fB;
+				sampleCount++;
+			};
+
+		// Top strip: y=[0, border_size), x=[0, width)
+		for (UINT y = 0; y < border_size && y < height; ++y)
+			for (UINT x = 0; x < width; ++x)
+				sample_pixel(x, y);
+
+		// Bottom strip: y=[height-border_size, height), x=[0, width)
+		for (UINT y = (height > border_size ? height - border_size : 0); y < height; ++y)
+		{
+			if (y < border_size) continue;  // top strip과 겹치는 경우 방지 (이미지가 매우 작을 때)
+			for (UINT x = 0; x < width; ++x)
+				sample_pixel(x, y);
+		}
+
+		// Left strip: y=[border_size, height-border_size), x=[0, border_size)
+		UINT y_start = border_size;
+		UINT y_end = (height > border_size ? height - border_size : 0);
+		for (UINT y = y_start; y < y_end; ++y)
+			for (UINT x = 0; x < border_size && x < width; ++x)
+				sample_pixel(x, y);
+
+		// Right strip: y=[border_size, height-border_size), x=[width-border_size, width)
+		for (UINT y = y_start; y < y_end; ++y)
+			for (UINT x = (width > border_size ? width - border_size : 0); x < width; ++x)
+			{
+				if (x < border_size) continue;  // left strip과 겹치는 경우 방지
+				sample_pixel(x, y);
+			}
+
+		// 샘플이 하나도 없으면 (테두리가 모두 투명) 이 프레임은 건너뛴다
+		if (sampleCount == 0)
+			continue;
+
+		// ── 샘플 비율 검증: 이미 배경이 제거된 상태인지 판별 ──
+		// border 전체 픽셀 수 대비 비투명 샘플 비율이 너무 낮으면
+		// 남은 샘플이 전경 콘텐츠일 가능성이 높으므로 건너뛴다.
+		UINT totalBorderPixels = (width * border_size * 2) +
+			((height > border_size * 2 ? height - border_size * 2 : 0) * border_size * 2);
+		float sampleRatio = (totalBorderPixels > 0) ? (float)sampleCount / (float)totalBorderPixels : 0.f;
+
+		if (sampleRatio < 0.2f)
+		{
+			TRACE(_T("make_back_transparent: frame %d skipped - border already mostly transparent (ratio=%.1f%%, samples=%d/%d)\n"),
+				i, sampleRatio * 100.f, sampleCount, totalBorderPixels);
+			continue;
+		}
+
+		const float bgR = sumR / sampleCount;
+		const float bgG = sumG / sampleCount;
+		const float bgB = sumB / sampleCount;
+
+		TRACE(_T("make_back_transparent: frame %d, detected bg = RGB(%.0f, %.0f, %.0f) from %d border samples (border=%d)\n"), i, bgR, bgG, bgB, sampleCount, border_size);
+
+		// ── 4) 소프트 키 처리 (PBGRA → un-premultiply → 거리 계산 → 알파 수정 → re-premultiply) ──
+		for (UINT y = 0; y < height; ++y)
+		{
+			BYTE* row = pixels.data() + y * stride;
+
+			for (UINT x = 0; x < width; ++x)
+			{
+				BYTE* px = row + x * 4;
+				// PBGRA 레이아웃: [B, G, R, A]
+				BYTE pB = px[0];
+				BYTE pG = px[1];
+				BYTE pR = px[2];
+				BYTE pA = px[3];
+
+				// 완전 투명 픽셀은 건너뛰기
+				if (pA == 0)
+					continue;
+
+				// un-premultiply: straight BGRA 복원
+				float fR, fG, fB;
+				if (pA == 255)
+				{
+					fR = (float)pR;
+					fG = (float)pG;
+					fB = (float)pB;
+				}
+				else
+				{
+					float invA = 255.0f / (float)pA;
+					fR = min(255.0f, pR * invA);
+					fG = min(255.0f, pG * invA);
+					fB = min(255.0f, pB * invA);
+				}
+
+				// 배경색과의 유클리드 거리 계산
+				float dR = fR - bgR;
+				float dG = fG - bgG;
+				float dB = fB - bgB;
+				float distance = sqrtf(dR * dR + dG * dG + dB * dB);
+
+				// 소프트 키: 거리에 따른 새 알파 결정
+				float newAlphaF;
+				if (distance <= inner_threshold)
+				{
+					// 배경색과 매우 가까움 → 완전 투명
+					newAlphaF = 0.0f;
+				}
+				else if (distance >= outer_threshold)
+				{
+					// 배경색과 충분히 다름 → 원본 알파 유지
+					newAlphaF = (float)pA;
+				}
+				else
+				{
+					// 전환 구간: 선형 보간
+					float t = (distance - inner_threshold) / (outer_threshold - inner_threshold);
+					newAlphaF = (float)pA * t;
+				}
+
+				BYTE newA = (BYTE)(newAlphaF + 0.5f);
+
+				// re-premultiply: D2D가 요구하는 PBGRA 형식으로 복원
+				if (newA == 0)
+				{
+					px[0] = px[1] = px[2] = px[3] = 0;
+				}
+				else
+				{
+					float scale = (float)newA / 255.0f;
+					px[0] = (BYTE)(fB * scale + 0.5f);  // B
+					px[1] = (BYTE)(fG * scale + 0.5f);  // G
+					px[2] = (BYTE)(fR * scale + 0.5f);  // R
+					px[3] = newA;
+				}
+			}
+		}
+
+		// ── 5) CPU → GPU: 수정된 픽셀을 D2D 비트맵에 다시 쓰기 ──
+		D2D1_RECT_U destRect = D2D1::RectU(0, 0, width, height);
+		hr = m_img[i]->CopyFromMemory(&destRect, pixels.data(), stride);
+
+		if (FAILED(hr))
+		{
+			TRACE(_T("make_transparent: CopyFromMemory failed frame %d, hr=0x%08X\n"), i, hr);
+		}
+	}
+
+	// 알파 픽셀 수 변경되었으므로 재계산 플래그 설정을 하고 다시 계산하도록 해야 하지만
+	//실제 알파 픽셀의 정확한 갯수가 필요한게 아니고 알파 픽셀을 포함하는지를 판별하는 용도이므로
+	//0보다 큰 값을 지정한다.
+	//또는 위에서 계산 시 a < 255인 픽셀의 갯수를 센 후 여기 할당해줘도 된다.
+	m_alpha_pixel_count = 1;
 }
 
 bool ConvertPBGRAtoBGRA(

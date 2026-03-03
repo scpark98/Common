@@ -270,7 +270,7 @@ HRESULT CSCD2Context::create_device_context()
 	return hr;
 }
 
-ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(byte fore, byte back)
+ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(Gdiplus::Color cr_fore, Gdiplus::Color cr_back)
 {
 	if (m_zigzag_size <= 0.0f)
 		m_zigzag_size = 8.0f;
@@ -281,8 +281,8 @@ ComPtr<ID2D1BitmapBrush> CSCD2Context::create_zigzag_brush(byte fore, byte back)
 		BYTE* p = pixels + y * stride + x * 4; p[0] = B; p[1] = G; p[2] = R; p[3] = A;
 		};
 	// W B / B W
-	px(0, 0, fore, fore, fore, 255); px(1, 0, back, back, back, 255);
-	px(0, 1, back, back, back, 255);       px(1, 1, fore, fore, fore, 255);
+	px(0, 0, cr_fore.GetB(), cr_fore.GetG(), cr_fore.GetR(), 255); px(1, 0, cr_back.GetB(), cr_back.GetG(), cr_back.GetR(), 255);
+	px(0, 1, cr_back.GetB(), cr_back.GetG(), cr_back.GetR(), 255); px(1, 1, cr_fore.GetB(), cr_fore.GetG(), cr_fore.GetR(), 255);
 
 	D2D1_BITMAP_PROPERTIES props =
 		D2D1::BitmapProperties(

@@ -7,6 +7,7 @@
 #include <d3d11.h>
 #include <wincodec.h>
 #include <wrl/client.h>
+#include <gdiplus.h>
 
 /*
 [초기화 및 사용 방법]
@@ -88,6 +89,7 @@ public:
 	float						get_zigzag_size() { return m_zigzag_size; }
 	HRESULT						set_zigzag_size(float new_size);
 	ComPtr<ID2D1BitmapBrush>	get_zigzag_brush() { return m_br_zigzag; }
+	void						set_zigzag_color(Gdiplus::Color cr_fore, Gdiplus::Color cr_back) { m_br_zigzag = create_zigzag_brush(cr_fore, cr_back); }
 
 	HRESULT						on_size_changed(int cx, int cy);
 
@@ -113,6 +115,6 @@ protected:
 
 	float						m_zigzag_size = 8.0f;
 	ComPtr<ID2D1BitmapBrush>	m_br_zigzag;
-	ComPtr<ID2D1BitmapBrush>	create_zigzag_brush(byte fore = 200, byte back = 255);
+	ComPtr<ID2D1BitmapBrush>	create_zigzag_brush(Gdiplus::Color cr_fore = Gdiplus::Color(255, 200, 200, 200), Gdiplus::Color cr_back = Gdiplus::Color(255, 255, 255, 255));
 };
 

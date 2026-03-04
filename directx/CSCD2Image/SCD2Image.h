@@ -146,16 +146,24 @@ public:
 	//현재는 gif, webp라도 0번 이미지에 대한 m_data를 대상으로 한다.
 	int						get_alpha_pixel_count(bool recount = false);
 
+
+	//테두리 픽셀들을 이용하여 배경색을 자동 감지한다. index가 -1이면 index = m_frame_index
+	Gdiplus::Color			detect_back_color(int index = -1);
+
 	//index 위치의 이미지에서 배경 색상을 transparent 색상으로 변경한다.
 	//내부적으로는 make_back_transparent()를 호출하지만
 	//set_back_transparency()는 현재 이미지의 원본을 보존하면서 투명하게 만들고자 하는 경우에 사용한다. make_back_transparent()는 현재 이미지 자체를 변경한다.
-	void					set_back_transparency(int index, float inner_threshold = 30.f, float outer_threshold = 120.f);
+	void					set_back_transparency(int index, float inner_threshold = 30.f, float outer_threshold = 120.f, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
-	//배경 색상을 자동 탐지하여 transparent 색상으로 변경한다.
+	//cr_back을 Transparent가 아닌 다른 색으로 주면 해당 색상을 투명 배경색으로 처리한다.
+	//cr_back을 Red로 주면 실제 배경이 Red가 아니어도 Red에 가까운 색상은 투명하게 처리한다.
+	//inner_threshold는 완전히 투명한 색상과의 최대 허용 오차, (default 30)
+	//outer_threshold는 완전히 불투명한 색상과의 최소 허용 오차이다. (default 120)
+	//inner_threshold와 outer_threshold 사이의 색상은 반투명으로 처리한다.
 	//index = -1이면 모든 프레임에 대해 적용한다.
 	//inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
 	//outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)
-	void					make_back_transparent(int index, float inner_threshold = 30.f, float outer_threshold = 120.f);
+	void					make_back_transparent(int index, float inner_threshold = 30.f, float outer_threshold = 120.f, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 
 	//index 위치의 이미지가 nullptr이 아니고, width, height 모두 0보다 커야 한다.
@@ -227,6 +235,7 @@ public:
 
 //animated gif
 	bool					is_animated_image() { return (m_img.size() > 1); }
+	int						get_cur_frame_index() { return m_frame_index; }
 	int						get_frame_count() { return m_img.size(); }
 	int						get_frame_delay(int index);
 	void					set_parent(HWND hWnd) { m_parent = hWnd; }
@@ -258,6 +267,11 @@ protected:
 	//대부분은 이미지가 1장이지만 animated gif, jfif, webp 등은 n개의 이미지로 구성되므로 deque로 선언한다.
 	std::deque<ComPtr<ID2D1Bitmap1>> m_img = std::deque<ComPtr<ID2D1Bitmap1>>{ nullptr, };
 	ComPtr<ID2D1Bitmap1>	m_img_origin;
+
+	Gdiplus::Color			m_auto_detected_back_color = Gdiplus::Color::Transparent; //배경 제거 시 투명하게 만들 색상. 기본값은 투명색이지만 배경 제거 시 자동으로 탐지된 색상으로 변경된다.
+	//배경 제거 시 슬라이드로 파라미터를 조정하며 제거할 수 있는데 이미 제거를 시도한 이미지를 대상으로 또 제거시도하는 것은 의미없다.
+	//슬라이드로 제거 시도할 때 원본 이미지를 복원한 후 파라미터를 적용시켜야 한다.
+	//thread_animation() 등의 함수에서 표시되는 프레임이 변경될 때마다 이 변수는 리셋되어야 한다.
 	ComPtr<ID2D1Bitmap1>	m_img_origin_for_back_transparency;
 
 	uint8_t*				m_data = nullptr;
@@ -277,9 +291,6 @@ protected:
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play = true);
 
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
-
-
-
 
 //animated gif
 	HWND					m_parent = NULL; //animation이 진행될 때 parent에게 메시지를 보내기 위해 필요

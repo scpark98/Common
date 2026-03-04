@@ -131,7 +131,7 @@ public:
 
 //자체 편집 기능
 	//편집 기능 허용. click으로 편집시작, esc, return, 다른 항목 클릭으로 편집 종료된다.
-	void			set_use_edit(bool use = true);
+	void			set_use_edit(bool use = true, UINT align = ES_RIGHT);
 	CString			get_text_value() { return m_text_value; }
 	void			set_text_value(CString value = _T(""));
 	void			set_text_value(LPCTSTR format, ...);

@@ -629,8 +629,11 @@ void CSCStatic::OnPaint()
 			{
 				CRect rvalue = rc;
 				rvalue.left += (m_text_extent + 8);
+
+				//edit이 rc.right - 2까지이고 edit 자체의 내부 margin까지 고려하여 총 4만큼 빼줘야만 right align이 위치 변경없이 표현된다.
+				rvalue.right -= 4;
 				dc.SetTextColor(m_theme.cr_edit_text.ToCOLORREF());
-				dc.DrawText(m_text_value, rvalue, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+				dc.DrawText(m_text_value, rvalue, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 			}
 		}
 	}
@@ -699,21 +702,23 @@ void CSCStatic::set_textf(LPCTSTR format, ...)
 }
 
 //편집 기능 허용. click으로 편집시작, esc, return, 다른 항목 클릭으로 편집 종료된다.
-void CSCStatic::set_use_edit(bool use)
+void CSCStatic::set_use_edit(bool use, UINT align)
 {
 	m_use_edit = use;
 
 	if (m_use_edit)
 	{
+		ModifyStyle(0, SS_NOTIFY);
+
 		if (m_edit.m_hWnd == NULL)
 		{
-			DWORD dwStyle = ES_LEFT | /*WS_BORDER |*/ WS_CHILD | ES_AUTOHSCROLL | /*ES_AUTOVSCROLL |*/ ES_MULTILINE;
+			DWORD dwStyle = align | /*WS_BORDER |*/ WS_CHILD | ES_AUTOHSCROLL | /*ES_AUTOVSCROLL |*/ ES_MULTILINE;
 			m_edit.create(dwStyle, CRect(0, 0, 1, 1), this, 0);
 			m_edit.set_font_name(m_lf.lfFaceName);
 			m_edit.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));
 			m_edit.set_font_weight(m_lf.lfWeight);
 			m_edit.set_text_color(m_theme.cr_text);
-			m_edit.set_back_color(m_theme.cr_back);
+			m_edit.set_back_color(m_theme.cr_edit_back);
 		}
 	}
 	else
@@ -744,6 +749,9 @@ void CSCStatic::edit_begin()
 {
 	CRect rc;
 	GetClientRect(rc);
+
+	//rc.right - 2만큼 여백을 둬서 edit을 위치시킨다.
+	//이 여백값을 변경하면 OnPaint()에서 value text를 출력시키는 위치 또한 보정해줘야 한다.
 	CRect r(m_text_extent + 4, 3, rc.right - 2, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
@@ -1654,7 +1662,21 @@ LRESULT CSCStatic::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 	//TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
 	if (msg->message == WM_KILLFOCUS)
+	{
 		edit_end(true);
+	}
+	else if (msg->message == WM_KEYDOWN)
+	{
+		switch ((int)lParam)
+		{
+			case VK_RETURN:
+				edit_end(true);
+				break;
+			case VK_ESCAPE:
+				edit_end(false);
+				break;
+		}
+	}
 
 	Invalidate();
 

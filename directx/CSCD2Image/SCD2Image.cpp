@@ -146,6 +146,7 @@ void CSCD2Image::release()
 	m_channel = 0;
 	m_run_thread_animation = false;
 	m_thread_animation_terminated = true;
+	m_img_origin_for_back_transparency.Reset();
 }
 
 HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height)
@@ -313,6 +314,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	m_frame_index = 0;
 	m_img.clear();
 	m_frame_delay.clear();
+	m_img_origin_for_back_transparency.Reset();
 
 	IWICBitmap* pWicBitmap = NULL;
 	IWICFormatConverter* pFormatConverter = NULL;
@@ -2106,6 +2108,8 @@ int CSCD2Image::goto_frame(int index, bool pause)
 		index = 0;
 
 	m_frame_index = index;
+	m_img_origin_for_back_transparency.Reset();
+
 	if (pause)
 	{
 		m_ani_paused = true;
@@ -2130,6 +2134,8 @@ void CSCD2Image::step(int interval)
 		m_frame_index = m_img.size() - 1;
 	if (m_frame_index >= (int)m_img.size())
 		m_frame_index = 0;
+	
+	m_img_origin_for_back_transparency.Reset();
 
 	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
 	::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
@@ -2181,6 +2187,8 @@ void CSCD2Image::pause(int pos)
 
 	m_frame_index = pos;
 	m_ani_paused = true;
+
+	m_img_origin_for_back_transparency.Reset();
 }
 
 bool CSCD2Image::stop()
@@ -2209,24 +2217,33 @@ void CSCD2Image::thread_animation()
 	{
 		t0 = clock();
 
-		if (m_ani_paused)
-		{
-			if (!m_run_thread_animation)
-				break;
-
-			//TRACE(_T("paused\n"));
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			continue;
-		}
-
 		msg.frame_index = m_frame_index;
 		TRACE(_T("frame index = %d\n"), msg.frame_index);
 		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
+
+		if (!m_run_thread_animation)
+			break;
+
+		//프레임이 바뀔때마다 m_img_origin_for_back_transparency는 리셋되어야 한다.
+		m_img_origin_for_back_transparency.Reset();
 
 		int delay = 100;
 		if (m_frame_delay.size() != 0 && m_frame_index < m_frame_delay.size())
 			delay = m_frame_delay[m_frame_index];// -elapsed;
 		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
+
+		while (m_ani_paused)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(33));
+
+			if (!m_run_thread_animation)
+			{
+				m_run_thread_animation = false;
+				m_thread_animation_terminated = true;
+				TRACE(_T("%s terminated.\n"), __function__);
+				return;
+			}
+		}
 
 		m_frame_index++;
 		if (m_frame_index >= (int)m_img.size())
@@ -2442,10 +2459,167 @@ int CSCD2Image::get_alpha_pixel_count(bool recount)
 	return m_alpha_pixel_count;
 }
 
+//테두리 픽셀들을 이용하여 배경색을 자동 감지한다.
+Gdiplus::Color CSCD2Image::detect_back_color(int index)
+{
+	if (index < 0 || index >= (int)m_img.size())
+		index = m_frame_index;
+
+	Gdiplus::Color cr_back(0, 0, 0, 0);
+
+	if (!m_img[index])
+		return cr_back;
+
+	D2D1_SIZE_U px = m_img[index]->GetPixelSize();
+	UINT width = px.width;
+	UINT height = px.height;
+	if (width == 0 || height == 0)
+		return cr_back;
+
+	// ── 1) GPU → CPU: 읽기 가능한 비트맵 생성 및 복사 ──
+	D2D1_BITMAP_PROPERTIES1 cpuProps = D2D1::BitmapProperties1(
+		D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+		D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+
+	ComPtr<ID2D1Bitmap1> cpuBitmap;
+	HRESULT hr = m_d2dc->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, &cpuProps, &cpuBitmap);
+	if (FAILED(hr))
+		return cr_back;
+
+	hr = cpuBitmap->CopyFromBitmap(nullptr, m_img[index].Get(), nullptr);
+	if (FAILED(hr))
+		return cr_back;
+
+	D2D1_MAPPED_RECT mapped = {};
+	hr = cpuBitmap->Map(D2D1_MAP_OPTIONS_READ, &mapped);
+	if (FAILED(hr))
+		return cr_back;
+
+	// ── 2) 패딩 제거하며 로컬 버퍼로 복사 ──
+	UINT stride = width * 4;
+	UINT bufSize = stride * height;
+	std::vector<BYTE> pixels(bufSize);
+
+	for (UINT y = 0; y < height; ++y)
+		memcpy(pixels.data() + y * stride, mapped.bits + y * mapped.pitch, stride);
+
+	cpuBitmap->Unmap();
+
+
+	// ── 3) 배경색 자동 탐지: n픽셀 두께의 border 영역 전체 샘플링 ──
+	// 이미지 외곽 border_size 픽셀 두께의 테두리를 구성하는 모든 픽셀을
+	// un-premultiply 후 평균 RGB를 구한다.
+	const UINT border_size = max(1, min(4, min(width, height) / 8));
+	float sumR = 0.f;
+	float sumG = 0.f;
+	float sumB = 0.f;
+	int sampleCount = 0;
+
+	// 테두리 픽셀인지 판별하는 람다
+	// 4개의 strip으로 순회하면 중복 없이 효율적으로 처리할 수 있다.
+	// ┌────────────────────┐
+	// │  Top strip         │  y: [0, border_size)           x: [0, width)
+	// ├──┬──────────┬──┤
+	// │L │          │R │  y: [border_size, height-border)  x: [0, border) or [width-border, width)
+	// ├──┴──────────┴──┤
+	// │  Bottom strip      │  y: [height-border, height)    x: [0, width)
+	// └────────────────────┘
+
+	auto sample_pixel = [&](UINT x, UINT y)
+		{
+			BYTE* p = pixels.data() + y * stride + x * 4;
+			BYTE pB = p[0];
+			BYTE pG = p[1];
+			BYTE pR = p[2];
+			BYTE pA = p[3];
+
+			// 완전 투명 픽셀은 배경색 후보에서 제외
+			if (pA == 0)
+				return;
+
+			// un-premultiply
+			float fR, fG, fB;
+			if (pA == 255)
+			{
+				fR = (float)pR;
+				fG = (float)pG;
+				fB = (float)pB;
+			}
+			else
+			{
+				float invA = 255.0f / (float)pA;
+				fR = min(255.0f, pR * invA);
+				fG = min(255.0f, pG * invA);
+				fB = min(255.0f, pB * invA);
+			}
+
+			sumR += fR;
+			sumG += fG;
+			sumB += fB;
+			sampleCount++;
+		};
+
+	// Top strip: y=[0, border_size), x=[0, width)
+	for (UINT y = 0; y < border_size && y < height; ++y)
+		for (UINT x = 0; x < width; ++x)
+			sample_pixel(x, y);
+
+	// Bottom strip: y=[height-border_size, height), x=[0, width)
+	for (UINT y = (height > border_size ? height - border_size : 0); y < height; ++y)
+	{
+		if (y < border_size) continue;  // top strip과 겹치는 경우 방지 (이미지가 매우 작을 때)
+		for (UINT x = 0; x < width; ++x)
+			sample_pixel(x, y);
+	}
+
+	// Left strip: y=[border_size, height-border_size), x=[0, border_size)
+	UINT y_start = border_size;
+	UINT y_end = (height > border_size ? height - border_size : 0);
+	for (UINT y = y_start; y < y_end; ++y)
+		for (UINT x = 0; x < border_size && x < width; ++x)
+			sample_pixel(x, y);
+
+	// Right strip: y=[border_size, height-border_size), x=[width-border_size, width)
+	for (UINT y = y_start; y < y_end; ++y)
+		for (UINT x = (width > border_size ? width - border_size : 0); x < width; ++x)
+		{
+			if (x < border_size) continue;  // left strip과 겹치는 경우 방지
+			sample_pixel(x, y);
+		}
+
+	// 샘플이 하나도 없으면 (테두리가 모두 투명) 이 프레임은 건너뛴다
+	if (sampleCount == 0)
+		return cr_back;
+
+	// ── 샘플 비율 검증: 이미 배경이 제거된 상태인지 판별 ──
+	// border 전체 픽셀 수 대비 비투명 샘플 비율이 너무 낮으면
+	// 남은 샘플이 전경 콘텐츠일 가능성이 높으므로 건너뛴다.
+	UINT totalBorderPixels = (width * border_size * 2) +
+		((height > border_size * 2 ? height - border_size * 2 : 0) * border_size * 2);
+	float sampleRatio = (totalBorderPixels > 0) ? (float)sampleCount / (float)totalBorderPixels : 0.f;
+
+	if (sampleRatio < 0.2f)
+	{
+		TRACE(_T("make_back_transparent: frame %d skipped - border already mostly transparent (ratio=%.1f%%, samples=%d/%d)\n"),
+			index, sampleRatio * 100.f, sampleCount, totalBorderPixels);
+		return cr_back;
+	}
+
+	const float bgR = sumR / sampleCount;
+	const float bgG = sumG / sampleCount;
+	const float bgB = sumB / sampleCount;
+
+	TRACE(_T("make_back_transparent: frame %d, detected bg = RGB(%.0f, %.0f, %.0f) from %d border samples (border=%d)\n"), index, bgR, bgG, bgB, sampleCount, border_size);
+
+	cr_back = Gdiplus::Color(255, (BYTE)bgR, (BYTE)bgG, (BYTE)bgB);
+
+	return cr_back;
+}
+
 //index 위치의 이미지에서 배경 색상을 transparent 색상으로 변경한다.
 //내부적으로는 make_back_transparent()를 호출하지만
 //set_back_transparency()는 현재 이미지의 원본을 보존하면서 투명하게 만들고자 하는 경우에 사용한다. make_back_transparent()는 현재 이미지 자체를 변경한다.
-void CSCD2Image::set_back_transparency(int index, float inner_threshold, float outer_threshold)
+void CSCD2Image::set_back_transparency(int index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back)
 {
 	if (m_img_origin_for_back_transparency == nullptr)
 	{
@@ -2458,7 +2632,9 @@ void CSCD2Image::set_back_transparency(int index, float inner_threshold, float o
 		m_img[index].Get()->CopyFromBitmap(nullptr, m_img_origin_for_back_transparency.Get(), nullptr);
 	}
 
-	make_back_transparent(index, inner_threshold, outer_threshold);
+	trace(inner_threshold);
+	trace(outer_threshold);
+	make_back_transparent(index, inner_threshold, outer_threshold, cr_back);
 }
 
 
@@ -2466,7 +2642,7 @@ void CSCD2Image::set_back_transparency(int index, float inner_threshold, float o
 //index = -1이면 모든 프레임에 대해 적용한다.
 //inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
 //outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)
-void CSCD2Image::make_back_transparent(int index, float inner_threshold, float outer_threshold)
+void CSCD2Image::make_back_transparent(int index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back)
 {
 	if (!m_d2dc || m_img.empty())
 		return;
@@ -2624,20 +2800,31 @@ void CSCD2Image::make_back_transparent(int index, float inner_threshold, float o
 			continue;
 		}
 
-		const float bgR = sumR / sampleCount;
-		const float bgG = sumG / sampleCount;
-		const float bgB = sumB / sampleCount;
+		float bgR = sumR / sampleCount;
+		float bgG = sumG / sampleCount;
+		float bgB = sumB / sampleCount;
 
 		TRACE(_T("make_back_transparent: frame %d, detected bg = RGB(%.0f, %.0f, %.0f) from %d border samples (border=%d)\n"), i, bgR, bgG, bgB, sampleCount, border_size);
+
+		if (cr_back.GetValue() != Gdiplus::Color::Transparent)
+		{
+			bgR = (float)cr_back.GetR();
+			bgG = (float)cr_back.GetG();
+			bgB = (float)cr_back.GetB();
+			TRACE(_T("use specified cr_back = RGB(%.0f, %.0f, %.0f)\n"), i, bgR, bgG, bgB);
+		}
 
 		// ── 4) 소프트 키 처리 (PBGRA → un-premultiply → 거리 계산 → 알파 수정 → re-premultiply) ──
 		for (UINT y = 0; y < height; ++y)
 		{
 			BYTE* row = pixels.data() + y * stride;
+			BYTE* data_row = m_data + y * stride;
 
 			for (UINT x = 0; x < width; ++x)
 			{
 				BYTE* px = row + x * 4;
+				BYTE* data_px = data_row + x * 4;
+
 				// PBGRA 레이아웃: [B, G, R, A]
 				BYTE pB = px[0];
 				BYTE pG = px[1];
@@ -2695,6 +2882,7 @@ void CSCD2Image::make_back_transparent(int index, float inner_threshold, float o
 				if (newA == 0)
 				{
 					px[0] = px[1] = px[2] = px[3] = 0;
+					data_px[0] = data_px[1] = data_px[2] = data_px[3] = 0;
 				}
 				else
 				{
@@ -2703,6 +2891,10 @@ void CSCD2Image::make_back_transparent(int index, float inner_threshold, float o
 					px[1] = (BYTE)(fG * scale + 0.5f);  // G
 					px[2] = (BYTE)(fR * scale + 0.5f);  // R
 					px[3] = newA;
+					data_px[0] = (BYTE)fB;
+					data_px[1] = (BYTE)fG;
+					data_px[2] = (BYTE)fR;
+					data_px[3] = px[3];
 				}
 			}
 		}

@@ -1130,6 +1130,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_hover			= Gdiplus::Color(255, 229, 243, 255);
 			cr_back_alternate		= get_color(cr_back, -12);
 
+			cr_edit_text			= cr_text;
+			cr_edit_back			= Gdiplus::Color::White;
+
 			cr_title_text			= get_sys_color(COLOR_CAPTIONTEXT);
 			cr_title_back_active	= get_sys_color(COLOR_ACTIVECAPTION);
 			cr_title_back_inactive	= get_sys_color(COLOR_INACTIVECAPTION);

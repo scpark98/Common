@@ -681,8 +681,11 @@ bool CSCD2ImageDlg::paste_from_clipboard()
 
 Gdiplus::RectF CSCD2ImageDlg::get_image_roi()
 {
-	if (m_image_roi.IsEmptyArea())
-		return Gdiplus::RectF(0, 0, m_images[0].get_width(), m_images[0].get_height());
+	//roi가 설정되어 있지 않다면 전체 이미지 영역을 roi로 간주하도록 했었으나
+	//roi가 설정되어 있지 않은 상태와 roi가 이미지 전체 영역으로 설정된 상태를 구분하기 위해서는
+	//아래 코드를 제거시켜야 한다.
+	//if (m_image_roi.IsEmptyArea())
+	//	return Gdiplus::RectF(0, 0, m_images[0].get_width(), m_images[0].get_height());
 
 	return m_image_roi;
 }
@@ -1322,62 +1325,6 @@ void CSCD2ImageDlg::goto_frame_percent(int pos, bool pause)
 	goto_frame((int)dpos, pause);
 }
 
-/*
-void CSCD2ImageDlg::thread_gif_animation()
-{
-	if (m_img[0].get_frame_count() < 2)
-		return;
-
-	m_frame_index = 0;
-	m_run_thread_animation = true;
-	m_thread_animation_terminated = false;
-
-	long t0 = clock();
-	long t1 = t0;
-
-	while (m_run_thread_animation)
-	{
-		GUID   pageGuid = Gdiplus::FrameDimensionTime;
-
-		if (m_paused)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			continue;
-		}
-
-		if (!m_run_thread_animation)
-			break;
-
-		trace(m_frame_index);
-		m_slider_gif.set_pos(m_frame_index + 1);
-
-		m_frame_index++;
-		if (m_frame_index >= m_img[0].get_frame_count())
-			m_frame_index = 0;
-
-		m_img[0].m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-
-		if (!m_run_thread_animation)
-			break;
-
-		Invalidate();
-
-		//delay는 해당 프레임에 설정된 delay를 그대로 주면 안되고
-		//전 프레임부터 현 프레임까지 재생하는데 걸린 시간은 빼줘야 한다.
-		t1 = clock();
-		long display_delay = t1 - t0;
-		long delay = ((long*)(m_img[0].m_frame_delay->value))[m_frame_index] * 10;
-
-		if (delay > display_delay)
-			std::this_thread::sleep_for(std::chrono::milliseconds((delay - display_delay)));
-		t0 = clock();
-	}
-
-	m_run_thread_animation = false;
-	m_thread_animation_terminated = true;
-}
-*/
-
 void CSCD2ImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore)
 {
 	m_d2dc.set_zigzag_color(cr_back, cr_fore);
@@ -1690,6 +1637,12 @@ void CSCD2ImageDlg::goto_index(int index)
 	display_image(index);
 }
 
+//m_images에 담긴 이미지 파일들 중 현재 표시중인 이미지 리턴
+CSCD2Image* CSCD2ImageDlg::get_cur_image()
+{
+	return (m_images.size() > 0 ? &m_images[0] : nullptr);
+}
+
 //테스트 목적으로 파일을 저장하여 확인할 경우는 주의해야 한다.
 //ASee 프로젝트에서는 CDirWatcher에 의해 현재 이미지가 속한 폴더를 모니터링하고 있으므로
 //계속 refresh하게 되어 thread_buffering()에서 계속 오류가 발생한 적이 있다.
@@ -1942,7 +1895,17 @@ void CSCD2ImageDlg::set_image(CSCD2Image* pImage)
 	}
 }
 
-void CSCD2ImageDlg::set_back_transparency(int inner_threshold, int outer_threshold)
+//현재 재생중인 animated image의 프레임 인덱스 리턴. 애니메이션이 아닌 이미지인 경우는 0을 리턴한다.
+int CSCD2ImageDlg::get_cur_frame_index()
 {
-	m_images[0].set_back_transparency(inner_threshold, outer_threshold);
+	if (m_images.size() == 0 || m_images[0].is_empty())
+		return -1;
+	return m_images[0].get_cur_frame_index();
 }
+
+void CSCD2ImageDlg::set_back_transparency(int target_index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back)
+{
+	m_images[0].set_back_transparency(target_index, inner_threshold, outer_threshold, cr_back);
+	Invalidate();
+}
+

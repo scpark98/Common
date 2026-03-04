@@ -554,8 +554,8 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 			case VK_RETURN:
 				if (!(GetStyle() & ES_WANTRETURN))
 				{
-					CSCEditMessage msg(this, WM_KILLFOCUS);
-					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, 0);
+					CSCEditMessage msg(this, WM_KEYDOWN);
+					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, pMsg->wParam);
 					//WM_KILLFOCUS를 전달하고 그 안에서 edit_end()를 처리하므로 VK_RETURN에 대한 추가적인 처리는 하지 않아야하므로 TRUE를 리턴한다.
 					//20260226 scpark 이렇게 처리하면 dlg에서 값을 입력하고 enter를 쳐도 해당 dlg에서 OnOK()가 호출되지 않게 된다.
 					//동적으로 생성된 경우만 이렇게 처리하고 dlg에서 정적으로 생성된 경우는 기본 메시지 처리에 맡겨야 한다.
@@ -566,7 +566,7 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 			case VK_ESCAPE:
 				{
 					CSCEditMessage msg(this, WM_KEYDOWN);
-					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, VK_ESCAPE);
+					::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, pMsg->wParam);
 					return TRUE;
 				}
 				break;

@@ -150,7 +150,10 @@ public:
 	//index = 0 (goto first image), index = -1 (goto last image)
 	void			goto_index(int index);
 	int				get_image_count() { return m_files.size(); }
+	//m_images에 담긴 이미지 파일들 중 현재 표시중인 파일 인덱스 리턴
 	int				get_cur_index() { return m_index; }
+	//m_images에 담긴 이미지 파일들 중 현재 표시중인 이미지 리턴
+	CSCD2Image*		get_cur_image();
 
 	//quality = 0.0f(lowest quality) ~ 1.0f(best quality)
 	HRESULT			save(CString filepath, float quality);
@@ -248,6 +251,9 @@ public:
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
 
+	//현재 재생중인 animated image의 프레임 인덱스 리턴. 애니메이션이 아닌 이미지인 경우는 0을 리턴한다.
+	int				get_cur_frame_index();
+
 //exif
 	double			get_gps_latitude();
 	double			get_gps_longitude();
@@ -258,7 +264,12 @@ public:
 
 	bool			m_skip_repaint = false;
 
-	void			set_back_transparency(int inner_threshold, int outer_threshold);
+	//cr_back을 Transparent가 아닌 다른 색으로 주면 해당 색상을 투명 배경색으로 처리한다.
+	//cr_back을 Red로 주면 실제 배경이 Red가 아니어도 Red에 가까운 색상은 투명하게 처리한다.
+	//inner_threshold는 완전히 투명한 색상과의 최대 허용 오차, (default 30)
+	//outer_threshold는 완전히 불투명한 색상과의 최소 허용 오차이다. (default 120)
+	//inner_threshold와 outer_threshold 사이의 색상은 반투명으로 처리한다.
+	void			set_back_transparency(int target_index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 protected:
 	enum TIMER_ID
 	{

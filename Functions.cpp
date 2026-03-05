@@ -6724,7 +6724,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				int shadow_depth,
 				float thickness)
 {
-	d2dc->DrawText(text, text.GetLength(), dWriteTextFormat, CRect_to_d2Rect(rTarget), brush);
+	d2dc->DrawText((CStringW)text, text.GetLength(), dWriteTextFormat, CRect_to_d2Rect(rTarget), brush);
 	return CRect();
 }
 
@@ -6782,7 +6782,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	d2dc->CreateSolidColorBrush(get_d2color(cr_shadow), &shadow_brush);
 
 	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&write_factory));
-	write_factory->CreateTextFormat(font_name, nullptr, (DWRITE_FONT_WEIGHT)font_weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, _T("ko-kr"), &write_format);
+	write_factory->CreateTextFormat((CStringW)font_name, nullptr, (DWRITE_FONT_WEIGHT)font_weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, CStringW("ko-kr"), &write_format);
 
 	//CDC와는 다르게 뭔가 갱신할 때 write_format 생성이 실패할때가 있다.
 	if (write_format == NULL)
@@ -6802,7 +6802,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	//);
 
 	float line_spacing = 1.5f;
-	write_factory->CreateTextLayout(text, text.GetLength(), write_format, rTarget.right - rTarget.left, rTarget.bottom - rTarget.top, &text_layout);
+	write_factory->CreateTextLayout((CStringW)text, text.GetLength(), write_format, rTarget.right - rTarget.left, rTarget.bottom - rTarget.top, &text_layout);
 
 	if (text_layout == nullptr)
 		return CRect();
@@ -8442,7 +8442,7 @@ char* ANSItoUTF8(char* pszCode)
 	return pszUTFCode;
 }
 
-CString utf82CString(std::string inputtext)
+CString utf8toCString(std::string inputtext)
 {
 #ifdef _UNICODE
 	return CString(utf8ToUnicode(inputtext).c_str());

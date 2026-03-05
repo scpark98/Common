@@ -269,7 +269,7 @@ public:
 	//inner_threshold는 완전히 투명한 색상과의 최대 허용 오차, (default 30)
 	//outer_threshold는 완전히 불투명한 색상과의 최소 허용 오차이다. (default 120)
 	//inner_threshold와 outer_threshold 사이의 색상은 반투명으로 처리한다.
-	void			set_back_transparency(int target_index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+	void			set_back_transparency(int target_index, int inner_threshold, int outer_threshold, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 protected:
 	enum TIMER_ID
 	{

@@ -983,7 +983,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 					if (SUCCEEDED(hr))
 					{
 						disposal = propValue.bVal;
-						trace(disposal);
+						//trace(disposal);
 					}
 					PropVariantClear(&propValue);
 				}
@@ -1003,7 +1003,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 							if (SUCCEEDED(hr) && propValue.uiVal < actualColors)
 							{
 								transparentIndex = static_cast<int>(propValue.uiVal);
-								trace(transparentIndex);
+								//trace(transparentIndex);
 							}
 						}
 					}
@@ -2218,7 +2218,7 @@ void CSCD2Image::thread_animation()
 		t0 = clock();
 
 		msg.frame_index = m_frame_index;
-		TRACE(_T("frame index = %d\n"), msg.frame_index);
+		//TRACE(_T("frame index = %d\n"), msg.frame_index);
 		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 
 		if (!m_run_thread_animation)
@@ -2619,21 +2619,26 @@ Gdiplus::Color CSCD2Image::detect_back_color(int index)
 //index 위치의 이미지에서 배경 색상을 transparent 색상으로 변경한다.
 //내부적으로는 make_back_transparent()를 호출하지만
 //set_back_transparency()는 현재 이미지의 원본을 보존하면서 투명하게 만들고자 하는 경우에 사용한다. make_back_transparent()는 현재 이미지 자체를 변경한다.
-void CSCD2Image::set_back_transparency(int index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back)
+void CSCD2Image::set_back_transparency(int index, int inner_threshold, int outer_threshold, Gdiplus::Color cr_back)
 {
-	if (m_img_origin_for_back_transparency == nullptr)
+	//투명 처리 파라미터를 변경해가면서 이미지의 변화를 비교하려면 원본 백업 및 재사용이 필요하다.
+	//단, index = -1로 넘어왔다면 모든 프레임에 대해 일괄 적용이므로 백업이 의미없다.
+	if (index >= 0)
 	{
-		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
-		get_d2dc()->CreateBitmap(D2D1::SizeU(get_width(), get_height()), nullptr, 0, properties, m_img_origin_for_back_transparency.GetAddressOf());
-		copy(index, m_img_origin_for_back_transparency.Get());
-	}
-	else
-	{
-		m_img[index].Get()->CopyFromBitmap(nullptr, m_img_origin_for_back_transparency.Get(), nullptr);
+		if (m_img_origin_for_back_transparency == nullptr)
+		{
+			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+			get_d2dc()->CreateBitmap(D2D1::SizeU(get_width(), get_height()), nullptr, 0, properties, m_img_origin_for_back_transparency.GetAddressOf());
+			copy(index, m_img_origin_for_back_transparency.Get());
+		}
+		else
+		{
+			m_img[index].Get()->CopyFromBitmap(nullptr, m_img_origin_for_back_transparency.Get(), nullptr);
+		}
 	}
 
-	trace(inner_threshold);
-	trace(outer_threshold);
+	//trace(inner_threshold);
+	//trace(outer_threshold);
 	make_back_transparent(index, inner_threshold, outer_threshold, cr_back);
 }
 
@@ -2642,14 +2647,14 @@ void CSCD2Image::set_back_transparency(int index, float inner_threshold, float o
 //index = -1이면 모든 프레임에 대해 적용한다.
 //inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
 //outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)
-void CSCD2Image::make_back_transparent(int index, float inner_threshold, float outer_threshold, Gdiplus::Color cr_back)
+void CSCD2Image::make_back_transparent(int index, int inner_threshold, int outer_threshold, Gdiplus::Color cr_back)
 {
 	if (!m_d2dc || m_img.empty())
 		return;
 
 	// threshold 유효성 보정
-	if (inner_threshold < 0.f) inner_threshold = 0.f;
-	if (outer_threshold <= inner_threshold) outer_threshold = inner_threshold + 1.f;
+	if (inner_threshold < 0) inner_threshold = 0;
+	if (outer_threshold <= inner_threshold) outer_threshold = inner_threshold + 1;
 
 	int from = index;
 	int to = index;
@@ -2859,12 +2864,12 @@ void CSCD2Image::make_back_transparent(int index, float inner_threshold, float o
 
 				// 소프트 키: 거리에 따른 새 알파 결정
 				float newAlphaF;
-				if (distance <= inner_threshold)
+				if (distance <= (float)inner_threshold)
 				{
 					// 배경색과 매우 가까움 → 완전 투명
 					newAlphaF = 0.0f;
 				}
-				else if (distance >= outer_threshold)
+				else if (distance >= (float)outer_threshold)
 				{
 					// 배경색과 충분히 다름 → 원본 알파 유지
 					newAlphaF = (float)pA;
@@ -2872,7 +2877,7 @@ void CSCD2Image::make_back_transparent(int index, float inner_threshold, float o
 				else
 				{
 					// 전환 구간: 선형 보간
-					float t = (distance - inner_threshold) / (outer_threshold - inner_threshold);
+					float t = (distance - (float)inner_threshold) / (float)(outer_threshold - inner_threshold);
 					newAlphaF = (float)pA * t;
 				}
 

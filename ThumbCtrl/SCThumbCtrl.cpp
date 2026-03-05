@@ -293,12 +293,12 @@ void CSCThumbCtrl::OnPaint()
 
 		if (m_thumb[i].load_completed == false)
 		{
-			DrawShadowText(dc.GetSafeHdc(), _T("loading..."), -1, rThumb,
+			DrawShadowText(dc.GetSafeHdc(), CStringW("loading..."), -1, rThumb,
 				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, m_theme.cr_text.ToCOLORREF(), 0, 2, 1);
 		}
 		else if (m_thumb[i].img == NULL || m_thumb[i].img->is_empty())
 		{
-			DrawShadowText(dc.GetSafeHdc(), _T("X"), -1, rThumb,
+			DrawShadowText(dc.GetSafeHdc(), CStringW("X"), -1, rThumb,
 				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, RGB(255, 0, 0), 0, 2, 1);
 		}
 		else
@@ -322,7 +322,7 @@ void CSCThumbCtrl::OnPaint()
 			rIndex.top += 4;
 			//멀티바이트 환경에서는 DrawShadowText를 쓰기위해서는 manifest를 추가해야 하는 등
 			//번거로워 일단 DrawTextShadow로 대체한다.
-			DrawShadowText(dc.GetSafeHdc(), i2S(i), -1, rIndex,
+			DrawShadowText(dc.GetSafeHdc(), CStringW(i2S(i)), -1, rIndex,
 							DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
 		}
 	}

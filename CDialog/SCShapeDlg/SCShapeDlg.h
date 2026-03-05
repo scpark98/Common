@@ -182,10 +182,24 @@ public:
 	//원래 protected로 선언되는게 일반적이지만 Gdiplus관련 멤버함수 등을 원활히 사용하기 위해 public으로 변경한다.
 	CSCGdiplusBitmap	m_img;
 
+//resize
+	//표시 크기를 변경한다. cx, cy 중 0이 아닌 값을 기준으로 0인 크기가 비율로 계산되며
+	//(ex. cx = 200, cy = 0이면 cy는 cx에 비례하여 계산된다)
+	//둘 다 0이 아니면 해당 크기로 resize한다.(비율 무시)
+	//둘 다 0이면 원래 크기로 resize한다.
+	//Gdiplus에서는 모든 프레임의 이미지를 추출한 후 표시하는 방식이 아니고
+	//gif_thread()에서 매 프레임마다 SelectActiveFrame()으로 현재 프레임을 render()하고 있으므로
+	//실제 원본의 크기를 줄이는 것이 아니라 render()에서 그려지는 크기를 변경하는 방식으로 resize가 구현했다.
+	//
+	void			set_display_size(int cx = 0, int cy = 0);
+	void			set_display_size(float ratio);
+
 protected:
 	CWnd*			m_parent = NULL;
 
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스의 구절
+
+	float			m_zoom = 1.0f;
 
 	//0 : 투명, 255 : 불투명
 	int				m_alpha = 255;

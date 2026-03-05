@@ -194,6 +194,12 @@ public:
 	void			sort_by_score();
 
 //옵션
+	bool			get_show_index() { return m_show_index; }
+	void			set_show_index(bool show) { m_show_index = show; Invalidate(); }
+	bool			get_show_title() { return m_show_title; }
+	void			set_show_title(bool show) { m_show_title = show; Invalidate(); }
+	bool			get_show_resolution() { return m_show_resolution; }
+	void			set_show_resolution(bool show) { m_show_resolution = show; Invalidate(); }
 	bool			get_show_file_extension() { return m_show_extension; }
 	void			set_show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
 
@@ -217,7 +223,7 @@ protected:
 	//thumb 크기를 기준으로 tile 크기를 계산해야 한다. 그래야 이미지를 로드할 때 thumb 크기 비율로 resize 할 수 있다.
 	CSize			m_sz_thumb = CSize(100, 120);
 
-	//썸네일이 올려질 타일의 크기(타일 = 내부마진 + 썸네일크기 + 타이틀표시영역)
+	//썸네일이 올려질 타일의 크기(타일 = 내부마진 + 썸네일크기 + 타이틀 표시 영역)
 	CSize			m_sz_tile;	//m_sz_thumb의 크기에 따라 자동 계산되므로 직접 입력하지 말것!
 
 	//타일과 썸네일의 상하좌우 여백

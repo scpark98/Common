@@ -1225,14 +1225,14 @@ BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 	{
 		switch (pMsg->wParam)
 		{
-			case VK_LEFT:
-			case VK_DOWN:
-				step(-1);
-				return TRUE;
-			case VK_RIGHT:
-			case VK_UP:
-				step(1);
-				return TRUE;
+			//case VK_LEFT:
+			//case VK_DOWN:
+			//	step(-1);
+			//	return TRUE;
+			//case VK_RIGHT:
+			//case VK_UP:
+			//	step(1);
+			//	return TRUE;
 		}
 
 		return false;

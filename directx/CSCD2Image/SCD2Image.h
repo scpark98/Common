@@ -153,7 +153,7 @@ public:
 	//index 위치의 이미지에서 배경 색상을 transparent 색상으로 변경한다.
 	//내부적으로는 make_back_transparent()를 호출하지만
 	//set_back_transparency()는 현재 이미지의 원본을 보존하면서 투명하게 만들고자 하는 경우에 사용한다. make_back_transparent()는 현재 이미지 자체를 변경한다.
-	void					set_back_transparency(int index, float inner_threshold = 30.f, float outer_threshold = 120.f, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+	void					set_back_transparency(int index, int inner_threshold = 30, int outer_threshold = 120, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 	//cr_back을 Transparent가 아닌 다른 색으로 주면 해당 색상을 투명 배경색으로 처리한다.
 	//cr_back을 Red로 주면 실제 배경이 Red가 아니어도 Red에 가까운 색상은 투명하게 처리한다.
@@ -163,7 +163,7 @@ public:
 	//index = -1이면 모든 프레임에 대해 적용한다.
 	//inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
 	//outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)
-	void					make_back_transparent(int index, float inner_threshold = 30.f, float outer_threshold = 120.f, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
+	void					make_back_transparent(int index, int inner_threshold = 30, int outer_threshold = 120, Gdiplus::Color cr_back = Gdiplus::Color::Transparent);
 
 
 	//index 위치의 이미지가 nullptr이 아니고, width, height 모두 0보다 커야 한다.
@@ -242,8 +242,9 @@ public:
 	void					play();
 	void					pause(int pos = -1);
 	bool					stop();
-	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
+	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 특정 프레임 인덱스로 이동
 	int						goto_frame(int index, bool pause = false);
+	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 interval 만큼 프레임 이동
 	void					step(int interval = 1);
 
 //exif

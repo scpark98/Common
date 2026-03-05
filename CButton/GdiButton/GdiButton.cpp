@@ -973,11 +973,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
 	//for test for breakpoint
-	if (text == _T("환경설정"))
-	{
-		text = text;
-		trace(is_down);
-	}
+	//if (text == _T("환경설정"))
+	//{
+	//	text = text;
+	//	trace(is_down);
+	//}
 
 	//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 	//	is_down = (GetCheck() == BST_CHECKED);

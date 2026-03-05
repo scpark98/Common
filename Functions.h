@@ -131,7 +131,7 @@ template<typename T> void trace_impl(const TCHAR* func, int line, const TCHAR* v
 {
 	std::basic_ostringstream<TCHAR> oss;
 
-	oss << func << _T("(") << line << _T(")") << _T(" ") << var_name << L" = " << value;
+	oss << func << _T("(") << line << _T(")") << _T(" ") << var_name << _T(" = ") << value;
 	TRACE(_T("%s\n"), oss.str().c_str());
 }
 
@@ -1043,6 +1043,7 @@ struct	NETWORK_INFO
 	}
 
 	//str의 from 위치 이후에 있는 숫자 영역값을 num에 넣어주고 숫자 시작위치를 return한다.
+	//음수인 경우도 있으므로 unsigned로 하면 안됨.
 	int	extract_digit_number(char *str, int from, double *num);
 
 	//version string valid check
@@ -1092,15 +1093,15 @@ struct	NETWORK_INFO
 	CStringA	UTF16toUTF8(const CStringW& utf16);
 	CStringW	UTF8toUTF16(const CStringA& utf8);
 	CString		UTF8toCString(char* pszCode);
+	CString		utf8toCString(std::string inputtext);
 	char*		UTF8toANSI(char* pszCode);
 	char*		ANSItoUTF8(char* pszCode);
-	CString		utf82CString(std::string inputtext);
 	std::string	multibyteToUtf8(std::string inputtext);
 	std::string	utf82Multibyte(std::string inputtext);
 	std::wstring multibyte2Unicode(std::string inputtext);
-	std::string unicode2Multibyte(std::wstring inputtext);
+	std::string	unicode2Multibyte(std::wstring inputtext);
 	std::wstring utf8ToUnicode(std::string inputtext);
-	std::string unicode2Utf8(std::wstring inputtext);
+	std::string	unicode2Utf8(std::wstring inputtext);
 	std::string multibyteToUtf8(std::string inputtext);
 	std::string utf82Multibyte(std::string inputtext);
 
@@ -1329,7 +1330,7 @@ struct	NETWORK_INFO
 	enum FILENAME_PART
 	{
 		fn_drive,			//드라이브명으로 반드시 \로 끝난다.
-		fn_folder,			//fullpath 폴더명이므로 드라이브 경로까지 모두 포함한다.	
+		fn_folder,			//fullpath 폴더명이므로 드라이브 경로까지 모두 포함된다.	
 		fn_leaf_folder,		//fullpath의 마지막 폴더명. fullpath가 "C:\"일 경우 drive, folder, leaf_folder는 모두 동일한 값인 "C:\"가 된다.
 		fn_title,			//파일 타이틀(확장자 제외)
 		fn_ext,				//파일 확장자(dot 제외)
@@ -1452,6 +1453,7 @@ struct	NETWORK_INFO
 	//(반드시 https로 접근해야 하는 경우, port가 기본값인 443이 아니라면 주소를 https://~로 명시하여 호출해야 한다)
 	//DWORD		request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb = _T("GET"), std::vector<CString> *headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
 	//DWORD		request_url(CString& result_str, CString full_url, CString verb = _T("GET"), std::vector<CString>* headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
+
 	void		request_url(CRequestUrlParams* params);
 
 
@@ -1535,7 +1537,7 @@ struct	NETWORK_INFO
 	// 폴더의 모든 파일을 지운다.
 	int			delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive = true, bool trash_can = false);
 	bool		DeleteFolder(LPCTSTR lpFolder);
-	bool		SHDeleteFolder(CString sFolder);
+	//bool		SHDeleteFolder(CString sFolder);
 
 
 	//풀패스를 주면 폴더를 자동으로 만들어준다.
@@ -1644,7 +1646,7 @@ struct	NETWORK_INFO
 	bool		get_screensaver_setting(int *timeout = NULL, int* use_secure = NULL);
 
 	//좀 더 테스트 필요!
-	//실행파일명으로부터 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
+	//실행파일명으로 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
 	HWND		get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid = 0);
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
 
@@ -1952,12 +1954,6 @@ w		: 복사할 width 크기(pixel)
 h		: 복사할 height 크기(pixel)
 */
 	bool		memcpy_block(uint8_t *src, int srcx, int srcy, int srcw, int srch, uint8_t *dst, int dstx, int dsty, int dstw, int dsth, int w, int h, int ch);
-	bool		memcpy_block(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, int ch, uint8_t *dst);
-
-//src에서 roi 영역을 잘라서 dst_width * dst_height 크기로 resize 시킨다.
-	bool		resize_roi(uint8_t *src, int src_width, int src_height, int x_roi, int y_roi, int w_roi, int h_roi, uint8_t *dst, int dst_width, int dst_height);
-
-//HDD
 	ULONGLONG	get_disk_total_size(CString sDrive);
 	ULONGLONG	get_disk_free_size(CString sDrive);
 	//위의 함수로 크기를 구한 후 get_size_str()을 이용할 것
@@ -1975,7 +1971,7 @@ h		: 복사할 height 크기(pixel)
 	CString		get_HDD_serial_number(int index, bool unify16 = true);
 
 	//디스크 드라이브 목록을 얻어온다. include_legacy = true이면 floppy, cdrom까지 넣는다.
-	void		get_drive_list(std::deque<CString> *drive_list, bool include_legacy = false);
+	void		get_drive_list(std::deque<CString>* drive_list, bool include_legacy = false);
 	CString		get_drive_volume(TCHAR drive_letter);
 
 	//드라이브 패스는 "C:\\"와 같이 3개 문자로 구성되고 첫문자는 대문자로 표시하는 것이 일반적이다.
@@ -1995,30 +1991,30 @@ h		: 복사할 height 크기(pixel)
 	//"c:\windows"를 입력하면 "C:\Windows"와 같이 실제 파일시스템에 저장된 경로명 리턴.
 	CString		get_original_path(CString path);
 
-//파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
+	//파라미터로 들어온 연속된 파일명들을 분리한다. 실행파일명은 제외됨.(ex. command line or shell command)
 	void		ParseCommandString(CString sParam, CStringArray& ar);
 
-//지정한 이미지를 바탕화면에 표시한다.
+	//지정한 이미지를 바탕화면에 표시한다.
 #ifndef _USING_V110_SDK71_
 	void		set_wallpaper(CString sfile);
 #endif
 
-//단축아이콘을 만들어준다.
+	//단축아이콘을 만들어준다.
 	HRESULT		MyCreateShortCut(LPCTSTR pszSrcFile, LPCOLESTR pszLnkFile,
-								 LPTSTR pszWorkingDir = NULL, LPTSTR pszArgument = NULL, LPTSTR pszDesc = NULL);
+		LPTSTR pszWorkingDir = NULL, LPTSTR pszArgument = NULL, LPTSTR pszDesc = NULL);
 	HRESULT		CreateShortCut(LPCTSTR pszShortcutFile, LPCOLESTR pszLink,
-								LPCTSTR pszWorkingDir = _T(""), LPCTSTR pszArgument = _T(""), LPCTSTR pszDesc = _T(""));
+		LPCTSTR pszWorkingDir = _T(""), LPCTSTR pszArgument = _T(""), LPCTSTR pszDesc = _T(""));
 
-//printer
-	int			GetPrinterList(CStringArray *arPrinter);
+	//printer
+	int			GetPrinterList(CStringArray* arPrinter);
 	CString		GetDefaultPrinterName();
 	CSize		GetPrinterPaperSize(CString sPrinterName);
 
 	//system error code를 문자열로 리턴.
 	CString		get_error_str(DWORD dwError);
 
-//////////////////////////////////////////////////////////////////////////
-//날짜/시간 date, time 
+	//////////////////////////////////////////////////////////////////////////
+	//날짜/시간 date, time 
 	CString		get_date_str(CTime t, CString sep = _T("-"));
 	CString		get_date_str(COleDateTime t, CString sep = _T("-"));
 	CString		get_date_str(__timeb32 tb, CString sep = _T("-"));
@@ -2058,14 +2054,14 @@ h		: 복사할 height 크기(pixel)
 	CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour = true, bool bHasMilliSec = true);
 	int			GetSecondsFromTimeString(CString timeString);
 	int			GetMilliSecondsFromTimeString(CString timeString);
-	void		GetTimeFromSeconds(int nTotalSeconds, int &nHours, int &nMinutes, int &nSeconds);
+	void		GetTimeFromSeconds(int nTotalSeconds, int& nHours, int& nMinutes, int& nSeconds);
 	void		SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond);
 	double		GetElapsedTime(__timeb32 pOldTime);	//pOldTime과 현재 시간의 차이 계산
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시(format 0 = "?일 ?시간 ?분 ?초", 1 = "00:00:00") 
 	CString		GetDayTimeCountString(int format, CTimeSpan ts, bool bShowZero = true, bool bIncludeSec = true);
 	//ts값을 넘겨 받아 "a일 b시간 c분 d초" 형태로 표시
 	CString		GetDayTimeCountString(COleDateTimeSpan ts, bool bShowZero, bool bIncludeSec);
-	time_t		_mkgmtime(const struct tm *tm) ;
+	time_t		_mkgmtime(const struct tm* tm);
 	time_t		_mkgmtime(const struct tm* tm);
 	bool		IsAM(CTime t = 0);	//t=0이면 현재시각기준, 0보다 크면 그 시간값 기준
 	CString		GetDayOfWeekString(CTime t = NULL, bool short_str = false);
@@ -2080,9 +2076,9 @@ h		: 복사할 height 크기(pixel)
 	bool		is_valid_time(CString str);
 
 	//날짜시각 형식을 yyyy/mm/dd hh:mm:ss 포맷으로 맞춘다.
-	void		normalize_datetime(CString & src);
+	void		normalize_datetime(CString& src);
 
-//타이머 관련
+	//타이머 관련
 	void		Wait(DWORD dwMillisecond);		//예전에는 OnTimer() 내에서는 동작되지 않았었는데 현재는 가능하다.
 	//void		usleep(int microSec);
 	void		ProcessWindowMessage();			//반복문에 의해 process가 응답없음이 되지 않도록 반복문안에서 호출하여 메시지큐의 내용을 바로 처리시킨다.
@@ -2093,20 +2089,20 @@ h		: 복사할 height 크기(pixel)
 
 	extern bool		initialized_YUV_lookup_table;
 	void		init_YUV_lookup_table();
-	void		yuv420_yv12_to_bgr(unsigned char *src, unsigned char *dst, int w, int h);
+	void		yuv420_yv12_to_bgr(unsigned char* src, unsigned char* dst, int w, int h);
 	//cv::Mat		yuv420_yv12_to_bgr(uchar *pBuffer,long bufferSize, int width,int height);
 	void		yuv420_nv12_to_gray(unsigned char* src, unsigned char* dst, int width, int height);
 	void		yuv420_nv12_to_bgr(unsigned char* src, unsigned char* dst, int width, int height);
-	void		yuv422_uyvy_to_bgr(unsigned char *src, unsigned char *dst, int w, int h);
+	void		yuv422_uyvy_to_bgr(unsigned char* src, unsigned char* dst, int w, int h);
 	void		yuv_yuyv_to_bgr(unsigned char* src, unsigned char* dst, int w, int h);
 	void		bgr_to_yuv422(uint8_t* src, uint8_t* dst, int width, int height, bool yuyv);	//yuyv(true) or uyuv(false)
 	//convert 1ch gray to yuv_plain_gray(YYYY....128 128..128 128..)
-	void		gray_to_yuv_plain_gray(uint8_t *src, uint8_t *dst, int width, int height);
+	void		gray_to_yuv_plain_gray(uint8_t* src, uint8_t* dst, int width, int height);
 	void		bgr_to_hsv(uint8_t* src, uint8_t* dst, int width, int height);
 
 
-//////////////////////////////////////////////////////////////////////////
-//GDI
+	//////////////////////////////////////////////////////////////////////////
+	//GDI
 	void		draw_text(CDC* pDC, int x, int y, CString text, COLORREF cr_text);
 	void		draw_center_text(CDC* pdc, const CString& strText, CRect& rcRect);
 
@@ -2115,78 +2111,78 @@ h		: 복사할 height 크기(pixel)
 	Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR String, int length = -1);
 
 	//Gdiplus를 이용한 텍스트 출력
-	CRect		draw_text(Gdiplus::Graphics &g,
-							int x, int y, int w, int h,
-							CString text,
-							float font_size,
-							int font_style = Gdiplus::FontStyleRegular,
-							int shadow_depth = 0,
-							float thickness = 0.0f,
-							CString font_name = _T("맑은 고딕"),
-							Gdiplus::Color cr_text = Gdiplus::Color::Black,
-							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
-							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-							UINT align = DT_CENTER | DT_VCENTER);
+	CRect		draw_text(Gdiplus::Graphics& g,
+		int x, int y, int w, int h,
+		CString text,
+		float font_size,
+		int font_style = Gdiplus::FontStyleRegular,
+		int shadow_depth = 0,
+		float thickness = 0.0f,
+		CString font_name = _T("맑은 고딕"),
+		Gdiplus::Color cr_text = Gdiplus::Color::Black,
+		Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+		Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
+		UINT align = DT_CENTER | DT_VCENTER);
 
-	CRect		draw_text(Gdiplus::Graphics &g,
-							CRect rTarget,
-							CString text,
-							float font_size,
-							int font_style = Gdiplus::FontStyleRegular,
-							int shadow_depth = 0,
-							float thickness = 0.0f,
-							CString font_name = _T("맑은 고딕"),
-							Gdiplus::Color cr_text = Gdiplus::Color::Black,
-							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
-							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-							UINT align = DT_CENTER | DT_VCENTER);
+	CRect		draw_text(Gdiplus::Graphics& g,
+		CRect rTarget,
+		CString text,
+		float font_size,
+		int font_style = Gdiplus::FontStyleRegular,
+		int shadow_depth = 0,
+		float thickness = 0.0f,
+		CString font_name = _T("맑은 고딕"),
+		Gdiplus::Color cr_text = Gdiplus::Color::Black,
+		Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
+		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+		Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
+		UINT align = DT_CENTER | DT_VCENTER);
 
 #ifndef _USING_V110_SDK71_
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
-							CRect rTarget,
-							CString text,
-							IDWriteTextFormat* dWriteTextFormat,
-							ID2D1Brush* brush,
-							int shadow_depth = 0,
-							float thickness = 0.0f
-							);
+		CRect rTarget,
+		CString text,
+		IDWriteTextFormat* dWriteTextFormat,
+		ID2D1Brush* brush,
+		int shadow_depth = 0,
+		float thickness = 0.0f
+	);
 
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
-							CRect rTarget,
-							CString text,
-							CString font_name = _T("맑은 고딕"),
-							float font_size = 12.0f,
-							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
-							Gdiplus::Color cr_text = Gdiplus::Color::Black,
-							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							UINT align = DT_CENTER | DT_VCENTER,
-							bool show_text = true,
-							bool show_shadow = true);
+		CRect rTarget,
+		CString text,
+		CString font_name = _T("맑은 고딕"),
+		float font_size = 12.0f,
+		int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
+		Gdiplus::Color cr_text = Gdiplus::Color::Black,
+		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+		UINT align = DT_CENTER | DT_VCENTER,
+		bool show_text = true,
+		bool show_shadow = true);
 
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
-							Gdiplus::RectF rTarget,
-							CString text,
-							CString font_name = _T("맑은 고딕"),
-							float font_size = 12.0f,
-							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
-							Gdiplus::Color cr_text = Gdiplus::Color::Black,
-							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							UINT align = DT_CENTER | DT_VCENTER,
-							bool show_text = true,
-							bool show_shadow = true);
+		Gdiplus::RectF rTarget,
+		CString text,
+		CString font_name = _T("맑은 고딕"),
+		float font_size = 12.0f,
+		int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
+		Gdiplus::Color cr_text = Gdiplus::Color::Black,
+		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+		UINT align = DT_CENTER | DT_VCENTER,
+		bool show_text = true,
+		bool show_shadow = true);
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
-							D2D1_RECT_F rTarget,
-							CString text,
-							CString font_name = _T("맑은 고딕"),
-							float font_size = 12.0f,
-							int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
-							Gdiplus::Color cr_text = Gdiplus::Color::Black,
-							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
-							UINT align = DT_CENTER | DT_VCENTER,
-							bool show_text = true,
-							bool show_shadow = true);
+		D2D1_RECT_F rTarget,
+		CString text,
+		CString font_name = _T("맑은 고딕"),
+		float font_size = 12.0f,
+		int font_weight = DWRITE_FONT_WEIGHT_NORMAL,
+		Gdiplus::Color cr_text = Gdiplus::Color::Black,
+		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
+		UINT align = DT_CENTER | DT_VCENTER,
+		bool show_text = true,
+		bool show_shadow = true);
 #endif
 
 	void		unpremultiply(BYTE* p, UINT pixelCount);
@@ -2201,8 +2197,8 @@ h		: 복사할 height 크기(pixel)
 	void		draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick = 1.0f, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int nDrawMode = R2_COPYPEN);
 	void		draw_line_pt(CDC* pDC, CPoint pt1, CPoint pt2, Gdiplus::Color cr = 0, int width = 1, Gdiplus::DashStyle pen_style = Gdiplus::DashStyleSolid, int draw_mode = R2_COPYPEN);
 	void		draw_rect(CDC* pDC, CRect r, COLORREF crColor = RGB(0, 0, 0), COLORREF crFill = NULL_BRUSH, int nWidth = 1, int nPenStyle = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		draw_rect(CDC*	pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
-	void		draw_rect(Gdiplus::Graphics &g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
+	void		draw_rect(CDC* pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
+	void		draw_rect(Gdiplus::Graphics& g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 	void		draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 #ifndef _USING_V110_SDK71_
 	void		draw_line(ID2D1DeviceContext* d2dc, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick = 1.0f);
@@ -2220,14 +2216,14 @@ h		: 복사할 height 크기(pixel)
 	void		draw_ellipse(CDC* pDC, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);
 	void		draw_ellipse(Gdiplus::Graphics& g, CRect r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);
 	void		draw_ellipse(Gdiplus::Graphics& g, float cx, float cy, float radius, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int pen_style = PS_SOLID, int width = 1, int draw_mode = R2_COPYPEN);
-	void		draw_circle(CDC* pDC, int xMidPoint,  int yMidPoint,  int radius);
+	void		draw_circle(CDC* pDC, int xMidPoint, int yMidPoint, int radius);
 	void		draw_polygon(CDC* pDC, std::vector<CPoint> pts, bool closed = true, COLORREF crLine = 0, int nWidth = 1, int pen_style = PS_SOLID, int nDrawMode = R2_COPYPEN);
-	void		draw_arc(CDC *pDC, double cx, double cy,double r1, double r2, double start, double end, int width = 1, int pen_style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN);
-	bool		LoadBitmapFromFile(CBitmap &bmp, CString strFile);
+	void		draw_arc(CDC* pDC, double cx, double cy, double r1, double r2, double start, double end, int width = 1, int pen_style = PS_SOLID, COLORREF cr = 0, int mode = R2_COPYPEN);
+	bool		LoadBitmapFromFile(CBitmap& bmp, CString strFile);
 	bool		SaveBitmapToTile(CBitmap* bmp, CString strFile, CWnd* pWnd);
 	bool		SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch);
 	HANDLE		DDBToDIB(CBitmap* bitmap, DWORD dwCompression, CPalette* pPal);
-	
+
 	//.ico 아이콘 파일을 크기를 지정해서 로딩이 가능하다. LoadIcon()으로는 안되며 PNG와 같은 이미지도 불가하다.
 	HICON		load_icon(HINSTANCE hInstance, UINT nID, int cx, int cy = 0);
 	//해당 DC에 그리고 아이콘의 실제 크기를 리턴한다.
@@ -2245,10 +2241,10 @@ h		: 복사할 height 크기(pixel)
 
 //gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 //종료될 때 해제시켜주는 함수도 반드시 호출해줘야 한다.
-	typedef UINT (CALLBACK* LPFNDLLFUNC1)(HDC,CONST PTRIVERTEX,DWORD,CONST PVOID,DWORD,DWORD);
+	typedef UINT(CALLBACK* LPFNDLLFUNC1)(HDC, CONST PTRIVERTEX, DWORD, CONST PVOID, DWORD, DWORD);
 	extern HINSTANCE	g_hInst_msimg32;
 	extern LPFNDLLFUNC1 g_dllfunc_GradientFill;
-	void gradient_rect(CDC* pDC, CRect &rect, std::deque<Gdiplus::Color> dqColor, bool vertical = false);
+	void gradient_rect(CDC* pDC, CRect& rect, std::deque<Gdiplus::Color> dqColor, bool vertical = false);
 	enum GRADIENT_RECT_PRESET
 	{
 		gradient_rect_white_black_white = 0,
@@ -2257,25 +2253,25 @@ h		: 복사할 height 크기(pixel)
 		gradient_rect_black_gray128_black,
 	};
 	//아직 미구현
-	void		gradient_rect(CDC* pDC, CRect &rect, int preset, bool vertical);
+	void		gradient_rect(CDC* pDC, CRect& rect, int preset, bool vertical);
 	void		safe_release_gradient_rect_handle();
 
-//이미지가 표시되고 있는 영역 정보와 화면상의 좌표를 주면 이미지상의 실제 좌표를 리턴한다.
-//단, 계산된 이미지상의 실제 좌표가 이미지 크기를 벗어나면 결과 변수에는 -1값을 채워서 리턴한다.
-	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float*dx, float*dy);
-	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
-	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
+	//이미지가 표시되고 있는 영역 정보와 화면상의 좌표를 주면 이미지상의 실제 좌표를 리턴한다.
+	//단, 계산된 이미지상의 실제 좌표가 이미지 크기를 벗어나면 결과 변수에는 -1값을 채워서 리턴한다.
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float* dx, float* dy);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint* pt_dst);
+	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect* r_dst);
 	void		get_real_coord_from_screen_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst);
 
 	//이미지가 표시되고 있는 영역 정보와 이미지 상의 좌표를 주면 화면상의 좌표를 리턴한다.
-	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float*dx, float*dy);
-	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint *pt_dst);
-	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect *r_dst);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, float sx, float sy, float* dx, float* dy);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CPoint pt_src, CPoint* pt_dst);
+	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, CRect r_src, CRect* r_dst);
 	void		get_screen_coord_from_real_coord(CRect rDisplayedImageRect, int srcWidth, Gdiplus::RectF r_src, Gdiplus::RectF* r_dst);
 
 
-//직선, Line 관련 함수
-	//lower >= src <= upper 인지 판별
+	//직선, Line 관련 함수
+		//lower >= src <= upper 인지 판별
 	template <class T> bool is_in_range(T src, T lower, T upper)
 	{
 		if (src >= lower && src <= upper)
@@ -2316,19 +2312,19 @@ h		: 복사할 height 크기(pixel)
 
 	//도형, 삼각형
 	//삼각형 외접원의 중심을 기하학적으로 구한다.(http://kipl.tistory.com/113)
-	int circumCenter(CPoint A, CPoint B, CPoint C, double *xc, double *yc);
+	int circumCenter(CPoint A, CPoint B, CPoint C, double* xc, double* yc);
 	//삼각형 외접원의 중심을 대수적으로 구한다.
-	int circumCenter2(CPoint P, CPoint Q, CPoint R, double *xc, double *yc);
+	int circumCenter2(CPoint P, CPoint Q, CPoint R, double* xc, double* yc);
 	//삼각형 외접원의 반지름을 구한다.
 	double circumRadius(CPoint A, CPoint B, CPoint C);
 
 
-//사각형 Rectangle
-	//사각형 정보를 문자열로 리턴한다. (default : 2)
-	//0 : "1 2 3 4"
-	//1 : "(1,2) ~ (4,8)"
-	//2 : "(1,2) ~ (4,8) (2x6)"
-	//3 : "1, 2, 3, 4"
+	//사각형 Rectangle
+		//사각형 정보를 문자열로 리턴한다. (default : 2)
+		//0 : "1 2 3 4"
+		//1 : "(1,2) ~ (4,8)"
+		//2 : "(1,2) ~ (4,8) (2x6)"
+		//3 : "1, 2, 3, 4"
 	enum RECT_INFO_FORMAT
 	{
 		rect_info_format_comma = -1,
@@ -2399,7 +2395,7 @@ h		: 복사할 height 크기(pixel)
 		return str;
 	}
 
-	void			make_rect(CRect &Rect, int x, int y, int w, int h);
+	void			make_rect(CRect& Rect, int x, int y, int w, int h);
 	CRect			make_rect(int x, int y, int w, int h);
 	CRect			make_center_rect(int cx, int cy, int w, int h);
 	Gdiplus::Rect	make_center_gprect(int cx, int cy, int w, int h);
@@ -2432,10 +2428,10 @@ h		: 복사할 height 크기(pixel)
 	CRect		get_zoom_rect(CRect rect, double zoom);
 
 	//0:lt, 1:rt, 2:rb, 3:lb, rb_cut이 true이면 끝점-1인 값을 리턴하고 false이면 끝점 좌표를 리턴한다.
-	CPoint		vertex(CRect r, int index, bool rb_cut = false);	
+	CPoint		vertex(CRect r, int index, bool rb_cut = false);
 
 	//주어진 사각형 범위를 벗어나지 않도록 보정해준다.
-	void		adjust_rect_range(float *l, float*t, float*r, float*b, float minx, float miny, float maxx, float maxy, bool retainSize, bool includeBottomRight = false);
+	void		adjust_rect_range(float* l, float* t, float* r, float* b, float minx, float miny, float maxx, float maxy, bool retainSize, bool includeBottomRight = false);
 	//이미지의 경우 includeBottomRight은 false로 해야 끝점 좌표가 유효하다.(도형일 경우는 true)
 	void		adjust_rect_range(CRect& rect, CRect rLimit, bool bRetainSize = true, bool includeBottomRight = false);
 	void		adjust_rect_range(CRect& rect, int32_t minx, int32_t miny, int32_t maxx, int32_t maxy, bool bRetainSize = true, bool includeBottomRight = false);
@@ -2444,7 +2440,7 @@ h		: 복사할 height 크기(pixel)
 	void		normalize_rect(Gdiplus::RectF& r);
 
 	//모니터의 한쪽에 붙은 사각형을 새로운 크기로 변경할 경우 붙은 상태를 유지하고 변경할 필요가 있을 경우 사용.
-	void		adjust_with_monitor_attached(CRect rOld, CRect &rNew);
+	void		adjust_with_monitor_attached(CRect rOld, CRect& rNew);
 
 	//rTarget에 접하는 dRatio를 유지하는 최대 사각형을 구한다.
 	//stretch = false로 주면 확대하지 않지만 큰 경우에는 축소한다.
@@ -2482,8 +2478,8 @@ h		: 복사할 height 크기(pixel)
 	//resized : zoom in/out에 의해 변경된 크기
 	CRect		get_real_from_screen_coord(CRect sr, CRect displayed, CSize real, CSize resized);
 
-//side 배열의 인덱스는 resize하는 영역 인덱스로서
-//DefWindowProc의 두번째 파라미터에 (SC_SIZE + m_nSideIndex)로 쓰이므로 그 차례를 따른다.
+	//side 배열의 인덱스는 resize하는 영역 인덱스로서
+	//DefWindowProc의 두번째 파라미터에 (SC_SIZE + m_nSideIndex)로 쓰이므로 그 차례를 따른다.
 	enum CORNER_INDEX
 	{
 		corner_inside = 0,
@@ -2497,7 +2493,7 @@ h		: 복사할 height 크기(pixel)
 		corner_bottomright,
 	};
 
-	void		GetSideRect(CRect src, CRect *side, int margin);
+	void		GetSideRect(CRect src, CRect* side, int margin);
 	//src사각형의 margin크기의 테두리 영역에 pt점이 존재하는 영역의 인덱스를 리턴한다.
 	//인덱스는 CORNER_INDEX의 차례이며 이는 DefWindowProc에서 사용하는 차례와 동일하다.
 	int			get_corner_index(CRect src, CPoint pt, int margin);
@@ -2515,27 +2511,27 @@ h		: 복사할 height 크기(pixel)
 	//인덱스 정의는 enum CORNER_INDEX 정의를 공통으로 사용한다.
 	int			get_handle_index(CRect src, CPoint pt, int sz);
 
-//다각형 polygon 관련
-	//임의 점이 다각형 내에 존재하는지 판별.
+	//다각형 polygon 관련
+		//임의 점이 다각형 내에 존재하는지 판별.
 	bool PtInPolygon(CPoint* ptPolygons, CPoint pt, int nCorners);
 	bool PtInPolygon0(CPoint* ptPolygons, CPoint pt, int nCorners);
 	bool PtInPolygon1(CPoint* ptPolygons, CPoint pt, int nCorners);
-	bool PtInPolygon2(CPoint *ptPolygons, CPoint pt, int nCorners);
+	bool PtInPolygon2(CPoint* ptPolygons, CPoint pt, int nCorners);
 
 	//다각형의 넓이를 구한다. 단, 변이 하나라도 교차되면 성립하지 않는다.
-	double		GetPolygonAreaSize(CPoint *pt, int nPoints);
+	double		GetPolygonAreaSize(CPoint* pt, int nPoints);
 	//주어진 다각형 점들을 포함하는 최대 사각형을 구한다.
-	CRect		get_max_rect(CPoint	*pt, int nPoints);
+	CRect		get_max_rect(CPoint* pt, int nPoints);
 	CRect		get_max_rect(std::vector<CPoint> pt, int pt_max = -1);
 
 
-//region 관련
-	HRGN		BitmapToRegion (HBITMAP hBmp, COLORREF cTransparentColor/* = 0*/, COLORREF cTolerance/* = 0x101010*/);
+	//region 관련
+	HRGN		BitmapToRegion(HBITMAP hBmp, COLORREF cTransparentColor/* = 0*/, COLORREF cTolerance/* = 0x101010*/);
 	HRGN		BitmapRegion(HBITMAP hBitmap, COLORREF cTransparentColor, bool bIsTransparent);
 	HRGN		CreateRgnFromBitmap(HBITMAP hBmp, COLORREF color);
 
-//캡쳐 기능
-	//r은 윈도우 좌표계. jpg, png, bmp만 현재 지원.
+	//캡쳐 기능
+		//r은 윈도우 좌표계. jpg, png, bmp만 현재 지원.
 	bool		capture_window(CRect r, CString filename);
 	//특정 영역을 캡처하여 HBITMAP으로 리턴한다.
 	//resourceID를 주면 해당 이미지를 overlay하여 리턴한다.(watermark와 같은 용도로 사용시)
@@ -2546,298 +2542,297 @@ h		: 복사할 height 크기(pixel)
 	//pRect를 줘서 정해진 영역만 캡처시킨다.
 	HBITMAP		PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect = NULL);
 
-//HBITMAP
+	//HBITMAP
 	void		draw_bitmap(HDC hdc, int x, int y, HBITMAP hBitmap);
 	HRESULT		save_bitmap(HBITMAP bitmap, LPCTSTR filename);
 
-//키보드 언어를 그 나라 기본언어로 변경한다.
-void		ime_convert(HWND hWnd, bool bNative);
-//현재 한글 입력중인지
-bool		is_ime_composing(HWND hWnd);
+	//키보드 언어를 그 나라 기본언어로 변경한다.
+	void		ime_convert(HWND hWnd, bool bNative);
+	//현재 한글 입력중인지
+	bool		is_ime_composing(HWND hWnd);
 
-//문자입력창을 숨긴다.
-void		HideIMM(HWND hwnd);
-
-
-bool		IsLeapYear(int nYear);	//윤년인지 판단
-
-//CRichEditCtrlEx를 사용하여 AppendToLog함수를 이용하는 앱은 로그를 UI에 표시하기가 좋으나
-//CRichEditCtrlEx을 이용하지 못하는 상황의 앱으로 관련 코드들을 재이용하려면 코드 수정이 필요하다.
-//따라서 아래 함수를 이용한다.
-//void		AppendToLog(CWnd* pWnd,)
+	//문자입력창을 숨긴다.
+	void		HideIMM(HWND hwnd);
 
 
+	bool		IsLeapYear(int nYear);	//윤년인지 판단
 
-//UI control 관련
-DWORD		getButtonStyle(HWND hWnd);	//button의 종류를 리턴한다.
+	//CRichEditCtrlEx를 사용하여 AppendToLog함수를 이용하는 앱은 로그를 UI에 표시하기가 좋으나
+	//CRichEditCtrlEx을 이용하지 못하는 상황의 앱으로 관련 코드들을 재이용하려면 코드 수정이 필요하다.
+	//따라서 아래 함수를 이용한다.
+	//void		AppendToLog(CWnd* pWnd,)
 
-//연속된 버튼들에 대한 일괄 처리용 함수
-//기본 CheckRadioButton같은 경우는 unselect 기능을 제공하지 않기 때문에
-//아래 함수를 새로이 정의해서 사용한다.
-//id_offset이 0보다 작으면 first ~ last까지 모두 적용.
-void		CheckRadioButtons(CWnd *pWnd, int idFirst, int idLast, int id_offset, int nCheck = BST_CHECKED);
 
-//dialog based에서 키입력으로 동작을 정의하는데 CEdit과 같은 입력창에 포커스가 있으면
-//PreTranslateMessage에서 방향키나 char키를 처리하기가 곤란하다.
-//따라서 현재 포커스를 가진 컨트롤이 CEdit이고 enable이고 readonly가 아닌 경우에는
-//PreTranslateMessage에서 입력된 키를 처리하도록 한다.
-bool		IsEditCtrlAcceptKeyState(CWnd *pWnd);
 
-//start	: 시작 인덱스.
-//end	: 정렬을 원하는 n번째 항목
-//ex. quicksort(data, 9, 2);를 호출하면
-//2번 인덱스부터 9번째 항목인 data[2] ~ data[8]까지의 데이터가 정렬된다.
-//보통 n개의 데이터를 정렬한다면 quicksort(data, n); 이라 호출하면 된다.
-template<class T> void quicksort(T& v, int end, int start = 0, bool bAscending = true)
-{
-	while(end > start)
+	//UI control 관련
+	DWORD		getButtonStyle(HWND hWnd);	//button의 종류를 리턴한다.
+
+	//연속된 버튼들에 대한 일괄 처리용 함수
+	//기본 CheckRadioButton같은 경우는 unselect 기능을 제공하지 않기 때문에
+	//아래 함수를 새로이 정의해서 사용한다.
+	//id_offset이 0보다 작으면 first ~ last까지 모두 적용.
+	void		CheckRadioButtons(CWnd* pWnd, int idFirst, int idLast, int id_offset, int nCheck = BST_CHECKED);
+
+	//dialog based에서 키입력으로 동작을 정의하는데 CEdit과 같은 입력창에 포커스가 있으면
+	//PreTranslateMessage에서 방향키나 char키를 처리하기가 곤란하다.
+	//따라서 현재 포커스를 가진 컨트롤이 CEdit이고 enable이고 readonly가 아닌 경우에는
+	//PreTranslateMessage에서 입력된 키를 처리하도록 한다.
+	bool		IsEditCtrlAcceptKeyState(CWnd* pWnd);
+
+	//start	: 시작 인덱스.
+	//end	: 정렬을 원하는 n번째 항목
+	//ex. quicksort(data, 9, 2);를 호출하면
+	//2번 인덱스부터 9번째 항목인 data[2] ~ data[8]까지의 데이터가 정렬된다.
+	//보통 n개의 데이터를 정렬한다면 quicksort(data, n); 이라 호출하면 된다.
+	template<class T> void quicksort(T& v, int end, int start = 0, bool bAscending = true)
 	{
-		int i = start;
-		int j = end;
-
-		do
+		while (end > start)
 		{
-			if (bAscending)
-			{
-				while((v[i] < v[start]) && (i < j))
-					i++;
+			int i = start;
+			int j = end;
 
-				//함수 원형을 quicksort(T *v, ...)와 같이 정의해서 사용하면 아래 문장에서 디버깅 에러가 발생한다.
-				while(v[--j] > v[start])
-					;
+			do
+			{
+				if (bAscending)
+				{
+					while ((v[i] < v[start]) && (i < j))
+						i++;
+
+					//함수 원형을 quicksort(T *v, ...)와 같이 정의해서 사용하면 아래 문장에서 디버깅 에러가 발생한다.
+					while (v[--j] > v[start])
+						;
+				}
+				else
+				{
+					while ((v[i] > v[start]) && (i < j))
+						i++;
+					while (v[--j] < v[start])
+						;
+				}
+
+				if (i < j)
+					swap(v[i], v[j]);
+			} while (i < j);
+
+			swap(v[start], v[j]);
+
+			if (j - start > end - (j + 1))
+			{
+				quicksort(v, j - 1, start, bAscending);
+				start = j + 1;
 			}
 			else
 			{
-				while((v[i] > v[start]) && (i < j))
-					i++;
-				while(v[--j] < v[start])
-					;
+				quicksort(v, end, j + 1, bAscending);
+				end = j - 1;
 			}
-
-			if (i < j)
-				swap(v[i], v[j]);
-		} while(i < j);
-
-		swap(v[start], v[j]);
-
-		if (j - start > end - (j + 1))
-		{
-			quicksort(v, j - 1, start, bAscending);
-			start = j + 1;
-		}
-		else
-		{
-			quicksort(v, end, j + 1, bAscending);
-			end = j - 1;
 		}
 	}
-}
 
-/*
-template<class T> void quickSort(T *a, const int& leftarg, const int& rightarg);
-	{
-  if (leftarg < rightarg) {
+	/*
+	template<class T> void quickSort(T *a, const int& leftarg, const int& rightarg);
+		{
+	  if (leftarg < rightarg) {
 
-    T pivotvalue = a[leftarg];
-    int left = leftarg - 1;
-    int right = rightarg + 1;
+		T pivotvalue = a[leftarg];
+		int left = leftarg - 1;
+		int right = rightarg + 1;
 
-  for(;;) {
+	  for(;;) {
 
-    while (a[--right] > pivotvalue);
-    while (a[++left] < pivotvalue);
+		while (a[--right] > pivotvalue);
+		while (a[++left] < pivotvalue);
 
-    if (left >= right) break;
+		if (left >= right) break;
 
-    T temp = a[right];
-    a[right] = a[left];
-    a[left] = temp;
-  }
+		T temp = a[right];
+		a[right] = a[left];
+		a[left] = temp;
+	  }
 
-  int pivot = right;
-  quickSort(a, leftarg, pivot);
-  quickSort(a, pivot + 1, rightarg);
-  }
-}
-*/
+	  int pivot = right;
+	  quickSort(a, leftarg, pivot);
+	  quickSort(a, pivot + 1, rightarg);
+	  }
+	}
+	*/
 
-/* template함수의 특징
-- 데이터 타입에 무관하게 함수 하나로 커버가 되지만
-  데이터 타입마다 함수 바디가 obj코드로 생성되는 단점이 있다고 알고있다.
-  또한 vs의 debug모드에서는 속도 저하가 발생한다.
-  release모드에서는 속도 저하가 발생하지 않는다.
-*/
+	/* template함수의 특징
+	- 데이터 타입에 무관하게 함수 하나로 커버가 되지만
+	  데이터 타입마다 함수 바디가 obj코드로 생성되는 단점이 있다고 알고있다.
+	  또한 vs의 debug모드에서는 속도 저하가 발생한다.
+	  release모드에서는 속도 저하가 발생하지 않는다.
+	*/
 
-//치환 함수
+	//치환 함수
 #ifndef SWAP
-template<class T> void SWAP(T& x, T& y)
-{
-	T temp	= x;
-	x		= y;
-	y		= temp;
-}
+	template<class T> void SWAP(T& x, T& y)
+	{
+		T temp = x;
+		x = y;
+		y = temp;
+	}
 #endif
 
-//클리핑 함수. 클리핑이 일어나면 true를 리턴한다. std::clamp() 권장.
-template<class T> bool Clamp(T &n, T min, T max)
-{
-	if (max < min)
-		SWAP(min, max);
-
-	if (n < min)
+	//클리핑 함수. 클리핑이 일어나면 true를 리턴한다. std::clamp() 권장.
+	template<class T> bool Clamp(T& n, T min, T max)
 	{
-		n = min;
-		return true;
+		if (max < min)
+			SWAP(min, max);
+
+		if (n < min)
+		{
+			n = min;
+			return true;
+		}
+		else if (n > max)
+		{
+			n = max;
+			return true;
+		}
+
+		return false;
 	}
-	else if (n > max)
+
+	//범위 순환 함수
+	template<class T> void Cycle(T& n, T min, T max)
 	{
-		n = max;
-		return true;
+		if (n < min) n = max;
+		else if (n > max) n = min;
 	}
 
-	return false;
-}
-
-//범위 순환 함수
-template<class T> void Cycle(T& n, T min, T max)
-{
-	if (n < min) n = max;
-	else if (n > max) n = min;
-}
-
-//범위를 벗어나면 default값으로 세팅
-template<class T> void Validate(T& n, T min, T max, T default_value)
-{
-	if (n < min || n > max)
-		n = default_value;
-}
-
-//치환 함수
-template<class T> void Swap(T& x, T& y)
-{
-	T temp	= x;
-	x		= y;
-	y		= temp;
-}
-
-//template<typename ... T> inline T get_max(T ... args)
-//{
-//	int n = sizeof...(args);
-//	int arg[] = { args... };
-//}
-
-int compareInteger (const void * a, const void * b);
-int compareChar(const void *arg1, const void *arg2);
-int compareString (const void * a, const void * b);
-
-template<typename T> void move_item(std::deque<T>& dq, size_t from, size_t to)
-{
-	if (from == to || from >= dq.size() || to >= dq.size())
-		return;
-
-	auto value = std::move(dq[from]);
-	dq.erase(dq.begin() + from);
-	dq.insert(dq.begin() + to, std::move(value));
-}
-
-//////////////////////////////////////////////////////////////////////////
-//수학
-double		tangentfunc(double x, double y);
-//두 점의 각도를 구한다. screencoord일때와 Cartesian coordinate(직교좌표계)일때는 y가 반대임에 주의.
-double		GetAngle(double vx, double vy, bool bScreenCoord = true);
-double		GetAngle(double x1, double y1, double x2,  double y2, bool bScreenCoord = true);
-double		GetAngle(CPoint pt0, CPoint pt1, bool bScreenCoord = true);
-double		GetAngle(CPoint a, CPoint b, CPoint c);	//3점이 이루는 각도
-CPoint		GetCenterPoint(CPoint pt0, CPoint pt1);
-double		GetDistance(CPoint pt0, CPoint pt1);
-
-//두 점을 지나는 직선상의 x3 또는 y3를 구한다.
-double		getLinePointX(double x1, double y1, double x2, double y2, double y3);
-double		getLinePointY(double x1, double y1, double x2, double y2, double x3);
-double		GetManhattanDistance(double x1, double y1, double x2, double y2);
-//ptCenter를 기준으로 dAngle 만큼 회전된 dDist거리의 점의 좌표를 구한다.
-CPoint		GetRotatedPoint(CPoint ptCenter, double dAngle, double dDist);
-//cx, cy를 중심으로 tx, ty점이 degree를 회전할 경우 tx, ty점의 변경 좌표
-void		get_rotated(int cx, int cy, int* tx, int* ty, double degree);
-std::vector<CPoint>	get_rotated(int cx, int cy, CRect* r, double degree);
-
-//지도 좌표 <-> 도분초 변환
-double		gps_to_double(int d, int m, double s);
-CString		double_to_gps(double gps, bool is_latitude, int *d = nullptr, int *m = nullptr, double *s = nullptr);
-
-//src내의 모든 문자에 대해 digits자릿수의 조합 생성
-void		combination(std::vector<TCHAR> src, CString temp, std::vector<CString>& result, int depth);
-
-//http://www.gamedevforever.com/114 (2012년 포스트)
-//기존 rand()에 비해 분포가 고르고 속도도 빠르다고 소개되었으나
-//정작 실험해보니 분포는 유사하고 속도는 rand()가 2배 더 빨랐다.
-//release mode, 1000000개의 SetPixel, GetTickCount()로 시간체크.
-template<typename T> inline T random19937(T min, T max)
-{
-	std::random_device rd;
-	std::mt19937 mt(rd());
-	if (typeid(T) == typeid(float) ||
-		typeid(T) == typeid(double) ||
-		typeid(T) == typeid(long double))
+	//범위를 벗어나면 default값으로 세팅
+	template<class T> void Validate(T& n, T min, T max, T default_value)
 	{
-		std::uniform_real_distribution<double> dist((double)min, (double)max);
+		if (n < min || n > max)
+			n = default_value;
+	}
+
+	//치환 함수
+	template<class T> void Swap(T& x, T& y)
+	{
+		T temp = x;
+		x = y;
+		y = temp;
+	}
+
+	//template<typename ... T> inline T get_max(T ... args)
+	//{
+	//	int n = sizeof...(args);
+	//	int arg[] = { args... };
+	//}
+
+	int compareInteger(const void* a, const void* b);
+	int compareChar(const void* arg1, const void* arg2);
+	int compareString(const void* a, const void* b);
+
+	template<typename T> void move_item(std::deque<T>& dq, size_t from, size_t to)
+	{
+		if (from == to || from >= dq.size() || to >= dq.size())
+			return;
+
+		auto value = std::move(dq[from]);
+		dq.erase(dq.begin() + from);
+		dq.insert(dq.begin() + to, std::move(value));
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	//수학
+	double		tangentfunc(double x, double y);
+	//두 점의 각도를 구한다. screencoord일때와 Cartesian coordinate(직교좌표계)일때는 y가 반대임에 주의.
+	double		GetAngle(double vx, double vy, bool bScreenCoord = true);
+	double		GetAngle(double x1, double y1, double x2, double y2, bool bScreenCoord = true);
+	double		GetAngle(CPoint pt0, CPoint pt1, bool bScreenCoord = true);
+	double		GetAngle(CPoint a, CPoint b, CPoint c);	//3점이 이루는 각도
+	CPoint		GetCenterPoint(CPoint pt0, CPoint pt1);
+	double		GetDistance(CPoint pt0, CPoint pt1);
+
+	//두 점을 지나는 직선상의 x3 또는 y3를 구한다.
+	double		getLinePointX(double x1, double y1, double x2, double y2, double y3);
+	double		getLinePointY(double x1, double y1, double x2, double y2, double x3);
+	double		GetManhattanDistance(double x1, double y1, double x2, double y2);
+	//ptCenter를 기준으로 dAngle 만큼 회전된 dDist거리의 점의 좌표를 구한다.
+	CPoint		GetRotatedPoint(CPoint ptCenter, double dAngle, double dDist);
+	//cx, cy를 중심으로 tx, ty점이 degree를 회전할 경우 tx, ty점의 변경 좌표
+	void		get_rotated(int cx, int cy, int* tx, int* ty, double degree);
+	std::vector<CPoint>	get_rotated(int cx, int cy, CRect* r, double degree);
+
+	//지도 좌표 <-> 도분초 변환
+	double		gps_to_double(int d, int m, double s);
+	CString		double_to_gps(double gps, bool is_latitude, int* d = nullptr, int* m = nullptr, double* s = nullptr);
+
+	//src내의 모든 문자에 대해 digits자릿수의 조합 생성
+	void		combination(std::vector<TCHAR> src, CString temp, std::vector<CString>& result, int depth);
+
+	//http://www.gamedevforever.com/114 (2012년 포스트)
+	//기존 rand()에 비해 분포가 고르고 속도도 빠르다고 소개되었으나
+	//정작 실험해보니 분포는 유사하고 속도는 rand()가 2배 더 빨랐다.
+	//release mode, 1000000개의 SetPixel, GetTickCount()로 시간체크.
+	template<typename T> inline T random19937(T min, T max)
+	{
+		std::random_device rd;
+		std::mt19937 mt(rd());
+		if (typeid(T) == typeid(float) ||
+			typeid(T) == typeid(double) ||
+			typeid(T) == typeid(long double))
+		{
+			std::uniform_real_distribution<double> dist((double)min, (double)max);
+			return dist(mt);
+		}
+
+		std::uniform_int_distribution<int> dist((int)min, (int)max);
 		return dist(mt);
+		/*
+		std::mt19937 engine((unsigned int)time(NULL));       // MT19937 난수 엔진
+		std::uniform_int<> distribution(min, max);                     // 생성 범위
+		std::variate_generator<std::mt19937, std::uniform_int<>> generator(engine, distribution);
+		return generator();
+		*/
 	}
-
-	std::uniform_int_distribution<int> dist((int)min, (int)max);
-	return dist(mt);
 	/*
-	std::mt19937 engine((unsigned int)time(NULL));       // MT19937 난수 엔진
-	std::uniform_int<> distribution(min, max);                     // 생성 범위
-	std::variate_generator<std::mt19937, std::uniform_int<>> generator(engine, distribution);
-	return generator();
+	template<typename T> T random19937(T min, T max)
+	{
+		srand((unsigned int)time(NULL));
+		return rand();
+	}
 	*/
-}
-/*
-template<typename T> T random19937(T min, T max)
-{
-	srand((unsigned int)time(NULL));
-	return rand();
-}
-*/
 
 #include <numeric>
-template<typename T> double standardDeviation(std::deque<T> v) 
-{
-	T sum = std::accumulate(v.begin(), v.end(), 0.0);
-	double mean = sum / v.size();
+	template<typename T> double standardDeviation(std::deque<T> v)
+	{
+		T sum = std::accumulate(v.begin(), v.end(), 0.0);
+		double mean = sum / v.size();
 
-	double squareSum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
-	return sqrt(squareSum / v.size() - mean * mean);
-}
+		double squareSum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+		return sqrt(squareSum / v.size() - mean * mean);
+	}
 
-double		Rounding(double x, int digit);
-//대각선의 길이로 가로, 세로 크기를 구한다.
-void		get_HV_angle_from_diagonal(double diagonal, double *h, double *v, double width, double height);
-void		get_HV_angle_from_diagonal(int diagonal, int *h, int *v, int width, int height);
+	double		Rounding(double x, int digit);
+	//대각선의 길이로 가로, 세로 크기를 구한다.
+	void		get_HV_angle_from_diagonal(double diagonal, double* h, double* v, double width, double height);
+	void		get_HV_angle_from_diagonal(int diagonal, int* h, int* v, int width, int height);
 
-//numlock, capslock, scrolllock
-bool		GetLockKeyState(BYTE nLockKey);
-void		SetLockKeyState(BYTE nLockKey, bool bOn);
+	//numlock, capslock, scrolllock
+	bool		GetLockKeyState(BYTE nLockKey);
+	void		SetLockKeyState(BYTE nLockKey, bool bOn);
 
-HBITMAP		MakeDIBSection(CDC& dc, int width, int height);
+	HBITMAP		MakeDIBSection(CDC& dc, int width, int height);
 
-//2D 단일 영상에서 이미 알려진 설정값을 기준으로 영상내의 한 점과 렌즈와의 거리를 계산(by sucwon)
-//cam_height	: 카메라 설치 높이. 단위 cm
-//fl_x, fl_y	: focal length
-//c_x, c_y		: 주점
-double		getObjectDistance(	int width, int height, int vanishing_y, int x, int y, int cam_height, double *dx, double *dy,
-								int cali_width = 1920, int cali_height = 1080,
-								double fl_x = 2361.130, double fl_y = 2357.436);
+	//2D 단일 영상에서 이미 알려진 설정값을 기준으로 영상내의 한 점과 렌즈와의 거리를 계산(by sucwon)
+	//cam_height	: 카메라 설치 높이. 단위 cm
+	//fl_x, fl_y	: focal length
+	//c_x, c_y		: 주점
+	double		getObjectDistance(int width, int height, int vanishing_y, int x, int y, int cam_height, double* dx, double* dy,
+		int cali_width = 1920, int cali_height = 1080,
+		double fl_x = 2361.130, double fl_y = 2357.436);
 
-//원본보다 크게 resize는 불가함.
-void		resize_image(uint8_t *source_ptr,
-						int source_width, 
-						int source_height, 
-						uint8_t *destination_ptr, 
-						int destination_width, 
-						int destination_height);
-
+	//원본보다 크게 resize는 불가함.
+	void		resize_image(uint8_t* source_ptr,
+		int source_width,
+		int source_height,
+		uint8_t* destination_ptr,
+		int destination_width,
+		int destination_height);
 
 //resize_bilinear는 ncnn에서 가져왔으나 뭔가 메모리 에러가 발생한다.
 //일단 사용하지 않는다.
@@ -2883,7 +2878,7 @@ bool		SavePlateInfoFile(char* sfile, char* sPlate, RECT* rect = NULL);
 
 void		printMessage(std::string msg, uint8_t bNewLine = true);
 
-int readFilenames(std::vector<std::string> &filenames, const std::string &directory);
+int readFilenames(std::vector<std::string>& filenames, const std::string& directory);
 
 //CMenu
 //HMENU에서 메뉴ID와 캡션을 얻어온다.

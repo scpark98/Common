@@ -240,8 +240,10 @@ public:
 	int						get_frame_delay(int index);
 	void					set_parent(HWND hWnd) { m_parent = hWnd; }
 	void					play();
-	void					pause(int pos = -1);
+	void					pause();
 	bool					stop();
+	bool					is_playing() { return m_run_thread_animation && !m_ani_paused; }
+	bool					is_paused() { return m_ani_paused; }
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 특정 프레임 인덱스로 이동
 	int						goto_frame(int index, bool pause = false);
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 interval 만큼 프레임 이동

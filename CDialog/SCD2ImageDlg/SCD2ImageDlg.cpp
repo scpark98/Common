@@ -132,14 +132,6 @@ END_MESSAGE_MAP()
 
 void CSCD2ImageDlg::OnPaint()
 {
-	//if (m_skip_repaint)
-	//{
-	//	CDialog::OnPaint();
-	//	return;
-	//}
-
-	//TRACE(_T("CSCD2ImageDlg::OnPaint. %ld\n"), GetTickCount64());
-
 	CPaintDC dc(this); // device context for painting
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	// 그리기 메시지에 대해서는 CStatic::OnPaint()을(를) 호출하지 마십시오.
@@ -415,7 +407,7 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 			case VK_SPACE :
  				if (m_images[0].is_animated_image())
 				{
-					pause(-1);
+					play();
 					return TRUE;
 				}
 				break;
@@ -1294,13 +1286,13 @@ void CSCD2ImageDlg::play()
 	m_images[0].play();
 }
 
-//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCD2ImageDlg::pause(int pos)
+//재생중이든 아니든 무조건 일시정지로 동작시킨다.
+void CSCD2ImageDlg::pause()
 {
 	if (m_images.size() == 0)
 		return;
 
-	m_images[0].pause(pos);
+	m_images[0].pause();
 }
 
 void CSCD2ImageDlg::stop()

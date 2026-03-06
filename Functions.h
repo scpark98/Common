@@ -98,7 +98,9 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define Trace_only(fmt, ...) trace_output(true, __function__, __LINE__, true, fmt, ##__VA_ARGS__)
 #define Trace_func() trace_output(false, __function__, __LINE__, false, _T("%s\n"), __function__)
 
+#ifndef _USING_V110_SDK71_
 #define traceonly TRACE(_T("%s(%d) current clock = %ld\n"), __function__, __LINE__, GetTickCount64());
+#endif
 
 inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CString& s)
 {
@@ -1586,7 +1588,9 @@ struct	NETWORK_INFO
 	ULONG		get_S_addr_from_domain_or_ip_str(CString domain_or_ip_str);
 	CString		get_my_ip();
 	CString		get_mac_addres(bool include_colon = true);
+#ifndef _USING_V110_SDK71_
 	CString		get_ip_error_string(DWORD error_code);
+#endif
 	bool		port_is_open(const std::string& address, int port);
 	//ip 또는 domain의 일부 값을 '*'로 치환한다.
 	CString		get_asterisk_addr(CString ip);
@@ -1642,13 +1646,17 @@ struct	NETWORK_INFO
 	//(0:aunlNotConfigured, 1:aunlDisabled, 2:aunlNotifyBeforeDownload, 3:aunlNotifyBeforeInstallation, 4:aunlScheduledInstallation)
 	bool		get_windows_update_setting(bool& auto_update, int& level);
 
+#ifndef _USING_V110_SDK71_
 	//SystemParametersInfo(SPI_GETSCREENSAVEACTIVE...)으로는 제대로 설정값을 얻어오지 못한다.
 	bool		get_screensaver_setting(int *timeout = NULL, int* use_secure = NULL);
+#endif
 
 	//좀 더 테스트 필요!
 	//실행파일명으로 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
 	HWND		get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid = 0);
+#ifndef _USING_V110_SDK71_
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
+#endif
 
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE);
 	HINSTANCE	FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult);
@@ -2378,9 +2386,9 @@ h		: 복사할 height 크기(pixel)
 			else
 				str.Format(_T("%f, %f, %f, %f"), r->X, r->Y, r->X + r->Width, r->Y + r->Height);
 		}
+#ifndef _USING_V110_SDK71_
 		else if (typeid(T) == typeid(D2D1_RECT_F))
 		{
-			//D2D1::RectF* r = reinterpret_cast<D2D1::RectF*>(&rr);
 			D2D1_RECT_F* r = reinterpret_cast<D2D1_RECT_F*>(&rr);
 			if (format == rect_info_format_point)
 				str.Format(_T("(%f, %f)~(%f, %f)"), r->left, r->top, r->right, r->bottom);
@@ -2391,7 +2399,7 @@ h		: 복사할 height 크기(pixel)
 			else
 				str.Format(_T("%f, %f, %f, %f"), r->left, r->top, r->right, r->bottom);
 		}
-
+#endif
 		return str;
 	}
 
@@ -2399,16 +2407,21 @@ h		: 복사할 height 크기(pixel)
 	CRect			make_rect(int x, int y, int w, int h);
 	CRect			make_center_rect(int cx, int cy, int w, int h);
 	Gdiplus::Rect	make_center_gprect(int cx, int cy, int w, int h);
-	D2D1_RECT_F		make_center_d2rect(float cx, float cy, float w, float h);
-	void			inflate_rect(D2D1_RECT_F& r, float x, float y);
 	CRect			gpRect_to_CRect(Gdiplus::Rect r);
 	CRect			gpRectF_to_CRect(Gdiplus::RectF r);
 	Gdiplus::Rect	CRect_to_gpRect(CRect r);
 	Gdiplus::RectF	CRect_to_gpRectF(CRect r);
+
+#ifndef _USING_V110_SDK71_
+	D2D1_RECT_F		make_center_d2rect(float cx, float cy, float w, float h);
+	void			inflate_rect(D2D1_RECT_F& r, float x, float y);
 	D2D1_RECT_F		CRect_to_d2Rect(CRect r);
+	D2D1_RECT_F		gpRectF_to_d2Rect(Gdiplus::RectF r);
 	CRect			d2RectF_to_CRect(D2D1_RECT_F r);
 	Gdiplus::RectF	d2RectF_to_gpRectF(D2D1_RECT_F r);
-	D2D1_RECT_F		gpRectF_to_d2Rect(Gdiplus::RectF r);
+	D2D1_RECT_F		get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
+	D2D1_RECT_F		get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
+#endif
 
 
 	//Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
@@ -2970,5 +2983,3 @@ std::basic_string<CharT> GetSystemErrorMesssage(const DWORD errorCode)
 	return result;
 }
 
-D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float ratio, int attach = attach_hcenter | attach_vcenter, bool stretch = true);
-D2D1_RECT_F				get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach = attach_hcenter | attach_vcenter, bool stretch = true);

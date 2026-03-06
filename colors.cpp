@@ -1,3 +1,10 @@
+//#ifndef WINVER
+//#define WINVER 0x0501
+//#endif
+//#ifndef _WIN32_WINNT
+//#define _WIN32_WINNT 0x0501
+//#endif
+
 #include "colors.h"
 #include "Functions.h"
 
@@ -284,10 +291,12 @@ Gdiplus::Color get_color(std::string cr_name)
 	return CSCColorList::get_color(cr_name);
 }
 
+#ifndef _USING_V110_SDK71_
 D2D1::ColorF get_d2color(Gdiplus::Color cr)
 {
 	return D2D1::ColorF((float)cr.GetR() / 255.0f, (float)cr.GetG() / 255.0f, (float)cr.GetB() / 255.0f, (float)cr.GetA() / 255.0f);
 }
+#endif
 
 Gdiplus::Color get_color(CString cr_str)
 {
@@ -1162,9 +1171,11 @@ Gdiplus::Color get_sys_color(int index)
 	return cr;
 }
 
+#ifndef _USING_V110_SDK71_
 D2D1_COLOR_F get_sys_d2color(int index, int alpha)
 {
 	COLORREF cr = GetSysColor(index);
 	D2D1::ColorF d2cr{ GetRValue(cr) / 255.0f, GetGValue(cr) / 255.0f, GetBValue(cr) / 255.f, (float)alpha / 255.0f };
 	return d2cr;
 }
+#endif

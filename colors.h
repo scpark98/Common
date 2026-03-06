@@ -257,7 +257,9 @@ Gdiplus::Color	get_color(COLORREF rgb);
 Gdiplus::Color	get_color(CString cr_str);
 Gdiplus::Color	get_color(std::string cr_name);
 
+#ifndef _USING_V110_SDK71_
 D2D1::ColorF	get_d2color(Gdiplus::Color cr);
+#endif
 
 
 //#RRGGBB와 같은 16진수 컬러 문자열을 COLORREF로 변환
@@ -328,7 +330,9 @@ int				get_hue(COLORREF cr);
 CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = nullptr);
 
 Gdiplus::Color	get_sys_color(int index);
+#ifndef _USING_V110_SDK71_
 D2D1_COLOR_F	get_sys_d2color(int index, int alpha = 255);
+#endif
 
 extern COLORREF g_default_color[16];
 

@@ -1,3 +1,10 @@
+//#ifndef WINVER
+//#define WINVER 0x0501
+//#endif
+//#ifndef _WIN32_WINNT
+//#define _WIN32_WINNT 0x0501
+//#endif
+
 #include "SCLog.h"
 #include <afxmt.h>
 
@@ -10,10 +17,9 @@ CSCLog* pLog = NULL;
 CSCLog::CSCLog()
 {
 	pLog = this;
-
 	m_log_level = SCLOG_LEVEL_RELEASE;
-
 	m_fp = NULL;
+	InitializeCriticalSection(&m_cs);  // 생성자에서 초기화
 
 	//여기서 시작 로그 기록함수를 바로 호출하면 편하지만
 	//로그파일명, 로그저장 경로등을 변경한 후 기록해야 하는 경우는 오히려 불필요한 로그가 생기는 단점이 있다.
@@ -35,6 +41,7 @@ CSCLog::~CSCLog()
 	{
 
 	}
+	DeleteCriticalSection(&m_cs);      // 소멸자에서 해제
 }
 
 bool CSCLog::set(CString log_folder, CString file_title, int show_log_level)
@@ -182,13 +189,15 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 
 	try
 	{
-		m_mutex.lock();
+		// m_mutex.lock();   → 
+		EnterCriticalSection(&m_cs);
 
 		if ((m_fp == NULL) && (log_level <= m_log_level))
 		{
 			if (!set(m_log_folder, m_log_file_title, m_log_level))
 			{
-				m_mutex.unlock();
+				// m_mutex.unlock(); → 
+				LeaveCriticalSection(&m_cs);
 				return result;
 			}
 		}
@@ -207,7 +216,8 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 		{
 			CString str = get_error_str(GetLastError());
 			TRACE(_T("%s\n"), str);
-			m_mutex.unlock();
+			// m_mutex.unlock(); → 
+			LeaveCriticalSection(&m_cs);
 			return _T("log_text.FormatV() exception.");
 		}
 
@@ -295,16 +305,14 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 				fflush(m_fp);
 			}
 		}
-
-		release();
-		m_mutex.unlock();
 	}
 	catch (...)
 	{
-		release();
-		m_mutex.unlock();
-		//theCSLog.Unlock();
 	}
+
+	release();
+	// m_mutex.unlock(); → 
+	LeaveCriticalSection(&m_cs);
 
 	return result;
 }

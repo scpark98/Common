@@ -244,8 +244,8 @@ public:
 
 //animated gif 관련 public member
 	void			play();
-	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void			pause(int pos = 0);
+	//재생중이든 아니든 무조건 일시정지로 동작시킨다.
+	void			pause();
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
 	void			stop();
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동

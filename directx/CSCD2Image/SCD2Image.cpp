@@ -2171,23 +2171,25 @@ void CSCD2Image::play()
 	t.detach();
 }
 
-void CSCD2Image::pause(int pos)
+//특정 위치에서 멈추게 할 경우도 있어서 원래는 파라미터로 pos를 받았지만
+//pause는 그냥 재생중이든 아니든 그냥 일시정지 명령으로 처리하는 것이 명확하므로 pos는 제거한다.
+//특정 위치에서 멈추게 할 경우는 goto_frame()을 이용하면 된다.
+void CSCD2Image::pause()
 {
 	if (m_img.size() <= 1 || !m_run_thread_animation)
 		return;
 	
-	if (pos >= (int)m_img.size())
-		pos = 0;
+	//if (pos >= (int)m_img.size())
+	//	pos = 0;
 
-	if (pos < 0)
-	{
-		play();
-		return;
-	}
+	//default -1이 넘어오면 play()가 호출되고 
+	//if (pos < 0)
+	//{
+	//	play();
+	//	return;
+	//}
 
-	m_frame_index = pos;
 	m_ani_paused = true;
-
 	m_img_origin_for_back_transparency.Reset();
 }
 
@@ -2637,13 +2639,13 @@ void CSCD2Image::set_back_transparency(int index, int inner_threshold, int outer
 		}
 	}
 
-	//trace(inner_threshold);
-	//trace(outer_threshold);
 	make_back_transparent(index, inner_threshold, outer_threshold, cr_back);
 }
 
 
 //배경 색상을 자동 탐지하여 transparent 색상으로 변경한다.
+//cr_back == Gdiplus::Color::Transparent인 경우는 border에서 일정 두께만큼의 픽셀들을 읽어서 배경색을 자동 탐지하게 되고
+//cr_back != Gdiplus::Color::Transparent이 아니면 해당 색을 투명처리하게 된다.
 //index = -1이면 모든 프레임에 대해 적용한다.
 //inner_threshold: 이 거리 이내의 픽셀은 완전 투명 (기본값 30)
 //outer_threshold: 이 거리 이상의 픽셀은 원본 유지 (기본값 120)

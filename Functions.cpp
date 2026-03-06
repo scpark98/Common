@@ -1,10 +1,21 @@
-﻿
+﻿//#ifndef WINVER
+//#define WINVER 0x0501
+//#endif
+//#ifndef _WIN32_WINNT
+//#define _WIN32_WINNT 0x0501
+//#endif
+
+
 #include <afxinet.h>	// for Internet
 #include <string>
 #include <utility>
 #include <fstream>
-#include <filesystem>
 #include <regex>		//require c++11
+#include <IPHlpApi.h>
+
+#ifndef _USING_V110_SDK71_
+#include <filesystem>
+#endif
 
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
@@ -4367,6 +4378,7 @@ CString	get_mac_addres(bool include_colon)
 	return mac;
 }
 
+#ifndef _USING_V110_SDK71_
 CString get_ip_error_string(DWORD error_code)
 {
 	//auto e = GetLastError();
@@ -4376,6 +4388,7 @@ CString get_ip_error_string(DWORD error_code)
 
 	return CString(buf);
 }
+#endif
 
 bool port_is_open(const std::string& address, int port)
 {
@@ -7557,6 +7570,7 @@ Gdiplus::Rect make_center_gprect(int cx, int cy, int w, int h)
 	return result;
 }
 
+#ifndef _USING_V110_SDK71_
 D2D1_RECT_F	make_center_d2rect(float cx, float cy, float w, float h)
 {
 	D2D1_RECT_F r;
@@ -7574,6 +7588,102 @@ void inflate_rect(D2D1_RECT_F& r, float x, float y)
 	r.top -= y;
 	r.bottom += y;
 }
+
+D2D1_RECT_F	CRect_to_d2Rect(CRect r)
+{
+	D2D1_RECT_F rf = { r.left, r.top, r.right, r.bottom };
+	return rf;
+}
+
+Gdiplus::RectF	d2RectF_to_gpRectF(D2D1_RECT_F r)
+{
+	return Gdiplus::RectF(r.left, r.top, r.right, r.bottom);
+}
+
+D2D1_RECT_F gpRectF_to_d2Rect(Gdiplus::RectF r)
+{
+	return D2D1::RectF(r.X, r.Y, r.GetRight(), r.GetBottom());
+}
+
+CRect d2RectF_to_CRect(D2D1_RECT_F r)
+{
+	return CRect(r.left, r.top, r.right, r.bottom);
+}
+
+D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)
+{
+	if (height == 0.0f)
+		return D2D1_RECT_F();
+
+	return get_ratio_rect(target, width / height, attach, stretch);
+}
+
+D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool stretch)
+{
+	float w = target.right - target.left;
+	float h = target.bottom - target.top;
+	float nNewW;
+	float nNewH;
+	float dTargetRatio = float(w) / float(h);
+
+	D2D1_RECT_F	result;
+
+	if (w == 0.f || h == 0.f)
+		return D2D1_RECT_F();
+
+	bool bResizeWidth;
+
+	if (ratio > 1.0f)
+	{
+		if (dTargetRatio < ratio)
+			bResizeWidth = false;
+		else
+			bResizeWidth = true;
+	}
+	else
+	{
+		if (dTargetRatio > ratio)
+			bResizeWidth = true;
+		else
+			bResizeWidth = false;
+	}
+
+
+	if (bResizeWidth)
+	{
+		result.top = target.top;
+		result.bottom = target.bottom;
+
+		nNewW = h * ratio;
+		if (attach & attach_left)
+			result.left = target.left;
+		else if (attach & attach_right)
+			result.left = target.right - nNewW;
+		else
+			result.left = target.left + (w - nNewW) / 2.0f;
+
+		result.right = result.left + nNewW;
+	}
+	else
+	{
+		result.left = target.left;
+		result.right = target.right;
+
+		nNewH = w / ratio;
+
+		if (attach & attach_top)
+			result.top = target.top;
+		else if (attach & attach_bottom)
+			result.top = target.bottom - nNewH;
+		else
+			result.top = target.top + (h - nNewH) / 2.0f;
+
+		result.bottom = result.top + nNewH;
+	}
+
+	return result;
+}
+#endif
 
 CRect getCenterRect(int cx, int cy, int w, int h)
 {
@@ -7606,12 +7716,6 @@ Gdiplus::Rect CRect_to_gpRect(CRect r)
 Gdiplus::RectF CRect_to_gpRectF(CRect r)
 {
 	return Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
-}
-
-D2D1_RECT_F	CRect_to_d2Rect(CRect r)
-{
-	D2D1_RECT_F rf = { r.left, r.top, r.right, r.bottom };
-	return rf;
 }
 
 //Gdiplus::RectF는 right 또는 x2가 없고 x(left)와 Width 멤버변수만 존재힌다.
@@ -10181,6 +10285,7 @@ bool get_windows_update_setting(bool& auto_update, int& level)
 //SystemParametersInfo(SPI_GETSCREENSAVEACTIVE...)으로는 제대로 설정값을 얻어오지 못한다.
 //SCRNSAVE.EXE라는 항목이 존재하면 설정된 것이고 없으면 해제된 것이다.
 //설정시간과 잠금화면을 표시할지에 대한 설정값을 얻어올 수 있다.
+#ifndef _USING_V110_SDK71_
 bool get_screensaver_setting(int *timeout, int* use_secure)
 {
 	HKEY hKeySreenSaver = NULL;
@@ -10212,6 +10317,7 @@ bool get_screensaver_setting(int *timeout, int* use_secure)
 
 	return false;
 }
+#endif
 
 #include <WinIoCtl.h>
 
@@ -11847,6 +11953,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd,LPARAM lParam)
 	return TRUE;
 }
 
+#ifndef _USING_V110_SDK71_
 HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 {
 	HANDLE hProcessSnapshot;
@@ -11900,6 +12007,7 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 
 	return INVALID_HANDLE_VALUE;
 }
+#endif
 
 //실행파일명으로부터 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
 HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
@@ -20829,95 +20937,6 @@ bool set_privilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
 	AdjustTokenPrivileges(hToken, FALSE, &tp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
 
 	return ((GetLastError() != ERROR_SUCCESS) ? false : true);
-}
-
-Gdiplus::RectF	d2RectF_to_gpRectF(D2D1_RECT_F r)
-{
-	return Gdiplus::RectF(r.left, r.top, r.right, r.bottom);
-}
-
-D2D1_RECT_F gpRectF_to_d2Rect(Gdiplus::RectF r)
-{
-	return D2D1::RectF(r.X, r.Y, r.GetRight(), r.GetBottom());
-}
-
-CRect d2RectF_to_CRect(D2D1_RECT_F r)
-{
-	return CRect(r.left, r.top, r.right, r.bottom);
-}
-
-D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float width, float height, int attach, bool stretch)
-{
-	if (height == 0.0f)
-		return D2D1_RECT_F();
-
-	return get_ratio_rect(target, width / height, attach, stretch);
-}
-
-D2D1_RECT_F get_ratio_rect(D2D1_RECT_F target, float ratio, int attach, bool stretch)
-{
-	float w = target.right - target.left;
-	float h = target.bottom - target.top;
-	float nNewW;
-	float nNewH;
-	float dTargetRatio = float(w) / float(h);
-
-	D2D1_RECT_F	result;
-
-	if (w == 0.f || h == 0.f)
-		return D2D1_RECT_F();
-
-	bool bResizeWidth;
-
-	if (ratio > 1.0f)
-	{
-		if (dTargetRatio < ratio)
-			bResizeWidth = false;
-		else
-			bResizeWidth = true;
-	}
-	else
-	{
-		if (dTargetRatio > ratio)
-			bResizeWidth = true;
-		else
-			bResizeWidth = false;
-	}
-
-
-	if (bResizeWidth)
-	{
-		result.top = target.top;
-		result.bottom = target.bottom;
-
-		nNewW = h * ratio;
-		if (attach & attach_left)
-			result.left = target.left;
-		else if (attach & attach_right)
-			result.left = target.right - nNewW;
-		else
-			result.left = target.left + (w - nNewW) / 2.0f;
-
-		result.right = result.left + nNewW;
-	}
-	else
-	{
-		result.left = target.left;
-		result.right = target.right;
-
-		nNewH = w / ratio;
-
-		if (attach & attach_top)
-			result.top = target.top;
-		else if (attach & attach_bottom)
-			result.top = target.bottom - nNewH;
-		else
-			result.top = target.top + (h - nNewH) / 2.0f;
-
-		result.bottom = result.top + nNewH;
-	}
-
-	return result;
 }
 
 //현재 한글 입력중인지

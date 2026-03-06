@@ -53,7 +53,7 @@
 */
 
 #include <afxwin.h>
-#include <mutex>
+// #include <mutex>  // ← XP에서 InitializeCriticalSectionEx 호출하여 비호환
 
 #ifdef UNICODE
 #define CHARSET _T(",ccs=UTF-8")
@@ -130,7 +130,8 @@ public:
 	void		open_log_file();
 
 protected:
-	std::mutex	m_mutex;
+	// std::mutex	m_mutex;  // ← XP 비호환
+	CRITICAL_SECTION m_cs;     // ← XP 호환 대체
 	CTime		m_tlog = CTime::GetCurrentTime();
 	CString		m_log_fullpath;
 	CString		m_log_file_title;

@@ -95,6 +95,7 @@ public:
 	//set_image()로 CSCGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
 	void			set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy = true);
+
 	bool			load(CWnd* parent, UINT id);
 	bool			load(CWnd* parent, CString sType, UINT id);
 	bool			load(CWnd* parent, CString sFile);

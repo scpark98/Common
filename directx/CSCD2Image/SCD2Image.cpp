@@ -2914,6 +2914,10 @@ void CSCD2Image::make_back_transparent(int index, int inner_threshold, int outer
 		{
 			TRACE(_T("make_transparent: CopyFromMemory failed frame %d, hr=0x%08X\n"), i, hr);
 		}
+		else
+		{
+			TRACE(_T("make_transparent done. frame %d\n"), i);
+		}
 	}
 
 	// 알파 픽셀 수 변경되었으므로 재계산 플래그 설정을 하고 다시 계산하도록 해야 하지만

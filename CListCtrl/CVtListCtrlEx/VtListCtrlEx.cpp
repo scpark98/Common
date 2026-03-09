@@ -1942,7 +1942,6 @@ LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 void CVtListCtrlEx::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
-
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
 
 	if (m_hWnd && invalidate)
@@ -5257,7 +5256,10 @@ LRESULT	CVtListCtrlEx::on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam)
 
 void CVtListCtrlEx::OnNcPaint()
 {
-	// 기본 테두리 그리기를 무시하고 설정된 테두리 색으로그린다.
+	//기본 테두리 색상을 별도로 지정한 색으로 그리기 위해 OnNcPaint() 함수를 override.
+	//아래 CListCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
+	CListCtrl::OnNcPaint();
+
 	CWindowDC dc(this);
 
 	CRect rect;

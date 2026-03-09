@@ -613,6 +613,9 @@ public:
 	//한 라인에 대한 하단 라인 표시 여부 설정. m_draw_top_line
 	void		draw_bottom_line(bool draw, Gdiplus::Color cr = Gdiplus::Color::LightGray) { m_draw_bottom_line = draw; m_cr_bottom_line = cr; }
 
+	//선택항목등의 border가 아닌 ctrl 자체의 cr_border. OnNcPaint()에서 border 속성유무를 판단하여 테두리를 그린다.
+	void		set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; Invalidate(); }
+
 //scroll
 	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
 	{

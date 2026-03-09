@@ -4637,7 +4637,7 @@ CWnd* FindWindowByCaption(CString sCaption, bool bMatchWholeWord/* = FALSE*/)
 		sCaptionString.TrimRight();
 		//sCaptionString.MakeLower();
 
-		TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
+		//TRACE(_T("pWnd = %p, hWnd = %p, caption = %s, visible = %d\n"), pWnd, pWnd->GetSafeHwnd(), sText, pWnd->IsWindowVisible());
 		if (sText.IsEmpty() || !pWnd->IsWindowVisible())
 			continue;
 
@@ -11974,7 +11974,6 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 
 	do
 	{
-
 		TCHAR sFilePath[MAX_PATH] = { 0, };
 		DWORD bufLen = MAX_PATH;
 
@@ -12227,6 +12226,7 @@ int get_process_running_count(CString processname)
 	return running_count;
 } 
 
+#ifndef _USING_V110_SDK71_
 bool KillProcess(CString szFilename)
 {
 	HANDLE hProcess = GetProcessHandleByName(szFilename);
@@ -12239,6 +12239,7 @@ bool KillProcess(CString szFilename)
 
 	return false;
 }
+#endif
 
 //프로세스 강제 종료.
 //return value : 1 : killed, 0 : fail to kill, -1 : not found

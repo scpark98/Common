@@ -237,7 +237,7 @@ public:
 	void			enlarge_font_size(bool enlarge);
 	void			set_auto_font_size(bool auto_font_size = true);
 	//default bold = FW_BOLD
-	void			set_font_bold(int weight = FW_BOLD);
+	void			set_font_weight(int weight = FW_BOLD);
 	void			set_font_underline(bool underline = true);
 	void			set_font_italic(bool italic = true);
 	void			set_font_antialiased(bool antiAliased = true);

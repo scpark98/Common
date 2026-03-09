@@ -233,7 +233,7 @@ public:
 
 	void		expand_all(bool expand = true);
 
-	void		set_color_theme(int theme);
+	void		set_color_theme(int theme, bool invalidate = true);
 	void		set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
 	void		set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
 	//CTreeCtrl에서 지원하는 기본 함수 override
@@ -305,6 +305,9 @@ public:
 	void			set_root_item(CString label = _T(""), int image_index = -1, int selected_image_index = -1);
 	HTREEITEM		get_root_item() { return (m_use_root ? m_root_item : GetRootItem()); }
 	TV_INSERTSTRUCT get_root_tvItem() { return m_root_tvItem; }
+
+	//선택항목등의 border가 아닌 ctrl 자체의 cr_border. OnNcPaint()에서 border 속성유무를 판단하여 테두리를 그린다.
+	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; Invalidate(); }
 
 protected:
 	//root 항목은 실제 또는 가상의 root일 수 있다.

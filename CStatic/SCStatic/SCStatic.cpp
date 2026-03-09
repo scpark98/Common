@@ -1311,7 +1311,7 @@ void CSCStatic::set_auto_font_size(bool auto_font_size)
 	//}
 }
 
-void CSCStatic::set_font_bold(int weight)
+void CSCStatic::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
 	reconstruct_font();

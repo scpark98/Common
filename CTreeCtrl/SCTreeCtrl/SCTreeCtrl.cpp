@@ -1828,7 +1828,7 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 
-	if (!m_use_drag_and_drop)
+	if (!m_use_drag_and_drop || !m_is_shell_treectrl)
 		return;
 
 	CRect	rc;
@@ -3570,14 +3570,15 @@ BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	return CTreeCtrl::OnMouseWheel(nFlags, zDelta, pt);
 }
 
-void CSCTreeCtrl::set_color_theme(int theme)
+void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 	
 	if (!m_hWnd)
 		return;
 	
-	Invalidate();
+	if (m_hWnd && invalidate)
+		Invalidate();
 }
 
 //가상 루트 항목 설정.
@@ -3718,7 +3719,10 @@ void CSCTreeCtrl::serialize_item(CArchive& ar, HTREEITEM hItem)
 
 void CSCTreeCtrl::OnNcPaint()
 {
-	// 기본 테두리 그리기를 무시하고 설정된 테두리 색으로그린다.
+	//기본 테두리 색상을 별도로 지정한 색으로 그리기 위해 OnNcPaint() 함수를 override.
+	//아래 CTreeCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
+	CTreeCtrl::OnNcPaint();
+
 	CWindowDC dc(this);
 
 	CRect rect;

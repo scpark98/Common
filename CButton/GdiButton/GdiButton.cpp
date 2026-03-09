@@ -973,11 +973,11 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	bool is_disabled = (lpDIS->itemState & ODS_DISABLED);
 
 	//for test for breakpoint
-	//if (text == _T("환경설정"))
-	//{
-	//	text = text;
-	//	trace(is_down);
-	//}
+	if (text == _T("add new"))
+	{
+		text = text;
+		trace(is_down);
+	}
 
 	//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 	//	is_down = (GetCheck() == BST_CHECKED);
@@ -1297,7 +1297,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			if (m_round == 0 && m_b3DRect && !is_button_style(BS_FLAT))
+			if (m_round == 0 && m_draw_3D_rect && !is_button_style(BS_FLAT))
 			{
 				dc.Draw3dRect(rc,
 					is_down ? GRAY160 : white,
@@ -1582,12 +1582,11 @@ void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == timer_auto_repeat)
 	{
-		if ((GetState() & BST_PUSHED) == 0)
-			return;
-
-		SetTimer(timer_auto_repeat, m_repeat_delay, NULL);
+		//if ((GetState() & BST_PUSHED) == 0)
+		//	return;
 		GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 		m_sent_once_auto_repeat_click_message++;
+		SetTimer(timer_auto_repeat, m_repeat_delay, NULL);
 	}
 
 
@@ -1893,12 +1892,17 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 		{
 			KillTimer(timer_auto_repeat);
 
-			if (GetCapture() != NULL)
-			{
-				ReleaseCapture();
-				if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
-					GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
-			}
+			SendMessage(BM_SETSTATE, TRUE);
+			Invalidate();
+			Wait(1);
+
+			//GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+			SetCapture();
+			SetTimer(timer_auto_repeat, m_repeat_initial_delay, NULL);
+			//if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
+			//{
+			//	GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+			//}
 
 			return;
 		}
@@ -1915,16 +1919,17 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
+	ReleaseCapture();
+
 	if (m_use_auto_repeat)
 	{
-		//SetCapture();
-		SetTimer(timer_auto_repeat, m_initial_delay, NULL);
+		KillTimer(timer_auto_repeat);
 		m_sent_once_auto_repeat_click_message = 0;
+		SendMessage(BM_SETSTATE, FALSE);
+		Invalidate();
 	}
 	else
 	{
-		ReleaseCapture();
-
 		CRect rc;
 		GetClientRect(rc);
 
@@ -2270,7 +2275,8 @@ void CGdiButton::set_auto_repeat(bool use)
 
 void CGdiButton::set_auto_repeat_delay(int initial_delay, int repeat_delay)
 {
-	m_initial_delay = initial_delay;
+	m_use_auto_repeat = true;
+	m_repeat_initial_delay = initial_delay;
 	m_repeat_delay = repeat_delay;
 }
 #if 0

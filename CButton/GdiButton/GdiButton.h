@@ -384,7 +384,7 @@ public:
 	void		draw_border(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent);
 
 //3D, sunken 
-	void		use_3D_rect(bool use = true) { m_b3DRect = use; Invalidate(); }
+	void		draw_3D_rect(bool use = true) { m_draw_3D_rect = use; Invalidate(); }
 
 	//투명 버튼의 경우 그림자를 표시한다.
 	//shadow_weight가 1.0보다 크면 밝은, 작으면 어두운 그림자가 그려진다.
@@ -522,7 +522,7 @@ protected:
 	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::DimGray;	//색상
 	int			m_focus_rect_width = 1;					//두께
 
-	bool		m_b3DRect = false;						//입체 느낌의 3D, 누르면 sunken. default = true;
+	bool		m_draw_3D_rect = false;					//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다. default = false;
 
@@ -579,7 +579,7 @@ protected:
 
 
 //auto repeat
-	int			m_initial_delay = 1;
+	int			m_repeat_initial_delay = 1;
 	int			m_repeat_delay = 500;
 	bool		m_use_auto_repeat = false;
 	int			m_sent_once_auto_repeat_click_message = 0;	//만약 down후 initial_delay가 되기도 전에 up된다면 이때에도 한번은 마우스 클릭 이벤트를 처리해줘야 한다.

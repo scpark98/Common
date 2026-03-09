@@ -473,52 +473,52 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 	switch (theme)
 	{
 		case CSCColorTheme::color_theme_linkmemine :
-			SetWindowText(_T("color_theme_linkmemine"));
+			//SetWindowText(_T("color_theme_linkmemine"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_linkmemine_se:
-			SetWindowText(_T("color_theme_linkmemine_se"));
+			//SetWindowText(_T("color_theme_linkmemine_se"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_helpu:
-			SetWindowText(_T("color_theme_helpu"));
+			//SetWindowText(_T("color_theme_helpu"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_anysupport:
-			SetWindowText(_T("color_theme_anysupport"));
+			//SetWindowText(_T("color_theme_anysupport"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_pcanypro:
-			SetWindowText(_T("color_theme_pcanypro"));
+			//SetWindowText(_T("color_theme_pcanypro"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_default:
-			SetWindowText(_T("color_theme_default"));
+			//SetWindowText(_T("color_theme_default"));
 			break;
 		case CSCColorTheme::color_theme_white:
-			SetWindowText(_T("color_theme_white"));
+			//SetWindowText(_T("color_theme_white"));
 			break;
 		case CSCColorTheme::color_theme_gray:
-			SetWindowText(_T("color_theme_gray"));
+			//SetWindowText(_T("color_theme_gray"));
 			break;
 		case CSCColorTheme::color_theme_dark_gray:
-			SetWindowText(_T("color_theme_dark_gray"));
+			//SetWindowText(_T("color_theme_dark_gray"));
 			break;
 		case CSCColorTheme::color_theme_dark:
-			SetWindowText(_T("color_theme_dark"));
+			//SetWindowText(_T("color_theme_dark"));
 			break;
 		default:
-			SetWindowText(_T("not defined color_theme"));
+			;//SetWindowText(_T("not defined color_theme"));
 	}
 
 	if (invalidate)

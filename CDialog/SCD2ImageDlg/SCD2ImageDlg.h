@@ -88,7 +88,6 @@ public:
 	void			set_simple_mode(bool simple = true) { m_simple_mode = simple; }
 
 
-
 	//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할 수도, 이미 불러온 CSCD2Image를 표시하기 위해 사용할수도 있다.
 	//ex. ASee는 이미지 뷰어이므로 simple mode가 아니고 load()를 사용하여 이미지를 불러오지만
 	//AniMaker는 gif, webp 등 애니메이션 이미지의 각 프레임을 표시하기 위해 load()를 사용하여 이미지를 불러오고

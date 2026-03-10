@@ -43,10 +43,12 @@
 #include <wrl/client.h>
 
 #include "../../Functions.h"
+#include "../../thread/CSCThread/SCThread.h"
 
 using namespace Microsoft::WRL;
 
 static const UINT Message_CSCD2Image = ::RegisterWindowMessage(_T("MessageString_CSCD2Image"));
+static constexpr UINT WM_APP_UI_INVOKE = WM_APP + 2;
 
 enum
 {
@@ -233,7 +235,7 @@ public:
 	//클립보드에 이미지가 있다면 클립보드의 이미지를 index 위치에 붙여넣는다. 0보다 작으면 현재 프레임 이미지에 붙여넣는다.
 	bool					paste_from_clipboard(int index = -1);
 
-//animated gif
+//animated image
 	bool					is_animated_image() { return (m_img.size() > 1); }
 	int						get_cur_frame_index() { return m_frame_index; }
 	int						get_frame_count() { return m_img.size(); }
@@ -242,8 +244,8 @@ public:
 	void					play();
 	void					pause();
 	bool					stop();
-	bool					is_playing() { return m_run_thread_animation && !m_ani_paused; }
-	bool					is_paused() { return m_ani_paused; }
+	bool					is_playing() { return m_ani_thread.is_running() && !m_ani_thread.is_paused(); }
+	bool					is_paused() { return m_ani_thread.is_paused(); }
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 특정 프레임 인덱스로 이동
 	int						goto_frame(int index, bool pause = false);
 	//n개의 이미지로 구성된 gif와 같은 이미지일 경우 interval 만큼 프레임 이동
@@ -298,10 +300,15 @@ protected:
 //animated gif
 	HWND					m_parent = NULL; //animation이 진행될 때 parent에게 메시지를 보내기 위해 필요
 	std::deque<int>			m_frame_delay; //in milliseconds
-	bool					m_run_thread_animation = false;
-	bool					m_thread_animation_terminated = true;
-	bool					m_ani_paused = false;
+	//bool					m_run_thread_animation = false;
+	//bool					m_thread_animation_terminated = true;
+	//bool					m_ani_paused = false;
 	bool					m_ani_mirror = false;
 
-	void					thread_animation();
+	CSCThread				m_ani_thread;
+	void					thread_animation(CSCThread& th);
+	void					thread_function(int index, CSCThread& th);
+	afx_msg					LRESULT on_ui_invoke(WPARAM wParam, LPARAM lParam);
+	void					invoke_ui(std::function<void()> func);
+
 };

@@ -44,7 +44,7 @@
 	위와 같이 invoke_ui() 람다로 묶어주면 UI 관련 코드들을 메시지 방식으로 큐에 넣고 안전하게 호출하여 사용할 수 있다.
 
 
-	아래 두 함수는 thread_function()과 함께 프로젝트에 추가시켜야 한다.
+	//아래 두 함수는 thread_function()과 함께 프로젝트에 추가시켜야 한다.
 	void CTestCSCThreadDlg::invoke_ui(std::function<void()> func)
 	{
 		const HWND hWnd = GetSafeHwnd();
@@ -59,6 +59,7 @@
 		}
 	}
 
+	//BEGIN_MESSAGE_MAP에 ON_MESSAGE(WM_APP_UI_INVOKE, &CSCShapeDlg::on_ui_invoke) 추가 필수.
 	LRESULT CTestCSCThreadDlg::on_ui_invoke(WPARAM wParam, LPARAM lParam)
 	{
 		std::unique_ptr<std::function<void()>> pfunc(
@@ -147,6 +148,9 @@ public:
 
 	void stop()
 	{
+		//if (is_stopped())
+		//	return;
+
 		m_stop_requested.store(true, std::memory_order_release);
 		m_paused.store(false, std::memory_order_release);
 		m_state.store(CSCThreadState::Stopping, std::memory_order_release);

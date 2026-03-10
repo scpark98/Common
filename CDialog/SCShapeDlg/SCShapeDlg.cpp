@@ -29,6 +29,7 @@ BEGIN_MESSAGE_MAP(CSCShapeDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_MOUSEMOVE()
+	ON_MESSAGE(WM_APP_UI_INVOKE, &CSCShapeDlg::on_ui_invoke)
 END_MESSAGE_MAP()
 
 
@@ -337,10 +338,10 @@ void CSCShapeDlg::set_text_align(int align, bool invalidate)
 void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 {
 	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
-	if (m_img.is_animated_gif() && m_gif_state == state_play)
+	if (m_img.is_animated_gif() && m_gif_thread.is_running())
 	{
 		TRACE(_T("stop current gif...\n"));
-		m_gif_state = state_stop;
+		m_gif_thread.stop();
 		Wait(100);
 	}
 
@@ -361,16 +362,12 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 	//단일 이미지인지 gif인지에 따라 별도 처리
 	if (m_img.is_animated_gif())
 	{
-		gif_play(state_play);
+		gif_play();
 	}
 	else
 	{
 		render(m_img.m_pBitmap);
 	}
-
-	//set_alpha(255);
-	//ShowWindow(SW_SHOW);
-	//ShowWindow(SW_SHOWNOACTIVATE);
 }
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
@@ -497,49 +494,19 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 }
 
 //일반 이미지와 animated gif 공통으로 사용한다.
-void CSCShapeDlg::gif_play(int new_state)
+void CSCShapeDlg::gif_play()
 {
-	if (new_state == state_stop)
-	{
-		m_gif_state = state_stop;
-		return;
-	}
-	else if (new_state == state_toggle)
-	{
-		if (m_gif_state == state_play)
-			m_gif_state = state_pause;
-		else if (m_gif_state == state_pause)
-			m_gif_state = state_play;
-		return;
-	}
-	else if (new_state == state_pause)
-	{
-		m_gif_state = state_pause;
-		return;
-	}
-
-	//기존 gif play중이라면 thread를 종료시킨 후 새로 생성한다.
-	if (m_gif_state == state_play)
-	{
-		m_gif_state = state_stop;
-		//Wait(1000);
-	}
-
-	m_gif_state = state_play;
-
-	//단일 이미지인지 gif인지에 따라 별도 처리
-	std::thread t(&CSCShapeDlg::gif_thread, this);
-	t.detach();
+	m_gif_thread.start([this](CSCThread& th) { gif_thread(th); });
 }
 
 void CSCShapeDlg::gif_pause()
 {
-	m_gif_state = state_pause;
+	m_gif_thread.pause();
 }
 
 void CSCShapeDlg::gif_stop()
 {
-	m_gif_state = state_stop;
+	m_gif_thread.stop();
 }
 
 void CSCShapeDlg::gif_goto(int pos, bool pause)
@@ -547,38 +514,52 @@ void CSCShapeDlg::gif_goto(int pos, bool pause)
 
 }
 
-void CSCShapeDlg::gif_thread()
+void CSCShapeDlg::invoke_ui(std::function<void()> func)
+{
+	const HWND hWnd = GetSafeHwnd();
+	if (!::IsWindow(hWnd))
+		return;
+
+	// 함수 객체를 힙에 올려서 lParam으로 전달
+	auto* pfunc = new std::function<void()>(std::move(func));
+	if (!::PostMessage(hWnd, WM_APP_UI_INVOKE, 0, reinterpret_cast<LPARAM>(pfunc)))
+	{
+		delete pfunc;
+	}
+}
+
+LRESULT CSCShapeDlg::on_ui_invoke(WPARAM wParam, LPARAM lParam)
+{
+	std::unique_ptr<std::function<void()>> pfunc(
+		reinterpret_cast<std::function<void()>*>(lParam));
+	(*pfunc)();
+	return 0;
+}
+
+void CSCShapeDlg::gif_thread(CSCThread& th)
 {
 	TRACE(_T("gif_thread started...\n"));
 
 	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_gif_index = 0;
 
-	while (m_gif_state != state_stop)
+	while (!th.stop_requested())
 	{
-		if (m_gif_state == state_pause)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(200));
-			continue;
-		}
-
-		if (!m_img.is_valid() ||
-			m_img.m_pBitmap == NULL ||
-			m_gif_index > m_img.get_frame_count())
+		if (th.stop_requested())
 			break;
+
+		th.wait_if_paused();
 
 		m_img.m_pBitmap->SelectActiveFrame(&pageGuid, m_gif_index);
-		render(m_img.m_pBitmap);
-
-		if (!m_img.is_valid() ||
-			m_img.m_pBitmap == NULL ||
-			m_gif_index > m_img.get_frame_count())
-			break;
+		invoke_ui([=]()
+			{
+				render(m_img.m_pBitmap);
+			});
 
 		long delay = ((long*)m_img.m_frame_delay->value)[m_gif_index] * 10;
 		//if (delay < 10)
 		//	delay = 10;
-		//TRACE(_T("gif_thread %3d = %ld ms\n"), m_gif_index, delay);
+		TRACE(_T("gif_thread %3d = %ld ms\n"), m_gif_index, delay);
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 		m_gif_index++;
 
@@ -607,18 +588,9 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 {
 	if (timeout <= 0)
 	{
-		//ShowWindow(SW_SHOW);
 		ShowWindow(SW_SHOWNOACTIVATE);
 		return;
 	}
-
-	//if (fadein)
-	//	fade_in();
-
-	//Wait(timeout * 1000);
-
-	//if (fadeout)
-	//	fade_out();
 }
 
 #if 1

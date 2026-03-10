@@ -3,6 +3,7 @@
 #include <afxwin.h>
 #include <afxdialogex.h>
 
+#include "../../thread/CSCThread/SCThread.h"
 /*
 * https://github.com/scpark98/Test_SCShapeDlg.git
 * png, gif 등의 이미지 또는 CSCGdiplusBitmap 이미지 모양대로 dlg를 생성하여 표시한다.
@@ -162,20 +163,9 @@ public:
 
 	CSCTextProperty*		get_logfont() { return &m_text_setting.text_prop; }
 
-	//animated gif인 경우
-	enum GIF_PLAY_STATE
-	{
-		state_stop = -1,
-		state_pause,
-		state_play,
-		state_toggle,
-	};
-
-	int				m_gif_state = state_stop;
 	int				m_gif_index = 0;
 
-	void			gif_thread();
-	void			gif_play(int new_state = state_play);
+	void			gif_play();
 	void			gif_pause();
 	void			gif_stop();
 	void			gif_goto(int pos, bool pause = false);
@@ -222,6 +212,12 @@ protected:
 
 	//m_para 항목 중 마우스 커서가 올라간 음절 정보를 parent에게 메시지로 전달한다.
 	bool			m_send_hover_info = false;
+
+	CSCThread		m_gif_thread;
+	void			gif_thread(CSCThread& th);
+	static			constexpr UINT WM_APP_UI_INVOKE = WM_APP + 2;
+	afx_msg			LRESULT on_ui_invoke(WPARAM wParam, LPARAM lParam);
+	void			invoke_ui(std::function<void()> func);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.

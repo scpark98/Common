@@ -814,8 +814,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_header_back = get_color(cr_back, -16);
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 32, 32, 255);
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
@@ -847,8 +846,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_header_back = get_color(cr_back, -16);
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
@@ -881,8 +879,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
@@ -915,8 +912,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = Gdiplus::Color::RoyalBlue;
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
@@ -949,8 +945,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = Gdiplus::Color::RoyalBlue;
 
 			cr_border = Gdiplus::Color::DarkGray;
 			break;
@@ -984,8 +979,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = get_color(cr_back, 96);
 
 			cr_border				= Gdiplus::Color::DarkGray;
 			break;
@@ -1018,8 +1012,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress				= Gdiplus::Color(255, 32, 32, 255);
-			//cr_progress_text		= Gdiplus::Color(255, 192, 192, 192);
+			cr_progress = get_color(cr_back, 96);
 
 			cr_border				= Gdiplus::Color::Gray;
 			break;
@@ -1068,8 +1061,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_header_back = get_sys_color(COLOR_3DFACE);
 
 			cr_percentage_bar.clear();
-			cr_percentage_bar.push_back(gGRAY(192));
-			cr_progress = Gdiplus::Color(255, 49, 108, 244);
+			cr_percentage_bar.push_back(Gdiplus::Color::RoyalBlue);// gGRAY(192));
+			cr_progress = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 49, 108, 244);
 
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -1103,7 +1096,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(gGRAY(192));
-			cr_progress = Gdiplus::Color(255, 49, 108, 244);
+			cr_progress = gGRAY(128);
 
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -1154,8 +1147,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_header_back			= get_sys_color(COLOR_3DFACE);
 
 			cr_percentage_bar.clear();
-			cr_percentage_bar.push_back(gGRAY(192));
-			cr_progress				= Gdiplus::Color(255, 49, 108, 244);
+			cr_percentage_bar.push_back(Gdiplus::Color::RoyalBlue);// gGRAY(192));
+			cr_progress				= Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 49, 108, 244);
 
 			cr_selected_border		= gRGB(153, 209, 255);
 			cr_selected_border_inactive	= cr_back_selected_inactive;

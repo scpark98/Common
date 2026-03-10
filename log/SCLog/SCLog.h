@@ -140,9 +140,9 @@ protected:
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;
 	FILE*		m_fp;
-
+	
 	//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.
-	//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지므로 수동 호출해서는 안되므로 protected로 이동시킴.
+	//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지도록 하여 수동 호출할 필요가 없다.
 	void		write_end_log();
 };
 

@@ -371,13 +371,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.top = r.CenterPoint().y - 7;
 			r.bottom = r.top + 14;
 			draw_rect(pDC, r, m_theme.cr_text);
-			//pDC->DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONCHECK);
-
-			//Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
 
 			int check_state = m_list_db[iItem].checked;// GetCheck(iItem);
-			//TRACE(_T("%d check_state = %d\n"), iItem, check_state);
-			//int check_state = GetCheck(iItem);
 
 			if (check_state == BST_CHECKED)
 			{
@@ -385,14 +380,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				//Gdiplus::Pen 설정 시 width를 1.5로 해도 적용되지 않는다. 
 				draw_line(pDC, r.left + 2, r.CenterPoint().y - 1, r.left + 5, r.CenterPoint().y + 2, m_theme.cr_text.ToCOLORREF(), 2);
 				draw_line(pDC, r.left + 5, r.CenterPoint().y + 2, r.left + 5 + 6, r.CenterPoint().y + 2 - 6, m_theme.cr_text.ToCOLORREF(), 2);
-
-				//CPen pen(PS_SOLID, 2, m_theme.cr_text.ToCOLORREF());
-				//CPen* pOldPen = pDC->SelectObject(&pen);
-				//pDC->MoveTo(r.left + 2, r.CenterPoint().y - 1);
-				//pDC->LineTo(r.left + 5, r.CenterPoint().y + 2);
-				////pDC->MoveTo(r.left + 4, r.CenterPoint().y + 2);
-				//pDC->LineTo(r.left + 5 + 6, r.CenterPoint().y + 2 - 6);
-				//pDC->SelectObject(pOldPen);
 			}
 			else if (check_state == BST_INDETERMINATE)
 			{
@@ -444,8 +431,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else if (get_column_data_type(iSubItem) == column_data_type_percentage_grid)
 		{
-			//pDC->FillSolidRect(itemRect, crBack);
-
 			CRect r = itemRect;
 
 			//바그래프는 셀의 높이, 즉 라인 간격과는 관계없다. 폰트의 높이값에 비례하는 높이로 그려주자.
@@ -459,9 +444,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			//std::deque<COLORREF> dqColor(m_cr_percentage_bar);
-			//dqColor.push_back(crBack);
-			//gradient_rect(pDC, r, dqColor, false);
 
 			if (m_theme.cr_percentage_bar.size() == 1)
 			{
@@ -486,8 +468,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else if (get_column_data_type(iSubItem) == column_data_type_progress)
 		{
-			//pDC->FillSolidRect(itemRect, crBack);
-
 			CRect r = itemRect;
 
 			//바그래프는 셀의 높이, 즉 라인 간격에 상대적이지 않고 폰트의 높이값에 비례하는 높이로 그려줘야 한다.
@@ -523,39 +503,30 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					else
 						//pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());
 						pDC->SetTextColor(crText.ToCOLORREF());
-#if 1
+#if 0
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-
-					//for region test
-#elif 0
-					CRgn rgn;
-					CRect r = itemRect;
-					//r.DeflateRect(30, 10);
-					rgn.CreateRectRgnIndirect(&r);
-					int res = ::SelectClipRgn(pDC->GetSafeHdc(), (HRGN)rgn.GetSafeHandle());
-					ASSERT(res == SIMPLEREGION);
-					pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
-					pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y + 4, sPercent);
-					rgn.DeleteObject();
 #else
+					//progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하기 위해 클리핑 영역을 나눠서 텍스트를 두 번 그려준다.
 					CRect rcLeft, rcRight;
 					rcLeft = rcRight = itemRect;
 					rcRight.left = rcLeft.right = r.right;
+
+					//OnPaint()에서 header ctrl 유무에 따라 MemoryDC의 높이를 보정해주므로
+					//SelectClipRgn()을 사용하려면 LPtoDP()로 좌표 보정이 필요하다.
+					pDC->LPtoDP(&rcLeft);
+					pDC->LPtoDP(&rcRight);
 
 					CRgn rgnLeft, rgnRight;
 					rgnLeft.CreateRectRgnIndirect(&rcLeft);
 					rgnRight.CreateRectRgnIndirect(&rcRight);
 
-					pDC->SetTextColor(RGB(255, 0, 0));// m_cr_back);
+					pDC->SetTextColor(m_theme.cr_back.ToCOLORREF());
 					pDC->SelectClipRgn(&rgnLeft);
-					pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-					//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
+					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
 
-					//rgnRight.SetRectRgn(rcRight);
-					pDC->SetTextColor(RGB(0, 0, 255)); //m_cr_text);
+					pDC->SetTextColor(m_theme.cr_progress.ToCOLORREF());
 					pDC->SelectClipRgn(&rgnRight);
-					pDC->DrawText(sPercent, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-					//pDC->TextOut(itemRect.CenterPoint().x, itemRect.CenterPoint().y+4, sPercent);
+					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
 
 					rgnLeft.DeleteObject();
 					rgnRight.DeleteObject();
@@ -620,8 +591,6 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			pDC->DrawText(text, textRect, format);
 		}
 	}
-
-	//rowRect.bottom--;
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
 	if (m_draw_selected_border && !m_in_editing && (m_has_focus || is_show_selection_always) && is_selected)
@@ -1670,12 +1639,17 @@ void CVtListCtrlEx::OnPaint()
 	CHeaderCtrl* pHeaderCtrl = GetHeaderCtrl();
 	GetClientRect(rc);
 
+	//header가 있다면 header의 높이만큼 리스트의 시작점을 아래로 보정해준다.
+	//그래야만 header도 사용자 지정색으로 그려진다.
 	if (pHeaderCtrl)
 	{
 		pHeaderCtrl->GetClientRect(&rcHeader);
 		rc.top += rcHeader.Height();
 	}
 
+	//MemorDC 또한 header만큼 낮춘 크기로 잡히게 되는데 이로 인해 DrawItem()에서
+	//progress를 그려줄 때 LPtoDP()를 사용해서 SelectClipRgn()의 좌표를 보정해주는 코드가 추가되었다.
+	//(DrawText()는 논리좌표를 사용하고 SelectClipRgn()은 물리좌표를 사용하기 때문에 둘의 좌표가 달라지기 때문)
 	CMemoryDC dc(&dc1, &rc, true);
 	Gdiplus::Graphics g(dc.m_hDC);
 

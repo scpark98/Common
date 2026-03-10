@@ -41,9 +41,6 @@ CSCD2Image::CSCD2Image(CSCD2Image&& other) noexcept  // 이동 생성자
 , m_parent(other.m_parent)
 , m_frame_delay(std::move(other.m_frame_delay))
 , m_ani_mirror(other.m_ani_mirror)
-, m_run_thread_animation(other.m_run_thread_animation)
-, m_thread_animation_terminated(other.m_thread_animation_terminated)
-, m_ani_paused(other.m_ani_paused)
 {
 	other.m_data = nullptr;
 	other.m_pWICFactory = nullptr;
@@ -76,9 +73,6 @@ CSCD2Image& CSCD2Image::operator=(CSCD2Image&& other) noexcept
 		m_parent = other.m_parent;
 		m_frame_delay = std::move(other.m_frame_delay);
 		m_ani_mirror = other.m_ani_mirror;
-		m_run_thread_animation = other.m_run_thread_animation;
-		m_thread_animation_terminated = other.m_thread_animation_terminated;
-		m_ani_paused = other.m_ani_paused;
 
 		other.m_data = nullptr;
 		other.m_pWICFactory = nullptr;
@@ -99,27 +93,7 @@ CSCD2Image::~CSCD2Image()
 void CSCD2Image::release()
 {
 	// 1. 애니메이션 스레드 안전하게 종료
-	if (m_run_thread_animation)
-	{
-		m_run_thread_animation = false;
-
-		// 타임아웃 설정: 최대 500ms 대기
-		int timeout_count = 0;
-		const int MAX_TIMEOUT = 50;  // 50 * 10ms = 500ms
-
-		while (!m_thread_animation_terminated && timeout_count < MAX_TIMEOUT)
-		{
-			Wait(10);
-			timeout_count++;
-		}
-
-		// 타임아웃 발생 시 경고 로그
-		if (!m_thread_animation_terminated)
-		{
-			TRACE(_T("Warning: Animation thread did not terminate within timeout at line %d\n"), __LINE__);
-			// 스레드가 종료될 때까지 무한 대기하지 않고 계속 진행
-		}
-	}
+	m_ani_thread.stop();
 
 	// 2. m_data 메모리 정리
 	if (m_data != nullptr)
@@ -144,8 +118,6 @@ void CSCD2Image::release()
 	m_frame_index = 0;
 	m_stride = 0;
 	m_channel = 0;
-	m_run_thread_animation = false;
-	m_thread_animation_terminated = true;
 	m_img_origin_for_back_transparency.Reset();
 }
 
@@ -2112,7 +2084,7 @@ int CSCD2Image::goto_frame(int index, bool pause)
 
 	if (pause)
 	{
-		m_ani_paused = true;
+		m_ani_thread.pause();
 		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
 		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 	}
@@ -2122,7 +2094,7 @@ int CSCD2Image::goto_frame(int index, bool pause)
 
 void CSCD2Image::step(int interval)
 {
-	m_ani_paused = true;
+	m_ani_thread.pause();
 
 	if (m_img.size() <= 1)
 		return;
@@ -2156,19 +2128,18 @@ void CSCD2Image::play()
 
 	//thread를 이용하여 현재 프레임의 delay가 지나면 m_frame_index를 증가시키고
 	//parent에게 이를 알려 re-rendering하도록 한다.
-	if (m_run_thread_animation)
+	if (m_ani_thread.is_running())
 	{
-		m_ani_paused = !m_ani_paused;
-		return;
+		m_ani_thread.pause();
 	}
-
-	// 스레드 생성 전에 플래그를 먼저 설정하여 중복 생성 방지
-	m_run_thread_animation = true;
-	m_thread_animation_terminated = false;
-	m_ani_paused = false;
-
-	std::thread t(&CSCD2Image::thread_animation, this);
-	t.detach();
+	else if (m_ani_thread.is_paused())
+	{
+		m_ani_thread.resume();
+	}
+	else
+	{
+		m_ani_thread.start([this](CSCThread& th) { thread_animation(th); });
+	}
 }
 
 //특정 위치에서 멈추게 할 경우도 있어서 원래는 파라미터로 pos를 받았지만
@@ -2176,54 +2147,39 @@ void CSCD2Image::play()
 //특정 위치에서 멈추게 할 경우는 goto_frame()을 이용하면 된다.
 void CSCD2Image::pause()
 {
-	if (m_img.size() <= 1 || !m_run_thread_animation)
+	if (m_img.size() <= 1 || m_ani_thread.is_paused())
 		return;
-	
-	//if (pos >= (int)m_img.size())
-	//	pos = 0;
 
-	//default -1이 넘어오면 play()가 호출되고 
-	//if (pos < 0)
-	//{
-	//	play();
-	//	return;
-	//}
-
-	m_ani_paused = true;
+	m_ani_thread.pause();
 	m_img_origin_for_back_transparency.Reset();
 }
 
 bool CSCD2Image::stop()
 {
-	if (m_img.size() <= 1)
+	if (m_img.size() <= 1 || m_ani_thread.is_stopped())
 		return true;
 
-	if (m_run_thread_animation)
-	{
-		m_run_thread_animation = false;
-		while (!m_thread_animation_terminated)
-			Wait(10);
-	}
+	m_ani_thread.stop();
 
 	return true;
 }
 
-void CSCD2Image::thread_animation()
+void CSCD2Image::thread_animation(CSCThread& th)
 {
 	long t0;
 	long t1;
 
 	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
 
-	while (m_run_thread_animation)
+	while (!th.stop_requested())// m_run_thread_animation)
 	{
 		t0 = clock();
 
 		msg.frame_index = m_frame_index;
-		//TRACE(_T("frame index = %d\n"), msg.frame_index);
+		TRACE(_T("frame index = %d\n"), msg.frame_index);
 		::PostMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 
-		if (!m_run_thread_animation)
+		if (th.stop_requested())
 			break;
 
 		//프레임이 바뀔때마다 m_img_origin_for_back_transparency는 리셋되어야 한다.
@@ -2234,27 +2190,14 @@ void CSCD2Image::thread_animation()
 			delay = m_frame_delay[m_frame_index];// -elapsed;
 		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
 
-		while (m_ani_paused)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(33));
-
-			if (!m_run_thread_animation)
-			{
-				m_run_thread_animation = false;
-				m_thread_animation_terminated = true;
-				TRACE(_T("%s terminated.\n"), __function__);
-				return;
-			}
-		}
+		th.wait_if_paused();
 
 		m_frame_index++;
 		if (m_frame_index >= (int)m_img.size())
 			m_frame_index = 0;
 	}
 
-	m_run_thread_animation = false;
-	m_thread_animation_terminated = true;
-	TRACE(_T("%s terminated.\n"), __function__);
+	TRACE(_T("%s() terminated.\n"), __function__);
 }
 
 //data멤버에 픽셀 데이터를 가리키도록 한다.

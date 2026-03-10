@@ -1539,7 +1539,7 @@ struct	NETWORK_INFO
 	// 폴더의 모든 파일을 지운다.
 	int			delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive = true, bool trash_can = false);
 	bool		DeleteFolder(LPCTSTR lpFolder);
-	//bool		SHDeleteFolder(CString sFolder);
+	bool		SHDeleteFolder(CString sFolder);
 
 
 	//풀패스를 주면 폴더를 자동으로 만들어준다.

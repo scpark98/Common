@@ -107,6 +107,9 @@ public:
 	//0 : 투명, 255 : 불투명
 	void			set_alpha(int alpha);
 
+	//기본 ShowWindow()와 달리 기억된 위치로 이동하여 보여준다.
+	void			show_window(int nCmdShow);
+
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
 	//default는 hide 상태로 시작되므로 set_text()로 세팅한 후 ShowWindow(SW_SHOW)를 호출해야 함.
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
@@ -179,9 +182,8 @@ public:
 	//둘 다 0이 아니면 해당 크기로 resize한다.(비율 무시)
 	//둘 다 0이면 원래 크기로 resize한다.
 	//Gdiplus에서는 모든 프레임의 이미지를 추출한 후 표시하는 방식이 아니고
-	//gif_thread()에서 매 프레임마다 SelectActiveFrame()으로 현재 프레임을 render()하고 있으므로
+	//thread_animation()에서 매 프레임마다 SelectActiveFrame()으로 현재 프레임을 render()하고 있으므로
 	//실제 원본의 크기를 줄이는 것이 아니라 render()에서 그려지는 크기를 변경하는 방식으로 resize가 구현했다.
-	//
 	void			set_display_size(int cx = 0, int cy = 0);
 	void			set_display_size(float ratio);
 
@@ -213,8 +215,8 @@ protected:
 	//m_para 항목 중 마우스 커서가 올라간 음절 정보를 parent에게 메시지로 전달한다.
 	bool			m_send_hover_info = false;
 
-	CSCThread		m_gif_thread;
-	void			gif_thread(CSCThread& th);
+	CSCThread		m_thread_animation;
+	void			thread_animation(CSCThread& th);
 	static			constexpr UINT WM_APP_UI_INVOKE = WM_APP + 2;
 	afx_msg			LRESULT on_ui_invoke(WPARAM wParam, LPARAM lParam);
 	void			invoke_ui(std::function<void()> func);

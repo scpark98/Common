@@ -257,7 +257,7 @@ public:
 	void					apply_orientation_transform();  // EXIF Orientation 적용
 	WICBitmapTransformOptions ExifOrientationToWicTransform(USHORT orientation);
 
-	bool					read_webp_frame_delay(const CString& path);
+	bool					read_webp_frame_delay(const uint8_t* data, size_t size);
 
 
 	HRESULT					extract_raw_data_from_bitmap(ID2D1DeviceContext* d2dc, ID2D1Bitmap1* src, uint8_t** data);
@@ -300,9 +300,6 @@ protected:
 //animated gif
 	HWND					m_parent = NULL; //animation이 진행될 때 parent에게 메시지를 보내기 위해 필요
 	std::deque<int>			m_frame_delay; //in milliseconds
-	//bool					m_run_thread_animation = false;
-	//bool					m_thread_animation_terminated = true;
-	//bool					m_ani_paused = false;
 	bool					m_ani_mirror = false;
 
 	CSCThread				m_ani_thread;

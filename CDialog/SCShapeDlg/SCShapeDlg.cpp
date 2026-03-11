@@ -337,14 +337,6 @@ void CSCShapeDlg::set_text_align(int align, bool invalidate)
 
 void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 {
-	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
-	if (m_img.is_animated_gif() && m_gif_thread.is_running())
-	{
-		TRACE(_T("stop current gif...\n"));
-		m_gif_thread.stop();
-		Wait(100);
-	}
-
 	if (deep_copy)
 		img->deep_copy(&m_img);
 
@@ -372,6 +364,14 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
 {
+	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
+	if (m_img.is_animated_gif() && !m_thread_animation.is_stopped())
+	{
+		TRACE(_T("stop current gif...\n"));
+		m_thread_animation.stop();
+		Wait(100);
+	}
+
 	bool res = m_img.load(id);
 	if (res)
 		set_image(parent, &m_img, false);
@@ -380,6 +380,14 @@ bool CSCShapeDlg::load(CWnd* parent, UINT id)
 
 bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 {
+	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
+	if (m_img.is_animated_gif() && !m_thread_animation.is_stopped())
+	{
+		TRACE(_T("stop current gif...\n"));
+		m_thread_animation.stop();
+		Wait(100);
+	}
+
 	bool res = m_img.load(sType, id);
 
 	if (res)
@@ -390,6 +398,14 @@ bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 
 bool CSCShapeDlg::load(CWnd* parent, CString sFile)
 {
+	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
+	if (m_img.is_animated_gif() && !m_thread_animation.is_stopped())
+	{
+		TRACE(_T("stop current gif...\n"));
+		m_thread_animation.stop();
+		Wait(100);
+	}
+
 	bool res = m_img.load(sFile);
 	if (res)
 		set_image(parent, &m_img, false);
@@ -408,9 +424,6 @@ void CSCShapeDlg::use_control(bool use)
 void CSCShapeDlg::set_alpha(int alpha)
 {
 	m_alpha = alpha;
-
-	//if (!IsWindowVisible())
-	//	ShowWindow(SW_SHOW);
 
 	if (!m_img.is_animated_gif())
 		render(m_img.m_pBitmap);
@@ -433,12 +446,6 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	else
 		sz = CSize(img->GetWidth(), img->GetHeight());
 
-	//if (img->GetWidth() == 0 || img->GetHeight() == 0)
-	//{
-	//	TRACE(_T("image width or height is invalid. m_alpha = %d\n"), m_alpha);
-	//	return;
-	//}
-
 	HDC hDC = ::GetDC(m_hWnd);
 	HDC hdcMemory = ::CreateCompatibleDC(hDC);
 
@@ -457,7 +464,6 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 	HBITMAP hbmpMem = ::CreateDIBSection(NULL, (PBITMAPINFO)&bmih, DIB_RGB_COLORS, &pvBits, NULL, 0);
 	if (!hbmpMem)
 		return;
-	//ASSERT(hbmpMem != NULL);
 
 	memset(pvBits, 0, sz.cx * sz.cy * 4);
 	if (hbmpMem)
@@ -496,17 +502,17 @@ void CSCShapeDlg::render(Gdiplus::Bitmap* img)
 //일반 이미지와 animated gif 공통으로 사용한다.
 void CSCShapeDlg::gif_play()
 {
-	m_gif_thread.start([this](CSCThread& th) { gif_thread(th); });
+	m_thread_animation.start([this](CSCThread& th) { thread_animation(th); });
 }
 
 void CSCShapeDlg::gif_pause()
 {
-	m_gif_thread.pause();
+	m_thread_animation.pause();
 }
 
 void CSCShapeDlg::gif_stop()
 {
-	m_gif_thread.stop();
+	m_thread_animation.stop();
 }
 
 void CSCShapeDlg::gif_goto(int pos, bool pause)
@@ -536,9 +542,9 @@ LRESULT CSCShapeDlg::on_ui_invoke(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-void CSCShapeDlg::gif_thread(CSCThread& th)
+void CSCShapeDlg::thread_animation(CSCThread& th)
 {
-	TRACE(_T("gif_thread started...\n"));
+	TRACE(_T("thread_animation started...\n"));
 
 	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_gif_index = 0;
@@ -556,10 +562,13 @@ void CSCShapeDlg::gif_thread(CSCThread& th)
 				render(m_img.m_pBitmap);
 			});
 
-		long delay = ((long*)m_img.m_frame_delay->value)[m_gif_index] * 10;
+		long delay = 30;
+		
+		//if (m_img.m_frame_delay != NULL)
+			 delay = ((long*)m_img.m_frame_delay->value)[m_gif_index] * 10;
 		//if (delay < 10)
 		//	delay = 10;
-		TRACE(_T("gif_thread %3d = %ld ms\n"), m_gif_index, delay);
+		TRACE(_T("thread_animation %3d = %ld ms\n"), m_gif_index, delay);
 		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 		m_gif_index++;
 
@@ -738,6 +747,7 @@ void CSCShapeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CDialogEx::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	SaveWindowPosition(AfxGetApp(), this, _T("SCShapeDlg"));
 }
 /*
 void CSCShapeDlg::get_logfont(LOGFONT *lf)
@@ -784,4 +794,11 @@ void CSCShapeDlg::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 	CDialogEx::OnMouseMove(nFlags, point);
+}
+
+//기본 ShowWindow()와 달리 기억된 위치로 이동하여 보여준다.
+void CSCShapeDlg::show_window(int nCmdShow)
+{
+	RestoreWindowPosition(AfxGetApp(), this, _T("SCShapeDlg"), true);
+	ShowWindow(nCmdShow);
 }

@@ -210,13 +210,13 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play)
 {
-	while (!stop())
-		Wait(10);
+	//while (!stop())
+	//	Wait(10);
+	m_ani_thread.stop();
 
 	m_filename = path;
 
 	HRESULT hr = S_FALSE;
-	ComPtr<IWICBitmapDecoder> pDecoder;
 
 	if (!pWICFactory)
 		return S_FALSE;
@@ -244,33 +244,42 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	std::vector<uint8_t> data(file_size);
 	read_raw(path, data.data(), file_size);
 
-	ComPtr<IWICStream> stream;
-	pWICFactory->CreateStream(&stream);
+	// WIC 객체들을 블록 스코프로 감싸서 inner load 완료 후 즉시 해제하기 위해.
+	{
+		ComPtr<IWICBitmapDecoder> pDecoder;
+		ComPtr<IWICStream> stream;
+		_M(hr, pWICFactory->CreateStream(&stream));
 
-	stream->InitializeFromMemory(
-		data.data(),
-		static_cast<DWORD>(file_size)
-	);
+		_M(hr, stream->InitializeFromMemory(
+			data.data(),
+			static_cast<DWORD>(file_size)
+		));
 
-	pWICFactory->CreateDecoderFromStream(
-		stream.Get(),
-		nullptr,
-		WICDecodeMetadataCacheOnLoad,
-		&pDecoder
-	);
+		_M(hr, pWICFactory->CreateDecoderFromStream(
+			stream.Get(),
+			nullptr,
+			WICDecodeMetadataCacheOnLoad,
+			&pDecoder
+		));
 
-	if (FAILED(hr) || !pDecoder)
-		return hr;
+		if (FAILED(hr) || !pDecoder)
+			return hr;
 
-	hr = load(pWICFactory, d2context, pDecoder.Get(), auto_play);
+		hr = load(pWICFactory, d2context, pDecoder.Get(), false);
+		// 블록을 벗어나면 pDecoder → stream 순서로 자동 해제되어
+		// WIC WebP 코덱이 유지하던 참조 체인이 완전히 끊김
+	}
 
-	// WebP인 경우 실제 프레임 딜레이를 덮어쓴다
+	// WebP인 경우 이미 읽어둔 data 버퍼로 프레임 딜레이를 읽어온다 (파일 재접근 없음)
 	if (SUCCEEDED(hr))
 	{
 		CString ext = get_part(path, fn_ext).MakeLower();
 		if (ext == _T("webp"))
-			read_webp_frame_delay(path);
+			read_webp_frame_delay(data.data(), data.size());
 	}
+
+	if (m_img.size() > 1 && auto_play)
+		play();
 
 	return hr;
 }
@@ -940,6 +949,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				else
 				{
 					//webp는 위 방식으로 읽을 수 없고 파일 로딩 후 read_webp_frame_delay() 함수를 호출해서 다시 불러오도록 구현되어 있다.
+					//그러므로 우선 기본값으로 채워준다.
 					m_frame_delay.push_back(10);
 				}
 
@@ -1042,6 +1052,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			hr = d2context->CreateBitmapFromWicBitmap(pConverter.Get(), nullptr, img.GetAddressOf());
 
 			//여러장의 이미지를 담고 있는 이미지일 경우 0번 이미지의 색상정보만 유지한다.
+			/*
 			if (i == 0)
 			{
 				//pixel data loading start.
@@ -1080,6 +1091,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 				lock.Reset();
 				//pixel data loading end.
 			}
+			*/
 
 			d2context->SetTarget(frame_img.Get());
 			d2context->BeginDraw();
@@ -1164,6 +1176,11 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			}
 			*/
 		}
+	}
+
+	if (m_img.size() > 0 && m_img[0])
+	{
+		extract_raw_data_from_bitmap(d2context, m_img[0].Get(), &m_data);
 	}
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
@@ -3496,18 +3513,14 @@ WICBitmapTransformOptions CSCD2Image::ExifOrientationToWicTransform(USHORT orien
 	}
 }
 
-bool CSCD2Image::read_webp_frame_delay(const CString& path)
+bool CSCD2Image::read_webp_frame_delay(const uint8_t* data, size_t size)
 {
-	ULONGLONG file_size = get_file_size(path);
-	if (file_size == 0)
+	if (!data || size == 0)
 		return false;
 
-	std::vector<uint8_t> data(file_size);
-	read_raw(path, data.data(), file_size);
-
 	WebPData webp_data;
-	webp_data.bytes = data.data();
-	webp_data.size = data.size();
+	webp_data.bytes = data;
+	webp_data.size = size;
 
 	WebPDemuxer* demux = WebPDemux(&webp_data);
 	if (!demux)

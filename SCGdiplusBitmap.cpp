@@ -471,6 +471,99 @@ bool CSCGdiplusBitmap::load_webp(CString sfile)
 {
 	bool res = true;
 
+	// 1) 파일을 메모리로 읽어서 파일 잠금 방지
+	ULONGLONG file_size = get_file_size(sfile);
+	if (file_size == 0)
+		return false;
+
+	std::vector<uint8_t> fileData(file_size);
+	if (read_raw(sfile, fileData.data(), file_size) == 0)
+		return false;
+
+	// Init WIC
+	IWICImagingFactory* pFactory = nullptr;
+	CoInitialize(NULL);
+	CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+		IID_PPV_ARGS(&pFactory));
+
+	if (!pFactory)
+	{
+		CoUninitialize();
+		return false;
+	}
+
+	// 2) 메모리 스트림으로 디코더 생성 (CreateDecoderFromFilename 대신)
+	IWICStream* pStream = nullptr;
+	pFactory->CreateStream(&pStream);
+	if (!pStream)
+	{
+		pFactory->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	pStream->InitializeFromMemory(fileData.data(), static_cast<DWORD>(file_size));
+
+	IWICBitmapDecoder* pDecoder = nullptr;
+	pFactory->CreateDecoderFromStream(
+		pStream, nullptr,
+		WICDecodeMetadataCacheOnLoad, &pDecoder);
+
+	if (!pDecoder)
+	{
+		pStream->Release();
+		pFactory->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	IWICBitmapFrameDecode* pFrame = nullptr;
+	pDecoder->GetFrame(0, &pFrame);
+
+	if (!pFrame)
+	{
+		pDecoder->Release();
+		pStream->Release();
+		pFactory->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	Gdiplus::GpBitmap* gpBitmap = nullptr;
+
+	GdipCreateBitmapFromWicBitmapFunc* myGdipCreateBitmapFromWicBitmap = nullptr;
+
+	HMODULE gdip = LoadLibraryW(L"gdiplus.dll");
+	if (gdip)
+	{
+		myGdipCreateBitmapFromWicBitmap =
+			(GdipCreateBitmapFromWicBitmapFunc*)GetProcAddress(
+				gdip, "GdipCreateBitmapFromWicBitmap"
+			);
+	}
+
+	if (myGdipCreateBitmapFromWicBitmap)
+	{
+		myGdipCreateBitmapFromWicBitmap(pFrame, NULL, &gpBitmap);
+		m_pBitmap = BitmapFromGpBitmap(gpBitmap);
+	}
+	else
+	{
+		res = false;
+	}
+
+	// 3) COM 객체 해제 (기존 코드에서 누락되어 있던 부분)
+	pFrame->Release();
+	pDecoder->Release();
+	pStream->Release();
+	pFactory->Release();
+
+	CoUninitialize();
+
+	return res;
+	/*
+	bool res = true;
+
 	// Init WIC
 	IWICImagingFactory* pFactory = nullptr;
 	CoInitialize(NULL);
@@ -512,6 +605,7 @@ bool CSCGdiplusBitmap::load_webp(CString sfile)
 	CoUninitialize();
 
 	return res;
+	*/
 }
 
 //png일 경우는 sType을 생략할 수 있다.

@@ -5088,6 +5088,7 @@ void CVtListCtrlEx::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	TRACE(_T("CVtListCtrlEx::OnVScroll\n"));
 	if (m_in_editing)
 		edit_end();
+
 	CListCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
 }
 
@@ -5098,7 +5099,7 @@ void CVtListCtrlEx::OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	// _WIN32_IE 기호는 0x0560보다 크거나 같아야 합니다.
 	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	//TRACE(_T("CVtListCtrlEx::OnLvnBeginScroll\n"));
+	TRACE(_T("CVtListCtrlEx::OnLvnBeginScroll\n"));
 	*pResult = 0;
 }
 
@@ -5109,7 +5110,7 @@ void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	// _WIN32_IE 기호는 0x0560보다 크거나 같아야 합니다.
 	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	//TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
+	TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
 	*pResult = 0;
 }
 

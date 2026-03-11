@@ -17490,7 +17490,7 @@ bool valid_version_string(CString versionStr, int digits)
 //버전 또는 IP주소등은 그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로
 //.을 없앤 숫자로 비교했으나 이 방법도 오류 발생(1.0.1.13 > 1.0.10.3보다 크다고 판단함)
 //결국 각 자릿수끼리 구분하거나 자릿수를 맞춘 후 비교한다.
-//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:str0가 큼, -:str1이 큼, 0:같음)
+//리턴값은 strcmp와 동일한 규칙으로 처리한다.(+:str0가 큼, -:str1이 큼, 0:같음)
 int	compare_string(CString str0, CString str1, TCHAR separator)
 {
 	size_t i = 0, j = 0;

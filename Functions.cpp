@@ -5987,7 +5987,9 @@ CString read(CString filepath, int max_length, int encoding)
 
 	if (PathFileExists(filepath) == false)
 	{
+#ifdef _DEBUG
 		AfxMessageBox(filepath + _T("\n\n위 파일이 존재하지 않습니다."));
+#endif
 		return result;
 	}
 
@@ -10135,6 +10137,80 @@ CString	get_windows_version_string(bool detail)
 	}
 
 	return version;
+}
+
+bool open_with_explorer(CString path)
+{
+#ifndef _USING_V110_SDK71_
+	PIDLIST_ABSOLUTE pidlFolder = NULL;
+	PCUITEMID_CHILD pidlItem = NULL;
+
+	HRESULT hr = SHParseDisplayName(path, NULL, &pidlFolder, 0, NULL);
+	if (SUCCEEDED(hr))
+	{
+		pidlItem = ILFindLastID(pidlFolder);
+
+		PIDLIST_ABSOLUTE pidlParent = ILClone(pidlFolder);
+		ILRemoveLastID(pidlParent);
+
+		SHOpenFolderAndSelectItems(pidlParent, 1, &pidlItem, 0);
+
+		ILFree(pidlParent);
+		ILFree(pidlFolder);
+		return true;
+	}
+	return false;
+#else
+	if (!PathFileExists(path))
+		return false;
+
+	HRESULT hr = CoInitialize(NULL);
+	BOOL bCoInited = SUCCEEDED(hr);
+
+	PIDLIST_ABSOLUTE pidlFull = NULL;
+	PIDLIST_ABSOLUTE pidlFolder = NULL;
+	PCUITEMID_CHILD pidlItem = NULL;
+
+	hr = SHParseDisplayName(path, NULL, &pidlFull, 0, NULL);
+	if (FAILED(hr) || pidlFull == NULL)
+	{
+		if (bCoInited)
+			CoUninitialize();
+		return false;
+	}
+
+	// 전체 PIDL에서 마지막 child만 아이템으로 분리
+	pidlItem = ILFindLastID(pidlFull);
+
+	// 부모 폴더 PIDL 복제 후 마지막 child 제거
+	pidlFolder = ILClone(pidlFull);
+	if (pidlFolder == NULL)
+	{
+		ILFree(pidlFull);
+		if (bCoInited)
+			CoUninitialize();
+		return false;
+	}
+
+	if (!ILRemoveLastID(pidlFolder))
+	{
+		ILFree(pidlFolder);
+		ILFree(pidlFull);
+		if (bCoInited)
+			CoUninitialize();
+		return false;
+	}
+
+	hr = SHOpenFolderAndSelectItems(pidlFolder, 1, &pidlItem, 0);
+
+	ILFree(pidlFolder);
+	ILFree(pidlFull);
+
+	if (bCoInited)
+		CoUninitialize();
+
+	return SUCCEEDED(hr); 
+#endif
 }
 
 CString	get_system_label(int csidl, int* sysIconIndex)

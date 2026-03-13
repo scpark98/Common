@@ -1627,8 +1627,8 @@ struct	NETWORK_INFO
 	DWORD		get_windows_major_version();
 	//detail=true이면 edition 정보까지 포함
 	CString		get_windows_version_string(bool detail = true);
-	//
-	//CString		get_windows_version_string(CString version);
+
+	bool		open_with_explorer(CString path);
 
 	CString		get_system_label(int csidl, int *sysIconIndex = NULL);
 

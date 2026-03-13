@@ -553,7 +553,18 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_thumb, bool invalidate)
 {
 	m_thumb[index].img = new CSCGdiplusBitmap();
-	m_thumb[index].img->load(full_path);
+
+	if (get_part(full_path, fn_ext).CompareNoCase(_T("webp")) == 0)
+	{
+		if (m_thumb[index].img->load_webp(full_path) == false)
+			return -1;
+	}
+	else
+	{
+		if (m_thumb[index].img->load(full_path) == false)
+			return -1;
+	}
+
 	m_thumb[index].width = m_thumb[index].img->width;
 	m_thumb[index].height = m_thumb[index].img->height;
 	m_thumb[index].channel = m_thumb[index].img->channel;

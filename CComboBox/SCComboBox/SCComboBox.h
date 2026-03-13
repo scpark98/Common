@@ -147,6 +147,7 @@ public:
 	afx_msg void OnNcPaint();
 	afx_msg void OnDestroy();
 	afx_msg void OnCbnEditchange();
+	afx_msg void OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct);
 };
 
 

@@ -727,6 +727,14 @@ void CSCStatic::set_use_edit(bool use, UINT align)
 	}
 }
 
+void CSCStatic::set_edit_width(int width)
+{
+	m_edit_width = width;
+
+	if (!m_use_edit)
+		set_use_edit();
+}
+
 void CSCStatic::set_text_value(CString text)
 {
 	m_text_value = text;
@@ -752,7 +760,7 @@ void CSCStatic::edit_begin()
 
 	//rc.right - 2만큼 여백을 둬서 edit을 위치시킨다.
 	//이 여백값을 변경하면 OnPaint()에서 value text를 출력시키는 위치 또한 보정해줘야 한다.
-	CRect r(m_text_extent + 4, 3, rc.right - 2, rc.bottom - 2);
+	CRect r((m_edit_width <= 0 ? m_text_extent + 8 : m_edit_width), 3, rc.right - 2, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
 	//m_edit.set_text_color(m_theme.cr_edit_text);

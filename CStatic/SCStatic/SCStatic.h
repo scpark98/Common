@@ -1,3 +1,5 @@
+//Test Project: https://github.com/scpark98/Test_CEdit.git
+
 #if !defined(AFX_SCSTATIC_INCLUDED_)
 #define AFX_SCSTATIC_INCLUDED_
 
@@ -47,6 +49,9 @@ m_static1.set_gradient_color(RED);
   이 파라미터를 추가한 이유 CSCMessageBox에서 이 CSCStatic을 사용하는데 메시지박스를 보면 아이콘은 항상 왼쪽에, 텍스트는 왼쪽 또는 중앙정렬로 표시된다.
   false일 경우는 텍스트의 위치에 따라 아이콘과 이미지의 위치가 변경된다.
 
+[label + value 형태로 사용할 때]
+- set_use_edit(true)를 하면 click으로 편집이 가능해진다. 편집이 시작되면 내부적으로 CEdit 컨트롤이 생성되고 편집이 끝나면 소멸된다.
+- Resource Editor에서 해당 static의 속성에서 "이미지 가운데 맞춤" 선택, 컨트롤의 높이는 default로 8 DLU로 생성되지만 12 DLU로 조정해준다.
 
 
 [2014-11-26]
@@ -132,6 +137,8 @@ public:
 //자체 편집 기능
 	//편집 기능 허용. click으로 편집시작, esc, return, 다른 항목 클릭으로 편집 종료된다.
 	void			set_use_edit(bool use = true, UINT align = ES_RIGHT);
+	//편집 시 표시되는 edit의 width를 지정한다. 0 또는 음수값이면 텍스트의 너비 + 8만큼 edit의 width가 지정된다. (편집이 시작될 때 계산되어 적용된다.)
+	void			set_edit_width(int width);
 	CString			get_text_value() { return m_text_value; }
 	void			set_text_value(CString value = _T(""));
 	void			set_text_value(LPCTSTR format, ...);
@@ -326,6 +333,7 @@ protected:
 	CSCEdit			m_edit;
 	bool			m_use_edit = false;
 	CString			m_text_value;		//m_use_edit = true이면 label + value로 표시되는데 이 때 value의 내용이 저장된다.
+	int				m_edit_width = 0;	//편집모드일 때 edit의 너비. 이 값이 0이면 (m_text_extent + 8)부터 edit이 시작된다.
 
 	enum ENUM_TIMER
 	{

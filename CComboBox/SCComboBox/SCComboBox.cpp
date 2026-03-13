@@ -23,13 +23,12 @@ CSCComboBox::~CSCComboBox()
 
 BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	//ON_WM_NCPAINT()
-	//ON_WM_DRAWITEM()
 	//ON_WM_PAINT()
 	//ON_CONTROL_REFLECT(CBN_EDITUPDATE, OnEditUpdate)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	ON_CONTROL_REFLECT(CBN_DROPDOWN, &CSCComboBox::OnCbnDropdown)
-	//ON_WM_PAINT()
+	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
 	ON_CONTROL_REFLECT(CBN_SETFOCUS, &CSCComboBox::OnCbnSetfocus)
 	ON_CONTROL_REFLECT(CBN_KILLFOCUS, &CSCComboBox::OnCbnKillfocus)
@@ -38,10 +37,11 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_CONTROL_REFLECT(CBN_SELENDCANCEL, &CSCComboBox::OnCbnSelendcancel)
 	//ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
 	ON_WM_NCPAINT()
-	ON_WM_CTLCOLOR()
-	ON_WM_CTLCOLOR_REFLECT()
+	//ON_WM_CTLCOLOR()
+	//ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_DESTROY()
 	ON_CONTROL_REFLECT(CBN_EDITCHANGE, &CSCComboBox::OnCbnEditchange)
+	ON_WM_DRAWITEM()
 END_MESSAGE_MAP()
 
 
@@ -116,6 +116,7 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	{
 	}
 
+	dc.SetBkMode(TRANSPARENT);
 	dc.FillSolidRect(rItem, cr_back);
 	dc.SetTextColor(cr_text);
 
@@ -134,6 +135,7 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 			if (!cf.CreateFont(m_font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, strData))
 			{
 				ASSERT(0);
+				dc.Detach();
 				return;
 			}
 		}
@@ -149,7 +151,6 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	dc.Detach();
 }
-
 
 void CSCComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct )
 {
@@ -514,6 +515,8 @@ int CSCComboBox::find_string(CString src)
 
 void CSCComboBox::OnPaint()
 {
+	Default();
+
 	//CComboBox::OnPaint();
 	//return;
 	CPaintDC dc(this); // device context for painting
@@ -956,4 +959,12 @@ void CSCComboBox::OnCbnEditchange()
 
 	// 커서 위치 복구
 	SetEditSel(start, end);
+}
+
+void CSCComboBox::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct)
+{
+	// 내부 ListBox가 보내는 WM_DRAWITEM의 CtlType은 ODT_LISTBOX이므로
+	// DrawItem의 ASSERT를 통과하도록 ODT_COMBOBOX로 변경
+	lpDrawItemStruct->CtlType = ODT_COMBOBOX;
+	DrawItem(lpDrawItemStruct);
 }

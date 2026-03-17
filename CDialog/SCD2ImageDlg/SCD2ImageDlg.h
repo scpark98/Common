@@ -146,6 +146,8 @@ public:
 	void			display_image(CString filepath, bool scan_folder = false);
 	void			build_image_info_str();
 
+	void			remove(int index);
+
 	//index = 0 (goto first image), index = -1 (goto last image)
 	void			goto_index(int index);
 	int				get_image_count() { return m_files.size(); }

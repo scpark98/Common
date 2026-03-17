@@ -1902,3 +1902,28 @@ void CSCD2ImageDlg::set_back_transparency(int target_index, int inner_threshold,
 	Invalidate();
 }
 
+void CSCD2ImageDlg::remove(int index)
+{
+	//파일 자체를 지우는 기능은 메인에서 판단하고 처리해야 하며
+	//이 클래스에서는 목록에서만 지우는 역할만 한다.
+	if (index < 0 || index >= m_files.size())
+		return;
+
+	m_files.erase(m_files.begin() + index);
+
+	//thumbnail view에서도 해당 파일을 삭제시켜준다.
+	if (index >= m_thumb.size())
+		return;
+
+	m_thumb.remove(index);
+
+	//맨 마지막 이미지를 지웠다면 다시 마지막 이미지를 표시한다.
+	if (index >= m_files.size())
+		index = m_files.size() - 1;
+
+	//미리 버퍼링된 이미지들을 삭제한 후
+	m_images.clear();
+
+	//현재 이미지를 다시 display한다.
+	display_image(index);
+}

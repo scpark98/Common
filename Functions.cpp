@@ -10145,7 +10145,7 @@ bool open_with_explorer(CString path)
 	PIDLIST_ABSOLUTE pidlFolder = NULL;
 	PCUITEMID_CHILD pidlItem = NULL;
 
-	HRESULT hr = SHParseDisplayName(path, NULL, &pidlFolder, 0, NULL);
+	HRESULT hr = SHParseDisplayName(CStringW(path), NULL, &pidlFolder, 0, NULL);
 	if (SUCCEEDED(hr))
 	{
 		pidlItem = ILFindLastID(pidlFolder);
@@ -12617,10 +12617,11 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 //"query"	: status를 리턴
 //"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
 //			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
-//"delete"	: 서비스 삭제가 성공하면 0이 아닌 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
-DWORD service_command(CString service_name, CString cmd, CString *detail)
+//"delete"	: 서비스 삭제가 성공하면 0보다 큰 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
+DWORD service_command(CString service_name, CString cmd, DWORD& error_code, CString* detail)
 {
-	DWORD res = 0;
+	DWORD status_code = 0;
+	CString detail_msg;
 	SERVICE_STATUS status;
 	ZeroMemory(&status, sizeof(status));
 
@@ -12632,39 +12633,37 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 
 	if ((hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS)) == NULL)
 	{
-		res = GetLastError();
-		TRACE(_T("get_error_str = %s\n"), get_error_str(res));
-		return res;
+		error_code = GetLastError();
+		TRACE(_T("get_error_str = %s\n"), get_error_str(error_code));
+		return error_code;
 	}
 
 	if ((hService = OpenService(hManager, service_name, SC_MANAGER_ALL_ACCESS)) == NULL)
 	{
-		res = GetLastError();
-		switch (res)
+		error_code = GetLastError();
+		switch (error_code)
 		{
 			case ERROR_ACCESS_DENIED:
-				if (detail)
-					*detail = _T("ERROR_ACCESS_DENIED");
+				detail_msg = _T("ERROR_ACCESS_DENIED");
 				break;
 			case ERROR_INVALID_HANDLE:
-				if (detail)
-					*detail = _T("ERROR_INVALID_HANDLE");
+				detail_msg = _T("ERROR_INVALID_HANDLE");
 				break;
 			case ERROR_INVALID_NAME:
-				if (detail)
-					*detail = _T("ERROR_INVALID_NAME");
+				detail_msg = _T("ERROR_INVALID_NAME");
 				break;
 			case ERROR_SERVICE_DOES_NOT_EXIST:
-				if (detail)
-					*detail = _T("ERROR_SERVICE_DOES_NOT_EXIST");
+				detail_msg = _T("ERROR_SERVICE_DOES_NOT_EXIST");
 				break;
 			default :
-				*detail = _T("not defined error.");
+				detail_msg = _T("not defined error.");
 		}
 
-		TRACE(_T("detail = %s\n"), (detail ? *detail : CString()));
+		if (detail)
+			*detail = detail_msg;
+		TRACE(_T("detail = %s\n"), detail_msg);
 		CloseServiceHandle(hManager);
-		return res;
+		return error_code;
 	}
 
 	//서비스에게 INTERROGATE 제어신호를 보내면 해당 서비스는 자신의 현재 상태를 리턴한다.
@@ -12675,15 +12674,16 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 	//설명이 있으므로 
 
 	if (QueryServiceStatus(hService, &status))
-		//if (ControlService(hService, SERVICE_CONTROL_INTERROGATE, &status))	//error = ERROR_ACCESS_DENIED
+	//if (ControlService(hService, SERVICE_CONTROL_INTERROGATE, &status))	//error = ERROR_ACCESS_DENIED
 	{
 		if (cmd == _T("query"))
-			res = status.dwCurrentState;
+			status_code = status.dwCurrentState;
 	}
 	else
 	{
-		res = GetLastError();
-		TRACE(_T("get_error_str = %s\n"), get_error_str(res));
+		error_code = GetLastError();
+		detail_msg = get_error_str(error_code);
+		TRACE(_T("get_error_str = %s\n"), detail_msg);
 	}
 
 	//delete할 경우는 반드시 stop후에 delete해야 함.
@@ -12697,26 +12697,35 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 				//
 				while (status.dwCurrentState != SERVICE_STOPPED)
 					QueryServiceStatus(hService, &status);
-				res = SERVICE_STOPPED;
+				status_code = SERVICE_STOPPED;
 			}
 			else
 			{
-				res = GetLastError();
-				TRACE(_T("get_error_str = %s\n"), get_error_str(res));
+				error_code = GetLastError();
+				detail_msg = get_error_str(error_code);
+				TRACE(_T("get_error_str = %s\n"), detail_msg);
 			}
 		}
 
 		if (cmd == _T("delete"))
 		{
-			res = DeleteService(hService);
-			if (res == 0)
-				res = GetLastError();
+			if (DeleteService(hService))
+			{
+				status_code = SERVICE_STOPPED;
+			}
+			else
+			{
+				error_code = GetLastError();
+				detail_msg = get_error_str(error_code);
+				TRACE(_T("get_error_str = %s\n"), detail_msg);
+			}
 		}
 	}
 
 	//5		: ERROR_ACCESS_DENIED
 	//6		: ERROR_INVALID_HANDLE
 	//87	: ERROR_INVALID_PARAMETER
+	//1060	: ERROR_SERVICE_DOES_NOT_EXIST
 	//1051	: ERROR_DEPENDENT_SERVICES_RUNNING
 	//1052	: ERROR_INVALID_SERVICE_CONTROL
 	//1053	: ERROR_SERVICE_REQUEST_TIMEOUT
@@ -12727,7 +12736,31 @@ DWORD service_command(CString service_name, CString cmd, CString *detail)
 	CloseServiceHandle(hService);
 	CloseServiceHandle(hManager);
 
-	return res;
+	return status_code;
+}
+
+//status값에 해당하는 상태 스트링 리턴
+CString	service_status_str(DWORD status)
+{
+	switch (status)
+	{
+		case SERVICE_STOPPED:			//0x00000001
+			return _T("SERVICE_STOPPED");
+		case SERVICE_START_PENDING:		//0x00000002
+			return _T("SERVICE_START_PENDING");
+		case SERVICE_STOP_PENDING:		//0x00000003
+			return _T("SERVICE_STOP_PENDING");
+		case SERVICE_RUNNING:			//0x00000004
+			return _T("SERVICE_RUNNING");
+		case SERVICE_CONTINUE_PENDING:	//0x00000005
+			return _T("SERVICE_CONTINUE_PENDING");
+		case SERVICE_PAUSE_PENDING:		//0x00000006
+			return _T("SERVICE_PAUSE_PENDING");
+		case SERVICE_PAUSED:			//0x00000007
+			return _T("SERVICE_PAUSED");
+	}
+
+	return _T("not defined service status");
 }
 
 /*

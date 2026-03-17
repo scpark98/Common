@@ -766,7 +766,9 @@ struct	NETWORK_INFO
 	//"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
 	//			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
 	//"delete"	: 서비스 삭제가 성공하면 0이 아닌 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
-	DWORD		service_command(CString service_name, CString cmd, CString *detail = NULL);
+	DWORD		service_command(CString service_name, CString cmd, DWORD& error_code, CString *detail = NULL);
+	//status값에 해당하는 상태 스트링 리턴
+	CString		service_status_str(DWORD status);
 
 	//Console 명령인지 GUI 윈도우 어플리케이션인지 구분
 	bool		is_gui_application(CString fullPath);

@@ -1395,6 +1395,49 @@ std::unique_ptr<Gdiplus::TextureBrush> CSCGdiplusBitmap::get_zigzag_pattern(int 
 	return std::make_unique<Gdiplus::TextureBrush>(tile.get(), Gdiplus::WrapModeTile);
 }
 
+// ── 체커보드 비트맵 생성 (인스턴스) ─────────────────────
+void CSCGdiplusBitmap::create_zigzag_bmp(int tile_size,
+	Gdiplus::Color cr_light, Gdiplus::Color cr_dark)
+{
+	release();
+
+	m_pBitmap = new Gdiplus::Bitmap(tile_size * 2, tile_size * 2, PixelFormat32bppARGB);
+
+	Gdiplus::Graphics g(m_pBitmap);
+	Gdiplus::SolidBrush lb(cr_light), db(cr_dark);
+	g.FillRectangle(&lb, 0, 0, tile_size, tile_size);
+	g.FillRectangle(&db, tile_size, 0, tile_size, tile_size);
+	g.FillRectangle(&db, 0, tile_size, tile_size, tile_size);
+	g.FillRectangle(&lb, tile_size, tile_size, tile_size, tile_size);
+
+	width = tile_size * 2;
+	height = tile_size * 2;
+}
+
+// ── 공유 체커보드 Bitmap* 반환 (정적, 앱 수명 1회 생성) ─
+Gdiplus::Bitmap* CSCGdiplusBitmap::checker_bmp(int tile_size,
+	Gdiplus::Color cr_light, Gdiplus::Color cr_dark)
+{
+	static CSCGdiplusBitmap s_bmp;
+	static int          s_tile_size = 0;
+	static Gdiplus::ARGB s_cr_light = 0;
+	static Gdiplus::ARGB s_cr_dark = 0;
+
+	// 파라미터가 하나라도 달라지면 재생성
+	if (!s_bmp.is_valid()
+		|| s_tile_size != tile_size
+		|| s_cr_light != cr_light.GetValue()
+		|| s_cr_dark != cr_dark.GetValue())
+	{
+		s_bmp.create_zigzag_bmp(tile_size, cr_light, cr_dark);
+		s_tile_size = tile_size;
+		s_cr_light = cr_light.GetValue();
+		s_cr_dark = cr_dark.GetValue();
+	}
+
+	return s_bmp.m_pBitmap;
+}
+
 //rgb 3원색의 3개원을 겹치게 그리는 이미지를 생성한다. Koino UCTogether 그리기 색상 선택 버튼과 유사
 void CSCGdiplusBitmap::create_rgb_color_wheel(int width, int height,
 											Gdiplus::Color cr_border, Gdiplus::Color cr_back,

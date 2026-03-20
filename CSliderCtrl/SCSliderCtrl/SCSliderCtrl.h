@@ -137,6 +137,7 @@ public:
 		style_normal = 0,
 		style_thumb,
 		style_thumb_round,
+		style_thumb_round_alpha,	//색상 선택 시 alpha값 조절 용도로 사용. 트랙 배경에 격자패턴을 깔고 thumb에 alpha를 적용해서 그린다.
 		style_value,
 		style_progress,
 		style_progress_line,

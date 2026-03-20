@@ -15,12 +15,7 @@ IMPLEMENT_DYNAMIC(CSCMessageBox, CDialogEx)
 
 CSCMessageBox::CSCMessageBox(CWnd* parent, CString title, UINT icon_id, bool as_modal, int cx, int cy)
 {
-	if (!parent)
-		return;
-
-	m_as_modal = as_modal;
 	memset(&m_lf, 0, sizeof(LOGFONT));
-
 	create(parent, title, icon_id, cx, cy);
 }
 
@@ -56,9 +51,19 @@ END_MESSAGE_MAP()
 // CSCMessageBox 메시지 처리기
 bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_modal, int cx, int cy)
 {
-	m_as_modal = as_modal;
+	if (parent == nullptr)
+		parent = AfxGetApp()->GetMainWnd();
+
+	if (parent == nullptr)
+		return false;
+
 	m_parent = parent;
-	m_title = title;
+
+	if (title.IsEmpty())
+		title = _T("Color Picker");
+
+	m_as_modal = as_modal;
+
 	m_hIcon = load_icon(NULL, icon_id, 16, 16);
 
 	LANGID lang = GetUserDefaultUILanguage();
@@ -447,6 +452,10 @@ void CSCMessageBox::set_color_theme(int theme)
 LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 {
 	auto msg = (CGdiButtonMessage*)wParam;
+
+	if (m_parent == nullptr)
+		m_parent = msg->pThis->GetParent();
+
 	if (msg->message == WM_LBUTTONUP)
 	{
 		TRACE(_T("on_message_CGdiButton, WM_LBUTTONUP = %s\n"), m_button_caption[msg->ctrl_id - SC_BUTTON_ID]);
@@ -508,7 +517,10 @@ void CSCMessageBox::OnBnClickedOk()
 void CSCMessageBox::OnBnClickedCancel()
 {
 	m_response = IDCANCEL;
-	if (!m_as_modal)
+
+	if (m_as_modal)
+		EndDialog(m_response);
+	else
 		ShowWindow(SW_HIDE);
 }
 
@@ -521,6 +533,9 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	//return CDialogEx::DoModal();
+
+	if (m_parent == nullptr)
+		m_parent = GetParent();
 
 	KillTimer(timer_timeout);
 	m_response = -1;

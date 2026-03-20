@@ -80,7 +80,7 @@ class CSCMessageBox : public CDialogEx
 	DECLARE_DYNAMIC(CSCMessageBox)
 
 public:
-	CSCMessageBox(CWnd* parent = NULL, CString title = _T(""), UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);   // 표준 생성자입니다.
+	CSCMessageBox(CWnd* parent = nullptr, CString title = _T(""), UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);   // 표준 생성자입니다.
 	virtual ~CSCMessageBox();
 
 	//사용할 클래스의 .h에서 멤버변수로 선언하고
@@ -170,7 +170,7 @@ public:
 	afx_msg void OnBnClickedCancel();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	//실제 사용 시 MAX_WIDTH(800)를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
-	virtual INT_PTR DoModal(CString msg = _T(""), int type = MB_OK, int timeout = 0);
+	virtual INT_PTR DoModal(CString msg, int type = MB_OK, int timeout = 0);
 	afx_msg void OnPaint();
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);

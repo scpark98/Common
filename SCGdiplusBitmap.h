@@ -237,6 +237,12 @@ public:
 	static Gdiplus::Color m_cr_zigzag_back;
 	static Gdiplus::Color m_cr_zigzag_fore;
 
+	void					create_zigzag_bmp(int tile_size = 4, Gdiplus::Color cr_light = Gdiplus::Color::White, Gdiplus::Color cr_dark = Gdiplus::Color(200, 200, 200));
+
+	// 정적 메서드: 앱 수명 동안 1회만 생성되는 공유 Bitmap* 반환
+	// → CSCColorPicker, CSCSliderCtrl 등 어느 곳에서도 동일 인스턴스 사용 가능
+	static Gdiplus::Bitmap* checker_bmp(int tile_size = 4, Gdiplus::Color cr_light = Gdiplus::Color::White, Gdiplus::Color cr_dark = Gdiplus::Color(200, 200, 200));
+
 	//rgb 3원색의 3개원을 겹치게 그리는 이미지를 생성한다. Koino UCTogether 그리기 색상 선택 버튼과 유사
 	void			create_rgb_color_wheel(int width = 60, int height = 60,
 										Gdiplus::Color cr_border = Gdiplus::Color(255, 221, 221, 221), Gdiplus::Color cr_back = Gdiplus::Color::White,

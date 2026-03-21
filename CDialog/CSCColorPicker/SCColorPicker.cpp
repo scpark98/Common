@@ -144,33 +144,33 @@ void CSCColorPicker::calc_layout()
 	int hexa_width = 80;
 	int bottomRef = max(m_preview_rect.bottom, m_slider_rect.bottom);
 	int editTop = bottomRef + 24;
-	m_edit_area_rect = CRect(m_palette_rect.left + m_margin, editTop, m_palette_rect.right - m_margin, editTop + kEditH + kEditGap + kEditH);
+	m_edit_area_rect = CRect(m_palette_rect.left + m_margin, editTop, m_palette_rect.right - m_margin, editTop + kEditH);
 
 	if (!m_edit_hexa.GetSafeHwnd())
 	{
-		//Hex (#AARRGGBB)
+		//Hex (AARRGGBB)
 		m_edit_hexa.Create(
 			WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
 			CRect(m_edit_area_rect.left, m_edit_area_rect.top, m_edit_area_rect.left + hexa_width, m_edit_area_rect.top + kEditH), this, IDC_EDIT_HEXA);
-		m_edit_hexa.LimitText(9);   // '#' + 8 hex digits
-		m_edit_hexa.set_font_name(_T("Segoe UI"));
+		m_edit_hexa.LimitText(8);   // 8 hex digits
+		m_edit_hexa.set_font_name(_T("Consolas"));
 		m_edit_hexa.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_hexa.set_back_color(Gdiplus::Color::White);
 		m_edit_hexa.set_border_color(Gdiplus::Color::LightGray);
 
 		//ARGB (4등분, 레이블 공간 포함)
-		const int cellW = (m_edit_area_rect.Width() - hexa_width - 3 * kCellGap) / 4;
+		const int cellW = (m_edit_area_rect.Width() - hexa_width - 4 * kCellGap) / 4;
 		const int kIds[4] = { IDC_EDIT_ARGB_A, IDC_EDIT_ARGB_R, IDC_EDIT_ARGB_G, IDC_EDIT_ARGB_B };
 
 		for (int i = 0; i < 4; i++)
 		{
-			const int x0 = m_edit_area_rect.left + hexa_width + i * (cellW + kCellGap);
+			const int x0 = m_edit_area_rect.left + hexa_width + kCellGap + i * (cellW + kCellGap);
 			m_edit_argb[i].Create(
 				WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
-				CRect(x0 + kLabelW, m_edit_area_rect.top, x0 + cellW, m_edit_area_rect.top + kEditH),
+				CRect(x0, m_edit_area_rect.top, x0 + cellW, m_edit_area_rect.top + kEditH),
 				this, kIds[i]);
 			m_edit_argb[i].LimitText(3);    // 0 ~ 255
-			m_edit_argb[i].set_font_name(_T("Segoe UI"));
+			m_edit_argb[i].set_font_name(_T("Consolas"));
 			m_edit_argb[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
 			m_edit_argb[i].set_back_color(Gdiplus::Color::White);
 			m_edit_argb[i].set_border_color(Gdiplus::Color::LightGray);
@@ -180,39 +180,26 @@ void CSCColorPicker::calc_layout()
 	}
 	else    // calc_layout() 재호출 시 위치만 갱신
 	{
-		m_edit_hexa.MoveWindow(
-			CRect(m_edit_area_rect.left, m_edit_area_rect.top,
-				m_edit_area_rect.right, m_edit_area_rect.top + kEditH));
+		m_edit_hexa.MoveWindow(CRect(m_edit_area_rect.left, m_edit_area_rect.top, m_edit_area_rect.left + hexa_width, m_edit_area_rect.top + kEditH));
 
-		const int cellW = (m_edit_area_rect.Width() - 3 * kCellGap) / 4;
-		const int row2Top = m_edit_area_rect.top + kEditH + kEditGap;
+		const int cellW = (m_edit_area_rect.Width() - hexa_width - 4 * kCellGap) / 4;
 
 		for (int i = 0; i < 4; i++)
 		{
-			const int x0 = m_edit_area_rect.left + i * (cellW + kCellGap);
-			m_edit_argb[i].MoveWindow(
-				CRect(x0 + kLabelW, row2Top, x0 + cellW, row2Top + kEditH));
+			const int x0 = m_edit_area_rect.left + hexa_width + kCellGap + i * (cellW + kCellGap);
+			m_edit_argb[i].MoveWindow(CRect(x0, m_edit_area_rect.top, x0 + cellW, m_edit_area_rect.top + kEditH));
 		}
 	}
 
-	//const int client_h = info_top + preview_size + m_margin + 0.5f;
 
-	// 창 크기를 콘텐츠에 맞게 조정
-	//const DWORD style = (DWORD)::GetWindowLong(m_hWnd, GWL_STYLE);
-	//const DWORD styleEx = (DWORD)::GetWindowLong(m_hWnd, GWL_EXSTYLE);
-	//CRect wr(0, 0, width, client_h);
-	//::AdjustWindowRectEx(&wr, style, FALSE, styleEx);
-	//SetWindowPos(nullptr, 0, 0, wr.Width(), wr.Height(),
-	//	SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-
-	// 다이얼로그 높이를 편집 영역이 들어오도록 확장
-	CRect dlgRect;
-	GetWindowRect(&dlgRect);
-	int neededBottom = m_edit_area_rect.bottom + (int)m_margin;
-	if (dlgRect.Height() < neededBottom)
+	// ── 다이얼로그 크기를 콘텐츠에 맞게 자동 조정 (width + height 모두) ──
 	{
-		SetWindowPos(nullptr, 0, 0,
-			dlgRect.Width(), neededBottom + (int)m_margin,
+		const int client_h = m_edit_area_rect.bottom + (int)m_margin;	// 하단 여백 1회만
+		const DWORD wStyle = (DWORD)::GetWindowLong(m_hWnd, GWL_STYLE);
+		const DWORD wExStyle = (DWORD)::GetWindowLong(m_hWnd, GWL_EXSTYLE);
+		CRect wr(0, 0, width, client_h);
+		::AdjustWindowRectEx(&wr, wStyle, FALSE, wExStyle);
+		SetWindowPos(nullptr, 0, 0, wr.Width(), wr.Height(),
 			SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	}
 
@@ -242,27 +229,34 @@ void CSCColorPicker::sync_edits()
 	if (!m_edit_hexa.GetSafeHwnd())
 		return;
 
-	static bool s_syncing = false;
-	if (s_syncing)
+	if (m_edit_syncing)
 		return;
-	s_syncing = true;
+	m_edit_syncing = true;
 
 	auto cr = m_sel_color;
+	CString newText, curText;
 
-	// Hex 편집: #AARRGGBB
-	CString hex;
-	hex.Format(_T("#%02X%02X%02X%02X"),
+	// Hex 편집: AARRGGBB — 내용이 달라진 경우에만 SetWindowText 호출
+	newText.Format(_T("%02X%02X%02X%02X"),
 		cr.GetAlpha(), cr.GetRed(), cr.GetGreen(), cr.GetBlue());
-	m_edit_hexa.SetWindowText(hex);
+	m_edit_hexa.GetWindowText(curText);
+	if (newText != curText)
+		m_edit_hexa.SetWindowText(newText);
 
-	// A / R / G / B 개별 편집
-	CString val;
-	val.Format(_T("%d"), (int)cr.GetAlpha()); m_edit_argb[0].SetWindowText(val);
-	val.Format(_T("%d"), (int)cr.GetRed());   m_edit_argb[1].SetWindowText(val);
-	val.Format(_T("%d"), (int)cr.GetGreen()); m_edit_argb[2].SetWindowText(val);
-	val.Format(_T("%d"), (int)cr.GetBlue());  m_edit_argb[3].SetWindowText(val);
+	// A / R / G / B — 내용이 달라진 경우에만 호출 (같으면 재렌더링 자체를 건너뜀)
+	const int vals[4] = {
+		(int)cr.GetAlpha(), (int)cr.GetRed(),
+		(int)cr.GetGreen(), (int)cr.GetBlue()
+	};
+	for (int i = 0; i < 4; i++)
+	{
+		newText.Format(_T("%d"), vals[i]);
+		m_edit_argb[i].GetWindowText(curText);
+		if (newText != curText)
+			m_edit_argb[i].SetWindowText(newText);
+	}
 
-	s_syncing = false;
+	m_edit_syncing = false;
 }
 
 // ── apply_edit_to_color() ──────────────────────────────────────
@@ -293,12 +287,14 @@ void CSCColorPicker::apply_edit_to_color()
 // Hex 편집 변경 → m_sel_color 파싱 반영
 void CSCColorPicker::OnEnChangeHexa()
 {
+	if (m_edit_syncing)	// sync_edits()가 진행 중이면 무시 (재진입 차단)
+		return;
+
 	if (!m_edit_hexa.GetSafeHwnd())
 		return;
 
 	CString text;
 	m_edit_hexa.GetWindowText(text);
-	text.TrimLeft(_T('#'));
 	if (text.GetLength() != 8)
 		return;
 
@@ -321,6 +317,9 @@ void CSCColorPicker::OnEnChangeHexa()
 // ARGB 개별 편집 변경 → m_sel_color 반영
 void CSCColorPicker::OnEnChangeArgb()
 {
+	if (m_edit_syncing)	// sync_edits()가 진행 중이면 무시 (재진입 차단)
+		return;
+
 	apply_edit_to_color();
 }
 
@@ -346,7 +345,7 @@ Gdiplus::PointF CSCColorPicker::get_cell_center(const HitTarget& t) const
 	{
 		// 최근 색상 칸(MAX_RECENT_COLORS개) 바로 뒤에 순서대로 배치
 		return {
-			m_palette_rect.left + m_margin + (MAX_RECENT_COLORS + t.idx) * m_cell + m_cell * 0.5f,
+			m_palette_rect.left + m_margin + ((int)m_recent_colors.size() + t.idx) * m_cell + m_cell * 0.5f,
 			static_cast<float>(m_palette_rect.bottom) + 4.f + m_cell * 0.5f
 		};
 	}
@@ -509,16 +508,19 @@ bool CSCColorPicker::hit_test(CPoint pt, HitTarget& out) const
 	if (!m_recent_colors.empty() && !m_palette_rect.IsRectEmpty())
 	{
 		// ② 최근 색상
-		for (int i = 0; i < (int)m_recent_colors.size(); ++i)
+		if (!m_recent_colors.empty())
 		{
-			HitTarget t{ HitArea::Recent, -1, -1, i };
-			const Gdiplus::PointF c = get_cell_center(t);
-			const float dx = static_cast<float>(pt.x) - c.X;
-			const float dy = static_cast<float>(pt.y) - c.Y;
-			if (dx * dx + dy * dy <= m_radius * m_radius)
+			for (int i = 0; i < (int)m_recent_colors.size(); ++i)
 			{
-				out = t;
-				return true;
+				HitTarget t{ HitArea::Recent, -1, -1, i };
+				const Gdiplus::PointF c = get_cell_center(t);
+				const float dx = static_cast<float>(pt.x) - c.X;
+				const float dy = static_cast<float>(pt.y) - c.Y;
+				if (dx * dx + dy * dy <= m_radius * m_radius)
+				{
+					out = t;
+					return true;
+				}
 			}
 		}
 
@@ -921,7 +923,7 @@ void CSCColorPicker::OnPaint()
 
 	draw_overlays(g);		// ⑤ 색상 셀 hover 확대원 + 체크마크
 
-	Gdiplus::Font        labelFont(L"Segoe UI", 10.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
+	Gdiplus::Font        labelFont(L"Consolas", 10.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 	Gdiplus::SolidBrush  labelBrush(Gdiplus::Color(64, 64, 64));
 	Gdiplus::StringFormat sf;
 	sf.SetAlignment(Gdiplus::StringAlignmentNear);

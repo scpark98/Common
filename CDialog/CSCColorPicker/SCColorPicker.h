@@ -25,6 +25,7 @@ protected:
 	bool			m_as_modal = true;
 	CWnd*			m_parent = NULL;
 	int				m_response = -1;
+	bool			m_edit_syncing = false;	// sync_edits() 진행 중 EN_CHANGE 재진입 방지. 깜빡임 방지
 
 	CSCSliderCtrl	m_slider;
 	CSCEdit			m_edit_hexa;
@@ -55,7 +56,7 @@ protected:
 	static constexpr int kEditH = 22;
 	static constexpr int kEditGap = 4;
 	static constexpr int kLabelW = 14;
-	static constexpr int kCellGap = 3;
+	static constexpr int kCellGap = 4;
 
 	struct PaletteSV { float s, v; };
 	static const float      m_hues[PALETTE_COLOR_COLS];

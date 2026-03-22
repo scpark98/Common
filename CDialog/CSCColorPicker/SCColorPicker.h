@@ -27,30 +27,35 @@ protected:
 	int				m_response = -1;
 	bool			m_edit_syncing = false;	// sync_edits() 진행 중 EN_CHANGE 재진입 방지. 깜빡임 방지
 
-	CSCSliderCtrl	m_slider;
+	CSCSliderCtrl	m_slider_alpha;
+	CSCSliderCtrl	m_slider_hue;		// ← NEW: Hue 슬라이더 (0~360)
+	CSCSliderCtrl	m_slider_light;		// ← NEW: 밝기(Value) 슬라이더 (0~100)
 	CSCEdit			m_edit_hexa;
 	CSCEdit			m_edit_argb[4];
 
 	// ── 팔레트 레이아웃 상수 ──────────────────────────────
-	static constexpr int PALETTE_COLOR_COLS = 8;
-	static constexpr int PALETTE_TOTAL_COLS = 9;	// 색상 8 + 무채색 1
-	static constexpr int PALETTE_ROWS = 8;
+	static constexpr int PALETTE_COLOR_COLS = 10;
+	static constexpr int PALETTE_TOTAL_COLS = PALETTE_COLOR_COLS;		// 무채색 별도 행 → 열 수 동일
+	static constexpr int PALETTE_COLOR_ROWS = 6;						// 색상 변화 행 수
+	static constexpr int PALETTE_ROWS = PALETTE_COLOR_ROWS + 1;		// 무채색 행(1) + 색상 행(6) = 7
 
 	static constexpr int BTN_ADD_IDX = 0;	// "+" 사용자 정의색 추가
 	static constexpr int BTN_DROPPER_IDX = 1;	// 스포이드 (미구현, 공간 예약)
 	static constexpr int PALETTE_BTN_COUNT = 2;	// 예약 버튼 수
 
-	// 팔레트 9열 중 버튼 2칸 제외 → 최근 색상 최대 7개
-	static constexpr int MAX_RECENT_COLORS = PALETTE_TOTAL_COLS - PALETTE_BTN_COUNT;	// 7
+	// 팔레트 10열 중 버튼 2칸 제외 → 최근 색상 최대 8개
+	static constexpr int MAX_RECENT_COLORS = PALETTE_TOTAL_COLS - PALETTE_BTN_COUNT;	// 8
 
 	static constexpr int IDC_SLIDER_ALPHA = 1001;	// ← 알파 슬라이더 ID
+	static constexpr int IDC_SLIDER_HUE = 1002;	// ← NEW
+	static constexpr int IDC_SLIDER_LIGHT = 1003;	// ← NEW
 
 	// ── 편집 컨트롤 ID ────────────────────────────────────
-	static constexpr int IDC_EDIT_HEXA = 1002;
-	static constexpr int IDC_EDIT_ARGB_A = 1003;
-	static constexpr int IDC_EDIT_ARGB_R = 1004;
-	static constexpr int IDC_EDIT_ARGB_G = 1005;
-	static constexpr int IDC_EDIT_ARGB_B = 1006;
+	static constexpr int IDC_EDIT_HEXA = 1011;
+	static constexpr int IDC_EDIT_ARGB_A = 1012;
+	static constexpr int IDC_EDIT_ARGB_R = 1013;
+	static constexpr int IDC_EDIT_ARGB_G = 1014;
+	static constexpr int IDC_EDIT_ARGB_B = 1015;
 
 	// ── 편집 영역 레이아웃 상수 ───────────────────────────
 	static constexpr int kEditH = 22;
@@ -60,19 +65,26 @@ protected:
 
 	struct PaletteSV { float s, v; };
 	static const float      m_hues[PALETTE_COLOR_COLS];
-	static const PaletteSV  m_sv_rows[PALETTE_ROWS];
+	static const PaletteSV  m_sv_rows[PALETTE_COLOR_ROWS];		// [8] → [6]
 
 	// ── 팔레트 레이아웃 메트릭 (calc_layout에서 1회 설정) ─
 	float	m_cell			= 0.f;
 	float	m_margin		= 0.f;
 	float	m_radius		= 0.f;
-	CRect	m_palette_rect	= { 0, 0, 0, 0 };	// 좌표 계산의 단일 기준
-	CRect	m_preview_rect	= { 0, 0, 0, 0 };	// 선택 색상 미리보기 영역
-	CRect	m_slider_rect	= { 0, 0, 0, 0 };	// ← NEW: 슬라이더 위치 추적
-	CRect	m_edit_area_rect = { 0, 0, 0, 0 };	// ← NEW: 편집 컨트롤 전체 영역
+	CRect	m_r_palette	= { 0, 0, 0, 0 };	// 좌표 계산의 단일 기준
+	CRect	m_r_preview	= { 0, 0, 0, 0 };	// 선택 색상 미리보기 영역
+	CRect	m_r_slider_alpha	= { 0, 0, 0, 0 };	// ← NEW: 슬라이더 위치 추적
+	CRect	m_r_slider_hue	= { 0, 0, 0, 0 };	// ← NEW: Hue 슬라이더 위치 추적
+	CRect	m_r_slider_light	= { 0, 0, 0, 0 };	// ← NEW: 밝기(Value) 슬라이더 위치 추적
+	CRect	m_r_edit_area = { 0, 0, 0, 0 };	// ← NEW: 편집 컨트롤 전체 영역
 
 	// ── 선택 색상 ─────────────────────────────────────────
 	Gdiplus::Color	m_sel_color;
+
+	// ── HSV 상태 (슬라이더 연동용) ────────────────────────
+	float	m_hue = 0.f;	// ← NEW: 색조 0~360
+	float	m_sat = 1.f;	// ← NEW: 채도 0~1
+	float	m_val = 1.f;	// ← NEW: 밝기 0~1
 
 	// ── 최근 색상 ─────────────────────────────────────────
 	std::vector<Gdiplus::Color>	m_recent_colors;
@@ -121,6 +133,8 @@ protected:
 
 	// ── 슬라이더 ──────────────────────────────────────────
 	void					update_slider_alpha();	// 선택 색상에 맞춰 슬라이더 위치·색상 동기화
+	void					update_slider_hue();	// ← NEW
+	void					update_slider_light();	// ← NEW
 
 	// ── 편집 컨트롤 동기화 ────────────────────────────────
 	void					sync_edits();				// ← NEW: m_sel_color → 편집 컨트롤 반영
@@ -128,6 +142,9 @@ protected:
 
 	void					on_btn_add_clicked();							// ← RENAMED: "+" 클릭 → recent 추가
 	HitTarget				find_color(Gdiplus::Color target) const;
+
+	LRESULT					on_message_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);	// ← 슬라이더 이벤트 핸들러
+	LRESULT					on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
@@ -145,9 +162,10 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
-	afx_msg LRESULT on_message_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);	// ← 슬라이더 이벤트 핸들러
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnEnChangeHexa();		// ← NEW
 	afx_msg void OnEnChangeArgb();		// ← NEW
+	virtual void PostNcDestroy();
+	afx_msg void OnDestroy();
 };

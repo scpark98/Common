@@ -138,6 +138,8 @@ public:
 		style_thumb,
 		style_thumb_round,
 		style_thumb_round_alpha,	//색상 선택 시 alpha값 조절 용도로 사용. 트랙 배경에 격자패턴을 깔고 thumb에 alpha를 적용해서 그린다.
+		style_thumb_round_hue,		//hue 그라디언트 트랙 + 둥근 썸
+		style_thumb_round_gradient,	//밝기 선택 그라디언트 트랙 + 둥근 썸
 		style_value,
 		style_progress,
 		style_progress_line,
@@ -185,6 +187,8 @@ public:
 	int		get_upper();
 	void	set_step_completed() { m_step_completed = true; Invalidate(); }
 	int		get_style() { return m_style; }
+	// style_thumb_round_hue / style_thumb_round_gradient: pill 트랙 + 별도 둥근 썸
+	bool	is_round_pill_style() const { return m_style >= style_thumb_round_alpha && m_style <= style_thumb_round_gradient; }
 
 	int32_t	step(int step = 1);
 

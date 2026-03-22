@@ -315,6 +315,7 @@ void			rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
 //r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
 void			hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
 COLORREF		hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
+void			color_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v);
 
 Gdiplus::Color	RGB2gpColor(COLORREF cr, BYTE alpha = 255);
 
@@ -325,6 +326,9 @@ Gdiplus::Color	set_color(Gdiplus::Color &cr, int argb_index, BYTE value);
 //hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)
 COLORREF		get_color(int hue_start, int hue_end, int percent, float saturation = 1.0f, float value = 1.0f);
 int				get_hue(COLORREF cr);
+Gdiplus::Color	get_color(float hue);
+Gdiplus::Color	get_color(float hue, float saturation, float value);
+Gdiplus::Color	lerp_color(Gdiplus::Color a, Gdiplus::Color b, float t);
 
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
 CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = nullptr);

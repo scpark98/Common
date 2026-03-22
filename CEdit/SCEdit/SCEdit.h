@@ -182,6 +182,7 @@ public:
 	Gdiplus::Color	get_border_color() { return m_theme.cr_border; }
 	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; }
 	int				get_border_type() { return m_border_type; }
+	void			set_dark_border_on_focus(bool dark_on_focus = true) { m_dark_border_on_focus = dark_on_focus; }
 
 	// Generated message map functions
 protected:
@@ -199,6 +200,7 @@ protected:
 
 //border
 	bool			m_draw_border = false;
+	bool			m_dark_border_on_focus = false;		//focus일 때 border를 좀 더 진하게 그릴 지 여부. default = false
 	int				m_border_width = 1;	//border width
 	int				m_border_type = border_type_sunken;	//border radius
 	//Gdiplus::Color	m_cr_border = Gdiplus::Color::LightGray;	//border color

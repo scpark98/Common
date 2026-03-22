@@ -493,7 +493,7 @@ uint8_t get_gray_value(uint8_t r, uint8_t g, uint8_t b)
 	int cr = r * 4897 + g * 9617 + b * 1868;
 	//float crf = cr >> 14;	//shift연산의 결과는 정수이므로 이 식은 부정확하다.
 	float crf = (float)(double)cr / pow(2,14);
-	uint8_t gray = ROUND(crf, 0);
+	uint8_t gray = (uint8_t)ROUND(crf, 0);
 	return gray;
 }
 
@@ -667,6 +667,31 @@ COLORREF hsv2rgb(float fH, float fS, float fV)
 	return RGB(r, g, b);
 }
 
+void color_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v)
+{
+	const float r = cr.GetR() / 255.f;
+	const float g = cr.GetG() / 255.f;
+	const float b = cr.GetB() / 255.f;
+
+	const float maxC = max(r, max(g, b));
+	const float minC = min(r, min(g, b));
+	const float delta = maxC - minC;
+
+	v = maxC;
+	s = (maxC > 1e-6f) ? delta / maxC : 0.f;
+
+	if (delta < 1e-6f)
+		h = 0.f;
+	else if (maxC == r)
+		h = 60.f * fmodf((g - b) / delta, 6.f);
+	else if (maxC == g)
+		h = 60.f * ((b - r) / delta + 2.f);
+	else
+		h = 60.f * ((r - g) / delta + 4.f);
+
+	if (h < 0.f) h += 360.f;
+}
+
 //red ~ green 범위에서 37%일때의 색상은? get_color(0, 120, 37); (0:red, 120:green of hue)
 //hue : 0(red), 60(yellow), 120(green), 180(cyan), 240(blue), 300(violet), 360(red)
 COLORREF get_color(int hue_start, int hue_end, int percent, float saturation, float value)
@@ -687,6 +712,56 @@ int	get_hue(COLORREF cr)
 	float h, s, v;
 	rgb2hsv(GetRValue(cr), GetGValue(cr), GetBValue(cr), h, s, v);
 	return (int)h;
+}
+
+Gdiplus::Color	get_color(float hue)
+{
+	hue = fmodf(hue, 360.f);
+	if (hue < 0.f) hue += 360.f;
+	const int   i = static_cast<int>(hue / 60.f) % 6;
+	const float f = hue / 60.f - floorf(hue / 60.f);
+	const float q = 1.f - f;
+	float r, g, b;
+
+	switch (i)
+	{
+		case 0: r = 1.f; g = f;   b = 0.f; break;
+		case 1: r = q;   g = 1.f; b = 0.f; break;
+		case 2: r = 0.f; g = 1.f; b = f;   break;
+		case 3: r = 0.f; g = q;   b = 1.f; break;
+		case 4: r = f;   g = 0.f; b = 1.f; break;
+		case 5: r = 1.f; g = 0.f; b = q;   break;
+		default: r = g = b = 0.f;
+	}
+	return Gdiplus::Color(255,
+		static_cast<BYTE>(r * 255.f + 0.5f),
+		static_cast<BYTE>(g * 255.f + 0.5f),
+		static_cast<BYTE>(b * 255.f + 0.5f));
+}
+
+Gdiplus::Color	get_color(float hue, float saturation, float value)
+{
+	hue = fmodf(hue, 360.f);
+	if (hue < 0.f) hue += 360.f;
+
+	Clamp(saturation, 0.f, 1.f);
+	Clamp(value, 0.f, 1.f);
+
+	int r, g, b;
+	hsv2rgb(hue, saturation, value, r, g, b);
+
+	return Gdiplus::Color(255,
+		static_cast<BYTE>(r),
+		static_cast<BYTE>(g),
+		static_cast<BYTE>(b));
+}
+
+Gdiplus::Color lerp_color(Gdiplus::Color a, Gdiplus::Color b, float t)
+{
+	return Gdiplus::Color(255,
+		static_cast<BYTE>(static_cast<int>(a.GetR()) + static_cast<int>((static_cast<int>(b.GetR()) - static_cast<int>(a.GetR())) * t + 0.5f)),
+		static_cast<BYTE>(static_cast<int>(a.GetG()) + static_cast<int>((static_cast<int>(b.GetG()) - static_cast<int>(a.GetG())) * t + 0.5f)),
+		static_cast<BYTE>(static_cast<int>(a.GetB()) + static_cast<int>((static_cast<int>(b.GetB()) - static_cast<int>(a.GetB())) * t + 0.5f)));
 }
 
 COLORREF gpColor2RGB(Gdiplus::Color cr)

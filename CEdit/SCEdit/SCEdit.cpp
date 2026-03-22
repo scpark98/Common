@@ -137,6 +137,9 @@ void CSCEdit::reconstruct_font()
 	//따라서 고정시켜서는 안된다.
 	//m_lf.lfQuality = DEFAULT_QUALITY;
 	//m_lf.lfQuality = ANTIALIASED_QUALITY;
+
+	m_lf.lfWidth = 0;
+
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	CEdit::SetFont(&m_font, TRUE);
@@ -703,11 +706,17 @@ void CSCEdit::OnNcPaint()
 
 void CSCEdit::update_ctrl()
 {
+	if (!m_hWnd)
+		return;
+
 	if (!m_transparent)
 		return;
 	
 	CWnd* pParent = GetParent();
 	CRect rect;
+
+	if (!pParent || !pParent->m_hWnd)
+		return;
 
 	GetWindowRect(rect);
 	pParent->ScreenToClient(rect);
@@ -745,9 +754,19 @@ void CSCEdit::update_ctrl()
 BOOL CSCEdit::OnEnKillfocus()
 {
 	TRACE(_T("OnEnKillfocus\n"));
-	update_ctrl();
+
+	if (m_transparent)
+	{
+		update_ctrl();
+	}
+	else
+	{
+		if (m_dark_border_on_focus)
+			Invalidate();
+	}
+
 	draw_dim_text();
-	//::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)this, (LPARAM)WM_KILLFOCUS);
+
 	CWnd* parent = GetParent();
 	if (parent && parent->m_hWnd)
 	{
@@ -790,7 +809,6 @@ BOOL CSCEdit::OnEnSetfocus()
 }
 
 
-#if 1
 BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
@@ -822,6 +840,9 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	{
 		cr_back = m_cr_button_back_down;
 	}
+
+	if (m_dark_border_on_focus && (GetFocus() == this))
+		cr_border = Gdiplus::Color::Black;// get_color(m_theme.cr_border, -32);
 
 	/*
 	if (m_action_button)
@@ -863,7 +884,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	}
 	*/
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
-	draw_rect(g, rc, (m_draw_border ? m_theme.cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
+	draw_rect(g, rc, (m_draw_border ? cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
 	//draw_round_rect(&g, CRect_to_gpRect(rc), (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, rc.Height()/2, m_border_width);
 
 	//pDC->SetBkMode(TRANSPARENT);
@@ -871,65 +892,6 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	return FALSE;
 	return CEdit::OnEraseBkgnd(pDC);
 }
-#else
-BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
-{
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	CRect rc;
-	Gdiplus::Color cr_back = Gdiplus::Color::Red;// m_cr_back;
-	Gdiplus::Color cr_border = m_cr_border;
-
-	GetClientRect(rc);
-	Gdiplus::Graphics g(pDC->GetSafeHdc());
-	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-
-	if (m_action_button)
-		rc.left = rc.right - m_sz_action_button.cx;
-
-	CMemoryDC dc(pDC, &rc);
-	//pDC = &dc;
-	/*
-	if (!IsWindowEnabled())
-	{
-		cr_back = gRGB(192, 192, 192);
-	}
-	else if (GetStyle() & ES_READONLY)
-	{
-		cr_back = gRGB(255, 192, 192);
-	}
-	else if (m_action_button_down)
-	{
-		cr_back = m_cr_button_back_down;
-	}
-	*/
-	if (m_action_button)
-	{
-		Gdiplus::Pen pen(IsWindowEnabled() ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::Gray, 2.0F);
-
-		CPoint cp = rc.CenterPoint();
-
-		//검색일 경우 돋보기 이미지를 그려준다.
-		if (m_action_button == action_find)
-		{
-			if (m_action_button_down)
-				cp.Offset(1, 1);
-
-			int size = 12;
-			CRect r = make_center_rect(cp.x, cp.y, size, size);
-			r.OffsetRect(-2, -2);
-			g.DrawEllipse(&pen, CRect_to_gpRect(r));
-			g.DrawLine(&pen, cp.x + 2, cp.y + 2, cp.x + 7, cp.y + 7);
-		}
-	}
-
-	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
-	//또한 IsWindowEnabled(), ES_READONLY에 따라 배경색이 달라진다.
-	draw_rect(g, rc, (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, m_border_width);
-
-	return FALSE;
-	return CEdit::OnEraseBkgnd(pDC);
-}
-#endif
 
 void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
 {

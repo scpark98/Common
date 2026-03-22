@@ -99,7 +99,7 @@ void CSCSliderCtrl::OnPaint()
 	//실제 그려지는 게이지 영역은 thumb_size/2씩 좌우에서 빼야 한다.
 	CRect rtrack = m_rc;
 
-	if (m_style <= style_thumb_round_alpha)
+	if (m_style <= style_thumb_round_alpha || is_round_pill_style())
 	{
 		if (m_is_vertical)
 		{
@@ -107,9 +107,9 @@ void CSCSliderCtrl::OnPaint()
 		}
 		else
 		{
-			// style_thumb_round_alpha: rtrack 전체가 곧 시각적 트랙이므로
-			// m_track_thick 대신 m_track_height로 높이를 결정한다
-			const int track_h = (m_style == style_thumb_round_alpha) ? m_track_height : m_track_thick;
+			// style_thumb_round_alpha / hue / gradient: rtrack 전체가 큰 썸이므로
+			// m_track_thick 대신 m_track_height의 높이를 사용한다
+			const int track_h = (is_round_pill_style() ? m_track_height : m_track_thick);
 			rtrack.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - track_h) / 2);
 		}
 	}
@@ -149,7 +149,7 @@ void CSCSliderCtrl::OnPaint()
 
 
 	//inactive 영역을 먼저 그리고
-	if (m_style <= style_value && m_style != style_thumb_round_alpha)  // ← 조건 추가)
+	if (m_style <= style_value && !is_round_pill_style())
 	{
 		//tic text가 표시되는 경우에는 gap + m_thumb.cy + 4 + text_height(12) 만큼이 센터에 위치하도록 보정해준다.
 		if (m_tic_show_text)
@@ -226,6 +226,65 @@ void CSCSliderCtrl::OnPaint()
 			Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
 			g.DrawPath(&track_border, &track_path);
 		}
+	}
+	else if (m_style == style_thumb_round_hue)	// ← NEW: 무지개 hue 그라디언트
+	{
+		const Gdiplus::RectF track_rf(
+			static_cast<Gdiplus::REAL>(rtrack.left),
+			static_cast<Gdiplus::REAL>(rtrack.top),
+			static_cast<Gdiplus::REAL>(rtrack.Width()),
+			static_cast<Gdiplus::REAL>(rtrack.Height())
+		);
+
+		Gdiplus::GraphicsPath track_path;
+		get_round_rect_path(&track_path,
+			Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()),
+			static_cast<float>(rtrack.Height()) * 0.5f, 1);
+
+		// 무지개 그라디언트 (7개 색 정지점)
+		Gdiplus::LinearGradientBrush grad(
+			Gdiplus::PointF(track_rf.X, track_rf.Y),
+			Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
+			Gdiplus::Color::Red, Gdiplus::Color::Red);
+
+		Gdiplus::Color hue_colors[] = {
+			Gdiplus::Color(255, 255,   0,   0),  // 0°   Red
+			Gdiplus::Color(255, 255, 255,   0),  // 60°  Yellow
+			Gdiplus::Color(255,   0, 255,   0),  // 120° Green
+			Gdiplus::Color(255,   0, 255, 255),  // 180° Cyan
+			Gdiplus::Color(255,   0,   0, 255),  // 240° Blue
+			Gdiplus::Color(255, 255,   0, 255),  // 300° Magenta
+			Gdiplus::Color(255, 255,   0,   0),  // 360° Red (wrap)
+		};
+		Gdiplus::REAL positions[] = { 0.f, 1.f / 6.f, 2.f / 6.f, 3.f / 6.f, 4.f / 6.f, 5.f / 6.f, 1.f };
+		grad.SetInterpolationColors(hue_colors, positions, 7);
+		g.FillPath(&grad, &track_path);
+
+		Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
+		g.DrawPath(&track_border, &track_path);
+	}
+	else if (m_style == style_thumb_round_gradient)	// ← NEW: cr_inactive→cr_active 2색 그라디언트
+	{
+		const Gdiplus::RectF track_rf(
+			static_cast<Gdiplus::REAL>(rtrack.left),
+			static_cast<Gdiplus::REAL>(rtrack.top),
+			static_cast<Gdiplus::REAL>(rtrack.Width()),
+			static_cast<Gdiplus::REAL>(rtrack.Height())
+		);
+
+		Gdiplus::GraphicsPath track_path;
+		get_round_rect_path(&track_path,
+			Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()),
+			static_cast<float>(rtrack.Height()) * 0.5f, 1);
+
+		Gdiplus::LinearGradientBrush grad(
+			Gdiplus::PointF(track_rf.X, track_rf.Y),
+			Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
+			cr_inactive, cr_active);
+		g.FillPath(&grad, &track_path);
+
+		Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
+		g.DrawPath(&track_border, &track_path);
 	}
 	else if (m_style == style_progress)
 	{
@@ -370,7 +429,7 @@ void CSCSliderCtrl::OnPaint()
 
 	//경과된 영역(active area) 표시
 #if 1
-	if (m_style <= style_value && m_style != style_thumb_round_alpha)
+	if (m_style <= style_value && !is_round_pill_style())
 	{
 		//tic text가 표시되는 경우에는 m_thumb.cy + 2(gap) + text_height(10) 만큼이 센터에 위치하도록 보정해준다.
 		if (m_tic_show_text)
@@ -609,8 +668,7 @@ void CSCSliderCtrl::OnPaint()
 	}
 
 	// 손잡이(thumb)를 그린다
-#if 1
-	if (!m_thumb_hide && m_style <= style_value)
+	if (!m_thumb_hide && (m_style <= style_value || is_round_pill_style()))	// ← 새 스타일 포함
 	{
 		CRect	rThumb = make_center_rect(pxpos, rtrack.CenterPoint().y, m_thumb.cx, m_thumb.cy);
 
@@ -665,24 +723,43 @@ void CSCSliderCtrl::OnPaint()
 			g.FillEllipse(&brush_outer, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()));
 			g.FillEllipse(&brush_inner, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()));
 		}
-		else if (m_style == style_thumb_round_alpha)
+		else if (is_round_pill_style())
 		{
+			//제일 바깥쪽 테두리 원. 1을 줄이고 2두께로 그리는 것은 선과 선사이 공백이 나타나므로 겹치도록 그리기 위함.
 			rThumb.DeflateRect(1, 1);
-
-			//회색 윤곽선
-			g.DrawEllipse(&Gdiplus::Pen(Gdiplus::Color(255, 160, 160, 160), 1.0f),
+			g.DrawEllipse(&Gdiplus::Pen(Gdiplus::Color(255, 160, 160, 160), 2.0f),
 				rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height());
 
-			//1픽셀 줄여서 흰색 윤곽선
+			//그 다음 테두리 원
 			rThumb.DeflateRect(1, 1);
-			g.DrawEllipse(&Gdiplus::Pen(Gdiplus::Color(255, 232, 232, 232), 2.0f),
+			g.DrawEllipse(&Gdiplus::Pen(Gdiplus::Color(255, 232, 232, 232), 3.0f),
 				rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height());
 
-			//현재 색상으로 내부 칠하기
+			// ③ 스타일별 내부 채우기 색상 결정
 			rThumb.DeflateRect(2, 2);
-			const BYTE cur_alpha = static_cast<BYTE>(max(0, min(255, pos)));
-			const Gdiplus::Color cr_inner(cur_alpha, cr_active.GetR(), cr_active.GetG(), cr_active.GetB());
-			g.FillEllipse(&Gdiplus::SolidBrush(cr_inner),
+
+			Gdiplus::Color cr_fill;
+			if (m_style == style_thumb_round_alpha)
+			{
+				// 현재 pos = alpha 값 (0~255)
+				const BYTE cur_alpha = static_cast<BYTE>(max(0, min(255, pos)));
+				cr_fill = Gdiplus::Color(cur_alpha, cr_active.GetR(), cr_active.GetG(), cr_active.GetB());
+			}
+			else if (m_style == style_thumb_round_hue)
+			{
+				// 현재 hue 위치의 순색
+				cr_fill = get_color(static_cast<float>(pos));
+			}
+			else  // style_thumb_round_gradient
+			{
+				// cr_inactive ~ cr_active 선형 보간
+				const float t = (upper > lower)
+					? static_cast<float>(pos - lower) / static_cast<float>(upper - lower)
+					: 0.f;
+				cr_fill = lerp_color(cr_inactive, cr_active, t);
+			}
+
+			g.FillEllipse(&Gdiplus::SolidBrush(cr_fill),
 				rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height());
 		}
 		else if (m_style == style_value)
@@ -797,7 +874,7 @@ void CSCSliderCtrl::OnPaint()
 		font_bracket.DeleteObject();
 		dc.SelectObject(pOldFont);
 	}
-#endif
+
 	// 포커스 사각형을 그린다
 	if(m_draw_focus_rect && m_has_focus && !IsWindowEnabled())
 	{
@@ -835,27 +912,28 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	int lower = GetRangeMin();
 	int upper = GetRangeMax();
 
+	const bool use_thumb_offset = (m_style <= style_value || is_round_pill_style());	// ← 수정
+
 	if (upper == lower)
-		return (m_style <= style_value ? m_thumb.cx / 2 : 0);
+		return (use_thumb_offset ? m_thumb.cx / 2 : 0);
 
 	if (m_is_vertical)
 	{
 		return
 			m_margin.top + m_thumb.cy / 2 +
 			(int)(
-			(double)(m_rc.Height() - m_margin.top - m_margin.bottom - m_thumb.cy) *
-			((double)(nPos - lower) / (double)(upper - lower))
-			);
-
+				(double)(m_rc.Height() - m_margin.top - m_margin.bottom - m_thumb.cy) *
+				((double)(nPos - lower) / (double)(upper - lower))
+				);
 	}
 	else
 	{
-		return 
-			m_margin.left + (m_style <= style_value ? m_thumb.cx / 2 : 0) +
+		return
+			m_margin.left + (use_thumb_offset ? m_thumb.cx / 2 : 0) +
 			(int)(
-			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= style_value ? m_thumb.cx : 0)) *
-			((double)(nPos - lower) / (double)(upper - lower))
-			);
+				(double)(m_rc.Width() - m_margin.left - m_margin.right - (use_thumb_offset ? m_thumb.cx : 0)) *
+				((double)(nPos - lower) / (double)(upper - lower))
+				);
 	}
 }
 
@@ -867,12 +945,14 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 	int upper = GetRangeMax();
 	int pos;
 
-	if(m_is_vertical)
+	const bool use_thumb_offset = (m_style <= style_value || is_round_pill_style());	// ← 수정
+
+	if (m_is_vertical)
 	{
 		pos = int(
 			lower +
-			(double)(nPixel - m_margin.top - (double)m_thumb.cy/2.0) /
-			(double)(m_rc.Height() - m_margin.bottom - m_margin.top - (m_style <= style_value ? m_thumb.cy : 0)) *
+			(double)(nPixel - m_margin.top - (double)m_thumb.cy / 2.0) /
+			(double)(m_rc.Height() - m_margin.bottom - m_margin.top - (use_thumb_offset ? m_thumb.cy : 0)) *
 			(double)(upper - lower)
 			);
 		Clamp(pos, lower, upper);
@@ -881,8 +961,8 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 	{
 		pos = int(
 			lower +
-			(double)(nPixel - m_margin.left - (m_style <= style_value ? m_thumb.cx/2 : 0)) /
-			(double)(m_rc.Width() - m_margin.left - m_margin.right - (m_style <= style_value ? m_thumb.cx : 0)) *
+			(double)(nPixel - m_margin.left - (use_thumb_offset ? m_thumb.cx / 2 : 0)) /
+			(double)(m_rc.Width() - m_margin.left - m_margin.right - (use_thumb_offset ? m_thumb.cx : 0)) *
 			(double)(upper - lower)
 			);
 		Clamp(pos, lower, upper);
@@ -1288,18 +1368,6 @@ BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class 
 	if (pMsg->message == WM_KEYDOWN && IsWindowVisible())
 	{
-		switch (pMsg->wParam)
-		{
-			//case VK_LEFT:
-			//case VK_DOWN:
-			//	step(-1);
-			//	return TRUE;
-			//case VK_RIGHT:
-			//case VK_UP:
-			//	step(1);
-			//	return TRUE;
-		}
-
 		return FALSE;
 	}
 
@@ -1376,7 +1444,7 @@ void CSCSliderCtrl::set_style(int nStyle)
 		m_thumb = CSize(16, 16);
 		m_track_height = 2;
 	}
-	else if (m_style == style_thumb_round_alpha)
+	else if (is_round_pill_style())
 	{
 		m_thumb = CSize(24, 24);
 		m_track_height = 12;

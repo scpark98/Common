@@ -106,8 +106,8 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 	// → UIAutomation이 즉시 추적을 시작하여 DestroyWindow 시점에 충돌하는 현상 방지.
 	const DWORD dwExStyle = NULL;// WS_EX_TOOLWINDOW;
 	DWORD dwStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN;
-	if (!as_modal)
-		dwStyle |= WS_VISIBLE;	// modeless 경로: 생성 즉시 표시
+	//if (!as_modal)
+	//	dwStyle |= WS_VISIBLE;	// modeless 경로: 생성 즉시 표시
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
@@ -120,6 +120,7 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 		return false;
 
 	SetWindowText(title);
+	CenterWindow(m_parent);
 	calc_layout();
 	load_recent_colors();	// ← modeless 경로: create()에서 직접 로드
 
@@ -359,6 +360,8 @@ void CSCColorPicker::calc_layout()
 	{
 		m_slider_value.MoveWindow(m_r_slider_value);
 	}
+
+	m_initialized = true;
 }
 
 // m_sel_color → 편집 컨트롤에 반영 (무한 루프 방지 플래그 포함)
@@ -438,6 +441,16 @@ void CSCColorPicker::sync_edits()
 		m_edit_color_name.GetWindowText(curText);
 		if (wname.CompareNoCase(curText) != 0)
 			m_edit_color_name.SetWindowText(wname);
+	}
+
+	// ── modeless 모드: 색상 변경 시 parent에게 알림 ──────────────────
+	if (!m_as_modal && m_initialized)
+	{
+		if (m_parent && ::IsWindow(m_parent->m_hWnd))
+		{
+			CSCColorPickerMessage msg(this, m_sel_color);
+			m_parent->SendMessage(Message_CSCColorPicker, (WPARAM)&msg,	(LPARAM)this);
+		}
 	}
 
 	m_edit_syncing = false;

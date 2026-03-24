@@ -1,5 +1,38 @@
-﻿//Test project	: https://github.com/scpark98/Test_CSCColorPicker.git
-//Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
+﻿/*
+Test project : https://github.com/scpark98/Test_CSCColorPicker.git
+Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
+
+[usage]
+	Common\CDialog\CSCColorPicker 폴더의 4개 파일을 프로젝트에 추가.
+
+	//사용하는 cpp에 include (modeless로 사용한다면 h에서)
+	#include "Common/CDialog/CSCColorPicker/SCColorPicker.h"
+
+	//modeless로 사용한다면 h에서 include 및 멤버변수 선언 필요
+	CSCColorPicker picker;
+
+	* Modal 방식으로 사용하려면 해당 블록에서 선언 및 DoModal() 호출.
+	//타이틀과 초기 색상 지정은 옵션. Transparent로 주면 맨 마지막 선택했던 색상으로 시작
+	if (picker.DoModal([op]_T("Color Picker"), [op]Gdiplus::Color::Transparent) == IDCANCEL)
+		return;
+	Gdiplus::Color cr = picker.get_selected_color();
+
+	* Modeless 방식으로 사용 예.
+	ON_REGISTERED_MESSAGE(Message_CSCColorPicker, &CTestCSCColorPickerDlg::on_message_CSCColorPicker)
+
+	//in OnInitDialog()
+	m_color_picker.create(this, _T("Color Picker"), false);
+
+	//message handler
+	LRESULT CTestCSCColorPickerDlg::on_message_CSCColorPicker(WPARAM wParam, LPARAM lParam)
+	{
+		auto msg = (CSCColorPickerMessage*)wParam;
+		m_cr_back = msg->cr_selected;
+		Invalidate();
+		return 0;
+	}
+*/
+
 #pragma once
 
 #include "afxwin.h"
@@ -9,6 +42,28 @@
 #include "../../colors.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include "../../CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
+
+static const UINT Message_CSCColorPicker = ::RegisterWindowMessage(_T("MessageString_CSCColorPicker"));
+
+class CSCColorPicker;
+
+class CSCColorPickerMessage
+{
+public:
+	CSCColorPickerMessage(CSCColorPicker* _pThis, Gdiplus::Color _cr_selected)
+	{
+		pThis = _pThis;
+		cr_selected = _cr_selected;
+	}
+
+	enum Messages
+	{
+		message_color_changed = 1,
+	};
+
+	CSCColorPicker* pThis = NULL;
+	Gdiplus::Color cr_selected;
+};
 
 
 // CSCColorPicker 대화 상자
@@ -122,6 +177,9 @@ protected:
 
 	// ── 선택 색상 ─────────────────────────────────────────
 	Gdiplus::Color	m_sel_color;
+
+	//맨 처음 실행 시 calc_layout() 후 sync_edits()에서는 parent에게 메시지를 보낼 필요가 없으므로 처음 실행임을 판별하기 위해.
+	bool	m_initialized = false;
 
 	// ── HSV 상태 (슬라이더 연동용) ────────────────────────
 	float	m_hue = 0.f;	// ← NEW: 색조 0~360

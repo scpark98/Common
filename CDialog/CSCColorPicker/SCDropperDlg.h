@@ -14,7 +14,7 @@ public:
 		kWndSizeMax = 500,          // Ctrl+wheel max
 		kWndSizeStep = 20,          // Ctrl+wheel step
 		kTimerID = 1,
-		kSampleMin = 3,             // zoom in limit (odd)
+		kSampleMin = 9,             // zoom in limit (odd). 현재 dropper 창에 kSampleMin x kSampleMin 개의 셀이 표시된다.
 		kSampleDefault = 15         // default sample count (odd)
 	};
 

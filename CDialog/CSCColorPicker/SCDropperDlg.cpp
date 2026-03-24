@@ -134,17 +134,13 @@ void CSCDropperDlg::update_display()
 
 	BITMAPINFOHEADER bih = { sizeof(bih), m_sample, -m_sample, 1, 32, BI_RGB };
 	BYTE* pCapBits = nullptr;
-	HBITMAP hCapDib = ::CreateDIBSection(
-		nullptr, (BITMAPINFO*)&bih, DIB_RGB_COLORS, (void**)&pCapBits, nullptr, 0);
+	HBITMAP hCapDib = ::CreateDIBSection(nullptr, (BITMAPINFO*)&bih, DIB_RGB_COLORS, (void**)&pCapBits, nullptr, 0);
 	HDC hCapDC = ::CreateCompatibleDC(nullptr);
 	HBITMAP hOldCap = (HBITMAP)::SelectObject(hCapDC, hCapDib);
 
-	::BitBlt(hCapDC, 0, 0, m_sample, m_sample,
-		m_hScreenDC, srcX, srcY, SRCCOPY);
+	::BitBlt(hCapDC, 0, 0, m_sample, m_sample, m_hScreenDC, srcX, srcY, SRCCOPY);
 
-	m_center_color = ::GetPixel(m_hScreenDC,
-		cursor.x - m_screen_origin.x,
-		cursor.y - m_screen_origin.y);
+	m_center_color = ::GetPixel(m_hScreenDC, cursor.x - m_screen_origin.x, cursor.y - m_screen_origin.y);
 
 	::SelectObject(hCapDC, hOldCap);
 	::DeleteDC(hCapDC);
@@ -156,8 +152,7 @@ void CSCDropperDlg::update_display()
 
 	Gdiplus::Bitmap content(ws, ws, PixelFormat32bppPARGB);
 	{
-		Gdiplus::Bitmap capBmp(m_sample, m_sample, m_sample * 4,
-			PixelFormat32bppPARGB, pCapBits);
+		Gdiplus::Bitmap capBmp(m_sample, m_sample, m_sample * 4, PixelFormat32bppPARGB, pCapBits);
 
 		Gdiplus::Graphics cg(&content);
 		cg.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);

@@ -927,8 +927,6 @@ void CSCColorPicker::on_btn_dropper_clicked()
 
 	ShowWindow(SW_HIDE);
 
-	//while (IsWindowVisible())
-	//	Wait(100);
 	// (2) 메시지 펌프: 윈도우 매니저가 SW_HIDE를 완전히 처리하고
 	//     DWM에 "합성 표면 제거" 통보를 전달할 수 있도록 대기
 	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -943,15 +941,14 @@ void CSCColorPicker::on_btn_dropper_clicked()
 	}
 
 	// (3) DwmFlush 2회:
-	//     1회차 - DWM이 제거 통보를 수신하고 새 프레임 합성 시작
-	//     2회차 - 컬러피커가 제외된 프레임이 실제 표시 완료됨을 보장
-	DwmFlush();
-	DwmFlush();
+	DwmFlush();	//1회차 - DWM이 제거 통보를 수신하고 새 프레임 합성 시작
+	DwmFlush();	//2회차 - 컬러피커가 제외된 프레임이 실제 표시 완료됨을 보장
 
 	// ② CSCDropperDlg 생성 (CWnd-derived: DoModal() 대신 create() + 메시지 루프)
 	CSCDropperDlg dlg;
 	dlg.create(this);
 
+	//위에서 SW_HIDE 후 DwmFlush()를 2회 해줘도 여전히 color picker창이 숨겨지지 않은 채 화면이 캡처되어 SetWindowDisplayAffinity()를 사용함.
 	if (!dlg.GetSafeHwnd())    // create() 내부 CreateEx 실패 시
 	{
 		::SetWindowDisplayAffinity(m_hWnd, WDA_NONE);

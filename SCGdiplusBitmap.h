@@ -86,6 +86,9 @@ static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("Message
 
 //Gdiplus 초기화 과정을 자동으로 하기 위해 CGdiplusDummyForInitialization 클래스를 선언하고
 //GdiplusBitmap.cpp의 맨 위에서 static 인스턴스를 선언함.
+//단, 이렇게 하면 초기화, 해제가 편하지만
+//MFC의 누수 검출(_AFX_DEBUG_STATE::~_AFX_DEBUG_STATE())이 이 정적 소멸자보다 먼저 실행되면, GDI+ 내부 할당이 모두 "누수"로 표시되는 문제가 있다(false positive)
+//만약 이를 해결하려면 모든 app마다 InitInstance(), ExitInstance()에서 Gdiplus 초기화/해제 코드를 매번 넣어줘야 하는 불편함이 있다.
 class CGdiplusDummyForInitialization
 {
 public:

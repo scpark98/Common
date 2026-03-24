@@ -176,82 +176,83 @@ public:
 	//즉, border width는 m_border_width 값이 사용된다.
 	//border를 해제하기 위해 set_draw_border(false);를 호출하면 border를 그리지 않을 뿐 기본 설정값들은 유지된다.
 	//다시 border를 그리기 위해 set_draw_border();를 호출하면 전에 설정된 세팅값대로 그릴 수 있다.
-	void			set_draw_border(bool draw = true, int border_width = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, int border_type = border_type_disregard);
-	bool			get_draw_border() { return m_draw_border; }
-	int				get_border_width() { return m_border_width; }
-	Gdiplus::Color	get_border_color() { return m_theme.cr_border; }
-	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; }
-	int				get_border_type() { return m_border_type; }
-	void			set_dark_border_on_focus(bool dark_on_focus = true) { m_dark_border_on_focus = dark_on_focus; }
+	void				set_draw_border(bool draw = true, int border_width = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, int border_type = border_type_disregard);
+	bool				get_draw_border() { return m_draw_border; }
+	int					get_border_width() { return m_border_width; }
+	Gdiplus::Color		get_border_color() { return m_theme.cr_border; }
+	void				set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; }
+	int					get_border_type() { return m_border_type; }
+	void				set_dark_border_on_focus(bool dark_on_focus = true) { m_dark_border_on_focus = dark_on_focus; }
 
 	// Generated message map functions
 protected:
-	bool			m_transparent = false;
+	bool				m_transparent = false;
 
 	//create()으로 동적 생성했는지, 일반 dlg 등에서 정적으로 생성했는지에 따라
 	//일부 메시지(ex. VK_RETURN)의 처리방식이 달라지므로 이를 구분하기 위한 플래그.
-	bool			m_is_dynamic_control = false;
+	//default = false. create()이 호출되면 true로 자동 변경됨.
+	bool				m_is_dynamic_control = false;
 
 //vertical align
 	//vertical align이므로 DT_CENTER가 아닌 DT_VCENTER로 줘야 한다.
 	//단, 한줄이 아닌 여러줄을 입력하기 위한 CEdit일 경우는 DT_TOP으로 시작되어야 한다.
 	//여러줄이고 DT_VCENTER일 경우 어디가 입력필드이고 어디가 여백인지가 애매하다.
-	DWORD			m_valign = DT_TOP;
+	DWORD				m_valign = DT_TOP;
 
 //border
-	bool			m_draw_border = false;
-	bool			m_dark_border_on_focus = false;		//focus일 때 border를 좀 더 진하게 그릴 지 여부. default = false
-	int				m_border_width = 1;	//border width
-	int				m_border_type = border_type_sunken;	//border radius
+	bool				m_draw_border = false;
+	bool				m_dark_border_on_focus = false;		//focus일 때 border를 좀 더 진하게 그릴 지 여부. default = false
+	int					m_border_width = 1;	//border width
+	int					m_border_type = border_type_sunken;	//border radius
 	//Gdiplus::Color	m_cr_border = Gdiplus::Color::LightGray;	//border color
 
 	//editbox의 오른쪽에 액션버튼을 표시하여 특정 기능을 실행할 수 있다.
 	//ex)돋보기 그림을 그려주고 클릭하면 검색으로 사용
-	int				m_action_button = 0;
-	bool			m_action_button_down = false;
-	Gdiplus::Color	m_cr_button_back;
-	Gdiplus::Color	m_cr_button_back_hover;
-	Gdiplus::Color	m_cr_button_back_down;
+	int					m_action_button = 0;
+	bool				m_action_button_down = false;
+	Gdiplus::Color		m_cr_button_back;
+	Gdiplus::Color		m_cr_button_back_hover;
+	Gdiplus::Color		m_cr_button_back_down;
 
 //dim text
-	CString			m_dim_text;
-	Gdiplus::Color	m_cr_dim_text = Gdiplus::Color::LightGray;
-	DWORD			m_dwStyle;
-	void			draw_dim_text();
+	CString				m_dim_text;
+	Gdiplus::Color		m_cr_dim_text = Gdiplus::Color::LightGray;
+	DWORD				m_dwStyle;
+	void				draw_dim_text();
 
 
 	//
-	CSize			m_sz_action_button;
+	CSize				m_sz_action_button;
 	//마우스가 액션버튼내에 있는지 판별
-	bool			mouse_in_action_button(CPoint pt = CPoint(0, 0));
+	bool				mouse_in_action_button(CPoint pt = CPoint(0, 0));
 
 
 	//Gdiplus::Color	m_cr_text;
 	//Gdiplus::Color	m_cr_back;
-	Gdiplus::Color	m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
-	Gdiplus::Color	m_cr_back_disabled = Gdiplus::Color::LightGray;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
+	Gdiplus::Color		m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
+	Gdiplus::Color		m_cr_back_disabled = Gdiplus::Color::LightGray;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
 
 	//readonly일 때 m_cr_back_readonly를 사용할 지 지정된 배경인 m_cr_back을 사용할 지.
 	//때로는 readonly일 때도 m_cr_back으로 표현해야 하는 경우도 있다.
 	//default = true
-	bool			m_use_readonly_color = true;
-	Gdiplus::Color	m_cr_back_readonly = get_sys_color(COLOR_3DFACE);
+	bool				m_use_readonly_color = true;
+	Gdiplus::Color		m_cr_back_readonly = get_sys_color(COLOR_3DFACE);
 
-	CBrush			m_br_back;
-	CBrush			m_br_back_disabled;
+	CBrush				m_br_back;
+	CBrush				m_br_back_disabled;
 
 
-	LOGFONT			m_lf;
-	CFont			m_font;
-	int				m_font_size;
-	bool			m_auto_resize_font;	//default = false
-	double			m_auto_resize_ratio;
-	int				m_default_height;
-	void			reconstruct_font();
-	void			update_ctrl();
+	LOGFONT				m_lf;
+	CFont				m_font;
+	int					m_font_size;
+	bool				m_auto_resize_font;	//default = false
+	double				m_auto_resize_ratio;
+	int					m_default_height;
+	void				reconstruct_font();
+	void				update_ctrl();
 
-	CRect			m_rect_NCbottom;
-	CRect			m_rect_NCtop;
+	CRect				m_rect_NCbottom;
+	CRect				m_rect_NCtop;
 
 	//{{AFX_MSG(CSCEdit)
 	afx_msg HBRUSH CtlColor(CDC* pDC, UINT nCtlColor); // This Function Gets Called Every Time Your Window Gets Redrawn.

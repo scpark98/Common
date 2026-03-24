@@ -110,7 +110,12 @@ void CSCSliderCtrl::OnPaint()
 			// style_thumb_round_alpha / hue / gradient: rtrack 전체가 큰 썸이므로
 			// m_track_thick 대신 m_track_height의 높이를 사용한다
 			const int track_h = (is_round_pill_style() ? m_track_height : m_track_thick);
-			rtrack.DeflateRect(m_thumb.cx / 2, (m_rc.Height() - track_h) / 2);
+			// is_round_pill_style(): 트랙이 컨트롤 전체 너비를 사용한다.
+			// → lower에서 thumb.left == track.left == 0
+			// → upper에서 thumb.right == track.right == rc.Width()
+			// Pos2Pixel/Pixel2Pos는 use_thumb_offset=true로 이미 올바르게 처리되므로 변경 불필요.
+			const int h_margin = is_round_pill_style() ? 0 : m_thumb.cx / 2;
+			rtrack.DeflateRect(h_margin, (m_rc.Height() - track_h) / 2);
 		}
 	}
 
@@ -185,7 +190,6 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_thumb_round_alpha)  // ← 신규 블록
 	{
-		// ── 트랙: pill-shape, 체커보드 + alpha 그라디언트 ──────────
 		const Gdiplus::RectF track_rf(
 			static_cast<Gdiplus::REAL>(rtrack.left),
 			static_cast<Gdiplus::REAL>(rtrack.top),
@@ -193,21 +197,24 @@ void CSCSliderCtrl::OnPaint()
 			static_cast<Gdiplus::REAL>(rtrack.Height())
 		);
 
-		// 양 끝이 반원인 pill 경로
 		Gdiplus::GraphicsPath track_path;
 		get_round_rect_path(&track_path,
 			Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()),
 			static_cast<float>(rtrack.Height()) * 0.5f, 1);
 
-		// ① 체커보드: 투명 영역 시각화
-		g.SetClip(&track_path);
+		// rtrack 범위로 clip: fill/border의 antialiasing bleed 방지
+		g.SetClip(Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()));
+
+		// ① 체커보드: rect clip과 path clip의 교집합으로 pill 형태 유지
 		{
+			Gdiplus::GraphicsState state = g.Save();
+			g.SetClip(&track_path, Gdiplus::CombineModeIntersect);
 			Gdiplus::TextureBrush tb(CSCGdiplusBitmap::checker_bmp(5), Gdiplus::WrapModeTile);
 			g.FillRectangle(&tb,
 				track_rf.X - 1.f, track_rf.Y - 1.f,
 				track_rf.Width + 2.f, track_rf.Height + 2.f);
+			g.Restore(state);	// rect clip으로 복원
 		}
-		g.ResetClip();
 
 		// ② 좌(투명) → 우(불투명) 선형 그라디언트
 		{
@@ -226,6 +233,8 @@ void CSCSliderCtrl::OnPaint()
 			Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
 			g.DrawPath(&track_border, &track_path);
 		}
+
+		g.ResetClip();
 	}
 	else if (m_style == style_thumb_round_hue)	// ← NEW: 무지개 hue 그라디언트
 	{
@@ -241,20 +250,22 @@ void CSCSliderCtrl::OnPaint()
 			Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()),
 			static_cast<float>(rtrack.Height()) * 0.5f, 1);
 
-		// 무지개 그라디언트 (7개 색 정지점)
+		// rtrack 범위로 clip
+		g.SetClip(Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()));
+
 		Gdiplus::LinearGradientBrush grad(
 			Gdiplus::PointF(track_rf.X, track_rf.Y),
 			Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
 			Gdiplus::Color::Red, Gdiplus::Color::Red);
 
 		Gdiplus::Color hue_colors[] = {
-			Gdiplus::Color(255, 255,   0,   0),  // 0°   Red
-			Gdiplus::Color(255, 255, 255,   0),  // 60°  Yellow
-			Gdiplus::Color(255,   0, 255,   0),  // 120° Green
-			Gdiplus::Color(255,   0, 255, 255),  // 180° Cyan
-			Gdiplus::Color(255,   0,   0, 255),  // 240° Blue
-			Gdiplus::Color(255, 255,   0, 255),  // 300° Magenta
-			Gdiplus::Color(255, 255,   0,   0),  // 360° Red (wrap)
+			Gdiplus::Color(255, 255,   0,   0),
+			Gdiplus::Color(255, 255, 255,   0),
+			Gdiplus::Color(255,   0, 255,   0),
+			Gdiplus::Color(255,   0, 255, 255),
+			Gdiplus::Color(255,   0,   0, 255),
+			Gdiplus::Color(255, 255,   0, 255),
+			Gdiplus::Color(255, 255,   0,   0),
 		};
 		Gdiplus::REAL positions[] = { 0.f, 1.f / 6.f, 2.f / 6.f, 3.f / 6.f, 4.f / 6.f, 5.f / 6.f, 1.f };
 		grad.SetInterpolationColors(hue_colors, positions, 7);
@@ -262,6 +273,8 @@ void CSCSliderCtrl::OnPaint()
 
 		Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
 		g.DrawPath(&track_border, &track_path);
+
+		g.ResetClip();
 	}
 	else if (m_style == style_thumb_round_gradient)	// ← NEW: cr_inactive→cr_active 2색 그라디언트
 	{
@@ -277,6 +290,9 @@ void CSCSliderCtrl::OnPaint()
 			Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()),
 			static_cast<float>(rtrack.Height()) * 0.5f, 1);
 
+		// rtrack 범위로 clip
+		g.SetClip(Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()));
+
 		Gdiplus::LinearGradientBrush grad(
 			Gdiplus::PointF(track_rf.X, track_rf.Y),
 			Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
@@ -285,6 +301,8 @@ void CSCSliderCtrl::OnPaint()
 
 		Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
 		g.DrawPath(&track_border, &track_path);
+
+		g.ResetClip();
 	}
 	else if (m_style == style_progress)
 	{
@@ -912,7 +930,7 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	int lower = GetRangeMin();
 	int upper = GetRangeMax();
 
-	const bool use_thumb_offset = (m_style <= style_value || is_round_pill_style());	// ← 수정
+	const bool use_thumb_offset = (m_style <= style_value || is_round_pill_style());
 
 	if (upper == lower)
 		return (use_thumb_offset ? m_thumb.cx / 2 : 0);
@@ -921,19 +939,19 @@ int CSCSliderCtrl::Pos2Pixel(int nPos)
 	{
 		return
 			m_margin.top + m_thumb.cy / 2 +
-			(int)(
+			(int)round(
 				(double)(m_rc.Height() - m_margin.top - m_margin.bottom - m_thumb.cy) *
 				((double)(nPos - lower) / (double)(upper - lower))
-				);
+			);
 	}
 	else
 	{
 		return
 			m_margin.left + (use_thumb_offset ? m_thumb.cx / 2 : 0) +
-			(int)(
+			(int)round(
 				(double)(m_rc.Width() - m_margin.left - m_margin.right - (use_thumb_offset ? m_thumb.cx : 0)) *
 				((double)(nPos - lower) / (double)(upper - lower))
-				);
+			);
 	}
 }
 
@@ -945,7 +963,7 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 	int upper = GetRangeMax();
 	int pos;
 
-	const bool use_thumb_offset = (m_style <= style_value || is_round_pill_style());	// ← 수정
+	const bool use_thumb_offset = (m_style <= style_value || is_round_pill_style());
 
 	if (m_is_vertical)
 	{
@@ -1124,8 +1142,9 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	GetRange(lower, upper);
 	GetClientRect(&rc);
 
-	int pos = (int)((double)point.x * (double)(upper - lower) / (double)rc.right) + lower;
-	Clamp(pos, lower, upper);
+	//int pos = (int)((double)point.x * (double)(upper - lower) / (double)rc.right) + lower;
+	//Clamp(pos, lower, upper);
+	int pos = Pixel2Pos(point.x);
 
 	CString str;
 

@@ -463,25 +463,51 @@ COLORREF get_complementary_color(COLORREF crColor, COLORREF crBack)
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 COLORREF get_distinct_color(COLORREF cr)
 {
-	if (get_gray_value(cr) > 128)
-		return RGB(0, 0, 0);
+	float h, s, v;
+	rgb2hsv(GetRValue(cr), GetGValue(cr), GetBValue(cr), h, s, v);
 
-	return RGB(255, 255, 255);
+	h = fmodf(h + 180.f, 360.f);
+
+	if (s < 0.05f)
+		v = 1.f - v;
+
+	return hsv2rgb(h, s, v);
 }
 
-//보색과는 달리 밝기에 따라 black or white를 리턴한다.
+//보색과는 달리 alpha까지 고려한 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+Gdiplus::Color get_distinct_bw_color(Gdiplus::Color cr)
+{
+	const float a = cr.GetA() / 255.0f;
+	const BYTE R_eff = static_cast<BYTE>(cr.GetR() * a + 255.0f * (1.0f - a));
+	const BYTE G_eff = static_cast<BYTE>(cr.GetG() * a + 255.0f * (1.0f - a));
+	const BYTE B_eff = static_cast<BYTE>(cr.GetB() * a + 255.0f * (1.0f - a));
+	const BYTE lum = static_cast<BYTE>(0.299f * R_eff + 0.587f * G_eff + 0.114f * B_eff);
+
+	const Gdiplus::Color distinct_bw_cr = (lum > 160) ? Gdiplus::Color::Black : Gdiplus::Color::White;
+
+	return distinct_bw_cr;
+}
+
 Gdiplus::Color get_distinct_color(Gdiplus::Color cr)
 {
-	int gray = get_gray_value(cr);
+	float h, s, v;
+	color_to_hsv(cr, h, s, v);
 
-	if (gray == 25)
-		gray = gray;
+	// hue를 180도 이동
+	h = fmodf(h + 180.f, 360.f);
 
-	if (gray > 128)
-		return Gdiplus::Color::Black;
+	// 무채색(saturation이 매우 낮은 경우)에는 hue shift가 무의미하므로 명도를 반전
+	if (s < 0.05f)
+		v = 1.f - v;
 
-	return Gdiplus::Color::White;
+	int r, g, b;
+	hsv2rgb(h, s, v, r, g, b);
+
+	return Gdiplus::Color(cr.GetA(),
+		static_cast<BYTE>(r),
+		static_cast<BYTE>(g),
+		static_cast<BYTE>(b));
 }
 
 //gray = (2989 * r + 5870 * g + 1140 * b) / 10000; 

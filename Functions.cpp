@@ -809,6 +809,8 @@ int find_dqstring(std::deque<CString> dqSrc, std::deque<CString> dqFind, TCHAR o
 //클립보드 clipboard
 bool copy_to_clipboard(HWND hWnd, CString str)
 {
+	bool res = false;
+
 	if (str.IsEmpty())
 		return false;
 
@@ -838,18 +840,23 @@ bool copy_to_clipboard(HWND hWnd, CString str)
 		if (::OpenClipboard(hWnd))
 		{
 			::EmptyClipboard(); // 클립보드를 연다.
-			::SetClipboardData(CF_TEXT, h_data);  // 클립보드에 저장된 기존 문자열을 삭제한다.
-												  // 클립보드로 문자열을 복사한다.
+			::SetClipboardData(CF_TEXT, h_data);  // 클립보드가 h_data 소유권 획득
 			::CloseClipboard(); // 클립보드를 닫는다.
-			delete[] pString;
+			res = true;
+		}
+		else
+		{
+			::GlobalFree(h_data); // OpenClipboard 실패 시 직접 해제
 		}
 	}
 	else
 	{
-		return false;
+		::GlobalFree(h_data); // OpenClipboard 실패 시 직접 해제
 	}
 
-	return true;
+	delete[] pString;
+
+	return res;
 }
 
 bool Compare_By_Case_Sensitive(CString str1, CString str2, bool bCase)

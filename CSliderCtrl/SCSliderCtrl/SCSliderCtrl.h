@@ -187,7 +187,7 @@ public:
 	int		get_upper();
 	void	set_step_completed() { m_step_completed = true; Invalidate(); }
 	int		get_style() { return m_style; }
-	// style_thumb_round_hue / style_thumb_round_gradient: pill Æ®·¢ + º°µµ µÕ±Ù ½æ
+	// style_thumb_round_alpha ~ style_thumb_round_gradient: pill Æ®·¢ + º°µµ µÕ±Ù ½æ
 	bool	is_round_pill_style() const { return m_style >= style_thumb_round_alpha && m_style <= style_thumb_round_gradient; }
 
 	int32_t	step(int step = 1);

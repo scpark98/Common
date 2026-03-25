@@ -211,6 +211,12 @@ public:
 	void	set_thumb_color(Gdiplus::Color cr_thumb);
 	void	set_tic_color(Gdiplus::Color cr_tic);
 
+	// ── N-stop 그라디언트 (style_thumb_round_gradient 전용) ──────────
+	// 비어 있으면 기존 cr_inactive→cr_active 2색 폴백.
+	// 호출 예: set_gradient_colors({ Black, PureColor, White });
+	void	set_gradient_colors(const std::vector<Gdiplus::Color>& colors);
+	void	set_gradient_colors(std::initializer_list<Gdiplus::Color> colors);
+
 	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	void	set_text_style(int text_style) { m_text_style = text_style; Invalidate(); }
 	void	set_text(LPCTSTR text, ...);
@@ -373,6 +379,11 @@ protected:
 	Gdiplus::Color	m_cr_thumb_darker;
 	Gdiplus::Color	m_cr_bookmark;
 	Gdiplus::Color	m_cr_bookmark_current = gRGB(0, 255, 0);
+
+	// N-stop 그라디언트 색상 (비어 있으면 2색 폴백)
+	std::vector<Gdiplus::Color>	m_gradient_colors;
+	// m_gradient_colors에서 비율 t(0~1)에 해당하는 색상을 보간하여 반환
+	Gdiplus::Color	sample_gradient(float t) const;
 
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
 	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 64);

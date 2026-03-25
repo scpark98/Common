@@ -188,7 +188,7 @@ void CSCSliderCtrl::OnPaint()
 			penLight.DeleteObject();
 		}
 	}
-	else if (m_style == style_thumb_round_alpha)  // ← 신규 블록
+	else if (m_style == style_thumb_round_alpha)//투명도 선택 슬라이더
 	{
 		const Gdiplus::RectF track_rf(
 			static_cast<Gdiplus::REAL>(rtrack.left),
@@ -236,7 +236,7 @@ void CSCSliderCtrl::OnPaint()
 
 		g.ResetClip();
 	}
-	else if (m_style == style_thumb_round_hue)	// ← NEW: 무지개 hue 그라디언트
+	else if (m_style == style_thumb_round_hue)	//무지개 hue 그라디언트
 	{
 		const Gdiplus::RectF track_rf(
 			static_cast<Gdiplus::REAL>(rtrack.left),
@@ -276,7 +276,7 @@ void CSCSliderCtrl::OnPaint()
 
 		g.ResetClip();
 	}
-	else if (m_style == style_thumb_round_gradient)	// ← NEW: cr_inactive→cr_active 2색 그라디언트
+	else if (m_style == style_thumb_round_gradient)
 	{
 		const Gdiplus::RectF track_rf(
 			static_cast<Gdiplus::REAL>(rtrack.left),
@@ -290,14 +290,34 @@ void CSCSliderCtrl::OnPaint()
 			Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()),
 			static_cast<float>(rtrack.Height()) * 0.5f, 1);
 
-		// rtrack 범위로 clip
 		g.SetClip(Gdiplus::Rect(rtrack.left, rtrack.top, rtrack.Width(), rtrack.Height()));
 
-		Gdiplus::LinearGradientBrush grad(
-			Gdiplus::PointF(track_rf.X, track_rf.Y),
-			Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
-			cr_inactive, cr_active);
-		g.FillPath(&grad, &track_path);
+		if (m_gradient_colors.size() >= 2)
+		{
+			// ── N-stop 그라디언트 (hue 슬라이더와 동일한 패턴) ──────
+			const int n = static_cast<int>(m_gradient_colors.size());
+			Gdiplus::LinearGradientBrush grad(
+				Gdiplus::PointF(track_rf.X, track_rf.Y),
+				Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
+				m_gradient_colors.front(), m_gradient_colors.back());
+
+			std::vector<Gdiplus::Color> colors(m_gradient_colors.begin(), m_gradient_colors.end());
+			std::vector<Gdiplus::REAL>  positions(n);
+			for (int i = 0; i < n; i++)
+				positions[i] = static_cast<Gdiplus::REAL>(i) / static_cast<Gdiplus::REAL>(n - 1);
+
+			grad.SetInterpolationColors(colors.data(), positions.data(), n);
+			g.FillPath(&grad, &track_path);
+		}
+		else
+		{
+			// ── 폴백: 기존 2색 (cr_inactive → cr_active) ─────────
+			Gdiplus::LinearGradientBrush grad(
+				Gdiplus::PointF(track_rf.X, track_rf.Y),
+				Gdiplus::PointF(track_rf.X + track_rf.Width, track_rf.Y),
+				cr_inactive, cr_active);
+			g.FillPath(&grad, &track_path);
+		}
 
 		Gdiplus::Pen track_border(Gdiplus::Color(60, 0, 0, 0), 1.0f);
 		g.DrawPath(&track_border, &track_path);
@@ -768,13 +788,13 @@ void CSCSliderCtrl::OnPaint()
 				// 현재 hue 위치의 순색
 				cr_fill = get_color(static_cast<float>(pos));
 			}
-			else  // style_thumb_round_gradient
+			else if (m_style == style_thumb_round_gradient)
 			{
-				// cr_inactive ~ cr_active 선형 보간
+				// N-stop 그라디언트에서 현재 위치의 색상을 샘플링
 				const float t = (upper > lower)
 					? static_cast<float>(pos - lower) / static_cast<float>(upper - lower)
 					: 0.f;
-				cr_fill = lerp_color(cr_inactive, cr_active, t);
+				cr_fill = sample_gradient(t);
 			}
 
 			g.FillEllipse(&Gdiplus::SolidBrush(cr_fill),
@@ -1943,4 +1963,35 @@ void CSCSliderCtrl::set_color_theme(int theme)
 	m_cr_inactive = get_gray_color(m_cr_active);
 	m_cr_thumb = gRGB(64, 80, 181); //RGB(124, 192, 232);
 	m_cr_tic = get_gray_color(m_cr_thumb);
+}
+
+void CSCSliderCtrl::set_gradient_colors(const std::vector<Gdiplus::Color>& colors)
+{
+	m_gradient_colors = colors;
+	Invalidate(FALSE);
+}
+
+void CSCSliderCtrl::set_gradient_colors(std::initializer_list<Gdiplus::Color> colors)
+{
+	m_gradient_colors.assign(colors);
+	Invalidate(FALSE);
+}
+
+// ── N-stop 그라디언트에서 비율 t(0~1) 위치의 색상을 보간 ───────
+Gdiplus::Color CSCSliderCtrl::sample_gradient(float t) const
+{
+	const int n = static_cast<int>(m_gradient_colors.size());
+	if (n == 0)
+		return lerp_color(m_cr_inactive, m_cr_active, t);
+	if (n == 1)
+		return m_gradient_colors[0];
+
+	t = max(0.f, min(1.f, t));
+
+	// t가 어느 두 색 사이에 있는지 찾기
+	const float segment = 1.f / static_cast<float>(n - 1);
+	const int   idx = min(static_cast<int>(t / segment), n - 2);
+	const float local_t = (t - idx * segment) / segment;
+
+	return lerp_color(m_gradient_colors[idx], m_gradient_colors[idx + 1], local_t);
 }

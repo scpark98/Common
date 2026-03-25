@@ -36,14 +36,8 @@ const CSCColorPicker::PaletteSV CSCColorPicker::m_sv_rows[PALETTE_COLOR_ROWS] = 
 
 IMPLEMENT_DYNAMIC(CSCColorPicker, CDialog)
 
-CSCColorPicker::CSCColorPicker(CWnd* parent, CString title, bool as_modal)
+CSCColorPicker::CSCColorPicker()
 {
-	if (!parent)
-		parent = AfxGetApp()->GetMainWnd();
-
-	//memset(&m_lf, 0, sizeof(LOGFONT));
-
-	create(parent, title, as_modal);
 }
 
 CSCColorPicker::~CSCColorPicker()
@@ -75,12 +69,13 @@ BEGIN_MESSAGE_MAP(CSCColorPicker, CDialog)
 	ON_EN_CHANGE(IDC_EDIT_ARGB_R, OnEnChangeArgb)
 	ON_EN_CHANGE(IDC_EDIT_ARGB_G, OnEnChangeArgb)
 	ON_EN_CHANGE(IDC_EDIT_ARGB_B, OnEnChangeArgb)
-	ON_EN_CHANGE(IDC_EDIT_HSV_H, OnEnChangeHsv)
-	ON_EN_CHANGE(IDC_EDIT_HSV_S, OnEnChangeHsv)
-	ON_EN_CHANGE(IDC_EDIT_HSV_V, OnEnChangeHsv)
+	ON_EN_CHANGE(IDC_EDIT_HSL_H, OnEnChangeHsl)
+	ON_EN_CHANGE(IDC_EDIT_HSL_S, OnEnChangeHsl)
+	ON_EN_CHANGE(IDC_EDIT_HSL_L, OnEnChangeHsl)
 	ON_WM_DESTROY()
 	ON_WM_CONTEXTMENU()
 	ON_MESSAGE(WM_MOUSELEAVE, &CSCColorPicker::OnMouseLeave)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -123,6 +118,18 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 	CenterWindow(m_parent);
 	calc_layout();
 	load_recent_colors();	// ← modeless 경로: create()에서 직접 로드
+
+	// ── 최근 색상이 있으면 recent[0] 기본 선택 ──────────────────────
+	if (!m_recent_colors.empty())
+	{
+		m_sel = { HitArea::Recent, -1, -1, 0 };
+		m_sel_color = m_recent_colors[0];
+		gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
+		update_slider_alpha();
+		update_slider_hue();
+		update_slider_light();
+		sync_edits();
+	}
 
 	// ── 트래킹 툴팁 생성 ─────────────────────────────────────
 	// TTF_TRACK | TTF_ABSOLUTE: 위치·표시를 코드에서 완전 제어
@@ -208,12 +215,12 @@ void CSCColorPicker::calc_layout()
 		m_edit_hexa.Create(
 			WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
 			CRect(m_r_edit_area.left, m_r_edit_area.top, m_r_edit_area.left + hexa_width, m_r_edit_area.top + kEditH), this, IDC_EDIT_HEXA);
-		m_edit_hexa.LimitText(8);
+		m_edit_hexa.LimitText(9);
 		m_edit_hexa.set_font_name(_T("Consolas"));
 		m_edit_hexa.set_font_size(9);
 		m_edit_hexa.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_hexa.set_back_color(Gdiplus::Color::White);
-		m_edit_hexa.set_border_color(Gdiplus::Color::LightGray);
+		m_edit_hexa.set_border_color(Gdiplus::Color(255, 232, 232, 232));
 		m_edit_hexa.set_dark_border_on_focus(true);
 		m_edit_hexa.set_line_align(DT_VCENTER);
 
@@ -234,28 +241,28 @@ void CSCColorPicker::calc_layout()
 			m_edit_argb[i].set_font_size(9);
 			m_edit_argb[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
 			m_edit_argb[i].set_back_color(Gdiplus::Color::White);
-			m_edit_argb[i].set_border_color(Gdiplus::Color::LightGray);
+			m_edit_argb[i].set_border_color(Gdiplus::Color(255, 232, 232, 232));
 			m_edit_argb[i].set_dark_border_on_focus(true);
 			m_edit_argb[i].set_line_align(DT_VCENTER);
 		}
 
-		// ── HSV (3등분, R·G·B 아래 정렬) ─────────────────────────────────
-		const int kHsvIds[3] = { IDC_EDIT_HSV_H, IDC_EDIT_HSV_S, IDC_EDIT_HSV_V };
+		// ── HSL (3등분, R·G·B 아래 정렬) ─────────────────────────────────
+		const int kHslIds[3] = { IDC_EDIT_HSL_H, IDC_EDIT_HSL_S, IDC_EDIT_HSL_L };
 		for (int i = 0; i < 3; i++)
 		{
 			const int x0 = hsvX0 + i * (cellW + kCellGap);
-			m_edit_hsv[i].Create(
+			m_edit_hsl[i].Create(
 				WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
 				CRect(x0, hsvTop, x0 + cellW, hsvTop + kEditH),
-				this, kHsvIds[i]);
-			m_edit_hsv[i].LimitText(3);
-			m_edit_hsv[i].set_font_name(_T("Consolas"));
-			m_edit_hsv[i].set_font_size(9);
-			m_edit_hsv[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
-			m_edit_hsv[i].set_back_color(Gdiplus::Color::White);
-			m_edit_hsv[i].set_border_color(Gdiplus::Color::LightGray);
-			m_edit_hsv[i].set_dark_border_on_focus(true);
-			m_edit_hsv[i].set_line_align(DT_VCENTER);
+				this, kHslIds[i]);
+			m_edit_hsl[i].LimitText(3);
+			m_edit_hsl[i].set_font_name(_T("Consolas"));
+			m_edit_hsl[i].set_font_size(9);
+			m_edit_hsl[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
+			m_edit_hsl[i].set_back_color(Gdiplus::Color::White);
+			m_edit_hsl[i].set_border_color(Gdiplus::Color(255, 232, 232, 232));
+			m_edit_hsl[i].set_dark_border_on_focus(true);
+			m_edit_hsl[i].set_line_align(DT_VCENTER);
 		}
 
 		// ── Color Name Edit (HSV row left empty area) ─────────────────
@@ -267,7 +274,7 @@ void CSCColorPicker::calc_layout()
 		m_edit_color_name.set_font_size(9);
 		m_edit_color_name.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_color_name.set_back_color(Gdiplus::Color::White);
-		m_edit_color_name.set_border_color(Gdiplus::Color::LightGray);
+		m_edit_color_name.set_border_color(Gdiplus::Color(255, 232, 232, 232));
 		m_edit_color_name.set_dark_border_on_focus(true);
 		m_edit_color_name.set_line_align(DT_VCENTER);
 
@@ -288,7 +295,7 @@ void CSCColorPicker::calc_layout()
 		for (int i = 0; i < 3; i++)
 		{
 			const int x0 = hsvX0 + i * (cellW + kCellGap);
-			m_edit_hsv[i].MoveWindow(CRect(x0, hsvTop, x0 + cellW, hsvTop + kEditH));
+			m_edit_hsl[i].MoveWindow(CRect(x0, hsvTop, x0 + cellW, hsvTop + kEditH));
 		}
 
 		m_edit_color_name.MoveWindow(m_r_color_name);
@@ -342,24 +349,27 @@ void CSCColorPicker::calc_layout()
 	}
 
 	// ── Light(밝기) 슬라이더 생성 or 위치 갱신 ───────────────────────────
-	if (!m_slider_value.GetSafeHwnd())
+	if (!m_slider_light.GetSafeHwnd())
 	{
-		m_slider_value.Create(
+		m_slider_light.Create(
 			WS_CHILD | WS_VISIBLE | TBS_HORZ | TBS_NOTICKS,
 			m_r_slider_value, this, IDC_SLIDER_VALUE
 		);
-		m_slider_value.set_style(CSCSliderCtrl::style_thumb_round_gradient);
-		m_slider_value.set_range(0, 100);
-		m_slider_value.set_back_color(Gdiplus::Color::White);
-		m_slider_value.set_text_style(CSCSliderCtrl::text_style_none);
-		m_slider_value.set_inactive_color(Gdiplus::Color(180, 180, 180));
-		m_slider_value.set_active_color(Gdiplus::Color(225, 225, 225));
-		m_slider_value.set_pos(100);
+		m_slider_light.set_style(CSCSliderCtrl::style_thumb_round_gradient);
+		m_slider_light.set_range(0, 100);
+		m_slider_light.set_back_color(Gdiplus::Color::White);
+		m_slider_light.set_text_style(CSCSliderCtrl::text_style_none);
+		m_slider_light.set_inactive_color(Gdiplus::Color(180, 180, 180));
+		m_slider_light.set_active_color(Gdiplus::Color(225, 225, 225));
+		m_slider_light.set_pos(50);
 	}
 	else
 	{
-		m_slider_value.MoveWindow(m_r_slider_value);
+		m_slider_light.MoveWindow(m_r_slider_value);
 	}
+
+	//시작 시 ARGB edit에 포커스가 표시되어 보기 안좋으므로 m_slider_alpha로 포커스 강제 변경하여 시작.
+	m_slider_alpha.SetFocus();
 
 	m_initialized = true;
 }
@@ -380,10 +390,10 @@ void CSCColorPicker::sync_edits()
 	// Hex 편집: 현재 m_hex_format에 따라 바이트 순서 변경
 	switch (m_hex_format)
 	{
-		case HexFormat::ARGB: newText.Format(_T("%02X%02X%02X%02X"), cr.GetAlpha(), cr.GetRed(), cr.GetGreen(), cr.GetBlue());  break;
-		case HexFormat::ABGR: newText.Format(_T("%02X%02X%02X%02X"), cr.GetAlpha(), cr.GetBlue(), cr.GetGreen(), cr.GetRed());   break;
-		case HexFormat::RGBA: newText.Format(_T("%02X%02X%02X%02X"), cr.GetRed(), cr.GetGreen(), cr.GetBlue(), cr.GetAlpha()); break;
-		case HexFormat::BGRA: newText.Format(_T("%02X%02X%02X%02X"), cr.GetBlue(), cr.GetGreen(), cr.GetRed(), cr.GetAlpha()); break;
+		case HexFormat::ARGB: newText.Format(_T("#%02X%02X%02X%02X"), cr.GetAlpha(), cr.GetRed(), cr.GetGreen(), cr.GetBlue()); break;
+		case HexFormat::ABGR: newText.Format(_T("#%02X%02X%02X%02X"), cr.GetAlpha(), cr.GetBlue(), cr.GetGreen(), cr.GetRed()); break;
+		case HexFormat::RGBA: newText.Format(_T("#%02X%02X%02X%02X"), cr.GetRed(), cr.GetGreen(), cr.GetBlue(), cr.GetAlpha()); break;
+		case HexFormat::BGRA: newText.Format(_T("#%02X%02X%02X%02X"), cr.GetBlue(), cr.GetGreen(), cr.GetRed(), cr.GetAlpha()); break;
 	}
 
 	m_edit_hexa.GetWindowText(curText);
@@ -407,22 +417,22 @@ void CSCColorPicker::sync_edits()
 			m_edit_argb[i].SetWindowText(newText);
 	}
 
-	// ── H / S / V ─────────────────────────────────────────────────────────
-	if (m_edit_hsv[0].GetSafeHwnd())
+	// ── H / S / L ─────────────────────────────────────────────────────────
+	if (m_edit_hsl[0].GetSafeHwnd())
 	{
-		float h, s, v;
-		color_to_hsv(cr, h, s, v);
-		const int hsv_vals[3] = {
+		float h, s, l;
+		gcolor_to_hsl(cr, h, s, l);
+		const int hsl_vals[3] = {
 			(int)roundf(h),
 			(int)roundf(s * 100.f),
-			(int)roundf(v * 100.f)
+			(int)roundf(l * 100.f)
 		};
 		for (int i = 0; i < 3; i++)
 		{
-			newText.Format(_T("%d"), hsv_vals[i]);
-			m_edit_hsv[i].GetWindowText(curText);
+			newText.Format(_T("%d"), hsl_vals[i]);
+			m_edit_hsl[i].GetWindowText(curText);
 			if (newText != curText)
-				m_edit_hsv[i].SetWindowText(newText);
+				m_edit_hsl[i].SetWindowText(newText);
 		}
 	}
 
@@ -441,6 +451,7 @@ void CSCColorPicker::sync_edits()
 		m_edit_color_name.GetWindowText(curText);
 		if (wname.CompareNoCase(curText) != 0)
 			m_edit_color_name.SetWindowText(wname);
+		InvalidateRect(&m_r_color_name, FALSE);
 	}
 
 	// ── modeless 모드: 색상 변경 시 parent에게 알림 ──────────────────
@@ -486,11 +497,11 @@ void CSCColorPicker::apply_edit_to_color()
 
 	m_sel_color = Gdiplus::Color(a, r, g, b);
 
-	// 편집 → HSV 추출 후 슬라이더 동기화
-	color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+	// 편집 → HSL 추출 후 슬라이더 동기화
+	gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 	update_slider_alpha();
 	update_slider_hue();
-	update_slider_value();
+	update_slider_light();
 	sync_edits();
 	Invalidate(FALSE);
 }
@@ -507,8 +518,8 @@ void CSCColorPicker::OnEnChangeHexa()
 
 	CString text;
 	m_edit_hexa.GetWindowText(text);
-	if (text.GetLength() != 8)
-		return;
+	if (text.GetLength() == 9 && text[0] == '#')
+		text = text.Mid(1);
 
 	DWORD raw = 0;
 	if (_stscanf_s(text, _T("%8X"), &raw) != 1)
@@ -532,10 +543,10 @@ void CSCColorPicker::OnEnChangeHexa()
 
 	m_sel_color = Gdiplus::Color(a, r, g, b);
 
-	color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+	gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 	update_slider_alpha();
 	update_slider_hue();
-	update_slider_value();
+	update_slider_light();
 	sync_edits();
 	Invalidate(FALSE);
 }
@@ -550,33 +561,33 @@ void CSCColorPicker::OnEnChangeArgb()
 	apply_edit_to_color();
 }
 
-void CSCColorPicker::OnEnChangeHsv()
+void CSCColorPicker::OnEnChangeHsl()
 {
 	if (m_edit_syncing)
 		return;
 
-	if (!m_edit_hsv[0].GetSafeHwnd())
+	if (!m_edit_hsl[0].GetSafeHwnd())
 		return;
 
 	CString s[3];
 	for (int i = 0; i < 3; i++)
-		m_edit_hsv[i].GetWindowText(s[i]);
+		m_edit_hsl[i].GetWindowText(s[i]);
 
 	const float h = max(0.f, min(360.f, (float)_ttof(s[0])));
 	const float sat = max(0.f, min(100.f, (float)_ttof(s[1]))) / 100.f;
-	const float val = max(0.f, min(100.f, (float)_ttof(s[2]))) / 100.f;
+	const float lit = max(0.f, min(100.f, (float)_ttof(s[2]))) / 100.f;
 
 	m_hue = h;
 	m_sat = sat;
-	m_val = val;
+	m_light = lit;
 
 	const BYTE           a = m_sel_color.GetA();
-	const Gdiplus::Color rgb = hsv_to_color(m_hue, m_sat, m_val);
+	const Gdiplus::Color rgb = hsl_to_gcolor(m_hue, m_sat, m_light);
 	m_sel_color = Gdiplus::Color(a, rgb.GetR(), rgb.GetG(), rgb.GetB());
 
 	update_slider_alpha();
 	update_slider_hue();
-	update_slider_value();
+	update_slider_light();
 	sync_edits();
 	Invalidate(FALSE);
 }
@@ -704,34 +715,6 @@ void CSCColorPicker::draw_color_preview(Gdiplus::Graphics& g) const
 	g.DrawEllipse(&borderPen, rf);
 }
 
-Gdiplus::Color CSCColorPicker::hsv_to_color(float h, float s, float v)
-{
-	float r = v, gr = v, b = v;
-	if (s > 0.f)
-	{
-		h = fmodf(h, 360.f);
-		if (h < 0.f) h += 360.f;
-		const int   i = static_cast<int>(h / 60.f) % 6;
-		const float f = h / 60.f - static_cast<int>(h / 60.f);
-		const float p = v * (1.f - s);
-		const float q = v * (1.f - f * s);
-		const float t = v * (1.f - (1.f - f) * s);
-		switch (i)
-		{
-		case 0: r = v;  gr = t;  b = p;  break;
-		case 1: r = q;  gr = v;  b = p;  break;
-		case 2: r = p;  gr = v;  b = t;  break;
-		case 3: r = p;  gr = q;  b = v;  break;
-		case 4: r = t;  gr = p;  b = v;  break;
-		case 5: r = v;  gr = p;  b = q;  break;
-		}
-	}
-	return Gdiplus::Color(255,
-		static_cast<BYTE>(r * 255.f + 0.5f),
-		static_cast<BYTE>(gr * 255.f + 0.5f),
-		static_cast<BYTE>(b * 255.f + 0.5f));
-}
-
 // ── (col, row) → 색상 ────────────────────────────────────
 Gdiplus::Color CSCColorPicker::get_color_at(int col, int row) const
 {
@@ -743,8 +726,9 @@ Gdiplus::Color CSCColorPicker::get_color_at(int col, int row) const
 		return Gdiplus::Color(gray, gray, gray);
 	}
 	// row 1~6 → m_sv_rows[row-1]
-	return hsv_to_color(m_hues[col], m_sv_rows[row - 1].s, m_sv_rows[row - 1].v);
+	return hsv_to_gcolor(m_hues[col], m_sv_rows[row - 1].s, m_sv_rows[row - 1].v);
 }
+
 
 // ── HitTarget → 색상 ─────────────────────────────────────
 Gdiplus::Color CSCColorPicker::get_color(const HitTarget& t) const
@@ -931,6 +915,13 @@ void CSCColorPicker::on_btn_add_clicked()
 
 void CSCColorPicker::on_btn_dropper_clicked()
 {
+	ShowWindow(SW_HIDE);
+	//아래 주석처리된 코드블록처럼 즉시 실행하는 방식으로 구현했었으나
+	//메시지 펌프, SetWindowDisplayAffinity까지 써봐도 여전히 ColorPicker창이 완전히 hide됨이 보장되지 않았다.
+	//간단히 타이머로 500ms ~ 1초후에 동작되도록 수정함.
+	SetTimer(timer_run_dropper_wnd, 500, NULL);
+	return;
+	/*
 	MSG msg = {};
 
 	// ① 컬러피커 숨김 (확대창 화면에 찍히지 않도록)
@@ -1022,15 +1013,14 @@ void CSCColorPicker::on_btn_dropper_clicked()
 		m_recent_scroll = 0;
 		m_sel = { HitArea::Recent, -1, -1, 0 };
 
-		color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+		gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 		update_slider_alpha();
 		update_slider_hue();
-		update_slider_value();
+		update_slider_light();
 		sync_edits();
 		Invalidate(FALSE);
 	}
-
-
+	*/
 }
 
 // CSCColorPicker 메시지 처리기
@@ -1039,7 +1029,13 @@ void CSCColorPicker::OnBnClickedOk()
 	m_response = IDOK;
 
 	if (!m_as_modal)
+	{
+		// modeless: 선택 색상을 레지스트리에 저장 (다음 세션에서 복원 가능)
+		if (m_sel.is_valid())
+			save_recent_color(m_sel_color);
+
 		ShowWindow(SW_HIDE);
+	}
 }
 
 void CSCColorPicker::OnBnClickedCancel()
@@ -1050,23 +1046,30 @@ void CSCColorPicker::OnBnClickedCancel()
 		ShowWindow(SW_HIDE);
 }
 
-INT_PTR CSCColorPicker::DoModal(CString title, Gdiplus::Color cr_selected)
+INT_PTR CSCColorPicker::DoModal(CWnd* parent, CString title, Gdiplus::Color cr_selected)
 {
 	//return CDialog::DoModal();
 
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	if (m_parent == nullptr)
-		m_parent = GetParent();
+	if (parent == nullptr)
+		return -1;
 
+	m_parent = parent;
 	m_as_modal = true;
-
-	load_recent_colors();
 
 	if (title.IsEmpty())
 		title = _T("Color Picker");
 
+	if (m_hWnd == nullptr)
+		create(m_parent, title, m_as_modal);
+
+	load_recent_colors();
+
+
 	if (cr_selected.GetValue() != Gdiplus::Color::Transparent)
 	{
+		m_sel_color = cr_selected;
+
 		const HitTarget found = find_color(cr_selected);
 		if (found.is_valid())
 		{
@@ -1080,10 +1083,6 @@ INT_PTR CSCColorPicker::DoModal(CString title, Gdiplus::Color cr_selected)
 			{
 				// RGB 일치 → 팔레트 RGB + 전달된 alpha 유지
 				const Gdiplus::Color palette_cr = get_color_at(found.col, found.row);
-				m_sel_color = Gdiplus::Color(cr_selected.GetA(),
-					palette_cr.GetR(),
-					palette_cr.GetG(),
-					palette_cr.GetB());
 			}
 		}
 	}
@@ -1095,9 +1094,9 @@ INT_PTR CSCColorPicker::DoModal(CString title, Gdiplus::Color cr_selected)
 	}
 
 	update_slider_alpha();	// ← m_sel 확정 후 슬라이더 동기화
-	color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+	gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 	update_slider_hue();
-	update_slider_value();
+	update_slider_light();
 	sync_edits();
 
 	SetWindowText(title);
@@ -1450,25 +1449,26 @@ void CSCColorPicker::OnPaint()
 		}
 	}
 
-	// ── H / S / V 레이블 ──────────────────────────────────────────────────
-	if (m_edit_hsv[0].GetSafeHwnd())
+	// ── H / S / L 레이블 ──────────────────────────────────────────────────
+	if (m_edit_hsl[0].GetSafeHwnd())
 	{
-		static const wchar_t* kHsvLabels[3] = { L"H", L"S", L"V" };
+		static const wchar_t* kHslLabels[3] = { L"H", L"S", L"L" };
 
 		for (int i = 0; i < 3; i++)
 		{
 			CRect r;
-			m_edit_hsv[i].GetWindowRect(r);
+			m_edit_hsl[i].GetWindowRect(r);
 			ScreenToClient(r);
 			r.OffsetRect(0, -16);
 			label_rect = Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
-			g.DrawString(kHsvLabels[i], -1, &labelFont, label_rect, &sf, &labelBrush);
+			g.DrawString(kHslLabels[i], -1, &labelFont, label_rect, &sf, &labelBrush);
 		}
 	}
 
 	// ── Color Name Label (near 여부에 따라 레이블 변경) ───────────────
 	if (!m_r_color_name.IsRectEmpty())
 	{
+		trace(m_color_name_near);
 		const wchar_t* name_label = m_color_name_near ? L"Name(near)" : L"Name";
 		label_rect = Gdiplus::RectF((float)m_r_color_name.left,
 			(float)(m_r_color_name.top - 16),
@@ -1527,10 +1527,10 @@ void CSCColorPicker::OnLButtonUp(UINT nFlags, CPoint point)
 			m_sel = t;
 			m_sel_color = get_color(t);
 
-			color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+			gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 			update_slider_alpha();
 			update_slider_hue();
-			update_slider_value();
+			update_slider_light();
 			Invalidate(FALSE);
 		}
 	}
@@ -1644,36 +1644,36 @@ LRESULT CSCColorPicker::on_message_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 	}
 	else if (msg->pThis == &m_slider_hue)
 	{
-		// ── Hue 슬라이더 ──────────────────────────────────────────────
 		if (!m_sel.is_valid())
 			return 0;
 
 		m_hue = static_cast<float>(max(0, min(360, msg->pos)));
 
-		const Gdiplus::Color cr_new = hsv_to_color(m_hue, m_sat, m_val);
+		const Gdiplus::Color cr_new = hsl_to_gcolor(m_hue, m_sat, m_light);
 		m_sel_color = Gdiplus::Color(m_sel_color.GetA(),
 			cr_new.GetR(), cr_new.GetG(), cr_new.GetB());
 
-		update_slider_value();	// ← Hue 변경 시 Light 그라디언트 갱신
-		update_slider_alpha();	// ← Alpha 그라디언트의 활성색 갱신
+		update_slider_alpha();
+		update_slider_light();
 		sync_edits();
 		InvalidateRect(&m_r_preview, FALSE);
+		InvalidateRect(&m_r_color_name, FALSE);
 	}
-	else if (msg->pThis == &m_slider_value)
+	else if (msg->pThis == &m_slider_light)
 	{
-		// ── Light(밝기) 슬라이더 ─────────────────────────────────────
 		if (!m_sel.is_valid())
 			return 0;
 
-		m_val = static_cast<float>(max(0, min(100, msg->pos))) / 100.f;
+		m_light = static_cast<float>(max(0, min(100, msg->pos))) / 100.f;
 
-		const Gdiplus::Color cr_new = hsv_to_color(m_hue, m_sat, m_val);
+		const Gdiplus::Color cr_new = hsl_to_gcolor(m_hue, m_sat, m_light);
 		m_sel_color = Gdiplus::Color(m_sel_color.GetA(),
 			cr_new.GetR(), cr_new.GetG(), cr_new.GetB());
 
-		update_slider_alpha();	// ← Alpha 그라디언트의 활성색 갱신
+		update_slider_alpha();
 		sync_edits();
 		InvalidateRect(&m_r_preview, FALSE);
+		InvalidateRect(&m_r_color_name, FALSE);
 	}
 
 	return 0;
@@ -1700,22 +1700,24 @@ LRESULT CSCColorPicker::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 					if (name_text.IsEmpty())
 						break;
 
-					Gdiplus::Color cr = CSCColorList::get_color(CString2string(name_text));
+					std::string ssname = CString2string(name_text);
+					Gdiplus::Color cr = CSCColorList::get_color(ssname);
+					m_edit_color_name.SetWindowText(ssname.c_str());
+
 
 					// alpha 유지 (선택 없으면 255)
 					const BYTE alpha = m_sel.is_valid() ? m_sel_color.GetA() : 255;
-					m_sel_color = Gdiplus::Color(alpha,
-						cr.GetR(), cr.GetG(), cr.GetB());
+					m_sel_color = Gdiplus::Color(alpha, cr.GetR(), cr.GetG(), cr.GetB());
 
 					// 팔레트/recent에서 해당 색상 검색하여 선택 상태 갱신
 					const HitTarget found = find_color(m_sel_color);
 					if (found.is_valid())
 						m_sel = found;
 
-					color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+					gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 					update_slider_alpha();
 					update_slider_hue();
-					update_slider_value();
+					update_slider_light();
 					sync_edits();
 					Invalidate(FALSE);
 				}
@@ -1750,8 +1752,7 @@ void CSCColorPicker::update_slider_alpha()
 		m_slider_alpha.set_pos(static_cast<int>(m_sel_color.GetA()));
 
 		// active 구간 = 현재 RGB의 불투명 버전 → 어떤 색인지 한눈에 파악 가능
-		m_slider_alpha.set_active_color(
-			Gdiplus::Color(255, m_sel_color.GetR(), m_sel_color.GetG(), m_sel_color.GetB()));
+		m_slider_alpha.set_active_color(Gdiplus::Color(255, m_sel_color.GetR(), m_sel_color.GetG(), m_sel_color.GetB()));
 		m_slider_alpha.set_inactive_color(Gdiplus::Color(225, 225, 225));
 	}
 
@@ -1769,26 +1770,24 @@ void CSCColorPicker::update_slider_hue()
 }
 
 // ── Light 슬라이더 동기화 (m_val + 현재 색조 → 그라디언트 + 위치) ─────────
-void CSCColorPicker::update_slider_value()
+void CSCColorPicker::update_slider_light()
 {
-	if (!m_slider_value.GetSafeHwnd())
+	if (!m_slider_light.GetSafeHwnd())
 		return;
 
 	if (!m_sel.is_valid())
 	{
-		m_slider_value.set_inactive_color(Gdiplus::Color(180, 180, 180));
-		m_slider_value.set_active_color(Gdiplus::Color(225, 225, 225));
-		m_slider_value.set_pos(100);
+		m_slider_light.set_gradient_colors({Gdiplus::Color(180, 180, 180), Gdiplus::Color(225, 225, 225)});
+		m_slider_light.set_pos(50);
 	}
 	else
 	{
-		// Black(V=0) → 현재 Hue+Sat의 순색(V=1.0) 그라디언트
-		const Gdiplus::Color cr_full = hsv_to_color(m_hue, m_sat, 1.0f);
-		m_slider_value.set_inactive_color(Gdiplus::Color::Black);
-		m_slider_value.set_active_color(cr_full);  // ← White → 현재 순색
-		m_slider_value.set_pos(static_cast<int>(m_val * 100.f + 0.5f));
+		// HSL L=0(Black) → L=0.5(순색) → L=1(White)
+		const Gdiplus::Color pure = hsl_to_gcolor(m_hue, m_sat, 0.5f);
+		m_slider_light.set_gradient_colors({Gdiplus::Color::Black, pure, Gdiplus::Color::White});
+		m_slider_light.set_pos(static_cast<int>(m_light * 100.f + 0.5f));
 	}
-	m_slider_value.Invalidate(FALSE);
+	m_slider_light.Invalidate(FALSE);
 }
 
 void CSCColorPicker::OnLButtonDblClk(UINT nFlags, CPoint point)
@@ -2032,10 +2031,10 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 			m_sel_color = Gdiplus::Color(m_sel_color.GetA(),
 				comp.GetR(), comp.GetG(), comp.GetB());
 
-			color_to_hsv(m_sel_color, m_hue, m_sat, m_val);
+			gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 			update_slider_alpha();
 			update_slider_hue();
-			update_slider_value();
+			update_slider_light();
 			sync_edits();
 			Invalidate(FALSE);
 			break;
@@ -2430,4 +2429,81 @@ void CSCColorPicker::import_recent_colors()
 	}
 
 	Invalidate(FALSE);
+}
+
+void CSCColorPicker::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (nIDEvent == timer_run_dropper_wnd)
+	{
+		KillTimer(timer_run_dropper_wnd);
+
+		MSG msg = {};
+
+		CSCDropperDlg dlg;
+		dlg.create(this);
+
+		// ESC 키 수신을 위해 포커스 명시적 지정
+		//dlg.SetForegroundWindow();
+		//dlg.SetFocus();
+
+		// ③ 메시지 루프 — dlg가 DestroyWindow()로 닫힐 때까지 대기
+//    (LButtonDown 또는 VK_ESCAPE → KillTimer + DestroyWindow → GetSafeHwnd() == NULL)
+		bool quit_posted = false;
+		msg = {};
+		while (dlg.GetSafeHwnd() != NULL)
+		{
+			while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			{
+				if (msg.message == WM_QUIT)
+				{
+					quit_posted = true;
+					break;
+				}
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			if (quit_posted) break;
+			if (dlg.GetSafeHwnd() != NULL)
+				WaitMessage();
+		}
+		if (quit_posted)
+			PostQuitMessage(static_cast<int>(msg.wParam));
+
+		// ④ 컬러피커 복원
+		// 드로퍼 종료 후 복원
+		::SetWindowDisplayAffinity(m_hWnd, WDA_NONE);
+		ShowWindow(SW_SHOW);
+		SetForegroundWindow();
+
+		// ⑤ 색상 반영 (is_picked() == true: 클릭으로 확정, false: ESC 취소)
+		if (dlg.is_picked())
+		{
+			m_sel_color = dlg.get_picked_color();
+
+			// recent에 추가 후 m_sel을 recent[0]으로 지정 (미리보기·슬라이더 활성화)
+			for (auto it = m_recent_colors.begin(); it != m_recent_colors.end(); )
+			{
+				if (it->GetValue() == m_sel_color.GetValue())
+					it = m_recent_colors.erase(it);
+				else
+					++it;
+			}
+			m_recent_colors.insert(m_recent_colors.begin(), m_sel_color);
+			if ((int)m_recent_colors.size() > MAX_RECENT_COLORS)
+				m_recent_colors.resize(MAX_RECENT_COLORS);
+
+			m_recent_scroll = 0;
+			m_sel = { HitArea::Recent, -1, -1, 0 };
+
+			gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
+			update_slider_alpha();
+			update_slider_hue();
+			update_slider_light();
+			sync_edits();
+			Invalidate(FALSE);
+		}
+	}
+
+	CDialog::OnTimer(nIDEvent);
 }

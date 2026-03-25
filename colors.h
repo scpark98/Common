@@ -317,7 +317,12 @@ void			rgb2hsv(int r, int g, int b, float& fH, float& fS, float& fV);
 //r,g,b : 0 ~ 255, fH : 0 ~ 360, fS, fV : 0.0f ~ 1.0f
 void			hsv2rgb(float fH, float fS, float fV, int &r, int &g, int &b);
 COLORREF		hsv2rgb(float fH, float fS = 1.0f, float fV = 1.0f);
-void			color_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v);
+Gdiplus::Color	hsv_to_gcolor(float h, float s, float v);
+void			gcolor_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v);
+
+// HSL 변환 (h: 0~360, s: 0~1, l: 0~1)
+void			gcolor_to_hsl(Gdiplus::Color cr, float& h, float& s, float& l);
+Gdiplus::Color	hsl_to_gcolor(float h, float s, float l);
 
 Gdiplus::Color	RGB2gpColor(COLORREF cr, BYTE alpha = 255);
 
@@ -604,7 +609,8 @@ public:
 	//	return get_color_map();
 	//}
 
-	static Gdiplus::Color get_color(std::string name)
+	//"royalblue"로 검색하면 Gdiplus::Color::RoyalBlue로 리턴하고 name 또한 "RoyalBlue"로 변경된다.
+	static Gdiplus::Color get_color(std::string& name)
 	{
 		//m_cr_map::iterator it = get_color_map().find(name);
 		//위와 같이 map.find()를 쓰면 대소문자 구분을 하므로, 대소문자 구분없이 검색하기 위해 std::find_if와 _stricmp()를 사용한다.
@@ -616,8 +622,12 @@ public:
 			});
 
 		if (it == get_color_list().end())
+		{
+			name = "Black";
 			return Gdiplus::Color::Black;
+		}
 
+		name = it->first;
 		return it->second;
 	}
 

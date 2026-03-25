@@ -2,7 +2,20 @@
 Test project : https://github.com/scpark98/Test_CSCColorPicker.git
 Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
 
+[개발목적]
+	- MFC용 고급 컬러 피커 대화 상자 구현
+	- 기존 CColorDialog, CMFCColorButton은 아직도 COLORREF를 사용하는 것이 가장 큰 단점이며
+	  사용자 정의색 추가, 제거 등의 UI도 불편하고
+	  CMFCColorButton에는 color picker를 추가했지만 모든 창에서 검출되지도 않고 확대기능이 없으므로 사용하기 불편하다.
+	- 이 color picker는 ARGB, ABGR, RGBA, BGRA 등 다양한 Hex 표시 형식을 지원하며
+	  색상 이름 표시 기능도 포함한다.
+	- Wheel 또는 Ctrl+Wheel로 색상추출 영역 확대/축소, 픽셀크기 확대/축소를 지원한다.
+	- 사용자 정의색을 import, export 할 수 있다.
+	- Modal 또는 Modeless 두가지 방식을 선택하여 사용할 수 있다.
+
 [usage]
+	- 원하는 색상을 더블클릭 또는 Enter키로 선택.
+
 	Common\CDialog\CSCColorPicker 폴더의 4개 파일을 프로젝트에 추가.
 
 	//사용하는 cpp에 include (modeless로 사용한다면 h에서)
@@ -13,11 +26,12 @@ Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
 
 	* Modal 방식으로 사용하려면 해당 블록에서 선언 및 DoModal() 호출.
 	//타이틀과 초기 색상 지정은 옵션. Transparent로 주면 맨 마지막 선택했던 색상으로 시작
-	if (picker.DoModal([op]_T("Color Picker"), [op]Gdiplus::Color::Transparent) == IDCANCEL)
+	if (picker.DoModal(this, [op]_T("Color Picker"), [op]Gdiplus::Color::Transparent) == IDCANCEL)
 		return;
 	Gdiplus::Color cr = picker.get_selected_color();
 
 	* Modeless 방식으로 사용 예.
+	//message handler 함수 및 등록
 	ON_REGISTERED_MESSAGE(Message_CSCColorPicker, &CTestCSCColorPickerDlg::on_message_CSCColorPicker)
 
 	//in OnInitDialog()
@@ -73,13 +87,18 @@ class CSCColorPicker : public CDialog
 	DECLARE_DYNAMIC(CSCColorPicker)
 
 public:
-	CSCColorPicker(CWnd* pParent = nullptr, CString title = _T(""), bool as_modal = true);
+	CSCColorPicker();
 	virtual ~CSCColorPicker();
 
 	bool			create(CWnd* parent, CString title = _T(""), bool as_modal = true);
 	Gdiplus::Color	get_selected_color() const { return m_sel_color; }
 
 protected:
+	enum TIMER_ID
+	{
+		timer_run_dropper_wnd = 1,
+	};
+
 	bool			m_as_modal = true;
 	CWnd*			m_parent = NULL;
 	int				m_response = -1;
@@ -89,17 +108,18 @@ protected:
 
 	CSCSliderCtrl	m_slider_alpha;
 	CSCSliderCtrl	m_slider_hue;		// ← NEW: Hue 슬라이더 (0~360)
-	CSCSliderCtrl	m_slider_value;		// ← NEW: 밝기(Value) 슬라이더 (0~100)
+	CSCSliderCtrl	m_slider_light;		// Lightness(밝기) 슬라이더 (0~100)
+
 	CSCEdit			m_edit_hexa;
 	CSCEdit			m_edit_argb[4];
-	CSCEdit			m_edit_hsv[3];
-	CSCEdit			m_edit_color_name;					// ← color name edit
-	bool			m_color_name_near = false;			// ← true if approximate match
+	CSCEdit			m_edit_hsl[3];
+	CSCEdit			m_edit_color_name;
+	bool			m_color_name_near = false;	//true if approximate match
 
 	// ── Hex 표시 형식 ──────────────────────────────────────
-	enum class HexFormat { ARGB, ABGR, RGBA, BGRA };	// ← NEW
-	HexFormat		m_hex_format = HexFormat::ARGB;	// ← NEW: 현재 Hex 표시 형식
-	CRect			m_r_label_hexa = { 0, 0, 0, 0 };	// ← NEW: 레이블 더블클릭 영역
+	enum class HexFormat { ARGB, ABGR, RGBA, BGRA };
+	HexFormat		m_hex_format = HexFormat::ARGB;
+	CRect			m_r_label_hexa = { 0, 0, 0, 0 };
 
 	bool			m_show_tooltip = true;		// ← 툴팁 표시 여부
 	CToolTipCtrl    m_tooltip;
@@ -117,9 +137,9 @@ protected:
 	static constexpr int PALETTE_BTN_COUNT = 2;	// 예약 버튼 수
 
 	// ← RECENT_DISPLAY_COLS: 화면에 보이는 최근 색상 슬롯 수 (고정 8)
-	// ← MAX_RECENT_COLORS: 저장 최대 개수 (실질적 무제한 → 100)
+	// ← MAX_RECENT_COLORS: 저장 최대 개수 (실질적 무제한 → 512)
 	static constexpr int RECENT_DISPLAY_COLS = PALETTE_TOTAL_COLS - PALETTE_BTN_COUNT;	// 8
-	static constexpr int MAX_RECENT_COLORS = 100;
+	static constexpr int MAX_RECENT_COLORS = 512;
 
 	static constexpr int IDC_SLIDER_ALPHA = 1001;	// ← 알파 슬라이더 ID
 	static constexpr int IDC_SLIDER_HUE = 1002;	// ← NEW
@@ -131,9 +151,9 @@ protected:
 	static constexpr int IDC_EDIT_ARGB_R = 1013;
 	static constexpr int IDC_EDIT_ARGB_G = 1014;
 	static constexpr int IDC_EDIT_ARGB_B = 1015;
-	static constexpr int IDC_EDIT_HSV_H = 1016;	// ← NEW
-	static constexpr int IDC_EDIT_HSV_S = 1017;	// ← NEW
-	static constexpr int IDC_EDIT_HSV_V = 1018;	// ← NEW
+	static constexpr int IDC_EDIT_HSL_H = 1016;
+	static constexpr int IDC_EDIT_HSL_S = 1017;
+	static constexpr int IDC_EDIT_HSL_L = 1018;
 	static constexpr int IDC_EDIT_COLOR_NAME = 1019;
 
 	// ── 컨텍스트 메뉴 ID ──────────────────────────────────
@@ -182,9 +202,9 @@ protected:
 	bool	m_initialized = false;
 
 	// ── HSV 상태 (슬라이더 연동용) ────────────────────────
-	float	m_hue = 0.f;	// ← NEW: 색조 0~360
-	float	m_sat = 1.f;	// ← NEW: 채도 0~1
-	float	m_val = 1.f;	// ← NEW: 밝기 0~1
+	float	m_hue = 0.f;	//색조 0~360
+	float	m_sat = 1.f;	//채도 0~1
+	float	m_light = 0.5f;	//밝기 0~1  (HSL L, 기본 0.5 = 순색)
 
 	// ── 최근 색상 ─────────────────────────────────────────
 	std::vector<Gdiplus::Color>	m_recent_colors;
@@ -220,7 +240,6 @@ protected:
 	Gdiplus::PointF			get_cell_center(const HitTarget& t) const;		// 유일한 좌표 계산 함수
 
 	// ── 데이터 헬퍼 ───────────────────────────────────────
-	static Gdiplus::Color	hsv_to_color(float h, float s, float v);
 	Gdiplus::Color			get_color_at(int col, int row) const;
 	Gdiplus::Color			get_color(const HitTarget& t) const;
 	bool					hit_test(CPoint pt, HitTarget& out) const;
@@ -242,7 +261,7 @@ protected:
 	// ── 슬라이더 ──────────────────────────────────────────
 	void					update_slider_alpha();	// 선택 색상에 맞춰 슬라이더 위치·색상 동기화
 	void					update_slider_hue();	// ← NEW
-	void					update_slider_value();	// ← NEW
+	void					update_slider_light();	// ← NEW
 
 	// ── 편집 컨트롤 동기화 ────────────────────────────────
 	void					sync_edits();				// ← NEW: m_sel_color → 편집 컨트롤 반영
@@ -264,7 +283,7 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	virtual INT_PTR DoModal(CString title = _T(""), Gdiplus::Color cr_selected = Gdiplus::Color::Transparent);
+	virtual INT_PTR DoModal(CWnd* parent, CString title = _T(""), Gdiplus::Color cr_selected = Gdiplus::Color::Transparent);
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedCancel();
 	virtual BOOL OnInitDialog();
@@ -280,9 +299,10 @@ public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnEnChangeHexa();
 	afx_msg void OnEnChangeArgb();
-	afx_msg void OnEnChangeHsv();
+	afx_msg void OnEnChangeHsl();
 	virtual void PostNcDestroy();
 	afx_msg void OnDestroy();
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 	afx_msg LRESULT OnMouseLeave(WPARAM, LPARAM);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

@@ -492,7 +492,7 @@ Gdiplus::Color get_distinct_bw_color(Gdiplus::Color cr)
 Gdiplus::Color get_distinct_color(Gdiplus::Color cr)
 {
 	float h, s, v;
-	color_to_hsv(cr, h, s, v);
+	gcolor_to_hsv(cr, h, s, v);
 
 	// hue를 180도 이동
 	h = fmodf(h + 180.f, 360.f);
@@ -693,7 +693,35 @@ COLORREF hsv2rgb(float fH, float fS, float fV)
 	return RGB(r, g, b);
 }
 
-void color_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v)
+Gdiplus::Color hsv_to_gcolor(float h, float s, float v)
+{
+	float r = v, gr = v, b = v;
+	if (s > 0.f)
+	{
+		h = fmodf(h, 360.f);
+		if (h < 0.f) h += 360.f;
+		const int   i = static_cast<int>(h / 60.f) % 6;
+		const float f = h / 60.f - static_cast<int>(h / 60.f);
+		const float p = v * (1.f - s);
+		const float q = v * (1.f - f * s);
+		const float t = v * (1.f - (1.f - f) * s);
+		switch (i)
+		{
+		case 0: r = v;  gr = t;  b = p;  break;
+		case 1: r = q;  gr = v;  b = p;  break;
+		case 2: r = p;  gr = v;  b = t;  break;
+		case 3: r = p;  gr = q;  b = v;  break;
+		case 4: r = t;  gr = p;  b = v;  break;
+		case 5: r = v;  gr = p;  b = q;  break;
+		}
+	}
+	return Gdiplus::Color(255,
+		static_cast<BYTE>(r * 255.f + 0.5f),
+		static_cast<BYTE>(gr * 255.f + 0.5f),
+		static_cast<BYTE>(b * 255.f + 0.5f));
+}
+
+void gcolor_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v)
 {
 	const float r = cr.GetR() / 255.f;
 	const float g = cr.GetG() / 255.f;
@@ -716,6 +744,80 @@ void color_to_hsv(Gdiplus::Color cr, float& h, float& s, float& v)
 		h = 60.f * ((r - g) / delta + 4.f);
 
 	if (h < 0.f) h += 360.f;
+}
+
+// ── RGB → HSL ─────────────────────────────────────────────
+// h: 0~360, s: 0~1, l: 0~1
+void gcolor_to_hsl(Gdiplus::Color cr, float& h, float& s, float& l)
+{
+	const float r = cr.GetR() / 255.f;
+	const float g = cr.GetG() / 255.f;
+	const float b = cr.GetB() / 255.f;
+	const float maxC = max(r, max(g, b));
+	const float minC = min(r, min(g, b));
+	const float delta = maxC - minC;
+
+	// Lightness
+	l = (maxC + minC) * 0.5f;
+
+	// Saturation
+	if (delta < 1e-6f)
+		s = 0.f;
+	else
+		s = delta / (1.f - fabsf(2.f * l - 1.f));
+
+	// clamp (부동소수점 오차로 1.0 초과 방지)
+	if (s > 1.f) s = 1.f;
+
+	// Hue (HSV와 동일한 계산)
+	if (delta < 1e-6f)
+		h = 0.f;
+	else if (maxC == r)
+		h = 60.f * fmodf((g - b) / delta, 6.f);
+	else if (maxC == g)
+		h = 60.f * ((b - r) / delta + 2.f);
+	else
+		h = 60.f * ((r - g) / delta + 4.f);
+
+	if (h < 0.f) h += 360.f;
+}
+
+// ── HSL → RGB ─────────────────────────────────────────────
+// h: 0~360, s: 0~1, l: 0~1
+Gdiplus::Color hsl_to_gcolor(float h, float s, float l)
+{
+	// achromatic
+	if (s < 1e-6f)
+	{
+		const BYTE gray = static_cast<BYTE>(l * 255.f + 0.5f);
+		return Gdiplus::Color(255, gray, gray, gray);
+	}
+
+	h = fmodf(h, 360.f);
+	if (h < 0.f) h += 360.f;
+
+	const float c = (1.f - fabsf(2.f * l - 1.f)) * s;   // chroma
+	const float hp = h / 60.f;
+	const float x = c * (1.f - fabsf(fmodf(hp, 2.f) - 1.f));
+	const float m = l - c * 0.5f;
+
+	float r1 = 0.f, g1 = 0.f, b1 = 0.f;
+	const int sector = static_cast<int>(hp) % 6;
+	switch (sector)
+	{
+		case 0: r1 = c;  g1 = x;  b1 = 0;  break;
+		case 1: r1 = x;  g1 = c;  b1 = 0;  break;
+		case 2: r1 = 0;  g1 = c;  b1 = x;  break;
+		case 3: r1 = 0;  g1 = x;  b1 = c;  break;
+		case 4: r1 = x;  g1 = 0;  b1 = c;  break;
+		case 5: r1 = c;  g1 = 0;  b1 = x;  break;
+	}
+
+	auto to_byte = [](float v) -> BYTE {
+		return static_cast<BYTE>(max(0.f, min(255.f, v * 255.f + 0.5f)));
+		};
+
+	return Gdiplus::Color(255, to_byte(r1 + m), to_byte(g1 + m), to_byte(b1 + m));
 }
 
 //red ~ green 범위에서 37%일때의 색상은? get_color(0, 120, 37); (0:red, 120:green of hue)

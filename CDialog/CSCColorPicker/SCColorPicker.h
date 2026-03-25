@@ -26,7 +26,7 @@ Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
 
 	* Modal 방식으로 사용하려면 해당 블록에서 선언 및 DoModal() 호출.
 	//타이틀과 초기 색상 지정은 옵션. Transparent로 주면 맨 마지막 선택했던 색상으로 시작
-	if (picker.DoModal(this, [op]_T("Color Picker"), [op]Gdiplus::Color::Transparent) == IDCANCEL)
+	if (picker.DoModal(this, [op]Gdiplus::Color::Transparent, [op]_T("Color Picker")) == IDCANCEL)
 		return;
 	Gdiplus::Color cr = picker.get_selected_color();
 
@@ -283,7 +283,7 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	virtual INT_PTR DoModal(CWnd* parent, CString title = _T(""), Gdiplus::Color cr_selected = Gdiplus::Color::Transparent);
+	virtual INT_PTR DoModal(CWnd* parent, Gdiplus::Color cr_selected = Gdiplus::Color::Transparent, CString title = _T(""));
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedCancel();
 	virtual BOOL OnInitDialog();
@@ -305,4 +305,5 @@ public:
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
 	afx_msg LRESULT OnMouseLeave(WPARAM, LPARAM);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 };

@@ -73,6 +73,7 @@ BEGIN_MESSAGE_MAP(CSCColorPicker, CDialog)
 	ON_WM_CONTEXTMENU()
 	ON_MESSAGE(WM_MOUSELEAVE, &CSCColorPicker::OnMouseLeave)
 	ON_WM_TIMER()
+	ON_WM_WINDOWPOSCHANGED()
 END_MESSAGE_MAP()
 
 
@@ -96,7 +97,12 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 	// WS_VISIBLE은 modeless 경로에서만 초기 생성 시 포함.
 	// modal 경로는 DoModal()에서 ShowWindow(SW_SHOW)로 직접 표시하므로 초기 가시화 불필요.
 	// → UIAutomation이 즉시 추적을 시작하여 DestroyWindow 시점에 충돌하는 현상 방지.
-	const DWORD dwExStyle = NULL;// WS_EX_TOOLWINDOW;
+
+	//dwExStyle을 NULL로 주면 기본 아이콘이 타이틀바에 표시된다. main dialog의 아이콘을 조회해서 가져오는 방법도 있으나 굳이.
+	//그렇다고 WS_SYSMENU를 주지 않으면 아이콘은 표시되지 않지만 우측의 종료 버튼도 표시되지 않는다.
+	//GPT에 검색해보니 WS_EX_DLGMODALFRAME를 주고 우회하여 아이콘을 보이지 않게 non-client 영역 다시 계산등의 방법을 제안했는데
+	//WS_EX_DLGMODALFRAME를 주는것만으로도 x버튼은 살리고 아이콘은 표시되지 않도록 실행된다.
+	const DWORD dwExStyle = WS_EX_DLGMODALFRAME;
 	DWORD dwStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN;
 	//if (!as_modal)
 	//	dwStyle |= WS_VISIBLE;	// modeless 경로: 생성 즉시 표시
@@ -112,7 +118,7 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 		return false;
 
 	SetWindowText(title);
-	CenterWindow(m_parent);
+	//CenterWindow(m_parent);
 	calc_layout();
 	load_recent_colors();	// ← modeless 경로: create()에서 직접 로드
 
@@ -367,6 +373,8 @@ void CSCColorPicker::calc_layout()
 
 	//시작 시 ARGB edit에 포커스가 표시되어 보기 안좋으므로 m_slider_alpha로 포커스 강제 변경하여 시작.
 	m_slider_alpha.SetFocus();
+
+	RestoreWindowPosition(AfxGetApp(), this, _T("color picker"));
 
 	m_initialized = true;
 }
@@ -1029,13 +1037,11 @@ void CSCColorPicker::OnBnClickedOk()
 	m_response = IDOK;
 
 	if (!m_as_modal)
-	{
-		// modeless: 선택 색상을 레지스트리에 저장 (다음 세션에서 복원 가능)
-		if (m_sel.is_valid())
-			save_recent_color(m_sel_color);
-
 		ShowWindow(SW_HIDE);
-	}
+
+	//선택 색상을 레지스트리에 저장
+	if (m_sel.is_valid())
+		save_recent_color(m_sel_color);
 }
 
 void CSCColorPicker::OnBnClickedCancel()
@@ -1046,7 +1052,7 @@ void CSCColorPicker::OnBnClickedCancel()
 		ShowWindow(SW_HIDE);
 }
 
-INT_PTR CSCColorPicker::DoModal(CWnd* parent, CString title, Gdiplus::Color cr_selected)
+INT_PTR CSCColorPicker::DoModal(CWnd* parent, Gdiplus::Color cr_selected, CString title)
 {
 	//return CDialog::DoModal();
 
@@ -1100,7 +1106,7 @@ INT_PTR CSCColorPicker::DoModal(CWnd* parent, CString title, Gdiplus::Color cr_s
 	sync_edits();
 
 	SetWindowText(title);
-	CenterWindow(m_parent);
+	//CenterWindow(m_parent);
 	ShowWindow(SW_SHOW);
 	Invalidate(FALSE);
 
@@ -1151,7 +1157,7 @@ INT_PTR CSCColorPicker::DoModal(CWnd* parent, CString title, Gdiplus::Color cr_s
 	DestroyWindow();
 
 	//ok, cancel 구분 없이 최근 색상 목록 저장
-	save_recent_color(m_sel_color);
+	//save_recent_color(m_sel_color);
 
 	return m_response;
 }
@@ -2506,4 +2512,12 @@ void CSCColorPicker::OnTimer(UINT_PTR nIDEvent)
 	}
 
 	CDialog::OnTimer(nIDEvent);
+}
+
+void CSCColorPicker::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+{
+	CDialog::OnWindowPosChanged(lpwndpos);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	SaveWindowPosition(AfxGetApp(), this, _T("color picker"));
 }

@@ -7,9 +7,6 @@
 #include "../../MemoryDC.h"
 #include <map>          // ← import 파싱용 (index→Color)
 
-#include <dwmapi.h>
-#pragma comment(lib, "dwmapi.lib")
-
 const float CSCColorPicker::m_hues[PALETTE_COLOR_COLS] = {
 	0.f,    // Red
 	30.f,   // Orange
@@ -916,9 +913,12 @@ void CSCColorPicker::on_btn_add_clicked()
 void CSCColorPicker::on_btn_dropper_clicked()
 {
 	ShowWindow(SW_HIDE);
-	//아래 주석처리된 코드블록처럼 즉시 실행하는 방식으로 구현했었으나
+
+	//아래 주석처리된 코드블록처럼 이 함수내에서 끝까지 실행하는 방식으로 구현했었으나
 	//메시지 펌프, SetWindowDisplayAffinity까지 써봐도 여전히 ColorPicker창이 완전히 hide됨이 보장되지 않았다.
 	//간단히 타이머로 500ms ~ 1초후에 동작되도록 수정함.
+	//물론 타이머로 동작한다고 해서 hide를 반드시 보장하는 것은 아니다.
+	//다만 500ms면 hide하고 창이 화면에서 사라지는 시간으로는 충분하다는 가정으로 결정한 것임.
 	SetTimer(timer_run_dropper_wnd, 500, NULL);
 	return;
 	/*
@@ -2472,7 +2472,7 @@ void CSCColorPicker::OnTimer(UINT_PTR nIDEvent)
 
 		// ④ 컬러피커 복원
 		// 드로퍼 종료 후 복원
-		::SetWindowDisplayAffinity(m_hWnd, WDA_NONE);
+		//::SetWindowDisplayAffinity(m_hWnd, WDA_NONE);
 		ShowWindow(SW_SHOW);
 		SetForegroundWindow();
 

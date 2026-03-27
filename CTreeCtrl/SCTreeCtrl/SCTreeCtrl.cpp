@@ -709,15 +709,12 @@ void CSCTreeCtrl::refresh(HTREEITEM hParent)
 		m_documentItem = insert_special_folder(CSIDL_MYDOCUMENTS);
 		m_computerItem = insert_special_folder(CSIDL_DRIVES);
 
-		if (m_is_local)
-		{
-			std::deque<CDiskDriveInfo>* drive_list = m_pShellImageList->m_volume[!m_is_local].get_drive_list();
+		std::deque<CDiskDriveInfo>* drive_list = m_pShellImageList->m_volume[!m_is_local].get_drive_list();
 
-			for (int i = 0; i < drive_list->size(); i++)
-				insert_drive(drive_list->at(i));
+		for (int i = 0; i < drive_list->size(); i++)
+			insert_drive(drive_list->at(i));
 
-			Expand(m_computerItem, TVE_EXPAND);
-		}
+		Expand(m_computerItem, TVE_EXPAND);
 	}
 	else
 	{
@@ -909,8 +906,6 @@ HTREEITEM CSCTreeCtrl::insert_special_folder(int csidl)
 
 void CSCTreeCtrl::insert_drive(CDiskDriveInfo drive_info)
 {
-	//CString real_path = convert_special_folder_to_real_path(driveName, m_pShellImageList, !m_is_local);
-
 	TV_INSERTSTRUCT tvInsert;
 	tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
 
@@ -925,10 +920,12 @@ void CSCTreeCtrl::insert_drive(CDiskDriveInfo drive_info)
 		tvInsert.item.iSelectedImage = m_pShellImageList->get_drive_icon(drive_info.type);
 	}
 
-	//tvInsert.item.cChildren = 0;
 	tvInsert.hInsertAfter = TVI_LAST;
 	tvInsert.hParent = m_computerItem;
 	tvInsert.item.pszText = (LPTSTR)(LPCTSTR)drive_info.label;
+	//local일 경우는 has_sub_folders()로 검사하지만 remote인 경우는 요청해서 얻어와야 한다.
+	//단, 특정 폴더가 아닌 disk drive이므로 하위 폴더가 있다고 가정한다.
+	tvInsert.item.cChildren = 1;// has_sub_folders(drive_info.path);
 	HTREEITEM hItem = InsertItem(&tvInsert);
 
 	//아래 코드는 드라이브 루트를 추가할 때 1레벨 하위 폴더까지 기본으로 추가
@@ -3097,7 +3094,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//rText.right = rText.left + szText.cx;
 			dc.SetBkMode(TRANSPARENT);
 			dc.SetTextColor(crText.ToCOLORREF());
-			dc.DrawText(GetItemText(hItem), &rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+			dc.DrawText(GetItemText(hItem), &rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
 			//dc.DrawText(GetItemText(hItem), &rcItem, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 

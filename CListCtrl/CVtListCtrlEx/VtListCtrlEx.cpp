@@ -522,12 +522,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 					pDC->SetTextColor(m_theme.cr_back.ToCOLORREF());
 					pDC->SelectClipRgn(&rgnLeft);
-					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
+					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 
 					pDC->SetTextColor(m_theme.cr_progress.ToCOLORREF());
 					pDC->SelectClipRgn(&rgnRight);
-					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP);
-
+					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 					rgnLeft.DeleteObject();
 					rgnRight.DeleteObject();
 					pDC->SelectClipRgn(NULL);
@@ -587,7 +586,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			else if (get_column_text_align(iSubItem) == LVCFMT_RIGHT)
 				format = DT_RIGHT;
 
-			format = format | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS;
+			format = format | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS | DT_NOPREFIX;
 			pDC->DrawText(text, textRect, format);
 		}
 	}
@@ -1197,19 +1196,19 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 						{
 							if (!include_null)
 							{
-								return (compare_string(a.text[iSub], b.text[iSub]) > 0);
+								return (compare_str(a.text[iSub], b.text[iSub]) > 0);
 							}
 							else
 							{
-								return (compare_string(a.text[iSub], b.text[iSub]) > 0);
+								return (compare_str(a.text[iSub], b.text[iSub]) > 0);
 							}
 						}
 						else
 						{
-							return (compare_string(a.text[iSub], b.text[iSub]) > 0);
+							return (compare_str(a.text[iSub], b.text[iSub]) > 0);
 						}
 
-						return (compare_string(a.text[iSub], b.text[iSub]) > 0);
+						return (compare_str(a.text[iSub], b.text[iSub]) > 0);
 					}
 					else
 					{
@@ -1230,19 +1229,19 @@ void CVtListCtrlEx::sort(int subItem, int ascending)
 						{
 							if (!include_null)
 							{
-								return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+								return (compare_str(a.text[iSub], b.text[iSub]) == -1);
 							}
 							else
 							{
-								return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+								return (compare_str(a.text[iSub], b.text[iSub]) == -1);
 							}
 						}
 						else
 						{
-							return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+							return (compare_str(a.text[iSub], b.text[iSub]) == -1);
 						}
 
-						return (compare_string(a.text[iSub], b.text[iSub]) == -1);
+						return (compare_str(a.text[iSub], b.text[iSub]) == -1);
 					}
 					else
 					{

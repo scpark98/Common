@@ -17593,7 +17593,7 @@ int extract_digit_number(char *str, int from, double *num)
 
 //version string valid check
 //digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
-bool valid_version_string(CString versionStr, int digits)
+bool valid_version_str(CString versionStr, int digits)
 {
 	std::deque<CString> token;
 	get_token_str(versionStr, token, '.');
@@ -17607,23 +17607,43 @@ bool valid_version_string(CString versionStr, int digits)
 //.을 없앤 숫자로 비교했으나 이 방법도 오류 발생(1.0.1.13 > 1.0.10.3보다 크다고 판단함)
 //결국 각 자릿수끼리 구분하거나 자릿수를 맞춘 후 비교한다.
 //리턴값은 strcmp와 동일한 규칙으로 처리한다.(+:str0가 큼, -:str1이 큼, 0:같음)
-int	compare_string(CString str0, CString str1, TCHAR separator)
+//이 함수는 자릿수는 틀려도 무관하나 separator가 숫자라든지, 숫자가 아닌 문자가 섞여있을 경우에 대한 처리는 없다.
+//버전이든 IP주소이든 정석적인 문자열이 들어왔다라는 가정하에 정확히 판단한다.
+int compare_str(const CString& str0, const CString& str1, TCHAR separator)
 {
-	size_t i = 0, j = 0;
-	while (i < str0.GetLength() || j < str1.GetLength())
+	int i = 0, j = 0;
+	const int len0 = str0.GetLength();
+	const int len1 = str1.GetLength();
+
+	while (i < len0 || j < len1)
 	{
-		int acc1 = 0, acc2 = 0;
+		unsigned long long acc1 = 0, acc2 = 0;
 
-		while (i < str0.GetLength() && str0[i] != separator) { acc1 = acc1 * 10 + (str0[i] - '0');  i++; }
-		while (j < str1.GetLength() && str1[j] != separator) { acc2 = acc2 * 10 + (str1[j] - '0');  j++; }
+		while (i < len0 && str0[i] != separator)
+		{
+			if (!_istdigit(str0[i]))
+				return 0;
+			acc1 = acc1 * 10 + (str0[i] - _T('0'));
+			++i;
+		}
 
-		if (acc1 < acc2)  return -1;
-		if (acc1 > acc2)  return +1;
+		while (j < len1 && str1[j] != separator)
+		{
+			if (!_istdigit(str1[j]))
+				return 0;
+			acc2 = acc2 * 10 + (str1[j] - _T('0'));
+			++j;
+		}
 
-		++i;
-		++j;
+		if (acc1 < acc2) return -1;
+		if (acc1 > acc2) return +1;
+
+		if (i < len0 && str0[i] == separator) ++i;
+		if (j < len1 && str1[j] == separator) ++j;
 	}
+
 	return 0;
+
 	/*
 	int i;
 	std::deque<CString> token0;

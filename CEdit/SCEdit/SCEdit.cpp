@@ -40,20 +40,20 @@ CSCEdit::~CSCEdit()
 
 bool CSCEdit::create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
 {
-	bool res = CEdit::Create(dwStyle, rect, pParentWnd, nID);
+	bool res = CMFCMaskedEdit::Create(dwStyle, rect, pParentWnd, nID);
 	m_lf.lfWidth = 0;
 	m_is_dynamic_control = true;
 	PreSubclassWindow();
 	return res;
 }
 
-//기본 CEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
+//기본 CMFCMaskedEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
 BOOL CSCEdit::Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
 {
 	return create(dwStyle, rect, pParentWnd, nID);
 }
 
-BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
+BEGIN_MESSAGE_MAP(CSCEdit, CMFCMaskedEdit)
 	//{{AFX_MSG_MAP(CSCEdit)
 	ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_SIZE()
@@ -78,7 +78,7 @@ END_MESSAGE_MAP()
 void CSCEdit::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	CEdit::PreSubclassWindow();
+	CMFCMaskedEdit::PreSubclassWindow();
 
 	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
 	//dlg의 parent의 font를 얻어와야 한다.
@@ -142,7 +142,7 @@ void CSCEdit::reconstruct_font()
 
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	CEdit::SetFont(&m_font, TRUE);
+	CMFCMaskedEdit::SetFont(&m_font, TRUE);
 
 	set_line_align(m_valign);
 
@@ -163,7 +163,7 @@ int CSCEdit::get_font_size(bool pixel_size)
 	return m_font_size;
 }
 
-//CEdit::SetRect()를 이용해서 상하좌우 여백의 크기를 조정할 수 있는데
+//CMFCMaskedEdit::SetRect()를 이용해서 상하좌우 여백의 크기를 조정할 수 있는데
 //ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
 //ES_MULTILINE 속성은 생성후에는 변경할 수 없으므로 반드시 속성창에서 설정해줘야 한다.
 //https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally
@@ -496,7 +496,7 @@ void CSCEdit::recalc_font_size()
 
 void CSCEdit::OnSize(UINT nType, int cx, int cy)
 {
-	CEdit::OnSize(nType, cx, cy);
+	CMFCMaskedEdit::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 
@@ -517,7 +517,7 @@ void CSCEdit::OnSize(UINT nType, int cx, int cy)
 /*
 void CSCEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
-	CEdit::OnWindowPosChanged(lpwndpos);
+	CMFCMaskedEdit::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	if ( m_hWnd == nullptr )
@@ -548,7 +548,7 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 		//동적 생성한 후 어떤 메시지들을 직접 처리해야 하는 경우가 아니라면
 		//기본 메시지 처리되어야 한다.
 		if (!m_is_dynamic_control)
-			return CEdit::PreTranslateMessage(pMsg);
+			return CMFCMaskedEdit::PreTranslateMessage(pMsg);
 
 		//hscroll될 때 배경이 갱신되지 않는 현상으로 우선 코드 추가.
 		switch (pMsg->wParam)
@@ -576,7 +576,7 @@ BOOL CSCEdit::PreTranslateMessage(MSG* pMsg)
 		}
 	}
 
-	return CEdit::PreTranslateMessage(pMsg);
+	return CMFCMaskedEdit::PreTranslateMessage(pMsg);
 }
 
 
@@ -589,7 +589,7 @@ void CSCEdit::OnPaint()
 #if 0
 	CPaintDC dc(this); // device context for painting
 					   // TODO: Add your message handler code here
-					   // Do not call CEdit::OnPaint() for painting messages
+					   // Do not call CMFCMaskedEdit::OnPaint() for painting messages
 	CRect	rc;
 
 	GetClientRect( rc );
@@ -602,7 +602,7 @@ void CSCEdit::OnPaint()
 	rc.bottom -= 3;
 	dc.Rectangle( rc );
 #endif
-	//CEdit::OnPaint();
+	//CMFCMaskedEdit::OnPaint();
 }
 
 
@@ -650,7 +650,7 @@ void CSCEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 	//lpncsp->rgrc[0].left += uiCX;
 	//lpncsp->rgrc[0].right -= uiCY;
-	CEdit::OnNcCalcSize(bCalcValidRects, lpncsp);
+	CMFCMaskedEdit::OnNcCalcSize(bCalcValidRects, lpncsp);
 }
 
 
@@ -788,7 +788,7 @@ BOOL CSCEdit::OnEnUpdate()
 
 void CSCEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
-	CEdit::OnWindowPosChanged(lpwndpos);
+	CMFCMaskedEdit::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	update_ctrl();
@@ -797,7 +797,7 @@ void CSCEdit::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 //ON_WM_CTLCOLOR_REFLECT() 때문인지 OnCtlColor()는 호출되지 않는다.
 HBRUSH CSCEdit::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
-	return CEdit::OnCtlColor(pDC, pWnd, nCtlColor);
+	return CMFCMaskedEdit::OnCtlColor(pDC, pWnd, nCtlColor);
 }
 */
 
@@ -814,7 +814,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_transparent)
 	{
-		return CEdit::OnEraseBkgnd(pDC);
+		return CMFCMaskedEdit::OnEraseBkgnd(pDC);
 	}
 
 	CRect rc;
@@ -890,7 +890,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	//pDC->SetBkMode(TRANSPARENT);
 
 	return FALSE;
-	return CEdit::OnEraseBkgnd(pDC);
+	return CMFCMaskedEdit::OnEraseBkgnd(pDC);
 }
 
 void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
@@ -904,7 +904,7 @@ void CSCEdit::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 
-	CEdit::OnLButtonDown(nFlags, point);
+	CMFCMaskedEdit::OnLButtonDown(nFlags, point);
 }
 
 
@@ -918,7 +918,7 @@ void CSCEdit::OnLButtonUp(UINT nFlags, CPoint point)
 		return;
 	}
 
-	CEdit::OnLButtonUp(nFlags, point);
+	CMFCMaskedEdit::OnLButtonUp(nFlags, point);
 }
 
 //마우스가 액션버튼내에 있는지 판별
@@ -949,7 +949,7 @@ BOOL CSCEdit::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		return true;
 	}
 
-	return CEdit::OnSetCursor(pWnd, nHitTest, message);
+	return CMFCMaskedEdit::OnSetCursor(pWnd, nHitTest, message);
 }
 
 

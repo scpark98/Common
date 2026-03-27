@@ -58,9 +58,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 		return false;
 
 	m_parent = parent;
-
-	if (title.IsEmpty())
-		title = _T("Color Picker");
+	m_title = title;
 
 	m_as_modal = as_modal;
 

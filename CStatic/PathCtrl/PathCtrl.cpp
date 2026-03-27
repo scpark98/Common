@@ -243,18 +243,14 @@ void CPathCtrl::OnPaint()
 
 		if (m_path[i].ellipsis)
 		{
-			//dc.DrawText(m_path[i].label.Left(m_path[i].ellipsis_pos) + _T("..."), rt, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-			dc.DrawText(m_path[i].label, rt, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+			dc.DrawText(m_path[i].label, rt, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
 		}
 		else
 		{
 			//0번 항목은 label은 존재하지만 텍스트를 출력하진 않는다.
 			if (i > 0)
 			{
-			//	if (rt.right >= rc.right)
-			//		dc.DrawText(m_path[i].label, rt, DT_RIGHT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
-			//	else
-					dc.DrawText(m_path[i].label, rt, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+				dc.DrawText(m_path[i].label, rt, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
 			}
 		}
 

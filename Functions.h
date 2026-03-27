@@ -1052,13 +1052,15 @@ struct	NETWORK_INFO
 
 	//version string valid check
 	//digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
-	bool valid_version_string(CString versionStr, int digits);
+	bool valid_version_str(CString versionStr, int digits);
 
 	//버전 또는 IP주소등은 그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로
 	//.을 없앤 숫자로 비교했으나 이 방법도 오류 발생(1.0.1.13 > 1.0.10.3보다 크다고 판단함)
 	//결국 각 자릿수끼리 구분해야 한다.
 	//리턴값은 strcmp와 동일한 규칙으로 판단한다.(+:str0가 큼, -:str1이 큼, 0:같음)
-	int	compare_string(CString str0, CString str1, TCHAR separator = '.');
+	//이 함수는 자릿수는 틀려도 무관하나 separator가 숫자라든지, 숫자가 아닌 문자가 섞여있을 경우에 대한 처리는 없다.
+	//버전이든 IP주소이든 정석적인 문자열이 들어왔다라는 가정하에 정확히 판단한다.
+	int compare_str(const CString& str0, const CString& str1, TCHAR separator = '.');
 
 	//src를 n번 연결한 문자열 리턴. n개의 공백, 탭이 필요할 경우 사용
 	//20250829 기존 make_string() 함수의 이름을 duplicate_str()으로 변경함.

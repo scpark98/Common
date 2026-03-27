@@ -23,7 +23,9 @@
 // SCEdit.h : header file
 //
 
-#include <Afxwin.h>
+#include <afxwin.h>
+#include <afxmaskededit.h>
+
 #include "../../colors.h"
 #include "../../SCGdiplusBitmap.h"
 
@@ -53,7 +55,7 @@ public:
 
 //ES_MULTILINE 속성이 있어야만 정상 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
 //ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이므로 리소스 에디터에서 설정해야 한다.
-class CSCEdit : public CEdit
+class CSCEdit : public CMFCMaskedEdit
 {
 // Construction
 public:
@@ -69,12 +71,12 @@ public:
 
 	//동적 생성 시 호출
 	bool					create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
-	//기본 CEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
+	//기본 CMFCMaskedEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
 	BOOL					Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }
-	void					set_text(CString text = _T("")) { CEdit::SetWindowText(text); }
-	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CEdit::SetWindowText(text); }
+	void					set_text(CString text = _T("")) { CMFCMaskedEdit::SetWindowText(text); }
+	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CMFCMaskedEdit::SetWindowText(text); }
 	void					SetWindowText(CString text) { set_text(text); }
 
 	//아래와 같이 템플릿으로 구현하려 했으나 typeid()가 제대로 동작하지 않는 문제가 있어 사용할 수 없음.
@@ -96,7 +98,7 @@ public:
 		else
 			TRACE(_T("warning. not defined type.\n"));
 
-		CEdit::SetWindowText(text);
+		CMFCMaskedEdit::SetWindowText(text);
 	}
 	*/
 
@@ -148,7 +150,7 @@ public:
 	void				recalc_font_size();						//recalculate font height when control size is changed.
 	int					get_font_size(bool pixel_size = false);
 
-	//CEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
+	//CMFCMaskedEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
 	//ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
 	//ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이다.
 	//https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally
@@ -195,7 +197,7 @@ protected:
 
 //vertical align
 	//vertical align이므로 DT_CENTER가 아닌 DT_VCENTER로 줘야 한다.
-	//단, 한줄이 아닌 여러줄을 입력하기 위한 CEdit일 경우는 DT_TOP으로 시작되어야 한다.
+	//단, 한줄이 아닌 여러줄을 입력하기 위한 CMFCMaskedEdit일 경우는 DT_TOP으로 시작되어야 한다.
 	//여러줄이고 DT_VCENTER일 경우 어디가 입력필드이고 어디가 여백인지가 애매하다.
 	DWORD				m_valign = DT_TOP;
 

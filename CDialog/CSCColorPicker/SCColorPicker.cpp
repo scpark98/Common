@@ -920,7 +920,9 @@ void CSCColorPicker::on_btn_add_clicked()
 
 void CSCColorPicker::on_btn_dropper_clicked()
 {
-	ShowWindow(SW_HIDE);
+	//shift를 누르고 실행하면 자기 자신, 즉 color picker창을 숨기지 않고 실행시킨다.
+	if (!IsShiftPressed())
+		ShowWindow(SW_HIDE);
 
 	//아래 주석처리된 코드블록처럼 이 함수내에서 끝까지 실행하는 방식으로 구현했었으나
 	//메시지 펌프, SetWindowDisplayAffinity까지 써봐도 여전히 ColorPicker창이 완전히 hide됨이 보장되지 않았다.

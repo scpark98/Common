@@ -18,7 +18,7 @@ public:
 	enum {
 		kWndSizeDefault = 180,      // default circle diameter
 		kWndSizeMin = 100,           // Ctrl+wheel min
-		kWndSizeMax = 500,          // Ctrl+wheel max
+		kWndSizeMax = 1000,          // Ctrl+wheel max
 		kWndSizeStep = 20,          // Ctrl+wheel step
 		kTimerID = 1,
 		kSampleMin = 9,             // zoom in limit (odd). 현재 dropper 창에 kSampleMin x kSampleMin 개의 셀이 표시된다.

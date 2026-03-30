@@ -20120,6 +20120,89 @@ CString base64_decode(CString in)
 	return str;
 }
 
+//URL or filepath safe base64
+CString base64_encode_url(CString plain_src, bool remove_padding)
+{
+	//base64로 encode한 후에 URL이나 파일 경로에서 사용할 수 있도록 '+'는 '-'로, '/'는 '_'로 변환한다.
+	CString base64 = base64_encode(plain_src);
+	base64.Replace('+', '-');
+	base64.Replace('/', '_');
+
+	if (remove_padding)
+	{
+		while (!base64.IsEmpty())
+		{
+			const int len = base64.GetLength();
+			if (base64[len - 1] != '=')
+				break;
+
+			base64 = base64.Left(len - 1);
+		}
+	}
+
+	return base64;
+}
+
+std::string base64_encode_url(const std::string& plain_src, bool remove_padding)
+{
+	// base64로 encode한 후 URL이나 파일 경로에서 사용할 수 있도록
+	// '+'는 '-', '/'는 '_'로 변환한다.
+	std::string base64 = base64_encode(plain_src);
+
+	for (char& ch : base64)
+	{
+		if (ch == '+')
+			ch = '-';
+		else if (ch == '/')
+			ch = '_';
+	}
+
+	if (remove_padding)
+	{
+		while (!base64.empty() && base64.back() == '=')
+			base64.pop_back();
+	}
+
+	return base64;
+}
+
+//URL or filepath safe base64
+CString base64_decode_url(CString safe_base64_src)
+{
+	//URL이나 파일 경로에서 사용할 수 있도록 '+'는 '-'로, '/'는 '_'로 변환한 것을 원래의 base64로 복원한다.
+	CString result = safe_base64_src;
+
+	result.Replace(_T('-'), _T('+'));
+	result.Replace(_T('_'), _T('/'));
+
+	while ((result.GetLength() % 4) != 0)
+		result += _T('=');
+
+	result = base64_decode(result);
+	return result;
+}
+
+std::string base64_decode_url(std::string safe_base64_src)
+{
+	// URL이나 파일 경로에서 사용할 수 있도록
+	// '+'는 '-', '/'는 '_'로 변환한 것을 원래의 base64로 복원한다.
+	std::string result = safe_base64_src;
+
+	for (char& ch : result)
+	{
+		if (ch == '-')
+			ch = '+';
+		else if (ch == '_')
+			ch = '/';
+	}
+
+	while ((result.length() % 4) != 0)
+		result += '=';
+
+	result = base64_decode(result);
+	return result;
+}
+
 std::string base64_decode(const std::string& in)
 {
 	static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

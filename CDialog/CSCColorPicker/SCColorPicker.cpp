@@ -371,8 +371,8 @@ void CSCColorPicker::calc_layout()
 		m_slider_light.MoveWindow(m_r_slider_value);
 	}
 
-	//시작 시 ARGB edit에 포커스가 표시되어 보기 안좋으므로 m_slider_alpha로 포커스 강제 변경하여 시작.
-	m_slider_alpha.SetFocus();
+	//시작 시 ARGB edit에 포커스가 표시되어 보기 안좋으므로 다른 컨트롤에 포커스 강제 변경하여 시작.
+	SetFocus();
 
 	RestoreWindowPosition(AfxGetApp(), this, _T("color picker"));
 
@@ -1792,7 +1792,7 @@ void CSCColorPicker::update_slider_light()
 	{
 		// HSL L=0(Black) → L=0.5(순색) → L=1(White)
 		const Gdiplus::Color pure = hsl_to_gcolor(m_hue, m_sat, 0.5f);
-		m_slider_light.set_gradient_colors({Gdiplus::Color::Black, pure, Gdiplus::Color::White});
+		m_slider_light.set_gradient_colors({Gdiplus::Color(0, 0, 0), pure, Gdiplus::Color(255, 255, 255)});
 		m_slider_light.set_pos(static_cast<int>(m_light * 100.f + 0.5f));
 	}
 	m_slider_light.Invalidate(FALSE);

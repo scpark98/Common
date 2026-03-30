@@ -51,6 +51,7 @@ BEGIN_MESSAGE_MAP(CSCSliderCtrl, CSliderCtrl)
 	ON_WM_TIMER()
 	ON_WM_SIZE()
 	ON_WM_WINDOWPOSCHANGED()
+	ON_WM_MOUSEWHEEL()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1994,4 +1995,16 @@ Gdiplus::Color CSCSliderCtrl::sample_gradient(float t) const
 	const float local_t = (t - idx * segment) / segment;
 
 	return lerp_color(m_gradient_colors[idx], m_gradient_colors[idx + 1], local_t);
+}
+
+BOOL CSCSliderCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	int pos = GetPos();
+
+	Invalidate();
+	CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_move, this, pos);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&msg, 0);
+
+	return CSliderCtrl::OnMouseWheel(nFlags, zDelta, pt);
 }

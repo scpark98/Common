@@ -1319,6 +1319,12 @@ struct	NETWORK_INFO
 	std::string base64_encode(const std::string& in);
 	CString base64_encode(CString in);
 	CString base64_decode(CString in);
+	//URL or filepath safe base64 encoding
+	CString base64_encode_url(CString plain_src, bool remove_padding = false);
+	std::string base64_encode_url(const std::string& plain_src, bool remove_padding = false);
+	//URL or filepath safe base64 decoding
+	CString base64_decode_url(CString safe_base64_src);
+	std::string base64_decode_url(std::string safe_base64_src);
 #endif
 
 //////////////////////////////////////////////////////////////////////////

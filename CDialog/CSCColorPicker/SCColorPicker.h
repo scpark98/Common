@@ -226,6 +226,10 @@ protected:
 		int     row = -1;   // Palette
 		int     idx = -1;   // Recent / Button
 
+		HitTarget() = default;
+		HitTarget(HitArea _area, int _col = -1, int _row = -1, int _idx = -1)
+			: area(_area), col(_col), row(_row), idx(_idx) {}
+
 		bool operator==(const HitTarget& o) const {
 			return area == o.area && col == o.col && row == o.row && idx == o.idx;
 		}

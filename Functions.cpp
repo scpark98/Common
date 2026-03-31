@@ -2846,6 +2846,41 @@ bool parse_url(CString full_url, CString& ip, int& port, CString& sub_url, bool 
 	return ret;
 }
 
+bool is_server_reachable(CString ip, int port, int timeout_ms)
+{
+	WSADATA wsa;
+	WSAStartup(MAKEWORD(2, 2), &wsa);
+
+	SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sock == INVALID_SOCKET)
+		return false;
+
+	// non-blocking 모드 설정
+	u_long mode = 1;
+	ioctlsocket(sock, FIONBIO, &mode);
+
+	sockaddr_in addr = {};
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	addr.sin_addr.S_un.S_addr = get_S_addr_from_domain_or_ip_str(ip);
+
+	connect(sock, (sockaddr*)&addr, sizeof(addr));
+
+	// select()로 timeout 내에 연결 성공 여부 판별
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(sock, &fds);
+
+	timeval tv;
+	tv.tv_sec = timeout_ms / 1000;
+	tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+	bool reachable = (select(0, nullptr, &fds, nullptr, &tv) > 0);
+
+	closesocket(sock);
+	return reachable;
+}
+
 //void request_url(CRequestUrlParams* params)
 //{
 //	params->status = request_url(params->result, params->ip, params->port, params->sub_url, params->verb, &params->headers, params->body, params->local_file_path);
@@ -2874,6 +2909,14 @@ void request_url(CRequestUrlParams* params)
 {
 	long t0 = clock();
 
+	// 빠른 연결 가능 여부 사전 체크 (3초 내)
+	if (!is_server_reachable(params->ip, params->port, 3000))
+	{
+		params->status = ERROR_HOST_UNREACHABLE;
+		params->result = _T("서버에 연결할 수 없습니다.");
+		return;
+	}
+
 	//ip에 http://인지 https://인지가 명시되어 있다면 이는 명확하므로
 	//이를 판단하여 params->is_https값을 재설정한다.
 	//포트번호로 https를 판별하는 것은 한계가 있으므로 ip에 명시하든, params->is_https에 정확히 명시하여 사용한다.
@@ -2889,12 +2932,10 @@ void request_url(CRequestUrlParams* params)
 		params->ip.Replace(_T("https://"), _T(""));
 	}
 
-
 	if (params->full_url.IsEmpty() == false)
 	{
 		parse_url(params->full_url, params->ip, params->port, params->sub_url, params->is_https);
 	}
-
 
 	//sub_url의 맨 앞에는 반드시 '/'가 붙어있어야 한다.
 	if (params->sub_url[0] != '/')
@@ -2953,6 +2994,8 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
+	DWORD dwConnectTimeout = 3000;
+	InternetSetOption(hInternetRoot, INTERNET_OPTION_CONNECT_TIMEOUT, &dwConnectTimeout, sizeof(DWORD));
 
 	HINTERNET hInternetConnect = InternetConnect(hInternetRoot,
 		params->ip,
@@ -2997,10 +3040,11 @@ void request_url(CRequestUrlParams* params)
 	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
 	//https://blog.naver.com/che5886/20061092638
 	//20250117 30초 timeout됨을 확인 완료.
-	DWORD dwTimeout = params->timeout_ms;
-	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwTimeout, sizeof(DWORD));
-	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeout, sizeof(DWORD));
-	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeout, sizeof(DWORD));
+	dwConnectTimeout = MIN(5000, params->timeout_ms);
+	DWORD dwTransferTimeout = params->timeout_ms;
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwConnectTimeout, sizeof(DWORD));
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTransferTimeout, sizeof(DWORD));
+	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTransferTimeout, sizeof(DWORD));
 
 	//Proxy 계정관련 코드를 추가했으나 확인 필요.
 	if (params->proxy_id.IsEmpty() == false || params->proxy_pw.IsEmpty() == false)
@@ -10244,6 +10288,85 @@ CString	get_system_label(int csidl, int* sysIconIndex)
 	CoUninitialize();
 
 	return sfi.szDisplayName;
+}
+
+//현재 실행파일의 새 버전을 특정 임시 이름으로 다운받았다는 가정하에 이 함수를 실행하면
+//자신을 스스로 업데이트시키는 bat파일을 생성하고 실행시킨다.
+//메인은 이 함수를 호출하고 약간의 시간 딜레이를 준 후 종료시키면
+//이 배치파일이 실행되면서 스스로 패치되도록 한다.
+bool run_self_update_batch()
+{
+	CString path = get_exe_directory();
+	CString exe_name = get_exe_filename();
+	CString backup_name = exe_name + _T(".backup");
+	CString temp_postfix = _T("_patch_temp");
+	CString temp_file = get_exe_filename(false) + temp_postfix;
+	CString batch_file = path + _T("\\") + _T("_self_update.bat");
+
+	FILE* fp = NULL;
+	_tfopen_s(&fp, batch_file, _T("wt")CHARSET);
+
+	if (!fp)
+	{
+		AfxMessageBox(_T("업데이트 배치파일을 생성하지 못했습니다."));
+		return false;
+	}
+
+	//UTF-8로 저장하되 자동으로 붙는 BOM(3 char)를 날려준다.
+	//그렇지 않으면 InternetReadFile()로 읽어올 때 BOM문자까지 읽어지므로 문제가 된다.
+	fseek(fp, 0L, SEEK_SET);
+
+	//_ftprintf(fp, _T("@echo off\n"));
+
+	//set 등 이 배치파일에서 사용하는 명령들이	영향을 주지 않도록 하기 위해 setlocal로 로컬변수로 만들어준다.
+	_ftprintf(fp, _T("setlocal\n"));
+
+	//각 로컬변수 정의
+	_ftprintf(fp, _T("set \"APPDIR=%s\"\n"), path);
+	_ftprintf(fp, _T("set \"APP=%%APPDIR%%\\%s\"\n"), exe_name);
+	_ftprintf(fp, _T("set \"APP_NAME=%s\"\n"), exe_name);
+	_ftprintf(fp, _T("set \"NEW=%%APPDIR%%\\%s\"\n"), temp_file);
+	_ftprintf(fp, _T("set \"OLD=%%APPDIR%%\\%s\"\n"), backup_name);
+	_ftprintf(fp, _T("\n"));
+
+	_ftprintf(fp, _T(":waitloop\n"));
+	_ftprintf(fp, _T("if exist \"%%APP%%\" (\n"));
+	_ftprintf(fp, _T("	move /y \"%%APP%%\" \"%%OLD%%\" >nul 2>nul\n"));
+	_ftprintf(fp, _T("	if exist \"%%APP%%\" (\n"));
+	_ftprintf(fp, _T("		ping 127.0.0.1 -n 2 >nul\n"));
+	_ftprintf(fp, _T("		goto waitloop\n"));
+	_ftprintf(fp, _T("	)\n"));
+	_ftprintf(fp, _T(")\n\n"));
+
+	//새 파일을 원래 이름으로 변경. 변경이 실패하면 backup을 복원시키고 batch도 종료시킨다.
+	_ftprintf(fp, _T("move /y \"%%NEW%%\" \"%%APP%%\" >nul\n"));
+	_ftprintf(fp, _T("if not exist \"%%APP%%\" (\n"));
+	_ftprintf(fp, _T("	if exist \"%%OLD%%\" move /y \"%%OLD%%\" \"%%APP%%\" >nul\n"));
+	_ftprintf(fp, _T("	exit /b 1\n"));
+	_ftprintf(fp, _T(")\n\n"));
+
+	//실행시킨 후 3초 정도 기다렸다가 실행파일이 정상적으로 실행되었는지 확인한다.
+	_ftprintf(fp, _T("start \"\" \"%%APP%%\"\n"));
+	_ftprintf(fp, _T("ping 127.0.0.1 -n 3 >nul\n"));
+	_ftprintf(fp, _T("tasklist /fi \"imagename eq %%APP_NAME%%\" | find /i \"%%APP_NAME%%\" >nul\n"));
+	_ftprintf(fp, _T("if errorlevel 1 (\n"));
+	_ftprintf(fp, _T("	exit /b 1\n"));
+	_ftprintf(fp, _T(") else (\n"));
+	_ftprintf(fp, _T("	del /f /q \"%%OLD%%\"\n"));	//실행이 정상적으로 되었으면 백업파일은 삭제한다.
+	_ftprintf(fp, _T("\n"));
+	_ftprintf(fp, _T("\n"));
+	_ftprintf(fp, _T(")\n"));
+	_ftprintf(fp, _T("\n"));
+	_ftprintf(fp, _T("\n"));
+	_ftprintf(fp, _T("endlocal\n"));
+	//_ftprintf(fp, _T("exit /b 0\n"));
+
+	fflush(fp);
+	fclose(fp);
+
+	ShellExecute(NULL, _T("OPEN"), batch_file, NULL, NULL, SW_HIDE);
+
+	return true;
 }
 
 //이 값은 윈도우가 설치될 때 생성되고 재설치되지 않으면 유지된다.

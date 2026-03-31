@@ -59,7 +59,7 @@ BEGIN_MESSAGE_MAP(CSCEdit, CMFCMaskedEdit)
 	ON_WM_SIZE()
 	ON_WM_PAINT()
 	ON_WM_NCCALCSIZE()
-	//ON_WM_NCPAINT()
+	ON_WM_NCPAINT()
 	ON_CONTROL_REFLECT_EX(EN_SETFOCUS, &CSCEdit::OnEnSetfocus)
 	ON_CONTROL_REFLECT_EX(EN_KILLFOCUS, &CSCEdit::OnEnKillfocus)
 	ON_CONTROL_REFLECT_EX(EN_UPDATE, &CSCEdit::OnEnUpdate)
@@ -656,6 +656,7 @@ void CSCEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSCEdit::OnNcPaint()
 {
+	//CEdit::OnNcPaint();
 	return;
 	//Default();
 

@@ -1838,7 +1838,13 @@ void CSCSliderCtrl::set_pos(int pos)
 	if (!m_hWnd)
 		return;
 
+	//20260331 scpark
+	//CTest_SliderCtrlExDlg 프로젝트에서 휠을 움직였을 때 CTest_SliderCtrlExDlg에도 이 이벤트 메시지를 보내고
+	//CTest_SliderCtrlExDlg에서는 현재 변경된 slider의 pos로 모두 set_pos()하는 코드가 있다.
+	//그런데 여기서 Invalidate()만 호출하면 다른 slider의 UI가 바로 갱신되지 않고 깨지는 현상이 발생한다.
+	//UpdateWindow()까지 호출해줘야 즉시 갱신된다.
 	Invalidate();
+	UpdateWindow();
 }
 
 int CSCSliderCtrl::get_lower()
@@ -1997,14 +2003,28 @@ Gdiplus::Color CSCSliderCtrl::sample_gradient(float t) const
 	return lerp_color(m_gradient_colors[idx], m_gradient_colors[idx + 1], local_t);
 }
 
+//휠을 올리면 감소하고 내리면 증가하는 기본 동작을 반대로 동작하도록 수정.
 BOOL CSCSliderCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	int pos = GetPos();
+	TRACE(_T("delta = %d, pos = %d\n"), zDelta, pos);
 
-	Invalidate();
+	if (zDelta > 0)
+		pos += 1;
+	else
+		pos -= 1;
+
+	int lower = get_lower();
+	int upper = get_upper();
+
+	Clamp(pos, lower, upper);
+
+	set_pos(pos);
+
 	CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_move, this, pos);
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&msg, 0);
 
-	return CSliderCtrl::OnMouseWheel(nFlags, zDelta, pt);
+	return TRUE;
+	//return CSliderCtrl::OnMouseWheel(nFlags, -zDelta, pt);
 }

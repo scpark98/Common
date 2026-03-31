@@ -180,6 +180,8 @@ public:
 	}	//콜백함수 콜 방식으로 이벤트를 전달할 경우 사용.
 
 	//int		GetPos();
+	//m_hWnd 유효한지 검사, 특정 스타일에서의 별도 처리등이 포함되어 있으므로 CSliderCtrl::SetPos() 대신 이 함수를 사용한다.
+	//SetPos()를 사용해도 set_pos()가 호출되도록 함.
 	void	set_pos(int pos);
 	void	SetPos(int pos) { set_pos(pos); }
 	void	set_range(int lower, int upper) { SetRange(lower, upper); }

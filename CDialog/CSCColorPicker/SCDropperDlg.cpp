@@ -1,5 +1,6 @@
 ﻿// SCDropperDlg.cpp
 #include "SCDropperDlg.h"
+#include "../../Functions.h"
 
 IMPLEMENT_DYNAMIC(CSCDropperDlg, CDialog)
 
@@ -197,6 +198,16 @@ void CSCDropperDlg::update_display()
 		g.DrawEllipse(&borderPen,
 			1.5f, 1.5f,
 			(float)(ws - 3), (float)(ws - 3));
+
+		CString rgb;
+		rgb.Format(_T("(%dx%d %s"), cursor.x - m_screen_origin.x, cursor.y - m_screen_origin.y, get_color_str(m_center_color));
+
+		CRect rinfo(0, 0, ws, ws);
+		rinfo.OffsetRect(0, 32);
+		draw_text(g, rinfo, rgb, 12.0f, Gdiplus::FontStyleBold, 2, 1.0f, _T("Arial"), Gdiplus::Color::Black);
+		//Gdiplus::Font font(L"Arial", 12);
+		//Gdiplus::SolidBrush brush(Gdiplus::Color(255, 255, 255, 255));
+		//g.DrawString(rgb, -1, &font, Gdiplus::PointF(10.f, 10.f), &brush);
 	}
 
 	HBITMAP hBmp = nullptr;

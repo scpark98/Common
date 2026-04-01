@@ -438,7 +438,7 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				//창에 맞게 크기조절이 아니고 확대/축소되고 이미지 표시 영역이 rc를 벗어났다면 스크롤 처리
-				else if (!m_fit2ctrl && !rect_in_rect(get_rc(m_hWnd), m_r_display))
+				else if (!m_fit2ctrl && !rect_in_rect(get_client_rect(m_hWnd), m_r_display))
 				{
 					scroll(is_ctrl_pressed ? interval * 8 : 8, 0);
 					return true;
@@ -460,7 +460,7 @@ BOOL CSCD2ImageDlg::PreTranslateMessage(MSG* pMsg)
 					return TRUE;
 				}
 				//창에 맞게 크기조절이 아니고 확대/축소되고 이미지 표시 영역이 rc를 벗어났다면 스크롤 처리
-				else if (!m_fit2ctrl && !rect_in_rect(get_rc(m_hWnd), m_r_display))
+				else if (!m_fit2ctrl && !rect_in_rect(get_client_rect(m_hWnd), m_r_display))
 				{
 					scroll(is_ctrl_pressed ? interval * -8 : -8, 0);
 					return true;

@@ -2477,7 +2477,10 @@ h		: 복사할 height 크기(pixel)
 	//w, h보다 target이 적을때는 target보다 큰 영역이 리턴될 것이다.
 	CRect		get_center_rect(CRect target, int w, int h);
 
-	CRect		get_rc(HWND hWnd);
+	CRect		get_client_rect(HWND hWnd);
+	//GetWindowRect()는 실제 보여지는 윈도우의 리얼 좌표가 아닌 DWM/Aero 기반의 resize border까지 포함하므로 보통 8씩 확장된 영역을 리턴한다.
+	//특히 전체화면일 경우 lt는 0,0이 아닌 -8,-8로 리턴된다. 실제 보여지는 영역을 구하기 위한 함수
+	CRect		get_window_real_rect(CWnd* pWnd);
 
 	bool		pt_in_rect(CRect r, CPoint pt);
 	bool		pt_in_rect(Gdiplus::RectF r, CPoint pt);

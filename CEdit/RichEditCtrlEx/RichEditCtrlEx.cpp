@@ -35,7 +35,7 @@ BEGIN_MESSAGE_MAP(CRichEditCtrlEx, CRichEditCtrl)
 	ON_WM_RBUTTONUP()
 	ON_WM_RBUTTONDBLCLK()
 	ON_WM_TIMER()
-	ON_COMMAND_RANGE(id_menu_richedit_toggle_log, id_menu_richedit_toggle_time, OnPopupMenu)
+	ON_COMMAND_RANGE(id_menu_richedit_auto_scroll, id_menu_richedit_toggle_time, OnPopupMenu)
 	ON_WM_MOUSEHWHEEL()
 	ON_WM_HSCROLL()
 	ON_WM_VSCROLL()
@@ -149,10 +149,10 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	CHARFORMAT	cf;
 	ZeroMemory(&cf, sizeof(cf));
 
-	CPoint pt = GetCaretPos();
-	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
-	if (pt.x > 1)
-		m_auto_scroll = false;
+	//CPoint pt = GetCaretPos();
+	////TRACE(_T("%d, %d\n"), pt.x, pt.y);
+	//if (pt.x > 10)
+	//	m_auto_scroll = false;
 
 	SCROLLINFO	si;
 	si.cbSize = sizeof(SCROLLINFO);
@@ -860,6 +860,8 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 
 	menu.CreatePopupMenu();
 
+	menu.AppendMenu(MF_STRING, id_menu_richedit_auto_scroll, _T("Auto Scroll(&A)"));
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, id_menu_richedit_clearl_log, _T("Clear all logs(&C)"));
 	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, id_menu_richedit_toggle_log, _T("Display logs(&S)"));
@@ -875,6 +877,7 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 	paraFormat.dwMask = PFM_LINESPACING;
 	BYTE nLineSpacing = paraFormat.bLineSpacingRule;	//줄간격을 1.5배로 한다. 0=1.0, 1=1.5, 2=2.0
 
+	menu.CheckMenuItem(id_menu_richedit_auto_scroll, m_auto_scroll ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(id_menu_richedit_toggle_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(id_menu_richedit_toggle_time, m_show_time ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(id_menu_richedit_line_space10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED);
@@ -939,6 +942,9 @@ void CRichEditCtrlEx::OnPopupMenu(UINT menuID)
 {
 	switch (menuID)
 	{
+		case id_menu_richedit_auto_scroll :
+			m_auto_scroll = !m_auto_scroll;
+			break;
 		case id_menu_richedit_toggle_log :
 			toggle_show_log();
 			break;
@@ -1038,6 +1044,10 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 		//TRACE(_T("CRichEditCtrlEx::PreTranslateMessage(). WM_VSCROLL\n"));
 		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_VSCROLL), 0);
 		return FALSE;
+	}
+	else if (pMsg->message == WM_LBUTTONDOWN)
+	{
+		m_auto_scroll = false;
 	}
 
 	return CRichEditCtrl::PreTranslateMessage(pMsg);
@@ -1159,7 +1169,7 @@ void CRichEditCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 	//Trace_func();
 	//CPoint pt = GetCaretPos();
 	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
-
+	m_auto_scroll = false;
 
 	CRichEditCtrl::OnLButtonDown(nFlags, point);
 }

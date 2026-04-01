@@ -64,16 +64,16 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGING, &CSCTreeCtrl::OnTvnSelchanging)
 	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGED, &CSCTreeCtrl::OnTvnSelchanged)
 	ON_WM_WINDOWPOSCHANGED()
-	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDING, &CSCTreeCtrl::OnTvnItemexpanding)
+	ON_NOTIFY_REFLECT_EX(TVN_ITEMEXPANDING, &CSCTreeCtrl::OnTvnItemexpanding)
 	ON_NOTIFY_REFLECT_EX(NM_CLICK, &CSCTreeCtrl::OnNMClick)
-	ON_NOTIFY_REFLECT(TVN_BEGINDRAG, &CSCTreeCtrl::OnTvnBegindrag)
-	ON_NOTIFY_REFLECT(NM_DBLCLK, &CSCTreeCtrl::OnNMDblclk)
+	ON_NOTIFY_REFLECT_EX(TVN_BEGINDRAG, &CSCTreeCtrl::OnTvnBegindrag)
+	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CSCTreeCtrl::OnNMDblclk)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
 	ON_WM_HSCROLL()
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
 	ON_NOTIFY_REFLECT_EX(TVN_ENDLABELEDIT, &CSCTreeCtrl::OnTvnEndlabeledit)
-	ON_NOTIFY_REFLECT(TVN_ITEMEXPANDED, &CSCTreeCtrl::OnTvnItemexpanded)
+	ON_NOTIFY_REFLECT_EX(TVN_ITEMEXPANDED, &CSCTreeCtrl::OnTvnItemexpanded)
 	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomDraw)
 	ON_WM_TIMER()
 	ON_WM_CONTEXTMENU()
@@ -1261,7 +1261,7 @@ bool CSCTreeCtrl::is_visible_item(HTREEITEM hItem)
 	return (r.Height() > 0);
 }
 
-void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
+BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
@@ -1292,6 +1292,8 @@ void CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 
 	*pResult = 0;
+
+	return FALSE;
 }
 
 //check, has button등에 의해 HitTest가 알아서 해당 영역을 알려주리라 기대했으나
@@ -1784,9 +1786,11 @@ void CSCTreeCtrl::set_color_theme(int theme, bool apply_now)
 }
 */
 
-void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
+BOOL CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	HTREEITEM hItem = GetSelectedItem();
+
 	/*
 	CPoint pt;
 	UINT nFlags = 0;
@@ -1817,16 +1821,18 @@ void CSCTreeCtrl::OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 	*/
 	*pResult = 0;
+
+	return FALSE;
 }
 
 
-void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
+BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 
 	if (!m_use_drag_and_drop || !m_is_shell_treectrl)
-		return;
+		return FALSE;
 
 	CRect	rc;
 	GetClientRect(rc);
@@ -1899,6 +1905,8 @@ void CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	TRACE(_T("start drag...\n"));
 
 	*pResult = 0;
+
+	return FALSE;
 }
 
 //https://jiniya.net/tt/594/
@@ -2843,14 +2851,13 @@ void CSCTreeCtrl::undo_edit_label()
 
 LRESULT CSCTreeCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 {
-	CSCEdit* pEdit = (CSCEdit*)wParam;
-	int	msg = (int)lParam;
+	CSCEditMessage* msg = (CSCEditMessage*)wParam;
 
-	if (!pEdit->IsWindowVisible())
+	if (msg->pThis->IsWindowVisible() == FALSE)
 		return 0;
 
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
-	if (msg == WM_KILLFOCUS)
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)msg->message, msg->pThis);
+	if (msg->message == WM_KILLFOCUS)
 		edit_end();
 
 	Invalidate();
@@ -2908,7 +2915,7 @@ void CSCTreeCtrl::set_font_italic(bool italic)
 }
 
 
-void CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
+BOOL CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
@@ -2923,6 +2930,8 @@ void CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 		Expand(pNMTreeView->itemNew.hItem, TVE_EXPAND);
 	*/
 	*pResult = 0;
+
+	return FALSE;
 }
 
 //해당 아이템에 지정된 이미지 인덱스를 리턴한다.

@@ -376,6 +376,15 @@ Gdiplus::Color get_gcolor_from_hexa_str(CString hexa_str)
 	return Gdiplus::Color(a, r, g, b);
 }
 
+//rgb 순서로 "123, 12, 255" 형태의 문자열을 리턴.
+CString get_color_str(COLORREF cr, CString sep)
+{
+	CString str;
+
+	str.Format(_T("%d%s%d%s%d"), GetRValue(cr), sep, GetGValue(cr), sep, GetBValue(cr));
+	return str;
+}
+
 //argb 순서로 "255, 123, 12, 255" 형태의 문자열을 리턴.
 CString	get_color_str(Gdiplus::Color cr, bool include_alpha, CString sep)
 {
@@ -1338,9 +1347,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_edit_text			= cr_text;
 			cr_edit_back			= Gdiplus::Color::White;
 
-			cr_title_text			= get_sys_color(COLOR_CAPTIONTEXT);
-			cr_title_back_active	= get_sys_color(COLOR_ACTIVECAPTION);
-			cr_title_back_inactive	= get_sys_color(COLOR_INACTIVECAPTION);
+			cr_title_text			= Gdiplus::Color(32, 32, 32);// get_sys_color(COLOR_CAPTIONTEXT);
+			cr_title_back_active	= Gdiplus::Color(239, 244, 249);// get_sys_color(COLOR_ACTIVECAPTION);
+			cr_title_back_inactive	= Gdiplus::Color(239, 244, 249);// get_sys_color(COLOR_INACTIVECAPTION);
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 

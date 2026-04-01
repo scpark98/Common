@@ -34,6 +34,7 @@
 #pragma comment(lib, "netapi32.lib")
 
 #ifndef _USING_V110_SDK71_
+#pragma comment(lib, "Dwmapi.lib")
 #include <dwrite.h>
 #pragma comment(lib, "dwrite")
 #pragma comment(lib, "d2d1.lib")
@@ -3191,14 +3192,15 @@ void request_url(CRequestUrlParams* params)
 	//HTTP_QUERY_FLAG_NUMBER을 넣지 않으면 HttpQueryInfo()에서 오류가 발생한다.
 	DWORD dwBufLen = sizeof(dwTotalSize);
 	uint64_t total_read = 0;
-	char* total_result = NULL;
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwTotalSize, &dwBufLen, NULL);
 
 	if (!ret)
-		dwTotalSize = 4 * 10240;
+		dwTotalSize = 16 * 1024;
 
-	total_result = new char[dwTotalSize + 1];
-	memset(total_result, 0, sizeof(char) * (dwTotalSize + 1));
+	std::string total_result;
+	total_result.reserve(dwTotalSize + 1);
+
+	bool first_bom_check = true;
 
 	do
 	{
@@ -3206,7 +3208,17 @@ void request_url(CRequestUrlParams* params)
 		long t2 = clock();
 		//1.48GB, buffer_size에 따른 시간 비교. 1K:133s, 4K:65s, 1M:63s, 4M:64s
 		//버퍼 크기가 1K면 너무 빈번한 read가 발생하여 느리지만 4K이상이면 큰 차이는 발생하지 않는다.
-		InternetReadFile(hOpenRequest, buffer, buffer_size, &dwRead);
+		if (!InternetReadFile(hOpenRequest, buffer, buffer_size, &dwRead))
+		{
+			params->result = _T("InternetReadFile() failed.");
+			params->status = -1;
+
+			InternetCloseHandle(hOpenRequest);
+			InternetCloseHandle(hInternetConnect);
+			InternetCloseHandle(hInternetRoot);
+
+			return;
+		}
 
 		total_read += dwRead;
 
@@ -3215,21 +3227,29 @@ void request_url(CRequestUrlParams* params)
 
 		if (params->local_file_path.IsEmpty())
 		{
-			//UTF-8 with BOM으로 작성된 txt 파일을 읽어오면 파일 헤더에 EF BB BF 라는 3 char가 붙어온다.
-			//이는 윈도우에서 fopen으로 읽어올때는 문제되지 않으나
-			//InternetReadFile()로 읽어와서 저장하면 맨 앞 글자가 깨져 표시되는 문제가 발생한다. 날려준다.
-			if (byte(buffer[0]) == 0xEF &&
-				byte(buffer[1]) == 0xBB &&
-				byte(buffer[2]) == 0xBF)
-				memcpy(buffer, buffer + 3, dwRead - 3);
-			//TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
-			//buffer[dwRead] = '\0';
-			strncat(total_result, buffer, dwRead);
-			//TRACE(_T("total_result len = %d\n"), strlen(total_result));
+			total_result.append(buffer, buffer + dwRead);
+			/*
+			if (first_bom_check)
+			{
+				//UTF-8 with BOM으로 작성된 txt 파일을 읽어오면 파일 헤더에 EF BB BF 라는 3 char가 붙어온다.
+				//이는 윈도우에서 fopen으로 읽어올때는 문제되지 않으나
+				//InternetReadFile()로 읽어와서 저장하면 맨 앞 글자가 깨져 표시되는 문제가 발생한다. 날려준다.
+				if (byte(buffer[0]) == 0xEF &&
+					byte(buffer[1]) == 0xBB &&
+					byte(buffer[2]) == 0xBF)
+					memcpy(buffer, buffer + 3, dwRead - 3);
+				//TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
+				//buffer[dwRead] = '\0';
+				strncat(total_result, buffer, dwRead);
+				//TRACE(_T("total_result len = %d\n"), strlen(total_result));
 
-			//buffer_size씩 읽어와서 UTF8toCString()하여 result에 넣어주면 반쪽짜리 한글이 생겨서 깨지게 된다.
-			//모두 읽어온 후 한번에 UTF8toCString()을 돌려야 한다.
-			//params->result += UTF8toCString(buffer);
+				//buffer_size씩 읽어와서 UTF8toCString()하여 result에 넣어주면 반쪽짜리 한글이 생겨서 깨지게 된다.
+				//모두 읽어온 후 한번에 UTF8toCString()을 돌려야 한다.
+				//params->result += UTF8toCString(buffer);
+
+				first_bom_check = false;
+			}
+			*/
 		}
 		else
 		{
@@ -3239,7 +3259,7 @@ void request_url(CRequestUrlParams* params)
 				if (PathFileExists(params->local_file_path) && !DeleteFile(params->local_file_path))
 				{
 					SAFE_DELETE_ARRAY(buffer);
-					SAFE_DELETE_ARRAY(total_result);
+					//SAFE_DELETE_ARRAY(total_result);
 
 					InternetCloseHandle(hOpenRequest);
 					InternetCloseHandle(hInternetConnect);
@@ -3251,11 +3271,11 @@ void request_url(CRequestUrlParams* params)
 					return;
 				}
 
-				hFile = CreateFile(params->local_file_path, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+				hFile = CreateFile(params->local_file_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 				if (hFile == INVALID_HANDLE_VALUE)
 				{
 					SAFE_DELETE_ARRAY(buffer);
-					SAFE_DELETE_ARRAY(total_result);
+					//SAFE_DELETE_ARRAY(total_result);
 
 					InternetCloseHandle(hOpenRequest);
 					InternetCloseHandle(hInternetConnect);
@@ -3268,26 +3288,44 @@ void request_url(CRequestUrlParams* params)
 				}
 			}
 
-			WriteFile(hFile, buffer, dwRead, &dwWritten, NULL);
+			if (!WriteFile(hFile, buffer, dwRead, &dwWritten, NULL) || dwWritten != dwRead)
+			{
+				CloseHandle(hFile);
+				DeleteFile(params->local_file_path);
+				SAFE_DELETE_ARRAY(buffer);
+				//SAFE_DELETE_ARRAY(total_result);
+				InternetCloseHandle(hOpenRequest);
+				InternetCloseHandle(hInternetConnect);
+				InternetCloseHandle(hInternetRoot);
+				params->result = _T("error=") + params->local_file_path + _T("\n\nfail to WriteFile().");
+				params->status = -1;
+				TRACE(_T("result = %s\n"), params->result);
+				return;
+			}
+
 			params->downloaded_size += dwWritten;
 
 			//TRACE(_T("id = %d, downloaded_size = %d\n"), params->request_id, params->downloaded_size);
 		}
 	} while (dwRead != 0);
 
-	total_result[dwTotalSize] = '\0';
-	params->result = UTF8toCString(total_result);
+	// BOM 제거
+	const char* p = total_result.data();
+	size_t len = total_result.size();
 
-	if (params->local_file_path.IsEmpty())
+	if (len >= 3 &&
+		(unsigned char)p[0] == 0xEF &&
+		(unsigned char)p[1] == 0xBB &&
+		(unsigned char)p[2] == 0xBF)
 	{
-		//UTF-8 with BOM으로 인코딩 된 파일의 경우 헤더에 EF BB BF가 붙는다. 제거하자.
-		if (params->result.GetLength() >= 3 &&
-			params->result[0] == 0xEF &&
-			params->result[1] == 0xBB &&
-			params->result[2] == 0xBF)
-			params->result = params->result.Mid(3);
+		params->result = UTF8toCString((char*)std::string(p + 3, len - 3).c_str());
 	}
 	else
+	{
+		params->result = UTF8toCString((char*)total_result.c_str());
+	}
+
+	if (!params->local_file_path.IsEmpty())
 	{
 		CloseHandle(hFile);
 		params->result = _T("");
@@ -3295,7 +3333,7 @@ void request_url(CRequestUrlParams* params)
 
 	SAFE_DELETE_ARRAY(jsonData);
 	SAFE_DELETE_ARRAY(buffer);
-	SAFE_DELETE_ARRAY(total_result);
+	//SAFE_DELETE_ARRAY(total_result);
 
 	InternetCloseHandle(hOpenRequest);
 	InternetCloseHandle(hInternetConnect);
@@ -14367,11 +14405,47 @@ CRect get_center_rect(CRect target, int w, int h)
 	return CRect(target.left + (target.Width() - w) / 2, target.top + (target.Height() - h) / 2, w, h);
 }
 
-CRect get_rc(HWND hWnd)
+CRect get_client_rect(HWND hWnd)
 {
 	CRect r;
 	::GetClientRect(hWnd, &r);
 	return r;
+}
+
+//GetWindowRect()는 실제 보여지는 윈도우의 리얼 좌표가 아닌 DWM/Aero 기반의 resize border까지 포함하므로 보통 8씩 확장된 영역을 리턴한다.
+//특히 전체화면일 경우 lt는 0,0이 아닌 -8,-8로 리턴된다. 실제 보여지는 영역을 구하기 위한 함수
+CRect get_window_real_rect(CWnd* pWnd)
+{
+	CRect rw;
+
+	if (!pWnd)
+		return rw;
+
+	pWnd->GetWindowRect(rw);
+
+	if (pWnd->IsZoomed())
+	{
+		//최대화일때는 해당 윈도우가 포함된 모니터의 해상도를 리턴하고
+		int index = get_monitor_index(rw.CenterPoint().x, rw.CenterPoint().y);
+		rw = g_monitors[index].rMonitor;
+	}
+	else
+	{
+		//일반 창 모드일 경우에는 직접 계산한다.
+#ifndef _USING_V110_SDK71_
+		RECT rcFrame{};
+		DwmGetWindowAttribute(
+			pWnd->m_hWnd,
+			DWMWA_EXTENDED_FRAME_BOUNDS,
+			&rcFrame,
+			sizeof(rcFrame));
+		rw = rcFrame;
+#else
+#endif
+	}
+
+	trace(rw);
+	return rw;
 }
 
 //주어진 점들을 포함하는 최대 사각형을 구한다.

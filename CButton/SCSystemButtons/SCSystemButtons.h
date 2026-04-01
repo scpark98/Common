@@ -5,11 +5,16 @@
 * parent dlg의 h에서 다음과 같이 선언하고
 		CSCSystemButtons	m_sys_buttons;
   cpp에서 다음과 같이 호출하면 생성 및 설정이 완료된다.
+		m_sys_buttons.create(this, rc.right, m_titlebar_height, -1, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE); or
+		m_sys_buttons.create(this, rc.right, m_titlebar_height, -1, SC_CLOSE);//종료 버튼만 필요한 경우
+
+		//특히 CSCThemeDlg에서는 m_sys_buttons을 이미 선언, 생성하므로 아래와 같이 바로 설정할 수 있다.
 		set_system_buttons(SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE);
   
 * set_color_theme()으로 컬러 테마를 선택할 수 있다.
+* 
 * parent dlg의 OnSize()등에서 아래와 같이 보정해줘야 올바른 위치에 표시된다.
-		m_sys_buttons.adjust_right(rc.right);
+		m_sys_buttons.adjust(rc.top, rc.right);
 */
 
 #include <afxwin.h>
@@ -18,6 +23,10 @@
 #include "../../colors.h"
 
 #define DEFAULT_SYSTEM_BUTTON_WIDTH 44
+
+static const UINT Message_CSCSystemButtons = ::RegisterWindowMessage(_T("MessageString_CSCSystemButtons"));
+
+class CSCSystemButtons;
 
 enum SCSYSTEM_BUTTON_CUSTOM
 {
@@ -28,6 +37,19 @@ enum SCSYSTEM_BUTTON_CUSTOM
 	//그 외 SC_MINIMIZE, SC_MAXIMIZE, SC_RESTORE는 건드리지 않는다.
 	SC_PIN = WM_USER + 0x1001,	//add new sc command for always on top
 	SC_HELP,
+};
+
+class CSCSystemButtonsMessage
+{
+public:
+	CSCSystemButtonsMessage(CSCSystemButtons* _pThis, int _cmd)
+	{
+		pThis = _pThis;
+		cmd = _cmd;
+	}
+	
+	CSCSystemButtons* pThis = nullptr;
+	int cmd = -1;
 };
 
 class CSCSystemButtonProperty
@@ -162,6 +184,7 @@ public:
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void	set_color_theme(int theme, bool invalidate = false);
+	CSCColorTheme* get_color_theme() { return &m_theme; }
 	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
 	void	set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; }
 	void	set_back_hover_color(Gdiplus::Color cr_back_hover) { m_theme.cr_back_hover = cr_back_hover; }

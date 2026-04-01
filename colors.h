@@ -267,7 +267,8 @@ COLORREF		get_color_from_hexa_str(CString hexa_str);
 //#RRGGBB 또는 #AARRGGBB와 같은 16진수 컬러 문자열을 Gdiplus::Color로 변환
 Gdiplus::Color	get_gcolor_from_hexa_str(CString hexa_str);
 
-
+//rgb 순서로 "123, 12, 255" 형태의 문자열을 리턴.
+CString			get_color_str(COLORREF cr, CString sep = _T(", "));
 //argb 순서로 "255, 123, 12, 255" 형태의 문자열을 리턴.
 CString			get_color_str(Gdiplus::Color cr, bool include_alpha = true, CString sep = _T(", "));
 

@@ -77,7 +77,8 @@ public:
 
 	enum CRichEditCtrlExMenu
 	{
-		id_menu_richedit_toggle_log = 9900,
+		id_menu_richedit_auto_scroll = 9900,
+		id_menu_richedit_toggle_log,
 		id_menu_richedit_clearl_log,
 		id_menu_richedit_line_space10,
 		id_menu_richedit_line_space15,
@@ -162,7 +163,10 @@ protected:
 	int			m_clear_log_interval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
 	int			m_max_length;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
 	int			m_scroll_size;
-	bool		m_auto_scroll = true;	//default = true;
+	//내용이 계속 추가될 때 자동 스크롤되는데 text 임의 위치를 클릭하면 auto scroll은 자동 해제된다.
+	//팝업메뉴를 통해 on/off 할 수 있다.
+	//default = true;
+	bool		m_auto_scroll = true;
 
 	int			m_align = PFA_LEFT;
 

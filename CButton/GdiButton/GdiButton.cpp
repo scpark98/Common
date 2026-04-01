@@ -1896,20 +1896,16 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 			Invalidate();
 			Wait(1);
 
-			//GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 			SetCapture();
 			SetTimer(timer_auto_repeat, m_repeat_initial_delay, NULL);
-			//if (m_sent_once_auto_repeat_click_message == 0 && (GetState() & BST_PUSHED) != 0)
-			//{
-			//	GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
-			//}
-
 			return;
 		}
-
-		SetCapture();
-		CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN);
-		::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+		else
+		{
+			SetCapture();
+			CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN);
+			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+		}
 	}
 
 	CButton::OnLButtonDown(nFlags, point);

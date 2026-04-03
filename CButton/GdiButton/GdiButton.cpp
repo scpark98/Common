@@ -1487,6 +1487,25 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (is_down)
 		rText.OffsetRect(m_down_offset);
 
+	if (m_menu_items.size() > 0)
+	{
+		CRect rDownArrow = rText;
+		rDownArrow.left = rText.right - m_menu_button_width;
+		rDownArrow.DeflateRect(4, 4);
+
+		rText.right -= m_menu_button_width;
+
+		//draw separator line
+		draw_line(&dc, rDownArrow.left, rDownArrow.top, rDownArrow.left, rDownArrow.bottom, GRAY128);
+
+		//draw dropdown arrow using draw_line
+		CPoint cp = rDownArrow.CenterPoint();
+		cp.Offset(1, -1);
+
+		for (int arrow = 0; arrow < 4; arrow++)
+			draw_line(&dc, cp.x - 4 + arrow, cp.y + arrow, cp.x + 4 - arrow, cp.y + arrow, GRAY64);
+	}
+
 	dc.DrawText(text, rText, dwText);
 	dc.SelectObject(pOldFont);
 }
@@ -1900,6 +1919,10 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 			SetTimer(timer_auto_repeat, m_repeat_initial_delay, NULL);
 			return;
 		}
+		else if (m_menu_items.size() > 0 && point.x >= rc.right - m_menu_button_width)
+		{
+			m_menu_clicked = true;
+		}
 		else
 		{
 			SetCapture();
@@ -1938,6 +1961,27 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 			else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON))
 			{
 				SetCheck((m_idx = 1));
+			}
+			else if (m_menu_items.size() > 0 && point.x >= rc.right - m_menu_button_width)
+			{
+				CMenu menu;
+				menu.CreatePopupMenu();
+
+				for (size_t i = 0; i < m_menu_items.size(); i++)
+					menu.AppendMenu(MF_STRING, i + 1, m_menu_items[i]);
+
+				CRect rw;
+				GetWindowRect(rw);
+				int cmd = menu.TrackPopupMenu(TPM_RETURNCMD | TPM_NONOTIFY, rw.left, rw.bottom, this);
+
+				//맨 첫번째	메뉴의 cmd값이 1이므로 1을 빼서 전달해야 한다.
+				if (cmd > 0)
+				{
+					CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_COMMAND, CPoint(), m_menu_items[cmd - 1]);
+					::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+				}
+
+				return;
 			}
 
 			GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);

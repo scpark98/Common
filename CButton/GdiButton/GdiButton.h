@@ -27,6 +27,10 @@
 		.기본 MFC 버튼과 동일하게 표시
 - 이미지 설정
 	-
+[메뉴 지원 버튼]
+- 이미지 버튼의 경우는 고려할 사항이 많으므로 우선 배제
+- 이미지가 설정되지 않은 기본 버튼만 대상으로 함
+- 버튼 클릭, 메뉴 클릭 구분 및 표시 방법?
 
 [draw_shadow 관련]
 - 이미지로 표현되는 버튼의 경우는 그림자를 생성해서 표현하는 것은 간단하나
@@ -132,18 +136,20 @@ static const UINT Message_CGdiButton = ::RegisterWindowMessage(_T("MessageString
 class CGdiButtonMessage
 {
 public:
-	CGdiButtonMessage(CWnd* _this, UINT _ctrl_id, int _message, CPoint _pt = CPoint(-1, -1))
+	CGdiButtonMessage(CWnd* _this, UINT _ctrl_id, int _message, CPoint _pt = CPoint(-1, -1), CString _text = CString())
 	{
 		pThis = _this;
 		ctrl_id = _ctrl_id;
 		message = _message;
 		pt = _pt;
+		text = _text;
 	}
 
 	CWnd*		pThis = NULL;
 	UINT		ctrl_id;
 	int			message;
 	CPoint		pt;
+	CString		text;
 };
 
 class CGdiButtonImage
@@ -197,7 +203,7 @@ public:
 	void		set_3state(bool tri_state = true) { m_is_3state = tri_state; }
 	bool		is_3state() { return m_is_3state; }
 
-	//SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 등의 한 값으로 줄 경우 해당 버튼이 그려진다.
+	//SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 등에서 한 값으로 줄 경우 해당 버튼이 그려진다.
 	void		set_button_cmd(UINT cmd) { m_button_cmd = cmd; }
 	
 	//기본 PUSH_BUTTON, CHECKBOX, RADIOBUTTON과 같은 style과는 달리
@@ -410,6 +416,25 @@ public:
 	void		set_auto_repeat(bool use = true);
 	void		set_auto_repeat_delay(int initial_delay = 1, int repeat_delay = 500);
 
+//menu button
+	//set_menu_items(_T("Menu Item 0"), _T("Menu Item 1"), _T("Menu Item 2"));
+	//이와 같이 각 메뉴 캡션을 나열하여 메뉴를 표시한다.
+	//caption과 id까지 모두 설정하여 처리하는 것이 정석이나 많이 복잡해지므로
+	//우선 caption만 지정하고 main의 on_message_CGdiButton()에서도 caption으로 비교하여 해당 명령을 처리한다.
+	template <typename ... T> void set_menu_items(T... menu_item_captions)
+	{
+		int n = sizeof...(menu_item_captions);
+		CString arg[] = { menu_item_captions... };
+
+		m_menu_items.clear();
+
+		for (auto caption : arg)
+			m_menu_items.push_back(caption);
+
+		Invalidate();
+	}
+
+
 	//public으로 하여 CSCGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
 	//하나의 버튼에는 n개의 이미지를 담을 수 있고 각 이미지는 4개의 state image를 각각 설정할 수 있다.
 	std::deque<CGdiButtonImage*> m_image;
@@ -583,6 +608,11 @@ protected:
 	int			m_repeat_delay = 500;
 	bool		m_use_auto_repeat = false;
 	int			m_sent_once_auto_repeat_click_message = 0;	//만약 down후 initial_delay가 되기도 전에 up된다면 이때에도 한번은 마우스 클릭 이벤트를 처리해줘야 한다.
+
+//menu button
+	std::deque<CString> m_menu_items;
+	bool		m_menu_clicked = false;
+	int			m_menu_button_width = 24;
 
 protected:
 	DECLARE_MESSAGE_MAP()

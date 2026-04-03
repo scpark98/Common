@@ -254,7 +254,7 @@ public:
 	void			set_font(CFont* font);
 
 	void			set_border_thick(int thick) { m_border_thick = thick; Invalidate(); }
-	void			draw_border(bool draw, int thick, Gdiplus::Color cr_outline) { m_draw_border = draw; m_border_thick = thick; m_theme.cr_border = cr_outline; Invalidate(); }
+	void			draw_border(bool draw, int thick, Gdiplus::Color cr_outline) { m_draw_border = draw; m_border_thick = thick; m_theme.cr_border_inactive = cr_outline; Invalidate(); }
 
 	void			set_blink_time(int nTime0 = 400, int nTime1 = 1200);
 	void			set_blink(BOOL bBlink = TRUE);

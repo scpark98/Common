@@ -9,6 +9,9 @@ BEGIN_MESSAGE_MAP(CSCDropperDlg, CDialog)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_KEYDOWN()
 	ON_WM_MOUSEWHEEL()
+	ON_WM_MBUTTONUP()
+	ON_WM_RBUTTONDOWN()
+	ON_WM_RBUTTONUP()
 END_MESSAGE_MAP()
 
 // --- 레지스트리 키 경로 (CSCColorPicker와 동일 그룹) ---
@@ -188,7 +191,9 @@ void CSCDropperDlg::update_display()
 	Gdiplus::Bitmap canvas(ws, ws, PixelFormat32bppPARGB);
 	{
 		Gdiplus::Graphics g(&canvas);
-		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+		//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+		//g.SetTextRenderingHint(Gdiplus::TextRenderingHint::TextRenderingHintAntiAliasGridFit);
 
 		Gdiplus::TextureBrush tb(&content);
 		g.FillEllipse(&tb,
@@ -199,15 +204,18 @@ void CSCDropperDlg::update_display()
 			1.5f, 1.5f,
 			(float)(ws - 3), (float)(ws - 3));
 
-		CString rgb;
-		rgb.Format(_T("(%dx%d %s"), cursor.x - m_screen_origin.x, cursor.y - m_screen_origin.y, get_color_str(m_center_color));
+		if (m_show_info)
+		{
+			CString rgb;
+			rgb.Format(_T("%dx%d (%s)"), cursor.x - m_screen_origin.x, cursor.y - m_screen_origin.y, get_color_str(m_center_color));
 
-		CRect rinfo(0, 0, ws, ws);
-		rinfo.OffsetRect(0, 32);
-		draw_text(g, rinfo, rgb, 12.0f, Gdiplus::FontStyleBold, 2, 1.0f, _T("Arial"), Gdiplus::Color::Black);
-		//Gdiplus::Font font(L"Arial", 12);
-		//Gdiplus::SolidBrush brush(Gdiplus::Color(255, 255, 255, 255));
-		//g.DrawString(rgb, -1, &font, Gdiplus::PointF(10.f, 10.f), &brush);
+			CRect rinfo(0, 0, ws, ws);
+			rinfo.OffsetRect(0, 32);
+			Gdiplus::Color cr_text;
+			cr_text.SetFromCOLORREF(m_center_color);
+			Gdiplus::Color cr_shadow = get_distinct_bw_color(cr_text);
+			draw_text(g, rinfo, rgb, 14.0f, Gdiplus::FontStyleBold, 2, 1.0f, _T("Arial"), cr_text, cr_shadow, cr_shadow);
+		}
 	}
 
 	HBITMAP hBmp = nullptr;
@@ -285,4 +293,38 @@ BOOL CSCDropperDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint /*pt*/)
 
 	update_display();
 	return TRUE;
+}
+void CSCDropperDlg::OnMButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	m_show_info = !m_show_info;
+	update_display();
+
+	CDialog::OnMButtonUp(nFlags, point);
+}
+
+void CSCDropperDlg::OnRButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	CDialog::OnRButtonDown(nFlags, point);
+}
+
+BOOL CSCDropperDlg::PreTranslateMessage(MSG* pMsg)
+{
+	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
+	return CDialog::PreTranslateMessage(pMsg);
+}
+
+void CSCDropperDlg::OnRButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	m_picked = false;
+
+	save_settings();
+	KillTimer(kTimerID);
+	DestroyWindow();
+
+	CDialog::OnRButtonUp(nFlags, point);
 }

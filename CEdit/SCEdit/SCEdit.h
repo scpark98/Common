@@ -78,6 +78,11 @@ public:
 	void					set_text(CString text = _T("")) { CMFCMaskedEdit::SetWindowText(text); }
 	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CMFCMaskedEdit::SetWindowText(text); }
 	void					SetWindowText(CString text) { set_text(text); }
+	//기존 CEdit을 상속받았을때는 문제 없었으나 CMaskedEdit을 상속받으면서
+	//EN_CHANGE에서 바로 전 단계의 text를 리턴하는 문제가 발생하여 Override하여
+	//GetWindowText()가 내부 m_str 캐시가 아닌 실제 edit control의 text를 리턴하도록 수정하였다.
+	//Sonnet : CMFCMaskedEdit::GetWindowText()는 내부 m_str 캐시를 반환한다.
+	void					GetWindowText(CString& text) const;
 
 	//아래와 같이 템플릿으로 구현하려 했으나 typeid()가 제대로 동작하지 않는 문제가 있어 사용할 수 없음.
 	//L"test string"을 인자로 넘기면 CString으로 기대했으나 typeid()가 const wchar_t[12]로 인식하는 등
@@ -181,10 +186,11 @@ public:
 	void				set_draw_border(bool draw = true, int border_width = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, int border_type = border_type_disregard);
 	bool				get_draw_border() { return m_draw_border; }
 	int					get_border_width() { return m_border_width; }
-	Gdiplus::Color		get_border_color() { return m_theme.cr_border; }
-	void				set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; }
+	Gdiplus::Color		get_border_color() { return m_theme.cr_border_inactive; }
+	void				set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; }
 	int					get_border_type() { return m_border_type; }
-	void				set_dark_border_on_focus(bool dark_on_focus = true) { m_dark_border_on_focus = dark_on_focus; }
+	//focus일때는 border가 더 진하게 그려진다. m_draw_border = false라도 focus를 가지면 그려진다.
+	void				set_border_color_on_active(Gdiplus::Color cr_border_active) { m_theme.cr_border_active = cr_border_active; }
 
 	// Generated message map functions
 protected:
@@ -203,7 +209,6 @@ protected:
 
 //border
 	bool				m_draw_border = false;
-	bool				m_dark_border_on_focus = false;		//focus일 때 border를 좀 더 진하게 그릴 지 여부. default = false
 	int					m_border_width = 1;	//border width
 	int					m_border_type = border_type_sunken;	//border radius
 	//Gdiplus::Color	m_cr_border = Gdiplus::Color::LightGray;	//border color
@@ -279,6 +284,7 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg BOOL OnEnChange();
+	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 };
 
 /////////////////////////////////////////////////////////////////////////////

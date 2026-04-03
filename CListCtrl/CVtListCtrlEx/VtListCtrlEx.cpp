@@ -5248,6 +5248,6 @@ void CVtListCtrlEx::OnNcPaint()
 		CRect rc;
 		GetWindowRect(&rc);
 		rc.OffsetRect(-rc.TopLeft());
-		draw_rect(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent);
+		draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
 	}
 }

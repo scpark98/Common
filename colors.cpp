@@ -483,6 +483,15 @@ COLORREF get_distinct_color(COLORREF cr)
 	return hsv2rgb(h, s, v);
 }
 
+COLORREF get_distinct_bw_color(COLORREF cr)
+{
+	uint8_t lum = get_gray_value(cr);
+
+	COLORREF distinct_bw_cr = (lum > 160) ? RGB(0, 0, 0) : RGB(255, 255, 255);
+
+	return distinct_bw_cr;
+}
+
 //보색과는 달리 alpha까지 고려한 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 Gdiplus::Color get_distinct_bw_color(Gdiplus::Color cr)
@@ -491,7 +500,7 @@ Gdiplus::Color get_distinct_bw_color(Gdiplus::Color cr)
 	const BYTE R_eff = static_cast<BYTE>(cr.GetR() * a + 255.0f * (1.0f - a));
 	const BYTE G_eff = static_cast<BYTE>(cr.GetG() * a + 255.0f * (1.0f - a));
 	const BYTE B_eff = static_cast<BYTE>(cr.GetB() * a + 255.0f * (1.0f - a));
-	const BYTE lum = static_cast<BYTE>(0.299f * R_eff + 0.587f * G_eff + 0.114f * B_eff);
+	const BYTE lum = get_gray_value(R_eff, G_eff, B_eff);
 
 	const Gdiplus::Color distinct_bw_cr = (lum > 160) ? Gdiplus::Color::Black : Gdiplus::Color::White;
 
@@ -1028,7 +1037,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 32, 32, 255);
 
-			cr_border = Gdiplus::Color::DarkGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_linkmemine_se:
@@ -1060,7 +1070,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
 
-			cr_border = Gdiplus::Color::DarkGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_anysupport :
@@ -1093,7 +1104,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
 
-			cr_border = Gdiplus::Color::DarkGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_helpu:
@@ -1126,7 +1138,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue;
 
-			cr_border = Gdiplus::Color::DarkGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_pcanypro:
@@ -1159,7 +1172,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue;
 
-			cr_border = Gdiplus::Color::DarkGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_dark_gray :
@@ -1193,7 +1207,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = get_color(cr_back, 96);
 
-			cr_border				= Gdiplus::Color::DarkGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_dark :
@@ -1226,7 +1241,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = get_color(cr_back, 96);
 
-			cr_border				= Gdiplus::Color::Gray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_popup_folder_list:
@@ -1243,7 +1259,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border		= Gdiplus::Color(255, 153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_border				= Gdiplus::Color::DimGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_white :
@@ -1279,7 +1296,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_border = Gdiplus::Color::DimGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_gray:
@@ -1313,7 +1331,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_border = Gdiplus::Color::DimGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		default : //case color_theme_default :
@@ -1365,7 +1384,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border		= gRGB(153, 209, 255);
 			cr_selected_border_inactive	= cr_back_selected_inactive;
 
-			cr_border				= Gdiplus::Color::DimGray;
+			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_inactive = Gdiplus::Color::LightGray;
 	}
 }
 

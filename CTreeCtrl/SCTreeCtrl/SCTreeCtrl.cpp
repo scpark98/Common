@@ -3,11 +3,11 @@
 
 #include "SCTreeCtrl.h"
 #include <thread>
-#include "Common/Functions.h"
-#include "Common/MemoryDC.h"
-#include "Common/SCGdiPlusBitmap.h"
+#include "../../Functions.h"
+#include "../../MemoryDC.h"
+#include "../../SCGdiPlusBitmap.h"
 
-
+#include <fstream>
 // CSCTreeCtrl
 
 IMPLEMENT_DYNAMIC(CSCTreeCtrl, CTreeCtrl)
@@ -2858,7 +2858,21 @@ LRESULT CSCTreeCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)msg->message, msg->pThis);
 	if (msg->message == WM_KILLFOCUS)
+	{
 		edit_end();
+	}
+	else if (msg->message == WM_KEYDOWN)
+	{
+		switch ((int)lParam)
+		{
+			case VK_RETURN:
+				edit_end();
+				break;
+			case VK_ESCAPE:
+				edit_end(false);
+				break;
+		}
+	}
 
 	Invalidate();
 
@@ -3003,11 +3017,12 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			Gdiplus::Color crText = m_theme.cr_text;
 			Gdiplus::Color crBack = m_theme.cr_back;
 
-			//간혹 특정 조건의 아이템의 색상을 달리 표현할 필요가 있는데 이를 판별하는 것은 parent에서 하도록 해야
-			//범용성이 유지된다.
-			//parent의 함수포인터를 지정받아서 호출하고 그 결과에 따라 정해진 액션을 취한다.
+			//간혹 특정 조건의 아이템의 색상을 달리 표현할 필요가 있는데
+			//이를 판별하는 것은 parent에서 하도록 해야 이 컨트롤이 범용성을 유지한다.
+			//이 범용 컨트롤에 특정 처리코드를 넣는다면 범용성은 깨지게 된다.
+			//parent의 특정 처리 함수 포인터를 지정받아서 호출하고 그 결과에 따라 정해진 액션을 취한다.
 			//이 컨트롤의 CWnd*와 아이템 핸들을 건네주면 parent에서 판별하여 리턴한다.
-			if (check_is_dim_text && check_is_dim_text(this, hItem))
+			if (function_check_is_dim_text && function_check_is_dim_text(this, hItem))
 				crText = m_theme.cr_text_dim;
 
 
@@ -3097,7 +3112,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//m_imagelist.Draw(&dc, 0, CPoint(rIcon.CenterPoint().x - m_image_size / 2, rIcon.CenterPoint().y - m_image_size / 2), ILD_TRANSPARENT);
 
 			CRect rText = rcItem;
-			//rText.left += 2;
+			rText.left += 2;
 			//CSize szText = dc.GetTextExtent(GetItemText(hItem));
 			//rText.OffsetRect(m_image_size, 0);
 			//rText.right = rText.left + szText.cx;
@@ -3746,7 +3761,184 @@ void CSCTreeCtrl::OnNcPaint()
 		CRect rc;
 		GetWindowRect(&rc);
 		rc.OffsetRect(-rc.TopLeft());
-		draw_rect(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent);
+		draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
 		//dc.Draw3dRect(rc, RGB(255, 0, 0), RGB(255, 0, 255)); // 파란색 테두리}
 	}
+}
+
+bool CSCTreeCtrl::load_tree_from_json_file(CString json_file_path)
+{
+	std::string jsonText;
+	if (!ReadFileToString(json_file_path, jsonText))
+		return false;
+
+	rapidjson::Document doc;
+	rapidjson::ParseResult ok = doc.Parse(jsonText.c_str());
+
+	if (!ok)
+		return false;
+
+	return load_tree_from_json_document(doc);
+}
+
+// JSON Document를 TreeCtrl에 복원
+bool CSCTreeCtrl::load_tree_from_json_document(const rapidjson::Document& doc)
+{
+	if (!doc.IsArray())
+		return false;
+
+	DeleteAllItems();
+
+	HTREEITEM hSelectedItem = NULL;
+
+	for (rapidjson::SizeType i = 0; i < doc.Size(); ++i)
+	{
+		JsonValueToTreeItem(doc[i], NULL, TVI_LAST);
+	}
+
+	if (hSelectedItem != NULL)
+		SelectItem(hSelectedItem);
+
+	return true;
+}
+
+// 파일 전체 읽기
+bool CSCTreeCtrl::ReadFileToString(const CString& filePath, std::string& outText)
+{
+#ifdef UNICODE
+	CW2A pathA(filePath, CP_ACP);
+	std::ifstream ifs(pathA, std::ios::binary);
+#else
+	std::ifstream ifs(filePath, std::ios::binary);
+#endif
+
+	if (!ifs.is_open())
+		return false;
+
+	std::ostringstream oss;
+	oss << ifs.rdbuf();
+	outText = oss.str();
+
+	return true;
+}
+
+// JSON 객체 1개를 Tree 노드로 재귀 복원
+HTREEITEM CSCTreeCtrl::JsonValueToTreeItem(const rapidjson::Value& nodeValue, HTREEITEM hParent, HTREEITEM hInsertAfter)
+{
+	HTREEITEM hItem = nullptr;
+
+	if (!nodeValue.IsObject())
+		return hItem;
+
+	CString name;
+
+	DWORD* node = 0;
+	if (function_set_node_data_on_loading)
+	{
+		hItem = function_set_node_data_on_loading(this, &node, nodeValue, hParent, hInsertAfter);
+	}
+
+	SetItemData(hItem, (DWORD_PTR)node);
+
+	// children 재귀 처리
+	if (nodeValue.HasMember("nodes") && nodeValue["nodes"].IsArray())
+	{
+		const rapidjson::Value& children = nodeValue["nodes"];
+		for (rapidjson::SizeType i = 0; i < children.Size(); ++i)
+		{
+			JsonValueToTreeItem(children[i], hItem, TVI_LAST);
+		}
+	}
+
+	// 자식이 모두 들어간 뒤 확장
+	Expand(hItem, TVE_EXPAND);
+
+	return hItem;
+}
+
+//save to json file
+bool CSCTreeCtrl::save_tree_to_json_file(CString json_file_path)
+{
+	rapidjson::Document doc;
+	tree_to_json_document(doc);
+
+	rapidjson::StringBuffer buffer;
+	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+	writer.SetIndent(' ', 4);
+	doc.Accept(writer);
+
+#ifdef UNICODE
+	CW2A pathA(json_file_path, CP_ACP);
+	std::ofstream ofs(pathA, std::ios::binary);
+#else
+	std::ofstream ofs(json_file_path, std::ios::binary);
+#endif
+
+	if (!ofs.is_open())
+		return false;
+
+	ofs.write(buffer.GetString(), buffer.GetSize());
+	return ofs.good();
+}
+
+// 트리 전체를 Document로 생성
+void CSCTreeCtrl::tree_to_json_document(rapidjson::Document& doc)
+{
+	doc.SetArray();
+	rapidjson::Document::AllocatorType& alloc = doc.GetAllocator();
+
+	HTREEITEM hRoot = GetRootItem();
+	while (hRoot != NULL)
+	{
+		doc.PushBack(tree_item_to_json_value(hRoot, alloc), alloc);
+		hRoot = GetNextSiblingItem(hRoot);
+	}
+}
+
+rapidjson::Value CSCTreeCtrl::tree_item_to_json_value(HTREEITEM hItem, rapidjson::Document::AllocatorType& alloc)
+{
+	rapidjson::Value nodeValue(rapidjson::kObjectType);
+	CString text = GetItemText(hItem);
+
+	//nodeValue와 hItem을 넘겨주고 main에서 nodeValue에 type, name, description 등의 속성값들을 채워서 리턴한다.
+	if (function_set_node_value_on_saving)
+		function_set_node_value_on_saving(this, hItem, nodeValue, alloc);
+	/*
+	//프로젝트마다 data 구조가 다르므로 이를 메인의 콜백함수로 처리하도록 한다면
+	//CSCTreeCtrl에 범용 json 저장 코드를 넣을 수 있다.
+	CApiNode* data = (CApiNode*)tree.GetItemData(hItem);
+
+	if (data)
+	{
+		nodeValue.AddMember("type", data->type, alloc);
+		nodeValue.AddMember("name", rapidjson::Value(CString2string(text), alloc).Move(), alloc);
+		//nodeValue.AddMember(rapidjson::Value("name", alloc).Move(), CString2string(text), alloc);	//UXStudio에서는 이렇게 저장했으나 여기서는 에러발생함. rapidjson::Value type이 달라서 그럴수도 있음.
+		nodeValue.AddMember("description", rapidjson::Value(CString2string(data->desc), alloc).Move(), alloc);
+		if (data->type == node_request)
+		{
+			nodeValue.AddMember("method", rapidjson::Value(CString2string(data->method), alloc).Move(), alloc);
+			nodeValue.AddMember("url", rapidjson::Value(CString2string(data->url), alloc).Move(), alloc);
+			nodeValue.AddMember("header", rapidjson::Value(CString2string(data->header), alloc).Move(), alloc);
+			nodeValue.AddMember("body", rapidjson::Value(CString2string(data->body), alloc).Move(), alloc);
+		}
+	}
+	else
+	{
+		TRACE(_T("[error] tree item data is null. name = %s\n"), text);
+	}
+	*/
+
+	rapidjson::Value children(rapidjson::kArrayType);
+
+	HTREEITEM hChild = GetChildItem(hItem);
+	while (hChild != NULL)
+	{
+		children.PushBack(tree_item_to_json_value(hChild, alloc), alloc);
+		hChild = GetNextSiblingItem(hChild);
+	}
+
+	if (!children.Empty())
+		nodeValue.AddMember("nodes", children, alloc);
+
+	return nodeValue;
 }

@@ -220,8 +220,8 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_PIN)
 			{
-				//g.DrawLine(is_top_most(m_target->GetSafeHwnd()) ? &pen_pin : &pen_pin_gray, cp.x - 7, cp.y, cp.x + 7, cp.y);
-				//g.FillEllipse(&br_pin, cp.x + (is_top_most(m_target->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
+				g.DrawLine(is_top_most(GetParent()->GetSafeHwnd()) ? &pen_pin : &pen_pin_gray, cp.x - 7, cp.y, cp.x + 7, cp.y);
+				g.FillEllipse(&br_pin, cp.x + (is_top_most(GetParent()->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{
@@ -270,6 +270,7 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 		//즉, 중간에 있는 CTitleDlg는 이 메시지를 직접 처리해야 하는 주체가 아니므로 이를 parent인 CASeeDlg로 전달해야 한다.
 		//WM_SYSCOMMAND로 보냈었으나 이 시스템 메시지는 부가적인 처리까지 동반되어 원래 의도했던 명령이 제대로 전달되지 않는 문제가 있었다.
 		//따라서 사용자 정의 메시지로 보내고 각 메시지에 맞는 처리를 하도록 수정함.
+		//parent에서는 메시지 핸들러를 추가하여 Message_CSCSystemButtons 메시지를 처리하는 코드가 추가되어야 한다.
 		CSCSystemButtonsMessage msg(this, m_button[m_over_index].cmd);
 		GetParent()->SendMessage(Message_CSCSystemButtons, (WPARAM)&msg, 0);
 	}

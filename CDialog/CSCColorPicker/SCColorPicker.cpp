@@ -224,7 +224,7 @@ void CSCColorPicker::calc_layout()
 		m_edit_hexa.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_hexa.set_back_color(Gdiplus::Color::White);
 		m_edit_hexa.set_border_color(Gdiplus::Color(255, 232, 232, 232));
-		m_edit_hexa.set_dark_border_on_focus(true);
+		m_edit_hexa.set_border_color_on_active(Gdiplus::Color::RoyalBlue);
 		m_edit_hexa.set_line_align(DT_VCENTER);
 
 
@@ -245,7 +245,7 @@ void CSCColorPicker::calc_layout()
 			m_edit_argb[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
 			m_edit_argb[i].set_back_color(Gdiplus::Color::White);
 			m_edit_argb[i].set_border_color(Gdiplus::Color(255, 232, 232, 232));
-			m_edit_argb[i].set_dark_border_on_focus(true);
+			m_edit_argb[i].set_border_color_on_active(Gdiplus::Color::RoyalBlue);
 			m_edit_argb[i].set_line_align(DT_VCENTER);
 		}
 
@@ -264,7 +264,7 @@ void CSCColorPicker::calc_layout()
 			m_edit_hsl[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
 			m_edit_hsl[i].set_back_color(Gdiplus::Color::White);
 			m_edit_hsl[i].set_border_color(Gdiplus::Color(255, 232, 232, 232));
-			m_edit_hsl[i].set_dark_border_on_focus(true);
+			m_edit_hsl[i].set_border_color_on_active(Gdiplus::Color::RoyalBlue);
 			m_edit_hsl[i].set_line_align(DT_VCENTER);
 		}
 
@@ -278,7 +278,7 @@ void CSCColorPicker::calc_layout()
 		m_edit_color_name.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_color_name.set_back_color(Gdiplus::Color::White);
 		m_edit_color_name.set_border_color(Gdiplus::Color(255, 232, 232, 232));
-		m_edit_color_name.set_dark_border_on_focus(true);
+		m_edit_color_name.set_border_color_on_active(Gdiplus::Color::RoyalBlue);
 		m_edit_color_name.set_line_align(DT_VCENTER);
 
 		sync_edits();

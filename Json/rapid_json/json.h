@@ -74,6 +74,9 @@
 #include <map>
 #include <gdiplus.h>
 #include "include/document.h"
+#include "include/filereadstream.h"
+#include "include/filewritestream.h"
+#include "include/prettywriter.h"
 #include "include/rapidjson.h"
 
 //변수이름과 변수값을 json으로 저장하기 위해 정의.

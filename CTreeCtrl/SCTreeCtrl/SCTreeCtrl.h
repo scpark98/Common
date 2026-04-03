@@ -37,6 +37,7 @@
 #include "../../CMenu/CSCMenuBar/SCMenu.h"
 #include "../../colors.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../Json/rapid_json/json.h"
 
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
@@ -204,6 +205,18 @@ public:
 	//탭으로 구분된 텍스트 파일 로딩
 	bool		load_from_string(CString text);
 
+
+	//load from json file
+	HTREEITEM	(*function_set_node_data_on_loading)(CTreeCtrl* pTree, DWORD** node_data, const rapidjson::Value& nodeValue, HTREEITEM hParent, HTREEITEM hInsertAfter) = nullptr;
+	void		set_function_set_node_data_on_loading(HTREEITEM (*func)(CTreeCtrl* pTree, DWORD** node, const rapidjson::Value& nodeValue, HTREEITEM hParent, HTREEITEM hInsertAfter)) { function_set_node_data_on_loading = func; }
+	bool		load_tree_from_json_file(CString json_file_path);
+
+	//save to json file
+	bool		(*function_set_node_value_on_saving)(CTreeCtrl* pTree, HTREEITEM hItem, rapidjson::Value& nodeValue, rapidjson::Document::AllocatorType& alloc) = nullptr;
+	void		set_function_set_node_value_on_saving(bool (*func)(CTreeCtrl* pTree, HTREEITEM hItem, rapidjson::Value& nodeValue, rapidjson::Document::AllocatorType& alloc)) { function_set_node_value_on_saving = func; }
+	bool		save_tree_to_json_file(CString json_file_path);
+
+
 	//HTREEITEM	find_item(const CString& name);
 	//hItem 위치부터 child, sibling들을 recursive하게 모두 탐색하여 label을 찾는다. 
 	HTREEITEM	find_item(const CString& label, HTREEITEM hItem = NULL);
@@ -290,9 +303,9 @@ public:
 	//std::function<void()>	function_check_dim_text;
 	//void			set_dim_text_function(std::function<void()> func) { function_check_dim_text = func; }
 	//특정 노드는 어떤 조건에 의해 다른색으로 표현하고 싶은데 그 판별은 parent에서 해야 할 때
-	//이 함수를 parent에서 호출하면서 판별함수를 지정할 수 있다. (LMM CSManager에서 속한 device가 없는 그룹의 색상을 dim처리)
-	bool			(*check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
-	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { check_is_dim_text = func; }
+	//이 함수를 parent에서 호출하면서 판별함수를 지정할 수 있다. (LMM CSManager에서 속한 device가 없는 그룹의 색상을 dim color로 처리)
+	bool			(*function_check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
+	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { function_check_is_dim_text = func; }
 
 	//가상 루트 항목 설정.
 	//가상 루트가 없는 상태에서 노드들이 추가된 경우, 가상 루트를 새로 추가할 경우
@@ -307,7 +320,7 @@ public:
 	TV_INSERTSTRUCT get_root_tvItem() { return m_root_tvItem; }
 
 	//선택항목등의 border가 아닌 ctrl 자체의 cr_border. OnNcPaint()에서 border 속성유무를 판단하여 테두리를 그린다.
-	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border = cr_border; Invalidate(); }
+	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; Invalidate(); }
 
 protected:
 	//root 항목은 실제 또는 가상의 root일 수 있다.
@@ -415,8 +428,18 @@ protected:
 
 //Serialize 관련
 	void			serialize_item(CArchive& ar, HTREEITEM hItem = NULL);
-
 	void			release_iterator(HTREEITEM hItem = NULL);
+
+//json load
+	bool			load_tree_from_json_document(const rapidjson::Document& doc);
+	bool			ReadFileToString(const CString& filePath, std::string& outText);
+	// JSON 객체 1개를 Tree 노드로 재귀 복원
+	HTREEITEM		JsonValueToTreeItem(const rapidjson::Value& nodeValue, HTREEITEM hParent, HTREEITEM hInsertAfter);
+
+//json save
+	void			tree_to_json_document(rapidjson::Document& doc);
+	// Tree 노드 1개를 JSON 객체로 재귀 변환
+	rapidjson::Value tree_item_to_json_value(HTREEITEM hItem, rapidjson::Document::AllocatorType& alloc);
 
 protected:
 	DECLARE_MESSAGE_MAP()

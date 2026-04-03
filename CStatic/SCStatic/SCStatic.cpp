@@ -100,7 +100,7 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 	dst.m_transparent = m_transparent;
 
 	dst.m_round = m_round;
-	dst.set_round(dst.m_round, dst.m_theme.cr_border, dst.m_theme.cr_parent_back);
+	dst.set_round(dst.m_round, dst.m_theme.cr_border_inactive, dst.m_theme.cr_parent_back);
 
 	dst.m_draw_border = m_draw_border;
 	dst.m_border_thick = m_border_thick;
@@ -642,9 +642,9 @@ void CSCStatic::OnPaint()
 	{
 		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
-			draw_round_rect(&g, CRect_to_gpRect(rc), m_theme.cr_border, Gdiplus::Color::Transparent, m_round, m_border_thick);
+			draw_round_rect(&g, CRect_to_gpRect(rc), m_theme.cr_border_inactive, Gdiplus::Color::Transparent, m_round, m_border_thick);
 		else
-			draw_rect(g, rc, m_theme.cr_border);
+			draw_rect(g, rc, m_theme.cr_border_inactive);
 	}
 
 	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
@@ -1207,7 +1207,7 @@ void CSCStatic::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color cr
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
-		m_theme.cr_border = cr_border;
+		m_theme.cr_border_inactive = cr_border;
 	}
 
 	if (cr_parent_back.GetValue() != Gdiplus::Color::Transparent)

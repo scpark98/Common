@@ -261,10 +261,16 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
 		m_button[i].ShowWindow(SW_HIDE);
 
+	//MB_HELP는 다른 버튼들의 조합 프리셋에는 기본 포함되지 않으므로
+	//has_help인지 판별하고 그에 따라 버튼 갯수가 달라지며
+	//항상 맨 오른쪽에 붙기 때문에 아래 if문 후에 오른쪽 끝에 붙인다.
+	bool has_help = ((m_type & MB_HELP) == MB_HELP);
+
 	//m_type에 따라 필요한 버튼들만 SW_SHOW 시킨다.
 	if ((m_type & MB_OKCANCEL) == MB_OKCANCEL)
 	{
-		button_count = 2;
+		button_count = 2 + (has_help ? 1 : 0);
+
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDOK].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDOK].ShowWindow(SW_SHOW);
@@ -275,7 +281,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 	else if ((m_type & MB_ABORTRETRYIGNORE) == MB_ABORTRETRYIGNORE)
 	{
-		button_count = 3;
+		button_count = 3 + (has_help ? 1 : 0);
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDABORT].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDABORT].ShowWindow(SW_SHOW);
@@ -290,7 +296,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 	else if ((m_type & MB_YESNOCANCEL) == MB_YESNOCANCEL)
 	{
-		button_count = 3;
+		button_count = 3 + (has_help ? 1 : 0);
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDYES].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDYES].ShowWindow(SW_SHOW);
@@ -305,7 +311,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 	else if ((m_type & MB_YESNO) == MB_YESNO)
 	{
-		button_count = 2;
+		button_count = 2 + (has_help ? 1 : 0);
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDYES].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDYES].ShowWindow(SW_SHOW);
@@ -319,7 +325,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 	else if ((m_type & MB_RETRYCANCEL) == MB_RETRYCANCEL)
 	{
-		button_count = 2;
+		button_count = 2 + (has_help ? 1 : 0);
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDRETRY].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDRETRY].ShowWindow(SW_SHOW);
@@ -330,7 +336,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 	else if ((m_type & MB_CANCELTRYCONTINUE) == MB_CANCELTRYCONTINUE)
 	{
-		button_count = 3;
+		button_count = 3 + (has_help ? 1 : 0);
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDCANCEL].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDCANCEL].ShowWindow(SW_SHOW);
@@ -345,11 +351,19 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 	else //if (m_type == MB_OK)
 	{
-		button_count = 1;
+		button_count = 1 + (has_help ? 1 : 0);
 		x = (rc.Width() - button_count * m_sz_button.cx - (button_count - 1) * button_gap) / 2;
 		m_button[IDOK].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
 		m_button[IDOK].ShowWindow(SW_SHOW);
 	}
+
+	if (has_help)
+	{
+		x += (button_gap + m_sz_button.cx);
+		m_button[IDHELP].MoveWindow(x, rc.bottom - bottom_gap - m_sz_button.cy, m_sz_button.cx, m_sz_button.cy);
+		m_button[IDHELP].ShowWindow(SW_SHOW);
+	}
+
 
 
 	//옵션에 따라 아이콘 인덱스 결정

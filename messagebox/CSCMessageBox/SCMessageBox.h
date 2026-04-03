@@ -8,6 +8,9 @@
   - ColorTheme 역시 CColorTheme을 공통으로 사용하므로
 	parent의 ColorTheme을 설정해주면 parent와 동일한 테마로 동작함.
 
+  - D:\1.Projects_C++\1.test\Test_SCMessageBox
+  - https://github.com/scpark98/Test_SCMessageBox.git
+
   - 사용법은 아래와 같음.
 	* parent의 .h에 CSCMessageBox m_messagebox;를 선언해서 사용해도 되고
 	  매번 사용할 때마다 인스턴스 선언 후 dlg.DoModal()을 호출해도 되지만 전자를 권장함.

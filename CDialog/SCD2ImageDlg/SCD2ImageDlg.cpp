@@ -125,6 +125,7 @@ BEGIN_MESSAGE_MAP(CSCD2ImageDlg, CDialog)
 	ON_REGISTERED_MESSAGE(Message_CSCThumbCtrl, &CSCD2ImageDlg::on_message_CSCThumbCtrl)
 	ON_WM_TIMER()
 	ON_WM_MOUSEHWHEEL()
+	ON_WM_NCHITTEST()
 END_MESSAGE_MAP()
 
 
@@ -835,9 +836,8 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	else if (m_fit2ctrl)
 	{
-		//::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCD2ImageDlg, (WPARAM)&CSCD2ImageDlgMessage(this, message_lbuttondown), 0);
-		::DefWindowProc(GetParent()->GetSafeHwnd(), WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
-		//GetParent()->PostMessage(WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
+		ReleaseCapture();
+		GetParent()->SendMessage(WM_LBUTTONDOWN, nFlags, MAKELPARAM(point.x, point.y));
 	}
 
 	CDialog::OnLButtonDown(nFlags, point);
@@ -1079,7 +1079,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			{
 				m_static_pixel.set_back_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::White : m_cr_pixel);
-				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_color(m_cr_pixel));
+				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_bw_color(m_cr_pixel));
 				m_static_pixel.set_text(str);
 				m_cr_pixel_old = m_cr_pixel;
 			}
@@ -1926,4 +1926,14 @@ void CSCD2ImageDlg::remove(int index)
 
 	//현재 이미지를 다시 display한다.
 	display_image(index);
+}
+
+LRESULT CSCD2ImageDlg::OnNcHitTest(CPoint point)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	//shift를 누르지 않으면 그대로 parent에게 전달되어 창위치 이동 기능으로 동작한다.
+	//shift를 누르면 확대된 이미지의 offset을 이동시킨다.
+	if (!IsShiftPressed())
+		return HTTRANSPARENT;
+	return CDialog::OnNcHitTest(point);
 }

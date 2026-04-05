@@ -1355,7 +1355,21 @@ LRESULT CSCThumbCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 	
 	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
 	if (msg->message == WM_KILLFOCUS)
+	{
 		edit_end();
+	}
+	else if (msg->message == WM_KEYDOWN)
+	{
+		switch ((int)lParam)
+		{
+		case VK_RETURN:
+			edit_end();
+			break;
+		case VK_ESCAPE:
+			edit_end(false);
+			break;
+		}
+	}
 
 	Invalidate();
 
@@ -1505,6 +1519,9 @@ void CSCThumbCtrl::on_key_down(int key)
 	{
 		selected += m_per_line * 3;
 	}
+
+	if (selected < 0 || selected >= m_thumb.size())
+		return;
 
 	select_item(selected);
 }

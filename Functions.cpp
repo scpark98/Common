@@ -14444,7 +14444,7 @@ CRect get_window_real_rect(CWnd* pWnd)
 #endif
 	}
 
-	trace(rw);
+	//trace(rw);
 	return rw;
 }
 

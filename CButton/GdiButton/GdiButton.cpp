@@ -1487,6 +1487,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (is_down)
 		rText.OffsetRect(m_down_offset);
 
+	//만약 메뉴가 있다면 텍스트 영역을 줄여주고 드롭다운 화살표를 그려준다.
 	if (m_menu_items.size() > 0)
 	{
 		CRect rDownArrow = rText;
@@ -1496,14 +1497,16 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		rText.right -= m_menu_button_width;
 
 		//draw separator line
-		draw_line(&dc, rDownArrow.left, rDownArrow.top, rDownArrow.left, rDownArrow.bottom, GRAY128);
+		draw_line(&dc, rDownArrow.left, rDownArrow.top, rDownArrow.left, rDownArrow.bottom, GRAY192);
 
 		//draw dropdown arrow using draw_line
 		CPoint cp = rDownArrow.CenterPoint();
-		cp.Offset(1, -1);
+		cp.Offset(2, 3);
 
-		for (int arrow = 0; arrow < 4; arrow++)
-			draw_line(&dc, cp.x - 4 + arrow, cp.y + arrow, cp.x + 4 - arrow, cp.y + arrow, GRAY64);
+		//for (int arrow = 0; arrow < 4; arrow++)
+		//	draw_line(&dc, cp.x - 4 + arrow, cp.y + arrow, cp.x + 4 - arrow, cp.y + arrow, GRAY64);
+		draw_line(&dc, cp.x - 4, cp.y - 4, cp.x, cp.y, GRAY128, 2);
+		draw_line(&dc, cp.x + 4, cp.y - 4, cp.x, cp.y, GRAY128, 2);
 	}
 
 	dc.DrawText(text, rText, dwText);

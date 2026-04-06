@@ -133,7 +133,7 @@ public:
 	void	set_back_image(UINT resource_id, int draw_mode = CSCGdiplusBitmap::draw_mode_stretch);
 
 	void	set_draw_border(bool draw, int width = 1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
-	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border = cr; }
+	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border_inactive = cr; }
 
 	void	set_color_theme(int theme, bool invalidate = false);
 	void	enable_resize(bool resizable);

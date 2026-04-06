@@ -700,7 +700,7 @@ void CSCListBox::OnPaint()
 
 	//DrawItem()에서 각 아이템을 모두 그린 후 OnPaint()에서 border를 그리려 했으나
 	//DrawItem()에서 그려진 내용이 모두 가려진다. 우선 WM_PAINT는 주석처리한다.
-	draw_rect(&dc, rc, m_theme.cr_border);
+	draw_rect(&dc, rc, m_theme.cr_border_inactive);
 	//dc.FillSolidRect(rc, red);
 }
 

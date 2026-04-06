@@ -3483,7 +3483,7 @@ void CSCTreeCtrl::rename_child_item(HTREEITEM hParent, CString old_label, CStrin
 }
 
 //only_children이 true이면 해당 노드의 자식들만 제거한다.
-void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
+void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm, bool delete_data)
 {
 	//hItem을 지정하지 않으면 선택된 아이템을 기준으로 동작한다.
 	if (hItem == NULL)
@@ -3509,11 +3509,14 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 	//현재 노드 포함 모든 하위 노드까지 삭제
 	if (!only_children)
 	{
-		DWORD* pData = (DWORD*)GetItemData(hItem);
-		if (pData)
+		if (delete_data)
 		{
-			delete pData;
-			SetItemData(hItem, NULL);
+			DWORD* pData = (DWORD*)GetItemData(hItem);
+			if (pData)
+			{
+				delete pData;
+				SetItemData(hItem, NULL);
+			}
 		}
 
 		DeleteItem(hItem);
@@ -3550,16 +3553,16 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm)
 	SetItem(&tvItem);
 }
 
-void CSCTreeCtrl::delete_all_items(bool confirm)
+void CSCTreeCtrl::delete_all_items(bool confirm, bool delete_data)
 {
-	delete_item(GetRootItem(), false, confirm);
+	delete_item(GetRootItem(), false, confirm, delete_data);
 }
 
 //CTreeCtrl::DeleteAllItems() override.
-void CSCTreeCtrl::DeleteAllItems(bool confirm)
-{
-	delete_all_items(confirm);
-}
+//void CSCTreeCtrl::DeleteAllItems(bool confirm, bool delete_data)
+//{
+//	delete_all_items(confirm, delete_data);
+//}
 
 
 void CSCTreeCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)

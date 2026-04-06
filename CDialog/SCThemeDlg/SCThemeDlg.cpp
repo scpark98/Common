@@ -457,7 +457,7 @@ void CSCThemeDlg::OnPaint()
 	if (m_draw_border && m_border_width > 0)
 	{
 		GetClientRect(rc);
-		draw_rect(&dc, rc, m_theme.cr_border, Gdiplus::Color::Transparent, m_border_width);
+		draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent, m_border_width);
 	}
 }
 
@@ -776,7 +776,7 @@ void CSCThemeDlg::set_draw_border(bool draw, int width, Gdiplus::Color cr)
 {
 	m_draw_border = draw;
 	m_border_width = width;
-	m_theme.cr_border = cr;
+	m_theme.cr_border_inactive = cr;
 	Invalidate();
 	RedrawWindow();
 }

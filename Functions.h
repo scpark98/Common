@@ -139,7 +139,7 @@ template<typename T> void trace_impl(const TCHAR* func, int line, const TCHAR* v
 
 //trace(n);으로 호출하면 "n = %d\n"를 출력한다. 타입에 따라 %d, %f, %s 등이 자동으로 결정된다.
 //정수, 실수, 문자열, CPoint, CRect를 지원하며 그 외 타입은 << 연산자를 오버로딩해서 지원할 수 있다.
-#define trace(n) trace_impl(__function__, __LINE__, L#n, n)
+#define trace(n) trace_impl(__function__, __LINE__, _T(#n), n)
 
 #ifdef __GNUG__
 #include <cxxabi.h>

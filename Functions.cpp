@@ -10260,7 +10260,7 @@ bool open_with_explorer(CString path)
 	PIDLIST_ABSOLUTE pidlFolder = NULL;
 	PCUITEMID_CHILD pidlItem = NULL;
 
-	hr = SHParseDisplayName(path, NULL, &pidlFull, 0, NULL);
+	hr = SHParseDisplayName((CStringW)path, NULL, &pidlFull, 0, NULL);
 	if (FAILED(hr) || pidlFull == NULL)
 	{
 		if (bCoInited)

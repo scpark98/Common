@@ -45,11 +45,10 @@ void CSCTreeCtrl::release_iterator(HTREEITEM hItem)
 {
 	for (HTREEITEM hNext = hItem; hNext; hNext = GetNextItem(hNext, TVGN_NEXT))
 	{
-		DWORD* item = (DWORD*)GetItemData(hNext);
+		DWORD_PTR item = GetItemData(hNext);
 		if (item)
 		{
-			//item
-				delete item;
+			delete reinterpret_cast<void*>(item);
 		}
 
 		release_iterator(GetChildItem(hNext));
@@ -1831,14 +1830,17 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 
-	if (!m_use_drag_and_drop || !m_is_shell_treectrl)
+	if (!m_use_drag_and_drop)// || !m_is_shell_treectrl)
 		return FALSE;
 
 	CRect	rc;
 	GetClientRect(rc);
 
 	m_DragItem = pNMTreeView->itemNew.hItem;
-	CString path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(m_DragItem));
+	CString path;
+	
+	if (m_is_shell_treectrl)
+		path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(m_DragItem));
 	
 	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
@@ -1846,8 +1848,8 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	::SetFocus(m_hWnd);
 	SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
 
-	bool sub_folder_exist = has_sub_folders(path);
-	CSCGdiplusBitmap bmpRes(64, 64, Gdiplus::Color(128, 255, 0, 0), PixelFormat32bppARGB);
+	bool sub_folder_exist = (m_is_shell_treectrl ? has_sub_folders(path) : false);
+	CSCGdiplusBitmap drag_img(64, 64, Gdiplus::Color(128, 255, 0, 0), PixelFormat32bppARGB);
 
 	if (m_pDragImage && m_pDragImage->GetSafeHandle())
 	{
@@ -1860,32 +1862,31 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//GDIPlus를 이용한 create_drag_image()를 이용해서 만드는 것도 좋을듯함.
 	if (m_drag_images_id.size() == 0)
 	{
-		//bmpRes.create_drag_image(this);
-		m_pDragImage = create_drag_image((CTreeCtrl*)this, &pNMTreeView->ptDrag);
+		//bmpRes.create_drag_image(this, m_imagelist.ExtractIcon(0));
+		//bmpRes = create_drag_image((CTreeCtrl*)this, &pNMTreeView->ptDrag);
+		create_drag_image(drag_img);
 	}
 	else
 	{
 		//drag_image가 1개일 경우
 		if (m_drag_images_id.size() == 1)
 		{
-			bmpRes.load(m_drag_images_id[0]);
+			drag_img.load(m_drag_images_id[0]);
 		}
 		//drag_image가 2개 이상일 경우는 drag count에 따라 0번 또는 1번 이미지를 사용한다.
 		else if (m_drag_images_id.size() > 1)
 		{
-			bmpRes.load(sub_folder_exist ? m_drag_images_id[1] : m_drag_images_id[0]);
+			drag_img.load(sub_folder_exist ? m_drag_images_id[1] : m_drag_images_id[0]);
 		}
-
-		//bmpRes.draw_text(bmpRes.width / 2 + 10, bmpRes.height / 2, i2S(item_count), 20, 2,
-		//	_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
-
-		m_pDragImage = new CImageList();
-		m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
-
-		HICON hicon;
-		bmpRes.m_pBitmap->GetHICON(&hicon);
-		m_pDragImage->Add(hicon);
 	}
+	//drag_img.draw_text(drag_img.width / 2 + 10, drag_img.height / 2, i2S(item_count), 20, 2,
+	//	_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
+
+	m_pDragImage = new CImageList();
+	m_pDragImage->Create(drag_img.width, drag_img.height, ILC_COLOR32, 1, 1);
+	HICON hicon;
+	drag_img.m_pBitmap->GetHICON(&hicon);
+	m_pDragImage->Add(hicon);
 
 	ASSERT(m_pDragImage); //make sure it was created
 
@@ -1987,7 +1988,7 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 				+ rectIcon.bottom - rectComplete.top) / 2
 			- (info.rcImage.bottom - info.rcImage.top) / 2);
 
-		pSingleImageList->Draw(&dcMem, item.iImage, CPoint(0, 0), ILD_TRANSPARENT);
+		pSingleImageList->Draw(&dcMem, item.iImage, p, ILD_TRANSPARENT);
 	}
 
 	// Draw the text  
@@ -2026,6 +2027,58 @@ CImageList* CSCTreeCtrl::create_drag_image(CTreeCtrl* pTree, LPPOINT lpPoint)
 	}
 
 	return pCompleteImageList;
+}
+
+void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
+{
+	if (m_DragItem == NULL)
+		return;
+
+	//CImageList* imglist = ctrl->CreateDragImage(hItem);
+
+	CString text = GetItemText(m_DragItem);
+	CRect rItem;
+
+	GetItemRect(m_DragItem, rItem, TRUE);
+	rItem.MoveToXY(0, 0);
+
+	//이미지가 있다면 크기+여백만큼 넓혀준다.
+	int img_index;
+	int sel_img_index;
+	HICON hIcon;
+
+	GetItemImage(m_DragItem, img_index, sel_img_index);
+	if (img_index >= 0)
+	{
+		hIcon = m_imagelist.ExtractIcon(img_index);
+
+		if (hIcon)
+		{
+			Gdiplus::Bitmap icon(hIcon);
+			rItem.left = 2;
+			rItem.right += (2 + icon.GetWidth() + 4 + 8);	//2=left margin, 4=icon과 text 사이 간격, 8=text의 right 확장 여유롭게 잡음
+		}
+	}
+
+	drag_img.release();
+
+	drag_img.create(rItem.Width(), rItem.Height(), PixelFormat32bppARGB);
+
+	Gdiplus::Graphics g(drag_img.m_pBitmap);
+
+	if (hIcon)
+	{
+		Gdiplus::Bitmap icon(hIcon);
+		g.DrawImage(&icon, rItem.left, (rItem.Height() - icon.GetHeight()) / 2, icon.GetWidth(), icon.GetHeight());
+		rItem.OffsetRect(icon.GetWidth() + 4, 0);
+	}
+
+	int font_size = get_font_size();
+	::draw_text(g, rItem, text, font_size, Gdiplus::FontStyleRegular, 2, 0.0f, m_lf.lfFaceName,
+		m_theme.cr_text, Gdiplus::Color::Transparent, Gdiplus::Color::LightGray, Gdiplus::Color::Transparent, DT_LEFT | DT_VCENTER);
+#ifdef _DEBUG
+	drag_img.save(_T("D:\\drag_img.png"));
+#endif
 }
 
 void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
@@ -2444,7 +2497,7 @@ BOOL CSCTreeCtrl::move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM
 	TV.cchTextMax = sizeof(str);
 	GetItem(&TV);
 
-	DWORD dwData = pTree->GetItemData(hSrcItem);
+	DWORD_PTR dwData = pTree->GetItemData(hSrcItem);
 
 	// 아이템을 추가 하자.
 	TVINSERTSTRUCT  TI;
@@ -2513,7 +2566,7 @@ BOOL CSCTreeCtrl::move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, H
 		TV.cchTextMax = sizeof(str);
 		GetItem(&TV);
 
-		DWORD dwData = pTree->GetItemData(hSrcItem);
+		DWORD_PTR dwData = pTree->GetItemData(hSrcItem);
 
 		// 아이템을 추가 하자.
 		TVINSERTSTRUCT  TI;
@@ -3511,10 +3564,10 @@ void CSCTreeCtrl::delete_item(HTREEITEM hItem, bool only_children, bool confirm,
 	{
 		if (delete_data)
 		{
-			DWORD* pData = (DWORD*)GetItemData(hItem);
+			DWORD_PTR pData = GetItemData(hItem);
 			if (pData)
 			{
-				delete pData;
+				delete reinterpret_cast<void*>(pData);
 				SetItemData(hItem, NULL);
 			}
 		}

@@ -4,6 +4,8 @@
 * 기본 CTreeCtrl에서 제공하지 않는 기능들을 확장하기 위해 제작.
 	- 파일 load, save (txt, json?)
 	  (txt의 경우 depth는 tab으로 표현함)
+- git : https://github.com/scpark98/Test_CSCTreeCtrl.git
+- test project : D:\1.Projects_C++\1.test\Test_CSCSliderCtrl
 
 [윈도우 탐색기와 같은 폴더 트리로 사용할 경우]
 	- dlg.h에 CShellImageList의 인스턴스를 선언하고,
@@ -408,6 +410,7 @@ protected:
 	//https://jiniya.net/tt/594/
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
 	CImageList*		create_drag_image(CTreeCtrl* pList, LPPOINT lpPoint);
+	void			create_drag_image(CSCGdiplusBitmap& drag_img);
 
 //편집 관련
 	bool			m_allow_edit = true;

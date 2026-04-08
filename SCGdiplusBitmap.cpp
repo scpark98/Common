@@ -146,7 +146,7 @@ void CSCGdiplusBitmap::create(int cx, int cy, Gdiplus::Color cr, Gdiplus::PixelF
 }
 
 //CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
-void CSCGdiplusBitmap::create_drag_image(CWnd* pWnd)
+void CSCGdiplusBitmap::create_drag_image(CWnd* pWnd, HICON hIcon)
 {
 	release();
 
@@ -163,13 +163,22 @@ void CSCGdiplusBitmap::create_drag_image(CWnd* pWnd)
 		CRect rItem;
 
 		ctrl->GetItemRect(hItem, rItem, TRUE);
+		rItem.MoveToXY(0, 0);
+
 		m_pBitmap = new Gdiplus::Bitmap(rItem.Width(), rItem.Height(), PixelFormat32bppARGB);
 
 		CFont* font = ctrl->GetFont();
 
 		Gdiplus::Graphics g(m_pBitmap);
 
-		//draw_text(0, 0, text, 12, 1);
+		if (hIcon)
+		{
+			Gdiplus::Bitmap icon(hIcon);
+			g.DrawImage(&icon, 0, 0, icon.GetWidth(), icon.GetHeight());
+			rItem.OffsetRect(icon.GetWidth() + 2, 0);
+		}
+
+		//::draw_text(g, rItem, text, 10, Gdiplus::FontStyleRegular, 2, 0.0f, );
 
 		resolution();
 	}

@@ -166,7 +166,7 @@ public:
 	void			create(int cx, int cy, Gdiplus::Color cr = Gdiplus::Color::Transparent, Gdiplus::PixelFormat format = PixelFormat32bppARGB);
 
 	//CTreeCtrl, CListCtrl등에서 선택된 항목 자체를 이미지로 리턴(drag시에 사용)
-	void			create_drag_image(CWnd* pWnd);
+	void			create_drag_image(CWnd* pWnd, HICON hIcon = NULL);
 
 	void			release();
 

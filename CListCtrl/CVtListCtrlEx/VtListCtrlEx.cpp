@@ -3890,6 +3890,28 @@ void CVtListCtrlEx::OnDropFiles(HDROP hDropInfo)
 //x, y위치의 item, sub_item 인덱스를 구할 수 있다. item의 인덱스만을 필요로 할 경우는 리턴값만 이용하면 된다.
 int CVtListCtrlEx::index_from_point(int x, int y, int* item, int* sub_item)
 {
+	LVHITTESTINFO ht = {};
+	ht.pt.x = x;
+	ht.pt.y = y;
+	SubItemHitTest(&ht);
+
+	if (item)
+		*item = ht.iItem;
+	if (sub_item)
+		*sub_item = ht.iSubItem;
+
+	return ht.iItem;
+	/*
+	// 헤더 높이만큼 y 보정
+	CHeaderCtrl* pHeader = GetHeaderCtrl();
+	if (pHeader)
+	{
+		CRect rcHeader;
+		pHeader->GetWindowRect(&rcHeader);
+		ScreenToClient(&rcHeader);
+		y -= rcHeader.Height();  // 헤더 높이를 빼줌
+	}
+
 	int first = GetTopIndex();
 	int last = first + GetCountPerPage();
 	CRect rItem;
@@ -3916,6 +3938,7 @@ int CVtListCtrlEx::index_from_point(int x, int y, int* item, int* sub_item)
 	}
 
 	return -1;
+	*/
 }
 
 

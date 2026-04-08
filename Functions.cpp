@@ -12782,7 +12782,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 
 //서비스 관련 명령을 쉽게 처리하기 위해 작성.
 //cmd는 다음과 같은 키워드를 사용하며 명령에 따라 리턴값의 의미도 다르므로 주의할 것.
-//"query"	: status를 리턴
+//"query"	: status를 리턴. 정상적인 query 결과는 1 이상의 값을 리턴.
 //"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
 //			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
 //"delete"	: 서비스 삭제가 성공하면 0보다 큰 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
@@ -12798,6 +12798,8 @@ DWORD service_command(CString service_name, CString cmd, DWORD& error_code, CStr
 	//service control manager를 얻어와서 서비스 상태값을 조회.
 	SC_HANDLE hManager = NULL;
 	SC_HANDLE hService = NULL; 
+
+	//cmd = "restart"일 때 서비스가 중지중이면 각 API를 호출해야하고
 
 	if ((hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS)) == NULL)
 	{
@@ -12823,15 +12825,16 @@ DWORD service_command(CString service_name, CString cmd, DWORD& error_code, CStr
 			case ERROR_SERVICE_DOES_NOT_EXIST:
 				detail_msg = _T("ERROR_SERVICE_DOES_NOT_EXIST");
 				break;
-			default :
+			default:
 				detail_msg = _T("not defined error.");
 		}
 
 		if (detail)
 			*detail = detail_msg;
+
 		TRACE(_T("detail = %s\n"), detail_msg);
 		CloseServiceHandle(hManager);
-		return error_code;
+		return 0;
 	}
 
 	//서비스에게 INTERROGATE 제어신호를 보내면 해당 서비스는 자신의 현재 상태를 리턴한다.
@@ -12889,6 +12892,22 @@ DWORD service_command(CString service_name, CString cmd, DWORD& error_code, CStr
 			}
 		}
 	}
+	else if (cmd == _T("restart"))
+	{
+		if (ControlService(hService, SERVICE_CONTROL_STOP, &status))
+		{
+			//SERVICE_CONTROL_STOP 명령을 내린 후 SERVICE_STOP_PENDING (3) 상태가 된 후 SERVICE_STOPPED 상태로 변경되므로
+			//
+			while (status.dwCurrentState != SERVICE_STOPPED)
+				QueryServiceStatus(hService, &status);
+			status_code = SERVICE_STOPPED;
+		}
+
+		Wait(1000);
+
+		if (StartService(hService, 0, nullptr))
+			status_code = SERVICE_RUNNING;
+	}
 
 	//5		: ERROR_ACCESS_DENIED
 	//6		: ERROR_INVALID_HANDLE
@@ -12908,10 +12927,12 @@ DWORD service_command(CString service_name, CString cmd, DWORD& error_code, CStr
 }
 
 //status값에 해당하는 상태 스트링 리턴
-CString	service_status_str(DWORD status)
+CString	get_service_status_str(DWORD status)
 {
 	switch (status)
 	{
+		case 0:
+			return _T("ERROR_SERVICE_DOES_NOT_EXIST");
 		case SERVICE_STOPPED:			//0x00000001
 			return _T("SERVICE_STOPPED");
 		case SERVICE_START_PENDING:		//0x00000002

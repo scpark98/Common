@@ -2045,7 +2045,7 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 	//이미지가 있다면 크기+여백만큼 넓혀준다.
 	int img_index;
 	int sel_img_index;
-	HICON hIcon;
+	HICON hIcon = nullptr;
 
 	GetItemImage(m_DragItem, img_index, sel_img_index);
 	if (img_index >= 0)

@@ -567,6 +567,16 @@ public:
 			sub_url.Empty();
 	}
 
+	// 취소 지원: request_url 내부에서 InternetOpen 핸들을 저장하고,
+	// 외부에서 cancel()을 호출하면 핸들을 닫아 블로킹 WinInet 작업을 즉시 취소한다.
+	std::atomic<HINTERNET> h_cancel_root{ nullptr };
+	void cancel()
+	{
+		HINTERNET h = h_cancel_root.exchange(nullptr);
+		if (h) InternetCloseHandle(h);
+		// MSDN: 부모 핸들을 닫으면 자식 핸들(hConnect, hRequest)도 무효화됨
+	}
+
 	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
 	bool		use_thread = false;
 

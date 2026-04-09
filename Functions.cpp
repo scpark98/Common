@@ -2995,7 +2995,10 @@ void request_url(CRequestUrlParams* params)
 		return;
 	}
 
-	DWORD dwConnectTimeout = 3000;
+	// ★ 취소용 핸들 저장
+	params->h_cancel_root.store(hInternetRoot);
+
+	DWORD dwConnectTimeout = MAX(5000, params->timeout_ms);	//타임아웃 최소값은 5초로 한다.
 	InternetSetOption(hInternetRoot, INTERNET_OPTION_CONNECT_TIMEOUT, &dwConnectTimeout, sizeof(DWORD));
 
 	HINTERNET hInternetConnect = InternetConnect(hInternetRoot,
@@ -3041,7 +3044,7 @@ void request_url(CRequestUrlParams* params)
 	//버그라고 되어 있는데 현재도 그러한지는 확인되지 않고 동작도 되지 않는듯함.
 	//https://blog.naver.com/che5886/20061092638
 	//20250117 30초 timeout됨을 확인 완료.
-	dwConnectTimeout = MIN(5000, params->timeout_ms);
+	
 	DWORD dwTransferTimeout = params->timeout_ms;
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwConnectTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTransferTimeout, sizeof(DWORD));
@@ -3118,9 +3121,12 @@ void request_url(CRequestUrlParams* params)
 
 		SAFE_DELETE_ARRAY(jsonData);
 
-		InternetCloseHandle(hOpenRequest);
-		InternetCloseHandle(hInternetConnect);
-		InternetCloseHandle(hInternetRoot);
+		if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+		if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+		{
+			HINTERNET h = params->h_cancel_root.exchange(nullptr);
+			if (h) InternetCloseHandle(h);
+		}
 
 		return;
 	}
@@ -3155,9 +3161,12 @@ void request_url(CRequestUrlParams* params)
 		SAFE_DELETE_ARRAY(jsonData);
 		SAFE_DELETE_ARRAY(buffer);
 
-		InternetCloseHandle(hOpenRequest);
-		InternetCloseHandle(hInternetConnect);
-		InternetCloseHandle(hInternetRoot);
+		if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+		if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+		{
+			HINTERNET h = params->h_cancel_root.exchange(nullptr);
+			if (h) InternetCloseHandle(h);
+		}
 
 		return;
 	}
@@ -3170,9 +3179,12 @@ void request_url(CRequestUrlParams* params)
 		SAFE_DELETE_ARRAY(jsonData);
 		SAFE_DELETE_ARRAY(buffer);
 
-		InternetCloseHandle(hOpenRequest);
-		InternetCloseHandle(hInternetConnect);
-		InternetCloseHandle(hInternetRoot);
+		if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+		if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+		{
+			HINTERNET h = params->h_cancel_root.exchange(nullptr);
+			if (h) InternetCloseHandle(h);
+		}
 
 		return;
 	}
@@ -3213,9 +3225,12 @@ void request_url(CRequestUrlParams* params)
 			params->result = _T("InternetReadFile() failed.");
 			params->status = -1;
 
-			InternetCloseHandle(hOpenRequest);
-			InternetCloseHandle(hInternetConnect);
-			InternetCloseHandle(hInternetRoot);
+			if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+			if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+			{
+				HINTERNET h = params->h_cancel_root.exchange(nullptr);
+				if (h) InternetCloseHandle(h);
+			}
 
 			return;
 		}
@@ -3261,9 +3276,12 @@ void request_url(CRequestUrlParams* params)
 					SAFE_DELETE_ARRAY(buffer);
 					//SAFE_DELETE_ARRAY(total_result);
 
-					InternetCloseHandle(hOpenRequest);
-					InternetCloseHandle(hInternetConnect);
-					InternetCloseHandle(hInternetRoot);
+					if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+					if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+					{
+						HINTERNET h = params->h_cancel_root.exchange(nullptr);
+						if (h) InternetCloseHandle(h);
+					}
 
 					params->result = _T("error=") + params->local_file_path + _T("\n\nfail to DeleteFile().");
 					params->status = -1;
@@ -3277,9 +3295,12 @@ void request_url(CRequestUrlParams* params)
 					SAFE_DELETE_ARRAY(buffer);
 					//SAFE_DELETE_ARRAY(total_result);
 
-					InternetCloseHandle(hOpenRequest);
-					InternetCloseHandle(hInternetConnect);
-					InternetCloseHandle(hInternetRoot);
+					if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+					if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+					{
+						HINTERNET h = params->h_cancel_root.exchange(nullptr);
+						if (h) InternetCloseHandle(h);
+					}
 
 					params->result = _T("error=") + params->local_file_path + _T("\n\nfail to CreateFile().");
 					params->status = -1;
@@ -3294,9 +3315,12 @@ void request_url(CRequestUrlParams* params)
 				DeleteFile(params->local_file_path);
 				SAFE_DELETE_ARRAY(buffer);
 				//SAFE_DELETE_ARRAY(total_result);
-				InternetCloseHandle(hOpenRequest);
-				InternetCloseHandle(hInternetConnect);
-				InternetCloseHandle(hInternetRoot);
+				if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+				if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+				{
+					HINTERNET h = params->h_cancel_root.exchange(nullptr);
+					if (h) InternetCloseHandle(h);
+				}
 				params->result = _T("error=") + params->local_file_path + _T("\n\nfail to WriteFile().");
 				params->status = -1;
 				TRACE(_T("result = %s\n"), params->result);
@@ -3335,9 +3359,12 @@ void request_url(CRequestUrlParams* params)
 	SAFE_DELETE_ARRAY(buffer);
 	//SAFE_DELETE_ARRAY(total_result);
 
-	InternetCloseHandle(hOpenRequest);
-	InternetCloseHandle(hInternetConnect);
-	InternetCloseHandle(hInternetRoot);
+	if (hOpenRequest) InternetCloseHandle(hOpenRequest);
+	if (hInternetConnect) InternetCloseHandle(hInternetConnect);
+	{
+		HINTERNET h = params->h_cancel_root.exchange(nullptr);
+		if (h) InternetCloseHandle(h);
+	}
 
 	params->elapsed = clock() - t0;
 	//TRACE(_T("elapsed = %ld\n"), params->elapsed);

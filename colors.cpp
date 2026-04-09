@@ -326,7 +326,8 @@ Gdiplus::Color get_color(CString cr_str)
 	}
 	else //cr_str == _T("Red")라면 Gdiplus::Color::Red 라는 컬러값을 리턴한다.
 	{
-		cr = CSCColorList::get_color(CString2string(cr_str));
+		std::string scr_name = CString2string(cr_str);
+		cr = CSCColorList::get_color(scr_name);
 	}
 
 	return cr;

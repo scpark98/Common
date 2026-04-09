@@ -14,7 +14,7 @@
   (테스트 방법. 0 ~ 999까지 10ms 간격으로 로그를 기록하는 50개 쓰레드를 생성하여 기록 후 확인함)
 
 * app.h에서 (프로젝트 구성에 따라 App class가 아닌 stdafx.h 또는 pch.h 등에 선언할 수도 있음)
-	#include "../Common/log/SCLog/SCLog.h"
+	#include "Common/log/SCLog/SCLog.h"
 	...
 	전역변수로 아래 변수 선언.
 	extern CSCLog gLog;
@@ -109,6 +109,12 @@ public:
 	//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지므로 수동 호출하지 말 것!
 	void		write_start_log();
 
+	//로그 파일명에 타임스탬프를 추가할 지 여부를 설정한다.
+	//이를 설정하면 매 실행 시 로그파일명에 시간까지 포함되어 생성된다. (예: 실행파일명_yyyymmdd_hhmmss.log)
+	//즉, 실행시마다 매번 로그를 새로운 파일에 기록하고자 할 때 이 옵션을 켜면 된다.
+	//default = false
+	void		use_filename_timestamp(bool use_filename_timestamp = true) { m_use_filename_timestamp = use_filename_timestamp; }
+
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }
 
@@ -139,6 +145,7 @@ protected:
 	int			m_log_level = SCLOG_LEVEL_RELEASE;
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;
+	bool		m_use_filename_timestamp = false;
 	FILE*		m_fp;
 	
 	//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.

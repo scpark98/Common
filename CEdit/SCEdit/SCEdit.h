@@ -75,6 +75,7 @@ public:
 	BOOL					Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
 
 	CString					get_text() { CString text; GetWindowText(text); return text; }
+	int						get_int() { CString text = get_text(); return _ttoi(text); }
 	void					set_text(CString text = _T("")) { CMFCMaskedEdit::SetWindowText(text); }
 	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CMFCMaskedEdit::SetWindowText(text); }
 	void					SetWindowText(CString text) { set_text(text); }

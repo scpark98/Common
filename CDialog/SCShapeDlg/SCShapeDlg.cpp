@@ -196,7 +196,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	//배경을 그린다면 r은 더 크게 잡아줘야 한다. margin만큼 더 크게 키워준다.
 	if (m_text_setting.text_prop.cr_back.GetValue() != Gdiplus::Color::Transparent)
 	{
-		r.InflateRect(m_text_setting.text_prop.margin, m_text_setting.text_prop.margin);
+		r.InflateRect(m_text_setting.margin);
 		r.InflateRect((int)m_text_setting.text_prop.round_thickness + 2, (int)m_text_setting.text_prop.round_thickness + 2);
 	}
 
@@ -264,10 +264,22 @@ void CSCShapeDlg::set_round_stroke_color(Gdiplus::Color cr_round_stroke, bool in
 		set_text();
 }
 
-//배경을 그릴 경우 텍스트와 배경 사각형 사이의 여백
+//배경을 그릴 경우 텍스트와 배경 사각형 사이의 여백. margin이 0이면 텍스트와 배경이 딱 붙어서 그려진다. margin이 10이면 텍스트와 배경 사이에 10픽셀의 여백이 생긴다.
+//left, top, right, bottom을 각각 지정하려 했으나 margin만큼 커진 사각형에 center에 그리는 방식이므로 현재로서는 의미없다.
+//추후 각각을 준 경우 텍스트와 배경 사이의 여백이 각각 달라지는 방식으로 구현이 필요하다.
 void CSCShapeDlg::set_margin(float margin, bool invalidate)
 {
-	m_text_setting.text_prop.margin = margin;
+	m_text_setting.margin = CRect(margin, margin, margin, margin);
+	if (invalidate)
+		set_text();
+}
+
+//배경을 그릴 경우 텍스트와 배경 사각형 사이의 여백. margin이 0이면 텍스트와 배경이 딱 붙어서 그려진다. margin이 10이면 텍스트와 배경 사이에 10픽셀의 여백이 생긴다.
+//left, top, right, bottom을 각각 지정하려 했으나 margin만큼 커진 사각형에 center에 그리는 방식이므로 현재로서는 의미없다.
+//추후 각각을 준 경우 텍스트와 배경 사이의 여백이 각각 달라지는 방식으로 구현이 필요하다.
+void CSCShapeDlg::set_margin(CRect margin, bool invalidate)
+{
+	m_text_setting.margin = margin;
 	if (invalidate)
 		set_text();
 }
@@ -360,6 +372,12 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 	{
 		render(m_img.m_pBitmap);
 	}
+}
+
+//현재 설정된 이미지를 파일로 저장해서 확인해 볼 수 있다.
+void CSCShapeDlg::save_image(CString path)
+{
+	m_img.save(path);
 }
 
 bool CSCShapeDlg::load(CWnd* parent, UINT id)

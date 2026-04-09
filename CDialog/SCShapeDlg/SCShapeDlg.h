@@ -79,6 +79,8 @@ public:
 
 	CString text;
 	CSCTextProperty	text_prop;
+	//shape과 상하좌우 여백 크기
+	CRect margin;
 };
 
 //CSCShapeDlg
@@ -96,6 +98,9 @@ public:
 	//set_image()로 CSCGdiplusBitmap를 받는 경우는 반드시 deep_copy를 해야 하지만
 	//load()를 통해서 직접 로딩하여 m_img에 넣을 경우는 불필요하다.
 	void			set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy = true);
+
+	//현재 설정된 이미지를 파일로 저장해서 확인해 볼 수 있다.
+	void			save_image(CString path);
 
 	bool			load(CWnd* parent, UINT id);
 	bool			load(CWnd* parent, CString sType, UINT id);
@@ -143,6 +148,10 @@ public:
 	//left, top, right, bottom을 각각 지정하려 했으나 margin만큼 커진 사각형에 center에 그리는 방식이므로 현재로서는 의미없다.
 	//추후 각각을 준 경우 텍스트와 배경 사이의 여백이 각각 달라지는 방식으로 구현이 필요하다.
 	void			set_margin(float margin, bool invalidate = true);
+	//배경을 그릴 경우 텍스트와 배경 사각형 사이의 여백. margin이 0이면 텍스트와 배경이 딱 붙어서 그려진다. margin이 10이면 텍스트와 배경 사이에 10픽셀의 여백이 생긴다.
+	//left, top, right, bottom을 각각 지정하려 했으나 margin만큼 커진 사각형에 center에 그리는 방식이므로 현재로서는 의미없다.
+	//추후 각각을 준 경우 텍스트와 배경 사이의 여백이 각각 달라지는 방식으로 구현이 필요하다.
+	void			set_margin(CRect margin, bool invalidate = true);
 
 	//기본 정렬은 센터정렬로 만들어지지만 DT_LEFT를 주면 모든 라인이 왼쪽 정렬된다. 각 라인마다 따로 정렬을 지정할 수도 있지만 필요성을 따져봐야 한다.
 	void			set_text_align(int align, bool invalidate = true);

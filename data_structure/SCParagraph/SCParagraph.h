@@ -60,9 +60,6 @@ public:
 	Gdiplus::Color cr_shadow = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_round = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_round_stroke = Gdiplus::Color::Transparent;
-
-	//배경색을 칠할 경우 텍스트와	배경 사각형 사이의 여백
-	float		margin = 20.0f;
 };
 
 class CSCParagraph
@@ -98,6 +95,9 @@ public:
 
 	//calc_text_rect()에서 이미 각 paragraph의 r이 align에 따라 정해지지만 이를 동적으로 변경하고자 할 경우 호출.
 	static CRect	set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>>& para, DWORD align);
+
+	//텍스트 상하좌우 여백
+	//static void		set_margin(std::deque<std::deque<CSCParagraph>>& para, float margin);
 
 	//출력 위치를 이동시킨다.
 	static CRect	offset(int x, int y);

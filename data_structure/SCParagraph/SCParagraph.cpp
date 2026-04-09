@@ -750,6 +750,12 @@ CRect CSCParagraph::set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>
 	return rect_text;
 }
 
+//텍스트 상하좌우 여백
+//void CSCParagraph::set_margin(std::deque<std::deque<CSCParagraph>>& para, float margin)
+//{
+//	para.text_prop.
+//}
+
 //para의 정보를 문자열로 리턴한다.
 CString	CSCParagraph::get_paragraph_info_string(std::deque<std::deque<CSCParagraph>>& para)
 {

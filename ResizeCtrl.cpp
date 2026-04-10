@@ -20,11 +20,6 @@
 // that you have found/implemented and I will fix/incorporate them into this
 // file. 
 //////////////////////////////////////////////////////////////////////
-
-//#include "pch.h"
-//#include <Windows.h>
-
-//#include <WinUser.h>
 #include "ResizeCtrl.h"
 #ifndef __AFXTEMPL_H__
 #include <afxtempl.H>

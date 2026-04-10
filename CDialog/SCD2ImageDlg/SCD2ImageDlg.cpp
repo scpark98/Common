@@ -142,7 +142,6 @@ void CSCD2ImageDlg::OnPaint()
 	GetClientRect(rc);
 
 	ID2D1DeviceContext* d2dc = m_d2dc.get_d2dc();
-
 	D2D1_SIZE_F sz_dc = m_d2dc.get_size();
 
 	d2dc->BeginDraw();

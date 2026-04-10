@@ -5,7 +5,6 @@
 //#define _WIN32_WINNT 0x0501
 //#endif
 
-
 #include <afxinet.h>	// for Internet
 #include <string>
 #include <utility>
@@ -10092,7 +10091,7 @@ CString	get_parent_dir(CString path, TCHAR path_sep)
 //그냥 확실하게 GetComputerNameString().MakeLower() 등과 같이
 //대소문자를 명확히 하여 비교하는 것이 좋다.
 //=>255글자까지 리턴되는 GetComputerNameEx()로 변경함.
-CString get_computer_name_string()
+CString get_computer_name()
 {
 	//TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
 	TCHAR computerName[255] = { 0, };

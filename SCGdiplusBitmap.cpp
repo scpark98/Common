@@ -1,6 +1,4 @@
 ﻿#include "SCGdiplusBitmap.h"
-
-
 #include "Functions.h"
 #include "MemoryDC.h"
 

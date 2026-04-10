@@ -31,7 +31,6 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <math.h>
 #include <memory.h>
 #include <string>
-#include <memory>
 #include <WinPerf.h>	//for cpu usage
 #include <sys/timeb.h>	//for elapsed time
 #include <atlimage.h>
@@ -46,6 +45,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <set>
 #include <ostream>
 #include <sstream>
+#include <atomic>
 
 #ifndef _USING_V110_SDK71_
 	#include <d2d1_1.h>
@@ -1641,7 +1641,7 @@ struct	NETWORK_INFO
 	//그냥 확실하게 GetComputerNameString().MakeLower() 등과 같이
 	//대소문자를 명확히 하여 비교하는 것이 좋다.
 	//=>255글자까지 리턴되는 GetComputerNameEx()로 변경함.
-	CString		get_computer_name_string();
+	CString		get_computer_name();
 	//버전정보를 구조체로 리턴
 	OSVERSIONINFOEX	get_windows_version();
 	//버전정보를 숫자와 '.'로 리턴. ex. "10.0.12345"

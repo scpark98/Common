@@ -140,6 +140,7 @@ void CSCLog::write_start_log()
 {
 	logWrite(_T("\n==================== Program Start ===================="));
 
+	logWrite(_T("device name = %s"), get_computer_name());
 	CString sVersion = get_file_property(get_exe_filename(true), _T("FileVersion"));
 	logWrite(_T("file version = %s"), sVersion);
 	//gLog.write(_T("file version = 2023.7.24.1"));// , sVersion);

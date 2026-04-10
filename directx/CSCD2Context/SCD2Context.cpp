@@ -1,6 +1,7 @@
 #include "SCD2Context.h"
 
 #pragma comment(lib, "d2d1.lib")
+#pragma comment(lib, "d3d11.lib")
 
 CSCD2Context::CSCD2Context()
 {

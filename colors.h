@@ -259,6 +259,15 @@ Gdiplus::Color	get_color(std::string cr_name);
 
 #ifndef _USING_V110_SDK71_
 D2D1::ColorF	get_d2color(Gdiplus::Color cr);
+inline bool operator==(const D2D1_COLOR_F& a, const D2D1_COLOR_F& b)
+{
+	return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+
+inline bool operator!=(const D2D1_COLOR_F& a, const D2D1_COLOR_F& b)
+{
+	return !(a == b);
+}
 #endif
 
 

@@ -182,17 +182,21 @@ void CSCHeatmapCtrl::set_back_color(Gdiplus::Color cr_back)
 
 //num 갯수만큼 더 추가한다. cell_col, 즉 가로 셀의 갯수를 재지정 할 수 있다.
 //0이면 현재 설정값 사용. 만약 현재 설정값이 0이라면 기본값으로 자동 계산한다.
-void CSCHeatmapCtrl::add_cell(int num, int cell_col)
+//고정모드(m_cell_size > 0)에서는 m_cell_col > 0일 때 열 수 고정, 아니면 너비에서 동적 계산.
+int CSCHeatmapCtrl::add_cell(int num, int cell_col)
 {
 	if (num <= 0)
-		return;
+		return -1;
+
+	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
 
 	if (cell_col > 0)
 	{
 		m_cell_col = cell_col;
 	}
-	else if (m_cell_col <= 0)
+	else if (auto_mode && m_cell_col <= 0)
 	{
+		// 자동모드에서만 m_cell_col 초기화 필요 (고정모드는 calc_col_count()에서 동적 계산)
 		CRect rc;
 		GetClientRect(rc);
 		m_cell_col = (rc.Width() / (8 + m_cell_gap.cx));
@@ -202,6 +206,8 @@ void CSCHeatmapCtrl::add_cell(int num, int cell_col)
 
 	clamp_scroll();
 	Invalidate();
+
+	return (m_total - 1);
 }
 
 void CSCHeatmapCtrl::set_fit_to_client(bool fit)
@@ -223,52 +229,106 @@ void CSCHeatmapCtrl::OnCancel()
 {
 }
 
-void CSCHeatmapCtrl::set_cell_color(int x, int y, Gdiplus::Color cr)
+void CSCHeatmapCtrl::set_cell_color(int x, int y, Gdiplus::Color cr, bool redraw)
 {
-	if (m_cell_col <= 0 || x < 0 || x >= m_cell_col || y < 0 || y * m_cell_col + x >= m_total)
+	int cols = calc_col_count();
+	if (cols <= 0 || x < 0 || x >= cols || y < 0)
 		return;
 
-	m_cell[{x, y}].color = get_d2color(cr);
-	Invalidate();
+	int index = y * cols + x;
+	if (index >= m_total)
+		return;
+
+	D2D1_COLOR_F cr_fill = get_d2color(cr);
+	if (m_cell[index].cr_fill != cr_fill)
+	{
+		m_cell[index].cr_fill = cr_fill;
+		if (m_redraw && redraw) Invalidate();
+	}
 }
 
-void CSCHeatmapCtrl::set_cell_color(int index, Gdiplus::Color cr)
+void CSCHeatmapCtrl::set_cell_color(int index, Gdiplus::Color cr, bool redraw)
 {
 	if (index < 0 || index >= m_total)
 		return;
 
-	int x = index % m_cell_col;
-	int y = index / m_cell_col;
-	m_cell[{x, y}].color = get_d2color(cr);
-	Invalidate();
+	D2D1_COLOR_F cr_fill = get_d2color(cr);
+	if (m_cell[index].cr_fill != cr_fill)
+	{
+		m_cell[index].cr_fill = cr_fill;
+		if (m_redraw && redraw) Invalidate();
+	}
 }
 
-void CSCHeatmapCtrl::set_cell_text(int x, int y, const CString& text)
+void CSCHeatmapCtrl::set_cell_text(int x, int y, CString& text, bool redraw)
 {
-	if (m_cell_col <= 0 || x < 0 || x >= m_cell_col || y < 0 || y * m_cell_col + x >= m_total)
+	int cols = calc_col_count();
+	if (cols <= 0 || x < 0 || x >= cols || y < 0)
 		return;
 
-	m_cell[{x, y}].text = text;
+	int index = y * cols + x;
+	if (index >= m_total)
+		return;
+
+	if (m_cell[index].text != text)
+	{
+		m_cell[index].text = text;
+		if (m_redraw && redraw) Invalidate();
+	}
 }
 
-DWORD_PTR CSCHeatmapCtrl::get_cell_data(int index)
+void CSCHeatmapCtrl::set_cell_text(int index, CString& text, bool redraw)
+{
+	if (index < 0 || index >= m_total)
+		return;
+
+	if (m_cell[index].text != text)
+	{
+		m_cell[index].text = text;
+		if (m_redraw && redraw) Invalidate();
+	}
+}
+
+void CSCHeatmapCtrl::set_cell_border_color(int index, Gdiplus::Color cr_border, bool redraw)
+{
+	if (index < 0 || index >= m_total)
+		return;
+
+	D2D1_COLOR_F cr_b = get_d2color(cr_border);
+	if (m_cell[index].cr_border != cr_b)
+	{
+		m_cell[index].cr_border = cr_b;
+		if (m_redraw && redraw) Invalidate();
+	}
+}
+
+void CSCHeatmapCtrl::set_border_color(Gdiplus::Color cr_border, bool redraw)
+{
+	m_cr_border = get_d2color(cr_border);
+	if (m_redraw && redraw) Invalidate();
+}
+
+DWORD_PTR CSCHeatmapCtrl::get_item_data(int index)
 {
 	if (index < 0 || index >= m_total)
 		return 0;
 
-	int x = index % m_cell_col;
-	int y = index / m_cell_col;
-	return m_cell[{x, y}].data;
+	auto it = m_cell.find(index);
+	if (it != m_cell.end())
+		return it->second.data;
+
+	return 0;
 }
 
-void CSCHeatmapCtrl::set_cell_data(int index, DWORD_PTR data)
+void CSCHeatmapCtrl::set_item_data(int index, DWORD_PTR data)
 {
 	if (index < 0 || index >= m_total)
 		return;
 
-	int x = index % m_cell_col;
-	int y = index / m_cell_col;
-	m_cell[{x, y}].data = data;
+	m_cell[index].data = data;
+
+	//새로 생성한 셀의 채움색은 전체에 적용되는 기본 색상으로 초기화한다.
+	m_cell[index].cr_fill = m_cr_cell;
 }
 
 BOOL CSCHeatmapCtrl::OnEraseBkgnd(CDC* pDC)
@@ -279,6 +339,88 @@ BOOL CSCHeatmapCtrl::OnEraseBkgnd(CDC* pDC)
 }
 
 //------------------------------------------------------------
+// 현재 유효 열 수 반환
+// - 자동모드(m_cell_size <= 0): m_cell_col 반환
+// - 고정모드(m_cell_size > 0):
+//     m_cell_col > 0이면 그 값으로 고정
+//     m_cell_col <= 0이면 윈도우 너비에서 동적 계산
+//------------------------------------------------------------
+int CSCHeatmapCtrl::calc_col_count()
+{
+	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
+	if (auto_mode)
+		return m_cell_col;
+
+	// 고정 셀 크기 모드: m_cell_col > 0이면 해당 값 사용
+	if (m_cell_col > 0)
+		return m_cell_col;
+
+	// m_cell_col <= 0이면 클라이언트 너비에서 열 수 동적 계산
+	float cell_w = (float)max(1, m_cell_size.cx);
+	float gap_x = (float)m_cell_gap.cx;
+	float margin_x = gap_x;
+
+	float width;
+	if (m_d2dc.get_d2dc())
+		width = m_d2dc.get_size().width;
+	else
+	{
+		CRect rc;
+		GetClientRect(rc);
+		width = (float)rc.Width();
+	}
+
+	if (width <= margin_x * 2.0f)
+		return 1;
+
+	int cols = (int)((width - margin_x * 2.0f + gap_x) / (cell_w + gap_x));
+	return max(1, cols);
+}
+
+//------------------------------------------------------------
+// 고정모드에서 실제 렌더링에 사용되는 셀 크기를 반환
+// - m_cell_col > 0: 셀 너비를 클라이언트 너비에 맞게 자동 계산 (가로 꽉 채움)
+// - m_cell_col <= 0: m_cell_size를 그대로 사용
+//------------------------------------------------------------
+void CSCHeatmapCtrl::get_effective_cell_size(float& cell_w, float& cell_h)
+{
+	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
+
+	if (auto_mode)
+	{
+		float fit = calc_fit_cell_size();
+		float sz = m_fit_to_client ? fit : max(1.0f, fit * m_zoom);
+		cell_w = cell_h = sz;
+		return;
+	}
+
+	// 고정모드 기본값
+	cell_w = (m_cell_size.cx > 0) ? (float)m_cell_size.cx : 1.0f;
+	cell_h = (m_cell_size.cy > 0) ? (float)m_cell_size.cy : cell_w;
+
+	// m_cell_col > 0이면 셀 너비를 클라이언트 너비에 맞게 자동 계산
+	if (m_cell_col > 0)
+	{
+		float gap_x = (float)m_cell_gap.cx;
+		float margin_x = gap_x;
+
+		float width;
+		if (m_d2dc.get_d2dc())
+			width = m_d2dc.get_size().width;
+		else
+		{
+			CRect rc;
+			GetClientRect(rc);
+			width = (float)rc.Width();
+		}
+
+		float area_w = width - margin_x * 2.0f;
+		cell_w = (area_w - gap_x * max(0, m_cell_col - 1)) / (float)m_cell_col;
+		if (cell_w < 1.0f) cell_w = 1.0f;
+	}
+}
+
+//------------------------------------------------------------
 // 자동모드에서 client에 전체 셀이 들어가는 정사각 셀 크기 반환
 //------------------------------------------------------------
 float CSCHeatmapCtrl::calc_fit_cell_size()
@@ -286,8 +428,9 @@ float CSCHeatmapCtrl::calc_fit_cell_size()
 	if (!m_d2dc.get_d2dc())
 		return 1.0f;
 
-	int rows = row_count();
-	if (m_cell_col <= 0 || rows <= 0)
+	int cols = calc_col_count();
+	int rows = (m_total > 0 && cols > 0) ? (m_total + cols - 1) / cols : 0;
+	if (cols <= 0 || rows <= 0)
 		return 1.0f;
 
 	D2D1_SIZE_F sz_dc = m_d2dc.get_size();
@@ -301,7 +444,7 @@ float CSCHeatmapCtrl::calc_fit_cell_size()
 	float gap_x = (float)m_cell_gap.cx;
 	float gap_y = (float)m_cell_gap.cy;
 
-	float fit_w = (area_w - gap_x * (m_cell_col - 1)) / (float)m_cell_col;
+	float fit_w = (area_w - gap_x * (cols - 1)) / (float)cols;
 	float fit_h = (area_h - gap_y * (rows - 1)) / (float)rows;
 
 	return max(1.0f, min(fit_w, fit_h));
@@ -312,10 +455,16 @@ float CSCHeatmapCtrl::calc_fit_cell_size()
 //------------------------------------------------------------
 void CSCHeatmapCtrl::clamp_scroll()
 {
-	int rows = row_count();
+	int cols = calc_col_count();
+	int rows = (m_total > 0 && cols > 0) ? (m_total + cols - 1) / cols : 0;
+
+	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
+
+	// 고정모드: 가로 스크롤 없음
+	if (!auto_mode)
+		m_scroll.x = 0.0f;
 
 	// fit_to_client 자동모드에서는 스크롤 불필요
-	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
 	if (auto_mode && m_fit_to_client)
 	{
 		m_scroll = { 0.0f, 0.0f };
@@ -325,7 +474,7 @@ void CSCHeatmapCtrl::clamp_scroll()
 	if (!m_d2dc.get_d2dc())
 		return;
 
-	if (m_cell_col <= 0 || rows <= 0)
+	if (cols <= 0 || rows <= 0)
 	{
 		m_scroll = { 0.0f, 0.0f };
 		return;
@@ -338,21 +487,12 @@ void CSCHeatmapCtrl::clamp_scroll()
 	float margin_y = gap_y;
 
 	float cell_w, cell_h;
-	if (auto_mode)
-	{
-		float sz = max(1.0f, calc_fit_cell_size() * m_zoom);
-		cell_w = cell_h = sz;
-	}
-	else
-	{
-		cell_w = (m_cell_size.cx > 0) ? (float)m_cell_size.cx : 1.0f;
-		cell_h = (m_cell_size.cy > 0) ? (float)m_cell_size.cy : cell_w;
-	}
+	get_effective_cell_size(cell_w, cell_h);
 
-	float total_w = margin_x * 2.0f + m_cell_col * cell_w + (m_cell_col - 1) * gap_x;
+	float total_w = margin_x * 2.0f + cols * cell_w + (cols - 1) * gap_x;
 	float total_h = margin_y * 2.0f + rows * cell_h + (rows - 1) * gap_y;
 
-	float max_x = max(0.0f, total_w - sz_dc.width);
+	float max_x = auto_mode ? max(0.0f, total_w - sz_dc.width) : 0.0f;
 	float max_y = max(0.0f, total_h - sz_dc.height);
 
 	m_scroll.x = max(0.0f, min(m_scroll.x, max_x));
@@ -367,8 +507,9 @@ CPoint CSCHeatmapCtrl::hit_test_cell(CPoint pt)
 	if (!m_d2dc.get_d2dc())
 		return { -1, -1 };
 
-	int rows = row_count();
-	if (m_cell_col <= 0 || rows <= 0)
+	int cols = calc_col_count();
+	int rows = (m_total > 0 && cols > 0) ? (m_total + cols - 1) / cols : 0;
+	if (cols <= 0 || rows <= 0)
 		return { -1, -1 };
 
 	float margin_x = (float)m_cell_gap.cx;
@@ -376,19 +517,8 @@ CPoint CSCHeatmapCtrl::hit_test_cell(CPoint pt)
 	float gap_x = (float)m_cell_gap.cx;
 	float gap_y = (float)m_cell_gap.cy;
 
-	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
 	float cell_w, cell_h;
-	if (auto_mode)
-	{
-		float fit = calc_fit_cell_size();
-		float sz = m_fit_to_client ? fit : max(1.0f, fit * m_zoom);
-		cell_w = cell_h = sz;
-	}
-	else
-	{
-		cell_w = (m_cell_size.cx > 0) ? (float)m_cell_size.cx : 1.0f;
-		cell_h = (m_cell_size.cy > 0) ? (float)m_cell_size.cy : cell_w;
-	}
+	get_effective_cell_size(cell_w, cell_h);
 
 	// 화면 좌표 → 컨텐츠 좌표 (스크롤 반영)
 	float fx = (float)pt.x + m_scroll.x - margin_x;
@@ -402,11 +532,11 @@ CPoint CSCHeatmapCtrl::hit_test_cell(CPoint pt)
 	int ix = (int)(fx / stride_x);
 	int iy = (int)(fy / stride_y);
 
-	if (ix < 0 || ix >= m_cell_col || iy < 0 || iy >= rows)
+	if (ix < 0 || ix >= cols || iy < 0 || iy >= rows)
 		return { -1, -1 };
 
 	// 마지막 행 부분 채움 처리: 선형 인덱스가 m_total 이상이면 무효
-	if (iy * m_cell_col + ix >= m_total)
+	if (iy * cols + ix >= m_total)
 		return { -1, -1 };
 
 	// gap 영역 위인지 확인
@@ -419,7 +549,7 @@ CPoint CSCHeatmapCtrl::hit_test_cell(CPoint pt)
 }
 
 //------------------------------------------------------------
-// Shift+Wheel: 줌,  Wheel: 세로 스크롤
+// Shift+Wheel: 셀 크기 확대/축소,  Wheel: 세로 스크롤
 //------------------------------------------------------------
 BOOL CSCHeatmapCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
@@ -432,10 +562,27 @@ BOOL CSCHeatmapCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 	if (nFlags & MK_SHIFT)
 	{
-		//--- 줌 (자동모드 전용) ---
+		//--- 고정모드: Shift+Wheel로 m_cell_size 확대/축소 ---
 		if (!auto_mode)
-			return TRUE;
+		{
+			// 현재 크기의 ~20%씩 변경 (최소 1px)
+			int step = max(1, m_cell_size.cy / 5);
+			if (zDelta < 0) step = -step;
 
+			int new_cx = max((int)m_cell_size_min.cx, min((int)m_cell_size_max.cx, (int)m_cell_size.cx + step));
+			int new_cy = max((int)m_cell_size_min.cy, min((int)m_cell_size_max.cy, (int)m_cell_size.cy + step));
+
+			if (new_cx != m_cell_size.cx || new_cy != m_cell_size.cy)
+			{
+				m_cell_size.cx = new_cx;
+				m_cell_size.cy = new_cy;
+				clamp_scroll();
+				Invalidate();
+			}
+			return TRUE;
+		}
+
+		//--- 자동모드: 기존 줌 동작 유지 ---
 		float fit = calc_fit_cell_size();
 		float old_cell = m_fit_to_client ? fit : max(1.0f, fit * m_zoom);
 
@@ -501,10 +648,15 @@ BOOL CSCHeatmapCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 }
 
 //------------------------------------------------------------
-// WM_MOUSEHWHEEL: 가로 스크롤 (틸트 휠)
+// WM_MOUSEHWHEEL: 가로 스크롤 (틸트 휠, 자동모드 전용)
 //------------------------------------------------------------
 LRESULT CSCHeatmapCtrl::OnMouseHWheel(WPARAM wParam, LPARAM lParam)
 {
+	// 고정 셀 크기 모드에서는 가로 스크롤 무시
+	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
+	if (!auto_mode)
+		return 0;
+
 	short zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 	float step = 40.0f;
 	m_scroll.x += (float)(zDelta) / WHEEL_DELTA * step;
@@ -570,7 +722,11 @@ void CSCHeatmapCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//--- 드래그 중이면 스크롤 업데이트 ---
 	if (m_bDragging)
 	{
-		m_scroll.x = m_drag_start_scroll.x - (float)(point.x - m_drag_start_pt.x);
+		bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
+		// 자동모드에서만 가로 드래그 허용
+		if (auto_mode)
+			m_scroll.x = m_drag_start_scroll.x - (float)(point.x - m_drag_start_pt.x);
+
 		m_scroll.y = m_drag_start_scroll.y - (float)(point.y - m_drag_start_pt.y);
 		clamp_scroll();
 		Invalidate();
@@ -586,9 +742,10 @@ void CSCHeatmapCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		if (cell.x >= 0 && cell.y >= 0)
 		{
-			int index = cell.y * m_cell_col + cell.x;
+			int cols = calc_col_count();
+			int index = cell.y * cols + cell.x;
 			CString tip;
-			auto it = m_cell.find({ cell.x, cell.y });
+			auto it = m_cell.find(index);
 			if (it != m_cell.end() && !it->second.text.IsEmpty())
 				tip.Format(_T("%d (%d, %d) %s"), index, cell.x, cell.y, (LPCTSTR)it->second.text);
 			else
@@ -630,8 +787,9 @@ void CSCHeatmapCtrl::draw_heatmap()
 	if (d2dc == nullptr)
 		return;
 
-	int rows = row_count();
-	if (m_cell_col <= 0 || rows <= 0)
+	int cols = calc_col_count();
+	int rows = (m_total > 0 && cols > 0) ? (m_total + cols - 1) / cols : 0;
+	if (cols <= 0 || rows <= 0)
 		return;
 
 	D2D1_SIZE_F sz_dc = m_d2dc.get_size();
@@ -648,19 +806,7 @@ void CSCHeatmapCtrl::draw_heatmap()
 
 	//--- 셀 크기 결정 ---
 	float cell_w, cell_h;
-	bool auto_mode = (m_cell_size.cx <= 0 && m_cell_size.cy <= 0);
-
-	if (auto_mode)
-	{
-		float fit = calc_fit_cell_size();
-		float sz = m_fit_to_client ? fit : max(1.0f, fit * m_zoom);
-		cell_w = cell_h = sz;
-	}
-	else
-	{
-		cell_w = (m_cell_size.cx > 0) ? (float)m_cell_size.cx : 1.0f;
-		cell_h = (m_cell_size.cy > 0) ? (float)m_cell_size.cy : cell_w;
-	}
+	get_effective_cell_size(cell_w, cell_h);
 
 	float radius = min(cell_w, cell_h) * 0.2f;
 	if (radius < 1.0f) radius = 1.0f;
@@ -675,7 +821,7 @@ void CSCHeatmapCtrl::draw_heatmap()
 
 	//--- 화면에 보이는 셀 범위만 계산하여 그린다 ---
 	int ix_start = max(0L, (long)floor((m_scroll.x - margin_x) / stride_x));
-	int ix_end = min((long)m_cell_col, (long)ceil((m_scroll.x + sz_dc.width - margin_x) / stride_x) + 1);
+	int ix_end = min((long)cols, (long)ceil((m_scroll.x + sz_dc.width - margin_x) / stride_x) + 1);
 	int iy_start = max(0L, (long)floor((m_scroll.y - margin_y) / stride_y));
 	int iy_end = min((long)rows, (long)ceil((m_scroll.y + sz_dc.height - margin_y) / stride_y) + 1);
 
@@ -684,7 +830,8 @@ void CSCHeatmapCtrl::draw_heatmap()
 		for (int ix = ix_start; ix < ix_end; ix++)
 		{
 			// 마지막 행 부분 채움 처리: 선형 인덱스가 m_total 이상이면 건너뜀
-			if (iy * m_cell_col + ix >= m_total)
+			int index = iy * cols + ix;
+			if (index >= m_total)
 				continue;
 
 			float left = margin_x + ix * stride_x - m_scroll.x;
@@ -692,17 +839,29 @@ void CSCHeatmapCtrl::draw_heatmap()
 			float right = left + cell_w;
 			float bottom = top + cell_h;
 
-			auto it = m_cell.find({ ix, iy });
-			if (it != m_cell.end())
-				brush->SetColor(it->second.color);
-			else
-				brush->SetColor(m_cr_cell);
-
 			D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(
 				D2D1::RectF(left, top, right, bottom),
 				radius, radius);
 
+			// 채우기 색상
+			auto it = m_cell.find(index);
+			if (it != m_cell.end())
+				brush->SetColor(it->second.cr_fill);
+			else
+				brush->SetColor(m_cr_cell);
+
 			d2dc->FillRoundedRectangle(rr, brush.Get());
+
+			// 테두리 색상: 개별 셀에 지정되어 있으면(alpha>0) 그것을 사용, 아니면 전체 기본값 사용
+			D2D1_COLOR_F border_cr = m_cr_border;
+			if (it != m_cell.end() && it->second.cr_border.a > 0.0f)
+				border_cr = it->second.cr_border;
+
+			if (border_cr.a > 0.0f)
+			{
+				brush->SetColor(border_cr);
+				d2dc->DrawRoundedRectangle(rr, brush.Get(), 1.0f);
+			}
 		}
 	}
 }

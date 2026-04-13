@@ -1357,6 +1357,7 @@ void CSCListBox::edit(int index)
 		m_pEdit->SetFont(&m_font);
 		DWORD margin = m_pEdit->GetMargins();
 		m_pEdit->SetMargins(4, 4);
+		m_pEdit->set_line_align(DT_VCENTER);
 	}
 
 	m_pEdit->SetWindowText(text);
@@ -1589,7 +1590,21 @@ LRESULT CSCListBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	if (msg->message == WM_KILLFOCUS)
+	{
 		edit_end();
+	}
+	else if (msg->message == WM_KEYDOWN)
+	{
+		switch ((int)lParam)
+		{
+		case VK_RETURN:
+			edit_end();
+			break;
+		case VK_ESCAPE:
+			edit_end(false);
+			break;
+		}
+	}
 
 	return 0;
 }

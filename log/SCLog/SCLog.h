@@ -3,7 +3,7 @@
 /*
 * 기존 Koino에서 사용하던 UtilLog에 로그를 출력한 함수명과 라인 정보를 추가.
 * (#define logWrite...매크로를 사용하므로 멀티쓰레드가 가능할지는 아직 확인 못함)
-* 
+*
 * !주의!
 * 일반적인 앱에서는 아주 잘 동작하지만
 * LMMAgent.exe와 같이 SYSTEM session 0번에서 실행되는 프로그램에서는
@@ -20,9 +20,9 @@
 	extern CSCLog gLog;
 
   app.cpp에서 실제 전역변수 선언.
-    CSCLog gLog;
+	CSCLog gLog;
 
-  
+
 
 [set Log folder path]
 	//로그파일이 저장되는 위치는 기본적으로 실행파일 폴더의 "Log" 폴더 아래 "실행파일 타이틀_yyyymmdd.log" 파일에 기록되지만
@@ -53,6 +53,7 @@
 */
 
 #include <afxwin.h>
+#include <atomic>
 // #include <mutex>  // ← XP에서 InitializeCriticalSectionEx 호출하여 비호환
 
 #ifdef UNICODE
@@ -146,8 +147,15 @@ protected:
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;
 	bool		m_use_filename_timestamp = false;
-	FILE*		m_fp;
-	
+	FILE* m_fp;
+
+	//소멸자 안전 종료를 위한 원자적 카운터/플래그
+	//write() 진입 시 m_writer_count를 먼저 증가시킨 뒤 m_shutting_down을 확인하고,
+	//소멸자는 m_shutting_down을 먼저 설정한 뒤 m_writer_count == 0이 될 때까지 대기한다.
+	//이 순서가 교차하므로 race condition 없이 안전하게 정리할 수 있다.
+	std::atomic<int>	m_writer_count{ 0 };
+	std::atomic<bool>	m_shutting_down{ false };
+
 	//프로그램 종료 시 일반적인 정보를 로그에 기록하면서 종료한다.
 	//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지도록 하여 수동 호출할 필요가 없다.
 	void		write_end_log();

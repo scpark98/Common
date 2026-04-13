@@ -31,8 +31,17 @@ CSCLog::CSCLog()
 
 CSCLog::~CSCLog()
 {
+	// ① 아직 shutting_down이 아니므로 end log는 정상 기록됨
 	write_end_log();
 
+	// ② 이후부터 새로운 write() 요청을 거부
+	m_shutting_down.store(true, std::memory_order_seq_cst);
+
+	// ③ 현재 진행 중인 write()가 모두 완료될 때까지 대기
+	while (m_writer_count.load(std::memory_order_seq_cst) > 0)
+		Sleep(1);
+
+	// ④ 모든 writer가 빠져나간 후 안전하게 자원 해제
 	try
 	{
 		release();
@@ -177,6 +186,14 @@ bool CSCLog::release()
 
 CString	CSCLog::write(LPCTSTR format, ...)
 {
+	// shutdown 중이면 즉시 반환
+	m_writer_count.fetch_add(1, std::memory_order_seq_cst);
+	if (m_shutting_down.load(std::memory_order_seq_cst))
+	{
+		m_writer_count.fetch_sub(1, std::memory_order_seq_cst);
+		return CString();
+	}
+
 	va_list args;
 	va_start(args, format);
 
@@ -184,12 +201,26 @@ CString	CSCLog::write(LPCTSTR format, ...)
 
 	log_text.FormatV(format, args);
 
-	return write(SCLOG_LEVEL_NONE, _T(""), 0, log_text);
+	CString result = write(SCLOG_LEVEL_NONE, _T(""), 0, log_text);
+
+	m_writer_count.fetch_sub(1, std::memory_order_seq_cst);
+	return result;
 }
 
 CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 {
 	CString result = CString();
+
+	// shutdown 중이면 즉시 반환
+	// ※ 핵심: count를 먼저 올린 뒤 flag를 확인한다.
+	//   소멸자는 flag를 먼저 세운 뒤 count를 확인하므로
+	//   둘 중 하나는 반드시 상대의 변경을 관측한다. (race-free)
+	m_writer_count.fetch_add(1, std::memory_order_seq_cst);
+	if (m_shutting_down.load(std::memory_order_seq_cst))
+	{
+		m_writer_count.fetch_sub(1, std::memory_order_seq_cst);
+		return result;
+	}
 
 	try
 	{
@@ -202,6 +233,7 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 			{
 				// m_mutex.unlock(); → 
 				LeaveCriticalSection(&m_cs);
+				m_writer_count.fetch_sub(1, std::memory_order_seq_cst);
 				return result;
 			}
 		}
@@ -222,6 +254,7 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 			TRACE(_T("%s\n"), str);
 			// m_mutex.unlock(); → 
 			LeaveCriticalSection(&m_cs);
+			m_writer_count.fetch_sub(1, std::memory_order_seq_cst);
 			return _T("log_text.FormatV() exception.");
 		}
 
@@ -243,27 +276,27 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 
 		switch (log_level)
 		{
-			case SCLOG_LEVEL_INFO :
-				log_level_str = _T("[info]");
-				break;
-			case SCLOG_LEVEL_WARN:
-				log_level_str = _T("[warn]");
-				break;
-			case SCLOG_LEVEL_ERROR:
-				log_level_str = _T("[error]");
-				break;
-			case SCLOG_LEVEL_CRITICAL:
-				log_level_str = _T("[critical]");
-				break;
-			case SCLOG_LEVEL_SQL:
-				log_level_str = _T("[sql]");
-				break;
-			case SCLOG_LEVEL_DEBUG:
-				log_level_str = _T("[debug]");
-				break;
-			case SCLOG_LEVEL_RELEASE:		//release도 no level로 처리한다.
-				//log_text = _T("info");
-				break;
+		case SCLOG_LEVEL_INFO:
+			log_level_str = _T("[info]");
+			break;
+		case SCLOG_LEVEL_WARN:
+			log_level_str = _T("[warn]");
+			break;
+		case SCLOG_LEVEL_ERROR:
+			log_level_str = _T("[error]");
+			break;
+		case SCLOG_LEVEL_CRITICAL:
+			log_level_str = _T("[critical]");
+			break;
+		case SCLOG_LEVEL_SQL:
+			log_level_str = _T("[sql]");
+			break;
+		case SCLOG_LEVEL_DEBUG:
+			log_level_str = _T("[debug]");
+			break;
+		case SCLOG_LEVEL_RELEASE:		//release도 no level로 처리한다.
+			//log_text = _T("info");
+			break;
 		}
 
 		//if (!log_level_str.IsEmpty())
@@ -317,6 +350,8 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 	release();
 	// m_mutex.unlock(); → 
 	LeaveCriticalSection(&m_cs);
+
+	m_writer_count.fetch_sub(1, std::memory_order_seq_cst);
 
 	return result;
 }

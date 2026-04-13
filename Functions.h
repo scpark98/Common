@@ -592,7 +592,8 @@ public:
 	int			port = 0;
 	CString		sub_url;				//domain을 제외한 나머지 주소
 	CString		verb = _T("GET");
-	//url의 시작이 http인지 https인지, port가 80인지 443인지등의 정보로 판단할 수 있지만 제대로 명시되지 않거나 임의 포트번호를 사용하는 경우도 많다.
+	//url의 시작이 http인지 https인지, port가 80 또는 443일 경우는 자동 설정되지만
+	//임의 포트번호를 사용하는 경우에는 반드시 명시해줘야 한다.
 	bool		is_https = true;
 	CString		body;					//post data(json format)
 

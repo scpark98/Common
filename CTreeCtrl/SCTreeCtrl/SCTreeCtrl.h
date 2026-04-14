@@ -271,8 +271,12 @@ public:
 
 	void			set_use_popup_menu(bool use = true) { m_use_popup_menu = use; }
 
+	//드래그앤드롭 기능을 사용할 것인지. 드래그앤드롭 기능이 false이면 순서 변경도 의미가 없다.
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
+	//순서도 변경 가능하도록 할것인지. m_use_drag_and_drop = false이면 무의미하다.
+	bool			get_use_rearrange_order() { return m_use_rearrange_order; }
+	void			set_use_rearrange_order(bool use_rearrange = true) { m_use_rearrange_order = use_rearrange; }
 	HTREEITEM		m_DragItem = NULL;			//drag되는 아이템
 	HTREEITEM		m_DropItem = NULL;			//drop된 아이템
 	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
@@ -400,10 +404,19 @@ protected:
 	void			reconstruct_font();
 
 //Drag&Drop 드래깅 관련
-	bool			m_use_drag_and_drop = false;//default = false
-	CWnd*			m_pDragWnd = NULL;			//Which wnd we are dragging FROM
-	CWnd*			m_pDropWnd = NULL;			//Which wnd we are dropping ON
-	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
+	//drag&drop으로 노드 순서변경
+	enum DropPosition
+	{
+		drop_on_item = 0,		// 노드 위에 놓기 → parent 변경 (child로 이동)
+		drop_before_item,		// 노드 앞에 놓기 → 같은 레벨에서 순서 변경
+		drop_after_item,		// 노드 뒤에 놓기 → 같은 레벨에서 순서 변경
+	};
+
+	bool			m_use_drag_and_drop = false;	//노드 이동기능 사용여부. default = false
+	bool			m_use_rearrange_order = false;	//노드 위치조정기능 사용여부. default = false
+	CWnd*			m_pDragWnd = nullptr;		//Which wnd we are dragging FROM
+	CWnd*			m_pDropWnd = nullptr;		//Which wnd we are dropping ON
+	CImageList*		m_pDragImage = nullptr;		//For creating and managing the drag-image
 	bool			m_bDragging = false;		//T during a drag operation
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
@@ -411,6 +424,14 @@ protected:
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
 	CImageList*		create_drag_image(CTreeCtrl* pList, LPPOINT lpPoint);
 	void			create_drag_image(CSCGdiplusBitmap& drag_img);
+
+	// 드롭 위치 판별 및 삽입 마크 관련
+	DropPosition	m_dropPosition = drop_on_item;
+	HTREEITEM		m_hInsertMarkItem = NULL;		// 삽입 마크가 표시될 아이템
+	DropPosition	hit_test_drop_position(CPoint ptClient, HTREEITEM hItem);
+	void			draw_insert_mark(CDC* pDC);
+	void			clear_insert_mark();
+	BOOL			move_tree_item_as_sibling(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hRefItem, bool bAfter);
 
 //편집 관련
 	bool			m_allow_edit = true;

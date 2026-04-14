@@ -55,7 +55,7 @@ public:
 
 //ES_MULTILINE 속성이 있어야만 정상 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
 //ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이므로 리소스 에디터에서 설정해야 한다.
-class CSCEdit : public CMFCMaskedEdit
+class CSCEdit : public CEdit
 {
 // Construction
 public:
@@ -71,19 +71,20 @@ public:
 
 	//동적 생성 시 호출
 	bool					create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
-	//기본 CMFCMaskedEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
+	//기본 CEdit::Create() override. 동적 생성 시 font width가 잘못 세팅되는 문제 수정을 위해 override.
 	BOOL					Create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID);
 
-	CString					get_text() { CString text; GetWindowText(text); return text; }
+	CString					get_text() { CString text; CEdit::GetWindowText(text); return text; }
 	int						get_int() { CString text = get_text(); return _ttoi(text); }
-	void					set_text(CString text = _T("")) { CMFCMaskedEdit::SetWindowText(text); }
-	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CMFCMaskedEdit::SetWindowText(text); }
+	void					set_text(CString text = _T("")) { CEdit::SetWindowText(text); }
+	void					set_text(int n) { CString text; text.Format(_T("%d"), n); CEdit::SetWindowText(text); }
 	void					SetWindowText(CString text) { set_text(text); }
 	//기존 CEdit을 상속받았을때는 문제 없었으나 CMaskedEdit을 상속받으면서
 	//EN_CHANGE에서 바로 전 단계의 text를 리턴하는 문제가 발생하여 Override하여
 	//GetWindowText()가 내부 m_str 캐시가 아닌 실제 edit control의 text를 리턴하도록 수정하였다.
-	//Sonnet : CMFCMaskedEdit::GetWindowText()는 내부 m_str 캐시를 반환한다.
-	void					GetWindowText(CString& text) const;
+	//Sonnet : CEdit::GetWindowText()는 내부 m_str 캐시를 반환한다.
+	//뭔가 오동작이 자꾸 발생되어 CMaskedEdit 사용 중지! 관계된 별도 처리함수 등 모두 제거.
+	//void					GetWindowText(CString& text) const;
 
 	//아래와 같이 템플릿으로 구현하려 했으나 typeid()가 제대로 동작하지 않는 문제가 있어 사용할 수 없음.
 	//L"test string"을 인자로 넘기면 CString으로 기대했으나 typeid()가 const wchar_t[12]로 인식하는 등
@@ -104,7 +105,7 @@ public:
 		else
 			TRACE(_T("warning. not defined type.\n"));
 
-		CMFCMaskedEdit::SetWindowText(text);
+		CEdit::SetWindowText(text);
 	}
 	*/
 
@@ -156,7 +157,7 @@ public:
 	void				recalc_font_size();						//recalculate font height when control size is changed.
 	int					get_font_size(bool pixel_size = false);
 
-	//CMFCMaskedEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
+	//CEdit::SetRect()를 이용해서 상하좌우 크기를 조정할 수 있는데
 	//ES_MULTILINE 속성이 있어야만 동작하므로 속성에 반드시 멀티라인 속성을 설정해야 한다.
 	//ES_MULTILINE 속성은 생성후에는 변경할 수 없는 속성이다.
 	//https://forums.codeguru.com/showthread.php?361420-Want-to-set-quot-ES_MULTILINE-quot-property-of-Edit-object-externally

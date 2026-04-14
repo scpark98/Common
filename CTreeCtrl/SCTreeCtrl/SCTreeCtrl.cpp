@@ -2158,8 +2158,120 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			// Get the item that is below cursor
 			m_DropItem = ((CTreeCtrl*)pDropWnd)->HitTest(point, &uFlags);
 			TRACE(_T("%d, %d, hItem = %p\n"), point.x, point.y, m_DropItem);
-			pTree->SelectDropTarget(m_DropItem);
-			ASSERT(m_DropItem == pTree->GetDropHilightItem());
+
+			// 이전 삽입 마크를 지우기 위해 기억
+			HTREEITEM hOldInsertMark = m_hInsertMarkItem;
+			DropPosition oldDropPos = m_dropPosition;
+
+			if (m_DropItem && m_DropItem != m_DragItem)
+			{
+				// 드롭 위치 판별 (상단/중앙/하단)
+				// 드롭 위치 판별 (상단/중앙/하단)
+				if (m_use_rearrange_order)
+					m_dropPosition = hit_test_drop_position(point, m_DropItem);
+				else
+					m_dropPosition = drop_on_item;
+
+				m_hInsertMarkItem = m_DropItem;
+
+				// 자기 자신의 바로 앞뒤에 놓는 것은 의미 없으므로 drop_on_item으로 전환
+				if (m_dropPosition == drop_after_item && GetNextSiblingItem(m_DragItem) == m_DropItem)
+				{
+					// DragItem 바로 다음 sibling의 before == 현재 위치 그대로
+					// 의미 없는 이동이지만 표시는 해줌
+				}
+
+				if (m_dropPosition == drop_on_item)
+				{
+					// 기존 방식: DropHilight 표시
+					pTree->SelectDropTarget(m_DropItem);
+				}
+				else
+				{
+					// 삽입 마크 모드: DropHilight 해제
+					pTree->SelectDropTarget(NULL);
+				}
+			}
+			else
+			{
+				m_hInsertMarkItem = NULL;
+				m_dropPosition = drop_on_item;
+				pTree->SelectDropTarget(m_DropItem);
+			}
+
+			// 삽입 마크 위치가 변경되면 다시 그리기
+			if (hOldInsertMark != m_hInsertMarkItem || oldDropPos != m_dropPosition)
+			{
+				m_pDragImage->DragShowNolock(FALSE);
+
+				// 이전 삽입 마크가 걸쳐있던 아이템 행 전체를 무효화
+				if (hOldInsertMark && oldDropPos != drop_on_item)
+				{
+					CRect rcOld;
+					GetItemRect(hOldInsertMark, &rcOld, FALSE);
+
+					// 위쪽 아이템도 포함 (drop_before라면 이전 아이템의 하단에도 걸침)
+					HTREEITEM hPrev = GetPrevVisibleItem(hOldInsertMark);
+					if (hPrev)
+					{
+						CRect rcPrev;
+						GetItemRect(hPrev, &rcPrev, FALSE);
+						rcOld.UnionRect(&rcOld, &rcPrev);
+					}
+
+					// 아래쪽 아이템도 포함
+					HTREEITEM hNext = GetNextVisibleItem(hOldInsertMark);
+					if (hNext)
+					{
+						CRect rcNext;
+						GetItemRect(hNext, &rcNext, FALSE);
+						rcOld.UnionRect(&rcOld, &rcNext);
+					}
+
+					// 전체 너비로 확장
+					CRect rcClient;
+					GetClientRect(&rcClient);
+					rcOld.left = rcClient.left;
+					rcOld.right = rcClient.right;
+
+					InvalidateRect(&rcOld, TRUE);
+				}
+
+				// 새 삽입 마크 영역 무효화
+				if (m_hInsertMarkItem && m_dropPosition != drop_on_item)
+				{
+					CRect rcNew;
+					GetItemRect(m_hInsertMarkItem, &rcNew, FALSE);
+
+					HTREEITEM hPrev = GetPrevVisibleItem(m_hInsertMarkItem);
+					if (hPrev)
+					{
+						CRect rcPrev;
+						GetItemRect(hPrev, &rcPrev, FALSE);
+						rcNew.UnionRect(&rcNew, &rcPrev);
+					}
+
+					HTREEITEM hNext = GetNextVisibleItem(m_hInsertMarkItem);
+					if (hNext)
+					{
+						CRect rcNext;
+						GetItemRect(hNext, &rcNext, FALSE);
+						rcNew.UnionRect(&rcNew, &rcNext);
+					}
+
+					CRect rcClient;
+					GetClientRect(&rcClient);
+					rcNew.left = rcClient.left;
+					rcNew.right = rcClient.right;
+
+					InvalidateRect(&rcNew, TRUE);
+				}
+
+				UpdateWindow();
+				m_pDragImage->DragShowNolock(TRUE);
+			}
+
+			ASSERT(m_DropItem == NULL || m_dropPosition != drop_on_item || m_DropItem == pTree->GetDropHilightItem());
 		}
 		else
 		{
@@ -2190,44 +2302,45 @@ void CSCTreeCtrl::OnMouseLeave()
 	KillTimer(timer_expand_for_drag_hover);
 	//TRACE(_T("tree. leave\n"));
 	SelectDropTarget(NULL);
+	clear_insert_mark();
 
 	CTreeCtrl::OnMouseLeave();
 }
 
 void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (m_bDragging)
 	{
 		TRACE(_T("OnLButtonUp\n"));
-		// Release mouse capture, so that other controls can get control/messages
 		ReleaseCapture();
 
-		// Note that we are NOT in a drag operation
 		m_bDragging = false;
 
-		// End dragging image
 		m_pDragImage->DragLeave(GetDesktopWindow());
 		m_pDragImage->EndDrag();
-		delete m_pDragImage; //must delete it because it was created at the beginning of the drag
+		delete m_pDragImage;
 
-		CPoint pt(point); //Get current mouse coordinates
-		ClientToScreen(&pt); //Convert to screen coordinates
+		// clear_insert_mark()를 여기서 호출하지 않는다.
+		// DroppedHandler() 내부에서 m_dropPosition을 사용한 후 clear_insert_mark()가 호출됨.
 
-		// Get the CWnd pointer of the window that is under the mouse cursor
+		CPoint pt(point);
+		ClientToScreen(&pt);
+
 		CWnd* pDropWnd = WindowFromPoint(pt);
-		ASSERT(pDropWnd); //make sure we have a window pointer
+		ASSERT(pDropWnd);
 
 		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
 			pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 		{
-			m_pDropWnd = pDropWnd; //Set pointer to the list we are dropping on
-			DroppedHandler(m_pDragWnd, m_pDropWnd); //Call routine to perform the actual drop
+			m_pDropWnd = pDropWnd;
+			DroppedHandler(m_pDragWnd, m_pDropWnd);
+		}
+		else
+		{
+			// 유효하지 않은 영역에 드롭한 경우에도 삽입 마크를 초기화
+			clear_insert_mark();
 		}
 
-		//ListCtrl에서 drag하여 drophilited가 표시된 상태에서 빠르게 마우스를 밖으로 이동시키면
-		//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
-		//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜준다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
 	}
 	else
@@ -2240,11 +2353,6 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 {
-	//drop되면 그 이벤트만 메인에 알리고
-	//메인에서는 drag관련 정보와 drop정보를 이용해서 원하는 처리만 한다.
-	//따라서 맨 아래 ::SendMessage만 필요하며
-	//중간 코드들은 메인에서 활용하는 방법에 대한 예시임.
-
 	CString droppedItem;
 
 	if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
@@ -2255,27 +2363,37 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 			droppedItem = pDropListCtrl->GetItemText(m_nDropIndex, 0);
 
 		TRACE(_T("drag item = %s\n"), GetItemText(m_DragItem));
-
 		TRACE(_T("dropped on = %s\n"), (droppedItem.IsEmpty() ? _T("dropped on ListCtrl") : droppedItem));
 	}
 	else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 	{
 		CTreeCtrl* pDropTreeCtrl = (CTreeCtrl*)pDropWnd;
 
-		//dragItem, dropItem 정보는 drag가 시작된 컨트롤이 기억하고 있다.
 		TRACE(_T("drag item = %s\n"), GetItemText(m_DragItem));
 		TRACE(_T("dropped on = %s\n"), pDropTreeCtrl->GetItemText(m_DropItem));
 
-		//같은 CTreeCtrl내에서 노드 이동, 같은 item이면 skip.
+		// 같은 CTreeCtrl 내에서의 이동
 		if ((pDragWnd == pDropWnd) && (m_DragItem != m_DropItem))
 		{
-			move_tree_item(this, m_DragItem, m_DropItem);
+			if (m_dropPosition == drop_on_item)
+			{
+				// 기존 동작: 자식으로 이동 (parent 변경)
+				move_tree_item(this, m_DragItem, m_DropItem);
+			}
+			else
+			{
+				// 새 동작: 같은 레벨에서 순서 변경 (sibling reorder)
+				move_tree_item_as_sibling(this, m_DragItem, m_DropItem,
+					(m_dropPosition == drop_after_item));
+			}
 		}
 	}
 
-	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM)&(CSCTreeCtrlMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
-}
+	// 삽입 마크 초기화
+	clear_insert_mark();
 
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_drag_and_drop, pDropWnd)), (LPARAM)0);
+}
 
 void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
@@ -3049,7 +3167,16 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			*pResult = (CDRF_NOTIFYPOSTPAINT | CDRF_NOTIFYITEMDRAW);
 			//*pResult = (CDRF_NOTIFYITEMDRAW);
 			break;
-
+		case CDDS_POSTPAINT:
+		{
+			// 모든 아이템이 그려진 후 삽입 마크를 그려준다.
+			if (m_bDragging && m_hInsertMarkItem && m_dropPosition != drop_on_item)
+			{
+				draw_insert_mark(&dc);
+			}
+			*pResult = CDRF_DODEFAULT;
+			break;
+		}
 		case CDDS_ITEMPREPAINT:
 			rcItem = pNMCustomDraw->rc;
 			GetItemRect(hItem, &rtemp, TRUE);
@@ -3997,4 +4124,163 @@ rapidjson::Value CSCTreeCtrl::tree_item_to_json_value(HTREEITEM hItem, rapidjson
 		nodeValue.AddMember("nodes", children, alloc);
 
 	return nodeValue;
+}
+
+// 마우스 위치로부터 drop 모드를 판별한다.
+// 아이템 영역의 상단 25% → drop_before_item
+// 아이템 영역의 하단 25% → drop_after_item
+// 가운데 50% → drop_on_item (child로 이동)
+CSCTreeCtrl::DropPosition CSCTreeCtrl::hit_test_drop_position(CPoint ptClient, HTREEITEM hItem)
+{
+	if (hItem == NULL)
+		return drop_on_item;
+
+	CRect rc;
+	GetItemRect(hItem, &rc, FALSE);
+
+	int itemHeight = rc.Height();
+	int threshold = MAX(itemHeight / 4, 3);
+
+	if (ptClient.y < rc.top + threshold)
+		return drop_before_item;
+	else if (ptClient.y > rc.bottom - threshold)
+		return drop_after_item;
+	else
+		return drop_on_item;
+}
+
+// 드롭 위치를 나타내는 삽입 마크(수평선)를 그려준다.
+void CSCTreeCtrl::draw_insert_mark(CDC* pDC)
+{
+	if (m_hInsertMarkItem == NULL || m_dropPosition == drop_on_item)
+		return;
+
+	CRect rc;
+	GetItemRect(m_hInsertMarkItem, &rc, FALSE);
+
+
+	int y = (m_dropPosition == drop_before_item) ? rc.top : rc.bottom;
+
+	GetClientRect(&rc);
+
+	// 삽입 마크 라인 그리기
+	Gdiplus::Graphics g(pDC->GetSafeHdc());
+	Gdiplus::Color cr_insert_line = m_theme.cr_selected_border;
+	draw_line(g, rc.left + 4, y, rc.right - 4, y, cr_insert_line, 3.0f);
+}
+
+void CSCTreeCtrl::clear_insert_mark()
+{
+	if (m_hInsertMarkItem != NULL)
+	{
+		CRect rcInvalidate;
+		GetItemRect(m_hInsertMarkItem, &rcInvalidate, FALSE);
+
+		HTREEITEM hPrev = GetPrevVisibleItem(m_hInsertMarkItem);
+		if (hPrev)
+		{
+			CRect rcPrev;
+			GetItemRect(hPrev, &rcPrev, FALSE);
+			rcInvalidate.UnionRect(&rcInvalidate, &rcPrev);
+		}
+
+		HTREEITEM hNext = GetNextVisibleItem(m_hInsertMarkItem);
+		if (hNext)
+		{
+			CRect rcNext;
+			GetItemRect(hNext, &rcNext, FALSE);
+			rcInvalidate.UnionRect(&rcInvalidate, &rcNext);
+		}
+
+		CRect rcClient;
+		GetClientRect(&rcClient);
+		rcInvalidate.left = rcClient.left;
+		rcInvalidate.right = rcClient.right;
+
+		m_hInsertMarkItem = NULL;
+		m_dropPosition = drop_on_item;
+
+		InvalidateRect(&rcInvalidate, TRUE);
+	}
+}
+
+// hSrcItem을 hRefItem의 앞(bAfter=false) 또는 뒤(bAfter=true)에 같은 레벨로 이동시킨다.
+BOOL CSCTreeCtrl::move_tree_item_as_sibling(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM hRefItem, bool bAfter)
+{
+	if (hSrcItem == NULL || hRefItem == NULL || hSrcItem == hRefItem)
+		return FALSE;
+
+	// src가 ref의 조상이면 이동 불가 (자기 하위로 이동 방지)
+	HTREEITEM hCheck = GetParentItem(hRefItem);
+	while (hCheck)
+	{
+		if (hCheck == hSrcItem)
+			return FALSE;
+		hCheck = GetParentItem(hCheck);
+	}
+
+	HTREEITEM hDestParent = GetParentItem(hRefItem);
+
+	// 이동할 아이템의 정보를 수집
+	TVITEM TV;
+	TCHAR str[256];
+	ZeroMemory(str, sizeof(str));
+
+	TV.hItem = hSrcItem;
+	TV.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_STATE | TVIF_CHILDREN;
+	TV.stateMask = 0xFF;
+	TV.pszText = str;
+	TV.cchTextMax = _countof(str);
+	pTree->GetItem(&TV);
+
+	DWORD_PTR dwData = pTree->GetItemData(hSrcItem);
+	BOOL bExpanded = (pTree->GetItemState(hSrcItem, TVIS_EXPANDED) & TVIS_EXPANDED);
+
+	// 삽입 위치 결정
+	HTREEITEM hInsertAfter;
+	if (bAfter)
+	{
+		hInsertAfter = hRefItem;
+	}
+	else
+	{
+		// hRefItem 앞에 삽입하려면 hRefItem의 이전 sibling을 찾아야 한다.
+		// 이전 sibling이 없으면 TVI_FIRST
+		HTREEITEM hPrev = GetPrevSiblingItem(hRefItem);
+		hInsertAfter = hPrev ? hPrev : TVI_FIRST;
+	}
+
+	// 새 위치에 아이템 삽입
+	TVINSERTSTRUCT TI;
+	TI.hParent = hDestParent ? hDestParent : TVI_ROOT;
+	TI.hInsertAfter = hInsertAfter;
+	TI.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
+	TI.item.iImage = TV.iImage;
+	TI.item.iSelectedImage = TV.iSelectedImage;
+	TI.item.pszText = TV.pszText;
+	TI.item.cChildren = TV.cChildren;
+
+	HTREEITEM hNewItem = pTree->InsertItem(&TI);
+	pTree->SetItemData(hNewItem, dwData);
+
+	// 자식 노드들도 함께 복사
+	HTREEITEM hChildItem = pTree->GetChildItem(hSrcItem);
+	if (hChildItem)
+	{
+		move_child_tree_item(pTree, hChildItem, hNewItem);
+	}
+
+	// 확장 상태 복원
+	if (bExpanded)
+	{
+		pTree->Expand(hNewItem, TVE_EXPAND);
+	}
+
+	// 원래 아이템 삭제
+	pTree->DeleteItem(hSrcItem);
+
+	// 새 아이템 선택
+	pTree->SelectItem(hNewItem);
+
+	return TRUE;
 }

@@ -669,11 +669,11 @@ CString CSCStatic::get_text()
 	return text;
 }
 
-CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color /*-1*/)
+CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color)
 {
 	m_text = text;
 
-	//-1이면 기본 설정된 글자색 사용
+	//cr_text_color가 투명색이면 기본 글자색을 사용한다는 의미임
  	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)
  		m_theme.cr_text = cr_text_color;
 	
@@ -682,7 +682,7 @@ CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color /*-1*/)
 	//투명일때 update_surface()를 써야 온전히 갱신된다.
 	//=>dlg에서 clip sibling에 따라 결과가 달라진다.
 	//if (m_transparent)
-		update_surface();
+		//update_surface();
 	//else
 		Invalidate(false);
 

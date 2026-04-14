@@ -2905,12 +2905,13 @@ DWORD request_url(CString& result_str, CString full_url, CString verb, std::vect
 //DWORD request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb, std::vector<CString> *headers, CString jsonBody, CString local_file_path)
 //https://m.blog.naver.com/nawoo/80132924296
 //https://blog.naver.com/tija98/120037685173
-void request_url(CRequestUrlParams* params)
+void request_url(CRequestUrlParams* params, bool check_server_reachable)
 {
 	long t0 = clock();
 
 	// 빠른 연결 가능 여부 사전 체크 (3초 내)
-	if (!is_server_reachable(params->ip, params->port, 3000))
+	// is_server_reachable()은 매 요청마다 별도의 TCP 소켓을 열고 닫는 단점이 있다.
+	if (check_server_reachable && !is_server_reachable(params->ip, params->port, 3000))
 	{
 		params->status = ERROR_HOST_UNREACHABLE;
 		params->result = _T("서버에 연결할 수 없습니다.");

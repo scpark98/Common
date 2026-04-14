@@ -46,6 +46,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <ostream>
 #include <sstream>
 #include <atomic>
+#include <chrono>
 
 #ifndef _USING_V110_SDK71_
 	#include <d2d1_1.h>
@@ -523,6 +524,61 @@ public:
 	if (params.status == HTTP_STATUS_OK)
 	...
 */
+
+//request_url() 내부에서 또는 단독적으로 서버가 현재 기동중인지를 빠르게 판별하기 위한 함수
+bool		is_server_reachable(CString ip, int port, int timeout_ms = 1000);
+
+// 서버 도달 가능 여부를 공유 캐시로 관리하는 클래스
+class CServerReachabilityCache
+{
+public:
+	// check_interval_ms: 실제 소켓 검사를 수행하는 최소 간격 (밀리초)
+	CServerReachabilityCache(int check_interval_ms = 10000)
+		: m_check_interval_ms(check_interval_ms)
+		, m_reachable(true)
+		, m_last_check_time(0)
+		, m_checking(false)
+	{
+	}
+
+	// 5000개 스레드가 동시에 호출해도 안전.
+	// 실제 소켓 검사는 interval마다 1회만 수행됨.
+	bool is_reachable(CString ip, int port, int timeout_ms = 1000)
+	{
+		auto now = std::chrono::steady_clock::now().time_since_epoch();
+		long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+		long long last = m_last_check_time.load();
+
+		// 검사 주기가 경과했고, 다른 스레드가 검사 중이 아닐 때만 실제 검사 수행
+		if (now_ms - last >= m_check_interval_ms)
+		{
+			bool expected = false;
+			if (m_checking.compare_exchange_strong(expected, true))
+			{
+				// 이 스레드만 실제 소켓 검사 수행
+				bool result = is_server_reachable(ip, port, timeout_ms);
+				m_reachable.store(result);
+				m_last_check_time.store(now_ms);
+				m_checking.store(false);
+			}
+		}
+
+		return m_reachable.load();
+	}
+
+	// 캐시를 즉시 무효화 (서버 전환 등의 상황에서 사용)
+	void invalidate()
+	{
+		m_last_check_time.store(0);
+	}
+
+private:
+	int					m_check_interval_ms;
+	std::atomic<bool>	m_reachable;
+	std::atomic<long long> m_last_check_time;
+	std::atomic<bool>	m_checking;		// 스핀락 역할
+};
+
 class CRequestUrlParams
 {
 public:
@@ -1477,9 +1533,9 @@ struct	NETWORK_INFO
 	//DWORD		request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb = _T("GET"), std::vector<CString> *headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
 	//DWORD		request_url(CString& result_str, CString full_url, CString verb = _T("GET"), std::vector<CString>* headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
 
-	//request_url() 내부에서 또는 단독적으로 서버가 현재 기동중인지를 빠르게 판별하기 위한 함수
-	bool		is_server_reachable(CString ip, int port, int timeout_ms = 1000);
-	void		request_url(CRequestUrlParams* params);
+	//기본 30초 타임아웃으로 요청하는데 간혹 서버가 구동중인지 빠르게 확인하고자 한다면 check_server_reachable을 true로 하면 3초이내 판별된다.
+	//단, 이 요청은 별도의 TCP 소켓을 생성하므로 다수의 요청이 발생하는 상황에서는 절대 사용하면 안된다.
+	void		request_url(CRequestUrlParams* params, bool check_server_reachable = false);
 
 
 	//기본 브라우저로 설정된 브라우저 이름을 리턴하고 부가적으로 경로, 버전을 얻을 수 있다.

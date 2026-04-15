@@ -95,6 +95,11 @@ public:
 
 	HRESULT						save(CString path);
 
+	void						draw_text(	IDWriteFactory* dwriteFactory,
+											IDWriteTextFormat* writeFormat,
+											const CString& text,
+											const D2D1_RECT_F& rect,
+											ID2D1Brush* brush);
 protected:
 	D2D1_SIZE_F					m_sz;
 	HWND						m_hWnd;

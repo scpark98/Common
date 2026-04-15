@@ -3212,8 +3212,6 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	std::string total_result;
 	total_result.reserve(dwTotalSize + 1);
 
-	bool first_bom_check = true;
-
 	do
 	{
 		//InternetQueryDataAvailable(hOpenRequest, &dwSize, 0, 0); //이 함수는 웹페이지의 크기를 리턴하는 듯하다.
@@ -3243,33 +3241,11 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 		if (params->local_file_path.IsEmpty())
 		{
 			total_result.append(buffer, buffer + dwRead);
-			/*
-			if (first_bom_check)
-			{
-				//UTF-8 with BOM으로 작성된 txt 파일을 읽어오면 파일 헤더에 EF BB BF 라는 3 char가 붙어온다.
-				//이는 윈도우에서 fopen으로 읽어올때는 문제되지 않으나
-				//InternetReadFile()로 읽어와서 저장하면 맨 앞 글자가 깨져 표시되는 문제가 발생한다. 날려준다.
-				if (byte(buffer[0]) == 0xEF &&
-					byte(buffer[1]) == 0xBB &&
-					byte(buffer[2]) == 0xBF)
-					memcpy(buffer, buffer + 3, dwRead - 3);
-				//TRACE(_T("%X, %X, %X\n"), buffer[0], buffer[1], buffer[2]);
-				//buffer[dwRead] = '\0';
-				strncat(total_result, buffer, dwRead);
-				//TRACE(_T("total_result len = %d\n"), strlen(total_result));
-
-				//buffer_size씩 읽어와서 UTF8toCString()하여 result에 넣어주면 반쪽짜리 한글이 생겨서 깨지게 된다.
-				//모두 읽어온 후 한번에 UTF8toCString()을 돌려야 한다.
-				//params->result += UTF8toCString(buffer);
-
-				first_bom_check = false;
-			}
-			*/
 		}
 		else
 		{
 			//remote file이 존재하지 않을 경우 로컬에 파일을 만들지 않기 위해 여기서 체크.
-			if (hFile == NULL)
+			if (hFile == nullptr)
 			{
 				if (PathFileExists(params->local_file_path) && !DeleteFile(params->local_file_path))
 				{

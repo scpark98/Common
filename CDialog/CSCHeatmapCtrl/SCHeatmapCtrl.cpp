@@ -75,6 +75,17 @@ bool CSCHeatmapCtrl::create(CWnd* parent, int cell_col)
 	else
 		m_d2dc.init(m_hWnd);
 
+	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&m_WriteFactory));
+	if (SUCCEEDED(hr))
+	{
+		m_WriteFactory->CreateTextFormat(_T("Arial"), nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 10.0f, _T("ko-kr"), &m_WriteFormat);
+		m_WriteFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+		m_WriteFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+	}
+
+	m_d2dc.get_d2dc()->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_brush);
+
+
 	// 툴팁 초기화
 	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX);
 	m_tooltip.SetDelayTime(TTDT_AUTOPOP, 10000);
@@ -265,11 +276,9 @@ void CSCHeatmapCtrl::set_cell_text(int x, int y, CString& text, bool redraw)
 	int cols = calc_col_count();
 	if (cols <= 0 || x < 0 || x >= cols || y < 0)
 		return;
-
 	int index = y * cols + x;
 	if (index >= m_total)
 		return;
-
 	if (m_cell[index].text != text)
 	{
 		m_cell[index].text = text;
@@ -281,10 +290,38 @@ void CSCHeatmapCtrl::set_cell_text(int index, CString& text, bool redraw)
 {
 	if (index < 0 || index >= m_total)
 		return;
-
 	if (m_cell[index].text != text)
 	{
 		m_cell[index].text = text;
+		if (m_redraw && redraw) Invalidate();
+	}
+}
+
+void CSCHeatmapCtrl::set_cell_tooltip(int x, int y, CString& tooltip, bool redraw)
+{
+	int cols = calc_col_count();
+	if (cols <= 0 || x < 0 || x >= cols || y < 0)
+		return;
+
+	int index = y * cols + x;
+	if (index >= m_total)
+		return;
+
+	if (m_cell[index].tooltip != tooltip)
+	{
+		m_cell[index].tooltip = tooltip;
+		if (m_redraw && redraw) Invalidate();
+	}
+}
+
+void CSCHeatmapCtrl::set_cell_tooltip(int index, CString& tooltip, bool redraw)
+{
+	if (index < 0 || index >= m_total)
+		return;
+
+	if (m_cell[index].tooltip != tooltip)
+	{
+		m_cell[index].tooltip = tooltip;
 		if (m_redraw && redraw) Invalidate();
 	}
 }
@@ -746,8 +783,8 @@ void CSCHeatmapCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			int index = cell.y * cols + cell.x;
 			CString tip;
 			auto it = m_cell.find(index);
-			if (it != m_cell.end() && !it->second.text.IsEmpty())
-				tip.Format(_T("%d (%d, %d) %s"), index, cell.x, cell.y, (LPCTSTR)it->second.text);
+			if (it != m_cell.end() && !it->second.tooltip.IsEmpty())
+				tip.Format(_T("%d (%d, %d) %s"), index, cell.x, cell.y, (LPCTSTR)it->second.tooltip);
 			else
 				tip.Format(_T("%d (%d, %d)"), index, cell.x, cell.y);
 
@@ -862,6 +899,9 @@ void CSCHeatmapCtrl::draw_heatmap()
 				brush->SetColor(border_cr);
 				d2dc->DrawRoundedRectangle(rr, brush.Get(), 1.0f);
 			}
+
+			m_d2dc.draw_text(m_WriteFactory, m_WriteFormat, it->second.text, D2D1::RectF(left, top, right, bottom), m_brush);
+			//d2dc->DrawText(it->second.text, it->second.text.GetLength(), m_WriteFormat, D2D1::RectF(left, top, right, bottom), m_brush);
 		}
 	}
 }

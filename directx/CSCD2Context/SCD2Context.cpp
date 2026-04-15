@@ -454,3 +454,39 @@ HRESULT	CSCD2Context::save(CString path)
 
 	return res;
 }
+
+void CSCD2Context::draw_text(	IDWriteFactory* dwriteFactory,
+								IDWriteTextFormat* writeFormat,
+								const CString& text,
+								const D2D1_RECT_F& rect,
+								ID2D1Brush* brush)
+{
+	float rectWidth = rect.right - rect.left;
+	float rectHeight = rect.bottom - rect.top;
+
+	// 1. TextLayout 생성 (측정용 큰 영역)
+	Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
+	dwriteFactory->CreateTextLayout(
+		text, text.GetLength(), writeFormat,
+		10000.0f, 10000.0f,
+		&textLayout
+	);
+
+	// 2. 현재 텍스트 크기 측정
+	DWRITE_TEXT_METRICS metrics;
+	textLayout->GetMetrics(&metrics);
+
+	// 3. 비율 계산 후 폰트 크기 조정
+	float scale = min(rectWidth / metrics.width, rectHeight / metrics.height);
+	float newFontSize = writeFormat->GetFontSize() * scale;
+
+	DWRITE_TEXT_RANGE allRange = { 0, (UINT32)text.GetLength() };
+	textLayout->SetFontSize(newFontSize, allRange);  // ← 핵심
+
+	// 4. DrawTextLayout으로 렌더링
+	m_d2context->DrawTextLayout(
+		D2D1::Point2F(rect.left, rect.top),
+		textLayout.Get(),
+		brush
+	);
+}

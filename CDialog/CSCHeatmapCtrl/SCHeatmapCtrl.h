@@ -18,7 +18,8 @@ public:
 	D2D1_COLOR_F	cr_fill;
 	D2D1_COLOR_F	cr_border = { 0.0f, 0.0f, 0.0f, 0.0f };	//alpha=0이면 기본값 사용(m_cr_border)
 	D2D1_COLOR_F	cr_text = { 0.0f, 0.0f, 0.0f, 1.0f };		//셀 텍스트 색상. 기본 검정.
-	CString			text;
+	CString			text;		//셀 중앙에 그려지는 텍스트
+	CString			tooltip;
 	DWORD_PTR		data = 0;	//사용자 임의 데이터 저장용. 필요 없으면 사용하지 않아도 됨.
 };
 
@@ -47,6 +48,8 @@ public:
 	void					set_cell_color(int index, Gdiplus::Color cr, bool redraw = true);
 	void					set_cell_text(int x, int y, CString& text, bool redraw = true);
 	void					set_cell_text(int index, CString& text, bool redraw = true);
+	void					set_cell_tooltip(int x, int y, CString& tooltip, bool redraw = true);
+	void					set_cell_tooltip(int index, CString& tooltip, bool redraw = true);
 
 	void					set_cell_border_color(int index, Gdiplus::Color cr_border, bool redraw = true);
 
@@ -69,12 +72,12 @@ public:
 
 	void					set_redraw(bool redraw) { m_redraw = redraw; }
 protected:
-	CWnd* m_parent = nullptr;
-	CSCD2Context* m_pSharedD2DC = nullptr;
+	CWnd*					m_parent = nullptr;
+	CSCD2Context*			m_pSharedD2DC = nullptr;
 	CSCD2Context			m_d2dc;
-	ID2D1SolidColorBrush* m_brush;
-	IDWriteFactory* m_WriteFactory;
-	IDWriteTextFormat* m_WriteFormat;
+	ID2D1SolidColorBrush*	m_brush = nullptr;
+	IDWriteFactory*			m_WriteFactory = nullptr;
+	IDWriteTextFormat*		m_WriteFormat = nullptr;
 
 	int						m_cell_col = 0;		// 가로 열 수. >0이면 고정, <=0이면 셀 크기와 너비로 자동 계산
 	int						m_total = 0;		// 전체 셀 수

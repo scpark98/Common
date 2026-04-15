@@ -47,7 +47,7 @@
 class CSCTextProperty
 {
 public:
-	CString		name = _T("Arial");
+	TCHAR		name[64] = _T("Arial");
 	float		size = 10.0f;
 	int			style = Gdiplus::FontStyleRegular;	//bold, italic, underline, strikeout
 	float		shadow_depth = 0.0f;

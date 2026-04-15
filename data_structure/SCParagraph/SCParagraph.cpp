@@ -92,26 +92,26 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		else if (tags[i].Find(_T("<f=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(3, tags[i].GetLength() - 4);
-			para_temp.text_prop.name = str_font;
+			_tcscpy_s(para_temp.text_prop.name, str_font);
 		}
 		else if (tags[i].Find(_T("<font=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.text_prop.name = str_font;
+			_tcscpy_s(para_temp.text_prop.name, str_font);
 		}
 		else if (tags[i].Find(_T("<name=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.text_prop.name = str_font;
+			_tcscpy_s(para_temp.text_prop.name, str_font);
 		}
 		else if (tags[i].Find(_T("<font_name=")) >= 0)
 		{
 			CString str_font = tags[i].Mid(11, tags[i].GetLength() - 12);
-			para_temp.text_prop.name = str_font;
+			_tcscpy_s(para_temp.text_prop.name, str_font);
 		}
 		else if (tags[i].Find(_T("</f>")) >= 0 || tags[i].Find(_T("</font>")) >= 0 || tags[i].Find(_T("</name>")) >= 0 || tags[i].Find(_T("</font_name>")) >= 0)
 		{
-			para_temp.text_prop.name = basic_para.text_prop.name;
+			_tcscpy_s(para_temp.text_prop.name, basic_para.text_prop.name);
 		}
 		else if (tags[i].Find(_T("<sz=")) >= 0)
 		{

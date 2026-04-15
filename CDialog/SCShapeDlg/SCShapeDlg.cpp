@@ -164,7 +164,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	}
 
 	m_text_setting.text = text;
-	m_text_setting.text_prop.name = font_name;
+	_tcscpy_s(m_text_setting.text_prop.name, font_name);
 	m_text_setting.text_prop.size = font_size;
 	m_text_setting.text_prop.style = font_style;
 	m_text_setting.text_prop.cr_text = cr_text;

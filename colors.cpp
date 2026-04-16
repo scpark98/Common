@@ -1404,4 +1404,46 @@ D2D1_COLOR_F get_sys_d2color(int index, int alpha)
 	D2D1::ColorF d2cr{ GetRValue(cr) / 255.0f, GetGValue(cr) / 255.0f, GetBValue(cr) / 255.f, (float)alpha / 255.0f };
 	return d2cr;
 }
+//보색과는 달리 alpha까지 고려한 밝기에 따라 black or white를 리턴한다.
+//어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+D2D1_COLOR_F	get_distinct_bw_color(D2D1_COLOR_F cr)
+{
+	// alpha를 고려한 유효 RGB (흰색 배경 가정)
+	const float a = cr.a;
+	const float R_eff = cr.r * a + 1.0f * (1.0f - a);
+	const float G_eff = cr.g * a + 1.0f * (1.0f - a);
+	const float B_eff = cr.b * a + 1.0f * (1.0f - a);
+
+	// 0~255 스케일로 변환 후 휘도 계산
+	const uint8_t lum = get_gray_value(
+		static_cast<uint8_t>(R_eff * 255.0f + 0.5f),
+		static_cast<uint8_t>(G_eff * 255.0f + 0.5f),
+		static_cast<uint8_t>(B_eff * 255.0f + 0.5f));
+
+	return (lum > 160)
+		? D2D1::ColorF(0.0f, 0.0f, 0.0f, 1.0f)   // Black
+		: D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f);   // White
+}
+
+//get_distinct_bw_color()와는 달리 hue를 180도 이동시킨 색상을 리턴한다.
+D2D1_COLOR_F	get_distinct_color(D2D1_COLOR_F cr)
+{
+	float h, s, v;
+	rgb2hsv(static_cast<int>(cr.r * 255.0f + 0.5f),
+		static_cast<int>(cr.g * 255.0f + 0.5f),
+		static_cast<int>(cr.b * 255.0f + 0.5f),
+		h, s, v);
+
+	// hue를 180도 이동
+	h = fmodf(h + 180.0f, 360.0f);
+
+	// 무채색(saturation이 매우 낮은 경우)에는 hue shift가 무의미하므로 명도를 반전
+	if (s < 0.05f)
+		v = 1.0f - v;
+
+	int r, g, b;
+	hsv2rgb(h, s, v, r, g, b);
+
+	return D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, cr.a);
+}
 #endif

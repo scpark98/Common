@@ -354,6 +354,11 @@ CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = nullptr);
 Gdiplus::Color	get_sys_color(int index);
 #ifndef _USING_V110_SDK71_
 D2D1_COLOR_F	get_sys_d2color(int index, int alpha = 255);
+//보색과는 달리 alpha까지 고려한 밝기에 따라 black or white를 리턴한다.
+//어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
+D2D1_COLOR_F	get_distinct_bw_color(D2D1_COLOR_F cr);
+//get_distinct_bw_color()와는 달리 hue를 180도 이동시킨 색상을 리턴한다.
+D2D1_COLOR_F	get_distinct_color(D2D1_COLOR_F cr);
 #endif
 
 extern COLORREF g_default_color[16];

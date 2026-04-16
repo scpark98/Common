@@ -455,38 +455,66 @@ HRESULT	CSCD2Context::save(CString path)
 	return res;
 }
 
-void CSCD2Context::draw_text(	IDWriteFactory* dwriteFactory,
-								IDWriteTextFormat* writeFormat,
-								const CString& text,
-								const D2D1_RECT_F& rect,
-								ID2D1Brush* brush)
+void CSCD2Context::draw_text(IDWriteFactory* dwriteFactory,
+	IDWriteTextFormat* writeFormat,
+	const CString& text,
+	const D2D1_RECT_F& rect,
+	ID2D1Brush* brush,
+	float min_fontsize,
+	float max_fontsize)
 {
+	if (text.IsEmpty() || !dwriteFactory || !writeFormat || !brush)
+		return;
+
 	float rectWidth = rect.right - rect.left;
 	float rectHeight = rect.bottom - rect.top;
+	if (rectWidth < 1.0f || rectHeight < 1.0f)
+		return;
 
-	// 1. TextLayout 생성 (측정용 큰 영역)
-	Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
+	// 1. 무한 영역으로 원본 크기 측정
+	Microsoft::WRL::ComPtr<IDWriteTextLayout> measureLayout;
 	dwriteFactory->CreateTextLayout(
 		text, text.GetLength(), writeFormat,
 		10000.0f, 10000.0f,
-		&textLayout
-	);
+		&measureLayout);
 
-	// 2. 현재 텍스트 크기 측정
+	if (!measureLayout)
+		return;
+
 	DWRITE_TEXT_METRICS metrics;
-	textLayout->GetMetrics(&metrics);
+	measureLayout->GetMetrics(&metrics);
 
-	// 3. 비율 계산 후 폰트 크기 조정
+	if (metrics.width < 0.001f || metrics.height < 0.001f)
+		return;
+
+	// 2. 축소 비율 계산
 	float scale = min(rectWidth / metrics.width, rectHeight / metrics.height);
 	float newFontSize = writeFormat->GetFontSize() * scale;
 
-	DWRITE_TEXT_RANGE allRange = { 0, (UINT32)text.GetLength() };
-	textLayout->SetFontSize(newFontSize, allRange);  // ← 핵심
+	//폰트 크기 제한 적용
+	if (min_fontsize > 0.0f && newFontSize < min_fontsize)
+		newFontSize = min_fontsize;
+	if (max_fontsize > 0.0f && newFontSize > max_fontsize)
+		newFontSize = max_fontsize;
 
-	// 4. DrawTextLayout으로 렌더링
+	// 3. ★ 셀 크기에 맞는 새 레이아웃을 재생성
+	Microsoft::WRL::ComPtr<IDWriteTextLayout> drawLayout;
+	dwriteFactory->CreateTextLayout(
+		text, text.GetLength(), writeFormat,
+		rectWidth, rectHeight,		// ← 10000이 아닌 실제 셀 크기
+		&drawLayout);
+
+	if (!drawLayout)
+		return;
+
+	DWRITE_TEXT_RANGE allRange = { 0, (UINT32)text.GetLength() };
+	drawLayout->SetFontSize(newFontSize, allRange);
+
+	// 4. 셀 영역의 좌상단 기준으로 출력
+	//    (writeFormat의 center/center 정렬이 적용됨)
 	m_d2context->DrawTextLayout(
 		D2D1::Point2F(rect.left, rect.top),
-		textLayout.Get(),
+		drawLayout.Get(),
 		brush
 	);
 }

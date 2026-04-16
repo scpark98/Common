@@ -2998,7 +2998,11 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	// ★ 취소용 핸들 저장
 	params->h_cancel_root.store(hInternetRoot);
 
-	DWORD dwConnectTimeout = MAX(5000, params->timeout_ms);	//타임아웃 최소값은 5초로 한다.
+	// ★ 연결 타임아웃(connect)과 전송 타임아웃(send/receive)을 분리
+	// connect: 서버가 다운이면 빠르게 실패 (5초)
+	// send/receive: 대기열 + 실제 데이터 전송에 충분한 시간
+	DWORD dwConnectTimeout = params->connect_timeout_ms;   // ★ 연결만 2초 (대기열과 무관)
+	DWORD dwTransferTimeout = params->transfer_timeout_ms;  // send/receive는 기존대로
 	InternetSetOption(hInternetRoot, INTERNET_OPTION_CONNECT_TIMEOUT, &dwConnectTimeout, sizeof(DWORD));
 
 	HINTERNET hInternetConnect = InternetConnect(hInternetRoot,
@@ -3045,7 +3049,6 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	//https://blog.naver.com/che5886/20061092638
 	//20250117 30초 timeout됨을 확인 완료.
 	
-	DWORD dwTransferTimeout = params->timeout_ms;
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_CONNECT_TIMEOUT, &dwConnectTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_SEND_TIMEOUT, &dwTransferTimeout, sizeof(DWORD));
 	InternetSetOption(hOpenRequest, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTransferTimeout, sizeof(DWORD));

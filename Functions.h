@@ -47,6 +47,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <sstream>
 #include <atomic>
 #include <chrono>
+#include <mutex>
 
 #ifndef _USING_V110_SDK71_
 	#include <d2d1_1.h>
@@ -525,14 +526,18 @@ public:
 	...
 */
 
+class CRequestUrlParams;
+
 //request_url() 내부에서 또는 단독적으로 서버가 현재 기동중인지를 빠르게 판별하기 위한 함수
 bool		is_server_reachable(CString ip, int port, int timeout_ms = 1000);
 
 // 서버 도달 가능 여부를 공유 캐시로 관리하는 클래스
+// 529행 그대로
+class CRequestUrlParams;
+
 class CServerReachabilityCache
 {
 public:
-	// check_interval_ms: 실제 소켓 검사를 수행하는 최소 간격 (밀리초)
 	CServerReachabilityCache(int check_interval_ms = 10000)
 		: m_check_interval_ms(check_interval_ms)
 		, m_reachable(true)
@@ -541,23 +546,23 @@ public:
 	{
 	}
 
-	// 5000개 스레드가 동시에 호출해도 안전.
-	// 실제 소켓 검사는 interval마다 1회만 수행됨.
 	bool is_reachable(CString ip, int port, int timeout_ms = 1000)
 	{
 		auto now = std::chrono::steady_clock::now().time_since_epoch();
 		long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 		long long last = m_last_check_time.load();
 
-		// 검사 주기가 경과했고, 다른 스레드가 검사 중이 아닐 때만 실제 검사 수행
 		if (now_ms - last >= m_check_interval_ms)
 		{
 			bool expected = false;
 			if (m_checking.compare_exchange_strong(expected, true))
 			{
-				// 이 스레드만 실제 소켓 검사 수행
 				bool result = is_server_reachable(ip, port, timeout_ms);
-				m_reachable.store(result);
+				bool was_reachable = m_reachable.exchange(result);
+
+				if (was_reachable && !result)
+					cancel_all_pending();
+
 				m_last_check_time.store(now_ms);
 				m_checking.store(false);
 			}
@@ -566,17 +571,40 @@ public:
 		return m_reachable.load();
 	}
 
-	// 캐시를 즉시 무효화 (서버 전환 등의 상황에서 사용)
+	bool is_reachable_cached() const
+	{
+		return m_reachable.load();
+	}
+
+	void update(bool success);		// ★ 선언만 (구현은 CRequestUrlParams 정의 이후)
+
+	void register_request(CRequestUrlParams* param)
+	{
+		std::lock_guard<std::mutex> lock(m_mtx);
+		m_pending.insert(param);
+	}
+
+	void unregister_request(CRequestUrlParams* param)
+	{
+		std::lock_guard<std::mutex> lock(m_mtx);
+		m_pending.erase(param);
+	}
+
 	void invalidate()
 	{
 		m_last_check_time.store(0);
 	}
 
 private:
-	int					m_check_interval_ms;
-	std::atomic<bool>	m_reachable;
-	std::atomic<long long> m_last_check_time;
-	std::atomic<bool>	m_checking;		// 스핀락 역할
+	void cancel_all_pending();		// ★ 선언만
+
+	int						m_check_interval_ms;
+	std::atomic<bool>		m_reachable;
+	std::atomic<long long>	m_last_check_time;
+	std::atomic<bool>		m_checking;
+
+	std::mutex				m_mtx;
+	std::set<CRequestUrlParams*> m_pending;
 };
 
 class CRequestUrlParams
@@ -654,7 +682,9 @@ public:
 	CString		body;					//post data(json format)
 
 	//default = 30초
-	int			timeout_ms = 30000;
+	//연결 타임아웃과 전송 타임아웃 분리.
+	int			connect_timeout_ms = 5000;
+	int			transfer_timeout_ms = 30000;
 
 	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
 	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
@@ -678,6 +708,26 @@ public:
 	uint64_t	downloaded_size = 0;	//현재까지 받은 크기
 	int			download_index = -1;	//n개의 파일 다운로드시 현재 파일의 인덱스. request_id와는 다름.
 };
+
+// ★ CRequestUrlParams 완전 정의 이후에 구현
+inline void CServerReachabilityCache::cancel_all_pending()
+{
+	std::lock_guard<std::mutex> lock(m_mtx);
+	for (auto* p : m_pending)
+		p->cancel();
+}
+
+inline void CServerReachabilityCache::update(bool success)
+{
+	bool was_reachable = m_reachable.exchange(success);
+
+	if (was_reachable && !success)
+		cancel_all_pending();
+
+	auto now = std::chrono::steady_clock::now().time_since_epoch();
+	long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+	m_last_check_time.store(now_ms);
+}
 
 class CMouseEvent
 {

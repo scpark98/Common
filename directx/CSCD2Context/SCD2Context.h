@@ -95,11 +95,14 @@ public:
 
 	HRESULT						save(CString path);
 
+	//rect의 크기에 따라 글자크기가 자동 조정된다. min, max 크기를 지정할 수 있다. (0이면 자동 조정)
 	void						draw_text(	IDWriteFactory* dwriteFactory,
 											IDWriteTextFormat* writeFormat,
 											const CString& text,
 											const D2D1_RECT_F& rect,
-											ID2D1Brush* brush);
+											ID2D1Brush* brush,
+											float min_fontsize = 4.0f,
+											float max_fontsize = 12.0f);
 protected:
 	D2D1_SIZE_F					m_sz;
 	HWND						m_hWnd;

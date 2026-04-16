@@ -900,6 +900,7 @@ void CSCHeatmapCtrl::draw_heatmap()
 				d2dc->DrawRoundedRectangle(rr, brush.Get(), 1.0f);
 			}
 
+			m_brush->SetColor(get_distinct_bw_color(it->second.cr_fill));
 			m_d2dc.draw_text(m_WriteFactory, m_WriteFormat, it->second.text, D2D1::RectF(left, top, right, bottom), m_brush);
 			//d2dc->DrawText(it->second.text, it->second.text.GetLength(), m_WriteFormat, D2D1::RectF(left, top, right, bottom), m_brush);
 		}

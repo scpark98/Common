@@ -346,7 +346,7 @@ void CSCParagraphStatic::PreSubclassWindow()
 
 void CSCParagraphStatic::update_text_property()
 {
-	m_text_prop.name = m_lf.lfFaceName;
+	_tcscpy_s(m_text_prop.name, _countof(m_text_prop.name), m_lf.lfFaceName);
 	m_text_prop.size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 
 	if (m_lf.lfWeight >= FW_BOLD)

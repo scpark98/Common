@@ -148,6 +148,18 @@ CString get_time_str(CTime t, CString sep, bool h24, bool sec)
 	return get_time_str(COleDateTime(t.GetTime()), sep, h24, sec);
 }
 
+CString	get_time_str(CTimeSpan ts, bool bHasHour)
+{
+	CString str;
+
+	if (bHasHour)
+		str.Format(_T("%02d:%02d:%02d"), (int)ts.GetTotalHours(), ts.GetMinutes(), ts.GetSeconds());
+	else
+		str.Format(_T("%02d:%02d"), ts.GetMinutes(), ts.GetSeconds());
+
+	return str;
+}
+
 CString get_time_str(COleDateTime t, CString sep, bool h24, bool sec)
 {
 	CString str;

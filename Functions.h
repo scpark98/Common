@@ -633,6 +633,65 @@ public:
 		}
 	}
 
+	// 복사 생성자
+	CRequestUrlParams(const CRequestUrlParams& other)
+		: use_thread(other.use_thread)
+		, request_id(other.request_id)
+		, status(other.status)
+		, ip(other.ip)
+		, port(other.port)
+		, sub_url(other.sub_url)
+		, verb(other.verb)
+		, is_https(other.is_https)
+		, body(other.body)
+		, connect_timeout_ms(other.connect_timeout_ms)
+		, transfer_timeout_ms(other.transfer_timeout_ms)
+		, headers(other.headers)
+		, proxy_id(other.proxy_id)
+		, proxy_pw(other.proxy_pw)
+		, full_url(other.full_url)
+		, result(other.result)
+		, elapsed(other.elapsed)
+		, local_file_path(other.local_file_path)
+		, file_size(other.file_size)
+		, downloaded_size(other.downloaded_size)
+		, download_index(other.download_index)
+	{
+		h_cancel_root.store(nullptr);
+	}
+
+	// 복사 대입 연산자
+	CRequestUrlParams& operator=(const CRequestUrlParams& other)
+	{
+		if (this == &other) return *this;
+
+		use_thread = other.use_thread;
+		request_id = other.request_id;
+		status = other.status;
+		ip = other.ip;
+		port = other.port;
+		sub_url = other.sub_url;
+		verb = other.verb;
+		is_https = other.is_https;
+		body = other.body;
+		connect_timeout_ms = other.connect_timeout_ms;
+		transfer_timeout_ms = other.transfer_timeout_ms;
+		headers = other.headers;
+		proxy_id = other.proxy_id;
+		proxy_pw = other.proxy_pw;
+		full_url = other.full_url;
+		result = other.result;
+		elapsed = other.elapsed;
+		local_file_path = other.local_file_path;
+		file_size = other.file_size;
+		downloaded_size = other.downloaded_size;
+		download_index = other.download_index;
+
+		h_cancel_root.store(nullptr);
+
+		return *this;
+	}
+
 	CRequestUrlParams(CString _full_url, CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
 
 	void		reset(bool sub_url_reset = false)
@@ -2160,6 +2219,7 @@ h		: 복사할 height 크기(pixel)
 	CString		get_date_str(SYSTEMTIME st, CString sep = _T("-"));
 
 	CString		get_time_str(CTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
+	CString		get_time_str(CTimeSpan ts, bool bHasHour = true);
 	CString		get_time_str(COleDateTime t, CString sep = _T(":"), bool h24 = true, bool sec = true);
 	CString		get_time_str(__timeb32 tb, CString sep = _T(":"), bool h24 = true, bool sec = true);
 	CString		get_time_str(SYSTEMTIME st, CString sep = _T(":"), bool h24 = true, bool sec = true, bool msec = true);

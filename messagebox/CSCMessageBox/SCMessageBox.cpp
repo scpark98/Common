@@ -128,7 +128,10 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 		m_button[i].create(m_button_caption[i], WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, SC_BUTTON_ID + i);
 		m_button[i].use_hover();
 		m_button[i].set_round(4, Gdiplus::Color::LightGray);
-		//m_button[i].draw_focus_rect(true, Gdiplus::Color::Red);
+
+		m_button[i].set_text_color(m_theme.cr_text);
+		m_button[i].set_back_color(m_theme.cr_title_back_inactive);
+		m_button[i].set_parent_back_color(m_theme.cr_back);
 	}
 
 	reconstruct_font();
@@ -143,7 +146,8 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_button_quit.use_hover();
 
 	m_static_message.create(_T("message"), WS_CHILD | WS_VISIBLE, CRect(0, m_title_height, cx, rc.bottom - 20 - 8 - m_sz_button.cy), this, 0);
-	m_static_message.set_back_color(Gdiplus::Color::White);
+	m_static_message.set_back_color(m_theme.cr_back);
+	m_static_message.set_text_color(m_theme.cr_text);
 	m_static_message.set_font(&m_font);
 
 	return res;
@@ -434,7 +438,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 
 	Invalidate();
 
-	if (!m_as_modal)
+	//if (m_as_modal)
 	{
 		CenterWindow(m_parent);
 		ShowWindow(SW_SHOW);
@@ -450,15 +454,35 @@ void CSCMessageBox::set_align(int align)
 	m_static_message.ModifyStyle(0, align);
 }
 
+//set_color_theme()은 create() 전에도 호출될 수 있으므로 그에 대한 처리도 필요하다.
 void CSCMessageBox::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
 
-	m_static_message.set_back_color(m_theme.cr_back);
+	if (m_static_message.m_hWnd)
+	{
+		m_static_message.set_text_color(m_theme.cr_text);
+		m_static_message.set_back_color(m_theme.cr_back);
+	}
 
-	m_button_quit.set_text_color(m_theme.cr_title_text);
-	m_button_quit.set_back_color(m_theme.cr_title_back_active);
-	m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
+	if (m_button_quit)
+	{
+		m_button_quit.set_text_color(m_theme.cr_title_text);
+		m_button_quit.set_back_color(m_theme.cr_title_back_active);
+		m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
+	}
+
+	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
+	{
+		if (m_button[i].m_hWnd)
+		{
+			m_button[i].set_text_color(m_theme.cr_text);
+			m_button[i].set_back_color(m_theme.cr_title_back_inactive);
+			m_button[i].set_parent_back_color(m_theme.cr_back);
+			m_button[i].set_hover_back_color(m_theme.cr_title_back_active);
+			m_button[i].draw_focus_rect(true, m_theme.cr_title_back_active);
+		}
+	}
 }
 
 LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
@@ -602,11 +626,13 @@ void CSCMessageBox::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 	Gdiplus::Graphics g(dc.m_hDC);
-	
+
+	draw_rect(g, rc, m_theme.cr_title_back_inactive, m_theme.cr_back);
+
 	//draw titlebar
 	rtitle = rc;
 	rtitle.bottom = rtitle.top + m_title_height;
-	dc.FillSolidRect(rtitle, m_theme.cr_title_back_active.ToCOLORREF());
+	dc.FillSolidRect(rtitle, m_theme.cr_title_back_inactive.ToCOLORREF());
 
 	rtitle.left += 8;
 
@@ -633,21 +659,6 @@ void CSCMessageBox::OnPaint()
 	dc.DrawText(title, rtitle, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 	dc.SelectObject(pOldFont);
 	//end of draw title text
-
-
-	//draw messagebox icon
-	//아이콘의 세로 위치는 메시지박스의 m_align에	따라 다르다.
-	//CRect rmsg;
-	//m_static_message.GetWindowRect(rmsg);
-	//ScreenToClient(rmsg);
-	//if (m_align & SS_CENTERIMAGE)
-	//	dc.DrawIcon(16, rmsg.CenterPoint().y - 16, m_icons[m_icon_index]);
-	//else
-	//	dc.DrawIcon(16, rmsg.top, m_icons[m_icon_index]);
-
-
-	//draw border
-	draw_rect(g, rc, Gdiplus::Color::DimGray);
 }
 
 void CSCMessageBox::OnLButtonDown(UINT nFlags, CPoint point)

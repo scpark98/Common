@@ -54,17 +54,15 @@ static const UINT Message_CSCShapeDlg = ::RegisterWindowMessage(_T("MessageStrin
 
 class CSCShapeDlgMessage
 {
-	CSCShapeDlgMessage(CWnd* _pThis)
+public:
+	CSCShapeDlgMessage(CWnd* _pThis, int _massage = -1)
 	{
 		pThis = _pThis;
+		message = _massage;
 	}
 
-	enum Messages
-	{
-		msg_window_moved = 0,
-	};
-
 	CWnd*	pThis = NULL;
+	int 	message = -1;
 };
 
 class CSCShapeDlgTextSetting
@@ -91,6 +89,11 @@ class CSCShapeDlg : public CDialogEx
 public:
 	CSCShapeDlg();   // 표준 생성자입니다.
 	virtual ~CSCShapeDlg();
+
+	enum Messages
+	{
+		message_window_pos_changed = 0,
+	};
 
 	//default : SW_HIDE
 	bool			create(CWnd* parent, int left, int top, int right, int bottom);

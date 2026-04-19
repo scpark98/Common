@@ -1471,6 +1471,12 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 	}
 	else if (pMsg->message == WM_KEYDOWN && !m_in_editing)
 	{
+		if (!IsWindowVisible())
+		{
+			TRACE(_T("not visible listctrl\n"), pMsg->wParam);
+			return FALSE;
+		}
+
 		TRACE(_T("VtListCtrl key = %d\n"), pMsg->wParam);
 		switch (pMsg->wParam)
 		{
@@ -2698,7 +2704,7 @@ CString CVtListCtrlEx::get_line_text(int index, std::deque<int>* dqColumn, CStri
 	CString linetext = _T("");
 
 	for (i = 0; i < dqColumn->size(); i++)
-		linetext = linetext + get_text(index, dqColumn->at(i)) + sep;
+		linetext = linetext + get_text(index, dqColumn->at(i)) + (i == dqColumn->size() - 1 ? _T("") : sep);
 
 	return linetext;
 }

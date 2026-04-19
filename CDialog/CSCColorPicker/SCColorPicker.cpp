@@ -1402,7 +1402,9 @@ void CSCColorPicker::OnPaint()
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHint::TextRenderingHintAntiAliasGridFit);
 
 	draw_palette(g);		// ① 팔레트 원
 

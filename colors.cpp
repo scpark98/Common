@@ -1184,7 +1184,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
-			cr_text					= Gdiplus::Color(255, 164, 164, 164);
+			cr_text					= Gdiplus::Color(255, 192, 192, 192);
 			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);

@@ -765,7 +765,8 @@ void CSCShapeDlg::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	CDialogEx::OnWindowPosChanged(lpwndpos);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	SaveWindowPosition(AfxGetApp(), this, _T("SCShapeDlg"));
+	CSCShapeDlgMessage msg(this, message_window_pos_changed);
+	::SendMessage(m_parent->m_hWnd, Message_CSCShapeDlg, (WPARAM)&msg, 0);
 }
 /*
 void CSCShapeDlg::get_logfont(LOGFONT *lf)

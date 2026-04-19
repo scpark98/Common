@@ -130,6 +130,10 @@ inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, cons
 {
 	return os << _T("(") << r.X << _T(", ") << r.Y << _T(", ") << r.GetRight() << _T(", ") << r.GetBottom() << L")";
 }
+inline std::basic_ostream<TCHAR>& operator<<(std::basic_ostream<TCHAR>& os, const CTime& time)
+{
+	return os << time.Format(_T("%Y-%m-%d %H:%M:%S"));
+}
 
 template<typename T> void trace_impl(const TCHAR* func, int line, const TCHAR* var_name, const T& value)
 {

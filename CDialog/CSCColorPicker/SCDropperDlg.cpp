@@ -278,7 +278,7 @@ BOOL CSCDropperDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint /*pt*/)
 	}
 	else
 	{
-		const int step = 2;
+		const int step = (IsShiftPressed() ? 10 : 2);
 		if (zDelta > 0)
 			m_sample = m_sample - step;
 		else

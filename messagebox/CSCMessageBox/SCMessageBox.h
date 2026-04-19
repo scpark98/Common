@@ -105,6 +105,7 @@ public:
 
 //theme 관련 설정
 	CSCColorTheme	m_theme = CSCColorTheme(this);
+	//set_color_theme()은 create() 전에도 호출될 수 있으므로 그에 대한 처리도 필요하다.
 	void			set_color_theme(int theme);
 
 	//normal message일 경우는 theme에 지정된 title_back_color를 사용하지만 이 함수를 사용하면

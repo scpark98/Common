@@ -17014,7 +17014,10 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pApp || !pWnd || !pWnd->GetSafeHwnd() || !pWnd->IsWindowVisible() || pWnd->IsIconic())
+	{
+		TRACE(_T("invalid window. SaveWindowPosition() skip.\n"));
 		return;
+	}
 
 	CString sSection = sSubSection.IsEmpty() ? CString("screen") : sSubSection + CString("\\screen");
 

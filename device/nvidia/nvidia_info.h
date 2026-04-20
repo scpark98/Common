@@ -35,15 +35,26 @@ typedef struct
 } NV_GPU_THERMAL_SETTINGS;
 
 // magic numbers, do not change them
-#define NVAPI_MAX_PHYSICAL_GPUS   64
-#define NVAPI_MAX_USAGES_PER_GPU  34
+#define NVAPI_MAX_PHYSICAL_GPUS       64
+#define NVAPI_MAX_GPU_UTILIZATIONS    8
+
+typedef struct
+{
+    unsigned int version;
+    unsigned int flags;
+    struct
+    {
+        unsigned int bIsPresent : 1;
+        unsigned int percentage;
+    } utilization[NVAPI_MAX_GPU_UTILIZATIONS];
+} NV_GPU_DYNAMIC_PSTATES_INFO_EX;
 
 // function pointer types
 typedef int* (*NvAPI_QueryInterface_t)(unsigned int offset);
 typedef int (*NvAPI_Initialize_t)();
 typedef int (*NvAPI_EnumPhysicalGPUs_t)(int** handles, int* count);
-typedef int (*NvAPI_GPU_GetUsages_t)(int* handle, unsigned int* usages);
 typedef int (*NvAPI_GPU_GetThermalSettings_t)(int* handle, int sensorIndex, NV_GPU_THERMAL_SETTINGS* temp);
+typedef int (*NvAPI_GPU_GetDynamicPstatesInfoEx_t)(int* handle, NV_GPU_DYNAMIC_PSTATES_INFO_EX* info);
 
 
 class CNVidiaInfo
@@ -51,22 +62,19 @@ class CNVidiaInfo
 public :
     CNVidiaInfo::CNVidiaInfo();
 
-	//bool	init();
     int     get_usage(int index);
     int     get_temperature(int index);
 
 protected :
     // nvapi.dll internal function pointers
-    NvAPI_QueryInterface_t      NvAPI_QueryInterface = NULL;
-    NvAPI_Initialize_t          NvAPI_Initialize = NULL;
-    NvAPI_EnumPhysicalGPUs_t    NvAPI_EnumPhysicalGPUs = NULL;
-    NvAPI_GPU_GetUsages_t       NvAPI_GPU_GetUsages = NULL;
-    NvAPI_GPU_GetThermalSettings_t	NvAPI_GPU_GetThermalSettings = NULL;
+    NvAPI_QueryInterface_t               NvAPI_QueryInterface = NULL;
+    NvAPI_Initialize_t                   NvAPI_Initialize = NULL;
+    NvAPI_EnumPhysicalGPUs_t             NvAPI_EnumPhysicalGPUs = NULL;
+    NvAPI_GPU_GetThermalSettings_t       NvAPI_GPU_GetThermalSettings = NULL;
+    NvAPI_GPU_GetDynamicPstatesInfoEx_t  NvAPI_GPU_GetDynamicPstatesInfoEx = NULL;
 
-    NV_GPU_THERMAL_SETTINGS 		 nvgts;
+    NV_GPU_THERMAL_SETTINGS  nvgts;
     int          gpuCount = 0;
     int 		 gpuTemp;
     int* gpuHandles[NVAPI_MAX_PHYSICAL_GPUS] = { NULL };
-    unsigned int gpuUsages[NVAPI_MAX_USAGES_PER_GPU] = { 0 };
-
 };

@@ -675,7 +675,7 @@ void CSCColorPicker::draw_overlays(Gdiplus::Graphics& g) const
 			draw_hover_circle(g, m_hover);
 	}
 
-	if (m_sel.is_valid() && m_sel.area != HitArea::Button)
+	if (m_sel.is_valid() && m_sel.area != HitArea::Button && m_sel.area != HitArea::External)
 	{
 		if (is_recent_visible(m_sel))
 			draw_selected_mark(g, m_sel);
@@ -1093,6 +1093,11 @@ INT_PTR CSCColorPicker::DoModal(CWnd* parent, Gdiplus::Color cr_selected, CStrin
 				const Gdiplus::Color palette_cr = get_color_at(found.col, found.row);
 			}
 		}
+		else
+		{
+			//일치하는 색상 없음 → m_sel_color는 유지, 선택 링은 그리지 않음
+			m_sel = { HitArea::External, -1, -1, -1 };
+		}
 	}
 	else if (!m_recent_colors.empty())
 	{
@@ -1185,28 +1190,99 @@ BOOL CSCColorPicker::PreTranslateMessage(MSG* pMsg)
 	return CDialog::PreTranslateMessage(pMsg);
 }
 
+// ── 레지스트리 헬퍼 ────────────────────────────────────
+// m_use_shared_color == false: AfxGetApp() 기반 HKCU\Software\<Company>\<AppName>\...
+// m_use_shared_color == true : HKEY_LOCAL_MACHINE\Software\CSCColorPicker\... 공유 위치
+static constexpr LPCTSTR SHARED_REG_ROOT = _T("Software\\CSCColorPicker");
+
+void CSCColorPicker::set_use_shared_color(bool use_shared)
+{
+	if (m_use_shared_color == use_shared)
+		return;
+	m_use_shared_color = use_shared;
+
+	// 이미 창이 생성된 상태라면 새 위치 기준으로 재로딩
+	if (GetSafeHwnd())
+	{
+		load_recent_colors();
+		clamp_recent_scroll();
+		update_slider_alpha();
+		Invalidate(FALSE);
+	}
+}
+
+int CSCColorPicker::reg_get_int(LPCTSTR section, LPCTSTR entry, int def) const
+{
+	if (!m_use_shared_color)
+		return AfxGetApp()->GetProfileInt(section, entry, def);
+
+	CString subkey;
+	subkey.Format(_T("%s\\%s"), SHARED_REG_ROOT, section);
+
+	DWORD value = 0;
+	if (::get_registry_int(HKEY_LOCAL_MACHINE, subkey, entry, &value) != ERROR_SUCCESS)
+		return def;
+	return (int)value;
+}
+
+CString CSCColorPicker::reg_get_string(LPCTSTR section, LPCTSTR entry, LPCTSTR def) const
+{
+	if (!m_use_shared_color)
+		return AfxGetApp()->GetProfileString(section, entry, def);
+
+	CString subkey;
+	subkey.Format(_T("%s\\%s"), SHARED_REG_ROOT, section);
+
+	CString result;
+	if (::get_registry_str(HKEY_LOCAL_MACHINE, subkey, entry, &result) != ERROR_SUCCESS)
+		return def ? CString(def) : CString();
+	return result;
+}
+
+BOOL CSCColorPicker::reg_write_int(LPCTSTR section, LPCTSTR entry, int value)
+{
+	if (!m_use_shared_color)
+		return AfxGetApp()->WriteProfileInt(section, entry, value);
+
+	CString subkey;
+	subkey.Format(_T("%s\\%s"), SHARED_REG_ROOT, section);
+
+	return ::set_registry_int(HKEY_LOCAL_MACHINE, subkey, entry, (DWORD)value) == ERROR_SUCCESS;
+}
+
+BOOL CSCColorPicker::reg_write_string(LPCTSTR section, LPCTSTR entry, LPCTSTR value)
+{
+	if (!m_use_shared_color)
+		return AfxGetApp()->WriteProfileString(section, entry, value);
+
+	CString subkey;
+	subkey.Format(_T("%s\\%s"), SHARED_REG_ROOT, section);
+
+	return ::set_registry_str(HKEY_LOCAL_MACHINE, subkey, entry, value) == ERROR_SUCCESS;
+}
+
 void CSCColorPicker::load_recent_colors()
 {
 	// ── Hex 표시 형식 복원 ────────────────────────────────────────────────
-	const int fmt = AfxGetApp()->GetProfileInt(_T("setting\\color picker"), _T("hex_format"), (int)HexFormat::ARGB);
+	const int fmt = reg_get_int(_T("setting\\color picker"), _T("hex_format"), (int)HexFormat::ARGB);
 	m_hex_format = (fmt >= (int)HexFormat::ARGB && fmt <= (int)HexFormat::BGRA)
 		? static_cast<HexFormat>(fmt)
 		: HexFormat::ARGB;	// 범위 벗어난 값은 기본값(ARGB)으로 복원
 
 	// ── 툴팁 표시 설정 복원 ──────────────────────────────────────────────
-	m_show_tooltip = AfxGetApp()->GetProfileInt(
+	m_show_tooltip = reg_get_int(
 		_T("setting\\color picker"), _T("show_tooltip"), false) != false;  // 기본값: false
 
 	m_recent_colors.clear();
 	const int count = min(
-		AfxGetApp()->GetProfileInt(_T("setting\\color picker"), _T("count"), 0),
+		reg_get_int(_T("setting\\color picker"), _T("count"), 0),
 		MAX_RECENT_COLORS);
 
 	for (int i = 0; i < count; ++i)
 	{
 		CString key;
 		key.Format(_T("color_%d"), i);
-		CString val = AfxGetApp()->GetProfileString(_T("setting\\color picker"), key, _T(""));
+		CString val = reg_get_string(_T("setting\\color picker"), key, _T(""));
 		if (val.GetLength() == 8)
 		{
 			DWORD argb = _tcstoul(val, nullptr, 16);
@@ -1242,13 +1318,13 @@ void CSCColorPicker::save_recent_color(Gdiplus::Color cr)
 		m_recent_colors.resize(MAX_RECENT_COLORS);
 
 	// 레지스트리에 기록
-	AfxGetApp()->WriteProfileInt(_T("setting\\color picker"), _T("count"), (int)m_recent_colors.size());
+	reg_write_int(_T("setting\\color picker"), _T("count"), (int)m_recent_colors.size());
 	for (int i = 0; i < (int)m_recent_colors.size(); ++i)
 	{
 		CString key, val;
 		key.Format(_T("color_%d"), i);
 		val.Format(_T("%08X"), m_recent_colors[i].GetValue());	// GetValue() = ARGB 전체
-		AfxGetApp()->WriteProfileString(_T("setting\\color picker"), key, val);
+		reg_write_string(_T("setting\\color picker"), key, val);
 	}
 }
 
@@ -1885,7 +1961,7 @@ void CSCColorPicker::toggle_hex_format()
 		case HexFormat::BGRA: m_hex_format = HexFormat::ARGB; break;
 	}
 
-	AfxGetApp()->WriteProfileInt(_T("setting\\color picker"), _T("hex_format"), (int)m_hex_format);
+	reg_write_int(_T("setting\\color picker"), _T("hex_format"), (int)m_hex_format);
 
 	sync_edits();      // Hex 편집 텍스트 갱신
 	Invalidate(FALSE); // 레이블 텍스트 갱신
@@ -1961,6 +2037,10 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 		MF_BYCOMMAND);
 
 	menu.AppendMenu(MF_SEPARATOR);
+
+	// ── 공유 컬러 사용 (HKLM/HKCU 전환) ───────────────────
+	menu.AppendMenu(MF_STRING | (m_use_shared_color ? MF_CHECKED : MF_UNCHECKED),
+		IDM_USE_SHARED_COLOR, _T("공유 컬러 사용"));
 
 	// ── 최근 색상 내보내기 / 가져오기 ────────────────────
 	menu.AppendMenu(MF_STRING, IDM_EXPORT_RECENT, _T("최근 색상 내보내기"));
@@ -2069,13 +2149,13 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 				clamp_recent_scroll();
 
 				// 레지스트리에 반영
-				AfxGetApp()->WriteProfileInt(_T("setting\\color picker"), _T("count"), (int)m_recent_colors.size());
+				reg_write_int(_T("setting\\color picker"), _T("count"), (int)m_recent_colors.size());
 				for (int i = 0; i < (int)m_recent_colors.size(); ++i)
 				{
 					CString key, val;
 					key.Format(_T("color_%d"), i);
 					val.Format(_T("%08X"), m_recent_colors[i].GetValue());
-					AfxGetApp()->WriteProfileString(_T("setting\\color picker"), key, val);
+					reg_write_string(_T("setting\\color picker"), key, val);
 				}
 
 				Invalidate(FALSE);
@@ -2100,7 +2180,7 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 				m_hover = {};
 
 				// 레지스트리에 반영
-				AfxGetApp()->WriteProfileInt(_T("setting\\color picker"), _T("count"), 0);
+				reg_write_int(_T("setting\\color picker"), _T("count"), 0);
 
 				Invalidate(FALSE);
 			}
@@ -2109,7 +2189,7 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 
 		case IDM_TOOLTIP:
 			m_show_tooltip = !m_show_tooltip;
-			AfxGetApp()->WriteProfileInt(
+			reg_write_int(
 				_T("setting\\color picker"), _T("show_tooltip"), m_show_tooltip ? 1 : 0);
 			// 비활성화 시 현재 표시 중인 툴팁 즉시 숨김
 			if (!m_show_tooltip && m_tooltip.GetSafeHwnd())
@@ -2126,6 +2206,16 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 		case IDM_FMT_RGBA: m_hex_format = HexFormat::RGBA; break;
 		case IDM_FMT_BGRA: m_hex_format = HexFormat::BGRA; break;
 
+		case IDM_USE_SHARED_COLOR:
+			// 토글 + 새 위치에서 최근 색상 재로딩 (set_use_shared_color 내부에서 load + 화면 갱신)
+			set_use_shared_color(!m_use_shared_color);
+			// m_sel이 이전 recent 인덱스를 가리킬 수 있으므로 해제
+			if (m_sel.area == HitArea::Recent)
+				m_sel = {};
+			m_hover = {};
+			Invalidate(FALSE);
+			break;
+
 		case IDM_EXPORT_RECENT:
 			export_recent_colors();
 			break;
@@ -2141,7 +2231,7 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 	// Hex 형식 변경 시 레지스트리 저장 + 편집 컨트롤·레이블 갱신
 	if (cmd >= IDM_FMT_ARGB && cmd <= IDM_FMT_BGRA)
 	{
-		AfxGetApp()->WriteProfileInt(
+		reg_write_int(
 			_T("setting\\color picker"), _T("hex_format"), static_cast<int>(m_hex_format));
 		sync_edits();
 		Invalidate(FALSE);
@@ -2259,7 +2349,7 @@ void CSCColorPicker::export_recent_colors()
 	}
 
 	// 초기 폴더: 마지막으로 사용한 폴더 → 없으면 exe 폴더
-	CString init_dir = AfxGetApp()->GetProfileString(
+	CString init_dir = reg_get_string(
 		_T("setting\\color picker"), _T("recent colors exported folder"), _T(""));
 	if (init_dir.IsEmpty())
 		init_dir = get_exe_directory();
@@ -2275,7 +2365,7 @@ void CSCColorPicker::export_recent_colors()
 	const CString filepath = dlg.GetPathName();
 
 	// 마지막으로 사용한 폴더 저장
-	AfxGetApp()->WriteProfileString(
+	reg_write_string(
 		_T("setting\\color picker"), _T("recent colors exported folder"),
 		get_part(filepath, fn_folder));
 
@@ -2288,13 +2378,20 @@ void CSCColorPicker::export_recent_colors()
 	}
 
 	// ── .reg 형식으로 색상 목록 기록 ──────────────────────────────────
-	LPCTSTR app_key = AfxGetApp()->m_pszRegistryKey;
-	if (!app_key || !app_key[0])
-		app_key = _T("MyApp");
-
 	_ftprintf(fp, _T("Windows Registry Editor Version 5.00\n\n"));
-	_ftprintf(fp, _T("[HKEY_CURRENT_USER\\Software\\%s\\setting\\color picker\\recent_colors]\n"),
-		app_key);
+	if (m_use_shared_color)
+	{
+		_ftprintf(fp, _T("[HKEY_LOCAL_MACHINE\\%s\\setting\\color picker\\recent_colors]\n"),
+			SHARED_REG_ROOT);
+	}
+	else
+	{
+		LPCTSTR app_key = AfxGetApp()->m_pszRegistryKey;
+		if (!app_key || !app_key[0])
+			app_key = _T("MyApp");
+		_ftprintf(fp, _T("[HKEY_CURRENT_USER\\Software\\%s\\setting\\color picker\\recent_colors]\n"),
+			app_key);
+	}
 
 	_ftprintf(fp, _T("\"count\"=\"%d\"\n"), (int)m_recent_colors.size());
 	for (int i = 0; i < (int)m_recent_colors.size(); ++i)
@@ -2311,7 +2408,7 @@ void CSCColorPicker::export_recent_colors()
 void CSCColorPicker::import_recent_colors()
 {
 	// 초기 폴더: 마지막으로 사용한 폴더 → 없으면 exe 폴더
-	CString init_dir = AfxGetApp()->GetProfileString(_T("setting\\color picker"), _T("recent colors exported folder"), _T(""));
+	CString init_dir = reg_get_string(_T("setting\\color picker"), _T("recent colors exported folder"), _T(""));
 	if (init_dir.IsEmpty())
 		init_dir = get_exe_directory();
 
@@ -2324,7 +2421,7 @@ void CSCColorPicker::import_recent_colors()
 	const CString filepath = dlg.GetPathName();
 
 	// 마지막으로 사용한 폴더 저장
-	AfxGetApp()->WriteProfileString(_T("setting\\color picker"), _T("recent colors exported folder"), get_part(filepath, fn_folder));
+	reg_write_string(_T("setting\\color picker"), _T("recent colors exported folder"), get_part(filepath, fn_folder));
 
 	// ── 파일 읽기 (바이너리 → BOM 감지 → CString 변환) ────────────────
 	CFile file;
@@ -2428,14 +2525,14 @@ void CSCColorPicker::import_recent_colors()
 	m_recent_scroll = 0;
 
 	// ── 레지스트리에 반영 ─────────────────────────────────────────────
-	AfxGetApp()->WriteProfileInt(
+	reg_write_int(
 		_T("setting\\color picker"), _T("count"), (int)m_recent_colors.size());
 	for (int i = 0; i < (int)m_recent_colors.size(); ++i)
 	{
 		CString key, val;
 		key.Format(_T("color_%d"), i);
 		val.Format(_T("%08X"), m_recent_colors[i].GetValue());
-		AfxGetApp()->WriteProfileString(_T("setting\\color picker"), key, val);
+		reg_write_string(_T("setting\\color picker"), key, val);
 	}
 
 	Invalidate(FALSE);

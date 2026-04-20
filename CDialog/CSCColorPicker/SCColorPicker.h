@@ -45,6 +45,8 @@ Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
 		Invalidate();
 		return 0;
 	}
+
+	- 만약 여러 앱에서 최근 색상 정보를 공유하려면 set_use_shared_color(true)로 설정한다. (HKLM 사용, 관리자 권한으로 빌드해야 함)
 */
 
 #pragma once
@@ -93,6 +95,10 @@ public:
 	bool			create(CWnd* parent, CString title = _T(""), bool as_modal = true);
 	Gdiplus::Color	get_selected_color() const { return m_sel_color; }
 
+	//각 앱이 색상정보를 공유할지 개별로 기억할지 설정.
+	//true이면 다른 앱에서 선택한 recent colors를 이 앱에서도 사용할 수 있다.
+	void			set_use_shared_color(bool use_shared = true);
+
 protected:
 	enum TIMER_ID
 	{
@@ -103,6 +109,7 @@ protected:
 	CWnd*			m_parent = NULL;
 	int				m_response = -1;
 	bool			m_edit_syncing = false;	// sync_edits() 진행 중 EN_CHANGE 재진입 방지. 깜빡임 방지
+	bool			m_use_shared_color = false;	//default = false. true일 경우 HKLM 공유 위치 사용, false: HKCU 앱별 위치
 
 	//CSCDropperDlg	m_dropperDlg;
 
@@ -170,6 +177,7 @@ protected:
 	static constexpr int IDM_DELETE_ALL_RECENT = 2011;	// ← 모든 최근 색상 삭제
 	static constexpr int IDM_VIEW_COMPLEMENTARY = 2012;	// ← 보색 보기
 	static constexpr int IDM_COPY_WEB_COLOR = 2013;		// ← Copy Web Color Value
+	static constexpr int IDM_USE_SHARED_COLOR = 2014;	// ← 공유 컬러 사용 (HKLM/HKCU 전환)
 
 	// ── 편집 영역 레이아웃 상수 ───────────────────────────
 	static constexpr int kEditH = 22;
@@ -218,7 +226,7 @@ protected:
 	void		import_recent_colors();		// ← 최근 색상 가져오기 (.reg)
 
 	// ── 히트 타겟 ─────────────────────────────────────────
-	enum class HitArea { None, Palette, Recent, Button };
+	enum class HitArea { None, Palette, Recent, Button, External };
 
 	struct HitTarget {
 		HitArea area = HitArea::None;
@@ -251,6 +259,12 @@ protected:
 	void					load_recent_colors();
 	void					save_recent_color(Gdiplus::Color cr);
 	void					clamp_recent_scroll();					// ← NEW
+
+	// ── 레지스트리 접근 헬퍼 (m_use_shared_color에 따라 HKCU/HKLM 분기) ──
+	int						reg_get_int(LPCTSTR section, LPCTSTR entry, int def) const;
+	CString					reg_get_string(LPCTSTR section, LPCTSTR entry, LPCTSTR def) const;
+	BOOL					reg_write_int(LPCTSTR section, LPCTSTR entry, int value);
+	BOOL					reg_write_string(LPCTSTR section, LPCTSTR entry, LPCTSTR value);
 
 	// ── 렌더링 ────────────────────────────────────────────
 	void					draw_palette(Gdiplus::Graphics& g) const;

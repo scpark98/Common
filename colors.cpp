@@ -1348,6 +1348,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			if (m_parent->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || 
 				m_parent->IsKindOf(RUNTIME_CLASS(CListBox)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CComboBox)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CEdit)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CRichEditCtrl)))
 			{
@@ -1385,7 +1386,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border		= gRGB(153, 209, 255);
 			cr_selected_border_inactive	= cr_back_selected_inactive;
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::RoyalBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 	}
 }

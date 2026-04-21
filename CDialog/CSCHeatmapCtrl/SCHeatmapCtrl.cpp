@@ -239,7 +239,7 @@ void CSCHeatmapCtrl::OnOK()
 void CSCHeatmapCtrl::OnCancel()
 {
 }
-
+/*
 void CSCHeatmapCtrl::set_cell_color(int x, int y, Gdiplus::Color cr, bool redraw)
 {
 	int cols = calc_col_count();
@@ -257,7 +257,7 @@ void CSCHeatmapCtrl::set_cell_color(int x, int y, Gdiplus::Color cr, bool redraw
 		if (m_redraw && redraw) Invalidate();
 	}
 }
-
+*/
 void CSCHeatmapCtrl::set_cell_color(int index, Gdiplus::Color cr, bool redraw)
 {
 	if (index < 0 || index >= m_total)
@@ -293,6 +293,37 @@ void CSCHeatmapCtrl::set_cell_text(int index, CString& text, bool redraw)
 	if (m_cell[index].text != text)
 	{
 		m_cell[index].text = text;
+		if (m_redraw && redraw) Invalidate();
+	}
+}
+
+/*
+void CSCHeatmapCtrl::set_cell_text_color(int x, int y, Gdiplus::Color cr, bool redraw)
+{
+	int cols = calc_col_count();
+	if (cols <= 0 || x < 0 || x >= cols || y < 0)
+		return;
+	int index = y * cols + x;
+	if (index >= m_total)
+		return;
+
+	D2D1_COLOR_F cr_t = get_d2color(cr);
+	if (m_cell[index].cr_text != cr_t)
+	{
+		m_cell[index].cr_text = cr_t;
+		if (m_redraw && redraw) Invalidate();
+	}
+}
+*/
+void CSCHeatmapCtrl::set_cell_text_color(int index, Gdiplus::Color cr, bool redraw)
+{
+	if (index < 0 || index >= m_total)
+		return;
+
+	D2D1_COLOR_F cr_t = get_d2color(cr);
+	if (m_cell[index].cr_text != cr_t)
+	{
+		m_cell[index].cr_text = cr_t;
 		if (m_redraw && redraw) Invalidate();
 	}
 }
@@ -900,7 +931,11 @@ void CSCHeatmapCtrl::draw_heatmap()
 				d2dc->DrawRoundedRectangle(rr, brush.Get(), 1.0f);
 			}
 
-			m_brush->SetColor(get_distinct_bw_color(it->second.cr_fill));
+			// cr_text의 alpha > 0이면 개별 셀의 텍스트 색상 사용, 아니면 배경 대비 자동(흑/백)
+			if (it != m_cell.end() && it->second.cr_text.a > 0.0f)
+				m_brush->SetColor(it->second.cr_text);
+			else
+				m_brush->SetColor(get_distinct_bw_color(it->second.cr_fill));
 			m_d2dc.draw_text(m_WriteFactory, m_WriteFormat, it->second.text, D2D1::RectF(left, top, right, bottom), m_brush);
 			//d2dc->DrawText(it->second.text, it->second.text.GetLength(), m_WriteFormat, D2D1::RectF(left, top, right, bottom), m_brush);
 		}

@@ -17,7 +17,7 @@ public:
 
 	D2D1_COLOR_F	cr_fill;
 	D2D1_COLOR_F	cr_border = { 0.0f, 0.0f, 0.0f, 0.0f };	//alpha=0이면 기본값 사용(m_cr_border)
-	D2D1_COLOR_F	cr_text = { 0.0f, 0.0f, 0.0f, 1.0f };		//셀 텍스트 색상. 기본 검정.
+	D2D1_COLOR_F	cr_text = { 0.0f, 0.0f, 0.0f, 0.0f };		//셀 텍스트 색상. alpha=0이면 자동(배경 대비 흑/백) 선택.
 	CString			text;		//셀 중앙에 그려지는 텍스트
 	CString			tooltip;
 	DWORD_PTR		data = 0;	//사용자 임의 데이터 저장용. 필요 없으면 사용하지 않아도 됨.
@@ -40,14 +40,17 @@ public:
 	int						add_cell(int add_num, int cell_col = 0);
 
 	void					set_cell_size(int cell_size_x, int cell_size_y) { m_cell_size.cx = cell_size_x; m_cell_size.cy = cell_size_y; Invalidate(); }
+	CSize					get_cell_size() const { return m_cell_size; }
 
 	//Shift+Wheel로 확대/축소할 때의 셀 크기 제한 범위 설정
 	void					set_cell_size_range(CSize size_min, CSize size_max) { m_cell_size_min = size_min; m_cell_size_max = size_max; }
 
-	void					set_cell_color(int x, int y, Gdiplus::Color cr, bool redraw = true);
+	//void					set_cell_color(int x, int y, Gdiplus::Color cr, bool redraw = true);
 	void					set_cell_color(int index, Gdiplus::Color cr, bool redraw = true);
 	void					set_cell_text(int x, int y, CString& text, bool redraw = true);
 	void					set_cell_text(int index, CString& text, bool redraw = true);
+	//void					set_cell_text_color(int x, int y, Gdiplus::Color cr, bool redraw = true);
+	void					set_cell_text_color(int index, Gdiplus::Color cr, bool redraw = true);
 	void					set_cell_tooltip(int x, int y, CString& tooltip, bool redraw = true);
 	void					set_cell_tooltip(int index, CString& tooltip, bool redraw = true);
 
@@ -83,7 +86,7 @@ protected:
 	int						m_total = 0;		// 전체 셀 수
 
 	//각 셀의 크기. <=0 이면 자동 계산(줌/가로세로 스크롤 지원), >0 이면 고정 크기(세로 스크롤만 지원)
-	CSize					m_cell_size = { 12, 12 };
+	CSize					m_cell_size = { 24, 24 };
 	//셀 간격
 	CSize					m_cell_gap = { 4, 4 };
 

@@ -56,6 +56,7 @@ public:
 	void			set_line_height_px(int height_pixel_unit);
 
 //font
+	CString			get_font_name();
 	void			set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void			set_font_size(int font_size);
 	void			set_font_bold(int weight = FW_BOLD);

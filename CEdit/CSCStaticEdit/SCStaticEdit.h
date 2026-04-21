@@ -1,0 +1,264 @@
+﻿#pragma once
+
+/*
+ * CSCStaticEdit
+ * CStatic을 상속받아 CEdit처럼 동작하는 완전 커스터마이즈 가능한 Edit 컨트롤.
+ *
+ * https://github.com/scpark98/Test_CSCStaticEdit.git
+ * 
+ * [특징]
+ * - OnPaint()를 완전히 직접 그리므로 round rect, 그라디언트, 그림자 등 자유롭게 구현 가능
+ * - CEdit 기반의 Default() 덮어쓰기 문제 없음
+ * - Resource Editor에서 Static Text 컨트롤로 배치 후 DDX_Control로 연결하여 사용
+ * - 캐럿, 선택 영역, 클립보드(Ctrl+C/V/X/A), Backspace/Delete, Home/End 구현
+ * - 한글 IME 지원 (WM_IME_COMPOSITION)
+ * - Dim text (placeholder) 지원
+ * - 포커스 활성/비활성 border 색상 변경
+ * - Round rect border 지원
+ * - Password 모드 지원
+ *
+ * [사용법]
+ * 1. Resource Editor에서 Static Text 컨트롤 배치, ID 부여 (SS_NOTIFY 스타일 추가 필요 없음 - 코드에서 처리)
+ * 2. 다이얼로그 헤더에 CSCStaticEdit m_edit; 선언
+ * 3. DoDataExchange에서 DDX_Control(pDX, IDC_STATIC1, m_edit); 연결
+ *
+ * [주의]
+ * - ES_MULTILINE은 현재 미지원 (싱글라인만 지원)
+ * - IME 입력 시 조합 중인 문자는 별도 처리됨
+ *
+ * [네이밍]
+ * - 사용자가 추가한 모든 식별자는 GNU 컨벤션 (snake_case)
+ * - 기반 클래스 override (Create, SetFont, SetWindowText, PreSubclassWindow, PreTranslateMessage 등) 및
+ *   ON_WM_* 매크로로 wiring되는 표준 메시지 핸들러 (OnPaint, OnChar, OnKeyDown 등)는 MFC 컨벤션 유지
+ * - ON_MESSAGE 로 직접 wiring하는 커스텀 핸들러는 GNU 컨벤션 (on_ime_composition 등)
+ */
+
+#include <afxwin.h>
+#include <gdiplus.h>
+#pragma comment(lib, "gdiplus.lib")
+
+#include "Common/colors.h"
+#include "Common/Functions.h"
+
+// 부모에게 전달하는 커스텀 메시지 (CSCEdit 과 동일한 스타일)
+static const UINT Message_CSCStaticEdit = ::RegisterWindowMessage(_T("MessageString_CSCStaticEdit"));
+
+class CSCStaticEditMessage
+{
+public:
+    CSCStaticEditMessage(CWnd* _this, int _message)
+    {
+        pThis   = _this;
+        message = _message;
+    }
+
+    CWnd*	pThis = nullptr;
+    int		message;
+};
+
+class CSCStaticEdit : public CStatic
+{
+    DECLARE_MESSAGE_MAP()
+
+public:
+    CSCStaticEdit();
+    virtual ~CSCStaticEdit();
+
+    enum MESSAGES
+    {
+        message_scstaticedit_killfocus = 0,
+        message_scstaticedit_setfocus,
+        message_scstaticedit_enter,
+        message_scstaticedit_escape,
+        message_scstaticedit_text_changed,
+    };
+
+    CSCColorTheme	m_theme = CSCColorTheme(this);
+    void			set_color_theme(int color_theme, bool invalidate = false); //apply current m_theme colors to the control.
+
+
+    // ──────────────────────────────────────────────
+    // 텍스트
+    // ──────────────────────────────────────────────
+    void			SetWindowText(LPCTSTR lpsz_string);
+    void			GetWindowText(CString& r_string) const;
+    CString			get_text() const { return m_text; }
+    void			set_text(const CString& text);
+    void			set_text(int n)    { CString s; s.Format(_T("%d"), n); set_text(s); }
+    void			set_text(double d) { CString s; s.Format(_T("%g"), d); set_text(s); }
+    int				get_text_length() const { return m_text.GetLength(); }
+
+    // ──────────────────────────────────────────────
+    // 색상 (모두 m_theme으로 위임. 개별 색상 저장 변수 없음)
+    // ──────────────────────────────────────────────
+    void			set_text_color(Gdiplus::Color cr)         { m_theme.cr_text = cr; Invalidate(); }
+    void			set_back_color(Gdiplus::Color cr)         { m_theme.cr_back = cr; Invalidate(); }
+    void			set_selection_color(Gdiplus::Color cr_back, Gdiplus::Color cr_text);
+
+    Gdiplus::Color	get_text_color() const { return m_theme.cr_text; }
+    Gdiplus::Color	get_back_color() const { return m_theme.cr_back; }
+
+    // ──────────────────────────────────────────────
+    // 테두리
+    // ──────────────────────────────────────────────
+    void			set_border_width(int width)               { m_border_width = width; Invalidate(); }
+    // border 색은 active(focus) / inactive(unfocus) 두 상태로 저장한다.
+    //   - set_border_color(cr)                     : 두 상태 동일하게 세팅 (가장 흔한 케이스)
+    //   - set_border_color(cr_inactive, cr_active) : 두 상태를 다른 색으로 명시 세팅
+    //   - set_border_color_inactive / _active      : 한쪽만 변경
+    void			set_border_color(Gdiplus::Color cr)
+                        { m_theme.cr_border_inactive = cr; m_theme.cr_border_active = cr; Invalidate(); }
+    void			set_border_color(Gdiplus::Color cr_inactive, Gdiplus::Color cr_active)
+                        { m_theme.cr_border_inactive = cr_inactive; m_theme.cr_border_active = cr_active; Invalidate(); }
+    void			set_border_color_inactive(Gdiplus::Color cr){ m_theme.cr_border_inactive = cr; Invalidate(); }
+    void			set_border_color_active  (Gdiplus::Color cr){ m_theme.cr_border_active   = cr; Invalidate(); }
+
+    Gdiplus::Color	get_border_color_inactive() const { return m_theme.cr_border_inactive; }
+    Gdiplus::Color	get_border_color_active  () const { return m_theme.cr_border_active;   }
+    void			set_round(int radius = -1);
+    void			set_draw_border(bool draw)                { m_draw_border = draw; Invalidate(); }
+
+    // ──────────────────────────────────────────────
+    // 폰트
+    // ──────────────────────────────────────────────
+    void			SetFont(CFont* p_font, BOOL b_redraw = TRUE);
+    void			set_font_name(LPCTSTR name);
+    void			set_font_size(int size);
+    void			set_font_bold(bool bold = true);
+    void			set_font_antialias(bool antialias = true);
+    // ──────────────────────────────────────────────
+    // 기능 옵션
+    // ──────────────────────────────────────────────
+    void		set_readonly(bool readonly = true);
+    bool		is_readonly() const { return m_readonly; }
+    void		set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
+    void		set_max_length(int max)              { m_max_length = max; }
+    void		set_dim_text(const CString& dim_text);
+    void		set_padding(int padding)             { m_padding = padding; Invalidate(); }
+    void		set_vert_align(DWORD align = DT_VCENTER) { m_valign = align; Invalidate(); }
+
+    // 선택
+    void		set_sel(int start, int end);
+    void		get_sel(int& start, int& end) const  { start = m_sel_start; end = m_sel_end; }
+    void		select_all();
+    CString		get_sel_text() const;
+
+    // 동적 생성용
+    bool		Create(DWORD dw_style, const RECT& rect, CWnd* parent, UINT id);
+
+protected:
+    virtual void	PreSubclassWindow() override;
+    virtual BOOL	PreTranslateMessage(MSG* p_msg) override;
+
+    // 메시지 핸들러
+    afx_msg void	OnPaint();
+    afx_msg void	OnSetFocus(CWnd* p_old_wnd);
+    afx_msg void	OnKillFocus(CWnd* p_new_wnd);
+    afx_msg UINT	OnGetDlgCode();
+    afx_msg void	OnChar(UINT n_char, UINT n_rep_cnt, UINT n_flags);
+    afx_msg void	OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags);
+    afx_msg void	OnLButtonDown(UINT n_flags, CPoint point);
+    afx_msg void	OnLButtonUp(UINT n_flags, CPoint point);
+    afx_msg void	OnMouseMove(UINT n_flags, CPoint point);
+    afx_msg void	OnLButtonDblClk(UINT n_flags, CPoint point);
+    afx_msg void	OnContextMenu(CWnd* p_wnd, CPoint point);
+    afx_msg BOOL	OnEraseBkgnd(CDC* p_dc);
+    afx_msg void	OnTimer(UINT_PTR id_event);
+    afx_msg void	OnEnable(BOOL b_enable);
+    afx_msg void	OnSize(UINT n_type, int cx, int cy);
+
+    // IME (MFC에 ON_WM_IME_STARTCOMPOSITION 매크로가 없어 ON_MESSAGE로 직접 처리)
+    afx_msg LRESULT	on_ime_start_composition_message(WPARAM w_param, LPARAM l_param);
+    afx_msg LRESULT	on_ime_end_composition_message(WPARAM w_param, LPARAM l_param);
+    afx_msg LRESULT	on_ime_composition(WPARAM w_param, LPARAM l_param);
+
+private:
+    // ── 텍스트 버퍼 ──
+    CString		m_text;              // 실제 텍스트
+    int			m_caret_pos  = 0;    // 캐럿 문자 인덱스
+    int			m_sel_start  = 0;    // 선택 시작
+    int			m_sel_end    = 0;    // 선택 끝 (= 캐럿 위치)
+    bool		m_selecting  = false;// 마우스 드래그 선택 중
+
+    // 드래그 선택 중 가장자리 자동 스크롤
+    bool		m_drag_scrolling = false;
+    CPoint		m_last_drag_point;
+
+    // IME 조합 중 문자
+    CString		m_compose;           // 현재 조합 중인 문자열
+    bool		m_composing = false;
+
+    // ── 테두리 ──
+    bool		m_draw_border   = true;
+    int			m_border_width  = 1;
+    int			m_border_radius = 0;   // 0 = 직사각형, >0 = 라운드
+
+    // ── 폰트 ──
+    LOGFONT		m_lf = {};
+    CFont		m_font;
+    void		rebuild_font();
+
+    // ── 옵션 ──
+    bool		m_readonly   = false;
+    bool		m_password   = false;
+    TCHAR		m_mask_char  = _T('*');
+    int			m_max_length = 0;      // 0 = 제한 없음
+    int			m_padding    = 4;      // 텍스트 여백
+    DWORD		m_valign     = DT_VCENTER;
+    bool		m_dynamic    = false;  // 동적 생성 여부
+
+    // ── Dim text ──
+    CString		m_dim_text;       // placeholder 텍스트. 색상은 m_theme.cr_text_dim 사용
+
+    // ── 캐럿 ──
+    int			m_caret_height  = 0;    // 빔 캐럿 기본 높이 (폰트 높이 기준)
+    int			m_caret_width   = 2;    // 현재 생성된 캐럿 폭
+    int			m_caret_cur_h   = 0;    // 현재 생성된 캐럿 높이
+    bool		m_caret_visible = false;
+
+    // ── 스크롤 (가로) ──
+    int			m_scroll_offset = 0;    // 픽셀 단위 스크롤 오프셋
+
+    // ── 내부 헬퍼 ──
+    CString		get_display_text() const;      // 패스워드 마스킹 적용된 표시용 텍스트
+    CRect		get_text_rect() const;         // 텍스트가 그려지는 영역 (패딩/보더 제외)
+    CPoint		calc_caret_pixel_pos(int char_pos) const; // 문자 인덱스 → 픽셀 좌표
+    int			hit_test_char(CPoint pt) const;           // 픽셀 좌표 → 문자 인덱스
+    CRect		get_compose_draw_box() const;             // 조합 중 글자가 그려지는 박스
+    void		update_caret_pos();
+    void		ensure_caret_visible();        // 캐럿이 보이도록 스크롤 조정
+
+    void		insert_text(const CString& str);
+    void		delete_selection();
+    bool		has_selection() const { return m_sel_start != m_sel_end; }
+    void		clear_selection()     { m_sel_start = m_sel_end = m_caret_pos; }
+
+    void		do_copy();
+    void		do_cut();
+    void		do_paste();
+
+    void		draw_background(Gdiplus::Graphics& g, const CRect& rc);
+    void		draw_border(Gdiplus::Graphics& g, const CRect& rc);
+    void		draw_selection(Gdiplus::Graphics& g, const CRect& rc_text);
+    void		draw_text(Gdiplus::Graphics& g, const CRect& rc_text);
+    void		draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text);
+
+
+    void		notify_parent(int message);
+
+    // Undo / Redo (이중 스택).
+    //   - push_undo(): 편집 직전의 상태를 m_undo_stack에 저장하고 m_redo_stack은 clear.
+    //   - do_undo()  : m_undo_stack pop → 현재 상태는 m_redo_stack으로 이동 → pop한 상태 적용.
+    //   - do_redo()  : m_redo_stack pop → 현재 상태는 m_undo_stack으로 이동 → pop한 상태 적용.
+    struct undo_state {
+        CString	text;
+        int		caret_pos;
+    };
+    CArray<undo_state, undo_state&> m_undo_stack;
+    CArray<undo_state, undo_state&> m_redo_stack;
+    void		push_undo();
+    void		do_undo();
+    void		do_redo();
+    bool		can_undo() const { return m_undo_stack.GetSize() > 0; }
+    bool		can_redo() const { return m_redo_stack.GetSize() > 0; }
+};

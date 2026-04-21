@@ -77,6 +77,7 @@ public:
 	//width를 고정한 채 이동시키려면 SPF_LEFT만 준다.
 	void AddToBottomOrRightCtrls(CControlItem ctrl);
 	void AddToBottomOrRightCtrls(UINT id, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
+	void AddToBottomOrRightCtrls(CWnd* pWnd, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
 
 	void AddToTopOrLeftCtrls(CControlItem ctrl);
 	void AddToTopOrLeftCtrls(UINT id, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);

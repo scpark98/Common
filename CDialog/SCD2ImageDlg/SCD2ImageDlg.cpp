@@ -723,7 +723,6 @@ void CSCD2ImageDlg::fit2ctrl(bool fit, bool invalidate)
 {
 	m_fit2ctrl = fit;
 	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), m_fit2ctrl);
-	write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
 
 	if (invalidate)
 		rerender();
@@ -740,6 +739,7 @@ void CSCD2ImageDlg::zoom(int mode)
 		m_zoom = 1.0;
 
 	Clamp(m_zoom, 0.2, 40.0);
+	write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
 
 	//m_fit2ctrl의 값을 직접 변경하지 말고 fit2ctrl() 함수를 호출해야만
 	//registry에 설정이 저장된다.
@@ -753,6 +753,8 @@ void CSCD2ImageDlg::zoom(double ratio)
 {
 	m_zoom = ratio;
 	Clamp(m_zoom, 0.2, 40.0);
+	write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
+
 	fit2ctrl(false, false);
 	rerender();
 }

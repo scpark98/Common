@@ -458,6 +458,11 @@ void CControlSplitter::AddToTopOrLeftCtrls(CControlItem ctrl)
 	*/
 }
 
+void CControlSplitter::AddToBottomOrRightCtrls(CWnd* pWnd, int min_cx, int min_cy, UINT flag)
+{
+	m_vtBottomRightControls.push_back(CControlItem(pWnd, min_cx, min_cy, flag));
+}
+
 void CControlSplitter::AddToBottomOrRightCtrls(UINT id, int min_cx, int min_cy, UINT flag)
 {
 	m_vtBottomRightControls.push_back(CControlItem(GetParent()->GetDlgItem(id), min_cx, min_cy, flag));

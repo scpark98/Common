@@ -33,6 +33,7 @@ BEGIN_MESSAGE_MAP(CSCStaticEdit, CStatic)
 	ON_WM_ENABLE()
 	ON_WM_SIZE()
 	ON_WM_GETDLGCODE()
+	ON_WM_SETCURSOR()
 	ON_MESSAGE(WM_IME_STARTCOMPOSITION, &CSCStaticEdit::on_ime_start_composition_message)
 	ON_MESSAGE(WM_IME_ENDCOMPOSITION, &CSCStaticEdit::on_ime_end_composition_message)
 	ON_MESSAGE(WM_IME_COMPOSITION, &CSCStaticEdit::on_ime_composition)
@@ -564,6 +565,16 @@ void CSCStaticEdit::OnMouseMove(UINT n_flags, CPoint point)
 		}
 	}
 	CStatic::OnMouseMove(n_flags, point);
+}
+
+BOOL CSCStaticEdit::OnSetCursor(CWnd* p_wnd, UINT n_hit_test, UINT message)
+{
+	if (IsWindowEnabled() && n_hit_test == HTCLIENT)
+	{
+		::SetCursor(::LoadCursor(nullptr, IDC_IBEAM));
+		return TRUE;
+	}
+	return CStatic::OnSetCursor(p_wnd, n_hit_test, message);
 }
 
 void CSCStaticEdit::OnLButtonDblClk(UINT n_flags, CPoint point)

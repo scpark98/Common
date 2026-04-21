@@ -1386,7 +1386,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border		= gRGB(153, 209, 255);
 			cr_selected_border_inactive	= cr_back_selected_inactive;
 
-			cr_border_active = Gdiplus::Color::RoyalBlue;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 	}
 }

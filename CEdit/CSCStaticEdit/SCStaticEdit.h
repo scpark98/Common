@@ -166,6 +166,7 @@ protected:
     afx_msg void	OnTimer(UINT_PTR id_event);
     afx_msg void	OnEnable(BOOL b_enable);
     afx_msg void	OnSize(UINT n_type, int cx, int cy);
+    afx_msg BOOL	OnSetCursor(CWnd* p_wnd, UINT n_hit_test, UINT message);
 
     // IME (MFC에 ON_WM_IME_STARTCOMPOSITION 매크로가 없어 ON_MESSAGE로 직접 처리)
     afx_msg LRESULT	on_ime_start_composition_message(WPARAM w_param, LPARAM l_param);

@@ -94,6 +94,9 @@ public:
     void			set_text_color(Gdiplus::Color cr)         { m_theme.cr_text = cr; Invalidate(); }
     void			set_back_color(Gdiplus::Color cr)         { m_theme.cr_back = cr; Invalidate(); }
     void			set_selection_color(Gdiplus::Color cr_back, Gdiplus::Color cr_text);
+    // round > 0 일 때 모서리 밖을 채울 색. 명시 호출 안 하면 COLOR_3DFACE 로 fallback.
+    void			set_parent_back_color(Gdiplus::Color cr_parent_back)
+                        { m_theme.cr_parent_back = cr_parent_back; m_has_parent_back_color = true; Invalidate(); }
 
     Gdiplus::Color	get_text_color() const { return m_theme.cr_text; }
     Gdiplus::Color	get_back_color() const { return m_theme.cr_back; }
@@ -129,22 +132,36 @@ public:
     // ──────────────────────────────────────────────
     // 기능 옵션
     // ──────────────────────────────────────────────
-    void		set_readonly(bool readonly = true);
-    bool		is_readonly() const { return m_readonly; }
-    void		set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
-    void		set_max_length(int max)              { m_max_length = max; }
-    void		set_dim_text(const CString& dim_text);
-    void		set_padding(int padding)             { m_padding = padding; Invalidate(); }
-    void		set_vert_align(DWORD align = DT_VCENTER) { m_valign = align; Invalidate(); }
+    void		    set_readonly(bool readonly = true);
+    bool		    is_readonly() const { return m_readonly; }
+    void		    set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
+    void		    set_max_length(int max)              { m_max_length = max; }
+    // up/down 방향키로 정수 값 증감. 텍스트가 정수로 파싱되지 않으면 스킵.
+    void		    set_use_updown_key(bool use_updown_key = true, int interval = 1)
+                        { m_use_updown_key = use_updown_key; m_updown_interval = interval; }
+    void		    set_dim_text(const CString& dim_text);
+    void		    set_padding(int padding)             { m_padding = padding; Invalidate(); }
+    // 세로 정렬 (line align): DT_TOP / DT_VCENTER (기본) / DT_BOTTOM
+    void		    set_line_align(DWORD align = DT_VCENTER) { m_valign = align; Invalidate(); }
+    DWORD		    get_line_align() const { return m_valign; }
+    // 가로 정렬 (text align): DT_LEFT (기본) / DT_CENTER / DT_RIGHT
+    //  - LEFT  : 길어지면 m_scroll_offset 으로 가로 스크롤 (시작점이 rc.left 보다 왼쪽으로).
+    //  - CENTER: 길이가 rc 폭 이내면 가운데, 초과 시 LEFT 처럼 스크롤 폴백.
+    //  - RIGHT : 항상 끝을 rc.right 에 정렬. 길어지면 시작이 rc.left 보다 왼쪽으로 가서 앞부분이
+    //            잘림 (캐럿이 끝에 있을 때의 자연스러운 right 동작).
+    //  - 정렬 변경 시 누적 스크롤은 0 으로 리셋.
+    void		    set_text_align(DWORD align = DT_LEFT)
+                        { m_halign = align; m_scroll_offset = 0; if (m_hWnd) { update_caret_pos(); Invalidate(); } }
+    DWORD		    get_text_align() const { return m_halign; }
 
     // 선택
-    void		set_sel(int start, int end);
-    void		get_sel(int& start, int& end) const  { start = m_sel_start; end = m_sel_end; }
-    void		select_all();
-    CString		get_sel_text() const;
+    void		    set_sel(int start, int end);
+    void		    get_sel(int& start, int& end) const  { start = m_sel_start; end = m_sel_end; }
+    void		    select_all();
+    CString		    get_sel_text() const;
 
     // 동적 생성용
-    bool		Create(DWORD dw_style, const RECT& rect, CWnd* parent, UINT id);
+    bool		    Create(DWORD dw_style, const RECT& rect, CWnd* parent, UINT id);
 
 protected:
     virtual void	PreSubclassWindow() override;
@@ -206,7 +223,15 @@ private:
     int			m_max_length = 0;      // 0 = 제한 없음
     int			m_padding    = 4;      // 텍스트 여백
     DWORD		m_valign     = DT_VCENTER;
+    DWORD		m_halign     = DT_LEFT;    // DT_LEFT / DT_CENTER / DT_RIGHT
     bool		m_dynamic    = false;  // 동적 생성 여부
+    bool		m_use_updown_key  = false;
+    int			m_updown_interval = 1;
+
+    // set_parent_back_color() 명시 호출 여부.
+    // Gdiplus::Color() 의 default 생성자가 Black opaque(0xFF000000) 로 초기화되기 때문에
+    // m_theme.cr_parent_back.GetA() 만으로는 "미지정" 과 "사용자가 검정 설정" 을 구분 못 한다.
+    bool		m_has_parent_back_color = false;
 
     // ── Dim text ──
     CString		m_dim_text;       // placeholder 텍스트. 색상은 m_theme.cr_text_dim 사용
@@ -223,6 +248,10 @@ private:
     // ── 내부 헬퍼 ──
     CString		get_display_text() const;      // 패스워드 마스킹 적용된 표시용 텍스트
     CRect		get_text_rect() const;         // 텍스트가 그려지는 영역 (패딩/보더 제외)
+    // 가로 정렬 + 가로 스크롤을 반영한 "텍스트의 첫 글자 픽셀 x". draw_text / calc_caret_pixel_pos /
+    // hit_test_char / get_compose_draw_box / draw_dim_text 가 공통으로 사용하여 정렬이 동기화됨.
+    // text_width 는 현재 표시될 문자열(패스워드 마스킹 + IME 조합 포함) 의 GDI TextExtent.cx.
+    int			get_text_start_x(int text_width) const;
     CPoint		calc_caret_pixel_pos(int char_pos) const; // 문자 인덱스 → 픽셀 좌표
     int			hit_test_char(CPoint pt) const;           // 픽셀 좌표 → 문자 인덱스
     CRect		get_compose_draw_box() const;             // 조합 중 글자가 그려지는 박스

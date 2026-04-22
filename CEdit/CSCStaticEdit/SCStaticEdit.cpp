@@ -243,10 +243,9 @@ void CSCStaticEdit::set_dim_text(const CString& dim_text)
 
 void CSCStaticEdit::set_round(int radius)
 {
-
 	CRect rc;
 	GetClientRect(rc);
-	
+
 	int max_r = rc.Height() / 2;
 
 	// 반지름이 컨트롤 높이의 절반을 넘으면 트랙(알약) 모양 이상의 degenerate 렌더가
@@ -480,6 +479,37 @@ void CSCStaticEdit::OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 				m_text.Delete(m_caret_pos, 1);
 				notify_parent(message_scstaticedit_text_changed);
 			}
+		}
+		break;
+
+	case VK_UP:
+	case VK_DOWN:
+		{
+			if (m_readonly || !m_use_updown_key || m_composing)
+			{
+				CStatic::OnKeyDown(n_char, n_rep_cnt, n_flags);
+				return;
+			}
+			// _tcstol 로 전체가 정수인지 검사. 공백/부호 허용, 그 외 문자가 하나라도
+			// 섞이면 스킵한다.
+			CString trimmed = m_text;
+			trimmed.Trim();
+			if (trimmed.IsEmpty())
+				return;
+			LPCTSTR begin = trimmed;
+			LPTSTR  p_end = nullptr;
+			long val = _tcstol(begin, &p_end, 10);
+			if (p_end == begin || p_end == nullptr || *p_end != _T('\0'))
+				return;
+			push_undo();
+			val += (n_char == VK_UP) ? m_updown_interval : -m_updown_interval;
+			CString new_text;
+			new_text.Format(_T("%ld"), val);
+			m_text = new_text;
+			m_caret_pos = m_text.GetLength();
+			clear_selection();
+			m_scroll_offset = 0;
+			notify_parent(message_scstaticedit_text_changed);
 		}
 		break;
 
@@ -832,18 +862,15 @@ void CSCStaticEdit::OnPaint()
 	mem_bmp.CreateCompatibleBitmap(&dc, rc_client.Width(), rc_client.Height());
 	CBitmap* p_old_bmp = mem_dc.SelectObject(&mem_bmp);
 
-	// round rect 바깥쪽 코너는 부모 다이얼로그가 그리는 실제 배경색으로 채워야 한다.
-	// 고정 COLOR_3DFACE를 사용하면 부모가 다크 테마 등 다른 색을 쓸 때 모서리에
-	// 흰 얼룩이 보인다. WM_CTLCOLORSTATIC으로 부모의 배경 브러시를 받아 사용.
+	// round rect 바깥쪽 코너 채움:
+	//   ① set_parent_back_color() 로 명시된 색 (m_has_parent_back_color == true) — 호출자 지정.
+	//   ② 미지정 → COLOR_3DFACE fallback.
+	// 주의: Gdiplus::Color() default 생성자는 Black opaque 로 초기화되므로 alpha 값으로
+	// "미지정" 을 판단할 수 없고 별도 플래그가 필요하다.
+	if (m_border_radius > 0)
 	{
-		HDC hdc = mem_dc.GetSafeHdc();
-		CWnd* p_parent = GetParent();
-		HBRUSH hbr = p_parent
-			? (HBRUSH)::SendMessage(p_parent->GetSafeHwnd(), WM_CTLCOLORSTATIC,
-				(WPARAM)hdc, (LPARAM)m_hWnd)
-			: NULL;
-		if (false)//hbr)
-			::FillRect(hdc, &rc_client, hbr);
+		if (m_has_parent_back_color)
+			mem_dc.FillSolidRect(&rc_client, m_theme.cr_parent_back.ToCOLORREF());
 		else
 			mem_dc.FillSolidRect(&rc_client, GetSysColor(COLOR_3DFACE));
 	}
@@ -892,8 +919,6 @@ void CSCStaticEdit::OnPaint()
 void CSCStaticEdit::draw_background(Gdiplus::Graphics& g, const CRect& rc)
 {
 	// readonly/disabled 배경은 표준 다이얼로그 배경색(COLOR_3DFACE)으로.
-	// m_theme.cr_parent_back은 CSCColorTheme에서 테마별로 초기화되지 않아(=검정)
-	// 사용 불가. 시스템 색을 통해 사용자 Windows 테마도 자동 반영.
 	Gdiplus::Color cr_back = (!IsWindowEnabled() || m_readonly)
 		? get_sys_color(COLOR_3DFACE)
 		: m_theme.cr_back;
@@ -1017,7 +1042,9 @@ void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
 		else
 			text_y = rc_text.top;
 
-		int text_x = rc_text.left - m_scroll_offset;
+		// 가로 정렬 + 스크롤 반영한 시작 x
+		CSize sz_total = dc.GetTextExtent(display);
+		int text_x = get_text_start_x(sz_total.cx);
 
 		// 일반 텍스트
 		dc.TextOut(text_x, text_y, display);
@@ -1064,8 +1091,13 @@ void CSCStaticEdit::draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text)
 
 	float f_text_y = rc_text.top + (rc_text.Height() - measure_rect.Height) / 2.0f;
 
+	// dim 텍스트는 실제 입력이 없는 placeholder 이므로 m_scroll_offset 은 무시하고
+	// 현재 가로 정렬만 적용. get_text_start_x 는 text > rc_text 일 때 scroll 기반
+	// 좌표를 돌려주지만, dim 텍스트 길이가 rc 보다 클 일은 드물고 넘쳐도 clip 으로 처리된다.
+	float f_text_x = (float)get_text_start_x((int)(measure_rect.Width + 0.5f));
+
 	Gdiplus::SolidBrush brush(m_theme.cr_text_dim);
-	g.DrawString(m_dim_text, -1, &font, Gdiplus::PointF((float)rc_text.left, f_text_y), &brush);
+	g.DrawString(m_dim_text, -1, &font, Gdiplus::PointF(f_text_x, f_text_y), &brush);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1074,7 +1106,7 @@ void CSCStaticEdit::draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text)
 CRect CSCStaticEdit::get_text_rect() const
 {
 	CRect rc;
-	const_cast<CSCStaticEdit*>(this)->GetClientRect(rc);
+	GetClientRect(rc);
 	int inset = m_padding + (m_draw_border ? m_border_width : 0);
 	rc.DeflateRect(inset, inset);
 
@@ -1091,6 +1123,23 @@ CRect CSCStaticEdit::get_text_rect() const
 }
 
 // ──────────────────────────────────────────────────────────
+// 헬퍼: 가로 정렬 + 가로 스크롤을 반영한 텍스트 시작 x 좌표
+//  - LEFT  : rc_text.left - m_scroll_offset (길어지면 스크롤)
+//  - CENTER: 길이 ≤ rc 폭이면 가운데, 넘치면 LEFT 처럼 스크롤 폴백
+//  - RIGHT : 항상 rc_text.right - text_width (넘쳐도 끝을 rc.right 에 맞추고 앞이 잘림 —
+//            일반 입력기에서 캐럿이 끝에 있을 때 보이는 자연스러운 right 동작)
+// ──────────────────────────────────────────────────────────
+int CSCStaticEdit::get_text_start_x(int text_width) const
+{
+	CRect rc_text = get_text_rect();
+	if (m_halign == DT_RIGHT)
+		return rc_text.right - text_width;
+	if (m_halign == DT_CENTER && text_width <= rc_text.Width())
+		return rc_text.left + (rc_text.Width() - text_width) / 2;
+	return rc_text.left - m_scroll_offset;
+}
+
+// ──────────────────────────────────────────────────────────
 // 헬퍼: 문자 인덱스 → 픽셀 좌표
 // ──────────────────────────────────────────────────────────
 CPoint CSCStaticEdit::calc_caret_pixel_pos(int char_pos) const
@@ -1102,13 +1151,14 @@ CPoint CSCStaticEdit::calc_caret_pixel_pos(int char_pos) const
 	if (m_composing)
 		display.Insert(m_caret_pos, m_compose);
 
+	CSize sz_total = dc.GetTextExtent(display);
 	CString left = display.Left(char_pos);
 	CSize sz = dc.GetTextExtent(left);
 	dc.SelectObject(p_old);
 
-	CRect rc_text = get_text_rect();
-	int x = rc_text.left + sz.cx - m_scroll_offset;
-	int y = rc_text.top;
+	// 가로 정렬 + 스크롤을 반영한 텍스트 시작 x 에 문자까지의 폭을 더한다.
+	int x = get_text_start_x(sz_total.cx) + sz.cx;
+	int y = get_text_rect().top;
 	return CPoint(x, y);
 }
 
@@ -1121,8 +1171,10 @@ int CSCStaticEdit::hit_test_char(CPoint pt) const
 	CFont* p_old = dc.SelectObject(const_cast<CFont*>(&m_font));
 
 	CString display = get_display_text();
-	CRect rc_text = get_text_rect();
-	int rel_x = pt.x - rc_text.left + m_scroll_offset;
+	// 텍스트 실제 시작 x (정렬 + 스크롤 반영). rel_x 는 "텍스트 시작점으로부터의 오프셋".
+	CSize sz_total = dc.GetTextExtent(display);
+	int text_start_x = get_text_start_x(sz_total.cx);
+	int rel_x = pt.x - text_start_x;
 
 	int len  = display.GetLength();
 	int best = 0;
@@ -1174,6 +1226,7 @@ CRect CSCStaticEdit::get_compose_draw_box() const
 	CString display = get_display_text();
 	display.Insert(m_caret_pos, m_compose);
 
+	CSize sz_total = dc.GetTextExtent(display);
 	CSize sz_before = dc.GetTextExtent(display.Left(m_caret_pos));
 	CSize sz_compose = dc.GetTextExtent(m_compose);
 
@@ -1192,7 +1245,8 @@ CRect CSCStaticEdit::get_compose_draw_box() const
 		text_y = rc_text.top;
 
 	// IME 블록도 빔 커서/선택 블록과 동일하게 rc_text 안으로 clamp.
-	int x = rc_text.left - m_scroll_offset + sz_before.cx;
+	// 가로 정렬 + 스크롤 반영한 텍스트 시작 x 에서 조합 이전 부분의 폭만큼 오른쪽으로.
+	int x = get_text_start_x(sz_total.cx) + sz_before.cx;
 	int h = min(text_h, rc_text.Height());
 	int y = text_y + (text_h - h) / 2;   // clamp 시 중앙 정렬 유지
 	int w = sz_compose.cx;

@@ -56,7 +56,7 @@ Test folder	: D:\1.Projects_C++\1.test\Test_CSCColorPicker
 #include <gdiplus.h>	// SCGdiplusBitmap.h 대체 (팔레트 비트맵 제거)
 
 #include "../../colors.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
 
 static const UINT Message_CSCColorPicker = ::RegisterWindowMessage(_T("MessageString_CSCColorPicker"));
@@ -117,10 +117,10 @@ protected:
 	CSCSliderCtrl	m_slider_hue;		// ← NEW: Hue 슬라이더 (0~360)
 	CSCSliderCtrl	m_slider_light;		// Lightness(밝기) 슬라이더 (0~100)
 
-	CSCEdit			m_edit_hexa;
-	CSCEdit			m_edit_argb[4];
-	CSCEdit			m_edit_hsl[3];
-	CSCEdit			m_edit_color_name;
+	CSCStaticEdit	m_edit_hexa;
+	CSCStaticEdit	m_edit_argb[4];
+	CSCStaticEdit	m_edit_hsl[3];
+	CSCStaticEdit	m_edit_color_name;
 	bool			m_color_name_near = false;	//true if approximate match
 
 	// ── Hex 표시 형식 ──────────────────────────────────────
@@ -177,7 +177,7 @@ protected:
 	static constexpr int IDM_DELETE_ALL_RECENT = 2011;	// ← 모든 최근 색상 삭제
 	static constexpr int IDM_VIEW_COMPLEMENTARY = 2012;	// ← 보색 보기
 	static constexpr int IDM_COPY_WEB_COLOR = 2013;		// ← Copy Web Color Value
-	static constexpr int IDM_USE_SHARED_COLOR = 2014;	// ← 공유 컬러 사용 (HKLM/HKCU 전환)
+	static constexpr int IDM_USE_SHARED_COLOR = 2014;	// ← 공유 컬러 사용 (HKLM/HKCU 전환. 관리자권한없이 실행되면 disable)
 
 	// ── 편집 영역 레이아웃 상수 ───────────────────────────
 	static constexpr int kEditH = 22;
@@ -294,7 +294,7 @@ protected:
 	HitTarget				find_color(Gdiplus::Color target) const;
 
 	LRESULT					on_message_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);	// ← 슬라이더 이벤트 핸들러
-	LRESULT					on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+	LRESULT					on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);

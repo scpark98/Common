@@ -5,6 +5,26 @@
 #include "SCComboBox.h"
 #include "../../../Common/Functions.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
+#include <imm.h>	// ImmGetCompositionString — IME 조합 중 문자열 취득 (필터링용)
+#include <commctrl.h>	// SetWindowSubclass / RemoveWindowSubclass
+#pragma comment(lib, "comctl32.lib")
+
+// Combobox 내부 edit 용 subclass proc.
+// CBN_EDITCHANGE 는 IME composition 중 edit buffer 가 변하지 않아 발생하지 않는다.
+// WM_IME_COMPOSITION 을 직접 받아 필터링을 트리거해야 "한" 조합 단계에서도 반응한다.
+static LRESULT CALLBACK sccombo_edit_subclass(
+	HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
+	UINT_PTR /*id_subclass*/, DWORD_PTR ref_data)
+{
+	LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
+	if (msg == WM_IME_COMPOSITION)
+	{
+		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
+		if (self && self->GetSafeHwnd())
+			self->OnCbnEditchange();
+	}
+	return r;
+}
 
 // CColorComboBox
 
@@ -42,6 +62,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_DESTROY()
 	ON_CONTROL_REFLECT(CBN_EDITCHANGE, &CSCComboBox::OnCbnEditchange)
 	ON_WM_DRAWITEM()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -447,7 +468,42 @@ void CSCComboBox::PreSubclassWindow()
 
 	reconstruct_font();
 
+	// 원본 리소스에 지정된 콤보 window height 를 cache — 동적 dropdown height 의 상한.
+	CRect rc;
+	GetWindowRect(&rc);
+	m_initial_height = rc.Height();
+
 	CComboBox::PreSubclassWindow();
+
+	// 내부 edit subcontrol 을 subclass 해서 WM_IME_COMPOSITION 직접 수신.
+	COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
+	if (::GetComboBoxInfo(m_hWnd, &cbi) && cbi.hwndItem)
+		::SetWindowSubclass(cbi.hwndItem, sccombo_edit_subclass, 1, (DWORD_PTR)this);
+}
+
+// 필터링 결과 항목 수에 맞춰 dropdown listbox 영역 높이를 조정.
+// CComboBox 는 window height 를 "edit 필드 + dropdown listbox" 로 해석하고
+// edit 필드 높이는 폰트에서 자동 결정되는 고유값이라, SetWindowPos 로 height 를 바꾸면
+// 그 차이는 listbox 영역에만 반영된다. 초기 height 를 상한으로 clamp 하여 원본 리소스에
+// 지정된 최대 dropdown 크기를 넘지 않게 한다.
+void CSCComboBox::adjust_dropdown_height()
+{
+	const int count = GetCount();
+	if (count <= 0)
+		return;
+
+	const int item_h = GetItemHeight(0);	// listbox 한 항목 높이
+	const int edit_h = GetItemHeight(-1);	// edit(selection field) 높이
+	const int list_padding = 4;				// listbox 윤곽/여백
+
+	int desired_h = edit_h + count * item_h + list_padding;
+	if (m_initial_height > 0 && desired_h > m_initial_height)
+		desired_h = m_initial_height;
+
+	CRect rc;
+	GetWindowRect(&rc);
+	SetWindowPos(nullptr, 0, 0, rc.Width(), desired_h,
+		SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void CSCComboBox::load_history(CWinApp* app, CString section)
@@ -926,6 +982,11 @@ void CSCComboBox::set_as_font_combo()
 
 void CSCComboBox::OnDestroy()
 {
+	// edit subcontrol subclass 해제 (base OnDestroy 전에 처리).
+	COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
+	if (m_hWnd && ::GetComboBoxInfo(m_hWnd, &cbi) && cbi.hwndItem)
+		::RemoveWindowSubclass(cbi.hwndItem, sccombo_edit_subclass, 1);
+
 	CComboBox::OnDestroy();
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
@@ -950,50 +1011,96 @@ void CSCComboBox::OnCbnEditchange()
 	if (!m_use_input_filtering)
 		return;
 
-	//입력 타이핑에 따라 필터된 항목들이 리스트박스에 표시
+	// 입력마다 타이머 reset — 사용자가 타이핑을 "멈춘 시점" 에서 필터링 실행.
+	// composing 중 즉시 필터링하면 ResetContent/ShowDropDown 의 연쇄 호출이 IMM 조합 오버레이를
+	// 깨뜨리므로, 지연을 두고 만료 시점에 IMM 을 강제 commit 하여 안전한 상태에서 수행한다.
+	static constexpr UINT filter_delay_ms_ime    = 700;	// 한글 조합 중 '멈춤' 감지 delay
+	static constexpr UINT filter_delay_ms_normal = 1;	// 비-IME 입력은 거의 즉시
+	KillTimer(TIMER_INPUT_FILTER);
+	const UINT delay = is_ime_composing(m_hWnd) ? filter_delay_ms_ime : filter_delay_ms_normal;
+	SetTimer(TIMER_INPUT_FILTER, delay, nullptr);
+}
 
-	//온전한 한글이 입력되기 전까지는 필터링해서는 안됨
-	if (is_ime_composing(m_hWnd))
+void CSCComboBox::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == TIMER_INPUT_FILTER)
+	{
+		KillTimer(TIMER_INPUT_FILTER);
+
+		// composing 중이면 IMM 에 "현재 조합을 완성된 문자열로 commit" 요청.
+		// commit 이 edit buffer 를 업데이트해 CBN_EDITCHANGE 를 발생시키고, 그 경로에서 이 함수가
+		// 다시 호출되어 non-composing 상태로 타이머가 걸린 뒤 apply_filter_now() 가 수행된다.
+		// 여기서는 commit 만 하고 반환.
+		if (is_ime_composing(m_hWnd))
+		{
+			COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
+			HWND h_edit = (::GetComboBoxInfo(m_hWnd, &cbi) && cbi.hwndItem) ? cbi.hwndItem : m_hWnd;
+			HIMC himc = ::ImmGetContext(h_edit);
+			if (himc)
+			{
+				::ImmNotifyIME(himc, NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
+				::ImmReleaseContext(h_edit, himc);
+			}
+			return;
+		}
+
+		apply_filter_now();
 		return;
+	}
 
-	CString input;
-	GetWindowText(input);
-	input.MakeLower();
-	trace(input);
+	CComboBox::OnTimer(nIDEvent);
+}
 
-	// 현재 커서 위치 보관
-	int start, end;
-	DWORD pos = GetEditSel();
-	start = LOWORD(pos);
-	end = HIWORD(pos);
+void CSCComboBox::apply_filter_now()
+{
+	CString filter;
+	GetWindowText(filter);
+
+	const CString raw_text = filter;
+	filter.MakeLower();
+
+	// 동일 filter 연속 호출 시 재구성 skip
+	if (filter == m_last_filter)
+		return;
+	m_last_filter = filter;
+
+	// 커서/선택 위치 보관
+	const DWORD pos = GetEditSel();
+	const int sel_start = LOWORD(pos);
+	const int sel_end   = HIWORD(pos);
 
 	SetRedraw(FALSE);
-
-	// 리스트 재구성
 	ResetContent();
-
 	for (const auto& item : m_font_list)
 	{
 		CString text = item;
 		text.MakeLower();
-
-		if (input.IsEmpty() || text.Find(input) != -1)
-		{
+		if (filter.IsEmpty() || text.Find(filter) != -1)
 			AddString(item);
-		}
 	}
-
 	SetRedraw(TRUE);
 
-	// 드롭다운 열기
+	// 드롭다운 열기 — 필터된 항목 수에 맞춰 높이 동적 조정 후 표시.
+	// 동적 height 로 리사이즈된 리스트박스가 slide-down 애니메이션으로 천천히 펼쳐지는 게
+	// 어색하므로, 시스템 전역 SPI_SETCOMBOBOXANIMATION 을 잠깐 OFF → ShowDropDown → 원복.
 	if (GetCount() > 0)
+	{
+		adjust_dropdown_height();
+
+		BOOL combo_anim = TRUE;
+		::SystemParametersInfo(SPI_GETCOMBOBOXANIMATION, 0, &combo_anim, 0);
+		if (combo_anim)
+			::SystemParametersInfo(SPI_SETCOMBOBOXANIMATION, 0, (PVOID)(DWORD_PTR)FALSE, 0);
+
 		ShowDropDown(TRUE);
 
-	// Edit 텍스트 복구
-	SetWindowText(input);
+		if (combo_anim)
+			::SystemParametersInfo(SPI_SETCOMBOBOXANIMATION, 0, (PVOID)(DWORD_PTR)TRUE, 0);
+	}
 
-	// 커서 위치 복구
-	SetEditSel(start, end);
+	// Edit 텍스트 / 커서 복원 — 대소문자 보존용.
+	SetWindowText(raw_text);
+	SetEditSel(sel_start, sel_end);
 }
 
 void CSCComboBox::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruct)

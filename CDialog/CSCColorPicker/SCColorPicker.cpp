@@ -7,6 +7,22 @@
 #include "../../MemoryDC.h"
 #include <map>          // ← import 파싱용 (index→Color)
 
+// HKLM\Software 에 실제 쓰기 권한이 있는지 확인. IsUserAnAdmin() 은 토큰이
+// Administrators SID 를 가지기만 하면 TRUE 를 돌려주므로 VS 를 관리자로 띄운 뒤
+// asInvoker manifest 로 자식 프로세스를 디버깅하는 상황에서도 TRUE 가 된다.
+// 반면 HKLM\Software 에 KEY_WRITE 로 open 시도하면 실제 UAC 필터 토큰으로는
+// ERROR_ACCESS_DENIED 가 돌아와 "배포 환경에서 HKLM 에 저장 가능한가" 를 정확히 반영한다.
+static bool can_write_hklm_software()
+{
+	HKEY h_key = NULL;
+	LONG ret = ::RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("Software"),
+		0, KEY_WRITE, &h_key);
+	if (ret != ERROR_SUCCESS)
+		return false;
+	::RegCloseKey(h_key);
+	return true;
+}
+
 const float CSCColorPicker::m_hues[PALETTE_COLOR_COLS] = {
 	0.f,    // Red
 	30.f,   // Orange
@@ -58,17 +74,11 @@ BEGIN_MESSAGE_MAP(CSCColorPicker, CDialog)
 	ON_WM_RBUTTONDOWN()
 	ON_WM_RBUTTONUP()
 	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCColorPicker::on_message_CSCSliderCtrl)
-	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCColorPicker::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CSCColorPicker::on_message_CSCStaticEdit)
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_ERASEBKGND()
-	ON_EN_CHANGE(IDC_EDIT_HEXA, OnEnChangeHexa)
-	ON_EN_CHANGE(IDC_EDIT_ARGB_A, OnEnChangeArgb)
-	ON_EN_CHANGE(IDC_EDIT_ARGB_R, OnEnChangeArgb)
-	ON_EN_CHANGE(IDC_EDIT_ARGB_G, OnEnChangeArgb)
-	ON_EN_CHANGE(IDC_EDIT_ARGB_B, OnEnChangeArgb)
-	ON_EN_CHANGE(IDC_EDIT_HSL_H, OnEnChangeHsl)
-	ON_EN_CHANGE(IDC_EDIT_HSL_S, OnEnChangeHsl)
-	ON_EN_CHANGE(IDC_EDIT_HSL_L, OnEnChangeHsl)
+	// ON_EN_CHANGE 제거: CSCStaticEdit 는 CStatic 기반이라 EN_CHANGE 가 나오지 않는다.
+	// 실시간 편집 반영은 on_message_CSCStaticEdit 의 message_scstaticedit_text_changed 에서 pThis 로 분기.
 	ON_WM_DESTROY()
 	ON_WM_CONTEXTMENU()
 	ON_MESSAGE(WM_MOUSELEAVE, &CSCColorPicker::OnMouseLeave)
@@ -120,6 +130,12 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 	SetWindowText(title);
 	//CenterWindow(m_parent);
 	calc_layout();
+
+	// use_shared_color 플래그는 "앱별 기호" 라 항상 HKCU 앱별에 저장. reg_* 헬퍼는
+	// m_use_shared_color 값 자체에 따라 HKLM/HKCU 분기되므로 여기서는 우회한다.
+	m_use_shared_color = AfxGetApp()->GetProfileInt(
+		_T("setting\\color picker"), _T("use_shared_color"), 0) != 0;
+
 	load_recent_colors();	// ← modeless 경로: create()에서 직접 로드
 
 	// ── 최근 색상이 있으면 recent[0] 기본 선택 ──────────────────────
@@ -156,6 +172,7 @@ bool CSCColorPicker::create(CWnd* parent, CString title, bool as_modal)
 // ── 레이아웃 메트릭 계산 (1회 호출) ──────────────────────
 void CSCColorPicker::calc_layout()
 {
+	int round = 4;
 	const int width = 284;
 
 	m_margin = width * 0.04f;
@@ -215,17 +232,22 @@ void CSCColorPicker::calc_layout()
 	if (!m_edit_hexa.GetSafeHwnd())
 	{
 		//Hex (AARRGGBB)
+		// CSCStaticEdit 은 CStatic 기반이라 ES_* / WS_BORDER 는 무효 — 제거.
+		// 센터 정렬은 set_text_align(DT_CENTER) 로.
 		m_edit_hexa.Create(
-			WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
+			WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			CRect(m_r_edit_area.left, m_r_edit_area.top, m_r_edit_area.left + hexa_width, m_r_edit_area.top + kEditH), this, IDC_EDIT_HEXA);
-		m_edit_hexa.LimitText(9);
+		m_edit_hexa.set_max_length(9);
 		m_edit_hexa.set_font_name(_T("Consolas"));
 		m_edit_hexa.set_font_size(9);
 		m_edit_hexa.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_hexa.set_back_color(Gdiplus::Color::White);
 		m_edit_hexa.set_border_color(Gdiplus::Color(255, 232, 232, 232));
-		m_edit_hexa.set_border_color_on_active(Gdiplus::Color::RoyalBlue);
+		m_edit_hexa.set_border_color_active(Gdiplus::Color::RoyalBlue);
 		m_edit_hexa.set_line_align(DT_VCENTER);
+		m_edit_hexa.set_text_align(DT_CENTER);
+		m_edit_hexa.set_round(round);
+		m_edit_hexa.set_parent_back_color(Gdiplus::Color::White);
 
 
 		//ARGB (4등분)
@@ -236,17 +258,21 @@ void CSCColorPicker::calc_layout()
 		{
 			const int x0 = m_r_edit_area.left + hexa_width + kCellGap + i * (cellW + kCellGap);
 			m_edit_argb[i].Create(
-				WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
+				WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 				CRect(x0, m_r_edit_area.top, x0 + cellW, m_r_edit_area.top + kEditH),
 				this, kIds[i]);
-			m_edit_argb[i].LimitText(3);
+			m_edit_argb[i].set_max_length(3);
 			m_edit_argb[i].set_font_name(_T("Consolas"));
 			m_edit_argb[i].set_font_size(9);
 			m_edit_argb[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
 			m_edit_argb[i].set_back_color(Gdiplus::Color::White);
 			m_edit_argb[i].set_border_color(Gdiplus::Color(255, 232, 232, 232));
-			m_edit_argb[i].set_border_color_on_active(Gdiplus::Color::RoyalBlue);
+			m_edit_argb[i].set_border_color_active(Gdiplus::Color::RoyalBlue);
 			m_edit_argb[i].set_line_align(DT_VCENTER);
+			m_edit_argb[i].set_text_align(DT_CENTER);
+			m_edit_argb[i].set_round(round);
+			m_edit_argb[i].set_parent_back_color(Gdiplus::Color::White);
+			m_edit_argb[i].set_use_updown_key();
 		}
 
 		// ── HSL (3등분, R·G·B 아래 정렬) ─────────────────────────────────
@@ -255,31 +281,38 @@ void CSCColorPicker::calc_layout()
 		{
 			const int x0 = hsvX0 + i * (cellW + kCellGap);
 			m_edit_hsl[i].Create(
-				WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
+				WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 				CRect(x0, hsvTop, x0 + cellW, hsvTop + kEditH),
 				this, kHslIds[i]);
-			m_edit_hsl[i].LimitText(3);
+			m_edit_hsl[i].set_max_length(3);
 			m_edit_hsl[i].set_font_name(_T("Consolas"));
 			m_edit_hsl[i].set_font_size(9);
 			m_edit_hsl[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
 			m_edit_hsl[i].set_back_color(Gdiplus::Color::White);
 			m_edit_hsl[i].set_border_color(Gdiplus::Color(255, 232, 232, 232));
-			m_edit_hsl[i].set_border_color_on_active(Gdiplus::Color::RoyalBlue);
+			m_edit_hsl[i].set_border_color_active(Gdiplus::Color::RoyalBlue);
 			m_edit_hsl[i].set_line_align(DT_VCENTER);
+			m_edit_hsl[i].set_text_align(DT_CENTER);
+			m_edit_hsl[i].set_round(round);
+			m_edit_hsl[i].set_parent_back_color(Gdiplus::Color::White);
+			m_edit_hsl[i].set_use_updown_key();
 		}
 
 		// ── Color Name Edit (HSV row left empty area) ─────────────────
 		m_edit_color_name.Create(
-			WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL | ES_MULTILINE,
+			WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			m_r_color_name, this, IDC_EDIT_COLOR_NAME);
-		m_edit_color_name.LimitText(24);
+		m_edit_color_name.set_max_length(24);
 		m_edit_color_name.set_font_name(_T("Consolas"));
 		m_edit_color_name.set_font_size(9);
 		m_edit_color_name.set_text_color(Gdiplus::Color(52, 68, 71, 70));
 		m_edit_color_name.set_back_color(Gdiplus::Color::White);
 		m_edit_color_name.set_border_color(Gdiplus::Color(255, 232, 232, 232));
-		m_edit_color_name.set_border_color_on_active(Gdiplus::Color::RoyalBlue);
+		m_edit_color_name.set_border_color_active(Gdiplus::Color::RoyalBlue);
 		m_edit_color_name.set_line_align(DT_VCENTER);
+		m_edit_color_name.set_text_align(DT_CENTER);
+		m_edit_color_name.set_round(round);
+		m_edit_color_name.set_parent_back_color(Gdiplus::Color::White);
 
 		sync_edits();
 	}
@@ -896,17 +929,8 @@ void CSCColorPicker::on_btn_add_clicked()
 
 	const Gdiplus::Color cr = m_sel_color;
 
-	for (auto it = m_recent_colors.begin(); it != m_recent_colors.end(); )
-	{
-		if (it->GetValue() == cr.GetValue())
-			it = m_recent_colors.erase(it);
-		else
-			++it;
-	}
-
-	m_recent_colors.insert(m_recent_colors.begin(), cr);
-	if ((int)m_recent_colors.size() > MAX_RECENT_COLORS)
-		m_recent_colors.resize(MAX_RECENT_COLORS);
+	// 중복 제거 + 맨 앞 삽입 + 레지스트리 기록까지 save_recent_color() 가 전담.
+	save_recent_color(cr);
 
 	m_recent_scroll = 0;				// ← 새로 추가된 항목이 보이도록 맨 앞으로
 	m_sel = { HitArea::Recent, -1, -1, 0 };
@@ -1200,6 +1224,10 @@ void CSCColorPicker::set_use_shared_color(bool use_shared)
 	if (m_use_shared_color == use_shared)
 		return;
 	m_use_shared_color = use_shared;
+
+	// 플래그 자체는 앱별 HKCU 에 저장 (reg_* 분기 우회). 다음 실행 시 이 값으로 복원된다.
+	AfxGetApp()->WriteProfileInt(
+		_T("setting\\color picker"), _T("use_shared_color"), use_shared ? 1 : 0);
 
 	// 이미 창이 생성된 상태라면 새 위치 기준으로 재로딩
 	if (GetSafeHwnd())
@@ -1765,58 +1793,69 @@ LRESULT CSCColorPicker::on_message_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-LRESULT CSCColorPicker::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+LRESULT CSCColorPicker::on_message_CSCStaticEdit(WPARAM wParam, LPARAM /*lParam*/)
 {
-	const CSCEditMessage* msg = reinterpret_cast<CSCEditMessage*>(wParam);
+	// CSCStaticEdit 은 enter/escape/text_changed 등을 enum (msg->message) 으로 통지.
+	// CSCEdit 시절의 WM_KEYDOWN + lParam(key) 규약이 아니므로 분기도 enum 기반.
+	const CSCStaticEditMessage* msg = reinterpret_cast<CSCStaticEditMessage*>(wParam);
 	if (!msg || msg->pThis == nullptr)
 		return 0;
 
-	if (msg->message == WM_KEYDOWN)
+	switch (msg->message)
 	{
-		int key = static_cast<int>(lParam);
-		switch (key)
-		{
-			case VK_RETURN:
-				if (msg->pThis == &m_edit_color_name)
-				{
-					// ── Color Name → apply color ──────────────────────
-					CString name_text;
-					m_edit_color_name.GetWindowText(name_text);
-					name_text.Trim();
-					if (name_text.IsEmpty())
-						break;
+		case CSCStaticEdit::message_scstaticedit_text_changed:
+			// 실시간 편집 반영. 과거 ON_EN_CHANGE 매크로 역할을 대체한다.
+			if (msg->pThis == &m_edit_hexa)
+				OnEnChangeHexa();
+			else if (msg->pThis == &m_edit_argb[0] || msg->pThis == &m_edit_argb[1] ||
+			         msg->pThis == &m_edit_argb[2] || msg->pThis == &m_edit_argb[3])
+				OnEnChangeArgb();
+			else if (msg->pThis == &m_edit_hsl[0] || msg->pThis == &m_edit_hsl[1] ||
+			         msg->pThis == &m_edit_hsl[2])
+				OnEnChangeHsl();
+			break;
 
-					std::string ssname = CString2string(name_text);
-					Gdiplus::Color cr = CSCColorList::get_color(ssname);
-					m_edit_color_name.SetWindowText(ssname.c_str());
+		case CSCStaticEdit::message_scstaticedit_enter:
+			if (msg->pThis == &m_edit_color_name)
+			{
+				// ── Color Name → apply color ──────────────────────
+				CString name_text;
+				m_edit_color_name.GetWindowText(name_text);
+				name_text.Trim();
+				if (name_text.IsEmpty())
+					break;
+
+				std::string ssname = CString2string(name_text);
+				Gdiplus::Color cr = CSCColorList::get_color(ssname);
+				m_edit_color_name.set_text(ssname.c_str());
 
 
-					// alpha 유지 (선택 없으면 255)
-					const BYTE alpha = m_sel.is_valid() ? m_sel_color.GetA() : 255;
-					m_sel_color = Gdiplus::Color(alpha, cr.GetR(), cr.GetG(), cr.GetB());
+				// alpha 유지 (선택 없으면 255)
+				const BYTE alpha = m_sel.is_valid() ? m_sel_color.GetA() : 255;
+				m_sel_color = Gdiplus::Color(alpha, cr.GetR(), cr.GetG(), cr.GetB());
 
-					// 팔레트/recent에서 해당 색상 검색하여 선택 상태 갱신
-					const HitTarget found = find_color(m_sel_color);
-					if (found.is_valid())
-						m_sel = found;
+				// 팔레트/recent에서 해당 색상 검색하여 선택 상태 갱신
+				const HitTarget found = find_color(m_sel_color);
+				if (found.is_valid())
+					m_sel = found;
 
-					gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
-					update_slider_alpha();
-					update_slider_hue();
-					update_slider_light();
-					sync_edits();
-					Invalidate(FALSE);
-				}
-				else
-				{
-					sync_edits();
-					OnBnClickedOk();
-				}
-				break;
-			case VK_ESCAPE:
-				OnBnClickedCancel();
-				break;
-		}
+				gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
+				update_slider_alpha();
+				update_slider_hue();
+				update_slider_light();
+				sync_edits();
+				Invalidate(FALSE);
+			}
+			else
+			{
+				sync_edits();
+				OnBnClickedOk();
+			}
+			break;
+
+		case CSCStaticEdit::message_scstaticedit_escape:
+			OnBnClickedCancel();
+			break;
 	}
 
 	return 0;
@@ -2039,8 +2078,11 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 	menu.AppendMenu(MF_SEPARATOR);
 
 	// ── 공유 컬러 사용 (HKLM/HKCU 전환) ───────────────────
-	menu.AppendMenu(MF_STRING | (m_use_shared_color ? MF_CHECKED : MF_UNCHECKED),
-		IDM_USE_SHARED_COLOR, _T("공유 컬러 사용"));
+	// HKLM 쓰기 불가 토큰이면 메뉴 자체를 grayed.
+	UINT shared_flags = MF_STRING | (m_use_shared_color ? MF_CHECKED : MF_UNCHECKED);
+	if (!can_write_hklm_software())
+		shared_flags |= MF_GRAYED;
+	menu.AppendMenu(shared_flags, IDM_USE_SHARED_COLOR, _T("공유 컬러 사용"));
 
 	// ── 최근 색상 내보내기 / 가져오기 ────────────────────
 	menu.AppendMenu(MF_STRING, IDM_EXPORT_RECENT, _T("최근 색상 내보내기"));
@@ -2209,9 +2251,12 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 		case IDM_USE_SHARED_COLOR:
 			// 토글 + 새 위치에서 최근 색상 재로딩 (set_use_shared_color 내부에서 load + 화면 갱신)
 			set_use_shared_color(!m_use_shared_color);
-			// m_sel이 이전 recent 인덱스를 가리킬 수 있으므로 해제
-			if (m_sel.area == HitArea::Recent)
-				m_sel = {};
+			// 현재 선택색(m_sel_color)이 새로 로드된 recent 또는 palette 에 있으면 그 위치에
+			// 선택 링을 다시 표시. 없으면 선택 해제 (이전 인덱스는 무의미).
+			{
+				const HitTarget found = find_color(m_sel_color);
+				m_sel = found.is_valid() ? found : HitTarget{};
+			}
 			m_hover = {};
 			Invalidate(FALSE);
 			break;

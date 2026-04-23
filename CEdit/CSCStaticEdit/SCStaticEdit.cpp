@@ -37,6 +37,7 @@ BEGIN_MESSAGE_MAP(CSCStaticEdit, CStatic)
 	ON_WM_SIZE()
 	ON_WM_GETDLGCODE()
 	ON_WM_SETCURSOR()
+	ON_WM_MOUSEWHEEL()
 	ON_MESSAGE(WM_IME_STARTCOMPOSITION, &CSCStaticEdit::on_ime_start_composition_message)
 	ON_MESSAGE(WM_IME_ENDCOMPOSITION, &CSCStaticEdit::on_ime_end_composition_message)
 	ON_MESSAGE(WM_IME_COMPOSITION, &CSCStaticEdit::on_ime_composition)
@@ -507,7 +508,9 @@ void CSCStaticEdit::OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 	case VK_UP:
 	case VK_DOWN:
 		{
-			if (m_readonly || !m_use_updown_key || m_composing)
+			// Shift 없이 누른 Up/Down 은 증감 대상 아님 — 탭/폼 내비게이션 중 실수로
+			// 값이 바뀌는 footgun 방지. MouseWheel 과 동일하게 Shift 필요.
+			if (!shift || m_readonly || !m_use_updown_key || m_composing)
 			{
 				CStatic::OnKeyDown(n_char, n_rep_cnt, n_flags);
 				return;
@@ -700,6 +703,24 @@ BOOL CSCStaticEdit::OnSetCursor(CWnd* p_wnd, UINT n_hit_test, UINT message)
 		return TRUE;
 	}
 	return CStatic::OnSetCursor(p_wnd, n_hit_test, message);
+}
+
+// Shift+MouseWheel = VK_UP / VK_DOWN 과 동일한 수치 증감.
+// 게이트(readonly / use_updown_key / composing) 를 여기서 한 번 확인한 뒤
+// OnKeyDown 의 VK_UP/VK_DOWN 분기로 위임 — 파싱/자리수 로직 재사용.
+BOOL CSCStaticEdit::OnMouseWheel(UINT n_flags, short z_delta, CPoint pt)
+{
+	if ((n_flags & MK_SHIFT) && !m_readonly && m_use_updown_key && !m_composing)
+	{
+		UINT key = (z_delta > 0) ? VK_UP : VK_DOWN;
+		int ticks = abs((int)z_delta) / WHEEL_DELTA;
+		if (ticks <= 0)
+			ticks = 1;
+		for (int i = 0; i < ticks; i++)
+			OnKeyDown(key, 1, 0);
+		return TRUE;
+	}
+	return CStatic::OnMouseWheel(n_flags, z_delta, pt);
 }
 
 void CSCStaticEdit::OnLButtonDblClk(UINT n_flags, CPoint point)

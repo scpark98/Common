@@ -1,6 +1,6 @@
 # CSCStaticEdit
 
-CStatic 을 상속받아 CEdit 처럼 동작하도록 완전히 직접 그린 싱글라인 edit 컨트롤. round rect border, 커스텀 색상, placeholder, IME, clipboard, undo/redo, up/down 키로 정수 증감 등 지원.
+CStatic 을 상속받아 CEdit 처럼 동작하도록 완전히 직접 그린 싱글라인 edit 컨트롤. round rect border, 커스텀 색상, placeholder, IME, clipboard, undo/redo, Shift+Up/Down 및 Shift+MouseWheel 로 수치 증감, I-beam 커서 자동 전환 등 지원.
 
 ## 개발 목적
 
@@ -190,9 +190,11 @@ void  set_padding(int padding);
 void  set_line_align(DWORD align = DT_VCENTER);  // DT_TOP / DT_VCENTER / DT_BOTTOM
 void  set_text_align(DWORD align = DT_LEFT);     // DT_LEFT / DT_CENTER / DT_RIGHT
 
-// 텍스트가 실수로 파싱되는 경우 up/down 방향키로 ± interval. 실수 파싱 실패 시 skip.
+// 텍스트가 실수로 파싱되는 경우 Shift+Up / Shift+Down / Shift+MouseWheel 로 ± interval.
+// 실수 파싱 실패 시 skip. 맨 Up/Down 또는 맨 MouseWheel 은 동작하지 않음 —
+// 탭/폼 내비게이션 중 값이 무심코 바뀌는 footgun 방지 (CEdit 은 방향키 시 아무 동작 없음).
 // interval 은 float (예: 0.001). 표시 자리수 = max(interval 자리수, 현재 텍스트 자리수).
-// 예: interval=0.01, "0.09" → up → "0.10" (trailing 0 보존).
+// 예: interval=0.01, "0.09" → Shift+Up → "0.10" (trailing 0 보존).
 void  set_use_updown_key(bool use = true, float interval = 1.0f);
 ```
 
@@ -216,6 +218,8 @@ CString get_sel_text() const;
 - 포커스 active/inactive 에 따라 border 색 전환
 - 가로 스크롤 오프셋 자동 관리 (캐럿 가시화)
 - Drag 선택 시 가장자리 자동 스크롤
+- 컨트롤 위에서 마우스 커서 자동으로 I-beam 전환 (disabled 시 기본 커서 유지, 카피 버튼 위에서는 화살표)
+- `set_use_updown_key(true)` 활성 시 Shift+Up/Down 및 Shift+MouseWheel 로 수치 증감 (고해상도 휠은 `WHEEL_DELTA` 단위로 반복 적용)
 
 ## 제약 사항
 

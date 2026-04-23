@@ -143,18 +143,22 @@ public:
 
     void		    set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
     void		    set_max_length(int max)              { m_max_length = max; }
-    // up/down 방향키로 수치 증감. 텍스트가 실수로 파싱되지 않으면 스킵.
+
+    // shift + up/down 방향키로 수치 증감. shift + mousewheel로도 동일.
+    // 텍스트가 실수로 파싱되지 않으면 스킵.
     // interval 은 실수 허용 (예: 0.001). 표시 자리수 = max(interval 소수자리수, 현재 텍스트 소수자리수).
     // 예: interval=0.01, "0.09" → up → "0.10" (trailing 0 보존).
     void		    set_use_updown_key(bool use_updown_key = true, float interval = 1.0f)
                         { m_use_updown_key = use_updown_key; m_updown_interval = interval; }
     void		    set_dim_text(const CString& dim_text);
     void		    set_padding(int padding)             { m_padding = padding; Invalidate(); }
+
     // 우측에 카피 버튼 표시. true 면 텍스트 영역이 우측 32px 줄어들고 그 자리에 클립보드
     // 아이콘(라운드 사각형 2개 교차) 을 그린다. 클릭 시 현재 전체 텍스트를 클립보드로 복사.
     // 별도 CButton 을 만들지 않고 OnPaint/마우스 핸들러에서 직접 처리.
     void		    set_use_copy_button(bool use = true);
     bool		    is_use_copy_button() const { return m_use_copy_button; }
+
     // 세로 정렬 (line align): DT_TOP / DT_VCENTER (기본) / DT_BOTTOM
     void		    set_line_align(DWORD align = DT_VCENTER) { m_valign = align; Invalidate(); }
     DWORD		    get_line_align() const { return m_valign; }
@@ -198,6 +202,7 @@ protected:
     afx_msg void	OnEnable(BOOL b_enable);
     afx_msg void	OnSize(UINT n_type, int cx, int cy);
     afx_msg BOOL	OnSetCursor(CWnd* p_wnd, UINT n_hit_test, UINT message);
+    afx_msg BOOL	OnMouseWheel(UINT n_flags, short z_delta, CPoint pt);
 
     // IME (MFC에 ON_WM_IME_STARTCOMPOSITION 매크로가 없어 ON_MESSAGE로 직접 처리)
     afx_msg LRESULT	on_ime_start_composition_message(WPARAM w_param, LPARAM l_param);

@@ -1,4 +1,4 @@
-// FtpClient.h: interface for the CFtpClient class.
+ï»¿// FtpClient.h: interface for the CFtpClient class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -9,7 +9,7 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
-#include <afxinet.h>	//ftp ¸¦ À§ÇØ Ãß°¡ÇØ¾ßµÊ
+#include <afxinet.h>	//ftp ë¥¼ ìœ„í•´ ì¶”ê°€í•´ì•¼ë¨
 
 class CFTPFileFind  
 {
@@ -17,7 +17,7 @@ public:
 
 	void GetErrorMessage();
 	
-	//{{AFX_FindFile ÇÔ¼ö
+	//{{AFX_FindFile í•¨ìˆ˜
 	BOOL MatchsMask(DWORD dwMask);
 	BOOL IsTemporary();
 	BOOL IsSystem();

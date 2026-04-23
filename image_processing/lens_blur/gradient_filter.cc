@@ -1,4 +1,4 @@
-//
+﻿//
 //  sgss/gradient_filter.cc
 //
 //  MIT License

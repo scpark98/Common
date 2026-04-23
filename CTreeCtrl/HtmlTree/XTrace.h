@@ -1,4 +1,4 @@
-// XTrace.h  Version 1.1
+﻿// XTrace.h  Version 1.1
 //
 // Author:       Paul Mclachlan
 //

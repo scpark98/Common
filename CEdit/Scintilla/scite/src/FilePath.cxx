@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file FilePath.cxx
  ** Encapsulate a file path.
  **/

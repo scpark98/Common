@@ -1,4 +1,4 @@
-// OwnMenu.cpp: Implementierung der Klasse COwnMenu.
+﻿// OwnMenu.cpp: Implementierung der Klasse COwnMenu.
 //
 //////////////////////////////////////////////////////////////////////
 

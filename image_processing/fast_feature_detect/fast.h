@@ -1,4 +1,4 @@
-#ifndef FAST_H
+﻿#ifndef FAST_H
 #define FAST_H
 
 #ifndef xy

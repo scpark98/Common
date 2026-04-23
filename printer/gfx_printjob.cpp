@@ -1,4 +1,4 @@
-
+﻿
 // gfx_printjob.cpp
 
 #include "stdafx.h"

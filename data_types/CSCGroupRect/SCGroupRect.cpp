@@ -1,4 +1,4 @@
-#include "SCGroupRect.h"
+﻿#include "SCGroupRect.h"
 
 CSCGroupRect::CSCGroupRect(float left, float top, float right, float bottom)
 {

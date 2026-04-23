@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file ScintillaTypes.h
  ** Types used to communicate with Scintilla.
  **/

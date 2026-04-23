@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file CharacterCategoryMap.h
  ** Returns the Unicode general category of a character.
  ** Similar code to Lexilla's lexilla/lexlib/CharacterCategory.h but renamed

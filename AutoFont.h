@@ -1,4 +1,4 @@
-//CAutoFont class definition
+﻿//CAutoFont class definition
 //
 //This class will simplify the creation and use of the CFont object
 //By Jamie Nordmeyer

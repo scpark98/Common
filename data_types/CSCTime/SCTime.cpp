@@ -1,4 +1,4 @@
-#include "SCTime.h"
+ï»¿#include "SCTime.h"
 #include <regex>
 #include "../../Functions.h"
 
@@ -35,10 +35,10 @@ CSCTime::CSCTime(const SYSTEMTIME& t)
 	milliseconds = t.wMilliseconds;
 }
 
-//"yyyy-MM-dd HH:mm:ss.SSS" ÇüÅÂÀÇ ÆĞÅÏÀ» Ã£¾Æ ÆÄ½ÌÇÑ´Ù.
+//"yyyy-MM-dd HH:mm:ss.SSS" í˜•íƒœì˜ íŒ¨í„´ì„ ì°¾ì•„ íŒŒì‹±í•œë‹¤.
 CSCTime::CSCTime(CString str)
 {
-	//strÀÌ ÃÖ¼Ò "yyyyMMddHHmmss" 14±ÛÀÚº¸´Ù ÀÛÀ¸¸é ÆÄ½Ì ºÒ°¡
+	//strì´ ìµœì†Œ "yyyyMMddHHmmss" 14ê¸€ìë³´ë‹¤ ì‘ìœ¼ë©´ íŒŒì‹± ë¶ˆê°€
 	if (str.GetLength() < 14)
 		return;
 

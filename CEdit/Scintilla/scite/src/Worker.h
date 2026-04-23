@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file Worker.h
  ** Definition of classes to perform background tasks as threads.
  **/

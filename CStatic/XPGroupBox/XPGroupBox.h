@@ -1,4 +1,4 @@
-#if !defined(AFX_XPGROUPBOX_H__F70D755B_9C4B_4F4A_A1FB_AFF720C29717__INCLUDED_)
+ï»¿#if !defined(AFX_XPGROUPBOX_H__F70D755B_9C4B_4F4A_A1FB_AFF720C29717__INCLUDED_)
 #define AFX_XPGROUPBOX_H__F70D755B_9C4B_4F4A_A1FB_AFF720C29717__INCLUDED_
 
 #if _MSC_VER > 1000
@@ -7,8 +7,8 @@
 // XPGroupBox.h : header file
 //
 
-//2025.02.16 scpark COLORREF¸¦ Gdiplus::Color·Î Å¸ÀÔÀº º¯°æÇßÀ¸³ª
-//¾ÆÁ÷ ½ÇÁ¦ ÄÚµåµéÀ» ¿ÏÀüÈ÷ º¯°æÇÏÁö ¾ÊÀº »óÅÂÀÓ.
+//2025.02.16 scpark COLORREFë¥¼ Gdiplus::Colorë¡œ íƒ€ì…ì€ ë³€ê²½í–ˆìœ¼ë‚˜
+//ì•„ì§ ì‹¤ì œ ì½”ë“œë“¤ì„ ì™„ì „íˆ ë³€ê²½í•˜ì§€ ì•Šì€ ìƒíƒœì„.
 
 #include <afxwin.h>
 #include "../../Functions.h"
@@ -82,7 +82,7 @@ private:
 	CString			m_title;
 	CRect			m_rt_title;
 
-	Gdiplus::Color	m_crBase;		//Å¸ÀÌÆ²ÀÌ roundrect¶ó¼­ ¾çÂÊ ¸ğÅüÀÌÀÇ »öÀÌ ±×·ÁÁöÁö ¾Ê°Ô µÈ´Ù. parent¹è°æ»öÀ¸·Î Ä¥ÇØÁà¾ß roundrect°¡ ¿ÂÀüÈ÷ Ç¥½ÃµÈ´Ù.
+	Gdiplus::Color	m_crBase;		//íƒ€ì´í‹€ì´ roundrectë¼ì„œ ì–‘ìª½ ëª¨í‰ì´ì˜ ìƒ‰ì´ ê·¸ë ¤ì§€ì§€ ì•Šê²Œ ëœë‹¤. parentë°°ê²½ìƒ‰ìœ¼ë¡œ ì¹ í•´ì¤˜ì•¼ roundrectê°€ ì˜¨ì „íˆ í‘œì‹œëœë‹¤.
 	Gdiplus::Color	m_cr_border = Gdiplus::Color::Gray;// ::GetSysColor(COLOR_3DSHADOW);
 	Gdiplus::Color	m_cr_title_text = gRGB(0, 0, 0);
 	Gdiplus::Color	m_cr_title_back = gRGB(249, 236, 192);

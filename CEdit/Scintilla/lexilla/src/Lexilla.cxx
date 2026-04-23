@@ -1,4 +1,4 @@
-// Lexilla lexer library
+﻿// Lexilla lexer library
 /** @file Lexilla.cxx
  ** Lexer infrastructure.
  ** Provides entry points to shared library.

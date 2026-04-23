@@ -1,4 +1,4 @@
-#include "MP4Recorder.h"
+ï»¿#include "MP4Recorder.h"
 #include <mmsystem.h>
 #include "AutoSync.h"
 
@@ -280,10 +280,10 @@ void CMP4Recorder::WriteVideoSample(BYTE* pData, int nSize, int nCapWidth, int n
 
 		ret = avcodec_receive_packet(m_pCodecCtx, &pkt);
 		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-			break; // ÆĞÅ¶ÀÌ ¾ø°Å³ª ½ºÆ®¸² ³¡
+			break; // íŒ¨í‚·ì´ ì—†ê±°ë‚˜ ìŠ¤íŠ¸ë¦¼ ë
 		}
 		else if (ret < 0) {
-			TRACE("ÆĞÅ¶À» ÀÎÄÚµùÇÏ´Â Áß ¿À·ù ¹ß»ı: %s\n", av_err2str(ret));
+			TRACE("íŒ¨í‚·ì„ ì¸ì½”ë”©í•˜ëŠ” ì¤‘ ì˜¤ë¥˜ ë°œìƒ: %s\n", av_err2str(ret));
 			break;
 		}
 
@@ -292,7 +292,7 @@ void CMP4Recorder::WriteVideoSample(BYTE* pData, int nSize, int nCapWidth, int n
 
 		ret = av_interleaved_write_frame(m_pFormatCtx, &pkt);
 		if (ret < 0) {
-			TRACE("ÆĞÅ¶À» ÆÄÀÏ¿¡ ¾²´Â Áß ¿À·ù ¹ß»ı: %s\n", av_err2str(ret));
+			TRACE("íŒ¨í‚·ì„ íŒŒì¼ì— ì“°ëŠ” ì¤‘ ì˜¤ë¥˜ ë°œìƒ: %s\n", av_err2str(ret));
 			break;
 		}
 

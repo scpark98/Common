@@ -1,4 +1,4 @@
-#ifndef ASYNCSOCKETSERVERIMPL_H
+﻿#ifndef ASYNCSOCKETSERVERIMPL_H
 #define ASYNCSOCKETSERVERIMPL_H
 #pragma once
 #pragma warning(push)

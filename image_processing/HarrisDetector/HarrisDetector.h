@@ -1,4 +1,4 @@
-
+﻿
 #if !defined HARRISDETECTOR
 
 #define HARRISDETECTOR

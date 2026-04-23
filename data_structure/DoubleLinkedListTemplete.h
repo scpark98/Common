@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /* Usage :
 DoublyLinkedList<int> dll;

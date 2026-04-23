@@ -1,4 +1,4 @@
-
+﻿
 #ifndef XLNT_API_H
 #define XLNT_API_H
 

@@ -1,4 +1,4 @@
-// ResizeCtrl.cpp: implementation of the CResizeCtrl class.
+ï»¿// ResizeCtrl.cpp: implementation of the CResizeCtrl class.
 //
 //
 // Written by Herbert Menke (h.menke@gmx.de)
@@ -37,13 +37,13 @@ static char THIS_FILE[]=__FILE__;
 struct RSRect
 {
 	int left;   // Specifies the percentage change in the position of the left edge 
-	// of the object relative to the total change in the parent form’s width. 
+	// of the object relative to the total change in the parent formë­© width. 
 	int top;    // Specifies the percentage change in the position of the top 
-	// of the object relative to the total change in the parent form’s height.
+	// of the object relative to the total change in the parent formë­© height.
 	int width;  // Specifies the percentage change in the width of the object 
-	// relative to the total change in the parent form’s width.
+	// relative to the total change in the parent formë­© width.
 	int height; // Specifies the percentage change in the height of the object 
-	// relative to the total change in the parent form’s height.
+	// relative to the total change in the parent formë­© height.
 };
 
 

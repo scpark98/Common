@@ -1,4 +1,4 @@
-/*
+﻿/*
 Font Name Library 1.0.0
 
 Copyright (c) 2009 Wong Shao Voon

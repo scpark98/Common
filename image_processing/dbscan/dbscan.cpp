@@ -1,4 +1,4 @@
-//#include "stdafx.h"
+﻿//#include "stdafx.h"
 #include "dbscan.h"
 
 node_t *create_node(unsigned int index)

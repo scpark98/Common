@@ -1,4 +1,4 @@
-#include "gpu_usage.h"
+﻿#include "gpu_usage.h"
 
 #include <pdhmsg.h>
 #include <vector>
@@ -12,7 +12,7 @@ CGpuUsage::CGpuUsage()
 	if (PdhOpenQueryW(NULL, 0, &m_query) != ERROR_SUCCESS)
 		return;
 
-	// 영문 카운터명으로 추가 → 한글 등 로케일 영향 없음
+	// ?곷Ц 移댁슫?곕챸?쇰줈 異붽? ???쒓? ??濡쒖????곹뼢 ?놁쓬
 	if (PdhAddEnglishCounterW(m_query, L"\\GPU Engine(*)\\Utilization Percentage", 0, &m_counter) != ERROR_SUCCESS)
 	{
 		PdhCloseQuery(m_query);
@@ -20,7 +20,7 @@ CGpuUsage::CGpuUsage()
 		return;
 	}
 
-	// 초기 수집 — 일부 카운터는 2회 수집 후부터 값이 나옴
+	// 珥덇린 ?섏쭛 ???쇰? 移댁슫?곕뒗 2???섏쭛 ?꾨???媛믪씠 ?섏샂
 	PdhCollectQueryData(m_query);
 	m_ready = true;
 }
@@ -50,8 +50,8 @@ int CGpuUsage::get_usage()
 	if (PdhGetFormattedCounterArrayW(m_counter, PDH_FMT_DOUBLE, &buf_size, &item_count, items) != ERROR_SUCCESS)
 		return -1;
 
-	// 인스턴스명 예: "pid_1234_luid_0x00000000_0x0000ABCD_phys_0_eng_0_engtype_3D"
-	// 엔진 타입별로 프로세스 사용률을 합산 → 타입 중 최댓값이 Task Manager의 GPU 수치
+	// ?몄뒪?댁뒪紐??? "pid_1234_luid_0x00000000_0x0000ABCD_phys_0_eng_0_engtype_3D"
+	// ?붿쭊 ??낅퀎濡??꾨줈?몄뒪 ?ъ슜瑜좎쓣 ?⑹궛 ?????以?理쒕뙎媛믪씠 Task Manager??GPU ?섏튂
 	std::unordered_map<std::wstring, double> engine_sums;
 	for (DWORD i = 0; i < item_count; ++i)
 	{

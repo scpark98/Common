@@ -1,4 +1,4 @@
-// StaticRange.cpp : implementation file
+ï»¿// StaticRange.cpp : implementation file
 //
 
 #include "StaticRange.h"
@@ -61,7 +61,7 @@ void CStaticRange::OnPaint()
 
 	CMemoryDC	dc( &dc1, &Rect );
 	
-	// ¹è°æ ±×¸²À» Ä¥ÇÑ´Ù.
+	// ë°°ê²½ ê·¸ë¦¼ì„ ì¹ í•œë‹¤.
 	for ( int i = Rect.left; i < Rect.right; i += 2 )
 		m_ImageBack.Draw( &dc, 0, CPoint( i, Rect.top ), ILD_TRANSPARENT );
 
@@ -89,11 +89,11 @@ void CStaticRange::OnPaint()
 		UnderColor = RGB( 32, 32, 50 );
 	}	
 
-	// ¿ŞÂÊ È­»ìÇ¥
+	// ì™¼ìª½ í™”ì‚´í‘œ
 	for ( i = 0; i < 5; i++ )
 		dc.FillSolidRect( nLeft - 0, Rect.top + i, i + 1, 1, ArrowColor );
 
-	// ¿À¸¥ÂÊ È­»ìÇ¥
+	// ì˜¤ë¥¸ìª½ í™”ì‚´í‘œ
 	for ( i = 0; i < 5; i++ )
 		dc.FillSolidRect( nRight - i - 1, Rect.top + i, i + 1, 1, ArrowColor );
 
@@ -248,7 +248,7 @@ void CStaticRange::OnMButtonDown(UINT nFlags, CPoint point)
 	if ( m_nLower == 0 && m_nUpper == 0 )
 		return;
 
-	// ¼±ÅÃ ±¸°£À» ÃÊ±âÈ­ ÇÑ´Ù. -2¸¦ Àü¼ÛÇÑ´Ù.
+	// ì„ íƒ êµ¬ê°„ì„ ì´ˆê¸°í™” í•œë‹¤. -2ë¥¼ ì „ì†¡í•œë‹¤.
 	m_nSelLower	= m_nLower;
 	m_nSelUpper	= m_nUpper;
 

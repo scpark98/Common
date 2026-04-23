@@ -1,4 +1,4 @@
-#if !defined _SIDEBAR_H
+﻿#if !defined _SIDEBAR_H
 #define _SIDEBAR_H
 
 /*

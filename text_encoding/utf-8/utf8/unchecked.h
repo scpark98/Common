@@ -1,4 +1,4 @@
-// Copyright 2006 Nemanja Trifunovic
+ï»¿// Copyright 2006 Nemanja Trifunovic
 
 /*
 Permission is hereby granted, free of charge, to any person or organization
@@ -183,10 +183,10 @@ namespace utf8
 		public:
 			// ===== iterator traits (C++17+) =====
 			using iterator_category = std::bidirectional_iterator_tag;
-			using value_type = uint32_t;          // ¹İµå½Ã non-const
+			using value_type = uint32_t;          // ë°˜ë“œì‹œ non-const
 			using difference_type = std::ptrdiff_t;
-			using pointer = value_type*;       // traits ÃæÁ·¿ë
-			using reference = value_type;         // °ª ¹İÈ¯ iterator
+			using pointer = value_type*;       // traits ì¶©ì¡±ìš©
+			using reference = value_type;         // ê°’ ë°˜í™˜ iterator
 
 			// ===== constructors =====
 			iterator() = default;
@@ -246,7 +246,7 @@ namespace utf8
 		}; // class iterator
 
 		/*
-		//scpark. std::iterator ±â¹İ Å¬·¡½º´Â C++17ºÎÅÍ deprecatedÀÌ¹Ç·Î À§¿Í °°ÀÌ ¼öÁ¤ÇÔ.
+		//scpark. std::iterator ê¸°ë°˜ í´ë˜ìŠ¤ëŠ” C++17ë¶€í„° deprecatedì´ë¯€ë¡œ ìœ„ì™€ ê°™ì´ ìˆ˜ì •í•¨.
 		// The iterator class
 		template <typename octet_iterator>
 		class iterator : public std::iterator <std::bidirectional_iterator_tag, uint32_t>

@@ -1,4 +1,4 @@
-//
+﻿//
 //  sgss/filter.h
 //
 //  MIT License

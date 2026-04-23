@@ -1,4 +1,4 @@
-#ifndef _TEXTIMPLGETHEIGHT_H_
+﻿#ifndef _TEXTIMPLGETHEIGHT_H_
 #define _TEXTIMPLGETHEIGHT_H_
 
 #include <Gdiplus.h>

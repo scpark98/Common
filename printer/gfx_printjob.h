@@ -1,4 +1,4 @@
-
+﻿
 // gfx_printjob.h
 
 #ifndef _GFX_PRINTJOB_H_

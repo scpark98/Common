@@ -1,4 +1,4 @@
-// RandomText.h: interface for the RandomText class.
+ï»¿// RandomText.h: interface for the RandomText class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -17,7 +17,7 @@ public:
 	static CString GetSlogan();
 	static CString GetName();
 
-	//parts¸¦ 2·Î ÁÖ¸é "1.103"Ã³·³ ³¡ µÎ ÇÊµå¸¸ »ı¼ºÇÑ´Ù.
+	//partsë¥¼ 2ë¡œ ì£¼ë©´ "1.103"ì²˜ëŸ¼ ë ë‘ í•„ë“œë§Œ ìƒì„±í•œë‹¤.
 	static CString get_ip(int parts = 4);
 	static CString get_mac();
 	static CString extension(bool dot = false);

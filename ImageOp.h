@@ -1,4 +1,4 @@
-#ifndef IMAGE_OP_H
+﻿#ifndef IMAGE_OP_H
 #define IMAGE_OP_H
 
 int ARGB2Pixel(int alpha, int r, int g, int b);

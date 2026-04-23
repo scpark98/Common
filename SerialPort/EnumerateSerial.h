@@ -1,4 +1,4 @@
-/*
+﻿/*
 Module : enumser.h
 Purpose: Defines the interface for a class to enumerate the serial ports installed on a PC
 using a number of different approaches

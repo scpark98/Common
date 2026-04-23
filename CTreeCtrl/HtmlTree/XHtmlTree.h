@@ -1,4 +1,4 @@
-// XHtmlTree.h  Version 1.6 - article available at www.codeproject.com
+ï»¿// XHtmlTree.h  Version 1.6 - article available at www.codeproject.com
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com
@@ -202,7 +202,7 @@ public:
 	CXHtmlDrawLink	m_Links;
 #endif // XHTMLHTML
 
-	//Tab indentationÀ» ÀÌ¿ëÇÑ ÀúÀå¹æ½Ä(checkAtRoot:check treeÀÏ °æ¿ì root¿¡µµ checkbox¸¦ Ç¥½ÃÇÒ Áö)
+	//Tab indentationì„ ì´ìš©í•œ ì €ì¥ë°©ì‹(checkAtRoot:check treeì¼ ê²½ìš° rootì—ë„ checkboxë¥¼ í‘œì‹œí•  ì§€)
 	void		LoadSaveTreeTabData( BOOL bLoad, CString sFileName, bool checkAtRoot = false );
 
 	COLORREF	GetBkColor() { return m_crCustomWindow; }

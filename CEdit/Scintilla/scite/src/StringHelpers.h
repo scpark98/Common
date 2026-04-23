@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file StringHelpers.h
  ** Definition of widely useful string functions.
  **/

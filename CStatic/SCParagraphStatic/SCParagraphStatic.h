@@ -22,10 +22,12 @@ public:
 
 	//tag가 포함된 모든 텍스트를 설정한다. 기본 글자색, 폰트 등 설정값을 모두 한 후에 이 함수를 호출해야 한다.
 	CRect			set_text(CString sText);
+	void			set_textf(LPCTSTR format, ...);
 
 	//라인 사이 간격 배수. 1.0f = 기본, 1.5f = 1.5배. set_text() 이후 호출하면 즉시 반영되고
 	//이후 set_text() / OnSize() 로 라인 위치가 재계산될 때도 자동 재적용된다.
 	void			set_line_spacing(float spacing = 1.0f);
+	float			get_line_spacing() { return m_line_spacing; }
 
 	//마우스가 hover된 음절에 사각형 표시
 	void			draw_word_hover_rect(bool draw = true, Gdiplus::Color cr_rect = Gdiplus::Color::Transparent);
@@ -44,7 +46,7 @@ protected:
 	bool			m_font_antialiasing = true;
 
 	//라인 사이 간격 배수. set_text() / OnSize() 에서 calc_text_rect() 후에 자동 재적용된다.
-	float			m_line_spacing = 1.0f;
+	float			m_line_spacing = 1.5f;
 
 	DWORD			m_static_option;				//SS_LEFT -> DT_LEFT 등 옵션값 저장
 	int				m_max_width;					//각 라인들 중 최대 너비

@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file scite_lua_win.h
  ** SciTE Lua scripting interface.
  **/

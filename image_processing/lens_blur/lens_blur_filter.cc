@@ -1,4 +1,4 @@
-//
+﻿//
 //  sgss/lens_blur_filter.cc
 //
 //  MIT License

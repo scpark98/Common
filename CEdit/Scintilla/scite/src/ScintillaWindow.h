@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file ScintillaWindow.h
  ** Interface to a Scintilla instance.
  **/

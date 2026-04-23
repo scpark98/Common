@@ -1,27 +1,27 @@
-#pragma once
+ï»¿#pragma once
 
 #ifndef DIB_WIDTHBYTES
 #define		DIB_WIDTHBYTES(bits)	(((bits) + 31) / 32 * 4)	//bits is not width, but (width * bitCount)
 #endif
 
-#define		MAKE4WIDTH(width)		( (width + 3) & ~3 )		//width¸¦ 4ÀÇ ¹è¼ö·Î ¸¸µé¾îÁØ´Ù.
+#define		MAKE4WIDTH(width)		( (width + 3) & ~3 )		//widthë¥¼ 4ì˜ ë°°ìˆ˜ë¡œ ë§Œë“¤ì–´ì¤€ë‹¤.
 
-// CShowImageDlg ´ëÈ­ »óÀÚÀÔ´Ï´Ù.
+// CShowImageDlg ëŒ€í™” ìƒìì…ë‹ˆë‹¤.
 
 class CShowImageDlg : public CDialogEx
 {
 	DECLARE_DYNAMIC(CShowImageDlg)
 
 public:
-	CShowImageDlg(CWnd* pParent = NULL);   // Ç¥ÁØ »ı¼ºÀÚÀÔ´Ï´Ù.
+	CShowImageDlg(CWnd* pParent = NULL);   // í‘œì¤€ ìƒì„±ìì…ë‹ˆë‹¤.
 	virtual ~CShowImageDlg();
 
-// ´ëÈ­ »óÀÚ µ¥ÀÌÅÍÀÔ´Ï´Ù.
+// ëŒ€í™” ìƒì ë°ì´í„°ì…ë‹ˆë‹¤.
 	//enum { IDD = IDD_SHOW_IMAGE };
 	void		SetImageData( BYTE* pImage, int w, int h, int ch = 3, CString sTitle = _T("") );
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Áö¿øÀÔ´Ï´Ù.
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV ì§€ì›ì…ë‹ˆë‹¤.
 
 	BITMAPINFO	m_bmpInfo;
 

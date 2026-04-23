@@ -1,4 +1,4 @@
-/* 
+﻿/* 
  * QR Code generator library (C++)
  * 
  * Copyright (c) Project Nayuki. (MIT License)

@@ -1,4 +1,4 @@
-// CClipboard Class
+﻿// CClipboard Class
 // ----------------
 // Written by David Terracino <davet@lycosemail.com>
 //

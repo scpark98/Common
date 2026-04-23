@@ -1,4 +1,4 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "XShellTreeCtrl.h"
 #include "XShellMan.h"
 
@@ -43,14 +43,14 @@ void XShellTreeCtrl::Refresh()
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-///         ¾ÆÀÌÅÛ Ãß°¡
+///         ì•„ì´í…œ ì¶”ê°€
 /// @param  
 /// @return 
 /// @date   Monday, October 17, 2011  3:03:44 PM
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 HTREEITEM XShellTreeCtrl::InsertItem(HTREEITEM hParentItem, CShellItem* pItem)
 {
-	if(pItem->isTreeItem==FALSE) return 0;		// Æ®¸®¿ë ¾ÆÀÌÅÛÀÌ ¾Æ´Ï¸é ÆÐ½º.
+	if(pItem->isTreeItem==FALSE) return 0;		// íŠ¸ë¦¬ìš© ì•„ì´í…œì´ ì•„ë‹ˆë©´ íŒ¨ìŠ¤.
 
 	TV_ITEM tvItem;
 	tvItem.mask = TVIF_PARAM | TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
@@ -69,7 +69,7 @@ HTREEITEM XShellTreeCtrl::InsertItem(HTREEITEM hParentItem, CShellItem* pItem)
 	tvInsert.hInsertAfter = TVI_LAST;
 	tvInsert.hParent = hParentItem;
 
-	// ¾ÆÀÌÅÛ Ãß°¡
+	// ì•„ì´í…œ ì¶”ê°€
 	HTREEITEM hItem = TreeView_InsertItem(m_hWnd, &tvInsert);
 	return hItem;
 }
@@ -107,12 +107,12 @@ int XShellTreeCtrl::OnGetItemIcon(CShellItem* pItem, BOOL bSelected)
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-///         PARENT ¿¡¼­ º¸³»¿Â WM_NOTIFY (OCM_NOTIFY) Ã³¸®ÇÏ±â
-///			parent ¿¡¼­´Â ´ÙÀ½°ú °°ÀÌ REFLECT_NOTIFICATIONS() °¡ ÀÖ¾î¾ß ÇÑ´Ù.
+///         PARENT ì—ì„œ ë³´ë‚´ì˜¨ WM_NOTIFY (OCM_NOTIFY) ì²˜ë¦¬í•˜ê¸°
+///			parent ì—ì„œëŠ” ë‹¤ìŒê³¼ ê°™ì´ REFLECT_NOTIFICATIONS() ê°€ ìžˆì–´ì•¼ í•œë‹¤.
 /* 
 			BEGIN_MSG_MAP(CMainDlg)
 				// ...
-				REFLECT_NOTIFICATIONS()		// Â÷ÀÏµå ÄÁÆ®·ÑÀÇ ¸Þ½ÃÁö ¸®ÇÃ·º¼Ç Ã³¸®
+				REFLECT_NOTIFICATIONS()		// ì°¨ì¼ë“œ ì»¨íŠ¸ë¡¤ì˜ ë©”ì‹œì§€ ë¦¬í”Œë ‰ì…˜ ì²˜ë¦¬
 				// ...
 			END_MSG_MAP()
 */
@@ -135,11 +135,11 @@ LRESULT	XShellTreeCtrl::OnNotify(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& 
 	else if(pNotify->code==TVN_BEGINLABELEDIT)
 	{
 		if(m_editing)
-			return FALSE;		// ÆíÁý
+			return FALSE;		// íŽ¸ì§‘
 
 		HTREEITEM hTreeItem;
 		if(IsEditable(hTreeItem)==FALSE)
-			return TRUE;				// edit ¾ÈÇÔ
+			return TRUE;				// edit ì•ˆí•¨
 
 		m_editing = TRUE;
 		return FALSE;
@@ -167,7 +167,7 @@ void XShellTreeCtrl::OnItemexpanding(NMHDR* pNMHDR)
 	switch (pNMTreeView->action)
 	{
 	case TVE_EXPAND:
-		m_man->OnTreeExpand(hItem);		// parent ¿¡¼­ Ã³¸®
+		m_man->OnTreeExpand(hItem);		// parent ì—ì„œ ì²˜ë¦¬
 		break;
 
 	case TVE_COLLAPSE:
@@ -183,7 +183,7 @@ void XShellTreeCtrl::Expand(HTREEITEM hItem)
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-///         '+' ¸ð¾ç ¾ø¾Ö±â
+///         '+' ëª¨ì–‘ ì—†ì• ê¸°
 /// @param  
 /// @return 
 /// @date   Wednesday, October 19, 2011  10:51:41 AM
@@ -196,7 +196,7 @@ void XShellTreeCtrl::RemovePlusMark(HTREEITEM hItem, BOOL remove)
 	tvItem.hItem = hItem;
 	tvItem.mask = TVIF_CHILDREN;
 
-	// Ãß°¡!
+	// ì¶”ê°€!
 	if(remove==FALSE)
 		tvItem.cChildren = 1;
 
@@ -270,14 +270,14 @@ LRESULT XShellTreeCtrl::OnKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-///         ÇöÀç ¼±ÅÃµÈ ¾ÆÀÌÅÛÀÌ ÆíÁý °¡´ÉÇÑ ¾ÆÀÌÅÛÀÎ°¡?
+///         í˜„ìž¬ ì„ íƒëœ ì•„ì´í…œì´ íŽ¸ì§‘ ê°€ëŠ¥í•œ ì•„ì´í…œì¸ê°€?
 /// @param  
 /// @return 
 /// @date   Monday, October 24, 2011  2:56:55 PM
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 BOOL XShellTreeCtrl::IsEditable(HTREEITEM& hTreeItem)
 {
-	// ¼³Á¤»ó ÆíÁý ºÒ°¡´É
+	// ì„¤ì •ìƒ íŽ¸ì§‘ ë¶ˆê°€ëŠ¥
 	if(m_man->m_opt.enableTreeControlRename==FALSE)
 		return FALSE;
 
@@ -288,7 +288,7 @@ BOOL XShellTreeCtrl::IsEditable(HTREEITEM& hTreeItem)
 	if(pItem==NULL){ASSERT(0); return FALSE;}
 
 
-	// ÆíÁý °¡´ÉÇÑ ¾ÆÀÌÅÛÀÎ°¡?
+	// íŽ¸ì§‘ ê°€ëŠ¥í•œ ì•„ì´í…œì¸ê°€?
 	if(pItem->isEditable)
 		return TRUE;
 
@@ -296,7 +296,7 @@ BOOL XShellTreeCtrl::IsEditable(HTREEITEM& hTreeItem)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-///         ÆíÁý ¿Ï·á Ã³¸®
+///         íŽ¸ì§‘ ì™„ë£Œ ì²˜ë¦¬
 /// @param  
 /// @return 
 /// @date   Monday, October 24, 2011  3:09:13 PM
@@ -314,19 +314,19 @@ BOOL XShellTreeCtrl::EndLabelEdit(NMTVDISPINFO* pdi)
 	if(FAILED(hr))
 		return FALSE;
 
-	// shell notify ¹«½ÃÇÏµµ·Ï..
+	// shell notify ë¬´ì‹œí•˜ë„ë¡..
 	if(m_man->m_list)
 		m_man->m_list->ResetShellNotifyTick();
 
 
-	// ¼º°ø½Ã.. newpidl ·Î ¹Ù²Û´Ù.
+	// ì„±ê³µì‹œ.. newpidl ë¡œ ë°”ê¾¼ë‹¤.
 	pItem->ChangePidl(newPidl);
 	pItem->dispName = pItem->pidlFQ.GetDispName();
 
-	// ½ÇÁ¦·Î ¹Ù²ï ÀÌ¸§ ´Ù½Ã ¹Ý¿µ
+	// ì‹¤ì œë¡œ ë°”ë€ ì´ë¦„ ë‹¤ì‹œ ë°˜ì˜
 	pdi->item.pszText = pItem->dispName.GetBuffer();
 
-	// current path µµ ¹Ù²î¾ú´Ù..
+	// current path ë„ ë°”ë€Œì—ˆë‹¤..
 	m_man->GetCurrentPathFromCurPidl();
 
 	return TRUE;

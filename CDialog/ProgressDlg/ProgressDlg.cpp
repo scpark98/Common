@@ -1,4 +1,4 @@
-// ProgressDlg.cpp : implementation file
+﻿// ProgressDlg.cpp : implementation file
 //
 
 #include "stdafx.h"

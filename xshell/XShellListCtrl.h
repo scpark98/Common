@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
+ï»¿////////////////////////////////////////////////////////////////////////////////////////////////////
 /// 
 /// 
 /// 
@@ -42,7 +42,7 @@ public :
 
 public :
 	BEGIN_MSG_MAP(XShellListCtrl)
-		MESSAGE_HANDLER(OCM_NOTIFY, OnNotify)		// PARENT ¿¡¼­ REFLECT µÈ WM_NOTIFY ¸Ş½ÃÁö Ã³¸®
+		MESSAGE_HANDLER(OCM_NOTIFY, OnNotify)		// PARENT ì—ì„œ REFLECT ëœ WM_NOTIFY ë©”ì‹œì§€ ì²˜ë¦¬
 		MESSAGE_HANDLER(WM_CONTEXTMENU, OnContextMenu)
 		MESSAGE_HANDLER(WM_INITMENUPOPUP, HandleMenu)
 		MESSAGE_HANDLER(WM_LBUTTONDBLCLK, OnLButtonDblClk)
@@ -54,7 +54,7 @@ public :
 		MESSAGE_HANDLER(WM_GETDLGCODE, OnGetDlgCode)
 	END_MSG_MAP()
 
-public :			// »ó¼Ó °¡´ÉÇÑ ¸Ş½îµå
+public :			// ìƒì† ê°€ëŠ¥í•œ ë©”ì˜ë“œ
 	virtual void	OnSetItemText(int nItem, CShellItem* pItem);
 	virtual int		OnCompareItems(CShellItem* pItem1, CShellItem* pItem2);
 
@@ -75,7 +75,7 @@ private :
 		TIMER_DELAYPOSTSELCHANGE	= 3,
 	};
 
-private :			// friend class ¿¡¼­ È£ÃâÇÏ´Â ³ğµé
+private :			// friend class ì—ì„œ í˜¸ì¶œí•˜ëŠ” ë†ˆë“¤
 	void			RefreshScreen();
 	void			ClearItems();
 	void			ResetShellNotifyTick();
@@ -108,7 +108,7 @@ private :
 	int				m_column2sort;
 	IContextMenu2*	m_pContextMenu2;
 	BOOL			m_editing;
-	int				m_editingPos;					// ÇöÀç ÀÌ¸§ ¹Ù²Ù´ÂÁßÀÎ ¾ÆÀÌÅÛ À§Ä¡
+	int				m_editingPos;					// í˜„ì¬ ì´ë¦„ ë°”ê¾¸ëŠ”ì¤‘ì¸ ì•„ì´í…œ ìœ„ì¹˜
 	DWORD			m_tick2IgnoreShallChangeNotify;
 	ShellListColumns	m_sortBy;
 	BOOL				m_sortAscending;

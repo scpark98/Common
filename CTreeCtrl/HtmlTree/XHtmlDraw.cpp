@@ -1,4 +1,4 @@
-// XHtmlDraw.cpp  Version 1.2 - article available at www.codeproject.com
+﻿// XHtmlDraw.cpp  Version 1.2 - article available at www.codeproject.com
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

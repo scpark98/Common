@@ -72,6 +72,17 @@ CRect CSCParagraphStatic::set_text(CString text)
 	return m_rect_text;
 }
 
+void CSCParagraphStatic::set_textf(LPCTSTR format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	CString text;
+	text.FormatV(format, args);
+
+	set_text(text);
+}
+
 void CSCParagraphStatic::set_line_spacing(float spacing)
 {
 	float old_spacing = m_line_spacing;

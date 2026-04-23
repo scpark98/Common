@@ -1,10 +1,10 @@
-
+﻿
 #if _MSC_VER > 1000
 #pragma once
 #endif // _MSC_VER > 1000
 
 #include <Afxwin.h>
-//scpark. ��ó codeproject.com
+//scpark. 출처 codeproject.com
 
 
 class CInputBox : public CFrameWnd

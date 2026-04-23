@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file StyleWriter.h
  ** Simple buffered interface to the text and styles of a document held by Scintilla.
  **/

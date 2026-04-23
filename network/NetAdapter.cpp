@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "NetAdapter.h"
 #include "winerr.h"
 //#include ".\netadapter.h"

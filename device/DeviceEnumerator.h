@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifndef DEVICE_ENUMERATOR
 #define DEVICE_ENUMERATOR

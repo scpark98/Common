@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Thomas Fussell
+﻿// Copyright (c) 2014-2022 Thomas Fussell
 // Copyright (c) 2010-2015 openpyxl
 // Copyright (c) 2024-2025 xlnt-community
 //

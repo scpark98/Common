@@ -1,4 +1,4 @@
-// RangeSlider.cpp : implementation file
+﻿// RangeSlider.cpp : implementation file
 //
 /* Written By and (C) 2002 Jens Scheidtmann
 

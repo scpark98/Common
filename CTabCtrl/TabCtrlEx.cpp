@@ -1,4 +1,4 @@
-// TabCtrlEx.cpp : implementation file
+﻿// TabCtrlEx.cpp : implementation file
 //
 #include "TabCtrlEx.h"
 

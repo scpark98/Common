@@ -1,4 +1,4 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 //#include "listPrint.h"
 
 #include "helper.h"
@@ -455,7 +455,7 @@ void CListCtrlDataPage::CreatePrintFonts()
 	LOGFONT logFont;
 	GMAKESTNUL(logFont);
 
-	LPCTSTR lpszFaceName = _T("±¼¸²");//I18nok
+	LPCTSTR lpszFaceName = _T("êµ´ë¦¼");//I18nok
 
 	logFont.lfCharSet = DEFAULT_CHARSET;
 	logFont.lfHeight = 90;

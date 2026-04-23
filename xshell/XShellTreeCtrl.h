@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
+Ôªø////////////////////////////////////////////////////////////////////////////////////////////////////
 /// 
 /// 
 /// 
@@ -25,12 +25,12 @@ public :
 
 public :
 	BEGIN_MSG_MAP(XShellTreeCtrl)
-		MESSAGE_HANDLER(OCM_NOTIFY, OnNotify)		// PARENT ø°º≠ REFLECT µ» WM_NOTIFY ∏ﬁΩ√¡ˆ √≥∏Æ
+		MESSAGE_HANDLER(OCM_NOTIFY, OnNotify)		// PARENT ÏóêÏÑú REFLECT Îêú WM_NOTIFY Î©îÏãúÏßÄ Ï≤òÎ¶¨
 		MESSAGE_HANDLER(WM_KEYDOWN, OnKeyDown)
 		MESSAGE_HANDLER(WM_PAINT, OnPaint)
 	END_MSG_MAP()
 
-private :			// friend ≈¨∑°Ω∫ø°º≠ »£√‚
+private :			// friend ÌÅ¥ÎûòÏä§ÏóêÏÑú Ìò∏Ï∂ú
 	BOOL			Attach(XShellMan* man, HWND hWndList);
 	HTREEITEM		InsertItem(HTREEITEM hParentItem, CShellItem* pItem);
 	BOOL			RemoveItem(HTREEITEM hTreeItem);
@@ -51,7 +51,7 @@ private :
 	BOOL			IsEditable(HTREEITEM& hTreeItem);
 	BOOL			EndLabelEdit(NMTVDISPINFO* pdi);
 
-private :			// º“∆Æ √≥∏ÆøÎ
+private :			// ÏÜåÌä∏ Ï≤òÎ¶¨Ïö©
 	static int CALLBACK CompareProc(LPARAM, LPARAM, LPARAM);
 
 private :

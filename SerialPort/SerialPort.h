@@ -1,4 +1,4 @@
-/*
+﻿/*
 Module : SerialPort.H
 Purpose: Interface for an MFC wrapper class for serial ports
 

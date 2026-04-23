@@ -1,4 +1,4 @@
-// QPrint.cpp: Implementation of class CQPrint.
+ο»Ώ// QPrint.cpp: Implementation of class CQPrint.
 /*
 Program extention by George Papaioannou : papaioannou@i-paradox.gr, sdancer75@yahoo.gr
 
@@ -222,7 +222,7 @@ int CQPrint::SetMargins (int top, int bottom, int left, int right)
 // overloaded function, see original for instructions
 int CQPrint::SetMargins (CRect rect)
 {
-	return(SetMargins (rect.top, rect.bottom, rect.left, rect.right));	//ΌψΌ­Ώ΅ ΑΦΐΗ
+	return(SetMargins (rect.top, rect.bottom, rect.left, rect.right));	//μμ„μ— μ£Όμ
 }
 
 // set the distance between the lines
@@ -426,7 +426,7 @@ void CQPrint::Print (HPRIVATEFONT font, CString strText, UINT Format, int left)
 			} while (SubTextSize.cx < Width && ( (pos+count) <= strText.GetLength() )) ;
 
 
-			//βρες αν υπάρχει κενό μέχρι MAXCHARS πριν. Αν ναι τότε μείωσε ανάλογα διαφορετικά προχώρα
+			//θ“΄ε¥„ ο¥° ζ¥ι€Άη‰Ή?ο§‡θ΄“ ο§®η¶?MAXCHARS ηε‹–. μ¥Ό ε¥¬?ζ„θΌ’ ι­η€ζΆ ο¥°ηƒ½ζ·€?ζ»ε›η²Ύζ·Ήι…?ηι„­ξ‚®?
 			if ( ( (pos+count) <= strText.GetLength() ) && (strSubText.Right(0) != ' ' ) )
 			{
 				pos2 = strSubText.ReverseFind (' ');

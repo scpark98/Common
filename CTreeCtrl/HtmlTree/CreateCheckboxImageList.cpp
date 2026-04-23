@@ -1,4 +1,4 @@
-// CreateCheckboxImageList.cpp  Version 1.0
+﻿// CreateCheckboxImageList.cpp  Version 1.0
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

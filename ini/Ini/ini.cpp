@@ -1,4 +1,4 @@
-/*
+﻿/*
  INI File Processor.
  Optimized INI text file processor for the embedded c++ system.
  Written by Huirak Lee (huirak.lee@gmail.com)
@@ -1510,7 +1510,7 @@ Ini::SetValueULong(const char* sect, const char* key, unsigned long val)
 void
 Ini::SetValueLongLong(const char* sect, const char* key, long long val)
 {
-	//language spec: –9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
+	//language spec: ??,223,372,036,854,775,808 to 9,223,372,036,854,775,807
 	//but actually...
 	//long long ll = -9223372036854775808; //mingw32-gcc: ../ini.cpp:1610:18: error: integer constant is so large that it is unsigned [-Werror]
 	//TBD: fit buffer size to max value width

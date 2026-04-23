@@ -1,4 +1,4 @@
-// WndShadow.h : header file
+﻿// WndShadow.h : header file
 //
 // Version 0.3
 //

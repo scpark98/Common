@@ -1,4 +1,4 @@
-#ifndef __SOME_HELPER__H__
+﻿#ifndef __SOME_HELPER__H__
 #define __SOME_HELPER__H__
 
 #include "gfx_printjob.h"

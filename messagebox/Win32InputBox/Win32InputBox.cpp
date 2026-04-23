@@ -1,4 +1,4 @@
-#include "Win32InputBox.h"
+ï»¿#include "Win32InputBox.h"
 #include <stdio.h>
 
 #pragma warning (disable: 4312)
@@ -16,10 +16,10 @@ History
 */
 
 /*
-ÀÌ ÆÄÀÏÀº stdafx.h¸¦ ÀÌ¿ëÇÏÁö ¾Ê°í Win32Api·Î¸¸ ÀÛ¼ºµÇ¾úÀ¸¹Ç·Î
-Solution Explorer¿¡¼­ ÀÌ ÆÄÀÏÀÇ Properties¸¦ ¿­°í
-C++ ¿É¼Ç Ç×¸ñ Áß Precompiled Headers¸¦
-"Not Using Precompiled Headers"·Î ¼¼ÆÃÇØÁà¾ß ÇÑ´Ù.
+ì´ íŒŒì¼ì€ stdafx.hë¥¼ ì´ìš©í•˜ì§€ ì•Šê³  Win32Apië¡œë§Œ ì‘ì„±ë˜ì—ˆìœ¼ë¯€ë¡œ
+Solution Explorerì—ì„œ ì´ íŒŒì¼ì˜ Propertiesë¥¼ ì—´ê³ 
+C++ ì˜µì…˜ í•­ëª© ì¤‘ Precompiled Headersë¥¼
+"Not Using Precompiled Headers"ë¡œ ì„¸íŒ…í•´ì¤˜ì•¼ í•œë‹¤.
 */
 
 #define TIMER_TIMEOUT		0

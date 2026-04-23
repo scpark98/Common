@@ -144,7 +144,7 @@ public:
 
 	//read only일 때 배경색을 변경할 수 있다. 파라미터를 주지 않으면 윈도우 기본 readonly 배경색(COLOR_3DFACE)으로 설정된다.
 	void				set_back_color_readonly(Gdiplus::Color cr_back_readonly = get_sys_color(COLOR_3DFACE));
-	//readonly일 때 전용 배경색인 m_cr_back_readonly를 사용할 지, 무관하게 m_cr_back을 사용할 지.
+	//readonly일 때 원래 기본색인 gray로 표시할 것인지, m_cr_back을 사용할 지.
 	void				set_use_readonly_color(bool use_default = true);
 
 	//기본 CWnd::SetFont() override

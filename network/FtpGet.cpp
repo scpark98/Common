@@ -1,4 +1,4 @@
-/*
+ï»¿/*
 		Big thanks to  Ken Sutherland, he answered a post in
 		codeguru and this class was made using his answer.
 		Qu: How to Get file form ftp server
@@ -225,10 +225,10 @@ BOOL CFtpGet::PutFile( CString localFile, CString remoteFile )
 	if ( !m_pFtpConnection )
 		return FALSE;
 
-	//½ÉÇÃ ¹æ½Ä
+	//ì‹¬í”Œ ë°©ì‹
 	return m_pFtpConnection->PutFile(localFile,	remoteFile );
 /*
-	//ÆĞÅ¶ ¹æ½Ä
+	//íŒ¨í‚· ë°©ì‹
 	CInternetFile* pIFile = NULL;
 	pIFile = m_pFtpConnection->OpenFile( remoteFile, GENERIC_WRITE, FTP_TRANSFER_TYPE_BINARY );
 
@@ -442,7 +442,7 @@ void CFtpGet::FindDirectoryFiles( CString strPath, CStringArray& arFile, CDWordA
 			continue;
 		else if ( finder.IsDirectory() )
 		{
-			// Æú´õÀÌ¸é Æú´õ¸®½ºÆ®¿¡ ³Ö¾îÁÖ°í
+			// í´ë”ì´ë©´ í´ë”ë¦¬ìŠ¤íŠ¸ì— ë„£ì–´ì£¼ê³ 
 			arFolder.Add( sFile );
 		}
 		else
@@ -456,7 +456,7 @@ void CFtpGet::FindDirectoryFiles( CString strPath, CStringArray& arFile, CDWordA
 
 	finder.Close();
 
-	// °¢ Æú´õ¸¶´Ù Àç±ÍÈ£Ãâ ½ÃÀÛ.
+	// ê° í´ë”ë§ˆë‹¤ ì¬ê·€í˜¸ì¶œ ì‹œì‘.
 	for ( int i = 0; i < arFolder.GetSize(); i++ )
 		FindDirectoryFiles( arFolder.GetAt(i), arFile, arSize );
 }

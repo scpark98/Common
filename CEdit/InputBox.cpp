@@ -1,4 +1,4 @@
-//#include "stdafx.h"
+﻿//#include "stdafx.h"
 #include "InputBox.h"
 
 #ifdef _DEBUG

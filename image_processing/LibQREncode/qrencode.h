@@ -1,4 +1,4 @@
-/**
+﻿/**
  * qrencode - QR Code encoder
  *
  * Copyright (C) 2006-2011 Kentaro Fukuchi <kentaro@fukuchi.org>

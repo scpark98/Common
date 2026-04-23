@@ -1,4 +1,4 @@
-// WndShadow.h : header file
+Ôªø// WndShadow.h : header file
 //
 // Version 0.3
 //
@@ -343,7 +343,7 @@ LRESULT CALLBACK CWndShadow::ParentProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
 }
 
-// Update ∞Ëº” »£√‚µ 
+// Update Í≥ÑÏÜç Ìò∏Ï∂úÎê®
 void CWndShadow::Update(HWND hParent)
 {
 	RECT WndRect;

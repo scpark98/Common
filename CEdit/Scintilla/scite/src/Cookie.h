@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file Cookie.h
  ** Examine start of files for coding cookies and type information.
  **/

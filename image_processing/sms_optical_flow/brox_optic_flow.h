@@ -1,9 +1,9 @@
-// This program is free software: you can use, modify and/or redistribute it
+﻿// This program is free software: you can use, modify and/or redistribute it
 // under the terms of the simplified BSD License. You should have received a
 // copy of this license along this program. If not, see
 // <http://www.opensource.org/licenses/bsd-license.html>.
 //
-// Copyright (C) 2012, Javier Sánchez Pérez <jsanchez@dis.ulpgc.es>
+// Copyright (C) 2012, Javier S찼nchez P챕rez <jsanchez@dis.ulpgc.es>
 // All rights reserved.
 
 #ifndef BROX_OPTIC_FLOW_H
@@ -21,10 +21,10 @@ typedef struct { double x, y; } xy_vector;
 #endif
 
 //2017. 02. 07
-//MOD PAS과제용으로 속도 최적화 및 c 코드로 포팅.(jwchoi)
-//동적 할당을 모두 없애고 nscale을 1로 fix.
-//이미지의 크기 또한 동적 변경은 불가하고 fix 시킴.
-//동일한 설정으로 원래 코드의 약 22% 처리 속도가 향상됨.
+//MOD PAS怨쇱젣?⑹쑝濡??띾룄 理쒖쟻??諛?c 肄붾뱶濡??ы똿.(jwchoi)
+//?숈쟻 ?좊떦??紐⑤몢 ?놁븷怨?nscale??1濡?fix.
+//?대?吏???ш린 ?먰븳 ?숈쟻 蹂寃쎌? 遺덇??섍퀬 fix ?쒗궡.
+//?숈씪???ㅼ젙?쇰줈 ?먮옒 肄붾뱶????22% 泥섎━ ?띾룄媛 ?μ긽??
 
 #define PAR_DEFAULT_ALPHA 18
 #define PAR_DEFAULT_GAMMA 7
@@ -60,7 +60,7 @@ void psi_data(
 {
 	const int size = nx * ny;
 
-	//compute 1/(sqrt((I2-I1+I2x*du+I2y*dv)²+e²) in each pixel
+	//compute 1/(sqrt((I2-I1+I2x*du+I2y*dv)짼+e짼) in each pixel
 	for(int i = 0; i < size; i++)
 	{
 		const float dI  = I2[i] - I1[i] + I2x[i] * du[i] + I2y[i] * dv[i];
@@ -93,7 +93,7 @@ void psi_gradient(
 {
 	const int size = nx * ny;
 
-	//compute 1/(sqrt(|DI2-DI1+HI2*(du,dv)|²+e²) in each pixel
+	//compute 1/(sqrt(|DI2-DI1+HI2*(du,dv)|짼+e짼) in each pixel
 	for(int i = 0; i < size; i++)
 	{
 		const float dIx = I2x[i] - I1x[i] + I2xx[i] * du[i] + I2xy[i] * dv[i];
@@ -122,7 +122,7 @@ void psi_smooth(
 {
 	const int size = nx * ny;
 
-	//compute 1/(sqrt(ux²+uy²+vx²+vy²+e²) in each pixel
+	//compute 1/(sqrt(ux짼+uy짼+vx짼+vy짼+e짼) in each pixel
 	for(int i = 0; i < size; i++)
 	{
 		const float du  = ux[i] * ux[i] + uy[i] * uy[i];
@@ -573,11 +573,11 @@ void brox_optic_flow_main(
 	}
 }
 
-//opencv OpticalFlow 대체코드
+//opencv OpticalFlow ?泥댁퐫??
 //calcOpticalFlowPyrLK( m_prevImg, img, corners[0], corners[1], status, err, cv::Size(31,31),
 //                      3, TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 20, 0.03), 0, 0.001);
 
-//두 이미지의 OpticalFlow vector값을 리턴.
+//???대?吏??OpticalFlow vector媛믪쓣 由ы꽩.
 xy_vector optical_flow( unsigned char *img1, unsigned char *img2, int w, int h)
 {
 	if ( w > INIT_NX )

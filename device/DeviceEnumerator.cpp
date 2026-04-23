@@ -1,4 +1,4 @@
-#include "DeviceEnumerator.h"
+﻿#include "DeviceEnumerator.h"
 
 #include <dshow.h>
 #pragma comment(lib, "strmiids")

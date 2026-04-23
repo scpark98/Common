@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file ScintillaStructures.h
  ** Structures used to communicate with Scintilla.
  ** The same structures are defined for C in Scintilla.h.

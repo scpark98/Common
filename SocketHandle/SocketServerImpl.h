@@ -1,4 +1,4 @@
-#ifndef SOCKETSERVERIMPL_H
+﻿#ifndef SOCKETSERVERIMPL_H
 #define SOCKETSERVERIMPL_H
 #pragma once
 #pragma warning(push)

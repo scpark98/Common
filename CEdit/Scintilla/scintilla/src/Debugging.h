@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file Debugging.h
  ** Assert and debug trace functions.
  ** Implemented in each platform layer.

@@ -1,4 +1,4 @@
-// XNamedColors.cpp  Version 1.5
+﻿// XNamedColors.cpp  Version 1.5
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

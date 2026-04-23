@@ -1,4 +1,4 @@
-/*
+﻿/*
  INI File Processor.
  Optimized INI text file processor for the embedded c++ system.
  Written by Huirak Lee (huirak.lee@gmail.com)

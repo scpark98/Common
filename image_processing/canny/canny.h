@@ -1,4 +1,4 @@
-#ifndef __CANNY_H__
+ï»¿#ifndef __CANNY_H__
 #define __CANNY_H__
 
 
@@ -22,7 +22,7 @@ extern void function_canny_main(
 
 extern void CannyEdge(unsigned char *src, unsigned char *dst, int width, int height, int th_low, int th_high );
 
-//ÀÌ¹ÌÁö¼±¾ğ
+//ì´ë¯¸ì§€ì„ ì–¸
 
 //#ifdef __cplusplus
 //}

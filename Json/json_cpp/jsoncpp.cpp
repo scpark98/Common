@@ -1,4 +1,4 @@
-/// Json-cpp amalgated source (http://jsoncpp.sourceforge.net/).
+ï»¿/// Json-cpp amalgated source (http://jsoncpp.sourceforge.net/).
 /// It is intended to be used with #include "json/json.h"
 
 // //////////////////////////////////////////////////////////////////////
@@ -4333,7 +4333,7 @@ static unsigned int utf8ToCodepoint(const char*& s, const char* e) {
   if (firstByte < 0x80)
     return firstByte;
   else
-	return 7777; // 2022.12.07 fix - ÇÑ±Û¹®Á¦ Ã³¸® (Âü°í: https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=minkyuramer&logNo=221807330540)
+	return 7777; // 2022.12.07 fix - í•œê¸€ë¬¸ì œ ì²˜ë¦¬ (ì°¸ê³ : https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=minkyuramer&logNo=221807330540)
 
   if (firstByte < 0xE0) {
     if (e - s < 2)
@@ -4459,7 +4459,7 @@ static JSONCPP_STRING valueToQuotedStringN(const char* value, unsigned length) {
         // (short escape sequence are applied above)
         if (cp < 0x80 && cp >= 0x20)
           result += static_cast<char>(cp);
-		else if (cp == 7777) // 2022.12.07 fix - ÇÑ±Û¹®Á¦ Ã³¸® (Âü°í: https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=minkyuramer&logNo=221807330540)
+		else if (cp == 7777) // 2022.12.07 fix - í•œê¸€ë¬¸ì œ ì²˜ë¦¬ (ì°¸ê³ : https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=minkyuramer&logNo=221807330540)
 			result += c[0];
         else if (cp < 0x10000) { // codepoint is in Basic Multilingual Plane
           result += "\\u";

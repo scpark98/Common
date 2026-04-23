@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file ExportTEX.cxx
  ** Export the current document to TEX.
  **/

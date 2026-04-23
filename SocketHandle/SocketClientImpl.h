@@ -1,4 +1,4 @@
-#ifndef SOCKETCLIENTIMPL_H
+﻿#ifndef SOCKETCLIENTIMPL_H
 #define SOCKETCLIENTIMPL_H
 #pragma once
 #pragma warning(push)

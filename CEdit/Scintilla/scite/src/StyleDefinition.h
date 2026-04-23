@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file StyleDefinition.h
  ** Definition of style aggregate and helper functions.
  **/

@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file StripDefinition.h
  ** Definition of classes build user strips from a description string.
  **/

@@ -1,4 +1,4 @@
-//#include "stdafx.h"
+Ôªø//#include "stdafx.h"
 #include "LayeredWindowHelperST.h"
 
 #ifdef _DEBUG
@@ -53,7 +53,7 @@ LONG CLayeredWindowHelperST::AddLayeredStyle(HWND hWnd)
 		return 0;
 	}
 
-	return (LONG)oldEx; // º∫∞¯ Ω√ ¿Ã¿¸∞™ ∏Æ≈œ
+	return (LONG)oldEx; // ÏÑ±Í≥µ Ïãú Ïù¥Ï†ÑÍ∞í Î¶¨ÌÑ¥
 	/*
 	LONG res = ::SetWindowLongPtr(hWnd, GWL_EXSTYLE, ::GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
 	if (!res)

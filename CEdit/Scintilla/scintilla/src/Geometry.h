@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file Geometry.h
  ** Classes and functions for geometric and colour calculations.
  **/

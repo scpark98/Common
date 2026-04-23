@@ -1,4 +1,4 @@
-// GraphicObject.cpp : implementation file
+﻿// GraphicObject.cpp : implementation file
 //
 
 #include "stdafx.h"

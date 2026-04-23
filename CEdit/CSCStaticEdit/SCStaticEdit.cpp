@@ -242,6 +242,14 @@ void CSCStaticEdit::set_readonly(bool readonly)
 	Invalidate(FALSE);
 }
 
+void CSCStaticEdit::set_use_default_readonly_color(bool use_default, Gdiplus::Color cr_back_readonly)
+{
+	m_use_default_readonly_color = use_default;
+	if (!use_default && cr_back_readonly.GetValue() != Gdiplus::Color::Transparent)
+		m_theme.cr_back = cr_back_readonly;
+	Invalidate();
+}
+
 void CSCStaticEdit::set_password_mode(bool password, TCHAR mask_char)
 {
 	m_password = password;
@@ -504,7 +512,7 @@ void CSCStaticEdit::OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 				CStatic::OnKeyDown(n_char, n_rep_cnt, n_flags);
 				return;
 			}
-			// _tcstol 로 전체가 정수인지 검사. 공백/부호 허용, 그 외 문자가 하나라도
+			// _tcstod 로 전체가 실수인지 검사. 공백/부호/소수점 허용, 그 외 문자가 하나라도
 			// 섞이면 스킵한다.
 			CString trimmed = m_text;
 			trimmed.Trim();
@@ -512,13 +520,38 @@ void CSCStaticEdit::OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 				return;
 			LPCTSTR begin = trimmed;
 			LPTSTR  p_end = nullptr;
-			long val = _tcstol(begin, &p_end, 10);
+			double val = _tcstod(begin, &p_end);
 			if (p_end == begin || p_end == nullptr || *p_end != _T('\0'))
 				return;
 			push_undo();
 			val += (n_char == VK_UP) ? m_updown_interval : -m_updown_interval;
+
+			// 소수점 자리수 = max(interval 자리수, 현재 텍스트 자리수).
+			// %g 는 trailing 0 을 제거해 "0.09 + 0.01 = 0.10" 이 "0.1" 로 보이므로
+			// %.Nf 로 고정 자리수 표시. 사용자 입력 정밀도 (예: "1.234") 도 보존.
+			//
+			// interval 자리수 추출: float 의 이진 부정확성 때문에 반복 곱하기 방식은 오버카운트됨
+			// (0.0001f 는 실제 9.99999974e-5 라 ×10 을 반복해도 fractional part 가 안 사라짐).
+			// → (double) 승격 후 %g 문자열 표현에서 '.' / 'e' 위치로 직접 계산.
+			CString s_iv;
+			s_iv.Format(_T("%g"), (double)m_updown_interval);
+			int iexp = s_iv.FindOneOf(_T("eE"));
+			int idot = s_iv.Find(_T('.'));
+			int mantissa_end  = (iexp >= 0) ? iexp : s_iv.GetLength();
+			int mantissa_prec = (idot >= 0 && idot < mantissa_end) ? (mantissa_end - idot - 1) : 0;
+			int exp_val       = (iexp >= 0) ? _ttoi(s_iv.Mid(iexp + 1)) : 0;
+			int interval_prec = mantissa_prec - exp_val;
+			if (interval_prec < 0)
+				interval_prec = 0;
+
+			int text_prec = 0;
+			int dot = trimmed.ReverseFind(_T('.'));
+			if (dot >= 0)
+				text_prec = trimmed.GetLength() - dot - 1;
+			int precision = max(interval_prec, text_prec);
+
 			CString new_text;
-			new_text.Format(_T("%ld"), val);
+			new_text.Format(_T("%.*f"), precision, val);
 			m_text = new_text;
 			m_caret_pos = m_text.GetLength();
 			clear_selection();
@@ -985,7 +1018,7 @@ void CSCStaticEdit::OnPaint()
 void CSCStaticEdit::draw_background(Gdiplus::Graphics& g, const CRect& rc)
 {
 	// readonly/disabled 배경은 표준 다이얼로그 배경색(COLOR_3DFACE)으로.
-	Gdiplus::Color cr_back = (!IsWindowEnabled() || m_readonly)
+	Gdiplus::Color cr_back = (!IsWindowEnabled() || (m_readonly && m_use_default_readonly_color))
 		? get_sys_color(COLOR_3DFACE)
 		: m_theme.cr_back;
 

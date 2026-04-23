@@ -1,4 +1,4 @@
-//
+﻿//
 //  sgss/quadtree.h
 //
 //  MIT License

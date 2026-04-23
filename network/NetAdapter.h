@@ -1,4 +1,4 @@
-#ifndef _ADAPTER_INFO_H____
+﻿#ifndef _ADAPTER_INFO_H____
 #define _ADAPTER_INFO_H____
 //#include "stdafx.h"
 #include <windows.h>

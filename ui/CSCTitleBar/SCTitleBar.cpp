@@ -1,4 +1,4 @@
-#include "SCTitleBar.h"
+﻿#include "SCTitleBar.h"
 
 void CSCTitleBar::draw(CDC* pDC, CRect rc)
 {

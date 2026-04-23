@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file ChangeHistory.h
  ** Manages a history of changes in a document.
  **/

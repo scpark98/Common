@@ -1,4 +1,4 @@
-#ifndef THREADPOOL_HPP
+﻿#ifndef THREADPOOL_HPP
 #define THREADPOOL_HPP
 #pragma warning(push)
 #pragma warning(disable:4995)

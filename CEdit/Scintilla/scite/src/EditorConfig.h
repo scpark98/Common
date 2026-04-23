@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file EditorConfig.h
  ** Read and interpret settings files in the EditorConfig format.
  **/

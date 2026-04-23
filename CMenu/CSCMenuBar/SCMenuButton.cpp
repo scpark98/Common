@@ -1,4 +1,4 @@
-#include "SCMenuButton.h"
+ï»¿#include "SCMenuButton.h"
 
 #include "../../Functions.h"
 #include "../../SCGdiplusBitmap.h"
@@ -56,7 +56,7 @@ void CSCMenuButton::popup_menu()
 		CRect rmenu = get_menu_rect();
 		HBITMAP hBitmap = capture_screen_to_bitmap(&rmenu);
 		CSCGdiplusBitmap img(hBitmap);
-		//img.blur(35.3, FALSE);	//½Å±Ô Ãß°¡µÈ blur()´Â ¿À·ù°¡ ¹ß»ıµÊ.
+		//img.blur(35.3, FALSE);	//ì‹ ê·œ ì¶”ê°€ëœ blur()ëŠ” ì˜¤ë¥˜ê°€ ë°œìƒë¨.
 		img.gdip_blur(35.3, FALSE);
 		m_menu.set_back_image(&img);
 	}

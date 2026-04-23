@@ -1,4 +1,4 @@
-#ifndef _zip_H
+ï»¿#ifndef _zip_H
 #define _zip_H
 
 
@@ -75,9 +75,9 @@ ZRESULT ZipAddFolder(HZIP hz,const TCHAR *dstzn);
 #include <atlstr.h>	//for CString
 #include <deque>
 
-//scpark add ÁöÁ¤µÈ Æú´õ³»ÀÇ ¸ğµç ÆÄÀÏµéÀ» ¾ĞÃàÇÑ´Ù.
-//folder_name_in_zip : »ı¼ºµÉ ·Î±×ÆÄÀÏ³»¿¡ º°µµ Æú´õ¸¦ »ı¼ºÇÒ °ÍÀÎÁö. ""ÀÌ¸é »ı¼ºÇÏÁö ¾Ê°í ÀÌ °ªÀÌ "Log"¶ó¸é ¾ĞÃàÆÄÀÏ ¾È¿¡ "Log" Æú´õ¸¦ »ı¼ºÇÑ ÈÄ Æú´õ/ÆÄÀÏµéÀÌ Ãß°¡µÈ´Ù.
-//dqÀÇ ¸ğµç ÆÄÀÏµéÀº root_dir Æú´õ ¹× ±× ÇÏÀ§Æú´õ¿¡ Á¸ÀçÇØ¾ß ÇÑ´Ù.
+//scpark add ì§€ì •ëœ í´ë”ë‚´ì˜ ëª¨ë“  íŒŒì¼ë“¤ì„ ì••ì¶•í•œë‹¤.
+//folder_name_in_zip : ìƒì„±ë  ë¡œê·¸íŒŒì¼ë‚´ì— ë³„ë„ í´ë”ë¥¼ ìƒì„±í•  ê²ƒì¸ì§€. ""ì´ë©´ ìƒì„±í•˜ì§€ ì•Šê³  ì´ ê°’ì´ "Log"ë¼ë©´ ì••ì¶•íŒŒì¼ ì•ˆì— "Log" í´ë”ë¥¼ ìƒì„±í•œ í›„ í´ë”/íŒŒì¼ë“¤ì´ ì¶”ê°€ëœë‹¤.
+//dqì˜ ëª¨ë“  íŒŒì¼ë“¤ì€ root_dir í´ë” ë° ê·¸ í•˜ìœ„í´ë”ì— ì¡´ì¬í•´ì•¼ í•œë‹¤.
 ZRESULT ZipAddMultipleFiles(CString folder_name_in_zip, CString root_dir, std::deque<CString>& dq, CString zip_path);
 
 

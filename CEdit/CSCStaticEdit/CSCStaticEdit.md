@@ -190,8 +190,10 @@ void  set_padding(int padding);
 void  set_line_align(DWORD align = DT_VCENTER);  // DT_TOP / DT_VCENTER / DT_BOTTOM
 void  set_text_align(DWORD align = DT_LEFT);     // DT_LEFT / DT_CENTER / DT_RIGHT
 
-// 텍스트가 정수로 파싱되는 경우 up/down 방향키로 ± interval. 비정수면 동작 skip.
-void  set_use_updown_key(bool use = true, int interval = 1);
+// 텍스트가 실수로 파싱되는 경우 up/down 방향키로 ± interval. 실수 파싱 실패 시 skip.
+// interval 은 float (예: 0.001). 표시 자리수 = max(interval 자리수, 현재 텍스트 자리수).
+// 예: interval=0.01, "0.09" → up → "0.10" (trailing 0 보존).
+void  set_use_updown_key(bool use = true, float interval = 1.0f);
 ```
 
 ### 선택

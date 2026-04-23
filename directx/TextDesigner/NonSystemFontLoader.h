@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <WinGDI.h>
 
 // StringType = std::string or std::wstring

@@ -1,4 +1,4 @@
-// OwnMenu.h: Schnittstelle f? die Klasse COwnMenu.
+﻿// OwnMenu.h: Schnittstelle f? die Klasse COwnMenu.
 //
 //////////////////////////////////////////////////////////////////////
 

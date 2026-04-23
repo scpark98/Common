@@ -1,4 +1,4 @@
-
+ï»¿
 #include "subtitle_setting.h"
 #include "../Functions.h"
 
@@ -19,7 +19,7 @@ void CSubtitleSetting::set_default()
 {
 	memset(lf, 0, sizeof(LOGFONT));
 
-	_tcscpy(lf->lfFaceName, _T("¸¼Àº °íµñ"));
+	_tcscpy(lf->lfFaceName, _T("ë§‘ì€ ê³ ë”•"));
 	lf->lfCharSet = DEFAULT_CHARSET;
 	lf->lfHeight = -MulDiv(font_size, GetDeviceCaps(::GetDC(NULL), LOGPIXELSY), 72);
 	lf->lfWeight = FW_DONTCARE;

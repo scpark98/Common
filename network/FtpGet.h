@@ -1,4 +1,4 @@
-// FtpGet.h: interface for the CFtpGet class.
+ï»¿// FtpGet.h: interface for the CFtpGet class.
 
 #if !defined(AFX_FTPGET_H__9A4CA560_F2F5_11D3_9FF0_0080C8F223E1__INCLUDED_)
 #define AFX_FTPGET_H__9A4CA560_F2F5_11D3_9FF0_0080C8F223E1__INCLUDED_
@@ -21,7 +21,7 @@ public:// function
 	CFtpGet();
 	virtual ~CFtpGet();
 
-	//Àü¼Û »óÅÂ¸¦ Àü´ŞÇÏ±â À§ÇÑ parentÀ©µµ¿ì ÇÚµé ¸í½Ã
+	//ì „ì†¡ ìƒíƒœë¥¼ ì „ë‹¬í•˜ê¸° ìœ„í•œ parentìœˆë„ìš° í•¸ë“¤ ëª…ì‹œ
 	BOOL		Connect( HWND hParentWnd, CString sServerIP, CString sID, CString sPass, int nPort = 21, BOOL bPassive = FALSE );
 	BOOL		IsConnected() {	return ( m_pFtpConnection != NULL ); }
 	void		AbortDownloading( BOOL bAbortDownloading );
@@ -43,7 +43,7 @@ public:// function
 	// close the connection
 	BOOL		CloseConnection();
 
-	BOOL		m_bDeleteAfterGet;		// ´Ù¿î¹ŞÀº ÈÄ ¼­¹ö¿¡¼­ ±× ÆÄÀÏÀ» Áö¿ï°ÍÀÎÁö...
+	BOOL		m_bDeleteAfterGet;		// ë‹¤ìš´ë°›ì€ í›„ ì„œë²„ì—ì„œ ê·¸ íŒŒì¼ì„ ì§€ìš¸ê²ƒì¸ì§€...
 	int			m_nFileCount;
 	CString		m_sFileName[500];
 

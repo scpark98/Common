@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file CharacterType.h
  ** Tests for character type and case-insensitive comparisons.
  **/

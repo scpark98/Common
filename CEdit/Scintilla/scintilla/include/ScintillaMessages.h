@@ -1,4 +1,4 @@
-// Scintilla source code edit control
+﻿// Scintilla source code edit control
 /** @file ScintillaMessages.h
  ** Enumerate the messages that can be sent to Scintilla.
  **/

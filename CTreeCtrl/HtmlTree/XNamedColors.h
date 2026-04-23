@@ -1,4 +1,4 @@
-// XNamedColors.h  Version 1.5
+﻿// XNamedColors.h  Version 1.5
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

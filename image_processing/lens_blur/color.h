@@ -1,4 +1,4 @@
-//
+﻿//
 //  sgss/color.h
 //
 //  MIT License

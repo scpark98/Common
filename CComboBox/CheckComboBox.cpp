@@ -1,4 +1,4 @@
-// CheckComboBox.cpp 
+﻿// CheckComboBox.cpp 
 //
 // Written by Magnus Egelberg (magnus.egelberg@lundalogik.se)
 //

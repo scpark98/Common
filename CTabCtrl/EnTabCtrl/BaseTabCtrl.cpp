@@ -1,4 +1,4 @@
-// BaseTabCtrl.cpp : implementation file
+﻿// BaseTabCtrl.cpp : implementation file
 //
 
 //#include "stdafx.h"

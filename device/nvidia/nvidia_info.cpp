@@ -1,4 +1,4 @@
-#include "nvidia_info.h"
+﻿#include "nvidia_info.h"
 #include <afxwin.h>
 
 CNVidiaInfo::CNVidiaInfo()

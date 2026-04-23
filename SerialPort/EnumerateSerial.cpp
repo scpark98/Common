@@ -1,4 +1,4 @@
-/*
+﻿/*
 Module : enumser.cpp
 Purpose: Implementation for a class to enumerate the serial ports installed on a PC using a number
 of different approaches. 

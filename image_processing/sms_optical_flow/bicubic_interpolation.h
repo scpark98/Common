@@ -1,9 +1,9 @@
-// This program is free software: you can use, modify and/or redistribute it
+﻿// This program is free software: you can use, modify and/or redistribute it
 // under the terms of the simplified BSD License. You should have received a
 // copy of this license along this program. If not, see
 // <http://www.opensource.org/licenses/bsd-license.html>.
 //
-// Copyright (C) 2012, Javier Sánchez Pérez <jsanchez@dis.ulpgc.es>
+// Copyright (C) 2012, Javier S찼nchez P챕rez <jsanchez@dis.ulpgc.es>
 // All rights reserved.
 
 
@@ -12,7 +12,7 @@
 
 #define BOUNDARY_CONDITION 0
 
-//이미지 가로 세로 셀 최대 크기. 4 이상만 가능.
+//?대?吏 媛濡??몃줈 ? 理쒕? ?ш린. 4 ?댁긽留?媛??
 #define INIT_NX 21
 #define INIT_NY 21
 #define INIT_SIZE (INIT_NY*INIT_NX) 

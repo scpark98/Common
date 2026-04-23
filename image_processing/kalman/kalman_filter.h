@@ -1,4 +1,4 @@
-#ifndef __KALMANFILTER__H__
+﻿#ifndef __KALMANFILTER__H__
 #define __KALMANFILTER__H__
 
 #include <limits.h>

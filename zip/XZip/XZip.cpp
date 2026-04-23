@@ -1,4 +1,4 @@
-// XZip.cpp  Version 1.3
+﻿// XZip.cpp  Version 1.3
 //
 // Authors:      Mark Adler et al. (see below)
 //

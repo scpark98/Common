@@ -1,4 +1,4 @@
-#include <opencv/cv.h>
+ï»¿#include <opencv/cv.h>
 #include <opencv/highgui.h>
 
 #include "fast.h"
@@ -15,7 +15,7 @@ void main()
 	int xsize = src.cols;
 	int ysize = src.rows;
 	int stride = xsize;
-	int threshold;			//meanÀÇ 1/2ÀÌ Àû´ç.
+	int threshold;			//meanì˜ 1/2ì´ ì ë‹¹.
 	int numcorners;
 	int sum = 0;
 

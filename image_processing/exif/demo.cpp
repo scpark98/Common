@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include "exif.h"
 
 int main(int argc, char *argv[]) {

@@ -1,4 +1,4 @@
-/**
+﻿/**
 * Copyright (C) 2008 by Kyung-jin Kim
 * e-mail		: devmachine@naver.com
 *

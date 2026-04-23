@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file GUI.h
  ** Interface to platform GUI facilities.
  ** Split off from Scintilla's Platform.h to avoid SciTE depending on implementation of Scintilla.

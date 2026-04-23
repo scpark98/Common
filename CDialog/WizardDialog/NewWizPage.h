@@ -1,4 +1,4 @@
-#if !defined(AFX_NEWWIZPAGE_H__915D4C8B_2E27_11D4_9FA9_0030DB0011C6__INCLUDED_)
+ï»¿#if !defined(AFX_NEWWIZPAGE_H__915D4C8B_2E27_11D4_9FA9_0030DB0011C6__INCLUDED_)
 #define AFX_NEWWIZPAGE_H__915D4C8B_2E27_11D4_9FA9_0030DB0011C6__INCLUDED_
 
 #if _MSC_VER > 1000
@@ -50,7 +50,7 @@ public:
 	BOOL			m_bCreated; // flag to tell us if the dialog has been created
 
 	//scpark 2010-3-10 11:13:33
-	//°¢ ÆäÀÌÁö¸¶´Ù Ä«¿îÆ®´Ù¿îÀÌ ÁøÇàÁßÀÎÁö, ÀÏ½ÃÁ¤Áö»óÅÂÀÎÁö.
+	//ê° í˜ì´ì§€ë§ˆë‹¤ ì¹´ìš´íŠ¸ë‹¤ìš´ì´ ì§„í–‰ì¤‘ì¸ì§€, ì¼ì‹œì •ì§€ìƒíƒœì¸ì§€.
 	BOOL			m_bPaused;
 	CString			m_sDesignPath;
 	CString			m_sSoundPath;
@@ -63,7 +63,7 @@ protected:
 private:
 	UINT			m_nDialogID;	// resource ID for thie page
 	BOOL			m_bActive;		// flag to tell is if the dialog is the active page
-	BOOL			m_bInitialized;	//Àû¾îµµ ÇÑ¹øÀº ÆäÀÌÁö°¡ ·ÎµùµÊ.
+	BOOL			m_bInitialized;	//ì ì–´ë„ í•œë²ˆì€ í˜ì´ì§€ê°€ ë¡œë”©ë¨.
 
 	// Operations
 public:

@@ -1,4 +1,4 @@
-// SerialComm.h
+ï»¿// SerialComm.h
 // 
 // RS-232c Serial Communication Class
 // 
@@ -99,7 +99,7 @@ public:
 	BOOL	m_bConnected,
 			m_bPause;
    
-	HWND	m_hwndNotify;	// Comm Port Data / Status ¼ö½Å À©µµ¿ì
+	HWND	m_hwndNotify;	// Comm Port Data / Status ìˆ˜ì‹  ìœˆë„ìš°
 
 	
 	/*

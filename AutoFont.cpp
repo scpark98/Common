@@ -1,4 +1,4 @@
-//CAutoFont class implementation
+﻿//CAutoFont class implementation
 
 //CAutoFont class implementation
 //#include "stdafx.h"

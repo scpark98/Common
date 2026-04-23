@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file UnicodeConstants.h
  ** Define constants used for Unicode.
  **/

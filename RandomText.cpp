@@ -1,4 +1,4 @@
-// RandomText.cpp: implementation of the RandomText class.
+﻿// RandomText.cpp: implementation of the RandomText class.
 //
 //////////////////////////////////////////////////////////////////////
 

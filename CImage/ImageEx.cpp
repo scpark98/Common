@@ -1,10 +1,10 @@
-#include "ImageEx.h"
+ï»¿#include "ImageEx.h"
 #include <math.h>
 #include "../Functions.h"
 
 //////////////////////////////////////////////////////////////////////////////////
 
-//¹¹Ôìº¯Êı
+//ë­èŠšë³€é‘’
 CImageEx::CImageEx()
 {
 	::SetRect(&m_rcNinePart,0,0,0,0);
@@ -13,13 +13,13 @@ CImageEx::CImageEx()
 	return;
 }
 
-//Îö¹¹º¯Êı
+//é©•ë­ë³€é‘’
 CImageEx::~CImageEx()
 {
 	//DestroyImage(); 
 }
 
-//Ïú»ÙÍ¼Æ¬
+//é¥‹ì‘æš íŠ¬
 bool CImageEx::DestroyImage()
 {
 	if (CImage::IsNull() == false)
@@ -30,7 +30,7 @@ bool CImageEx::DestroyImage()
 	return true;
 }
 
-//¼ÓÔØÍ¼Æ¬
+//ì†æ½¼æš íŠ¬
 bool CImageEx::LoadImage(LPCTSTR pszFileName)
 {
 	HRESULT hr = CImage::Load(pszFileName);
@@ -44,18 +44,18 @@ bool CImageEx::LoadImage(LPCTSTR pszFileName)
 	}
 }
 
-//¼ÓÔØÍ¼Æ¬
+//ì†æ½¼æš íŠ¬
 bool CImageEx::LoadImage(HINSTANCE hInstance, LPCTSTR pszResourceName,LPCTSTR pszResourceType/*=TEXT("IMAGE")*/)
 {
-	//²éÕÒ×ÊÔ´
+	//ê¿´å†·æ —éƒ½
 	HRSRC hResource=FindResource(hInstance,pszResourceName,pszResourceType);
 	if (hResource==NULL) return false;
 
-	//¶ÁÈ¡×ÊÔ´
+	//ë—í˜¤æ —éƒ½
 	DWORD dwImageSize=SizeofResource(hInstance,hResource);
 	LPVOID pImageBuffer=LoadResource(hInstance,hResource);
 
-	//´´½¨Êı¾İ
+	//ëˆ¼ì‰”é‘’ì•´
 	IStream * pIStream=NULL;
 	if (CreateStreamOnHGlobal(NULL,TRUE,&pIStream)!=S_OK)
 	{
@@ -63,12 +63,12 @@ bool CImageEx::LoadImage(HINSTANCE hInstance, LPCTSTR pszResourceName,LPCTSTR ps
 		return false;
 	}
 
-	//Ğ´ÈëÊı¾İ
+	//ç•‡í™é‘’ì•´
 	pIStream->Write(pImageBuffer,dwImageSize,NULL);
 
 	HRESULT hr = CImage::Load(pIStream);
 
- 	//ÊÍ·Å×ÊÔ´
+ 	//å§¦ë ´æ —éƒ½
  	SAFE_RELEASE(pIStream);
 
 	if (hr == S_OK)
@@ -81,7 +81,7 @@ bool CImageEx::LoadImage(HINSTANCE hInstance, LPCTSTR pszResourceName,LPCTSTR ps
 	}
 }
 
-//»æ»­Í¼Ïñ
+//ì‚¥ëºŒæš ç—
 BOOL CImageEx::DrawImage(CDC * pDC, INT nXPos, INT nYPos)
 {
 	pDC->SetStretchBltMode(HALFTONE);
@@ -98,7 +98,7 @@ BOOL CImageEx::DrawImage(CDC * pDC, INT nXPos, INT nYPos)
 	return CImage::Draw(pDC->GetSafeHdc(),nXPos,nYPos);
 }
 
-//»æ»­Í¼Ïñ
+//ì‚¥ëºŒæš ç—
 BOOL CImageEx::DrawImage( CDC * pDC, INT nXPos, INT nYPos, INT nDestWidth, INT nDestHeight )
 {
 	pDC->SetStretchBltMode(HALFTONE);
@@ -116,7 +116,7 @@ BOOL CImageEx::DrawImage( CDC * pDC, INT nXPos, INT nYPos, INT nDestWidth, INT n
 	return FALSE;
 }
 
-//»æ»­Í¼Ïñ
+//ì‚¥ëºŒæš ç—
 BOOL CImageEx::DrawImage( CDC * pDC, RECT &rc )
 {
 	pDC->SetStretchBltMode(HALFTONE);
@@ -139,7 +139,7 @@ BOOL CImageEx::DrawImage( CDC * pDC, RECT &rc )
 	return FALSE;
 }
 
-//»æ»­Í¼Ïñ
+//ì‚¥ëºŒæš ç—
 BOOL CImageEx::DrawImage(CDC * pDC, INT nXDest, INT nYDest, INT nDestWidth, INT nDestHeight, INT nXScr, INT nYSrc)
 {
 	pDC->SetStretchBltMode(HALFTONE);
@@ -157,7 +157,7 @@ BOOL CImageEx::DrawImage(CDC * pDC, INT nXDest, INT nYDest, INT nDestWidth, INT 
 	return FALSE;
 }
 
-//»æ»­Í¼Ïñ
+//ì‚¥ëºŒæš ç—
 BOOL CImageEx::DrawImage(CDC * pDC, INT nXDest, INT nYDest, INT nDestWidth, INT nDestHeight, INT nXScr, INT nYSrc, INT nSrcWidth, INT nSrcHeight)
 {
 	pDC->SetStretchBltMode(HALFTONE);
@@ -180,7 +180,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
 	int cxImage = GetWidth();
 	int cyImage = GetHeight();
 
-	// ×óÉÏ
+	// ç’˜î€®
 	{
 		RECT rcDest = {x, y, x+nLeft, y+nTop};
 		RECT rcSrc = {0, 0, nLeft, nTop};
@@ -189,7 +189,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
 			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ×ó±ß
+	// ç’˜ê¸‹
 	{
 		RECT rcDest = {x, y+nTop, x+nLeft, (y+nTop)+(cy-nTop-nBottom)};
 		RECT rcSrc = {0, nTop, nLeft, nTop+(cyImage-nTop-nBottom)};
@@ -198,7 +198,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
 			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÉÏ±ß
+	// î€®ê¸‹
 	{
 		RECT rcDest = {x+nLeft, y,x+(cx-nRight), y+nTop};
 		RECT rcSrc = {nLeft, 0, (cxImage-nLeft-nRight), nTop};
@@ -207,7 +207,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
  			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÓÒÉÏ
+	// å¡˜î€®
 	{
 		RECT rcDest = {x+(cx-nRight), y, (x+(cx-nRight))+nRight, y+nTop};
 		RECT rcSrc = {cxImage-nRight, 0, (cxImage-nRight)+nRight, nTop};
@@ -216,7 +216,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
   			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÓÒ±ß
+	// å¡˜ê¸‹
 	{
 		RECT rcDest = {x+(cx-nRight), y+nTop, (x+(cx-nRight))+nRight, (y+nTop)+(cy-nTop-nBottom)};
 		RECT rcSrc = {cxImage-nRight, nTop, (cxImage-nRight)+nRight, nTop+(cyImage-nTop-nBottom)};
@@ -225,7 +225,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
   			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÏÂ±ß
+	// è‹Ÿê¸‹
 	{
 		RECT rcDest = {x+nLeft, y+(cy-nBottom), (x+nLeft)+(cx-nLeft-nRight), (y+(cy-nBottom))+nBottom};
 		RECT rcSrc = {nLeft, cyImage-nBottom, nLeft+(cxImage-nLeft-nRight), (cyImage-nBottom)+nBottom};
@@ -234,7 +234,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
  			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÓÒÏÂ
+	// å¡˜è‹Ÿ
 	{
 		RECT rcDest = {x+(cx-nRight), y+(cy-nBottom), (x+(cx-nRight))+nRight, (y+(cy-nBottom))+nBottom};
 		RECT rcSrc = {cxImage-nRight, cyImage-nBottom, (cxImage-nRight)+nRight, (cyImage-nBottom)+nBottom};
@@ -243,7 +243,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
  			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ×óÏÂ
+	// ç’˜è‹Ÿ
 	{
 		RECT rcDest = {x, y+(cy-nBottom), x+nLeft, (y+(cy-nBottom))+nBottom};
 		RECT rcSrc = {0, cyImage-nBottom, nLeft, (cyImage-nBottom)+nBottom};
@@ -252,7 +252,7 @@ bool CImageEx::Draw( CDC * pDC, INT x, INT y, INT cx, INT cy,INT nLeft,INT nTop,
 			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÖĞ¼ä
+	// æ«“ì‡Œ
 	{
 		RECT rcDest = {x+nLeft, y+nTop, x+(cx-nRight), y+(cy-nBottom)};
 		RECT rcSrc = {nLeft, nTop, cxImage-nRight, cyImage-nBottom};
@@ -289,7 +289,7 @@ bool CImageEx::DrawFrame( CDC * pDC, const RECT& rectDest )
 	INT nRight = m_rcNinePart.right;
 	INT nBottom = m_rcNinePart.bottom;
  
-	// ×ó±ß
+	// ç’˜ê¸‹
 	{
 		RECT rcDest = {x, y, x+nLeft, (y+nTop)+(cy)};
 		RECT rcSrc = {0, nTop, nLeft, nTop+(GetHeight()-nTop-nBottom)};
@@ -298,7 +298,7 @@ bool CImageEx::DrawFrame( CDC * pDC, const RECT& rectDest )
 			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÉÏ±ß
+	// î€®ê¸‹
 	{
 		RECT rcDest = {x, y,x+(cx), y+nTop};
 		RECT rcSrc = {nLeft, 0, (GetWidth()-nLeft-nRight), nTop};
@@ -307,7 +307,7 @@ bool CImageEx::DrawFrame( CDC * pDC, const RECT& rectDest )
 			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÓÒ±ß
+	// å¡˜ê¸‹
 	{
 		RECT rcDest = {x+(cx-nRight), y+nTop, (x+(cx-nRight))+nRight, (y+nTop)+(cy-nTop-nBottom)};
 		RECT rcSrc = {GetWidth()-nRight, nTop, (GetWidth()-nRight)+nRight, nTop+(GetHeight()-nTop-nBottom)};
@@ -316,7 +316,7 @@ bool CImageEx::DrawFrame( CDC * pDC, const RECT& rectDest )
 			rcSrc.left, rcSrc.top,rcSrc.right-rcSrc.left, rcSrc.bottom-rcSrc.top);
 	}
 
-	// ÏÂ±ß
+	// è‹Ÿê¸‹
 	{
 		RECT rcDest = {x, y+(cy-nBottom), (x)+(cx), (y+(cy-nBottom))+nBottom};
 		RECT rcSrc = {nLeft, GetHeight()-nBottom, nLeft+(GetWidth()-nLeft-nRight), (GetHeight()-nBottom)+nBottom};
@@ -346,7 +346,7 @@ HBITMAP CImageEx::ImageToBitmap()
 
 bool CImageEx::DrawExtrude( CDC*pDC,const RECT& rectDest,bool bLeft,int nPixel )
 {
-	//´´½¨ÆÁÄ»
+	//ëˆ¼ì‰”íŒìº¥
 	ASSERT(pDC!=NULL);
 
 	int nWidth = rectDest.right - rectDest.left;
@@ -396,9 +396,9 @@ bool CImageEx::SetGray()
 		{
 			int grayVal = (BYTE)(((*(pArray + nPitch * i + j * nBitCount) * 306)
 				+ (*(pArray + nPitch * i + j * nBitCount + 1) * 601)
-				+ (*(pArray + nPitch * i + j * nBitCount + 2) * 117) + 512 ) >> 10);	// ¼ÆËã»Ò¶ÈÖµ
+				+ (*(pArray + nPitch * i + j * nBitCount + 2) * 117) + 512 ) >> 10);	// ì…•ç‚¬ë¿ë˜‘ä»¤
 
-			*(pArray + nPitch * i + j * nBitCount) = grayVal;							// ¸³»Ò¶ÈÖµ
+			*(pArray + nPitch * i + j * nBitCount) = grayVal;							// ë¦½ë¿ë˜‘ä»¤
 			*(pArray + nPitch * i + j * nBitCount + 1) = grayVal;
 			*(pArray + nPitch * i + j * nBitCount + 2) = grayVal;
 		}
@@ -412,7 +412,7 @@ bool CImageEx::SetAlphaBit()
 	ASSERT(IsNull() == false);
 	if(IsNull())return FALSE;
 
-	if ( GetBPP() == 32 )//pngÍ¼Ïñ
+	if ( GetBPP() == 32 )//pngæš ç—
 	{
 		LPVOID pBitsSrc = NULL;
 		BYTE * psrc = NULL;
@@ -447,16 +447,16 @@ void CImageEx::GetImageParament( CImage *pImg,IMAGEPARAMENT *ppImgParam )
 {
 	if (pImg->IsNull()) return;  
 
-	ppImgParam->nWidth   = pImg->GetWidth();      //Í¼Ïñ¿í¶È  
-	ppImgParam->nHeight   = pImg->GetHeight();        //Í¼Ïñ¸ß¶È  
-	ppImgParam->nBitCount  = pImg->GetBPP();      //Ã¿ÏñËØÎ»Êı  
-	ppImgParam->nBytesPerLine   = (pImg->GetWidth()*pImg->GetBPP()+31)/32*4;   //Ã¿ĞĞ×Ö½ÚÊı  
-	ppImgParam->nBytesPerPixel   = pImg->GetBPP()/8;      //Ã¿ÏñËØ×Ö½ÚÊı  
+	ppImgParam->nWidth   = pImg->GetWidth();      //æš ç—ìš±ë˜‘  
+	ppImgParam->nHeight   = pImg->GetHeight();        //æš ç—ë©•ë˜‘  
+	ppImgParam->nBitCount  = pImg->GetBPP();      //ì²¼ç—ç¾¹è²«é‘’  
+	ppImgParam->nBytesPerLine   = (pImg->GetWidth()*pImg->GetBPP()+31)/32*4;   //ì²¼ï¤‰ä¿šìŒ˜é‘’  
+	ppImgParam->nBytesPerPixel   = pImg->GetBPP()/8;      //ì²¼ç—ç¾¹ä¿šìŒ˜é‘’  
 	if (pImg->GetBPP()<=8)   
-		ppImgParam->nNumColors= 1 << pImg->GetBPP();        //µ÷É«°åµ¥ÔªÊı  
+		ppImgParam->nNumColors= 1 << pImg->GetBPP();        //ë”§î€Šê²¼ë°ç¦±é‘’  
 	else   
 		ppImgParam->nNumColors= 0;  
-	ppImgParam->nSize  = ppImgParam->nBytesPerLine*ppImgParam->nHeight;        //ÏñËØ×Ü×Ö½ÚÊı    
+	ppImgParam->nSize  = ppImgParam->nBytesPerLine*ppImgParam->nHeight;        //ç—ç¾¹æ‚§ä¿šìŒ˜é‘’    
 }
 
 int CImageEx::InImage( CImage *pImg,int x,int y )
@@ -583,8 +583,8 @@ void CImageEx::RotateCimage( CImage *Imgn, int nAngle )
 	int x1, y1, x2, y2, flag;   
 	double p, q, a, b, c, d, t1, t2, t3;   
 
-	if (ImageType() == 2)  flag = 1; //flagÎª±êÖ¾Î»£¬µ±È¡ÖµÎª1Ê±£¬±íÊ¾Ë«ÏßĞÔÄÚ²å·¨ ,´ËÊ±Í¼ÏñÀàĞÍÎª»Ò½×Í¼Ïñ  
-	else flag = 0; //0±íÊ¾×î½üÁÚµã·¨   
+	if (ImageType() == 2)  flag = 1; //flagæ§¨ê¹ƒç¾šè²«ï¼Œë í˜¤ä»¤æ§¨1ç‚ï¼Œê¹Šåˆ»å´—çªŸæ˜‘ì½”ê¿¨ë¬ ,ëŠªç‚æš ç—ìšè¬¹æ§¨ë¿ìŒ“æš ç—  
+	else flag = 0; //0ê¹Šåˆ»é›¢ì¤ì¤…ë“ë¬   
 	GetImageParament(this,&P);   
 
 	Dx = P.nWidth;   
@@ -600,16 +600,16 @@ void CImageEx::RotateCimage( CImage *Imgn, int nAngle )
 	}  
 	int nLineBytes = (nSize * P.nBitCount + 31) / 32 * 4;  
 
-	//»¹ÓĞÒ»µãÒªĞŞ¸Ä£¬²»È»µ±Í¼Ïñ¸ß¶ÈÔ¶´óÓÚ¿í¶ÈÊ±»á±ÀÀ£  
-	sc = (BYTE*) malloc(2 * nLineBytes);    // * P.nBytesPerLine); //ÉêÇë¹¤×÷µ¥Ôª   
+	//ë»˜å”å¯§ë“ï¤«éŒ¦ë§£ï¼Œê¼‡íš”ë æš ç—ë©•ë˜‘é™¶ëŒ•é»¨ìš±ë˜‘ç‚ì‚”êµ¼ì›°  
+	sc = (BYTE*) malloc(2 * nLineBytes);    // * P.nBytesPerLine); //î‰í—ë¬é±—ë°ç¦±   
 	//  
-	list = (BYTE**) malloc(Dy * sizeof(BYTE*)); //¶ÔÔ­Î»Í¼½¨Á¢¶şÎ¬Êı×é   
+	list = (BYTE**) malloc(Dy * sizeof(BYTE*)); //ëš¤è¦©è²«æš ì‰”ì ‘ë—éƒ­é‘’è‰   
 	for (i = 0; i < Dy; i++)   
 		list[i] = (BYTE*) GetPixelAddress(0, i);   
 
-	centerx = Dx / 2; //¼ÆËãÎ»Í¼ÖĞĞÄÎ»ÖÃ   
+	centerx = Dx / 2; //ì…•ç‚¬è²«æš æ«“æ‡ƒè²«é›¶   
 	centery = Dy / 2;   
-	rr = sqrt(centerx * centerx + centery *centery); //¼ÆËã¶Ô½ÇÏß³¤¶È   
+	rr = sqrt(centerx * centerx + centery *centery); //ì…•ç‚¬ëš¤ì‹¤çªŸë‚€ë˜‘   
 
 	theta = atan((double) centery / (double) centerx);   
 
@@ -618,19 +618,19 @@ void CImageEx::RotateCimage( CImage *Imgn, int nAngle )
 	X2 = fabs(rr * cos(alpha - theta)) + 0.5;   
 	Y2 = fabs(rr * sin(alpha - theta)) + 0.5;   
 
-	if (X2 > X1) X1 = X2; //µÃÍâ½Ó¾ØĞÎ¿í¶È   
-	if (Y2 > Y1) Y1 = Y2; //Íâ½Ó¾ØĞÎ¸ß¶È   
+	if (X2 > X1) X1 = X2; //ë¤æ£ìŒˆì•¤è¿‘ìš±ë˜‘   
+	if (Y2 > Y1) Y1 = Y2; //æ£ìŒˆì•¤è¿‘ë©•ë˜‘   
 	ww = (int) (2 * X1);   
 
 	Imgn ->Destroy();   
 
-	//½¨Á¢½á¹ûÎ»Í¼  
+	//ì‰”ì ‘ì¨ë²è²«æš   
 	Imgn ->Create(ww, (int) (2 * Y1), P.nBitCount,CImage::createAlphaChannel );  
 	if (P.nBitCount == 8)   
 	{   
 		GetAllPalette(this,ColorTab);   
-		//ĞŞ¸ÄÒ»£¬ÉèÖÃÄ¿±êµ÷É«°å  
-		SetAllPalette(Imgn, ColorTab); //¸´ÖÆµ÷É«°å   
+		//éŒ¦ë§£å¯§ï¼Œî‡é›¶ì»¤ê¹ƒë”§î€Šê²¼  
+		SetAllPalette(Imgn, ColorTab); //ë¦¿é½¡ë”§î€Šê²¼   
 	}   
 
 	sintheta = sin(alpha);   
@@ -639,8 +639,8 @@ void CImageEx::RotateCimage( CImage *Imgn, int nAngle )
 	for (j = (int) (centery - Y1), Yd = 0; j <= (centery + Y1); j++, Yd++)   
 	{   
 		if (P.nBitCount == 8)   
-			memset (sc, 0, ww); //256É«Î»Í¼ÏñËØĞĞÖÃ±³¾°Öµ   
-		else memset(sc, 0, ww * P.nBytesPerPixel); //Õæ²ÊÉ«Î»Í¼ÏñËØĞĞÖÃ±³¾°Öµ   
+			memset (sc, 0, ww); //256î€Šè²«æš ç—ç¾¹ï¤‰é›¶êµì’¼ä»¤   
+		else memset(sc, 0, ww * P.nBytesPerPixel); //å»¬ê½ˆî€Šè²«æš ç—ç¾¹ï¤‰é›¶êµì’¼ä»¤   
 
 		for (i = (int) (centerx - X1), Xd = 0; i <= centerx + X1; i++, Xd += P.nBytesPerPixel)   
 		{   
@@ -658,26 +658,26 @@ void CImageEx::RotateCimage( CImage *Imgn, int nAngle )
 			{   
 				if (q > 0.5)  y1 = y2;   
 				if (p > 0.5)  x1 = x2;   
-				//ĞŞ¸Ä¶ş, sc[Xd]  
-				memcpy(&sc[Xd], &list[y1][x1 * P.nBytesPerPixel], P.nBytesPerPixel); //´ÓÔ´Î»Í¼¸´ÖÆÏñËØÊı¾İ   
+				//éŒ¦ë§£ë—, sc[Xd]  
+				memcpy(&sc[Xd], &list[y1][x1 * P.nBytesPerPixel], P.nBytesPerPixel); //ë‹’éƒ½è²«æš ë¦¿é½¡ç—ç¾¹é‘’ì•´   
 			}   
 			else   
-			{ // flagµÈÓÚ1£¬Ë«ÏßĞÔÄÚ²å·¨   
-				a = (double) list[y1][x1]; //´ÓÔ´Î»Í¼È¡Êı¾İ   
+			{ // flagëœé»¨1ï¼Œå´—çªŸæ˜‘ì½”ê¿¨ë¬   
+				a = (double) list[y1][x1]; //ë‹’éƒ½è²«æš í˜¤é‘’ì•´   
 				b = (double) list[y1][x2];   
 				c = (double) list[y2][x1];   
 				d = (double) list[y2][x2];   
-				t1 = (1 - p) * a + p * b; //Ë«ÏßĞÔÄÚ²å¼ÆËã   
+				t1 = (1 - p) * a + p * b; //å´—çªŸæ˜‘ì½”ê¿¨ì…•ç‚¬   
 				t2 = (1 - p) * c + p * d;   
 				t3 = (1 - q) * t1 + q * t2;   
-				//ĞŞ¸ÄÈı  
+				//éŒ¦ë§£í›  
 				sc[Xd] = (BYTE) t3;   
 			}   
 		}   
 		SetRectValue(Imgn, 0, Yd, ww, 1, sc);   
 	}  
 
-	//pngÍ¼Ïñ
+	//pngæš ç—
 	if ( P.nBitCount == 32 )
 	{
 		LPVOID pBitsSrc = NULL;
@@ -706,7 +706,7 @@ void CImageEx::RotateCimage( CImage *Imgn, int nAngle )
 		}
 	}
 
-	free(list); //ÊÍ·Å¹¤×÷µ¥Ôª   
+	free(list); //å§¦ë ´ë¬é±—ë°ç¦±   
 	free(sc);   
 }
 
@@ -747,7 +747,7 @@ bool CImageEx::get_crop(CImageEx &dst, int sx, int sy, int sw, int sh)
 	return true;
 }
 
-// SetPixel ´ë¿ë
+// SetPixel ëŒ€ìš©
 void CImageEx::set_pixel(int x, int y, COLORREF c)
 {
 	// m_image.SetPixel() call ::SetPixel() which is too slow
@@ -766,12 +766,12 @@ void CImageEx::set_pixel(int x, int y, COLORREF c)
 	}
 }
 
-// GetPixel ´ë¿ë. Ç¥ÁØ GetPixel°úÀÇ °è»ê ¼Óµµ´Â ÇöÀúÇÏ´Ù.
+// GetPixel ëŒ€ìš©. í‘œì¤€ GetPixelê³¼ì˜ ê³„ì‚° ì†ë„ëŠ” í˜„ì €í•˜ë‹¤.
 COLORREF CImageEx::get_pixel(int x, int y)
 {
 	COLORREF result = *((COLORREF*)CImage::GetPixelAddress(x,y));
 
-	// ¸Ş¸ğ¸®¿¡¼­ °¡Á®¿Ã¶§, blue¿Í redÀ§Ä¡°¡ ¹Ù²î¾î¼­ °¡Á®¿ÍÁø´Ù
+	// ë©”ëª¨ë¦¬ì—ì„œ ê°€ì ¸ì˜¬ë•Œ, blueì™€ redìœ„ì¹˜ê°€ ë°”ë€Œì–´ì„œ ê°€ì ¸ì™€ì§„ë‹¤
 	BYTE r = GetBValue(result);
 	BYTE g = GetGValue(result);
 	BYTE b = GetRValue(result);

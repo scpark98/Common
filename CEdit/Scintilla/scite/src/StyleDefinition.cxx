@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file StyleDefinition.cxx
  ** Implementation of style aggregate.
  **/

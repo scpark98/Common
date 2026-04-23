@@ -1,4 +1,4 @@
-/*
+﻿/*
 Module : SerialPort.cpp
 Purpose: Implementation for an MFC wrapper class for serial ports
 Created: PJN / 31-05-1999

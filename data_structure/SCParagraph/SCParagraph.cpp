@@ -1,4 +1,4 @@
-#include "SCParagraph.h"
+﻿#include "SCParagraph.h"
 #include "../../Functions.h"
 
 CSCParagraph::CSCParagraph()
@@ -10,8 +10,8 @@ CSCParagraph::~CSCParagraph()
 {
 }
 
-//text�� �±׸� �Ľ��Ͽ� �� ������ �Ӽ��� ������ �� para�� �����Ѵ�.
-//cr_text, cr_back�� ����, ��� �⺻��
+//text占쏙옙 占승그몌옙 占식쏙옙占싹울옙 占쏙옙 占쏙옙占쏙옙占쏙옙 占쌈쇽옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙 para占쏙옙 占쏙옙占쏙옙占싼댐옙.
+//cr_text, cr_back占쏙옙 占쏙옙占쏙옙, 占쏙옙占?占썩본占쏙옙
 void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextProperty* text_prop)
 {
 	int i;
@@ -29,9 +29,9 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 
 	std::deque<CSCParagraph> para_line;
 
-	//���� �±׸� ������ �Ӽ��� �����ϰ�
-	//�ܼ� �ؽ�Ʈ�� ������ �ش� �Ӽ��� �Բ� paragraph�� push�ϰ�
-	//�� �±׸� ������ �� �±װ� ���������� �����ϰ� �� �±׸� ������ �� �Ӽ��� �����Ѵ�. 
+	//占쏙옙占쏙옙 占승그몌옙 占쏙옙占쏙옙占쏙옙 占쌈쇽옙占쏙옙 占쏙옙占쏙옙占싹곤옙
+	//占쌤쇽옙 占쌔쏙옙트占쏙옙 占쏙옙占쏙옙占쏙옙 占쌔댐옙 占쌈쇽옙占쏙옙 占쌉뀐옙 paragraph占쏙옙 push占싹곤옙
+	//占쏙옙 占승그몌옙 占쏙옙占쏙옙占쏙옙 占쏙옙 占승그곤옙 占쏙옙占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占싹곤옙 占쏙옙 占승그몌옙 占쏙옙占쏙옙占쏙옙 占쏙옙 占쌈쇽옙占쏙옙 占쏙옙占쏙옙占싼댐옙. 
 	for (i = 0; i < tags.size(); i++)
 	{
 		if (tags[i] == _T("<b>"))
@@ -134,7 +134,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		}
 		else if (tags[i] == _T("<br>"))
 		{
-			//<br>�� ���� ���� ������ �߰��� ���
+			//<br>占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쌩곤옙占쏙옙 占쏙옙占?
 			if (para_line.size() == 0)
 			{
 				para_line.push_back(basic_para);
@@ -148,8 +148,8 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		{
 			para_temp.text = tags[i];
 
-			//��ü ������ cr_back�� Transparent�� �ƴ� �� ������ ������ �������� ���� para[][].cr_back�� cr_back�� �� ��� �ߺ����� �׷����� �ȴ�.
-			//cr_back�� �������̸� ����Ἥ �׷����� ǥ�� ���� ������ �������̸� ������ �׷����� �ȴ�.
+			//占쏙옙체 占쏙옙占쏙옙占쏙옙 cr_back占쏙옙 Transparent占쏙옙 占싣댐옙 占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 para[][].cr_back占쏙옙 cr_back占쏙옙 占쏙옙 占쏙옙占?占쌩븝옙占쏙옙占쏙옙 占쌓뤄옙占쏙옙占쏙옙 占싫댐옙.
+			//cr_back占쏙옙 占쏙옙占쏙옙占쏙옙占싱몌옙 占쏙옙占쏙옙消?占쌓뤄옙占쏙옙占쏙옙 표占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙占싱몌옙 占쏙옙占쏙옙占쏙옙 占쌓뤄옙占쏙옙占쏙옙 占싫댐옙.
 			if (para_temp.text_prop.cr_back.GetValue() == basic_para.text_prop.cr_back.GetValue())
 				para_temp.text_prop.cr_back = Gdiplus::Color::Transparent;
 
@@ -161,7 +161,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		para.push_back(para_line);
 }
 
-//paragraph text ������ dc�� ����� �� ��� ũ�⸦ ����ϰ� �� �ؽ�Ʈ�� ��µ� ��ġ���� CSCParagraph ����� �����Ѵ�.
+//paragraph text 占쏙옙占쏙옙占쏙옙 dc占쏙옙 占쏙옙占쏙옙占?占쏙옙 占쏙옙占?크占썩를 占쏙옙占쏙옙構占?占쏙옙 占쌔쏙옙트占쏙옙 占쏙옙쨉占?占쏙옙치占쏙옙占쏙옙 CSCParagraph 占쏙옙占쏙옙占?占쏙옙占쏙옙占싼댐옙.
 CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align)
 {
 	if (para.empty())
@@ -169,7 +169,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 	int i, j;
 	int sx = 0;
-	int sy = 0;				//�� ������ ���� ��ġ(���̰� ����)
+	int sy = 0;				//占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙치(占쏙옙占싱곤옙 占쏙옙占쏙옙)
 	int total_text_height;
 	CRect rect_text;
 	CFont font;
@@ -199,7 +199,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 #if 0
 			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
 
-			//GetTextExtent()�� DrawText(DT_CALCRECT)�� ���� ũ��� �����ϸ� italic�� �ణ �߸�.
+			//GetTextExtent()占쏙옙 DrawText(DT_CALCRECT)占쏙옙 占쏙옙占쏙옙 크占쏙옙占?占쏙옙占쏙옙占싹몌옙 italic占쏙옙 占썅간 占쌩몌옙.
 			sz = pDC->GetTextExtent(para[i][j].text);
 			//GetTextExtentExPoint(dc.m_hDC, m_paragraph[i].text, m_paragraph[i].text.GetLength(), 0, NULL, NULL, &sz);
 
@@ -220,10 +220,10 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			Gdiplus::RectF boundRect;
 			Gdiplus::RectF boundRect_temp;
 
-			//"text...    "�� ���� �ڿ� ������ ���� ��� ������ ���õǾ� ��µ��� �ʴ´�.
-			//���1. �� ���� "|"�� ���� ���ڸ� �־� ����� �� "|"�� width�� �A��.
-			//���2. SetMeasurableCharacterRanges(), MeasureCharacterRanges() ���� �̿��ϴ� ���� �� ����
-			//�켱 �����ϰ� 1�� ����� ����Ѵ�.
+			//"text...    "占쏙옙 占쏙옙占쏙옙 占쌘울옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙占?占쏙옙占쏙옙占쏙옙 占쏙옙占시되억옙 占쏙옙쨉占쏙옙占?占십는댐옙.
+			//占쏙옙占?. 占쏙옙 占쏙옙占쏙옙 "|"占쏙옙 占쏙옙占쏙옙 占쏙옙占쌘몌옙 占쌍억옙 占쏙옙占쏙옙占?占쏙옙 "|"占쏙옙 width占쏙옙 占폗占쏙옙.
+			//占쏙옙占?. SetMeasurableCharacterRanges(), MeasureCharacterRanges() 占쏙옙占쏙옙 占싱울옙占싹댐옙 占쏙옙占쏙옙 占쏙옙 占쏙옙占쏙옙
+			//占쎌선 占쏙옙占쏙옙占싹곤옙 1占쏙옙 占쏙옙占쏙옙占?占쏙옙占쏙옙磯占?
 			g.MeasureString(CStringW(para[i][j].text + _T("|")), -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect);
 			g.MeasureString(L"|", -1, font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &boundRect_temp);
 
@@ -233,7 +233,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 				boundRect.Height = 40;
 			}
 
-			//stroke �β����� ������ ũ�⿩�� �Ѵ�.
+			//stroke 占싸뀐옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 크占썩여占쏙옙 占싼댐옙.
 			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].text_prop.thickness;// *2.0f;
 			sz.cy = boundRect.Height + para[i][j].text_prop.thickness;// *2.0f;
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
@@ -241,18 +241,18 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
 			sz_text.cx += sz.cx;
 
-			//�� ���ο��� ���� cy�� ū ���� ����Ų��.
+			//占쏙옙 占쏙옙占싸울옙占쏙옙 占쏙옙占쏙옙 cy占쏙옙 큰 占쏙옙占쏙옙 占쏙옙占쏙옙킨占쏙옙.
 			sz_text.cy = MAX(sz_text.cy, sz.cy);
 		}
 
-		//�� ���ε� �߿��� �ִ� �ʺ� ���Ѵ�.
+		//占쏙옙 占쏙옙占싸듸옙 占쌩울옙占쏙옙 占쌍댐옙 占십븝옙 占쏙옙占싼댐옙.
 		if (sz_text.cx > max_width)
 		{
 			max_width = sz_text.cx;
 			max_width_line = i;
 		}
 
-		//�� ���� ���� ��ġ�� �����ȴ�.
+		//占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙치占쏙옙 占쏙옙占쏙옙占싫댐옙.
 		sy += sz_text.cy;
 	}
 
@@ -260,13 +260,13 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 	font.DeleteObject();
 
-	//�� ���γ����� height�� ���� ���� �׸����� ���Ͻ�Ű����? �ƴϸ� ������ ���̸� �״�� �����ϴ���...
+	//占쏙옙 占쏙옙占싸놂옙占쏙옙占쏙옙 height占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙 占쌓몌옙占쏙옙占쏙옙 占쏙옙占싹쏙옙키占쏙옙占쏙옙? 占싣니몌옙 占쏙옙占쏙옙占쏙옙 占쏙옙占싱몌옙 占쌓댐옙占?占쏙옙占쏙옙占싹댐옙占쏙옙...
 	//for (i = 0; i < m_paragraph.size(); i++)
 	//{
 	//	m_paragraph[i].r.bottom = m_paragraph[i].r.top + m_sz_text.cy;
 	//}
 
-	//align �ɼǿ� ���� ����
+	//align 占심션울옙 占쏙옙占쏙옙 占쏙옙占쏙옙
 	/*
 	DWORD dwStyle = GetStyle();
 	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
@@ -285,21 +285,21 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 	CRect margin;
 
-	//align�� ���� ����
+	//align占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙
 	if (align & DT_CENTER)
 	{
-		//�� ���θ��� total_width�� ���ϰ�
+		//占쏙옙 占쏙옙占싸몌옙占쏙옙 total_width占쏙옙 占쏙옙占싹곤옙
 		for (i = 0; i < para.size(); i++)
 		{
 			int total_width = 0;
 			for (j = 0; j < para[i].size(); j++)
 				total_width += para[i][j].r.Width();
 
-			//�������� �����Ͽ� center�� ǥ���� ��, �ؽ�Ʈ�� center�� ǥ���� ��...
+			//占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占싹울옙 center占쏙옙 표占쏙옙占쏙옙 占쏙옙, 占쌔쏙옙트占쏙옙 center占쏙옙 표占쏙옙占쏙옙 占쏙옙...
 			//if (m_hIcon)
 			//	total_width -= (m_sz_icon.cx + 4);
 
-			//cx���� total_width/2�� �� ��ġ�� ù ��° �׸��� sx�̹Ƿ� �� ��ŭ shift��Ű�� �ȴ�.
+			//cx占쏙옙占쏙옙 total_width/2占쏙옙 占쏙옙 占쏙옙치占쏙옙 첫 占쏙옙째 占쌓몌옙占쏙옙 sx占싱므뤄옙 占쏙옙 占쏙옙큼 shift占쏙옙키占쏙옙 占싫댐옙.
 			sx = rc.CenterPoint().x - total_width / 2;
 			for (j = 0; j < para[i].size(); j++)
 				para[i][j].r.OffsetRect(sx, 0);
@@ -307,14 +307,14 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	}
 	else if (align & DT_RIGHT)
 	{
-		//�� ���θ��� total_width�� ���ϰ�
+		//占쏙옙 占쏙옙占싸몌옙占쏙옙 total_width占쏙옙 占쏙옙占싹곤옙
 		for (i = 0; i < para.size(); i++)
 		{
 			int total_width = 0;
 			for (j = 0; j < para[i].size(); j++)
 				total_width += para[i][j].r.Width();
 
-			//rc.right���� total_width�� �� ��ġ�� ù ��° �׸��� sx�̹Ƿ� �� ��ŭ shift��Ű�� �ȴ�.
+			//rc.right占쏙옙占쏙옙 total_width占쏙옙 占쏙옙 占쏙옙치占쏙옙 첫 占쏙옙째 占쌓몌옙占쏙옙 sx占싱므뤄옙 占쏙옙 占쏙옙큼 shift占쏙옙키占쏙옙 占싫댐옙.
 			sx = rc.right - margin.right - total_width;
 			for (j = 0; j < para[i].size(); j++)
 				para[i][j].r.OffsetRect(sx, 0);
@@ -336,7 +336,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 	if (align & DT_VCENTER)// SS_CENTERIMAGE)
 	{
-		//��ü ���̿��� ��ü �ؽ�Ʈ ���� �հ踦 �� 1/2 ��ŭ shift ��Ų��.
+		//占쏙옙체 占쏙옙占싱울옙占쏙옙 占쏙옙체 占쌔쏙옙트 占쏙옙占쏙옙 占쌌계를 占쏙옙 1/2 占쏙옙큼 shift 占쏙옙킨占쏙옙.
 		sy = (rc.Height() - total_text_height) / 2;
 		for (i = 0; i < para.size(); i++)
 		{
@@ -361,13 +361,13 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	if (para.size() > 0)
 	{
 		//m_pt_icon.x = m_para[m_max_width_line][0].r.left - m_sz_icon.cx - 4;
-		//�������� top �����ϴ���, ��� ������ vcenter�� �����ϴ���...
+		//占쏙옙占쏙옙占쏙옙占쏙옙 top 占쏙옙占쏙옙占싹댐옙占쏙옙, 占쏙옙占?占쏙옙占쏙옙占쏙옙 vcenter占쏙옙 占쏙옙占쏙옙占싹댐옙占쏙옙...
 		//m_pt_icon.y = m_para[0][0].r.top;
 
-		rect_text.left = para[max_width_line][0].r.left;	//�ִ� ���� ������ 0�� �������� left
-		rect_text.top = para[0][0].r.top;					//�ֻ�� �׸��� top
-		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//�ִ� ���� ������ ������ �׸��� right
-		rect_text.bottom = para[0][0].r.top + total_text_height;	//�ֻ�� �׸��� top + ��ü �ؽ�Ʈ ����
+		rect_text.left = para[max_width_line][0].r.left;	//占쌍댐옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 0占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙 left
+		rect_text.top = para[0][0].r.top;					//占쌍삼옙占?占쌓몌옙占쏙옙 top
+		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//占쌍댐옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쌓몌옙占쏙옙 right
+		rect_text.bottom = para[0][0].r.top + total_text_height;	//占쌍삼옙占?占쌓몌옙占쏙옙 top + 占쏙옙체 占쌔쏙옙트 占쏙옙占쏙옙
 	}
 	else
 	{
@@ -377,7 +377,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		//m_rect_text = make_rect(m_pt_icon.x, m_pt_icon.y, m_sz_icon.cx, m_sz_icon.cy);
 	}
 
-	//text ũ�⿡ ���� ��Ʈ���� ũ�⸦ �����ϴ� ���� �ش� �����쿡�� ó���� ���̴�.
+	//text 크占썩에 占쏙옙占쏙옙 占쏙옙트占쏙옙占쏙옙 크占썩를 占쏙옙占쏙옙占싹댐옙 占쏙옙占쏙옙 占쌔댐옙 占쏙옙占쏙옙占쎌에占쏙옙 처占쏙옙占쏙옙 占쏙옙占싱댐옙.
 	/*
 	if (false)//m_auto_ctrl_size)
 	{
@@ -415,10 +415,10 @@ int CSCParagraph::get_max_width_line(std::deque<std::deque<CSCParagraph>>& para)
 	return max_width_line;
 }
 
-//calc_text_rect()로 각 paragraph의 r이 결정된 이후에 호출.
-//라인 사이 간격을 조정한다. 글자 자체 크기는 그대로 두고 다음 라인의 시작 위치만 아래로 밀어낸다.
-//spacing = 1.0f이면 변경 없음, 1.5f이면 라인 i의 max height의 0.5배만큼 이후 라인부터 누적 shift된다.
-//spacing < 1.0f도 허용하나 음수 shift로 라인이 겹칠 수 있다.
+//calc_text_rect()濡?媛?paragraph??r??寃곗젙???댄썑???몄텧.
+//?쇱씤 ?ъ씠 媛꾧꺽??議곗젙?쒕떎. 湲???먯껜 ?ш린??洹몃?濡??먭퀬 ?ㅼ쓬 ?쇱씤???쒖옉 ?꾩튂留??꾨옒濡?諛?대궦??
+//spacing = 1.0f?대㈃ 蹂寃??놁쓬, 1.5f?대㈃ ?쇱씤 i??max height??0.5諛곕쭔???댄썑 ?쇱씤遺???꾩쟻 shift?쒕떎.
+//spacing < 1.0f???덉슜?섎굹 ?뚯닔 shift濡??쇱씤??寃뱀튌 ???덈떎.
 CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, float spacing)
 {
 	if (para.empty())
@@ -426,7 +426,7 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 
 	int i, j;
 
-	//각 라인의 max height를 미리 구한다.
+	//媛??쇱씤??max height瑜?誘몃━ 援ы븳??
 	std::deque<int> line_heights;
 
 	for (i = 0; i < para.size(); i++)
@@ -439,8 +439,8 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 		line_heights.push_back(line_h);
 	}
 
-	//라인 0은 그대로 두고 라인 1부터 누적 shift를 적용.
-	//라인 i의 추가 shift = sum(line_heights[0..i-1]) * (spacing - 1.0)
+	//?쇱씤 0? 洹몃?濡??먭퀬 ?쇱씤 1遺???꾩쟻 shift瑜??곸슜.
+	//?쇱씤 i??異붽? shift = sum(line_heights[0..i-1]) * (spacing - 1.0)
 	int shift_y = 0;
 
 	for (i = 1; i < (int)para.size(); i++)
@@ -451,7 +451,7 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 			para[i][j].r.OffsetRect(0, shift_y);
 	}
 
-	//전체 영역 산출. calc_text_rect()와 동일한 방식으로 max_width_line 기준.
+	//?꾩껜 ?곸뿭 ?곗텧. calc_text_rect()? ?숈씪??諛⑹떇?쇰줈 max_width_line 湲곗?.
 	CRect rect_text;
 	int max_width_line = get_max_width_line(para);
 
@@ -462,7 +462,7 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 	rect_text.top = para[0][0].r.top;
 	rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;
 
-	//bottom은 마지막 라인의 가장 큰 bottom (shift 적용 결과 그대로).
+	//bottom? 留덉?留??쇱씤??媛????bottom (shift ?곸슜 寃곌낵 洹몃?濡?.
 	int last_line = (int)para.size() - 1;
 	int max_bottom = para[last_line][0].r.bottom;
 
@@ -496,22 +496,22 @@ void CSCParagraph::get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font
 }
 
 /*
-//ex. add("<font size=12><font bold = 1>first line") �Էµ� ��
-//add("second line")�̸� �� �� ��Ÿ���� �� ��Ÿ�ϰ��� �״�� �����Ѵ�.
+//ex. add("<font size=12><font bold = 1>first line") 占쌉력듸옙 占쏙옙
+//add("second line")占싱몌옙 占쏙옙 占쏙옙 占쏙옙타占쏙옙占쏙옙 占쏙옙 占쏙옙타占싹곤옙占쏙옙 占쌓댐옙占?占쏙옙占쏙옙占싼댐옙.
 void CSCParagraph::add(CString data)
 {
 	CSCParagraphData	para_data;
 	int font_size = get_value(data, _T("font size"));
 }
 
-//tag_name�� ���� ���ڿ� �����Ϳ��� ���� �� �����Ƿ� �ݵ�� <, > ��ȣ�� ���������� Ȯ���ؾ� �Ѵ�.
+//tag_name占쏙옙 占쏙옙占쏙옙 占쏙옙占쌘울옙 占쏙옙占쏙옙占싶울옙占쏙옙 占쏙옙占쏙옙 占쏙옙 占쏙옙占쏙옙占실뤄옙 占쌥듸옙占?<, > 占쏙옙호占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙占쏙옙 확占쏙옙占쌔억옙 占싼댐옙.
 DWORD CSCParagraph::get_value(CString data, CString tag_name, int start)
 {
 	int tag_pos = data.Find(tag_name, start);
 	if (tag_pos < 0)
 		return -1;
 
-	//< font size=1>�� ���� '<'�� tag_name ������ ���� ����
+	//< font size=1>占쏙옙 占쏙옙占쏙옙 '<'占쏙옙 tag_name 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙
 	int tag_start = tag_pos - 1;
 	while (tag_start >= 0)
 	{
@@ -528,7 +528,7 @@ DWORD CSCParagraph::get_value(CString data, CString tag_name, int start)
 	if (tag_end < 0)
 		return -1;
 
-	//�� �±׺��� ������ '='��ȣ���� ã�ư���.
+	//占쏙옙 占승그븝옙占쏙옙 占쏙옙占쏙옙占쏙옙 '='占쏙옙호占쏙옙占쏙옙 찾占싣곤옙占쏙옙.
 	int value_start = tag_end;
 	while (value_start >= 0)
 	{
@@ -560,7 +560,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
 	//Gdiplus::REAL emSize = (Gdiplus::REAL)MulDiv(font_size, 96, logPixelsY);
 
-	//g�� �̿��ؼ� pDC�� ���ؼ� ����ϴ� ���� g.ReleaseHDC(hdc);�� ȣ���ϱ� �������� g�� � �Լ� ��뵵 ���� �ʾƾ� �Ѵ�.
+	//g占쏙옙 占싱울옙占쌔쇽옙 pDC占쏙옙 占쏙옙占쌔쇽옙 占쏙옙占쏙옙求占?占쏙옙占쏙옙 g.ReleaseHDC(hdc);占쏙옙 호占쏙옙占싹깍옙 占쏙옙占쏙옙占쏙옙占쏙옙 g占쏙옙 占쏘떤 占쌉쇽옙 占쏙옙逾?占쏙옙占쏙옙 占십아억옙 占싼댐옙.
 	// Make GDI calls, but don't call any methods
 	// on g until after the call to ReleaseHDC.
 #ifdef USING_HDC
@@ -571,37 +571,37 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 	sf.SetAlignment(Gdiplus::StringAlignmentNear);
 	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
 
-	//dc.SetBkColor()�� ������ ������ �����ϸ� ��������
-	//���� �Ӽ��� ���� �� �����̰� �ٸ� ��쵵 �ִ�.
-	//���� calc_text_rect()���� max height�� ��� paragraph�� ����������
-	//���⼭�� �������� ĥ�� �� �ؽ�Ʈ�� ǥ���Ѵ�.
+	//dc.SetBkColor()占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占싹몌옙 占쏙옙占쏙옙占쏙옙占쏙옙
+	//占쏙옙占쏙옙 占쌈쇽옙占쏙옙 占쏙옙占쏙옙 占쏙옙 占쏙옙占쏙옙占싱곤옙 占쌕몌옙 占쏙옙理?占쌍댐옙.
+	//占쏙옙占쏙옙 calc_text_rect()占쏙옙占쏙옙 max height占쏙옙 占쏙옙占?paragraph占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙占쏙옙
+	//占쏙옙占썩서占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙 칠占쏙옙 占쏙옙 占쌔쏙옙트占쏙옙 표占쏙옙占싼댐옙.
 
 	for (i = 0; i < para.size(); i++)
 	{
-		//�� �׸��� ����ϵ� �ڿ������� ��½�Ų��.
-		//�̴� italic�� ��� ���� �׸� ���� �Ϻ� �������� ������ �����ϱ� �����̴�.
+		//占쏙옙 占쌓몌옙占쏙옙 占쏙옙占쏙옙溝占?占쌘울옙占쏙옙占쏙옙占쏙옙 占쏙옙쩍占신뀐옙占?
+		//占싱댐옙 italic占쏙옙 占쏙옙占?占쏙옙占쏙옙 占쌓몌옙 占쏙옙占쏙옙 占싹븝옙 占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占싹깍옙 占쏙옙占쏙옙占싱댐옙.
 		for (j = para[i].size() - 1; j >= 0; j--)
 		{
 #ifdef USING_HDC
 			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
 
-			//text ������ ĥ�ϰ�
+			//text 占쏙옙占쏙옙占쏙옙 칠占싹곤옙
 			if (para[i][j].cr_back.GetA() != 0)
 				pDC->FillSolidRect(para[i][j].r, para[i][j].cr_back.ToCOLORREF());
 
-			//text�� ����Ѵ�.
+			//text占쏙옙 占쏙옙占쏙옙磯占?
 			pDC->SetTextColor(para[i][j].cr_text.ToCOLORREF());
 			pDC->DrawText(para[i][j].text, para[i][j].r, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
 			//draw_text(g, m_para[i][j].r, m_para[i][j].cr_text, m_para[i][j].text, m_para[i][j].size, m_para[i][j].);
 			//g.DrawString(CStringW(m_para[i][j].text), m_para[i][j].text.GetLength(), font, Gdiplus::PointF((Gdiplus::REAL)m_para[i][j].r.left, (Gdiplus::REAL)m_para[i][j].r.top), &sf);
 			pDC->SelectObject(pOldFont);
 #else
-			//text ������ ĥ�ϰ�
+			//text 占쏙옙占쏙옙占쏙옙 칠占싹곤옙
 			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
 			Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
 
-			//�ý��ۿ� ��ϵ��� ���� ��Ʈ�� ������ ��� ff�� null�̹Ƿ� �⺻ ��Ʈ�ζ� ��ü���Ѿ� �Ѵ�.
+			//占시쏙옙占쌜울옙 占쏙옙溝占쏙옙占?占쏙옙占쏙옙 占쏙옙트占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占?ff占쏙옙 null占싱므뤄옙 占썩본 占쏙옙트占싸띰옙 占쏙옙체占쏙옙占싼억옙 占싼댐옙.
 			if (!fontFamily->IsAvailable())
 			{
 				delete fontFamily;
@@ -614,12 +614,12 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			//Gdiplus::Font font(&ff, emSize, para[i][j].text_prop.style);
 
 
-			//text�� ����Ѵ�.
+			//text占쏙옙 占쏙옙占쏙옙磯占?
 			Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
 
-			//GraphicsPath�� �̿��ϸ� stroke, shadow �� �پ��� ȿ���� ������ �� ������
-			//DrawString()���� ���ڰ� �����ϰ� ������ �ʴ� ������ �ִ�.
-			//stroke, shadow�� �ƿ� ������� ���� ���� DrawString()���� �׷��ش�.
+			//GraphicsPath占쏙옙 占싱울옙占싹몌옙 stroke, shadow 占쏙옙 占쌕억옙占쏙옙 효占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙 占쏙옙占쏙옙占쏙옙
+			//DrawString()占쏙옙占쏙옙 占쏙옙占쌘곤옙 占쏙옙占쏙옙占싹곤옙 占쏙옙占쏙옙占쏙옙 占십댐옙 占쏙옙占쏙옙占쏙옙 占쌍댐옙.
+			//stroke, shadow占쏙옙 占싣울옙 占쏙옙占쏙옙占쏙옙占?占쏙옙占쏙옙 占쏙옙占쏙옙 DrawString()占쏙옙占쏙옙 占쌓뤄옙占쌔댐옙.
 			if (para[i][j].text_prop.shadow_depth == 0 && para[i][j].text_prop.thickness == 0)
 			{
 				g.DrawString(CStringW(para[i][j].text), -1, font,
@@ -631,18 +631,18 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 				float emSize = fDpiY * para[i][j].text_prop.size / 72.0;
 				Gdiplus::GraphicsPath str_path, shadow_path;
 
-				//��ġ�� �κ��� ������Ű�� �ʴ´�. FillModeAlternate�� ������Ŵ.
+				//占쏙옙치占쏙옙 占싸븝옙占쏙옙 占쏙옙占쏙옙占쏙옙키占쏙옙 占십는댐옙. FillModeAlternate占쏙옙 占쏙옙占쏙옙占쏙옙킴.
 				str_path.SetFillMode(Gdiplus::FillModeWinding);
 				shadow_path.SetFillMode(Gdiplus::FillModeWinding);
 
-				//AddString() �Ķ���� �� �����ġ�� �� �� Gdiplus::Rect() �Ǵ� Gdiplus::Point()�� �� �� �ִµ�
-				//stroke �Ǵ� shadow�� �߰��Ǿ� r�� ������ �ؽ�Ʈ�� ��µ��� �ʴ� ������ �ִ�.
-				//r�� ��Ȯ�� ����ϴ� ���� �����̳� ���� r�� ���� �ʰ� Gdiplus::Point()�� �ָ� �������� �ʴ´�.
+				//AddString() 占식띰옙占쏙옙占?占쏙옙 占쏙옙占쏙옙占식∽옙占?占쏙옙 占쏙옙 Gdiplus::Rect() 占실댐옙 Gdiplus::Point()占쏙옙 占쏙옙 占쏙옙 占쌍는듸옙
+				//stroke 占실댐옙 shadow占쏙옙 占쌩곤옙占실억옙 r占쏙옙 占쏙옙占쏙옙占쏙옙 占쌔쏙옙트占쏙옙 占쏙옙쨉占쏙옙占?占십댐옙 占쏙옙占쏙옙占쏙옙 占쌍댐옙.
+				//r占쏙옙 占쏙옙확占쏙옙 占쏙옙占쏙옙求占?占쏙옙占쏙옙 占쏙옙占쏙옙占싱놂옙 占쏙옙占쏙옙 r占쏙옙 占쏙옙占쏙옙 占십곤옙 Gdiplus::Point()占쏙옙 占쌍몌옙 占쏙옙占쏙옙占쏙옙占쏙옙 占십는댐옙.
 				CRect r = para[i][j].r;
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-				//�׸����� ���̴� �ؽ�Ʈ height�� ���� ����ϰ� stroke�� thickness �����͵� �����ִ�
+				//占쌓몌옙占쏙옙占쏙옙 占쏙옙占싱댐옙 占쌔쏙옙트 height占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙構占?stroke占쏙옙 thickness 占쏙옙占쏙옙占싶듸옙 占쏙옙占쏙옙占쌍댐옙
 				Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
 
 				
@@ -664,8 +664,8 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 
 				g.FillPath(&br_shadow, &shadow_path);
 
-				//thickness�� 0.0f�̸� g.DrawPath()�� �ƴ� g.DrawString()���� �׸��� �ǰ� ���� ������ �� �׷�������
-				//���� �ɼ��� Ʋ���� ������ �߻��Ͽ� �켱 �Ʒ��� ���� ���ǿ� ���� g.DrawPath()�� �����ϵ��� �Ѵ�.
+				//thickness占쏙옙 0.0f占싱몌옙 g.DrawPath()占쏙옙 占싣댐옙 g.DrawString()占쏙옙占쏙옙 占쌓몌옙占쏙옙 占실곤옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙 占쌓뤄옙占쏙옙占쏙옙占쏙옙
+				//占쏙옙占쏙옙 占심쇽옙占쏙옙 틀占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쌩삼옙占싹울옙 占쎌선 占싣뤄옙占쏙옙 占쏙옙占쏙옙 占쏙옙占실울옙 占쏙옙占쏙옙 g.DrawPath()占쏙옙 占쏙옙占쏙옙占싹듸옙占쏙옙 占싼댐옙.
 				if (para[i][j].text_prop.thickness > 0.0f)
 					g.DrawPath(&pen, &str_path);
 
@@ -673,9 +673,9 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			}
 #endif
 
-			//�� para ���� Ȯ�ο� �ڵ�
+			//占쏙옙 para 占쏙옙占쏙옙 확占싸울옙 占쌘듸옙
 #ifdef _DEBUG
-			//"\n"�� ���� ���� ������ ���� �簢���� ���� ǥ������ �ʴ´�.
+			//"\n"占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占썹각占쏙옙占쏙옙 占쏙옙占쏙옙 표占쏙옙占쏙옙占쏙옙 占십는댐옙.
 			//if (para[i][j].r.Width() > 2)
 				//draw_rect(g, para[i][j].r, Gdiplus::Color::Blue);// , Gdiplus::Color(255, 255, 0, 0));
 #endif
@@ -687,7 +687,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 		}
 	}
 
-	//�ؽ�Ʈ ��� ���� Ȯ�ο�
+	//占쌔쏙옙트 占쏙옙占?占쏙옙占쏙옙 확占싸울옙
 #ifdef _DEBUG
 	//draw_rect(g, m_rect_text, Gdiplus::Color::Blue, Gdiplus::Color::Transparent, 1);
 #endif
@@ -701,28 +701,28 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 #endif
 }
 
-//calc_text_rect()���� �̹� �� paragraph�� r�� align�� ���� ���������� �̸� �������� �����ϰ��� �� ��� ȣ��.
+//calc_text_rect()占쏙옙占쏙옙 占싱뱄옙 占쏙옙 paragraph占쏙옙 r占쏙옙 align占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙占쏙옙 占싱몌옙 占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占싹곤옙占쏙옙 占쏙옙 占쏙옙占?호占쏙옙.
 CRect CSCParagraph::set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>>& para, DWORD align)
 {
 	int i, j;
 	int sx, sy;
 	int total_text_height = 0;
-	CRect margin;	//���� static ��������� �и��� ����
+	CRect margin;	//占쏙옙占쏙옙 static 占쏙옙占쏙옙占쏙옙占쏙옙占?占싻몌옙占쏙옙 占쏙옙占쏙옙
 
 	if (align & DT_CENTER)
 	{
-		//�� ���θ��� total_width�� ���ϰ�
+		//占쏙옙 占쏙옙占싸몌옙占쏙옙 total_width占쏙옙 占쏙옙占싹곤옙
 		for (i = 0; i < para.size(); i++)
 		{
 			int total_width = 0;
 			for (j = 0; j < para[i].size(); j++)
 				total_width += para[i][j].r.Width();
 
-			//�������� �����Ͽ� center�� ǥ���� ��, �ؽ�Ʈ�� center�� ǥ���� ��...
+			//占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占싹울옙 center占쏙옙 표占쏙옙占쏙옙 占쏙옙, 占쌔쏙옙트占쏙옙 center占쏙옙 표占쏙옙占쏙옙 占쏙옙...
 			//if (m_hIcon)
 			//	total_width -= (m_sz_icon.cx + 4);
 
-			//cx���� total_width/2�� �� ��ġ�� ù ��° �׸��� sx�̹Ƿ� �� ��ŭ shift��Ű�� �ȴ�.
+			//cx占쏙옙占쏙옙 total_width/2占쏙옙 占쏙옙 占쏙옙치占쏙옙 첫 占쏙옙째 占쌓몌옙占쏙옙 sx占싱므뤄옙 占쏙옙 占쏙옙큼 shift占쏙옙키占쏙옙 占싫댐옙.
 			sx = rc.CenterPoint().x - total_width / 2;
 			for (j = 0; j < para[i].size(); j++)
 				para[i][j].r.OffsetRect(sx, 0);
@@ -730,14 +730,14 @@ CRect CSCParagraph::set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>
 	}
 	else if (align & DT_RIGHT)
 	{
-		//�� ���θ��� total_width�� ���ϰ�
+		//占쏙옙 占쏙옙占싸몌옙占쏙옙 total_width占쏙옙 占쏙옙占싹곤옙
 		for (i = 0; i < para.size(); i++)
 		{
 			int total_width = 0;
 			for (j = 0; j < para[i].size(); j++)
 				total_width += para[i][j].r.Width();
 
-			//rc.right���� total_width�� �� ��ġ�� ù ��° �׸��� sx�̹Ƿ� �� ��ŭ shift��Ű�� �ȴ�.
+			//rc.right占쏙옙占쏙옙 total_width占쏙옙 占쏙옙 占쏙옙치占쏙옙 첫 占쏙옙째 占쌓몌옙占쏙옙 sx占싱므뤄옙 占쏙옙 占쏙옙큼 shift占쏙옙키占쏙옙 占싫댐옙.
 			sx = rc.right - margin.right - total_width;
 			for (j = 0; j < para[i].size(); j++)
 				para[i][j].r.OffsetRect(sx, 0);
@@ -759,7 +759,7 @@ CRect CSCParagraph::set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>
 
 	if (align & DT_VCENTER)// SS_CENTERIMAGE)
 	{
-		//��ü ���̿��� ��ü �ؽ�Ʈ ���� �հ踦 �� 1/2 ��ŭ shift ��Ų��.
+		//占쏙옙체 占쏙옙占싱울옙占쏙옙 占쏙옙체 占쌔쏙옙트 占쏙옙占쏙옙 占쌌계를 占쏙옙 1/2 占쏙옙큼 shift 占쏙옙킨占쏙옙.
 		sy = (rc.Height() - total_text_height) / 2;
 		for (i = 0; i < para.size(); i++)
 		{
@@ -785,22 +785,22 @@ CRect CSCParagraph::set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>
 
 	if (para.size() > 0)
 	{
-		rect_text.left = para[max_width_line][0].r.left;	//�ִ� ���� ������ 0�� �������� left
-		rect_text.top = para[0][0].r.top;					//�ֻ�� �׸��� top
-		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//�ִ� ���� ������ ������ �׸��� right
-		rect_text.bottom = para[0][0].r.top + total_text_height;	//�ֻ�� �׸��� top + ��ü �ؽ�Ʈ ����
+		rect_text.left = para[max_width_line][0].r.left;	//占쌍댐옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 0占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙 left
+		rect_text.top = para[0][0].r.top;					//占쌍삼옙占?占쌓몌옙占쏙옙 top
+		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//占쌍댐옙 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쌓몌옙占쏙옙 right
+		rect_text.bottom = para[0][0].r.top + total_text_height;	//占쌍삼옙占?占쌓몌옙占쏙옙 top + 占쏙옙체 占쌔쏙옙트 占쏙옙占쏙옙
 	}
 
 	return rect_text;
 }
 
-//�ؽ�Ʈ �����¿� ����
+//占쌔쏙옙트 占쏙옙占쏙옙占승울옙 占쏙옙占쏙옙
 //void CSCParagraph::set_margin(std::deque<std::deque<CSCParagraph>>& para, float margin)
 //{
 //	para.text_prop.
 //}
 
-//para�� ������ ���ڿ��� �����Ѵ�.
+//para占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쌘울옙占쏙옙 占쏙옙占쏙옙占싼댐옙.
 CString	CSCParagraph::get_paragraph_info_string(std::deque<std::deque<CSCParagraph>>& para)
 {
 	int i, j;

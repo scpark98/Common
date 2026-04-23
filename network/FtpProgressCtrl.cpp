@@ -1,4 +1,4 @@
-// FtpProgressCtrl.cpp : implementation file
+﻿// FtpProgressCtrl.cpp : implementation file
 //
 
 #include "stdafx.h"

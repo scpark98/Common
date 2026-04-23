@@ -1,4 +1,4 @@
-// NewWizDialog.cpp : implementation file
+﻿// NewWizDialog.cpp : implementation file
 //
 
 #include "stdafx.h"

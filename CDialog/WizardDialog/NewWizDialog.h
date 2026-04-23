@@ -1,4 +1,4 @@
-#if !defined(AFX_NEWWIZDIALOG_H__915D4C89_2E27_11D4_9FA9_0030DB0011C6__INCLUDED_)
+ï»¿#if !defined(AFX_NEWWIZDIALOG_H__915D4C89_2E27_11D4_9FA9_0030DB0011C6__INCLUDED_)
 #define AFX_NEWWIZDIALOG_H__915D4C89_2E27_11D4_9FA9_0030DB0011C6__INCLUDED_
 
 #if _MSC_VER > 1000
@@ -53,7 +53,7 @@ public:
 	void SetTitle(UINT nIDText);
 	void SetFinishText(LPCTSTR lpszText);
 	void SetFinishText(UINT nIDText);
-	void FinishWizard();							// masterdlg¸¦ Á¾·á½ÃÅ²´Ù.
+	void FinishWizard();							// masterdlgë¥¼ ì¢…ë£Œì‹œí‚¨ë‹¤.
 
 protected:
 	BOOL ActivatePage(CNewWizPage* pPage);

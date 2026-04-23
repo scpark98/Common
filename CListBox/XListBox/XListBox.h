@@ -1,4 +1,4 @@
-// XListBox.cpp  Version 1.2
+﻿// XListBox.cpp  Version 1.2
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

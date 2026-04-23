@@ -1,4 +1,4 @@
-// Filename: ScrollHelper.cpp
+﻿// Filename: ScrollHelper.cpp
 // 2005-07-01 nschan Initial revision.
 // 2005-09-08 nschan Added GetClientRectSB() function.
 

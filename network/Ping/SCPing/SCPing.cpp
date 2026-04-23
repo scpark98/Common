@@ -1,4 +1,4 @@
-#include "SCPing.h"
+ï»¿#include "SCPing.h"
 
 #include <thread>
 #include <WinSock2.h>
@@ -40,7 +40,7 @@ void CSCPing::add(CString job_name, CString addr, int retry, int timeout)
 
 	std::map<CString, int>::iterator it = m_map.find(job_name);
 
-	//ÀÌ¹Ì µî·ÏµÈ Àåºñ¶ó¸é
+	//ì´ë¯¸ ë“±ë¡ëœ ì¥ë¹„ë¼ë©´
 	if (it != m_map.end())
 		m_map[params->job_name] = PING_THREAD_IS_RUNNING;
 	else
@@ -50,7 +50,7 @@ void CSCPing::add(CString job_name, CString addr, int retry, int timeout)
 	t.detach();
 }
 
-//Æ¯Á¤ jobÀÇ ÇÎ ¾²·¹µå¸¦ ÁßÁö. ""ÀÌ¸é ¸ğµç ÇÎ ÁßÁö.
+//íŠ¹ì • jobì˜ í•‘ ì“°ë ˆë“œë¥¼ ì¤‘ì§€. ""ì´ë©´ ëª¨ë“  í•‘ ì¤‘ì§€.
 void CSCPing::stop(CString job_name)
 {
 	std::map<CString, int>::iterator it;
@@ -68,7 +68,7 @@ void CSCPing::stop(CString job_name)
 	}
 	else
 	{
-		//¸ğµÎ ÁßÁöÇÒ °æ¿ì
+		//ëª¨ë‘ ì¤‘ì§€í•  ê²½ìš°
 		for (it = m_map.begin(); it != m_map.end(); it++)
 		{
 			if (it->second == PING_THREAD_IS_RUNNING)

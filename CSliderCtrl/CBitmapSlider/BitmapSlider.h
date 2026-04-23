@@ -1,4 +1,4 @@
-#if !defined(AFX_BITMAPSLIDER_H__BED36788_B60C_4C9E_AC56_FE430B93A0FD__INCLUDED_)
+ï»¿#if !defined(AFX_BITMAPSLIDER_H__BED36788_B60C_4C9E_AC56_FE430B93A0FD__INCLUDED_)
 #define AFX_BITMAPSLIDER_H__BED36788_B60C_4C9E_AC56_FE430B93A0FD__INCLUDED_
 
 #if _MSC_VER > 1000
@@ -11,7 +11,7 @@
 //
 // CBitmapSlider v1.5
 //
-// ¾îµðµç ¹«·áÀÔ´Ï´Ù - 2003³â 9¿ù 16ÀÏ - ·ùÁØÈ£
+// ì–´ë””ë“  ë¬´ë£Œìž…ë‹ˆë‹¤ - 2003ë…„ 9ì›” 16ì¼ - ë¥˜ì¤€í˜¸
 //
 /////////////////////////////////////////////////////////////////////////////
 

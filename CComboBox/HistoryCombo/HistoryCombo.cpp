@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////
+ï»¿////////////////////////////////////////////////////////////////////////////
 // File:	HistoryCombo.cpp
 // Version:	3.1
 // Created:	20-Apr-2007
@@ -469,7 +469,7 @@ BOOL CHistoryCombo::PreTranslateMessage(MSG* pMsg)
 
 void CHistoryCombo::OnEditUpdate()
 {
-	//¹º°¡ Á¦´ë·Î µ¿ÀÛÇÏÁö ¾Ê¾Æ¼­ ÀÏ´Ü ÁßÁö.
+	//ë­”ê°€ ì œëŒ€ë¡œ ë™ì‘í•˜ì§€ ì•Šì•„ì„œ ì¼ë‹¨ ì¤‘ì§€.
 	return;
 
 	// if we are not to auto update the text, get outta here

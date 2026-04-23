@@ -1,4 +1,4 @@
-// XPGroupBox.cpp : implementation file
+ï»¿// XPGroupBox.cpp : implementation file
 //
 
 #include "XPGroupBox.h"
@@ -59,7 +59,7 @@ void CXPGroupBox::OnPaint()
 	{ 
         GetWindowText(m_title);
 		if (!m_title.IsEmpty())
-			m_title = _T("  ") + m_title + _T("  ");	//ÁÂ¿ì ¿©¹é Ãß°¡
+			m_title = _T("  ") + m_title + _T("  ");	//ì¢Œìš° ì—¬ë°± ì¶”ê°€
 	}
 	
 	if (!m_title.IsEmpty())
@@ -345,7 +345,7 @@ CXPGroupBox& CXPGroupBox::set_font_size(int nSize)
 	return *this;
 }
 
-//clrBase : ÀÌ ÄÁÆ®·ÑÀÌ ±×·ÁÁú parentÀÇ ¹è°æ»ö
+//clrBase : ì´ ì»¨íŠ¸ë¡¤ì´ ê·¸ë ¤ì§ˆ parentì˜ ë°°ê²½ìƒ‰
 CXPGroupBox& CXPGroupBox::set_base_color(Gdiplus::Color cr_base)
 {
 	m_crBase = cr_base;

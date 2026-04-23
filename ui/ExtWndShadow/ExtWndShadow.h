@@ -1,4 +1,4 @@
-// This is part of the Professional User Interface Suite library.
+﻿// This is part of the Professional User Interface Suite library.
 // Copyright (C) 2001-2003 FOSS Software, Inc.
 // All rights reserved.
 //

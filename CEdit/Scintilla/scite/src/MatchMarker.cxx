@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file MatchMarker.cxx
  ** Mark all the matches of a string.
  **/

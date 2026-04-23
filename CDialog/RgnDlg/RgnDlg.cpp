@@ -1,4 +1,4 @@
-// RGNDlg.cpp : implementation file
+﻿// RGNDlg.cpp : implementation file
 //
 
 #include "stdafx.h"

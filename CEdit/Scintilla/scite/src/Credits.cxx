@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file Credits.cxx
  ** Display a list of contributors in the about box.
  **/

@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file ExportRTF.cxx
  ** Export the current document to RTF.
  **/

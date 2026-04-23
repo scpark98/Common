@@ -1,4 +1,4 @@
-/* This is an implementation of the threads API of POSIX 1003.1-2001.
+﻿/* This is an implementation of the threads API of POSIX 1003.1-2001.
  *
  * --------------------------------------------------------------------------
  *

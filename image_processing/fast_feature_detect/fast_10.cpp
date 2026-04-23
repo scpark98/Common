@@ -1,4 +1,4 @@
-/*This is mechanically generated code*/
+﻿/*This is mechanically generated code*/
 #include <stdlib.h>
 
 typedef struct { int x, y; } xy; 

@@ -1,1 +1,1 @@
-#include "SCThread.h"
+﻿#include "SCThread.h"

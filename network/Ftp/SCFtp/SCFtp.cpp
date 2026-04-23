@@ -1,4 +1,4 @@
-#include "SCFtp.h"
+ï»¿#include "SCFtp.h"
 
 #include <thread>
 #include "../../../Functions.h"
@@ -52,7 +52,7 @@ void CSCFtp::add_job(int job_index, CString local_file, CString remote_file)
 
 	std::map<int, int>::iterator it = m_map.find(job_index);
 
-	//ÀÌ¹Ì µî·ÏµÈ Àåºñ¶ó¸é
+	//ì´ë¯¸ ë“±ë¡ëœ ì¥ë¹„ë¼ë©´
 	if (it != m_map.end())
 		m_map[params->job_index] = FTP_THREAD_IS_RUNNING;
 	else
@@ -62,7 +62,7 @@ void CSCFtp::add_job(int job_index, CString local_file, CString remote_file)
 	t.detach();
 }
 
-//Æ¯Á¤ jobÀÇ ÇÎ ¾²·¹µå¸¦ ÁßÁö. ""ÀÌ¸é ¸ğµç ÇÎ ÁßÁö.
+//íŠ¹ì • jobì˜ í•‘ ì“°ë ˆë“œë¥¼ ì¤‘ì§€. ""ì´ë©´ ëª¨ë“  í•‘ ì¤‘ì§€.
 void CSCFtp::stop(int job_index)
 {
 	std::map<int, int>::iterator it;
@@ -80,7 +80,7 @@ void CSCFtp::stop(int job_index)
 	}
 	else
 	{
-		//¸ğµÎ ÁßÁöÇÒ °æ¿ì
+		//ëª¨ë‘ ì¤‘ì§€í•  ê²½ìš°
 		for (it = m_map.begin(); it != m_map.end(); it++)
 		{
 			if (it->second == FTP_THREAD_IS_RUNNING)
@@ -122,8 +122,8 @@ void CSCFtp::thread_ftp(CSCFtpParams* params)
 
 	m_map[params->job_index] = FTP_THREAD_IS_RUNNING;
 
-	//params->remote_pathÀÇ Æú´õ°¡ FTP ¼­¹ö Root °æ·Î°¡ ¾Æ´Ò °æ¿ì ÇØ´ç Æú´õ·Î º¯°æÇØÁà¾ß ÇÑ´Ù.
-	//¹°·Ğ Æú´õ°¡ Á¸ÀçÇÏÁö ¾ÊÀ¸¸é Æú´õ¸¦ ¸ğµÎ ¸¸µé¾îÁà¾ß ÇÑ´Ù.
+	//params->remote_pathì˜ í´ë”ê°€ FTP ì„œë²„ Root ê²½ë¡œê°€ ì•„ë‹ ê²½ìš° í•´ë‹¹ í´ë”ë¡œ ë³€ê²½í•´ì¤˜ì•¼ í•œë‹¤.
+	//ë¬¼ë¡  í´ë”ê°€ ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ í´ë”ë¥¼ ëª¨ë‘ ë§Œë“¤ì–´ì¤˜ì•¼ í•œë‹¤.
 	DWORD remote_cur_path_len = INTERNET_MAX_PATH_LENGTH;
 	TCHAR remote_cur_path[INTERNET_MAX_PATH_LENGTH];
 	res = FtpGetCurrentDirectory(m_connection, remote_cur_path, &remote_cur_path_len);
@@ -156,7 +156,7 @@ void CSCFtp::thread_ftp(CSCFtpParams* params)
 	if (!fp)
 	{
 		m_parent->SendMessage(Message_CSCFtp, (WPARAM)&CSCFtpMessage(FTP_STATUS_UPLOAD_FILEOPEN_FAILED, params->job_index), 0);
-		TRACE(_T("ÆÄÀÏ ¿­±â ½ÇÆĞ"));
+		TRACE(_T("íŒŒì¼ ì—´ê¸° ì‹¤íŒ¨"));
 		return;
 	}
 
@@ -166,7 +166,7 @@ void CSCFtp::thread_ftp(CSCFtpParams* params)
 	if (!hRemoteFile)
 	{
 		m_parent->SendMessage(Message_CSCFtp, (WPARAM)&CSCFtpMessage(FTP_STATUS_UPLOAD_SKIPPED, params->job_index), 0);
-		TRACE(_T("%s ÆÄÀÏÀÌ ÀÌ¹Ì Á¸ÀçÇÏ¹Ç·Î ½ºÅµ.\n"), params->remote_path);
+		TRACE(_T("%s íŒŒì¼ì´ ì´ë¯¸ ì¡´ì¬í•˜ë¯€ë¡œ ìŠ¤í‚µ.\n"), params->remote_path);
 		m_map[params->job_index] = FTP_THREAD_NOT_RUNNING;
 		fclose(fp);
 		return;
@@ -176,9 +176,9 @@ void CSCFtp::thread_ftp(CSCFtpParams* params)
 	DWORD dwWrite = 0;
 	UINT64 total_sent = nStartFilePointer;
 
-	while (!feof(fp))//·ÎÄÃÆÄÀÏÀ» ´Ù ÀĞÀ»¶§±îÁö ¹İº¹
+	while (!feof(fp))//ë¡œì»¬íŒŒì¼ì„ ë‹¤ ì½ì„ë•Œê¹Œì§€ ë°˜ë³µ
 	{
-		//_tcscpy_s(st_TransferInfo_In.szFilePath, strLocalFilePath);//Àü¼ÛÁßÀÎ ÆÄÀÏ¸í(°æ·ÎÆ÷ÇÔ)
+		//_tcscpy_s(st_TransferInfo_In.szFilePath, strLocalFilePath);//ì „ì†¡ì¤‘ì¸ íŒŒì¼ëª…(ê²½ë¡œí¬í•¨)
 		size_t nReadSize = fread(Buff, 1, MAX_BUFFER_SIZE, fp);
 
 		if (nReadSize == 0)
@@ -187,15 +187,15 @@ void CSCFtp::thread_ftp(CSCFtpParams* params)
 		UINT dwSend = 0;
 		do
 		{
-			//FTP¼­¹ö¿¡ ¾÷·Îµå
+			//FTPì„œë²„ì— ì—…ë¡œë“œ
 			if (InternetWriteFile(hRemoteFile, Buff + dwSend, nReadSize - dwSend, &dwWrite) == FALSE)
 			{
 				InternetCloseHandle(hRemoteFile);
 				fclose(fp);
 				return;
 			}
-			total_sent += dwWrite;//ÃÑ Àü¼ÛµÈ Å©±â
-			dwSend += dwWrite;//ÇöÀç ÆÄÀÏÀÇ Àü¼ÛµÈ Å©±â
+			total_sent += dwWrite;//ì´ ì „ì†¡ëœ í¬ê¸°
+			dwSend += dwWrite;//í˜„ì¬ íŒŒì¼ì˜ ì „ì†¡ëœ í¬ê¸°
 			*Buff += dwSend;//MAX_BUFFER_SIZE
 
 			double percentage = ((double)total_sent / (double)local_file_size) * 100.0;
@@ -211,7 +211,7 @@ void CSCFtp::thread_ftp(CSCFtpParams* params)
 			//	PUMP_MESSAGES();
 			//}
 
-			//if (WaitForSingleObject(hCloseEvent, 0) == WAIT_OBJECT_0)//¿¹¿ÜÀû Á¾·á
+			//if (WaitForSingleObject(hCloseEvent, 0) == WAIT_OBJECT_0)//ì˜ˆì™¸ì  ì¢…ë£Œ
 			//{
 			//	InternetCloseHandle(hFile);
 			//	fclose(fp);

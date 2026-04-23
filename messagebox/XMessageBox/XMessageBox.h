@@ -1,4 +1,4 @@
-// XMessageBox.h  Version 1.10
+﻿// XMessageBox.h  Version 1.10
 //
 // This software is released into the public domain.  You are free to use it
 // in any way you like, except that you may not sell this source code.
@@ -157,7 +157,7 @@ struct XMSGBOXPARAMS
 	}
 
 	UINT		nIdHelp;						// help context ID for message;
-												// 0 indicates the application�s 
+												// 0 indicates the application뭩 
 												// default Help context will 
 												// be used
 	int			nTimeoutSeconds;				// number of seconds before the

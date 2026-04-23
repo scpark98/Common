@@ -1,4 +1,4 @@
-// XString.cpp  Version 1.1 - article available at www.codeproject.com
+﻿// XString.cpp  Version 1.1 - article available at www.codeproject.com
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

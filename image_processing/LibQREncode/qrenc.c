@@ -1,4 +1,4 @@
-/**
+﻿/**
  * qrencode - QR Code encoder
  *
  * QR Code encoding tool

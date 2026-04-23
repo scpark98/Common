@@ -1,4 +1,4 @@
-// SkinHeaderCtrl.cpp : implementation file
+ï»¿// SkinHeaderCtrl.cpp : implementation file
 //
 
 //#include "stdafx.h"
@@ -258,7 +258,7 @@ int	CHeaderCtrlEx::GetColumnTextAlign( int nColumn )
 	HDITEM	hdItem;
 
 	//scpark 2010-3-25 10:01:15
-	//¾Æ·¡ memsetÀ» ¾ÈÇØÁÖ¸é heap error³­´Ù.
+	//ì•„ë˜ memsetì„ ì•ˆí•´ì£¼ë©´ heap errorë‚œë‹¤.
 	memset(&hdItem, 0, sizeof(hdItem));
 
 	hdItem.mask	= HDI_FORMAT;
@@ -279,7 +279,7 @@ void CHeaderCtrlEx::SetColumnTextAlign( int nColumn, int format )
 	HDITEM	hdItem;
 
 	//scpark 2010-3-25 10:01:15
-	//¾Æ·¡ memsetÀ» ¾ÈÇØÁÖ¸é heap error³­´Ù.
+	//ì•„ë˜ memsetì„ ì•ˆí•´ì£¼ë©´ heap errorë‚œë‹¤.
 	memset(&hdItem, 0, sizeof(hdItem));
 	
 	GetItem( nColumn, &hdItem );
@@ -295,7 +295,7 @@ int CHeaderCtrlEx::GetClickedColumn( CPoint point )
 	for ( int i = 0; i < GetItemCount(); i++ )
 	{
 		GetItemRect( i, rItem );
-		//separator¿Í ±¸ºĞÇÏ±â À§ÇØ ÁÙ¿©¼­ Ã¼Å©.
+		//separatorì™€ êµ¬ë¶„í•˜ê¸° ìœ„í•´ ì¤„ì—¬ì„œ ì²´í¬.
 
 		rItem.DeflateRect( 6, 0 );
 		if ( rItem.PtInRect( point ) )

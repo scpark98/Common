@@ -1,4 +1,4 @@
-// XUnzip.cpp  Version 1.3
+Ôªø// XUnzip.cpp  Version 1.3
 //
 // Authors:      Mark Adler et al. (see below)
 //
@@ -4005,7 +4005,7 @@ ZRESULT TUnzip::Get(int index, ZIPENTRY* ze)
     FILETIME ft;
     DosDateTimeToFileTime(dosdate, dostime, &ft);
 
-    ft.dwLowDateTime -= 5000000;    // 500π–∏Æ√  π›ø√∏≤ ∂ßπÆø° .. 
+    ft.dwLowDateTime -= 5000000;    // 500Î∞ÄÎ¶¨Ï¥à Î∞òÏò¨Î¶º ÎïåÎ¨∏Ïóê .. 
 
     FILETIME lpft;
     LocalFileTimeToFileTime(&ft, &lpft); 

@@ -1,4 +1,4 @@
-/*! \file
+﻿/*! \file
  *
  * HTTP Status Codes - C++ Variant
  *

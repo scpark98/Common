@@ -1,4 +1,4 @@
-// NewWizPage.cpp : implementation file
+﻿// NewWizPage.cpp : implementation file
 //
 
 #include "stdafx.h"

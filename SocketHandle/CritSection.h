@@ -1,4 +1,4 @@
-#ifndef CRITSECTION_H
+﻿#ifndef CRITSECTION_H
 #define CRITSECTION_H
 
 /**

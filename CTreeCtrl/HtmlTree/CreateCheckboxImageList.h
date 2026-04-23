@@ -1,4 +1,4 @@
-// CreateCheckboxImageList.h  Version 1.0
+﻿// CreateCheckboxImageList.h  Version 1.0
 //
 // Author:  Hans Dietrich
 //          hdietrich@gmail.com

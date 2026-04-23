@@ -1,4 +1,4 @@
-// BitListBox.cpp : implementation file
+﻿// BitListBox.cpp : implementation file
 //
 
 #include "stdafx.h"

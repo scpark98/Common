@@ -83,6 +83,8 @@ public:
     void			SetWindowText(LPCTSTR lpsz_string);
     void			GetWindowText(CString& r_string) const;
     CString			get_text() const { return m_text; }
+	int             get_int() const { return _ttoi(m_text); }
+	float           get_float() const { return (float)_ttof(m_text); }
     void			set_text(const CString& text);
     void			set_text(int n)    { CString s; s.Format(_T("%d"), n); set_text(s); }
     void			set_text(double d) { CString s; s.Format(_T("%g"), d); set_text(s); }
@@ -135,10 +137,16 @@ public:
     // ──────────────────────────────────────────────
     void		    set_readonly(bool readonly = true);
     bool		    is_readonly() const { return m_readonly; }
+    //readonly일 때 원래 기본색인 gray로 표시할 것인지, 특정색을 사용할 지, transparent라면 m_cr_back을 사용하게 된다.
+    void			set_use_default_readonly_color(bool use_default_readonly_color = true, Gdiplus::Color cr_back_readonly = Gdiplus::Color::Transparent);
+
+
     void		    set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
     void		    set_max_length(int max)              { m_max_length = max; }
-    // up/down 방향키로 정수 값 증감. 텍스트가 정수로 파싱되지 않으면 스킵.
-    void		    set_use_updown_key(bool use_updown_key = true, int interval = 1)
+    // up/down 방향키로 수치 증감. 텍스트가 실수로 파싱되지 않으면 스킵.
+    // interval 은 실수 허용 (예: 0.001). 표시 자리수 = max(interval 소수자리수, 현재 텍스트 소수자리수).
+    // 예: interval=0.01, "0.09" → up → "0.10" (trailing 0 보존).
+    void		    set_use_updown_key(bool use_updown_key = true, float interval = 1.0f)
                         { m_use_updown_key = use_updown_key; m_updown_interval = interval; }
     void		    set_dim_text(const CString& dim_text);
     void		    set_padding(int padding)             { m_padding = padding; Invalidate(); }
@@ -224,6 +232,7 @@ private:
 
     // ── 옵션 ──
     bool		m_readonly   = false;
+    bool        m_use_default_readonly_color = true;
     bool		m_password   = false;
     TCHAR		m_mask_char  = _T('*');
     int			m_max_length = 0;      // 0 = 제한 없음
@@ -232,7 +241,7 @@ private:
     DWORD		m_halign     = DT_LEFT;    // DT_LEFT / DT_CENTER / DT_RIGHT
     bool		m_dynamic    = false;  // 동적 생성 여부
     bool		m_use_updown_key  = false;
-    int			m_updown_interval = 1;
+    float		m_updown_interval = 1.0f;
 
     // set_parent_back_color() 명시 호출 여부.
     // Gdiplus::Color() 의 default 생성자가 Black opaque(0xFF000000) 로 초기화되기 때문에

@@ -1,4 +1,4 @@
-/*******************************************************************************
+﻿/*******************************************************************************
 File:        SysTrayIcon.cpp
 
 Description: This file contains the module for creating and manipulating

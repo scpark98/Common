@@ -1,4 +1,4 @@
-#include "MP4Recorder2.h"
+ï»¿#include "MP4Recorder2.h"
 #include <mmsystem.h>
 #include "AutoSync.h"
 
@@ -62,7 +62,7 @@ bool CMP4Recorder2::Start(CMP4RecorderParam* param)
 	m_nEncWidth			= param->width;
 	m_nEncHeight		= param->height;
 	m_unFPS				= param->fps;
-	m_nQuantizer		= 18 + (int)((float)(100 - param->quality) / 4.0); //³ôÀ»¼ö·Î È­ÁúÀúÇÏ
+	m_nQuantizer		= 18 + (int)((float)(100 - param->quality) / 4.0); //ë†’ì„ìˆ˜ë¡œ í™”ì§ˆì €í•˜
 
 	char* cfilename = WCHARToUTF8(param->filepath);
 	m_hMP4File = MP4Create(cfilename);

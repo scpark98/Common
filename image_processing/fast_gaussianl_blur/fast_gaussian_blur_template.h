@@ -1,4 +1,4 @@
-// Copyright (C) 2017-2022 Basile Fraboni
+ï»¿// Copyright (C) 2017-2022 Basile Fraboni
 // Copyright (C) 2014 Ivan Kutskir (for the original fast blur implementation)
 // All Rights Reserved
 // You may use, distribute and modify this code under the
@@ -7,11 +7,11 @@
 //
 #pragma once
 
-//scpark ¾Æ·¡ 2ÁÙÀÇ #undef´Â ¿ø·¡ ¼Ò½º¿¡¼­´Â ¾ø¾úÀ¸³ª std::min, std::max¿ÍÀÇ ¸ğÈ£¼º ¿À·ù¶§¹®¿¡ Ãß°¡ÇÔ.
+//scpark ì•„ë˜ 2ì¤„ì˜ #undefëŠ” ì›ë˜ ì†ŒìŠ¤ì—ì„œëŠ” ì—†ì—ˆìœ¼ë‚˜ std::min, std::maxì™€ì˜ ëª¨í˜¸ì„± ì˜¤ë¥˜ë•Œë¬¸ì— ì¶”ê°€í•¨.
 #undef min
 #undef max
 
-//scpark ¾Æ·¡ 2ÁÙÀÇ #includeµµ ¾ø¾úÀ¸³ª Ãß°¡ÇÔ.
+//scpark ì•„ë˜ 2ì¤„ì˜ #includeë„ ì—†ì—ˆìœ¼ë‚˜ ì¶”ê°€í•¨.
 #include <cmath>
 #include <algorithm>
 //!

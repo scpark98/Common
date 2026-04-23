@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+Ôªø//-----------------------------------------------------------------------------
 // Picture (Implementations) Version 1.00
 //
 // Routins 4 Showing Picture Files... (.BMP .DIB .EMF .GIF .ICO .JPG .WMF)
@@ -235,7 +235,7 @@ BOOL CPicture::Load(CString sFilePathName)
 	if ( m_IPicture != NULL )
 		FreePictureData(); // Important - Avoid Leaks...
 
-	//CFile::modeRead∑Œ «œ¥œ «—±€ ∆ƒ¿œ∏Ì¿∫ ø≠±‚ Ω«∆–∂Ûº≠ CFile::shareDenyNone∑Œ ∫Ø∞Ê.
+	//CFile::modeReadÎ°ú ÌïòÎãà ÌïúÍ∏Ä ÌååÏùºÎ™ÖÏùÄ Ïó¥Í∏∞ Ïã§Ìå®ÎùºÏÑú CFile::shareDenyNoneÎ°ú Î≥ÄÍ≤Ω.
 	if(PictureFile.Open(sFilePathName, CFile::shareDenyNone | CFile::typeBinary, &e))
 		{
 		nSize = PictureFile.GetLength();
@@ -356,8 +356,8 @@ BOOL CPicture::Draw(CDC *pDC, CRect DrawRect, bool bAspectRatio /*= true*/ )
 {
     if (pDC == NULL || m_IPicture == NULL) return FALSE;
     
-    long Width  = 0;	//¿ÃπÃ¡ˆ ∞°∑Œ ≈©±‚
-    long Height = 0;	//¿ÃπÃ¡ˆ ºº∑Œ ≈©±‚
+    long Width  = 0;	//Ïù¥ÎØ∏ÏßÄ Í∞ÄÎ°ú ÌÅ¨Í∏∞
+    long Height = 0;	//Ïù¥ÎØ∏ÏßÄ ÏÑ∏Î°ú ÌÅ¨Í∏∞
     m_IPicture->get_Width(&Width);
     m_IPicture->get_Height(&Height);
 
@@ -374,14 +374,14 @@ BOOL CPicture::Draw(CDC *pDC, CRect DrawRect, bool bAspectRatio /*= true*/ )
 		double dZoom;
 		double dRatio = (double)Width / (double)Height;
 
-		//∞°∑Œ ¿ÃπÃ¡ˆ
+		//Í∞ÄÎ°ú Ïù¥ÎØ∏ÏßÄ
 		if ( dRatio > 1.0 )
 		{
 			double new_Height = (double)DrawRect.Width() / dRatio;
 			newRect.top = DrawRect.top + ( DrawRect.Height() - new_Height ) / 2.0;
 			newRect.bottom = newRect.top + new_Height;
 		}
-		//ºº∑Œ ¿ÃπÃ¡ˆ
+		//ÏÑ∏Î°ú Ïù¥ÎØ∏ÏßÄ
 		else if ( dRatio < 1.0 )
 		{
 			double new_Width = (double)DrawRect.Height() * dRatio;

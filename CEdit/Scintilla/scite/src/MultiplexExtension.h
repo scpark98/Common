@@ -1,4 +1,4 @@
-// SciTE - Scintilla based Text Editor
+﻿// SciTE - Scintilla based Text Editor
 /** @file MultiplexExtension.h
  ** Extension that manages / dispatches messages to multiple extensions.
  **/

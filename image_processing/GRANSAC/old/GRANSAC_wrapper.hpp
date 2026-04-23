@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "GRANSAC.hpp"
 #include "LineModel.hpp"

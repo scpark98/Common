@@ -63,9 +63,37 @@ CRect CSCParagraphStatic::set_text(CString text)
 
 	m_static_option = dwText;
 	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, m_static_option);
+
+	if (m_line_spacing != 1.0f)
+		m_rect_text = CSCParagraph::set_line_spacing(m_para, m_line_spacing);
+
 	Invalidate();
 
 	return m_rect_text;
+}
+
+void CSCParagraphStatic::set_line_spacing(float spacing)
+{
+	float old_spacing = m_line_spacing;
+	m_line_spacing = spacing;
+
+	//set_text() 이전이면 m_para 가 비어있으므로 다음 set_text() 시 자동 적용된다.
+	if (m_para.empty())
+	{
+		Invalidate();
+		return;
+	}
+
+	if (spacing == old_spacing)
+		return;
+
+	//현재 m_para 는 old_spacing 이 적용된 상태.
+	//CSCParagraph::set_line_spacing() 의 shift 공식이 (arg - 1.0) * line_height 로 가산적이므로
+	//arg = (spacing - old_spacing + 1.0f) 을 넘기면 정확히 (spacing - old_spacing) 만큼만 추가 shift 되어
+	//calc_text_rect() 재호출 없이 old → new 전이가 가능하다.
+	m_rect_text = CSCParagraph::set_line_spacing(m_para, spacing - old_spacing + 1.0f);
+
+	Invalidate();
 }
 
 #if 0
@@ -332,6 +360,13 @@ void CSCParagraphStatic::OnPaint()
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	Gdiplus::Graphics g(dc);
+
+	//AntiAlias, TextRenderingHint 등은 미리 g에 세팅되서 넘어와야 한다.
+	//무조건 여기서 이를 고정하여 출력하게 되면 일부 텍스트는 antiAlias로 인해 흐리게 표시된다.
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
 	CSCParagraph::draw_text(g, m_para);
 }
 
@@ -370,6 +405,9 @@ void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)
 	CRect rc;
 	GetClientRect(rc);
 	CSCParagraph::calc_text_rect(rc, GetDC(), m_para, m_static_option);
+
+	if (m_line_spacing != 1.0f)
+		CSCParagraph::set_line_spacing(m_para, m_line_spacing);
 }
 
 void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)

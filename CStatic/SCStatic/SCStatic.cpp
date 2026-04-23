@@ -695,7 +695,6 @@ void CSCStatic::set_textf(LPCTSTR format, ...)
 	va_start(args, format);
 
 	CString text;
-
 	text.FormatV(format, args);
 
 	set_text(text);

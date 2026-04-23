@@ -14,6 +14,9 @@ static inline COLORREF to_colorref(const Gdiplus::Color& c)
 // 드래그 선택 중 가장자리 자동 스크롤 타이머 ID
 static const UINT_PTR TID_DRAG_AUTOSCROLL = 1;
 
+// 카피 버튼: 텍스트 영역 우측을 reserved 만큼 줄여 공간 확보. 실제 그리기 위치는 draw_copy_button 참고.
+static const int copy_button_reserved = 32;
+
 // ──────────────────────────────────────────────────────────
 // Message Map
 // ──────────────────────────────────────────────────────────
@@ -186,6 +189,17 @@ void CSCStaticEdit::set_text(const CString& text)
 	}
 }
 
+void CSCStaticEdit::set_textf(LPCTSTR format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	CString text;
+	text.FormatV(format, args);
+
+	set_text(text);
+}
+
 // ──────────────────────────────────────────────────────────
 // 선택
 // ──────────────────────────────────────────────────────────
@@ -286,7 +300,7 @@ void CSCStaticEdit::OnSetFocus(CWnd* p_old_wnd)
 		dc.SelectObject(p_old);
 		// 폰트 높이(tmHeight) 기준 + rc_text.Height() 상한 clamp. 큰 폰트가 와도
 		// 캐럿이 컨트롤 내부에만 표시되도록 제한 (update_caret_pos 에서도 재clamp 됨).
-		CRect rc_text = get_text_rect();
+		CRect rc_text = get_text_area();
 		m_caret_height = min((int)tm.tmHeight, (int)rc_text.Height());
 	}
 	m_caret_width = 2;
@@ -528,6 +542,16 @@ void CSCStaticEdit::OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 // ──────────────────────────────────────────────────────────
 void CSCStaticEdit::OnLButtonDown(UINT n_flags, CPoint point)
 {
+	// 카피 버튼 위 클릭은 텍스트 선택/포커스 이동 없이 버튼 동작만
+	if (m_use_copy_button && get_copy_button_area().PtInRect(point))
+	{
+		m_copy_button_capturing = true;
+		m_copy_button_pressed   = true;
+		SetCapture();
+		Invalidate(FALSE);
+		return;
+	}
+
 	SetFocus();
 
 	int pos = hit_test_char(point);
@@ -554,6 +578,20 @@ void CSCStaticEdit::OnLButtonDown(UINT n_flags, CPoint point)
 
 void CSCStaticEdit::OnLButtonUp(UINT n_flags, CPoint point)
 {
+	if (m_copy_button_capturing)
+	{
+		// pressed 상태로 mouseup 되면 = 영역 안에서 손 뗀 것 → 클릭 성공
+		bool fire = m_copy_button_pressed;
+		m_copy_button_capturing = false;
+		m_copy_button_pressed   = false;
+		if (GetCapture() == this)
+			ReleaseCapture();
+		Invalidate(FALSE);
+		if (fire)
+			copy_to_clipboard(m_hWnd, m_text);
+		return;
+	}
+
 	m_selecting = false;
 	if (m_drag_scrolling)
 	{
@@ -567,6 +605,18 @@ void CSCStaticEdit::OnLButtonUp(UINT n_flags, CPoint point)
 
 void CSCStaticEdit::OnMouseMove(UINT n_flags, CPoint point)
 {
+	// 카피 버튼 캡처 중: 영역 내/외 따라 pressed 시각만 토글 (드래그 아웃하면 release)
+	if (m_copy_button_capturing)
+	{
+		bool inside = get_copy_button_area().PtInRect(point);
+		if (inside != m_copy_button_pressed)
+		{
+			m_copy_button_pressed = inside;
+			Invalidate(FALSE);
+		}
+		return;
+	}
+
 	if (m_selecting && (n_flags & MK_LBUTTON))
 	{
 		int pos = hit_test_char(point);
@@ -581,7 +631,7 @@ void CSCStaticEdit::OnMouseMove(UINT n_flags, CPoint point)
 		// 마우스가 좌/우 가장자리 밖으로 나간 상태로 멈추면 OnMouseMove 가 더 이상
 		// 오지 않으므로 타이머로 연속 스크롤. 안으로 돌아오면 타이머 정지.
 		m_last_drag_point = point;
-		CRect rc_text = get_text_rect();
+		CRect rc_text = get_text_area();
 		bool at_edge = (point.x < rc_text.left) || (point.x > rc_text.right);
 		if (at_edge && !m_drag_scrolling)
 		{
@@ -601,6 +651,18 @@ BOOL CSCStaticEdit::OnSetCursor(CWnd* p_wnd, UINT n_hit_test, UINT message)
 {
 	if (IsWindowEnabled() && n_hit_test == HTCLIENT)
 	{
+		// 카피 버튼 위에서는 화살표 커서 (텍스트 영역만 IBEAM)
+		if (m_use_copy_button)
+		{
+			CPoint pt;
+			::GetCursorPos(&pt);
+			ScreenToClient(&pt);
+			if (get_copy_button_area().PtInRect(pt))
+			{
+				::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+				return TRUE;
+			}
+		}
 		::SetCursor(::LoadCursor(nullptr, IDC_IBEAM));
 		return TRUE;
 	}
@@ -804,7 +866,7 @@ void CSCStaticEdit::OnTimer(UINT_PTR id_event)
 			return;
 		}
 
-		CRect rc_text = get_text_rect();
+		CRect rc_text = get_text_area();
 		bool at_left  = m_last_drag_point.x < rc_text.left;
 		bool at_right = m_last_drag_point.x > rc_text.right;
 		if (!at_left && !at_right)
@@ -884,7 +946,7 @@ void CSCStaticEdit::OnPaint()
 		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 		g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 
-		CRect rc_text = get_text_rect();
+		CRect rc_text = get_text_area();
 
 		draw_background(g, rc_client);
 		draw_border(g, rc_client);
@@ -907,6 +969,10 @@ void CSCStaticEdit::OnPaint()
 			draw_selection(g, rc_text);
 			draw_text(g, rc_text);
 		}
+
+		// 텍스트 영역 클립을 해제한 뒤 카피 버튼을 그린다 (버튼은 클립 밖에 위치)
+		g.ResetClip();
+		draw_copy_button(g);
 	}
 
 	dc.BitBlt(0, 0, rc_client.Width(), rc_client.Height(), &mem_dc, 0, 0, SRCCOPY);
@@ -1103,7 +1169,7 @@ void CSCStaticEdit::draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text)
 // ──────────────────────────────────────────────────────────
 // 헬퍼: 텍스트 그리기 영역
 // ──────────────────────────────────────────────────────────
-CRect CSCStaticEdit::get_text_rect() const
+CRect CSCStaticEdit::get_text_area() const
 {
 	CRect rc;
 	GetClientRect(rc);
@@ -1119,7 +1185,51 @@ CRect CSCStaticEdit::get_text_rect() const
 		rc.left  += extra;
 		rc.right -= extra;
 	}
+
+	// 카피 버튼 사용 시 우측 영역 확보 (텍스트는 버튼 좌측까지만 그려짐)
+	if (m_use_copy_button)
+		rc.right -= copy_button_reserved;
+
 	return rc;
+}
+
+// ──────────────────────────────────────────────────────────
+// 헬퍼: 실제 그려진 텍스트의 bounding box (= 글자 픽셀 크기 + 정렬·스크롤 반영 위치)
+//   - get_text_area() 와 다름: area 는 그려질 수 있는 공간, rect 는 실제 글자가 차지하는 영역.
+//   - draw_text 의 text_x/text_y 계산과 동기 — 거기 로직 바뀌면 같이 수정 필요.
+//   - CClientDC / CFont* 는 비-const 시그니처라 const_cast 필요 (calc_caret_pixel_pos 와 동일 패턴).
+// ──────────────────────────────────────────────────────────
+CRect CSCStaticEdit::get_text_rect() const
+{
+	CRect rc_area = get_text_area();
+
+	CClientDC dc(const_cast<CSCStaticEdit*>(this));
+	CFont* p_old = dc.SelectObject(const_cast<CFont*>(&m_font));
+
+	CString display = get_display_text();
+	if (m_composing)
+		display.Insert(m_caret_pos, m_compose);
+
+	CSize      sz = dc.GetTextExtent(display);
+	TEXTMETRIC tm = {};
+	dc.GetTextMetrics(&tm);
+
+	dc.SelectObject(p_old);
+
+	int text_w = sz.cx;
+	int text_h = tm.tmHeight;
+
+	int text_y;
+	if (m_valign & DT_VCENTER)
+		text_y = rc_area.top + (rc_area.Height() - text_h) / 2;
+	else if (m_valign & DT_BOTTOM)
+		text_y = rc_area.bottom - text_h;
+	else
+		text_y = rc_area.top;
+
+	int text_x = get_text_start_x(text_w);
+
+	return CRect(text_x, text_y, text_x + text_w, text_y + text_h);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1131,7 +1241,7 @@ CRect CSCStaticEdit::get_text_rect() const
 // ──────────────────────────────────────────────────────────
 int CSCStaticEdit::get_text_start_x(int text_width) const
 {
-	CRect rc_text = get_text_rect();
+	CRect rc_text = get_text_area();
 	if (m_halign == DT_RIGHT)
 		return rc_text.right - text_width;
 	if (m_halign == DT_CENTER && text_width <= rc_text.Width())
@@ -1158,7 +1268,7 @@ CPoint CSCStaticEdit::calc_caret_pixel_pos(int char_pos) const
 
 	// 가로 정렬 + 스크롤을 반영한 텍스트 시작 x 에 문자까지의 폭을 더한다.
 	int x = get_text_start_x(sz_total.cx) + sz.cx;
-	int y = get_text_rect().top;
+	int y = get_text_area().top;
 	return CPoint(x, y);
 }
 
@@ -1219,7 +1329,7 @@ CRect CSCStaticEdit::get_compose_draw_box() const
 	if (!m_composing || m_compose.IsEmpty())
 		return CRect();
 
-	CRect rc_text = get_text_rect();
+	CRect rc_text = get_text_area();
 	CClientDC dc(const_cast<CSCStaticEdit*>(this));
 	CFont* p_old = dc.SelectObject(const_cast<CFont*>(&m_font));
 
@@ -1276,7 +1386,7 @@ void CSCStaticEdit::update_caret_pos()
 	else
 	{
 		CPoint pt = calc_caret_pixel_pos(m_caret_pos);
-		CRect  rcT = get_text_rect();
+		CRect  rcT = get_text_area();
 		want_w = 2;
 		// 폰트가 컨트롤 높이보다 큰 경우 rc_text 안에 들어오도록 clamp.
 		// m_caret_height 는 OnSetFocus 시점의 폰트 기준이라 폰트 변경 시 stale 할 수 있으므로
@@ -1306,7 +1416,7 @@ void CSCStaticEdit::update_caret_pos()
 // ──────────────────────────────────────────────────────────
 void CSCStaticEdit::ensure_caret_visible()
 {
-	CRect rc_text = get_text_rect();
+	CRect rc_text = get_text_area();
 	int pos = m_caret_pos + (m_composing ? m_compose.GetLength() : 0);
 	CPoint pt = calc_caret_pixel_pos(pos);
 
@@ -1375,24 +1485,7 @@ void CSCStaticEdit::delete_selection()
 // ──────────────────────────────────────────────────────────
 void CSCStaticEdit::do_copy()
 {
-	CString sel = get_sel_text();
-	if (sel.IsEmpty()) return;
-	if (!::OpenClipboard(m_hWnd)) return;
-	::EmptyClipboard();
-	int n_bytes = (sel.GetLength() + 1) * sizeof(TCHAR);
-	HGLOBAL h_mem = ::GlobalAlloc(GMEM_MOVEABLE, n_bytes);
-	if (h_mem)
-	{
-		LPVOID p = ::GlobalLock(h_mem);
-		memcpy(p, (LPCTSTR)sel, n_bytes);
-		::GlobalUnlock(h_mem);
-#ifdef UNICODE
-		::SetClipboardData(CF_UNICODETEXT, h_mem);
-#else
-		::SetClipboardData(CF_TEXT, h_mem);
-#endif
-	}
-	::CloseClipboard();
+	copy_to_clipboard(m_hWnd, get_sel_text());
 }
 
 void CSCStaticEdit::do_cut()
@@ -1442,6 +1535,70 @@ void CSCStaticEdit::do_paste()
 		update_caret_pos();
 		Invalidate(FALSE);
 	}
+}
+
+// ──────────────────────────────────────────────────────────
+// 카피 버튼 (우측 클립보드 아이콘)
+//   - 별도 CButton 없이 OnPaint 에서 직접 그리고, OnLButtonDown/Up/MouseMove 에서
+//     마우스 캡처를 받아 버튼처럼 동작.
+//   - get_text_area() 가 버튼 영역만큼 우측을 줄여 텍스트와 캐럿이 자연스럽게 잘림.
+// ──────────────────────────────────────────────────────────
+void CSCStaticEdit::set_use_copy_button(bool use)
+{
+	if (m_use_copy_button == use)
+		return;
+	m_use_copy_button = use;
+	if (m_hWnd)
+	{
+		ensure_caret_visible();
+		update_caret_pos();
+		Invalidate();
+	}
+}
+
+CRect CSCStaticEdit::get_copy_button_area() const
+{
+	if (!m_use_copy_button)
+		return CRect();
+
+	CRect rc;
+	GetClientRect(rc);
+
+	CRect btn_area = rc;
+	btn_area.left  = btn_area.right - 6 - get_text_area().Height() - 5 - 4;
+
+	if (btn_area.IsRectEmpty())
+		return CRect();
+
+	return btn_area;
+}
+
+void CSCStaticEdit::draw_copy_button(Gdiplus::Graphics& g)
+{
+	if (!m_use_copy_button)
+		return;
+
+	CRect rc;
+	GetClientRect(rc);
+
+	// 버튼 사이즈 = 텍스트 영역 높이 기준 정사각, 우측 6px 안쪽에 배치.
+	CRect rc_btn = get_text_rect();
+	rc_btn.right = rc.right - 6;
+	rc_btn.left  = rc_btn.right - rc_btn.Height() + 2;
+	if (rc_btn.IsRectEmpty())
+		return;
+
+	// 두 라운드 사각형이 좌하 / 우상으로 어긋나게 그려져 클립보드 아이콘 형태가 됨.
+	// 첫 그리기는 좌하(-5,+2), 두번째는 거기서 (+5,-3) → 우상으로 이동 (실효 offset 0,-1).
+	rc_btn.OffsetRect(-5, +2);
+	draw_round_rect(&g, CRect_to_gpRect(rc_btn),
+		m_copy_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray,
+		m_copy_button_pressed ? Gdiplus::Color::Moccasin : m_theme.cr_back, 2, 1);
+	
+	rc_btn.OffsetRect(+5, -3);
+	draw_round_rect(&g, CRect_to_gpRect(rc_btn),
+		m_copy_button_pressed ? Gdiplus::Color::DimGray   : Gdiplus::Color::RoyalBlue,
+		m_copy_button_pressed ? m_theme.cr_back : Gdiplus::Color::Moccasin, 2, 1);
 }
 
 // ──────────────────────────────────────────────────────────

@@ -86,6 +86,7 @@ public:
     void			set_text(const CString& text);
     void			set_text(int n)    { CString s; s.Format(_T("%d"), n); set_text(s); }
     void			set_text(double d) { CString s; s.Format(_T("%g"), d); set_text(s); }
+    void			set_textf(LPCTSTR format, ...);
     int				get_text_length() const { return m_text.GetLength(); }
 
     // ──────────────────────────────────────────────
@@ -141,6 +142,11 @@ public:
                         { m_use_updown_key = use_updown_key; m_updown_interval = interval; }
     void		    set_dim_text(const CString& dim_text);
     void		    set_padding(int padding)             { m_padding = padding; Invalidate(); }
+    // 우측에 카피 버튼 표시. true 면 텍스트 영역이 우측 32px 줄어들고 그 자리에 클립보드
+    // 아이콘(라운드 사각형 2개 교차) 을 그린다. 클릭 시 현재 전체 텍스트를 클립보드로 복사.
+    // 별도 CButton 을 만들지 않고 OnPaint/마우스 핸들러에서 직접 처리.
+    void		    set_use_copy_button(bool use = true);
+    bool		    is_use_copy_button() const { return m_use_copy_button; }
     // 세로 정렬 (line align): DT_TOP / DT_VCENTER (기본) / DT_BOTTOM
     void		    set_line_align(DWORD align = DT_VCENTER) { m_valign = align; Invalidate(); }
     DWORD		    get_line_align() const { return m_valign; }
@@ -245,9 +251,17 @@ private:
     // ── 스크롤 (가로) ──
     int			m_scroll_offset = 0;    // 픽셀 단위 스크롤 오프셋
 
+    // ── 카피 버튼 (우측 클립보드 아이콘) ──
+    bool		m_use_copy_button       = false;
+    bool		m_copy_button_capturing = false; // 마우스 캡처 중
+    bool		m_copy_button_pressed   = false; // 시각 상태 (캡처 중 + 영역 내)
+    CRect		get_copy_button_area() const;
+    void		draw_copy_button(Gdiplus::Graphics& g);
+
     // ── 내부 헬퍼 ──
     CString		get_display_text() const;      // 패스워드 마스킹 적용된 표시용 텍스트
-    CRect		get_text_rect() const;         // 텍스트가 그려지는 영역 (패딩/보더 제외)
+    CRect		get_text_area() const;         // 텍스트가 그려질 수 있는 영역 (패딩/보더/round/카피버튼 제외)
+    CRect		get_text_rect() const;         // 실제 그려진 텍스트의 bounding box (글자 크기 + 정렬·스크롤 반영)
     // 가로 정렬 + 가로 스크롤을 반영한 "텍스트의 첫 글자 픽셀 x". draw_text / calc_caret_pixel_pos /
     // hit_test_char / get_compose_draw_box / draw_dim_text 가 공통으로 사용하여 정렬이 동기화됨.
     // text_width 는 현재 표시될 문자열(패스워드 마스킹 + IME 조합 포함) 의 GDI TextExtent.cx.

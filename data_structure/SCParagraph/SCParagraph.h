@@ -90,6 +90,9 @@ public:
 	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align);
 	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
 
+	//각 paragraph의 r이 계산된 후에 줄 간격을 spacing 배수로 조정한다. spacing이 1.0f이면 기본 줄 간격, 2.0f이면 줄 간격이 2배가 된다.
+	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, float spacing = 1.0f);
+
 	//static void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
 	static void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para);
 

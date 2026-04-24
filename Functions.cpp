@@ -3563,6 +3563,48 @@ CString DownloadURLFile(CString sUrl, CString sLocalFileName, HWND hWnd/*=NULL*/
 }
 
 //기본 브라우저로 설정된 브라우저 이름을 리턴하고 부가적으로 경로, 버전을 얻을 수 있다.
+CString get_default_browser_info(CString* pPath, CString* pVersion)
+{
+	CString browser, path, prog_id;
+	LPWSTR  raw_prog_id = NULL;
+
+	CComPtr<IApplicationAssociationRegistration> aar;
+	HRESULT hr = aar.CoCreateInstance(CLSID_ApplicationAssociationRegistration);
+	if (SUCCEEDED(hr))
+	{
+		hr = aar->QueryCurrentDefault(L"https", AT_URLPROTOCOL, AL_EFFECTIVE, &raw_prog_id);
+		if (SUCCEEDED(hr) && raw_prog_id)
+		{
+			prog_id = raw_prog_id;
+			CoTaskMemFree(raw_prog_id);
+		}
+	}
+
+	// 폴백: 위 API 가 실패하면 기존 레지스트리 방식
+	if (prog_id.IsEmpty())
+		get_registry_str(HKEY_CURRENT_USER,
+			_T("SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice"),
+			_T("ProgId"), &prog_id);
+
+	if (prog_id.Find(_T("Chrome")) >= 0) browser = _T("Google Chrome");
+	else if (prog_id.Find(_T("Edge")) >= 0) browser = _T("Microsoft Edge");
+	else if (prog_id.Find(_T("Firefox")) >= 0) browser = _T("Mozilla Firefox");
+	else if (prog_id.Find(_T("IE.HTTP")) >= 0) browser = _T("Internet Explorer");
+	else if (prog_id.Find(_T("WhaleHTM")) >= 0) browser = _T("Naver Whale");
+	else                                        browser = prog_id;
+
+	CString section;
+	section.Format(_T("SOFTWARE\\Classes\\%s\\shell\\open\\command"), prog_id);
+	get_registry_str(HKEY_LOCAL_MACHINE, section, _T(""), &path);
+
+	int pos = path.Find(_T(".exe\""));
+	if (pos > 0) { path = path.Left(pos) + _T(".exe"); path.Remove('\"'); }
+	if (pPath)    *pPath = path;
+	if (pVersion) *pVersion = get_file_property(path);
+
+	return browser;
+}
+/*
 CString	get_default_browser_info(CString* pPath, CString* pVersion)
 {
 	CString ProgId;
@@ -3607,7 +3649,7 @@ CString	get_default_browser_info(CString* pPath, CString* pVersion)
 
 	return browser;
 }
-
+*/
 bool is_exist_registry_key(HKEY hKeyRoot, CString sSubKey)
 {
 	HKEY hkey = NULL;

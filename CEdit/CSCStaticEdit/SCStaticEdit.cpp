@@ -1643,12 +1643,15 @@ void CSCStaticEdit::draw_copy_button(Gdiplus::Graphics& g)
 		return;
 
 	// 두 라운드 사각형이 좌하 / 우상으로 어긋나게 그려져 클립보드 아이콘 형태가 됨.
-	// 첫 그리기는 좌하(-5,+2), 두번째는 거기서 (+5,-3) → 우상으로 이동 (실효 offset 0,-1).
+	// 기본은 좌하(-5,+2), 거기서 (+5,-3) 이동 → 우상(0,-1). 눌림 시 전체를 (+1,+1) 이동.
+	if (m_copy_button_pressed)
+		rc_btn.OffsetRect(+1, +1);
+
 	rc_btn.OffsetRect(-5, +2);
 	draw_round_rect(&g, CRect_to_gpRect(rc_btn),
 		m_copy_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray,
 		m_copy_button_pressed ? Gdiplus::Color::Moccasin : m_theme.cr_back, 2, 1);
-	
+
 	rc_btn.OffsetRect(+5, -3);
 	draw_round_rect(&g, CRect_to_gpRect(rc_btn),
 		m_copy_button_pressed ? Gdiplus::Color::DimGray   : Gdiplus::Color::RoyalBlue,

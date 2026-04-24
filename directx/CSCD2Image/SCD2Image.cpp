@@ -3067,10 +3067,56 @@ bool CSCD2Image::copy_to_clipboard(int index)
 		// stream 소멸 시 fDeleteOnRelease=TRUE이므로 hStreamMem 자동 해제
 	}
 
+	// 7.5) CF_DIB (legacy) 생성 — BITMAPINFOHEADER + BI_RGB + 24bpp BGR + bottom-up.
+	//Jasc Paint Shop Pro 등 구형 툴은 CF_DIBV5(BI_BITFIELDS + top-down)를 제대로 못 읽고 크래시.
+	//Windows auto-synthesis CF_DIB 는 V5 의 compression·방향을 상속하므로 synthesis 오버라이드용 CF_DIB 를 명시 발행.
+	//32bpp BI_RGB 로 시도했으나 PSP 가 "high byte undefined" 스펙을 엄격히 적용해 alpha 를 0 으로 강제 초기화(→이미지가 완전 투명).
+	//legacy 경로는 알파 없는 24bpp BGR 이 가장 안전. 알파가 필요한 앱은 PNG 경로(Photoshop, Chrome, Paint.NET)로 빠지므로 실손 없음.
+	HGLOBAL hDib = nullptr;
+	{
+		const UINT dibStride = ((width * 3 + 3) & ~3u);   // 24bpp, DWORD align
+		const UINT dibImageSize = dibStride * height;
+		const UINT dibTotal = sizeof(BITMAPINFOHEADER) + dibImageSize;
+		hDib = GlobalAlloc(GHND, dibTotal);
+		if (hDib)
+		{
+			BYTE* pData = (BYTE*)GlobalLock(hDib);
+			BITMAPINFOHEADER* pbi = (BITMAPINFOHEADER*)pData;
+			ZeroMemory(pbi, sizeof(*pbi));
+			pbi->biSize = sizeof(BITMAPINFOHEADER);
+			pbi->biWidth = (LONG)width;
+			pbi->biHeight = (LONG)height;   // bottom-up (양수)
+			pbi->biPlanes = 1;
+			pbi->biBitCount = 24;
+			pbi->biCompression = BI_RGB;
+			pbi->biSizeImage = dibImageSize;
+
+			//pixels(top-down, 32bpp BGRA)에서 24bpp BGR 로 채널 축소 + bottom-up 저장.
+			BYTE* dst = pData + sizeof(BITMAPINFOHEADER);
+			for (UINT y = 0; y < height; ++y)
+			{
+				const BYTE* src = pixels.data() + (height - 1 - y) * stride;
+				BYTE* d = dst + y * dibStride;
+				for (UINT x = 0; x < width; ++x)
+				{
+					d[0] = src[0]; // B
+					d[1] = src[1]; // G
+					d[2] = src[2]; // R
+					d += 3;
+					src += 4;
+				}
+				//DWORD padding 은 GHND zero-init 로 이미 0.
+			}
+
+			GlobalUnlock(hDib);
+		}
+	}
+
 	// 8) 클립보드 등록
 	if (!OpenClipboard(nullptr))
 	{
 		GlobalFree(hDibv5);
+		if (hDib) GlobalFree(hDib);
 		if (hPng) GlobalFree(hPng);
 		return false;
 	}
@@ -3081,9 +3127,17 @@ bool CSCD2Image::copy_to_clipboard(int index)
 	if (!SetClipboardData(CF_DIBV5, hDibv5))
 	{
 		GlobalFree(hDibv5);
+		if (hDib) GlobalFree(hDib);
 		if (hPng) GlobalFree(hPng);
 		CloseClipboard();
 		return false;
+	}
+
+	// CF_DIB 등록 (legacy 호환; Paint Shop Pro 등)
+	if (hDib)
+	{
+		if (!SetClipboardData(CF_DIB, hDib))
+			GlobalFree(hDib);
 	}
 
 	// PNG 등록 (Photoshop, Chrome 등에서 alpha 인식)
@@ -3315,15 +3369,13 @@ bool CSCD2Image::copy_to_clipboard(int index)
 }
 
 //클립보드에 이미지가 있다면 클립보드의 이미지를 index 위치에 붙여넣는다. 0보다 작으면 현재 프레임 이미지에 붙여넣는다.
-bool CSCD2Image::paste_from_clipboard(int index)
+//index 파라미터는 현재 사용하지 않음. 클립보드 이미지를 현재 이미지 전체로 교체함 (크기도 클립보드 원본 기준).
+//기존에는 m_img[index]에 SetTarget 후 DrawBitmap으로 리사이즈 복사하는 구조였으나,
+//m_img[index]는 load() 경로에서 D2D1_BITMAP_OPTIONS_TARGET 없이 생성되므로 SetTarget이 D2DERR_INVALID_TARGET(0x88990024)로 실패.
+//이미지 뷰어 관점에서도 "클립보드 이미지를 원본 크기 그대로 표시"가 자연스러우므로 load()와 동일한 교체 방식으로 변경함.
+bool CSCD2Image::paste_from_clipboard(int /*index*/)
 {
 	if (!m_d2dc || !m_pWICFactory)
-		return false;
-
-	if (index < 0)
-		index = m_frame_index;
-
-	if (index < 0 || index >= (int)m_img.size() || !m_img[index])
 		return false;
 
 	if (!OpenClipboard(nullptr))
@@ -3362,6 +3414,8 @@ bool CSCD2Image::paste_from_clipboard(int index)
 	}
 
 	// 2) CF_DIBV5 시도
+	//원본이 32bpp 가 아닐 수 있으므로 bV5BitCount 기준으로 stride·픽셀 포맷을 결정해야 한다.
+	//기존에는 stride = w*4, 포맷 = BGRA 고정이어서 24bpp 원본이면 매 row 마다 stride 가 어긋나 대각선 스트라이프로 깨졌음.
 	if (!wicSource)
 	{
 		HANDLE hDibv5 = GetClipboardData(CF_DIBV5);
@@ -3374,23 +3428,41 @@ bool CSCD2Image::paste_from_clipboard(int index)
 				BITMAPV5HEADER* pbv5 = (BITMAPV5HEADER*)pData;
 				UINT w = abs((int)pbv5->bV5Width);
 				UINT h = abs((int)pbv5->bV5Height);
+				UINT bpp = pbv5->bV5BitCount;
+				UINT stride = ((w * bpp + 31) / 32) * 4;
 				BYTE* pixels = pData + pbv5->bV5Size;
-				UINT stride = w * 4;
 
-				// top-down이면 그대로, bottom-up이면 뒤집기
-				std::vector<BYTE> flipped;
-				if (pbv5->bV5Height > 0)
+				//팔레트가 있으면(≤8bpp) header 뒤에 RGBQUAD 테이블이 오므로 건너뛴다.
+				if (bpp <= 8)
 				{
-					flipped.resize(stride * h);
-					for (UINT y = 0; y < h; y++)
-						memcpy(flipped.data() + y * stride, pixels + (h - 1 - y) * stride, stride);
-					pixels = flipped.data();
+					UINT paletteSize = pbv5->bV5ClrUsed ? pbv5->bV5ClrUsed : (1u << bpp);
+					pixels += paletteSize * sizeof(RGBQUAD);
 				}
 
-				ComPtr<IWICBitmap> wicBmp;
-				hr = m_pWICFactory->CreateBitmapFromMemory(w, h, GUID_WICPixelFormat32bppBGRA, stride, stride * h, pixels, &wicBmp);
-				if (SUCCEEDED(hr))
-					wicSource = wicBmp;
+				//지원 bpp 별 WIC 픽셀 포맷 매핑. 32bpp 이면서 알파 마스크가 0 이면 BGRX 로 처리(알파 채널 없는 32bpp).
+				WICPixelFormatGUID srcFormat = GUID_WICPixelFormatDontCare;
+				if (bpp == 32)
+					srcFormat = (pbv5->bV5AlphaMask != 0) ? GUID_WICPixelFormat32bppBGRA : GUID_WICPixelFormat32bppBGR;
+				else if (bpp == 24)
+					srcFormat = GUID_WICPixelFormat24bppBGR;
+
+				if (!IsEqualGUID(srcFormat, GUID_WICPixelFormatDontCare))
+				{
+					// top-down이면 그대로, bottom-up이면 뒤집기
+					std::vector<BYTE> flipped;
+					if (pbv5->bV5Height > 0)
+					{
+						flipped.resize(stride * h);
+						for (UINT y = 0; y < h; y++)
+							memcpy(flipped.data() + y * stride, pixels + (h - 1 - y) * stride, stride);
+						pixels = flipped.data();
+					}
+
+					ComPtr<IWICBitmap> wicBmp;
+					hr = m_pWICFactory->CreateBitmapFromMemory(w, h, srcFormat, stride, stride * h, pixels, &wicBmp);
+					if (SUCCEEDED(hr))
+						wicSource = wicBmp;
+				}
 			}
 			GlobalUnlock(hDibv5);
 		}
@@ -3468,33 +3540,27 @@ bool CSCD2Image::paste_from_clipboard(int index)
 	if (FAILED(hr))
 		return false;
 
-	// D2D 비트맵 생성
-	ComPtr<ID2D1Bitmap1> srcBitmap;
-	hr = m_d2dc->CreateBitmapFromWicBitmap(converter.Get(), nullptr, &srcBitmap);
-	if (FAILED(hr) || !srcBitmap)
+	//D2D 비트맵 생성 — 표시 전용 sampleable bitmap (SetTarget 용도 아님).
+	ComPtr<ID2D1Bitmap1> new_bitmap;
+	hr = m_d2dc->CreateBitmapFromWicBitmap(converter.Get(), nullptr, &new_bitmap);
+	if (FAILED(hr) || !new_bitmap)
 		return false;
 
-	// 대상 프레임에 복사 (크기가 다를 수 있으므로 DrawBitmap으로 리사이즈)
-	D2D1_SIZE_U dstSize = m_img[index]->GetPixelSize();
-	D2D1_SIZE_F srcSize = srcBitmap->GetSize();
+	//load()와 동일한 교체 절차. 애니메이션 중이면 정지 후 상태 리셋.
+	while (!stop())
+		Wait(10);
 
-	ComPtr<ID2D1Image> prevTarget;
-	m_d2dc->GetTarget(&prevTarget);
+	m_frame_index = 0;
+	m_frame_delay.clear();
+	m_img.clear();
+	m_img.push_back(std::move(new_bitmap));
 
-	m_d2dc->SetTarget(m_img[index].Get());
-	m_d2dc->BeginDraw();
-	m_d2dc->Clear(D2D1::ColorF(0, 0, 0, 0));
+	m_img_origin.Reset();
+	m_img_origin_for_back_transparency.Reset();
 
-	D2D1_RECT_F dstRect = get_ratio_rect(
-		D2D1::RectF(0, 0, (float)dstSize.width, (float)dstSize.height),
-		srcSize.width, srcSize.height);
+	m_filename = _T("image from clipboard");
 
-	m_d2dc->DrawBitmap(srcBitmap.Get(), dstRect);
-	hr = m_d2dc->EndDraw();
-
-	m_d2dc->SetTarget(prevTarget.Get());
-
-	return SUCCEEDED(hr);
+	return true;
 }
 
 WICBitmapTransformOptions CSCD2Image::ExifOrientationToWicTransform(USHORT orientation)

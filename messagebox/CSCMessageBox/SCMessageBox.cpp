@@ -580,7 +580,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 	if (!msg.IsEmpty())
 		set_message(msg, type, timeout_sec, m_align);
 
-	CenterWindow(m_parent);
+	CenterWindow(m_show_on_parent_center ? m_parent : GetDesktopWindow());
 	ShowWindow(SW_SHOW);
 
 	m_timeout_sec = timeout_sec;

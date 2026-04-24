@@ -655,8 +655,7 @@ bool CSCD2ImageDlg::copy_to_clipboard(int type)
 
 bool CSCD2ImageDlg::paste_from_clipboard()
 {
-	/*
-	stop_gif();
+	stop();
 
 	if (m_images[0].paste_from_clipboard())
 	{
@@ -667,7 +666,7 @@ bool CSCD2ImageDlg::paste_from_clipboard()
 		rerender();
 		return true;
 	}
-	*/
+
 	return false;
 }
 

@@ -107,6 +107,14 @@ void CSCParagraphStatic::set_line_spacing(float spacing)
 	Invalidate();
 }
 
+void CSCParagraphStatic::set_text_align(DWORD align)
+{
+	CRect rc;
+	GetClientRect(rc);
+	m_rect_text = CSCParagraph::set_text_align(rc, m_para, align);
+	Invalidate();
+}
+
 #if 0
 CRect CSCParagraphStatic::calc_text_size()
 {
@@ -374,9 +382,12 @@ void CSCParagraphStatic::OnPaint()
 
 	//AntiAlias, TextRenderingHint 등은 미리 g에 세팅되서 넘어와야 한다.
 	//무조건 여기서 이를 고정하여 출력하게 되면 일부 텍스트는 antiAlias로 인해 흐리게 표시된다.
-	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	if (m_font_antialiasing)
+	{
+		g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	}
 
 	CSCParagraph::draw_text(g, m_para);
 }

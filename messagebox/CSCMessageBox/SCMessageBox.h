@@ -92,6 +92,8 @@ public:
 
 	bool			create(CWnd* parent, CString title, UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);
 
+	bool			set_show_on_parent_center(bool show_on_parent_center = true) { m_show_on_parent_center = show_on_parent_center; return m_show_on_parent_center; }
+
 //title 관련
 	void			set_title(CString title);
 	void			set_title_height(int title_height) { m_title_height = title_height; }
@@ -126,6 +128,9 @@ protected:
 	int				m_type = MB_OK;
 	int				m_timeout_sec = 0;
 	int				m_align = SS_CENTER | SS_CENTERIMAGE;
+
+	//parent의 중앙에 표시할지 여부. false이면 화면 중앙에 표시됨.
+	bool			m_show_on_parent_center = true;
 
 	int				m_response = -1;
 

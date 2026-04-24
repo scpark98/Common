@@ -24,6 +24,9 @@ public:
 	CRect			set_text(CString sText);
 	void			set_textf(LPCTSTR format, ...);
 
+//align
+	void			set_text_align(DWORD align);
+
 	//라인 사이 간격 배수. 1.0f = 기본, 1.5f = 1.5배. set_text() 이후 호출하면 즉시 반영되고
 	//이후 set_text() / OnSize() 로 라인 위치가 재계산될 때도 자동 재적용된다.
 	void			set_line_spacing(float spacing = 1.0f);
@@ -43,7 +46,7 @@ protected:
 	void			update_text_property();			//현재 변경값을 m_text_prop에 갱신
 
 	//
-	bool			m_font_antialiasing = true;
+	bool			m_font_antialiasing = false;
 
 	//라인 사이 간격 배수. set_text() / OnSize() 에서 calc_text_rect() 후에 자동 재적용된다.
 	float			m_line_spacing = 1.5f;

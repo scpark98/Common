@@ -248,7 +248,7 @@ BOOL CClipboard::SetText(LPCTSTR lpszBuffer)
 			{
 				// Now, copy the text from the buffer into the allocated
 				// global memory pointer
-				_tcscpy(lpszData, lpszBuffer);
+				_tcscpy_s(lpszData, nSize + 1, lpszBuffer);
 
 				// Now, simply unlock the global memory pointer,
 				// set the clipboard data type and pointer,

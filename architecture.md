@@ -47,9 +47,9 @@ Direct2D 아닌 GDI+ 기반 이미지. 독립 모듈.
 ### `ThumbCtrl/SCThumbCtrl.h` — `CSCThumbCtrl`
 타일 썸네일 브라우저.
 
-- **멤버**: `m_thumb` (deque<CThumbImage>), `m_files`, `m_selected` (deque<int>), `m_sz_thumb` (100x120 기본), `m_thread` (CThreadManager), `m_scroll_pos`.
+- **멤버**: `m_thumb` (deque<CThumbImage>), `m_files`, `m_selected` (deque<int>), `m_sz_thumb` (100x120 기본), `m_thread` (CSCThreadGroup), `m_scroll_pos`.
 - **API**: `create(parent, l, t, r, b)`, `set_path(folder)` (자동 스캔), `add_files`, `insert(idx, path, title, keyThumb)`, `remove(idx)`, `remove_selected`, `select_item(idx, sel, make_visible)`, `find_text`, `sort_by_title/score`, `get_selected_item(s)`.
-- **의존**: `CSCGdiplusBitmap` (썸네일), `CThreadManager` (병렬 로드), `CSCEdit` (타이틀 인라인 편집), `CSCColorTheme`.
+- **의존**: `CSCGdiplusBitmap` (썸네일), `CSCThreadGroup` + `CSCThread` (병렬 로드, 안전 종료), `CSCEdit` (타이틀 인라인 편집), `CSCColorTheme`.
 - **주의**: 종료 시 `stop_loading()` 호출. 로딩 중 `remove()` 호출 충돌 가능.
 
 ---
@@ -146,10 +146,19 @@ std::thread 래핑 (CreateThread/AfxBeginThread 아님).
 - 워커 내부: `th.stop_requested()` 주기 체크, `th.wait_if_paused()`, `th.sleep_for(dur)` (중단 가능).
 - 부가: `set_on_cancel(cb)`, UI 콜백 `invoke_ui(...)` (PostMessage(WM_APP_UI_INVOKE)).
 
-### `thread/ThreadManager.h` — `CThreadManager`
-데이터 분할 병렬 실행 + 전체 완료 콜백.
+### `thread/CSCThreadGroup/SCThreadGroup.h` — `CSCThreadGroup`
+CSCThread 위에 N 데이터 자동 분할 병렬 실행 + 전체 완료 콜백을 얹은 헬퍼. 헤더 전용.
+- API: `start(count, work, on_complete=null, thread_count=0)`, `stop()` (request_stop + join), `request_stop()`, `join()`, `pause/resume()`, `is_running()`, `is_completed()`, `worker_count()`, `completed_count()`.
+- `work(worker_idx, start, end, CSCThread& th)` 시그니처. 워커 내부에서 `th.stop_requested()`, `th.sleep_for()` 사용 가능.
+- `on_complete` 는 마지막 끝나는 워커 스레드에서 호출 — UI 갱신은 `invoke_ui` / `PostMessage` 로 마샬링 필요.
+- 자동 thread 수 휴리스틱은 CThreadManager 와 동일 (≤10→5, ≤100→10, else count/20, max 40). 명시 지정도 가능.
+- ThreadManager 대비 장점: detach 안 함 (객체 소멸 시 안전 join), 람다/std::function 지원 (전역 pThisWnd 불필요), 인터럽트 가능 sleep, 예외 처리.
+
+### `thread/ThreadManager.h` — `CThreadManager` (legacy)
+데이터 분할 병렬 실행 + 전체 완료 콜백. **신규 코드는 `CSCThreadGroup` 사용 권장.**
 - API: `job(count, thread_func, end_func, detach)`, `is_all_thread_completed()`, `get_thread_completed_count()`, `set_thread_completed(idx)`.
 - `thread_func(idx, start, end)` 시그니처로 자동 범위 분배.
+- 약점: detach 후 dangling 위험, 종료 신호 메커니즘 없음, 콜백이 free function 포인터라 멤버 함수 직접 사용 불가 (file-static 전역 우회 필요), busy poll 완료 감지.
 
 ---
 
@@ -197,7 +206,7 @@ CASeeDlg (프로젝트)
  ├─ CSCD2ImageDlg ──┬─ CSCD2Context ──(D2D, WIC)
  │                  ├─ CSCD2Image × deque ─── CSCThread (animation)
  │                  ├─ CSCThumbCtrl ──┬─ CSCGdiplusBitmap
- │                  │                 ├─ CThreadManager
+ │                  │                 ├─ CSCThreadGroup → CSCThread × N
  │                  │                 ├─ CSCEdit (inline title edit)
  │                  │                 └─ CSCColorTheme
  │                  └─ CSCSliderCtrl (GIF frame)

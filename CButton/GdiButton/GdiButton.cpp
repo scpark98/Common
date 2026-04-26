@@ -74,6 +74,10 @@ CGdiButton::~CGdiButton()
 //동적 생성시에만 사용.
 BOOL CGdiButton::create(CString caption, DWORD dwStyle, CRect r, CWnd* parent, UINT button_id)
 {
+	//BS_OWNERDRAW 외부 명시는 type bit 4개를 11 로 덮어 push button 검사가 항상 false 됨 →
+	//DrawItem 의 use_disabled_image 분기가 true 되어 normal 상태에도 회색(disabled) 이미지 그려짐.
+	//CGdiButton 이 PreSubclassWindow 에서 ModifyStyle 로 BS_OWNERDRAW 를 자동 추가하므로 외부 명시 불필요 → 제거.
+	dwStyle &= ~BS_OWNERDRAW;
 	BOOL res = Create(caption, dwStyle, r, parent, button_id);
 	return res;
 }
@@ -198,15 +202,18 @@ bool CGdiButton::add_image_resize(UINT normal, float ratio)
 	if (ratio == 1.0f)
 		return add_image(normal);
 
-	CGdiButtonImage* btn = new CGdiButtonImage();
-
 	//normal은 0이어서는 안된다.
 	if (normal == 0)
 		return false;
 
+	CGdiButtonImage* btn = new CGdiButtonImage();
+
 	btn->img[0].load(_T("PNG"), normal);
 	if (btn->img[0].is_empty())
+	{
+		delete btn;
 		return false;
+	}
 
 	m_sz_img_origin = CSize(btn->img[0].width, btn->img[0].height);
 
@@ -241,18 +248,21 @@ bool CGdiButton::add_image(UINT normal, UINT over, UINT down, UINT disabled)
 
 bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UINT disabled)
 {
+	//normal은 0이어서는 안된다.
+	if (normal == 0)
+		return false;
+
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
 	//그렇지 않으면 어느 시점에서 소멸되어 잘못된 참조가 된다.
 	CGdiButtonImage* btn = new CGdiButtonImage();
 
-	//normal은 0이어서는 안된다.
-	if (normal == 0)
-		return false;
-
 	btn->img[0].load(lpType, normal);
 	if (btn->img[0].is_empty())
+	{
+		delete btn;
 		return false;
+	}
 
 	m_sz_img_origin = CSize(btn->img[0].width, btn->img[0].height);
 
@@ -300,18 +310,21 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 
 bool CGdiButton::add_image(CSCGdiplusBitmap *img, bool add_auto_state_images)
 {
+	//normal은 0이어서는 안된다.
+	if (img->is_empty())
+		return false;
+
 	//m_image라는 list에 push_back하여 유지시키기 위해서는
 	//반드시 동적 할당받은 인스턴스를 넣어줘야 한다.
 	//그렇지 않으면 어느 시점에서 소멸되어 잘못된 참조가 된다.
 	CGdiButtonImage* btn = new CGdiButtonImage();
 
-	//normal은 0이어서는 안된다.
-	if (img->is_empty())
-		return false;
-
 	img->deep_copy(&btn->img[0]);
 	if (btn->img[0].is_empty())
+	{
+		delete btn;
 		return false;
+	}
 
 	m_sz_img_origin = CSize(btn->img[0].width, btn->img[0].height);
 
@@ -757,9 +770,18 @@ void CGdiButton::PreSubclassWindow()
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	// Set control to owner draw
 	m_button_style = GetButtonStyle();
-	
+
 	m_button_type = m_button_style & BS_TYPEMASK;
-	
+
+	//리소스 에디터 / 동적 생성에서 사용자가 외부에서 BS_OWNERDRAW 를 줬다면 type bit 가 11 로 덮인 상태.
+	//CGdiButton 은 BS_OWNERDRAW 를 자체 추가하므로 외부 명시는 noise → default 인 BS_PUSHBUTTON 으로 정규화.
+	//정규화 안 하면 DrawItem 의 is_button_style(BS_PUSHBUTTON,BS_DEFPUSHBUTTON) 이 항상 false → 회색 이미지 그려짐.
+	if (m_button_type == BS_OWNERDRAW)
+	{
+		TRACE(_T("CGdiButton은 BS_OWNERDRAW를 자체적으로 설정하므로 외부 리소스 에디터 또는 create dwStyle에서 설정할 필요 없음.\n"));
+		m_button_type = BS_PUSHBUTTON;
+	}
+
 	//버튼 타입을 같은 종끼리 일단 그룹화한다.
 	if ((m_button_type & BS_AUTORADIOBUTTON) == BS_AUTORADIOBUTTON)
 	{
@@ -912,11 +934,15 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		switch (pMsg->wParam)
 		{
 			case VK_SPACE :
+			{
 				redraw_window();
 				Wait(50);
 				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN, pMsg->pt);
-				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+				CWnd* parent = GetParent();
+				if (parent && parent->GetSafeHwnd())
+					::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				break;
+			}
 		}
 	}
 	else if (pMsg->message == WM_KEYUP)
@@ -924,11 +950,15 @@ BOOL CGdiButton::PreTranslateMessage(MSG* pMsg)
 		switch (pMsg->wParam)
 		{
 			case VK_SPACE:
+			{
 				redraw_window();
 				Wait(50);
 				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP, pMsg->pt);
-				::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+				CWnd* parent = GetParent();
+				if (parent && parent->GetSafeHwnd())
+					::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				break;
+			}
 		}
 	}
 
@@ -1561,7 +1591,9 @@ void CGdiButton::OnMouseHover(UINT nFlags, CPoint point)
 	//TRACE(_T("hover\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_MOUSEHOVER, point);
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+	CWnd* parent = GetParent();
+	if (parent && parent->GetSafeHwnd())
+		::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
 	CButton::OnMouseHover(nFlags, point);
 }
@@ -1582,7 +1614,9 @@ void CGdiButton::OnMouseLeave()
 	//TRACE(_T("leave\n"));
 	//::PostMessage()로 전달하면 쓰레기값이 전달된다.
 	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_MOUSELEAVE);
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+	CWnd* parent = GetParent();
+	if (parent && parent->GetSafeHwnd())
+		::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
 	CButton::OnMouseLeave();
 }
@@ -1606,7 +1640,9 @@ void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 	{
 		//if ((GetState() & BST_PUSHED) == 0)
 		//	return;
-		GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+		CWnd* parent = GetParent();
+		if (parent && parent->GetSafeHwnd())
+			parent->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
 		m_sent_once_auto_repeat_click_message++;
 		SetTimer(timer_auto_repeat, m_repeat_delay, NULL);
 	}
@@ -1930,7 +1966,9 @@ void CGdiButton::OnLButtonDown(UINT nFlags, CPoint point)
 		{
 			SetCapture();
 			CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONDOWN);
-			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+			CWnd* parent = GetParent();
+			if (parent && parent->GetSafeHwnd())
+				::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 		}
 	}
 
@@ -1981,16 +2019,22 @@ void CGdiButton::OnLButtonUp(UINT nFlags, CPoint point)
 				if (cmd > 0)
 				{
 					CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_COMMAND, CPoint(), m_menu_items[cmd - 1]);
-					::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+					CWnd* parent = GetParent();
+					if (parent && parent->GetSafeHwnd())
+						::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 				}
 
 				return;
 			}
 
-			GetParent()->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+			CWnd* parent = GetParent();
+			if (parent && parent->GetSafeHwnd())
+			{
+				CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP, point);
+				::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
-			CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_LBUTTONUP, point);
-			::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+				parent->SendMessage(WM_COMMAND, MAKELONG(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+			}
 		}
 	}
 
@@ -2445,9 +2489,10 @@ void CGdiButton::OnRButtonDown(UINT nFlags, CPoint point)
 
 void CGdiButton::OnRButtonUp(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	CGdiButtonMessage msg(this, GetDlgCtrlID(), WM_RBUTTONUP, point);
-	::SendMessage(GetParent()->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
+	CWnd* parent = GetParent();
+	if (parent && parent->GetSafeHwnd())
+		::SendMessage(parent->m_hWnd, Message_CGdiButton, (WPARAM)&msg, 0);
 
 	CButton::OnRButtonUp(nFlags, point);
 }

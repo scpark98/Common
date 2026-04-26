@@ -11,6 +11,36 @@ CSCD2Context::~CSCD2Context()
 {
 }
 
+HRESULT CSCD2Context::handle_device_lost()
+{
+	//D3D device 가 lost 되었는지 확인 (TDR, GPU 드라이버 재설치, RemoteDesktop 전환 등).
+	//호출 후 호출자는 모든 ID2D1Bitmap / Brush / 다른 디바이스 자원 무효화 + 재로드 필요.
+	HRESULT removed_reason = S_OK;
+	if (m_dxgiDevice)
+	{
+		ComPtr<ID3D11Device> d3d_device;
+		if (SUCCEEDED(m_dxgiDevice.As(&d3d_device)) && d3d_device)
+			removed_reason = d3d_device->GetDeviceRemovedReason();
+	}
+
+	//기존 디바이스 자원 일괄 해제 후 재생성.
+	m_d2context.Reset();
+	m_swapchain.Reset();
+	m_d2device.Reset();
+	m_dxgiDevice.Reset();
+	m_br_zigzag.Reset();
+
+	HRESULT hr = create_device_resources();
+	if (FAILED(hr))
+		return hr;
+
+	//zigzag brush 도 디바이스 의존이므로 재생성 (기존 색상 유지).
+	if (m_d2context && !m_br_zigzag)
+		m_br_zigzag = create_zigzag_brush();
+
+	return removed_reason;   //호출자에게 원래 손실 사유 반환 (S_OK 면 단순 RECREATE_TARGET).
+}
+
 HRESULT CSCD2Context::init(HWND hWnd, int cx, int cy)
 {
 	m_hWnd = hWnd;

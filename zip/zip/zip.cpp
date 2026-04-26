@@ -2270,8 +2270,9 @@ ZRESULT GetFileInfo(HANDLE hf, ulg* attr, long* size, iztimes* times, ulg* times
 class TZip
 {
 public:
-	TZip(const char* pwd) : hfout(0), mustclosehfout(false), hmapout(0), zfis(0), obuf(0), hfin(0), writ(0), oerr(false), hasputcen(false), ooffset(0), encwriting(false), encbuf(0), password(0), state(0) { if (pwd != 0 && *pwd != 0) { password = new char[strlen(pwd) + 1]; strcpy(password, pwd); } }
-	~TZip() { if (state != 0) delete state; state = 0; if (encbuf != 0) delete[] encbuf; encbuf = 0; if (password != 0) delete[] password; password = 0; }
+	TZip(const char* pwd) : hfout(0), mustclosehfout(false), hmapout(0), zfis(0), obuf(0), hfin(0), writ(0), oerr(false), hasputcen(false), ooffset(0), encwriting(false), encbuf(0), password(0), state(0) { if (pwd != 0 && *pwd != 0) { size_t pwd_len = strlen(pwd) + 1; password = new char[pwd_len]; strcpy_s(password, pwd_len, pwd); } }
+	//소멸 시 패스워드 메모리 secure wipe — heap dump / 디버거에서 평문 노출 방지.
+	~TZip() { if (state != 0) delete state; state = 0; if (encbuf != 0) delete[] encbuf; encbuf = 0; if (password != 0) { SecureZeroMemory(password, strlen(password)); delete[] password; password = 0; } }
 
 	// These variables say about the file we're writing into
 	// We can write to pipe, file-by-handle, file-by-name, memory-to-memmapfile

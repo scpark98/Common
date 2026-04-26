@@ -272,7 +272,9 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 		//따라서 사용자 정의 메시지로 보내고 각 메시지에 맞는 처리를 하도록 수정함.
 		//parent에서는 메시지 핸들러를 추가하여 Message_CSCSystemButtons 메시지를 처리하는 코드가 추가되어야 한다.
 		CSCSystemButtonsMessage msg(this, m_button[m_over_index].cmd);
-		GetParent()->SendMessage(Message_CSCSystemButtons, (WPARAM)&msg, 0);
+		CWnd* parent = GetParent();
+		if (parent && parent->GetSafeHwnd())
+			parent->SendMessage(Message_CSCSystemButtons, (WPARAM)&msg, 0);
 	}
 
 	CButton::OnLButtonUp(nFlags, point);

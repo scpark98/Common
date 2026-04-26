@@ -91,10 +91,10 @@ typedef long LONG_PTR, *PLONG_PTR;
 #define ODS_INACTIVE        0x0080
 #endif
 
-// Typedefinition for old compatibility lesser than MFC 8.0
-#if _MFC_VER < 0x0800  
-#define _tcscpy_s(strDestination,sizeInTchar,strSource )  _tcscpy(strDestination,strSource)
-#define _tcsncpy_s(strDestination,sizeInTchar,strSource,sizeCopyInTchar) _tcsncpy(strDestination,strSource,sizeCopyInTchar)
+// MFC 8.0 (VS2005) 미만 호환 매크로 제거 — 현재 빌드는 모두 8.0 이상이며,
+// 여기에 정의되면 _tcscpy_s 가 unsafe _tcscpy 로 강등돼 보안 검사 무력화됨.
+#if _MFC_VER < 0x0800
+#error "MFC 8.0 (VS2005) 이상 필요. legacy _tcscpy_s 매크로 fallback 제거됨."
 #endif
 
 

@@ -38,6 +38,7 @@
 #include "afxdialogex.h"
 
 #include <mutex>
+#include <functional>
 //#include "Common/SCGdiplusBitmap.h"
 #include "Common/ThumbCtrl/SCThumbCtrl.h"
 #include "Common/CStatic/SCStatic/SCStatic.h"
@@ -85,7 +86,29 @@ public:
 
 	//create() 호출 전에 미리 설정해야 한다. create() 호출 후에는 적용되지 않는다.
 	//default로 simple_mode로 동작되므로 BandiView와 같은 이미지 브라우저로 동작시킬 경우는 set_simple_mode(false)로 설정해야 한다.
-	void			set_simple_mode(bool simple = true) { m_simple_mode = simple; }
+	//set_simple_mode(true)  = 모든 enable 플래그 false 일괄 (= 단순 표시만)
+	//set_simple_mode(false) = 모든 enable 플래그 true 일괄 (= 풀 기능, ASee 동작)
+	//그 후 set_enable_xxx(true/false) 로 개별 조정 가능 (예: simple + pan + wheel zoom 만 enable).
+	void			set_simple_mode(bool simple = true);
+
+	//===== 개별 기능 enable 플래그 — set_simple_mode 호출 후 fine-tune 용도 =====
+	void			set_enable_pan         (bool en) { m_enable_pan          = en; }	//단순 드래그 = 이미지 이동
+	void			set_enable_zoom_wheel  (bool en) { m_enable_zoom_wheel   = en; }	//휠 = 줌
+	void			set_enable_roi         (bool en) { m_enable_roi          = en; }	//Ctrl+드래그 = ROI 선택 + 핸들 편집
+	void			set_enable_dropper     (bool en) { m_enable_dropper      = en; }	//픽셀 색상 추출 모드
+	void			set_enable_drop        (bool en) { m_enable_drop         = en; }	//외부 파일 드래그&드롭 열기
+	void			set_enable_file_nav    (bool en) { m_enable_file_nav     = en; }	//파일 네비게이션 (다음/이전)
+	void			set_enable_thumbnail   (bool en) { m_enable_thumbnail    = en; }	//하단 썸네일 스트립
+	void			set_enable_pixel_info  (bool en) { m_enable_pixel_info   = en; }	//우하단 픽셀 정보 위젯
+
+	//===== post-paint 콜백 =====
+	//OnPaint 의 D2D BeginDraw / EndDraw 사이, 이미지 그린 직후에 호출된다.
+	//derived 만들 필요 없이 컨테이너에서 람다 등록만으로 D2D 위에 추가 그리기 가능.
+	//derived 가 on_post_paint 를 override 했다면 base 호출을 통해 콜백도 발화하게 할 수 있음.
+	void			set_post_paint_callback(std::function<void(ID2D1DeviceContext*)> cb)
+	{
+		m_post_paint_callback = std::move(cb);
+	}
 
 
 	//하나의 이미지만 표시하는 simple mode이므로 load()를 사용할 수도, 이미 불러온 CSCD2Image를 표시하기 위해 사용할수도 있다.
@@ -222,6 +245,11 @@ public:
 
 	void			rotate(Gdiplus::RotateFlipType type);
 
+	//임의 각도 회전 (단위 = 도). D2D transform 으로 그릴 때만 적용 → 원본 데이터 보존, 무손실.
+	//양수 = 시계방향. 누적이 아니므로 절대 각도. 변경 시 자동 재그리기.
+	void			set_render_angle(double deg);
+	double			get_render_angle() const { return m_render_angle; }
+
 	//true일 경우 이 컨트롤의 크기에 맞춰서 이미지를 stretch한다.
 	void			fit2ctrl(bool fit, bool invalidate = true);
 	bool			get_fit2ctrl() { return m_fit2ctrl; }
@@ -283,6 +311,17 @@ protected:
 	//default = true
 	bool					m_simple_mode = true;
 
+	//개별 기능 enable 플래그. set_simple_mode 가 일괄 set, 그 후 set_enable_xxx 로 fine-tune.
+	//기본값 false (simple_mode = true 와 동일 상태). ASee 처럼 set_simple_mode(false) 호출하면 모두 true.
+	bool					m_enable_pan          = false;
+	bool					m_enable_zoom_wheel   = false;
+	bool					m_enable_roi          = false;
+	bool					m_enable_dropper      = false;
+	bool					m_enable_drop         = false;
+	bool					m_enable_file_nav     = false;
+	bool					m_enable_thumbnail    = false;
+	bool					m_enable_pixel_info   = false;
+
 	std::mutex				m_mutex;
 
 	CSCD2Context*			m_pSharedD2DC = nullptr;
@@ -327,6 +366,9 @@ protected:
 //확대, 축소 배율을 사용하지 않고 창 크기에 맞춤
 	bool			m_fit2ctrl = true;
 
+//임의 각도 회전 (도). 0 = 회전 없음. D2D transform 으로 적용.
+	double			m_render_angle = 0.0;
+
 //확대 및 이동
 	double			m_zoom = 1.0;
 	//mode : 1(zoom in), -1(zoom out), 0(reset)
@@ -339,7 +381,7 @@ protected:
 	HCURSOR			m_hCursor;
 
 //이미지 정보 표시
-	bool			m_show_info = true;
+	bool			m_show_info = false;
 	//파일명 뒤에 인덱스 정보등의 추가 정보를 표시하고자 할 경우 설정한다.
 	CString			m_alt_info;
 	//파일명부터 exif 정보까지...tab을 누르면 표시되는 정보를 저장해두고
@@ -362,7 +404,7 @@ protected:
 	//dc에 그리면 처음엔 심플하지만 font, draw style(multiline vcenter)등 CSCStatic 구현 시 했던 번거로움이 그대로 발생한다.
 	//CSCStatic으로 하면 생성 등 처음엔 복잡하지만 결국 더 편한 방법이 된다.
 	bool			m_show_pixel = false;
-	bool			m_show_pixel_pos = true;
+	bool			m_show_pixel_pos = false;
 	Gdiplus::PointF	m_pixel_pos;
 	CRect			m_r_pixel_pos;
 	ID2D1SolidColorBrush* m_brush_pixel_guide = nullptr;
@@ -388,6 +430,17 @@ protected:
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
+
+	//OnPaint 의 D2D BeginDraw/EndDraw 사이에서 호출되는 오버레이 후크.
+	//파생이 D2D 안티앨리어싱과 동일한 swapchain 위에 추가 그래픽을 그릴 때 사용.
+	//파생이 추가로 오버레이를 그릴 hook + 외부 등록 콜백 발화. base 호출 안 하면 콜백 미발화.
+	virtual void on_post_paint(ID2D1DeviceContext* d2dc)
+	{
+		if (m_post_paint_callback)
+			m_post_paint_callback(d2dc);
+	}
+
+	std::function<void(ID2D1DeviceContext*)>	m_post_paint_callback;
 
 	DECLARE_MESSAGE_MAP()
 public:

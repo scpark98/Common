@@ -312,7 +312,9 @@ int CXHtmlDraw::Draw(HDC hDC,
 		if (nRep > 0)
 		{
 			bCharacterEntities = TRUE;
-			_tcscpy(pszText, buf);
+			//buf 는 char-entity 치환 결과(원본보다 짧음). pszText 의 원래 할당 크기는 호출자 보장.
+			//최소 strlen(원본)+1 보장된다는 가정 하에 _tcscpy_s 로 안전 복사.
+			_tcscpy_s(pszText, _tcslen(pszText) + 1, buf);
 		}
 	}
 
@@ -492,11 +494,13 @@ int CXHtmlDraw::Draw(HDC hDC,
 				while (m > 0)
 				{
 					// trim left whitespace
-					if ((_tcslen(szAttributes) > 0) && 
+					if ((_tcslen(szAttributes) > 0) &&
 						(szAttributes[0] == _T(' ')))
 					{
 						m--;
-						_tcscpy(szAttributes, &szAttributes[1]);
+						//겹치는 영역 복사 — _tcscpy 는 overlap 시 정의되지 않은 동작. memmove 로 안전 처리.
+						size_t remain_len = _tcslen(szAttributes);
+						memmove(szAttributes, &szAttributes[1], remain_len * sizeof(TCHAR));
 						continue;
 					}
 
@@ -508,7 +512,9 @@ int CXHtmlDraw::Draw(HDC hDC,
 						if (cp2)
 						{
 							m -= (cp2 - szAttributes) + 1;
-							_tcscpy(szAttributes, cp2+1);
+							//겹치는 영역 복사 — _tcscpy 는 overlap 시 정의되지 않은 동작. memmove 로 안전 처리.
+							size_t remain_len = _tcslen(cp2 + 1);
+							memmove(szAttributes, cp2 + 1, (remain_len + 1) * sizeof(TCHAR));
 
 							cp2 = _tcschr(szAttributes, _T('"'));
 							if (cp2)

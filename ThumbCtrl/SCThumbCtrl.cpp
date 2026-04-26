@@ -328,113 +328,6 @@ void CSCThumbCtrl::OnPaint()
 	}
 
 	dc.SelectObject(pOldFont);
-
-
-	/*
-	//선택된 항목에 특수한 표시를 해야 할 경우는 이 블럭을 주석해제하여 수정한다. (m_img_selection_mark or m_use_circle_number)
-	Gdiplus::Color cr_text(128, 255, 24, 16);
-	Gdiplus::Font font(L"Spoqa Han Sans Neo", 32, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-	Gdiplus::FontFamily fontFamily(L"맑은 고딕");
-	Gdiplus::SolidBrush br_text(cr_text);
-	Gdiplus::Pen pen(Gdiplus::Color(64, 0, 0, 255), 8);
-
-	Gdiplus::StringFormat format;
-	format.SetAlignment(Gdiplus::StringAlignmentCenter);
-	format.SetLineAlignment(Gdiplus::StringAlignmentCenter);
-
-	Gdiplus::GraphicsPath path;
-
-	for (i = 0; i < m_selected.size(); i++)
-	{
-		CRect r = m_thumb[m_selected[i]].r;
-		//r.top -= 4;
-		r.InflateRect(4, 2, 4, 2);
-
-		if (m_img_selection_mark.is_valid())
-		{
-			r = make_center_rect(r.CenterPoint().x, r.CenterPoint().y, m_img_selection_mark.width, m_img_selection_mark.height);
-			m_img_selection_mark.draw(g, r.left, r.top);
-		}
-		else if (m_use_circle_number)
-		{
-			//g.DrawString(CStringW(i2S(i)), -1, &font, CRect_to_gpRectF(r), &format, &br_text);
-
-			r = make_center_rect(r.CenterPoint().x, r.CenterPoint().y, 60, 60);
-
-			g.DrawEllipse(&pen, CRect_to_gpRectF(r));
-			path.AddString(CStringW(i2S(i + 1)), -1, &fontFamily, Gdiplus::FontStyleBold, 32, CRect_to_gpRectF(r), &format);
-			for (int j = 0; j < 4; ++j)
-			{
-				Gdiplus::Pen pen(Gdiplus::Color(128, 64, 64, 64), j);		//윤곽선
-				pen.SetLineJoin(Gdiplus::LineJoinRound);
-				g.DrawPath(&pen, &path);
-			}
-			Gdiplus::SolidBrush brush(Gdiplus::Color(128, 255, 128, 255));	//글자색
-			g.FillPath(&brush, &path);
-			path.Reset();
-		}
-		else
-		{
-			draw_rect(g, r, Gdiplus::Color(153, 209, 255), Gdiplus::Color(128, 204, 232, 255));
-		}
-	}
-	*/
-
-
-
-
-	/*
-	CRect	rItem(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_margin.cx + m_sz_tile.cx, m_sz_margin.cy + m_sz_tile.cy + m_scroll_pos);
-
-	for (i = 0; i < m_thumb.size(); i++)
-	{
-		if ((rItem.top > rc.bottom) || ((rItem.bottom + 80) < rc.top))
-		{
-			
-		}
-
-		CRect rTile = rItem;
-		CRect rFit;
-
-		if (m_thumb[i].img.is_valid() == false)
-		{
-			dc.SetTextColor(deeppink);
-			dc.DrawText(_T("Ｘ"), rItem, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
-		}
-		else
-		{
-			rFit = get_ratio_rect(rItem, (double)m_thumb[i].img.width / (double)m_thumb[i].img.height);
-			m_thumb[i].img.draw(g, rFit.left, rItem.bottom - rFit.Height(), rFit.Width(), rFit.Height());
-		}
-
-		m_thumb[i].r = rItem;
-		//m_thumb[i].r.bottom = rItem.bottom + height + 2;
-		m_thumb[i].r.InflateRect(2, 2);
-		m_thumb[i].thumb_bottom = rItem.bottom;
-		//m_thumb[i].line_index = nLineCount;
-
-		rItem.left += (m_sz_gap.cx + m_sz_tile.cx);
-		rItem.right = rItem.left + m_sz_tile.cx;
-
-		if ((rItem.right + m_sz_margin.cx > rc.right + 2))
-		{
-			//m_per_line = dqOneLineHeight.size();
-
-			//std::deque<int>::iterator result = std::max_element(dqOneLineHeight.begin(), dqOneLineHeight.end());
-			rItem.left = m_sz_margin.cx;
-			rItem.top = rItem.bottom + m_sz_gap.cy;// +result[0];
-			rItem.right = rItem.left + m_sz_tile.cx;
-			rItem.bottom = rItem.top + m_sz_tile.cy;
-
-			//m_line_height.push_back(result[0]);
-			//dqOneLineHeight.clear();
-			//nLineCount++;
-		}
-	}
-
-	m_scroll_total = rItem.bottom - m_scroll_pos + m_sz_margin.cy;
-	TRACE(_T("m_scroll_total = %d\n"), m_scroll_total);
-	*/
 }
 
 BOOL CSCThumbCtrl::OnEraseBkgnd(CDC* pDC)
@@ -442,53 +335,6 @@ BOOL CSCThumbCtrl::OnEraseBkgnd(CDC* pDC)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	return FALSE;
 	return CDialogEx::OnEraseBkgnd(pDC);
-}
-
-#include <mutex>
-std::mutex mtx;
-CSCThumbCtrl* pThisWnd;	//add_files() 함수에서 할당됨
-
-void CSCThumbCtrl::loading_function(int idx, int start, int end)
-{
-	int i;
-	CString str;
-
-	if (end - start == 1)
-		str.Format(_T("%d job started..."), start);
-	else
-		str.Format(_T("%d ~ %d job started..."), start, end - 1);
-	//TRACE(_T("%s\n"), str);
-
-	for (i = start; i < end; i++)
-	{
-		if (pThisWnd->m_stop_loading)
-			break;
-
-		pThisWnd->insert(i, pThisWnd->m_files[i], get_part(pThisWnd->m_files[i], fn_name), false, false);
-		//trace(i);
-
-		mtx.lock();
-		pThisWnd->m_loading_completed_count ++;
-		//trace(pThisWnd->m_loading_completed_count);
-		mtx.unlock();
-	}
-
-	if ((end - start) == 1)
-		str.Format(_T("job completed : %d"), start);
-	else
-		str.Format(_T("job completed : %d ~ %d"), start, end - 1);
-	//TRACE(_T("%s\n"), str);
-
-	mtx.lock();
-	//pThisWnd->m_loading_completed_count += (end - start);
-	//trace(pThisWnd->m_loading_completed_count);
-	pThisWnd->m_thread.set_thread_completed(idx);
-	mtx.unlock();
-}
-
-void CSCThumbCtrl::loading_completed_callback()
-{
-	pThisWnd->on_loading_completed();
 }
 
 void CSCThumbCtrl::on_loading_completed()
@@ -516,8 +362,6 @@ void CSCThumbCtrl::set_path(CString path)
 
 void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 {
-	pThisWnd = this;
-
 	m_tloading_start = clock();
 
 	if (reset)
@@ -544,8 +388,23 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 	m_thumb.resize(m_files.size());
 
-	m_loading_completed_count = 0;
-	m_thread.job(m_files.size(), loading_function, loading_completed_callback);
+	m_loading_completed_count.store(0);
+	m_thread.start((int)m_files.size(),
+		[this](int /*worker_idx*/, int start, int end, CSCThread& th)
+		{
+			for (int i = start; i < end; i++)
+			{
+				if (th.stop_requested())
+					break;
+
+				insert(i, m_files[i], get_part(m_files[i], fn_name), false, false);
+				m_loading_completed_count.fetch_add(1, std::memory_order_acq_rel);
+			}
+		},
+		[this]()
+		{
+			on_loading_completed();
+		});
 
 	Invalidate();
 }
@@ -1783,15 +1642,7 @@ CSCGdiplusBitmap* CSCThumbCtrl::get_img(int index)
 
 void CSCThumbCtrl::stop_loading()
 {
-	//if (!m_loading_completed)
-	{
-		m_stop_loading = true;
-
-		while (!m_thread.is_all_thread_completed())
-		{
-			Wait(10);
-		}
-
-		m_stop_loading = false;
-	}
+	//CSCThreadGroup::stop()이 모든 워커에 stop 신호 전송 후 join 까지 대기.
+	//각 워커는 th.stop_requested()를 매 반복마다 체크해서 즉시 빠져나옴.
+	m_thread.stop();
 }

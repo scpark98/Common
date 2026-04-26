@@ -144,15 +144,13 @@ std::future<typename std::result_of<F(Args...)>::type> ThreadPool::EnqueueJob(
 		std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 	std::future<return_type> job_result_future = job->get_future();
 
-	//std::lock_guard<std::mutex> lock(m_job_q_);
-	m_job_q_.lock();
-	job_list.push([job]() { (*job)(); });
-	m_job_q_.unlock();
+	//RAII 락 — 수동 lock/unlock 시 push 가 throw 하면 mutex 가 해제되지 않아 deadlock.
+	{
+		std::lock_guard<std::mutex> lock(m_job_q_);
+		job_list.push([job]() { (*job)(); });
+	}
 
 	cond.notify_one();
-
-	//Sleep()을 걸어주지 않을 경우 EnqueueJob()이 짧은 시간 간격으로 호출될 경우 에러 발생.
-	//Sleep(1);
 
 	return job_result_future;
 }

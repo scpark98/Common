@@ -93,6 +93,10 @@ public:
 
 	HRESULT						on_size_changed(int cx, int cy);
 
+	//D3D device removal 감지 후 디바이스/컨텍스트 재생성. EndDraw / Present 가 D2DERR_RECREATE_TARGET 또는
+	//DXGI_ERROR_DEVICE_REMOVED 반환 시 호출. 호출자는 이후 비트맵 / 브러시 등 디바이스 의존 자원 모두 재생성 필요.
+	HRESULT						handle_device_lost();
+
 	HRESULT						save(CString path);
 
 	//rect의 크기에 따라 글자크기가 자동 조정된다. min, max 크기를 지정할 수 있다. (0이면 자동 조정)

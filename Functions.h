@@ -2245,6 +2245,11 @@ h		: 복사할 height 크기(pixel)
 	//2003-04-16 18:01:00.120
 	CString		GetCurrentTimeString(bool bSeparator = true, bool msec = false);
 	CTime		get_CTime_from_datetime_str(CString date, CString time = _T("00:00:00"));
+
+	//"1d 2h 3m" 형식의 문자열을 분으로 환산. 대소문자 무관, 공백 무시.
+	//동일 단위 반복 등장 시 누적 (ex: "1d 2m 3h 4m" = 1d + 3h + 6m = 1626분).
+	//단위 없이 입력된 숫자 토큰은 무시되므로 호출 측에서 사전 검사 권장.
+	int			get_total_minutes_from_dhm(CString dhm_time);
 	SYSTEMTIME	get_SYSTEMTIME_from_datetime_str(CString datetime, CString separator = _T(" "));
 	SYSTEMTIME	diff_SYSTEMTIME(SYSTEMTIME stStart, SYSTEMTIME stEnd);
 	SYSTEMTIME operator-(const SYSTEMTIME& pSr, const SYSTEMTIME& pSl);

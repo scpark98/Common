@@ -413,6 +413,46 @@ CTime get_CTime_from_datetime_str(CString date, CString time)
 	return t;
 }
 
+//"1d 2h 3m" 형식의 문자열을 분으로 환산.
+//대소문자 무관(MakeLower), 공백 무시, 단위 없는 숫자 토큰은 무시.
+//동일 단위가 여러 번 나오면 누적된다 (ex: "1d 2m 3h 4m" = 1d + 3h + 6m = 1626분).
+int get_total_minutes_from_dhm(CString dhm_time)
+{
+	int minutes = 0;
+
+	dhm_time.MakeLower();
+
+	CString sub;
+	for (int i = 0; i < dhm_time.GetLength(); i++)
+	{
+		if (IsNatural(sub) && dhm_time[i] == _T('d'))
+		{
+			minutes += (_ttoi(sub) * 24 * 60);
+			sub.Empty();
+		}
+		else if (IsNatural(sub) && dhm_time[i] == _T('h'))
+		{
+			minutes += (_ttoi(sub) * 60);
+			sub.Empty();
+		}
+		else if (IsNatural(sub) && dhm_time[i] == _T('m'))
+		{
+			minutes += _ttoi(sub);
+			sub.Empty();
+		}
+		else if (_istdigit(dhm_time[i]))
+		{
+			sub += dhm_time[i];
+		}
+		else if (dhm_time[i] == _T(' '))
+		{
+			continue;
+		}
+	}
+
+	return minutes;
+}
+
 //2025/09/24 09:12:09.299
 SYSTEMTIME	get_SYSTEMTIME_from_datetime_str(CString datetime, CString separator)
 {
@@ -2144,60 +2184,49 @@ void	SystemShutdown(int nMode)
 
 void SystemShutdownNT(int nMode /* = 2 */)
 {
-	HANDLE				hToken;		// handle to process token 
-	TOKEN_PRIVILEGES	tkp;		// pointer to token structure 
-	bool				fResult;	// system shutdown flag 
-	bool				bReboot;
-	
+	HANDLE				hToken;
+	TOKEN_PRIVILEGES	tkp;
+
+	// nMode == 1 → reboot, 그 외 → shutdown(power off).
+	UINT uFlags;
 	if (nMode == 1)
-		bReboot = TRUE;
+		uFlags = EWX_REBOOT | EWX_FORCEIFHUNG;
 	else
-		bReboot = FALSE;
-	
-	// Get the current process token handle so we can get shutdown 
-	// privilege. 
+		uFlags = EWX_SHUTDOWN | EWX_POWEROFF | EWX_FORCEIFHUNG;
+
+	// 종료 권한(SE_SHUTDOWN_NAME)은 ExitWindowsEx 호출 전 반드시 활성화해야 한다.
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
-		TRACE("OpenProcessToken failed.");
-	
-	LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &tkp.Privileges[0].Luid); 
-	
-	tkp.PrivilegeCount              = 1;                                    // one privilege to set    
-	tkp.Privileges[0].Attributes    = SE_PRIVILEGE_ENABLED; 
-	
-	// Get shutdown privilege for this process. 
-	AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES) NULL, 0); 
-	
-	// Cannot test the return value of AdjustTokenPrivileges. 
-	if (GetLastError() != ERROR_SUCCESS) 
 	{
-		TRACE("AdjustTokenPrivileges enable failed.\n"); 
+		TRACE("OpenProcessToken failed.\n");
+		return;
+	}
+
+	LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &tkp.Privileges[0].Luid);
+	tkp.PrivilegeCount           = 1;
+	tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+	AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
+
+	if (GetLastError() != ERROR_SUCCESS)
+	{
+		TRACE("AdjustTokenPrivileges enable failed.\n");
 		CloseHandle(hToken);
 		return;
 	}
-	
-	// Display the shutdown dialog box and start the time-out countdown. 
-	fResult = InitiateSystemShutdown(
-		NULL,					// shut down local computer 
-		(LPTSTR)_T("System rebooting."),	// message to user 
-		0,						// time-out period (<- 여기를 20 이라고 쓰면 20초 후 에 리부팅한다.)
-		FALSE,					// ask user to close apps 
-		bReboot);				// reboot after shutdown 
-	
-	if (!fResult) 
-	{ 
-		TRACE("InitiateSystemShutdown failed."); 
-		return;
-	} 
-	
-	// error string..
-	// PrintCSBackupAPIErrorMessage(GetLastError());
-	// Disable shutdown privilege. 
-	
-	tkp.Privileges[0].Attributes = 0; 
-	AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES) NULL, 0); 
-	
-	if (GetLastError() != ERROR_SUCCESS) 
-		TRACE("AdjustTokenPrivileges disable failed."); 
+
+	// 이전 구현은 InitiateSystemShutdown 을 사용했으나, 이 API 는 종료 알림 다이얼로그를
+	// 띄우면서 Windows Exclamation 시스템 사운드("띵")를 재생한다. 예약 종료 용도에는
+	// 부적절하므로 알림 없이 즉시 종료하는 ExitWindowsEx 로 교체.
+	if (!ExitWindowsEx(uFlags, SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED))
+	{
+		TRACE("ExitWindowsEx failed. err=%d\n", GetLastError());
+	}
+
+	// 종료 권한 비활성화(정리).
+	tkp.Privileges[0].Attributes = 0;
+	AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
+
+	CloseHandle(hToken);
 }
 /*
 bool	IsNumericString(CString str)
@@ -4091,6 +4120,13 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 {
 	CFile file;
 
+	//정수 오버플로우 방지 — 음수 / 비현실적 크기 차단.
+	if (w <= 0 || h <= 0 || ch <= 0 || ch > 4)
+		return false;
+	const size_t pixel_count = static_cast<size_t>(w) * h * ch;
+	if (pixel_count > 0x7FFFFFFFu)   // BITMAPINFOHEADER::biSizeImage 는 DWORD 라 ~2GB 한도
+		return false;
+
 	if (file.Open(sBmpFile, CFile::modeCreate | CFile::modeWrite) == false)
 	{
 		AfxMessageBox(_T("create bmp failed"));
@@ -4123,7 +4159,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 	bmpInfo.bmiHeader.biWidth			= MAKE_MULTIPLY_UP(w, 4);
 	bmpInfo.bmiHeader.biHeight			= -h;
 	bmpInfo.bmiHeader.biBitCount		= 8 * ch;
-	bmpInfo.bmiHeader.biSizeImage		= sizeof(BYTE) * w * h * ch;
+	bmpInfo.bmiHeader.biSizeImage		= (DWORD)(sizeof(BYTE) * static_cast<size_t>(w) * h * ch);
 
 	file.Write(&bmpInfo, sizeof(BITMAPINFOHEADER));
 
@@ -5463,50 +5499,51 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 			continue;
 		}
 
+		//심볼릭 링크 / junction / mount point 차단 — junction 사이클로 무한 재귀 방지.
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+			continue;
+
 		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
 			if ((_tcscmp(data.cFileName, _T(".")) != 0) && (_tcscmp(data.cFileName, _T("..")) != 0))
 			{
-				if (include_folder)
-				{
-					TCHAR temp[1024] = { 0, };
+				//full path 를 안전한 버퍼 크기로 합성 (구버전: _stprintf 로 unsafe).
+				TCHAR full_path[MAX_PATH] = { 0, };
+				const TCHAR* sep = (folder.GetLength() > 0 && folder.Right(1) == '\\') ? _T("") : _T("\\");
+				int written = _sntprintf_s(full_path, _countof(full_path), _TRUNCATE, _T("%s%s%s"), (LPCTSTR)folder, sep, data.cFileName);
 
-					_stprintf(temp, _T("%s%s%s"), folder, folder.Right(1) == '\\' ? _T("") : _T("\\"), data.cFileName);
-					if (_tcslen(temp) < MAX_PATH)
+				if (written > 0)
+				{
+					if (include_folder)
 					{
 						//V3 제품군을 설치하면 랜섬웨어 방지를 위한 Decoy로 인해 각 드라이브 루트에 ")GTFE0E"와 같은 폴더가 생기고
 						//그 안에는 오피스 파일들이 생긴다. 이 경로는 스킵한다.
-						//if (_tcslen(data.cAlternateFileName) == 0)
-						{
-							_tcscpy(data.cFileName, temp);
-							dq->push_back(data);
-						}
+						_tcscpy_s(data.cFileName, _countof(data.cFileName), full_path);
+						dq->push_back(data);
 					}
-					else
-					{
-						TRACE(_T("exceed filename length : %d. (%s)\n"), _tcslen(temp), temp);
-					}
-				}
 
-				if (recursive)
-					find_all_files(CString(data.cFileName), dq, filter, include_folder, recursive);
+					if (recursive)
+						find_all_files(CString(full_path), dq, filter, include_folder, recursive);
+				}
+				else
+				{
+					TRACE(_T("exceed filename length: %s\\%s\n"), (LPCTSTR)folder, data.cFileName);
+				}
 			}
 		}
 		else
 		{
-			TCHAR temp[1024] = { 0, };
-			_stprintf(temp, _T("%s%s%s"), folder, folder.Right(1) == '\\' ? _T("") : _T("\\"), data.cFileName);
-			if (_tcslen(temp) < MAX_PATH)
+			TCHAR full_path[MAX_PATH] = { 0, };
+			const TCHAR* sep = (folder.GetLength() > 0 && folder.Right(1) == '\\') ? _T("") : _T("\\");
+			int written = _sntprintf_s(full_path, _countof(full_path), _TRUNCATE, _T("%s%s%s"), (LPCTSTR)folder, sep, data.cFileName);
+			if (written > 0)
 			{
-				//if (_tcslen(data.cAlternateFileName) == 0)
-				{
-					_tcscpy(data.cFileName, temp);
-					dq->push_back(data);
-				}
+				_tcscpy_s(data.cFileName, _countof(data.cFileName), full_path);
+				dq->push_back(data);
 			}
 			else
 			{
-				TRACE(_T("exceed filename length : %d. (%s)\n"), _tcslen(temp), temp);
+				TRACE(_T("exceed filename length: %s\\%s\n"), (LPCTSTR)folder, data.cFileName);
 			}
 		}
 	} while (FindNextFile(hFind, &data));
@@ -6430,13 +6467,15 @@ bool RecursiveCreateDirectory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* =
 
 bool RecursiveRemoveDirectory(LPCTSTR lpPathName, bool bDeletePermanent/* = TRUE*/)
 {
-	ASSERT(lpPathName);
+	if (lpPathName == NULL)
+		return false;
 
-	TCHAR szDirectory[MAX_PATH + 1];
+	// SHFileOperation 의 pFrom 은 double-null termination 요구.
+	// +2 크기로 잡고 zero-init 하면 두 번째 null 자동 보장 → 별도 인덱스 쓰기 불필요.
+	TCHAR szDirectory[MAX_PATH + 2] = { 0 };
 	SHFILEOPSTRUCT fos = {0};
 
-	_tcscpy_s(szDirectory, MAX_PATH, lpPathName);
-	szDirectory[_tcslen(szDirectory) + 1] = 0;
+	_tcscpy_s(szDirectory, MAX_PATH + 1, lpPathName);
 
 	fos.wFunc = FO_DELETE;
 	fos.fFlags = FOF_NO_UI | (bDeletePermanent ? 0 : FOF_ALLOWUNDO);
@@ -6449,10 +6488,11 @@ bool RecursiveRemoveDirectory(LPCTSTR lpPathName, bool bDeletePermanent/* = TRUE
 bool SHDeleteFolder(CString sFolder)
 {
     SHFILEOPSTRUCT FileOp = {0};
-    TCHAR szTemp[MAX_PATH];
- 
-	_stprintf(szTemp, _T("%s"), sFolder);
-    szTemp[_tcslen(szTemp) + 1] = NULL;
+	// SHFileOperation 의 pFrom 은 double-null termination 요구.
+	// +2 크기로 잡고 zero-init 하면 두 번째 null 자동 보장.
+    TCHAR szTemp[MAX_PATH + 2] = { 0 };
+
+	_tcscpy_s(szTemp, MAX_PATH + 1, (LPCTSTR)sFolder);
  
     FileOp.hwnd = NULL;
     FileOp.wFunc = FO_DELETE;       // 삭제 속성 설정
@@ -9598,7 +9638,9 @@ int get_token_str(char *src, char *seps, char **sToken, int nMaxToken)
 
 	while (token != NULL)
 	{
-		strcpy(sToken[nToken++], token);
+		// 각 토큰 버퍼는 위에서 100바이트 calloc. 토큰이 100바이트 이상이면 truncate.
+		strncpy_s(sToken[nToken], 100, token, _TRUNCATE);
+		nToken++;
 
 		if (nToken >= nMaxToken)
 		{
@@ -11378,6 +11420,11 @@ CString URLEncode(CString sIn)
 {
 	CString sOut;
 	const int nLen = sIn.GetLength() + 1;
+
+	// nLen * 3 정수 오버플로 방어. 이론상 한계, 실무에선 도달 어려우나 견고성 위해 차단.
+	if (nLen <= 0 || nLen > INT_MAX / 3)
+		return CString();
+
 	LPBYTE pOutTmp = NULL;
 	LPBYTE pOutBuf = NULL;
 	LPBYTE pInTmp = NULL;
@@ -12763,15 +12810,21 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 		//exePath = _T("/c ") + exePath;
 	}
 
-	// Start the child process. 
+	// CreateProcessW 가 lpCommandLine 버퍼를 수정할 수 있어
+	// CString 내부 버퍼를 const-cast 로 전달하면 ref-counting 이 깨진다.
+	// 별도 가변 버퍼로 복사 후 전달.
+	std::vector<TCHAR> cmdLine(exePath.GetLength() + 1);
+	_tcscpy_s(cmdLine.data(), cmdLine.size(), (LPCTSTR)exePath);
+
+	// Start the child process.
 	if (!CreateProcess(NULL,
-		(TCHAR*)(const TCHAR*)(exePath),//_T("dir")과 같이 상수값을 직접 주면 실패.	// Command line
+		cmdLine.data(),	// Command line (writable buffer; CreateProcessW 가 수정 가능)
 		NULL,           // Process handle not inheritable
 		NULL,           // Thread handle not inheritable
 		TRUE,          // Set handle inheritance to FALSE
 		CREATE_NEW_CONSOLE,              // No creation flags
 		NULL,           // Use parent's environment block
-		NULL,           // Use parent's starting directory 
+		NULL,           // Use parent's starting directory
 		&si,            // Pointer to STARTUPINFO structure
 		&pi)           // Pointer to PROCESS_INFORMATION structure
 		)
@@ -14584,24 +14637,37 @@ double		GetPolygonAreaSize(CPoint *pt, int nPoints)
 //return받은 char*는 반드시 사용 후 free()해줘야 함.
 TCHAR* replace(TCHAR* src, const TCHAR* olds, const TCHAR* news)
 {
+	if (src == NULL || olds == NULL || news == NULL || *olds == _T('\0'))
+		return NULL;
+
 	TCHAR* result;
 	int i, cnt = 0;
-	int newWlen = _tcslen(news);
-	int oldWlen = _tcslen(olds);
+	int newWlen = (int)_tcslen(news);
+	int oldWlen = (int)_tcslen(olds);
 
-	// Counting the number of times old word 
-	// occur in the string 
+	// Counting the number of times old word
+	// occur in the string
 	for (i = 0; src[i] != '\0'; i++) {
 		if (_tcsstr(&src[i], olds) == &src[i]) {
 			cnt++;
 
-			// Jumping to index after the old word. 
+			// Jumping to index after the old word.
 			i += oldWlen - 1;
 		}
 	}
 
-	// Making new string of enough length 
-	result = (TCHAR*)malloc(i + cnt * (newWlen - oldWlen) + 1);
+	// 결과 버퍼 크기 = i - cnt*oldWlen + cnt*newWlen + 1.
+	// int 산술이 음수가 되거나 오버플로 되지 않도록 size_t 로 계산.
+	// malloc 은 byte 단위이므로 sizeof(TCHAR) 곱하기 (UNICODE 빌드에서 누락되면 절반 크기로 할당됨).
+	size_t out_chars = (size_t)i + (size_t)cnt * (size_t)newWlen;
+	if (out_chars >= (size_t)cnt * (size_t)oldWlen)
+		out_chars -= (size_t)cnt * (size_t)oldWlen;
+	else
+		return NULL;
+
+	result = (TCHAR*)malloc((out_chars + 1) * sizeof(TCHAR));
+	if (result == NULL)
+		return NULL;
 
 	i = 0;
 	while (*src)

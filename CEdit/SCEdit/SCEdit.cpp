@@ -36,6 +36,11 @@ CSCEdit::CSCEdit()
 
 CSCEdit::~CSCEdit()
 {
+	//CBrush 는 base 소멸자가 자동 정리하지만, 명시적으로 호출해 핸들 leak 가능성 차단.
+	if (m_br_back.GetSafeHandle())
+		m_br_back.DeleteObject();
+	if (m_br_back_disabled.GetSafeHandle())
+		m_br_back_disabled.DeleteObject();
 }
 
 bool CSCEdit::create(DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)

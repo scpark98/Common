@@ -23,6 +23,23 @@ CSCD2ImageDlg::~CSCD2ImageDlg()
 	stop();
 }
 
+void CSCD2ImageDlg::set_simple_mode(bool simple)
+{
+	//simple=true 면 모든 enable 플래그 일괄 false (= 기본 단순 표시 모드).
+	//simple=false 면 모두 true (= ASee/BandiView 풀 기능 모드).
+	//그 후 set_enable_xxx 로 개별 fine-tune 가능 — 예: simple + pan + zoom_wheel 만 enable.
+	m_simple_mode       = simple;
+	const bool en       = !simple;
+	m_enable_pan        = en;
+	m_enable_zoom_wheel = en;
+	m_enable_roi        = en;
+	m_enable_dropper    = en;
+	m_enable_drop       = en;
+	m_enable_file_nav   = en;
+	m_enable_thumbnail  = en;
+	m_enable_pixel_info = en;
+}
+
 bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 {
 	m_parent = parent;
@@ -52,16 +69,17 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 	m_slider_gif.set_progress_border_color(Gdiplus::Color::DimGray);
 	m_slider_gif.set_use_slide();
 
-	if (!m_simple_mode)
+	if (m_enable_pixel_info)
 	{
 		CRect r_pixel = make_rect(x + 8, y + cy - 8 - PIXEL_INFO_CY, PIXEL_INFO_CX, PIXEL_INFO_CY);
 		m_static_pixel.create(_T("A 0\nR 0\nG 0\nB 0"), WS_CHILD | SS_CENTER | SS_CENTERIMAGE, r_pixel, this);
 		m_static_pixel.sunken();
 		m_static_pixel.set_font_name(_T("Consolas"));
 		m_static_pixel.set_font_size(10);
+	}
 
-		//m_br_zigzag = CSCGdiplusBitmap::get_zigzag_pattern(32, m_cr_zigzag_back, m_cr_zigzag_fore);
-
+	if (m_enable_thumbnail)
+	{
 		m_thumb.create(this);
 		m_thumb.set_color_theme(CSCColorTheme::color_theme_dark_gray);
 		m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
@@ -242,9 +260,22 @@ void CSCD2ImageDlg::OnPaint()
 		d2dc->FillRectangle(CRect_to_d2Rect(m_r_display), zigzag.Get());
 	}
 
-	m_images[0].draw(d2dc, CRect_to_d2Rect(m_r_display));
+	//임의 각도 회전 적용 — m_r_display 중심 기준. 0° 이면 transform 변경 없이 빠른 경로.
+	if (m_render_angle != 0.0)
+	{
+		D2D1_POINT_2F center = D2D1::Point2F(
+			float(m_r_display.left + m_r_display.right)  * 0.5f,
+			float(m_r_display.top  + m_r_display.bottom) * 0.5f);
+		d2dc->SetTransform(D2D1::Matrix3x2F::Rotation(float(m_render_angle), center));
+		m_images[0].draw(d2dc, CRect_to_d2Rect(m_r_display));
+		d2dc->SetTransform(D2D1::Matrix3x2F::Identity());
+	}
+	else
+	{
+		m_images[0].draw(d2dc, CRect_to_d2Rect(m_r_display));
+	}
 	//이미지 정보 표시
-	if (!m_simple_mode && m_show_info)// && m_parent->IsZoomed())
+	if (m_show_info)// && m_parent->IsZoomed())
 	{
 		CString info_str;
 		info_str.Format(_T("%s\n확대 배율: %.0f%%\n표시 크기: %d x %d"), m_info_str, m_zoom * 100.0, m_r_display.Width(), m_r_display.Height());
@@ -264,7 +295,7 @@ void CSCD2ImageDlg::OnPaint()
 
 	//dc에 그릴 경우 d2devicecontext가 그려지고 dc에 그려지므로 깜빡임이 발생한다.
 	//반드시 CDC로 그려야 하는 경우가 아니라면 d2dc에 그려야 한다.
-	if (!m_simple_mode && m_show_pixel_pos && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
+	if (m_show_pixel_pos && m_pixel_pos.X >= 0.0f && m_pixel_pos.Y >= 0.0f)
 	{
 		CString pixel_pos;
 		pixel_pos.Format(_T("(%.f, %.f)"), m_pixel_pos.X, m_pixel_pos.Y);
@@ -277,7 +308,7 @@ void CSCD2ImageDlg::OnPaint()
 		draw_text(d2dc, rText, pixel_pos, _T("맑은 고딕"), 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_RIGHT | DT_TOP);
 	}
 
-	if (!m_simple_mode)
+	if (m_enable_roi)
 	{
 		//roi를 그리거나 위치, 크기를 조정할 때는 오로지 m_screen_roi만 신경쓴다.
 		if (!m_image_roi.IsEmptyArea() && m_screen_roi.IsEmptyArea())
@@ -303,12 +334,11 @@ void CSCD2ImageDlg::OnPaint()
 		else if (m_image_roi.Width >= 5.0f && m_image_roi.Height >= 5.0f)
 		{
 			//이미지 확대 축소 등에 의해 m_r_display가 변경되면 그에 따라 m_screen_roi도 다시 계산해줘야 한다.
+			//m_r_display.left/top 자체가 m_offset을 이미 반영(OnPaint의 sx=m_offset.x, sy=m_offset.y)하므로
+			//get_screen_coord_from_real_coord()의 결과는 이미 화면상 정확한 좌표다. 추가로 m_offset을 더하면 offset이 두 번 적용된다.
 			get_screen_coord_from_real_coord(m_r_display, m_images[0].get_width(), m_image_roi, &m_screen_roi);
-			m_screen_roi.Offset(m_offset.x, m_offset.y);
 			screen_roi = gpRectF_to_CRect(m_screen_roi);
 			screen_roi.InflateRect(0, 0, 2, 2);	//이렇게 2씩 늘려줘야 roi의 right, bottom이 정확히 픽셀과 일치되게 표시된다.
-			//이미 offset 변경에 의한 보정은 get_screen_coord_from_real_coord()에서 해준다.
-			//screen_roi.OffsetRect(m_offset);
 			//draw_rect(&dc, screen_roi, red, NULL_BRUSH, 1, PS_DASH, R2_XORPEN);
 			//draw_rect(g, screen_roi, Gdiplus::Color::Red, Gdiplus::Color(64, 0, 64, 255), 1);
 			//d2dc->FillRectangle(convert(screen_roi), br_roi);
@@ -344,6 +374,9 @@ void CSCD2ImageDlg::OnPaint()
 			}
 		}
 	}
+
+	//파생 클래스가 D2D 같은 frame 안에서 오버레이 (close 버튼 등) 를 그릴 수 있게 후크 호출.
+	on_post_paint(d2dc);
 
 	HRESULT hr = d2dc->EndDraw();
 
@@ -539,7 +572,7 @@ bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs, bool auto_play)
 		rerender();
 	}
 
-	if (!m_simple_mode && m_thumb.GetSafeHwnd() && (m_thumb.size() == 0 || load_thumbs))
+	if (m_enable_thumbnail && m_thumb.GetSafeHwnd() && (m_thumb.size() == 0 || load_thumbs))
 		m_thumb.set_path(get_part(sFile, fn_folder));
 
 	return (hr == S_OK);
@@ -718,6 +751,14 @@ void CSCD2ImageDlg::rotate(Gdiplus::RotateFlipType type)
 	rerender();
 }
 
+void CSCD2ImageDlg::set_render_angle(double deg)
+{
+	if (m_render_angle == deg)
+		return;
+	m_render_angle = deg;
+	rerender();
+}
+
 void CSCD2ImageDlg::fit2ctrl(bool fit, bool invalidate)
 {
 	m_fit2ctrl = fit;
@@ -777,7 +818,7 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 
 	m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 
-	if (m_simple_mode)
+	if (!m_enable_pixel_info)
 		return;
 
 	if (m_static_pixel.m_hWnd == nullptr)
@@ -797,7 +838,8 @@ void CSCD2ImageDlg::OnSize(UINT nType, int cx, int cy)
 
 void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	if (m_simple_mode)
+	//interactive 기능이 하나도 enable 안 됐으면 base 위임 (= simple mode 동등).
+	if (!m_enable_pan && !m_enable_roi && !m_enable_dropper)
 	{
 		CDialog::OnLButtonDown(nFlags, point);
 		return;
@@ -814,7 +856,7 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	SetCapture();
 
 	//roi 설정중
-	if (IsCtrlPressed())
+	if (m_enable_roi && IsCtrlPressed())
 	{
 		m_drawing_roi = true;
 		m_screen_roi = Gdiplus::RectF(point.x, point.y, 0, 0);
@@ -830,11 +872,11 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 	//roi의 크기를 변경중
-	else if (m_handle_index >= 0)
+	else if (m_enable_roi && m_handle_index >= 0)
 	{
 		m_drawing_roi = false;
 	}
-	else if (m_fit2ctrl)
+	else if (m_enable_pan && m_fit2ctrl)
 	{
 		ReleaseCapture();
 		GetParent()->SendMessage(WM_LBUTTONDOWN, nFlags, MAKELPARAM(point.x, point.y));
@@ -845,7 +887,7 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	if (m_simple_mode)
+	if (!m_enable_pan && !m_enable_roi && !m_enable_dropper)
 	{
 		CDialog::OnLButtonUp(nFlags, point);
 		return;
@@ -914,7 +956,7 @@ void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 {
-	if (m_simple_mode)
+	if (!m_enable_pan && !m_enable_roi && !m_enable_dropper)
 	{
 		CDialog::OnMouseMove(nFlags, point);
 		return;
@@ -932,10 +974,11 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 		Clamp(point.x, m_r_display.left, m_r_display.right);
 		Clamp(point.y, m_r_display.top, m_r_display.bottom);
 
-		m_static_pixel.ShowWindow(SW_HIDE);
+		if (m_static_pixel.GetSafeHwnd())
+			m_static_pixel.ShowWindow(SW_HIDE);
 
 		//roi 설정중인 경우
-		if (m_drawing_roi)
+		if (m_enable_roi && m_drawing_roi)
 		{
 			m_screen_roi.Width = point.x - m_screen_roi.X;
 			m_screen_roi.Height = point.y - m_screen_roi.Y;
@@ -954,7 +997,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			rerender();
 		}
 		//그려진 roi의 크기, 위치를 조절하는 경우
-		else if (m_handle_index >= 0)
+		else if (m_enable_roi && m_handle_index >= 0)
 		{
 			//TRACE(_T("m_handle_index = %d\n"), m_handle_index);
 			switch (m_handle_index)
@@ -1013,7 +1056,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			rerender();
 		}
 		//이미지 이동을 위한 단순 드래그인 경우
-		else
+		else if (m_enable_pan)
 		{
 			m_offset.x += (point.x - m_pt_lbuttondown.x);
 			m_offset.y += (point.y - m_pt_lbuttondown.y);
@@ -1048,7 +1091,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			m_pt_lbuttondown = point;
 		}
 	}
-	else if (m_show_pixel)
+	else if (m_show_pixel && m_static_pixel.GetSafeHwnd())
 	{
 		CPoint pt;
 		get_real_coord_from_screen_coord(m_r_display, m_images[0].get_width(), point, &pt);
@@ -1132,7 +1175,8 @@ void CSCD2ImageDlg::OnMouseHover(UINT nFlags, CPoint point)
 void CSCD2ImageDlg::OnMouseLeave()
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	m_static_pixel.ShowWindow(SW_HIDE);
+	if (m_static_pixel.GetSafeHwnd())
+		m_static_pixel.ShowWindow(SW_HIDE);
 
 	CDialog::OnMouseLeave();
 }
@@ -1172,8 +1216,6 @@ BOOL CSCD2ImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 				break;
 			}
 		}
-
-
 
 		if (m_handle_index != -1)
 		{
@@ -1217,7 +1259,7 @@ BOOL CSCD2ImageDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 	ScreenToClient(&client_pt);
 
 	//CSCD2ImageDlg이고 이미지 표시 영역에 한해
-	if (!m_simple_mode && WindowFromPoint(pt) == this && m_r_display.PtInRect(client_pt))
+	if (m_enable_dropper && WindowFromPoint(pt) == this && m_r_display.PtInRect(client_pt))
 	{
 		//픽셀 정보 표시라면 스포이트를
 		if (m_show_pixel && m_cursor_dropper)
@@ -1414,7 +1456,7 @@ LRESULT CSCD2ImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)
 
 void CSCD2ImageDlg::set_view_mode(int view_mode)
 {
-	if (m_simple_mode)
+	if (!m_enable_thumbnail)
 		return;
 
 	if (view_mode == view_mode_toggle)

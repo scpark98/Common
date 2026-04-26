@@ -37,37 +37,10 @@ CRect CSCParagraphStatic::set_text(CString text)
 	//설정값을 m_text_prop에 갱신시켜줘야 한다.
 	update_text_property();
 
-
 	CSCParagraph::build_paragraph_str(text, m_para, &m_text_prop);
 
-	//"<b><cr = Red>This</b></cr > is a <cr =Blue><i>sample</i> <b>paragraph</b>."
-	CClientDC dc(this);
-	CRect rc;
-	GetClientRect(&rc);
-
-	//align 옵션에 따른 보정
-	DWORD dwStyle = GetStyle();
-	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
-
-	if (m_dwStyle == 0)
-	{
-		MAP_STYLE(SS_LEFT, DT_LEFT);
-		MAP_STYLE(SS_RIGHT, DT_RIGHT);
-		MAP_STYLE(SS_CENTER, DT_CENTER);
-		MAP_STYLE(SS_CENTERIMAGE, DT_VCENTER);
-		MAP_STYLE(SS_NOPREFIX, DT_NOPREFIX);
-		MAP_STYLE(SS_WORDELLIPSIS, DT_WORD_ELLIPSIS);
-		MAP_STYLE(SS_ENDELLIPSIS, DT_END_ELLIPSIS);
-		MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
-	}
-
-	m_static_option = dwText;
-	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, m_static_option);
-
-	if (m_line_spacing != 1.0f)
-		m_rect_text = CSCParagraph::set_line_spacing(m_para, m_line_spacing);
-
-	Invalidate();
+	//halign/valign, line_spacing 은 rebuild_layout() 에서 한 번에 적용된다.
+	rebuild_layout();
 
 	return m_rect_text;
 }
@@ -85,34 +58,277 @@ void CSCParagraphStatic::set_textf(LPCTSTR format, ...)
 
 void CSCParagraphStatic::set_line_spacing(float spacing)
 {
-	float old_spacing = m_line_spacing;
 	m_line_spacing = spacing;
+	rebuild_layout();
+}
 
-	//set_text() 이전이면 m_para 가 비어있으므로 다음 set_text() 시 자동 적용된다.
+//line = 1에서 1은 인덱스이므로 두번째 라인(인덱스=1)의 윗 간격을 조정하는 것이다.
+//즉 해당 라인이 시작될 때 위에서 얼마나 간격을 넓힐것인지를 설정하는 것이다. line >= 1 이어야 한다.
+//line = 0이면 0번 라인이 출력되기 전의 라인 간격이라고 할 수 있으나
+//그건 top margin 에 해당한다.
+//line=3, spacing=2.0f 라고 하면 index=3, 즉 4번째 라인 앞의 공백이 두배가 되는 것이고
+//이는 결국 3번째 라인 다음에 2배 간격이 생기는 것과 같다.
+void CSCParagraphStatic::set_line_spacing(int line, float spacing)
+{
+	//line == 0 은 "위쪽 간격" 개념이 없으므로 무시.
+	if (line < 1)
+		return;
+
+	m_line_spacings[line] = spacing;
+	rebuild_layout();
+}
+
+float CSCParagraphStatic::get_line_spacing(int line)
+{
+	auto it = m_line_spacings.find(line);
+
+	if (it != m_line_spacings.end())
+		return it->second;
+
+	return m_line_spacing;
+}
+
+CRect CSCParagraphStatic::reapply_line_spacings()
+{
+	//호출 시점: m_para 의 각 r 는 calc_text_rect() 직후의 baseline(spacing=1.0) 위치여야 한다.
+	if (m_para.empty())
+		return m_rect_text;
+
+	int i, j;
+	int shift_y = 0;
+
+	//line 0 은 기준이므로 shift 0. line >= 1 부터 누적 shift 를 가산.
+	for (i = 1; i < (int)m_para.size(); i++)
+	{
+		int line_above_h = 0;
+
+		for (j = 0; j < (int)m_para[i - 1].size(); j++)
+		{
+			int h = m_para[i - 1][j].r.Height();
+
+			if (h > line_above_h)
+				line_above_h = h;
+		}
+
+		auto it = m_line_spacings.find(i);
+		float spacing = (it != m_line_spacings.end()) ? it->second : m_line_spacing;
+
+		shift_y += (int)((float)line_above_h * (spacing - 1.0f));
+
+		if (shift_y == 0)
+			continue;
+
+		for (j = 0; j < (int)m_para[i].size(); j++)
+			m_para[i][j].r.OffsetRect(0, shift_y);
+	}
+
+	//m_rect_text 재계산. CSCParagraph::set_line_spacing() 의 최종 블록과 동일한 공식.
+	CRect rect_text;
+	int max_width_line = CSCParagraph::get_max_width_line(m_para);
+
+	if (max_width_line < 0)
+		max_width_line = 0;
+
+	rect_text.left = m_para[max_width_line][0].r.left;
+	rect_text.top = m_para[0][0].r.top;
+	rect_text.right = m_para[max_width_line][m_para[max_width_line].size() - 1].r.right;
+
+	int last_line = (int)m_para.size() - 1;
+	int max_bottom = m_para[last_line][0].r.bottom;
+
+	for (j = 1; j < (int)m_para[last_line].size(); j++)
+	{
+		if (m_para[last_line][j].r.bottom > max_bottom)
+			max_bottom = m_para[last_line][j].r.bottom;
+	}
+
+	rect_text.bottom = max_bottom;
+
+	return rect_text;
+}
+
+void CSCParagraphStatic::set_text_align(DWORD align)
+{
+	//halign 추출.
+	if (align & DT_CENTER)
+		m_halign = DT_CENTER;
+	else if (align & DT_RIGHT)
+		m_halign = DT_RIGHT;
+	else
+		m_halign = DT_LEFT;
+
+	//valign 추출. DT_TOP 은 0 이므로 bit 검사로는 잡히지 않아 else 에서 fallback.
+	if (align & DT_VCENTER)
+		m_valign = DT_VCENTER;
+	else if (align & DT_BOTTOM)
+		m_valign = DT_BOTTOM;
+	else
+		m_valign = DT_TOP;
+
+	rebuild_layout();
+}
+
+void CSCParagraphStatic::set_halign(DWORD halign)
+{
+	m_halign = halign;
+	rebuild_layout();
+}
+
+void CSCParagraphStatic::set_halign(int line, DWORD halign)
+{
+	if (line < 0)
+		return;
+
+	m_line_haligns[line] = halign;
+	rebuild_layout();
+}
+
+void CSCParagraphStatic::set_valign(DWORD valign)
+{
+	m_valign = valign;
+	rebuild_layout();
+}
+
+DWORD CSCParagraphStatic::get_halign(int line)
+{
+	auto it = m_line_haligns.find(line);
+
+	if (it != m_line_haligns.end())
+		return it->second;
+
+	return m_halign;
+}
+
+void CSCParagraphStatic::rebuild_layout()
+{
 	if (m_para.empty())
 	{
 		Invalidate();
 		return;
 	}
 
-	if (spacing == old_spacing)
-		return;
+	CClientDC dc(this);
+	CRect rc;
+	GetClientRect(&rc);
 
-	//현재 m_para 는 old_spacing 이 적용된 상태.
-	//CSCParagraph::set_line_spacing() 의 shift 공식이 (arg - 1.0) * line_height 로 가산적이므로
-	//arg = (spacing - old_spacing + 1.0f) 을 넘기면 정확히 (spacing - old_spacing) 만큼만 추가 shift 되어
-	//calc_text_rect() 재호출 없이 old → new 전이가 가능하다.
-	m_rect_text = CSCParagraph::set_line_spacing(m_para, spacing - old_spacing + 1.0f);
+	//DT_NOCLIP 만 넘겨 baseline 배치만 얻는다 — halign/valign 은 별도 단계로 적용.
+	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_NOCLIP);
+	m_rect_text = reapply_line_spacings();
+	m_rect_text = apply_halign();
+	m_rect_text = apply_valign();
 
 	Invalidate();
 }
 
-void CSCParagraphStatic::set_text_align(DWORD align)
+CRect CSCParagraphStatic::apply_halign()
 {
+	//baseline 은 모든 라인이 x=0 에서 시작. 각 라인별로 target_left 을 구해 현재 left 와의 차이만큼 shift.
+	if (m_para.empty())
+		return m_rect_text;
+
 	CRect rc;
-	GetClientRect(rc);
-	m_rect_text = CSCParagraph::set_text_align(rc, m_para, align);
-	Invalidate();
+	GetClientRect(&rc);
+
+	int i, j;
+
+	for (i = 0; i < (int)m_para.size(); i++)
+	{
+		if (m_para[i].empty())
+			continue;
+
+		auto it = m_line_haligns.find(i);
+		DWORD halign = (it != m_line_haligns.end()) ? it->second : m_halign;
+
+		int total_width = 0;
+		for (j = 0; j < (int)m_para[i].size(); j++)
+			total_width += m_para[i][j].r.Width();
+
+		int target_left;
+
+		if (halign & DT_CENTER)
+			target_left = rc.CenterPoint().x - total_width / 2;
+		else if (halign & DT_RIGHT)
+			target_left = rc.right - total_width;
+		else
+			target_left = rc.left;
+
+		int shift_x = target_left - m_para[i][0].r.left;
+
+		if (shift_x == 0)
+			continue;
+
+		for (j = 0; j < (int)m_para[i].size(); j++)
+			m_para[i][j].r.OffsetRect(shift_x, 0);
+	}
+
+	//라인별 halign 이 다를 수 있으므로 rect_text.left/right 는 모든 라인에 걸친 min/max 로 구한다.
+	CRect rect_text = m_rect_text;
+	rect_text.left = m_para[0][0].r.left;
+	rect_text.right = m_para[0][m_para[0].size() - 1].r.right;
+
+	for (i = 1; i < (int)m_para.size(); i++)
+	{
+		if (m_para[i].empty())
+			continue;
+
+		if (m_para[i][0].r.left < rect_text.left)
+			rect_text.left = m_para[i][0].r.left;
+
+		int line_right = m_para[i][m_para[i].size() - 1].r.right;
+
+		if (line_right > rect_text.right)
+			rect_text.right = line_right;
+	}
+
+	return rect_text;
+}
+
+CRect CSCParagraphStatic::apply_valign()
+{
+	if (m_para.empty())
+		return m_rect_text;
+
+	CRect rc;
+	GetClientRect(&rc);
+
+	int first_top = m_para[0][0].r.top;
+	int last_line = (int)m_para.size() - 1;
+	int last_bottom = m_para[last_line][0].r.bottom;
+	int j;
+
+	for (j = 1; j < (int)m_para[last_line].size(); j++)
+	{
+		if (m_para[last_line][j].r.bottom > last_bottom)
+			last_bottom = m_para[last_line][j].r.bottom;
+	}
+
+	int total_h = last_bottom - first_top;
+
+	int target_top;
+
+	if (m_valign & DT_VCENTER)
+		target_top = rc.top + (rc.Height() - total_h) / 2;
+	else if (m_valign & DT_BOTTOM)
+		target_top = rc.bottom - total_h;
+	else
+		target_top = rc.top;
+
+	int shift_y = target_top - first_top;
+
+	if (shift_y != 0)
+	{
+		for (int i = 0; i < (int)m_para.size(); i++)
+		{
+			for (j = 0; j < (int)m_para[i].size(); j++)
+				m_para[i][j].r.OffsetRect(0, shift_y);
+		}
+	}
+
+	CRect rect_text = m_rect_text;
+	rect_text.top = target_top;
+	rect_text.bottom = target_top + total_h;
+
+	return rect_text;
 }
 
 #if 0
@@ -399,6 +615,31 @@ void CSCParagraphStatic::PreSubclassWindow()
 	CSCStatic::PreSubclassWindow();
 
 	update_text_property();
+
+	//다이얼로그 리소스의 SS_* 스타일로부터 초기 halign/valign 추출.
+	//사용자가 이후 set_halign()/set_valign()/set_text_align() 을 호출하면 덮어쓴다.
+	DWORD dwStyle = GetStyle();
+	DWORD dwText = 0;
+
+	if (m_dwStyle == 0)
+	{
+		MAP_STYLE(SS_LEFT, DT_LEFT);
+		MAP_STYLE(SS_RIGHT, DT_RIGHT);
+		MAP_STYLE(SS_CENTER, DT_CENTER);
+		MAP_STYLE(SS_CENTERIMAGE, DT_VCENTER);
+	}
+
+	if (dwText & DT_CENTER)
+		m_halign = DT_CENTER;
+	else if (dwText & DT_RIGHT)
+		m_halign = DT_RIGHT;
+	else
+		m_halign = DT_LEFT;
+
+	if (dwText & DT_VCENTER)
+		m_valign = DT_VCENTER;
+	else
+		m_valign = DT_TOP;
 }
 
 void CSCParagraphStatic::update_text_property()
@@ -424,12 +665,7 @@ void CSCParagraphStatic::OnSize(UINT nType, int cx, int cy)
 	CSCStatic::OnSize(nType, cx, cy);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	CRect rc;
-	GetClientRect(rc);
-	CSCParagraph::calc_text_rect(rc, GetDC(), m_para, m_static_option);
-
-	if (m_line_spacing != 1.0f)
-		CSCParagraph::set_line_spacing(m_para, m_line_spacing);
+	rebuild_layout();
 }
 
 void CSCParagraphStatic::OnMouseMove(UINT nFlags, CPoint point)

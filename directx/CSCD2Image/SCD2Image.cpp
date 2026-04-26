@@ -2093,6 +2093,8 @@ CRect CSCD2Image::calc_rect(CRect targetRect, eSCD2Image_DRAW_MODE draw_mode)
 //n개의 이미지로 구성된 gif와 같은 이미지일 경우 프레임 이동
 int CSCD2Image::goto_frame(int index, bool pause)
 {
+	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+
 	if (index >= m_img.size())
 		index = 0;
 
@@ -2111,6 +2113,8 @@ int CSCD2Image::goto_frame(int index, bool pause)
 
 void CSCD2Image::step(int interval)
 {
+	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+
 	m_ani_thread.pause();
 
 	if (m_img.size() <= 1)
@@ -2123,7 +2127,7 @@ void CSCD2Image::step(int interval)
 		m_frame_index = m_img.size() - 1;
 	if (m_frame_index >= (int)m_img.size())
 		m_frame_index = 0;
-	
+
 	m_img_origin_for_back_transparency.Reset();
 
 	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
@@ -2200,18 +2204,28 @@ void CSCD2Image::thread_animation(CSCThread& th)
 			break;
 
 		//프레임이 바뀔때마다 m_img_origin_for_back_transparency는 리셋되어야 한다.
-		m_img_origin_for_back_transparency.Reset();
-
+		//draw() / load() / step() 등과 동일 mutex 보호 — m_img / m_frame_index 갱신 시 race 방지.
 		int delay = 100;
-		if (m_frame_delay.size() != 0 && m_frame_index < m_frame_delay.size())
-			delay = m_frame_delay[m_frame_index];// -elapsed;
-		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
+		{
+			std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+			m_img_origin_for_back_transparency.Reset();
+			if (m_frame_delay.size() != 0 && m_frame_index < m_frame_delay.size())
+				delay = m_frame_delay[m_frame_index];// -elapsed;
+		}
 
+		//sleep / wait_if_paused 는 mutex 밖에서 — UI thread 의 draw() 가 블로킹되지 않도록.
+		std::this_thread::sleep_for(std::chrono::milliseconds(MAX(1, delay)));
 		th.wait_if_paused();
 
-		m_frame_index++;
-		if (m_frame_index >= (int)m_img.size())
-			m_frame_index = 0;
+		if (th.stop_requested())
+			break;
+
+		{
+			std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
+			m_frame_index++;
+			if (m_frame_index >= (int)m_img.size())
+				m_frame_index = 0;
+		}
 	}
 
 	TRACE(_T("%s() terminated.\n"), __function__);
@@ -2963,8 +2977,16 @@ bool CSCD2Image::copy_to_clipboard(int index)
 	if (FAILED(hr))
 		return false;
 
-	const UINT stride = width * 4;
-	const UINT imageSize = stride * height;
+	//정수 오버플로우 방지 — SIZE_T 로 곱셈 후 UINT_MAX 한도 검증.
+	const size_t stride64 = static_cast<size_t>(width) * 4;
+	const size_t imageSize64 = stride64 * height;
+	if (stride64 > UINT_MAX || imageSize64 > UINT_MAX)
+	{
+		cpuBitmap->Unmap();
+		return false;
+	}
+	const UINT stride = (UINT)stride64;
+	const UINT imageSize = (UINT)imageSize64;
 
 	// 5) Premultiplied Alpha → Straight Alpha 변환 (BGRA 채널 순서 유지)
 	std::vector<BYTE> pixels(imageSize);
@@ -2976,20 +2998,48 @@ bool CSCD2Image::copy_to_clipboard(int index)
 
 	cpuBitmap->Unmap();
 
+	//5.5) a=0 픽셀의 BGR 이 premultiplied 잔존으로 0,0,0 (=black) 인 상태인데,
+	//PSP 처럼 알파를 무시하고 BGR 만 읽는 앱과 OS auto-synthesized CF_DIB 에서 검정으로 표시됨.
+	//a=0 픽셀의 BGR 만 흰색으로 채워 검정 표시 회피. 알파(=0) 자체는 그대로이므로 alpha-aware 리더(PowerPoint, Photoshop, Chrome, PNG)에는 영향 없음.
+	for (UINT y = 0; y < height; ++y)
+	{
+		BYTE* row = pixels.data() + y * stride;
+		for (UINT x = 0; x < width; ++x)
+		{
+			BYTE* px = row + x * 4;
+			if (px[3] == 0)
+			{
+				px[0] = 255; // B
+				px[1] = 255; // G
+				px[2] = 255; // R
+				//px[3] = 0; // A 그대로 유지
+			}
+		}
+	}
+
 	// 6) CF_DIBV5 생성
-	const UINT totalSize = sizeof(BITMAPV5HEADER) + imageSize;
-	HGLOBAL hDibv5 = GlobalAlloc(GHND, totalSize);
+	const size_t totalSize64 = sizeof(BITMAPV5HEADER) + (size_t)imageSize;
+	if (totalSize64 > SIZE_MAX)
+		return false;
+	HGLOBAL hDibv5 = GlobalAlloc(GHND, totalSize64);
 	if (!hDibv5)
 		return false;
 
 	{
 		BYTE* pData = (BYTE*)GlobalLock(hDibv5);
+		if (!pData)
+		{
+			GlobalFree(hDibv5);
+			return false;
+		}
 		BITMAPV5HEADER* pbv5 = (BITMAPV5HEADER*)pData;
 		ZeroMemory(pbv5, sizeof(*pbv5));
 
 		pbv5->bV5Size = sizeof(BITMAPV5HEADER);
 		pbv5->bV5Width = width;
-		pbv5->bV5Height = -(LONG)height;   // top-down
+		//bottom-up (양수). top-down 으로 발행하면 PSP 등 legacy 알파 지원 앱이 알파 마스크를 무시하고 검정 배경에 합성하는 사례.
+		//PowerPoint 의 알파 보존 V5 도 bottom-up. 호환성 위해 bottom-up + 행 반전.
+		pbv5->bV5Height = (LONG)height;
 		pbv5->bV5Planes = 1;
 		pbv5->bV5BitCount = 32;
 		pbv5->bV5Compression = BI_BITFIELDS;
@@ -3001,7 +3051,12 @@ bool CSCD2Image::copy_to_clipboard(int index)
 		pbv5->bV5CSType = LCS_sRGB;
 		pbv5->bV5Intent = LCS_GM_IMAGES;
 
-		memcpy(pData + sizeof(BITMAPV5HEADER), pixels.data(), imageSize);
+		//pixels 는 top-down 이므로 bottom-up V5 에 맞게 행 단위 반전.
+		BYTE* dst = pData + sizeof(BITMAPV5HEADER);
+		for (UINT y = 0; y < height; ++y)
+		{
+			memcpy(dst + y * stride, pixels.data() + (height - 1 - y) * stride, stride);
+		}
 		GlobalUnlock(hDibv5);
 	}
 
@@ -3019,46 +3074,69 @@ bool CSCD2Image::copy_to_clipboard(int index)
 		if (SUCCEEDED(hr))
 		{
 			ComPtr<IStream> stream;
-			CreateStreamOnHGlobal(nullptr, TRUE, &stream);
+			HRESULT hr_stream = CreateStreamOnHGlobal(nullptr, TRUE, &stream);
 
 			ComPtr<IWICBitmapEncoder> encoder;
-			hr = m_pWICFactory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+			if (SUCCEEDED(hr_stream))
+				hr = m_pWICFactory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+			else
+				hr = hr_stream;
 
 			if (SUCCEEDED(hr))
 			{
-				encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+				HRESULT hr_enc = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
 
 				ComPtr<IWICBitmapFrameEncode> frame;
-				encoder->CreateNewFrame(&frame, nullptr);
-				frame->Initialize(nullptr);
-				frame->SetSize(width, height);
+				if (SUCCEEDED(hr_enc))
+					hr_enc = encoder->CreateNewFrame(&frame, nullptr);
+				if (SUCCEEDED(hr_enc))
+					hr_enc = frame->Initialize(nullptr);
+				if (SUCCEEDED(hr_enc))
+					hr_enc = frame->SetSize(width, height);
 
-				WICPixelFormatGUID fmt = GUID_WICPixelFormat32bppBGRA;
-				frame->SetPixelFormat(&fmt);
-				frame->WriteSource(wicBmp.Get(), nullptr);
-				frame->Commit();
-				encoder->Commit();
+				if (SUCCEEDED(hr_enc))
+				{
+					WICPixelFormatGUID fmt = GUID_WICPixelFormat32bppBGRA;
+					hr_enc = frame->SetPixelFormat(&fmt);
+					if (SUCCEEDED(hr_enc))
+						hr_enc = frame->WriteSource(wicBmp.Get(), nullptr);
+					if (SUCCEEDED(hr_enc))
+						hr_enc = frame->Commit();
+					if (SUCCEEDED(hr_enc))
+						hr_enc = encoder->Commit();
+				}
 
 				// 스트림에서 PNG 데이터를 별도 HGLOBAL에 복사
-				HGLOBAL hStreamMem = nullptr;
-				GetHGlobalFromStream(stream.Get(), &hStreamMem);
-
-				if (hStreamMem)
+				if (SUCCEEDED(hr_enc))
 				{
-					STATSTG st = {};
-					stream->Stat(&st, STATFLAG_NONAME);
-					SIZE_T pngSize = (SIZE_T)st.cbSize.QuadPart;
+					HGLOBAL hStreamMem = nullptr;
+					HRESULT hr_get = GetHGlobalFromStream(stream.Get(), &hStreamMem);
 
-					if (pngSize > 0)
+					if (SUCCEEDED(hr_get) && hStreamMem)
 					{
-						hPng = GlobalAlloc(GMEM_MOVEABLE, pngSize);
-						if (hPng)
+						STATSTG st = {};
+						HRESULT hr_stat = stream->Stat(&st, STATFLAG_NONAME);
+						SIZE_T pngSize = SUCCEEDED(hr_stat) ? (SIZE_T)st.cbSize.QuadPart : 0;
+
+						if (pngSize > 0)
 						{
-							void* pSrc = GlobalLock(hStreamMem);
-							void* pDst = GlobalLock(hPng);
-							memcpy(pDst, pSrc, pngSize);
-							GlobalUnlock(hPng);
-							GlobalUnlock(hStreamMem);
+							hPng = GlobalAlloc(GMEM_MOVEABLE, pngSize);
+							if (hPng)
+							{
+								void* pSrc = GlobalLock(hStreamMem);
+								void* pDst = GlobalLock(hPng);
+								if (pSrc && pDst)
+								{
+									memcpy(pDst, pSrc, pngSize);
+								}
+								if (pDst) GlobalUnlock(hPng);
+								if (pSrc) GlobalUnlock(hStreamMem);
+								if (!pSrc || !pDst)
+								{
+									GlobalFree(hPng);
+									hPng = nullptr;
+								}
+							}
 						}
 					}
 				}
@@ -3068,19 +3146,31 @@ bool CSCD2Image::copy_to_clipboard(int index)
 	}
 
 	// 7.5) CF_DIB (legacy) 생성 — BITMAPINFOHEADER + BI_RGB + 24bpp BGR + bottom-up.
-	//Jasc Paint Shop Pro 등 구형 툴은 CF_DIBV5(BI_BITFIELDS + top-down)를 제대로 못 읽고 크래시.
-	//Windows auto-synthesis CF_DIB 는 V5 의 compression·방향을 상속하므로 synthesis 오버라이드용 CF_DIB 를 명시 발행.
-	//32bpp BI_RGB 로 시도했으나 PSP 가 "high byte undefined" 스펙을 엄격히 적용해 alpha 를 0 으로 강제 초기화(→이미지가 완전 투명).
-	//legacy 경로는 알파 없는 24bpp BGR 이 가장 안전. 알파가 필요한 앱은 PNG 경로(Photoshop, Chrome, Paint.NET)로 빠지므로 실손 없음.
+	//PSP 는 PNG 클립보드 포맷을 인식 못함. CF_DIBV5 또는 CF_DIB 만 받음.
+	//OS auto-synthesis 로 만들어지는 CF_DIB 도 V5 의 BGR(=흰색, 5.5 단계에서 채움) 을 픽업하므로 검정 회피되지만,
+	//명시적으로 24bpp CF_DIB 를 발행해 PSP 가 어느 포맷을 픽업하든 일관되게 흰색 표시되도록 보장.
+	//알파 보존 자체는 V5 (alpha mask) 와 PNG 에서 담당.
 	HGLOBAL hDib = nullptr;
 	{
-		const UINT dibStride = ((width * 3 + 3) & ~3u);   // 24bpp, DWORD align
-		const UINT dibImageSize = dibStride * height;
-		const UINT dibTotal = sizeof(BITMAPINFOHEADER) + dibImageSize;
+		//정수 오버플로우 방지 — SIZE_T 로 곱셈 후 UINT_MAX 한도 검증.
+		const size_t dibStride64 = ((static_cast<size_t>(width) * 3 + 3) & ~static_cast<size_t>(3));
+		const size_t dibImageSize64 = dibStride64 * height;
+		if (dibStride64 <= UINT_MAX && dibImageSize64 <= UINT_MAX)
+		{
+		const UINT dibStride = (UINT)dibStride64;
+		const UINT dibImageSize = (UINT)dibImageSize64;
+		const size_t dibTotal = sizeof(BITMAPINFOHEADER) + (size_t)dibImageSize;
 		hDib = GlobalAlloc(GHND, dibTotal);
 		if (hDib)
 		{
 			BYTE* pData = (BYTE*)GlobalLock(hDib);
+			if (!pData)
+			{
+				GlobalFree(hDib);
+				hDib = nullptr;
+			}
+			else
+			{
 			BITMAPINFOHEADER* pbi = (BITMAPINFOHEADER*)pData;
 			ZeroMemory(pbi, sizeof(*pbi));
 			pbi->biSize = sizeof(BITMAPINFOHEADER);
@@ -3092,6 +3182,10 @@ bool CSCD2Image::copy_to_clipboard(int index)
 			pbi->biSizeImage = dibImageSize;
 
 			//pixels(top-down, 32bpp BGRA)에서 24bpp BGR 로 채널 축소 + bottom-up 저장.
+			//알파를 이용해 흰 배경 합성: out = (src*a + 255*(255-a)) / 255.
+			//a=0 (투명) → 255(white), a=255 (불투명) → src 원색, 부분 알파 → 흰 배경에 블렌드.
+			//그림자·안티앨리어싱 가장자리 등 부분 알파 픽셀의 un-premult BGR 이 어두워 PSP 가 검정 그림자로 표시되던 문제 해결.
+			//V5/PNG 는 알파 채널 그대로 보존되므로 PowerPoint·Photoshop 등 alpha-aware 앱에는 영향 없음.
 			BYTE* dst = pData + sizeof(BITMAPINFOHEADER);
 			for (UINT y = 0; y < height; ++y)
 			{
@@ -3099,20 +3193,26 @@ bool CSCD2Image::copy_to_clipboard(int index)
 				BYTE* d = dst + y * dibStride;
 				for (UINT x = 0; x < width; ++x)
 				{
-					d[0] = src[0]; // B
-					d[1] = src[1]; // G
-					d[2] = src[2]; // R
+					BYTE a = src[3];
+					BYTE inv = (BYTE)(255 - a);
+					d[0] = (BYTE)((src[0] * a + 255 * inv) / 255); // B
+					d[1] = (BYTE)((src[1] * a + 255 * inv) / 255); // G
+					d[2] = (BYTE)((src[2] * a + 255 * inv) / 255); // R
 					d += 3;
 					src += 4;
 				}
-				//DWORD padding 은 GHND zero-init 로 이미 0.
 			}
 
 			GlobalUnlock(hDib);
+				}
+			}
 		}
 	}
 
 	// 8) 클립보드 등록
+	//CF_DIBV5: alpha-aware 앱 (PowerPoint, Photoshop) 에서 알파 인식.
+	//CF_DIB: PSP 등 PNG 미인식 + alpha 무시 앱에서 흰색 배경으로 표시 (a=0 픽셀의 BGR=255).
+	//PNG: Photoshop, Chrome 등에서 무손실 알파 인식.
 	if (!OpenClipboard(nullptr))
 	{
 		GlobalFree(hDibv5);
@@ -3133,7 +3233,7 @@ bool CSCD2Image::copy_to_clipboard(int index)
 		return false;
 	}
 
-	// CF_DIB 등록 (legacy 호환; Paint Shop Pro 등)
+	// CF_DIB 등록 (PSP 등 legacy 호환)
 	if (hDib)
 	{
 		if (!SetClipboardData(CF_DIB, hDib))

@@ -114,7 +114,26 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 
 	dst.m_margin = m_margin;
 
-	dst.m_header_images.assign(m_header_images.begin(), m_header_images.end());
+	//Deep copy — shallow assign 시 dst/src 양쪽 소멸자에서 같은 포인터 두 번 delete 로 crash.
+	for (auto* src_img : dst.m_header_images)
+	{
+		if (src_img)
+			delete src_img;
+	}
+	dst.m_header_images.clear();
+	for (auto* src_img : m_header_images)
+	{
+		if (src_img)
+		{
+			CSCGdiplusBitmap* new_img = new CSCGdiplusBitmap();
+			src_img->deep_copy(new_img);
+			dst.m_header_images.push_back(new_img);
+		}
+		else
+		{
+			dst.m_header_images.push_back(nullptr);
+		}
+	}
 
 	dst.m_image_left_align_fix = m_image_left_align_fix;
 	dst.m_use_tooltip = m_use_tooltip;

@@ -7,10 +7,12 @@
 
 #include <afxdialogex.h>
 
+#include <atomic>
 #include <deque>
 #include "../colors.h"
 #include "../SCGdiplusBitmap.h"
-#include "../thread/ThreadManager.h"
+#include "../thread/CSCThread/SCThread.h"
+#include "../thread/CSCThreadGroup/SCThreadGroup.h"
 #include "../CEdit/SCEdit/SCEdit.h"
 
 
@@ -302,16 +304,12 @@ protected:
 	CPoint			m_pt_old;
 
 //로딩 관련
-	bool			m_loading_completed = false;
-	int				m_loading_completed_count = 0;
-	CThreadManager	m_thread;
-	long			m_tloading_start = 0;
-	long			m_tloading_end = 0;
-	static void		loading_function(int idx, int start, int end);
-	static void		loading_completed_callback();
-	void			on_loading_completed();
-
-	bool			m_stop_loading = false;			//loading thread를 강제로 종료시킬 경우(loading중에 앱을 종료시키는 경우)
+	bool				m_loading_completed = false;
+	std::atomic<int>	m_loading_completed_count{ 0 };
+	CSCThreadGroup		m_thread;
+	long				m_tloading_start = 0;
+	long				m_tloading_end = 0;
+	void				on_loading_completed();
 
 //폰트 관련
 	LOGFONT			m_lf;

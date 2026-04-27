@@ -6939,12 +6939,15 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				float font_size,
 				int font_weight,
 				Gdiplus::Color cr_text,
+				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
+				Gdiplus::Color cr_back,
+				float stroke_width,
 				UINT align,
 				bool show_text,
 				bool show_shadow)
 {
-	return draw_text(d2dc, D2D1::RectF(rTarget.left, rTarget.top, rTarget.right, rTarget.bottom), text, font_name, font_size, font_weight, cr_text, cr_shadow, align, show_text, show_shadow);
+	return draw_text(d2dc, D2D1::RectF(rTarget.left, rTarget.top, rTarget.right, rTarget.bottom), text, font_name, font_size, font_weight, cr_text, cr_stroke, cr_shadow, cr_back, stroke_width, align, show_text, show_shadow);
 }
 
 CRect draw_text(ID2D1DeviceContext* d2dc,
@@ -6954,12 +6957,15 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				float font_size,
 				int font_weight,
 				Gdiplus::Color cr_text,
+				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
+				Gdiplus::Color cr_back,
+				float stroke_width,
 				UINT align,
 				bool show_text,
 				bool show_shadow)
 {
-	return draw_text(d2dc, D2D1::RectF(rTarget.X, rTarget.Y, rTarget.GetRight(), rTarget.GetBottom()), text, font_name, font_size, font_weight, cr_text, cr_shadow, align, show_text, show_shadow);
+	return draw_text(d2dc, D2D1::RectF(rTarget.X, rTarget.Y, rTarget.GetRight(), rTarget.GetBottom()), text, font_name, font_size, font_weight, cr_text, cr_stroke, cr_shadow, cr_back, stroke_width, align, show_text, show_shadow);
 }
 
 CRect draw_text(ID2D1DeviceContext* d2dc,
@@ -6969,7 +6975,10 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				float font_size,
 				int font_weight,
 				Gdiplus::Color cr_text,
+				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
+				Gdiplus::Color cr_back,
+				float stroke_width,
 				UINT align,
 				bool show_text,
 				bool show_shadow)
@@ -7057,6 +7066,14 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	//CRect text_rect(textMetrics.left, textMetrics.top, textMetrics.left + textMetrics.width, textMetrics.top + textMetrics.height);
 	CRect text_rect(x, y, x + tm.widthIncludingTrailingWhitespace, y + tm.height);
 
+	if (cr_back.GetA() > 0)
+	{
+		ID2D1SolidColorBrush* back_brush = NULL;
+		d2dc->CreateSolidColorBrush(get_d2color(cr_back), &back_brush);
+		if (back_brush)
+			d2dc->FillRectangle(D2D1::RectF(x, y, x + tm.widthIncludingTrailingWhitespace, y + tm.height), back_brush);
+	}
+
 	if (show_shadow)
 	{
 		//ID2D1BitmapRenderTarget* textRenderTarget;
@@ -7100,6 +7117,27 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 			shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 0.5f + i * 1.6f);
 			// 실제 월드 좌표에 padding 오프셋을 빼서 정확한 위치에 배치
 			d2dc->DrawImage(shadow.Get(), D2D1::Point2F(x - padding, y - padding));
+		}
+	}
+
+	//stroke (글자 외곽선) — 8 방향 offset 으로 stroke_brush 텍스트를 깔고 그 위에 본문 텍스트.
+	//진짜 glyph outline 보다 가벼우면서 thin stroke (1~2px) 에서 시각적으로 동등.
+	if (stroke_width > 0.0f && cr_stroke.GetA() > 0)
+	{
+		ID2D1SolidColorBrush* stroke_brush = NULL;
+		d2dc->CreateSolidColorBrush(get_d2color(cr_stroke), &stroke_brush);
+		if (stroke_brush)
+		{
+			const int s = (stroke_width < 1.0f) ? 1 : int(stroke_width + 0.5f);
+			const float ty = y - (lines[0].height - lines[0].baseline) * 0.5f - 1.0f;
+			const float tx = x - 1.0f;
+			for (int dy = -s; dy <= s; dy++)
+				for (int dx = -s; dx <= s; dx++)
+				{
+					if (dx == 0 && dy == 0)
+						continue;
+					d2dc->DrawTextLayout(D2D1::Point2F(tx + dx, ty + dy), text_layout, stroke_brush);
+				}
 		}
 	}
 
@@ -7191,7 +7229,7 @@ void draw_line(CDC* pDC, int x1, int y1, int x2, int y2, COLORREF cr, int thick,
 	pDC->SetROP2(nOldDrawMode);
 }
 
-void draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode)
+void draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick, Gdiplus::DashStyle pen_style, int draw_mode, Gdiplus::LineCap line_cap)
 {
 	//Gdiplus::Graphics g(pDC->m_hDC);
 
@@ -7200,6 +7238,11 @@ void draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Co
 
 	Gdiplus::Pen pen(cr, thick);
 	pen.SetDashStyle(pen_style);
+	if (line_cap != Gdiplus::LineCapFlat)
+	{
+		pen.SetStartCap(line_cap);
+		pen.SetEndCap(line_cap);
+	}
 
 	g.DrawLine(&pen, x1, y1, x2, y2);
 }

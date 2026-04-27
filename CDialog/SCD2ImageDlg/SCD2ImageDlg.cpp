@@ -290,7 +290,7 @@ void CSCD2ImageDlg::OnPaint()
 		//draw_text()를 사용하면 간편할수는 있으나 이 함수안에서는 OnPaint()가 호출될 때마다 계속 객체를 생성, 해제하는 액션을 수행하므로 부담을 줄 수 있다.
 		//기존처럼 이미 만들어진 인스턴스들에 대해 속성만 변경한 후 사용하는 것이 더 경제적일 수 있다.
 		//대신 draw_text에서는 라인 간격도 조정 가능하다.
-		draw_text(d2dc, rText, info_str, _T("맑은 고딕"), 14.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
+		draw_text(d2dc, rText, info_str, _T("맑은 고딕"), 14.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Transparent, Gdiplus::Color::Black, Gdiplus::Color::Transparent, 0.0f, DT_LEFT | DT_TOP);
 	}
 
 	//dc에 그릴 경우 d2devicecontext가 그려지고 dc에 그려지므로 깜빡임이 발생한다.
@@ -305,7 +305,7 @@ void CSCD2ImageDlg::OnPaint()
 		rText.top = rText.bottom - 14;
 
 		//shadow 파라미터까지 추가된 함수 이용 코드
-		draw_text(d2dc, rText, pixel_pos, _T("맑은 고딕"), 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Black, DT_RIGHT | DT_TOP);
+		draw_text(d2dc, rText, pixel_pos, _T("맑은 고딕"), 12.0f, DWRITE_FONT_WEIGHT_NORMAL, Gdiplus::Color::White, Gdiplus::Color::Transparent, Gdiplus::Color::Black, Gdiplus::Color::Transparent, 0.0f, DT_RIGHT | DT_TOP);
 	}
 
 	if (m_enable_roi)
@@ -362,15 +362,15 @@ void CSCD2ImageDlg::OnPaint()
 
 				//lt coord
 				str.Format(_T("%.0f, %.0f"), image_roi.X, image_roi.Y);
-				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_LEFT | DT_TOP);
+				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Transparent, Gdiplus::Color::Black, Gdiplus::Color::Transparent, 0.0f, DT_LEFT | DT_TOP);
 
 				//rb coord
 				str.Format(_T("%.0f, %.0f"), image_roi.X + image_roi.Width, image_roi.Y + image_roi.Height);
-				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_RIGHT | DT_BOTTOM);
+				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Transparent, Gdiplus::Color::Black, Gdiplus::Color::Transparent, 0.0f, DT_RIGHT | DT_BOTTOM);
 
 				//size info
 				str.Format(_T("%.0f x %.0f"), image_roi.Width, image_roi.Height);
-				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Black, DT_CENTER | DT_VCENTER);
+				draw_text(d2dc, screen_roi, str, _T("맑은 고딕"), 12.0f, FW_NORMAL, Gdiplus::Color::Ivory, Gdiplus::Color::Transparent, Gdiplus::Color::Black, Gdiplus::Color::Transparent, 0.0f, DT_CENTER | DT_VCENTER);
 			}
 		}
 	}

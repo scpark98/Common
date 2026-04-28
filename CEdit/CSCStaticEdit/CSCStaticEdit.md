@@ -198,6 +198,36 @@ void  set_text_align(DWORD align = DT_LEFT);     // DT_LEFT / DT_CENTER / DT_RIG
 void  set_use_updown_key(bool use = true, float interval = 1.0f);
 ```
 
+### Action 버튼 (우측 아이콘)
+
+오른쪽에 작은 아이콘 버튼을 그려 다양한 보조 액션을 수행. 별도 `CButton` 없이 `OnPaint` / 마우스 캡처로 구현.
+
+```cpp
+enum action_button_type
+{
+    action_none = 0,
+    action_copy,            // 클립보드로 복사 (자체 처리)
+    action_clear,           // 텍스트 전체 지움 (자체 처리)
+    action_find,            // 돋보기. parent 가 message_scstaticedit_action_button 수신해 처리
+    action_password_toggle, // 패스워드 보이기/감추기. password 모드와 연동
+};
+
+void                set_action_button(action_button_type action = action_copy);
+action_button_type  get_action_button() const;
+bool                has_action_button() const;
+```
+
+`action_find` 등 parent 처리가 필요한 action 은 `Message_CSCStaticEdit` 의 `message_scstaticedit_action_button` 으로 알림이 오므로 위 *EN_CHANGE → 메시지 전환 예시* 의 핸들러에 case 추가:
+
+```cpp
+case CSCStaticEdit::message_scstaticedit_action_button:
+    if (m_edit.get_action_button() == CSCStaticEdit::action_find)
+    {
+        // 검색 다이얼로그 열기 등
+    }
+    break;
+```
+
 ### 선택
 
 ```cpp

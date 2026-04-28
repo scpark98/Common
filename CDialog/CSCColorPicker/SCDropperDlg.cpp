@@ -1,6 +1,7 @@
 ﻿// SCDropperDlg.cpp
 #include "SCDropperDlg.h"
 #include "../../Functions.h"
+#include "../../cursor_helpers.h"
 
 IMPLEMENT_DYNAMIC(CSCDropperDlg, CDialog)
 
@@ -114,7 +115,7 @@ bool CSCDropperDlg::create(CWnd* parent)
 	}
 
 	SetTimer(kTimerID, 16, nullptr);
-	SetCursor(LoadCursor(nullptr, IDC_CROSS));
+	SetCursor(get_thin_cross_cursor());
 	return true;
 }
 
@@ -252,6 +253,8 @@ void CSCDropperDlg::OnLButtonDown(UINT /*nFlags*/, CPoint /*point*/)
 		GetBValue(m_center_color));
 	m_picked = true;
 
+	copy_to_clipboard(m_hWnd, get_color_str(m_center_color));
+
 	save_settings();
 	KillTimer(kTimerID);
 	DestroyWindow();
@@ -264,6 +267,39 @@ void CSCDropperDlg::OnKeyDown(UINT nChar, UINT /*nRepCnt*/, UINT /*nFlags*/)
 		save_settings();
 		KillTimer(kTimerID);
 		DestroyWindow();
+		return;
+	}
+
+	if (nChar == VK_LEFT || nChar == VK_RIGHT || nChar == VK_UP || nChar == VK_DOWN)
+	{
+		const int step = (IsShiftPressed() ? 8 : 1);
+		CPoint pt;
+		GetCursorPos(&pt);
+		switch (nChar)
+		{
+			case VK_LEFT:
+				pt.x -= step;
+				break;
+			case VK_RIGHT:
+				pt.x += step;
+				break;
+			case VK_UP:
+				pt.y -= step;
+				break;
+			case VK_DOWN:
+				pt.y += step;
+				break;
+		}
+
+		const int vx = ::GetSystemMetrics(SM_XVIRTUALSCREEN);
+		const int vy = ::GetSystemMetrics(SM_YVIRTUALSCREEN);
+		const int vw = ::GetSystemMetrics(SM_CXVIRTUALSCREEN);
+		const int vh = ::GetSystemMetrics(SM_CYVIRTUALSCREEN);
+		pt.x = max(vx, min(vx + vw - 1, pt.x));
+		pt.y = max(vy, min(vy + vh - 1, pt.y));
+
+		SetCursorPos(pt.x, pt.y);
+		update_display();
 	}
 }
 

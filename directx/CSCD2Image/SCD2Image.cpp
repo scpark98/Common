@@ -297,6 +297,21 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	m_frame_delay.clear();
 	m_img_origin_for_back_transparency.Reset();
 
+	//get_alpha_pixel_count() 가 m_data 를 스캔하므로 raw-data load 경로에서도 m_data 를 채워둔다.
+	//4채널 입력만 복사 (다른 채널은 alpha 채널 없음 → 카운트 0 이라 zigzag 무관).
+	if (m_data)
+	{
+		delete[] m_data;
+		m_data = nullptr;
+	}
+	m_alpha_pixel_count = -1;
+	if (channel == 4 && data && width > 0 && height > 0)
+	{
+		const size_t bufferSize = size_t(width) * size_t(height) * 4;
+		m_data = new uint8_t[bufferSize];
+		memcpy(m_data, data, bufferSize);
+	}
+
 	IWICBitmap* pWicBitmap = NULL;
 	IWICFormatConverter* pFormatConverter = NULL;
 	ComPtr<ID2D1Bitmap1> img;
@@ -1261,6 +1276,24 @@ void CSCD2Image::copy(CSCD2Image* dst)
 
 	dst->m_pixel_format_str = m_pixel_format_str;
 	dst->m_alpha_pixel_count = m_alpha_pixel_count;
+
+	//m_data 깊은 복사. get_alpha_pixel_count() 가 dst 에서도 정상 동작하려면 필요.
+	if (dst->m_data)
+	{
+		delete[] dst->m_data;
+		dst->m_data = nullptr;
+	}
+	if (m_data)
+	{
+		const int w = (int)get_width();
+		const int h = (int)get_height();
+		if (w > 0 && h > 0)
+		{
+			const size_t bufferSize = size_t(w) * size_t(h) * 4;
+			dst->m_data = new uint8_t[bufferSize];
+			memcpy(dst->m_data, m_data, bufferSize);
+		}
+	}
 
 	memcpy(&(dst->m_exif_info), &m_exif_info, sizeof(CSCEXIFInfo));
 

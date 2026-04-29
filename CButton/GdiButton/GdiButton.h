@@ -405,8 +405,10 @@ public:
 	void		draw_back_shadow(bool draw = true, float shadow_weight = 1.0f, float blur_sigma = 4.0f);
 
 //blink
-	void		set_blink_time(int nTime0 = 400, int nTime1 = 1200);	//nTime0:hidden, nTime1:shown
-	void		set_blink(bool blink = true);
+	//time0:show time, time1:hidden time
+	void		set_blink_time(int time0 = 1000, int time1 = 300);
+	//time0:show time, time1:hidden time
+	void		set_blink(bool blink = true, int time0 = 1000, int time1 = 300);
 
 //tooltip
 	//기본적인 툴팁은 이 컨트롤 내에서 지원하지만

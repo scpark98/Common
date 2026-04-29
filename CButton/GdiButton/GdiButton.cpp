@@ -1493,7 +1493,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	CSize sz_text = dc.GetTextExtent(text);
 
 	//m_img_header 유무에 따라 텍스트 정렬도 재정의된다.
-	if (m_img_header.is_valid())
+	if (m_img_header.is_valid() && !m_blink_status)
 	{
 		int x, y;
 		int gap = m_img_header_gap;	//header image와 text사이의 간격. 이미지의 여백 정도에 따라 다르게 표시될 수 있다. 이미지의 여백까지 검사해서 정해져야 정확하다.
@@ -1550,7 +1550,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		draw_line(&dc, cp.x + 4, cp.y - 4, cp.x, cp.y, GRAY128, 2);
 	}
 
-	dc.DrawText(text, rText, dwText);
+	if (!m_blink_status)
+		dc.DrawText(text, rText, dwText);
+
 	dc.SelectObject(pOldFont);
 }
 
@@ -1637,8 +1639,10 @@ void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	if (nIDEvent == timer_blink)
 	{
+		//버튼 통째로 깜빡이면 좀 산만하다. 텍스트만 깜빡이자.
 		m_blink_status = !m_blink_status;
-		ShowWindow(m_blink_status ? SW_SHOW : SW_HIDE);
+		Invalidate();
+		//ShowWindow(m_blink_status ? SW_SHOW : SW_HIDE);
 
 		KillTimer(timer_blink);
 
@@ -1882,31 +1886,34 @@ LRESULT CGdiButton::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 	return CButton::WindowProc(message, wParam, lParam);
 }
 
-void CGdiButton::set_blink_time(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
+void CGdiButton::set_blink_time(int time0, int time1)
 {
 	KillTimer(timer_blink);
 
-	m_blink_time0		= nTime0;
-	m_blink_time1		= nTime1;
+	m_blink_time0 = time0;
+	m_blink_time1 = time1;
 
 	set_blink(m_blink);
 }
 
-void CGdiButton::set_blink(bool blink /*= TRUE*/)
+void CGdiButton::set_blink(bool blink, int time0, int time1)
 {
+	KillTimer(timer_blink);
+
 	m_blink = blink;
 	m_blink_status = FALSE;
 
 	if (m_blink)
 	{
+		m_blink_time0 = time0;
+		m_blink_time1 = time1;
+
 		SetTimer(timer_blink, m_blink_time0, NULL);
 	}
 	else
 	{
 		m_blink = false;
-		KillTimer(timer_blink);
-		ShowWindow(SW_SHOW);
-		//update_surface();
+		Invalidate();
 	}
 }
 

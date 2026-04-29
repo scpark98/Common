@@ -252,6 +252,11 @@ COLORREF		get_color(COLORREF cr1, COLORREF cr2, double ratio);
 Gdiplus::Color	get_color(Gdiplus::Color cr1, Gdiplus::Color cr2, double ratio);
 Gdiplus::Color	get_color(COLORREF rgb);
 
+//기준색보다 밝거나 어두운 색을 리턴한다.
+//기준색이 밝은색 계열이면 그보다 offset만큼 좀 더 어두운 색을,
+//기준색이 어두운 계열이면 그보다 offset만큼 좀 더 밝은 색을 리턴한다.
+Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset = 32);
+
 //컬러 이름으로 Gdiplus::Color를 리턴한다. 대소문자를 구분하지 않으며 이름이 없으면 검정색을 리턴한다.
 //get_color("red") 또는 get_color(_T("Red")) -> Gdiplus::Color(255, 255, 0, 0);
 Gdiplus::Color	get_color(CString cr_str);
@@ -350,6 +355,9 @@ Gdiplus::Color	lerp_color(Gdiplus::Color a, Gdiplus::Color b, float t);
 
 //주어진 컬러와 가장 유사한 표준색의 이름을 리턴.
 CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = nullptr);
+
+//alpha까지 고려하여 컬러의 밝기값을 리턴한다.
+byte			get_luminance(Gdiplus::Color cr);
 
 Gdiplus::Color	get_sys_color(int index);
 #ifndef _USING_V110_SDK71_

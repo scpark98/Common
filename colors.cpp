@@ -286,6 +286,26 @@ Gdiplus::Color get_color(COLORREF rgb)
 	return cr;
 }
 
+//기준색보다 밝거나 어두운 색을 리턴한다.
+//기준색이 밝은색 계열이면 그보다 offset만큼 좀 더 어두운 색을,
+//기준색이 어두운 계열이면 그보다 offset만큼 좀 더 밝은 색을 리턴한다.
+Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset)
+{
+	byte lum = get_luminance(cr);
+
+	return get_color(cr, (lum > 128) ? -offset : offset);
+}
+
+//alpha까지 고려하여 컬러의 밝기값을 리턴한다.
+byte get_luminance(Gdiplus::Color cr)
+{
+	const float a = cr.GetA() / 255.0f;
+	const BYTE R_eff = static_cast<BYTE>(cr.GetR() * a + 255.0f * (1.0f - a));
+	const BYTE G_eff = static_cast<BYTE>(cr.GetG() * a + 255.0f * (1.0f - a));
+	const BYTE B_eff = static_cast<BYTE>(cr.GetB() * a + 255.0f * (1.0f - a));
+	return get_gray_value(R_eff, G_eff, B_eff);
+}
+
 Gdiplus::Color get_color(std::string cr_name)
 {
 	return CSCColorList::get_color(cr_name);
@@ -1011,8 +1031,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	{
 		case color_theme_linkmemine :
 			cr_title_text = Gdiplus::Color::White;
-			cr_title_back_active = gRGB(97, 132, 180);
-			cr_title_back_inactive = gRGB(97, 132, 180);
+			cr_title_back_active = gRGB(24, 95, 165);// 97, 132, 180);
+			cr_title_back_inactive = gRGB(24, 95, 165);// 97, 132, 180);
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
@@ -1040,7 +1060,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 32, 32, 255);
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1075,7 +1095,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1111,7 +1131,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1147,7 +1167,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue;
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1182,7 +1202,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = Gdiplus::Color::RoyalBlue;
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1218,7 +1238,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = get_color(cr_back, 96);
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::Gray;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1253,7 +1273,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = get_color(cr_back, 96);
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::Gray;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1309,7 +1329,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1345,7 +1365,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_border_active = Gdiplus::Color::LightGray;
+			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 

@@ -12,26 +12,25 @@
   - https://github.com/scpark98/Test_SCMessageBox.git
 
   - 사용법은 아래와 같음.
-	* parent의 .h에 CSCMessageBox m_messagebox;를 선언해서 사용해도 되고
+	* parent의 .h에 CSCMessageBox m_msgbox;를 선언해서 사용해도 되고
 	  매번 사용할 때마다 인스턴스 선언 후 dlg.DoModal()을 호출해도 되지만 전자를 권장함.
-	  왜냐하면 m_messagebox.set_color_theme(CSCColorTheme::color_theme_linkmemine);과 같이 테마를 설정하면
+	  왜냐하면 m_msgbox.set_color_theme(CSCColorTheme::color_theme_linkmemine);과 같이 테마를 설정하면
 	  해당 프로젝트에서는 지정한 테마가 적용되므로 매번 테마를 설정할 필요가 없음.
 
 	1.AfxMessageBox()와 같이 Modal()로 띠울 경우
 		//OnInitDialog() 등에서 아래와 같이 생성해준 후
-		m_messagebox.create(this, _T("Title Text"), IDR_MAINFRAME);
-		m_messagebox.set_color_theme(CSCColorTheme::color_theme_linkmemine);
+		m_msgbox.create(this, _T("Title Text"), IDR_MAINFRAME);
+		m_msgbox.set_color_theme(CSCColorTheme::color_theme_linkmemine);
 		...
 		//필요한 곳에서 DoModal()로 호출해서 사용.
-		int res = m_messagebox.DoModal(_T("Test MessageBox"));	//선택된 버튼이 res로 넘어옴. if (res == MB_OK) ...
-
+		int res = m_msgbox.DoModal(_T("Test MessageBox"));	//선택된 버튼이 res로 넘어옴. if (res == MB_OK) ...
 	2.Modeless로 띠울 경우
 		//OnInitDialog() 등에서 아래와 같이 생성해준 후
-		- m_messagebox.create(this, _T("Title Text"), IDR_MAINFRAME, false);
-		- m_messagebox.set_color_theme(CSCColorTheme::color_theme_linkmemine);
+		- m_msgbox.create(this, _T("Title Text"), IDR_MAINFRAME, false);
+		- m_msgbox.set_color_theme(CSCColorTheme::color_theme_linkmemine);
 		...
 		//필요한 곳에서 set_message()로 메시지박스 표시
-		- m_messagebox.set_message(_T("Test MessageBox"), MB_OKCANCEL);	//버튼 선택값은 메시지를 통해 parent로 전달됨.
+		- m_msgbox.set_message(_T("Test MessageBox"), MB_OKCANCEL);	//버튼 선택값은 메시지를 통해 parent로 전달됨.
 	  
 	* text의 width에 따라 어느 정도까지는 자동으로 넓혀지지만 MAX에 다다르면 잘리게 되는데
 	  WORDWRAP으로 처리해보고자 했으나 로직이 많이 복잡해지므로 굳이 처리하지 않음.
@@ -149,7 +148,7 @@ protected:
 //messagebox icon
 //https://blog.naver.com/pks1217/220407691110
 	//MB_ICONSTOP, MB_ICONQUESTION, MB_ICONEXCLAMATION, MB_ICONINFORMATION
-	int				m_icon_index = 3;
+	int				m_icon_index = -1;
 	HICON			m_icons[4];
 
 //font

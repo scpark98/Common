@@ -257,7 +257,7 @@ public:
 	void			draw_border(bool draw, int thick, Gdiplus::Color cr_outline) { m_draw_border = draw; m_border_thick = thick; m_theme.cr_border_inactive = cr_outline; Invalidate(); }
 
 	void			set_blink_time(int nTime0 = 400, int nTime1 = 1200);
-	void			set_blink(BOOL bBlink = TRUE);
+	void			set_blink(bool blink = true, int time0 = 400, int time1 = 400);
 	void			set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
 
 	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수이므로 자동 설정되도록 수정함.

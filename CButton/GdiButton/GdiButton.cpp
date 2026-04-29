@@ -539,9 +539,9 @@ void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool 
 void CGdiButton::set_text_color(Gdiplus::Color normal, bool auto_color)
 {
 	if (auto_color)
-		set_text_color(normal, get_color(normal, 16), get_color(normal, -16), get_gray_color(normal));
+		set_text_color(normal, get_color(normal, 16), get_color(normal, -16), get_sys_color(COLOR_GRAYTEXT));
 	else
-		set_text_color(normal, normal, normal, get_gray_color(normal));
+		set_text_color(normal, normal, normal, get_sys_color(COLOR_GRAYTEXT));
 }
 
 void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
@@ -553,7 +553,7 @@ void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_text.push_back(down);
 
 	if (disabled.GetValue() == Gdiplus::Color::Transparent)
-		disabled = get_gray_color(normal);
+		disabled = get_sys_color(COLOR_GRAYTEXT);
 
 	m_cr_text.push_back(disabled);
 
@@ -564,9 +564,9 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_color)
 {
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
 	if (auto_color)
-		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), get_gray_color(normal));
+		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), get_sys_color(COLOR_GRAYTEXT));
 	else
-		set_back_color(normal, normal, normal, get_gray_color(normal));
+		set_back_color(normal, normal, normal, get_sys_color(COLOR_GRAYTEXT));
 }
 
 void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
@@ -585,7 +585,7 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_back.push_back(down);
 
 	if (disabled.GetValue() == Gdiplus::Color::Transparent)
-		disabled = get_gray_color(normal);
+		disabled = get_sys_color(COLOR_GRAYTEXT);
 	m_cr_back.push_back(disabled);
 
 	m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
@@ -610,7 +610,7 @@ void CGdiButton::set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, G
 	m_cr_border.push_back(down);
 
 	if (disabled.GetValue() == Gdiplus::Color::Transparent)
-		disabled = get_gray_color(normal);
+		disabled = get_sys_color(COLOR_GRAYTEXT);
 	m_cr_border.push_back(disabled);
 }
 
@@ -622,7 +622,7 @@ void CGdiButton::set_border_color(Gdiplus::Color normal, bool auto_set_color)
 	m_cr_border.push_back(normal);
 
 	if (auto_set_color)
-		m_cr_border.push_back(get_gray_color(normal));
+		m_cr_border.push_back(get_sys_color(COLOR_GRAYTEXT));
 	else
 		m_cr_border.push_back(normal);
 }
@@ -1279,8 +1279,8 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			if (check_state == BST_CHECKED)
 			{
-				g.DrawLine(&pen, Gdiplus::Point(r.left + 1, r.CenterPoint().y - 1), Gdiplus::Point(r.left + 4, r.CenterPoint().y + 3));
-				g.DrawLine(&pen, Gdiplus::Point(r.left + 4, r.CenterPoint().y + 3), Gdiplus::Point(r.right - 3, r.top + 3));
+				g.DrawLine(&pen, Gdiplus::Point(r.left + 3, r.CenterPoint().y - 2), Gdiplus::Point(r.left + 7, r.CenterPoint().y + 2));
+				g.DrawLine(&pen, Gdiplus::Point(r.left + 7, r.CenterPoint().y + 2), Gdiplus::Point(r.left + 12, r.top + 4));
 			}
 			else if (check_state == BST_INDETERMINATE)
 			{

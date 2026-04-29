@@ -343,7 +343,9 @@ public:
 	void		set_font(CFont* font);
 
 	int			GetCheck();
-	void		SetCheck(int check_state);
+	void		SetCheck(int check_state = true);
+	void		set_check(int check_state = true) { SetCheck(check_state); }
+	int			get_check() { return GetCheck(); }
 	void		Toggle();
 
 	//m_bAsStatic이 true일 경우 hover와 down에는 반응을 하지 않는다.

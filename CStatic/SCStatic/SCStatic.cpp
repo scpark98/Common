@@ -357,6 +357,14 @@ void CSCStatic::OnPaint()
 		}
 	}
 
+	if (m_draw_border)
+	{
+		//TRACE(_T("draw_border\n"));
+		if (m_round > 0)
+			draw_round_rect(&g, CRect_to_gpRect(rc), m_theme.cr_border_inactive, Gdiplus::Color::Transparent, m_round, m_border_thick);
+		else
+			draw_rect(g, rc, m_theme.cr_border_inactive);
+	}
 
 	if (m_text.IsEmpty() && m_hIcon == NULL && m_header_images.size() == 0)
 		return;
@@ -655,15 +663,6 @@ void CSCStatic::OnPaint()
 				dc.DrawText(m_text_value, rvalue, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 			}
 		}
-	}
-
-	if (m_draw_border)
-	{
-		//TRACE(_T("draw_border\n"));
-		if (m_round > 0)
-			draw_round_rect(&g, CRect_to_gpRect(rc), m_theme.cr_border_inactive, Gdiplus::Color::Transparent, m_round, m_border_thick);
-		else
-			draw_rect(g, rc, m_theme.cr_border_inactive);
 	}
 
 	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
@@ -971,10 +970,15 @@ void CSCStatic::set_blink_time(int nTime0 /*= 500*/, int nTime1 /*= 500*/)
 	set_blink(m_bBlink);
 }
 
-void CSCStatic::set_blink(BOOL bBlink /*= TRUE*/)
+void CSCStatic::set_blink(bool blink, int time0, int time1)
 {
-	m_bBlink = bBlink;
+	KillTimer(TIMER_BLINK);
+
+	m_bBlink = blink;
 	m_bBlinkStatus = FALSE;
+
+	m_nBlinkTime0 = time0;
+	m_nBlinkTime1 = time1;
 
 	if (m_bBlink)
 	{

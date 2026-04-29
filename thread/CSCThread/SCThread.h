@@ -4,12 +4,13 @@
 - https://docs.google.com/presentation/d/1DAoQ3uADiSL5pFGJF25tN0mNlVJnYzkBemAUIWsxO0A/edit?slide=id.p#slide=id.p
 - std::thread 기반 start, pause/resume, stop 기능 지원 및 현재 스레드의 상태를 정확히 관리할 수 있는 클래스
 - Common/thread/CSCThread의 cpp, h 2개 파일을 프로젝트에 추가
-- 인스턴스 생성 : CSCThread	m_thread;
 - m_thread.start([this](CSCThread& th) { thread_function(th); });
 - start(), pause(), resume(), stop(), is_running(), is_stopped(), is_paused() 등의 멤버함수로 제어 또는 상태 확인
 
 - .h에 함수 선언.
 	public:
+		CSCThread	m_thread;
+
 		void		thread_function(int index, CSCThread& th);
 		static		constexpr UINT WM_APP_UI_INVOKE = WM_APP + 2;
 		afx_msg		LRESULT on_ui_invoke(WPARAM wParam, LPARAM lParam);

@@ -1792,32 +1792,53 @@ void CSCStaticEdit::draw_action_icon_find(Gdiplus::Graphics& g)
 
 void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 {
-	// 눈 모양: ellipse 외곽 + 가운데 동공. password 모드 ON 이면 슬래시 덧그림.
-	Gdiplus::Color cr_stroke = m_action_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray;
+	// 아몬드(렌즈) 형 눈 외곽: 상/하 cubic bezier 두 개로 양 끝이 뾰족한 아이라인을 그린다.
+	// 가운데 원형 동공. password 모드 ON 이면 우상→좌하 슬래시 덧그림.
+	Gdiplus::Color cr_stroke = get_weak_color(m_theme.cr_back, 48);// m_theme.cr_text_dim;// m_action_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray;
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
 	int eye_w = m_r_action_button.Width()  - 2;
-	int eye_h = max(4, m_r_action_button.Height() / 2);
+	int eye_h = max(8, (m_r_action_button.Height() * 4) / 5);
 	int eye_x = m_r_action_button.left + 1;
 	int eye_y = m_r_action_button.top  + (m_r_action_button.Height() - eye_h) / 2;
 
-	Gdiplus::Pen pen(cr_stroke, 1.2f);
+	float left   = (float)eye_x;
+	float right  = (float)(eye_x + eye_w - 1);
+	float top    = (float)eye_y;
+	float bottom = (float)(eye_y + eye_h - 1);
+	float mid_y  = (top + bottom) * 0.5f;
+	float bow    = eye_w * 0.25f;
+
+	Gdiplus::Pen pen(cr_stroke, 1.8f);
 	pen.SetStartCap(Gdiplus::LineCapRound);
 	pen.SetEndCap  (Gdiplus::LineCapRound);
 
-	g.DrawEllipse(&pen, eye_x, eye_y, eye_w - 1, eye_h - 1);
+	// 위쪽 곡선
+	g.DrawBezier(&pen,
+		Gdiplus::PointF(left,        mid_y),
+		Gdiplus::PointF(left + bow,  top),
+		Gdiplus::PointF(right - bow, top),
+		Gdiplus::PointF(right,       mid_y));
+	// 아래쪽 곡선
+	g.DrawBezier(&pen,
+		Gdiplus::PointF(left,        mid_y),
+		Gdiplus::PointF(left + bow,  bottom),
+		Gdiplus::PointF(right - bow, bottom),
+		Gdiplus::PointF(right,       mid_y));
 
-	int pupil = max(2, eye_h / 2);
-	Gdiplus::SolidBrush br_pupil(cr_stroke);
-	g.FillEllipse(&br_pupil,
-		eye_x + (eye_w - pupil) / 2,
-		eye_y + (eye_h - pupil) / 2,
+	// 동공: 눈 높이의 절반 크기 원, 중앙 정렬
+	// 동공 작게 + 외곽선만(ring) 으로 그려 실제 눈처럼 보이는 무서움 완화
+	float pupil = (float)max(3, eye_h / 3);
+	Gdiplus::Pen pen_pupil(cr_stroke, 1.8f);
+	g.DrawEllipse(&pen_pupil,
+		(left + right) * 0.5f - pupil * 0.5f,
+		mid_y - pupil * 0.5f,
 		pupil, pupil);
 
 	if (m_password)
 	{
-		Gdiplus::Pen pen_slash(cr_stroke, 1.5f);
+		Gdiplus::Pen pen_slash(cr_stroke, 1.8f);
 		pen_slash.SetStartCap(Gdiplus::LineCapRound);
 		pen_slash.SetEndCap  (Gdiplus::LineCapRound);
 		g.DrawLine(&pen_slash,

@@ -5,7 +5,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 
-#define MIN_SIZE_CX	320
+#define MIN_SIZE_CX	240
 #define MAX_SIZE_CX	800
 #define MIN_SIZE_CY	160
 
@@ -105,9 +105,25 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	if (!res)
 		return false;
 
-	dwStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
-	dwStyle &= ~(WS_CAPTION);
-	SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
+	dwStyle = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
+
+	//캡션 + 모든 테두리 제거
+	dwStyle &= ~(WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_DLGFRAME);
+	//dwStyle |= WS_THICKFRAME; //resize를 지원할 필요가 없을 경우는 주석처리한다.
+	::SetWindowLongPtr(m_hWnd, GWL_STYLE, dwStyle);
+
+	//반드시 필요 (프레임 다시 계산)
+	::SetWindowPos(m_hWnd, nullptr, 0, 0, 0, 0,
+		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+		SWP_NOACTIVATE | SWP_FRAMECHANGED);
+
+	//캡션바를 제거해도 직사각이 아닌 윈11처럼 라운드 모양으로.
+	//XP에서는 지원되지 않을것이다.
+#ifndef _USING_V110_SDK71_
+	DWORD corner = DWMWCP_ROUND;
+	DwmSetWindowAttribute(m_hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+#endif
+
 
 	CRect rc;
 	GetClientRect(rc);
@@ -476,7 +492,7 @@ void CSCMessageBox::set_color_theme(int theme)
 	{
 		if (m_button[i].m_hWnd)
 		{
-			m_button[i].set_text_color(m_theme.cr_text);
+			m_button[i].set_text_color(m_theme.cr_title_text);
 			m_button[i].set_back_color(m_theme.cr_title_back_inactive);
 			m_button[i].set_parent_back_color(m_theme.cr_back);
 			m_button[i].set_hover_back_color(m_theme.cr_title_back_active);

@@ -1,0 +1,23 @@
+* text=auto
+
+# --- encoding/EOL hardening (added 2026-04-29) ---
+# Source files: forced CRLF + treated as text. UTF-8 BOM is stored as-is in working tree.
+*.cpp     text eol=crlf
+*.h       text eol=crlf
+*.hpp     text eol=crlf
+*.c       text eol=crlf
+*.cc      text eol=crlf
+*.cxx     text eol=crlf
+*.inl     text eol=crlf
+*.ipp     text eol=crlf
+# .rc/.rc2 are UTF-16 LE; mark non-text so git does NOT do EOL normalization (would corrupt UTF-16).
+*.rc      -text
+*.rc2     -text
+*.aps     -text
+# Resource binaries
+*.ico     binary
+*.png     binary
+*.jpg     binary
+*.bmp     binary
+*.gif     binary
+*.cur     binary

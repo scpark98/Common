@@ -4120,7 +4120,7 @@ bool SaveRawDataToBmp(CString sBmpFile, BYTE* pData, int w, int h, int ch)
 {
 	CFile file;
 
-	//정수 오버플로우 방지 — 음수 / 비현실적 크기 차단.
+	//정수 오버플로우 방지 ? 음수 / 비현실적 크기 차단.
 	if (w <= 0 || h <= 0 || ch <= 0 || ch > 4)
 		return false;
 	const size_t pixel_count = static_cast<size_t>(w) * h * ch;
@@ -5499,7 +5499,7 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 			continue;
 		}
 
-		//심볼릭 링크 / junction / mount point 차단 — junction 사이클로 무한 재귀 방지.
+		//심볼릭 링크 / junction / mount point 차단 ? junction 사이클로 무한 재귀 방지.
 		if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
 			continue;
 
@@ -7120,7 +7120,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		}
 	}
 
-	//stroke (글자 외곽선) — 8 방향 offset 으로 stroke_brush 텍스트를 깔고 그 위에 본문 텍스트.
+	//stroke (글자 외곽선) ? 8 방향 offset 으로 stroke_brush 텍스트를 깔고 그 위에 본문 텍스트.
 	//진짜 glyph outline 보다 가벼우면서 thin stroke (1~2px) 에서 시각적으로 동등.
 	if (stroke_width > 0.0f && cr_stroke.GetA() > 0)
 	{
@@ -17073,7 +17073,7 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 	}
 
 	// WINDOWPLACEMENT로 일괄 복원
-	// resize_window가 false이면 현재 창 크기 유지 (저장된 위치만 적용)
+	// resize_window가 false이면 현재 창 크기 유지 (위치만 복원할 뿐 크기는 적용하지 않는다)
 	if (!resize_window)
 	{
 		CRect rcCurrent;

@@ -1,0 +1,19 @@
+root = true
+
+# Force UTF-8 BOM for C/C++ sources so VS in Korean locale (ANSI=CP949) does not silently re-encode.
+# .rc/.rc2 stay UTF-16 LE per VS Resource Editor convention.
+
+[*.{cpp,h,hpp,c,cc,cxx,inl,ipp}]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = tab
+tab_width = 4
+insert_final_newline = true
+
+[*.{rc,rc2}]
+charset = utf-16le
+end_of_line = crlf
+
+[*.md]
+charset = utf-8
+end_of_line = crlf

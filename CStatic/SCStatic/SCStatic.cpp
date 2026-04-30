@@ -42,7 +42,6 @@ CSCStatic::CSCStatic()
 	m_nBlinkTime0	= 400;
 	m_nBlinkTime1	= 1200;
 
-	m_dwStyle		= 0;
 	m_nPrefixSpace	= 0;
 
 	m_hIcon			= NULL;
@@ -106,8 +105,6 @@ void CSCStatic::copy_properties(CSCStatic& dst)
 	dst.m_border_thick = m_border_thick;
 
 	dst.m_cr_link = m_cr_link;
-	dst.m_dwStyle = m_dwStyle;
-	dst.ModifyStyle(0, m_dwStyle);
 	dst.m_nPrefixSpace = m_nPrefixSpace;
 	dst.m_halign = m_halign;
 	dst.m_valign = m_valign;
@@ -374,26 +371,25 @@ void CSCStatic::OnPaint()
 	DWORD dwStyle = GetStyle();
 	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
 	
-	if (m_dwStyle == 0)
-	{
-		MAP_STYLE(SS_LEFT,			DT_LEFT						);
-		MAP_STYLE(SS_RIGHT,			DT_RIGHT					);
-		MAP_STYLE(SS_CENTER,		DT_CENTER					);
-		//MAP_STYLE(SS_CENTERIMAGE,	DT_VCENTER | DT_SINGLELINE	);
-		MAP_STYLE(SS_NOPREFIX,		DT_NOPREFIX					);
-		MAP_STYLE(SS_WORDELLIPSIS,	DT_WORD_ELLIPSIS			);
-		MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
-		MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
+	//정렬은 m_halign/m_valign 이 진실 공급원 (set_halign / set_valign 으로 동적 변경 가능).
+	//그 외 SS_* 옵션 (NOPREFIX, ELLIPSIS, WORDBREAK 등) 은 윈도우 스타일에서 매핑.
+	if (m_halign == DT_CENTER)		dwText |= DT_CENTER;
+	else if (m_halign == DT_RIGHT)	dwText |= DT_RIGHT;
+	else							dwText |= DT_LEFT;
 
-		//SS_LEFTNOWORDWRAP 스타일은 DT_WORDBREAK와 함께 사용하면 안된다.
-		//즉, SS_LEFTNOWORDWRAP이면 텍스트는 자동으로 SS_LEFT가 되고 자동 줄바꿈 되지 않는다.
-		//다만 SS_CENTERIMAGE까지 포함되면 스타일이 너무 제한되므로 SS_CENTERIMAGE는 체크 대상에서 제외시킨다.
-		NMAP_STYLE(	SS_LEFTNOWORDWRAP |
-					//SS_CENTERIMAGE |
-					SS_WORDELLIPSIS |
-					SS_ENDELLIPSIS |
-					SS_PATHELLIPSIS,	DT_WORDBREAK);
-	}
+	MAP_STYLE(SS_NOPREFIX,		DT_NOPREFIX					);
+	MAP_STYLE(SS_WORDELLIPSIS,	DT_WORD_ELLIPSIS			);
+	MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
+	MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
+
+	//SS_LEFTNOWORDWRAP 스타일은 DT_WORDBREAK와 함께 사용하면 안된다.
+	//즉, SS_LEFTNOWORDWRAP이면 텍스트는 자동으로 SS_LEFT가 되고 자동 줄바꿈 되지 않는다.
+	//다만 SS_CENTERIMAGE까지 포함되면 스타일이 너무 제한되므로 SS_CENTERIMAGE는 체크 대상에서 제외시킨다.
+	NMAP_STYLE(	SS_LEFTNOWORDWRAP |
+				//SS_CENTERIMAGE |
+				SS_WORDELLIPSIS |
+				SS_ENDELLIPSIS |
+				SS_PATHELLIPSIS,	DT_WORDBREAK);
 
 	//텍스트 출력 루틴
 	CString sSpace = _T("");
@@ -430,7 +426,7 @@ void CSCStatic::OnPaint()
 		CSize szIcon = m_sz_icon;
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
-		if (dwStyle & SS_CENTER)
+		if (m_halign == DT_CENTER)
 		{
 			if (m_text.IsEmpty())
 				rIcon.left = rc.CenterPoint().x - m_sz_icon.cx / 2;// (rc.Width() - szText.cx - m_szIcon.cx) / 2;
@@ -447,7 +443,7 @@ void CSCStatic::OnPaint()
 				m_rect_text.left = rIcon.left + gap + m_sz_icon.cx;
 			}
 		}
-		else if (dwStyle & SS_RIGHT)
+		else if (m_halign == DT_RIGHT)
 		{
 			if (m_image_left_align_fix)
 			{
@@ -473,10 +469,15 @@ void CSCStatic::OnPaint()
 			}
 		}
 
-		if (dwStyle & SS_CENTERIMAGE)
+		if (m_valign == DT_VCENTER)
 		{
 			rIcon.top = rc.top + (rc.Height() - m_sz_icon.cy) / 2;
 			m_rect_text.top = (rc.Height() - szText.cy) / 2;
+		}
+		else if (m_valign == DT_BOTTOM)
+		{
+			rIcon.top = rc.bottom - m_sz_icon.cy;
+			m_rect_text.top = rc.bottom - szText.cy;
 		}
 		else
 		{
@@ -511,7 +512,7 @@ void CSCStatic::OnPaint()
 		//AfxMessageBox() 또는 그와 유사한 메시지박스들을 보면 아이콘은 항상 왼쪽에 표시되고 텍스트는 아이콘과 관계없이 지정된 정렬방식으로 표시된다.
 
 		//header image의 너비만큼 텍스트는 밀려서 출력된다.
-		if (dwStyle & SS_CENTER)
+		if (m_halign == DT_CENTER)
 		{
 			if (m_text.IsEmpty())
 				rImg.left = rc.CenterPoint().x - szImg.cx / 2;
@@ -528,7 +529,7 @@ void CSCStatic::OnPaint()
 				m_rect_text.left = rImg.left + gap + m_header_images[m_header_image_index]->width;
 			}
 		}
-		else if (dwStyle & SS_RIGHT)
+		else if (m_halign == DT_RIGHT)
 		{
 			if (m_image_left_align_fix)
 			{
@@ -554,10 +555,15 @@ void CSCStatic::OnPaint()
 			}
 		}
 
-		if (dwStyle & SS_CENTERIMAGE)
+		if (m_valign == DT_VCENTER)
 		{
 			rImg.top = rc.top + (rc.Height() - szImg.cy) / 2;
 			m_rect_text.top = (rc.Height() - szText.cy) / 2;
+		}
+		else if (m_valign == DT_BOTTOM)
+		{
+			rImg.top = rc.bottom - szImg.cy;
+			m_rect_text.top = rc.bottom - szText.cy;
 		}
 		else
 		{
@@ -584,9 +590,6 @@ void CSCStatic::OnPaint()
 	}
 	else
 	{
-		//이 코드가 있어서 center image가 false인데도 세로 중앙에 표시된다. 왜 이 코드가 있는지 확인하자!
-		//m_rect_text.top = (rc.Height() - szText.cy) / 2;
-		//m_rect_text.bottom = m_rect_text.top + szText.cy;
 	}
 
 	if (!m_text.IsEmpty())
@@ -603,13 +606,17 @@ void CSCStatic::OnPaint()
 			dc.SetTextColor(::GetSysColor(COLOR_GRAYTEXT));
 		}
 
-		//SS_CENTERIMAGE 일 경우 DT_VCENTER는 반드시 DT_SINGLELINE을 동반해야 한다.
-		//하지만 그럴 경우 multiline을 표현할 수 없으므로
-		//SS_CENTERIMAGE 일 경우는 세로 출력위치를 직접 보정해준다.
-		if (dwStyle & SS_CENTERIMAGE)
+		//DT_VCENTER 는 반드시 DT_SINGLELINE을 동반해야 하지만 그럴 경우 multiline을 표현할 수 없으므로
+		//세로 정렬은 m_rect_text 좌표를 직접 보정해 처리한다. (DT_BOTTOM 도 CStatic 기본에는 없는 정렬이라 같은 방식으로 보정)
+		if (m_valign == DT_VCENTER)
 		{
 			m_rect_text.top = (rc.Height() - szText.cy) / 2;
 			m_rect_text.bottom = m_rect_text.top + szText.cy;
+		}
+		else if (m_valign == DT_BOTTOM)
+		{
+			m_rect_text.top = rc.bottom - szText.cy;
+			m_rect_text.bottom = rc.bottom;
 		}
 		else
 		{
@@ -836,7 +843,8 @@ int CSCStatic::get_halign()
 	DWORD dwStyle = GetStyle();
 	if (dwStyle & SS_CENTER)
 		return DT_CENTER;
-	else if (dwStyle & DT_RIGHT)
+	//SS_RIGHT(0x2) 와 DT_RIGHT(0x2) 가 동일 값이라 과거 코드는 동작은 했으나 의미상 SS_RIGHT 비교가 옳다.
+	else if (dwStyle & SS_RIGHT)
 		return DT_RIGHT;
 
 	return DT_LEFT;
@@ -851,17 +859,17 @@ int CSCStatic::get_valign()
 	return DT_TOP;
 }
 
-/*
-void CSCStatic::set_halign()
+void CSCStatic::set_halign(DWORD halign)
 {
-
+	m_halign = (int)halign;
+	Invalidate();
 }
 
-void CSCStatic::set_valign()
+void CSCStatic::set_valign(DWORD valign)
 {
-
+	m_valign = (int)valign;
+	Invalidate();
 }
-*/
 
 void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_back)
 {

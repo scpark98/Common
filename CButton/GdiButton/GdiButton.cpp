@@ -21,16 +21,16 @@ CGdiButton::CGdiButton()
 	//default text and back color
 	//이 기본 색상값은 이미지를 설정하지 않은 경우의 기본값이다.
 	//만약 이미지를 설정한다면 clear()시켜야 한다.
-	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNTEXT)));
-	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT)));
-	m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT)));
+	m_cr_text.push_back(get_sys_color(COLOR_BTNTEXT));
+	m_cr_text.push_back(get_sys_color(COLOR_HIGHLIGHT));
+	m_cr_text.push_back(get_sys_color(COLOR_HIGHLIGHT));
 	//m_cr_text.push_back(RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT)));
 	m_cr_text.push_back(Gdiplus::Color(192, 192, 192));
 
-	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
+	m_cr_back.push_back(get_sys_color(COLOR_BTNFACE));
 	m_cr_back.push_back(get_color(m_cr_back[0], 16));
 	m_cr_back.push_back(get_color(m_cr_back[0], -16));
-	m_cr_back.push_back(RGB2gpColor(::GetSysColor(COLOR_BTNFACE)));
+	m_cr_back.push_back(get_sys_color(COLOR_BTNFACE));
 
 	m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
 
@@ -563,10 +563,13 @@ void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_color)
 {
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
+	//disabled 색을 normal 에서 get_weak_color 로 파생 — 테마에 자연스럽게 따라감.
+	//(이전: LightGray 하드코딩 → normal 색과 무관하게 동일 회색이 되어 테마와 어긋남)
+	Gdiplus::Color cr_disabled = get_weak_color(normal, 60);
 	if (auto_color)
-		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), get_sys_color(COLOR_GRAYTEXT));
+		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), cr_disabled);
 	else
-		set_back_color(normal, normal, normal, get_sys_color(COLOR_GRAYTEXT));
+		set_back_color(normal, normal, normal, cr_disabled);
 }
 
 void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdiplus::Color down, Gdiplus::Color disabled)
@@ -585,7 +588,12 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_back.push_back(down);
 
 	if (disabled.GetValue() == Gdiplus::Color::Transparent)
-		disabled = get_sys_color(COLOR_GRAYTEXT);
+		disabled = Gdiplus::Color::LightGray;
+
+	//checkbox, radio는 disabled라도 배경색까지 바꾸진 않는다.
+	if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)))
+		disabled = normal;
+
 	m_cr_back.push_back(disabled);
 
 	m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
@@ -786,12 +794,16 @@ void CGdiButton::PreSubclassWindow()
 	if ((m_button_type & BS_AUTORADIOBUTTON) == BS_AUTORADIOBUTTON)
 	{
 		m_button_type = BS_RADIOBUTTON;
+		//checkbox, radio는 배경색은 기본적으로 투명하다.
+		set_back_color(Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent);
 	}
 	else if ((m_button_type & BS_AUTOCHECKBOX) == BS_AUTOCHECKBOX ||
 			 (m_button_type & BS_3STATE) == BS_3STATE ||
 			 (m_button_type & BS_AUTO3STATE) == BS_AUTO3STATE)
 	{
 		m_button_type = BS_CHECKBOX;
+		//checkbox, radio는 배경색은 기본적으로 투명하다.
+		set_back_color(Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent);
 	}
 
 	if ((m_button_style & BS_PUSHLIKE) == BS_PUSHLIKE)
@@ -1254,6 +1266,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		int		size = 8;
 		CRect	r = rc;
+		Gdiplus::Color cr_fill = (is_disabled ? Gdiplus::Color::LightGray : m_cr_check_fill);
 
 		//사각형 안에 v자 체크를 직접 그려준다.
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
@@ -1266,17 +1279,18 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			if (m_check_style == check_style_default)
 				draw_rect(&dc, r, cr_text, Gdiplus::Color::White);
 			else if (m_check_style == check_style_round)
-				draw_round_rect(&g, CRect_to_gpRect(r), m_cr_text[0], Gdiplus::Color::Transparent, 2);
+				draw_round_rect(&g, CRect_to_gpRect(r), cr_text, Gdiplus::Color::Transparent, 2);
 			else if (m_check_style == check_style_round_fill)
-				draw_round_rect(&g, CRect_to_gpRect(r), Gdiplus::Color::Transparent, m_cr_check_fill, 2);
+				draw_round_rect(&g, CRect_to_gpRect(r), Gdiplus::Color::Transparent, cr_fill, 2);
 
-			Gdiplus::Pen pen(Gdiplus::Color(255, 32, 32, 32), 1.51);
+			Gdiplus::Pen pen(cr_text, 1.51);
 
 			if (m_check_style == check_style_round_fill)
-				pen.SetColor(get_distinct_bw_color(m_cr_check_fill));
+				pen.SetColor(is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_fill));
 
 			int check_state = GetCheck();
 
+			//v자 체크를 그려준다. indeterminate는 사각형으로 그려준다.
 			if (check_state == BST_CHECKED)
 			{
 				g.DrawLine(&pen, Gdiplus::Point(r.left + 3, r.CenterPoint().y - 2), Gdiplus::Point(r.left + 7, r.CenterPoint().y + 2));

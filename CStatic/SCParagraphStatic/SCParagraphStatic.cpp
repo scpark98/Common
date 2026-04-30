@@ -428,18 +428,6 @@ CRect CSCParagraphStatic::calc_text_size()
 
 	//align 옵션에 따른 보정
 	DWORD dwStyle = GetStyle();
-	DWORD dwText = DT_NOCLIP;// | DT_WORDBREAK;
-
-	if (m_dwStyle == 0)
-	{
-		MAP_STYLE(SS_LEFT, DT_LEFT);
-		MAP_STYLE(SS_RIGHT, DT_RIGHT);
-		MAP_STYLE(SS_CENTER, DT_CENTER);
-		MAP_STYLE(SS_NOPREFIX, DT_NOPREFIX);
-		MAP_STYLE(SS_WORDELLIPSIS, DT_WORD_ELLIPSIS);
-		MAP_STYLE(SS_ENDELLIPSIS, DT_END_ELLIPSIS);
-		MAP_STYLE(SS_PATHELLIPSIS, DT_PATH_ELLIPSIS);
-	}
 
 	CRect rc;
 	GetClientRect(&rc);
@@ -621,13 +609,10 @@ void CSCParagraphStatic::PreSubclassWindow()
 	DWORD dwStyle = GetStyle();
 	DWORD dwText = 0;
 
-	if (m_dwStyle == 0)
-	{
-		MAP_STYLE(SS_LEFT, DT_LEFT);
-		MAP_STYLE(SS_RIGHT, DT_RIGHT);
-		MAP_STYLE(SS_CENTER, DT_CENTER);
-		MAP_STYLE(SS_CENTERIMAGE, DT_VCENTER);
-	}
+	MAP_STYLE(SS_LEFT, DT_LEFT);
+	MAP_STYLE(SS_RIGHT, DT_RIGHT);
+	MAP_STYLE(SS_CENTER, DT_CENTER);
+	MAP_STYLE(SS_CENTERIMAGE, DT_VCENTER);
 
 	if (dwText & DT_CENTER)
 		m_halign = DT_CENTER;

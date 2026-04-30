@@ -410,7 +410,8 @@ public:
 	static void get_color_theme_list(std::deque<CString> &theme_list);
 
 	Gdiplus::Color	cr_text;
-	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목
+	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목 (placeholder 등)
+	Gdiplus::Color	cr_disabled_text = Gdiplus::Color::DarkGray;	//disabled 컨트롤의 텍스트/아이콘 stroke 공용 색
 	Gdiplus::Color	cr_text_hover;
 	Gdiplus::Color	cr_text_dropHilited;
 	Gdiplus::Color	cr_text_selected;

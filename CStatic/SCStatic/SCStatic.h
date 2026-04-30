@@ -157,9 +157,13 @@ public:
 	//VALIGN이 SS_CENTERIMAGE가 아니면 상단정렬 둘 뿐이므로 DT_TOP, DT_VCENTER, DT_BOTTOM으로 정렬할 수 있도록 확장한다.
 	int				get_halign();
 	int				get_valign();
-	//아직 미구현
-	//void			set_halign();
-	//void			set_valign();
+
+	//horizontal align을 동적으로 변경한다. halign은 DT_LEFT|DT_CENTER|DT_RIGHT 중 하나.
+	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_rect_text 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
+	void			set_halign(DWORD halign);
+	//vertical align을 동적으로 변경한다. valign은 DT_TOP|DT_VCENTER|DT_BOTTOM 중 하나.
+	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_rect_text 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
+	void			set_valign(DWORD valign);
 
 	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 동일한 값이 리턴된다.
 	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
@@ -258,7 +262,6 @@ public:
 
 	void			set_blink_time(int nTime0 = 400, int nTime1 = 1200);
 	void			set_blink(bool blink = true, int time0 = 400, int time1 = 400);
-	void			set_text_alignment(DWORD dwStyle) { m_dwStyle = dwStyle; }
 
 	//CStatic의 클릭 이벤트를 처리하려면 SS_NOTIFY 속성 필수이므로 자동 설정되도록 수정함.
 	void			set_link(CString url, Gdiplus::Color cr_link = Gdiplus::Color::RoyalBlue);
@@ -384,7 +387,6 @@ protected:
 	CString			m_link_url;
 	Gdiplus::Color	m_cr_link = Gdiplus::Color::RoyalBlue;
 
-	DWORD			m_dwStyle;
 	int				m_nPrefixSpace;
 	CSCGdiplusBitmap	m_img_back;
 

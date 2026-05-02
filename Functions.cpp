@@ -7370,7 +7370,30 @@ ID2D1PathGeometry* draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::C
 
 	ID2D1PathGeometry* rr = create_round_path(d2dc, r.left, r.top, r.right, r.bottom, round_lt, round_rt, round_lb, round_rb);
 
-	d2dc->FillGeometry(rr, br_fill);
+	//D2D 는 stroke 를 geometry 중앙에 그린다 → stroke 의 안쪽 절반과 fill 영역이 겹친다.
+	//양쪽이 반투명일 때 합성되어 외곽이 두 줄 (외곽 stroke + 안쪽 stroke+fill 합성) 처럼 보임.
+	//fill geometry 를 thick/2 만큼 inset 하여 겹침 제거.
+	if (thick > 0.0f)
+	{
+		float inset = thick * 0.5f;
+		float fl = r.left + inset;
+		float ft = r.top + inset;
+		float fr = r.right - inset;
+		float fb = r.bottom - inset;
+		if (fr > fl && fb > ft)
+		{
+			ID2D1PathGeometry* fill_geo = create_round_path(d2dc, fl, ft, fr, fb,
+				MAX(0.0f, round_lt - inset), MAX(0.0f, round_rt - inset),
+				MAX(0.0f, round_lb - inset), MAX(0.0f, round_rb - inset));
+			d2dc->FillGeometry(fill_geo, br_fill);
+			fill_geo->Release();
+		}
+	}
+	else
+	{
+		d2dc->FillGeometry(rr, br_fill);
+	}
+
 	d2dc->DrawGeometry(rr, br_stroke, thick);
 
 	return rr;

@@ -1,4 +1,5 @@
 ﻿#include "SCUIElement.h"
+#include "../../Functions.h"
 
 CSCUIElement::CSCUIElement(float left, float top, float right, float bottom, CString label)
 {
@@ -114,7 +115,20 @@ HRESULT CSCUIElement::load_image(IWICImagingFactory2* WICfactory, ID2D1DeviceCon
 		m_image = NULL;
 	}
 
-	if (m_image_path.IsEmpty() || !PathFileExists(m_image_path))
+	if (m_image_path.IsEmpty())
+		return hr;
+
+	//drive root("D:") / 디렉토리는 PathFileExists 통과해버려 WIC 디코더에 넘겨지면 메모리 폭주 발생.
+	//정규 파일 + 이미지 확장자만 허용하도록 가드. 부분 경로 입력(실시간 반영) 안전성 확보.
+	DWORD attr = ::GetFileAttributes(m_image_path);
+	if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
+		return hr;
+
+	CString ext = get_part(m_image_path, fn_ext);
+	ext.MakeLower();
+	if (ext != _T("png") && ext != _T("jpg") && ext != _T("jpeg") &&
+		ext != _T("bmp") && ext != _T("gif") && ext != _T("tif") &&
+		ext != _T("tiff") && ext != _T("ico") && ext != _T("webp"))
 		return hr;
 
 	m_image = new CSCD2Image;

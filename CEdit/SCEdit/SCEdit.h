@@ -194,9 +194,19 @@ public:
 	//focus일때는 border가 더 진하게 그려진다. m_draw_border = false라도 focus를 가지면 그려진다.
 	void				set_border_color_on_active(Gdiplus::Color cr_border_active) { m_theme.cr_border_active = cr_border_active; }
 
+	//Shift + Up/Down 또는 Shift + MouseWheel 로 숫자 값 증감.
+	//텍스트 전체가 정수/실수로 파싱 가능할 때만 동작 — 그 외엔 base 로 위임 (탭/네비게이션 보존).
+	void				set_use_updown_key(bool use = true, float interval = 1.0f)
+						{ m_use_updown_key = use; m_updown_interval = interval; }
+
 	// Generated message map functions
 protected:
 	bool				m_transparent = false;
+
+	bool				m_use_updown_key  = false;
+	float				m_updown_interval = 1.0f;
+	//VK_UP/DOWN, MouseWheel 양쪽에서 호출되는 공통 증감 로직. 적용 성공 시 true.
+	bool				apply_updown_step(bool up);
 
 	//create()으로 동적 생성했는지, 일반 dlg 등에서 정적으로 생성했는지에 따라
 	//일부 메시지(ex. VK_RETURN)의 처리방식이 달라지므로 이를 구분하기 위한 플래그.
@@ -270,6 +280,10 @@ protected:
 	DECLARE_MESSAGE_MAP()
 	virtual void PreSubclassWindow();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	//WM_CHAR / WM_KEYDOWN / WM_PASTE / WM_CUT / WM_SETTEXT / EM_REPLACESEL / WM_CLEAR / EM_UNDO 등
+	//텍스트 변경을 유발할 수 있는 메시지의 처리 전후 텍스트를 비교해, 실제 변경 시 부모로
+	//Message_CSCEdit(EN_CHANGE) 를 직접 SendMessage. reflection 경로 의존 회피.
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	//afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 public:
@@ -287,6 +301,7 @@ public:
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg BOOL OnEnChange();
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 };
 
 /////////////////////////////////////////////////////////////////////////////

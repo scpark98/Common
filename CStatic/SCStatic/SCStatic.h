@@ -97,6 +97,9 @@ public:
 	enum CSCStaticMsgs
 	{
 		msg_text_value_changed,
+		//color picker 모드에서 alpha 만 변경된 경우. nValue = alpha (0~255), sValue = 동일 값의 문자열.
+		//text/RGB 변경 시에는 기존 msg_text_value_changed 가 sValue = "R, G, B" 로 전파된다.
+		msg_alpha_value_changed,
 	};
 
 	CSCStatic* pThis = NULL;
@@ -150,6 +153,18 @@ public:
 	void			edit_end(bool valid);
 	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
 
+	//color picker 전용. swatch 옆 "R, G, B" 영역 / alpha 영역을 각각 편집한다.
+	void			edit_begin_color_text();
+	void			edit_end_color_text(bool valid);
+	void			edit_begin_alpha();
+	void			edit_end_alpha(bool valid);
+
+	//편집 중 Shift + Up/Down 또는 Shift + MouseWheel 로 숫자값 증감.
+	//텍스트가 정수/실수로 파싱되는 경우에만 동작 (그 외엔 base 위임).
+	//set_use_edit() 보다 먼저 호출되어도 m_edit 인스턴스 자체엔 적용되며, 이후 create 시에도 유지.
+	void			set_use_updown_key(bool use = true, float interval = 1.0f)
+					{ m_edit.set_use_updown_key(use, interval); }
+
 
 	//CStatic의 SS_LEFT, SS_RIGHT 등의 align 설정값을 DrawText()에서 사용하는 DT_LEFT, DT_RIGHT 등으로 치환하여 리턴
 	DWORD			get_text_align();
@@ -164,6 +179,31 @@ public:
 	//vertical align을 동적으로 변경한다. valign은 DT_TOP|DT_VCENTER|DT_BOTTOM 중 하나.
 	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_rect_text 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
 	void			set_valign(DWORD valign);
+
+	//label + value 형태로 표시될 때 value 의 가로 정렬. DT_LEFT|DT_CENTER|DT_RIGHT 중 하나. 기본값 DT_RIGHT.
+	//편집 모드 진입 시 CSCEdit 의 텍스트 정렬에도 자동 반영된다.
+	void			set_value_halign(DWORD halign);
+
+	//label + value 형태일 때 label 영역의 고정 너비. 0 (기본) 이면 텍스트 길이 + 8 픽셀 자동 계산.
+	//여러 항목을 같은 컬럼에 정렬하려면 동일 값으로 호출. value/edit 의 시작 위치가 일치한다.
+	void			set_label_width(int width) { m_label_width = width; Invalidate(); }
+
+	//color picker 모드 (m_text == "_color picker_") 의 alpha 표시 형식.
+	enum alpha_format_t
+	{
+		alpha_byte		= 0,	//0~255 (Figma 와 다른 toggle, 기본값)
+		alpha_percent,			//0~100% 표기
+	};
+	void			set_alpha_format(alpha_format_t fmt) { m_alpha_format = fmt; Invalidate(); }
+	void			set_show_alpha(bool show) { m_show_alpha = show; Invalidate(); }
+
+	//color picker 의 alpha (0~255) 를 외부에서 설정. CMFCColorDialog 가 alpha 를 다루지 않으므로 보조 setter.
+	void			set_alpha(BYTE a)
+	{
+		Gdiplus::Color& c = m_theme.cr_text;
+		c = Gdiplus::Color(a, c.GetR(), c.GetG(), c.GetB());
+		Invalidate();
+	}
 
 	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 동일한 값이 리턴된다.
 	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
@@ -334,9 +374,14 @@ protected:
 	int				m_text_extent = 0;	//텍스트의 크기
 
 	CSCEdit			m_edit;
+	//color picker 모드의 alpha 편집 전용. lazy create.
+	CSCEdit			m_edit_alpha;
 	bool			m_use_edit = false;
 	CString			m_text_value;		//m_use_edit = true이면 label + value로 표시되는데 이 때 value의 내용이 저장된다.
 	int				m_edit_width = 0;	//편집모드일 때 edit의 너비. 이 값이 0이면 (m_text_extent + 8)부터 edit이 시작된다.
+
+	//color picker 모드 전용 layout 계산. swatch / RGB text / separator x / alpha rect 를 모두 채워준다.
+	void			get_color_picker_layout(CRect& rc_swatch, CRect& rc_text, int& sep_x, CRect& rc_alpha);
 
 	enum ENUM_TIMER
 	{
@@ -380,7 +425,7 @@ protected:
 	//Gdiplus::Color	m_cr_parent_back = Gdiplus::Color::Transparent;
 
 	BOOL			m_bBlink;
-	BOOL			m_bBlinkStatus;
+	BOOL			m_blink_status;
 	int				m_nBlinkTime0;		//blink type is Show/Hide, time0 = shown duration, time1 = hidden duration in millisecond.
 	int				m_nBlinkTime1;
 
@@ -392,6 +437,16 @@ protected:
 
 	int				m_halign = -1;
 	int				m_valign = -1;
+
+	//label + value 형태일 때 value 의 가로 정렬. 기본 DT_RIGHT.
+	DWORD			m_value_halign = DT_RIGHT;
+
+	//label + value 형태일 때 label 영역의 고정 너비. 0 이면 m_text_extent + 8 사용.
+	int				m_label_width = 0;
+
+	//color picker 모드의 alpha 표시 옵션.
+	alpha_format_t	m_alpha_format = alpha_byte;
+	bool			m_show_alpha = true;
 
 	LOGFONT			m_lf;
 	CFont			m_font;

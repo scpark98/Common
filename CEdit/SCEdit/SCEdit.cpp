@@ -83,6 +83,7 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_WM_SETCURSOR()
 	ON_CONTROL_REFLECT_EX(EN_CHANGE, &CSCEdit::OnEnChange)
 	ON_WM_KEYDOWN()
+	ON_WM_MOUSEWHEEL()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -969,8 +970,49 @@ BOOL CSCEdit::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 
 BOOL CSCEdit::OnEnChange()
 {
-	//TRACE(_T("CSCEdit::OnEnChange()\n"));
+	//텍스트 변경 통지는 WindowProc 에서 before/after 비교로 직접 처리. 여기는 no-op.
 	return FALSE;
+}
+
+// WM_CHAR / WM_KEYDOWN / WM_PASTE / WM_CUT / WM_SETTEXT / EM_REPLACESEL / WM_CLEAR / EM_UNDO 등
+// 텍스트 변경을 유발할 수 있는 메시지의 처리 전후 텍스트를 비교해 실제 변경 시 부모로
+// Message_CSCEdit(EN_CHANGE) 를 직접 SendMessage. reflection / OnCommand 경로의 reliability
+// 이슈 회피용 직접 경로.
+LRESULT CSCEdit::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	bool may_change = false;
+	switch (message)
+	{
+		case WM_CHAR:
+		case WM_KEYDOWN:
+		case WM_PASTE:
+		case WM_CUT:
+		case WM_CLEAR:
+		case WM_SETTEXT:
+		case EM_REPLACESEL:
+		case EM_UNDO:
+			may_change = true;
+			break;
+	}
+
+	CString prev;
+	if (may_change && m_hWnd)
+		GetWindowText(prev);
+
+	LRESULT result = CEdit::WindowProc(message, wParam, lParam);
+
+	if (may_change && m_hWnd)
+	{
+		CString cur;
+		GetWindowText(cur);
+		if (cur != prev && GetParent() && GetParent()->GetSafeHwnd())
+		{
+			CSCEditMessage msg(this, EN_CHANGE);
+			::SendMessage(GetParent()->m_hWnd, Message_CSCEdit, (WPARAM)&msg, 0);
+		}
+	}
+
+	return result;
 }
 
 void CSCEdit::draw_dim_text()
@@ -1086,10 +1128,68 @@ void CSCEdit::GetWindowText(CString& text) const
 }
 */
 
+// 텍스트 전체가 정수/실수로 파싱 가능하면 ±m_updown_interval 적용 후 set_text.
+// 부분 문자(예: "12abc") 가 섞여 있으면 false 리턴해 호출처가 base 로 위임하도록 함.
+bool CSCEdit::apply_updown_step(bool up)
+{
+	if (!m_use_updown_key)
+		return false;
+
+	if ((GetStyle() & ES_READONLY) || !IsWindowEnabled())
+		return false;
+
+	CString trimmed = get_text();
+	trimmed.Trim();
+	if (trimmed.IsEmpty())
+		return false;
+
+	LPCTSTR begin = trimmed;
+	LPTSTR  p_end = nullptr;
+	double val = _tcstod(begin, &p_end);
+	if (p_end == begin || p_end == nullptr || *p_end != _T('\0'))
+		return false;
+
+	val += up ? m_updown_interval : -m_updown_interval;
+
+	// 소수점 자리수 = max(interval prec, 현재 텍스트 prec). %g 의 trailing 0 제거 회피.
+	// interval 자리수 추출: float 의 이진 부정확성 때문에 ×10 반복 방식은 오버카운트되므로
+	// (double) 승격 후 %g 표현의 '.'/'e' 위치로 직접 계산.
+	CString s_iv;
+	s_iv.Format(_T("%g"), (double)m_updown_interval);
+	int iexp = s_iv.FindOneOf(_T("eE"));
+	int idot = s_iv.Find(_T('.'));
+	int mantissa_end  = (iexp >= 0) ? iexp : s_iv.GetLength();
+	int mantissa_prec = (idot >= 0 && idot < mantissa_end) ? (mantissa_end - idot - 1) : 0;
+	int exp_val       = (iexp >= 0) ? _ttoi(s_iv.Mid(iexp + 1)) : 0;
+	int interval_prec = mantissa_prec - exp_val;
+	if (interval_prec < 0)
+		interval_prec = 0;
+
+	int text_prec = 0;
+	int dot = trimmed.ReverseFind(_T('.'));
+	if (dot >= 0)
+		text_prec = trimmed.GetLength() - dot - 1;
+	int precision = max(interval_prec, text_prec);
+
+	CString new_text;
+	new_text.Format(_T("%.*f"), precision, val);
+	set_text(new_text);
+	SetSel(new_text.GetLength(), new_text.GetLength());
+	return true;
+}
+
 void CSCEdit::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	const bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
+	// Shift + Up/Down — 숫자값 증감. 비숫자 텍스트면 apply_updown_step 이 false 리턴 → base 로 위임.
+	// Shift 없이 누른 Up/Down 은 통과 — 폼 네비게이션 보존.
+	if (bShift && (nChar == VK_UP || nChar == VK_DOWN))
+	{
+		if (apply_updown_step(nChar == VK_UP))
+			return;
+	}
 
 	// Shift + Home / End 는 CEdit 기본 처리 전에 직접 처리
 	if (bShift && (nChar == VK_HOME || nChar == VK_END))
@@ -1137,4 +1237,27 @@ void CSCEdit::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	}
 
 	CEdit::OnKeyDown(nChar, nRepCnt, nFlags);
+}
+
+// Shift + MouseWheel = VK_UP/DOWN 과 동일한 수치 증감. 고해상도 휠은 WHEEL_DELTA 단위로 반복.
+BOOL CSCEdit::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	if ((nFlags & MK_SHIFT) && m_use_updown_key)
+	{
+		int ticks = abs((int)zDelta) / WHEEL_DELTA;
+		if (ticks <= 0)
+			ticks = 1;
+
+		bool any = false;
+		for (int i = 0; i < ticks; i++)
+		{
+			if (apply_updown_step(zDelta > 0))
+				any = true;
+			else
+				break;
+		}
+		if (any)
+			return TRUE;
+	}
+	return CEdit::OnMouseWheel(nFlags, zDelta, pt);
 }

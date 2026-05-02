@@ -1266,27 +1266,29 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		int		size = 8;
 		CRect	r = rc;
-		Gdiplus::Color cr_fill = (is_disabled ? Gdiplus::Color::LightGray : m_cr_check_fill);
 
 		//사각형 안에 v자 체크를 직접 그려준다.
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
 		{
 			r.left += 2;
-			r.right = r.left + size * 2 + 1;
-			r.top = r.CenterPoint().y - size - 1;
-			r.bottom = r.top + size * 2 + 1;
+			r.right = r.left + size * 2;
+			r.top = r.CenterPoint().y - size;
+			r.bottom = r.top + size * 2;
+
+			Gdiplus::Color cr_check_fill = (is_disabled ? Gdiplus::Color::LightGray : m_cr_check_fill);
 
 			if (m_check_style == check_style_default)
 				draw_rect(&dc, r, cr_text, Gdiplus::Color::White);
 			else if (m_check_style == check_style_round)
 				draw_round_rect(&g, CRect_to_gpRect(r), cr_text, Gdiplus::Color::Transparent, 2);
 			else if (m_check_style == check_style_round_fill)
-				draw_round_rect(&g, CRect_to_gpRect(r), Gdiplus::Color::Transparent, cr_fill, 2);
+				draw_round_rect(&g, CRect_to_gpRect(r), Gdiplus::Color::Transparent, cr_check_fill, 2);
 
 			Gdiplus::Pen pen(cr_text, 1.51);
+			//Gdiplus::Pen pen(Gdiplus::Color::Red, 1.51);
 
 			if (m_check_style == check_style_round_fill)
-				pen.SetColor(is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_fill));
+				pen.SetColor(is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_check_fill));
 
 			int check_state = GetCheck();
 
@@ -1325,9 +1327,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				//dc.DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONRADIO);
 				r.left += 2;
-				r.right = r.left + size * 2 + 0;
-				r.top = r.CenterPoint().y - size - 0;
-				r.bottom = r.top + size * 2 + 0;
+				r.right = r.left + size * 2;
+				r.top = r.CenterPoint().y - size;
+				r.bottom = r.top + size * 2;
 
 				Gdiplus::Pen pen(cr_text, 1.0);
 				Gdiplus::SolidBrush br(cr_text);
@@ -1335,7 +1337,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 				if (GetCheck())
 				{
-					r.DeflateRect(2, 2);
+					r.DeflateRect(3, 3);
 					g.FillEllipse(&br,
 						(Gdiplus::REAL)(r.left) + 0.2f,
 						(Gdiplus::REAL)(r.top) + 0.2f,

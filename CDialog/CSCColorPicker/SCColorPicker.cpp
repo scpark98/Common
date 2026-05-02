@@ -2081,8 +2081,14 @@ void CSCColorPicker::OnContextMenu(CWnd* pWnd, CPoint point)
 	// HKLM 쓰기 불가 토큰이면 메뉴 자체를 grayed.
 	UINT shared_flags = MF_STRING | (m_use_shared_color ? MF_CHECKED : MF_UNCHECKED);
 	if (!can_write_hklm_software())
+	{
 		shared_flags |= MF_GRAYED;
-	menu.AppendMenu(shared_flags, IDM_USE_SHARED_COLOR, _T("공유 컬러 사용"));
+		menu.AppendMenu(shared_flags, IDM_USE_SHARED_COLOR, _T("공유 컬러 사용 (관리자 권한 실행 필요)"));
+	}
+	else
+	{
+		menu.AppendMenu(shared_flags, IDM_USE_SHARED_COLOR, _T("공유 컬러 사용"));
+	}
 
 	// ── 최근 색상 내보내기 / 가져오기 ────────────────────
 	menu.AppendMenu(MF_STRING, IDM_EXPORT_RECENT, _T("최근 색상 내보내기"));

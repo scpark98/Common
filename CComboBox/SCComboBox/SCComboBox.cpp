@@ -63,6 +63,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_CONTROL_REFLECT(CBN_EDITCHANGE, &CSCComboBox::OnCbnEditchange)
 	ON_WM_DRAWITEM()
 	ON_WM_TIMER()
+	ON_WM_CTLCOLOR_REFLECT()
 END_MESSAGE_MAP()
 
 
@@ -392,7 +393,11 @@ void CSCComboBox::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
 void CSCComboBox::set_font_size(int font_size)
 {
 	if (m_is_font_combo)
+	{
+		m_font_size = font_size;
+		Invalidate();
 		return;
+	}
 
 	if (font_size == 0)
 		return;

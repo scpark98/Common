@@ -165,6 +165,8 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_static_message.set_back_color(m_theme.cr_back);
 	m_static_message.set_text_color(m_theme.cr_text);
 	m_static_message.set_font(&m_font);
+	m_static_message.set_halign(DT_CENTER);
+	m_static_message.set_valign(DT_VCENTER);
 
 	return res;
 }

@@ -17189,7 +17189,7 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 {
 	if (!pApp || !pWnd || !pWnd->GetSafeHwnd() || !pWnd->IsWindowVisible() || pWnd->IsIconic())
 	{
-		TRACE(_T("invalid window. SaveWindowPosition() skip.\n"));
+		//TRACE(_T("invalid window. SaveWindowPosition() skip.\n"));
 		return;
 	}
 

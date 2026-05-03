@@ -1,4 +1,7 @@
 ﻿#include "dshow.h"
+#include "SCAudioGain.h"
+#include "SCAudioCompressor.h"
+#include "../log/SCLog/SCLog.h"
 #include <gdiplus.h>
 
 
@@ -19,6 +22,767 @@
 #define REGISTER_FILTERGRAPH
 
 DWORD     g_dwGraphRegister=0;
+
+//MEDIATYPE_Subtitle 은 Windows SDK 의 uuids.h 에 없고 LAV/Haali/MPC splitter SDK 들이 공통으로 사용하는 GUID.
+//{e487eb08-6b26-4be9-9dd3-4434f6db9dfe}
+#ifndef MEDIATYPE_Subtitle
+static const GUID MEDIATYPE_Subtitle =
+{ 0xe487eb08, 0x6b26, 0x4be9, { 0x9d, 0xd3, 0x44, 0x34, 0xf6, 0xdb, 0x9d, 0xfe } };
+#endif
+
+//Custom IBaseFilter sink — Microsoft SampleGrabber 가 video/audio majortype 만 받기 때문에
+//자막 stream 을 직접 받을 수 없어 자체 sink filter 를 작성한다.
+//단일 input pin (IPin + IMemInputPin) + 단순 IEnumPins / IEnumMediaTypes stub.
+
+class CSubtitleEnumPins : public IEnumPins
+{
+	LONG m_ref;
+	IPin* m_pPin;
+	int m_pos;
+public:
+	CSubtitleEnumPins(IPin* pPin) : m_ref(0), m_pPin(pPin), m_pos(0) { if (pPin) pPin->AddRef(); }
+	~CSubtitleEnumPins() { if (m_pPin) m_pPin->Release(); }
+
+	STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override {
+		if (iid == IID_IUnknown || iid == IID_IEnumPins) { *ppv = static_cast<IEnumPins*>(this); AddRef(); return S_OK; }
+		*ppv = NULL; return E_NOINTERFACE;
+	}
+	STDMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&m_ref); }
+	STDMETHODIMP_(ULONG) Release() override { ULONG n = InterlockedDecrement(&m_ref); if (n == 0) delete this; return n; }
+
+	STDMETHODIMP Next(ULONG cPins, IPin** ppPins, ULONG* pcFetched) override {
+		ULONG fetched = 0;
+		if (m_pos == 0 && cPins >= 1 && m_pPin) {
+			m_pPin->AddRef();
+			ppPins[0] = m_pPin;
+			fetched = 1;
+			m_pos = 1;
+		}
+		if (pcFetched) *pcFetched = fetched;
+		return (fetched == cPins) ? S_OK : S_FALSE;
+	}
+	STDMETHODIMP Skip(ULONG cPins) override { m_pos += cPins; return S_OK; }
+	STDMETHODIMP Reset() override { m_pos = 0; return S_OK; }
+	STDMETHODIMP Clone(IEnumPins** ppEnum) override {
+		if (!ppEnum) return E_POINTER;
+		CSubtitleEnumPins* p = new CSubtitleEnumPins(m_pPin);
+		p->m_pos = m_pos;
+		p->AddRef();
+		*ppEnum = p;
+		return S_OK;
+	}
+};
+
+class CSubtitleEnumMediaTypes : public IEnumMediaTypes
+{
+	LONG m_ref;
+public:
+	CSubtitleEnumMediaTypes() : m_ref(0) {}
+
+	STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override {
+		if (iid == IID_IUnknown || iid == IID_IEnumMediaTypes) { *ppv = static_cast<IEnumMediaTypes*>(this); AddRef(); return S_OK; }
+		*ppv = NULL; return E_NOINTERFACE;
+	}
+	STDMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&m_ref); }
+	STDMETHODIMP_(ULONG) Release() override { ULONG n = InterlockedDecrement(&m_ref); if (n == 0) delete this; return n; }
+
+	STDMETHODIMP Next(ULONG, AM_MEDIA_TYPE**, ULONG* pcFetched) override { if (pcFetched) *pcFetched = 0; return S_FALSE; }
+	STDMETHODIMP Skip(ULONG) override { return S_OK; }
+	STDMETHODIMP Reset() override { return S_OK; }
+	STDMETHODIMP Clone(IEnumMediaTypes** ppEnum) override {
+		if (!ppEnum) return E_POINTER;
+		CSubtitleEnumMediaTypes* p = new CSubtitleEnumMediaTypes();
+		p->AddRef();
+		*ppEnum = p;
+		return S_OK;
+	}
+};
+
+class CSubtitleSinkPin : public IPin, public IMemInputPin
+{
+	LONG m_ref;
+	IBaseFilter* m_pFilter;	//weak — filter 가 pin 보다 먼저 destruct 안 됨
+	IPin* m_pConnected;
+	AM_MEDIA_TYPE m_mt;
+	bool m_mt_set;
+	HWND m_target;
+	UINT m_msg;
+	IMemAllocator* m_pAllocator;
+	REFERENCE_TIME m_segment_start;	//NewSegment.tStart — Receive 의 sample timestamp 가 segment-relative 라 add 해야 absolute stream time
+public:
+	CSubtitleSinkPin(IBaseFilter* pFilter, HWND target, UINT msg)
+		: m_ref(0), m_pFilter(pFilter), m_pConnected(NULL), m_mt_set(false),
+		  m_target(target), m_msg(msg), m_pAllocator(NULL), m_segment_start(0) {
+		ZeroMemory(&m_mt, sizeof(m_mt));
+	}
+	~CSubtitleSinkPin() {
+		if (m_pConnected) m_pConnected->Release();
+		if (m_pAllocator) m_pAllocator->Release();
+		if (m_mt_set) {
+			if (m_mt.cbFormat && m_mt.pbFormat) CoTaskMemFree(m_mt.pbFormat);
+			if (m_mt.pUnk) m_mt.pUnk->Release();
+		}
+	}
+
+	GUID get_subtype() {
+		if (m_mt_set) return m_mt.subtype;
+		GUID g; ZeroMemory(&g, sizeof(g)); return g;
+	}
+
+	//IUnknown
+	STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override {
+		if (iid == IID_IUnknown || iid == IID_IPin) { *ppv = static_cast<IPin*>(this); AddRef(); return S_OK; }
+		if (iid == IID_IMemInputPin) { *ppv = static_cast<IMemInputPin*>(this); AddRef(); return S_OK; }
+		*ppv = NULL; return E_NOINTERFACE;
+	}
+	STDMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&m_ref); }
+	STDMETHODIMP_(ULONG) Release() override { ULONG n = InterlockedDecrement(&m_ref); if (n == 0) delete this; return n; }
+
+	//IPin
+	STDMETHODIMP Connect(IPin*, const AM_MEDIA_TYPE*) override { return E_UNEXPECTED; }
+	STDMETHODIMP ReceiveConnection(IPin* pConnector, const AM_MEDIA_TYPE* pmt) override {
+		if (!pConnector || !pmt) return E_POINTER;
+		if (m_pConnected) return VFW_E_ALREADY_CONNECTED;
+		if (!IsEqualGUID(pmt->majortype, MEDIATYPE_Subtitle) && pmt->majortype.Data1 != 0xE487EB08)
+			return VFW_E_TYPE_NOT_ACCEPTED;
+		m_mt = *pmt;
+		if (pmt->cbFormat && pmt->pbFormat) {
+			m_mt.pbFormat = (BYTE*)CoTaskMemAlloc(pmt->cbFormat);
+			if (m_mt.pbFormat) memcpy(m_mt.pbFormat, pmt->pbFormat, pmt->cbFormat);
+		}
+		if (pmt->pUnk) pmt->pUnk->AddRef();
+		m_mt_set = true;
+		m_pConnected = pConnector;
+		m_pConnected->AddRef();
+		return S_OK;
+	}
+	STDMETHODIMP Disconnect() override {
+		if (!m_pConnected) return S_FALSE;
+		m_pConnected->Release(); m_pConnected = NULL;
+		if (m_mt_set) {
+			if (m_mt.cbFormat && m_mt.pbFormat) CoTaskMemFree(m_mt.pbFormat);
+			if (m_mt.pUnk) m_mt.pUnk->Release();
+			ZeroMemory(&m_mt, sizeof(m_mt));
+			m_mt_set = false;
+		}
+		return S_OK;
+	}
+	STDMETHODIMP ConnectedTo(IPin** ppPin) override {
+		if (!ppPin) return E_POINTER;
+		if (!m_pConnected) { *ppPin = NULL; return VFW_E_NOT_CONNECTED; }
+		m_pConnected->AddRef(); *ppPin = m_pConnected;
+		return S_OK;
+	}
+	STDMETHODIMP ConnectionMediaType(AM_MEDIA_TYPE* pmt) override {
+		if (!pmt) return E_POINTER;
+		if (!m_pConnected) return VFW_E_NOT_CONNECTED;
+		*pmt = m_mt;
+		if (m_mt.cbFormat && m_mt.pbFormat) {
+			pmt->pbFormat = (BYTE*)CoTaskMemAlloc(m_mt.cbFormat);
+			if (pmt->pbFormat) memcpy(pmt->pbFormat, m_mt.pbFormat, m_mt.cbFormat);
+		}
+		if (m_mt.pUnk) m_mt.pUnk->AddRef();
+		return S_OK;
+	}
+	STDMETHODIMP QueryPinInfo(PIN_INFO* pInfo) override {
+		if (!pInfo) return E_POINTER;
+		pInfo->pFilter = m_pFilter;
+		if (m_pFilter) m_pFilter->AddRef();
+		pInfo->dir = PINDIR_INPUT;
+		wcscpy_s(pInfo->achName, L"In");
+		return S_OK;
+	}
+	STDMETHODIMP QueryDirection(PIN_DIRECTION* pPinDir) override {
+		if (!pPinDir) return E_POINTER;
+		*pPinDir = PINDIR_INPUT; return S_OK;
+	}
+	STDMETHODIMP QueryId(LPWSTR* Id) override {
+		if (!Id) return E_POINTER;
+		*Id = (LPWSTR)CoTaskMemAlloc(sizeof(WCHAR) * 3);
+		if (!*Id) return E_OUTOFMEMORY;
+		wcscpy_s(*Id, 3, L"In");
+		return S_OK;
+	}
+	STDMETHODIMP QueryAccept(const AM_MEDIA_TYPE* pmt) override {
+		if (!pmt) return E_POINTER;
+		if (IsEqualGUID(pmt->majortype, MEDIATYPE_Subtitle) || pmt->majortype.Data1 == 0xE487EB08)
+			return S_OK;
+		return S_FALSE;
+	}
+	STDMETHODIMP EnumMediaTypes(IEnumMediaTypes** ppEnum) override {
+		if (!ppEnum) return E_POINTER;
+		CSubtitleEnumMediaTypes* p = new CSubtitleEnumMediaTypes();
+		p->AddRef();
+		*ppEnum = p;
+		return S_OK;
+	}
+	STDMETHODIMP QueryInternalConnections(IPin**, ULONG* pcCount) override {
+		if (pcCount) *pcCount = 0; return E_NOTIMPL;
+	}
+	STDMETHODIMP EndOfStream() override { return S_OK; }
+	STDMETHODIMP BeginFlush() override {
+		if (m_pAllocator) m_pAllocator->Decommit();
+		return S_OK;
+	}
+	STDMETHODIMP EndFlush() override {
+		if (m_pAllocator) m_pAllocator->Commit();
+		return S_OK;
+	}
+	STDMETHODIMP NewSegment(REFERENCE_TIME tStart, REFERENCE_TIME, double) override {
+		m_segment_start = tStart;
+		return S_OK;
+	}
+
+	//IMemInputPin
+	STDMETHODIMP GetAllocator(IMemAllocator** ppAllocator) override {
+		if (!ppAllocator) return E_POINTER;
+		if (!m_pAllocator) {
+			HRESULT hr = CoCreateInstance(CLSID_MemoryAllocator, NULL, CLSCTX_INPROC_SERVER,
+				IID_IMemAllocator, (void**)&m_pAllocator);
+			if (FAILED(hr)) return hr;
+		}
+		m_pAllocator->AddRef();
+		*ppAllocator = m_pAllocator;
+		return S_OK;
+	}
+	STDMETHODIMP NotifyAllocator(IMemAllocator* pAllocator, BOOL) override {
+		if (m_pAllocator) m_pAllocator->Release();
+		m_pAllocator = pAllocator;
+		if (m_pAllocator) m_pAllocator->AddRef();
+		return S_OK;
+	}
+	STDMETHODIMP GetAllocatorRequirements(ALLOCATOR_PROPERTIES*) override { return E_NOTIMPL; }
+	STDMETHODIMP Receive(IMediaSample* pSample) override {
+		if (!pSample) return E_POINTER;
+		if (!::IsWindow(m_target)) return S_OK;
+
+		BYTE* pBuf = NULL;
+		pSample->GetPointer(&pBuf);
+		long len = pSample->GetActualDataLength();
+		if (!pBuf || len <= 0) return S_OK;
+
+		REFERENCE_TIME rtStart = 0, rtEnd = 0;
+		pSample->GetTime(&rtStart, &rtEnd);
+
+		//sample timestamp 는 NewSegment.tStart 기준 segment-relative offset 이므로
+		//absolute stream time 으로 변환하기 위해 m_segment_start 를 add 한다.
+		REFERENCE_TIME absStart = rtStart + m_segment_start;
+		REFERENCE_TIME absEnd   = rtEnd   + m_segment_start;
+
+		if (absStart < 0 || absEnd <= absStart)
+			return S_OK;
+
+		rtStart = absStart;
+		rtEnd   = absEnd;
+
+		CDShow::SubtitlePacket* pkt = new CDShow::SubtitlePacket;
+		pkt->start_ms = (int)(rtStart / 10000);
+		pkt->end_ms   = (int)(rtEnd   / 10000);
+		pkt->data.assign(pBuf, pBuf + len);
+
+		if (!::PostMessage(m_target, m_msg, 0, (LPARAM)pkt))
+			delete pkt;
+		return S_OK;
+	}
+	STDMETHODIMP ReceiveMultiple(IMediaSample** pSamples, long nSamples, long* nSamplesProcessed) override {
+		long n = 0;
+		for (long i = 0; i < nSamples; i++) {
+			HRESULT hr = Receive(pSamples[i]);
+			if (FAILED(hr)) break;
+			n++;
+		}
+		if (nSamplesProcessed) *nSamplesProcessed = n;
+		return S_OK;
+	}
+	STDMETHODIMP ReceiveCanBlock() override { return S_FALSE; }
+};
+
+class CSubtitleSinkFilter : public IBaseFilter
+{
+	LONG m_ref;
+	FILTER_STATE m_state;
+	IFilterGraph* m_pGraph;	//weak (DirectShow convention)
+	IReferenceClock* m_pClock;
+	WCHAR m_name[64];
+	CSubtitleSinkPin* m_pPin;
+public:
+	CSubtitleSinkFilter(HWND target, UINT msg)
+		: m_ref(0), m_state(State_Stopped), m_pGraph(NULL), m_pClock(NULL) {
+		m_name[0] = 0;
+		m_pPin = new CSubtitleSinkPin(this, target, msg);
+		m_pPin->AddRef();
+	}
+	~CSubtitleSinkFilter() {
+		if (m_pPin) m_pPin->Release();
+		if (m_pClock) m_pClock->Release();
+	}
+
+	GUID get_subtype() { return m_pPin ? m_pPin->get_subtype() : GUID_NULL; }
+
+	//IUnknown
+	STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override {
+		if (iid == IID_IUnknown || iid == IID_IPersist || iid == IID_IMediaFilter || iid == IID_IBaseFilter) {
+			*ppv = static_cast<IBaseFilter*>(this);
+			AddRef();
+			return S_OK;
+		}
+		*ppv = NULL; return E_NOINTERFACE;
+	}
+	STDMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&m_ref); }
+	STDMETHODIMP_(ULONG) Release() override { ULONG n = InterlockedDecrement(&m_ref); if (n == 0) delete this; return n; }
+
+	//IPersist
+	STDMETHODIMP GetClassID(CLSID* pClsID) override {
+		if (!pClsID) return E_POINTER;
+		ZeroMemory(pClsID, sizeof(CLSID));
+		return S_OK;
+	}
+
+	//IMediaFilter
+	STDMETHODIMP Stop() override { m_state = State_Stopped; return S_OK; }
+	STDMETHODIMP Pause() override { m_state = State_Paused; return S_OK; }
+	STDMETHODIMP Run(REFERENCE_TIME) override { m_state = State_Running; return S_OK; }
+	STDMETHODIMP GetState(DWORD, FILTER_STATE* pState) override {
+		if (!pState) return E_POINTER;
+		*pState = m_state; return S_OK;
+	}
+	STDMETHODIMP SetSyncSource(IReferenceClock* pClock) override {
+		if (m_pClock) m_pClock->Release();
+		m_pClock = pClock;
+		if (m_pClock) m_pClock->AddRef();
+		return S_OK;
+	}
+	STDMETHODIMP GetSyncSource(IReferenceClock** ppClock) override {
+		if (!ppClock) return E_POINTER;
+		*ppClock = m_pClock;
+		if (m_pClock) m_pClock->AddRef();
+		return S_OK;
+	}
+
+	//IBaseFilter
+	STDMETHODIMP EnumPins(IEnumPins** ppEnum) override {
+		if (!ppEnum) return E_POINTER;
+		CSubtitleEnumPins* p = new CSubtitleEnumPins(m_pPin);
+		p->AddRef(); *ppEnum = p;
+		return S_OK;
+	}
+	STDMETHODIMP FindPin(LPCWSTR Id, IPin** ppPin) override {
+		if (!ppPin) return E_POINTER;
+		if (Id && wcscmp(Id, L"In") == 0) {
+			m_pPin->AddRef(); *ppPin = m_pPin; return S_OK;
+		}
+		*ppPin = NULL; return VFW_E_NOT_FOUND;
+	}
+	STDMETHODIMP QueryFilterInfo(FILTER_INFO* pInfo) override {
+		if (!pInfo) return E_POINTER;
+		wcscpy_s(pInfo->achName, m_name);
+		pInfo->pGraph = m_pGraph;
+		if (m_pGraph) m_pGraph->AddRef();
+		return S_OK;
+	}
+	STDMETHODIMP JoinFilterGraph(IFilterGraph* pGraph, LPCWSTR pName) override {
+		m_pGraph = pGraph;	//weak ref
+		if (pName) wcscpy_s(m_name, pName);
+		else m_name[0] = 0;
+		return S_OK;
+	}
+	STDMETHODIMP QueryVendorInfo(LPWSTR*) override { return E_NOTIMPL; }
+};
+
+static IPin* find_unconnected_pin(IBaseFilter* filter, PIN_DIRECTION dir_want)
+{
+	IEnumPins* pEnum = NULL;
+	if (!filter || FAILED(filter->EnumPins(&pEnum)) || !pEnum) return NULL;
+	IPin* pPin = NULL;
+	IPin* pFound = NULL;
+	while (pEnum->Next(1, &pPin, NULL) == S_OK)
+	{
+		PIN_DIRECTION dir;
+		pPin->QueryDirection(&dir);
+		if (dir == dir_want)
+		{
+			IPin* pOther = NULL;
+			pPin->ConnectedTo(&pOther);
+			if (pOther) { pOther->Release(); pPin->Release(); continue; }
+			pFound = pPin;
+			break;
+		}
+		pPin->Release();
+	}
+	pEnum->Release();
+	return pFound;
+}
+
+void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
+{
+	teardown_subtitle_grabber();
+
+	if (!m_pGB || !m_pSplitter || !target) return;
+
+	//graph state 보호 — running/paused 시 새 필터 추가/연결 실패 가능. stop 후 setup 후 복원.
+	CComQIPtr<IMediaControl> pMC(m_pGB);
+	OAFilterState saved_state = State_Stopped;
+	if (pMC) { pMC->GetState(0, &saved_state); pMC->Stop(); }
+
+	//splitter 의 자막 출력 핀 찾기
+	IPin* pSubPin = NULL;
+	IEnumPins* pEnum = NULL;
+	m_pSplitter->EnumPins(&pEnum);
+	if (pEnum)
+	{
+		IPin* pPin = NULL;
+		while (pEnum->Next(1, &pPin, NULL) == S_OK)
+		{
+			PIN_DIRECTION dir;
+			pPin->QueryDirection(&dir);
+			if (dir == PINDIR_OUTPUT)
+			{
+				IEnumMediaTypes* pEnumMT = NULL;
+				pPin->EnumMediaTypes(&pEnumMT);
+				if (pEnumMT)
+				{
+					AM_MEDIA_TYPE* pmt = NULL;
+					if (pEnumMT->Next(1, &pmt, NULL) == S_OK)
+					{
+						//IsEqualGUID + Data1 fallback (E487EB08 은 자막 majortype 의 unique signature)
+						if (IsEqualGUID(pmt->majortype, MEDIATYPE_Subtitle) ||
+							pmt->majortype.Data1 == 0xE487EB08)
+						{
+							IPin* pConnected = NULL;
+							pPin->ConnectedTo(&pConnected);
+							if (pConnected) { m_pGB->Disconnect(pPin); m_pGB->Disconnect(pConnected); pConnected->Release(); }
+							pSubPin = pPin;
+							pSubPin->AddRef();
+							m_subtitle_subtype = pmt->subtype;
+						}
+						if (pmt->cbFormat && pmt->pbFormat) CoTaskMemFree(pmt->pbFormat);
+						if (pmt->pUnk) pmt->pUnk->Release();
+						CoTaskMemFree(pmt);
+					}
+					pEnumMT->Release();
+				}
+			}
+			pPin->Release();
+			if (pSubPin) break;
+		}
+		pEnum->Release();
+	}
+
+	if (!pSubPin)
+	{
+		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		return;
+	}
+
+	//Custom sink filter 생성 + 그래프에 추가
+	CSubtitleSinkFilter* pSink = new CSubtitleSinkFilter(target, msg);
+	pSink->AddRef();
+
+	m_pGB->AddFilter(pSink, L"Subtitle Sink");
+
+	//splitter 자막 핀 → sink input 핀 직접 연결 (intermediate filter 사용 안 함)
+	IPin* pSinkIn = NULL;
+	pSink->FindPin(L"In", &pSinkIn);
+	if (pSinkIn)
+	{
+		m_pGB->ConnectDirect(pSubPin, pSinkIn, NULL);
+		pSinkIn->Release();
+	}
+
+	pSubPin->Release();
+
+	m_pSubtitleGrabber = pSink;	//IBaseFilter* alias
+	m_pSubtitleNullRenderer = NULL;
+	m_pSubtitleGrabberCB = pSink;	//CSubtitleSinkFilter* (subtype 조회용 별칭)
+
+	//graph state 복원
+	if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+}
+
+GUID CDShow::get_subtitle_format()
+{
+	if (m_pSubtitleGrabberCB)
+	{
+		GUID g = ((CSubtitleSinkFilter*)m_pSubtitleGrabberCB)->get_subtype();
+		if (g.Data1 != 0)
+			return g;
+	}
+	return m_subtitle_subtype;
+}
+
+void CDShow::teardown_subtitle_grabber()
+{
+	//m_pSubtitleGrabber 와 m_pSubtitleGrabberCB 는 같은 sink 객체의 다른 alias
+	//(IBaseFilter* / CSubtitleSinkFilter*). Release 는 한 번만.
+	if (m_pGB && m_pSubtitleGrabber)
+		m_pGB->RemoveFilter(m_pSubtitleGrabber);
+	if (m_pSubtitleGrabber) { m_pSubtitleGrabber->Release(); m_pSubtitleGrabber = NULL; }
+	m_pSubtitleNullRenderer = NULL;
+	m_pSubtitleGrabberCB = NULL;	//alias 였으므로 별도 release 안 함
+}
+
+
+//Audio gain filter — graph 의 audio renderer 직전에 끼워 PCM sample 직접 amplify.
+//graph 빌드 후 (load_media 끝) 호출. graph 가 stopped 인 상태에서 reconnect.
+void CDShow::setup_audio_filter_chain() { setup_audio_gain_filter(); }
+void CDShow::teardown_audio_filter_chain() { teardown_audio_gain_filter(); }
+void CDShow::set_audio_compressor_makeup_db(float db)
+{
+	if (!m_pAudioCompressorFilter) return;
+	((CSCAudioCompressor*)m_pAudioCompressorFilter)->set_makeup_db(db);
+	logWrite(_T("[set_audio_compressor_makeup_db] db=%.2f"), db);
+}
+
+void CDShow::setup_audio_gain_filter()
+{
+	logWrite(_T("[AudioGain] setup entry gb=%p"), m_pGB);
+	teardown_audio_gain_filter();
+
+	if (!m_pGB) return;
+
+	//graph state 보호
+	CComQIPtr<IMediaControl> pMC(m_pGB);
+	OAFilterState saved_state = State_Stopped;
+	if (pMC) { pMC->GetState(0, &saved_state); pMC->Stop(); }
+
+	//audio renderer 찾기 — IBaseFilter::EnumPins 로 Audio renderer 의 input pin 검사.
+	//기준: input pin 만 가진 (output pin 없는) filter + connected media major == MEDIATYPE_Audio.
+	IBaseFilter*	pRenderer = NULL;
+	IPin*			pRendererIn = NULL;
+	IPin*			pUpstreamOut = NULL;
+
+	IEnumFilters* pEnumF = NULL;
+	if (SUCCEEDED(m_pGB->EnumFilters(&pEnumF)) && pEnumF)
+	{
+		IBaseFilter* pF = NULL;
+		while (pEnumF->Next(1, &pF, NULL) == S_OK)
+		{
+			IEnumPins* pEnumP = NULL;
+			if (SUCCEEDED(pF->EnumPins(&pEnumP)) && pEnumP)
+			{
+				bool has_input = false;
+				bool has_output = false;
+				IPin* pAudioIn = NULL;
+				IPin* p = NULL;
+				while (pEnumP->Next(1, &p, NULL) == S_OK)
+				{
+					PIN_DIRECTION dir;
+					p->QueryDirection(&dir);
+					if (dir == PINDIR_OUTPUT) has_output = true;
+					else if (dir == PINDIR_INPUT)
+					{
+						has_input = true;
+						AM_MEDIA_TYPE mt;
+						memset(&mt, 0, sizeof(mt));
+						if (SUCCEEDED(p->ConnectionMediaType(&mt)))
+						{
+							if (IsEqualGUID(mt.majortype, MEDIATYPE_Audio))
+							{
+								if (pAudioIn) pAudioIn->Release();
+								pAudioIn = p;
+								pAudioIn->AddRef();
+							}
+							if (mt.cbFormat && mt.pbFormat) CoTaskMemFree(mt.pbFormat);
+							if (mt.pUnk) mt.pUnk->Release();
+						}
+					}
+					p->Release();
+				}
+				pEnumP->Release();
+
+				if (has_input && !has_output && pAudioIn)
+				{
+					pRenderer = pF;	pRenderer->AddRef();
+					pRendererIn = pAudioIn;	//ref 그대로 owner
+					pAudioIn = NULL;
+				}
+				if (pAudioIn) pAudioIn->Release();
+			}
+			pF->Release();
+			if (pRenderer) break;
+		}
+		pEnumF->Release();
+	}
+
+	if (!pRenderer || !pRendererIn)
+	{
+		logWrite(_T("[AudioGain] no audio renderer found"));
+		if (pRenderer) pRenderer->Release();
+		if (pRendererIn) pRendererIn->Release();
+		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		return;
+	}
+	logWrite(_T("[AudioGain] audio renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
+
+	//audio renderer input 의 connected upstream output pin 가져옴.
+	pRendererIn->ConnectedTo(&pUpstreamOut);
+
+	if (!pUpstreamOut)
+	{
+		logWrite(_T("[AudioGain] upstream pin not connected"));
+		pRenderer->Release();
+		pRendererIn->Release();
+		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		return;
+	}
+
+	//기존 connection 의 media type 을 보존 (disconnect 후 EnumMediaTypes 만으론 재협상 불안정).
+	AM_MEDIA_TYPE saved_mt;
+	memset(&saved_mt, 0, sizeof(saved_mt));
+	HRESULT hr_mt = pRendererIn->ConnectionMediaType(&saved_mt);
+	bool has_saved_mt = SUCCEEDED(hr_mt);
+	logWrite(_T("[AudioGain] saved mt hr=0x%08lX major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
+		hr_mt, saved_mt.majortype.Data1, saved_mt.subtype.Data1, saved_mt.cbFormat);
+
+	//기존 connection 끊기.
+	m_pGB->Disconnect(pRendererIn);
+	m_pGB->Disconnect(pUpstreamOut);
+
+	//gain filter 생성 + graph 추가.
+	CSCAudioGain* pGain = new CSCAudioGain();
+	pGain->AddRef();
+
+	HRESULT hr_add = m_pGB->AddFilter(pGain, L"SC Audio Gain");
+	logWrite(_T("[AudioGain] AddFilter hr=0x%08lX"), hr_add);
+	if (FAILED(hr_add))
+	{
+		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
+		pGain->Release();
+		if (has_saved_mt) { if (saved_mt.cbFormat && saved_mt.pbFormat) CoTaskMemFree(saved_mt.pbFormat); if (saved_mt.pUnk) saved_mt.pUnk->Release(); }
+		pUpstreamOut->Release();
+		pRenderer->Release();
+		pRendererIn->Release();
+		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		return;
+	}
+
+	IPin* pGainIn = NULL;
+	IPin* pGainOut = NULL;
+	pGain->FindPin(L"In",  &pGainIn);
+	pGain->FindPin(L"Out", &pGainOut);
+
+	HRESULT hr1 = (pGainIn  ? m_pGB->ConnectDirect(pUpstreamOut, pGainIn,  has_saved_mt ? &saved_mt : NULL) : E_FAIL);
+	HRESULT hr2 = (pGainOut ? m_pGB->ConnectDirect(pGainOut, pRendererIn, has_saved_mt ? &saved_mt : NULL) : E_FAIL);
+	logWrite(_T("[AudioGain] Connect upstream->gain hr=0x%08lX  gain->renderer hr=0x%08lX"), hr1, hr2);
+
+	if (pGainIn) pGainIn->Release();
+	if (pGainOut) pGainOut->Release();
+
+	if (FAILED(hr1) || FAILED(hr2))
+	{
+		logWrite(_T("[AudioGain] connect failed - restoring original chain"));
+		m_pGB->RemoveFilter(pGain);
+		pGain->Release();
+		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
+	}
+	else
+	{
+		logWrite(_T("[AudioGain] gain filter inserted into graph"));
+		m_pAudioGainFilter = pGain;
+
+		//Compressor 도 chain 에 추가: upstream → gain → compressor → renderer.
+		//현재 gain → renderer 의 link 를 끊고 그 사이에 compressor 끼움.
+		IPin* pGainOutPin = NULL;
+		pGain->FindPin(L"Out", &pGainOutPin);
+		if (pGainOutPin)
+		{
+			AM_MEDIA_TYPE comp_mt;
+			memset(&comp_mt, 0, sizeof(comp_mt));
+			HRESULT hr_cmt = pGainOutPin->ConnectionMediaType(&comp_mt);
+			bool has_comp_mt = SUCCEEDED(hr_cmt);
+
+			m_pGB->Disconnect(pGainOutPin);
+			m_pGB->Disconnect(pRendererIn);
+
+			CSCAudioCompressor* pComp = new CSCAudioCompressor();
+			pComp->AddRef();
+			//-24 dB threshold, 4:1 ratio — 음악·음성 통상 setting. attack/release 는 default(30/200ms).
+			pComp->set_threshold_db(-24.0f);
+			pComp->set_ratio(4.0f);
+			pComp->set_makeup_db(0.0f);	//set_volume 에서 동적 조절
+
+			HRESULT hr_addc = m_pGB->AddFilter(pComp, L"SC Audio Compressor");
+			logWrite(_T("[AudioComp] AddFilter hr=0x%08lX"), hr_addc);
+
+			IPin* pCompIn = NULL, * pCompOut = NULL;
+			pComp->FindPin(L"In",  &pCompIn);
+			pComp->FindPin(L"Out", &pCompOut);
+
+			HRESULT hr_c1 = (pCompIn  ? m_pGB->ConnectDirect(pGainOutPin, pCompIn,  has_comp_mt ? &comp_mt : NULL) : E_FAIL);
+			HRESULT hr_c2 = (pCompOut ? m_pGB->ConnectDirect(pCompOut, pRendererIn, has_comp_mt ? &comp_mt : NULL) : E_FAIL);
+			logWrite(_T("[AudioComp] Connect gain->comp hr=0x%08lX  comp->renderer hr=0x%08lX"), hr_c1, hr_c2);
+
+			if (pCompIn) pCompIn->Release();
+			if (pCompOut) pCompOut->Release();
+
+			if (FAILED(hr_c1) || FAILED(hr_c2))
+			{
+				logWrite(_T("[AudioComp] connect failed - reverting (compressor 없이 gain 만 사용)"));
+				m_pGB->RemoveFilter(pComp);
+				pComp->Release();
+				m_pGB->ConnectDirect(pGainOutPin, pRendererIn, has_comp_mt ? &comp_mt : NULL);
+			}
+			else
+			{
+				logWrite(_T("[AudioComp] compressor inserted into chain (gain->comp->renderer)"));
+				m_pAudioCompressorFilter = pComp;
+			}
+
+			if (has_comp_mt)
+			{
+				if (comp_mt.cbFormat && comp_mt.pbFormat) CoTaskMemFree(comp_mt.pbFormat);
+				if (comp_mt.pUnk) comp_mt.pUnk->Release();
+			}
+			pGainOutPin->Release();
+		}
+	}
+
+	if (has_saved_mt)
+	{
+		if (saved_mt.cbFormat && saved_mt.pbFormat) CoTaskMemFree(saved_mt.pbFormat);
+		if (saved_mt.pUnk) saved_mt.pUnk->Release();
+	}
+
+	pUpstreamOut->Release();
+	pRenderer->Release();
+	pRendererIn->Release();
+
+	if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+}
+
+void CDShow::teardown_audio_gain_filter()
+{
+	if (m_pAudioCompressorFilter)
+	{
+		CSCAudioCompressor* pComp = (CSCAudioCompressor*)m_pAudioCompressorFilter;
+		if (m_pGB) m_pGB->RemoveFilter(pComp);
+		pComp->Release();
+		m_pAudioCompressorFilter = NULL;
+	}
+
+	if (m_pAudioGainFilter)
+	{
+		CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+		if (m_pGB) m_pGB->RemoveFilter(pGain);
+		pGain->Release();
+		m_pAudioGainFilter = NULL;
+	}
+}
+
+void CDShow::set_audio_gain_db(float db)
+{
+	logWrite(_T("[set_audio_gain_db] db=%.2f filter=%p"), db, m_pAudioGainFilter);
+	if (!m_pAudioGainFilter) return;
+	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+	pGain->set_gain_db(db);
+}
+
+float CDShow::get_audio_gain_db()
+{
+	if (!m_pAudioGainFilter) return 0.0f;
+	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+	return pGain->get_gain_db();
+}
 
 #ifndef JIF
 #define JIF(x) if (FAILED(hr=(x))) {return hr;}
@@ -47,6 +811,14 @@ CDShow::CDShow()
 	m_pMemDC[1] = NULL;
 	m_pBitmap[0] = NULL;
 	m_pBitmap[1] = NULL;
+
+	m_pSubtitleGrabber = NULL;
+	m_pSubtitleNullRenderer = NULL;
+	m_pSubtitleGrabberCB = NULL;
+	memset(&m_subtitle_subtype, 0, sizeof(m_subtitle_subtype));
+
+	m_pAudioGainFilter = NULL;
+	m_pAudioCompressorFilter = NULL;
 
 	m_use_dvs = false;
 	m_has_subtitle = false;
@@ -105,6 +877,9 @@ CDShow::~CDShow()
 
 void CDShow::close_media()
 {
+	teardown_subtitle_grabber();
+	teardown_audio_gain_filter();
+
 	if (m_pGB)
 	{
 		CComQIPtr<IMediaControl> pMC(m_pGB);
@@ -399,6 +1174,89 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	if (is_media_video())
 		prepare_AlphaBitmap();
 
+	//audio gain filter 끼움 — graph 의 audio renderer 직전. graph 빌드 끝난 후 한 번.
+	setup_audio_gain_filter();
+
+	//graph 의 현재 connection 상태를 .grf 파일로 export — GraphEdit/GraphStudioNext 로 시각화 검증.
+	{
+		TCHAR exe_path[MAX_PATH] = {0};
+		GetModuleFileName(NULL, exe_path, MAX_PATH);
+		CString grf_path = exe_path;
+		int slash = grf_path.ReverseFind(_T('\\'));
+		if (slash >= 0) grf_path = grf_path.Left(slash);
+		grf_path += _T("\\Log");
+		CreateDirectory(grf_path, NULL);
+		grf_path += _T("\\last_graph.grf");
+		HRESULT hr_save = save_filter_graph(m_pGB, grf_path);
+		logWrite(_T("[graph] save_filter_graph hr=0x%08lX path=%s"), hr_save, grf_path.GetString());
+	}
+
+	//graph 구조 dump — 모든 filter / pin / connection 을 로그로 출력.
+	{
+		IEnumFilters* pEnumF = NULL;
+		if (SUCCEEDED(m_pGB->EnumFilters(&pEnumF)) && pEnumF)
+		{
+			IBaseFilter* pF = NULL;
+			int fidx = 0;
+			while (pEnumF->Next(1, &pF, NULL) == S_OK)
+			{
+				FILTER_INFO fi; memset(&fi, 0, sizeof(fi));
+				pF->QueryFilterInfo(&fi);
+				if (fi.pGraph) fi.pGraph->Release();
+				logWrite(_T("[graph] filter[%d] %s"), fidx, fi.achName);
+
+				IEnumPins* pEnumP = NULL;
+				if (SUCCEEDED(pF->EnumPins(&pEnumP)) && pEnumP)
+				{
+					IPin* pP = NULL;
+					int pidx = 0;
+					while (pEnumP->Next(1, &pP, NULL) == S_OK)
+					{
+						PIN_DIRECTION dir;
+						pP->QueryDirection(&dir);
+						PIN_INFO pi; memset(&pi, 0, sizeof(pi));
+						pP->QueryPinInfo(&pi);
+						if (pi.pFilter) pi.pFilter->Release();
+
+						IPin* pConn = NULL;
+						pP->ConnectedTo(&pConn);
+						if (pConn)
+						{
+							PIN_INFO ci; memset(&ci, 0, sizeof(ci));
+							pConn->QueryPinInfo(&ci);
+							FILTER_INFO cfi; memset(&cfi, 0, sizeof(cfi));
+							if (ci.pFilter)
+							{
+								ci.pFilter->QueryFilterInfo(&cfi);
+								if (cfi.pGraph) cfi.pGraph->Release();
+							}
+							AM_MEDIA_TYPE mt; memset(&mt, 0, sizeof(mt));
+							pP->ConnectionMediaType(&mt);
+							logWrite(_T("[graph]   pin[%d] %s '%s' -> '%s'.'%s'  major.D1=%08lX"),
+								pidx, dir == PINDIR_INPUT ? _T("IN ") : _T("OUT"),
+								pi.achName, cfi.achName, ci.achName, mt.majortype.Data1);
+							if (mt.cbFormat && mt.pbFormat) CoTaskMemFree(mt.pbFormat);
+							if (mt.pUnk) mt.pUnk->Release();
+							if (ci.pFilter) ci.pFilter->Release();
+							pConn->Release();
+						}
+						else
+						{
+							logWrite(_T("[graph]   pin[%d] %s '%s' -> (disconnected)"),
+								pidx, dir == PINDIR_INPUT ? _T("IN ") : _T("OUT"), pi.achName);
+						}
+						pP->Release();
+						pidx++;
+					}
+					pEnumP->Release();
+				}
+				pF->Release();
+				fidx++;
+			}
+			pEnumF->Release();
+		}
+	}
+
 	return 1;
 }
 
@@ -455,8 +1313,10 @@ void CDShow::analyze_stream(IBaseFilter *pBaseFilter)
 
 	m_video_stream_index = 0;
 	m_audio_stream_index = 0;
+	m_subtitle_stream_index = -1;
 	m_video_stream.clear();
 	m_audio_stream.clear();
+	m_subtitle_stream.clear();
 
 	if (!pBaseFilter)
 		return;
@@ -477,13 +1337,22 @@ void CDShow::analyze_stream(IBaseFilter *pBaseFilter)
 			continue;
 		}
 
-		if (pmt->majortype == MEDIATYPE_Video)
+		//LAV Splitter 는 video=group0, audio=group1, subtitle=group2 로 분류한다.
+		//일부 splitter 는 자막의 majortype 으로 MEDIATYPE_Subtitle 가 아닌 다른 GUID 를 쓰므로
+		//dwGroup 검사를 OR 로 같이 둔다.
+		if (pmt->majortype == MEDIATYPE_Video || dwGroup == 0)
 		{
 			m_video_stream.push_back(CMediaStream(pzsName, i));
 		}
-		else if (pmt->majortype == MEDIATYPE_Audio)
+		else if (pmt->majortype == MEDIATYPE_Audio || dwGroup == 1)
 		{
 			m_audio_stream.push_back(CMediaStream(pzsName, i));
+		}
+		else if (pmt->majortype == MEDIATYPE_Subtitle || dwGroup == 2)
+		{
+			m_subtitle_stream.push_back(CMediaStream(pzsName, i));
+			if (dwFlags & (AMSTREAMSELECTINFO_ENABLED | AMSTREAMSELECTINFO_EXCLUSIVE))
+				m_subtitle_stream_index = (int)m_subtitle_stream.size() - 1;
 		}
 
 		if (pmt->formattype == FORMAT_VideoInfo)
@@ -768,13 +1637,15 @@ void CDShow::set_video_position(CRect r)
 	if (!m_pGB || !m_pVMRWC)
 		return;
 
-	//CComQIPtr<IVMRWindowlessControl9> pVMRWC(m_VMR);
 	m_pVMRWC->SetVideoPosition(NULL, &r);
 
-	//이걸 해주지 않으면 일시정지 한 후 창 크기를 변경해도 비디오 영상이 제대로 표시되지 않는다.
-	if (m_play_state == State_Paused)
+	//Paused / Running 모두 즉시 redraw — resize 중 video frame 이 새 위치에 즉시 그려져 깜빡임 최소화.
+	//Running 시 다음 frame 까지 1~16ms 지연이 깜빡임 원인이 됨.
+	if (m_pParent && m_pParent->GetSafeHwnd())
 	{
-		m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), ::GetDC(m_pParent->GetSafeHwnd()));
+		HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+		m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+		::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
 	}
 }
 
@@ -876,6 +1747,47 @@ void CDShow::select_stream(bool video, int index)
 		pStreamSelect->Enable(m_video_stream[index].get_index(), AMSTREAMSELECTENABLE_ENABLE);
 	else
 		pStreamSelect->Enable(m_audio_stream[index].get_index(), AMSTREAMSELECTENABLE_ENABLE);
+}
+
+void CDShow::select_subtitle_stream(int index)
+{
+	if (!m_pSplitter)
+		return;
+
+	CComQIPtr<IAMStreamSelect> pStreamSelect(m_pSplitter);
+	if (!pStreamSelect)
+		return;
+
+	//index < 0 = 임베디드 자막 stream 전체 비활성화 (외부 자막 우선용).
+	//splitter 의 default active stream 도 disable 해야 하므로 m_subtitle_stream_index 가 -1 이어도 전체 loop.
+	if (index < 0)
+	{
+		for (size_t k = 0; k < m_subtitle_stream.size(); k++)
+			pStreamSelect->Enable(m_subtitle_stream[k].get_index(), 0);
+		m_subtitle_stream_index = -1;
+		return;
+	}
+	if (index >= (int)m_subtitle_stream.size())
+		return;
+
+	pStreamSelect->Enable(m_subtitle_stream[index].get_index(), AMSTREAMSELECTENABLE_ENABLE);
+	m_subtitle_stream_index = index;
+}
+
+void CDShow::reselect_current_subtitle_stream()
+{
+	if (!m_pSplitter || m_subtitle_stream_index < 0)
+		return;
+	if (m_subtitle_stream_index >= (int)m_subtitle_stream.size())
+		return;
+
+	CComQIPtr<IAMStreamSelect> pStreamSelect(m_pSplitter);
+	if (!pStreamSelect)
+		return;
+
+	int abs_idx = m_subtitle_stream[m_subtitle_stream_index].get_index();
+	pStreamSelect->Enable(abs_idx, 0);
+	pStreamSelect->Enable(abs_idx, AMSTREAMSELECTENABLE_ENABLE);
 }
 
 double CDShow::get_playback_rate()
@@ -1200,16 +2112,50 @@ void CDShow::set_volume(int volume, bool reset_mute)
 	if (!pBA)
 		return;
 
-	double d;
-	//d = -1.0 * pow( 1.0964, VOLUME_MAX - m_volume );
-	d = -29.5 * pow(1.06, VOLUME_MAX - m_volume) + 30;
-	//d = -7.23 * pow(1.075, VOLUME_MAX - m_volume) + 7.2;
-	//d = -200.0 * pow(1.04, VOLUME_MAX - m_volume) + 101;
+	//Volume 매핑 — piece-wise 곡선:
+	//  v=0~10  : -25 dB → -10 dB (가파른 attenuation, 작은 영역의 미세 조정)
+	//  v=10~100: -10 dB → +30 dB (점진 boost, 큰 영역의 PotPlayer 비교 음량)
+	//   0  : mute
+	//   1  : -23.5 dB (거의 안 들림 — 작은 음량 표현)
+	//   2  : -22 dB
+	//   5  : -17.5 dB
+	//  10  : -10 dB (분기점, 작음)
+	//  20  : -5.56 dB
+	//  33  : ≈ 0 dB (IBasicAudio max — boost 분기)
+	//  50  : +7.78 dB
+	// 100  : +30 dB
+	//전 영역 boost 는 작은 영역 표현 불가 / 전 영역 attenuation 은 큰 영역 부족 — piece-wise 가 균형.
+	const int v = m_volume_mute ? 0 : m_volume;
+	logWrite(_T("[set_volume] v=%d gain=%p comp=%p"), v, m_pAudioGainFilter, m_pAudioCompressorFilter);
 
-	if (m_volume_mute)
+	//gain filter 는 chain 에 있지만 항상 0 dB (passthrough). amplification 은 compressor makeup 으로.
+	set_audio_gain_db(0.0f);
+	if (v <= 0)
+	{
 		pBA->put_Volume(-10000);
+		set_audio_compressor_makeup_db(0.0f);
+	}
 	else
-		pBA->put_Volume((long)d);
+	{
+		double total_db;
+		if (v <= 10)
+			total_db = -25.0 + (double)v * 15.0 / 10.0;			//v=1: -23.5, v=10: -10
+		else
+			total_db = -10.0 + (double)(v - 10) * 40.0 / 90.0;	//v=10: -10, v=100: +30
+
+		if (total_db <= 0.0)
+		{
+			long centibels = (long)(total_db * 100.0);
+			if (centibels < -10000) centibels = -10000;
+			pBA->put_Volume(centibels);
+			set_audio_compressor_makeup_db(0.0f);
+		}
+		else
+		{
+			pBA->put_Volume(0);
+			set_audio_compressor_makeup_db((float)total_db);
+		}
+	}
 }
 
 #ifdef REGISTER_FILTERGRAPH

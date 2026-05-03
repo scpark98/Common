@@ -49,8 +49,9 @@ void CPropGridSlider::OnSliderPosChanged()
 	int pos = m_pSlider->GetPos();
 	float ratio = ((float)pos / float(m_step));
 	int value = (int)(float(m_max - m_min) * ratio + m_min);
-	SetValue((_variant_t)(int)value);
-	m_pWndList->OnPropertyChanged(this);
+	SetValue((_variant_t)(long)value);
+	if (m_pWndList)
+		m_pWndList->OnPropertyChanged(this);
 }
 
 void CPropGridSlider::SetSliderPos()

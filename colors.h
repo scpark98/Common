@@ -81,10 +81,10 @@
 
 struct RGBA
 {
-	byte r;
-	byte g;
-	byte b;
-	byte a;
+	::byte r;
+	::byte g;
+	::byte b;
+	::byte a;
 };
 //std::map으로 컬러 표현
 //참조 방법 : cr = g_cr["white"]
@@ -357,7 +357,7 @@ Gdiplus::Color	lerp_color(Gdiplus::Color a, Gdiplus::Color b, float t);
 CString			get_nearest_color_name(COLORREF cr, COLORREF * cr_nearest = nullptr);
 
 //alpha까지 고려하여 컬러의 밝기값을 리턴한다.
-byte			get_luminance(Gdiplus::Color cr);
+::byte			get_luminance(Gdiplus::Color cr);
 
 Gdiplus::Color	get_sys_color(int index);
 #ifndef _USING_V110_SDK71_

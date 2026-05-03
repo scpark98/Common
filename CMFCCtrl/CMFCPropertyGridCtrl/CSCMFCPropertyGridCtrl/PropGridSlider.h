@@ -41,7 +41,8 @@ protected:
 
 public:
 	CPropGridSlider(CString name, int value, CString tip, int min, int max, int step, DWORD dwData, int edit_ctrl_width=-2 ) :
-		CMFCPropertyGridProperty(name, (_variant_t)(value), tip, dwData) {
+		CMFCPropertyGridProperty(name, (_variant_t)(long)value, tip, dwData) {
+		//_variant_t(int) 은 VT_INT 를 만들지만 일부 MFC 경로가 VT_I4 를 기대하므로 long 으로 강제하여 VT_I4 를 만든다.
 		m_min = min;
 		m_max = max;
 		m_step = step;

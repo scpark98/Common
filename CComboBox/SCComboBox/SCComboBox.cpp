@@ -963,7 +963,7 @@ static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTyp
 	{
 		pThis->add_font_list(lplf->lfFaceName);
 		index = pThis->AddString(lplf->lfFaceName);
-		TRACE(_T("%s\n"), lplf->lfFaceName);
+		//TRACE(_T("%s\n"), lplf->lfFaceName);
 	}
 	ASSERT(index != -1);
 

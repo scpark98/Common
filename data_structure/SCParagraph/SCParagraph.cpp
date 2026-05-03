@@ -664,6 +664,7 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			//GraphicsPath를 이용하면 stroke, shadow 등 다양한 효과를 구현할 수 있지만
 			//DrawString()보다 글자가 선명하게 보이지 않는 단점이 있다.
 			//stroke, shadow를 아예 사용하지 않을 경우는 DrawString()으로 그려준다.
+			//shadow_depth 의미: 0 = shadow 사용 안 함, > 0 = 해당 픽셀만큼 offset, < 0 = 자동 계산.
 			if (para[i][j].text_prop.shadow_depth == 0 && para[i][j].text_prop.thickness == 0)
 			{
 				g.DrawString(CStringW(para[i][j].text), -1, font,
@@ -686,27 +687,37 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-				//그림자의 깊이는 텍스트 height에 따라 비례하고 stroke의 thickness 유무와도 관계있다
-				Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
+				if (para[i][j].text_prop.shadow_depth != 0)
+				{
+					Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
 
+					CPoint pt_shadow_offset;
+					if (para[i][j].text_prop.shadow_depth > 0)
+					{
+						pt_shadow_offset.x = (LONG)para[i][j].text_prop.shadow_depth;
+						pt_shadow_offset.y = (LONG)para[i][j].text_prop.shadow_depth;
+					}
+					else
+					{
+						//자동 계산: 텍스트 height에 비례하고 stroke thickness 유무와도 관계있다.
+						pt_shadow_offset.x = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
+						pt_shadow_offset.x = max(pt_shadow_offset.x, para[i][j].text_prop.thickness / 1.4f);
+						pt_shadow_offset.y = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
+						pt_shadow_offset.y = max(pt_shadow_offset.y, para[i][j].text_prop.thickness / 1.4f);
+					}
+					r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
 
-				CPoint pt_shadow_offset;
-				pt_shadow_offset.x = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
-				pt_shadow_offset.x = max(pt_shadow_offset.x, para[i][j].text_prop.thickness / 1.4f);
-				pt_shadow_offset.y = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
-				pt_shadow_offset.y = max(pt_shadow_offset.y, para[i][j].text_prop.thickness / 1.4f);
-				r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
+					shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
+						para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-				shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
-					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
+					g.FillPath(&br_shadow, &shadow_path);
+				}
 
 				Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
 				Gdiplus::SolidBrush brush(para[i][j].text_prop.cr_text);
 
 				//pen.SetLineJoin(Gdiplus::LineJoinMiter);
 				pen.SetLineJoin(Gdiplus::LineJoinRound);
-
-				g.FillPath(&br_shadow, &shadow_path);
 
 				//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
 				//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.

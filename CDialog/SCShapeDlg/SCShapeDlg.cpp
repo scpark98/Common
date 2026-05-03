@@ -200,6 +200,16 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 		r.InflateRect((int)m_text_setting.text_prop.round_thickness + 2, (int)m_text_setting.text_prop.round_thickness + 2);
 	}
 
+	//cr_back 이 Transparent 여도 stroke / shadow 가 있으면 비트맵을 그만큼 키워야
+	//SCParagraph::draw_text 의 path 가장자리·그림자 offset 이 잘리지 않는다.
+	//shadow_depth < 0 (자동) 인 경우 SCParagraph::draw_text 의 자동 계산식과 같은 추정으로 여유를 잡는다.
+	float shadow_extra = m_text_setting.text_prop.shadow_depth;
+	if (shadow_extra < 0)
+		shadow_extra = max((float)r.Height() / 30.0f, 2.0f);
+	int extra = (int)(m_text_setting.text_prop.thickness + shadow_extra) + 2;
+	if (extra > 0)
+		r.InflateRect(extra, extra);
+
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);

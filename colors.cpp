@@ -297,7 +297,7 @@ Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset)
 }
 
 //alpha까지 고려하여 컬러의 밝기값을 리턴한다.
-byte get_luminance(Gdiplus::Color cr)
+::byte get_luminance(Gdiplus::Color cr)
 {
 	const float a = cr.GetA() / 255.0f;
 	const BYTE R_eff = static_cast<BYTE>(cr.GetR() * a + 255.0f * (1.0f - a));
@@ -322,6 +322,9 @@ Gdiplus::Color get_color(CString cr_str)
 {
 	Gdiplus::Color cr = Gdiplus::Color::Black;
 
+	if (cr_str.IsEmpty())
+		return cr;
+
 	if (cr_str[0] == '#')
 	{
 		cr = get_gcolor_from_hexa_str(cr_str);
@@ -344,8 +347,30 @@ Gdiplus::Color get_color(CString cr_str)
 			cr = Gdiplus::Color(_ttoi(token[0]), _ttoi(token[1]), _ttoi(token[2]), _ttoi(token[3]));
 		}
 	}
-	else //cr_str == _T("Red")라면 Gdiplus::Color::Red 라는 컬러값을 리턴한다.
+	else
 	{
+		//prefix 없는 6/8자리 hex 도 hex 로 처리 (예: "FFA500", "FF0000FF").
+		//SMI/SAMI 자막에서 흔히 prefix 생략됨. 이 분기를 named color 보다 먼저 검사.
+		int len = cr_str.GetLength();
+		if (len == 6 || len == 8)
+		{
+			bool all_hex = true;
+			for (int k = 0; k < len; k++)
+			{
+				TCHAR c = cr_str[k];
+				if (!((c >= _T('0') && c <= _T('9')) ||
+					  (c >= _T('A') && c <= _T('F')) ||
+					  (c >= _T('a') && c <= _T('f'))))
+				{
+					all_hex = false;
+					break;
+				}
+			}
+			if (all_hex)
+				return get_gcolor_from_hexa_str(cr_str);
+		}
+
+		//cr_str == _T("Red")라면 Gdiplus::Color::Red 라는 컬러값을 리턴한다.
 		std::string scr_name = CString2string(cr_str);
 		cr = CSCColorList::get_color(scr_name);
 	}

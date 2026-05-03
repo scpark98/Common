@@ -121,7 +121,7 @@ public:
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
 	//default는 hide 상태로 시작되므로 set_text()로 세팅한 후 ShowWindow(SW_SHOW)를 호출해야 함.
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
-	//shadow_depth는 출력되는 텍스트의 height에 대한 비율이지만 font_size에 비례하여 자동 조정되므로 지금은 사용되지 않음.
+	//shadow_depth: 0 = shadow 사용 안 함, > 0 = 해당 픽셀만큼 offset, < 0 = 텍스트 height/thickness 에 비례하여 자동 계산.
 	CSCShapeDlgTextSetting*	set_text(CWnd* parent, CString text,
 							float font_size,
 							int font_style,

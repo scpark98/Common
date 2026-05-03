@@ -22,10 +22,11 @@
 #endif //MEDIAINFO_LIBRARY
 #include <iostream>
 #include <iomanip>
+#include <vector>
 using namespace MediaInfoNameSpace;
 
 
-#define VOLUME_MAX 100
+#define VOLUME_MAX 100	//slider 범위. 80% = 0 dB, 100% = +18 dB (software boost via CSCAudioGain).
 #define MESSAGE_DSHOW_MEDIA		WM_USER + 23
 #define WM_GRAPHNOTIFY			WM_USER + 24
 
@@ -109,13 +110,46 @@ public:
 
 	std::deque<CMediaStream> m_video_stream;
 	std::deque<CMediaStream> m_audio_stream;
+	std::deque<CMediaStream> m_subtitle_stream;
 	int				get_video_stream_count() { return m_video_stream.size(); }
 	int				get_audio_stream_count() { return m_audio_stream.size(); }
+	int				get_subtitle_stream_count() { return m_subtitle_stream.size(); }
 	int				get_video_stream_current() { return m_video_stream_index; }
 	int				get_audio_stream_current() { return m_audio_stream_index; }
+	int				get_subtitle_stream_current() { return m_subtitle_stream_index; }
 	CString			get_video_stream(int index) { return m_video_stream[index].get_stream_name(); }
 	CString			get_audio_stream(int index) { return m_audio_stream[index].get_stream_name(); }
+	CString			get_subtitle_stream(int index) { return m_subtitle_stream[index].get_stream_name(); }
 	void			select_stream(bool video, int index);
+	void			select_subtitle_stream(int index);
+	//현재 active 자막 트랙을 disable→enable 로 toggle 하여 splitter 의 자막 stream 을 re-prime.
+	//graph seek 후 LAV Splitter 가 자막 sample emit 안 하는 경우 stream 재시작 시도 용도.
+	void			reselect_current_subtitle_stream();
+
+	//SampleGrabber 가 콜백에서 만들어 PostMessage 로 보내는 자막 cue 패킷.
+	struct SubtitlePacket
+	{
+		int start_ms;
+		int end_ms;
+		std::vector<BYTE> data;	//원본 sample bytes (UTF-8 / ASS / PGS / ...)
+	};
+
+	//Phase 1.1 — 임베디드 자막 SampleGrabber 추출.
+	//target HWND 의 msg 메시지로 (WPARAM=0, LPARAM=heap-allocated CDShowSubtitlePacket*) 통지.
+	//주의: 핸들러는 packet 사용 후 delete 해야 함.
+	void			setup_subtitle_grabber(HWND target, UINT msg);
+	void			teardown_subtitle_grabber();
+	GUID			get_subtitle_format();
+
+	//Audio software gain + compressor chain — IBasicAudio 의 0 dB ceiling 을 넘어 PCM 단계에서
+	//인지 음량을 키운다. chain: upstream → CSCAudioGain → CSCAudioCompressor → renderer.
+	void			setup_audio_filter_chain();
+	void			teardown_audio_filter_chain();
+	void			setup_audio_gain_filter();		//internal — chain 의 한 단계
+	void			teardown_audio_gain_filter();	//internal — chain 전체 해체
+	void			set_audio_gain_db(float db);
+	float			get_audio_gain_db();
+	void			set_audio_compressor_makeup_db(float db);
 
 	double			get_playback_rate();
 	void			set_playback_rate(double rate);
@@ -224,6 +258,9 @@ public:
 
 	void ShowFilterPropertyPage(CString sFilterName);
 
+	//IReferenceClock 같은 외부 동기화 인터페이스를 caller 가 직접 얻기 위한 graph builder accessor.
+	IGraphBuilder*	get_graph_builder() { return m_pGB; }
+
 protected:
 	CWnd*			m_pParent;
 	CString			m_media_filename;
@@ -280,7 +317,18 @@ protected:
 
 	int						m_video_stream_index;
 	int						m_audio_stream_index;
+	int						m_subtitle_stream_index;
 	void					analyze_stream(IBaseFilter *pBaseFilter);
+
+	//SampleGrabber 자막 추출 멤버
+	IBaseFilter*			m_pSubtitleGrabber;
+	IBaseFilter*			m_pSubtitleNullRenderer;
+	void*					m_pSubtitleGrabberCB;	//CSubtitleGrabberCB* (qedit 의존 안 하려고 void*)
+	GUID					m_subtitle_subtype;
+
+	//Audio filter chain (CSCAudioGain* / CSCAudioCompressor* — header 의존 줄이려 void*)
+	void*					m_pAudioGainFilter;
+	void*					m_pAudioCompressorFilter;
 
 	int						m_nFilter;				// 사용된 필터의 수
 	BOOL					m_bFilter[10];			// 등록정보가 가능한 필터인지...

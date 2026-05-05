@@ -7,6 +7,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../AutoFont.h"
+#include "../../log/SCLog/SCLog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -352,10 +353,9 @@ void CSCSliderCtrl::OnPaint()
 		dc.FillSolidRect(r.left, cy - 2, r.Width(), 4, m_cr_back);//GRAY192);
 		dc.FillSolidRect(r.left, cy + 2, r.Width(), 2, get_color(m_cr_back, 64));
 		*/
-		draw_sunken_rect(&dc, r, true, get_color(m_theme.cr_back, -32), get_color(m_theme.cr_back, 32), 1);
-		r.DeflateRect(1, 1);
-		draw_sunken_rect(&dc, r, true, get_color(m_theme.cr_back, -32), get_color(m_theme.cr_back, 32), 1);
-
+		draw_sunken_rect(&dc, r, true, get_weak_color(m_theme.cr_back, -12), get_weak_color(m_theme.cr_back, 12));
+		//r.DeflateRect(1, 1);
+		//draw_sunken_rect(&dc, r, true, get_color(m_theme.cr_back, -32), get_color(m_theme.cr_back, 32), 1);
 	}
 	else if (m_style == style_step)
 	{
@@ -1010,7 +1010,7 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 	return pos;
 }
 
-void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point) 
+void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	SetFocus();
 
@@ -1023,17 +1023,17 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_use_slide == false)
 		return;
 
-	/*
-	int pos = GetPos();
-
-	// TODO: Add your message handler code here and/or call default
-	if (m_use_bookmark && (m_cur_bookmark >= 0))
+	//북마크 근처 click 시 정확한 bookmark 위치로 점프.
+	//OnMouseMove 가 마우스 위치 ±m_bookmark_near_tolerance 안에 bookmark 있으면 m_cur_bookmark 를 미리 set.
+	//그 상태에서 click 하면 바로 그 bookmark 의 pos 로 SetPos + thumb_release 통지 (트랙 점프 의미).
+	if (m_use_bookmark && m_cur_bookmark >= 0)
 	{
-		SetPos(m_bookmark[m_cur_bookmark].pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
+		int bm_pos = m_bookmark[m_cur_bookmark].pos;
+		SetPos(bm_pos);
+		CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_release, this, bm_pos);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&msg, 0);
 		return;
 	}
-	*/
 	/*
 	int		lower;
 	int		upper;
@@ -1177,8 +1177,8 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		if (point.y < m_rc.CenterPoint().y + 4)
 		{
-			pos_range[0] = Pixel2Pos(point.x - 4);
-			pos_range[1] = Pixel2Pos(point.x + 4);
+			pos_range[0] = Pixel2Pos(point.x - m_bookmark_near_tolerance);
+			pos_range[1] = Pixel2Pos(point.x + m_bookmark_near_tolerance);
 			//TRACE(_T("0:%f, 1:%f\n"), pos[0], pos[1]);
 			for (i = 0; i < m_bookmark.size(); i++)
 			{
@@ -1201,7 +1201,6 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			if (m_tooltip.m_hWnd)
 				m_tooltip.UpdateTipText(str, this);
 		}
-		
 		redraw_window();
 	}
 
@@ -1213,6 +1212,12 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			str.Format(_T("%s"), GetTimeStringFromMilliSeconds(pos, true, false));
 		else if (m_tooltip_format == tooltip_time_ms)
 			str.Format(_T("%s"), GetTimeStringFromMilliSeconds(pos));
+		else if (m_tooltip_format == tooltip_time_percent)
+		{
+			int range = upper - lower;
+			int percent = (range > 0) ? (int)(((double)(pos - lower) / range) * 100.0 + 0.5) : 0;
+			str.Format(_T("%s(%d%%)"), GetTimeStringFromMilliSeconds(pos, true, false), percent);
+		}
 		else//if (m_tooltip_format == tooltip_value)
 			str.Format(_T("%d / %d"), pos, upper);
 
@@ -1683,15 +1688,22 @@ void CSCSliderCtrl::PreSubclassWindow()
 
 	reconstruct_font();
 
-	/*
-	m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
-	m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
-	m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
-	m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
-	m_tooltip.SetMaxTipWidth(400); 
-	m_tooltip.AddTool(this, _T(""));
-	m_tooltip.Activate(TRUE);
-	*/
+	use_tooltip(m_use_tooltip);
+}
+
+void CSCSliderCtrl::use_tooltip(bool use)
+{
+	m_use_tooltip = use;
+	if (use && GetSafeHwnd() && !m_tooltip.GetSafeHwnd())
+	{
+		m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+		m_tooltip.SetDelayTime(TTDT_AUTOPOP, -1);
+		m_tooltip.SetDelayTime(TTDT_INITIAL, 0);
+		m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
+		m_tooltip.SetMaxTipWidth(400);
+		m_tooltip.AddTool(this, _T(""));
+		m_tooltip.Activate(TRUE);
+	}
 }
 
 void CSCSliderCtrl::reconstruct_font()

@@ -3,6 +3,7 @@
 
 #include <Afxwin.h>
 #include <Afxdisp.h>
+#include <gdiplus.h>
 
 class CSubtitleSetting
 {
@@ -18,9 +19,7 @@ public:
 	int			border_style;					// 0: outline, 1: opaque box
 	double		outline_widthX, outline_widthY;
 	double		shadow_depthX, shadow_depthY;
-	COLORREF	colors[4];						// usually: {primary, secondary, outline/background, shadow}
-	BYTE		alpha[4];
-	bool		alpha_link;
+	Gdiplus::Color	cr[4];						// ARGB. usually: {primary, secondary, outline/background, shadow}
 
 	int			font_size;						// height
 	bool		font_auto_size;

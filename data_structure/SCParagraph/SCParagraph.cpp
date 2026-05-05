@@ -1,5 +1,6 @@
 ﻿#include "SCParagraph.h"
 #include "../../Functions.h"
+#include "../../SCGdiplusBitmap.h"
 
 CSCParagraph::CSCParagraph()
 {
@@ -620,6 +621,83 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 	//따라서 calc_text_rect()에서 max height를 모든 paragraph에 적용했으며
 	//여기서도 배경색으로 칠한 뒤 텍스트를 표시한다.
 
+	//Gaussian blur 그림자 사전 패스.
+	//음절별 단순 offset fillpath 가 아닌, 모든 음절을 별도 layer 에 모아 한 번 blur 하면
+	//음절 사이가 자연스럽게 번지고 가장자리도 부드럽다. para[0][0] 의 sigma/weight 를 대표값으로 사용한다.
+	float global_blur_sigma = 0.0f;
+	float global_gray_weight = 1.0f;
+	if (!para.empty() && !para[0].empty())
+	{
+		global_blur_sigma = para[0][0].text_prop.shadow_blur_sigma;
+		global_gray_weight = para[0][0].text_prop.shadow_gray_weight;
+	}
+
+	if (global_blur_sigma > 0.0f)
+	{
+		Gdiplus::RectF clip;
+		g.GetVisibleClipBounds(&clip);
+		int layer_w = (int)ceil(clip.X + clip.Width);
+		int layer_h = (int)ceil(clip.Y + clip.Height);
+
+		if (layer_w > 0 && layer_h > 0)
+		{
+			CSCGdiplusBitmap shadow_layer(layer_w, layer_h, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
+			Gdiplus::Graphics gs(shadow_layer.m_pBitmap);
+			gs.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+			gs.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+			for (i = 0; i < para.size(); i++)
+			{
+				for (j = (int)para[i].size() - 1; j >= 0; j--)
+				{
+					if (para[i][j].text_prop.shadow_depth == 0)
+						continue;
+
+					Gdiplus::FontFamily* ff = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
+					if (!ff->IsAvailable())
+					{
+						delete ff;
+						ff = Gdiplus::FontFamily::GenericSansSerif()->Clone();
+					}
+
+					float emSize = fDpiY * para[i][j].text_prop.size / 72.0f;
+
+					CPoint off;
+					if (para[i][j].text_prop.shadow_depth > 0)
+					{
+						off.x = (LONG)para[i][j].text_prop.shadow_depth;
+						off.y = (LONG)para[i][j].text_prop.shadow_depth;
+					}
+					else
+					{
+						off.x = (LONG)max((float)para[i][j].r.Height() / 30.0f, 2.0f);
+						off.x = max(off.x, (LONG)(para[i][j].text_prop.thickness / 1.4f));
+						off.y = (LONG)max((float)para[i][j].r.Height() / 30.0f, 2.0f);
+						off.y = max(off.y, (LONG)(para[i][j].text_prop.thickness / 1.4f));
+					}
+
+					Gdiplus::GraphicsPath shadow_path;
+					shadow_path.SetFillMode(Gdiplus::FillModeWinding);
+					shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
+						para[i][j].text_prop.style, emSize,
+						Gdiplus::Point(para[i][j].r.left + off.x, para[i][j].r.top + off.y),
+						sf.GenericTypographic());
+
+					Gdiplus::SolidBrush br_shadow(para[i][j].text_prop.cr_shadow);
+					gs.FillPath(&br_shadow, &shadow_path);
+
+					delete ff;
+				}
+			}
+
+			shadow_layer.blur(global_blur_sigma);
+			if (global_gray_weight > 0.0f && global_gray_weight < 1.0f)
+				shadow_layer.gray(global_gray_weight);
+
+			g.DrawImage(shadow_layer.m_pBitmap, 0, 0);
+		}
+	}
+
 	for (i = 0; i < para.size(); i++)
 	{
 		//각 항목을 출력하되 뒤에서부터 출력시킨다.
@@ -687,7 +765,8 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-				if (para[i][j].text_prop.shadow_depth != 0)
+				//사전 패스에서 blur 그림자를 이미 그렸다면 음절 단위 하드 엣지 그림자는 건너뛴다.
+				if (para[i][j].text_prop.shadow_depth != 0 && global_blur_sigma <= 0.0f)
 				{
 					Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
 

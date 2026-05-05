@@ -838,19 +838,18 @@ void CVtListCtrlEx::set_header_height(int height, bool invalidate)
 void CVtListCtrlEx::set_line_height(int height, bool invalidate)
 {
 	m_line_height = height;
-	//reconstruct_font();
-	//RedrawItems(0, -1);
-	//UpdateWindow();
-	//RedrawWindow();
 
-	//자체적으로 imagelist를 사용하지 않는 경우는 아래 코드만으로도
-	//height가 적용된다.
-	if (!m_use_own_imagelist)
-	{
-		CImageList gapImage;
-		gapImage.Create(1, height, ILC_COLORDDB, 1, 0); //2번째 파라미터로 높이조절.....
-		SetImageList(&gapImage, LVSIL_SMALL);
-	}
+	//SetImageList(LVSIL_SMALL) 호출이 listview 의 item height 재측정을 강제 (WM_MEASUREITEM 재발화).
+	//own imagelist 를 쓰는 케이스도 동일하게 즉시 적용되도록 prev imagelist 백업 후 더미 set → 직후 복원.
+	//Why: m_line_height 만 변경하면 listview 가 cached itemHeight 그대로 사용 → 다음 WM_SIZE 까지 미반영.
+	HIMAGELIST hPrev = m_use_own_imagelist
+		? ListView_GetImageList(m_hWnd, LVSIL_SMALL)
+		: NULL;
+	CImageList gapImage;
+	gapImage.Create(1, height, ILC_COLORDDB, 1, 0);
+	SetImageList(&gapImage, LVSIL_SMALL);
+	if (m_use_own_imagelist && hPrev)
+		ListView_SetImageList(m_hWnd, hPrev, LVSIL_SMALL);
 
 	if (invalidate)
 		Invalidate();

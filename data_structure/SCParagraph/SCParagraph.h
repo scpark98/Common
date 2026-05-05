@@ -51,6 +51,13 @@ public:
 	float		size = 10.0f;
 	int			style = Gdiplus::FontStyleRegular;	//bold, italic, underline, strikeout
 	float		shadow_depth = 0.0f;
+
+	//> 0 이면 음절 그림자들을 별도 layer에 모아 fast_gaussian_blur로 한 번에 흐리게 처리한다.
+	//0 이면 기존 하드 엣지 offset 그림자(호환). para[0][0] 값이 대표값으로 사용된다.
+	float		shadow_blur_sigma = 5.0f;
+	//< 1.0 이면 blur layer를 gray()로 톤 다운. 1.0 이면 컬러 톤 유지.
+	float		shadow_gray_weight = 1.0f;
+
 	float		thickness = 0.0f;
 	float		round = 0.0f;
 	float		round_thickness = 0.0f;

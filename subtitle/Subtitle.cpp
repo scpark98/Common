@@ -396,6 +396,7 @@ void CSubtitle::parse_subtltle(CString src)
 			{
 				//sToken += src[i];
 				sToken = sToken.Left(sToken.GetLength() - 3);
+				sToken.Replace(_T("&nbsp;"), _T(" "));
 				caption.sentences.push_back(CSentence(sToken, color));
 				sToken.Empty();
 				color.Empty();
@@ -430,6 +431,7 @@ void CSubtitle::parse_subtltle(CString src)
 	//하나의 sync절의 분석이 끝났는데 sToken이 존재하면 이는 자막이니 넣어주자.
 	if (sToken.IsEmpty() == false)
 	{
+		sToken.Replace(_T("&nbsp;"), _T(" "));
 		caption.sentences.push_back(CSentence(sToken, color));
 	}
 

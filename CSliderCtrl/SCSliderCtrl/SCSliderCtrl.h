@@ -251,8 +251,9 @@ public:
 		tooltip_value = 0,
 		tooltip_time,
 		tooltip_time_ms,
+		tooltip_time_percent,	//"HH:MM:SS(NN%)" — 시간 + 트랙 진행률.
 	};
-	void			use_tooltip(bool use = true) { m_use_tooltip = use; }
+	void			use_tooltip(bool use = true);	//hWnd valid 면 즉시 tooltip 생성 (PreSubclassWindow 이후 호출에 대응).
 	void			set_tooltip_format(int format = tooltip_value) { m_tooltip_format = format; }
 
 //구간 반복 관련(slider_track style일 경우)
@@ -338,7 +339,7 @@ protected:
 	//mouse move, sliding할 때 북마크 근처에 가면 이 값이 세팅된다. 근처가 아니면 -1.
 	int				m_cur_bookmark = -1;
 	//마우스 위치에서 가장 가까운 북마크를 찾는데 그 허용 오차를 미리 구해놓는다.
-	int				m_bookmark_near_tolerance;
+	int				m_bookmark_near_tolerance = 8;	//px
 	//현재 위치에서 가장 가까운 이전/다음 북마크 위치를 찾는다.
 	int				get_near_bookmark(int pos, bool forward);
 

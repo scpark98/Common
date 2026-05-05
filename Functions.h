@@ -905,6 +905,13 @@ struct	NETWORK_INFO
 	//ex. 풀패스인 c:\test.exe를 주면 d:\test.exe는 실행중이라도 카운트되지 않는다.
 	int			get_process_running_count(CString processname);
 	bool		is_running(CString processname);
+
+	//processname의 audio session이 실제로 active 상태인지 (= 소리 출력 중) 검사.
+	//PotPlayer 같은 미디어 플레이어가 *재생 중* 인지 *일시정지/정지/미디어 없음* 인지 구분할 때 사용.
+	//- 같은 이름의 프로세스가 여러 개면 그 중 하나라도 active 면 true.
+	//- 프로세스가 실행조차 안 됐으면 false.
+	//- 무음 트랙 재생 중인 경우는 inactive 로 잡힐 수 있으나 PotPlayer 등 일반 미디어 재생에는 충분.
+	bool		is_process_audio_active(CString processname);
 	
 	//return value : 1(killed), 0(fail to kill), -1(not found)
 	int			kill_process_by_fullpath(CString fullpath);

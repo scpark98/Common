@@ -596,7 +596,10 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 
 	m_cr_back.push_back(disabled);
 
-	m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
+	//사용자가 명시적으로 border 색을 지정하지 않았을 때만 m_cr_back 으로 동기화.
+	//그렇지 않으면 set_back_color 호출이 set_border_color/set_round(cr_border) 의 결과를 덮어씀.
+	if (!m_border_color_user_set)
+		m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
 
 	redraw_window();
 }
@@ -612,6 +615,7 @@ void CGdiButton::set_parent_back_color(Gdiplus::Color cr_parent_back)
 //3개의 색상은 지정하지만 disabled는 기본 disable color를 쓰고자 할 경우에는 Transparent로 호출한다.
 void CGdiButton::set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled)
 {
+	m_border_color_user_set = true;
 	m_cr_border.clear();
 	m_cr_border.push_back(normal);
 	m_cr_border.push_back(hover);
@@ -624,6 +628,7 @@ void CGdiButton::set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, G
 
 void CGdiButton::set_border_color(Gdiplus::Color normal, bool auto_set_color)
 {
+	m_border_color_user_set = true;
 	m_cr_border.clear();
 	m_cr_border.push_back(normal);
 	m_cr_border.push_back(normal);
@@ -1814,6 +1819,7 @@ void CGdiButton::set_round(int round, Gdiplus::Color cr_border, Gdiplus::Color c
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
 		m_draw_border = true;
+		m_border_color_user_set = true;
 		if (m_cr_border.size() == 0)
 			m_cr_border.resize(4);
 
@@ -2113,11 +2119,13 @@ void CGdiButton::set_hover_rect_color(Gdiplus::Color cr)
 
 //border
 void CGdiButton::draw_border(bool draw, int thick, int round, Gdiplus::Color cr_border)
+//cr_border 가 명시되면 m_border_color_user_set 도 true 로 set 되어 후속 set_back_color 가 덮어쓰지 않음.
 {
 	m_draw_border = draw;
 
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 	{
+		m_border_color_user_set = true;
 		if (m_cr_border.size() == 0)
 			m_cr_border.assign(m_cr_back.begin(), m_cr_back.end());
 

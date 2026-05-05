@@ -90,7 +90,7 @@ protected:
 //폰트 관련
 	LOGFONT			m_lf;
 	CFont			m_font;
-	int				m_font_size = 9;
+	int				m_font_size = 10;
 	void			reconstruct_font();
 
 	bool			m_is_font_combo = false;

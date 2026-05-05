@@ -6,6 +6,10 @@
 #include <dshow.h>          // 디쇼 사용시
 #include <D3d9.h>
 #include <vmr9.h>
+#include <evr.h>
+#include <mfidl.h>
+#pragma comment(lib, "Mfuuid.lib")
+#pragma comment(lib, "Strmiids.lib")
 
 #include "../Functions.h"
 #include "../subtitle/Subtitle.h"
@@ -181,6 +185,14 @@ public:
 		adjust_saturation,
 	};
 	int				adjust_video(int dwStreamID, int target, bool up);
+	//percent (0~100) 직접 set. 저장된 사용자 설정 복원용. target ∈ [0..3].
+	int				set_video_adjust(int dwStreamID, int target, int percent);
+	//호출처가 갖고 있는 HDC 로 즉시 backbuffer 의 가장 최근 frame 을 다시 그림. resize 중 OnEraseBkgnd 에서
+	//호출하면 OS erase 가 stale 픽셀로 남기는 깜빡임 영역을 비디오로 메움.
+	void			repaint_video(HDC hdc);
+private:
+	void			repaint_for_procamp_change();	//paused 상태에서 ProcAmp 변경을 즉시 반영시키기 위한 redraw.
+public:
 
 	int				get_volume() { return m_volume; }
 	//volume이 -1이면 mute로 처리하고 m_volume에는 저장하지 않는다.
@@ -282,6 +294,13 @@ protected:
 	CComQIPtr<IVMRFilterConfig9> m_pVMRFC;
 	CComQIPtr<IVMRMixerControl9> m_pVMRMC;
 	CComQIPtr<IVMRMixerBitmap9> m_pVMRMB;
+
+	//MPC VR / madVR 등 비-VMR9 렌더러용 windowless 제어. windowless EVR 인터페이스로 자식 윈도우 안 만들고 parent 에 직접 D3D 출력.
+	CComPtr<IMFVideoDisplayControl> m_pVDC;
+
+	//현재 그래프에 MPC Video Renderer (Aleksoid) 가 활성인지. true 면 IVMR* 인터페이스 NULL,
+	//IVideoWindow::put_Owner 호출 금지 (자식 윈도우 만들면 검정·드래그 차단).
+	bool			m_use_mpcvr;
 
 
 	//총 재생 시간(ms)

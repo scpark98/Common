@@ -539,6 +539,7 @@ protected:
 	std::deque <Gdiplus::Color>	m_cr_text;
 	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경색이 그려진다.
 	std::deque <Gdiplus::Color> m_cr_border;	//border의 색상은 기본적으로 m_cr_back과 동일하게 세팅되지만 개별 설정도 가능하다.
+	bool		m_border_color_user_set = false;	//set_border_color/set_round(cr_border!=Transparent) 호출 시 true. set_back_color 가 m_cr_border 를 덮어쓰지 않도록 보호.
 
 	//int			m_width = 0;
 	//int			m_height = 0;

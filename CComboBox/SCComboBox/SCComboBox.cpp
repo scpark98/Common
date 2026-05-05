@@ -152,9 +152,12 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	{
 		// i feel bad creating this font on each draw. but i can't think of a better way (other than creating ALL fonts at once and saving them - yuck
 		CFont cf;
+		//m_font_size 는 사용자 의도(=메모장 표시) point 단위. CreateFont 의 nHeight 는 논리 단위(픽셀) 라
+		//point→pixel 변환 후 음수(=character height) 로 넘겨야 동일 크기로 표시.
+		int lf_height = -MulDiv(m_font_size, dc.GetDeviceCaps(LOGPIXELSY), 72);
 		if (true)//m_style != NAME_GUI_FONT)
 		{
-			if (!cf.CreateFont(m_font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, strData))
+			if (!cf.CreateFont(lf_height, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, strData))
 			{
 				ASSERT(0);
 				dc.Detach();

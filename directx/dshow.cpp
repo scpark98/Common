@@ -821,6 +821,7 @@ CDShow::CDShow()
 	m_pAudioCompressorFilter = NULL;
 
 	m_use_dvs = false;
+	m_use_mpcvr = false;
 	m_has_subtitle = false;
 	m_subtitle_file.Empty();
 	m_hDirectVobSubWnd = NULL;
@@ -837,6 +838,19 @@ CDShow::CDShow()
 	m_show_subtitle = AfxGetApp()->GetProfileInt(_T("subtitle"), _T("show"), true);
 
 	m_subCfg <<= AfxGetApp()->GetProfileString(_T("subtitle"), _T("setting"), _T(""));
+
+	//옛 schema (colors[4] + alpha[4] + alpha_link) 로 저장된 값을 새 schema (cr[4] ARGB) 로 deserialize 하면
+	//cr 의 alpha 비트가 모두 0 으로 읽혀 자막이 완전 투명. 그 경우 옛 garbage 데이터로 판정해
+	//default 로 reset 하고 즉시 새 schema 로 저장 — 옛 키 데이터 덮어쓰기.
+	bool legacy = true;
+	for (int i = 0; i < 4; i++)
+		if (m_subCfg.cr[i].GetA() != 0) { legacy = false; break; }
+	if (legacy)
+	{
+		m_subCfg.set_default();
+		CString style;
+		AfxGetApp()->WriteProfileString(_T("subtitle"), _T("setting"), style <<= m_subCfg);
+	}
 
 	/*
 	memset(&m_subCfg, 0, sizeof(m_subCfg));
@@ -908,6 +922,8 @@ void CDShow::close_media()
 	m_pVMRFC.Release();
 	m_pVMRMC.Release();
 	m_pVMRMB.Release();
+	m_pVDC.Release();
+	m_use_mpcvr = false;
 
 	m_has_subtitle = false;
 	m_subtitle_file.Empty();
@@ -992,46 +1008,65 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	m_media_filename = sfile;
 
 	CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_IGraphBuilder,(void **)&m_pGB) ;
-	CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC, IID_IBaseFilter, (LPVOID *)&m_VMR);
+
+	CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
+		IID_IBaseFilter, (LPVOID *)&m_VMR);
 	if (m_VMR != NULL)
 	{
-		m_pGB->AddFilter(m_VMR,L"Video Mixing Renderer 9");
+		m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
 	}
 
-	//CComQIPtr<IVMRFilterConfig9> pVMRFC9(m_VMR);
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRFC));
 	if (m_pVMRFC != NULL)
 	{
-		//pVMRFC9->SetRenderingMode(VMR9Mode_Windowed);
-		m_pVMRFC->SetRenderingMode(VMR9Mode_Windowless); // 창이 없는 모드로 설정
+		m_pVMRFC->SetRenderingMode(VMR9Mode_Windowless);
 	}
 
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRWC));
 	if (m_pVMRWC != NULL)
 	{
-		RECT rcClient={0,},rc={0,},rc1={0,};
+		RECT rcClient = {0,}, rc = {0,};
 		pParent->GetClientRect(&rcClient);
-		SetRect(&rc,0,0,rcClient.right-rcClient.left,rcClient.bottom-rcClient.top);
-		m_pVMRWC->SetVideoClippingWindow(pParent->m_hWnd);  //비디오를 출력할 창을 지정하는 함수 
+		SetRect(&rc, 0, 0, rcClient.right - rcClient.left, rcClient.bottom - rcClient.top);
+		m_pVMRWC->SetVideoClippingWindow(pParent->m_hWnd);
 		m_pVMRWC->SetAspectRatioMode(VMR_ARMODE_LETTER_BOX);
-		m_pVMRWC->SetVideoPosition(NULL,&rc);
+		m_pVMRWC->SetVideoPosition(NULL, &rc);
 	}
 
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMB));
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMC));
-#if 0
-	// Request point filtering (instead of bilinear filtering)
-	// to improve the text quality.  In general, if you are
-	// not scaling the app Image, you should use point filtering.
-	// This is very important if you are doing source color keying.
-	DWORD dwPrefs=0;
-	m_pVMRMC->GetMixingPrefs(&dwPrefs);
-	dwPrefs |= MixerPref_PointFiltering;
-	dwPrefs &= ~(MixerPref_BiLinearFiltering);
-	m_pVMRMC->SetMixingPrefs(dwPrefs);
-#endif
 
-	//interface를 못가져온다.
+	//VMR9 mixer 의 픽셀 보간 모드 — 고품질 GaussianQuad → PyramidalQuad → Anisotropic 순 fallback.
+	//저화질 미디어 큰 화면 표시 시 격자 완화. 드라이버가 지원 안 하면 GetMixingPrefs 결과가 다른 값으로 떨어짐.
+	//품질 순: Point < BiLinear < Anisotropic < PyramidalQuad < GaussianQuad (PotPlayer Lanczos 까진 못 미침).
+	if (m_pVMRMC != NULL)
+	{
+		const DWORD modes[3] = {
+			MixerPref9_GaussianQuadFiltering,
+			MixerPref9_PyramidalQuadFiltering,
+			MixerPref9_AnisotropicFiltering,
+		};
+		const TCHAR* names[3] = { _T("GaussianQuad"), _T("PyramidalQuad"), _T("Anisotropic") };
+
+		for (int i = 0; i < 3; ++i)
+		{
+			DWORD prefs = 0;
+			if (FAILED(m_pVMRMC->GetMixingPrefs(&prefs)))
+				break;
+			prefs &= ~MixerPref9_FilteringMask;
+			prefs |= modes[i];
+			HRESULT hr_mp = m_pVMRMC->SetMixingPrefs(prefs);
+
+			DWORD readback = 0;
+			m_pVMRMC->GetMixingPrefs(&readback);
+			DWORD applied = readback & MixerPref9_FilteringMask;
+			logWrite(_T("[VMR9] SetMixingPrefs(%s) hr=0x%08lX requested=0x%08lX readback=0x%08lX applied=0x%08lX"),
+				names[i], hr_mp, modes[i], readback, applied);
+			if (SUCCEEDED(hr_mp) && applied == modes[i])
+				break;
+		}
+	}
+
 	CComQIPtr<IVideoWindow> pVW(m_pGB);
 	if (pVW != NULL)
 	{
@@ -1105,6 +1140,23 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 				//hr = m_SourceBase->QueryInterface(IID_ISpecifyPropertyPages, (void **)&pSpecify);
 
 
+				//LAV Video Decoder 의 HW 가속 톤매핑 활성화 — D3D11 디코더 + GPU 톤매핑으로
+				//BT.2020+PQ → BT.709+sRGB 변환을 LAV 가 직접 수행. 그 후 VMR9 에는 SDR frame 만 전달.
+				//VMR9 자체는 HDR 미지원이라 LAV 측에서 미리 변환하지 않으면 워시드 아웃이 된다.
+				HKEY hLavKey = NULL;
+				if (::RegCreateKeyEx(HKEY_CURRENT_USER, _T("Software\\LAV\\Video"),
+						0, NULL, 0, KEY_SET_VALUE, NULL, &hLavKey, NULL) == ERROR_SUCCESS)
+				{
+					DWORD hwaccel = 2;	//0=SW, 1=DXVA2-native, 2=DXVA2-copyback, 3=D3D11
+					//madVR 와의 호환성을 위해 copyback 모드. D3D11/native 모드는 madVR D3D11 device 와 충돌해 access violation 가능.
+					::RegSetValueEx(hLavKey, _T("HWAccel"), 0, REG_DWORD,
+						(const BYTE*)&hwaccel, sizeof(hwaccel));
+					DWORD hw_tonemap = 1;
+					::RegSetValueEx(hLavKey, _T("HWAccelTonemap"), 0, REG_DWORD,
+						(const BYTE*)&hw_tonemap, sizeof(hw_tonemap));
+					::RegCloseKey(hLavKey);
+				}
+
 				hr = FindFilter(_T("LAV Splitter"), CLSID_LegacyAmFilterCategory, &m_pSplitter );
 				hr = m_pGB->AddFilter(m_pSplitter, _T("LAV Splitter"));
 
@@ -1167,9 +1219,30 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	}
 
 	if (m_pVMRWC != NULL && is_media_video())
+	{
 		m_pVMRWC->GetNativeVideoSize(&m_video_size.cx, &m_video_size.cy, NULL, NULL);
+	}
+	else if (m_pVDC != NULL && is_media_video())
+	{
+		SIZE sz = {0,};
+		if (SUCCEEDED(m_pVDC->GetNativeVideoSize(&sz, NULL)) && sz.cx > 0 && sz.cy > 0)
+			m_video_size = CSize(sz.cx, sz.cy);
+		else
+			m_video_size = CSize(640, 368);
+	}
+	else if (is_media_video())
+	{
+		CComQIPtr<IBasicVideo> pBV(m_pGB);
+		long w = 0, h = 0;
+		if (pBV && SUCCEEDED(pBV->GetVideoSize(&w, &h)) && w > 0 && h > 0)
+			m_video_size = CSize(w, h);
+		else
+			m_video_size = CSize(640, 368);
+	}
 	else
+	{
 		m_video_size = CSize(640, 368);
+	}
 
 	if (is_media_video())
 		prepare_AlphaBitmap();
@@ -1634,18 +1707,34 @@ void CDShow::play(int state)
 
 void CDShow::set_video_position(CRect r)
 {
-	if (!m_pGB || !m_pVMRWC)
+	if (!m_pGB)
 		return;
 
-	m_pVMRWC->SetVideoPosition(NULL, &r);
-
-	//Paused / Running 모두 즉시 redraw — resize 중 video frame 이 새 위치에 즉시 그려져 깜빡임 최소화.
-	//Running 시 다음 frame 까지 1~16ms 지연이 깜빡임 원인이 됨.
-	if (m_pParent && m_pParent->GetSafeHwnd())
+	if (m_pVMRWC)
 	{
-		HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
-		m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
-		::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+		m_pVMRWC->SetVideoPosition(NULL, &r);
+
+		//Paused / Running 모두 즉시 redraw — resize 중 video frame 이 새 위치에 즉시 그려져 깜빡임 최소화.
+		//Running 시 다음 frame 까지 1~16ms 지연이 깜빡임 원인이 됨.
+		if (m_pParent && m_pParent->GetSafeHwnd())
+		{
+			HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+			m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+			::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+		}
+	}
+	else if (m_pVDC)
+	{
+		RECT rc = r;
+		m_pVDC->SetVideoPosition(NULL, &rc);
+		if (m_pParent && m_pParent->GetSafeHwnd())
+			m_pVDC->RepaintVideo();
+	}
+	else
+	{
+		CComQIPtr<IVideoWindow> pVW(m_pGB);
+		if (pVW)
+			pVW->SetWindowPosition(r.left, r.top, r.Width(), r.Height());
 	}
 }
 
@@ -1708,7 +1797,9 @@ void CDShow::move_track(bool forward, int interval)
 	pos = pos + (forward ? interval : -interval);
 	m_pMP->put_CurrentPosition(pos < 0 ? 0 : pos);
 
-	::PostMessage(m_pParent->m_hWnd, MESSAGE_DSHOW_MEDIA, msg_track_moved, MAKEWORD(forward, interval));
+	//forward 를 wParam 의 상위 word 에 (msg_track_moved 와 함께) 인코딩하지 않고 wParam 에는 msg, lParam 에 interval 그대로 (signed int).
+	//forward 부호는 lParam 의 signed bit 로 표현 — backward 면 음수.
+	::PostMessage(m_pParent->m_hWnd, MESSAGE_DSHOW_MEDIA, msg_track_moved, (LPARAM)(forward ? interval : -interval));
 }
 
 void CDShow::step_frame(bool forward)
@@ -2037,27 +2128,177 @@ void CDShow::set_video_pan_scan(DWORD dwStreamID, int mode, float dx, float dy)
 	m_pVMRMC->SetOutputRect(0, &rc);
 }
 
+//ProcAmp 변경 후 paused/stopped 상태에서도 즉시 시각 반영시키기 위한 redraw.
+//RepaintVideo 만으론 mixer 가 현재 backbuffer 를 단순 복사할 뿐 새 ProcAmp 로 *재합성* 안 함.
+//paused 일 땐 같은 위치로 seek 해 mixer 가 frame 을 디코더에서 다시 받아 새 ProcAmp 적용 후 push.
+//PotPlayer/MPC 가 paused 시 화질 변경을 즉시 반영하는 정공.
+//호출처의 HDC 로 즉시 backbuffer 의 가장 최근 frame 다시 그림. resize 중 OS erase 가 stale 픽셀
+//남기는 깜빡임 영역을 비디오로 메우기 위해 OnEraseBkgnd 에서 사용.
+void CDShow::repaint_video(HDC hdc)
+{
+	if (hdc == NULL)
+		return;
+	if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+		m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+	else if (m_pVDC)
+		m_pVDC->RepaintVideo();
+}
+
+
+void CDShow::repaint_for_procamp_change()
+{
+	if (m_pMC && m_pMS)
+	{
+		OAFilterState state = State_Stopped;
+		if (SUCCEEDED(m_pMC->GetState(0, &state)) && state == State_Paused)
+		{
+			LONGLONG cur = 0;
+			if (SUCCEEDED(m_pMS->GetCurrentPosition(&cur)))
+				m_pMS->SetPositions(&cur, AM_SEEKING_AbsolutePositioning,
+					NULL, AM_SEEKING_NoPositioning);
+		}
+	}
+
+	if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+	{
+		HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+		m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+		::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+	}
+}
+
 int CDShow::adjust_video(int dwStreamID, int target, bool up)
 {
-	HRESULT hr;
-
 	if (!m_pVMRMC)
 		return -1;
 
-	VMR9ProcAmpControlRange  ClrControlRange;
+	//enum VIDEO_ADJUST 와 1:1 매핑. contrast=0, bright=1, hue=2, saturation=3.
+	const DWORD flag_table[4] = {
+		ProcAmpControl9_Contrast,
+		ProcAmpControl9_Brightness,
+		ProcAmpControl9_Hue,
+		ProcAmpControl9_Saturation,
+	};
 
-	ClrControlRange.dwSize = sizeof(VMR9ProcAmpControlRange);
-	ClrControlRange.dwProperty = ProcAmpControl9_Brightness;
+	const DWORD all_flags = ProcAmpControl9_Contrast | ProcAmpControl9_Brightness |
+	                        ProcAmpControl9_Hue | ProcAmpControl9_Saturation;
 
-	hr = m_pVMRMC->GetProcAmpControlRange(dwStreamID, &ClrControlRange);
+	//target == -1 : 4채널 모두 driver default 로 복원.
+	if (target == -1)
+	{
+		VMR9ProcAmpControl ctrl = {0,};
+		ctrl.dwSize = sizeof(ctrl);
+		ctrl.dwFlags = all_flags;
+		if (FAILED(m_pVMRMC->GetProcAmpControl(dwStreamID, &ctrl)))
+			return -1;
 
+		for (int i = 0; i < 4; ++i)
+		{
+			VMR9ProcAmpControlRange range;
+			range.dwSize = sizeof(range);
+			range.dwProperty = (VMR9ProcAmpControlFlags)flag_table[i];
+			if (FAILED(m_pVMRMC->GetProcAmpControlRange(dwStreamID, &range)))
+				continue;
+			switch (flag_table[i])
+			{
+			case ProcAmpControl9_Contrast:   ctrl.Contrast   = range.DefaultValue; break;
+			case ProcAmpControl9_Brightness: ctrl.Brightness = range.DefaultValue; break;
+			case ProcAmpControl9_Hue:        ctrl.Hue        = range.DefaultValue; break;
+			case ProcAmpControl9_Saturation: ctrl.Saturation = range.DefaultValue; break;
+			}
+		}
+		ctrl.dwFlags = all_flags;
+		m_pVMRMC->SetProcAmpControl(dwStreamID, &ctrl);
+		repaint_for_procamp_change();
+		return 0;
+	}
 
-	VMR9ProcAmpControl  ClrControl;
-	ClrControl.dwSize = sizeof(VMR9ProcAmpControl);
-	ClrControl.dwFlags = ProcAmpControl9_Brightness | ProcAmpControl9_Contrast | ProcAmpControl9_Hue | ProcAmpControl9_Saturation;
-	hr = m_pVMRMC->GetProcAmpControl(dwStreamID, &ClrControl);
+	if (target < 0 || target > 3)
+		return -1;
 
-	return 1;
+	const DWORD flag = flag_table[target];
+
+	VMR9ProcAmpControlRange range;
+	range.dwSize = sizeof(range);
+	range.dwProperty = (VMR9ProcAmpControlFlags)flag;
+	if (FAILED(m_pVMRMC->GetProcAmpControlRange(dwStreamID, &range)))
+		return -1;
+
+	VMR9ProcAmpControl ctrl = {0,};
+	ctrl.dwSize = sizeof(ctrl);
+	ctrl.dwFlags = all_flags;
+	if (FAILED(m_pVMRMC->GetProcAmpControl(dwStreamID, &ctrl)))
+		return -1;
+
+	const float step = (range.MaxValue - range.MinValue) / 100.0f;	//1% per click (PotPlayer 호환)
+	float* pVal = NULL;
+	switch (flag)
+	{
+	case ProcAmpControl9_Contrast:   pVal = &ctrl.Contrast; break;
+	case ProcAmpControl9_Brightness: pVal = &ctrl.Brightness; break;
+	case ProcAmpControl9_Hue:        pVal = &ctrl.Hue; break;
+	case ProcAmpControl9_Saturation: pVal = &ctrl.Saturation; break;
+	}
+	if (!pVal)
+		return -1;
+
+	*pVal += up ? step : -step;
+	if (*pVal < range.MinValue) *pVal = range.MinValue;
+	if (*pVal > range.MaxValue) *pVal = range.MaxValue;
+
+	//SetProcAmpControl 은 dwFlags 에 set 된 비트만 반영. 다른 채널값은 GetProcAmpControl 로 미리 채워둠.
+	ctrl.dwFlags = flag;
+	if (FAILED(m_pVMRMC->SetProcAmpControl(dwStreamID, &ctrl)))
+		return -1;
+
+	repaint_for_procamp_change();
+
+	//현재 값을 0~100 % 로 변환해 반환 (OSD 표시용).
+	return (int)(((*pVal - range.MinValue) / (range.MaxValue - range.MinValue)) * 100.0f + 0.5f);
+}
+
+int CDShow::set_video_adjust(int dwStreamID, int target, int percent)
+{
+	if (!m_pVMRMC || target < 0 || target > 3)
+		return -1;
+	if (percent < 0)   percent = 0;
+	if (percent > 100) percent = 100;
+
+	const DWORD flag_table[4] = {
+		ProcAmpControl9_Contrast,
+		ProcAmpControl9_Brightness,
+		ProcAmpControl9_Hue,
+		ProcAmpControl9_Saturation,
+	};
+	const DWORD flag = flag_table[target];
+
+	VMR9ProcAmpControlRange range;
+	range.dwSize = sizeof(range);
+	range.dwProperty = (VMR9ProcAmpControlFlags)flag;
+	if (FAILED(m_pVMRMC->GetProcAmpControlRange(dwStreamID, &range)))
+		return -1;
+
+	const DWORD all_flags = ProcAmpControl9_Contrast | ProcAmpControl9_Brightness |
+	                        ProcAmpControl9_Hue | ProcAmpControl9_Saturation;
+	VMR9ProcAmpControl ctrl = {0,};
+	ctrl.dwSize = sizeof(ctrl);
+	ctrl.dwFlags = all_flags;
+	if (FAILED(m_pVMRMC->GetProcAmpControl(dwStreamID, &ctrl)))
+		return -1;
+
+	float val = range.MinValue + (range.MaxValue - range.MinValue) * (percent / 100.0f);
+	switch (flag)
+	{
+	case ProcAmpControl9_Contrast:   ctrl.Contrast   = val; break;
+	case ProcAmpControl9_Brightness: ctrl.Brightness = val; break;
+	case ProcAmpControl9_Hue:        ctrl.Hue        = val; break;
+	case ProcAmpControl9_Saturation: ctrl.Saturation = val; break;
+	}
+	ctrl.dwFlags = flag;
+	if (FAILED(m_pVMRMC->SetProcAmpControl(dwStreamID, &ctrl)))
+		return -1;
+	repaint_for_procamp_change();
+	return percent;
 }
 
 void CDShow::volume_up(bool up, int interval)
@@ -2387,27 +2628,19 @@ HRESULT CDShow::update_osd_subtitle()
 		{
 			TextDesigner::OutlineText td;
 
-			Gdiplus::Color color(255/*m_subCfg.alpha[0]*/, GetRValue(m_subCfg.colors[0]), GetGValue(m_subCfg.colors[0]), GetBValue(m_subCfg.colors[0]));
+			Gdiplus::Color color = m_subCfg.cr[0];
 			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
 			{
 				COLORREF crText = get_color(m_cur_subtitle.sentences[i].color);
-				color = Gdiplus::Color(255/*m_subCfg.alpha[0]*/, GetRValue(crText), GetGValue(crText), GetBValue(crText));
+				color = Gdiplus::Color(m_subCfg.cr[0].GetA(), GetRValue(crText), GetGValue(crText), GetBValue(crText));
 			}
 
-			td.TextOutline(color,
-							Gdiplus::Color(255/*m_subCfg.alpha[2]*/,
-							GetRValue(m_subCfg.colors[2]),
-							GetGValue(m_subCfg.colors[2]),
-							GetBValue(m_subCfg.colors[2])),
-							m_subCfg.outline_widthX * 2.5);
+			td.TextOutline(color, m_subCfg.cr[2], m_subCfg.outline_widthX * 2.5);
 			//text.TextGlow(Gdiplus::Color(255, 255, 255), Gdiplus::Color(32, 255, 0, 0), 16);
 
 			td.EnableShadow(true);
 
-			td.Shadow(Gdiplus::Color(255/*m_subCfg.alpha[3]*/,
-									GetRValue(m_subCfg.colors[3]),
-									GetGValue(m_subCfg.colors[3]),
-									GetBValue(m_subCfg.colors[3])),
+			td.Shadow(m_subCfg.cr[3],
 									m_subCfg.shadow_depthX,
 									Gdiplus::Point(m_subCfg.shadow_depthX, m_subCfg.shadow_depthY));
 			/*
@@ -2487,7 +2720,7 @@ HRESULT CDShow::update_osd_subtitle()
 
 
 			//마지막으로 실제 글자 출력
-			Gdiplus::SolidBrush brush(Gdiplus::Color(m_subCfg.alpha[0], 253, 238, 193));
+			Gdiplus::SolidBrush brush(m_subCfg.cr[0]);
 			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
 			{
 				Gdiplus::Color crText = get_color(m_cur_subtitle.sentences[i].color);

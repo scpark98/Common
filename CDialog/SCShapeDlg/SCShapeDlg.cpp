@@ -204,9 +204,17 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	//SCParagraph::draw_text 의 path 가장자리·그림자 offset 이 잘리지 않는다.
 	//shadow_depth < 0 (자동) 인 경우 SCParagraph::draw_text 의 자동 계산식과 같은 추정으로 여유를 잡는다.
 	float shadow_extra = m_text_setting.text_prop.shadow_depth;
-	if (shadow_extra < 0)
+	float blur_extra = 0.0f;
+	if (shadow_extra != 0.0f)
+	{
 		shadow_extra = max((float)r.Height() / 30.0f, 2.0f);
-	int extra = (int)(m_text_setting.text_prop.thickness + shadow_extra) + 2;
+		//Gaussian blur 그림자가 활성화되어 있으면 sigma 의 약 3배까지 번지므로 그만큼 추가 여유를 준다.
+		blur_extra = m_text_setting.text_prop.shadow_blur_sigma * 3.0f;
+	}
+
+	//thickness 는 GDI+ Pen LineJoinRound + anti-alias 로 stroke 가 path 양쪽 외부에까지 번진다.
+	//calc_text_rect 가 path bounds 보다 약간 좁게 잡는 경우 글자 위/아래 디센더가 잘리는 회귀가 있어 +6 의 여유 추가.
+	int extra = (int)(m_text_setting.text_prop.thickness + shadow_extra + blur_extra) + 6;
 	if (extra > 0)
 		r.InflateRect(extra, extra);
 
@@ -225,10 +233,15 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-	//배경 그리기
-	draw_round_rect(&g, Gdiplus::Rect(0.0f, 0.0f, (float)m_img.width, (float)m_img.height),
-		m_text_setting.text_prop.cr_round_stroke, m_text_setting.text_prop.cr_back,
-		(int)(m_text_setting.text_prop.round), m_text_setting.text_prop.round_thickness);
+	//배경 그리기. stroke가 투명이 아니고 두께가 있거나, cr_back이 투명이 아닌 경우에만 그려준다.
+	if ((m_text_setting.text_prop.cr_round_stroke.GetValue() != Gdiplus::Color::Transparent &&
+		 m_text_setting.text_prop.round_thickness > 0.0f) ||
+		m_text_setting.text_prop.cr_back.GetValue() != Gdiplus::Color::Transparent)
+	{
+		draw_round_rect(&g, Gdiplus::Rect(0.0f, 0.0f, (float)m_img.width, (float)m_img.height),
+			m_text_setting.text_prop.cr_round_stroke, m_text_setting.text_prop.cr_back,
+			(int)(m_text_setting.text_prop.round), m_text_setting.text_prop.round_thickness);
+	}
 
 	//기본적으로 m_para는 DT_CENTER로 가정하고 계산하므로 DT_CENTER이면 여기서 바로 그려주고
 	//DT_LEFT, DT_RIGHT라면 set_text_align()을 한 후 그 함수 안에서 다시 그려준다.

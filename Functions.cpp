@@ -21,6 +21,9 @@
 #include <TlHelp32.h>	//for CreateToolhelp32Snapshot
 #include "Psapi.h"		//for GetCurrentMemUsage()
 #include <wuapi.h>		//for windows update option check
+#include <mmdeviceapi.h>	//for is_process_audio_active
+#include <audiopolicy.h>
+#include <endpointvolume.h>	//for IAudioMeterInformation
 
 #include "Functions.h"
 #include "text_encoding/utf-8/utf8.h"
@@ -7111,7 +7114,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 
 		//한번 사용해서는 흐릿하고 얊은 그림자가 그려져서 크게 표시나지 않는다.
 		//알파 누적시켜서 좀 더 진한 그림자를 만든다.
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 13; i++)
 		{
 			//설정값은 폰트 크기나 종류에 따라 달라져야만 최적의 그림자 효과가 적용될 듯 함.
 			shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 0.5f + i * 1.6f);
@@ -12574,6 +12577,104 @@ int	kill_process_by_fullpath(CString fullpath)
 bool is_running(CString processname)
 {
 	return (get_process_running_count(processname) > 0);
+}
+
+//processname의 audio session이 active 상태(=실제 소리 출력 중)인지 검사.
+//내부적으로 (1) process snapshot 으로 같은 이름의 PID 들을 모은 뒤
+//(2) 기본 출력 장치의 IAudioSessionEnumerator 로 모든 session 을 돌며
+//(3) GetProcessId() 가 매칭되는 session 의 IAudioMeterInformation::GetPeakValue() 가 0 이상인지 확인.
+//AudioSessionState 는 active->inactive 전이에 수십초 grace period 가 있어 일시정지에 즉각 반응 못 함.
+//peak value 는 audio render 가 멈추는 즉시 0 이 되어 일시정지/정지에 즉각 반응.
+bool is_process_audio_active(CString processname)
+{
+	if (processname.IsEmpty())
+		return false;
+
+	//1) processname 과 매칭되는 PID 수집.
+	std::set<DWORD> target_pids;
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hSnap == INVALID_HANDLE_VALUE)
+		return false;
+
+	PROCESSENTRY32 pe32 = { 0, };
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+
+	if (Process32First(hSnap, &pe32))
+	{
+		do
+		{
+			if (_tcsicmp(pe32.szExeFile, processname) == 0)
+				target_pids.insert(pe32.th32ProcessID);
+		} while (Process32Next(hSnap, &pe32));
+	}
+	CloseHandle(hSnap);
+
+	if (target_pids.empty())
+		return false;
+
+	//2) COM 초기화 — 호출 thread 가 이미 init 했으면 RPC_E_CHANGED_MODE 를 받지만 진행 가능.
+	//S_OK / S_FALSE 를 받았을 때만 짝맞춰 CoUninitialize.
+	HRESULT hr_co = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	bool need_uninit = (hr_co == S_OK || hr_co == S_FALSE);
+
+	bool active = false;
+
+	IMMDeviceEnumerator* pEnum = NULL;
+	if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL,
+		__uuidof(IMMDeviceEnumerator), (void**)&pEnum)))
+	{
+		IMMDevice* pDevice = NULL;
+		if (SUCCEEDED(pEnum->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice)))
+		{
+			IAudioSessionManager2* pSM = NULL;
+			if (SUCCEEDED(pDevice->Activate(__uuidof(IAudioSessionManager2),
+				CLSCTX_ALL, NULL, (void**)&pSM)))
+			{
+				IAudioSessionEnumerator* pSE = NULL;
+				if (SUCCEEDED(pSM->GetSessionEnumerator(&pSE)))
+				{
+					int count = 0;
+					pSE->GetCount(&count);
+
+					for (int i = 0; i < count && !active; i++)
+					{
+						IAudioSessionControl* pCtl = NULL;
+						if (FAILED(pSE->GetSession(i, &pCtl)))
+							continue;
+
+						IAudioSessionControl2* pCtl2 = NULL;
+						if (SUCCEEDED(pCtl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pCtl2)))
+						{
+							DWORD pid = 0;
+							if (SUCCEEDED(pCtl2->GetProcessId(&pid)) &&
+								target_pids.find(pid) != target_pids.end())
+							{
+								IAudioMeterInformation* pMeter = NULL;
+								if (SUCCEEDED(pCtl->QueryInterface(__uuidof(IAudioMeterInformation), (void**)&pMeter)))
+								{
+									float peak = 0.0f;
+									if (SUCCEEDED(pMeter->GetPeakValue(&peak)) && peak > 0.0001f)
+										active = true;
+									pMeter->Release();
+								}
+							}
+							pCtl2->Release();
+						}
+						pCtl->Release();
+					}
+					pSE->Release();
+				}
+				pSM->Release();
+			}
+			pDevice->Release();
+		}
+		pEnum->Release();
+	}
+
+	if (need_uninit)
+		CoUninitialize();
+
+	return active;
 }
 
 //해당 파일이 실행중인 카운트를 리턴하는 함수이며

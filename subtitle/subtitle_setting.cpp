@@ -19,7 +19,12 @@ void CSubtitleSetting::set_default()
 {
 	memset(lf, 0, sizeof(LOGFONT));
 
-	_tcscpy(lf->lfFaceName, _T("맑은 고딕"));
+	font_size = 36;
+	font_auto_size = false;
+	char_per_line = 20;
+	font_scaleX = font_scaleY = 100;
+
+	_tcscpy(lf->lfFaceName, _T("Yu Gothic UI"));
 	lf->lfCharSet = DEFAULT_CHARSET;
 	lf->lfHeight = -MulDiv(font_size, GetDeviceCaps(::GetDC(NULL), LOGPIXELSY), 72);
 	lf->lfWeight = FW_DONTCARE;
@@ -27,11 +32,6 @@ void CSubtitleSetting::set_default()
 	lf->lfUnderline = false;
 	lf->lfStrikeOut = false;
 	lf->lfQuality = ANTIALIASED_QUALITY;
-
-	font_size = 36;
-	font_auto_size = false;
-	char_per_line = 20;
-	font_scaleX = font_scaleY = 100;
 
 	display_method = 1;
 
@@ -42,15 +42,10 @@ void CSubtitleSetting::set_default()
 	outline_widthX = outline_widthY = 3;
 	shadow_depthX = shadow_depthY = 3;
 
-	colors[0] = RGB(255, 243, 212);//0x00fef2d4;
-	colors[1] = 0x0000ffff;
-	colors[2] = 0;
-	colors[3] = RGB(32, 32, 32);
-	alpha[0] = 0xff;
-	alpha[1] = 0xff;
-	alpha[2] = 0xff;
-	alpha[3] = 0x80;
-	alpha_link = false;
+	cr[0] = Gdiplus::Color(0xff, 255, 243, 212);
+	cr[1] = Gdiplus::Color(0xff,   0, 255, 255);
+	cr[2] = Gdiplus::Color(0xff,   0,   0,   0);
+	cr[3] = Gdiplus::Color(0x80,  32,  32,  32);
 
 	pos_x = 50;
 	pos_y = 90;
@@ -71,9 +66,7 @@ CString& operator <<= (CString& style, CSubtitleSetting& s)
 %d|\
 %f|%f|\
 %f|%f|\
-0x%06x|0x%06x|0x%06x|0x%06x|\
-0x%02x|0x%02x|0x%02x|0x%02x|\
-%d|\
+0x%08x|0x%08x|0x%08x|0x%08x|\
 %d|%d|\
 %d|\
 %d"),
@@ -102,9 +95,7 @@ CString& operator <<= (CString& style, CSubtitleSetting& s)
 		s.outline_widthX, s.outline_widthY,
 		s.shadow_depthX, s.shadow_depthY,
 
-		s.colors[0], s.colors[1], s.colors[2], s.colors[3],
-		s.alpha[0], s.alpha[1], s.alpha[2], s.alpha[3],
-		s.alpha_link,
+		s.cr[0].GetValue(), s.cr[1].GetValue(), s.cr[2].GetValue(), s.cr[3].GetValue(),
 
 		s.pos_x, s.pos_y,
 		s.line_spacing,
@@ -157,10 +148,7 @@ CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style)
 			s.shadow_depthY = get_double(str);
 
 			for(ptrdiff_t i = 0; i < 4; i++)
-				s.colors[i] = (COLORREF)get_int(str);
-			for(ptrdiff_t i = 0; i < 4; i++)
-				s.alpha[i] = get_int(str);
-			s.alpha_link = get_int(str);
+				s.cr[i] = Gdiplus::Color((Gdiplus::ARGB)get_int(str));
 
 			s.pos_x = get_int(str);
 			s.pos_y = get_int(str);

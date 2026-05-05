@@ -64,6 +64,10 @@ private:
 	BOOL		m_bMemDC;		// TRUE if CDC really is a Memory DC.
 public:
 	
+	//bBg : TRUE이면 배경을 복사한다. FALSE이면 배경을 FillSolidRect로 채운다.
+	//만약 PaintDC에서 전체 화면을 모두 그린다면 bBg는 FALSE로 하면 된다.
+	//dshow처럼 가운데에 미디어를 재생하는 경우는 TRUE로 해서 비디오 영상이 해당 영역에
+	//그대로 그려지게 해야 한다. 그렇지 않으면 깜빡이게 된다.
 	CMemoryDC(CDC* pDC, const CRect* pRect = NULL, BOOL bBg = FALSE) : CDC()
 	{
 		ASSERT(pDC != NULL); 

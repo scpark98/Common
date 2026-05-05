@@ -1,5 +1,5 @@
 ﻿#include "SCAudioTransformFilter.h"
-#include "../log/SCLog/SCLog.h"
+#include "../../log/SCLog/SCLog.h"
 #include <strsafe.h>
 
 #pragma comment(lib, "strmiids.lib")

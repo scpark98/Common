@@ -1,7 +1,7 @@
 ﻿#include "dshow.h"
 #include "SCAudioGain.h"
 #include "SCAudioCompressor.h"
-#include "../log/SCLog/SCLog.h"
+#include "../../log/SCLog/SCLog.h"
 #include <gdiplus.h>
 
 
@@ -1009,8 +1009,10 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 	CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_IGraphBuilder,(void **)&m_pGB) ;
 
+	//VMR9 으로 revert — EVR 의 SetVideoPosition 보간이 resize 마다 비디오가 y=0 으로 잠깐 점프하는 transient 유발.
+	//VMR9 은 SetVideoPosition 즉시 적용되어 transient 없음. 깜빡임 fix 는 m_in_size_move 패턴 (drag 중 검정 fill).
 	CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
-		IID_IBaseFilter, (LPVOID *)&m_VMR);
+		IID_IBaseFilter, (LPVOID*)&m_VMR);
 	if (m_VMR != NULL)
 	{
 		m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
@@ -1018,62 +1020,30 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRFC));
 	if (m_pVMRFC != NULL)
-	{
 		m_pVMRFC->SetRenderingMode(VMR9Mode_Windowless);
-	}
 
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRWC));
 	if (m_pVMRWC != NULL)
 	{
-		RECT rcClient = {0,}, rc = {0,};
-		pParent->GetClientRect(&rcClient);
-		SetRect(&rc, 0, 0, rcClient.right - rcClient.left, rcClient.bottom - rcClient.top);
 		m_pVMRWC->SetVideoClippingWindow(pParent->m_hWnd);
 		m_pVMRWC->SetAspectRatioMode(VMR_ARMODE_LETTER_BOX);
-		m_pVMRWC->SetVideoPosition(NULL, &rc);
+		//letterbox 바 색을 명시적으로 검정. default 가 미정이라 비디오 aspect 와 rect aspect 가 다를 때
+		//좌/우 또는 상/하 바에 흰색·미초기화 픽셀이 깜빡임으로 보일 수 있음.
+		m_pVMRWC->SetBorderColor(RGB(0, 0, 0));
+		//SetVideoPosition 은 호출자(open_media) 가 chrome strip 뺀 정확한 비디오 영역으로 직접 호출.
 	}
 
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMB));
 	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMC));
-
-	//VMR9 mixer 의 픽셀 보간 모드 — 고품질 GaussianQuad → PyramidalQuad → Anisotropic 순 fallback.
-	//저화질 미디어 큰 화면 표시 시 격자 완화. 드라이버가 지원 안 하면 GetMixingPrefs 결과가 다른 값으로 떨어짐.
-	//품질 순: Point < BiLinear < Anisotropic < PyramidalQuad < GaussianQuad (PotPlayer Lanczos 까진 못 미침).
-	if (m_pVMRMC != NULL)
-	{
-		const DWORD modes[3] = {
-			MixerPref9_GaussianQuadFiltering,
-			MixerPref9_PyramidalQuadFiltering,
-			MixerPref9_AnisotropicFiltering,
-		};
-		const TCHAR* names[3] = { _T("GaussianQuad"), _T("PyramidalQuad"), _T("Anisotropic") };
-
-		for (int i = 0; i < 3; ++i)
-		{
-			DWORD prefs = 0;
-			if (FAILED(m_pVMRMC->GetMixingPrefs(&prefs)))
-				break;
-			prefs &= ~MixerPref9_FilteringMask;
-			prefs |= modes[i];
-			HRESULT hr_mp = m_pVMRMC->SetMixingPrefs(prefs);
-
-			DWORD readback = 0;
-			m_pVMRMC->GetMixingPrefs(&readback);
-			DWORD applied = readback & MixerPref9_FilteringMask;
-			logWrite(_T("[VMR9] SetMixingPrefs(%s) hr=0x%08lX requested=0x%08lX readback=0x%08lX applied=0x%08lX"),
-				names[i], hr_mp, modes[i], readback, applied);
-			if (SUCCEEDED(hr_mp) && applied == modes[i])
-				break;
-		}
-	}
 
 	CComQIPtr<IVideoWindow> pVW(m_pGB);
 	if (pVW != NULL)
 	{
 		hr = pVW->put_Owner((OAHWND)pParent->m_hWnd);
 		hr = pVW->put_WindowStyle(WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
-		hide_cursor(true);
 	}
+
+	hide_cursor(true);
 
 	m_pGB->QueryInterface(IID_PPV_ARGS(&m_pMC));
 
@@ -1713,22 +1683,11 @@ void CDShow::set_video_position(CRect r)
 	if (m_pVMRWC)
 	{
 		m_pVMRWC->SetVideoPosition(NULL, &r);
-
-		//Paused / Running 모두 즉시 redraw — resize 중 video frame 이 새 위치에 즉시 그려져 깜빡임 최소화.
-		//Running 시 다음 frame 까지 1~16ms 지연이 깜빡임 원인이 됨.
-		if (m_pParent && m_pParent->GetSafeHwnd())
-		{
-			HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
-			m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
-			::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
-		}
 	}
 	else if (m_pVDC)
 	{
 		RECT rc = r;
 		m_pVDC->SetVideoPosition(NULL, &rc);
-		if (m_pParent && m_pParent->GetSafeHwnd())
-			m_pVDC->RepaintVideo();
 	}
 	else
 	{
@@ -2955,7 +2914,7 @@ void CDShow::ShowFilterPropertyPage(CString sFilterName)
 	TCHAR szNameToFind[128];
 	ISpecifyPropertyPages *pSpecify;
 
-	_stprintf(szNameToFind, _T("%s"), sFilterName);
+	_stprintf_s(szNameToFind, _T("%s"), sFilterName);
 	// Read the current list box name and find it in the graph
 	pFilter = FindFilterByNameInGraph(szNameToFind);
 	if (!pFilter)

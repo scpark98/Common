@@ -11,9 +11,9 @@
 #pragma comment(lib, "Mfuuid.lib")
 #pragma comment(lib, "Strmiids.lib")
 
-#include "../Functions.h"
-#include "../subtitle/Subtitle.h"
-#include "../subtitle/subtitle_setting.h"
+#include "../../Functions.h"
+#include "../../subtitle/Subtitle.h"
+#include "../../subtitle/subtitle_setting.h"
 
 #define USE_DIRECT_VOB_SUB	false
 
@@ -21,7 +21,7 @@
 #include "MediaInfo/MediaInfo.h" //Staticly-loaded library (.lib or .a or .so)
 #define MediaInfoNameSpace MediaInfoLib;
 #else //MEDIAINFO_LIBRARY
-#include "MediaInfoDLL/MediaInfoDLL.h" //Dynamicly-loaded library (.dll or .so)
+#include "../MediaInfoDLL/MediaInfoDLL.h" //Dynamicly-loaded library (.dll or .so)
 #define MediaInfoNameSpace MediaInfoDLL;
 #endif //MEDIAINFO_LIBRARY
 #include <iostream>

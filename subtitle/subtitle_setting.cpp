@@ -24,7 +24,7 @@ void CSubtitleSetting::set_default()
 	char_per_line = 20;
 	font_scaleX = font_scaleY = 100;
 
-	_tcscpy(lf->lfFaceName, _T("Yu Gothic UI"));
+	_tcscpy_s(lf->lfFaceName, LF_FACESIZE, _T("Yu Gothic UI"));
 	lf->lfCharSet = DEFAULT_CHARSET;
 	lf->lfHeight = -MulDiv(font_size, GetDeviceCaps(::GetDC(NULL), LOGPIXELSY), 72);
 	lf->lfWeight = FW_DONTCARE;
@@ -117,7 +117,7 @@ CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style)
 
 		if(str.Find('|') >= 0)
 		{
-			_tcscpy(s.lf->lfFaceName, get_str(str));
+			_tcscpy_s(s.lf->lfFaceName, LF_FACESIZE, get_str(str));
 			s.lf->lfCharSet = get_int(str);
 			s.lf->lfHeight = get_int(str);
 			s.lf->lfWeight = get_int(str);

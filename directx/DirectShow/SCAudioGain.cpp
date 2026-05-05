@@ -1,5 +1,5 @@
 ﻿#include "SCAudioGain.h"
-#include "../log/SCLog/SCLog.h"
+#include "../../log/SCLog/SCLog.h"
 #include <math.h>
 #include <mmreg.h>
 

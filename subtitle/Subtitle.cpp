@@ -325,12 +325,12 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 
 	if (text_encoding <= text_encoding_ansi)
 	{
-		m_fp = _tfopen(sfile, _T("rt"));
+		_tfopen_s(&m_fp, sfile, _T("rt"));
 		m_unicode = false;
 	}
 	else
 	{
-		m_fp = _tfopen(sfile, _T("rt, ccs=UNICODE"));
+		_tfopen_s(&m_fp, sfile, _T("rt, ccs=UNICODE"));
 		m_unicode = true;
 	}
 
@@ -518,7 +518,8 @@ bool CSubtitle::save_subtitle_file(CString sfile)
 
 bool CSubtitle::save_srt(CString sfile)
 {
-	FILE*	fp = _tfopen(sfile, _T("wt, ccs=UNICODE"));
+	FILE* fp = NULL;
+	_tfopen_s(&fp, sfile, _T("wt, ccs=UNICODE"));
 	if (fp == NULL)
 		return false;
 
@@ -566,7 +567,9 @@ bool CSubtitle::save_smi(CString sfile)
 	if (dwAttrs & FILE_ATTRIBUTE_READONLY)
 		SetFileAttributes(sfile, FILE_ATTRIBUTE_NORMAL);
 
-	FILE* fp = _tfopen(sfile, _T("wt,ccs=UNICODE"));
+	FILE* fp = nullptr;
+	_tfopen_s(&fp, sfile, _T("wt,ccs=UNICODE"));
+
 	if (fp == NULL)
 		return false;
 

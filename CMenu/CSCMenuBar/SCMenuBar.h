@@ -67,7 +67,7 @@ public:
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
-	//CMenu를 이용하여 resource의 menu를 읽어오는 경우
+	//CMenu를 이용하여 resource의 menu를 읽어
 	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_button_width = 0, int menu_button_height = 0);
 	void	set_check(int menu_index, UINT menu_id, int sub_button_index, bool check);
 	void	set_color_theme(int theme);

@@ -1928,7 +1928,7 @@ int	GetSecondsFromTimeString(CString timeString)
 {
 	bool minus = false;
 
-	if (timeString[0] == '-')
+	if (!timeString.IsEmpty() && timeString[0] == '-')
 	{
 		minus = true;
 		timeString = timeString.Mid(1);
@@ -1936,9 +1936,27 @@ int	GetSecondsFromTimeString(CString timeString)
 
 	std::deque<CString> dqToken;
 	get_token_str(timeString, dqToken, ':');
-	int hour = _ttoi(dqToken[0]);
-	int minute = _ttoi(dqToken[1]);
-	int second = _ttoi(dqToken[2]);
+
+	//토큰 수 별 해석: 0=빈 입력, 1=SS, 2=MM:SS, 3+=HH:MM:SS (마지막 3개를 사용).
+	//검증 없이 [0][1][2] 접근하면 비정상 입력에서 deque OOB crash. 호출처가
+	//resize/seek 도중 임시 부분문자열을 넘기는 race 를 만나도 안전하게 0 반환.
+	int hour = 0, minute = 0, second = 0;
+	const int n = (int)dqToken.size();
+	if (n >= 3)
+	{
+		hour   = _ttoi(dqToken[n - 3]);
+		minute = _ttoi(dqToken[n - 2]);
+		second = _ttoi(dqToken[n - 1]);
+	}
+	else if (n == 2)
+	{
+		minute = _ttoi(dqToken[0]);
+		second = _ttoi(dqToken[1]);
+	}
+	else if (n == 1)
+	{
+		second = _ttoi(dqToken[0]);
+	}
 
 	int seconds = (hour * 3600 + minute * 60 + second);
 	if (minus)

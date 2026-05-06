@@ -106,7 +106,7 @@ void CSCToolBar::insert(int index, CString caption, UINT resource_id, int button
 		btn->SetButtonStyle(button_type);
 
 		CSCGdiplusBitmap img(_T("PNG"), resource_id), img1;
-		img.canvas_size(m_width, m_height);
+		img.resize_canvas(m_width, m_height);
 
 		img.deep_copy(&img1);
 		img1.replace_color(Gdiplus::Color(255, 45, 51, 51));
@@ -175,12 +175,12 @@ void CSCToolBar::set_back_color(COLORREF cr_back)
 LRESULT	CSCToolBar::on_message_GdiButton(WPARAM wParam, LPARAM lParam)
 {
 	CGdiButtonMessage* msg = (CGdiButtonMessage*)wParam;
-	TRACE(_T("btn = %p, msg = %d\n"), msg->pWnd, msg->msg);
+	TRACE(_T("btn = %p, msg = %d\n"), msg->pThis, msg->message);
 
-	if (msg->msg == WM_LBUTTONUP)
+	if (msg->message == WM_LBUTTONUP)
 	{
 		CString caption;
-		msg->pWnd->GetWindowText(caption);
+		msg->pThis->GetWindowText(caption);
 		TRACE(_T("toolbar id = %d, caption = %s\n"), msg->ctrl_id, caption);
 	}
 	//main dlg에 그림이 깔려있는 상태에서 투명 GdiButton이 있는 경우라면
@@ -188,17 +188,17 @@ LRESULT	CSCToolBar::on_message_GdiButton(WPARAM wParam, LPARAM lParam)
 	//main dlg안에 SCToolbar가 있고 그 안에 투명 GdiButton이 있다면
 	//GdiButton에서 hover, leave시에 화면을 갱신하는 것은 GdiButton 내부에서의 처리로만은 해결되지 않는다.
 	//GdiButton의 parent인 SCToolBar에서 그 메시지를 받아서 main dlg의 해당 영역을 invalidate()해줘야 한다.
-	else if (msg->msg == WM_MOUSEHOVER)
+	else if (msg->message == WM_MOUSEHOVER)
 	{
 		CRect rc;
-		msg->pWnd->GetWindowRect(rc);
+		msg->pThis->GetWindowRect(rc);
 		GetParent()->ScreenToClient(rc);
 		GetParent()->InvalidateRect(rc, TRUE);
 	}
-	else if (msg->msg == WM_MOUSELEAVE)
+	else if (msg->message == WM_MOUSELEAVE)
 	{
 		CRect rc;
-		msg->pWnd->GetWindowRect(rc);
+		msg->pThis->GetWindowRect(rc);
 		GetParent()->ScreenToClient(rc);
 		GetParent()->InvalidateRect(rc, TRUE);
 	}

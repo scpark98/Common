@@ -75,7 +75,7 @@ static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("Message
 //주의할 점은 TOP, LEFT는 0이므로 먼저 비교하면 안되고 CENTER, RIGHT인지 검사한 후 아니면 LEFT라고 판단해야 한다.
 //align = ALIGN_LEFT | ALIGN_BOTTOM 을 주면 8이 되는데 이렇게 호출하면
 //if (align & ALIGN_LEFT) //이 비교 결과는 0이 되므로 실행되지 않는다.
-//=> CSCGdiplusBitmap::canvas_size()를 호출할 때 이미지 위치를 지정할 때 사용하기 위해 정의했으나
+//=> CSCGdiplusBitmap::resize_canvas()를 호출할 때 이미지 위치를 지정할 때 사용하기 위해 정의했으나
 //이미 afxbutton.h에 정의되어 중복된다. DrawText()에서 사용되는 align을 그냥 이용한다.
 //#define ALIGN_TOP        0x00000000
 //#define ALIGN_LEFT       0x00000000

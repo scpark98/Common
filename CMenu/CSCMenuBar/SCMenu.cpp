@@ -639,11 +639,24 @@ void CSCMenu::recalc_items_rect()
 	ScreenToClient(rw);
 	rw.MoveToXY(0, 0);
 
+	//썸네일 항목 height = 위 padding(4) + 썸네일 max height(45) + 아래 padding(4).
+	//claude.md spike 디자인: 80x45 비대칭 이미지 + 우측 2줄 텍스트.
+	const int thumbnail_item_h = 4 + 45 + 4;
+
 	//item rect의 크기는 border 유무에 따라 다를 수 있다.
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		is_separator = (m_items[i]->m_id <= 0);
-		m_items[i]->m_r = CRect(4, sy, rw.right - 5 - border.cx, sy + (is_separator ? 5 : m_line_height));
+
+		int item_h;
+		if (is_separator)
+			item_h = 5;
+		else if (m_items[i]->m_type == CSCMenuItem::item_thumbnail)
+			item_h = thumbnail_item_h;
+		else
+			item_h = m_line_height;
+
+		m_items[i]->m_r = CRect(4, sy, rw.right - 5 - border.cx, sy + item_h);
 		sy = m_items[i]->m_r.bottom + 2;
 
 		total_height = m_items[i]->m_r.bottom;
@@ -713,6 +726,40 @@ void CSCMenu::OnPaint()
 			else
 			{
 				dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+			}
+
+			//썸네일 항목: 좌측 썸네일(80x45 영역 안에 center) + 우측 primary/secondary 2줄 텍스트.
+			//hover 색은 위에서 이미 적용됨. sub button/hot_key 는 없으므로 continue.
+			if (m_items[i]->m_type == CSCMenuItem::item_thumbnail)
+			{
+				CRect rThumb = m_items[i]->m_r;
+				rThumb.DeflateRect(4, 4);
+				rThumb.right = rThumb.left + 80;
+
+				if (m_items[i]->m_thumbnail.is_valid())
+				{
+					CRect r_centered = get_center_rect(rThumb,
+						m_items[i]->m_thumbnail.width, m_items[i]->m_thumbnail.height);
+					m_items[i]->m_thumbnail.draw(g, r_centered.left, r_centered.top);
+				}
+
+				CRect rTextArea = m_items[i]->m_r;
+				rTextArea.left = rThumb.right + 6;
+				rTextArea.right -= 6;
+				rTextArea.DeflateRect(0, 4);
+
+				CRect rPrimary = rTextArea;
+				rPrimary.bottom = rTextArea.top + rTextArea.Height() / 2;
+				dc.DrawText(m_items[i]->m_caption, rPrimary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+				CRect rSecondary = rTextArea;
+				rSecondary.top = rPrimary.bottom;
+				COLORREF prev_text_color = dc.GetTextColor();
+				dc.SetTextColor(m_theme.cr_text_dim.ToCOLORREF());
+				dc.DrawText(m_items[i]->m_sub_caption, rSecondary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+				dc.SetTextColor(prev_text_color);
+
+				continue;
 			}
 
 			CRect rText = m_items[i]->m_r;

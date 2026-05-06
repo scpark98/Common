@@ -209,14 +209,14 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	{
 		shadow_extra = max((float)r.Height() / 30.0f, 2.0f);
 		//Gaussian blur 그림자가 활성화되어 있으면 sigma 의 약 3배까지 번지므로 그만큼 추가 여유를 준다.
-		blur_extra = m_text_setting.text_prop.shadow_blur_sigma * 3.0f;
+		blur_extra = m_text_setting.text_prop.shadow_blur_sigma;// *3.0f;
 	}
 
 	//thickness 는 GDI+ Pen LineJoinRound + anti-alias 로 stroke 가 path 양쪽 외부에까지 번진다.
 	//calc_text_rect 가 path bounds 보다 약간 좁게 잡는 경우 글자 위/아래 디센더가 잘리는 회귀가 있어 +6 의 여유 추가.
 	int extra = (int)(m_text_setting.text_prop.thickness + shadow_extra + blur_extra) + 6;
 	if (extra > 0)
-		r.InflateRect(extra, extra);
+		r.InflateRect(extra, extra / 2);
 
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
@@ -398,7 +398,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 }
 
 //현재 설정된 이미지를 파일로 저장해서 확인해 볼 수 있다.
-void CSCShapeDlg::save_image(CString path)
+void CSCShapeDlg::save(CString path)
 {
 	m_img.save(path);
 }

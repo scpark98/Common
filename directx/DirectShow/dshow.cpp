@@ -932,6 +932,13 @@ void CDShow::close_media()
 	m_subtitle_sync = 0;
 	m_media_filename.Empty();
 
+	m_video_stream.clear();
+	m_audio_stream.clear();
+	m_subtitle_stream.clear();
+	m_video_stream_index = 0;
+	m_audio_stream_index = 0;
+	m_subtitle_stream_index = -1;
+
 	m_mirror = m_flip = false;
 
 	if (m_pParentDC)
@@ -1694,6 +1701,26 @@ void CDShow::set_video_position(CRect r)
 		CComQIPtr<IVideoWindow> pVW(m_pGB);
 		if (pVW)
 			pVW->SetWindowPosition(r.left, r.top, r.Width(), r.Height());
+	}
+
+	//paused/stopped 상태에서는 새 프레임이 들어오지 않아 위치 변경 후 stale 픽셀이 남음.
+	//RepaintVideo 로 backbuffer 의 마지막 프레임을 새 영역에 강제로 다시 그림.
+	if (m_pMC)
+	{
+		OAFilterState state = State_Running;
+		if (SUCCEEDED(m_pMC->GetState(0, &state)) && state != State_Running)
+		{
+			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+			{
+				HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+				m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+				::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+			}
+			else if (m_pVDC)
+			{
+				m_pVDC->RepaintVideo();
+			}
+		}
 	}
 }
 

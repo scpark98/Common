@@ -103,7 +103,7 @@ public:
 	void			set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy = true);
 
 	//현재 설정된 이미지를 파일로 저장해서 확인해 볼 수 있다.
-	void			save_image(CString path);
+	void			save(CString path);
 
 	bool			load(CWnd* parent, UINT id);
 	bool			load(CWnd* parent, CString sType, UINT id);

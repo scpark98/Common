@@ -138,9 +138,18 @@ public:
 	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
 
 	//썸네일 + 2줄 텍스트 항목. res_type 은 "PNG"/"JPG" 등 리소스 type 문자열, res_id 는 리소스 ID.
-	//1단계: 데이터만 보관. 화면엔 일반 항목처럼 caption 만 표시됨 (paint 분기 = 2단계).
+	//_secondary 가 빈 문자열이면 단일 라인으로 표시.
 	void			add_thumbnail_item(int _id, CString _primary, CString _secondary,
 									   CString thumbnail_res_type, UINT thumbnail_res_id);
+
+	//bitmap 을 직접 받는 오버로드. 캡처된 프레임 / registry 에서 디코딩한 bitmap 등.
+	//내부적으로 deep_copy 하므로 호출자는 인자 lifetime 신경 쓸 필요 없음.
+	void			add_thumbnail_item(int _id, CString _primary, CString _secondary,
+									   CSCGdiplusBitmap* thumbnail);
+
+	//submenu 항목. sub_menu 의 lifecycle 은 호출자가 보유 (보통 dialog 멤버).
+	//클릭 시 sub_menu 가 항목 우측 edge 에서 popup, 부모 메뉴는 자식이 닫힐 때까지 유지.
+	void			add_submenu_item(int _id, CString _caption, CSCMenu* sub_menu);
 
 	//sub button이 여러개일 때 args에 나열하여 호출.
 	template <typename ... Types> void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""), Types... args)
@@ -208,7 +217,13 @@ protected:
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	CWnd*			m_parent = NULL;
+	CSCMenu*		m_parent_menu = nullptr;
+	bool			m_suppress_cascade_hide = false;
 	CSCGdiplusBitmap	m_img_back;
+
+	bool			is_in_menu_chain(CWnd* pWnd);
+	bool			contains_descendant_hwnd(HWND hwnd);
+	void			hide_visible_descendants();
 	std::deque<CSCMenuItem*> m_items;
 
 	bool		m_use_over = true;			//hover hilighted
@@ -243,6 +258,7 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	//afx_msg BOOL OnLbnSelchange();
 	afx_msg void OnPaint();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };
 
 

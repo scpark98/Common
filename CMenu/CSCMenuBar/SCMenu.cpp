@@ -171,6 +171,7 @@ BEGIN_MESSAGE_MAP(CSCMenu, CDialogEx)
 	ON_WM_SIZE()
 	//ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CSCMenu::OnLbnSelchange)
 	ON_WM_PAINT()
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 void CSCMenu::add(int _id, CString _caption, UINT icon_id, CString _hot_key)
@@ -188,6 +189,29 @@ void CSCMenu::add_thumbnail_item(int _id, CString _primary, CString _secondary,
 	item->m_sub_caption = _secondary;
 	if (thumbnail_res_id > 0)
 		item->m_thumbnail.load(thumbnail_res_type, thumbnail_res_id);
+	m_items.push_back(item);
+	recalc_items_rect();
+}
+
+void CSCMenu::add_thumbnail_item(int _id, CString _primary, CString _secondary,
+								 CSCGdiplusBitmap* thumbnail)
+{
+	CSCMenuItem* item = new CSCMenuItem(_id, _primary);
+	item->m_type = CSCMenuItem::item_thumbnail;
+	item->m_sub_caption = _secondary;
+	if (thumbnail)
+		thumbnail->deep_copy(&item->m_thumbnail);
+	m_items.push_back(item);
+	recalc_items_rect();
+}
+
+void CSCMenu::add_submenu_item(int _id, CString _caption, CSCMenu* sub_menu)
+{
+	CSCMenuItem* item = new CSCMenuItem(_id, _caption);
+	item->m_type = CSCMenuItem::item_submenu;
+	item->m_sub_menu = sub_menu;
+	if (sub_menu)
+		sub_menu->m_parent_menu = this;
 	m_items.push_back(item);
 	recalc_items_rect();
 }
@@ -262,10 +286,68 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 {
 	CDialogEx::OnKillFocus(pNewWnd);
 
-	// TODO: Add your message handler code here
+	//부모가 우리를 강제 hide 시킨 경우 — cascade/message 까지 가면 부모도 닫혀버리므로 skip.
+	if (m_suppress_cascade_hide)
+	{
+		m_suppress_cascade_hide = false;
+		return;
+	}
+
+	//focus 가 우리 메뉴 체인 내부 (자식 popup, 부모 복귀 등) 로 이동했으면 그대로 유지.
+	if (is_in_menu_chain(pNewWnd))
+		return;
+
+	//외부로 focus 가 갔으면 우리 + 보이는 자식 + 조상 모두 닫는다.
+	hide_visible_descendants();
 	ShowWindow(SW_HIDE);
+	if (m_parent_menu && m_parent_menu->IsWindowVisible())
+		m_parent_menu->ShowWindow(SW_HIDE);
+
 	::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
 		(WPARAM)&CSCMenuMessage(this, message_scmenu_hide, NULL), 0);
+}
+
+bool CSCMenu::is_in_menu_chain(CWnd* pWnd)
+{
+	if (!pWnd || !pWnd->m_hWnd)
+		return false;
+
+	CSCMenu* top = this;
+	while (top->m_parent_menu)
+		top = top->m_parent_menu;
+
+	return top->contains_descendant_hwnd(pWnd->m_hWnd);
+}
+
+bool CSCMenu::contains_descendant_hwnd(HWND hwnd)
+{
+	if (m_hWnd == hwnd)
+		return true;
+
+	for (auto* item : m_items)
+	{
+		if (item->m_type == CSCMenuItem::item_submenu && item->m_sub_menu)
+		{
+			if (item->m_sub_menu->contains_descendant_hwnd(hwnd))
+				return true;
+		}
+	}
+	return false;
+}
+
+void CSCMenu::hide_visible_descendants()
+{
+	for (auto* item : m_items)
+	{
+		if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+			continue;
+		if (!item->m_sub_menu->IsWindowVisible())
+			continue;
+
+		item->m_sub_menu->hide_visible_descendants();
+		item->m_sub_menu->m_suppress_cascade_hide = true;
+		item->m_sub_menu->ShowWindow(SW_HIDE);
+	}
 }
 
 
@@ -313,9 +395,19 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 		//메뉴 항목이 눌린 경우
 		else if (m_items[i]->m_r.PtInRect(point))
 		{
+			if (m_items[i]->m_type == CSCMenuItem::item_submenu && m_items[i]->m_sub_menu)
+			{
+				CRect rItem = m_items[i]->m_r;
+				ClientToScreen(rItem);
+				m_items[i]->m_sub_menu->popup_menu(rItem.right - 4, rItem.top);
+				return;
+			}
+
 			::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
 				(WPARAM)&CSCMenuMessage(this, message_scmenu_selchanged, m_items[i]), 0);
 			ShowWindow(SW_HIDE);
+			if (m_parent_menu && m_parent_menu->IsWindowVisible())
+				m_parent_menu->ShowWindow(SW_HIDE);
 			return;
 		}
 	}
@@ -345,9 +437,11 @@ int CSCMenu::get_item_index(CPoint pt)
 	return -1;
 }
 
+static const UINT_PTR timer_submenu_hover = 0x10001;
+static const int submenu_hover_delay_ms = 300;
+
 void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 {
-	// TODO: Add your message handler code here and/or call default
 	if (m_use_over)
 	{
 		int over_item = get_item_index(point);
@@ -355,10 +449,58 @@ void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			m_over_item = over_item;
 			Invalidate(false);
+
+			KillTimer(timer_submenu_hover);
+
+			//hover 가 형제 항목으로 이동했으면 떠있던 자식 submenu 닫기.
+			//자식이 hide 되며 focus 가 test dialog 로 빠져나가면 부모(자기)도 외부 클릭 시 KillFocus 를 못 받아 안 닫힌다 — SetFocus 로 회수.
+			bool dismissed_any = false;
+			for (auto* item : m_items)
+			{
+				if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+					continue;
+				if (!item->m_sub_menu->IsWindowVisible())
+					continue;
+				if (over_item < 0 || m_items[over_item] != item)
+				{
+					item->m_sub_menu->m_suppress_cascade_hide = true;
+					item->m_sub_menu->ShowWindow(SW_HIDE);
+					dismissed_any = true;
+				}
+			}
+			if (dismissed_any)
+				SetFocus();
+
+			if (over_item >= 0 && m_items[over_item]->m_type == CSCMenuItem::item_submenu)
+				SetTimer(timer_submenu_hover, submenu_hover_delay_ms, NULL);
 		}
 	}
 
 	CDialogEx::OnMouseMove(nFlags, point);
+}
+
+void CSCMenu::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == timer_submenu_hover)
+	{
+		KillTimer(timer_submenu_hover);
+
+		if (m_over_item < 0)
+			return;
+
+		CSCMenuItem* item = m_items[m_over_item];
+		if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+			return;
+		if (item->m_sub_menu->IsWindowVisible())
+			return;
+
+		CRect rItem = item->m_r;
+		ClientToScreen(rItem);
+		item->m_sub_menu->popup_menu(rItem.right - 4, rItem.top);
+		return;
+	}
+
+	CDialogEx::OnTimer(nIDEvent);
 }
 
 
@@ -398,6 +540,9 @@ bool CSCMenu::create(CWnd* parent, int width)
 		else
 			GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
+		_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), _T("Segoe UI"));
+		m_lf.lfCharSet = DEFAULT_CHARSET;
+
 		ReconstructFont();
 	}
 
@@ -429,7 +574,9 @@ void CSCMenu::load(UINT resource_id, int menu_index)
 			std::deque<CString> token;
 			get_token_str(menu_caption, token, _T("\t"));
 
-			add(menu_id, menu_caption, 0, (token.size() == 2 ? token[1] : CString()));
+			CString caption = (token.size() >= 1 ? token[0] : menu_caption);
+			CString hot_key = (token.size() >= 2 ? token[1] : CString());
+			add(menu_id, caption, 0, hot_key);
 		}
 	}
 }
@@ -737,27 +884,30 @@ void CSCMenu::OnPaint()
 				rThumb.right = rThumb.left + 80;
 
 				if (m_items[i]->m_thumbnail.is_valid())
-				{
-					CRect r_centered = get_center_rect(rThumb,
-						m_items[i]->m_thumbnail.width, m_items[i]->m_thumbnail.height);
-					m_items[i]->m_thumbnail.draw(g, r_centered.left, r_centered.top);
-				}
+					m_items[i]->m_thumbnail.draw(g, rThumb);
 
 				CRect rTextArea = m_items[i]->m_r;
 				rTextArea.left = rThumb.right + 6;
 				rTextArea.right -= 6;
 				rTextArea.DeflateRect(0, 4);
 
-				CRect rPrimary = rTextArea;
-				rPrimary.bottom = rTextArea.top + rTextArea.Height() / 2;
-				dc.DrawText(m_items[i]->m_caption, rPrimary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+				if (m_items[i]->m_sub_caption.IsEmpty())
+				{
+					dc.DrawText(m_items[i]->m_caption, rTextArea, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+				}
+				else
+				{
+					CRect rPrimary = rTextArea;
+					rPrimary.bottom = rTextArea.top + rTextArea.Height() / 2;
+					dc.DrawText(m_items[i]->m_caption, rPrimary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-				CRect rSecondary = rTextArea;
-				rSecondary.top = rPrimary.bottom;
-				COLORREF prev_text_color = dc.GetTextColor();
-				dc.SetTextColor(m_theme.cr_text_dim.ToCOLORREF());
-				dc.DrawText(m_items[i]->m_sub_caption, rSecondary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-				dc.SetTextColor(prev_text_color);
+					CRect rSecondary = rTextArea;
+					rSecondary.top = rPrimary.bottom;
+					COLORREF prev_text_color = dc.GetTextColor();
+					dc.SetTextColor(m_theme.cr_text_dim.ToCOLORREF());
+					dc.DrawText(m_items[i]->m_sub_caption, rSecondary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+					dc.SetTextColor(prev_text_color);
+				}
 
 				continue;
 			}
@@ -811,6 +961,13 @@ void CSCMenu::OnPaint()
 
 				//DrawRectangle(&dc, rText);
 				dc.DrawText(m_items[i]->m_hot_key, rText, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+			}
+
+			if (m_items[i]->m_type == CSCMenuItem::item_submenu)
+			{
+				CRect rArrow = m_items[i]->m_r;
+				rArrow.right -= 6;
+				dc.DrawText(_T(">"), rArrow, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 			}
 		}
 	}

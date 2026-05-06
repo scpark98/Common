@@ -107,6 +107,57 @@ CSCGdiplusBitmap::CSCGdiplusBitmap(IStream* pStream)
 	resolution();
 }
 
+bool CSCGdiplusBitmap::load_from_buffer(const BYTE* data, UINT size)
+{
+	if (!data || size == 0)
+		return false;
+
+	release();
+
+	HGLOBAL hg = ::GlobalAlloc(GMEM_MOVEABLE, size);
+	if (!hg)
+		return false;
+
+	LPVOID p = ::GlobalLock(hg);
+	if (!p)
+	{
+		::GlobalFree(hg);
+		return false;
+	}
+	memcpy(p, data, size);
+	::GlobalUnlock(hg);
+
+	IStream* stream = NULL;
+	//TRUE = stream 이 hg ownership 인수 → stream->Release() 시 GlobalFree 자동.
+	HRESULT hr = ::CreateStreamOnHGlobal(hg, TRUE, &stream);
+	if (FAILED(hr) || !stream)
+	{
+		::GlobalFree(hg);
+		return false;
+	}
+
+	Gdiplus::Bitmap* temp = Gdiplus::Bitmap::FromStream(stream, TRUE);
+	if (!temp || temp->GetLastStatus() != Gdiplus::Ok)
+	{
+		if (temp)
+			delete temp;
+		stream->Release();
+		return false;
+	}
+
+	m_pBitmap = new Gdiplus::Bitmap(temp->GetWidth(), temp->GetHeight(), PixelFormat32bppARGB);
+	Gdiplus::Graphics g(m_pBitmap);
+	Gdiplus::SolidBrush brush_tr(Gdiplus::Color(0, 0, 0, 0));
+	g.FillRectangle(&brush_tr, 0, 0, temp->GetWidth(), temp->GetHeight());
+	g.DrawImage(temp, 0, 0);
+
+	SAFE_DELETE(temp);
+	stream->Release();
+
+	resolution();
+	return true;
+}
+
 CSCGdiplusBitmap::CSCGdiplusBitmap(CString sFile)
 {
 	load(sFile);

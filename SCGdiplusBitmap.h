@@ -180,6 +180,8 @@ public:
 	bool			load(UINT id);
 	bool			load_icon(UINT id, int size = 32);
 	bool			load_webp(CString sfile);
+	//in-memory PNG/JPEG byte buffer 로부터 로드. registry binary round-trip 등에 사용.
+	bool			load_from_buffer(const BYTE* data, UINT size);
 
 	CString			get_filename(bool fullpath = true);
 

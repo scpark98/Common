@@ -15,6 +15,8 @@
 #include "../../subtitle/Subtitle.h"
 #include "../../subtitle/subtitle_setting.h"
 
+class CSCGdiplusBitmap;
+
 #define USE_DIRECT_VOB_SUB	false
 
 #ifdef MEDIAINFO_LIBRARY
@@ -111,6 +113,8 @@ public:
 	void			move_track(bool forward, int interval = -1);	//unit:sec
 	void			step_frame(bool forward);
 	bool			capture_frame(CString sfile);
+	//현재 video frame 을 in-memory CSCGdiplusBitmap 으로 캡처. 북마크 thumbnail 등에 사용.
+	bool			capture_frame(CSCGdiplusBitmap& out);
 
 	std::deque<CMediaStream> m_video_stream;
 	std::deque<CMediaStream> m_audio_stream;

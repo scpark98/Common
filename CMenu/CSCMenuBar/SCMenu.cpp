@@ -148,6 +148,11 @@ CSCMenu::CSCMenu()
 
 CSCMenu::~CSCMenu()
 {
+	clear();
+}
+
+void CSCMenu::clear()
+{
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		for (int j = 0; j < m_items[i]->m_buttons.size(); j++)
@@ -159,6 +164,7 @@ CSCMenu::~CSCMenu()
 
 		delete m_items[i];
 	}
+	m_items.clear();
 }
 
 
@@ -242,6 +248,38 @@ void CSCMenu::set_check(UINT menu_id, int sub_button_index, bool check)
 	menu_item->set_check(sub_button_index, check);
 }
 
+void CSCMenu::enable_item(int menu_id, bool enabled)
+{
+	CSCMenuItem* item = get_menu_item(menu_id);
+	if (!item)
+		return;
+	item->m_enabled = enabled;
+	if (m_hWnd)
+		Invalidate();
+}
+
+void CSCMenu::check_item(int menu_id, bool checked)
+{
+	CSCMenuItem* item = get_menu_item(menu_id);
+	if (!item)
+		return;
+	item->m_checked = checked;
+	if (m_hWnd)
+		Invalidate();
+}
+
+void CSCMenu::check_radio_item(int first_id, int last_id, int selected_id)
+{
+	for (auto* item : m_items)
+	{
+		if (item->m_id < first_id || item->m_id > last_id)
+			continue;
+		item->m_checked = (item->m_id == selected_id);
+	}
+	if (m_hWnd)
+		Invalidate();
+}
+
 //resource editor에서 이 클래스 컨트롤을 추가해서 사용하는 것이 아닌
 //동적으로 create해서 사용하므로 여기에 초기화 코드를 넣어도 의미없다.
 //create() 한 후에 초기화 코드를 넣어줘야 한다.
@@ -300,8 +338,7 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 	//외부로 focus 가 갔으면 우리 + 보이는 자식 + 조상 모두 닫는다.
 	hide_visible_descendants();
 	ShowWindow(SW_HIDE);
-	if (m_parent_menu && m_parent_menu->IsWindowVisible())
-		m_parent_menu->ShowWindow(SW_HIDE);
+	hide_visible_ancestors();		//focus 가 외부로 나가면 전체 체인 종료.
 
 	::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
 		(WPARAM)&CSCMenuMessage(this, message_scmenu_hide, NULL), 0);
@@ -350,6 +387,20 @@ void CSCMenu::hide_visible_descendants()
 	}
 }
 
+void CSCMenu::hide_visible_ancestors()
+{
+	CSCMenu* p = m_parent_menu;
+	while (p)
+	{
+		if (p->IsWindowVisible())
+		{
+			p->m_suppress_cascade_hide = true;
+			p->ShowWindow(SW_HIDE);
+		}
+		p = p->m_parent_menu;
+	}
+}
+
 
 void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 {
@@ -395,6 +446,10 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 		//메뉴 항목이 눌린 경우
 		else if (m_items[i]->m_r.PtInRect(point))
 		{
+			//disabled 항목은 아무 동작 안 함.
+			if (!m_items[i]->m_enabled)
+				return;
+
 			if (m_items[i]->m_type == CSCMenuItem::item_submenu && m_items[i]->m_sub_menu)
 			{
 				CRect rItem = m_items[i]->m_r;
@@ -406,8 +461,7 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 			::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
 				(WPARAM)&CSCMenuMessage(this, message_scmenu_selchanged, m_items[i]), 0);
 			ShowWindow(SW_HIDE);
-			if (m_parent_menu && m_parent_menu->IsWindowVisible())
-				m_parent_menu->ShowWindow(SW_HIDE);
+			hide_visible_ancestors();		//다단 nested 메뉴 — root 까지 모두 닫음.
 			return;
 		}
 	}
@@ -550,13 +604,29 @@ bool CSCMenu::create(CWnd* parent, int width)
 }
 
 //load from menu resource
-void CSCMenu::load(UINT resource_id, int menu_index)
+void CSCMenu::load(UINT resource_id, int idx0, int idx1)
 {
 	CMenu menu;
-	CMenu* pMenu;
-
 	menu.LoadMenu(resource_id);
-	pMenu = menu.GetSubMenu(menu_index);
+	CMenu* pMenu = menu.GetSubMenu(idx0);
+	if (idx1 >= 0 && pMenu)
+		pMenu = pMenu->GetSubMenu(idx1);
+	load_from_menu(pMenu);
+}
+
+void CSCMenu::set_thumbnail_size(int w, int h)
+{
+	m_thumb_w = w;
+	m_thumb_h = h;
+	recalc_items_rect();
+	if (m_hWnd)
+		Invalidate();
+}
+
+void CSCMenu::load_from_menu(CMenu* pMenu)
+{
+	if (!pMenu)
+		return;
 
 	int i, nCount = GetMenuItemCount(pMenu->m_hMenu);
 	UINT menu_id;
@@ -566,9 +636,7 @@ void CSCMenu::load(UINT resource_id, int menu_index)
 	{
 		get_menu_item_info(pMenu->m_hMenu, i, &menu_id, &menu_caption, TRUE);
 
-		TRACE(_T("ID = %u, string = %s\n"), menu_id, menu_caption);
-
-		//seperator와 일반 메뉴항목만 허용(서브 팝업메뉴 항목은 배제)
+		//seperator와 일반 메뉴항목만 허용(서브 팝업메뉴 항목은 배제 — 호출자가 add_submenu_item 으로 chain).
 		if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
 		{
 			std::deque<CString> token;
@@ -786,9 +854,9 @@ void CSCMenu::recalc_items_rect()
 	ScreenToClient(rw);
 	rw.MoveToXY(0, 0);
 
-	//썸네일 항목 height = 위 padding(4) + 썸네일 max height(45) + 아래 padding(4).
-	//claude.md spike 디자인: 80x45 비대칭 이미지 + 우측 2줄 텍스트.
-	const int thumbnail_item_h = 4 + 45 + 4;
+	//썸네일 항목 height = 위 padding(4) + 썸네일 height + 아래 padding(4).
+	//크기 변경: set_thumbnail_size(w, h) 로 m_thumb_w/m_thumb_h 설정.
+	const int thumbnail_item_h = 4 + m_thumb_h + 4;
 
 	//item rect의 크기는 border 유무에 따라 다를 수 있다.
 	for (int i = 0; i < m_items.size(); i++)
@@ -849,8 +917,13 @@ void CSCMenu::OnPaint()
 		//일반 메뉴 항목인 경우
 		else
 		{
+			//disabled 항목은 hover 무시 + dim 색상.
+			if (!m_items[i]->m_enabled)
+			{
+				dc.SetTextColor(m_theme.cr_text_dim.ToCOLORREF());
+			}
 			//선택된 항목 표시
-			if (i == m_over_item)
+			else if (i == m_over_item)
 			{
 				dc.SetTextColor(m_theme.cr_text_hover.ToCOLORREF());
 				dc.FillSolidRect(m_items[i]->m_r, m_theme.cr_back_hover.ToCOLORREF());
@@ -881,7 +954,7 @@ void CSCMenu::OnPaint()
 			{
 				CRect rThumb = m_items[i]->m_r;
 				rThumb.DeflateRect(4, 4);
-				rThumb.right = rThumb.left + 80;
+				rThumb.right = rThumb.left + m_thumb_w;
 
 				if (m_items[i]->m_thumbnail.is_valid())
 					m_items[i]->m_thumbnail.draw(g, rThumb);
@@ -921,6 +994,15 @@ void CSCMenu::OnPaint()
 				rIcon.right = rIcon.left + 28;
 				rIcon = get_center_rect(rIcon, m_items[i]->m_icon.width, m_items[i]->m_icon.height);
 				m_items[i]->m_icon.draw(g, rIcon.left, rIcon.top);
+			}
+			//checked 표시 (icon 영역 한가운데). icon 과 m_checked 동시 사용 시에는 icon 이 먼저 그려진 후 dot 이 위에 덮어써짐 — 일반적으로 checkable 항목엔 icon 안 둠.
+			else if (m_items[i]->m_checked)
+			{
+				CPoint cp = m_items[i]->m_r.CenterPoint();
+				cp.x = m_items[i]->m_r.left + 14;
+				Gdiplus::Color cr_check = m_items[i]->m_enabled ? m_theme.cr_text : m_theme.cr_text_dim;
+				Gdiplus::SolidBrush br(cr_check);
+				g.FillEllipse(&br, cp.x - 3, cp.y - 3, 6, 6);
 			}
 
 			//메뉴 아이콘 유무에 관계없이 아이콘 영역만큼 공백을 준다.

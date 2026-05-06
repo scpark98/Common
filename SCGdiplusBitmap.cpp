@@ -158,6 +158,30 @@ bool CSCGdiplusBitmap::load_from_buffer(const BYTE* data, UINT size)
 	return true;
 }
 
+bool CSCGdiplusBitmap::create_from_dib(const BITMAPINFO* bmi, const void* pixels)
+{
+	if (!bmi || !pixels)
+		return false;
+
+	release();
+
+	//Gdiplus::Bitmap(BITMAPINFO*, void* pixelData) 는 pixel 메모리를 *참조* 만 함 — 호출자가 살아있는 동안만 유효.
+	//Clone 으로 자체 소유 픽셀을 갖는 32bpp ARGB Bitmap 생성.
+	Gdiplus::Bitmap ref(bmi, const_cast<void*>(pixels));
+	if (ref.GetLastStatus() != Gdiplus::Ok)
+		return false;
+
+	m_pBitmap = ref.Clone(0, 0, ref.GetWidth(), ref.GetHeight(), PixelFormat32bppARGB);
+	if (!m_pBitmap || m_pBitmap->GetLastStatus() != Gdiplus::Ok)
+	{
+		SAFE_DELETE(m_pBitmap);
+		return false;
+	}
+
+	resolution();
+	return true;
+}
+
 CSCGdiplusBitmap::CSCGdiplusBitmap(CString sFile)
 {
 	load(sFile);

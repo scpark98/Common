@@ -88,6 +88,10 @@ public:
 	int				m_access_key = 0;	//메뉴 캡션에 (&N)과 같은 문자열이 있다면 이를 추출해서 n키를 접근키로 사용한다.
 	int				m_menu_height;
 
+	//CMenu::EnableMenuItem / CheckMenuItem 동등. CSCMenu::enable_item / check_item / check_radio_item 으로 설정.
+	bool			m_enabled = true;
+	bool			m_checked = false;
+
 	//icon 이미지는 투명 png로 제작하고 m_line_height의 높이와 동일한 정사각형 크기로 제작해야 한다.
 	//그 크기가 32x32라면 실제 이미지는 그 안에 작게 표시될 정도로 그려진 이미지이어야 한다.
 	//32x32 크기에 꽉차게 그려진 이미지를 사용해서는 안된다.
@@ -131,8 +135,11 @@ public:
 
 	bool			create(CWnd* parent, int width = 220);
 
-	//load from menu resource
-	void			load(UINT resource_id, int menu_index);
+	//resource 의 sub-popup 을 직접 load. idx0 = LoadMenu 직후 첫 번째 GetSubMenu, idx1 = 그 안의 nested sub-popup (생략 시 1 단계만).
+	//IDR 의 nested 구조: load(IDR, 0, 4) = LoadMenu().GetSubMenu(0).GetSubMenu(4).
+	void			load(UINT resource_id, int idx0, int idx1 = -1);
+	//이미 navigate 된 CMenu* 의 항목들을 load. 3단계 이상 nested 등 특수 경우.
+	void			load_from_menu(CMenu* pMenu);
 
 	//add menu item manually. _id < 0 = separator
 	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
@@ -191,11 +198,19 @@ public:
 
 	void			set_check(UINT menu_id, int sub_button_index, bool check);
 
+	//CMenu 호환 API. sub-button 의 set_check 와 별개로, 항목 자체의 enable/check 상태.
+	void			enable_item(int menu_id, bool enabled);			//CMenu::EnableMenuItem 동등
+	void			check_item(int menu_id, bool checked);			//CMenu::CheckMenuItem 동등
+	//[first_id, last_id] 범위 내에서 selected_id 만 checked, 나머지 uncheck. CMenu::CheckMenuRadioItem 동등.
+	void			check_radio_item(int first_id, int last_id, int selected_id);
+
 
 	//모니터 영역을 벗어나지 않도록 보정한 후 표시해야 한다.
 	void			popup_menu(int x, int y);
 	CSCMenuItem*	get_menu_item(int menu_id);
 	int				get_menu_count() { return m_items.size(); }
+	//모든 항목 destroy. 동적 메뉴 (북마크 / 최근 파일 등) 를 popup 마다 rebuild 할 때 사용.
+	void			clear();
 
 	//라인 간격
 	int				get_line_height() { return m_line_height; }
@@ -205,6 +220,9 @@ public:
 	int				get_over_item() { return (m_use_over ? m_over_item : -1); }
 
 	void			set_back_image(CSCGdiplusBitmap* img);
+
+	//썸네일 항목 표시 영역 크기. 기본 80x45 (16:9 비대칭). 정사각 thumbnail 사용 시 128x128 등으로 설정.
+	void			set_thumbnail_size(int w, int h);
 
 	virtual			CSCMenu& set_font(LOGFONT& lf);
 	virtual			CSCMenu& set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
@@ -224,6 +242,7 @@ protected:
 	bool			is_in_menu_chain(CWnd* pWnd);
 	bool			contains_descendant_hwnd(HWND hwnd);
 	void			hide_visible_descendants();
+	void			hide_visible_ancestors();		//자기 위쪽 (parent_menu 체인) 모두 hide.
 	std::deque<CSCMenuItem*> m_items;
 
 	bool		m_use_over = true;			//hover hilighted
@@ -239,6 +258,8 @@ protected:
 	//font_size를 증감했는데 라인 간격이 변경되지 않는 것도 문제가 되니 필요할 경우
 	//해당 함수를 통해 설정하자.
 	int			m_line_height;
+	int			m_thumb_w = 80;
+	int			m_thumb_h = 45;
 	//항목이 추가/삭제되거나 m_line_height가 변경되면 반드시 rect정보를 갱신해줘야 한다.
 	//라인 간격은 font size에 따라 자동 조절되게 할 수도 있지만 장단점이 있다.
 	//일단은 별개로 처리되도록 한다.

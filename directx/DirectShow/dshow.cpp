@@ -1886,109 +1886,74 @@ void CDShow::set_playback_rate(double rate)
 }
 
 #include <atlimage.h>
+#include "../../SCGdiplusBitmap.h"
+
+//현재 video frame 의 packed DIB (BITMAPINFOHEADER + pixel rows) 를 얻는다.
+//성공 시 *out_dib 는 CoTaskMemAlloc 된 메모리 — 호출자가 CoTaskMemFree 책임.
+//paused 상태에서 GetCurrentImage 가 frame 을 blank 시키는 VMR9 동작을 step_frame 으로 보정.
+static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, BYTE** out_dib)
+{
+	*out_dib = NULL;
+	if (!pVMRWC)
+		return false;
+
+	HRESULT hr = pVMRWC->GetCurrentImage(out_dib);
+	if (FAILED(hr) || !*out_dib)
+		return false;
+
+	return true;
+}
+
 bool CDShow::capture_frame(CString sfile)
 {
 	if (!is_media_opened() || !m_VMR || !m_pVMRWC)
 		return false;
 
-	HRESULT hr;
-	BYTE *lpDib = NULL;
+	BYTE* lpDib = NULL;
+	if (!get_current_image_dib(m_pVMRWC, &lpDib))
+		return false;
+
+	BITMAPINFOHEADER* pBMI = (BITMAPINFOHEADER*)lpDib;
+	LPBYTE pixels = (LPBYTE)pBMI + pBMI->biSize;
+
 	CImage img;
+	img.Create(pBMI->biWidth, pBMI->biHeight, pBMI->biBitCount);
+	BITMAPINFO bmInfo = {};
+	bmInfo.bmiHeader = *pBMI;
+	HDC dc = img.GetDC();
+	SetDIBitsToDevice(dc, 0, 0, pBMI->biWidth, pBMI->biHeight, 0, 0, 0, pBMI->biHeight, pixels, &bmInfo, DIB_RGB_COLORS);
+	img.ReleaseDC();
+	HRESULT hr_save = img.Save(sfile);
 
-	hr = m_pVMRWC->GetCurrentImage(&lpDib);
+	if (get_play_state() == State_Paused)
+		step_frame(true);
 
-	if (SUCCEEDED(hr))
-	{
-		BITMAPINFOHEADER  *pBMI = (BITMAPINFOHEADER*) lpDib;
+	CoTaskMemFree(lpDib);
+	return hr_save == S_OK;
+}
 
-		/*
-		BITMAPFILEHEADER	hdr;
-		DWORD				dwWritten = 0;
-			
-		int nColors = 0;
-		if (pBMI->biBitCount <= 8)
-		{
-			nColors = (1 << pBMI->biBitCount);
-		}
+bool CDShow::capture_frame(CSCGdiplusBitmap& out)
+{
+	if (!is_media_opened() || !m_VMR || !m_pVMRWC)
+		return false;
 
-		// Prepare FileHeader
-		hdr.bfType = 0x4d42;        // 0x42 = "B" 0x4d = "M" 
-		hdr.bfReserved1 = 0; 
-		hdr.bfReserved2 = 0; 
+	BYTE* lpDib = NULL;
+	if (!get_current_image_dib(m_pVMRWC, &lpDib))
+		return false;
 
-		// Compute the size of the entire file. 
-		hdr.bfSize = (DWORD) (sizeof(BITMAPFILEHEADER) + 
-			pBMI->biSize + pBMI->biClrUsed
-			* sizeof(RGBQUAD) + pBMI->biSizeImage); 
+	BITMAPINFOHEADER* pBMI = (BITMAPINFOHEADER*)lpDib;
+	LPBYTE pixels = (LPBYTE)pBMI + pBMI->biSize;
 
-		// Compute the offset to the array of color indices. 
-		hdr.bfOffBits = (DWORD) sizeof(BITMAPFILEHEADER) + 
-			pBMI->biSize + pBMI->biClrUsed 
-			* sizeof (RGBQUAD); 
+	BITMAPINFO bmInfo = {};
+	bmInfo.bmiHeader = *pBMI;
 
-		// Create the .BMP file. 
-		HANDLE hf = CreateFile(sfile, 
-			GENERIC_READ | GENERIC_WRITE, 
-			(DWORD) 0, 
-			NULL, 
-			CREATE_ALWAYS, 
-			FILE_ATTRIBUTE_NORMAL, 
-			(HANDLE) NULL); 
-		if (hf == INVALID_HANDLE_VALUE) 
-		{
-			//sMessage = "Cannot create file";
-			//bResult = FALSE;
-			goto CLEANUP;
-		}
+	bool ok = out.create_from_dib(&bmInfo, pixels);
 
-		// Copy the BITMAPFILEHEADER into the .BMP file. 
-		if (!WriteFile(hf, (LPVOID) &hdr, sizeof(BITMAPFILEHEADER), 
-			(LPDWORD) &dwWritten,  NULL)) 
-		{
-			//sMessage = "Cannot write to file";
-			//bResult = FALSE;
-			goto CLEANUP;
-		}
+	if (get_play_state() == State_Paused)
+		step_frame(true);
 
-		// Copy the BITMAPINFOHEADER and RGBQUAD array into the file. 
-		if (!WriteFile(hf, (LPVOID) pBMI, sizeof(BITMAPINFOHEADER) 
-			+ pBMI->biClrUsed * sizeof (RGBQUAD), 
-			(LPDWORD) &dwWritten, ( NULL)) )
-		{
-			//sMessage = "Cannot write to file";
-			//bResult = FALSE;
-			goto CLEANUP;
-		}
-		*/
-
-		// Copy the array of color indices into the .BMP file. 
-		LPBYTE hp = (LPBYTE)pBMI + (pBMI->biSize);// + nColors * sizeof(RGBQUAD)); 
-		/*
-		if (!WriteFile(hf, (LPSTR) hp, (int) pBMI->biSizeImage, (LPDWORD) &dwWritten,NULL)) 
-		{
-			//sMessage = "Cannot write to file";
-			//bResult = FALSE;
-			goto CLEANUP;
-		}
-		*/
-		img.Create(pBMI->biWidth, pBMI->biHeight, pBMI->biBitCount);
-		BITMAPINFO bmInfo;
-		bmInfo.bmiHeader = *pBMI;
-		HDC dc = img.GetDC();
-		SetDIBitsToDevice(dc, 0, 0, pBMI->biWidth, pBMI->biHeight, 0, 0, 0, pBMI->biHeight, hp, &bmInfo, DIB_RGB_COLORS);
-		hr = img.Save(sfile);
-		img.ReleaseDC();
-
-		if (get_play_state() == State_Paused)
-			step_frame(true);
-
-		CoTaskMemFree(lpDib);
-
-		if (hr == S_OK)
-			return true;
-	}
-
-	return false;
+	CoTaskMemFree(lpDib);
+	return ok;
 }
 
 DWORD CDShow::get_aspect_ratio_mode()

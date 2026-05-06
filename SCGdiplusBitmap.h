@@ -182,6 +182,9 @@ public:
 	bool			load_webp(CString sfile);
 	//in-memory PNG/JPEG byte buffer 로부터 로드. registry binary round-trip 등에 사용.
 	bool			load_from_buffer(const BYTE* data, UINT size);
+	//packed DIB (BITMAPINFOHEADER + pixel rows) 으로부터 ARGB Bitmap 생성.
+	//VMR9 IVMRWindowlessControl9::GetCurrentImage 등 video API 가 돌려주는 raw frame 데이터 로드용.
+	bool			create_from_dib(const BITMAPINFO* bmi, const void* pixels);
 
 	CString			get_filename(bool fullpath = true);
 

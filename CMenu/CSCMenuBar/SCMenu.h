@@ -14,6 +14,7 @@
 static const UINT Message_CSCMenu = ::RegisterWindowMessage(_T("MessageString_CSCMenu"));
 
 class CSCMenuItem;
+class CSCMenu;
 
 class CSCMenuMessage
 {
@@ -48,13 +49,20 @@ public:
 class CSCMenuItem
 {
 public:
+	enum item_type
+	{
+		item_normal,
+		item_thumbnail,
+		item_submenu,
+	};
+
 	CSCMenuItem(int id, CString caption, UINT icon_id = 0, CString hot_key = _T(""), int menu_height = -1);
 	~CSCMenuItem();
 
 	//하나의 메뉴 아이템을 추가하면서 resource의 png로 등록된 sub button들을 추가할 수 있다.
 	//m_menu.add(control_start, _T("원격제어 시작하기"), IDB_CONTROL_START, _T(""), IDB_MENU_CHECK);
 	//m_menu.add(control_mode, _T("제어모드"), IDB_CONTROL_MODE, _T(""), IDB_MENU_DRIVE_MODE, IDB_MENU_GDI_MODE);
-	template <typename ... Types> CSCMenuItem(int id, CString caption, UINT icon_id = 0, CString hot_key = _T(""), int menu_height = -1, Types... args)
+	template <typename ... Types> CSCMenuItem(int _id, CString caption, UINT icon_id = 0, CString hot_key = _T(""), int menu_height = -1, Types... args)
 	{
 		m_id = _id;
 		m_caption = _caption;
@@ -85,6 +93,12 @@ public:
 	//32x32 크기에 꽉차게 그려진 이미지를 사용해서는 안된다.
 	CSCGdiplusBitmap	m_icon;
 	std::deque<CSCMenuSubButton*> m_buttons;
+
+	//1단계: 데이터 슬롯만. layout/paint 분기는 2단계, sub-popup 동작은 3단계.
+	item_type			m_type = item_normal;
+	CSCGdiplusBitmap	m_thumbnail;
+	CString				m_sub_caption;
+	CSCMenu*			m_sub_menu = nullptr;
 
 	void			set_icon(UINT icon_id);
 	void			add_button(UINT button_id, bool reset = false);
@@ -122,6 +136,11 @@ public:
 
 	//add menu item manually. _id < 0 = separator
 	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
+
+	//썸네일 + 2줄 텍스트 항목. res_type 은 "PNG"/"JPG" 등 리소스 type 문자열, res_id 는 리소스 ID.
+	//1단계: 데이터만 보관. 화면엔 일반 항목처럼 caption 만 표시됨 (paint 분기 = 2단계).
+	void			add_thumbnail_item(int _id, CString _primary, CString _secondary,
+									   CString thumbnail_res_type, UINT thumbnail_res_id);
 
 	//sub button이 여러개일 때 args에 나열하여 호출.
 	template <typename ... Types> void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""), Types... args)

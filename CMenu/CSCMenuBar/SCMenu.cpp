@@ -180,6 +180,18 @@ void CSCMenu::add(int _id, CString _caption, UINT icon_id, CString _hot_key)
 	recalc_items_rect();
 }
 
+void CSCMenu::add_thumbnail_item(int _id, CString _primary, CString _secondary,
+								 CString thumbnail_res_type, UINT thumbnail_res_id)
+{
+	CSCMenuItem* item = new CSCMenuItem(_id, _primary);
+	item->m_type = CSCMenuItem::item_thumbnail;
+	item->m_sub_caption = _secondary;
+	if (thumbnail_res_id > 0)
+		item->m_thumbnail.load(thumbnail_res_type, thumbnail_res_id);
+	m_items.push_back(item);
+	recalc_items_rect();
+}
+
 void CSCMenu::add_sub_button_by_menu_index(int index, UINT id)
 {
 	CSCMenuSubButton* button = new CSCMenuSubButton(id, m_line_height);

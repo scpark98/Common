@@ -409,6 +409,56 @@ public:
 	void	set_color_theme(int color_theme);
 	static void get_color_theme_list(std::deque<CString> &theme_list);
 
+	//호출자가 set_color_theme(int) 후 cr_back 등 일부 필드를 수정한 테마를 그대로 다른 객체에 전달할 때 사용.
+	//operator= 와 달리 m_parent / m_cur_theme 은 *수신측 본인 것을 유지* 하여
+	//이후 default 테마 재적용 시 부모 종류 판정이 어긋나는 문제를 방지한다.
+	void	copy_colors_from(const CSCColorTheme& src)
+	{
+		cr_text						= src.cr_text;
+		cr_text_dim					= src.cr_text_dim;
+		cr_disabled_text			= src.cr_disabled_text;
+		cr_text_hover				= src.cr_text_hover;
+		cr_text_dropHilited			= src.cr_text_dropHilited;
+		cr_text_selected			= src.cr_text_selected;
+		cr_text_selected_inactive	= src.cr_text_selected_inactive;
+
+		cr_back						= src.cr_back;
+		cr_back_hover				= src.cr_back_hover;
+		cr_back_dropHilited			= src.cr_back_dropHilited;
+		cr_back_selected			= src.cr_back_selected;
+		cr_back_selected_inactive	= src.cr_back_selected_inactive;
+		cr_back_alternate			= src.cr_back_alternate;
+
+		cr_parent_back				= src.cr_parent_back;
+
+		cr_edit_text				= src.cr_edit_text;
+		cr_edit_back				= src.cr_edit_back;
+
+		cr_selected_border			= src.cr_selected_border;
+		cr_selected_border_inactive	= src.cr_selected_border_inactive;
+		cr_border_active			= src.cr_border_active;
+		cr_border_inactive			= src.cr_border_inactive;
+
+		cr_title_text				= src.cr_title_text;
+		cr_title_back_active		= src.cr_title_back_active;
+		cr_title_back_inactive		= src.cr_title_back_inactive;
+		cr_sys_buttons_hover_back	= src.cr_sys_buttons_hover_back;
+		cr_sys_buttons_down_back	= src.cr_sys_buttons_down_back;
+
+		cr_header_text				= src.cr_header_text;
+		cr_header_back				= src.cr_header_back;
+		cr_percentage_bar			= src.cr_percentage_bar;
+		cr_progress					= src.cr_progress;
+
+		cr_success					= src.cr_success;
+		cr_info						= src.cr_info;
+		cr_warning					= src.cr_warning;
+		cr_error					= src.cr_error;
+
+		//원본의 theme 인덱스도 가져옴 — 호출자가 의도한 "수정된 프리셋" 의 베이스를 추적할 수 있도록.
+		m_cur_theme					= src.m_cur_theme;
+	}
+
 	Gdiplus::Color	cr_text;
 	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목 (placeholder 등)
 	Gdiplus::Color	cr_disabled_text = Gdiplus::Color::DarkGray;	//disabled 컨트롤의 텍스트/아이콘 stroke 공용 색

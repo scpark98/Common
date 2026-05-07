@@ -72,6 +72,19 @@ void CSCStaticEdit::set_color_theme(int color_theme, bool invalidate)
 		Invalidate();
 }
 
+//호출자가 이미 수정해 둔 CSCColorTheme 을 그대로 적용. operator= 가 아닌 copy_colors_from()
+//을 써서 m_parent (= 본 컨트롤) 는 보존. cr_parent_back 도 호출자 값 그대로 유지하므로
+//set_color_theme(int) 처럼 cr_back 으로 덮지 않는다 — 호출자가 이미 둘을 의도적으로 다르게
+//설정했을 수 있기 때문.
+void CSCStaticEdit::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	m_has_parent_back_color = true;
+
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
 // ──────────────────────────────────────────────────────────
 // 동적 생성
 // ──────────────────────────────────────────────────────────

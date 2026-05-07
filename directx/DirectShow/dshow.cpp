@@ -1703,12 +1703,14 @@ void CDShow::set_video_position(CRect r)
 			pVW->SetWindowPosition(r.left, r.top, r.Width(), r.Height());
 	}
 
-	//paused/stopped 상태에서는 새 프레임이 들어오지 않아 위치 변경 후 stale 픽셀이 남음.
-	//RepaintVideo 로 backbuffer 의 마지막 프레임을 새 영역에 강제로 다시 그림.
+	//paused 상태에서 resize 시 새 프레임이 안 들어와 stale 픽셀이 남음 → RepaintVideo 로 backbuffer 마지막 프레임을 새 영역에 다시 그림.
+	//가드: 이전 버전 (state != Running) 은 미디어 open 중 graph 가 Running 으로 transition 하던 시점도 통과시켜 codec(avi/일부 mp4) 빌드 느린 케이스에서 미준비 VMR9 internals 를 건드려 freezing 유발.
+	//hr==S_OK 만 통과 (VFW_S_STATE_INTERMEDIATE 차단) + state==State_Paused 한정 (Stopped 시점 = open 직후라 제외).
 	if (m_pMC)
 	{
 		OAFilterState state = State_Running;
-		if (SUCCEEDED(m_pMC->GetState(0, &state)) && state != State_Running)
+		HRESULT hr = m_pMC->GetState(0, &state);
+		if (hr == S_OK && state == State_Paused)
 		{
 			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
 			{

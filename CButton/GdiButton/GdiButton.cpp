@@ -16,7 +16,7 @@ IMPLEMENT_DYNAMIC(CGdiButton, CButton)
 
 CGdiButton::CGdiButton()
 {
-	RegisterWindowClass();
+	//RegisterWindowClass();
 
 	//default text and back color
 	//이 기본 색상값은 이미지를 설정하지 않은 경우의 기본값이다.

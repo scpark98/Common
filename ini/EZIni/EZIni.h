@@ -345,8 +345,10 @@ void EZIni::Key::_SetKeyValue(_T value, LPCTSTR lpFormatSpec)
 
 	EZIni dummy( m_sFileName );
 
-	while ( dummy[m_sSectionName][m_sKeyName].Exists() )
-		dummy[m_sSectionName][m_sKeyName].Delete();
+	//20260509 scpark 이미 존재하면 지우고 새로 만들다보니 값을 저장할 때
+	//해당 키가 그 색션의 맨 밑에 기록되는 부작용이 있으므로 기존 키가 존재하면 지우지 않고 덮어쓰도록 수정.
+	//while (dummy[m_sSectionName][m_sKeyName].Exists())
+	//	dummy[m_sSectionName][m_sKeyName].Delete();
 
 	CString sValue;
 	sValue.Format(lpFormatSpec, value);

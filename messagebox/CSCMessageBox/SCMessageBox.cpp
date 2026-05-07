@@ -476,7 +476,19 @@ void CSCMessageBox::set_align(int align)
 void CSCMessageBox::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
+	apply_theme();
+}
 
+//호출자가 이미 cr_back 등을 수정해 둔 CSCColorTheme 객체를 그대로 적용.
+//operator= 가 아닌 copy_colors_from() 을 사용해 m_parent (= 본 msgbox) 는 보존.
+void CSCMessageBox::set_color_theme(const CSCColorTheme& theme)
+{
+	m_theme.copy_colors_from(theme);
+	apply_theme();
+}
+
+void CSCMessageBox::apply_theme()
+{
 	if (m_static_message.m_hWnd)
 	{
 		m_static_message.set_text_color(m_theme.cr_text);

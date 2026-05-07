@@ -92,6 +92,9 @@ public:
 
     CSCColorTheme	m_theme = CSCColorTheme(this);
     void			set_color_theme(int color_theme, bool invalidate = false); //apply current m_theme colors to the control.
+    //호출자가 이미 cr_back 등을 수정해 둔 CSCColorTheme 객체를 그대로 적용.
+    //프리셋 + 사용자 오버라이드를 모두 보존한다. m_parent 는 본 컨트롤의 것을 유지.
+    void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 
 
     // ──────────────────────────────────────────────

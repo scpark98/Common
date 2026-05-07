@@ -178,6 +178,7 @@ BEGIN_MESSAGE_MAP(CSCMenu, CDialogEx)
 	//ON_CONTROL_REFLECT_EX(LBN_SELCHANGE, &CSCMenu::OnLbnSelchange)
 	ON_WM_PAINT()
 	ON_WM_TIMER()
+	ON_WM_MOUSEWHEEL()
 END_MESSAGE_MAP()
 
 void CSCMenu::add(int _id, CString _caption, UINT icon_id, CString _hot_key)
@@ -405,6 +406,30 @@ void CSCMenu::hide_visible_ancestors()
 void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
+
+	//스크롤 화살표 영역 클릭 — 한 페이지의 절반 만큼 이동.
+	if (m_scrollable)
+	{
+		CRect rc;
+		GetClientRect(rc);
+		int viewport_h = rc.Height() - 2 * scroll_arrow_h;
+		int page_step = max(m_line_height, viewport_h / 2);
+
+		if (get_top_arrow_rect().PtInRect(point))
+		{
+			scroll_by(-page_step);
+			return;
+		}
+		if (get_bottom_arrow_rect().PtInRect(point))
+		{
+			scroll_by(page_step);
+			return;
+		}
+	}
+
+	//항목 hit-test 는 컨텐츠 좌표로.
+	CPoint pt = client_to_content(point);
+
 	//클릭된 위치가 메뉴의 sub button일 경우
 	bool found = false;
 
@@ -415,7 +440,7 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 
 		for (int j = 0; j < m_items[i]->m_buttons.size(); j++)
 		{
-			if (m_items[i]->m_buttons[j]->m_r.PtInRect(point))
+			if (m_items[i]->m_buttons[j]->m_r.PtInRect(pt))
 			{
 				m_items[i]->set_check(j);
 				TRACE(_T("%d, %d\n"), i, j);
@@ -444,7 +469,7 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 			break;
 		}
 		//메뉴 항목이 눌린 경우
-		else if (m_items[i]->m_r.PtInRect(point))
+		else if (m_items[i]->m_r.PtInRect(pt))
 		{
 			//disabled 항목은 아무 동작 안 함.
 			if (!m_items[i]->m_enabled)
@@ -453,6 +478,7 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 			if (m_items[i]->m_type == CSCMenuItem::item_submenu && m_items[i]->m_sub_menu)
 			{
 				CRect rItem = m_items[i]->m_r;
+				rItem.OffsetRect(0, view_dy());		//submenu 는 보이는 항목 위치 옆에서 popup.
 				ClientToScreen(rItem);
 				m_items[i]->m_sub_menu->popup_menu(rItem.right - 4, rItem.top);
 				return;
@@ -482,6 +508,7 @@ void CSCMenu::OnLButtonUp(UINT nFlags, CPoint point)
 
 int CSCMenu::get_item_index(CPoint pt)
 {
+	//pt 는 컨텐츠 좌표.
 	for (int i = 0; i < m_items.size(); i++)
 	{
 		if (m_items[i]->m_id > 0 && m_items[i]->m_r.PtInRect(pt))
@@ -492,13 +519,47 @@ int CSCMenu::get_item_index(CPoint pt)
 }
 
 static const UINT_PTR timer_submenu_hover = 0x10001;
+static const UINT_PTR timer_scroll_auto = 0x10002;
 static const int submenu_hover_delay_ms = 300;
+static const int scroll_auto_interval_ms = 30;
+static const int scroll_auto_step_px = 4;
 
 void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 {
+	//스크롤 가능 + 화살표 위 hover → 자동 스크롤 타이머. 그 외는 타이머 종료.
+	if (m_scrollable)
+	{
+		int dir = 0;
+		if (get_top_arrow_rect().PtInRect(point))
+			dir = -1;
+		else if (get_bottom_arrow_rect().PtInRect(point))
+			dir = 1;
+
+		if (dir != m_auto_scroll_dir)
+		{
+			m_auto_scroll_dir = dir;
+			KillTimer(timer_scroll_auto);
+			if (dir != 0)
+				SetTimer(timer_scroll_auto, scroll_auto_interval_ms, NULL);
+		}
+
+		if (dir != 0)
+		{
+			//화살표 위에선 hover 항목 없음.
+			if (m_over_item != -1)
+			{
+				m_over_item = -1;
+				Invalidate(false);
+			}
+			CDialogEx::OnMouseMove(nFlags, point);
+			return;
+		}
+	}
+
 	if (m_use_over)
 	{
-		int over_item = get_item_index(point);
+		CPoint pt = client_to_content(point);
+		int over_item = get_item_index(pt);
 		if (over_item != m_over_item)
 		{
 			m_over_item = over_item;
@@ -549,12 +610,37 @@ void CSCMenu::OnTimer(UINT_PTR nIDEvent)
 			return;
 
 		CRect rItem = item->m_r;
+		rItem.OffsetRect(0, view_dy());
 		ClientToScreen(rItem);
 		item->m_sub_menu->popup_menu(rItem.right - 4, rItem.top);
 		return;
 	}
 
+	if (nIDEvent == timer_scroll_auto)
+	{
+		if (m_auto_scroll_dir == 0)
+		{
+			KillTimer(timer_scroll_auto);
+			return;
+		}
+		scroll_by(m_auto_scroll_dir * scroll_auto_step_px);
+		//경계 도달 시 더 이상 스크롤 안 됨 — 타이머 유지하되 무해 (다음 mousemove 에서 정리).
+		return;
+	}
+
 	CDialogEx::OnTimer(nIDEvent);
+}
+
+BOOL CSCMenu::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	if (m_scrollable)
+	{
+		//WHEEL_DELTA = 120 한 노치 당 약 3 라인.
+		int dy = -zDelta * m_line_height * 3 / WHEEL_DELTA;
+		scroll_by(dy);
+		return TRUE;
+	}
+	return CDialogEx::OnMouseWheel(nFlags, zDelta, pt);
 }
 
 
@@ -568,6 +654,7 @@ void CSCMenu::OnSize(UINT nType, int cx, int cy)
 bool CSCMenu::create(CWnd* parent, int width)
 {
 	m_parent = parent;
+	m_min_width = width;
 
 	DWORD dwStyle = WS_POPUP | WS_BORDER;
 
@@ -656,6 +743,11 @@ void CSCMenu::popup_menu(int x, int y)
 		return;
 
 	m_over_item = -1;
+	m_scroll_offset = 0;
+	m_scrollable = false;
+	m_max_scroll = 0;
+	m_auto_scroll_dir = 0;
+	KillTimer(0x10002);		//timer_scroll_auto
 
 	recalc_items_rect();
 
@@ -664,9 +756,11 @@ void CSCMenu::popup_menu(int x, int y)
 	//그래야 멀티모니터, 모니터 영역 변경 등의 설정에 맞춰 올바르게 표시된다.
 	enum_display_monitors();
 
-	CRect rw, rMonitor;
+	CRect rw, rMonitor, rc;
 
 	GetWindowRect(rw);
+	GetClientRect(rc);
+	CSize border((rw.Width() - rc.Width()) / 2, (rw.Height() - rc.Height()) / 2);
 
 	int idx = get_monitor_index(x, y);
 	if (idx < 0)
@@ -681,12 +775,51 @@ void CSCMenu::popup_menu(int x, int y)
 	//모니터 영역을 벗어나는 경우 모니터의 right or bottom에서 10정도는 떨어뜨린다.
 	rMonitor.DeflateRect(10, 10);
 
+	//컨텐츠가 모니터 가용 높이보다 크면 윈도우를 모니터 높이로 클램프 + 스크롤 모드 활성.
+	int max_h = rMonitor.Height();
+	if (rw.Height() > max_h)
+	{
+		rw.bottom = rw.top + max_h;
+		m_scrollable = true;
+		int client_h = max_h - border.cy * 2;
+		int viewport_h = client_h - 2 * scroll_arrow_h;
+		m_max_scroll = max(0, m_content_h - viewport_h);
+	}
+
 	adjust_rect_range(rw, rMonitor, true, true);
 
 	MoveWindow(rw);
 
 	//CenterWindow();
 	ShowWindow(SW_SHOW);
+}
+
+CRect CSCMenu::get_top_arrow_rect() const
+{
+	if (!m_scrollable)
+		return CRect();
+	CRect rc;
+	GetClientRect(&rc);
+	return CRect(0, 0, rc.right, scroll_arrow_h);
+}
+
+CRect CSCMenu::get_bottom_arrow_rect() const
+{
+	if (!m_scrollable)
+		return CRect();
+	CRect rc;
+	GetClientRect(&rc);
+	return CRect(0, rc.bottom - scroll_arrow_h, rc.right, rc.bottom);
+}
+
+void CSCMenu::scroll_by(int dy)
+{
+	if (!m_scrollable || dy == 0)
+		return;
+	int prev = m_scroll_offset;
+	m_scroll_offset = max(0, min(m_max_scroll, m_scroll_offset + dy));
+	if (m_scroll_offset != prev)
+		Invalidate(false);
 }
 
 CSCMenuItem* CSCMenu::get_menu_item(int menu_id)
@@ -840,7 +973,6 @@ void CSCMenu::recalc_items_rect()
 	int sy = 2;
 	bool is_separator;
 	int total_height = 0;	//모든 메뉴 항목을 표시하는 총 높이
-	int max_width = 0;		//가장 긴 메뉴항목 너비
 	CSize	border;
 	CRect	rw, rc;
 
@@ -853,6 +985,58 @@ void CSCMenu::recalc_items_rect()
 
 	ScreenToClient(rw);
 	rw.MoveToXY(0, 0);
+
+	//width 측정 패스 — 가장 긴 항목 너비를 산출 후 윈도우 너비를 max(min_width, 측정+padding) 으로 확장.
+	int max_content_w = 0;
+	{
+		CClientDC dc_m(this);
+		CFont* old_f = dc_m.SelectObject(&m_font);
+
+		for (int i = 0; i < m_items.size(); i++)
+		{
+			if (m_items[i]->m_id <= 0)
+				continue;
+
+			int item_w = 0;
+			if (m_items[i]->m_type == CSCMenuItem::item_thumbnail)
+			{
+				CSize sz_p = dc_m.GetTextExtent(m_items[i]->m_caption);
+				CSize sz_s = m_items[i]->m_sub_caption.IsEmpty() ? CSize(0, 0) : dc_m.GetTextExtent(m_items[i]->m_sub_caption);
+				int text_w = max(sz_p.cx, sz_s.cx);
+				item_w = 4 + m_thumb_w + 6 + text_w + 6;
+			}
+			else
+			{
+				CSize sz_c = dc_m.GetTextExtent(m_items[i]->m_caption);
+				item_w = 28 + 4 + sz_c.cx;
+
+				int trailing = 12;
+				if (!m_items[i]->m_hot_key.IsEmpty())
+				{
+					CSize sz_h = dc_m.GetTextExtent(m_items[i]->m_hot_key);
+					trailing = max(trailing, sz_h.cx + 16);
+				}
+				if (m_items[i]->m_type == CSCMenuItem::item_submenu)
+					trailing = max(trailing, 28);
+
+				int btn_block = 0;
+				for (auto* btn : m_items[i]->m_buttons)
+					btn_block += 6 + btn->m_button_image[0]->width;
+				if (btn_block > 0)
+					btn_block += 8;
+
+				item_w += trailing + btn_block;
+			}
+
+			max_content_w = max(max_content_w, item_w);
+		}
+
+		dc_m.SelectObject(old_f);
+	}
+
+	//min_width 는 윈도우 전체 너비. 컨텐츠 너비 비교는 동일 기준으로.
+	int needed_w = max(m_min_width, max_content_w + 8 + 8 + border.cx * 2);
+	rw.right = rw.left + needed_w;
 
 	//썸네일 항목 height = 위 padding(4) + 썸네일 height + 아래 padding(4).
 	//크기 변경: set_thumbnail_size(w, h) 로 m_thumb_w/m_thumb_h 설정.
@@ -876,6 +1060,8 @@ void CSCMenu::recalc_items_rect()
 
 		total_height = m_items[i]->m_r.bottom;
 	}
+
+	m_content_h = total_height;
 
 	rw.bottom = rw.top + total_height + 4 + border.cy * 2;	//2=margin(equal to top margin), 8 = border height? * 2
 
@@ -907,12 +1093,31 @@ void CSCMenu::OnPaint()
 
 	CFont* pOldFont = (CFont*)dc.SelectObject(&m_font);
 
+	//스크롤 모드: 항목 그리기는 viewport 영역에 clip. (화살표 영역은 항목과 분리)
+	int vp_top = m_scrollable ? scroll_arrow_h : 0;
+	int vp_bot = m_scrollable ? rc.bottom - scroll_arrow_h : rc.bottom;
+	int dy = view_dy();
+
+	if (m_scrollable)
+	{
+		CRgn rgn_vp;
+		rgn_vp.CreateRectRgn(0, vp_top, rc.right, vp_bot);
+		dc.SelectClipRgn(&rgn_vp);
+	}
+
 	for (int i = 0; i < m_items.size(); i++)
 	{
+		CRect view_r = m_items[i]->m_r;
+		view_r.OffsetRect(0, dy);
+
+		//viewport 밖이면 skip (성능 + 인접 영역 침범 방지).
+		if (view_r.bottom < vp_top || view_r.top > vp_bot)
+			continue;
+
 		//separator의 경우
 		if (m_items[i]->m_id <= 0)
 		{
-			draw_line(&dc, m_items[i]->m_r.left, m_items[i]->m_r.CenterPoint().y, m_items[i]->m_r.right, m_items[i]->m_r.CenterPoint().y, GRAY(214));
+			draw_line(&dc, view_r.left, view_r.CenterPoint().y, view_r.right, view_r.CenterPoint().y, GRAY(214));
 		}
 		//일반 메뉴 항목인 경우
 		else
@@ -926,22 +1131,7 @@ void CSCMenu::OnPaint()
 			else if (i == m_over_item)
 			{
 				dc.SetTextColor(m_theme.cr_text_hover.ToCOLORREF());
-				dc.FillSolidRect(m_items[i]->m_r, m_theme.cr_back_hover.ToCOLORREF());
-
-				//Gdiplus::Color cr_over_stroke = Gdiplus::Color(128, GetRValue(m_cr_back_selected_border), GetGValue(m_cr_back_selected_border), GetBValue(m_cr_back_selected_border));
-				//Gdiplus::Color cr_over_fill = Gdiplus::Color(128, GetRValue(m_cr_back_over), GetGValue(m_cr_back_over), GetBValue(m_cr_back_over));
-				Gdiplus::Color cr_over_stroke = m_theme.cr_selected_border;
-				Gdiplus::Color cr_over_fill = m_theme.cr_back_hover;
-
-				//cr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
-				//cr_over_stroke.SetFromCOLORREF(m_cr_back_selected_border);
-				//cr_over_fill.SetFromCOLORREF(m_cr_back_over);
-				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), gcr_over_stroke, gcr_over_fill, 0);
-				//draw_round_rect(&g, CRect2GpRect(m_items[i]->m_r), Gdiplus::Color(255,225,0,0), gcr_over_fill, 2);
-
-				//CSCGdiplusBitmap img;
-				//img.round_shadow_rect(m_items[i]->r.Width(), m_items[i]->r.Height(), 4);
-				//img.draw(&g, m_items[i]->r, true);
+				dc.FillSolidRect(view_r, m_theme.cr_back_hover.ToCOLORREF());
 			}
 			else
 			{
@@ -952,14 +1142,14 @@ void CSCMenu::OnPaint()
 			//hover 색은 위에서 이미 적용됨. sub button/hot_key 는 없으므로 continue.
 			if (m_items[i]->m_type == CSCMenuItem::item_thumbnail)
 			{
-				CRect rThumb = m_items[i]->m_r;
+				CRect rThumb = view_r;
 				rThumb.DeflateRect(4, 4);
 				rThumb.right = rThumb.left + m_thumb_w;
 
 				if (m_items[i]->m_thumbnail.is_valid())
 					m_items[i]->m_thumbnail.draw(g, rThumb);
 
-				CRect rTextArea = m_items[i]->m_r;
+				CRect rTextArea = view_r;
 				rTextArea.left = rThumb.right + 6;
 				rTextArea.right -= 6;
 				rTextArea.DeflateRect(0, 4);
@@ -985,12 +1175,12 @@ void CSCMenu::OnPaint()
 				continue;
 			}
 
-			CRect rText = m_items[i]->m_r;
+			CRect rText = view_r;
 
 			//메뉴 아이콘을 그리고
 			if (m_items[i]->m_icon.is_valid())
 			{
-				CRect rIcon = m_items[i]->m_r;
+				CRect rIcon = view_r;
 				rIcon.right = rIcon.left + 28;
 				rIcon = get_center_rect(rIcon, m_items[i]->m_icon.width, m_items[i]->m_icon.height);
 				m_items[i]->m_icon.draw(g, rIcon.left, rIcon.top);
@@ -998,8 +1188,8 @@ void CSCMenu::OnPaint()
 			//checked 표시 (icon 영역 한가운데). icon 과 m_checked 동시 사용 시에는 icon 이 먼저 그려진 후 dot 이 위에 덮어써짐 — 일반적으로 checkable 항목엔 icon 안 둠.
 			else if (m_items[i]->m_checked)
 			{
-				CPoint cp = m_items[i]->m_r.CenterPoint();
-				cp.x = m_items[i]->m_r.left + 14;
+				CPoint cp = view_r.CenterPoint();
+				cp.x = view_r.left + 14;
 				Gdiplus::Color cr_check = m_items[i]->m_enabled ? m_theme.cr_text : m_theme.cr_text_dim;
 				Gdiplus::SolidBrush br(cr_check);
 				g.FillEllipse(&br, cp.x - 3, cp.y - 3, 6, 6);
@@ -1008,50 +1198,92 @@ void CSCMenu::OnPaint()
 			//메뉴 아이콘 유무에 관계없이 아이콘 영역만큼 공백을 준다.
 			rText.left = rText.left + 28 + 4;
 
+			//submenu '>' 영역과 겹치지 않도록 caption right 제한.
+			if (m_items[i]->m_type == CSCMenuItem::item_submenu)
+				rText.right = view_r.right - 22;
+
 			//메뉴 캡션 표시
 			dc.DrawText(m_items[i]->m_caption, rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-			//sub button들이 존재하면 그려준다.
-			CRect r = m_items[i]->m_r;
-			//r.top += 2;
-			//하나의 메뉴 항목에 표시되는 sub button들의 r은 여기서 계산해서 그린다?
-			//라인 간격이 정해지면 그 때 이미 계산은 가능하다.
+			//sub button: 컨텐츠 좌표는 m_r 에 저장 (hit test용), 그리기는 view 좌표.
+			CRect r_content = m_items[i]->m_r;
+			CRect r_view = view_r;
 			for (int j = m_items[i]->m_buttons.size() - 1; j >= 0; j--)
 			{
-				r.right = r.right - 6;
-				r.left = r.right - m_items[i]->m_buttons[j]->m_r.Width();
+				int btn_w = m_items[i]->m_buttons[j]->m_r.Width();
+				r_content.right -= 6;
+				r_view.right -= 6;
+				r_content.left = r_content.right - btn_w;
+				r_view.left = r_view.right - btn_w;
 				//sub button의 영역은 left, right는 정확히 줘야하지만 top, bottom은 메뉴항목과 동일하게 한다.
 				//그래야 버튼을 클릭할 때 버튼보다 약간 위 또는 아래를 눌러도 클릭으로 처리되므로
 				//사용자가 버튼 이미지를 정확히 클릭해야하는 부담이 없다.
-				m_items[i]->m_buttons[j]->m_r = r;
-				m_items[i]->m_buttons[j]->m_button_image[m_items[i]->m_buttons[j]->m_state]->draw(g, r);
+				m_items[i]->m_buttons[j]->m_r = r_content;
+				m_items[i]->m_buttons[j]->m_button_image[m_items[i]->m_buttons[j]->m_state]->draw(g, r_view);
 
-				//현재 sub button 앞에 아직 다른 버튼이 존재한다면 r을 왼쪽으로 shift시키고 계속 그려준다.
 				if (j > 0)
-					r.OffsetRect(-m_items[i]->m_buttons[j]->m_r.Width() - 2, 0);
+				{
+					r_content.OffsetRect(-btn_w - 2, 0);
+					r_view.OffsetRect(-btn_w - 2, 0);
+				}
 			}
 
 			//단축키 정보가 있다면 표시하고
 			if (!m_items[i]->m_hot_key.IsEmpty())
 			{
 				//sub button이 없는 메뉴항목일 경우
-				if (r == m_items[i]->m_r)
-					rText.right = r.right - 6;
+				if (r_content == m_items[i]->m_r)
+					rText.right = r_view.right - 6;
 				//sub button이 있을 경우
 				else
-					rText.right = r.left - 8;
+					rText.right = r_view.left - 8;
 
-				//DrawRectangle(&dc, rText);
 				dc.DrawText(m_items[i]->m_hot_key, rText, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 			}
 
 			if (m_items[i]->m_type == CSCMenuItem::item_submenu)
 			{
-				CRect rArrow = m_items[i]->m_r;
+				CRect rArrow = view_r;
 				rArrow.right -= 6;
 				dc.DrawText(_T(">"), rArrow, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 			}
 		}
+	}
+
+	if (m_scrollable)
+	{
+		dc.SelectClipRgn(NULL);
+
+		//스크롤 화살표 영역 — back 색으로 채우고 위/아래 삼각형. 비활성 (boundary) 이면 dim.
+		dc.FillSolidRect(0, 0, rc.right, scroll_arrow_h, m_theme.cr_back.ToCOLORREF());
+		dc.FillSolidRect(0, rc.bottom - scroll_arrow_h, rc.right, rc.bottom, m_theme.cr_back.ToCOLORREF());
+
+		bool top_active = m_scroll_offset > 0;
+		bool bot_active = m_scroll_offset < m_max_scroll;
+
+		Gdiplus::Color cr_top = top_active ? m_theme.cr_text : m_theme.cr_text_dim;
+		Gdiplus::Color cr_bot = bot_active ? m_theme.cr_text : m_theme.cr_text_dim;
+
+		Gdiplus::SolidBrush br_top(cr_top);
+		Gdiplus::SolidBrush br_bot(cr_bot);
+
+		int cx = rc.right / 2;
+		int tri_w = 8, tri_h = 5;
+
+		Gdiplus::PointF pts_top[3] = {
+			Gdiplus::PointF((float)cx, (float)(scroll_arrow_h / 2 - tri_h / 2)),
+			Gdiplus::PointF((float)(cx - tri_w), (float)(scroll_arrow_h / 2 + tri_h / 2)),
+			Gdiplus::PointF((float)(cx + tri_w), (float)(scroll_arrow_h / 2 + tri_h / 2)),
+		};
+		g.FillPolygon(&br_top, pts_top, 3);
+
+		int by = rc.bottom - scroll_arrow_h / 2;
+		Gdiplus::PointF pts_bot[3] = {
+			Gdiplus::PointF((float)cx, (float)(by + tri_h / 2)),
+			Gdiplus::PointF((float)(cx - tri_w), (float)(by - tri_h / 2)),
+			Gdiplus::PointF((float)(cx + tri_w), (float)(by - tri_h / 2)),
+		};
+		g.FillPolygon(&br_bot, pts_bot, 3);
 	}
 
 	dc.SelectObject(pOldFont);

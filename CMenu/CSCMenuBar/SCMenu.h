@@ -260,10 +260,25 @@ protected:
 	int			m_line_height;
 	int			m_thumb_w = 80;
 	int			m_thumb_h = 45;
+	int			m_min_width = 220;		//create() 시 전달된 너비 — 항목 측정값이 이보다 크면 그만큼 확장.
 	//항목이 추가/삭제되거나 m_line_height가 변경되면 반드시 rect정보를 갱신해줘야 한다.
 	//라인 간격은 font size에 따라 자동 조절되게 할 수도 있지만 장단점이 있다.
 	//일단은 별개로 처리되도록 한다.
 	void		recalc_items_rect();
+
+	//컨텐츠가 모니터 높이를 초과할 때 스크롤. m_r 은 항상 컨텐츠 좌표.
+	int			m_content_h = 0;			//전체 항목이 차지하는 높이 (recalc 에서 산출)
+	int			m_scroll_offset = 0;		//현재 스크롤된 픽셀
+	int			m_max_scroll = 0;			//최대 스크롤
+	bool		m_scrollable = false;
+	int			m_auto_scroll_dir = 0;		//-1=top arrow hover, +1=bottom, 0=none
+	static const int scroll_arrow_h = 20;
+
+	void		scroll_by(int dy);
+	int			view_dy() const { return (m_scrollable ? scroll_arrow_h : 0) - m_scroll_offset; }
+	CPoint		client_to_content(CPoint pt) const { return CPoint(pt.x, pt.y - view_dy()); }
+	CRect		get_top_arrow_rect() const;
+	CRect		get_bottom_arrow_rect() const;
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -280,6 +295,7 @@ public:
 	//afx_msg BOOL OnLbnSelchange();
 	afx_msg void OnPaint();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 };
 
 

@@ -1757,7 +1757,9 @@ void CDShow::set_track_pos(double pos)
 
 	{
 		LONGLONG lPos = (LONGLONG)(pos * 10000.0);
-		hr = m_pMS->SetPositions(&lPos, AM_SEEKING_AbsolutePositioning | AM_SEEKING_SeekToKeyFrame, 0, 0);
+		//AM_SEEKING_SeekToKeyFrame 제거 — keyframe snap 때문에 GOP (보통 5~10초) 안에서 드래그하면
+		//같은 frame 만 표시되던 증상 해소. 정확한 위치로 seek (decoder 가 keyframe 부터 forward decode).
+		hr = m_pMS->SetPositions(&lPos, AM_SEEKING_AbsolutePositioning, 0, 0);
 	}
 
 	//seek target 을 cache. seek 직후 graph 가 INTERMEDIATE 로 transition 중일 때 get_track_pos 가

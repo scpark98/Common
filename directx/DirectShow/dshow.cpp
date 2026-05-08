@@ -839,15 +839,10 @@ CDShow::CDShow()
 
 	m_subCfg <<= AfxGetApp()->GetProfileString(_T("subtitle"), _T("setting"), _T(""));
 
-	//옛 schema (colors[4] + alpha[4] + alpha_link) 로 저장된 값을 새 schema (cr[4] ARGB) 로 deserialize 하면
-	//cr 의 alpha 비트가 모두 0 으로 읽혀 자막이 완전 투명. 그 경우 옛 garbage 데이터로 판정해
-	//default 로 reset 하고 즉시 새 schema 로 저장 — 옛 키 데이터 덮어쓰기.
-	bool legacy = true;
-	for (int i = 0; i < 4; i++)
-		if (m_subCfg.cr[i].GetA() != 0) { legacy = false; break; }
-	if (legacy)
+	//<<= 가 deserialize 후 is_sane() 으로 자체 검증, 부적합하면 set_default() 호출.
+	//garbage 잔여 (옛 schema, 부분 쓰기, 손상 토큰) 가 registry 에 남아있으면 매 실행마다 reset 되므로
+	//현재 sane 한 값을 새 schema 로 즉시 저장 — 다음 실행에서 garbage 를 다시 읽지 않도록.
 	{
-		m_subCfg.set_default();
 		CString style;
 		AfxGetApp()->WriteProfileString(_T("subtitle"), _T("setting"), style <<= m_subCfg);
 	}

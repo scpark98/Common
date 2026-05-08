@@ -40,6 +40,9 @@ public:
 	int			text_align;
 
 	void		set_default();
+	//deserialize 후 또는 외부에서 값 정합성 검증. 한 필드라도 임계 범위 밖이면 false.
+	//부적합한 값이 GdiPlus path / VMR9 SetAlphaBitmap 호출에 garbage 로 흘러가 hang 유발하는 것을 방지.
+	bool		is_sane() const;
 	friend CString& operator <<= (CString& style, CSubtitleSetting& s);
 	friend CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style);
 };

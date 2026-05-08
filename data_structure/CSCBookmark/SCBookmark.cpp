@@ -87,6 +87,12 @@ bool CSCBookmark::deserialize(const BYTE* data, UINT size)
 	if (!data || size == 0)
 		return false;
 
+	//전체 blob 의 비합리적 크기 차단 — registry 부분 쓰기 / 손상으로 거대한 size 가 보고될 가능성.
+	//일반 bookmark = 시간 (4) + 경로 (~수백 byte) + 이름 (~수백 byte) + 128x128 PNG (~수십 KB).
+	//안전 마진으로 5MB 상한.
+	if (size > 5 * 1024 * 1024)
+		return false;
+
 	const BYTE* p = data;
 	const BYTE* end = data + size;
 
@@ -96,15 +102,28 @@ bool CSCBookmark::deserialize(const BYTE* data, UINT size)
 
 	if (!read_pod(p, end, time_ms))
 		return false;
+	//time_ms 범위 — 0 이상, 24시간 이내.
+	if (time_ms < 0 || time_ms > 24 * 3600 * 1000)
+		return false;
 
 	if (!read_string(p, end, fullpath))
+		return false;
+	//path 길이 sanity — Windows MAX_PATH 의 4 배 정도까지 허용 (확장 경로 \\?\ 형식 포함).
+	if (fullpath.GetLength() > 4096)
 		return false;
 
 	if (!read_string(p, end, name))
 		return false;
+	//북마크 이름 — 사용자 입력. 합리적 상한.
+	if (name.GetLength() > 1024)
+		return false;
 
 	UINT thumb_size = 0;
 	if (!read_pod(p, end, thumb_size))
+		return false;
+
+	//thumbnail PNG 합리적 상한 — 128x128 PNG 가 최악 ~50KB. 1MB 이상이면 손상 의심.
+	if (thumb_size > 1024 * 1024)
 		return false;
 
 	if (thumb_size > 0)

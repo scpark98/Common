@@ -130,7 +130,7 @@ CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style)
 			s.font_auto_size = get_int(str);
 			s.char_per_line = get_int(str);
 			s.font_scaleX = get_double(str);
-			s.font_scaleX = get_double(str);
+			s.font_scaleY = get_double(str);	//bug fix: 이전엔 font_scaleX 가 두 번 호출되어 font_scaleY 토큰이 무시되고 다음 필드들이 한 칸씩 밀려 읽혔음.
 			s.char_spacing = get_int(str);
 
 			s.display_method = get_int(str);
@@ -162,5 +162,73 @@ CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style)
 		s.set_default();
 	}
 
+	//파싱 후 값 범위 검증. 디버거 강제종료로 인한 부분 쓰기 / 옛 schema 잔여 / 손상된 토큰 등으로
+	//garbage 값이 들어오면 GdiPlus path 연산이나 VMR9 SetAlphaBitmap 호출에서 hang 유발 가능.
+	//한 필드라도 임계 범위 밖이면 전체 default 로 reset (사용자 customization 유실 < hang 회피).
+	if (!s.is_sane())
+		s.set_default();
+
 	return(s);
+}
+
+bool CSubtitleSetting::is_sane() const
+{
+	if (!lf)
+		return false;
+
+	//font face — empty 면 GdiPlus FontFamily 생성 fail 또는 default fallback. 빈 문자열 차단.
+	if (lf->lfFaceName[0] == _T('\0'))
+		return false;
+
+	//lfHeight: 음수 = 픽셀 단위, 양수 = 논리 포인트, 0 = 정의 안 됨 (GdiPlus path 가 fail).
+	int abs_h = lf->lfHeight < 0 ? -lf->lfHeight : lf->lfHeight;
+	if (abs_h < 4 || abs_h > 400)
+		return false;
+
+	if (font_size < 4 || font_size > 400)
+		return false;
+	if (font_scaleX < 10 || font_scaleX > 1000)
+		return false;
+	if (font_scaleY < 10 || font_scaleY > 1000)
+		return false;
+	if (char_spacing < -100 || char_spacing > 100)
+		return false;
+
+	if (marginRect.left < 0 || marginRect.left > 1000 ||
+		marginRect.top < 0 || marginRect.top > 1000 ||
+		marginRect.right < 0 || marginRect.right > 1000 ||
+		marginRect.bottom < 0 || marginRect.bottom > 1000)
+		return false;
+
+	if (outline_widthX < 0 || outline_widthX > 100)
+		return false;
+	if (outline_widthY < 0 || outline_widthY > 100)
+		return false;
+	if (shadow_depthX < -100 || shadow_depthX > 100)
+		return false;
+	if (shadow_depthY < -100 || shadow_depthY > 100)
+		return false;
+
+	if (pos_x < 0 || pos_x > 100)
+		return false;
+	if (pos_y < 0 || pos_y > 100)
+		return false;
+
+	if (char_per_line < 0 || char_per_line > 999)
+		return false;
+
+	//cr[]: 옛 schema (alpha=0 garbage) 잔여 검출 — 4 채널 모두 alpha=0 이면 invalid.
+	bool any_alpha = false;
+	for (int i = 0; i < 4; i++)
+	{
+		if (cr[i].GetA() != 0)
+		{
+			any_alpha = true;
+			break;
+		}
+	}
+	if (!any_alpha)
+		return false;
+
+	return true;
 }

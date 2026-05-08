@@ -194,10 +194,11 @@ bool CSubtitleSetting::is_sane() const
 	if (char_spacing < -100 || char_spacing > 100)
 		return false;
 
-	if (marginRect.left < 0 || marginRect.left > 1000 ||
-		marginRect.top < 0 || marginRect.top > 1000 ||
-		marginRect.right < 0 || marginRect.right > 1000 ||
-		marginRect.bottom < 0 || marginRect.bottom > 1000)
+	//marginRect: % 단위 (0~100). 양측 합 100% 이상이면 자막 표시 영역 0 → 의미 없음.
+	if (marginRect.left < 0 || marginRect.left > 100 ||
+		marginRect.top < 0 || marginRect.top > 100 ||
+		marginRect.right < 0 || marginRect.right > 100 ||
+		marginRect.bottom < 0 || marginRect.bottom > 100)
 		return false;
 
 	if (outline_widthX < 0 || outline_widthX > 100)

@@ -2471,6 +2471,8 @@ void CDShow::prepare_AlphaBitmap()
 
 	float fZoom = 1.0f;
 
+	m_crColorKey = RGB(0, 31, 1);
+
 	for (int i = 0; i < 2; i++)
 	{
 		m_pMemDC[i] = new CDC();
@@ -2480,9 +2482,12 @@ void CDShow::prepare_AlphaBitmap()
 		m_pBitmap[i]->CreateCompatibleBitmap(m_pParentDC, m_video_size.cx * fZoom, m_video_size.cy * fZoom);
 		m_pMemDC[i]->SelectObject(m_pBitmap[i]);
 		m_pMemDC[i]->SetBkMode(TRANSPARENT);
-	}
 
-	m_crColorKey = RGB(0, 31, 1);
+		//VMR9 mixer 가 alpha bitmap 을 colorkey 기반 투명도로 합성. 새로 생성한 비트맵의 픽셀이
+		//undefined (보통 black) 상태면 mixer 는 이를 불투명으로 보고 영상 위 덮어 영상이 안 보임.
+		//전체를 colorkey 색으로 채워 mixer 가 fully transparent 로 인식하도록 초기화.
+		m_pMemDC[i]->FillSolidRect(0, 0, m_video_size.cx * fZoom, m_video_size.cy * fZoom, m_crColorKey);
+	}
 
 	m_buf_index = 0;
 	RECT reText;

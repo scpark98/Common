@@ -85,8 +85,11 @@ public:
 	CRect			m_r = CRect(0, 0, 0, 0);
 	CString			m_caption;
 	CString			m_hot_key;
-	int				m_access_key = 0;	//메뉴 캡션에 (&N)과 같은 문자열이 있다면 이를 추출해서 n키를 접근키로 사용한다.
-	int				m_menu_height = 34;
+	//caption 의 access-key 마커 ('&X') 가 가리키는 글자의 *cleaned m_caption 안의 인덱스*. 없으면 -1.
+	//ctor 에서 caption 파싱: '&&' → '&' literal / '&X' → X 추출 후 X 의 위치 저장. OnPaint 가 이 위치 글자
+	//아래에 underline 을 수동으로 그린다. DrawText 는 DT_NOPREFIX 로 호출되어 자동 underline 안 그림.
+	int				m_access_key = -1;
+	int				m_menu_height;
 
 	//CMenu::EnableMenuItem / CheckMenuItem 동등. CSCMenu::enable_item / check_item / check_radio_item 으로 설정.
 	bool			m_enabled = true;
@@ -244,42 +247,52 @@ protected:
 	bool			contains_descendant_hwnd(HWND hwnd);
 	void			hide_visible_descendants();
 	void			hide_visible_ancestors();		//자기 위쪽 (parent_menu 체인) 모두 hide.
+	void			popup_submenu_for(int over_index);	//over_index 의 항목이 submenu 면 부모 우측 edge 너머에 popup.
+
+	//키보드 navigation helpers — PreTranslateMessage 의 WM_KEYDOWN 분기에서 사용.
+	void			set_over_item(int idx);				//hover 항목 변경 + 형제 submenu dismiss + Invalidate.
+	void			navigate_over(int delta);			//+1 = 다음 enabled 항목, -1 = 이전. separator skip + wrap-around.
+	void			activate_over_item();				//over_item 활성화 — submenu 면 popup, 일반은 selchanged + cascade close.
+	bool			handle_access_key(TCHAR ch);		//ch (대소문자 무관) 매칭 access_key 항목 찾아 activate.
+
+	//이번 popup session 동안 sub-menu 가 한 번이라도 열린 적 있으면 true. 다음 hover 의 delay 생략 결정에 사용.
+	//popup_menu 진입 시 false 로 reset, popup_submenu_for 첫 호출 시 true.
+	bool			m_submenu_ever_opened = false;
 	std::deque<CSCMenuItem*> m_items;
 
-	bool		m_use_over = true;			//hover hilighted
-	int			m_over_item = -1;
-	int			get_item_index(CPoint pt);
+	bool			m_use_over = true;			//hover hilighted
+	int				m_over_item = -1;
+	int				get_item_index(CPoint pt);
 
-	LOGFONT		m_lf;
-	CFont		m_font;
-	void		ReconstructFont();
+	LOGFONT			m_lf;
+	CFont			m_font;
+	void			ReconstructFont();
 
 	//라인 높이는 글꼴 높이에 따라 자동 계산된다.
 	//만약 수동으로 라인 간격을 변경하려면 set_line_height(32); 와 같이 함수를 이용해야 한다.
 	//font_size를 증감했는데 라인 간격이 변경되지 않는 것도 문제가 되니 필요할 경우
 	//해당 함수를 통해 설정하자.
-	int			m_line_height;
-	int			m_thumb_w = 80;
-	int			m_thumb_h = 45;
-	int			m_min_width = 220;		//create() 시 전달된 너비 — 항목 측정값이 이보다 크면 그만큼 확장.
+	int				m_line_height;
+	int				m_thumb_w = 80;
+	int				m_thumb_h = 45;
+	int				m_min_width = 220;		//create() 시 전달된 너비 — 항목 측정값이 이보다 크면 그만큼 확장.
 	//항목이 추가/삭제되거나 m_line_height가 변경되면 반드시 rect정보를 갱신해줘야 한다.
 	//라인 간격은 font size에 따라 자동 조절되게 할 수도 있지만 장단점이 있다.
 	//일단은 별개로 처리되도록 한다.
-	void		recalc_items_rect();
-
+	void			recalc_items_rect();
 	//컨텐츠가 모니터 높이를 초과할 때 스크롤. m_r 은 항상 컨텐츠 좌표.
-	int			m_content_h = 0;			//전체 항목이 차지하는 높이 (recalc 에서 산출)
-	int			m_scroll_offset = 0;		//현재 스크롤된 픽셀
-	int			m_max_scroll = 0;			//최대 스크롤
-	bool		m_scrollable = false;
-	int			m_auto_scroll_dir = 0;		//-1=top arrow hover, +1=bottom, 0=none
+	int				m_content_h = 0;			//전체 항목이 차지하는 높이 (recalc 에서 산출)
+	int				m_scroll_offset = 0;		//현재 스크롤된 픽셀
+	int				m_max_scroll = 0;			//최대 스크롤
+	bool			m_scrollable = false;
+	int				m_auto_scroll_dir = 0;		//-1=top arrow hover, +1=bottom, 0=none
 	static const int scroll_arrow_h = 20;
 
-	void		scroll_by(int dy);
-	int			view_dy() const { return (m_scrollable ? scroll_arrow_h : 0) - m_scroll_offset; }
-	CPoint		client_to_content(CPoint pt) const { return CPoint(pt.x, pt.y - view_dy()); }
-	CRect		get_top_arrow_rect() const;
-	CRect		get_bottom_arrow_rect() const;
+	void			scroll_by(int dy);
+	int				view_dy() const { return (m_scrollable ? scroll_arrow_h : 0) - m_scroll_offset; }
+	CPoint			client_to_content(CPoint pt) const { return CPoint(pt.x, pt.y - view_dy()); }
+	CRect			get_top_arrow_rect() const;
+	CRect			get_bottom_arrow_rect() const;
 
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -287,6 +300,7 @@ public:
 	//virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
 	virtual void PreSubclassWindow();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
@@ -297,6 +311,7 @@ public:
 	afx_msg void OnPaint();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
 };
 
 

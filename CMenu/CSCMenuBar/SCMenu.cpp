@@ -7,6 +7,13 @@
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 
+//timer ID 와 hover/scroll 상수들 — set_over_item / OnMouseMove / OnTimer 등 여러 함수에서 사용. 파일 상단으로 이동.
+static const UINT_PTR timer_submenu_hover = 0x10001;
+static const UINT_PTR timer_scroll_auto = 0x10002;
+static const int submenu_hover_delay_ms = 300;
+static const int scroll_auto_interval_ms = 30;
+static const int scroll_auto_step_px = 4;
+
 CSCMenuMessage::CSCMenuMessage(CWnd* _this, int message, CSCMenuItem* menu_item, int button_index, int button_state)
 {
 	m_pWnd = _this;
@@ -51,9 +58,41 @@ CSCMenuSubButton::~CSCMenuSubButton()
 CSCMenuItem::CSCMenuItem(int id, CString caption, UINT icon_id, CString hot_key, int menu_height)
 {
 	m_id = id;
-	m_caption = caption;
 	m_hot_key = hot_key;
 	m_menu_height = (menu_height > 0 ? menu_height : 22);
+
+	//caption 의 access-key 마커 처리:
+	//- '&&' → '&' literal (access-key 마커 아님)
+	//- '&X' (X != '&') → X 추출 후 m_access_key = X 의 cleaned caption 내 위치
+	//- 끝의 단독 '&' → 무시 (다음 글자 없음)
+	//최초 1회만 access_key 인식 (다중 마커 무시).
+	m_access_key = -1;
+	CString cleaned;
+	int n = caption.GetLength();
+	for (int i = 0; i < n; i++)
+	{
+		TCHAR c = caption[i];
+		if (c == _T('&'))
+		{
+			if (i + 1 < n && caption[i + 1] == _T('&'))
+			{
+				cleaned += _T('&');
+				i++;	//두 번째 '&' skip
+			}
+			else if (i + 1 < n && m_access_key < 0)
+			{
+				m_access_key = cleaned.GetLength();
+				cleaned += caption[i + 1];
+				i++;	//access key 글자는 이미 추가했으므로 한 번 더 skip
+			}
+			//else: 끝의 단독 '&' — 무시
+		}
+		else
+		{
+			cleaned += c;
+		}
+	}
+	m_caption = cleaned;
 
 	set_icon(icon_id);
 }
@@ -179,6 +218,7 @@ BEGIN_MESSAGE_MAP(CSCMenu, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_TIMER()
 	ON_WM_MOUSEWHEEL()
+	ON_WM_NCCALCSIZE()
 END_MESSAGE_MAP()
 
 void CSCMenu::add(int _id, CString _caption, UINT icon_id, CString _hot_key)
@@ -294,22 +334,72 @@ void CSCMenu::PreSubclassWindow()
 
 BOOL CSCMenu::PreTranslateMessage(MSG* pMsg)
 {
-	// TODO: Add your specialized code here and/or call the base class
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		TRACE(_T("CSCMenu::PreTranslateMessage() WM_KEYDOWN\n"));
-		switch (pMsg->wParam)
+		UINT key = (UINT)pMsg->wParam;
+		switch (key)
 		{
-			case VK_ESCAPE :
-				TRACE(_T("esc\n"));
+			case VK_ESCAPE:
 				ShowWindow(SW_HIDE);
-				::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
-					(WPARAM)&CSCMenuMessage(this, message_scmenu_hide, NULL), 0);
+				if (m_parent && ::IsWindow(m_parent->m_hWnd))
+					::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
+						(WPARAM)&CSCMenuMessage(this, message_scmenu_hide, NULL), 0);
 				return TRUE;
+
+			case VK_DOWN:
+				navigate_over(+1);
+				return TRUE;
+
+			case VK_UP:
+				navigate_over(-1);
+				return TRUE;
+
+			case VK_RIGHT:
+				//over_item 이 submenu 면 펼치고 그 안으로 focus 이동. 그 외엔 무시.
+				if (m_over_item >= 0 && m_over_item < (int)m_items.size() &&
+					m_items[m_over_item]->m_type == CSCMenuItem::item_submenu)
+				{
+					activate_over_item();
+				}
+				return TRUE;
+
+			case VK_LEFT:
+				//parent_menu 가 있으면 자기 hide 후 parent 로 focus 회수 — sub 닫기 동작.
+				if (m_parent_menu && ::IsWindow(m_parent_menu->m_hWnd))
+				{
+					m_suppress_cascade_hide = true;
+					ShowWindow(SW_HIDE);
+					m_parent_menu->SetFocus();
+				}
+				return TRUE;
+
+			case VK_RETURN:
+			case VK_SPACE:
+				activate_over_item();
+				return TRUE;
+
+			default:
+				//access-key 매칭 — 영문/숫자 키만. case-insensitive.
+				if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9'))
+				{
+					if (handle_access_key((TCHAR)key))
+						return TRUE;
+				}
+				break;
 		}
 	}
 
 	return CDialogEx::PreTranslateMessage(pMsg);
+}
+
+LRESULT CSCMenu::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	//WS_THICKFRAME 사용 시 NC 영역 활성/비활성 전환 micro-flash 차단.
+	//lParam = -1 = title bar 전환 그리기 skip (Endorphin2Dlg 와 동일 트릭). WS_EX_NOACTIVATE 와 함께 적용.
+	if (message == WM_NCACTIVATE)
+		return DefWindowProc(WM_NCACTIVATE, wParam, -1);
+
+	return CDialogEx::WindowProc(message, wParam, lParam);
 }
 
 
@@ -414,6 +504,130 @@ void CSCMenu::hide_visible_ancestors()
 	}
 }
 
+//over_index 의 항목이 submenu 면 부모 메뉴의 window 우측 edge 너머에 popup.
+//Win10/11 의 WS_THICKFRAME 은 좌/우/하에 ~7 px invisible border 가 있어 GetWindowRect 가 실제 visible edge
+//보다 큰 rect 반환. get_window_real_rect (DwmGetWindowAttribute DWMWA_EXTENDED_FRAME_BOUNDS) 로
+//actual visible bounds 사용. Windows 탐색기 / 기본 CMenu 와 동일하게 부모 우측 border 와 ~3 px 겹쳐 표시.
+void CSCMenu::popup_submenu_for(int over_index)
+{
+	if (over_index < 0 || over_index >= (int)m_items.size())
+		return;
+	CSCMenuItem* item = m_items[over_index];
+	if (!item->m_enabled)
+		return;	//disabled 항목은 hover/click/keyboard 모든 경로에서 sub popup 차단.
+	if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+		return;
+	if (item->m_sub_menu->IsWindowVisible())
+		return;
+
+	CRect rItem = item->m_r;
+	rItem.OffsetRect(0, view_dy());
+	ClientToScreen(rItem);
+
+	CRect rWin = get_window_real_rect(this);
+	item->m_sub_menu->popup_menu(rWin.right - 11, rItem.top);
+
+	m_submenu_ever_opened = true;
+}
+
+void CSCMenu::set_over_item(int idx)
+{
+	if (idx == m_over_item)
+		return;
+
+	m_over_item = idx;
+	if (m_hWnd)
+		Invalidate(FALSE);
+
+	//형제 submenu dismiss — mouse hover 와 동일 처리. 자동 popup 은 안 함 (키보드는 RIGHT/Enter 로 명시 popup).
+	KillTimer(timer_submenu_hover);
+	for (auto* item : m_items)
+	{
+		if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+			continue;
+		if (!::IsWindow(item->m_sub_menu->m_hWnd))
+			continue;
+		if (!item->m_sub_menu->IsWindowVisible())
+			continue;
+		if (idx < 0 || m_items[idx] != item)
+		{
+			item->m_sub_menu->m_suppress_cascade_hide = true;
+			item->m_sub_menu->ShowWindow(SW_HIDE);
+		}
+	}
+}
+
+void CSCMenu::navigate_over(int delta)
+{
+	int n = (int)m_items.size();
+	if (n == 0)
+		return;
+
+	//시작 위치 — over_item 이 없으면 delta>0 일 때 -1 (다음이 0), delta<0 일 때 0 (다음이 n-1).
+	int idx = (m_over_item < 0) ? (delta > 0 ? -1 : 0) : m_over_item;
+	for (int step = 0; step < n; step++)
+	{
+		idx = (idx + delta + n) % n;
+		if (m_items[idx]->m_id <= 0)		//separator skip
+			continue;
+		if (!m_items[idx]->m_enabled)		//disabled skip
+			continue;
+		set_over_item(idx);
+		return;
+	}
+}
+
+void CSCMenu::activate_over_item()
+{
+	if (m_over_item < 0 || m_over_item >= (int)m_items.size())
+		return;
+	CSCMenuItem* item = m_items[m_over_item];
+	if (!item->m_enabled)
+		return;
+
+	//submenu 면 펼치고 sub 의 첫 항목 hover 로 focus 이동.
+	if (item->m_type == CSCMenuItem::item_submenu && item->m_sub_menu)
+	{
+		popup_submenu_for(m_over_item);
+		CSCMenu* sub = item->m_sub_menu;
+		if (sub && ::IsWindow(sub->m_hWnd))
+		{
+			sub->SetFocus();
+			sub->navigate_over(+1);
+		}
+		return;
+	}
+
+	//일반 항목 — parent 에 selchanged 통지 + cascade close.
+	if (m_parent && ::IsWindow(m_parent->m_hWnd))
+		::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
+			(WPARAM)&CSCMenuMessage(this, message_scmenu_selchanged, item), 0);
+	ShowWindow(SW_HIDE);
+	hide_visible_ancestors();
+}
+
+bool CSCMenu::handle_access_key(TCHAR ch)
+{
+	TCHAR lower = (TCHAR)_totlower(ch);
+	for (int i = 0; i < (int)m_items.size(); i++)
+	{
+		if (m_items[i]->m_access_key < 0)
+			continue;
+		if (!m_items[i]->m_enabled)
+			continue;
+		if (m_items[i]->m_access_key >= m_items[i]->m_caption.GetLength())
+			continue;
+		TCHAR ak = m_items[i]->m_caption[m_items[i]->m_access_key];
+		if ((TCHAR)_totlower(ak) == lower)
+		{
+			set_over_item(i);
+			activate_over_item();
+			return true;
+		}
+	}
+	return false;
+}
+
 
 void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 {
@@ -489,10 +703,7 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 
 			if (m_items[i]->m_type == CSCMenuItem::item_submenu && m_items[i]->m_sub_menu)
 			{
-				CRect rItem = m_items[i]->m_r;
-				rItem.OffsetRect(0, view_dy());		//submenu 는 보이는 항목 위치 옆에서 popup.
-				ClientToScreen(rItem);
-				m_items[i]->m_sub_menu->popup_menu(rItem.right - 4, rItem.top);
+				popup_submenu_for(i);
 				return;
 			}
 
@@ -529,12 +740,6 @@ int CSCMenu::get_item_index(CPoint pt)
 
 	return -1;
 }
-
-static const UINT_PTR timer_submenu_hover = 0x10001;
-static const UINT_PTR timer_scroll_auto = 0x10002;
-static const int submenu_hover_delay_ms = 300;
-static const int scroll_auto_interval_ms = 30;
-static const int scroll_auto_step_px = 4;
 
 void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 {
@@ -601,7 +806,15 @@ void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 				SetFocus();
 
 			if (over_item >= 0 && m_items[over_item]->m_type == CSCMenuItem::item_submenu)
-				SetTimer(timer_submenu_hover, submenu_hover_delay_ms, NULL);
+			{
+				//이번 popup session 에서 sub 가 한 번이라도 열렸으면 (m_submenu_ever_opened) 모든 후속 hover 는
+				//즉시 전환 — 사용자가 sub 열린 → non-sub 거쳐 → 다른 sub 로 이동해도 delay 없음.
+				//첫 hover (sub 가 아직 한 번도 안 열림) 만 hover_delay_ms 후 popup.
+				if (dismissed_any || m_submenu_ever_opened)
+					popup_submenu_for(over_item);
+				else
+					SetTimer(timer_submenu_hover, submenu_hover_delay_ms, NULL);
+			}
 		}
 	}
 
@@ -613,20 +826,7 @@ void CSCMenu::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_submenu_hover)
 	{
 		KillTimer(timer_submenu_hover);
-
-		if (m_over_item < 0)
-			return;
-
-		CSCMenuItem* item = m_items[m_over_item];
-		if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
-			return;
-		if (item->m_sub_menu->IsWindowVisible())
-			return;
-
-		CRect rItem = item->m_r;
-		rItem.OffsetRect(0, view_dy());
-		ClientToScreen(rItem);
-		item->m_sub_menu->popup_menu(rItem.right - 4, rItem.top);
+		popup_submenu_for(m_over_item);
 		return;
 	}
 
@@ -670,7 +870,7 @@ bool CSCMenu::create(CWnd* parent, int width)
 	m_parent = parent;
 	m_min_width = width;
 
-	DWORD dwStyle = WS_POPUP | WS_BORDER;
+	DWORD dwStyle = WS_POPUP | WS_THICKFRAME;// WS_BORDER;
 	//WS_EX_NOACTIVATE: popup 표시 시 부모 dlg 가 deactivate 되지 않아야 함 (deactivation 시 부모의 NC paint
 	//가 흰색 막대 등을 잠시 노출시키는 증상 차단). focus 는 SetFocus 로 명시적 전달 (KillFocus 기반 cascade close 유지).
 	//WS_EX_TOOLWINDOW: 작업표시줄 미표시 + 작은 caption 영역 (popup 메뉴에 적합).
@@ -768,6 +968,7 @@ void CSCMenu::popup_menu(int x, int y)
 	m_scrollable = false;
 	m_max_scroll = 0;
 	m_auto_scroll_dir = 0;
+	m_submenu_ever_opened = false;	//새 popup session — 첫 hover 는 delay, 이후엔 즉시 전환.
 	KillTimer(0x10002);		//timer_scroll_auto
 
 	recalc_items_rect();
@@ -998,7 +1199,7 @@ BOOL CSCMenu::OnLbnSelchange()
 //일단은 별개로 처리되도록 한다.
 void CSCMenu::recalc_items_rect()
 {
-	int sy = 2;
+	int sy = 4;	//top margin (bottom 의 +4 와 대칭)
 	bool is_separator;
 	int total_height = 0;	//모든 메뉴 항목을 표시하는 총 높이
 	CSize	border;
@@ -1083,7 +1284,10 @@ void CSCMenu::recalc_items_rect()
 		else
 			item_h = m_line_height;
 
-		m_items[i]->m_r = CRect(4, sy, rw.right - 5 - border.cx, sy + item_h);
+		//item rect 는 client 좌표 (CPaintDC 는 client 기준). client_right = rw.right - 2*border.cx 이므로
+		//우측 4 px 마진 = rw.right - 2*border.cx - 4. 이전 식 (rw.right - 5 - border.cx) 은 WS_BORDER (~1px)
+		//에선 거의 맞았지만 WS_THICKFRAME (~7~8px) 에선 item 이 client 영역을 넘어 잘려 우측 마진이 사라졌음.
+		m_items[i]->m_r = CRect(4, sy, rw.right - 2 * border.cx - 4, sy + item_h);
 		sy = m_items[i]->m_r.bottom + 2;
 
 		total_height = m_items[i]->m_r.bottom;
@@ -1158,8 +1362,8 @@ void CSCMenu::OnPaint()
 			//선택된 항목 표시
 			else if (i == m_over_item)
 			{
-				dc.SetTextColor(m_theme.cr_text_hover.ToCOLORREF());
-				dc.FillSolidRect(view_r, m_theme.cr_back_hover.ToCOLORREF());
+				dc.SetTextColor(m_theme.cr_text_selected.ToCOLORREF());
+				dc.FillSolidRect(view_r, m_theme.cr_back_selected.ToCOLORREF());
 			}
 			else
 			{
@@ -1184,19 +1388,19 @@ void CSCMenu::OnPaint()
 
 				if (m_items[i]->m_sub_caption.IsEmpty())
 				{
-					dc.DrawText(m_items[i]->m_caption, rTextArea, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+					dc.DrawText(m_items[i]->m_caption, rTextArea, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 				}
 				else
 				{
 					CRect rPrimary = rTextArea;
 					rPrimary.bottom = rTextArea.top + rTextArea.Height() / 2;
-					dc.DrawText(m_items[i]->m_caption, rPrimary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+					dc.DrawText(m_items[i]->m_caption, rPrimary, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
 					CRect rSecondary = rTextArea;
 					rSecondary.top = rPrimary.bottom;
 					COLORREF prev_text_color = dc.GetTextColor();
 					dc.SetTextColor(m_theme.cr_text_dim.ToCOLORREF());
-					dc.DrawText(m_items[i]->m_sub_caption, rSecondary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+					dc.DrawText(m_items[i]->m_sub_caption, rSecondary, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 					dc.SetTextColor(prev_text_color);
 				}
 
@@ -1230,8 +1434,29 @@ void CSCMenu::OnPaint()
 			if (m_items[i]->m_type == CSCMenuItem::item_submenu)
 				rText.right = view_r.right - 22;
 
-			//메뉴 캡션 표시
-			dc.DrawText(m_items[i]->m_caption, rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+			//메뉴 캡션 표시 — DT_NOPREFIX 로 자동 '&' 처리 차단 (caption 은 ctor 에서 이미 cleaned).
+			dc.DrawText(m_items[i]->m_caption, rText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+			//access-key 위치 글자 아래 수동 underline. ctor 에서 m_access_key 에 위치 저장됨.
+			if (m_items[i]->m_access_key >= 0)
+			{
+				int pos = m_items[i]->m_access_key;
+				CString prefix = m_items[i]->m_caption.Left(pos);
+				CString key_ch = m_items[i]->m_caption.Mid(pos, 1);
+				CSize sz_prefix = dc.GetTextExtent(prefix);
+				CSize sz_key = dc.GetTextExtent(key_ch);
+				CSize sz_full = dc.GetTextExtent(m_items[i]->m_caption);
+
+				int text_top = rText.top + (rText.Height() - sz_full.cy) / 2;
+				int underline_y = text_top + sz_full.cy - 2;
+				int x1 = rText.left + sz_prefix.cx;
+				int x2 = x1 + sz_key.cx;
+
+				COLORREF cr_line = (i == m_over_item)
+					? m_theme.cr_text_hover.ToCOLORREF()
+					: (m_items[i]->m_enabled ? m_theme.cr_text.ToCOLORREF() : m_theme.cr_text_dim.ToCOLORREF());
+				dc.FillSolidRect(CRect(x1, underline_y, x2, underline_y + 1), cr_line);
+			}
 
 			//sub button: 컨텐츠 좌표는 m_r 에 저장 (hit test용), 그리기는 view 좌표.
 			CRect r_content = m_items[i]->m_r;
@@ -1266,14 +1491,23 @@ void CSCMenu::OnPaint()
 				else
 					rText.right = r_view.left - 8;
 
-				dc.DrawText(m_items[i]->m_hot_key, rText, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+				dc.DrawText(m_items[i]->m_hot_key, rText, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			}
 
 			if (m_items[i]->m_type == CSCMenuItem::item_submenu)
 			{
-				CRect rArrow = view_r;
-				rArrow.right -= 6;
-				dc.DrawText(_T(">"), rArrow, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+				//chevron 두 직선 — 우측 꼭짓점에서 45° 로 만남. text '>' 글리프가 폰트 따라 깨져 보이는 증상 회피.
+				Gdiplus::Pen pen(m_items[i]->m_enabled ? m_theme.cr_text : m_theme.cr_text_dim, 1.5f);
+				pen.SetStartCap(Gdiplus::LineCapRound);
+				pen.SetEndCap(Gdiplus::LineCapRound);
+
+				const int half = 4;
+				int tip_x = view_r.right - 10;
+				int base_x = tip_x - half;
+				int cy = view_r.CenterPoint().y;
+
+				g.DrawLine(&pen, base_x, cy - half, tip_x, cy);
+				g.DrawLine(&pen, base_x, cy + half, tip_x, cy);
 			}
 		}
 	}
@@ -1325,4 +1559,15 @@ void CSCMenu::set_back_image(CSCGdiplusBitmap* img)
 
 	img->deep_copy(&m_img_back);
 	Invalidate();
+}
+
+void CSCMenu::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (bCalcValidRects)
+	{
+		lpncsp->rgrc[0].top -= 6;
+	}
+
+	CDialogEx::OnNcCalcSize(bCalcValidRects, lpncsp);
 }

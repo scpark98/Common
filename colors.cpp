@@ -1395,12 +1395,12 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		default : //case color_theme_default :
-			cr_text					= RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
-			cr_text_dim				= get_color(cr_text, 32);
+			cr_text					= get_sys_color(COLOR_BTNTEXT);
+			cr_text_dim				= get_weak_color(cr_text, 132);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= cr_text;// RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
 			cr_text_selected_inactive = cr_text_selected;
-			cr_text_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+			cr_text_dropHilited		= get_sys_color(COLOR_HIGHLIGHTTEXT);
 
 			//컨트롤 종류에 따라 기본 배경색이 다르다.
 			if (m_parent->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||

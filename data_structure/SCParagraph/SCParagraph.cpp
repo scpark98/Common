@@ -163,7 +163,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 }
 
 //paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align)
+CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width)
 {
 	if (para.empty())
 		return CRect();
@@ -187,7 +187,149 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
 	//sf.SetTrimming(Gdiplus::StringTrimmingNone);
 
-	int max_width = 0;
+	//[Phase 0] word-wrap pre-pass — max_width > 0 일 때 라인을 max_width 안으로 재분배.
+	//whitespace 우선 boundary, 없으면 character boundary (CJK 자막 등).
+	//tag/run 단위 (text_prop) 는 보존 — chunk 가 같은 run 의 속성을 그대로 상속.
+	if (max_width > 0)
+	{
+		//binary search 가 한 run 안에서 measure 를 O(log n) 번 호출하므로 Font 를 매번 Clone 하면 leak 누적.
+		//caller 가 한 run 처리하는 동안에만 같은 Font 재사용하도록 cache.
+		Gdiplus::Font* cached_font = NULL;
+		const CSCParagraph* cached_run = NULL;
+		float cached_thickness = 0.0f;
+		float cached_pipe_w = 0.0f;
+
+		auto release_cache = [&]() {
+			if (cached_font) { delete cached_font; cached_font = NULL; }
+			cached_run = NULL;
+		};
+
+		auto measure_run_w = [&](CSCParagraph& run, const CString& text) -> int
+		{
+			if (text.IsEmpty())
+				return 0;
+			if (cached_run != &run)
+			{
+				release_cache();
+				run.get_paragraph_font(g, &cached_font);
+				cached_run = &run;
+				cached_thickness = run.text_prop.thickness;
+				Gdiplus::RectF bp;
+				g.MeasureString(L"|", -1, cached_font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &bp);
+				cached_pipe_w = bp.Width;
+			}
+			Gdiplus::RectF b;
+			g.MeasureString(CStringW(text + _T("|")), -1, cached_font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &b);
+			int w = (int)(b.Width - cached_pipe_w + cached_thickness);
+			return w > 0 ? w : 0;
+		};
+
+		std::deque<std::deque<CSCParagraph>> wrapped;
+		std::deque<CSCParagraph> cur;
+		int cur_w = 0;
+
+		for (auto& line : para)
+		{
+			cur.clear();
+			cur_w = 0;
+
+			for (auto& run : line)
+			{
+				CString text = run.text;
+
+				while (!text.IsEmpty())
+				{
+					int avail = max_width - cur_w;
+					if (avail <= 0 && !cur.empty())
+					{
+						wrapped.push_back(cur);
+						cur.clear();
+						cur_w = 0;
+						avail = max_width;
+					}
+					if (avail <= 0)
+						avail = max_width;
+
+					//binary search — text 의 longest prefix 가 avail 안에 들어가는 길이.
+					int n = text.GetLength();
+					int lo = 1, hi = n, fit = 0;
+					while (lo <= hi)
+					{
+						int mid = (lo + hi) / 2;
+						int w = measure_run_w(run, text.Left(mid));
+						if (w <= avail) { fit = mid; lo = mid + 1; }
+						else { hi = mid - 1; }
+					}
+
+					if (fit == 0)
+					{
+						//1 글자도 avail 에 안 들어가면 라인 flush 후 fresh 라인에 재시도.
+						if (!cur.empty())
+						{
+							wrapped.push_back(cur);
+							cur.clear();
+							cur_w = 0;
+							continue;
+						}
+						//빈 라인인데도 1 글자가 max_width 보다 넓으면 무한루프 방지로 강제 1 글자 진행.
+						fit = 1;
+					}
+
+					if (fit == n)
+					{
+						//전체 text 가 들어감 — 그대로 append.
+						CSCParagraph chunk = run;
+						chunk.text = text;
+						cur.push_back(chunk);
+						cur_w += measure_run_w(run, text);
+						text.Empty();
+						continue;
+					}
+
+					//split 필요. fit 위치 이전의 마지막 whitespace 가 있으면 거기서 끊음 (어절 boundary).
+					int split_at = fit;
+					for (int k = fit; k >= 1; --k)
+					{
+						TCHAR c = text[k - 1];
+						if (c == _T(' ') || c == _T('\t'))
+						{
+							split_at = k;
+							break;
+						}
+					}
+
+					CSCParagraph chunk = run;
+					chunk.text = text.Left(split_at);
+					cur.push_back(chunk);
+					cur_w += measure_run_w(run, chunk.text);
+
+					//라인 flush.
+					wrapped.push_back(cur);
+					cur.clear();
+					cur_w = 0;
+
+					text = text.Mid(split_at);
+					//다음 라인 시작 시 leading whitespace 제거.
+					while (!text.IsEmpty() && (text[0] == _T(' ') || text[0] == _T('\t')))
+						text = text.Mid(1);
+				}
+			}
+
+			if (!cur.empty())
+			{
+				wrapped.push_back(cur);
+				cur.clear();
+				cur_w = 0;
+			}
+		}
+
+		if (!wrapped.empty())
+			para.swap(wrapped);
+
+		release_cache();
+	}
+
+	int max_width_measured = 0;
 	int max_width_line = 0;
 
 	for (i = 0; i < para.size(); i++)
@@ -247,9 +389,9 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		}
 
 		//각 라인들 중에서 최대 너비를 구한다.
-		if (sz_text.cx > max_width)
+		if (sz_text.cx > max_width_measured)
 		{
-			max_width = sz_text.cx;
+			max_width_measured = sz_text.cx;
 			max_width_line = i;
 		}
 

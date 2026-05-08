@@ -190,7 +190,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	}
 
 	CClientDC dc(this);
-	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
+	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER, m_max_width);
 	r.InflateRect(1, 1);
 
 	//배경을 그린다면 r은 더 크게 잡아줘야 한다. margin만큼 더 크게 키워준다.
@@ -220,6 +220,7 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
+	//Phase 0 wrap 은 첫 calc_text_rect 호출에서 이미 적용됨. 두 번째는 wrapped para 의 최종 위치만 재측정 — max_width 다시 넘기면 이미 짧아진 chunk 가 더 잘게 쪼개짐. 0 으로 호출.
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
 
 	//CSCParagraph::get_paragraph_info_string(m_para);

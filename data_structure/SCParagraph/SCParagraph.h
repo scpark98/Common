@@ -94,7 +94,9 @@ public:
 
 	//paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
 	//모든 para가 출력되는 최대 사각형을 리턴한다.
-	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align);
+	//max_width > 0 이면 word-wrap 활성 — 라인 누적 너비가 max_width 초과 시 whitespace 우선 boundary,
+	//	없으면 character boundary 로 split 하여 para 구조를 라인 단위로 재구성한다 (CJK 자막처럼 공백 없는 텍스트 대응).
+	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width = 0);
 	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
 
 	//각 paragraph의 r이 계산된 후에 줄 간격을 spacing 배수로 조정한다. spacing이 1.0f이면 기본 줄 간격, 2.0f이면 줄 간격이 2배가 된다.

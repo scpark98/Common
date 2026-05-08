@@ -3,6 +3,7 @@
 #include "SCAudioCompressor.h"
 #include "../../log/SCLog/SCLog.h"
 #include <gdiplus.h>
+#include <cmath>
 
 
 #pragma comment(lib, "strmiids.lib")
@@ -2317,19 +2318,24 @@ void CDShow::set_volume(int volume, bool reset_mute)
 	if (!pBA)
 		return;
 
-	//Volume 매핑 — piece-wise 곡선:
-	//  v=0~10  : -25 dB → -10 dB (가파른 attenuation, 작은 영역의 미세 조정)
-	//  v=10~100: -10 dB → +30 dB (점진 boost, 큰 영역의 PotPlayer 비교 음량)
-	//   0  : mute
-	//   1  : -23.5 dB (거의 안 들림 — 작은 음량 표현)
-	//   2  : -22 dB
-	//   5  : -17.5 dB
-	//  10  : -10 dB (분기점, 작음)
-	//  20  : -5.56 dB
-	//  33  : ≈ 0 dB (IBasicAudio max — boost 분기)
-	//  50  : +7.78 dB
-	// 100  : +30 dB
-	//전 영역 boost 는 작은 영역 표현 불가 / 전 영역 attenuation 은 큰 영역 부족 — piece-wise 가 균형.
+	//Volume 매핑 — 헤더 코멘트 의도 ("80% = 0 dB, 100% = +18 dB") 그대로 복원 + 인간 청각의 log 특성 반영:
+	//   v=0       : mute
+	//   1≤v<80   : db = 33 * log10(v / 80)        (순수 log 곡선, v=80 에서 0 dB unity)
+	//  80≤v≤100  : db = (v - 80) * 18 / 20        (선형 boost 0 → +18 dB)
+	//
+	//   v=1  : -62.8 dB   거의 mute
+	//   v=2  : -52.9 dB   미세 (사용자 요구 "거의 안 들림")
+	//   v=5  : -39.7 dB
+	//   v=10 : -29.8 dB
+	//   v=20 : -19.9 dB
+	//   v=30 : -14.1 dB   (이전 -1.1 dB 가 "꽤 크다" 였던 영역)
+	//   v=40 :  -9.95 dB
+	//   v=50 :  -6.7 dB
+	//   v=70 :  -1.9 dB
+	//   v=80 :   0  dB   unity
+	//   v=100:  +18 dB   max boost
+	//
+	//IBasicAudio 는 -100~0 dB 범위만 attenuation 가능. boost (>0 dB) 는 compressor makeup_db 로 처리.
 	const int v = m_volume_mute ? 0 : m_volume;
 	logWrite(_T("[set_volume] v=%d gain=%p comp=%p"), v, m_pAudioGainFilter, m_pAudioCompressorFilter);
 
@@ -2343,10 +2349,10 @@ void CDShow::set_volume(int volume, bool reset_mute)
 	else
 	{
 		double total_db;
-		if (v <= 10)
-			total_db = -25.0 + (double)v * 15.0 / 10.0;			//v=1: -23.5, v=10: -10
+		if (v < 80)
+			total_db = 33.0 * std::log10((double)v / 80.0);		//attenuation 영역, v=80 에서 0 dB
 		else
-			total_db = -10.0 + (double)(v - 10) * 40.0 / 90.0;	//v=10: -10, v=100: +30
+			total_db = (double)(v - 80) * 18.0 / 20.0;			//boost 영역, v=100 에서 +18 dB
 
 		if (total_db <= 0.0)
 		{

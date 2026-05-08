@@ -81,7 +81,9 @@ void CSCSliderCtrl::OnPaint()
 	CBrush*		pOldBrush = NULL;
 	CString		str, str_dual;
 
-	Gdiplus::Color	cr_back = (m_forced_gray_include_back ? enable_color(m_theme.cr_back) : m_theme.cr_back);
+	//배경색은 OS 기본 disable 비주얼 (gray-out) 을 적용하지 않음 — customized 컨트롤이라
+	//EnableWindow(FALSE) 만으로는 배경 유지. set_forced_gray(true, include_back=true) 로 호출자가 명시 요청한 경우에만 gray.
+	Gdiplus::Color	cr_back = (m_forced_gray && m_forced_gray_include_back) ? get_color(get_gray_color(m_theme.cr_back), 64) : m_theme.cr_back;
 	Gdiplus::Color	cr_active = enable_color(m_cr_active);
 	Gdiplus::Color	cr_inactive = enable_color(m_cr_inactive, 32);
 	Gdiplus::Color	cr_text = enable_color(m_theme.cr_text);

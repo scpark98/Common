@@ -12,37 +12,33 @@ CSubtitle::CSubtitle()
 
 bool CSubtitle::load_smi(CString sfile)
 {
-	char chLine[1024];
-	TCHAR tcLine[1024];
-	CString sLine = _T("");		//char문자열을 CString으로 저장하고
-	CString sSync = _T("");		//sync start단위씩 읽어온 후 처리하자.
-	CString str;
-	bool header_part = true;	//first sync를 만나기 전까지는 모두 헤더에 넣는다.
-	int pos1, pos2;
-	CCaption caption;
-	CString color = _T("");
-
-	caption.start = -1;
+	//1024 → 4096: 긴 라인 (다국어 번역, 다중 font tag 등) 이 잘려 다음 read 가 같은 라인 후속 부분을 별개 라인으로 오인하던 문제 회피.
+	char chLine[4096];
+	TCHAR tcLine[4096];
+	CString sLine;
+	CString sSync;			//sync 시작 단위로 누적 후 한 번에 parse_subtltle 호출.
+	bool header_part = true;
 
 	while (true)
 	{
 		if (m_unicode)
 		{
-			if (_fgetts(tcLine, 1024, m_fp) == 0)
+			if (_fgetts(tcLine, _countof(tcLine), m_fp) == 0)
 				break;
 			sLine = tcLine;
 		}
 		else
 		{
-			if (fgets(chLine, 1024, m_fp) == 0)
+			if (fgets(chLine, _countof(chLine), m_fp) == 0)
 				break;
 			sLine = chLine;
 		}
 
 		if (header_part)
 		{
-			//<BODY>를 만나기 전까지는 모두 header로 저장한다.
-			if (find(sLine, _T("<body>")) >= 0)
+			//"<body" 부분 매칭 — "<BODY CLASS=...>" 같은 attribute 있는 형식도 처리.
+			//기존 "<body>" literal 검사는 attribute 있는 흔한 형식을 놓쳐 모든 라인을 header 로 흡수했었음. find() 는 case-insensitive.
+			if (find(sLine, _T("<body")) >= 0)
 				header_part = false;
 
 			if (m_unicode)
@@ -53,144 +49,51 @@ bool CSubtitle::load_smi(CString sfile)
 			continue;
 		}
 
-		//sync를 만나면 그 전까지 저장해 둔 문자열이 있다면 파싱을 시작하고
+		//"</body" 매칭 — "</BODY >" 같은 변형도 처리.
+		if (find(sLine, _T("</body")) >= 0)
+		{
+			if (!sSync.IsEmpty())
+				parse_subtltle(sSync);
+			sSync.Empty();
+			break;
+		}
+
 		if (find(sLine, _T("<sync start")) >= 0)
 		{
-			//저장해 둔 문자열이 없으면 일단 저장하고
-			if (sSync.IsEmpty())
-			{
-				sSync += sLine;
-			}
-			//자막끝 표시 문자열을 만나면 현재까지 저장해두었던 sSync를 파싱하고
-			//그 자막의 end값으로 넣어준다.
-			else if (find(sLine, _T("&nbsp;")) > 0)
+			//이전 sync 누적이 있으면 먼저 flush.
+			if (!sSync.IsEmpty())
 			{
 				parse_subtltle(sSync);
 				sSync.Empty();
-				pos1 = sLine.Find(_T("=")) + 1;
-				pos2 = sLine.Find(BRACKET_CLOSE, pos1 + 1);
-				str = sLine.Mid(pos1, pos2 - pos1);
-				m_subtitle[m_subtitle.size()-1].end = _ttoi(str);
 			}
-			//그것도 아니면 자막 블럭이므로 분석해서 넣어준다.
+
+			//자막끝 (&nbsp;) 마커 라인이면 직전 caption 의 end 만 갱신, sSync 누적은 건너뜀.
+			if (find(sLine, _T("&nbsp;")) > 0)
+			{
+				int eq = sLine.Find(_T('='));
+				int gt = (eq >= 0) ? sLine.Find(_T('>'), eq) : -1;
+				if (eq >= 0 && gt > eq && !m_subtitle.empty())
+				{
+					int t = _ttoi(sLine.Mid(eq + 1, gt - eq - 1));
+					//역행 방지 — 간혹 end 가 직전 start 보다 작은 잘못된 SMI 가 있음.
+					if (t > m_subtitle.back().start)
+						m_subtitle.back().end = t;
+				}
+			}
 			else
 			{
-				parse_subtltle(sSync);
 				sSync = sLine;
 			}
-		}
-		//바디의 끝 테그를 만나면 더 이상 파싱할 게 없을것이다.
-		else if (find(sLine, _T("</body>")) >= 0)
-		{
-			parse_subtltle(sSync);
-			break;
-		}
-		//sync를 만나기 전까지는 일단 저장해둔다.
-		else
-		{
-			sSync += sLine;
+			continue;
 		}
 
-
-
-		//한 라인씩 처리하는 방식으로 문제가 될 소지가 있다.
-		//sync start단위로 처리하는 것이 좋으므로
-		//다음 sync start를 만나기 전까지 우선 읽어들이고
-		//그 읽어들인 문장을 파싱하자.
-		/*
-		if (sline.Find(_T("<SYNC Start")) >= 0)
-		{
-		first_sync = true;
-		pos1 = sline.Find(_T("=")) + 1;
-		pos2 = sline.Find(BRACKET_CLOSE, pos1 + 1);
-
-		str = sline.Mid(pos1, pos2 - pos1);
-
-		//자막 끝문자를 만나면 현재까지 추출한 자막을 저장한다.
-		if (sline.Find(_T("&nbsp;")) > 0)
-		{
-		if (caption.sentences.size())
-		{
-		caption.end = _ttoi(str);
-		m_subtitle.push_back(caption);
-		caption.sentences.clear();
-		caption.start = -1;
-		color.Empty();
-		}
-		}
-		//추출한 자막이 있는데 &nbsp;와 같은 끝문자를 안만나더라도
-		//다음 싱크 시작 테그를 만났다면 저장해주고 넘어가야 한다.
-		else if (caption.start >= 0 && caption.sentences.size())
-		{
-		caption.end = -1;
-		m_subtitle.push_back(caption);
-		caption.sentences.clear();
-		caption.start = _ttoi(str);
-		color.Empty();
-		}
-		else
-		{
-		caption.start = _ttoi(str);
-		}
-		}
-		else if (caption.start < 0)
-		{
-		if (!first_sync)
-		{
-		if (isUnicode)
-		m_header += tLine;
-		else
-		m_header += sLine;
-		}
-
-		continue;
-		}
-		//바디의 끝을 만났다면 마지막 저장해두었던 자막 데이터를 추가한다.
-		else if (sline.Find(_T("</BODY>")) >= 0)
-		{
-		m_subtitle.push_back(caption);
-		}
-		else
-		{
-		//<font color="#FF0000">카밀로 2번째 자막<br>
-		//<font color="#ffb400">新あたしんち <font color="#dcdcdc">신 우리집<br>
-		while (true)
-		{
-		int font_tag = sline.Find(_T("<font color"));
-		if (font_tag < 0)
-		{
-		if (caption.start >= 0)
-		{
-		sline.Replace(_T("\n"), _T(""));
-		if (sline.GetLength())
-		caption.sentences.push_back(CSentence(sline, color));
-		}
-		break;
-		}
-		else
-		{
-		if (font_tag > 0)
-		{
-		str = sline.Left(font_tag);
-		caption.sentences.push_back(CSentence(str, color));
-		sline = sline.Mid(str.GetLength());
-		}
-
-		//컬러 태그는 조금씩 다르다. '='과 '>'는 반드시 존재한다.
-		//<font color=FF6600>제 1 화<br>
-		//<font color="#FF0000">카밀로 2번째 자막<br>
-		sline = sline.Mid(sline.Find(_T("=")) + 1);
-		pos1 = sline.Find(_T(">"));
-		color = sline.Left(pos1);
-		remove_chars(color, _T("\"#"));
-		//color.Replace(_T("\""), _T(""));
-		//color.Replace(_T("#"), _T(""));
-		sline = sline.Mid(pos1 + 1);
-		}
-		}
-		}
-		*/
+		//sync 시작 라인이 아닌 일반 텍스트 라인 — 현재 sync 에 누적.
+		sSync += sLine;
 	}
+
+	//파일이 </body> 없이 끝났을 때 마지막 sync 도 flush.
+	if (!sSync.IsEmpty())
+		parse_subtltle(sSync);
 
 	fclose(m_fp);
 
@@ -206,93 +109,132 @@ bool CSubtitle::load_smi(CString sfile)
 
 bool CSubtitle::load_srt(CString sfile)
 {
-	char chLine[1024];
-	TCHAR tcLine[1024];
-	CString sLine = _T("");		//char문자열을 CString으로 저장하고
-	CString str;
-	int pos1, pos2;
+	//1024 → 4096: 긴 자막 라인 (다국어 번역 등) 이 잘려 다음 read 가 같은 라인 후속 부분을 별개 라인으로 오인하던 문제 회피.
+	char chLine[4096];
+	TCHAR tcLine[4096];
+	CString sLine;
 	CCaption caption;
 	CString color;
+
+	//인라인 스타일 태그 제거 (color 는 별도 처리). i/b/u/s 대소문자 + ASS override {\an8} 등.
+	auto strip_inline_tags = [](CString& s)
+	{
+		static const TCHAR* tags[] = {
+			_T("<i>"), _T("</i>"), _T("<I>"), _T("</I>"),
+			_T("<b>"), _T("</b>"), _T("<B>"), _T("</B>"),
+			_T("<u>"), _T("</u>"), _T("<U>"), _T("</U>"),
+			_T("<s>"), _T("</s>"), _T("<S>"), _T("</S>")
+		};
+		for (auto t : tags)
+			s.Replace(t, _T(""));
+
+		int p1;
+		while ((p1 = s.Find(_T('{'))) >= 0)
+		{
+			int p2 = s.Find(_T('}'), p1);
+			if (p2 < 0)
+				break;
+			s.Delete(p1, p2 - p1 + 1);
+		}
+	};
 
 	while (true)
 	{
 		if (m_unicode)
 		{
-			if (_fgetts(tcLine, 1024, m_fp) == 0)
+			if (_fgetts(tcLine, _countof(tcLine), m_fp) == 0)
 				break;
 			sLine = tcLine;
 		}
 		else
 		{
-			if (fgets(chLine, 1024, m_fp) == 0)
+			if (fgets(chLine, _countof(chLine), m_fp) == 0)
 				break;
 			sLine = chLine;
 		}
 
-		//시간 태그인 경우
-		//00:00:29,468 --> 00:00:32,988
-		if ((get_char_count(sLine, ':') == 4) && (get_char_count(sLine, ',') == 2) &&
-			(get_char_count(sLine, '-') >= 1) && (get_char_count(sLine, '>') == 1))
+		sLine.Trim();
+
+		//시간 라인 감지: "HH:MM:SS,mmm --> HH:MM:SS,mmm [X1:N X2:N ...]"
+		//기존 char-count 휴리스틱은 점(.) decimal 또는 positioning extension 이 붙은 형태에서 fail.
+		//"-->" 토큰 + 양쪽 콜론 개수 ≥ 2 로 판정. right 에 따라오는 cue settings 는 첫 whitespace 에서 cut.
+		int arrow = sLine.Find(_T("-->"));
+		if (arrow > 0)
 		{
-			sLine.Trim();
+			CString left = sLine.Left(arrow);
+			CString right = sLine.Mid(arrow + 3);
+			left.Trim();
+			right.Trim();
 
-			pos1 = sLine.Find('-');
-			str = sLine.Left(pos1);
-			caption.start = GetMilliSecondsFromTimeString(str);
+			int sp = right.FindOneOf(_T(" \t"));
+			if (sp > 0)
+				right = right.Left(sp);
 
-			sLine = sLine.Mid(sLine.ReverseFind('>') + 1);
-			caption.end = GetMilliSecondsFromTimeString(sLine);
+			if (get_char_count(left, ':') >= 2 && get_char_count(right, ':') >= 2)
+			{
+				//이전 caption 이 blank line 누락 등으로 push 안 됐으면 여기서 flush.
+				if (caption.is_valid())
+				{
+					m_subtitle.push_back(caption);
+					caption.reset();
+				}
+				caption.start = GetMilliSecondsFromTimeString(left);
+				caption.end = GetMilliSecondsFromTimeString(right);
+				continue;
+			}
 		}
-		//아직 시간 태그를 만나기 전이라면 순번이므로 패스
-		else if (caption.start == -1)
+
+		//아직 시간 태그를 만나기 전이라면 순번 (또는 WEBVTT 헤더 등) 으로 보고 pass.
+		if (caption.start == -1)
+			continue;
+
+		//blank line 이면 해당 caption 의 끝.
+		if (sLine.IsEmpty())
 		{
+			if (caption.is_valid())
+				m_subtitle.push_back(caption);
+			caption.reset();
 			continue;
 		}
-		//자막 내용인 경우
+
+		//스타일/ASS 태그 먼저 제거 — 그래야 다음의 <font color> 추출이 first '=' / '>' 매칭 오류를 안 일으킴.
+		strip_inline_tags(sLine);
+
+		//<font color="..."> ... </font>
+		if (find(sLine, _T("<font color")) >= 0)
+		{
+			int pos1 = sLine.Find(_T("=")) + 1;
+			int pos2 = sLine.Find(_T(">"));
+			if (pos2 > pos1)
+			{
+				color = sLine.Mid(pos1, pos2 - pos1);
+				color.Trim();
+				remove_chars(color, _T("\"#"));
+				sLine = sLine.Mid(pos2 + 1);
+			}
+
+			if (find(sLine, _T("</font>")) >= 0)
+				sLine.Replace(_T("</font>"), _T(""));
+		}
+		//컬러끝 태그만 있으면 바로 전 캡션의 색상을 유지.
+		else if (find(sLine, _T("</font>")) >= 0)
+		{
+			if (caption.sentences.size() > 0)
+				color = caption.sentences[caption.sentences.size() - 1].color;
+			sLine.Replace(_T("</font>"), _T(""));
+		}
 		else
 		{
-			sLine.Trim();
-
-			//자막이 비어있으면 해당 자막의 끝이고
-			if (sLine.IsEmpty())
-			{
-				m_subtitle.push_back(caption);
-				caption.reset();
-			}
-			//자막의 내용이 있으면 계속 추가한다.
-			else
-			{
-				//색생값이 있으면 추출해준다.
-				if (find(sLine, _T("<font color")) >= 0)
-				{
-					pos1 = sLine.Find(_T("=")) + 1;
-					pos2 = sLine.Find(_T(">"));
-					color = sLine.Mid(pos1, pos2 - pos1);
-					color.Trim();
-					remove_chars(color, _T("\"#"));
-					sLine = sLine.Mid(pos2 + 1);
-
-					//현재 라인에 컬러끝 태그가 있다면 그냥 삭제시켜주면 된다.
-					if (find(sLine, _T("</font>")) >= 0)
-						sLine.Replace(_T("</font>"), _T(""));
-				}
-				//컬러끝 태그가 있다면 바로 전 캡션의 색상을 계속 유지하는 경우다.
-				else if (find(sLine, _T("</font>")) >= 0)
-				{
-					if (caption.sentences.size() > 0)
-						color = caption.sentences[caption.sentences.size() - 1].color;
-					sLine.Replace(_T("</font>"), _T(""));
-				}
-				else
-				{
-					color.Empty();
-				}
-
-				//caption.sentences.push_back(sLine);
-				caption.sentences.push_back(CSentence(sLine, color));
-			}
+			color.Empty();
 		}
+
+		if (!sLine.IsEmpty())
+			caption.sentences.push_back(CSentence(sLine, color));
 	}
+
+	//파일이 trailing blank line 없이 끝났을 때 마지막 caption 도 flush.
+	if (caption.is_valid())
+		m_subtitle.push_back(caption);
 
 	fclose(m_fp);
 
@@ -391,11 +333,15 @@ void CSubtitle::parse_subtltle(CString src)
 				remove_chars(color, _T("\"#"));
 				sToken.Empty();
 			}
-			//한 문장의 끝에 <br>이 붙어있다면 제거하고 넣어준다.
+			//한 문장의 끝에 <br> / <br/> / <br /> 등이 붙어있다면 제거하고 넣어준다.
+			//기존 "Length-3" 고정 절단은 <br/> 같은 변형에서 잘못된 위치를 자름. 마지막 "<br" 위치부터 끝까지 모두 제거.
 			else if (find(sToken, _T("<br")) >= 0)
 			{
-				//sToken += src[i];
-				sToken = sToken.Left(sToken.GetLength() - 3);
+				CString lower = sToken;
+				lower.MakeLower();
+				int br_pos = lower.ReverseFind(_T('<'));
+				if (br_pos >= 0 && lower.Mid(br_pos, 3) == _T("<br"))
+					sToken = sToken.Left(br_pos);
 				sToken.Replace(_T("&nbsp;"), _T(" "));
 				caption.sentences.push_back(CSentence(sToken, color));
 				sToken.Empty();
@@ -420,10 +366,13 @@ void CSubtitle::parse_subtltle(CString src)
 		sToken.Trim();
 		if ((sToken == _T("&nbsp;")) && (caption.sentences.size() == 0))
 		{
-			//간혹 end싱크가 start싱크보다 빠르게 작성된 smi도 있으므로 이는 스킵시킨다.
-			if (caption.start <= m_subtitle[m_subtitle.size()-1].start)
+			//m_subtitle 이 비어있으면 직전 caption 이 없으므로 end 갱신 대상도 없음 — 그냥 skip.
+			if (m_subtitle.empty())
 				return;
-			m_subtitle[m_subtitle.size()-1].end = caption.start;
+			//간혹 end싱크가 start싱크보다 빠르게 작성된 smi도 있으므로 이는 스킵시킨다.
+			if (caption.start <= m_subtitle.back().start)
+				return;
+			m_subtitle.back().end = caption.start;
 			return;
 		}
 	}
@@ -439,10 +388,10 @@ void CSubtitle::parse_subtltle(CString src)
 	{
 		//만약 현재 자막이 마지막 자막의 시작 시간과 같다면
 		//이전 자막에 추가시켜준다.
-		if ((m_subtitle.size() > 0) && (caption.start == m_subtitle[m_subtitle.size()-1].start))
+		if (!m_subtitle.empty() && caption.start == m_subtitle.back().start)
 		{
 			for (i = 0; i < caption.sentences.size(); i++)
-				m_subtitle[m_subtitle.size()-1].sentences.push_back(caption.sentences[i]);
+				m_subtitle.back().sentences.push_back(caption.sentences[i]);
 		}
 		else
 		{

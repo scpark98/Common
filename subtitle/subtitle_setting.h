@@ -15,7 +15,7 @@ public:
 
 	int			display_method;					//on video or on overlay surface
 
-	CRect		marginRect;						// measured from the sides
+	CRect		marginRect;						// parcentage of app width/height. left/right, top/bottom 각각 따로 설정 가능. 1080p 기준 픽셀 단위로 입력받아 display_subtitle 의 wrap_w 계산이 video_height/1080 scale 로 변환해 사용.
 	int			border_style;					// 0: outline, 1: opaque box
 	double		outline_widthX, outline_widthY;
 	double		shadow_depthX, shadow_depthY;

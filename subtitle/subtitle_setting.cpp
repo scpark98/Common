@@ -35,7 +35,8 @@ void CSubtitleSetting::set_default()
 
 	display_method = 1;
 
-	marginRect = CRect(20, 20, 20, 20);
+	//좌우 여백은 5%, 상하는 0%를 기본값으로 한다.
+	marginRect = CRect(5, 0, 5, 0);
 
 	border_style = 0;
 

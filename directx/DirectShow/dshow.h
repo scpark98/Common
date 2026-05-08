@@ -101,6 +101,10 @@ public:
 	void			play(int state);
 	int				get_play_state() { return m_play_state; }
 
+	//get_track_pos 가 graph transition 중에 IMediaPosition::get_CurrentPosition 의 무한 block 을 회피하기 위해
+	//마지막 정상 query 결과를 cache. transition 중에는 이 값 반환.
+	double			m_last_track_pos_ms = 0.0;
+
 	//ms단위의 재생시간을 얻어온다.
 	double			get_media_duration() { return m_duration; }
 

@@ -1731,10 +1731,21 @@ double CDShow::get_track_pos()
 	if (!m_pGB || !m_pMP)
 		return 0.0;
 
-	REFTIME pos;
+	//IMediaPosition::get_CurrentPosition 은 graph state 가 transition 중일 때 무한 block 가능.
+	//IMediaControl::GetState(0, ...) 로 timeout=0 즉시 query. VFW_S_STATE_INTERMEDIATE 면
+	//graph 가 transition 중이므로 query 안 하고 cached pos 반환 — UI thread freeze 회피.
+	if (m_pMC)
+	{
+		OAFilterState fs = State_Stopped;
+		HRESULT hr_s = m_pMC->GetState(0, &fs);
+		if (hr_s == VFW_S_STATE_INTERMEDIATE)
+			return m_last_track_pos_ms;
+	}
 
+	REFTIME pos;
 	m_pMP->get_CurrentPosition(&pos);
-	return pos * 1000.0;
+	m_last_track_pos_ms = pos * 1000.0;
+	return m_last_track_pos_ms;
 }
 
 void CDShow::set_track_pos(double pos)

@@ -1763,17 +1763,11 @@ void CSCSliderCtrl::set_repeat_range(int start, int end)
 void CSCSliderCtrl::set_repeat_start(int pos)
 {
 	if (pos == -2)
-	{
-		m_repeat_start = pos;
-	}
+		m_repeat_start = GetPos();
 	else if (pos == -1)
-	{
 		m_repeat_start = -1;
-	}
 	else
-	{
 		m_repeat_start = pos;
-	}
 
 	//시작과 끝이 역순이 되면 end를 끝으로 변경
 	if ((m_repeat_start >= 0) &&
@@ -1789,17 +1783,11 @@ void CSCSliderCtrl::set_repeat_start(int pos)
 void CSCSliderCtrl::set_repeat_end(int pos)
 {
 	if (pos == -2)
-	{
-		m_repeat_end = pos;
-	}
+		m_repeat_end = GetPos();
 	else if (pos == -1)
-	{
 		m_repeat_end = -1;
-	}
 	else
-	{
 		m_repeat_end = pos;
-	}
 
 	//시작과 끝이 역순이 되면 start를 시작으로 변경
 	if ((m_repeat_start >= 0) &&

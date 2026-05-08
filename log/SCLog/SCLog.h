@@ -50,6 +50,11 @@
 	//간혹 특별한 로그 내용이 없어도 linefeed 또는 함수진입 기록등의 목적으로 "" 또는 " "을 넘김.
 	//gLog.write(_T(""));	//한 줄 빈 라인 추가
 	//gLog.write(_T(" "));	//시간, 함수정보까지만 출력되는 라인 추가
+
+[추가 예정 기능]
+- 로그파일이 일정 크기를 넘으면 자동으로 새 파일에 기록하는 기능 (예: 실행파일명_yyyymmdd_1.log, 실행파일명_yyyymmdd_2.log ...). 이 경우 m_new_create 옵션과는 별도로 동작하여 매 실행마다 새로운 파일을 생성하는 옵션과는 별개로 로그파일 크기에 따른 분할 기능으로 동작하도록 할 예정.
+- 일정 기간이 지난 로그 파일들을 삭제해주는 기능
+
 */
 
 #include <afxwin.h>
@@ -110,11 +115,10 @@ public:
 	//write_end_log()는 CSCLog의 소멸자에서 자동으로 불려지므로 수동 호출하지 말 것!
 	void		write_start_log();
 
-	//로그 파일명에 타임스탬프를 추가할 지 여부를 설정한다.
-	//이를 설정하면 매 실행 시 로그파일명에 시간까지 포함되어 생성된다. (예: 실행파일명_yyyymmdd_hhmmss.log)
-	//즉, 실행시마다 매번 로그를 새로운 파일에 기록하고자 할 때 이 옵션을 켜면 된다.
+	//매 실행 시 로그파일명에 시간까지 포함하여 새 파일로 생성하는 옵션. (예: 실행파일명_yyyymmdd_hhmmss.log)
+	//set() 호출 전에 켜둬야 효과 (set 안에서 m_log_fullpath 가 결정됨).
 	//default = false
-	void		use_filename_timestamp(bool use_filename_timestamp = true) { m_use_filename_timestamp = use_filename_timestamp; }
+	void		set_new_create(bool new_create = true) { m_new_create = new_create; }
 
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }
@@ -146,7 +150,7 @@ protected:
 	int			m_log_level = SCLOG_LEVEL_RELEASE;
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;
-	bool		m_use_filename_timestamp = false;
+	bool		m_new_create = false;
 	FILE* m_fp;
 
 	//소멸자 안전 종료를 위한 원자적 카운터/플래그

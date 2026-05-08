@@ -835,9 +835,13 @@ CDShow::CDShow()
 	m_default_interval = AfxGetApp()->GetProfileInt(_T("setting"), _T("default track interval"), 5);
 	m_control_interval = AfxGetApp()->GetProfileInt(_T("setting"), _T("control track interval"), 30);
 
+	logWrite(_T("[reg] CDShow.ctor: GetProfileInt subtitle/show ENTER"));
 	m_show_subtitle = AfxGetApp()->GetProfileInt(_T("subtitle"), _T("show"), true);
+	logWrite(_T("[reg] CDShow.ctor: GetProfileInt subtitle/show OK = %d"), m_show_subtitle);
 
+	logWrite(_T("[reg] CDShow.ctor: GetProfileString subtitle/setting ENTER"));
 	m_subCfg <<= AfxGetApp()->GetProfileString(_T("subtitle"), _T("setting"), _T(""));
+	logWrite(_T("[reg] CDShow.ctor: subtitle/setting deserialize OK is_sane=%d"), (int)m_subCfg.is_sane());
 
 	//<<= 가 deserialize 후 is_sane() 으로 자체 검증, 부적합하면 set_default() 호출.
 	//garbage 잔여 (옛 schema, 부분 쓰기, 손상 토큰) 가 registry 에 남아있으면 매 실행마다 reset 되므로
@@ -846,6 +850,7 @@ CDShow::CDShow()
 		CString style;
 		AfxGetApp()->WriteProfileString(_T("subtitle"), _T("setting"), style <<= m_subCfg);
 	}
+	logWrite(_T("[reg] CDShow.ctor: subtitle/setting writeback OK"));
 
 	/*
 	memset(&m_subCfg, 0, sizeof(m_subCfg));

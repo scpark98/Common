@@ -1755,28 +1755,26 @@ void CDShow::set_track_pos(double pos)
 
 	HRESULT hr;
 
-	/*
-	if (false)
 	{
-		CComQIPtr<IMediaPosition> pMP(m_pGB);
-		if (pMP != NULL)
-		{
-			pMP->put_CurrentPosition(pos / 1000.0);
-		}
-	}	
-	else
-	*/
-	{
-		//CComQIPtr<IMediaSeeking> pMC(m_pGB);
-		//hr = pMC->IsFormatSupported(&TIME_FORMAT_FRAME);
 		LONGLONG lPos = (LONGLONG)(pos * 10000.0);
-		//HRESULT hr = pMC->SetPositions(&lPos, AM_SEEKING_SeekToKeyFrame, NULL, AM_SEEKING_AbsolutePositioning);
 		hr = m_pMS->SetPositions(&lPos, AM_SEEKING_AbsolutePositioning | AM_SEEKING_SeekToKeyFrame, 0, 0);
+	}
 
-		//set_track_pos에서도 msg_track_moved를 보내면
-		//메인에 많은 혼란이 온다.
-		//메시지는 보내지 말고 메인에서 set_track_pos한 후 필요한 조치를 취하도록 하자.
-		//::PostMessage(m_pParent->m_hWnd, MESSAGE_DSHOW_MEDIA, msg_track_moved, (LPARAM)pos);
+	//seek target 을 cache. seek 직후 graph 가 INTERMEDIATE 로 transition 중일 때 get_track_pos 가
+	//IMediaPosition 을 query 하지 않고 이 cache 를 반환 → 슬라이더가 사용자가 클릭한 위치 그대로 유지 (B → A → B 깜빡임 회피).
+	m_last_track_pos_ms = pos;
+
+	//paused 상태에서 set_track_pos 후 mixer 가 auto-refresh 안 하는 케이스 — drag 중 일부 위치만 영상 변경되는 증상 회피.
+	//RepaintVideo 로 backbuffer 새 frame 을 즉시 paint.
+	if (m_pMC && m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+	{
+		OAFilterState fs;
+		if (SUCCEEDED(m_pMC->GetState(0, &fs)) && fs == State_Paused)
+		{
+			HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+			m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+			::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+		}
 	}
 }
 

@@ -1049,8 +1049,18 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	SetPos(pos);
 	*/
 	m_lbuttondown = true;
-	OnMouseMove(nFlags, point);
 	SetCapture();
+
+	//PotPlayer 식 grab — click 시 즉시 그 위치로 seek (msg_thumb_grab) + thumb 도 시각적으로 그 위치에 jump.
+	//drag 중에는 OnMouseMove 가 thumb 를 다시 움직이지 않으므로 thumb 는 grab 위치에 고정 유지된다.
+	//(이전: OnMouseMove(nFlags, point) 호출 → drag 첫 프레임에 msg_thumb_move 가 추가 발송되어
+	// 같은 위치를 두 번 처리하는 문제가 있었음. grab 한 번이면 충분.)
+	{
+		int pos = Pixel2Pos(point.x);
+		SetPos(pos);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
+			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, this, pos), 0);
+	}
 
 #if 0
 	// 손잡이를 마우스로 클릭했을 때
@@ -1127,23 +1137,14 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	m_lbuttondown = false;
 	ReleaseCapture();
 	Invalidate();
-	/*
-	int pos = GetPos();
-	if (m_nEventMsgStyle == msg_style_timer)
+
+	//drag 종료 알림 — 호출자가 timer 재시작하고 graph 를 다시 Running 으로 복귀시킬 수 있도록.
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
+		int pos = Pixel2Pos(point.x);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
+			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, this, pos), 0);
 	}
-	else if (m_nEventMsgStyle == msg_style_post)
-	{
-		::PostMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, GetDlgCtrlID(), pos), 0);
-	}
-	else if (m_nEventMsgStyle == msg_style_callback)
-	{
-		//if (m_pCallback_func != NULL)
-			//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_THUMB_RELEASE, pos);
-	}
-	*/
-	
+
 	CSliderCtrl::OnLButtonUp(nFlags, point);
 }
 
@@ -1228,10 +1229,13 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 
+	//drag 중에는 thumb 가 마우스를 따라가고 msg_thumb_move 가 발송되어 호출자가 set_track_pos 로 seek.
+	//(click+hold = mouse 가 안 움직이는 상태에서는 이 분기가 발화하지 않으므로 thumb 는 grab 위치에 고정.)
 	if (m_lbuttondown && IsWindowEnabled())
 	{
 		SetPos(pos);
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
+			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 	}
 
 	//이 코드를 살려놓으면 thumb위에서 마우스가 클릭되지 않고 움직여도 WM_PAINT가 호출되는 현상이 발생한다.

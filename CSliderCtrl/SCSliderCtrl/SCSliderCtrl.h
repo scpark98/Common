@@ -297,6 +297,9 @@ public:
 	//그 배율을 slider의 pos로 설정할 수도 있지만 auto fit을 토글하여 수동 설정된 배율과 auto fit을 토글할 수도 있다.
 	void			hide_thumb(bool hide = true) { m_thumb_hide = hide; Invalidate(); }
 
+	//drag/click+hold 중 여부 — 외부 timer 가 thumb 자동 갱신을 skip 할지 판단하는 용도.
+	bool			is_lbutton_down() const { return m_lbuttondown; }
+
 protected:
 	// Attributes
 

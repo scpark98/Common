@@ -405,7 +405,7 @@ public:
 	};
 
 	//현재 설정된 color theme 인덱스를 리턴
-	int		get_color_theme() { return m_cur_theme; }
+	int		get_color_theme() const { return m_cur_theme; }
 	void	set_color_theme(int color_theme);
 	static void get_color_theme_list(std::deque<CString> &theme_list);
 

@@ -338,11 +338,13 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 
 	//외부로 focus 가 갔으면 우리 + 보이는 자식 + 조상 모두 닫는다.
 	hide_visible_descendants();
-	ShowWindow(SW_HIDE);
+	if (::IsWindow(m_hWnd))
+		ShowWindow(SW_HIDE);
 	hide_visible_ancestors();		//focus 가 외부로 나가면 전체 체인 종료.
 
-	::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
-		(WPARAM)&CSCMenuMessage(this, message_scmenu_hide, NULL), 0);
+	if (m_parent && ::IsWindow(m_parent->m_hWnd))
+		::SendMessage(m_parent->m_hWnd, Message_CSCMenu,
+			(WPARAM)&CSCMenuMessage(this, message_scmenu_hide, NULL), 0);
 }
 
 bool CSCMenu::is_in_menu_chain(CWnd* pWnd)
@@ -350,8 +352,10 @@ bool CSCMenu::is_in_menu_chain(CWnd* pWnd)
 	if (!pWnd || !pWnd->m_hWnd)
 		return false;
 
+	//프로그램 종료 시 ancestor 체인의 일부 menu window 가 먼저 destroy 되어 m_hWnd 가 NULL 인 채로
+	//C++ 객체만 살아있을 수 있다. 이 경우 ::IsWindow guard 로 traversal 중단.
 	CSCMenu* top = this;
-	while (top->m_parent_menu)
+	while (top->m_parent_menu && ::IsWindow(top->m_parent_menu->m_hWnd))
 		top = top->m_parent_menu;
 
 	return top->contains_descendant_hwnd(pWnd->m_hWnd);
@@ -359,6 +363,9 @@ bool CSCMenu::is_in_menu_chain(CWnd* pWnd)
 
 bool CSCMenu::contains_descendant_hwnd(HWND hwnd)
 {
+	if (!::IsWindow(m_hWnd))
+		return false;
+
 	if (m_hWnd == hwnd)
 		return true;
 
@@ -379,6 +386,10 @@ void CSCMenu::hide_visible_descendants()
 	{
 		if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
 			continue;
+		//종료 단계 등 sub_menu window 가 이미 destroy 된 경우 (m_hWnd=NULL) IsWindowVisible/ShowWindow
+		//호출 시 MFC ASSERT — ::IsWindow 로 우회.
+		if (!::IsWindow(item->m_sub_menu->m_hWnd))
+			continue;
 		if (!item->m_sub_menu->IsWindowVisible())
 			continue;
 
@@ -393,7 +404,8 @@ void CSCMenu::hide_visible_ancestors()
 	CSCMenu* p = m_parent_menu;
 	while (p)
 	{
-		if (p->IsWindowVisible())
+		//종료 단계에 ancestor menu 가 이미 destroy 됐으면 (m_hWnd=NULL) IsWindowVisible/ShowWindow ASSERT.
+		if (::IsWindow(p->m_hWnd) && p->IsWindowVisible())
 		{
 			p->m_suppress_cascade_hide = true;
 			p->ShowWindow(SW_HIDE);
@@ -574,6 +586,8 @@ void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 			{
 				if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
 					continue;
+				if (!::IsWindow(item->m_sub_menu->m_hWnd))
+					continue;
 				if (!item->m_sub_menu->IsWindowVisible())
 					continue;
 				if (over_item < 0 || m_items[over_item] != item)
@@ -657,17 +671,24 @@ bool CSCMenu::create(CWnd* parent, int width)
 	m_min_width = width;
 
 	DWORD dwStyle = WS_POPUP | WS_BORDER;
+	//WS_EX_NOACTIVATE: popup 표시 시 부모 dlg 가 deactivate 되지 않아야 함 (deactivation 시 부모의 NC paint
+	//가 흰색 막대 등을 잠시 노출시키는 증상 차단). focus 는 SetFocus 로 명시적 전달 (KillFocus 기반 cascade close 유지).
+	//WS_EX_TOOLWINDOW: 작업표시줄 미표시 + 작은 caption 영역 (popup 메뉴에 적합).
+	DWORD dwExStyle = WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
 	wc.lpszClassName = _T("CSCMenu");
+	wc.hbrBackground = NULL;	//#32770 의 default brush (COLOR_3DFACE = 시스템 회색) 제거.
+								//OS 가 popup 표시 시 default brush 로 먼저 fill 한 후 OnPaint 가 theme 색으로 덮어 회색 flash 가 보이는 증상 회피.
+								//OnEraseBkgnd 가 FALSE 반환하므로 자동 erase 도 안 일어나 flicker 없음.
 	AfxRegisterClass(&wc);
 
 	//CString class_name = AfxRegisterWndClass(CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS, ::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), NULL);
 
 	//CreateEx()에서 첫번째 파라미터를 0으로 준 경우는 class_name도 NULL로 줘도 동작했으나 WS_EX_...스타일이 있을 경우는 NULL로 하면 에러 발생.
 	//height는 자동 recalc됨.
-	bool res = CreateEx(NULL, wc.lpszClassName, _T("CSCMenu"), dwStyle, CRect(0, 0, width, 300), parent, 0);
+	bool res = CreateEx(dwExStyle, wc.lpszClassName, _T("CSCMenu"), dwStyle, CRect(0, 0, width, 300), parent, 0);
 
 	if (res)
 	{
@@ -790,8 +811,15 @@ void CSCMenu::popup_menu(int x, int y)
 
 	MoveWindow(rw);
 
-	//CenterWindow();
-	ShowWindow(SW_SHOW);
+	//Pre-paint — ShowWindow 전에 hidden 상태에서 OnPaint 강제 실행해 backbuffer 를 theme 색으로 채움.
+	//그래야 ShowWindow 시 첫 화면부터 정상 theme 색으로 보이고, 빈 backbuffer 가 잠시 노출되는 flicker 회피.
+	Invalidate();
+	UpdateWindow();
+
+	//SW_SHOWNA: WS_EX_NOACTIVATE 와 일관 — activation 안 일어나 부모의 NC paint 트리거 안 함.
+	//SetFocus: cascade close 가 KillFocus 기반이므로 focus 는 명시적으로 메뉴에 부여.
+	ShowWindow(SW_SHOWNA);
+	SetFocus();
 }
 
 CRect CSCMenu::get_top_arrow_rect() const

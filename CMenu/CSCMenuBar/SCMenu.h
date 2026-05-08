@@ -86,7 +86,7 @@ public:
 	CString			m_caption;
 	CString			m_hot_key;
 	int				m_access_key = 0;	//메뉴 캡션에 (&N)과 같은 문자열이 있다면 이를 추출해서 n키를 접근키로 사용한다.
-	int				m_menu_height;
+	int				m_menu_height = 34;
 
 	//CMenu::EnableMenuItem / CheckMenuItem 동등. CSCMenu::enable_item / check_item / check_radio_item 으로 설정.
 	bool			m_enabled = true;
@@ -230,6 +230,7 @@ public:
 	virtual			CSCMenu& set_font_bold(bool bBold = true);
 
 	void			set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
+	int				get_color_theme() const { return m_theme.get_color_theme(); }
 
 protected:
 	CSCColorTheme	m_theme = CSCColorTheme(this);

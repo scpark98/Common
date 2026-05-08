@@ -96,7 +96,14 @@ public:
 	//모든 para가 출력되는 최대 사각형을 리턴한다.
 	//max_width > 0 이면 word-wrap 활성 — 라인 누적 너비가 max_width 초과 시 whitespace 우선 boundary,
 	//	없으면 character boundary 로 split 하여 para 구조를 라인 단위로 재구성한다 (CJK 자막처럼 공백 없는 텍스트 대응).
-	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width = 0);
+	//char_spacing != 0 이면 같은 라인 안에서 인접 run 사이에 char_spacing 픽셀 만큼 간격 추가/축소.
+	//	(자간을 진짜 글자 단위로 적용하려면 호출 측이 사전에 per-char 로 run 을 split 해 주어야 한다.)
+	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width = 0, int char_spacing = 0);
+
+	//run 들을 character 단위로 split 한다 — 자간 (char_spacing) 적용 시 각 글자가 독립 run 이 되어
+	//calc_text_rect 가 run 사이에 spacing 을 넣는 것이 곧 글자 사이에 spacing 이 되도록 한다.
+	//이미 1 글자 이하인 run 은 그대로 두고, 다중 글자 run 만 분해.
+	static void		split_runs_per_char(std::deque<std::deque<CSCParagraph>>& para);
 	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
 
 	//각 paragraph의 r이 계산된 후에 줄 간격을 spacing 배수로 조정한다. spacing이 1.0f이면 기본 줄 간격, 2.0f이면 줄 간격이 2배가 된다.

@@ -182,6 +182,11 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	CSCParagraph::build_paragraph_str(m_text_setting.text, m_para, &m_text_setting.text_prop);
 	//m_text_setting = CSCShapeDlgTextSetting(text, m_text_setting.text_prop);
 
+	//자간 != 0 이면 run 들을 1 글자씩 split — calc_text_rect 가 인접 run 사이에 char_spacing 을 넣는 것이
+	//곧 글자 사이에 spacing 이 되도록.
+	if (m_char_spacing != 0)
+		CSCParagraph::split_runs_per_char(m_para);
+
 	if (!m_hWnd)
 	{
 		bool success = create(parent, 0, 0, r.Width(), r.Height());
@@ -190,8 +195,12 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	}
 
 	CClientDC dc(this);
-	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER, m_max_width);
+	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER, m_max_width, m_char_spacing);
 	r.InflateRect(1, 1);
+
+	//행간 factor 적용 — 1.0 이 아닐 때만. 라인 사이 gap 을 비례로 늘리거나 줄임.
+	if (m_line_spacing_factor != 1.0f)
+		CSCParagraph::set_line_spacing(m_para, m_line_spacing_factor);
 
 	//배경을 그린다면 r은 더 크게 잡아줘야 한다. margin만큼 더 크게 키워준다.
 	if (m_text_setting.text_prop.cr_back.GetValue() != Gdiplus::Color::Transparent)
@@ -221,7 +230,12 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	r = CRect(0, 0, r.Width(), r.Height());
 	//Phase 0 wrap 은 첫 calc_text_rect 호출에서 이미 적용됨. 두 번째는 wrapped para 의 최종 위치만 재측정 — max_width 다시 넘기면 이미 짧아진 chunk 가 더 잘게 쪼개짐. 0 으로 호출.
-	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER);
+	//char_spacing 은 동일 값 전달 — run 위치 재계산 시 자간 유지.
+	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER, 0, m_char_spacing);
+
+	//행간 factor 재적용 — 두 번째 calc_text_rect 가 r 을 재계산하므로 다시 호출.
+	if (m_line_spacing_factor != 1.0f)
+		CSCParagraph::set_line_spacing(m_para, m_line_spacing_factor);
 
 	//CSCParagraph::get_paragraph_info_string(m_para);
 

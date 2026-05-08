@@ -162,8 +162,32 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		para.push_back(para_line);
 }
 
+//run 들을 character 단위로 split.
+void CSCParagraph::split_runs_per_char(std::deque<std::deque<CSCParagraph>>& para)
+{
+	for (auto& line : para)
+	{
+		std::deque<CSCParagraph> split_line;
+		for (auto& run : line)
+		{
+			if (run.text.GetLength() <= 1)
+			{
+				split_line.push_back(run);
+				continue;
+			}
+			for (int k = 0; k < run.text.GetLength(); k++)
+			{
+				CSCParagraph one = run;
+				one.text = run.text.Mid(k, 1);
+				split_line.push_back(one);
+			}
+		}
+		line.swap(split_line);
+	}
+}
+
 //paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width)
+CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width, int char_spacing)
 {
 	if (para.empty())
 		return CRect();
@@ -338,6 +362,10 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 		for (j = 0; j < para[i].size(); j++)
 		{
+			//char_spacing: 같은 라인의 두 번째 run 부터 spacing 만큼 left 를 미리 옮긴다 (run 사이 간격).
+			if (j > 0 && char_spacing != 0)
+				sz_text.cx += char_spacing;
+
 			CSize sz;
 #if 0
 			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);

@@ -165,6 +165,15 @@ public:
 	void			set_max_width(int max_width) { m_max_width = max_width; }
 	int				get_max_width() { return m_max_width; }
 
+	//자간 (character spacing) 픽셀. 0 (기본) 이면 적용 안 함. != 0 이면 set_text 가 run 들을 1글자씩 split 한 뒤
+	//calc_text_rect 가 인접 run (=인접 글자) 사이에 spacing 픽셀 만큼 간격을 둠.
+	void			set_char_spacing(int n) { m_char_spacing = n; }
+	int				get_char_spacing() { return m_char_spacing; }
+
+	//행간 factor (line height multiplier). 1.0 (기본) 이면 적용 안 함. 1.2 → 20% 더 띄움, 0.9 → 10% 좁힘.
+	void			set_line_spacing_factor(float f) { m_line_spacing_factor = f; }
+	float			get_line_spacing_factor() { return m_line_spacing_factor; }
+
 	//show상태로 만들고 time후에 hide된다.
 	void			time_out(int time, bool fadein, bool fadeout);
 
@@ -220,6 +229,10 @@ protected:
 
 	//word-wrap 최대 너비. 0 = wrap 안 함.
 	int				m_max_width = 0;
+
+	//자간 (px) / 행간 factor.
+	int				m_char_spacing = 0;
+	float			m_line_spacing_factor = 1.0f;
 
 	bool			m_fadeinout_ing = false;
 	//fade_in(), fade_out() 함수에서 호출하며

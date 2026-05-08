@@ -62,10 +62,11 @@ CSCMenuItem::CSCMenuItem(int id, CString caption, UINT icon_id, CString hot_key,
 	m_menu_height = (menu_height > 0 ? menu_height : 22);
 
 	//caption 의 access-key 마커 처리:
-	//- '&&' → '&' literal (access-key 마커 아님)
-	//- '&X' (X != '&') → X 추출 후 m_access_key = X 의 cleaned caption 내 위치
-	//- 끝의 단독 '&' → 무시 (다음 글자 없음)
-	//최초 1회만 access_key 인식 (다중 마커 무시).
+	//- '&&' → '&' literal
+	//- '&X' (X 가 alphanumeric, 최초 1회) → X 추출 후 m_access_key = X 위치
+	//- '&' 다음이 alphanumeric 이 아닌 글자 (space, punctuation 등) → literal '&' (GetMenuItemInfo 가 '&&' 를
+	//  '&' 로 collapse 하는 케이스 방어 — 예: '팬 && 스캔' → '팬 & 스캔' → '& ' 가 access-key 가 아닌 literal '&').
+	//- 끝의 단독 '&' → literal '&'
 	m_access_key = -1;
 	CString cleaned;
 	int n = caption.GetLength();
@@ -79,13 +80,16 @@ CSCMenuItem::CSCMenuItem(int id, CString caption, UINT icon_id, CString hot_key,
 				cleaned += _T('&');
 				i++;	//두 번째 '&' skip
 			}
-			else if (i + 1 < n && m_access_key < 0)
+			else if (i + 1 < n && _istalnum((_TUCHAR)caption[i + 1]) && m_access_key < 0)
 			{
 				m_access_key = cleaned.GetLength();
 				cleaned += caption[i + 1];
 				i++;	//access key 글자는 이미 추가했으므로 한 번 더 skip
 			}
-			//else: 끝의 단독 '&' — 무시
+			else
+			{
+				cleaned += _T('&');	//literal '&' — 다음이 non-alnum 이거나 끝.
+			}
 		}
 		else
 		{
@@ -204,6 +208,22 @@ void CSCMenu::clear()
 		delete m_items[i];
 	}
 	m_items.clear();
+}
+
+void CSCMenu::remove_item(int menu_id)
+{
+	for (auto it = m_items.begin(); it != m_items.end(); ++it)
+	{
+		if ((*it)->m_id != menu_id)
+			continue;
+		for (auto* btn : (*it)->m_buttons)
+			delete btn;
+		(*it)->m_buttons.clear();
+		delete *it;
+		m_items.erase(it);
+		recalc_items_rect();
+		return;
+	}
 }
 
 
@@ -573,6 +593,7 @@ void CSCMenu::navigate_over(int delta)
 		if (!m_items[idx]->m_enabled)		//disabled skip
 			continue;
 		set_over_item(idx);
+		m_kb_priority = true;	//mouse 가 실제로 움직일 때까지 hover 갱신 차단.
 		return;
 	}
 }
@@ -621,6 +642,7 @@ bool CSCMenu::handle_access_key(TCHAR ch)
 		if ((TCHAR)_totlower(ak) == lower)
 		{
 			set_over_item(i);
+			m_kb_priority = true;
 			activate_over_item();
 			return true;
 		}
@@ -743,6 +765,20 @@ int CSCMenu::get_item_index(CPoint pt)
 
 void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 {
+	//keyboard nav 직후 동일 좌표 WM_MOUSEMOVE (Invalidate 후 hover refresh 등) 또는 사용자가 키 누르며
+	//발생한 hand jitter 가 keyboard hover 를 덮어 m_over_item 이 마우스 아래 항목으로 되돌아가는 증상 차단.
+	//- 동일 좌표면 무조건 skip
+	//- m_kb_priority 가 set 이면 mouse 가 실제로 움직일 때까지 hover 갱신 안 함. 한 번 다른 좌표가 들어오면 release.
+	if (point == m_last_mouse_pt)
+		return;
+	if (m_kb_priority)
+	{
+		m_kb_priority = false;	//mouse 가 실제로 움직였으니 mouse 모드로 복귀.
+		m_last_mouse_pt = point;
+		return;					//이번 한 번은 무시 — 다음 mouse move 부터 정상 처리.
+	}
+	m_last_mouse_pt = point;
+
 	//스크롤 가능 + 화살표 위 hover → 자동 스크롤 타이머. 그 외는 타이머 종료.
 	if (m_scrollable)
 	{
@@ -969,6 +1005,8 @@ void CSCMenu::popup_menu(int x, int y)
 	m_max_scroll = 0;
 	m_auto_scroll_dir = 0;
 	m_submenu_ever_opened = false;	//새 popup session — 첫 hover 는 delay, 이후엔 즉시 전환.
+	m_last_mouse_pt = CPoint(-1, -1);
+	m_kb_priority = false;
 	KillTimer(0x10002);		//timer_scroll_auto
 
 	recalc_items_rect();

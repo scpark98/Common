@@ -214,6 +214,9 @@ public:
 	int				get_menu_count() { return m_items.size(); }
 	//모든 항목 destroy. 동적 메뉴 (북마크 / 최근 파일 등) 를 popup 마다 rebuild 할 때 사용.
 	void			clear();
+	//특정 menu_id 항목 1개 제거. 첫 매칭만 제거. resource load 후 일부 항목 위치를 옮기고 싶을 때 사용
+	//(load 가 모든 항목을 append 하므로 duplicate 가 생기는 경우 — 호출자가 동일 ID 를 미리 add 한 후 load 끝에 remove).
+	void			remove_item(int menu_id);
 
 	//라인 간격
 	int				get_line_height() { return m_line_height; }
@@ -258,6 +261,11 @@ protected:
 	//이번 popup session 동안 sub-menu 가 한 번이라도 열린 적 있으면 true. 다음 hover 의 delay 생략 결정에 사용.
 	//popup_menu 진입 시 false 로 reset, popup_submenu_for 첫 호출 시 true.
 	bool			m_submenu_ever_opened = false;
+
+	//mouse vs keyboard 우선순위. 키보드 nav 후 mouse 가 실제로 움직일 때까지 hover 갱신 차단.
+	//Invalidate 후 synthetic WM_MOUSEMOVE / 키 누를 때 손 jitter 가 keyboard hover 를 덮는 증상 회피.
+	CPoint			m_last_mouse_pt = CPoint(-1, -1);
+	bool			m_kb_priority = false;
 	std::deque<CSCMenuItem*> m_items;
 
 	bool			m_use_over = true;			//hover hilighted

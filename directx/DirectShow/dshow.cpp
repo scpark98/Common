@@ -2511,6 +2511,13 @@ HRESULT CDShow::update_osd_subtitle()
 	if (!m_pVMRWC)
 		return E_FAIL;
 
+	//OSD 텍스트와 자막 모두 비어있으면 alpha bitmap 을 그릴 일이 없음 → SetAlphaBitmap 호출 자체 skip.
+	//일부 환경 (특정 GPU/드라이버) 에서 graph Running 중 SetAlphaBitmap 호출이 VMR9 mixer 내부 lock 으로
+	//무한 block 되는 현상 (UI thread freeze, CPU 0~5%) 회피.
+	//Endorphin2 는 OSD/자막을 모두 별도 CSCShapeDlg popup 으로 그리므로 dshow 의 alpha bitmap path 는 미사용.
+	if (m_osd_text.IsEmpty() && !(m_show_subtitle && m_cur_subtitle.is_valid()))
+		return S_OK;
+
 	int i;
 	int sx = m_video_size.cx * m_subCfg.pos_x / 100.0;
 	int sy = m_video_size.cy * m_subCfg.pos_y / 100.0;// -56;

@@ -362,6 +362,15 @@ protected:
 	bool			m_has_focus = false;
 	bool			m_draw_focus_rect = false;
 
+	//drag threshold — click+hold 중 손 jitter 가 미세한 px 변동을 만들면 매번 msg_thumb_move 가 발송되어
+	//호출자가 grab 위치 근처로 반복 seek 하게 됨 (영상이 그 자리로 계속 되돌아가는 증상). reference point 가
+	//drag 시작 전엔 lbutton_down_point, 시작 후엔 last_emit_point — 이 점으로부터 m_drag_threshold_px 이상
+	//이동해야 emission. drag 후 mouse 가 멈춘 채 jitter 만 있으면 last_emit 의 threshold 안이라 emission 안 됨.
+	CPoint			m_lbutton_down_point = CPoint(0, 0);
+	CPoint			m_last_emit_point = CPoint(0, 0);
+	bool			m_drag_started = false;
+	static const int m_drag_threshold_px = 5;
+
 	CString			m_text;			//m_text_style == text_style_user_defined일 경우 표시되는 텍스트
 	CString			m_text_dual;	//m_text_style == text_style_dual_text일 경우 오른쪽에 표시되는 텍스트
 	int				m_text_style = text_style_value;

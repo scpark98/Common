@@ -1049,6 +1049,8 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	SetPos(pos);
 	*/
 	m_lbuttondown = true;
+	m_lbutton_down_point = point;
+	m_drag_started = false;
 	SetCapture();
 
 	//PotPlayer 식 grab — click 시 즉시 그 위치로 seek (msg_thumb_grab) + thumb 도 시각적으로 그 위치에 jump.
@@ -1135,6 +1137,7 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 
 	m_lbuttondown = false;
+	m_drag_started = false;
 	ReleaseCapture();
 	Invalidate();
 
@@ -1231,8 +1234,21 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 	//drag 중에는 thumb 가 마우스를 따라가고 msg_thumb_move 가 발송되어 호출자가 set_track_pos 로 seek.
 	//(click+hold = mouse 가 안 움직이는 상태에서는 이 분기가 발화하지 않으므로 thumb 는 grab 위치에 고정.)
+	//drag threshold 가드 — reference point 로부터 m_drag_threshold_px 이상 이동해야 emission.
+	//- drag 시작 전: reference = lbutton_down_point. 손 jitter 무시.
+	//- drag 중: reference = last_emit_point. drag-and-hold 시 마우스가 그 자리에 멈춰 있으면 jitter 가
+	//  threshold 안이라 emission 안 됨 → 호출자의 throttle seek 도 안 일어나서 그 위치부터 정상 재생.
 	if (m_lbuttondown && IsWindowEnabled())
 	{
+		const CPoint& ref = m_drag_started ? m_last_emit_point : m_lbutton_down_point;
+		int dx = point.x - ref.x;
+		int dy = point.y - ref.y;
+		if (dx * dx + dy * dy < m_drag_threshold_px * m_drag_threshold_px)
+			return;
+
+		m_drag_started = true;
+		m_last_emit_point = point;
+
 		SetPos(pos);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
 			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);

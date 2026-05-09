@@ -6044,6 +6044,9 @@ bool delete_file(CString fullpath, bool bTrashCan)
 	return false;
 }
 
+//forward decl — definition 은 get_text_encoding 아래.
+static bool is_utf8_encoding(CString filepath);
+
 int	get_text_encoding(CString sfile)
 {
 	int text_encoding = text_encoding_unknown;
@@ -6103,79 +6106,14 @@ int	get_text_encoding(CString sfile)
 	return text_encoding;
 }
 
-//BOM이 없는 일반 파일의 경우 아래와 같이 utf8 문자 범위를 검사하여 utf8인지 euc-kr인지 판별한다.
-//출처: https://dev-drive.tistory.com/10 [Dev Drive:티스토리]
-//단, 용량이 0바이트이면 판별이 불가하므로 utf8로 간주한다.
-bool is_utf8_encoding_old(CString filepath)
-{
-	bool is_utf8 = true;
-
-	unsigned char buf[4096] = { 0, };
-
-	FILE* fp = NULL;
-
-	_tfopen_s(&fp, filepath, _T("rb"));
-
-	if (fp == NULL)
-		return is_utf8;
-
-	size_t dwRead = fread(buf, 1, 4096, fp);
-	fclose(fp);
-
-	unsigned char* start = (unsigned char*)buf;
-	unsigned char* end = (unsigned char*)buf + dwRead;
-
-	while (start < end)
-	{
-		if (*start < 0x80) // (10000000)[output][/output]
-		{
-			start++;
-		}
-		else if (*start < (0xC0)) // (11000000)
-		{
-			is_utf8 = false;
-			break;
-		}
-		else if (*start < (0xE0)) // (11100000)
-		{
-			if (start >= end - 1)
-				break;
-			if ((start[1] & (0xC0)) != 0x80)
-			{
-				is_utf8 = false;
-				break;
-			}
-			start += 2;
-		}
-		else if (*start < (0xF0)) // (11110000)
-		{
-			if (start >= end - 2)
-				break;
-			if ((start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80)
-			{
-				is_utf8 = false;
-				break;
-			}
-			start += 3;
-		}
-		else
-		{
-			is_utf8 = false;
-			break;
-		}
-	}
-
-	if (is_utf8)
-		return true;
-
-	return false;
-}
-
-bool is_utf8_encoding(CString filepath)
+//get_text_encoding 내부 helper — 파일 전체를 utf8 valid byte sequence 인지 검사.
+//utf8::is_valid 라이브러리 사용. 외부 호출자가 직접 쓸 일 없으므로 static 으로 격리.
+//Korean EUC-KR 의 0xA1-0xFE lead byte 는 utf8 invalid 라 false 반환.
+static bool is_utf8_encoding(CString filepath)
 {
 	std::ifstream ifs(filepath);
 	if (!ifs)
-		return false; // even better, throw here
+		return false;
 
 	std::istreambuf_iterator<char> it(ifs.rdbuf());
 	std::istreambuf_iterator<char> eos;
@@ -6197,9 +6135,9 @@ CString read(CString filepath, int max_length, int encoding)
 		return result;
 	}
 
-#if 0
+#if 0	//dead code — 초기 시도 (CFile + IsTextUnicode 통계). #elif 1 의 단순 경로 채택 후 보존만 됨.
 	CFile file;
-	
+
 	if (!file.Open(filepath, CFile::modeRead))
 		return result;
 

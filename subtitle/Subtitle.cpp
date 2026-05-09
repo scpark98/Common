@@ -6,34 +6,21 @@
 
 CSubtitle::CSubtitle()
 {
-	m_fp = NULL;
 	reset();
 }
 
 bool CSubtitle::load_smi(CString sfile)
 {
-	//1024 → 4096: 긴 라인 (다국어 번역, 다중 font tag 등) 이 잘려 다음 read 가 같은 라인 후속 부분을 별개 라인으로 오인하던 문제 회피.
-	char chLine[4096];
-	TCHAR tcLine[4096];
-	CString sLine;
+	//read() 가 BOM/byte 통계로 인코딩 정확 판별 → CString 으로 한 번에 변환. get_token_str 으로 라인 분리.
+	std::deque<CString> lines;
+	if (!read_lines(sfile, &lines))
+		return false;
+
 	CString sSync;			//sync 시작 단위로 누적 후 한 번에 parse_subtltle 호출.
 	bool header_part = true;
 
-	while (true)
+	for (CString& sLine : lines)
 	{
-		if (m_unicode)
-		{
-			if (_fgetts(tcLine, _countof(tcLine), m_fp) == 0)
-				break;
-			sLine = tcLine;
-		}
-		else
-		{
-			if (fgets(chLine, _countof(chLine), m_fp) == 0)
-				break;
-			sLine = chLine;
-		}
-
 		if (header_part)
 		{
 			//"<body" 부분 매칭 — "<BODY CLASS=...>" 같은 attribute 있는 형식도 처리.
@@ -41,10 +28,9 @@ bool CSubtitle::load_smi(CString sfile)
 			if (find(sLine, _T("<body")) >= 0)
 				header_part = false;
 
-			if (m_unicode)
-				m_header += tcLine;
-			else
-				m_header += chLine;
+			//read_lines 가 \r\n → \n 정규화 후 \n separator 로 분리 → 각 라인에 \n 미포함. 헤더 재구성 시 명시 추가.
+			m_header += sLine;
+			m_header += _T("\n");
 
 			continue;
 		}
@@ -95,8 +81,6 @@ bool CSubtitle::load_smi(CString sfile)
 	if (!sSync.IsEmpty())
 		parse_subtltle(sSync);
 
-	fclose(m_fp);
-
 	if (find(m_header, _T(".encc")) >= 0)
 		m_sLanguage = _T("ENCC");
 	else if (find(m_header, _T(".jpcc")) >= 0)
@@ -109,10 +93,11 @@ bool CSubtitle::load_smi(CString sfile)
 
 bool CSubtitle::load_srt(CString sfile)
 {
-	//1024 → 4096: 긴 자막 라인 (다국어 번역 등) 이 잘려 다음 read 가 같은 라인 후속 부분을 별개 라인으로 오인하던 문제 회피.
-	char chLine[4096];
-	TCHAR tcLine[4096];
-	CString sLine;
+	//read() 가 BOM/byte 통계로 인코딩 정확 판별 → CString 으로 한 번에 변환. get_token_str 으로 라인 분리.
+	std::deque<CString> lines;
+	if (!read_lines(sfile, &lines))
+		return false;
+
 	CCaption caption;
 	CString color;
 
@@ -138,21 +123,8 @@ bool CSubtitle::load_srt(CString sfile)
 		}
 	};
 
-	while (true)
+	for (CString& sLine : lines)
 	{
-		if (m_unicode)
-		{
-			if (_fgetts(tcLine, _countof(tcLine), m_fp) == 0)
-				break;
-			sLine = tcLine;
-		}
-		else
-		{
-			if (fgets(chLine, _countof(chLine), m_fp) == 0)
-				break;
-			sLine = chLine;
-		}
-
 		sLine.Trim();
 
 		//시간 라인 감지: "HH:MM:SS,mmm --> HH:MM:SS,mmm [X1:N X2:N ...]"
@@ -236,8 +208,6 @@ bool CSubtitle::load_srt(CString sfile)
 	if (caption.is_valid())
 		m_subtitle.push_back(caption);
 
-	fclose(m_fp);
-
 	return true;
 }
 
@@ -246,9 +216,9 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 	if (sfile.IsEmpty())
 	{
 		if (m_sfile.IsEmpty() == false)
-			sfile = m_sfile;
+				sfile = m_sfile;
 		else
-			return false;
+				return false;
 	}
 
 	m_sfile = sfile;
@@ -259,27 +229,8 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 	if (PathFileExists(sfile) == false)
 		return false;
 
-	//encording 방식을 읽어온다.
-	int	text_encoding = get_text_encoding(sfile);
-
-	if (m_fp)
-		fclose(m_fp);
-
-	if (text_encoding <= text_encoding_ansi)
-	{
-		_tfopen_s(&m_fp, sfile, _T("rt"));
-		m_unicode = false;
-	}
-	else
-	{
-		_tfopen_s(&m_fp, sfile, _T("rt, ccs=UNICODE"));
-		m_unicode = true;
-	}
-
-	if (m_fp == NULL)
-		return false;
-
-
+	//인코딩 판별·파일 열기는 load_smi / load_srt 가 read_lines() (Common helper) 로 처리.
+	//여기서는 확장자 dispatch 만.
 	CString ext = get_part(sfile, fn_ext);
 	ext.MakeLower();
 

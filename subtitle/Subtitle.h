@@ -119,9 +119,6 @@ protected:
 	CString m_sfile;
 	CString m_sLanguage;	//KRCC or JPCC or ENCC...
 
-	FILE	*m_fp;
-	bool	m_unicode;
-
 	//처리 대상이 아닌 태그들을 삭제한다.
 	//ex. <font face>, </font>, <b>, <i>
 	void remove_other_tags(CString &str);

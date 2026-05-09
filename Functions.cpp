@@ -6054,6 +6054,11 @@ int	get_text_encoding(CString sfile)
 	if (fp == NULL)
 		return text_encoding_unknown;
 
+	//UTF-16LE no-BOM 검사용 — IsTextUnicode 와 함께 쓸 짝수 byte 확인.
+	fseek(fp, 0, SEEK_END);
+	long filesize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
 	size_t dwRead = fread(buf, 1, 4096, fp);
 	fclose(fp);
 
@@ -6073,34 +6078,26 @@ int	get_text_encoding(CString sfile)
 	else if (dwRead >= 4 && buf[0] == 0x2b && buf[1] == 0x2f && buf[2] == 0x76 && buf[3] == 0x39)
 		text_encoding = text_encoding_utf7;
 
-	//BOM이 없을 경우 판별
+	//BOM이 없을 경우 판별 — Scintilla CScintillaCtrl::read_file 의 4중 검사 패턴.
 	if (text_encoding == text_encoding_unknown)
 	{
-		//BOM이 없는 일반 파일의 경우 아래와 같이 utf8 문자 범위를 검사하여 utf8인지 euc-kr인지 판별한다.
-		//출처: https://dev-drive.tistory.com/10 [Dev Drive:티스토리]
-		//단, 용량이 0바이트이면 판별이 불가하므로 utf8로 간주한다.
-		bool is_utf8 = is_utf8_encoding(sfile);
-
-		if (is_utf8)
-			text_encoding = text_encoding_utf8;
-		//else
-			//text_encoding = text_encoding_ansi;
-
-		//utf16-le인데 BOM이 없어서 unknown으로 판별했다는 가정하에
-		//utf16-le는 홀수 byte가 무조건 0이다. 만약 중간에 한글이 있다면?
-		if (text_encoding == text_encoding_unknown)
+		//1) UTF-16LE no-BOM — strict 검사. 기존 휴리스틱 (`is_hangul(CString((char*)buf[i]))`) 은 byte 값을
+		//포인터로 cast 해 임의 메모리 접근하던 버그라 EUC-KR 한글 자막을 UTF-16LE 로 오판함.
+		//strict: 파일크기 짝수, buf[0] != 0, buf[1] == 0 (ASCII 가 LE 로 표현된 형태), IsTextUnicode 통계 검사 모두 통과.
+		int nUniTest = IS_TEXT_UNICODE_STATISTICS;
+		if (dwRead > 1 && (filesize % 2) == 0 && (dwRead % 2) == 0
+			&& buf[0] != 0 && buf[1] == 0
+			&& IsTextUnicode(buf, (int)dwRead, &nUniTest))
 		{
-			int i = 1;
-
-			for (i = 1; i < dwRead; i += 2)
-			{
-				if (!is_hangul(CString((char*)buf[i])) && buf[i] != 0x00)
-					break;
-			}
-
-			if (i >= dwRead)
-				text_encoding = text_encoding_utf16le;
+			text_encoding = text_encoding_utf16le;
 		}
+		//2) UTF-8 valid byte sequence — Korean EUC-KR 의 0xA1-0xFE 시작 byte 는 UTF-8 lead 로 invalid → false 반환.
+		//단, 파일이 0 바이트면 is_utf8_encoding 이 utf8 로 간주.
+		else if (is_utf8_encoding(sfile))
+		{
+			text_encoding = text_encoding_utf8;
+		}
+		//3) 그 외 — text_encoding_unknown 유지. read() / file_open() 이 ANSI (CP_ACP) 로 fallback 처리.
 	}
 
 	return text_encoding;

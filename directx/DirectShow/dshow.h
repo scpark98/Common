@@ -288,7 +288,6 @@ protected:
 	CString			m_media_filename;
 	IGraphBuilder*	m_pGB;
 	IBaseFilter*	m_VMR;
-	IBaseFilter*	pSource;
 	IBaseFilter*	m_pSplitter;
 	IBaseFilter*	m_SourceBase;
 	IFileSourceFilter	*m_pFileSource;
@@ -330,19 +329,6 @@ protected:
 	bool			m_flip;
 
 	BOOL VerifyVMR9(void);
-	HRESULT GetUnconnectedPin(
-		IGraphBuilder *pGB,
-		IBaseFilter *pFilter,   // Pointer to the filter.
-		PIN_DIRECTION PinDir,   // Direction of the pin to find.
-		IPin **ppPin) ;          // Receives a pointer to the pin.
-
-	HRESULT GetUnConnectPin( IGraphBuilder *pGB,
-		IBaseFilter *pFilter,   // Pointer to the filter.
-		PIN_DIRECTION PinDir,   // Direction of the pin to find.
-		IPin **ppPin,int &num);           // Receives a pointer to the pin.)
-
-	HRESULT RenderFileToVMR9(IGraphBuilder *pGB, WCHAR *wFileName, 
-		IBaseFilter *pRenderer, BOOL bRenderAudio=TRUE);
 
 	HRESULT AddGraphToRot(IUnknown *pUnkGraph, DWORD *pdwRegister);
 	void RemoveGraphFromRot(DWORD pdwRegister);

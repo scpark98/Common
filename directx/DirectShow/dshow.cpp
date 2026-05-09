@@ -489,7 +489,7 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 
 	if (!pSubPin)
 	{
-		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
 
@@ -515,7 +515,7 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 	m_pSubtitleGrabberCB = pSink;	//CSubtitleSinkFilter* (subtype 조회용 별칭)
 
 	//graph state 복원
-	if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+	if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 }
 
 GUID CDShow::get_subtitle_format()
@@ -628,7 +628,7 @@ void CDShow::setup_audio_gain_filter()
 		logWrite(_T("[AudioGain] no audio renderer found"));
 		if (pRenderer) pRenderer->Release();
 		if (pRendererIn) pRendererIn->Release();
-		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
 	logWrite(_T("[AudioGain] audio renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
@@ -641,7 +641,7 @@ void CDShow::setup_audio_gain_filter()
 		logWrite(_T("[AudioGain] upstream pin not connected"));
 		pRenderer->Release();
 		pRendererIn->Release();
-		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
 
@@ -671,7 +671,7 @@ void CDShow::setup_audio_gain_filter()
 		pUpstreamOut->Release();
 		pRenderer->Release();
 		pRendererIn->Release();
-		if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
 
@@ -766,7 +766,7 @@ void CDShow::setup_audio_gain_filter()
 	pRenderer->Release();
 	pRendererIn->Release();
 
-	if (pMC && (saved_state == State_Running || saved_state == State_Paused)) pMC->Run();
+	if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 }
 
 void CDShow::teardown_audio_gain_filter()
@@ -820,7 +820,6 @@ CDShow::CDShow()
 
 	m_pGB = NULL;
 	m_VMR = NULL;
-	pSource = NULL;
 	m_SourceBase = NULL;
 	m_pFileSource = NULL;
 	m_pSplitter = NULL;
@@ -926,7 +925,6 @@ void CDShow::close_media()
 	}
 
 	SAFE_RELEASE(m_VMR);
-	SAFE_RELEASE(pSource);
 	SAFE_RELEASE(m_pSplitter)
 	SAFE_RELEASE(m_pFileSource);
 	SAFE_RELEASE(m_SourceBase);
@@ -1173,7 +1171,6 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 	if (m_VMR != NULL)
 	{
-		//RenderFileToVMR9(m_pGB, wFileName, pSource);
 		if (!auto_render)
 		{
 			IBaseFilter	*pBaseFilter = NULL;
@@ -1229,16 +1226,25 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 
 				//LAV Video Decoder 의 HW 가속 톤매핑 활성화 — D3D11 디코더 + GPU 톤매핑으로
-				//BT.2020+PQ → BT.709+sRGB 변환을 LAV 가 직접 수행. 그 후 VMR9 에는 SDR frame 만 전달.
-				//VMR9 자체는 HDR 미지원이라 LAV 측에서 미리 변환하지 않으면 워시드 아웃이 된다.
+				//BT.2020+PQ → BT.709+sRGB 변환을 LAV 가 직접 수행. 그 후 우리 렌더러 (EVR/MPCVR/VMR9) 에는 SDR frame 만 전달.
+				//현재 사용 렌더러 모두 HDR 미지원이라 LAV 측에서 미리 변환하지 않으면 워시드 아웃.
+				//HWAccel 은 사용자 설정 보존 — 이미 0(SW)이 아니거나 정의돼 있으면 건드리지 않음.
+				//HWAccelTonemap 만 우리 SDR-only 출력을 위해 강제.
 				HKEY hLavKey = NULL;
 				if (::RegCreateKeyEx(HKEY_CURRENT_USER, _T("Software\\LAV\\Video"),
-						0, NULL, 0, KEY_SET_VALUE, NULL, &hLavKey, NULL) == ERROR_SUCCESS)
+						0, NULL, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, NULL, &hLavKey, NULL) == ERROR_SUCCESS)
 				{
-					DWORD hwaccel = 2;	//0=SW, 1=DXVA2-native, 2=DXVA2-copyback, 3=D3D11
-					//madVR 와의 호환성을 위해 copyback 모드. D3D11/native 모드는 madVR D3D11 device 와 충돌해 access violation 가능.
-					::RegSetValueEx(hLavKey, _T("HWAccel"), 0, REG_DWORD,
-						(const BYTE*)&hwaccel, sizeof(hwaccel));
+					DWORD hwaccel_existing = 0;
+					DWORD cb = sizeof(hwaccel_existing);
+					LONG q = ::RegQueryValueEx(hLavKey, _T("HWAccel"), NULL, NULL,
+						(LPBYTE)&hwaccel_existing, &cb);
+					//사용자가 SW 모드 (0) 거나 키 자체 없을 때만 GPU 가속 enable. 기존 1/2/3 은 그대로 둠.
+					if (q != ERROR_SUCCESS || hwaccel_existing == 0)
+					{
+						DWORD hwaccel = 2;	//DXVA2-copyback — 모든 렌더러와 호환되는 가장 안전한 GPU 가속.
+						::RegSetValueEx(hLavKey, _T("HWAccel"), 0, REG_DWORD,
+							(const BYTE*)&hwaccel, sizeof(hwaccel));
+					}
 					DWORD hw_tonemap = 1;
 					::RegSetValueEx(hLavKey, _T("HWAccelTonemap"), 0, REG_DWORD,
 						(const BYTE*)&hw_tonemap, sizeof(hw_tonemap));
@@ -1582,188 +1588,6 @@ BOOL CDShow::VerifyVMR9(void)
 	}
 }
 
-
-HRESULT CDShow::GetUnconnectedPin(
-	IGraphBuilder *pGB,
-	IBaseFilter *pFilter,   // Pointer to the filter.
-	PIN_DIRECTION PinDir,   // Direction of the pin to find.
-	IPin **ppPin)           // Receives a pointer to the pin.
-{
-
-	IEnumPins *pEnum = 0;
-	IPin *pPin = 0;
-	bool ren = FALSE;
-	CComPtr <IFilterGraph2> pFG;
-
-	if (!ppPin)
-		return E_POINTER;
-	*ppPin = 0;
-
-	// Get a pin enumerator
-	HRESULT hr = pFilter->EnumPins(&pEnum);
-	if (FAILED(hr))
-		return hr;
-
-	JIF(pGB->QueryInterface(IID_IFilterGraph2, (void **)&pFG));
-	// Look for the first unconnected pin
-	while (pEnum->Next(1, &pPin, NULL) == S_OK)
-	{
-		PIN_DIRECTION ThisPinDir;
-
-		pPin->QueryDirection(&ThisPinDir);
-		if (ThisPinDir == PinDir)
-		{
-			IPin *pTmp = 0;
-
-			hr = pPin->ConnectedTo(&pTmp);
-			if (SUCCEEDED(hr))  // Already connected, not the pin we want.
-			{
-				pTmp->Release();
-			}
-			else  // Unconnected, this is the pin we want.
-			{
-				//			pEnum->Release();
-				//			*ppPin = pPin;
-				hr = pFG->RenderEx(pPin, AM_RENDEREX_RENDERTOEXISTINGRENDERERS, NULL);
-				if(FAILED(hr))
-				{
-					pGB->Render(pPin);
-				}
-				//				return S_OK;
-			}
-		}
-		pPin->Release();
-	}
-
-	// Release the enumerator
-	pEnum->Release();
-
-	// Did not find a matching pin
-	return S_OK;
-}
-HRESULT CDShow::GetUnConnectPin( IGraphBuilder *pGB,
-	IBaseFilter *pFilter,   // Pointer to the filter.
-	PIN_DIRECTION PinDir,   // Direction of the pin to find.
-	IPin **ppPin,int &num)           // Receives a pointer to the pin.)
-{
-	IEnumPins *EnumPin=0;
-	IPin *pin=0;
-	HRESULT hr;
-	int count =0;
-	hr=pFilter->EnumPins(&EnumPin);
-	if(FAILED(hr))
-	{
-		return E_FAIL;
-	}
-
-	while(EnumPin->Next(1,&pin,NULL) == S_OK)
-	{
-		PIN_DIRECTION ThisPinDir;   //인핀인지 아웃 핀인지 판별하기위한 변수 
-		pin->QueryDirection(&ThisPinDir);
-		IPin *TPin=0;
-		if (ThisPinDir == PinDir)  // 판별하기 
-		{
-			hr = pin->ConnectedTo(&TPin);
-			if (FAILED(hr))
-			{
-				ppPin[count] = pin;
-				count++;
-			}else
-			{
-
-			}
-		}
-
-	}
-	return S_OK;
-
-
-}
-
-HRESULT CDShow::RenderFileToVMR9(IGraphBuilder *pGB, WCHAR *wFileName, 
-	IBaseFilter *pRenderer, BOOL bRenderAudio)
-{
-	HRESULT hr=S_OK;
-	CComPtr <IPin> pOutputPin;
-	CComPtr <IBaseFilter> pSource;
-	CComPtr <IBaseFilter> pAudioRenderer;
-	CComPtr <IFilterGraph2> pFG;
-
-	if (SUCCEEDED(CoCreateInstance(CLSID_DSoundRender, NULL, CLSCTX_INPROC_SERVER, 
-		IID_IBaseFilter, (void **)&pAudioRenderer)))
-	{
-		// The audio renderer was successfully created, so add it to the graph
-		JIF(pGB->AddFilter(pAudioRenderer, L"Audio Renderer"));
-	}
-
-
-	if (FAILED(hr = pGB->AddSourceFilter(wFileName, L"SOURCE", &pSource)))
-	{
-		USES_CONVERSION;
-		TCHAR szMsg[MAX_PATH + 128];
-
-		wsprintf(szMsg, TEXT("Failed to add the source filter to the graph!  hr=0x%x\r\n\r\n")
-			TEXT("Filename: %s\0"), hr, W2T(wFileName));
-		MessageBox(NULL, szMsg, TEXT("Failed to render file to VMR9"), MB_OK | MB_ICONERROR);
-		return hr;
-	}
-
-	// Get the interface for the first unconnected output pin
-	JIF(GetUnconnectedPin(pGB,pSource, PINDIR_OUTPUT, &pOutputPin));
-
-	// Render audio if requested (defaults to TRUE)
-
-	/*	if (bRenderAudio)
-	{
-	// Because we will be rendering with the RENDERTOEXISTINGRENDERERS flag,
-	// we need to create an audio renderer and add it to the graph.  
-	// Create an instance of the DirectSound renderer (for each media file).
-	//
-	// Note that if the system has no sound card (or if the card is disabled),
-	// then creating the DirectShow renderer will fail.  In that case,
-	// handle the failure quietly.
-	if (SUCCEEDED(CoCreateInstance(CLSID_DSoundRender, NULL, CLSCTX_INPROC_SERVER, 
-	IID_IBaseFilter, (void **)&pAudioRenderer)))
-	{
-	// The audio renderer was successfully created, so add it to the graph
-	JIF(pGB->AddFilter(pAudioRenderer, L"Audio Renderer"));
-	}
-	}
-
-	// Get an IFilterGraph2 interface to assist in building the
-	// multifile graph with the non-default VMR9 renderer
-	JIF(pGB->QueryInterface(IID_IFilterGraph2, (void **)&pFG));
-
-	// Render the output pin, using the VMR9 as the specified renderer.  This is 
-	// necessary in case the GraphBuilder needs to insert a Color Space convertor,
-	// or if multiple filters insist on using multiple allocators.
-	// The audio renderer will also be used, if the media file contains audio.
-	JIF(pFG->RenderEx(pOutputPin, AM_RENDEREX_RENDERTOEXISTINGRENDERERS, NULL));
-
-	// If this media file does not contain an audio stream, then the 
-	// audio renderer that we created will be unconnected.  If left in the 
-	// graph, it could interfere with rate changes and timing.
-	// Therefore, if the audio renderer is unconnected, remove it from the graph.
-	*/	if (pAudioRenderer != NULL)
-	{
-		int num;
-		IPin *pUnconnectedPin[10]={0,};
-
-
-		// Is the audio renderer's input pin connected?
-		HRESULT hrPin = GetUnConnectPin(pGB,pAudioRenderer, PINDIR_INPUT, pUnconnectedPin,num);
-
-		// If there is an unconnected pin, then remove the unused filter
-		if (num == 0) 
-		{
-			// Release the returned IPin interface
-			// Remove the audio renderer from the graph
-			hrPin = pGB->RemoveFilter(pAudioRenderer);
-		}
-	}
-
-	return hr;
-}
 
 void CDShow::play(int state)
 {
@@ -3518,71 +3342,44 @@ void CDShow::FindAudioRenderer()
 
 HRESULT CDShow::EnumFilters(IEnumMoniker *pEnumCat)
 {
-	HRESULT hr=S_OK;
-	IMoniker *pMoniker;
-	ULONG cFetched;
-	VARIANT varName={0};
-
 	m_nAudioFilter = 0;
 
-	// If there are no filters of a requested type, show default string
-	if ( !pEnumCat )
-	{
+	if (!pEnumCat)
 		return S_FALSE;
-	}
 
-	// Enumerate all items associated with the moniker
-	while(pEnumCat->Next(1, &pMoniker, &cFetched) == S_OK)
+	while (true)
 	{
-		IPropertyBag *pPropBag;
-		ASSERT(pMoniker);
+		CComPtr<IMoniker> pMoniker;
+		ULONG cFetched = 0;
+		if (pEnumCat->Next(1, &pMoniker, &cFetched) != S_OK)
+			break;
 
-		// Associate moniker with a file
-		hr = pMoniker->BindToStorage(0, 0, IID_IPropertyBag, 
-			(void **)&pPropBag);
-		ASSERT(SUCCEEDED(hr));
-		ASSERT(pPropBag);
+		CComPtr<IPropertyBag> pPropBag;
+		HRESULT hr = pMoniker->BindToStorage(0, 0, IID_IPropertyBag, (void**)&pPropBag);
 		if (FAILED(hr))
 			continue;
 
-		// Read filter name from property bag
+		VARIANT varName = {};
 		varName.vt = VT_BSTR;
 		hr = pPropBag->Read(L"FriendlyName", &varName, 0);
 		if (FAILED(hr))
+		{
+			VariantClear(&varName);
 			continue;
-
-		// Get filter name (converting BSTR name to a CString)
+		}
 		CString str(varName.bstrVal);
-		SysFreeString(varName.bstrVal);
+		VariantClear(&varName);
 
-		// Read filter's CLSID from property bag.  This CLSID string will be
-		// converted to a binary CLSID and passed to AddFilter(), which will
-		// add the filter's name to the listbox and its CLSID to the listbox
-		// item's DataPtr item.  When the user clicks on a filter name in
-		// the listbox, we'll read the stored CLSID, convert it to a string,
-		// and use it to find the filter's filename in the registry.
-		VARIANT varFilterClsid;
+		VARIANT varFilterClsid = {};
 		varFilterClsid.vt = VT_BSTR;
-
-		// Read CLSID string from property bag
 		hr = pPropBag->Read(L"CLSID", &varFilterClsid, 0);
-		if(SUCCEEDED(hr))
+		if (SUCCEEDED(hr))
 		{
 			CLSID clsidFilter;
-
-			// Add filter name and CLSID to listbox
-			if(CLSIDFromString(varFilterClsid.bstrVal, &clsidFilter) == S_OK)
-			{
-				//AddFilter(str, &clsidFilter);
+			if (CLSIDFromString(varFilterClsid.bstrVal, &clsidFilter) == S_OK)
 				m_sAudioFilter[m_nAudioFilter++] = str;
-			}
-
-			SysFreeString(varFilterClsid.bstrVal);
 		}
-
-		// Cleanup interfaces
-		SAFE_RELEASE(pPropBag);
-		SAFE_RELEASE(pMoniker);
+		VariantClear(&varFilterClsid);
 	}
 
 	return S_OK;
@@ -3590,87 +3387,59 @@ HRESULT CDShow::EnumFilters(IEnumMoniker *pEnumCat)
 
 HRESULT CDShow::FindFilter(CString compFiterName, REFCLSID clsID, IBaseFilter **ppSrcFilter)
 {
-	HRESULT hr=S_OK;
-	IBaseFilter * pSrc = NULL;
-	IMoniker* pMoniker =NULL;
-	ULONG cFetched;
-	VARIANT varName={0};
-
 	if (!ppSrcFilter)
 		return E_POINTER;
 
-	// Create the system device enumerator
-	CComPtr <ICreateDevEnum> pDevEnum =NULL;
+	HRESULT hr = S_OK;
 
-	hr = CoCreateInstance (CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC,
-		IID_ICreateDevEnum, (void **) &pDevEnum);
+	CComPtr<ICreateDevEnum> pDevEnum;
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC,
+		IID_ICreateDevEnum, (void**)&pDevEnum);
 	if (FAILED(hr))
-	{
 		return hr;
-	}
 
-	// Create an enumerator for the video capture devices
-	CComPtr <IEnumMoniker> pClassEnum = NULL;
-
-	hr = pDevEnum->CreateClassEnumerator( clsID, &pClassEnum, 0 );
-
+	CComPtr<IEnumMoniker> pClassEnum;
+	hr = pDevEnum->CreateClassEnumerator(clsID, &pClassEnum, 0);
 	if (FAILED(hr))
-	{
 		return hr;
-	}
-
-	// If there are no enumerators for the requested type, then 
-	// CreateClassEnumerator will succeed, but pClassEnum will be NULL.
 	if (pClassEnum == NULL)
-	{
 		return E_FAIL;
-	}
 
-	// Use the first video capture device on the device list.
-	// Note that if the Next() call succeeds but there are no monikers,
-	// it will return S_FALSE (which is not a failure).  Therefore, we
-	// check that the return code is S_OK instead of using SUCCEEDED() macro.
-	while (S_OK == (pClassEnum->Next (1, &pMoniker, &cFetched)))
+	//Loop 안의 pMoniker / pPropBag / varName 은 매 iteration 끝/continue 시 자동 정리되어야 함.
+	//CComPtr 로 감싸 자동 release. VARIANT 는 VariantClear 로 일관 정리.
+	while (true)
 	{
-		IPropertyBag *pPropBag;
-		ASSERT(pMoniker);
+		CComPtr<IMoniker> pMoniker;
+		ULONG cFetched = 0;
+		if (pClassEnum->Next(1, &pMoniker, &cFetched) != S_OK)
+			break;
 
-		// Associate moniker with a file
-		hr = pMoniker->BindToStorage(0, 0, IID_IPropertyBag, 
-			(void **)&pPropBag);
-		ASSERT(SUCCEEDED(hr));
-		ASSERT(pPropBag);
+		CComPtr<IPropertyBag> pPropBag;
+		hr = pMoniker->BindToStorage(0, 0, IID_IPropertyBag, (void**)&pPropBag);
 		if (FAILED(hr))
 			continue;
 
-		// Read filter name from property bag
+		VARIANT varName = {};
 		varName.vt = VT_BSTR;
 		hr = pPropBag->Read(L"FriendlyName", &varName, 0);
 		if (FAILED(hr))
-			continue;
-
-		// Get filter name (converting BSTR name to a CString)
-		CString str(varName.bstrVal);
-		SysFreeString(varName.bstrVal);
-
-		//TRACE( "%s\n", str );
-
-		if(str.Compare(compFiterName) == 0)
 		{
-			// Bind Moniker to a filter object
-			hr = pMoniker->BindToObject(0,0,IID_IBaseFilter, (void**)&pSrc);
+			VariantClear(&varName);
+			continue;
+		}
+
+		CString str(varName.bstrVal);
+		VariantClear(&varName);
+
+		if (str.Compare(compFiterName) == 0)
+		{
+			IBaseFilter* pSrc = NULL;
+			hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void**)&pSrc);
 			if (FAILED(hr))
-			{
 				return hr;
-			}
-			SAFE_RELEASE(pPropBag);
 			*ppSrcFilter = pSrc;
 			return hr;
 		}
-
-		// Cleanup interfaces
-		SAFE_RELEASE(pPropBag);
-		SAFE_RELEASE(pMoniker);
 	}
 
 	// Copy the found filter pointer to the output parameter.

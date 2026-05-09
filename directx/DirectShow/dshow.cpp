@@ -1274,6 +1274,49 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 				hr = FindFilter(_T("LAV Splitter"), CLSID_LegacyAmFilterCategory, &m_pSplitter );
 				hr = m_pGB->AddFilter(m_pSplitter, _T("LAV Splitter"));
 
+				//File Source → LAV Splitter 를 명시적으로 Connect — 이후 RenderOutputPins 시 graph builder 가 이미
+				//연결된 LAV 를 따라 진행하고 더 높은 merit 의 Haali Media Splitter (AR) 등을 자동 채택해 video pin
+				//없이 audio 만 빠지는 케이스 차단.
+				if (m_SourceBase && m_pSplitter)
+				{
+					CComPtr<IPin> pSrcOut, pSplIn;
+					CComPtr<IEnumPins> pEnumS;
+					if (SUCCEEDED(m_SourceBase->EnumPins(&pEnumS)))
+					{
+						CComPtr<IPin> p;
+						while (pEnumS->Next(1, &p, NULL) == S_OK)
+						{
+							PIN_DIRECTION dir;
+							if (SUCCEEDED(p->QueryDirection(&dir)) && dir == PINDIR_OUTPUT)
+							{
+								pSrcOut = p;
+								break;
+							}
+							p.Release();
+						}
+					}
+					CComPtr<IEnumPins> pEnumD;
+					if (SUCCEEDED(m_pSplitter->EnumPins(&pEnumD)))
+					{
+						CComPtr<IPin> p;
+						while (pEnumD->Next(1, &p, NULL) == S_OK)
+						{
+							PIN_DIRECTION dir;
+							if (SUCCEEDED(p->QueryDirection(&dir)) && dir == PINDIR_INPUT)
+							{
+								pSplIn = p;
+								break;
+							}
+							p.Release();
+						}
+					}
+					if (pSrcOut && pSplIn)
+					{
+						HRESULT hr_conn = m_pGB->Connect(pSrcOut, pSplIn);
+						logWrite(_T("[splitter] explicit Connect File Source -> LAV Splitter hr=0x%08x"), hr_conn);
+					}
+				}
+
 				hr = FindFilter(_T("LAV Video Decoder"), CLSID_LegacyAmFilterCategory, &pBaseFilter );
 				hr = m_pGB->AddFilter(pBaseFilter, _T("LAV Video Decoder"));
 
@@ -1299,6 +1342,12 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 		//따라서 m_SourceBase의 OUT_PIN을 찾아서 수동으로 렌더시켜준다.
 		//hr = m_pGB->RenderFile(wFileName, NULL);
 		hr = RenderOutputPins(m_pGB, m_SourceBase);
+
+		//File Source 의 output 이 explicit Connect 로 LAV Splitter 에 이미 붙어있는 경우 RenderOutputPins 는
+		//그 pin 을 already-connected 로 skip — splitter 의 video/audio output 까지 내려가지 않음.
+		//splitter 의 output pin 들도 render 해 chain 완성.
+		if (m_pSplitter)
+			RenderOutputPins(m_pGB, m_pSplitter);
 
 		if (is_windows_media())
 			analyze_stream(m_SourceBase);
@@ -1713,20 +1762,26 @@ void CDShow::set_video_position(CRect r)
 		}
 	}
 
-	//VMR9 paused 상태에서 resize 시 새 프레임이 안 들어와 stale 픽셀이 남음 → RepaintVideo 로 backbuffer 마지막 프레임을 새 영역에 다시 그림.
-	//가드: 이전 버전 (state != Running) 은 미디어 open 중 graph 가 Running 으로 transition 하던 시점도 통과시켜 codec(avi/일부 mp4) 빌드 느린 케이스에서 미준비 VMR9 internals 를 건드려 freezing 유발.
-	//hr==S_OK 만 통과 (VFW_S_STATE_INTERMEDIATE 차단) + state==State_Paused 한정 (Stopped 시점 = open 직후라 제외).
-	if (m_pVMRWC && m_pMC)
+	//Paused 상태에서 resize 시 새 프레임이 안 들어와 stale 픽셀이 남음 → renderer 별 강제 redraw.
+	//VMR9 paused: RepaintVideo / EVR paused: 위에서 이미 처리 / MPCVR paused: cmd_redraw via IExFilterConfig.
+	//가드: hr==S_OK 만 통과 (VFW_S_STATE_INTERMEDIATE 차단) + state==State_Paused 한정.
+	if (m_pMC)
 	{
 		OAFilterState state = State_Running;
 		HRESULT hr = m_pMC->GetState(0, &state);
 		if (hr == S_OK && state == State_Paused)
 		{
-			if (m_pParent && m_pParent->GetSafeHwnd())
+			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
 			{
 				HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
 				m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
 				::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+			}
+			else if (m_use_mpcvr && m_VMR)
+			{
+				CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+				if (pCfg)
+					pCfg->Flt_SetBool("cmd_redraw", true);
 			}
 		}
 	}
@@ -2245,7 +2300,8 @@ static bool ensure_evr_proc_amp(IBaseFilter* pVMR, CComPtr<IMFVideoProcessor>& p
 int CDShow::adjust_video(int dwStreamID, int target, bool up)
 {
 	//EVR 분기 — m_pVMRMC NULL 일 때 IMFVideoProcessor 로 ProcAmp 제어.
-	if (!m_pVMRMC && ensure_evr_proc_amp(m_VMR, m_pVP))
+	//MPCVR 는 GetService(VP) 가 succeed 하지만 lifecycle 차이로 close_media 시 m_pVP release 가 access violation — skip.
+	if (!m_pVMRMC && !m_use_mpcvr && ensure_evr_proc_amp(m_VMR, m_pVP))
 	{
 		const DWORD all_flags = DXVA2_ProcAmp_Brightness | DXVA2_ProcAmp_Contrast |
 		                        DXVA2_ProcAmp_Hue | DXVA2_ProcAmp_Saturation;
@@ -2409,8 +2465,8 @@ int CDShow::set_video_adjust(int dwStreamID, int target, int percent)
 	if (percent < 0)   percent = 0;
 	if (percent > 100) percent = 100;
 
-	//EVR 분기
-	if (!m_pVMRMC && ensure_evr_proc_amp(m_VMR, m_pVP))
+	//EVR 분기 — MPCVR 모드는 lifecycle 충돌로 m_pVP skip (위 adjust_video 와 동일).
+	if (!m_pVMRMC && !m_use_mpcvr && ensure_evr_proc_amp(m_VMR, m_pVP))
 	{
 		DWORD flag = target_to_dxva2(target);
 		DXVA2_ValueRange range = {};

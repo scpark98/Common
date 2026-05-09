@@ -924,6 +924,7 @@ void CDShow::close_media()
 	m_pVMRMC.Release();
 	m_pVMRMB.Release();
 	m_pVDC.Release();
+	m_pVP.Release();
 	m_use_mpcvr = false;
 
 	m_has_subtitle = false;
@@ -1017,38 +1018,92 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 	CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_IGraphBuilder,(void **)&m_pGB) ;
 
-	//VMR9 으로 revert — EVR 의 SetVideoPosition 보간이 resize 마다 비디오가 y=0 으로 잠깐 점프하는 transient 유발.
-	//VMR9 은 SetVideoPosition 즉시 적용되어 transient 없음. 깜빡임 fix 는 m_in_size_move 패턴 (drag 중 검정 fill).
-	CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
+	//EVR 우선 — DXVA Video Processor 경유로 GPU 가 고품질 resize/anti-alias.
+	//VMR9 mixer 의 자체 D3D9 sampler 는 일부 GPU 에서 point filtering 으로 떨어져 곡선/사선이 계단으로 보임.
+	//EVR 생성 실패 시 VMR9 fallback.
+	HRESULT hr_evr = CoCreateInstance(CLSID_EnhancedVideoRenderer, NULL, CLSCTX_INPROC,
 		IID_IBaseFilter, (LPVOID*)&m_VMR);
+	if (SUCCEEDED(hr_evr) && m_VMR != NULL)
+	{
+		m_pGB->AddFilter(m_VMR, L"Enhanced Video Renderer");
+	}
+	else
+	{
+		m_VMR = NULL;
+		CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
+			IID_IBaseFilter, (LPVOID*)&m_VMR);
+		if (m_VMR != NULL)
+			m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
+	}
+
+	//EVR 경로 — IMFVideoDisplayControl 로 windowless 제어. VMR9 의 IVMRWindowlessControl9 등가.
 	if (m_VMR != NULL)
 	{
-		m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
+		CComQIPtr<IMFGetService> pGetService(m_VMR);
+		if (pGetService)
+		{
+			pGetService->GetService(MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS(&m_pVDC));
+			if (m_pVDC)
+			{
+				m_pVDC->SetVideoWindow(pParent->m_hWnd);
+				m_pVDC->SetAspectRatioMode(MFVideoARMode_PreservePicture);
+				m_pVDC->SetBorderColor(RGB(0, 0, 0));
+			}
+			//ProcAmp 채널 제어 — graph build 후에야 stream 생성되므로 여기서 QI 는 fail 가능.
+			//실제 사용 시점 (adjust_video) 에 lazy 로 다시 시도하되, 가능하면 미리 잡아둠.
+			pGetService->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&m_pVP));
+		}
 	}
 
-	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRFC));
-	if (m_pVMRFC != NULL)
-		m_pVMRFC->SetRenderingMode(VMR9Mode_Windowless);
+	//VMR9 경로 — EVR QI 가 fail 했거나 fallback 로 VMR9 인스턴스화된 경우.
+	if (m_pVDC == NULL && m_VMR != NULL)
+	{
+		m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRFC));
+		if (m_pVMRFC != NULL)
+			m_pVMRFC->SetRenderingMode(VMR9Mode_Windowless);
 
-	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRWC));
+		m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRWC));
+		if (m_pVMRWC != NULL)
+		{
+			m_pVMRWC->SetVideoClippingWindow(pParent->m_hWnd);
+			m_pVMRWC->SetAspectRatioMode(VMR_ARMODE_LETTER_BOX);
+			//letterbox 바 색을 명시적으로 검정. default 가 미정이라 비디오 aspect 와 rect aspect 가 다를 때
+			//좌/우 또는 상/하 바에 흰색·미초기화 픽셀이 깜빡임으로 보일 수 있음.
+			m_pVMRWC->SetBorderColor(RGB(0, 0, 0));
+		}
+
+		m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMB));
+		m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMC));
+
+		if (m_pVMRMC != NULL)
+		{
+			DWORD prefs = 0;
+			if (SUCCEEDED(m_pVMRMC->GetMixingPrefs(&prefs)))
+			{
+				prefs &= ~MixerPref_FilteringMask;
+				prefs |= MixerPref_BiLinearFiltering;
+				prefs &= ~MixerPref_RenderTargetMask;
+				prefs |= MixerPref_RenderTargetYUV;
+				if (FAILED(m_pVMRMC->SetMixingPrefs(prefs)))
+				{
+					prefs &= ~MixerPref_RenderTargetMask;
+					prefs |= MixerPref_RenderTargetRGB;
+					m_pVMRMC->SetMixingPrefs(prefs);
+				}
+			}
+		}
+	}
+
+	//VMR9 windowless 전용 — EVR 은 IMFVideoDisplayControl::SetVideoWindow 로 이미 처리.
+	//EVR 모드에서 IVideoWindow::put_Owner 호출 시 windowless 셋업이 깨질 수 있어 skip.
 	if (m_pVMRWC != NULL)
 	{
-		m_pVMRWC->SetVideoClippingWindow(pParent->m_hWnd);
-		m_pVMRWC->SetAspectRatioMode(VMR_ARMODE_LETTER_BOX);
-		//letterbox 바 색을 명시적으로 검정. default 가 미정이라 비디오 aspect 와 rect aspect 가 다를 때
-		//좌/우 또는 상/하 바에 흰색·미초기화 픽셀이 깜빡임으로 보일 수 있음.
-		m_pVMRWC->SetBorderColor(RGB(0, 0, 0));
-		//SetVideoPosition 은 호출자(open_media) 가 chrome strip 뺀 정확한 비디오 영역으로 직접 호출.
-	}
-
-	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMB));
-	m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMC));
-
-	CComQIPtr<IVideoWindow> pVW(m_pGB);
-	if (pVW != NULL)
-	{
-		hr = pVW->put_Owner((OAHWND)pParent->m_hWnd);
-		hr = pVW->put_WindowStyle(WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+		CComQIPtr<IVideoWindow> pVW(m_pGB);
+		if (pVW != NULL)
+		{
+			hr = pVW->put_Owner((OAHWND)pParent->m_hWnd);
+			hr = pVW->put_WindowStyle(WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+		}
 	}
 
 	hide_cursor(true);
@@ -1696,6 +1751,9 @@ void CDShow::set_video_position(CRect r)
 	{
 		RECT rc = r;
 		m_pVDC->SetVideoPosition(NULL, &rc);
+		//EVR mixer 가 새 dst rect 를 1~2 프레임 늦게 반영해 resize 시 "스르륵" 슬라이드.
+		//Running/Paused 무관 즉시 RepaintVideo 호출해 새 rect 로 마지막 frame 강제 합성.
+		m_pVDC->RepaintVideo();
 	}
 	else
 	{
@@ -1704,24 +1762,20 @@ void CDShow::set_video_position(CRect r)
 			pVW->SetWindowPosition(r.left, r.top, r.Width(), r.Height());
 	}
 
-	//paused 상태에서 resize 시 새 프레임이 안 들어와 stale 픽셀이 남음 → RepaintVideo 로 backbuffer 마지막 프레임을 새 영역에 다시 그림.
+	//VMR9 paused 상태에서 resize 시 새 프레임이 안 들어와 stale 픽셀이 남음 → RepaintVideo 로 backbuffer 마지막 프레임을 새 영역에 다시 그림.
 	//가드: 이전 버전 (state != Running) 은 미디어 open 중 graph 가 Running 으로 transition 하던 시점도 통과시켜 codec(avi/일부 mp4) 빌드 느린 케이스에서 미준비 VMR9 internals 를 건드려 freezing 유발.
 	//hr==S_OK 만 통과 (VFW_S_STATE_INTERMEDIATE 차단) + state==State_Paused 한정 (Stopped 시점 = open 직후라 제외).
-	if (m_pMC)
+	if (m_pVMRWC && m_pMC)
 	{
 		OAFilterState state = State_Running;
 		HRESULT hr = m_pMC->GetState(0, &state);
 		if (hr == S_OK && state == State_Paused)
 		{
-			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+			if (m_pParent && m_pParent->GetSafeHwnd())
 			{
 				HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
 				m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
 				::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
-			}
-			else if (m_pVDC)
-			{
-				m_pVDC->RepaintVideo();
 			}
 		}
 	}
@@ -1905,54 +1959,83 @@ void CDShow::set_playback_rate(double rate)
 //현재 video frame 의 packed DIB (BITMAPINFOHEADER + pixel rows) 를 얻는다.
 //성공 시 *out_dib 는 CoTaskMemAlloc 된 메모리 — 호출자가 CoTaskMemFree 책임.
 //paused 상태에서 GetCurrentImage 가 frame 을 blank 시키는 VMR9 동작을 step_frame 으로 보정.
-static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, BYTE** out_dib)
+//EVR 은 BMI 와 pixel bits 를 별도 인자로 돌려주므로 VMR9 packed 포맷에 맞춰 합쳐서 반환.
+static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, IMFVideoDisplayControl* pVDC, BYTE** out_dib)
 {
 	*out_dib = NULL;
-	if (!pVMRWC)
-		return false;
 
-	HRESULT hr = pVMRWC->GetCurrentImage(out_dib);
-	if (FAILED(hr) || !*out_dib)
-		return false;
+	if (pVMRWC)
+	{
+		HRESULT hr = pVMRWC->GetCurrentImage(out_dib);
+		return SUCCEEDED(hr) && *out_dib;
+	}
 
-	return true;
+	if (pVDC)
+	{
+		BITMAPINFOHEADER bih = {};
+		bih.biSize = sizeof(BITMAPINFOHEADER);
+		BYTE* dib = NULL;
+		DWORD cb = 0;
+		LONGLONG ts = 0;
+		HRESULT hr = pVDC->GetCurrentImage(&bih, &dib, &cb, &ts);
+		if (FAILED(hr) || !dib)
+			return false;
+
+		BYTE* combined = (BYTE*)CoTaskMemAlloc(sizeof(BITMAPINFOHEADER) + cb);
+		if (!combined)
+		{
+			CoTaskMemFree(dib);
+			return false;
+		}
+		memcpy(combined, &bih, sizeof(BITMAPINFOHEADER));
+		memcpy(combined + sizeof(BITMAPINFOHEADER), dib, cb);
+		CoTaskMemFree(dib);
+		*out_dib = combined;
+		return true;
+	}
+
+	return false;
 }
 
 bool CDShow::capture_frame(CString sfile)
 {
-	if (!is_media_opened() || !m_VMR || !m_pVMRWC)
+	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC))
 		return false;
 
 	BYTE* lpDib = NULL;
-	if (!get_current_image_dib(m_pVMRWC, &lpDib))
+	if (!get_current_image_dib(m_pVMRWC, m_pVDC, &lpDib))
 		return false;
 
 	BITMAPINFOHEADER* pBMI = (BITMAPINFOHEADER*)lpDib;
 	LPBYTE pixels = (LPBYTE)pBMI + pBMI->biSize;
 
-	CImage img;
-	img.Create(pBMI->biWidth, pBMI->biHeight, pBMI->biBitCount);
 	BITMAPINFO bmInfo = {};
 	bmInfo.bmiHeader = *pBMI;
-	HDC dc = img.GetDC();
-	SetDIBitsToDevice(dc, 0, 0, pBMI->biWidth, pBMI->biHeight, 0, 0, 0, pBMI->biHeight, pixels, &bmInfo, DIB_RGB_COLORS);
-	img.ReleaseDC();
-	HRESULT hr_save = img.Save(sfile);
+
+	//EVR GetCurrentImage 가 display rect 크기로 반환 (window 변경에 따라 변동) — 일관성 위해 native 로 resize.
+	CSCGdiplusBitmap bmp;
+	bool ok = bmp.create_from_dib(&bmInfo, pixels);
+	if (ok && m_video_size.cx > 0 && m_video_size.cy > 0 &&
+		(pBMI->biWidth != m_video_size.cx || pBMI->biHeight != m_video_size.cy))
+	{
+		bmp.resize(m_video_size.cx, m_video_size.cy);
+	}
+	bool saved = ok && bmp.save(sfile);
 
 	if (get_play_state() == State_Paused)
 		step_frame(true);
 
 	CoTaskMemFree(lpDib);
-	return hr_save == S_OK;
+	return saved;
 }
 
 bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 {
-	if (!is_media_opened() || !m_VMR || !m_pVMRWC)
+	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC))
 		return false;
 
 	BYTE* lpDib = NULL;
-	if (!get_current_image_dib(m_pVMRWC, &lpDib))
+	if (!get_current_image_dib(m_pVMRWC, m_pVDC, &lpDib))
 		return false;
 
 	BITMAPINFOHEADER* pBMI = (BITMAPINFOHEADER*)lpDib;
@@ -1962,6 +2045,11 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 	bmInfo.bmiHeader = *pBMI;
 
 	bool ok = out.create_from_dib(&bmInfo, pixels);
+	if (ok && m_video_size.cx > 0 && m_video_size.cy > 0 &&
+		(pBMI->biWidth != m_video_size.cx || pBMI->biHeight != m_video_size.cy))
+	{
+		out.resize(m_video_size.cx, m_video_size.cy);
+	}
 
 	if (get_play_state() == State_Paused)
 		step_frame(true);
@@ -2130,10 +2218,107 @@ void CDShow::repaint_for_procamp_change()
 		m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
 		::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
 	}
+	else if (m_pVDC)
+	{
+		m_pVDC->RepaintVideo();
+	}
+}
+
+//target index (contrast=0, bright=1, hue=2, saturation=3) → DXVA2 ProcAmp flag.
+static DWORD target_to_dxva2(int target)
+{
+	switch (target)
+	{
+	case 0: return DXVA2_ProcAmp_Contrast;
+	case 1: return DXVA2_ProcAmp_Brightness;
+	case 2: return DXVA2_ProcAmp_Hue;
+	case 3: return DXVA2_ProcAmp_Saturation;
+	}
+	return 0;
+}
+
+//graph build 후에야 EVR mixer service 가 안정 — open_media 시점 QI 가 fail 했어도 사용 시 lazy retry.
+static bool ensure_evr_proc_amp(IBaseFilter* pVMR, CComPtr<IMFVideoProcessor>& pVP)
+{
+	if (pVP) return true;
+	if (!pVMR) return false;
+	CComQIPtr<IMFGetService> pGS(pVMR);
+	if (!pGS) return false;
+	return SUCCEEDED(pGS->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&pVP))) && pVP;
 }
 
 int CDShow::adjust_video(int dwStreamID, int target, bool up)
 {
+	//EVR 분기 — m_pVMRMC NULL 일 때 IMFVideoProcessor 로 ProcAmp 제어.
+	if (!m_pVMRMC && ensure_evr_proc_amp(m_VMR, m_pVP))
+	{
+		const DWORD all_flags = DXVA2_ProcAmp_Brightness | DXVA2_ProcAmp_Contrast |
+		                        DXVA2_ProcAmp_Hue | DXVA2_ProcAmp_Saturation;
+
+		if (target == -1)
+		{
+			DXVA2_ProcAmpValues vals = {};
+			if (FAILED(m_pVP->GetProcAmpValues(all_flags, &vals)))
+				return -1;
+			for (int i = 0; i < 4; ++i)
+			{
+				DWORD f = target_to_dxva2(i);
+				DXVA2_ValueRange r = {};
+				if (FAILED(m_pVP->GetProcAmpRange(f, &r)))
+					continue;
+				switch (f)
+				{
+				case DXVA2_ProcAmp_Brightness: vals.Brightness = r.DefaultValue; break;
+				case DXVA2_ProcAmp_Contrast:   vals.Contrast   = r.DefaultValue; break;
+				case DXVA2_ProcAmp_Hue:        vals.Hue        = r.DefaultValue; break;
+				case DXVA2_ProcAmp_Saturation: vals.Saturation = r.DefaultValue; break;
+				}
+			}
+			if (FAILED(m_pVP->SetProcAmpValues(all_flags, &vals)))
+				return -1;
+			repaint_for_procamp_change();
+			return 0;
+		}
+
+		if (target < 0 || target > 3)
+			return -1;
+
+		DWORD flag = target_to_dxva2(target);
+		DXVA2_ValueRange range = {};
+		if (FAILED(m_pVP->GetProcAmpRange(flag, &range)))
+			return -1;
+
+		DXVA2_ProcAmpValues vals = {};
+		if (FAILED(m_pVP->GetProcAmpValues(all_flags, &vals)))
+			return -1;
+
+		const float minv = DXVA2FixedToFloat(range.MinValue);
+		const float maxv = DXVA2FixedToFloat(range.MaxValue);
+		DXVA2_Fixed32* pVal = NULL;
+		switch (flag)
+		{
+		case DXVA2_ProcAmp_Brightness: pVal = &vals.Brightness; break;
+		case DXVA2_ProcAmp_Contrast:   pVal = &vals.Contrast; break;
+		case DXVA2_ProcAmp_Hue:        pVal = &vals.Hue; break;
+		case DXVA2_ProcAmp_Saturation: pVal = &vals.Saturation; break;
+		}
+		if (!pVal)
+			return -1;
+
+		float current = DXVA2FixedToFloat(*pVal);
+		const float step = (maxv - minv) / 100.0f;
+		current += up ? step : -step;
+		if (current < minv) current = minv;
+		if (current > maxv) current = maxv;
+		*pVal = DXVA2FloatToFixed(current);
+
+		if (FAILED(m_pVP->SetProcAmpValues(flag, &vals)))
+			return -1;
+
+		repaint_for_procamp_change();
+		return (int)(((current - minv) / (maxv - minv)) * 100.0f + 0.5f);
+	}
+
 	if (!m_pVMRMC)
 		return -1;
 
@@ -2224,10 +2409,44 @@ int CDShow::adjust_video(int dwStreamID, int target, bool up)
 
 int CDShow::set_video_adjust(int dwStreamID, int target, int percent)
 {
-	if (!m_pVMRMC || target < 0 || target > 3)
+	if (target < 0 || target > 3)
 		return -1;
 	if (percent < 0)   percent = 0;
 	if (percent > 100) percent = 100;
+
+	//EVR 분기
+	if (!m_pVMRMC && ensure_evr_proc_amp(m_VMR, m_pVP))
+	{
+		DWORD flag = target_to_dxva2(target);
+		DXVA2_ValueRange range = {};
+		if (FAILED(m_pVP->GetProcAmpRange(flag, &range)))
+			return -1;
+
+		const DWORD all_flags = DXVA2_ProcAmp_Brightness | DXVA2_ProcAmp_Contrast |
+		                        DXVA2_ProcAmp_Hue | DXVA2_ProcAmp_Saturation;
+		DXVA2_ProcAmpValues vals = {};
+		if (FAILED(m_pVP->GetProcAmpValues(all_flags, &vals)))
+			return -1;
+
+		const float minv = DXVA2FixedToFloat(range.MinValue);
+		const float maxv = DXVA2FixedToFloat(range.MaxValue);
+		const float val = minv + (maxv - minv) * (percent / 100.0f);
+		const DXVA2_Fixed32 fixed = DXVA2FloatToFixed(val);
+		switch (flag)
+		{
+		case DXVA2_ProcAmp_Brightness: vals.Brightness = fixed; break;
+		case DXVA2_ProcAmp_Contrast:   vals.Contrast   = fixed; break;
+		case DXVA2_ProcAmp_Hue:        vals.Hue        = fixed; break;
+		case DXVA2_ProcAmp_Saturation: vals.Saturation = fixed; break;
+		}
+		if (FAILED(m_pVP->SetProcAmpValues(flag, &vals)))
+			return -1;
+		repaint_for_procamp_change();
+		return percent;
+	}
+
+	if (!m_pVMRMC)
+		return -1;
 
 	const DWORD flag_table[4] = {
 		ProcAmpControl9_Contrast,

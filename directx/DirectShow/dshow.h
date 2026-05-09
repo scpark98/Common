@@ -7,7 +7,9 @@
 #include <D3d9.h>
 #include <vmr9.h>
 #include <evr.h>
+#include <evr9.h>
 #include <mfidl.h>
+#include <dxva2api.h>
 #pragma comment(lib, "Mfuuid.lib")
 #pragma comment(lib, "Strmiids.lib")
 
@@ -305,6 +307,9 @@ protected:
 
 	//MPC VR / madVR 등 비-VMR9 렌더러용 windowless 제어. windowless EVR 인터페이스로 자식 윈도우 안 만들고 parent 에 직접 D3D 출력.
 	CComPtr<IMFVideoDisplayControl> m_pVDC;
+
+	//EVR mixer service — ProcAmp(밝기/대비/색상/채도) 채널 제어. VMR9 의 IVMRMixerControl9 등가.
+	CComPtr<IMFVideoProcessor> m_pVP;
 
 	//현재 그래프에 MPC Video Renderer (Aleksoid) 가 활성인지. true 면 IVMR* 인터페이스 NULL,
 	//IVideoWindow::put_Owner 호출 금지 (자식 윈도우 만들면 검정·드래그 차단).

@@ -252,6 +252,7 @@ public:
 	void		expand_all(bool expand = true);
 
 	void		set_color_theme(int theme, bool invalidate = true);
+	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 	void		set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
 	void		set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
 	//CTreeCtrl에서 지원하는 기본 함수 override
@@ -331,6 +332,10 @@ public:
 	//선택항목등의 border가 아닌 ctrl 자체의 cr_border. OnNcPaint()에서 border 속성유무를 판단하여 테두리를 그린다.
 	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; Invalidate(); }
 
+	//resource editor에서 border를 true로 하면 m_draw_border = true;로 자동 설정된다.
+	//그런데 만약 사용자가 set_draw_border(false)로 하면 border는 그려지지 않아야 한다.
+	void			set_draw_border(bool draw_border = true) { m_draw_border = draw_border; Invalidate(); }
+
 protected:
 	//root 항목은 실제 또는 가상의 root일 수 있다.
 	//탐색기의 "내 PC"는 가상의 root이고 "로컬 디스크 (C:)"는 C드라이브의 실제적인 root다.
@@ -365,7 +370,7 @@ protected:
 	void			OnPopupMenu(UINT nID);
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 
-
+	bool			m_draw_border = false;
 
 //마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;
@@ -503,6 +508,7 @@ public:
 	virtual void Serialize(CArchive& ar);
 	afx_msg void OnDestroy();
 	afx_msg void OnNcPaint();
+	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
 };
 
 

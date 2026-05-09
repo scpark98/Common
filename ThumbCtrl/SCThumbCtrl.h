@@ -52,7 +52,11 @@ public:
 	bool		load_completed = false;
 	CString		title;						//파일명 또는 지정된 타이틀
 	bool		key_thumb = false;			//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
-	CString		info[4];					//info text 표시용. 0(lt info) ~ 3(rb info)
+	//info text 표시용 9 슬롯 (3x3 그리드, 위치 고정):
+	//0=lt        1=center_top    2=rt
+	//3=lcenter   4=center        5=rcenter
+	//6=lb        7=center_bottom 8=rb
+	CString		info[9];
 	CString		full_path;
 	int			width = 0;					//원래 이미지의 크기 정보
 	int			height = 0;
@@ -115,6 +119,8 @@ public:
 
 	void			add_files(std::deque<CString> files, bool reset = true);
 	int				insert(int index, CString full_path, CString sTitle = _T("\0"), bool bKeyThumb = false, bool invalidate = true);
+	//in-memory bitmap 으로 insert — 북마크 같이 파일 없는 thumbnail 등록용. src 를 deep_copy 후 MAX_TILE_SIZE 로 resize.
+	int				insert(int index, CSCGdiplusBitmap* src_thumb, CString sTitle = _T("\0"), bool bKeyThumb = false, bool invalidate = true);
 
 	//loading중에 앱을 종료시키면 m_thumb를 release하면서 충돌이 발생한다. 모든 thread를 정상 중지시킨 후 앱을 종료시켜야 한다.
 	void			stop_loading();
@@ -198,6 +204,8 @@ public:
 //옵션
 	bool			get_show_index() { return m_show_index; }
 	void			set_show_index(bool show) { m_show_index = show; Invalidate(); }
+	int				get_start_index() { return m_start_index; }
+	void			set_start_index(int start_index = 0) { m_start_index = start_index; Invalidate(); }
 	bool			get_show_title() { return m_show_title; }
 	void			set_show_title(bool show) { m_show_title = show; Invalidate(); }
 	bool			get_show_resolution() { return m_show_resolution; }
@@ -207,12 +215,14 @@ public:
 
 
 //color theme
-	void			set_color_theme(int theme);
+	void			set_color_theme(int theme, bool invalidate = true);
+	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 
-//정보 텍스트 표시
-	bool			m_show_info_text[4];
-	COLORREF		m_crInfoText[4];
-	void			set_info_text(int thumb_index, int idx, CString sInfo, bool refresh);
+//정보 텍스트 표시 — 인덱스 0~8 의 위치 고정 (CThumbImage::info 주석 참조).
+	bool				m_show_info_text[9];
+	Gdiplus::Color		m_crInfoText[9];
+	void				set_info_text(int thumb_index, int idx, CString sInfo, bool refresh);
 
 //폰트 관련
 	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);
@@ -253,6 +263,7 @@ protected:
 
 //옵션
 	bool			m_show_index = true;		//썸네일의 인덱스 번호를 표시할지
+	int				m_start_index = 0;			//썸네일의 인덱스 번호 시작값 (0 또는 1 등 호출자 의도에 맞춤)
 	bool			m_show_title = true;		//썸네일 아래 타이틀 문자열을 표시할지...
 	bool			m_show_resolution = false;
 	bool			m_show_extension = true;

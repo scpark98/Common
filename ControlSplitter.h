@@ -90,6 +90,16 @@ public:
 	//컨트롤을 hide시키면 제어를 할 수 없으므로 show 시키되 배경색으로 칠해줘야 UI에서 감출 수 있다.
 	void set_back_color(Gdiplus::Color cr) { m_cr_back = cr; Invalidate(); }
 
+	//split offset 저장/복원용 — CS_VERT 면 splitter 의 left, CS_HORZ 면 top 의 parent client 좌표.
+	int  get_split_offset() const;
+	//splitter 와 linked ctrls 를 new_offset 위치로 일괄 이동. min size / parent 경계 체크 후 모두 통과해야 적용.
+	bool set_split_offset(int new_offset);
+
+protected:
+	//splitter + linked ctrls 의 새 위치 산출 후 한꺼번에 적용. drag (OnMouseMove) 와 programmatic set_split_offset 공용.
+	bool apply_split_delta(int dcx, int dcy);
+public:
+
 	// 맯맟궠귢궫긽긞긜?긙 ?긞긵듫릶
 protected:
 	//{{AFX_MSG(CControlSplitter)

@@ -88,6 +88,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCTreeCtrl::on_message_CSCEdit)
 	ON_WM_DESTROY()
 	ON_WM_NCPAINT()
+	ON_WM_NCCALCSIZE()
 END_MESSAGE_MAP()
 
 
@@ -96,6 +97,24 @@ END_MESSAGE_MAP()
 void CSCTreeCtrl::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
+	// 원하는 색상으로 테두리 그리기
+	DWORD dwStyle = GetStyle();
+	DWORD exStyle = GetExStyle();
+
+	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
+	//exStyle까지 함께 체크하니 리소스 에디터에서 테두리 설정 여부에 따라 정상 동작한다.
+	if ((GetStyle() & WS_BORDER) || (exStyle & WS_EX_CLIENTEDGE))
+	{
+		m_draw_border = true;
+
+		//기본 border 제거 — default OnNcPaint 는 이후 scrollbar/corner 만 그리고
+		//border 는 m_draw_border 에 따라 우리가 직접 그림.
+		ModifyStyle(WS_BORDER, 0);
+		ModifyStyleEx(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE, 0);
+		SetWindowPos(NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
 
 	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
 	CWnd const* pWnd = GetParent();
@@ -110,6 +129,8 @@ void CSCTreeCtrl::PreSubclassWindow()
 		font->GetObject(sizeof(m_lf), &m_lf);
 
 	reconstruct_font();
+
+
 
 	CTreeCtrl::PreSubclassWindow();
 }
@@ -3785,6 +3806,15 @@ void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 		Invalidate();
 }
 
+void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	//m_has_parent_back_color = true;
+
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
 //가상 루트 항목 설정.
 //가상 루트가 없는 상태에서 노드들이 추가된 경우, 가상 루트를 새로 추가할 경우
 //가상 루트를 추가하고 기존 노드들을 모두 가상루트의 child로 이동시킨다.
@@ -3923,30 +3953,16 @@ void CSCTreeCtrl::serialize_item(CArchive& ar, HTREEITEM hItem)
 
 void CSCTreeCtrl::OnNcPaint()
 {
-	//기본 테두리 색상을 별도로 지정한 색으로 그리기 위해 OnNcPaint() 함수를 override.
-	//아래 CTreeCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
-	CTreeCtrl::OnNcPaint();
+	CTreeCtrl::OnNcPaint();        //스크롤바 + corner box 정상 그림 (border 는 스타일 없으니 skip).
+
+	if (!m_draw_border)
+		return;
 
 	CWindowDC dc(this);
-
-	CRect rect;
-	GetWindowRect(&rect);
-	ScreenToClient(&rect);
-
-	// 원하는 색상으로 테두리 그리기
-	DWORD dwStyle = GetStyle();
-	DWORD exStyle = GetExStyle();
-
-	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
-	//exStyle까지 함께 체크하니 리소스 에디터에서 테두리 설정 여부에 따라 정상 동작한다.
-	if ((GetStyle() & WS_BORDER) || (exStyle & WS_EX_CLIENTEDGE))
-	{
-		CRect rc;
-		GetWindowRect(&rc);
-		rc.OffsetRect(-rc.TopLeft());
-		draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
-		//dc.Draw3dRect(rc, RGB(255, 0, 0), RGB(255, 0, 255)); // 파란색 테두리}
-	}
+	CRect rc;
+	GetWindowRect(&rc);
+	rc.OffsetRect(-rc.TopLeft());
+	draw_rect(&dc, rc, m_theme.cr_border_inactive);
 }
 
 bool CSCTreeCtrl::load_tree_from_json_file(CString json_file_path)
@@ -4283,4 +4299,12 @@ BOOL CSCTreeCtrl::move_tree_item_as_sibling(CTreeCtrl* pTree, HTREEITEM hSrcItem
 	pTree->SelectItem(hNewItem);
 
 	return TRUE;
+}
+
+void CSCTreeCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
+{
+	//기본 NC (scrollbar 등) 처리 후 client 에서 1px 만큼 더 deflate — border 자리 확보.
+	CTreeCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
+	if (m_draw_border && lpncsp)
+		::InflateRect(&lpncsp->rgrc[0], -1, -1);
 }

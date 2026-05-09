@@ -15,6 +15,12 @@ CSCThumbCtrl::CSCThumbCtrl()
 	memset(&m_lf, 0, sizeof(LOGFONT));
 
 	m_max_thumbs = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), 0);
+
+	for (int i = 0; i < 9; i++)
+	{
+		m_show_info_text[i] = false;
+		m_crInfoText[i] = Gdiplus::Color::White;
+	}
 }
 
 CSCThumbCtrl::~CSCThumbCtrl()
@@ -307,6 +313,25 @@ void CSCThumbCtrl::OnPaint()
 			g.DrawImage(*m_thumb[i].img, CRect_to_gpRect(rImage));
 		}
 
+		//info text 9 슬롯 (3x3) — rThumb (이미지 영역) 안에 위치 고정 표시.
+		{
+			static const UINT halign[3] = { DT_LEFT, DT_CENTER, DT_RIGHT };
+			static const UINT valign[3] = { DT_TOP, DT_VCENTER, DT_BOTTOM };
+
+			CRect rInfo = rThumb;
+			rInfo.DeflateRect(8, 8);
+
+			for (int idx = 0; idx < 9; idx++)
+			{
+				if (!m_show_info_text[idx] || m_thumb[i].info[idx].IsEmpty())
+					continue;
+
+				UINT flags = halign[idx % 3] | valign[idx / 3] | DT_SINGLELINE | DT_NOCLIP;
+				DrawShadowText(dc.GetSafeHdc(), CStringW(m_thumb[i].info[idx]), -1, rInfo,
+					flags, m_crInfoText[idx].ToCOLORREF(), 0, 2, 1);
+			}
+		}
+
 		CRect rTitle = rThumb;
 		rTitle.top = rThumb.bottom + m_thumb_title_gap;
 		rTitle.bottom = rTitle.top + m_title_height;
@@ -322,7 +347,7 @@ void CSCThumbCtrl::OnPaint()
 			rIndex.top += 4;
 			//멀티바이트 환경에서는 DrawShadowText를 쓰기위해서는 manifest를 추가해야 하는 등
 			//번거로워 일단 DrawTextShadow로 대체한다.
-			DrawShadowText(dc.GetSafeHdc(), CStringW(i2S(i)), -1, rIndex,
+			DrawShadowText(dc.GetSafeHdc(), CStringW(i2S(i + m_start_index)), -1, rIndex,
 							DT_CENTER | DT_TOP | DT_NOCLIP, RGB(255, 255, 255), 0, 2, 1);
 		}
 	}
@@ -445,6 +470,34 @@ int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_t
 		recalc_tile_rect();
 		//Invalidate();
 	}
+
+	return index;
+}
+
+int CSCThumbCtrl::insert(int index, CSCGdiplusBitmap* src_thumb, CString title, bool key_thumb, bool invalidate)
+{
+	if (!src_thumb || !src_thumb->m_pBitmap)
+		return -1;
+
+	m_thumb[index].img = new CSCGdiplusBitmap();
+	src_thumb->deep_copy(m_thumb[index].img);
+
+	m_thumb[index].width = m_thumb[index].img->width;
+	m_thumb[index].height = m_thumb[index].img->height;
+	m_thumb[index].channel = m_thumb[index].img->channel;
+
+	//file-path 버전과 동일 — MAX_TILE_SIZE 로 미리 축소해야 m_sz_thumb 변경 시 품질 유지.
+	CRect r = get_ratio_rect(CRect(0, 0, MAX_TILE_SIZE, MAX_TILE_SIZE), m_thumb[index].img->width, m_thumb[index].img->height);
+	m_thumb[index].img->resize(r.Width(), r.Height());
+
+	m_thumb[index].title = title;
+	m_thumb[index].full_path.Empty();
+	m_thumb[index].score = 0.0;
+	m_thumb[index].feature = NULL;
+	m_thumb[index].load_completed = true;
+
+	if (invalidate)
+		recalc_tile_rect();
 
 	return index;
 }
@@ -1176,10 +1229,18 @@ std::deque<int> CSCThumbCtrl::find_text(bool show_inputbox, CString text, bool s
 	return dqFound;
 }
 
-void CSCThumbCtrl::set_color_theme(int theme)
+void CSCThumbCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
-	Invalidate();
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
+void CSCThumbCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	if (invalidate && m_hWnd)
+		Invalidate();
 }
 
 void CSCThumbCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)
@@ -1390,7 +1451,7 @@ void CSCThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool re
 	if (thumb_index < 0 || thumb_index >= (int)m_thumb.size())
 		return;
 
-	if (idx < 0 || idx >= 4)
+	if (idx < 0 || idx >= 9)
 		return;
 
 	m_show_info_text[idx] = true;

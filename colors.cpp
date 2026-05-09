@@ -1263,8 +1263,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = get_color(cr_back, 96);
 
-			cr_border_active = Gdiplus::Color::Gray;
-			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_border_active		= get_weak_color(cr_back, 128);
+			cr_border_inactive		= get_weak_color(cr_back, 64);
 			break;
 
 		case color_theme_dark :

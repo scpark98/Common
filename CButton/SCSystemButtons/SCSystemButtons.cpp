@@ -255,7 +255,7 @@ void CSCSystemButtons::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
 	m_over_index = get_button_index(point);
-	TRACE(_T("m_over_index = %d\n"), m_over_index);
+	//TRACE(_T("m_over_index = %d\n"), m_over_index);
 	m_down_state = false;
 	//RedrawWindow();
 	Invalidate();

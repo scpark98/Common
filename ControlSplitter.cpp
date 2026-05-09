@@ -562,3 +562,128 @@ BOOL CControlSplitter::PreTranslateMessage(MSG* pMsg)
 
 	return CButton::PreTranslateMessage(pMsg);
 }
+
+int CControlSplitter::get_split_offset() const
+{
+	if (!::IsWindow(m_hWnd))
+		return -1;
+	CWnd* pParent = const_cast<CControlSplitter*>(this)->GetParent();
+	if (!pParent)
+		return -1;
+
+	CRect rect;
+	GetWindowRect(&rect);
+	pParent->ScreenToClient(&rect);
+	return (m_type == CS_HORZ) ? rect.top : rect.left;
+}
+
+bool CControlSplitter::set_split_offset(int new_offset)
+{
+	if (!::IsWindow(m_hWnd) || !GetParent() || m_type == CS_NONE)
+		return false;
+
+	CRect rect;
+	GetWindowRect(&rect);
+	GetParent()->ScreenToClient(&rect);
+
+	int current = (m_type == CS_HORZ) ? rect.top : rect.left;
+	int delta = new_offset - current;
+	if (delta == 0)
+		return true;
+
+	return apply_split_delta(m_type == CS_VERT ? delta : 0,
+	                         m_type == CS_HORZ ? delta : 0);
+}
+
+bool CControlSplitter::apply_split_delta(int dcx, int dcy)
+{
+	if (m_type == CS_NONE)
+		return false;
+	if (dcx == 0 && dcy == 0)
+		return true;
+
+	//OnMouseMove 와 동일 산식 — top_left vs bottom_right + flag 조합으로 ctrl rect 변형.
+	auto compute = [&](const CControlItem& it, bool top_left, CRect& out) -> bool {
+		out = CRect();
+		it.pWnd->GetWindowRect(&out);
+		if (m_type == CS_HORZ)
+		{
+			if (top_left)
+			{
+				if (it.flag & SPF_BOTTOM)   out.bottom += dcy;
+				if (!(it.flag & SPF_TOP))   out.top    += dcy;
+			}
+			else
+			{
+				if (it.flag & SPF_TOP)      out.top    += dcy;
+				if (!(it.flag & SPF_BOTTOM)) out.bottom += dcy;
+			}
+		}
+		else
+		{
+			if (top_left)
+			{
+				if (it.flag & SPF_RIGHT)    out.right += dcx;
+				if (!(it.flag & SPF_LEFT))  out.left  += dcx;
+			}
+			else
+			{
+				if (it.flag & SPF_LEFT)     out.left  += dcx;
+				if (!(it.flag & SPF_RIGHT)) out.right += dcx;
+			}
+		}
+		if ((it.min_cx > 0 && out.Width()  < it.min_cx) ||
+		    (it.min_cy > 0 && out.Height() < it.min_cy))
+			return false;
+		return true;
+	};
+
+	struct Pending { CWnd* pCtrl; CRect rect; };
+	std::vector<Pending> pending;
+
+	for (const auto& it : m_vtTopLeftControls)
+	{
+		if (!it.pWnd) continue;
+		CRect r;
+		if (!compute(it, true, r)) return false;
+		pending.push_back({ it.pWnd, r });
+	}
+	for (const auto& it : m_vtBottomRightControls)
+	{
+		if (!it.pWnd) continue;
+		CRect r;
+		if (!compute(it, false, r)) return false;
+		pending.push_back({ it.pWnd, r });
+	}
+
+	//splitter 자체 위치 + parent 경계 체크.
+	CRect rectSplit;
+	GetWindowRect(&rectSplit);
+	rectSplit.OffsetRect(dcx, dcy);
+	CRect rectSplitClient = rectSplit;
+	GetParent()->ScreenToClient(&rectSplitClient);
+
+	GetParent()->GetWindowRect(m_rectMax);
+	GetParent()->ScreenToClient(m_rectMax);
+	if (m_type == CS_HORZ)
+	{
+		if (rectSplitClient.top < m_rectMax.top || rectSplitClient.bottom > m_rectMax.bottom)
+			return false;
+	}
+	else
+	{
+		if (rectSplitClient.left < m_rectMax.left || rectSplitClient.right > m_rectMax.right)
+			return false;
+	}
+
+	for (auto& m : pending)
+	{
+		CRect rc = m.rect;
+		GetParent()->ScreenToClient(&rc);
+		m.pCtrl->MoveWindow(rc);
+	}
+	MoveWindow(rectSplitClient);
+	GetParent()->SendMessage(Message_CControlSplitter, (WPARAM)m_hWnd, 0);
+	Invalidate();
+	return true;
+}

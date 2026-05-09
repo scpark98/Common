@@ -31,6 +31,24 @@ static const GUID MEDIATYPE_Subtitle =
 { 0xe487eb08, 0x6b26, 0x4be9, { 0x9d, 0xd3, 0x44, 0x34, 0xf6, 0xdb, 0x9d, 0xfe } };
 #endif
 
+//MPC-BE include/FilterInterfaces.h 의 IExFilterConfig 정의 (필요한 메서드만 추출).
+//MPCVR 의 runtime config — "lessRedraws" 등으로 resize 매끄러움 개선.
+interface __declspec(uuid("37CBDF10-D65E-4E5A-8F37-40E0C8EA1695")) IExFilterConfig : public IUnknown
+{
+	STDMETHOD(Flt_GetBool  )(LPCSTR field, bool    *value) PURE;
+	STDMETHOD(Flt_GetInt   )(LPCSTR field, int     *value) PURE;
+	STDMETHOD(Flt_GetInt64 )(LPCSTR field, __int64 *value) PURE;
+	STDMETHOD(Flt_GetDouble)(LPCSTR field, double  *value) PURE;
+	STDMETHOD(Flt_GetString)(LPCSTR field, LPWSTR  *value, unsigned *chars) PURE;
+	STDMETHOD(Flt_GetBin   )(LPCSTR field, LPVOID  *value, unsigned *size ) PURE;
+	STDMETHOD(Flt_SetBool  )(LPCSTR field, bool    value) PURE;
+	STDMETHOD(Flt_SetInt   )(LPCSTR field, int     value) PURE;
+	STDMETHOD(Flt_SetInt64 )(LPCSTR field, __int64 value) PURE;
+	STDMETHOD(Flt_SetDouble)(LPCSTR field, double  value) PURE;
+	STDMETHOD(Flt_SetString)(LPCSTR field, LPWSTR  value, int chars) PURE;
+	STDMETHOD(Flt_SetBin   )(LPCSTR field, LPVOID  value, int size ) PURE;
+};
+
 //Custom IBaseFilter sink — Microsoft SampleGrabber 가 video/audio majortype 만 받기 때문에
 //자막 stream 을 직접 받을 수 없어 자체 sink filter 를 작성한다.
 //단일 input pin (IPin + IMemInputPin) + 단순 IEnumPins / IEnumMediaTypes stub.
@@ -1018,26 +1036,62 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 	CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_IGraphBuilder,(void **)&m_pGB) ;
 
-	//EVR 우선 — DXVA Video Processor 경유로 GPU 가 고품질 resize/anti-alias.
-	//VMR9 mixer 의 자체 D3D9 sampler 는 일부 GPU 에서 point filtering 으로 떨어져 곡선/사선이 계단으로 보임.
-	//EVR 생성 실패 시 VMR9 fallback.
-	HRESULT hr_evr = CoCreateInstance(CLSID_EnhancedVideoRenderer, NULL, CLSCTX_INPROC,
+	//Renderer 우선순위: MPCVR > EVR > VMR9. MPC-BE FGFilter.cpp 의 통합 패턴 참고.
+	//{71F080AA-8661-4093-B15E-4F6903E77D0A} = MPC Video Renderer (Aleksoid 0.7+).
+	static const GUID CLSID_MPCVR_NEW =
+		{ 0x71F080AA, 0x8661, 0x4093, { 0xB1, 0x5E, 0x4F, 0x69, 0x03, 0xE7, 0x7D, 0x0A } };
+	HRESULT hr_mpcvr = CoCreateInstance(CLSID_MPCVR_NEW, NULL, CLSCTX_INPROC,
 		IID_IBaseFilter, (LPVOID*)&m_VMR);
-	if (SUCCEEDED(hr_evr) && m_VMR != NULL)
+	if (SUCCEEDED(hr_mpcvr) && m_VMR != NULL)
 	{
-		m_pGB->AddFilter(m_VMR, L"Enhanced Video Renderer");
+		m_pGB->AddFilter(m_VMR, L"MPC Video Renderer");
+		m_use_mpcvr = true;
+		logWrite(_T("[renderer] MPC Video Renderer (MPCVR) selected"));
+
+		//MPC-BE 방식 — pin 연결 전 put_Owner 만 호출. put_WindowStyle/put_Visible/put_MessageDrain 은 호출 안 함
+		//(E_NOTIMPL 반환 + 내부 상태 변경 가능성 — 직전 시도에서 화면 깨짐 원인).
+		CComQIPtr<IVideoWindow> pVW(m_VMR);
+		if (pVW)
+		{
+			HRESULT hr_owner = pVW->put_Owner((OAHWND)pParent->m_hWnd);
+			logWrite(_T("[renderer] MPCVR put_Owner=0x%08x"), hr_owner);
+		}
+
+		//IExFilterConfig 로 resize 동작 최적화. MPC-BE 가 권장하는 lessRedraws 활성화.
+		CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+		if (pCfg)
+		{
+			HRESULT hr_lr = pCfg->Flt_SetBool("lessRedraws", true);
+			HRESULT hr_dc = pCfg->Flt_SetBool("d3dFullscreenControl", false);
+			logWrite(_T("[renderer] MPCVR cfg lessRedraws=0x%08x d3dFullscreenControl=0x%08x"), hr_lr, hr_dc);
+		}
 	}
 	else
 	{
+		logWrite(_T("[renderer] MPCVR CoCreate failed hr=0x%08x — try EVR"), hr_mpcvr);
 		m_VMR = NULL;
-		CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
+		HRESULT hr_evr = CoCreateInstance(CLSID_EnhancedVideoRenderer, NULL, CLSCTX_INPROC,
 			IID_IBaseFilter, (LPVOID*)&m_VMR);
-		if (m_VMR != NULL)
-			m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
+		if (SUCCEEDED(hr_evr) && m_VMR != NULL)
+		{
+			m_pGB->AddFilter(m_VMR, L"Enhanced Video Renderer");
+			logWrite(_T("[renderer] EVR selected"));
+		}
+		else
+		{
+			m_VMR = NULL;
+			CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
+				IID_IBaseFilter, (LPVOID*)&m_VMR);
+			if (m_VMR != NULL)
+			{
+				m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
+				logWrite(_T("[renderer] VMR9 selected"));
+			}
+		}
 	}
 
-	//EVR 경로 — IMFVideoDisplayControl 로 windowless 제어. VMR9 의 IVMRWindowlessControl9 등가.
-	if (m_VMR != NULL)
+	//EVR 경로 — IMFVideoDisplayControl 로 windowless 제어. MPCVR 는 위에서 IVideoWindow + IBasicVideo 로 처리됨.
+	if (m_VMR != NULL && !m_use_mpcvr)
 	{
 		CComQIPtr<IMFGetService> pGetService(m_VMR);
 		if (pGetService)
@@ -1051,6 +1105,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 			}
 			//ProcAmp 채널 제어 — graph build 후에야 stream 생성되므로 여기서 QI 는 fail 가능.
 			//실제 사용 시점 (adjust_video) 에 lazy 로 다시 시도하되, 가능하면 미리 잡아둠.
+			//MPCVR 는 GetService(VP) 가 succeed 하지만 lifecycle 차이로 close_media 시 Release 가 access violation 유발 — skip.
 			pGetService->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&m_pVP));
 		}
 	}
@@ -1735,6 +1790,16 @@ void CDShow::play(int state)
 			pMC->Pause();
 		else if (m_play_state == State_Running)
 			pMC->Run();
+
+		//MPCVR — graph Run 후에야 put_MessageDrain 이 succeed. parent 로 마우스 forward 해 영상 클릭/드래그가 main dlg 의
+		//OnLButtonDown 등에 도달하도록 (창 이동 / 더블클릭 fullscreen 등 기존 동작 유지).
+		if (m_use_mpcvr && m_VMR && m_pParent && m_pParent->GetSafeHwnd() &&
+			(m_play_state == State_Running || m_play_state == State_Paused))
+		{
+			CComQIPtr<IVideoWindow> pVW(m_VMR);
+			if (pVW)
+				pVW->put_MessageDrain((OAHWND)m_pParent->m_hWnd);
+		}
 	}
 }
 
@@ -1758,9 +1823,50 @@ void CDShow::set_video_position(CRect r)
 	}
 	else
 	{
-		CComQIPtr<IVideoWindow> pVW(m_pGB);
-		if (pVW)
-			pVW->SetWindowPosition(r.left, r.top, r.Width(), r.Height());
+		//MPCVR / legacy IVideoWindow path. MPC-BE FGFilter::SetPosition 패턴:
+		//IBasicVideo::SetDefaultSourcePosition + SetDestinationPosition 으로 video rect (MPCVR window 의 client 좌표),
+		//IVideoWindow::SetWindowPosition 으로 window rect (parent 의 client 좌표). 둘 다 필요.
+		if (m_use_mpcvr)
+		{
+			//Aspect-preserve 계산 — MPCVR 의 IBasicVideo 는 raw stretch 라 호출자가 letterbox/pillarbox sub-rect 를 직접 산출해야 함
+			//(MPC-BE 의 SetPosition(RECT w, RECT v) 에서 caller 가 v 를 미리 계산해 넘기는 패턴).
+			const int win_w = r.Width();
+			const int win_h = r.Height();
+			int vid_w = win_w, vid_h = win_h, vid_x = 0, vid_y = 0;
+			if (m_video_size.cx > 0 && m_video_size.cy > 0 && win_w > 0 && win_h > 0)
+			{
+				const float src_ar = (float)m_video_size.cx / (float)m_video_size.cy;
+				const float win_ar = (float)win_w / (float)win_h;
+				if (win_ar > src_ar)
+				{
+					vid_h = win_h;
+					vid_w = (int)(win_h * src_ar + 0.5f);
+					vid_x = (win_w - vid_w) / 2;
+				}
+				else
+				{
+					vid_w = win_w;
+					vid_h = (int)(win_w / src_ar + 0.5f);
+					vid_y = (win_h - vid_h) / 2;
+				}
+			}
+
+			CComQIPtr<IBasicVideo> pBV(m_VMR);
+			if (pBV)
+			{
+				pBV->SetDefaultSourcePosition();
+				pBV->SetDestinationPosition(vid_x, vid_y, vid_w, vid_h);
+			}
+			CComQIPtr<IVideoWindow> pVW(m_VMR);
+			if (pVW)
+				pVW->SetWindowPosition(r.left, r.top, win_w, win_h);
+		}
+		else
+		{
+			CComQIPtr<IVideoWindow> pVW(m_pGB);
+			if (pVW)
+				pVW->SetWindowPosition(r.left, r.top, r.Width(), r.Height());
+		}
 	}
 
 	//VMR9 paused 상태에서 resize 시 새 프레임이 안 들어와 stale 픽셀이 남음 → RepaintVideo 로 backbuffer 마지막 프레임을 새 영역에 다시 그림.

@@ -99,6 +99,7 @@ Direct2D 아닌 GDI+ 기반 이미지. 독립 모듈.
 | `CEdit/CSCStaticEdit/SCStaticEdit.h` | **CStatic** (Edit 아님) | Static 으로 배치되지만 Edit 처럼 동작. OnPaint 완전 커스텀. IME: `on_ime_start_composition_message`, `on_ime_end_composition`, `on_ime_composition` (ON_MESSAGE, snake_case). password masking, undo/redo, 드래그 선택 자동 스크롤. |
 | `CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h` | CSliderCtrl | 9+ 스타일 (normal/thumb/progress/track/step), 북마크, N-stop 그라디언트. 커스텀 메시지 `Message_CSCSliderCtrl` + `CSCSliderCtrlMsg{msg, pos}` 구조체. msg enum: `msg_thumb_grab/move/release/track_bottom_slide`. 이벤트 전송 스타일 timer/post/callback 선택. |
 | `CButton/SCSystemButtons/SCSystemButtons.h` | CButton | 타이틀바 minimize/maximize/close/pin/help/custom 복합. `create(parent, top, right, w, h, SC_PIN, SC_MINIMIZE, ...)` 가변 템플릿. parent 에 SC_MINIMIZE/MAXIMIZE/CLOSE(표준) + SC_PIN/SC_HELP(커스텀, WM_USER+) 전송. `CSCSystemButtonsMessage{cmd}`. |
+| `CScrollbar/SCScrollbar/SCScrollbar.h` | CWnd | 자체 그리기 스크롤바 (OS native 스크롤바 색 못 바꾸는 한계 우회, XP 호환). `create(parent, vertical/horizontal, x,y,cx,cy)`. 모델 push: `set_range/page/pos/line`, 보조 `scroll_by_lines/pages`. host 가 `Message_CSCScrollbar` 수신 — `CSCScrollbarMsg{msg, pos}` 의 msg = `msg_scrollbar_pos_changed/drag_start/drag_end`. thumb hover/pressed 색은 `cr_back ↔ cr_text` ratio 자동 derive — theme 무관. `set_show_arrows(false)` 기본 (modern minimal). |
 
 ---
 

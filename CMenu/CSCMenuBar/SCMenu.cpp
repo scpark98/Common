@@ -14,6 +14,37 @@ static const int submenu_hover_delay_ms = 300;
 static const int scroll_auto_interval_ms = 30;
 static const int scroll_auto_step_px = 4;
 
+//WS_EX_NOACTIVATE 팝업이라 KillFocus 만으로 외부 클릭 dismiss 가 불완전 — main dlg client 의 빈 영역을 클릭하면
+//focus 변동 없이 active 상태도 그대로라 KillFocus 가 안 불린다. thread-local mouse hook 으로 능동 감지.
+static HHOOK s_menu_mouse_hook = NULL;
+static CSCMenu* s_menu_root = NULL;
+
+LRESULT CALLBACK CSCMenu::menu_mouse_hook_proc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (nCode == HC_ACTION && s_menu_root)
+	{
+		const bool is_press =
+			wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN ||
+			wParam == WM_NCLBUTTONDOWN || wParam == WM_NCRBUTTONDOWN || wParam == WM_NCMBUTTONDOWN;
+		if (is_press)
+		{
+			MOUSEHOOKSTRUCT* p = (MOUSEHOOKSTRUCT*)lParam;
+			HWND hwnd_at = ::WindowFromPoint(p->pt);
+			if (!s_menu_root->contains_descendant_hwnd(hwnd_at))
+			{
+				CSCMenu* root = s_menu_root;
+				root->hide_visible_descendants();
+				if (::IsWindow(root->m_hWnd))
+					root->ShowWindow(SW_HIDE);
+				if (root->m_parent && ::IsWindow(root->m_parent->m_hWnd))
+					::SendMessage(root->m_parent->m_hWnd, Message_CSCMenu,
+						(WPARAM)&CSCMenuMessage(root, message_scmenu_hide, NULL), 0);
+			}
+		}
+	}
+	return ::CallNextHookEx(NULL, nCode, wParam, lParam);
+}
+
 CSCMenuMessage::CSCMenuMessage(CWnd* _this, int message, CSCMenuItem* menu_item, int button_index, int button_state)
 {
 	m_pWnd = _this;
@@ -239,6 +270,7 @@ BEGIN_MESSAGE_MAP(CSCMenu, CDialogEx)
 	ON_WM_TIMER()
 	ON_WM_MOUSEWHEEL()
 	ON_WM_NCCALCSIZE()
+	ON_WM_SHOWWINDOW()
 END_MESSAGE_MAP()
 
 void CSCMenu::add(int _id, CString _caption, UINT icon_id, CString _hot_key)
@@ -430,6 +462,22 @@ BOOL CSCMenu::OnEraseBkgnd(CDC* pDC)
 	//return CDialogEx::OnEraseBkgnd(pDC);
 }
 
+
+void CSCMenu::OnShowWindow(BOOL bShow, UINT nStatus)
+{
+	CDialogEx::OnShowWindow(bShow, nStatus);
+
+	//root popup 이 hide 될 때 mouse hook 해제. 다음 popup 시 popup_menu 가 재설치.
+	if (!bShow && !m_parent_menu && this == s_menu_root)
+	{
+		if (s_menu_mouse_hook)
+		{
+			::UnhookWindowsHookEx(s_menu_mouse_hook);
+			s_menu_mouse_hook = NULL;
+		}
+		s_menu_root = NULL;
+	}
+}
 
 void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 {
@@ -1059,6 +1107,15 @@ void CSCMenu::popup_menu(int x, int y)
 	//SetFocus: cascade close 가 KillFocus 기반이므로 focus 는 명시적으로 메뉴에 부여.
 	ShowWindow(SW_SHOWNA);
 	SetFocus();
+
+	//top-level popup 만 hook 설치 — submenu 들은 root 가 hook 으로 한꺼번에 관리.
+	if (!m_parent_menu)
+	{
+		s_menu_root = this;
+		if (!s_menu_mouse_hook)
+			s_menu_mouse_hook = ::SetWindowsHookEx(WH_MOUSE,
+				menu_mouse_hook_proc, NULL, ::GetCurrentThreadId());
+	}
 }
 
 CRect CSCMenu::get_top_arrow_rect() const

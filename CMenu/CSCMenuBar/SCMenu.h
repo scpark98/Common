@@ -311,6 +311,8 @@ public:
 	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
+	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
+	static LRESULT CALLBACK menu_mouse_hook_proc(int nCode, WPARAM wParam, LPARAM lParam);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);

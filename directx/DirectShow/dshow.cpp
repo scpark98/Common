@@ -699,6 +699,15 @@ void CDShow::setup_audio_gain_filter()
 		logWrite(_T("[AudioGain] gain filter inserted into graph"));
 		m_pAudioGainFilter = pGain;
 
+		//AGC default 적용 — registry "setting\audio_agc_enabled" + "audio_agc_target_db" 에서 읽고
+		//CSCAudioGain 에 set. 없으면 default (enabled=true, target=-20 dB).
+		bool agc_on = AfxGetApp()->GetProfileInt(_T("setting"), _T("audio_agc_enabled"), 1) != 0;
+		int target_int = AfxGetApp()->GetProfileInt(_T("setting"), _T("audio_agc_target_db"), -20);
+		pGain->set_agc_target_db((float)target_int);
+		pGain->set_agc_enabled(agc_on);
+		pGain->reset_agc();
+		logWrite(_T("[AudioGain] AGC enabled=%d target=%d dB"), (int)agc_on, target_int);
+
 		//Compressor 도 chain 에 추가: upstream → gain → compressor → renderer.
 		//현재 gain → renderer 의 link 를 끊고 그 사이에 compressor 끼움.
 		IPin* pGainOutPin = NULL;
@@ -801,6 +810,37 @@ float CDShow::get_audio_gain_db()
 	if (!m_pAudioGainFilter) return 0.0f;
 	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
 	return pGain->get_gain_db();
+}
+
+//AGC (Automatic Gain Control) — 미디어별 인코딩 레벨 차이를 자동 보정. CSCAudioGain 의 AGC 모드 토글.
+void CDShow::set_audio_agc_enabled(bool e)
+{
+	if (!m_pAudioGainFilter) return;
+	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+	pGain->set_agc_enabled(e);
+	if (e) pGain->reset_agc();		//enable 직후 새로 측정 시작.
+}
+
+bool CDShow::get_audio_agc_enabled()
+{
+	if (!m_pAudioGainFilter) return false;
+	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+	return pGain->get_agc_enabled();
+}
+
+//AGC 목표 RMS dB — default -20 dB. 더 작은 값 (예: -16) 은 평균 인지 음량 더 크게.
+void CDShow::set_audio_agc_target_db(float db)
+{
+	if (!m_pAudioGainFilter) return;
+	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+	pGain->set_agc_target_db(db);
+}
+
+float CDShow::get_audio_agc_target_db()
+{
+	if (!m_pAudioGainFilter) return -20.0f;
+	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+	return pGain->get_agc_target_db();
 }
 
 #ifndef JIF
@@ -941,6 +981,7 @@ void CDShow::close_media()
 	m_pVMRMB.Release();
 	m_pVDC.Release();
 	m_pVP.Release();
+	m_pMixerControl.Release();
 	m_use_mpcvr = false;
 
 	m_has_subtitle = false;
@@ -958,6 +999,8 @@ void CDShow::close_media()
 	m_subtitle_stream_index = -1;
 
 	m_mirror = m_flip = false;
+	m_panscan_left = 0.0f; m_panscan_top = 0.0f; m_panscan_right = 1.0f; m_panscan_bottom = 1.0f;
+	m_last_video_position_rect.SetRectEmpty();
 
 	if (m_pParentDC)
 	{
@@ -1105,6 +1148,9 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 			//실제 사용 시점 (adjust_video) 에 lazy 로 다시 시도하되, 가능하면 미리 잡아둠.
 			//MPCVR 는 GetService(VP) 가 succeed 하지만 lifecycle 차이로 close_media 시 Release 가 access violation 유발 — skip.
 			pGetService->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&m_pVP));
+
+			//EVR mixer control — pan&scan output rect. VMR9 의 IVMRMixerControl9 등가.
+			pGetService->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&m_pMixerControl));
 		}
 	}
 
@@ -1744,15 +1790,25 @@ void CDShow::set_video_position(CRect r)
 				}
 			}
 
+			//panscan 누적 state 적용 — base (vid_x, vid_y, vid_w, vid_h) 위에 normalized rect 변환.
+			//mirror/flip (값 swap 으로 음수 width/height 가 되는 경우) 은 IBasicVideo 가 reject 가능 — Phase 2.
+			int final_x = vid_x + (int)(m_panscan_left * vid_w + 0.5f);
+			int final_y = vid_y + (int)(m_panscan_top * vid_h + 0.5f);
+			int final_w = (int)((m_panscan_right - m_panscan_left) * vid_w + 0.5f);
+			int final_h = (int)((m_panscan_bottom - m_panscan_top) * vid_h + 0.5f);
+
 			CComQIPtr<IBasicVideo> pBV(m_VMR);
 			if (pBV)
 			{
 				pBV->SetDefaultSourcePosition();
-				pBV->SetDestinationPosition(vid_x, vid_y, vid_w, vid_h);
+				pBV->SetDestinationPosition(final_x, final_y, final_w, final_h);
 			}
 			CComQIPtr<IVideoWindow> pVW(m_VMR);
 			if (pVW)
 				pVW->SetWindowPosition(r.left, r.top, win_w, win_h);
+
+			//panscan refresh 위해 base rect 기억.
+			m_last_video_position_rect = r;
 		}
 		else
 		{
@@ -2190,45 +2246,119 @@ void CDShow::DirectVobSub_function(WPARAM wParam, LPARAM lParam)
 
 void CDShow::set_video_pan_scan(DWORD dwStreamID, int mode, float dx, float dy)
 {
-	if (!m_pVMRMC)
+	//VMR9 path — IVMRMixerControl9::SetOutputRect 사용.
+	if (m_pVMRMC)
+	{
+		VMR9NormalizedRect rc;
+		m_pVMRMC->GetOutputRect(dwStreamID, &rc);
+
+		if (mode == pan_scan_origin)
+		{
+			rc.left = 0.0f;
+			rc.right = 1.0f;
+			rc.top = 0.0f;
+			rc.bottom = 1.0f;
+		}
+		else if (mode == pan_scan_size)
+		{
+			rc.left -= dx;
+			rc.right += dx;
+			rc.top -= dy;
+			rc.bottom += dy;
+		}
+		else if (mode == pan_scan_move)
+		{
+			rc.left += dx;
+			rc.right += dx;
+			rc.top += dy;
+			rc.bottom += dy;
+		}
+		else if (mode == pan_scan_mirror)
+		{
+			m_mirror = !m_mirror;
+			SWAP(rc.left, rc.right);
+		}
+		else if (mode == pan_scan_flip)
+		{
+			m_flip = !m_flip;
+			SWAP(rc.top, rc.bottom);
+		}
+
+		m_pVMRMC->SetOutputRect(0, &rc);
 		return;
-
-	VMR9NormalizedRect rc;
-	m_pVMRMC->GetOutputRect(dwStreamID, &rc);
-
-	if (mode == pan_scan_origin)
-	{
-		rc.left = 0.0f;
-		rc.right = 1.0f;
-		rc.top = 0.0f;
-		rc.bottom = 1.0f;
-	}
-	else if (mode == pan_scan_size)
-	{
-		rc.left -= dx;
-		rc.right += dx;
-		rc.top -= dy;
-		rc.bottom += dy;
-	}
-	else if (mode == pan_scan_move)
-	{
-		rc.left += dx;
-		rc.right += dx;
-		rc.top += dy;
-		rc.bottom += dy;
-	}
-	else if (mode == pan_scan_mirror)
-	{
-		m_mirror = !m_mirror;
-		SWAP(rc.left, rc.right);
-	}
-	else if (mode == pan_scan_flip)
-	{
-		m_flip = !m_flip;
-		SWAP(rc.top, rc.bottom);
 	}
 
-	m_pVMRMC->SetOutputRect(0, &rc);
+	//EVR path — IMFVideoMixerControl::SetStreamOutputRect 사용. VMR9NormalizedRect 와 같은 normalized 좌표 모델.
+	if (m_pMixerControl)
+	{
+		MFVideoNormalizedRect rc;
+		m_pMixerControl->GetStreamOutputRect(dwStreamID, &rc);
+
+		if (mode == pan_scan_origin)
+		{
+			rc.left = 0.0f;
+			rc.right = 1.0f;
+			rc.top = 0.0f;
+			rc.bottom = 1.0f;
+		}
+		else if (mode == pan_scan_size)
+		{
+			rc.left -= dx;
+			rc.right += dx;
+			rc.top -= dy;
+			rc.bottom += dy;
+		}
+		else if (mode == pan_scan_move)
+		{
+			rc.left += dx;
+			rc.right += dx;
+			rc.top += dy;
+			rc.bottom += dy;
+		}
+		else if (mode == pan_scan_mirror)
+		{
+			m_mirror = !m_mirror;
+			SWAP(rc.left, rc.right);
+		}
+		else if (mode == pan_scan_flip)
+		{
+			m_flip = !m_flip;
+			SWAP(rc.top, rc.bottom);
+		}
+
+		m_pMixerControl->SetStreamOutputRect(dwStreamID, &rc);
+		return;
+	}
+
+	//MPCVR path — m_panscan_* 누적 state 갱신 후 set_video_position 재호출해 IBasicVideo::SetDestinationPosition 적용.
+	//mirror/flip 의 swap (값 좌우/상하 뒤집기) 은 음수 width/height 유발해 IBasicVideo 가 reject — Phase 2 (IExFilterConfig flip/rotation 우회).
+	if (m_use_mpcvr)
+	{
+		if (mode == pan_scan_origin)
+		{
+			m_panscan_left = 0.0f; m_panscan_top = 0.0f;
+			m_panscan_right = 1.0f; m_panscan_bottom = 1.0f;
+		}
+		else if (mode == pan_scan_size)
+		{
+			m_panscan_left -= dx; m_panscan_right += dx;
+			m_panscan_top -= dy; m_panscan_bottom += dy;
+		}
+		else if (mode == pan_scan_move)
+		{
+			m_panscan_left += dx; m_panscan_right += dx;
+			m_panscan_top += dy; m_panscan_bottom += dy;
+		}
+		else if (mode == pan_scan_mirror || mode == pan_scan_flip)
+		{
+			//MPCVR 미지원 — IExFilterConfig "flip"/"rotation" 으로 후속 구현 가능.
+			return;
+		}
+
+		//마지막 set_video_position rect 로 재호출 — panscan 적용된 final dest 로 SetDestinationPosition.
+		if (!m_last_video_position_rect.IsRectEmpty())
+			set_video_position(m_last_video_position_rect);
+	}
 }
 
 //ProcAmp 변경 후 paused/stopped 상태에서도 즉시 시각 반영시키기 위한 redraw.

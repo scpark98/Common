@@ -167,6 +167,12 @@ public:
 	float			get_audio_gain_db();
 	void			set_audio_compressor_makeup_db(float db);
 
+	//AGC — 미디어별 인코딩 레벨 차이 자동 보정. CSCAudioGain 의 AGC 모드.
+	void			set_audio_agc_enabled(bool e);
+	bool			get_audio_agc_enabled();
+	void			set_audio_agc_target_db(float db);
+	float			get_audio_agc_target_db();
+
 	double			get_playback_rate();
 	void			set_playback_rate(double rate);
 
@@ -312,6 +318,9 @@ protected:
 	//EVR mixer service — ProcAmp(밝기/대비/색상/채도) 채널 제어. VMR9 의 IVMRMixerControl9 등가.
 	CComPtr<IMFVideoProcessor> m_pVP;
 
+	//EVR mixer service — pan&scan (output rect). VMR9 의 SetOutputRect 등가.
+	CComPtr<IMFVideoMixerControl> m_pMixerControl;
+
 	//현재 그래프에 MPC Video Renderer (Aleksoid) 가 활성인지. true 면 IVMR* 인터페이스 NULL,
 	//IVideoWindow::put_Owner 호출 금지 (자식 윈도우 만들면 검정·드래그 차단).
 	bool			m_use_mpcvr;
@@ -329,6 +338,13 @@ protected:
 
 	bool			m_mirror;
 	bool			m_flip;
+
+	//MPCVR pan&scan 누적 state — base aspect-preserve dest rect 위에 적용되는 normalized 변환.
+	//(0,0,1,1) = identity (변환 없음). 음/양수 외삽 가능 (zoom in 시 -0.1, 1.1).
+	//VMR9/EVR 는 mixer 가 자체 누적 state 보유 (IVMRMixerControl9 / IMFVideoMixerControl).
+	float			m_panscan_left, m_panscan_top, m_panscan_right, m_panscan_bottom;
+	//set_video_position 의 마지막 호출 rect — set_video_pan_scan 에서 panscan refresh 시 재사용.
+	CRect			m_last_video_position_rect;
 
 	BOOL VerifyVMR9(void);
 

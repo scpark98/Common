@@ -2036,7 +2036,8 @@ void CDShow::set_playback_rate(double rate)
 //성공 시 *out_dib 는 CoTaskMemAlloc 된 메모리 — 호출자가 CoTaskMemFree 책임.
 //paused 상태에서 GetCurrentImage 가 frame 을 blank 시키는 VMR9 동작을 step_frame 으로 보정.
 //EVR 은 BMI 와 pixel bits 를 별도 인자로 돌려주므로 VMR9 packed 포맷에 맞춰 합쳐서 반환.
-static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, IMFVideoDisplayControl* pVDC, BYTE** out_dib)
+//MPCVR 은 IVMRWindowlessControl9 / IMFVideoDisplayControl 둘 다 노출 안 함 — IBasicVideo::GetCurrentImage 사용.
+static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, IMFVideoDisplayControl* pVDC, IBaseFilter* pMPCVR, BYTE** out_dib)
 {
 	*out_dib = NULL;
 
@@ -2067,6 +2068,31 @@ static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, IMFVideoDispla
 		memcpy(combined + sizeof(BITMAPINFOHEADER), dib, cb);
 		CoTaskMemFree(dib);
 		*out_dib = combined;
+		return true;
+	}
+
+	if (pMPCVR)
+	{
+		CComQIPtr<IBasicVideo> pBV(pMPCVR);
+		if (!pBV)
+			return false;
+
+		LONG cb = 0;
+		HRESULT hr = pBV->GetCurrentImage(&cb, NULL);
+		if (FAILED(hr) || cb <= 0)
+			return false;
+
+		BYTE* dib = (BYTE*)CoTaskMemAlloc(cb);
+		if (!dib)
+			return false;
+
+		hr = pBV->GetCurrentImage(&cb, (LONG*)dib);
+		if (FAILED(hr))
+		{
+			CoTaskMemFree(dib);
+			return false;
+		}
+		*out_dib = dib;
 		return true;
 	}
 
@@ -2112,11 +2138,12 @@ static void normalize_captured_to_native(CSCGdiplusBitmap& bmp, int native_w, in
 
 bool CDShow::capture_frame(CString sfile)
 {
-	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC))
+	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC && !m_use_mpcvr))
 		return false;
 
 	BYTE* lpDib = NULL;
-	if (!get_current_image_dib(m_pVMRWC, m_pVDC, &lpDib))
+	IBaseFilter* pMPCVR = m_use_mpcvr ? m_VMR : NULL;
+	if (!get_current_image_dib(m_pVMRWC, m_pVDC, pMPCVR, &lpDib))
 		return false;
 
 	BITMAPINFOHEADER* pBMI = (BITMAPINFOHEADER*)lpDib;
@@ -2140,11 +2167,12 @@ bool CDShow::capture_frame(CString sfile)
 
 bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 {
-	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC))
+	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC && !m_use_mpcvr))
 		return false;
 
 	BYTE* lpDib = NULL;
-	if (!get_current_image_dib(m_pVMRWC, m_pVDC, &lpDib))
+	IBaseFilter* pMPCVR = m_use_mpcvr ? m_VMR : NULL;
+	if (!get_current_image_dib(m_pVMRWC, m_pVDC, pMPCVR, &lpDib))
 		return false;
 
 	BITMAPINFOHEADER* pBMI = (BITMAPINFOHEADER*)lpDib;

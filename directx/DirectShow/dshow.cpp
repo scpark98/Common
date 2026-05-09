@@ -1251,6 +1251,26 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					::RegCloseKey(hLavKey);
 				}
 
+				//LAV Splitter 손상 미디어 대응 설정 — registry 에 set 후 CoCreateInstance 시점에 LAV 가 read.
+				//- GenerateMissingCueTime: Matroska 의 cue table 누락/손상 시 LAV 가 자체 cue 생성 (linear scan 한 번).
+				//  → 이후 seek 요청에 빠르고 정확한 keyframe 응답 가능. 손상 미디어 freeze 완화 핵심.
+				//- MaxQueueSizeMem / MaxQueueSize: splitter 내부 버퍼 확대 → seek 직후 decoder 가 버퍼링한 데이터로 빨리 회복.
+				HKEY hLavSpKey = NULL;
+				if (::RegCreateKeyEx(HKEY_CURRENT_USER, _T("Software\\LAV\\Splitter"),
+						0, NULL, 0, KEY_SET_VALUE, NULL, &hLavSpKey, NULL) == ERROR_SUCCESS)
+				{
+					DWORD gen_cue = 1;
+					::RegSetValueEx(hLavSpKey, _T("GenerateMissingCueTime"), 0, REG_DWORD,
+						(const BYTE*)&gen_cue, sizeof(gen_cue));
+					DWORD max_mem = 256;	//MB. default 64.
+					::RegSetValueEx(hLavSpKey, _T("MaxQueueSizeMem"), 0, REG_DWORD,
+						(const BYTE*)&max_mem, sizeof(max_mem));
+					DWORD max_pkts = 1000;	//packets per stream. default 350.
+					::RegSetValueEx(hLavSpKey, _T("MaxQueueSize"), 0, REG_DWORD,
+						(const BYTE*)&max_pkts, sizeof(max_pkts));
+					::RegCloseKey(hLavSpKey);
+				}
+
 				hr = FindFilter(_T("LAV Splitter"), CLSID_LegacyAmFilterCategory, &m_pSplitter );
 				hr = m_pGB->AddFilter(m_pSplitter, _T("LAV Splitter"));
 

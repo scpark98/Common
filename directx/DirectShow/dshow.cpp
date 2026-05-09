@@ -1750,9 +1750,10 @@ void CDShow::set_video_position(CRect r)
 	else if (m_pVDC)
 	{
 		RECT rc = r;
-		m_pVDC->SetVideoPosition(NULL, &rc);
-		//EVR mixer 가 새 dst rect 를 1~2 프레임 늦게 반영해 resize 시 "스르륵" 슬라이드.
-		//Running/Paused 무관 즉시 RepaintVideo 호출해 새 rect 로 마지막 frame 강제 합성.
+		//pnrcSource 를 full normalized rect 로 명시 — NULL 일 때 EVR 이 dst 변경에 smooth 보간 적용,
+		//양쪽 다 명시하면 EVR 이 즉시 적용하는 것으로 알려짐 (PotPlayer/MPC 우회 트릭).
+		MFVideoNormalizedRect src = { 0.0f, 0.0f, 1.0f, 1.0f };
+		m_pVDC->SetVideoPosition(&src, &rc);
 		m_pVDC->RepaintVideo();
 	}
 	else
@@ -1997,6 +1998,43 @@ static bool get_current_image_dib(IVMRWindowlessControl9* pVMRWC, IMFVideoDispla
 	return false;
 }
 
+//EVR GetCurrentImage 는 display rect (letterbox/pillarbox bars 포함) 으로 반환.
+//Bars 를 crop 하고 native 사이즈로 resize 해 window 와 무관한 일관 출력.
+static void normalize_captured_to_native(CSCGdiplusBitmap& bmp, int native_w, int native_h)
+{
+	if (!bmp.m_pBitmap || native_w <= 0 || native_h <= 0)
+		return;
+
+	const int cap_w = bmp.m_pBitmap->GetWidth();
+	const int cap_h = bmp.m_pBitmap->GetHeight();
+	if (cap_w <= 0 || cap_h <= 0)
+		return;
+
+	const float native_ar = (float)native_w / (float)native_h;
+	const float cap_ar = (float)cap_w / (float)cap_h;
+
+	if (fabs(cap_ar - native_ar) > 0.005f)
+	{
+		CRect r;
+		if (cap_ar > native_ar)
+		{
+			//pillarbox — 좌/우 bars
+			int video_w = (int)(cap_h * native_ar + 0.5f);
+			r.SetRect((cap_w - video_w) / 2, 0, (cap_w - video_w) / 2 + video_w, cap_h);
+		}
+		else
+		{
+			//letterbox — 상/하 bars
+			int video_h = (int)(cap_w / native_ar + 0.5f);
+			r.SetRect(0, (cap_h - video_h) / 2, cap_w, (cap_h - video_h) / 2 + video_h);
+		}
+		bmp.sub_image(r);
+	}
+
+	if (bmp.m_pBitmap->GetWidth() != (UINT)native_w || bmp.m_pBitmap->GetHeight() != (UINT)native_h)
+		bmp.resize(native_w, native_h);
+}
+
 bool CDShow::capture_frame(CString sfile)
 {
 	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC))
@@ -2012,14 +2050,10 @@ bool CDShow::capture_frame(CString sfile)
 	BITMAPINFO bmInfo = {};
 	bmInfo.bmiHeader = *pBMI;
 
-	//EVR GetCurrentImage 가 display rect 크기로 반환 (window 변경에 따라 변동) — 일관성 위해 native 로 resize.
 	CSCGdiplusBitmap bmp;
 	bool ok = bmp.create_from_dib(&bmInfo, pixels);
-	if (ok && m_video_size.cx > 0 && m_video_size.cy > 0 &&
-		(pBMI->biWidth != m_video_size.cx || pBMI->biHeight != m_video_size.cy))
-	{
-		bmp.resize(m_video_size.cx, m_video_size.cy);
-	}
+	if (ok)
+		normalize_captured_to_native(bmp, m_video_size.cx, m_video_size.cy);
 	bool saved = ok && bmp.save(sfile);
 
 	if (get_play_state() == State_Paused)
@@ -2045,11 +2079,8 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 	bmInfo.bmiHeader = *pBMI;
 
 	bool ok = out.create_from_dib(&bmInfo, pixels);
-	if (ok && m_video_size.cx > 0 && m_video_size.cy > 0 &&
-		(pBMI->biWidth != m_video_size.cx || pBMI->biHeight != m_video_size.cy))
-	{
-		out.resize(m_video_size.cx, m_video_size.cy);
-	}
+	if (ok)
+		normalize_captured_to_native(out, m_video_size.cx, m_video_size.cy);
 
 	if (get_play_state() == State_Paused)
 		step_frame(true);

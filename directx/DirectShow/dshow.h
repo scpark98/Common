@@ -115,7 +115,9 @@ public:
 	int				m_control_interval;
 	void			set_video_position(CRect r);
 	double			get_track_pos();
-	void			set_track_pos(double pos);
+	//seek_to_keyframe: true 면 AM_SEEKING_SeekToKeyFrame 플래그로 splitter 가 keyframe 으로 snap → 손상 미디어에서도
+	//decoder 가 즉시 producible frame 받음. false 면 정확한 위치로 seek (drag 중 GOP 안 frame 변화 보장 위해).
+	void			set_track_pos(double pos, bool seek_to_keyframe = true);
 	void			move_track(bool forward, int interval = -1);	//unit:sec
 	void			step_frame(bool forward);
 	bool			capture_frame(CString sfile);

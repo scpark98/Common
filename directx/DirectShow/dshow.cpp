@@ -1734,34 +1734,48 @@ double CDShow::get_track_pos()
 	return m_last_track_pos_ms;
 }
 
-void CDShow::set_track_pos(double pos)
+void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 {
 	if (!m_pGB || !m_pMS)
 		return;
 
 	HRESULT hr;
-
 	{
 		LONGLONG lPos = (LONGLONG)(pos * 10000.0);
-		//AM_SEEKING_SeekToKeyFrame 제거 — keyframe snap 때문에 GOP (보통 5~10초) 안에서 드래그하면
-		//같은 frame 만 표시되던 증상 해소. 정확한 위치로 seek (decoder 가 keyframe 부터 forward decode).
-		hr = m_pMS->SetPositions(&lPos, AM_SEEKING_AbsolutePositioning, 0, 0);
+		//AM_SEEKING_SeekToKeyFrame: splitter 가 요청 위치 이전의 가장 가까운 keyframe 으로 snap 후 decoder 에 전달.
+		//손상 미디어에선 keyframe snap 자체가 부정확할 수 있어 (LAV 가 byte-position 으로 fallback) 도움 한계 있음.
+		//drag 중에는 false 로 호출 — GOP 안 frame 변화 보장.
+		DWORD flags = AM_SEEKING_AbsolutePositioning;
+		if (seek_to_keyframe)
+			flags |= AM_SEEKING_SeekToKeyFrame;
+		hr = m_pMS->SetPositions(&lPos, flags, 0, 0);
 	}
 
-	//seek target 을 cache. seek 직후 graph 가 INTERMEDIATE 로 transition 중일 때 get_track_pos 가
-	//IMediaPosition 을 query 하지 않고 이 cache 를 반환 → 슬라이더가 사용자가 클릭한 위치 그대로 유지 (B → A → B 깜빡임 회피).
+	//seek target cache — get_track_pos 가 INTERMEDIATE transition 중에 cache 반환 (B→A→B 깜빡임 회피).
 	m_last_track_pos_ms = pos;
 
-	//paused 상태에서 set_track_pos 후 mixer 가 auto-refresh 안 하는 케이스 — drag 중 일부 위치만 영상 변경되는 증상 회피.
-	//RepaintVideo 로 backbuffer 새 frame 을 즉시 paint.
-	if (m_pMC && m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+	//Post-seek refresh — paused 상태의 stale frame 제거.
+	if (m_pMC)
 	{
 		OAFilterState fs;
 		if (SUCCEEDED(m_pMC->GetState(0, &fs)) && fs == State_Paused)
 		{
-			HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
-			m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
-			::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+			{
+				HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+				m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+				::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+			}
+			else if (m_pVDC)
+			{
+				m_pVDC->RepaintVideo();
+			}
+			else if (m_use_mpcvr && m_VMR)
+			{
+				CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+				if (pCfg)
+					pCfg->Flt_SetBool("cmd_redraw", true);
+			}
 		}
 	}
 }

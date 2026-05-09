@@ -1243,17 +1243,50 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 			if (is_windows_media())
 			{
-				hr = FindFilter(_T("WM ASF Reader"), CLSID_LegacyAmFilterCategory, &m_SourceBase );
-				hr = m_pGB->AddFilter(m_SourceBase, _T("WM ASF Reader"));
+				logWrite(_T("[wmv] is_windows_media=true — building graph"));
 
-				hr = m_SourceBase->QueryInterface( IID_IFileSourceFilter, (void **) &m_pFileSource );
-				hr = m_pFileSource->Load(wFileName, NULL);
+				//WM ASF Reader 는 source 로 유지 (ASF 파싱 잘 함). decoder 만 LAV 로 교체 — MPC-BE 패턴.
+				//기존 WMVideo/WMAudio Decoder DMO 는 seek 후 video frame 생성을 못 하는 알려진 결함 → LAV 의
+				//FFmpeg 기반 decoder 가 WMV1/2/3/VC-1/WMA 모두 처리 + 빠른 flush + DXVA2 가속.
+				HRESULT hr_find = FindFilter(_T("WM ASF Reader"), CLSID_LegacyAmFilterCategory, &m_SourceBase );
+				HRESULT hr_add = m_SourceBase ? m_pGB->AddFilter(m_SourceBase, _T("WM ASF Reader")) : E_FAIL;
+				logWrite(_T("[wmv] WM ASF Reader find=0x%08x add=0x%08x ptr=%p"), hr_find, hr_add, m_SourceBase);
 
-				hr = FindFilter(_T("WMVideo Decoder DMO"), CLSID_LegacyAmFilterCategory, &pBaseFilter );
-				hr = m_pGB->AddFilter(pBaseFilter, _T("WMVideo Decoder DMO"));
+				if (m_SourceBase)
+				{
+					hr = m_SourceBase->QueryInterface( IID_IFileSourceFilter, (void **) &m_pFileSource );
+					if (m_pFileSource)
+					{
+						HRESULT hr_load = m_pFileSource->Load(wFileName, NULL);
+						logWrite(_T("[wmv] WM ASF Reader Load hr=0x%08x"), hr_load);
+					}
+				}
 
-				hr = FindFilter(_T("WMAudio Decoder DMO"), CLSID_LegacyAmFilterCategory, &pBaseFilter );
-				hr = m_pGB->AddFilter(pBaseFilter, _T("WMAudio Decoder DMO"));
+				IBaseFilter* pLavV = NULL;
+				HRESULT hr_lav_v_find = FindFilter(_T("LAV Video Decoder"), CLSID_LegacyAmFilterCategory, &pLavV);
+				HRESULT hr_lav_v_add = pLavV ? m_pGB->AddFilter(pLavV, _T("LAV Video Decoder")) : E_FAIL;
+				logWrite(_T("[wmv] LAV Video Decoder find=0x%08x add=0x%08x ptr=%p"), hr_lav_v_find, hr_lav_v_add, pLavV);
+
+				IBaseFilter* pLavA = NULL;
+				HRESULT hr_lav_a_find = FindFilter(_T("LAV Audio Decoder"), CLSID_LegacyAmFilterCategory, &pLavA);
+				HRESULT hr_lav_a_add = pLavA ? m_pGB->AddFilter(pLavA, _T("LAV Audio Decoder")) : E_FAIL;
+				logWrite(_T("[wmv] LAV Audio Decoder find=0x%08x add=0x%08x ptr=%p"), hr_lav_a_find, hr_lav_a_add, pLavA);
+
+				//LAV Video Decoder 가 없으면 fallback 으로 WMVideo Decoder DMO 추가 (느리지만 재생은 됨).
+				if (!pLavV)
+				{
+					IBaseFilter* pDmo = NULL;
+					HRESULT hr_dmo_find = FindFilter(_T("WMVideo Decoder DMO"), CLSID_LegacyAmFilterCategory, &pDmo);
+					HRESULT hr_dmo_add = pDmo ? m_pGB->AddFilter(pDmo, _T("WMVideo Decoder DMO")) : E_FAIL;
+					logWrite(_T("[wmv] fallback WMVideo Decoder DMO find=0x%08x add=0x%08x"), hr_dmo_find, hr_dmo_add);
+				}
+				if (!pLavA)
+				{
+					IBaseFilter* pDmo = NULL;
+					HRESULT hr_dmo_find = FindFilter(_T("WMAudio Decoder DMO"), CLSID_LegacyAmFilterCategory, &pDmo);
+					HRESULT hr_dmo_add = pDmo ? m_pGB->AddFilter(pDmo, _T("WMAudio Decoder DMO")) : E_FAIL;
+					logWrite(_T("[wmv] fallback WMAudio Decoder DMO find=0x%08x add=0x%08x"), hr_dmo_find, hr_dmo_add);
+				}
 			}
 			else
 			{
@@ -1295,6 +1328,35 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					::RegSetValueEx(hLavKey, _T("HWAccelTonemap"), 0, REG_DWORD,
 						(const BYTE*)&hw_tonemap, sizeof(hw_tonemap));
 					::RegCloseKey(hLavKey);
+				}
+
+				//LAV Video Decoder 의 format-specific enable — 일부 사용자 환경에서 wmv3/vc1 등이 default disabled.
+				//disabled 면 LAV Video 의 input pin 이 해당 subtype reject → graph builder 가 WMVideo Decoder DMO 로 fallback
+				//→ DMO 의 seek-flush 결함으로 WMV seek 후 영상 freeze. 명시적 enable 로 LAV 가 처리하게 보장.
+				HKEY hLavFmt = NULL;
+				if (::RegCreateKeyEx(HKEY_CURRENT_USER, _T("Software\\LAV\\Video\\Formats"),
+						0, NULL, 0, KEY_SET_VALUE, NULL, &hLavFmt, NULL) == ERROR_SUCCESS)
+				{
+					DWORD on = 1;
+					::RegSetValueEx(hLavFmt, _T("wmv1"), 0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavFmt, _T("wmv2"), 0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavFmt, _T("wmv3"), 0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavFmt, _T("vc1"),  0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegCloseKey(hLavFmt);
+				}
+
+				//LAV Audio Decoder 의 format-specific enable — wma 계열.
+				HKEY hLavAFmt = NULL;
+				if (::RegCreateKeyEx(HKEY_CURRENT_USER, _T("Software\\LAV\\Audio\\Formats"),
+						0, NULL, 0, KEY_SET_VALUE, NULL, &hLavAFmt, NULL) == ERROR_SUCCESS)
+				{
+					DWORD on = 1;
+					::RegSetValueEx(hLavAFmt, _T("wmav1"),    0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavAFmt, _T("wmav2"),    0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavAFmt, _T("wmavoice"), 0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavAFmt, _T("wmapro"),   0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegSetValueEx(hLavAFmt, _T("wmalossless"), 0, REG_DWORD, (const BYTE*)&on, sizeof(on));
+					::RegCloseKey(hLavAFmt);
 				}
 
 				//LAV Splitter 손상 미디어 대응 설정 — registry 에 set 후 CoCreateInstance 시점에 LAV 가 read.
@@ -1363,12 +1425,121 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					}
 				}
 
-				hr = FindFilter(_T("LAV Video Decoder"), CLSID_LegacyAmFilterCategory, &pBaseFilter );
-				hr = m_pGB->AddFilter(pBaseFilter, _T("LAV Video Decoder"));
+				IBaseFilter* pLavVideo = NULL;
+				hr = FindFilter(_T("LAV Video Decoder"), CLSID_LegacyAmFilterCategory, &pLavVideo);
+				if (pLavVideo)
+					m_pGB->AddFilter(pLavVideo, _T("LAV Video Decoder"));
 
-				hr = FindFilter(_T("LAV Audio Decoder"), CLSID_LegacyAmFilterCategory, &pBaseFilter );
-				hr = m_pGB->AddFilter(pBaseFilter, _T("LAV Audio Decoder"));
+				IBaseFilter* pLavAudio = NULL;
+				hr = FindFilter(_T("LAV Audio Decoder"), CLSID_LegacyAmFilterCategory, &pLavAudio);
+				if (pLavAudio)
+					m_pGB->AddFilter(pLavAudio, _T("LAV Audio Decoder"));
 
+				//Splitter 의 named output pin 을 LAV decoder 의 input 에 명시적 Connect — graph builder 가 자동으로
+				//WMVideo/WMAudio Decoder DMO 를 채택하지 않도록 강제. WMV/ASF 같은 포맷에서 DMO 의 seek-flush
+				//결함을 우회. RenderOutputPins(splitter) 가 이미 connected pin 을 skip 하므로 안전.
+				auto connect_splitter_to_lav = [&](LPCWSTR splitterPinName, IBaseFilter* pLavDec) -> HRESULT
+				{
+					if (!m_pSplitter || !pLavDec)
+						return E_FAIL;
+
+					CComPtr<IPin> pSpOut;
+					{
+						CComPtr<IEnumPins> pEnum;
+						if (FAILED(m_pSplitter->EnumPins(&pEnum)))
+							return E_FAIL;
+						CComPtr<IPin> p;
+						while (pEnum->Next(1, &p, NULL) == S_OK)
+						{
+							PIN_DIRECTION dir;
+							PIN_INFO info = {};
+							p->QueryDirection(&dir);
+							p->QueryPinInfo(&info);
+							if (info.pFilter)
+								info.pFilter->Release();
+							if (dir == PINDIR_OUTPUT && wcscmp(info.achName, splitterPinName) == 0)
+							{
+								pSpOut = p;
+								break;
+							}
+							p.Release();
+						}
+					}
+					if (!pSpOut)
+						return E_FAIL;
+
+					CComPtr<IPin> pLavIn;
+					{
+						CComPtr<IEnumPins> pEnum;
+						if (FAILED(pLavDec->EnumPins(&pEnum)))
+							return E_FAIL;
+						CComPtr<IPin> p;
+						while (pEnum->Next(1, &p, NULL) == S_OK)
+						{
+							PIN_DIRECTION dir;
+							p->QueryDirection(&dir);
+							if (dir == PINDIR_INPUT)
+							{
+								pLavIn = p;
+								break;
+							}
+							p.Release();
+						}
+					}
+					if (!pLavIn)
+						return E_FAIL;
+
+					return m_pGB->Connect(pSpOut, pLavIn);
+				};
+
+				HRESULT hr_v = connect_splitter_to_lav(L"Video", pLavVideo);
+				HRESULT hr_a = connect_splitter_to_lav(L"Audio", pLavAudio);
+				logWrite(_T("[splitter->lav] Video hr=0x%08x  Audio hr=0x%08x"), hr_v, hr_a);
+
+				//LAV 가 WMV3/WMA 등을 reject 하는 환경 fallback — MPC Video Decoder 시도 (MPC-BE 설치 시 사용 가능).
+				//그것도 실패면 default RenderOutputPins(splitter) 가 registry 에서 (느린) DMO 자동 선택.
+				IBaseFilter* pMpcVideo = NULL;
+				if (FAILED(hr_v))
+				{
+					if (pLavVideo) { m_pGB->RemoveFilter(pLavVideo); pLavVideo->Release(); pLavVideo = NULL; }
+					if (SUCCEEDED(FindFilter(_T("MPC Video Decoder"), CLSID_LegacyAmFilterCategory, &pMpcVideo)) && pMpcVideo)
+					{
+						m_pGB->AddFilter(pMpcVideo, _T("MPC Video Decoder"));
+						hr_v = connect_splitter_to_lav(L"Video", pMpcVideo);
+						logWrite(_T("[splitter->mpc] Video hr=0x%08x"), hr_v);
+					}
+				}
+				IBaseFilter* pMpcAudio = NULL;
+				if (FAILED(hr_a))
+				{
+					if (pLavAudio) { m_pGB->RemoveFilter(pLavAudio); pLavAudio->Release(); pLavAudio = NULL; }
+					if (SUCCEEDED(FindFilter(_T("MPC Audio Decoder"), CLSID_LegacyAmFilterCategory, &pMpcAudio)) && pMpcAudio)
+					{
+						m_pGB->AddFilter(pMpcAudio, _T("MPC Audio Decoder"));
+						hr_a = connect_splitter_to_lav(L"Audio", pMpcAudio);
+						logWrite(_T("[splitter->mpc] Audio hr=0x%08x"), hr_a);
+					}
+				}
+
+				//Splitter→Decoder 가 직접 연결되면서 RenderOutputPins(splitter) 가 splitter pin 을 skip → decoder 의
+				//OUTPUT pin 까지 chain 이 안 내려감. decoder 의 output 을 명시적 render 해 renderer / audio chain 까지 완성.
+				IBaseFilter* pVDec = pLavVideo ? pLavVideo : pMpcVideo;
+				IBaseFilter* pADec = pLavAudio ? pLavAudio : pMpcAudio;
+				if (SUCCEEDED(hr_v) && pVDec)
+				{
+					HRESULT hr_rv = RenderOutputPins(m_pGB, pVDec);
+					logWrite(_T("[decoder->renderer] Video render hr=0x%08x"), hr_rv);
+				}
+				if (SUCCEEDED(hr_a) && pADec)
+				{
+					HRESULT hr_ra = RenderOutputPins(m_pGB, pADec);
+					logWrite(_T("[decoder->renderer] Audio render hr=0x%08x"), hr_ra);
+				}
+
+				if (pLavVideo) pLavVideo->Release();
+				if (pLavAudio) pLavAudio->Release();
+				if (pMpcVideo) pMpcVideo->Release();
+				if (pMpcAudio) pMpcAudio->Release();
 
 				// Attempt to load this file
 			}
@@ -1873,39 +2044,51 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 	HRESULT hr;
 	{
 		LONGLONG lPos = (LONGLONG)(pos * 10000.0);
-		//AM_SEEKING_SeekToKeyFrame: splitter 가 요청 위치 이전의 가장 가까운 keyframe 으로 snap 후 decoder 에 전달.
-		//손상 미디어에선 keyframe snap 자체가 부정확할 수 있어 (LAV 가 byte-position 으로 fallback) 도움 한계 있음.
-		//drag 중에는 false 로 호출 — GOP 안 frame 변화 보장.
+		//AM_SEEKING_SeekToKeyFrame: LAV 는 internally 처리 (redundant) 하지만 WMVideo Decoder DMO 등
+		//Microsoft DMO 는 keyframe snap 없으면 frame 생성 못 하는 경우 있음. drag 경로(false) 외엔 활성.
 		DWORD flags = AM_SEEKING_AbsolutePositioning;
 		if (seek_to_keyframe)
 			flags |= AM_SEEKING_SeekToKeyFrame;
-		hr = m_pMS->SetPositions(&lPos, flags, 0, 0);
+		hr = m_pMS->SetPositions(&lPos, flags, NULL, AM_SEEKING_NoPositioning);
+		logWrite(_T("[seek] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x"), pos, hr, flags);
 	}
 
 	//seek target cache — get_track_pos 가 INTERMEDIATE transition 중에 cache 반환 (B→A→B 깜빡임 회피).
 	m_last_track_pos_ms = pos;
 
-	//Post-seek refresh — paused 상태의 stale frame 제거.
+	//Post-seek refresh — paused 상태의 stale frame 제거 + WMV running 상태 DMO flush 강제.
 	if (m_pMC)
 	{
 		OAFilterState fs;
-		if (SUCCEEDED(m_pMC->GetState(0, &fs)) && fs == State_Paused)
+		if (SUCCEEDED(m_pMC->GetState(0, &fs)))
 		{
-			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+			if (fs == State_Paused)
 			{
-				HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
-				m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
-				::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+				if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
+				{
+					HDC hdc = ::GetDC(m_pParent->GetSafeHwnd());
+					m_pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), hdc);
+					::ReleaseDC(m_pParent->GetSafeHwnd(), hdc);
+				}
+				else if (m_pVDC)
+				{
+					m_pVDC->RepaintVideo();
+				}
+				else if (m_use_mpcvr && m_VMR)
+				{
+					CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+					if (pCfg)
+						pCfg->Flt_SetBool("cmd_redraw", true);
+				}
 			}
-			else if (m_pVDC)
+			else if (fs == State_Running && is_windows_media())
 			{
-				m_pVDC->RepaintVideo();
-			}
-			else if (m_use_mpcvr && m_VMR)
-			{
-				CComQIPtr<IExFilterConfig> pCfg(m_VMR);
-				if (pCfg)
-					pCfg->Flt_SetBool("cmd_redraw", true);
+				//WMV + DMO decoder 환경 — seek 후 video frame 생성 안 되는 결함 회피.
+				//Pause 가 renderer 에게 "다음 frame 즉시 표시" 명령 → DMO 가 keyframe → forward 디코딩 후 frame push.
+				//Run 으로 즉시 재개. audio 잠깐 click 가능하나 video freeze 보단 나음.
+				m_pMC->Pause();
+				m_pMC->Run();
+				logWrite(_T("[seek] WMV pause-run cycle for DMO flush"));
 			}
 		}
 	}

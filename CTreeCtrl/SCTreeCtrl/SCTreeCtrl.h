@@ -38,6 +38,7 @@
 #include "../../ui/theme/theme.h"
 #include "../../CMenu/CSCMenuBar/SCMenu.h"
 #include "../../colors.h"
+#include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include "../../Json/rapid_json/json.h"
 
@@ -335,6 +336,14 @@ public:
 	//resource editor에서 border를 true로 하면 m_draw_border = true;로 자동 설정된다.
 	//그런데 만약 사용자가 set_draw_border(false)로 하면 border는 그려지지 않아야 한다.
 	void			set_draw_border(bool draw_border = true) { m_draw_border = draw_border; Invalidate(); }
+
+//자체 overlay scrollbar — native WS_VSCROLL 제거 + 우측 child 로 그림. 트리 mutation 후 sync_scrollbar() 외부 호출 가능.
+	CSCScrollbar	m_scrollbar;
+	int				m_scrollbar_width = 16;	//= scrollbar 의 hover thickness.
+	bool			m_scrollbar_setup = false;
+	void			setup_scrollbar();		//PreSubclassWindow 끝에서 호출 — WS_VSCROLL 제거 + scrollbar 생성.
+	void			sync_scrollbar();		//트리 scroll state → scrollbar 모델 push. 외부에서도 batch insert/delete 후 호출 가능.
+	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
 
 protected:
 	//root 항목은 실제 또는 가상의 root일 수 있다.

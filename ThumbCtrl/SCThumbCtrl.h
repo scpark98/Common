@@ -14,6 +14,7 @@
 #include "../thread/CSCThread/SCThread.h"
 #include "../thread/CSCThreadGroup/SCThreadGroup.h"
 #include "../CEdit/SCEdit/SCEdit.h"
+#include "../CScrollbar/SCScrollbar/SCScrollbar.h"
 
 
 #define MIN_TILE_SIZE		40
@@ -228,6 +229,12 @@ public:
 	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);
 	void			set_font_size(int nSize);
 	void			set_font_bold(bool bBold = true);
+
+//자체 스크롤바 — recalc_tile_rect 가 m_scroll_total > viewport 면 자동 표시.
+	CSCScrollbar	m_scrollbar;
+	int				m_scrollbar_width = 16;			//= scrollbar 의 hover thickness. 윈도우 width 가 항상 hover 만큼이라 reserve 도 그만큼.
+	bool			m_scrollbar_visible = false;	//현재 표시 상태 — 레이아웃이 visibility 변경 감지에 사용.
+	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
 
 protected:
 	CWnd*			m_parent = NULL;

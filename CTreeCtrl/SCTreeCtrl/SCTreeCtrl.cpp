@@ -78,6 +78,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_CONTEXTMENU()
 	ON_NOTIFY_REFLECT_EX(NM_RCLICK, &CSCTreeCtrl::OnNMRClick)
 	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCTreeCtrl::OnMessageCSCMenu)
+	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCTreeCtrl::on_message_CSCScrollbar)
 	ON_WM_VSCROLL()
 	ON_WM_MOUSEHWHEEL()
 	ON_WM_MOUSEWHEEL()
@@ -133,6 +134,8 @@ void CSCTreeCtrl::PreSubclassWindow()
 
 
 	CTreeCtrl::PreSubclassWindow();
+
+	setup_scrollbar();
 }
 
 void CSCTreeCtrl::reconstruct_font()
@@ -695,8 +698,14 @@ BOOL CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 void CSCTreeCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 {
 	CTreeCtrl::OnWindowPosChanged(lpwndpos);
+	sync_scrollbar();
 
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//size 변경시 — splitter drag 의 빠른 resize race 에서 invalidate 누락. 강제 redraw 동기 paint.
+	if (lpwndpos && !(lpwndpos->flags & SWP_NOSIZE) && ::IsWindow(m_hWnd))
+	{
+		Invalidate();
+		UpdateWindow();
+	}
 }
 
 void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool is_local, CString default_path)
@@ -2421,7 +2430,10 @@ void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 
 	//가로 스크롤시에 선택된 항목 사각형이 제대로 그려지지 않는 문제가 있어서 Invalidate()을 호출함.
-	Invalidate();
+	//CSCScrollbar overlay 모드에선 native scrollbar 안 쓰니 이 회피 불필요 — Invalidate() 가 매 hscroll 이벤트마다
+	//전체 client erase+draw 사이클 유발해 글자 깜빡임 원인.
+	if (!m_scrollbar_setup)
+		Invalidate();
 
 	CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
 }
@@ -3137,6 +3149,8 @@ BOOL CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 	*/
 	*pResult = 0;
 
+	sync_scrollbar();
+
 	return FALSE;
 }
 
@@ -3774,6 +3788,7 @@ void CSCTreeCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	edit_end(false);
 
 	CTreeCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+	sync_scrollbar();
 }
 
 //윈도우 탐색기의 폴더뷰를 보면 마우스 휠의 vscroll, hscroll을 모두 vscroll로 처리하고 있으며
@@ -3792,16 +3807,21 @@ BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	edit_end(false);
-	return CTreeCtrl::OnMouseWheel(nFlags, zDelta, pt);
+	BOOL res = CTreeCtrl::OnMouseWheel(nFlags, zDelta, pt);
+	sync_scrollbar();
+	return res;
 }
 
 void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
-	
+
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, invalidate);
+
 	if (!m_hWnd)
 		return;
-	
+
 	if (m_hWnd && invalidate)
 		Invalidate();
 }
@@ -3811,8 +3831,107 @@ void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	m_theme.copy_colors_from(theme);
 	//m_has_parent_back_color = true;
 
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, invalidate);
+
 	if (invalidate && m_hWnd)
 		Invalidate();
+}
+
+void CSCTreeCtrl::setup_scrollbar()
+{
+	if (m_scrollbar_setup || !::IsWindow(m_hWnd))
+		return;
+
+	//WS_VSCROLL / WS_HSCROLL 만 제거. TVS_NOSCROLL 은 프로그래밍 scroll 까지 차단해 SelectSetFirstVisible / 마우스 휠도 안 됨 — 사용 안 함.
+	//OnNcCalcSize override 가 native scrollbar 의 NC 공간을 0 으로 만들어 시각적으로 안 그려지게 함.
+	//WS_CLIPCHILDREN — scrollbar child 영역 부모가 paint 하지 않도록 → flicker / 잔상 회피.
+	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+
+
+	CRect rc;
+	GetClientRect(&rc);
+	m_scrollbar.create(this, CSCScrollbar::vertical,
+		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+	m_scrollbar.set_color_theme(m_theme, false);
+	m_scrollbar.ShowWindow(SW_HIDE);
+
+	m_scrollbar_setup = true;
+}
+
+void CSCTreeCtrl::sync_scrollbar()
+{
+	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
+		return;
+
+	int total = (int)GetCount();
+	int visible = (int)GetVisibleCount();
+
+	//위치/크기 sync — 두께는 scrollbar 자체가 hover 확장 관리하므로 width 유지, 우측 edge 와 height 만 갱신.
+	CRect rc;
+	GetClientRect(&rc);
+
+	CRect rCur;
+	m_scrollbar.GetWindowRect(rCur);
+	ScreenToClient(rCur);
+	int cur_width = rCur.Width();
+	CRect rTarget(rc.right - cur_width, 0, rc.right, rc.Height());
+	if (rCur != rTarget)
+	{
+		CRect rOld = rCur;
+		m_scrollbar.MoveWindow(rTarget);
+		//system 이 자동으로 child 의 old position 을 parent 에 invalidate 하지만 splitter drag 의
+		//rapid resize 에서 누락 발생 — 명시적 InvalidateRect 로 잔상 회피.
+		InvalidateRect(rOld, TRUE);
+	}
+
+	bool need = (total > visible) && (visible > 0);
+
+	if (!need)
+	{
+		if (m_scrollbar.IsWindowVisible())
+			m_scrollbar.ShowWindow(SW_HIDE);
+		return;
+	}
+
+	//item-based 모델 — WS_VSCROLL 제거된 상태라 GetScrollInfo 신뢰 어려움. GetVisibleCount 는 view 의 item 수.
+	HTREEITEM first = GetFirstVisibleItem();
+	int first_index = 0;
+	HTREEITEM cur = GetRootItem();
+	if (m_use_root && cur == m_root_item)
+		cur = GetChildItem(cur);
+	while (cur && cur != first)
+	{
+		cur = GetNextVisibleItem(cur);
+		first_index++;
+	}
+
+	m_scrollbar.set_range(0, total - 1);
+	m_scrollbar.set_page(visible);
+	m_scrollbar.set_pos(first_index);
+
+	if (!m_scrollbar.IsWindowVisible())
+		m_scrollbar.ShowWindow(SW_SHOW);
+}
+
+LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
+{
+	CSCScrollbarMsg* msg = (CSCScrollbarMsg*)wParam;
+	if (msg == nullptr || msg->pThis != &m_scrollbar)
+		return 0;
+
+	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
+	{
+		//target 인덱스의 visible item 찾아 SelectSetFirstVisible — 트리 자체가 scroll/repaint 처리.
+		HTREEITEM cur = GetRootItem();
+		if (m_use_root && cur == m_root_item)
+			cur = GetChildItem(cur);
+		for (int i = 0; cur && i < msg->pos; i++)
+			cur = GetNextVisibleItem(cur);
+		if (cur)
+			SelectSetFirstVisible(cur);
+	}
+	return 0;
 }
 
 //가상 루트 항목 설정.
@@ -3953,6 +4072,21 @@ void CSCTreeCtrl::serialize_item(CArchive& ar, HTREEITEM hItem)
 
 void CSCTreeCtrl::OnNcPaint()
 {
+	//CSCScrollbar overlay 사용 후엔 base NC paint skip — native scrollbar 그릴 NC 공간 없는데도 tree 내부 scroll state
+	//변경 (긴 아이템 select 시 자동 horizontal scroll 시도 등) 마다 NC paint 가 트리거돼 깜빡임 유발.
+	if (m_scrollbar_setup)
+	{
+		if (m_draw_border)
+		{
+			CWindowDC dc(this);
+			CRect rc;
+			GetWindowRect(&rc);
+			rc.OffsetRect(-rc.TopLeft());
+			draw_rect(&dc, rc, m_theme.cr_border_inactive);
+		}
+		return;
+	}
+
 	CTreeCtrl::OnNcPaint();        //스크롤바 + corner box 정상 그림 (border 는 스타일 없으니 skip).
 
 	if (!m_draw_border)
@@ -4303,6 +4437,15 @@ BOOL CSCTreeCtrl::move_tree_item_as_sibling(CTreeCtrl* pTree, HTREEITEM hSrcItem
 
 void CSCTreeCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 {
+	//CSCScrollbar overlay 설치된 후엔 native scrollbar 의 NC 공간 미할당 — 시각적으로 안 그려짐.
+	//base 호출 안 함 → DefWindowProc 의 WS_VSCROLL 기반 NC 예약 skip. client = window (border 1px 제외).
+	if (m_scrollbar_setup && lpncsp)
+	{
+		if (m_draw_border)
+			::InflateRect(&lpncsp->rgrc[0], -1, -1);
+		return;
+	}
+
 	//기본 NC (scrollbar 등) 처리 후 client 에서 1px 만큼 더 deflate — border 자리 확보.
 	CTreeCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
 	if (m_draw_border && lpncsp)

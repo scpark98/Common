@@ -80,7 +80,9 @@ bool CSCThumbCtrl::create(CWnd* parent, int left, int top, int right, int bottom
 	m_parent = parent;
 
 	//DWORD dwStyle = WS_POPUP;
-	DWORD dwStyle = WS_CHILD | WS_VISIBLE;
+	//WS_CLIPCHILDREN — 자식 (m_scrollbar) 영역 제외하고 부모 paint. 안 하면 부모 FillSolidRect 위에
+	//자식이 다시 paint 해 같은 영역에 2 회 그리기 → flicker.
+	DWORD dwStyle = WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
@@ -108,6 +110,11 @@ bool CSCThumbCtrl::create(CWnd* parent, int left, int top, int right, int bottom
 	//GetClientRect(rc);
 	//TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
+	//자체 스크롤바 — m_scroll_total > viewport 일 때만 가시화. 기본 hide 로 시작.
+	m_scrollbar.create(this, CSCScrollbar::vertical, rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+	m_scrollbar.set_color_theme(m_theme, false);
+	m_scrollbar.ShowWindow(SW_HIDE);
+
 	return res;
 }
 
@@ -125,6 +132,7 @@ BEGIN_MESSAGE_MAP(CSCThumbCtrl, CDialogEx)
 	ON_WM_RBUTTONUP()
 	ON_WM_RBUTTONDBLCLK()
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCThumbCtrl::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCThumbCtrl::on_message_CSCScrollbar)
 	ON_WM_CONTEXTMENU()
 	ON_COMMAND_RANGE(idTotalCount, idProperty, on_context_menu)
 END_MESSAGE_MAP()
@@ -140,6 +148,11 @@ void CSCThumbCtrl::recalc_tile_rect()
 	{
 		m_scroll_pos = 0;
 		m_scroll_total = 0;
+		if (::IsWindow(m_scrollbar.m_hWnd))
+		{
+			m_scrollbar.ShowWindow(SW_HIDE);
+			m_scrollbar_visible = false;
+		}
 		return;
 	}
 
@@ -153,9 +166,15 @@ void CSCThumbCtrl::recalc_tile_rect()
 	m_sz_tile.cx = m_r_inner.left + m_sz_thumb.cx + m_r_inner.right;
 	m_sz_tile.cy = m_r_inner.top + m_sz_thumb.cy + m_thumb_title_gap + m_title_height + m_r_inner.bottom;
 
-	//맨 첫번째 항목의 위치를 잡고 인덱스가 증가하면 그 위치를 조정해준다.
-	while (true)
+	//스크롤바 visibility 가 column wrap 경계를 바꾸므로 visibility 변동 감지 시 1 회 더 iterate.
+	//iter cap 으로 무한 루프 방지.
+	int max_iter = 4;
+
+	while (max_iter-- > 0)
 	{
+		int reserve = m_scrollbar_visible ? m_scrollbar_width : 0;
+		int rc_right = rc.right - reserve;
+
 		rTile = make_rect(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_tile.cx, m_sz_tile.cy);
 
 		m_per_line = -1;
@@ -167,9 +186,9 @@ void CSCThumbCtrl::recalc_tile_rect()
 
 			rTile.OffsetRect(rTile.Width() + m_sz_gap.cx, 0);
 
-			//다음 thumb를 표시할 위치가 rc.right를 벗어난다면 다음줄로 내려준다.
+			//다음 thumb를 표시할 위치가 가용 영역 (rc_right) 을 벗어난다면 다음줄로 내려준다.
 			//단, i가 마지막 항목일 경우는 이 체크를 하지 않아야 한다.
-			if (i < m_thumb.size() - 1 && (rTile.right + m_sz_margin.cx > rc.right))
+			if (i < m_thumb.size() - 1 && (rTile.right + m_sz_margin.cx > rc_right))
 			{
 				if (m_per_line == -1)
 					m_per_line = i + 1;
@@ -183,6 +202,14 @@ void CSCThumbCtrl::recalc_tile_rect()
 
 		m_scroll_total = rTile.bottom - m_scroll_pos + m_sz_margin.cy;
 
+		//visibility 갱신 — total > viewport 면 visible.
+		bool need_visible = (m_scroll_total > rc.Height());
+		if (need_visible != m_scrollbar_visible)
+		{
+			m_scrollbar_visible = need_visible;
+			continue;	//width 가 변했으니 layout 다시.
+		}
+
 		//맨 아래로 스크롤한 후 창 크기를 늘리거나 썸네일 크기를 줄이거나 썸네일을 제거하면
 		//하단에 공백이 생기므로 m_scroll_pos를 보정한 후 다시 계산해줘야 한다.
 		if ((m_scroll_pos != 0) && (m_scroll_pos < -m_scroll_total + rc.Height()))
@@ -195,6 +222,28 @@ void CSCThumbCtrl::recalc_tile_rect()
 		{
 			break;
 		}
+	}
+
+	//스크롤바 위치/크기 + 모델 sync. m_scroll_pos 는 0 또는 음수 (top=0) — scrollbar 모델은 양수 (top=0) 라 부호 반전.
+	//각 setter 가 변동 없으면 no-op. 두께(width)는 scrollbar 가 hover 확장 자체 관리 — host 는 우측 edge 정렬 + 수직 영역만 갱신.
+	if (::IsWindow(m_scrollbar.m_hWnd))
+	{
+		CRect rCur;
+		m_scrollbar.GetWindowRect(rCur);
+		ScreenToClient(rCur);
+		int cur_width = rCur.Width();
+		CRect rTarget(rc.right - cur_width, 0, rc.right, rc.Height());
+		if (rCur != rTarget)
+			m_scrollbar.MoveWindow(rTarget);
+
+		m_scrollbar.set_range(0, m_scroll_total);
+		m_scrollbar.set_page(rc.Height());
+		m_scrollbar.set_line(m_sz_tile.cy / 4 + m_sz_gap.cy);
+		m_scrollbar.set_pos(-m_scroll_pos);
+
+		bool cur_visible = m_scrollbar.IsWindowVisible() != FALSE;
+		if (cur_visible != m_scrollbar_visible)
+			m_scrollbar.ShowWindow(m_scrollbar_visible ? SW_SHOW : SW_HIDE);
 	}
 	/*
 	//여러 thumb들을 삭제할 경우 현재의 m_scroll_pos는 m_scroll_total보다 불필요하게 큰 값인 경우가 있다.
@@ -1232,6 +1281,8 @@ std::deque<int> CSCThumbCtrl::find_text(bool show_inputbox, CString text, bool s
 void CSCThumbCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, invalidate);
 	if (invalidate && m_hWnd)
 		Invalidate();
 }
@@ -1239,8 +1290,24 @@ void CSCThumbCtrl::set_color_theme(int theme, bool invalidate)
 void CSCThumbCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, invalidate);
 	if (invalidate && m_hWnd)
 		Invalidate();
+}
+
+LRESULT CSCThumbCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
+{
+	CSCScrollbarMsg* msg = (CSCScrollbarMsg*)wParam;
+	if (msg == nullptr || msg->pThis != &m_scrollbar)
+		return 0;
+
+	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
+	{
+		//scrollbar pos (양수, top=0) → thumb 의 m_scroll_pos (음수 또는 0).
+		set_scroll_pos(-msg->pos);
+	}
+	return 0;
 }
 
 void CSCThumbCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)

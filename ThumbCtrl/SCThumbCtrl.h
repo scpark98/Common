@@ -20,6 +20,7 @@
 #define MIN_TILE_SIZE		40
 #define MAX_TILE_SIZE		400
 #define MIN_GAP				12
+#define INFO_TEXT_COUNT		9	//thumb 1개당 info text 최대 개수 (3x3 grid: lt/ct/rt/lc/c/rc/lb/cb/rb).
 
 static const UINT Message_CSCThumbCtrl = ::RegisterWindowMessage(_T("MessageString_CSCThumbCtrl"));
 
@@ -50,23 +51,24 @@ public:
 	//img는 그림파일마다 그 크기가 다양한데 이를 정적으로 잡는 것이 맞는가?
 	//img.load()에서 m_pBitmap이 동적할당되는가?
 	CSCGdiplusBitmap* img = NULL;
-	bool		load_completed = false;
-	CString		title;						//파일명 또는 지정된 타이틀
-	bool		key_thumb = false;			//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
+	bool			load_completed = false;
+	CString			title;						//파일명 또는 지정된 타이틀
+	bool			key_thumb = false;			//Thumbnail들 중에서 T1과 같은 특정 thumbnail일 경우의 표시를 위해.
 	//info text 표시용 9 슬롯 (3x3 그리드, 위치 고정):
 	//0=lt        1=center_top    2=rt
 	//3=lcenter   4=center        5=rcenter
 	//6=lb        7=center_bottom 8=rb
-	CString		info[9];
-	CString		full_path;
-	int			width = 0;					//원래 이미지의 크기 정보
-	int			height = 0;
-	int			channel = 0;
-	CRect		r;							//이미지가 그려지는 thumb 영역이 아닌 thumb+title+여백까지 포함된 타일 영역
-	int			thumb_bottom;				//thumb image의 하단 좌표, 타이틀 편집시 사용
-	int			line_index;					//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
-	float		score = 0.0;
-	float*		feature = NULL;
+	CString			info[INFO_TEXT_COUNT];
+	Gdiplus::Color	cr_info[INFO_TEXT_COUNT];
+	CString			full_path;
+	int				width = 0;					//원래 이미지의 크기 정보
+	int				height = 0;
+	int				channel = 0;
+	CRect			r;							//이미지가 그려지는 thumb 영역이 아닌 thumb+title+여백까지 포함된 타일 영역
+	int				thumb_bottom;				//thumb image의 하단 좌표, 타이틀 편집시 사용
+	int				line_index;					//몇번째 라인에 있는지, 반쯤 가려진 항목을 클릭하면 그 항목이 다 보이게 자동 스크롤되는데 이때 해당 라인에서 가장 height가 높은 항목이 누군지 알 필요가 있다.
+	float			score = 0.0;
+	float*			feature = NULL;
 
 	CThumbImage()
 	{
@@ -219,11 +221,19 @@ public:
 	void			set_color_theme(int theme, bool invalidate = true);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
 	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+protected:
+	//set_color_theme 후 호출. info text default + 모든 썸네일 cr_info 를 theme.cr_text 로 동기화.
+	void			apply_theme_to_info_text();
+public:
 
 //정보 텍스트 표시 — 인덱스 0~8 의 위치 고정 (CThumbImage::info 주석 참조).
-	bool				m_show_info_text[9];
-	Gdiplus::Color		m_crInfoText[9];
-	void				set_info_text(int thumb_index, int idx, CString sInfo, bool refresh);
+	bool			m_show_info_text[INFO_TEXT_COUNT];
+	Gdiplus::Color	m_cr_info_text[INFO_TEXT_COUNT];
+	void			set_info_text(int thumb_index, int idx, CString sInfo, bool refresh);
+	//특정 썸네일의 특정 info text의 색상을 변경할 수 있다.
+	//thumb_index < 0이면 모든 썸네일에 대해 모두 적용하고
+	//idx < 0이면 9개의 모든 인덱스에 적용된다.
+	void			set_info_text_color(int thumb_index, int idx, Gdiplus::Color cr_info_text);
 
 //폰트 관련
 	void			set_font_name(LPCTSTR font_name, BYTE char_set = DEFAULT_CHARSET);

@@ -16,10 +16,11 @@ CSCThumbCtrl::CSCThumbCtrl()
 
 	m_max_thumbs = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), 0);
 
-	for (int i = 0; i < 9; i++)
+	//info text default 를 theme.cr_text 로 — light/dark theme 자동 적응.
+	for (int i = 0; i < INFO_TEXT_COUNT; i++)
 	{
 		m_show_info_text[i] = false;
-		m_crInfoText[i] = Gdiplus::Color::White;
+		m_cr_info_text[i] = get_weak_color(m_theme.cr_text, 64);
 	}
 }
 
@@ -370,14 +371,15 @@ void CSCThumbCtrl::OnPaint()
 			CRect rInfo = rThumb;
 			rInfo.DeflateRect(8, 8);
 
-			for (int idx = 0; idx < 9; idx++)
+			for (int idx = 0; idx < INFO_TEXT_COUNT; idx++)
 			{
 				if (!m_show_info_text[idx] || m_thumb[i].info[idx].IsEmpty())
 					continue;
 
+				//per-thumb cr_info 직접 사용 — insert 에서 m_cr_info_text 로부터 복사받음.
 				UINT flags = halign[idx % 3] | valign[idx / 3] | DT_SINGLELINE | DT_NOCLIP;
 				DrawShadowText(dc.GetSafeHdc(), CStringW(m_thumb[i].info[idx]), -1, rInfo,
-					flags, m_crInfoText[idx].ToCOLORREF(), 0, 2, 1);
+					flags, m_thumb[i].cr_info[idx].ToCOLORREF(), 0, 2, 1);
 			}
 		}
 
@@ -512,6 +514,10 @@ int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_t
 	m_thumb[index].score = 0.0;
 	m_thumb[index].feature = NULL;
 
+	//cr_info 를 default (m_cr_info_text) 로 초기화 — Gdiplus::Color() 의 default ctor 가 사실 opaque black 이라 init 안 하면 모든 info text 가 검정.
+	for (int j = 0; j < INFO_TEXT_COUNT; j++)
+		m_thumb[index].cr_info[j] = m_cr_info_text[j];
+
 	m_thumb[index].load_completed = true;
 
 	if (invalidate)
@@ -543,6 +549,11 @@ int CSCThumbCtrl::insert(int index, CSCGdiplusBitmap* src_thumb, CString title, 
 	m_thumb[index].full_path.Empty();
 	m_thumb[index].score = 0.0;
 	m_thumb[index].feature = NULL;
+
+	//cr_info 를 default (m_cr_info_text) 로 복사
+	for (int j = 0; j < INFO_TEXT_COUNT; j++)
+		m_thumb[index].cr_info[j] = m_cr_info_text[j];
+
 	m_thumb[index].load_completed = true;
 
 	if (invalidate)
@@ -1281,6 +1292,7 @@ std::deque<int> CSCThumbCtrl::find_text(bool show_inputbox, CString text, bool s
 void CSCThumbCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
+	apply_theme_to_info_text();
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
 	if (invalidate && m_hWnd)
@@ -1290,10 +1302,25 @@ void CSCThumbCtrl::set_color_theme(int theme, bool invalidate)
 void CSCThumbCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
+	apply_theme_to_info_text();
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
 	if (invalidate && m_hWnd)
 		Invalidate();
+}
+
+//theme 변경 시 info text default + 모든 썸네일의 cr_info 를 theme.cr_text 의 weak 색 (살짝 톤 다운) 으로 동기화.
+//사용자가 set_info_text_color 로 customize 한 색은 함께 reset 됨 — 필요시 theme 변경 후 재호출.
+void CSCThumbCtrl::apply_theme_to_info_text()
+{
+	Gdiplus::Color cr_default = get_weak_color(m_theme.cr_text, 64);
+
+	for (int i = 0; i < INFO_TEXT_COUNT; i++)
+		m_cr_info_text[i] = cr_default;
+
+	for (auto& t : m_thumb)
+		for (int i = 0; i < INFO_TEXT_COUNT; i++)
+			t.cr_info[i] = cr_default;
 }
 
 LRESULT CSCThumbCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
@@ -1518,7 +1545,7 @@ void CSCThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool re
 	if (thumb_index < 0 || thumb_index >= (int)m_thumb.size())
 		return;
 
-	if (idx < 0 || idx >= 9)
+	if (idx < 0 || idx >= INFO_TEXT_COUNT)
 		return;
 
 	m_show_info_text[idx] = true;
@@ -1526,6 +1553,42 @@ void CSCThumbCtrl::set_info_text(int thumb_index, int idx, CString info, bool re
 
 	if (refresh)
 		Invalidate();
+}
+
+
+//특정 썸네일의 특정 info text의 색상을 변경할 수 있다.
+//thumb_index < 0이면 모든 썸네일에 대해 모두 적용하고
+//idx < 0이면 9개의 모든 인덱스에 적용된다.
+//기본값 m_cr_info_text[idx] 는 insert 시점에 각 썸네일의 cr_info[idx] 로 복사됨.
+//따라서 default 변경 (thumb_index<0) 시 m_cr_info_text + 모든 기존 썸네일의 cr_info 를 같이 갱신해야 일관성 유지.
+void CSCThumbCtrl::set_info_text_color(int thumb_index, int idx, Gdiplus::Color cr_info_text)
+{
+	auto apply_range = [&](Gdiplus::Color* arr)
+	{
+		if (idx < 0)
+		{
+			for (int i = 0; i < INFO_TEXT_COUNT; i++)
+				arr[i] = cr_info_text;
+		}
+		else if (idx < INFO_TEXT_COUNT)
+		{
+			arr[idx] = cr_info_text;
+		}
+	};
+
+	if (thumb_index < 0)
+	{
+		//default 갱신 + 모든 썸네일의 per-thumb override 도 동일 색으로 force.
+		apply_range(m_cr_info_text);
+		for (auto& t : m_thumb)
+			apply_range(t.cr_info);
+	}
+	else if (thumb_index < (int)m_thumb.size())
+	{
+		apply_range(m_thumb[thumb_index].cr_info);
+	}
+
+	Invalidate();
 }
 
 //point는 screen coord.

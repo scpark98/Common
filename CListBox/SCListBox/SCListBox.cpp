@@ -554,7 +554,7 @@ int CSCListBox::add(LPCTSTR text, ...)
 
 int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 {
-	if (cr.GetValue() == Gdiplus::Color::Transparent)
+	if (cr.GetA() == 0)
 		cr = m_theme.cr_text;
 
 	for (int i = 0; i < lists->size(); i++)
@@ -602,7 +602,7 @@ int CSCListBox::insert_string(int nIndex, CString text, Gdiplus::Color rgb)
 	int index = ((CListBox*)this)->InsertString(nIndex, text);
 	if (index >= 0)
 	{
-		if (rgb.GetValue() == Gdiplus::Color::Transparent)
+		if (rgb.GetA() == 0)
 			rgb = m_theme.cr_text;
 		//COLORREF rgb_value = rgb.ToCOLORREF();
 		SetItemData(index, rgb.GetValue());

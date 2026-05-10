@@ -552,7 +552,7 @@ void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_text.push_back(over);
 	m_cr_text.push_back(down);
 
-	if (disabled.GetValue() == Gdiplus::Color::Transparent)
+	if (disabled.GetA() == 0)
 		disabled = get_sys_color(COLOR_GRAYTEXT);
 
 	m_cr_text.push_back(disabled);
@@ -587,7 +587,7 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 	m_cr_back.push_back(over);
 	m_cr_back.push_back(down);
 
-	if (disabled.GetValue() == Gdiplus::Color::Transparent)
+	if (disabled.GetA() == 0)
 		disabled = Gdiplus::Color::LightGray;
 
 	//checkbox, radio는 disabled라도 배경색까지 바꾸진 않는다.
@@ -621,7 +621,7 @@ void CGdiButton::set_border_color(Gdiplus::Color normal, Gdiplus::Color hover, G
 	m_cr_border.push_back(hover);
 	m_cr_border.push_back(down);
 
-	if (disabled.GetValue() == Gdiplus::Color::Transparent)
+	if (disabled.GetA() == 0)
 		disabled = get_sys_color(COLOR_GRAYTEXT);
 	m_cr_border.push_back(disabled);
 }

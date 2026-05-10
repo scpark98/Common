@@ -1126,21 +1126,14 @@ HTREEITEM CSCTreeCtrl::find_item(const CString& label, HTREEITEM hItem)
 //hItem의 첫 레벨 children만 검사한다. recursive를 사용하지 않는다.
 HTREEITEM CSCTreeCtrl::find_children_item(const CString& label, HTREEITEM hParentItem)
 {
- 	if (hParentItem == NULL)
-		hParentItem = GetRootItem();// GetNextItem(NULL, TVGN_ROOT);
-
-	CString cur_label;
-	HTREEITEM hItem = GetChildItem(hParentItem);
-
-	if (hItem == NULL)
-		hItem = GetNextSiblingItem(hItem);
+	//hParentItem == NULL → root level 전체 순회 (GetRootItem() 으로 첫 root 부터 sibling 으로 진행).
+	//기존 구현은 GetRootItem() 의 children 만 검색해 같은 level 의 다른 root 항목을 못 찾는 버그가 있었음.
+	HTREEITEM hItem = (hParentItem == NULL) ? GetRootItem() : GetChildItem(hParentItem);
 
 	while (hItem)
 	{
-		cur_label = GetItemText(hItem);
-		//TRACE(_T("cur_label = %s\n"), cur_label);
-
-		if (cur_label == label)
+		//파일 경로 / 시스템 라벨 매칭은 case-insensitive 가 일반적 — Windows path / drive letter 모두 case 무관.
+		if (GetItemText(hItem).CompareNoCase(label) == 0)
 			return hItem;
 		hItem = GetNextSiblingItem(hItem);
 	}
@@ -1150,27 +1143,32 @@ HTREEITEM CSCTreeCtrl::find_children_item(const CString& label, HTREEITEM hParen
 
 CString CSCTreeCtrl::get_selected_item_text(bool include_parent)
 {
-	CString label;
-	HTREEITEM hItem = GetSelectedItem();
+	return get_item_text(GetSelectedItem(), include_parent);
+}
 
+CString CSCTreeCtrl::get_item_text(HTREEITEM hItem, bool include_parent, CString sep)
+{
+	CString label;
 	if (hItem == NULL)
 		return label;
 
 	label = GetItemText(hItem);
-
 	if (!include_parent)
 		return label;
 
 	while (hItem)
 	{
 		hItem = GetParentItem(hItem);
-
 		if (hItem == NULL)
 			break;
 
-		//파일경로일때는 "\\" = "/" 모두 정상 처리되지만
-		//레지스트리 등 일부 경로에서는 "\\"만 유효하게 처리되므로 "\\"로 통일한다.
-		label = GetItemText(hItem) + _T("\\") + label;
+		CString parent_label = GetItemText(hItem);
+		//parent 라벨이 이미 sep 로 끝나면 추가 sep 안 넣음 (drive "C:\" 처럼 trailing 분리자가 라벨에 포함된 경우 "C:\\\\path" 중복 회피).
+		if (!parent_label.IsEmpty() && !sep.IsEmpty() &&
+			parent_label.Right(sep.GetLength()) == sep)
+			label = parent_label + label;
+		else
+			label = parent_label + sep + label;
 	}
 
 	return label;

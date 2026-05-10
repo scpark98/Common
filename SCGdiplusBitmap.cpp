@@ -3548,7 +3548,7 @@ void CSCGdiplusBitmap::thread_gif_animation()
 
 			if (m_has_alpha_pixel)
 			{
-				if (m_cr_back.GetValue() == Gdiplus::Color::Transparent)
+				if (m_cr_back.GetA() == 0)
 					g.FillRectangle(br_zigzag.get(), CRect_to_gpRect(r));
 				else
 				{
@@ -3801,7 +3801,7 @@ CRect CSCGdiplusBitmap::get_transparent_rect()
 	{
 		for (y = 0; y < height; y++)
 		{
-			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetA() != 0)
 				r.left = x;
 		}
 	}
@@ -3811,7 +3811,7 @@ CRect CSCGdiplusBitmap::get_transparent_rect()
 	{
 		for (x = 0; x < width; x++)
 		{
-			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetA() != 0)
 				r.top = y;
 		}
 	}
@@ -3821,7 +3821,7 @@ CRect CSCGdiplusBitmap::get_transparent_rect()
 	{
 		for (y = 0; y < height; y++)
 		{
-			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetA() != 0)
 				r.right = x;
 		}
 	}
@@ -3832,7 +3832,7 @@ CRect CSCGdiplusBitmap::get_transparent_rect()
 	{
 		for (x = 0; x < width; x++)
 		{
-			if (temp.get_pixel(x, y).GetValue() != Gdiplus::Color::Transparent)
+			if (temp.get_pixel(x, y).GetA() != 0)
 				r.bottom = y;
 		}
 	}

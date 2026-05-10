@@ -469,7 +469,7 @@ void CHeaderCtrlEx::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gd
 	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
 		m_cr_back = cr_back;
 
-	if (m_cr_separator.GetValue() == Gdiplus::Color::Transparent)
+	if (m_cr_separator.GetA() == 0)
 	{
 		if (get_gray_value(m_cr_back) < 128)
 			m_cr_separator = get_color(m_cr_back, 32);

@@ -229,6 +229,8 @@ public:
 	//hParentItem의 첫 레벨 children만 검사한다. recursive를 사용하지 않는다.
 	HTREEITEM	find_children_item(const CString& label, HTREEITEM hParentItem = NULL);
 	CString		get_selected_item_text(bool include_parent = false);
+	//hItem 의 라벨을 리턴. include_parent=true 면 root 까지 walk-up + sep 로 join. parent 라벨이 이미 sep 로 끝나면 (drive "C:\" 등) 추가 sep 안 넣음 (smart-join).
+	CString		get_item_text(HTREEITEM hItem, bool include_parent = false, CString sep = _T("\\"));
 
 	//hItem = NULL인 경우는 모든 노드를 unselect로 만드는데 사용된다.
 	//NULL이 아닌 어떤 노드를 select상태로 만들지만 기존 selected 노드에는 영향을 주지 않는다.

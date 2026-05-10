@@ -252,10 +252,88 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		std::deque<CSCParagraph> cur;
 		int cur_w = 0;
 
+		//word-boundary-aware flush — char_spacing != 0 일 때 split_runs_per_char 가 글자 1개씩 run 으로 쪼개므로
+		//run 안에서의 backward boundary 검색이 효력 없음 (n=1, fit=0/1 만 가능). 이미 cur 에 누적된 runs 를 char 단위로 walk-back 하여 마지막 boundary 위치를 찾고 거기서 split.
+		auto flush_with_word_boundary = [&]()
+		{
+			if (cur.empty())
+				return;
+
+			//walk back: cur[i].text 의 char 단위로 ' '/'\t'/',' 검색.
+			int found_run = -1;
+			int found_pos = -1;	//1-based, like split_at semantics.
+			for (int i = (int)cur.size() - 1; i >= 0 && found_run < 0; --i)
+			{
+				const CString& t = cur[i].text;
+				for (int k = t.GetLength(); k >= 1; --k)
+				{
+					TCHAR c = t[k - 1];
+					if (c == _T(' ') || c == _T('\t') || c == _T(','))
+					{
+						found_run = i;
+						found_pos = k;
+						break;
+					}
+				}
+			}
+
+			if (found_run < 0)
+			{
+				//boundary 전혀 없음 — 통째로 flush.
+				wrapped.push_back(cur);
+				cur.clear();
+				cur_w = 0;
+				return;
+			}
+
+			//head = cur[0..found_run-1] + cur[found_run].Left(found_pos)
+			std::deque<CSCParagraph> head;
+			for (int i = 0; i < found_run; ++i)
+				head.push_back(cur[i]);
+			{
+				CSCParagraph head_chunk = cur[found_run];
+				head_chunk.text = cur[found_run].text.Left(found_pos);
+				head.push_back(head_chunk);
+			}
+			wrapped.push_back(head);
+
+			//tail = cur[found_run].Mid(found_pos) + cur[found_run+1..]
+			std::deque<CSCParagraph> tail;
+			{
+				CString rest = cur[found_run].text.Mid(found_pos);
+				while (!rest.IsEmpty() && (rest[0] == _T(' ') || rest[0] == _T('\t')))
+					rest = rest.Mid(1);
+				if (!rest.IsEmpty())
+				{
+					CSCParagraph tail_chunk = cur[found_run];
+					tail_chunk.text = rest;
+					tail.push_back(tail_chunk);
+				}
+			}
+			for (int i = found_run + 1; i < (int)cur.size(); ++i)
+				tail.push_back(cur[i]);
+
+			//char-spacing 1글자 run 케이스: tail 머리에 ' '/'\t' 단일 run 이 남아있으면 strip.
+			while (!tail.empty())
+			{
+				const CString& t = tail.front().text;
+				if (t.GetLength() == 1 && (t[0] == _T(' ') || t[0] == _T('\t')))
+					tail.pop_front();
+				else
+					break;
+			}
+
+			cur = tail;
+			cur_w = 0;
+			for (auto& r2 : cur)
+				cur_w += measure_run_w(r2, r2.text);
+		};
+
 		for (auto& line : para)
 		{
 			cur.clear();
 			cur_w = 0;
+			int wrapped_size_before = (int)wrapped.size();
 
 			for (auto& run : line)
 			{
@@ -266,10 +344,10 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 					int avail = max_width - cur_w;
 					if (avail <= 0 && !cur.empty())
 					{
-						wrapped.push_back(cur);
-						cur.clear();
-						cur_w = 0;
-						avail = max_width;
+						flush_with_word_boundary();
+						avail = max_width - cur_w;
+						if (avail <= 0)
+							avail = max_width;
 					}
 					if (avail <= 0)
 						avail = max_width;
@@ -290,9 +368,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 						//1 글자도 avail 에 안 들어가면 라인 flush 후 fresh 라인에 재시도.
 						if (!cur.empty())
 						{
-							wrapped.push_back(cur);
-							cur.clear();
-							cur_w = 0;
+							flush_with_word_boundary();
 							continue;
 						}
 						//빈 라인인데도 1 글자가 max_width 보다 넓으면 무한루프 방지로 강제 1 글자 진행.
@@ -310,16 +386,42 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 						continue;
 					}
 
-					//split 필요. fit 위치 이전의 마지막 whitespace 가 있으면 거기서 끊음 (어절 boundary).
-					int split_at = fit;
+					//split 필요. boundary = 공백/탭/쉼표. 단어 중간 자르지 않도록.
+					int split_at = -1;
+					//1) backward: fit 이전의 마지막 boundary
 					for (int k = fit; k >= 1; --k)
 					{
 						TCHAR c = text[k - 1];
-						if (c == _T(' ') || c == _T('\t'))
+						if (c == _T(' ') || c == _T('\t') || c == _T(','))
 						{
 							split_at = k;
 							break;
 						}
+					}
+
+					if (split_at < 0)
+					{
+						//2) fit 안에 boundary 없음 — 현재 라인이 비어있지 않으면 flush 후 재시도 (단어 통째를 다음 라인으로).
+						if (!cur.empty())
+						{
+							wrapped.push_back(cur);
+							cur.clear();
+							cur_w = 0;
+							continue;
+						}
+						//3) 빈 라인 — forward look-ahead 으로 단어 끝(=다음 boundary)까지 포함, 라인 너비 초과 허용.
+						for (int k = fit + 1; k <= n; ++k)
+						{
+							TCHAR c = text[k - 1];
+							if (c == _T(' ') || c == _T('\t') || c == _T(','))
+							{
+								split_at = k;
+								break;
+							}
+						}
+						//4) 전체에 boundary 없음 (공백 없는 CJK 등) — char boundary fallback.
+						if (split_at < 0)
+							split_at = fit;
 					}
 
 					CSCParagraph chunk = run;
@@ -344,6 +446,13 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 				wrapped.push_back(cur);
 				cur.clear();
 				cur_w = 0;
+			}
+
+			//현재 source line 으로부터 생성된 wrapped 라인이 2개 이상이면 첫 라인 외에는 wrap 연속 라인.
+			for (int wi = wrapped_size_before + 1; wi < (int)wrapped.size(); ++wi)
+			{
+				if (!wrapped[wi].empty())
+					wrapped[wi][0].wrap_continuation = true;
 			}
 		}
 
@@ -464,7 +573,12 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		{
 			int total_width = 0;
 			for (j = 0; j < para[i].size(); j++)
+			{
+				//char_spacing 도 라인 너비에 반영 — 안 그러면 negative spacing 시 라인이 실제보다 넓다고 계산되어 왼쪽으로 밀려 widest 라인의 첫 글자가 잘림.
+				if (j > 0 && char_spacing != 0)
+					total_width += char_spacing;
 				total_width += para[i][j].r.Width();
+			}
 
 			//아이콘을 포함하여 center에 표시할 지, 텍스트만 center에 표시할 지...
 			//if (m_hIcon)
@@ -483,7 +597,11 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		{
 			int total_width = 0;
 			for (j = 0; j < para[i].size(); j++)
+			{
+				if (j > 0 && char_spacing != 0)
+					total_width += char_spacing;
 				total_width += para[i][j].r.Width();
+			}
 
 			//rc.right에서 total_width를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
 			sx = rc.right - margin.right - total_width;
@@ -590,7 +708,7 @@ int CSCParagraph::get_max_width_line(std::deque<std::deque<CSCParagraph>>& para)
 //라인 사이 간격을 조정한다. 글자 자체 크기는 그대로 두고 다음 라인의 시작 위치만 아래로 밀어낸다.
 //spacing = 1.0f이면 변경 없음, 1.5f이면 라인 i의 max height의 0.5배만큼 이후 라인부터 누적 shift된다.
 //spacing < 1.0f도 허용하나 음수 shift로 라인이 겹칠 수 있다.
-CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, float spacing)
+CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, float spacing, float wrap_continuation_delta, float paragraph_break_delta)
 {
 	if (para.empty())
 		return CRect();
@@ -611,12 +729,18 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 	}
 
 	//라인 0은 그대로 두고 라인 1부터 누적 shift를 적용.
-	//라인 i의 추가 shift = sum(line_heights[0..i-1]) * (spacing - 1.0)
+	//pair_spacing — wrap 연속이면 wrap_continuation_delta, 그 외 (=paragraph break) 면 paragraph_break_delta 추가.
 	int shift_y = 0;
 
 	for (i = 1; i < (int)para.size(); i++)
 	{
-		shift_y += (int)((float)line_heights[i - 1] * (spacing - 1.0f));
+		float pair_spacing = spacing;
+		if (!para[i].empty() && para[i][0].wrap_continuation)
+			pair_spacing += wrap_continuation_delta;
+		else
+			pair_spacing += paragraph_break_delta;
+
+		shift_y += (int)((float)line_heights[i - 1] * (pair_spacing - 1.0f));
 
 		for (j = 0; j < para[i].size(); j++)
 			para[i][j].r.OffsetRect(0, shift_y);

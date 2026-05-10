@@ -196,11 +196,15 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 
 	CClientDC dc(this);
 	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER, m_max_width, m_char_spacing);
+	int pre_h = r.Height();	//pre-spacing total height. 2nd calc_text_rect 의 rc.H 로 사용해 stroke 여백 고정.
 	r.InflateRect(1, 1);
 
-	//행간 factor 적용 — 1.0 이 아닐 때만. 라인 사이 gap 을 비례로 늘리거나 줄임.
-	if (m_line_spacing_factor != 1.0f)
-		CSCParagraph::set_line_spacing(m_para, m_line_spacing_factor);
+	//행간 factor 적용. wrap_continuation_delta 는 wrap 으로 분리된 연속 라인 위 간격에만 적용 (=원래 <br> 분리 라인보다 좁게 → 한 paragraph 임을 시각적으로 구분).
+	//base factor 가 1.0 이라도 wrap 라인이 있으면 호출돼야 하므로 unconditional.
+	//반환된 post-spacing rect 로 r.bottom 갱신 — wrap 압축 시 캔버스 하단 공백 (=다이얼로그 위치가 위로 밀리는 시각 버그) 제거.
+	CRect r_spacing = CSCParagraph::set_line_spacing(m_para, m_line_spacing_factor, -0.05f, +0.20f);
+	r.top = r_spacing.top - 1;
+	r.bottom = r_spacing.bottom + 1;
 
 	//배경을 그린다면 r은 더 크게 잡아줘야 한다. margin만큼 더 크게 키워준다.
 	if (m_text_setting.text_prop.cr_back.GetValue() != Gdiplus::Color::Transparent)
@@ -228,21 +232,22 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 		r.InflateRect(extra, extra / 2);
 
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
-	r = CRect(0, 0, r.Width(), r.Height());
 	//Phase 0 wrap 은 첫 calc_text_rect 호출에서 이미 적용됨. 두 번째는 wrapped para 의 최종 위치만 재측정 — max_width 다시 넘기면 이미 짧아진 chunk 가 더 잘게 쪼개짐. 0 으로 호출.
 	//char_spacing 은 동일 값 전달 — run 위치 재계산 시 자간 유지.
-	r = CSCParagraph::calc_text_rect(r, &dc, m_para, DT_CENTER | DT_VCENTER, 0, m_char_spacing);
+	//rc.H 는 canvas (post + 2 + extra) 가 아니라 pre + 2 + extra. DT_VCENTER 의 sy_offset = (rc.H - pre_h)/2 = 1+extra/2 (=stroke 여백 M) 로 고정 — spacing 이 캔버스 크기 변경해도 stroke 여백은 일정.
+	CRect r_for_calc(0, 0, r.Width(), pre_h + (r.Height() - r_spacing.Height()));
+	r = CSCParagraph::calc_text_rect(r_for_calc, &dc, m_para, DT_CENTER | DT_VCENTER, 0, m_char_spacing);
 
 	//행간 factor 재적용 — 두 번째 calc_text_rect 가 r 을 재계산하므로 다시 호출.
-	if (m_line_spacing_factor != 1.0f)
-		CSCParagraph::set_line_spacing(m_para, m_line_spacing_factor);
+	CSCParagraph::set_line_spacing(m_para, m_line_spacing_factor, -0.05f, +0.20f);
 
 	//CSCParagraph::get_paragraph_info_string(m_para);
 
 
 	//해당 캔버스에
 	Gdiplus::Graphics g(m_img.m_pBitmap);
-	g.Clear(Gdiplus::Color::Transparent);
+	//alpha=0 캔버스 클리어 시 RGB=0 강제 — Color::Transparent (0x00FFFFFF) 의 RGB=255 가 anti-aliased 글자 가장자리와 섞여 흰색 헤일로 (가독성 저하) 발생. RGB=0 이면 어두운 글자에 자연스럽게 묻힘.
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -380,7 +385,17 @@ void CSCShapeDlg::set_text_align(int align, bool invalidate)
 
 	//해당 캔버스에 다시 그려준다.
 	Gdiplus::Graphics g(m_img.m_pBitmap);
-	g.Clear(m_text_setting.text_prop.cr_back);
+	//alpha=0 cr_back 인 경우 RGB=0 으로 강제 — RGB=255 (Color::Transparent) 라면 anti-aliased 가장자리가 흰색 헤일로 발생.
+	Gdiplus::Color clear_color = m_text_setting.text_prop.cr_back;
+	if (clear_color.GetA() == 0)
+		clear_color = Gdiplus::Color(0, 0, 0, 0);
+	g.Clear(clear_color);
+
+	//AA / TextRenderingHint — set_text 의 첫 렌더에선 적용했지만 set_text_align 의 두 번째 렌더가 첫 렌더를 덮어쓰면서 AA 가 빠진 raw 픽셀로 다시 그려짐. DT_LEFT/DT_RIGHT 경로의 OSD/자막 가독성 회귀의 진짜 원인.
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
 	CSCParagraph::draw_text(g, m_para);
 	set_image(m_parent, &m_img, false);
 }

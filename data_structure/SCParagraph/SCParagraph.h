@@ -79,6 +79,10 @@ public:
 	CSCTextProperty	text_prop;
 	CRect			r;						//이 텍스트가 그려질 위치(절대좌표가 아닌 0,0을 기준으로 상대좌표)
 
+	//라인의 첫 run 에 set 되며, 그 라인이 source 의 같은 paragraph 에서 wrap 으로 분리된 연속 라인임을 표시.
+	//set_line_spacing 이 wrap 연속 라인 위 간격에는 wrap_continuation_delta 를 추가 적용하여 <br> 분리 라인보다 좁게.
+	bool			wrap_continuation = false;
+
 	//이 paragraph의 CSCTextProperty 설정에 맞는 Gdiplus::Font를 구한다.
 	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
 
@@ -107,7 +111,13 @@ public:
 	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
 
 	//각 paragraph의 r이 계산된 후에 줄 간격을 spacing 배수로 조정한다. spacing이 1.0f이면 기본 줄 간격, 2.0f이면 줄 간격이 2배가 된다.
-	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, float spacing = 1.0f);
+	//wrap_continuation_delta != 0 이면 wrap 연속 라인 (line[0].wrap_continuation == true) 위 간격에 (spacing + wrap_continuation_delta) 적용. 음수 = 좁힘.
+	//paragraph_break_delta != 0 이면 그 외 라인 (i>0 이면서 wrap_continuation == false, =원래 <br> 분리) 위 간격에 (spacing + paragraph_break_delta) 적용. 양수 = 넓힘.
+	//두 delta 를 같이 쓰면 wrap 과 paragraph break 의 시각적 차이를 강조 — wrap 라인 압축 + paragraph break 확장.
+	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
+								float spacing = 1.0f,
+								float wrap_continuation_delta = 0.0f,
+								float paragraph_break_delta = 0.0f);
 	//line번째 라인의 윗 간격(line-1 번째 라인과의 간격)만 spacing 배수로 조정한다. line >= 1 이어야 한다.
 	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, int line, float spacing = 1.0f);
 

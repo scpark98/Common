@@ -19,6 +19,7 @@
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
+#include "../../log/SCLog/SCLog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -89,6 +90,11 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_WINDOWPOSCHANGED()
 	//ON_WM_NCPAINT()
 	//ON_WM_CTLCOLOR()
+	ON_WM_CTLCOLOR_REFLECT()
+	ON_WM_DESTROY()
+	ON_WM_NCCALCSIZE()
+	ON_WM_VSCROLL()
+	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCListBox::on_message_CSCScrollbar)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCListBox::on_message_CSCEdit)
 END_MESSAGE_MAP()
 
@@ -135,6 +141,8 @@ void CSCListBox::PreSubclassWindow()
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
 
 	ReconstructFont();
+
+	setup_scrollbar();
 }
 
 void CSCListBox::ReconstructFont()
@@ -207,7 +215,10 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	Gdiplus::Color	cr_text;
 	Gdiplus::Color	cr_back = m_theme.cr_back;
 
-	cr_text.SetFromCOLORREF(lpDIS->itemData);	// Color information is in item data.
+	//itemData 에 CSCListBoxItem* 저장됨. alpha=0 = "사용자 미지정 → theme 으로 fallback".
+	CSCListBoxItem* item = (CSCListBoxItem*)lpDIS->itemData;
+	cr_text = (item && item->cr_text.GetA() != 0) ? item->cr_text : m_theme.cr_text;
+	Gdiplus::Color cr_item_back = (item && item->cr_back.GetA() != 0) ? item->cr_back : m_theme.cr_back;
 
 	CRect		rc;
 	CRect		rect = lpDIS->rcItem;
@@ -272,11 +283,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			else if (m_show_selection_always)
 				cr_back = m_theme.cr_back_selected_inactive;
 			else
-				cr_back = m_theme.cr_back;
+				cr_back = cr_item_back;	//normal-but-selected-not-focused — per-item cr_back 또는 theme.
 		}
 		else
 		{
-			cr_back = m_theme.cr_back;
+			cr_back = cr_item_back;	//normal — per-item cr_back override 가능.
 		}
 
 	}
@@ -549,7 +560,7 @@ int CSCListBox::add(LPCTSTR text, ...)
 
 	new_text.FormatV(text, args);
 
-	return insert_string(-1, new_text);
+	return insert(-1, new_text);
 }
 
 int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
@@ -558,26 +569,25 @@ int CSCListBox::add(std::deque<CString> *lists, Gdiplus::Color cr)
 		cr = m_theme.cr_text;
 
 	for (int i = 0; i < lists->size(); i++)
-		insert_string(-1, lists->at(i), cr);
+		insert(-1, lists->at(i), cr);
 
 	return lists->size();
 }
 
 //-------------------------------------------------------------------
 //
-int CSCListBox::insert_string(int nIndex, CString text, Gdiplus::Color rgb)
+int CSCListBox::insert(int index, CString text, Gdiplus::Color cr_text)
 //
-// Return Value:	The zero-based index of the position at which the 
-//						string was inserted. The return value is LB_ERR if 
-//						an error occurs; the return value is LB_ERRSPACE if 
+// Return Value:	The zero-based index of the position at which the
+//						string was inserted. The return value is LB_ERR if
+//						an error occurs; the return value is LB_ERRSPACE if
 //						insufficient space is available to store the new string.
 //
-// Parameters	:	nIndex - Specifies the zero-based index of the position
-//							to insert the string. If this parameter is ?, the string
-//							is added to the end of the list.
-//						lpszItem - Points to the null-terminated string that 
+// Parameters	:	index - Specifies the zero-based index of the position
+//							to insert the string. -1 = append to end.
+//						text - Points to the null-terminated string that
 //							is to be inserted.
-//						rgb - Specifies the color to be associated with the item.
+//						cr_text - Specifies the color to be associated with the item.
 //
 // Remarks		:	Inserts a colored string into the list box.
 //
@@ -599,21 +609,23 @@ int CSCListBox::insert_string(int nIndex, CString text, Gdiplus::Color rgb)
 			text = date_str + _T(" ") + text;
 	}
 
-	int index = ((CListBox*)this)->InsertString(nIndex, text);
-	if (index >= 0)
+	int inserted = ((CListBox*)this)->InsertString(index, text);
+	if (inserted >= 0)
 	{
-		if (rgb.GetA() == 0)
-			rgb = m_theme.cr_text;
-		//COLORREF rgb_value = rgb.ToCOLORREF();
-		SetItemData(index, rgb.GetValue());
+		//itemData 에 CSCListBoxItem* 저장. text 도 같이 보관해 외부에서 직접 접근 가능 (color 외 메타).
+		//cr_back = Transparent → DrawItem 이 m_theme.cr_back 사용 의미.
+		CSCListBoxItem* item = new CSCListBoxItem(text, cr_text, Gdiplus::Color::Transparent);
+		SetItemData(inserted, (DWORD_PTR)item);
 		RedrawWindow();
 
 		if (m_auto_scroll)
-			SetTopIndex(index);
+			SetTopIndex(inserted);
+
+		sync_scrollbar();
 	}
 
-	return index;
-}	// InsertString
+	return inserted;
+}	// CSCListBox::insert
 
 //-------------------------------------------------------------------
 //
@@ -628,14 +640,17 @@ void CSCListBox::set_item_color(int nIndex, Gdiplus::Color rgb, bool invalidate)
 //						item in the list box.
 //
 {
-	SetItemData(nIndex, rgb.ToCOLORREF());
+	CSCListBoxItem* item = (CSCListBoxItem*)GetItemData(nIndex);
+	if (item)
+		item->cr_text = rgb;
 	if (invalidate)
 		RedrawWindow();
 }
 
 Gdiplus::Color CSCListBox::get_item_color(int nIndex)
 {
-	return (Gdiplus::Color)GetItemData(nIndex);
+	CSCListBoxItem* item = (CSCListBoxItem*)GetItemData(nIndex);
+	return item ? item->cr_text : m_theme.cr_text;
 }
 
 CString CSCListBox::get_text(int index)
@@ -663,9 +678,67 @@ void CSCListBox::set_text(int index, CString text, Gdiplus::Color cr)
 
 	SetRedraw(FALSE);
 	DeleteString(index);
-	insert_string(index, text, cr);
+	insert(index, text, cr);
 	SetRedraw(TRUE);
 	UpdateWindow();
+}
+
+//CSCListBoxItem::alt_text 에 추가 메타 문자열 저장 (full path 등). 표시 텍스트는 그대로 유지.
+void CSCListBox::set_alt_text(int index, CString _alt_text)
+{
+	if (index < 0 || index >= GetCount())
+	{
+		TRACE(_T("out of range of listbox index = %d.\n"), index);
+		return;
+	}
+
+	CSCListBoxItem* item = (CSCListBoxItem*)GetItemData(index);
+	if (item)
+		item->alt_text = _alt_text;
+}
+
+CString CSCListBox::get_alt_text(int index)
+{
+	if (index < 0 || index >= GetCount())
+	{
+		TRACE(_T("out of range of listbox index = %d.\n"), index);
+		return _T("");
+	}
+
+	CSCListBoxItem* item = (CSCListBoxItem*)GetItemData(index);
+	return item ? item->alt_text : _T("");
+}
+
+//start 부터 case-insensitive 로 find_str 검색. Functions.h::find 위임 (case_sensitive=false 고정).
+//find_main_text = true: 표시 텍스트 (listbox 의 GetText). false: CSCListBoxItem::alt_text.
+//whole_word: Functions.h::find 의 same param — needle 양 끝이 punctuation/string 경계 여야 매치 (word boundary).
+int CSCListBox::find(int start, CString find_str, bool find_main_text, bool whole_word)
+{
+	if (find_str.IsEmpty())
+		return -1;
+	if (start < 0)
+		start = 0;
+
+	int count = GetCount();
+	for (int i = start; i < count; i++)
+	{
+		CString target;
+		if (find_main_text)
+		{
+			target = get_text(i);
+		}
+		else
+		{
+			CSCListBoxItem* item = (CSCListBoxItem*)GetItemData(i);
+			if (!item)
+				continue;
+			target = item->alt_text;
+		}
+
+		if (::find(target, find_str, 0, false, whole_word) >= 0)
+			return i;
+	}
+	return -1;
 }
 
 void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
@@ -706,17 +779,28 @@ void CSCListBox::OnPaint()
 
 BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 {
-	// TODO: Add your message handler code here and/or call default
-
-	//여기서 배경색으로 칠해주지 않으면 항목이 없는 영역은 다른 색으로 채워져있다.
+	//전체 client 를 fill 하면 DrawItem 이 그 위에 다시 그려 erase ↔ paint 사이 bg flash → 스크롤 시 깜빡임.
+	//항목 영역은 DrawItem 이 cr_back 포함해 그리므로 여기서 erase 안 해도 됨. 마지막 항목 *아래* 의 빈 영역만 fill.
 	CRect rc;
 	GetClientRect(rc);
-	//pDC->FillSolidRect(rc, red);
-	pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
-	//draw_line(pDC, 0, 0, 100, 100);
 
-	return FALSE;
-	return CListBox::OnEraseBkgnd(pDC);
+	int count = GetCount();
+	int top = GetTopIndex();
+	int items_bottom = 0;
+	if (count > 0 && m_line_height > 0)
+	{
+		items_bottom = (count - top) * m_line_height;
+		if (items_bottom > rc.Height())
+			items_bottom = rc.Height();
+	}
+
+	if (items_bottom < rc.Height())
+	{
+		CRect r_empty(rc.left, items_bottom, rc.right, rc.Height());
+		pDC->FillSolidRect(r_empty, m_theme.cr_back.ToCOLORREF());
+	}
+
+	return TRUE;
 }
 
 CSize CSCListBox::resizeToFit(bool bHori, bool bVert)
@@ -952,7 +1036,7 @@ int CSCListBox::set_folder_list(std::deque<CString>* lists, CString selected_tex
 
 	for (int i = 0; i < m_folder_list.size(); i++)
 	{
-		insert_string(-1, get_part(m_folder_list[i], fn_name));
+		insert(-1, get_part(m_folder_list[i], fn_name));
 	}
 
 	SelectString(-1, selected_text);
@@ -977,6 +1061,12 @@ BOOL CSCListBox::OnLbnSelchange()
 	//Ctrl+End 또는 PageDown으로 맨 마지막 항목이 선택되면 자동 스크롤,
 	//그 외 항목이 선택되면 자동 스크롤을 멈춘다.
 	m_auto_scroll = (index == GetCount() - 1);
+
+	//화살표 키 등 keyboard navigation 으로 listbox internal auto-scroll 발생 시 m_scrollbar.m_pos 가 stale.
+	//여기서 sync 하면 새로운 top 이 scrollbar 에 반영. 추가로 RedrawWindow 로 ScrollWindow 후 잔류 픽셀 artifact 제거 — RDW_NOERASE 로 erase 단계 skip해 깜빡임 회피, RDW_UPDATENOW 로 동기 paint.
+	sync_scrollbar();
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_NOERASE | RDW_UPDATENOW);
 
 	if (m_as_popup)
 	{
@@ -1285,12 +1375,23 @@ void CSCListBox::save_all_to_file()
 
 BOOL CSCListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	
 	//mouse wheel 이벤트가 발생하면 자동 스크롤을 멈춘다.
 	m_auto_scroll = false;
 
-	return CListBox::OnMouseWheel(nFlags, zDelta, pt);
+	//WS_VSCROLL 제거된 상태라 base CListBox 의 default wheel 처리는 동작 안 함. 수동으로 SetTopIndex.
+	int notches = zDelta / WHEEL_DELTA;	//양수 = 위로 휠.
+	UINT scroll_lines = 3;
+	::SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &scroll_lines, 0);
+	if ((int)scroll_lines == WHEEL_PAGESCROLL)	scroll_lines = 1;	//page scroll 모드는 1라인 fallback.
+
+	int new_top = GetTopIndex() - notches * (int)scroll_lines;
+	int max_top = GetCount() - 1;
+	if (max_top < 0) max_top = 0;
+	if (new_top < 0) new_top = 0;
+	if (new_top > max_top) new_top = max_top;
+
+	SetTopIndex(new_top);	//override 가 sync_scrollbar 도 호출.
+	return TRUE;
 }
 
 
@@ -1322,6 +1423,7 @@ void CSCListBox::OnSize(UINT nType, int cx, int cy)
 	Invalidate();
 	RedrawWindow();
 	UpdateWindow();
+	sync_scrollbar();
 }
 
 
@@ -1380,7 +1482,6 @@ void CSCListBox::edit_end(bool modify)
 
 	if (modify)
 	{
-		DWORD cr;
 		CString text;
 		m_pEdit->GetWindowText(text);
 		TRACE(_T("index = %d\n"), m_edit_index);
@@ -1395,9 +1496,11 @@ void CSCListBox::edit_end(bool modify)
 		if (text.IsEmpty() == false || m_accept_empty_edit_str)
 		{
 			SetRedraw(FALSE);
-			cr = GetItemData(m_edit_index);
+			//기존 itemData 의 색을 보존하기 위해 delete 전 미리 추출. DeleteString 이 CSCListBoxItem* 를 free 한다.
+			CSCListBoxItem* old_item = (CSCListBoxItem*)GetItemData(m_edit_index);
+			Gdiplus::Color cr_save = old_item ? old_item->cr_text : m_theme.cr_text;
 			DeleteString(m_edit_index);
-			insert_string(m_edit_index, text, cr);
+			insert(m_edit_index, text, cr_save);
 			SetRedraw(TRUE);
 			SetCurSel(m_edit_index);
 		}
@@ -1526,7 +1629,7 @@ void CSCListBox::move_item(int from_index, int to_index)
 	cr = get_item_color(from_index);
 	SetRedraw(FALSE);
 	DeleteString(from_index);
-	insert_string(to_index, text, cr);
+	insert(to_index, text, cr);
 	SetRedraw(TRUE);
 	SetCurSel(to_index);
 	UpdateWindow();
@@ -1560,6 +1663,31 @@ void CSCListBox::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
 
+	//cr_back brush 재생성 — CtlColor (reflected) 가 owner-draw listbox 의 빈 영역 색으로 사용.
+	if (m_br_back.GetSafeHandle())
+		m_br_back.DeleteObject();
+	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
+
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, false);
+
+	if (!m_hWnd)
+		return;
+
+	Invalidate();
+}
+
+void CSCListBox::set_color_theme(const CSCColorTheme& theme)
+{
+	m_theme.copy_colors_from(theme);
+
+	if (m_br_back.GetSafeHandle())
+		m_br_back.DeleteObject();
+	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
+
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, false);
+
 	if (!m_hWnd)
 		return;
 
@@ -1581,6 +1709,176 @@ HBRUSH CSCListBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 	// TODO:  여기서 DC의 특성을 변경합니다.
 	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
 	return hbr;
+}
+
+//reflected: 부모가 WM_CTLCOLORLISTBOX 처리 안 하면 MFC 가 child 의 CtlColor 호출.
+//owner-draw listbox 의 빈 영역도 이 brush 로 칠해져 cr_back 일관 적용.
+HBRUSH CSCListBox::CtlColor(CDC* pDC, UINT nCtlColor)
+{
+	pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
+	pDC->SetBkColor(m_theme.cr_back.ToCOLORREF());
+	if (m_br_back.GetSafeHandle())
+		return (HBRUSH)m_br_back.GetSafeHandle();
+	return NULL;
+}
+
+//base 의 ResetContent / DeleteString 은 itemData (= CSCListBoxItem*) 를 그냥 버리므로 leak. override 해서 먼저 해제.
+void CSCListBox::ResetContent()
+{
+	int count = CListBox::GetCount();
+	for (int i = 0; i < count; i++)
+	{
+		CSCListBoxItem* item = (CSCListBoxItem*)CListBox::GetItemData(i);
+		delete item;
+	}
+	CListBox::ResetContent();
+	sync_scrollbar();
+}
+
+int CSCListBox::DeleteString(UINT nIndex)
+{
+	if ((int)nIndex < CListBox::GetCount())
+	{
+		CSCListBoxItem* item = (CSCListBoxItem*)CListBox::GetItemData(nIndex);
+		delete item;
+	}
+	int r = CListBox::DeleteString(nIndex);
+	sync_scrollbar();
+	return r;
+}
+
+int CSCListBox::SetCurSel(int nSelect)
+{
+	int r = CListBox::SetCurSel(nSelect);
+	//SetCurSel 이 internal 로 SetTopIndex 호출해 auto-scroll 시킬 수 있음 — top 갱신 가능성 있어 sync.
+	sync_scrollbar();
+	return r;
+}
+
+int CSCListBox::SetTopIndex(int nIndex)
+{
+	int r = CListBox::SetTopIndex(nIndex);
+	sync_scrollbar();
+	return r;
+}
+
+void CSCListBox::OnDestroy()
+{
+	//창 destroy 시점에 남아있는 항목들의 itemData 정리. ResetContent 로 처리하면 base 가 invalidate 등 호출 시도하므로 manual loop.
+	int count = CListBox::GetCount();
+	for (int i = 0; i < count; i++)
+	{
+		CSCListBoxItem* item = (CSCListBoxItem*)CListBox::GetItemData(i);
+		delete item;
+	}
+	CListBox::OnDestroy();
+}
+
+void CSCListBox::setup_scrollbar()
+{
+	if (m_scrollbar_setup || !::IsWindow(m_hWnd))
+		return;
+
+	//flag 를 먼저 true 로 — 다음 SetWindowPos(SWP_FRAMECHANGED) 가 트리거하는 WM_NCCALCSIZE 가
+	//OnNcCalcSize 의 m_scrollbar_setup 분기를 타도록 (false 면 base 가 native scrollbar NC 영역 reserve 함).
+	m_scrollbar_setup = true;
+
+	//WS_HSCROLL 제거 + WS_VSCROLL 유지 + WS_CLIPCHILDREN 추가. WS_VSCROLL 유지 이유 — base CListBox 내부 scroll 시
+	//WM_VSCROLL 을 자체 발화 → OnVScroll catch → sync_scrollbar 가 base scroll 직후 동기 실행 (SCTreeCtrl 패턴과 동일).
+	//OnNcCalcSize 가 NC 공간 0 으로 만들어 native scrollbar 시각적 비표시. ShowScrollBar 로 추가 차단.
+	LONG_PTR style = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
+	style &= ~(LONG_PTR)WS_HSCROLL;
+	style |= WS_VSCROLL | WS_CLIPCHILDREN;
+	::SetWindowLongPtr(m_hWnd, GWL_STYLE, style);
+
+	::SetWindowPos(m_hWnd, NULL, 0, 0, 0, 0,
+		SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+	ShowScrollBar(SB_VERT, FALSE);
+	ShowScrollBar(SB_HORZ, FALSE);
+
+	CRect rc;
+	GetClientRect(&rc);
+	m_scrollbar.create(this, CSCScrollbar::vertical,
+		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+	m_scrollbar.set_color_theme(m_theme, false);
+	m_scrollbar.ShowWindow(SW_HIDE);
+}
+
+void CSCListBox::sync_scrollbar()
+{
+	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
+		return;
+
+	//listbox 가 항목 추가 등으로 native scrollbar 재표시 시도 — 매 sync 마다 강제 hide.
+	ShowScrollBar(SB_VERT, FALSE);
+	ShowScrollBar(SB_HORZ, FALSE);
+
+	int total = GetCount();
+
+	//visible item 수 — owner-draw fixed 이므로 line_height 로 계산.
+	CRect rc;
+	GetClientRect(&rc);
+	int visible = (m_line_height > 0) ? (rc.Height() / m_line_height) : 0;
+
+	//위치 sync — width 은 scrollbar 자체 hover 확장 관리, 우측 edge / height 만 갱신.
+	CRect rCur;
+	m_scrollbar.GetWindowRect(rCur);
+	ScreenToClient(rCur);
+	int cur_width = rCur.Width();
+	CRect rTarget(rc.right - cur_width, 0, rc.right, rc.Height());
+	if (rCur != rTarget)
+	{
+		CRect rOld = rCur;
+		m_scrollbar.MoveWindow(rTarget);
+		InvalidateRect(rOld, TRUE);
+	}
+
+	bool need = (total > visible) && (visible > 0);
+	int top = GetTopIndex();
+	if (top < 0) top = 0;
+
+	if (!need)
+	{
+		if (m_scrollbar.IsWindowVisible())
+			m_scrollbar.ShowWindow(SW_HIDE);
+		return;
+	}
+
+	m_scrollbar.set_range(0, total - 1);
+	m_scrollbar.set_page(visible);
+	m_scrollbar.set_pos(top);
+
+	if (!m_scrollbar.IsWindowVisible())
+		m_scrollbar.ShowWindow(SW_SHOW);
+}
+
+LRESULT CSCListBox::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
+{
+	CSCScrollbarMsg* msg = (CSCScrollbarMsg*)wParam;
+	if (msg == nullptr || msg->pThis != &m_scrollbar)
+		return 0;
+
+	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
+	{
+		SetTopIndex(msg->pos);
+	}
+	return 0;
+}
+
+void CSCListBox::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
+{
+	//CSCScrollbar overlay 설치된 후엔 native scrollbar 의 NC 공간 미할당 — 시각적으로 안 그려짐.
+	if (m_scrollbar_setup && lpncsp)
+		return;
+
+	CListBox::OnNcCalcSize(bCalcValidRects, lpncsp);
+}
+
+void CSCListBox::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	CListBox::OnVScroll(nSBCode, nPos, pScrollBar);
+	sync_scrollbar();
 }
 
 LRESULT CSCListBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)

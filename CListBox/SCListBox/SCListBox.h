@@ -43,6 +43,7 @@
 #include "../../SCGdiplusBitmap.h"
 #include "../../colors.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
 
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
@@ -82,14 +83,20 @@ public:
 
 class CSCListBoxItem
 {
-	CSCListBoxItem(WIN32_FIND_DATA _data, UINT _icon_index)
+public:
+	CSCListBoxItem() {}
+	//Transparent일 경우는 기본 글자색, 배경색을 사용하는 의미
+	CSCListBoxItem(CString _text, Gdiplus::Color _cr_text = Gdiplus::Color::Transparent, Gdiplus::Color _cr_back = Gdiplus::Color::Transparent)
 	{
-		data = _data;
-		icon_index = _icon_index;
+		text = _text;
+		cr_text = _cr_text;
+		cr_back = _cr_back;
 	}
 
-	WIN32_FIND_DATA		data;
-	UINT				icon_index = 0;	//remote의 파일/폴더목록을 표시할 경우 이 값
+	CString			text;
+	CString			alt_text;		//추가적인 str 저장
+	Gdiplus::Color	cr_text;
+	Gdiplus::Color	cr_back;
 };
 
 class CSCListBox : public CListBox
@@ -112,7 +119,7 @@ public:
 // Operations
 public:
 	//가변 인자를 사용하면 CString::FormatV()를 이용하는데 문자열에 %가 포함되면 format specifier로 인식되므로 에러가 발생한다.
-	//add 대신 insert_string()을 이용하자.
+	//add 대신 insert()를 이용하자.
 	/*
 	//기본 글자색으로 한 줄 추가
 	int			add(LPCTSTR lpszFormat, ...);
@@ -131,13 +138,19 @@ public:
 	//여러줄의 문자열을 한번에 추가(shell_listbox에 사용)
 	int			add(std::deque<CString>* lists, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
-	int			insert_string(int nIndex, CString lpszItem, Gdiplus::Color rgb = Gdiplus::Color::Transparent);	// Inserts a colored string to the list box
+	int			insert(int index, CString text, Gdiplus::Color cr_text = Gdiplus::Color::Transparent);	// Inserts a colored string to the list box
 	void		set_item_color(int nIndex, Gdiplus::Color rgb, bool invalidate = true);	// Sets the color of an item in the list box
 	Gdiplus::Color	get_item_color(int nIndex);
 
 	CString		get_text(int index);
 	void		set_text(int index, CString text, Gdiplus::Color cr = Gdiplus::Color::Transparent);
+	CString		get_alt_text(int index);
+	void		set_alt_text(int index, CString _alt_text);
 
+	//find_main_text = false인 경우는 alt_text에서 찾는다.
+	int			find(int start, CString find_str, bool find_main_text = true, bool whole_word = true);
+
+	int			size() { return GetCount(); }
 	void		clear_all() { ResetContent(); Invalidate(); }
 
 	CSize		resizeToFit(bool bHori = true, bool bVert = true);			//변경된 크기를 리턴한다.
@@ -204,6 +217,8 @@ public:
 	void		set_font_bold(int weight = FW_BOLD);
 
 	void		set_color_theme(int theme);
+	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
+	void		set_color_theme(const CSCColorTheme& theme);
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList, bool is_local) { m_pShellImageList = pShellImageList; m_is_local = is_local; }
@@ -368,7 +383,31 @@ protected:
 public:
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnNcPaint();
+	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
+	//reflected: 부모 (PlaylistDlg 등) 가 WM_CTLCOLORLISTBOX 를 처리 안 하면 MFC 가 child 에 reflect.
+	//owner-draw listbox 의 빈 영역 (항목 없는 공간) 도 이 brush 로 칠해짐 — 흰색 default 회피.
+	afx_msg HBRUSH CtlColor(CDC* pDC, UINT nCtlColor);
+	afx_msg void OnDestroy();
+	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+
+	//base 의 ResetContent / DeleteString 을 hide — itemData 에 저장된 CSCListBoxItem* 를 먼저 해제해 leak 회피.
+	void			ResetContent();
+	int				DeleteString(UINT nIndex);
+	//SetCurSel / SetTopIndex 도 hide — auto-scroll 로 top 이 바뀌면 sync_scrollbar 호출해 CSCScrollbar 위치 갱신.
+	int				SetCurSel(int nSelect);
+	int				SetTopIndex(int nIndex);
+
+	//자체 스크롤바 — CSCTreeCtrl / CSCThumbCtrl 와 동일 패턴. WS_VSCROLL 제거 + OnNcCalcSize 가 NC 영역 0 → native scrollbar 안 보임.
+	CSCScrollbar	m_scrollbar;
+	int				m_scrollbar_width = 16;
+	bool			m_scrollbar_setup = false;
+	void			setup_scrollbar();
+	void			sync_scrollbar();
+	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
+
+protected:
+	CBrush			m_br_back;	//cr_back 색 brush — set_color_theme 에서 재생성, CtlColor 에서 반환.
 };
 
 /////////////////////////////////////////////////////////////////////////////

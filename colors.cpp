@@ -1402,9 +1402,17 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = cr_text_selected;
 			cr_text_dropHilited		= get_sys_color(COLOR_HIGHLIGHTTEXT);
 
-			//컨트롤 종류에 따라 기본 배경색이 다르다.
+			//컨트롤 종류에 따라 기본 배경색이 다르다 (List/Tree/Edit 류 = COLOR_WINDOW, 그 외 = COLOR_BTNFACE).
+			//m_parent 는 강제 — NULL 이면 잘못된 선언 (`CSCColorTheme m_theme;`) 이므로 즉시 알림.
+			//올바른 선언: `CSCColorTheme m_theme = CSCColorTheme(this);` (this 로 컨트롤 종류 판별).
+			if (m_parent == NULL)
+			{
+				TRACE(_T("CSCColorTheme::set_color_theme(default): m_parent is NULL. Declare as `CSCColorTheme m_theme = CSCColorTheme(this);` to enable control-kind detection.\n"));
+				ASSERT(FALSE);
+			}
+
 			if (m_parent->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
-				m_parent->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || 
+				m_parent->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CListBox)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CComboBox)) ||
 				m_parent->IsKindOf(RUNTIME_CLASS(CEdit)) ||

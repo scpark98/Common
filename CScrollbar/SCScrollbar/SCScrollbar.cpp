@@ -478,11 +478,19 @@ void CSCScrollbar::draw_track(Gdiplus::Graphics& g, const CRect& rTrack)
 	if (rTrack.IsRectEmpty())
 		return;
 
-	//track 색은 cr_back 에서 약간 톤 변경 — light theme 면 어둡게, dark theme 면 밝게.
-	Gdiplus::Color cr_track = get_color(m_theme.cr_back, 8);
+	//track 색은 cr_back 에서 톤 변경 — light theme 면 어둡게, dark theme 면 밝게. delta 크게 잡아야 listbox 등 cr_back 가까운 host 에서도 구분 가능.
+	Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
 
-	Gdiplus::SolidBrush br(cr_track);
-	g.FillRectangle(&br, rTrack.left, rTrack.top, rTrack.Width(), rTrack.Height());
+	//thumb 와 동일 radius 라운드 사각형. thumb 의 DeflateRect 와 동일 패턴 적용해 두 사각형의 형태가 시각적으로 일치.
+	int radius = max(2, m_thickness / 4);
+	CRect rDraw = rTrack;
+	if (m_orient == vertical)
+		rDraw.DeflateRect(2, 1);
+	else
+		rDraw.DeflateRect(1, 2);
+
+	draw_round_rect(&g, Gdiplus::Rect(rDraw.left, rDraw.top, rDraw.Width(), rDraw.Height()),
+		Gdiplus::Color::Transparent, cr_track, radius, 0);
 }
 
 void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
@@ -490,10 +498,10 @@ void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
 	if (rThumb.IsRectEmpty())
 		return;
 
-	//thumb base color = cr_text 와 cr_back 의 중간 (약 25% text). hover/pressed 시 점진적으로 cr_text 에 가까워짐.
-	double ratio = 0.30;
-	if (m_hover == part_thumb)		ratio = 0.50;
-	if (m_pressed == part_thumb)	ratio = 0.70;
+	//thumb color = cr_text 와 cr_back 의 blend. hover/pressed 시 cr_text 에 가까워짐. base ratio 0.45 로 track 과 충분한 대비 (track 은 cr_back+24).
+	double ratio = 0.45;
+	if (m_hover == part_thumb)		ratio = 0.65;
+	if (m_pressed == part_thumb)	ratio = 0.85;
 
 	Gdiplus::Color cr_thumb = get_color(m_theme.cr_back, m_theme.cr_text, ratio);
 

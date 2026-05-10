@@ -236,6 +236,7 @@ public:
 	virtual			CSCMenu& set_font_bold(bool bBold = true);
 
 	void			set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
+	void			set_color_theme(const CSCColorTheme& theme) { m_theme.copy_colors_from(theme); if (!m_hWnd) return; Invalidate(); }
 	int				get_color_theme() const { return m_theme.get_color_theme(); }
 
 protected:

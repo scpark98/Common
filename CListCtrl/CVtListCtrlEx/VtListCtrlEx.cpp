@@ -83,6 +83,10 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CVtListCtrlEx::on_message_CGdiButton)
 	ON_REGISTERED_MESSAGE(Message_CHeaderCtrlEx, &CVtListCtrlEx::on_message_CHeaderCtrlEx)
 	ON_WM_NCPAINT()
+	ON_WM_NCCALCSIZE()
+	ON_WM_MOUSEWHEEL()
+	ON_WM_MOUSEHWHEEL()
+	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CVtListCtrlEx::on_message_CSCScrollbar)
 END_MESSAGE_MAP()
 
 
@@ -1357,6 +1361,7 @@ void CVtListCtrlEx::PreSubclassWindow()
 	CListCtrl::PreSubclassWindow();
 
 	modify_style();
+	setup_scrollbar();
 }
 
 void CVtListCtrlEx::modify_style()
@@ -1651,6 +1656,33 @@ void CVtListCtrlEx::OnPaint()
 		rc.top += rcHeader.Height();
 	}
 
+	//m_scrollbar_setup 일 때 — OnPaint override 자체가 native LVS_EX_DOUBLEBUFFER 를 우회하므로 사각형 잔상.
+	//CPaintDC 만들지 않고 Default() 로 native paint flow 위임 — native 가 BeginPaint/backbuffer 처리.
+	//cr_back 은 SetBkColor 으로 native 처리, corner 는 Default() 후 ClientDC 로 직접.
+	if (m_scrollbar_setup)
+	{
+		//CPaintDC dc1 가 이미 위에서 만들어져 BeginPaint 호출됨 → native paint 가 update region empty 로 받음.
+		//그래서 dc1 의 hDC 를 wParam 으로 넘겨 native 가 그 HDC 에 그리도록.
+		DefWindowProc(WM_PAINT, (WPARAM)dc1.m_hDC, (LPARAM)0);
+
+		if (pHeaderCtrl && ::IsWindow(pHeaderCtrl->GetSafeHwnd()))
+		{
+			CRect rh;
+			pHeaderCtrl->GetWindowRect(rh);
+			ScreenToClient(rh);
+
+			CRect rcFull;
+			GetClientRect(rcFull);
+
+			if (rh.right < rcFull.right)
+			{
+				CRect rcCorner(rh.right, rh.top, rcFull.right, rh.bottom);
+				dc1.FillSolidRect(rcCorner, m_theme.cr_header_back.ToCOLORREF());
+			}
+		}
+		return;
+	}
+
 	//MemorDC 또한 header만큼 낮춘 크기로 잡히게 되는데 이로 인해 DrawItem()에서
 	//progress를 그려줄 때 LPtoDP()를 사용해서 SelectClipRgn()의 좌표를 보정해주는 코드가 추가되었다.
 	//(DrawText()는 논리좌표를 사용하고 SelectClipRgn()은 물리좌표를 사용하기 때문에 둘의 좌표가 달라지기 때문)
@@ -1921,6 +1953,39 @@ void CVtListCtrlEx::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
+
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, false);
+
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+		m_scrollbar_h.set_color_theme(m_theme, false);
+
+	if (m_scrollbar_setup && ::IsWindow(m_hWnd))
+	{
+		SetBkColor(m_theme.cr_back.ToCOLORREF());
+		SetTextBkColor(m_theme.cr_back.ToCOLORREF());
+	}
+
+	if (m_hWnd && invalidate)
+		Invalidate();
+}
+
+void CVtListCtrlEx::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
+
+	if (::IsWindow(m_scrollbar.m_hWnd))
+		m_scrollbar.set_color_theme(m_theme, false);
+
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+		m_scrollbar_h.set_color_theme(m_theme, false);
+
+	if (m_scrollbar_setup && ::IsWindow(m_hWnd))
+	{
+		SetBkColor(m_theme.cr_back.ToCOLORREF());
+		SetTextBkColor(m_theme.cr_back.ToCOLORREF());
+	}
 
 	if (m_hWnd && invalidate)
 		Invalidate();
@@ -2204,6 +2269,8 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 	{
 		Invalidate();
 	}
+
+	sync_scrollbar();
 
 	return index;
 }
@@ -2509,6 +2576,7 @@ void CVtListCtrlEx::delete_selected_items()
 	}
 
 	SetItemCount(m_list_db.size());
+	sync_scrollbar();
 }
 
 //shell_listctrl이라면 파일 또한 삭제할 지 파라미터를 줄 수 있고 실제 파일을 지운 후에 리스트에서도 삭제해야 한다.
@@ -2533,6 +2601,7 @@ bool CVtListCtrlEx::delete_item(int index, bool delete_physical_file)
 		CListCtrl::DeleteItem(index);
 		m_list_db.erase(m_list_db.begin() + index);
 		SetItemCount(m_list_db.size());
+		sync_scrollbar();
 	}
 
 	return res;
@@ -2615,6 +2684,7 @@ void CVtListCtrlEx::delete_all_items(bool delete_file_list)
 	}
 
 	SetRedraw(TRUE);
+	sync_scrollbar();
 }
 
 CString CVtListCtrlEx::get_text(int item, int subItem)
@@ -4894,6 +4964,20 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	if (pNMListView->iItem < 0)
 		return FALSE;
 
+	//키보드 navigation 으로 selection 이동 시 base 가 internal top 갱신 → overlay scrollbar 도 sync.
+	//LVN_ENDSCROLL 이 키보드 auto-scroll 에선 발화 누락 → top 변경 시에만 UpdateWindow 강제.
+	//(매 selection 변경마다 호출하면 자막 highlight 같은 빈번한 변경에 깜빡임 발생.)
+	if (m_scrollbar_setup)
+	{
+		int top = GetTopIndex();
+		if (top != m_last_top_index)
+		{
+			UpdateWindow();
+			m_last_top_index = top;
+		}
+	}
+	sync_scrollbar();
+
 	//if (!m_use_virtual_list)
 	//	return FALSE;
 
@@ -5117,6 +5201,7 @@ void CVtListCtrlEx::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		edit_end();
 
 	CListCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+	sync_scrollbar();
 }
 
 
@@ -5138,6 +5223,15 @@ void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	LPNMLVSCROLL pStateChanged = reinterpret_cast<LPNMLVSCROLL>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	//TRACE(_T("CVtListCtrlEx::OnLvnEndScroll\n"));
+
+	//모든 scroll source (휠, 가로 휠, 키보드 navigation, internal) 가 LVN_ENDSCROLL 발화 →
+	//여기서 UpdateWindow + sync 강제하면 erase ↔ paint 사이 디스플레이 refresh 차단.
+	if (m_scrollbar_setup)
+	{
+		UpdateWindow();
+		sync_scrollbar();
+	}
+
 	*pResult = 0;
 }
 
@@ -5166,6 +5260,8 @@ void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 		}
 		set_column_width(m_fixed_width_column, rc.Width() - total_column_width - 2);
 	}
+
+	sync_scrollbar();
 }
 
 void CVtListCtrlEx::show_auto_scroll_button(bool show)
@@ -5278,4 +5374,235 @@ void CVtListCtrlEx::OnNcPaint()
 		rc.OffsetRect(-rc.TopLeft());
 		draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
 	}
+}
+
+void CVtListCtrlEx::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
+{
+	//CSCScrollbar overlay 모드에선 native scrollbar NC 영역 미할당 — base 호출 안 해 client = window.
+	if (m_scrollbar_setup && lpncsp)
+		return;
+
+	CListCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
+}
+
+void CVtListCtrlEx::setup_scrollbar()
+{
+	if (m_scrollbar_setup || !::IsWindow(m_hWnd))
+		return;
+
+	m_scrollbar_setup = true;
+
+	//WS_VSCROLL/HSCROLL 제거 + WS_CLIPCHILDREN 추가. native scrollbar 영역 / corner padding 제거.
+	//OnNcCalcSize override 가 NC 영역 0 으로 만들어 시각적으로 native 안 그려지게 함.
+	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+
+	//빈 영역 cr_back 처리 — native 가 자체 erase 시 사용.
+	SetBkColor(m_theme.cr_back.ToCOLORREF());
+	SetTextBkColor(m_theme.cr_back.ToCOLORREF());
+
+	CRect rc;
+	GetClientRect(&rc);
+
+	m_scrollbar.create(this, CSCScrollbar::vertical,
+		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+	m_scrollbar.set_color_theme(m_theme, false);
+	m_scrollbar.ShowWindow(SW_HIDE);
+
+	m_scrollbar_h.create(this, CSCScrollbar::horizontal,
+		0, rc.bottom - m_scrollbar_height,
+		rc.Width() - m_scrollbar_width, m_scrollbar_height);
+	m_scrollbar_h.set_color_theme(m_theme, false);
+	m_scrollbar_h.ShowWindow(SW_HIDE);
+}
+
+void CVtListCtrlEx::sync_scrollbar()
+{
+	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
+		return;
+
+	ShowScrollBar(SB_VERT, FALSE);
+	ShowScrollBar(SB_HORZ, FALSE);
+
+	int total = GetItemCount();
+	int visible = GetCountPerPage();
+
+	CRect rc;
+	GetClientRect(&rc);
+
+	int total_col_width = 0;
+	int col_count = get_column_count();
+	for (int i = 0; i < col_count; i++)
+		total_col_width += GetColumnWidth(i);
+
+	bool need_h = (col_count > 0) && (total_col_width > rc.Width());
+	bool need_v = (total > visible) && (visible > 0);
+
+	//header 아래부터 세로 scrollbar 시작.
+	int top_offset = 0;
+	CHeaderCtrl* pHeader = GetHeaderCtrl();
+	if (pHeader && ::IsWindow(pHeader->GetSafeHwnd()))
+	{
+		CRect rh;
+		pHeader->GetWindowRect(rh);
+		ScreenToClient(rh);
+		top_offset = rh.bottom;
+
+		//헤더 우상단 corner padding (헤더 우측 끝 ~ client 우측 끝) — native 가 그리는 사각형 가리기 위해 invalidate.
+		if (rh.right < rc.right)
+		{
+			CRect rcCorner(rh.right, rh.top, rc.right, rh.bottom);
+			InvalidateRect(rcCorner, FALSE);
+		}
+	}
+
+	int v_right = rc.right;
+	int h_bottom = rc.bottom;
+	int v_bottom = need_h ? (rc.bottom - m_scrollbar_height) : rc.bottom;
+	int h_right = need_v ? (rc.right - m_scrollbar_width) : rc.right;
+
+	//세로 scrollbar 위치/크기.
+	CRect rCurV;
+	m_scrollbar.GetWindowRect(rCurV);
+	ScreenToClient(rCurV);
+	int cur_v_width = rCurV.Width();
+	CRect rTargetV(v_right - cur_v_width, top_offset, v_right, v_bottom);
+	if (rCurV != rTargetV)
+	{
+		CRect rOld = rCurV;
+		m_scrollbar.MoveWindow(rTargetV);
+		InvalidateRect(rOld, TRUE);
+	}
+
+	//가로 scrollbar 위치/크기.
+	CRect rCurH;
+	m_scrollbar_h.GetWindowRect(rCurH);
+	ScreenToClient(rCurH);
+	int cur_h_height = rCurH.Height();
+	CRect rTargetH(0, h_bottom - cur_h_height, h_right, h_bottom);
+	if (rCurH != rTargetH)
+	{
+		CRect rOld = rCurH;
+		m_scrollbar_h.MoveWindow(rTargetH);
+		InvalidateRect(rOld, TRUE);
+	}
+
+	if (!need_v)
+	{
+		if (m_scrollbar.IsWindowVisible())
+			m_scrollbar.ShowWindow(SW_HIDE);
+	}
+	else
+	{
+		int top = GetTopIndex();
+		if (top < 0) top = 0;
+		m_scrollbar.set_range(0, total - 1);
+		m_scrollbar.set_page(visible);
+		m_scrollbar.set_pos(top);
+		if (!m_scrollbar.IsWindowVisible())
+			m_scrollbar.ShowWindow(SW_SHOW);
+	}
+
+	if (!need_h)
+	{
+		if (m_scrollbar_h.IsWindowVisible())
+			m_scrollbar_h.ShowWindow(SW_HIDE);
+	}
+	else
+	{
+		int hpos = GetScrollPos(SB_HORZ);
+		if (hpos < 0) hpos = 0;
+		m_scrollbar_h.set_range(0, total_col_width - 1);
+		m_scrollbar_h.set_page(rc.Width());
+		m_scrollbar_h.set_pos(hpos);
+		if (!m_scrollbar_h.IsWindowVisible())
+			m_scrollbar_h.ShowWindow(SW_SHOW);
+	}
+}
+
+LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
+{
+	CSCScrollbarMsg* msg = (CSCScrollbarMsg*)wParam;
+	if (msg == nullptr)
+		return 0;
+
+	if (msg->msg != CSCScrollbarMsg::msg_scrollbar_pos_changed)
+		return 0;
+
+	if (msg->pThis == &m_scrollbar)
+	{
+		int visible = GetCountPerPage();
+		int total = GetItemCount();
+		int new_top = max(0, min(msg->pos, total - visible));
+
+		int cur_top = GetTopIndex();
+		if (new_top != cur_top && total > 0)
+		{
+			CRect rItem;
+			if (GetItemRect(0, &rItem, LVIR_BOUNDS))
+			{
+				int item_h = rItem.Height();
+				if (item_h > 0)
+					Scroll(CSize(0, (new_top - cur_top) * item_h));
+			}
+		}
+	}
+	else if (msg->pThis == &m_scrollbar_h)
+	{
+		int cur = GetScrollPos(SB_HORZ);
+		int delta = msg->pos - cur;
+		if (delta != 0)
+			Scroll(CSize(delta, 0));
+	}
+	return 0;
+}
+
+BOOL CVtListCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	if (m_scrollbar_setup && GetItemCount() > 0)
+	{
+		bool shift = (nFlags & MK_SHIFT) != 0;
+		if (shift)
+		{
+			int dx = -zDelta / WHEEL_DELTA * 60;
+			if (dx == 0)
+				dx = (zDelta > 0) ? -60 : 60;
+			Scroll(CSize(dx, 0));
+			UpdateWindow();
+			sync_scrollbar();
+			return TRUE;
+		}
+
+		int lines = -zDelta / WHEEL_DELTA * 3;
+		if (lines == 0)
+			lines = (zDelta > 0) ? -1 : 1;
+
+		CRect rItem;
+		if (GetItemRect(0, &rItem, LVIR_BOUNDS))
+		{
+			int item_h = rItem.Height();
+			if (item_h > 0)
+			{
+				Scroll(CSize(0, lines * item_h));
+				UpdateWindow();
+				sync_scrollbar();
+				return TRUE;
+			}
+		}
+	}
+	return CListCtrl::OnMouseWheel(nFlags, zDelta, pt);
+}
+
+void CVtListCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	if (m_scrollbar_setup)
+	{
+		int dx = zDelta / WHEEL_DELTA * 60;
+		if (dx == 0)
+			dx = (zDelta > 0) ? 60 : -60;
+		Scroll(CSize(dx, 0));
+		UpdateWindow();
+		sync_scrollbar();
+		return;
+	}
+	CListCtrl::OnMouseHWheel(nFlags, zDelta, pt);
 }

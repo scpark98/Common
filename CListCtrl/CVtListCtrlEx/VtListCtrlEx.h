@@ -10,6 +10,7 @@
 #include "../../colors.h"
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
 
 /*
 * CVtListCtrlEx를 사용하기 위해 프로젝트에 추가해야 하는 소스들
@@ -480,6 +481,7 @@ public:
 
 //컬러 관련
 	void			set_color_theme(int theme, bool invalidate = false);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 	Gdiplus::Color	get_text_color(int item, int subItem);
 	Gdiplus::Color	get_back_color(int item, int subItem);
 	//특정 셀이 아닌 기본 배경색을 리턴.
@@ -818,6 +820,20 @@ public:
 	afx_msg void OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnNcPaint();
+	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
+
+	//자체 스크롤바 — CSCListBox / CSCTreeCtrl 와 동일 패턴. 가로/세로 모두 overlay.
+	CSCScrollbar	m_scrollbar;		//세로
+	CSCScrollbar	m_scrollbar_h;		//가로 — listctrl 은 column 가로폭 합계 > client 일 때 필요.
+	int				m_scrollbar_width = 16;
+	int				m_scrollbar_height = 16;
+	bool			m_scrollbar_setup = false;
+	int				m_last_top_index = -1;
+	void			setup_scrollbar();
+	void			sync_scrollbar();
+	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
 };
 
 

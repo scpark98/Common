@@ -2105,10 +2105,15 @@ void CDShow::move_track(bool forward, int interval)
 	if (IsCtrlPressed())
 		interval = m_control_interval;
 
-	REFTIME pos;
-	m_pMP->get_CurrentPosition(&pos);
-	pos = pos + (forward ? interval : -interval);
-	m_pMP->put_CurrentPosition(pos < 0 ? 0 : pos);
+	//set_track_pos 가 SetPositions(absolute) + m_last_track_pos_ms cache 갱신 + paused 분기 RepaintVideo /
+	//MPCVR cmd_redraw + WMV DMO flush 까지 위임. legacy put_CurrentPosition 만 호출하던 시점 paused 상태에서
+	//IMediaPosition graph 가 INTERMEDIATE state 로 머물면서 get_track_pos 가 stale cache 반환 → 컨트롤바
+	//시각 stuck, 자막 매칭 실패 누적 회귀 (2026-05-12 좌우 화살표 회귀 fix).
+	//base 위치는 get_track_pos() 사용 — INTERMEDIATE state 도 cache 로 처리하므로 누적 오차 없음.
+	double new_pos_ms = get_track_pos() + (forward ? interval : -interval) * 1000.0;
+	if (new_pos_ms < 0)
+		new_pos_ms = 0;
+	set_track_pos(new_pos_ms);
 
 	//forward 를 wParam 의 상위 word 에 (msg_track_moved 와 함께) 인코딩하지 않고 wParam 에는 msg, lParam 에 interval 그대로 (signed int).
 	//forward 부호는 lParam 의 signed bit 로 표현 — backward 면 음수.

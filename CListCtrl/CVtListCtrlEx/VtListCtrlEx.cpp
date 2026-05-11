@@ -1454,6 +1454,19 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
+	//편집 중 (m_in_editing) 이고 메시지 target 이 내부 CSCEdit (m_pEdit) 이면, walk 가 부모 dialog 로
+	//계속 가서 메인 단축키 (Q~I 화질조정 / Space 재생 등) 가 발화되는 문제 차단.
+	//자체 dispatch 후 TRUE 반환 — edit 는 정상 입력 받고 부모 walk 만 멈춤.
+	if (m_in_editing && m_pEdit && m_pEdit->GetSafeHwnd() == pMsg->hwnd &&
+		(pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP ||
+		 pMsg->message == WM_CHAR || pMsg->message == WM_SYSKEYDOWN ||
+		 pMsg->message == WM_SYSKEYUP || pMsg->message == WM_SYSCHAR))
+	{
+		::TranslateMessage(pMsg);
+		::DispatchMessage(pMsg);
+		return TRUE;
+	}
+
 	//마우스 back button up
 	if (pMsg->message == WM_XBUTTONUP)
 	{

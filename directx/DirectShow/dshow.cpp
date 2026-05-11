@@ -2640,6 +2640,86 @@ static bool ensure_evr_proc_amp(IBaseFilter* pVMR, CComPtr<IMFVideoProcessor>& p
 
 int CDShow::adjust_video(int dwStreamID, int target, bool up)
 {
+	//MPCVR 분기 — IMFVideoProcessor (DXVA2 ProcAmp) 로 제어. IExFilterConfig 의 "video_*" 키는
+	//Aleksoid MPCVR 에서 E_INVALIDARG (검증됨). m_pVP 캐싱 시 close_media 시 access violation —
+	//매 호출마다 lazy QI + 로컬 변수로만 사용.
+	if (m_use_mpcvr && m_VMR)
+	{
+		CComPtr<IMFVideoProcessor> pVP;
+		CComQIPtr<IMFGetService> pGS(m_VMR);
+		if (pGS)
+			pGS->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&pVP));
+
+		if (pVP)
+		{
+			const DWORD all_flags = DXVA2_ProcAmp_Brightness | DXVA2_ProcAmp_Contrast |
+			                        DXVA2_ProcAmp_Hue | DXVA2_ProcAmp_Saturation;
+
+			if (target == -1)
+			{
+				DXVA2_ProcAmpValues vals = {};
+				if (FAILED(pVP->GetProcAmpValues(all_flags, &vals)))
+					return -1;
+				for (int i = 0; i < 4; ++i)
+				{
+					DWORD f = target_to_dxva2(i);
+					DXVA2_ValueRange r = {};
+					if (FAILED(pVP->GetProcAmpRange(f, &r)))
+						continue;
+					switch (f)
+					{
+					case DXVA2_ProcAmp_Brightness: vals.Brightness = r.DefaultValue; break;
+					case DXVA2_ProcAmp_Contrast:   vals.Contrast   = r.DefaultValue; break;
+					case DXVA2_ProcAmp_Hue:        vals.Hue        = r.DefaultValue; break;
+					case DXVA2_ProcAmp_Saturation: vals.Saturation = r.DefaultValue; break;
+					}
+				}
+				if (FAILED(pVP->SetProcAmpValues(all_flags, &vals)))
+					return -1;
+				repaint_for_procamp_change();
+				return 0;
+			}
+
+			if (target < 0 || target > 3)
+				return -1;
+
+			DWORD flag = target_to_dxva2(target);
+			DXVA2_ValueRange range = {};
+			if (FAILED(pVP->GetProcAmpRange(flag, &range)))
+				return -1;
+
+			DXVA2_ProcAmpValues vals = {};
+			if (FAILED(pVP->GetProcAmpValues(all_flags, &vals)))
+				return -1;
+
+			const float minv = DXVA2FixedToFloat(range.MinValue);
+			const float maxv = DXVA2FixedToFloat(range.MaxValue);
+			DXVA2_Fixed32* pVal = NULL;
+			switch (flag)
+			{
+			case DXVA2_ProcAmp_Brightness: pVal = &vals.Brightness; break;
+			case DXVA2_ProcAmp_Contrast:   pVal = &vals.Contrast; break;
+			case DXVA2_ProcAmp_Hue:        pVal = &vals.Hue; break;
+			case DXVA2_ProcAmp_Saturation: pVal = &vals.Saturation; break;
+			}
+			if (!pVal)
+				return -1;
+
+			float current = DXVA2FixedToFloat(*pVal);
+			const float step = (maxv - minv) / 100.0f;
+			current += up ? step : -step;
+			if (current < minv) current = minv;
+			if (current > maxv) current = maxv;
+			*pVal = DXVA2FloatToFixed(current);
+
+			if (FAILED(pVP->SetProcAmpValues(flag, &vals)))
+				return -1;
+
+			repaint_for_procamp_change();
+			return (int)(((current - minv) / (maxv - minv)) * 100.0f + 0.5);
+		}
+	}
+
 	//EVR 분기 — m_pVMRMC NULL 일 때 IMFVideoProcessor 로 ProcAmp 제어.
 	//MPCVR 는 GetService(VP) 가 succeed 하지만 lifecycle 차이로 close_media 시 m_pVP release 가 access violation — skip.
 	if (!m_pVMRMC && !m_use_mpcvr && ensure_evr_proc_amp(m_VMR, m_pVP))
@@ -2805,6 +2885,44 @@ int CDShow::set_video_adjust(int dwStreamID, int target, int percent)
 		return -1;
 	if (percent < 0)   percent = 0;
 	if (percent > 100) percent = 100;
+
+	//MPCVR 분기 — adjust_video 와 동일하게 IMFVideoProcessor lazy QI + 로컬 사용.
+	if (m_use_mpcvr && m_VMR)
+	{
+		CComPtr<IMFVideoProcessor> pVP;
+		CComQIPtr<IMFGetService> pGS(m_VMR);
+		if (pGS)
+			pGS->GetService(MR_VIDEO_MIXER_SERVICE, IID_PPV_ARGS(&pVP));
+		if (pVP)
+		{
+			DWORD flag = target_to_dxva2(target);
+			DXVA2_ValueRange range = {};
+			if (FAILED(pVP->GetProcAmpRange(flag, &range)))
+				return -1;
+
+			const DWORD all_flags = DXVA2_ProcAmp_Brightness | DXVA2_ProcAmp_Contrast |
+			                        DXVA2_ProcAmp_Hue | DXVA2_ProcAmp_Saturation;
+			DXVA2_ProcAmpValues vals = {};
+			if (FAILED(pVP->GetProcAmpValues(all_flags, &vals)))
+				return -1;
+
+			const float minv = DXVA2FixedToFloat(range.MinValue);
+			const float maxv = DXVA2FixedToFloat(range.MaxValue);
+			const float val = minv + (maxv - minv) * (percent / 100.0f);
+			const DXVA2_Fixed32 fixed = DXVA2FloatToFixed(val);
+			switch (flag)
+			{
+			case DXVA2_ProcAmp_Brightness: vals.Brightness = fixed; break;
+			case DXVA2_ProcAmp_Contrast:   vals.Contrast   = fixed; break;
+			case DXVA2_ProcAmp_Hue:        vals.Hue        = fixed; break;
+			case DXVA2_ProcAmp_Saturation: vals.Saturation = fixed; break;
+			}
+			if (FAILED(pVP->SetProcAmpValues(flag, &vals)))
+				return -1;
+			repaint_for_procamp_change();
+			return percent;
+		}
+	}
 
 	//EVR 분기 — MPCVR 모드는 lifecycle 충돌로 m_pVP skip (위 adjust_video 와 동일).
 	if (!m_pVMRMC && !m_use_mpcvr && ensure_evr_proc_amp(m_VMR, m_pVP))

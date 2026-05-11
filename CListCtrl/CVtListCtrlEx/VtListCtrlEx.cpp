@@ -1685,7 +1685,11 @@ void CVtListCtrlEx::OnPaint()
 		if (!rcCornerTop.IsRectEmpty())
 			dc1.FillSolidRect(rcCornerTop, m_theme.cr_header_back.ToCOLORREF());
 		if (!rcCornerBottom.IsRectEmpty())
-			dc1.FillSolidRect(rcCornerBottom, m_theme.cr_back.ToCOLORREF());
+		{
+			//CSCScrollbar::draw_track 와 동일한 색 — h/v 스크롤바 사이 코너가 list cr_back 으로 비치지 않도록.
+			Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
+			dc1.FillSolidRect(rcCornerBottom, cr_track.ToCOLORREF());
+		}
 
 		if (!rcCornerTop.IsRectEmpty())
 			dc1.ExcludeClipRect(rcCornerTop);
@@ -5277,6 +5281,11 @@ void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 	}
 
 	sync_scrollbar();
+
+	//WS_CLIPCHILDREN + 자식 스크롤바 환경에서 대각 resize 로 새로 확장된 client 영역이
+	//listctrl native invalidate 만으로는 stale pixel 남음 — 부모가 그릴 영역 강제 invalidate.
+	if (m_scrollbar_setup)
+		Invalidate(FALSE);
 }
 
 void CVtListCtrlEx::show_auto_scroll_button(bool show)
@@ -5483,13 +5492,12 @@ void CVtListCtrlEx::sync_scrollbar()
 		InvalidateRect(rOld, TRUE);
 	}
 
-	//가로 scrollbar 위치/크기. 좌측 list edge 와 시각 분리를 위해 small padding.
+	//가로 scrollbar — list 좌측 edge 에 정확히 정렬 (padding 없음 — list 항목이 그 틈으로 비치는 문제 회피).
 	CRect rCurH;
 	m_scrollbar_h.GetWindowRect(rCurH);
 	ScreenToClient(rCurH);
 	int cur_h_height = rCurH.Height();
-	const int h_left_pad = 4;
-	CRect rTargetH(h_left_pad, h_bottom - cur_h_height, h_right, h_bottom);
+	CRect rTargetH(0, h_bottom - cur_h_height, h_right, h_bottom);
 	if (rCurH != rTargetH)
 	{
 		CRect rOld = rCurH;
@@ -5543,6 +5551,8 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 	if (msg->msg != CSCScrollbarMsg::msg_scrollbar_pos_changed)
 		return 0;
 
+	m_last_user_scroll_at = GetTickCount();
+
 	if (msg->pThis == &m_scrollbar)
 	{
 		int visible = GetCountPerPage();
@@ -5581,6 +5591,7 @@ BOOL CVtListCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	if (m_scrollbar_setup && GetItemCount() > 0)
 	{
+		m_last_user_scroll_at = GetTickCount();
 		bool shift = (nFlags & MK_SHIFT) != 0;
 		if (shift)
 		{
@@ -5618,6 +5629,7 @@ void CVtListCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	if (m_scrollbar_setup)
 	{
+		m_last_user_scroll_at = GetTickCount();
 		int dx = zDelta / WHEEL_DELTA * 60;
 		if (dx == 0)
 			dx = (zDelta > 0) ? 60 : -60;

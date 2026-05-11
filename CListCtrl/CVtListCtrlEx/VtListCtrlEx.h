@@ -832,9 +832,13 @@ public:
 	bool			m_scrollbar_setup = false;
 	int				m_last_top_index = -1;
 	int				m_h_scroll_pos = 0;		//가로 scroll 누적 pixel offset — WS_HSCROLL 제거 후 GetScrollPos(SB_HORZ) 가 stale 이라 자체 추적.
+	DWORD			m_last_user_scroll_at = 0;	//사용자 입력에 의한 scroll tick — 자동 ensure_visible 호출 측에서 sticky timeout 으로 사용.
 	void			setup_scrollbar();
 	void			sync_scrollbar();
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
+
+public:
+	DWORD			get_last_user_scroll_at() const { return m_last_user_scroll_at; }
 };
 
 

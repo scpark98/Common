@@ -1802,6 +1802,7 @@ void CSCListBox::setup_scrollbar()
 	m_scrollbar.create(this, CSCScrollbar::vertical,
 		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
 	m_scrollbar.set_color_theme(m_theme, false);
+	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인.
 	m_scrollbar.ShowWindow(SW_HIDE);
 }
 

@@ -114,10 +114,10 @@ void CSCScrollbar::clamp_pos()
 
 void CSCScrollbar::set_thickness(int thickness)
 {
-	int t = max(4, thickness);
+	int t = max(1, thickness);
 	m_thickness_normal = t;
 	if (m_thickness_hover < t + 2)
-		m_thickness_hover = t + 4;
+		m_thickness_hover = t + 3;
 	if (!m_window_hovering)
 		apply_visible_thickness(t);
 	else if (::IsWindow(m_hWnd))
@@ -145,26 +145,9 @@ void CSCScrollbar::apply_visible_thickness(int new_thickness)
 
 CRect CSCScrollbar::get_visible_rect() const
 {
+	//track 영역 = window 전체. thumb 의 cross 정렬은 calc_thumb_rect 에서 따로 처리.
 	CRect rc;
 	GetClientRect(&rc);
-	if (m_orient == vertical)
-	{
-		int margin = (rc.Width() - m_thickness) / 2;
-		if (margin > 0)
-		{
-			rc.left += margin;
-			rc.right -= margin;
-		}
-	}
-	else
-	{
-		int margin = (rc.Height() - m_thickness) / 2;
-		if (margin > 0)
-		{
-			rc.top += margin;
-			rc.bottom -= margin;
-		}
-	}
 	return rc;
 }
 
@@ -259,8 +242,12 @@ CRect CSCScrollbar::calc_thumb_rect() const
 	Clamp(thumb_offset, 0, max_thumb_offset);
 
 	if (m_orient == vertical)
-		return CRect(rTrack.left, rTrack.top + thumb_offset, rTrack.right, rTrack.top + thumb_offset + thumb_extent);
-	return CRect(rTrack.left + thumb_offset, rTrack.top, rTrack.left + thumb_offset + thumb_extent, rTrack.bottom);
+	{
+		int cx = rTrack.left + (rTrack.Width() - m_thickness) / 2;
+		return CRect(cx, rTrack.top + thumb_offset, cx + m_thickness, rTrack.top + thumb_offset + thumb_extent);
+	}
+	int cy = rTrack.top + (rTrack.Height() - m_thickness) / 2;
+	return CRect(rTrack.left + thumb_offset, cy, rTrack.left + thumb_offset + thumb_extent, cy + m_thickness);
 }
 
 CSCScrollbar::SCROLL_PART CSCScrollbar::hit_test(CPoint pt) const
@@ -272,10 +259,26 @@ CSCScrollbar::SCROLL_PART CSCScrollbar::hit_test(CPoint pt) const
 	}
 
 	CRect rThumb = calc_thumb_rect();
-	if (!rThumb.IsRectEmpty() && rThumb.PtInRect(pt))
-		return part_thumb;
-
 	CRect rTrack = calc_track_rect();
+
+	//thumb hit 영역 — cross 폭은 track 전체로 확장. 얇은 thumb 라도 scrollbar 전체 폭에서 hover/클릭 인식.
+	if (!rThumb.IsRectEmpty())
+	{
+		CRect rHit = rThumb;
+		if (m_orient == vertical)
+		{
+			rHit.left = rTrack.left;
+			rHit.right = rTrack.right;
+		}
+		else
+		{
+			rHit.top = rTrack.top;
+			rHit.bottom = rTrack.bottom;
+		}
+		if (rHit.PtInRect(pt))
+			return part_thumb;
+	}
+
 	if (rTrack.PtInRect(pt))
 	{
 		if (rThumb.IsRectEmpty())
@@ -478,19 +481,10 @@ void CSCScrollbar::draw_track(Gdiplus::Graphics& g, const CRect& rTrack)
 	if (rTrack.IsRectEmpty())
 		return;
 
-	//track 색은 cr_back 에서 톤 변경 — light theme 면 어둡게, dark theme 면 밝게. delta 크게 잡아야 listbox 등 cr_back 가까운 host 에서도 구분 가능.
+	//직사각형 — cr_back 보다 약간 weak 한 톤. "여기 scrollbar 가 있다" 정도 인지.
 	Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
-
-	//thumb 와 동일 radius 라운드 사각형. thumb 의 DeflateRect 와 동일 패턴 적용해 두 사각형의 형태가 시각적으로 일치.
-	int radius = max(2, m_thickness / 4);
-	CRect rDraw = rTrack;
-	if (m_orient == vertical)
-		rDraw.DeflateRect(2, 1);
-	else
-		rDraw.DeflateRect(1, 2);
-
-	draw_round_rect(&g, Gdiplus::Rect(rDraw.left, rDraw.top, rDraw.Width(), rDraw.Height()),
-		Gdiplus::Color::Transparent, cr_track, radius, 0);
+	Gdiplus::SolidBrush br(cr_track);
+	g.FillRectangle(&br, rTrack.left, rTrack.top, rTrack.Width(), rTrack.Height());
 }
 
 void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
@@ -505,15 +499,9 @@ void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
 
 	Gdiplus::Color cr_thumb = get_color(m_theme.cr_back, m_theme.cr_text, ratio);
 
-	int radius = max(2, m_thickness / 4);
-	CRect rDraw = rThumb;
-	//thumb 양옆 1px 여백 — track 바닥과 시각 구분.
-	if (m_orient == vertical)
-		rDraw.DeflateRect(2, 1);
-	else
-		rDraw.DeflateRect(1, 2);
-
-	draw_round_rect(&g, Gdiplus::Rect(rDraw.left, rDraw.top, rDraw.Width(), rDraw.Height()),
+	//cross 두께는 m_thickness 가 직접 결정 — DeflateRect 로 더 깎으면 얇은 thumb 가 사라짐.
+	int radius = max(1, m_thickness / 2);
+	draw_round_rect(&g, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()),
 		Gdiplus::Color::Transparent, cr_thumb, radius, 0);
 }
 
@@ -522,19 +510,18 @@ void CSCScrollbar::draw_arrow(Gdiplus::Graphics& g, const CRect& rArrow, bool to
 	if (rArrow.IsRectEmpty())
 		return;
 
-	//배경 — hover/pressed 면 약간 강조.
-	Gdiplus::Color cr_bg = m_theme.cr_back;
-	if (m_hover == part)	cr_bg = get_color(m_theme.cr_back, 16);
-	if (m_pressed == part)	cr_bg = get_color(m_theme.cr_back, 32);
-	Gdiplus::SolidBrush br_bg(cr_bg);
+	//배경은 track 과 동일 — 클릭/hover 시에도 변경하지 않음.
+	Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
+	Gdiplus::SolidBrush br_bg(cr_track);
 	g.FillRectangle(&br_bg, rArrow.left, rArrow.top, rArrow.Width(), rArrow.Height());
 
-	//화살표 글리프 — 작은 삼각형. orient 와 toward_lt 조합으로 4 방향.
-	Gdiplus::Color cr_glyph = (m_pressed == part) ? m_theme.cr_text : get_color(m_theme.cr_back, m_theme.cr_text, 0.55);
+	//화살표 글리프 — pressed 시 크기 축소로 클릭 피드백.
+	Gdiplus::Color cr_glyph = get_color(m_theme.cr_back, m_theme.cr_text, 0.55);
 	Gdiplus::SolidBrush br_glyph(cr_glyph);
 
 	CPoint c = rArrow.CenterPoint();
-	int s = max(3, min(rArrow.Width(), rArrow.Height()) / 4);
+	int base = max(4, min(rArrow.Width(), rArrow.Height()) / 3);
+	int s = (m_pressed == part) ? max(3, base * 4 / 5) : base;
 
 	Gdiplus::Point pts[3];
 	if (m_orient == vertical)
@@ -562,9 +549,12 @@ void CSCScrollbar::OnPaint()
 	Gdiplus::Graphics g(dc);
 	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
 
-	draw_track(g, calc_track_rect());
+	//track 배경은 window 전체 (arrow 영역 포함) — 평소에도 그 영역까지 시각적으로 같은 톤.
+	//thumb 의 스크롤 범위는 calc_track_rect (arrow 제외) — calc_thumb_rect 가 그 위에서 계산.
+	draw_track(g, get_visible_rect());
 
-	if (m_show_arrows)
+	//arrow 영역은 항상 reserve (thumb 범위 일관) — 삼각형 그리기만 hover 시.
+	if (m_show_arrows && m_window_hovering)
 	{
 		draw_arrow(g, calc_arrow_lt_rect(), true, part_arrow_lt);
 		draw_arrow(g, calc_arrow_rb_rect(), false, part_arrow_rb);

@@ -1656,30 +1656,45 @@ void CVtListCtrlEx::OnPaint()
 		rc.top += rcHeader.Height();
 	}
 
-	//m_scrollbar_setup 일 때 — OnPaint override 자체가 native LVS_EX_DOUBLEBUFFER 를 우회하므로 사각형 잔상.
-	//CPaintDC 만들지 않고 Default() 로 native paint flow 위임 — native 가 BeginPaint/backbuffer 처리.
-	//cr_back 은 SetBkColor 으로 native 처리, corner 는 Default() 후 ClientDC 로 직접.
 	if (m_scrollbar_setup)
 	{
-		//CPaintDC dc1 가 이미 위에서 만들어져 BeginPaint 호출됨 → native paint 가 update region empty 로 받음.
-		//그래서 dc1 의 hDC 를 wParam 으로 넘겨 native 가 그 HDC 에 그리도록.
-		DefWindowProc(WM_PAINT, (WPARAM)dc1.m_hDC, (LPARAM)0);
+		CRect rcFull;
+		GetClientRect(rcFull);
 
+		CRect rcCornerTop;
 		if (pHeaderCtrl && ::IsWindow(pHeaderCtrl->GetSafeHwnd()))
 		{
 			CRect rh;
 			pHeaderCtrl->GetWindowRect(rh);
 			ScreenToClient(rh);
-
-			CRect rcFull;
-			GetClientRect(rcFull);
-
 			if (rh.right < rcFull.right)
-			{
-				CRect rcCorner(rh.right, rh.top, rcFull.right, rh.bottom);
-				dc1.FillSolidRect(rcCorner, m_theme.cr_header_back.ToCOLORREF());
-			}
+				rcCornerTop = CRect(rh.right, rh.top, rcFull.right, rh.bottom);
 		}
+
+		CRect rcCornerBottom;
+		bool vis_v = ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
+		bool vis_h = ::IsWindow(m_scrollbar_h.GetSafeHwnd()) && m_scrollbar_h.IsWindowVisible();
+		if (vis_v && vis_h)
+		{
+			rcCornerBottom = CRect(
+				rcFull.right - m_scrollbar_width,
+				rcFull.bottom - m_scrollbar_height,
+				rcFull.right, rcFull.bottom);
+		}
+
+		if (!rcCornerTop.IsRectEmpty())
+			dc1.FillSolidRect(rcCornerTop, m_theme.cr_header_back.ToCOLORREF());
+		if (!rcCornerBottom.IsRectEmpty())
+			dc1.FillSolidRect(rcCornerBottom, m_theme.cr_back.ToCOLORREF());
+
+		if (!rcCornerTop.IsRectEmpty())
+			dc1.ExcludeClipRect(rcCornerTop);
+		if (!rcCornerBottom.IsRectEmpty())
+			dc1.ExcludeClipRect(rcCornerBottom);
+
+		dc1.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+
+		DefWindowProc(WM_PAINT, (WPARAM)dc1.m_hDC, (LPARAM)0);
 		return;
 	}
 
@@ -5406,12 +5421,14 @@ void CVtListCtrlEx::setup_scrollbar()
 	m_scrollbar.create(this, CSCScrollbar::vertical,
 		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
 	m_scrollbar.set_color_theme(m_theme, false);
+	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인 (휠 single notch 와 동일).
 	m_scrollbar.ShowWindow(SW_HIDE);
 
 	m_scrollbar_h.create(this, CSCScrollbar::horizontal,
 		0, rc.bottom - m_scrollbar_height,
 		rc.Width() - m_scrollbar_width, m_scrollbar_height);
 	m_scrollbar_h.set_color_theme(m_theme, false);
+	m_scrollbar_h.set_line(30);		//화살표 클릭 = 30px (average char width ~ 7 의 약 4 배).
 	m_scrollbar_h.ShowWindow(SW_HIDE);
 }
 
@@ -5446,13 +5463,6 @@ void CVtListCtrlEx::sync_scrollbar()
 		pHeader->GetWindowRect(rh);
 		ScreenToClient(rh);
 		top_offset = rh.bottom;
-
-		//헤더 우상단 corner padding (헤더 우측 끝 ~ client 우측 끝) — native 가 그리는 사각형 가리기 위해 invalidate.
-		if (rh.right < rc.right)
-		{
-			CRect rcCorner(rh.right, rh.top, rc.right, rh.bottom);
-			InvalidateRect(rcCorner, FALSE);
-		}
 	}
 
 	int v_right = rc.right;
@@ -5473,12 +5483,13 @@ void CVtListCtrlEx::sync_scrollbar()
 		InvalidateRect(rOld, TRUE);
 	}
 
-	//가로 scrollbar 위치/크기.
+	//가로 scrollbar 위치/크기. 좌측 list edge 와 시각 분리를 위해 small padding.
 	CRect rCurH;
 	m_scrollbar_h.GetWindowRect(rCurH);
 	ScreenToClient(rCurH);
 	int cur_h_height = rCurH.Height();
-	CRect rTargetH(0, h_bottom - cur_h_height, h_right, h_bottom);
+	const int h_left_pad = 4;
+	CRect rTargetH(h_left_pad, h_bottom - cur_h_height, h_right, h_bottom);
 	if (rCurH != rTargetH)
 	{
 		CRect rOld = rCurH;
@@ -5506,14 +5517,18 @@ void CVtListCtrlEx::sync_scrollbar()
 	{
 		if (m_scrollbar_h.IsWindowVisible())
 			m_scrollbar_h.ShowWindow(SW_HIDE);
+		m_h_scroll_pos = 0;
 	}
 	else
 	{
-		int hpos = GetScrollPos(SB_HORZ);
-		if (hpos < 0) hpos = 0;
+		int max_h = max(0, total_col_width - rc.Width());
+		if (m_h_scroll_pos > max_h)
+			m_h_scroll_pos = max_h;
+		if (m_h_scroll_pos < 0)
+			m_h_scroll_pos = 0;
 		m_scrollbar_h.set_range(0, total_col_width - 1);
 		m_scrollbar_h.set_page(rc.Width());
-		m_scrollbar_h.set_pos(hpos);
+		m_scrollbar_h.set_pos(m_h_scroll_pos);
 		if (!m_scrollbar_h.IsWindowVisible())
 			m_scrollbar_h.ShowWindow(SW_SHOW);
 	}
@@ -5548,10 +5563,16 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 	}
 	else if (msg->pThis == &m_scrollbar_h)
 	{
-		int cur = GetScrollPos(SB_HORZ);
-		int delta = msg->pos - cur;
+		int new_pos = max(0, msg->pos);
+		int delta = new_pos - m_h_scroll_pos;
 		if (delta != 0)
+		{
+			//Scroll() 이 동기적으로 LVN_ENDSCROLL → sync_scrollbar 호출 → m_h_scroll_pos 가 stale 이면 thumb reset.
+			//그래서 Scroll() 전에 새 값으로 갱신.
+			m_h_scroll_pos = new_pos;
 			Scroll(CSize(delta, 0));
+			UpdateWindow();
+		}
 	}
 	return 0;
 }
@@ -5566,6 +5587,7 @@ BOOL CVtListCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			int dx = -zDelta / WHEEL_DELTA * 60;
 			if (dx == 0)
 				dx = (zDelta > 0) ? -60 : 60;
+			m_h_scroll_pos += dx;
 			Scroll(CSize(dx, 0));
 			UpdateWindow();
 			sync_scrollbar();
@@ -5599,6 +5621,7 @@ void CVtListCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 		int dx = zDelta / WHEEL_DELTA * 60;
 		if (dx == 0)
 			dx = (zDelta > 0) ? 60 : -60;
+		m_h_scroll_pos += dx;
 		Scroll(CSize(dx, 0));
 		UpdateWindow();
 		sync_scrollbar();

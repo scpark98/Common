@@ -99,13 +99,13 @@ protected:
 	int				m_page = 1;
 	int				m_line = 1;
 
-	//시각
-	int				m_thickness = 12;			//현재 적용된 두께 (rendered).
-	int				m_thickness_normal = 12;	//resting 두께.
-	int				m_thickness_hover = 16;		//mouse 가 윈도우 안 들어왔을 때 확장 두께.
+	//시각 — m_thickness 는 *thumb 의 cross 두께만*. track 영역(=window 폭) 과 별개.
+	int				m_thickness = 2;			//현재 적용된 thumb cross 두께.
+	int				m_thickness_normal = 2;		//resting thumb 두께 (탐색기 reference).
+	int				m_thickness_hover = 5;		//hover thumb 두께.
 	bool			m_window_hovering = false;	//마우스가 scrollbar 윈도우 안에 있는지.
-	bool			m_show_arrows = false;
-	int				m_arrow_size = 16;	//set_show_arrows(true) 일 때 화살표 영역 크기.
+	bool			m_show_arrows = true;	//arrow 영역은 항상 reserve, 그리기만 hover 시 — 탐색기 스타일.
+	int				m_arrow_size = 18;	//화살표 영역 크기.
 
 	//상호작용 상태
 	enum SCROLL_PART { part_none = 0, part_arrow_lt, part_arrow_rb, part_thumb, part_track_lt, part_track_rb };
@@ -125,7 +125,7 @@ protected:
 	CRect			calc_arrow_rb_rect() const;	//vertical=bottom, horizontal=right
 	CRect			calc_track_rect() const;		//arrow 사이의 트랙 전체 (arrow off 면 client 전체).
 	CRect			calc_thumb_rect() const;		//track 안의 thumb 영역.
-	int				thumb_min_extent() const { return 16; }
+	int				thumb_min_extent() const { return 60; }
 
 	//pos 계산 보조
 	void			clamp_pos();

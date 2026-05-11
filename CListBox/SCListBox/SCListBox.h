@@ -400,7 +400,7 @@ public:
 
 	//자체 스크롤바 — CSCTreeCtrl / CSCThumbCtrl 와 동일 패턴. WS_VSCROLL 제거 + OnNcCalcSize 가 NC 영역 0 → native scrollbar 안 보임.
 	CSCScrollbar	m_scrollbar;
-	int				m_scrollbar_width = 16;
+	int				m_scrollbar_width = 18;
 	bool			m_scrollbar_setup = false;
 	void			setup_scrollbar();
 	void			sync_scrollbar();

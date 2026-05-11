@@ -260,7 +260,7 @@ void Json::traverse_rapid_json(const rapidjson::Value& oRoot, CString sKey, CStr
 	}
 }
 
-CString Json::get_json_string(bool pretty)
+CString Json::get_json_str(bool pretty)
 {
 	StringBuffer buffer;
 

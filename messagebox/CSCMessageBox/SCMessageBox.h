@@ -50,14 +50,18 @@
 static const UINT Message_CSCMessageBox = ::RegisterWindowMessage(_T("MessageString_CSCMessageBox"));
 
 // CSCMessageBox 대화 상자
-#define DEFAULT_SIZE_CX				440
-#define DEFAULT_SIZE_CY				240
-#define DEFAULT_BUTTON_CX			84
-#define DEFAULT_BUTTON_CY			28
-#define DEFAULT_TITLE_HEIGHT		24
+#define DEFAULT_SIZE_CX					440
+#define DEFAULT_SIZE_CY					240
+#define DEFAULT_BUTTON_CX				84
+#define DEFAULT_BUTTON_CY				28
+#define DEFAULT_TITLE_HEIGHT			24
 
-#define TOTAL_BUTTON_COUNT			12
-#define SC_BUTTON_ID				(WM_USER + 123)	//#define의 계산식은 반드시 괄호로 묶어주는 것을 잊지 않아야 한다.
+#define TOTAL_BUTTON_COUNT				12
+#define SC_BUTTON_ID					(WM_USER + 123)	//#define의 계산식은 반드시 괄호로 묶어주는 것을 잊지 않아야 한다.
+
+#define BUTTON_TYPE_NO_CHANGE			-1	//set_message로 메시지만 변경할 수 있는데 이 때 버튼 파라미터는 -1이면 현재의 m_type을 그대로 이용한다.
+#define BUTTON_TYPE_NO_BUTTON			-8	//확인버튼도 생략한다.
+#define BUTTON_TYPE_NO_BUTTON_NO_EXIT	-9	//종료버튼도 생략한다.
 
 /*
 * 각 버튼의 ID는 winuser.h에 정의된 것과 동일하게 사용한다.
@@ -101,7 +105,10 @@ public:
 //Modeless로 실행할 경우 호출. //실제 사용 시 MAX_WIDTH(800)를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
 	//set_message(_T("changed message"));와 같이 동적으로 메시지만 변경할 경우는 type, timeout_sec, align은 기본 음수를 가지며
 	//음수일 경우는 기본값 또는 이미 설정된 값을 사용한다.
-	void			set_message(CString msg, int type = -1, int timeout = -1, int align = -1);
+	//type은 표시할 버튼 종류. default : MB_OK, 그 외 MB_OKCANCEL 등 WinUser.h에 정의된 값들을 그대로 사용할 수 있다.
+	//단, m_type = -1이면 OK버튼도 표시되지 않는다.
+	//m_type = -2이면 종료버튼도 표시되지 않는다.
+	void			set_message(CString msg, int type = MB_OK, int timeout = -1, int align = -1);
 	void			set_align(int align);
 
 //theme 관련 설정
@@ -131,6 +138,9 @@ protected:
 	CWnd*			m_parent = NULL;
 	HICON			m_hIcon = NULL;
 	CString			m_message;
+	//표시할 버튼 종류. default : MB_OK, 그 외 MB_OKCANCEL 등 WinUser.h에 정의된 값들을 그대로 사용할 수 있다.
+	//단, m_type = -1이면 OK버튼도 표시되지 않는다.
+	//m_type = -2이면 종료버튼도 표시되지 않는다.
 	int				m_type = MB_OK;
 	int				m_timeout_sec = 0;
 	int				m_align = SS_CENTER | SS_CENTERIMAGE;

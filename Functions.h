@@ -91,6 +91,55 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #define __class_func__ __function__
 #endif
 
+class vector2
+{
+public:
+	double x, y;
+
+	//생성자
+	vector2()
+	{
+		x = 0.0, y = 0.0;
+	}
+
+	vector2(double _x, double _y)
+	{
+		x = _x, y = _y;
+	}
+	//외적
+	double cross(const vector2& other) const
+	{
+		return x * other.y - y * other.x;
+	}
+
+	/* 연산자 오버로딩을 통해 실제 벡터의 연산을 구현합니다. */
+
+	//벡터의 실수배
+	vector2 operator * (double r) const
+	{
+		return vector2(x * r, y * r);
+	}
+	//벡터의 덧셈
+	vector2 operator + (vector2 other) const
+	{
+		return vector2(x + other.x, y + other.y);
+	}
+	//벡터의 뺄셈
+	vector2 operator - (vector2 other) const
+	{
+		return vector2(x - other.x, y - other.y);
+	}
+	//두 벡터의 비교
+	bool operator == (vector2 other) const
+	{
+		return x == other.x && y == other.y;
+	}
+	bool operator < (vector2 other) const
+	{
+		return x < other.x && y < other.y;
+	}
+};
+
 //20231101 opencv에 trace가 이미 정의되어 있어서 trace를 Trace로 변경함.
 //매크로로 정의되어 그런지 간혹 비정상적으로 출력되는 현상이 있다.
 //일단, thread 내부에서 사용하는 일부 프로젝트에서는 오류가 발생하므로 주의할 것.
@@ -437,422 +486,6 @@ void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR 
 //	TRACE(_T("%s = %d\n"), name, args);
 //}
 
-template < typename T > class AutoEraser
-{
-private:
-	T * VarPtr;
-public:
-	template < typename T2 >
-	AutoEraser(T2& ptr)    {    VarPtr = (T*)ptr;   }
-	~AutoEraser()           {    delete[] VarPtr;    }
-};
-
-struct timezone  
-{ 
-  int  tz_minuteswest; /* minutes W of Greenwich */ 
-  int  tz_dsttime;     /* type of dst correction */ 
-}; 
-
-
-//https://exiv2.org/tags.html
-//https://learn.microsoft.com/en-us/windows/win32/wic/-wic-native-image-format-metadata-queries#exif-metadata
-class CSCEXIFInfo
-{
-public:
-	CString camera_make;
-	CString camera_model;
-	CString software;
-	CString image_description;
-	CString image_copyright;
-	CString original_datetime;
-	CString last_modified_datetime;
-	double exposure_time = 1.0;
-	double exposure_bias = 0.0;
-	double f_number = 0.0;				//"
-	unsigned short iso_speed = 0;
-	char flash = 0;
-	double focal_length = 0.0;
-	double focal_length_in_35mm = 0.0;
-	double gps_altitude;
-	double gps_latitude = 0.0;
-	double gps_longitude = 0.0;
-	int orientation = 0;
-	CString gps_latitude_str;
-	CString gps_longitude_str;
-	CString orientation_str;
-
-	CString get_exif_str()
-	{
-		CString res;
-		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
-			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d"),
-			camera_make,
-			camera_model,
-			software,
-			original_datetime,
-			flash ? _T("on") : _T("off"),
-			focal_length,
-			focal_length_in_35mm,
-			(unsigned)round(1.0 / exposure_time),
-			exposure_bias,
-			f_number,
-			iso_speed);
-
-		CString orientation_info;
-		if (!orientation_str.IsEmpty())
-		{
-			orientation_info.Format(_T("\n회전 정보: %s"), orientation_str);
-			res += orientation_info;
-		}
-
-		CString gps_info;
-		if (!gps_latitude_str.IsEmpty() || !gps_longitude_str.IsEmpty())
-		{
-			gps_info.Format(_T("\nGPS 정보: %s, %s, %.0fm"), gps_latitude_str, gps_longitude_str, gps_altitude);
-			res += gps_info;
-		}
-
-		return res;
-	}
-};
-
-/*
-* 	서버정보가 full_url이나 ip, port로 나눠져있어도 그에 맞는 생성자함수를 호출하여 채움.
-	CRequestUrlParams params(m_server_ip, m_server_port, _T(""), _T("GET"));
-
-	//만약 sub_url이 필요할 경우 아래와 같이 채워주고
-	params.sub_url.Format(_T("/lmm/api/v1.0/temp_envcheck/config-value-return?input_type=flag_windows_auto_update&mgrid=%s"), m_login_id);
-
-	//실제 request를 호출한다. thread방식이 아니면 바로 결과가 params에 채워져서 리턴된다.
-	request_url(&params);
-	...
-	if (params.status == HTTP_STATUS_OK)
-	...
-*/
-
-class CRequestUrlParams;
-
-//request_url() 내부에서 또는 단독적으로 서버가 현재 기동중인지를 빠르게 판별하기 위한 함수
-bool		is_server_reachable(CString ip, int port, int timeout_ms = 1000);
-
-// 서버 도달 가능 여부를 공유 캐시로 관리하는 클래스
-// 529행 그대로
-class CRequestUrlParams;
-
-class CServerReachabilityCache
-{
-public:
-	CServerReachabilityCache(int check_interval_ms = 10000)
-		: m_check_interval_ms(check_interval_ms)
-		, m_reachable(true)
-		, m_last_check_time(0)
-		, m_checking(false)
-	{
-	}
-
-	bool is_reachable(CString ip, int port, int timeout_ms = 1000)
-	{
-		auto now = std::chrono::steady_clock::now().time_since_epoch();
-		long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-		long long last = m_last_check_time.load();
-
-		if (now_ms - last >= m_check_interval_ms)
-		{
-			bool expected = false;
-			if (m_checking.compare_exchange_strong(expected, true))
-			{
-				bool result = is_server_reachable(ip, port, timeout_ms);
-				bool was_reachable = m_reachable.exchange(result);
-
-				if (was_reachable && !result)
-					cancel_all_pending();
-
-				m_last_check_time.store(now_ms);
-				m_checking.store(false);
-			}
-		}
-
-		return m_reachable.load();
-	}
-
-	bool is_reachable_cached() const
-	{
-		return m_reachable.load();
-	}
-
-	void update(bool success);		// ★ 선언만 (구현은 CRequestUrlParams 정의 이후)
-
-	void register_request(CRequestUrlParams* param)
-	{
-		std::lock_guard<std::mutex> lock(m_mtx);
-		m_pending.insert(param);
-	}
-
-	void unregister_request(CRequestUrlParams* param)
-	{
-		std::lock_guard<std::mutex> lock(m_mtx);
-		m_pending.erase(param);
-	}
-
-	void invalidate()
-	{
-		m_last_check_time.store(0);
-	}
-
-private:
-	void cancel_all_pending();		// ★ 선언만
-
-	int						m_check_interval_ms;
-	std::atomic<bool>		m_reachable;
-	std::atomic<long long>	m_last_check_time;
-	std::atomic<bool>		m_checking;
-
-	std::mutex				m_mtx;
-	std::set<CRequestUrlParams*> m_pending;
-};
-
-class CRequestUrlParams
-{
-public:
-	CRequestUrlParams() {}
-	CRequestUrlParams(CString _ip, int _port, CString _sub_url = _T(""), CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>*_headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
-	{
-		ip = _ip;
-		port = _port;
-		sub_url = _sub_url;
-
-		verb = _verb;
-		is_https = _is_https;
-		body = _body;
-		local_file_path = _local_file_path;
-
-		if (_headers)
-		{
-			for (size_t i = 0; i < _headers->size(); i++)
-			{
-				if (_headers->at(i).Right(2) != _T("\r\n"))
-					_headers->at(i) += _T("\r\n");
-				headers.push_back(_headers->at(i));
-			}
-		}
-	}
-
-	// 복사 생성자
-	CRequestUrlParams(const CRequestUrlParams& other)
-		: use_thread(other.use_thread)
-		, request_id(other.request_id)
-		, status(other.status)
-		, ip(other.ip)
-		, port(other.port)
-		, sub_url(other.sub_url)
-		, verb(other.verb)
-		, is_https(other.is_https)
-		, body(other.body)
-		, connect_timeout_ms(other.connect_timeout_ms)
-		, transfer_timeout_ms(other.transfer_timeout_ms)
-		, headers(other.headers)
-		, proxy_id(other.proxy_id)
-		, proxy_pw(other.proxy_pw)
-		, full_url(other.full_url)
-		, result(other.result)
-		, elapsed(other.elapsed)
-		, local_file_path(other.local_file_path)
-		, file_size(other.file_size)
-		, downloaded_size(other.downloaded_size)
-		, download_index(other.download_index)
-	{
-		h_cancel_root.store(nullptr);
-	}
-
-	// 복사 대입 연산자
-	CRequestUrlParams& operator=(const CRequestUrlParams& other)
-	{
-		if (this == &other) return *this;
-
-		use_thread = other.use_thread;
-		request_id = other.request_id;
-		status = other.status;
-		ip = other.ip;
-		port = other.port;
-		sub_url = other.sub_url;
-		verb = other.verb;
-		is_https = other.is_https;
-		body = other.body;
-		connect_timeout_ms = other.connect_timeout_ms;
-		transfer_timeout_ms = other.transfer_timeout_ms;
-		headers = other.headers;
-		proxy_id = other.proxy_id;
-		proxy_pw = other.proxy_pw;
-		full_url = other.full_url;
-		result = other.result;
-		elapsed = other.elapsed;
-		local_file_path = other.local_file_path;
-		file_size = other.file_size;
-		downloaded_size = other.downloaded_size;
-		download_index = other.download_index;
-
-		h_cancel_root.store(nullptr);
-
-		return *this;
-	}
-
-	CRequestUrlParams(CString _full_url, CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
-
-	void		reset(bool sub_url_reset = false)
-	{
-		status = -1;
-		full_url.Empty();	//full_url 멤버값이 채워져있으면 그 문자열을 파싱하여 ip, port, sub_url로 분리하므로 reset()할 경우는 반드시 비워줘야 한다.
-		body.Empty();
-		result.Empty();
-		elapsed = 0;
-		local_file_path.Empty();
-		file_size = 0;
-		downloaded_size = 0;
-		download_index = -1;
-
-		if (sub_url_reset)
-			sub_url.Empty();
-	}
-
-	// 취소 지원: request_url 내부에서 InternetOpen 핸들을 저장하고,
-	// 외부에서 cancel()을 호출하면 핸들을 닫아 블로킹 WinInet 작업을 즉시 취소한다.
-	std::atomic<HINTERNET> h_cancel_root{ nullptr };
-	void cancel()
-	{
-		HINTERNET h = h_cancel_root.exchange(nullptr);
-		if (h) InternetCloseHandle(h);
-		// MSDN: 부모 핸들을 닫으면 자식 핸들(hConnect, hRequest)도 무효화됨
-	}
-
-	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
-	bool		use_thread = false;
-
-	//m_request_id로 해당 작업이 무엇인지 구분한다.
-	int			request_id = -1;
-
-	//200, 404...와 같은 HTTP_STATUS를 담지만 invalid address 등과 같은 에러코드도 담기 위해 int로 사용한다. 0보다 작을 경우는 result 문자열에 에러 내용이 담겨있다.
-	int			status = -1;
-
-	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
-	CString		ip = _T("");
-
-	int			port = 0;
-	CString		sub_url;				//domain을 제외한 나머지 주소
-	CString		verb = _T("GET");
-	//url의 시작이 http인지 https인지, port가 80 또는 443일 경우는 자동 설정되지만
-	//임의 포트번호를 사용하는 경우에는 반드시 명시해줘야 한다.
-	bool		is_https = true;
-	CString		body;					//post data(json format)
-
-	//default = 30초
-	//연결 타임아웃과 전송 타임아웃 분리.
-	int			connect_timeout_ms = 5000;
-	int			transfer_timeout_ms = 30000;
-
-	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
-	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
-	std::deque<CString> headers;
-
-	//proxy 계정 정보가 없어서 실패하면 407(Proxy Authentication Required) error가 발생하므로 이때는 사용자에게 직접 입력받고
-	//다시 호출해줘야 한다.
-	CString		proxy_id;
-	CString		proxy_pw;
-
-	//한번 호출해서 실패한 후 port나 주소 등 url관련 정보를 수정하여 다시 request_url()을 호출할 때
-	//full_url을 ""로 만들어주지 않으면 이 값을 바로 사용해서 다시 request하므로 역시 실패하게 된다.
-	//반드시 url 관련값을 수정하여 다시 request할 경우에는 반드시 full_url = _T("")로 만들어주고 호출해야 한다.
-	CString		full_url;				//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
-	CString		result;
-	long		elapsed = 0;			//소요시간. ms단위.
-
-	//파일 다운로드 관련
-	CString		local_file_path;		//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
-	uint64_t	file_size = 0;			//url 파일 크기
-	uint64_t	downloaded_size = 0;	//현재까지 받은 크기
-	int			download_index = -1;	//n개의 파일 다운로드시 현재 파일의 인덱스. request_id와는 다름.
-};
-
-// ★ CRequestUrlParams 완전 정의 이후에 구현
-inline void CServerReachabilityCache::cancel_all_pending()
-{
-	std::lock_guard<std::mutex> lock(m_mtx);
-	for (auto* p : m_pending)
-		p->cancel();
-}
-
-inline void CServerReachabilityCache::update(bool success)
-{
-	bool was_reachable = m_reachable.exchange(success);
-
-	if (was_reachable && !success)
-		cancel_all_pending();
-
-	auto now = std::chrono::steady_clock::now().time_since_epoch();
-	long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-	m_last_check_time.store(now_ms);
-}
-
-class CMouseEvent
-{
-public:
-	CMouseEvent();
-	CMouseEvent(CPoint pt1, int msg1, short zDelta1 = 0) { pt = pt1; msg = msg1; zDelta = zDelta1; }
-
-	CPoint	pt;
-	int		msg;
-	short	zDelta;
-};
-
-class vector2
-{
-public:
-     double x, y;
-
-   //생성자
-	vector2()
-	{
-		x = 0.0, y = 0.0;
-	}
-
-    vector2(double _x, double _y)
-	{
-        x = _x, y = _y;
-    }
-    //외적
-    double cross(const vector2& other) const
-	{
-        return x*other.y-y*other.x;
-    }
-
-    /* 연산자 오버로딩을 통해 실제 벡터의 연산을 구현합니다. */
-
-    //벡터의 실수배
-    vector2 operator * (double r) const
-	{
-        return vector2(x*r, y*r);
-    }
-    //벡터의 덧셈
-    vector2 operator + (vector2 other) const
-	{
-        return vector2(x + other.x, y + other.y);
-    }
-    //벡터의 뺄셈
-    vector2 operator - (vector2 other) const
-	{
-        return vector2(x - other.x, y - other.y);
-    }
-    //두 벡터의 비교
-    bool operator == (vector2 other) const
-	{
-        return x == other.x && y == other.y;
-    }
-    bool operator < (vector2 other) const
-	{
-        return x < other.x && y < other.y;
-    }
-};
-
-
 //timer 관련변수
 extern		double		g_dTime0;
 extern		double		g_dTime1;
@@ -1137,7 +770,7 @@ struct	NETWORK_INFO
 	}
 
 	//dq항목을 하나의 문자열로 합쳐준다.
-	CString		get_concat_string(std::deque<CString> dq, CString separator = _T("|"));
+	CString		get_concat_str(std::deque<CString> dq, CString separator = _T("|"));
 
 	//[2023/1/1 22:1:29] [DBMS][NMS_LS_TERMINATE_SESSION_DATA][ID : tmax25][update livesupport_report set endtime = '2023-01-01 22:01:29', env_type = '5', viewer_type = '0' where accesscode = '31108355' and sptnum = '50400']
 	//[]로 묶여진 토큰을 분리한다.
@@ -1642,19 +1275,6 @@ struct	NETWORK_INFO
 
 	bool		parse_url(CString full_url, CString &ip, int &port, CString &sub_url, bool &is_https);
 
-	//url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
-	//local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
-	//local_file_path가 지정되어 있으면 파일로 다운받는다.
-	//(이때 리턴값은 "")
-	//리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
-	//port만 가지고 http와 https를 구분하는 것은 위험하므로 명확한 지시자로 접근해야 한다.
-	//(반드시 https로 접근해야 하는 경우, port가 기본값인 443이 아니라면 주소를 https://~로 명시하여 호출해야 한다)
-	//DWORD		request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb = _T("GET"), std::vector<CString> *headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
-	//DWORD		request_url(CString& result_str, CString full_url, CString verb = _T("GET"), std::vector<CString>* headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
-
-	//기본 30초 타임아웃으로 요청하는데 간혹 서버가 구동중인지 빠르게 확인하고자 한다면 check_server_reachable을 true로 하면 3초이내 판별된다.
-	//단, 이 요청은 별도의 TCP 소켓을 생성하므로 다수의 요청이 발생하는 상황에서는 절대 사용하면 안된다.
-	void		request_url(CRequestUrlParams* params, bool check_server_reachable = false);
 
 
 	//기본 브라우저로 설정된 브라우저 이름을 리턴하고 부가적으로 경로, 버전을 얻을 수 있다.
@@ -3202,3 +2822,379 @@ std::basic_string<CharT> GetSystemErrorMesssage(const DWORD errorCode)
 	return result;
 }
 
+template < typename T > class AutoEraser
+{
+private:
+	T* VarPtr;
+public:
+	template < typename T2 >
+	AutoEraser(T2& ptr) { VarPtr = (T*)ptr; }
+	~AutoEraser() { delete[] VarPtr; }
+};
+
+struct timezone
+{
+	int  tz_minuteswest; /* minutes W of Greenwich */
+	int  tz_dsttime;     /* type of dst correction */
+};
+
+
+//https://exiv2.org/tags.html
+//https://learn.microsoft.com/en-us/windows/win32/wic/-wic-native-image-format-metadata-queries#exif-metadata
+class CSCEXIFInfo
+{
+public:
+	CString camera_make;
+	CString camera_model;
+	CString software;
+	CString image_description;
+	CString image_copyright;
+	CString original_datetime;
+	CString last_modified_datetime;
+	double exposure_time = 1.0;
+	double exposure_bias = 0.0;
+	double f_number = 0.0;				//"
+	unsigned short iso_speed = 0;
+	char flash = 0;
+	double focal_length = 0.0;
+	double focal_length_in_35mm = 0.0;
+	double gps_altitude;
+	double gps_latitude = 0.0;
+	double gps_longitude = 0.0;
+	int orientation = 0;
+	CString gps_latitude_str;
+	CString gps_longitude_str;
+	CString orientation_str;
+
+	CString get_exif_str()
+	{
+		CString res;
+		res.Format(_T("카메라 제조사: %s\n카메라 모델명: %s\n소프트웨어: %s\n촬영 시각: %s\n플래시: %s\n초점 거리: %.1f mm\n35mm 환산: %.1f\n")\
+			_T("노출 시간: 1/%d sec\n노출 보정: %.2f EV\n조리개 값: f/%.1f\nISO 감도: %d"),
+			camera_make,
+			camera_model,
+			software,
+			original_datetime,
+			flash ? _T("on") : _T("off"),
+			focal_length,
+			focal_length_in_35mm,
+			(unsigned)round(1.0 / exposure_time),
+			exposure_bias,
+			f_number,
+			iso_speed);
+
+		CString orientation_info;
+		if (!orientation_str.IsEmpty())
+		{
+			orientation_info.Format(_T("\n회전 정보: %s"), orientation_str);
+			res += orientation_info;
+		}
+
+		CString gps_info;
+		if (!gps_latitude_str.IsEmpty() || !gps_longitude_str.IsEmpty())
+		{
+			gps_info.Format(_T("\nGPS 정보: %s, %s, %.0fm"), gps_latitude_str, gps_longitude_str, gps_altitude);
+			res += gps_info;
+		}
+
+		return res;
+	}
+};
+
+class CRequestUrlParams;
+
+//request_url() 내부에서 또는 단독적으로 서버가 현재 기동중인지를 빠르게 판별하기 위한 함수
+bool		is_server_reachable(CString ip, int port, int timeout_ms = 1000);
+
+// 서버 도달 가능 여부를 공유 캐시로 관리하는 클래스
+// 529행 그대로
+class CRequestUrlParams;
+
+class CServerReachabilityCache
+{
+public:
+	CServerReachabilityCache(int check_interval_ms = 10000)
+		: m_check_interval_ms(check_interval_ms)
+		, m_reachable(true)
+		, m_last_check_time(0)
+		, m_checking(false)
+	{
+	}
+
+	bool is_reachable(CString ip, int port, int timeout_ms = 1000)
+	{
+		auto now = std::chrono::steady_clock::now().time_since_epoch();
+		long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+		long long last = m_last_check_time.load();
+
+		if (now_ms - last >= m_check_interval_ms)
+		{
+			bool expected = false;
+			if (m_checking.compare_exchange_strong(expected, true))
+			{
+				bool result = is_server_reachable(ip, port, timeout_ms);
+				bool was_reachable = m_reachable.exchange(result);
+
+				if (was_reachable && !result)
+					cancel_all_pending();
+
+				m_last_check_time.store(now_ms);
+				m_checking.store(false);
+			}
+		}
+
+		return m_reachable.load();
+	}
+
+	bool is_reachable_cached() const
+	{
+		return m_reachable.load();
+	}
+
+	void update(bool success);		// ★ 선언만 (구현은 CRequestUrlParams 정의 이후)
+
+	void register_request(CRequestUrlParams* param)
+	{
+		std::lock_guard<std::mutex> lock(m_mtx);
+		m_pending.insert(param);
+	}
+
+	void unregister_request(CRequestUrlParams* param)
+	{
+		std::lock_guard<std::mutex> lock(m_mtx);
+		m_pending.erase(param);
+	}
+
+	void invalidate()
+	{
+		m_last_check_time.store(0);
+	}
+
+private:
+	void cancel_all_pending();		// ★ 선언만
+
+	int						m_check_interval_ms;
+	std::atomic<bool>		m_reachable;
+	std::atomic<long long>	m_last_check_time;
+	std::atomic<bool>		m_checking;
+
+	std::mutex				m_mtx;
+	std::set<CRequestUrlParams*> m_pending;
+};
+
+class CRequestUrlParams
+{
+public:
+	CRequestUrlParams() {}
+	CRequestUrlParams(CString _ip, int _port, CString _sub_url = _T(""), CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""))
+	{
+		ip = _ip;
+		port = _port;
+		sub_url = _sub_url;
+
+		verb = _verb;
+		is_https = _is_https;
+		body = _body;
+		local_file_path = _local_file_path;
+
+		if (_headers)
+		{
+			for (size_t i = 0; i < _headers->size(); i++)
+			{
+				if (_headers->at(i).Right(2) != _T("\r\n"))
+					_headers->at(i) += _T("\r\n");
+				headers.push_back(_headers->at(i));
+			}
+		}
+	}
+
+	// 복사 생성자
+	CRequestUrlParams(const CRequestUrlParams& other)
+		: use_thread(other.use_thread)
+		, request_id(other.request_id)
+		, status(other.status)
+		, ip(other.ip)
+		, port(other.port)
+		, sub_url(other.sub_url)
+		, verb(other.verb)
+		, is_https(other.is_https)
+		, body(other.body)
+		, connect_timeout_ms(other.connect_timeout_ms)
+		, transfer_timeout_ms(other.transfer_timeout_ms)
+		, headers(other.headers)
+		, proxy_id(other.proxy_id)
+		, proxy_pw(other.proxy_pw)
+		, full_url(other.full_url)
+		, result(other.result)
+		, elapsed(other.elapsed)
+		, local_file_path(other.local_file_path)
+		, file_size(other.file_size)
+		, downloaded_size(other.downloaded_size)
+		, download_index(other.download_index)
+	{
+		h_cancel_root.store(nullptr);
+	}
+
+	// 복사 대입 연산자
+	CRequestUrlParams& operator=(const CRequestUrlParams& other)
+	{
+		if (this == &other) return *this;
+
+		use_thread = other.use_thread;
+		request_id = other.request_id;
+		status = other.status;
+		ip = other.ip;
+		port = other.port;
+		sub_url = other.sub_url;
+		verb = other.verb;
+		is_https = other.is_https;
+		body = other.body;
+		connect_timeout_ms = other.connect_timeout_ms;
+		transfer_timeout_ms = other.transfer_timeout_ms;
+		headers = other.headers;
+		proxy_id = other.proxy_id;
+		proxy_pw = other.proxy_pw;
+		full_url = other.full_url;
+		result = other.result;
+		elapsed = other.elapsed;
+		local_file_path = other.local_file_path;
+		file_size = other.file_size;
+		downloaded_size = other.downloaded_size;
+		download_index = other.download_index;
+
+		h_cancel_root.store(nullptr);
+
+		return *this;
+	}
+
+	CRequestUrlParams(CString _full_url, CString _verb = _T("GET"), bool _is_https = true, std::deque<CString>* _headers = NULL, CString _body = _T(""), CString _local_file_path = _T(""));
+
+	//현재 설정된 정보를 문자열로 리턴한다. 로그 출력시 주로 사용.
+	CString		get_param_str()
+	{
+		CString param_str;
+		CString header_list = get_concat_str(headers, _T(""));
+
+		param_str.Format(_T("ip = %s, port = %d, sub_url = %s, is_https = %d, additional_header = %s, body = %s"),
+							ip, port, sub_url, is_https, header_list, body);
+		return param_str;
+	}
+
+	void		reset(bool sub_url_reset = false)
+	{
+		status = -1;
+		full_url.Empty();	//full_url 멤버값이 채워져있으면 그 문자열을 파싱하여 ip, port, sub_url로 분리하므로 reset()할 경우는 반드시 비워줘야 한다.
+		body.Empty();
+		result.Empty();
+		elapsed = 0;
+		local_file_path.Empty();
+		file_size = 0;
+		downloaded_size = 0;
+		download_index = -1;
+
+		if (sub_url_reset)
+			sub_url.Empty();
+	}
+
+	// 취소 지원: request_url 내부에서 InternetOpen 핸들을 저장하고,
+	// 외부에서 cancel()을 호출하면 핸들을 닫아 블로킹 WinInet 작업을 즉시 취소한다.
+	std::atomic<HINTERNET> h_cancel_root{ nullptr };
+	void cancel()
+	{
+		HINTERNET h = h_cancel_root.exchange(nullptr);
+		if (h) InternetCloseHandle(h);
+		// MSDN: 부모 핸들을 닫으면 자식 핸들(hConnect, hRequest)도 무효화됨
+	}
+
+	//thread로 별도 실행할지(특히 파일 다운로드 request), request 결과를 바로 받아서 처리할지(단순 request)
+	bool		use_thread = false;
+
+	//m_request_id로 해당 작업이 무엇인지 구분한다.
+	int			request_id = -1;
+
+	//200, 404...와 같은 HTTP_STATUS를 담지만 invalid address 등과 같은 에러코드도 담기 위해 int로 사용한다. 0보다 작을 경우는 result 문자열에 에러 내용이 담겨있다.
+	int			status = -1;
+
+	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
+	CString		ip = _T("");
+
+	int			port = 0;
+	CString		sub_url;				//domain을 제외한 나머지 주소
+	CString		verb = _T("GET");
+	//url의 시작이 http인지 https인지, port가 80 또는 443일 경우는 자동 설정되지만
+	//임의 포트번호를 사용하는 경우에는 반드시 명시해줘야 한다.
+	bool		is_https = true;
+	CString		body;					//post data(json format)
+
+	//default = 30초
+	//연결 타임아웃과 전송 타임아웃 분리.
+	int			connect_timeout_ms = 5000;
+	int			transfer_timeout_ms = 30000;
+
+	//token_header.Format(_T("token: %s"), ServiceSetting::strManagerToken);
+	//각 항목의 끝에는 반드시 "\r\n"을 붙여줘야하는데 이는 requestAPI()에서 알아서 처리함.
+	std::deque<CString> headers;
+
+	//proxy 계정 정보가 없어서 실패하면 407(Proxy Authentication Required) error가 발생하므로 이때는 사용자에게 직접 입력받고
+	//다시 호출해줘야 한다.
+	CString		proxy_id;
+	CString		proxy_pw;
+
+	//한번 호출해서 실패한 후 port나 주소 등 url관련 정보를 수정하여 다시 request_url()을 호출할 때
+	//full_url을 ""로 만들어주지 않으면 이 값을 바로 사용해서 다시 request하므로 역시 실패하게 된다.
+	//반드시 url 관련값을 수정하여 다시 request할 경우에는 반드시 full_url = _T("")로 만들어주고 호출해야 한다.
+	CString		full_url;				//[in][out] full_url을 주고 호출하면 이를 ip, port, sub_url로 나눠서 처리한다. ""로 호출하면 
+	CString		result;
+	long		elapsed = 0;			//소요시간. ms단위.
+
+	//파일 다운로드 관련
+	CString		local_file_path;		//url의 파일을 다운받을 경우 로컬 파일 full path 지정.
+	uint64_t	file_size = 0;			//url 파일 크기
+	uint64_t	downloaded_size = 0;	//현재까지 받은 크기
+	int			download_index = -1;	//n개의 파일 다운로드시 현재 파일의 인덱스. request_id와는 다름.
+};
+
+// ★ CRequestUrlParams 완전 정의 이후에 구현
+inline void CServerReachabilityCache::cancel_all_pending()
+{
+	std::lock_guard<std::mutex> lock(m_mtx);
+	for (auto* p : m_pending)
+		p->cancel();
+}
+
+inline void CServerReachabilityCache::update(bool success)
+{
+	bool was_reachable = m_reachable.exchange(success);
+
+	if (was_reachable && !success)
+		cancel_all_pending();
+
+	auto now = std::chrono::steady_clock::now().time_since_epoch();
+	long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+	m_last_check_time.store(now_ms);
+}
+
+class CMouseEvent
+{
+public:
+	CMouseEvent();
+	CMouseEvent(CPoint pt1, int msg1, short zDelta1 = 0) { pt = pt1; msg = msg1; zDelta = zDelta1; }
+
+	CPoint	pt;
+	int		msg;
+	short	zDelta;
+};
+
+//url을 호출하여 결과값을 리턴하거나 지정된 로컬 파일로 다운로드 한다.
+//local_file_path가 ""이면 결과값을 문자열로 리턴받는다.
+//local_file_path가 지정되어 있으면 파일로 다운받는다.
+//(이때 리턴값은 "")
+//리턴값이 200이 아닐 경우는 리턴된 에러코드와 result_str에 저장된 에러 메시지를 조합하여 에러 처리한다.
+//port만 가지고 http와 https를 구분하는 것은 위험하므로 명확한 지시자로 접근해야 한다.
+//(반드시 https로 접근해야 하는 경우, port가 기본값인 443이 아니라면 주소를 https://~로 명시하여 호출해야 한다)
+//DWORD		request_url(CString &result_str, CString ip, int port, CString sub_url, CString verb = _T("GET"), std::vector<CString> *headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
+//DWORD		request_url(CString& result_str, CString full_url, CString verb = _T("GET"), std::vector<CString>* headers = NULL, CString jsonBody = _T(""), CString local_file_path = _T(""));
+
+//기본 30초 타임아웃으로 요청하는데 간혹 서버가 구동중인지 빠르게 확인하고자 한다면 check_server_reachable을 true로 하면 3초이내 판별된다.
+//단, 이 요청은 별도의 TCP 소켓을 생성하므로 다수의 요청이 발생하는 상황에서는 절대 사용하면 안된다.
+void		request_url(CRequestUrlParams* params, bool check_server_reachable = false);

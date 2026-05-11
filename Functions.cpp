@@ -9857,7 +9857,7 @@ int	get_map_str(CString src, std::map<CString, CString>& map, CString lfrf, CStr
 }
 
 //dq항목을 하나의 문자열로 합쳐준다.
-CString	get_concat_string(std::deque<CString> dq, CString separator)
+CString	get_concat_str(std::deque<CString> dq, CString separator)
 {
 	int i;
 	CString res;

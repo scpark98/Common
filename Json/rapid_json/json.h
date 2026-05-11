@@ -159,7 +159,7 @@ public:
 	CString		get_all_data();
 
 	//pretty가 true이면 indent가 적용된 형식으로 리턴.
-	CString		get_json_string(bool pretty = true);
+	CString		get_json_str(bool pretty = true);
 
 	//어떤 멤버값을 읽어올 때 해당 멤버가 존재하지 않으면 exception이 발생하므로 이럴 경우 default_value를 리턴하도록 함수 추가.
 	int			get_int(std::string member, int default_value = 0);

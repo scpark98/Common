@@ -300,6 +300,7 @@ public:
 	//투명png는 배경을 줄 필요가 없지만 간혹 배경이 refresh가 제대로 동작하지 않아서 필요한 경우도 존재한다.
 	//(NH 프로젝트에서 김근호 부장이 작성한 CBaseDialog를 상속받은 CDialog 사용시)
 	//auto_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
+	//투명 이미지의 배경을 칠하고자 할 경우 add_image()보다 나중에 호출해야 배경색이 적용된다.
 	void		set_back_color(Gdiplus::Color normal, bool auto_color = true);
 
 	//3개의 색상은 지정하지만 disabled는 기본 disable color를 쓰고자 할 경우에는 Transparent로 호출한다.

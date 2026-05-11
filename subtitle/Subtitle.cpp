@@ -443,11 +443,11 @@ bool CSubtitle::save_srt(CString sfile)
 			{
 				_ftprintf(fp, _T("<font color=%s>%s</font>\n"),
 								m_subtitle[i].sentences[j].color,
-								m_subtitle[i].sentences[j]);
+								m_subtitle[i].sentences[j].sentence);
 			}
 			else
 			{
-				_ftprintf(fp, _T("%s\n"), m_subtitle[i].sentences[j]);
+				_ftprintf(fp, _T("%s\n"), m_subtitle[i].sentences[j].sentence);
 			}
 		}
 

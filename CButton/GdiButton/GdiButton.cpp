@@ -182,6 +182,7 @@ void CGdiButton::copy_properties(CGdiButton& dst)
 
 	dst.m_down_offset = m_down_offset;
 	dst.m_use_normal_image_on_disabled = m_use_normal_image_on_disabled;
+	dst.m_use_normal_back_color_on_disabled = m_use_normal_back_color_on_disabled;
 
 	dst.m_draw_own_text = m_draw_own_text;
 
@@ -368,6 +369,20 @@ void CGdiButton::use_normal_image_on_disabled(bool use)
 			if (!m_use_normal_image_on_disabled)
 				m_image[i]->img[3].set_matrix(&m_grayMatrix);
 		}
+	}
+}
+
+void CGdiButton::use_normal_back_color_on_disabled(bool use)
+{
+	m_use_normal_back_color_on_disabled = use;
+
+	//호출 시점에 이미 m_cr_back 이 채워져 있을 수 있어 disabled 슬롯을 즉시 갱신.
+	if (m_cr_back.size() >= 4)
+	{
+		m_cr_back[3] = use ? m_cr_back[0] : get_weak_color(m_cr_back[0], 60);
+		if (!m_border_color_user_set && m_cr_border.size() >= 4)
+			m_cr_border[3] = m_cr_back[3];
+		redraw_window();
 	}
 }
 
@@ -565,7 +580,7 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_color)
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
 	//disabled 색을 normal 에서 get_weak_color 로 파생 — 테마에 자연스럽게 따라감.
 	//(이전: LightGray 하드코딩 → normal 색과 무관하게 동일 회색이 되어 테마와 어긋남)
-	Gdiplus::Color cr_disabled = get_weak_color(normal, 60);
+	Gdiplus::Color cr_disabled = m_use_normal_back_color_on_disabled ? normal : get_weak_color(normal, 60);
 	if (auto_color)
 		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), cr_disabled);
 	else
@@ -592,6 +607,10 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 
 	//checkbox, radio는 disabled라도 배경색까지 바꾸진 않는다.
 	if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)))
+		disabled = normal;
+
+	//use_normal_back_color_on_disabled 가 set 되어 있으면 인자 무시하고 normal 색 사용.
+	if (m_use_normal_back_color_on_disabled)
 		disabled = normal;
 
 	m_cr_back.push_back(disabled);

@@ -1581,10 +1581,10 @@ void CSCMenu::OnPaint()
 			{
 				//sub button이 없는 메뉴항목일 경우
 				if (r_content == m_items[i]->m_r)
-					rText.right = r_view.right - 6;
+					rText.right = r_view.right - 10;
 				//sub button이 있을 경우
 				else
-					rText.right = r_view.left - 8;
+					rText.right = r_view.left - 12;
 
 				dc.DrawText(m_items[i]->m_hot_key, rText, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 			}
@@ -1597,7 +1597,7 @@ void CSCMenu::OnPaint()
 				pen.SetEndCap(Gdiplus::LineCapRound);
 
 				const int half = 4;
-				int tip_x = view_r.right - 10;
+				int tip_x = view_r.right - 14;
 				int base_x = tip_x - half;
 				int cy = view_r.CenterPoint().y;
 

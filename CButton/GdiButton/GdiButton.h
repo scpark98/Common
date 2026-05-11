@@ -261,6 +261,8 @@ public:
 	bool		add_image(CSCGdiplusBitmap *normal, bool add_auto_state_images = true);
 	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
+	//disabled 상태에서도 배경색을 normal 색 그대로 사용 (회색 자동변환 안 함). image 의 use_normal_image_on_disabled 와 동일 패턴.
+	void		use_normal_back_color_on_disabled(bool use = true);
 
 	CSize		get_img_size(int index = 0);
 	CSize		get_img_origin_size() { return m_sz_img_origin; }
@@ -568,6 +570,7 @@ protected:
 	bool		m_draw_3D_rect = false;					//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다. default = false;
+	bool		m_use_normal_back_color_on_disabled = false;	//disabled 시에도 배경색을 normal 그대로. default = false (= 회색 자동 파생).
 
 	//이미지를 사용하는 버튼이라도 자신에게 세팅된 텍스트를 표시해줘야 할 경우도 존재한다.
 	//ex. 공용 버튼 이미지를 사용하는 경우

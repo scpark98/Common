@@ -5476,16 +5476,8 @@ void CVtListCtrlEx::sync_scrollbar()
 	bool need_h = (col_count > 0) && (total_col_width > rc.Width());
 	bool need_v = (total > visible) && (visible > 0);
 
-	//header 아래부터 세로 scrollbar 시작.
+	//탐색기 스타일 — list.top 부터 세로 scrollbar 시작. header 위로 overlay.
 	int top_offset = 0;
-	CHeaderCtrl* pHeader = GetHeaderCtrl();
-	if (pHeader && ::IsWindow(pHeader->GetSafeHwnd()))
-	{
-		CRect rh;
-		pHeader->GetWindowRect(rh);
-		ScreenToClient(rh);
-		top_offset = rh.bottom;
-	}
 
 	int v_right = rc.right;
 	int h_bottom = rc.bottom;

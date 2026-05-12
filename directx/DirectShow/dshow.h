@@ -249,6 +249,11 @@ public:
 	//-1:faster, 1:slower, 0:origin	//per 500ms
 	void			subtitle_sync(int sync);
 
+	int				m_audio_sync;		//ms (>0 = audio 느리게 / 영상 대비 지연, <0 = audio 빠르게)
+	//-1, 1이면 100ms 단위로 빠르게/느리게, 그 외 값이면 해당 값 절대 적용.
+	//-1:faster, 1:slower, 0:origin	//per 100ms
+	void			audio_sync(int sync);
+
 	//자막 위치 이동
 	enum SUBTITLE_POS_DIRECTION
 	{

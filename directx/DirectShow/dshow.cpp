@@ -884,6 +884,7 @@ CDShow::CDShow()
 	m_subtitle_file.Empty();
 	m_hDirectVobSubWnd = NULL;
 	m_subtitle_sync = 0;
+	m_audio_sync = 0;
 	m_media_filename.Empty();
 
 	close_media();
@@ -989,6 +990,7 @@ void CDShow::close_media()
 	m_show_subtitle = true;
 	m_hDirectVobSubWnd = NULL;
 	m_subtitle_sync = 0;
+	m_audio_sync = 0;
 	m_media_filename.Empty();
 
 	m_video_stream.clear();
@@ -4070,6 +4072,38 @@ void CDShow::subtitle_sync(int sync)
 
 	if (m_use_dvs)
 		DirectVobSub_function(msg_put_SubtitleTiming, m_subtitle_sync);
+}
+
+void CDShow::audio_sync(int sync)
+{
+	if (sync == 1)
+		m_audio_sync += 100;
+	else if (sync == 0)
+		m_audio_sync = 0;
+	else if (sync == -1)
+		m_audio_sync -= 100;
+	else
+		m_audio_sync = sync;
+
+	//MPC convention — IExFilterConfig::Flt_SetInt("audio_delay", ms) 를 지원하는 모든 graph filter
+	//(MPC Audio Renderer / SaneAR / MPC-BE 의 audio renderer 등) 에 새 delay 값 전파.
+	//지원 안 하는 renderer 면 silent no-op — m_audio_sync 값만 저장.
+	if (!m_pGB)
+		return;
+
+	CComPtr<IEnumFilters> pEnum;
+	if (FAILED(m_pGB->EnumFilters(&pEnum)) || !pEnum)
+		return;
+
+	IBaseFilter* pF = NULL;
+	ULONG fetched = 0;
+	while (pEnum->Next(1, &pF, &fetched) == S_OK)
+	{
+		CComQIPtr<IExFilterConfig> pCfg(pF);
+		if (pCfg)
+			pCfg->Flt_SetInt("audio_delay", m_audio_sync);
+		pF->Release();
+	}
 }
 
 void CDShow::subtitle_placement(int dir)

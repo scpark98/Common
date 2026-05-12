@@ -3262,6 +3262,8 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 		end_idx = size() - 1;
 	if (end_idx < 0)
 		return -1;
+	if (start_idx > end_idx)
+		return -1;
 
 	//찾은 항목을 선택으로 표시하는 경우 먼저 기존 선택된 항목들을 초기화시켜준다.
 	//if (select)
@@ -3306,18 +3308,9 @@ int CVtListCtrlEx::find(CString find_target, std::deque<int>* result,
 			}
 		}
 
-		if (start_idx < end_idx)
-		{
-			cur_idx++;
-			if (cur_idx > end_idx)
-				break;
-		}
-		//else
-		//{
-		//	cur_idx--;
-		//	if (cur_idx < end_idx)
-		//		return result->size();
-		//}
+		cur_idx++;
+		if (cur_idx > end_idx)
+			break;
 
 		/*
 		//한 라인의 데이터를 하나의 스트링 리스트로 얻어와서 비교
@@ -5573,6 +5566,22 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 				int item_h = rItem.Height();
 				if (item_h > 0)
 					Scroll(CSize(0, (new_top - cur_top) * item_h));
+			}
+		}
+
+		//pixel 정렬 보정 — ensure_visible(visible_center) 등이 top 한계를 넘는 Scroll 을 호출하면
+		//listctrl 이 부분 스크롤로 끝내 item 0 top y 가 header_bottom 와 어긋난 채 정착할 수 있음.
+		//top_index 가 같아 위 Scroll 이 발화 안 해도 잔여 offset 을 여기서 보정.
+		if (total > 0)
+		{
+			int target_idx = max(0, min(new_top, total - 1));
+			CRect rItem;
+			if (GetItemRect(target_idx, &rItem, LVIR_BOUNDS))
+			{
+				int header_h = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
+				int dy = rItem.top - header_h;
+				if (dy != 0)
+					Scroll(CSize(0, dy));
 			}
 		}
 	}

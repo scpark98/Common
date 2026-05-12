@@ -827,8 +827,8 @@ public:
 	//자체 스크롤바 — CSCListBox / CSCTreeCtrl 와 동일 패턴. 가로/세로 모두 overlay.
 	CSCScrollbar	m_scrollbar;		//세로
 	CSCScrollbar	m_scrollbar_h;		//가로 — listctrl 은 column 가로폭 합계 > client 일 때 필요.
-	int				m_scrollbar_width = 18;
-	int				m_scrollbar_height = 18;
+	int				m_scrollbar_width = 16;
+	int				m_scrollbar_height = 16;
 	bool			m_scrollbar_setup = false;
 	int				m_last_top_index = -1;
 	int				m_h_scroll_pos = 0;		//가로 scroll 누적 pixel offset — WS_HSCROLL 제거 후 GetScrollPos(SB_HORZ) 가 stale 이라 자체 추적.

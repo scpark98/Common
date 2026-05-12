@@ -241,6 +241,7 @@ CRect CSCScrollbar::calc_thumb_rect() const
 	int thumb_offset = (int)((double)(m_pos - m_range_min) * max_thumb_offset / span + 0.5);
 	Clamp(thumb_offset, 0, max_thumb_offset);
 
+	//even thickness + floor cx → FillRectangle 의 visual center sub-pixel = rTrack.left + Width()/2 = client 정중앙 9.0 (width 18 기준). arrow chevron sub-pixel center 와 일치.
 	if (m_orient == vertical)
 	{
 		int cx = rTrack.left + (rTrack.Width() - m_thickness) / 2;
@@ -515,26 +516,43 @@ void CSCScrollbar::draw_arrow(Gdiplus::Graphics& g, const CRect& rArrow, bool to
 	Gdiplus::SolidBrush br_bg(cr_track);
 	g.FillRectangle(&br_bg, rArrow.left, rArrow.top, rArrow.Width(), rArrow.Height());
 
-	//화살표 글리프 — pressed 시 크기 축소로 클릭 피드백.
-	Gdiplus::Color cr_glyph = get_color(m_theme.cr_back, m_theme.cr_text, 0.55);
+	//삼각형 — 탐색기 reference. sharp triangle (FillPolygon) + 각 vertex 의 1×1 픽셀을 배경색으로 덮어 round triangle 효과.
+	//세로 scrollbar 기준: 가로 8 (hw=4), 세로 6 (hh=3). 가로 scrollbar 는 90° 회전 → 가로 6, 세로 8 (코드상 hw/hh swap 적용).
+	//PointF sub-pixel center 사용 — visual mass center 가 client 정중앙 (width 16 → sub-pixel 8.0) 에 정확 align.
+	Gdiplus::Color cr_glyph = get_color(m_theme.cr_back, m_theme.cr_text, 0.75);
 	Gdiplus::SolidBrush br_glyph(cr_glyph);
 
-	CPoint c = rArrow.CenterPoint();
-	int base = max(4, min(rArrow.Width(), rArrow.Height()) / 3);
-	int s = (m_pressed == part) ? max(3, base * 4 / 5) : base;
+	Gdiplus::REAL cx = (rArrow.left + rArrow.right) * 0.5f;
+	Gdiplus::REAL cy = (rArrow.top + rArrow.bottom) * 0.5f;
 
-	Gdiplus::Point pts[3];
+	Gdiplus::REAL hw = 4.0f;	//세로 scrollbar 기준: 삼각형 가로 반폭 (전체 8). 가로 scrollbar 에선 세로 반폭 (전체 8).
+	Gdiplus::REAL hh = 3.0f;	//세로 scrollbar 기준: 삼각형 세로 반높이 (전체 6). 가로 scrollbar 에선 가로 반폭 (전체 6).
+	if (m_pressed == part)
+	{
+		hw *= 0.85f;
+		hh *= 0.85f;
+	}
+
+	Gdiplus::PointF pts[3];
 	if (m_orient == vertical)
 	{
-		if (toward_lt)	{ pts[0] = Gdiplus::Point(c.x - s, c.y + s/2); pts[1] = Gdiplus::Point(c.x + s, c.y + s/2); pts[2] = Gdiplus::Point(c.x, c.y - s/2); }
-		else			{ pts[0] = Gdiplus::Point(c.x - s, c.y - s/2); pts[1] = Gdiplus::Point(c.x + s, c.y - s/2); pts[2] = Gdiplus::Point(c.x, c.y + s/2); }
+		if (toward_lt)	{ pts[0] = Gdiplus::PointF(cx - hw, cy + hh); pts[1] = Gdiplus::PointF(cx, cy - hh); pts[2] = Gdiplus::PointF(cx + hw, cy + hh); }
+		else			{ pts[0] = Gdiplus::PointF(cx - hw, cy - hh); pts[1] = Gdiplus::PointF(cx, cy + hh); pts[2] = Gdiplus::PointF(cx + hw, cy - hh); }
 	}
 	else
 	{
-		if (toward_lt)	{ pts[0] = Gdiplus::Point(c.x + s/2, c.y - s); pts[1] = Gdiplus::Point(c.x + s/2, c.y + s); pts[2] = Gdiplus::Point(c.x - s/2, c.y); }
-		else			{ pts[0] = Gdiplus::Point(c.x - s/2, c.y - s); pts[1] = Gdiplus::Point(c.x - s/2, c.y + s); pts[2] = Gdiplus::Point(c.x + s/2, c.y); }
+		if (toward_lt)	{ pts[0] = Gdiplus::PointF(cx + hh, cy - hw); pts[1] = Gdiplus::PointF(cx - hh, cy); pts[2] = Gdiplus::PointF(cx + hh, cy + hw); }
+		else			{ pts[0] = Gdiplus::PointF(cx - hh, cy - hw); pts[1] = Gdiplus::PointF(cx + hh, cy); pts[2] = Gdiplus::PointF(cx - hh, cy + hw); }
 	}
 	g.FillPolygon(&br_glyph, pts, 3);
+
+	//각 vertex 의 1×1 픽셀을 배경색으로 덮음 → 1px 뾰족점 제거, 라운드 삼각형 효과.
+	for (int i = 0; i < 3; i++)
+	{
+		int vx = (int)pts[i].X;
+		int vy = (int)pts[i].Y;
+		g.FillRectangle(&br_bg, vx, vy, 1, 1);
+	}
 }
 
 void CSCScrollbar::OnPaint()

@@ -690,7 +690,8 @@ bool CSCD2ImageDlg::paste_from_clipboard()
 {
 	stop();
 
-	if (m_images[0].paste_from_clipboard())
+	//빈 dialog 에 바로 paste 시 m_images[0] 에 아직 D2D context 가 주입돼 있지 않으므로 명시 주입.
+	if (m_images[0].paste_from_clipboard(m_d2dc.get_WICFactory(), m_d2dc.get_d2dc()))
 	{
 		m_slider_gif.ShowWindow(SW_HIDE);
 		m_filename = _T("image from clipboard");

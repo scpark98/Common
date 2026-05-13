@@ -234,6 +234,8 @@ public:
 	bool					copy_to_clipboard(int index = -1);
 	//클립보드에 이미지가 있다면 클립보드의 이미지를 index 위치에 붙여넣는다. 0보다 작으면 현재 프레임 이미지에 붙여넣는다.
 	bool					paste_from_clipboard(int index = -1);
+	//load() 한 번도 호출 안 된 상태(빈 dialog 에 바로 paste) 대비 — factory / d2dc 주입 후 paste.
+	bool					paste_from_clipboard(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context);
 
 //animated image
 	bool					is_animated_image() { return (m_img.size() > 1); }

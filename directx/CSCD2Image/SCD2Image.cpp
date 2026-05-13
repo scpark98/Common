@@ -3506,13 +3506,32 @@ bool CSCD2Image::copy_to_clipboard(int index)
 //기존에는 m_img[index]에 SetTarget 후 DrawBitmap으로 리사이즈 복사하는 구조였으나,
 //m_img[index]는 load() 경로에서 D2D1_BITMAP_OPTIONS_TARGET 없이 생성되므로 SetTarget이 D2DERR_INVALID_TARGET(0x88990024)로 실패.
 //이미지 뷰어 관점에서도 "클립보드 이미지를 원본 크기 그대로 표시"가 자연스러우므로 load()와 동일한 교체 방식으로 변경함.
+bool CSCD2Image::paste_from_clipboard(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context)
+{
+	if (!pWICFactory || !d2context)
+		return false;
+
+	//load() 가 한 번도 호출되지 않은 빈 상태일 수 있으므로 context 를 주입.
+	//이미 set 되어 있더라도 동일 값으로 덮어쓰는 건 무해.
+	m_pWICFactory = pWICFactory;
+	m_d2dc = d2context;
+
+	return paste_from_clipboard(-1);
+}
+
 bool CSCD2Image::paste_from_clipboard(int /*index*/)
 {
 	if (!m_d2dc || !m_pWICFactory)
+	{
+		TRACE(_T("paste_from_clipboard: m_d2dc=%p m_pWICFactory=%p — load() 한 번도 호출 안 된 상태이거나 context 미주입. paste_from_clipboard(factory, d2dc) 오버로드 사용 권장.\n"), m_d2dc, m_pWICFactory);
 		return false;
+	}
 
 	if (!OpenClipboard(nullptr))
+	{
+		TRACE(_T("paste_from_clipboard: OpenClipboard failed, GetLastError=%lu\n"), GetLastError());
 		return false;
+	}
 
 	ComPtr<IWICBitmapSource> wicSource;
 	HRESULT hr = E_FAIL;
@@ -3541,6 +3560,8 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 
 			if (SUCCEEDED(hr))
 				wicSource = frame;
+			else
+				TRACE(_T("paste_from_clipboard: PNG path failed hr=0x%08X\n"), hr);
 
 			GlobalUnlock(hPng);
 		}
@@ -3565,6 +3586,16 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 				UINT stride = ((w * bpp + 31) / 32) * 4;
 				BYTE* pixels = pData + pbv5->bV5Size;
 
+				//BI_BITFIELDS / BI_ALPHABITFIELDS 인데 V5 보다 작은 헤더(V4 / BITMAPINFOHEADER) 가 들어오는 경우
+				//mask DWORD 들이 헤더 뒤에 따라온다. V5 헤더 자체에는 mask 가 포함돼 있으므로 V5 헤더면 skip 불필요.
+				if (pbv5->bV5Size < sizeof(BITMAPV5HEADER))
+				{
+					if (pbv5->bV5Compression == BI_BITFIELDS)
+						pixels += 3 * sizeof(DWORD);
+					else if (pbv5->bV5Compression == 6 /*BI_ALPHABITFIELDS*/)
+						pixels += 4 * sizeof(DWORD);
+				}
+
 				//팔레트가 있으면(≤8bpp) header 뒤에 RGBQUAD 테이블이 오므로 건너뛴다.
 				if (bpp <= 8)
 				{
@@ -3578,6 +3609,9 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 					srcFormat = (pbv5->bV5AlphaMask != 0) ? GUID_WICPixelFormat32bppBGRA : GUID_WICPixelFormat32bppBGR;
 				else if (bpp == 24)
 					srcFormat = GUID_WICPixelFormat24bppBGR;
+
+				TRACE(_T("paste_from_clipboard: CF_DIBV5 w=%u h=%u bpp=%u amask=0x%08X comp=%u\n"),
+					w, h, bpp, (UINT)pbv5->bV5AlphaMask, (UINT)pbv5->bV5Compression);
 
 				if (!IsEqualGUID(srcFormat, GUID_WICPixelFormatDontCare))
 				{
@@ -3595,6 +3629,12 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 					hr = m_pWICFactory->CreateBitmapFromMemory(w, h, srcFormat, stride, stride * h, pixels, &wicBmp);
 					if (SUCCEEDED(hr))
 						wicSource = wicBmp;
+					else
+						TRACE(_T("paste_from_clipboard: CF_DIBV5 CreateBitmapFromMemory failed hr=0x%08X\n"), hr);
+				}
+				else
+				{
+					TRACE(_T("paste_from_clipboard: CF_DIBV5 unsupported bpp=%u\n"), bpp);
 				}
 			}
 			GlobalUnlock(hDibv5);
@@ -3618,6 +3658,13 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 				UINT srcStride = ((w * bpp + 31) / 32) * 4;
 				BYTE* pixels = pData + pbi->biSize;
 
+				//BI_BITFIELDS / BI_ALPHABITFIELDS 인 경우 BITMAPINFOHEADER 뒤에 mask DWORD 들이 따라온다.
+				//pixels 가 mask 영역을 건너뛰지 않으면 매 row 가 12~16 byte 만큼 어긋나 결과가 깨진다.
+				if (pbi->biCompression == BI_BITFIELDS)
+					pixels += 3 * sizeof(DWORD);
+				else if (pbi->biCompression == 6 /*BI_ALPHABITFIELDS*/)
+					pixels += 4 * sizeof(DWORD);
+
 				// 팔레트가 있으면 건너뛰기
 				if (bpp <= 8)
 				{
@@ -3625,15 +3672,20 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 					pixels += paletteSize * sizeof(RGBQUAD);
 				}
 
-				// WIC 비트맵으로 변환
+				TRACE(_T("paste_from_clipboard: CF_DIB w=%u h=%u bpp=%u comp=%u\n"),
+					w, h, bpp, (UINT)pbi->biCompression);
+
+				//WIC 비트맵으로 변환
+				//32bpp BI_RGB 는 4번째 바이트가 보통 0(예약) 이라 BGRA 로 해석하면 alpha=0 으로 전체 투명이 된다.
+				//→ BI_RGB 32bpp 는 BGR(알파 무시) 로 처리. BI_BITFIELDS 면 알파 마스크 유무로 판단할 수 없으므로 BGR 안전.
 				WICPixelFormatGUID srcFormat;
-				if (bpp == 32)      srcFormat = GUID_WICPixelFormat32bppBGRA;
+				if (bpp == 32)      srcFormat = GUID_WICPixelFormat32bppBGR;	//alpha 바이트 무시 — 전체 투명 사고 방지
 				else if (bpp == 24) srcFormat = GUID_WICPixelFormat24bppBGR;
 				else
 				{
+					TRACE(_T("paste_from_clipboard: CF_DIB unsupported bpp=%u\n"), bpp);
 					GlobalUnlock(hDib);
-					CloseClipboard();
-					return false;
+					goto try_bitmap;
 				}
 
 				// bottom-up → top-down 변환
@@ -3652,15 +3704,65 @@ bool CSCD2Image::paste_from_clipboard(int /*index*/)
 				hr = m_pWICFactory->CreateBitmapFromMemory(w, h, srcFormat, srcStride, srcStride * h, flipped.data(), &wicBmp);
 				if (SUCCEEDED(hr))
 					wicSource = wicBmp;
+				else
+					TRACE(_T("paste_from_clipboard: CF_DIB CreateBitmapFromMemory failed hr=0x%08X\n"), hr);
 			}
 			GlobalUnlock(hDib);
+		}
+	}
+
+try_bitmap:
+	//4) CF_BITMAP 시도 — 일부 캡쳐 도구가 PNG/DIB 없이 HBITMAP 만 클립보드에 두는 경우.
+	if (!wicSource)
+	{
+		HBITMAP hBmp = (HBITMAP)GetClipboardData(CF_BITMAP);
+		if (hBmp)
+		{
+			BITMAP bm = { 0 };
+			if (GetObject(hBmp, sizeof(bm), &bm) && bm.bmWidth > 0 && bm.bmHeight > 0)
+			{
+				HDC hdc = GetDC(nullptr);
+				if (hdc)
+				{
+					BITMAPINFO bi = { 0 };
+					bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+					bi.bmiHeader.biWidth = bm.bmWidth;
+					bi.bmiHeader.biHeight = -bm.bmHeight;	//top-down
+					bi.bmiHeader.biPlanes = 1;
+					bi.bmiHeader.biBitCount = 32;
+					bi.bmiHeader.biCompression = BI_RGB;
+
+					UINT stride = bm.bmWidth * 4;
+					std::vector<BYTE> buf((size_t)stride * bm.bmHeight);
+
+					int lines = GetDIBits(hdc, hBmp, 0, bm.bmHeight, buf.data(), &bi, DIB_RGB_COLORS);
+					ReleaseDC(nullptr, hdc);
+
+					TRACE(_T("paste_from_clipboard: CF_BITMAP w=%d h=%d lines=%d\n"), bm.bmWidth, bm.bmHeight, lines);
+
+					if (lines == bm.bmHeight)
+					{
+						ComPtr<IWICBitmap> wicBmp;
+						hr = m_pWICFactory->CreateBitmapFromMemory(bm.bmWidth, bm.bmHeight,
+							GUID_WICPixelFormat32bppBGR,	//alpha 의미 없음 — BI_RGB 32bpp
+							stride, stride * bm.bmHeight, buf.data(), &wicBmp);
+						if (SUCCEEDED(hr))
+							wicSource = wicBmp;
+						else
+							TRACE(_T("paste_from_clipboard: CF_BITMAP CreateBitmapFromMemory failed hr=0x%08X\n"), hr);
+					}
+				}
+			}
 		}
 	}
 
 	CloseClipboard();
 
 	if (!wicSource)
+	{
+		TRACE(_T("paste_from_clipboard: no usable clipboard format found\n"));
 		return false;
+	}
 
 	// PBGRA로 변환
 	ComPtr<IWICFormatConverter> converter;

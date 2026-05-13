@@ -2566,9 +2566,31 @@ void CSCTreeCtrl::create_imagelist()
 		m_imagelist.Add(AfxGetApp()->LoadIcon(m_image_IDs[i]));
 
 	SetImageList(&m_imagelist, TVSIL_NORMAL);
-	
+
 	int height = GetItemHeight();
 	SetItemHeight(MAX(m_image_size, height));
+
+	Invalidate();
+}
+
+void CSCTreeCtrl::set_imagelist(const std::vector<HICON>& icons, int image_size)
+{
+	m_use_own_imagelist = true;
+	m_image_size = image_size;
+
+	m_imagelist.DeleteImageList();
+	m_imagelist.Create(image_size, image_size, ILC_COLOR32 | ILC_MASK, 0, 1);
+
+	for (HICON h : icons)
+	{
+		if (h)
+			m_imagelist.Add(h);
+	}
+
+	SetImageList(&m_imagelist, TVSIL_NORMAL);
+
+	int height = GetItemHeight();
+	SetItemHeight(MAX(image_size, height));
 
 	Invalidate();
 }

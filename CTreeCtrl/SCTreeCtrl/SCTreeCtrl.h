@@ -33,6 +33,7 @@
 #include <afxcmn.h>
 #include <deque>
 #include <functional>
+#include <vector>
 
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
@@ -148,6 +149,11 @@ public:
 
 		create_imagelist();
 	}
+
+	//HICON 리스트로 imagelist 구성. 리소스 ID 가 아닌 동적 아이콘 (SHGetStockIconInfo,
+	//ExtractIconEx 등) 을 imagelist 에 넣을 때 사용.
+	//호출 측 HICON 은 imagelist 가 내부 복사하므로 호출 후 ::DestroyIcon 으로 해제 가능.
+	void			set_imagelist(const std::vector<HICON>& icons, int image_size = 16);
 
 	bool		m_is_shell_treectrl = false;
 	bool		m_is_local = true;
@@ -337,7 +343,26 @@ public:
 
 	//resource editor에서 border를 true로 하면 m_draw_border = true;로 자동 설정된다.
 	//그런데 만약 사용자가 set_draw_border(false)로 하면 border는 그려지지 않아야 한다.
-	void			set_draw_border(bool draw_border = true) { m_draw_border = draw_border; Invalidate(); }
+	//
+	//border 는 OnNcPaint 에서 CWindowDC 로 그리므로 m_draw_border 변경 후 WM_NCPAINT 를 발생시켜야
+	//한다. Invalidate() 는 client area 만 갱신하므로 부족 → SWP_FRAMECHANGED 로 NC 재계산 + 재그리기.
+	//또한 native WS_BORDER/WS_EX_CLIENTEDGE 가 남아 있으면 OnNcPaint 직후 native NC paint 가 덮어쓰므로 함께 제거.
+	void			set_draw_border(bool draw_border = true)
+	{
+		m_draw_border = draw_border;
+		if (m_hWnd)
+		{
+			if (draw_border)
+			{
+				if (GetStyle()   & WS_BORDER)        ModifyStyle(WS_BORDER, 0);
+				if (GetExStyle() & WS_EX_CLIENTEDGE) ModifyStyleEx(WS_EX_CLIENTEDGE, 0);
+				if (GetExStyle() & WS_EX_STATICEDGE) ModifyStyleEx(WS_EX_STATICEDGE, 0);
+			}
+			SetWindowPos(NULL, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+			Invalidate();
+		}
+	}
 
 //자체 overlay scrollbar — native WS_VSCROLL 제거 + 우측 child 로 그림. 트리 mutation 후 sync_scrollbar() 외부 호출 가능.
 	CSCScrollbar	m_scrollbar;

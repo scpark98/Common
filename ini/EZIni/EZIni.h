@@ -190,6 +190,21 @@ public:
 		operator CPoint();
 		operator CRect();
 		operator COleDateTime();
+
+		//varargs(printf/Format 등) 호출 시에는 컴파일러가 변환 연산자를 선택할 문맥이 없어
+		//프록시 객체가 그대로 푸시되어 %s 등이 엉뚱한 메모리를 읽는다. 명시적으로 타입을
+		//얻기 위한 dot-call 진입점. 모두 동일 변환 로직을 호출하므로 operator T() 와 동치.
+		//타입 종류는 위의 Read Operation 변환 연산자 목록과 1:1 대응.
+		int				to_int()			{ return operator int(); }
+		UINT			to_UINT()			{ return operator UINT(); }
+		INT64			to_INT64()			{ return operator INT64(); }
+		UINT64			to_UINT64()			{ return operator UINT64(); }
+		bool			to_bool()			{ return operator bool(); }
+		double			to_double()			{ return operator double(); }
+		CString			to_CString()		{ return operator CString(); }
+		CPoint			to_CPoint()			{ return operator CPoint(); }
+		CRect			to_CRect()			{ return operator CRect(); }
+		COleDateTime	to_COleDateTime()	{ return operator COleDateTime(); }
 		
 		// Arithmetic/Logical Operation
 		Key& operator++();

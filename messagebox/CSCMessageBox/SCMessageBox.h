@@ -95,6 +95,11 @@ public:
 
 	bool			create(CWnd* parent, CString title, UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);
 
+	//theApp 공유 인스턴스로 사용할 때 parent 를 사후에 바인딩하기 위한 setter.
+	//특히 modeless 모드에서 버튼 응답 메시지(Message_CSCMessageBox)의 수신자가 되므로
+	//set_message() 호출 직전에 현재 화면을 띄운 dlg 를 parent 로 지정해 줘야 한다.
+	void			set_parent(CWnd* parent) { m_parent = parent; }
+
 	bool			set_show_on_parent_center(bool show_on_parent_center = true) { m_show_on_parent_center = show_on_parent_center; return m_show_on_parent_center; }
 
 //title 관련
@@ -166,7 +171,12 @@ protected:
 //https://blog.naver.com/pks1217/220407691110
 	//MB_ICONSTOP, MB_ICONQUESTION, MB_ICONEXCLAMATION, MB_ICONINFORMATION
 	int				m_icon_index = -1;
-	HICON			m_icons[4];
+	//SHGetStockIconInfo(Vista+) 또는 LoadIcon(NULL, IDI_xxx)(XP fallback)이 실패할 수 있는
+	//환경을 대비해 NULL 초기화.
+	HICON			m_icons[4] = { NULL, NULL, NULL, NULL };
+	//set_message 에서 계산되는 메시지 아이콘 그리기 영역. 첫 줄 텍스트의 세로 중심에 맞춤.
+	//OnPaint 에서 DrawIconEx 로 그림.
+	CRect			m_icon_rect = CRect(0, 0, 0, 0);
 
 //font
 	LOGFONT			m_lf;

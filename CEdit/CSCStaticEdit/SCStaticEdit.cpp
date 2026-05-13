@@ -135,6 +135,19 @@ void CSCStaticEdit::PreSubclassWindow()
 		ModifyStyleEx(WS_EX_CLIENTEDGE, 0);
 	if (GetStyle() & WS_BORDER)
 		ModifyStyle(WS_BORDER, 0);
+
+	// Resource Editor 에서 지정한 Static 정렬 스타일을 m_halign / m_valign 에 반영.
+	// 본 클래스는 OnPaint 를 직접 구현하므로 SS_CENTER/SS_RIGHT 비트를 자체적으로
+	// 해석해 주지 않으면 정렬이 무시되고 기본 DT_LEFT 로 그려진다.
+	DWORD dw_style = GetStyle();
+	switch (dw_style & SS_TYPEMASK)
+	{
+	case SS_CENTER:	m_halign = DT_CENTER;	break;
+	case SS_RIGHT:	m_halign = DT_RIGHT;	break;
+	default:		m_halign = DT_LEFT;		break;	//SS_LEFT(0) 및 그 외
+	}
+	if (dw_style & SS_CENTERIMAGE)
+		m_valign = DT_VCENTER;
 }
 
 // ──────────────────────────────────────────────────────────

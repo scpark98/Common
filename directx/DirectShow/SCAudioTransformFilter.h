@@ -34,6 +34,13 @@ public:
 	//wfx : sample format (cached from connection negotiation)
 	virtual void	process_sample(BYTE* buf, long len, const WAVEFORMATEX* wfx) = 0;
 
+	//audio delay (ms 단위, +양수 = audio 늦게/지연, -음수 = audio 빠르게).
+	//Receive 시점에 IMediaSample 의 start/stop time 을 shift 한다 — base 에서 일괄 처리.
+	//graph 의 audio renderer 가 DirectSound 처럼 IExFilterConfig 미지원이어도 동작.
+	void			set_delay_ms(int ms) { m_delay_100ns.store((LONGLONG)ms * 10000LL); }
+	int				get_delay_ms() const { return (int)(m_delay_100ns.load() / 10000LL); }
+	LONGLONG		get_delay_ns()  const { return m_delay_100ns.load(); }	//Receive 가 timestamp shift 시 호출
+
 //IUnknown
 	STDMETHODIMP			QueryInterface(REFIID iid, void** ppv) override;
 	STDMETHODIMP_(ULONG)	AddRef() override;
@@ -79,6 +86,8 @@ protected:
 
 	WAVEFORMATEXTENSIBLE	m_wfx_ext;	//40 byte 까지 저장. WAVEFORMATEX 만 와도 18 byte 만 채움.
 	bool					m_wfx_set;
+
+	std::atomic<LONGLONG>	m_delay_100ns;	//timestamp shift (100-ns units, REFERENCE_TIME 단위)
 };
 
 

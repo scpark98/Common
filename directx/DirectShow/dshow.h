@@ -253,6 +253,9 @@ public:
 	//-1, 1이면 100ms 단위로 빠르게/느리게, 그 외 값이면 해당 값 절대 적용.
 	//-1:faster, 1:slower, 0:origin	//per 100ms
 	void			audio_sync(int sync);
+	//graph 의 audio renderer 가 IExFilterConfig::Flt_SetInt("audio_delay") 를 지원하는지 진단.
+	//audio_sync 가 실제 효과를 내는지 OSD/로그로 즉시 확인하기 위함.
+	CString			get_audio_delay_status();
 
 	//자막 위치 이동
 	enum SUBTITLE_POS_DIRECTION

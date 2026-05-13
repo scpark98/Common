@@ -112,7 +112,7 @@ static void release_media_type(AM_MEDIA_TYPE* mt)
 
 CSCAudioTransformFilter::CSCAudioTransformFilter(LPCWSTR friendly_name)
 	: m_ref(0), m_state(State_Stopped), m_pGraph(NULL), m_pClock(NULL),
-	  m_pInputPin(NULL), m_pOutputPin(NULL), m_wfx_set(false)
+	  m_pInputPin(NULL), m_pOutputPin(NULL), m_wfx_set(false), m_delay_100ns(0)
 {
 	memset(&m_wfx_ext, 0, sizeof(m_wfx_ext));
 	if (friendly_name) StringCchCopyW(m_name, 64, friendly_name);
@@ -418,6 +418,22 @@ STDMETHODIMP CSCAudioTransformInputPin::Receive(IMediaSample* pSample)
 			s_trace_count++;
 		}
 		m_pFilter->process_sample(pBuf, len, pwfx);
+	}
+
+	//audio delay — IMediaSample 의 start/stop timestamp 를 base 의 m_delay_100ns 만큼 shift.
+	//양수면 audio 가 늦게 도착 → renderer 가 reference clock 의 그 시각까지 buffer → 영상 대비 늦게 들림.
+	//0 이면 GetTime/SetTime 호출 자체 skip 으로 overhead 없음.
+	LONGLONG delay = m_pFilter->get_delay_ns();
+	if (delay != 0)
+	{
+		REFERENCE_TIME tStart = 0, tStop = 0;
+		HRESULT hr_t = pSample->GetTime(&tStart, &tStop);
+		if (SUCCEEDED(hr_t))
+		{
+			tStart += delay;
+			tStop  += delay;
+			pSample->SetTime(&tStart, &tStop);
+		}
 	}
 
 	//downstream 으로 forward (같은 IMediaSample 객체 그대로).

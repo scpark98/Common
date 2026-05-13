@@ -4095,6 +4095,12 @@ void CDShow::audio_sync(int sync)
 	if (FAILED(m_pGB->EnumFilters(&pEnum)) || !pEnum)
 		return;
 
+	//1차 — audio chain 에 끼워진 자체 transform filter (CSCAudioGain) 에 직접 setter.
+	//graph 의 audio renderer 가 DirectSound 처럼 IExFilterConfig 미지원이어도 timestamp shift 가 작동.
+	if (m_pAudioGainFilter)
+		((CSCAudioGain*)m_pAudioGainFilter)->set_delay_ms(m_audio_sync);
+
+	//2차 — MPC convention IExFilterConfig 지원 filter 가 있으면 그쪽도 호출 (MPC Audio Renderer / SaneAR 등).
 	IBaseFilter* pF = NULL;
 	ULONG fetched = 0;
 	while (pEnum->Next(1, &pF, &fetched) == S_OK)
@@ -4104,6 +4110,61 @@ void CDShow::audio_sync(int sync)
 			pCfg->Flt_SetInt("audio_delay", m_audio_sync);
 		pF->Release();
 	}
+}
+
+CString CDShow::get_audio_delay_status()
+{
+	if (!m_pGB)
+		return _T("graph 없음");
+
+	CComPtr<IEnumFilters> pEnum;
+	if (FAILED(m_pGB->EnumFilters(&pEnum)) || !pEnum)
+		return _T("EnumFilters fail");
+
+	CString supported;
+	CString all_filters;
+	IBaseFilter* pF = NULL;
+	ULONG fetched = 0;
+	while (pEnum->Next(1, &pF, &fetched) == S_OK)
+	{
+		FILTER_INFO fi = {};
+		if (SUCCEEDED(pF->QueryFilterInfo(&fi)))
+		{
+			if (!all_filters.IsEmpty())
+				all_filters += _T(", ");
+			all_filters += fi.achName;
+
+			CComQIPtr<IExFilterConfig> pCfg(pF);
+			if (pCfg)
+			{
+				if (!supported.IsEmpty())
+					supported += _T(", ");
+				supported += fi.achName;
+			}
+			if (fi.pGraph)
+				fi.pGraph->Release();
+		}
+		pF->Release();
+	}
+
+	logWrite(_T("[audio_delay_diag] all=%s | supports=%s | gain_chain=%s"),
+		all_filters.GetString(),
+		supported.IsEmpty() ? _T("(none)") : supported.GetString(),
+		m_pAudioGainFilter ? _T("yes") : _T("no"));
+
+	//CSCAudioGain 이 audio chain 에 끼워진 경우 base 의 timestamp shift 로 delay 동작.
+	//renderer 가 IExFilterConfig 미지원이어도 OK.
+	if (m_pAudioGainFilter)
+		return _T("오디오 싱크 지원 (CSCAudioGain timestamp shift)");
+
+	if (!supported.IsEmpty())
+	{
+		CString result;
+		result.Format(_T("오디오 싱크 지원: %s"), supported.GetString());
+		return result;
+	}
+
+	return _T("오디오 싱크 미지원 renderer");
 }
 
 void CDShow::subtitle_placement(int dir)

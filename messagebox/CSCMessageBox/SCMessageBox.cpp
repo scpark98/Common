@@ -247,6 +247,12 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_static_message.set_font(&m_font);
 	m_static_message.set_halign(DT_CENTER);
 	m_static_message.set_valign(DT_VCENTER);
+	//CSCParagraphStatic 기본 line_spacing 은 1.5x. set_message 의 "첫 줄 중심" 아이콘 정렬 계산이
+	//line_count * line_height (=1.0x 가정) 이므로 1.5x 로 두면 멀티라인에서 아이콘이 어긋난다.
+	m_static_message.set_line_spacing(1.0f);
+	//paragraph 의 안티앨리어싱 기본값은 false (작은 시스템 폰트 흐림 방지). 메시지박스 텍스트는
+	//태그 컬러 강조 등 큰 글자도 종종 들어오므로 ON 으로 켜서 부드럽게 렌더링.
+	m_static_message.set_font_antialiasing(true);
 
 	return res;
 }
@@ -313,48 +319,31 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 
 	rc.top += m_title_height;
 
+	//halign 결정 — set_text 호출 전에 두면 rebuild_layout 이 즉시 올바른 정렬로 빌드.
+	bool single_line = (m_message.Find(_T('\n')) < 0);
+	bool has_icon = (m_icon_index >= 0);
+	m_static_message.set_halign((!has_icon && single_line) ? DT_CENTER : DT_LEFT);
+
 	//메시지 너비, 높이에 따라 대화상자 크기를 재조정한다.
 	//최소 cx = 240, cy = 140이며 cx의 최대 크기는 800으로 제한한다.
-	//이 값을 넘으면 DT_WORDBREAK를 넣어 다시 계산하려 했으나 많이 복잡해진다. 우선 MAX_WIDTH로 제한한다.
-	//실제 사용 시 MAX_WIDTH를 넘을 경우는 좌우가 잘리므로 적절하게 '\n'을 넣어준다.
+	//이 값을 넘으면 좌우가 잘리므로 호출 측에서 적절하게 '\n'을 넣어 줘야 함.
 	if (m_auto_size)
 	{
-		CRect rmsg(rc.left + gap_side, rc.top + gap, rc.Width() - gap_side * 2, rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
-		//rmsg = m_static_message.set_text(msg);
-		CClientDC dc(this);
-		CFont* pOldFont = dc.SelectObject(&m_font);
-
-		//DWORD dwText = m_static_message.get_text_align();
-		dc.DrawText(msg, rmsg, DT_CALCRECT);// | DT_WORDBREAK);
-
-		//TRACE(_T("rmsg = %s\n"), get_rect_info_string(rmsg));
+		//paragraph 의 자체 layout 으로 측정. 태그 strip, 폰트 크기 변화(<sz=N>), line_spacing 모두 반영.
+		//GDI DrawText(DT_CALCRECT) 는 raw 텍스트(태그 포함)를 단일 폰트로 측정하므로 부정확.
+		//측정 정확성을 위해 임시로 MAX_SIZE_CX 너비 + 충분한 높이로 키워 자연 폭으로 layout 하게 둠.
+		CRect rmsg_temp(0, 0, MAX_SIZE_CX, 4000);
+		m_static_message.MoveWindow(rmsg_temp);
+		CRect rect_text = m_static_message.set_text(m_message);
 
 		//right, bottom을 줄 때는 dlg의 최소 크기를 고려한다.
-		//width는 MIN_SIZE_CX 크기가 기본이지만 메시지가 길어지면 아이콘과의 기본 간격을 유지하면서 MAX_SIZE_CX까지 늘어난다.
-		int needed_width = icon_size + icon_msg_gap + rmsg.Width() + gap_side * 2;
-		rc.right = MAX(needed_width + 48, MIN_SIZE_CX);	//m_sz_button.cx * 2 + gap + button_gap * 2 + 40);
-
-		//만약 최대 너비를 넘어간다면 DT_WORDBREAK를 주고 다시 계산해서 height를 늘리려했으나 많이 복잡해진다.
-		//그냥 메시지박스를 띠울 때 width가 max를
+		//width는 MIN_SIZE_CX 가 기본이지만 메시지가 길어지면 아이콘과의 기본 간격 유지하며 MAX_SIZE_CX 까지 늘어남.
+		int needed_width = icon_size + icon_msg_gap + rect_text.Width() + gap_side * 2;
+		rc.right = MAX(needed_width + 48, MIN_SIZE_CX);
 		if (rc.right > MAX_SIZE_CX)
-		{
 			rc.right = MAX_SIZE_CX;
-			//CRect rtext = m_static_message.set_text(msg);
-			//rc.bottom = rc.top + rtext.Height();
-			//rmsg.right = rc.right;
-			////rmsg.bottom = 1000;
-			//dc.DrawText(msg, rmsg, DT_CALCRECT | DT_WORDBREAK);
-			//rc.bottom = MAX(rc.top + rmsg.Height() + gap, 140);
-			//TRACE(_T("re rmsg = %s\n"), get_rect_info_string(rmsg));
-			//right, bottom을 줄 때는 dlg의 최소 크기를 고려한다.
-			//rc.right = MAX(rmsg.Width() + gap * 2, 240);// m_sz_button.cx * 2 + gap + button_gap * 2 + 40);
-		}
-		else
-		{
-			rc.bottom = MAX(rc.top + gap + rmsg.Height() + gap + m_sz_button.cy + bottom_gap, MIN_SIZE_CY);
-		}
 
-		dc.SelectObject(pOldFont);
+		rc.bottom = MAX(rc.top + gap + rect_text.Height() + gap + m_sz_button.cy + bottom_gap, MIN_SIZE_CY);
 
 		rc.top -= m_title_height;
 		MoveWindow(rc);
@@ -523,8 +512,14 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		rc.top + gap,
 		rc.Width() - gap_side * 2 - message_left_offset,
 		rc.Height() - bottom_gap - m_sz_button.cy - gap * 2);
-	m_static_message.SetWindowText(m_message);
 	m_static_message.ModifyStyle(0, m_align);
+
+	//halign / set_text 는 auto_size 경로에서 이미 처리됨.
+	//auto_size==false 일 때만 여기서 처리. MoveWindow 후이므로 OnSize 가 rebuild_layout 을 트리거함.
+	if (!m_auto_size)
+	{
+		m_static_message.set_text(m_message);
+	}
 	m_static_message.ShowWindow(SW_SHOW);
 
 	//m_icon_rect 계산 — 첫 줄 텍스트의 세로 중심에 아이콘의 세로 중심을 맞춤.

@@ -161,10 +161,15 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	//중복 등록은 RegisterClass 가 ERROR_CLASS_ALREADY_EXISTS 로 실패하지만 본 호출은 idempotent.
 	AfxRegisterClass(&wc);
 
-	//WS_EX_TOOLWINDOW: parent 가 NULL 이어도 taskbar / Alt+Tab 에서 제외.
-	//(parent 없는 owner-less 팝업은 기본적으로 taskbar 에 별도 항목으로 뜨기 때문.)
-	//본 클래스는 caption 을 직접 그리므로 WS_EX_TOOLWINDOW 가 강제하는 짧은 캡션바 영향은 없음.
-	bool res = CreateEx(WS_EX_TOOLWINDOW, wc.lpszClassName, _T("CSCMessageDlg"), (DWORD)dwStyle, CRect(0, 0, cx, cy), parent, 0);
+	//WS_EX_TOOLWINDOW 는 *owner 가 있을 때만* 적용.
+	//Tool window 는 Windows 설계상 owner 윈도우의 보조 부유(floating) 윈도우다.
+	//owner 가 없는 tool window 는 ShowWindow(SW_HIDE) → SW_SHOW 의 재활성 흐름이 깨져
+	//두 번째 호출부터 visible 이지만 foreground 가 아닌 상태로 입력을 못 받는 버그가 있다.
+	//owner 가 없으면 일반 popup 으로 생성 — taskbar 에 잠깐 뜨더라도 동작은 정상.
+	//(DoModal 에서 lazy binding 으로 m_parent 가 잡히면 SetWindowLongPtr GWLP_HWNDPARENT 로
+	// owner 가 설정되며, owned 윈도우는 WS_EX_TOOLWINDOW 없이도 taskbar 에서 자동 제외된다.)
+	DWORD ex_style = (parent != nullptr) ? WS_EX_TOOLWINDOW : 0;
+	bool res = CreateEx(ex_style, wc.lpszClassName, _T("CSCMessageDlg"), (DWORD)dwStyle, CRect(0, 0, cx, cy), parent, 0);
 	if (!res)
 		return false;
 
@@ -632,8 +637,11 @@ LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 {
 	auto msg = (CGdiButtonMessage*)wParam;
 
-	if (m_parent == nullptr)
-		m_parent = msg->pThis->GetParent();
+	//[버그 수정] 과거에 여기서 "m_parent 가 NULL 이면 버튼의 GetParent() 로 채운다" 는 코드가 있었으나,
+	//버튼의 parent = CSCMessageBox **자기 자신**. 결과적으로 m_parent = this 로 박혀버려
+	//다음 DoModal 호출 시 m_parent->EnableWindow(FALSE) 가 *자기 자신을 disable* — 두 번째 메시지박스
+	//가 visible 이지만 키보드/마우스 무응답이 되는 진짜 원인이었다.
+	//m_parent 는 DoModal 의 lazy binding 에서만 설정한다.
 
 	if (msg->message == WM_LBUTTONUP)
 	{
@@ -642,7 +650,8 @@ LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 
 		if (!m_as_modal)
 		{
-			::SendMessage(m_parent->m_hWnd, Message_CSCMessageBox, (WPARAM)this, m_response);
+			if (m_parent && ::IsWindow(m_parent->m_hWnd))
+				::SendMessage(m_parent->m_hWnd, Message_CSCMessageBox, (WPARAM)this, m_response);
 			ShowWindow(SW_HIDE);
 		}
 		/*
@@ -696,11 +705,10 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 					m_response = IDOK;  break;
 				}
 
-				if (m_as_modal)
-				{
-					EndDialog(m_response);
-				}
-				else
+				//우리 popup 은 CreateEx 로 만들었으므로 ::EndDialog 호출은 undefined behavior.
+				//modal: m_response 만 설정 → 펌프 루프 자체 종료 → DoModal 끝에서 ShowWindow(SW_HIDE).
+				//modeless: parent 에 통지 + 즉시 hide.
+				if (!m_as_modal)
 				{
 					if (m_parent && ::IsWindow(m_parent->m_hWnd))
 						::SendMessage(m_parent->m_hWnd, Message_CSCMessageBox, (WPARAM)this, m_response);
@@ -716,19 +724,16 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 void CSCMessageBox::OnBnClickedOk()
 {
 	m_response = IDOK;
-	if (m_as_modal)
-		EndDialog(m_response);
-	else
+	//modal: m_response 만 설정 → 펌프 종료 → DoModal 끝에서 ShowWindow(SW_HIDE).
+	//modeless: 즉시 hide.
+	if (!m_as_modal)
 		ShowWindow(SW_HIDE);
 }
 
 void CSCMessageBox::OnBnClickedCancel()
 {
 	m_response = IDCANCEL;
-
-	if (m_as_modal)
-		EndDialog(m_response);
-	else
+	if (!m_as_modal)
 		ShowWindow(SW_HIDE);
 }
 
@@ -752,15 +757,44 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 			return -1;
 	}
 
-	//m_parent lazy binding 순서: 명시 지정 → GetParent() → AfxGetMainWnd() → GetActiveWindow().
-	//그래도 NULL 이면 NULL 로 두고 아래 호출들을 가드한다.
-	//(theApp 에서 m_msgbox.create(nullptr,...) 으로 생성된 케이스 대응.)
+	//m_parent lazy binding — *반드시 우리 프로세스의 윈도우만* 채택한다.
+	//AfxGetMainWnd() / GetForegroundWindow() / GetActiveWindow() 는 InitInstance 처럼 우리 프로세스
+	//main 윈도우가 없는 시점에는 **다른 프로세스의 foreground 윈도우**를 반환한다 (예: VS, 탐색기).
+	//그것을 owner 로 잡으면 SetWindowLongPtr(GWLP_HWNDPARENT) 가 외부 프로세스 윈도우를 owner 로
+	//지정하고, EnableWindow(FALSE) 가 *다른 프로세스의 윈도우* 를 disable 한다. 두 번째 DoModal
+	//호출에서 외부 윈도우 상태가 변해 activation 흐름이 깨지는 게 그동안의 "두번째 메시지박스 무응답"
+	//진짜 원인이었다.
+	DWORD this_pid = ::GetCurrentProcessId();
+	auto is_our_process = [&](CWnd* w) -> bool
+	{
+		if (w == nullptr || w->m_hWnd == NULL) return false;
+		DWORD pid = 0;
+		::GetWindowThreadProcessId(w->m_hWnd, &pid);
+		return pid == this_pid;
+	};
+
+	if (m_parent != nullptr && !is_our_process(m_parent))
+		m_parent = nullptr;     //이전 호출 캐시가 외부 윈도우면 버린다.
+
 	if (m_parent == nullptr)
 		m_parent = GetParent();
+	if (!is_our_process(m_parent))
+		m_parent = nullptr;
+
 	if (m_parent == nullptr)
-		m_parent = AfxGetMainWnd();
+	{
+		CWnd* cand = AfxGetMainWnd();
+		if (is_our_process(cand))
+			m_parent = cand;
+	}
 	if (m_parent == nullptr)
-		m_parent = CWnd::GetActiveWindow();
+	{
+		CWnd* cand = CWnd::GetActiveWindow();
+		if (is_our_process(cand))
+			m_parent = cand;
+	}
+	//여전히 NULL 이면 NULL 로 둔다. 아래 호출들은 m_parent NULL 가드되어 있다 —
+	//우리 프로세스에 유효한 owner 가 없으면 owner-less top-level popup 으로 동작.
 
 	//owner 관계 설정 — owned window 는 owner 보다 항상 위에 z-order 가 강제되므로
 	//메인앱 클릭으로 메시지박스가 뒤로 가는 것을 막는다.
@@ -779,6 +813,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 	//GetDesktopWindow() 는 virtual desktop 전체(다중 모니터 합산) 기준이라 모니터 사이에 뜰 수 있음.
 	CenterWindow(m_show_on_parent_center ? m_parent : nullptr);
 	ShowWindow(SW_SHOW);
+
 
 	m_timeout_sec = timeout_sec;
 	if (m_timeout_sec > 0)
@@ -819,7 +854,10 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 	if (m_parent && m_parent->m_hWnd)
 		m_parent->EnableWindow(TRUE);
 
-	EndDialog(m_response);
+	//::EndDialog 는 DialogBox/DialogBoxIndirect 로 만든 윈도우 전용 (MSDN: "must not be used
+	//for any other purpose"). 우리 popup 은 CreateEx 로 만들었으므로 ShowWindow(SW_HIDE).
+	//두 번째 DoModal 호출 시 무응답이던 버그의 직접 원인.
+	ShowWindow(SW_HIDE);
 
 	return m_response;
 }

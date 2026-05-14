@@ -4,6 +4,45 @@
 #pragma warning(disable: 4018)	//'>=': signed/unsigned mismatch
 #pragma warning(disable: 4477)	//'fwprintf' : format string '%s' requires an argument of type 'wchar_t *', but variadic argument 1 has type 'CString'
 
+//<font ...> 의 attribute body (open '<font' 와 close '>' 사이) 에서 color 값 추출.
+//face/size 와 순서 무관, 인용·비인용 모두 지원. 못 찾으면 빈 문자열.
+static CString extract_font_color_attr(const CString& body)
+{
+	CString lower = body;
+	lower.MakeLower();
+	int c = lower.Find(_T("color"));
+	if (c < 0)
+		return _T("");
+	int eq = lower.Find(_T('='), c);
+	if (eq < 0)
+		return _T("");
+	int v = eq + 1;
+	int len = body.GetLength();
+	while (v < len && (body[v] == _T(' ') || body[v] == _T('\t')))
+		v++;
+	if (v >= len)
+		return _T("");
+	int v_end;
+	if (body[v] == _T('"'))
+	{
+		v++;
+		v_end = v;
+		while (v_end < len && body[v_end] != _T('"'))
+			v_end++;
+	}
+	else
+	{
+		v_end = v;
+		while (v_end < len && body[v_end] != _T(' ') && body[v_end] != _T('\t') && body[v_end] != _T('"'))
+			v_end++;
+	}
+	CString result = body.Mid(v, v_end - v);
+	result.Trim();
+	result.Remove(_T('"'));
+	result.Remove(_T('#'));
+	return result;
+}
+
 CSubtitle::CSubtitle()
 {
 	reset();
@@ -172,33 +211,38 @@ bool CSubtitle::load_srt(CString sfile)
 		//스타일/ASS 태그 먼저 제거 — 그래야 다음의 <font color> 추출이 first '=' / '>' 매칭 오류를 안 일으킴.
 		strip_inline_tags(sLine);
 
-		//<font color="..."> ... </font>
-		if (find(sLine, _T("<font color")) >= 0)
+		//<font ...> 안의 color attribute 추출 — face/size 등이 함께 있어도 무관.
+		int font_open = sLine.Find(_T("<font"));
+		if (font_open < 0)
 		{
-			int pos1 = sLine.Find(_T("=")) + 1;
-			int pos2 = sLine.Find(_T(">"));
-			if (pos2 > pos1)
-			{
-				color = sLine.Mid(pos1, pos2 - pos1);
-				color.Trim();
-				remove_chars(color, _T("\"#"));
-				sLine = sLine.Mid(pos2 + 1);
-			}
-
-			if (find(sLine, _T("</font>")) >= 0)
-				sLine.Replace(_T("</font>"), _T(""));
+			CString lo = sLine;
+			lo.MakeLower();
+			font_open = lo.Find(_T("<font"));
 		}
-		//컬러끝 태그만 있으면 바로 전 캡션의 색상을 유지.
+
+		if (font_open >= 0)
+		{
+			int font_close = sLine.Find(_T('>'), font_open);
+			if (font_close > font_open + 5)
+			{
+				CString body = sLine.Mid(font_open + 5, font_close - font_open - 5);
+				color = extract_font_color_attr(body);
+				sLine.Delete(font_open, font_close - font_open + 1);
+			}
+		}
 		else if (find(sLine, _T("</font>")) >= 0)
 		{
+			//컬러끝 태그만 있으면 바로 전 캡션의 색상을 유지.
 			if (caption.sentences.size() > 0)
 				color = caption.sentences[caption.sentences.size() - 1].color;
-			sLine.Replace(_T("</font>"), _T(""));
 		}
 		else
 		{
 			color.Empty();
 		}
+
+		sLine.Replace(_T("</font>"), _T(""));
+		sLine.Replace(_T("</FONT>"), _T(""));
 
 		if (!sLine.IsEmpty())
 			caption.sentences.push_back(CSentence(sLine, color));
@@ -364,13 +408,29 @@ void CSubtitle::remove_other_tags(CString &str)
 	lstr.MakeLower();
 
 	//<font face=HY견고딕 size=6 color=yellowgreen>화 양 연 화</font><br><font face=HY중고딕 size=4 color=lightyellow>in the mood for love
+	//face/size 와 color 가 섞여 있어도 color 만은 보존해 <font color=VALUE> 로 정규화 — 그래야 뒤따르는 parse_subtltle 의 <font color> 인식이 동작.
 	while ((pos1 = lstr.Find(_T("<font face"))) >= 0)
 	{
 		pos2 = lstr.Find(BRACKET_CLOSE, pos1);
 		if (pos2 > pos1)
 		{
-			lstr.Delete(pos1, pos2 - pos1 + 1);
-			str.Delete(pos1, pos2 - pos1 + 1);
+			int tag_len = pos2 - pos1 + 1;
+			CString body = str.Mid(pos1 + 5, pos2 - pos1 - 5);
+			CString color = extract_font_color_attr(body);
+
+			CString replacement;
+			if (!color.IsEmpty())
+				replacement.Format(_T("<font color=%s>"), (LPCTSTR)color);
+
+			lstr.Delete(pos1, tag_len);
+			str.Delete(pos1, tag_len);
+			if (!replacement.IsEmpty())
+			{
+				CString rep_lower = replacement;
+				rep_lower.MakeLower();
+				lstr.Insert(pos1, rep_lower);
+				str.Insert(pos1, replacement);
+			}
 		}
 	}
 

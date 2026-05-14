@@ -1594,6 +1594,14 @@ void CSCThumbCtrl::set_info_text_color(int thumb_index, int idx, Gdiplus::Color 
 //point는 screen coord.
 void CSCThumbCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 {
+	if (!m_use_context_menu)
+	{
+		CWnd* parent = GetParent();
+		if (parent)
+			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)(pWnd ? pWnd->GetSafeHwnd() : GetSafeHwnd()), MAKELPARAM(point.x, point.y));
+		return;
+	}
+
 	if (get_selected_items() <= 1)
 	{
 		CPoint pt = point;

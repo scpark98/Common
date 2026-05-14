@@ -216,6 +216,8 @@ public:
 	bool			get_show_file_extension() { return m_show_extension; }
 	void			set_show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
 
+	void			set_use_context_menu(bool use) { m_use_context_menu = use; }
+
 
 //color theme
 	void			set_color_theme(int theme, bool invalidate = true);
@@ -302,8 +304,7 @@ protected:
 		idRemoveAll,
 		idProperty,
 	};
-	bool			m_use_context_menu;
-	void			use_context_menu(bool use) { m_use_context_menu = use; }
+	bool			m_use_context_menu = true;
 	void			on_context_menu(UINT nID);
 
 	void			on_menu_delete();

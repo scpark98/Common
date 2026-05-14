@@ -3561,7 +3561,7 @@ int CDShow::subtitle_font_enlarge(int enlarge)
 	else
 		m_subCfg.font_size += ((enlarge > 0) ? 1 : -1);
 
-	Clamp(m_subCfg.font_size, 10, 100);
+	Clamp(m_subCfg.font_size, 2, 100);
 
 	m_subCfg.lf->lfHeight = get_pixel_size_from_font_size(m_pParent->m_hWnd, m_subCfg.font_size);
 	update_osd_subtitle();

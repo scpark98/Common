@@ -183,10 +183,10 @@ bool CSubtitleSetting::is_sane() const
 
 	//lfHeight: 음수 = 픽셀 단위, 양수 = 논리 포인트, 0 = 정의 안 됨 (GdiPlus path 가 fail).
 	int abs_h = lf->lfHeight < 0 ? -lf->lfHeight : lf->lfHeight;
-	if (abs_h < 4 || abs_h > 400)
+	if (abs_h < 2 || abs_h > 400)
 		return false;
 
-	if (font_size < 4 || font_size > 400)
+	if (font_size < 2 || font_size > 400)
 		return false;
 	if (font_scaleX < 10 || font_scaleX > 1000)
 		return false;

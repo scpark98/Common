@@ -812,6 +812,16 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 	//CenterWindow(NULL) 은 MFC 가 화면 기준으로 가운데 배치하므로 GetDesktopWindow() 보다 안전.
 	//GetDesktopWindow() 는 virtual desktop 전체(다중 모니터 합산) 기준이라 모니터 사이에 뜰 수 있음.
 	CenterWindow(m_show_on_parent_center ? m_parent : nullptr);
+
+	//owner 가 WS_EX_TOPMOST 면 messagebox 도 TOPMOST 로 띄운다.
+	//그렇지 않으면 owner 가 z-order 상 항상 위라 messagebox 가 visible/active 더라도 owner 뒤에 가려져
+	//mouse hit-test 가 messagebox 에 도달하지 못한다 (키보드는 active 라 동작, 마우스만 안 되는 증상).
+	//(SetWindowPos 는 SWP_NOACTIVATE 없이 호출 — 활성화도 같이 처리.)
+	bool parent_topmost = (m_parent && m_parent->m_hWnd
+		&& (::GetWindowLong(m_parent->m_hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST));
+	::SetWindowPos(m_hWnd, parent_topmost ? HWND_TOPMOST : HWND_TOP,
+		0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
 	ShowWindow(SW_SHOW);
 
 

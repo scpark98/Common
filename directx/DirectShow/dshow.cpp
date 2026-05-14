@@ -2203,20 +2203,39 @@ void CDShow::reselect_current_subtitle_stream()
 
 double CDShow::get_playback_rate()
 {
-	if (!m_pGB || !m_pMP)
+	if (!m_pGB)
 		return 1.0;
 
-	double rate;
-	m_pMP->get_Rate(&rate);
+	double rate = 1.0;
+	if (m_pMS)
+	{
+		HRESULT hr = m_pMS->GetRate(&rate);
+		if (FAILED(hr))
+		{
+			rate = 1.0;
+			if (m_pMP)
+				m_pMP->get_Rate(&rate);
+		}
+	}
+	else if (m_pMP)
+	{
+		m_pMP->get_Rate(&rate);
+	}
 	return rate;
 }
 
 void CDShow::set_playback_rate(double rate)
 {
-	if (!m_pGB || !m_pMP)
+	if (!m_pGB)
 		return;
 
-	m_pMP->put_Rate(rate);
+	HRESULT hr = E_FAIL;
+	if (m_pMS)
+		hr = m_pMS->SetRate(rate);
+	if (FAILED(hr) && m_pMP)
+		hr = m_pMP->put_Rate(rate);
+
+	logWrite(_T("[playback_rate] SetRate %.2f hr=0x%08x"), rate, hr);
 }
 
 #include <atlimage.h>

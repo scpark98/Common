@@ -2971,9 +2971,9 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 {
 	long t0 = clock();
 
-	// 빠른 연결 가능 여부 사전 체크 (3초 내)
+	// 빠른 연결 가능 여부 사전 체크 (2초 내)
 	// is_server_reachable()은 매 요청마다 별도의 TCP 소켓을 열고 닫는 단점이 있다.
-	if (check_server_reachable && !is_server_reachable(params->ip, params->port, 3000))
+	if (check_server_reachable && !is_server_reachable(params->ip, params->port, 2000))
 	{
 		params->status = ERROR_HOST_UNREACHABLE;
 		params->result = _T("서버에 연결할 수 없습니다.");

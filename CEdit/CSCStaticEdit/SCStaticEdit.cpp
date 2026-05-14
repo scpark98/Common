@@ -195,9 +195,9 @@ void CSCStaticEdit::set_font_size(int size)
 	rebuild_font();
 }
 
-void CSCStaticEdit::set_font_bold(bool bold)
+void CSCStaticEdit::set_font_weight(int weight)
 {
-	m_lf.lfWeight = bold ? FW_BOLD : FW_NORMAL;
+	m_lf.lfWeight = weight;
 	rebuild_font();
 }
 
@@ -1598,11 +1598,11 @@ void CSCStaticEdit::insert_text(const CString& str)
 	if (has_selection())
 		delete_selection();
 
-	if (m_max_length > 0 &&
-		m_text.GetLength() + str.GetLength() > m_max_length)
+	if (m_limit_text > 0 &&
+		m_text.GetLength() + str.GetLength() > m_limit_text)
 	{
 		// 최대 길이 초과 방지
-		int avail = m_max_length - m_text.GetLength();
+		int avail = m_limit_text - m_text.GetLength();
 		if (avail <= 0) return;
 		m_text.Insert(m_caret_pos, str.Left(avail));
 		m_caret_pos += avail;

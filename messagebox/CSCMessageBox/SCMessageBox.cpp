@@ -679,7 +679,34 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_ESCAPE :
 				OnBnClickedCancel();
-				break;
+				return TRUE;
+
+			case VK_RETURN :
+				//모든 버튼이 CGdiButton 으로 동적 생성되어 표준 BS_DEFPUSHBUTTON 이 없다.
+				//엔터키는 여기서 직접 m_type 에 따라 기본 응답을 결정해 종료한다.
+				switch (m_type & MB_TYPEMASK)
+				{
+				case MB_YESNO :
+				case MB_YESNOCANCEL :
+					m_response = IDYES; break;
+				case MB_RETRYCANCEL :
+				case MB_ABORTRETRYIGNORE :
+					m_response = IDRETRY; break;
+				default :
+					m_response = IDOK;  break;
+				}
+
+				if (m_as_modal)
+				{
+					EndDialog(m_response);
+				}
+				else
+				{
+					if (m_parent && ::IsWindow(m_parent->m_hWnd))
+						::SendMessage(m_parent->m_hWnd, Message_CSCMessageBox, (WPARAM)this, m_response);
+					ShowWindow(SW_HIDE);
+				}
+				return TRUE;
 		}
 	}
 
@@ -689,7 +716,9 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 void CSCMessageBox::OnBnClickedOk()
 {
 	m_response = IDOK;
-	if (!m_as_modal)
+	if (m_as_modal)
+		EndDialog(m_response);
+	else
 		ShowWindow(SW_HIDE);
 }
 
@@ -712,6 +741,16 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	//return CDialogEx::DoModal();
+
+	//임시 인스턴스 사용 패턴 지원 — create() 가 호출되지 않았으면 기본 인자로 자동 생성.
+	//생성자에서 create 를 못 부르는 이유(글로벌 ctor 가 MFC 초기화 전에 실행)는 여기 해당 없음 —
+	//DoModal 은 항상 InitInstance 이후 호출되므로 안전.
+	//theApp.m_msgbox 처럼 이미 create() 된 케이스는 create() 내부의 m_hWnd 가드로 no-op.
+	if (m_hWnd == NULL)
+	{
+		if (!create(nullptr, _T(""), 0, true))
+			return -1;
+	}
 
 	//m_parent lazy binding 순서: 명시 지정 → GetParent() → AfxGetMainWnd() → GetActiveWindow().
 	//그래도 NULL 이면 NULL 로 두고 아래 호출들을 가드한다.
@@ -753,19 +792,28 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 
 	while (m_response < 0)
 	{
-		while (PeekMessage(&stmsg, NULL, 0, 0, PM_REMOVE))
+		if (!PeekMessage(&stmsg, NULL, 0, 0, PM_REMOVE))
 		{
-			//TRACE("GetFocus() = %p, tick = %d\n", GetFocus(), GetTickCount());
-			if (stmsg.message == WM_KEYDOWN || stmsg.message == WM_KEYUP)
-			{
-				GetFocus()->PreTranslateMessage(&stmsg);
-			}
-			else
-			{
-				TranslateMessage(&stmsg);
-				DispatchMessage(&stmsg);
-			}
+			//WaitMessage 없이 PeekMessage 만 돌리면 CPU 100% 스핀. 메시지 큐가 빌 때 대기.
+			WaitMessage();
+			continue;
 		}
+
+		if (stmsg.message == WM_QUIT)
+		{
+			::PostQuitMessage((int)stmsg.wParam);
+			break;
+		}
+
+		//MFC 표준 PreTranslate 트리 워킹 — 포커스 받은 윈도우부터 m_hWnd 까지 위로 올라가며
+		//각 윈도우의 PreTranslateMessage 를 호출한다. 이래야 CGdiButton 의 VK_SPACE 처리
+		//(포커스된 버튼을 클릭처럼 처리) 와 본 dialog 의 VK_RETURN/VK_ESCAPE 처리가 모두 동작한다.
+		//단순히 this->PreTranslateMessage 만 호출하면 자식 컨트롤의 PreTranslate 는 누락됨.
+		if (CWnd::WalkPreTranslateTree(m_hWnd, &stmsg))
+			continue;
+
+		TranslateMessage(&stmsg);
+		DispatchMessage(&stmsg);
 	}
 
 	if (m_parent && m_parent->m_hWnd)

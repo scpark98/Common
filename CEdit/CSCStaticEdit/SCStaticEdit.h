@@ -150,7 +150,7 @@ public:
     void			SetFont(CFont* p_font, BOOL b_redraw = TRUE);
     void			set_font_name(LPCTSTR name);
     void			set_font_size(int size);
-    void			set_font_bold(bool bold = true);
+    void			set_font_weight(int weight = FW_BOLD);
     void			set_font_antialias(bool antialias = true);
     // ──────────────────────────────────────────────
     // 기능 옵션
@@ -162,7 +162,10 @@ public:
 
 
     void		    set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
-    void		    set_max_length(int max)              { m_max_length = max; }
+    //입력 가능한 최대 문자 수. 0 = 제한 없음. insert_text 에서 enforce.
+    //CEdit::LimitText() 네이밍을 따름.
+    void		    set_limit_text(int max)              { m_limit_text = max; }
+    int             get_limit_text() const               { return m_limit_text; }
 
     // shift + up/down 방향키로 수치 증감. shift + mousewheel로도 동일.
     // 텍스트가 실수로 파싱되지 않으면 스킵.
@@ -278,7 +281,7 @@ private:
     bool        m_use_default_readonly_color = true;
     bool		m_password   = false;
     TCHAR		m_mask_char  = _T('*');
-    int			m_max_length = 0;      // 0 = 제한 없음
+    int			m_limit_text = 0;      // 0 = 제한 없음
     int			m_padding    = 4;      // 텍스트 여백
     CRect		m_margin     = CRect(0, 0, 0, 0); // 사용자 정의 4면 추가 inset
     DWORD		m_valign     = DT_VCENTER;

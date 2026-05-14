@@ -24,6 +24,13 @@
 		...
 		//필요한 곳에서 DoModal()로 호출해서 사용.
 		int res = m_msgbox.DoModal(_T("Test MessageBox"));	//선택된 버튼이 res로 넘어옴. if (res == MB_OK) ...
+
+	1-1.임시 인스턴스로 한 번만 사용할 경우 (create() 생략 가능)
+		CSCMessageBox dlg;
+		int res = dlg.DoModal(_T("Test MessageBox"), MB_OKCANCEL);
+		//create() 가 안 불렸으면 DoModal() 진입 시 기본 인자(parent=nullptr, title="", icon_id=0)
+		//로 자동 create 된다. 타이틀/아이콘/테마가 필요하면 DoModal 전에 create() 를 명시 호출.
+
 	2.Modeless로 띠울 경우
 		//OnInitDialog() 등에서 아래와 같이 생성해준 후
 		- m_msgbox.create(this, _T("Title Text"), IDR_MAINFRAME, false);

@@ -237,7 +237,7 @@ void CSCColorPicker::calc_layout()
 		m_edit_hexa.Create(
 			WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			CRect(m_r_edit_area.left, m_r_edit_area.top, m_r_edit_area.left + hexa_width, m_r_edit_area.top + kEditH), this, IDC_EDIT_HEXA);
-		m_edit_hexa.set_max_length(9);
+		m_edit_hexa.set_limit_text(9);
 		m_edit_hexa.set_font_name(_T("Consolas"));
 		m_edit_hexa.set_font_size(9);
 		m_edit_hexa.set_text_color(Gdiplus::Color(52, 68, 71, 70));
@@ -261,7 +261,7 @@ void CSCColorPicker::calc_layout()
 				WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 				CRect(x0, m_r_edit_area.top, x0 + cellW, m_r_edit_area.top + kEditH),
 				this, kIds[i]);
-			m_edit_argb[i].set_max_length(3);
+			m_edit_argb[i].set_limit_text(3);
 			m_edit_argb[i].set_font_name(_T("Consolas"));
 			m_edit_argb[i].set_font_size(9);
 			m_edit_argb[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
@@ -284,7 +284,7 @@ void CSCColorPicker::calc_layout()
 				WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 				CRect(x0, hsvTop, x0 + cellW, hsvTop + kEditH),
 				this, kHslIds[i]);
-			m_edit_hsl[i].set_max_length(3);
+			m_edit_hsl[i].set_limit_text(3);
 			m_edit_hsl[i].set_font_name(_T("Consolas"));
 			m_edit_hsl[i].set_font_size(9);
 			m_edit_hsl[i].set_text_color(Gdiplus::Color(52, 68, 71, 70));
@@ -302,7 +302,7 @@ void CSCColorPicker::calc_layout()
 		m_edit_color_name.Create(
 			WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			m_r_color_name, this, IDC_EDIT_COLOR_NAME);
-		m_edit_color_name.set_max_length(24);
+		m_edit_color_name.set_limit_text(24);
 		m_edit_color_name.set_font_name(_T("Consolas"));
 		m_edit_color_name.set_font_size(9);
 		m_edit_color_name.set_text_color(Gdiplus::Color(52, 68, 71, 70));

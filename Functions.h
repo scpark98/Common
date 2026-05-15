@@ -1474,9 +1474,7 @@ struct	NETWORK_INFO
 	//좀 더 테스트 필요!
 	//실행파일명으로 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
 	HWND		get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid = 0);
-#ifndef _USING_V110_SDK71_
 	HANDLE		GetProcessHandleByName(LPCTSTR szFilename);
-#endif
 
 	CWnd*		FindWindowByCaption(CString sCaption, bool bMatchWholeWord = FALSE);
 	HINSTANCE	FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDir, LPTSTR lpResult);
@@ -1760,10 +1758,8 @@ struct	NETWORK_INFO
 	//현재 가용 메모리를 리턴한다. (total_memory : 전체 메모리 용량)
 	uint64_t	get_available_memory(uint64_t *total_memory = NULL);
 
-#ifndef _USING_V110_SDK71_
 	//현재 프로세스의 메모리 사용량을 구한다.
 	SIZE_T		GetCurrentMemUsage();
-#endif
 	INT			IsAvailableMemory(LPVOID pMemoryAddr);
 
 

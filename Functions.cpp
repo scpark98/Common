@@ -10133,7 +10133,6 @@ bool is_exist_keyword(CString src, CString set_of_keyword, bool case_sensitive, 
 	return false;
 }
 
-#ifndef _USING_V110_SDK71_
 SIZE_T GetCurrentMemUsage()
 {
 	DWORD dwpid = GetCurrentProcessId();
@@ -10151,7 +10150,6 @@ SIZE_T GetCurrentMemUsage()
 
 	return 0;
 }
-#endif
 
 //경로에 '\\' 또는 '/'가 혼용되어 사용되는 경우가 있으므로 이를 감안해야 한다.
 //c:\\folder1\\folder2\\	=> c:\\folder1
@@ -12327,7 +12325,6 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd,LPARAM lParam)
 	return TRUE;
 }
 
-#ifndef _USING_V110_SDK71_
 HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 {
 	HANDLE hProcessSnapshot;
@@ -12354,7 +12351,6 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 		_tcscpy(sFilePath, pe32.szExeFile);
 
 		//전체경로로 검색하는 경우
-#ifndef _USING_V110_SDK71_
 		if (PathFileExists(szFilename))
 		{
 			hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
@@ -12367,7 +12363,6 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 				CloseHandle(hProcess);
 			}
 		}
-#endif
 
 		if (_tcsicmp(sFilePath, szFilename) == 0)
 		{
@@ -12380,7 +12375,6 @@ HANDLE GetProcessHandleByName(LPCTSTR szFilename)
 
 	return INVALID_HANDLE_VALUE;
 }
-#endif
 
 //실행파일명으로부터 윈도우 핸들 리턴. 실행파일명 또는 fullpath로 검색.
 HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
@@ -12415,7 +12409,6 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 		//target_exe_file이 실행 파일명만 있다면 exe 파일명만 비교하고
 		//전체 경로라면 fullpath를 구해서 비교한다.
 		//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
-#ifndef _USING_V110_SDK71_
 		if (target_exe_file.Find('\\') > 0 && PathFileExists(target_exe_file))
 		{
 			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
@@ -12429,7 +12422,6 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 			}
 		}
 		else
-#endif
 		{
 			_tcscpy_s(sFilePath, _countof(sFilePath), exe_name);
 		}
@@ -12500,10 +12492,8 @@ int	kill_process_by_fullpath(CString fullpath)
 
 			if (hProcess)
 			{
-#ifndef _USING_V110_SDK71_
 				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
 				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
-#endif
 				//TRACE(_T("%s\n"), sFilePath);
 				CloseHandle(hProcess);
 
@@ -12668,7 +12658,6 @@ int get_process_running_count(CString processname)
 			//processname이 실행파일명만 있다면 exe 파일명만 비교하고
 			//전체 경로라면 fullpath를 구해서 비교한다.
 			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
-#ifndef _USING_V110_SDK71_
 			if (processname.Find(_T("\\")) > 0 && PathFileExists(processname))
 			{
 				//HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
@@ -12686,7 +12675,6 @@ int get_process_running_count(CString processname)
 					TRACE(_T("fail to get OpenProcess(). %s\n"), get_error_str(false));
 				}
 			}
-#endif
 
 			if (_tcsicmp(sFilePath, processname) == 0)
 				running_count++;
@@ -12698,7 +12686,6 @@ int get_process_running_count(CString processname)
 	return running_count;
 } 
 
-#ifndef _USING_V110_SDK71_
 bool KillProcess(CString szFilename)
 {
 	HANDLE hProcess = GetProcessHandleByName(szFilename);
@@ -12711,7 +12698,6 @@ bool KillProcess(CString szFilename)
 
 	return false;
 }
-#endif
 
 //프로세스 강제 종료.
 //return value : 1 : killed, 0 : fail to kill, -1 : not found

@@ -112,7 +112,8 @@ static void release_media_type(AM_MEDIA_TYPE* mt)
 
 CSCAudioTransformFilter::CSCAudioTransformFilter(LPCWSTR friendly_name)
 	: m_ref(0), m_state(State_Stopped), m_pGraph(NULL), m_pClock(NULL),
-	  m_pInputPin(NULL), m_pOutputPin(NULL), m_wfx_set(false), m_delay_100ns(0)
+	  m_pInputPin(NULL), m_pOutputPin(NULL), m_wfx_set(false), m_delay_100ns(0),
+	  m_worker_run(false), m_flushing(false)
 {
 	memset(&m_wfx_ext, 0, sizeof(m_wfx_ext));
 	if (friendly_name) StringCchCopyW(m_name, 64, friendly_name);
@@ -124,6 +125,7 @@ CSCAudioTransformFilter::CSCAudioTransformFilter(LPCWSTR friendly_name)
 
 CSCAudioTransformFilter::~CSCAudioTransformFilter()
 {
+	stop_worker();		//worker join + queue drain
 	if (m_pInputPin)  { m_pInputPin->Release();  m_pInputPin = NULL; }
 	if (m_pOutputPin) { m_pOutputPin->Release(); m_pOutputPin = NULL; }
 	if (m_pClock)     { m_pClock->Release();     m_pClock = NULL; }
@@ -146,6 +148,11 @@ STDMETHODIMP CSCAudioTransformFilter::QueryInterface(REFIID iid, void** ppv)
 		*ppv = static_cast<IBaseFilter*>(this); AddRef();
 		return S_OK;
 	}
+	if (iid == IID_IMediaSeeking)
+	{
+		*ppv = static_cast<IMediaSeeking*>(this); AddRef();
+		return S_OK;
+	}
 	*ppv = NULL;
 	return E_NOINTERFACE;
 }
@@ -159,9 +166,9 @@ STDMETHODIMP CSCAudioTransformFilter::GetClassID(CLSID* pClsID)
 	return S_OK;
 }
 
-STDMETHODIMP CSCAudioTransformFilter::Stop()  { m_state = State_Stopped; return S_OK; }
-STDMETHODIMP CSCAudioTransformFilter::Pause() { m_state = State_Paused;  return S_OK; }
-STDMETHODIMP CSCAudioTransformFilter::Run(REFERENCE_TIME) { m_state = State_Running; return S_OK; }
+STDMETHODIMP CSCAudioTransformFilter::Stop()  { m_state = State_Stopped; stop_worker(); return S_OK; }
+STDMETHODIMP CSCAudioTransformFilter::Pause() { m_state = State_Paused; start_worker(); return S_OK; }
+STDMETHODIMP CSCAudioTransformFilter::Run(REFERENCE_TIME) { m_state = State_Running; start_worker(); return S_OK; }
 STDMETHODIMP CSCAudioTransformFilter::GetState(DWORD, FILTER_STATE* pState)
 {
 	if (!pState) return E_POINTER;
@@ -215,11 +222,331 @@ STDMETHODIMP CSCAudioTransformFilter::QueryVendorInfo(LPWSTR*) { return E_NOTIMP
 
 
 //================================================================================
+// CSCAudioTransformFilter — IMediaSeeking pass-through
+//
+// graph IMediaSeeking::SetRate 의 default 구현은 *모든 filter 의 IMediaSeeking::SetRate*
+// 를 호출하며, 응답한 filter 가 자기 NewSegment 발행으로 chain rate propagation 보장.
+// 우리 transform 이 IMediaSeeking 미응답이면 SC chain 의 일부 단계 NewSegment 가 환경
+// 의존적으로 누락되어 audio renderer 의 실재 rate 적용 fail. 모든 메서드를 upstream pin /
+// filter 의 IMediaSeeking 으로 위임 — CPosPassThru 표준 패턴.
+//================================================================================
+
+//helper — input pin 의 connected upstream 의 IMediaSeeking 얻기. 우선 pin 자체 QI,
+//안 되면 그 pin 이 속한 filter 의 IMediaSeeking. caller 가 release. NULL 가능.
+static IMediaSeeking* get_upstream_seeking(CSCAudioTransformInputPin* pInputPin)
+{
+	if (!pInputPin) return NULL;
+
+	IPin* pConnected = NULL;
+	pInputPin->ConnectedTo(&pConnected);
+	if (!pConnected) return NULL;
+
+	IMediaSeeking* pMS = NULL;
+	HRESULT hr = pConnected->QueryInterface(IID_IMediaSeeking, (void**)&pMS);
+	if (FAILED(hr) || !pMS)
+	{
+		pMS = NULL;
+		PIN_INFO info = { 0 };
+		if (SUCCEEDED(pConnected->QueryPinInfo(&info)) && info.pFilter)
+		{
+			info.pFilter->QueryInterface(IID_IMediaSeeking, (void**)&pMS);
+			info.pFilter->Release();
+		}
+	}
+	pConnected->Release();
+	return pMS;
+}
+
+//각 IMediaSeeking 메서드 macro — upstream IMediaSeeking 얻고 동일 호출 후 release.
+//얻기 실패 시 E_NOTIMPL (DirectShow convention).
+#define SC_SEEK_DELEGATE_0(method) \
+	IMediaSeeking* pMS = get_upstream_seeking(m_pInputPin); \
+	if (!pMS) return E_NOTIMPL; \
+	HRESULT hr = pMS->method(); \
+	pMS->Release(); \
+	return hr;
+
+#define SC_SEEK_DELEGATE_1(method, a1) \
+	IMediaSeeking* pMS = get_upstream_seeking(m_pInputPin); \
+	if (!pMS) return E_NOTIMPL; \
+	HRESULT hr = pMS->method(a1); \
+	pMS->Release(); \
+	return hr;
+
+#define SC_SEEK_DELEGATE_2(method, a1, a2) \
+	IMediaSeeking* pMS = get_upstream_seeking(m_pInputPin); \
+	if (!pMS) return E_NOTIMPL; \
+	HRESULT hr = pMS->method(a1, a2); \
+	pMS->Release(); \
+	return hr;
+
+#define SC_SEEK_DELEGATE_4(method, a1, a2, a3, a4) \
+	IMediaSeeking* pMS = get_upstream_seeking(m_pInputPin); \
+	if (!pMS) return E_NOTIMPL; \
+	HRESULT hr = pMS->method(a1, a2, a3, a4); \
+	pMS->Release(); \
+	return hr;
+
+STDMETHODIMP CSCAudioTransformFilter::GetCapabilities(DWORD* pCapabilities)
+{
+	SC_SEEK_DELEGATE_1(GetCapabilities, pCapabilities)
+}
+STDMETHODIMP CSCAudioTransformFilter::CheckCapabilities(DWORD* pCapabilities)
+{
+	SC_SEEK_DELEGATE_1(CheckCapabilities, pCapabilities)
+}
+STDMETHODIMP CSCAudioTransformFilter::IsFormatSupported(const GUID* pFormat)
+{
+	SC_SEEK_DELEGATE_1(IsFormatSupported, pFormat)
+}
+STDMETHODIMP CSCAudioTransformFilter::QueryPreferredFormat(GUID* pFormat)
+{
+	SC_SEEK_DELEGATE_1(QueryPreferredFormat, pFormat)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetTimeFormat(GUID* pFormat)
+{
+	SC_SEEK_DELEGATE_1(GetTimeFormat, pFormat)
+}
+STDMETHODIMP CSCAudioTransformFilter::IsUsingTimeFormat(const GUID* pFormat)
+{
+	SC_SEEK_DELEGATE_1(IsUsingTimeFormat, pFormat)
+}
+STDMETHODIMP CSCAudioTransformFilter::SetTimeFormat(const GUID* pFormat)
+{
+	SC_SEEK_DELEGATE_1(SetTimeFormat, pFormat)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetDuration(LONGLONG* pDuration)
+{
+	SC_SEEK_DELEGATE_1(GetDuration, pDuration)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetStopPosition(LONGLONG* pStop)
+{
+	SC_SEEK_DELEGATE_1(GetStopPosition, pStop)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetCurrentPosition(LONGLONG* pCurrent)
+{
+	SC_SEEK_DELEGATE_1(GetCurrentPosition, pCurrent)
+}
+STDMETHODIMP CSCAudioTransformFilter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat,
+	LONGLONG Source, const GUID* pSourceFormat)
+{
+	SC_SEEK_DELEGATE_4(ConvertTimeFormat, pTarget, pTargetFormat, Source, pSourceFormat)
+}
+STDMETHODIMP CSCAudioTransformFilter::SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags,
+	LONGLONG* pStop, DWORD dwStopFlags)
+{
+	SC_SEEK_DELEGATE_4(SetPositions, pCurrent, dwCurrentFlags, pStop, dwStopFlags)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetPositions(LONGLONG* pCurrent, LONGLONG* pStop)
+{
+	SC_SEEK_DELEGATE_2(GetPositions, pCurrent, pStop)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest)
+{
+	SC_SEEK_DELEGATE_2(GetAvailable, pEarliest, pLatest)
+}
+STDMETHODIMP CSCAudioTransformFilter::SetRate(double dRate)
+{
+	SC_SEEK_DELEGATE_1(SetRate, dRate)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetRate(double* pdRate)
+{
+	SC_SEEK_DELEGATE_1(GetRate, pdRate)
+}
+STDMETHODIMP CSCAudioTransformFilter::GetPreroll(LONGLONG* pllPreroll)
+{
+	SC_SEEK_DELEGATE_1(GetPreroll, pllPreroll)
+}
+
+#undef SC_SEEK_DELEGATE_0
+#undef SC_SEEK_DELEGATE_1
+#undef SC_SEEK_DELEGATE_2
+#undef SC_SEEK_DELEGATE_4
+
+
+//================================================================================
+// CSCAudioTransformFilter — Async worker thread + queue
+//
+// LAV→SC→DSound 직렬 sample push 가 LAV emit rate 를 throttle 해 graph rate 변경이
+// audio renderer 에 반영되지 못하는 문제 해결. Receive 는 sample copy + queue push 후
+// 즉시 return, worker thread 가 dequeue → process_sample → downstream Receive. LAV thread
+// 와 DSound thread 사이의 직접 backpressure 단절 → 양쪽 모두 자기 속도로 동작.
+//================================================================================
+
+void CSCAudioTransformFilter::start_worker()
+{
+	if (m_worker_run.load())
+		return;	//already running
+	m_worker_run.store(true);
+	m_flushing.store(false);
+	m_worker = std::thread(&CSCAudioTransformFilter::worker_main, this);
+}
+
+void CSCAudioTransformFilter::stop_worker()
+{
+	if (!m_worker_run.load() && !m_worker.joinable())
+		return;
+	m_worker_run.store(false);
+	{
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
+		m_queue_cv.notify_all();
+	}
+	if (m_worker.joinable())
+		m_worker.join();
+	clear_queue();		//남은 sample release
+}
+
+void CSCAudioTransformFilter::clear_queue()
+{
+	std::lock_guard<std::mutex> lock(m_queue_mutex);
+	for (auto& w : m_queue)
+	{
+		if (w.kind == kind_sample && w.sample)
+			w.sample->Release();
+	}
+	m_queue.clear();
+}
+
+void CSCAudioTransformFilter::enqueue_sample(IMediaSample* pSample)
+{
+	if (!pSample) return;
+	if (m_flushing.load())
+	{
+		//flush 중엔 신규 sample drop. caller 가 AddRef 해서 넘긴 ref 해제.
+		pSample->Release();
+		return;
+	}
+	work_item w;
+	w.kind = kind_sample;
+	w.sample = pSample;	//caller 가 AddRef 한 상태로 전달 — worker 가 dequeue 후 Release
+	w.ns_start = 0; w.ns_stop = 0; w.ns_rate = 1.0;
+	{
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
+		m_queue.push_back(w);
+	}
+	m_queue_cv.notify_one();
+}
+
+void CSCAudioTransformFilter::enqueue_new_segment(REFERENCE_TIME tStart, REFERENCE_TIME tStop, double dRate)
+{
+	if (m_flushing.load())
+		return;
+	work_item w;
+	w.kind = kind_new_segment;
+	w.sample = NULL;
+	w.ns_start = tStart; w.ns_stop = tStop; w.ns_rate = dRate;
+	{
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
+		m_queue.push_back(w);
+	}
+	m_queue_cv.notify_one();
+}
+
+void CSCAudioTransformFilter::enqueue_end_of_stream()
+{
+	if (m_flushing.load())
+		return;
+	work_item w;
+	w.kind = kind_eos;
+	w.sample = NULL;
+	w.ns_start = 0; w.ns_stop = 0; w.ns_rate = 1.0;
+	{
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
+		m_queue.push_back(w);
+	}
+	m_queue_cv.notify_one();
+}
+
+void CSCAudioTransformFilter::begin_flush()
+{
+	m_flushing.store(true);
+	clear_queue();		//queue 비우기
+	{
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
+		m_queue_cv.notify_all();	//worker 가 wait 중이면 깨움
+	}
+}
+
+void CSCAudioTransformFilter::end_flush()
+{
+	m_flushing.store(false);
+}
+
+void CSCAudioTransformFilter::worker_main()
+{
+	for (;;)
+	{
+		work_item w;
+		bool got = false;
+		{
+			std::unique_lock<std::mutex> lock(m_queue_mutex);
+			m_queue_cv.wait(lock, [this] {
+				return !m_queue.empty() || !m_worker_run.load();
+			});
+			if (!m_worker_run.load() && m_queue.empty())
+				break;
+			if (!m_queue.empty())
+			{
+				w = m_queue.front();
+				m_queue.pop_front();
+				got = true;
+			}
+		}
+		if (got)
+			process_one(w);
+	}
+}
+
+void CSCAudioTransformFilter::process_one(const work_item& w)
+{
+	if (w.kind == kind_sample && w.sample)
+	{
+		//in-place process + delay shift + downstream deliver.
+		BYTE* pBuf = NULL;
+		w.sample->GetPointer(&pBuf);
+		long len = w.sample->GetActualDataLength();
+		if (pBuf && len > 0)
+		{
+			const WAVEFORMATEX* pwfx = get_wave_format();
+			process_sample(pBuf, len, pwfx);
+		}
+
+		LONGLONG delay = m_delay_100ns.load();
+		if (delay != 0)
+		{
+			REFERENCE_TIME tStart = 0, tStop = 0;
+			if (SUCCEEDED(w.sample->GetTime(&tStart, &tStop)))
+			{
+				tStart += delay;
+				tStop  += delay;
+				w.sample->SetTime(&tStart, &tStop);
+			}
+		}
+
+		if (m_pOutputPin)
+			m_pOutputPin->deliver_sample(w.sample);
+		w.sample->Release();	//enqueue 시 AddRef 된 ref 해제
+	}
+	else if (w.kind == kind_new_segment)
+	{
+		if (m_pOutputPin)
+			m_pOutputPin->deliver_new_segment(w.ns_start, w.ns_stop, w.ns_rate);
+	}
+	else if (w.kind == kind_eos)
+	{
+		if (m_pOutputPin)
+			m_pOutputPin->deliver_end_of_stream();
+	}
+}
+
+
+//================================================================================
 // CSCAudioTransformInputPin
 //================================================================================
 
 CSCAudioTransformInputPin::CSCAudioTransformInputPin(CSCAudioTransformFilter* pFilter)
-	: m_ref(0), m_pFilter(pFilter), m_pConnected(NULL), m_mt_set(false), m_pAllocator(NULL)
+	: m_ref(0), m_pFilter(pFilter), m_pConnected(NULL), m_mt_set(false),
+	  m_pAllocator(NULL), m_pInternalAllocator(NULL)
 {
 	memset(&m_mt, 0, sizeof(m_mt));
 }
@@ -228,7 +555,36 @@ CSCAudioTransformInputPin::~CSCAudioTransformInputPin()
 {
 	if (m_pConnected) m_pConnected->Release();
 	if (m_pAllocator) m_pAllocator->Release();
+	if (m_pInternalAllocator)
+	{
+		m_pInternalAllocator->Decommit();
+		m_pInternalAllocator->Release();
+	}
 	free_media_type();
+}
+
+IMemAllocator* CSCAudioTransformInputPin::get_or_create_internal_allocator()
+{
+	if (m_pInternalAllocator)
+		return m_pInternalAllocator;
+
+	HRESULT hr = CoCreateInstance(CLSID_MemoryAllocator, NULL, CLSCTX_INPROC_SERVER,
+		IID_IMemAllocator, (void**)&m_pInternalAllocator);
+	if (FAILED(hr) || !m_pInternalAllocator)
+		return NULL;
+
+	//async queue path 의 sample copy 용 — LAV ↔ DSound 의 buffer pool 과 분리.
+	//cBuffers 충분히 (16) — worker 가 dequeue 후 downstream 에 forward 되기까지의 in-flight.
+	//cbBuffer 는 first Receive 시 upstream sample size 로 동적 갱신 가능하나 일단 64KB.
+	ALLOCATOR_PROPERTIES props = { 0 };
+	props.cBuffers = 16;
+	props.cbBuffer = 65536;
+	props.cbAlign  = 1;
+	props.cbPrefix = 0;
+	ALLOCATOR_PROPERTIES actual = { 0 };
+	m_pInternalAllocator->SetProperties(&props, &actual);
+	m_pInternalAllocator->Commit();
+	return m_pInternalAllocator;
 }
 
 void CSCAudioTransformInputPin::free_media_type()
@@ -357,23 +713,32 @@ STDMETHODIMP CSCAudioTransformInputPin::QueryInternalConnections(IPin** apPin, U
 	return S_FALSE;
 }
 
+//Async path — EOS / Flush / NewSegment 모두 worker queue 로 라우팅해 sample 흐름과
+//순서 보존. 직접 downstream 호출하면 worker 가 queue 에 holding 한 sample 보다 먼저 도착해
+//순서 깨짐 (예: EOS 가 마지막 sample 보다 먼저 도착해 audio 꼬리 잘림).
 STDMETHODIMP CSCAudioTransformInputPin::EndOfStream()
 {
-	return m_pFilter->get_output_pin()->deliver_end_of_stream();
+	m_pFilter->enqueue_end_of_stream();
+	return S_OK;
 }
 STDMETHODIMP CSCAudioTransformInputPin::BeginFlush()
 {
+	m_pFilter->begin_flush();		//queue clear + 신규 sample drop
 	if (m_pAllocator) m_pAllocator->Decommit();
+	if (m_pInternalAllocator) m_pInternalAllocator->Decommit();
 	return m_pFilter->get_output_pin()->deliver_begin_flush();
 }
 STDMETHODIMP CSCAudioTransformInputPin::EndFlush()
 {
 	if (m_pAllocator) m_pAllocator->Commit();
+	if (m_pInternalAllocator) m_pInternalAllocator->Commit();
+	m_pFilter->end_flush();
 	return m_pFilter->get_output_pin()->deliver_end_flush();
 }
 STDMETHODIMP CSCAudioTransformInputPin::NewSegment(REFERENCE_TIME tStart, REFERENCE_TIME tStop, double dRate)
 {
-	return m_pFilter->get_output_pin()->deliver_new_segment(tStart, tStop, dRate);
+	m_pFilter->enqueue_new_segment(tStart, tStop, dRate);
+	return S_OK;
 }
 
 STDMETHODIMP CSCAudioTransformInputPin::GetAllocator(IMemAllocator** ppAllocator)
@@ -398,46 +763,55 @@ STDMETHODIMP CSCAudioTransformInputPin::NotifyAllocator(IMemAllocator* pAllocato
 }
 STDMETHODIMP CSCAudioTransformInputPin::GetAllocatorRequirements(ALLOCATOR_PROPERTIES*) { return E_NOTIMPL; }
 
+//Async Receive — 자체 IMemAllocator 의 새 sample 으로 upstream sample 데이터를 복사한 후
+//queue 에 push, 즉시 return. upstream (LAV) 의 buffer 는 그 즉시 해제되어 LAV 가 자기
+//thread 에서 다음 sample produce 가능. worker thread 가 dequeue → process_sample → deliver.
+//이로써 LAV emit rate 와 DSound consume rate 의 직접 backpressure 가 끊겨, graph rate 변경
+//시에도 DSound 가 자기 audio device clock 에 따라 sample timestamp 정상 적용.
 STDMETHODIMP CSCAudioTransformInputPin::Receive(IMediaSample* pSample)
 {
 	if (!pSample) return E_POINTER;
+	if (m_pFilter->get_state() == State_Stopped) return E_UNEXPECTED;
 
-	BYTE* pBuf = NULL;
-	pSample->GetPointer(&pBuf);
+	//자체 allocator 에서 새 sample 가져옴.
+	IMemAllocator* pAlloc = get_or_create_internal_allocator();
+	if (!pAlloc)
+		return E_FAIL;
+
+	IMediaSample* pOur = NULL;
+	HRESULT hr = pAlloc->GetBuffer(&pOur, NULL, NULL, 0);
+	if (FAILED(hr) || !pOur)
+		return hr;
+
+	BYTE* pInBuf = NULL;
+	pSample->GetPointer(&pInBuf);
 	long len = pSample->GetActualDataLength();
 
-	//파생이 sample buffer 를 in-place 수정.
-	if (pBuf && len > 0)
-	{
-		const WAVEFORMATEX* pwfx = m_pFilter->get_wave_format();
-		static int s_trace_count = 0;
-		if (s_trace_count < 3)
-		{
-			logWrite(_T("[AudioFilter] Receive #%d len=%ld wfx=%p tag=0x%04X bps=%d"),
-				s_trace_count, len, pwfx, pwfx ? pwfx->wFormatTag : 0, pwfx ? pwfx->wBitsPerSample : 0);
-			s_trace_count++;
-		}
-		m_pFilter->process_sample(pBuf, len, pwfx);
-	}
+	BYTE* pOutBuf = NULL;
+	pOur->GetPointer(&pOutBuf);
+	long maxLen = pOur->GetSize();
+	if (len > maxLen)
+		len = maxLen;
+	if (pInBuf && pOutBuf && len > 0)
+		memcpy(pOutBuf, pInBuf, len);
+	pOur->SetActualDataLength(len);
 
-	//audio delay — IMediaSample 의 start/stop timestamp 를 base 의 m_delay_100ns 만큼 shift.
-	//양수면 audio 가 늦게 도착 → renderer 가 reference clock 의 그 시각까지 buffer → 영상 대비 늦게 들림.
-	//0 이면 GetTime/SetTime 호출 자체 skip 으로 overhead 없음.
-	LONGLONG delay = m_pFilter->get_delay_ns();
-	if (delay != 0)
-	{
-		REFERENCE_TIME tStart = 0, tStop = 0;
-		HRESULT hr_t = pSample->GetTime(&tStart, &tStop);
-		if (SUCCEEDED(hr_t))
-		{
-			tStart += delay;
-			tStop  += delay;
-			pSample->SetTime(&tStart, &tStop);
-		}
-	}
+	//timestamp / flags 복사 — sync point / discontinuity / preroll 보존.
+	REFERENCE_TIME tStart = 0, tStop = 0;
+	if (SUCCEEDED(pSample->GetTime(&tStart, &tStop)))
+		pOur->SetTime(&tStart, &tStop);
 
-	//downstream 으로 forward (같은 IMediaSample 객체 그대로).
-	return m_pFilter->get_output_pin()->deliver_sample(pSample);
+	LONGLONG mStart = 0, mStop = 0;
+	if (SUCCEEDED(pSample->GetMediaTime(&mStart, &mStop)))
+		pOur->SetMediaTime(&mStart, &mStop);
+
+	pOur->SetSyncPoint(pSample->IsSyncPoint() == S_OK ? TRUE : FALSE);
+	pOur->SetDiscontinuity(pSample->IsDiscontinuity() == S_OK ? TRUE : FALSE);
+	pOur->SetPreroll(pSample->IsPreroll() == S_OK ? TRUE : FALSE);
+
+	//queue 에 push — worker 가 dequeue 후 process + deliver + Release.
+	m_pFilter->enqueue_sample(pOur);
+	return S_OK;
 }
 STDMETHODIMP CSCAudioTransformInputPin::ReceiveMultiple(IMediaSample** pSamples, long nSamples, long* nSamplesProcessed)
 {
@@ -453,9 +827,10 @@ STDMETHODIMP CSCAudioTransformInputPin::ReceiveMultiple(IMediaSample** pSamples,
 }
 STDMETHODIMP CSCAudioTransformInputPin::ReceiveCanBlock()
 {
-	//downstream 의 ReceiveCanBlock 결과 반환.
-	IMemInputPin* pDown = m_pFilter->get_output_pin()->get_downstream_input();
-	return pDown ? pDown->ReceiveCanBlock() : S_FALSE;
+	//async path — 우리 Receive 는 GetBuffer 외에는 block 안 함. allocator 의 buffer 가
+	//고갈되면 GetBuffer 가 block 가능하나 cBuffers=16 이라 보통 충분. S_FALSE 반환으로
+	//upstream 에게 "block 안 한다" 안내 → upstream 자기 thread 흐름 결정에 도움.
+	return S_FALSE;
 }
 
 

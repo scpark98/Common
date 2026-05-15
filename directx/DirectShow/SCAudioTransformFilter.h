@@ -18,11 +18,18 @@
 #include <dshow.h>
 #include <mmreg.h>	//WAVEFORMATEXTENSIBLE
 #include <atomic>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <deque>
 
 class CSCAudioTransformInputPin;
 class CSCAudioTransformOutputPin;
 
-class CSCAudioTransformFilter : public IBaseFilter
+//IMediaSeeking pass-through — graph IMediaSeeking::SetRate 가 chain 의 모든 filter 의
+//IMediaSeeking::SetRate 호출 시 우리 transform filter 도 응답해야 NewSegment 가 결정적으로
+//chain 따라 propagate. 자체 state 는 없고 upstream connected pin 의 IMediaSeeking 으로 모두 위임.
+class CSCAudioTransformFilter : public IBaseFilter, public IMediaSeeking
 {
 public:
 	CSCAudioTransformFilter(LPCWSTR friendly_name);
@@ -64,6 +71,28 @@ public:
 	STDMETHODIMP	JoinFilterGraph(IFilterGraph* pGraph, LPCWSTR pName) override;
 	STDMETHODIMP	QueryVendorInfo(LPWSTR* pVendorInfo) override;
 
+//IMediaSeeking — upstream connected pin / filter 의 IMediaSeeking 으로 모두 위임.
+//transform filter 가 seeking state 를 자체 보유하지 않으므로 pass-through 만이 안전.
+	STDMETHODIMP	GetCapabilities(DWORD* pCapabilities) override;
+	STDMETHODIMP	CheckCapabilities(DWORD* pCapabilities) override;
+	STDMETHODIMP	IsFormatSupported(const GUID* pFormat) override;
+	STDMETHODIMP	QueryPreferredFormat(GUID* pFormat) override;
+	STDMETHODIMP	GetTimeFormat(GUID* pFormat) override;
+	STDMETHODIMP	IsUsingTimeFormat(const GUID* pFormat) override;
+	STDMETHODIMP	SetTimeFormat(const GUID* pFormat) override;
+	STDMETHODIMP	GetDuration(LONGLONG* pDuration) override;
+	STDMETHODIMP	GetStopPosition(LONGLONG* pStop) override;
+	STDMETHODIMP	GetCurrentPosition(LONGLONG* pCurrent) override;
+	STDMETHODIMP	ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat,
+		LONGLONG Source, const GUID* pSourceFormat) override;
+	STDMETHODIMP	SetPositions(LONGLONG* pCurrent, DWORD dwCurrentFlags,
+		LONGLONG* pStop, DWORD dwStopFlags) override;
+	STDMETHODIMP	GetPositions(LONGLONG* pCurrent, LONGLONG* pStop) override;
+	STDMETHODIMP	GetAvailable(LONGLONG* pEarliest, LONGLONG* pLatest) override;
+	STDMETHODIMP	SetRate(double dRate) override;
+	STDMETHODIMP	GetRate(double* pdRate) override;
+	STDMETHODIMP	GetPreroll(LONGLONG* pllPreroll) override;
+
 //Internal — pin 에서 호출.
 	IFilterGraph*			get_graph() { return m_pGraph; }
 	FILTER_STATE			get_state() { return m_state; }
@@ -73,6 +102,21 @@ public:
 	void					clear_wave_format() { m_wfx_set = false; }
 	CSCAudioTransformInputPin*	get_input_pin()  { return m_pInputPin; }
 	CSCAudioTransformOutputPin* get_output_pin() { return m_pOutputPin; }
+
+//Async worker — Receive 가 sample 을 queue 에 push 후 즉시 return,
+//worker thread 가 dequeue → process_sample → deliver_sample. LAV emit thread 와 DSound
+//consume thread 의 직렬 chain 을 분리 → graph rate 변경 시 audio renderer 가 rate 적용 보장.
+	//Queue 에 sample 을 push. sample 은 AddRef 된 상태로 전달 — worker 가 dequeue 후 Release.
+	void					enqueue_sample(IMediaSample* pSample);
+	//NewSegment 도 sample 흐름과 같은 순서로 처리되어야 — queue 에 sentinel 로 enqueue.
+	void					enqueue_new_segment(REFERENCE_TIME tStart, REFERENCE_TIME tStop, double dRate);
+	//EOS / Flush 등 흐름 제어.
+	void					enqueue_end_of_stream();
+	void					begin_flush();	//queue clear + worker drain
+	void					end_flush();
+	//worker thread 시작/종료. Run 시 start, Stop / destructor 에서 stop.
+	void					start_worker();
+	void					stop_worker();
 
 protected:
 	std::atomic<LONG>		m_ref;
@@ -88,6 +132,27 @@ protected:
 	bool					m_wfx_set;
 
 	std::atomic<LONGLONG>	m_delay_100ns;	//timestamp shift (100-ns units, REFERENCE_TIME 단위)
+
+	//Async worker queue.
+	//queue 의 element 는 sample (or sentinel 표시). sentinel 은 NewSegment / EOS / Flush mark.
+	enum work_kind { kind_sample, kind_new_segment, kind_eos };
+	struct work_item
+	{
+		work_kind		kind;
+		IMediaSample*	sample;		//kind_sample 시 AddRef 된 상태로 보유
+		REFERENCE_TIME	ns_start;	//kind_new_segment 인자
+		REFERENCE_TIME	ns_stop;
+		double			ns_rate;
+	};
+	std::thread					m_worker;
+	std::mutex					m_queue_mutex;
+	std::condition_variable		m_queue_cv;
+	std::deque<work_item>		m_queue;
+	std::atomic<bool>			m_worker_run;	//worker loop 종료 신호
+	std::atomic<bool>			m_flushing;		//BeginFlush ↔ EndFlush 사이엔 queue 비우고 신규 sample drop
+	void					worker_main();
+	void					process_one(const work_item& w);
+	void					clear_queue();		//queue clear + sample release
 };
 
 
@@ -130,6 +195,10 @@ public:
 
 	IMemAllocator*	get_allocator() { return m_pAllocator; }
 
+	//async path 용 — Receive 가 upstream sample 을 자체 allocator 의 새 sample 으로 복사 후
+	//queue 에 push. 자체 allocator 가 충분한 buffer pool 제공 (LAV ↔ DSound 분리).
+	IMemAllocator*	get_or_create_internal_allocator();
+
 protected:
 	std::atomic<LONG>			m_ref;
 	CSCAudioTransformFilter*	m_pFilter;	//weak — filter outlives pin
@@ -137,6 +206,7 @@ protected:
 	AM_MEDIA_TYPE				m_mt;
 	bool						m_mt_set;
 	IMemAllocator*				m_pAllocator;
+	IMemAllocator*				m_pInternalAllocator;	//async copy 용. lazy create.
 
 	void	free_media_type();
 };

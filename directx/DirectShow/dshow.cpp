@@ -708,6 +708,14 @@ void CDShow::setup_audio_gain_filter()
 		pGain->reset_agc();
 		logWrite(_T("[AudioGain] AGC enabled=%d target=%d dB"), (int)agc_on, target_int);
 
+		//audio_sync 복원 — chain teardown/setup 토글 시 이전 m_audio_sync 가 0 이 아니면
+		//새 chain 에 set_delay_ms 적용. rate=1.0 복귀 후 audio_sync 유실 방지.
+		if (m_audio_sync != 0)
+		{
+			pGain->set_delay_ms(m_audio_sync);
+			logWrite(_T("[AudioGain] audio_sync %d ms re-applied after chain setup"), m_audio_sync);
+		}
+
 		//Compressor 도 chain 에 추가: upstream → gain → compressor → renderer.
 		//현재 gain → renderer 의 link 를 끊고 그 사이에 compressor 끼움.
 		IPin* pGainOutPin = NULL;
@@ -780,20 +788,89 @@ void CDShow::setup_audio_gain_filter()
 
 void CDShow::teardown_audio_gain_filter()
 {
-	if (m_pAudioCompressorFilter)
-	{
-		CSCAudioCompressor* pComp = (CSCAudioCompressor*)m_pAudioCompressorFilter;
-		if (m_pGB) m_pGB->RemoveFilter(pComp);
-		pComp->Release();
-		m_pAudioCompressorFilter = NULL;
-	}
+	if (!m_pGB || (!m_pAudioGainFilter && !m_pAudioCompressorFilter))
+		return;
+
+	//graph state 보존 — Stop 후 chain 제거, 마지막에 복원.
+	CComQIPtr<IMediaControl> pMC(m_pGB);
+	OAFilterState saved_state = State_Stopped;
+	if (pMC) { pMC->GetState(0, &saved_state); pMC->Stop(); }
+
+	//chain: upstream(LAV Audio out) → Gain → Compressor → downstream(DSound in).
+	//재연결 위한 양끝 pin + media type 보존.
+	IPin* pUpstreamOut = NULL;
+	IPin* pDownstreamIn = NULL;
+	AM_MEDIA_TYPE saved_mt;
+	memset(&saved_mt, 0, sizeof(saved_mt));
+	bool has_mt = false;
 
 	if (m_pAudioGainFilter)
 	{
 		CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
-		if (m_pGB) m_pGB->RemoveFilter(pGain);
+		IPin* pGainIn = NULL;
+		pGain->FindPin(L"In", &pGainIn);
+		if (pGainIn) { pGainIn->ConnectedTo(&pUpstreamOut); pGainIn->Release(); }
+	}
+
+	IBaseFilter* pTailFilter = m_pAudioCompressorFilter ? (IBaseFilter*)(CSCAudioCompressor*)m_pAudioCompressorFilter
+														 : (m_pAudioGainFilter ? (IBaseFilter*)(CSCAudioGain*)m_pAudioGainFilter : NULL);
+	if (pTailFilter)
+	{
+		IPin* pTailOut = NULL;
+		pTailFilter->FindPin(L"Out", &pTailOut);
+		if (pTailOut)
+		{
+			pTailOut->ConnectedTo(&pDownstreamIn);
+			if (pDownstreamIn)
+			{
+				AM_MEDIA_TYPE mt;
+				memset(&mt, 0, sizeof(mt));
+				if (SUCCEEDED(pDownstreamIn->ConnectionMediaType(&mt)))
+				{
+					saved_mt = mt;
+					has_mt = true;
+				}
+			}
+			pTailOut->Release();
+		}
+	}
+
+	//SC filter 들 RemoveFilter — graph 가 자동 disconnect.
+	if (m_pAudioCompressorFilter)
+	{
+		CSCAudioCompressor* pComp = (CSCAudioCompressor*)m_pAudioCompressorFilter;
+		m_pGB->RemoveFilter(pComp);
+		pComp->Release();
+		m_pAudioCompressorFilter = NULL;
+	}
+	if (m_pAudioGainFilter)
+	{
+		CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
+		m_pGB->RemoveFilter(pGain);
 		pGain->Release();
 		m_pAudioGainFilter = NULL;
+	}
+
+	//upstream ↔ downstream 직결 재연결 — 이게 누락되면 audio path 가 끊겨 graph broken.
+	HRESULT hr_reconnect = E_FAIL;
+	if (pUpstreamOut && pDownstreamIn)
+	{
+		hr_reconnect = m_pGB->ConnectDirect(pUpstreamOut, pDownstreamIn, has_mt ? &saved_mt : NULL);
+		logWrite(_T("[AudioGain] teardown direct reconnect hr=0x%08x"), hr_reconnect);
+	}
+	if (pUpstreamOut) pUpstreamOut->Release();
+	if (pDownstreamIn) pDownstreamIn->Release();
+	if (has_mt)
+	{
+		if (saved_mt.cbFormat && saved_mt.pbFormat) CoTaskMemFree(saved_mt.pbFormat);
+		if (saved_mt.pUnk) saved_mt.pUnk->Release();
+	}
+
+	//graph state 복원.
+	if (pMC)
+	{
+		if (saved_state == State_Running) pMC->Run();
+		else if (saved_state == State_Paused) pMC->Pause();
 	}
 }
 
@@ -2229,11 +2306,25 @@ void CDShow::set_playback_rate(double rate)
 	if (!m_pGB)
 		return;
 
+	//SC Audio chain (Compressor/Gain) 의 존재 자체가 audio renderer 의 rate 적응 메커니즘을
+	//차단 — graph chain 차원의 SetRate / NewSegment / timestamp scale 모두 정상 동작해도
+	//DSound 의 실재 rate 변경 fail. async worker queue 로 sample 흐름을 분리해도 같음.
+	//rate != 1.0 시 chain teardown 으로 LAV → DSound 직결, rate == 1.0 복귀 시 setup 으로
+	//AGC / Compressor / audio_sync 복원. rate != 1.0 사이 이동 시 chain 이 이미 없으니 추가 변경 없음.
+	bool chain_active = (m_pAudioGainFilter != NULL || m_pAudioCompressorFilter != NULL);
+	bool need_chain = (rate == 1.0);
+
+	if (chain_active && !need_chain)
+		teardown_audio_gain_filter();
+
 	HRESULT hr = E_FAIL;
 	if (m_pMS)
 		hr = m_pMS->SetRate(rate);
 	if (FAILED(hr) && m_pMP)
 		hr = m_pMP->put_Rate(rate);
+
+	if (!chain_active && need_chain)
+		setup_audio_filter_chain();
 
 	logWrite(_T("[playback_rate] SetRate %.2f hr=0x%08x"), rate, hr);
 }

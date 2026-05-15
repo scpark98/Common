@@ -1280,22 +1280,41 @@ void CSCStaticEdit::draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text)
 {
 	if (m_dim_text.IsEmpty()) return;
 
-	Gdiplus::FontFamily font_family(m_lf.lfFaceName);
-	float f_size = (m_lf.lfHeight < 0) ? (float)(-m_lf.lfHeight) : (float)(m_lf.lfHeight);
-	Gdiplus::Font font(&font_family, f_size, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+	//과거: Gdiplus::FontFamily(m_lf.lfFaceName) + g.DrawString 으로 그렸으나
+	//GDI+ 의 FontFamily(name) 은 정확한 이름이 없으면 FontFamilyNotFound 상태가 되어
+	//DrawString 이 조용히 no-op. XP 처럼 Segoe UI 미포함 환경에서 dim text 만 사라짐.
+	//draw_text 와 동일하게 GDI(TextOut + HFONT) 경로로 통일 — 시스템 폰트 substitution
+	//이 자동 적용되어 OS 무관하게 그려지고, 픽셀 정렬도 draw_text 와 일치.
+	HDC hdc = g.GetHDC();
+	{
+		CDC dc;
+		dc.Attach(hdc);
 
-	Gdiplus::RectF measure_rect;
-	g.MeasureString(m_dim_text, -1, &font, Gdiplus::PointF(0, 0), &measure_rect);
+		int saved_clip = dc.SaveDC();
+		dc.IntersectClipRect(&rc_text);
 
-	float f_text_y = rc_text.top + (rc_text.Height() - measure_rect.Height) / 2.0f;
+		CFont* p_old_font = dc.SelectObject(&m_font);
+		int   old_bk_mode = dc.SetBkMode(TRANSPARENT);
+		COLORREF old_color = dc.SetTextColor(to_colorref(m_theme.cr_text_dim));
 
-	// dim 텍스트는 실제 입력이 없는 placeholder 이므로 m_scroll_offset 은 무시하고
-	// 현재 가로 정렬만 적용. get_text_start_x 는 text > rc_text 일 때 scroll 기반
-	// 좌표를 돌려주지만, dim 텍스트 길이가 rc 보다 클 일은 드물고 넘쳐도 clip 으로 처리된다.
-	float f_text_x = (float)get_text_start_x((int)(measure_rect.Width + 0.5f));
+		TEXTMETRIC tm = {};
+		dc.GetTextMetrics(&tm);
 
-	Gdiplus::SolidBrush brush(m_theme.cr_text_dim);
-	g.DrawString(m_dim_text, -1, &font, Gdiplus::PointF(f_text_x, f_text_y), &brush);
+		int text_y = rc_text.top + (rc_text.Height() - tm.tmHeight) / 2;
+
+		//dim 텍스트는 실제 입력이 없으므로 m_scroll_offset 은 무시하고 가로 정렬만 적용.
+		CSize sz = dc.GetTextExtent(m_dim_text);
+		int text_x = get_text_start_x(sz.cx);
+
+		dc.TextOut(text_x, text_y, m_dim_text);
+
+		dc.SetTextColor(old_color);
+		dc.SetBkMode(old_bk_mode);
+		dc.SelectObject(p_old_font);
+		dc.RestoreDC(saved_clip);
+		dc.Detach();
+	}
+	g.ReleaseHDC(hdc);
 }
 
 // ──────────────────────────────────────────────────────────

@@ -19,7 +19,16 @@
 #include <imm.h>
 #include <comutil.h>	//for _bstr_t
 #include <TlHelp32.h>	//for CreateToolhelp32Snapshot
+
+//XP 호환 필수.
+//Win7+ SDK 의 psapi.h 는 기본(PSAPI_VERSION=2) 에서 GetModuleFileNameEx 등을
+//K32GetModuleFileNameExW 같은 K32_ 접두 심볼로 리다이렉트하고 kernel32.dll 에서 import.
+//XP 의 kernel32.dll 에는 이 심볼들이 없어 EXE 시작 시 "프로시저 시작 지점 없음" 에러로 죽는다.
+//PSAPI_VERSION=1 로 강제하면 SDK 가 구 경로(psapi.dll) 로 링크되며 XP~Win11 모두 정상 동작.
+//(Win7+ 의 psapi.dll 은 shim 으로 남아 K32_ 함수로 forward 된다.)
+#define PSAPI_VERSION 1
 #include "Psapi.h"		//for GetCurrentMemUsage()
+#pragma comment(lib, "psapi.lib")
 #include <wuapi.h>		//for windows update option check
 #include <mmdeviceapi.h>	//for is_process_audio_active
 #include <audiopolicy.h>

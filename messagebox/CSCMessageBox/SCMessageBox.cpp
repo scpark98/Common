@@ -4,6 +4,7 @@
 #include "SCMessageBox.h"
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
+#include "../../win_compat/dwm.h"
 
 //SHGetStockIconInfo (Vista+). XP toolset (v110_xp) 에서는 #ifndef _USING_V110_SDK71_ 가드로 보호됨.
 #ifndef _USING_V110_SDK71_
@@ -186,11 +187,8 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 		SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
 	//캡션바를 제거해도 직사각이 아닌 윈11처럼 라운드 모양으로.
-	//XP에서는 지원되지 않을것이다.
-#ifndef _USING_V110_SDK71_
-	DWORD corner = DWMWCP_ROUND;
-	DwmSetWindowAttribute(m_hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
-#endif
+	//XP/Win10 이하는 헬퍼 안에서 자동 no-op.
+	win_compat::dwm::set_window_corner_round(m_hWnd);
 
 
 	CRect rc;

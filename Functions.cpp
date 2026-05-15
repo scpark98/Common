@@ -27,6 +27,7 @@
 
 #include "Functions.h"
 #include "text_encoding/utf-8/utf8.h"
+#include "win_compat/dwm.h"
 
 //아래 두 라인은 GetWindowsVersion()함수를 위해 포함되었는데
 //Functions.h에 include할 경우
@@ -14686,16 +14687,10 @@ CRect get_window_real_rect(CWnd* pWnd)
 	else
 	{
 		//일반 창 모드일 경우에는 직접 계산한다.
-#ifndef _USING_V110_SDK71_
-		RECT rcFrame{};
-		DwmGetWindowAttribute(
-			pWnd->m_hWnd,
-			DWMWA_EXTENDED_FRAME_BOUNDS,
-			&rcFrame,
-			sizeof(rcFrame));
+		//XP / dwmapi 미존재 시 GetWindowRect 결과(=현재 rw) 가 그대로 유지됨.
+		RECT rcFrame = rw;
+		win_compat::dwm::get_extended_frame_bounds_or_window_rect(pWnd->m_hWnd, rcFrame);
 		rw = rcFrame;
-#else
-#endif
 	}
 
 	//trace(rw);

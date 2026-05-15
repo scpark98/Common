@@ -147,7 +147,9 @@ void CSCSystemButtons::OnPaint()
 
 	for (size_t i = 0; i < m_button.size(); i++)
 	{
-		if (i == m_over_index)
+		//SC_PIN 은 toggle 상태 (always-on-top on/off) 가 self-evident 한 색 변화로 표시되므로
+		//hover 배경 강조 불필요. 다른 명령들 (MIN/MAX/CLOSE) 만 hover 효과 적용.
+		if (i == m_over_index && m_button[i].cmd != SC_PIN)
 		{
 			//if (m_down_state)
 			//	cr_back = (m_button[i].cmd == SC_CLOSE ? gRGB(232, 17, 35) : m_theme.cr_sys_buttons_down_back);
@@ -220,8 +222,21 @@ void CSCSystemButtons::OnPaint()
 			}
 			else if (m_button[i].cmd == SC_PIN)
 			{
-				g.DrawLine(is_top_most(GetParent()->GetSafeHwnd()) ? &pen_pin : &pen_pin_gray, cp.x - 7, cp.y, cp.x + 7, cp.y);
-				g.FillEllipse(&br_pin, cp.x + (is_top_most(GetParent()->GetSafeHwnd()) ? 1 : -11), cp.y - 5, 10, 10);
+				//SC_PIN 의 always-on-top 상태는 *최상위 top-level window* 의 WS_EX_TOPMOST 로 판정.
+				//SystemButtons 가 TitleDlg 같은 중간 child dialog 안에 있으면 GetParent() 는 그
+				//child 의 hwnd 라 EX_TOPMOST 가 자동 sync 안 됨 (메인만 TOPMOST 되어도 child 는 그대로).
+				//GetAncestor(GA_ROOT) 로 메인 dlg 의 hwnd 직접 얻어 일관 판정.
+				HWND hwnd_root = ::GetAncestor(GetSafeHwnd(), GA_ROOT);
+				bool on_top = is_top_most(hwnd_root);
+
+				//세로 중앙 보정 — 일반창 모드에서만 1px 위로 보정. 전체화면 / maximized 에선
+				//보정 없이 원래 정상 위치. m_parent_maximized 는 호출자 (TitleDlg::set_floating_mode
+				//등) 가 명시적으로 갱신 — IsZoomed 자체 체크는 self-styled fullscreen 미감지라 신뢰 X.
+				int y_off = m_parent_maximized ? 0 : -1;
+				g.DrawLine(on_top ? &pen_pin : &pen_pin_gray,
+					cp.x - 7, cp.y + y_off, cp.x + 7, cp.y + y_off);
+				g.FillEllipse(&br_pin,
+					cp.x + (on_top ? 1 : -11), cp.y + y_off - 5, 10, 10);
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{

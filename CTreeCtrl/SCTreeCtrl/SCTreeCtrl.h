@@ -477,6 +477,7 @@ protected:
 //편집 관련
 	bool			m_allow_edit = true;
 	bool			m_in_editing = false;		//편집중인지
+	bool			m_in_context_menu = false;	//우클릭 메뉴 표시 중 — focus 가 menu 로 가도 selected 항목을 active 색으로 그리기 위한 가드
 	CSCEdit*		m_pEdit = NULL;
 	CString			m_edit_old_text;
 	CString			m_edit_new_text;

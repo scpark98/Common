@@ -310,7 +310,8 @@ void CSCTreeCtrl::OnPaint()
 			dc.SetTextColor(red);
 
 			//포커스에 따라 다르다. 단, 편집중일때도 CEdit이 focus를 가지게 되는데 inactive 색상 대신 원래의 선택배경색을 그대로 사용하자.
-			if (GetFocus() == this || m_in_editing)
+			//우클릭 메뉴 표시 중 (m_in_context_menu) 도 동일 — menu 가 focus 를 가져가도 right-clicked 항목은 active 색 유지.
+			if (GetFocus() == this || m_in_editing || m_in_context_menu)
 			{
 				crText = m_cr_text_selected;
 				DrawRectangle(&dc, (GetStyle() & TVS_FULLROWSELECT) ? rItem[rect_row] : rItem[rect_label], m_cr_selected_border, m_cr_back_selected);
@@ -3396,16 +3397,35 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 
 BOOL CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	//context menu를 띠우기 위해 OnContextMenu()를 추가했으나
-	//우클릭으로는 OnContextMenu()가 호출되지 않았고 더블우클릭을 해야 OnContextMenu()가 호출되는 현상이 있다.
-	//검색해보니 NM_RCLICK에서 아래와 같은 처리를 해줘야 OnContextMenu()가 호출된다.
+	//CTreeCtrl 의 default RBUTTONDOWN/UP 처리가 WM_CONTEXTMENU 를 생성하지 않아 OnContextMenu 가 단일 우클릭으로
+	//호출되지 않음 (이중 우클릭만). 명시적으로 WM_CONTEXTMENU 를 self 에 SendMessage 해야 함.
 
-	TRACE("CSCTreeCtrl::OnRClick()\n");
-	// Send WM_CONTEXTMENU to self
-	//SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, GetMessagePos());
-	// Mark message as handled and suppress default handling
-	//*pResult = 1;
-	return FALSE;
+	//우클릭 위치의 item 을 즉시 선택 + active 색 paint — focus 가 popup_menu 로 가기 전 시점.
+	CPoint pt_screen;
+	GetCursorPos(&pt_screen);
+	CPoint pt_client = pt_screen;
+	ScreenToClient(&pt_client);
+
+	UINT uFlags = 0;
+	HTREEITEM hItem = HitTest(pt_client, &uFlags);
+	if (hItem)
+	{
+		SelectItem(hItem);
+		m_in_context_menu = true;
+		Invalidate();
+		UpdateWindow();
+	}
+
+	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
+
+	if (hItem)
+	{
+		m_in_context_menu = false;
+		Invalidate();
+	}
+
+	*pResult = 1;
+	return TRUE;
 }
 
 //context menu를 컨트롤 내부에서 처리하면 레이블 변경, 삭제, 추가 등의 일반적인 메뉴항목들을 처리하는 것이 간단해지지만
@@ -3427,9 +3447,24 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	SelectItem(hItem);
 
-	//팝업메뉴를 사용하지 않아도 우클릭을 하면 선택상태로는 변경시켜줘야 하므로 여기서 리턴한다.
+	//자체 popup 사용 안 하면 parent 로 forward — wParam = source hwnd 로 parent OnContextMenu 가
+	//pWnd 로 tree/thumb 구분 가능.
 	if (!m_use_popup_menu)
+	{
+		CWnd* parent = GetParent();
+		if (parent)
+		{
+			//menu 표시 중 focus 가 menu 로 가도 selected 항목이 active 색으로 그려지도록 가드.
+			//parent->SendMessage 는 popup_menu 가 modal 로 끝날 때까지 return 안 함.
+			m_in_context_menu = true;
+			Invalidate();
+			UpdateWindow();
+			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)GetSafeHwnd(), MAKELPARAM(point.x, point.y));
+			m_in_context_menu = false;
+			Invalidate();
+		}
 		return;
+	}
 
 	LANGID langID = GetSystemDefaultUILanguage();
 

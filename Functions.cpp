@@ -17076,6 +17076,39 @@ template<class T> void quicksort(T& v, int end, int start, bool bAscending)
 //20260211 scpark
 //::SetWindowPos() / MoveWindow() / CenterWindow() 혼용, main에서 SWP_NOACTIVATE을 사용해도 유지되지 않는 문제 등
 //여러가지 문제로 인해 WINDOWPLACEMENT 구조체를 이용해서 복원되도록 변경.
+//내부 헬퍼: SaveWindowPosition 이 같이 저장한 monitor fingerprint 와 현재 monitor 토폴로지를 비교해
+//saved rect 가 여전히 유효한지 판단. 매칭 안 되면 false (호출자가 fallback 위치로 옮긴다).
+//- 매칭 기준: szDevice 이름 일치 OR rcMonitor 일치 (둘 중 하나라도 통과)
+//- fingerprint 가 저장돼있지 않은 legacy 데이터는 true 반환 (기존 동작 유지)
+//- phantom audio monitor 같이 OS 가 valid HMONITOR 로 리턴하는 가짜 모니터도, *이전 정상 시점의*
+//  fingerprint 가 그쪽이 아니면 매칭 실패로 fallback 처리.
+static bool validate_saved_monitor_fingerprint(CWinApp* pApp, CString sSection)
+{
+	CString saved_device = pApp->GetProfileString(sSection, _T("monitor_device"), _T(""));
+	if (saved_device.IsEmpty())
+		return true;	//legacy 데이터 — 검증 건너뜀.
+
+#if (_MSVC_LANG >= _std_cpp17)
+	CRect saved_mrc = get_profile_value(sSection, _T("monitor_rect"), CRect());
+#else
+	CRect saved_mrc(
+		pApp->GetProfileInt(sSection, _T("monitor_left"), 0),
+		pApp->GetProfileInt(sSection, _T("monitor_top"), 0),
+		pApp->GetProfileInt(sSection, _T("monitor_right"), 0),
+		pApp->GetProfileInt(sSection, _T("monitor_bottom"), 0));
+#endif
+
+	enum_display_monitors();
+	for (const auto& m : g_monitors)
+	{
+		if (saved_device.Compare(m.mi.szDevice) == 0)
+			return true;
+		if (!saved_mrc.IsRectNull() && saved_mrc == m.rMonitor)
+			return true;
+	}
+	return false;
+}
+
 void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool use_maximize, bool resize_window, bool force_primary_monitor)
 {
 	if (!pApp || !pWnd || !pWnd->GetSafeHwnd())
@@ -17115,8 +17148,12 @@ void RestoreWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection, bool 
 		return;
 	}
 
+	//monitor fingerprint 검증 — saved 시점의 모니터가 사라졌거나 (멀티모니터 해제),
+	//phantom audio monitor 등으로 굳은 좌표면 여기서 false → primary 로 fallback.
+	bool fingerprint_ok = validate_saved_monitor_fingerprint(pApp, sSection);
+
 	// force_primary_monitor : 주 모니터 작업 영역 내로 강제 이동
-	if (force_primary_monitor)
+	if (force_primary_monitor || !fingerprint_ok)
 	{
 		enum_display_monitors();
 		if (!g_monitors.empty())
@@ -17256,6 +17293,28 @@ void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)
 	pApp->WriteProfileInt(sSection, _T("right"), wp.rcNormalPosition.right);
 	pApp->WriteProfileInt(sSection, _T("bottom"), wp.rcNormalPosition.bottom);
 #endif
+
+	//monitor fingerprint — saved rect 가 속한 모니터의 식별자 동시 저장. 다음 RestoreWindowPosition
+	//시점에 그 모니터가 사라졌거나 (모니터 분리/교체) 다른 환경이면 primary 로 fallback 가능.
+	HMONITOR hMon = MonitorFromRect(&wp.rcNormalPosition, MONITOR_DEFAULTTONEAREST);
+	if (hMon)
+	{
+		MONITORINFOEX mi = {};
+		mi.cbSize = sizeof(MONITORINFOEX);
+		if (GetMonitorInfo(hMon, &mi))
+		{
+			pApp->WriteProfileString(sSection, _T("monitor_device"), mi.szDevice);
+			pApp->WriteProfileInt(sSection, _T("monitor_primary"), (mi.dwFlags & MONITORINFOF_PRIMARY) ? 1 : 0);
+#if (_MSVC_LANG >= _std_cpp17)
+			write_profile_value(sSection, _T("monitor_rect"), CRect(mi.rcMonitor));
+#else
+			pApp->WriteProfileInt(sSection, _T("monitor_left"), mi.rcMonitor.left);
+			pApp->WriteProfileInt(sSection, _T("monitor_top"), mi.rcMonitor.top);
+			pApp->WriteProfileInt(sSection, _T("monitor_right"), mi.rcMonitor.right);
+			pApp->WriteProfileInt(sSection, _T("monitor_bottom"), mi.rcMonitor.bottom);
+#endif
+		}
+	}
 }
 /*
 void SaveWindowPosition(CWinApp* pApp, CWnd* pWnd, CString sSubSection)

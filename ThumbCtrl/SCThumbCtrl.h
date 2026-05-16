@@ -160,9 +160,12 @@ public:
 //선택 관련
 	std::deque<int> m_selected;
 	bool			m_use_multi_selection = false;	//default = false
-	//m_use_multi_selection이 false라도 Ctrl키를 누르면 다중 선택이 가능하다.
+	//m_use_multi_selection이 false라도 Ctrl/Shift키를 누르면 다중 선택이 가능하다.
 	//m_use_multi_selection는 그냥 좌클릭만으로도 다중 선택이 가능하게 할 지에 대한 플래그임.
 	void			use_multi_selection(bool multi_select = true) { m_use_multi_selection = multi_select; }
+	//Windows Explorer 식 멀티 선택의 anchor — 마지막 "establishing" 클릭 (modifier 없음 또는 Ctrl 단독) 위치.
+	//Shift / Ctrl+Shift 가 누른 항목 ↔ anchor 의 range 로 사용. -1 = anchor 미설정.
+	int				m_anchor_index = -1;
 	//선택된 첫번째 항목의 인덱스를 리턴.
 	int				get_selected_item();
 	//선택된 항목들은 이미 m_selected에 저장되어 있으므로 이를 dqSelected로 복사한다.

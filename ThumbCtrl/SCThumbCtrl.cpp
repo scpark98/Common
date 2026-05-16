@@ -556,6 +556,10 @@ int CSCThumbCtrl::insert(int index, CSCGdiplusBitmap* src_thumb, CString title, 
 
 	m_thumb[index].load_completed = true;
 
+	//bitmap 직접 insert 는 동기 — 비동기 loader 가 set 할 m_loading_completed 가 영원히 false 로 남아
+	//select_item 가드를 통과 못 하는 증상 방지. 여기서 호출자에게 "이 항목은 로드 완료" 신호.
+	m_loading_completed = true;
+
 	if (invalidate)
 		recalc_tile_rect();
 
@@ -809,62 +813,74 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		if (m_thumb[i].r.PtInRect(point))
 		{
-			int selected_index = find_index(m_selected, i);
+			//Windows Explorer 식 멀티 선택:
+			// - modifier 없음     : 단일 선택 (clear + add), anchor = i.
+			// - Ctrl              : i 토글 (다른 선택 보존), anchor = i.
+			// - Shift             : clear 후 [anchor, i] 범위 선택. anchor 유지.
+			// - Ctrl+Shift        : [anchor, i] 범위 추가 (기존 선택 보존). anchor 유지.
+			//m_use_multi_selection 가 false 여도 Ctrl/Shift 가 눌리면 다중 선택 가능.
+			bool ctrl  = IsCtrlPressed();
+			bool shift = IsShiftPressed();
+			int  selected_index = find_index(m_selected, i);
+			int  anchor = (m_anchor_index >= 0) ? m_anchor_index : i;
 
-			//컨트롤키를 누르면 m_use_multi_selection이 false라고 해도 다중선택이 가능하다.
-			if (IsCtrlPressed())
+			if (ctrl && shift)
 			{
-				int last_selected = 0;
-				if (m_selected.size() > 0)
-					last_selected = m_selected[m_selected.size() - 1];
-
-				//해당 항목이 이미 선택된 상태라면 선택 해제시켜주고
+				//Ctrl+Shift: [anchor, i] 범위 추가. 이미 포함된 인덱스는 skip.
+				for (j = MIN(i, anchor); j <= MAX(i, anchor); j++)
+				{
+					if (find_index(m_selected, j) < 0)
+					{
+						m_selected.push_back(j);
+						::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, j), 0);
+					}
+				}
+				//anchor 유지.
+			}
+			else if (shift)
+			{
+				//Shift: clear 후 [anchor, i] 범위 선택. anchor 유지.
+				m_selected.clear();
+				for (j = MIN(i, anchor); j <= MAX(i, anchor); j++)
+				{
+					m_selected.push_back(j);
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, j), 0);
+				}
+			}
+			else if (ctrl)
+			{
+				//Ctrl: 토글. 다른 선택은 그대로.
 				if (selected_index >= 0)
 				{
-					//shift까지 눌렸다면 마지막 선택 ~ 현재 항목까지 모두 해제.
-					if (IsShiftPressed())
-					{
-						//마지막 선택 ~ 현재 항목중에서 선택된 항목이 있다면 삭제시킨다.
-						if (m_selected.size())
-						{
-							for (j = m_selected.size() - 1; j >= 0; j--)
-							{
-								if ((m_selected[j] >= last_selected && m_selected[j] <= i) ||
-									(m_selected[j] <= last_selected && m_selected[j] >= i))
-									m_selected.erase(m_selected.begin() + j);
-							}
-						}
-					}
-					else
+					m_selected.erase(m_selected.begin() + selected_index);
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_unselected, i), 0);
+				}
+				else
+				{
+					m_selected.push_back(i);
+					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
+						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
+				}
+				m_anchor_index = i;
+			}
+			else
+			{
+				//modifier 없음.
+				//전에 선택한 항목과 새로 선택한 항목이 다르면 m_last_clicked 초기화 — 원클릭 타이틀 편집 동작용.
+				if (m_selected.size() && (i != m_selected[0]))
+					m_last_clicked = 0;
+
+				if (m_use_multi_selection)
+				{
+					//multi 모드의 plain click — toggle 동작 보존 (기존 동작 호환).
+					if (selected_index >= 0)
 					{
 						m_selected.erase(m_selected.begin() + selected_index);
 						::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_unselected, selected_index), 0);
-					}
-				}
-				//선택되지 않은 항목이라면 선택리스트에 추가한다.
-				else
-				{
-					//shift까지 눌렸다면 마지막 선택 ~ 현재 항목까지 모두 선택
-					if (IsShiftPressed())
-					{
-						//마지막 선택 ~ 현재 항목중에서 선택된 항목이 있다면 삭제하고 추가해야 한다.
-						if (m_selected.size())
-						{
-							for (j = m_selected.size() - 1; j >= 0; j--)
-							{
-								if ((m_selected[j] >= last_selected && m_selected[j] <= i) ||
-									(m_selected[j] <= last_selected && m_selected[j] >= i))
-									m_selected.erase(m_selected.begin() + j);
-							}
-						}
-
-						for (j = MIN(i, last_selected); j <= MAX(i, last_selected); j++)
-						{
-							m_selected.push_back(j);
-							::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-								(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
-						}
+							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_unselected, i), 0);
 					}
 					else
 					{
@@ -873,31 +889,15 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 							(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
 					}
 				}
-			}
-			else
-			{
-				//전에 선택항 항목과 새로 선택한 항목이 다르면 m_last_clicked를 초기화시켜줘야
-				//원클릭에 의한 타이틀 변경이 올바르게 동작한다.
-				if (m_selected.size() && (i != m_selected[0]))
-					m_last_clicked = 0;
-
-				//단일 선택이면 기존 선택리스트를 초기화하고 선택리스트에 새로 넣어준다.
-				if (!m_use_multi_selection)
-					m_selected.clear();
-
-				if (selected_index >= 0 && m_selected.size() && find_index(m_selected, m_selected[selected_index]) >= 0)
-				{
-					m_selected.erase(m_selected.begin() + selected_index);
-					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
-						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_unselected, selected_index), 0);
-				}
 				else
 				{
-					if (find_index(m_selected, i) < 0)
-						m_selected.push_back(i);
+					//단일 선택: clear + add.
+					m_selected.clear();
+					m_selected.push_back(i);
 					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCThumbCtrl,
 						(WPARAM)&CSCThumbCtrlMessage(this, message_thumb_lbutton_selected, i), 0);
 				}
+				m_anchor_index = i;
 			}
 
 			//선택된 항목이 rc안에 다 안들어오고 일부만 보이면 다 보이도록 스크롤 시켜준다.
@@ -1594,14 +1594,8 @@ void CSCThumbCtrl::set_info_text_color(int thumb_index, int idx, Gdiplus::Color 
 //point는 screen coord.
 void CSCThumbCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 {
-	if (!m_use_context_menu)
-	{
-		CWnd* parent = GetParent();
-		if (parent)
-			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)(pWnd ? pWnd->GetSafeHwnd() : GetSafeHwnd()), MAKELPARAM(point.x, point.y));
-		return;
-	}
-
+	//우클릭 위치의 썸네일을 선택 — 메뉴 표시 (자체 popup 이든 parent 위임이든) 의 대상이 시각·m_selected 양쪽 모두로
+	//일관되도록. multi-select 가 이미 2 개 이상이면 그 선택을 보존.
 	if (get_selected_items() <= 1)
 	{
 		CPoint pt = point;
@@ -1610,6 +1604,14 @@ void CSCThumbCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 		int index = get_index_from_point(pt);
 		if (index >= 0)
 			select_item(index);
+	}
+
+	if (!m_use_context_menu)
+	{
+		CWnd* parent = GetParent();
+		if (parent)
+			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)(pWnd ? pWnd->GetSafeHwnd() : GetSafeHwnd()), MAKELPARAM(point.x, point.y));
+		return;
 	}
 
 	int selected_count = get_selected_items();

@@ -451,6 +451,22 @@ LRESULT CSCMenu::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 	if (message == WM_NCACTIVATE)
 		return DefWindowProc(WM_NCACTIVATE, wParam, -1);
 
+	//WS_THICKFRAME 의 부작용 — 가장자리에서 resize 커서 + drag-resize 가능. popup 메뉴는 resize 불가여야 함.
+	//resize 관련 hit-test 결과는 모두 HTCLIENT 로 강제 — 커서 변경·drag 시작 양쪽 다 차단.
+	//WS_THICKFRAME 자체는 유지 (invisible NC border 가 popup 레이아웃 계산에 이미 반영됨).
+	if (message == WM_NCHITTEST)
+	{
+		LRESULT hit = DefWindowProc(WM_NCHITTEST, wParam, lParam);
+		switch (hit)
+		{
+			case HTLEFT: case HTRIGHT: case HTTOP: case HTBOTTOM:
+			case HTTOPLEFT: case HTTOPRIGHT: case HTBOTTOMLEFT: case HTBOTTOMRIGHT:
+			case HTGROWBOX:		//= HTSIZE (alias)
+				return HTCLIENT;
+		}
+		return hit;
+	}
+
 	return CDialogEx::WindowProc(message, wParam, lParam);
 }
 

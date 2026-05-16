@@ -635,6 +635,7 @@ void CSCMenu::set_over_item(int idx)
 			continue;
 		if (idx < 0 || m_items[idx] != item)
 		{
+			item->m_sub_menu->hide_visible_descendants();
 			item->m_sub_menu->m_suppress_cascade_hide = true;
 			item->m_sub_menu->ShowWindow(SW_HIDE);
 		}
@@ -897,6 +898,7 @@ void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 					continue;
 				if (over_item < 0 || m_items[over_item] != item)
 				{
+					item->m_sub_menu->hide_visible_descendants();
 					item->m_sub_menu->m_suppress_cascade_hide = true;
 					item->m_sub_menu->ShowWindow(SW_HIDE);
 					dismissed_any = true;

@@ -974,7 +974,10 @@ bool CSCMenu::create(CWnd* parent, int width)
 	//WS_EX_NOACTIVATE: popup 표시 시 부모 dlg 가 deactivate 되지 않아야 함 (deactivation 시 부모의 NC paint
 	//가 흰색 막대 등을 잠시 노출시키는 증상 차단). focus 는 SetFocus 로 명시적 전달 (KillFocus 기반 cascade close 유지).
 	//WS_EX_TOOLWINDOW: 작업표시줄 미표시 + 작은 caption 영역 (popup 메뉴에 적합).
-	DWORD dwExStyle = WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+	//WS_EX_COMPOSITED: OS-level 더블버퍼링. hbrBackground=NULL 만으로는 DWM 이 backing store 를
+	//transparent/garbage 로 잡았다가 OnPaint 가 늦게 덮으면 회색/잔상 flash 가 보이는 경우가 있다.
+	//COMPOSITED 는 paint 완료 후 한 번에 compose 해서 그 단계를 사용자에게 노출하지 않는다.
+	DWORD dwExStyle = WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_COMPOSITED;
 
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);

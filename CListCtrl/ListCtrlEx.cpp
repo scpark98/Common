@@ -2985,8 +2985,68 @@ void CListCtrlEx::EnableHighlighting(int row, bool enable)
 }
 
 #if USE_CUSTOMDRAW
+void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	NMLVCUSTOMDRAW* pLVCD = reinterpret_cast<NMLVCUSTOMDRAW*>(pNMHDR);
+	LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
+	static bool bHighlighted = false;
+
+	*pResult = CDRF_DODEFAULT;
+
+	if (pNMCD->dwDrawStage == CDDS_PREPAINT)
+	{
+		*pResult = (LRESULT)CDRF_NOTIFYITEMDRAW;
+	}
+	else if (CDDS_ITEMPREPAINT == pLVCD->nmcd.dwDrawStage)
+	{
+		pLVCD->nmcd.rc.bottom = pLVCD->nmcd.rc.top + 60;
+		*pResult = CDRF_NOTIFYSUBITEMDRAW;
+	}
+	else if (pLVCD->nmcd.dwDrawStage == (CDDS_SUBITEM | CDDS_ITEMPREPAINT))
+	{
+		NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR);
+		bHighlighted = ListView_GetItemState(m_hWnd, pLVCD->nmcd.dwItemSpec, LVIS_SELECTED);
+
+		pLVCD->nmcd.rc.bottom = pLVCD->nmcd.rc.top + 60;
+
+		CListCtrlExItemColorDeque *dq = (CListCtrlExItemColorDeque*)GetItemData(pLVCD->nmcd.dwItemSpec);
+
+		if ((dq != NULL) &&
+			(dq->dqColor.size() > pDraw->iSubItem))
+		{
+			if (dq->dqColor[pDraw->iSubItem].text != LISTCTRLEX_UNUSED_COLOR)
+				pDraw->clrText = dq->dqColor[pDraw->iSubItem].text;
+			else
+				pDraw->clrText = m_crText;
+			if (dq->dqColor[pDraw->iSubItem].back != LISTCTRLEX_UNUSED_COLOR)
+				pDraw->clrTextBk = dq->dqColor[pDraw->iSubItem].back;
+			else
+				pDraw->clrTextBk = m_crBack;
+		}
+		else
+		{
+			pDraw->clrText = m_crText;
+			pDraw->clrTextBk = m_crBack;
+		}
+
+		*pResult = (LRESULT)CDRF_NEWFONT;
+		return;
+	}
+	else if (CDDS_ITEMPOSTPAINT == pLVCD->nmcd.dwDrawStage)
+	{
+		if (bHighlighted)
+		{
+			int iRow = (int)pLVCD->nmcd.dwItemSpec;
+			ListView_SetItemState(m_hWnd, iRow, 0xff, LVIS_SELECTED);
+		}
+		*pResult = CDRF_DODEFAULT;
+	}
+}
+#endif
+
 #if 0
-void CListCtrlEx::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
+//폐기된 OnNMCustomdraw 구현 후보 — 활성 버전과 통합 정리됨. 보존 의미 없으므로 제거 대상.
+void CListCtrlEx::OnNMCustomdraw_v1_unused(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	bool callParent = true;
 	static bool bHighlighted = false;
@@ -3049,10 +3109,11 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 }
 #endif
 #if 0
-void CListCtrlEx::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
+//v2 — switch 기반 시도. 활성 버전과 중복 식별자 충돌 방지 위해 _v2_unused 로 rename.
+void CListCtrlEx::OnNMCustomdraw_v2_unused(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMLVCUSTOMDRAW lpLVCustomDraw = reinterpret_cast<LPNMLVCUSTOMDRAW>(pNMHDR);
-	NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR); 
+	NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR);
 	switch (lpLVCustomDraw->nmcd.dwDrawStage)
 	{
 	case CDDS_ITEMPREPAINT:
@@ -3109,8 +3170,10 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR* pNMHDR, LRESULT* pResult)
 }
 #endif
 
-#if 1
-void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
+#if 0
+//v3 — 활성 함수와 동일 식별자라 중복 정의 빌드 에러였음. _v3_unused 로 rename 하고 #if 0 으로 비활성화.
+//내용은 이미 상단의 활성 OnNMCustomdraw 와 동일. 참고용 보존.
+void CListCtrlEx::OnNMCustomdraw_v3_unused(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	//TRACE("%d, %s\n", GetTickCount(), __FUNCTION__);
 	//LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
@@ -3281,7 +3344,6 @@ void CListCtrlEx::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 		*pResult = CDRF_DODEFAULT;
 	}
 }
-#endif
 #endif
 
 void CListCtrlEx::ModifyExtendedStyle(DWORD dwExStyle, bool bAdd)

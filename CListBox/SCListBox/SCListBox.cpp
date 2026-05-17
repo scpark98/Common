@@ -760,22 +760,8 @@ void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 	CListBox::OnMouseMove(nFlags, point);
 }
 
-void CSCListBox::OnPaint()
-{
-	CListBox::OnPaint();
-
-	CPaintDC dc1(this);
-	CRect rc;
-
-	GetClientRect(rc);
-	
-	CMemoryDC dc(&dc1, &rc);
-
-	//DrawItem()에서 각 아이템을 모두 그린 후 OnPaint()에서 border를 그리려 했으나
-	//DrawItem()에서 그려진 내용이 모두 가려진다. 우선 WM_PAINT는 주석처리한다.
-	draw_rect(&dc, rc, m_theme.cr_border_inactive);
-	//dc.FillSolidRect(rc, red);
-}
+//OnPaint override 삭제 (구현 broken — base 가 BeginPaint/EndPaint 로 region validate 후 두 번째 CPaintDC 의 rcPaint
+//가 비어있어 border 가 실제로 그려지지 않았음. WS_BORDER 가 default 1px native border 처리).
 
 BOOL CSCListBox::OnEraseBkgnd(CDC* pDC)
 {
@@ -1413,16 +1399,8 @@ void CSCListBox::OnSize(UINT nType, int cx, int cy)
 {
 	CListBox::OnSize(nType, cx, cy);
 
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	//자동 스크롤을 off상태에서 세로로 resize하면 목록이 잘 갱신되지만
-	//가로로 resize 또는 가로로 스크롤하면 텍스트들이 표시가 안된다.
-	//time_str과 선택된 항목은 잘 나타난다.
-	//여기서 Invalidate()해서 해결할 문제가 아니다. DrawItem()에서 원인을 찾자.
-	//DrawItem()에서 DrawText()할때 NO_CLIP을 주고 여기서 Invalidate()하면
-	//전혀 문제는 없이 잘 갱신은 되지만 왜 이런 현상이 발생했는지는 아직 미지수임.
-	Invalidate();
-	RedrawWindow();
-	UpdateWindow();
+	//과거 가로 resize 시 텍스트 미표시 → DrawItem 의 DT_NOCLIP 으로 해결. 여기서 Invalidate + RedrawWindow + UpdateWindow
+	//3중 호출은 그 응급처치 잔재. 정상 paint cycle 로 충분. resize 시 native 가 invalidate 처리.
 	sync_scrollbar();
 }
 

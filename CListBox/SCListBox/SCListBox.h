@@ -365,7 +365,6 @@ protected:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	virtual void PreSubclassWindow();
 	afx_msg void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
-	afx_msg void OnPaint();
 	//afx_msg void OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);

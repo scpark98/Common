@@ -31,7 +31,25 @@ BEGIN_MESSAGE_MAP(CSCSystemButtons, CButton)
 	ON_WM_MOUSEMOVE()
 	ON_WM_MOUSEHOVER()
 	ON_WM_MOUSELEAVE()
+	ON_WM_MOUSEACTIVATE()
+	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
+
+//타이틀바 시스템 버튼은 클릭해도 keyboard focus 를 가져가서는 안 됨 (Alt 키가 단축키로 쓰이고 Alt 누를 때
+//focus 컨트롤에 focus rect 가 그려지는 OS 동작 회피). MA_NOACTIVATE = 클릭은 정상 처리하지만 focus 이동 안 됨.
+int CSCSystemButtons::OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message)
+{
+	return MA_NOACTIVATE;
+}
+
+//MA_NOACTIVATE 는 마우스 클릭 경로만 차단. dialog init / 외부 SetFocus() 호출 등으로 focus 가 도달하면
+//그대로 받아들임 → Alt 키 누를 때 OS 의 keyboard cues 가 focus rect 그림. OnSetFocus 에서 즉시 parent 로 회수.
+void CSCSystemButtons::OnSetFocus(CWnd* pOldWnd)
+{
+	CWnd* parent = GetParent();
+	if (parent && parent->GetSafeHwnd() && parent->m_hWnd != m_hWnd)
+		parent->SetFocus();
+}
 
 
 

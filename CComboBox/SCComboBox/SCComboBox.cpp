@@ -4,6 +4,7 @@
 //#include "stdafx.h"
 #include "SCComboBox.h"
 #include "../../../Common/Functions.h"
+#include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include <imm.h>	// ImmGetCompositionString — IME 조합 중 문자열 취득 (필터링용)
 #include <commctrl.h>	// SetWindowSubclass / RemoveWindowSubclass
@@ -102,10 +103,14 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	if (lpDrawItemStruct->itemID == -1)
 		return;
 
-	CDC dc;
-	CString    strData;
+	CDC screen_dc;
+	screen_dc.Attach(lpDrawItemStruct->hDC);
+	//per-item MemoryDC — DrawItem 이 OS hDC 에 직접 paint 하면 항목 갱신 시 깜빡임 가능.
+	//MemoryDC 에 합성 후 destructor 에서 한 번에 blit.
+	CRect rc_item = lpDrawItemStruct->rcItem;
+	CMemoryDC dc(&screen_dc, &rc_item, true);
 
-	dc.Attach(lpDrawItemStruct->hDC);
+	CString strData;
 	GetLBText(lpDrawItemStruct->itemID, strData);
 
 	COLORREF cr_text = m_theme.cr_text.ToCOLORREF();
@@ -174,7 +179,7 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 		dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
 	}
 
-	dc.Detach();
+	screen_dc.Detach();
 }
 
 void CSCComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct )

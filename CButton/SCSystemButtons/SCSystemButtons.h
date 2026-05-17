@@ -228,6 +228,8 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
 	afx_msg void OnMouseLeave();
+	afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
+	afx_msg void OnSetFocus(CWnd* pOldWnd);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };
 

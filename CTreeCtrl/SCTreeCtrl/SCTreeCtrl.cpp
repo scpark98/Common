@@ -135,6 +135,13 @@ void CSCTreeCtrl::PreSubclassWindow()
 
 	CTreeCtrl::PreSubclassWindow();
 
+	//native CTreeCtrl 의 default item paint 가 native bg color 로 row 를 칠한 후 우리 customdraw POSTPAINT 가
+	//덮어쓰는 구조. native bg color 가 default (COLOR_WINDOW = 흰색) 면 splitter rapid resize 시 흰색 깜빡임 가시화 —
+	//native bg 를 theme cr_back 으로 동기화하면 default item paint 부터 theme 색이라 중간 frame 흰색 없음.
+	//TVS_EX_DOUBLEBUFFER 가 BufferedPaint 로 전체 paint 를 atomic 합성 → 추가로 깜빡임 차단.
+	SendMessage(TVM_SETEXTENDEDSTYLE, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
+	CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
+
 	setup_scrollbar();
 }
 
@@ -218,21 +225,9 @@ void CSCTreeCtrl::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 
 BOOL CSCTreeCtrl::OnEraseBkgnd(CDC* pDC)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-
-	//아래 코드가 있어야만 배경색이 표시된다.
-	CBrush backBrush(m_theme.cr_back.ToCOLORREF());
-	CBrush* pPrevBrush = pDC->SelectObject(&backBrush);
-	CRect rect;
-	pDC->GetClipBox(&rect);
-	pDC->PatBlt(rect.left, rect.top, rect.Width(), rect.Height(),
-		PATCOPY);
-	pDC->SelectObject(pPrevBrush);
-	
-	//draw_rect(pDC, rect, red, NULL_BRUSH, 1);
+	//native bg color 를 SetBkColor 로 theme 색 설정 + TVS_EX_DOUBLEBUFFER 가 buffer 합성 시 native bg 로 fill.
+	//여기서 직접 PatBlt 하면 buffer 아닌 화면 DC 에 fill 되어 splitter rapid resize 시 깜빡임 원인이 됨.
 	return TRUE;
-
-	return CTreeCtrl::OnEraseBkgnd(pDC);
 }
 
 
@@ -702,9 +697,11 @@ void CSCTreeCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	sync_scrollbar();
 
 	//size 변경시 — splitter drag 의 빠른 resize race 에서 invalidate 누락. 강제 redraw 동기 paint.
+	//bErase=FALSE — OnEraseBkgnd 의 PatBlt 가 직접 화면에 dark gray fill 후 item 재그림 사이클이 splitter drag rapid
+	//resize 에서 text 깜빡임 유발. native bg color (SetBkColor) + TVS_EX_DOUBLEBUFFER 가 atomic 합성하므로 erase pass 불필요.
 	if (lpwndpos && !(lpwndpos->flags & SWP_NOSIZE) && ::IsWindow(m_hWnd))
 	{
-		Invalidate();
+		Invalidate(FALSE);
 		UpdateWindow();
 	}
 }
@@ -3410,10 +3407,8 @@ BOOL CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 	HTREEITEM hItem = HitTest(pt_client, &uFlags);
 	if (hItem)
 	{
-		SelectItem(hItem);
 		m_in_context_menu = true;
-		Invalidate();
-		UpdateWindow();
+		SelectItem(hItem);
 	}
 
 	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
@@ -3421,7 +3416,9 @@ BOOL CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 	if (hItem)
 	{
 		m_in_context_menu = false;
-		Invalidate();
+		CRect rc_item;
+		if (GetItemRect(hItem, &rc_item, FALSE))
+			InvalidateRect(rc_item, FALSE);
 	}
 
 	*pResult = 1;
@@ -3457,11 +3454,11 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 			//menu 표시 중 focus 가 menu 로 가도 selected 항목이 active 색으로 그려지도록 가드.
 			//parent->SendMessage 는 popup_menu 가 modal 로 끝날 때까지 return 안 함.
 			m_in_context_menu = true;
-			Invalidate();
-			UpdateWindow();
 			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)GetSafeHwnd(), MAKELPARAM(point.x, point.y));
 			m_in_context_menu = false;
-			Invalidate();
+			CRect rc_item;
+			if (GetItemRect(hItem, &rc_item, FALSE))
+				InvalidateRect(rc_item, FALSE);
 		}
 		return;
 	}
@@ -3877,6 +3874,8 @@ void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 	if (!m_hWnd)
 		return;
 
+	CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
+
 	if (m_hWnd && invalidate)
 		Invalidate();
 }
@@ -3888,6 +3887,9 @@ void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
+
+	if (::IsWindow(m_hWnd))
+		CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
 
 	if (invalidate && m_hWnd)
 		Invalidate();
@@ -3938,7 +3940,9 @@ void CSCTreeCtrl::sync_scrollbar()
 		m_scrollbar.MoveWindow(rTarget);
 		//system 이 자동으로 child 의 old position 을 parent 에 invalidate 하지만 splitter drag 의
 		//rapid resize 에서 누락 발생 — 명시적 InvalidateRect 로 잔상 회피.
-		InvalidateRect(rOld, TRUE);
+		//bErase=FALSE — TVS_EX_DOUBLEBUFFER + SetBkColor 가 buffer 합성 시 native bg color 로 fill 하므로
+		//OnEraseBkgnd 의 PatBlt 직접 화면 fill (= text 깜빡임 원인) 우회.
+		InvalidateRect(rOld, FALSE);
 	}
 
 	bool need = (total > visible) && (visible > 0);

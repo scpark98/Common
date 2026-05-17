@@ -2424,15 +2424,12 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 
 void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-
-	//가로 스크롤시에 선택된 항목 사각형이 제대로 그려지지 않는 문제가 있어서 Invalidate()을 호출함.
-	//CSCScrollbar overlay 모드에선 native scrollbar 안 쓰니 이 회피 불필요 — Invalidate() 가 매 hscroll 이벤트마다
-	//전체 client erase+draw 사이클 유발해 글자 깜빡임 원인.
-	if (!m_scrollbar_setup)
-		Invalidate();
-
+	//tree-view 의 native H scroll 은 ScrollWindowEx 로 픽셀만 shift 후 새로 노출된 우측 strip 만 invalidate 함.
+	//CDRF_SKIPDEFAULT customdraw 의 row fill 이 DC clip 에 잘려 그 strip 만 칠해지면 — 다른 column 의 이전 glyph /
+	//text pixel 잔존 (잔상). 전체 client Invalidate 로 full repaint 강제 + CSCScrollbar overlay 도 sync.
 	CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+	Invalidate(FALSE);
+	sync_scrollbar();
 }
 
 //file의 내용을 읽어서 load_from_string()를 호출한다.
@@ -3230,10 +3227,26 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			break;
 
 		case CDDS_POSTPAINT:
+		{
 			if (m_bDragging && m_hInsertMarkItem && m_dropPosition != drop_on_item)
 				draw_insert_mark(&dc);
+
+			//V/H overlay 가 만나는 우측 하단 corner — CSCScrollbar track 색으로 칠해 이질감 제거.
+			//(CVtListCtrlEx::OnPaint 참조: get_color(cr_back, 24) = scrollbar track tint).
+			bool vis_v = ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
+			bool vis_h = ::IsWindow(m_scrollbar_h.GetSafeHwnd()) && m_scrollbar_h.IsWindowVisible();
+			if (vis_v && vis_h)
+			{
+				CRect rcClient2;
+				GetClientRect(&rcClient2);
+				CRect rcCorner(rcClient2.right - m_scrollbar_width, rcClient2.bottom - m_scrollbar_width,
+							   rcClient2.right, rcClient2.bottom);
+				Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
+				dc.FillSolidRect(&rcCorner, cr_track.ToCOLORREF());
+			}
 			*pResult = CDRF_DODEFAULT;
 			break;
+		}
 
 		case CDDS_ITEMPREPAINT:
 		{
@@ -3279,14 +3292,17 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			}
 
 			//1. row fill — Win11 Explorer 동일하게 항상 full-row 폭으로 fill. (TVS_FULLROWSELECT 무관)
-			//   client.right 는 OnNcCalcSize 가 이미 overlay column 만큼 좁혔으므로 그대로 fill — 별도 clip 불필요.
+			//   NC=0 으로 client = window 전체. CSCScrollbar overlay 가 client 안쪽 우측 끝 m_scrollbar_width 점유하므로
+			//   row fill / text right 는 overlay 좌측까지로 clip — 안 그러면 overlay 아래로 들어감.
 			CRect rcClient;
 			GetClientRect(&rcClient);
-			CRect rcFill(rcClient.left, rcRow.top, rcClient.right, rcRow.bottom);
+			int right_limit = rcClient.right - (m_scrollbar_setup ? m_scrollbar_width : 0);
+			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
 			dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
 
-			//2. expand/collapse glyph — native TVHT_ONITEMBUTTON column 과 일치시키기 위해 level + indent_step 기반 계산.
-			//   rcText.left - 고정값 방식은 icon column 안쪽에 그려져 클릭이 button 으로 hit-test 안됨.
+			//2. expand/collapse glyph — rcText.left 기준 역산 (H scroll 따라 같이 움직이도록).
+			//   pNMCustomDraw->rc.left 는 client.left 고정이라 사용 시 H scroll 무관 고정 위치에 그려져 trail 현상 발생.
+			//   button center = rcText.left - icon_w - (checkbox slot) - gap_icon_text - indent_step/2.
 			if ((GetStyle() & TVS_HASBUTTONS) && ItemHasChildren(hItem))
 			{
 				int level = get_indent_level(hItem);
@@ -3297,7 +3313,16 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//LINESATROOT 없으면 root level (0) 은 button column 없음 — 그릴 자리도 없음.
 				if ((GetStyle() & TVS_LINESATROOT) || level > 0)
 				{
-					int gx = pNMCustomDraw->rc.left + level * indent_step + indent_step / 2;
+					int icon_w_for_glyph = 0;
+					HIMAGELIST hil_g = (HIMAGELIST)SendMessage(TVM_GETIMAGELIST, TVSIL_NORMAL, 0);
+					if (hil_g)
+					{
+						int cx_il = 0, cy_il = 0;
+						ImageList_GetIconSize(hil_g, &cx_il, &cy_il);
+						icon_w_for_glyph = cx_il;
+					}
+					int state_offset = (GetStyle() & TVS_CHECKBOXES) ? (16 + 3) : 0;	//state_w + gap_check_icon
+					int gx = rcText.left - icon_w_for_glyph - 3 - state_offset - indent_step / 2;	//-3 = gap_icon_text
 					int gy = (rcRow.top + rcRow.bottom) / 2;
 
 					Gdiplus::Graphics g(dc.m_hDC);
@@ -3386,6 +3411,8 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			CString text = GetItemText(hItem);
 			CRect rcDraw = rcText;
 			rcDraw.left += 2;
+			if (rcDraw.right > right_limit)
+				rcDraw.right = right_limit;
 			dc.SetBkMode(TRANSPARENT);
 			dc.SetTextColor(crText.ToCOLORREF());
 			dc.DrawText(text, &rcDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -4070,6 +4097,8 @@ void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+		m_scrollbar_h.set_color_theme(m_theme, invalidate);
 
 	if (!m_hWnd)
 		return;
@@ -4087,6 +4116,8 @@ void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+		m_scrollbar_h.set_color_theme(m_theme, invalidate);
 
 	if (::IsWindow(m_hWnd))
 		CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
@@ -4100,24 +4131,31 @@ void CSCTreeCtrl::setup_scrollbar()
 	if (m_scrollbar_setup || !::IsWindow(m_hWnd))
 		return;
 
-	//WS_VSCROLL 만 제거 — CSCScrollbar (vertical only) overlay 대체. WS_HSCROLL 은 그대로 두어 native horizontal
-	//scrollbar 가 정상 표시되게 함 (horizontal CSCScrollbar 미구현). TVS_NOSCROLL 은 프로그래밍 scroll 까지 차단해
-	//SelectSetFirstVisible / 마우스 휠도 안 됨 — 사용 안 함.
-	//OnStyleChanging 에서 WS_VSCROLL 재추가 차단 + ShowScrollBar 로 native V scrollbar 시각적으로도 hide.
+	//WS_VSCROLL + WS_HSCROLL 둘 다 제거 — CSCScrollbar overlay (V/H 두 개) 로 대체.
+	//TVS_NOSCROLL 은 프로그래밍 scroll 까지 차단해 SelectSetFirstVisible / 마우스 휠도 안 됨 — 사용 안 함.
+	//OnStyleChanging 에서 WS_VSCROLL / WS_HSCROLL 재추가 차단 + ShowScrollBar 로 native scrollbar 시각적으로도 hide.
 	//WS_CLIPCHILDREN — scrollbar child 영역 부모가 paint 하지 않도록 → flicker / 잔상 회피.
-	ModifyStyle(WS_VSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
-	::ShowScrollBar(m_hWnd, SB_VERT, FALSE);
+	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	::ShowScrollBar(m_hWnd, SB_BOTH, FALSE);
 
 
 	CRect rc;
 	GetClientRect(&rc);
-	//overlay 위치: client.right 직후 (NC right 로 reserve 한 m_scrollbar_width 영역). child 가 parent NC 영역까지 그릴 수
-	//있어 window 우측 끝에 표시됨.
+	//V overlay: client 안쪽 우측 끝 (client.right - m_scrollbar_width 부터 m_scrollbar_width 폭).
+	//height 는 H overlay 자리 (bottom m_scrollbar_width) 만큼 짧게 — 우하단 corner 가 겹치지 않게.
 	m_scrollbar.create(this, CSCScrollbar::vertical,
-		rc.right, 0, m_scrollbar_width, rc.Height());
+		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height() - m_scrollbar_width);
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인.
 	m_scrollbar.ShowWindow(SW_HIDE);
+
+	//H overlay: client 안쪽 하단 끝 (client.bottom - m_scrollbar_width 부터 m_scrollbar_width 높이).
+	//width 는 V overlay 자리 만큼 짧게.
+	m_scrollbar_h.create(this, CSCScrollbar::horizontal,
+		0, rc.bottom - m_scrollbar_width, rc.Width() - m_scrollbar_width, m_scrollbar_width);
+	m_scrollbar_h.set_color_theme(m_theme, false);
+	m_scrollbar_h.set_line(20);		//arrow 클릭 = 20px.
+	m_scrollbar_h.ShowWindow(SW_HIDE);
 
 	m_scrollbar_setup = true;
 }
@@ -4127,68 +4165,107 @@ void CSCTreeCtrl::sync_scrollbar()
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
 		return;
 
-	int total = (int)GetCount();
-	int visible = (int)GetVisibleCount();
-
-	//위치/크기 sync — 두께는 scrollbar 자체가 hover 확장 관리하므로 width 유지, 우측 edge 와 height 만 갱신.
-	//overlay 위치: client.right + m_text_right_padding (NC right reserve 의 우측 끝). window 오른쪽 끝에 붙음.
 	CRect rc;
 	GetClientRect(&rc);
 
-	CRect rCur;
-	m_scrollbar.GetWindowRect(rCur);
-	ScreenToClient(rCur);
-	int cur_width = rCur.Width();
-	CRect rTarget(rc.right, 0, rc.right + cur_width, rc.Height());
-	if (rCur != rTarget)
+	//---- V overlay 위치 sync (right edge inside client) ----
 	{
-		CRect rOld = rCur;
-		m_scrollbar.MoveWindow(rTarget);
-		//system 이 자동으로 child 의 old position 을 parent 에 invalidate 하지만 splitter drag 의
-		//rapid resize 에서 누락 발생 — 명시적 InvalidateRect 로 잔상 회피.
-		//bErase=FALSE — TVS_EX_DOUBLEBUFFER + SetBkColor 가 buffer 합성 시 native bg color 로 fill 하므로
-		//OnEraseBkgnd 의 PatBlt 직접 화면 fill (= text 깜빡임 원인) 우회.
-		InvalidateRect(rOld, FALSE);
+		CRect rCur;
+		m_scrollbar.GetWindowRect(rCur);
+		ScreenToClient(rCur);
+		int cur_width = rCur.Width();
+		CRect rTarget(rc.right - cur_width, 0, rc.right, rc.Height() - m_scrollbar_width);
+		if (rCur != rTarget)
+		{
+			CRect rOld = rCur;
+			m_scrollbar.MoveWindow(rTarget);
+			InvalidateRect(rOld, FALSE);
+		}
 	}
 
-	bool need = (total > visible) && (visible > 0);
+	//---- H overlay 위치 sync (bottom edge inside client) ----
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	{
+		CRect rCur;
+		m_scrollbar_h.GetWindowRect(rCur);
+		ScreenToClient(rCur);
+		int cur_height = rCur.Height();
+		CRect rTarget(0, rc.bottom - cur_height, rc.Width() - m_scrollbar_width, rc.bottom);
+		if (rCur != rTarget)
+		{
+			CRect rOld = rCur;
+			m_scrollbar_h.MoveWindow(rTarget);
+			InvalidateRect(rOld, FALSE);
+		}
+	}
 
-	if (!need)
+	//---- V scrollbar 모델: item-based (total / visible / first_visible_index) ----
+	int total = (int)GetCount();
+	int visible = (int)GetVisibleCount();
+	bool need_v = (total > visible) && (visible > 0);
+	if (need_v)
+	{
+		HTREEITEM first = GetFirstVisibleItem();
+		int first_index = 0;
+		HTREEITEM cur = GetRootItem();
+		if (m_use_root && cur == m_root_item)
+			cur = GetChildItem(cur);
+		while (cur && cur != first)
+		{
+			cur = GetNextVisibleItem(cur);
+			first_index++;
+		}
+		m_scrollbar.set_range(0, total - 1);
+		m_scrollbar.set_page(visible);
+		m_scrollbar.set_pos(first_index);
+		if (!m_scrollbar.IsWindowVisible())
+			m_scrollbar.ShowWindow(SW_SHOW);
+	}
+	else
 	{
 		if (m_scrollbar.IsWindowVisible())
 			m_scrollbar.ShowWindow(SW_HIDE);
-		return;
 	}
 
-	//item-based 모델 — WS_VSCROLL 제거된 상태라 GetScrollInfo 신뢰 어려움. GetVisibleCount 는 view 의 item 수.
-	HTREEITEM first = GetFirstVisibleItem();
-	int first_index = 0;
-	HTREEITEM cur = GetRootItem();
-	if (m_use_root && cur == m_root_item)
-		cur = GetChildItem(cur);
-	while (cur && cur != first)
+	//---- H scrollbar 모델: native H scroll info (WS_HSCROLL strip 했어도 tree-view 의 내부 scroll state 는 유지) ----
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
 	{
-		cur = GetNextVisibleItem(cur);
-		first_index++;
+		SCROLLINFO si = { sizeof(si), SIF_RANGE | SIF_PAGE | SIF_POS };
+		BOOL ok = ::GetScrollInfo(m_hWnd, SB_HORZ, &si);
+		bool need_h = ok && si.nPage > 0 && (si.nMax > (int)si.nPage);
+		if (need_h)
+		{
+			m_scrollbar_h.set_range(si.nMin, si.nMax);
+			m_scrollbar_h.set_page(si.nPage);
+			m_scrollbar_h.set_pos(si.nPos);
+			if (!m_scrollbar_h.IsWindowVisible())
+				m_scrollbar_h.ShowWindow(SW_SHOW);
+		}
+		else
+		{
+			if (m_scrollbar_h.IsWindowVisible())
+				m_scrollbar_h.ShowWindow(SW_HIDE);
+		}
 	}
-
-	m_scrollbar.set_range(0, total - 1);
-	m_scrollbar.set_page(visible);
-	m_scrollbar.set_pos(first_index);
-
-	if (!m_scrollbar.IsWindowVisible())
-		m_scrollbar.ShowWindow(SW_SHOW);
 }
 
 LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 {
 	CSCScrollbarMsg* msg = (CSCScrollbarMsg*)wParam;
-	if (msg == nullptr || msg->pThis != &m_scrollbar)
+	if (msg == nullptr)
 		return 0;
 
-	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
+	if (msg->msg != CSCScrollbarMsg::msg_scrollbar_pos_changed)
+		return 0;
+
+	if (msg->pThis == &m_scrollbar)
 	{
-		//target 인덱스의 visible item 찾아 SelectSetFirstVisible — 트리 자체가 scroll/repaint 처리.
+		//V scroll — target 인덱스의 visible item 찾아 SelectSetFirstVisible.
+		//SelectSetFirstVisible 은 select + ensure-visible 이 함께라 selected item 이 H 시야 밖이면 tree 가 자동 H-scroll.
+		//V 만 의도한 경우 부작용이므로 호출 전 H pos 기억 → 후 복원.
+		SCROLLINFO si_h_before = { sizeof(si_h_before), SIF_POS };
+		::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_before);
+
 		HTREEITEM cur = GetRootItem();
 		if (m_use_root && cur == m_root_item)
 			cur = GetChildItem(cur);
@@ -4196,6 +4273,20 @@ LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 			cur = GetNextVisibleItem(cur);
 		if (cur)
 			SelectSetFirstVisible(cur);
+
+		SCROLLINFO si_h_after = { sizeof(si_h_after), SIF_POS };
+		::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_after);
+		if (si_h_after.nPos != si_h_before.nPos)
+		{
+			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)si_h_before.nPos), 0);
+			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+		}
+	}
+	else if (msg->pThis == &m_scrollbar_h)
+	{
+		//H scroll — tree 에 SB_THUMBPOSITION WM_HSCROLL 발송. tree 내부 H scroll state 갱신 + ScrollWindowEx.
+		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)msg->pos), 0);
+		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
 	}
 	return 0;
 }
@@ -4709,12 +4800,13 @@ void CSCTreeCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 		return;
 	}
 
-	//NC right = m_scrollbar_width: tree-view 가 좁아진 client 기준 H scroll 범위 계산 → max H scroll 시 텍스트 끝이
-	//overlay 좌측에 정렬 (마지막 글자까지 보임). overlay 는 NC right 영역에 위치 = window 우측 끝.
-	//WS_VSCROLL 은 setup_scrollbar 에서 strip + OnStyleChanging 에서 재추가 차단 → native V scrollbar 그려질 자리 없음.
+	//NC = 0 (full client = window). native V/H scrollbar 의 NC 자리 자체를 안 줌 → 그릴 공간 없음.
+	//CSCScrollbar overlay 는 client 안쪽 right/bottom edge 에 child 로 위치 (clip 회피).
+	//OnNMCustomDraw 의 row fill / text 는 overlay column/row 만큼 clip 해 overlay 아래로 안 들어가게.
 	RECT rcOrig = lpncsp->rgrc[0];
 	CTreeCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
-	lpncsp->rgrc[0].right = rcOrig.right - m_scrollbar_width;
+	lpncsp->rgrc[0].right  = rcOrig.right;
+	lpncsp->rgrc[0].bottom = rcOrig.bottom;
 
 	if (m_draw_border)
 		::InflateRect(&lpncsp->rgrc[0], -1, -1);
@@ -4722,10 +4814,10 @@ void CSCTreeCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSCTreeCtrl::OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct)
 {
-	//CSCScrollbar overlay 가 V scrollbar 역할 — native WS_VSCROLL 재추가 차단.
-	//tree-view 가 overflow 감지 시 ShowScrollBar / SetScrollInfo 경로로 WS_VSCROLL 다시 set 하려 함 → 여기서 강제 strip.
-	if (nStyleType == GWL_STYLE && lpStyleStruct && (lpStyleStruct->styleNew & WS_VSCROLL))
-		lpStyleStruct->styleNew &= ~WS_VSCROLL;
+	//CSCScrollbar overlay (V/H) 가 native scrollbar 역할 대체 — WS_VSCROLL / WS_HSCROLL 재추가 둘 다 차단.
+	//tree-view 가 overflow 감지 시 ShowScrollBar / SetScrollInfo 경로로 다시 set 하려 함 → 여기서 강제 strip.
+	if (nStyleType == GWL_STYLE && lpStyleStruct)
+		lpStyleStruct->styleNew &= ~(WS_VSCROLL | WS_HSCROLL);
 
 	CTreeCtrl::OnStyleChanging(nStyleType, lpStyleStruct);
 }

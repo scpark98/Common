@@ -364,10 +364,11 @@ public:
 		}
 	}
 
-//자체 overlay scrollbar — native WS_VSCROLL 제거 + 우측 child 로 그림. 트리 mutation 후 sync_scrollbar() 외부 호출 가능.
-	CSCScrollbar	m_scrollbar;
+//자체 overlay scrollbar — native WS_VSCROLL / WS_HSCROLL 제거 + 우측 / 하단 child 로 그림.
+	//트리 mutation 후 sync_scrollbar() 외부 호출 가능.
+	CSCScrollbar	m_scrollbar;	//vertical
+	CSCScrollbar	m_scrollbar_h;	//horizontal
 	int				m_scrollbar_width = 18;	//track (window) 폭. thumb 두께는 CSCScrollbar 내부에서 별도 (resting 2, hover 5).
-	int				m_text_right_padding = 20;	//텍스트 우측 끝 ↔ V scrollbar overlay 좌측 사이 여백 (max H scroll 시 텍스트가 너무 타이트하게 붙지 않게).
 	bool			m_scrollbar_setup = false;
 	void			setup_scrollbar();		//PreSubclassWindow 끝에서 호출 — WS_VSCROLL 제거 + scrollbar 생성.
 	void			sync_scrollbar();		//트리 scroll state → scrollbar 모델 push. 외부에서도 batch insert/delete 후 호출 가능.

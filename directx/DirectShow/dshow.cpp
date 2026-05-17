@@ -2679,7 +2679,27 @@ void CDShow::set_video_pan_scan(DWORD dwStreamID, int mode, float dx, float dy)
 		}
 		else if (mode == pan_scan_mirror || mode == pan_scan_flip)
 		{
-			//MPCVR 미지원 — IExFilterConfig "flip"/"rotation" 으로 후속 구현 가능.
+			if (mode == pan_scan_mirror)
+				m_mirror = !m_mirror;
+			else
+				m_flip = !m_flip;
+
+			//MPCVR 의 IExFilterConfig 는 "rotation" (0/90/180/270) + "flip" (bool, 가로 반전) 만 제공.
+			//VMR9/EVR 경로의 m_mirror (좌우) / m_flip (상하) 두 독립 토글을 MPCVR 모델로 매핑:
+			//  m_mirror=0,m_flip=0 → rot=0,   flip=0  (정상)
+			//  m_mirror=1,m_flip=0 → rot=0,   flip=1  (좌우만)
+			//  m_mirror=0,m_flip=1 → rot=180, flip=1  (상하만 = 180회전 + 가로반전 = 결과적으로 상하 뒤집기)
+			//  m_mirror=1,m_flip=1 → rot=180, flip=0  (180회전 = 좌우+상하 동시)
+			int mpcvr_rot = m_flip ? 180 : 0;
+			bool mpcvr_flip = (m_mirror != m_flip);
+
+			CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+			if (pCfg)
+			{
+				pCfg->Flt_SetInt("rotation", mpcvr_rot);
+				pCfg->Flt_SetBool("flip", mpcvr_flip);
+				pCfg->Flt_SetBool("cmd_redraw", true);
+			}
 			return;
 		}
 

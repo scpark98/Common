@@ -90,6 +90,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_DESTROY()
 	ON_WM_NCPAINT()
 	ON_WM_NCCALCSIZE()
+	ON_WM_STYLECHANGING()
 END_MESSAGE_MAP()
 
 
@@ -2851,7 +2852,16 @@ void CSCTreeCtrl::use_checkbox(bool use)
 	ModifyStyle(TVS_CHECKBOXES, 0);
 
 	if (use)
+	{
 		ModifyStyle(0, TVS_CHECKBOXES);
+	}
+	else
+	{
+		//Win32 quirk: TVS_CHECKBOXES 를 제거해도 native CTreeCtrl 은 state image list 를 그대로 유지해서
+		//state column slot 이 살아남음 → 항목이 우측으로 밀린 채 안 돌아옴. state image list 를 NULL 로 풀어줘야
+		//column 이 회수됨.
+		SendMessage(TVM_SETIMAGELIST, TVSIL_STATE, (LPARAM)NULL);
+	}
 
 	Invalidate();
 }
@@ -3204,6 +3214,195 @@ void CSCTreeCtrl::has_line(bool line)
 
 void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 {
+	//시도 — Win11 DarkMode_Explorer 의 selection 시 system accent box border 차단 위해 CDRF_SKIPDEFAULT 로 native item paint 자체 차단 + 우리가 background / icon / +/- glyph / text 모두 paint.
+	//(기존 NOTIFYPOSTPAINT 방식 본문은 아래 #if 0 ... #endif 로 보존 — 미세 조정 실패 시 비교/복원 용.)
+	LPNMCUSTOMDRAW pNMCustomDraw = (LPNMCUSTOMDRAW)pNMHDR;
+	HTREEITEM hItem = (HTREEITEM)pNMCustomDraw->dwItemSpec;
+	*pResult = CDRF_DODEFAULT;
+
+	CDC dc;
+	dc.Attach(pNMCustomDraw->hdc);
+
+	switch (pNMCustomDraw->dwDrawStage)
+	{
+		case CDDS_PREPAINT:
+			*pResult = CDRF_NOTIFYITEMDRAW | CDRF_NOTIFYPOSTPAINT;
+			break;
+
+		case CDDS_POSTPAINT:
+			if (m_bDragging && m_hInsertMarkItem && m_dropPosition != drop_on_item)
+				draw_insert_mark(&dc);
+			*pResult = CDRF_DODEFAULT;
+			break;
+
+		case CDDS_ITEMPREPAINT:
+		{
+			CRect rcRow = pNMCustomDraw->rc;
+			if (rcRow.IsRectEmpty())
+			{
+				*pResult = CDRF_DODEFAULT;
+				break;
+			}
+
+			CRect rcText;
+			GetItemRect(hItem, &rcText, TRUE);
+
+			Gdiplus::Color crText = m_theme.cr_text;
+			Gdiplus::Color crBack = m_theme.cr_back;
+
+			if (function_check_is_dim_text && function_check_is_dim_text(this, hItem))
+				crText = m_theme.cr_text_dim;
+
+			//state 색 결정 — DropHilited > Hot > Selected.
+			if (m_use_drag_and_drop && m_bDragging && hItem == GetDropHilightItem())
+			{
+				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
+				crText = m_theme.cr_text_dropHilited;
+				crBack = m_theme.cr_back_dropHilited;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_HOT)
+			{
+				crBack = m_theme.cr_back_hover;
+			}
+			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			{
+				if (GetFocus() == this || m_in_editing || m_in_context_menu)
+				{
+					crText = m_theme.cr_text_selected;
+					crBack = m_theme.cr_back_selected;
+				}
+				else
+				{
+					crText = m_theme.cr_text_selected_inactive;
+					crBack = m_theme.cr_back_selected_inactive;
+				}
+			}
+
+			//1. row fill — Win11 Explorer 동일하게 항상 full-row 폭으로 fill. (TVS_FULLROWSELECT 무관)
+			//   client.right 는 OnNcCalcSize 가 이미 overlay column 만큼 좁혔으므로 그대로 fill — 별도 clip 불필요.
+			CRect rcClient;
+			GetClientRect(&rcClient);
+			CRect rcFill(rcClient.left, rcRow.top, rcClient.right, rcRow.bottom);
+			dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
+
+			//2. expand/collapse glyph — native TVHT_ONITEMBUTTON column 과 일치시키기 위해 level + indent_step 기반 계산.
+			//   rcText.left - 고정값 방식은 icon column 안쪽에 그려져 클릭이 button 으로 hit-test 안됨.
+			if ((GetStyle() & TVS_HASBUTTONS) && ItemHasChildren(hItem))
+			{
+				int level = get_indent_level(hItem);
+				int indent_step = (int)SendMessage(TVM_GETINDENT, 0, 0);
+				if (indent_step <= 0)
+					indent_step = 19;
+
+				//LINESATROOT 없으면 root level (0) 은 button column 없음 — 그릴 자리도 없음.
+				if ((GetStyle() & TVS_LINESATROOT) || level > 0)
+				{
+					int gx = pNMCustomDraw->rc.left + level * indent_step + indent_step / 2;
+					int gy = (rcRow.top + rcRow.bottom) / 2;
+
+					Gdiplus::Graphics g(dc.m_hDC);
+					g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+					Gdiplus::SolidBrush brush(m_theme.cr_text);
+
+					bool expanded = (GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED) != 0;
+					Gdiplus::PointF pts[3];
+					if (expanded)
+					{
+						//▼
+						pts[0] = Gdiplus::PointF((Gdiplus::REAL)(gx - 4), (Gdiplus::REAL)(gy - 2));
+						pts[1] = Gdiplus::PointF((Gdiplus::REAL)(gx + 4), (Gdiplus::REAL)(gy - 2));
+						pts[2] = Gdiplus::PointF((Gdiplus::REAL)(gx    ), (Gdiplus::REAL)(gy + 3));
+					}
+					else
+					{
+						//▶
+						pts[0] = Gdiplus::PointF((Gdiplus::REAL)(gx - 2), (Gdiplus::REAL)(gy - 4));
+						pts[1] = Gdiplus::PointF((Gdiplus::REAL)(gx + 3), (Gdiplus::REAL)(gy    ));
+						pts[2] = Gdiplus::PointF((Gdiplus::REAL)(gx - 2), (Gdiplus::REAL)(gy + 4));
+					}
+					g.FillPolygon(&brush, pts, 3);
+				}
+			}
+
+			//3. checkbox (state image) + 4. icon — 간격 변수로 통합 관리.
+			int icon_w = 0;
+			HIMAGELIST hil_n = (HIMAGELIST)SendMessage(TVM_GETIMAGELIST, TVSIL_NORMAL, 0);
+			if (hil_n)
+			{
+				int cx_il = 0, cy_il = 0;
+				ImageList_GetIconSize(hil_n, &cx_il, &cy_il);
+				icon_w = cx_il;
+			}
+			const int gap_icon_text = 3;	//icon right ↔ text rcText.left 사이
+			const int gap_check_icon = 3;	//checkbox right ↔ icon left 사이
+			const int state_w = 16;
+
+			if (GetStyle() & TVS_CHECKBOXES)
+			{
+				int cx_left = rcText.left - icon_w - gap_icon_text - gap_check_icon - state_w;
+				int cy = (rcRow.top + rcRow.bottom) / 2;
+				int half = state_w / 2;
+				CRect rcCheck(cx_left, cy - half, cx_left + state_w, cy + half);
+
+				bool checked = GetCheck(hItem) != 0;
+				dc.FillSolidRect(&rcCheck, m_theme.cr_back.ToCOLORREF());
+				CPen pen(PS_SOLID, 1, m_theme.cr_text_dim.ToCOLORREF());
+				CPen* pOldPen = dc.SelectObject(&pen);
+				CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
+				dc.Rectangle(&rcCheck);
+				dc.SelectObject(pOldBrush);
+				dc.SelectObject(pOldPen);
+
+				if (checked)
+				{
+					Gdiplus::Graphics g(dc.m_hDC);
+					g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+					Gdiplus::Pen p(m_theme.cr_text, 1.8f);
+					int x1 = rcCheck.left + 3;
+					int y1 = rcCheck.top + rcCheck.Height() * 6 / 10;
+					int x2 = rcCheck.left + rcCheck.Width() * 4 / 10;
+					int y2 = rcCheck.bottom - 3;
+					int x3 = rcCheck.right - 3;
+					int y3 = rcCheck.top + 3;
+					g.DrawLine(&p, x1, y1, x2, y2);
+					g.DrawLine(&p, x2, y2, x3, y3);
+				}
+			}
+
+			int img_normal = -1, img_selected = -1;
+			GetItemImage(hItem, img_normal, img_selected);
+			bool is_sel = (pNMCustomDraw->uItemState & CDIS_SELECTED) != 0;
+			int img_use = (is_sel && img_selected >= 0) ? img_selected : img_normal;
+			if (img_use >= 0 && hil_n)
+			{
+				int cx_il = 0, cy_il = 0;
+				ImageList_GetIconSize(hil_n, &cx_il, &cy_il);
+				int ix = rcText.left - cx_il - gap_icon_text;
+				int iy = (rcRow.top + rcRow.bottom - cy_il) / 2;
+				ImageList_Draw(hil_n, img_use, dc.m_hDC, ix, iy, ILD_TRANSPARENT);
+			}
+
+			//5. text.
+			CString text = GetItemText(hItem);
+			CRect rcDraw = rcText;
+			rcDraw.left += 2;
+			dc.SetBkMode(TRANSPARENT);
+			dc.SetTextColor(crText.ToCOLORREF());
+			dc.DrawText(text, &rcDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+			*pResult = CDRF_SKIPDEFAULT;
+			break;
+		}
+	}
+
+	dc.Detach();
+	return;
+}
+
+//기존 NM_CUSTOMDRAW 본문 보존 — native item paint 후 우리 POSTPAINT 에서 background/text override 방식. SetWindowTheme(DarkMode_Explorer) 도입 후 selection 시 native 가 system accent border 추가 그려 양옆 형광 띠 보이는 문제로 신규 방식 (위) 으로 시도 중. #if 0 으로 비활성, 비교/복원 용.
+#if 0
+void CSCTreeCtrl::OnNMCustomDraw_old(NMHDR* pNMHDR, LRESULT* pResult)
+{
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	LPNMCUSTOMDRAW pNMCustomDraw = (LPNMCUSTOMDRAW)pNMHDR;
 	LPNMTVCUSTOMDRAW pNMTVCustomDraw = (LPNMTVCUSTOMDRAW)pNMHDR;
@@ -3377,6 +3576,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 	//*pResult = 0;
 }
+#endif
 
 
 void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
@@ -3900,16 +4100,21 @@ void CSCTreeCtrl::setup_scrollbar()
 	if (m_scrollbar_setup || !::IsWindow(m_hWnd))
 		return;
 
-	//WS_VSCROLL / WS_HSCROLL 만 제거. TVS_NOSCROLL 은 프로그래밍 scroll 까지 차단해 SelectSetFirstVisible / 마우스 휠도 안 됨 — 사용 안 함.
-	//OnNcCalcSize override 가 native scrollbar 의 NC 공간을 0 으로 만들어 시각적으로 안 그려지게 함.
+	//WS_VSCROLL 만 제거 — CSCScrollbar (vertical only) overlay 대체. WS_HSCROLL 은 그대로 두어 native horizontal
+	//scrollbar 가 정상 표시되게 함 (horizontal CSCScrollbar 미구현). TVS_NOSCROLL 은 프로그래밍 scroll 까지 차단해
+	//SelectSetFirstVisible / 마우스 휠도 안 됨 — 사용 안 함.
+	//OnStyleChanging 에서 WS_VSCROLL 재추가 차단 + ShowScrollBar 로 native V scrollbar 시각적으로도 hide.
 	//WS_CLIPCHILDREN — scrollbar child 영역 부모가 paint 하지 않도록 → flicker / 잔상 회피.
-	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	ModifyStyle(WS_VSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	::ShowScrollBar(m_hWnd, SB_VERT, FALSE);
 
 
 	CRect rc;
 	GetClientRect(&rc);
+	//overlay 위치: client.right 직후 (NC right 로 reserve 한 m_scrollbar_width 영역). child 가 parent NC 영역까지 그릴 수
+	//있어 window 우측 끝에 표시됨.
 	m_scrollbar.create(this, CSCScrollbar::vertical,
-		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+		rc.right, 0, m_scrollbar_width, rc.Height());
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인.
 	m_scrollbar.ShowWindow(SW_HIDE);
@@ -3926,6 +4131,7 @@ void CSCTreeCtrl::sync_scrollbar()
 	int visible = (int)GetVisibleCount();
 
 	//위치/크기 sync — 두께는 scrollbar 자체가 hover 확장 관리하므로 width 유지, 우측 edge 와 height 만 갱신.
+	//overlay 위치: client.right + m_text_right_padding (NC right reserve 의 우측 끝). window 오른쪽 끝에 붙음.
 	CRect rc;
 	GetClientRect(&rc);
 
@@ -3933,7 +4139,7 @@ void CSCTreeCtrl::sync_scrollbar()
 	m_scrollbar.GetWindowRect(rCur);
 	ScreenToClient(rCur);
 	int cur_width = rCur.Width();
-	CRect rTarget(rc.right - cur_width, 0, rc.right, rc.Height());
+	CRect rTarget(rc.right, 0, rc.right + cur_width, rc.Height());
 	if (rCur != rTarget)
 	{
 		CRect rOld = rCur;
@@ -4497,17 +4703,29 @@ BOOL CSCTreeCtrl::move_tree_item_as_sibling(CTreeCtrl* pTree, HTREEITEM hSrcItem
 
 void CSCTreeCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 {
-	//CSCScrollbar overlay 설치된 후엔 native scrollbar 의 NC 공간 미할당 — 시각적으로 안 그려짐.
-	//base 호출 안 함 → DefWindowProc 의 WS_VSCROLL 기반 NC 예약 skip. client = window (border 1px 제외).
-	if (m_scrollbar_setup && lpncsp)
+	if (!lpncsp)
 	{
-		if (m_draw_border)
-			::InflateRect(&lpncsp->rgrc[0], -1, -1);
+		CTreeCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
 		return;
 	}
 
-	//기본 NC (scrollbar 등) 처리 후 client 에서 1px 만큼 더 deflate — border 자리 확보.
+	//NC right = m_scrollbar_width: tree-view 가 좁아진 client 기준 H scroll 범위 계산 → max H scroll 시 텍스트 끝이
+	//overlay 좌측에 정렬 (마지막 글자까지 보임). overlay 는 NC right 영역에 위치 = window 우측 끝.
+	//WS_VSCROLL 은 setup_scrollbar 에서 strip + OnStyleChanging 에서 재추가 차단 → native V scrollbar 그려질 자리 없음.
+	RECT rcOrig = lpncsp->rgrc[0];
 	CTreeCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
-	if (m_draw_border && lpncsp)
+	lpncsp->rgrc[0].right = rcOrig.right - m_scrollbar_width;
+
+	if (m_draw_border)
 		::InflateRect(&lpncsp->rgrc[0], -1, -1);
+}
+
+void CSCTreeCtrl::OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct)
+{
+	//CSCScrollbar overlay 가 V scrollbar 역할 — native WS_VSCROLL 재추가 차단.
+	//tree-view 가 overflow 감지 시 ShowScrollBar / SetScrollInfo 경로로 WS_VSCROLL 다시 set 하려 함 → 여기서 강제 strip.
+	if (nStyleType == GWL_STYLE && lpStyleStruct && (lpStyleStruct->styleNew & WS_VSCROLL))
+		lpStyleStruct->styleNew &= ~WS_VSCROLL;
+
+	CTreeCtrl::OnStyleChanging(nStyleType, lpStyleStruct);
 }

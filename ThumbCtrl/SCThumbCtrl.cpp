@@ -958,13 +958,21 @@ void CSCThumbCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		return;
 
 	long t1 = getClock();
-	//TRACE(_T("clicked = %d\n"), t1 - m_last_clicked);
+	long delta = t1 - m_last_clicked;
+	//TRACE(_T("clicked = %d\n"), delta);
 
-	//name영역을 클릭한 후 1~2초 사이에 다시 클릭하면 name 편집모드로 전환된다.
-	if ((abs(t1 - m_last_clicked) >= 1000) && (abs(t1 - m_last_clicked) < 2000))
+	//Windows 탐색기 식 click-rename — 같은 index 의 name 영역을 두 번 클릭 (double-click 보다 김, 너무 늦지 않음) 시 편집모드.
+	// (a) m_last_clicked_index == index — 직전 클릭과 같은 항목. 다른 항목 거치면 자동 차단.
+	// (b) m_last_clicked != 0 — 최초 클릭 이후만.
+	// (c) delta > GetDoubleClickTime() — double-click (즉시 두 번 클릭) 회피, OnLButtonDblClk 으로 라우팅.
+	// (d) delta < 5000ms — 임의 후속 클릭이 rename 으로 잡히는 사고 회피.
+	UINT dbl_time = ::GetDoubleClickTime();
+	if (m_last_clicked_index == index && m_last_clicked != 0
+		&& delta > (long)dbl_time && delta < 5000)
 		edit_begin(-1);
 
 	m_last_clicked = t1;
+	m_last_clicked_index = index;
 
 	CDialogEx::OnLButtonUp(nFlags, point);
 }
@@ -1111,6 +1119,12 @@ void CSCThumbCtrl::edit_end(bool valid)
 
 	m_in_editing = false;
 	m_pEdit->ShowWindow(SW_HIDE);
+
+	//편집모드 종료 시 click-rename state 도 초기화 — 그래야 종료 직후 같은 썸네일 click 이
+	//"첫 번째 클릭" 으로 인식돼 두 번째 click 까지 가야 다시 편집모드 진입.
+	//(reset 안 하면 편집 직전의 m_last_clicked 가 남아 있어 종료 직후 single click 으로 즉시 재진입.)
+	m_last_clicked = 0;
+	m_last_clicked_index = -1;
 
 	CString sText;
 

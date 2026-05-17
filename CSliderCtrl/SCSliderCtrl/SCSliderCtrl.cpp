@@ -1204,8 +1204,13 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		else
 		{
 			str.Format(_T("%s (%s)"), GetTimeStringFromMilliSeconds(m_bookmark[m_cur_bookmark].pos, true, false), m_bookmark[m_cur_bookmark].name);
-			if (m_tooltip.m_hWnd)
+			//손 떨림으로 인한 micro WM_MOUSEMOVE 마다 UpdateTipText 가 호출되면 같은 텍스트로도 popup redraw 발생 → 깜빡임.
+			//m_use_tooltip — 호출자가 use_tooltip(false) 로 suppress 한 경우 (미디어 미오픈 등) 북마크 위 hover 도 표시 안 함.
+			if (m_use_tooltip && m_tooltip.m_hWnd && str != m_tooltip_last_text)
+			{
 				m_tooltip.UpdateTipText(str, this);
+				m_tooltip_last_text = str;
+			}
 		}
 		redraw_window();
 	}
@@ -1227,8 +1232,11 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		else//if (m_tooltip_format == tooltip_value)
 			str.Format(_T("%d / %d"), pos, upper);
 
-		if (m_tooltip.m_hWnd)
+		if (m_tooltip.m_hWnd && str != m_tooltip_last_text)
+		{
 			m_tooltip.UpdateTipText(str, this);
+			m_tooltip_last_text = str;
+		}
 	}
 
 
@@ -1583,52 +1591,55 @@ int CSCSliderCtrl::find_index_bookmark(int pos)
 	return -1;
 }
 
-void CSCSliderCtrl::bookmark(int mode, int pos, CString name)
+//pos 에 북마크 추가 — 같은 pos 가 이미 있으면 그 항목 제거 (토글). 없으면 push.
+void CSCSliderCtrl::add_bookmark(int pos, CString name)
 {
 	if (!m_use_bookmark)
 		return;
 
-	int index;
-
-	if (mode == bookmark_add_current || mode == bookmark_delete_current)
+	int index = find_index_bookmark(pos);
+	if (index >= 0)
 	{
-		pos = GetPos();
+		m_bookmark.erase(m_bookmark.begin() + index);
 	}
-	else if (mode == bookmark_reset)
-	{
-		m_bookmark.clear();
-		Invalidate();
-		return;
-	}
-
-	index = find_index_bookmark(pos);
-
-	if (index < 0 && mode <= bookmark_add)
+	else
 	{
 		if (name.IsEmpty())
 			name.Format(_T("bookmark%02d"), m_bookmark.size());
 		m_bookmark.push_back(CSCSliderCtrlBookmark(pos, name));
+		std::sort(m_bookmark.begin(), m_bookmark.end(),
+			[](const CSCSliderCtrlBookmark& a, const CSCSliderCtrlBookmark& b) { return a.pos < b.pos; });
 	}
-	else if (mode <= bookmark_delete)
-	{
-		m_bookmark.erase(m_bookmark.begin() + index);
-	}
-	else if (mode == bookmark_move)
-	{
-		index = get_near_bookmark(GetPos(), pos > 0);
-		if (index >= 0)
-		{
-			SetPos(m_bookmark[index].pos);
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
-		}
-	}
+	Invalidate();
+}
 
-	std::sort(m_bookmark.begin(), m_bookmark.end(),
-			[](CSCSliderCtrlBookmark a, CSCSliderCtrlBookmark b)
+//북마크 list 전체 교체 — 외부에서 데이터 own 하는 경우 view 갱신.
+//입력 list 에 같은 pos 중복이 있으면 마지막 항목만 남김 (방어).
+void CSCSliderCtrl::set_bookmarks(const std::deque<CSCSliderCtrlBookmark>& items)
+{
+	if (!m_use_bookmark)
+		return;
+
+	m_bookmark.clear();
+	for (const auto& bm : items)
 	{
-		return (a.pos < b.pos);
+		int index = find_index_bookmark(bm.pos);
+		if (index >= 0)
+			m_bookmark[index] = bm;
+		else
+			m_bookmark.push_back(bm);
 	}
-	);
+	std::sort(m_bookmark.begin(), m_bookmark.end(),
+		[](const CSCSliderCtrlBookmark& a, const CSCSliderCtrlBookmark& b) { return a.pos < b.pos; });
+	Invalidate();
+}
+
+//모두 비움.
+void CSCSliderCtrl::clear_bookmarks()
+{
+	if (m_bookmark.empty())
+		return;
+	m_bookmark.clear();
 	Invalidate();
 }
 
@@ -1725,6 +1736,15 @@ void CSCSliderCtrl::use_tooltip(bool use)
 		m_tooltip.SetMaxTipWidth(400);
 		m_tooltip.AddTool(this, _T(""));
 		m_tooltip.Activate(TRUE);
+		return;
+	}
+
+	//기존 tooltip 이 이미 만들어져 있으면 Activate 만 토글 — 호출자가 미디어 close 등으로 일시 suppress 가능.
+	if (m_tooltip.GetSafeHwnd())
+	{
+		m_tooltip.Activate(use ? TRUE : FALSE);
+		if (!use)
+			m_tooltip.Pop();
 	}
 }
 

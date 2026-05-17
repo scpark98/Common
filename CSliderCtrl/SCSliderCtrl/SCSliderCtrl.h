@@ -230,21 +230,27 @@ public:
 	//즉, freq = 23이면 23 등분이 아니라 0 ~ 23 ~ 46 ~ 69 ~ 92와 같이 틱이 표시된다.
 	void	set_tic_freq(int freq, bool show_text = false);
 
-	//현재 위치를 북마크에 추가한다. 만약 해당 위치가 이미 북마크라면 삭제한다.
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
 	void	set_bookmark_color(Gdiplus::Color cr);
 	void	set_bookmark_current_color(Gdiplus::Color cr);
-	enum BOOKMARK
-	{
-		bookmark_add_current = 0,
-		bookmark_add,
-		bookmark_delete_current,
-		bookmark_delete,
-		bookmark_move,				//pos < 0 ? go to previous bookmark : go to next bookmark
-		bookmark_reset,
-	};
-	void	bookmark(int mode = bookmark_add_current, int pos = -1, CString name = _T(""));
-	std::deque<CSCSliderCtrlBookmark> get_bookmark_list() { return m_bookmark; }
+
+	//pos 에 북마크 추가 — 같은 pos 가 이미 있으면 그 항목 제거 (토글). 없으면 push.
+	//N키 같은 사용자 입력의 기본 호출. 슬라이더가 데이터 own 하는 사용 패턴.
+	void	add_bookmark(int pos, CString name = _T(""));
+
+	//북마크 list 전체 교체 — 외부에서 데이터 own 하는 경우 view 갱신용.
+	//입력 list 에 같은 pos 가 중복되면 마지막 항목만 남김 (방어).
+	void	set_bookmarks(const std::deque<CSCSliderCtrlBookmark>& items);
+
+	//모두 비움.
+	void	clear_bookmarks();
+
+	//read-only 조회. prev/next 등 호출자가 직접 결정해야 할 때 사용.
+	const std::deque<CSCSliderCtrlBookmark>& get_bookmarks() const { return m_bookmark; }
+
+	//현재 위치 from_pos 에서 가장 가까운 이전/다음 북마크의 index 반환. 없으면 -1.
+	//호출자가 prev/next 점프 시 → idx 받아 get_bookmarks()[idx].pos 로 점프 위치 결정.
+	int		get_near_bookmark(int from_pos, bool forward);
 
 	enum TOOLTIP_FORMAT
 	{
@@ -313,6 +319,7 @@ protected:
 	CToolTipCtrl	m_tooltip;
 	bool			m_use_tooltip = false;	//default = false
 	int				m_tooltip_format = tooltip_value;	//default = tooltip_value
+	CString			m_tooltip_last_text;	//OnMouseMove 마다 UpdateTipText 호출 시 같은 텍스트면 skip — popup redraw 깜빡임 회피.
 
 
 	//실제 전체 구간 게이지 영역
@@ -343,8 +350,7 @@ protected:
 	int				m_cur_bookmark = -1;
 	//마우스 위치에서 가장 가까운 북마크를 찾는데 그 허용 오차를 미리 구해놓는다.
 	int				m_bookmark_near_tolerance = 8;	//px
-	//현재 위치에서 가장 가까운 이전/다음 북마크 위치를 찾는다.
-	int				get_near_bookmark(int pos, bool forward);
+	//get_near_bookmark 는 public 섹션으로 이동 — 호출자가 prev/next 결정 시 사용.
 
 
 	/*

@@ -353,7 +353,8 @@ protected:
 	bool			m_in_editing = false;
 	int				m_editing_index;
 	CString			m_old_title;
-	long			m_last_clicked;
+	long			m_last_clicked = 0;
+	int				m_last_clicked_index = -1;	//Windows 탐색기 식 click-rename — 직전 클릭과 같은 index 일 때만 edit_begin.
 
 //color theme
 	CSCColorTheme	m_theme = CSCColorTheme(this);

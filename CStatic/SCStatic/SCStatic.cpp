@@ -729,19 +729,27 @@ CString CSCStatic::get_text()
 
 CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color)
 {
+	//호출처가 동일 텍스트로 반복 set_text 하는 경우 (예: Endorphin2 의 500ms timer 가
+	//일시정지 중에도 같은 시간 문자열을 매번 재설정) Invalidate 가 매 tick 발생 →
+	//부모 영역 invalidate / WM_PAINT 사이클 → 자식 컨트롤 (슬라이더 등) 위 툴팁이 깜빡임.
+	//텍스트·색상이 실제로 변했을 때만 Invalidate.
+	bool changed = (m_text != text);
 	m_text = text;
 
 	//cr_text_color가 투명색이면 기본 글자색을 사용한다는 의미임
- 	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)
- 		m_theme.cr_text = cr_text_color;
-	
-	//반복문안에서 이를 호출할 경우 Invalidate()만으로는 텍스트가 바로 변경되지 않기도 한다.
+	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)
+	{
+		if (m_theme.cr_text.GetValue() != cr_text_color.GetValue())
+			changed = true;
+		m_theme.cr_text = cr_text_color;
+	}
 
 	//투명일때 update_surface()를 써야 온전히 갱신된다.
 	//=>dlg에서 clip sibling에 따라 결과가 달라진다.
 	//if (m_transparent)
 		//update_surface();
 	//else
+	if (changed)
 		Invalidate(false);
 
 	return m_rect_text;

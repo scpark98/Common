@@ -105,78 +105,65 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 	CDC screen_dc;
 	screen_dc.Attach(lpDrawItemStruct->hDC);
-	//per-item MemoryDC — DrawItem 이 OS hDC 에 직접 paint 하면 항목 갱신 시 깜빡임 가능.
-	//MemoryDC 에 합성 후 destructor 에서 한 번에 blit.
-	CRect rc_item = lpDrawItemStruct->rcItem;
-	CMemoryDC dc(&screen_dc, &rc_item, true);
 
-	CString strData;
-	GetLBText(lpDrawItemStruct->itemID, strData);
-
-	COLORREF cr_text = m_theme.cr_text.ToCOLORREF();
-	COLORREF cr_back = m_theme.cr_back.ToCOLORREF();
-
-	CRect rItem = lpDrawItemStruct->rcItem;
-
-	if (!m_is_font_combo)
+	//CMemoryDC 의 destructor 는 m_pDC(=&screen_dc) 로 BitBlt 한다.
+	//screen_dc.Detach() 가 dc 의 destructor 보다 먼저 실행되면 NULL HDC 에 BitBlt → 크래시.
+	//따라서 dc 의 lifetime 을 inner scope 로 한정해 destructor 가 Detach 보다 먼저 돌게 한다.
 	{
-		CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(lpDrawItemStruct->itemID);
-		if (cr && (cr->cr_text.GetValue() != m_theme.cr_text.GetValue()) && (cr->cr_text.GetValue() != Gdiplus::Color::Transparent))
-			cr_text = cr->cr_text.ToCOLORREF();
+		CRect rc_item = lpDrawItemStruct->rcItem;
+		CMemoryDC dc(&screen_dc, &rc_item, true);
 
-		if (!IsWindowEnabled())
-			cr_text = get_gray_color(cr_text);
-	}
+		CString strData;
+		GetLBText(lpDrawItemStruct->itemID, strData);
 
+		COLORREF cr_text = m_theme.cr_text.ToCOLORREF();
+		COLORREF cr_back = m_theme.cr_back.ToCOLORREF();
 
-	if (lpDrawItemStruct->itemState & ODS_SELECTED)
-	{
-		//cr_text = m_theme.cr_text_selected.ToCOLORREF();
-		cr_back = m_theme.cr_back_selected.ToCOLORREF();
-	}
-	else if (lpDrawItemStruct->itemState & ODS_HOTLIGHT)
-	{
-		//cr_text = m_theme.cr_text_hover.ToCOLORREF();
-		cr_back = m_theme.cr_back_hover.ToCOLORREF();
-	}
-	else
-	{
-	}
+		CRect rItem = lpDrawItemStruct->rcItem;
 
-	dc.SetBkMode(TRANSPARENT);
-	dc.FillSolidRect(rItem, cr_back);
-	dc.SetTextColor(cr_text);
-
-	CRect rtext = rItem;
-	//dc.DrawText(strData, rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_CALCRECT);
-	//TRACE(_T("width = %d\n"), rtext.Width());
-	
-	rtext.DeflateRect(4, 0);
-
-	if (m_is_font_combo)
-	{
-		// i feel bad creating this font on each draw. but i can't think of a better way (other than creating ALL fonts at once and saving them - yuck
-		CFont cf;
-		//m_font_size 는 사용자 의도(=메모장 표시) point 단위. CreateFont 의 nHeight 는 논리 단위(픽셀) 라
-		//point→pixel 변환 후 음수(=character height) 로 넘겨야 동일 크기로 표시.
-		int lf_height = -MulDiv(m_font_size, dc.GetDeviceCaps(LOGPIXELSY), 72);
-		if (true)//m_style != NAME_GUI_FONT)
+		if (!m_is_font_combo)
 		{
-			if (!cf.CreateFont(lf_height, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, strData))
-			{
-				ASSERT(0);
-				dc.Detach();
-				return;
-			}
+			CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(lpDrawItemStruct->itemID);
+			if (cr && (cr->cr_text.GetValue() != m_theme.cr_text.GetValue()) && (cr->cr_text.GetValue() != Gdiplus::Color::Transparent))
+				cr_text = cr->cr_text.ToCOLORREF();
+
+			if (!IsWindowEnabled())
+				cr_text = get_gray_color(cr_text);
 		}
 
-		HFONT hf = (HFONT)dc.SelectObject(cf);
-		dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
-		dc.SelectObject(hf);
-	}
-	else
-	{
-		dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+		if (lpDrawItemStruct->itemState & ODS_SELECTED)
+			cr_back = m_theme.cr_back_selected.ToCOLORREF();
+		else if (lpDrawItemStruct->itemState & ODS_HOTLIGHT)
+			cr_back = m_theme.cr_back_hover.ToCOLORREF();
+
+		dc.SetBkMode(TRANSPARENT);
+		dc.FillSolidRect(rItem, cr_back);
+		dc.SetTextColor(cr_text);
+
+		CRect rtext = rItem;
+		rtext.DeflateRect(4, 0);
+
+		if (m_is_font_combo)
+		{
+			CFont cf;
+			//m_font_size 는 사용자 의도(=메모장 표시) point 단위. CreateFont 의 nHeight 는 논리 단위(픽셀) 라
+			//point→pixel 변환 후 음수(=character height) 로 넘겨야 동일 크기로 표시.
+			int lf_height = -MulDiv(m_font_size, dc.GetDeviceCaps(LOGPIXELSY), 72);
+			if (cf.CreateFont(lf_height, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, strData))
+			{
+				HFONT hf = (HFONT)dc.SelectObject(cf);
+				dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+				dc.SelectObject(hf);
+			}
+			else
+			{
+				dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+			}
+		}
+		else
+		{
+			dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+		}
 	}
 
 	screen_dc.Detach();

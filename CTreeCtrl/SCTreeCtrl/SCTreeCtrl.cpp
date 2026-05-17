@@ -1319,6 +1319,9 @@ BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 
 	*pResult = 0;
 
+	//expand/collapse paint 1-cycle 화 — native expand paint 차단, OnTvnItemexpanded 에서 sync + Invalidate 후 SetRedraw(TRUE).
+	SetRedraw(FALSE);
+
 	return FALSE;
 }
 
@@ -1335,10 +1338,6 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		edit_end(true);
 	}
-
-	//V over-scroll 상태에서 click 시 tree 가 selection 처리 + 자동 scroll 발생 → stale shift 적용되면 item 사라짐.
-	//click 시 over-scroll 강제 reset.
-	m_v_extra_shift_px = 0;
 
 	LPNMTVDISPINFO pTVDispInfo = reinterpret_cast<LPNMTVDISPINFO>(pNMHDR);
 
@@ -2428,10 +2427,29 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 
 void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
-	//tree-view 의 native H scroll 은 ScrollWindowEx 로 픽셀만 shift 후 새로 노출된 우측 strip 만 invalidate 함.
-	//CDRF_SKIPDEFAULT customdraw 의 row fill 이 DC clip 에 잘려 그 strip 만 칠해지면 — 다른 column 의 이전 glyph /
-	//text pixel 잔존 (잔상). 전체 client Invalidate 로 full repaint 강제 + CSCScrollbar overlay 도 sync.
-	CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+	//mouse 의 H wheel / tilt 가 일부 driver 에선 WM_MOUSEHWHEEL 이 아니라 WM_HSCROLL SB_LINELEFT/RIGHT 로 직접 발사 →
+	//base 처리 시 default line width (= 한 글자 width) 라 굴려도 변화 미미. 여기서 line step 을 큰 chunk 로 보정.
+	if (nSBCode == SB_LINELEFT || nSBCode == SB_LINERIGHT)
+	{
+		SCROLLINFO si = { sizeof(si), SIF_ALL };
+		if (::GetScrollInfo(m_hWnd, SB_HORZ, &si))
+		{
+			int direction = (nSBCode == SB_LINELEFT) ? -1 : 1;
+			int max_pos = max(0, si.nMax - (int)si.nPage + 1);
+			int new_pos = (int)si.nPos + direction * 60;
+			if (new_pos < 0)
+				new_pos = 0;
+			if (new_pos > max_pos)
+				new_pos = max_pos;
+			CTreeCtrl::OnHScroll(SB_THUMBPOSITION, new_pos, pScrollBar);
+			CTreeCtrl::OnHScroll(SB_ENDSCROLL, 0, pScrollBar);
+		}
+		else
+			CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+	}
+	else
+		CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+
 	Invalidate(FALSE);
 	sync_scrollbar();
 }
@@ -3166,9 +3184,7 @@ BOOL CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
 
-	//expand/collapse 시 tree paint + sync_scrollbar 의 overlay show/hide/move + range/pos set 이 연속 paint 트리거 →
-	//깜빡임 발생. SetRedraw 로 wrap 해 일련의 조작 동안 paint 차단, 끝에 단일 Invalidate(FALSE) 로 atomic repaint.
-	SetRedraw(FALSE);
+	//OnTvnItemexpanding 에서 SetRedraw(FALSE) 했음 — native expand paint 차단된 상태. 여기서 sync 후 SetRedraw(TRUE) + Invalidate 로 1-cycle repaint.
 	sync_scrollbar();
 	SetRedraw(TRUE);
 	Invalidate(FALSE);
@@ -3256,30 +3272,6 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			CRect rcText;
 			GetItemRect(hItem, &rcText, TRUE);
-
-			//over-scroll paint shift (H/V) — tree 가 natural max 까지 clamp 한 후 rcText/rcRow 반영하지만, 우리가 그
-			//위에 추가 shift 해 over-scroll 위치로 이동. 마지막 콘텐츠가 overlay 좌/상측 직전에 정렬됨.
-			int over_shift = 0;
-			if (m_h_natural_max >= 0)
-			{
-				SCROLLINFO si_h = { sizeof(si_h), SIF_POS };
-				if (::GetScrollInfo(m_hWnd, SB_HORZ, &si_h))
-					over_shift = m_h_scroll_pos - si_h.nPos;
-				if (over_shift < 0)
-					over_shift = 0;
-			}
-			if (over_shift > 0)
-			{
-				rcText.left  -= over_shift;
-				rcText.right -= over_shift;
-			}
-			if (m_v_extra_shift_px > 0)
-			{
-				rcRow.top    -= m_v_extra_shift_px;
-				rcRow.bottom -= m_v_extra_shift_px;
-				rcText.top    -= m_v_extra_shift_px;
-				rcText.bottom -= m_v_extra_shift_px;
-			}
 
 			Gdiplus::Color crText = m_theme.cr_text;
 			Gdiplus::Color crBack = m_theme.cr_back;
@@ -4084,32 +4076,112 @@ void CSCTreeCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	//편집중에 스크롤 할 경우는 편집 취소.
 	edit_end(false);
 
-	//V over-scroll 은 overlay drag 가 트리거 → 다른 경로 (wheel / native V) 에선 reset 해서 stale shift 방지.
-	m_v_extra_shift_px = 0;
-
 	CTreeCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
 	sync_scrollbar();
+	Invalidate(FALSE);
 }
 
-//윈도우 탐색기의 폴더뷰를 보면 마우스 휠의 vscroll, hscroll을 모두 vscroll로 처리하고 있으며
-//실제 가로 스크롤
+//H wheel: SB_THUMBPOSITION 한 번 호출로 큰 jump — line 누적은 매 line 마다 ScrollWindowEx 호출되어 깜빡임.
 void CSCTreeCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
-	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	edit_end(false);
-	CTreeCtrl::OnMouseHWheel(nFlags, zDelta, pt);
+
+	SCROLLINFO si = { sizeof(si), SIF_ALL };
+	if (!::GetScrollInfo(m_hWnd, SB_HORZ, &si))
+		return;
+
+	if (zDelta == 0)
+		return;
+
+	//mouse driver 가 H wheel 한 번 굴림에 작은 zDelta 다수 메시지를 보내는 경우 — 매 메시지 처리 시 N * chunk 만큼 jump.
+	//zDelta 누적해 WHEEL_DELTA 도달 시 1 notch 로 process, 나머지는 다음 메시지에 carry.
+	m_h_wheel_accum += zDelta;
+	if (abs(m_h_wheel_accum) < WHEEL_DELTA)
+		return;
+
+	int direction = (m_h_wheel_accum > 0) ? 1 : -1;
+	int notches = abs(m_h_wheel_accum) / WHEEL_DELTA;
+	m_h_wheel_accum -= direction * notches * WHEEL_DELTA;
+
+	int delta_px = direction * notches * 240;
+
+	int max_pos = max(0, si.nMax - (int)si.nPage + 1);
+	int new_pos = (int)si.nPos + delta_px;
+	if (new_pos < 0)
+		new_pos = 0;
+	if (new_pos > max_pos)
+		new_pos = max_pos;
+
+	SendMessage(WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)new_pos), 0);
+	SendMessage(WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+
+	sync_scrollbar();
+	Invalidate(FALSE);
 }
 
 
+//V wheel: WS_VSCROLL 제거 상태에서 CTreeCtrl::OnMouseWheel 이 H scroll 로 fallback 하는 문제 회피 — base 우회.
+//item 단위 jump — TVM_SELECTITEM(TVGN_FIRSTVISIBLE) 한 번 호출 (selection 변경 없음).
 BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	edit_end(false);
-	BOOL res = CTreeCtrl::OnMouseWheel(nFlags, zDelta, pt);
+
+	int notches = zDelta / WHEEL_DELTA;
+	int delta_rows = -notches * 3;
+	if (delta_rows == 0)
+		return TRUE;
+
+	int total = (int)GetCount();
+	int visible = (int)GetVisibleCount();
+	if (total <= 0 || visible <= 0)
+		return TRUE;
+
+	HTREEITEM first = GetFirstVisibleItem();
+	int first_index = 0;
+	HTREEITEM cur = GetRootItem();
+	if (m_use_root && cur == m_root_item)
+		cur = GetChildItem(cur);
+	while (cur && cur != first)
+	{
+		cur = GetNextVisibleItem(cur);
+		first_index++;
+	}
+
+	int max_pos = max(0, total - visible);
+	int new_pos = first_index + delta_rows;
+	if (new_pos < 0)
+		new_pos = 0;
+	if (new_pos > max_pos)
+		new_pos = max_pos;
+
+	//이미 그 위치면 no-op — TVM_SELECTITEM 의 H scroll 부수효과 + ScrollWindowEx + Invalidate 사이클 회피.
+	if (new_pos == first_index)
+		return TRUE;
+
+	cur = GetRootItem();
+	if (m_use_root && cur == m_root_item)
+		cur = GetChildItem(cur);
+	for (int i = 0; cur && i < new_pos; i++)
+		cur = GetNextVisibleItem(cur);
+
+	//TVM_SELECTITEM 부수효과로 tree 가 자기 H scroll 위치 reset 하는 케이스 차단 — V wheel 만 의도했는데 H 가 같이 변하는 현상 회피.
+	SCROLLINFO si_h_before = { sizeof(si_h_before), SIF_POS };
+	::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_before);
+
+	if (cur)
+		SendMessage(TVM_SELECTITEM, TVGN_FIRSTVISIBLE, (LPARAM)cur);
+
+	SCROLLINFO si_h_after = { sizeof(si_h_after), SIF_POS };
+	::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_after);
+	if (si_h_after.nPos != si_h_before.nPos)
+	{
+		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)si_h_before.nPos), 0);
+		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+	}
+
 	sync_scrollbar();
-	return res;
+	Invalidate(FALSE);
+	return TRUE;
 }
 
 void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
@@ -4218,9 +4290,8 @@ void CSCTreeCtrl::sync_scrollbar()
 		}
 	}
 
-	//---- V scrollbar 모델: item-based (total / visible / first_visible_index) ----
-	//over-scroll: H overlay 가 bottom m_scrollbar_width 점유 → 마지막 item 이 그 아래로 들어가는 것 회피 위해
-	//page 를 H overlay 가 가리는 row 수만큼 줄임 → 사용자가 max scroll 시 마지막 item 이 H overlay 위로 올라옴.
+	//---- V scrollbar 모델: tree 의 natural max 그대로 사용 (SetScrollInfo 보정 없음 — drag 중 tree 와 충돌해 thumb jump back 일으킴).
+	//trade-off: 마지막 row 가 H overlay 아래에 일부 가려질 수 있음 — NC reservation 적용 시 해결.
 	int total = (int)GetCount();
 	int visible = (int)GetVisibleCount();
 	bool need_v = (total > visible) && (visible > 0);
@@ -4236,11 +4307,8 @@ void CSCTreeCtrl::sync_scrollbar()
 			cur = GetNextVisibleItem(cur);
 			first_index++;
 		}
-		int row_height = max(1, (int)GetItemHeight());
-		int rows_under_h_overlay = (m_scrollbar_width + row_height - 1) / row_height;	//ceil
-		int effective_visible = max(1, visible - rows_under_h_overlay);
 		m_scrollbar.set_range(0, total - 1);
-		m_scrollbar.set_page(effective_visible);
+		m_scrollbar.set_page(visible);
 		m_scrollbar.set_pos(first_index);
 		if (!m_scrollbar.IsWindowVisible())
 			m_scrollbar.ShowWindow(SW_SHOW);
@@ -4251,8 +4319,8 @@ void CSCTreeCtrl::sync_scrollbar()
 			m_scrollbar.ShowWindow(SW_HIDE);
 	}
 
-	//---- H scrollbar 모델: tree 의 natural max 읽고 boost. tree 자체엔 SetScrollInfo 하지 않음 (clamp 회피).
-	//over-scroll 은 customdraw 에서 paint shift 로 시각화 (m_h_scroll_pos - tree_si.nPos 만큼 추가 shift).
+	//---- H scrollbar 모델: tree 의 natural 값 그대로.
+	//trade-off: 우측 끝이 V overlay 에 일부 가려질 수 있음.
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 	{
 		SCROLLINFO si = { sizeof(si), SIF_RANGE | SIF_PAGE | SIF_POS };
@@ -4260,29 +4328,14 @@ void CSCTreeCtrl::sync_scrollbar()
 		bool need_h = ok && si.nPage > 0 && (si.nMax > (int)si.nPage);
 		if (need_h)
 		{
-			//tree 의 natural max — over-scroll 시 paint shift 계산에 사용.
-			m_h_natural_max = si.nMax;
-			int boosted = si.nMax + m_scrollbar_width;
-
-			//사용자 pos 가 tree 의 자연 max 안이면 tree 의 pos 를 따라가고, 초과면 m_h_scroll_pos 유지.
-			int tree_max_pos = si.nMax - (int)si.nPage + 1;
-			if (m_h_scroll_pos < si.nPos)
-				m_h_scroll_pos = si.nPos;	//tree 가 mouse wheel 등으로 자체 scroll 한 경우 따라감.
-			//boosted max-pos = boosted - page + 1 — clamp.
-			int boosted_max_pos = boosted - (int)si.nPage + 1;
-			if (m_h_scroll_pos > boosted_max_pos)
-				m_h_scroll_pos = boosted_max_pos;
-
-			m_scrollbar_h.set_range(si.nMin, boosted);
+			m_scrollbar_h.set_range(si.nMin, si.nMax);
 			m_scrollbar_h.set_page(si.nPage);
-			m_scrollbar_h.set_pos(m_h_scroll_pos);
+			m_scrollbar_h.set_pos(si.nPos);
 			if (!m_scrollbar_h.IsWindowVisible())
 				m_scrollbar_h.ShowWindow(SW_SHOW);
 		}
 		else
 		{
-			m_h_natural_max = -1;
-			m_h_scroll_pos = 0;
 			if (m_scrollbar_h.IsWindowVisible())
 				m_scrollbar_h.ShowWindow(SW_HIDE);
 		}
@@ -4300,31 +4353,21 @@ LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 	if (msg->pThis == &m_scrollbar)
 	{
-		//V scroll — target 인덱스의 visible item 찾아 SelectSetFirstVisible.
-		//SelectSetFirstVisible 은 select + ensure-visible 이 함께라 selected item 이 H 시야 밖이면 tree 가 자동 H-scroll.
-		//V 만 의도한 경우 부작용 → H pos 보존/복원. SetRedraw(FALSE/TRUE) 로 wrapping 해 multi-paint flicker 차단.
-		//over-scroll: tree natural max 초과 요청 시 SelectSetFirstVisible 은 clamp 되므로, 차이만큼 customdraw 에서
-		//paint 를 위로 shift (m_v_extra_shift_px).
-		SetRedraw(FALSE);
-
+		//V scroll drag — TVM_SELECTITEM (TVGN_FIRSTVISIBLE) 호출. selection 변경 없이 scroll 만.
+		//sync_scrollbar 호출 안 함 — drag 중 measured first_index 로 set_pos 하면 user drag pos 보다 작은 값으로 thumb jump back.
+		//H scroll 위치 보존/복원 — TVM_SELECTITEM 의 부수효과로 tree 가 자기 H scroll 위치를 reset 하는 케이스 차단.
 		SCROLLINFO si_h_before = { sizeof(si_h_before), SIF_POS };
 		::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_before);
-
-		int total = (int)GetCount();
-		int visible = (int)GetVisibleCount();
-		int natural_max_pos = max(0, total - visible);
-		int target_pos = msg->pos;
-		int clamped_pos = min(target_pos, natural_max_pos);
-		int row_height = max(1, (int)GetItemHeight());
-		m_v_extra_shift_px = (target_pos - clamped_pos) * row_height;
 
 		HTREEITEM cur = GetRootItem();
 		if (m_use_root && cur == m_root_item)
 			cur = GetChildItem(cur);
-		for (int i = 0; cur && i < clamped_pos; i++)
+		for (int i = 0; cur && i < msg->pos; i++)
 			cur = GetNextVisibleItem(cur);
+
+		SetRedraw(FALSE);
 		if (cur)
-			SelectSetFirstVisible(cur);
+			SendMessage(TVM_SELECTITEM, TVGN_FIRSTVISIBLE, (LPARAM)cur);
 
 		SCROLLINFO si_h_after = { sizeof(si_h_after), SIF_POS };
 		::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_after);
@@ -4333,18 +4376,16 @@ LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)si_h_before.nPos), 0);
 			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
 		}
-
 		SetRedraw(TRUE);
 		Invalidate(FALSE);
 	}
 	else if (msg->pThis == &m_scrollbar_h)
 	{
-		//H scroll — 사용자 요청 pos 를 m_h_scroll_pos 에 기록 (tree natural max 초과 가능).
-		//tree 에 SB_THUMBPOSITION WM_HSCROLL 발송 — tree 는 자기 natural max 까지 clamp 해서 처리.
-		//넘는 부분 (m_h_scroll_pos - tree_pos) 은 customdraw 에서 paint 를 추가 shift 해 over-scroll 시각화.
-		m_h_scroll_pos = msg->pos;
+		//H scroll drag — SB_THUMBPOSITION 으로 tree 의 H scroll 위치 변경. sync_scrollbar 호출 안 함 (V 와 같은 이유).
+		SetRedraw(FALSE);
 		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)msg->pos), 0);
 		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+		SetRedraw(TRUE);
 		Invalidate(FALSE);
 	}
 	return 0;

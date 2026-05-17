@@ -369,10 +369,7 @@ public:
 	CSCScrollbar	m_scrollbar;	//vertical
 	CSCScrollbar	m_scrollbar_h;	//horizontal
 	int				m_scrollbar_width = 18;	//track (window) 폭. thumb 두께는 CSCScrollbar 내부에서 별도 (resting 2, hover 5).
-	int				m_h_natural_max = -1;	//tree 가 자체 계산한 H scroll natural nMax. 우리가 boost 한 후 변화 감지용.
-	int				m_h_scroll_pos = 0;		//사용자가 요청한 H scroll position (tree natural max 초과 가능 — over-scroll).
-	int				m_v_extra_shift_px = 0;	//V over-scroll: tree natural max 초과 시 customdraw 가 추가로 위로 shift 할 픽셀.
-	int				m_v_user_pos = 0;		//사용자가 V overlay 에서 요청한 first-visible item index (over-scroll 가능).
+	int				m_h_wheel_accum = 0;	//mouse driver 가 한 번 굴림에 작은 zDelta 다수 메시지 보낼 때 누적해서 WHEEL_DELTA 단위로 process.
 	bool			m_scrollbar_setup = false;
 	void			setup_scrollbar();		//PreSubclassWindow 끝에서 호출 — WS_VSCROLL 제거 + scrollbar 생성.
 	void			sync_scrollbar();		//트리 scroll state → scrollbar 모델 push. 외부에서도 batch insert/delete 후 호출 가능.

@@ -88,6 +88,8 @@ bool CSCThumbCtrl::create(CWnd* parent, int left, int top, int right, int bottom
 	WNDCLASS wc = {};
 	::GetClassInfo(AfxGetInstanceHandle(), _T("#32770"), &wc);
 	wc.lpszClassName = _T("CSCThumbCtrl");
+	//#32770 (dialog) 의 default class style 에는 CS_DBLCLKS 가 없어 추가 안 하면 WM_LBUTTONDBLCLK 가 dispatch 안 됨 → OnLButtonDblClk 호출 X.
+	wc.style |= CS_DBLCLKS;
 	AfxRegisterClass(&wc);
 
 	if (right <= left)
@@ -531,26 +533,37 @@ int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_t
 
 int CSCThumbCtrl::insert(int index, CSCGdiplusBitmap* src_thumb, CString title, bool key_thumb, bool invalidate)
 {
-	if (!src_thumb || !src_thumb->m_pBitmap)
+	if (index < 0 || index >= (int)m_thumb.size())
 		return -1;
 
-	m_thumb[index].img = new CSCGdiplusBitmap();
-	src_thumb->deep_copy(m_thumb[index].img);
+	//img 가 유효하면 deep_copy 해서 보관. null / invalid 면 m_thumb[index].img 는 그대로 (NULL 또는 기존 값).
+	//왜 분기: 호출자가 thumbnail 유실된 항목 (예: 캡처 실패 / deserialize 실패) 을 그래도 표시하려는 경우,
+	//title / info 는 보이고 image 영역은 OnPaint 의 "X" placeholder 가 그려져야 한다. 이전엔 img null 이면
+	//early-return 으로 title 까지 set 안 돼 cell 전체가 빈 채로 남던 우회 (BookmarkEditDlg 의 set_title 명시 호출 등) 가 필요했음.
+	if (src_thumb && src_thumb->m_pBitmap)
+	{
+		if (m_thumb[index].img)
+			delete m_thumb[index].img;
 
-	m_thumb[index].width = m_thumb[index].img->width;
-	m_thumb[index].height = m_thumb[index].img->height;
-	m_thumb[index].channel = m_thumb[index].img->channel;
+		m_thumb[index].img = new CSCGdiplusBitmap();
+		src_thumb->deep_copy(m_thumb[index].img);
 
-	//file-path 버전과 동일 — MAX_TILE_SIZE 로 미리 축소해야 m_sz_thumb 변경 시 품질 유지.
-	CRect r = get_ratio_rect(CRect(0, 0, MAX_TILE_SIZE, MAX_TILE_SIZE), m_thumb[index].img->width, m_thumb[index].img->height);
-	m_thumb[index].img->resize(r.Width(), r.Height());
+		m_thumb[index].width = m_thumb[index].img->width;
+		m_thumb[index].height = m_thumb[index].img->height;
+		m_thumb[index].channel = m_thumb[index].img->channel;
 
+		//file-path 버전과 동일 — MAX_TILE_SIZE 로 미리 축소해야 m_sz_thumb 변경 시 품질 유지.
+		CRect r = get_ratio_rect(CRect(0, 0, MAX_TILE_SIZE, MAX_TILE_SIZE), m_thumb[index].img->width, m_thumb[index].img->height);
+		m_thumb[index].img->resize(r.Width(), r.Height());
+	}
+
+	//title / metadata 는 img 유무와 무관하게 항상 set.
 	m_thumb[index].title = title;
 	m_thumb[index].full_path.Empty();
 	m_thumb[index].score = 0.0;
 	m_thumb[index].feature = NULL;
 
-	//cr_info 를 default (m_cr_info_text) 로 복사
+	//cr_info 를 default (m_cr_info_text) 로 복사.
 	for (int j = 0; j < INFO_TEXT_COUNT; j++)
 		m_thumb[index].cr_info[j] = m_cr_info_text[j];
 
@@ -869,10 +882,7 @@ void CSCThumbCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			else
 			{
 				//modifier 없음.
-				//전에 선택한 항목과 새로 선택한 항목이 다르면 m_last_clicked 초기화 — 원클릭 타이틀 편집 동작용.
-				if (m_selected.size() && (i != m_selected[0]))
-					m_last_clicked = 0;
-
+				//click-rename state 의 다른 항목 click 차단은 OnLButtonUp 의 m_last_clicked_index 가드가 처리 — 여기서 별도 reset 불필요.
 				if (m_use_multi_selection)
 				{
 					//multi 모드의 plain click — toggle 동작 보존 (기존 동작 호환).
@@ -965,10 +975,11 @@ void CSCThumbCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	// (a) m_last_clicked_index == index — 직전 클릭과 같은 항목. 다른 항목 거치면 자동 차단.
 	// (b) m_last_clicked != 0 — 최초 클릭 이후만.
 	// (c) delta > GetDoubleClickTime() — double-click (즉시 두 번 클릭) 회피, OnLButtonDblClk 으로 라우팅.
-	// (d) delta < 5000ms — 임의 후속 클릭이 rename 으로 잡히는 사고 회피.
-	UINT dbl_time = ::GetDoubleClickTime();
+	// (d) delta < click_rename_max_ms — 너무 오래 전 클릭 (별개 의도) 이 rename 으로 잡히는 사고 회피. 탐색기는 무한이지만 5초 정도면 의도성 클릭 안 놓침.
+	const long click_rename_max_ms = 5000;
+	const long dbl_time = (long)::GetDoubleClickTime();
 	if (m_last_clicked_index == index && m_last_clicked != 0
-		&& delta > (long)dbl_time && delta < 5000)
+		&& delta > dbl_time && delta < click_rename_max_ms)
 		edit_begin(-1);
 
 	m_last_clicked = t1;

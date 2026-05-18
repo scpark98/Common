@@ -138,6 +138,7 @@ BEGIN_MESSAGE_MAP(CSCThumbCtrl, CDialogEx)
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCThumbCtrl::on_message_CSCScrollbar)
 	ON_WM_CONTEXTMENU()
 	ON_COMMAND_RANGE(idTotalCount, idProperty, on_context_menu)
+	ON_WM_NCPAINT()
 END_MESSAGE_MAP()
 
 
@@ -156,6 +157,8 @@ void CSCThumbCtrl::recalc_tile_rect()
 			m_scrollbar.ShowWindow(SW_HIDE);
 			m_scrollbar_visible = false;
 		}
+
+		Invalidate();
 		return;
 	}
 
@@ -323,13 +326,13 @@ void CSCThumbCtrl::OnPaint()
 	}
 	else */if (m_loading_completed && m_thumb.size() == 0)
 	{
+		draw_rect(&dc, rc, m_draw_border ? m_theme.cr_border_inactive : Gdiplus::Color::Transparent, m_theme.cr_back);
+
 		CString str = _T("표시할 이미지가 없습니다.");
+		dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		//DrawTextShadow(&dc, str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE, GRAY64, red);
-		//DrawShadowText(dc.GetSafeHdc(), str, str.GetLength(), rc,
-		//	DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, 0, red, 2, 4);
-		draw_rect(&dc, rc, GRAY192);
 		dc.SelectObject(pOldFont);
+
 		return;
 	}
 
@@ -466,7 +469,9 @@ void CSCThumbCtrl::add_files(std::deque<CString> files, bool reset)
 
 	m_thumb.resize(m_files.size());
 
+	m_loading_completed = false;
 	m_loading_completed_count.store(0);
+
 	m_thread.start((int)m_files.size(),
 		[this](int /*worker_idx*/, int start, int end, CSCThread& th)
 		{
@@ -747,6 +752,20 @@ void CSCThumbCtrl::scroll_up(bool up, int offset)
 void CSCThumbCtrl::PreSubclassWindow()
 {
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+
+	//resource editor 의 border 속성 자동 감지 — WS_BORDER 또는 WS_EX_CLIENTEDGE 있으면 우리가 직접 테두리 그림.
+	//분명 WS_BORDER 가 켜져 있어도 (GetStyle() & WS_BORDER) 가 false 로 나오는 경우가 있어 exStyle 까지 함께 검사.
+	if ((GetStyle() & WS_BORDER) || (GetExStyle() & WS_EX_CLIENTEDGE))
+	{
+		m_draw_border = true;
+
+		//기본 border 제거 — default OnNcPaint 가 덮어쓰지 않도록.
+		ModifyStyle(WS_BORDER, 0);
+		ModifyStyleEx(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE, 0);
+		SetWindowPos(NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
+
 	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
 	//dlg의 parent의 font를 얻어와야 한다.
 	CFont* font = AfxGetApp()->GetMainWnd()->GetFont();
@@ -762,6 +781,20 @@ void CSCThumbCtrl::PreSubclassWindow()
 	m_sz_thumb.cy = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("thumb size cy"), 120);
 
 	CDialogEx::PreSubclassWindow();
+}
+
+void CSCThumbCtrl::OnNcPaint()
+{
+	CDialogEx::OnNcPaint();
+
+	if (!m_draw_border)
+		return;
+
+	CWindowDC dc(this);
+	CRect rc;
+	GetWindowRect(&rc);
+	rc.OffsetRect(-rc.TopLeft());
+	draw_rect(&dc, rc, m_theme.cr_border_inactive);
 }
 
 void CSCThumbCtrl::reconstruct_font()

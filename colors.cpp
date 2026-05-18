@@ -1250,7 +1250,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_back_selected		= get_color(cr_back, -16);
 			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover			= get_weak_color(cr_back, 32);
+			cr_back_hover			= get_weak_color(cr_back, 16);
 			cr_back_alternate		= get_color(cr_back, 8);
 
 			cr_selected_border		= Gdiplus::Color(255, 128, 128, 128);

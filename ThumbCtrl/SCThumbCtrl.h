@@ -226,6 +226,32 @@ public:
 	void			set_color_theme(int theme, bool invalidate = true);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
 	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+
+	//ctrl 자체의 cr_border. OnNcPaint() 에서 border 속성 유무를 판단하여 테두리를 그린다.
+	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; Invalidate(); }
+
+	//resource editor 에서 border 를 true 로 하면 PreSubclassWindow 에서 m_draw_border = true 로 자동 설정된다.
+	//사용자가 set_draw_border(false) 로 끄면 테두리를 그리지 않는다.
+	//
+	//border 는 OnNcPaint 에서 CWindowDC 로 그리므로 m_draw_border 변경 후 WM_NCPAINT 발생시켜야 한다.
+	//Invalidate() 는 client area 만 갱신하므로 부족 → SWP_FRAMECHANGED 로 NC 재계산 + 재그리기.
+	//native WS_BORDER / WS_EX_CLIENTEDGE 가 남아 있으면 OnNcPaint 직후 native NC paint 가 덮어쓰므로 함께 제거.
+	void			set_draw_border(bool draw_border = true)
+	{
+		m_draw_border = draw_border;
+		if (m_hWnd)
+		{
+			if (draw_border)
+			{
+				if (GetStyle()   & WS_BORDER)        ModifyStyle(WS_BORDER, 0);
+				if (GetExStyle() & WS_EX_CLIENTEDGE) ModifyStyleEx(WS_EX_CLIENTEDGE, 0);
+				if (GetExStyle() & WS_EX_STATICEDGE) ModifyStyleEx(WS_EX_STATICEDGE, 0);
+			}
+			SetWindowPos(NULL, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+			Invalidate();
+		}
+	}
 protected:
 	//set_color_theme 후 호출. info text default + 모든 썸네일 cr_info 를 theme.cr_text 로 동기화.
 	void			apply_theme_to_info_text();
@@ -336,7 +362,7 @@ protected:
 	CPoint			m_pt_old;
 
 //로딩 관련
-	bool				m_loading_completed = false;
+	bool				m_loading_completed = true;
 	std::atomic<int>	m_loading_completed_count{ 0 };
 	CSCThreadGroup		m_thread;
 	long				m_tloading_start = 0;
@@ -359,6 +385,8 @@ protected:
 //color theme
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
+	bool			m_draw_border = false;
+
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 지원입니다.
 
@@ -379,4 +407,5 @@ public:
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
+	afx_msg void OnNcPaint();
 };

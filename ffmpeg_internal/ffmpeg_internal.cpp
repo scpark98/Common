@@ -1,5 +1,12 @@
-﻿#include "ffmpeg_internal.h"
+﻿//Include 순서 critical (Common/ffmpeg_internal/ffi_source_filter.cpp 와 동일 이유):
+//  winsock2.h → afxwin.h → BaseClasses (streams.h via ffi_source_filter.h).
+//  MFC + BaseClasses 의 __POSITION 충돌 회피 + MFC Winsock2 detection.
+#include <winsock2.h>
+#include <afxwin.h>
+
+#include "ffmpeg_internal.h"
 #include "ffi_decoder.h"
+#include "ffi_source_filter.h"
 
 #include "../Functions.h"
 #include "../log/SCLog/SCLog.h"   //logWrite
@@ -208,6 +215,89 @@ namespace ffi
 
         dec.stop();
         dec.close();
+        return 0;
+    }
+
+    int filter_test(const wchar_t* utf16_path)
+    {
+        //CSource 는 COM (CUnknown 파생) — worker thread 에서 사용 시 COM init 필요.
+        //직접 `delete` 대신 AddRef/Release 로 ref count 가 0 될 때 자동 delete.
+        HRESULT hr_coinit = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+        HRESULT hr = S_OK;
+        CFFiSource* pSource = new CFFiSource(NULL, &hr);
+        if (!pSource || FAILED(hr))
+        {
+            logWrite(_T("[ffi/filter_test] CFFiSource ctor fail hr=0x%08x"), hr);
+            if (pSource)
+                delete pSource;   //ref count 0 상태라 delete 안전.
+            if (SUCCEEDED(hr_coinit)) CoUninitialize();
+            return -1;
+        }
+
+        pSource->AddRef();   //ref count 1 — 소유권 확보.
+
+        hr = pSource->open_file(utf16_path);
+        if (FAILED(hr))
+        {
+            logWrite(_T("[ffi/filter_test] open_file fail hr=0x%08x"), hr);
+            pSource->Release();   //→ ref count 0 → delete this 로 안전 정리.
+            if (SUCCEEDED(hr_coinit)) CoUninitialize();
+            return -2;
+        }
+
+        //pin 메타데이터 dump.
+        IEnumPins* pEnum = NULL;
+        if (SUCCEEDED(pSource->EnumPins(&pEnum)) && pEnum)
+        {
+            IPin* pPin = NULL;
+            int pidx = 0;
+            while (pEnum->Next(1, &pPin, NULL) == S_OK)
+            {
+                PIN_INFO pi; memset(&pi, 0, sizeof(pi));
+                pPin->QueryPinInfo(&pi);
+                if (pi.pFilter) pi.pFilter->Release();
+
+                //미디어 타입 확인
+                IEnumMediaTypes* pEnumMT = NULL;
+                if (SUCCEEDED(pPin->EnumMediaTypes(&pEnumMT)) && pEnumMT)
+                {
+                    AM_MEDIA_TYPE* pmt = NULL;
+                    if (pEnumMT->Next(1, &pmt, NULL) == S_OK && pmt)
+                    {
+                        if (pmt->formattype == FORMAT_VideoInfo && pmt->pbFormat)
+                        {
+                            VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)pmt->pbFormat;
+                            char fourcc[5] = {0};
+                            DWORD comp = pvi->bmiHeader.biCompression;
+                            for (int i = 0; i < 4; ++i)
+                                fourcc[i] = (char)((comp >> (i * 8)) & 0xFF);
+                            logWrite(_T("[ffi/filter_test] pin[%d] name=%ls type=Video subtype=%hs %dx%d %d-bpp avg_fps=%.2f"),
+                                pidx, pi.achName, fourcc,
+                                pvi->bmiHeader.biWidth, pvi->bmiHeader.biHeight,
+                                pvi->bmiHeader.biBitCount,
+                                pvi->AvgTimePerFrame > 0 ? 10000000.0 / pvi->AvgTimePerFrame : 0.0);
+                        }
+                        else
+                        {
+                            logWrite(_T("[ffi/filter_test] pin[%d] name=%ls (non-video media type)"), pidx, pi.achName);
+                        }
+                        if (pmt->pbFormat) CoTaskMemFree(pmt->pbFormat);
+                        CoTaskMemFree(pmt);
+                    }
+                    pEnumMT->Release();
+                }
+
+                pPin->Release();
+                ++pidx;
+            }
+            pEnum->Release();
+            logWrite(_T("[ffi/filter_test] total pin count = %d"), pidx);
+        }
+
+        //filter Release — ref count 0 → delete this → ~CSource 가 pin 까지 정리.
+        pSource->Release();
+        if (SUCCEEDED(hr_coinit)) CoUninitialize();
         return 0;
     }
 }

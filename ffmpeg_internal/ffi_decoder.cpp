@@ -185,6 +185,29 @@ namespace ffi
         return (double)m_fmt->duration / 1000.0;   //AV_TIME_BASE = 1000000 (μs), /1000 → ms.
     }
 
+    double CDecoder::frame_rate() const
+    {
+        if (!m_fmt || m_video_stream_idx < 0)
+            return 0.0;
+        AVRational r = m_fmt->streams[m_video_stream_idx]->avg_frame_rate;
+        if (r.den == 0)
+            return 0.0;
+        return (double)r.num / (double)r.den;
+    }
+
+    AVRational CDecoder::video_time_base() const
+    {
+        AVRational zero = { 0, 1 };
+        if (!m_fmt || m_video_stream_idx < 0)
+            return zero;
+        return m_fmt->streams[m_video_stream_idx]->time_base;
+    }
+
+    int CDecoder::video_pixel_format() const
+    {
+        return m_video_ctx ? (int)m_video_ctx->pix_fmt : (int)AV_PIX_FMT_NONE;
+    }
+
     void CDecoder::worker_loop()
     {
         AVPacket* pkt = av_packet_alloc();

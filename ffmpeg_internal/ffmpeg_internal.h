@@ -51,6 +51,10 @@ namespace ffi
     //frame N 개 디코드 후 미디어 중간 위치 seek + 추가 N 개 디코드. 각 frame 의 pts / decode 소요시간 로그.
     int                 decode_test(const wchar_t* utf16_path, int num_frames_to_dump = 10);
 
+    //Phase 3a smoke test — CFFiSource 인스턴스화 + open_file + pin 메타데이터 dump.
+    //graph 통합은 Phase 3b 에서. 일단 filter 만 독립적으로 동작하는지 검증.
+    int                 filter_test(const wchar_t* utf16_path);
+
     //av_err2str 의 C++ 호환 buffer 버전. 매크로 형태가 일부 컴파일러에서 문제 일으켜 인라인 함수로 대체.
     inline const char*  err_str(int err_code, char* buf, size_t buf_size)
     {

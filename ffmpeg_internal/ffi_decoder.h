@@ -55,6 +55,9 @@ namespace ffi
         int     video_width()  const;
         int     video_height() const;
         double  duration_ms()  const;
+        double  frame_rate()   const;        //avg_frame_rate (fps). 0 이면 unknown.
+        AVRational video_time_base() const;  //stream 의 time_base. pts→ms 변환에 사용.
+        int     video_pixel_format() const;  //AVPixelFormat. AVFrame 의 format 과 동일 또는 codec 의 hw_pix_fmt.
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
 

@@ -232,18 +232,15 @@ namespace ffi
 
         CDecoder& dec = m_pSource->decoder();
 
-        //AVFrame pop — 없으면 worker 가 frame 만들 때까지 짧게 대기.
+        //AVFrame pop — decoder 가 running 인 동안 wait. 빠른 drag 시 timeout S_FALSE 반환 시 stream 종료 → 영구 freeze 회피.
         AVFrame* frame = NULL;
-        for (int wait_ms = 0; wait_ms < 500; wait_ms += 5)
+        while (true)
         {
             frame = dec.pop_video_frame();
             if (frame) break;
-            Sleep(5);
-        }
-        if (!frame)
-        {
-            logWrite(_T("[ffi/src] FillBuffer timeout — no frame for 500ms"));
-            return S_FALSE;   //EOF or starvation
+            if (!dec.is_running())
+                return S_FALSE;
+            Sleep(2);
         }
 
         BYTE* pData = NULL;
@@ -458,15 +455,17 @@ namespace ffi
 
         CDecoder& dec = m_pSource->decoder();
 
+        //decoder 가 running 인 동안 계속 wait — 빠른 drag 시 큐 비는 시간 길어도 EOS 처리하지 않음.
+        //이게 없으면 500ms timeout → S_FALSE → 스트림 종료 → 무음 영구화 (drag 후 더 이상 audio 안 나옴).
         AVFrame* frame = NULL;
-        for (int wait_ms = 0; wait_ms < 500; wait_ms += 5)
+        while (true)
         {
             frame = dec.pop_audio_frame();
             if (frame) break;
-            Sleep(5);
+            if (!dec.is_running())
+                return S_FALSE;
+            Sleep(2);
         }
-        if (!frame)
-            return S_FALSE;
 
         BYTE* pData = NULL;
         HRESULT hr = pSample->GetPointer(&pData);

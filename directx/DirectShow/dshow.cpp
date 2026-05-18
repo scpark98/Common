@@ -1991,6 +1991,15 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		m_audio_stream_index = 0;
 	}
 
+	//SC Audio chain (Gain / Compressor / audio_sync) 삽입 — LAV path 와 동일 코드 재사용.
+	//setup_audio_gain_filter 가 graph 에서 audio renderer 자동 탐색 후 그 input 앞단에 filter 들 끼움.
+	//audio_sync ±ms 미세 조정 / volume gain / compressor 등 기존 기능 internal path 에서도 동작.
+	if (pFFi->decoder().has_audio())
+	{
+		setup_audio_gain_filter();
+		logWrite(_T("[internal] SC Audio chain setup attempted"));
+	}
+
 	//graph 가 ref 보유 — 우리 소유권 해제.
 	pFFi->Release();
 	return 1;

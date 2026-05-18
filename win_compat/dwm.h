@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /*
 * win_compat::dwm
@@ -56,6 +56,44 @@ namespace dwm
         if (!pfn) return;
         DWORD v = pref_round;
         pfn(hwnd, attr_corner_pref, &v, sizeof(v));
+    }
+
+    //Win10 Build 17763+ / Win11 : immersive dark mode 적용.
+    //  - 윈도우 caption / inactive frame / system buttons 등 OS 가 그리는 chrome 의 색을 dark 계열로.
+    //  - borderless 윈도우에서도 DWM 합성 frame (deactivate 시 그려지는 thin border) 가 dark 가 됨.
+    //  - DWMWA_BORDER_COLOR 와 함께 사용해야 일관 dark.
+    //  - Win10 1809 ~ 1903: attribute = 19 (DWMWA_USE_IMMERSIVE_DARK_MODE_OLD)
+    //  - Win10 1909+ / Win11 : attribute = 20 (DWMWA_USE_IMMERSIVE_DARK_MODE)
+    //    → 둘 다 시도 (어느 게 인식되는지 OS 가 알아서 무시 / 적용).
+    inline void use_immersive_dark_mode(HWND hwnd, bool dark = true)
+    {
+        auto pfn = _get_set_attr();
+        if (!pfn) return;
+        BOOL v = dark ? TRUE : FALSE;
+        pfn(hwnd, 20, &v, sizeof(v));   //DWMWA_USE_IMMERSIVE_DARK_MODE (1909+/11)
+        pfn(hwnd, 19, &v, sizeof(v));   //DWMWA_USE_IMMERSIVE_DARK_MODE_OLD (Win10 1809~1903)
+    }
+
+    //Win11 Build 22000+ : 윈도우 border 색상 지정.
+    //  - DWM 이 그리는 thick-frame 의 border 를 우리 지정 COLORREF 로 그림.
+    //  - DWMWA_COLOR_NONE 으로 끄면 DWM border 자체 그리지 않음.
+    //  - WS_THICKFRAME borderless 윈도우의 deactivate 시 흰 frame 차단에 사용.
+    //  - XP/Vista/7/8/10 : no-op
+    inline void set_border_color(HWND hwnd, COLORREF cr)
+    {
+        const DWORD attr_border_color = 34;  //DWMWA_BORDER_COLOR
+        auto pfn = _get_set_attr();
+        if (!pfn) return;
+        pfn(hwnd, attr_border_color, &cr, sizeof(cr));
+    }
+
+    inline void disable_border_color(HWND hwnd)
+    {
+        const DWORD attr_border_color = 34;       //DWMWA_BORDER_COLOR
+        const COLORREF color_none     = 0xFFFFFFFE; //DWMWA_COLOR_NONE
+        auto pfn = _get_set_attr();
+        if (!pfn) return;
+        pfn(hwnd, attr_border_color, &color_none, sizeof(color_none));
     }
 
     //DWMWA_EXTENDED_FRAME_BOUNDS (Vista+) : 보이는 frame 경계를 얻는다.

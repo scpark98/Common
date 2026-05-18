@@ -294,10 +294,10 @@ protected:
 	CRect			m_r_title;				//title 표시 영역. 자동 계산
 
 	//이 컨트롤과 썸네일들이 표시되는 영역의 상하좌우 여백
-	CSize			m_sz_margin = CSize(12, 12);
+	CSize			m_sz_margin = CSize(4, 4);
 
 	//썸네일 사이의 간격
-	CSize			m_sz_gap = CSize(12, 12);
+	CSize			m_sz_gap = CSize(4, 4);
 
 	//계속 thumb를 추가하는 형태로 사용하는 앱에서 thumb가 계속 증가하면 메모리도 계속 증가된다.
 	//제한을 둬야 할 경우도 있다. -1이면 제한없음.

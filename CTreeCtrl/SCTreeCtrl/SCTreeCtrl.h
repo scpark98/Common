@@ -373,6 +373,8 @@ public:
 	int				m_h_scroll_pos = 0;		//사용자 H scroll 위치 — tree natural max + m_scrollbar_width 까지. 초과분은 customdraw 가 paint shift 로 표시.
 	int				m_h_natural_max = -1;	//tree 의 native si.nMax (over-scroll 계산용).
 	bool			m_h_internal_thumb = false;	//우리 코드가 발사한 SB_THUMBPOSITION 인지 마킹 (외부 driver / 자체 발사 구분).
+	bool			m_v_visible_state = false;	//sync_scrollbar 가 결정한 V overlay visible — customdraw 가 timing 무관하게 정확한 값 사용.
+	bool			m_h_visible_state = false;	//H overlay visible 동일.
 	bool			m_scrollbar_setup = false;
 	void			setup_scrollbar();		//PreSubclassWindow 끝에서 호출 — WS_VSCROLL 제거 + scrollbar 생성.
 	void			sync_scrollbar();		//트리 scroll state → scrollbar 모델 push. 외부에서도 batch insert/delete 후 호출 가능.

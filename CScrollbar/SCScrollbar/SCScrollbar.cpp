@@ -559,6 +559,11 @@ void CSCScrollbar::draw_arrow(Gdiplus::Graphics& g, const CRect& rArrow, bool to
 void CSCScrollbar::OnPaint()
 {
 	CPaintDC dc1(this);
+
+	//BeginPaint 의 hdc 는 update region 으로 clip 됨 — 호출자가 row 단위 partial invalidate 시 BitBlt 가 dest 의 일부만 copy.
+	//SelectClipRgn(NULL) 로 clip 제거 → 항상 client 전체 paint. (BeginPaint 의 ValidateRect 효과는 유지되므로 무한 paint 위험 없음.)
+	::SelectClipRgn(dc1.m_hDC, NULL);
+
 	CRect rc;
 	GetClientRect(&rc);
 

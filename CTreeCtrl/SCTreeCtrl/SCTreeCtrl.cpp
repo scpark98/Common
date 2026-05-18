@@ -3363,10 +3363,11 @@ BOOL CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
 
-	//OnTvnItemexpanding 에서 SetRedraw(FALSE) 했음 — native expand paint 차단된 상태. 여기서 sync 후 SetRedraw(TRUE) + Invalidate 로 1-cycle repaint.
+	//OnTvnItemexpanding 에서 SetRedraw(FALSE). 여기서 sync 후 SetRedraw(TRUE) + RedrawWindow 로 tree + 모든 child (overlay) invalidate.
+	//Invalidate(FALSE) 는 tree client 만 invalidate — WS_CLIPCHILDREN 때문에 overlay 가 paint cycle 안 거치면 customdraw fill 이 overlay 영역에 노출됨.
 	sync_scrollbar();
 	SetRedraw(TRUE);
-	Invalidate(FALSE);
+	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
 
 	return FALSE;
 }
@@ -3503,9 +3504,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//   overlay 가 client 안쪽 우측 끝 m_scrollbar_width 점유 → row fill / text right 는 overlay 좌측까지로 clip.
 			CRect rcClient;
 			GetClientRect(&rcClient);
-			//V/H overlay 가 보이는 경우만 그 영역 reserved. hide 시 client 전체 사용.
-			bool v_visible_now = m_scrollbar_setup && ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
-			int right_limit = rcClient.right - (v_visible_now ? m_scrollbar_width : 0);
+			//overlay 가 setup 된 상태면 우측 m_scrollbar_width 항상 reserved (visible state 검사가 paint timing 으로 stale → 침범 발생).
+			//trade-off: V scrollbar hide 시에도 우측 18px 빈 영역. visible state 정확 추적 어려움 보다 깔끔한 painting 우선.
+			int right_limit = rcClient.right - (m_scrollbar_setup ? m_scrollbar_width : 0);
 			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
 			dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
 
@@ -4464,6 +4465,15 @@ void CSCTreeCtrl::setup_scrollbar()
 	m_scrollbar_h.ShowWindow(SW_HIDE);
 
 	m_scrollbar_setup = true;
+
+	//parent dialog 에 WS_CLIPCHILDREN — dialog 가 자체 OnPaint 시 tree window 영역 안 그리도록.
+	//없으면 dialog paint cycle (system COLOR_3DFACE 등 fill) + tree paint cycle 둘 다 발생해 두 frame 사이 깜빡임.
+	CWnd* pParent = GetParent();
+	if (pParent && !(pParent->GetStyle() & WS_CLIPCHILDREN))
+		pParent->ModifyStyle(0, WS_CLIPCHILDREN);
+
+	//초기 sync — m_v_visible_state / m_h_visible_state setting + overlay 위치 정확화. paint 전에 정확한 값 보장.
+	sync_scrollbar();
 }
 
 void CSCTreeCtrl::sync_scrollbar()
@@ -4499,6 +4509,10 @@ void CSCTreeCtrl::sync_scrollbar()
 	SCROLLINFO si_h = { sizeof(si_h), SIF_RANGE | SIF_PAGE | SIF_POS };
 	BOOL ok_h = ::IsWindow(m_scrollbar_h.m_hWnd) && ::GetScrollInfo(m_hWnd, SB_HORZ, &si_h);
 	bool need_h = ok_h && si_h.nPage > 0 && (si_h.nMax > (int)si_h.nPage);
+
+	//customdraw 가 timing 무관하게 정확한 값 사용 — IsWindowVisible 의 paint cycle stale 회피.
+	m_v_visible_state = need_v;
+	m_h_visible_state = need_h;
 
 	//---- 2단계: ShowWindow ----
 	if (need_v && !m_scrollbar.IsWindowVisible())

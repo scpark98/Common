@@ -22,14 +22,86 @@ namespace ffi
     // CFFiVideoStream
     //============================================================
 
+    //============================================================
+    // CFFiSeeking — aggregated CSourceSeeking
+    //============================================================
+
+    CFFiSeeking::CFFiSeeking(LPUNKNOWN pUnkOuter, HRESULT* phr, CCritSec* pLock, CFFiVideoStream* pPin)
+        : CSourceSeeking(NAME("CFFiSeeking"), pUnkOuter, phr, pLock)
+        , m_pPin(pPin)
+    {
+        //duration / caps 초기 설정.
+        if (pPin && pPin->source() && pPin->source()->decoder().is_opened())
+        {
+            m_rtDuration = (REFERENCE_TIME)(pPin->source()->decoder().duration_ms() * 10000.0);
+            m_rtStop = m_rtDuration;
+        }
+        m_dwSeekingCaps = AM_SEEKING_CanSeekAbsolute |
+                          AM_SEEKING_CanSeekForwards |
+                          AM_SEEKING_CanSeekBackwards |
+                          AM_SEEKING_CanGetCurrentPos |
+                          AM_SEEKING_CanGetStopPos |
+                          AM_SEEKING_CanGetDuration;
+    }
+
+    HRESULT CFFiSeeking::ChangeStart()
+    {
+        //graph 의 IMediaSeeking::SetPositions 호출 시 CSourceSeeking::SetPositions 가 m_rtStart 갱신 후 본 함수 호출.
+        if (m_pPin)
+            m_pPin->on_change_start(m_rtStart);
+        return S_OK;
+    }
+
+    HRESULT CFFiSeeking::ChangeStop()  { return S_OK; }
+    HRESULT CFFiSeeking::ChangeRate()  { return S_OK; }   //rate 변경 Phase 후속.
+
+    STDMETHODIMP CFFiSeeking::GetCurrentPosition(LONGLONG* pCurrent)
+    {
+        if (!pCurrent)
+            return E_POINTER;
+        *pCurrent = m_pPin ? m_pPin->last_rtStart() : 0;
+        return S_OK;
+    }
+
+    //============================================================
+    // CFFiVideoStream
+    //============================================================
+
     CFFiVideoStream::CFFiVideoStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName)
         : CSourceStream(NAME("CFFiVideoStream"), phr, pParent, pPinName)
         , m_pSource(pParent)
     {
+        //aggregated seeking 객체 — pin 의 IUnknown (GetOwner) 을 outer 로 넘김 → AddRef/Release 가 pin 으로 위임.
+        m_pSeeking = new CFFiSeeking(GetOwner(), phr, &m_cs_seeking, this);
     }
 
     CFFiVideoStream::~CFFiVideoStream()
     {
+        if (m_pSeeking)
+        {
+            delete m_pSeeking;
+            m_pSeeking = nullptr;
+        }
+    }
+
+    STDMETHODIMP CFFiVideoStream::NonDelegatingQueryInterface(REFIID riid, void** ppv)
+    {
+        if (riid == IID_IMediaSeeking && m_pSeeking)
+            return m_pSeeking->NonDelegatingQueryInterface(riid, ppv);
+        return CSourceStream::NonDelegatingQueryInterface(riid, ppv);
+    }
+
+    void CFFiVideoStream::on_change_start(REFERENCE_TIME rtStart)
+    {
+        if (!m_pSource)
+            return;
+
+        double pos_ms = (double)rtStart / 10000.0;
+        m_pSource->decoder().seek(pos_ms);
+        m_sample_count = 0;
+        m_last_rtStart = rtStart;
+
+        logWrite(_T("[ffi/src] on_change_start → CDecoder.seek %.0fms (async)"), pos_ms);
     }
 
     HRESULT CFFiVideoStream::OnThreadCreate()
@@ -213,6 +285,7 @@ namespace ffi
         }
         rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / (dec.frame_rate() > 0 ? dec.frame_rate() : 30.0));
         pSample->SetTime(&rtStart, &rtStop);
+        m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
 
         ++m_sample_count;
 

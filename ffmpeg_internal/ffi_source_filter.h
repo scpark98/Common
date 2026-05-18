@@ -27,12 +27,37 @@ namespace ffi
 {
     class CFFiSource;
 
-    //CSourceStream — push thread 가 FillBuffer 를 loop 호출. NV12 sample 을 IMediaSample 에 채워 downstream 에 push.
+    class CFFiVideoStream;
+
+    //CSourceSeeking 의 aggregated 구현 — pin 에 composition 으로 부착.
+    //ChangeStart/Stop/Rate 가 trigger 되면 back-pointer 로 pin 에 알림.
+    class CFFiSeeking : public CSourceSeeking
+    {
+    public:
+        CFFiSeeking(LPUNKNOWN pUnkOuter, HRESULT* phr, CCritSec* pLock, CFFiVideoStream* pPin);
+
+        //CSourceSeeking pure virtual override.
+        HRESULT ChangeStart() override;
+        HRESULT ChangeStop() override;
+        HRESULT ChangeRate() override;
+
+        //GetCurrentPosition override — pin 의 last_rtStart 반환.
+        STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent) override;
+
+    private:
+        CFFiVideoStream*    m_pPin;
+    };
+
+    //CSourceStream + IMediaSeeking 노출 (composition).
+    //NV12 sample 을 IMediaSample 에 채워 downstream 에 push. graph 의 SetPositions 는 CDecoder::seek 로 async 위임.
     class CFFiVideoStream : public CSourceStream
     {
     public:
         CFFiVideoStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
         ~CFFiVideoStream();
+
+        //IMediaSeeking 노출 — m_pSeeking 으로 라우팅. 그 외는 CSourceStream (CBaseOutputPin → CBasePin).
+        STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv) override;
 
         //CSourceStream overrides
         HRESULT FillBuffer(IMediaSample* pSample) override;
@@ -42,9 +67,19 @@ namespace ffi
         HRESULT OnThreadCreate() override;
         HRESULT OnThreadDestroy() override;
 
+        //CFFiSeeking 의 ChangeStart 가 호출 — CDecoder::seek 비동기 위임.
+        void                on_change_start(REFERENCE_TIME rtStart);
+
+        REFERENCE_TIME      last_rtStart() const { return m_last_rtStart; }
+        CFFiSource*         source() { return m_pSource; }
+
     private:
         CFFiSource*     m_pSource;
         LONGLONG        m_sample_count = 0;   //sample 순번. timestamping 에 사용.
+        LONGLONG        m_last_rtStart = 0;   //직전 emit 한 frame 의 rtStart. GetCurrentPosition 의 응답값.
+
+        CCritSec        m_cs_seeking;
+        CFFiSeeking*    m_pSeeking = nullptr;   //aggregated seeking object — pin 의 ref count 와 공유.
     };
 
     //CSource — base filter. Pin (CFFiVideoStream) 을 보유. open_file 로 CDecoder 준비.

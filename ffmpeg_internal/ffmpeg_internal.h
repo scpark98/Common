@@ -55,6 +55,10 @@ namespace ffi
     //graph 통합은 Phase 3b 에서. 일단 filter 만 독립적으로 동작하는지 검증.
     int                 filter_test(const wchar_t* utf16_path);
 
+    //Phase 3b smoke test — CFFiSource 를 GraphBuilder 에 add + Render → graph 자동 완성 + Run 3 초 + Stop.
+    //그래프 연결 성공 + worker thread 가 FillBuffer 호출되는지 확인. 화면 출력은 default renderer (보통 VMR9) 가 처리.
+    int                 graph_test(const wchar_t* utf16_path);
+
     //av_err2str 의 C++ 호환 buffer 버전. 매크로 형태가 일부 컴파일러에서 문제 일으켜 인라인 함수로 대체.
     inline const char*  err_str(int err_code, char* buf, size_t buf_size)
     {

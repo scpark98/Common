@@ -300,4 +300,93 @@ namespace ffi
         if (SUCCEEDED(hr_coinit)) CoUninitialize();
         return 0;
     }
+
+    int graph_test(const wchar_t* utf16_path)
+    {
+        HRESULT hr_coinit = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+        //1) FilterGraph 생성.
+        IGraphBuilder* pGB = NULL;
+        HRESULT hr = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC,
+            IID_IGraphBuilder, (void**)&pGB);
+        if (FAILED(hr) || !pGB)
+        {
+            logWrite(_T("[ffi/graph_test] FilterGraph create fail hr=0x%08x"), hr);
+            if (SUCCEEDED(hr_coinit)) CoUninitialize();
+            return -1;
+        }
+
+        //2) CFFiSource 인스턴스화 + open_file.
+        HRESULT hr_src = S_OK;
+        CFFiSource* pSource = new CFFiSource(NULL, &hr_src);
+        if (!pSource || FAILED(hr_src))
+        {
+            logWrite(_T("[ffi/graph_test] CFFiSource ctor fail hr=0x%08x"), hr_src);
+            if (pSource) delete pSource;
+            pGB->Release();
+            if (SUCCEEDED(hr_coinit)) CoUninitialize();
+            return -2;
+        }
+        pSource->AddRef();
+
+        hr = pSource->open_file(utf16_path);
+        if (FAILED(hr))
+        {
+            logWrite(_T("[ffi/graph_test] open_file fail hr=0x%08x"), hr);
+            pSource->Release();
+            pGB->Release();
+            if (SUCCEEDED(hr_coinit)) CoUninitialize();
+            return -3;
+        }
+
+        //3) IBaseFilter QI 후 graph 에 add.
+        IBaseFilter* pBF = NULL;
+        pSource->NonDelegatingQueryInterface(IID_IBaseFilter, (void**)&pBF);
+        if (!pBF)
+        {
+            logWrite(_T("[ffi/graph_test] QueryInterface IBaseFilter fail"));
+            pSource->Release();
+            pGB->Release();
+            if (SUCCEEDED(hr_coinit)) CoUninitialize();
+            return -4;
+        }
+        hr = pGB->AddFilter(pBF, L"FFmpeg Internal Source");
+        logWrite(_T("[ffi/graph_test] AddFilter hr=0x%08x"), hr);
+
+        //4) video out pin enum + Render → graph 가 자동으로 renderer (MPC-VR / EVR / VMR9) 추가 + connect.
+        IEnumPins* pEnumP = NULL;
+        IPin* pVideoOut = NULL;
+        if (SUCCEEDED(pBF->EnumPins(&pEnumP)) && pEnumP)
+        {
+            pEnumP->Next(1, &pVideoOut, NULL);
+            pEnumP->Release();
+        }
+
+        if (pVideoOut)
+        {
+            hr = pGB->Render(pVideoOut);
+            logWrite(_T("[ffi/graph_test] Render(video) hr=0x%08x"), hr);
+            pVideoOut->Release();
+        }
+
+        //5) IMediaControl 로 Run, 3 초 대기, Stop.
+        IMediaControl* pMC = NULL;
+        pGB->QueryInterface(IID_IMediaControl, (void**)&pMC);
+        if (pMC)
+        {
+            hr = pMC->Run();
+            logWrite(_T("[ffi/graph_test] Run hr=0x%08x — sleeping 3s"), hr);
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            pMC->Stop();
+            logWrite(_T("[ffi/graph_test] Stop"));
+            pMC->Release();
+        }
+
+        //6) 정리.
+        pBF->Release();
+        pSource->Release();   //ref count 0 → delete this 자동.
+        pGB->Release();
+        if (SUCCEEDED(hr_coinit)) CoUninitialize();
+        return 0;
+    }
 }

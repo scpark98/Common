@@ -2410,12 +2410,18 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 
 	//expand button (▶/▼) 클릭 — customdraw 의 glyph 위치 기준 hit-test (native TVHT_ONITEMBUTTON 영역과 어긋남, 특히 왼쪽).
+	//SetRedraw(FALSE/TRUE) wrap — collapse 시 tree 의 ScrollWindowEx BitBlt 가 row pixel 을 위로 끌어올려 화면에 잔상 (motion blur) 으로 보이는 거 차단.
+	//Expand 처리 동안 paint 차단, 끝에 Invalidate + UpdateWindow 로 단일 cycle paint.
 	if (hItem)
 	{
 		CRect rcButton = get_expand_button_rect(hItem);
 		if (!rcButton.IsRectEmpty() && rcButton.PtInRect(point))
 		{
+			SetRedraw(FALSE);
 			Expand(hItem, TVE_TOGGLE);
+			SetRedraw(TRUE);
+			Invalidate(FALSE);
+			UpdateWindow();
 			return;
 		}
 	}

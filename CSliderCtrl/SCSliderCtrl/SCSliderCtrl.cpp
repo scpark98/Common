@@ -350,14 +350,8 @@ void CSCSliderCtrl::OnPaint()
 		int cy = r.CenterPoint().y;
 		r.top = cy - 4;
 		r.bottom = cy + 4;
-		/*
-		dc.FillSolidRect(r.left, cy - 4, r.Width(), 2, get_color(m_cr_back, -64));
-		dc.FillSolidRect(r.left, cy - 2, r.Width(), 4, m_cr_back);//GRAY192);
-		dc.FillSolidRect(r.left, cy + 2, r.Width(), 2, get_color(m_cr_back, 64));
-		*/
-		draw_sunken_rect(&dc, r, true, get_weak_color(m_theme.cr_back, -20), get_weak_color(m_theme.cr_back, 20));
-		//r.DeflateRect(1, 1);
-		//draw_sunken_rect(&dc, r, true, get_color(m_theme.cr_back, -32), get_color(m_theme.cr_back, 32), 1);
+
+		draw_sunken_rect(&dc, r, true, get_color(m_theme.cr_back, -32), get_color(m_theme.cr_back, 32));
 	}
 	else if (m_style == style_step)
 	{

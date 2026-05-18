@@ -96,6 +96,19 @@ namespace dwm
         pfn(hwnd, attr_border_color, &color_none, sizeof(color_none));
     }
 
+    //DwmExtendFrameIntoClientArea — borderless 윈도우에 DWM shadow 활성화 시 사용.
+    //  - WS_THICKFRAME 없는 borderless 윈도우는 기본적으로 shadow 미적용. margins {0,0,0,1} 같은 최소 extend 로 DWM 가 shadow 계산.
+    //  - 시각적 client 영역은 영향 받지 않음 (extend 가 1px 라 거의 보이지 않음).
+    //  - XP/Vista 이전: no-op.
+    inline void extend_frame_into_client_area(HWND hwnd, int left = 0, int top = 0, int right = 0, int bottom = 1)
+    {
+        typedef HRESULT (WINAPI *pfn_t)(HWND, const void*);   //MARGINS struct 의 4-int 레이아웃 ABI 와 동일.
+        static pfn_t pfn = _get_dwmapi() ? (pfn_t)::GetProcAddress(_get_dwmapi(), "DwmExtendFrameIntoClientArea") : nullptr;
+        if (!pfn) return;
+        int margins[4] = { left, right, top, bottom };   //MARGINS = { cxLeft, cxRight, cyTop, cyBottom }
+        pfn(hwnd, margins);
+    }
+
     //DWMWA_EXTENDED_FRAME_BOUNDS (Vista+) : 보이는 frame 경계를 얻는다.
     //  - XP / dwmapi 미존재 / 함수 미존재 시 fallback 으로 GetWindowRect 사용.
     //  - 호출자가 분기 안 하도록 한 함수에 통합.

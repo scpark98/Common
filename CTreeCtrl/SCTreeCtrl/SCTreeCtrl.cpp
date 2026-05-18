@@ -2409,8 +2409,18 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		}
 	}
 
-	//expand button 은 base 가 자체 처리.
-	if (hItem && !(hit_flags & TVHT_ONITEMBUTTON))
+	//expand button (▶/▼) 클릭 — customdraw 의 glyph 위치 기준 hit-test (native TVHT_ONITEMBUTTON 영역과 어긋남, 특히 왼쪽).
+	if (hItem)
+	{
+		CRect rcButton = get_expand_button_rect(hItem);
+		if (!rcButton.IsRectEmpty() && rcButton.PtInRect(point))
+		{
+			Expand(hItem, TVE_TOGGLE);
+			return;
+		}
+	}
+
+	if (hItem)
 	{
 		SelectItem(hItem);
 		SetFocus();
@@ -2919,6 +2929,40 @@ void CSCTreeCtrl::winctrl_theme_init()
 		m_winctrl_theme.Init(m_hWnd);
 		m_winctrl_theme_initialized = true;
 	}
+}
+
+CRect CSCTreeCtrl::get_expand_button_rect(HTREEITEM hItem)
+{
+	if (hItem == NULL || !(GetStyle() & TVS_HASBUTTONS) || !ItemHasChildren(hItem))
+		return CRect();
+
+	int level = get_indent_level(hItem);
+	if (!(GetStyle() & TVS_LINESATROOT) && level == 0)
+		return CRect();
+
+	int indent_step = (int)SendMessage(TVM_GETINDENT, 0, 0);
+	if (indent_step <= 0)
+		indent_step = 19;
+
+	CRect rcText, rcRow;
+	GetItemRect(hItem, &rcText, TRUE);
+	GetItemRect(hItem, &rcRow, FALSE);
+
+	int icon_w = 0;
+	HIMAGELIST hil = (HIMAGELIST)SendMessage(TVM_GETIMAGELIST, TVSIL_NORMAL, 0);
+	if (hil)
+	{
+		int cx = 0, cy = 0;
+		ImageList_GetIconSize(hil, &cx, &cy);
+		icon_w = cx;
+	}
+	int state_offset = (GetStyle() & TVS_CHECKBOXES) ? (16 + 3) : 0;
+	int gx = rcText.left - icon_w - 3 - state_offset - indent_step / 2;
+	int gy = (rcRow.top + rcRow.bottom) / 2;
+
+	//hit-test 양쪽 padding — 삼각형 반 폭 (~4) + 여백 (~4) = 8.
+	const int hit_pad = 8;
+	return CRect(gx - hit_pad, gy - hit_pad, gx + hit_pad, gy + hit_pad);
 }
 
 CRect CSCTreeCtrl::get_checkbox_rect(HTREEITEM hItem)

@@ -50,6 +50,7 @@ namespace ffi
 
         //queue 에서 frame 1개 pop. 비면 nullptr. caller 가 av_frame_free 책임.
         AVFrame* pop_video_frame();
+        AVFrame* pop_audio_frame();
 
         //info
         int     video_width()  const;
@@ -58,14 +59,24 @@ namespace ffi
         double  frame_rate()   const;        //avg_frame_rate (fps). 0 이면 unknown.
         AVRational video_time_base() const;  //stream 의 time_base. pts→ms 변환에 사용.
         int     video_pixel_format() const;  //AVPixelFormat. AVFrame 의 format 과 동일 또는 codec 의 hw_pix_fmt.
+
+        //audio info — Phase 4. has_audio() false 면 audio stream 없음 / 디코더 fail.
+        bool    has_audio() const { return m_audio_stream_idx >= 0 && m_audio_ctx != nullptr; }
+        int     audio_sample_rate() const;       //Hz
+        int     audio_channels()    const;
+        int     audio_sample_format() const;     //AVSampleFormat enum 값
+        AVRational audio_time_base() const;
+
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
 
         //queue 의 현재 size — 디버깅용.
         size_t  video_queue_size();
+        size_t  audio_queue_size();
 
-        //queue 최대 깊이 (default 5, PotPlayer 와 동일).
-        void    set_max_queue(int n) { m_max_queue = n; }
+        //queue 최대 깊이 (default video 5 / audio 50, PotPlayer 와 비슷).
+        void    set_max_video_queue(int n) { m_max_queue = n; }
+        void    set_max_audio_queue(int n) { m_max_audio_queue = n; }
 
     private:
         void    worker_loop();
@@ -73,6 +84,10 @@ namespace ffi
         AVFormatContext*    m_fmt = nullptr;
         AVCodecContext*     m_video_ctx = nullptr;
         int                 m_video_stream_idx = -1;
+
+        //audio decode
+        AVCodecContext*     m_audio_ctx = nullptr;
+        int                 m_audio_stream_idx = -1;
 
         std::thread             m_thread;
         std::atomic<bool>       m_quit{false};
@@ -87,6 +102,8 @@ namespace ffi
         std::mutex              m_mtx_queue;
         std::condition_variable m_cv_queue;     //worker 가 queue 비울 때 ↔ UI 가 pop 할 때 양방향 wake.
         std::deque<AVFrame*>    m_video_queue;
+        std::deque<AVFrame*>    m_audio_queue;
         int                     m_max_queue = 5;
+        int                     m_max_audio_queue = 50;
     };
 }

@@ -1946,19 +1946,24 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	}
 	m_pGB->AddFilter(pBF, L"FFmpeg Internal Source");
 
-	//=== 3) video out pin → renderer connect (Render 가 자동 처리) ===
+	//=== 3) output pins → renderer connect (Render 가 자동 처리, video + audio 모두) ===
 	IEnumPins* pEnumP = NULL;
-	IPin* pVideoOut = NULL;
 	if (SUCCEEDED(pBF->EnumPins(&pEnumP)) && pEnumP)
 	{
-		pEnumP->Next(1, &pVideoOut, NULL);
+		IPin* pPin = NULL;
+		int pidx = 0;
+		while (pEnumP->Next(1, &pPin, NULL) == S_OK)
+		{
+			PIN_DIRECTION dir;
+			if (SUCCEEDED(pPin->QueryDirection(&dir)) && dir == PINDIR_OUTPUT)
+			{
+				hr = m_pGB->Render(pPin);
+				logWrite(_T("[internal] Render(pin[%d]) hr=0x%08x"), pidx, hr);
+			}
+			pPin->Release();
+			++pidx;
+		}
 		pEnumP->Release();
-	}
-	if (pVideoOut)
-	{
-		hr = m_pGB->Render(pVideoOut);
-		logWrite(_T("[internal] Render(video) hr=0x%08x"), hr);
-		pVideoOut->Release();
 	}
 	pBF->Release();
 
@@ -1974,11 +1979,17 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	logWrite(_T("[internal] open OK %dx%d fps=%.2f duration=%.0fms"),
 		m_video_size.cx, m_video_size.cy, m_frame_rate, m_duration);
 
-	//stream list — Endorphin2 의 open_media corruption check (`video_cnt==0 && audio_cnt==0` 이면 손상 처리) 통과용.
-	//Phase 3c 는 video only, 하나의 entry 만 넣음.
+	//stream list — Endorphin2 의 open_media corruption check 통과용.
 	m_video_stream.clear();
 	m_video_stream.push_back(CMediaStream(L"Video", 0));
 	m_video_stream_index = 0;
+
+	m_audio_stream.clear();
+	if (pFFi->decoder().has_audio())
+	{
+		m_audio_stream.push_back(CMediaStream(L"Audio", 0));
+		m_audio_stream_index = 0;
+	}
 
 	//graph 가 ref 보유 — 우리 소유권 해제.
 	pFFi->Release();

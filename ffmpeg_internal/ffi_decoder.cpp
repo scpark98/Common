@@ -90,6 +90,40 @@ namespace ffi
         logWrite(_T("[ffi/dec] opened codec=%hs %dx%d threads=%d"),
             codec->name, m_video_ctx->width, m_video_ctx->height, m_video_ctx->thread_count);
 
+        //audio stream 도 시도 — 없으면 has_audio() false 로 진행.
+        m_audio_stream_idx = av_find_best_stream(m_fmt, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+        if (m_audio_stream_idx >= 0)
+        {
+            AVCodecParameters* apar = m_fmt->streams[m_audio_stream_idx]->codecpar;
+            const AVCodec* acodec = avcodec_find_decoder(apar->codec_id);
+            if (acodec)
+            {
+                m_audio_ctx = avcodec_alloc_context3(acodec);
+                if (m_audio_ctx)
+                {
+                    avcodec_parameters_to_context(m_audio_ctx, apar);
+                    int ahr = avcodec_open2(m_audio_ctx, acodec, NULL);
+                    if (ahr < 0)
+                    {
+                        logWrite(_T("[ffi/dec] audio codec open fail hr=%d — audio disabled"), ahr);
+                        avcodec_free_context(&m_audio_ctx);
+                        m_audio_stream_idx = -1;
+                    }
+                    else
+                    {
+                        logWrite(_T("[ffi/dec] opened audio codec=%hs %dHz ch=%d sample_fmt=%d"),
+                            acodec->name, m_audio_ctx->sample_rate,
+                            m_audio_ctx->ch_layout.nb_channels, (int)m_audio_ctx->sample_fmt);
+                    }
+                }
+            }
+            else
+            {
+                logWrite(_T("[ffi/dec] no audio decoder for codec_id=%d"), (int)apar->codec_id);
+                m_audio_stream_idx = -1;
+            }
+        }
+
         return true;
     }
 
@@ -99,11 +133,14 @@ namespace ffi
 
         if (m_video_ctx)
             avcodec_free_context(&m_video_ctx);
+        if (m_audio_ctx)
+            avcodec_free_context(&m_audio_ctx);
 
         if (m_fmt)
             avformat_close_input(&m_fmt);
 
         m_video_stream_idx = -1;
+        m_audio_stream_idx = -1;
     }
 
     void CDecoder::start()
@@ -129,6 +166,12 @@ namespace ffi
         {
             AVFrame* f = m_video_queue.front();
             m_video_queue.pop_front();
+            av_frame_free(&f);
+        }
+        while (!m_audio_queue.empty())
+        {
+            AVFrame* f = m_audio_queue.front();
+            m_audio_queue.pop_front();
             av_frame_free(&f);
         }
         logWrite(_T("[ffi/dec] worker stopped"));
@@ -162,10 +205,27 @@ namespace ffi
         return f;
     }
 
+    AVFrame* CDecoder::pop_audio_frame()
+    {
+        std::unique_lock<std::mutex> lk(m_mtx_queue);
+        if (m_audio_queue.empty())
+            return nullptr;
+        AVFrame* f = m_audio_queue.front();
+        m_audio_queue.pop_front();
+        m_cv_queue.notify_one();
+        return f;
+    }
+
     size_t CDecoder::video_queue_size()
     {
         std::unique_lock<std::mutex> lk(m_mtx_queue);
         return m_video_queue.size();
+    }
+
+    size_t CDecoder::audio_queue_size()
+    {
+        std::unique_lock<std::mutex> lk(m_mtx_queue);
+        return m_audio_queue.size();
     }
 
     int CDecoder::video_width() const
@@ -208,6 +268,29 @@ namespace ffi
         return m_video_ctx ? (int)m_video_ctx->pix_fmt : (int)AV_PIX_FMT_NONE;
     }
 
+    int CDecoder::audio_sample_rate() const
+    {
+        return m_audio_ctx ? m_audio_ctx->sample_rate : 0;
+    }
+
+    int CDecoder::audio_channels() const
+    {
+        return m_audio_ctx ? m_audio_ctx->ch_layout.nb_channels : 0;
+    }
+
+    int CDecoder::audio_sample_format() const
+    {
+        return m_audio_ctx ? (int)m_audio_ctx->sample_fmt : (int)AV_SAMPLE_FMT_NONE;
+    }
+
+    AVRational CDecoder::audio_time_base() const
+    {
+        AVRational zero = { 0, 1 };
+        if (!m_fmt || m_audio_stream_idx < 0)
+            return zero;
+        return m_fmt->streams[m_audio_stream_idx]->time_base;
+    }
+
     void CDecoder::worker_loop()
     {
         AVPacket* pkt = av_packet_alloc();
@@ -223,7 +306,7 @@ namespace ffi
                     m_pending_seek_ms = -1.0;
                     lk.unlock();
 
-                    //queue flush — 이전 위치 frame 들 모두 버림.
+                    //queue flush — 이전 위치 frame 들 모두 버림. video + audio 둘 다.
                     {
                         std::unique_lock<std::mutex> lkq(m_mtx_queue);
                         while (!m_video_queue.empty())
@@ -232,11 +315,19 @@ namespace ffi
                             m_video_queue.pop_front();
                             av_frame_free(&f);
                         }
+                        while (!m_audio_queue.empty())
+                        {
+                            AVFrame* f = m_audio_queue.front();
+                            m_audio_queue.pop_front();
+                            av_frame_free(&f);
+                        }
                     }
 
                     int64_t target = (int64_t)(seek_pos * AV_TIME_BASE / 1000.0);
                     int hr_seek = av_seek_frame(m_fmt, -1, target, AVSEEK_FLAG_BACKWARD);
                     avcodec_flush_buffers(m_video_ctx);
+                    if (m_audio_ctx)
+                        avcodec_flush_buffers(m_audio_ctx);
                     logWrite(_T("[ffi/dec] seek to %.0fms hr=%d"), seek_pos, hr_seek);
 
                     //seek 처리 완료 — wait_seek_done() 동기 대기 중인 caller 에게 신호.
@@ -250,11 +341,13 @@ namespace ffi
             }
 
             //=== 2) queue 가득 차면 wait ===
+            //video 또는 audio 둘 다 max 이상이면 wait. 둘 중 하나 비어 있으면 packet 읽고 그쪽 채움.
             {
                 std::unique_lock<std::mutex> lk(m_mtx_queue);
                 m_cv_queue.wait(lk, [this]() {
                     return m_quit.load() ||
-                           (int)m_video_queue.size() < m_max_queue ||
+                           ((int)m_video_queue.size() < m_max_queue) ||
+                           ((int)m_audio_queue.size() < m_max_audio_queue) ||
                            [this]() {
                                std::unique_lock<std::mutex> lks(m_mtx_seek);
                                return m_pending_seek_ms >= 0;
@@ -280,34 +373,58 @@ namespace ffi
                 continue;
             }
 
-            if (pkt->stream_index != m_video_stream_idx)
+            //=== 4) decode (video or audio) ===
+            if (pkt->stream_index == m_video_stream_idx)
+            {
+                hr = avcodec_send_packet(m_video_ctx, pkt);
+                av_packet_unref(pkt);
+                if (hr < 0)
+                    continue;
+
+                while (true)
+                {
+                    AVFrame* frame = av_frame_alloc();
+                    hr = avcodec_receive_frame(m_video_ctx, frame);
+                    if (hr < 0)
+                    {
+                        av_frame_free(&frame);
+                        break;
+                    }
+
+                    {
+                        std::unique_lock<std::mutex> lk(m_mtx_queue);
+                        m_video_queue.push_back(frame);
+                    }
+                    m_cv_queue.notify_one();
+                }
+            }
+            else if (m_audio_ctx && pkt->stream_index == m_audio_stream_idx)
+            {
+                hr = avcodec_send_packet(m_audio_ctx, pkt);
+                av_packet_unref(pkt);
+                if (hr < 0)
+                    continue;
+
+                while (true)
+                {
+                    AVFrame* frame = av_frame_alloc();
+                    hr = avcodec_receive_frame(m_audio_ctx, frame);
+                    if (hr < 0)
+                    {
+                        av_frame_free(&frame);
+                        break;
+                    }
+
+                    {
+                        std::unique_lock<std::mutex> lk(m_mtx_queue);
+                        m_audio_queue.push_back(frame);
+                    }
+                    m_cv_queue.notify_one();
+                }
+            }
+            else
             {
                 av_packet_unref(pkt);
-                continue;
-            }
-
-            //=== 4) decode ===
-            hr = avcodec_send_packet(m_video_ctx, pkt);
-            av_packet_unref(pkt);
-            if (hr < 0)
-                continue;
-
-            while (true)
-            {
-                AVFrame* frame = av_frame_alloc();
-                hr = avcodec_receive_frame(m_video_ctx, frame);
-                if (hr < 0)
-                {
-                    av_frame_free(&frame);
-                    break;
-                }
-
-                //queue push
-                {
-                    std::unique_lock<std::mutex> lk(m_mtx_queue);
-                    m_video_queue.push_back(frame);
-                }
-                m_cv_queue.notify_one();
             }
         }
 

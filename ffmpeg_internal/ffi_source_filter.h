@@ -48,6 +48,8 @@ namespace ffi
         CFFiVideoStream*    m_pPin;
     };
 
+    class CFFiAudioStream;
+
     //CSourceStream + IMediaSeeking 노출 (composition).
     //NV12 sample 을 IMediaSample 에 채워 downstream 에 push. graph 의 SetPositions 는 CDecoder::seek 로 async 위임.
     class CFFiVideoStream : public CSourceStream
@@ -82,6 +84,32 @@ namespace ffi
         CFFiSeeking*    m_pSeeking = nullptr;   //aggregated seeking object — pin 의 ref count 와 공유.
     };
 
+    //Audio pin — PCM S16 출력. libswresample 로 decoder 출력 (FLTP 등) 을 S16 으로 변환.
+    class CFFiAudioStream : public CSourceStream
+    {
+    public:
+        CFFiAudioStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
+        ~CFFiAudioStream();
+
+        HRESULT FillBuffer(IMediaSample* pSample) override;
+        HRESULT GetMediaType(CMediaType* pMediaType) override;
+        HRESULT CheckMediaType(const CMediaType* pmt) override;
+        HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
+        HRESULT OnThreadCreate() override;
+        HRESULT OnThreadDestroy() override;
+
+        //video pin 의 on_change_start 에서 호출 — flush + new_segment.
+        void    on_seek_flush(REFERENCE_TIME rtStart);
+
+    private:
+        CFFiSource*     m_pSource;
+        LONGLONG        m_sample_count = 0;
+        SwrContext*     m_swr = nullptr;
+        int             m_out_sample_rate = 0;
+        int             m_out_channels = 0;
+        AVChannelLayout m_out_chlayout{};
+    };
+
     //CSource — base filter. Pin (CFFiVideoStream) 을 보유. open_file 로 CDecoder 준비.
     class CFFiSource : public CSource
     {
@@ -99,8 +127,13 @@ namespace ffi
         //CDecoder 직접 접근 — VideoStream 의 FillBuffer 가 frame 꺼낼 때 사용.
         CDecoder& decoder() { return m_decoder; }
 
+    public:
+        CFFiVideoStream*  video_stream() const { return m_pVideoStream; }
+        CFFiAudioStream*  audio_stream() const { return m_pAudioStream; }
+
     private:
-        CDecoder        m_decoder;
+        CDecoder         m_decoder;
         CFFiVideoStream* m_pVideoStream = nullptr;
+        CFFiAudioStream* m_pAudioStream = nullptr;   //has_audio 일 때만 생성.
     };
 }

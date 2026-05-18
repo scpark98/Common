@@ -11,7 +11,10 @@
 
 extern "C" {
 #include <libswscale/swscale.h>
+#include <libswresample/swresample.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
+#include <libavutil/channel_layout.h>
 }
 
 #include <vector>
@@ -97,22 +100,23 @@ namespace ffi
             return;
 
         double pos_ms = (double)rtStart / 10000.0;
+        REFERENCE_TIME rtStop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
 
-        //DirectShow seek 표준 시퀀스 — downstream 에 flush + new segment 통보.
-        //이걸 안 하면 renderer 가 graph clock 기준으로 "이미 지난 시간" 의 frame 으로 판단해 모두 drop → 화면 freeze.
-        //DeliverBeginFlush: 현재 in-flight 샘플 폐기 명령. 동기 — downstream 의 flush 완료까지 wait.
-        //DeliverEndFlush: flush 끝. resume 가능.
-        //DeliverNewSegment(0, rtStop, 1.0): "이 시점부터 시작하는 새 segment, rtStart=0 부터 시작" 알림.
-        //  rtStart=0 이라는 의미는 우리 sample 의 rtStart 가 0 부터 시작한다는 뜻 (sample_count 기반).
+        //video pin 의 downstream flush + new segment.
         DeliverBeginFlush();
+        DeliverEndFlush();
 
+        //CDecoder.seek 는 video / audio 큐 모두 flush + 두 codec 모두 flush_buffers.
         m_pSource->decoder().seek(pos_ms);
+
         m_sample_count = 0;
         m_last_rtStart = 0;
 
-        DeliverEndFlush();
-        REFERENCE_TIME rtStop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
         DeliverNewSegment(0, rtStop, 1.0);
+
+        //audio pin 도 동일한 flush + new segment 전파.
+        if (m_pSource->audio_stream())
+            m_pSource->audio_stream()->on_seek_flush(rtStart);
 
         logWrite(_T("[ffi/src] on_change_start → seek %.0fms + flush + new_segment(0..%lld)"),
             pos_ms, (long long)rtStop);
@@ -309,6 +313,209 @@ namespace ffi
     }
 
     //============================================================
+    // CFFiAudioStream
+    //============================================================
+
+    CFFiAudioStream::CFFiAudioStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName)
+        : CSourceStream(NAME("CFFiAudioStream"), phr, pParent, pPinName)
+        , m_pSource(pParent)
+    {
+        //output format: S16, 같은 sample_rate / channel layout. swresample 로 변환.
+        if (pParent && pParent->decoder().has_audio())
+        {
+            m_out_sample_rate = pParent->decoder().audio_sample_rate();
+            m_out_channels    = pParent->decoder().audio_channels();
+
+            //channel layout default — mono/stereo/surround.
+            av_channel_layout_default(&m_out_chlayout, m_out_channels);
+        }
+    }
+
+    CFFiAudioStream::~CFFiAudioStream()
+    {
+        if (m_swr)
+        {
+            swr_free(&m_swr);
+            m_swr = nullptr;
+        }
+        av_channel_layout_uninit(&m_out_chlayout);
+    }
+
+    HRESULT CFFiAudioStream::OnThreadCreate()
+    {
+        m_sample_count = 0;
+
+        //SwrContext 초기화 — decoder 의 sample format → S16 interleaved.
+        if (!m_swr && m_pSource && m_pSource->decoder().has_audio())
+        {
+            CDecoder& dec = m_pSource->decoder();
+            AVCodecContext* actx = nullptr;   //decoder 의 audio context 접근 — CDecoder 에 getter 없으면 sample_fmt 만 query.
+            //sample_fmt 를 raw int 로 받음.
+            AVSampleFormat in_fmt = (AVSampleFormat)dec.audio_sample_format();
+
+            m_swr = swr_alloc();
+
+            AVChannelLayout in_layout;
+            av_channel_layout_default(&in_layout, dec.audio_channels());
+
+            av_opt_set_chlayout(m_swr, "in_chlayout",     &in_layout, 0);
+            av_opt_set_int     (m_swr, "in_sample_rate",  dec.audio_sample_rate(), 0);
+            av_opt_set_sample_fmt(m_swr, "in_sample_fmt", in_fmt, 0);
+
+            av_opt_set_chlayout(m_swr, "out_chlayout",    &m_out_chlayout, 0);
+            av_opt_set_int     (m_swr, "out_sample_rate", m_out_sample_rate, 0);
+            av_opt_set_sample_fmt(m_swr, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);
+
+            int hr = swr_init(m_swr);
+            av_channel_layout_uninit(&in_layout);
+            if (hr < 0)
+            {
+                logWrite(_T("[ffi/src/audio] swr_init fail hr=%d"), hr);
+                swr_free(&m_swr);
+                m_swr = nullptr;
+                return E_FAIL;
+            }
+
+            logWrite(_T("[ffi/src/audio] swr ready in_fmt=%d → S16, %dHz ch=%d"),
+                (int)in_fmt, m_out_sample_rate, m_out_channels);
+        }
+
+        if (m_pSource && !m_pSource->decoder().is_running())
+            m_pSource->decoder().start();
+
+        return NOERROR;
+    }
+
+    HRESULT CFFiAudioStream::OnThreadDestroy()
+    {
+        if (m_swr)
+        {
+            swr_free(&m_swr);
+            m_swr = nullptr;
+        }
+        return NOERROR;
+    }
+
+    HRESULT CFFiAudioStream::GetMediaType(CMediaType* pMediaType)
+    {
+        if (!pMediaType || m_out_sample_rate <= 0 || m_out_channels <= 0)
+            return E_FAIL;
+
+        WAVEFORMATEX* pwfx = (WAVEFORMATEX*)pMediaType->AllocFormatBuffer(sizeof(WAVEFORMATEX));
+        if (!pwfx)
+            return E_OUTOFMEMORY;
+        ZeroMemory(pwfx, sizeof(WAVEFORMATEX));
+
+        pwfx->wFormatTag      = WAVE_FORMAT_PCM;
+        pwfx->nChannels       = (WORD)m_out_channels;
+        pwfx->nSamplesPerSec  = (DWORD)m_out_sample_rate;
+        pwfx->wBitsPerSample  = 16;
+        pwfx->nBlockAlign     = pwfx->nChannels * pwfx->wBitsPerSample / 8;
+        pwfx->nAvgBytesPerSec = pwfx->nSamplesPerSec * pwfx->nBlockAlign;
+        pwfx->cbSize          = 0;
+
+        pMediaType->SetType(&MEDIATYPE_Audio);
+        pMediaType->SetFormatType(&FORMAT_WaveFormatEx);
+        pMediaType->SetTemporalCompression(FALSE);
+        pMediaType->SetSubtype(&MEDIASUBTYPE_PCM);
+        pMediaType->SetSampleSize(pwfx->nBlockAlign);
+
+        return NOERROR;
+    }
+
+    HRESULT CFFiAudioStream::CheckMediaType(const CMediaType* pmt)
+    {
+        if (!pmt) return E_POINTER;
+        if (*pmt->Type()       != MEDIATYPE_Audio)       return E_INVALIDARG;
+        if (*pmt->Subtype()    != MEDIASUBTYPE_PCM)      return E_INVALIDARG;
+        if (*pmt->FormatType() != FORMAT_WaveFormatEx)   return E_INVALIDARG;
+        return S_OK;
+    }
+
+    HRESULT CFFiAudioStream::DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties)
+    {
+        if (!pAlloc || !pProperties)
+            return E_POINTER;
+
+        //1 frame ≈ 1024 samples (aac default). S16 stereo 44.1kHz: 1024 * 4 = 4096 bytes.
+        //여유 두고 8192 bytes (1024 sample × 8byte/sample [up to 8ch]).
+        pProperties->cBuffers = 8;
+        pProperties->cbBuffer = 8192;
+
+        ALLOCATOR_PROPERTIES Actual;
+        HRESULT hr = pAlloc->SetProperties(pProperties, &Actual);
+        if (FAILED(hr))
+            return hr;
+        if (Actual.cbBuffer < pProperties->cbBuffer)
+            return E_FAIL;
+        return NOERROR;
+    }
+
+    HRESULT CFFiAudioStream::FillBuffer(IMediaSample* pSample)
+    {
+        if (!pSample || !m_pSource || !m_swr)
+            return E_POINTER;
+
+        CDecoder& dec = m_pSource->decoder();
+
+        AVFrame* frame = NULL;
+        for (int wait_ms = 0; wait_ms < 500; wait_ms += 5)
+        {
+            frame = dec.pop_audio_frame();
+            if (frame) break;
+            Sleep(5);
+        }
+        if (!frame)
+            return S_FALSE;
+
+        BYTE* pData = NULL;
+        HRESULT hr = pSample->GetPointer(&pData);
+        if (FAILED(hr) || !pData)
+        {
+            av_frame_free(&frame);
+            return hr;
+        }
+        long buffer_size = pSample->GetSize();
+
+        //swr_convert — frame (planar / 다양한 fmt) → S16 interleaved.
+        int max_out_samples = buffer_size / (m_out_channels * 2);   //S16 = 2 bytes/sample
+        uint8_t* out_planes[1] = { pData };
+
+        int out_samples = swr_convert(m_swr,
+            out_planes, max_out_samples,
+            (const uint8_t**)frame->extended_data, frame->nb_samples);
+        if (out_samples < 0)
+        {
+            av_frame_free(&frame);
+            return E_FAIL;
+        }
+
+        int bytes_written = out_samples * m_out_channels * 2;
+        pSample->SetActualDataLength(bytes_written);
+        pSample->SetSyncPoint(TRUE);
+
+        //timing — sample_count 기반. audio sample_count 는 audio sample 수 (PCM frame 수 X — 그건 너무 빠름).
+        //rtStart = (sample_count / sample_rate) × 10^7
+        REFERENCE_TIME rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        m_sample_count += out_samples;
+        REFERENCE_TIME rtStop  = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        pSample->SetTime(&rtStart, &rtStop);
+
+        av_frame_free(&frame);
+        return NOERROR;
+    }
+
+    void CFFiAudioStream::on_seek_flush(REFERENCE_TIME rtStart)
+    {
+        REFERENCE_TIME rtStop = m_pSource ?
+            (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0) : 0;
+        DeliverBeginFlush();
+        DeliverEndFlush();
+        m_sample_count = 0;
+        DeliverNewSegment(0, rtStop, 1.0);
+    }
+
+    //============================================================
     // CFFiSource
     //============================================================
 
@@ -346,9 +553,23 @@ namespace ffi
             return FAILED(hr) ? hr : E_OUTOFMEMORY;
         }
 
-        logWrite(_T("[ffi/src] open_file OK %dx%d fps=%.2f duration=%.0fms"),
+        //Audio pin — decoder 에 audio stream 있으면 생성.
+        if (m_decoder.has_audio())
+        {
+            HRESULT hr_a = S_OK;
+            m_pAudioStream = new CFFiAudioStream(&hr_a, this, L"Audio");
+            if (!m_pAudioStream || FAILED(hr_a))
+            {
+                logWrite(_T("[ffi/src] audio stream create fail hr=0x%08x"), hr_a);
+                //audio 실패해도 video 만으로 계속.
+                m_pAudioStream = nullptr;
+            }
+        }
+
+        logWrite(_T("[ffi/src] open_file OK %dx%d fps=%.2f duration=%.0fms audio=%d"),
             m_decoder.video_width(), m_decoder.video_height(),
-            m_decoder.frame_rate(), m_decoder.duration_ms());
+            m_decoder.frame_rate(), m_decoder.duration_ms(),
+            (int)m_decoder.has_audio());
 
         return S_OK;
     }

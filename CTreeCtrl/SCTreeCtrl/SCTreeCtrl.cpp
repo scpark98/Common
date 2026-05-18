@@ -2396,8 +2396,21 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		}
 	}
 
-	//expand button / state icon (체크박스) 은 base 가 자체 처리.
-	if (hItem && !(hit_flags & (TVHT_ONITEMBUTTON | TVHT_ONITEMSTATEICON)))
+	//체크박스 클릭 — 우리 customdraw 의 체크박스 위치 기준 hit-test (native TVHT_ONITEMSTATEICON 영역과 어긋남).
+	if (hItem && (GetStyle() & TVS_CHECKBOXES))
+	{
+		CRect rcCheck = get_checkbox_rect(hItem);
+		if (!rcCheck.IsRectEmpty() && rcCheck.PtInRect(point))
+		{
+			SetCheck(hItem, !GetCheck(hItem));
+			SelectItem(hItem);
+			SetFocus();
+			return;
+		}
+	}
+
+	//expand button 은 base 가 자체 처리.
+	if (hItem && !(hit_flags & TVHT_ONITEMBUTTON))
 	{
 		SelectItem(hItem);
 		SetFocus();
@@ -2906,6 +2919,32 @@ void CSCTreeCtrl::winctrl_theme_init()
 		m_winctrl_theme.Init(m_hWnd);
 		m_winctrl_theme_initialized = true;
 	}
+}
+
+CRect CSCTreeCtrl::get_checkbox_rect(HTREEITEM hItem)
+{
+	if (hItem == NULL || !(GetStyle() & TVS_CHECKBOXES))
+		return CRect();
+
+	CRect rcText, rcRow;
+	GetItemRect(hItem, &rcText, TRUE);
+	GetItemRect(hItem, &rcRow, FALSE);
+
+	int icon_w = 0;
+	HIMAGELIST hil = (HIMAGELIST)SendMessage(TVM_GETIMAGELIST, TVSIL_NORMAL, 0);
+	if (hil)
+	{
+		int cx = 0, cy = 0;
+		ImageList_GetIconSize(hil, &cx, &cy);
+		icon_w = cx;
+	}
+	const int gap_icon_text = 3;
+	const int gap_check_icon = 3;
+	const int state_w = 16;
+	int cx_left = rcText.left - icon_w - gap_icon_text - gap_check_icon - state_w;
+	int cy = (rcRow.top + rcRow.bottom) / 2;
+	int half = state_w / 2;
+	return CRect(cx_left, cy - half, cx_left + state_w, cy + half);
 }
 
 void CSCTreeCtrl::draw_checkbox(CDC* pDC, CRect r, int check_state)
@@ -3490,10 +3529,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			if (GetStyle() & TVS_CHECKBOXES)
 			{
-				int cx_left = rcText.left - icon_w - gap_icon_text - gap_check_icon - state_w;
-				int cy = (rcRow.top + rcRow.bottom) / 2;
-				int half = state_w / 2;
-				CRect rcCheck(cx_left, cy - half, cx_left + state_w, cy + half);
+				CRect rcCheck = get_checkbox_rect(hItem);
 
 				bool checked = GetCheck(hItem) != 0;
 				dc.FillSolidRect(&rcCheck, m_theme.cr_back.ToCOLORREF());

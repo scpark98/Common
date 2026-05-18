@@ -431,6 +431,9 @@ protected:
 	void			winctrl_theme_init();
 	void			draw_checkbox(CDC* pDC, CRect r, int check_state);
 
+	//customdraw 의 체크박스 그리기 위치 — OnLButtonDown 의 hit-test 와 일관성 위해 helper. TVS_CHECKBOXES 없을 시 empty rect.
+	CRect			get_checkbox_rect(HTREEITEM hItem);
+
 	CImageList		m_imagelist;			//자체 이미지 리스트
 	std::deque<UINT>m_image_IDs;			//이미지 리스트에 추가한 resource id. 이를 저장하는 이유는 icon size 동적 변경도 지원하기 위해.
 	int				m_image_size = -1;		//-1(not yet set), 16 or 32?

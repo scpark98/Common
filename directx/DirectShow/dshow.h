@@ -93,6 +93,12 @@ public:
 	double			get_frame_rate();
 
 	int				load_media(CString sfile, CWnd* pParent, bool auto_render = false);
+	void			set_use_internal_ffmpeg(bool b) { m_use_internal_ffmpeg = b; }
+	bool			use_internal_ffmpeg() const { return m_use_internal_ffmpeg; }
+
+	//Phase 3c: load_media 의 internal path. video only. ffi::CFFiSource + MPC-VR.
+	//성공 시 1, 실패 시 0.
+	int				load_media_internal_ffmpeg(CString sfile, CWnd* pParent);
 	void			close_media();
 	bool			is_media_opened() { return (m_pGB != NULL); }
 	CString			get_media_filename() { return m_media_filename; }
@@ -332,6 +338,12 @@ protected:
 	//현재 그래프에 MPC Video Renderer (Aleksoid) 가 활성인지. true 면 IVMR* 인터페이스 NULL,
 	//IVideoWindow::put_Owner 호출 금지 (자식 윈도우 만들면 검정·드래그 차단).
 	bool			m_use_mpcvr;
+
+	//LAV Splitter+Decoder 의 SetPositions 동기 블로킹 (25-604ms) 회피용 내장 FFmpeg path.
+	//true 면 load_media 가 LAV 대신 ffi::CFFiSource (CDecoder + async seek) 로 graph build.
+	//Phase 3c: video only. Audio 는 추후 Phase 4 에서.
+	bool			m_use_internal_ffmpeg = false;
+	void*			m_pFFiSource = nullptr;   //ffi::CFFiSource* (raw 포인터, header 의존 회피용 void).
 
 
 	//총 재생 시간(ms)

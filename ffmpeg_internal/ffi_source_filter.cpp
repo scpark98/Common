@@ -97,11 +97,25 @@ namespace ffi
             return;
 
         double pos_ms = (double)rtStart / 10000.0;
+
+        //DirectShow seek 표준 시퀀스 — downstream 에 flush + new segment 통보.
+        //이걸 안 하면 renderer 가 graph clock 기준으로 "이미 지난 시간" 의 frame 으로 판단해 모두 drop → 화면 freeze.
+        //DeliverBeginFlush: 현재 in-flight 샘플 폐기 명령. 동기 — downstream 의 flush 완료까지 wait.
+        //DeliverEndFlush: flush 끝. resume 가능.
+        //DeliverNewSegment(0, rtStop, 1.0): "이 시점부터 시작하는 새 segment, rtStart=0 부터 시작" 알림.
+        //  rtStart=0 이라는 의미는 우리 sample 의 rtStart 가 0 부터 시작한다는 뜻 (sample_count 기반).
+        DeliverBeginFlush();
+
         m_pSource->decoder().seek(pos_ms);
         m_sample_count = 0;
-        m_last_rtStart = rtStart;
+        m_last_rtStart = 0;
 
-        logWrite(_T("[ffi/src] on_change_start → CDecoder.seek %.0fms (async)"), pos_ms);
+        DeliverEndFlush();
+        REFERENCE_TIME rtStop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
+        DeliverNewSegment(0, rtStop, 1.0);
+
+        logWrite(_T("[ffi/src] on_change_start → seek %.0fms + flush + new_segment(0..%lld)"),
+            pos_ms, (long long)rtStop);
     }
 
     HRESULT CFFiVideoStream::OnThreadCreate()
@@ -269,21 +283,14 @@ namespace ffi
         pSample->SetActualDataLength(required);
         pSample->SetSyncPoint((frame->flags & AV_FRAME_FLAG_KEY) ? TRUE : FALSE);
 
-        //Sample timing — frame pts (stream time_base) → REFERENCE_TIME (100ns).
-        REFERENCE_TIME rtStart = 0, rtStop = 0;
-        if (frame->pts != AV_NOPTS_VALUE)
-        {
-            AVRational tb = dec.video_time_base();
-            //pts × tb × 10^7 → 100ns. av_rescale_q 로 overflow 안전.
-            rtStart = av_rescale_q(frame->pts, tb, AVRational{1, 10000000});
-        }
-        else
-        {
-            double fps = dec.frame_rate();
-            if (fps <= 0.0) fps = 30.0;
-            rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
-        }
-        rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / (dec.frame_rate() > 0 ? dec.frame_rate() : 30.0));
+        //Sample timing — sample_count × 1/fps 기반 stream-relative time.
+        //pts (절대 media time) 으로 SetTime 하면 graph clock (0 부터 시작) 과 mismatch → renderer 가 frame 을 멀리 미래 시점에 schedule → freeze.
+        //sample_count 는 on_change_start 에서 0 으로 reset 되므로 seek 시 0 부터 다시 시작 → 즉시 표시.
+        //(Phase 4 audio 통합 시 pts/clock 정렬 필요 — 그때 재검토.)
+        double fps = dec.frame_rate();
+        if (fps <= 0.0) fps = 30.0;
+        REFERENCE_TIME rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
+        REFERENCE_TIME rtStop  = rtStart + (REFERENCE_TIME)(10000000.0 / fps);
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
 

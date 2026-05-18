@@ -1156,6 +1156,15 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 	CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_IGraphBuilder,(void **)&m_pGB) ;
 
+	//Internal FFmpeg 경로 — LAV Splitter+Decoder 의 SetPositions 동기 블로킹 회피.
+	//Phase 3c: video only. Audio path 는 Phase 4 에서.
+	if (m_use_internal_ffmpeg)
+	{
+		int ret = load_media_internal_ffmpeg(sfile, pParent);
+		logWrite(_T("[load/internal] result=%d"), ret);
+		return ret;
+	}
+
 	//Renderer 우선순위: MPCVR > EVR > VMR9. MPC-BE FGFilter.cpp 의 통합 패턴 참고.
 	//{71F080AA-8661-4093-B15E-4F6903E77D0A} = MPC Video Renderer (Aleksoid 0.7+).
 	static const GUID CLSID_MPCVR_NEW =
@@ -1856,6 +1865,124 @@ bool CDShow::is_windows_media()
 		return true;
 
 	return false;
+}
+
+#include "../../ffmpeg_internal/ffi_source_filter.h"
+
+int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
+{
+	//Phase 3c — LAV Splitter+Decoder skip, CFFiSource 단일 filter 로 demux+decode.
+	//Renderer 는 기존 우선순위 (MPCVR > EVR > VMR9) 그대로 사용.
+	//Audio path 는 Phase 4 — 현재 video only.
+
+	//=== 1) Renderer 추가 (기존 load_media 의 renderer 셋업 코드 압축 사본) ===
+	static const GUID CLSID_MPCVR_NEW =
+		{ 0x71F080AA, 0x8661, 0x4093, { 0xB1, 0x5E, 0x4F, 0x69, 0x03, 0xE7, 0x7D, 0x0A } };
+	HRESULT hr_mpcvr = CoCreateInstance(CLSID_MPCVR_NEW, NULL, CLSCTX_INPROC,
+		IID_IBaseFilter, (LPVOID*)&m_VMR);
+	if (SUCCEEDED(hr_mpcvr) && m_VMR != NULL)
+	{
+		m_pGB->AddFilter(m_VMR, L"MPC Video Renderer");
+		m_use_mpcvr = true;
+		logWrite(_T("[internal] MPC Video Renderer selected"));
+		CComQIPtr<IVideoWindow> pVW(m_VMR);
+		if (pVW && pParent)
+			pVW->put_Owner((OAHWND)pParent->m_hWnd);
+		CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+		if (pCfg)
+		{
+			pCfg->Flt_SetBool("lessRedraws", true);
+			pCfg->Flt_SetBool("d3dFullscreenControl", false);
+		}
+	}
+	else
+	{
+		HRESULT hr_evr = CoCreateInstance(CLSID_EnhancedVideoRenderer, NULL, CLSCTX_INPROC,
+			IID_IBaseFilter, (LPVOID*)&m_VMR);
+		if (SUCCEEDED(hr_evr) && m_VMR != NULL)
+		{
+			m_pGB->AddFilter(m_VMR, L"Enhanced Video Renderer");
+			logWrite(_T("[internal] EVR selected"));
+		}
+		else
+		{
+			CoCreateInstance(CLSID_VideoMixingRenderer9, NULL, CLSCTX_INPROC,
+				IID_IBaseFilter, (LPVOID*)&m_VMR);
+			if (m_VMR != NULL)
+			{
+				m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
+				logWrite(_T("[internal] VMR9 selected"));
+			}
+		}
+	}
+
+	//=== 2) CFFiSource 생성 + open_file + graph add ===
+	HRESULT hr_src = S_OK;
+	ffi::CFFiSource* pFFi = new ffi::CFFiSource(NULL, &hr_src);
+	if (!pFFi || FAILED(hr_src))
+	{
+		logWrite(_T("[internal] CFFiSource ctor fail hr=0x%08x"), hr_src);
+		if (pFFi) delete pFFi;
+		return 0;
+	}
+	pFFi->AddRef();
+
+	HRESULT hr = pFFi->open_file(sfile);
+	if (FAILED(hr))
+	{
+		logWrite(_T("[internal] CFFiSource.open_file fail hr=0x%08x"), hr);
+		pFFi->Release();
+		return 0;
+	}
+	m_pFFiSource = pFFi;   //caching for later (duration / video size accessor).
+
+	IBaseFilter* pBF = NULL;
+	pFFi->NonDelegatingQueryInterface(IID_IBaseFilter, (void**)&pBF);
+	if (!pBF)
+	{
+		pFFi->Release();
+		m_pFFiSource = nullptr;
+		return 0;
+	}
+	m_pGB->AddFilter(pBF, L"FFmpeg Internal Source");
+
+	//=== 3) video out pin → renderer connect (Render 가 자동 처리) ===
+	IEnumPins* pEnumP = NULL;
+	IPin* pVideoOut = NULL;
+	if (SUCCEEDED(pBF->EnumPins(&pEnumP)) && pEnumP)
+	{
+		pEnumP->Next(1, &pVideoOut, NULL);
+		pEnumP->Release();
+	}
+	if (pVideoOut)
+	{
+		hr = m_pGB->Render(pVideoOut);
+		logWrite(_T("[internal] Render(video) hr=0x%08x"), hr);
+		pVideoOut->Release();
+	}
+	pBF->Release();
+
+	//=== 4) control 인터페이스 QI ===
+	m_pGB->QueryInterface(IID_IMediaPosition, (void**)&m_pMP);
+	m_pGB->QueryInterface(IID_IMediaSeeking,  (void**)&m_pMS);
+	m_pGB->QueryInterface(IID_IMediaControl,  (void**)&m_pMC);
+
+	//=== 5) media info ===
+	m_duration   = pFFi->decoder().duration_ms();
+	m_video_size = CSize(pFFi->decoder().video_width(), pFFi->decoder().video_height());
+	m_frame_rate = pFFi->decoder().frame_rate();
+	logWrite(_T("[internal] open OK %dx%d fps=%.2f duration=%.0fms"),
+		m_video_size.cx, m_video_size.cy, m_frame_rate, m_duration);
+
+	//stream list — Endorphin2 의 open_media corruption check (`video_cnt==0 && audio_cnt==0` 이면 손상 처리) 통과용.
+	//Phase 3c 는 video only, 하나의 entry 만 넣음.
+	m_video_stream.clear();
+	m_video_stream.push_back(CMediaStream(L"Video", 0));
+	m_video_stream_index = 0;
+
+	//graph 가 ref 보유 — 우리 소유권 해제.
+	pFFi->Release();
+	return 1;
 }
 
 void CDShow::analyze_stream(IBaseFilter *pBaseFilter)

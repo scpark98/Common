@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+DirectShow BaseClasses integration property sheet.
+
+- 위치: D:\1.projects_c++\Common\dshow_baseclasses\
+- 출처: MPC-BE 의 src/ExtLib/BaseClasses (Win7Samples + MPC-BE 패치). 라이센스: MS-PL / 호환.
+- BaseClasses 는 modern Windows SDK 에 빠진 DirectShow filter 베이스 (CSource / CSourceStream /
+  CBaseFilter / CBaseOutputPin 등). custom filter 작성에 필수.
+
+사용 프로젝트의 PropertySheets ImportGroup 에:
+    <Import Project="..\Common\dshow_baseclasses.props" />
+
+자동으로:
+- include path 추가
+- strmiids.lib 링크
+- BaseClasses 의 ItemDefinitionGroup 설정 (USE_STD_STRING 등)
+
+ClCompile 항목은 props 에 직접 안 넣음 — vcxproj 의 ItemGroup 에 명시적으로 추가해야 함
+(props 의 ClCompile 은 ItemDefinition 만 처리, Item 자체는 vcxproj 측 책임).
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <BaseClassesDir>$(MSBuildThisFileDirectory)dshow_baseclasses</BaseClassesDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(BaseClassesDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>USE_STD_STRING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>strmiids.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+</Project>

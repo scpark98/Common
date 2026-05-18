@@ -3420,8 +3420,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//   overlay 가 client 안쪽 우측 끝 m_scrollbar_width 점유 → row fill / text right 는 overlay 좌측까지로 clip.
 			CRect rcClient;
 			GetClientRect(&rcClient);
-			//overlay 가 client 안 우측 m_scrollbar_width 점유 → paint 영역은 그 좌측까지.
-			int right_limit = rcClient.right - (m_scrollbar_setup ? m_scrollbar_width : 0);
+			//V/H overlay 가 보이는 경우만 그 영역 reserved. hide 시 client 전체 사용.
+			bool v_visible_now = m_scrollbar_setup && ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
+			int right_limit = rcClient.right - (v_visible_now ? m_scrollbar_width : 0);
 			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
 			dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
 
@@ -4398,29 +4399,8 @@ void CSCTreeCtrl::sync_scrollbar()
 	CRect rc;
 	GetClientRect(&rc);
 
-	//---- V overlay 위치 sync (client 안 우측 끝, H overlay 자리만큼 짧게) ----
-	{
-		CRect rTarget(rc.right - m_scrollbar_width, 0, rc.right, rc.Height() - m_scrollbar_width);
-		CRect rCur;
-		m_scrollbar.GetWindowRect(&rCur);
-		ScreenToClient(&rCur);
-		if (rCur != rTarget)
-			m_scrollbar.MoveWindow(rTarget);
-	}
-
-	//---- H overlay 위치 sync (client 안 하단 끝, V overlay 자리만큼 짧게) ----
-	if (::IsWindow(m_scrollbar_h.m_hWnd))
-	{
-		CRect rTarget(0, rc.bottom - m_scrollbar_width, rc.Width() - m_scrollbar_width, rc.bottom);
-		CRect rCur;
-		m_scrollbar_h.GetWindowRect(&rCur);
-		ScreenToClient(&rCur);
-		if (rCur != rTarget)
-			m_scrollbar_h.MoveWindow(rTarget);
-	}
-
-	//---- V scrollbar 모델 — visible item (= collapsed children 제외) 기준.
-	//GetCount() 는 collapsed children 포함이라 collapse 후 range 안 변함. GetNextVisibleItem loop 으로 정확.
+	//---- 1단계: 모델 결정 (need_v / need_h) ----
+	//V: visible item count 기준 (collapsed children 제외).
 	int total_visible_items = 0;
 	{
 		HTREEITEM cur = GetRootItem();
@@ -4434,6 +4414,51 @@ void CSCTreeCtrl::sync_scrollbar()
 	}
 	int visible = (int)GetVisibleCount();
 	bool need_v = (total_visible_items > visible) && (visible > 0);
+
+	//H: tree 의 native si 기준.
+	SCROLLINFO si_h = { sizeof(si_h), SIF_RANGE | SIF_PAGE | SIF_POS };
+	BOOL ok_h = ::IsWindow(m_scrollbar_h.m_hWnd) && ::GetScrollInfo(m_hWnd, SB_HORZ, &si_h);
+	bool need_h = ok_h && si_h.nPage > 0 && (si_h.nMax > (int)si_h.nPage);
+
+	//---- 2단계: ShowWindow ----
+	if (need_v && !m_scrollbar.IsWindowVisible())
+		m_scrollbar.ShowWindow(SW_SHOW);
+	else if (!need_v && m_scrollbar.IsWindowVisible())
+		m_scrollbar.ShowWindow(SW_HIDE);
+
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	{
+		if (need_h && !m_scrollbar_h.IsWindowVisible())
+			m_scrollbar_h.ShowWindow(SW_SHOW);
+		else if (!need_h && m_scrollbar_h.IsWindowVisible())
+			m_scrollbar_h.ShowWindow(SW_HIDE);
+	}
+
+	//---- 3단계: 위치 sync — 상대 overlay 의 visible 여부 따라 동적 크기 ----
+	//V overlay: H 가 보이면 H 자리만큼 짧게, 아니면 client 하단까지.
+	{
+		int v_bottom = need_h ? (rc.Height() - m_scrollbar_width) : rc.Height();
+		CRect rTarget(rc.right - m_scrollbar_width, 0, rc.right, v_bottom);
+		CRect rCur;
+		m_scrollbar.GetWindowRect(&rCur);
+		ScreenToClient(&rCur);
+		if (rCur != rTarget)
+			m_scrollbar.MoveWindow(rTarget);
+	}
+
+	//H overlay: V 가 보이면 V 자리만큼 짧게, 아니면 client 우측까지.
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	{
+		int h_right = need_v ? (rc.Width() - m_scrollbar_width) : rc.Width();
+		CRect rTarget(0, rc.bottom - m_scrollbar_width, h_right, rc.bottom);
+		CRect rCur;
+		m_scrollbar_h.GetWindowRect(&rCur);
+		ScreenToClient(&rCur);
+		if (rCur != rTarget)
+			m_scrollbar_h.MoveWindow(rTarget);
+	}
+
+	//---- 4단계: 모델 값 push ----
 	if (need_v)
 	{
 		HTREEITEM first = GetFirstVisibleItem();
@@ -4449,46 +4474,27 @@ void CSCTreeCtrl::sync_scrollbar()
 		m_scrollbar.set_range(0, total_visible_items - 1);
 		m_scrollbar.set_page(visible);
 		m_scrollbar.set_pos(first_index);
-		if (!m_scrollbar.IsWindowVisible())
-			m_scrollbar.ShowWindow(SW_SHOW);
+	}
+
+	if (need_h)
+	{
+		m_h_natural_max = si_h.nMax;
+		int boosted_max = si_h.nMax + m_scrollbar_width;
+		int boosted_max_pos = boosted_max - (int)si_h.nPage + 1;
+
+		if (m_h_scroll_pos < si_h.nPos)
+			m_h_scroll_pos = si_h.nPos;
+		if (m_h_scroll_pos > boosted_max_pos)
+			m_h_scroll_pos = boosted_max_pos;
+
+		m_scrollbar_h.set_range(si_h.nMin, boosted_max);
+		m_scrollbar_h.set_page(si_h.nPage);
+		m_scrollbar_h.set_pos(m_h_scroll_pos);
 	}
 	else
 	{
-		if (m_scrollbar.IsWindowVisible())
-			m_scrollbar.ShowWindow(SW_HIDE);
-	}
-
-	//---- H scrollbar 모델 — tree 의 natural max + m_scrollbar_width 만큼 boost. over-scroll 영역은 customdraw 의 paint shift 로 시각화.
-	if (::IsWindow(m_scrollbar_h.m_hWnd))
-	{
-		SCROLLINFO si = { sizeof(si), SIF_RANGE | SIF_PAGE | SIF_POS };
-		BOOL ok = ::GetScrollInfo(m_hWnd, SB_HORZ, &si);
-		bool need_h = ok && si.nPage > 0 && (si.nMax > (int)si.nPage);
-		if (need_h)
-		{
-			m_h_natural_max = si.nMax;
-			int boosted_max = si.nMax + m_scrollbar_width;
-			int boosted_max_pos = boosted_max - (int)si.nPage + 1;
-
-			//tree 가 자체 H scroll (wheel 등) 한 경우 m_h_scroll_pos 도 따라감.
-			if (m_h_scroll_pos < si.nPos)
-				m_h_scroll_pos = si.nPos;
-			if (m_h_scroll_pos > boosted_max_pos)
-				m_h_scroll_pos = boosted_max_pos;
-
-			m_scrollbar_h.set_range(si.nMin, boosted_max);
-			m_scrollbar_h.set_page(si.nPage);
-			m_scrollbar_h.set_pos(m_h_scroll_pos);
-			if (!m_scrollbar_h.IsWindowVisible())
-				m_scrollbar_h.ShowWindow(SW_SHOW);
-		}
-		else
-		{
-			m_h_natural_max = -1;
-			m_h_scroll_pos = 0;
-			if (m_scrollbar_h.IsWindowVisible())
-				m_scrollbar_h.ShowWindow(SW_HIDE);
-		}
+		m_h_natural_max = -1;
+		m_h_scroll_pos = 0;
 	}
 }
 

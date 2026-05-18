@@ -1,2 +1,7 @@
 #/system/CCmdLine/switch가 있는 cmdLine을 사용할 때 편리.txt
 #/office
+
+#FFmpeg LGPL shared binary — GitHub 100MB 한도 초과 (avfilter-11.dll = 104MB).
+#두 머신 모두 동일 경로 (D:\1.projects_c++\Common\ffmpeg\) 에 사용자가 직접 배치.
+#설치 절차는 Common/CDialog/borderless dialog.md 옆에 별도 문서로 추가 예정.
+/ffmpeg/

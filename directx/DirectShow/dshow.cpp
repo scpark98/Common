@@ -1709,6 +1709,31 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	//audio gain filter 끼움 — graph 의 audio renderer 직전. graph 빌드 끝난 후 한 번.
 	setup_audio_gain_filter();
 
+	//Graph reference clock 을 audio renderer (default) 가 아닌 SystemClock 으로 변경 —
+	//  audio renderer 가 clock master 면 seek 후 audio buffer preroll (~50-200ms) 동안 clock 이 정지 → video 도 wait → 사용자 체감 delay.
+	//  SystemClock 은 시스템 시간 기반 free-running 이라 buffer fill 과 무관하게 항상 advance → seek 후 first frame 도착 즉시 표시.
+	//  Trade-off: audio renderer 가 system clock 에 sync (자체 sample rate 와 미세 차이 보정 — drop/dup sample 가능, 보통 imperceptible).
+	//  진단에서 SetSyncSource(NULL) 시 video 가 1배속보다 빠르게 free-run 됨을 확인 → clock 이 video pace limiter 임을 증명.
+	//  NULL 대신 SystemClock 으로 video pace 유지 + audio buffer wait 우회.
+	{
+		CComPtr<IReferenceClock> pSysClock;
+		HRESULT hr_sc = CoCreateInstance(CLSID_SystemClock, NULL, CLSCTX_INPROC_SERVER,
+			IID_IReferenceClock, (void**)&pSysClock);
+		if (SUCCEEDED(hr_sc) && pSysClock)
+		{
+			CComQIPtr<IMediaFilter> pMF(m_pGB);
+			if (pMF)
+			{
+				HRESULT hr_set = pMF->SetSyncSource(pSysClock);
+				logWrite(_T("[clock] graph sync source = SystemClock hr=0x%08x"), hr_set);
+			}
+		}
+		else
+		{
+			logWrite(_T("[clock] SystemClock CoCreateInstance failed hr=0x%08x — keep default audio clock"), hr_sc);
+		}
+	}
+
 	//graph 의 현재 connection 상태를 .grf 파일로 export — GraphEdit/GraphStudioNext 로 시각화 검증.
 	{
 		TCHAR exe_path[MAX_PATH] = {0};
@@ -2120,16 +2145,34 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 	if (!m_pGB || !m_pMS)
 		return;
 
+	LARGE_INTEGER qpc_freq, qpc_t0, qpc_t1, qpc_t2, qpc_t3;
+	::QueryPerformanceFrequency(&qpc_freq);
+	::QueryPerformanceCounter(&qpc_t0);
+
+	//[diag] graph clock + 현재 position 진단 — seek 후 graph clock 이 새 위치로 advance 되는 시점이 visible frame 의 proxy.
+	REFERENCE_TIME pre_pos = 0;
+	m_pMS->GetCurrentPosition(&pre_pos);
+
 	HRESULT hr;
 	{
 		LONGLONG lPos = (LONGLONG)(pos * 10000.0);
 		//AM_SEEKING_SeekToKeyFrame: LAV 는 internally 처리 (redundant) 하지만 WMVideo Decoder DMO 등
 		//Microsoft DMO 는 keyframe snap 없으면 frame 생성 못 하는 경우 있음. drag 경로(false) 외엔 활성.
-		DWORD flags = AM_SEEKING_AbsolutePositioning;
+		//AM_SEEKING_NoFlush: graph 가 seek 시 internal buffer flush 안 함 → target 이 이미 디코드된 영역 안이면
+		//재디코드 없이 즉시 hit. 영역 밖이면 무효이지만 무해 (LAV/EVR 는 NoFlush 정상 처리).
+		DWORD flags = AM_SEEKING_AbsolutePositioning | AM_SEEKING_NoFlush;
 		if (seek_to_keyframe)
 			flags |= AM_SEEKING_SeekToKeyFrame;
 		hr = m_pMS->SetPositions(&lPos, flags, NULL, AM_SEEKING_NoPositioning);
-		logWrite(_T("[seek] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x"), pos, hr, flags);
+		::QueryPerformanceCounter(&qpc_t1);
+
+		REFERENCE_TIME post_pos = 0;
+		m_pMS->GetCurrentPosition(&post_pos);
+
+		logWrite(_T("[seek/t0] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x setpos_us=%lld pre_pos=%.0fms post_pos=%.0fms"),
+			pos, hr, flags,
+			(long long)((qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart),
+			(double)pre_pos / 10000.0, (double)post_pos / 10000.0);
 	}
 
 	//seek target cache — get_track_pos 가 INTERMEDIATE transition 중에 cache 반환 (B→A→B 깜빡임 회피).
@@ -2160,14 +2203,46 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 						pCfg->Flt_SetBool("cmd_redraw", true);
 				}
 			}
-			else if (fs == State_Running && is_windows_media())
+			else if (fs == State_Running)
 			{
-				//WMV + DMO decoder 환경 — seek 후 video frame 생성 안 되는 결함 회피.
-				//Pause 가 renderer 에게 "다음 frame 즉시 표시" 명령 → DMO 가 keyframe → forward 디코딩 후 frame push.
-				//Run 으로 즉시 재개. audio 잠깐 click 가능하나 video freeze 보단 나음.
-				m_pMC->Pause();
-				m_pMC->Run();
-				logWrite(_T("[seek] WMV pause-run cycle for DMO flush"));
+				::QueryPerformanceCounter(&qpc_t2);
+				if (m_use_mpcvr && m_VMR)
+				{
+					CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+					if (pCfg)
+						pCfg->Flt_SetBool("cmd_redraw", true);
+				}
+				else
+				{
+					m_pMC->Pause();
+					OAFilterState fs_paused;
+					m_pMC->GetState(100, &fs_paused);
+					m_pMC->Run();
+				}
+				::QueryPerformanceCounter(&qpc_t3);
+
+				//[diag] cmd_redraw / Pause-Run 후 graph clock 이 new pos 부근으로 advance 될 때까지 polling.
+				//advance 가 빨리 시작되면 video 가 곧 표시됨. 길면 audio buffer wait 등으로 clock stuck.
+				LONGLONG advance_us = -1;
+				REFERENCE_TIME tgt = (REFERENCE_TIME)(pos * 10000.0);
+				for (int i = 0; i < 50; i++)   //최대 500ms (10ms × 50)
+				{
+					REFERENCE_TIME cur = 0;
+					if (FAILED(m_pMS->GetCurrentPosition(&cur)))
+						break;
+					if (cur >= tgt - 10000000)   //tgt -1s 범위 도달 = clock 이 새 위치로 advance 시작
+					{
+						LARGE_INTEGER now;
+						::QueryPerformanceCounter(&now);
+						advance_us = (now.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
+						break;
+					}
+					::Sleep(10);
+				}
+
+				logWrite(_T("[seek/t1] redraw_us=%lld total_advance_us=%lld (T0→clock@target)"),
+					(long long)((qpc_t3.QuadPart - qpc_t2.QuadPart) * 1000000LL / qpc_freq.QuadPart),
+					(long long)advance_us);
 			}
 		}
 	}

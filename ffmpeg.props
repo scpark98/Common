@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+FFmpeg shared (LGPL) integration property sheet.
+
+- 외부 binary 위치: D:\1.projects_c++\Common\ffmpeg\{include,lib,bin}
+- 라이센스: LGPL (Gyan release-essentials-shared 또는 BtbN lgpl-shared)
+- 사용 프로젝트는 이 props 를 Import 한 후 그대로 빌드하면 됨.
+  vcxproj 의 PropertySheets ImportGroup 에:
+    <Import Project="..\Common\ffmpeg.props" />
+
+이 props 가 자동으로:
+- include path 추가 (libavformat / libavcodec 등 헤더 접근)
+- lib path 추가 + .lib 링크
+- Build 후 output 디렉토리로 5 개 DLL 자동 복사
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <FFmpegRoot>$(MSBuildThisFileDirectory)ffmpeg</FFmpegRoot>
+    <FFmpegInclude>$(FFmpegRoot)\include</FFmpegInclude>
+    <FFmpegLib>$(FFmpegRoot)\lib</FFmpegLib>
+    <FFmpegBin>$(FFmpegRoot)\bin</FFmpegBin>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(FFmpegInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- FFmpeg 헤더가 C99 inttypes.h 의 __STDC_CONSTANT_MACROS 를 요구함 (C++ 빌드 시) -->
+      <PreprocessorDefinitions>__STDC_CONSTANT_MACROS;__STDC_LIMIT_MACROS;__STDC_FORMAT_MACROS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(FFmpegLib);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>avformat.lib;avcodec.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Build 후 DLL 자동 copy. 32-bit / 64-bit 모두 동일 binary (Win64 LGPL) 가정. -->
+  <Target Name="CopyFFmpegDlls" AfterTargets="Build">
+    <ItemGroup>
+      <FFmpegDllFiles Include="$(FFmpegBin)\avformat-*.dll" />
+      <FFmpegDllFiles Include="$(FFmpegBin)\avcodec-*.dll" />
+      <FFmpegDllFiles Include="$(FFmpegBin)\avutil-*.dll" />
+      <FFmpegDllFiles Include="$(FFmpegBin)\swresample-*.dll" />
+      <FFmpegDllFiles Include="$(FFmpegBin)\swscale-*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FFmpegDllFiles)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

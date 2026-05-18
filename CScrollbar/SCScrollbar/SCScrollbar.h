@@ -89,7 +89,13 @@ public:
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
+//Message_CSCScrollbar 발신 대상 — 미지정 시 GetParent() 로 fallback.
+//overlay 가 host 의 형제로 (다른 window 의 child 로) 부착될 때 host 가 자기 자신을 target 으로 지정 가능.
+	void			set_message_target(CWnd* target) { m_message_target = target; }
+
 protected:
+	CWnd*			m_message_target = nullptr;
+
 	ORIENTATION		m_orient = vertical;
 
 	//모델

@@ -321,10 +321,11 @@ void CSCScrollbar::update_hover(CPoint pt)
 
 void CSCScrollbar::emit(int msg)
 {
-	if (CWnd* parent = GetParent())
+	CWnd* dst = m_message_target ? m_message_target : GetParent();
+	if (dst)
 	{
 		CSCScrollbarMsg payload(msg, this, m_pos);
-		::SendMessage(parent->GetSafeHwnd(), Message_CSCScrollbar, (WPARAM)&payload, 0);
+		::SendMessage(dst->GetSafeHwnd(), Message_CSCScrollbar, (WPARAM)&payload, 0);
 	}
 }
 

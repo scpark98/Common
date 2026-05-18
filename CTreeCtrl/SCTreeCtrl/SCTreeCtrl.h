@@ -370,6 +370,9 @@ public:
 	CSCScrollbar	m_scrollbar_h;	//horizontal
 	int				m_scrollbar_width = 18;	//track (window) 폭. thumb 두께는 CSCScrollbar 내부에서 별도 (resting 2, hover 5).
 	int				m_h_wheel_accum = 0;	//mouse driver 가 한 번 굴림에 작은 zDelta 다수 메시지 보낼 때 누적해서 WHEEL_DELTA 단위로 process.
+	bool			m_h_internal_thumb = false;	//우리 overlay drag 가 발사한 SB_THUMBPOSITION 와 외부 (mouse utility 등) 발사를 구분.
+	DWORD			m_h_burst_time = 0;			//마지막 외부 H scroll 메시지 시각 — 150ms 내 같은 굴림으로 인식.
+	int				m_h_burst_total = 0;		//같은 굴림 내 누적 delta — page/2 cap 의 기준.
 	bool			m_scrollbar_setup = false;
 	void			setup_scrollbar();		//PreSubclassWindow 끝에서 호출 — WS_VSCROLL 제거 + scrollbar 생성.
 	void			sync_scrollbar();		//트리 scroll state → scrollbar 모델 push. 외부에서도 batch insert/delete 후 호출 가능.
@@ -413,6 +416,7 @@ protected:
 
 //마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;
+	HTREEITEM		m_hot_item = NULL;	//Y 좌표 기준 row 의 어디든 hover 시 hot 으로 인식 — native HitTest 가 label 외 영역에서 hItem 반환 안 하는 케이스 보완.
 
 
 //들여쓰기 크기
@@ -530,6 +534,7 @@ public:
 	afx_msg BOOL OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg BOOL OnTvnBeginlabeledit(NMHDR* pNMHDR, LRESULT* pResult);

@@ -68,6 +68,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINDRAG, &CSCTreeCtrl::OnTvnBegindrag)
 	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CSCTreeCtrl::OnNMDblclk)
 	ON_WM_MOUSEMOVE()
+	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_HSCROLL()
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
@@ -2128,6 +2129,32 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		//RedrawWindow();
 	}
 
+	//full-row hot tracking — Y 좌표 기준 row 찾고 m_hot_item 갱신. native TVS_TRACKSELECT 의 CDIS_HOT 가 label 영역에서만 발사되는 한계를 보완.
+	HTREEITEM new_hot = NULL;
+	{
+		HTREEITEM cur = GetFirstVisibleItem();
+		while (cur)
+		{
+			CRect r;
+			if (GetItemRect(cur, &r, FALSE) && point.y >= r.top && point.y < r.bottom)
+			{
+				new_hot = cur;
+				break;
+			}
+			cur = GetNextVisibleItem(cur);
+		}
+	}
+	if (new_hot != m_hot_item)
+	{
+		HTREEITEM old_hot = m_hot_item;
+		m_hot_item = new_hot;
+		CRect r;
+		if (old_hot && GetItemRect(old_hot, &r, FALSE))
+			InvalidateRect(&r, FALSE);
+		if (new_hot && GetItemRect(new_hot, &r, FALSE))
+			InvalidateRect(&r, FALSE);
+	}
+
 	if (m_bDragging)
 	{
 		GetCursorPos(&point);
@@ -2334,7 +2361,49 @@ void CSCTreeCtrl::OnMouseLeave()
 	SelectDropTarget(NULL);
 	clear_insert_mark();
 
+	if (m_hot_item)
+	{
+		HTREEITEM old_hot = m_hot_item;
+		m_hot_item = NULL;
+		CRect r;
+		if (GetItemRect(old_hot, &r, FALSE))
+			InvalidateRect(&r, FALSE);
+	}
+
 	CTreeCtrl::OnMouseLeave();
+}
+
+void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	//탐색기 동작: full-row selection 표시 + row 어디 클릭이든 그 항목 선택.
+	//base CTreeCtrl::OnLButtonDown 는 Default() → DefWindowProc 로 *원래 message 의 lParam* (= 사용자 클릭 좌표) 그대로 보내므로
+	//point 인자를 label 좌표로 바꿔 호출해도 redirect 가 무효 → SelectItem 직접 호출로 명시적 선택.
+	UINT hit_flags = 0;
+	HTREEITEM hItem = HitTest(point, &hit_flags);
+
+	if (!hItem)
+	{
+		HTREEITEM cur = GetFirstVisibleItem();
+		while (cur)
+		{
+			CRect r;
+			if (GetItemRect(cur, &r, FALSE) && point.y >= r.top && point.y < r.bottom)
+			{
+				hItem = cur;
+				break;
+			}
+			cur = GetNextVisibleItem(cur);
+		}
+	}
+
+	//expand button / state icon (체크박스) 은 base 가 자체 처리.
+	if (hItem && !(hit_flags & (TVHT_ONITEMBUTTON | TVHT_ONITEMSTATEICON)))
+	{
+		SelectItem(hItem);
+		SetFocus();
+	}
+
+	CTreeCtrl::OnLButtonDown(nFlags, point);
 }
 
 void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
@@ -2427,16 +2496,59 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 
 void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
-	//mouse 의 H wheel / tilt 가 일부 driver 에선 WM_MOUSEHWHEEL 이 아니라 WM_HSCROLL SB_LINELEFT/RIGHT 로 직접 발사 →
-	//base 처리 시 default line width (= 한 글자 width) 라 굴려도 변화 미미. 여기서 line step 을 큰 chunk 로 보정.
-	if (nSBCode == SB_LINELEFT || nSBCode == SB_LINERIGHT)
+	//외부 SB_THUMBPOSITION (mouse utility 등) 의 큰 nPos cap — m_h_internal_thumb=false 일 때만 page/2 cap.
+	if ((nSBCode == SB_THUMBPOSITION || nSBCode == SB_THUMBTRACK) && !m_h_internal_thumb)
 	{
 		SCROLLINFO si = { sizeof(si), SIF_ALL };
 		if (::GetScrollInfo(m_hWnd, SB_HORZ, &si))
 		{
-			int direction = (nSBCode == SB_LINELEFT) ? -1 : 1;
+			int cap = max(120, (int)si.nPage / 2);
+			int delta = (int)nPos - (int)si.nPos;
+			if (delta > cap)
+				delta = cap;
+			else if (delta < -cap)
+				delta = -cap;
+			int new_pos = (int)si.nPos + delta;
 			int max_pos = max(0, si.nMax - (int)si.nPage + 1);
-			int new_pos = (int)si.nPos + direction * 60;
+			if (new_pos < 0)
+				new_pos = 0;
+			if (new_pos > max_pos)
+				new_pos = max_pos;
+
+			m_h_internal_thumb = true;
+			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)new_pos), 0);
+			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+			m_h_internal_thumb = false;
+		}
+		else
+			CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+	}
+	//mouse 의 H wheel / tilt 가 일부 driver 에선 WM_MOUSEHWHEEL 이 아니라 WM_HSCROLL SB_LINELEFT/RIGHT 로 직접 발사 →
+	//base 처리 시 default line width (= 한 글자 width) 라 굴려도 변화 미미. 여기서 line step 을 큰 chunk 로 보정.
+	//첫 굴림 시 mouse driver 가 큰 burst (수십 개 메시지) 한꺼번에 dispatch 하는 경우 — PeekMessage 로 queue 합치고 page/2 cap.
+	else if (nSBCode == SB_LINELEFT || nSBCode == SB_LINERIGHT)
+	{
+		SCROLLINFO si = { sizeof(si), SIF_ALL };
+		if (::GetScrollInfo(m_hWnd, SB_HORZ, &si))
+		{
+			int chunks = 1;
+			MSG peek_msg;
+			while (::PeekMessage(&peek_msg, m_hWnd, WM_HSCROLL, WM_HSCROLL, PM_NOREMOVE))
+			{
+				if (LOWORD(peek_msg.wParam) != nSBCode)
+					break;
+				::PeekMessage(&peek_msg, m_hWnd, WM_HSCROLL, WM_HSCROLL, PM_REMOVE);
+				chunks++;
+			}
+
+			int direction = (nSBCode == SB_LINELEFT) ? -1 : 1;
+			int total_px = chunks * 60;
+			int cap = max(60, (int)si.nPage / 2);
+			if (total_px > cap)
+				total_px = cap;
+
+			int max_pos = max(0, si.nMax - (int)si.nPage + 1);
+			int new_pos = (int)si.nPos + direction * total_px;
 			if (new_pos < 0)
 				new_pos = 0;
 			if (new_pos > max_pos)
@@ -3286,7 +3398,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				crText = m_theme.cr_text_dropHilited;
 				crBack = m_theme.cr_back_dropHilited;
 			}
-			else if (pNMCustomDraw->uItemState & CDIS_HOT)
+			else if ((pNMCustomDraw->uItemState & CDIS_HOT) || hItem == m_hot_item)
 			{
 				crBack = m_theme.cr_back_hover;
 			}
@@ -4103,7 +4215,7 @@ void CSCTreeCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	int notches = abs(m_h_wheel_accum) / WHEEL_DELTA;
 	m_h_wheel_accum -= direction * notches * WHEEL_DELTA;
 
-	int delta_px = direction * notches * 240;
+	int delta_px = direction * notches * 60;
 
 	int max_pos = max(0, si.nMax - (int)si.nPage + 1);
 	int new_pos = (int)si.nPos + delta_px;
@@ -4112,8 +4224,11 @@ void CSCTreeCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	if (new_pos > max_pos)
 		new_pos = max_pos;
 
+	//m_h_internal_thumb=true marking — OnHScroll 의 외부 SB_THUMBPOSITION cap 우회.
+	m_h_internal_thumb = true;
 	SendMessage(WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)new_pos), 0);
 	SendMessage(WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+	m_h_internal_thumb = false;
 
 	sync_scrollbar();
 	Invalidate(FALSE);
@@ -4382,9 +4497,12 @@ LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 	else if (msg->pThis == &m_scrollbar_h)
 	{
 		//H scroll drag — SB_THUMBPOSITION 으로 tree 의 H scroll 위치 변경. sync_scrollbar 호출 안 함 (V 와 같은 이유).
+		//m_h_internal_thumb flag 로 OnHScroll 의 외부 SB_THUMBPOSITION cap 분기 우회.
 		SetRedraw(FALSE);
+		m_h_internal_thumb = true;
 		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)msg->pos), 0);
 		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+		m_h_internal_thumb = false;
 		SetRedraw(TRUE);
 		Invalidate(FALSE);
 	}

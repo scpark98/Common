@@ -1,10 +1,13 @@
 ﻿#include "ffmpeg_internal.h"
+#include "ffi_decoder.h"
 
 #include "../Functions.h"
 #include "../log/SCLog/SCLog.h"   //logWrite
 
 #include <afxstr.h>
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <vector>
 
 namespace ffi
@@ -123,6 +126,88 @@ namespace ffi
         }
 
         avformat_close_input(&fmt);
+        return 0;
+    }
+
+    int decode_test(const wchar_t* utf16_path, int num_frames_to_dump)
+    {
+        CDecoder dec;
+        if (!dec.open(utf16_path))
+            return -1;
+
+        logWrite(_T("[ffi/dec_test] open OK %dx%d duration=%.0fms — starting worker"),
+            dec.video_width(), dec.video_height(), dec.duration_ms());
+
+        dec.start();
+
+        //frame N 개 받을 때까지 polling.
+        int received = 0;
+        auto t_start = std::chrono::steady_clock::now();
+        while (received < num_frames_to_dump)
+        {
+            AVFrame* f = dec.pop_video_frame();
+            if (!f)
+            {
+                if (std::chrono::steady_clock::now() - t_start > std::chrono::seconds(5))
+                {
+                    logWrite(_T("[ffi/dec_test] timeout — only %d frames"), received);
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                continue;
+            }
+            ++received;
+            logWrite(_T("[ffi/dec_test] frame[%d] pts=%lld key=%d %dx%d queue=%zu"),
+                received, (long long)f->pts, (int)(f->flags & AV_FRAME_FLAG_KEY),
+                f->width, f->height, dec.video_queue_size());
+            av_frame_free(&f);
+        }
+
+        //seek 테스트 — 미디어 중간 위치.
+        double mid_pos_ms = dec.duration_ms() * 0.5;
+        logWrite(_T("[ffi/dec_test] seek to %.0fms"), mid_pos_ms);
+        auto t_seek = std::chrono::steady_clock::now();
+        dec.seek(mid_pos_ms);
+
+        //worker 가 av_seek_frame + queue drain 끝낼 때까지 동기 대기.
+        //이걸 안 하면 pop_video_frame 이 pre-seek 잔여 frame 을 반환해 latency 측정이 거의 0 으로 나옴 (버그).
+        bool seek_done = dec.wait_seek_done(2000);
+        auto t_seek_done = std::chrono::steady_clock::now();
+        long long seek_proc_us = std::chrono::duration_cast<std::chrono::microseconds>(t_seek_done - t_seek).count();
+        logWrite(_T("[ffi/dec_test] wait_seek_done=%d seek_proc_us=%lld"), (int)seek_done, seek_proc_us);
+
+        //queue drain (worker 이미 drain 했지만 race 방어).
+        while (AVFrame* old_f = dec.pop_video_frame())
+            av_frame_free(&old_f);
+
+        //이제 진짜 post-seek 첫 frame 까지 시간 측정.
+        AVFrame* first_after_seek = nullptr;
+        auto t_drain = std::chrono::steady_clock::now();
+        while (!first_after_seek)
+        {
+            first_after_seek = dec.pop_video_frame();
+            if (!first_after_seek)
+            {
+                if (std::chrono::steady_clock::now() - t_drain > std::chrono::seconds(5))
+                {
+                    logWrite(_T("[ffi/dec_test] post-seek first frame timeout"));
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+        if (first_after_seek)
+        {
+            auto t_first = std::chrono::steady_clock::now();
+            long long total_us = std::chrono::duration_cast<std::chrono::microseconds>(t_first - t_seek).count();
+            long long decode_us = std::chrono::duration_cast<std::chrono::microseconds>(t_first - t_seek_done).count();
+            logWrite(_T("[ffi/dec_test] first post-seek frame pts=%lld total_latency_us=%lld decode_us=%lld"),
+                (long long)first_after_seek->pts, total_us, decode_us);
+            av_frame_free(&first_after_seek);
+        }
+
+        dec.stop();
+        dec.close();
         return 0;
     }
 }

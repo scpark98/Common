@@ -29,6 +29,12 @@ static char THIS_FILE[] = __FILE__;
 
 #define IDC_EDIT_CELL	WM_USER + 9001
 
+//PreSubclassWindow 에서 자식 윈도우를 *직접* 만들면 MFC CBT hook (wincore.cpp _AfxCbtFilterHook) 안에서
+//중첩 CreateEx 가 일어나 AfxHookWindowCreate 의 ASSERT(m_pWndInit == NULL) 가 터진다 — parent 가 동적
+//CreateEx 로 만들어지는 CPathCtrl::m_list_folder 같은 경우. 그래서 setup_scrollbar 호출을 PostMessage 로
+//지연 — CBT hook 이 m_pWndInit 를 클리어한 뒤 메시지 큐에서 처리되도록 한다.
+#define UWM_CSCLISTBOX_SETUP_SCROLLBAR	(WM_USER + 9002)
+
 /////////////////////////////////////////////////////////////////////////////
 // CSCListBox
 
@@ -96,6 +102,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_VSCROLL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCListBox::on_message_CSCScrollbar)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCListBox::on_message_CSCEdit)
+	ON_MESSAGE(UWM_CSCLISTBOX_SETUP_SCROLLBAR, &CSCListBox::on_setup_scrollbar_deferred)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -130,19 +137,50 @@ void CSCListBox::PreSubclassWindow()
 	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
 	ModifyStyle(LBS_SORT, dwStyle | LBS_HASSTRINGS | LBS_OWNERDRAWFIXED);
 
-	CFont* font = GetFont();
-
-	if (font == NULL)
-		font = AfxGetMainWnd()->GetFont();
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	//이전 패턴 (AfxGetMainWnd()->GetFont() + SYSTEM_FONT 폴백) 은 ① MainWnd NULL dereference 위험 ②
+	//SYSTEM_FONT 가 비트맵 fixed font 라 stroke 가 두꺼워 bold 처럼 보이는 부작용 → 4단계 폴백으로 교체.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
 	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
 
 	ReconstructFont();
 
+	//setup_scrollbar() 를 직접 호출하면 parent 가 동적 CreateEx 로 만들어진 경우 (예: CPathCtrl::m_list_folder)
+	//CBT hook 안의 PreSubclassWindow 호출 시점이라 중첩 CreateEx 가 AfxHookWindowCreate 의
+	//ASSERT(m_pWndInit == NULL) 를 터뜨린다. PostMessage 로 큐에 넣어 hook 종료 후 실행.
+	PostMessage(UWM_CSCLISTBOX_SETUP_SCROLLBAR);
+}
+
+LRESULT CSCListBox::on_setup_scrollbar_deferred(WPARAM, LPARAM)
+{
 	setup_scrollbar();
+	return 0;
 }
 
 void CSCListBox::ReconstructFont()
@@ -317,8 +355,19 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 	else
 	{
+		//state 우선순위 — hover > selected (hover 가 더 즉각적 인터랙션). selected text 변경 누락 시
+		//selected bg (dark) 위에 본문 dark text 가 그대로 그려져 navy on navy 가독성 ↓.
 		if (lpDIS->itemID == m_over_item)
+		{
 			cr_text = m_theme.cr_text_hover;
+		}
+		else if (lpDIS->itemState & ODS_SELECTED)
+		{
+			if (lpDIS->itemState & ODS_FOCUS)
+				cr_text = m_theme.cr_text_selected;
+			else if (m_show_selection_always)
+				cr_text = m_theme.cr_text_selected_inactive;
+		}
 	}
 
 	// Get and display item text.
@@ -1637,7 +1686,7 @@ bool CSCListBox::is_available_move_item_down(int index)
 	return (index >= 0 && index < GetCount() - 1);
 }
 
-void CSCListBox::set_color_theme(int theme)
+void CSCListBox::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 
@@ -1649,13 +1698,11 @@ void CSCListBox::set_color_theme(int theme)
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, false);
 
-	if (!m_hWnd)
-		return;
-
-	Invalidate();
+	if (invalidate && m_hWnd)
+		Invalidate();
 }
 
-void CSCListBox::set_color_theme(const CSCColorTheme& theme)
+void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
 
@@ -1663,13 +1710,14 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme)
 		m_br_back.DeleteObject();
 	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 
+	//scrollbar 도 invalidate 전파 — 이전엔 false 하드코딩이라 scrollbar 색만 바뀌고 redraw 안 됐다.
 	if (::IsWindow(m_scrollbar.m_hWnd))
-		m_scrollbar.set_color_theme(m_theme, false);
+		m_scrollbar.set_color_theme(m_theme, invalidate);
 
-	if (!m_hWnd)
-		return;
-
-	Invalidate();
+	//Invalidate(TRUE) — erase background 강제. owner-draw listbox 의 빈 영역 (항목 없는 부분) 이
+	//이전 theme 의 brush 로 남아있는 잔상 차단. CtlColor 가 m_br_back 반환하지 않는 경로 보완.
+	if (invalidate && m_hWnd)
+		Invalidate(TRUE);
 }
 
 
@@ -1682,11 +1730,14 @@ void CSCListBox::OnNcPaint()
 
 HBRUSH CSCListBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
-	HBRUSH hbr = CListBox::OnCtlColor(pDC, pWnd, nCtlColor);
-
-	// TODO:  여기서 DC의 특성을 변경합니다.
-	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
-	return hbr;
+	//owner-draw listbox 의 빈 영역 (항목 없는 부분) 은 OS 가 CtlColor 의 brush 로 fill 한다.
+	//base 반환을 그대로 두면 system COLOR_WINDOW brush 사용 → theme 변경 시 listbox 배경이 흰색 그대로 잔존.
+	//theme 의 cr_back 으로 갱신된 m_br_back 을 반환해 빈 영역도 theme 색을 따르게 한다.
+	pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
+	pDC->SetBkColor(m_theme.cr_back.ToCOLORREF());
+	if (m_br_back.GetSafeHandle())
+		return (HBRUSH)m_br_back.GetSafeHandle();
+	return CListBox::OnCtlColor(pDC, pWnd, nCtlColor);
 }
 
 //reflected: 부모가 WM_CTLCOLORLISTBOX 처리 안 하면 MFC 가 child 의 CtlColor 호출.

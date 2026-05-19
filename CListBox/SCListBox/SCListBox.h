@@ -216,9 +216,9 @@ public:
 	void		set_font_size(int nSize);
 	void		set_font_bold(int weight = FW_BOLD);
 
-	void		set_color_theme(int theme);
+	void		set_color_theme(int theme, bool invalidate = false);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
-	void		set_color_theme(const CSCColorTheme& theme);
+	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList, bool is_local) { m_pShellImageList = pShellImageList; m_is_local = is_local; }
@@ -404,6 +404,8 @@ public:
 	void			setup_scrollbar();
 	void			sync_scrollbar();
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
+	//PreSubclassWindow 에서 PostMessage 로 지연된 setup_scrollbar 처리 핸들러. CBT hook 종료 후 큐에서 호출됨.
+	LRESULT			on_setup_scrollbar_deferred(WPARAM wParam, LPARAM lParam);
 
 protected:
 	CBrush			m_br_back;	//cr_back 색 brush — set_color_theme 에서 재생성, CtlColor 에서 반환.

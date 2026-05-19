@@ -106,20 +106,25 @@ namespace ffi
         DeliverBeginFlush();
         DeliverEndFlush();
 
-        //CDecoder.seek 는 video / audio 큐 모두 flush + 두 codec 모두 flush_buffers.
-        m_pSource->decoder().seek(pos_ms);
+        //CDecoder.seek 가 m_pending_segment_rt 저장 → worker 가 av_seek_frame 후 m_segment_rt 갱신 + generation ++.
+        //두 갱신이 같은 시점이라 FillBuffer 의 rt 계산이 frame.gen 과 일관된 segment 사용 → race 없음.
+        m_pSource->decoder().seek(pos_ms, rtStart);
 
         m_sample_count = 0;
         m_last_rtStart = 0;
+        m_segment_start = rtStart;   //legacy — audio pin 이 참조. atomic 은 CDecoder.m_segment_rt.
 
+        //NewSegment.start = 0. sample 의 rtStart 는 frame_pts - seek_target_pts (delta) 사용.
+        //video keyframe walk 의 첫 frame (target 이전) 은 음수 rt → 즉시 출력. audio 첫 frame ≈ target 이라 rt≈0 → 정확 시작.
+        //video / audio 둘 다 동일 baseline (seek target) → 두 stream sync.
         DeliverNewSegment(0, rtStop, 1.0);
 
-        //audio pin 도 동일한 flush + new segment 전파.
+        //audio pin 도 동일한 flush + new segment + 같은 baseline 전파.
         if (m_pSource->audio_stream())
             m_pSource->audio_stream()->on_seek_flush(rtStart);
 
-        logWrite(_T("[ffi/src] on_change_start → seek %.0fms + flush + new_segment(0..%lld)"),
-            pos_ms, (long long)rtStop);
+        logWrite(_T("[ffi/src] on_change_start → seek %.0fms + flush + new_segment(%lld..%lld)"),
+            pos_ms, (long long)rtStart, (long long)rtStop);
     }
 
     HRESULT CFFiVideoStream::OnThreadCreate()
@@ -233,15 +238,44 @@ namespace ffi
         CDecoder& dec = m_pSource->decoder();
 
         //AVFrame pop — decoder 가 running 인 동안 wait. 빠른 drag 시 timeout S_FALSE 반환 시 stream 종료 → 영구 freeze 회피.
+        //pre-target frame skip + seg_rt 재read — 매 pop iteration 마다 m_segment_rt 다시 읽기.
+        //wait 동안 worker 가 av_seek_frame 후 m_segment_rt 갱신 + gen++ → 새 frame push.
+        //seq_cst atomic memory order 로 frame.gen=N 이면 그 시점의 m_segment_rt 도 N 시점 값 보장.
+        AVRational video_tb = dec.video_time_base();
+        REFERENCE_TIME seg_rt = 0;
+        int64_t seek_target_pts = 0;
+
         AVFrame* frame = NULL;
+        int skipped = 0;
+        int wait_v_ms = 0;
         while (true)
         {
             frame = dec.pop_video_frame();
-            if (frame) break;
+            if (frame)
+            {
+                //frame 받은 시점의 seg_rt 사용 — generation 과 동기.
+                seg_rt = dec.segment_rt();
+                seek_target_pts = (video_tb.num > 0 && video_tb.den > 0) ?
+                    av_rescale_q(seg_rt, AVRational{1, 10000000}, video_tb) : 0;
+
+                if (frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts)
+                {
+                    ++skipped;
+                    av_frame_free(&frame);   //pre-target keyframe walk frame skip
+                    continue;
+                }
+                break;
+            }
             if (!dec.is_running())
                 return S_FALSE;
             Sleep(2);
+            wait_v_ms += 2;
+            if (wait_v_ms == 500 || wait_v_ms == 2000 || wait_v_ms == 5000)
+                logWrite(_T("[ffi/src/video/diag] FillBuffer waiting %dms queue empty"), wait_v_ms);
         }
+        if (skipped > 0 || wait_v_ms >= 100)
+            logWrite(_T("[ffi/src/video/diag] pre-target skip=%d wait=%dms target_pts=%lld frame_pts=%lld"),
+                skipped, wait_v_ms, (long long)seek_target_pts, (long long)frame->pts);
 
         BYTE* pData = NULL;
         HRESULT hr = pSample->GetPointer(&pData);
@@ -261,47 +295,72 @@ namespace ffi
             return E_FAIL;
         }
 
-        //AVFrame → NV12 변환. swscale 로 통합 처리 (입력이 YUV420P / NV12 / 그 외 어느 것이든 모두 NV12 로 출력).
-        SwsContext* sws = sws_getContext(
-            frame->width, frame->height, (AVPixelFormat)frame->format,
-            w, h, AV_PIX_FMT_NV12,
-            SWS_BILINEAR, NULL, NULL, NULL);
-
-        if (!sws)
+        //fast path — frame 이 이미 NV12 (HW transferred 등) 면 swscale 우회, 직접 copy.
+        //매 frame swscale alloc/free 가 thread-unsafe 또는 무거워 crash/freeze 원인.
+        if ((AVPixelFormat)frame->format == AV_PIX_FMT_NV12)
         {
-            av_frame_free(&frame);
-            return E_FAIL;
+            //Y plane copy — source stride 와 dest stride 가 다를 수 있어 row 단위 copy.
+            uint8_t* dst_y  = pData;
+            uint8_t* dst_uv = pData + w * h;
+            for (int y = 0; y < h; ++y)
+                memcpy(dst_y + y * w, frame->data[0] + y * frame->linesize[0], w);
+            for (int y = 0; y < h / 2; ++y)
+                memcpy(dst_uv + y * w, frame->data[1] + y * frame->linesize[1], w);
         }
+        else
+        {
+            //AVFrame → NV12 변환 (YUV420P 등). swscale 로 통합 처리.
+            SwsContext* sws = sws_getContext(
+                frame->width, frame->height, (AVPixelFormat)frame->format,
+                w, h, AV_PIX_FMT_NV12,
+                SWS_BILINEAR, NULL, NULL, NULL);
 
-        //NV12 destination layout: Y plane (w*h) + UV plane interleaved (w*h/2).
-        uint8_t* dst_planes[2] = { pData, pData + w * h };
-        int dst_strides[2]     = { w, w };
+            if (!sws)
+            {
+                av_frame_free(&frame);
+                return E_FAIL;
+            }
 
-        sws_scale(sws, frame->data, frame->linesize, 0, frame->height,
-                  dst_planes, dst_strides);
-        sws_freeContext(sws);
+            uint8_t* dst_planes[2] = { pData, pData + w * h };
+            int dst_strides[2]     = { w, w };
+
+            sws_scale(sws, frame->data, frame->linesize, 0, frame->height,
+                      dst_planes, dst_strides);
+            sws_freeContext(sws);
+        }
 
         pSample->SetActualDataLength(required);
         pSample->SetSyncPoint((frame->flags & AV_FRAME_FLAG_KEY) ? TRUE : FALSE);
 
-        //Sample timing — sample_count × 1/fps 기반 stream-relative time.
-        //pts (절대 media time) 으로 SetTime 하면 graph clock (0 부터 시작) 과 mismatch → renderer 가 frame 을 멀리 미래 시점에 schedule → freeze.
-        //sample_count 는 on_change_start 에서 0 으로 reset 되므로 seek 시 0 부터 다시 시작 → 즉시 표시.
-        //(Phase 4 audio 통합 시 pts/clock 정렬 필요 — 그때 재검토.)
+        //Sample timing — frame_pts_rt - seek_target_pts (delta).
+        //음수 가능 (video keyframe walk 의 첫 frame). DSound / video renderer 는 음수 rt 를 "이미 지난 시간" 으로 즉시 처리.
+        //audio 첫 frame ≈ seek target → rt ≈ 0 → 정확 시작. video / audio 동일 baseline 으로 sync.
         double fps = dec.frame_rate();
         if (fps <= 0.0) fps = 30.0;
-        REFERENCE_TIME rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
-        REFERENCE_TIME rtStop  = rtStart + (REFERENCE_TIME)(10000000.0 / fps);
+        REFERENCE_TIME rtStart;
+        if (frame->pts != AV_NOPTS_VALUE)
+        {
+            AVRational tb = dec.video_time_base();
+            REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, tb, AVRational{1, 10000000});
+            rtStart = frame_pts_rt - seg_rt;   //skip 단계와 같은 seg_rt — race 없음.
+        }
+        else
+        {
+            rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
+        }
+        REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps);
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
 
         ++m_sample_count;
 
+        //매 frame 의 rt 추적 — seek 후 first frame + 매 60 frame.
         if (m_sample_count <= 5 || m_sample_count % 60 == 0)
         {
-            logWrite(_T("[ffi/src] frame[%lld] pts=%lld rtStart=%lld key=%d"),
+            logWrite(_T("[ffi/src] frame[%lld] pts=%lld rtStart=%lld(ms=%lld) seg=%lld key=%d"),
                 m_sample_count, (long long)frame->pts,
-                (long long)rtStart,
+                (long long)rtStart, (long long)(rtStart / 10000),
+                (long long)m_segment_start,
                 (int)((frame->flags & AV_FRAME_FLAG_KEY) ? 1 : 0));
         }
 
@@ -317,13 +376,15 @@ namespace ffi
         : CSourceStream(NAME("CFFiAudioStream"), phr, pParent, pPinName)
         , m_pSource(pParent)
     {
-        //output format: S16, 같은 sample_rate / channel layout. swresample 로 변환.
+        //output format: S16, **STEREO 강제 downmix**.
+        //이유: DSound 의 plain WAVEFORMATEX 는 mono/stereo PCM 만 받음. 5.1ch 등은 WAVEFORMATEXTENSIBLE 필요.
+        //DTS 6ch / AC3 6ch 등 multi-channel 미디어에서 DSound 가 Render(pin) 시 0x80040200 (VFW_E_INVALIDMEDIATYPE) reject → audio 무음.
+        //swresample 이 downmix 자동 처리.
         if (pParent && pParent->decoder().has_audio())
         {
             m_out_sample_rate = pParent->decoder().audio_sample_rate();
-            m_out_channels    = pParent->decoder().audio_channels();
+            m_out_channels    = 2;   //강제 stereo downmix.
 
-            //channel layout default — mono/stereo/surround.
             av_channel_layout_default(&m_out_chlayout, m_out_channels);
         }
     }
@@ -455,16 +516,35 @@ namespace ffi
 
         CDecoder& dec = m_pSource->decoder();
 
-        //decoder 가 running 인 동안 계속 wait — 빠른 drag 시 큐 비는 시간 길어도 EOS 처리하지 않음.
-        //이게 없으면 500ms timeout → S_FALSE → 스트림 종료 → 무음 영구화 (drag 후 더 이상 audio 안 나옴).
+        //pre-target skip + seg_rt 재read — 매 pop iteration 마다.
+        REFERENCE_TIME seek_target = 0;
+        AVRational audio_tb = dec.audio_time_base();
+        int64_t seek_target_pts_aud = 0;
+
         AVFrame* frame = NULL;
+        int wait_ms = 0;
         while (true)
         {
             frame = dec.pop_audio_frame();
-            if (frame) break;
+            if (frame)
+            {
+                seek_target = dec.segment_rt();
+                seek_target_pts_aud = (audio_tb.num > 0 && audio_tb.den > 0) ?
+                    av_rescale_q(seek_target, AVRational{1, 10000000}, audio_tb) : 0;
+
+                if (frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts_aud)
+                {
+                    av_frame_free(&frame);
+                    continue;
+                }
+                break;
+            }
             if (!dec.is_running())
                 return S_FALSE;
             Sleep(2);
+            wait_ms += 2;
+            if (wait_ms == 500 || wait_ms == 2000 || wait_ms == 5000)
+                logWrite(_T("[ffi/src/audio/diag] FillBuffer waiting %dms audio_queue empty"), wait_ms);
         }
 
         BYTE* pData = NULL;
@@ -493,11 +573,38 @@ namespace ffi
         pSample->SetActualDataLength(bytes_written);
         pSample->SetSyncPoint(TRUE);
 
-        //timing — sample_count 기반. audio sample_count 는 audio sample 수 (PCM frame 수 X — 그건 너무 빠름).
-        //rtStart = (sample_count / sample_rate) × 10^7
-        REFERENCE_TIME rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        //[diag] FillBuffer 호출 카운트 + 100 호출마다 amplitude 출력. seek 회귀 진단.
+        static thread_local int s_fill_count = 0;
+        ++s_fill_count;
+        if (s_fill_count == 1 || (s_fill_count % 100) == 0)
+        {
+            int16_t* s16 = (int16_t*)pData;
+            int n = out_samples * m_out_channels;
+            int16_t mx = 0;
+            for (int i = 0; i < n && i < 4096; ++i)
+            {
+                int16_t v = s16[i];
+                if (v < 0) v = -v;
+                if (v > mx) mx = v;
+            }
+            logWrite(_T("[ffi/src/audio/diag] fill#%d samples=%d ch=%d nb=%d fmt=%d max_abs=%d sc=%lld"),
+                s_fill_count, out_samples, m_out_channels, frame->nb_samples, (int)frame->format,
+                (int)mx, (long long)m_sample_count);
+        }
+
+        //timing — frame_pts_rt - seek_target_pts (video pin 과 같은 baseline). seek_target 은 위에서 이미 query.
+        REFERENCE_TIME rtStart;
+        if (frame->pts != AV_NOPTS_VALUE)
+        {
+            REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
+            rtStart = frame_pts_rt - seek_target;
+        }
+        else
+        {
+            rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        }
         m_sample_count += out_samples;
-        REFERENCE_TIME rtStop  = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
         pSample->SetTime(&rtStart, &rtStop);
 
         av_frame_free(&frame);
@@ -511,6 +618,7 @@ namespace ffi
         DeliverBeginFlush();
         DeliverEndFlush();
         m_sample_count = 0;
+        //NewSegment.start = 0. audio sample 의 rt 는 frame_pts - seek_target (video pin 과 같은 baseline).
         DeliverNewSegment(0, rtStop, 1.0);
     }
 

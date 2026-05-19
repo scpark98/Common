@@ -723,15 +723,13 @@ STDMETHODIMP CSCAudioTransformInputPin::EndOfStream()
 }
 STDMETHODIMP CSCAudioTransformInputPin::BeginFlush()
 {
+	//Decommit/Commit cycle 제거 — 빠른 연속 seek 시 outstanding sample 의 Release 와 race 로 allocator state stuck
+	//→ 새 GetBuffer fail → audio 영구 silence 회귀. m_flushing flag + clear_queue 만으로 충분.
 	m_pFilter->begin_flush();		//queue clear + 신규 sample drop
-	if (m_pAllocator) m_pAllocator->Decommit();
-	if (m_pInternalAllocator) m_pInternalAllocator->Decommit();
 	return m_pFilter->get_output_pin()->deliver_begin_flush();
 }
 STDMETHODIMP CSCAudioTransformInputPin::EndFlush()
 {
-	if (m_pAllocator) m_pAllocator->Commit();
-	if (m_pInternalAllocator) m_pInternalAllocator->Commit();
 	m_pFilter->end_flush();
 	return m_pFilter->get_output_pin()->deliver_end_flush();
 }

@@ -1157,12 +1157,19 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_IGraphBuilder,(void **)&m_pGB) ;
 
 	//Internal FFmpeg 경로 — LAV Splitter+Decoder 의 SetPositions 동기 블로킹 회피.
-	//Phase 3c: video only. Audio path 는 Phase 4 에서.
+	//HW 가속 가능 codec (h.264/h.265/vp9/av1/mpeg2) 만 internal path. 그 외 (mpeg4/vc1/wmv 등 SW 한정) 는 LAV fallback.
 	if (m_use_internal_ffmpeg)
 	{
 		int ret = load_media_internal_ffmpeg(sfile, pParent);
 		logWrite(_T("[load/internal] result=%d"), ret);
-		return ret;
+		if (ret == 1)
+			return ret;
+
+		//ret = -1 (HW 미지원) 또는 0 (실패) → graph 정리 후 LAV path 진행.
+		close_media();
+		CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&m_pGB);
+		logWrite(_T("[load/internal] falling back to LAV path"));
+		//아래 LAV path 로 흐름 계속.
 	}
 
 	//Renderer 우선순위: MPCVR > EVR > VMR9. MPC-BE FGFilter.cpp 의 통합 패턴 참고.
@@ -1934,6 +1941,17 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		pFFi->Release();
 		return 0;
 	}
+
+	//HW 가속 미지원 codec (mpeg4 / vc1 / wmv 등) 은 SW keyframe walk 가 5-10초 freeze 유발 → LAV path 로 fallback.
+	//H.264 / H.265 / VP9 / AV1 / MPEG-2 등 modern codec 만 internal path.
+	if (!pFFi->decoder().has_hw_accel())
+	{
+		logWrite(_T("[internal] no HW accel for this codec — fallback to LAV path"));
+		pFFi->Release();
+		m_pFFiSource = nullptr;
+		return -1;   //caller 가 LAV path 진행 신호.
+	}
+
 	m_pFFiSource = pFFi;   //caching for later (duration / video size accessor).
 
 	IBaseFilter* pBF = NULL;
@@ -1992,12 +2010,10 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	}
 
 	//SC Audio chain (Gain / Compressor / audio_sync) 삽입 — LAV path 와 동일 코드 재사용.
-	//setup_audio_gain_filter 가 graph 에서 audio renderer 자동 탐색 후 그 input 앞단에 filter 들 끼움.
-	//audio_sync ±ms 미세 조정 / volume gain / compressor 등 기존 기능 internal path 에서도 동작.
 	if (pFFi->decoder().has_audio())
 	{
 		setup_audio_gain_filter();
-		logWrite(_T("[internal] SC Audio chain setup attempted"));
+		logWrite(_T("[internal] SC Audio chain setup"));
 	}
 
 	//graph 가 ref 보유 — 우리 소유권 해제.

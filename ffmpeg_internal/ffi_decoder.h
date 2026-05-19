@@ -41,7 +41,8 @@ namespace ffi
 
         //seek 요청 — worker thread 에 비동기 위임. UI thread 는 즉시 반환.
         //worker 가 queue flush + av_seek_frame + codec flush 후 새 위치부터 디코드 재개.
-        void seek(double pos_ms);
+        //segment_rt = graph 가 알린 seek target rt. worker 가 av_seek_frame 후 generation ++ 와 동시에 m_segment_rt 갱신.
+        void seek(double pos_ms, int64_t segment_rt = 0);
 
         //worker 가 seek 를 *처리 완료* 할 때까지 동기 대기 (queue drain + av_seek_frame + codec flush 끝남).
         //그 후 pop_video_frame 으로 받는 frame 은 모두 post-seek. timeout_ms 안에 처리되면 true.
@@ -69,6 +70,7 @@ namespace ffi
 
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
+        bool    has_hw_accel() const { return m_hw_pix_fmt != AV_PIX_FMT_NONE; }
 
         //queue 의 현재 size — 디버깅용.
         size_t  video_queue_size();
@@ -78,12 +80,19 @@ namespace ffi
         void    set_max_video_queue(int n) { m_max_queue = n; }
         void    set_max_audio_queue(int n) { m_max_audio_queue = n; }
 
+        //CFFi*Stream 의 FillBuffer 가 매 frame pop 후 호출. atomic load — race-free segment baseline.
+        int64_t segment_rt() const { return m_segment_rt.load(); }
+
     private:
         void    worker_loop();
 
         AVFormatContext*    m_fmt = nullptr;
         AVCodecContext*     m_video_ctx = nullptr;
         int                 m_video_stream_idx = -1;
+
+        //HW 가속 — D3D11VA / DXVA2. SW keyframe walk decode 의 5-10초 freeze 회피.
+        AVBufferRef*        m_hw_device_ctx = nullptr;
+        AVPixelFormat       m_hw_pix_fmt = AV_PIX_FMT_NONE;   //HW frame format (codec 의 get_format 반환).
 
         //audio decode
         AVCodecContext*     m_audio_ctx = nullptr;
@@ -97,6 +106,16 @@ namespace ffi
         std::condition_variable m_cv_seek_done;
         double                  m_pending_seek_ms = -1.0;
         bool                    m_seek_processed = true;   //worker 가 seek 끝낸 직후 true. seek() 호출 시 false.
+
+        //Seek generation — frame 마다 tag 부여. seek() 호출 시 ++. pop 시 current generation 만 accept,
+        //이전 generation 의 stale frame 은 skip + free. caller flush 와 worker push 의 모든 race 차단.
+        std::atomic<int>        m_seek_generation{0};
+
+        //Segment baseline rt — worker 의 av_seek_frame 처리 후 generation ++ 와 동시에 갱신.
+        //FillBuffer 의 rt 계산이 generation tag 와 같은 시점의 segment 사용 → race 없음.
+        //CFFiVideoStream / CFFiAudioStream 이 직접 m_segment_rt.load() 접근 가능하도록 public-like accessor 별도 제공.
+        std::atomic<int64_t>   m_segment_rt{0};
+        int64_t                m_pending_segment_rt = 0;   //seek() 호출 시 저장. worker 가 av_seek_frame 후 m_segment_rt.store(this).
 
         //frame queue
         std::mutex              m_mtx_queue;

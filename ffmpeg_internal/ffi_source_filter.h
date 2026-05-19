@@ -79,6 +79,9 @@ namespace ffi
         CFFiSource*     m_pSource;
         LONGLONG        m_sample_count = 0;   //sample 순번. timestamping 에 사용.
         LONGLONG        m_last_rtStart = 0;   //직전 emit 한 frame 의 rtStart. GetCurrentPosition 의 응답값.
+    public:
+        REFERENCE_TIME  m_segment_start = 0;  //seek target rt. video/audio sync 의 공유 baseline.
+    private:
 
         CCritSec        m_cs_seeking;
         CFFiSeeking*    m_pSeeking = nullptr;   //aggregated seeking object — pin 의 ref count 와 공유.

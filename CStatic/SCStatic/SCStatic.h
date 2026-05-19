@@ -217,6 +217,8 @@ public:
 	//color theme 설정
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	void			set_color_theme(int theme, bool invalidate = false);
+	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 커스터마이즈된 색까지 자식이 반영하기 위해 사용.
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);

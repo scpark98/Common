@@ -1055,179 +1055,221 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	switch (color_theme)
 	{
 		case color_theme_linkmemine :
-			cr_title_text = Gdiplus::Color::White;
-			cr_title_back_active = gRGB(24, 95, 165);// 97, 132, 180);
-			cr_title_back_inactive = gRGB(24, 95, 165);// 97, 132, 180);
-			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
-			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
+			//LinkMeMine 1.0 — admin.linkmemine.com 의 실제 chrome 색 + BI 4색 종합.
+			//BI 가 1.0 / 3.0 SE 를 같은 행에 묶었으나 실제 두 제품 chrome 은 다르다.
+			//1.0 은 navy primary + orange accent, SE 는 orange primary (color_theme_linkmemine_se 참조).
+			//
+			//  primary chrome   #222E3D : dark navy — admin chrome dominant 색 (#232f3e 와 매핑).
+			//                              BI 에선 'logo 보조' 분류였지만 실제 1.0 UI 의 primary.
+			//  accent / progress #FD7E14 : 시그니처 주황 — BI logo color, accent 로 활용
+			//  body text         #16191f : near-black navy (admin 본문)
+			//  secondary text    #869fb1 : mid gray-blue
+			//  light bg          #f7f7f7 : 보조 배경
+			//  border-inactive   #d2d2d2 : admin 일반 보더
 
-			cr_text = Gdiplus::Color::Black;
-			cr_text_dim = Gdiplus::Color::LightGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
-			cr_text_selected_inactive = cr_text_selected;
-			cr_text_dropHilited = white;
+			cr_title_text = Gdiplus::Color::White;            //navy 위 white
+			cr_title_back_active = gRGB(34, 46, 61);          //#222E3D — 1.0 의 실제 primary navy
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = gRGB(22, 25, 31);                       //#16191f — admin 본문 dark
+			cr_text_dim = gRGB(134, 159, 177);                //#869fb1 — mid gray-blue
+			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo color +32 (dark) 라 dark text 가독성 ↓ — white 강제
+			cr_text_selected = Gdiplus::Color::White;         //selected 배경 = navy → white text
+			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = Gdiplus::Color::White;
 			cr_parent_back = cr_back;
-			cr_back_selected = get_color(cr_back, -32);
-			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			//primary navy (#222E3D, luma ~44) 가 매우 어두워 selection/hover 에 직접 쓰면 흰 본문 위에서 대비가 너무 강함.
+			//한 톤 lighter 변환 — primary 정체성 유지하면서 톤 완화. (다른 brand 는 중간 명도라 primary 직접 사용 OK.)
+			cr_back_selected = get_color(cr_title_back_active, 64);   //navy +64 — medium navy-gray
+			cr_back_selected_inactive = get_color(cr_back_selected, 96);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = get_color(cr_back, -16);
-			cr_back_alternate = get_color(cr_back, 8);
+			cr_back_hover = get_color(cr_title_back_active, 96);      //hover 는 selected 보다 한 톤 더 lighter
+			cr_back_alternate = gRGB(247, 247, 247);          //#f7f7f7 — admin light gray bg
 
-			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border = cr_title_back_active;        //navy
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_header_text = get_color(cr_text, -16);
-			cr_header_back = get_color(cr_back, -16);
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(247, 247, 247);             //#f7f7f7
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 32, 32, 255);
+			cr_progress = gRGB(253, 126, 20);                 //#FD7E14 — BI logo orange (accent)
 
-			cr_border_active = Gdiplus::Color::CornflowerBlue;
-			cr_border_inactive = Gdiplus::Color::LightGray;
+			//focus border 는 다른 brand theme 과 동일하게 primary chrome 색 사용. orange accent 를 border 에 쓰면
+			//navy chrome + orange border 가 시각적으로 충돌. orange 는 cr_progress 등 강조 액션에만 한정.
+			cr_border_active = cr_title_back_active;          //#222E3D — primary navy
+			cr_border_inactive = gRGB(210, 210, 210);         //#d2d2d2 — admin 보더
 			break;
 
 		case color_theme_linkmemine_se:
-			cr_title_text = Gdiplus::Color::White; //gRGB(253, 126, 20);
-			cr_title_back_active = gRGB(186, 89, 18);
-			cr_title_back_inactive = gRGB(186, 89, 18);
+			//코이노 BI Color 문서 — LinkMeMine 3.0 SE.
+			//BI 에서 1.0 과 같은 행에 묶여 4색 (#FD7E14, #222E3D, #0045FF, #ff7b22) 공유.
+			//1.0 과 시각적 구분을 위해 SE 는 BI 의 보조 주황 #ff7b22 를 primary 로 채택.
+			//이전 #BA5912 는 BI 4색 어느 것과도 일치 안 함 → 폐기.
+
+			cr_title_text = Gdiplus::Color::White;
+			cr_title_back_active = gRGB(255, 123, 34);        //#ff7b22 — BI 보조 주황 (SE 시그니처)
+			cr_title_back_inactive = cr_title_back_active;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
-			cr_text = Gdiplus::Color::Black;
+			cr_text = gRGB(34, 46, 61);                       //#222E3D — BI dark navy-gray (1.0 과 공유)
 			cr_text_dim = Gdiplus::Color::DimGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = Gdiplus::Color(255, 241, 241, 241);
-			cr_text_selected_inactive = cr_text_selected;
-			cr_text_dropHilited = white;
+			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo color +32 (dark) — white 강제
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = Gdiplus::Color::White;
 			cr_parent_back = cr_back;
-			cr_back_selected = get_color(cr_back, 16);
-			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_selected = cr_title_back_active;
+			cr_back_selected_inactive = get_color(cr_back_selected, 160);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
+			cr_back_hover = get_color(cr_title_back_active, 32);
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border = cr_text;                     //#222E3D
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_header_text = get_color(cr_text, -16);
+			cr_header_text = cr_text;
 			cr_header_back = get_color(cr_back, -16);
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
+			cr_progress = gRGB(0, 69, 255);                   //#0045FF — BI 홈페이지 strong blue (accent)
 
-			cr_border_active = Gdiplus::Color::CornflowerBlue;
+			cr_border_active = cr_title_back_active;          //logo orange (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_anysupport :
-			cr_title_text = gRGB(255, 255, 255);
-			cr_title_back_active = gRGB(59, 69, 91);
-			cr_title_back_inactive = gRGB(59, 69, 91);
+			//코이노 BI Color 문서 — ANYSUPPORT 행 매핑.
+			//  logo color    #309AC0 : medium teal-blue 시그니처
+			//  logo 보조      #0D2947 : dark navy (text/border accent)
+			//  홈페이지       #145AFF : strong blue (accent only)
+			//  홈페이지 보조   #0F1F3D : dark navy variant
+			//이전 #3B455B (짙은 청회색) 은 BI 와 다른 톤 → 폐기.
+
+			cr_title_text = Gdiplus::Color::White;
+			cr_title_back_active = gRGB(48, 154, 192);        //#309AC0 — BI logo color
+			cr_title_back_inactive = cr_title_back_active;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
-			cr_text = Gdiplus::Color::Black;
+			cr_text = gRGB(13, 41, 71);                       //#0D2947 — BI logo 보조 dark navy
 			cr_text_dim = Gdiplus::Color::DimGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = cr_title_text;
-			cr_text_selected_inactive = cr_text_dim;
-			cr_text_dropHilited = white;
+			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo color +32 (dark) — white 강제
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = Gdiplus::Color::White;
 			cr_parent_back = cr_back;
-			cr_back_selected = get_color(cr_title_back_active, 16);
+			cr_back_selected = cr_title_back_active;
 			cr_back_selected_inactive = get_color(cr_back_selected, 160);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
+			cr_back_hover = get_color(cr_title_back_active, 32);
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border = cr_text;                     //#0D2947
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_header_text = get_color(cr_text, -16);
+			cr_header_text = cr_text;
 			cr_header_back = get_color(cr_back, -16);
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color::RoyalBlue; //Gdiplus::Color(255, 32, 32, 255);
+			cr_progress = gRGB(20, 90, 255);                  //#145AFF — BI 홈페이지 strong blue
 
-			cr_border_active = Gdiplus::Color::CornflowerBlue;
+			cr_border_active = cr_title_back_active;          //logo blue (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
 		case color_theme_helpu:
-			cr_title_text = gRGB(18, 24, 58);
-			cr_title_back_active = gRGB(32, 178, 174);
-			cr_title_back_inactive = gRGB(32, 178, 174);
+			//코이노 원격서비스 BI Color 문서 (Google Slides, 디자이너 정리) — helpU 행 매핑.
+			//  logo color   #20B2AE  : helpU 시그니처 teal (= 홈페이지 color 와 동일)
+			//  logo 보조     #12183A  : very dark navy — text/border accent
+			//  보조 회색     #9F9F9F  : mid gray — secondary text / border-inactive
+			//  light bg     #F4F5F8  : very light gray — header/divider 배경
+			//웹페이지(helpu.co.kr)의 #2a969d 는 BI 의 "홈페이지 color" 가 아닌, helpu.css 의 후속 변형이라
+			//BI 가 source-of-truth. (BI 표에선 logo/홈페이지 둘 다 #20B2AE 로 통일.)
+
+			cr_title_text = gRGB(18, 24, 58);                //#12183A — BI dark navy
+			cr_title_back_active = gRGB(32, 178, 174);       //#20B2AE — BI logo color
+			cr_title_back_inactive = cr_title_back_active;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
-			cr_text = cr_title_text;
-			cr_text_dim = Gdiplus::Color::DimGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = cr_text;// Gdiplus::Color(255, 241, 241, 241);
+			cr_text = cr_title_text;                         //본문도 동일 dark navy
+			cr_text_dim = gRGB(159, 159, 159);               //#9F9F9F — BI gray
+			cr_text_hover = Gdiplus::Color::White;           //hover bg 가 logo teal +32 — white 강제
+			cr_text_selected = Gdiplus::Color::White;        //selected = logo teal 위 white
 			cr_text_selected_inactive = get_color(cr_text, 32);
-			cr_text_dropHilited = white;
+			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = Gdiplus::Color::White;
 			cr_parent_back = cr_back;
-			cr_back_selected = get_color(cr_title_back_active, 16);
+			cr_back_selected = cr_title_back_active;         //selected = logo teal
 			cr_back_selected_inactive = get_color(cr_back_selected, 160);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
-			cr_back_alternate = get_color(cr_back, 8);
+			cr_back_hover = get_color(cr_title_back_active, 32);
+			cr_back_alternate = gRGB(244, 245, 248);         //#F4F5F8 — BI light gray bg
 
-			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border = cr_title_text;              //#12183A — BI dark navy
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_header_text = get_color(cr_text, -16);
-			cr_header_back = get_color(cr_back, -16);
+			cr_header_text = cr_title_text;
+			cr_header_back = gRGB(244, 245, 248);            //#F4F5F8 — BI light gray bg
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color::RoyalBlue;
+			cr_progress = cr_title_back_active;              //logo teal (RoyalBlue 폐기)
 
-			cr_border_active = Gdiplus::Color::CornflowerBlue;
-			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_border_active = cr_title_back_active;         //logo teal (CornflowerBlue 폐기)
+			cr_border_inactive = gRGB(159, 159, 159);        //#9F9F9F — BI gray
 			break;
 
 		case color_theme_pcanypro:
-			cr_title_text = Gdiplus::Color::White;// gRGB(18, 24, 58);
-			cr_title_back_active = gRGB(214, 129, 8);
+			//코이노 BI Color 문서 — PCANYPRO 행 매핑.
+			//  logo color    #F5A419 : golden orange 시그니처 (BI 명시 색 1개)
+			//BI 에 보조 색 명시 없음 — text/border 는 다른 제품과 일관된 dark navy/gray 톤 사용.
+			//이전 #D68108 은 BI 와 한 톤 다름 → 폐기.
+
+			cr_title_text = Gdiplus::Color::White;
+			cr_title_back_active = gRGB(245, 164, 25);        //#F5A419 — BI logo color
+			cr_title_back_inactive = cr_title_back_active;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
-			cr_text = Gdiplus::Color::Black;
+			cr_text = gRGB(34, 46, 61);                       //BI 보조 명시 없음 — 일반 dark navy
 			cr_text_dim = Gdiplus::Color::DimGray;
-			cr_text_hover = cr_text;
-			cr_text_selected = cr_title_text;
-			cr_text_selected_inactive = cr_text_dim;
-			cr_text_dropHilited = white;
+			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo orange +32 — white 강제
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = Gdiplus::Color::White;
 			cr_parent_back = cr_back;
-			cr_back_selected = get_color(cr_title_back_active, 16);
-			cr_back_selected_inactive = get_gray_color(get_color(cr_back_selected, 128));
+			cr_back_selected = cr_title_back_active;
+			cr_back_selected_inactive = get_color(cr_back_selected, 160);
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
-			cr_back_hover = cr_back_selected;
+			cr_back_hover = get_color(cr_title_back_active, 32);
 			cr_back_alternate = get_color(cr_back, 8);
 
-			cr_selected_border = Gdiplus::Color(255, 128, 128, 128);
+			cr_selected_border = cr_text;
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
-			cr_header_text = get_color(cr_text, -16);
+			cr_header_text = cr_text;
 			cr_header_back = get_color(cr_back, -16);
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = Gdiplus::Color::RoyalBlue;
+			cr_progress = cr_title_back_active;               //logo orange (RoyalBlue 폐기)
 
-			cr_border_active = Gdiplus::Color::CornflowerBlue;
+			cr_border_active = cr_title_back_active;          //logo orange (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
 			break;
 
@@ -1454,6 +1496,16 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
+	}
+
+	//selected + hover combo — selected 의 luma 방향으로 12% 만큼 black/white 와 블렌딩.
+	//(이전 공식 = cr_back→cr_back_selected delta 의 절반 가산 — light bg + dark selected 처럼 delta 가 크면
+	// 채널 cap 0/255 에 박혀 selected_hover 가 거의 검정/흰색 되어 contrast 깨졌음.)
+	//selected 가 dark 면 black 쪽으로 12% 블렌딩해 한 톤 더 어둡게, light 면 white 쪽으로 같은 비율.
+	{
+		const bool selected_dark = (get_luminance(cr_back_selected) < 128);
+		Gdiplus::Color cr_target = selected_dark ? Gdiplus::Color(255, 0, 0, 0) : Gdiplus::Color(255, 255, 255, 255);
+		cr_back_selected_hover = get_color(cr_back_selected, cr_target, 0.12);
 	}
 }
 

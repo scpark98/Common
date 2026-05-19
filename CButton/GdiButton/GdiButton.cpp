@@ -551,6 +551,26 @@ void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool 
 	set_back_color(cr_back, auto_color);
 }
 
+void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	//Windows 11 push-button look — theme.cr_back 의 luma 로 light/dark 자동 분기해 button face 산출.
+	//  light theme (cr_back=white) : face ≈ #F7F7F7 (살짝 회색), border ≈ #D0D0D0 — Win11 native button 톤.
+	//  dark  theme (cr_back=dark)  : face ≈ cr_back +16 (살짝 lighter), border ≈ cr_back +40.
+	//hover/down/disabled 색은 set_back_color/set_border_color 의 auto_color=true 가 자동 산출.
+	//round=4 — Win11 button 의 corner radius. text 색은 cr_text (auto = hover lighter / down darker).
+	const bool is_light = (get_luminance(theme.cr_back) >= 128);
+	Gdiplus::Color cr_face   = is_light ? get_color(theme.cr_back, -8)  : get_color(theme.cr_back, 16);
+	Gdiplus::Color cr_border = is_light ? get_color(theme.cr_back, -40) : get_color(theme.cr_back, 40);
+
+	set_text_color(theme.cr_text, true);
+	set_back_color(cr_face, true);
+	set_border_color(cr_border, true);
+	set_round(4, cr_border);
+
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
 void CGdiButton::set_text_color(Gdiplus::Color normal, bool auto_color)
 {
 	if (auto_color)
@@ -860,12 +880,35 @@ void CGdiButton::PreSubclassWindow()
 	GetParent()->ScreenToClient(m_rOrigin);
 	//TRACE(_T("%s : %s\n"), text, GetRectInfoString(m_rOrigin, 0));
 
-	CFont* font = GetFont();
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
 	if (font != NULL)
-		font->GetObject(sizeof(m_lf),&m_lf);
+	{
+		font->GetObject(sizeof(m_lf), &m_lf);
+	}
 	else
-		GetObject(GetStockObject(SYSTEM_FONT),sizeof(m_lf),&m_lf);
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
 
 	reconstruct_font();
 

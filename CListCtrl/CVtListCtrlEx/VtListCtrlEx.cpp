@@ -303,25 +303,22 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//그 색상 그대로 표시되어야 한다.
 		if ((m_has_focus || is_show_selection_always) && is_selected) //ok
 		{
+			//selected 행은 모든 셀이 selected text 색을 사용해야 일관 가독성. 이전엔 셀 색이 명시된
+			//(unused 가 아닌) 경우 그 색 그대로라 dark 셀 색 + dark selected bg = 안 보이는 문제 발생.
+			//(예: 셸 list 의 size/date 셀이 dark navy 명시되어 있어 selected navy bg 위에서 안 보였음.)
+			//OS native list 의 selected 동작과도 일치 — 모든 셀이 system highlight text color.
 			if (m_has_focus)
 			{
-				//TRACE(_T("active\n"));
-				if (crText.GetValue() == listctrlex_unused_color.GetValue())
-					crText = m_theme.cr_text_selected;
+				crText = m_theme.cr_text_selected;
 				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				//TRACE(_T("inactive\n"));
-				if (crText.GetValue() == listctrlex_unused_color.GetValue())
-					crText = m_theme.cr_text_selected_inactive;
+				crText = m_theme.cr_text_selected_inactive;
 				if (is_full_row_selection || iSubItem == 0)
 					crBack = m_theme.cr_back_selected_inactive;
 			}
-
-			//if (!is_full_row_selection && iSubItem != 0)
-			//	crBack = m_list_db[iItem].crBack[iSubItem];
 		}
 		//drophilited라면 active에 관계없이 drop hilited 색상으로 표시한다.
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
@@ -1366,20 +1363,51 @@ void CVtListCtrlEx::PreSubclassWindow()
 
 void CVtListCtrlEx::modify_style()
 {
-	//get parent font
-	CWnd* pWnd = GetParent();
-	CFont* font = NULL;
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
-	if (pWnd)
-		font = pWnd->GetFont();
-
-	if (font == NULL)
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-	else
+	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
+	else
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
+
+	//리소스에서 WS_BORDER / WS_EX_CLIENTEDGE 가 켜져 있으면 native border 제거하고 자체 그리기로 전환.
+	//m_scrollbar_setup 시 OnNcCalcSize 가 NC=0 으로 만들기 때문에 native WM_NCPAINT 가 그릴 영역이 없어
+	//OS native border 도 우리 self-paint border 도 보이지 않는다 → 자체 1px NC 확보가 필요.
+	//(CSCTreeCtrl::PreSubclassWindow 와 동일 패턴.)
+	if ((GetStyle() & WS_BORDER) || (GetExStyle() & WS_EX_CLIENTEDGE))
+	{
+		m_draw_border = true;
+		ModifyStyle(WS_BORDER, 0);
+		ModifyStyleEx(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE, 0);
+		SetWindowPos(NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
 
 	//헤더컨트롤을 제어할 일이 있는지 확인 필요.
-	// if view style is other than LVS_REPORT 
+	// if view style is other than LVS_REPORT
 	// returned pointer will be NULL
 	CHeaderCtrl* pHeader = GetHeaderCtrl();
 
@@ -1986,11 +2014,13 @@ void CVtListCtrlEx::set_color_theme(int theme, bool invalidate)
 	m_theme.set_color_theme(theme);
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
 
+	//invalidate 를 그대로 전파 — 호출자가 true 로 호출하면 scrollbar 도 즉시 redraw 되어야 한다.
+	//(이전엔 false 하드코딩이라 색만 바뀌고 화면 갱신은 안 됐다.)
 	if (::IsWindow(m_scrollbar.m_hWnd))
-		m_scrollbar.set_color_theme(m_theme, false);
+		m_scrollbar.set_color_theme(m_theme, invalidate);
 
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
-		m_scrollbar_h.set_color_theme(m_theme, false);
+		m_scrollbar_h.set_color_theme(m_theme, invalidate);
 
 	if (m_scrollbar_setup && ::IsWindow(m_hWnd))
 	{
@@ -2007,11 +2037,13 @@ void CVtListCtrlEx::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	m_theme.copy_colors_from(theme);
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
 
+	//invalidate 를 그대로 전파 — 호출자가 true 로 호출하면 scrollbar 도 즉시 redraw 되어야 한다.
+	//(이전엔 false 하드코딩이라 색만 바뀌고 화면 갱신은 안 됐다.)
 	if (::IsWindow(m_scrollbar.m_hWnd))
-		m_scrollbar.set_color_theme(m_theme, false);
+		m_scrollbar.set_color_theme(m_theme, invalidate);
 
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
-		m_scrollbar_h.set_color_theme(m_theme, false);
+		m_scrollbar_h.set_color_theme(m_theme, invalidate);
 
 	if (m_scrollbar_setup && ::IsWindow(m_hWnd))
 	{
@@ -5394,10 +5426,8 @@ void CVtListCtrlEx::OnNcPaint()
 	GetWindowRect(&rect);
 	ScreenToClient(&rect);
 
-	// 원하는 색상으로 테두리 그리기
-	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
-	//exStyle까지 함께 체크하니 리소스 에디터에서 테두리 설정 여부에 따라 정상 동작한다.
-	if ((GetStyle() & WS_BORDER) || (GetExStyle() & WS_EX_CLIENTEDGE))
+	//PreSubclassWindow 에서 WS_BORDER/WS_EX_CLIENTEDGE 를 제거하고 m_draw_border 로 옮겨놨다 — GetStyle 직접 검사는 작동 안 함.
+	if (m_draw_border)
 	{
 		CRect rc;
 		GetWindowRect(&rc);
@@ -5410,7 +5440,17 @@ void CVtListCtrlEx::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp
 {
 	//CSCScrollbar overlay 모드에선 native scrollbar NC 영역 미할당 — base 호출 안 해 client = window.
 	if (m_scrollbar_setup && lpncsp)
+	{
+		//단 m_draw_border 시 자체 border 그릴 1px 공간만 확보 (4변 각 1px).
+		if (m_draw_border && bCalcValidRects)
+		{
+			lpncsp->rgrc[0].left   += 1;
+			lpncsp->rgrc[0].top    += 1;
+			lpncsp->rgrc[0].right  -= 1;
+			lpncsp->rgrc[0].bottom -= 1;
+		}
 		return;
+	}
 
 	CListCtrl::OnNcCalcSize(bCalcValidRects, lpncsp);
 }

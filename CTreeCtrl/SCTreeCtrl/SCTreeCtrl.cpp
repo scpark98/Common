@@ -119,17 +119,35 @@ void CSCTreeCtrl::PreSubclassWindow()
 			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 	}
 
-	//Resource View에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
-	CWnd const* pWnd = GetParent();
-	CFont* font = nullptr;
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
-	if (pWnd)
-		font = pWnd->GetFont();
-
-	if (font == nullptr)
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-	else
+	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
+	else
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
 
 	reconstruct_font();
 
@@ -3481,23 +3499,28 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (function_check_is_dim_text && function_check_is_dim_text(this, hItem))
 				crText = m_theme.cr_text_dim;
 
-			//state 색 결정 — DropHilited > Hot > Selected.
+			//state 색 결정 — DropHilited > Selected > Hot. selected 가 hover 보다 의미상 우선 — selected 인 항목 위에 hover 가 와도 selected 색 유지.
 			if (m_use_drag_and_drop && m_bDragging && hItem == GetDropHilightItem())
 			{
 				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 				crText = m_theme.cr_text_dropHilited;
 				crBack = m_theme.cr_back_dropHilited;
 			}
-			else if ((pNMCustomDraw->uItemState & CDIS_HOT) || hItem == m_hot_item)
-			{
-				crBack = m_theme.cr_back_hover;
-			}
 			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
+				bool hot_too = (pNMCustomDraw->uItemState & CDIS_HOT) || hItem == m_hot_item;
 				if (GetFocus() == this || m_in_editing || m_in_context_menu)
 				{
 					crText = m_theme.cr_text_selected;
-					crBack = m_theme.cr_back_selected;
+					crBack = hot_too ? m_theme.cr_back_selected_hover : m_theme.cr_back_selected;
+				}
+				else if (hot_too)
+				{
+					//inactive + hot 위 selected — bg 는 cr_back_selected_hover (selected 보다 darker, white text 가 잘 보임).
+					//그러나 active 의 cr_text_selected (순 white) 와 *살짝 구분* 시켜 inactive identity 유지.
+					//cr_text_selected 를 32 단계 darken → light gray.
+					crText = get_color(m_theme.cr_text_selected, -32);
+					crBack = m_theme.cr_back_selected_hover;
 				}
 				else
 				{
@@ -3505,14 +3528,19 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 					crBack = m_theme.cr_back_selected_inactive;
 				}
 			}
+			else if ((pNMCustomDraw->uItemState & CDIS_HOT) || hItem == m_hot_item)
+			{
+				//hover 배경 (cr_back_hover) 이 logo color +32 인 brand theme 들은 여전히 dark — dark text 가 안 보인다.
+				//cr_text_hover 도 함께 적용해 contrast 확보.
+				crText = m_theme.cr_text_hover;
+				crBack = m_theme.cr_back_hover;
+			}
 
 			//1. row fill — Win11 Explorer 동일하게 항상 full-row 폭으로 fill. (TVS_FULLROWSELECT 무관)
-			//   overlay 가 client 안쪽 우측 끝 m_scrollbar_width 점유 → row fill / text right 는 overlay 좌측까지로 clip.
+			//   V scrollbar visible 시에만 우측 m_scrollbar_width reserve. hide 시 풀폭. m_v_visible_state 는 sync_scrollbar 가 정한 stable cache 라 paint cycle stale 안전.
 			CRect rcClient;
 			GetClientRect(&rcClient);
-			//overlay 가 setup 된 상태면 우측 m_scrollbar_width 항상 reserved (visible state 검사가 paint timing 으로 stale → 침범 발생).
-			//trade-off: V scrollbar hide 시에도 우측 18px 빈 영역. visible state 정확 추적 어려움 보다 깔끔한 painting 우선.
-			int right_limit = rcClient.right - (m_scrollbar_setup ? m_scrollbar_width : 0);
+			int right_limit = rcClient.right - (m_scrollbar_setup && m_v_visible_state ? m_scrollbar_width : 0);
 			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
 			dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
 
@@ -3700,7 +3728,7 @@ void CSCTreeCtrl::OnNMCustomDraw_old(NMHDR* pNMHDR, LRESULT* pResult)
 
 			int nOldBkMode = dc.SetBkMode(TRANSPARENT);
 			
-			//CDIS_DROPHILITED 의 우선순위가 가장 높다. > CDIS_HOT > CDIS_SELECTED
+			//우선순위: CDIS_DROPHILITED > CDIS_SELECTED > CDIS_HOT. selected 항목 위 hover 가 와도 selected 색 유지.
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
 			if (m_use_drag_and_drop && m_bDragging && (hItem == GetDropHilightItem()))// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
 			{
@@ -3713,25 +3741,26 @@ void CSCTreeCtrl::OnNMCustomDraw_old(NMHDR* pNMHDR, LRESULT* pResult)
 				crText = m_theme.cr_text_dropHilited;//VSLC_TREEVIEW_FOCUS_FONT_COLOR;
 				crBack = m_theme.cr_back_dropHilited;
 			}
+			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
+			{
+				//TRACE(_T("%s, CDIS_SELECTED\n"), GetItemText(hItem));
+				bool hot_too = (pNMCustomDraw->uItemState & CDIS_HOT) != 0;
+				if (GetFocus() == this)
+				{
+					crText = m_theme.cr_text_selected;
+					crBack = hot_too ? m_theme.cr_back_selected_hover : m_theme.cr_back_selected;
+				}
+				else
+				{
+					crText = m_theme.cr_text_selected_inactive;
+					crBack = hot_too ? m_theme.cr_back_selected_hover : m_theme.cr_back_selected_inactive;
+				}
+			}
 			else if (pNMCustomDraw->uItemState & CDIS_HOT)
 			{
 				//TRACE(_T("%s, CDIS_HOT\n"), GetItemText(hItem));
 				//crText = m_cr_text_selected;
 				crBack = m_theme.cr_back_hover;
-			}
-			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
-			{
-				//TRACE(_T("%s, CDIS_SELECTED\n"), GetItemText(hItem));
-				if (GetFocus() == this)
-				{
-					crText = m_theme.cr_text_selected;
-					crBack = m_theme.cr_back_selected;
-				}
-				else
-				{
-					crText = m_theme.cr_text_selected_inactive;
-					crBack = m_theme.cr_back_selected_inactive;
-				}
 			}
 			//else if (pNMCustomDraw->uItemState & CDIS_FOCUS)
 			//{
@@ -4521,18 +4550,35 @@ void CSCTreeCtrl::sync_scrollbar()
 	m_h_visible_state = need_h;
 
 	//---- 2단계: ShowWindow ----
+	//visible 변화 시 tree client 도 invalidate — right_limit (m_v_visible_state 기반) 가 바뀐 새 폭으로 row fill 재계산.
+	bool vis_changed = false;
 	if (need_v && !m_scrollbar.IsWindowVisible())
+	{
 		m_scrollbar.ShowWindow(SW_SHOW);
+		vis_changed = true;
+	}
 	else if (!need_v && m_scrollbar.IsWindowVisible())
+	{
 		m_scrollbar.ShowWindow(SW_HIDE);
+		vis_changed = true;
+	}
 
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 	{
 		if (need_h && !m_scrollbar_h.IsWindowVisible())
+		{
 			m_scrollbar_h.ShowWindow(SW_SHOW);
+			vis_changed = true;
+		}
 		else if (!need_h && m_scrollbar_h.IsWindowVisible())
+		{
 			m_scrollbar_h.ShowWindow(SW_HIDE);
+			vis_changed = true;
+		}
 	}
+
+	if (vis_changed)
+		Invalidate(FALSE);
 
 	//---- 3단계: 위치 sync — 상대 overlay 의 visible 여부 따라 동적 크기 ----
 	//V overlay: H 가 보이면 H 자리만큼 짧게, 아니면 client 하단까지.

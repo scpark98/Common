@@ -131,10 +131,18 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 				cr_text = get_gray_color(cr_text);
 		}
 
+		//selected/hover 시 cr_back 만 바꾸고 cr_text 변경을 누락하면 dark bg + dark text 가독성 ↓.
+		//cr_text_selected / cr_text_hover 로 함께 변경해야 contrast 확보 (theme 측에서 white 등 설정 전제).
 		if (lpDrawItemStruct->itemState & ODS_SELECTED)
+		{
 			cr_back = m_theme.cr_back_selected.ToCOLORREF();
+			cr_text = m_theme.cr_text_selected.ToCOLORREF();
+		}
 		else if (lpDrawItemStruct->itemState & ODS_HOTLIGHT)
+		{
 			cr_back = m_theme.cr_back_hover.ToCOLORREF();
+			cr_text = m_theme.cr_text_hover.ToCOLORREF();
+		}
 
 		dc.SetBkMode(TRANSPARENT);
 		dc.FillSolidRect(rItem, cr_back);
@@ -162,7 +170,13 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 		}
 		else
 		{
+			//Owner-draw 콤보의 LPDRAWITEMSTRUCT::hDC 는 OS 가 콤보의 폰트(SetFont 로 설정한 것)를
+			//자동으로 select 해주지 않는다. 명시적으로 m_font 를 select 해야 SetFont 효과가 dropdown 항목에 반영된다.
+			//(SetFont 효과는 콤보 자신의 edit 영역 에만 자동 적용. listbox 의 각 항목은 owner-draw 라
+			//우리가 직접 폰트를 select 해야 함.)
+			CFont* pOldFont = dc.SelectObject(&m_font);
 			dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+			dc.SelectObject(pOldFont);
 		}
 	}
 
@@ -456,15 +470,39 @@ void CSCComboBox::reconstruct_font()
 
 void CSCComboBox::PreSubclassWindow()
 {
-	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
-	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
-	//dlg의 parent의 font를 얻어와야 한다.
-	CFont* font = GetParent()->GetFont();
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
 	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	{
+		//Vista+ : lfMessageFont = Segoe UI 9pt. XP : Tahoma 8pt.
+		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth (4byte) 가
+		//XP 커널이 인식하는 구조체보다 크다 → SystemParametersInfo 가 ERROR_INVALID_PARAMETER 로 실패.
+		//실패 시 4byte 줄여 재시도하면 XP 에서도 lfMessageFont 를 정상 획득.
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
 
 	reconstruct_font();
 
@@ -873,6 +911,13 @@ void CSCComboBox::set_color_theme(int theme)
 	m_theme.set_color_theme(theme);
 }
 
+void CSCComboBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
 void CSCComboBox::set_text_color(Gdiplus::Color cr_text)
 {
 	m_theme.cr_text = cr_text;
@@ -885,21 +930,23 @@ void CSCComboBox::set_back_color(Gdiplus::Color cr_back)
 	Invalidate();
 }
 
-//이걸해도 테두리 색상이 변경되지 않는다. 역시 GPT
 void CSCComboBox::OnNcPaint()
 {
-	// 기본 테두리 그리기 막기
+	//combobox 의 NC border 를 theme 색으로 그린다. 이전엔 debug 용 빨강/마젠타 Draw3dRect 가 남아있었음.
 	CWindowDC dc(this);
 
-	CRect rect;
-	GetWindowRect(&rect);
-	ScreenToClient(&rect);
-
-	// 원하는 색상으로 테두리 그리기
 	CRect rc;
 	GetWindowRect(&rc);
 	rc.OffsetRect(-rc.TopLeft());
-	dc.Draw3dRect(rc, RGB(255, 0, 0), RGB(255, 0, 255)); // 파란색 테두리}
+
+	//focus 여부에 따라 active/inactive border 색 선택 — CSCEdit 등 다른 SC* 컨트롤과 일관.
+	bool focused = (GetFocus() == this) || (GetFocus() != nullptr && IsChild(GetFocus()));
+	COLORREF cr_border = focused
+		? m_theme.cr_border_active.ToCOLORREF()
+		: m_theme.cr_border_inactive.ToCOLORREF();
+
+	CBrush br(cr_border);
+	dc.FrameRect(rc, &br);
 }
 
 void CSCComboBox::prepare_tooltip()

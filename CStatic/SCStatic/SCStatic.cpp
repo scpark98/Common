@@ -155,34 +155,40 @@ void CSCStatic::PreSubclassWindow()
 	m_halign = get_halign();
 	m_valign = get_valign();
 
-	//Resource Editor에서 이 컨트롤을 사용하는 dlg에 적용된 폰트를 기본으로 사용해야 한다.
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
 	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
-	//아직 MainWnd가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로
-	//pWnd = NULL일 수 있다.
-	CWnd* pWnd = GetParent();
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
-	if (pWnd == NULL)
-		pWnd = AfxGetApp()->GetMainWnd();
-
-	CFont* font = NULL;
-
-	if (pWnd)
-		font = pWnd->GetFont();
-
-	if (font == NULL)
-	{
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-		//SYSTEM_FONT를 얻어오면 m_lf.lfWidth가 8로 세팅되는데
-		//이후 font_size, font_name을 변경해도 이 값이 그대로이므로
-		//가로로 넓어진 글꼴로 표시된다.
-		//따라서 m_lf.lfWidth를 0으로 초기화해줘야만 lfHeight에 따라 자동으로 조절된 글꼴로 올바르게 표시된다.
-		//의도적으로 넓이를 지정하지 않는 한 이 값은 0으로 설정해야 한다.
-		m_lf.lfWidth = 0; // 0 means default width
-	}
-	else
+	if (font != NULL)
 	{
 		font->GetObject(sizeof(m_lf), &m_lf);
 	}
+	else
+	{
+		//Vista+ : lfMessageFont = Segoe UI 9pt. XP : Tahoma 8pt.
+		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth (4byte) 가
+		//XP 커널이 인식하는 구조체보다 크다 → SystemParametersInfo 가 ERROR_INVALID_PARAMETER 로 실패.
+		//실패 시 4byte 줄여 재시도하면 XP 에서도 lfMessageFont 를 정상 획득.
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
+	//SYSTEM_FONT 경로에 있던 m_lf.lfWidth=0 강제는 lfMessageFont / DEFAULT_GUI_FONT 가 이미 lfWidth=0 이라 불필요.
 
 	reconstruct_font();
 }
@@ -1819,6 +1825,13 @@ void CSCStatic::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 	if (invalidate)
+		Invalidate();
+}
+
+void CSCStatic::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	if (invalidate && m_hWnd)
 		Invalidate();
 }
 

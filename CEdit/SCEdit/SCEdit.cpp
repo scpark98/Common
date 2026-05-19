@@ -94,14 +94,35 @@ void CSCEdit::PreSubclassWindow()
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	CEdit::PreSubclassWindow();
 
-	//자기 자신에게 부여된 폰트가 없다면 null이 리턴된다.
-	//dlg의 parent의 font를 얻어와야 한다.
-	CFont* font = GetParent()->GetFont();
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
+	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
-	if (font != nullptr)
+	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
 
 	m_default_height = m_lf.lfHeight;
 	reconstruct_font();
@@ -406,6 +427,16 @@ void CSCEdit::set_color_theme(int color_theme, bool invalidate)
 
 	if (invalidate)
 		Invalidate();// RedrawWindow();
+}
+
+void CSCEdit::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	m_br_back.DeleteObject();
+	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
+
+	if (invalidate && m_hWnd)
+		Invalidate();
 }
 
 void CSCEdit::set_transparent(bool transparent)

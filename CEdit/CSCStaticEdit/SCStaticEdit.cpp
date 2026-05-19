@@ -1087,7 +1087,10 @@ void CSCStaticEdit::OnPaint()
 			draw_dim_text(g, rc_text);
 		else
 		{
-			draw_selection(g, rc_text);
+			//focus 없을 때 selection 시각 hide — native CEdit (ES_NOHIDESEL 미설정) 동작.
+			//selection 상태(m_sel_start/_end) 자체는 보존되어 focus 다시 얻으면 재표시.
+			if (focused)
+				draw_selection(g, rc_text);
 			draw_text(g, rc_text);
 		}
 
@@ -1183,16 +1186,16 @@ void CSCStaticEdit::draw_selection(Gdiplus::Graphics& g, const CRect& rc_text)
 	CPoint pt_s = calc_caret_pixel_pos(sel_s);
 	CPoint pt_e = calc_caret_pixel_pos(sel_e);
 
-	// 선택 블록 높이 = 빔 커서 높이와 시각적으로 일치시키기 위해 상·하 1px 씩 확장.
-	// (CEdit 은 선택 블록과 빔 캐럿의 높이가 정확히 같은데, tmHeight 그대로 쓰면
-	//  빔보다 1~2px 작아 보인다. 중앙 정렬이므로 +2 하면 상·하 1px 씩 늘어남.)
+	// 선택 블록 높이 — native CEdit 의 selection 은 컨트롤 client 거의 전체에 가깝게 그려진다.
+	// tmHeight 만 쓰면 글자 정확히 둘러싸는 정도라 CEdit 보다 좁아 보임 → +4 (상하 2px 씩) 확장.
+	// (이전 +2 는 CEdit 와 시각적 일치 부족했음. 사용자 보고 후 추가 padding 1px 씩 더.)
 	CClientDC dc(this);
 	CFont* p_old = dc.SelectObject(&m_font);
 	TEXTMETRIC tm = {};
 	dc.GetTextMetrics(&tm);
 	dc.SelectObject(p_old);
-	// 폰트가 컨트롤 높이보다 큰 경우 rc_text 안에 들어오도록 clamp (빔 캐럿과 동일 정책).
-	int sel_h = min(tm.tmHeight + 2, rc_text.Height());
+	// 폰트가 컨트롤 높이보다 큰 경우 rc_text 안에 들어오도록 clamp.
+	int sel_h = min(tm.tmHeight + 4, rc_text.Height());
 	int top = rc_text.top + (rc_text.Height() - sel_h) / 2;
 
 	Gdiplus::SolidBrush brush(m_theme.cr_back_selected);
@@ -1246,8 +1249,11 @@ void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
 		// 일반 텍스트
 		dc.TextOut(text_x, text_y, display);
 
-		// 선택 영역 텍스트는 다른 색으로 덮어 그리기
-		if (has_selection())
+		// 선택 영역 텍스트는 다른 색 (cr_text_selected = white) 으로 덮어 그리기.
+		// 단 focus 가 없으면 draw_selection 이 navy bg 를 안 그리므로 (focus 잃은 후 selection 시각 hide)
+		// selection 영역 텍스트도 일반 색으로 두어야 함. 안 그러면 white text 가 white bg 위에 그려져
+		// 글자가 사라진 듯한 시각 깨짐 발생.
+		if (has_selection() && GetFocus() == this)
 		{
 			int sel_s = min(m_sel_start, m_sel_end);
 			int sel_e = max(m_sel_start, m_sel_end);

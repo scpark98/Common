@@ -294,6 +294,11 @@ public:
 	//auto_color를 true로 주면 over, down일때의 색상을 자동으로 설정해준다.
 	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool auto_color = true);
 
+	//SC* 시리즈 컨트롤들과 동일한 호출 패턴 — 부모 dlg 의 m_theme 객체를 그대로 받아 cr_text/cr_back 적용.
+	//내부에 m_theme 멤버를 두지 않는 클래스라 set_text_color/set_back_color 의 auto_color=true 경로를 거쳐
+	//hover/down/disabled 까지 자동 산출된다.
+	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		set_text_color(Gdiplus::Color normal, bool auto_color = true);
 	void		set_text_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled = Gdiplus::Color::Transparent);

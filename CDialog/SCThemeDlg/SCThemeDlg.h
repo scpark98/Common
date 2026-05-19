@@ -136,6 +136,9 @@ public:
 	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border_inactive = cr; }
 
 	void	set_color_theme(int theme, bool invalidate = false);
+	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 또 다른 CSCThemeDlg 가 자식인 경우 부모의 모든 색
+	//(titlebar 커스터마이즈 포함) 을 정확히 복사하기 위해 사용. int 만 받으면 인덱스 기반 default 만 적용된다.
+	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 	void	enable_resize(bool resizable);
 
 	//void	refresh_activate_status(bool is_activated);
@@ -211,9 +214,12 @@ protected:
 public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
-	afx_msg LRESULT OnNcHitTest(CPoint point);
+	//Borderless customized dlg — borderless dialog.md 참조.
+	//WM_NCHITTEST 는 ON_WM_NCHITTEST 매크로 안 쓰고 WindowProc 에서 직접 분기 (절차서 Step 3, 9).
 	afx_msg BOOL OnNcActivate(BOOL bActive);
 	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
+	afx_msg void OnNcPaint();
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 	afx_msg void OnPaint();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
@@ -222,10 +228,8 @@ public:
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
-	//afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
-	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg void OnSetFocus(CWnd* pOldWnd);
 };

@@ -830,6 +830,9 @@ public:
 	int				m_scrollbar_width = 16;
 	int				m_scrollbar_height = 16;
 	bool			m_scrollbar_setup = false;
+	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
+	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)
+	bool			m_draw_border = false;
 	int				m_last_top_index = -1;
 	int				m_h_scroll_pos = 0;		//가로 scroll 누적 pixel offset — WS_HSCROLL 제거 후 GetScrollPos(SB_HORZ) 가 stale 이라 자체 추적.
 	DWORD			m_last_user_scroll_at = 0;	//사용자 입력에 의한 scroll tick — 자동 ensure_visible 호출 측에서 sticky timeout 으로 사용.

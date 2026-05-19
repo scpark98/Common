@@ -4,8 +4,10 @@
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
+#include "../../win_compat/dwm.h"
 
-#pragma comment(lib, "Dwmapi.lib")
+//Dwmapi.lib 정적 링크는 XP에서 dwmapi.dll 부재로 로드 실패. win_compat::dwm 가 LoadLibrary 로 안전 호출하므로 정적 링크 제거.
+//#pragma comment(lib, "Dwmapi.lib")
 
 // CSCThemeDlg 대화 상자
 
@@ -34,9 +36,11 @@ void CSCThemeDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_ERASEBKGND()
 	ON_WM_LBUTTONDOWN()
-	ON_WM_NCHITTEST()
+	//Borderless customized dlg (borderless dialog.md Step 3).
+	//WM_NCHITTEST 는 WindowProc 에서 직접 분기하므로 ON_WM_NCHITTEST 등록 안 함.
 	ON_WM_NCACTIVATE()
 	ON_WM_NCCALCSIZE()
+	ON_WM_NCPAINT()
 	ON_WM_PAINT()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDBLCLK()
@@ -46,8 +50,7 @@ BEGIN_MESSAGE_MAP(CSCThemeDlg, CDialogEx)
 	ON_WM_KILLFOCUS()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_GETMINMAXINFO()
-	ON_WM_SETCURSOR()
-	//ON_WM_ACTIVATE()
+	ON_WM_ACTIVATE()
 	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
 
@@ -97,28 +100,38 @@ BOOL CSCThemeDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-	//기본 타이틀바 제거
+	//Borderless customized dlg 변환 (borderless dialog.md Step 4).
+	//resource 의 caption/border 속성 어느 조합이든 *항상 동일 상태* 로 정규화한다.
+	//WS_CAPTION/WS_BORDER/WS_DLGFRAME 전부 제거 → 필요 시 WS_THICKFRAME 재부여.
+	//SWP_FRAMECHANGED 가 핵심 — NC 영역 재계산을 OS 에 알린다. 없으면 style 변경이 반영 안 됨.
+	{
+		LONG_PTR style = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
+		style &= ~(WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_DLGFRAME);
+		if (m_use_resizable)
+			style |= WS_THICKFRAME;
+		style |= (WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+		::SetWindowLongPtr(m_hWnd, GWL_STYLE, style);
+		::SetWindowPos(m_hWnd, nullptr, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
 
-	//find border thickness
-	m_has_thickframe = GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME;
+	//정규화된 style 로부터 border thickness 산출 — resize hit-test fallback path 에서 참조.
+	m_has_thickframe = (::GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME) != 0;
 	if (m_has_thickframe)
 	{
-		AdjustWindowRectEx(&m_border_thickness, GetWindowLongPtr(m_hWnd, GWL_STYLE), FALSE, NULL);
+		AdjustWindowRectEx(&m_border_thickness, ::GetWindowLongPtr(m_hWnd, GWL_STYLE), FALSE, NULL);
 		m_border_thickness.left *= -1;
 		m_border_thickness.top *= -1;
 	}
-	else if (GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_BORDER)
+	else
 	{
 		SetRect(&m_border_thickness, 1, 1, 1, 1);
 	}
 
-	MARGINS margins = { 0 };
-	//DwmExtendFrameIntoClientArea(m_hWnd, &margins);
-
 	if (m_titlebar_height > 0)
 	{
 		m_sys_buttons.create(this);
-		m_sys_buttons.set_color_theme(m_theme.get_color_theme());
+		m_sys_buttons.set_color_theme(m_theme);
 		m_sys_buttons.set_buttons_cmd(SC_CLOSE);
 	}
 
@@ -236,132 +249,127 @@ void CSCThemeDlg::set_titlebar_height(int height)
 
 void CSCThemeDlg::enable_resize(bool resizable)
 {
+	m_use_resizable = resizable;
 	m_has_thickframe = resizable;
 
 	if (resizable)
+		ModifyStyle(0, WS_THICKFRAME);
+	else
+		ModifyStyle(WS_THICKFRAME, 0);
+
+	//SWP_FRAMECHANGED 가 핵심 — NC 재계산 트리거.
+	::SetWindowPos(m_hWnd, nullptr, 0, 0, 0, 0,
+		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+
+	if (resizable)
 	{
-		ModifyStyle(0, WS_THICKFRAME, SWP_FRAMECHANGED);
-
-		//find border thickness
-		if (GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_THICKFRAME)
-		{
-			AdjustWindowRectEx(&m_border_thickness, GetWindowLongPtr(m_hWnd, GWL_STYLE) & ~WS_CAPTION, FALSE, NULL);
-			m_border_thickness.left *= -1;
-			m_border_thickness.top *= -1;
-		}
-		else if (GetWindowLongPtr(m_hWnd, GWL_STYLE) & WS_BORDER)
-		{
-			SetRect(&m_border_thickness, 1, 1, 1, 1);
-		}
-
-		MARGINS margins = { 0 };
-		DwmExtendFrameIntoClientArea(m_hWnd, &margins);
+		AdjustWindowRectEx(&m_border_thickness,
+			::GetWindowLongPtr(m_hWnd, GWL_STYLE), FALSE, NULL);
+		m_border_thickness.left *= -1;
+		m_border_thickness.top *= -1;
 	}
 	else
 	{
-		ModifyStyle(WS_THICKFRAME, 0, SWP_FRAMECHANGED);
+		SetRect(&m_border_thickness, 1, 1, 1, 1);
 	}
 }
 
 
-LRESULT CSCThemeDlg::OnNcHitTest(CPoint point)
-{
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	CPoint pt;
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
-	//TRACE(_T("pt.y = %d\n"), pt.y);
-
-	//resize하지 않는 dlg라도 타이틀바는 반응해야 한다.
-	if (!m_use_resizable && (pt.y < 7 || pt.y > m_titlebar_height))
-		return -1;
-
-	if (!m_has_thickframe)
-	{
-		return CDialogEx::OnNcHitTest(point);
-	}
-
-	DWORD win_ver = get_windows_major_version();
-	LRESULT result;
-
-	if (win_ver >= 10)
-	{
-		result = CDialogEx::OnNcHitTest(point);
-
-		if (result == HTCLIENT)
-		{
-			ScreenToClient(&point);
-			if (point.y < m_border_thickness.top)
-				return HTTOP;
-		}
-	}
-	else
-	{
-		CRect rc;
-
-		GetClientRect(rc);
-
-		enum { left = 1, top = 2, right = 4, bottom = 8 };
-
-		int hit = 0;
-
-		if (point.x < m_border_thickness.left) hit |= left;
-		if (point.x > rc.right - m_border_thickness.right) hit |= right;
-		if (point.y < m_border_thickness.top) hit |= top;
-		if (point.y > rc.bottom - m_border_thickness.bottom) hit |= bottom;
-
-		if (hit & top && hit & left) return HTTOPLEFT;
-		if (hit & top && hit & right) return HTTOPRIGHT;
-		if (hit & bottom && hit & left) return HTBOTTOMLEFT;
-		if (hit & bottom && hit & right) return HTBOTTOMRIGHT;
-		if (hit & left) return HTLEFT;
-		if (hit & top) return HTTOP;
-		if (hit & right) return HTRIGHT;
-		if (hit & bottom) return HTBOTTOM;
-
-		return HTCLIENT;
-	}
-
-	return result;
-}
-
-
+//borderless dialog.md Step 8 — 실제 NC paint 차단은 WindowProc 의 WM_NCACTIVATE → TRUE 에서 한다.
+//여기서는 base 위임만. (이전엔 Invalidate()+RedrawWindow() 부수효과가 있었으나
+//WM_NCACTIVATE 를 WindowProc 에서 완전 차단하는 새 패턴에서는 불필요.)
 BOOL CSCThemeDlg::OnNcActivate(BOOL bActive)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	//if (m_is_resizable)
-	{
-		//return을 FALSE로 하게 되면 메시지박스가 떴을 때 액션이 동작되지 않는다.
-		//또한 여기서 Invalidate()을 해주지 않으면 상단 잔상이 생긴다.
-		Invalidate();
-		RedrawWindow();
-		return TRUE;
-	}
-
 	return CDialogEx::OnNcActivate(bActive);
 }
 
 
+//borderless dialog.md Step 6 — NC 영역 축소.
+//Win10+ DWM 은 WS_THICKFRAME 윈도우에 default 로 두꺼운 NC margin (Win11=7px) 을 둔다.
+//6px 흡수해 NC=1px 만 남기면 시각적으로 두꺼운 띠가 사라지고 OnNcPaint 가 theme 색으로 채운다.
+//XP/Vista/7/8 은 DWM 의 두꺼운 frame 이 없으므로 축소하지 않음 (음수 NC margin 은 미정의 동작).
+//*반드시 base 호출 후* rgrc 보정 — base 가 자체 계산을 우리 보정 위에 덮어쓰지 않도록.
 void CSCThemeDlg::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (m_has_thickframe)
+	CDialogEx::OnNcCalcSize(bCalcValidRects, lpncsp);
+
+	if (!m_has_thickframe || !lpncsp || !bCalcValidRects)
+		return;
+
+	//Win10+ 에서만 6px 흡수. XP/Vista/7/8 은 OS-default NC 그대로.
+	if (get_windows_major_version() >= 10)
 	{
-		DWORD win_ver = get_windows_major_version();
+		const int kNcShrink = 6;
+		lpncsp->rgrc[0].left   -= kNcShrink;
+		lpncsp->rgrc[0].top    -= kNcShrink;
+		lpncsp->rgrc[0].right  += kNcShrink;
+		lpncsp->rgrc[0].bottom += kNcShrink;
+	}
+}
 
-		if (win_ver < 10)
-			return;
 
-		if (lpncsp)
-		{
-			lpncsp->rgrc[0].left += m_border_thickness.left;
-			lpncsp->rgrc[0].right -= m_border_thickness.right;
-			lpncsp->rgrc[0].bottom -= m_border_thickness.bottom;
-			return;
-		}
+//borderless dialog.md Step 7 — NC 영역을 theme 색으로 직접 칠한다.
+//CDialogEx::OnNcPaint 호출 안 함 — base 호출 시 default frame 이 우리 paint 위에 덮어 그림.
+//CWindowDC 로 window 전체 (NC 포함) 잡고, ExcludeClipRect(client) 로 client 영역 침범 차단.
+void CSCThemeDlg::OnNcPaint()
+{
+	CWindowDC dc(this);
+
+	CRect rcWindow;
+	GetWindowRect(rcWindow);
+	CRect rcWindowLocal(0, 0, rcWindow.Width(), rcWindow.Height());
+
+	CRect rcClient;
+	GetClientRect(rcClient);
+	CPoint ptClientOrg(0, 0);
+	ClientToScreen(&ptClientOrg);
+	CRect rcClientInWin = rcClient;
+	rcClientInWin.OffsetRect(ptClientOrg.x - rcWindow.left, ptClientOrg.y - rcWindow.top);
+
+	dc.ExcludeClipRect(rcClientInWin);
+	//내부 titlebar 가 있는 dlg 는 NC 1px 도 titlebar 색으로 — cr_back (보통 white) 으로 두면 titlebar teal 위/좌/우에
+	//흰 띠가 보인다. titlebar 없는 dlg 는 cr_back 그대로.
+	COLORREF nc_fill = (m_titlebar_height > 0)
+		? m_theme.cr_title_back_active.ToCOLORREF()
+		: m_theme.cr_back.ToCOLORREF();
+	dc.FillSolidRect(rcWindowLocal, nc_fill);
+}
+
+
+//borderless dialog.md Step 9 — WindowProc 트랩.
+// 1) WM_NCACTIVATE: DefWindowProc(WM_NCACTIVATE, wParam, -1) 은 Win11 에서 frame 자체를 light 색으로
+//    그리는 경로가 남는다. 완전 차단을 위해 DefWindowProc 호출 안 하고 TRUE 반환.
+// 2) WM_NCHITTEST: NC=1px 라 OS default hit-test 의 resize 폭이 1px → 마우스로 잡기 거의 불가.
+//    화면 좌표 (lParam) 기준 가장자리 8px 폭에서 직접 resize 코드 반환.
+LRESULT CSCThemeDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	if (message == WM_NCACTIVATE)
+		return TRUE;
+
+	if (message == WM_NCHITTEST && m_has_thickframe)
+	{
+		POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+		CRect rcWin;
+		GetWindowRect(rcWin);
+
+		const int kEdge = 8;
+		bool left   = pt.x >= rcWin.left   && pt.x <  rcWin.left   + kEdge;
+		bool right  = pt.x <  rcWin.right  && pt.x >= rcWin.right  - kEdge;
+		bool top    = pt.y >= rcWin.top    && pt.y <  rcWin.top    + kEdge;
+		bool bottom = pt.y <  rcWin.bottom && pt.y >= rcWin.bottom - kEdge;
+
+		if (top && left)     return HTTOPLEFT;
+		if (top && right)    return HTTOPRIGHT;
+		if (bottom && left)  return HTBOTTOMLEFT;
+		if (bottom && right) return HTBOTTOMRIGHT;
+		if (left)            return HTLEFT;
+		if (right)           return HTRIGHT;
+		if (top)             return HTTOP;
+		if (bottom)          return HTBOTTOM;
+		//내부는 default 가 HTCLIENT 반환하도록 base 에 위임.
 	}
 
-	CDialogEx::OnNcCalcSize(bCalcValidRects, lpncsp);
+	return CDialogEx::WindowProc(message, wParam, lParam);
 }
 
 
@@ -465,7 +473,9 @@ void CSCThemeDlg::OnPaint()
 void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
-	m_sys_buttons.set_color_theme(theme);
+	//int 인덱스로 부모 m_theme 를 채운 직후 — 자식 sys_buttons 에도 객체 전체를 전달해야
+	//cr_title_back_active 등 sys_buttons 가 참조하는 모든 필드가 일관되게 반영된다.
+	m_sys_buttons.set_color_theme(m_theme, invalidate);
 
 	//m_theme.set_color_theme(theme);에서는 cr_text, cr_back 등 일반적인 색상값들을 세팅한다.
 	//CSCThemeDlg::set_color_theme(int theme) 에서는 m_sys_buttons 등
@@ -521,7 +531,45 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 			;//SetWindowText(_T("not defined color_theme"));
 	}
 
+	//borderless dialog.md Step 5 — Win11 DWM 합성 frame 의 dark/round/border-color 동기화.
+	//3개 호출 모두 win_compat::dwm 경유라 XP/Vista 등 dwmapi 미존재/속성 미지원 OS 에선 자동 no-op.
+	//theme 변경 시점마다 다시 호출되어야 inactive frame 의 색이 새 theme 과 일관.
+	if (m_hWnd)
+	{
+		win_compat::dwm::use_immersive_dark_mode(m_hWnd, true);
+		win_compat::dwm::set_window_corner_round(m_hWnd);
+		//OnNcPaint 의 nc_fill 과 동일한 색 — titlebar 가 있는 dlg 는 frame seam 제거를 위해 titlebar 색.
+		win_compat::dwm::set_border_color(m_hWnd,
+			(m_titlebar_height > 0)
+				? m_theme.cr_title_back_active.ToCOLORREF()
+				: m_theme.cr_back.ToCOLORREF());
+	}
+
 	if (invalidate)
+		Invalidate();
+}
+
+//또 다른 CSCThemeDlg / SCxxx 컨트롤이 자식으로 있을 때 부모의 m_theme 객체 자체를 그대로 전파하는 경로.
+//int 인덱스만 넘기면 자식이 인덱스 기반 default 만 재계산하여 부모의 titlebar 색 커스터마이즈 등이 누락된다.
+//case 별 titlebar font 조정은 set_color_theme(int) 의 책임 (부모가 인덱스로 처음 적용하는 시점) 이고,
+//여기서는 색만 복사 + 자식 sys_buttons 동기화 + DWM 호출 동기화 만 수행한다.
+void CSCThemeDlg::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	m_sys_buttons.set_color_theme(m_theme, invalidate);
+
+	if (m_hWnd)
+	{
+		win_compat::dwm::use_immersive_dark_mode(m_hWnd, true);
+		win_compat::dwm::set_window_corner_round(m_hWnd);
+		//OnNcPaint 의 nc_fill 과 동일한 색 — titlebar 가 있는 dlg 는 frame seam 제거를 위해 titlebar 색.
+		win_compat::dwm::set_border_color(m_hWnd,
+			(m_titlebar_height > 0)
+				? m_theme.cr_title_back_active.ToCOLORREF()
+				: m_theme.cr_back.ToCOLORREF());
+	}
+
+	if (invalidate && m_hWnd)
 		Invalidate();
 }
 
@@ -762,15 +810,10 @@ void CSCThemeDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	CDialogEx::OnGetMinMaxInfo(lpMMI);
 }
 
-BOOL CSCThemeDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
-{
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	if (!m_use_resizable)
-	{
-		return TRUE;
-	}
-	return CDialogEx::OnSetCursor(pWnd, nHitTest, message);
-}
+//OnSetCursor 제거 — 이전 구현 `if (!m_use_resizable) return TRUE;` 는 cursor 미설정 채 TRUE 반환이라
+//resize 가능 영역 밖에서도 직전 cursor (resize 화살표 등) 가 잔류하는 부수효과가 있었다.
+//WindowProc 의 WM_NCHITTEST 트랩이 m_has_thickframe=false 일 때 resize 코드를 반환하지 않으므로
+//OS default 가 알아서 client cursor 를 세팅한다. 별도 OnSetCursor 트랩 불필요.
 
 void CSCThemeDlg::set_draw_border(bool draw, int width, Gdiplus::Color cr)
 {

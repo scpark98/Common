@@ -427,6 +427,7 @@ public:
 		cr_back_dropHilited			= src.cr_back_dropHilited;
 		cr_back_selected			= src.cr_back_selected;
 		cr_back_selected_inactive	= src.cr_back_selected_inactive;
+		cr_back_selected_hover		= src.cr_back_selected_hover;
 		cr_back_alternate			= src.cr_back_alternate;
 
 		cr_parent_back				= src.cr_parent_back;
@@ -472,6 +473,7 @@ public:
 	Gdiplus::Color	cr_back_dropHilited;
 	Gdiplus::Color	cr_back_selected;
 	Gdiplus::Color	cr_back_selected_inactive;
+	Gdiplus::Color	cr_back_selected_hover;			//selected 항목 위 hover combo 색. selected identity 유지하면서 미세하게 강조.
 	Gdiplus::Color	cr_back_alternate;				//list의 경우 짝수라인, 홀수라인 번갈아 색상을 표시하는 목적
 
 	Gdiplus::Color	cr_parent_back;					//round가 적용된 컨트롤의 경우 parent back 색상으로 칠한 후 round가 그려져야 한다.

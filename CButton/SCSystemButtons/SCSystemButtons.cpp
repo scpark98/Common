@@ -345,6 +345,13 @@ void CSCSystemButtons::set_color_theme(int theme, bool invalidate)
 		Invalidate();
 }
 
+void CSCSystemButtons::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
 
 void CSCSystemButtons::OnMouseHover(UINT nFlags, CPoint point)
 {

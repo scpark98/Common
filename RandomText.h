@@ -2,6 +2,12 @@
 //
 //////////////////////////////////////////////////////////////////////
 
+/*
+[usage]
+- #include "Common/RandomText.h"
+- use RandomText::GetName() or RandomText::GetSlogan()...
+*/
+
 #if !defined(AFX_RANDOMTEXT_H__999A1FA0_DEF8_11D8_B14D_002018574596__INCLUDED_)
 #define AFX_RANDOMTEXT_H__999A1FA0_DEF8_11D8_B14D_002018574596__INCLUDED_
 

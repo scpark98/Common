@@ -449,17 +449,29 @@ namespace ffi
                     }
 
                     int64_t target = (int64_t)(seek_pos * AV_TIME_BASE / 1000.0);
+
+                    LARGE_INTEGER qpc_freq, qpc_t0, qpc_t1;
+                    ::QueryPerformanceFrequency(&qpc_freq);
+                    ::QueryPerformanceCounter(&qpc_t0);
+
+                    //stream_index=-1 → AV_TIME_BASE 자동 변환. 명시하면 target 이 stream time_base 단위여야 함.
+                    //(stream 명시한 채 AV_TIME_BASE 값 넘기면 미디어 범위 밖으로 seek → fail → 같은 자리 stay = freeze 의 진짜 원인)
                     int hr_seek = av_seek_frame(m_fmt, -1, target, AVSEEK_FLAG_BACKWARD);
                     avcodec_flush_buffers(m_video_ctx);
                     if (m_audio_ctx)
                         avcodec_flush_buffers(m_audio_ctx);
 
-                    //av_seek_frame 끝남 → m_segment_rt 갱신 + generation ++. 둘 다 같은 시점이라 FillBuffer 의 race 차단.
-                    //이후 push 되는 frame 의 generation 과 m_segment_rt 가 일관.
+                    ::QueryPerformanceCounter(&qpc_t1);
+                    long long seek_us = (qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
+
                     m_segment_rt.store(m_pending_segment_rt);
                     int new_gen = m_seek_generation.fetch_add(1) + 1;
-                    logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld"),
-                        seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt);
+                    logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld seek_us=%lld"),
+                        seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt, seek_us);
+
+                    //first frame 시간 측정용 — worker 가 다음 frame push 시점.
+                    m_first_frame_after_seek = false;
+                    m_seek_done_qpc = qpc_t1.QuadPart;
 
                     //seek 처리 완료 — wait_seek_done() 동기 대기 중인 caller 에게 신호.
                     {
@@ -609,6 +621,18 @@ namespace ffi
                         m_video_queue.push_back(out_frame);
                     }
                     m_cv_queue.notify_one();
+
+                    //first frame 시간 측정 — seek 후 디코드 시작까지의 wallclock.
+                    if (!m_first_frame_after_seek)
+                    {
+                        LARGE_INTEGER qpc_freq, qpc_now;
+                        ::QueryPerformanceFrequency(&qpc_freq);
+                        ::QueryPerformanceCounter(&qpc_now);
+                        long long us = (qpc_now.QuadPart - m_seek_done_qpc) * 1000000LL / qpc_freq.QuadPart;
+                        logWrite(_T("[ffi/dec/seek] seek→first_video_frame us=%lld pts=%lld"),
+                            us, (long long)out_frame->pts);
+                        m_first_frame_after_seek = true;
+                    }
                 }
             }
             else if (m_audio_ctx && pkt->stream_index == m_audio_stream_idx)

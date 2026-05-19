@@ -117,12 +117,16 @@ namespace ffi
         std::atomic<int64_t>   m_segment_rt{0};
         int64_t                m_pending_segment_rt = 0;   //seek() 호출 시 저장. worker 가 av_seek_frame 후 m_segment_rt.store(this).
 
+        //seek → first frame 시간 측정용.
+        bool                   m_first_frame_after_seek = true;
+        int64_t                m_seek_done_qpc = 0;
+
         //frame queue
         std::mutex              m_mtx_queue;
         std::condition_variable m_cv_queue;     //worker 가 queue 비울 때 ↔ UI 가 pop 할 때 양방향 wake.
         std::deque<AVFrame*>    m_video_queue;
         std::deque<AVFrame*>    m_audio_queue;
-        int                     m_max_queue = 5;
-        int                     m_max_audio_queue = 50;
+        int                     m_max_queue = 30;       //seek 후 큐 빨리 채워지도록 5→30. FillBuffer wait 시간 단축.
+        int                     m_max_audio_queue = 100;
     };
 }

@@ -1168,6 +1168,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 		//ret = -1 (HW 미지원) 또는 0 (실패) → graph 정리 후 LAV path 진행.
 		close_media();
 		CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&m_pGB);
+		m_media_filename = sfile;   //close_media() 가 reset 한 filename 재세팅 — LAV path 의 OSD/registry 가 caller file 인식 필요.
 		logWrite(_T("[load/internal] falling back to LAV path"));
 		//아래 LAV path 로 흐름 계속.
 	}

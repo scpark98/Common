@@ -84,6 +84,12 @@ namespace ffi
         //CFFi*Stream 의 FillBuffer 가 매 frame pop 후 호출. atomic load — race-free segment baseline.
         int64_t segment_rt() const { return m_segment_rt.load(); }
 
+        //video 의 seek 후 *첫 emit frame* 의 pts_rt. audio FillBuffer 가 *anchor* 로 사용 → 그 이전 audio frame skip.
+        //이유: MPEG-TS 등에서 av_seek_frame BACKWARD 가 target +3초 forward keyframe 으로 fallback 점프. video 첫 frame 의
+        //미디어 시점 ≠ audio 첫 frame 의 미디어 시점. 둘 다 segment-local 0 시점에 시작하면 *영구 audio drift*.
+        //audio 가 video anchor 까지 frame skip → 두 stream 이 *같은 미디어 시점* 부터 emit.
+        int64_t video_first_emit_pts_rt() const { return m_video_first_emit_pts_rt.load(); }
+
     private:
         void    worker_loop();
 
@@ -120,6 +126,10 @@ namespace ffi
         //CFFiVideoStream / CFFiAudioStream 이 직접 m_segment_rt.load() 접근 가능하도록 public-like accessor 별도 제공.
         std::atomic<int64_t>   m_segment_rt{0};
         int64_t                m_pending_segment_rt = 0;   //seek() 호출 시 저장. worker 가 av_seek_frame 후 m_segment_rt.store(this).
+
+        //seek 후 *첫 video frame emit* 의 pts_rt — audio FillBuffer 의 anchor.
+        //av_seek_frame 후 reset (LLONG_MIN). worker 가 첫 video frame queue push 시 set.
+        std::atomic<int64_t>   m_video_first_emit_pts_rt{LLONG_MIN};
 
         //seek → first frame 시간 측정용.
         bool                   m_first_frame_after_seek = true;

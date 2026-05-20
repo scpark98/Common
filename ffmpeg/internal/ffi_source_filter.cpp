@@ -62,7 +62,15 @@ namespace ffi
     {
         if (!pCurrent)
             return E_POINTER;
-        *pCurrent = m_pPin ? m_pPin->last_rtStart() : 0;
+        //미디어 timeline 의 현재 표시 위치 = seek 시 미디어 timeline 위치(m_segment_start) + segment-local 누적(last_rtStart).
+        //last_rtStart 자체는 sample.rtStart = m_sample_count * frame_duration (segment-local 0 부터).
+        //graph 의 IMediaPosition::put_CurrentPosition(GetCurrentPosition + delta) frame step path 가
+        //*미디어 timeline* 으로 SetPositions → on_change_start 받음. 만약 segment-local 만 반환하면
+        //put_CurrentPosition(0 + interval) → 미디어 0초로 점프하는 버그.
+        if (m_pPin)
+            *pCurrent = m_pPin->m_segment_start + m_pPin->last_rtStart();
+        else
+            *pCurrent = 0;
         return S_OK;
     }
 
@@ -104,7 +112,7 @@ namespace ffi
 
         //state 갱신은 ThreadExists 무관 항상. play(Running) 첫 진입 시 OnThreadStartPlay 가 이 값을 사용.
         m_pSource->decoder().seek(pos_ms, rtStart);
-        m_sample_count = 0;
+        m_sample_count = 0;   //sample.rtStart = m_sample_count * frame_duration 의 출발점.
         m_last_rtStart = 0;
         m_segment_start = rtStart;
         m_pending_segment_stop = rtStop;
@@ -139,7 +147,8 @@ namespace ffi
 
     HRESULT CFFiVideoStream::OnThreadStartPlay()
     {
-        //thread restart 직후 — 새 segment 통지 + 다음 sample discontinuity 표시. MS 표준.
+        //thread restart 직후 — segment[0, duration] + discontinuity. MS 표준 정공.
+        //sample.rtStart 는 segment-local time (0 부터 누적). renderer 가 segment.start + sample.rtStart 로 absolute time 계산.
         m_need_discontinuity = true;
         return DeliverNewSegment(0, m_pending_segment_stop, 1.0);
     }
@@ -342,9 +351,15 @@ namespace ffi
         CDecoder& dec = m_pSource->decoder();
 
         //AVFrame pop — decoder 가 running 인 동안 wait. 빠른 drag 시 timeout S_FALSE 반환 시 stream 종료 → 영구 freeze 회피.
-        //pre-target frame skip + seg_rt 재read — 매 pop iteration 마다 m_segment_rt 다시 읽기.
-        //wait 동안 worker 가 av_seek_frame 후 m_segment_rt 갱신 + gen++ → 새 frame push.
-        //seq_cst atomic memory order 로 frame.gen=N 이면 그 시점의 m_segment_rt 도 N 시점 값 보장.
+        //seg_rt 재read — 매 pop iteration 마다 m_segment_rt 다시 읽기.
+        //
+        //pre-target skip 복원 — frame.pts < seek_target_pts 인 frame 은 skip (가장 가까운 target *직후* frame 부터 emit).
+        //이유: av_seek_frame(BACKWARD) 가 *target 이전 keyframe* 으로 점프 → keyframe→target 사이 frame 들 decode.
+        //skip 없이 keyframe 부터 emit 하면 sparse-keyframe 미디어 (mkv 29초 GOP 등) 에서 *작은 seek* (5초 step / frame step)
+        //이 *같은 keyframe* 도달 → 같은 frame 표시 → 사용자 perception "현재 위치 회귀".
+        //skip 으로 *target 위치 frame 부터 emit* → 정확한 위치 이동.
+        //freeze 우려 (이전 fix 시 NewSegment + sample timing mismatch 로 wait 발생) 는 NewSegment(0,...) + sample.rtStart=0
+        //부터 누적 fix 가 이미 적용 → skip 해도 첫 emit sample.rtStart=0 즉시 표시.
         AVRational video_tb = dec.video_time_base();
         REFERENCE_TIME seg_rt = 0;
         int64_t seek_target_pts = 0;
@@ -357,17 +372,21 @@ namespace ffi
             frame = dec.pop_video_frame();
             if (frame)
             {
-                //frame 받은 시점의 seg_rt 사용 — generation 과 동기.
-                seg_rt = dec.segment_rt();
+                seg_rt = dec.segment_rt();   //generation 과 동기.
                 seek_target_pts = (video_tb.num > 0 && video_tb.den > 0) ?
                     av_rescale_q(seg_rt, AVRational{1, 10000000}, video_tb) : 0;
 
+                //pre-target skip — target 도달 frame 부터 emit. 단 *forward keyframe fallback* (MPEG-TS 등) case 에서
+                //모든 frame 이 target 보다 크면 skip 안 됨 (첫 frame emit).
                 if (frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts)
                 {
                     ++skipped;
-                    av_frame_free(&frame);   //pre-target keyframe walk frame skip
+                    av_frame_free(&frame);
                     continue;
                 }
+                if (skipped > 0)
+                    logWrite(_T("[ffi/src/video/diag] pre-target skip=%d frame_pts=%lld target_pts=%lld"),
+                        skipped, (long long)frame->pts, (long long)seek_target_pts);
                 break;
             }
             if (!dec.is_running())
@@ -388,9 +407,9 @@ namespace ffi
             if (wait_v_ms == 500 || wait_v_ms == 2000 || wait_v_ms == 5000)
                 logWrite(_T("[ffi/src/video/diag] FillBuffer waiting %dms queue empty"), wait_v_ms);
         }
-        if (skipped > 0 || wait_v_ms >= 100)
-            logWrite(_T("[ffi/src/video/diag] pre-target skip=%d wait=%dms target_pts=%lld frame_pts=%lld"),
-                skipped, wait_v_ms, (long long)seek_target_pts, (long long)frame->pts);
+        if (wait_v_ms >= 100)
+            logWrite(_T("[ffi/src/video/diag] wait=%dms frame_pts=%lld seg_rt=%lld"),
+                wait_v_ms, (long long)frame->pts, (long long)seg_rt);
 
         BYTE* pData = NULL;
         HRESULT hr = pSample->GetPointer(&pData);
@@ -437,8 +456,11 @@ namespace ffi
                 return E_FAIL;
             }
 
-            uint8_t* dst_planes[2] = { pData, pData + aligned_w * h };
-            int dst_strides[2]     = { aligned_w, aligned_w };
+            //dst_planes/dst_strides 는 size 4 배열 — swscale 이 4 plane 가정. size 2 면 [2], [3] 가 stack
+            //uninitialized (0xCCCC...) 인데 swscale 이 NULL check 없이 access → crash. NV12 는 2 plane 만 쓰지만
+            //배열 자체는 4 개 필요.
+            uint8_t* dst_planes[4] = { pData, pData + aligned_w * h, NULL, NULL };
+            int      dst_strides[4] = { aligned_w, aligned_w, 0, 0 };
 
             sws_scale(sws, frame->data, frame->linesize, 0, frame->height,
                       dst_planes, dst_strides);
@@ -451,21 +473,15 @@ namespace ffi
         BOOL is_sync = (frame->flags & AV_FRAME_FLAG_KEY) || m_need_discontinuity;
         pSample->SetSyncPoint(is_sync);
 
-        //Sample timing — frame_pts_rt - seek_target (delta). NewSegment(0, ...) baseline.
-        //음수 가능 (keyframe walk 의 pre-target frame). renderer 는 음수 rt 를 즉시 처리.
+        //Sample timing — MS 표준 정공. m_sample_count * frame_duration 부터 누적.
+        //NewSegment(0, duration, 1.0) 와 매칭. sample.rtStart 는 segment-local time.
+        //renderer 의 absolute display time = m_tStart_at_run + sample.rtStart. graph 가 seek 후 자동 Run cycle 시
+        //m_tStart 가 *Run 시점의 clock* 으로 갱신 → 첫 sample.rtStart=0 이 *Run 직후 즉시* 표시.
+        //frame.pts 직접 사용은 *graph clock 의 시간계* 와 *미디어 pts 의 시간계* 가 다른 m_tStart 갱신 cycle 때 mismatch
+        //→ Deliver wait 발생. m_sample_count 기반 누적은 그 mismatch 회피.
         double fps = dec.frame_rate();
         if (fps <= 0.0) fps = 30.0;
-        REFERENCE_TIME rtStart;
-        if (frame->pts != AV_NOPTS_VALUE)
-        {
-            AVRational tb = dec.video_time_base();
-            REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, tb, AVRational{1, 10000000});
-            rtStart = frame_pts_rt - seg_rt;
-        }
-        else
-        {
-            rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
-        }
+        REFERENCE_TIME rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps);
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
@@ -646,10 +662,11 @@ namespace ffi
 
         CDecoder& dec = m_pSource->decoder();
 
-        //pre-target skip + seg_rt 재read — 매 pop iteration 마다.
-        REFERENCE_TIME seek_target = 0;
+        //audio frame skip — video 의 첫 emit pts_rt anchor 까지. 두 stream sync 위해.
+        //MPEG-TS 등에서 video keyframe 이 target+3초 forward fallback 시 audio 도 그 시점부터 시작.
         AVRational audio_tb = dec.audio_time_base();
-        int64_t seek_target_pts_aud = 0;
+        int audio_skipped = 0;
+        int wait_anchor_ms = 0;
 
         AVFrame* frame = NULL;
         int wait_ms = 0;
@@ -658,15 +675,30 @@ namespace ffi
             frame = dec.pop_audio_frame();
             if (frame)
             {
-                seek_target = dec.segment_rt();
-                seek_target_pts_aud = (audio_tb.num > 0 && audio_tb.den > 0) ?
-                    av_rescale_q(seek_target, AVRational{1, 10000000}, audio_tb) : 0;
-
-                if (frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts_aud)
+                //video anchor 확인 — set 안 되어 있으면 short wait (video first emit 까지).
+                int64_t video_anchor = dec.video_first_emit_pts_rt();
+                if (video_anchor == LLONG_MIN && wait_anchor_ms < 200)
                 {
+                    //video first emit 아직 안 됨 — frame 다시 큐 앞에 못 넣음. discard + wait.
                     av_frame_free(&frame);
+                    Sleep(5);
+                    wait_anchor_ms += 5;
                     continue;
                 }
+                if (video_anchor != LLONG_MIN && audio_tb.num > 0 && audio_tb.den > 0)
+                {
+                    int64_t anchor_pts = av_rescale_q(video_anchor,
+                        AVRational{1, 10000000}, audio_tb);
+                    if (frame->pts != AV_NOPTS_VALUE && frame->pts < anchor_pts)
+                    {
+                        ++audio_skipped;
+                        av_frame_free(&frame);
+                        continue;
+                    }
+                }
+                if (audio_skipped > 0)
+                    logWrite(_T("[ffi/src/audio/diag] anchor skip=%d wait_anchor=%dms frame_pts=%lld video_anchor_rt=%lld"),
+                        audio_skipped, wait_anchor_ms, (long long)frame->pts, (long long)video_anchor);
                 break;
             }
             if (!dec.is_running())
@@ -732,17 +764,8 @@ namespace ffi
                 (int)mx, (long long)m_sample_count);
         }
 
-        //timing — frame_pts_rt - seek_target (delta). video pin 과 같은 baseline. NewSegment(0, ...).
-        REFERENCE_TIME rtStart;
-        if (frame->pts != AV_NOPTS_VALUE)
-        {
-            REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
-            rtStart = frame_pts_rt - seek_target;
-        }
-        else
-        {
-            rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
-        }
+        //timing — m_sample_count 기반 segment-local time. video pin 과 같은 MS 표준 정공.
+        REFERENCE_TIME rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
         m_sample_count += out_samples;
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
         pSample->SetTime(&rtStart, &rtStop);
@@ -777,6 +800,7 @@ namespace ffi
 
     HRESULT CFFiAudioStream::OnThreadStartPlay()
     {
+        //MS 표준 — segment[0, duration] + sample.rtStart 는 segment-local time. video pin 과 동일.
         m_need_discontinuity = true;
         return DeliverNewSegment(0, m_pending_segment_stop, 1.0);
     }

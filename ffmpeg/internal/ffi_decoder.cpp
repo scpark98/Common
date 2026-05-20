@@ -448,15 +448,26 @@ namespace ffi
                         }
                     }
 
-                    int64_t target = (int64_t)(seek_pos * AV_TIME_BASE / 1000.0);
+                    int64_t target_us = (int64_t)(seek_pos * AV_TIME_BASE / 1000.0);
 
                     LARGE_INTEGER qpc_freq, qpc_t0, qpc_t1;
                     ::QueryPerformanceFrequency(&qpc_freq);
                     ::QueryPerformanceCounter(&qpc_t0);
 
-                    //stream_index=-1 → AV_TIME_BASE 자동 변환. 명시하면 target 이 stream time_base 단위여야 함.
-                    //(stream 명시한 채 AV_TIME_BASE 값 넘기면 미디어 범위 밖으로 seek → fail → 같은 자리 stay = freeze 의 진짜 원인)
-                    int hr_seek = av_seek_frame(m_fmt, -1, target, AVSEEK_FLAG_BACKWARD);
+                    //stream_index=video 로 명시 + target 을 video stream time_base 단위로 변환.
+                    //stream_index=-1 (format-level) 은 *어느* stream 의 keyframe 으로 갈지 모호.
+                    //sparse keyframe 미디어 (MPEG-TS 29초 GOP / .mp4-as-TS 등) 에서 av_seek_frame BACKWARD 가
+                    //*prefer* 일 뿐 *force* 가 아니라 target 보다 *늦은 keyframe* 으로 forward fallback 발생.
+                    //fix: target_pts - 1초 margin 으로 seek → 항상 backward keyframe 보장 + source filter 의 pre-target
+                    //skip 이 *원래 target* 까지 forward decode + emit. 1초 = 30 frame ≈ 150ms HW decode (사용자 perception
+                    //영향 작음). frame step backward 시도 정확히 1 frame 이전 frame emit.
+                    AVRational vtb = m_fmt->streams[m_video_stream_idx]->time_base;
+                    int64_t target_pts = av_rescale_q(target_us,
+                        AVRational{1, AV_TIME_BASE}, vtb);
+                    int64_t margin_pts = av_rescale_q(1 * AV_TIME_BASE,
+                        AVRational{1, AV_TIME_BASE}, vtb);   //1초 margin
+                    int64_t safe_target_pts = (target_pts > margin_pts) ? target_pts - margin_pts : 0;
+                    int hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, safe_target_pts, AVSEEK_FLAG_BACKWARD);
                     avcodec_flush_buffers(m_video_ctx);
                     if (m_audio_ctx)
                         avcodec_flush_buffers(m_audio_ctx);
@@ -466,6 +477,7 @@ namespace ffi
                     long long seek_us = (qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
 
                     m_segment_rt.store(m_pending_segment_rt);
+                    m_video_first_emit_pts_rt.store(LLONG_MIN);   //다음 video frame push 시 set.
                     int new_gen = m_seek_generation.fetch_add(1) + 1;
                     logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld seek_us=%lld"),
                         seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt, seek_us);
@@ -577,8 +589,18 @@ namespace ffi
                     {
                         //명시적 CPU buffer 할당 — device-managed pool 의 buffer 가 아닌 own buffer.
                         //이 안 하면 transferred sw_frame->data 가 D3D11 device 관리 상태로 남아 swscale 와 device lock race → FillBuffer stuck.
+                        //sw_frame->format 을 frame->hw_frames_ctx 의 sw_format 으로 query — codec/미디어 마다 다름 (NV12 / P010 / NV21 등).
+                        //hard-coded NV12 가 다른 native sw_format 인 미디어 (mkv 일부 H.264 등) 에서 av_hwframe_transfer_data EINVAL fail 원인.
+                        AVPixelFormat sw_fmt = AV_PIX_FMT_NV12;
+                        if (frame->hw_frames_ctx)
+                        {
+                            AVHWFramesContext* hwfc = (AVHWFramesContext*)frame->hw_frames_ctx->data;
+                            if (hwfc && hwfc->sw_format != AV_PIX_FMT_NONE)
+                                sw_fmt = hwfc->sw_format;
+                        }
+
                         AVFrame* sw_frame = av_frame_alloc();
-                        sw_frame->format = AV_PIX_FMT_NV12;
+                        sw_frame->format = sw_fmt;
                         sw_frame->width  = frame->width;
                         sw_frame->height = frame->height;
                         int buf_hr = av_frame_get_buffer(sw_frame, 32);
@@ -619,6 +641,15 @@ namespace ffi
                     }
 
                     out_frame->opaque = (void*)(intptr_t)m_seek_generation.load();   //generation tag
+
+                    //video first emit pts_rt set — audio anchor 로 사용.
+                    if (m_video_first_emit_pts_rt.load() == LLONG_MIN && out_frame->pts != AV_NOPTS_VALUE)
+                    {
+                        AVRational tb = m_fmt->streams[m_video_stream_idx]->time_base;
+                        int64_t pts_rt = av_rescale_q(out_frame->pts, tb, AVRational{1, 10000000});
+                        m_video_first_emit_pts_rt.store(pts_rt);
+                    }
+
                     {
                         std::unique_lock<std::mutex> lk(m_mtx_queue);
                         m_video_queue.push_back(out_frame);

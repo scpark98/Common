@@ -2469,6 +2469,20 @@ void CDShow::step_frame(bool forward)
 	if (get_play_state() == State_Running)
 		play(State_Paused);
 
+	//forward step: IVideoFrameStep (MPC-VR / EVR 지원) — graph clock 진행 없이 *다음 sample 1 개* 표시.
+	//seek-based step 의 부작용 (sparse keyframe 미디어에서 av_seek_frame BACKWARD 가 forward fallback → 수초 jump) 회피.
+	if (forward)
+	{
+		CComQIPtr<IVideoFrameStep> pFrameStep(m_pGB);
+		if (pFrameStep && pFrameStep->CanStep(0, NULL) == S_OK)
+		{
+			HRESULT hr = pFrameStep->Step(1, NULL);
+			if (SUCCEEDED(hr))
+				return;
+		}
+	}
+
+	//backward step 또는 IVideoFrameStep 미지원: seek-based fallback.
 	REFTIME pos;
 	double interval = 1.0 / m_frame_rate;
 	m_pMP->get_CurrentPosition(&pos);

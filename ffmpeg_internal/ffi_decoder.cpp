@@ -460,6 +460,7 @@ namespace ffi
                     avcodec_flush_buffers(m_video_ctx);
                     if (m_audio_ctx)
                         avcodec_flush_buffers(m_audio_ctx);
+                    m_eof.store(false);   //seek 후 새 위치부터 재생 — EOF 상태 해제.
 
                     ::QueryPerformanceCounter(&qpc_t1);
                     long long seek_us = (qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
@@ -511,7 +512,9 @@ namespace ffi
             int hr = av_read_frame(m_fmt, pkt);
             if (hr < 0)
             {
-                //EOF — 잠시 대기 후 다음 iteration (seek 가 올 수도 있음).
+                //EOF — flag set. queue 비면 source FillBuffer 가 S_FALSE 반환 → DeliverEndOfStream → renderer EC_COMPLETE 발화.
+                //seek 가 오면 av_seek_frame 처리 시 clear.
+                m_eof.store(true);
                 std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 continue;
             }

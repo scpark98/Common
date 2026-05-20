@@ -1990,6 +1990,13 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	m_pGB->QueryInterface(IID_IMediaSeeking,  (void**)&m_pMS);
 	m_pGB->QueryInterface(IID_IMediaControl,  (void**)&m_pMC);
 
+	//IMediaEventEx — graph event 통지 (EC_COMPLETE / EC_VIDEO_SIZE_CHANGED 등). PreTranslateMessage → HandleGraphEvent 가 사용.
+	//LAV path 와 동일 — 누락 시 60fps 등 event 빈도 높은 미디어에서 HandleGraphEvent 의 m_pME 접근 = NULL assert.
+	HRESULT hr_me = m_pGB->QueryInterface(IID_PPV_ARGS(&m_pME));
+	if (m_pME != NULL && pParent != NULL)
+		m_pME->SetNotifyWindow((OAHWND)pParent->m_hWnd, WM_GRAPHNOTIFY, 0);
+	logWrite(_T("[internal] IMediaEventEx hr=0x%08x me=%p"), hr_me, (void*)m_pME);
+
 	//=== 5) media info ===
 	m_duration   = pFFi->decoder().duration_ms();
 	m_video_size = CSize(pFFi->decoder().video_width(), pFFi->decoder().video_height());
@@ -2014,6 +2021,19 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	{
 		setup_audio_gain_filter();
 		logWrite(_T("[internal] SC Audio chain setup"));
+	}
+
+	//새 renderer 인스턴스의 surface position 설정 — OnSize 가 fire 안 되는 미디어 전환 (mkv→mp4 등) 케이스에서
+	//MPCVR 의 SetWindowPosition / SetDestinationPosition 이 한 번도 안 호출되어 surface 표시 안 되는 결함 fix.
+	//set_video_position 이 m_video_size 의 새 aspect 로 letterbox 재계산. 이전 rect 가 없으면 parent client rect 사용.
+	if (pParent && pParent->GetSafeHwnd())
+	{
+		CRect r = m_last_video_position_rect;
+		if (r.IsRectEmpty())
+			pParent->GetClientRect(&r);
+		set_video_position(r);
+		logWrite(_T("[internal] set_video_position(%d,%d,%d,%d) after open"),
+			r.left, r.top, r.right, r.bottom);
 	}
 
 	//graph 가 ref 보유 — 우리 소유권 해제.

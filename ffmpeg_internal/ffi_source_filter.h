@@ -68,6 +68,8 @@ namespace ffi
         HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
         HRESULT OnThreadCreate() override;
         HRESULT OnThreadDestroy() override;
+        HRESULT OnThreadStartPlay() override;   //MS 표준 정공법 — thread restart 직후 NewSegment + discontinuity.
+        HRESULT DoBufferProcessingLoop() override;   //(Z) 측정 — GetDeliveryBuffer / Deliver wait 분리.
 
         //CFFiSeeking 의 ChangeStart 가 호출 — CDecoder::seek 비동기 위임.
         void                on_change_start(REFERENCE_TIME rtStart);
@@ -81,6 +83,17 @@ namespace ffi
         LONGLONG        m_last_rtStart = 0;   //직전 emit 한 frame 의 rtStart. GetCurrentPosition 의 응답값.
     public:
         REFERENCE_TIME  m_segment_start = 0;  //seek target rt. video/audio sync 의 공유 baseline.
+
+        //(A) FillBuffer entry 측정 — seek 후 첫 호출 latency / 비정상 gap.
+        ULONGLONG       m_seek_t0_ms = 0;
+        ULONGLONG       m_fb_last_entry_ms = 0;
+        int             m_fb_count_since_seek = 0;
+
+        //flush 후 첫 sample 에 SetDiscontinuity(TRUE) 알림 플래그.
+        bool            m_need_discontinuity = false;
+
+        //MS 표준 정공법 — on_change_start 가 저장 → OnThreadStartPlay 가 NewSegment 에 사용.
+        REFERENCE_TIME  m_pending_segment_stop = 0;
     private:
 
         CCritSec        m_cs_seeking;
@@ -111,6 +124,10 @@ namespace ffi
         int             m_out_sample_rate = 0;
         int             m_out_channels = 0;
         AVChannelLayout m_out_chlayout{};
+        bool            m_need_discontinuity = false;
+        REFERENCE_TIME  m_pending_segment_stop = 0;
+    public:
+        HRESULT OnThreadStartPlay() override;
     };
 
     //CSource — base filter. Pin (CFFiVideoStream) 을 보유. open_file 로 CDecoder 준비.

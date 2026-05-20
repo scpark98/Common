@@ -71,6 +71,7 @@ namespace ffi
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
         bool    has_hw_accel() const { return m_hw_pix_fmt != AV_PIX_FMT_NONE; }
+        bool    is_eof()       const { return m_eof.load(); }   //av_read_frame AVERROR_EOF 도달 + queue 비면 stream 끝.
 
         //queue 의 현재 size — 디버깅용.
         size_t  video_queue_size();
@@ -110,6 +111,9 @@ namespace ffi
         //Seek generation — frame 마다 tag 부여. seek() 호출 시 ++. pop 시 current generation 만 accept,
         //이전 generation 의 stale frame 은 skip + free. caller flush 와 worker push 의 모든 race 차단.
         std::atomic<int>        m_seek_generation{0};
+
+        //EOF — av_read_frame AVERROR_EOF 도달 시 set, seek 시 clear. FillBuffer 가 EOS 인지 vs 일시 starve 구분.
+        std::atomic<bool>       m_eof{false};
 
         //Segment baseline rt — worker 의 av_seek_frame 처리 후 generation ++ 와 동시에 갱신.
         //FillBuffer 의 rt 계산이 generation tag 와 같은 시점의 segment 사용 → race 없음.

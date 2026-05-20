@@ -102,29 +102,46 @@ namespace ffi
         double pos_ms = (double)rtStart / 10000.0;
         REFERENCE_TIME rtStop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
 
-        //video pin 의 downstream flush + new segment.
-        DeliverBeginFlush();
-        DeliverEndFlush();
-
-        //CDecoder.seek 가 m_pending_segment_rt 저장 → worker 가 av_seek_frame 후 m_segment_rt 갱신 + generation ++.
-        //두 갱신이 같은 시점이라 FillBuffer 의 rt 계산이 frame.gen 과 일관된 segment 사용 → race 없음.
+        //state 갱신은 ThreadExists 무관 항상. play(Running) 첫 진입 시 OnThreadStartPlay 가 이 값을 사용.
         m_pSource->decoder().seek(pos_ms, rtStart);
-
         m_sample_count = 0;
         m_last_rtStart = 0;
-        m_segment_start = rtStart;   //legacy — audio pin 이 참조. atomic 은 CDecoder.m_segment_rt.
+        m_segment_start = rtStart;
+        m_pending_segment_stop = rtStop;
 
-        //NewSegment.start = 0. sample 의 rtStart 는 frame_pts - seek_target_pts (delta) 사용.
-        //video keyframe walk 의 첫 frame (target 이전) 은 음수 rt → 즉시 출력. audio 첫 frame ≈ target 이라 rt≈0 → 정확 시작.
-        //video / audio 둘 다 동일 baseline (seek target) → 두 stream sync.
-        DeliverNewSegment(0, rtStop, 1.0);
+        //(A) measurement reset.
+        m_seek_t0_ms = GetTickCount64();
+        m_fb_count_since_seek = 0;
+        m_fb_last_entry_ms = 0;
 
-        //audio pin 도 동일한 flush + new segment + 같은 baseline 전파.
+        //streaming 중인 경우만 MS 표준 정공법 (Stop/Flush/Pause cycle) 적용.
+        //  BeginFlush → Stop → EndFlush → Pause → OnThreadStartPlay → NewSegment + Discontinuity
+        //pre-streaming (graph Stopped, ThreadExists false) — play(Running) 의 thread create → OnThreadStartPlay 가 동일 NewSegment 처리.
+        if (ThreadExists())
+        {
+            DeliverBeginFlush();
+            Stop();
+            DeliverEndFlush();
+            //decoder.seek 가 worker 에 비동기 위임. Pause→OnThreadStartPlay 시점까지 seek 처리될 가능성 높음.
+            //FillBuffer 의 pre-target skip 이 stale frame (frame.pts < seek_target_pts) drop 으로 race 보호.
+            Pause();
+        }
+
+        //audio pin 도 동일한 정공법 적용 (별도 streaming thread).
         if (m_pSource->audio_stream())
             m_pSource->audio_stream()->on_seek_flush(rtStart);
 
-        logWrite(_T("[ffi/src] on_change_start → seek %.0fms + flush + new_segment(%lld..%lld)"),
-            pos_ms, (long long)rtStart, (long long)rtStop);
+        logWrite(_T("[ffi/src] on_change_start → seek %.0fms + %s (NewSegment 0..%lld)"),
+            pos_ms,
+            ThreadExists() ? _T("Stop/Flush/Pause cycle") : _T("pre-streaming defer"),
+            (long long)rtStop);
+    }
+
+    HRESULT CFFiVideoStream::OnThreadStartPlay()
+    {
+        //thread restart 직후 — 새 segment 통지 + 다음 sample discontinuity 표시. MS 표준.
+        m_need_discontinuity = true;
+        return DeliverNewSegment(0, m_pending_segment_stop, 1.0);
     }
 
     HRESULT CFFiVideoStream::OnThreadCreate()
@@ -133,7 +150,12 @@ namespace ffi
         //CDecoder 의 worker thread 가 아직 안 돌고 있으면 시작.
         if (m_pSource && !m_pSource->decoder().is_running())
             m_pSource->decoder().start();
-        logWrite(_T("[ffi/src] video stream thread create"));
+        //m_pending_segment_stop 이 미초기화 (history seek 없이 바로 play 한 케이스) 일 때 duration 으로 fallback.
+        //OnThreadStartPlay 가 이 값으로 NewSegment(0, stop, 1.0) 호출 — stop=0 이면 renderer 가 sample drop.
+        if (m_pSource && m_pending_segment_stop <= 0)
+            m_pending_segment_stop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
+        logWrite(_T("[ffi/src] video stream thread create (segment_stop=%lld)"),
+            (long long)m_pending_segment_stop);
         return NOERROR;
     }
 
@@ -154,6 +176,7 @@ namespace ffi
 
         int w = dec.video_width();
         int h = dec.video_height();
+        int aligned_w = (w + 127) & ~127;   //128 byte alignment — DecideBufferSize / FillBuffer 와 일치.
         double fps = dec.frame_rate();
         if (fps <= 0.0)
             fps = 30.0;
@@ -165,18 +188,18 @@ namespace ffi
         ZeroMemory(pvi, sizeof(VIDEOINFOHEADER));
 
         pvi->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-        pvi->bmiHeader.biWidth       = w;
-        pvi->bmiHeader.biHeight      = h;          //양수 = bottom-up. NV12 는 top-down 이 표준이지만 양수도 처리됨.
+        pvi->bmiHeader.biWidth       = aligned_w;   //stride. rcSource 가 valid 영역.
+        pvi->bmiHeader.biHeight      = h;
         pvi->bmiHeader.biPlanes      = 1;
-        pvi->bmiHeader.biBitCount    = 12;         //NV12 = 12 bpp
+        pvi->bmiHeader.biBitCount    = 12;          //NV12 = 12 bpp
         pvi->bmiHeader.biCompression = MAKEFOURCC('N','V','1','2');
-        pvi->bmiHeader.biSizeImage   = w * h * 3 / 2;
+        pvi->bmiHeader.biSizeImage   = aligned_w * h * 3 / 2;
 
         pvi->AvgTimePerFrame = (REFERENCE_TIME)(10000000.0 / fps);   //100ns 단위
-        pvi->rcSource.right  = w;
+        pvi->rcSource.right  = w;   //valid 영역만 (padded stride 가 아닌 실제 표시 영역).
         pvi->rcSource.bottom = h;
         pvi->rcTarget        = pvi->rcSource;
-        pvi->dwBitRate       = w * h * 3 / 2 * 8 * (DWORD)fps;
+        pvi->dwBitRate       = aligned_w * h * 3 / 2 * 8 * (DWORD)fps;
         pvi->dwBitErrorRate  = 0;
 
         const GUID MEDIASUBTYPE_NV12_LOCAL = { MAKEFOURCC('N','V','1','2'),
@@ -216,8 +239,10 @@ namespace ffi
         int w = dec.video_width();
         int h = dec.video_height();
 
-        pProperties->cBuffers = 3;   //triple buffer — render 가 한 frame 사용 중에도 우리는 다음 frame 채울 수 있음.
-        pProperties->cbBuffer = w * h * 3 / 2;   //NV12 사이즈
+        //NV12 stride 를 128 byte align — MPCVR 의 D3D11 texture upload 가 aligned stride 가정 시 480 같은 unaligned width 에서 garbage 합성 가능.
+        int aligned_w = (w + 127) & ~127;
+        pProperties->cBuffers = 3;
+        pProperties->cbBuffer = aligned_w * h * 3 / 2;
 
         ALLOCATOR_PROPERTIES Actual;
         HRESULT hr = pAlloc->SetProperties(pProperties, &Actual);
@@ -230,10 +255,89 @@ namespace ffi
         return NOERROR;
     }
 
+    //(Z) DoBufferProcessingLoop override — default impl 그대로 + GetDeliveryBuffer / Deliver wait 측정.
+    //정확한 block 위치 추적: flush 후 첫 iteration 에서 어느 단계가 stuck 인지.
+    HRESULT CFFiVideoStream::DoBufferProcessingLoop()
+    {
+        Command com;
+        OnThreadStartPlay();
+        do
+        {
+            while (!CheckRequest(&com))
+            {
+                IMediaSample* pSample;
+
+                ULONGLONG t0 = GetTickCount64();
+                HRESULT hr = GetDeliveryBuffer(&pSample, NULL, NULL, 0);
+                ULONGLONG t_gdb_ms = GetTickCount64() - t0;
+                if (t_gdb_ms > 100)
+                    logWrite(_T("[ffi/src/video/diag] GetDeliveryBuffer wait %llums"), t_gdb_ms);
+
+                if (FAILED(hr))
+                {
+                    Sleep(1);
+                    continue;
+                }
+
+                hr = FillBuffer(pSample);
+
+                if (hr == S_OK)
+                {
+                    ULONGLONG t1 = GetTickCount64();
+                    hr = Deliver(pSample);
+                    ULONGLONG t_dlv_ms = GetTickCount64() - t1;
+                    if (t_dlv_ms > 100)
+                        logWrite(_T("[ffi/src/video/diag] Deliver wait %llums"), t_dlv_ms);
+
+                    pSample->Release();
+                    if (hr != S_OK)
+                        return S_OK;
+                }
+                else if (hr == S_FALSE)
+                {
+                    pSample->Release();
+                    DeliverEndOfStream();
+                    return S_OK;
+                }
+                else
+                {
+                    pSample->Release();
+                    DeliverEndOfStream();
+                    m_pFilter->NotifyEvent(EC_ERRORABORT, hr, 0);
+                    return hr;
+                }
+            }
+
+            if (com == CMD_RUN || com == CMD_PAUSE)
+                Reply(NOERROR);
+            else if (com != CMD_STOP)
+                Reply((DWORD)E_UNEXPECTED);
+        } while (com != CMD_STOP);
+
+        return S_FALSE;
+    }
+
     HRESULT CFFiVideoStream::FillBuffer(IMediaSample* pSample)
     {
         if (!pSample || !m_pSource)
             return E_POINTER;
+
+        //(A) entry timing — seek 후 첫 호출 latency / 비정상 gap (>100ms) 측정.
+        ULONGLONG now_ms = GetTickCount64();
+        if (m_fb_count_since_seek == 0)
+        {
+            logWrite(_T("[ffi/src/video/diag] FillBuffer first entry +%llums after seek"),
+                m_seek_t0_ms ? (now_ms - m_seek_t0_ms) : 0ULL);
+        }
+        else if (m_fb_last_entry_ms != 0)
+        {
+            ULONGLONG gap_ms = now_ms - m_fb_last_entry_ms;
+            if (gap_ms > 100)
+                logWrite(_T("[ffi/src/video/diag] FillBuffer entry gap %llums (call #%d since seek)"),
+                    gap_ms, m_fb_count_since_seek);
+        }
+        m_fb_last_entry_ms = now_ms;
+        ++m_fb_count_since_seek;
 
         CDecoder& dec = m_pSource->decoder();
 
@@ -268,6 +372,17 @@ namespace ffi
             }
             if (!dec.is_running())
                 return S_FALSE;
+            //EOS — decoder 가 av_read_frame EOF + queue 비면 stream 끝. S_FALSE → DeliverEndOfStream → EC_COMPLETE.
+            if (dec.is_eof() && dec.video_queue_size() == 0)
+            {
+                logWrite(_T("[ffi/src/video/diag] EOS reached — DeliverEndOfStream"));
+                return S_FALSE;
+            }
+            //CMD_STOP / CMD_PAUSE 등 pending command peek — close 시 wait loop 깨기 (deadlock 회피).
+            //CheckRequest 는 peek (consume X), DoBufferProcessingLoop 가 정상 GetRequest+Reply 처리.
+            Command pending;
+            if (CheckRequest(&pending))
+                return S_FALSE;
             Sleep(2);
             wait_v_ms += 2;
             if (wait_v_ms == 500 || wait_v_ms == 2000 || wait_v_ms == 5000)
@@ -287,8 +402,9 @@ namespace ffi
 
         int w = dec.video_width();
         int h = dec.video_height();
+        int aligned_w = (w + 127) & ~127;   //DecideBufferSize 와 같은 alignment.
         long buffer_size = pSample->GetSize();
-        long required = w * h * 3 / 2;
+        long required = aligned_w * h * 3 / 2;
         if (buffer_size < required)
         {
             av_frame_free(&frame);
@@ -299,13 +415,13 @@ namespace ffi
         //매 frame swscale alloc/free 가 thread-unsafe 또는 무거워 crash/freeze 원인.
         if ((AVPixelFormat)frame->format == AV_PIX_FMT_NV12)
         {
-            //Y plane copy — source stride 와 dest stride 가 다를 수 있어 row 단위 copy.
+            //dst stride = aligned_w. src 의 valid 영역은 처음 w byte, 나머지는 padding (0 또는 stale 무관).
             uint8_t* dst_y  = pData;
-            uint8_t* dst_uv = pData + w * h;
+            uint8_t* dst_uv = pData + aligned_w * h;
             for (int y = 0; y < h; ++y)
-                memcpy(dst_y + y * w, frame->data[0] + y * frame->linesize[0], w);
+                memcpy(dst_y + y * aligned_w, frame->data[0] + y * frame->linesize[0], w);
             for (int y = 0; y < h / 2; ++y)
-                memcpy(dst_uv + y * w, frame->data[1] + y * frame->linesize[1], w);
+                memcpy(dst_uv + y * aligned_w, frame->data[1] + y * frame->linesize[1], w);
         }
         else
         {
@@ -321,8 +437,8 @@ namespace ffi
                 return E_FAIL;
             }
 
-            uint8_t* dst_planes[2] = { pData, pData + w * h };
-            int dst_strides[2]     = { w, w };
+            uint8_t* dst_planes[2] = { pData, pData + aligned_w * h };
+            int dst_strides[2]     = { aligned_w, aligned_w };
 
             sws_scale(sws, frame->data, frame->linesize, 0, frame->height,
                       dst_planes, dst_strides);
@@ -330,11 +446,13 @@ namespace ffi
         }
 
         pSample->SetActualDataLength(required);
-        pSample->SetSyncPoint((frame->flags & AV_FRAME_FLAG_KEY) ? TRUE : FALSE);
+        //flush 후 첫 sample 은 SyncPoint=TRUE 강제 — keyframe walk 후 첫 frame 이 정확한 IDR 이 아닐 수 있으나
+        //MPCVR 는 SyncPoint 첫 sample 만 신뢰해 internal queue baseline 설정. 누락 시 stuck 가능.
+        BOOL is_sync = (frame->flags & AV_FRAME_FLAG_KEY) || m_need_discontinuity;
+        pSample->SetSyncPoint(is_sync);
 
-        //Sample timing — frame_pts_rt - seek_target_pts (delta).
-        //음수 가능 (video keyframe walk 의 첫 frame). DSound / video renderer 는 음수 rt 를 "이미 지난 시간" 으로 즉시 처리.
-        //audio 첫 frame ≈ seek target → rt ≈ 0 → 정확 시작. video / audio 동일 baseline 으로 sync.
+        //Sample timing — frame_pts_rt - seek_target (delta). NewSegment(0, ...) baseline.
+        //음수 가능 (keyframe walk 의 pre-target frame). renderer 는 음수 rt 를 즉시 처리.
         double fps = dec.frame_rate();
         if (fps <= 0.0) fps = 30.0;
         REFERENCE_TIME rtStart;
@@ -342,7 +460,7 @@ namespace ffi
         {
             AVRational tb = dec.video_time_base();
             REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, tb, AVRational{1, 10000000});
-            rtStart = frame_pts_rt - seg_rt;   //skip 단계와 같은 seg_rt — race 없음.
+            rtStart = frame_pts_rt - seg_rt;
         }
         else
         {
@@ -351,6 +469,14 @@ namespace ffi
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps);
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
+
+        //flush 후 첫 sample 에 Discontinuity flag — renderer 의 internal state reset 알림.
+        //누락 시 MPCVR 가 이전 segment continuation 으로 처리 → Receive 가 stuck.
+        if (m_need_discontinuity)
+        {
+            pSample->SetDiscontinuity(TRUE);
+            m_need_discontinuity = false;
+        }
 
         ++m_sample_count;
 
@@ -402,6 +528,10 @@ namespace ffi
     HRESULT CFFiAudioStream::OnThreadCreate()
     {
         m_sample_count = 0;
+
+        //m_pending_segment_stop 미초기화 시 duration fallback. video pin 과 동일.
+        if (m_pSource && m_pending_segment_stop <= 0)
+            m_pending_segment_stop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
 
         //SwrContext 초기화 — decoder 의 sample format → S16 interleaved.
         if (!m_swr && m_pSource && m_pSource->decoder().has_audio())
@@ -541,6 +671,16 @@ namespace ffi
             }
             if (!dec.is_running())
                 return S_FALSE;
+            //EOS — video pin 과 동일. audio queue 도 비면 stream 끝.
+            if (dec.is_eof() && dec.audio_queue_size() == 0)
+            {
+                logWrite(_T("[ffi/src/audio/diag] EOS reached — DeliverEndOfStream"));
+                return S_FALSE;
+            }
+            //video pin 과 동일 — pending CMD peek 로 wait loop 깨기.
+            Command pending;
+            if (CheckRequest(&pending))
+                return S_FALSE;
             Sleep(2);
             wait_ms += 2;
             if (wait_ms == 500 || wait_ms == 2000 || wait_ms == 5000)
@@ -592,7 +732,7 @@ namespace ffi
                 (int)mx, (long long)m_sample_count);
         }
 
-        //timing — frame_pts_rt - seek_target_pts (video pin 과 같은 baseline). seek_target 은 위에서 이미 query.
+        //timing — frame_pts_rt - seek_target (delta). video pin 과 같은 baseline. NewSegment(0, ...).
         REFERENCE_TIME rtStart;
         if (frame->pts != AV_NOPTS_VALUE)
         {
@@ -607,6 +747,12 @@ namespace ffi
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
         pSample->SetTime(&rtStart, &rtStop);
 
+        if (m_need_discontinuity)
+        {
+            pSample->SetDiscontinuity(TRUE);
+            m_need_discontinuity = false;
+        }
+
         av_frame_free(&frame);
         return NOERROR;
     }
@@ -615,11 +761,24 @@ namespace ffi
     {
         REFERENCE_TIME rtStop = m_pSource ?
             (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0) : 0;
-        DeliverBeginFlush();
-        DeliverEndFlush();
+        //state 갱신은 ThreadExists 무관. play(Running) 첫 thread create 시 OnThreadStartPlay 가 이 값을 사용.
         m_sample_count = 0;
-        //NewSegment.start = 0. audio sample 의 rt 는 frame_pts - seek_target (video pin 과 같은 baseline).
-        DeliverNewSegment(0, rtStop, 1.0);
+        m_pending_segment_stop = rtStop;
+
+        //streaming 중인 경우만 Stop/Flush/Pause cycle.
+        if (ThreadExists())
+        {
+            DeliverBeginFlush();
+            Stop();
+            DeliverEndFlush();
+            Pause();
+        }
+    }
+
+    HRESULT CFFiAudioStream::OnThreadStartPlay()
+    {
+        m_need_discontinuity = true;
+        return DeliverNewSegment(0, m_pending_segment_stop, 1.0);
     }
 
     //============================================================

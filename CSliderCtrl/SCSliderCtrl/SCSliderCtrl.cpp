@@ -875,39 +875,7 @@ void CSCSliderCtrl::OnPaint()
 			}
 		}
 
-		dc.SetBkMode(TRANSPARENT);
-		dc.SetTextColor(RGB(0,255,0));
-
-		LOGFONT lf;
-		memcpy(&lf, &m_lf, sizeof(LOGFONT));
-		lf.lfHeight = -8;
-		lf.lfWeight = FW_ULTRABOLD;
-		//lf.lfQuality = ANTIALIASED_QUALITY;
-		lf.lfWidth = 8;
-
-		CFont font_bracket;
-		font_bracket.CreateFontIndirect(&lf);
-		pOldFont = (CFont*)dc.SelectObject(&font_bracket);
-		int repeat_pos;
-
-		if (m_repeat_start >= 0)
-		{
-			repeat_pos = Pos2Pixel(m_repeat_start);
-			dc.DrawText(_T("["), CRect(repeat_pos, m_rc.top-2, repeat_pos, m_rc.bottom),
-						DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
-			//DrawShadowText(dc.m_hDC, _T("["), 1, CRect(pxpos, m_rc.top-2, pxpos, m_rc.bottom),
-			//	DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP, RGB(0,255,0),
-			//	RGB(0,0,0), 4, 4);
-		}
-		if (m_repeat_end >= 0)
-		{
-			repeat_pos = Pos2Pixel(m_repeat_end);
-			dc.DrawText(_T("]"), CRect(repeat_pos, m_rc.top-2, repeat_pos, m_rc.bottom),
-				DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
-		}
-
-		font_bracket.DeleteObject();
-		dc.SelectObject(pOldFont);
+		//구간 반복 bracket — 다른 element 가 덮지 못하도록 OnPaint 의 *맨 마지막* 으로 이동됨 (아래 progress_border 다음 블록 참조).
 	}
 
 	// 포커스 사각형을 그린다
@@ -923,7 +891,43 @@ void CSCSliderCtrl::OnPaint()
 		draw_rect(&dc, rtrack, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 
-	dc.SelectObject(pOldFont);
+	//구간 반복 bracket — 다른 모든 element 가 그려진 *후 맨 마지막* 에. FillSolidRect 직접.
+	//세로와 가로의 x 좌표 완전 분리 — 세로 (cx ~ cx+VW), 가로 (cx+VW ~ cx+VW+HW). 겹침 없음.
+	if (m_style == style_track)
+	{
+		const COLORREF cr = RGB(0, 255, 0);
+		const int VW = 2;                       //세로 두께
+		const int HH = 2;                       //가로 두께
+		const int HW = 6;                       //가로 폭 (세로 옆으로)
+		const int top = m_rc.top;
+		const int bot = m_rc.bottom;
+		const int h   = bot - top;
+
+		//(diag) 한 번만 — 실제 그려지는 좌표 검증.
+		static bool s_diag_logged = false;
+		if (!s_diag_logged && (m_repeat_start >= 0 || m_repeat_end >= 0))
+		{
+			s_diag_logged = true;
+			logWrite(_T("[slider/bracket/diag] m_rc=(L%d T%d R%d B%d) h=%d, start=%d end=%d"),
+				m_rc.left, m_rc.top, m_rc.right, m_rc.bottom, h, m_repeat_start, m_repeat_end);
+		}
+
+		if (m_repeat_start >= 0)
+		{
+			int cx = Pos2Pixel(m_repeat_start);
+			dc.FillSolidRect(cx,        top,            VW, h,  cr);   //세로
+			dc.FillSolidRect(cx + VW,   top,            HW, HH, cr);   //위 가로 (세로 *옆부터*)
+			dc.FillSolidRect(cx + VW,   bot - HH,       HW, HH, cr);   //아래 가로 (세로 *옆부터*)
+		}
+		if (m_repeat_end >= 0)
+		{
+			int cx = Pos2Pixel(m_repeat_end);
+			dc.FillSolidRect(cx - VW,       top,            VW, h,  cr);   //세로
+			dc.FillSolidRect(cx - VW - HW,  top,            HW, HH, cr);   //위 가로 (세로 *옆부터, 왼쪽*)
+			dc.FillSolidRect(cx - VW - HW,  bot - HH,       HW, HH, cr);   //아래 가로
+		}
+	}
+
 	dc.SelectObject(pOldFont);
 	dc.SelectObject(pOldPen);
 

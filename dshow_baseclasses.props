@@ -2,7 +2,7 @@
 <!--
 DirectShow BaseClasses integration property sheet.
 
-- 위치: D:\1.projects_c++\Common\dshow_baseclasses\
+- 위치: D:\1.projects_c++\Common\directx\dshow_baseclasses\
 - 출처: MPC-BE 의 src/ExtLib/BaseClasses (Win7Samples + MPC-BE 패치). 라이센스: MS-PL / 호환.
 - BaseClasses 는 modern Windows SDK 에 빠진 DirectShow filter 베이스 (CSource / CSourceStream /
   CBaseFilter / CBaseOutputPin 등). custom filter 작성에 필수.
@@ -21,7 +21,7 @@ ClCompile 항목은 props 에 직접 안 넣음 — vcxproj 의 ItemGroup 에 �
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <PropertyGroup>
-    <BaseClassesDir>$(MSBuildThisFileDirectory)dshow_baseclasses</BaseClassesDir>
+    <BaseClassesDir>$(MSBuildThisFileDirectory)directx\dshow_baseclasses</BaseClassesDir>
   </PropertyGroup>
 
   <ItemDefinitionGroup>

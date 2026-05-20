@@ -1,7 +1,10 @@
 #/system/CCmdLine/switch가 있는 cmdLine을 사용할 때 편리.txt
 #/office
 
-#FFmpeg LGPL shared binary — GitHub 100MB 한도 초과 (avfilter-11.dll = 104MB).
-#두 머신 모두 동일 경로 (D:\1.projects_c++\Common\ffmpeg\) 에 사용자가 직접 배치.
-#설치 절차는 Common/CDialog/borderless dialog.md 옆에 별도 문서로 추가 예정.
-/ffmpeg/
+#FFmpeg LGPL shared binary.
+# /ffmpeg/include/ + /ffmpeg/lib/ 는 tracking — 두 머신 FFmpeg 버전 자동 일치, 빌드 즉시 가능.
+# /ffmpeg/bin/ 는 GitHub 100MB 한도 초과 (avfilter-11.dll = 104MB) — 사용자가 매 머신 한 번 수동 배치.
+# /ffmpeg/doc/ 는 사용 안 함.
+# /ffmpeg/internal/ 는 우리 source — tracking.
+/ffmpeg/bin/
+/ffmpeg/doc/

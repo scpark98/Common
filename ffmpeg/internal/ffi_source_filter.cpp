@@ -6,8 +6,8 @@
 
 #include "ffi_source_filter.h"
 
-#include "../Functions.h"
-#include "../log/SCLog/SCLog.h"
+#include "../../Functions.h"
+#include "../../log/SCLog/SCLog.h"
 
 extern "C" {
 #include <libswscale/swscale.h>

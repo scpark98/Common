@@ -1,4 +1,4 @@
-﻿//Include 순서 critical (Common/ffmpeg_internal/ffi_source_filter.cpp 와 동일 이유):
+﻿//Include 순서 critical (Common/ffmpeg/internal/ffi_source_filter.cpp 와 동일 이유):
 //  winsock2.h → afxwin.h → BaseClasses (streams.h via ffi_source_filter.h).
 //  MFC + BaseClasses 의 __POSITION 충돌 회피 + MFC Winsock2 detection.
 #include <winsock2.h>
@@ -8,8 +8,8 @@
 #include "ffi_decoder.h"
 #include "ffi_source_filter.h"
 
-#include "../Functions.h"
-#include "../log/SCLog/SCLog.h"   //logWrite
+#include "../../Functions.h"
+#include "../../log/SCLog/SCLog.h"   //logWrite
 
 #include <afxstr.h>
 #include <atomic>

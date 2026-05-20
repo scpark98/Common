@@ -1,7 +1,7 @@
 ﻿#include "ffi_decoder.h"
 
-#include "../Functions.h"
-#include "../log/SCLog/SCLog.h"
+#include "../../Functions.h"
+#include "../../log/SCLog/SCLog.h"
 
 extern "C" {
 #include <libavutil/hwcontext.h>

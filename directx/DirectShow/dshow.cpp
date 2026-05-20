@@ -1874,7 +1874,7 @@ bool CDShow::is_windows_media()
 	return false;
 }
 
-#include "../../ffmpeg_internal/ffi_source_filter.h"
+#include "../../ffmpeg/internal/ffi_source_filter.h"
 
 int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 {

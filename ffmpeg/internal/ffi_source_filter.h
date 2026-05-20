@@ -13,7 +13,7 @@
 *  Phase 3c: dshow.cpp 의 load_media 에 LAV ↔ Internal 토글 분기.
 */
 
-#include "../dshow_baseclasses/streams.h"
+#include "../../directx/dshow_baseclasses/streams.h"
 #include "ffi_decoder.h"
 
 #include <memory>

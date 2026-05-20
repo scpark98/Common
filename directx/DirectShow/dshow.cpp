@@ -4540,19 +4540,15 @@ CString CDShow::get_audio_delay_status()
 		supported.IsEmpty() ? _T("(none)") : supported.GetString(),
 		m_pAudioGainFilter ? _T("yes") : _T("no"));
 
-	//CSCAudioGain 이 audio chain 에 끼워진 경우 base 의 timestamp shift 로 delay 동작.
-	//renderer 가 IExFilterConfig 미지원이어도 OK.
+	//지원 시 empty 반환 — caller (OSD) 가 별도 표시 안 함.
+	//미지원 시만 문자열 반환 — caller 가 붉은 계열로 강조.
 	if (m_pAudioGainFilter)
-		return _T("오디오 싱크 지원 (CSCAudioGain timestamp shift)");
+		return _T("");   //CSCAudioGain chain 이 timestamp shift 로 delay 동작 — renderer 무관.
 
 	if (!supported.IsEmpty())
-	{
-		CString result;
-		result.Format(_T("오디오 싱크 지원: %s"), supported.GetString());
-		return result;
-	}
+		return _T("");   //renderer 가 IExFilterConfig::Flt_SetInt("audio_delay") 지원.
 
-	return _T("오디오 싱크 미지원 renderer");
+	return _T("오디오 싱크 미지원");
 }
 
 void CDShow::subtitle_placement(int dir)

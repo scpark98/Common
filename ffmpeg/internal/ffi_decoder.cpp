@@ -642,13 +642,9 @@ namespace ffi
 
                     out_frame->opaque = (void*)(intptr_t)m_seek_generation.load();   //generation tag
 
-                    //video first emit pts_rt set — audio anchor 로 사용.
-                    if (m_video_first_emit_pts_rt.load() == LLONG_MIN && out_frame->pts != AV_NOPTS_VALUE)
-                    {
-                        AVRational tb = m_fmt->streams[m_video_stream_idx]->time_base;
-                        int64_t pts_rt = av_rescale_q(out_frame->pts, tb, AVRational{1, 10000000});
-                        m_video_first_emit_pts_rt.store(pts_rt);
-                    }
+                    //video_first_emit_pts_rt 는 *worker push 시점이 아닌* CFFiVideoStream::FillBuffer 의 *pre-target skip
+                    //후 실제 emit 한 첫 frame* 시점에 set 됨 (filter source 에서). worker 의 첫 push frame 은 keyframe
+                    //일 수 있어 target 이상 frame 과 미디어 시점 차이 (= GOP 길이).
 
                     {
                         std::unique_lock<std::mutex> lk(m_mtx_queue);

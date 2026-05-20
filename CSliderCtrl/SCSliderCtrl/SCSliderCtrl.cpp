@@ -893,14 +893,16 @@ void CSCSliderCtrl::OnPaint()
 
 	//구간 반복 bracket — 다른 모든 element 가 그려진 *후 맨 마지막* 에. FillSolidRect 직접.
 	//세로와 가로의 x 좌표 완전 분리 — 세로 (cx ~ cx+VW), 가로 (cx+VW ~ cx+VW+HW). 겹침 없음.
+	//bracket 세로 height = 트랙 두께 + 2 (위/아래 1px 씩 확장).
 	if (m_style == style_track)
 	{
-		const COLORREF cr = RGB(0, 255, 0);
-		const int VW = 2;                       //세로 두께
-		const int HH = 2;                       //가로 두께
-		const int HW = 6;                       //가로 폭 (세로 옆으로)
-		const int top = m_rc.top;
-		const int bot = m_rc.bottom;
+		const COLORREF cr = RGB(64, 160, 64);
+		const int VW = 1;                       //세로 두께
+		const int HH = 1;                       //가로 두께
+		const int HW = 2;                       //가로 폭 (세로 옆으로)
+		const int cy = m_rc.CenterPoint().y;
+		const int top = cy - m_track_height / 2 + 2;
+		const int bot = cy + m_track_height / 2 - 2;
 		const int h   = bot - top;
 
 		//(diag) 한 번만 — 실제 그려지는 좌표 검증.

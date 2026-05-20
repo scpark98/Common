@@ -90,6 +90,10 @@ namespace ffi
         //audio 가 video anchor 까지 frame skip → 두 stream 이 *같은 미디어 시점* 부터 emit.
         int64_t video_first_emit_pts_rt() const { return m_video_first_emit_pts_rt.load(); }
 
+        //CFFiVideoStream::FillBuffer 가 *pre-target skip 후 실제 emit 한* 첫 frame 의 pts_rt 를 set.
+        //worker 의 첫 push frame (keyframe) 과 다를 수 있어 emit 시점 기준 필요.
+        void    set_video_first_emit_pts_rt(int64_t pts_rt) { m_video_first_emit_pts_rt.store(pts_rt); }
+
     private:
         void    worker_loop();
 

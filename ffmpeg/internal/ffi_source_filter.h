@@ -126,6 +126,12 @@ namespace ffi
         AVChannelLayout m_out_chlayout{};
         bool            m_need_discontinuity = false;
         REFERENCE_TIME  m_pending_segment_stop = 0;
+
+        //audio sync offset — audio first emit 의 미디어 시점이 video first emit 보다 *delta* 만큼 후 인 경우
+        //audio sample.rtStart 에 delta 만큼 더해서 audio 표시 시점을 delta 늦춤. 같은 graph_clock 시점에 video / audio
+        //의 *미디어 시점이 정렬* → sync 정확.
+        REFERENCE_TIME  m_audio_offset_rt = 0;
+        bool            m_audio_offset_set = false;
     public:
         HRESULT OnThreadStartPlay() override;
     };
@@ -151,9 +157,17 @@ namespace ffi
         CFFiVideoStream*  video_stream() const { return m_pVideoStream; }
         CFFiAudioStream*  audio_stream() const { return m_pAudioStream; }
 
+        //audio sync delay — video first emit pts_rt anchor 에 적용할 offset (REFERENCE_TIME, 100ns).
+        //CSCAudioGain 의 sample.rtStart shift 방식은 audio.rtStart 가 segment-local 0 부터인 internal path 에서
+        //negative 결과 → DSound 즉시 표시 → delay 무효. 대신 audio anchor 자체를 ±delay 만큼 shift 하여
+        //*audio first emit 의 미디어 시점* 을 video 와 분리 → 정상 sync.
+        void           set_audio_sync_delay_ms(int ms) { m_audio_sync_delay_rt.store((int64_t)ms * 10000LL); }
+        int64_t        audio_sync_delay_rt() const { return m_audio_sync_delay_rt.load(); }
+
     private:
         CDecoder         m_decoder;
         CFFiVideoStream* m_pVideoStream = nullptr;
         CFFiAudioStream* m_pAudioStream = nullptr;   //has_audio 일 때만 생성.
+        std::atomic<int64_t> m_audio_sync_delay_rt{0};
     };
 }

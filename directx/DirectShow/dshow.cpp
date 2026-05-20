@@ -1048,6 +1048,10 @@ void CDShow::close_media()
 	SAFE_RELEASE(m_SourceBase);
 	SAFE_RELEASE(m_pGB);
 
+	//internal FFmpeg source cache reset — 이전 미디어가 internal path 였고 다음 미디어가 LAV path 인 경우
+	//stale m_pFFiSource 로 audio_sync 의 분기가 잘못 발화. CSCAudioGain delay 적용 skip → sync 안 맞음.
+	m_pFFiSource = nullptr;
+
 	m_pMP.Release();
 	m_pMS.Release();
 	m_pMC.Release();
@@ -4493,6 +4497,16 @@ void CDShow::audio_sync(int sync)
 	//지원 안 하는 renderer 면 silent no-op — m_audio_sync 값만 저장.
 	if (!m_pGB)
 		return;
+
+	//internal FFmpeg path 인 경우 — CSCAudioGain 의 sample.rtStart shift 가 audio.rtStart 가 segment-local 0 부터인
+	//우리 path 에서 negative 결과 → DSound 즉시 표시 → delay 무효. 대신 CFFiSource 의 audio anchor offset 에 적용.
+	//audio first emit 의 미디어 시점 = video first emit 시점 + delay → 정상 sync.
+	if (m_pFFiSource)
+	{
+		((ffi::CFFiSource*)m_pFFiSource)->set_audio_sync_delay_ms(m_audio_sync);
+		logWrite(_T("[AudioSync] internal path: anchor offset = %d ms"), m_audio_sync);
+		return;
+	}
 
 	CComPtr<IEnumFilters> pEnum;
 	if (FAILED(m_pGB->EnumFilters(&pEnum)) || !pEnum)

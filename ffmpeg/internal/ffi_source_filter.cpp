@@ -473,16 +473,34 @@ namespace ffi
         BOOL is_sync = (frame->flags & AV_FRAME_FLAG_KEY) || m_need_discontinuity;
         pSample->SetSyncPoint(is_sync);
 
-        //Sample timing — MS 표준 정공. m_sample_count * frame_duration 부터 누적.
-        //NewSegment(0, duration, 1.0) 와 매칭. sample.rtStart 는 segment-local time.
-        //renderer 의 absolute display time = m_tStart_at_run + sample.rtStart. graph 가 seek 후 자동 Run cycle 시
-        //m_tStart 가 *Run 시점의 clock* 으로 갱신 → 첫 sample.rtStart=0 이 *Run 직후 즉시* 표시.
-        //frame.pts 직접 사용은 *graph clock 의 시간계* 와 *미디어 pts 의 시간계* 가 다른 m_tStart 갱신 cycle 때 mismatch
-        //→ Deliver wait 발생. m_sample_count 기반 누적은 그 mismatch 회피.
-        double fps = dec.frame_rate();
-        if (fps <= 0.0) fps = 30.0;
-        REFERENCE_TIME rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
-        REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps);
+        //Sample timing — frame.pts 직접 사용 (video first emit 기준 segment-local).
+        //rtStart = frame_pts_rt - video_first_emit_pts_rt. video 의 첫 frame.rtStart = 0, 이후 frame 의 *실제 pts 차이* 반영.
+        //이렇게 하면 VFR (variable frame rate) / 23.976/24/29.97 등 *실제 frame rate* 자동 흡수. m_sample_count * 30fps
+        //누적 시 mkv 의 실제 fps 와 mismatch 발생 — video 가 빠르게/느리게 진행 → audio 와 어긋남.
+        //frame.pts 직접 사용 + video first 기준이라 sample.rtStart 가 *segment-local 0 부터 작은 양수* → freeze 회피.
+        REFERENCE_TIME rtStart;
+        if (frame->pts != AV_NOPTS_VALUE)
+        {
+            AVRational tb = dec.video_time_base();
+            REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, tb, AVRational{1, 10000000});
+            int64_t video_first = dec.video_first_emit_pts_rt();
+            if (video_first == LLONG_MIN)
+            {
+                //이 emit 가 *FillBuffer 의 첫 emit* — pre-target skip 통과한 frame. audio 가 reference 로 사용할 anchor.
+                video_first = frame_pts_rt;
+                dec.set_video_first_emit_pts_rt(video_first);
+            }
+            rtStart = frame_pts_rt - video_first;
+        }
+        else
+        {
+            double fps = dec.frame_rate();
+            if (fps <= 0.0) fps = 30.0;
+            rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
+        }
+        double fps_for_stop = dec.frame_rate();
+        if (fps_for_stop <= 0.0) fps_for_stop = 30.0;
+        REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps_for_stop);
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
 
@@ -544,6 +562,8 @@ namespace ffi
     HRESULT CFFiAudioStream::OnThreadCreate()
     {
         m_sample_count = 0;
+        m_audio_offset_rt = 0;
+        m_audio_offset_set = false;
 
         //m_pending_segment_stop 미초기화 시 duration fallback. video pin 과 동일.
         if (m_pSource && m_pending_segment_stop <= 0)
@@ -685,6 +705,8 @@ namespace ffi
                     wait_anchor_ms += 5;
                     continue;
                 }
+                //anchor skip — 항상 적용. audio first emit 의 미디어 시점 = video first emit 의 미디어 시점 강제.
+                //video / audio 가 각자 first emit 시점 부터 segment-local 0 인 시간계라 정확한 시점 정렬 필요.
                 if (video_anchor != LLONG_MIN && audio_tb.num > 0 && audio_tb.den > 0)
                 {
                     int64_t anchor_pts = av_rescale_q(video_anchor,
@@ -697,8 +719,8 @@ namespace ffi
                     }
                 }
                 if (audio_skipped > 0)
-                    logWrite(_T("[ffi/src/audio/diag] anchor skip=%d wait_anchor=%dms frame_pts=%lld video_anchor_rt=%lld"),
-                        audio_skipped, wait_anchor_ms, (long long)frame->pts, (long long)video_anchor);
+                    logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld"),
+                        audio_skipped, (long long)frame->pts, (long long)video_anchor);
                 break;
             }
             if (!dec.is_running())
@@ -764,8 +786,21 @@ namespace ffi
                 (int)mx, (long long)m_sample_count);
         }
 
-        //timing — m_sample_count 기반 segment-local time. video pin 과 같은 MS 표준 정공.
-        REFERENCE_TIME rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        //timing — frame.pts 직접 사용 (video first emit 기준 segment-local). video pin 과 동일 패턴.
+        //rtStart = audio_frame_pts_rt - video_first_emit_pts_rt. audio / video 가 *같은 baseline* 기준이라 두 stream 의
+        //*실제 미디어 시점 차이* 가 sample.rtStart 차이로 정확 반영 → graph_clock 진행 시 sync 정확.
+        REFERENCE_TIME rtStart;
+        if (frame->pts != AV_NOPTS_VALUE)
+        {
+            int64_t audio_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
+            int64_t video_first = dec.video_first_emit_pts_rt();
+            if (video_first == LLONG_MIN) video_first = audio_pts_rt;
+            rtStart = audio_pts_rt - video_first;
+        }
+        else
+        {
+            rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        }
         m_sample_count += out_samples;
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
         pSample->SetTime(&rtStart, &rtStop);
@@ -787,6 +822,8 @@ namespace ffi
         //state 갱신은 ThreadExists 무관. play(Running) 첫 thread create 시 OnThreadStartPlay 가 이 값을 사용.
         m_sample_count = 0;
         m_pending_segment_stop = rtStop;
+        m_audio_offset_rt = 0;
+        m_audio_offset_set = false;   //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
 
         //streaming 중인 경우만 Stop/Flush/Pause cycle.
         if (ThreadExists())

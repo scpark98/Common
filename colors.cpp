@@ -1350,7 +1350,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_INACTIVECAPTIONTEXT));
 			cr_text_hover			= cr_text;
 
-			cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE)); //RGB(242, 242, 242);// ::GetSysColor(COLOR_WINDOW);
+			//Windows Explorer 의 주소표시줄 폴더 팝업과 동일하게 일반 윈도우 배경(흰색 default) 사용.
+			//이전에 COLOR_3DFACE (회색) 였으나 사용자 피드백으로 COLOR_WINDOW 로 정정.
+			cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
 			cr_back_selected		= Gdiplus::Color(255, 204, 232, 255);// ::GetSysColor(COLOR_HIGHLIGHT);
 			cr_back_selected_inactive.SetFromCOLORREF(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= Gdiplus::Color(255, 195, 222, 245);

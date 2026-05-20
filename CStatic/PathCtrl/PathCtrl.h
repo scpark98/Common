@@ -73,7 +73,7 @@ public:
 	//디스크 볼륨, 어떤 폴더의 하위 폴더 리스트, 파일 또는 폴더의 존재 유무
 
 	//로컬인지 원격인지 세팅
-	void		set_is_local_device(bool is_local);
+	void			set_is_local_device(bool is_local);
 
 	//원격일 경우 드라이브 볼륨 리스트를 얻어와서 이 함수를 통해 미리 넣어줘야 한다.
 	//({drive0 letter, drive0 volume}, {drive1 letter, drive1 volume}, ...)
@@ -93,13 +93,17 @@ public:
 	//parent의 OnLButtonDown(), OnRButtonDown()일때에도 편집모드를 종료시키는 코드를 직접 넣어줘야 한다.
 	void			edit_end(bool valid = true);
 
-	Gdiplus::Color	text_color() { return m_cr_text; }
-	void			text_color(Gdiplus::Color crText) { m_cr_text = crText; }
-	Gdiplus::Color	back_color() { return m_cr_back; }
-	void			back_color(Gdiplus::Color crBack) { m_cr_back = crBack; }
+	//CSCTreeCtrl / CSCComboBox / CVtListCtrlEx 와 동일한 theme 패턴.
+	//기존 개별 m_cr_text/m_cr_back/m_crOver/m_crDown* 멤버는 모두 m_theme.* 로 매핑됨.
+	CSCColorTheme	m_theme = CSCColorTheme(this);
+	void			set_color_theme(int theme, bool invalidate = true);
+	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 부모가 일부 색을 커스터마이즈한 결과까지 그대로 반영.
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
+	void			set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
+	void			set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; Invalidate(); }
 
 	CShellImageList* m_pShellImageList = NULL;
-	void		set_shell_imagelist(CShellImageList* pShellImageList, bool is_local)
+	void			set_shell_imagelist(CShellImageList* pShellImageList, bool is_local)
 	{
 		m_pShellImageList = pShellImageList;
 		m_list_folder.set_shell_imagelist(pShellImageList, is_local);
@@ -111,7 +115,8 @@ protected:
 		timer_mouse_over = 0,
 	};
 
-	bool					m_is_local = true;
+	//default = true;
+	bool				m_is_local = true;
 	//std::map<TCHAR, CString>	m_remote_drive_volume;
 
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만
@@ -135,13 +140,6 @@ protected:
 	int			m_arrow_area_width = 15;
 	void		recalc_path_width();
 	void		recalc_path_position();
-
-	Gdiplus::Color	m_cr_text = ::GetSysColor(COLOR_BTNTEXT);
-	Gdiplus::Color	m_cr_back = ::GetSysColor(COLOR_WINDOW);
-	Gdiplus::Color	m_crOver = RGB(229, 243, 255);
-	Gdiplus::Color	m_crOverBorder = RGB(204, 232, 255);
-	Gdiplus::Color	m_crDown = RGB(204, 232, 255);
-	Gdiplus::Color	m_crDownBorder = RGB(153, 209, 255);
 
 	int			m_index = -1;	//현재 over되거나 down인 항목
 	bool		m_down = false;

@@ -94,7 +94,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_LBUTTONUP()
 	//ON_WM_PAINT()
 	ON_WM_WINDOWPOSCHANGED()
-	//ON_WM_NCPAINT()
+	ON_WM_NCPAINT()
 	//ON_WM_CTLCOLOR()
 	ON_WM_CTLCOLOR_REFLECT()
 	ON_WM_DESTROY()
@@ -797,12 +797,28 @@ void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 	{
 		BOOL outside = false;
 		UINT nHover = ItemFromPoint(point, outside);
-		if (nHover != m_over_item)
+		int new_over = outside ? -1 : (int)nHover;
+
+		if (new_over != m_over_item)
 		{
-			m_over_item = nHover;
-			//over일때 해당 아이템을 selected로 하면 편하지만
-			//over와 selected를 별도로 처리하고자 함.
-			Invalidate(false);
+			//이전: Invalidate(false) — 전체 client 무효화 → 모든 visible 항목 DrawItem 재호출로 flicker.
+			//변경: 이전 hover 항목과 새 hover 항목 두 rect 만 invalidate. erase 단계 생략 (bErase=FALSE)
+			//하여 WM_ERASEBKGND 호출 없이 WM_PAINT → DrawItem 의 MemoryDC 더블버퍼링으로 flicker 제거.
+			int old_over = m_over_item;
+			m_over_item = new_over;
+
+			int count = GetCount();
+			CRect rc;
+			if (old_over >= 0 && old_over < count)
+			{
+				GetItemRect(old_over, &rc);
+				InvalidateRect(&rc, FALSE);
+			}
+			if (new_over >= 0 && new_over < count)
+			{
+				GetItemRect(new_over, &rc);
+				InvalidateRect(&rc, FALSE);
+			}
 		}
 	}
 
@@ -1054,7 +1070,22 @@ void CSCListBox::set_as_folder_list()
 	m_as_folder_list = true;
 	m_as_popup = true;
 	m_show_time = false;
-	m_theme.cr_back = ::GetSysColor(COLOR_3DFACE);
+
+	//popup chrome — Win11 탐색기 주소표시줄 폴더 팝업과 동일하게 둥근 모서리 + DWM shadow.
+	//WS_BORDER 는 시스템이 NC 안쪽 1px 을 default 색 (light gray) 으로 그려 dark theme 에서 흰 frame 잔상의 원인 →
+	//제거하고 DWM border (DWMWA_BORDER_COLOR) 로 대체. SWP_FRAMECHANGED 로 즉시 frame 재계산.
+	//WS_POPUP|WS_BORDER 만으로는 Win11 자동 라운딩 미적용이라 DwmSetWindowAttribute 로 명시 opt-in.
+	//shadow 는 borderless-popup 이라 DwmExtendFrameIntoClientArea margins{0,0,0,1} 트릭.
+	//DWM border 색은 default light gray 라 popup 둘레 흰 halo 회피용으로 cr_back 으로 지정.
+	//XP/Win10 에서는 dwm 헬퍼가 no-op 이라 안전.
+	//WS_BORDER / WS_EX_WINDOWEDGE 는 CreateEx 시점부터 제외 (PathCtrl 의 CreateEx 에서 통일 처리).
+	//DwmExtendFrameIntoClientArea 는 borderless 윈도우에 DWM shadow 를 끌어들이는 용도지만 1px 영역이
+	//DWM glass 로 합성되어 dark theme 에서 흰 띠로 보일 수 있어 일단 제외. shadow 가 약해지면 그때 재고려.
+	if (::IsWindow(m_hWnd))
+	{
+		win_compat::dwm::set_window_corner_round(m_hWnd);
+		win_compat::dwm::set_border_color(m_hWnd, m_theme.cr_back.ToCOLORREF());
+	}
 }
 
 int CSCListBox::set_folder_list(std::deque<CString>* lists, CString selected_text)
@@ -1698,13 +1729,24 @@ void CSCListBox::set_color_theme(int theme, bool invalidate)
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, false);
 
+	//popup 모드는 DWM border 색도 theme 에 맞춤. NC 영역까지 갱신되도록 RDW_FRAME 동반.
+	if (m_as_popup && ::IsWindow(m_hWnd))
+		win_compat::dwm::set_border_color(m_hWnd, m_theme.cr_back.ToCOLORREF());
+
 	if (invalidate && m_hWnd)
+	{
 		Invalidate();
+		if (m_as_popup)
+			RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
+	}
 }
 
 void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
+
+	if (m_as_popup && ::IsWindow(m_hWnd))
+		win_compat::dwm::set_border_color(m_hWnd, m_theme.cr_back.ToCOLORREF());
 
 	if (m_br_back.GetSafeHandle())
 		m_br_back.DeleteObject();
@@ -1717,14 +1759,45 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	//Invalidate(TRUE) — erase background 강제. owner-draw listbox 의 빈 영역 (항목 없는 부분) 이
 	//이전 theme 의 brush 로 남아있는 잔상 차단. CtlColor 가 m_br_back 반환하지 않는 경로 보완.
 	if (invalidate && m_hWnd)
+	{
 		Invalidate(TRUE);
+		if (m_as_popup)
+			RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
+	}
 }
 
 
 void CSCListBox::OnNcPaint()
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	// 그리기 메시지에 대해서는 CListBox::OnNcPaint()을(를) 호출하지 마십시오.
+	//popup mode 에서만 NC padding band 를 cr_back 으로 fill — OnNcCalcSize 가 reserve 한 영역에
+	//stale pixels 가 보이지 않도록. 그 외 경우 (일반 listbox) 는 base 가 처리할 NC 가 없어 no-op.
+	if (!m_as_popup || m_popup_padding <= 0)
+		return;
+
+	CWindowDC dc(this);
+	CRect rWindow, rClient;
+	GetWindowRect(&rWindow);
+	GetClientRect(&rClient);
+	ClientToScreen(&rClient);
+
+	//CWindowDC origin = window 좌상단. screen → window 좌표 변환.
+	int width  = rWindow.Width();
+	int height = rWindow.Height();
+	int cLeft   = rClient.left   - rWindow.left;
+	int cTop    = rClient.top    - rWindow.top;
+	int cRight  = rClient.right  - rWindow.left;
+	int cBottom = rClient.bottom - rWindow.top;
+
+	COLORREF cr_bg = m_theme.cr_back.ToCOLORREF();
+
+	if (cTop > 0)
+		dc.FillSolidRect(0, 0, width, cTop, cr_bg);
+	if (cBottom < height)
+		dc.FillSolidRect(0, cBottom, width, height - cBottom, cr_bg);
+	if (cLeft > 0)
+		dc.FillSolidRect(0, cTop, cLeft, cBottom - cTop, cr_bg);
+	if (cRight < width)
+		dc.FillSolidRect(cRight, cTop, width - cRight, cBottom - cTop, cr_bg);
 }
 
 
@@ -1900,7 +1973,18 @@ void CSCListBox::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 {
 	//CSCScrollbar overlay 설치된 후엔 native scrollbar 의 NC 공간 미할당 — 시각적으로 안 그려짐.
 	if (m_scrollbar_setup && lpncsp)
+	{
+		//popup folder list 모드일 때 4면에 padding 을 NC 영역으로 reserve — items 가 border 에 붙지 않도록.
+		//WS_BORDER 의 1px 와 별개. OnNcPaint 가 이 padding band 를 cr_back 으로 fill.
+		if (m_as_popup && m_popup_padding > 0 && lpncsp->rgrc)
+		{
+			lpncsp->rgrc[0].left   += m_popup_padding;
+			lpncsp->rgrc[0].top    += m_popup_padding;
+			lpncsp->rgrc[0].right  -= m_popup_padding;
+			lpncsp->rgrc[0].bottom -= m_popup_padding;
+		}
 		return;
+	}
 
 	CListBox::OnNcCalcSize(bCalcValidRects, lpncsp);
 }

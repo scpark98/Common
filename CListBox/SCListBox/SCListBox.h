@@ -44,6 +44,7 @@
 #include "../../colors.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
+#include "../../win_compat/dwm.h"
 
 
 //ROOT_LABEL은 PathCtrl에서 최상위를 표시하기 위한 용도임.
@@ -189,6 +190,9 @@ public:
 	//라인 간격
 	int			get_line_height() { return m_line_height; }
 	void		set_line_height(int _line_height);
+
+	//popup 모드에서 N 라인을 모두 보여주려면 필요한 전체 window height. NC padding 포함.
+	int			calc_popup_height_for_lines(int lines) { return lines * m_line_height + (m_as_popup ? 2 * m_popup_padding : 0); }
 
 	void		use_over(bool use = true) { m_use_over = use; }
 	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
@@ -401,6 +405,10 @@ public:
 	CSCScrollbar	m_scrollbar;
 	int				m_scrollbar_width = 18;
 	bool			m_scrollbar_setup = false;
+
+	//popup mode (m_as_popup) 에서 4면 NC padding — items 가 border 에 붙지 않도록.
+	//OnNcCalcSize 가 client 를 deflate, OnNcPaint 가 padding band 를 cr_back 으로 fill.
+	int				m_popup_padding = 4;
 	void			setup_scrollbar();
 	void			sync_scrollbar();
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);

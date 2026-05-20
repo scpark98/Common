@@ -13,12 +13,9 @@ CPathCtrl::CPathCtrl()
 {
 	m_pEdit = NULL;
 
-	m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-	m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_WINDOW));
-	m_crOver = Gdiplus::Color(255, 229, 243, 255);
-	m_crOverBorder = Gdiplus::Color(255, 204, 232, 255);
-	m_crDown = Gdiplus::Color(255, 204, 232, 255);
-	m_crDownBorder = Gdiplus::Color(255, 153, 209, 255);
+	//CSCColorTheme 의 default 테마는 CStatic 계열에는 cr_back = COLOR_BTNFACE 를 부여하지만
+	//PathCtrl 은 Win 탐색기 주소표시줄과 동일한 흰 배경이 의도된 외관이므로 명시 override.
+	m_theme.cr_back = RGB2gpColor(::GetSysColor(COLOR_WINDOW));
 }
 
 CPathCtrl::~CPathCtrl()
@@ -59,27 +56,55 @@ void CPathCtrl::PreSubclassWindow()
 	//CStatic은 SS_NOTIFY 속성을 줘야 마우스 이벤트가 처리된다.
 	ModifyStyle(0, SS_NOTIFY);
 
-	// Get Defalut Font 
-	CFont* font = GetFont();
-
-	if (font == NULL)
-		font = AfxGetMainWnd()->GetFont();
+	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
+	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나 아직 MainWnd 가 생성되지 않은 상태에서도
+	//이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
+	//이전 패턴 (AfxGetMainWnd()->GetFont() + SYSTEM_FONT 폴백) 은 ① MainWnd NULL dereference 위험 ②
+	//SYSTEM_FONT 가 비트맵 fixed font 라 stroke 가 두꺼워 bold 처럼 보이는 부작용 → CSCTreeCtrl / CSCListBox
+	//와 동일한 4단계 폴백 (GetFont → parent->GetFont → NONCLIENTMETRICS.lfMessageFont → DEFAULT_GUI_FONT) 으로 교체.
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
 	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
+
+	//Common 규약: 모든 기본 폰트는 Segoe UI 강제 (parent 에 다른 face 가 명시되어 있어도 일관성 우선).
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), _T("Segoe UI"));
+	m_lf.lfCharSet = DEFAULT_CHARSET;
 
 	ReconstructFont();
 
-	DWORD dwStyle = WS_POPUP | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL | WS_BORDER;
+	//WS_BORDER 와 WS_EX_WINDOWEDGE 는 시스템이 NC 안쪽에 default 색으로 1-2px frame 을 그려 dark theme 에서
+	//흰 띠로 보임. 둘 다 제거하고 시각적 border 는 DWM (DWMWA_WINDOW_CORNER_PREFERENCE + DWMWA_BORDER_COLOR) 가 담당.
+	DWORD dwStyle = WS_POPUP | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL;
 
-	m_list_folder.CreateEx(WS_EX_WINDOWEDGE, _T("listbox"),
+	m_list_folder.CreateEx(0, _T("listbox"),
 							_T("listbox"), dwStyle, CRect(0, 0, m_sz_list_folder.cx, m_sz_list_folder.cy), this, 0);//IDC_LIST_FOLDERS);
 
 	m_list_folder.set_as_folder_list();
 	m_list_folder.set_font(m_lf);
-	m_list_folder.set_color_theme(CSCColorTheme::color_theme_popup_folder_list);// popup_folder_list);
+	//m_list_folder.set_color_theme(CSCColorTheme::color_theme_popup_folder_list);// popup_folder_list);
 	m_list_folder.set_draw_border();
 
 	//OnNotify, OnSelChange등의 이벤트 핸들러를 추가해봤으나 되지 않아서 선택시에 SendMessage로 처리함.
@@ -179,7 +204,7 @@ void CPathCtrl::OnPaint()
 
 	CMemoryDC dc(&dc1, &rc);
 
-	dc.FillSolidRect(rc, m_cr_back.ToCOLORREF());
+	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	if (m_path.size() == 0)
 		return;
@@ -187,12 +212,20 @@ void CPathCtrl::OnPaint()
 	int		i;
 	int		arrow_width = 2;
 	CFont*	pOldFont = dc.SelectObject(&m_font);
-	CPen	pen(PS_SOLID, 1, m_down ? m_crDownBorder.ToCOLORREF() : m_crOverBorder.ToCOLORREF());
+	//down/hover 색상 매핑 — m_crDown/m_crOver 시절의 RGB 값과 동일한 theme 필드 사용:
+	//  m_crOver     (229,243,255) == cr_back_hover
+	//  m_crOverBorder(204,232,255) == cr_back_selected (light blue fill 과 동일 톤)
+	//  m_crDown     (204,232,255) == cr_back_selected
+	//  m_crDownBorder(153,209,255) == cr_selected_border
+	COLORREF cr_fill   = (m_down ? m_theme.cr_back_selected : m_theme.cr_back_hover).ToCOLORREF();
+	COLORREF cr_border = (m_down ? m_theme.cr_selected_border : m_theme.cr_back_selected).ToCOLORREF();
+	CPen	pen(PS_SOLID, 1, cr_border);
 	CPen*	pOldPen = (CPen*)dc.SelectObject(&pen);
-	CBrush	brush(m_down ? m_crDown.ToCOLORREF() : m_crOver.ToCOLORREF());
+	CBrush	brush(cr_fill);
 	CBrush* pOldBrush = (CBrush*)dc.SelectObject(&brush);
 
 	dc.SetBkMode(TRANSPARENT);
+	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 	CRect rArrow = rc;
 
 	//항상 표시되는 항목
@@ -259,24 +292,24 @@ void CPathCtrl::OnPaint()
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)
 			{
-				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY(192), 1);
-				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, GRAY(192), 1);
-				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY(192), 1);
-				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, GRAY(192), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
 			}
 			else
 			{
 				//아래로 향한 화살표 표시
 				if (m_down && i == m_index)
 				{
-					draw_line(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, GRAY(192), arrow_width);
-					draw_line(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, GRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
 				}
 				//일반상태의 > 화살표 표시
 				else
 				{
-					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, GRAY(192), arrow_width);
-					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, GRAY(192), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
+					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
 				}
 			}
 		}
@@ -284,7 +317,9 @@ void CPathCtrl::OnPaint()
 
 	if (m_pEdit->IsWindowVisible())
 	{
-		draw_rect(&dc, rc, Gdiplus::Color(0, 120, 215));
+		//edit 활성 시 포커스 indicator. cr_border_active 가 default 테마에서 CornflowerBlue 로
+		//Win Explorer 의 진한 accent blue 와 의미가 같음 (강한 active focus border).
+		draw_rect(&dc, rc, m_theme.cr_border_active);
 	}
 
 	dc.SelectObject(pOldFont);
@@ -486,8 +521,9 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	//1라인 적게 크기가 조정되는 현상이 있다. 왜 그럴까...우선 +1해서 처리한다.
 	total_lines++;
 
+	//calc_popup_height_for_lines 는 NC padding 포함한 전체 window height 반환.
 	m_list_folder.SetWindowPos(NULL, pt.x, pt.y,
-		m_sz_list_folder.cx, min(m_sz_list_folder.cy, total_lines * m_list_folder.get_line_height()),
+		m_sz_list_folder.cx, min(m_sz_list_folder.cy, m_list_folder.calc_popup_height_for_lines(total_lines)),
 		SWP_NOZORDER | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
 }
 
@@ -504,7 +540,7 @@ CString CPathCtrl::get_path(int index)
 	if (index < 0)
 		index = m_path.size() - 1;
 
-	if (index == 0)
+	if (index <= 0)
 		return _T("");
 	else if (index == 1)
 		return m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
@@ -947,15 +983,28 @@ void CPathCtrl::OnKillFocus(CWnd* pNewWnd)
 
 LRESULT CPathCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 {
-	CSCEdit* pEdit = (CSCEdit*)wParam;
-	int	msg = (int)lParam;
+	CSCEditMessage* msg = (CSCEditMessage*)wParam;
 
-	if (!pEdit->IsWindowVisible())
+	if (msg->pThis->IsWindowVisible() == FALSE)
 		return 0;
 
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, pEdit);
-	if (msg == WM_KILLFOCUS)
+	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)msg->message, msg->pThis);
+	if (msg->message == WM_KILLFOCUS)
+	{
 		edit_end();
+	}
+	else if (msg->message == WM_KEYDOWN)
+	{
+		switch ((int)lParam)
+		{
+		case VK_RETURN:
+			edit_end();
+			break;
+		case VK_ESCAPE:
+			edit_end(false);
+			break;
+		}
+	}
 
 	Invalidate();
 
@@ -1002,4 +1051,32 @@ void CPathCtrl::edit_end(bool valid)
 		set_path(m_edit_new_text);
 
 	Invalidate();
+}
+
+void CPathCtrl::set_color_theme(int theme, bool invalidate)
+{
+	m_theme.set_color_theme(theme);
+
+	//default 테마는 CStatic 계열에 COLOR_BTNFACE 를 부여하지만 PathCtrl 은 Win 탐색기 주소표시줄과
+	//동일한 흰 배경이 의도된 외관이므로 cr_back 만 COLOR_WINDOW 로 명시 override.
+	if (theme == CSCColorTheme::color_theme_default)
+		m_theme.cr_back = RGB2gpColor(::GetSysColor(COLOR_WINDOW));
+
+	//popup folder 리스트도 같은 theme 으로 propagate — CSCTreeCtrl/SCComboBox 와 동일한 패턴.
+	if (::IsWindow(m_list_folder.m_hWnd))
+		m_list_folder.set_color_theme(theme, invalidate);
+
+	if (invalidate && m_hWnd)
+		Invalidate();
+}
+
+void CPathCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+
+	if (::IsWindow(m_list_folder.m_hWnd))
+		m_list_folder.set_color_theme(m_theme, invalidate);
+
+	if (invalidate && m_hWnd)
+		Invalidate();
 }

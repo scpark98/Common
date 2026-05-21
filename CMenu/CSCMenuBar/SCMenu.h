@@ -221,6 +221,8 @@ public:
 	//id 항목을 after_id 항목 바로 뒤로 이동. 동적 추가 항목 (add_submenu_item 등) 을 resource 로 load 된
 	//특정 위치 뒤에 끼워 넣을 때 사용. 둘 중 하나라도 못 찾으면 no-op.
 	void			move_item_after(int id, int after_id);
+	//id 항목을 before_id 항목 바로 앞으로 이동. before_id 가 맨 앞이면 id 가 0번 위치로.
+	void			move_item_before(int id, int before_id);
 
 	//라인 간격
 	int				get_line_height() { return m_line_height; }

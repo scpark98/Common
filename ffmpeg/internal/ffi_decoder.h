@@ -80,6 +80,11 @@ namespace ffi
         //track switch 의 close+reopen 흐름에서 새 선택을 전달하는 채널. open() 이 한 번 consume 후 -1 로 reset.
         void                set_initial_audio_track(int track_idx) { m_initial_audio_track = track_idx; }
 
+        //subtitle stream metadata enumeration. internal path 는 자막 디코딩/렌더링 미지원이라
+        //이 API 는 메뉴 표시용 metadata 만 제공. 실제 선택은 LAV path 로 close+reopen 필요.
+        int                 subtitle_track_count() const { return (int)m_subtitle_track_names.size(); }
+        const std::wstring& subtitle_track_name(int track_idx) const;
+
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
         bool    has_hw_accel() const { return m_hw_pix_fmt != AV_PIX_FMT_NONE; }
@@ -139,6 +144,9 @@ namespace ffi
         std::vector<std::wstring> m_audio_track_names;
         int                      m_audio_track_current = -1;   //선택된 track index (audio_stream_indices 의 인덱스).
         int                      m_initial_audio_track = -1;   //open() 호출 전 set_initial_audio_track 으로 지정. consume 후 -1.
+
+        //subtitle stream metadata — open() 에서 채워짐. internal path 는 디코딩/렌더링 미지원, 메뉴 표시용.
+        std::vector<std::wstring> m_subtitle_track_names;
 
         std::thread             m_thread;
         std::atomic<bool>       m_quit{false};

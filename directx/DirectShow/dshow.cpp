@@ -283,6 +283,11 @@ public:
 		REFERENCE_TIME rtStart = 0, rtEnd = 0;
 		pSample->GetTime(&rtStart, &rtEnd);
 
+		static int s_count = 0;
+		if (++s_count <= 20)
+			logWrite(_T("[sub_sink] Receive #%d len=%ld rt=%lld..%lld"),
+				s_count, len, (long long)rtStart, (long long)rtEnd);
+
 		//sample timestamp 는 NewSegment.tStart 기준 segment-relative offset 이므로
 		//absolute stream time 으로 변환하기 위해 m_segment_start 를 add 한다.
 		REFERENCE_TIME absStart = rtStart + m_segment_start;
@@ -436,7 +441,12 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 {
 	teardown_subtitle_grabber();
 
-	if (!m_pGB || !m_pSplitter || !target) return;
+	if (!m_pGB || !m_pSplitter || !target)
+	{
+		logWrite(_T("[sub_grab] precondition fail: pGB=%p pSplitter=%p target=%p"),
+			(void*)m_pGB, (void*)m_pSplitter, (void*)target);
+		return;
+	}
 
 	//graph state 보호 — running/paused 시 새 필터 추가/연결 실패 가능. stop 후 setup 후 복원.
 	CComQIPtr<IMediaControl> pMC(m_pGB);
@@ -447,15 +457,22 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 	IPin* pSubPin = NULL;
 	IEnumPins* pEnum = NULL;
 	m_pSplitter->EnumPins(&pEnum);
+	int pin_seen = 0, pin_out = 0, pin_sub = 0;
 	if (pEnum)
 	{
 		IPin* pPin = NULL;
 		while (pEnum->Next(1, &pPin, NULL) == S_OK)
 		{
+			pin_seen++;
 			PIN_DIRECTION dir;
 			pPin->QueryDirection(&dir);
 			if (dir == PINDIR_OUTPUT)
 			{
+				pin_out++;
+				PIN_INFO pi; memset(&pi, 0, sizeof(pi));
+				pPin->QueryPinInfo(&pi);
+				if (pi.pFilter) pi.pFilter->Release();
+
 				IEnumMediaTypes* pEnumMT = NULL;
 				pPin->EnumMediaTypes(&pEnumMT);
 				if (pEnumMT)
@@ -463,10 +480,13 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 					AM_MEDIA_TYPE* pmt = NULL;
 					if (pEnumMT->Next(1, &pmt, NULL) == S_OK)
 					{
+						logWrite(_T("[sub_grab] splitter pin '%s' major.D1=%08lX sub.D1=%08lX"),
+							pi.achName, pmt->majortype.Data1, pmt->subtype.Data1);
 						//IsEqualGUID + Data1 fallback (E487EB08 은 자막 majortype 의 unique signature)
 						if (IsEqualGUID(pmt->majortype, MEDIATYPE_Subtitle) ||
 							pmt->majortype.Data1 == 0xE487EB08)
 						{
+							pin_sub++;
 							IPin* pConnected = NULL;
 							pPin->ConnectedTo(&pConnected);
 							if (pConnected) { m_pGB->Disconnect(pPin); m_pGB->Disconnect(pConnected); pConnected->Release(); }
@@ -486,6 +506,8 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 		}
 		pEnum->Release();
 	}
+	logWrite(_T("[sub_grab] splitter pin scan: seen=%d out=%d subtitle=%d → pSubPin=%p"),
+		pin_seen, pin_out, pin_sub, (void*)pSubPin);
 
 	if (!pSubPin)
 	{
@@ -502,11 +524,13 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 	//splitter 자막 핀 → sink input 핀 직접 연결 (intermediate filter 사용 안 함)
 	IPin* pSinkIn = NULL;
 	pSink->FindPin(L"In", &pSinkIn);
+	HRESULT hr_conn = E_FAIL;
 	if (pSinkIn)
 	{
-		m_pGB->ConnectDirect(pSubPin, pSinkIn, NULL);
+		hr_conn = m_pGB->ConnectDirect(pSubPin, pSinkIn, NULL);
 		pSinkIn->Release();
 	}
+	logWrite(_T("[sub_grab] ConnectDirect sink hr=0x%08x"), hr_conn);
 
 	pSubPin->Release();
 
@@ -2035,6 +2059,19 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 			m_audio_stream_index = 0;
 	}
 
+	//subtitle metadata enumeration — internal path 는 자막 디코딩/렌더링 미지원. 메뉴 표시용으로만
+	//m_subtitle_stream 을 채워둠. 사용자가 트랙 선택하면 Endorphin2 가 close+reopen 으로 LAV path 전환.
+	m_subtitle_stream.clear();
+	{
+		int n = pFFi->decoder().subtitle_track_count();
+		for (int i = 0; i < n; i++)
+		{
+			const std::wstring& nm = pFFi->decoder().subtitle_track_name(i);
+			m_subtitle_stream.push_back(CMediaStream(nm.c_str(), i));
+		}
+		m_subtitle_stream_index = -1;   //internal path 에선 어떤 트랙도 active 아님.
+	}
+
 	//SC Audio chain (Gain / Compressor / audio_sync) 삽입 — LAV path 와 동일 코드 재사용.
 	if (pFFi->decoder().has_audio())
 	{
@@ -2109,9 +2146,20 @@ void CDShow::analyze_stream(IBaseFilter *pBaseFilter)
 		}
 		else if (pmt->majortype == MEDIATYPE_Subtitle || dwGroup == 2)
 		{
-			m_subtitle_stream.push_back(CMediaStream(pzsName, i));
-			if (dwFlags & (AMSTREAMSELECTINFO_ENABLED | AMSTREAMSELECTINFO_EXCLUSIVE))
-				m_subtitle_stream_index = (int)m_subtitle_stream.size() - 1;
+			//LAV 의 가상 stream ("No subtitles" / "Forced Subtitles") 은 실제 자막 트랙 아님 — 메뉴에서 제외.
+			//PotPlayer 등 메이저 player 도 이를 노출 안 함.
+			CString name_check(pzsName ? pzsName : L"");
+			if (name_check.Find(_T("No subtitles")) >= 0 ||
+				name_check.Find(_T("Forced Subtitles")) >= 0)
+			{
+				logWrite(_T("[analyze] subtitle stream[%d] '%s' skipped (virtual)"), i, name_check.GetString());
+			}
+			else
+			{
+				m_subtitle_stream.push_back(CMediaStream(pzsName, i));
+				if (dwFlags & (AMSTREAMSELECTINFO_ENABLED | AMSTREAMSELECTINFO_EXCLUSIVE))
+					m_subtitle_stream_index = (int)m_subtitle_stream.size() - 1;
+			}
 		}
 
 		if (pmt->formattype == FORMAT_VideoInfo)
@@ -2531,25 +2579,40 @@ void CDShow::select_stream(bool video, int index)
 void CDShow::select_subtitle_stream(int index)
 {
 	if (!m_pSplitter)
+	{
+		logWrite(_T("[sub_sel] no splitter — skip (internal path or pre-load)"));
 		return;
+	}
 
 	CComQIPtr<IAMStreamSelect> pStreamSelect(m_pSplitter);
 	if (!pStreamSelect)
+	{
+		logWrite(_T("[sub_sel] splitter has no IAMStreamSelect — skip"));
 		return;
+	}
 
 	//index < 0 = 임베디드 자막 stream 전체 비활성화 (외부 자막 우선용).
 	//splitter 의 default active stream 도 disable 해야 하므로 m_subtitle_stream_index 가 -1 이어도 전체 loop.
 	if (index < 0)
 	{
 		for (size_t k = 0; k < m_subtitle_stream.size(); k++)
-			pStreamSelect->Enable(m_subtitle_stream[k].get_index(), 0);
+		{
+			HRESULT hr = pStreamSelect->Enable(m_subtitle_stream[k].get_index(), 0);
+			logWrite(_T("[sub_sel] disable subtitle[%zu] stream_idx=%d hr=0x%08x"),
+				k, m_subtitle_stream[k].get_index(), hr);
+		}
 		m_subtitle_stream_index = -1;
 		return;
 	}
 	if (index >= (int)m_subtitle_stream.size())
+	{
+		logWrite(_T("[sub_sel] index=%d out of range (size=%zu)"), index, m_subtitle_stream.size());
 		return;
+	}
 
-	pStreamSelect->Enable(m_subtitle_stream[index].get_index(), AMSTREAMSELECTENABLE_ENABLE);
+	HRESULT hr = pStreamSelect->Enable(m_subtitle_stream[index].get_index(), AMSTREAMSELECTENABLE_ENABLE);
+	logWrite(_T("[sub_sel] enable subtitle[%d] stream_idx=%d hr=0x%08x"),
+		index, m_subtitle_stream[index].get_index(), hr);
 	m_subtitle_stream_index = index;
 }
 

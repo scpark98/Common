@@ -350,6 +350,41 @@ namespace ffi
             }
         }
 
+        //subtitle stream enumeration — internal path 는 디코딩/렌더링 미지원, metadata 만 빌드.
+        //메뉴에서 트랙 보이게 + 사용자가 클릭하면 LAV path 로 close+reopen.
+        m_subtitle_track_names.clear();
+        for (unsigned i = 0; i < m_fmt->nb_streams; ++i)
+        {
+            AVCodecParameters* p = m_fmt->streams[i]->codecpar;
+            if (p->codec_type != AVMEDIA_TYPE_SUBTITLE) continue;
+            const AVCodec* c = avcodec_find_decoder(p->codec_id);
+            AVDictionaryEntry* lang  = av_dict_get(m_fmt->streams[i]->metadata, "language", NULL, 0);
+            AVDictionaryEntry* title = av_dict_get(m_fmt->streams[i]->metadata, "title",    NULL, 0);
+
+            const char* codec_str = c ? c->name : "?";
+            const char* lang_str  = (lang  && lang->value)  ? lang->value  : "";
+            const char* title_str = (title && title->value) ? title->value : "";
+
+            int track_idx = (int)m_subtitle_track_names.size();
+
+            wchar_t buf[256];
+            if (title_str[0] && lang_str[0])
+                swprintf_s(buf, L"트랙 %d : %hs [%hs] / %hs",
+                    track_idx + 1, title_str, lang_str, codec_str);
+            else if (title_str[0])
+                swprintf_s(buf, L"트랙 %d : %hs / %hs",
+                    track_idx + 1, title_str, codec_str);
+            else if (lang_str[0])
+                swprintf_s(buf, L"트랙 %d : %hs / %hs",
+                    track_idx + 1, lang_str, codec_str);
+            else
+                swprintf_s(buf, L"트랙 %d : %hs",
+                    track_idx + 1, codec_str);
+
+            m_subtitle_track_names.push_back(buf);
+            logWrite(_T("[ffi/dec] subtitle[%d→stream%u] %s"), track_idx, i, buf);
+        }
+
         return true;
     }
 
@@ -386,6 +421,7 @@ namespace ffi
         m_audio_stream_indices.clear();
         m_audio_track_names.clear();
         m_audio_track_current = -1;
+        m_subtitle_track_names.clear();
     }
 
     void CDecoder::start()
@@ -581,6 +617,14 @@ namespace ffi
         if (track_idx < 0 || track_idx >= (int)m_audio_track_names.size())
             return empty;
         return m_audio_track_names[track_idx];
+    }
+
+    const std::wstring& CDecoder::subtitle_track_name(int track_idx) const
+    {
+        static const std::wstring empty;
+        if (track_idx < 0 || track_idx >= (int)m_subtitle_track_names.size())
+            return empty;
+        return m_subtitle_track_names[track_idx];
     }
 
     void CDecoder::worker_loop()

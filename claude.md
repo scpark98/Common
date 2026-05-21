@@ -572,3 +572,18 @@ AfxGetApp()->WriteProfileString(_T("settings"), _T("recent_folder"),
 - 부득이한 예외 (보안 정책 / 시스템 파일 등) 외에는 반드시 적용.
 - 프로젝트 마다 이미 사용 중인 profile 키 컨벤션이 있다면 먼저 grep 후 따를 것.
 - Common 의 `get_part(path, fn_folder)` 가 path 에서 폴더 부분만 추출 (Functions.h).
+
+---
+
+## OnPaint / draw 함수에 분기 추가 시 — 도달 가능성을 함께 확인
+
+paint 함수에 새 그리기 분기를 추가할 때, 함수 *맨 아래* 에 코드를 붙이는 것만으로는 부족하다. 입구의 `if (...) return;` 같은 early return 이 *어떤 상태에서* 함수를 일찍 끊는지, 그 상태에서도 새 분기가 실행돼야 한다면 그 분기까지 같이 도달하게 만들어야 한다.
+
+**Why:** 2026-05-21 CPathCtrl 의 `OnPaint` 끝부분에 `else if (m_draw_border) draw_rect(...)` 만 추가하고 사용자에게 "확인해 보라" 라고 보고. 함수 입구의 `if (m_path.size() == 0) return;` 때문에 path 미설정 상태에서는 새 분기가 실행되지 않아 — 사용자 입장에선 *resource editor 의 Border=true 가 여전히 효과 없는 것처럼* 보였음. 사용자 지적: *"OnPaint에서 border 그리는 조건도 충분히 클로드가 같이 봤어야 할 흐름이다"*. (같은 paint 함수에 대해 2 회 연속 부분 분석으로 사용자가 재교정한 패턴이므로 강하게 메모.)
+
+**How to apply:**
+1. paint / draw 함수에 변경 가하기 전, 함수 *전체* 를 한 번 훑어 모든 `return` / `goto` / 예외 throw / 가드 식별.
+2. 추가하려는 분기가 "*어떤 상태에서 그려져야 하는가*" 를 분명히 한 뒤, 그 상태가 early return 으로 끊기는 경로에 속하지 않는지 확인.
+3. 끊기는 경로에서도 그려야 한다면 ① 그 분기 *안에* 도 같은 그리기를 넣거나, ② early return 자체를 재구성해 모든 경로가 공통 paint 종료점을 거치게 한다.
+4. 변경 후 "확인해 보라" 라고 보고하기 전에 *사용자가 보게 될 초기 상태에서 새 코드가 실행될지* 머릿속으로 한 번 실행해 본다. 빌드만으로는 안 잡힘.
+5. 이 규칙은 paint 외에도 적용 — 입력 핸들러 (`OnLButtonDown`, `OnKeyDown`), 메시지 dispatcher 등 early return / 가드가 많은 함수 전반.

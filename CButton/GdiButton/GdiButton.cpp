@@ -565,7 +565,9 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	set_text_color(theme.cr_text, true);
 	set_back_color(cr_face, true);
 	set_border_color(cr_border, true);
-	set_round(4, cr_border);
+	//theme.cr_parent_back 을 명시적으로 전달 — 없으면 set_round → set_transparent 의 Transparent 가드에 막혀
+	//m_cr_parent_back 이 초기 Transparent (= ToCOLORREF 시 흰색) 로 남아 round 코너 바깥이 흰색으로 찍힘.
+	set_round(4, cr_border, theme.cr_parent_back);
 
 	if (invalidate && m_hWnd)
 		Invalidate();

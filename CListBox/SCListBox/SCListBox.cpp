@@ -1769,35 +1769,49 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 void CSCListBox::OnNcPaint()
 {
-	//popup mode 에서만 NC padding band 를 cr_back 으로 fill — OnNcCalcSize 가 reserve 한 영역에
-	//stale pixels 가 보이지 않도록. 그 외 경우 (일반 listbox) 는 base 가 처리할 NC 가 없어 no-op.
-	if (!m_as_popup || m_popup_padding <= 0)
+	//popup mode 는 NC padding band 를 cr_back 으로 fill — OnNcCalcSize 가 reserve 한 영역에
+	//stale pixels 가 보이지 않도록.
+	if (m_as_popup && m_popup_padding > 0)
+	{
+		CWindowDC dc(this);
+		CRect rWindow, rClient;
+		GetWindowRect(&rWindow);
+		GetClientRect(&rClient);
+		ClientToScreen(&rClient);
+
+		//CWindowDC origin = window 좌상단. screen → window 좌표 변환.
+		int width  = rWindow.Width();
+		int height = rWindow.Height();
+		int cLeft   = rClient.left   - rWindow.left;
+		int cTop    = rClient.top    - rWindow.top;
+		int cRight  = rClient.right  - rWindow.left;
+		int cBottom = rClient.bottom - rWindow.top;
+
+		COLORREF cr_bg = m_theme.cr_back.ToCOLORREF();
+
+		if (cTop > 0)
+			dc.FillSolidRect(0, 0, width, cTop, cr_bg);
+		if (cBottom < height)
+			dc.FillSolidRect(0, cBottom, width, height - cBottom, cr_bg);
+		if (cLeft > 0)
+			dc.FillSolidRect(0, cTop, cLeft, cBottom - cTop, cr_bg);
+		if (cRight < width)
+			dc.FillSolidRect(cRight, cTop, width - cRight, cBottom - cTop, cr_bg);
+		return;
+	}
+
+	//일반 listbox — resource editor 의 Border 속성을 받았다면 m_draw_border=true (default).
+	//기존 코드는 여기서 그냥 return 해 themed border 가 전혀 그려지지 않았음 — OnNcCalcSize 가
+	//m_scrollbar_setup 시 NC 영역을 0 으로 만들어 native WS_BORDER 도 함께 무효화되었기 때문에
+	//사용자 입장에선 "Border 속성을 줬는데 안 그려진다" 가 되었음.
+	if (!m_draw_border)
 		return;
 
 	CWindowDC dc(this);
-	CRect rWindow, rClient;
-	GetWindowRect(&rWindow);
-	GetClientRect(&rClient);
-	ClientToScreen(&rClient);
-
-	//CWindowDC origin = window 좌상단. screen → window 좌표 변환.
-	int width  = rWindow.Width();
-	int height = rWindow.Height();
-	int cLeft   = rClient.left   - rWindow.left;
-	int cTop    = rClient.top    - rWindow.top;
-	int cRight  = rClient.right  - rWindow.left;
-	int cBottom = rClient.bottom - rWindow.top;
-
-	COLORREF cr_bg = m_theme.cr_back.ToCOLORREF();
-
-	if (cTop > 0)
-		dc.FillSolidRect(0, 0, width, cTop, cr_bg);
-	if (cBottom < height)
-		dc.FillSolidRect(0, cBottom, width, height - cBottom, cr_bg);
-	if (cLeft > 0)
-		dc.FillSolidRect(0, cTop, cLeft, cBottom - cTop, cr_bg);
-	if (cRight < width)
-		dc.FillSolidRect(cRight, cTop, width - cRight, cBottom - cTop, cr_bg);
+	CRect rc;
+	GetWindowRect(&rc);
+	rc.OffsetRect(-rc.TopLeft());
+	draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
 }
 
 
@@ -1982,6 +1996,15 @@ void CSCListBox::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 			lpncsp->rgrc[0].top    += m_popup_padding;
 			lpncsp->rgrc[0].right  -= m_popup_padding;
 			lpncsp->rgrc[0].bottom -= m_popup_padding;
+		}
+		//일반 listbox 에서 themed border 그릴 1px 공간 확보 (4변 각 1px).
+		//이게 없으면 OnNcPaint 가 그린 border 위에 DrawItem 의 항목 fill 이 1px 만큼 덮어쓰게 됨.
+		else if (m_draw_border && bCalcValidRects && lpncsp->rgrc)
+		{
+			lpncsp->rgrc[0].left   += 1;
+			lpncsp->rgrc[0].top    += 1;
+			lpncsp->rgrc[0].right  -= 1;
+			lpncsp->rgrc[0].bottom -= 1;
 		}
 		return;
 	}

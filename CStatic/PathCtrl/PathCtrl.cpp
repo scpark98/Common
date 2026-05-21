@@ -56,6 +56,22 @@ void CPathCtrl::PreSubclassWindow()
 	//CStatic은 SS_NOTIFY 속성을 줘야 마우스 이벤트가 처리된다.
 	ModifyStyle(0, SS_NOTIFY);
 
+	//resource editor 의 Border / Client Edge / Static Edge / Sunken 중 무엇을 켰든 시그널로 받아 m_draw_border 로 옮김.
+	//이 플래그들이 그대로 남으면 시스템이 sunken 또는 etched 외곽을 강제로 그려 (구식 XP 룩) 테마와 어긋남.
+	//CSCEdit/CSCListBox 등 다른 Common 컨트롤들과 동일한 패턴 — 플래그는 "사용자가 border 원함" 신호로만 쓰고,
+	//실제 그리기는 OnPaint 가 cr_border_inactive/active 로 직접 처리.
+	if ((GetStyle() & WS_BORDER) ||
+		(GetStyle() & SS_SUNKEN) ||
+		(GetExStyle() & WS_EX_CLIENTEDGE) ||
+		(GetExStyle() & WS_EX_STATICEDGE))
+	{
+		m_draw_border = true;
+		ModifyStyle(WS_BORDER | SS_SUNKEN, 0);
+		ModifyStyleEx(WS_EX_CLIENTEDGE | WS_EX_STATICEDGE, 0);
+		SetWindowPos(NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
+
 	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
 	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나 아직 MainWnd 가 생성되지 않은 상태에서도
 	//이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
@@ -136,7 +152,12 @@ void CPathCtrl::repos_edit()
 
 	GetClientRect(rc);
 	rc.DeflateRect(1, 1);
-	rc.left = ROOT_WIDTH;
+	//path 가 설정되어 있을 때는 ROOT_WIDTH (21px) 만큼 좌측을 비워둬야 OnPaint 가 그 자리에 루트 아이콘
+	//(내 PC / 문서 / 바탕화면 선택용) 을 그릴 수 있다.
+	//path 미설정 상태에서는 아이콘이 안 그려지므로 edit 의 left 는 0 (deflate 후) 부터 시작 — 사용자가
+	//"빈 상태에서는 왼쪽 들여쓰기가 어색하다" 라고 지적.
+	if (m_path.size() > 0)
+		rc.left = ROOT_WIDTH;
 	m_pEdit->MoveWindow(rc);
 	/*
 	CRect margin = rc;
@@ -206,8 +227,16 @@ void CPathCtrl::OnPaint()
 
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
+	//path 가 비어 있을 때도 border 는 그려야 한다 — 기존 early return 이 line 340 의 border 분기 도달을 막아
+	//resource editor 의 Border=true 가 효과 없어보이는 원인이 되었다. 여기서 한 번 그리고 빠진 뒤,
+	//path 가 채워진 경우는 함수 끝에서 한 번 더 그리게 된다 (drawing 비용 무시할 만하고, edit 활성 시
+	//cr_border_active 로 덮어쓰는 경로도 유지).
 	if (m_path.size() == 0)
+	{
+		if (m_draw_border)
+			draw_rect(&dc, rc, m_theme.cr_border_inactive);
 		return;
+	}
 
 	int		i;
 	int		arrow_width = 2;
@@ -320,6 +349,12 @@ void CPathCtrl::OnPaint()
 		//edit 활성 시 포커스 indicator. cr_border_active 가 default 테마에서 CornflowerBlue 로
 		//Win Explorer 의 진한 accent blue 와 의미가 같음 (강한 active focus border).
 		draw_rect(&dc, rc, m_theme.cr_border_active);
+	}
+	else if (m_draw_border)
+	{
+		//편집중이 아니어도 resource editor 에서 Border 를 켰다면 inactive 색으로 항상 외곽선.
+		//기존엔 CSCEdit 가 보일 때만 border 가 그려져, edit 표시 ↔ 숨김 시 외곽선이 깜박이듯 사라졌다.
+		draw_rect(&dc, rc, m_theme.cr_border_inactive);
 	}
 
 	dc.SelectObject(pOldFont);
@@ -1072,6 +1107,17 @@ void CPathCtrl::set_color_theme(int theme, bool invalidate)
 
 void CPathCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
+	//src 가 default 라면 set_color_theme(int) 경로로 단락 — 그 안에 PathCtrl 전용
+	//"cr_back = COLOR_WINDOW" override (탐색기 주소표시줄 흰 배경) 가 들어있어, 그걸 거치지 않으면
+	//CStatic 계열이 colors.cpp 의 default 분기에서 COLOR_BTNFACE 회색을 받게 된다.
+	//copy_colors_from 이 default src 에 대해 set_color_theme(int) 을 재호출하긴 하지만 그건
+	//CSCColorTheme 객체 자체의 메서드라 PathCtrl 의 override 는 안 거침.
+	if (theme.get_color_theme() == CSCColorTheme::color_theme_default)
+	{
+		set_color_theme(CSCColorTheme::color_theme_default, invalidate);
+		return;
+	}
+
 	m_theme.copy_colors_from(theme);
 
 	if (::IsWindow(m_list_folder.m_hWnd))

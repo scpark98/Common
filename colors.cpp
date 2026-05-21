@@ -1384,6 +1384,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text = Gdiplus::Color::Black;
 			cr_title_back_active = Gdiplus::Color::LightGray;
+			//cr_title_back_inactive 누락 시 이전 테마 값이 stale 로 유지돼 title bar / X 버튼 / OK 버튼 색이 어긋남.
+			//white 테마는 title 도 같은 LightGray 톤으로 통일 (active==inactive — 색차 거의 없는 minimal 테마).
+			cr_title_back_inactive = cr_title_back_active;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
@@ -1420,6 +1423,8 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_title_text = Gdiplus::Color::Black;
 			cr_title_back_active = Gdiplus::Color::LightGray;
+			//cr_title_back_inactive 누락 시 이전 테마 값이 stale 로 유지돼 title bar / X 버튼 / OK 버튼 색이 어긋남.
+			cr_title_back_inactive = cr_title_back_active;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 

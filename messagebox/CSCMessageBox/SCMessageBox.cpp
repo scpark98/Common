@@ -226,7 +226,8 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	{
 		m_button[i].create(m_button_caption[i], WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, SC_BUTTON_ID + i);
 		m_button[i].use_hover();
-		m_button[i].set_round(4, Gdiplus::Color::LightGray);
+		//초기 border = m_theme.cr_border_inactive (이전엔 LightGray 하드코딩 → 테마 변경 시 그대로 남아 어긋남).
+		m_button[i].set_round(4, m_theme.cr_border_inactive);
 
 		m_button[i].set_text_color(m_theme.cr_text);
 		m_button[i].set_back_color(m_theme.cr_title_back_inactive);
@@ -240,7 +241,8 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 						CRect(rc.right - 2 - m_title_height, rc.top + 2, rc.right - 2, m_title_height - 1), this, SC_BUTTON_ID + IDCANCEL);
 	m_button_quit.set_button_cmd(SC_CLOSE);
 	m_button_quit.set_text_color(m_theme.cr_title_text);
-	m_button_quit.set_back_color(m_theme.cr_title_back_active);
+	//title bar 가 cr_title_back_inactive 로 그려지므로 X 버튼도 같은 색으로 blend.
+	m_button_quit.set_back_color(m_theme.cr_title_back_inactive);
 	m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
 	m_button_quit.use_hover();
 
@@ -250,9 +252,9 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_static_message.set_font(&m_font);
 	m_static_message.set_halign(DT_CENTER);
 	m_static_message.set_valign(DT_VCENTER);
-	//CSCParagraphStatic 기본 line_spacing 은 1.5x. set_message 의 "첫 줄 중심" 아이콘 정렬 계산이
-	//line_count * line_height (=1.0x 가정) 이므로 1.5x 로 두면 멀티라인에서 아이콘이 어긋난다.
-	m_static_message.set_line_spacing(1.0f);
+	//CSCParagraphStatic 기본 line_spacing 은 1.5x. 메시지박스에서는 1.0 이 너무 좁다는 피드백으로 1.3 로 절충.
+	//아이콘 정렬 수식은 set_message 에서 spacing-aware 로 (line_count + (line_count-1)*(spacing-1)) 계산.
+	m_static_message.set_line_spacing(1.3f);
 	//paragraph 의 안티앨리어싱 기본값은 false (작은 시스템 폰트 흐림 방지). 메시지박스 텍스트는
 	//태그 컬러 강조 등 큰 글자도 종종 들어오므로 ON 으로 켜서 부드럽게 렌더링.
 	m_static_message.set_font_antialiasing(true);
@@ -492,15 +494,19 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		m_theme.cr_title_text = gRGB(0, 0, 0);
 
 		//버튼 색상도 타이틀바 색상과 동일하게 하려 했으나 우선 포커스 색상만 동일하게 한다.
+		//focus_rect 도 apply_theme 와 동일하게 cr_border_inactive 로 통일 — active/deactive 외관 일치 위함.
 		for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
 		{
-			m_button[i].draw_focus_rect(true, m_theme.cr_title_back_active);
+			m_button[i].draw_focus_rect(true, m_theme.cr_border_inactive);
 			//m_button[i].set_text_color(m_theme.cr_title_text);
 			//m_button[i].set_back_color(m_theme.cr_title_back);
 		}
 
 		m_button_quit.set_text_color(m_theme.cr_title_text);
-		m_button_quit.set_back_color(m_theme.cr_title_back_active);
+		//OnPaint 가 title bar 를 cr_title_back_inactive 로 그리므로 X 버튼도 같은 색이어야 blend.
+		//이전엔 active 로 칠해 X 가 title bar 와 다른 색으로 도드라지는 문제 (특히 흰/회색 테마).
+		//hover 는 Windows close button 의 빨간색 그대로.
+		m_button_quit.set_back_color(m_theme.cr_title_back_inactive);
 		m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
 	}
 
@@ -547,7 +553,10 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 
 		//m_static_message 가 DT_VCENTER 라서 텍스트 블록이 세로 중앙에 배치됨.
 		//텍스트 블록의 첫 줄 top = static_rect.top + (static_height - text_block_height) / 2.
-		int text_block_height = line_count * line_height;
+		//spacing-aware 총 높이 공식: 첫 줄(line_height) + (line_count-1) * line_height * spacing.
+		//CSCParagraphStatic::reapply_line_spacings 의 누적 shift 와 동일한 결과.
+		float line_spacing = m_static_message.get_line_spacing();
+		int text_block_height = line_height + (int)((line_count - 1) * line_height * line_spacing);
 		int first_line_top = static_rect.top + (static_rect.Height() - text_block_height) / 2;
 		int first_line_center = first_line_top + line_height / 2;
 
@@ -589,21 +598,21 @@ void CSCMessageBox::set_align(int align)
 }
 
 //set_color_theme()은 create() 전에도 호출될 수 있으므로 그에 대한 처리도 필요하다.
-void CSCMessageBox::set_color_theme(int theme)
+void CSCMessageBox::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
-	apply_theme();
+	apply_theme(invalidate);
 }
 
 //호출자가 이미 cr_back 등을 수정해 둔 CSCColorTheme 객체를 그대로 적용.
 //operator= 가 아닌 copy_colors_from() 을 사용해 m_parent (= 본 msgbox) 는 보존.
-void CSCMessageBox::set_color_theme(const CSCColorTheme& theme)
+void CSCMessageBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
-	apply_theme();
+	apply_theme(invalidate);
 }
 
-void CSCMessageBox::apply_theme()
+void CSCMessageBox::apply_theme(bool invalidate)
 {
 	if (m_static_message.m_hWnd)
 	{
@@ -614,7 +623,10 @@ void CSCMessageBox::apply_theme()
 	if (m_button_quit)
 	{
 		m_button_quit.set_text_color(m_theme.cr_title_text);
-		m_button_quit.set_back_color(m_theme.cr_title_back_active);
+		//OnPaint 가 title bar 를 cr_title_back_inactive 로 그리므로 X 버튼도 같은 색이어야 blend.
+		//이전엔 active 로 칠해 X 가 title bar 와 다른 색으로 도드라지는 문제 (특히 흰/회색 테마).
+		//hover 는 Windows close button 의 빨간색 그대로.
+		m_button_quit.set_back_color(m_theme.cr_title_back_inactive);
 		m_button_quit.set_hover_back_color(gRGB(232, 17, 35));
 	}
 
@@ -626,9 +638,19 @@ void CSCMessageBox::apply_theme()
 			m_button[i].set_back_color(m_theme.cr_title_back_inactive);
 			m_button[i].set_parent_back_color(m_theme.cr_back);
 			m_button[i].set_hover_back_color(m_theme.cr_title_back_active);
-			m_button[i].draw_focus_rect(true, m_theme.cr_title_back_active);
+			//border / focus_rect 를 모두 cr_border_inactive 로 통일.
+			//사용자 피드백: 메시지박스가 active 일 때는 focus_rect (이전 cr_title_back_active) 가
+			//버튼 배경과 같은 색이라 테두리가 사라져 보이고, deactive 면 본래 border (생성 시 LightGray) 가
+			//노출돼 양쪽 외관이 달라지는 문제. 양쪽 색을 동일하게 묶어 항상 같은 테두리가 보이게 함.
+			m_button[i].set_border_color(m_theme.cr_border_inactive);
+			m_button[i].draw_focus_rect(true, m_theme.cr_border_inactive);
 		}
 	}
+
+	//dialog 자체의 OnPaint 가 cr_title_back_inactive / cr_back 등을 직접 사용하므로
+	//invalidate=true 면 명시적으로 redraw 트리거. 자식 컨트롤들은 set_*_color 안에서 자체 invalidate 함.
+	if (invalidate && m_hWnd)
+		Invalidate();
 }
 
 LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)

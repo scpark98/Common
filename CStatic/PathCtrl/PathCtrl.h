@@ -107,7 +107,19 @@ public:
 	{
 		m_pShellImageList = pShellImageList;
 		m_list_folder.set_shell_imagelist(pShellImageList, is_local);
+
+		//사용자가 set_path 를 명시적으로 부르지 않은 채 imagelist 만 세팅하고 끝낸 경우 — 첫 표시 시점에
+		//path 가 비어 보이지 않도록 local 디바이스라면 "C:\" 를 기본으로 적용.
+		//set_path 는 m_pShellImageList NULL 가드 때문에 그 전에는 동작 못 했음 — 여기가 가장 이른 가능 시점.
+		//remote 디바이스는 C:\ 가 존재 보장 안 되므로 손대지 않는다.
+		if (is_local && m_path.size() == 0)
+			set_path(_T("C:\\"));
 	}
+
+	//resource editor 의 Border 속성을 받았는지에 따라 PreSubclassWindow 가 자동 결정.
+	//편집중이 아닐 때도 cr_border_inactive 로 1px 외곽선을 그린다.
+	bool			m_draw_border = false;
+	void			set_draw_border(bool draw = true) { m_draw_border = draw; Invalidate(); }
 
 protected:
 	enum TIMER_ID

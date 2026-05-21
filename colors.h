@@ -414,6 +414,18 @@ public:
 	//이후 default 테마 재적용 시 부모 종류 판정이 어긋나는 문제를 방지한다.
 	void	copy_colors_from(const CSCColorTheme& src)
 	{
+		//src 가 default 테마면 수신측의 m_parent 기준으로 default 를 재적용한다.
+		//배경: dlg 가 자기 m_theme(default) 을 자식 컨트롤에 일괄 전파할 때 dlg 의 cr_back (=COLOR_BTNFACE)
+		//이 List/Tree/Edit 류 컨트롤의 cr_back 으로 그대로 들어가, 본래 COLOR_WINDOW (흰색) 이어야 할
+		//배경이 회색이 되는 문제. default 의 set_color_theme(int) 안에서 m_parent->IsKindOf 로
+		//컨트롤 종류별 적절한 cr_back 을 골라주는 분기가 이미 있으므로, 그 경로를 다시 태운다.
+		//단, m_parent 가 NULL 이면 (theme 객체가 dlg/control 외부에서 단독으로 쓰이는 경우) 일반 copy 로 폴백.
+		if (src.m_cur_theme == color_theme_default && m_parent != nullptr)
+		{
+			set_color_theme(color_theme_default);
+			return;
+		}
+
 		cr_text						= src.cr_text;
 		cr_text_dim					= src.cr_text_dim;
 		cr_disabled_text			= src.cr_disabled_text;

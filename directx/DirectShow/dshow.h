@@ -95,6 +95,7 @@ public:
 	int				load_media(CString sfile, CWnd* pParent, bool auto_render = false);
 	void			set_use_internal_ffmpeg(bool b) { m_use_internal_ffmpeg = b; }
 	bool			use_internal_ffmpeg() const { return m_use_internal_ffmpeg; }
+	void			set_pending_internal_audio_track(int track_idx) { m_pending_internal_audio_track = track_idx; }
 
 	//Phase 3c: load_media 의 internal path. video only. ffi::CFFiSource + MPC-VR.
 	//성공 시 1, 실패 시 0.
@@ -347,6 +348,10 @@ protected:
 	//Phase 3c: video only. Audio 는 추후 Phase 4 에서.
 	bool			m_use_internal_ffmpeg = false;
 	void*			m_pFFiSource = nullptr;   //ffi::CFFiSource* (raw 포인터, header 의존 회피용 void).
+
+	//internal path 의 audio track 강제 선택 — close+reopen 흐름의 채널. load_media_internal_ffmpeg 가
+	//ffi::CDecoder::set_initial_audio_track 으로 전달 후 -1 로 reset.
+	int				m_pending_internal_audio_track = -1;
 
 
 	//총 재생 시간(ms)

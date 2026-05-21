@@ -1939,6 +1939,13 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	}
 	pFFi->AddRef();
 
+	if (m_pending_internal_audio_track >= 0)
+	{
+		pFFi->decoder().set_initial_audio_track(m_pending_internal_audio_track);
+		logWrite(_T("[internal] forcing audio track %d for open"), m_pending_internal_audio_track);
+		m_pending_internal_audio_track = -1;
+	}
+
 	HRESULT hr = pFFi->open_file(sfile);
 	if (FAILED(hr))
 	{
@@ -2017,8 +2024,15 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	m_audio_stream.clear();
 	if (pFFi->decoder().has_audio())
 	{
-		m_audio_stream.push_back(CMediaStream(L"Audio", 0));
-		m_audio_stream_index = 0;
+		int n = pFFi->decoder().audio_track_count();
+		for (int i = 0; i < n; i++)
+		{
+			const std::wstring& nm = pFFi->decoder().audio_track_name(i);
+			m_audio_stream.push_back(CMediaStream(nm.c_str(), i));
+		}
+		m_audio_stream_index = pFFi->decoder().audio_track_current();
+		if (m_audio_stream_index < 0)
+			m_audio_stream_index = 0;
 	}
 
 	//SC Audio chain (Gain / Compressor / audio_sync) 삽입 — LAV path 와 동일 코드 재사용.

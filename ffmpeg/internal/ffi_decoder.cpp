@@ -234,24 +234,90 @@ namespace ffi
         logWrite(_T("[ffi/dec] opened codec=%hs %dx%d threads=%d"),
             codec->name, m_video_ctx->width, m_video_ctx->height, m_video_ctx->thread_count);
 
-        //[diag] 모든 audio stream enumerate — multi-track 미디어에서 선택 stream 확인용.
+        //모든 audio stream enumerate + display name 빌드. m_audio_stream_indices 가 menu 의 track index 와 1:1.
+        m_audio_stream_indices.clear();
+        m_audio_track_names.clear();
+        m_audio_track_current = -1;
+
         for (unsigned i = 0; i < m_fmt->nb_streams; ++i)
         {
             AVCodecParameters* p = m_fmt->streams[i]->codecpar;
             if (p->codec_type != AVMEDIA_TYPE_AUDIO) continue;
             const AVCodec* c = avcodec_find_decoder(p->codec_id);
-            AVDictionaryEntry* lang = av_dict_get(m_fmt->streams[i]->metadata, "language", NULL, 0);
-            AVDictionaryEntry* title = av_dict_get(m_fmt->streams[i]->metadata, "title", NULL, 0);
-            logWrite(_T("[ffi/dec/diag] audio_stream[%u] codec=%hs %dHz ch=%d disposition=0x%x lang=%hs title=%hs"),
-                i, c ? c->name : "?", p->sample_rate, p->ch_layout.nb_channels,
-                m_fmt->streams[i]->disposition,
-                lang ? lang->value : "(none)",
-                title ? title->value : "(none)");
+            AVDictionaryEntry* lang  = av_dict_get(m_fmt->streams[i]->metadata, "language", NULL, 0);
+            AVDictionaryEntry* title = av_dict_get(m_fmt->streams[i]->metadata, "title",    NULL, 0);
+
+            const char* codec_str = c ? c->name : "?";
+            const char* lang_str  = (lang  && lang->value)  ? lang->value  : "";
+            const char* title_str = (title && title->value) ? title->value : "";
+
+            int track_idx = (int)m_audio_stream_indices.size();
+            m_audio_stream_indices.push_back((int)i);
+
+            wchar_t buf[256];
+            if (title_str[0] && lang_str[0])
+                swprintf_s(buf, L"트랙 %d : %hs [%hs] / %hs / %dch / %dHz",
+                    track_idx + 1, title_str, lang_str, codec_str,
+                    p->ch_layout.nb_channels, p->sample_rate);
+            else if (title_str[0])
+                swprintf_s(buf, L"트랙 %d : %hs / %hs / %dch / %dHz",
+                    track_idx + 1, title_str, codec_str,
+                    p->ch_layout.nb_channels, p->sample_rate);
+            else if (lang_str[0])
+                swprintf_s(buf, L"트랙 %d : %hs / %hs / %dch / %dHz",
+                    track_idx + 1, lang_str, codec_str,
+                    p->ch_layout.nb_channels, p->sample_rate);
+            else
+                swprintf_s(buf, L"트랙 %d : %hs / %dch / %dHz",
+                    track_idx + 1, codec_str,
+                    p->ch_layout.nb_channels, p->sample_rate);
+
+            m_audio_track_names.push_back(buf);
+
+            logWrite(_T("[ffi/dec] audio[%d→stream%u] %s"), track_idx, i, buf);
         }
 
-        //audio stream 도 시도 — 없으면 has_audio() false 로 진행.
-        m_audio_stream_idx = av_find_best_stream(m_fmt, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
-        logWrite(_T("[ffi/dec/diag] av_find_best_stream(AUDIO) → idx=%d"), m_audio_stream_idx);
+        //초기 선택: m_initial_audio_track 우선 (track switch 의 close+reopen 채널), 없으면 av_find_best_stream.
+        int chosen_stream_idx = -1;
+        if (m_initial_audio_track >= 0 && m_initial_audio_track < (int)m_audio_stream_indices.size())
+        {
+            chosen_stream_idx = m_audio_stream_indices[m_initial_audio_track];
+            m_audio_track_current = m_initial_audio_track;
+            logWrite(_T("[ffi/dec] audio track forced: track %d → stream %d"),
+                m_initial_audio_track, chosen_stream_idx);
+        }
+        else if (!m_audio_stream_indices.empty())
+        {
+            int best = av_find_best_stream(m_fmt, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+            if (best >= 0)
+            {
+                chosen_stream_idx = best;
+                for (size_t k = 0; k < m_audio_stream_indices.size(); ++k)
+                {
+                    if (m_audio_stream_indices[k] == best)
+                    {
+                        m_audio_track_current = (int)k;
+                        break;
+                    }
+                }
+                if (m_audio_track_current < 0)
+                {
+                    chosen_stream_idx = m_audio_stream_indices[0];
+                    m_audio_track_current = 0;
+                }
+            }
+            else
+            {
+                chosen_stream_idx = m_audio_stream_indices[0];
+                m_audio_track_current = 0;
+            }
+            logWrite(_T("[ffi/dec] audio track auto: track %d → stream %d"),
+                m_audio_track_current, chosen_stream_idx);
+        }
+        m_initial_audio_track = -1;   //consume
+
+        m_audio_stream_idx = chosen_stream_idx;
+        logWrite(_T("[ffi/dec/diag] selected audio stream idx=%d"), m_audio_stream_idx);
         if (m_audio_stream_idx >= 0)
         {
             AVCodecParameters* apar = m_fmt->streams[m_audio_stream_idx]->codecpar;
@@ -317,6 +383,9 @@ namespace ffi
 
         m_video_stream_idx = -1;
         m_audio_stream_idx = -1;
+        m_audio_stream_indices.clear();
+        m_audio_track_names.clear();
+        m_audio_track_current = -1;
     }
 
     void CDecoder::start()
@@ -504,6 +573,14 @@ namespace ffi
         if (!m_fmt || m_audio_stream_idx < 0)
             return zero;
         return m_fmt->streams[m_audio_stream_idx]->time_base;
+    }
+
+    const std::wstring& CDecoder::audio_track_name(int track_idx) const
+    {
+        static const std::wstring empty;
+        if (track_idx < 0 || track_idx >= (int)m_audio_track_names.size())
+            return empty;
+        return m_audio_track_names[track_idx];
     }
 
     void CDecoder::worker_loop()

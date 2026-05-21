@@ -17,7 +17,9 @@
 #include <condition_variable>
 #include <deque>
 #include <mutex>
+#include <string>
 #include <thread>
+#include <vector>
 
 namespace ffi
 {
@@ -67,6 +69,16 @@ namespace ffi
         int     audio_channels()    const;
         int     audio_sample_format() const;     //AVSampleFormat enum 값
         AVRational audio_time_base() const;
+
+        //multi-audio track enumeration. open() 후 audio_track_count() > 1 이면 multi-track 미디어.
+        //track_idx 는 0..count-1 의 dense index. AVFormatContext 의 stream index 와 다름 (audio 만 추림).
+        int                 audio_track_count() const { return (int)m_audio_stream_indices.size(); }
+        const std::wstring& audio_track_name(int track_idx) const;
+        int                 audio_track_current() const { return m_audio_track_current; }
+
+        //open() 전에 set_initial_audio_track(idx) 호출 시 av_find_best_stream 우회하고 그 track 으로 열기.
+        //track switch 의 close+reopen 흐름에서 새 선택을 전달하는 채널. open() 이 한 번 consume 후 -1 로 reset.
+        void                set_initial_audio_track(int track_idx) { m_initial_audio_track = track_idx; }
 
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
@@ -120,6 +132,13 @@ namespace ffi
         //audio decode
         AVCodecContext*     m_audio_ctx = nullptr;
         int                 m_audio_stream_idx = -1;
+
+        //multi-audio track enumeration — open() 에서 채워짐.
+        //m_audio_stream_indices[track_idx] = AVFormatContext::streams[] 의 stream index.
+        std::vector<int>         m_audio_stream_indices;
+        std::vector<std::wstring> m_audio_track_names;
+        int                      m_audio_track_current = -1;   //선택된 track index (audio_stream_indices 의 인덱스).
+        int                      m_initial_audio_track = -1;   //open() 호출 전 set_initial_audio_track 으로 지정. consume 후 -1.
 
         std::thread             m_thread;
         std::atomic<bool>       m_quit{false};

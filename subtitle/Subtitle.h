@@ -88,6 +88,8 @@ public:
 
 	std::deque<CCaption> m_subtitle;
 	CString get_subtitle_file() { return m_sfile; }
+	//외부에서 자막 파일이 rename 된 후 표기 경로만 갱신 — 내부 cue 데이터는 그대로.
+	void	set_subtitle_file(const CString& sfile) { m_sfile = sfile; }
 
 	//SMI 의 P Class 별 분리 저장. KRCC/ENCC/JPCC 등. srt 는 단일 키 "" 로 저장.
 	//load_smi 가 채우고 rebuild_active_view 가 m_active_classes 의 합집합으로 m_subtitle 재구성.

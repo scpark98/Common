@@ -3,6 +3,8 @@
 #include "../../Functions.h"
 #include "../../log/SCLog/SCLog.h"
 
+#include <windows.h>
+
 extern "C" {
 #include <libavutil/hwcontext.h>
 }
@@ -35,6 +37,42 @@ namespace ffi
         close();
     }
 
+    int CDecoder::avio_read_cb(void* opaque, uint8_t* buf, int buf_size)
+    {
+        CDecoder* self = (CDecoder*)opaque;
+        DWORD read = 0;
+        if (!::ReadFile(self->m_file_handle, buf, (DWORD)buf_size, &read, NULL))
+            return AVERROR(EIO);
+        if (read == 0)
+            return AVERROR_EOF;
+        return (int)read;
+    }
+
+    int64_t CDecoder::avio_seek_cb(void* opaque, int64_t offset, int whence)
+    {
+        CDecoder* self = (CDecoder*)opaque;
+        if (whence == AVSEEK_SIZE)
+        {
+            LARGE_INTEGER sz;
+            if (!::GetFileSizeEx(self->m_file_handle, &sz))
+                return AVERROR(EIO);
+            return sz.QuadPart;
+        }
+        DWORD method;
+        switch (whence & ~AVSEEK_FORCE)
+        {
+            case SEEK_CUR: method = FILE_CURRENT; break;
+            case SEEK_END: method = FILE_END;     break;
+            default:       method = FILE_BEGIN;   break;
+        }
+        LARGE_INTEGER pos;
+        pos.QuadPart = offset;
+        LARGE_INTEGER new_pos;
+        if (!::SetFilePointerEx(self->m_file_handle, pos, &new_pos, method))
+            return AVERROR(EIO);
+        return new_pos.QuadPart;
+    }
+
     bool CDecoder::open(const wchar_t* utf16_path)
     {
         if (m_fmt)
@@ -42,18 +80,59 @@ namespace ffi
         if (!utf16_path)
             return false;
 
-        //UTF-16 → UTF-8 path
-        int u8_len = ::WideCharToMultiByte(CP_UTF8, 0, utf16_path, -1, NULL, 0, NULL, NULL);
-        if (u8_len <= 0) return false;
-        std::vector<char> u8(u8_len);
-        ::WideCharToMultiByte(CP_UTF8, 0, utf16_path, -1, u8.data(), u8_len, NULL, NULL);
+        //Win32 CreateFile 로 직접 handle 열기 — FILE_SHARE_DELETE 포함해 외부 rename / move 시
+        //sharing violation 회피. avformat 기본 file protocol (_wsopen 기반) 은 FILE_SHARE_DELETE 미설정.
+        HANDLE h = ::CreateFileW(utf16_path, GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            logWrite(_T("[ffi/dec] CreateFile fail err=%u"), ::GetLastError());
+            return false;
+        }
+        m_file_handle = h;
 
-        int hr = avformat_open_input(&m_fmt, u8.data(), NULL, NULL);
+        //custom AVIOContext — avio_alloc_context 의 buffer 는 av_malloc, avformat 이 내부에서 재할당 가능.
+        //close 시 m_avio->buffer 를 av_freep + avio_context_free 필요.
+        const int kAvioBufSize = 32 * 1024;
+        uint8_t* avio_buf = (uint8_t*)av_malloc(kAvioBufSize);
+        if (!avio_buf)
+        {
+            ::CloseHandle(m_file_handle);
+            m_file_handle = nullptr;
+            return false;
+        }
+        m_avio = avio_alloc_context(avio_buf, kAvioBufSize, 0 /*write_flag*/,
+            this, &CDecoder::avio_read_cb, NULL, &CDecoder::avio_seek_cb);
+        if (!m_avio)
+        {
+            av_free(avio_buf);
+            ::CloseHandle(m_file_handle);
+            m_file_handle = nullptr;
+            return false;
+        }
+
+        m_fmt = avformat_alloc_context();
+        if (!m_fmt)
+        {
+            av_freep(&m_avio->buffer);
+            avio_context_free(&m_avio);
+            ::CloseHandle(m_file_handle);
+            m_file_handle = nullptr;
+            return false;
+        }
+        m_fmt->pb = m_avio;
+        m_fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+        //URL=NULL 이면 avformat 이 m_fmt->pb 사용. probe 도 callback 으로 처리.
+        int hr = avformat_open_input(&m_fmt, NULL, NULL, NULL);
         if (hr < 0)
         {
             char buf[256];
             logWrite(_T("[ffi/dec] avformat_open_input fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
-            m_fmt = NULL;
+            //avformat_open_input 실패 시 m_fmt 는 자동 해제 (NULL set). close() 가 m_avio + handle 정리.
+            close();
             return false;
         }
 
@@ -62,7 +141,7 @@ namespace ffi
         {
             char buf[256];
             logWrite(_T("[ffi/dec] find_stream_info fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
-            avformat_close_input(&m_fmt);
+            close();
             return false;
         }
 
@@ -71,7 +150,7 @@ namespace ffi
         if (m_video_stream_idx < 0)
         {
             logWrite(_T("[ffi/dec] no video stream"));
-            avformat_close_input(&m_fmt);
+            close();
             return false;
         }
 
@@ -81,14 +160,14 @@ namespace ffi
         if (!codec)
         {
             logWrite(_T("[ffi/dec] no decoder for codec_id=%d"), (int)par->codec_id);
-            avformat_close_input(&m_fmt);
+            close();
             return false;
         }
 
         m_video_ctx = avcodec_alloc_context3(codec);
         if (!m_video_ctx)
         {
-            avformat_close_input(&m_fmt);
+            close();
             return false;
         }
 
@@ -148,8 +227,7 @@ namespace ffi
         {
             char buf[256];
             logWrite(_T("[ffi/dec] avcodec_open2 fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
-            avcodec_free_context(&m_video_ctx);
-            avformat_close_input(&m_fmt);
+            close();
             return false;
         }
 
@@ -224,6 +302,18 @@ namespace ffi
 
         if (m_fmt)
             avformat_close_input(&m_fmt);
+
+        //AVFMT_FLAG_CUSTOM_IO 라 avformat_close_input 이 m_fmt->pb 를 정리하지 않음 — caller 책임.
+        if (m_avio)
+        {
+            av_freep(&m_avio->buffer);
+            avio_context_free(&m_avio);
+        }
+        if (m_file_handle)
+        {
+            ::CloseHandle(m_file_handle);
+            m_file_handle = nullptr;
+        }
 
         m_video_stream_idx = -1;
         m_audio_stream_idx = -1;

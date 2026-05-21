@@ -97,6 +97,18 @@ namespace ffi
     private:
         void    worker_loop();
 
+        //avformat 기본 file protocol 대신 custom AVIOContext + Win32 CreateFile (FILE_SHARE_DELETE 포함) 사용 —
+        //재생 중 미디어 파일이 외부에서 rename / move 되더라도 source 가 동일 handle 로 계속 read.
+        //_wsopen 기반 avformat 기본 path 는 FILE_SHARE_DELETE 미설정 → MoveFile 시 sharing violation.
+        static int      avio_read_cb(void* opaque, uint8_t* buf, int buf_size);
+        static int64_t  avio_seek_cb(void* opaque, int64_t offset, int whence);
+
+        //HANDLE 의 실 타입 = void*. 헤더에서 windows.h 미포함 (MFC winsock2 충돌 회피).
+        //cpp 내에서만 CreateFile/ReadFile/CloseHandle 등 windows API 호출.
+        //valid handle 만 저장 — CreateFile 의 INVALID_HANDLE_VALUE 결과는 nullptr 로 normalize.
+        void*               m_file_handle = nullptr;
+        AVIOContext*        m_avio = nullptr;
+
         AVFormatContext*    m_fmt = nullptr;
         AVCodecContext*     m_video_ctx = nullptr;
         int                 m_video_stream_idx = -1;

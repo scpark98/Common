@@ -102,6 +102,9 @@ public:
 	void			close_media();
 	bool			is_media_opened() { return (m_pGB != NULL); }
 	CString			get_media_filename() { return m_media_filename; }
+	//graph 를 close 하지 않고 path 표기만 갱신 — 외부에서 파일이 rename 된 후 호출.
+	//NTFS file handle 은 이름이 아닌 file object 를 참조하므로 source filter 의 핸들은 그대로 유효.
+	void			set_media_filename(const CString& fn) { m_media_filename = fn; }
 	bool			is_media_video();
 	bool			is_windows_media();
 

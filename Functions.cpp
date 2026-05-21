@@ -14992,9 +14992,192 @@ float similarity(char *str1, char *str2)
 	return lenLCS /= len1;
 }
 
+//파일명 유사도 — Ratcliff-Obershelp (Python difflib.SequenceMatcher) 기반.
+//
+//단순 LCS / Levenshtein 은 "01화 [1080p]" ↔ "02화 [1080p]" 같이 *식별 번호 한 글자만*
+//다른 경우 0.9+ 점수를 줘서 잘못된 매치를 유도. 다음 3단 정공법:
+//
+//  1. 정규화: [...], (...) 내용 제거 + 공백 정리. 품질/배포 메타데이터 노이즈 차단.
+//  2. Digit run 일치 강제: 정규화 후 양쪽의 숫자 연속열 (e.g. "01", "1080") 시퀀스가
+//     완전 일치 안 하면 0.0. "01화" vs "02화" 는 다른 콘텐츠 — 매칭 후보에서 즉시 제외.
+//  3. Ratcliff-Obershelp 알고리즘: 가장 긴 *연속* 공통 substring 을 찾아 매치 + 양쪽 잔여
+//     부분에 재귀 적용. matched_chars * 2 / (len1 + len2) 가 ratio.
+//     LCS (subsequence) 와 달리 *연속* substring 만 매치 — token 단위 변화에 적절히
+//     민감하고 단순 char drop 에 너무 관대하지 않음.
+
+namespace {
+	CString sim_normalize(CString s)
+	{
+		int p;
+		while ((p = s.Find(_T('['))) >= 0)
+		{
+			int e = s.Find(_T(']'), p);
+			if (e < 0) break;
+			s.Delete(p, e - p + 1);
+		}
+		while ((p = s.Find(_T('('))) >= 0)
+		{
+			int e = s.Find(_T(')'), p);
+			if (e < 0) break;
+			s.Delete(p, e - p + 1);
+		}
+		while (s.Replace(_T("  "), _T(" ")) > 0)
+		{
+		}
+		s.Trim();
+		return s;
+	}
+
+	std::vector<CString> sim_digit_runs(const CString& s)
+	{
+		std::vector<CString> runs;
+		CString cur;
+		for (int i = 0; i < s.GetLength(); i++)
+		{
+			if (iswdigit((wint_t)s[i]))
+				cur += s[i];
+			else if (!cur.IsEmpty())
+			{
+				runs.push_back(cur);
+				cur.Empty();
+			}
+		}
+		if (!cur.IsEmpty())
+			runs.push_back(cur);
+		return runs;
+	}
+
+	int sim_ro_match_count(const wchar_t* s1, int len1, const wchar_t* s2, int len2)
+	{
+		if (len1 == 0 || len2 == 0)
+			return 0;
+
+		std::vector<int> prev(len2 + 1, 0);
+		std::vector<int> curr(len2 + 1, 0);
+		int best = 0, best_i = 0, best_j = 0;
+		for (int i = 1; i <= len1; i++)
+		{
+			for (int j = 1; j <= len2; j++)
+			{
+				if (s1[i - 1] == s2[j - 1])
+				{
+					curr[j] = prev[j - 1] + 1;
+					if (curr[j] > best)
+					{
+						best = curr[j];
+						best_i = i - best;
+						best_j = j - best;
+					}
+				}
+				else
+					curr[j] = 0;
+			}
+			std::swap(prev, curr);
+			std::fill(curr.begin(), curr.end(), 0);
+		}
+
+		if (best == 0)
+			return 0;
+
+		int total = best;
+		total += sim_ro_match_count(s1, best_i, s2, best_j);
+		const int after_i = best_i + best;
+		const int after_j = best_j + best;
+		total += sim_ro_match_count(s1 + after_i, len1 - after_i, s2 + after_j, len2 - after_j);
+		return total;
+	}
+}
+
 float similarity(CString str1, CString str2)
 {
-	return 0.0f;
+	str1 = sim_normalize(str1);
+	str2 = sim_normalize(str2);
+
+	if (str1.IsEmpty() && str2.IsEmpty()) return 1.0f;
+	if (str1.IsEmpty() || str2.IsEmpty()) return 0.0f;
+
+	//Digit run 시퀀스 강제 일치 — "01화" vs "02화" 차단.
+	const auto d1 = sim_digit_runs(str1);
+	const auto d2 = sim_digit_runs(str2);
+	if (d1.size() != d2.size())
+		return 0.0f;
+	for (size_t k = 0; k < d1.size(); k++)
+		if (d1[k] != d2[k])
+			return 0.0f;
+
+	const int len1 = str1.GetLength();
+	const int len2 = str2.GetLength();
+	const int matched = sim_ro_match_count(str1.GetString(), len1, str2.GetString(), len2);
+	return (float)(2 * matched) / (float)(len1 + len2);
+}
+
+std::vector<std::pair<CString, float>> find_similar_files(
+	const CString& folder, const CString& target_filename, float threshold)
+{
+	std::vector<std::pair<CString, float>> candidates;
+
+	const CString target_title = get_part(target_filename, fn_title);
+	const CString target_ext   = get_part(target_filename, fn_ext);
+	if (target_title.IsEmpty() || target_ext.IsEmpty() || folder.IsEmpty())
+		return candidates;
+
+	std::deque<CString> files;
+	find_all_files(folder, &files, _T("*.") + target_ext, false, false, false, false);
+
+	for (const CString& path : files)
+	{
+		const CString title = get_part(path, fn_title);
+		if (title.CompareNoCase(target_title) == 0)
+			continue;	//완전 동일 이름은 원본이 존재한다는 뜻 — 호출자가 PathFileExists 로 이미 거름.
+
+		const float sim = similarity(target_title, title);
+		if (sim >= threshold)
+			candidates.push_back({ path, sim });
+	}
+
+	std::sort(candidates.begin(), candidates.end(),
+		[](const std::pair<CString, float>& a, const std::pair<CString, float>& b)
+		{ return a.second > b.second; });
+
+	return candidates;
+}
+
+std::vector<std::pair<CString, CString>> compute_companion_renames(
+	const CString& folder, const CString& old_basename_no_ext, const CString& new_basename_no_ext)
+{
+	std::vector<std::pair<CString, CString>> result;
+	if (folder.IsEmpty() || old_basename_no_ext.IsEmpty() || new_basename_no_ext.IsEmpty())
+		return result;
+	if (old_basename_no_ext == new_basename_no_ext)
+		return result;
+
+	std::deque<CString> files;
+	find_all_files(folder, &files, _T("*"), false, false, false, false);
+
+	const CString prefix = old_basename_no_ext + _T(".");
+	const int prefix_len = prefix.GetLength();
+
+	for (const CString& path : files)
+	{
+		const CString name = get_part(path, fn_name);
+		if (name.GetLength() <= prefix_len)
+			continue;
+		if (name.Left(prefix_len).CompareNoCase(prefix) != 0)
+			continue;
+
+		//suffix = "smi" 또는 "mkv.jpg" 또는 "kor.smi" 등.
+		const CString suffix = name.Mid(prefix_len);
+		const CString new_name = new_basename_no_ext + _T(".") + suffix;
+		const CString new_path = folder + _T("\\") + new_name;
+
+		//target 이 이미 존재 → 충돌, skip.
+		if (PathFileExists(new_path))
+			continue;
+
+		result.push_back({ path, new_path });
+	}
+
+	return result;
 }
 
 int minimum(int a, int b, int c)

@@ -975,6 +975,18 @@ struct	NETWORK_INFO
 	float		similarity(char *str1, char *str2);
 	float		similarity(CString str1, CString str2);
 
+	//지정 폴더에서 target_filename 과 이름이 유사한 파일들을 탐색. 확장자는 target 과 동일한 것만.
+	//threshold: 0.0~1.0 (보통 0.80). 반환: pair<full_path, similarity_score> — score 내림차순.
+	//파일명이 약간 변경된 미디어를 추적 (rename 감지) 하는 용도.
+	std::vector<std::pair<CString, float>> find_similar_files(
+		const CString& folder, const CString& target_filename, float threshold = 0.80f);
+
+	//폴더 내에서 old_basename_no_ext + "." 로 시작하는 파일들 (자막 .smi/.srt, 썸네일 .mkv.jpg 등) 의
+	//rename 대상 path 쌍 계산. 반환: pair<old_full_path, new_full_path>.
+	//target 이 이미 존재하면 (충돌) 결과에서 제외 — 호출자가 별도로 warning 처리 가능하게 hint 못 줌.
+	std::vector<std::pair<CString, CString>> compute_companion_renames(
+		const CString& folder, const CString& old_basename_no_ext, const CString& new_basename_no_ext);
+
 	void		SortStringArray(CStringArray* pArray);
 	bool		StringArrayCompareAndSwap(CStringArray* pArray, int pos); //called at SortStringArray function.
 

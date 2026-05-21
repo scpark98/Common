@@ -553,21 +553,59 @@ void CGdiButton::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool 
 
 void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
-	//Windows 11 push-button look — theme.cr_back 의 luma 로 light/dark 자동 분기해 button face 산출.
-	//  light theme (cr_back=white) : face ≈ #F7F7F7 (살짝 회색), border ≈ #D0D0D0 — Win11 native button 톤.
-	//  dark  theme (cr_back=dark)  : face ≈ cr_back +16 (살짝 lighter), border ≈ cr_back +40.
-	//hover/down/disabled 색은 set_back_color/set_border_color 의 auto_color=true 가 자동 산출.
-	//round=4 — Win11 button 의 corner radius. text 색은 cr_text (auto = hover lighter / down darker).
-	const bool is_light = (get_luminance(theme.cr_back) >= 128);
-	Gdiplus::Color cr_face   = is_light ? get_color(theme.cr_back, -8)  : get_color(theme.cr_back, 16);
-	Gdiplus::Color cr_border = is_light ? get_color(theme.cr_back, -40) : get_color(theme.cr_back, 40);
-
+	//텍스트 색은 모든 버튼 종류 공통 — push / checkbox / radio / image-button 의 label 모두 theme.cr_text 사용.
+	//(primary push 버튼이 cr_button_text 를 명시했으면 아래 push 분기에서 다시 override.)
 	set_text_color(theme.cr_text, true);
+
+	//배경색 분기:
+	//- push-button (PUSHBUTTON / DEFPUSHBUTTON / PUSHLIKE, image 없음)
+	//    → cr_button_back (explicit) 또는 cr_back luma 자동 산출. Win11 push-button face.
+	//- checkbox / radio (BS_PUSHLIKE 아님)
+	//    → theme.cr_back 으로 칠해 부모 dlg bg 와 자연스럽게 합쳐짐. (skip 하면 m_round==0 의
+	//      FillSolidRect 경로에서 다른 잔존 색이나 PreSubclassWindow 가 채운 Transparent 가 white 로
+	//      찍혀 가시 사각형 생김.)
+	//- image-button (add_image 호출 → m_transparent=true)
+	//    → 동일하게 cr_back 으로 face 를 칠하고 그 위에 alpha PNG 가 그려진다. cr_back 을 안 칠하면
+	//      투명 픽셀 자리에 이전 paint 잔존이 남아 깨짐.
+	const bool is_push = is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) || is_button_style(BS_PUSHLIKE);
+	const bool needs_blend_with_parent = (!is_push) || m_transparent;
+
+	Gdiplus::Color cr_face;
+	Gdiplus::Color cr_border;
+
+	if (needs_blend_with_parent)
+	{
+		cr_face   = theme.cr_back;
+		cr_border = theme.cr_back;
+	}
+	else if (theme.cr_button_back.GetA() != 0)
+	{
+		//theme 이 explicit primary button 색 (cr_button_back / cr_button_text) 을 지정한 경우.
+		//사용 예: LinkMeMine Agent origin 의 light blue 로그인 버튼 (#5BA2D9 + white text).
+		//border 는 face 와 같게 두어 시각적으로 단색 버튼.
+		cr_face   = theme.cr_button_back;
+		cr_border = theme.cr_button_back;
+		if (theme.cr_button_text.GetA() != 0)
+			set_text_color(theme.cr_button_text, true);
+	}
+	else
+	{
+		//Windows 11 push-button look — cr_back luma 로 light/dark 자동 분기.
+		//  light theme (cr_back=white) : face ≈ #F7F7F7, border ≈ #D0D0D0
+		//  dark  theme (cr_back=dark)  : face ≈ cr_back +16, border ≈ cr_back +40
+		//hover/down/disabled 색은 set_back_color/set_border_color 의 auto_color=true 가 자동 산출.
+		const bool is_light = (get_luminance(theme.cr_back) >= 128);
+		cr_face   = is_light ? get_color(theme.cr_back, -8)  : get_color(theme.cr_back, 16);
+		cr_border = is_light ? get_color(theme.cr_back, -40) : get_color(theme.cr_back, 40);
+	}
+
 	set_back_color(cr_face, true);
 	set_border_color(cr_border, true);
 	//theme.cr_parent_back 을 명시적으로 전달 — 없으면 set_round → set_transparent 의 Transparent 가드에 막혀
 	//m_cr_parent_back 이 초기 Transparent (= ToCOLORREF 시 흰색) 로 남아 round 코너 바깥이 흰색으로 찍힘.
-	set_round(4, cr_border, theme.cr_parent_back);
+	//push 가 아닌 경우는 round=0 (사각) — checkbox/radio/image-button 모서리를 둥글릴 이유 없음.
+	const int round = is_push ? 4 : 0;
+	set_round(round, cr_border, theme.cr_parent_back);
 
 	if (invalidate && m_hWnd)
 		Invalidate();
@@ -1479,33 +1517,13 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	//focus_rect, border를 그려준다.
-	//if (((lpDIS->itemAction & ODA_FOCUS) || (lpDIS->itemAction & ODA_DRAWENTIRE)) && (lpDIS->itemState & ODS_FOCUS))	//ok
-	//if (lpDIS->itemState & ODS_FOCUS)	//ok
-	//if (GetFocus() == this)	//ok
-	if (m_draw_focus_rect && m_bHasFocus)	//옵션처리하기 위해 이 코드를 사용함
+	//base 보더는 *focus / hover 와 독립적* 으로 항상 그린다 — 탭으로 focus 가 옮겨가도 버튼의 기본 형태는 동일.
+	//이전엔 else-if 체인이라 focus 시 focus_rect 만, hover 시 hover_rect 만 그려져 같은 다이얼로그의
+	//두 버튼이 시각적으로 다른 base 형태로 보이는 문제. (사용자 지적 2026-05-21)
+	//focus / hover 는 overlay 효과로 base 위에 *덧그려* 진다 — 옵션 (m_draw_focus_rect / m_draw_hover_rect)
+	//이 켜져있을 때만.
+	if (m_draw_border)
 	{
-		CRect rfocus = rc;
-		rfocus.DeflateRect(1, 1, 2, 2);
-		//TRACE(_T("draw focus rect\n"));
-		//dc.DrawFocusRect(rfocus);
-		Gdiplus::Pen	pen(m_cr_focus_rect, (Gdiplus::REAL)m_focus_rect_width);
-		pen.SetDashStyle(Gdiplus::DashStyleDot);
-		if (m_round <= 0)
-			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
-		else
-			draw_round_rect(&g, CRect_to_gpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
-	}
-	else if (m_use_hover && m_draw_hover_rect && m_is_hover)
-	{
-		if (m_round > 0)
-			draw_round_rect(&g, CRect_to_gpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
-		else
-			draw_rect(g, rc, cr_border);
-	}
-	else if (m_draw_border)// && !m_is_hover)
-	{
-		//TRACE(_T("draw_border\n"));
 		if (m_round > 0)
 		{
 			Gdiplus::Pen pen(cr_border, m_border_thick);
@@ -1522,6 +1540,28 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		{
 			draw_rect(g, rc, cr_border);
 		}
+	}
+
+	//hover overlay — base 위에 덧그림.
+	if (m_use_hover && m_draw_hover_rect && m_is_hover)
+	{
+		if (m_round > 0)
+			draw_round_rect(&g, CRect_to_gpRect(rc), m_hover_rect_color, Gdiplus::Color::Transparent, m_round, m_hover_rect_thick);
+		else
+			draw_rect(g, rc, cr_border);
+	}
+
+	//focus overlay — dotted, base 위에 덧그림. 옵션 off (m_draw_focus_rect = false) 면 표시 안 됨.
+	if (m_draw_focus_rect && m_bHasFocus)
+	{
+		CRect rfocus = rc;
+		rfocus.DeflateRect(1, 1, 2, 2);
+		Gdiplus::Pen	pen(m_cr_focus_rect, (Gdiplus::REAL)m_focus_rect_width);
+		pen.SetDashStyle(Gdiplus::DashStyleDot);
+		if (m_round <= 0)
+			g.DrawRectangle(&pen, rc.left, rc.top, rc.Width(), rc.Height());
+		else
+			draw_round_rect(&g, CRect_to_gpRect(rfocus), m_cr_focus_rect, Gdiplus::Color::Transparent, m_round, m_focus_rect_width);
 	}
 
 

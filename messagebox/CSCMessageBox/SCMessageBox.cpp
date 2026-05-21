@@ -642,8 +642,10 @@ void CSCMessageBox::apply_theme(bool invalidate)
 			//일반 GdiButton 과 *동일한* Win11-look 산출 공식 (face = cr_back +16, border = cr_back +40
 			//for dark; light 는 -8 / -40) 을 그대로 타게 해 외관 일관성 확보.
 			m_button[i].set_color_theme(m_theme);
-			//focus_rect 만 메시지박스 정책으로 별도 — 활성/비활성 외관 동일화 (cr_border_inactive 통일).
-			m_button[i].draw_focus_rect(true, m_theme.cr_border_inactive);
+			//focus_rect 끔 — 탭으로 focus 가 옮겨가도 두 버튼 외관이 동일하게 유지되도록.
+			//(이전엔 cr_border_inactive 로 dotted overlay 를 그려 focused 만 다르게 보였음 — 사용자 지적 2026-05-21.
+			// "탭은 별도 효과 OR 생략" 중 생략 선택.)
+			m_button[i].draw_focus_rect(false);
 		}
 	}
 

@@ -60,12 +60,14 @@ void CSCStaticEdit::set_color_theme(int color_theme, bool invalidate)
 {
 	m_theme.set_color_theme(color_theme);
 
-	// CSCStaticEdit 은 CStatic 상속이지만 Edit 처럼 동작하므로
-	// default 테마에서 colors.cpp 가 BTNFACE 로 설정한 배경을 WINDOW(흰색)로 덮어씀.
-	if (color_theme == CSCColorTheme::color_theme_default)
-		m_theme.cr_back = RGB2gpColor(::GetSysColor(COLOR_WINDOW));
-
+	//CSCStaticEdit 은 CStatic 상속이지만 Edit 처럼 동작 — 본문은 theme 의 *edit slot*
+	//(cr_edit_back / cr_edit_text) 을 사용한다. 클래스 기본값이 white / near-black 이므로
+	//별도 지정 없는 테마는 자동으로 흰 입력 필드.
+	//cr_parent_back 은 round 모서리가 부모 dlg bg 와 자연스럽게 합쳐지도록
+	//*override 직전* 의 theme cr_back (= dlg 본래 배경) 으로 먼저 잡아둠.
 	m_theme.cr_parent_back = m_theme.cr_back;
+	m_theme.cr_back        = m_theme.cr_edit_back;
+	m_theme.cr_text        = m_theme.cr_edit_text;
 	m_has_parent_back_color = true;
 
 	if (invalidate && m_hWnd)
@@ -73,12 +75,14 @@ void CSCStaticEdit::set_color_theme(int color_theme, bool invalidate)
 }
 
 //호출자가 이미 수정해 둔 CSCColorTheme 을 그대로 적용. operator= 가 아닌 copy_colors_from()
-//을 써서 m_parent (= 본 컨트롤) 는 보존. cr_parent_back 도 호출자 값 그대로 유지하므로
-//set_color_theme(int) 처럼 cr_back 으로 덮지 않는다 — 호출자가 이미 둘을 의도적으로 다르게
-//설정했을 수 있기 때문.
+//을 써서 m_parent (= 본 컨트롤) 는 보존. cr_parent_back 은 호출자가 의도적으로 세팅한 값
+//(= 부모 dlg 의 cr_back) 그대로 둔다.
+//본문은 set_color_theme(int) 와 동일하게 theme 의 cr_edit_back / cr_edit_text 사용.
 void CSCStaticEdit::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
+	m_theme.cr_back = m_theme.cr_edit_back;
+	m_theme.cr_text = m_theme.cr_edit_text;
 	m_has_parent_back_color = true;
 
 	if (invalidate && m_hWnd)

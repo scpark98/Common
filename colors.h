@@ -396,6 +396,7 @@ public:
 		color_theme_dark_gray,
 		color_theme_dark,
 		color_theme_linkmemine,
+		color_theme_linkmemine_origin,	//LMMLoginManager renewal 이전의 origin Agent UI (dark slate bg + light blue 버튼 + cyan accent)
 		color_theme_linkmemine_se,
 		color_theme_anysupport,
 		color_theme_helpu,
@@ -446,6 +447,8 @@ public:
 
 		cr_edit_text				= src.cr_edit_text;
 		cr_edit_back				= src.cr_edit_back;
+		cr_button_text				= src.cr_button_text;
+		cr_button_back				= src.cr_button_back;
 
 		cr_selected_border			= src.cr_selected_border;
 		cr_selected_border_inactive	= src.cr_selected_border_inactive;
@@ -490,10 +493,22 @@ public:
 
 	Gdiplus::Color	cr_parent_back;					//round가 적용된 컨트롤의 경우 parent back 색상으로 칠한 후 round가 그려져야 한다.
 
-	//CSCStatic, CSCTreeCtrl, CVtListCtrlEx 등 일부 컨트롤은 편집기능을 지원하는데
-	//이때 edit의 색상을	지정할 수 있다. (기본적으로는 cr_text, cr_back와 대부분 동일)
-	Gdiplus::Color	cr_edit_text;
-	Gdiplus::Color	cr_edit_back;
+	//CSCStatic, CSCTreeCtrl, CVtListCtrlEx, CSCStaticEdit 등 편집/입력 컨트롤의 본문 색.
+	//기본값은 흰색 + near-black — 어떤 테마에서도 input field 는 "흰 카드 + 어두운 글자"
+	//를 design baseline 으로 한다. 별도 지정이 필요한 테마(예: 모노톤 dark IDE) 만
+	//set_color_theme 에서 덮는다.
+	//(VSCode / Visual Studio / Notepad++ 등 외부 테마 import 시에도 input.background /
+	// input.foreground 슬롯과 직접 매핑된다.)
+	Gdiplus::Color	cr_edit_text = gRGB(32, 32, 32);
+	Gdiplus::Color	cr_edit_back = Gdiplus::Color::White;
+
+	//CGdiButton 의 primary action button 색. default = Transparent (alpha=0) 이면
+	//set_color_theme 안에서 cr_back luma 기반 Win11 push-button 자동 산출 경로 사용.
+	//alpha != 0 이면 그 값을 face/text 로 직접 사용 — 테마가 명시적으로 primary 버튼 색을
+	//정의하는 경우 (예: LinkMeMine Agent 의 light blue 로그인 버튼).
+	//(VSCode 의 button.background / button.foreground 와 매핑.)
+	Gdiplus::Color	cr_button_back = Gdiplus::Color::Transparent;
+	Gdiplus::Color	cr_button_text = Gdiplus::Color::Transparent;
 
 	Gdiplus::Color	cr_selected_border;
 	Gdiplus::Color	cr_selected_border_inactive;

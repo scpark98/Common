@@ -1041,6 +1041,7 @@ void CSCColorTheme::get_color_theme_list(std::deque<CString>& theme_list)
 	theme_list.push_back(_T("dark_gray"));
 	theme_list.push_back(_T("dark"));
 	theme_list.push_back(_T("linkmemine"));
+	theme_list.push_back(_T("linkmemine_origin"));
 	theme_list.push_back(_T("linkmemine_se"));
 	theme_list.push_back(_T("anysupport"));
 	theme_list.push_back(_T("helpu"));
@@ -1103,6 +1104,68 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			//navy chrome + orange border 가 시각적으로 충돌. orange 는 cr_progress 등 강조 액션에만 한정.
 			cr_border_active = cr_title_back_active;          //#222E3D — primary navy
 			cr_border_inactive = gRGB(210, 210, 210);         //#d2d2d2 — admin 보더
+			break;
+
+		case color_theme_linkmemine_origin :
+			//LMMLoginManager renewal 이전 origin Agent UI 의 chrome 복원.
+			//color_theme_linkmemine 은 admin web chrome (white bg + navy primary) 이고,
+			//이 origin 테마는 데스크탑 Agent 실행파일 chrome — dark slate bg + 흰 텍스트 +
+			//light blue 시그니처 버튼 + cyan accent (group box 보더, link).
+			//
+			//샘플 화면(LinkMeMine Agent, LinkMeMine 3.0 SE Agent) 의 pixel 추출:
+			//  body bg          #52575C : medium slate (사용자 지정 픽셀값)
+			//  title bg         #282D33 : body 보다 한 단계 어두운 슬레이트 (사용자 지시 — 본문과 명확히 구분)
+			//                             샘플 Agent 화면(IDS_TITLE) 은 OS title bar 자체를 안 그려 같은 색이라도 무방하지만,
+			//                             같은 테마를 쓰는 다른 dlg (VersionDlg 등) 는 title bar 가 있어야 하므로 schema 에서 분리.
+			//  section header   #B0B5BC : 'login', '업데이트' 등 light gray
+			//  edit bg / text   #FFFFFF / near-black
+			//  primary button   #5BA2D9 : signature light blue (로그인 / 업데이트)
+			//  group accent     #6CCFD3 : cyan — group box 보더 + '회원가입' 링크 + checkbox 체크
+			//  body text        white
+
+			cr_title_text = Gdiplus::Color::White;
+			cr_title_back_active = gRGB(40, 45, 51);          //#282D33 — body(#52575C) 보다 어두운 슬레이트
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = Gdiplus::Color::White;
+			cr_text_dim = gRGB(176, 181, 188);                //#B0B5BC — section header / '현재버전' 등 보조 텍스트
+			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 blue (#5BA2D9 +) — white 강제
+			cr_text_selected = Gdiplus::Color::White;         //selected bg = blue 위 white
+			cr_text_selected_inactive = get_color(cr_text, -32);
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(82, 87, 92);                       //#52575C — medium slate body bg (사용자 지정)
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(91, 162, 217);            //#5BA2D9 — signature light blue (로그인/업데이트 버튼)
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = get_color(cr_back, 8);
+
+			//edit box 본문은 class default (white bg + near-black text) 그대로 — 별도 지정 불요.
+
+			//primary 로그인/업데이트 버튼 — slate-light blue + white text 명시 (CGdiButton 이
+			//cr_button_back.alpha != 0 을 보고 cr_back luma 기반 자동 산출 대신 이 값을 직접 사용).
+			cr_button_back = gRGB(91, 162, 217);              //#5BA2D9 — agent UI 시그니처 버튼색
+			cr_button_text = Gdiplus::Color::White;
+
+			//focus / selected border = cr_button_back (시그니처 블루) 로 통일 —
+			//테마 내 강조 색을 하나로 유지하면 edit focus / checkbox 체크 / 버튼이 같은 톤으로 묶여 보임.
+			//(이전엔 #6CCFD3 cyan 으로 잡았으나 본문/버튼과 톤이 어긋나 어색했음 — 사용자 지적 2026-05-21.)
+			cr_selected_border = cr_button_back;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = Gdiplus::Color::White;
+			cr_header_back = get_color(cr_back, 16);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress = cr_button_back;                     //#5BA2D9 — 버튼과 동일 톤
+
+			cr_border_active = cr_button_back;                //focus border 도 동일 블루
+			cr_border_inactive = get_weak_color(cr_back, 64);
 			break;
 
 		case color_theme_linkmemine_se:

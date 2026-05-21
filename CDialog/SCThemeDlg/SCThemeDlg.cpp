@@ -488,6 +488,11 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
+		case CSCColorTheme::color_theme_linkmemine_origin:
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
 		case CSCColorTheme::color_theme_linkmemine_se:
 			//SetWindowText(_T("color_theme_linkmemine_se"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);

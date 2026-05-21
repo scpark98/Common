@@ -380,7 +380,7 @@ public:
 
 	//cr_border, cr_parent_back은 그 값이 Gdiplus::Color::Transparent가 아닐 경우에만 유효하다.
 	//round = radius. 음수일 경우는 height의 1/2로 세팅되고 트랙 모양의 버튼이 된다.
-	void		set_round(int round,
+	void		set_round(int round = -1,
 							Gdiplus::Color cr_border = Gdiplus::Color::Transparent,
 							Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 

@@ -226,12 +226,9 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	{
 		m_button[i].create(m_button_caption[i], WS_CHILD | WS_TABSTOP, CRect(0, 0, m_sz_button.cx, m_sz_button.cy), this, SC_BUTTON_ID + i);
 		m_button[i].use_hover();
-		//초기 border = m_theme.cr_border_inactive (이전엔 LightGray 하드코딩 → 테마 변경 시 그대로 남아 어긋남).
-		m_button[i].set_round(4, m_theme.cr_border_inactive);
-
-		m_button[i].set_text_color(m_theme.cr_text);
-		m_button[i].set_back_color(m_theme.cr_title_back_inactive);
-		m_button[i].set_parent_back_color(m_theme.cr_back);
+		//apply_theme 와 동일한 경로 (CGdiButton::set_color_theme) 로 초기 색 산출 — main dlg 의 일반
+		//GdiButton 과 외관 일관성 확보. set_color_theme 안에서 set_round(4, ...) 도 함께 적용됨.
+		m_button[i].set_color_theme(m_theme);
 	}
 
 	reconstruct_font();
@@ -618,6 +615,13 @@ void CSCMessageBox::apply_theme(bool invalidate)
 	{
 		m_static_message.set_text_color(m_theme.cr_text);
 		m_static_message.set_back_color(m_theme.cr_back);
+
+		//set_text_color 는 m_static_message.m_theme.cr_text 만 갱신 — 이미 set_text 로 파싱돼 m_para 안에
+		//baked 된 untagged 세그먼트의 cr_text 는 *옛 테마의 색* 그대로 남는다 (예: dark 에서 set_message
+		//후 default 로 전환 시 untagged 텍스트가 dark 의 light gray 로 잔존). 메시지가 비어있지 않으면
+		//re-parse 해 새 cr_text 로 다시 stamping.
+		if (!m_message.IsEmpty())
+			m_static_message.set_text(m_message);
 	}
 
 	if (m_button_quit)
@@ -634,15 +638,11 @@ void CSCMessageBox::apply_theme(bool invalidate)
 	{
 		if (m_button[i].m_hWnd)
 		{
-			m_button[i].set_text_color(m_theme.cr_title_text);
-			m_button[i].set_back_color(m_theme.cr_title_back_inactive);
-			m_button[i].set_parent_back_color(m_theme.cr_back);
-			m_button[i].set_hover_back_color(m_theme.cr_title_back_active);
-			//border / focus_rect 를 모두 cr_border_inactive 로 통일.
-			//사용자 피드백: 메시지박스가 active 일 때는 focus_rect (이전 cr_title_back_active) 가
-			//버튼 배경과 같은 색이라 테두리가 사라져 보이고, deactive 면 본래 border (생성 시 LightGray) 가
-			//노출돼 양쪽 외관이 달라지는 문제. 양쪽 색을 동일하게 묶어 항상 같은 테두리가 보이게 함.
-			m_button[i].set_border_color(m_theme.cr_border_inactive);
+			//hand-rolled 색 지정 대신 CGdiButton 자체의 set_color_theme 경로 사용 — main dlg 의
+			//일반 GdiButton 과 *동일한* Win11-look 산출 공식 (face = cr_back +16, border = cr_back +40
+			//for dark; light 는 -8 / -40) 을 그대로 타게 해 외관 일관성 확보.
+			m_button[i].set_color_theme(m_theme);
+			//focus_rect 만 메시지박스 정책으로 별도 — 활성/비활성 외관 동일화 (cr_border_inactive 통일).
 			m_button[i].draw_focus_rect(true, m_theme.cr_border_inactive);
 		}
 	}

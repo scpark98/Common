@@ -972,8 +972,8 @@ struct	NETWORK_INFO
 	//void		NewTypingMessageFromCodePage(TCHAR* Message, UINT CodePage=0);
 
 
-	float		Similarity(char *str1, char *str2);
-	float		Similarity(CString str1, CString str2);
+	float		similarity(char *str1, char *str2);
+	float		similarity(CString str1, CString str2);
 
 	void		SortStringArray(CStringArray* pArray);
 	bool		StringArrayCompareAndSwap(CStringArray* pArray, int pos); //called at SortStringArray function.

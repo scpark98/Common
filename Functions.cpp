@@ -14959,7 +14959,7 @@ std::string upper(std::string str)
 	return dst;
 }
 
-float Similarity(char *str1, char *str2)
+float similarity(char *str1, char *str2)
 {
 	size_t	len1=strlen(str1), len2=strlen(str2);
 	float	lenLCS;
@@ -14990,6 +14990,11 @@ float Similarity(char *str1, char *str2)
 	free(next);
 
 	return lenLCS /= len1;
+}
+
+float similarity(CString str1, CString str2)
+{
+	return 0.0f;
 }
 
 int minimum(int a, int b, int c)

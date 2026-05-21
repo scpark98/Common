@@ -1340,8 +1340,11 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
 			cr_progress = get_color(cr_back, 96);
 
-			cr_border_active = Gdiplus::Color::Gray;
-			cr_border_inactive = Gdiplus::Color::LightGray;
+			//dark 배경 위에 LightGray 는 거의 흰 띠로 보여 버튼 테두리가 부자연스러웠음.
+		//dark_gray 와 동일하게 cr_back 기준으로 가산해 어두운 톤 안에서 적절히 보이게 한다.
+		//active/inactive 차이도 작게 두어 dialog 활성 전환 시 외관 jolt 최소화.
+		cr_border_active   = get_weak_color(cr_back, 128);
+			cr_border_inactive = get_weak_color(cr_back, 64);
 			break;
 
 		case color_theme_popup_folder_list:

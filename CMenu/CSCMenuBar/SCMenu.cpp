@@ -257,6 +257,26 @@ void CSCMenu::remove_item(int menu_id)
 	}
 }
 
+void CSCMenu::move_item_after(int id, int after_id)
+{
+	int src = -1, dst = -1;
+	for (size_t i = 0; i < m_items.size(); i++)
+	{
+		if (m_items[i]->m_id == id) src = (int)i;
+		if (m_items[i]->m_id == after_id) dst = (int)i;
+	}
+	if (src < 0 || dst < 0 || src == dst)
+		return;
+
+	CSCMenuItem* item = m_items[src];
+	m_items.erase(m_items.begin() + src);
+	//src 가 dst 앞이었으면 erase 후 dst index 가 한 칸 당겨짐.
+	if (src < dst)
+		dst--;
+	m_items.insert(m_items.begin() + dst + 1, item);
+	recalc_items_rect();
+}
+
 
 BEGIN_MESSAGE_MAP(CSCMenu, CDialogEx)
 	ON_WM_ERASEBKGND()

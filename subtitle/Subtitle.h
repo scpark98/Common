@@ -3,6 +3,8 @@
 #include <Afxwin.h>
 
 #include <deque>
+#include <map>
+#include <vector>
 
 #include "../Functions.h"
 
@@ -87,6 +89,23 @@ public:
 	std::deque<CCaption> m_subtitle;
 	CString get_subtitle_file() { return m_sfile; }
 
+	//SMI 의 P Class 별 분리 저장. KRCC/ENCC/JPCC 등. srt 는 단일 키 "" 로 저장.
+	//load_smi 가 채우고 rebuild_active_view 가 m_active_classes 의 합집합으로 m_subtitle 재구성.
+	std::map<CString, std::deque<CCaption>> m_tracks;
+
+	//현재 활성 Class 목록. 다중 가능 (KRCC + ENCC 동시 → 한영 동시 표시).
+	//비어있으면 모든 트랙 활성 (기존 동작 호환).
+	std::vector<CString> m_active_classes;
+
+	//트랙 keys 반환 — 메뉴 빌더용. 정렬 순서: KRCC, ENCC, JPCC, 기타.
+	std::vector<CString> get_classes() const;
+
+	//활성 트랙 변경 후 m_subtitle 재구성. UI 에서 메뉴 선택 시 호출.
+	void set_active_classes(const std::vector<CString>& classes);
+
+	//m_tracks + m_active_classes → m_subtitle 재구성 (start 정렬 + 동일 start sentences merge).
+	void rebuild_active_view();
+
 	//pos가 포함된 자막 구간의 시작과 끝값을 구하고 그 자막 인덱스를 리턴한다.
 	int	get_subtitle_range(int pos, int &start, int &end);
 
@@ -112,6 +131,8 @@ public:
 		m_header.Empty();
 		m_sLanguage.Empty();
 		m_subtitle.clear();
+		m_tracks.clear();
+		m_active_classes.clear();
 	}
 
 protected:
@@ -124,8 +145,8 @@ protected:
 	void remove_other_tags(CString &str);
 
 	//한 sync단위를 입력받아 필요한 정보를 파싱한 후
-	//m_subtitle에 넣어준다.
-	void parse_subtltle(CString source);
+	//m_tracks[Class] 에 넣어준다. Class 가 없으면 default_class 사용.
+	void parse_subtltle(CString source, const CString& default_class = _T("KRCC"));
 
 	bool load_smi(CString sfile);
 	bool load_srt(CString sfile);

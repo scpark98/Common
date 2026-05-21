@@ -218,6 +218,10 @@ public:
 	//(load 가 모든 항목을 append 하므로 duplicate 가 생기는 경우 — 호출자가 동일 ID 를 미리 add 한 후 load 끝에 remove).
 	void			remove_item(int menu_id);
 
+	//id 항목을 after_id 항목 바로 뒤로 이동. 동적 추가 항목 (add_submenu_item 등) 을 resource 로 load 된
+	//특정 위치 뒤에 끼워 넣을 때 사용. 둘 중 하나라도 못 찾으면 no-op.
+	void			move_item_after(int id, int after_id);
+
 	//라인 간격
 	int				get_line_height() { return m_line_height; }
 	void			set_line_height(int _line_height);

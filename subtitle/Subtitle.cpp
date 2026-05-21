@@ -1,4 +1,5 @@
 ﻿#include "Subtitle.h"
+#include <algorithm>
 #include <fstream>
 
 #pragma warning(disable: 4018)	//'>=': signed/unsigned mismatch
@@ -127,7 +128,92 @@ bool CSubtitle::load_smi(CString sfile)
 	else
 		m_sLanguage = _T("KRCC");
 
+	//default 활성 트랙 — KRCC 가 있으면 KRCC, 없으면 첫 트랙.
+	//사용자 메뉴 선택으로 set_active_classes 로 변경 가능.
+	m_active_classes.clear();
+	if (!m_tracks.empty())
+	{
+		if (m_tracks.find(_T("KRCC")) != m_tracks.end())
+			m_active_classes.push_back(_T("KRCC"));
+		else
+			m_active_classes.push_back(m_tracks.begin()->first);
+	}
+	rebuild_active_view();
+
 	return true;
+}
+
+std::vector<CString> CSubtitle::get_classes() const
+{
+	std::vector<CString> result;
+	//정렬: KRCC → ENCC → JPCC → 기타 (alpha).
+	const TCHAR* priority[] = { _T("KRCC"), _T("ENCC"), _T("JPCC") };
+	for (const TCHAR* p : priority)
+		if (m_tracks.find(p) != m_tracks.end())
+			result.push_back(p);
+	for (const auto& kv : m_tracks)
+	{
+		bool already = false;
+		for (const TCHAR* p : priority)
+			if (kv.first == p) { already = true; break; }
+		if (!already)
+			result.push_back(kv.first);
+	}
+	return result;
+}
+
+void CSubtitle::set_active_classes(const std::vector<CString>& classes)
+{
+	m_active_classes = classes;
+	rebuild_active_view();
+}
+
+void CSubtitle::rebuild_active_view()
+{
+	m_subtitle.clear();
+
+	//m_tracks 가 비어있으면 srt 등 단일 트랙 경로 — m_subtitle 은 이미 load_srt 가 채움.
+	//rebuild 가 m_subtitle 을 지우면 srt 자막 손실 → 그 케이스는 m_tracks 가 없음을 검사해 skip.
+	if (m_tracks.empty())
+		return;
+
+	auto append_track = [this](const std::deque<CCaption>& track)
+	{
+		for (const auto& cap : track)
+			m_subtitle.push_back(cap);
+	};
+
+	if (m_active_classes.empty())
+	{
+		//명시적 비활성 — 자막 표시 끄기. m_subtitle 비워둠.
+		return;
+	}
+
+	for (const CString& cls : m_active_classes)
+	{
+		auto it = m_tracks.find(cls);
+		if (it != m_tracks.end())
+			append_track(it->second);
+	}
+
+	//start 기준 정렬.
+	std::sort(m_subtitle.begin(), m_subtitle.end(),
+		[](const CCaption& a, const CCaption& b) { return a.start < b.start; });
+
+	//같은 start 의 caption merge — 두 Class 동시 활성 시 한 sync 에 양 언어 sentences 합침.
+	for (size_t i = 1; i < m_subtitle.size();)
+	{
+		if (m_subtitle[i].start == m_subtitle[i - 1].start)
+		{
+			for (const auto& s : m_subtitle[i].sentences)
+				m_subtitle[i - 1].sentences.push_back(s);
+			if (m_subtitle[i].end > m_subtitle[i - 1].end)
+				m_subtitle[i - 1].end = m_subtitle[i].end;
+			m_subtitle.erase(m_subtitle.begin() + i);
+		}
+		else
+			++i;
+	}
 }
 
 bool CSubtitle::load_srt(CString sfile)
@@ -269,6 +355,8 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 	m_header.Empty();
 	m_sLanguage.Empty();
 	m_subtitle.clear();
+	m_tracks.clear();
+	m_active_classes.clear();
 
 	if (PathFileExists(sfile) == false)
 		return false;
@@ -286,7 +374,7 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 	return false;
 }
 
-void CSubtitle::parse_subtltle(CString src)
+void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 {
 	//<SYNC Start=0><P Class=KRCC>\n<font color=FF0000>카밀로 9번째 자막<br>\n<font color=dcdcdc>http://chan5132.egloos.com/
 	//L"<SYNC Start=2400><font color=\"#ff0000\">신 아따맘마 15화</font><br>\n<font color=\"#d097ff\">초원의 발자막[greenhill.o-r.kr]</font><br>\n<font color=\"#dcdcdc\">-'카밀로'님의 테마곡 자막 발췌-</font>\n"
@@ -299,6 +387,7 @@ void CSubtitle::parse_subtltle(CString src)
 	CString sToken;
 	CString str;
 	CString color;
+	CString cls;	//이 sync 블록의 P Class — KRCC/ENCC/JPCC 등. 없으면 default 사용.
 	int i;
 	int pos1;
 
@@ -319,6 +408,13 @@ void CSubtitle::parse_subtltle(CString src)
 			}
 			else if (find(sToken, _T("<p class")) >= 0)
 			{
+				pos1 = sToken.Find(_T("=")) + 1;
+				if (pos1 > 0)
+				{
+					cls = sToken.Mid(pos1);
+					cls.Trim();
+					cls.MakeUpper();
+				}
 				sToken.Empty();
 			}
 			else if (find(sToken, _T("<font color")) >= 0)
@@ -353,6 +449,12 @@ void CSubtitle::parse_subtltle(CString src)
 		}
 	}
 
+	//Class 미지정 시 default 사용 (호출자가 알려준 값. 보통 KRCC).
+	if (cls.IsEmpty())
+		cls = default_class;
+
+	auto& track = m_tracks[cls];
+
 	//만약 여기까지 왔을 때 sToken에 값이 들어있다면?
 	//caption에 sentences는 비어있고 자막끝 태그만 들어있다면
 	//마지막으로 추가한 자막의 끝 태그인 것이므로 그 정보를 수정해준다.
@@ -361,13 +463,13 @@ void CSubtitle::parse_subtltle(CString src)
 		sToken.Trim();
 		if ((sToken == _T("&nbsp;")) && (caption.sentences.size() == 0))
 		{
-			//m_subtitle 이 비어있으면 직전 caption 이 없으므로 end 갱신 대상도 없음 — 그냥 skip.
-			if (m_subtitle.empty())
+			//트랙이 비어있으면 직전 caption 이 없으므로 end 갱신 대상도 없음 — 그냥 skip.
+			if (track.empty())
 				return;
 			//간혹 end싱크가 start싱크보다 빠르게 작성된 smi도 있으므로 이는 스킵시킨다.
-			if (caption.start <= m_subtitle.back().start)
+			if (caption.start <= track.back().start)
 				return;
-			m_subtitle.back().end = caption.start;
+			track.back().end = caption.start;
 			return;
 		}
 	}
@@ -382,15 +484,15 @@ void CSubtitle::parse_subtltle(CString src)
 	if (caption.sentences.size())
 	{
 		//만약 현재 자막이 마지막 자막의 시작 시간과 같다면
-		//이전 자막에 추가시켜준다.
-		if (!m_subtitle.empty() && caption.start == m_subtitle.back().start)
+		//이전 자막에 추가시켜준다 (같은 Class 안에서 multi-line sync 처리).
+		if (!track.empty() && caption.start == track.back().start)
 		{
 			for (i = 0; i < caption.sentences.size(); i++)
-				m_subtitle.back().sentences.push_back(caption.sentences[i]);
+				track.back().sentences.push_back(caption.sentences[i]);
 		}
 		else
 		{
-			m_subtitle.push_back(caption);
+			track.push_back(caption);
 		}
 	}
 }

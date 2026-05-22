@@ -367,6 +367,15 @@ draw_text(d2dc, rect2, text2,
 
 **Why MSVC 가 BOM 을 요구하나:** MSVC 는 BOM 없는 파일을 시스템 코드페이지(한국어 Windows = CP949) 로 해석. UTF-8 한글 주석/문자열이 CP949 로 잘못 해석되면 클래스 선언 중간에 파싱이 끊겨 이후 모든 멤버가 `'m_xxx': 선언되지 않은 식별자` 에러로 출력됨 (SCStaticEditDemo / SCStaticEdit.h 90+ 가짜 에러, 2026-04-21).
 
+**보조 안전장치 — `.vcxproj` 에 `/source-charset:utf-8 /execution-charset:.949` 컴파일 옵션 추가 (강제, 모든 신규/기존 한글 MFC 프로젝트):** 모든 `ItemDefinitionGroup` 의 `<ClCompile>` 내부에 `<AdditionalOptions>/source-charset:utf-8 /execution-charset:.949 %(AdditionalOptions)</AdditionalOptions>` 를 추가한다.
+
+- `/source-charset:utf-8` — MSVC 가 BOM 유무와 무관하게 `.cpp/.h` 를 UTF-8 로 해석. BOM 이 어떤 이유로 떨어져도 한글 주석/문자열이 시스템 코드페이지(CP949)로 잘못 해석되지 않음.
+- `/execution-charset:.949` — narrow `char` literal ("한글") 을 binary 에 **CP949 (codepage 949)** 로 저장. wide literal (`L"..."`, `_T(...)` Unicode build) 은 UTF-16 으로 별개 저장.
+
+**왜 `/utf-8` 만 쓰면 안 되나:** `/utf-8` = `/source-charset:utf-8` + `/execution-charset:utf-8` 의 단축. execution charset 까지 UTF-8 로 바뀌면 narrow char literal 이 binary 에 **UTF-8 24 bytes** 로 저장되어, *기존에 CP949 16 bytes 로 컴파일된 binary key·header·file magic 과의 호환성이 깨진다*. 사례: 2026-05-22 KoinoTools 에서 `/utf-8` 추가 후 `Common\SeedProvider.cpp` 의 `char key[17] = "베라시스캔에디터";` 가 CP949 16 bytes 에서 UTF-8 24 bytes 로 바뀌어 (a) `char[17]` overflow warning, (b) 기존 .ver 암호화 파일을 영원히 못 읽게 되는 critical regression. `/source-charset:utf-8 /execution-charset:.949` 로 정정.
+
+**Why 이 조합이 정답:** 한글 MFC 프로젝트는 두 가지 요구가 동시에 있음 — (1) `.cpp/.h` 를 UTF-8 BOM 으로 안전하게 편집 (Claude·VS 가 한글 안 깸), (2) narrow char binary 인터페이스(파일 magic, 암호화 키, 레지스트리 ANSI 값)를 CP949 로 유지 (기존 데이터·다른 프로세스와 호환). 위 두 옵션이 정확히 그 분리를 만들어준다. BOM 부착이 *주 방어*, `/source-charset:utf-8` 가 *보조 방어*, `/execution-charset:.949` 가 *binary 호환 유지*.
+
 **How to apply:**
 - ~~`Edit` 는 BOM 보존됨~~ **(틀림 — 2026-04-28 반증)**: `SCStaticEdit.cpp` (한 세션 내 다수 Edit 후 BOM 유실 + CP949 재인코딩) / `Test_CSCStaticEditDlg.cpp` (단발 Edit 후 BOM 만 유실, UTF-8 유지) 양쪽 모두 발생. 환경/파일 크기/Edit 횟수 어떤 조건에서 BOM 이 떨어지는지 단정할 수 없으므로 **모든 `.cpp/.h` Edit/Write 직후 BOM 검사 강제**.
 - **BOM 검사 의무 절차 (Edit/Write 직후 매번):**
@@ -403,9 +412,21 @@ VS 가 띄우는 다이얼로그는 두 종류로 나눠 판단한다.
 
 ## 2B.1 세션 시작 시 인코딩 audit — Claude 의 U+FFFD 손상 방지
 
-Claude Read 툴은 파일 바이트를 UTF-8 로 해석한다. **BOM 없는 CP949 `.cpp/.h`** 를 Read 하면 한글 바이트가 UTF-8 로 유효하지 않아 내부적으로 U+FFFD 로 치환되고, 이후 Edit/Write 가 그 U+FFFD 를 UTF-8 바이트로 직렬화해 디스크에 저장 — **한글 영구 손실**. HEAD 커밋은 intact 이라 `git show HEAD:<f> | iconv -f CP949 -t UTF-8` 로 복원 가능하지만 세션 중 작업분은 복원 불가. `D:\1.projects_c++\Common` 은 이미 UTF-8 BOM 으로 통일돼 안전하고, `D:\1.projects_c++\1.test\Test_StaticEx` / `D:\1.projects_c++\SCDeskTools` 도 2026-04-25 ~ 2026-04-27 마이그레이션 완료. **그 외 프로젝트는 아직 CP949 no-BOM 이 남아있을 가능성.**
+Claude Read 툴은 파일 바이트를 UTF-8 로 해석한다. **BOM 없는 CP949 `.cpp/.h`** 를 Read 하면 한글 바이트가 UTF-8 로 유효하지 않아 내부적으로 U+FFFD 로 치환되고, 이후 Edit/Write 가 그 U+FFFD 를 UTF-8 바이트로 직렬화해 디스크에 저장 — **한글 영구 손실**. HEAD 커밋은 intact 이라 `git show HEAD:<f> | iconv -f CP949 -t UTF-8` 로 복원 가능하지만 세션 중 작업분은 복원 불가. `D:\1.projects_c++\Common` 은 이미 UTF-8 BOM 으로 통일돼 안전하고, `D:\1.projects_c++\1.test\Test_StaticEx` / `D:\1.projects_c++\SCDeskTools` 도 2026-04-25 ~ 2026-04-27 마이그레이션 완료. `D:\1.projects_c++\KoinoTools` 도 2026-05-22 마이그레이션 완료 (cpp/h 에 UTF-8 BOM 부착 + `.vcxproj` 에 `/source-charset:utf-8 /execution-charset:.949` 4 config 모두 추가 + HEAD 로부터 손상된 cpp/h 복원 + 프로젝트 루트에 `.editorconfig` 추가 — VS save 인코딩 강제). **그 외 프로젝트는 아직 CP949 no-BOM 이 남아있을 가능성.**
 
 **적용 — `D:\1.projects_c++\<project>` 에서 `.cpp/.h` 를 첫 Read/Edit 하기 전에 반드시 (Edit 가 아니라 Read 도 금지 — Read 자체가 손상의 첫 단계):**
+
+**Step 0 (가장 먼저): `.editorconfig` 존재 점검.** 이 파일이 없으면 BOM 을 부착해도 VS 가 다음 save 때 시스템 코드페이지(CP949) 로 다시 떨어뜨린다 — 무한루프. 따라서:
+
+```bash
+test -f <project_root>/.editorconfig || echo "MISSING .editorconfig — must add before any Read/Edit"
+```
+
+없으면 `Common\.editorconfig` 와 동일 내용으로 즉시 추가. 그 다음 Step 1 (BOM 점검) 진행.
+
+**중요**: `Common\.editorconfig` 가 있다고 *형제 프로젝트* (`KoinoTools` 등) 의 파일이 보호되지 않는다. `.editorconfig` 는 자기 디렉터리 + 하위에만 적용. 각 프로젝트 루트마다 독립적으로 필요.
+
+**Step 1 — BOM 점검:**
 
 ```bash
 cd <project_root>

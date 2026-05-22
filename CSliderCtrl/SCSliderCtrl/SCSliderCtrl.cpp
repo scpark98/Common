@@ -7,7 +7,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../AutoFont.h"
-#include "../../log/SCLog/SCLog.h"
+//#include "../../log/SCLog/SCLog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -910,8 +910,8 @@ void CSCSliderCtrl::OnPaint()
 		if (!s_diag_logged && (m_repeat_start >= 0 || m_repeat_end >= 0))
 		{
 			s_diag_logged = true;
-			logWrite(_T("[slider/bracket/diag] m_rc=(L%d T%d R%d B%d) h=%d, start=%d end=%d"),
-				m_rc.left, m_rc.top, m_rc.right, m_rc.bottom, h, m_repeat_start, m_repeat_end);
+			//logWrite(_T("[slider/bracket/diag] m_rc=(L%d T%d R%d B%d) h=%d, start=%d end=%d"),
+			//	m_rc.left, m_rc.top, m_rc.right, m_rc.bottom, h, m_repeat_start, m_repeat_end);
 		}
 
 		if (m_repeat_start >= 0)

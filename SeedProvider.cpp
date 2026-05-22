@@ -256,8 +256,8 @@ int SeedProvider::DecryptFileWithHeader(CString src_file, bool overwrite, CStrin
 //C code로만 작성됨.
 int SeedProvider::DecryptFileWithHeader(char* sfile)
 {
-	char header[17] = "verasys_can_info";
-	char key[17] = "베라시스캔에디터";
+	char header[] = "verasys_can_info";
+	char key[] = "베라시스캔에디터";
 
 	char		str[MAX_HEADER_SIZE];
 	FILE* fp = fopen(sfile, "rb");

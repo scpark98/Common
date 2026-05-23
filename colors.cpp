@@ -1585,10 +1585,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		cr_back_selected_hover = get_color(cr_back_selected, cr_target, 0.12);
 	}
 
-	//cr_separator — CSCMenu separator / 내부 분리선. cr_back 의 luma 방향으로 30 offset (dark 면 +30 lighter,
-	//light 면 -30 darker). get_weak_color 로 모든 theme 일관 산출. theme 별로 명시 override 필요시 case
-	//안에서 직접 cr_separator 대입 가능 (이 post-process 가 미리 set 한 값을 덮어쓰지 않도록 끝에 두지 않고
-	//switch 안에서 직접 정의 시 이 post-process 가 *그 위에* 다시 계산 — switch 후 명시 값 필요하면 따로 처리).
+	//cr_separator — cr_back luma 방향 ±30 (dark→lighter, light→darker). 모든 theme 일관.
 	cr_separator = get_weak_color(cr_back, 30);
 }
 

@@ -1068,7 +1068,33 @@ void CSCMenu::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_submenu_hover)
 	{
 		KillTimer(timer_submenu_hover);
-		//형제 sub 가 떠있으면 먼저 dismiss (sibling switch 케이스). 첫 hover (sub 가 안 떠있는) 케이스는 no-op.
+
+		//순서: popup → SetWindowPos(HWND_TOP) → UpdateWindow → dismiss → SetFocus → SetWindowPos(HWND_TOP) 한 번 더.
+		//각 step 의 이유:
+		//  popup 먼저 → 기존 dismiss 후 순서로 가면 SW_HIDE 와 SW_SHOW 사이 frame 에 background 노출 (깜빡임).
+		//  SetWindowPos(HWND_TOP) → 새 sub 를 Z 최상위 (WS_EX_NOACTIVATE popup 끼리 자동 정렬 불안정).
+		//  UpdateWindow → ShowWindow 가 post 한 WM_PAINT 를 동기 처리 — 다음 step 의 dismiss 전에 새 sub 가 그려진 상태 보장.
+		//  dismiss → 기존 sub hide.
+		//  SetFocus → 외부 클릭 dismiss 위해 parent focus 회수 (필수). 단 부작용: parent 가 Z-order 위로 끌어올려짐.
+		//  SetWindowPos(HWND_TOP) 한 번 더 → SetFocus 부작용 정정.
+
+		popup_submenu_for(m_over_item);
+
+		HWND new_sub_hwnd = NULL;
+		if (m_over_item >= 0 && m_over_item < (int)m_items.size() &&
+			m_items[m_over_item]->m_type == CSCMenuItem::item_submenu &&
+			m_items[m_over_item]->m_sub_menu &&
+			::IsWindow(m_items[m_over_item]->m_sub_menu->m_hWnd))
+		{
+			new_sub_hwnd = m_items[m_over_item]->m_sub_menu->m_hWnd;
+		}
+
+		if (new_sub_hwnd)
+		{
+			::SetWindowPos(new_sub_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			::UpdateWindow(new_sub_hwnd);
+		}
+
 		bool dismissed_any = false;
 		for (auto* item : m_items)
 		{
@@ -1085,7 +1111,8 @@ void CSCMenu::OnTimer(UINT_PTR nIDEvent)
 		}
 		if (dismissed_any)
 			SetFocus();
-		popup_submenu_for(m_over_item);
+		if (new_sub_hwnd)
+			::SetWindowPos(new_sub_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		return;
 	}
 

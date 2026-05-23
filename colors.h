@@ -454,6 +454,7 @@ public:
 		cr_selected_border_inactive	= src.cr_selected_border_inactive;
 		cr_border_active			= src.cr_border_active;
 		cr_border_inactive			= src.cr_border_inactive;
+		cr_separator				= src.cr_separator;
 
 		cr_title_text				= src.cr_title_text;
 		cr_title_back_active		= src.cr_title_back_active;
@@ -514,6 +515,9 @@ public:
 	Gdiplus::Color	cr_selected_border_inactive;
 	Gdiplus::Color	cr_border_active;
 	Gdiplus::Color	cr_border_inactive;
+
+	//CSCMenu separator / 컨트롤 내부 분리선 — cr_border_inactive 보다 약간 얕음. theme 별 정의.
+	Gdiplus::Color	cr_separator;
 
 	//caption이 없는 dialog based에서 사용
 	Gdiplus::Color	cr_title_text;

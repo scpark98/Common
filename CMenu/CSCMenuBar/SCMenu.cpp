@@ -1809,10 +1809,10 @@ void CSCMenu::OnPaint()
 		if (view_r.bottom < vp_top || view_r.top > vp_bot)
 			continue;
 
-		//separator의 경우 (id==0 + normal type)
+		//separator의 경우 (id<=0 + normal type) — theme 의 cr_separator 사용 (cr_back luma 따라 ±30 자동 산출).
 		if (m_items[i]->m_id <= 0 && m_items[i]->m_type == CSCMenuItem::item_normal)
 		{
-			draw_line(&dc, view_r.left, view_r.CenterPoint().y, view_r.right, view_r.CenterPoint().y, GRAY(214));
+			draw_line(&dc, view_r.left, view_r.CenterPoint().y, view_r.right, view_r.CenterPoint().y, m_theme.cr_separator.ToCOLORREF());
 		}
 		//일반 메뉴 항목인 경우
 		else

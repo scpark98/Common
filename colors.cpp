@@ -1108,6 +1108,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			//navy chrome + orange border 가 시각적으로 충돌. orange 는 cr_progress 등 강조 액션에만 한정.
 			cr_border_active = cr_title_back_active;          //#222E3D — primary navy
 			cr_border_inactive = gRGB(210, 210, 210);         //#d2d2d2 — admin 보더
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_linkmemine_origin :
@@ -1150,15 +1154,11 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			//edit box 본문은 class default (white bg + near-black text) 그대로 — 별도 지정 불요.
 
-			//primary 로그인/업데이트 버튼 — slate-light blue + white text 명시 (CGdiButton 이
-			//cr_button_back.alpha != 0 을 보고 cr_back luma 기반 자동 산출 대신 이 값을 직접 사용).
-			cr_button_back = gRGB(91, 162, 217);              //#5BA2D9 — agent UI 시그니처 버튼색
-			cr_button_text = Gdiplus::Color::White;
-
-			//focus / selected border = cr_button_back (시그니처 블루) 로 통일 —
-			//테마 내 강조 색을 하나로 유지하면 edit focus / checkbox 체크 / 버튼이 같은 톤으로 묶여 보임.
-			//(이전엔 #6CCFD3 cyan 으로 잡았으나 본문/버튼과 톤이 어긋나 어색했음 — 사용자 지적 2026-05-21.)
-			cr_selected_border = cr_button_back;
+			//focus / selected border / progress = cr_back_selected (시그니처 블루 #5BA2D9) 로 통일 —
+			//테마 내 강조 색을 하나로 유지하면 edit focus / checkbox 체크 / progress 가 같은 톤으로 묶여 보임.
+			//(이전엔 #6CCFD3 cyan 으로 잡았으나 본문 톤과 어긋나 어색했음 — 사용자 지적 2026-05-21.)
+			//버튼색은 다른 테마와 동일 규칙 (cr_title 계열) 을 따른다 — case 끝에서 할당.
+			cr_selected_border = cr_back_selected;
 			cr_selected_border_inactive = cr_back_selected_inactive;
 
 			cr_header_text = Gdiplus::Color::White;
@@ -1166,10 +1166,14 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_button_back;                     //#5BA2D9 — 버튼과 동일 톤
+			cr_progress = cr_back_selected;                   //#5BA2D9 — 시그니처 블루
 
-			cr_border_active = cr_button_back;                //focus border 도 동일 블루
+			cr_border_active = cr_back_selected;              //focus border 도 동일 블루
 			cr_border_inactive = get_weak_color(cr_back, 64);
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_linkmemine_se:
@@ -1210,6 +1214,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = cr_title_back_active;          //logo orange (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_anysupport :
@@ -1253,6 +1261,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = cr_title_back_active;          //logo blue (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_helpu:
@@ -1297,6 +1309,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = cr_title_back_active;         //logo teal (CornflowerBlue 폐기)
 			cr_border_inactive = gRGB(159, 159, 159);        //#9F9F9F — BI gray
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_pcanypro:
@@ -1338,6 +1354,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = cr_title_back_active;          //logo orange (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_dark_gray :
@@ -1374,6 +1394,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active		= get_weak_color(cr_back, 128);
 			cr_border_inactive		= get_weak_color(cr_back, 64);
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_dark :
@@ -1412,6 +1436,12 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		//active/inactive 차이도 작게 두어 dialog 활성 전환 시 외관 jolt 최소화.
 		cr_border_active   = get_weak_color(cr_back, 128);
 			cr_border_inactive = get_weak_color(cr_back, 64);
+			//dark 테마는 위에서 cr_title_back_inactive 를 세팅하지 않아 stale 위험 — 여기서 active 와 동일 톤으로 확정.
+			cr_title_back_inactive = cr_title_back_active;
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_popup_folder_list:
@@ -1432,6 +1462,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = Gdiplus::Color::LightGray;
 			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_white :
@@ -1473,6 +1504,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		case color_theme_gray:
@@ -1511,6 +1546,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
 		default: //case color_theme_default :
@@ -1573,6 +1612,11 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_border_active = Gdiplus::Color::CornflowerBlue;
 			cr_border_inactive = Gdiplus::Color::LightGray;
+
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
 	}
 
 	//selected + hover combo — selected 의 luma 방향으로 12% 만큼 black/white 와 블렌딩.
@@ -1584,9 +1628,6 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		Gdiplus::Color cr_target = selected_dark ? Gdiplus::Color(255, 0, 0, 0) : Gdiplus::Color(255, 255, 255, 255);
 		cr_back_selected_hover = get_color(cr_back_selected, cr_target, 0.12);
 	}
-
-	//cr_separator — cr_back luma 방향 ±30 (dark→lighter, light→darker). 모든 theme 일관.
-	cr_separator = get_weak_color(cr_back, 30);
 }
 
 Gdiplus::Color get_sys_color(int index)

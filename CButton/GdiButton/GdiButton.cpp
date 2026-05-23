@@ -586,10 +586,11 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	else if (theme.cr_button_back.GetA() != 0)
 	{
 		//theme 이 explicit primary button 색 (cr_button_back / cr_button_text) 을 지정한 경우.
-		//사용 예: LinkMeMine Agent origin 의 light blue 로그인 버튼 (#5BA2D9 + white text).
-		//border 는 face 와 같게 두어 시각적으로 단색 버튼.
+		//face 는 cr_button_back, border 는 cr_button_border (보통 테마가 cr_back 대비색으로 자동산출).
+		//cr_button_border 미지정(alpha=0)이면 face 와 동일색 → 테두리 없는 단색 버튼.
+		//cr_button_back≈cr_back 인 테마(default)에서도 border 가 cr_back 과 대비돼 버튼 윤곽이 유지된다.
 		cr_face   = theme.cr_button_back;
-		cr_border = theme.cr_button_back;
+		cr_border = (theme.cr_button_border.GetA() != 0) ? theme.cr_button_border : theme.cr_button_back;
 		if (theme.cr_button_text.GetA() != 0)
 			set_text_color(theme.cr_button_text, true);
 	}

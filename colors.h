@@ -449,6 +449,7 @@ public:
 		cr_edit_back				= src.cr_edit_back;
 		cr_button_text				= src.cr_button_text;
 		cr_button_back				= src.cr_button_back;
+		cr_button_border			= src.cr_button_border;
 
 		cr_selected_border			= src.cr_selected_border;
 		cr_selected_border_inactive	= src.cr_selected_border_inactive;
@@ -510,6 +511,10 @@ public:
 	//(VSCode 의 button.background / button.foreground 와 매핑.)
 	Gdiplus::Color	cr_button_back = Gdiplus::Color::Transparent;
 	Gdiplus::Color	cr_button_text = Gdiplus::Color::Transparent;
+	//버튼 테두리. 미지정(alpha=0)이면 face 와 동일색 → 테두리 없음. 보통 각 테마에서
+	//get_weak_color(cr_back, N) 로 자동산출 — cr_button_back≈cr_back 인 테마(default)에서도
+	//cr_back 대비로 버튼 윤곽이 유지된다. (VSCode 의 button.border 와 매핑.)
+	Gdiplus::Color	cr_button_border = Gdiplus::Color::Transparent;
 
 	Gdiplus::Color	cr_selected_border;
 	Gdiplus::Color	cr_selected_border_inactive;

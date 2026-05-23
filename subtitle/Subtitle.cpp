@@ -341,6 +341,223 @@ bool CSubtitle::load_srt(CString sfile)
 	return true;
 }
 
+//ASS / SSA — [Events] section 의 Format header 로 Start/End/Text 컬럼 위치 파악 후 Dialogue 라인 parse.
+//Time 형식 H:MM:SS.cc (centisecond) 는 cs × 10 = ms 직접 변환 — SRT 의 3-digit ms 와 단위 다름.
+//Text 안의 override tag ({\an8}, {\pos}, {\1c&H...} 등) 제거. \N → newline.
+bool CSubtitle::load_ass(CString sfile)
+{
+	std::deque<CString> lines;
+	if (!read_lines(sfile, &lines))
+		return false;
+
+	auto parse_ass_time_ms = [](const CString& s) -> int
+	{
+		int h = 0, m = 0, sec = 0, cs = 0;
+		if (_stscanf_s(s, _T("%d:%d:%d.%d"), &h, &m, &sec, &cs) >= 3)
+			return h * 3600000 + m * 60000 + sec * 1000 + cs * 10;
+		return -1;
+	};
+
+	//ASS override block parser — {...} 단위 처리.
+	//지원: \an<n> (caption alignment) / \1c|\c (primary color) / \b1|\b0 (bold) / \i1|\i0 (italic).
+	//변환된 SCParagraph tag (<cr=...>, <b>, <i>) 는 block 위치에 insert. 미지원 tag (\fad, \t, \move, \frz, \k 등) 는 skip.
+	auto convert_ass_tags = [](CString& s, int& alignment_out)
+	{
+		alignment_out = 0;
+		CString out;
+		const int len = s.GetLength();
+		int i = 0;
+
+		while (i < len)
+		{
+			if (s[i] != _T('{'))
+			{
+				out += s[i];
+				i++;
+				continue;
+			}
+			//{ block 시작 — 짝 } 찾기.
+			int close = s.Find(_T('}'), i);
+			if (close < 0)
+			{
+				out += s.Mid(i);
+				break;
+			}
+			CString block = s.Mid(i + 1, close - i - 1);
+			i = close + 1;
+
+			//block 안의 모든 \tag 순회.
+			CString sc_tags;
+			const int blen = block.GetLength();
+			int j = 0;
+			while (j < blen)
+			{
+				if (block[j] != _T('\\'))
+				{
+					j++;
+					continue;
+				}
+				//\an<n>
+				if (j + 3 < blen && block.Mid(j, 3) == _T("\\an") &&
+					block[j + 3] >= _T('1') && block[j + 3] <= _T('9'))
+				{
+					alignment_out = block[j + 3] - _T('0');
+					j += 4;
+					continue;
+				}
+				//\1c&H...& or \c&H...&
+				bool is_color = false;
+				int prefix_len = 0;
+				if (j + 5 <= blen && block.Mid(j, 5) == _T("\\1c&H")) { is_color = true; prefix_len = 5; }
+				else if (j + 4 <= blen && block.Mid(j, 4) == _T("\\c&H")) { is_color = true; prefix_len = 4; }
+				if (is_color)
+				{
+					int cs = j + prefix_len;
+					int ce = cs;
+					while (ce < blen && block[ce] != _T('&'))
+						ce++;
+					if (ce <= blen && (ce - cs) == 6)
+					{
+						CString bbggrr = block.Mid(cs, 6);
+						sc_tags.AppendFormat(_T("<cr=#%s%s%s>"),
+							bbggrr.Mid(4, 2).GetString(),
+							bbggrr.Mid(2, 2).GetString(),
+							bbggrr.Mid(0, 2).GetString());
+						j = ce + 1;
+						continue;
+					}
+				}
+				//\b1 / \b0
+				if (j + 2 < blen && block[j + 1] == _T('b') &&
+					(block[j + 2] == _T('0') || block[j + 2] == _T('1')))
+				{
+					sc_tags += (block[j + 2] == _T('1')) ? _T("<b>") : _T("</b>");
+					j += 3;
+					continue;
+				}
+				//\i1 / \i0
+				if (j + 2 < blen && block[j + 1] == _T('i') &&
+					(block[j + 2] == _T('0') || block[j + 2] == _T('1')))
+				{
+					sc_tags += (block[j + 2] == _T('1')) ? _T("<i>") : _T("</i>");
+					j += 3;
+					continue;
+				}
+				//미지원 tag — 다음 \ 또는 block 끝까지 skip.
+				int next = j + 1;
+				while (next < blen && block[next] != _T('\\'))
+					next++;
+				j = next;
+			}
+			out += sc_tags;
+		}
+
+		//ASS escape: \N = newline, \h = non-breaking space.
+		out.Replace(_T("\\N"), _T("\n"));
+		out.Replace(_T("\\n"), _T("\n"));
+		out.Replace(_T("\\h"), _T(" "));
+		s = out;
+	};
+
+	bool in_events_section = false;
+	int idx_start = -1, idx_end = -1, idx_text = -1;
+	int format_field_count = 0;
+
+	for (CString& sLine : lines)
+	{
+		sLine.Trim();
+		if (sLine.IsEmpty())
+			continue;
+
+		//섹션 헤더 — [Events] 시작 / 다른 섹션 진입 시 종료.
+		if (sLine[0] == _T('['))
+		{
+			CString lower = sLine; lower.MakeLower();
+			in_events_section = (lower == _T("[events]"));
+			idx_start = idx_end = idx_text = -1;
+			format_field_count = 0;
+			continue;
+		}
+
+		if (!in_events_section)
+			continue;
+
+		//"Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+		if (sLine.Left(7).CompareNoCase(_T("Format:")) == 0)
+		{
+			CString fields = sLine.Mid(7);
+			std::deque<CString> tokens;
+			get_token_str(fields, tokens, _T(","));
+			format_field_count = (int)tokens.size();
+			for (int i = 0; i < (int)tokens.size(); i++)
+			{
+				CString t = tokens[i]; t.Trim(); t.MakeLower();
+				if (t == _T("start"))      idx_start = i;
+				else if (t == _T("end"))   idx_end = i;
+				else if (t == _T("text"))  idx_text = i;
+			}
+			continue;
+		}
+
+		//"Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,1초"
+		if (sLine.Left(9).CompareNoCase(_T("Dialogue:")) == 0)
+		{
+			if (idx_start < 0 || idx_end < 0 || idx_text < 0 || format_field_count <= 0)
+				continue;	//Format header 없이는 parse 불가.
+
+			CString body = sLine.Mid(9);
+			//앞 (format_field_count - 1) 개 까지만 comma 로 split. 마지막 Text 필드는 콤마 포함 가능.
+			std::deque<CString> tokens;
+			int pos = 0;
+			int field = 0;
+			while (field < format_field_count - 1)
+			{
+				int comma = body.Find(_T(','), pos);
+				if (comma < 0)
+					break;
+				CString t = body.Mid(pos, comma - pos); t.Trim();
+				tokens.push_back(t);
+				pos = comma + 1;
+				field++;
+			}
+			tokens.push_back(body.Mid(pos));	//마지막 Text 필드 — 콤마 포함 가능.
+
+			if ((int)tokens.size() != format_field_count)
+				continue;
+
+			int start_ms = parse_ass_time_ms(tokens[idx_start]);
+			int end_ms = parse_ass_time_ms(tokens[idx_end]);
+			if (start_ms < 0 || end_ms < 0)
+				continue;
+
+			CString text = tokens[idx_text];
+			int alignment = 0;
+			convert_ass_tags(text, alignment);
+			text.Trim();
+			if (text.IsEmpty())
+				continue;
+
+			CCaption caption;
+			caption.start = start_ms;
+			caption.end = end_ms;
+			caption.alignment = alignment;
+			//\n split — 각 line 별 CSentence.
+			std::deque<CString> sub_lines;
+			get_token_str(text, sub_lines, _T("\n"));
+			for (CString& ln : sub_lines)
+			{
+				ln.Trim();
+				if (!ln.IsEmpty())
+					caption.sentences.push_back(CSentence(ln, _T("")));
+			}
+			if (caption.is_valid())
+				m_subtitle.push_back(caption);
+		}
+	}
+
+	return !m_subtitle.empty();
+}
+
 bool CSubtitle::load_subtitle_file(CString sfile)
 {
 	if (sfile.IsEmpty())
@@ -370,6 +587,8 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 		return load_smi(sfile);
 	else if (ext == _T("srt"))
 		return load_srt(sfile);
+	else if (ext == _T("ass") || ext == _T("ssa"))
+		return load_ass(sfile);
 
 	return false;
 }

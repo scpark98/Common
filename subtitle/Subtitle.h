@@ -52,6 +52,7 @@ public:
 		sentences.clear();
 		start = -1;
 		end = -1;
+		alignment = 0;
 	}
 
 	//여러줄의 한 캡션을 한 문자열로 합쳐서 리턴한다.
@@ -75,6 +76,11 @@ public:
 	std::deque<CSentence> sentences;
 	int start;	//자막 시작 시간
 	int end;	//자막 끝 시간
+	//ASS \an<n> numpad alignment (1~9). 0 = default (m_subCfg.pos_x/pos_y 기반).
+	//   7 8 9  (top)
+	//   4 5 6  (middle)
+	//   1 2 3  (bottom)
+	int alignment = 0;
 };
 
 //하나의 자막 파일을 읽고 전체 자막 데이터를 관리.
@@ -152,6 +158,7 @@ protected:
 
 	bool load_smi(CString sfile);
 	bool load_srt(CString sfile);
+	bool load_ass(CString sfile);	//ASS / SSA — Dialogue 라인 + Format header 기반 parsing.
 	bool save_smi(CString sfile);
 	bool save_srt(CString sfile);
 };

@@ -6,6 +6,8 @@
 #include "../../Functions.h"
 #include "../../colors.h"
 #include "../../MemoryDC.h"
+#include "../../log/SCLog/SCLog.h"
+extern CSCLog gLog;	//Endorphin2.cpp 의 전역 — 진단 logWrite 용.
 
 //caption 정규화 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
 //.rc 의 *즐겨찾기(&F)* / *즐겨찾기* / *즐겨찾기(&f)* 모두 동일 매칭 키 (*즐겨찾기*) 가 되도록.
@@ -407,6 +409,44 @@ void CSCMenu::add_submenu_item(int _id, CString _caption, CSCMenu* sub_menu)
 	recalc_items_rect();
 }
 
+void CSCMenu::insert_submenu_item_before(int _id, CString _caption, CSCMenu* sub_menu, int before_id)
+{
+	int pos = -1;
+	for (int i = 0; i < (int)m_items.size(); i++)
+		if (m_items[i]->m_id == before_id) { pos = i; break; }
+	if (pos < 0)
+	{
+		add_submenu_item(_id, _caption, sub_menu);
+		return;
+	}
+	CSCMenuItem* item = new CSCMenuItem(_id, _caption);
+	item->m_type = CSCMenuItem::item_submenu;
+	item->m_sub_menu = sub_menu;
+	if (sub_menu)
+		sub_menu->m_parent_menu = this;
+	m_items.insert(m_items.begin() + pos, item);
+	recalc_items_rect();
+}
+
+void CSCMenu::insert_submenu_item_after(int _id, CString _caption, CSCMenu* sub_menu, int after_id)
+{
+	int pos = -1;
+	for (int i = 0; i < (int)m_items.size(); i++)
+		if (m_items[i]->m_id == after_id) { pos = i + 1; break; }
+	if (pos < 0)
+	{
+		add_submenu_item(_id, _caption, sub_menu);
+		return;
+	}
+	CSCMenuItem* item = new CSCMenuItem(_id, _caption);
+	item->m_type = CSCMenuItem::item_submenu;
+	item->m_sub_menu = sub_menu;
+	if (sub_menu)
+		sub_menu->m_parent_menu = this;
+	m_items.insert(m_items.begin() + pos, item);
+	recalc_items_rect();
+}
+
 void CSCMenu::add_sub_button_by_menu_index(int index, UINT id)
 {
 	CSCMenuSubButton* button = new CSCMenuSubButton(id, m_line_height);
@@ -607,6 +647,14 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 {
 	CDialogEx::OnKillFocus(pNewWnd);
 
+	HWND new_hwnd = pNewWnd ? pNewWnd->m_hWnd : NULL;
+	TCHAR new_cls[64] = { 0 }, new_txt[64] = { 0 };
+	if (new_hwnd) { ::GetClassName(new_hwnd, new_cls, _countof(new_cls)); ::GetWindowText(new_hwnd, new_txt, _countof(new_txt)); }
+	logWrite(_T("[killfocus] this=%p suppress=%d → newFocus=%p '%s'/'%s' inChain=%d"),
+		this->m_hWnd, (int)m_suppress_cascade_hide,
+		new_hwnd, new_cls, new_txt,
+		new_hwnd ? (int)is_in_menu_chain(pNewWnd) : -1);
+
 	//부모가 우리를 강제 hide 시킨 경우 — cascade/message 까지 가면 부모도 닫혀버리므로 skip.
 	if (m_suppress_cascade_hide)
 	{
@@ -617,6 +665,8 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 	//focus 가 우리 메뉴 체인 내부 (자식 popup, 부모 복귀 등) 로 이동했으면 그대로 유지.
 	if (is_in_menu_chain(pNewWnd))
 		return;
+
+	logWrite(_T("[killfocus] CASCADE DISMISS this=%p"), this->m_hWnd);
 
 	//외부로 focus 가 갔으면 우리 + 보이는 자식 + 조상 모두 닫는다.
 	hide_visible_descendants();
@@ -718,6 +768,41 @@ void CSCMenu::popup_submenu_for(int over_index)
 
 	CRect rWin = get_window_real_rect(this);
 	item->m_sub_menu->popup_menu(rWin.right - 11, rItem.top);
+
+	//전체 단계 통합 — 모든 호출 경로 (hover timer / click / keyboard) 에서 sibling switch 일관 처리.
+	//(1) Z-order top → WS_EX_NOACTIVATE popup 끼리 자동 정렬 불안정해 명시.
+	//(2) UpdateWindow → ShowWindow 가 post 한 WM_PAINT 동기 처리 → 다음 단계 dismiss 전에 새 sub 가 그려진 상태 보장.
+	//    (background 노출 깜빡임 회피.)
+	//(3) 형제 sub dismiss.
+	//(4) SetFocus → 외부 클릭 dismiss 위해 parent focus 회수 (필수). 단 부작용: parent 가 Z 위로 끌어올려짐.
+	//(5) Z-order top 한 번 더 → SetFocus 부작용 정정.
+	HWND new_sub_hwnd = item->m_sub_menu->m_hWnd;
+	if (new_sub_hwnd)
+	{
+		::SetWindowPos(new_sub_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		::UpdateWindow(new_sub_hwnd);
+	}
+
+	bool dismissed_any = false;
+	for (auto* it : m_items)
+	{
+		if (it == item)
+			continue;
+		if (it->m_type != CSCMenuItem::item_submenu || !it->m_sub_menu)
+			continue;
+		if (!::IsWindow(it->m_sub_menu->m_hWnd) || !it->m_sub_menu->IsWindowVisible())
+			continue;
+		it->m_sub_menu->hide_visible_descendants();
+		it->m_sub_menu->m_suppress_cascade_hide = true;
+		it->m_sub_menu->ShowWindow(SW_HIDE);
+		dismissed_any = true;
+	}
+	if (dismissed_any)
+	{
+		SetFocus();
+		if (new_sub_hwnd)
+			::SetWindowPos(new_sub_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+	}
 
 	m_submenu_ever_opened = true;
 }
@@ -1068,51 +1153,8 @@ void CSCMenu::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_submenu_hover)
 	{
 		KillTimer(timer_submenu_hover);
-
-		//순서: popup → SetWindowPos(HWND_TOP) → UpdateWindow → dismiss → SetFocus → SetWindowPos(HWND_TOP) 한 번 더.
-		//각 step 의 이유:
-		//  popup 먼저 → 기존 dismiss 후 순서로 가면 SW_HIDE 와 SW_SHOW 사이 frame 에 background 노출 (깜빡임).
-		//  SetWindowPos(HWND_TOP) → 새 sub 를 Z 최상위 (WS_EX_NOACTIVATE popup 끼리 자동 정렬 불안정).
-		//  UpdateWindow → ShowWindow 가 post 한 WM_PAINT 를 동기 처리 — 다음 step 의 dismiss 전에 새 sub 가 그려진 상태 보장.
-		//  dismiss → 기존 sub hide.
-		//  SetFocus → 외부 클릭 dismiss 위해 parent focus 회수 (필수). 단 부작용: parent 가 Z-order 위로 끌어올려짐.
-		//  SetWindowPos(HWND_TOP) 한 번 더 → SetFocus 부작용 정정.
-
+		//popup_submenu_for 안에 형제 dismiss + Z-order + UpdateWindow + SetFocus 정정 모두 통합.
 		popup_submenu_for(m_over_item);
-
-		HWND new_sub_hwnd = NULL;
-		if (m_over_item >= 0 && m_over_item < (int)m_items.size() &&
-			m_items[m_over_item]->m_type == CSCMenuItem::item_submenu &&
-			m_items[m_over_item]->m_sub_menu &&
-			::IsWindow(m_items[m_over_item]->m_sub_menu->m_hWnd))
-		{
-			new_sub_hwnd = m_items[m_over_item]->m_sub_menu->m_hWnd;
-		}
-
-		if (new_sub_hwnd)
-		{
-			::SetWindowPos(new_sub_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-			::UpdateWindow(new_sub_hwnd);
-		}
-
-		bool dismissed_any = false;
-		for (auto* item : m_items)
-		{
-			if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
-				continue;
-			if (!::IsWindow(item->m_sub_menu->m_hWnd) || !item->m_sub_menu->IsWindowVisible())
-				continue;
-			if (m_over_item >= 0 && m_items[m_over_item] == item)
-				continue;
-			item->m_sub_menu->hide_visible_descendants();
-			item->m_sub_menu->m_suppress_cascade_hide = true;
-			item->m_sub_menu->ShowWindow(SW_HIDE);
-			dismissed_any = true;
-		}
-		if (dismissed_any)
-			SetFocus();
-		if (new_sub_hwnd)
-			::SetWindowPos(new_sub_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		return;
 	}
 
@@ -1323,6 +1365,10 @@ void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 			//부모의 theme 상속 — nested 가 코드 안에서 자동 생성되어 외부 set_color_theme 호출이 없어
 			//default 색으로 그려져 부모와 톤이 어긋나는 회귀 회피.
 			nested->set_color_theme(m_theme);
+			//m_parent_menu 설정 — is_in_menu_chain 의 chain traversal 이 root 까지 가야 형제 sub 도 같은
+			//chain 으로 인식. 누락 시 cascade dismiss 회귀 (sibling switch 후 새 sub 가 자기 KillFocus 에서
+			//inChain=false 판정 → 즉시 자기 hide).
+			nested->m_parent_menu = this;
 			CMenu sub_wrap;
 			sub_wrap.Attach(hSub);
 			nested->load_from_menu(&sub_wrap, include_popup_placeholder);

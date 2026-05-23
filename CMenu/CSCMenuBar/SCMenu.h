@@ -176,6 +176,10 @@ public:
 	//submenu 항목. sub_menu 의 lifecycle 은 호출자가 보유 (보통 dialog 멤버).
 	//클릭 시 sub_menu 가 항목 우측 edge 에서 popup, 부모 메뉴는 자식이 닫힐 때까지 유지.
 	void			add_submenu_item(int _id, CString _caption, CSCMenu* sub_menu);
+	//id 의 submenu item 을 before_id / after_id 항목 *바로 앞/뒤* 에 삽입 — add + move_item_before/after 한 호출 단축.
+	//ref_id 가 존재 안 하면 맨 뒤 append (= add_submenu_item 과 동일).
+	void			insert_submenu_item_before(int _id, CString _caption, CSCMenu* sub_menu, int before_id);
+	void			insert_submenu_item_after (int _id, CString _caption, CSCMenu* sub_menu, int after_id);
 
 	//sub button이 여러개일 때 args에 나열하여 호출.
 	template <typename ... Types> void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""), Types... args)

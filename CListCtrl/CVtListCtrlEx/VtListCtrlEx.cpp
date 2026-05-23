@@ -303,20 +303,21 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//그 색상 그대로 표시되어야 한다.
 		if ((m_has_focus || is_show_selection_always) && is_selected) //ok
 		{
-			//selected 행은 모든 셀이 selected text 색을 사용해야 일관 가독성. 이전엔 셀 색이 명시된
-			//(unused 가 아닌) 경우 그 색 그대로라 dark 셀 색 + dark selected bg = 안 보이는 문제 발생.
-			//(예: 셸 list 의 size/date 셀이 dark navy 명시되어 있어 selected navy bg 위에서 안 보였음.)
-			//OS native list 의 selected 동작과도 일치 — 모든 셀이 system highlight text color.
+			//셀 색 지정이 있으면 selected 든 inactive selected 든 그 색 우선 — 사용자가 set_text_color/set_back_color 로
+			//명시한 의도가 더 강함. 미지정 (listctrlex_unused_color) 셀만 theme 의 selected 색으로 fallback.
+			//(이전엔 selected 시 셀 색을 무조건 덮어써 자막창의 red 자막이 selected 시 white 로 바뀌는 회귀 발생.)
 			if (m_has_focus)
 			{
-				crText = m_theme.cr_text_selected;
+				if (crText.GetValue() == listctrlex_unused_color.GetValue())
+					crText = m_theme.cr_text_selected;
 				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				crText = m_theme.cr_text_selected_inactive;
-				if (is_full_row_selection || iSubItem == 0)
+				if (crText.GetValue() == listctrlex_unused_color.GetValue())
+					crText = m_theme.cr_text_selected_inactive;
+				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected_inactive;
 			}
 		}
@@ -324,8 +325,10 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (is_drophilited) //ok
 		{
-			crText = m_theme.cr_text_selected;
-			crBack = m_theme.cr_back_selected;
+			if (crText.GetValue() == listctrlex_unused_color.GetValue())
+				crText = m_theme.cr_text_selected;
+			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
+				crBack = m_theme.cr_back_selected;
 		}
 		else
 		{

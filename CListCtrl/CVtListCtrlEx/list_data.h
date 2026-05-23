@@ -28,6 +28,10 @@ public:
 			crText.assign(max_column, listctrlex_unused_color);
 			crBack.resize(max_column);
 			crBack.assign(max_column, listctrlex_unused_color);
+			weight.assign(max_column, 0);
+			italic.assign(max_column, 0);
+			underline.assign(max_column, 0);
+			strikeout.assign(max_column, 0);
 		}
 
 		text[0] = _text;
@@ -49,6 +53,15 @@ public:
 	//색상값이 특정색이 아니면 해당 색으로 그 컬럼을 표시한다.
 	std::deque<Gdiplus::Color> crText;
 	std::deque<Gdiplus::Color> crBack;
+
+	//셀별 font style. default 0 = "지정 없음" → base font (CVtListCtrlEx::GetFont()) 그대로 사용.
+	//  weight: LOGFONT.lfWeight (FW_DONTCARE=0/THIN=100/.../NORMAL=400/SEMIBOLD=600/BOLD=700/HEAVY=900)
+	//  italic / underline / strikeout: 0 = off, 1 = on
+	//CVtListCtrlEx 는 (weight, italic, underline, strikeout) 조합별 CFont 를 lazy 캐시 → cell 당 비용은 map lookup + SelectObject 만.
+	std::deque<int>  weight;
+	std::deque<BYTE> italic;
+	std::deque<BYTE> underline;
+	std::deque<BYTE> strikeout;
 
 	bool compare(const CListCtrlData &a, int index) const
 	{

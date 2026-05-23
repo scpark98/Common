@@ -19,6 +19,11 @@
 
 IMPLEMENT_DYNAMIC(CVtListCtrlEx, CListCtrl)
 
+//셀별 font style 안전 접근 — column 수 변화 등으로 미초기화면 default 0/false.
+//OnDrawItem 의 cell 그리기에서 직접 호출 + setter 들의 _apply_style_field 와 짝.
+static int  _safe_weight   (const std::deque<int>&  v, int i) { return ((int)v.size() > i && i >= 0) ? v[i] : 0; }
+static BYTE _safe_bytestyle(const std::deque<BYTE>& v, int i) { return ((int)v.size() > i && i >= 0) ? v[i] : (BYTE)0; }
+
 CVtListCtrlEx::CVtListCtrlEx()
 {
 	memset(&m_lf, 0, sizeof(LOGFONT));
@@ -36,6 +41,7 @@ CVtListCtrlEx::~CVtListCtrlEx()
 	}
 
 	m_font.DeleteObject();
+	clear_font_style_cache();
 	safe_release_gradient_rect_handle();
 
 	if (m_pEdit)
@@ -591,7 +597,23 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				format = DT_RIGHT;
 
 			format = format | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS | DT_NOPREFIX;
+
+			//셀별 font style — 하나라도 set 되어 있으면 캐시된 styled font 로 SelectObject 후 그리고 복원.
+			//모두 default (weight=0, italic/underline/strikeout=0) 이면 base font 그대로 (캐시 우회).
+			int  cell_weight    = _safe_weight   (m_list_db[iItem].weight,    iSubItem);
+			bool cell_italic    = _safe_bytestyle(m_list_db[iItem].italic,    iSubItem) != 0;
+			bool cell_underline = _safe_bytestyle(m_list_db[iItem].underline, iSubItem) != 0;
+			bool cell_strikeout = _safe_bytestyle(m_list_db[iItem].strikeout, iSubItem) != 0;
+			CFont* pOldFont = nullptr;
+			if (cell_weight != 0 || cell_italic || cell_underline || cell_strikeout)
+			{
+				CFont* pStyled = get_styled_font(cell_weight, cell_italic, cell_underline, cell_strikeout);
+				if (pStyled)
+					pOldFont = pDC->SelectObject(pStyled);
+			}
 			pDC->DrawText(text, textRect, format);
+			if (pOldFont)
+				pDC->SelectObject(pOldFont);
 		}
 	}
 
@@ -2245,6 +2267,139 @@ void CVtListCtrlEx::set_item_color(int item, int subItem, Gdiplus::Color crText,
 	Invalidate();
 }
 
+template <typename ValueT, typename DequeT>
+static void _apply_style_field(std::deque<CListCtrlData>& db, int item, int subItem, int col_count,
+	DequeT CListCtrlData::* member, ValueT value)
+{
+	auto set = [&](int i, int j)
+	{
+		auto& v = db[i].*member;
+		if ((int)v.size() <= j)
+			v.resize(j + 1);
+		v[j] = (typename DequeT::value_type)value;
+	};
+	if (item < 0)
+	{
+		for (int i = 0; i < (int)db.size(); i++)
+		{
+			if (subItem < 0)
+				for (int j = 0; j < col_count; j++) set(i, j);
+			else
+				set(i, subItem);
+		}
+	}
+	else
+	{
+		if (item >= (int)db.size())
+			return;
+		if (subItem < 0)
+			for (int j = 0; j < col_count; j++) set(item, j);
+		else
+			set(item, subItem);
+	}
+}
+
+void CVtListCtrlEx::set_text_weight(int item, int subItem, int weight, bool invalidate)
+{
+	_apply_style_field<int>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::weight, weight);
+	if (invalidate)
+		Invalidate();
+}
+
+void CVtListCtrlEx::set_text_italic(int item, int subItem, bool italic, bool invalidate)
+{
+	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::italic, italic ? 1 : 0);
+	if (invalidate)
+		Invalidate();
+}
+
+void CVtListCtrlEx::set_text_underline(int item, int subItem, bool underline, bool invalidate)
+{
+	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::underline, underline ? 1 : 0);
+	if (invalidate)
+		Invalidate();
+}
+
+void CVtListCtrlEx::set_text_strikeout(int item, int subItem, bool strikeout, bool invalidate)
+{
+	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::strikeout, strikeout ? 1 : 0);
+	if (invalidate)
+		Invalidate();
+}
+
+void CVtListCtrlEx::set_text_style(int item, int subItem, int weight, bool italic, bool underline, bool strikeout, bool invalidate)
+{
+	int col = get_column_count();
+	_apply_style_field<int> (m_list_db, item, subItem, col, &CListCtrlData::weight,    weight);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::italic,    italic    ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::underline, underline ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::strikeout, strikeout ? 1 : 0);
+	if (invalidate)
+		Invalidate();
+}
+
+int CVtListCtrlEx::get_text_weight(int item, int subItem) const
+{
+	if (item < 0 || item >= (int)m_list_db.size())
+		return 0;
+	return _safe_weight(m_list_db[item].weight, subItem);
+}
+
+bool CVtListCtrlEx::get_text_italic(int item, int subItem) const
+{
+	if (item < 0 || item >= (int)m_list_db.size())
+		return false;
+	return _safe_bytestyle(m_list_db[item].italic, subItem) != 0;
+}
+
+bool CVtListCtrlEx::get_text_underline(int item, int subItem) const
+{
+	if (item < 0 || item >= (int)m_list_db.size())
+		return false;
+	return _safe_bytestyle(m_list_db[item].underline, subItem) != 0;
+}
+
+bool CVtListCtrlEx::get_text_strikeout(int item, int subItem) const
+{
+	if (item < 0 || item >= (int)m_list_db.size())
+		return false;
+	return _safe_bytestyle(m_list_db[item].strikeout, subItem) != 0;
+}
+
+void CVtListCtrlEx::clear_font_style_cache()
+{
+	for (auto& kv : m_font_style_cache)
+		delete kv.second;
+	m_font_style_cache.clear();
+}
+
+CFont* CVtListCtrlEx::get_styled_font(int weight, bool italic, bool underline, bool strikeout)
+{
+	//key — weight 16 bit + italic/underline/strikeout 각 1 bit.
+	DWORD key = ((DWORD)(weight & 0xFFFF) << 16) | (italic ? 1 : 0) | (underline ? 2 : 0) | (strikeout ? 4 : 0);
+
+	auto it = m_font_style_cache.find(key);
+	if (it != m_font_style_cache.end())
+		return it->second;
+
+	//base font (m_font) 의 LOGFONT 복사 + style 필드 변경 + CreateFontIndirect.
+	LOGFONT lf = m_lf;
+	if (weight > 0)
+		lf.lfWeight = weight;
+	lf.lfItalic    = italic    ? 1 : 0;
+	lf.lfUnderline = underline ? 1 : 0;
+	lf.lfStrikeOut = strikeout ? 1 : 0;
+
+	CFont* pFont = new CFont;
+	if (!pFont->CreateFontIndirect(&lf))
+	{
+		delete pFont;
+		return nullptr;
+	}
+	m_font_style_cache[key] = pFont;
+	return pFont;
+}
+
 void CVtListCtrlEx::set_progress_color(Gdiplus::Color crProgress)
 {
 	m_theme.cr_progress = crProgress;
@@ -3715,6 +3870,9 @@ void CVtListCtrlEx::reconstruct_font(bool invalidate)
 		m_HeaderCtrlEx.set_font(&m_lf);
 
 	m_font_size = get_font_size();
+
+	//base font 변경 시 셀별 style font 캐시 무효화 — 다음 draw 에서 새 base 기준으로 lazy 재생성.
+	clear_font_style_cache();
 
 	if (invalidate)
 		Invalidate();

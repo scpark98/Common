@@ -502,6 +502,21 @@ public:
 	//글자색과 배경색 동시 변경
 	void		set_item_color(int item, int subItem, Gdiplus::Color crText, Gdiplus::Color crBack);
 
+	//셀별 font style. item/subItem 이 -1 이면 모든 행/모든 컬럼에 일괄 적용.
+	//weight: LOGFONT.lfWeight (FW_DONTCARE=0/THIN=100/.../NORMAL=400/SEMIBOLD=600/BOLD=700/HEAVY=900). 0 = base font 그대로.
+	//italic / underline / strikeout: 0=off, 1=on.
+	void		set_text_weight   (int item, int subItem, int  weight,    bool invalidate = true);
+	void		set_text_italic   (int item, int subItem, bool italic,    bool invalidate = true);
+	void		set_text_underline(int item, int subItem, bool underline, bool invalidate = true);
+	void		set_text_strikeout(int item, int subItem, bool strikeout, bool invalidate = true);
+	//4 속성 한 번에 — invalidate 한 번만.
+	void		set_text_style    (int item, int subItem, int  weight, bool italic, bool underline = false, bool strikeout = false, bool invalidate = true);
+
+	int			get_text_weight   (int item, int subItem) const;
+	bool		get_text_italic   (int item, int subItem) const;
+	bool		get_text_underline(int item, int subItem) const;
+	bool		get_text_strikeout(int item, int subItem) const;
+
 	//기본 글자색을 설정한다.
 	void		set_default_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	//기본 배경색을 설정한다.
@@ -728,6 +743,13 @@ protected:
 	CFont			m_font;
 	int				m_font_size;
 	void			reconstruct_font(bool invalidate = false);
+
+	//셀별 font style 캐시 — (weight, italic, underline, strikeout) 조합당 1 CFont. lazy 생성.
+	//draw 단계의 셀 당 비용 = std::map::find + SelectObject. weight 0 = base font (캐시 우회).
+	//base font (m_font) 가 바뀌면 (reconstruct_font) 캐시 무효화.
+	std::map<DWORD, CFont*>	m_font_style_cache;
+	void			clear_font_style_cache();
+	CFont*			get_styled_font(int weight, bool italic, bool underline, bool strikeout);
 
 	bool			m_show_progress_text = true;	//default = true
 

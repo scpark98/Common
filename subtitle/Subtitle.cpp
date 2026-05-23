@@ -62,30 +62,35 @@ static CString extract_first_cr_color(const CString& s)
 
 //<cr=...> / </cr> / </ct> 만 제거. <b>, <i>, <u>, <br> 등 다른 tag 는 보존.
 //Contract: sentence.sentence 는 *색 외* 의 SCParagraph 호환 inline tag 만 보존 — 색은 sentence.color 로 분리.
+//단일 패스 — case-insensitive 매칭으로 lower 사본 + 두 번 delete 회피.
 static void strip_cr_tags(CString& s)
 {
-	CString lower = s;
-	lower.MakeLower();
-
-	int p;
-	while ((p = lower.Find(_T("<cr="))) >= 0)
+	for (int i = 0; i < s.GetLength(); )
 	{
-		int gt = lower.Find(_T('>'), p);
-		if (gt < 0)
-			break;
-		int len = gt - p + 1;
-		s.Delete(p, len);
-		lower.Delete(p, len);
-	}
-	while ((p = lower.Find(_T("</cr>"))) >= 0)
-	{
-		s.Delete(p, 5);
-		lower.Delete(p, 5);
-	}
-	while ((p = lower.Find(_T("</ct>"))) >= 0)
-	{
-		s.Delete(p, 5);
-		lower.Delete(p, 5);
+		if (s[i] != _T('<'))
+		{
+			i++;
+			continue;
+		}
+		//<cr=...> : <c + r + = ... > (case-insensitive)
+		if (i + 4 <= s.GetLength() && (s[i+1] == _T('c') || s[i+1] == _T('C')) &&
+			(s[i+2] == _T('r') || s[i+2] == _T('R')) && s[i+3] == _T('='))
+		{
+			int gt = s.Find(_T('>'), i);
+			if (gt < 0) break;
+			s.Delete(i, gt - i + 1);
+			continue;
+		}
+		//</cr> 또는 </ct>
+		if (i + 5 <= s.GetLength() && s[i+1] == _T('/') &&
+			(s[i+2] == _T('c') || s[i+2] == _T('C')) &&
+			(s[i+3] == _T('r') || s[i+3] == _T('R') || s[i+3] == _T('t') || s[i+3] == _T('T')) &&
+			s[i+4] == _T('>'))
+		{
+			s.Delete(i, 5);
+			continue;
+		}
+		i++;
 	}
 }
 

@@ -1196,6 +1196,9 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 		//ret = -1 (HW 미지원) 또는 0 (실패) → graph 정리 후 LAV path 진행.
 		close_media();
+		m_use_internal_ffmpeg = false;	//fallback 후 query API 들이 LAV 분기로 가도록 flag reset.
+										//(이전엔 true 채로 남아 get_video_codec_name 등 모든 query 가 internal 분기 →
+										//m_pFFiSource=nullptr → empty 반환 → UI 의 "Video Codec:" 등 비어 보이는 회귀.)
 		CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&m_pGB);
 		m_media_filename = sfile;   //close_media() 가 reset 한 filename 재세팅 — LAV path 의 OSD/registry 가 caller file 인식 필요.
 		logWrite(_T("[load/internal] falling back to LAV path"));
@@ -2514,14 +2517,21 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		return 0;
 	}
 
-	//HW 가속 미지원 codec (mpeg4 / vc1 / wmv 등) 은 SW keyframe walk 가 5-10초 freeze 유발 → LAV path 로 fallback.
-	//H.264 / H.265 / VP9 / AV1 / MPEG-2 등 modern codec 만 internal path.
+	//HW 가속 미지원 codec — 기본은 LAV fallback (MPEG4/VC1/WMV 등은 SW keyframe walk 가 5-10초 freeze).
+	//단 frame-independent codec (MJPEG 등) 은 seek freeze 없음 + LAV path 가 일부 컨테이너에서 비정상 EOS 유발
+	//(예: MP4 in MJPEG + no audio) → internal SW decode 로 진행.
 	if (!pFFi->decoder().has_hw_accel())
 	{
-		logWrite(_T("[internal] no HW accel for this codec — fallback to LAV path"));
-		pFFi->Release();
-		m_pFFiSource = nullptr;
-		return -1;   //caller 가 LAV path 진행 신호.
+		std::wstring codec = pFFi->decoder().video_codec_name();
+		const bool safe_sw = (codec == L"MJPEG");	//필요 시 화이트리스트 확장.
+		if (!safe_sw)
+		{
+			logWrite(_T("[internal] no HW accel for codec=%s — fallback to LAV path"), codec.c_str());
+			pFFi->Release();
+			m_pFFiSource = nullptr;
+			return -1;   //caller 가 LAV path 진행 신호.
+		}
+		logWrite(_T("[internal] no HW accel for codec=%s — internal SW decode (frame-independent, freeze 무관)"), codec.c_str());
 	}
 
 	m_pFFiSource = pFFi;   //caching for later (duration / video size accessor).
@@ -4199,6 +4209,27 @@ HRESULT CDShow::HandleGraphEvent(WPARAM wParam,LPARAM lparam)
 			break;
 		case EC_COMPLETE: // 재생이 완벽하게 끝날을때
 		{
+			//EC_COMPLETE 의 정확한 trigger 진단 — current position / duration / lParam (HRESULT) / sender filter.
+			LONGLONG cur_ns = 0, dur_ns = 0;
+			CComQIPtr<IMediaSeeking> pMS(m_pGB);
+			if (pMS)
+			{
+				pMS->GetCurrentPosition(&cur_ns);
+				pMS->GetDuration(&dur_ns);
+			}
+			CString sender_name;
+			if (lParam2)
+			{
+				IBaseFilter* pSender = (IBaseFilter*)lParam2;
+				FILTER_INFO fi = { 0 };
+				if (SUCCEEDED(pSender->QueryFilterInfo(&fi)))
+				{
+					sender_name = fi.achName;
+					if (fi.pGraph) fi.pGraph->Release();
+				}
+			}
+			logWrite(_T("[EC_COMPLETE] hr=0x%08lX cur=%lldms dur=%lldms sender='%s'"),
+				(LONG)lParam1, cur_ns / 10000, dur_ns / 10000, sender_name.GetString());
 			::SendMessage(m_pParent->m_hWnd, MESSAGE_DSHOW_MEDIA, msg_ec_complete, 0);
 			/*
 			CComQIPtr<IMediaPosition> pMP(m_pGB);

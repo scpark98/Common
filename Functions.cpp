@@ -10265,7 +10265,7 @@ CString	get_windows_version_string(bool detail)
 		version = _T("Unknown OS version");
 	}
 
-	version.Format(_T("%s (Build %d)"), version, osvi.dwBuildNumber);
+	version.AppendFormat(_T(" (Build %d)"), osvi.dwBuildNumber);
 
 	if (detail)
 	{
@@ -10858,7 +10858,7 @@ CString	get_drive_volume(TCHAR drive_letter)
 	}
 	else
 	{
-		sLabel.Format(_T("%s (%c:)"), sLabel, drive_letter);
+		sLabel.AppendFormat(_T(" (%c:)"), drive_letter);
 	}
 
 	if (GetDriveType(drive_root.Left(2)) == DRIVE_REMOTE)
@@ -18506,7 +18506,11 @@ void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR 
 		return;
 
 	if (!only_text)
-		str.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_str(1, true, _T(" "), true, true, true), func, line, str, (linefeed ? '\n' : '\0'));
+		{
+			CString tmp;
+			tmp.Format(_T("%s [%s][%d] %s%c"), get_cur_datetime_str(1, true, _T(" "), true, true, true).GetString(), func, line, str.GetString(), (linefeed ? '\n' : '\0'));
+			str = tmp;
+		}
 
 	OutputDebugString(str);
 }
@@ -18662,7 +18666,7 @@ void normalize_datetime(CString &src)
 	int m = _ttoi(token[1]);
 	int s = _ttoi(token[2]);
 
-	result.Format(_T("%s%02d:%02d:%02d"), result, h, m, s);
+	result.AppendFormat(_T("%02d:%02d:%02d"), h, m, s);
 	src = result;
 }
 

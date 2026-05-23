@@ -282,7 +282,7 @@ void CSCD2ImageDlg::OnPaint()
 
 		//촬영된 사진이라면 exif 정보도 붙여서 출력해준다.
 		if (m_images[0].get_exif_str().GetLength())
-			info_str.Format(_T("%s\n\n%s"), info_str, m_images[0].get_exif_str());
+			info_str.AppendFormat(_T("\n\n%s"), m_images[0].get_exif_str().GetString());
 
 		CRect rText = rc;
 		rText.DeflateRect(8, 10);

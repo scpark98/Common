@@ -439,7 +439,11 @@ CString	get_color_str(Gdiplus::Color cr, bool include_alpha, CString sep)
 	str.Format(_T("%d%s%d%s%d"), cr.GetR(), sep, cr.GetG(), sep, cr.GetB());
 
 	if (include_alpha)
-		str.Format(_T("%d%s%s"), cr.GetA(), sep, str );
+	{
+		CString tmp;
+		tmp.Format(_T("%d%s%s"), cr.GetA(), sep.GetString(), str.GetString());
+		str = tmp;
+	}
 
 	return str;
 }

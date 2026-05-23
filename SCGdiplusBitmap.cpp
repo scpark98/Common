@@ -1377,7 +1377,11 @@ CString CSCGdiplusBitmap::get_pixel_format_str(Gdiplus::PixelFormat fmt, bool si
 		str_fmt.Replace(_T("bpp"), _T(""));
 		int bits = 0;
 		int bits_pos = get_number_from_string(str_fmt, bits);
-		str_fmt.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos), bits);
+		{
+			CString tmp;
+			tmp.Format(_T("%s %dbit"), str_fmt.Mid(bits_pos).GetString(), bits);
+			str_fmt = tmp;
+		}
 		//TRACE(_T("str_fmt = %s\n"), str_fmt);
 	}
 

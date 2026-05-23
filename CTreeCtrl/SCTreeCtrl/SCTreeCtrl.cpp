@@ -797,9 +797,9 @@ bool CSCTreeCtrl::new_folder(HTREEITEM hParent, CString new_folder_title, bool e
 
 
 	if (index == 1)
-		folder.Format(_T("%s\\%s"), folder, new_folder_title);
+		folder.AppendFormat(_T("\\%s"), new_folder_title.GetString());
 	else
-		folder.Format(_T("%s\\%s (%d)"), folder, new_folder_title, index);
+		folder.AppendFormat(_T("\\%s (%d)"), new_folder_title.GetString(), index);
 
 	//실제 폴더를 생성한 후 리스트에 목록을 추가한다.
 	BOOL res = CreateDirectory(folder, NULL);
@@ -4112,7 +4112,7 @@ HTREEITEM CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_
 			}
 
 			if (index > 1)
-				label.Format(_T("%s (%d)"), label, index);
+				label.AppendFormat(_T(" (%d)"), index);
 		}
 
 		path = concat_path(path, label);

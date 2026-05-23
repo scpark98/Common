@@ -2463,9 +2463,9 @@ CString CVtListCtrlEx::new_folder(CString &new_folder_title)
 		truncate(folder, 1);
 
 	if (index == 1)
-		folder.Format(_T("%s\\%s"), folder, new_folder_title);
+		folder.AppendFormat(_T("\\%s"), new_folder_title.GetString());
 	else
-		folder.Format(_T("%s\\%s (%d)"), folder, new_folder_title, index);
+		folder.AppendFormat(_T("\\%s (%d)"), new_folder_title.GetString(), index);
 
 	//실제 폴더를 생성한 후 리스트에 목록을 추가한다.
 	BOOL res;

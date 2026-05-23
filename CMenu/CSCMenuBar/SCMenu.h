@@ -154,7 +154,7 @@ public:
 									bool include_popup_placeholder = false);
 
 	//load_from_menu(include_popup_placeholder=true) 로 만들어진 sub-menu placeholder 항목 (m_sub_menu==nullptr) 중
-	//caption 매칭 항목에 sub_menu attach. 못 찾으면 false (logWrite 로 진단). .rc 의 menu 구조 + 코드 instance 매핑 패턴.
+	//caption 매칭 항목에 sub_menu attach. 못 찾으면 false. .rc 의 menu 구조 + 코드 instance 매핑 패턴.
 	//caption 매칭은 정규화 후 비교 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
 	//new_id != 0 이면 placeholder 의 unique negative id 를 new_id 로 교체 — 호출자가 attach 후
 	//enable_item(new_id, ...) / check_item(new_id, ...) 사용 가능. 0 이면 placeholder id 유지.

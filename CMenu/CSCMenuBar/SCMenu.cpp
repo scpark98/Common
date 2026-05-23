@@ -6,8 +6,6 @@
 #include "../../Functions.h"
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"
-extern CSCLog gLog;	//Endorphin2.cpp 의 전역 — 진단 logWrite 용.
 
 //caption 정규화 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
 //.rc 의 *즐겨찾기(&F)* / *즐겨찾기* / *즐겨찾기(&f)* 모두 동일 매칭 키 (*즐겨찾기*) 가 되도록.
@@ -647,14 +645,6 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 {
 	CDialogEx::OnKillFocus(pNewWnd);
 
-	HWND new_hwnd = pNewWnd ? pNewWnd->m_hWnd : NULL;
-	TCHAR new_cls[64] = { 0 }, new_txt[64] = { 0 };
-	if (new_hwnd) { ::GetClassName(new_hwnd, new_cls, _countof(new_cls)); ::GetWindowText(new_hwnd, new_txt, _countof(new_txt)); }
-	logWrite(_T("[killfocus] this=%p suppress=%d → newFocus=%p '%s'/'%s' inChain=%d"),
-		this->m_hWnd, (int)m_suppress_cascade_hide,
-		new_hwnd, new_cls, new_txt,
-		new_hwnd ? (int)is_in_menu_chain(pNewWnd) : -1);
-
 	//부모가 우리를 강제 hide 시킨 경우 — cascade/message 까지 가면 부모도 닫혀버리므로 skip.
 	if (m_suppress_cascade_hide)
 	{
@@ -665,8 +655,6 @@ void CSCMenu::OnKillFocus(CWnd* pNewWnd)
 	//focus 가 우리 메뉴 체인 내부 (자식 popup, 부모 복귀 등) 로 이동했으면 그대로 유지.
 	if (is_in_menu_chain(pNewWnd))
 		return;
-
-	logWrite(_T("[killfocus] CASCADE DISMISS this=%p"), this->m_hWnd);
 
 	//외부로 focus 가 갔으면 우리 + 보이는 자식 + 조상 모두 닫는다.
 	hide_visible_descendants();

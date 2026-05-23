@@ -230,6 +230,8 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	int extra = (int)(m_text_setting.text_prop.thickness + shadow_extra + blur_extra) + 6;
 	if (extra > 0)
 		r.InflateRect(extra, extra / 2);
+	//호출자가 SetWindowPos 시 글자 첫 픽셀 정렬을 위해 보정할 수 있도록 노출.
+	m_text_left_padding = (extra > 0) ? extra : 0;
 
 	m_img.create(r.Width(), r.Height(), Gdiplus::Color::Transparent, PixelFormat32bppARGB);
 	//Phase 0 wrap 은 첫 calc_text_rect 호출에서 이미 적용됨. 두 번째는 wrapped para 의 최종 위치만 재측정 — max_width 다시 넘기면 이미 짧아진 chunk 가 더 잘게 쪼개짐. 0 으로 호출.

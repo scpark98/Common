@@ -165,6 +165,11 @@ public:
 	void			set_max_width(int max_width) { m_max_width = max_width; }
 	int				get_max_width() { return m_max_width; }
 
+	//set_text 후의 image 의 좌측 inset (= image 좌상단에서 글자 첫 픽셀까지의 거리).
+	//SetWindowPos(x, ...) 로 위치 잡을 때 호출자가 *글자 첫 픽셀 = 원하는 x* 가 되도록 *x - get_text_left_padding()*
+	//로 보정. multi-line content 길이에 따라 InflateRect 의 extra 가 달라져 이 값이 변동 — 인스턴스 간 정렬 시 필수.
+	int				get_text_left_padding() { return m_text_left_padding; }
+
 	//자간 (character spacing) 픽셀. 0 (기본) 이면 적용 안 함. != 0 이면 set_text 가 run 들을 1글자씩 split 한 뒤
 	//calc_text_rect 가 인접 run (=인접 글자) 사이에 spacing 픽셀 만큼 간격을 둠.
 	void			set_char_spacing(int n) { m_char_spacing = n; }
@@ -229,6 +234,9 @@ protected:
 
 	//word-wrap 최대 너비. 0 = wrap 안 함.
 	int				m_max_width = 0;
+
+	//set_text 마지막의 r.InflateRect(extra, extra/2) 의 extra — image 좌측 padding.
+	int				m_text_left_padding = 0;
 
 	//자간 (px) / 행간 factor.
 	int				m_char_spacing = 0;

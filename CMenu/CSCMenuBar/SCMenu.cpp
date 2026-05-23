@@ -6,6 +6,8 @@
 #include "../../Functions.h"
 #include "../../colors.h"
 #include "../../MemoryDC.h"
+#include "../../log/SCLog/SCLog.h"		//logWrite — *.rc placeholder / caption 매칭 진단용.
+												//※ 메뉴 작업 정상 완료 후 logWrite 호출은 모두 제거 또는 TRACE 로 변경 예정.
 
 //timer ID 와 hover/scroll 상수들 — set_over_item / OnMouseMove / OnTimer 등 여러 함수에서 사용. 파일 상단으로 이동.
 static const UINT_PTR timer_submenu_hover = 0x10001;
@@ -1056,14 +1058,14 @@ bool CSCMenu::create(CWnd* parent, int width)
 }
 
 //load from menu resource
-void CSCMenu::load(UINT resource_id, int idx0, int idx1)
+void CSCMenu::load(UINT resource_id, int idx0, int idx1, bool include_popup_placeholder)
 {
 	CMenu menu;
 	menu.LoadMenu(resource_id);
 	CMenu* pMenu = menu.GetSubMenu(idx0);
 	if (idx1 >= 0 && pMenu)
 		pMenu = pMenu->GetSubMenu(idx1);
-	load_from_menu(pMenu);
+	load_from_menu(pMenu, include_popup_placeholder);
 }
 
 void CSCMenu::set_thumbnail_size(int w, int h)
@@ -1075,7 +1077,78 @@ void CSCMenu::set_thumbnail_size(int w, int h)
 		Invalidate();
 }
 
-void CSCMenu::load_from_menu(CMenu* pMenu)
+//caption 정규화 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
+//.rc 의 *즐겨찾기(&F)* / *즐겨찾기* / *즐겨찾기(&f)* 모두 동일 매칭 키 (*즐겨찾기*) 가 되도록.
+static CString normalize_menu_caption(LPCTSTR src)
+{
+	CString out;
+	if (!src)
+		return out;
+
+	CString s(src);
+	s.Trim();
+
+	const int len = s.GetLength();
+	int i = 0;
+	while (i < len)
+	{
+		TCHAR c = s[i];
+		if (c == _T('&'))
+		{
+			if (i + 1 < len && s[i + 1] == _T('&'))
+			{
+				out += _T('&');		//`&&` literal — single `&` 로 축약
+				i += 2;
+			}
+			else if (i + 1 >= len || s[i + 1] == _T(' ') || s[i + 1] == _T('\t'))
+			{
+				//공백 / EOL 앞 `&` — literal (access-key 가 아님).
+				out += _T('&');
+				i += 1;
+			}
+			else
+			{
+				//access-key marker — `&X` (X 가 non-space). `&` skip, X 는 다음 iteration 에서 보존.
+				i += 1;
+			}
+		}
+		else
+		{
+			out += c;
+			i += 1;
+		}
+	}
+	return out;
+}
+
+//caption 매칭으로 HMENU 의 자식 중 sub-menu (POPUP) HMENU 반환. 못 찾으면 NULL.
+static HMENU find_popup_by_caption(HMENU hMenu, LPCTSTR caption)
+{
+	if (!hMenu || !caption)
+		return NULL;
+
+	const CString target = normalize_menu_caption(caption);
+	const int n = ::GetMenuItemCount(hMenu);
+	for (int i = 0; i < n; i++)
+	{
+		HMENU hSub = ::GetSubMenu(hMenu, i);
+		if (!hSub)
+			continue;
+
+		TCHAR buf[256] = { 0 };
+		::GetMenuString(hMenu, i, buf, _countof(buf), MF_BYPOSITION);
+		CString raw(buf);
+		int tab = raw.Find(_T('\t'));
+		if (tab >= 0)
+			raw = raw.Left(tab);
+
+		if (normalize_menu_caption(raw).Compare(target) == 0)
+			return hSub;
+	}
+	return NULL;
+}
+
+void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 {
 	if (!pMenu)
 		return;
@@ -1086,19 +1159,119 @@ void CSCMenu::load_from_menu(CMenu* pMenu)
 
 	for (i = 0; i < nCount; i++)
 	{
+		HMENU hSub = ::GetSubMenu(pMenu->m_hMenu, i);
+		const bool is_popup = (hSub != NULL);
+
+		//VS resource editor 가 자식 없는 POPUP (Popup=True 지만 빈 BEGIN/END) 을 MENUITEM id=0xFFFF 로
+		//down-grade 해서 저장. 사용자 의도는 POPUP 이므로 0xFFFF 도 placeholder 로 인식한다.
 		get_menu_item_info(pMenu->m_hMenu, i, &menu_id, &menu_caption, TRUE);
+		const bool is_empty_popup_downgrade = !is_popup && (menu_id == 0xFFFF);
 
-		//seperator와 일반 메뉴항목만 허용(서브 팝업메뉴 항목은 배제 — 호출자가 add_submenu_item 으로 chain).
-		if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
+		if ((is_popup || is_empty_popup_downgrade) && include_popup_placeholder)
 		{
-			std::deque<CString> token;
-			get_token_str(menu_caption, token, _T("\t"));
+			CString raw;
+			if (is_popup)
+			{
+				TCHAR buf[256] = { 0 };
+				::GetMenuString(pMenu->m_hMenu, i, buf, _countof(buf), MF_BYPOSITION);
+				raw = buf;
+			}
+			else
+			{
+				raw = menu_caption;
+			}
 
-			CString caption = (token.size() >= 1 ? token[0] : menu_caption);
-			CString hot_key = (token.size() >= 2 ? token[1] : CString());
-			add(menu_id, caption, 0, hot_key);
+			std::deque<CString> token;
+			get_token_str(raw, token, _T("\t"));
+			CString caption = (token.size() >= 1 ? token[0] : raw);
+
+			//placeholder 용 unique negative id — 일반 menu_id (0x8000~0xDFFF) 와 separator(0) 모두와 충돌 회피.
+			//attach_submenu_by_caption 으로 m_sub_menu set 되기 전엔 click 시 m_sub_menu==nullptr 가드로 no-op.
+			int placeholder_id = -10000 - (int)m_items.size();
+			CSCMenuItem* item = new CSCMenuItem(placeholder_id, caption);
+			item->m_type = CSCMenuItem::item_submenu;
+			item->m_sub_menu = nullptr;
+			m_items.push_back(item);
+		}
+		else if (!is_popup)
+		{
+			//seperator와 일반 메뉴항목.
+			if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
+			{
+				std::deque<CString> token;
+				get_token_str(menu_caption, token, _T("\t"));
+
+				CString caption = (token.size() >= 1 ? token[0] : menu_caption);
+				CString hot_key = (token.size() >= 2 ? token[1] : CString());
+				add(menu_id, caption, 0, hot_key);
+			}
+		}
+		//else: POPUP 인데 include_popup_placeholder=false → skip (기존 동작).
+	}
+	recalc_items_rect();
+}
+
+void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR target_caption,
+							  bool include_popup_placeholder)
+{
+	CMenu menu;
+	if (!menu.LoadMenu(resource_id))
+	{
+		logWrite(_T("[SCMenu] load_by_caption: LoadMenu(%u) failed"), resource_id);
+		return;
+	}
+
+	HMENU hTop = menu.m_hMenu;
+	HMENU hTarget = NULL;
+
+	if (parent_caption && parent_caption[0] != _T('\0'))
+	{
+		HMENU hParent = find_popup_by_caption(hTop, parent_caption);
+		if (!hParent)
+		{
+			logWrite(_T("[SCMenu] load_by_caption: parent '%s' not found in resource %u"),
+				parent_caption, resource_id);
+			return;
+		}
+		hTarget = find_popup_by_caption(hParent, target_caption);
+	}
+	else
+	{
+		hTarget = find_popup_by_caption(hTop, target_caption);
+	}
+
+	if (!hTarget)
+	{
+		logWrite(_T("[SCMenu] load_by_caption: target '%s' not found under '%s'"),
+			target_caption, parent_caption ? parent_caption : _T("(top)"));
+		return;
+	}
+
+	CMenu menu_wrap;
+	menu_wrap.Attach(hTarget);
+	load_from_menu(&menu_wrap, include_popup_placeholder);
+	menu_wrap.Detach();
+}
+
+bool CSCMenu::attach_submenu_by_caption(LPCTSTR caption, CSCMenu* sub_menu, int new_id)
+{
+	const CString target = normalize_menu_caption(caption);
+	for (auto* item : m_items)
+	{
+		if (item->m_type == CSCMenuItem::item_submenu &&
+			item->m_sub_menu == nullptr &&
+			normalize_menu_caption(item->m_caption).Compare(target) == 0)
+		{
+			item->m_sub_menu = sub_menu;
+			if (sub_menu)
+				sub_menu->m_parent_menu = this;
+			if (new_id != 0)
+				item->m_id = new_id;
+			return true;
 		}
 	}
+	logWrite(_T("[SCMenu] attach_submenu_by_caption: '%s' not found among placeholders"), caption);
+	return false;
 }
 
 //모니터 영역을 벗어나지 않도록 보정한 후 표시해야 한다.

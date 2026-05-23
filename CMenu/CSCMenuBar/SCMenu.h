@@ -140,9 +140,25 @@ public:
 
 	//resource 의 sub-popup 을 직접 load. idx0 = LoadMenu 직후 첫 번째 GetSubMenu, idx1 = 그 안의 nested sub-popup (생략 시 1 단계만).
 	//IDR 의 nested 구조: load(IDR, 0, 4) = LoadMenu().GetSubMenu(0).GetSubMenu(4).
-	void			load(UINT resource_id, int idx0, int idx1 = -1);
+	//include_popup_placeholder=true 시 POPUP (sub menu) 항목 + VS 가 빈 POPUP 을 down-grade 한 MENUITEM id=0xFFFF 도
+	//placeholder 로 add — 호출자가 attach_submenu_by_caption() 으로 .rc 의 POPUP 자리에 코드 측 CSCMenu instance 를 매핑.
+	//.rc 가 menu 구조의 single source of truth.
+	void			load(UINT resource_id, int idx0, int idx1 = -1, bool include_popup_placeholder = false);
 	//이미 navigate 된 CMenu* 의 항목들을 load. 3단계 이상 nested 등 특수 경우.
-	void			load_from_menu(CMenu* pMenu);
+	void			load_from_menu(CMenu* pMenu, bool include_popup_placeholder = false);
+
+	//인덱스 의존성 제거 — caption 으로 navigate. parent_caption 이 NULL/빈 문자열이면 top-level 의 target_caption POPUP 직접 load.
+	//그 외엔 LoadMenu(resource_id) > parent_caption POPUP > target_caption POPUP 자식들을 load.
+	//.rc 의 자식 순서 변경에 robust — .rc 가 source of truth.
+	void			load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR target_caption,
+									bool include_popup_placeholder = false);
+
+	//load_from_menu(include_popup_placeholder=true) 로 만들어진 sub-menu placeholder 항목 (m_sub_menu==nullptr) 중
+	//caption 매칭 항목에 sub_menu attach. 못 찾으면 false (logWrite 로 진단). .rc 의 menu 구조 + 코드 instance 매핑 패턴.
+	//caption 매칭은 정규화 후 비교 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
+	//new_id != 0 이면 placeholder 의 unique negative id 를 new_id 로 교체 — 호출자가 attach 후
+	//enable_item(new_id, ...) / check_item(new_id, ...) 사용 가능. 0 이면 placeholder id 유지.
+	bool			attach_submenu_by_caption(LPCTSTR caption, CSCMenu* sub_menu, int new_id = 0);
 
 	//add menu item manually. _id < 0 = separator
 	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));

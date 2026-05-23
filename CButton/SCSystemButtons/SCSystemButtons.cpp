@@ -189,7 +189,7 @@ void CSCSystemButtons::OnPaint()
 		{
 			Gdiplus::Pen pen(m_theme.cr_title_text, 1.0f);
 			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0f);
-			Gdiplus::Pen pen_pin_gray(gGRAY(160), 17.0f);
+			Gdiplus::Pen pen_pin_gray(get_weak_color(m_theme.cr_title_back_inactive, 48), 17.0f);
 			Gdiplus::SolidBrush br_back(m_theme.cr_back);
 			Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
 

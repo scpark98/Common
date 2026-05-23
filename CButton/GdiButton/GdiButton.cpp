@@ -568,7 +568,12 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	//    → 동일하게 cr_back 으로 face 를 칠하고 그 위에 alpha PNG 가 그려진다. cr_back 을 안 칠하면
 	//      투명 픽셀 자리에 이전 paint 잔존이 남아 깨짐.
 	const bool is_push = is_button_style(BS_PUSHBUTTON, BS_DEFPUSHBUTTON) || is_button_style(BS_PUSHLIKE);
-	const bool needs_blend_with_parent = (!is_push) || m_transparent;
+	//image-button 여부는 보관된 이미지 유무로 직접 판별한다. m_transparent 를 쓰면 안 되는 이유:
+	//이 함수 끝의 set_round(4) 가 일반 push 버튼에도 m_transparent=true 를 세팅하므로, 같은 버튼에
+	//set_color_theme 이 2회 이상 호출되면 (예: msgbox 가 create + apply_theme 로 두 번 적용) 2회차 진입 시
+	//m_transparent 가 true 로 남아 push 버튼이 blend 분기로 잘못 빠진다 → face 가 cr_back 으로 칠해져 사라짐.
+	const bool is_image_button = (m_image.size() > 0) || m_back_img.is_valid();
+	const bool needs_blend_with_parent = (!is_push) || is_image_button;
 
 	Gdiplus::Color cr_face;
 	Gdiplus::Color cr_border;

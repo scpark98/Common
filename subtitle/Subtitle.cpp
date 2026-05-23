@@ -40,8 +40,53 @@ static CString extract_font_color_attr(const CString& body)
 	CString result = body.Mid(v, v_end - v);
 	result.Trim();
 	result.Remove(_T('"'));
-	result.Remove(_T('#'));
+	//# 와 색상이름은 SCParagraph 의 get_color 가 모두 인식 — 보존.
 	return result;
+}
+
+//line 의 첫 <cr=X> 의 X 값. ASS convert_ass_tags 결과의 inline tag 에서 추출 (SubtitleDlg list 의 색상 컬럼 표시용).
+static CString extract_first_cr_color(const CString& s)
+{
+	CString lower = s;
+	lower.MakeLower();
+	int p = lower.Find(_T("<cr="));
+	if (p < 0)
+		return _T("");
+	int gt = lower.Find(_T('>'), p);
+	if (gt < 0)
+		return _T("");
+	CString val = s.Mid(p + 4, gt - p - 4);
+	val.Trim();
+	return val;
+}
+
+//<cr=...> / </cr> / </ct> 만 제거. <b>, <i>, <u>, <br> 등 다른 tag 는 보존.
+//Contract: sentence.sentence 는 *색 외* 의 SCParagraph 호환 inline tag 만 보존 — 색은 sentence.color 로 분리.
+static void strip_cr_tags(CString& s)
+{
+	CString lower = s;
+	lower.MakeLower();
+
+	int p;
+	while ((p = lower.Find(_T("<cr="))) >= 0)
+	{
+		int gt = lower.Find(_T('>'), p);
+		if (gt < 0)
+			break;
+		int len = gt - p + 1;
+		s.Delete(p, len);
+		lower.Delete(p, len);
+	}
+	while ((p = lower.Find(_T("</cr>"))) >= 0)
+	{
+		s.Delete(p, 5);
+		lower.Delete(p, 5);
+	}
+	while ((p = lower.Find(_T("</ct>"))) >= 0)
+	{
+		s.Delete(p, 5);
+		lower.Delete(p, 5);
+	}
 }
 
 CSubtitle::CSubtitle()
@@ -58,6 +103,7 @@ bool CSubtitle::load_smi(CString sfile)
 
 	CString sSync;			//sync 시작 단위로 누적 후 한 번에 parse_subtltle 호출.
 	bool header_part = true;
+	bool in_html_comment = false;	//<!-- ... --> body 내 주석 skip — 첫 cue 직전에 들어있으면 sSync 에 누적돼 가짜 caption 으로 표시됨 (Roman.Holiday.smi 등 흔함).
 
 	for (CString& sLine : lines)
 	{
@@ -72,6 +118,20 @@ bool CSubtitle::load_smi(CString sfile)
 			m_header += sLine;
 			m_header += _T("\n");
 
+			continue;
+		}
+
+		//HTML 주석 skip — 단일 라인 / multi-line 모두.
+		if (in_html_comment)
+		{
+			if (find(sLine, _T("-->")) >= 0)
+				in_html_comment = false;
+			continue;
+		}
+		if (find(sLine, _T("<!--")) >= 0)
+		{
+			if (find(sLine, _T("-->")) < 0)
+				in_html_comment = true;
 			continue;
 		}
 
@@ -331,7 +391,11 @@ bool CSubtitle::load_srt(CString sfile)
 		sLine.Replace(_T("</FONT>"), _T(""));
 
 		if (!sLine.IsEmpty())
-			caption.sentences.push_back(CSentence(sLine, color));
+		{
+			//SRT 는 각 caption 내 새 line 마다 sentence — line_index = 현재 sentence 카운트.
+			//같은 line 안 multi-color 는 SRT 가 거의 표현 안 함 → 한 sentence 가 곧 한 line 으로 가정.
+			caption.sentences.push_back(CSentence(sLine, color, (int)caption.sentences.size()));
+		}
 	}
 
 	//파일이 trailing blank line 없이 끝났을 때 마지막 caption 도 flush.
@@ -541,14 +605,29 @@ bool CSubtitle::load_ass(CString sfile)
 			caption.start = start_ms;
 			caption.end = end_ms;
 			caption.alignment = alignment;
-			//\n split — 각 line 별 CSentence.
+			//\n split — 각 line 별 CSentence. parse_subtltle 와 동일 contract:
+			//sentence.color = line 의 첫 <cr=X>, sentence.sentence = 색 tag 제외 본문, line_index = \n 누적 카운트.
 			std::deque<CString> sub_lines;
 			get_token_str(text, sub_lines, _T("\n"));
+			int sub_line_idx = 0;
 			for (CString& ln : sub_lines)
 			{
 				ln.Trim();
-				if (!ln.IsEmpty())
-					caption.sentences.push_back(CSentence(ln, _T("")));
+				if (ln.IsEmpty())
+				{
+					sub_line_idx++;
+					continue;
+				}
+				CString ln_color = extract_first_cr_color(ln);
+				strip_cr_tags(ln);
+				ln.Trim();
+				if (ln.IsEmpty())
+				{
+					sub_line_idx++;
+					continue;
+				}
+				caption.sentences.push_back(CSentence(ln, ln_color, sub_line_idx));
+				sub_line_idx++;
 			}
 			if (caption.is_valid())
 				m_subtitle.push_back(caption);
@@ -595,188 +674,172 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 
 void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 {
-	//<SYNC Start=0><P Class=KRCC>\n<font color=FF0000>카밀로 9번째 자막<br>\n<font color=dcdcdc>http://chan5132.egloos.com/
-	//L"<SYNC Start=2400><font color=\"#ff0000\">신 아따맘마 15화</font><br>\n<font color=\"#d097ff\">초원의 발자막[greenhill.o-r.kr]</font><br>\n<font color=\"#dcdcdc\">-'카밀로'님의 테마곡 자막 발췌-</font>\n"
-	remove_other_tags(src);
-
+	//SMI sync 블록 → CCaption.sentences (segment 단위).
+	//Contract:
+	//  sentence.sentence  = 그 segment 의 본문 (<b>/<i>/<u> 같은 비색 SCParagraph tag 는 inline 보존)
+	//  sentence.color     = 그 segment 의 단일 색 (없으면 빈)
+	//  sentence.line_index = 같은 cue 안 <br> 그룹 id (같은 line 의 색 segment 들끼리 같은 값)
+	//
+	//알고리즘 (글자 단위 state machine):
+	//  - 텍스트 누적 중 <font color=X> 만나면 → 직전 text_buf flush (current_color, current_line_index),
+	//    current_color = X.
+	//  - </font> → flush, current_color = "".
+	//  - <br> → flush, current_line_index++. color 는 carry-over 안 함 (</font> 만난 직후 빈 상태에서 br),
+	//    단 <font> open 중에 <br> 만나면 그 색이 다음 line 까지 자동 유지 — current_color 가 그대로라.
+	//    (Roman.Holiday.smi 의 `<font color=yellow>로마의 휴일<br>(Roman Holiday)` 케이스.)
+	//  - <b>/<i>/<u>/<s> 등 비색 tag → text_buf 에 그대로 보존 → SCParagraph 가 OSD 렌더링 시 처리.
+	src.Trim();
+	src.Replace(_T("\r\n"), _T(""));
+	src.Replace(_T("\n"), _T(""));
 	if (src.IsEmpty())
 		return;
 
+	int sync_start = -1;
+	CString cls;
+	CString text_buf;
+	CString current_color;
+	int current_line_index = 0;
+
 	CCaption caption;
-	CString sToken;
-	CString str;
-	CString color;
-	CString cls;	//이 sync 블록의 P Class — KRCC/ENCC/JPCC 등. 없으면 default 사용.
-	int i;
-	int pos1;
 
-	sToken.Empty();
-
-	for (i = 0; i < src.GetLength(); i++)
+	auto flush_segment = [&]()
 	{
-		if (src[i] == '>')
-		{
-			//현재까지 추출된 태그를 파싱하여 정보를 추출한다.
+		if (text_buf.IsEmpty())
+			return;
+		text_buf.Replace(_T("&nbsp;"), _T(" "));
+		if (text_buf.IsEmpty())
+			return;
+		caption.sentences.push_back(CSentence(text_buf, current_color, current_line_index));
+		text_buf.Empty();
+	};
 
-			//시작시간인 경우
-			if (find(sToken, _T("<sync start")) >= 0)
+	auto handle_tag = [&](const CString& tag)
+	{
+		CString lower = tag;
+		lower.MakeLower();
+
+		if (lower.Find(_T("<sync start")) == 0)
+		{
+			int eq = tag.Find(_T('='));
+			if (eq > 0)
+				sync_start = _ttoi(tag.Mid(eq + 1));
+		}
+		else if (lower.Find(_T("<p class")) == 0)
+		{
+			int eq = tag.Find(_T('='));
+			if (eq > 0)
 			{
-				pos1 = sToken.Find(_T("=")) + 1;
-				caption.start = _ttoi(sToken.Mid(pos1));
-				sToken.Empty();
+				cls = tag.Mid(eq + 1);
+				cls.TrimRight(_T(">"));
+				cls.Trim();
+				cls.MakeUpper();
 			}
-			else if (find(sToken, _T("<p class")) >= 0)
+		}
+		else if (lower.Find(_T("<p")) == 0)
+		{
+			//class 없는 <P> — 무시.
+		}
+		else if (lower.Find(_T("</p")) == 0)
+		{
+			//</P> — 무시.
+		}
+		else if (lower.Find(_T("<font")) == 0)
+		{
+			//<font ...> — color attr 있으면 추출 + segment 경계. 없으면 (face/size only) tag 무시.
+			CString inner = tag.Mid(5, tag.GetLength() - 6);	//"<font " ~ ">"
+			CString color = extract_font_color_attr(inner);
+			if (!color.IsEmpty())
 			{
-				pos1 = sToken.Find(_T("=")) + 1;
-				if (pos1 > 0)
-				{
-					cls = sToken.Mid(pos1);
-					cls.Trim();
-					cls.MakeUpper();
-				}
-				sToken.Empty();
+				flush_segment();
+				current_color = color;
 			}
-			else if (find(sToken, _T("<font color")) >= 0)
-			{
-				pos1 = sToken.Find(_T("=")) + 1;
-				color = sToken.Mid(pos1);
-				remove_chars(color, _T("\"#"));
-				sToken.Empty();
-			}
-			//한 문장의 끝에 <br> / <br/> / <br /> 등이 붙어있다면 제거하고 넣어준다.
-			//기존 "Length-3" 고정 절단은 <br/> 같은 변형에서 잘못된 위치를 자름. 마지막 "<br" 위치부터 끝까지 모두 제거.
-			else if (find(sToken, _T("<br")) >= 0)
-			{
-				CString lower = sToken;
-				lower.MakeLower();
-				int br_pos = lower.ReverseFind(_T('<'));
-				if (br_pos >= 0 && lower.Mid(br_pos, 3) == _T("<br"))
-					sToken = sToken.Left(br_pos);
-				sToken.Replace(_T("&nbsp;"), _T(" "));
-				caption.sentences.push_back(CSentence(sToken, color));
-				sToken.Empty();
-				color.Empty();
-			}
-			else if (find(sToken, _T("</font")) >= 0)
-			{
-				sToken.Empty();
-			}
+		}
+		else if (lower.Find(_T("</font")) == 0)
+		{
+			flush_segment();
+			current_color.Empty();
+		}
+		else if (lower.Find(_T("<br")) == 0)
+		{
+			flush_segment();
+			current_line_index++;
 		}
 		else
 		{
-			sToken += src[i];
+			//그 외 inline tag (<b>, </b>, <i>, </i>, <u>, </u>, <s>, </s> ...) — text_buf 에 그대로 보존.
+			//SCParagraph 가 OSD 렌더링 시 인식. list 표시는 strip 헬퍼가 제거.
+			text_buf += tag;
+		}
+	};
+
+	CString sToken;
+	bool in_tag = false;
+	for (int i = 0; i < src.GetLength(); i++)
+	{
+		TCHAR c = src[i];
+		if (c == _T('<'))
+		{
+			in_tag = true;
+			sToken = _T("<");
+		}
+		else if (c == _T('>'))
+		{
+			if (!in_tag)
+				continue;
+			in_tag = false;
+			sToken += _T(">");
+			handle_tag(sToken);
+			sToken.Empty();
+		}
+		else
+		{
+			if (in_tag)
+				sToken += c;
+			else
+				text_buf += c;
 		}
 	}
+	flush_segment();
 
-	//Class 미지정 시 default 사용 (호출자가 알려준 값. 보통 KRCC).
+	if (sync_start < 0)
+		return;
 	if (cls.IsEmpty())
 		cls = default_class;
 
 	auto& track = m_tracks[cls];
 
-	//만약 여기까지 왔을 때 sToken에 값이 들어있다면?
-	//caption에 sentences는 비어있고 자막끝 태그만 들어있다면
-	//마지막으로 추가한 자막의 끝 태그인 것이므로 그 정보를 수정해준다.
-	if (sToken.IsEmpty() == false)
+	caption.start = sync_start;
+
+	//자막끝 마커 (빈 본문) — 직전 caption end 갱신.
+	if (caption.sentences.empty())
 	{
-		sToken.Trim();
-		if ((sToken == _T("&nbsp;")) && (caption.sentences.size() == 0))
-		{
-			//트랙이 비어있으면 직전 caption 이 없으므로 end 갱신 대상도 없음 — 그냥 skip.
-			if (track.empty())
-				return;
-			//간혹 end싱크가 start싱크보다 빠르게 작성된 smi도 있으므로 이는 스킵시킨다.
-			if (caption.start <= track.back().start)
-				return;
-			track.back().end = caption.start;
+		if (track.empty())
 			return;
-		}
+		if (sync_start <= track.back().start)
+			return;
+		track.back().end = sync_start;
+		return;
 	}
 
-	//하나의 sync절의 분석이 끝났는데 sToken이 존재하면 이는 자막이니 넣어주자.
-	if (sToken.IsEmpty() == false)
+	//같은 start 면 이전 caption 에 sentence merge (multi-line sync, multi-class).
+	//merge 시 line_index 충돌 회피 — 이전 caption 의 max line_index + 1 부터 부여.
+	if (!track.empty() && caption.start == track.back().start)
 	{
-		sToken.Replace(_T("&nbsp;"), _T(" "));
-		caption.sentences.push_back(CSentence(sToken, color));
+		int base_line = 0;
+		for (const auto& s : track.back().sentences)
+			if (s.line_index >= base_line)
+				base_line = s.line_index + 1;
+		for (const auto& s : caption.sentences)
+		{
+			CSentence shifted = s;
+			shifted.line_index += base_line;
+			track.back().sentences.push_back(shifted);
+		}
 	}
-
-	if (caption.sentences.size())
+	else
 	{
-		//만약 현재 자막이 마지막 자막의 시작 시간과 같다면
-		//이전 자막에 추가시켜준다 (같은 Class 안에서 multi-line sync 처리).
-		if (!track.empty() && caption.start == track.back().start)
-		{
-			for (i = 0; i < caption.sentences.size(); i++)
-				track.back().sentences.push_back(caption.sentences[i]);
-		}
-		else
-		{
-			track.push_back(caption);
-		}
+		track.push_back(caption);
 	}
-}
-
-//처리 대상이 아닌 태그들을 삭제한다.
-//ex. <font face>, </font>, <b>, <i>
-void CSubtitle::remove_other_tags(CString &str)
-{
-	int pos1, pos2;
-	CString lstr;
-	
-	str.Trim();
-	str.Replace(_T("\n"), _T(""));
-	lstr = str;
-	lstr.MakeLower();
-
-	//<font face=HY견고딕 size=6 color=yellowgreen>화 양 연 화</font><br><font face=HY중고딕 size=4 color=lightyellow>in the mood for love
-	//face/size 와 color 가 섞여 있어도 color 만은 보존해 <font color=VALUE> 로 정규화 — 그래야 뒤따르는 parse_subtltle 의 <font color> 인식이 동작.
-	while ((pos1 = lstr.Find(_T("<font face"))) >= 0)
-	{
-		pos2 = lstr.Find(BRACKET_CLOSE, pos1);
-		if (pos2 > pos1)
-		{
-			int tag_len = pos2 - pos1 + 1;
-			CString body = str.Mid(pos1 + 5, pos2 - pos1 - 5);
-			CString color = extract_font_color_attr(body);
-
-			CString replacement;
-			if (!color.IsEmpty())
-				replacement.Format(_T("<font color=%s>"), (LPCTSTR)color);
-
-			lstr.Delete(pos1, tag_len);
-			str.Delete(pos1, tag_len);
-			if (!replacement.IsEmpty())
-			{
-				CString rep_lower = replacement;
-				rep_lower.MakeLower();
-				lstr.Insert(pos1, rep_lower);
-				str.Insert(pos1, replacement);
-			}
-		}
-	}
-
-	while ((pos1 = lstr.Find(_T("</font"))) >= 0)
-	{
-		pos2 = lstr.Find(BRACKET_CLOSE, pos1);
-		if (pos2 > pos1)
-		{
-			lstr.Delete(pos1, pos2 - pos1 + 1);
-			str.Delete(pos1, pos2 - pos1 + 1);
-		}
-	}
-
-	str.Replace(_T("<b>"), _T(""));
-	str.Replace(_T("</b>"), _T(""));
-	str.Replace(_T("<B>"), _T(""));
-	str.Replace(_T("</B>"), _T(""));
-
-	str.Replace(_T("<i>"), _T(""));
-	str.Replace(_T("</i>"), _T(""));
-	str.Replace(_T("<I>"), _T(""));
-	str.Replace(_T("</I>"), _T(""));
-
-	str.Replace(_T("</P>"), _T(""));
-	str.Replace(_T("</p>"), _T(""));
 }
 
 bool CSubtitle::save_subtitle_file(CString sfile)
@@ -818,21 +881,22 @@ bool CSubtitle::save_srt(CString sfile)
 		end.Replace(_T("."), _T(","));
 		_ftprintf(fp, _T("%s --> %s\n"), start, end);
 
+		//line_index 변화 = \n (새 line), 같은 line_index = segment 직접 이어붙임.
+		int prev_line = -1;
 		for (j = 0; j < m_subtitle[i].sentences.size(); j++)
 		{
-			if (m_subtitle[i].sentences[j].color.IsEmpty() == false)
-			{
-				_ftprintf(fp, _T("<font color=%s>%s</font>\n"),
-								m_subtitle[i].sentences[j].color,
-								m_subtitle[i].sentences[j].sentence);
-			}
-			else
-			{
-				_ftprintf(fp, _T("%s\n"), m_subtitle[i].sentences[j].sentence);
-			}
-		}
+			const CSentence& s = m_subtitle[i].sentences[j];
+			if (prev_line >= 0 && s.line_index != prev_line)
+				_ftprintf(fp, _T("\n"));
 
-		_ftprintf(fp, _T("\n"));
+			if (s.color.IsEmpty() == false)
+				_ftprintf(fp, _T("<font color=%s>%s</font>"), s.color, s.sentence);
+			else
+				_ftprintf(fp, _T("%s"), s.sentence);
+
+			prev_line = s.line_index;
+		}
+		_ftprintf(fp, _T("\n\n"));	//마지막 line 종료 + cue 구분 blank line.
 	}
 
 	fclose(fp);
@@ -885,45 +949,25 @@ P { margin-left:8pt; margin-right:8pt; margin-bottom:2pt;\n\
 
 	for (i = 0; i < m_subtitle.size(); i++)
 	{
-		_ftprintf(fp, _T("<SYNC Start=%d><P Class=%s>\n"), m_subtitle[i].start, m_sLanguage);
+		_ftprintf(fp, _T("<SYNC Start=%d><P Class=%s>"), m_subtitle[i].start, m_sLanguage);
 
+		//line_index 변화 = <br> 출력, 같은 line_index 의 segment 들은 직접 이어붙임.
+		//color 있으면 <font color=X>seg</font>, 없으면 plain.
+		int prev_line = -1;
 		for (j = 0; j < m_subtitle[i].sentences.size(); j++)
 		{
-			//if (m_subtitle[i].sentences[j].color.IsEmpty() == false)
-			//	_ftprintf(fp, _T("<font color=%s>"), m_subtitle[i].sentences[j].color);
-			if (m_subtitle[i].sentences[j].color.IsEmpty() == false)
-			{
-				_ftprintf(fp, _T("<font color=%s>"), m_subtitle[i].sentences[j].color);
-			}
+			const CSentence& s = m_subtitle[i].sentences[j];
+			if (prev_line >= 0 && s.line_index != prev_line)
+				_ftprintf(fp, _T("<br>"));
 
-			//끝문장이 아니고 현재 자막의 끝에 <br>이 없다면 다음 문장과 한문장으로 이어지므로
-			//끝에 <br>을 붙여서 저장하자.
-			m_subtitle[i].sentences[j].sentence.TrimRight();
-
-			if (j < m_subtitle[i].sentences.size() - 1)
-			{
-				if (m_subtitle[i].sentences[j].sentence.GetLength() >= 4)
-				{
-					if (m_subtitle[i].sentences[j].sentence.Right(4) != _T("<br>"))
-						m_subtitle[i].sentences[j].sentence += _T("<br>");
-				}
-				else
-				{
-					m_subtitle[i].sentences[j].sentence += _T("<br>");
-				}
-			}
-
-			_ftprintf(fp, _T("%s"), m_subtitle[i].sentences[j].sentence);
-
-			if (m_subtitle[i].sentences[j].color.IsEmpty() == false)
-			{
-				_ftprintf(fp, _T("</font>\n"));
-			}
+			if (s.color.IsEmpty() == false)
+				_ftprintf(fp, _T("<font color=%s>%s</font>"), s.color, s.sentence);
 			else
-			{
-				_ftprintf(fp, _T("\n"));
-			}
+				_ftprintf(fp, _T("%s"), s.sentence);
+
+			prev_line = s.line_index;
 		}
+		_ftprintf(fp, _T("\n"));
 
 		if (m_subtitle[i].end > 0)
 			_ftprintf(fp, _T("<SYNC Start=%d><P Class=%s>&nbsp;\n"), m_subtitle[i].end, m_sLanguage);

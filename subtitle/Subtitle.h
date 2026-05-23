@@ -12,6 +12,8 @@
 #define BRACKET_CLOSE	_T(">")
 
 //한 단위의 자막에 한 문장씩. 색상이 다를 수 있어서 별도로 정의.
+//line_index: 같은 cue 안 <br> 그룹 id. 같은 line_index = 한 line 의 색 segment 들 (예: line 안에서
+//<font> 색 변화). 다른 line_index = <br> 로 분리된 다른 line. save 시 line_index 변화 = <br> 삽입.
 class CSentence
 {
 public:
@@ -19,16 +21,19 @@ public:
 	{
 		sentence.Empty();
 		color.Empty();
+		line_index = 0;
 	}
 
-	CSentence(CString _sentence, CString _cr = _T(""))
+	CSentence(CString _sentence, CString _cr = _T(""), int _line_index = 0)
 	{
 		sentence = _sentence;
 		color = _cr;
+		line_index = _line_index;
 	}
 
 	CString sentence;
 	CString color;
+	int line_index;
 };
 
 //한 단위의 자막
@@ -147,10 +152,6 @@ protected:
 	CString m_header;
 	CString m_sfile;
 	CString m_sLanguage;	//KRCC or JPCC or ENCC...
-
-	//처리 대상이 아닌 태그들을 삭제한다.
-	//ex. <font face>, </font>, <b>, <i>
-	void remove_other_tags(CString &str);
 
 	//한 sync단위를 입력받아 필요한 정보를 파싱한 후
 	//m_tracks[Class] 에 넣어준다. Class 가 없으면 default_class 사용.

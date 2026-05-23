@@ -92,6 +92,62 @@ public:
 	CString			get_media_info_string() { return m_media_info_string; }
 	double			get_frame_rate();
 
+	//---- UI 표시용 codec/format info — graph (LAV) + decoder context (internal FFmpeg) 직접 query.
+	//path-agnostic. m_use_internal_ffmpeg 가 true 면 ffi::CDecoder 측 호출, false 면 m_video_stream / m_audio_stream
+	//의 stream 이름 / pin media type 등에서 추출.
+	CString			get_video_codec_name();     //"HEVC" / "H264" / "VP9" 등.
+	CString			get_video_fourcc();         //"HVC1" / "AVC1" 등. 없으면 빈 문자열.
+	int				get_video_width();
+	int				get_video_height();
+	int				get_video_bit_depth();      //0 이면 unknown.
+	int64_t			get_video_bit_rate();       //bps. 0 이면 unknown.
+	CString			get_video_aspect_ratio();   //"16:9" / "1.85:1" 등.
+	double			get_video_fps();            //avg fps. 0 이면 unknown.
+
+	CString			get_audio_codec_name();
+	int				get_audio_sample_rate();    //Hz
+	int				get_audio_channels();
+	int				get_audio_bit_depth();      //0 이면 unknown.
+	int64_t			get_audio_bit_rate();       //bps. 0 이면 unknown.
+
+	CString			get_video_pixel_format();   //"yuv420p" / "nv12" 등. 없으면 빈 문자열.
+	CString			get_video_hw_accel_name();  //"D3D11VA" / "DXVA2" 등 — HW 미사용 시 빈 문자열.
+	CString			get_audio_channel_layout(); //"stereo" / "5.1" 등.
+
+	//graph filter 측 — decoder / renderer 이름 (filter 의 표시 이름).
+	CString			get_video_decoder_label();  //internal: "내장 FFmpeg 디코더 (codec[, HW])". LAV: m_VMR upstream filter name.
+	CString			get_audio_decoder_label();  //internal: "내장 FFmpeg 디코더 (codec)". LAV: audio renderer upstream filter name.
+	CString			get_video_renderer_label(); //m_VMR->QueryFilterInfo 결과.
+	CString			get_audio_renderer_label(); //graph 의 audio renderer filter (input pin 만 + audio media type) 의 이름.
+
+	//IQualProp 기반 실시간 통계 (VMR9/EVR/MPC-VR 모두 IQualProp 지원). m_VMR 가 query 대상.
+	struct FrameStats
+	{
+		int frames_drawn       = 0;
+		int frames_dropped     = 0;
+		int avg_frame_rate_x100 = 0;	//avg_frame_rate * 100 (IQualProp 의 정수 표현).
+		int avg_sync_offset_ms = 0;
+		int dev_sync_offset_ms = 0;
+		int jitter_ms          = 0;
+	};
+	bool			get_frame_stats(FrameStats& out);
+
+	//현재 monitor 의 refresh rate (Hz). EnumDisplaySettings.
+	int				get_refresh_rate_hz();
+
+	//m_VMR (video renderer) input pin 의 ConnectionMediaType.subtype 을 "NV12" / "YV12" / "XRGB" 등 string 으로.
+	//pixel format chain 의 *Output 단계* 표시용 (decoder output → renderer input 의 실제 협상 결과).
+	CString			get_video_output_subtype();
+
+	//m_VMR 의 client rect (실제 영상이 그려지는 픽셀 크기). 0 0 이면 미정.
+	CSize			get_display_size();
+
+	//primary display adapter 이름 (예: "NVIDIA GeForce RTX 4070 Ti SUPER"). EnumDisplayDevices.
+	CString			get_display_adapter_name();
+
+	//primary adapter 의 dedicated VRAM 총량 (MB). IDXGIFactory → IDXGIAdapter::GetDesc.
+	int				get_video_memory_mb();
+
 	int				load_media(CString sfile, CWnd* pParent, bool auto_render = false);
 	void			set_use_internal_ffmpeg(bool b) { m_use_internal_ffmpeg = b; }
 	bool			use_internal_ffmpeg() const { return m_use_internal_ffmpeg; }

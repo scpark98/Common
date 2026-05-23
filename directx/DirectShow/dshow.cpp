@@ -4,6 +4,7 @@
 #include "../../log/SCLog/SCLog.h"
 #include <gdiplus.h>
 #include <cmath>
+#include <dxgi.h>		//IDXGIFactory1 / IDXGIAdapter1 — get_video_memory_mb() 에서 사용.
 
 
 #pragma comment(lib, "strmiids.lib")
@@ -1904,6 +1905,541 @@ bool CDShow::is_windows_media()
 }
 
 #include "../../ffmpeg/internal/ffi_source_filter.h"
+
+//---- UI 표시용 codec/format info — graph + decoder context 직접 query.
+//internal FFmpeg path: m_pFFiSource->decoder() 의 AVCodecParameters 정보.
+//LAV path: 현재는 보유 정보 (m_video_size / m_frame_rate / m_video_stream 이름) 만 — 추가 정밀 query 는 Phase 다음.
+
+//graph filter enumerate helper — 정의는 아래쪽. forward 선언.
+static IBaseFilter* find_renderer_by_majortype(IFilterGraph* pGraph, REFGUID target_majortype);
+static IBaseFilter* get_upstream_filter(IBaseFilter* pDownstream);
+static CString filter_name(IBaseFilter* pFilter);
+
+static ffi::CDecoder* ffi_decoder_or_null(void* pFFiSource)
+{
+	if (!pFFiSource)
+		return nullptr;
+	return &((ffi::CFFiSource*)pFFiSource)->decoder();
+}
+
+CString CDShow::get_video_codec_name()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_codec_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_video_fourcc()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_fourcc().c_str());
+	}
+	return _T("");
+}
+
+int CDShow::get_video_width()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->video_width();
+	}
+	return m_video_size.cx;
+}
+
+int CDShow::get_video_height()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->video_height();
+	}
+	return m_video_size.cy;
+}
+
+int CDShow::get_video_bit_depth()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->video_bit_depth();
+	}
+	return 0;
+}
+
+int64_t CDShow::get_video_bit_rate()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->video_bit_rate();
+	}
+	return 0;
+}
+
+CString CDShow::get_video_aspect_ratio()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_aspect_ratio().c_str());
+	}
+	//LAV fallback — width:height 의 simplified ratio.
+	int w = m_video_size.cx, h = m_video_size.cy;
+	if (w <= 0 || h <= 0)
+		return _T("");
+	int a = w, b = h;
+	while (b) { int t = a % b; a = b; b = t; }
+	if (a > 0) { w /= a; h /= a; }
+	CString out;
+	out.Format(_T("%d:%d"), w, h);
+	return out;
+}
+
+double CDShow::get_video_fps()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->frame_rate();
+	}
+	return m_frame_rate;
+}
+
+CString CDShow::get_audio_codec_name()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->audio_codec_name().c_str());
+	}
+	return _T("");
+}
+
+int CDShow::get_audio_sample_rate()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->audio_sample_rate();
+	}
+	return 0;
+}
+
+int CDShow::get_audio_channels()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->audio_channels();
+	}
+	return 0;
+}
+
+int CDShow::get_audio_bit_depth()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->audio_bit_depth();
+	}
+	return 0;
+}
+
+int64_t CDShow::get_audio_bit_rate()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->audio_bit_rate();
+	}
+	return 0;
+}
+
+CString CDShow::get_video_pixel_format()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_pixel_format_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_video_hw_accel_name()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_hw_accel_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_audio_channel_layout()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->audio_channel_layout_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_video_decoder_label()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		auto* d = ffi_decoder_or_null(m_pFFiSource);
+		if (!d)
+			return _T("");
+		CString codec(d->video_codec_name().c_str());
+		CString hw(d->video_hw_accel_name().c_str());
+		CString out = _T("내장 FFmpeg 디코더");
+		if (!codec.IsEmpty())
+		{
+			out += _T(" (");
+			out += codec;
+			if (!hw.IsEmpty())
+			{
+				out += _T(", ");
+				out += hw;
+			}
+			out += _T(")");
+		}
+		return out;
+	}
+	//LAV path — m_VMR 의 upstream filter (= video decoder).
+	if (!m_VMR)
+		return _T("");
+	IBaseFilter* pDecoder = get_upstream_filter(m_VMR);
+	if (!pDecoder)
+		return _T("");
+	CString name = filter_name(pDecoder);
+	pDecoder->Release();
+	return name;
+}
+
+CString CDShow::get_video_renderer_label()
+{
+	if (!m_VMR)
+		return _T("");
+	FILTER_INFO info = { 0 };
+	HRESULT hr = m_VMR->QueryFilterInfo(&info);
+	if (FAILED(hr))
+		return _T("");
+	CString name(info.achName);
+	if (info.pGraph)
+		info.pGraph->Release();
+	return name;
+}
+
+//graph 의 filter 중 *output pin 없음 + input pin 의 ConnectionMediaType.majortype == target* 인 filter (renderer).
+//caller 가 Release.
+static IBaseFilter* find_renderer_by_majortype(IFilterGraph* pGraph, REFGUID target_majortype)
+{
+	if (!pGraph)
+		return NULL;
+
+	IEnumFilters* pEnum = NULL;
+	if (FAILED(pGraph->EnumFilters(&pEnum)))
+		return NULL;
+
+	IBaseFilter* result = NULL;
+	IBaseFilter* pF = NULL;
+	ULONG fetched = 0;
+	while (!result && pEnum->Next(1, &pF, &fetched) == S_OK && fetched == 1)
+	{
+		IEnumPins* pPinEnum = NULL;
+		bool has_output = false;
+		bool has_target_input = false;
+		if (SUCCEEDED(pF->EnumPins(&pPinEnum)))
+		{
+			IPin* pPin = NULL;
+			ULONG pf = 0;
+			while (!has_output && pPinEnum->Next(1, &pPin, &pf) == S_OK && pf == 1)
+			{
+				PIN_DIRECTION dir;
+				pPin->QueryDirection(&dir);
+				if (dir == PINDIR_OUTPUT)
+				{
+					has_output = true;
+				}
+				else if (dir == PINDIR_INPUT)
+				{
+					AM_MEDIA_TYPE mt = { 0 };
+					if (SUCCEEDED(pPin->ConnectionMediaType(&mt)))
+					{
+						if (mt.majortype == target_majortype)
+							has_target_input = true;
+						if (mt.cbFormat != 0) { CoTaskMemFree(mt.pbFormat); mt.pbFormat = NULL; mt.cbFormat = 0; }
+						if (mt.pUnk) { mt.pUnk->Release(); mt.pUnk = NULL; }
+					}
+				}
+				pPin->Release();
+			}
+			pPinEnum->Release();
+		}
+		if (!has_output && has_target_input)
+		{
+			result = pF;	//ref 유지 — caller 가 Release.
+		}
+		else
+		{
+			pF->Release();
+		}
+	}
+	pEnum->Release();
+	return result;
+}
+
+//filter 의 *input pin 의 ConnectedTo* upstream filter 반환. caller 가 Release.
+static IBaseFilter* get_upstream_filter(IBaseFilter* pDownstream)
+{
+	if (!pDownstream)
+		return NULL;
+
+	IEnumPins* pPinEnum = NULL;
+	if (FAILED(pDownstream->EnumPins(&pPinEnum)))
+		return NULL;
+
+	IBaseFilter* result = NULL;
+	IPin* pPin = NULL;
+	ULONG pf = 0;
+	while (!result && pPinEnum->Next(1, &pPin, &pf) == S_OK && pf == 1)
+	{
+		PIN_DIRECTION dir;
+		pPin->QueryDirection(&dir);
+		if (dir == PINDIR_INPUT)
+		{
+			IPin* pUpstream = NULL;
+			if (SUCCEEDED(pPin->ConnectedTo(&pUpstream)) && pUpstream)
+			{
+				PIN_INFO pi = { 0 };
+				if (SUCCEEDED(pUpstream->QueryPinInfo(&pi)))
+				{
+					result = pi.pFilter;	//ref 유지 — caller Release.
+				}
+				pUpstream->Release();
+			}
+		}
+		pPin->Release();
+	}
+	pPinEnum->Release();
+	return result;
+}
+
+static CString filter_name(IBaseFilter* pFilter)
+{
+	if (!pFilter)
+		return _T("");
+	FILTER_INFO info = { 0 };
+	if (FAILED(pFilter->QueryFilterInfo(&info)))
+		return _T("");
+	CString name(info.achName);
+	if (info.pGraph)
+		info.pGraph->Release();
+	return name;
+}
+
+CString CDShow::get_audio_renderer_label()
+{
+	IBaseFilter* pRenderer = find_renderer_by_majortype(m_pGB, MEDIATYPE_Audio);
+	if (!pRenderer)
+		return _T("");
+	CString name = filter_name(pRenderer);
+	pRenderer->Release();
+	return name;
+}
+
+CString CDShow::get_audio_decoder_label()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		auto* d = ffi_decoder_or_null(m_pFFiSource);
+		if (!d)
+			return _T("");
+		CString codec(d->audio_codec_name().c_str());
+		CString out = _T("내장 FFmpeg 디코더");
+		if (!codec.IsEmpty())
+		{
+			out += _T(" (");
+			out += codec;
+			out += _T(")");
+		}
+		return out;
+	}
+	//LAV path — audio renderer 의 upstream filter (= audio decoder).
+	IBaseFilter* pRenderer = find_renderer_by_majortype(m_pGB, MEDIATYPE_Audio);
+	if (!pRenderer)
+		return _T("");
+	IBaseFilter* pDecoder = get_upstream_filter(pRenderer);
+	pRenderer->Release();
+	if (!pDecoder)
+		return _T("");
+	CString name = filter_name(pDecoder);
+	pDecoder->Release();
+	return name;
+}
+
+bool CDShow::get_frame_stats(FrameStats& out)
+{
+	out = FrameStats();
+	if (!m_VMR)
+		return false;
+
+	IQualProp* pQP = NULL;
+	if (FAILED(m_VMR->QueryInterface(IID_IQualProp, (void**)&pQP)) || !pQP)
+		return false;
+
+	int v;
+	if (SUCCEEDED(pQP->get_FramesDrawn(&v)))                out.frames_drawn = v;
+	if (SUCCEEDED(pQP->get_FramesDroppedInRenderer(&v)))    out.frames_dropped = v;
+	if (SUCCEEDED(pQP->get_AvgFrameRate(&v)))               out.avg_frame_rate_x100 = v;
+	if (SUCCEEDED(pQP->get_AvgSyncOffset(&v)))              out.avg_sync_offset_ms = v;
+	if (SUCCEEDED(pQP->get_DevSyncOffset(&v)))              out.dev_sync_offset_ms = v;
+	if (SUCCEEDED(pQP->get_Jitter(&v)))                     out.jitter_ms = v;
+
+	pQP->Release();
+	return true;
+}
+
+int CDShow::get_refresh_rate_hz()
+{
+	DEVMODE dm = { 0 };
+	dm.dmSize = sizeof(dm);
+	if (!EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dm))
+		return 0;
+	return (int)dm.dmDisplayFrequency;
+}
+
+CString CDShow::get_video_output_subtype()
+{
+	if (!m_VMR)
+		return _T("");
+
+	IEnumPins* pPinEnum = NULL;
+	if (FAILED(m_VMR->EnumPins(&pPinEnum)))
+		return _T("");
+
+	CString result;
+	IPin* pPin = NULL;
+	ULONG pf = 0;
+	while (result.IsEmpty() && pPinEnum->Next(1, &pPin, &pf) == S_OK && pf == 1)
+	{
+		PIN_DIRECTION dir;
+		pPin->QueryDirection(&dir);
+		if (dir == PINDIR_INPUT)
+		{
+			AM_MEDIA_TYPE mt = { 0 };
+			if (SUCCEEDED(pPin->ConnectionMediaType(&mt)))
+			{
+				//subtype GUID 의 첫 4-char (Data1) 가 fourcc 인 경우 그것 사용.
+				DWORD d1 = mt.subtype.Data1;
+				char buf[5] = { 0 };
+				for (int i = 0; i < 4; i++)
+				{
+					unsigned char c = (d1 >> (i * 8)) & 0xFF;
+					if (c >= 0x20 && c < 0x7F)
+						buf[i] = (char)c;
+					else
+					{
+						buf[0] = 0;
+						break;
+					}
+				}
+				if (buf[0])
+				{
+					for (int i = 0; i < 4 && buf[i]; i++)
+						result += (TCHAR)(buf[i] >= 'a' && buf[i] <= 'z' ? buf[i] - 32 : buf[i]);
+				}
+				if (mt.cbFormat != 0) { CoTaskMemFree(mt.pbFormat); mt.pbFormat = NULL; mt.cbFormat = 0; }
+				if (mt.pUnk) { mt.pUnk->Release(); mt.pUnk = NULL; }
+			}
+		}
+		pPin->Release();
+	}
+	pPinEnum->Release();
+	return result;
+}
+
+CSize CDShow::get_display_size()
+{
+	CSize sz(0, 0);
+	if (!m_VMR)
+		return sz;
+	IBaseFilter* pVMR = m_VMR;
+	//VMR 의 video window 가 자체 HWND 보유 시 (IVideoWindow). 부재 시 m_pParent 의 client.
+	IVideoWindow* pVW = NULL;
+	if (SUCCEEDED(pVMR->QueryInterface(IID_IVideoWindow, (void**)&pVW)) && pVW)
+	{
+		long w = 0, h = 0;
+		pVW->get_Width(&w);
+		pVW->get_Height(&h);
+		pVW->Release();
+		if (w > 0 && h > 0)
+		{
+			sz.cx = (int)w;
+			sz.cy = (int)h;
+			return sz;
+		}
+	}
+	//fallback: parent client.
+	if (m_pParent && m_pParent->GetSafeHwnd())
+	{
+		CRect rc;
+		m_pParent->GetClientRect(&rc);
+		sz.cx = rc.Width();
+		sz.cy = rc.Height();
+	}
+	return sz;
+}
+
+CString CDShow::get_display_adapter_name()
+{
+	DISPLAY_DEVICE dd = { 0 };
+	dd.cb = sizeof(dd);
+	if (!EnumDisplayDevices(NULL, 0, &dd, 0))
+		return _T("");
+	return CString(dd.DeviceString);
+}
+
+int CDShow::get_video_memory_mb()
+{
+	//IDXGIFactory → IDXGIAdapter[0] → GetDesc().DedicatedVideoMemory.
+	//d3d11.lib / dxgi.lib link 필요 — dshow.cpp 가 이미 D3D11 사용 (internal path) 라 link 가능.
+	typedef HRESULT(WINAPI* PFN_CREATE_DXGI_FACTORY)(REFIID, void**);
+	static PFN_CREATE_DXGI_FACTORY pfn = NULL;
+	if (!pfn)
+	{
+		HMODULE hMod = LoadLibrary(_T("dxgi.dll"));
+		if (hMod)
+			pfn = (PFN_CREATE_DXGI_FACTORY)GetProcAddress(hMod, "CreateDXGIFactory1");
+	}
+	if (!pfn)
+		return 0;
+
+	IDXGIFactory1* pFactory = NULL;
+	if (FAILED(pfn(__uuidof(IDXGIFactory1), (void**)&pFactory)) || !pFactory)
+		return 0;
+
+	IDXGIAdapter1* pAdapter = NULL;
+	int total_mb = 0;
+	if (SUCCEEDED(pFactory->EnumAdapters1(0, &pAdapter)) && pAdapter)
+	{
+		DXGI_ADAPTER_DESC1 desc = { 0 };
+		if (SUCCEEDED(pAdapter->GetDesc1(&desc)))
+			total_mb = (int)(desc.DedicatedVideoMemory / (1024 * 1024));
+		pAdapter->Release();
+	}
+	pFactory->Release();
+	return total_mb;
+}
 
 int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 {

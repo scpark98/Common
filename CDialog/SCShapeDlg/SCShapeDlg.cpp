@@ -110,6 +110,38 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	return res;
 }
 
+void CSCShapeDlg::clip_to_screen_rect(const CRect& screen_clip)
+{
+	if (!::IsWindow(m_hWnd))
+		return;
+
+	CRect win;
+	GetWindowRect(&win);
+
+	CRect intersect;
+	if (!intersect.IntersectRect(&win, &screen_clip))
+	{
+		//완전히 밖 — 빈 region (안 보임).
+		HRGN empty = ::CreateRectRgn(0, 0, 0, 0);
+		::SetWindowRgn(m_hWnd, empty, TRUE);
+		return;
+	}
+
+	if (intersect == win)
+	{
+		//완전히 안 — region 해제 (전체 그려짐).
+		::SetWindowRgn(m_hWnd, NULL, TRUE);
+		return;
+	}
+
+	//부분 — window local coord 로 변환 후 region 설정.
+	CRect local = intersect;
+	local.OffsetRect(-win.left, -win.top);
+	HRGN rgn = ::CreateRectRgn(local.left, local.top, local.right, local.bottom);
+	::SetWindowRgn(m_hWnd, rgn, TRUE);
+	//SetWindowRgn 가 region ownership 가짐 — Delete 안 함.
+}
+
 CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CString str)
 {
 	m_text_setting.text = str;

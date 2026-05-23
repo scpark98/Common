@@ -170,6 +170,12 @@ public:
 	//로 보정. multi-line content 길이에 따라 InflateRect 의 extra 가 달라져 이 값이 변동 — 인스턴스 간 정렬 시 필수.
 	int				get_text_left_padding() { return m_text_left_padding; }
 
+	//popup window 의 그려질 영역을 screen_clip 과 자기 window rect 의 교집합으로 mask.
+	//popup 이 부모 client 밖으로 나갈 때 잘라내는 용도 (parent 자동 clip 안 됨 — popup 은 top-level).
+	//SetWindowRgn 기반 — layered window 와 호환. SetWindowPos / 부모 이동·resize 마다 호출.
+	//완전히 밖이면 빈 region (안 보임), 완전히 안이면 region 해제 (전체 그려짐).
+	void			clip_to_screen_rect(const CRect& screen_clip);
+
 	//자간 (character spacing) 픽셀. 0 (기본) 이면 적용 안 함. != 0 이면 set_text 가 run 들을 1글자씩 split 한 뒤
 	//calc_text_rect 가 인접 run (=인접 글자) 사이에 spacing 픽셀 만큼 간격을 둠.
 	void			set_char_spacing(int n) { m_char_spacing = n; }

@@ -7,6 +7,7 @@
 
 extern "C" {
 #include <libavutil/hwcontext.h>
+#include <libavutil/pixdesc.h>
 }
 
 #include <vector>
@@ -609,6 +610,170 @@ namespace ffi
         if (!m_fmt || m_audio_stream_idx < 0)
             return zero;
         return m_fmt->streams[m_audio_stream_idx]->time_base;
+    }
+
+    //--- display info — UI 표시용 (PotPlayer Tab OSD 식 codec/format 표시).
+    //AVCodecParameters / AVStream 의 정보 직접 query. MediaInfo lib 의존 없음.
+
+    static std::wstring utf8_to_wstring_upper(const char* s)
+    {
+        std::wstring out;
+        if (!s)
+            return out;
+        while (*s)
+        {
+            wchar_t c = (wchar_t)(unsigned char)(*s++);
+            if (c >= L'a' && c <= L'z')
+                c -= 32;
+            out += c;
+        }
+        return out;
+    }
+
+    static std::wstring fourcc_to_wstring(uint32_t tag)
+    {
+        std::wstring out;
+        if (tag == 0)
+            return out;
+        for (int i = 0; i < 4; i++)
+        {
+            unsigned char c = (tag >> (i * 8)) & 0xFF;
+            if (c >= 0x20 && c < 0x7F)
+                out += (wchar_t)c;
+        }
+        return out;
+    }
+
+    std::wstring CDecoder::video_codec_name() const
+    {
+        if (!m_fmt || m_video_stream_idx < 0)
+            return L"";
+        AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
+        return utf8_to_wstring_upper(avcodec_get_name(par->codec_id));
+    }
+
+    std::wstring CDecoder::video_fourcc() const
+    {
+        if (!m_fmt || m_video_stream_idx < 0)
+            return L"";
+        AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
+        return fourcc_to_wstring(par->codec_tag);
+    }
+
+    int CDecoder::video_bit_depth() const
+    {
+        if (!m_fmt || m_video_stream_idx < 0)
+            return 0;
+        AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
+        if (par->bits_per_raw_sample > 0)
+            return par->bits_per_raw_sample;
+        if (par->bits_per_coded_sample > 0)
+            return par->bits_per_coded_sample;
+        const AVPixFmtDescriptor* d = av_pix_fmt_desc_get((AVPixelFormat)par->format);
+        if (d && d->nb_components > 0)
+            return d->comp[0].depth;
+        return 0;
+    }
+
+    int64_t CDecoder::video_bit_rate() const
+    {
+        if (!m_fmt || m_video_stream_idx < 0)
+            return 0;
+        AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
+        return par->bit_rate;
+    }
+
+    std::wstring CDecoder::video_aspect_ratio() const
+    {
+        if (!m_fmt || m_video_stream_idx < 0)
+            return L"";
+        AVStream* s = m_fmt->streams[m_video_stream_idx];
+        AVCodecParameters* par = s->codecpar;
+        AVRational sar = s->sample_aspect_ratio;
+        if (sar.num == 0 || sar.den == 0)
+            sar = par->sample_aspect_ratio;
+        int dar_num = par->width;
+        int dar_den = par->height;
+        if (sar.num > 0 && sar.den > 0)
+        {
+            dar_num = par->width * sar.num;
+            dar_den = par->height * sar.den;
+        }
+        if (dar_num <= 0 || dar_den <= 0)
+            return L"";
+        //gcd 로 simplify.
+        int a = dar_num, b = dar_den;
+        while (b) { int t = a % b; a = b; b = t; }
+        if (a > 0)
+        {
+            dar_num /= a;
+            dar_den /= a;
+        }
+        wchar_t buf[32];
+        swprintf_s(buf, 32, L"%d:%d", dar_num, dar_den);
+        return buf;
+    }
+
+    std::wstring CDecoder::video_pixel_format_name() const
+    {
+        AVPixelFormat fmt = (AVPixelFormat)video_pixel_format();
+        if (fmt == AV_PIX_FMT_NONE)
+            return L"";
+        const char* name = av_get_pix_fmt_name(fmt);
+        if (!name)
+            return L"";
+        //pixel format 이름은 lower 그대로 (yuv420p, nv12 등 관례).
+        std::wstring out;
+        while (*name)
+            out += (wchar_t)(unsigned char)(*name++);
+        return out;
+    }
+
+    std::wstring CDecoder::video_hw_accel_name() const
+    {
+        if (!m_hw_device_ctx)
+            return L"";
+        AVHWDeviceContext* hwctx = (AVHWDeviceContext*)m_hw_device_ctx->data;
+        const char* name = av_hwdevice_get_type_name(hwctx->type);
+        return utf8_to_wstring_upper(name);
+    }
+
+    std::wstring CDecoder::audio_codec_name() const
+    {
+        if (!m_fmt || m_audio_stream_idx < 0)
+            return L"";
+        AVCodecParameters* par = m_fmt->streams[m_audio_stream_idx]->codecpar;
+        return utf8_to_wstring_upper(avcodec_get_name(par->codec_id));
+    }
+
+    std::wstring CDecoder::audio_channel_layout_name() const
+    {
+        if (!m_audio_ctx)
+            return L"";
+        char buf[64] = { 0 };
+        int n = av_channel_layout_describe(&m_audio_ctx->ch_layout, buf, sizeof(buf));
+        if (n <= 0)
+            return L"";
+        std::wstring out;
+        for (int i = 0; i < n - 1 && buf[i]; i++)
+            out += (wchar_t)(unsigned char)buf[i];
+        return out;
+    }
+
+    int CDecoder::audio_bit_depth() const
+    {
+        if (!m_fmt || m_audio_stream_idx < 0)
+            return 0;
+        AVCodecParameters* par = m_fmt->streams[m_audio_stream_idx]->codecpar;
+        return par->bits_per_coded_sample;
+    }
+
+    int64_t CDecoder::audio_bit_rate() const
+    {
+        if (!m_fmt || m_audio_stream_idx < 0)
+            return 0;
+        AVCodecParameters* par = m_fmt->streams[m_audio_stream_idx]->codecpar;
+        return par->bit_rate;
     }
 
     const std::wstring& CDecoder::audio_track_name(int track_idx) const

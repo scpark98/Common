@@ -63,12 +63,26 @@ namespace ffi
         AVRational video_time_base() const;  //stream 의 time_base. pts→ms 변환에 사용.
         int     video_pixel_format() const;  //AVPixelFormat. AVFrame 의 format 과 동일 또는 codec 의 hw_pix_fmt.
 
+        //display info — UI 표시용 (codec name string, fourcc, bit depth, bit rate, aspect ratio).
+        std::wstring video_codec_name()      const;  //"HEVC" / "H264" / "VP9" 등 — avcodec_get_name() 결과.
+        std::wstring video_fourcc()          const;  //codec_tag 4-char ("HVC1" / "AVC1" 등). 없으면 빈 문자열.
+        int          video_bit_depth()       const;  //bits_per_raw_sample > 0 우선, 아니면 bits_per_coded_sample, 둘 다 0 이면 pixel format 기준 추정.
+        int64_t      video_bit_rate()        const;  //bps. 0 이면 unknown.
+        std::wstring video_aspect_ratio()    const;  //"16:9" / "1.85:1" 같은 표시용. sample_aspect_ratio + width/height 조합.
+        std::wstring video_pixel_format_name() const;//"yuv420p" / "nv12" 등 — av_get_pix_fmt_name(). 없으면 빈 문자열.
+        std::wstring video_hw_accel_name()   const;  //HW accel 사용 중이면 "D3D11VA"/"DXVA2"/"CUDA" 등, 아니면 빈 문자열.
+
         //audio info — Phase 4. has_audio() false 면 audio stream 없음 / 디코더 fail.
         bool    has_audio() const { return m_audio_stream_idx >= 0 && m_audio_ctx != nullptr; }
         int     audio_sample_rate() const;       //Hz
         int     audio_channels()    const;
         int     audio_sample_format() const;     //AVSampleFormat enum 값
         AVRational audio_time_base() const;
+
+        std::wstring audio_codec_name()      const;  //"AAC" / "AC3" / "DTS" 등.
+        int          audio_bit_depth()       const;  //bits_per_coded_sample (0 = unknown).
+        int64_t      audio_bit_rate()        const;  //bps. 0 이면 unknown.
+        std::wstring audio_channel_layout_name() const; //"stereo"/"5.1"/"7.1" 등 — av_channel_layout_describe(). 없으면 빈 문자열.
 
         //multi-audio track enumeration. open() 후 audio_track_count() > 1 이면 multi-track 미디어.
         //track_idx 는 0..count-1 의 dense index. AVFormatContext 의 stream index 와 다름 (audio 만 추림).

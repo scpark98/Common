@@ -19,7 +19,6 @@
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

@@ -6,8 +6,6 @@
 #include "../../Functions.h"
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"		//logWrite — *.rc placeholder / caption 매칭 진단용.
-												//※ 메뉴 작업 정상 완료 후 logWrite 호출은 모두 제거 또는 TRACE 로 변경 예정.
 
 //timer ID 와 hover/scroll 상수들 — set_over_item / OnMouseMove / OnTimer 등 여러 함수에서 사용. 파일 상단으로 이동.
 static const UINT_PTR timer_submenu_hover = 0x10001;
@@ -1216,10 +1214,7 @@ void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR 
 {
 	CMenu menu;
 	if (!menu.LoadMenu(resource_id))
-	{
-		logWrite(_T("[SCMenu] load_by_caption: LoadMenu(%u) failed"), resource_id);
 		return;
-	}
 
 	HMENU hTop = menu.m_hMenu;
 	HMENU hTarget = NULL;
@@ -1228,11 +1223,7 @@ void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR 
 	{
 		HMENU hParent = find_popup_by_caption(hTop, parent_caption);
 		if (!hParent)
-		{
-			logWrite(_T("[SCMenu] load_by_caption: parent '%s' not found in resource %u"),
-				parent_caption, resource_id);
 			return;
-		}
 		hTarget = find_popup_by_caption(hParent, target_caption);
 	}
 	else
@@ -1241,11 +1232,7 @@ void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR 
 	}
 
 	if (!hTarget)
-	{
-		logWrite(_T("[SCMenu] load_by_caption: target '%s' not found under '%s'"),
-			target_caption, parent_caption ? parent_caption : _T("(top)"));
 		return;
-	}
 
 	CMenu menu_wrap;
 	menu_wrap.Attach(hTarget);
@@ -1270,7 +1257,6 @@ bool CSCMenu::attach_submenu_by_caption(LPCTSTR caption, CSCMenu* sub_menu, int 
 			return true;
 		}
 	}
-	logWrite(_T("[SCMenu] attach_submenu_by_caption: '%s' not found among placeholders"), caption);
 	return false;
 }
 

@@ -219,6 +219,10 @@ public:
 
 	//CMenu 호환 API. sub-button 의 set_check 와 별개로, 항목 자체의 enable/check 상태.
 	void			enable_item(int menu_id, bool enabled);			//CMenu::EnableMenuItem 동등
+	//caption 으로 enable/disable. submenu placeholder (id 가 자동 nested 의 negative 라 호출자가 모름) 의
+	//enable 제어용 — 예: m_menu_play.enable_item_by_caption("탐색", media_open).
+	//매칭은 normalize_menu_caption 적용 (accelerator key strip).
+	bool			enable_item_by_caption(LPCTSTR caption, bool enabled);
 	void			check_item(int menu_id, bool checked);			//CMenu::CheckMenuItem 동등
 	//[first_id, last_id] 범위 내에서 selected_id 만 checked, 나머지 uncheck. CMenu::CheckMenuRadioItem 동등.
 	void			check_radio_item(int first_id, int last_id, int selected_id);
@@ -257,8 +261,19 @@ public:
 	virtual			CSCMenu& set_font_size(int nSize);
 	virtual			CSCMenu& set_font_bold(bool bBold = true);
 
-	void			set_color_theme(int theme) { m_theme.set_color_theme(theme); if (!m_hWnd) return; Invalidate(); }
-	void			set_color_theme(const CSCColorTheme& theme) { m_theme.copy_colors_from(theme); if (!m_hWnd) return; Invalidate(); }
+	void			set_color_theme(int theme)
+	{
+		m_theme.set_color_theme(theme);
+		//자동 nested (load_from_menu 가 생성) 도 동기화 — 외부 set_color_theme 한 번 호출로 nested 까지 동일 톤.
+		for (auto* sub : m_owned_sub_menus) if (sub) sub->set_color_theme(theme);
+		if (!m_hWnd) return; Invalidate();
+	}
+	void			set_color_theme(const CSCColorTheme& theme)
+	{
+		m_theme.copy_colors_from(theme);
+		for (auto* sub : m_owned_sub_menus) if (sub) sub->set_color_theme(theme);
+		if (!m_hWnd) return; Invalidate();
+	}
 	int				get_color_theme() const { return m_theme.get_color_theme(); }
 
 protected:
@@ -290,6 +305,10 @@ protected:
 	CPoint			m_last_mouse_pt = CPoint(-1, -1);
 	bool			m_kb_priority = false;
 	std::deque<CSCMenuItem*> m_items;
+
+	//load_from_menu 가 .rc 의 자식 있는 POPUP 을 자동 재귀로 load 할 때 생성한 nested CSCMenu 의 ownership.
+	//attach_submenu_by_caption 으로 외부 sub_menu 가 덮어써도 leak 회피 — destructor / clear() 가 일괄 delete.
+	std::deque<CSCMenu*> m_owned_sub_menus;
 
 	bool			m_use_over = true;			//hover hilighted
 	int				m_over_item = -1;

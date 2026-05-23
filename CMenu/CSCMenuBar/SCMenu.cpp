@@ -7,10 +7,58 @@
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 
+//caption 정규화 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
+//.rc 의 *즐겨찾기(&F)* / *즐겨찾기* / *즐겨찾기(&f)* 모두 동일 매칭 키 (*즐겨찾기*) 가 되도록.
+//attach_submenu_by_caption / enable_item_by_caption / find_popup_by_caption 등 다수에서 사용 — 파일 상단.
+static CString normalize_menu_caption(LPCTSTR src)
+{
+	CString out;
+	if (!src)
+		return out;
+
+	CString s(src);
+	s.Trim();
+
+	const int len = s.GetLength();
+	int i = 0;
+	while (i < len)
+	{
+		TCHAR c = s[i];
+		if (c == _T('&'))
+		{
+			if (i + 1 < len && s[i + 1] == _T('&'))
+			{
+				out += _T('&');		//`&&` literal — single `&` 로 축약
+				i += 2;
+			}
+			else if (i + 1 >= len || s[i + 1] == _T(' ') || s[i + 1] == _T('\t'))
+			{
+				//공백 / EOL 앞 `&` — literal (access-key 가 아님).
+				out += _T('&');
+				i += 1;
+			}
+			else
+			{
+				//access-key marker — `&X` (X 가 non-space). `&` skip, X 는 다음 iteration 에서 보존.
+				i += 1;
+			}
+		}
+		else
+		{
+			out += c;
+			i += 1;
+		}
+	}
+	return out;
+}
+
 //timer ID 와 hover/scroll 상수들 — set_over_item / OnMouseMove / OnTimer 등 여러 함수에서 사용. 파일 상단으로 이동.
-static const UINT_PTR timer_submenu_hover = 0x10001;
-static const UINT_PTR timer_scroll_auto = 0x10002;
-static const int submenu_hover_delay_ms = 300;
+static const UINT_PTR timer_submenu_hover   = 0x10001;
+static const UINT_PTR timer_scroll_auto     = 0x10002;
+static const UINT_PTR timer_submenu_dismiss = 0x10003;
+static const int submenu_hover_delay_ms   = 300;	//hover-in delay (새 submenu item 에 hover 후 펼침)
+static const int submenu_switch_delay_ms  = 100;	//형제 submenu 전환 delay (산만함 회피 — 0 도 산만, Win native 처럼 길면 답답)
+static const int submenu_dismiss_delay_ms = 1000;	//hover-out delay (마우스가 submenu item 벗어났을 때 자식 dismiss) — TEST: 1000ms
 static const int scroll_auto_interval_ms = 30;
 static const int scroll_auto_step_px = 4;
 
@@ -239,6 +287,11 @@ void CSCMenu::clear()
 		delete m_items[i];
 	}
 	m_items.clear();
+
+	//자동 재귀 nested (load_from_menu 가 생성) 도 정리.
+	for (auto* sub : m_owned_sub_menus)
+		delete sub;
+	m_owned_sub_menus.clear();
 }
 
 void CSCMenu::remove_item(int menu_id)
@@ -388,6 +441,22 @@ void CSCMenu::enable_item(int menu_id, bool enabled)
 	item->m_enabled = enabled;
 	if (m_hWnd)
 		Invalidate();
+}
+
+bool CSCMenu::enable_item_by_caption(LPCTSTR caption, bool enabled)
+{
+	const CString target = normalize_menu_caption(caption);
+	for (auto* item : m_items)
+	{
+		if (normalize_menu_caption(item->m_caption).Compare(target) == 0)
+		{
+			item->m_enabled = enabled;
+			if (m_hWnd)
+				Invalidate();
+			return true;
+		}
+	}
+	return false;
 }
 
 void CSCMenu::check_item(int menu_id, bool checked)
@@ -692,7 +761,7 @@ void CSCMenu::navigate_over(int delta)
 	for (int step = 0; step < n; step++)
 	{
 		idx = (idx + delta + n) % n;
-		if (m_items[idx]->m_id <= 0)		//separator skip
+		if (m_items[idx]->m_id <= 0 && m_items[idx]->m_type == CSCMenuItem::item_normal)	//separator skip
 			continue;
 		if (!m_items[idx]->m_enabled)		//disabled skip
 			continue;
@@ -787,7 +856,8 @@ void CSCMenu::OnLButtonDown(UINT nFlags, CPoint point)
 
 	for (int i = 0; i < m_items.size(); i++)
 	{
-		if (m_items[i]->m_id <= 0)
+		//separator (id==0 + normal type) 만 skip. submenu placeholder (id=negative, type=submenu) 는 정상 표시 대상.
+		if (m_items[i]->m_id <= 0 && m_items[i]->m_type == CSCMenuItem::item_normal)
 			continue;
 
 		for (int j = 0; j < m_items[i]->m_buttons.size(); j++)
@@ -857,10 +927,19 @@ void CSCMenu::OnLButtonUp(UINT nFlags, CPoint point)
 
 int CSCMenu::get_item_index(CPoint pt)
 {
-	//pt 는 컨텐츠 좌표.
+	//pt 는 컨텐츠 좌표. hover 대상에서 제외:
+	//  - separator (id<=0 + normal)
+	//  - disabled 항목 (hover 색·access-key 반응 안 함 — Windows 표준 메뉴 동작과 일치)
+	//submenu placeholder (id=negative, type=submenu) 는 정상 hit 대상.
+	//click 은 별도 path (OnLButtonDown) 가 enabled 검사 후 처리하므로 hover 만 제외해도 충돌 없음.
 	for (int i = 0; i < m_items.size(); i++)
 	{
-		if (m_items[i]->m_id > 0 && m_items[i]->m_r.PtInRect(pt))
+		const bool is_sep = (m_items[i]->m_id <= 0 && m_items[i]->m_type == CSCMenuItem::item_normal);
+		if (is_sep)
+			continue;
+		if (!m_items[i]->m_enabled)
+			continue;
+		if (m_items[i]->m_r.PtInRect(pt))
 			return i;
 	}
 
@@ -924,37 +1003,59 @@ void CSCMenu::OnMouseMove(UINT nFlags, CPoint point)
 
 			KillTimer(timer_submenu_hover);
 
-			//hover 가 형제 항목으로 이동했으면 떠있던 자식 submenu 닫기.
-			//자식이 hide 되며 focus 가 test dialog 로 빠져나가면 부모(자기)도 외부 클릭 시 KillFocus 를 못 받아 안 닫힌다 — SetFocus 로 회수.
-			bool dismissed_any = false;
+			//hover 전환 분기:
+			//(a) 새 hover 가 다른 submenu item → 즉시 기존 dismiss + 새 popup (산만함 없이 빠른 전환 — PotPlayer 식).
+			//(b) 새 hover 가 non-submenu item 또는 over_item < 0 (메뉴 빈 영역) → dismiss 를 timer (submenu_dismiss_delay_ms)
+			//    로 지연. 사용자가 마우스를 잠깐 벗어나도 즉시 닫히지 않아 산만함 ↓.
+			//    delay 안에 다시 같은 submenu item 위로 돌아오면 timer cancel → dismiss 안 일어남.
+			const bool new_is_sub = (over_item >= 0 && m_items[over_item]->m_type == CSCMenuItem::item_submenu);
+
+			//현재 떠있는 자식 submenu 가 있는지 식별. 새 hover 가 그 submenu item 자신이면 dismiss 안 함.
+			bool need_dismiss_pending = false;
+			bool sibling_switch = false;
 			for (auto* item : m_items)
 			{
 				if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
 					continue;
-				if (!::IsWindow(item->m_sub_menu->m_hWnd))
+				if (!::IsWindow(item->m_sub_menu->m_hWnd) || !item->m_sub_menu->IsWindowVisible())
 					continue;
-				if (!item->m_sub_menu->IsWindowVisible())
-					continue;
-				if (over_item < 0 || m_items[over_item] != item)
-				{
-					item->m_sub_menu->hide_visible_descendants();
-					item->m_sub_menu->m_suppress_cascade_hide = true;
-					item->m_sub_menu->ShowWindow(SW_HIDE);
-					dismissed_any = true;
-				}
+				if (over_item >= 0 && m_items[over_item] == item)
+					continue;	//자기 자신 — dismiss 대상 아님.
+				if (new_is_sub)
+					sibling_switch = true;
+				need_dismiss_pending = true;
 			}
-			if (dismissed_any)
-				SetFocus();
 
-			if (over_item >= 0 && m_items[over_item]->m_type == CSCMenuItem::item_submenu)
+			if (sibling_switch)
 			{
-				//이번 popup session 에서 sub 가 한 번이라도 열렸으면 (m_submenu_ever_opened) 모든 후속 hover 는
-				//즉시 전환 — 사용자가 sub 열린 → non-sub 거쳐 → 다른 sub 로 이동해도 delay 없음.
-				//첫 hover (sub 가 아직 한 번도 안 열림) 만 hover_delay_ms 후 popup.
-				if (dismissed_any || m_submenu_ever_opened)
+				//(a) 형제 submenu 로 전환 — 약간의 delay 후 dismiss + popup (사용자가 메뉴를 빠르게 휙휙 지나갈
+				//때 매번 popup 깜빡임을 회피). delay 동안 또 다른 항목으로 hover 면 timer reset (다음 분기에서).
+				KillTimer(timer_submenu_dismiss);
+				KillTimer(timer_submenu_hover);
+				SetTimer(timer_submenu_hover, submenu_switch_delay_ms, NULL);
+			}
+			else if (need_dismiss_pending)
+			{
+				//(b) 자식 submenu 가 떠있고 새 hover 는 non-submenu / 빈 영역 → delay 후 dismiss.
+				//기존 timer 가 진행 중이면 reset (delay 재시작).
+				KillTimer(timer_submenu_dismiss);
+				SetTimer(timer_submenu_dismiss, submenu_dismiss_delay_ms, NULL);
+				//새 hover 가 submenu 가 아니라 timer_submenu_hover 도 의미 없음 — 이미 KillTimer 됨.
+			}
+			else if (new_is_sub)
+			{
+				//자식 submenu 가 안 떠있음 + 새 hover 가 submenu — hover-in 처리.
+				//pending dismiss timer 가 있으면 cancel (사용자가 다시 돌아온 경우).
+				KillTimer(timer_submenu_dismiss);
+				if (m_submenu_ever_opened)
 					popup_submenu_for(over_item);
 				else
 					SetTimer(timer_submenu_hover, submenu_hover_delay_ms, NULL);
+			}
+			else
+			{
+				//submenu 안 떠있음 + non-submenu hover — pending dismiss 도 cancel (안전).
+				KillTimer(timer_submenu_dismiss);
 			}
 		}
 	}
@@ -967,7 +1068,60 @@ void CSCMenu::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_submenu_hover)
 	{
 		KillTimer(timer_submenu_hover);
+		//형제 sub 가 떠있으면 먼저 dismiss (sibling switch 케이스). 첫 hover (sub 가 안 떠있는) 케이스는 no-op.
+		bool dismissed_any = false;
+		for (auto* item : m_items)
+		{
+			if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+				continue;
+			if (!::IsWindow(item->m_sub_menu->m_hWnd) || !item->m_sub_menu->IsWindowVisible())
+				continue;
+			if (m_over_item >= 0 && m_items[m_over_item] == item)
+				continue;
+			item->m_sub_menu->hide_visible_descendants();
+			item->m_sub_menu->m_suppress_cascade_hide = true;
+			item->m_sub_menu->ShowWindow(SW_HIDE);
+			dismissed_any = true;
+		}
+		if (dismissed_any)
+			SetFocus();
 		popup_submenu_for(m_over_item);
+		return;
+	}
+
+	if (nIDEvent == timer_submenu_dismiss)
+	{
+		KillTimer(timer_submenu_dismiss);
+		//마우스가 submenu item 을 벗어난 채 delay 경과 → 떠있는 자식 dismiss.
+		//그 사이 같은 submenu 로 돌아왔다면 OnMouseMove 에서 KillTimer 호출되어 여기 도달 안 함.
+		//단 마우스가 *자식 sub 자체* 또는 *그 자손 sub* 위에 있으면 사용자가 자식을 사용 중 — dismiss skip.
+		POINT cursor;
+		::GetCursorPos(&cursor);
+
+		bool dismissed_any = false;
+		for (auto* item : m_items)
+		{
+			if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
+				continue;
+			if (!::IsWindow(item->m_sub_menu->m_hWnd) || !item->m_sub_menu->IsWindowVisible())
+				continue;
+			if (m_over_item >= 0 && m_items[m_over_item] == item)
+				continue;
+			//자식 sub 또는 그 자손 sub window 안에 cursor 가 있으면 dismiss 안 함 (자식이 사용 중).
+			HWND hwnd_at = ::WindowFromPoint(cursor);
+			if (item->m_sub_menu->contains_descendant_hwnd(hwnd_at))
+			{
+				//자식 안에 있음 — timer 재시작해 다시 1000ms 후 검사.
+				SetTimer(timer_submenu_dismiss, submenu_dismiss_delay_ms, NULL);
+				continue;
+			}
+			item->m_sub_menu->hide_visible_descendants();
+			item->m_sub_menu->m_suppress_cascade_hide = true;
+			item->m_sub_menu->ShowWindow(SW_HIDE);
+			dismissed_any = true;
+		}
+		if (dismissed_any)
+			SetFocus();
 		return;
 	}
 
@@ -1075,50 +1229,6 @@ void CSCMenu::set_thumbnail_size(int w, int h)
 		Invalidate();
 }
 
-//caption 정규화 — `&` access-key marker 제거 + 좌우 공백 trim. `&&` literal 은 single `&` 로 보존.
-//.rc 의 *즐겨찾기(&F)* / *즐겨찾기* / *즐겨찾기(&f)* 모두 동일 매칭 키 (*즐겨찾기*) 가 되도록.
-static CString normalize_menu_caption(LPCTSTR src)
-{
-	CString out;
-	if (!src)
-		return out;
-
-	CString s(src);
-	s.Trim();
-
-	const int len = s.GetLength();
-	int i = 0;
-	while (i < len)
-	{
-		TCHAR c = s[i];
-		if (c == _T('&'))
-		{
-			if (i + 1 < len && s[i + 1] == _T('&'))
-			{
-				out += _T('&');		//`&&` literal — single `&` 로 축약
-				i += 2;
-			}
-			else if (i + 1 >= len || s[i + 1] == _T(' ') || s[i + 1] == _T('\t'))
-			{
-				//공백 / EOL 앞 `&` — literal (access-key 가 아님).
-				out += _T('&');
-				i += 1;
-			}
-			else
-			{
-				//access-key marker — `&X` (X 가 non-space). `&` skip, X 는 다음 iteration 에서 보존.
-				i += 1;
-			}
-		}
-		else
-		{
-			out += c;
-			i += 1;
-		}
-	}
-	return out;
-}
-
 //caption 매칭으로 HMENU 의 자식 중 sub-menu (POPUP) HMENU 반환. 못 찾으면 NULL.
 static HMENU find_popup_by_caption(HMENU hMenu, LPCTSTR caption)
 {
@@ -1165,33 +1275,54 @@ void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 		get_menu_item_info(pMenu->m_hMenu, i, &menu_id, &menu_caption, TRUE);
 		const bool is_empty_popup_downgrade = !is_popup && (menu_id == 0xFFFF);
 
-		if ((is_popup || is_empty_popup_downgrade) && include_popup_placeholder)
+		if (is_popup)
 		{
-			CString raw;
-			if (is_popup)
-			{
-				TCHAR buf[256] = { 0 };
-				::GetMenuString(pMenu->m_hMenu, i, buf, _countof(buf), MF_BYPOSITION);
-				raw = buf;
-			}
-			else
-			{
-				raw = menu_caption;
-			}
-
+			//자식 있는 POPUP — 항상 자동 재귀 nested load. (include_popup_placeholder 무관)
+			//.rc 의 정적 nested 메뉴 (예: "재생" > "탐색") 가 코드 변경 없이 자동 표현.
+			//외부에서 attach_submenu_by_caption 으로 m_sub_menu 를 덮어쓸 수도 있지만 m_owned_sub_menus 가
+			//destructor 까지 보관하므로 leak 없음.
+			TCHAR buf[256] = { 0 };
+			::GetMenuString(pMenu->m_hMenu, i, buf, _countof(buf), MF_BYPOSITION);
+			CString raw = buf;
 			std::deque<CString> token;
 			get_token_str(raw, token, _T("\t"));
 			CString caption = (token.size() >= 1 ? token[0] : raw);
 
-			//placeholder 용 unique negative id — 일반 menu_id (0x8000~0xDFFF) 와 separator(0) 모두와 충돌 회피.
+			CSCMenu* nested = new CSCMenu;
+			//nested 도 부모와 동일 parent / width 로 미리 create — popup_submenu_for 시점에 HWND 필요.
+			//add() → recalc_items_rect() 도 GetWindowRect 호출하므로 create 가 add 보다 선행되어야 ASSERT 회피.
+			if (m_parent)
+				nested->create(m_parent, m_min_width > 0 ? m_min_width : 280);
+			//부모의 theme 상속 — nested 가 코드 안에서 자동 생성되어 외부 set_color_theme 호출이 없어
+			//default 색으로 그려져 부모와 톤이 어긋나는 회귀 회피.
+			nested->set_color_theme(m_theme);
+			CMenu sub_wrap;
+			sub_wrap.Attach(hSub);
+			nested->load_from_menu(&sub_wrap, include_popup_placeholder);
+			sub_wrap.Detach();
+			m_owned_sub_menus.push_back(nested);
+
+			int placeholder_id = -10000 - (int)m_items.size();
+			CSCMenuItem* item = new CSCMenuItem(placeholder_id, caption);
+			item->m_type = CSCMenuItem::item_submenu;
+			item->m_sub_menu = nested;
+			m_items.push_back(item);
+		}
+		else if (is_empty_popup_downgrade && include_popup_placeholder)
+		{
+			//VS 가 빈 POPUP 을 MENUITEM id=0xFFFF 로 down-grade 한 케이스 — 동적 attach 용 placeholder.
 			//attach_submenu_by_caption 으로 m_sub_menu set 되기 전엔 click 시 m_sub_menu==nullptr 가드로 no-op.
+			std::deque<CString> token;
+			get_token_str(menu_caption, token, _T("\t"));
+			CString caption = (token.size() >= 1 ? token[0] : menu_caption);
+
 			int placeholder_id = -10000 - (int)m_items.size();
 			CSCMenuItem* item = new CSCMenuItem(placeholder_id, caption);
 			item->m_type = CSCMenuItem::item_submenu;
 			item->m_sub_menu = nullptr;
 			m_items.push_back(item);
 		}
-		else if (!is_popup)
+		else
 		{
 			//seperator와 일반 메뉴항목.
 			if (menu_id == 0 || (menu_id >= 0x8000 && menu_id <= 0xDFFF))
@@ -1204,7 +1335,6 @@ void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 				add(menu_id, caption, 0, hot_key);
 			}
 		}
-		//else: POPUP 인데 include_popup_placeholder=false → skip (기존 동작).
 	}
 	recalc_items_rect();
 }
@@ -1242,11 +1372,13 @@ void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR 
 
 bool CSCMenu::attach_submenu_by_caption(LPCTSTR caption, CSCMenu* sub_menu, int new_id)
 {
+	//외부 attach 우선 — 자동 nested 가 이미 m_sub_menu 에 채워져 있어도 덮어쓰기 (자동 nested 는
+	//m_owned_sub_menus 에 보관되어 destructor 가 정리하므로 leak 없음). 호출자가 명시한 sub_menu 가
+	//외부 instance (예: 동적으로 enable/check/add_submenu_item 등 적용된) 가 항상 사용자에게 표시된다.
 	const CString target = normalize_menu_caption(caption);
 	for (auto* item : m_items)
 	{
 		if (item->m_type == CSCMenuItem::item_submenu &&
-			item->m_sub_menu == nullptr &&
 			normalize_menu_caption(item->m_caption).Compare(target) == 0)
 		{
 			item->m_sub_menu = sub_menu;
@@ -1374,6 +1506,17 @@ CSCMenuItem* CSCMenu::get_menu_item(int menu_id)
 	{
 		if (m_items[i]->m_id == menu_id)
 			return m_items[i];
+	}
+
+	//자동 nested (load_from_menu 가 생성한 owned sub-menu) 안도 재귀 검색 — 그래야 nested 안 자식의
+	//id 로도 enable_item / check_item 동작 (예: 재생 > 탐색 > 한 프레임 뒤로 의 ID_POPUP_FRAME_BACKWARD).
+	for (auto* sub : m_owned_sub_menus)
+	{
+		if (!sub)
+			continue;
+		CSCMenuItem* found = sub->get_menu_item(menu_id);
+		if (found)
+			return found;
 	}
 
 	return NULL;
@@ -1513,6 +1656,11 @@ BOOL CSCMenu::OnLbnSelchange()
 //일단은 별개로 처리되도록 한다.
 void CSCMenu::recalc_items_rect()
 {
+	//windowless 상태 (create 전, 또는 자동 nested 생성 직후 m_parent null) 면 GetWindowRect/CClientDC 가 ASSERT.
+	//다음 popup_menu 시 windowless 가 아닐 때 한 번 더 호출됨 — 그때 정상 recalc.
+	if (!::IsWindow(m_hWnd))
+		return;
+
 	int sy = 4;	//top margin (bottom 의 +4 와 대칭)
 	bool is_separator;
 	int total_height = 0;	//모든 메뉴 항목을 표시하는 총 높이
@@ -1537,7 +1685,8 @@ void CSCMenu::recalc_items_rect()
 
 		for (int i = 0; i < m_items.size(); i++)
 		{
-			if (m_items[i]->m_id <= 0)
+			//separator (id==0 + normal) 만 측정 skip. submenu placeholder 는 caption 측정 대상.
+			if (m_items[i]->m_id <= 0 && m_items[i]->m_type == CSCMenuItem::item_normal)
 				continue;
 
 			int item_w = 0;
@@ -1588,7 +1737,7 @@ void CSCMenu::recalc_items_rect()
 	//item rect의 크기는 border 유무에 따라 다를 수 있다.
 	for (int i = 0; i < m_items.size(); i++)
 	{
-		is_separator = (m_items[i]->m_id <= 0);
+		is_separator = (m_items[i]->m_id <= 0 && m_items[i]->m_type == CSCMenuItem::item_normal);
 
 		int item_h;
 		if (is_separator)
@@ -1660,8 +1809,8 @@ void CSCMenu::OnPaint()
 		if (view_r.bottom < vp_top || view_r.top > vp_bot)
 			continue;
 
-		//separator의 경우
-		if (m_items[i]->m_id <= 0)
+		//separator의 경우 (id==0 + normal type)
+		if (m_items[i]->m_id <= 0 && m_items[i]->m_type == CSCMenuItem::item_normal)
 		{
 			draw_line(&dc, view_r.left, view_r.CenterPoint().y, view_r.right, view_r.CenterPoint().y, GRAY(214));
 		}

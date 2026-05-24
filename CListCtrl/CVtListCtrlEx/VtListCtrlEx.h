@@ -9,7 +9,7 @@
 #include "../../Functions.h"
 #include "../../colors.h"
 #include "../../system/ShellImageList/ShellImageList.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
 
 /*
@@ -561,13 +561,13 @@ public:
 	CString		get_edit_old_text() { return m_edit_old_text; }
 	CString		get_edit_new_text() { return m_edit_new_text; }
 	//item = -1이면 선택된 항목을, subItem = -1이면 0번 컬럼을 편집 시작한다.
-	//return되는 CEdit*를 이용할 경우도 필요하여 리턴함.
-	CEdit*		edit_item(int item = -1, int subItem = -1);
+	//return되는 편집 컨트롤 포인터를 이용할 경우도 필요하여 리턴함.
+	CSCStaticEdit*	edit_item(int item = -1, int subItem = -1);
 	void		edit_end(bool valid = true);
 	void		undo_edit_label();		//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 	bool		is_modified() { return m_modified; }
 	void		reset_modified_flag() { m_modified = false; }
-	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+	LRESULT		on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam);
 
 //폰트 관련. 반드시 set_headings() 후에 호출할것.
 	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET, bool invalidate = false);
@@ -744,7 +744,7 @@ protected:
 	bool			m_edit_readonly = false;		//편집모드로는 들어가지만 편집해서는 안되는 데이터인 경우 set_edit_readonly(true);를 호출한다.
 	CString			m_edit_old_text;				//편집 전 텍스트
 	CString			m_edit_new_text;				//편집 후 텍스트
-	CSCEdit*		m_pEdit = NULL;
+	CSCStaticEdit*	m_pEdit = NULL;
 	long			m_last_clicked_time = 0;		//one_click으로 편집모드 진입 시 마지막 클릭 시각
 	int				m_last_clicked_index = -1;		//one_click으로 편집모드 진입 시 마지막 클릭 인덱스
 

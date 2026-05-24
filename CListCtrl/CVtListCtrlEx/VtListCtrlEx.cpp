@@ -77,7 +77,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
-	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CVtListCtrlEx::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CVtListCtrlEx::on_message_CSCStaticEdit)
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGING, &CVtListCtrlEx::OnLvnItemchanging)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_NCHITTEST()
@@ -1507,7 +1507,7 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
-	//편집 중 (m_in_editing) 이고 메시지 target 이 내부 CSCEdit (m_pEdit) 이면, walk 가 부모 dialog 로
+	//편집 중 (m_in_editing) 이고 메시지 target 이 내부 편집기 (m_pEdit) 이면, walk 가 부모 dialog 로
 	//계속 가서 메인 단축키 (Q~I 화질조정 / Space 재생 등) 가 발화되는 문제 차단.
 	//자체 dispatch 후 TRUE 반환 — edit 는 정상 입력 받고 부모 walk 만 멈춤.
 	if (m_in_editing && m_pEdit && m_pEdit->GetSafeHwnd() == pMsg->hwnd &&
@@ -1873,7 +1873,7 @@ void CVtListCtrlEx::allow_edit_column(int column, bool allow_edit)
 }
 
 
-CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
+CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 {
 	// Make sure that nCol is valid
 	CHeaderCtrl* pHeader = (CHeaderCtrl*)GetDlgItem(0);
@@ -1912,15 +1912,13 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 
 	GetClientRect(rc);
 
-	// Get Column alignment
-	DWORD dwStyle = ES_LEFT;
+	//컬럼의 가로 정렬을 편집기 가로 정렬로 매핑.
+	DWORD halign = DT_LEFT;
 	int align = get_column_text_align(subItem);
 	if (align == HDF_CENTER)
-		dwStyle = ES_CENTER;
+		halign = DT_CENTER;
 	else if (align == HDF_RIGHT)
-		dwStyle = ES_RIGHT;
-
-	TRACE(_T("subItem = %d, dwStyle = %d\n"), subItem, dwStyle);
+		halign = DT_RIGHT;
 
 	if (r.right > rc.right)
 		r.right = rc.right;
@@ -1930,7 +1928,6 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	//20260214 scpark.
 	//edit_end()에서 DestroyWindow() 및 delete을 했었으나 타이밍이 맞지 않으면 double delete이 발생하므로
 	//edit_end()에서는 우선 hide 시키고 edit_item()에서 DestroyWindow() 및 delete을 하도록 수정한다.
-	//매번 새로 생성하는 이유는 ES_MULTILINE, ES_LEFT, ES_CENTER, ES_RIGHT 등은 동적변경이 불가능한 스타일이기 때문이다.
 	if (m_pEdit)
 	{
 		if (m_pEdit->m_hWnd)
@@ -1939,38 +1936,24 @@ CEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 		m_pEdit = NULL;
 	}
 
-	//edit을 동적으로 생성할 때 ES_MULTILINE 속성이 있을 경우
-	//edit의 높이는 1줄이고 너비가 텍스트 길이보다 작을 경우 word wrap되어 일부 텍스트가 다음줄로 넘어가서 보이지 않게 된다.
-	//따라서 SetRect를 이용해서 세로 중앙에 표시하는 등 ES_MULTILINE이 반드시 필요한 경우에만 명시한다.
-	if (m_pEdit == NULL)
-	{
-		m_pEdit = new CSCEdit;
-		m_pEdit->create(dwStyle | WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, IDC_EDIT_CELL);
-	}
+	m_pEdit = new CSCStaticEdit;
+	m_pEdit->Create(0, r, this, IDC_EDIT_CELL);
 
-	//ES_MULTILINE, ES_LEFT, ES_CENTER, ES_RIGHT 등은 동적변경이 불가능한 스타일이므로
-	//edit_end()에서 기존에는 hide시켰으나 delete으로 변경함.
-	//BOOL res = m_pEdit->ModifyStyle(0, dwStyle);
-	m_pEdit->MoveWindow(r);
-	//m_pEdit->SetRect(&r);
 	m_pEdit->SetFont(&m_font, true);
-	m_pEdit->SetWindowText(m_edit_old_text);
+	m_pEdit->set_text_align(halign);
 	m_pEdit->set_line_align(DT_VCENTER);
-	int a = m_pEdit->get_line_align();
+	m_pEdit->SetWindowText(m_edit_old_text);
+	m_pEdit->set_readonly(m_edit_readonly);
 
 	m_pEdit->ShowWindow(SW_SHOW);
-	m_pEdit->SetSel(0, -1);
 	m_pEdit->SetFocus();
 
-	//ES_READONLY는 ModifyStyle()로는 동적변경할 수 없다. 아래와 같이 EM_SETREADONLY를 보내야 한다.
-	//m_pEdit->ModifyStyle(m_edit_readonly ? 0 : ES_READONLY, m_edit_readonly ? ES_READONLY : 0);
-	m_pEdit->SendMessage(EM_SETREADONLY, m_edit_readonly ? TRUE : FALSE, 0);
-
+	//파일명 편집이면 확장자 앞까지만 선택, 그 외엔 전체 선택.
 	CString ext = get_part(m_edit_old_text, fn_ext);
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
-	{
-		m_pEdit->SetSel(0, m_edit_old_text.GetLength() - ext.GetLength() - 1);
-	}
+		m_pEdit->set_sel(0, m_edit_old_text.GetLength() - ext.GetLength() - 1);
+	else
+		m_pEdit->select_all();
 
 	m_in_editing = true;
 	m_edit_item = item;
@@ -2004,32 +1987,28 @@ void CVtListCtrlEx::undo_edit_label()
 	set_text(m_edit_item, m_edit_subItem, m_edit_old_text);
 }
 
-LRESULT CVtListCtrlEx::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+LRESULT CVtListCtrlEx::on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam)
 {
-	CSCEditMessage* msg = (CSCEditMessage*)wParam;
+	CSCStaticEditMessage* msg = (CSCStaticEditMessage*)wParam;
 
 	if (msg && msg->pThis && !msg->pThis->IsWindowVisible())
 		return 0;
 
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), msg->message, msg->pThis);
-	if (msg->message == WM_KILLFOCUS)
+	//CSCStaticEdit 은 타이핑마다 message_scstaticedit_text_changed 를 보낸다.
+	//여기서 무조건 Invalidate() 하면 키 입력마다 리스트 전체가 repaint 되어 깜빡인다.
+	//셀 내용이 실제로 바뀌는 커밋/취소 시에만 리스트를 갱신한다.
+	switch (msg->message)
 	{
-		edit_end();
+		case CSCStaticEdit::message_scstaticedit_killfocus:
+		case CSCStaticEdit::message_scstaticedit_enter:
+			edit_end();
+			Invalidate();
+			break;
+		case CSCStaticEdit::message_scstaticedit_escape:
+			edit_end(false);
+			Invalidate();
+			break;
 	}
-	else if (msg->message == WM_KEYDOWN)
-	{
-		switch ((int)lParam)
-		{
-			case VK_RETURN:
-				edit_end();
-				break;
-			case VK_ESCAPE:
-				edit_end(false);
-				break;
-		}
-	}
-
-	Invalidate();
 
 	return 0;
 }

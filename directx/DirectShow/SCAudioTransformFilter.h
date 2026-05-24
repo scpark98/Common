@@ -151,7 +151,10 @@ protected:
 	std::atomic<bool>			m_worker_run;	//worker loop 종료 신호
 	std::atomic<bool>			m_flushing;		//BeginFlush ↔ EndFlush 사이엔 queue 비우고 신규 sample drop
 	void					worker_main();
-	void					process_one(const work_item& w);
+	//virtual — variable-length output 이 필요한 파생 (예: CSCAudioTimeStretch) 이 override.
+	//default impl: in-place process_sample 호출 후 input sample 그대로 deliver. delay shift 도 처리.
+	//override 시 output sample 새로 할당 + 자체 deliver. 기존 in-place 파생 (Gain/Compressor 등) 은 override 안 함 → default 동작 유지.
+	virtual void			process_one(const work_item& w);
 	void					clear_queue();		//queue clear + sample release
 };
 

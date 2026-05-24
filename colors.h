@@ -401,6 +401,32 @@ public:
 		color_theme_anysupport,
 		color_theme_helpu,
 		color_theme_pcanypro,
+
+		//Notepad++ GlobalStyles 추출 import 테마 (2026-05-24). get_color_theme_list 의 push 순서 = 이 enum 값 순서여야 함
+		//(콤보 인덱스를 그대로 set_color_theme 에 넘기는 구조라 둘이 어긋나면 다른 테마가 적용됨).
+		color_theme_zenburn,
+		color_theme_bespin,
+		color_theme_black_board,
+		color_theme_choco,
+		color_theme_danslerush_dark,
+		color_theme_dark_mode_default,
+		color_theme_deep_black,
+		color_theme_hello_kitty,			//light
+		color_theme_hot_fudge_sundae,
+		color_theme_khaki,					//light
+		color_theme_mono_industrial,
+		color_theme_monokai,
+		color_theme_mossy_lawn,
+		color_theme_navajo,					//light
+		color_theme_obsidian,
+		color_theme_plastic_code_wrap,
+		color_theme_ruby_blue,
+		color_theme_solarized_light,		//light
+		color_theme_solarized,
+		color_theme_twilight,
+		color_theme_vibrant_ink,
+		color_theme_vim_dark_blue,
+
 		color_theme_custom,
 		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
 	};
@@ -409,6 +435,13 @@ public:
 	int		get_color_theme() const { return m_cur_theme; }
 	void	set_color_theme(int color_theme);
 	static void get_color_theme_list(std::deque<CString> &theme_list);
+
+	//Notepad++ / VSCode 등 외부 에디터 테마를 import 할 때 사용. 에디터 테마가 노출하는 소수의 색
+	//(본문 bg/fg, 선택 bg, gutter fg/bg)만 받아 title/button/border/hover/alternate/separator 등
+	//나머지 슬롯을 get_weak_color/get_color 로 파생한다. import 테마는 에디터 색을 그대로 써서
+	//흰 카드 baseline 을 적용하지 않는다 — cr_edit_back/text = bg/fg.
+	void	set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color sel_bg,
+										Gdiplus::Color header_fg, Gdiplus::Color header_bg);
 
 	//호출자가 set_color_theme(int) 후 cr_back 등 일부 필드를 수정한 테마를 그대로 다른 객체에 전달할 때 사용.
 	//operator= 와 달리 m_parent / m_cur_theme 은 *수신측 본인 것을 유지* 하여

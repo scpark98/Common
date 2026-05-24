@@ -23,7 +23,8 @@ void CSCAudioTimeStretch::set_rate(double rate)
 	if (rate < 0.5) rate = 0.5;
 	if (rate > 2.0) rate = 2.0;
 	m_pending_rate.store(rate);
-	logWrite(_T("[time_stretch] set_rate pending=%.3f"), rate);
+	m_pending_rate_changed.store(true);
+	logWrite(_T("[time_stretch] set_rate pending=%.3f (anchor reset 트리거)"), rate);
 }
 
 bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int bits_per_sample, bool is_float)
@@ -351,6 +352,17 @@ void CSCAudioTimeStretch::process_one(const work_item& w)
 {
 	if (w.kind == kind_sample && w.sample)
 	{
+		//rate 변경 직후 — atempo internal buffer flush + anchor reset (seek 시 NewSegment 와 동일 효과).
+		//이게 없으면 기존 rate 로 처리된 누적 sample 들의 timestamp 와 새 rate emit timestamp 가 불일치 → audio/video sync 어긋남.
+		if (m_pending_rate_changed.exchange(false))
+		{
+			if (m_filter_graph)
+				avfilter_graph_send_command(m_filter_graph, "atempo", "reset", "", NULL, 0, 0);
+			m_anchor_set = false;
+			m_emitted_total = 0;
+			logWrite(_T("[time_stretch] rate change → anchor + emitted reset"));
+		}
+
 		double rate = m_pending_rate.load();
 		if (rate == 1.0 && !m_filter_graph)
 		{

@@ -3504,6 +3504,12 @@ double CDShow::get_playback_rate()
 
 void CDShow::set_playback_rate(double rate)
 {
+	//rate clamp [0.5, 2.0] — atempo 의 valid range. 그 외는 audio/video 의 *동일 rate 동기 보장 X* (atempo
+	//hard clamp 0.5/2.0 → audio 가 그 한계 고정 + video 는 그 외 rate scale → sync 어긋남).
+	//사용자 명시 — 0.4 이하 시 audio 가 0.5 와 동일 재생되어 비교적 일치 깨지므로 chord clamp 도입.
+	if (rate < 0.5) rate = 0.5;
+	if (rate > 2.0) rate = 2.0;
+
 	//user-visible rate 갱신 — get_playback_rate 가 이 값 반환 (graph SetRate 안 호출하는 LAV path 도 OSD 정상).
 	m_user_playback_rate.store(rate);
 

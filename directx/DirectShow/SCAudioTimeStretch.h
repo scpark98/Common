@@ -78,6 +78,7 @@ private:
 	double m_filter_rate = 1.0;	//현재 atempo 의 tempo. process_one (audio thread) 만 접근.
 
 	std::atomic<double> m_pending_rate{1.0};	//set_rate (any thread) → process_one (audio thread) 전달.
+	std::atomic<bool>   m_pending_rate_changed{false};	//set_rate 호출 후 process_one 이 atempo reset + anchor reset 트리거.
 
 	//pts 누적 — atempo input frame 의 pts 가 timeline 진행 baseline.
 	int64_t m_in_pts_samples = 0;

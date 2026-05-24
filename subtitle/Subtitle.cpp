@@ -243,14 +243,14 @@ void CSubtitle::rebuild_active_view()
 		return;
 
 	//각 sentence 의 source_class 를 *원래 track 의 Class 명* 으로 set — lists_to_subtitle 의 m_tracks update 위해.
+	//copy 1번만 — push_back 의 copy 후 m_subtitle.back() 에서 in-place source_class set (이전 deep copy 2번 → 로딩 시간 2배).
 	auto append_track = [this](const CString& cls, const std::deque<CCaption>& track)
 	{
 		for (const auto& cap : track)
 		{
-			CCaption copy = cap;
-			for (auto& s : copy.sentences)
+			m_subtitle.push_back(cap);
+			for (auto& s : m_subtitle.back().sentences)
 				s.source_class = cls;
-			m_subtitle.push_back(copy);
 		}
 	};
 

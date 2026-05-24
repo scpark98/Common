@@ -1366,7 +1366,7 @@ CDShow::~CDShow()
 void CDShow::close_media()
 {
 	teardown_subtitle_grabber();
-	teardown_audio_gain_filter();
+	teardown_audio_filter_chain();	//video time-scale + audio gain 둘 다 해제 (이전 teardown_audio_gain_filter 만 호출 시 video filter leak).
 
 	if (m_pGB)
 	{

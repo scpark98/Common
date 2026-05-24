@@ -665,27 +665,16 @@ namespace ffi
 
     bool CFFiAudioStream::update_audio_filter_rate(double rate)
     {
-        if (!m_filter_graph || !m_filter_atempo)
-            return false;
         double clamped = rate;
         if (clamped < 0.5) clamped = 0.5;
         if (clamped > 2.0) clamped = 2.0;
         if (clamped == m_filter_rate)
             return true;
 
-        char val[32] = {0};
-        _snprintf_s(val, _TRUNCATE, "%.3f", clamped);
-        char resp[128] = {0};
-        int hr = avfilter_graph_send_command(m_filter_graph, "atempo", "tempo",
-            val, resp, sizeof(resp), 0);
-        if (hr < 0)
-        {
-            logWrite(_T("[ffi/src/audio/filter] send_command tempo=%S fail hr=%d resp=%S"), val, hr, resp);
-            return false;
-        }
-        logWrite(_T("[ffi/src/audio/filter] tempo %.3f → %.3f"), m_filter_rate, clamped);
-        m_filter_rate = clamped;
-        return true;
+        //단순 send_command "tempo" 만으로는 atempo internal state 가 잔류 — 간헐 sync 어긋남.
+        //graph 자체 재생성으로 internal state 완전 초기화 (LAV path 의 SCAudioTimeStretch 와 동일 패턴).
+        logWrite(_T("[ffi/src/audio/filter] tempo %.3f → %.3f (graph rebuild)"), m_filter_rate, clamped);
+        return init_audio_filter(clamped);
     }
 
     HRESULT CFFiAudioStream::OnThreadCreate()
@@ -1025,6 +1014,11 @@ namespace ffi
         m_pending_segment_stop = rtStop;
         m_audio_offset_rt = 0;
         m_audio_offset_set = false;   //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
+
+        //atempo graph 재생성 — internal latency 잔류 제거 (LAV path 의 SCAudioTimeStretch NewSegment 처리와 동일).
+        //현재 rate 유지 — m_filter_rate 가 직전 rate (init_audio_filter 가 그 rate 로 atempo 재init).
+        if (m_filter_graph)
+            init_audio_filter(m_filter_rate);
 
         //streaming 중인 경우만 Stop/Flush/Pause cycle.
         if (ThreadExists())

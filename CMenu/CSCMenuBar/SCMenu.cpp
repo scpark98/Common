@@ -1793,7 +1793,11 @@ void CSCMenu::recalc_items_rect()
 
 				int btn_block = 0;
 				for (auto* btn : m_items[i]->m_buttons)
-					btn_block += 6 + btn->m_button_image[0]->width;
+				{
+					//image button — width = image.width. text button (m_button_image NULL) — width = ctor 에서 set 한 m_r.Width().
+					int bw = btn->m_button_image[0] ? btn->m_button_image[0]->width : btn->m_r.Width();
+					btn_block += 6 + bw;
+				}
 				if (btn_block > 0)
 					btn_block += 8;
 

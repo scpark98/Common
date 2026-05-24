@@ -126,10 +126,10 @@ CSCMenuSubButton::CSCMenuSubButton(UINT _id, CString _text, int menu_height)
 {
 	m_id = _id;
 	m_text = _text;
-	//text button — image 없음. width 는 menu_height * 1.6 fixed (짧은 라벨 가정 — "저장" / "삭제" 등).
-	//정확 측정은 paint 시점에 dc 의 GetTextExtent — 단순화 위해 fixed.
-	int w = (int)((double)menu_height * 1.6);
-	if (w < 32) w = 32;
+	//text button — image 없음. width 추정: char 당 menu_height * 0.55 (한글 기준, 영문 더 작음) + 좌우 padding 20.
+	//정확 측정은 paint 시점이지만 layout 단계에서 width 필요해 ctor 에서 추정.
+	int w = (int)((double)menu_height * 0.55 * _text.GetLength()) + 20;
+	if (w < 36) w = 36;
 	m_r.right  = w;
 	m_r.bottom = menu_height;
 }
@@ -2023,14 +2023,21 @@ void CSCMenu::OnPaint()
 				CSCMenuSubButton* sub_btn = m_items[i]->m_buttons[j];
 				if (!sub_btn->m_text.IsEmpty())
 				{
-					//text button — border + 가운데 정렬 라벨. state 1 (hover/down) 시 색 invert.
+					//text button — theme 의 cr_button_* 사용 (alpha=0 fallback 은 cr_back 의 weak color).
+					//pressed 시 한 단계 더 강하게.
 					bool is_pressed = (sub_btn->m_state != 0);
-					Gdiplus::Color cr_bg     = is_pressed ? m_theme.cr_back_selected : m_theme.cr_back;
-					Gdiplus::Color cr_border = m_theme.cr_border_active;
-					Gdiplus::Color cr_text   = is_pressed ? m_theme.cr_text_selected : m_theme.cr_text;
+					Gdiplus::Color cr_bg = (m_theme.cr_button_back.GetA() > 0)
+						? m_theme.cr_button_back
+						: get_weak_color(m_theme.cr_back, is_pressed ? 48 : 24);
+					Gdiplus::Color cr_border = (m_theme.cr_button_border.GetA() > 0)
+						? m_theme.cr_button_border
+						: get_weak_color(m_theme.cr_back, 56);
+					Gdiplus::Color cr_text = (m_theme.cr_button_text.GetA() > 0)
+						? m_theme.cr_button_text
+						: m_theme.cr_text;
 
 					Gdiplus::Rect grect(r_view.left, r_view.top, r_view.Width(), r_view.Height());
-					draw_round_rect(&g, grect, cr_border, cr_bg, 1, 3);
+					draw_round_rect(&g, grect, cr_border, cr_bg, 1, 4);
 
 					Gdiplus::Font font(_T("Segoe UI"), (Gdiplus::REAL)(m_line_height * 0.45f), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 					Gdiplus::SolidBrush brush(cr_text);

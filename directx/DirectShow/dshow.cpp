@@ -3214,8 +3214,14 @@ void CDShow::set_playback_rate(double rate)
 	bool chain_active = (m_pAudioGainFilter != NULL || m_pAudioCompressorFilter != NULL);
 	bool need_chain = (rate == 1.0);
 
+	logWrite(_T("[playback_rate/diag] ENTER rate=%.3f chain_active=%d need_chain=%d ffi_source=%p pMS=%p pMP=%p"),
+		rate, (int)chain_active, (int)need_chain, m_pFFiSource, (void*)m_pMS, (void*)m_pMP);
+
 	if (chain_active && !need_chain)
+	{
+		logWrite(_T("[playback_rate/diag] teardown_audio_gain_filter()"));
 		teardown_audio_gain_filter();
+	}
 
 	HRESULT hr = E_FAIL;
 	if (m_pMS)
@@ -3224,7 +3230,10 @@ void CDShow::set_playback_rate(double rate)
 		hr = m_pMP->put_Rate(rate);
 
 	if (!chain_active && need_chain)
+	{
+		logWrite(_T("[playback_rate/diag] setup_audio_filter_chain()"));
 		setup_audio_filter_chain();
+	}
 
 	logWrite(_T("[playback_rate] SetRate %.2f hr=0x%08x"), rate, hr);
 }

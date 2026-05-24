@@ -271,20 +271,24 @@ void CSubtitle::rebuild_active_view()
 	std::sort(m_subtitle.begin(), m_subtitle.end(),
 		[](const CCaption& a, const CCaption& b) { return a.start < b.start; });
 
-	//같은 start 의 caption merge — 두 Class 동시 활성 시 한 sync 에 양 언어 sentences 합침.
-	for (size_t i = 1; i < m_subtitle.size();)
+	//같은 start 의 caption merge — 새 deque 생성 패턴 (O(n)). 이전 *erase from middle* 은
+	//deque O(n) × n번 = O(n^2) — multi-class 통합 (KRCC 700 + JPCC 700) 시 큰 병목.
+	std::deque<CCaption> merged;
+	for (size_t i = 0; i < m_subtitle.size(); ++i)
 	{
-		if (m_subtitle[i].start == m_subtitle[i - 1].start)
+		if (!merged.empty() && m_subtitle[i].start == merged.back().start)
 		{
 			for (const auto& s : m_subtitle[i].sentences)
-				m_subtitle[i - 1].sentences.push_back(s);
-			if (m_subtitle[i].end > m_subtitle[i - 1].end)
-				m_subtitle[i - 1].end = m_subtitle[i].end;
-			m_subtitle.erase(m_subtitle.begin() + i);
+				merged.back().sentences.push_back(s);
+			if (m_subtitle[i].end > merged.back().end)
+				merged.back().end = m_subtitle[i].end;
 		}
 		else
-			++i;
+		{
+			merged.push_back(std::move(m_subtitle[i]));
+		}
 	}
+	m_subtitle = std::move(merged);
 }
 
 bool CSubtitle::load_srt(CString sfile)
@@ -954,25 +958,36 @@ bool CSubtitle::save_smi(CString sfile)
 		}
 		_ftprintf(fp_m, _T("--></STYLE>\n</HEAD>\n<BODY>\n"));
 
-		//모든 cue 시간순 정렬 + 출력. 표준 SMI format — *같은 SYNC 별도 entry* per Class (KMPlayer/PotPlayer/
-		//일반 parser 호환). 같은 SYNC 안 multi-P 는 *Subtitle parser 가 처리 못함* (한 P 의 text 가 다음 P 까지 흡수).
-		std::map<int, std::vector<std::pair<CString, const CSentence*>>> by_start;
+		//표준 SMI format — *같은 SYNC 별도 entry* per Class. 같은 (start, class) 그룹의 sentence 들은
+		//한 SYNC entry 안에 line_index 변화 시 <br> join + color 있으면 <font color=X>seg</font> wrap
+		//(single class save_smi 와 동일 로직).
+		std::map<int, std::map<CString, std::vector<const CSentence*>>> by_start_class;
 		for (const auto& kv : m_tracks)
 		{
 			const CString& cls = kv.first;
 			for (const auto& cap : kv.second)
 				for (const auto& sent : cap.sentences)
-					by_start[cap.start].push_back({ cls, &sent });
+					by_start_class[cap.start][cls].push_back(&sent);
 		}
-		for (const auto& g : by_start)
+		for (const auto& g : by_start_class)
 		{
 			for (const auto& cs : g.second)
 			{
-				//text 안 newline → <br> (한 줄 SYNC entry 유지).
-				CString txt = cs.second->sentence;
-				txt.Replace(_T("\r\n"), _T("<br>"));
-				txt.Replace(_T("\n"), _T("<br>"));
-				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>%s\n"), g.first, cs.first.GetString(), txt.GetString());
+				const CString& cls = cs.first;
+				const auto& sents = cs.second;
+				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>"), g.first, cls.GetString());
+				int prev_line = -1;
+				for (const CSentence* s : sents)
+				{
+					if (prev_line >= 0 && s->line_index != prev_line)
+						_ftprintf(fp_m, _T("<br>"));
+					if (!s->color.IsEmpty())
+						_ftprintf(fp_m, _T("<font color=%s>%s</font>"), s->color.GetString(), s->sentence.GetString());
+					else
+						_ftprintf(fp_m, _T("%s"), s->sentence.GetString());
+					prev_line = s->line_index;
+				}
+				_ftprintf(fp_m, _T("\n"));
 			}
 		}
 

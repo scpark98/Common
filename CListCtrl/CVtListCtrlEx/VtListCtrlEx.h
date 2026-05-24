@@ -154,6 +154,13 @@ public:
 	//Owner Data, Owner Draw Fixed를 모두 false로 설정하고 왠만한 method는 공통적으로 사용 가능하다.
 	void			set_use_virtual_list(bool use_virtual = true) { m_use_virtual_list = use_virtual; }
 
+	//대량 insert/set 사이 sync_scrollbar/Invalidate/InvalidateRect 호출 일괄 차단.
+	//N row populate 시 매 호출마다 GetClientRect+GetColumnWidth*col+MoveWindow 가 N 회 누적 → 성능 저하.
+	//사용 패턴: begin_bulk_insert() → loop { insert_item + set_text + set_text_color + set_text_style } → end_bulk_insert().
+	//end 가 SetRedraw(TRUE) + sync_scrollbar() + Invalidate() 한 번씩 호출.
+	void			begin_bulk_insert();
+	void			end_bulk_insert();
+
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 
 	void			modify_style();
@@ -700,6 +707,9 @@ public:
 
 protected:
 	bool			m_use_virtual_list = true;
+
+	//begin_bulk_insert/end_bulk_insert 사이는 true — insert_item / set_text* 의 sync_scrollbar/Invalidate 차단.
+	bool			m_in_bulk_insert = false;
 
 //메인 데이터
 	std::deque<CListCtrlData> m_list_db;

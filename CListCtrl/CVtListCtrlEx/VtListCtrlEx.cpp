@@ -2162,7 +2162,7 @@ void CVtListCtrlEx::set_text_color(int item, int subItem, Gdiplus::Color crText,
 		}
 	}
 
-	if (invalidate)
+	if (invalidate && !m_in_bulk_insert)
 		Invalidate();
 }
 
@@ -2334,7 +2334,7 @@ void CVtListCtrlEx::set_text_style(int item, int subItem, int weight, bool itali
 	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::italic,    italic    ? 1 : 0);
 	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::underline, underline ? 1 : 0);
 	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::strikeout, strikeout ? 1 : 0);
-	if (invalidate)
+	if (invalidate && !m_in_bulk_insert)
 		Invalidate();
 }
 
@@ -2481,18 +2481,22 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 		index = InsertItem(&item);
 	}
 
-	//ensureVisible이면 Invalidate()을 생략해도 된다.
-	//TRACE(_T("m_auto_scroll = %d, ensureVisible = %d\n"), m_auto_scroll, ensureVisible);
-	if (m_auto_scroll && ensureVisible)
+	//bulk_insert 모드면 ensure/Invalidate/sync 모두 skip — end_bulk_insert 가 한 번에 처리.
+	if (!m_in_bulk_insert)
 	{
-		ensure_visible(index, visible_last);
-	}
-	else if (invalidate)
-	{
-		Invalidate();
-	}
+		//ensureVisible이면 Invalidate()을 생략해도 된다.
+		//TRACE(_T("m_auto_scroll = %d, ensureVisible = %d\n"), m_auto_scroll, ensureVisible);
+		if (m_auto_scroll && ensureVisible)
+		{
+			ensure_visible(index, visible_last);
+		}
+		else if (invalidate)
+		{
+			Invalidate();
+		}
 
-	sync_scrollbar();
+		sync_scrollbar();
+	}
 
 	return index;
 }
@@ -2948,7 +2952,7 @@ void CVtListCtrlEx::set_text(int item, int subItem, CString text, bool invalidat
 		SetItemText(item, subItem, text);
 	}
 
-	if (invalidate)
+	if (invalidate && !m_in_bulk_insert)
 		InvalidateRect(get_item_rect(item, subItem), false);
 }
 
@@ -5646,6 +5650,20 @@ void CVtListCtrlEx::setup_scrollbar()
 	m_scrollbar_h.set_color_theme(m_theme, false);
 	m_scrollbar_h.set_line(30);		//화살표 클릭 = 30px (average char width ~ 7 의 약 4 배).
 	m_scrollbar_h.ShowWindow(SW_HIDE);
+}
+
+void CVtListCtrlEx::begin_bulk_insert()
+{
+	m_in_bulk_insert = true;
+	SetRedraw(FALSE);
+}
+
+void CVtListCtrlEx::end_bulk_insert()
+{
+	m_in_bulk_insert = false;
+	SetRedraw(TRUE);
+	sync_scrollbar();
+	Invalidate();
 }
 
 void CVtListCtrlEx::sync_scrollbar()

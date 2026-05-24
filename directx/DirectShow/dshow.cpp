@@ -1060,6 +1060,7 @@ CDShow::CDShow()
 	m_hDirectVobSubWnd = NULL;
 	m_subtitle_sync = 0;
 	m_audio_sync = 0;
+	m_user_playback_rate.store(1.0);
 	m_media_filename.Empty();
 
 	close_media();
@@ -1170,6 +1171,7 @@ void CDShow::close_media()
 	m_hDirectVobSubWnd = NULL;
 	m_subtitle_sync = 0;
 	m_audio_sync = 0;
+	m_user_playback_rate.store(1.0);
 	m_media_filename.Empty();
 
 	m_video_stream.clear();
@@ -3253,29 +3255,17 @@ void CDShow::reselect_current_subtitle_stream()
 
 double CDShow::get_playback_rate()
 {
-	if (!m_pGB)
-		return 1.0;
-
-	double rate = 1.0;
-	if (m_pMS)
-	{
-		HRESULT hr = m_pMS->GetRate(&rate);
-		if (FAILED(hr))
-		{
-			rate = 1.0;
-			if (m_pMP)
-				m_pMP->get_Rate(&rate);
-		}
-	}
-	else if (m_pMP)
-	{
-		m_pMP->get_Rate(&rate);
-	}
-	return rate;
+	//user-visible rate — set_playback_rate 가 store 한 값. graph m_pMS->GetRate 무관.
+	//LAV path 에서 m_pMS->SetRate 안 호출 (LAV chipmunk 회피) → graph rate 항상 1.0.
+	//그러나 사용자에게는 우리가 atempo 로 적용한 rate 가 진짜 재생속도 — 그 값 반환.
+	return m_user_playback_rate.load();
 }
 
 void CDShow::set_playback_rate(double rate)
 {
+	//user-visible rate 갱신 — get_playback_rate 가 이 값 반환 (graph SetRate 안 호출하는 LAV path 도 OSD 정상).
+	m_user_playback_rate.store(rate);
+
 	if (!m_pGB)
 		return;
 

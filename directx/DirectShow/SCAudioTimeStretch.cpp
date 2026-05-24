@@ -98,6 +98,8 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	m_filter_flt = is_float;
 	m_filter_rate = initial_rate;
 	m_in_pts_samples = 0;
+	m_anchor_set = false;
+	m_emitted_total = 0;
 
 	logWrite(_T("[time_stretch] graph init OK sr=%d ch=%d bps=%d flt=%d rate=%.3f"),
 		sample_rate, channels, bits_per_sample, (int)is_float, initial_rate);
@@ -120,6 +122,8 @@ void CSCAudioTimeStretch::release_filter_graph()
 	m_filter_flt = false;
 	m_filter_rate = 1.0;
 	m_in_pts_samples = 0;
+	m_anchor_set = false;
+	m_emitted_total = 0;
 }
 
 bool CSCAudioTimeStretch::send_filter_rate(double rate)
@@ -264,10 +268,14 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 		return;
 	}
 
-	//input sample 의 timestamp 보존 — output sample 의 timestamp 는 동일 baseline 의 sample 수 기반.
+	//첫 input 의 timestamp 를 anchor 로 — 이후 output sample 들은 m_emitted_total 누적 기반.
 	REFERENCE_TIME in_tStart = 0, in_tStop = 0;
 	bool has_in_time = SUCCEEDED(pIn->GetTime(&in_tStart, &in_tStop));
-	const double rate = m_filter_rate;
+	if (has_in_time && !m_anchor_set)
+	{
+		m_anchor_rt = in_tStart;
+		m_anchor_set = true;
+	}
 	LONGLONG delay = m_delay_100ns.load();
 
 	//downstream allocator 에서 output sample 받아서 PCM 채워 deliver.
@@ -283,7 +291,10 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 	}
 
 	//atempo output frame pull loop — 한 input 이 여러 output 또는 0 output (누적) 가능.
-	int total_emitted_samples = 0;
+	//timestamp 의 핵심: m_emitted_total (누적 output sample 수) 은 atempo 가 양을 1/rate 로 줄였으므로
+	//*input 의 1/rate 빈도로 진행*. output sample.tStart = anchor + m_emitted_total / sample_rate.
+	//audio renderer 가 더 짧은 시간에 다음 sample 의 tStart 도달 → DSound 가 빨리 처리 → graph clock 가속.
+	//*추가 /rate 는 적용하지 말 것* — atempo 가 이미 양을 줄여서 자연 1/rate scale 됨.
 	while (true)
 	{
 		AVFrame* out_frame = av_frame_alloc();
@@ -312,14 +323,12 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 			pOut->SetActualDataLength(out_bytes);
 			pOut->SetSyncPoint(TRUE);
 
-			//timestamp — input 의 tStart 기준 + 누적 sample / sample_rate / rate*?
-			//atempo 의 output rate 는 input rate 와 동일 (sample_rate 변화 없음) — *시간 축* 만 stretch.
-			//output sample 의 미디어 시간 진행 = input 의 미디어 시간 진행 / rate.
-			//단순화 — output frame.pts (audio sink 의 1/sample_rate time_base) 가 input 의 1/rate 비례 진행.
-			if (has_in_time)
+			if (m_anchor_set)
 			{
-				REFERENCE_TIME outStart = in_tStart + (REFERENCE_TIME)((double)total_emitted_samples * 10000000.0 / sample_rate / rate);
-				REFERENCE_TIME outStop  = outStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / sample_rate / rate);
+				REFERENCE_TIME outStart = m_anchor_rt +
+					(REFERENCE_TIME)((double)m_emitted_total * 10000000.0 / sample_rate);
+				REFERENCE_TIME outStop = outStart +
+					(REFERENCE_TIME)((double)out_samples * 10000000.0 / sample_rate);
 				if (delay != 0)
 				{
 					outStart += delay;
@@ -331,7 +340,7 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 			m_pOutputPin->deliver_sample(pOut);
 		}
 		pOut->Release();
-		total_emitted_samples += out_samples;
+		m_emitted_total += out_samples;
 		av_frame_free(&out_frame);
 	}
 
@@ -362,13 +371,15 @@ void CSCAudioTimeStretch::process_one(const work_item& w)
 	}
 	else if (w.kind == kind_new_segment)
 	{
-		//new segment — atempo internal buffer flush.
+		//new segment — atempo internal buffer flush + anchor / emitted 누적 reset.
 		if (m_filter_graph && m_filter_src)
 		{
 			//flush_buffers 가 동기 호출 — 누적 buffer 비움. 다음 frame 부터 새 baseline.
 			avfilter_graph_send_command(m_filter_graph, "atempo", "reset", "", NULL, 0, 0);
 		}
 		m_in_pts_samples = 0;
+		m_anchor_set = false;
+		m_emitted_total = 0;
 		if (m_pOutputPin)
 			m_pOutputPin->deliver_new_segment(w.ns_start, w.ns_stop, w.ns_rate);
 	}

@@ -81,4 +81,11 @@ private:
 
 	//pts 누적 — atempo input frame 의 pts 가 timeline 진행 baseline.
 	int64_t m_in_pts_samples = 0;
+
+	//output sample 의 timestamp 계산 baseline. NewSegment 마다 reset.
+	//atempo 가 output sample 양 1/rate 로 줄임 → 누적 sample 양 기반 timestamp 가 자연 1/rate 빈도 진행
+	//→ audio renderer 가 더 짧은 시간에 다음 sample 요청 → graph clock 가속 → video 도 따라 가속.
+	REFERENCE_TIME m_anchor_rt = 0;
+	bool           m_anchor_set = false;
+	int64_t        m_emitted_total = 0;
 };

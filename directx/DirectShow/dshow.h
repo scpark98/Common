@@ -3,6 +3,8 @@
 #include <Afxwin.h>
 #include <Afxdisp.h>
 
+#include <atomic>
+
 #include <dshow.h>          // 디쇼 사용시
 #include <D3d9.h>
 #include <vmr9.h>
@@ -453,6 +455,11 @@ protected:
 	void*					m_pAudioGainFilter;
 	void*					m_pAudioCompressorFilter;
 	void*					m_pAudioTimeStretchFilter;	//CSCAudioTimeStretch — atempo pitch-preserving time-stretch. chain 끝 (renderer 직전).
+
+	//user-visible playback rate — set_playback_rate 가 갱신, get_playback_rate 가 반환.
+	//LAV path 에서는 graph m_pMS->SetRate 안 호출 (LAV 의 chipmunk 회피, TimeStretch 만 적용) 하므로
+	//m_pMS->GetRate 가 항상 1.0 — 그러면 OSD 가 사용자 의도와 달라짐. 별도 atomic 으로 user-visible rate 보관.
+	std::atomic<double>		m_user_playback_rate{ 1.0 };
 
 	int						m_nFilter;				// 사용된 필터의 수
 	BOOL					m_bFilter[10];			// 등록정보가 가능한 필터인지...

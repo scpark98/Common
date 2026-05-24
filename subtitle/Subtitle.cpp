@@ -861,6 +861,8 @@ bool CSubtitle::save_subtitle_file(CString sfile)
 		return save_smi(m_sfile);
 	else if (ext == _T("srt"))
 		return save_srt(m_sfile);
+	else if (ext == _T("ass") || ext == _T("ssa"))
+		return save_ass(m_sfile);
 	else
 		return false;
 }
@@ -979,6 +981,61 @@ P { margin-left:8pt; margin-right:8pt; margin-bottom:2pt;\n\
 	}
 
 	_ftprintf(fp, _T("\n</BODY>\n</SAMI>\n"));
+
+	fclose(fp);
+	return true;
+}
+
+//ASS save — 단순 skeleton + Default style + Dialogue lines. embedded subtitle export 용도.
+//원본 style 정보는 없음 (decoder 후 평문만 보유). 호환 viewer (PotPlayer, MPC, VLC) 에서 정상 표시.
+bool CSubtitle::save_ass(CString sfile)
+{
+	DWORD dwAttrs = GetFileAttributes(sfile);
+	if (dwAttrs != INVALID_FILE_ATTRIBUTES && (dwAttrs & FILE_ATTRIBUTE_READONLY))
+		SetFileAttributes(sfile, FILE_ATTRIBUTE_NORMAL);
+
+	FILE* fp = nullptr;
+	_tfopen_s(&fp, sfile, _T("wt,ccs=UTF-8"));
+	if (!fp) return false;
+
+	_ftprintf(fp, _T("[Script Info]\n"));
+	_ftprintf(fp, _T("Title: Exported\n"));
+	_ftprintf(fp, _T("ScriptType: v4.00+\n"));
+	_ftprintf(fp, _T("WrapStyle: 0\n"));
+	_ftprintf(fp, _T("ScaledBorderAndShadow: yes\n"));
+	_ftprintf(fp, _T("Collisions: Normal\n\n"));
+
+	_ftprintf(fp, _T("[V4+ Styles]\n"));
+	_ftprintf(fp, _T("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"));
+	_ftprintf(fp, _T("Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n\n"));
+
+	_ftprintf(fp, _T("[Events]\n"));
+	_ftprintf(fp, _T("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"));
+
+	for (int i = 0; i < (int)m_subtitle.size(); i++)
+	{
+		const CCaption& cap = m_subtitle[i];
+		int s_ms = cap.start;
+		int e_ms = cap.end >= 0 ? cap.end : (cap.start + 3000);
+
+		CString s_time, e_time;
+		s_time.Format(_T("%d:%02d:%02d.%02d"), s_ms/3600000, (s_ms/60000)%60, (s_ms/1000)%60, (s_ms%1000)/10);
+		e_time.Format(_T("%d:%02d:%02d.%02d"), e_ms/3600000, (e_ms/60000)%60, (e_ms/1000)%60, (e_ms%1000)/10);
+
+		//multi-sentence 한 caption 의 모든 sentence 를 \N 으로 join.
+		CString text;
+		for (int j = 0; j < (int)cap.sentences.size(); j++)
+		{
+			if (!text.IsEmpty()) text += _T("\\N");
+			CString s = cap.sentences[j].sentence;
+			s.Replace(_T("\r\n"), _T("\\N"));
+			s.Replace(_T("\n"), _T("\\N"));
+			text += s;
+		}
+
+		_ftprintf(fp, _T("Dialogue: 0,%s,%s,Default,,0,0,0,,%s\n"),
+			s_time.GetString(), e_time.GetString(), text.GetString());
+	}
 
 	fclose(fp);
 	return true;

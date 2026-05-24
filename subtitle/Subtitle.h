@@ -162,4 +162,6 @@ protected:
 	bool load_ass(CString sfile);	//ASS / SSA — Dialogue 라인 + Format header 기반 parsing.
 	bool save_smi(CString sfile);
 	bool save_srt(CString sfile);
+	//ASS 단순 skeleton + Dialogue lines. style 정보 보존 X — text 만. 호출자가 export 시 사용.
+	bool save_ass(CString sfile);
 };

@@ -231,6 +231,12 @@ public:
 	void			teardown_audio_filter_chain();
 	void			setup_audio_gain_filter();		//internal — chain 의 한 단계
 	void			teardown_audio_gain_filter();	//internal — chain 전체 해체
+
+	//Video time-scale filter — LAV path 의 video sample tStart/tStop 1/rate scale (zero-copy pass-through).
+	//audio TimeStretch 와 동일 비율로 video timestamp 진행 → graph clock master 무관 sync 일관.
+	//internal path 는 CFFiVideoStream::FillBuffer 가 이미 직접 scale — 이중 적용 방지 위해 skip.
+	void			setup_video_time_scale_filter();
+	void			teardown_video_time_scale_filter();
 	void			set_audio_gain_db(float db);
 	float			get_audio_gain_db();
 	void			set_audio_compressor_makeup_db(float db);
@@ -455,6 +461,7 @@ protected:
 	void*					m_pAudioGainFilter;
 	void*					m_pAudioCompressorFilter;
 	void*					m_pAudioTimeStretchFilter;	//CSCAudioTimeStretch — atempo pitch-preserving time-stretch. chain 끝 (renderer 직전).
+	void*					m_pVideoTimeScaleFilter;	//CSCVideoTimeScale — video sample tStart/tStop 만 1/rate scale (zero-copy). renderer 직전.
 
 	//user-visible playback rate — set_playback_rate 가 갱신, get_playback_rate 가 반환.
 	//LAV path 에서는 graph m_pMS->SetRate 안 호출 (LAV 의 chipmunk 회피, TimeStretch 만 적용) 하므로

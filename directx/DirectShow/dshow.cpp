@@ -2,6 +2,7 @@
 #include "SCAudioGain.h"
 #include "SCAudioCompressor.h"
 #include "SCAudioTimeStretch.h"
+#include "SCVideoTimeScale.h"
 #include "../../log/SCLog/SCLog.h"
 #include <gdiplus.h>
 #include <cmath>
@@ -569,8 +570,17 @@ void CDShow::teardown_subtitle_grabber()
 
 //Audio gain filter — graph 의 audio renderer 직전에 끼워 PCM sample 직접 amplify.
 //graph 빌드 후 (load_media 끝) 호출. graph 가 stopped 인 상태에서 reconnect.
-void CDShow::setup_audio_filter_chain() { setup_audio_gain_filter(); }
-void CDShow::teardown_audio_filter_chain() { teardown_audio_gain_filter(); }
+//Video TimeScale 도 LAV path 한정 동시 setup — audio TimeStretch 와 동일 rate 적용을 위해.
+void CDShow::setup_audio_filter_chain()
+{
+	setup_audio_gain_filter();
+	setup_video_time_scale_filter();
+}
+void CDShow::teardown_audio_filter_chain()
+{
+	teardown_video_time_scale_filter();
+	teardown_audio_gain_filter();
+}
 void CDShow::set_audio_compressor_makeup_db(float db)
 {
 	if (!m_pAudioCompressorFilter) return;
@@ -863,6 +873,31 @@ void CDShow::setup_audio_gain_filter()
 		if (saved_mt.pUnk) saved_mt.pUnk->Release();
 	}
 
+	//audio renderer 의 IReferenceClock 을 graph master 로 명시. graph 의 default 가 audio renderer 인 게 보통이지만
+	//chain 변경 (filter add/remove) 후 graph 가 재선택 — 다른 filter 가 master 가 되면 audio 의 sample timing 진행 속도가
+	//graph clock 에 반영 안 됨 → rate < 1.0 시 video 가 audio 보다 느림 같은 비대칭. audio renderer 강제로 안정.
+	if (pRenderer)
+	{
+		CComQIPtr<IReferenceClock> pClock(pRenderer);
+		if (pClock)
+		{
+			CComQIPtr<IMediaFilter> pMF(m_pGB);
+			if (pMF)
+			{
+				HRESULT hr_sync = pMF->SetSyncSource(pClock);
+				logWrite(_T("[AudioGain] SetSyncSource(audio renderer clock) hr=0x%08lX"), hr_sync);
+			}
+			else
+			{
+				logWrite(_T("[AudioGain] graph IMediaFilter QI fail — SetSyncSource skipped"));
+			}
+		}
+		else
+		{
+			logWrite(_T("[AudioGain] audio renderer IReferenceClock not exposed — SetSyncSource skipped"));
+		}
+	}
+
 	pUpstreamOut->Release();
 	pRenderer->Release();
 	pRendererIn->Release();
@@ -971,6 +1006,209 @@ void CDShow::teardown_audio_gain_filter()
 	}
 }
 
+
+void CDShow::setup_video_time_scale_filter()
+{
+	teardown_video_time_scale_filter();
+
+	if (!m_pGB) return;
+	//internal path (m_pFFiSource != NULL) 에서는 CFFiVideoStream::FillBuffer 가 이미 rate scaling — skip.
+	if (m_pFFiSource) return;
+
+	//graph state 보호.
+	CComQIPtr<IMediaControl> pMC(m_pGB);
+	OAFilterState saved_state = State_Stopped;
+	if (pMC) { pMC->GetState(0, &saved_state); pMC->Stop(); }
+
+	//video renderer 찾기 — input pin 만 가진 + connected media major = MEDIATYPE_Video.
+	IBaseFilter* pRenderer = NULL;
+	IPin*        pRendererIn = NULL;
+	IPin*        pUpstreamOut = NULL;
+
+	IEnumFilters* pEnumF = NULL;
+	if (SUCCEEDED(m_pGB->EnumFilters(&pEnumF)) && pEnumF)
+	{
+		IBaseFilter* pF = NULL;
+		while (pEnumF->Next(1, &pF, NULL) == S_OK)
+		{
+			IEnumPins* pEnumP = NULL;
+			if (SUCCEEDED(pF->EnumPins(&pEnumP)) && pEnumP)
+			{
+				bool has_input = false;
+				bool has_output = false;
+				IPin* pVideoIn = NULL;
+				IPin* p = NULL;
+				while (pEnumP->Next(1, &p, NULL) == S_OK)
+				{
+					PIN_DIRECTION dir;
+					p->QueryDirection(&dir);
+					if (dir == PINDIR_OUTPUT) has_output = true;
+					else if (dir == PINDIR_INPUT)
+					{
+						has_input = true;
+						AM_MEDIA_TYPE mt;
+						memset(&mt, 0, sizeof(mt));
+						if (SUCCEEDED(p->ConnectionMediaType(&mt)))
+						{
+							if (IsEqualGUID(mt.majortype, MEDIATYPE_Video))
+							{
+								if (pVideoIn) pVideoIn->Release();
+								pVideoIn = p;
+								pVideoIn->AddRef();
+							}
+							if (mt.cbFormat && mt.pbFormat) CoTaskMemFree(mt.pbFormat);
+							if (mt.pUnk) mt.pUnk->Release();
+						}
+					}
+					p->Release();
+				}
+				pEnumP->Release();
+
+				if (has_input && !has_output && pVideoIn)
+				{
+					pRenderer = pF; pRenderer->AddRef();
+					pRendererIn = pVideoIn;
+					pVideoIn = NULL;
+				}
+				if (pVideoIn) pVideoIn->Release();
+			}
+			pF->Release();
+			if (pRenderer) break;
+		}
+		pEnumF->Release();
+	}
+
+	if (!pRenderer || !pRendererIn)
+	{
+		logWrite(_T("[VideoTS] no video renderer found"));
+		if (pRenderer) pRenderer->Release();
+		if (pRendererIn) pRendererIn->Release();
+		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
+		return;
+	}
+	logWrite(_T("[VideoTS] video renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
+
+	pRendererIn->ConnectedTo(&pUpstreamOut);
+	if (!pUpstreamOut)
+	{
+		logWrite(_T("[VideoTS] upstream pin not connected"));
+		pRenderer->Release(); pRendererIn->Release();
+		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
+		return;
+	}
+
+	AM_MEDIA_TYPE saved_mt;
+	memset(&saved_mt, 0, sizeof(saved_mt));
+	HRESULT hr_mt = pRendererIn->ConnectionMediaType(&saved_mt);
+	bool has_saved_mt = SUCCEEDED(hr_mt);
+
+	m_pGB->Disconnect(pRendererIn);
+	m_pGB->Disconnect(pUpstreamOut);
+
+	CSCVideoTimeScale* pTS = new CSCVideoTimeScale();
+	pTS->AddRef();
+
+	HRESULT hr_add = m_pGB->AddFilter(pTS, L"SC Video Time-Scale");
+	logWrite(_T("[VideoTS] AddFilter hr=0x%08lX"), hr_add);
+	if (FAILED(hr_add))
+	{
+		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
+		pTS->Release();
+	}
+	else
+	{
+		IPin* pTsIn = NULL, *pTsOut = NULL;
+		pTS->FindPin(L"In",  &pTsIn);
+		pTS->FindPin(L"Out", &pTsOut);
+
+		HRESULT hr_t1 = (pTsIn  ? m_pGB->ConnectDirect(pUpstreamOut, pTsIn,  has_saved_mt ? &saved_mt : NULL) : E_FAIL);
+		HRESULT hr_t2 = (pTsOut ? m_pGB->ConnectDirect(pTsOut, pRendererIn, has_saved_mt ? &saved_mt : NULL) : E_FAIL);
+		logWrite(_T("[VideoTS] Connect upstream->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
+
+		if (pTsIn) pTsIn->Release();
+		if (pTsOut) pTsOut->Release();
+
+		if (FAILED(hr_t1) || FAILED(hr_t2))
+		{
+			logWrite(_T("[VideoTS] connect failed - restoring original"));
+			m_pGB->RemoveFilter(pTS);
+			pTS->Release();
+			m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
+		}
+		else
+		{
+			logWrite(_T("[VideoTS] video time-scale inserted into chain"));
+			m_pVideoTimeScaleFilter = pTS;
+		}
+	}
+
+	if (has_saved_mt)
+	{
+		if (saved_mt.cbFormat && saved_mt.pbFormat) CoTaskMemFree(saved_mt.pbFormat);
+		if (saved_mt.pUnk) saved_mt.pUnk->Release();
+	}
+
+	pUpstreamOut->Release();
+	pRenderer->Release();
+	pRendererIn->Release();
+
+	if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
+}
+
+void CDShow::teardown_video_time_scale_filter()
+{
+	if (!m_pGB || !m_pVideoTimeScaleFilter) return;
+
+	CComQIPtr<IMediaControl> pMC(m_pGB);
+	OAFilterState saved_state = State_Stopped;
+	if (pMC) { pMC->GetState(0, &saved_state); pMC->Stop(); }
+
+	CSCVideoTimeScale* pTS = (CSCVideoTimeScale*)m_pVideoTimeScaleFilter;
+
+	IPin* pTsIn = NULL, *pTsOut = NULL;
+	pTS->FindPin(L"In",  &pTsIn);
+	pTS->FindPin(L"Out", &pTsOut);
+
+	IPin* pUpstreamOut = NULL;
+	IPin* pDownstreamIn = NULL;
+	AM_MEDIA_TYPE saved_mt;
+	memset(&saved_mt, 0, sizeof(saved_mt));
+	bool has_mt = false;
+
+	if (pTsIn)  pTsIn->ConnectedTo(&pUpstreamOut);
+	if (pTsOut)
+	{
+		pTsOut->ConnectedTo(&pDownstreamIn);
+		if (pDownstreamIn && SUCCEEDED(pDownstreamIn->ConnectionMediaType(&saved_mt)))
+			has_mt = true;
+	}
+	if (pTsIn) pTsIn->Release();
+	if (pTsOut) pTsOut->Release();
+
+	m_pGB->RemoveFilter(pTS);
+	pTS->Release();
+	m_pVideoTimeScaleFilter = NULL;
+
+	if (pUpstreamOut && pDownstreamIn)
+	{
+		HRESULT hr_r = m_pGB->ConnectDirect(pUpstreamOut, pDownstreamIn, has_mt ? &saved_mt : NULL);
+		logWrite(_T("[VideoTS] teardown direct reconnect hr=0x%08x"), hr_r);
+	}
+	if (pUpstreamOut) pUpstreamOut->Release();
+	if (pDownstreamIn) pDownstreamIn->Release();
+	if (has_mt)
+	{
+		if (saved_mt.cbFormat && saved_mt.pbFormat) CoTaskMemFree(saved_mt.pbFormat);
+		if (saved_mt.pUnk) saved_mt.pUnk->Release();
+	}
+
+	if (pMC)
+	{
+		if (saved_state == State_Running) pMC->Run();
+		else if (saved_state == State_Paused) pMC->Pause();
+	}
+}
+
 void CDShow::set_audio_gain_db(float db)
 {
 	logWrite(_T("[set_audio_gain_db] db=%.2f filter=%p"), db, m_pAudioGainFilter);
@@ -1052,6 +1290,7 @@ CDShow::CDShow()
 	m_pAudioGainFilter = NULL;
 	m_pAudioCompressorFilter = NULL;
 	m_pAudioTimeStretchFilter = NULL;
+	m_pVideoTimeScaleFilter = NULL;
 
 	m_use_dvs = false;
 	m_use_mpcvr = false;
@@ -3280,14 +3519,13 @@ void CDShow::set_playback_rate(double rate)
 	HRESULT hr = S_OK;
 	if (m_pAudioTimeStretchFilter)
 	{
+		//LAV path — audio TimeStretch + video TimeScale 둘 다 적용. 동일 rate 보장.
+		//graph SetRate 안 호출 — LAV 가 받으면 audio/video 의 timestamp/data 양 변경 → 우리 filter 와 이중 적용 위험
+		//(rate < 1.0 시 video 가 1/rate^2 로 너무 느림 / audio 가 chipmunk 가능).
 		((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_rate(rate);
-		//video sample timestamp scale 위해 graph SetRate 도 호출 — LAV Video Decoder 가 받아 video timing 변경 →
-		//MPC-VR 가 빠르게 표시. LAV Audio Decoder 도 받지만 SC Audio chain (Gain/Compressor) 의 IMediaSeeking 이
-		//pass-through (upstream 위임) 라 audio 흐름의 *PCM 양 변경* 은 LAV 의 audio path 동작에 달림 —
-		//audio data 양 변화 시 TimeStretch 와 이중 적용 가능성. quality 확인 후 plan B (video-only transform filter).
-		if (m_pMS)
-			hr = m_pMS->SetRate(rate);
-		logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch->set_rate(%.3f) + graph SetRate hr=0x%08x"), rate, hr);
+		if (m_pVideoTimeScaleFilter)
+			((CSCVideoTimeScale*)m_pVideoTimeScaleFilter)->set_rate(rate);
+		logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch + CSCVideoTimeScale set_rate(%.3f)"), rate);
 	}
 	else if (m_pFFiSource)
 	{

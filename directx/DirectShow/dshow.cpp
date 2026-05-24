@@ -2069,8 +2069,8 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	if (is_media_video())
 		prepare_AlphaBitmap();
 
-	//audio gain filter 끼움 — graph 의 audio renderer 직전. graph 빌드 끝난 후 한 번.
-	setup_audio_gain_filter();
+	//audio gain filter + video time-scale filter 끼움 — graph 의 audio/video renderer 직전. graph 빌드 끝난 후 한 번.
+	setup_audio_filter_chain();
 
 	//Graph reference clock 을 audio renderer (default) 가 아닌 SystemClock 으로 변경 —
 	//  audio renderer 가 clock master 면 seek 후 audio buffer preroll (~50-200ms) 동안 clock 이 정지 → video 도 wait → 사용자 체감 delay.
@@ -2933,9 +2933,11 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	}
 
 	//SC Audio chain (Gain / Compressor / audio_sync) 삽입 — LAV path 와 동일 코드 재사용.
+	//internal path 는 video time-scale filter 미적용 (CFFiVideoStream::FillBuffer 가 이미 rate scaling)
+	//— setup_video_time_scale_filter 내부에서 m_pFFiSource 체크로 자동 skip.
 	if (pFFi->decoder().has_audio())
 	{
-		setup_audio_gain_filter();
+		setup_audio_filter_chain();
 		logWrite(_T("[internal] SC Audio chain setup"));
 	}
 

@@ -2048,7 +2048,7 @@ void CSCMenu::OnPaint()
 
 					Gdiplus::Rect grect(r_view.left, r_view.top, r_view.Width(), r_view.Height());
 					//draw_round_rect 시그니처: (g, rect, cr_stroke, cr_fill, radius=-1, width=1). 5번째 = radius, 6번째 = width.
-					draw_round_rect(&g, grect, cr_border, cr_bg, 4, 1);
+					draw_round_rect(&g, grect, cr_border, cr_bg, 6, 1);
 
 					Gdiplus::Font font(_T("Segoe UI"), (Gdiplus::REAL)(m_line_height * 0.45f), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 					Gdiplus::SolidBrush brush(cr_text);

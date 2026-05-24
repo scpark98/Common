@@ -1,4 +1,5 @@
 ﻿#include "Subtitle.h"
+#include "../log/SCLog/SCLog.h"
 #include <algorithm>
 #include <fstream>
 
@@ -101,6 +102,7 @@ CSubtitle::CSubtitle()
 
 bool CSubtitle::load_smi(CString sfile)
 {
+	DWORD __t0 = GetTickCount();
 	//read() 가 BOM/byte 통계로 인코딩 정확 판별 → CString 으로 한 번에 변환. get_token_str 으로 라인 분리.
 	std::deque<CString> lines;
 	if (!read_lines(sfile, &lines))
@@ -203,8 +205,13 @@ bool CSubtitle::load_smi(CString sfile)
 		else
 			m_active_classes.push_back(m_tracks.begin()->first);
 	}
+	DWORD __t1 = GetTickCount();
 	rebuild_active_view();
-
+	DWORD __t2 = GetTickCount();
+	int total_track_cues = 0;
+	for (const auto& kv : m_tracks) total_track_cues += (int)kv.second.size();
+	logWrite(_T("[sub] load_smi total=%lums parse=%lums rebuild=%lums tracks=%d total_cues=%d active_cues=%d"),
+		__t2 - __t0, __t1 - __t0, __t2 - __t1, (int)m_tracks.size(), total_track_cues, (int)m_subtitle.size());
 	return true;
 }
 

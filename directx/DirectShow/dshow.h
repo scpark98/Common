@@ -452,6 +452,7 @@ protected:
 	//Audio filter chain (CSCAudioGain* / CSCAudioCompressor* — header 의존 줄이려 void*)
 	void*					m_pAudioGainFilter;
 	void*					m_pAudioCompressorFilter;
+	void*					m_pAudioTimeStretchFilter;	//CSCAudioTimeStretch — atempo pitch-preserving time-stretch. chain 끝 (renderer 직전).
 
 	int						m_nFilter;				// 사용된 필터의 수
 	BOOL					m_bFilter[10];			// 등록정보가 가능한 필터인지...

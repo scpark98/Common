@@ -1,6 +1,7 @@
 ﻿#include "dshow.h"
 #include "SCAudioGain.h"
 #include "SCAudioCompressor.h"
+#include "SCAudioTimeStretch.h"
 #include "../../log/SCLog/SCLog.h"
 #include <gdiplus.h>
 #include <cmath>
@@ -796,6 +797,64 @@ void CDShow::setup_audio_gain_filter()
 			}
 			pGainOutPin->Release();
 		}
+
+		//CSCAudioTimeStretch (atempo pitch-preserving) — LAV path 에서만 chain 에 추가.
+		//internal path 는 CFFiAudioStream::FillBuffer 안에서 atempo 처리 — 중복 적용 방지.
+		//chain 위치: 마지막 tail filter (compressor 또는 gain) → time-stretch → renderer.
+		//compressor 실패해 tail 이 gain 인 경우는 일단 cover 안 함 (compressor 실패 자체가 드문 경로).
+		if (m_pAudioCompressorFilter && !m_pFFiSource)
+		{
+			CSCAudioCompressor* pCompTail = (CSCAudioCompressor*)m_pAudioCompressorFilter;
+			IPin* pTailOut = NULL;
+			pCompTail->FindPin(L"Out", &pTailOut);
+			if (pTailOut)
+			{
+				AM_MEDIA_TYPE ts_mt;
+				memset(&ts_mt, 0, sizeof(ts_mt));
+				HRESULT hr_tsmt = pTailOut->ConnectionMediaType(&ts_mt);
+				bool has_ts_mt = SUCCEEDED(hr_tsmt);
+
+				m_pGB->Disconnect(pTailOut);
+				m_pGB->Disconnect(pRendererIn);
+
+				CSCAudioTimeStretch* pTS = new CSCAudioTimeStretch();
+				pTS->AddRef();
+
+				HRESULT hr_addts = m_pGB->AddFilter(pTS, L"SC Audio Time-Stretch");
+				logWrite(_T("[AudioTS] AddFilter hr=0x%08lX"), hr_addts);
+
+				IPin* pTsIn = NULL, *pTsOut = NULL;
+				pTS->FindPin(L"In",  &pTsIn);
+				pTS->FindPin(L"Out", &pTsOut);
+
+				HRESULT hr_t1 = (pTsIn  ? m_pGB->ConnectDirect(pTailOut, pTsIn,  has_ts_mt ? &ts_mt : NULL) : E_FAIL);
+				HRESULT hr_t2 = (pTsOut ? m_pGB->ConnectDirect(pTsOut, pRendererIn, has_ts_mt ? &ts_mt : NULL) : E_FAIL);
+				logWrite(_T("[AudioTS] Connect comp->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
+
+				if (pTsIn) pTsIn->Release();
+				if (pTsOut) pTsOut->Release();
+
+				if (FAILED(hr_t1) || FAILED(hr_t2))
+				{
+					logWrite(_T("[AudioTS] connect failed - reverting (time-stretch 없이 compressor 까지만 사용)"));
+					m_pGB->RemoveFilter(pTS);
+					pTS->Release();
+					m_pGB->ConnectDirect(pTailOut, pRendererIn, has_ts_mt ? &ts_mt : NULL);
+				}
+				else
+				{
+					logWrite(_T("[AudioTS] time-stretch inserted into chain (comp->ts->renderer)"));
+					m_pAudioTimeStretchFilter = pTS;
+				}
+
+				if (has_ts_mt)
+				{
+					if (ts_mt.cbFormat && ts_mt.pbFormat) CoTaskMemFree(ts_mt.pbFormat);
+					if (ts_mt.pUnk) ts_mt.pUnk->Release();
+				}
+				pTailOut->Release();
+			}
+		}
 	}
 
 	if (has_saved_mt)
@@ -813,7 +872,7 @@ void CDShow::setup_audio_gain_filter()
 
 void CDShow::teardown_audio_gain_filter()
 {
-	if (!m_pGB || (!m_pAudioGainFilter && !m_pAudioCompressorFilter))
+	if (!m_pGB || (!m_pAudioGainFilter && !m_pAudioCompressorFilter && !m_pAudioTimeStretchFilter))
 		return;
 
 	//graph state 보존 — Stop 후 chain 제거, 마지막에 복원.
@@ -821,7 +880,7 @@ void CDShow::teardown_audio_gain_filter()
 	OAFilterState saved_state = State_Stopped;
 	if (pMC) { pMC->GetState(0, &saved_state); pMC->Stop(); }
 
-	//chain: upstream(LAV Audio out) → Gain → Compressor → downstream(DSound in).
+	//chain: upstream(LAV Audio out) → Gain → Compressor → TimeStretch → downstream(DSound in).
 	//재연결 위한 양끝 pin + media type 보존.
 	IPin* pUpstreamOut = NULL;
 	IPin* pDownstreamIn = NULL;
@@ -837,8 +896,14 @@ void CDShow::teardown_audio_gain_filter()
 		if (pGainIn) { pGainIn->ConnectedTo(&pUpstreamOut); pGainIn->Release(); }
 	}
 
-	IBaseFilter* pTailFilter = m_pAudioCompressorFilter ? (IBaseFilter*)(CSCAudioCompressor*)m_pAudioCompressorFilter
-														 : (m_pAudioGainFilter ? (IBaseFilter*)(CSCAudioGain*)m_pAudioGainFilter : NULL);
+	//tail 우선순위: TimeStretch > Compressor > Gain.
+	IBaseFilter* pTailFilter = NULL;
+	if (m_pAudioTimeStretchFilter)
+		pTailFilter = (IBaseFilter*)(CSCAudioTimeStretch*)m_pAudioTimeStretchFilter;
+	else if (m_pAudioCompressorFilter)
+		pTailFilter = (IBaseFilter*)(CSCAudioCompressor*)m_pAudioCompressorFilter;
+	else if (m_pAudioGainFilter)
+		pTailFilter = (IBaseFilter*)(CSCAudioGain*)m_pAudioGainFilter;
 	if (pTailFilter)
 	{
 		IPin* pTailOut = NULL;
@@ -860,7 +925,14 @@ void CDShow::teardown_audio_gain_filter()
 		}
 	}
 
-	//SC filter 들 RemoveFilter — graph 가 자동 disconnect.
+	//SC filter 들 RemoveFilter — graph 가 자동 disconnect. 순서: chain tail (TimeStretch) → Compressor → Gain.
+	if (m_pAudioTimeStretchFilter)
+	{
+		CSCAudioTimeStretch* pTS = (CSCAudioTimeStretch*)m_pAudioTimeStretchFilter;
+		m_pGB->RemoveFilter(pTS);
+		pTS->Release();
+		m_pAudioTimeStretchFilter = NULL;
+	}
 	if (m_pAudioCompressorFilter)
 	{
 		CSCAudioCompressor* pComp = (CSCAudioCompressor*)m_pAudioCompressorFilter;
@@ -979,6 +1051,7 @@ CDShow::CDShow()
 
 	m_pAudioGainFilter = NULL;
 	m_pAudioCompressorFilter = NULL;
+	m_pAudioTimeStretchFilter = NULL;
 
 	m_use_dvs = false;
 	m_use_mpcvr = false;
@@ -3206,36 +3279,36 @@ void CDShow::set_playback_rate(double rate)
 	if (!m_pGB)
 		return;
 
-	//SC Audio chain (Compressor/Gain) 의 존재 자체가 audio renderer 의 rate 적응 메커니즘을
-	//차단 — graph chain 차원의 SetRate / NewSegment / timestamp scale 모두 정상 동작해도
-	//DSound 의 실재 rate 변경 fail. async worker queue 로 sample 흐름을 분리해도 같음.
-	//rate != 1.0 시 chain teardown 으로 LAV → DSound 직결, rate == 1.0 복귀 시 setup 으로
-	//AGC / Compressor / audio_sync 복원. rate != 1.0 사이 이동 시 chain 이 이미 없으니 추가 변경 없음.
-	bool chain_active = (m_pAudioGainFilter != NULL || m_pAudioCompressorFilter != NULL);
-	bool need_chain = (rate == 1.0);
-
-	logWrite(_T("[playback_rate/diag] ENTER rate=%.3f chain_active=%d need_chain=%d ffi_source=%p pMS=%p pMP=%p"),
-		rate, (int)chain_active, (int)need_chain, m_pFFiSource, (void*)m_pMS, (void*)m_pMP);
-
-	if (chain_active && !need_chain)
+	//atempo time-stretch path — chain teardown / graph SetRate 모두 불필요.
+	//  (1) LAV path: CSCAudioTimeStretch 가 chain 에 들어가 있어 set_rate(rate) 만 호출하면
+	//      audio PCM 양 1/rate 줄어 DSound 가 빨리 처리 → graph clock 가속 → video 도 따라.
+	//      pitch 유지 (atempo). graph 의 IMediaSeeking::SetRate 는 호출 안 함 — LAV File Source 가
+	//      sample timestamp scale + audio data 양 줄임 동작 (chipmunk) 을 막아야 함.
+	//  (2) internal path: CFFiSource->set_playback_rate(rate) — CFFiSeeking::ChangeRate 통해
+	//      CFFiAudioStream::FillBuffer 의 atempo 가 처리. video FillBuffer 의 rtStart scaling 도 함께.
+	//  (3) fallback: 둘 다 없으면 graph SetRate 직접 (구버전 호환).
+	HRESULT hr = S_OK;
+	if (m_pAudioTimeStretchFilter)
 	{
-		logWrite(_T("[playback_rate/diag] teardown_audio_gain_filter()"));
-		teardown_audio_gain_filter();
+		((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_rate(rate);
+		logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch->set_rate(%.3f)"), rate);
 	}
-
-	HRESULT hr = E_FAIL;
-	if (m_pMS)
-		hr = m_pMS->SetRate(rate);
-	if (FAILED(hr) && m_pMP)
-		hr = m_pMP->put_Rate(rate);
-
-	if (!chain_active && need_chain)
+	else if (m_pFFiSource)
 	{
-		logWrite(_T("[playback_rate/diag] setup_audio_filter_chain()"));
-		setup_audio_filter_chain();
+		((ffi::CFFiSource*)m_pFFiSource)->set_playback_rate(rate);
+		//internal path 의 ChangeRate 가 호출되도록 graph SetRate 도 트리거 (CFFiSeeking 의 SetRate 라우팅).
+		if (m_pMS)
+			hr = m_pMS->SetRate(rate);
+		logWrite(_T("[playback_rate] internal path → CFFiSource->set_playback_rate(%.3f) + graph SetRate hr=0x%08x"), rate, hr);
 	}
-
-	logWrite(_T("[playback_rate] SetRate %.2f hr=0x%08x"), rate, hr);
+	else
+	{
+		if (m_pMS)
+			hr = m_pMS->SetRate(rate);
+		if (FAILED(hr) && m_pMP)
+			hr = m_pMP->put_Rate(rate);
+		logWrite(_T("[playback_rate] fallback graph SetRate %.3f hr=0x%08x"), rate, hr);
+	}
 }
 
 #include <atlimage.h>

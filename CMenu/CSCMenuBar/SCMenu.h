@@ -34,9 +34,15 @@ public:
 class CSCMenuSubButton
 {
 public:
+	//icon button — _id 가 PNG resource id. 이미지 로드 후 gray(unselect) / adjust_hsl(selected) 처리.
 	CSCMenuSubButton(UINT _id, int menu_height);
+	//text button — m_text 비어있지 않으면 paint 가 text 그림 (image 미사용).
+	//width 는 menu_height * 1.6 fixed (짧은 라벨 "저장" 등). id 는 click 매핑용.
+	CSCMenuSubButton(UINT _id, CString _text, int menu_height);
 	~CSCMenuSubButton();
 
+	int		m_id = 0;	//click 시 사용자 코드의 매핑 용도 (PNG resource id 또는 text button id).
+	CString	m_text;		//text button 모드 — 비어있으면 image 사용.
 	CSCGdiplusBitmap* m_button_image[2] = { NULL, };	//0:unselect, 1:select, (2:over, 3:down 추가 예정??)
 	CRect	m_r = CRect(0, 0, 0, 0);
 	//radio로 한다면 group 속성까지도 고려해야하지만 그렇게까지 메뉴를 복잡하게 구성하진 말자.
@@ -109,6 +115,8 @@ public:
 
 	void			set_icon(UINT icon_id);
 	void			add_button(UINT button_id, bool reset = false);
+	//text button — PNG resource 없이 라벨 표시 (예: "저장"). click 시 button_id 로 매핑.
+	void			add_text_button(UINT button_id, CString text, bool reset = false);
 
 	//버튼이 1개인 경우는 check <-> uncheck toggle이고
 	//2개 이상일 경우는 radio로 동작한다.

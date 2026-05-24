@@ -104,6 +104,7 @@ CSCMenuMessage::CSCMenuMessage(CWnd* _this, int message, CSCMenuItem* menu_item,
 
 CSCMenuSubButton::CSCMenuSubButton(UINT _id, int menu_height)
 {
+	m_id = _id;
 	m_button_image[0] = new CSCGdiplusBitmap(_T("PNG"), _id);	//normal
 	m_button_image[1] = new CSCGdiplusBitmap(_T("PNG"), _id);	//selected
 	m_button_image[0]->gray();
@@ -119,6 +120,18 @@ CSCMenuSubButton::CSCMenuSubButton(UINT _id, int menu_height)
 
 	m_r.right = m_button_image[0]->width;
 	m_r.bottom = m_button_image[0]->height;
+}
+
+CSCMenuSubButton::CSCMenuSubButton(UINT _id, CString _text, int menu_height)
+{
+	m_id = _id;
+	m_text = _text;
+	//text button — image 없음. width 는 menu_height * 1.6 fixed (짧은 라벨 가정 — "저장" / "삭제" 등).
+	//정확 측정은 paint 시점에 dc 의 GetTextExtent — 단순화 위해 fixed.
+	int w = (int)((double)menu_height * 1.6);
+	if (w < 32) w = 32;
+	m_r.right  = w;
+	m_r.bottom = menu_height;
 }
 
 CSCMenuSubButton::~CSCMenuSubButton()
@@ -208,6 +221,12 @@ void CSCMenuItem::set_icon(UINT icon_id)
 void CSCMenuItem::add_button(UINT button_id, bool reset)
 {
 	CSCMenuSubButton* btn = new CSCMenuSubButton(button_id, m_menu_height);
+	m_buttons.push_back(btn);
+}
+
+void CSCMenuItem::add_text_button(UINT button_id, CString text, bool reset)
+{
+	CSCMenuSubButton* btn = new CSCMenuSubButton(button_id, text, m_menu_height);
 	m_buttons.push_back(btn);
 }
 
@@ -1996,7 +2015,32 @@ void CSCMenu::OnPaint()
 				//그래야 버튼을 클릭할 때 버튼보다 약간 위 또는 아래를 눌러도 클릭으로 처리되므로
 				//사용자가 버튼 이미지를 정확히 클릭해야하는 부담이 없다.
 				m_items[i]->m_buttons[j]->m_r = r_content;
-				m_items[i]->m_buttons[j]->m_button_image[m_items[i]->m_buttons[j]->m_state]->draw(g, r_view);
+
+				CSCMenuSubButton* sub_btn = m_items[i]->m_buttons[j];
+				if (!sub_btn->m_text.IsEmpty())
+				{
+					//text button — border + 가운데 정렬 라벨. state 1 (hover/down) 시 색 invert.
+					bool is_pressed = (sub_btn->m_state != 0);
+					Gdiplus::Color cr_bg     = is_pressed ? m_theme.cr_back_selected : m_theme.cr_back;
+					Gdiplus::Color cr_border = m_theme.cr_border_active;
+					Gdiplus::Color cr_text   = is_pressed ? m_theme.cr_text_selected : m_theme.cr_text;
+
+					Gdiplus::Rect grect(r_view.left, r_view.top, r_view.Width(), r_view.Height());
+					draw_round_rect(&g, grect, cr_border, cr_bg, 1, 3);
+
+					Gdiplus::Font font(_T("Segoe UI"), (Gdiplus::REAL)(m_line_height * 0.45f), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+					Gdiplus::SolidBrush brush(cr_text);
+					Gdiplus::StringFormat sf;
+					sf.SetAlignment(Gdiplus::StringAlignmentCenter);
+					sf.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+					Gdiplus::RectF rf((Gdiplus::REAL)r_view.left, (Gdiplus::REAL)r_view.top,
+						(Gdiplus::REAL)r_view.Width(), (Gdiplus::REAL)r_view.Height());
+					g.DrawString(sub_btn->m_text, sub_btn->m_text.GetLength(), &font, rf, &sf, &brush);
+				}
+				else if (sub_btn->m_button_image[sub_btn->m_state])
+				{
+					sub_btn->m_button_image[sub_btn->m_state]->draw(g, r_view);
+				}
 
 				if (j > 0)
 				{

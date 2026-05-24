@@ -127,6 +127,16 @@ static CString extract_ass_text(const char* ass_line)
 					s.replace(pos, 2, "\n");
 					pos += 1;
 				}
+				//ASS override tag 제거 — {\i1}, {\b1}, {\an8}, {\fnArial}, {\c&Hffffff&} 등 inline format 명령.
+				//SMI/SRT 등 다른 format 으로 export 시 의미 없는 ASS 전용 문법이라 strip.
+				while (true)
+				{
+					size_t a = s.find('{');
+					if (a == std::string::npos) break;
+					size_t b = s.find('}', a);
+					if (b == std::string::npos) break;
+					s.erase(a, b - a + 1);
+				}
 				//trailing whitespace / newline 정리.
 				while (!s.empty() && (s.back() == '\r' || s.back() == '\n' || s.back() == ' '))
 					s.pop_back();

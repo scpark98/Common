@@ -352,15 +352,22 @@ void CSCAudioTimeStretch::process_one(const work_item& w)
 {
 	if (w.kind == kind_sample && w.sample)
 	{
-		//rate 변경 직후 — atempo internal buffer flush + anchor reset (seek 시 NewSegment 와 동일 효과).
-		//이게 없으면 기존 rate 로 처리된 누적 sample 들의 timestamp 와 새 rate emit timestamp 가 불일치 → audio/video sync 어긋남.
+		//rate 변경 직후 — atempo internal buffer/state 완전 초기화 + anchor reset.
+		//단순 reset 명령 (avfilter_graph_send_command "reset") 은 6ch / FLT 등 multi-channel 미디어에서 internal
+		//latency 가 누적되어 *간헐적* sync 어긋남 발생 (2ch stereo 는 거의 일관). graph 자체 재생성으로 완전 초기화.
 		if (m_pending_rate_changed.exchange(false))
 		{
-			if (m_filter_graph)
-				avfilter_graph_send_command(m_filter_graph, "atempo", "reset", "", NULL, 0, 0);
+			int sr  = m_filter_sr;
+			int ch  = m_filter_ch;
+			int bps = m_filter_bps;
+			bool flt = m_filter_flt;
+			release_filter_graph();
+			if (sr > 0 && ch > 0)
+				init_filter_graph(sr, ch, bps, flt);
 			m_anchor_set = false;
 			m_emitted_total = 0;
-			logWrite(_T("[time_stretch] rate change → anchor + emitted reset"));
+			logWrite(_T("[time_stretch] rate change → graph rebuild sr=%d ch=%d bps=%d flt=%d"),
+				sr, ch, bps, (int)flt);
 		}
 
 		double rate = m_pending_rate.load();

@@ -22,6 +22,7 @@ public:
 		sentence.Empty();
 		color.Empty();
 		line_index = 0;
+		source_class.Empty();
 	}
 
 	CSentence(CString _sentence, CString _cr = _T(""), int _line_index = 0)
@@ -29,11 +30,16 @@ public:
 		sentence = _sentence;
 		color = _cr;
 		line_index = _line_index;
+		source_class.Empty();
 	}
 
 	CString sentence;
 	CString color;
 	int line_index;
+	//multi-language (m_tracks 에 여러 Class) 자막에서 이 sentence 가 원래 어느 Class (KRCC/ENCC/JPCC 등) 에서
+	//왔는지. rebuild_active_view 가 set. lists_to_subtitle 가 사용자 편집 시 m_tracks 의 정확한 Class 의 cue
+	//를 update 하는데 사용. single-class 자막이거나 source 미확정 시 빈 문자열.
+	CString source_class;
 };
 
 //한 단위의 자막

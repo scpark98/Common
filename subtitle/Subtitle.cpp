@@ -242,10 +242,16 @@ void CSubtitle::rebuild_active_view()
 	if (m_tracks.empty())
 		return;
 
-	auto append_track = [this](const std::deque<CCaption>& track)
+	//각 sentence 의 source_class 를 *원래 track 의 Class 명* 으로 set — lists_to_subtitle 의 m_tracks update 위해.
+	auto append_track = [this](const CString& cls, const std::deque<CCaption>& track)
 	{
 		for (const auto& cap : track)
-			m_subtitle.push_back(cap);
+		{
+			CCaption copy = cap;
+			for (auto& s : copy.sentences)
+				s.source_class = cls;
+			m_subtitle.push_back(copy);
+		}
 	};
 
 	if (m_active_classes.empty())
@@ -258,7 +264,7 @@ void CSubtitle::rebuild_active_view()
 	{
 		auto it = m_tracks.find(cls);
 		if (it != m_tracks.end())
-			append_track(it->second);
+			append_track(cls, it->second);
 	}
 
 	//start 기준 정렬.

@@ -36,6 +36,7 @@ extern "C" {
 #pragma comment(lib, "avutil.lib")
 #pragma comment(lib, "swresample.lib")
 #pragma comment(lib, "swscale.lib")
+#pragma comment(lib, "avfilter.lib")
 
 namespace ffi
 {

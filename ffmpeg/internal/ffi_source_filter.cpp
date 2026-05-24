@@ -56,7 +56,17 @@ namespace ffi
     }
 
     HRESULT CFFiSeeking::ChangeStop()  { return S_OK; }
-    HRESULT CFFiSeeking::ChangeRate()  { return S_OK; }   //rate 변경 Phase 후속.
+
+    HRESULT CFFiSeeking::ChangeRate()
+    {
+        //CSourceSeeking::SetRate 가 m_dRateSeeking 갱신 후 본 함수 호출. source 의 atomic rate 로 전파 →
+        //video/audio FillBuffer 가 sample.rtStart/rtStop scaling 에 사용.
+        logWrite(_T("[ffi/seek/diag] ChangeRate called, m_dRateSeeking=%.3f pPin=%p source=%p"),
+            m_dRateSeeking, m_pPin, m_pPin ? m_pPin->source() : NULL);
+        if (m_pPin && m_pPin->source())
+            m_pPin->source()->set_playback_rate(m_dRateSeeking);
+        return S_OK;
+    }
 
     STDMETHODIMP CFFiSeeking::GetCurrentPosition(LONGLONG* pCurrent)
     {
@@ -501,6 +511,15 @@ namespace ffi
         double fps_for_stop = dec.frame_rate();
         if (fps_for_stop <= 0.0) fps_for_stop = 30.0;
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps_for_stop);
+
+        //rate scaling — graph IMediaSeeking::SetRate → ChangeRate 콜백을 통해 source 의 m_playback_rate 갱신.
+        const double rate = m_pSource->playback_rate();
+        if (rate > 0.0 && rate != 1.0)
+        {
+            rtStart = (REFERENCE_TIME)((double)rtStart / rate);
+            rtStop  = (REFERENCE_TIME)((double)rtStop  / rate);
+        }
+
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
 
@@ -556,7 +575,117 @@ namespace ffi
             swr_free(&m_swr);
             m_swr = nullptr;
         }
+        release_audio_filter();
         av_channel_layout_uninit(&m_out_chlayout);
+    }
+
+    bool CFFiAudioStream::init_audio_filter(double rate)
+    {
+        release_audio_filter();
+
+        if (m_out_sample_rate <= 0 || m_out_channels <= 0)
+            return false;
+
+        m_filter_graph = avfilter_graph_alloc();
+        if (!m_filter_graph)
+            return false;
+
+        const AVFilter* abuffer    = avfilter_get_by_name("abuffer");
+        const AVFilter* atempo     = avfilter_get_by_name("atempo");
+        const AVFilter* abuffersink = avfilter_get_by_name("abuffersink");
+        if (!abuffer || !atempo || !abuffersink)
+        {
+            logWrite(_T("[ffi/src/audio/filter] filter lookup fail abuffer=%p atempo=%p abuffersink=%p"),
+                abuffer, atempo, abuffersink);
+            release_audio_filter();
+            return false;
+        }
+
+        //abuffer source — swr 의 output format (S16 interleaved, stereo, m_out_sample_rate Hz).
+        char layout_desc[64] = {0};
+        av_channel_layout_describe(&m_out_chlayout, layout_desc, sizeof(layout_desc));
+        char src_args[256] = {0};
+        _snprintf_s(src_args, _TRUNCATE,
+            "sample_rate=%d:sample_fmt=s16:channel_layout=%s:time_base=1/%d",
+            m_out_sample_rate, layout_desc, m_out_sample_rate);
+
+        int hr = avfilter_graph_create_filter(&m_filter_src, abuffer, "in",
+            src_args, NULL, m_filter_graph);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] abuffer create fail hr=%d"), hr); release_audio_filter(); return false; }
+
+        //atempo — clamp rate to [0.5, 2.0] (atempo 단일 valid range). 그 밖은 1.0 으로 fallback (외부에서 chain 처리 가능하지만 일단 단일).
+        double clamped = rate;
+        if (clamped < 0.5) clamped = 0.5;
+        if (clamped > 2.0) clamped = 2.0;
+        char tempo_args[32] = {0};
+        _snprintf_s(tempo_args, _TRUNCATE, "tempo=%.3f", clamped);
+        hr = avfilter_graph_create_filter(&m_filter_atempo, atempo, "atempo",
+            tempo_args, NULL, m_filter_graph);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] atempo create fail hr=%d"), hr); release_audio_filter(); return false; }
+
+        hr = avfilter_graph_create_filter(&m_filter_sink, abuffersink, "out",
+            NULL, NULL, m_filter_graph);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] abuffersink create fail hr=%d"), hr); release_audio_filter(); return false; }
+
+        //sink 의 출력 sample format 강제 S16 — swr 와 일치.
+        //av_opt_set_int_list 가 내부에서 deprecated av_int_list_length_for_size 호출 — C4996 회피.
+        const AVSampleFormat out_fmts[] = { AV_SAMPLE_FMT_S16, AV_SAMPLE_FMT_NONE };
+#pragma warning(push)
+#pragma warning(disable: 4996)
+        av_opt_set_int_list(m_filter_sink, "sample_fmts", out_fmts, AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
+#pragma warning(pop)
+
+        //link: src → atempo → sink
+        hr = avfilter_link(m_filter_src, 0, m_filter_atempo, 0);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link src->atempo fail hr=%d"), hr); release_audio_filter(); return false; }
+        hr = avfilter_link(m_filter_atempo, 0, m_filter_sink, 0);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link atempo->sink fail hr=%d"), hr); release_audio_filter(); return false; }
+
+        hr = avfilter_graph_config(m_filter_graph, NULL);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] graph_config fail hr=%d"), hr); release_audio_filter(); return false; }
+
+        m_filter_rate = clamped;
+        logWrite(_T("[ffi/src/audio/filter] init OK rate=%.3f sr=%d ch=%d layout=%S"),
+            m_filter_rate, m_out_sample_rate, m_out_channels, layout_desc);
+        return true;
+    }
+
+    void CFFiAudioStream::release_audio_filter()
+    {
+        if (m_filter_graph)
+        {
+            avfilter_graph_free(&m_filter_graph);
+            m_filter_graph = nullptr;
+        }
+        m_filter_src = nullptr;
+        m_filter_atempo = nullptr;
+        m_filter_sink = nullptr;
+        m_filter_rate = 1.0;
+    }
+
+    bool CFFiAudioStream::update_audio_filter_rate(double rate)
+    {
+        if (!m_filter_graph || !m_filter_atempo)
+            return false;
+        double clamped = rate;
+        if (clamped < 0.5) clamped = 0.5;
+        if (clamped > 2.0) clamped = 2.0;
+        if (clamped == m_filter_rate)
+            return true;
+
+        char val[32] = {0};
+        _snprintf_s(val, _TRUNCATE, "%.3f", clamped);
+        char resp[128] = {0};
+        int hr = avfilter_graph_send_command(m_filter_graph, "atempo", "tempo",
+            val, resp, sizeof(resp), 0);
+        if (hr < 0)
+        {
+            logWrite(_T("[ffi/src/audio/filter] send_command tempo=%S fail hr=%d resp=%S"), val, hr, resp);
+            return false;
+        }
+        logWrite(_T("[ffi/src/audio/filter] tempo %.3f → %.3f"), m_filter_rate, clamped);
+        m_filter_rate = clamped;
+        return true;
     }
 
     HRESULT CFFiAudioStream::OnThreadCreate()
@@ -604,6 +733,13 @@ namespace ffi
                 (int)in_fmt, m_out_sample_rate, m_out_channels);
         }
 
+        //atempo filter graph — source 의 현재 playback_rate 로 init. 이후 FillBuffer 가 rate 변경 감지 시 send_command.
+        if (m_swr && !m_filter_graph)
+        {
+            double init_rate = m_pSource ? m_pSource->playback_rate() : 1.0;
+            init_audio_filter(init_rate);
+        }
+
         if (m_pSource && !m_pSource->decoder().is_running())
             m_pSource->decoder().start();
 
@@ -617,6 +753,7 @@ namespace ffi
             swr_free(&m_swr);
             m_swr = nullptr;
         }
+        release_audio_filter();
         return NOERROR;
     }
 
@@ -763,6 +900,56 @@ namespace ffi
             return E_FAIL;
         }
 
+        //atempo time-stretch — rate != 1.0 일 때 PCM sample count 를 1/rate 로 줄여 graph clock 가속 + pitch 유지.
+        //rate==1.0 도 동일 path (1:1 pass-through) 로 코드 일관. swr output 을 frame 으로 wrap → buffersrc 에 push → buffersink 에서 pull.
+        if (m_filter_graph && out_samples > 0)
+        {
+            //source rate 변경 감지 → atempo tempo 갱신.
+            double cur_rate = m_pSource ? m_pSource->playback_rate() : 1.0;
+            if (cur_rate != m_filter_rate)
+                update_audio_filter_rate(cur_rate);
+
+            //swr output 을 AVFrame 으로 wrap. pData 가 swr 의 output buffer 이므로 별도 copy 필요.
+            AVFrame* in_frame = av_frame_alloc();
+            if (in_frame)
+            {
+                in_frame->format = AV_SAMPLE_FMT_S16;
+                in_frame->sample_rate = m_out_sample_rate;
+                av_channel_layout_copy(&in_frame->ch_layout, &m_out_chlayout);
+                in_frame->nb_samples = out_samples;
+                if (av_frame_get_buffer(in_frame, 0) >= 0)
+                {
+                    memcpy(in_frame->data[0], pData, out_samples * m_out_channels * 2);
+                    av_buffersrc_add_frame(m_filter_src, in_frame);
+                }
+                av_frame_free(&in_frame);
+            }
+
+            //buffersink 에서 가능한 만큼 output frame pull → pData 에 누적 copy. buffer overflow 시 break.
+            int total_bytes = 0;
+            while (true)
+            {
+                AVFrame* out_frame = av_frame_alloc();
+                if (!out_frame) break;
+                int hr_pull = av_buffersink_get_frame(m_filter_sink, out_frame);
+                if (hr_pull < 0)
+                {
+                    av_frame_free(&out_frame);
+                    break;
+                }
+                int out_bytes = out_frame->nb_samples * m_out_channels * 2;
+                if (total_bytes + out_bytes > buffer_size)
+                {
+                    av_frame_free(&out_frame);
+                    break;
+                }
+                memcpy(pData + total_bytes, out_frame->data[0], out_bytes);
+                total_bytes += out_bytes;
+                av_frame_free(&out_frame);
+            }
+            out_samples = total_bytes / (m_out_channels * 2);
+        }
+
         int bytes_written = out_samples * m_out_channels * 2;
         pSample->SetActualDataLength(bytes_written);
         pSample->SetSyncPoint(TRUE);
@@ -786,11 +973,24 @@ namespace ffi
                 (int)mx, (long long)m_sample_count);
         }
 
-        //timing — frame.pts 직접 사용 (video first emit 기준 segment-local). video pin 과 동일 패턴.
-        //rtStart = audio_frame_pts_rt - video_first_emit_pts_rt. audio / video 가 *같은 baseline* 기준이라 두 stream 의
-        //*실제 미디어 시점 차이* 가 sample.rtStart 차이로 정확 반영 → graph_clock 진행 시 sync 정확.
+        //timing —
+        //- atempo 활성 시: sample_count 기반 (atempo 후 sample 양으로 누적되므로 자동 1/rate scale). anchor 는 첫 emit 시 video_first 와 한 번 정렬.
+        //- atempo 비활성 (init 실패) 시: 기존 frame.pts 기반 (video first 기준 segment-local).
         REFERENCE_TIME rtStart;
-        if (frame->pts != AV_NOPTS_VALUE)
+        if (m_filter_graph)
+        {
+            if (!m_audio_offset_set)
+            {
+                int64_t video_first = dec.video_first_emit_pts_rt();
+                int64_t audio_pts_rt = (frame->pts != AV_NOPTS_VALUE) ?
+                    av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000}) : 0;
+                m_audio_offset_rt = (video_first != LLONG_MIN) ? (audio_pts_rt - video_first) : 0;
+                m_audio_offset_set = true;
+            }
+            rtStart = m_audio_offset_rt +
+                (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+        }
+        else if (frame->pts != AV_NOPTS_VALUE)
         {
             int64_t audio_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
             int64_t video_first = dec.video_first_emit_pts_rt();
@@ -803,6 +1003,7 @@ namespace ffi
         }
         m_sample_count += out_samples;
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
+
         pSample->SetTime(&rtStart, &rtStop);
 
         if (m_need_discontinuity)

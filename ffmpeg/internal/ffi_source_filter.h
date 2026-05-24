@@ -18,6 +18,12 @@
 
 #include <memory>
 
+extern "C" {
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersrc.h>
+#include <libavfilter/buffersink.h>
+}
+
 //{C0D9F19A-1AAA-4B5E-8C3F-7D3B6E4F8A2D}
 //자체 filter CLSID. DirectShow 카탈로그에 등록 안 함 (exe 빌드, in-process 직접 instantiate).
 static const GUID CLSID_FFiSource =
@@ -117,6 +123,14 @@ namespace ffi
         //video pin 의 on_change_start 에서 호출 — flush + new_segment.
         void    on_seek_flush(REFERENCE_TIME rtStart);
 
+        //atempo audio filter graph — rate != 1.0 시 PCM time-stretch (pitch 유지).
+        //swr_convert 의 S16 stereo output 을 source 로 받아 atempo filter 통과 → sink 에서 sample count 1/rate 줄어든 PCM 출력.
+        //graph 의 audio renderer (DSound) 가 줄어든 sample 양만큼 빨리 처리 → graph clock 가속 → video 도 따라 가속.
+        //rate runtime 변경은 avfilter_graph_send_command 로 atempo tempo 갱신 (graph 재생성 불필요).
+        bool                init_audio_filter(double rate);
+        void                release_audio_filter();
+        bool                update_audio_filter_rate(double rate);
+
     private:
         CFFiSource*     m_pSource;
         LONGLONG        m_sample_count = 0;
@@ -126,6 +140,12 @@ namespace ffi
         AVChannelLayout m_out_chlayout{};
         bool            m_need_discontinuity = false;
         REFERENCE_TIME  m_pending_segment_stop = 0;
+
+        AVFilterGraph*   m_filter_graph = nullptr;
+        AVFilterContext* m_filter_src   = nullptr;   //abuffer
+        AVFilterContext* m_filter_atempo = nullptr;
+        AVFilterContext* m_filter_sink  = nullptr;   //abuffersink
+        double           m_filter_rate  = 1.0;       //현재 atempo 에 적용된 rate. source 의 playback_rate 와 비교해 달라지면 send_command.
 
         //audio sync offset — audio first emit 의 미디어 시점이 video first emit 보다 *delta* 만큼 후 인 경우
         //audio sample.rtStart 에 delta 만큼 더해서 audio 표시 시점을 delta 늦춤. 같은 graph_clock 시점에 video / audio
@@ -164,10 +184,17 @@ namespace ffi
         void           set_audio_sync_delay_ms(int ms) { m_audio_sync_delay_rt.store((int64_t)ms * 10000LL); }
         int64_t        audio_sync_delay_rt() const { return m_audio_sync_delay_rt.load(); }
 
+        //CFFiSeeking::ChangeRate 가 m_dRate 를 여기로 propagate. video/audio FillBuffer 가 sample 의 rtStart/rtStop 을
+        //1/rate 로 scale → renderer 가 graph clock 같은 시간에 rate 배의 미디어 시간 sample 표시 → 빠르게/느리게 재생.
+        //audio 는 sample data 양은 그대로 + duration 만 scale → renderer 가 시간 맞춰 빠르게 재생 (chipmunk 효과, LAV path 동등).
+        void           set_playback_rate(double r) { m_playback_rate.store(r); }
+        double         playback_rate() const { return m_playback_rate.load(); }
+
     private:
         CDecoder         m_decoder;
         CFFiVideoStream* m_pVideoStream = nullptr;
         CFFiAudioStream* m_pAudioStream = nullptr;   //has_audio 일 때만 생성.
         std::atomic<int64_t> m_audio_sync_delay_rt{0};
+        std::atomic<double>  m_playback_rate{1.0};
     };
 }

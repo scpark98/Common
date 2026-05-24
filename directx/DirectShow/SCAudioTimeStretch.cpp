@@ -390,12 +390,15 @@ void CSCAudioTimeStretch::process_one(const work_item& w)
 	}
 	else if (w.kind == kind_new_segment)
 	{
-		//new segment — atempo internal buffer flush + anchor / emitted 누적 reset.
-		if (m_filter_graph && m_filter_src)
-		{
-			//flush_buffers 가 동기 호출 — 누적 buffer 비움. 다음 frame 부터 새 baseline.
-			avfilter_graph_send_command(m_filter_graph, "atempo", "reset", "", NULL, 0, 0);
-		}
+		//new segment — atempo graph 자체 재생성 (단순 reset 명령은 6ch / FLT 미디어에서 internal latency 잔류).
+		//rate change 분기와 동일 패턴.
+		int sr = m_filter_sr;
+		int ch = m_filter_ch;
+		int bps = m_filter_bps;
+		bool flt = m_filter_flt;
+		release_filter_graph();
+		if (sr > 0 && ch > 0)
+			init_filter_graph(sr, ch, bps, flt);
 		m_in_pts_samples = 0;
 		m_anchor_set = false;
 		m_emitted_total = 0;

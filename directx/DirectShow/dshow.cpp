@@ -3281,7 +3281,13 @@ void CDShow::set_playback_rate(double rate)
 	if (m_pAudioTimeStretchFilter)
 	{
 		((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_rate(rate);
-		logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch->set_rate(%.3f)"), rate);
+		//video sample timestamp scale 위해 graph SetRate 도 호출 — LAV Video Decoder 가 받아 video timing 변경 →
+		//MPC-VR 가 빠르게 표시. LAV Audio Decoder 도 받지만 SC Audio chain (Gain/Compressor) 의 IMediaSeeking 이
+		//pass-through (upstream 위임) 라 audio 흐름의 *PCM 양 변경* 은 LAV 의 audio path 동작에 달림 —
+		//audio data 양 변화 시 TimeStretch 와 이중 적용 가능성. quality 확인 후 plan B (video-only transform filter).
+		if (m_pMS)
+			hr = m_pMS->SetRate(rate);
+		logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch->set_rate(%.3f) + graph SetRate hr=0x%08x"), rate, hr);
 	}
 	else if (m_pFFiSource)
 	{

@@ -3551,6 +3551,11 @@ void CDShow::set_playback_rate(double rate)
 			hr = m_pMP->put_Rate(rate);
 		logWrite(_T("[playback_rate] fallback graph SetRate %.3f hr=0x%08x"), rate, hr);
 	}
+
+	//self-seek — chain 전체 flush (DSound / MPC-VR queue 의 old timestamp sample 제거) + 새 NewSegment 발행
+	//→ 우리 두 filter 가 새 rate 의 timeline 으로 재시작. 사용자 수동 트랙 이동 시 sync 맞춰지던 효과의 자동화.
+	//부작용: video 1~2 frame 끊김 + audio 짧은 silence (수동 seek 와 동일). sync 정확 보장과 trade-off.
+	flush_audio_buffer();
 }
 
 #include <atlimage.h>

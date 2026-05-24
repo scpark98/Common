@@ -948,7 +948,8 @@ bool CSubtitle::save_smi(CString sfile)
 		}
 		_ftprintf(fp_m, _T("--></STYLE>\n</HEAD>\n<BODY>\n"));
 
-		//모든 cue 시간순 정렬 + 출력. 같은 start 의 multi-class cue 는 같은 SYNC 안 P 여러 개.
+		//모든 cue 시간순 정렬 + 출력. 표준 SMI format — *같은 SYNC 별도 entry* per Class (KMPlayer/PotPlayer/
+		//일반 parser 호환). 같은 SYNC 안 multi-P 는 *Subtitle parser 가 처리 못함* (한 P 의 text 가 다음 P 까지 흡수).
 		std::map<int, std::vector<std::pair<CString, const CSentence*>>> by_start;
 		for (const auto& kv : m_tracks)
 		{
@@ -959,9 +960,14 @@ bool CSubtitle::save_smi(CString sfile)
 		}
 		for (const auto& g : by_start)
 		{
-			_ftprintf(fp_m, _T("<SYNC Start=%d>"), g.first);
 			for (const auto& cs : g.second)
-				_ftprintf(fp_m, _T("<P Class=%s>%s\n"), cs.first.GetString(), cs.second->sentence.GetString());
+			{
+				//text 안 newline → <br> (한 줄 SYNC entry 유지).
+				CString txt = cs.second->sentence;
+				txt.Replace(_T("\r\n"), _T("<br>"));
+				txt.Replace(_T("\n"), _T("<br>"));
+				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>%s\n"), g.first, cs.first.GetString(), txt.GetString());
+			}
 		}
 
 		_ftprintf(fp_m, _T("\n</BODY>\n</SAMI>\n"));

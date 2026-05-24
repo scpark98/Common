@@ -919,6 +919,56 @@ bool CSubtitle::save_smi(CString sfile)
 	if (dwAttrs & FILE_ATTRIBUTE_READONLY)
 		SetFileAttributes(sfile, FILE_ATTRIBUTE_NORMAL);
 
+	//*** multi-class (다국어) 자막 보호 ***
+	//m_tracks 에 2 개 이상 Class 가 있다면 다국어 통합 자막. 단순 m_subtitle (현재 active view) 만 저장하면
+	//다른 언어 영구 손실. 자동 백업 (.bak) 후 m_tracks 의 모든 Class 통째로 출력.
+	//단일 class (m_tracks.size() <= 1) 면 기존 동작 (m_subtitle + m_sLanguage).
+	if (m_tracks.size() > 1)
+	{
+		//backup — 동일 폴더에 .bak (이미 있으면 덮어쓰지 않음, 첫 save 만 보존).
+		CString bak = sfile + _T(".bak");
+		if (GetFileAttributes(bak) == INVALID_FILE_ATTRIBUTES)
+			CopyFile(sfile, bak, TRUE);
+
+		FILE* fp_m = nullptr;
+		_tfopen_s(&fp_m, sfile, _T("wt,ccs=UNICODE"));
+		if (!fp_m) return false;
+
+		_ftprintf(fp_m, _T("<SAMI>\n<HEAD>\n<TITLE>Multi-language</TITLE>\n<STYLE TYPE=\"text/css\"><!--\n"));
+		_ftprintf(fp_m, _T("P { margin-left:8pt; margin-right:8pt; font-size:14pt; text-align:center; font-family:Arial; color:white; background-color:black; }\n"));
+		for (const auto& kv : m_tracks)
+		{
+			LPCTSTR cls = kv.first.GetString();
+			LPCTSTR lang =
+				kv.first == _T("KRCC") ? _T("ko-KR") :
+				kv.first == _T("ENCC") ? _T("en-US") :
+				kv.first == _T("JPCC") ? _T("ja-JP") :
+				kv.first == _T("CNCC") ? _T("zh-CN") : _T("und");
+			_ftprintf(fp_m, _T(".%s { Name:%s; lang:%s; SAMIType:CC; }\n"), cls, cls, lang);
+		}
+		_ftprintf(fp_m, _T("--></STYLE>\n</HEAD>\n<BODY>\n"));
+
+		//모든 cue 시간순 정렬 + 출력. 같은 start 의 multi-class cue 는 같은 SYNC 안 P 여러 개.
+		std::map<int, std::vector<std::pair<CString, const CSentence*>>> by_start;
+		for (const auto& kv : m_tracks)
+		{
+			const CString& cls = kv.first;
+			for (const auto& cap : kv.second)
+				for (const auto& sent : cap.sentences)
+					by_start[cap.start].push_back({ cls, &sent });
+		}
+		for (const auto& g : by_start)
+		{
+			_ftprintf(fp_m, _T("<SYNC Start=%d>"), g.first);
+			for (const auto& cs : g.second)
+				_ftprintf(fp_m, _T("<P Class=%s>%s\n"), cs.first.GetString(), cs.second->sentence.GetString());
+		}
+
+		_ftprintf(fp_m, _T("\n</BODY>\n</SAMI>\n"));
+		fclose(fp_m);
+		return true;
+	}
+
 	FILE* fp = nullptr;
 	_tfopen_s(&fp, sfile, _T("wt,ccs=UNICODE"));
 

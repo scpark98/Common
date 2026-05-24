@@ -887,7 +887,7 @@ bool CSubtitle::save_subtitle_file(CString sfile)
 bool CSubtitle::save_srt(CString sfile)
 {
 	FILE* fp = NULL;
-	_tfopen_s(&fp, sfile, _T("wt, ccs=UNICODE"));
+	_tfopen_s(&fp, sfile, _T("wt, ccs=UTF-8"));
 	if (fp == NULL)
 		return false;
 
@@ -948,7 +948,7 @@ bool CSubtitle::save_smi(CString sfile)
 			CopyFile(sfile, bak, TRUE);
 
 		FILE* fp_m = nullptr;
-		_tfopen_s(&fp_m, sfile, _T("wt,ccs=UNICODE"));
+		_tfopen_s(&fp_m, sfile, _T("wt,ccs=UTF-8"));
 		if (!fp_m) return false;
 
 		_ftprintf(fp_m, _T("<SAMI>\n<HEAD>\n<TITLE>Multi-language</TITLE>\n<STYLE TYPE=\"text/css\"><!--\n"));
@@ -1004,7 +1004,7 @@ bool CSubtitle::save_smi(CString sfile)
 	}
 
 	FILE* fp = nullptr;
-	_tfopen_s(&fp, sfile, _T("wt,ccs=UNICODE"));
+	_tfopen_s(&fp, sfile, _T("wt,ccs=UTF-8"));
 
 	if (fp == NULL)
 		return false;

@@ -1794,8 +1794,18 @@ void CSCMenu::recalc_items_rect()
 				int btn_block = 0;
 				for (auto* btn : m_items[i]->m_buttons)
 				{
-					//image button — width = image.width. text button (m_button_image NULL) — width = ctor 에서 set 한 m_r.Width().
-					int bw = btn->m_button_image[0] ? btn->m_button_image[0]->width : btn->m_r.Width();
+					int bw;
+					if (btn->m_button_image[0])
+					{
+						bw = btn->m_button_image[0]->width;
+					}
+					else
+					{
+						//text button — dc_m 의 정확 측정 + 좌우 padding 14씩.
+						CSize sz_b = dc_m.GetTextExtent(btn->m_text);
+						bw = sz_b.cx + 28;
+						btn->m_r.right = btn->m_r.left + bw;	//ctor 의 추정값 → 정확 width 갱신.
+					}
 					btn_block += 6 + bw;
 				}
 				if (btn_block > 0)
@@ -2037,7 +2047,8 @@ void CSCMenu::OnPaint()
 						: m_theme.cr_text;
 
 					Gdiplus::Rect grect(r_view.left, r_view.top, r_view.Width(), r_view.Height());
-					draw_round_rect(&g, grect, cr_border, cr_bg, 1, 4);
+					//draw_round_rect 시그니처: (g, rect, cr_stroke, cr_fill, radius=-1, width=1). 5번째 = radius, 6번째 = width.
+					draw_round_rect(&g, grect, cr_border, cr_bg, 4, 1);
 
 					Gdiplus::Font font(_T("Segoe UI"), (Gdiplus::REAL)(m_line_height * 0.45f), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 					Gdiplus::SolidBrush brush(cr_text);

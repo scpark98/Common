@@ -5128,11 +5128,11 @@ void CDShow::subtitle_sync(int sync)
 void CDShow::audio_sync(int sync)
 {
 	if (sync == 1)
-		m_audio_sync += 100;
+		m_audio_sync += 50;
 	else if (sync == 0)
 		m_audio_sync = 0;
 	else if (sync == -1)
-		m_audio_sync -= 100;
+		m_audio_sync -= 50;
 	else
 		m_audio_sync = sync;
 
@@ -5149,6 +5149,7 @@ void CDShow::audio_sync(int sync)
 	{
 		((ffi::CFFiSource*)m_pFFiSource)->set_audio_sync_delay_ms(m_audio_sync);
 		logWrite(_T("[AudioSync] internal path: anchor offset = %d ms"), m_audio_sync);
+		flush_audio_buffer();
 		return;
 	}
 
@@ -5171,6 +5172,19 @@ void CDShow::audio_sync(int sync)
 			pCfg->Flt_SetInt("audio_delay", m_audio_sync);
 		pF->Release();
 	}
+
+	flush_audio_buffer();
+}
+
+void CDShow::flush_audio_buffer()
+{
+	if (!m_pMS)
+		return;
+	LONGLONG cur = 0;
+	if (FAILED(m_pMS->GetCurrentPosition(&cur)))
+		return;
+	m_pMS->SetPositions(&cur, AM_SEEKING_AbsolutePositioning,
+						NULL, AM_SEEKING_NoPositioning);
 }
 
 CString CDShow::get_audio_delay_status()

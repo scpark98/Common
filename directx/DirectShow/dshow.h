@@ -316,9 +316,12 @@ public:
 	void			subtitle_sync(int sync);
 
 	int				m_audio_sync;		//ms (>0 = audio 느리게 / 영상 대비 지연, <0 = audio 빠르게)
-	//-1, 1이면 100ms 단위로 빠르게/느리게, 그 외 값이면 해당 값 절대 적용.
-	//-1:faster, 1:slower, 0:origin	//per 100ms
+	//-1, 1이면 50ms 단위로 빠르게/느리게, 그 외 값이면 해당 값 절대 적용.
+	//-1:faster, 1:slower, 0:origin	//per 50ms
 	void			audio_sync(int sync);
+	//audio renderer 의 queued buffer 가 이전 delay 로 재생되어 audio_sync 변경 직후 lag 발생 — 현재 위치로 self-seek 해
+	//buffer flush + 새 delay 즉시 적용. 영상 1~2 frame 짧게 끊김.
+	void			flush_audio_buffer();
 	//graph 의 audio renderer 가 IExFilterConfig::Flt_SetInt("audio_delay") 를 지원하는지 진단.
 	//audio_sync 가 실제 효과를 내는지 OSD/로그로 즉시 확인하기 위함.
 	CString			get_audio_delay_status();

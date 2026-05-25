@@ -47,6 +47,18 @@ static CString dict_get_string(AVDictionary* dict, const char* key)
 	return s;
 }
 
+//ffmpeg stream language 메타데이터 (ISO 639) → SAMI CC class. 미지원/없음이면 빈 문자열 (호출자가 default).
+static CString lang_to_cc_class(const CString& lang)
+{
+	CString l = lang;
+	l.MakeLower();
+	if (l == _T("eng") || l == _T("en"))										return _T("ENCC");
+	if (l == _T("kor") || l == _T("ko"))										return _T("KRCC");
+	if (l == _T("jpn") || l == _T("ja") || l == _T("jp"))						return _T("JPCC");
+	if (l == _T("chi") || l == _T("zho") || l == _T("zh") || l == _T("cn"))		return _T("CNCC");
+	return _T("");
+}
+
 bool list_embedded_subtitle_streams(LPCTSTR media_path, std::vector<EmbeddedSubtitleStream>& out)
 {
 	out.clear();
@@ -215,8 +227,17 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 		return false;
 	}
 
+	//스트림 언어 메타데이터 → SAMI CC class. 미지원/없음이면 ENCC (내부 자막 대부분 영어).
+	//set 안 하면 save_smi 가 빈 m_sLanguage 를 JPCC 로 폴백해 영어 자막이 JPCC 로 잘못 태깅됨.
+	CString lang = dict_get_string(st->metadata, "language");
+	CString cc_class = lang_to_cc_class(lang);
+	if (cc_class.IsEmpty())
+		cc_class = _T("ENCC");
+	logWrite(_T("[sub_export/export] stream lang='%s' -> class=%s"), lang.GetString(), cc_class.GetString());
+
 	CSubtitle sub;
 	sub.set_subtitle_file(out_path);
+	sub.set_language(cc_class);
 
 	//packet read loop — subtitle packet 만 decode.
 	AVPacket* pkt = av_packet_alloc();
@@ -285,12 +306,32 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 				CCaption cap;
 				cap.start = (int)start_ms;
 				cap.end   = (int)end_ms;
-				CSentence sent;
-				sent.sentence = combined;
-				sent.line_index = 0;
-				cap.sentences.push_back(sent);
-				sub.m_subtitle.push_back(cap);
-				caption_count++;
+
+				//멀티라인(\n) → line_index 별 CSentence 분리. save_smi 가 line_index 변화 시 <br> 출력 →
+				//"- A.<br>- B." 처럼 화자 구분 두 줄이 보존됨.
+				//(한 sentence 에 \n 박으면 raw 줄바꿈으로 저장돼 파서가 한 줄로 붙임.)
+				int line = 0;
+				int pos = 0;
+				while (pos >= 0)
+				{
+					int nl = combined.Find(_T('\n'), pos);
+					CString one = (nl < 0) ? combined.Mid(pos) : combined.Mid(pos, nl - pos);
+					one.Trim();
+					if (!one.IsEmpty())
+					{
+						CSentence sent;
+						sent.sentence = one;
+						sent.line_index = line++;
+						cap.sentences.push_back(sent);
+					}
+					pos = (nl < 0) ? -1 : nl + 1;
+				}
+
+				if (!cap.sentences.empty())
+				{
+					sub.m_subtitle.push_back(cap);
+					caption_count++;
+				}
 			}
 
 			avsubtitle_free(&av_sub);

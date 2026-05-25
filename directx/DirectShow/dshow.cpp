@@ -2420,7 +2420,7 @@ CString CDShow::get_video_decoder_label()
 		CString out = _T("내장 FFmpeg 디코더");
 		if (!codec.IsEmpty())
 		{
-			out += _T(" (");
+			out += _T("(");
 			out += codec;
 			if (!hw.IsEmpty())
 			{
@@ -2585,7 +2585,7 @@ CString CDShow::get_audio_decoder_label()
 		CString out = _T("내장 FFmpeg 디코더");
 		if (!codec.IsEmpty())
 		{
-			out += _T(" (");
+			out += _T("(");
 			out += codec;
 			out += _T(")");
 		}
@@ -2939,6 +2939,24 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	{
 		setup_audio_filter_chain();
 		logWrite(_T("[internal] SC Audio chain setup"));
+	}
+
+	//internal path 도 LAV 와 동일하게 graph reference clock 을 SystemClock 으로 (LAV path 는 2099 에서 override 하지만
+	//internal 은 setup_audio_gain_filter(887)의 audio renderer clock 그대로였음). LAV 가 이 방식으로 A/V 싱크되므로 동일 적용:
+	//SystemClock master → video real-time pace + audio renderer 가 system clock 에 drop/dup 으로 적응.
+	{
+		CComPtr<IReferenceClock> pSysClock;
+		HRESULT hr_sc = CoCreateInstance(CLSID_SystemClock, NULL, CLSCTX_INPROC_SERVER,
+			IID_IReferenceClock, (void**)&pSysClock);
+		if (SUCCEEDED(hr_sc) && pSysClock)
+		{
+			CComQIPtr<IMediaFilter> pMF(m_pGB);
+			if (pMF)
+			{
+				HRESULT hr_set = pMF->SetSyncSource(pSysClock);
+				logWrite(_T("[clock] internal: SystemClock master hr=0x%08x"), hr_set);
+			}
+		}
 	}
 
 	//새 renderer 인스턴스의 surface position 설정 — OnSize 가 fire 안 되는 미디어 전환 (mkv→mp4 등) 케이스에서

@@ -197,6 +197,9 @@ namespace ffi
         std::condition_variable m_cv_queue;     //worker 가 queue 비울 때 ↔ UI 가 pop 할 때 양방향 wake.
         std::deque<AVFrame*>    m_video_queue;
         std::deque<AVFrame*>    m_audio_queue;
+        //avcodec_receive_frame 가 (D3D11VA HW 경로 등) decode 순서로 주는 video frame 을 pts(presentation)
+        //순으로 재정렬하는 worker-thread 전용 버퍼. has_b_frames 만큼 hold 후 최소 pts 부터 m_video_queue 로.
+        std::deque<AVFrame*>    m_video_reorder;
         int                     m_max_queue = 30;       //seek 후 큐 빨리 채워지도록 5→30. FillBuffer wait 시간 단축.
         int                     m_max_audio_queue = 100;
     };

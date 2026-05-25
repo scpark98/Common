@@ -456,6 +456,13 @@ namespace ffi
             m_audio_queue.pop_front();
             av_frame_free(&f);
         }
+        //[reorder] worker 종료(join 완료)라 reorder 버퍼에 남은 frame free.
+        while (!m_video_reorder.empty())
+        {
+            AVFrame* f = m_video_reorder.front();
+            m_video_reorder.pop_front();
+            av_frame_free(&f);
+        }
         logWrite(_T("[ffi/dec] worker stopped"));
     }
 
@@ -630,6 +637,16 @@ namespace ffi
         return out;
     }
 
+    static std::wstring utf8_to_wstring(const char* s)
+    {
+        std::wstring out;
+        if (!s)
+            return out;
+        while (*s)
+            out += (wchar_t)(unsigned char)(*s++);
+        return out;
+    }
+
     static std::wstring fourcc_to_wstring(uint32_t tag)
     {
         std::wstring out;
@@ -649,7 +666,9 @@ namespace ffi
         if (!m_fmt || m_video_stream_idx < 0)
             return L"";
         AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
-        return utf8_to_wstring_upper(avcodec_get_name(par->codec_id));
+        //실제 디코더명 그대로 (PotPlayer 와 동일 표기): h264 / hevc 등 소문자. find 실패 시 codec id 명 fallback.
+        const AVCodec* dec = avcodec_find_decoder(par->codec_id);
+        return utf8_to_wstring(dec ? dec->name : avcodec_get_name(par->codec_id));
     }
 
     std::wstring CDecoder::video_fourcc() const
@@ -743,7 +762,9 @@ namespace ffi
         if (!m_fmt || m_audio_stream_idx < 0)
             return L"";
         AVCodecParameters* par = m_fmt->streams[m_audio_stream_idx]->codecpar;
-        return utf8_to_wstring_upper(avcodec_get_name(par->codec_id));
+        //실제 디코더명 그대로 (PotPlayer 와 동일): mp3float / aac 등 소문자.
+        const AVCodec* dec = avcodec_find_decoder(par->codec_id);
+        return utf8_to_wstring(dec ? dec->name : avcodec_get_name(par->codec_id));
     }
 
     std::wstring CDecoder::audio_channel_layout_name() const
@@ -824,6 +845,14 @@ namespace ffi
                         }
                     }
 
+                    //[reorder] worker-local reorder 버퍼의 이전 위치 frame 도 free (stale generation).
+                    while (!m_video_reorder.empty())
+                    {
+                        AVFrame* f = m_video_reorder.front();
+                        m_video_reorder.pop_front();
+                        av_frame_free(&f);
+                    }
+
                     int64_t target_us = (int64_t)(seek_pos * AV_TIME_BASE / 1000.0);
 
                     LARGE_INTEGER qpc_freq, qpc_t0, qpc_t1;
@@ -902,6 +931,24 @@ namespace ffi
             {
                 //EOF — flag set. queue 비면 source FillBuffer 가 S_FALSE 반환 → DeliverEndOfStream → renderer EC_COMPLETE 발화.
                 //seek 가 오면 av_seek_frame 처리 시 clear.
+                //[reorder] EOF 전이 시 1회 — reorder 버퍼에 hold 된 마지막 frame 들을 pts 순으로 배출.
+                if (!m_eof.load())
+                {
+                    while (!m_video_reorder.empty())
+                    {
+                        auto it_min = m_video_reorder.begin();
+                        for (auto it = m_video_reorder.begin() + 1; it != m_video_reorder.end(); ++it)
+                            if ((*it)->pts < (*it_min)->pts)
+                                it_min = it;
+                        AVFrame* emit = *it_min;
+                        m_video_reorder.erase(it_min);
+                        {
+                            std::unique_lock<std::mutex> lk(m_mtx_queue);
+                            m_video_queue.push_back(emit);
+                        }
+                        m_cv_queue.notify_one();
+                    }
+                }
                 m_eof.store(true);
                 std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 continue;
@@ -1022,11 +1069,30 @@ namespace ffi
                     //후 실제 emit 한 첫 frame* 시점에 set 됨 (filter source 에서). worker 의 첫 push frame 은 keyframe
                     //일 수 있어 target 이상 frame 과 미디어 시점 차이 (= GOP 길이).
 
+                    //[reorder] decode 순서로 나온 frame 을 pts 순으로 재정렬해 emit. has_b_frames(디코더 reorder 깊이)
+                    //만큼 hold 후 최소 pts 부터 m_video_queue 로. 이미 presentation 순서면 min=front 라 no-op,
+                    //D3D11VA HW 경로 등에서 decode 순서로 나오는 경우만 교정 → sample.rtStart 단조 → 렌더러 judder/drift 제거.
+                    int64_t cur_pts = out_frame->pts;   //logging 용 — push 후 out_frame 이 emit/free 될 수 있어 미리 보관.
+                    m_video_reorder.push_back(out_frame);
+                    //[test] reorder 비활성(depth 0) — avcodec 출력(receive) 순서를 그대로 유지.
+                    //pts 로 정렬하면 콘텐츠가 뒤죽박죽 되는 가설(b) 검증: 받은 순서가 올바른 presentation 순서.
+                    int reorder_depth = 0;
+                    static bool s_logged_bf = false;
+                    if (!s_logged_bf) { logWrite(_T("[reorder] DISABLED has_b_frames=%d"), m_video_ctx->has_b_frames); s_logged_bf = true; }
+                    while ((int)m_video_reorder.size() > reorder_depth)
                     {
-                        std::unique_lock<std::mutex> lk(m_mtx_queue);
-                        m_video_queue.push_back(out_frame);
+                        auto it_min = m_video_reorder.begin();
+                        for (auto it = m_video_reorder.begin() + 1; it != m_video_reorder.end(); ++it)
+                            if ((*it)->pts < (*it_min)->pts)
+                                it_min = it;
+                        AVFrame* emit = *it_min;
+                        m_video_reorder.erase(it_min);
+                        {
+                            std::unique_lock<std::mutex> lk(m_mtx_queue);
+                            m_video_queue.push_back(emit);
+                        }
+                        m_cv_queue.notify_one();
                     }
-                    m_cv_queue.notify_one();
 
                     //first frame 시간 측정 — seek 후 디코드 시작까지의 wallclock.
                     if (!m_first_frame_after_seek)
@@ -1036,7 +1102,7 @@ namespace ffi
                         ::QueryPerformanceCounter(&qpc_now);
                         long long us = (qpc_now.QuadPart - m_seek_done_qpc) * 1000000LL / qpc_freq.QuadPart;
                         logWrite(_T("[ffi/dec/seek] seek→first_video_frame us=%lld pts=%lld"),
-                            us, (long long)out_frame->pts);
+                            us, (long long)cur_pts);
                         m_first_frame_after_seek = true;
                     }
                 }

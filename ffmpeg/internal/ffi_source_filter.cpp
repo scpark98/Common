@@ -488,6 +488,13 @@ namespace ffi
         //이렇게 하면 VFR (variable frame rate) / 23.976/24/29.97 등 *실제 frame rate* 자동 흡수. m_sample_count * 30fps
         //누적 시 mkv 의 실제 fps 와 mismatch 발생 — video 가 빠르게/느리게 진행 → audio 와 어긋남.
         //frame.pts 직접 사용 + video first 기준이라 sample.rtStart 가 *segment-local 0 부터 작은 양수* → freeze 회피.
+        //frame->pts 가 비단조(엉터리)인 미디어가 있다. reorder(정렬)는 올바른 콘텐츠 순서를 망가뜨리므로 안 함 —
+        //avcodec 출력 순서(=올바른 presentation 순서) 를 그대로 유지. rtStart 는 pts 기반(audio/media 타임라인 정렬)으로
+        //구하되 *단조 강제*: pts 가 뒤로 가면 직전 + frame_dur 로 clamp. → 콘텐츠 정상 + 타이밍 단조 + audio 정렬.
+        double fps_v = dec.frame_rate();
+        if (fps_v <= 0.0) fps_v = 30.0;
+        REFERENCE_TIME frame_dur = (REFERENCE_TIME)(10000000.0 / fps_v);
+
         REFERENCE_TIME rtStart;
         if (frame->pts != AV_NOPTS_VALUE)
         {
@@ -496,7 +503,6 @@ namespace ffi
             int64_t video_first = dec.video_first_emit_pts_rt();
             if (video_first == LLONG_MIN)
             {
-                //이 emit 가 *FillBuffer 의 첫 emit* — pre-target skip 통과한 frame. audio 가 reference 로 사용할 anchor.
                 video_first = frame_pts_rt;
                 dec.set_video_first_emit_pts_rt(video_first);
             }
@@ -504,13 +510,21 @@ namespace ffi
         }
         else
         {
-            double fps = dec.frame_rate();
-            if (fps <= 0.0) fps = 30.0;
-            rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps);
+            rtStart = (REFERENCE_TIME)(m_sample_count * 10000000.0 / fps_v);
         }
-        double fps_for_stop = dec.frame_rate();
-        if (fps_for_stop <= 0.0) fps_for_stop = 30.0;
-        REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps_for_stop);
+        //엉터리 pts 로 rtStart 가 뒤로 가면 직전+frame_dur 로 단조 강제 (첫 프레임 제외).
+        //[ptscheck] pts 역행(clamp) 비율 = 비단조 pts 판별 신호. 이 미디어(문제)는 높고, 정상 미디어는 ~0%.
+        static int s_pts_frames = 0, s_pts_regress = 0;
+        s_pts_frames++;
+        if (m_sample_count > 0 && rtStart <= m_last_rtStart)
+        {
+            rtStart = m_last_rtStart + frame_dur;
+            s_pts_regress++;
+        }
+        if (s_pts_frames % 150 == 0)
+            logWrite(_T("[ptscheck] frames=%d pts_regress=%d (%.1f%%) — 높으면 비단조 pts(LAV 필요 신호)"),
+                s_pts_frames, s_pts_regress, 100.0 * s_pts_regress / s_pts_frames);
+        REFERENCE_TIME rtStop = rtStart + frame_dur;
 
         //rate scaling — graph IMediaSeeking::SetRate → ChangeRate 콜백을 통해 source 의 m_playback_rate 갱신.
         const double rate = m_pSource->playback_rate();
@@ -518,6 +532,19 @@ namespace ffi
         {
             rtStart = (REFERENCE_TIME)((double)rtStart / rate);
             rtStop  = (REFERENCE_TIME)((double)rtStop  / rate);
+        }
+
+        //[vsync diag] 시작 30 + 역행(delta<0)은 재생 내내 기록 — source 에서 rtStart 가 뒤로 가는지 확정.
+        {
+            static int s_vsync_dn = 0;
+            REFERENCE_TIME vdelta = rtStart - m_last_rtStart;
+            if ((s_vsync_dn % 30 == 0 || vdelta < 0) && s_vsync_dn < 6000)   //매 30프레임(≈1초) + 역행 — 장기 rate 추적.
+            {
+                logWrite(_T("[vsync]%s #%d rtStart=%lld delta=%lld"),
+                    (vdelta < 0 ? _T("-BACK") : _T("")), s_vsync_dn,
+                    (long long)rtStart, (long long)vdelta);
+            }
+            s_vsync_dn++;
         }
 
         pSample->SetTime(&rtStart, &rtStop);
@@ -682,6 +709,12 @@ namespace ffi
         m_sample_count = 0;
         m_audio_offset_rt = 0;
         m_audio_offset_set = false;
+        //A/V drift 보정 상태 리셋 — 새 스트림에서 다시 측정.
+        m_av_started = false;
+        m_av_ref_set = false;
+        m_av_locked = false;
+        m_av_corr = 0.0;
+        m_av_D_ema = -1.0;
 
         //m_pending_segment_stop 미초기화 시 duration fallback. video pin 과 동일.
         if (m_pSource && m_pending_segment_stop <= 0)
@@ -876,6 +909,70 @@ namespace ffi
         }
         long buffer_size = pSample->GetSize();
 
+        //=== A/V drift 보정 — 오디오 device 재생 rate(=emit rate: DSound 가 consume 하는 속도, 보정과 무관하게 device 실제 rate 반영) ===
+        //를 *누적* 측정해 시스템 실시간(=비디오)에 맞춰 swr 미세 resample. graph clock 은 시스템 동기라 device drift 를 못 잡음(검증됨).
+        //버퍼 충전·안정화(10초) 후 기준점 → 누적 측정(시간 갈수록 노이즈↓ 정확↑) → 연속 적응 보정.
+        if (false && m_swr && m_out_sample_rate > 0)   //[av_sync resample 보정 비활성 — SystemClock + DSound 네이티브 적응으로 대체 검증]
+        {
+            if (!m_av_started)
+            {
+                QueryPerformanceFrequency(&m_av_qpc_freq);
+                QueryPerformanceCounter(&m_av_qpc_start);
+                m_av_started = true;
+            }
+            else
+            {
+                LARGE_INTEGER now;
+                QueryPerformanceCounter(&now);
+                double elapsed = (double)(now.QuadPart - m_av_qpc_start.QuadPart) / m_av_qpc_freq.QuadPart;
+                if (!m_av_ref_set)
+                {
+                    if (elapsed > 10.0)   //prebuffer 충전 완료(버퍼 full)·안정화 후 기준점 — startup transient 배제.
+                    {
+                        m_av_ref_qpc = now;
+                        m_av_ref_samples = m_sample_count;
+                        m_av_last_comp_samples = m_sample_count;
+                        m_av_ref_set = true;
+                    }
+                }
+                else if (m_sample_count - m_av_last_comp_samples >= m_out_sample_rate)   //~1초마다 갱신.
+                {
+                    double win = (double)(now.QuadPart - m_av_ref_qpc.QuadPart) / m_av_qpc_freq.QuadPart;
+                    if (win > 8.0)   //최소 8초 누적 후 보정 시작.
+                    {
+                        double D = (double)(m_sample_count - m_av_ref_samples) / m_out_sample_rate / win;   //device 재생 rate(누적).
+                        //EMA + outlier 제거 — DSound 버퍼 drain/refill 로 D 가 가끔 spike(1%+) 침. ema 와 0.5% 이상 차이나면 무시.
+                        double diff = D - m_av_D_ema;
+                        if (diff < 0.0) diff = -diff;
+                        bool accepted = false;
+                        if (m_av_D_ema < 0.0)
+                        {
+                            m_av_D_ema = D;
+                            accepted = true;
+                        }
+                        else if (diff < 0.005)
+                        {
+                            m_av_D_ema = m_av_D_ema * 0.8 + D * 0.2;
+                            accepted = true;
+                        }
+                        double corr = m_av_D_ema - 1.0;   //>0 = device 가 빠름 → 샘플 늘려(+) 느리게.
+                        if (corr > 0.01)  corr = 0.01;
+                        if (corr < -0.01) corr = -0.01;
+                        m_av_corr = corr;
+                        //compensation_distance 를 10초로 크게 — 1초면 매 재적용마다 ramp 가 reset 되어 요청량(0.29%)의
+                        //1/3 만 적용됐음(diff +1/fill). 10초 distance 를 ~1초마다 갱신하면 full 보정율이 지속 적용됨.
+                        int comp_dist = m_out_sample_rate * 10;
+                        swr_set_compensation(m_swr, (int)(corr * comp_dist), comp_dist);
+                        m_av_last_comp_samples = m_sample_count;
+                        static int s_av_log = 0;
+                        if ((s_av_log++ % 10) == 0)
+                            logWrite(_T("[av_sync] win=%.0fs D=%.5f ema=%.5f corr=%+.4f%% %s"),
+                                win, D, m_av_D_ema, corr * 100.0, accepted ? _T("ok") : _T("OUTLIER"));
+                    }
+                }
+            }
+        }
+
         //swr_convert — frame (planar / 다양한 fmt) → S16 interleaved.
         int max_out_samples = buffer_size / (m_out_channels * 2);   //S16 = 2 bytes/sample
         uint8_t* out_planes[1] = { pData };
@@ -990,6 +1087,11 @@ namespace ffi
         {
             rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
         }
+        //audio sync 조정(사용자 audio_sync) — 오디오 앵커 offset. +면 오디오 지연(rtStart 증가 → 늦게 표시)으로
+        //비디오 파이프라인 지연 때문에 오디오가 먼저 들리는 고정 offset 을 보정. (그동안 m_audio_sync_delay_rt 가
+        //어디에도 적용 안 돼 internal 경로 audio sync 가 no-op 이었음 — 여기서 완성.)
+        if (m_pSource)
+            rtStart += m_pSource->audio_sync_delay_rt();
         m_sample_count += out_samples;
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
 
@@ -1014,6 +1116,12 @@ namespace ffi
         m_pending_segment_stop = rtStop;
         m_audio_offset_rt = 0;
         m_audio_offset_set = false;   //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
+        //A/V drift 보정 — seek 후 새 위치부터 다시 측정.
+        m_av_started = false;
+        m_av_ref_set = false;
+        m_av_locked = false;
+        m_av_corr = 0.0;
+        m_av_D_ema = -1.0;
 
         //atempo graph 재생성 — internal latency 잔류 제거 (LAV path 의 SCAudioTimeStretch NewSegment 처리와 동일).
         //현재 rate 유지 — m_filter_rate 가 직전 rate (init_audio_filter 가 그 rate 로 atempo 재init).

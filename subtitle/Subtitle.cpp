@@ -181,6 +181,9 @@ bool CSubtitle::load_smi(CString sfile)
 		}
 
 		//sync 시작 라인이 아닌 일반 텍스트 라인 — 현재 sync 에 누적.
+		//라인 경계는 공백으로 — SAMI/HTML 규칙상 raw 줄바꿈 = whitespace. 구분자 없이 붙이면
+		//멀티라인 <P> 본문이 "tomorrow.Nothing" 처럼 단어가 들러붙는다 (각 segment 는 flush 시 Trim).
+		sSync += _T(" ");
 		sSync += sLine;
 	}
 
@@ -285,8 +288,19 @@ void CSubtitle::rebuild_active_view()
 	{
 		if (!merged.empty() && m_subtitle[i].start == merged.back().start)
 		{
+			//다른 track (다국어) 의 같은 start caption 을 합칠 때 line_index 충돌 회피 —
+			//이전 caption 의 max line_index + 1 부터 부여해야 각 언어가 별도 줄로 표시된다.
+			//(안 하면 ENCC li=0 과 KRCC li=0 이 같은 줄로 들러붙음.)
+			int base_line = 0;
+			for (const auto& s : merged.back().sentences)
+				if (s.line_index >= base_line)
+					base_line = s.line_index + 1;
 			for (const auto& s : m_subtitle[i].sentences)
-				merged.back().sentences.push_back(s);
+			{
+				CSentence shifted = s;
+				shifted.line_index += base_line;
+				merged.back().sentences.push_back(shifted);
+			}
 			if (m_subtitle[i].end > merged.back().end)
 				merged.back().end = m_subtitle[i].end;
 		}
@@ -729,10 +743,53 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 		if (text_buf.IsEmpty())
 			return;
 		text_buf.Replace(_T("&nbsp;"), _T(" "));
+		text_buf.Trim();		//라인 경계 공백·들여쓰기 정규화 (SAMI/HTML whitespace 규칙). 공백만 남으면 skip.
 		if (text_buf.IsEmpty())
 			return;
 		caption.sentences.push_back(CSentence(text_buf, current_color, current_line_index));
 		text_buf.Empty();
+	};
+
+	//한 caption 을 해당 class 트랙으로 확정. 한 SYNC 안 다중 <P Class> 분리(class 전환 시) +
+	//파싱 끝에서 공통 호출. caption 비우기는 호출자 책임.
+	auto commit_caption = [&](CString commit_cls)
+	{
+		if (commit_cls.IsEmpty())
+			commit_cls = default_class;
+
+		auto& track = m_tracks[commit_cls];
+		caption.start = sync_start;
+
+		//자막끝 마커 (빈 본문) — 직전 caption end 갱신.
+		if (caption.sentences.empty())
+		{
+			if (track.empty())
+				return;
+			if (sync_start <= track.back().start)
+				return;
+			track.back().end = sync_start;
+			return;
+		}
+
+		//같은 start 면 이전 caption 에 sentence merge (multi-line sync).
+		//merge 시 line_index 충돌 회피 — 이전 caption 의 max line_index + 1 부터 부여.
+		if (!track.empty() && caption.start == track.back().start)
+		{
+			int base_line = 0;
+			for (const auto& s : track.back().sentences)
+				if (s.line_index >= base_line)
+					base_line = s.line_index + 1;
+			for (const auto& s : caption.sentences)
+			{
+				CSentence shifted = s;
+				shifted.line_index += base_line;
+				track.back().sentences.push_back(shifted);
+			}
+		}
+		else
+		{
+			track.push_back(caption);
+		}
 	};
 
 	auto handle_tag = [&](const CString& tag)
@@ -748,6 +805,18 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 		}
 		else if (lower.Find(_T("<p class")) == 0)
 		{
+			//한 SYNC 안에 <P Class> 가 여럿일 수 있다 (표준 다국어 SAMI). class 가 바뀌면
+			//직전 class 의 누적을 그 class 트랙으로 commit 하고 새 caption 으로 시작한다.
+			//안 하면 ENCC 본문과 KRCC 본문이 한 segment 로 들러붙고, 전체가 마지막 class 트랙에 들어간다.
+			flush_segment();
+			if (!cls.IsEmpty() && !caption.sentences.empty())
+			{
+				commit_caption(cls);
+				caption.sentences.clear();
+				current_line_index = 0;
+				current_color.Empty();
+			}
+
 			int eq = tag.Find(_T('='));
 			if (eq > 0)
 			{
@@ -825,43 +894,9 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 
 	if (sync_start < 0)
 		return;
-	if (cls.IsEmpty())
-		cls = default_class;
 
-	auto& track = m_tracks[cls];
-
-	caption.start = sync_start;
-
-	//자막끝 마커 (빈 본문) — 직전 caption end 갱신.
-	if (caption.sentences.empty())
-	{
-		if (track.empty())
-			return;
-		if (sync_start <= track.back().start)
-			return;
-		track.back().end = sync_start;
-		return;
-	}
-
-	//같은 start 면 이전 caption 에 sentence merge (multi-line sync, multi-class).
-	//merge 시 line_index 충돌 회피 — 이전 caption 의 max line_index + 1 부터 부여.
-	if (!track.empty() && caption.start == track.back().start)
-	{
-		int base_line = 0;
-		for (const auto& s : track.back().sentences)
-			if (s.line_index >= base_line)
-				base_line = s.line_index + 1;
-		for (const auto& s : caption.sentences)
-		{
-			CSentence shifted = s;
-			shifted.line_index += base_line;
-			track.back().sentences.push_back(shifted);
-		}
-	}
-	else
-	{
-		track.push_back(caption);
-	}
+	//마지막 (또는 유일한) class 의 누적을 commit.
+	commit_caption(cls);
 }
 
 bool CSubtitle::save_subtitle_file(CString sfile)

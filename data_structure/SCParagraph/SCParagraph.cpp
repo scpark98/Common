@@ -21,6 +21,9 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 	std::deque<CString> tags;
 	int line = 0;
 
+	//<ls=값> 으로 지정된, 현재 build 중인 라인의 윗 간격 factor. 라인을 flush 할 때 그 라인 첫 run 에 기록 후 -1 로 리셋.
+	float pending_line_spacing = -1.0f;
+
 	//"<b><cr=red>This</b></cr> is a <cr=blue><i>sample</i> <b>paragraph</b>."
 	get_tag_str(text, tags);
 
@@ -133,6 +136,21 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		{
 			para_temp.text_prop.size = basic_para.text_prop.size;
 		}
+		else if (tags[i].Find(_T("<ls=")) >= 0)
+		{
+			//<ls=값> 은 "이전 줄과의 간격" 이라 그 자체로 줄 경계 — 진행 중인 라인이 있으면 flush 하여 새 라인을 시작한다.
+			//별도 <br> 불필요. 이미 라인이 비어 있으면 (직전 <br> 등) 줄바꿈은 건너뛰고 다음 라인의 간격만 설정 → <br><ls=..> 도 빈 줄·중복 줄바꿈 없이 동작.
+			if (para_line.size())
+			{
+				para_line[0].line_spacing = pending_line_spacing;
+				para.push_back(para_line);
+				para_line.clear();
+				line++;
+			}
+
+			CString str_ls = tags[i].Mid(4, tags[i].GetLength() - 5);
+			pending_line_spacing = (float)_tstof(str_ls);
+		}
 		else if (tags[i] == _T("<br>"))
 		{
 			//<br>에 의해 공백 라인이 추가된 경우
@@ -141,8 +159,10 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 				para_line.push_back(basic_para);
 			}
 
+			para_line[0].line_spacing = pending_line_spacing;
 			para.push_back(para_line);
 			para_line.clear();
+			pending_line_spacing = -1.0f;
 			line++;
 		}
 		else
@@ -159,7 +179,10 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 	}
 
 	if (para_line.size())
+	{
+		para_line[0].line_spacing = pending_line_spacing;
 		para.push_back(para_line);
+	}
 }
 
 //run 들을 character 단위로 split.
@@ -517,6 +540,20 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].text_prop.thickness;// *2.0f;
 			sz.cy = boundRect.Height + para[i][j].text_prop.thickness;// *2.0f;
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+
+			//<ls> 줄간격용 실제 글자 높이 — sz.cy(=boundRect.Height) 는 MeasureString 의 라인 높이(박스)로 폰트 ascent/descent/leading 을 포함해 실제 글자보다 크다.
+			//set_line_spacing 이 '여백 = box - 글자높이' 로 여백만 ls 배율 적용하므로, 실제 글자 윤곽 높이를 GraphicsPath 로 직접 잰다.
+			Gdiplus::FontFamily ff;
+			if (font && font->GetFamily(&ff) == Gdiplus::Ok && !para[i][j].text.IsEmpty())
+			{
+				Gdiplus::GraphicsPath ink_path;
+				ink_path.AddString(CStringW(para[i][j].text), -1, &ff, para[i][j].text_prop.style,
+					font->GetSize(), Gdiplus::PointF(0, 0), sf.GenericTypographic());
+
+				Gdiplus::RectF ink_bounds;
+				if (ink_path.GetBounds(&ink_bounds) == Gdiplus::Ok && ink_bounds.Height > 0)
+					para[i][j].ink_height = ink_bounds.Height + para[i][j].text_prop.thickness;
+			}
 #endif
 			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
 			sz_text.cx += sz.cx;
@@ -715,32 +752,55 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 
 	int i, j;
 
-	//각 라인의 max height를 미리 구한다.
+	//각 라인의 max height(글자 박스)와, 그 박스를 만든 run 의 실측 글자 높이(ink)를 미리 구한다.
 	std::deque<int> line_heights;
+	std::deque<float> line_inks;
 
 	for (i = 0; i < para.size(); i++)
 	{
 		int line_h = 0;
+		float line_ink = 0.0f;
 
 		for (j = 0; j < para[i].size(); j++)
-			line_h = MAX(line_h, para[i][j].r.Height());
+		{
+			if (para[i][j].r.Height() > line_h)
+			{
+				line_h = para[i][j].r.Height();
+				line_ink = para[i][j].ink_height;
+			}
+		}
 
 		line_heights.push_back(line_h);
+		line_inks.push_back(line_ink);
 	}
 
 	//라인 0은 그대로 두고 라인 1부터 누적 shift를 적용.
-	//pair_spacing — wrap 연속이면 wrap_continuation_delta, 그 외 (=paragraph break) 면 paragraph_break_delta 추가.
 	int shift_y = 0;
 
 	for (i = 1; i < (int)para.size(); i++)
 	{
-		float pair_spacing = spacing;
-		if (!para[i].empty() && para[i][0].wrap_continuation)
-			pair_spacing += wrap_continuation_delta;
-		else
-			pair_spacing += paragraph_break_delta;
+		float box = (float)line_heights[i - 1];
+		float increment;
 
-		shift_y += (int)((float)line_heights[i - 1] * (pair_spacing - 1.0f));
+		//<ls=값> 으로 명시된 라인 (wrap 연속 라인 제외): "보이는 여백 = ls * 기본여백" 이 되도록 shift 한다.
+		//보이는 여백 = pitch - ink(실측 글자 높이). 기본여백 = (기본 pitch - ink). 따라서 ls=1.0 = 기본과 동일, 0.5 = 정확히 절반, 0 = 딱 붙음, 2.0 = 2배.
+		//이 식은 ink 추정이 다소 부정확해도 0.5 가 1.0 의 절반임을 정확히 보장한다 (같은 padding 을 양쪽에 쓰므로).
+		if (!para[i].empty() && para[i][0].line_spacing >= 0.0f && !para[i][0].wrap_continuation)
+		{
+			float ink = line_inks[i - 1];
+			if (ink <= 0.0f || ink > box)
+				ink = box;	//메트릭 실패 시 padding 0 (= 글자 박스 기준 fallback).
+
+			float padding = box - ink;
+			float default_shift = box * ((spacing + paragraph_break_delta) - 1.0f);
+			increment = para[i][0].line_spacing * (padding + default_shift) - padding;
+		}
+		else if (!para[i].empty() && para[i][0].wrap_continuation)
+			increment = box * ((spacing + wrap_continuation_delta) - 1.0f);
+		else
+			increment = box * ((spacing + paragraph_break_delta) - 1.0f);
+
+		shift_y += (int)increment;
 
 		for (j = 0; j < para[i].size(); j++)
 			para[i][j].r.OffsetRect(0, shift_y);

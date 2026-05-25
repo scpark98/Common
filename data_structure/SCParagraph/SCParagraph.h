@@ -24,6 +24,9 @@
 	<cr=red> = <ct=red>		//cr_text
 	<crb=Blue> = <cb=Blue>	//cr_back
 	<br>					//line break
+	<ls=0.5>				//line spacing — 이 태그 이후 텍스트를 새 라인으로 시작하며, 그 라인과 바로 전 라인 사이의 '빈 여백' 크기를 지정한다.
+							//<ls> 자체가 줄바꿈을 내포하므로 <br> 를 따로 둘 필요 없다 (둘 다 써도 빈 줄·중복 줄바꿈 없음).
+							//값은 "기본 여백의 배수": 1.0 = 기본(태그 없을 때)과 동일, 0.5 = 그 절반(여백만 좁아짐, 안 겹침), 0 = 딱 붙음, 2.0 = 2배.
 	ex. "<b><cr=red>This</b></cr > is a <ct=blue><i>sample</i> <b>paragraph</b>."
 
 	- cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다.
@@ -83,6 +86,14 @@ public:
 	//set_line_spacing 이 wrap 연속 라인 위 간격에는 wrap_continuation_delta 를 추가 적용하여 <br> 분리 라인보다 좁게.
 	bool			wrap_continuation = false;
 
+	//<ls=값> 태그로 지정된 이 라인의 윗 간격(바로 전 라인과의 간격). < 0 = 미지정(기본 간격 사용).
+	//값은 "기본 줄간격(보이는 여백)의 배수" — 1.0 = 기본, 0.5 = 절반, 0 = 딱 붙음, 2.0 = 2배.
+	float			line_spacing = -1.0f;
+
+	//calc_text_rect 가 채우는 실측 글자 높이(폰트 ascent+descent 기준). r.Height()(글자 박스)는 패딩을 포함해 더 크다.
+	//set_line_spacing 이 <ls> 줄간격을 "보이는 여백 = pitch - ink_height" 로 계산할 때 사용.
+	float			ink_height = 0.0f;
+
 	//이 paragraph의 CSCTextProperty 설정에 맞는 Gdiplus::Font를 구한다.
 	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
 
@@ -114,6 +125,7 @@ public:
 	//wrap_continuation_delta != 0 이면 wrap 연속 라인 (line[0].wrap_continuation == true) 위 간격에 (spacing + wrap_continuation_delta) 적용. 음수 = 좁힘.
 	//paragraph_break_delta != 0 이면 그 외 라인 (i>0 이면서 wrap_continuation == false, =원래 <br> 분리) 위 간격에 (spacing + paragraph_break_delta) 적용. 양수 = 넓힘.
 	//두 delta 를 같이 쓰면 wrap 과 paragraph break 의 시각적 차이를 강조 — wrap 라인 압축 + paragraph break 확장.
+	//단, <ls=값> 태그로 line_spacing >= 0 이 지정된 라인 (wrap 연속 제외) 은 그 값을 "빈 여백(pitch - ink_height)의 배수" 로 해석 — 1.0 = 기본, 0.5 = 절반, 0 = 딱 붙음.
 	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 								float spacing = 1.0f,
 								float wrap_continuation_delta = 0.0f,

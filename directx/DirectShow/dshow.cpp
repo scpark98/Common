@@ -3687,9 +3687,9 @@ bool CDShow::capture_frame(CString sfile)
 		normalize_captured_to_native(bmp, m_video_size.cx, m_video_size.cy);
 	bool saved = ok && bmp.save(sfile);
 
-	if (get_play_state() == State_Paused)
-		step_frame(true);
-
+	//capture 는 read-only — 캡처 후 frame 을 진행시키지 않는다. (step_frame 은 IVideoFrameStep::Step 으로
+	//그래프를 잠깐 Run 시켜 audio 블립 + 1프레임 진행 + Run/Pause 전환 지연을 유발했음. 다른 프레임이
+	//필요하면 호출자가 seek/step 으로 명시. 스냅샷은 cell 마다 set_track_pos 로 seek 하므로 step 불필요.)
 	CoTaskMemFree(lpDib);
 	return saved;
 }
@@ -3714,9 +3714,7 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 	if (ok)
 		normalize_captured_to_native(out, m_video_size.cx, m_video_size.cy);
 
-	if (get_play_state() == State_Paused)
-		step_frame(true);
-
+	//capture 는 read-only — 위 CString overload 와 동일하게 캡처 후 step_frame 제거 (소리·1프레임 진행·전환지연 원인).
 	CoTaskMemFree(lpDib);
 	return ok;
 }

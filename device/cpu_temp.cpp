@@ -1,4 +1,4 @@
-#include "cpu_temp.h"
+﻿#include "cpu_temp.h"
 
 #include <windows.h>
 
@@ -36,7 +36,8 @@ int CCpuTemp::get_temp()
 		return -1;
 	}
 
-	int max_celsius = -1;
+	double sum = 0.0;
+	int count = 0;
 	if (p->uiCoreCnt > 0 && p->uiCoreCnt <= 256 && p->uiCPUCnt > 0 && p->uiCPUCnt <= 128)
 	{
 		unsigned int cores_per_cpu = p->uiCoreCnt / p->uiCPUCnt;
@@ -55,13 +56,27 @@ int CCpuTemp::get_temp()
 			if (p->ucFahrenheit)
 				actual = (actual - 32.0f) * 5.0f / 9.0f;
 
-			int c = (int)(actual + 0.5f);
-			if (c > max_celsius && c > 0 && c < 150)
-				max_celsius = c;
+			if (actual > 0.0f && actual < 150.0f)
+			{
+				sum += actual;
+				count++;
+			}
 		}
 	}
 
 	UnmapViewOfFile(p);
 	CloseHandle(h);
-	return max_celsius;
+
+	int raw = count > 0 ? (int)(sum / count + 0.5) : -1;
+	if (raw < 0)
+	{
+		m_ema = -1.0;
+		return -1;
+	}
+
+	//온도 출렁임은 코어 간 차이가 아니라 시간축 — 8 코어가 매 순간 동일값을 보고하고(평균=그 값),
+	//그 값 자체가 초당 41~65 처럼 튄다(순간 부하 DTS). → EMA 시간평활로 안정화.
+	//표시값 = 이전*0.85 + 새값*0.15 (get_temp 가 ~1초 주기 호출 전제). 스파이크 완화, 평균 추종.
+	m_ema = (m_ema < 0.0) ? raw : (m_ema * 0.85 + raw * 0.15);
+	return (int)(m_ema + 0.5);
 }

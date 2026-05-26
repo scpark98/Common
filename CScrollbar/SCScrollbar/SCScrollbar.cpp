@@ -503,7 +503,12 @@ void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
 
 	//cross 두께는 m_thickness 가 직접 결정 — DeflateRect 로 더 깎으면 얇은 thumb 가 사라짐.
 	int radius = max(1, m_thickness / 2);
-	draw_round_rect(&g, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width(), rThumb.Height()),
+
+	//draw_round_rect → get_round_rect_path 는 stroke 여백 명목으로 fill 영역을 항상 1px deflate 한다(fill-only 라도
+	//stroke_thick 기본값 1 이 전달됨). 그대로 두면 얇은 thumb 가 cross 폭 1px 좁아지고 0.5px 좌(세로)/상(가로)으로
+	//밀려 track 중앙 정렬이 깨진다(세로 scrollbar 에서 좌측 1px 치우침으로 보임). width/height 에 +1 보정해 deflate
+	//후 의도한 rThumb 크기·중심이 되게 한다. 공유 draw_round_rect 는 다른 UI 회귀 위험이 있어 호출부에서 보정.
+	draw_round_rect(&g, Gdiplus::Rect(rThumb.left, rThumb.top, rThumb.Width() + 1, rThumb.Height() + 1),
 		Gdiplus::Color::Transparent, cr_thumb, radius, 0);
 }
 

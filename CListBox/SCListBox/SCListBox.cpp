@@ -239,9 +239,16 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 
+	//focus 사각형(점선 caret)은 그리지 않는다 — Win 탐색기 주소표시줄 폴더 팝업엔 없다. 따라서 변화가
+	//focus 뿐(ODA_FOCUS 만, 내용 변화 없음)인 호출은 다시 그릴 필요가 없다. 이 early-return 이 없으면
+	//listbox 가 다른 항목을 그릴 때마다 caret 항목을 focus-rect erase→draw 로 감싸 매 mouse move 마다 그
+	//항목만 두 번씩 재그려져 깜빡인다(hover flicker). 내용 변화(DRAWENTIRE/SELECT)가 동반되면 통과.
+	if ((lpDIS->itemAction & ODA_FOCUS) && !(lpDIS->itemAction & (ODA_DRAWENTIRE | ODA_SELECT)))
+		return;
+
 	//TRACE(_T("cur index() = %d\n"), (int)lpDIS->itemID);
 	if ((int)lpDIS->itemID < GetTopIndex())
-		return; 
+		return;
 
 	//bBg = false로 하면 최신 항목만 표시되고 다른 항목은 표시되지 않는 현상이 발생한다.
 	CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생하여 사용하지 않았으나 현재는 재현안됨.
@@ -298,14 +305,6 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	//	CBrush brush(::GetSysColor(COLOR_WINDOW));
 	//	pDC->FillRect(&lpDIS->rcItem, &brush);
 	//}	 	
-
-	// If item has focus, draw the focus rect.
-	if ((lpDIS->itemAction & ODA_FOCUS) && (lpDIS->itemState & ODS_FOCUS))
-		pDC->DrawFocusRect(&rect);
-
-	//// If item does not have focus, redraw (erase) the focus rect.
-	if ((lpDIS->itemAction & ODA_FOCUS) &&	!(lpDIS->itemState & ODS_FOCUS))
-		pDC->DrawFocusRect(&rect);
 
 	if (lpDIS->itemID == m_over_item)
 	{
@@ -1977,7 +1976,14 @@ LRESULT CSCListBox::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
 	{
+		//SetTopIndex 는 base CListBox 가 ScrollWindow(BitBlt) 로 스크롤한다 — 그 BitBlt 가 overlay scrollbar 의
+		//픽셀(thumb/arrow)까지 드래그 반대 방향으로 끌어와 잔상으로 보인다(thumb 이 위/아래에 잠깐 그려졌다 제자리로,
+		//잔상엔 끝 화살표까지 포함). SetRedraw(FALSE) 로 그 BitBlt 페인트를 막고, SetRedraw(TRUE) 후 Invalidate 로
+		//깨끗이 한 번에 다시 그린다. CSCTreeCtrl / CVtListCtrlEx 의 scrollbar drag 처리와 동일한 패턴.
+		SetRedraw(FALSE);
 		SetTopIndex(msg->pos);
+		SetRedraw(TRUE);
+		Invalidate(FALSE);
 	}
 	return 0;
 }

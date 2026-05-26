@@ -1871,8 +1871,15 @@ int CSCListBox::SetCurSel(int nSelect)
 
 int CSCListBox::SetTopIndex(int nIndex)
 {
+	//base CListBox::SetTopIndex 는 ScrollWindow(BitBlt) 로 스크롤한다 — 그 BitBlt 가 overlay scrollbar 의
+	//픽셀(thumb/arrow)을 스크롤 방향으로 끌어와 잔상/미세 깜빡임을 만든다. SetRedraw(FALSE) 로 BitBlt 페인트를
+	//막고, 끝난 뒤 Invalidate 로 한 번에 깨끗이 다시 그린다. 휠 스크롤·썸 드래그 등 모든 SetTopIndex 경로 공통.
+	//(CSCTreeCtrl / CVtListCtrlEx 의 scroll 처리와 동일 패턴.)
+	SetRedraw(FALSE);
 	int r = CListBox::SetTopIndex(nIndex);
+	SetRedraw(TRUE);
 	sync_scrollbar();
+	Invalidate(FALSE);
 	return r;
 }
 
@@ -1976,14 +1983,10 @@ LRESULT CSCListBox::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
 	{
-		//SetTopIndex 는 base CListBox 가 ScrollWindow(BitBlt) 로 스크롤한다 — 그 BitBlt 가 overlay scrollbar 의
-		//픽셀(thumb/arrow)까지 드래그 반대 방향으로 끌어와 잔상으로 보인다(thumb 이 위/아래에 잠깐 그려졌다 제자리로,
-		//잔상엔 끝 화살표까지 포함). SetRedraw(FALSE) 로 그 BitBlt 페인트를 막고, SetRedraw(TRUE) 후 Invalidate 로
-		//깨끗이 한 번에 다시 그린다. CSCTreeCtrl / CVtListCtrlEx 의 scrollbar drag 처리와 동일한 패턴.
-		SetRedraw(FALSE);
+		//스크롤 잔상(overlay scrollbar 픽셀이 ScrollWindow BitBlt 에 끌려가는 현상) 차단은 SetTopIndex 오버라이드가
+		//SetRedraw wrap 으로 일괄 처리 — 휠/드래그 공통. 여기서 중복 wrap 하면 nested SetRedraw 로 중간에 redraw 가
+		//재활성돼 오히려 깜빡일 수 있어 그대로 호출만 한다.
 		SetTopIndex(msg->pos);
-		SetRedraw(TRUE);
-		Invalidate(FALSE);
 	}
 	return 0;
 }

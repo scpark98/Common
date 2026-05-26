@@ -478,10 +478,25 @@ namespace ffi
         }
 
         pSample->SetActualDataLength(required);
-        //flush 후 첫 sample 은 SyncPoint=TRUE 강제 — keyframe walk 후 첫 frame 이 정확한 IDR 이 아닐 수 있으나
-        //MPCVR 는 SyncPoint 첫 sample 만 신뢰해 internal queue baseline 설정. 누락 시 stuck 가능.
-        BOOL is_sync = (frame->flags & AV_FRAME_FLAG_KEY) || m_need_discontinuity;
-        pSample->SetSyncPoint(is_sync);
+
+        //[csum] 임시 — 전달 frame 의 픽셀 checksum. pts 는 단조(검증됨)인데 checksum 이 진동(A,B,A,B / 반복)하면
+        //pts-픽셀 불일치(소스 버그), 모두 distinct & 순차면 소스 정상(렌더러가 진동). (분석 후 제거)
+        {
+            static int s_csum_n = 0;
+            if (s_csum_n < 50)
+            {
+                unsigned int csum = 0;
+                for (long i = 0; i < required; i += 97)
+                    csum += pData[i];
+                logWrite(_T("[csum] #%d pts=%lld csum=%u"), s_csum_n, (long long)frame->pts, csum);
+                s_csum_n++;
+            }
+        }
+
+        //우리가 넘기는 건 *디코드 완료된* NV12 프레임 — 모든 프레임이 독립 표시 가능한 sync point 다.
+        //(압축 스트림의 SyncPoint=keyframe 개념과 다름.) LAV 디코더도 출력 전부에 SyncPoint=TRUE 를 준다.
+        //non-keyframe 을 FALSE 로 주면 MPC-VR 가 delta 프레임으로 취급해 drop/repeat/오표시 → 떨림 유발 가능.
+        pSample->SetSyncPoint(TRUE);
 
         //Sample timing — frame.pts 직접 사용 (video first emit 기준 segment-local).
         //rtStart = frame_pts_rt - video_first_emit_pts_rt. video 의 첫 frame.rtStart = 0, 이후 frame 의 *실제 pts 차이* 반영.
@@ -986,12 +1001,15 @@ namespace ffi
             return E_FAIL;
         }
 
-        //atempo time-stretch — rate != 1.0 일 때 PCM sample count 를 1/rate 로 줄여 graph clock 가속 + pitch 유지.
-        //rate==1.0 도 동일 path (1:1 pass-through) 로 코드 일관. swr output 을 frame 으로 wrap → buffersrc 에 push → buffersink 에서 pull.
-        if (m_filter_graph && out_samples > 0)
+        //atempo time-stretch — rate != 1.0 일 때만 통과시켜 PCM sample count 를 1/rate 로 줄여 graph clock 가속 + pitch 유지.
+        //rate==1.0 은 atempo 가 identity 인데도 filter 내부 buffering 의 버스트 emit 이 buffersink overflow drop(아래 1027)
+        //을 유발 → ~7% sample 손실 → sample-count timeline 이 audio pts 보다 뒤처지고 그만큼 audio 가 video 앞으로 drift.
+        //([adiag] 로 확정: source 는 contiguous(nb=1152, pts +24ms 균일)인데 전달 sample 만 부족.) rate==1.0 은 swr
+        //output(48k→48k 1:1) 직결 → 손실 0 → sample-count = audio pts → A/V 정합.
+        double cur_rate = m_pSource ? m_pSource->playback_rate() : 1.0;
+        if (m_filter_graph && cur_rate != 1.0 && out_samples > 0)
         {
             //source rate 변경 감지 → atempo tempo 갱신.
-            double cur_rate = m_pSource ? m_pSource->playback_rate() : 1.0;
             if (cur_rate != m_filter_rate)
                 update_audio_filter_rate(cur_rate);
 
@@ -1092,6 +1110,23 @@ namespace ffi
         //어디에도 적용 안 돼 internal 경로 audio sync 가 no-op 이었음 — 여기서 완성.)
         if (m_pSource)
             rtStart += m_pSource->audio_sync_delay_rt();
+
+        //[adiag] 임시 — sample-count rtStart vs audio pts(미디어 timeline) 의 괴리 추적. diff 가 시간에 따라 커지면
+        //sample-count 가정이 틀린 것(audio pts gap/비연속) → pts 기반으로 전환 필요. diff~0 이면 drift 는 downstream(렌더러/HW). (분석 후 제거)
+        {
+            static int s_adiag = 0;
+            if (s_adiag < 5 || s_adiag % 150 == 0)
+            {
+                int64_t apts_rt    = (frame->pts != AV_NOPTS_VALUE) ? av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000}) : -1;
+                int64_t vfirst     = dec.video_first_emit_pts_rt();
+                int64_t apts_local = (apts_rt >= 0 && vfirst != LLONG_MIN) ? (apts_rt - vfirst) : -1;
+                logWrite(_T("[adiag] #%d sc=%lld rtStart=%lldms apts_local=%lldms diff=%lldms"),
+                    s_adiag, (long long)m_sample_count, (long long)(rtStart / 10000),
+                    (long long)(apts_local / 10000), (long long)((rtStart - apts_local) / 10000));
+            }
+            s_adiag++;
+        }
+
         m_sample_count += out_samples;
         REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
 

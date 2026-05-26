@@ -1069,22 +1069,34 @@ namespace ffi
                     //후 실제 emit 한 첫 frame* 시점에 set 됨 (filter source 에서). worker 의 첫 push frame 은 keyframe
                     //일 수 있어 target 이상 frame 과 미디어 시점 차이 (= GOP 길이).
 
-                    //[reorder] decode 순서로 나온 frame 을 pts 순으로 재정렬해 emit. has_b_frames(디코더 reorder 깊이)
-                    //만큼 hold 후 최소 pts 부터 m_video_queue 로. 이미 presentation 순서면 min=front 라 no-op,
-                    //D3D11VA HW 경로 등에서 decode 순서로 나오는 경우만 교정 → sample.rtStart 단조 → 렌더러 judder/drift 제거.
+                    //[reorder] HW 디코드(D3D11VA/DXVA)는 frame 을 decode 순서로 출력 — app 가 pts 로 presentation 순서를 재정렬해야 한다.
+                    //(SW 디코드는 libavcodec 가 내부 정렬하므로 이미 단조 → min=front no-op.) reorder_depth 만큼 hold 후 최소 pts 부터 emit.
+                    //깊이 = has_b_frames + 1: 일부 스트림에서 has_b_frames 가 실제 reorder 거리보다 1 작게 보고됨([ptsdiag] 검증 —
+                    //has_b_frames=1 인데 실측 reorder 거리 2. depth 를 has_b_frames 로 두면 부분 정렬돼 오히려 스크램블 → 이전에
+                    //reorder 가 "콘텐츠를 망가뜨린다"고 판단해 끈 원인이 바로 이 깊이 부족이었음). 정렬되면 pts 단조 →
+                    //source 의 rtStart clamp inflation 이 사라져 audio sample-count timeline 과 정합 → A/V drift 제거.
                     int64_t cur_pts = out_frame->pts;   //logging 용 — push 후 out_frame 이 emit/free 될 수 있어 미리 보관.
                     m_video_reorder.push_back(out_frame);
-                    //[test] reorder 비활성(depth 0) — avcodec 출력(receive) 순서를 그대로 유지.
-                    //pts 로 정렬하면 콘텐츠가 뒤죽박죽 되는 가설(b) 검증: 받은 순서가 올바른 presentation 순서.
-                    int reorder_depth = 0;
+                    int reorder_depth = m_video_ctx->has_b_frames + 1;
+                    if (reorder_depth > 16)
+                        reorder_depth = 16;   //비정상 보고 방어 — seek→first-frame 지연 폭주 방지.
                     static bool s_logged_bf = false;
-                    if (!s_logged_bf) { logWrite(_T("[reorder] DISABLED has_b_frames=%d"), m_video_ctx->has_b_frames); s_logged_bf = true; }
+                    if (!s_logged_bf)
+                    {
+                        logWrite(_T("[reorder] ENABLED depth=%d (has_b_frames=%d)"), reorder_depth, m_video_ctx->has_b_frames);
+                        s_logged_bf = true;
+                    }
                     while ((int)m_video_reorder.size() > reorder_depth)
                     {
+                        //최소 pts frame 선택. NOPTS 는 min 후보에서 제외(INT64_MIN 이라 그냥 비교하면 항상 min 으로 뽑혀 스크램블).
                         auto it_min = m_video_reorder.begin();
                         for (auto it = m_video_reorder.begin() + 1; it != m_video_reorder.end(); ++it)
-                            if ((*it)->pts < (*it_min)->pts)
+                        {
+                            if ((*it)->pts == AV_NOPTS_VALUE)
+                                continue;
+                            if ((*it_min)->pts == AV_NOPTS_VALUE || (*it)->pts < (*it_min)->pts)
                                 it_min = it;
+                        }
                         AVFrame* emit = *it_min;
                         m_video_reorder.erase(it_min);
                         {
@@ -1205,11 +1217,24 @@ namespace ffi
                 rtStart = (int64_t)(frames * 10000000.0 / fps);
             }
 
-            if (frames > 0 && rtStart <= last_rtStart)
+            bool is_regress = (frames > 0 && rtStart <= last_rtStart);
+            if (is_regress)
             {
                 rtStart = last_rtStart + frame_dur;
                 regress++;
             }
+
+            //[ptsdiag] 임시 — 앞 30프레임의 raw pts/best_effort/dts/key 패턴 덤프. B-frame decode-order vs genuinely 깨진 pts 판별용. (분석 후 제거)
+            if (frames < 30)
+            {
+                int64_t pts_ms = (f->pts != AV_NOPTS_VALUE) ? av_rescale_q(f->pts, tb, AVRational{1, 1000}) : -1;
+                int64_t be_ms  = (f->best_effort_timestamp != AV_NOPTS_VALUE) ? av_rescale_q(f->best_effort_timestamp, tb, AVRational{1, 1000}) : -1;
+                int64_t dts_ms = (f->pkt_dts != AV_NOPTS_VALUE) ? av_rescale_q(f->pkt_dts, tb, AVRational{1, 1000}) : -1;
+                logWrite(_T("[ptsdiag] #%d pts=%lldms best=%lldms dts=%lldms key=%d regress=%d"),
+                    frames, (long long)pts_ms, (long long)be_ms, (long long)dts_ms,
+                    (f->flags & AV_FRAME_FLAG_KEY) ? 1 : 0, is_regress ? 1 : 0);
+            }
+
             last_rtStart = rtStart;
             frames++;
 

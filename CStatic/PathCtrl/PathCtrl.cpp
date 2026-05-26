@@ -7,6 +7,13 @@
 
 // CPathCtrl
 
+//편집모드 바깥 클릭을 마우스 훅에서 감지하면, 훅 프로시저 안에서 직접 edit_end 를 부르지 않고(set_path/
+//SendMessage 재진입 위험) 이 메시지를 자기 자신에게 post 해 message loop 에서 종료 처리한다. CStatic 은
+//WM_USER 대역을 쓰지 않으므로 자기 window 로의 self-post 에 한해 충돌 없음.
+#define WM_PATHCTRL_END_EDIT	(WM_USER + 0x171)
+
+CPathCtrl* CPathCtrl::s_editing_ctrl = NULL;
+
 IMPLEMENT_DYNAMIC(CPathCtrl, CStatic)
 
 CPathCtrl::CPathCtrl()
@@ -20,6 +27,8 @@ CPathCtrl::CPathCtrl()
 
 CPathCtrl::~CPathCtrl()
 {
+	remove_edit_mouse_hook();
+
 	if (m_pEdit)
 	{
 		m_pEdit->DestroyWindow();
@@ -41,6 +50,7 @@ BEGIN_MESSAGE_MAP(CPathCtrl, CStatic)
 	//ON_NOTIFY(LBN_SELCHANGE, IDC_LIST_FOLDERS, &CPathCtrl::OnLbnSelchange)
 	ON_REGISTERED_MESSAGE(Message_CSCListBox, &CPathCtrl::on_message_CSCListBox)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CPathCtrl::on_message_CSCEdit)
+	ON_MESSAGE(WM_PATHCTRL_END_EDIT, &CPathCtrl::on_end_edit_posted)
 	ON_WM_SIZE()
 	ON_WM_KILLFOCUS()
 END_MESSAGE_MAP()
@@ -113,7 +123,11 @@ void CPathCtrl::PreSubclassWindow()
 
 	//WS_BORDER 와 WS_EX_WINDOWEDGE 는 시스템이 NC 안쪽에 default 색으로 1-2px frame 을 그려 dark theme 에서
 	//흰 띠로 보임. 둘 다 제거하고 시각적 border 는 DWM (DWMWA_WINDOW_CORNER_PREFERENCE + DWMWA_BORDER_COLOR) 가 담당.
-	DWORD dwStyle = WS_POPUP | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL;
+	//LBS_NOINTEGRALHEIGHT — 이게 없으면 listbox 가 "부분 항목 미표시" 위해 window 높이를 item_height 배수로
+	//자동 스냅하는데, 그 계산이 우리 커스텀 NC padding(2*m_popup_padding) 을 무시해 window 가 padding 만큼 줄어들고
+	//client 가 한 줄 모자라져 (visible = N-1) 불필요한 scrollbar + 하단 빈 띠가 생긴다. 자동 스냅을 끄고 우리가
+	//calc_popup_height_for_lines 로 정확한 높이를 직접 지정한다.
+	DWORD dwStyle = WS_POPUP | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL | LBS_NOINTEGRALHEIGHT;
 
 	m_list_folder.CreateEx(0, _T("listbox"),
 							_T("listbox"), dwStyle, CRect(0, 0, m_sz_list_folder.cx, m_sz_list_folder.cy), this, 0);//IDC_LIST_FOLDERS);
@@ -239,7 +253,6 @@ void CPathCtrl::OnPaint()
 	}
 
 	int		i;
-	int		arrow_width = 2;
 	CFont*	pOldFont = dc.SelectObject(&m_font);
 	//down/hover 색상 매핑 — m_crDown/m_crOver 시절의 RGB 값과 동일한 theme 필드 사용:
 	//  m_crOver     (229,243,255) == cr_back_hover
@@ -256,6 +269,36 @@ void CPathCtrl::OnPaint()
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 	CRect rArrow = rc;
+
+	//하위폴더 pulldown 의 ">" (접힘) / "v" (펼침) chevron 을 Windows 탐색기 트리와 동일한 룩으로 그린다.
+	//색은 기존 cr_text_dim 그대로 두고, 두꺼운 각진 GDI 선(draw_line, width 2) 대신 얇은 GDI+ 폴리라인 +
+	//안티앨리어싱 + 둥근 끝점(LineCapRound) + 둥근 꼭짓점(LineJoinRound) 으로 교체. (cx,cy) 는 arrow 영역 중심.
+	auto draw_chevron = [&](int cx, int cy, bool down)
+	{
+		Gdiplus::Graphics g(dc.GetSafeHdc());
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
+		Gdiplus::Pen pen(m_theme.cr_text_dim, 1.3f);
+		pen.SetStartCap(Gdiplus::LineCapRound);
+		pen.SetEndCap(Gdiplus::LineCapRound);
+		pen.SetLineJoin(Gdiplus::LineJoinRound);
+
+		Gdiplus::PointF pts[3];
+		if (down)
+		{
+			pts[0] = Gdiplus::PointF((float)(cx - 4), (float)(cy - 2));
+			pts[1] = Gdiplus::PointF((float)(cx + 0), (float)(cy + 3));
+			pts[2] = Gdiplus::PointF((float)(cx + 4), (float)(cy - 2));
+		}
+		else
+		{
+			pts[0] = Gdiplus::PointF((float)(cx - 2), (float)(cy - 4));
+			pts[1] = Gdiplus::PointF((float)(cx + 3), (float)(cy + 0));
+			pts[2] = Gdiplus::PointF((float)(cx - 2), (float)(cy + 4));
+		}
+		g.DrawLines(&pen, pts, 3);
+	};
 
 	//항상 표시되는 항목
 	if (m_pShellImageList)
@@ -328,18 +371,8 @@ void CPathCtrl::OnPaint()
 			}
 			else
 			{
-				//아래로 향한 화살표 표시
-				if (m_down && i == m_index)
-				{
-					draw_line(&dc, rArrow.CenterPoint().x - 4, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y + 3, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
-					draw_line(&dc, rArrow.CenterPoint().x + 5, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 3, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
-				}
-				//일반상태의 > 화살표 표시
-				else
-				{
-					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y - 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 1, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
-					draw_line(&dc, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y + 4, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 1, m_theme.cr_text_dim.ToCOLORREF(), arrow_width);
-				}
+				//m_down 이고 현재 항목이면 펼침 "v", 아니면 접힘 ">".
+				draw_chevron(rArrow.CenterPoint().x, rArrow.CenterPoint().y, (m_down && i == m_index));
 			}
 		}
 	}
@@ -552,13 +585,12 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	if (total_lines == 0)
 		show = false;
 
-	//total_lines * m_list_folder.get_line_height()를 했음에도
-	//1라인 적게 크기가 조정되는 현상이 있다. 왜 그럴까...우선 +1해서 처리한다.
-	total_lines++;
-
-	//calc_popup_height_for_lines 는 NC padding 포함한 전체 window height 반환.
+	//항목이 10개 이하면 항목 수만큼의 높이로 딱 맞게(스크롤바 없음), 10개를 초과하면 10줄 높이로 고정하고
+	//나머지는 스크롤바로 본다. calc_popup_height_for_lines 는 NC padding 포함한 전체 window height 반환.
+	const int max_popup_lines = 10;
+	int display_lines = min(total_lines, max_popup_lines);
 	m_list_folder.SetWindowPos(NULL, pt.x, pt.y,
-		m_sz_list_folder.cx, min(m_sz_list_folder.cy, m_list_folder.calc_popup_height_for_lines(total_lines)),
+		m_sz_list_folder.cx, m_list_folder.calc_popup_height_for_lines(display_lines),
 		SWP_NOZORDER | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
 }
 
@@ -623,6 +655,9 @@ void CPathCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 
 		m_pEdit->SetSel(0, -1);
 		m_pEdit->SetFocus();
+
+		//편집 시작 — 바깥 클릭 감지용 마우스 훅 설치.
+		install_edit_mouse_hook();
 
 		Invalidate();
 		return;
@@ -1048,6 +1083,9 @@ LRESULT CPathCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 
 void CPathCtrl::edit_end(bool valid)
 {
+	//편집 종료 경로(Enter/Esc/KILLFOCUS/바깥클릭) 가 어디든 훅은 반드시 해제. IsWindowVisible 가드보다 먼저.
+	remove_edit_mouse_hook();
+
 	if (!m_pEdit->IsWindowVisible())// || (GetFocus() != m_pEdit))
 		return;
 
@@ -1086,6 +1124,54 @@ void CPathCtrl::edit_end(bool valid)
 		set_path(m_edit_new_text);
 
 	Invalidate();
+}
+
+void CPathCtrl::install_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+		return;
+
+	//WH_MOUSE 는 자기 스레드 메시지 큐만 감시 → 다른 앱 클릭은 보지 않는다(그쪽은 WM_KILLFOCUS 가 처리).
+	//이 훅의 목적은 "같은 스레드(같은 dlg) 의 edit 바깥 클릭" 감지뿐이다.
+	s_editing_ctrl = this;
+	m_mouse_hook = ::SetWindowsHookEx(WH_MOUSE, edit_mouse_hook_proc, NULL, ::GetCurrentThreadId());
+}
+
+void CPathCtrl::remove_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+	{
+		::UnhookWindowsHookEx(m_mouse_hook);
+		m_mouse_hook = NULL;
+	}
+	if (s_editing_ctrl == this)
+		s_editing_ctrl = NULL;
+}
+
+LRESULT CALLBACK CPathCtrl::edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam)
+{
+	if (code == HC_ACTION && s_editing_ctrl != NULL && s_editing_ctrl->m_pEdit != NULL)
+	{
+		if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN ||
+			wParam == WM_NCLBUTTONDOWN || wParam == WM_NCRBUTTONDOWN || wParam == WM_NCMBUTTONDOWN)
+		{
+			MOUSEHOOKSTRUCT* mh = (MOUSEHOOKSTRUCT*)lParam;
+			CRect rc_edit;
+			s_editing_ctrl->m_pEdit->GetWindowRect(&rc_edit);
+
+			//edit 내부 클릭은 캐럿 이동이므로 종료 금지. 바깥이면 종료를 post(클릭 자체는 그대로 통과시킴).
+			if (!rc_edit.PtInRect(mh->pt))
+				s_editing_ctrl->PostMessage(WM_PATHCTRL_END_EDIT, 0, 0);
+		}
+	}
+
+	return ::CallNextHookEx(NULL, code, wParam, lParam);
+}
+
+LRESULT CPathCtrl::on_end_edit_posted(WPARAM wParam, LPARAM lParam)
+{
+	edit_end(true);
+	return 0;
 }
 
 void CPathCtrl::set_color_theme(int theme, bool invalidate)

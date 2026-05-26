@@ -145,6 +145,16 @@ protected:
 	CRect		m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
 	void		repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
 
+	//편집모드 중 edit 바깥 클릭 시에도 정상 종료시키기 위한 스레드-로컬 마우스 훅.
+	//다른 앱/포커스를 받는 다른 컨트롤 클릭은 edit 의 WM_KILLFOCUS 로 이미 종료되지만, 같은 dlg 의
+	//빈 바탕처럼 포커스가 옮겨지지 않는 영역 클릭은 KILLFOCUS 가 안 떠서 종료되지 않는다. 그 빈틈만 이 훅이 메운다.
+	HHOOK		m_mouse_hook = NULL;
+	void		install_edit_mouse_hook();
+	void		remove_edit_mouse_hook();
+	static CPathCtrl*		s_editing_ctrl;		//현재 편집 중인 인스턴스 (static hook proc 에서 역참조).
+	static LRESULT CALLBACK	edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT			on_end_edit_posted(WPARAM wParam, LPARAM lParam);
+
 	std::deque<CPathElement> m_path;
 	int			m_max_width = 200;		//한 path element에 표시할 수 있는 최대 label width in pixel
 	//int			m_root_width = 35;	//20+15. 맨 왼쪽에 항상 표시되는 영역으로 이 영역은 m_path에는 포함되지 않는다.(width가 작을땐 최하위 항목부터 표시하는데 이때에도 루트는 항상 표시된다.)

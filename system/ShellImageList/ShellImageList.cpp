@@ -573,6 +573,19 @@ CString	CShellImageList::convert_real_path_to_special_folder(int index, CString 
 	return volume_path;
 }
 
+//path가 "내 PC", "문서", "바탕 화면"일 경우에는 return true, 일반 폴더라면 return false
+bool CShellImageList::is_special_folder(int index, CString path)
+{
+	if (m_volume[index].get_label(CSIDL_DRIVES) == path)
+		return true;
+	if (m_volume[index].get_label(CSIDL_MYDOCUMENTS) == path)
+		return true;
+	if (m_volume[index].get_label(CSIDL_DESKTOP) == path)
+		return true;
+
+	return false;
+}
+
 //C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
 //내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
 bool CShellImageList::is_protected(int index, CString folder)

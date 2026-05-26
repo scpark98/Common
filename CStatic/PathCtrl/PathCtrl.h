@@ -74,6 +74,7 @@ public:
 
 	//로컬인지 원격인지 세팅
 	void			set_is_local_device(bool is_local);
+	bool			get_is_local() { return m_is_local; }
 
 	//원격일 경우 드라이브 볼륨 리스트를 얻어와서 이 함수를 통해 미리 넣어줘야 한다.
 	//({drive0 letter, drive0 volume}, {drive1 letter, drive1 volume}, ...)
@@ -103,6 +104,7 @@ public:
 	void			set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; Invalidate(); }
 
 	CShellImageList* m_pShellImageList = NULL;
+	CShellImageList* get_shell_imagelist() { return m_pShellImageList; }
 	void			set_shell_imagelist(CShellImageList* pShellImageList, bool is_local)
 	{
 		m_pShellImageList = pShellImageList;

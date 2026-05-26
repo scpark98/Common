@@ -155,6 +155,9 @@ public:
 	//"C:\Users\scpark\Documents"	=> "문서"
 	CString		convert_real_path_to_special_folder(int index, CString real_path);
 
+	//path가 "내 PC", "문서", "바탕 화면"일 경우에는 return true, 일반 폴더라면 return false
+	//local이면 index를 0으로 호출해야 한다. remote라면 1 또는 그 이상의 실제 remote의 인덱스.
+	bool		is_special_folder(int index, CString path);
 
 	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
 	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.

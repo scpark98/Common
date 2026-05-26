@@ -1151,4 +1151,80 @@ namespace ffi
 
         av_packet_free(&pkt);
     }
+
+    //앞 max_frames 비디오 프레임만 디코드해 frame->pts 단조성(역행 비율)을 측정한다.
+    //ffi_source_filter 의 video rtStart clamp(line 494~523) 와 *동일한* 산술을 복제 — 반환 ratio 는 그 [ptscheck] 비율과 일치한다.
+    //비단조 pts 미디어는 높고(이 류 0.37~0.42), 정상 미디어는 0.0 → open 시 LAV 라우팅 판별용. 실패 시 false (호출자는 내장 유지).
+    bool probe_video_pts_regress_ratio(const wchar_t* utf16_path, double* out_ratio, int max_frames)
+    {
+        if (out_ratio)
+            *out_ratio = 0.0;
+
+        CDecoder probe;
+        if (!probe.open(utf16_path))
+            return false;
+
+        probe.start();
+
+        double fps = probe.frame_rate();
+        if (fps <= 0.0)
+            fps = 30.0;
+        //REFERENCE_TIME(DirectShow 타입) 대신 int64_t — 동일한 100ns tick 값. ffi_decoder 는 DirectShow 헤더 비의존.
+        int64_t frame_dur = (int64_t)(10000000.0 / fps);
+        AVRational tb = probe.video_time_base();
+
+        int     frames       = 0;
+        int     regress      = 0;
+        int64_t last_rtStart = 0;
+        int64_t video_first  = LLONG_MIN;
+
+        DWORD t0 = ::GetTickCount();
+        while (frames < max_frames)
+        {
+            AVFrame* f = probe.pop_video_frame();
+            if (!f)
+            {
+                if (probe.is_eof())
+                    break;
+                if (::GetTickCount() - t0 > 3000)   //probe 가 hang 하지 않도록 상한
+                    break;
+                ::Sleep(3);
+                continue;
+            }
+
+            int64_t rtStart;
+            if (f->pts != AV_NOPTS_VALUE)
+            {
+                int64_t frame_pts_rt = av_rescale_q(f->pts, tb, AVRational{1, 10000000});
+                if (video_first == LLONG_MIN)
+                    video_first = frame_pts_rt;
+                rtStart = frame_pts_rt - video_first;
+            }
+            else
+            {
+                rtStart = (int64_t)(frames * 10000000.0 / fps);
+            }
+
+            if (frames > 0 && rtStart <= last_rtStart)
+            {
+                rtStart = last_rtStart + frame_dur;
+                regress++;
+            }
+            last_rtStart = rtStart;
+            frames++;
+
+            av_frame_free(&f);
+        }
+
+        probe.stop();
+        probe.close();
+
+        double ratio = (frames > 0) ? (double)regress / frames : 0.0;
+        if (out_ratio)
+            *out_ratio = ratio;
+
+        logWrite(_T("[ptsprobe] frames=%d regress=%d ratio=%.1f%% — >=15%% 면 비단조 pts(LAV 라우팅)"),
+            frames, regress, 100.0 * ratio);
+        return frames > 0;
+    }
 }

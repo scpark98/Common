@@ -203,4 +203,8 @@ namespace ffi
         int                     m_max_queue = 30;       //seek 후 큐 빨리 채워지도록 5→30. FillBuffer wait 시간 단축.
         int                     m_max_audio_queue = 100;
     };
+
+    //앞 max_frames 비디오 프레임만 디코드해 frame->pts 역행 비율을 측정 (0.0~1.0). open 시 LAV 라우팅 판별용.
+    //ffi_source_filter 의 rtStart clamp 와 동일 산술이라 반환값은 [ptscheck] 비율과 일치. 실패 시 false.
+    bool probe_video_pts_regress_ratio(const wchar_t* utf16_path, double* out_ratio, int max_frames = 60);
 }

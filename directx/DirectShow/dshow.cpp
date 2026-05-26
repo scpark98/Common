@@ -2239,6 +2239,14 @@ static ffi::CDecoder* ffi_decoder_or_null(void* pFFiSource)
 	return &((ffi::CFFiSource*)pFFiSource)->decoder();
 }
 
+double CDShow::probe_video_pts_regress_ratio(CString path, int max_frames)
+{
+	double ratio = 0.0;
+	if (!ffi::probe_video_pts_regress_ratio(path.GetString(), &ratio, max_frames))
+		return -1.0;
+	return ratio;
+}
+
 CString CDShow::get_video_codec_name()
 {
 	if (m_use_internal_ffmpeg)

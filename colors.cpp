@@ -296,6 +296,34 @@ Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset)
 	return get_color(cr, (lum > 128) ? -offset : offset);
 }
 
+//어떤 색의 ratio 배 (검정 기준 스케일). 각 RGB 채널 × ratio, alpha 보존, 0..255 clamp.
+//ratio↑ = 밝아짐 (밝기 배수). "어떤 색의 80% 밝기" = get_ratio_color(cr, 0.8f).
+Gdiplus::Color get_ratio_color(Gdiplus::Color cr, float ratio)
+{
+	auto ch = [ratio](int v) -> BYTE
+	{
+		float r = v * ratio;
+		return (BYTE)(r < 0.0f ? 0.0f : (r > 255.0f ? 255.0f : r));
+	};
+
+	return Gdiplus::Color(cr.GetA(), ch(cr.GetR()), ch(cr.GetG()), ch(cr.GetB()));
+}
+
+//기존 get_color(cr1, cr2, ratio) 는 ratio 를 [0,1] 로 clamp 하고 alpha 까지 보간하므로
+//level>1(더 진하게) 과 alpha 보존이 안 된다. 여기서는 흰색(255) 기준으로 각 채널 편차를
+//level 배 한 뒤 0..255 clamp, alpha 는 원본 유지 → 테마 강도 다이얼 용도.
+//get_ratio_color 와 기준점이 반대(흰색 vs 검정)라, dark 색을 옅게 하면 "덜 어두워진다"(밝아짐).
+Gdiplus::Color get_leveled_color(Gdiplus::Color cr, float level)
+{
+	auto ch = [level](int v) -> BYTE
+	{
+		float r = 255.0f + (v - 255) * level;
+		return (BYTE)(r < 0.0f ? 0.0f : (r > 255.0f ? 255.0f : r));
+	};
+
+	return Gdiplus::Color(cr.GetA(), ch(cr.GetR()), ch(cr.GetG()), ch(cr.GetB()));
+}
+
 //alpha까지 고려하여 컬러의 밝기값을 리턴한다.
 ::byte get_luminance(Gdiplus::Color cr)
 {
@@ -1035,45 +1063,98 @@ CString	get_nearest_color_name(COLORREF cr_src, COLORREF* cr_nearest)
 	return result;
 }
 
-//여기서 리턴하는 이름은 colors.h의 enum SC_COLOR_THEMES 에 정의된 순서와 동일해야 한다.
+//테마 enum ↔ 콤보 표시 이름의 단일 정의 테이블.
+//get_color_theme_list / get_theme_name / get_theme_index 가 모두 이 테이블만 참조한다.
+//(과거엔 enum 과 별도의 push_back 목록을 손으로 동기화해야 했고, 한쪽만 어긋나면
+// 콤보 인덱스→set_color_theme 매핑이 조용히 틀어졌다. 이제 이름은 이 테이블이 단일 진실원.)
+//custom / popup_folder_list 는 콤보 비노출 테마라 enum 끝(claude 뒤)에 두고 테이블엔 넣지 않는다.
+namespace
+{
+	struct sc_theme_entry
+	{
+		int				id;
+		const TCHAR*	name;
+	};
+
+	const sc_theme_entry g_sc_theme_table[] =
+	{
+		{ CSCColorTheme::color_theme_default,			_T("default") },
+		{ CSCColorTheme::color_theme_white,				_T("white") },
+		{ CSCColorTheme::color_theme_gray,				_T("gray") },
+		{ CSCColorTheme::color_theme_dark_gray,			_T("dark_gray") },
+		{ CSCColorTheme::color_theme_dark,				_T("dark") },
+		{ CSCColorTheme::color_theme_linkmemine,		_T("linkmemine") },
+		{ CSCColorTheme::color_theme_linkmemine_origin,	_T("linkmemine_origin") },
+		{ CSCColorTheme::color_theme_linkmemine_se,		_T("linkmemine_se") },
+		{ CSCColorTheme::color_theme_anysupport,		_T("anysupport") },
+		{ CSCColorTheme::color_theme_helpu,				_T("helpu") },
+		{ CSCColorTheme::color_theme_pcanypro,			_T("pcanypro") },
+		{ CSCColorTheme::color_theme_zenburn,			_T("zenburn") },
+		{ CSCColorTheme::color_theme_bespin,			_T("bespin") },
+		{ CSCColorTheme::color_theme_black_board,		_T("black_board") },
+		{ CSCColorTheme::color_theme_choco,				_T("choco") },
+		{ CSCColorTheme::color_theme_danslerush_dark,	_T("danslerush_dark") },
+		{ CSCColorTheme::color_theme_dark_mode_default,	_T("dark_mode_default") },
+		{ CSCColorTheme::color_theme_deep_black,		_T("deep_black") },
+		{ CSCColorTheme::color_theme_hello_kitty,		_T("hello_kitty") },
+		{ CSCColorTheme::color_theme_hot_fudge_sundae,	_T("hot_fudge_sundae") },
+		{ CSCColorTheme::color_theme_khaki,				_T("khaki") },
+		{ CSCColorTheme::color_theme_mono_industrial,	_T("mono_industrial") },
+		{ CSCColorTheme::color_theme_monokai,			_T("monokai") },
+		{ CSCColorTheme::color_theme_mossy_lawn,		_T("mossy_lawn") },
+		{ CSCColorTheme::color_theme_navajo,			_T("navajo") },
+		{ CSCColorTheme::color_theme_obsidian,			_T("obsidian") },
+		{ CSCColorTheme::color_theme_plastic_code_wrap,	_T("plastic_code_wrap") },
+		{ CSCColorTheme::color_theme_ruby_blue,			_T("ruby_blue") },
+		{ CSCColorTheme::color_theme_solarized_light,	_T("solarized_light") },
+		{ CSCColorTheme::color_theme_solarized,			_T("solarized") },
+		{ CSCColorTheme::color_theme_twilight,			_T("twilight") },
+		{ CSCColorTheme::color_theme_vibrant_ink,		_T("vibrant_ink") },
+		{ CSCColorTheme::color_theme_vim_dark_blue,		_T("vim_dark_blue") },
+		{ CSCColorTheme::color_theme_claude,			_T("claude") },
+		{ CSCColorTheme::color_theme_sepia,				_T("sepia") },
+	};
+
+	//테마 추가 시 enum 과 테이블 양쪽을 갱신하지 않으면 컴파일 타임에 잡힌다.
+	static_assert(_countof(g_sc_theme_table) == CSCColorTheme::color_theme_sepia + 1,
+				  "g_sc_theme_table 개수가 SC_COLOR_THEMES(default..sepia) 와 어긋남");
+}
+
 void CSCColorTheme::get_color_theme_list(std::deque<CString>& theme_list)
 {
 	theme_list.clear();
-	theme_list.push_back(_T("default"));
-	theme_list.push_back(_T("white"));
-	theme_list.push_back(_T("gray"));
-	theme_list.push_back(_T("dark_gray"));
-	theme_list.push_back(_T("dark"));
-	theme_list.push_back(_T("linkmemine"));
-	theme_list.push_back(_T("linkmemine_origin"));
-	theme_list.push_back(_T("linkmemine_se"));
-	theme_list.push_back(_T("anysupport"));
-	theme_list.push_back(_T("helpu"));
-	theme_list.push_back(_T("pcanypro"));
 
-	//Notepad++ import 테마 — enum 값 순서와 일치해야 함 (콤보 인덱스 = set_color_theme 인자).
-	theme_list.push_back(_T("zenburn"));
-	theme_list.push_back(_T("bespin"));
-	theme_list.push_back(_T("black_board"));
-	theme_list.push_back(_T("choco"));
-	theme_list.push_back(_T("danslerush_dark"));
-	theme_list.push_back(_T("dark_mode_default"));
-	theme_list.push_back(_T("deep_black"));
-	theme_list.push_back(_T("hello_kitty"));
-	theme_list.push_back(_T("hot_fudge_sundae"));
-	theme_list.push_back(_T("khaki"));
-	theme_list.push_back(_T("mono_industrial"));
-	theme_list.push_back(_T("monokai"));
-	theme_list.push_back(_T("mossy_lawn"));
-	theme_list.push_back(_T("navajo"));
-	theme_list.push_back(_T("obsidian"));
-	theme_list.push_back(_T("plastic_code_wrap"));
-	theme_list.push_back(_T("ruby_blue"));
-	theme_list.push_back(_T("solarized_light"));
-	theme_list.push_back(_T("solarized"));
-	theme_list.push_back(_T("twilight"));
-	theme_list.push_back(_T("vibrant_ink"));
-	theme_list.push_back(_T("vim_dark_blue"));
+#ifdef _DEBUG
+	//콤보 인덱스를 그대로 set_color_theme 에 넘기는 구조라 테이블 순서 = enum 값이어야 한다.
+	//(static_assert 는 개수만 본다 — 순서/값 어긋남은 여기서 검출.)
+	for (int i = 0; i < (int)_countof(g_sc_theme_table); i++)
+		ASSERT(g_sc_theme_table[i].id == i);
+#endif
+
+	for (const auto& e : g_sc_theme_table)
+		theme_list.push_back(e.name);
+}
+
+//static
+CString CSCColorTheme::get_theme_name(int theme)
+{
+	for (const auto& e : g_sc_theme_table)
+	{
+		if (e.id == theme)
+			return e.name;
+	}
+	return _T("default");
+}
+
+//static
+int CSCColorTheme::get_theme_index(LPCTSTR name, int fallback)
+{
+	for (const auto& e : g_sc_theme_table)
+	{
+		if (_tcsicmp(e.name, name) == 0)
+			return e.id;
+	}
+	return fallback;
 }
 
 void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color sel_bg,
@@ -1131,10 +1212,71 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 	cr_progress		= sel_bg;
 }
 
+void CSCColorTheme::set_theme_level(float level)
+{
+	m_theme_level = level;
+	//현재 테마를 base(정의값) 부터 다시 계산. set_color_theme 끝에서 apply_theme_level(m_theme_level)
+	//가 새 강도를 일괄 적용한다. (각 case 가 색을 절대값으로 재설정하므로 호출 누적 없이 매번 base 부터.)
+	set_color_theme(m_cur_theme);
+}
+
+//m_cur_theme 의 base 색(정의값) 에 강도 level 을 일괄 적용. level 이 클수록 흰 baseline 에서 멀어져
+//테마색이 강해진다 (dark 는 더 어둡게, sepia 는 더 진하게). 1.0 이면 정의값 그대로라 건너뛴다.
+//
+//글자색(cr_*_text)·상태색은 *스케일하지 않는다*. 강도 다이얼의 목적은 "배경의 강함" 조절이고,
+//글자를 배경과 같이 흰색 쪽으로 옅게 하면 level 이 낮을수록 글자·배경이 함께 흐려져 대비가
+//무너진다 (level=0.4 에서 글자 가독성 저하 보고). 글자는 가독성 담당이라 정의값을 유지하면
+//배경만 옅어져 light 테마는 오히려 대비가 좋아지고, dark 테마도 정상 사용 범위에서 안전하다.
+void CSCColorTheme::apply_theme_level(float level)
+{
+	if (level == 1.0f)
+		return;
+
+	cr_back						= get_leveled_color(cr_back, level);
+	cr_back_hover				= get_leveled_color(cr_back_hover, level);
+	cr_back_dropHilited			= get_leveled_color(cr_back_dropHilited, level);
+	cr_back_selected			= get_leveled_color(cr_back_selected, level);
+	cr_back_selected_inactive	= get_leveled_color(cr_back_selected_inactive, level);
+	cr_back_selected_hover		= get_leveled_color(cr_back_selected_hover, level);
+	cr_back_alternate			= get_leveled_color(cr_back_alternate, level);
+
+	cr_parent_back				= get_leveled_color(cr_parent_back, level);
+	cr_edit_back				= get_leveled_color(cr_edit_back, level);
+
+	cr_button_back				= get_leveled_color(cr_button_back, level);
+	cr_button_border			= get_leveled_color(cr_button_border, level);
+
+	cr_selected_border			= get_leveled_color(cr_selected_border, level);
+	cr_selected_border_inactive	= get_leveled_color(cr_selected_border_inactive, level);
+	cr_border_active			= get_leveled_color(cr_border_active, level);
+	cr_border_inactive			= get_leveled_color(cr_border_inactive, level);
+	cr_separator				= get_leveled_color(cr_separator, level);
+
+	cr_title_back_active		= get_leveled_color(cr_title_back_active, level);
+	cr_title_back_inactive		= get_leveled_color(cr_title_back_inactive, level);
+	cr_sys_buttons_hover_back	= get_leveled_color(cr_sys_buttons_hover_back, level);
+	cr_sys_buttons_down_back	= get_leveled_color(cr_sys_buttons_down_back, level);
+
+	cr_header_back				= get_leveled_color(cr_header_back, level);
+
+	cr_progress					= get_leveled_color(cr_progress, level);
+	for (auto& c : cr_percentage_bar)
+		c = get_leveled_color(c, level);
+}
+
 void CSCColorTheme::set_color_theme(int color_theme)
 {
 	//일부 색상을 변경했을 경우 다시 호출하면 기본값으로 롤백된다.
 	m_cur_theme = color_theme;
+
+	//edit/입력 본문 baseline = 흰 카드 + near-black. 손으로 작성한 light/neutral 테마 case 는
+	//이 두 필드를 명시하지 않으므로, 직전 테마(특히 set_theme_from_editor_palette 로 dark 본문을
+	//넣는 import 테마)의 값이 그대로 누수돼 CSCStaticEdit 등 cr_edit_back 을 본문색으로 쓰는
+	//컨트롤이 light 테마로 바꿔도 계속 어둡게 남는 문제가 있었다. switch 진입 전 baseline 으로
+	//고정하면 dark→light 전환이 결정적이 되고, dark IDE 류 import 테마는 switch 안의
+	//set_theme_from_editor_palette 가 이 baseline 을 덮는다.
+	cr_edit_back = Gdiplus::Color::White;
+	cr_edit_text = gRGB(32, 32, 32);
 
 	switch (color_theme)
 	{
@@ -1164,7 +1306,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = get_color(cr_text, 32);
 			cr_text_dropHilited = Gdiplus::Color::White;
 
-			cr_back = Gdiplus::Color::White;
+			cr_back = gRGB(250, 250, 250);                    //순수 흰색 대신 살짝 톤 다운한 off-white
 			cr_parent_back = cr_back;
 			//primary navy (#222E3D, luma ~44) 가 매우 어두워 selection/hover 에 직접 쓰면 흰 본문 위에서 대비가 너무 강함.
 			//한 톤 lighter 변환 — primary 정체성 유지하면서 톤 완화. (다른 brand 는 중간 명도라 primary 직접 사용 OK.)
@@ -1253,6 +1395,57 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_button_text = cr_title_text;
 			cr_button_border = get_weak_color(cr_back, 40);
 			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
+		case color_theme_claude:
+			//Claude.ai (Anthropic) chrome 재현 — 따뜻한 크림 배경 + 시그니처 rust orange.
+			//claude05 스크린샷 픽셀 추출 (histogram mode):
+			//  body/title bg   #FAF7F2 (250,247,242) : warm cream — dominant
+			//  primary button  #B45309 (180, 83,  9) : rust/amber orange — 로그인/재시작/확인
+			//  dark text       #3F3A33 ( 63, 58, 51) : warm charcoal — headline/body
+			//  deep cream      #E8E2D6 (232,226,214) : 보조버튼(white) 테두리 / separator / 헤더
+			//  edit bg         #FFFFFF              : white (class default — 별도 지정 불요)
+			//color_theme_linkmemine 과 같은 light 테마 구조 (밝은 bg + dark text + 단일 accent).
+
+			cr_title_text = gRGB(63, 58, 51);                 //#3F3A33 — 밝은 title bar 위 dark text
+			cr_title_back_active = gRGB(232, 226, 214);       //#E8E2D6 — body(#FAF7F2) 보다 한 단계 깊은 크림 (본문과 구분)
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_text = gRGB(63, 58, 51);                       //#3F3A33 — 본문 dark
+			cr_text_dim = get_color(cr_text, 80);             //~#8F8A83 — 버전/보조 텍스트 (추출 #8B8377 근사)
+			cr_text_hover = Gdiplus::Color::White;            //hover bg = orange → white text 강제
+			cr_text_selected = Gdiplus::Color::White;         //selected bg = orange → white text
+			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(250, 247, 242);                    //#FAF7F2 — warm cream body bg
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(180, 83, 9);              //#B45309 — rust orange (selection/primary)
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);  //orange 보다 한 톤 밝게
+			cr_back_alternate = gRGB(232, 226, 214);          //#E8E2D6 — 교대 행은 deep cream
+
+			//edit box 본문은 class default (white bg + near-black text) 그대로.
+
+			cr_selected_border = cr_back_selected;            //focus/selected border = rust orange
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(232, 226, 214);             //#E8E2D6
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, -16));
+			cr_progress = cr_back_selected;                   //#B45309 — rust orange
+
+			cr_border_active = cr_back_selected;              //focus border = rust orange
+			cr_border_inactive = gRGB(232, 226, 214);         //#E8E2D6 — 일반 보더 (deep cream)
+			cr_button_back = cr_back_selected;                //#B45309 — primary button rust orange
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = gRGB(232, 226, 214);           //#E8E2D6 — 보조버튼(white) 테두리
+			cr_separator = gRGB(232, 226, 214);               //#E8E2D6
 			break;
 
 		case color_theme_linkmemine_se:
@@ -1631,6 +1824,47 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
+		//세피아 — 빛바랜 종이/사진 톤. 따뜻한 크림 배경 + 갈색 글자 (light 테마 계열).
+		case color_theme_sepia:
+			cr_text = gRGB(80, 60, 42);					//dark sepia brown
+			cr_text_dim = get_weak_color(cr_text, 90);
+			cr_text_hover = cr_text;
+			cr_text_selected = cr_text;
+			cr_text_selected_inactive = cr_text_selected;
+			cr_text_dropHilited = cr_text;
+
+			cr_back = gRGB(244, 236, 219);				//aged paper
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(222, 196, 150);		//warm tan highlight
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = cr_back_selected;
+			cr_back_hover = get_color(cr_back, -12);
+			cr_back_alternate = get_color(cr_back, -8);
+
+			cr_title_text = cr_text;
+			cr_title_back_active = gRGB(224, 208, 178);	//한 톤 진한 세피아
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_header_text = cr_text;
+			cr_header_back = cr_title_back_active;
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(gRGB(150, 110, 70));
+			cr_progress = gRGB(150, 110, 70);
+
+			cr_selected_border = gRGB(190, 160, 110);
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_border_active = gRGB(160, 125, 80);		//sepia brown accent
+			cr_border_inactive = gRGB(206, 190, 160);	//light sepia
+			cr_button_back = cr_title_back_inactive;
+			cr_button_text = cr_title_text;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
 		//--- Notepad++ GlobalStyles 추출 import 테마 (2026-05-24). 인자: 본문 bg, fg, 선택 bg, gutter fg, gutter bg ---
 		case color_theme_zenburn:
 			set_theme_from_editor_palette(gRGB(0x3F,0x3F,0x3F), gRGB(0xDC,0xDC,0xCC), gRGB(0x58,0x58,0x58), gRGB(0x8A,0x8A,0x8A), gRGB(0x0C,0x0C,0x0C));
@@ -1775,6 +2009,34 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		Gdiplus::Color cr_target = selected_dark ? Gdiplus::Color(255, 0, 0, 0) : Gdiplus::Color(255, 255, 255, 255);
 		cr_back_selected_hover = get_color(cr_back_selected, cr_target, 0.12);
 	}
+
+#ifdef _DEBUG
+	//테마 정의 실수(글자색≈배경색) 조기 검출 — 핵심 가독성 쌍의 명도차만 본다.
+	//Gdiplus 기본 생성자가 불투명 검정이라 "필드 누락" 자체는 투명도로 못 잡으므로 대비로 대신 검출.
+	//dim/secondary 쌍은 의도적 저대비라 제외. Transparent(alpha=0=자동산출) 슬롯은 검사 대상 아님.
+	{
+		auto check = [this](LPCTSTR what, Gdiplus::Color fg, Gdiplus::Color bg)
+		{
+			if (fg.GetA() == 0 || bg.GetA() == 0)
+				return;
+			int diff = (int)get_luminance(fg) - (int)get_luminance(bg);
+			if (diff < 0)
+				diff = -diff;
+			if (diff < 48)
+				TRACE(_T("CSCColorTheme: low contrast [%s] luma diff=%d (theme %d)\n"), what, diff, m_cur_theme);
+			ASSERT(diff >= 16);		//거의 비가시 조합 — 테마 정의 오류일 가능성이 높다.
+		};
+		check(_T("body"),	cr_text,			cr_back);
+		check(_T("title"),	cr_title_text,		cr_title_back_active);
+		check(_T("edit"),	cr_edit_text,		cr_edit_back);
+		check(_T("select"),	cr_text_selected,	cr_back_selected);
+		check(_T("button"),	cr_button_text,		cr_button_back);
+	}
+#endif
+
+	//마지막으로 테마 강도 적용. 위 debug 검사는 base(정의값) 대비를 검증하고, 사용자가 조절한
+	//강도 변형은 의도적이므로 그 뒤에 일괄 스케일한다. level=1.0 이면 no-op.
+	apply_theme_level(m_theme_level);
 }
 
 Gdiplus::Color get_sys_color(int index)

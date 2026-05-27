@@ -257,6 +257,18 @@ Gdiplus::Color	get_color(COLORREF rgb);
 //기준색이 어두운 계열이면 그보다 offset만큼 좀 더 밝은 색을 리턴한다.
 Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset = 32);
 
+//어떤 색의 ratio 배 색 (검정 기준 스케일). 각 RGB 채널 × ratio, alpha 보존, 0..255 clamp.
+//ratio=1.0 → 원색, 0.8 → 80% 밝기(더 어둡게), 1.2 → 120%(더 밝게).
+//"어떤 색의 80%" 의 가장 일반적 의미(밝기 80%) 가 이것이다.
+Gdiplus::Color	get_ratio_color(Gdiplus::Color cr, float ratio);
+
+//테마 강도(intensity) 보간. 중성색(흰색) 기준으로 cr 의 편차를 level 배로 조절한다.
+//level=1.0 → cr 그대로, 0.0 → 흰색(편차 0), 0.8 → 편차 80%(20% 옅게), >1.0 → 편차 확대(더 진하게).
+//알파 보존. get_ratio_color 와 달리 *흰색* 기준이라 dark 테마를 옅게 하면 "덜 어두워진다"(밝아짐).
+//CSCColorTheme::set_theme_level 이 모든 색에 일괄 적용해, 유사 톤 테마(dark_gray_medium 등)를
+//따로 추가하지 않고 한 테마의 강도만 조절하는 데 쓴다.
+Gdiplus::Color	get_leveled_color(Gdiplus::Color cr, float level);
+
 //컬러 이름으로 Gdiplus::Color를 리턴한다. 대소문자를 구분하지 않으며 이름이 없으면 검정색을 리턴한다.
 //get_color("red") 또는 get_color(_T("Red")) -> Gdiplus::Color(255, 255, 0, 0);
 Gdiplus::Color	get_color(CString cr_str);
@@ -427,6 +439,11 @@ public:
 		color_theme_vibrant_ink,
 		color_theme_vim_dark_blue,
 
+		//브랜드 테마지만 enum 끝에 추가 — 중간 삽입 시 뒤따르는 인덱스가 밀려 저장된 테마 번호가 깨진다.
+		color_theme_claude,				//Claude.ai (Anthropic) chrome — warm cream bg + rust orange 버튼
+
+		color_theme_sepia,				//세피아 — 빛바랜 종이/사진 톤 (따뜻한 크림 배경 + 갈색 글자)
+
 		color_theme_custom,
 		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
 	};
@@ -435,6 +452,20 @@ public:
 	int		get_color_theme() const { return m_cur_theme; }
 	void	set_color_theme(int color_theme);
 	static void get_color_theme_list(std::deque<CString> &theme_list);
+
+	//테마 영속화는 int 인덱스 대신 *이름* 으로 저장/복원하는 것을 권장한다.
+	//enum 중간에 테마가 추가/재정렬돼도 저장값이 다른 테마로 매핑되지 않는다.
+	//저장: get_theme_name(get_color_theme()) / 복원: set_color_theme(get_theme_index(saved_name)).
+	//매핑 불가 시 get_theme_name 은 "default", get_theme_index 는 fallback 을 리턴한다.
+	static CString	get_theme_name(int theme);
+	static int		get_theme_index(LPCTSTR name, int fallback = color_theme_default);
+
+	//테마 강도(intensity) 조절. 같은 테마를 유지한 채 모든 키 컬러를 흰색(중성) 기준으로 스케일한다.
+	//dark_gray_medium 처럼 유사 톤 테마를 따로 추가하지 않고 한 테마의 강도만 조절하기 위함.
+	//예: set_color_theme(color_theme_dark_gray) 후 set_theme_level(0.8f) → 기본보다 20% 옅게(덜 어둡게).
+	//1.0 = 테마 정의값, <1 = 옅게, >1 = 진하게. 이후 set_color_theme 를 호출해도 값은 유지된다.
+	float	get_theme_level() const { return m_theme_level; }
+	void	set_theme_level(float level = 1.0f);
 
 	//Notepad++ / VSCode 등 외부 에디터 테마를 import 할 때 사용. 에디터 테마가 노출하는 소수의 색
 	//(본문 bg/fg, 선택 bg, gutter fg/bg)만 받아 title/button/border/hover/alternate/separator 등
@@ -454,6 +485,10 @@ public:
 		//배경이 회색이 되는 문제. default 의 set_color_theme(int) 안에서 m_parent->IsKindOf 로
 		//컨트롤 종류별 적절한 cr_back 을 골라주는 분기가 이미 있으므로, 그 경로를 다시 태운다.
 		//단, m_parent 가 NULL 이면 (theme 객체가 dlg/control 외부에서 단독으로 쓰이는 경우) 일반 copy 로 폴백.
+		//강도(level)는 default 재진입 분기보다 먼저 복사해야 그 안의 set_color_theme(default) 가
+		//src 의 강도로 재계산한다 (아래 일반 copy 경로는 이미 leveled 된 색을 그대로 복사).
+		m_theme_level = src.m_theme_level;
+
 		if (src.m_cur_theme == color_theme_default && m_parent != nullptr)
 		{
 			set_color_theme(color_theme_default);
@@ -507,6 +542,7 @@ public:
 		cr_error					= src.cr_error;
 
 		//원본의 theme 인덱스도 가져옴 — 호출자가 의도한 "수정된 프리셋" 의 베이스를 추적할 수 있도록.
+		//(m_theme_level 은 함수 맨 앞에서 이미 복사했다.)
 		m_cur_theme					= src.m_cur_theme;
 	}
 
@@ -584,6 +620,10 @@ public:
 protected:
 	CWnd*			m_parent = nullptr;
 	int				m_cur_theme = color_theme_default;
+	float			m_theme_level = 1.0f;	//테마 강도. set_theme_level 로 조절. 1.0 = 정의값.
+
+	//m_theme_level 을 모든 색 필드에 일괄 적용 (set_color_theme 끝에서 호출).
+	void			apply_theme_level(float level);
 };
 
 //color name으로 Gdiplus::Color 값을 구하기 위해 정의.

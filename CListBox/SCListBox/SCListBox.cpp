@@ -186,12 +186,29 @@ void CSCListBox::ReconstructFont()
 {
 	m_font.DeleteObject();
 	m_lf.lfCharSet = DEFAULT_CHARSET;
-	//AA 없이도 작은 글씨를 또렷하게: NONANTIALIASED_QUALITY 는 ClearType 의 서브픽셀 색번짐(픽셀
-	//도드라짐)도, grayscale AA 의 뭉갬도 없이 폰트 힌팅대로 흑백 픽셀 그리드에 그린다.
-	//단 11px 등 작은 크기에서 *완전히* 또렷하려면 그 크기에 embedded bitmap 을 가진 폰트여야 한다 —
-	//굴림(Gulim)/Tahoma/MS Sans Serif 는 8~12pt 비트맵 글리프를 내장해 픽셀 단위로 또렷(모두 XP 표준
-	//폰트라 XP 호환에도 부합). Segoe UI/맑은 고딕 등 순수 벡터 폰트는 비트맵이 없어 계단현상이 난다.
-	m_lf.lfQuality = NONANTIALIASED_QUALITY;
+
+	if (m_auto_font_quality)
+	{
+		//큰 글씨는 GDI+ 로 그려 embedded bitmap 을 회피한다(DrawItem 의 m_text_smooth 분기) — GDI 의 lfQuality 로는
+		//어떤 값을 줘도 굴림/돋움/궁서의 내장 비트맵을 못 끄기 때문. 여기선 "큰 글씨인가"만 판정해 기록하고,
+		//작은 글씨는 GDI DrawText + DEFAULT_QUALITY 로 내장 비트맵을 그대로 써서 픽셀 또렷하게 둔다.
+		int ppem = (m_lf.lfHeight < 0) ? -m_lf.lfHeight : m_lf.lfHeight;
+		int dpi = 96;
+		if (::IsWindow(m_hWnd))
+		{
+			HDC hdc = ::GetDC(m_hWnd);
+			dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+			::ReleaseDC(m_hWnd, hdc);
+		}
+		int pt = MulDiv(ppem, 72, dpi);
+		m_text_smooth = (pt >= m_aa_from_pt);
+		m_lf.lfQuality = DEFAULT_QUALITY;
+	}
+	else
+	{
+		m_text_smooth = false;
+	}
+
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	SetFont(&m_font, true);
@@ -231,7 +248,15 @@ void CSCListBox::set_font_weight(int weight)
 
 void CSCListBox::set_font_quality(int quality)
 {
+	m_auto_font_quality = false;
 	m_lf.lfQuality = quality;
+	ReconstructFont();
+}
+
+void CSCListBox::set_font_quality_auto(bool on, int aa_from_pt)
+{
+	m_auto_font_quality = on;
+	m_aa_from_pt = aa_from_pt;
 	ReconstructFont();
 }
 
@@ -478,7 +503,23 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	//가로 스크롤시에 뭔가 rect영역이 부족해서 출력되지 않는 현상이 있어서 DT_NOCLIP을 추가함.
 	pDC->SetTextColor(cr_text.ToCOLORREF());
-	pDC->DrawText(sText, rect, nFormat | DT_NOCLIP);
+	if (m_text_smooth)
+	{
+		//큰 글씨: GDI+ 로 그려 굴림/돋움/궁서의 embedded bitmap 을 회피한다 — GDI DrawText 는 lfQuality 가 무엇이든
+		//그 비트맵을 써서 톱니가 남는다. Common draw_text 가 TextRenderingHintAntiAlias 로 외곽선을 매끈하게 그린다.
+		int ppem = (m_lf.lfHeight < 0) ? -m_lf.lfHeight : m_lf.lfHeight;
+		int pt = MulDiv(ppem, 72, GetDeviceCaps(pDC->GetSafeHdc(), LOGPIXELSY));
+		int font_style = (m_lf.lfWeight >= FW_BOLD) ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular;
+
+		draw_text(g, rect, sText, (float)pt, font_style, 0, 0.0f,
+			CString(m_lf.lfFaceName), cr_text,
+			Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent,
+			DT_LEFT | DT_VCENTER);
+	}
+	else
+	{
+		pDC->DrawText(sText, rect, nFormat | DT_NOCLIP);
+	}
 
 	pDC->SelectObject(pOldFont);
 

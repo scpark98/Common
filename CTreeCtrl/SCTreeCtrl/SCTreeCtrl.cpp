@@ -4448,8 +4448,9 @@ void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 
 	CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
 
+	//테두리(non-client)까지 갱신 — Invalidate() 만으로는 OnNcPaint 가 안 불려 테두리에 이전 테마 색 잔상.
 	if (m_hWnd && invalidate)
-		Invalidate();
+		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME);
 }
 
 void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
@@ -4465,8 +4466,10 @@ void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	if (::IsWindow(m_hWnd))
 		CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
 
+	//Invalidate() 는 client 만 다시 그리고 non-client(OnNcPaint 의 테두리)는 갱신하지 않아
+	//테마를 바꾸면 테두리에 이전 cr_border_inactive 색이 잔상으로 남는다. RDW_FRAME 로 프레임까지 강제 갱신.
 	if (invalidate && m_hWnd)
-		Invalidate();
+		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME);
 }
 
 void CSCTreeCtrl::setup_scrollbar()

@@ -2032,8 +2032,9 @@ void CVtListCtrlEx::set_color_theme(int theme, bool invalidate)
 		SetTextBkColor(m_theme.cr_back.ToCOLORREF());
 	}
 
+	//테두리(non-client)까지 갱신 — Invalidate() 만으로는 OnNcPaint 가 안 불려 테두리에 이전 테마 색 잔상.
 	if (m_hWnd && invalidate)
-		Invalidate();
+		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME);
 }
 
 void CVtListCtrlEx::set_color_theme(const CSCColorTheme& theme, bool invalidate)
@@ -2055,8 +2056,9 @@ void CVtListCtrlEx::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 		SetTextBkColor(m_theme.cr_back.ToCOLORREF());
 	}
 
+	//테두리(non-client)까지 갱신 — Invalidate() 만으로는 OnNcPaint 가 안 불려 테두리에 이전 테마 색 잔상.
 	if (m_hWnd && invalidate)
-		Invalidate();
+		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME);
 }
 
 Gdiplus::Color CVtListCtrlEx::get_text_color(int item, int subItem)

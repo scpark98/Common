@@ -186,7 +186,10 @@ void CSCListBox::ReconstructFont()
 {
 	m_font.DeleteObject();
 	m_lf.lfCharSet = DEFAULT_CHARSET;
-	m_lf.lfQuality = ANTIALIASED_QUALITY;
+	//ANTIALIASED_QUALITY(grayscale AA)를 강제하면 작은 글씨가 뭉개진다(SCEdit.cpp 동일 주석 참조).
+	//형제 SC 컨트롤처럼 특정 AA 모드를 강제하지 않고 시스템 폰트 스무딩 설정(보통 ClearType)을
+	//따른다 — 전 크기에서 또렷하고 사용자/시스템 설정도 존중.
+	m_lf.lfQuality = DEFAULT_QUALITY;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	SetFont(&m_font, true);
@@ -1736,6 +1739,8 @@ void CSCListBox::set_color_theme(int theme, bool invalidate)
 		Invalidate();
 		if (m_as_popup)
 			RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
+		else if (m_draw_border)
+			RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME);	//테두리(OnNcPaint) 잔상 차단
 	}
 }
 
@@ -1761,6 +1766,8 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 		Invalidate(TRUE);
 		if (m_as_popup)
 			RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
+		else if (m_draw_border)
+			RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME);	//테두리(OnNcPaint) 잔상 차단
 	}
 }
 

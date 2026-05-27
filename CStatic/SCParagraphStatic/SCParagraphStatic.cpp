@@ -590,7 +590,9 @@ void CSCParagraphStatic::OnPaint()
 	{
 		g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-		g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+		//grayscale AntiAlias 는 작은 글씨를 뭉개므로(SCListBox/SCEdit 동일 이슈), bg 가 불투명한
+		//static 이라 ClearType(서브픽셀)로 그려 작은 글씨도 또렷하게 한다.
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 	}
 
 	CSCParagraph::draw_text(g, m_para);

@@ -64,11 +64,11 @@ void CSCStaticEdit::set_color_theme(int color_theme, bool invalidate)
 	//theme 본문 배경(= 부모 dlg bg 근사)을 parent_back 으로 잡아둔다.
 	m_theme.cr_parent_back = m_theme.cr_back;
 
-	//CSCStaticEdit 은 CEdit 처럼 보이지만 CStatic 파생이라 default 테마의 control-kind 판정에서
-	//COLOR_BTNFACE(회색) 를 받는다. 실제 edit 컨트롤(CSCEdit=CEdit-kind=COLOR_WINDOW)과 동일하게
-	//보이도록 default 일 때만 COLOR_WINDOW 로 교정. 그 외 테마는 CSCEdit 과 동일하게 theme 의
+	//CSCStaticEdit 은 CEdit 처럼 보이지만 CStatic 파생이라 시스템색 테마(default/windows)의 control-kind
+	//판정에서 COLOR_BTNFACE(회색) 를 받는다. 실제 edit 컨트롤(CSCEdit=CEdit-kind=COLOR_WINDOW)과 동일하게
+	//보이도록 그 두 테마에서만 COLOR_WINDOW 로 교정. 그 외 테마는 CSCEdit 과 동일하게 theme 의
 	//cr_back/cr_text 를 그대로 사용 — dark 계열에서 흰 카드로 떠 CSCEdit 과 어긋나던 문제 해소.
-	if (color_theme == CSCColorTheme::color_theme_default)
+	if (color_theme == CSCColorTheme::color_theme_default || color_theme == CSCColorTheme::color_theme_windows)
 		m_theme.cr_back = get_sys_color(COLOR_WINDOW);
 
 	m_has_parent_back_color = true;
@@ -85,9 +85,9 @@ void CSCStaticEdit::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	m_theme.copy_colors_from(theme);
 
 	//copy_colors_from 이 parent_back(부모 dlg bg) 까지 가져왔으므로 그대로 둔다.
-	//default 일 때만 CStatic 파생이라 BTNFACE 로 잡힌 본문 배경을 edit 처럼 COLOR_WINDOW 로 교정.
-	//(상세 근거는 set_color_theme(int) 주석 참조.)
-	if (theme.get_color_theme() == CSCColorTheme::color_theme_default)
+	//시스템색 테마(default/windows)일 때만 CStatic 파생이라 BTNFACE 로 잡힌 본문 배경을 edit 처럼
+	//COLOR_WINDOW 로 교정. (상세 근거는 set_color_theme(int) 주석 참조.)
+	if (theme.get_color_theme() == CSCColorTheme::color_theme_default || theme.get_color_theme() == CSCColorTheme::color_theme_windows)
 		m_theme.cr_back = get_sys_color(COLOR_WINDOW);
 
 	m_has_parent_back_color = true;

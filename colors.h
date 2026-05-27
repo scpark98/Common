@@ -443,6 +443,7 @@ public:
 		color_theme_claude,				//Claude.ai (Anthropic) chrome — warm cream bg + rust orange 버튼
 
 		color_theme_sepia,				//세피아 — 빛바랜 종이/사진 톤 (따뜻한 크림 배경 + 갈색 글자)
+		color_theme_windows,			//현재 윈도우 테마의 시스템 색(GetSysColor)을 그대로 반영. default 는 curated 기본 룩.
 
 		color_theme_custom,
 		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.

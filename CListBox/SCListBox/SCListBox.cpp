@@ -186,10 +186,12 @@ void CSCListBox::ReconstructFont()
 {
 	m_font.DeleteObject();
 	m_lf.lfCharSet = DEFAULT_CHARSET;
-	//ANTIALIASED_QUALITY(grayscale AA)를 강제하면 작은 글씨가 뭉개진다(SCEdit.cpp 동일 주석 참조).
-	//형제 SC 컨트롤처럼 특정 AA 모드를 강제하지 않고 시스템 폰트 스무딩 설정(보통 ClearType)을
-	//따른다 — 전 크기에서 또렷하고 사용자/시스템 설정도 존중.
-	m_lf.lfQuality = DEFAULT_QUALITY;
+	//AA 없이도 작은 글씨를 또렷하게: NONANTIALIASED_QUALITY 는 ClearType 의 서브픽셀 색번짐(픽셀
+	//도드라짐)도, grayscale AA 의 뭉갬도 없이 폰트 힌팅대로 흑백 픽셀 그리드에 그린다.
+	//단 11px 등 작은 크기에서 *완전히* 또렷하려면 그 크기에 embedded bitmap 을 가진 폰트여야 한다 —
+	//굴림(Gulim)/Tahoma/MS Sans Serif 는 8~12pt 비트맵 글리프를 내장해 픽셀 단위로 또렷(모두 XP 표준
+	//폰트라 XP 호환에도 부합). Segoe UI/맑은 고딕 등 순수 벡터 폰트는 비트맵이 없어 계단현상이 난다.
+	m_lf.lfQuality = NONANTIALIASED_QUALITY;
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
 	SetFont(&m_font, true);
@@ -221,9 +223,15 @@ void CSCListBox::set_font_size(int nSize)
 	ReconstructFont();
 }
 
-void CSCListBox::set_font_bold(int weight)
+void CSCListBox::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
+	ReconstructFont();
+}
+
+void CSCListBox::set_font_quality(int quality)
+{
+	m_lf.lfQuality = quality;
 	ReconstructFont();
 }
 

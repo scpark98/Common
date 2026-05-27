@@ -692,3 +692,21 @@ Common 의 `CSCLog` (`log/SCLog/SCLog.cpp`) 가 모든 프로젝트의 `logWrite
 - log 파일 직접 읽으려면 가장 최근 파일을 찾아야 함 — `Get-ChildItem <exe>\Log -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1`.
 
 **Why:** 2026-05-21, 자막 작업 중 사용자가 *"방금 rename 한 세션의 log 확인"* 을 요청. 클로드가 첫 응답에 `log.txt` 라고 추측해 답했고 사용자 지적 — *"log위치는 실행파일 경로의 Log라는 폴더에 실행시마다 새로 생기도록 이미 그렇게 우리 테스트하지 않았나? 왜 log.txt라는 생소한 로그파일을 언급하나? 일관성을 잃지마라"*. SCLog 컨벤션은 Common 라이브러리에 정의돼 모든 프로젝트가 동일 패턴 — 다음 세션도 이 규칙으로 일관 응답하도록 명시.
+
+---
+
+## Windows XP 호환 — SC 컨트롤은 XP 까지 지원 (강제, 최우선)
+
+`CSCTreeCtrl` / `CVtListCtrlEx` / `CSCListBox` / `CSCEdit` / `CSCStaticEdit` / `CSCComboBox` / `CSCStatic` 등 **Common 의 SC* 컨트롤은 Windows XP 까지 동작해야 한다.** XP 에 존재하지 않는 **API 도, 폰트도 절대 쓰지 말 것.**
+
+**절대 금지 (XP 미존재):**
+- **폰트**: `Segoe UI`(Vista+), `Segoe MDL2 Assets`(Win10+), `Segoe Fluent Icons`(Win11), `맑은 고딕/Malgun Gothic`(Vista+). → XP 표준 폰트만: `Tahoma`, `굴림(Gulim)`, `바탕(Batang)`, `돋움(Dotum)`, `MS Sans Serif`, `MS Shell Dlg`/`MS Shell Dlg 2`, `System`.
+- **아이콘 글리프 폰트로 기호 그리기 금지**: 트리 expand chevron, 화살표 등을 `Segoe MDL2/Fluent` 글리프(`0xE76C` 등)로 그리지 말 것 — XP 에 그 폰트가 없다. **GDI/GDI+ 벡터(`DrawLines`/`draw_line`/path)로 직접 그린다.** (2026-05-27 CSCTreeCtrl chevron 을 폰트 글리프로 그렸다가 이 규칙으로 폴리라인으로 환원.)
+- **API**: Vista+ 전용 API 직접 호출 금지. DWM(`DwmSetWindowAttribute` 등)·immersive dark mode 등은 반드시 Common 의 `win_compat::dwm::*` wrapper 경유 (XP/Vista 에서 자동 no-op). 신규 `dwmapi`/`uxtheme` API 직접 호출 금지.
+
+**적용:**
+- 새 폰트 생성 시 face 를 하드코딩하려면 위 XP 표준 목록에서 고르거나 부모/시스템 폰트를 상속. (Common §2 의 "기본 폰트 = Segoe UI" 는 *D2D/GDI+ 신규 앱* 한정 — XP 타깃 SC 컨트롤에는 적용하지 않는다. 충돌 시 XP 호환 우선.)
+- 기호/아이콘은 벡터로 직접 그림. 작은 글씨 또렷함이 필요하면 `NONANTIALIASED_QUALITY` + 비트맵 내장 XP 폰트(굴림/Tahoma) 조합 (ClearType 색번짐·grayscale 뭉갬 없이 픽셀 또렷).
+- 새 API 쓰기 전 "이게 XP 에 있나?" 자문. 없으면 `win_compat` wrapper 추가 또는 대체 구현.
+
+**Why:** 2026-05-27 사용자 명시 — *"tree/listctrl/edit등 모두 XP까지 지원해야 한다. 따라서 XP 호환되지 않는 API든, 폰트는 절대 쓰지 말아야 한다. 메모해라."* 같은 세션에서 chevron 을 Segoe Fluent Icons 글리프로 그렸다가(XP 미존재) 폴리라인으로 환원한 직후 받은 지시. SC 컨트롤은 광범위한 레거시 환경에 배포되므로 XP 호환이 깨지면 해당 환경에서 컨트롤이 동작하지 않거나 폰트가 fallback 돼 외관이 무너진다.

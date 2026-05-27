@@ -3569,27 +3569,40 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 					int gx = rcText.left - icon_w_for_glyph - 3 - state_offset - indent_step / 2;	//-3 = gap_icon_text
 					int gy = (rcRow.top + rcRow.bottom) / 2;
 
+					//탐색기 트리의 chevron 은 폰트 글리프가 아니라 *얇은 벡터*다 — 폰트 글리프(MDL2/Fluent)는
+					//같은 크기여도 더 두껍게 나온다. 그래서 얇은 폴리라인으로 직접 그려 두께를 제어한다.
+					//★ 두께(chevron_thickness) 한 값만 조정하면 탐색기와 두께를 맞출 수 있다.
+					//색은 항목 텍스트색(crText)을 get_weak_color 로 48 만큼 흐리게 — cr_text 원색은 너무
+					//진해 탐색기 chevron 의 옅은 톤과 다르다. crText 는 상태 반영색이라 선택 시 cr_text_selected
+					//기준으로 흐려진다.
+					const float chevron_thickness = 1.6f;
+
 					Gdiplus::Graphics g(dc.m_hDC);
 					g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-					Gdiplus::SolidBrush brush(m_theme.cr_text);
+					g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
+					Gdiplus::Pen pen(get_weak_color(crText, 48), chevron_thickness);
+					pen.SetStartCap(Gdiplus::LineCapRound);
+					pen.SetEndCap(Gdiplus::LineCapRound);
+					pen.SetLineJoin(Gdiplus::LineJoinRound);
 
 					bool expanded = (GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED) != 0;
 					Gdiplus::PointF pts[3];
 					if (expanded)
 					{
-						//▼
-						pts[0] = Gdiplus::PointF((Gdiplus::REAL)(gx - 4), (Gdiplus::REAL)(gy - 2));
-						pts[1] = Gdiplus::PointF((Gdiplus::REAL)(gx + 4), (Gdiplus::REAL)(gy - 2));
-						pts[2] = Gdiplus::PointF((Gdiplus::REAL)(gx    ), (Gdiplus::REAL)(gy + 3));
+						//v
+						pts[0] = Gdiplus::PointF((Gdiplus::REAL)(gx - 3.5f), (Gdiplus::REAL)(gy - 1.5f));
+						pts[1] = Gdiplus::PointF((Gdiplus::REAL)(gx + 0.0f), (Gdiplus::REAL)(gy + 1.5f));
+						pts[2] = Gdiplus::PointF((Gdiplus::REAL)(gx + 3.5f), (Gdiplus::REAL)(gy - 1.5f));
 					}
 					else
 					{
-						//▶
-						pts[0] = Gdiplus::PointF((Gdiplus::REAL)(gx - 2), (Gdiplus::REAL)(gy - 4));
-						pts[1] = Gdiplus::PointF((Gdiplus::REAL)(gx + 3), (Gdiplus::REAL)(gy    ));
-						pts[2] = Gdiplus::PointF((Gdiplus::REAL)(gx - 2), (Gdiplus::REAL)(gy + 4));
+						//>
+						pts[0] = Gdiplus::PointF((Gdiplus::REAL)(gx - 1.5f), (Gdiplus::REAL)(gy - 3.5f));
+						pts[1] = Gdiplus::PointF((Gdiplus::REAL)(gx + 1.5f), (Gdiplus::REAL)(gy + 0.0f));
+						pts[2] = Gdiplus::PointF((Gdiplus::REAL)(gx - 1.5f), (Gdiplus::REAL)(gy + 3.5f));
 					}
-					g.FillPolygon(&brush, pts, 3);
+					g.DrawLines(&pen, pts, 3);
 				}
 			}
 

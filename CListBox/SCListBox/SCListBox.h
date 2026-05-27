@@ -218,7 +218,8 @@ public:
 	void		set_font(LOGFONT& lf);
 	void		set_font_name(CString sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void		set_font_size(int nSize);
-	void		set_font_bold(int weight = FW_BOLD);
+	void		set_font_weight(int weight = FW_BOLD);
+	void		set_font_quality(int quality);
 
 	void		set_color_theme(int theme, bool invalidate = false);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.

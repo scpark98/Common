@@ -1113,11 +1113,12 @@ namespace
 		{ CSCColorTheme::color_theme_vim_dark_blue,		_T("vim_dark_blue") },
 		{ CSCColorTheme::color_theme_claude,			_T("claude") },
 		{ CSCColorTheme::color_theme_sepia,				_T("sepia") },
+		{ CSCColorTheme::color_theme_windows,			_T("windows") },
 	};
 
 	//테마 추가 시 enum 과 테이블 양쪽을 갱신하지 않으면 컴파일 타임에 잡힌다.
-	static_assert(_countof(g_sc_theme_table) == CSCColorTheme::color_theme_sepia + 1,
-				  "g_sc_theme_table 개수가 SC_COLOR_THEMES(default..sepia) 와 어긋남");
+	static_assert(_countof(g_sc_theme_table) == CSCColorTheme::color_theme_windows + 1,
+				  "g_sc_theme_table 개수가 SC_COLOR_THEMES(default..windows) 와 어긋남");
 }
 
 void CSCColorTheme::get_color_theme_list(std::deque<CString>& theme_list)
@@ -1931,6 +1932,60 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 		case color_theme_vim_dark_blue:
 			set_theme_from_editor_palette(gRGB(0x00,0x00,0x40), gRGB(0xFF,0xFF,0xBF), gRGB(0x20,0x50,0xD0), gRGB(0xFF,0xFF,0xFF), gRGB(0x00,0x00,0x40));
+			break;
+
+		case color_theme_windows:
+			//현재 윈도우 테마의 시스템 색(GetSysColor)을 그대로 반영한다. default 는 curated Win11 룩이라
+			//테두리/선택색 등을 하드코딩하지만, 이 테마는 라이브 OS 색(accent 포함 — Win11 의 COLOR_HIGHLIGHT
+			//= 사용자 accent)을 그대로 쓴다. control-kind 별 배경 분기는 default 와 동일.
+			cr_text					= get_sys_color(COLOR_WINDOWTEXT);
+			cr_text_dim				= get_sys_color(COLOR_GRAYTEXT);
+			cr_text_hover			= cr_text;
+			cr_text_selected		= get_sys_color(COLOR_HIGHLIGHTTEXT);
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited		= get_sys_color(COLOR_HIGHLIGHTTEXT);
+
+			if (m_parent && (m_parent->IsKindOf(RUNTIME_CLASS(CListCtrl)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CListBox)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CComboBox)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CEdit)) ||
+				m_parent->IsKindOf(RUNTIME_CLASS(CRichEditCtrl))))
+				cr_back = get_sys_color(COLOR_WINDOW);
+			else
+				cr_back = get_sys_color(COLOR_BTNFACE);
+			cr_parent_back			= cr_back;
+			cr_back_selected		= get_sys_color(COLOR_HIGHLIGHT);
+			cr_back_selected_inactive = get_sys_color(COLOR_BTNFACE);
+			cr_back_dropHilited		= get_sys_color(COLOR_HIGHLIGHT);
+			cr_back_hover			= get_color(cr_back, get_sys_color(COLOR_HIGHLIGHT), 0.18);
+			cr_back_alternate		= get_color(cr_back, -12);
+
+			cr_edit_text			= get_sys_color(COLOR_WINDOWTEXT);
+			cr_edit_back			= get_sys_color(COLOR_WINDOW);
+
+			cr_title_text			= get_sys_color(COLOR_CAPTIONTEXT);
+			cr_title_back_active	= get_sys_color(COLOR_ACTIVECAPTION);
+			cr_title_back_inactive	= get_sys_color(COLOR_INACTIVECAPTION);
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_header_text			= get_sys_color(COLOR_BTNTEXT);
+			cr_header_back			= get_sys_color(COLOR_3DFACE);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_sys_color(COLOR_HIGHLIGHT));
+			cr_progress				= get_sys_color(COLOR_HIGHLIGHT);
+
+			cr_selected_border		= get_sys_color(COLOR_HIGHLIGHT);
+			cr_selected_border_inactive = get_sys_color(COLOR_BTNSHADOW);
+
+			cr_border_active		= get_sys_color(COLOR_HIGHLIGHT);
+			cr_border_inactive		= get_sys_color(COLOR_BTNSHADOW);
+			cr_button_back			= get_sys_color(COLOR_BTNFACE);
+			cr_button_text			= get_sys_color(COLOR_BTNTEXT);
+			cr_button_border		= get_sys_color(COLOR_BTNSHADOW);
+			cr_separator			= get_sys_color(COLOR_BTNSHADOW);
 			break;
 
 		default: //case color_theme_default :

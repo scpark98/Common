@@ -3448,7 +3448,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (m_bDragging && m_hInsertMarkItem && m_dropPosition != drop_on_item)
 				draw_insert_mark(&dc);
 
-			//V/H overlay 가 만나는 우측 하단 corner — scrollbar track tint 로 fill 해 이질감 제거.
+			//V/H overlay 가 만나는 우측 하단 corner — 탐색기처럼 컨트롤 배경색(cr_back)으로 칠한다.
 			bool vis_v = ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
 			bool vis_h = ::IsWindow(m_scrollbar_h.GetSafeHwnd()) && m_scrollbar_h.IsWindowVisible();
 			if (vis_v && vis_h)
@@ -3457,8 +3457,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				GetClientRect(&rcClient2);
 				CRect rcCorner(rcClient2.right - m_scrollbar_width, rcClient2.bottom - m_scrollbar_width,
 							   rcClient2.right, rcClient2.bottom);
-				Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
-				dc.FillSolidRect(&rcCorner, cr_track.ToCOLORREF());
+				dc.FillSolidRect(&rcCorner, m_theme.cr_back.ToCOLORREF());
 			}
 			*pResult = CDRF_DODEFAULT;
 			break;

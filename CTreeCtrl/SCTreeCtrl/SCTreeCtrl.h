@@ -368,7 +368,7 @@ public:
 	//트리 mutation 후 sync_scrollbar() 외부 호출 가능.
 	CSCScrollbar	m_scrollbar;	//vertical
 	CSCScrollbar	m_scrollbar_h;	//horizontal
-	int				m_scrollbar_width = 18;	//track (window) 폭. thumb 두께는 CSCScrollbar 내부에서 별도 (resting 2, hover 5).
+	int				m_scrollbar_width = 14;	//track (window) 폭 — 18→16→14 로 양쪽 1px씩 축소. thumb 두께는 CSCScrollbar 내부 (resting 2, hover 6).
 	int				m_h_wheel_accum = 0;	//mouse driver 가 한 번 굴림에 작은 zDelta 다수 메시지 보낼 때 누적해서 WHEEL_DELTA 단위로 process.
 	int				m_h_scroll_pos = 0;		//사용자 H scroll 위치 — tree natural max + m_scrollbar_width 까지. 초과분은 customdraw 가 paint shift 로 표시.
 	int				m_h_natural_max = -1;	//tree 의 native si.nMax (over-scroll 계산용).

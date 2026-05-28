@@ -22,6 +22,13 @@
 * [setting]
 * - 필수 : Has String = true, Owner Draw = Fixed, No Integral Height = false
 * - 선택 : Multiline, Sort
+*
+* [항목 추가 규약]
+* - 항목은 모두 itemData 에 CSCListBoxItem* 를 저장하는 모델로 일관되게 들어간다.
+*   insert() / add(LPCTSTR,...) / AddString() / InsertString() 어느 것을 써도 결국 insert() 경로를 타도록
+*   AddString·InsertString 은 hide 되어 있다.
+* - 단, CListBox* 로 업캐스트한 포인터에서 AddString/InsertString 을 호출하면 베이스가 불려 itemData 가
+*   비어 있는 비대칭 항목이 생기므로 그 경로는 금지. CSCListBox 타입 그대로 호출할 것.
 * 
 * [수정될 내용]
 * - text color를 SetItemData()를 이용하여 지정하고 있으나 image index 등을 저장하려면
@@ -420,6 +427,11 @@ public:
 	//base 의 ResetContent / DeleteString 을 hide — itemData 에 저장된 CSCListBoxItem* 를 먼저 해제해 leak 회피.
 	void			ResetContent();
 	int				DeleteString(UINT nIndex);
+	//base 의 AddString / InsertString 을 hide — 모두 insert() 로 라우팅해 항목 모델(CSCListBoxItem* 저장)이
+	//항상 일관되게 유지되도록 한다. 외부에서 m_lb.AddString(...) 으로 무심코 호출해도 안전.
+	//(CListBox* 로 업캐스트한 포인터로 호출하면 베이스가 불려 모델이 깨지므로 그 경로는 여전히 금지.)
+	int				AddString(LPCTSTR lpszItem);
+	int				InsertString(int nIndex, LPCTSTR lpszItem);
 	//SetCurSel / SetTopIndex 도 hide — auto-scroll 로 top 이 바뀌면 sync_scrollbar 호출해 CSCScrollbar 위치 갱신.
 	int				SetCurSel(int nSelect);
 	int				SetTopIndex(int nIndex);

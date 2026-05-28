@@ -2043,6 +2043,18 @@ int CSCListBox::DeleteString(UINT nIndex)
 	return r;
 }
 
+//베이스 AddString / InsertString 을 hide — 외부 호출자가 무심코 베이스를 호출해도 insert() 로 라우팅돼
+//항목 모델(CSCListBoxItem* 저장)이 항상 일관되게 유지된다. 색은 기본(Transparent → DrawItem 이 m_theme.cr_text 사용).
+int CSCListBox::AddString(LPCTSTR lpszItem)
+{
+	return insert(-1, lpszItem);
+}
+
+int CSCListBox::InsertString(int nIndex, LPCTSTR lpszItem)
+{
+	return insert(nIndex, lpszItem);
+}
+
 int CSCListBox::SetCurSel(int nSelect)
 {
 	int r = CListBox::SetCurSel(nSelect);

@@ -155,9 +155,6 @@ public:
 	bool			use_internal_ffmpeg() const { return m_use_internal_ffmpeg; }
 	void			set_pending_internal_audio_track(int track_idx) { m_pending_internal_audio_track = track_idx; }
 
-	//내장 경로 라우팅 판별 — open 전 앞 프레임의 pts 역행 비율 측정 (0.0~1.0). 비단조 pts 미디어는 내장 audio 동기와 안 맞아 LAV 필요. 측정 실패 시 -1.0.
-	double			probe_video_pts_regress_ratio(CString path, int max_frames = 60);
-
 	//Phase 3c: load_media 의 internal path. video only. ffi::CFFiSource + MPC-VR.
 	//성공 시 1, 실패 시 0.
 	int				load_media_internal_ffmpeg(CString sfile, CWnd* pParent);

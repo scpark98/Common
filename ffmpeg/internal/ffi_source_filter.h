@@ -17,6 +17,7 @@
 #include "ffi_decoder.h"
 
 #include <memory>
+#include <vector>
 
 extern "C" {
 #include <libavfilter/avfilter.h>
@@ -147,26 +148,15 @@ namespace ffi
         AVFilterContext* m_filter_sink  = nullptr;   //abuffersink
         double           m_filter_rate  = 1.0;       //현재 atempo 에 적용된 rate. source 의 playback_rate 와 비교해 달라지면 send_command.
 
+        //atempo 가 한 FillBuffer 호출 안에서 여러 frame 을 emit. pData 가 한 frame 분량밖에 못 받으면 *나머지 drop* → audio sample 손실 → audio 가 stretch 안 된 듯 들림 + 띡 노이즈.
+        //드롭 대신 byte 로 보관 → 다음 FillBuffer pData 첫머리에 우선 copy. 사이즈 상한 (1MB) 으로 unbounded growth 방어.
+        std::vector<uint8_t> m_atempo_overflow;
+
         //audio sync offset — audio first emit 의 미디어 시점이 video first emit 보다 *delta* 만큼 후 인 경우
         //audio sample.rtStart 에 delta 만큼 더해서 audio 표시 시점을 delta 늦춤. 같은 graph_clock 시점에 video / audio
         //의 *미디어 시점이 정렬* → sync 정확.
         REFERENCE_TIME  m_audio_offset_rt = 0;
         bool            m_audio_offset_set = false;
-
-        //A/V drift 보정 — 오디오 하드웨어 클럭이 시스템(=비디오 real-time) 보다 미세하게 빨라(예: +0.115%)
-        //시간이 갈수록 오디오가 앞서가는 문제. emit content vs 시스템 실시간(QPC)을 측정해 swr_set_compensation
-        //으로 오디오를 미세 resample(늘림/줄임)해 real-time 에 lock. prebuffer 영향 배제 위해 3초 후 reference latch.
-        bool            m_av_started = false;
-        bool            m_av_ref_set = false;
-        bool            m_av_locked = false;
-        double          m_av_corr = 0.0;      //측정된 drift 보정율 (예: +0.00115 = 오디오 0.115% 느리게).
-        LARGE_INTEGER   m_av_qpc_freq{};
-        LARGE_INTEGER   m_av_qpc_start{};
-        LARGE_INTEGER   m_av_ref_qpc{};
-        int64_t         m_av_ref_samples = 0;
-        int64_t         m_av_ref_clock = 0;            //기준점의 graph reference clock(=DSound 재생) 시각(100ns).
-        int64_t         m_av_last_comp_samples = 0;    //마지막 swr_set_compensation 적용 시점의 m_sample_count.
-        double          m_av_D_ema = -1.0;             //device 재생 rate 의 EMA (spike 제거 + 평활). -1 = 미초기화.
     public:
         HRESULT OnThreadStartPlay() override;
     };

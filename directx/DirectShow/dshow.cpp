@@ -2239,14 +2239,6 @@ static ffi::CDecoder* ffi_decoder_or_null(void* pFFiSource)
 	return &((ffi::CFFiSource*)pFFiSource)->decoder();
 }
 
-double CDShow::probe_video_pts_regress_ratio(CString path, int max_frames)
-{
-	double ratio = 0.0;
-	if (!ffi::probe_video_pts_regress_ratio(path.GetString(), &ratio, max_frames))
-		return -1.0;
-	return ratio;
-}
-
 CString CDShow::get_video_codec_name()
 {
 	if (m_use_internal_ffmpeg)
@@ -2428,7 +2420,7 @@ CString CDShow::get_video_decoder_label()
 		CString out = _T("내장 FFmpeg 디코더");
 		if (!codec.IsEmpty())
 		{
-			out += _T("(");
+			out += _T(" (");
 			out += codec;
 			if (!hw.IsEmpty())
 			{
@@ -2593,7 +2585,7 @@ CString CDShow::get_audio_decoder_label()
 		CString out = _T("내장 FFmpeg 디코더");
 		if (!codec.IsEmpty())
 		{
-			out += _T("(");
+			out += _T(" (");
 			out += codec;
 			out += _T(")");
 		}
@@ -2947,24 +2939,6 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	{
 		setup_audio_filter_chain();
 		logWrite(_T("[internal] SC Audio chain setup"));
-	}
-
-	//internal path 도 LAV 와 동일하게 graph reference clock 을 SystemClock 으로 (LAV path 는 2099 에서 override 하지만
-	//internal 은 setup_audio_gain_filter(887)의 audio renderer clock 그대로였음). LAV 가 이 방식으로 A/V 싱크되므로 동일 적용:
-	//SystemClock master → video real-time pace + audio renderer 가 system clock 에 drop/dup 으로 적응.
-	{
-		CComPtr<IReferenceClock> pSysClock;
-		HRESULT hr_sc = CoCreateInstance(CLSID_SystemClock, NULL, CLSCTX_INPROC_SERVER,
-			IID_IReferenceClock, (void**)&pSysClock);
-		if (SUCCEEDED(hr_sc) && pSysClock)
-		{
-			CComQIPtr<IMediaFilter> pMF(m_pGB);
-			if (pMF)
-			{
-				HRESULT hr_set = pMF->SetSyncSource(pSysClock);
-				logWrite(_T("[clock] internal: SystemClock master hr=0x%08x"), hr_set);
-			}
-		}
 	}
 
 	//새 renderer 인스턴스의 surface position 설정 — OnSize 가 fire 안 되는 미디어 전환 (mkv→mp4 등) 케이스에서
@@ -3563,11 +3537,10 @@ void CDShow::set_playback_rate(double rate)
 	}
 	else if (m_pFFiSource)
 	{
+		//graph SetRate 안 호출 — LAV path 와 동일 원칙. 호출 시 audio renderer(DSound) 의 rate scaling 이 atempo 와 이중 적용되어 audio 가 1.0x source rate 로 들림.
+		//ChangeRate callback 은 set_playback_rate 가 직접 source filter 의 atomic rate 설정으로 대체.
 		((ffi::CFFiSource*)m_pFFiSource)->set_playback_rate(rate);
-		//internal path 의 ChangeRate 가 호출되도록 graph SetRate 도 트리거 (CFFiSeeking 의 SetRate 라우팅).
-		if (m_pMS)
-			hr = m_pMS->SetRate(rate);
-		logWrite(_T("[playback_rate] internal path → CFFiSource->set_playback_rate(%.3f) + graph SetRate hr=0x%08x"), rate, hr);
+		logWrite(_T("[playback_rate] internal path → CFFiSource->set_playback_rate(%.3f) (graph SetRate skipped — DSound 이중 rate scaling 회피)"), rate);
 	}
 	else
 	{
@@ -3713,9 +3686,9 @@ bool CDShow::capture_frame(CString sfile)
 		normalize_captured_to_native(bmp, m_video_size.cx, m_video_size.cy);
 	bool saved = ok && bmp.save(sfile);
 
-	//capture 는 read-only — 캡처 후 frame 을 진행시키지 않는다. (step_frame 은 IVideoFrameStep::Step 으로
-	//그래프를 잠깐 Run 시켜 audio 블립 + 1프레임 진행 + Run/Pause 전환 지연을 유발했음. 다른 프레임이
-	//필요하면 호출자가 seek/step 으로 명시. 스냅샷은 cell 마다 set_track_pos 로 seek 하므로 step 불필요.)
+	if (get_play_state() == State_Paused)
+		step_frame(true);
+
 	CoTaskMemFree(lpDib);
 	return saved;
 }
@@ -3740,7 +3713,9 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 	if (ok)
 		normalize_captured_to_native(out, m_video_size.cx, m_video_size.cy);
 
-	//capture 는 read-only — 위 CString overload 와 동일하게 캡처 후 step_frame 제거 (소리·1프레임 진행·전환지연 원인).
+	if (get_play_state() == State_Paused)
+		step_frame(true);
+
 	CoTaskMemFree(lpDib);
 	return ok;
 }

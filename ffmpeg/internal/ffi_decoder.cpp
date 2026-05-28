@@ -456,13 +456,6 @@ namespace ffi
             m_audio_queue.pop_front();
             av_frame_free(&f);
         }
-        //[reorder] worker 종료(join 완료)라 reorder 버퍼에 남은 frame free.
-        while (!m_video_reorder.empty())
-        {
-            AVFrame* f = m_video_reorder.front();
-            m_video_reorder.pop_front();
-            av_frame_free(&f);
-        }
         logWrite(_T("[ffi/dec] worker stopped"));
     }
 
@@ -637,16 +630,6 @@ namespace ffi
         return out;
     }
 
-    static std::wstring utf8_to_wstring(const char* s)
-    {
-        std::wstring out;
-        if (!s)
-            return out;
-        while (*s)
-            out += (wchar_t)(unsigned char)(*s++);
-        return out;
-    }
-
     static std::wstring fourcc_to_wstring(uint32_t tag)
     {
         std::wstring out;
@@ -666,9 +649,7 @@ namespace ffi
         if (!m_fmt || m_video_stream_idx < 0)
             return L"";
         AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
-        //실제 디코더명 그대로 (PotPlayer 와 동일 표기): h264 / hevc 등 소문자. find 실패 시 codec id 명 fallback.
-        const AVCodec* dec = avcodec_find_decoder(par->codec_id);
-        return utf8_to_wstring(dec ? dec->name : avcodec_get_name(par->codec_id));
+        return utf8_to_wstring_upper(avcodec_get_name(par->codec_id));
     }
 
     std::wstring CDecoder::video_fourcc() const
@@ -762,9 +743,7 @@ namespace ffi
         if (!m_fmt || m_audio_stream_idx < 0)
             return L"";
         AVCodecParameters* par = m_fmt->streams[m_audio_stream_idx]->codecpar;
-        //실제 디코더명 그대로 (PotPlayer 와 동일): mp3float / aac 등 소문자.
-        const AVCodec* dec = avcodec_find_decoder(par->codec_id);
-        return utf8_to_wstring(dec ? dec->name : avcodec_get_name(par->codec_id));
+        return utf8_to_wstring_upper(avcodec_get_name(par->codec_id));
     }
 
     std::wstring CDecoder::audio_channel_layout_name() const
@@ -845,14 +824,6 @@ namespace ffi
                         }
                     }
 
-                    //[reorder] worker-local reorder 버퍼의 이전 위치 frame 도 free (stale generation).
-                    while (!m_video_reorder.empty())
-                    {
-                        AVFrame* f = m_video_reorder.front();
-                        m_video_reorder.pop_front();
-                        av_frame_free(&f);
-                    }
-
                     int64_t target_us = (int64_t)(seek_pos * AV_TIME_BASE / 1000.0);
 
                     LARGE_INTEGER qpc_freq, qpc_t0, qpc_t1;
@@ -931,24 +902,6 @@ namespace ffi
             {
                 //EOF — flag set. queue 비면 source FillBuffer 가 S_FALSE 반환 → DeliverEndOfStream → renderer EC_COMPLETE 발화.
                 //seek 가 오면 av_seek_frame 처리 시 clear.
-                //[reorder] EOF 전이 시 1회 — reorder 버퍼에 hold 된 마지막 frame 들을 pts 순으로 배출.
-                if (!m_eof.load())
-                {
-                    while (!m_video_reorder.empty())
-                    {
-                        auto it_min = m_video_reorder.begin();
-                        for (auto it = m_video_reorder.begin() + 1; it != m_video_reorder.end(); ++it)
-                            if ((*it)->pts < (*it_min)->pts)
-                                it_min = it;
-                        AVFrame* emit = *it_min;
-                        m_video_reorder.erase(it_min);
-                        {
-                            std::unique_lock<std::mutex> lk(m_mtx_queue);
-                            m_video_queue.push_back(emit);
-                        }
-                        m_cv_queue.notify_one();
-                    }
-                }
                 m_eof.store(true);
                 std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 continue;
@@ -1069,42 +1022,11 @@ namespace ffi
                     //후 실제 emit 한 첫 frame* 시점에 set 됨 (filter source 에서). worker 의 첫 push frame 은 keyframe
                     //일 수 있어 target 이상 frame 과 미디어 시점 차이 (= GOP 길이).
 
-                    //[reorder] HW 디코드(D3D11VA/DXVA)는 frame 을 decode 순서로 출력 — app 가 pts 로 presentation 순서를 재정렬해야 한다.
-                    //(SW 디코드는 libavcodec 가 내부 정렬하므로 이미 단조 → min=front no-op.) reorder_depth 만큼 hold 후 최소 pts 부터 emit.
-                    //깊이 = has_b_frames + 1: 일부 스트림에서 has_b_frames 가 실제 reorder 거리보다 1 작게 보고됨([ptsdiag] 검증 —
-                    //has_b_frames=1 인데 실측 reorder 거리 2. depth 를 has_b_frames 로 두면 부분 정렬돼 오히려 스크램블 → 이전에
-                    //reorder 가 "콘텐츠를 망가뜨린다"고 판단해 끈 원인이 바로 이 깊이 부족이었음). 정렬되면 pts 단조 →
-                    //source 의 rtStart clamp inflation 이 사라져 audio sample-count timeline 과 정합 → A/V drift 제거.
-                    int64_t cur_pts = out_frame->pts;   //logging 용 — push 후 out_frame 이 emit/free 될 수 있어 미리 보관.
-                    m_video_reorder.push_back(out_frame);
-                    int reorder_depth = m_video_ctx->has_b_frames + 1;
-                    if (reorder_depth > 16)
-                        reorder_depth = 16;   //비정상 보고 방어 — seek→first-frame 지연 폭주 방지.
-                    static bool s_logged_bf = false;
-                    if (!s_logged_bf)
                     {
-                        logWrite(_T("[reorder] ENABLED depth=%d (has_b_frames=%d)"), reorder_depth, m_video_ctx->has_b_frames);
-                        s_logged_bf = true;
+                        std::unique_lock<std::mutex> lk(m_mtx_queue);
+                        m_video_queue.push_back(out_frame);
                     }
-                    while ((int)m_video_reorder.size() > reorder_depth)
-                    {
-                        //최소 pts frame 선택. NOPTS 는 min 후보에서 제외(INT64_MIN 이라 그냥 비교하면 항상 min 으로 뽑혀 스크램블).
-                        auto it_min = m_video_reorder.begin();
-                        for (auto it = m_video_reorder.begin() + 1; it != m_video_reorder.end(); ++it)
-                        {
-                            if ((*it)->pts == AV_NOPTS_VALUE)
-                                continue;
-                            if ((*it_min)->pts == AV_NOPTS_VALUE || (*it)->pts < (*it_min)->pts)
-                                it_min = it;
-                        }
-                        AVFrame* emit = *it_min;
-                        m_video_reorder.erase(it_min);
-                        {
-                            std::unique_lock<std::mutex> lk(m_mtx_queue);
-                            m_video_queue.push_back(emit);
-                        }
-                        m_cv_queue.notify_one();
-                    }
+                    m_cv_queue.notify_one();
 
                     //first frame 시간 측정 — seek 후 디코드 시작까지의 wallclock.
                     if (!m_first_frame_after_seek)
@@ -1114,7 +1036,7 @@ namespace ffi
                         ::QueryPerformanceCounter(&qpc_now);
                         long long us = (qpc_now.QuadPart - m_seek_done_qpc) * 1000000LL / qpc_freq.QuadPart;
                         logWrite(_T("[ffi/dec/seek] seek→first_video_frame us=%lld pts=%lld"),
-                            us, (long long)cur_pts);
+                            us, (long long)out_frame->pts);
                         m_first_frame_after_seek = true;
                     }
                 }
@@ -1162,94 +1084,5 @@ namespace ffi
         }
 
         av_packet_free(&pkt);
-    }
-
-    //앞 max_frames 비디오 프레임만 디코드해 frame->pts 단조성(역행 비율)을 측정한다.
-    //ffi_source_filter 의 video rtStart clamp(line 494~523) 와 *동일한* 산술을 복제 — 반환 ratio 는 그 [ptscheck] 비율과 일치한다.
-    //비단조 pts 미디어는 높고(이 류 0.37~0.42), 정상 미디어는 0.0 → open 시 LAV 라우팅 판별용. 실패 시 false (호출자는 내장 유지).
-    bool probe_video_pts_regress_ratio(const wchar_t* utf16_path, double* out_ratio, int max_frames)
-    {
-        if (out_ratio)
-            *out_ratio = 0.0;
-
-        CDecoder probe;
-        if (!probe.open(utf16_path))
-            return false;
-
-        probe.start();
-
-        double fps = probe.frame_rate();
-        if (fps <= 0.0)
-            fps = 30.0;
-        //REFERENCE_TIME(DirectShow 타입) 대신 int64_t — 동일한 100ns tick 값. ffi_decoder 는 DirectShow 헤더 비의존.
-        int64_t frame_dur = (int64_t)(10000000.0 / fps);
-        AVRational tb = probe.video_time_base();
-
-        int     frames       = 0;
-        int     regress      = 0;
-        int64_t last_rtStart = 0;
-        int64_t video_first  = LLONG_MIN;
-
-        DWORD t0 = ::GetTickCount();
-        while (frames < max_frames)
-        {
-            AVFrame* f = probe.pop_video_frame();
-            if (!f)
-            {
-                if (probe.is_eof())
-                    break;
-                if (::GetTickCount() - t0 > 3000)   //probe 가 hang 하지 않도록 상한
-                    break;
-                ::Sleep(3);
-                continue;
-            }
-
-            int64_t rtStart;
-            if (f->pts != AV_NOPTS_VALUE)
-            {
-                int64_t frame_pts_rt = av_rescale_q(f->pts, tb, AVRational{1, 10000000});
-                if (video_first == LLONG_MIN)
-                    video_first = frame_pts_rt;
-                rtStart = frame_pts_rt - video_first;
-            }
-            else
-            {
-                rtStart = (int64_t)(frames * 10000000.0 / fps);
-            }
-
-            bool is_regress = (frames > 0 && rtStart <= last_rtStart);
-            if (is_regress)
-            {
-                rtStart = last_rtStart + frame_dur;
-                regress++;
-            }
-
-            //[ptsdiag] 임시 — 앞 30프레임의 raw pts/best_effort/dts/key 패턴 덤프. B-frame decode-order vs genuinely 깨진 pts 판별용. (분석 후 제거)
-            if (frames < 30)
-            {
-                int64_t pts_ms = (f->pts != AV_NOPTS_VALUE) ? av_rescale_q(f->pts, tb, AVRational{1, 1000}) : -1;
-                int64_t be_ms  = (f->best_effort_timestamp != AV_NOPTS_VALUE) ? av_rescale_q(f->best_effort_timestamp, tb, AVRational{1, 1000}) : -1;
-                int64_t dts_ms = (f->pkt_dts != AV_NOPTS_VALUE) ? av_rescale_q(f->pkt_dts, tb, AVRational{1, 1000}) : -1;
-                logWrite(_T("[ptsdiag] #%d pts=%lldms best=%lldms dts=%lldms key=%d regress=%d"),
-                    frames, (long long)pts_ms, (long long)be_ms, (long long)dts_ms,
-                    (f->flags & AV_FRAME_FLAG_KEY) ? 1 : 0, is_regress ? 1 : 0);
-            }
-
-            last_rtStart = rtStart;
-            frames++;
-
-            av_frame_free(&f);
-        }
-
-        probe.stop();
-        probe.close();
-
-        double ratio = (frames > 0) ? (double)regress / frames : 0.0;
-        if (out_ratio)
-            *out_ratio = ratio;
-
-        logWrite(_T("[ptsprobe] frames=%d regress=%d ratio=%.1f%% — >=15%% 면 비단조 pts(LAV 라우팅)"),
-            frames, regress, 100.0 * ratio);
-        return frames > 0;
     }
 }

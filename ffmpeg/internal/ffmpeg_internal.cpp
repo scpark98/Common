@@ -21,16 +21,33 @@ namespace ffi
 {
     //FFmpeg log callback — libav* 내부 로그를 우리 logWrite 로 라우팅.
     //AV_LOG_WARNING 이상만 캡처 (TRACE / DEBUG 너무 verbose).
+    //ffmpeg 일부 내부 log 가 %s 에 NULL pointer 를 va_arg 로 전달, vsnprintf 안에서 access violation.
+    //callback 안에서 raise 하면 Windows 가 0xC000041D / fatal program termination 으로 wrap, 호출자(avfilter_link 등) 크래시.
+    //SEH 로 vsnprintf 의 access violation 잡아 fallback. C++ object unwinding 있는 함수에선 __try 불가하므로 별도 함수로 분리.
+    static bool seh_vsnprintf(char* line, size_t size, const char* fmt, va_list vl)
+    {
+        __try
+        {
+            vsnprintf(line, size, fmt, vl);
+            if (size > 0) line[size - 1] = '\0';
+            return true;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return false;
+        }
+    }
+
     static void av_log_cb(void* avcl, int level, const char* fmt, va_list vl)
     {
         if (level > AV_LOG_WARNING)
             return;
 
         char line[1024];
-        vsnprintf(line, sizeof(line), fmt, vl);
-        line[sizeof(line) - 1] = '\0';
+        if (!seh_vsnprintf(line, sizeof(line), fmt, vl))
+            strcpy_s(line, sizeof(line), "(av_log_cb: vsnprintf threw - fmt has bad arg)");
 
-        //trailing newline 제거 — logWrite 가 자체로 줄바꿈.
+        //trailing newline 제거. logWrite 가 자체로 줄바꿈.
         size_t len = strlen(line);
         while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'))
             line[--len] = '\0';

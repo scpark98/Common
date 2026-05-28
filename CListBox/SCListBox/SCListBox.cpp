@@ -1646,6 +1646,10 @@ void CSCListBox::edit(int index)
 	if (::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible())
 		rItem.right -= m_scrollbar_width;
 
+	//ES_MULTILINE EDIT 의 caret 높이는 폰트 line height 와 거의 동일하다. client area 가 caret 보다 작거나
+	//거의 같으면 Windows 가 caret 표시를 suppress 한다. 위/아래로 여유를 확보해 caret 이 항상 보이게 함.
+	rItem.InflateRect(0, 4);
+
 	CString text;
 	GetText(index, text);
 

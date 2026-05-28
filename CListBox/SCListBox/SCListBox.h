@@ -439,6 +439,11 @@ public:
 	bool			m_use_hscroll = true;	//가로 스크롤 허용 여부(기본 on). 신뢰 불가한 WS_HSCROLL 대신 명시 API 로 제어.
 	int				m_h_scroll_pos = 0;		//가로 스크롤 위치(px). DrawItem 이 텍스트/아이콘을 이만큼 왼쪽으로 이동.
 	bool			m_show_corner = false;	//세로·가로 바가 둘 다 보일 때 우측 하단 corner 를 cr_back 으로 칠할지(sync_scrollbar 가 설정).
+	//paint shift Y — 네이티브 SetTopIndex 의 내부 max top 은 H-bar 영역을 차감하지 않아 max 스크롤에서 마지막
+	//항목 bottom 이 H-bar 영역과 겹친다. DrawItem 진입 시 DC window origin 을 이만큼 위로 이동시켜 시각적으로만
+	//항목들을 끌어올려 마지막 항목이 H-bar 위로 완전히 보이게 한다. hit-test 는 window 좌표 기준이라 영향 없음.
+	//max 스크롤(GetTopIndex == max_top) 이고 need_h 일 때만 양수. sync_scrollbar 가 갱신.
+	int				m_v_paint_shift = 0;
 
 	//popup mode (m_as_popup) 에서 4면 NC padding — items 가 border 에 붙지 않도록.
 	//OnNcCalcSize 가 client 를 deflate, OnNcPaint 가 padding band 를 cr_back 으로 fill.

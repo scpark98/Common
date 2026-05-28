@@ -304,6 +304,22 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if ((int)lpDIS->itemID < GetTopIndex())
 		return;
 
+	//paint shift Y — lpDIS->hDC 의 window origin 을 m_v_paint_shift 만큼 위로 이동시켜 시각적으로만 항목을 끌어올림.
+	//CMemoryDC 가 함수 종료 시 blit 할 때 lpDIS->hDC 의 *현재* origin 을 사용 — guard 가 CMemoryDC 보다 *먼저* 선언돼
+	//RAII 역순으로 dc 가 먼저 소멸(blit 발생, 시프트된 위치로) 후 guard 가 origin 복원하는 순서가 핵심.
+	struct OrgGuard {
+		HDC hdc; POINT old; bool active;
+		OrgGuard(HDC h, int dy) : hdc(h), old{0,0}, active(dy != 0)
+		{
+			if (active) ::OffsetWindowOrgEx(hdc, 0, dy, &old);
+		}
+		~OrgGuard()
+		{
+			if (active) ::SetWindowOrgEx(hdc, old.x, old.y, NULL);
+		}
+	};
+	OrgGuard org_guard(lpDIS->hDC, m_v_paint_shift);
+
 	//bBg = false로 하면 최신 항목만 표시되고 다른 항목은 표시되지 않는 현상이 발생한다.
 	CMemoryDC dc(pDC, NULL, true);	//=> 이대로 사용하면 점차 느려지는 현상 발생하여 사용하지 않았으나 현재는 재현안됨.
 	pDC = &dc;
@@ -1607,8 +1623,24 @@ void CSCListBox::edit(int index)
 
 	m_edit_index = index;
 
+	//편집 대상 항목이 현재 보이지 않으면 보이도록 스크롤. (그래야 GetItemRect 가 visible 영역의 좌표를 반환.)
+	{
+		CRect rc_client;
+		GetClientRect(rc_client);
+		int top = GetTopIndex();
+		int visible_count = (m_line_height > 0) ? (rc_client.Height() / m_line_height) : 0;
+		if (index < top)
+			SetTopIndex(index);
+		else if (visible_count > 0 && index >= top + visible_count)
+			SetTopIndex(index - visible_count + 1);
+	}
+
 	CRect rItem;
 	GetItemRect(index, rItem);
+
+	//max 스크롤에서 마지막 항목은 paint shift 로 시각적 위치가 위로 올라가 있다 — edit window 도 그 시각 위치에 맞춰 이동.
+	if (m_v_paint_shift > 0)
+		rItem.OffsetRect(0, -m_v_paint_shift);
 
 	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
 	if (::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible())
@@ -2130,6 +2162,24 @@ void CSCListBox::sync_scrollbar()
 	bool need_v = (total > visible) && (visible > 0);
 
 	m_show_corner = need_v && need_h;
+
+	//paint shift Y — max 스크롤에서 마지막 항목이 H-bar 영역과 겹치는 만큼 그리기를 위로 이동.
+	int new_shift = 0;
+	if (need_h && need_v && visible > 0 && m_line_height > 0)
+	{
+		int max_top = max(0, total - visible);
+		if (GetTopIndex() == max_top)
+		{
+			int overlap = visible * m_line_height - (rc.Height() - m_scrollbar_width);
+			if (overlap > 0)
+				new_shift = overlap;
+		}
+	}
+	if (new_shift != m_v_paint_shift)
+	{
+		m_v_paint_shift = new_shift;
+		Invalidate(FALSE);	//shift 변경 시 전체 항목 재그리기.
+	}
 
 	int v_bottom = need_h ? (rc.bottom - m_scrollbar_width) : rc.bottom;
 	int h_right  = need_v ? (rc.right - m_scrollbar_width) : rc.right;

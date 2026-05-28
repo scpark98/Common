@@ -111,7 +111,7 @@ bool CSCLog::set(CString log_folder, CString file_title, int show_log_level)
 			m_log_file_title = file_title;// .Format(_T("%s_%d%02d%02d.log"), file_title, m_tlog.GetYear(), m_tlog.GetMonth(), m_tlog.GetDay());
 		}
 
-		if (m_new_create)
+		if (m_each_create)
 			m_log_fullpath.Format(_T("%s\\%s_%d%02d%02d_%02d%02d%02d.log"), m_log_folder, m_log_file_title, m_tlog.GetYear(), m_tlog.GetMonth(), m_tlog.GetDay(), m_tlog.GetHour(), m_tlog.GetMinute(), m_tlog.GetSecond());
 		else
 			m_log_fullpath.Format(_T("%s\\%s_%d%02d%02d.log"), m_log_folder, m_log_file_title, m_tlog.GetYear(), m_tlog.GetMonth(), m_tlog.GetDay());

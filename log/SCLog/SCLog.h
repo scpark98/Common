@@ -118,7 +118,7 @@ public:
 	//매 실행 시 로그파일명에 시간까지 포함하여 새 파일로 생성하는 옵션. (예: 실행파일명_yyyymmdd_hhmmss.log)
 	//set() 호출 전에 켜둬야 효과 (set 안에서 m_log_fullpath 가 결정됨).
 	//default = false
-	void		set_new_create(bool new_create = true) { m_new_create = new_create; }
+	void		set_each_create(bool each_create = true) { m_each_create = each_create; }
 
 	//함수명 표시 유무. default show
 	void		show_function_name(bool show) { m_show_function_name = show; }
@@ -150,7 +150,7 @@ protected:
 	int			m_log_level = SCLOG_LEVEL_RELEASE;
 	bool		m_show_function_name = true;
 	bool		m_show_line_number = true;
-	bool		m_new_create = false;
+	bool		m_each_create = false;
 	FILE* m_fp;
 
 	//소멸자 안전 종료를 위한 원자적 카운터/플래그

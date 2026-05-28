@@ -280,6 +280,9 @@ public:
 protected:
 	CWnd*			m_parent = NULL;
 
+	//현재 로딩한 경로
+	CString			m_path;
+
 	//thumb 크기를 기준으로 tile 크기를 계산해야 한다. 그래야 이미지를 로드할 때 thumb 크기 비율로 resize 할 수 있다.
 	CSize			m_sz_thumb = CSize(100, 120);
 

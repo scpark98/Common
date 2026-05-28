@@ -329,9 +329,14 @@ void CSCThumbCtrl::OnPaint()
 		draw_rect(&dc, rc, m_draw_border ? m_theme.cr_border_inactive : Gdiplus::Color::Transparent, m_theme.cr_back);
 
 		CString str = _T("표시할 이미지가 없습니다.");
-		dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
-		dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		dc.SelectObject(pOldFont);
+
+		if (m_path.IsEmpty() == false)
+			str.Format(_T("%s\n위 경로에는 %s"), m_path, str);
+
+		draw_text(g, rc, str, 10.0f);
+		//dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+		//dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+		//dc.SelectObject(pOldFont);
 
 		return;
 	}
@@ -432,6 +437,8 @@ void CSCThumbCtrl::on_loading_completed()
 
 void CSCThumbCtrl::set_path(CString path)
 {
+	m_path = path;
+
 	stop_loading();
 
 	m_files.clear();

@@ -245,6 +245,16 @@ public:
 	//false일 경우는 해당 라인을 제거한다.
 	void		set_accept_empty_edit_str(bool accept = true) { m_accept_empty_edit_str = accept; }
 
+	//편집 모드 중 *다른 컨트롤·다른 앱·다이얼로그 빈 영역* 어디를 클릭해도 편집을 정상 종료(commit) 시키기 위한 훅.
+	//CPathCtrl 과 동일 패턴 — WH_MOUSE 로 같은 스레드 외부 클릭 감지 → 메시지 post → on_end_edit_posted → edit_end(true).
+	//다른 앱으로의 포커스 이동은 CSCEdit 의 WM_KILLFOCUS 가 on_message_CSCEdit 로 전달돼 처리 (기존 경로 유지).
+	void		install_edit_mouse_hook();
+	void		remove_edit_mouse_hook();
+	static LRESULT CALLBACK	edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam);
+	LRESULT		on_end_edit_posted(WPARAM wParam, LPARAM lParam);
+	static CSCListBox*	s_editing_listbox;
+	HHOOK		m_mouse_hook = NULL;
+
 	//use own imagelist
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
 	void		add_to_imagelist(UINT id);
@@ -429,10 +439,6 @@ public:
 	bool			m_use_hscroll = true;	//가로 스크롤 허용 여부(기본 on). 신뢰 불가한 WS_HSCROLL 대신 명시 API 로 제어.
 	int				m_h_scroll_pos = 0;		//가로 스크롤 위치(px). DrawItem 이 텍스트/아이콘을 이만큼 왼쪽으로 이동.
 	bool			m_show_corner = false;	//세로·가로 바가 둘 다 보일 때 우측 하단 corner 를 cr_back 으로 칠할지(sync_scrollbar 가 설정).
-	//가로 오버레이가 표시될 때 NC 영역으로 listbox client 하단 m_scrollbar_width 를 reserve 하기 위한 상태.
-	//네이티브 SetTopIndex 의 내부 최대값이 (count - floor(client/line)) 이라 H-bar 가 client 안에 떠 있으면
-	//마지막 항목 위치까지 스크롤할 수 없다. client 자체를 줄여 listbox 내부 한계도 함께 줄여야 도달 가능.
-	bool			m_h_visible = false;
 
 	//popup mode (m_as_popup) 에서 4면 NC padding — items 가 border 에 붙지 않도록.
 	//OnNcCalcSize 가 client 를 deflate, OnNcPaint 가 padding band 를 cr_back 으로 fill.

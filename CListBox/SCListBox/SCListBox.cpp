@@ -28,6 +28,12 @@ static char THIS_FILE[] = __FILE__;
 
 #define IDC_EDIT_CELL	WM_USER + 9001
 
+//편집모드 바깥 클릭을 마우스 훅에서 감지하면, 훅 프로시저 안에서 직접 edit_end 를 부르지 않고(재진입 위험)
+//이 메시지를 자기 자신에게 post 해 message loop 에서 종료 처리한다. (CPathCtrl 과 동일 패턴.)
+#define WM_LISTBOX_END_EDIT		(WM_USER + 9003)
+
+CSCListBox* CSCListBox::s_editing_listbox = NULL;
+
 //PreSubclassWindow 에서 자식 윈도우를 *직접* 만들면 MFC CBT hook (wincore.cpp _AfxCbtFilterHook) 안에서
 //중첩 CreateEx 가 일어나 AfxHookWindowCreate 의 ASSERT(m_pWndInit == NULL) 가 터진다 — parent 가 동적
 //CreateEx 로 만들어지는 CPathCtrl::m_list_folder 같은 경우. 그래서 setup_scrollbar 호출을 PostMessage 로
@@ -61,6 +67,8 @@ CSCListBox::CSCListBox()
 //
 CSCListBox::~CSCListBox()
 {
+	remove_edit_mouse_hook();
+
 	if (m_pEdit)
 	{
 		m_pEdit->DestroyWindow();
@@ -102,6 +110,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCListBox::on_message_CSCScrollbar)
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCListBox::on_message_CSCEdit)
 	ON_MESSAGE(UWM_CSCLISTBOX_SETUP_SCROLLBAR, &CSCListBox::on_setup_scrollbar_deferred)
+	ON_MESSAGE(WM_LISTBOX_END_EDIT, &CSCListBox::on_end_edit_posted)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -279,6 +288,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 
+	//ODS_FOCUS 비트는 마우스 클릭 시 Windows 의 "키보드 cue 숨김" 접근성 동작으로 ODS_NOFOCUSRECT 와 함께
+	//클리어돼 들어와 신뢰 불가. 실제 focus 소유는 GetFocus() 로 직접 확인 (CSCTreeCtrl 와 동일 패턴).
+	//편집 중에는 m_pEdit 자식으로 focus 가 옮겨가지만 *논리적으로는* listbox 가 active 이므로 m_in_editing 도 포함.
+	bool has_focus = (::GetFocus() == m_hWnd) || m_in_editing;
+
 	//focus 사각형(점선 caret)은 그리지 않는다 — Win 탐색기 주소표시줄 폴더 팝업엔 없다. 따라서 변화가
 	//focus 뿐(ODA_FOCUS 만, 내용 변화 없음)인 호출은 다시 그릴 필요가 없다. 이 early-return 이 없으면
 	//listbox 가 다른 항목을 그릴 때마다 caret 항목을 focus-rect erase→draw 로 감싸 매 mouse move 마다 그
@@ -354,8 +368,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		if (lpDIS->itemState & ODS_SELECTED)
 		{
-			if (lpDIS->itemState & ODS_FOCUS)
+			if (has_focus)
+			{
+				TRACE(_T("ODS_SELECTED\n"));
 				cr_back = m_theme.cr_back_selected;
+			}
 			else if (m_show_selection_always)
 				cr_back = m_theme.cr_back_selected_inactive;
 			else
@@ -376,11 +393,13 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
 		//cr_text = m_cr_text_selected;
-		TRACE(_T("ODS_SELECTED\n"));
-		if (lpDIS->itemState & ODS_FOCUS)
+		//TRACE(_T("ODS_SELECTED\n"));
+		if (has_focus)
 			draw_rect(pDC, rect, m_theme.cr_selected_border, cr_back, 1);
 		else if (m_show_selection_always)
 			draw_rect(pDC, rect, m_theme.cr_selected_border_inactive, cr_back, 1);
+		else
+			draw_rect(pDC, rect, Gdiplus::Color::Transparent, cr_back, 1);	//focus 없고 show_always=false 면 selection 시각화 없이 배경만 fill. 이 fill 이 없으면 스크롤 시 이전 픽셀 잔상.
 	}
 	else
 	{
@@ -394,7 +413,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
-		cr_text = RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT));
+		cr_text = get_sys_color(COLOR_GRAYTEXT);
 	}
 	else
 	{
@@ -406,7 +425,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		}
 		else if (lpDIS->itemState & ODS_SELECTED)
 		{
-			if (lpDIS->itemState & ODS_FOCUS)
+			if (has_focus)
 				cr_text = m_theme.cr_text_selected;
 			else if (m_show_selection_always)
 				cr_text = m_theme.cr_text_selected_inactive;
@@ -1107,9 +1126,6 @@ void CSCListBox::set_color_theme(int theme, bool apply_now)
 void CSCListBox::OnKillFocus(CWnd* pNewWnd)
 {
 	CListBox::OnKillFocus(pNewWnd);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	TRACE(_T("CSCListBox::OnKillFocus"));
 	if (m_as_popup)
 		ShowWindow(SW_HIDE);
 
@@ -1585,10 +1601,18 @@ void CSCListBox::edit(int index)
 			return;
 	}
 
+	//edit() 호출 자체가 "편집 허용" 의도이므로 m_use_edit 를 자동으로 true 로 두어 OnLbnSelchange / OnKillFocus /
+	//edit_end 등 곳곳의 `m_use_edit && m_in_editing` 게이트가 정합하게 동작하도록 한다.
+	m_use_edit = true;
+
 	m_edit_index = index;
 
 	CRect rItem;
 	GetItemRect(index, rItem);
+
+	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
+	if (::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible())
+		rItem.right -= m_scrollbar_width;
 
 	CString text;
 	GetText(index, text);
@@ -1619,11 +1643,16 @@ void CSCListBox::edit(int index)
 	m_pEdit->SetFocus();
 
 	m_in_editing = true;
+
+	//편집 모드 외부 클릭 감지용 마우스 훅 설치 (다른 컨트롤·다이얼로그 빈 영역·NC 어디든) — CPathCtrl 패턴.
+	install_edit_mouse_hook();
 }
 
 //modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
 void CSCListBox::edit_end(bool modify)
 {
+	remove_edit_mouse_hook();
+
 	if (!m_use_edit || !m_in_editing || m_edit_index < 0 || m_edit_index >= GetCount())
 		return;
 
@@ -1890,7 +1919,7 @@ void CSCListBox::OnNcPaint()
 {
 	//NC 4면을 cr_back 으로 fill — popup padding / themed border 1px / H-bar 리저베이션 14px 모두 커버.
 	//H-bar 오버레이(child)는 그 위에 자기 영역만 그리고, 남은 우측 하단 corner 는 cr_back 으로 남는다.
-	bool need_paint = (m_as_popup && m_popup_padding > 0) || m_h_visible || m_draw_border;
+	bool need_paint = (m_as_popup && m_popup_padding > 0) || m_draw_border;
 	if (!need_paint)
 		return;
 
@@ -2273,5 +2302,55 @@ LRESULT CSCListBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
 		}
 	}
 
+	return 0;
+}
+
+//---- 편집 모드 외부 클릭 감지 (CPathCtrl 동일 패턴) -----------------------------------------
+
+void CSCListBox::install_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+		return;
+
+	//WH_MOUSE 는 자기 스레드 메시지 큐만 감시 → 다른 앱 클릭은 보지 않는다(그쪽은 WM_KILLFOCUS 가 처리).
+	//이 훅의 목적은 "같은 스레드(같은 dlg) 의 edit 바깥 클릭" 감지뿐이다.
+	s_editing_listbox = this;
+	m_mouse_hook = ::SetWindowsHookEx(WH_MOUSE, edit_mouse_hook_proc, NULL, ::GetCurrentThreadId());
+}
+
+void CSCListBox::remove_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+	{
+		::UnhookWindowsHookEx(m_mouse_hook);
+		m_mouse_hook = NULL;
+	}
+	if (s_editing_listbox == this)
+		s_editing_listbox = NULL;
+}
+
+LRESULT CALLBACK CSCListBox::edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam)
+{
+	if (code == HC_ACTION && s_editing_listbox != NULL && s_editing_listbox->m_pEdit != NULL)
+	{
+		if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN ||
+			wParam == WM_NCLBUTTONDOWN || wParam == WM_NCRBUTTONDOWN || wParam == WM_NCMBUTTONDOWN)
+		{
+			MOUSEHOOKSTRUCT* mh = (MOUSEHOOKSTRUCT*)lParam;
+			CRect rc_edit;
+			s_editing_listbox->m_pEdit->GetWindowRect(&rc_edit);
+
+			//edit 내부 클릭은 캐럿 이동이므로 종료 금지. 바깥이면 종료를 post (클릭 자체는 그대로 통과시킴).
+			if (!rc_edit.PtInRect(mh->pt))
+				s_editing_listbox->PostMessage(WM_LISTBOX_END_EDIT, 0, 0);
+		}
+	}
+
+	return ::CallNextHookEx(NULL, code, wParam, lParam);
+}
+
+LRESULT CSCListBox::on_end_edit_posted(WPARAM wParam, LPARAM lParam)
+{
+	edit_end(true);
 	return 0;
 }

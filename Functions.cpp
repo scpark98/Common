@@ -1610,24 +1610,52 @@ bool is_valid_url(CString url, bool check_prefix)
 
 bool IsFolder(CString sfile)
 {
+	if (sfile.IsEmpty())
+		return false;
+
+	//호출 측에서 끝에 공백/개행/NBSP, 또는 trailing '\'/'/'가 붙어 들어오는 경우를 흡수.
+	//NTFS와 Cloud Files API(가상 FS) 모두 정규 경로를 받아야 안정적이다.
+	sfile.TrimLeft (_T(" \t\r\n\xA0"));
+	sfile.TrimRight(_T(" \t\r\n\xA0"));
+	while (sfile.GetLength() > 3)
+	{
+		TCHAR c = sfile[sfile.GetLength() - 1];
+		if (c == _T('\\') || c == _T('/'))
+			sfile.Delete(sfile.GetLength() - 1);
+		else
+			break;
+	}
+
 	if (PathIsRoot(sfile))
 		return true;
 
-	WIN32_FIND_DATA info; 
-	HANDLE h_dir_info = ::FindFirstFile(sfile,&info); 
-	bool bIsFolder = false;
+	//1차: GetFileAttributes — 로컬/네트워크/대부분의 가상 FS에서 정상 동작.
+	DWORD attr = ::GetFileAttributes(sfile);
+	if (attr != INVALID_FILE_ATTRIBUTES)
+		return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-	if (h_dir_info != INVALID_HANDLE_VALUE)
-	{ 
-		if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-			bIsFolder = true; 
-		else
-			bIsFolder = false; 
+	//2차: \\?\ long-path 형식. MAX_PATH 초과 경로나, name-resolution 레이어에서
+	//     기본 경로가 거부되는 경우를 우회한다.
+	CString lp;
+	if (sfile.GetLength() >= 2 && sfile[0] == _T('\\') && sfile[1] == _T('\\'))
+		lp = _T("\\\\?\\UNC\\") + sfile.Mid(2);
+	else
+		lp = _T("\\\\?\\") + sfile;
+	attr = ::GetFileAttributes(lp);
+	if (attr != INVALID_FILE_ATTRIBUTES)
+		return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+	//3차: 자식 열거가 성공하면 디렉토리. 일부 가상 FS는 메타데이터 조회는 막아도
+	//     enumeration은 허용한다 (cloud placeholder의 일반적 동작).
+	WIN32_FIND_DATA fd;
+	HANDLE h = ::FindFirstFile(sfile + _T("\\*"), &fd);
+	if (h != INVALID_HANDLE_VALUE)
+	{
+		::FindClose(h);
+		return true;
 	}
 
-	::FindClose(h_dir_info); 
-
-	return bIsFolder;
+	return false;
 }
 
 #include <sys/types.h>
@@ -6766,6 +6794,10 @@ CRect draw_text(Gdiplus::Graphics &g,
 
 	Gdiplus::StringFormat sf;
 
+	//DT_SINGLELINE → 줄바꿈 금지(NoWrap). GDI+ DrawString 은 폭이 지정된 RectF 에 그릴 때 기본적으로
+	//word-wrap 하므로, GDI DT_SINGLELINE 의 의미(한 줄 + 우측 clip)를 유지하려면 명시적으로 꺼야 한다.
+	if (align & DT_SINGLELINE)
+		sf.SetFormatFlags(sf.GetFormatFlags() | Gdiplus::StringFormatFlagsNoWrap);
 
 	Gdiplus::RectF boundRect;
 	g.MeasureString(CStringW(text), -1, &font, Gdiplus::PointF(rTarget.left, rTarget.top), &boundRect);

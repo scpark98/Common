@@ -859,8 +859,8 @@ public:
 	//자체 스크롤바 — CSCListBox / CSCTreeCtrl 와 동일 패턴. 가로/세로 모두 overlay.
 	CSCScrollbar	m_scrollbar;		//세로
 	CSCScrollbar	m_scrollbar_h;		//가로 — listctrl 은 column 가로폭 합계 > client 일 때 필요.
-	int				m_scrollbar_width = 16;
-	int				m_scrollbar_height = 16;
+	int				m_scrollbar_width = 14;	//track(window) 폭 — 18→16→14 로 양쪽 1px씩 축소.
+	int				m_scrollbar_height = 14;
 	bool			m_scrollbar_setup = false;
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
 	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)

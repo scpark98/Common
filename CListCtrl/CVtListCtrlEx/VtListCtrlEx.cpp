@@ -1752,9 +1752,8 @@ void CVtListCtrlEx::OnPaint()
 			dc1.FillSolidRect(rcCornerTop, m_theme.cr_header_back.ToCOLORREF());
 		if (!rcCornerBottom.IsRectEmpty())
 		{
-			//CSCScrollbar::draw_track 와 동일한 색 — h/v 스크롤바 사이 코너가 list cr_back 으로 비치지 않도록.
-			Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
-			dc1.FillSolidRect(rcCornerBottom, cr_track.ToCOLORREF());
+			//탐색기처럼 h/v 스크롤바가 만나는 코너를 컨트롤 배경색(cr_back)으로 칠한다.
+			dc1.FillSolidRect(rcCornerBottom, m_theme.cr_back.ToCOLORREF());
 		}
 
 		if (!rcCornerTop.IsRectEmpty())
@@ -5656,17 +5655,25 @@ void CVtListCtrlEx::sync_scrollbar()
 	ShowScrollBar(SB_HORZ, FALSE);
 
 	int total = GetItemCount();
-	int visible = GetCountPerPage();
 
 	CRect rc;
 	GetClientRect(&rc);
 
+	//visible(세로 가시 항목 수): 커스텀 헤더 height(get_header_height) 와 실제 행 높이로 직접 계산한다.
+	//GetCountPerPage 는 커스텀 헤더(CHeaderCtrlEx, set_header_height) 높이를 반영하지 못해 세로 스크롤바
+	//출현 시점이 헤더 높이만큼 어긋난다.
 	int total_col_width = 0;
 	int col_count = get_column_count();
 	for (int i = 0; i < col_count; i++)
 		total_col_width += GetColumnWidth(i);
-
 	bool need_h = (col_count > 0) && (total_col_width > rc.Width());
+
+	//visible(세로 가시 항목 수): 커스텀 헤더 height + (가로바 표시 시) 가로바 높이를 뺀 영역 / 실제 행 높이.
+	//행 높이는 m_line_height(MeasureItem 이 보고하는 안정값) 사용 — GetItemRect 는 재측정 전 stale 값(예 19≠21)을
+	//반환해 visible 이 과대평가되어 세로 스크롤바가 늦게 나타난다. GetCountPerPage 는 커스텀 헤더/가로바를 반영 못함.
+	//가로바가 보이면 그 높이만큼 표시 영역이 줄어 세로바가 더 일찍 필요해진다.
+	int avail_h = rc.Height() - get_header_height() - (need_h ? m_scrollbar_height : 0);
+	int visible = (m_line_height > 0) ? (avail_h / m_line_height) : GetCountPerPage();
 	bool need_v = (total > visible) && (visible > 0);
 
 	//탐색기 스타일 — list.top 부터 세로 scrollbar 시작. header 위로 overlay.
@@ -5753,9 +5760,11 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 	if (msg->pThis == &m_scrollbar)
 	{
-		int visible = GetCountPerPage();
+		//msg->pos 는 이미 scrollbar 가 max_pos(=total - sync 에서 계산한 visible) 로 클램프해 보낸다. 여기서
+		//GetCountPerPage 로 다시 클램프하면 가로바·헤더 차감을 반영 못해 new_top 이 강제로 작아져, 끝까지
+		//드래그해도 마지막 항목이 보이지 않는다. msg->pos 를 그대로 쓰고 total-1 안전 클램프만 둔다.
 		int total = GetItemCount();
-		int new_top = max(0, min(msg->pos, total - visible));
+		int new_top = max(0, min(msg->pos, total - 1));
 
 		int cur_top = GetTopIndex();
 		if (new_top != cur_top && total > 0)

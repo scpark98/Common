@@ -129,7 +129,7 @@ LRESULT CSCListBox::OnSetFont(WPARAM wParam, LPARAM)
 void CSCListBox::PreSubclassWindow()
 {
 	// TODO: Add your specialized code here and/or call the base class
-	// Get Defalut Font 
+	// Get Defalut Font
 	CListBox::PreSubclassWindow();
 
 	//이게 왜 적용이 안될까...
@@ -215,6 +215,10 @@ void CSCListBox::ReconstructFont()
 
 	m_line_height = -m_lf.lfHeight + 10;
 	SetItemHeight(0, -m_lf.lfHeight + 10);
+
+	//폰트가 바뀌면 항목 폭(가로)·항목 높이→가시 항목 수(세로) 모두 달라진다 — recalc 가 extent 재계산 후
+	//sync_scrollbar 로 두 축 모두 갱신(setup 전엔 내부 가드로 no-op).
+	recalc_horizontal_extent();
 
 	ASSERT(bCreated);
 }
@@ -383,6 +387,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		draw_rect(pDC, rect, cr_back, cr_back, 1);
 	}
 
+	//가로 스크롤 오프셋 — 배경 fill/선택 테두리는 위에서 전체 폭으로 그렸고, 여기서부터의 아이콘/텍스트만
+	//왼쪽으로 이동시킨다. rect.right 는 client 오른쪽 끝을 유지하므로 한 줄이 우측에서 clip 된다.
+	if (m_h_scroll_pos != 0)
+		rect.left -= m_h_scroll_pos;
+
 	if (!m_as_static && lpDIS->itemState & ODS_DISABLED)
 	{
 		cr_text = RGB2gpColor(::GetSysColor(COLOR_GRAYTEXT));
@@ -501,12 +510,13 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		rect.right = lpDIS->rcItem.right - 10;
 	}
 
-	//가로 스크롤시에 뭔가 rect영역이 부족해서 출력되지 않는 현상이 있어서 DT_NOCLIP을 추가함.
+	//리스트박스는 wordwrap 하지 않는다(DT_SINGLELINE). 넘치는 부분은 우측 clip 되고, 가로 오버레이로 스크롤해 본다.
 	pDC->SetTextColor(cr_text.ToCOLORREF());
 	if (m_text_smooth)
 	{
 		//큰 글씨: GDI+ 로 그려 굴림/돋움/궁서의 embedded bitmap 을 회피한다 — GDI DrawText 는 lfQuality 가 무엇이든
 		//그 비트맵을 써서 톱니가 남는다. Common draw_text 가 TextRenderingHintAntiAlias 로 외곽선을 매끈하게 그린다.
+		//DT_SINGLELINE 을 넘기면 draw_text 가 StringFormatFlagsNoWrap 으로 한 줄 고정 + rect 우측 clip 한다.
 		int ppem = (m_lf.lfHeight < 0) ? -m_lf.lfHeight : m_lf.lfHeight;
 		int pt = MulDiv(ppem, 72, GetDeviceCaps(pDC->GetSafeHdc(), LOGPIXELSY));
 		int font_style = (m_lf.lfWeight >= FW_BOLD) ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular;
@@ -514,11 +524,25 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		draw_text(g, rect, sText, (float)pt, font_style, 0, 0.0f,
 			CString(m_lf.lfFaceName), cr_text,
 			Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent,
-			DT_LEFT | DT_VCENTER);
+			DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 	}
 	else
 	{
-		pDC->DrawText(sText, rect, nFormat | DT_NOCLIP);
+		//DT_NOCLIP 제거 — rect(우측=client 끝) 로 clip 돼야 가로 스크롤 뷰포트가 형성된다.
+		pDC->DrawText(sText, rect, nFormat);
+	}
+
+	//세로·가로 바가 둘 다 보일 때, 두 바가 만나는 우측 하단 corner 는 어느 바도 덮지 않아 항목 내용이 비친다.
+	//탐색기처럼 cr_back 으로 덮는다. 항목 paint 마다 수행되므로 스크롤/리사이즈 시 자동 재칠 → "간혹 안 칠해짐" 방지.
+	if (m_show_corner)
+	{
+		CRect rc_client;
+		GetClientRect(rc_client);
+		CRect rc_corner(rc_client.right - m_scrollbar_width, rc_client.bottom - m_scrollbar_width,
+						rc_client.right, rc_client.bottom);
+		CRect rc_overlap;
+		if (rc_overlap.IntersectRect(rc_corner, &lpDIS->rcItem))
+			pDC->FillSolidRect(rc_overlap, m_theme.cr_back.ToCOLORREF());
 	}
 
 	pDC->SelectObject(pOldFont);
@@ -720,7 +744,8 @@ int CSCListBox::insert(int index, CString text, Gdiplus::Color cr_text)
 		if (m_auto_scroll)
 			SetTopIndex(inserted);
 
-		sync_scrollbar();
+		//추가 항목 폭을 extent 에 반영하면서 세로/가로 오버레이를 함께 동기화(recalc 가 sync_scrollbar 호출).
+		recalc_horizontal_extent(text);
 	}
 
 	return inserted;
@@ -1494,6 +1519,18 @@ BOOL CSCListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	//mouse wheel 이벤트가 발생하면 자동 스크롤을 멈춘다.
 	m_auto_scroll = false;
 
+	//Shift+휠 = 가로 스크롤(CVtListCtrlEx 와 동일 UX). 가로 허용 시에만.
+	if ((nFlags & MK_SHIFT) && m_use_hscroll && m_scrollbar_setup)
+	{
+		int dx = -zDelta / WHEEL_DELTA * 60;
+		if (dx == 0)
+			dx = (zDelta > 0) ? -60 : 60;
+		m_h_scroll_pos += dx;
+		Invalidate(FALSE);
+		sync_scrollbar();
+		return TRUE;
+	}
+
 	//WS_VSCROLL 제거된 상태라 base CListBox 의 default wheel 처리는 동작 안 함. 수동으로 SetTopIndex.
 	int notches = zDelta / WHEEL_DELTA;	//양수 = 위로 휠.
 	UINT scroll_lines = 3;
@@ -1513,14 +1550,18 @@ BOOL CSCListBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 void CSCListBox::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
-	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	// 
-	//로그를 일시 중지시킨 후 가로 스크롤 할 
-	//Invalidate();
-	RedrawWindow();
-	UpdateWindow();
+	//WM_MOUSEHWHEEL 은 Vista+ 에서만 발생(XP 에서는 호출 안 됨 — 무해). 가로 스크롤 허용 시 픽셀 단위로 직접 이동
+	//(CVtListCtrlEx::OnMouseHWheel 과 동일 방식). m_h_scroll_pos 갱신 후 sync_scrollbar 가 범위 clamp + thumb 반영.
+	if (m_use_hscroll && m_scrollbar_setup)
+	{
+		int dx = zDelta / WHEEL_DELTA * 60;
+		if (dx == 0)
+			dx = (zDelta > 0) ? 60 : -60;
+		m_h_scroll_pos += dx;
+		Invalidate(FALSE);
+		sync_scrollbar();
+		return;
+	}
 	CListBox::OnMouseHWheel(nFlags, zDelta, pt);
 }
 
@@ -1687,38 +1728,58 @@ void CSCListBox::delete_items(bool for_selected)
 
 void CSCListBox::recalc_horizontal_extent(CString added_text)
 {
-	//항목의 출력 너비에 따라 가로 스크롤바를 재조정해준다.
+	//themed 가로 오버레이용 콘텐츠 폭(px) 재계산. 네이티브 SetHorizontalExtent 는 쓰지 않는다.
+	if (!::IsWindow(m_hWnd))
+		return;
+
 	CDC* pDC = GetDC();
-	CFont* pOldFont = (CFont*)pDC->SelectObject(&m_font);
-	CSize sz;
+	CFont* pOldFont = pDC->SelectObject(&m_font);
+
+	//DrawItem 의 좌측 인입 폭(margin/gutter/icon)과 우측 여백을 더해 실제 콘텐츠 폭을 구한다.
+	int base_indent = 4;	//DrawItem: rect.left += 4
+	if (m_nGutterCharNumber > 0)
+		base_indent += pDC->GetTextExtent(_T("M")).cx * m_nGutterCharNumber;
+	if (m_as_folder_list)
+		base_indent += 6 + 16 + 14;	//folder: left margin + small icon + gap
+	else if (m_imagelist.size() > 0)
+		base_indent += m_imagelist[0]->width + 4;
+	int right_margin = 10;
+	//GDI+ 렌더(m_text_smooth)는 좌우 typographic overhang 으로 GDI 측정보다 약간 넓다 — 과소측정(꼬리 잘림) 방지로 더한다.
+	int overhang = m_text_smooth ? ((-m_lf.lfHeight) / 3 + 4) : 0;
+
+	auto measure = [&](const CString& s) -> int
+	{
+		CSize sz;
+		GetTextExtentPoint32(pDC->GetSafeHdc(), s, s.GetLength(), &sz);
+		return base_indent + sz.cx + overhang + right_margin;
+	};
 
 	if (added_text.IsEmpty())
 	{
-		CString text;
+		//전체 재계산 — 삭제/리셋/폰트변경 후.
 		int max_cx = 0;
-
+		CString text;
 		for (int i = 0; i < GetCount(); i++)
 		{
 			GetText(i, text);
-			GetTextExtentPoint32(pDC->GetSafeHdc(), added_text, added_text.GetLength(), &sz);
-			if (sz.cx > max_cx)
-				sz.cx = max_cx;
+			int w = measure(text);
+			if (w > max_cx)
+				max_cx = w;
 		}
+		m_max_horizontal_extent = max_cx;
 	}
 	else
 	{
-		GetTextExtentPoint32(pDC->GetSafeHdc(), added_text, added_text.GetLength(), &sz);
-	}
-
-	if (sz.cx > m_max_horizontal_extent)
-	{
-		m_max_horizontal_extent = sz.cx;
+		//증분 — 추가된 항목만 측정해 최대값 갱신.
+		int w = measure(added_text);
+		if (w > m_max_horizontal_extent)
+			m_max_horizontal_extent = w;
 	}
 
 	pDC->SelectObject(pOldFont);
 	ReleaseDC(pDC);
 
-	SetHorizontalExtent(m_max_horizontal_extent + GetSystemMetrics(SM_CXVSCROLL));
+	sync_scrollbar();	//extent 갱신 후 세로/가로 오버레이 한 번에 동기화.
 }
 
 //항목 이동. single selection이고 auto sort가 아닐 경우에만 정상 동작함.
@@ -1778,6 +1839,8 @@ void CSCListBox::set_color_theme(int theme, bool invalidate)
 
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, false);
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+		m_scrollbar_h.set_color_theme(m_theme, false);
 
 	//popup 모드는 DWM border 색도 theme 에 맞춤. NC 영역까지 갱신되도록 RDW_FRAME 동반.
 	if (m_as_popup && ::IsWindow(m_hWnd))
@@ -1807,6 +1870,8 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	//scrollbar 도 invalidate 전파 — 이전엔 false 하드코딩이라 scrollbar 색만 바뀌고 redraw 안 됐다.
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+		m_scrollbar_h.set_color_theme(m_theme, invalidate);
 
 	//Invalidate(TRUE) — erase background 강제. owner-draw listbox 의 빈 영역 (항목 없는 부분) 이
 	//이전 theme 의 brush 로 남아있는 잔상 차단. CtlColor 가 m_br_back 반환하지 않는 경로 보완.
@@ -1823,49 +1888,43 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 void CSCListBox::OnNcPaint()
 {
-	//popup mode 는 NC padding band 를 cr_back 으로 fill — OnNcCalcSize 가 reserve 한 영역에
-	//stale pixels 가 보이지 않도록.
-	if (m_as_popup && m_popup_padding > 0)
-	{
-		CWindowDC dc(this);
-		CRect rWindow, rClient;
-		GetWindowRect(&rWindow);
-		GetClientRect(&rClient);
-		ClientToScreen(&rClient);
-
-		//CWindowDC origin = window 좌상단. screen → window 좌표 변환.
-		int width  = rWindow.Width();
-		int height = rWindow.Height();
-		int cLeft   = rClient.left   - rWindow.left;
-		int cTop    = rClient.top    - rWindow.top;
-		int cRight  = rClient.right  - rWindow.left;
-		int cBottom = rClient.bottom - rWindow.top;
-
-		COLORREF cr_bg = m_theme.cr_back.ToCOLORREF();
-
-		if (cTop > 0)
-			dc.FillSolidRect(0, 0, width, cTop, cr_bg);
-		if (cBottom < height)
-			dc.FillSolidRect(0, cBottom, width, height - cBottom, cr_bg);
-		if (cLeft > 0)
-			dc.FillSolidRect(0, cTop, cLeft, cBottom - cTop, cr_bg);
-		if (cRight < width)
-			dc.FillSolidRect(cRight, cTop, width - cRight, cBottom - cTop, cr_bg);
-		return;
-	}
-
-	//일반 listbox — resource editor 의 Border 속성을 받았다면 m_draw_border=true (default).
-	//기존 코드는 여기서 그냥 return 해 themed border 가 전혀 그려지지 않았음 — OnNcCalcSize 가
-	//m_scrollbar_setup 시 NC 영역을 0 으로 만들어 native WS_BORDER 도 함께 무효화되었기 때문에
-	//사용자 입장에선 "Border 속성을 줬는데 안 그려진다" 가 되었음.
-	if (!m_draw_border)
+	//NC 4면을 cr_back 으로 fill — popup padding / themed border 1px / H-bar 리저베이션 14px 모두 커버.
+	//H-bar 오버레이(child)는 그 위에 자기 영역만 그리고, 남은 우측 하단 corner 는 cr_back 으로 남는다.
+	bool need_paint = (m_as_popup && m_popup_padding > 0) || m_h_visible || m_draw_border;
+	if (!need_paint)
 		return;
 
 	CWindowDC dc(this);
-	CRect rc;
-	GetWindowRect(&rc);
-	rc.OffsetRect(-rc.TopLeft());
-	draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
+	CRect rWindow, rClient;
+	GetWindowRect(&rWindow);
+	GetClientRect(&rClient);
+	ClientToScreen(&rClient);
+
+	//CWindowDC origin = window 좌상단. screen → window 좌표 변환.
+	int width  = rWindow.Width();
+	int height = rWindow.Height();
+	int cLeft   = rClient.left   - rWindow.left;
+	int cTop    = rClient.top    - rWindow.top;
+	int cRight  = rClient.right  - rWindow.left;
+	int cBottom = rClient.bottom - rWindow.top;
+
+	COLORREF cr_bg = m_theme.cr_back.ToCOLORREF();
+
+	if (cTop > 0)
+		dc.FillSolidRect(0, 0, width, cTop, cr_bg);
+	if (cBottom < height)
+		dc.FillSolidRect(0, cBottom, width, height - cBottom, cr_bg);
+	if (cLeft > 0)
+		dc.FillSolidRect(0, cTop, cLeft, cBottom - cTop, cr_bg);
+	if (cRight < width)
+		dc.FillSolidRect(cRight, cTop, width - cRight, cBottom - cTop, cr_bg);
+
+	//popup 은 padding 으로 충분 — border 그리지 않음. 일반 listbox 만 themed 1px border.
+	if (!m_as_popup && m_draw_border)
+	{
+		CRect rcLocal(0, 0, width, height);
+		draw_rect(&dc, rcLocal, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
+	}
 }
 
 
@@ -1902,6 +1961,8 @@ void CSCListBox::ResetContent()
 		delete item;
 	}
 	CListBox::ResetContent();
+	m_max_horizontal_extent = 0;
+	m_h_scroll_pos = 0;
 	sync_scrollbar();
 }
 
@@ -1913,7 +1974,7 @@ int CSCListBox::DeleteString(UINT nIndex)
 		delete item;
 	}
 	int r = CListBox::DeleteString(nIndex);
-	sync_scrollbar();
+	recalc_horizontal_extent();		//삭제로 최대 폭이 줄 수 있어 전체 재계산(내부에서 sync_scrollbar).
 	return r;
 }
 
@@ -1936,6 +1997,20 @@ int CSCListBox::SetTopIndex(int nIndex)
 	SetRedraw(TRUE);
 	sync_scrollbar();
 	Invalidate(FALSE);
+
+	//마지막 항목 *아래* 의 빈 strip 은 어떤 DrawItem 도 그리지 않는다. 위 Invalidate(FALSE) 는 erase 를 생략하므로
+	//OnEraseBkgnd 가 안 불려 직전 스크롤 위치 항목의 픽셀이 그 strip 에 잔상으로 남는다(맨 아래로 스크롤 시 재현).
+	//그 strip 만 erase 동반 무효화하면 OnEraseBkgnd 가 cr_back 으로 채운다(항목 영역은 안 건드려 flicker 없음).
+	CRect rc_client;
+	GetClientRect(rc_client);
+	int count = GetCount();
+	int top = GetTopIndex();
+	int items_bottom = (count > 0 && m_line_height > 0) ? (count - top) * m_line_height : 0;
+	if (items_bottom < rc_client.Height())
+	{
+		CRect strip(rc_client.left, items_bottom, rc_client.right, rc_client.Height());
+		InvalidateRect(strip, TRUE);
+	}
 	return r;
 }
 
@@ -1963,6 +2038,9 @@ void CSCListBox::setup_scrollbar()
 	//WS_HSCROLL 제거 + WS_VSCROLL 유지 + WS_CLIPCHILDREN 추가. WS_VSCROLL 유지 이유 — base CListBox 내부 scroll 시
 	//WM_VSCROLL 을 자체 발화 → OnVScroll catch → sync_scrollbar 가 base scroll 직후 동기 실행 (SCTreeCtrl 패턴과 동일).
 	//OnNcCalcSize 가 NC 공간 0 으로 만들어 native scrollbar 시각적 비표시. ShowScrollBar 로 추가 차단.
+	//네이티브 스크롤바는 일절 쓰지 않으므로 WS_HSCROLL 제거(이미 listbox 가 비웠을 수 있음) + WS_VSCROLL 유지.
+	//가로 허용 여부는 리소스 WS_HSCROLL 이 아니라 m_use_hscroll(기본 on, set_use_hscroll 로 변경)로 판단한다 —
+	//네이티브 listbox 가 WS_HSCROLL 을 동적 제거해 런타임 GetStyle 로는 설계 의도를 읽을 수 없기 때문.
 	LONG_PTR style = ::GetWindowLongPtr(m_hWnd, GWL_STYLE);
 	style &= ~(LONG_PTR)WS_HSCROLL;
 	style |= WS_VSCROLL | WS_CLIPCHILDREN;
@@ -1981,8 +2059,23 @@ void CSCListBox::setup_scrollbar()
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인.
 	m_scrollbar.ShowWindow(SW_HIDE);
+
+	//가로 오버레이는 CVtListCtrlEx/CSCTreeCtrl 처럼 항상 생성한다(표시 여부는 sync_scrollbar 의 need_h 가 결정).
+	//세로 오버레이가 우측 corner 를 점유하므로 가로는 우측을 m_scrollbar_width 만큼 비워 sync_scrollbar 가 배치.
+	m_scrollbar_h.create(this, CSCScrollbar::horizontal,
+		0, rc.bottom - m_scrollbar_width, rc.Width() - m_scrollbar_width, m_scrollbar_width);
+	m_scrollbar_h.set_color_theme(m_theme, false);
+	m_scrollbar_h.set_line(30);	//화살표 클릭 = 30px (CVtListCtrlEx 와 동일).
+	m_scrollbar_h.ShowWindow(SW_HIDE);
+
+	//오버레이는 지연(PostMessage) 생성이라 이 시점엔 이미 항목이 채워져 있을 수 있다. 생성 직후 한 번 재계산+동기화해
+	//현재 콘텐츠(세로 항목 수 / 가로 폭) 기준으로 즉시 표시되게 한다. 이게 없으면 선택/리사이즈 전까지 안 나타난다.
+	recalc_horizontal_extent();	//내부에서 sync_scrollbar 호출.
 }
 
+//세로/가로 오버레이를 한 번에 동기화 — CVtListCtrlEx::sync_scrollbar 와 동일 구조.
+//세로: 가시 항목 수 기준, 가로: 우리가 계산해 캐시한 콘텐츠 폭(m_max_horizontal_extent) 기준.
+//상대 바가 보이면 그만큼 길이를 줄여 우측·하단 corner 가 겹치지 않게 한다.
 void CSCListBox::sync_scrollbar()
 {
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
@@ -1994,47 +2087,121 @@ void CSCListBox::sync_scrollbar()
 
 	int total = GetCount();
 
-	//visible item 수 — owner-draw fixed 이므로 line_height 로 계산.
 	CRect rc;
 	GetClientRect(&rc);
-	int visible = (m_line_height > 0) ? (rc.Height() / m_line_height) : 0;
 
-	//위치 sync — width 은 scrollbar 자체 hover 확장 관리, 우측 edge / height 만 갱신.
-	CRect rCur;
-	m_scrollbar.GetWindowRect(rCur);
-	ScreenToClient(rCur);
-	int cur_width = rCur.Width();
-	CRect rTarget(rc.right - cur_width, 0, rc.right, rc.Height());
-	if (rCur != rTarget)
+	//가로: 리소스 WS_HSCROLL(m_use_hscroll) 꺼져 있으면 항상 false → 넘쳐도 표시 안 함(우측 clip 정책). visible 과 무관하게 결정.
+	bool need_h = m_use_hscroll && ::IsWindow(m_scrollbar_h.m_hWnd)
+				&& (rc.Width() > 0) && (m_max_horizontal_extent > rc.Width());
+
+	//세로 가시 항목 수 — 네이티브 listbox 의 내부 max top(=count - floor(client/line))과 일치시켜 thumb 이
+	//끝까지 도달하도록 한다(effective_h 차감/NC 리저베이션 모두 부작용이 커서 채택 안 함).
+	//tradeoff: H-bar 가 보일 때 마지막 항목은 최대 m_scrollbar_width 만큼 H-bar 와 겹쳐 보일 수 있다.
+	int visible = (m_line_height > 0) ? (rc.Height() / m_line_height) : 0;
+	bool need_v = (total > visible) && (visible > 0);
+
+	m_show_corner = need_v && need_h;
+
+	int v_bottom = need_h ? (rc.bottom - m_scrollbar_width) : rc.bottom;
+	int h_right  = need_v ? (rc.right - m_scrollbar_width) : rc.right;
+
+	//세로 위치
+	CRect rCurV;
+	m_scrollbar.GetWindowRect(rCurV);
+	ScreenToClient(rCurV);
+	int cur_v_width = rCurV.Width();
+	CRect rTargetV(rc.right - cur_v_width, 0, rc.right, v_bottom);
+	if (rCurV != rTargetV)
 	{
-		CRect rOld = rCur;
-		m_scrollbar.MoveWindow(rTarget);
+		CRect rOld = rCurV;
+		m_scrollbar.MoveWindow(rTargetV);
 		InvalidateRect(rOld, TRUE);
 	}
 
-	bool need = (total > visible) && (visible > 0);
-	int top = GetTopIndex();
-	if (top < 0) top = 0;
+	//가로 위치
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	{
+		CRect rCurH;
+		m_scrollbar_h.GetWindowRect(rCurH);
+		ScreenToClient(rCurH);
+		int cur_h_height = rCurH.Height();
+		//H-bar 는 client 하단에 오버레이(항목 위에 겹쳐 표시). 마지막 항목이 일부 가려질 수 있는 tradeoff 수용.
+		CRect rTargetH(0, rc.bottom - cur_h_height, h_right, rc.bottom);
+		if (rCurH != rTargetH)
+		{
+			CRect rOld = rCurH;
+			m_scrollbar_h.MoveWindow(rTargetH);
+			InvalidateRect(rOld, TRUE);
+		}
+	}
 
-	if (!need)
+	//세로 모델
+	if (!need_v)
 	{
 		if (m_scrollbar.IsWindowVisible())
 			m_scrollbar.ShowWindow(SW_HIDE);
-		return;
+	}
+	else
+	{
+		int top = GetTopIndex();
+		if (top < 0) top = 0;
+		m_scrollbar.set_range(0, total - 1);
+		m_scrollbar.set_page(visible);
+		m_scrollbar.set_pos(top);
+		if (!m_scrollbar.IsWindowVisible())
+			m_scrollbar.ShowWindow(SW_SHOW);
 	}
 
-	m_scrollbar.set_range(0, total - 1);
-	m_scrollbar.set_page(visible);
-	m_scrollbar.set_pos(top);
-
-	if (!m_scrollbar.IsWindowVisible())
-		m_scrollbar.ShowWindow(SW_SHOW);
+	//가로 모델
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	{
+		if (!need_h)
+		{
+			if (m_scrollbar_h.IsWindowVisible())
+				m_scrollbar_h.ShowWindow(SW_HIDE);
+			if (m_h_scroll_pos != 0)
+			{
+				m_h_scroll_pos = 0;
+				Invalidate(FALSE);
+			}
+		}
+		else
+		{
+			//콘텐츠 폭 변화로 현재 위치가 끝을 넘으면 당겨온다.
+			int max_h = max(0, m_max_horizontal_extent - rc.Width());
+			if (m_h_scroll_pos > max_h) m_h_scroll_pos = max_h;
+			if (m_h_scroll_pos < 0)     m_h_scroll_pos = 0;
+			m_scrollbar_h.set_range(0, m_max_horizontal_extent - 1);
+			m_scrollbar_h.set_page(rc.Width());
+			m_scrollbar_h.set_pos(m_h_scroll_pos);
+			if (!m_scrollbar_h.IsWindowVisible())
+				m_scrollbar_h.ShowWindow(SW_SHOW);
+		}
+	}
 }
 
 LRESULT CSCListBox::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 {
 	CSCScrollbarMsg* msg = (CSCScrollbarMsg*)wParam;
-	if (msg == nullptr || msg->pThis != &m_scrollbar)
+	if (msg == nullptr)
+		return 0;
+
+	//가로 오버레이 — 픽셀 위치만 갱신하고 전체 재그리기(DrawItem 이 m_h_scroll_pos 만큼 항목을 좌측 이동).
+	if (msg->pThis == &m_scrollbar_h)
+	{
+		if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
+		{
+			int new_pos = max(0, msg->pos);
+			if (new_pos != m_h_scroll_pos)
+			{
+				m_h_scroll_pos = new_pos;
+				Invalidate(FALSE);
+			}
+		}
+		return 0;
+	}
+
+	if (msg->pThis != &m_scrollbar)
 		return 0;
 
 	if (msg->msg == CSCScrollbarMsg::msg_scrollbar_pos_changed)
@@ -2070,6 +2237,7 @@ void CSCListBox::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 			lpncsp->rgrc[0].right  -= 1;
 			lpncsp->rgrc[0].bottom -= 1;
 		}
+
 		return;
 	}
 

@@ -416,14 +416,33 @@ public:
 
 	//자체 스크롤바 — CSCTreeCtrl / CSCThumbCtrl 와 동일 패턴. WS_VSCROLL 제거 + OnNcCalcSize 가 NC 영역 0 → native scrollbar 안 보임.
 	CSCScrollbar	m_scrollbar;
-	int				m_scrollbar_width = 18;
+	int				m_scrollbar_width = 14;	//track(window) 폭 — 18→16→14 로 양쪽 1px씩 축소(CVtListCtrlEx 와 통일).
 	bool			m_scrollbar_setup = false;
+
+	//가로 themed 오버레이 — 네이티브 가로 스크롤바는 일절 쓰지 않고 이 컨트롤로만 가로 스크롤한다.
+	//(CVtListCtrlEx / CSCTreeCtrl 와 동일한 m_scrollbar_h / m_h_scroll_pos 네이밍 — 컨트롤 간 일관성.)
+	//표시 조건: m_use_hscroll(기본 on) 이고 콘텐츠 폭이 client 를 넘을 때만. tree/listctrl 처럼 overflow 시 항상 표시.
+	//Why default on / no WS_HSCROLL gate: 네이티브 listbox 가 비어있을 때 WS_HSCROLL 비트를 스스로 제거하고
+	//LB_SETHORIZONTALEXTENT 없이는 복원하지 않아, 리소스의 WS_HSCROLL 플래그를 런타임 GetStyle 로 읽는 것이 불가능하다.
+	//끄려면 응용단에서 set_use_hscroll(false) 호출.
+	CSCScrollbar	m_scrollbar_h;
+	bool			m_use_hscroll = true;	//가로 스크롤 허용 여부(기본 on). 신뢰 불가한 WS_HSCROLL 대신 명시 API 로 제어.
+	int				m_h_scroll_pos = 0;		//가로 스크롤 위치(px). DrawItem 이 텍스트/아이콘을 이만큼 왼쪽으로 이동.
+	bool			m_show_corner = false;	//세로·가로 바가 둘 다 보일 때 우측 하단 corner 를 cr_back 으로 칠할지(sync_scrollbar 가 설정).
+	//가로 오버레이가 표시될 때 NC 영역으로 listbox client 하단 m_scrollbar_width 를 reserve 하기 위한 상태.
+	//네이티브 SetTopIndex 의 내부 최대값이 (count - floor(client/line)) 이라 H-bar 가 client 안에 떠 있으면
+	//마지막 항목 위치까지 스크롤할 수 없다. client 자체를 줄여 listbox 내부 한계도 함께 줄여야 도달 가능.
+	bool			m_h_visible = false;
 
 	//popup mode (m_as_popup) 에서 4면 NC padding — items 가 border 에 붙지 않도록.
 	//OnNcCalcSize 가 client 를 deflate, OnNcPaint 가 padding band 를 cr_back 으로 fill.
 	int				m_popup_padding = 4;
 	void			setup_scrollbar();
-	void			sync_scrollbar();
+	void			sync_scrollbar();		//세로/가로 오버레이 위치·범위·표시를 한 번에 동기화(CVtListCtrlEx 패턴).
+
+	//가로 스크롤 허용 여부(기본 on). false 면 넘쳐도 가로 바 미표시(한 줄 + 우측 clip).
+	//리소스 WS_HSCROLL 은 네이티브 listbox 가 런타임에 동적 제거해 신뢰 불가하므로 이 API 로 제어한다.
+	void			set_use_hscroll(bool on) { m_use_hscroll = on; if (m_scrollbar_setup) sync_scrollbar(); }
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
 	//PreSubclassWindow 에서 PostMessage 로 지연된 setup_scrollbar 처리 핸들러. CBT hook 종료 후 큐에서 호출됨.
 	LRESULT			on_setup_scrollbar_deferred(WPARAM wParam, LPARAM lParam);

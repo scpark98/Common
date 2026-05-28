@@ -1306,8 +1306,13 @@ struct	NETWORK_INFO
 
 //////////////////////////////////////////////////////////////////////////
 //폴더 관련
-	//가능하면 PathIsDirectory() 사용할 것
-	bool		IsFolder(CString sfile);				//폴더인지 파일인지
+	//탐색기엔 폴더처럼 보이지만 실제로는 컴포넌트 중 하나가 .lnk shortcut 인 경로
+	//(예: "Z:\내 드라이브\..." — 실체는 "Z:\내 드라이브.lnk")를 IShellLink 로 풀어서
+	//실제 파일시스템 경로로 보정. 정상 경로/해석 실패면 원본 반환.
+	CString		resolve_lnk_path(CString path);
+
+	//폴더인지 파일인지. 1차 실패 시 resolve_lnk_path 로 자동 보정 후 재시도.
+	bool		IsFolder(CString sfile);
 	bool		isFolder(char *sfile);
 	//파일명이나 폴더명에 '\\', '/' 혼용일 경우가 있으므로 CString의 '==' 연산자로 비교해선 안된다. 
 	bool		IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive = false);

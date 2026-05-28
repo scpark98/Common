@@ -1608,54 +1608,135 @@ bool is_valid_url(CString url, bool check_prefix)
 	return false;
 }
 
+//단일 .lnk 파일을 타겟 경로로 dereference.
+static bool resolve_shortcut_target(LPCWSTR lnk_path, CString& out_target)
+{
+	out_target.Empty();
+
+	HRESULT co_hr = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+	bool need_uninit = SUCCEEDED(co_hr);	//RPC_E_CHANGED_MODE 등은 이미 초기화된 상태이므로 uninit 하지 않는다.
+
+	IShellLink* psl = nullptr;
+	if (SUCCEEDED(::CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
+									 IID_IShellLink, (void**)&psl)))
+	{
+		IPersistFile* ppf = nullptr;
+		if (SUCCEEDED(psl->QueryInterface(IID_IPersistFile, (void**)&ppf)))
+		{
+			if (SUCCEEDED(ppf->Load(lnk_path, STGM_READ)))
+			{
+				WCHAR buf[MAX_PATH] = { 0 };
+				WIN32_FIND_DATA fd = { 0 };
+				//SLGP_UNCPRIORITY: UNC 우선. SLGP_RAWPATH 와 달리 환경변수/MSI 변환을 거친 실제 경로.
+				if (SUCCEEDED(psl->GetPath(buf, MAX_PATH, &fd, SLGP_UNCPRIORITY)) && buf[0])
+					out_target = buf;
+			}
+			ppf->Release();
+		}
+		psl->Release();
+	}
+
+	if (need_uninit)
+		::CoUninitialize();
+
+	return !out_target.IsEmpty();
+}
+
+//사용자/탐색기 입장에선 폴더처럼 보이지만 실제로는 컴포넌트 중 하나가 .lnk shortcut 인
+//경로(예: "Z:\내 드라이브\sub\..." — 실체는 "Z:\내 드라이브.lnk")를 실제 폴더 경로로 보정.
+//정상 경로이거나 해석 실패면 원본을 그대로 반환한다.
+CString resolve_lnk_path(CString path)
+{
+	if (path.IsEmpty())
+		return path;
+
+	//그대로 존재하면 보정 불필요.
+	if (::GetFileAttributes(path) != INVALID_FILE_ATTRIBUTES)
+		return path;
+
+	path.Replace(_T('/'), _T('\\'));
+
+	//드라이브/UNC prefix 시작점 결정.
+	int pos;
+	if (path.GetLength() >= 3 && path[1] == _T(':') && path[2] == _T('\\'))
+	{
+		pos = 3;	//"C:\"
+	}
+	else if (path.GetLength() >= 2 && path[0] == _T('\\') && path[1] == _T('\\'))
+	{
+		int s1 = path.Find(_T('\\'), 2);		//\\server\
+		if (s1 < 0) return path;
+		int s2 = path.Find(_T('\\'), s1 + 1);	//\\server\share\
+		if (s2 < 0) return path;
+		pos = s2 + 1;
+	}
+	else
+	{
+		return path;	//상대경로 등은 처리하지 않는다.
+	}
+
+	CString prefix = path.Left(pos);
+
+	while (pos < path.GetLength())
+	{
+		int next = path.Find(_T('\\'), pos);
+		bool is_last = (next < 0);
+		int end = is_last ? path.GetLength() : next;
+		CString comp = path.Mid(pos, end - pos);
+		CString try_path = prefix + comp;
+
+		if (::GetFileAttributes(try_path) != INVALID_FILE_ATTRIBUTES)
+		{
+			prefix = try_path;
+		}
+		else
+		{
+			//같은 위치에 <comp>.lnk 가 있으면 dereference 해서 그 자리에 끼워넣는다.
+			CString lnk = try_path + _T(".lnk");
+			if (::GetFileAttributes(lnk) == INVALID_FILE_ATTRIBUTES)
+				return path;	//.lnk 도 없음 — 보정 불가.
+
+			CString target;
+			if (!resolve_shortcut_target(lnk, target))
+				return path;
+
+			prefix = target;
+		}
+
+		if (is_last)
+			break;
+
+		if (prefix.IsEmpty() || prefix[prefix.GetLength() - 1] != _T('\\'))
+			prefix += _T('\\');
+		pos = end + 1;
+	}
+
+	return prefix;
+}
+
 bool IsFolder(CString sfile)
 {
 	if (sfile.IsEmpty())
 		return false;
 
-	//호출 측에서 끝에 공백/개행/NBSP, 또는 trailing '\'/'/'가 붙어 들어오는 경우를 흡수.
-	//NTFS와 Cloud Files API(가상 FS) 모두 정규 경로를 받아야 안정적이다.
-	sfile.TrimLeft (_T(" \t\r\n\xA0"));
-	sfile.TrimRight(_T(" \t\r\n\xA0"));
-	while (sfile.GetLength() > 3)
-	{
-		TCHAR c = sfile[sfile.GetLength() - 1];
-		if (c == _T('\\') || c == _T('/'))
-			sfile.Delete(sfile.GetLength() - 1);
-		else
-			break;
-	}
-
 	if (PathIsRoot(sfile))
 		return true;
 
-	//1차: GetFileAttributes — 로컬/네트워크/대부분의 가상 FS에서 정상 동작.
 	DWORD attr = ::GetFileAttributes(sfile);
-	if (attr != INVALID_FILE_ATTRIBUTES)
-		return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-	//2차: \\?\ long-path 형식. MAX_PATH 초과 경로나, name-resolution 레이어에서
-	//     기본 경로가 거부되는 경우를 우회한다.
-	CString lp;
-	if (sfile.GetLength() >= 2 && sfile[0] == _T('\\') && sfile[1] == _T('\\'))
-		lp = _T("\\\\?\\UNC\\") + sfile.Mid(2);
-	else
-		lp = _T("\\\\?\\") + sfile;
-	attr = ::GetFileAttributes(lp);
-	if (attr != INVALID_FILE_ATTRIBUTES)
-		return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
-
-	//3차: 자식 열거가 성공하면 디렉토리. 일부 가상 FS는 메타데이터 조회는 막아도
-	//     enumeration은 허용한다 (cloud placeholder의 일반적 동작).
-	WIN32_FIND_DATA fd;
-	HANDLE h = ::FindFirstFile(sfile + _T("\\*"), &fd);
-	if (h != INVALID_HANDLE_VALUE)
+	//1차 실패 시: 경로 중간에 .lnk shortcut 이 끼어 있을 수 있으니 보정 후 재시도.
+	//(Google Drive 의 "내 드라이브" 등이 .lnk 로 노출되는 케이스)
+	if (attr == INVALID_FILE_ATTRIBUTES)
 	{
-		::FindClose(h);
-		return true;
+		CString resolved = resolve_lnk_path(sfile);
+		if (resolved == sfile)
+			return false;
+		attr = ::GetFileAttributes(resolved);
+		if (attr == INVALID_FILE_ATTRIBUTES)
+			return false;
 	}
 
-	return false;
+	return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 #include <sys/types.h>
@@ -5539,6 +5620,8 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 	if (filter.IsEmpty())
 		filter = _T("*");
 
+	folder = resolve_lnk_path(folder);
+
 	hFind = FindFirstFile(folder + _T("\\") + filter, &data);
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
@@ -5727,6 +5810,10 @@ std::deque<CString> find_all_files(CString path, CString name_filter, CString ex
 {
 	int i;
 	std::deque<CString> list;
+
+	//탐색기 표시 경로 중 .lnk shortcut 이 끼어 있는 경우(예: Google Drive "내 드라이브")
+	//FindFirstFile 은 실패하므로 실제 폴더 경로로 보정한 뒤 진행.
+	path = resolve_lnk_path(path);
 
 	if (IsFolder(path) == false)
 		return list;

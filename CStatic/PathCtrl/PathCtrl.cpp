@@ -4,6 +4,7 @@
 #include "PathCtrl.h"
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../Functions.h"	//get_monitor_index / get_monitor_rect / g_monitors — 서브폴더 팝업 모니터 보정용.
 
 // CPathCtrl
 
@@ -589,8 +590,31 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	//나머지는 스크롤바로 본다. calc_popup_height_for_lines 는 NC padding 포함한 전체 window height 반환.
 	const int max_popup_lines = 10;
 	int display_lines = min(total_lines, max_popup_lines);
+	int popup_w = m_sz_list_folder.cx;
+	int popup_h = m_list_folder.calc_popup_height_for_lines(display_lines);
+
+	//팝업이 모니터(작업영역) 밖으로 나가면 메뉴처럼 안쪽으로 보정한다. pt 는 이미 screen 좌표.
+	if (g_monitors.empty())
+		enum_display_monitors();
+	int mon = get_monitor_index(pt.x, pt.y);
+	CRect rc_mon = (mon >= 0 && mon < (int)g_monitors.size()) ? g_monitors[mon].rWork : get_monitor_rect(-1);
+
+	if (pt.x + popup_w > rc_mon.right)
+		pt.x = rc_mon.right - popup_w;
+	if (pt.x < rc_mon.left)
+		pt.x = rc_mon.left;
+
+	if (pt.y + popup_h > rc_mon.bottom)
+	{
+		//아래로 넘치면 경로 항목 위쪽으로 flip(메뉴 방식). 위로도 넘치면 상단 경계에 맞춘다.
+		int anchor_top = pt.y - m_path[m_index].r.Height();
+		pt.y = anchor_top - popup_h;
+		if (pt.y < rc_mon.top)
+			pt.y = rc_mon.top;
+	}
+
 	m_list_folder.SetWindowPos(NULL, pt.x, pt.y,
-		m_sz_list_folder.cx, m_list_folder.calc_popup_height_for_lines(display_lines),
+		popup_w, popup_h,
 		SWP_NOZORDER | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
 }
 

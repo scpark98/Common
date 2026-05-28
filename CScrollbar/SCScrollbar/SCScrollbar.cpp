@@ -484,7 +484,8 @@ void CSCScrollbar::draw_track(Gdiplus::Graphics& g, const CRect& rTrack)
 		return;
 
 	//직사각형 — cr_back 보다 약간 weak 한 톤. "여기 scrollbar 가 있다" 정도 인지.
-	Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
+	//get_weak_color: 밝은 배경(흰색 등)은 어둡게(→연회색), 어두운 배경은 밝게. get_color(+24)는 흰 배경에서 clamp 돼 흰색 유지되는 문제 회피.
+	Gdiplus::Color cr_track = get_weak_color(m_theme.cr_back, 24);
 	Gdiplus::SolidBrush br(cr_track);
 	g.FillRectangle(&br, rTrack.left, rTrack.top, rTrack.Width(), rTrack.Height());
 }
@@ -494,11 +495,9 @@ void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
 	if (rThumb.IsRectEmpty())
 		return;
 
-	//thumb color = cr_text 와 cr_back 의 blend. hover/pressed 시 cr_text 에 가까워짐. base ratio 0.45 로 track 과 충분한 대비 (track 은 cr_back+24).
+	//thumb color = cr_text 와 cr_back 의 blend. hover/pressed 여부와 무관하게 항상 동일한 색(두께만 hover 시 굵어짐).
+	//(이전엔 hover 0.65 / pressed 0.85 로 진해졌으나 사용자 요청으로 unhover 색으로 고정.)
 	double ratio = 0.45;
-	if (m_hover == part_thumb)		ratio = 0.65;
-	if (m_pressed == part_thumb)	ratio = 0.85;
-
 	Gdiplus::Color cr_thumb = get_color(m_theme.cr_back, m_theme.cr_text, ratio);
 
 	//cross 두께는 m_thickness 가 직접 결정 — DeflateRect 로 더 깎으면 얇은 thumb 가 사라짐.
@@ -517,8 +516,8 @@ void CSCScrollbar::draw_arrow(Gdiplus::Graphics& g, const CRect& rArrow, bool to
 	if (rArrow.IsRectEmpty())
 		return;
 
-	//배경은 track 과 동일 — 클릭/hover 시에도 변경하지 않음.
-	Gdiplus::Color cr_track = get_color(m_theme.cr_back, 24);
+	//배경은 track 과 동일 — 클릭/hover 시에도 변경하지 않음. (밝은 배경에서 흰색 clamp 회피 위해 get_weak_color.)
+	Gdiplus::Color cr_track = get_weak_color(m_theme.cr_back, 24);
 	Gdiplus::SolidBrush br_bg(cr_track);
 	g.FillRectangle(&br_bg, rArrow.left, rArrow.top, rArrow.Width(), rArrow.Height());
 

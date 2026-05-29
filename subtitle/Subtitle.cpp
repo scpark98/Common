@@ -2,6 +2,7 @@
 #include "../log/SCLog/SCLog.h"
 #include <algorithm>
 #include <fstream>
+#include <set>
 
 #pragma warning(disable: 4018)	//'>=': signed/unsigned mismatch
 #pragma warning(disable: 4477)	//'fwprintf' : format string '%s' requires an argument of type 'wchar_t *', but variadic argument 1 has type 'CString'
@@ -160,23 +161,12 @@ bool CSubtitle::load_smi(CString sfile)
 				sSync.Empty();
 			}
 
-			//자막끝 (&nbsp;) 마커 라인이면 직전 caption 의 end 만 갱신, sSync 누적은 건너뜀.
-			if (find(sLine, _T("&nbsp;")) > 0)
-			{
-				int eq = sLine.Find(_T('='));
-				int gt = (eq >= 0) ? sLine.Find(_T('>'), eq) : -1;
-				if (eq >= 0 && gt > eq && !m_subtitle.empty())
-				{
-					int t = _ttoi(sLine.Mid(eq + 1, gt - eq - 1));
-					//역행 방지 — 간혹 end 가 직전 start 보다 작은 잘못된 SMI 가 있음.
-					if (t > m_subtitle.back().start)
-						m_subtitle.back().end = t;
-				}
-			}
-			else
-			{
-				sSync = sLine;
-			}
+			//&nbsp; 마커 라인 (= 자막 종료 SYNC) 도 *normal sync line* 으로 누적.
+			//parse_subtltle 의 commit_caption 이 *빈 caption (sentences.empty())* 분기에서
+			//`m_tracks.back().end = sync_start` 로 직전 cue 의 end 정상 set. 이전엔 여기서
+			//*m_subtitle.back().end* 갱신을 시도했는데 parse 중에는 m_subtitle 가 비어있어 (rebuild_active_view 가
+			//파일 끝 후 호출) 영구 skip → .smi 의 end SYNC 가 모두 손실되던 bug.
+			sSync = sLine;
 			continue;
 		}
 
@@ -731,6 +721,7 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 		return;
 
 	int sync_start = -1;
+	int sync_end = -1;
 	CString cls;
 	CString text_buf;
 	CString current_color;
@@ -771,6 +762,10 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 			return;
 		}
 
+		//End=M (비표준) 속성이 SYNC tag 에 있었으면 caption.end 로 적용.
+		if (sync_end > 0)
+			caption.end = sync_end;
+
 		//같은 start 면 이전 caption 에 sentence merge (multi-line sync).
 		//merge 시 line_index 충돌 회피 — 이전 caption 의 max line_index + 1 부터 부여.
 		if (!track.empty() && caption.start == track.back().start)
@@ -785,6 +780,9 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 				shifted.line_index += base_line;
 				track.back().sentences.push_back(shifted);
 			}
+			//기존 cue 와 merge 시 end 는 max — End= 속성이 있으면 그게 우선.
+			if (sync_end > 0 && sync_end > track.back().end)
+				track.back().end = sync_end;
 		}
 		else
 		{
@@ -799,9 +797,23 @@ void CSubtitle::parse_subtltle(CString src, const CString& default_class)
 
 		if (lower.Find(_T("<sync start")) == 0)
 		{
-			int eq = tag.Find(_T('='));
-			if (eq > 0)
-				sync_start = _ttoi(tag.Mid(eq + 1));
+			//Start=N 추출. _ttoi 는 비숫자 도달 시 정지하므로 뒤에 " End=M>" 가 붙어도 N 만 정확 추출.
+			int p_start = lower.Find(_T("start"));
+			if (p_start >= 0)
+			{
+				int eq = tag.Find(_T('='), p_start);
+				if (eq > 0)
+					sync_start = _ttoi(tag.Mid(eq + 1));
+			}
+			//End=M (비표준 SMI 속성, 일부 편집기 출력) 도 인식. 표준 viewer 는 무시하지만
+			//사용자가 직접 .smi 편집한 경우 호환 위해 caption.end 로 활용.
+			int p_end = lower.Find(_T("end"));
+			if (p_end >= 0)
+			{
+				int eq = tag.Find(_T('='), p_end);
+				if (eq > 0)
+					sync_end = _ttoi(tag.Mid(eq + 1));
+			}
 		}
 		else if (lower.Find(_T("<p class")) == 0)
 		{
@@ -1031,6 +1043,23 @@ bool CSubtitle::save_smi(CString sfile)
 				}
 				_ftprintf(fp_m, _T("\n"));
 			}
+		}
+
+		//end SYNC — m_tracks 의 각 cue 의 end>0 를 (start, class) 별 entry 로 출력. 자막 종료 표시.
+		//단일 class path (line 1098-1099) 와 동등 — multi-class 에서도 동일 형식.
+		std::map<int, std::set<CString>> by_end_class;
+		for (const auto& kv : m_tracks)
+		{
+			const CString& cls = kv.first;
+			for (const auto& cap : kv.second)
+				if (cap.end > 0)
+					by_end_class[cap.end].insert(cls);
+		}
+		for (const auto& g : by_end_class)
+		{
+			for (const auto& cls : g.second)
+				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>&nbsp;\n"),
+					g.first, cls.GetString());
 		}
 
 		_ftprintf(fp_m, _T("\n</BODY>\n</SAMI>\n"));

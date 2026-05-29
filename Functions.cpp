@@ -3994,6 +3994,32 @@ LONG set_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString str
 }
 //#endif
 
+LONG delete_registry_key(HKEY hKeyRoot, CString sSubKey)
+{
+	return RegDeleteTree(hKeyRoot, sSubKey);
+}
+
+int delete_urlscheme(CString urlscheme)
+{
+	if (urlscheme.IsEmpty())
+		return 0;
+
+	struct { HKEY root; CString sub; } targets[3] =
+	{
+		{ HKEY_CLASSES_ROOT,  urlscheme },
+		{ HKEY_CURRENT_USER,  _T("Software\\Classes\\") + urlscheme },
+		{ HKEY_LOCAL_MACHINE, _T("Software\\Classes\\") + urlscheme },
+	};
+
+	int success_count = 0;
+	for (int i = 0; i < 3; i++)
+	{
+		if (delete_registry_key(targets[i].root, targets[i].sub) == ERROR_SUCCESS)
+			success_count++;
+	}
+	return success_count;
+}
+
 //reg_path에 해당 str 항목이 존재하지 않으면 추가한다.
 //레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성되어 있다.
 //추가된 인덱스를 리턴한다.

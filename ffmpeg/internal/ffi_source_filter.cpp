@@ -662,6 +662,11 @@ namespace ffi
         m_filter_sink = nullptr;
         m_filter_rate = 1.0;
         m_atempo_overflow.clear();
+
+        //rate 변경 graph rebuild 시 audio offset 도 재계산 트리거. 안 하면 직전 segment 의 offset 잔존으로
+        //새 atempo sample 분포에 stale baseline 적용 → 점진적 sync 어긋남.
+        m_audio_offset_rt = 0;
+        m_audio_offset_set = false;
     }
 
     bool CFFiAudioStream::update_audio_filter_rate(double rate)
@@ -672,9 +677,10 @@ namespace ffi
         if (clamped == m_filter_rate)
             return true;
 
-        //단순 send_command "tempo" 만으로는 atempo internal state 가 잔류 — 간헐 sync 어긋남.
-        //graph 자체 재생성으로 internal state 완전 초기화 (LAV path 의 SCAudioTimeStretch 와 동일 패턴).
-        logWrite(_T("[ffi/src/audio/filter] tempo %.3f → %.3f (graph rebuild)"), m_filter_rate, clamped);
+        //send_command path 는 미디어 전환 후 누적 호출 시 atempo yae_reset 의 internal pad/link
+        //pointer invalidate 로 다음 av_buffersrc_add_frame 에서 0xC0000005 (0x18 offset = input_pads/dstpad).
+        //rebuild path 로 복원 — freezing 회피는 dialog 레벨 throttle 로 호출 빈도 자체를 제한.
+        logWrite(_T("[ffi/src/audio/filter] tempo %.3f -> %.3f (graph rebuild)"), m_filter_rate, clamped);
         return init_audio_filter(clamped);
     }
 
@@ -1009,10 +1015,15 @@ namespace ffi
             if (!m_audio_offset_set)
             {
                 int64_t video_first = dec.video_first_emit_pts_rt();
-                int64_t audio_pts_rt = (frame->pts != AV_NOPTS_VALUE) ?
-                    av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000}) : 0;
-                m_audio_offset_rt = (video_first != LLONG_MIN) ? (audio_pts_rt - video_first) : 0;
-                m_audio_offset_set = true;
+                //video_first 미설정 시 set 보류 — audio thread 가 video pin 첫 emit 전에 진입하면
+                //offset=0 으로 영구 박혀 sync 어긋남. 다음 frame 에서 재시도.
+                if (video_first != LLONG_MIN)
+                {
+                    int64_t audio_pts_rt = (frame->pts != AV_NOPTS_VALUE) ?
+                        av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000}) : 0;
+                    m_audio_offset_rt = audio_pts_rt - video_first;
+                    m_audio_offset_set = true;
+                }
             }
             rtStart = m_audio_offset_rt +
                 (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);

@@ -3504,11 +3504,11 @@ double CDShow::get_playback_rate()
 
 void CDShow::set_playback_rate(double rate)
 {
-	//rate clamp [0.5, 2.0] — atempo 의 valid range. 그 외는 audio/video 의 *동일 rate 동기 보장 X* (atempo
-	//hard clamp 0.5/2.0 → audio 가 그 한계 고정 + video 는 그 외 rate scale → sync 어긋남).
-	//사용자 명시 — 0.4 이하 시 audio 가 0.5 와 동일 재생되어 비교적 일치 깨지므로 chord clamp 도입.
-	if (rate < 0.5) rate = 0.5;
-	if (rate > 2.0) rate = 2.0;
+	//caller (Endorphin2 dialog) 가 0.1~4.0 범위 허용. atempo (audio pitch-preserve) 는 자체 [0.5, 2.0]
+	//clamp 라 그 밖은 audio 만 한계 고정 + video 는 정상 scale (사용자 합의). 여기서 clamp 안 함 —
+	//이전 m_user_playback_rate 를 0.5~2.0 으로 clamp 하던 코드가 get_playback_rate 도 좁은 범위만 반환
+	//→ dialog 의 -=0.1 / +=0.1 step 이 stuck (0.4~1.9 oscillation 버그).
+	if (rate < 0.0) rate = 0.0;   //safety bound 만.
 
 	//user-visible rate 갱신 — get_playback_rate 가 이 값 반환 (graph SetRate 안 호출하는 LAV path 도 OSD 정상).
 	m_user_playback_rate.store(rate);

@@ -1,6 +1,7 @@
 ﻿#include "SCAudioTimeStretch.h"
 
 #include "../../log/SCLog/SCLog.h"
+#include <vector>
 
 extern "C" {
 #include <libavutil/opt.h>
@@ -20,8 +21,9 @@ CSCAudioTimeStretch::~CSCAudioTimeStretch()
 
 void CSCAudioTimeStretch::set_rate(double rate)
 {
-	if (rate < 0.5) rate = 0.5;
-	if (rate > 2.0) rate = 2.0;
+	//caller (dialog) 가 0.1~4.0 범위 허용. atempo 단일 instance [0.5, 2.0] 한계는 chain
+	//(init_filter_graph) 으로 회피. safety bound 만.
+	if (rate < 0.01) rate = 0.01;
 	m_pending_rate.store(rate);
 	m_pending_rate_changed.store(true);
 	logWrite(_T("[time_stretch] set_rate pending=%.3f (anchor reset 트리거)"), rate);
@@ -66,14 +68,46 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	int hr = avfilter_graph_create_filter(&m_filter_src, abuffer, "in", src_args, NULL, m_filter_graph);
 	if (hr < 0) { logWrite(_T("[time_stretch] abuffer create fail hr=%d args=%S"), hr, src_args); release_filter_graph(); return false; }
 
+	//atempo chain — 단일 instance [0.5, 2.0] 한계 회피.
+	//r<0.5: 0.5 push 하며 r/=0.5 반복, 마지막 [0.5,1.0] 의 r 한 번 더.
+	//r>2.0: 2.0 push 하며 r/=2.0 반복, 마지막 [1.0,2.0] 의 r 한 번 더.
 	double initial_rate = m_pending_rate.load();
-	if (initial_rate < 0.5) initial_rate = 0.5;
-	if (initial_rate > 2.0) initial_rate = 2.0;
+	if (initial_rate < 0.01) initial_rate = 0.01;
+	double r = initial_rate;
+	std::vector<double> tempos;
+	if (r < 0.5)
+	{
+		while (r < 0.5) { tempos.push_back(0.5); r /= 0.5; }
+		tempos.push_back(r);
+	}
+	else if (r > 2.0)
+	{
+		while (r > 2.0) { tempos.push_back(2.0); r /= 2.0; }
+		tempos.push_back(r);
+	}
+	else
+	{
+		tempos.push_back(r);
+	}
 
-	char tempo_args[32] = {0};
-	_snprintf_s(tempo_args, _TRUNCATE, "tempo=%.3f", initial_rate);
-	hr = avfilter_graph_create_filter(&m_filter_atempo, atempo, "atempo", tempo_args, NULL, m_filter_graph);
-	if (hr < 0) { logWrite(_T("[time_stretch] atempo create fail hr=%d"), hr); release_filter_graph(); return false; }
+	std::vector<AVFilterContext*> atempo_chain;
+	for (size_t k = 0; k < tempos.size(); ++k)
+	{
+		char tempo_args[32] = {0};
+		_snprintf_s(tempo_args, _TRUNCATE, "tempo=%.6f", tempos[k]);
+		char name[32] = {0};
+		_snprintf_s(name, _TRUNCATE, "atempo%zu", k);
+		AVFilterContext* ctx = nullptr;
+		hr = avfilter_graph_create_filter(&ctx, atempo, name, tempo_args, NULL, m_filter_graph);
+		if (hr < 0)
+		{
+			logWrite(_T("[time_stretch] atempo[%zu]=%.3f create fail hr=%d"), k, tempos[k], hr);
+			release_filter_graph();
+			return false;
+		}
+		atempo_chain.push_back(ctx);
+	}
+	m_filter_atempo = atempo_chain.empty() ? nullptr : atempo_chain.front();
 
 	hr = avfilter_graph_create_filter(&m_filter_sink, abuffersink, "out", NULL, NULL, m_filter_graph);
 	if (hr < 0) { logWrite(_T("[time_stretch] abuffersink create fail hr=%d"), hr); release_filter_graph(); return false; }
@@ -85,9 +119,15 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	av_opt_set_int_list(m_filter_sink, "sample_fmts", out_fmts, AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
 #pragma warning(pop)
 
-	hr = avfilter_link(m_filter_src, 0, m_filter_atempo, 0);
-	if (hr < 0) { logWrite(_T("[time_stretch] link src->atempo fail hr=%d"), hr); release_filter_graph(); return false; }
-	hr = avfilter_link(m_filter_atempo, 0, m_filter_sink, 0);
+	//link: src → atempo_chain[0] → atempo_chain[1] → ... → sink
+	hr = avfilter_link(m_filter_src, 0, atempo_chain.front(), 0);
+	if (hr < 0) { logWrite(_T("[time_stretch] link src->atempo[0] fail hr=%d"), hr); release_filter_graph(); return false; }
+	for (size_t k = 0; k + 1 < atempo_chain.size(); ++k)
+	{
+		hr = avfilter_link(atempo_chain[k], 0, atempo_chain[k + 1], 0);
+		if (hr < 0) { logWrite(_T("[time_stretch] link atempo[%zu]->atempo[%zu] fail hr=%d"), k, k+1, hr); release_filter_graph(); return false; }
+	}
+	hr = avfilter_link(atempo_chain.back(), 0, m_filter_sink, 0);
 	if (hr < 0) { logWrite(_T("[time_stretch] link atempo->sink fail hr=%d"), hr); release_filter_graph(); return false; }
 
 	hr = avfilter_graph_config(m_filter_graph, NULL);
@@ -102,8 +142,15 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	m_anchor_set = false;
 	m_emitted_total = 0;
 
-	logWrite(_T("[time_stretch] graph init OK sr=%d ch=%d bps=%d flt=%d rate=%.3f"),
-		sample_rate, channels, bits_per_sample, (int)is_float, initial_rate);
+	CString chain_desc;
+	for (size_t k = 0; k < tempos.size(); ++k)
+	{
+		CString seg;
+		seg.Format(_T("%s%.3f"), k ? _T(",") : _T(""), tempos[k]);
+		chain_desc += seg;
+	}
+	logWrite(_T("[time_stretch] graph init OK sr=%d ch=%d bps=%d flt=%d rate=%.3f chain=[%s]"),
+		sample_rate, channels, bits_per_sample, (int)is_float, initial_rate, chain_desc.GetString());
 	return true;
 }
 
@@ -129,24 +176,21 @@ void CSCAudioTimeStretch::release_filter_graph()
 
 bool CSCAudioTimeStretch::send_filter_rate(double rate)
 {
-	if (!m_filter_graph || !m_filter_atempo)
+	if (!m_filter_graph)
 		return false;
-	if (rate < 0.5) rate = 0.5;
-	if (rate > 2.0) rate = 2.0;
+	if (rate < 0.01) rate = 0.01;
 	if (rate == m_filter_rate)
 		return true;
 
-	char val[32] = {0};
-	_snprintf_s(val, _TRUNCATE, "%.3f", rate);
-	char resp[128] = {0};
-	int hr = avfilter_graph_send_command(m_filter_graph, "atempo", "tempo", val, resp, sizeof(resp), 0);
-	if (hr < 0)
+	//chain 의 instance 개수가 rate 따라 변하므로 send_command 만으로 불가능 — graph rebuild.
+	//(ffi_source_filter 의 update_audio_filter_rate 와 동일 원칙. 호출 빈도는 dialog throttle 로 제한.)
+	logWrite(_T("[time_stretch] tempo %.3f -> %.3f (graph rebuild, chain)"), m_filter_rate, rate);
+	m_pending_rate.store(rate);
+	if (!init_filter_graph(m_filter_sr, m_filter_ch, m_filter_bps, m_filter_flt))
 	{
-		logWrite(_T("[time_stretch] send_command tempo=%S fail hr=%d resp=%S"), val, hr, resp);
+		logWrite(_T("[time_stretch] init_filter_graph fail on rate change"));
 		return false;
 	}
-	logWrite(_T("[time_stretch] tempo %.3f -> %.3f"), m_filter_rate, rate);
-	m_filter_rate = rate;
 	return true;
 }
 

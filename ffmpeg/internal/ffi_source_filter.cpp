@@ -613,15 +613,47 @@ namespace ffi
             src_args, NULL, m_filter_graph);
         if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] abuffer create fail hr=%d"), hr); release_audio_filter(); return false; }
 
-        //atempo — clamp rate to [0.5, 2.0] (atempo 단일 valid range). 그 밖은 1.0 으로 fallback (외부에서 chain 처리 가능하지만 일단 단일).
-        double clamped = rate;
-        if (clamped < 0.5) clamped = 0.5;
-        if (clamped > 2.0) clamped = 2.0;
-        char tempo_args[32] = {0};
-        _snprintf_s(tempo_args, _TRUNCATE, "tempo=%.3f", clamped);
-        hr = avfilter_graph_create_filter(&m_filter_atempo, atempo, "atempo",
-            tempo_args, NULL, m_filter_graph);
-        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] atempo create fail hr=%d"), hr); release_audio_filter(); return false; }
+        //atempo chain — 단일 instance valid range [0.5, 2.0] 를 벗어나는 rate 도
+        //atempo=A,atempo=B,... 직렬 (곱이 rate) 로 처리. 0.1~4.0 까지 audio 도 pitch-preserve rate scale.
+        //r<0.5: 0.5 push 하며 r/=0.5 반복, 마지막 [0.5,1.0] 의 r 한 번 더.
+        //r>2.0: 2.0 push 하며 r/=2.0 반복, 마지막 [1.0,2.0] 의 r 한 번 더.
+        double r = rate;
+        if (r < 0.01) r = 0.01;   //safety bound — 0 또는 negative 방어.
+        std::vector<double> tempos;
+        if (r < 0.5)
+        {
+            while (r < 0.5) { tempos.push_back(0.5); r /= 0.5; }
+            tempos.push_back(r);
+        }
+        else if (r > 2.0)
+        {
+            while (r > 2.0) { tempos.push_back(2.0); r /= 2.0; }
+            tempos.push_back(r);
+        }
+        else
+        {
+            tempos.push_back(r);
+        }
+
+        std::vector<AVFilterContext*> atempo_chain;
+        for (size_t k = 0; k < tempos.size(); ++k)
+        {
+            char tempo_args[32] = {0};
+            _snprintf_s(tempo_args, _TRUNCATE, "tempo=%.6f", tempos[k]);
+            char name[32] = {0};
+            _snprintf_s(name, _TRUNCATE, "atempo%zu", k);
+            AVFilterContext* ctx = nullptr;
+            hr = avfilter_graph_create_filter(&ctx, atempo, name,
+                tempo_args, NULL, m_filter_graph);
+            if (hr < 0)
+            {
+                logWrite(_T("[ffi/src/audio/filter] atempo[%zu]=%.3f create fail hr=%d"), k, tempos[k], hr);
+                release_audio_filter();
+                return false;
+            }
+            atempo_chain.push_back(ctx);
+        }
+        m_filter_atempo = atempo_chain.empty() ? nullptr : atempo_chain.front();
 
         hr = avfilter_graph_create_filter(&m_filter_sink, abuffersink, "out",
             NULL, NULL, m_filter_graph);
@@ -635,18 +667,30 @@ namespace ffi
         av_opt_set_int_list(m_filter_sink, "sample_fmts", out_fmts, AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
 #pragma warning(pop)
 
-        //link: src → atempo → sink
-        hr = avfilter_link(m_filter_src, 0, m_filter_atempo, 0);
-        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link src->atempo fail hr=%d"), hr); release_audio_filter(); return false; }
-        hr = avfilter_link(m_filter_atempo, 0, m_filter_sink, 0);
+        //link: src → atempo_chain[0] → atempo_chain[1] → ... → sink
+        hr = avfilter_link(m_filter_src, 0, atempo_chain.front(), 0);
+        if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link src->atempo[0] fail hr=%d"), hr); release_audio_filter(); return false; }
+        for (size_t k = 0; k + 1 < atempo_chain.size(); ++k)
+        {
+            hr = avfilter_link(atempo_chain[k], 0, atempo_chain[k + 1], 0);
+            if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link atempo[%zu]->atempo[%zu] fail hr=%d"), k, k+1, hr); release_audio_filter(); return false; }
+        }
+        hr = avfilter_link(atempo_chain.back(), 0, m_filter_sink, 0);
         if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link atempo->sink fail hr=%d"), hr); release_audio_filter(); return false; }
 
         hr = avfilter_graph_config(m_filter_graph, NULL);
         if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] graph_config fail hr=%d"), hr); release_audio_filter(); return false; }
 
-        m_filter_rate = clamped;
-        logWrite(_T("[ffi/src/audio/filter] init OK rate=%.3f sr=%d ch=%d layout=%S"),
-            m_filter_rate, m_out_sample_rate, m_out_channels, layout_desc);
+        m_filter_rate = rate;
+        CString chain_desc;
+        for (size_t k = 0; k < tempos.size(); ++k)
+        {
+            CString seg;
+            seg.Format(_T("%s%.3f"), k ? _T(",") : _T(""), tempos[k]);
+            chain_desc += seg;
+        }
+        logWrite(_T("[ffi/src/audio/filter] init OK rate=%.3f chain=[%s] sr=%d ch=%d layout=%S"),
+            m_filter_rate, chain_desc.GetString(), m_out_sample_rate, m_out_channels, layout_desc);
         return true;
     }
 
@@ -671,17 +715,13 @@ namespace ffi
 
     bool CFFiAudioStream::update_audio_filter_rate(double rate)
     {
-        double clamped = rate;
-        if (clamped < 0.5) clamped = 0.5;
-        if (clamped > 2.0) clamped = 2.0;
-        if (clamped == m_filter_rate)
+        if (rate == m_filter_rate)
             return true;
 
-        //send_command path 는 미디어 전환 후 누적 호출 시 atempo yae_reset 의 internal pad/link
-        //pointer invalidate 로 다음 av_buffersrc_add_frame 에서 0xC0000005 (0x18 offset = input_pads/dstpad).
-        //rebuild path 로 복원 — freezing 회피는 dialog 레벨 throttle 로 호출 빈도 자체를 제한.
-        logWrite(_T("[ffi/src/audio/filter] tempo %.3f -> %.3f (graph rebuild)"), m_filter_rate, clamped);
-        return init_audio_filter(clamped);
+        //atempo chain 으로 0.1~4.0 범위 audio rate 적용 — init_audio_filter 가 r 분해 후 chain build.
+        //rebuild path 유지 — freezing 회피는 dialog 레벨 throttle 로 호출 빈도 자체 제한.
+        logWrite(_T("[ffi/src/audio/filter] tempo %.3f -> %.3f (graph rebuild, chain)"), m_filter_rate, rate);
+        return init_audio_filter(rate);
     }
 
     HRESULT CFFiAudioStream::OnThreadCreate()

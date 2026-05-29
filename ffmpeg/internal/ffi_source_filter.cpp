@@ -894,6 +894,13 @@ namespace ffi
                 if (audio_skipped > 0)
                     logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld"),
                         audio_skipped, (long long)frame->pts, (long long)video_anchor);
+
+                //get_track_pos 의 source — 원본 미디어 시점 (audio decoder input PTS). rate 무관.
+                if (frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
+                {
+                    int64_t pts_ms = av_rescale_q(frame->pts, audio_tb, AVRational{1, 1000});
+                    m_last_input_pts_ms.store(pts_ms);
+                }
                 break;
             }
             if (!dec.is_running())
@@ -1104,6 +1111,10 @@ namespace ffi
         m_audio_offset_rt = 0;
         m_audio_offset_set = false;   //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
 
+        //seek 위치 ms 로 m_last_input_pts_ms 우선 set — 다음 FillBuffer 가 실제 frame pts 로 덮어쓸 때까지
+        //get_track_pos 가 stale (직전 미디어 시점) 반환하지 않도록.
+        m_last_input_pts_ms.store(rtStart / 10000);   //REFERENCE_TIME 100ns → ms.
+
         //atempo graph 재생성 — internal latency 잔류 제거 (LAV path 의 SCAudioTimeStretch NewSegment 처리와 동일).
         //현재 rate 유지 — m_filter_rate 가 직전 rate (init_audio_filter 가 그 rate 로 atempo 재init).
         if (m_filter_graph)
@@ -1142,6 +1153,11 @@ namespace ffi
     CFFiSource::~CFFiSource()
     {
         //pin 들의 stop 은 CSource 의 base destructor 가 호출. m_decoder 는 소멸 시 close 자동.
+    }
+
+    int64_t CFFiSource::audio_current_pts_ms() const
+    {
+        return m_pAudioStream ? m_pAudioStream->last_input_pts_ms() : -1;
     }
 
     HRESULT CFFiSource::open_file(const wchar_t* utf16_path)

@@ -29,6 +29,17 @@ void CSCAudioTimeStretch::set_rate(double rate)
 	logWrite(_T("[time_stretch] set_rate pending=%.3f (anchor reset 트리거)"), rate);
 }
 
+int64_t CSCAudioTimeStretch::processed_input_pts_ms() const
+{
+	//비atomic read — process_one 의 갱신과 race 가능하지만 stale 폭이 한 frame (수 ms) 라 무시.
+	//anchor 미설정 (재생 시작 전 / seek 직후) 시 -1 반환 → 호출자가 graph position fallback.
+	if (m_filter_sr <= 0 || !m_anchor_set)
+		return -1;
+	int64_t samples = m_in_pts_samples;
+	REFERENCE_TIME anchor = m_anchor_rt;
+	return (anchor / 10000) + (int64_t)((double)samples * 1000.0 / (double)m_filter_sr);
+}
+
 bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int bits_per_sample, bool is_float)
 {
 	release_filter_graph();

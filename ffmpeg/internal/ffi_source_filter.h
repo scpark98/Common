@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <vector>
+#include <atomic>
 
 extern "C" {
 #include <libavfilter/avfilter.h>
@@ -124,6 +125,9 @@ namespace ffi
         //video pin 의 on_change_start 에서 호출 — flush + new_segment.
         void    on_seek_flush(REFERENCE_TIME rtStart);
 
+        //get_track_pos 의 source — 마지막 emit 한 atempo input frame 의 원본 PTS (ms). rate 무관.
+        int64_t last_input_pts_ms() const { return m_last_input_pts_ms.load(); }
+
         //atempo audio filter graph — rate != 1.0 시 PCM time-stretch (pitch 유지).
         //swr_convert 의 S16 stereo output 을 source 로 받아 atempo filter 통과 → sink 에서 sample count 1/rate 줄어든 PCM 출력.
         //graph 의 audio renderer (DSound) 가 줄어든 sample 양만큼 빨리 처리 → graph clock 가속 → video 도 따라 가속.
@@ -157,6 +161,11 @@ namespace ffi
         //의 *미디어 시점이 정렬* → sync 정확.
         REFERENCE_TIME  m_audio_offset_rt = 0;
         bool            m_audio_offset_set = false;
+
+        //실제 *미디어 시점* — audio decoder 가 마지막으로 emit 한 frame 의 원본 PTS (ms).
+        //get_track_pos 의 source 로 사용. graph clock 은 wall clock 진행이라 rate 변경 시 미디어 진행과 어긋남.
+        //이 값은 atempo input frame 의 pts 라 *원본 미디어 시점 그대로* — rate 무관 정확.
+        std::atomic<int64_t> m_last_input_pts_ms{ -1 };
     public:
         HRESULT OnThreadStartPlay() override;
     };
@@ -194,6 +203,11 @@ namespace ffi
         //audio 는 sample data 양은 그대로 + duration 만 scale → renderer 가 시간 맞춰 빠르게 재생 (chipmunk 효과, LAV path 동등).
         void           set_playback_rate(double r) { m_playback_rate.store(r); }
         double         playback_rate() const { return m_playback_rate.load(); }
+
+        //실제 *미디어 시점* (ms) — audio pin 이 마지막 emit 한 atempo input frame 의 원본 PTS.
+        //get_track_pos 가 wall clock 기반 graph position 대신 이 값을 반환해 rate 무관 정확 시점.
+        //audio pin 없으면 -1.
+        int64_t        audio_current_pts_ms() const;
 
     private:
         CDecoder         m_decoder;

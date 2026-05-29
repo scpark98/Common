@@ -45,6 +45,10 @@ public:
 	void	set_rate(double rate);
 	double	get_rate() const { return m_pending_rate.load(); }
 
+	//get_track_pos 의 source — atempo input 누적 sample + anchor 기반 *원본 미디어 시점* (ms).
+	//graph clock (wall clock 기반) 대신 이 값을 쓰면 rate 무관 정확. anchor 미설정 시 -1.
+	int64_t	processed_input_pts_ms() const;
+
 	//in-place process_sample 은 미사용. process_one 직접 override.
 	virtual void	process_sample(BYTE* /*buf*/, long /*len*/, const WAVEFORMATEX* /*wfx*/) override {}
 

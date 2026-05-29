@@ -3235,6 +3235,30 @@ double CDShow::get_track_pos()
 	if (!m_pGB || !m_pMP)
 		return 0.0;
 
+	//rate 무관 *원본 미디어 시점* — audio chain 의 input PTS 를 source 로. graph clock 은 wall clock 기반이라
+	//rate 변경 시 IMediaPosition::get_CurrentPosition 이 미디어 진행과 어긋남 (컨트롤바·자막 mismatch).
+	//(1) internal path : ffi audio pin 의 last_input_pts_ms (atempo input frame 의 원본 PTS).
+	//(2) LAV path     : SCAudioTimeStretch 의 anchor + processed input samples.
+	if (m_pFFiSource)
+	{
+		int64_t pts_ms = ((ffi::CFFiSource*)m_pFFiSource)->audio_current_pts_ms();
+		if (pts_ms >= 0)
+		{
+			m_last_track_pos_ms = (double)pts_ms;
+			return m_last_track_pos_ms;
+		}
+	}
+	else if (m_pAudioTimeStretchFilter)
+	{
+		int64_t pts_ms = ((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->processed_input_pts_ms();
+		if (pts_ms >= 0)
+		{
+			m_last_track_pos_ms = (double)pts_ms;
+			return m_last_track_pos_ms;
+		}
+	}
+	//audio path 없음 / anchor 미설정 — fallback 으로 graph position 사용.
+
 	//IMediaPosition::get_CurrentPosition 은 graph state 가 transition 중일 때 무한 block 가능.
 	//IMediaControl::GetState(0, ...) 로 timeout=0 즉시 query. VFW_S_STATE_INTERMEDIATE 면
 	//graph 가 transition 중이므로 query 안 하고 cached pos 반환 — UI thread freeze 회피.

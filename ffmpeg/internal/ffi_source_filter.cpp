@@ -127,6 +127,9 @@ namespace ffi
         m_segment_start = rtStart;
         m_pending_segment_stop = rtStop;
 
+        //seek 후 첫 video frame emit 전까지 get_track_pos 가 stale 반환하지 않도록 seek target 으로 우선 set.
+        m_last_emitted_pts_ms.store((int64_t)pos_ms);
+
         //(A) measurement reset.
         m_seek_t0_ms = GetTickCount64();
         m_fb_count_since_seek = 0;
@@ -522,6 +525,17 @@ namespace ffi
 
         pSample->SetTime(&rtStart, &rtStop);
         m_last_rtStart = rtStart;   //GetCurrentPosition 응답값.
+
+        //get_track_pos 의 source — 원본 video frame PTS (ms). seek/rate 무관, 화면 frame 시점 직접.
+        if (frame->pts != AV_NOPTS_VALUE && m_pSource)
+        {
+            AVRational video_tb = m_pSource->decoder().video_time_base();
+            if (video_tb.num > 0 && video_tb.den > 0)
+            {
+                int64_t pts_ms = av_rescale_q(frame->pts, video_tb, AVRational{1, 1000});
+                m_last_emitted_pts_ms.store(pts_ms);
+            }
+        }
 
         //flush 후 첫 sample 에 Discontinuity flag — renderer 의 internal state reset 알림.
         //누락 시 MPCVR 가 이전 segment continuation 으로 처리 → Receive 가 stuck.
@@ -1157,7 +1171,19 @@ namespace ffi
 
     int64_t CFFiSource::audio_current_pts_ms() const
     {
-        return m_pAudioStream ? m_pAudioStream->last_input_pts_ms() : -1;
+        //이름은 audio 지만 실제 source 는 *video pin 의 마지막 emit frame PTS* 우선.
+        //  - video frame 의 원본 PTS = 화면에 보이는 frame 시점 = .smi 자막 timing reference (영상 기준 작성).
+        //  - audio PTS 기반은 seek 시 audio 와 video 의 first-frame PTS 차이로 mismatch (1.6초 등) 발생.
+        //  - video pin 없거나 첫 emit 전 → audio fallback. 둘 다 없으면 -1.
+        if (m_pVideoStream)
+        {
+            int64_t v = m_pVideoStream->last_emitted_pts_ms();
+            if (v >= 0)
+                return v;
+        }
+        if (m_pAudioStream)
+            return m_pAudioStream->last_input_pts_ms();
+        return -1;
     }
 
     HRESULT CFFiSource::open_file(const wchar_t* utf16_path)

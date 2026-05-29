@@ -83,6 +83,7 @@ namespace ffi
         void                on_change_start(REFERENCE_TIME rtStart);
 
         REFERENCE_TIME      last_rtStart() const { return m_last_rtStart; }
+        int64_t             last_emitted_pts_ms() const { return m_last_emitted_pts_ms.load(); }
         CFFiSource*         source() { return m_pSource; }
 
     private:
@@ -102,6 +103,11 @@ namespace ffi
 
         //MS 표준 정공법 — on_change_start 가 저장 → OnThreadStartPlay 가 NewSegment 에 사용.
         REFERENCE_TIME  m_pending_segment_stop = 0;
+
+        //get_track_pos 의 source — 마지막 emit 한 video frame 의 원본 PTS (ms). 화면에 보이는 frame 시점.
+        //audio PTS 기반은 seek 시 video keyframe 후진과 mismatch → 컨트롤바 / 자막 timing 이 화면보다 앞섬.
+        //video frame 의 원본 PTS = 실제 화면 frame 시점 = .smi 자막 timing reference.
+        std::atomic<int64_t> m_last_emitted_pts_ms{ -1 };
     private:
 
         CCritSec        m_cs_seeking;

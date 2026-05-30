@@ -10467,6 +10467,35 @@ CString	get_windows_version_string(bool detail)
 			case PRODUCT_WEB_SERVER:
 				sType = _T("Web Server Edition");
 				break;
+			//Windows 8/10/11 시대 edition — 위 케이스는 Vista/7 시대 상수라 이게 없으면
+			//Home(PRODUCT_CORE) 등이 빈 문자열로 빠져 edition 이 표시 안 됨.
+			case PRODUCT_CORE:
+				sType = _T("Home");
+				break;
+			case PRODUCT_CORE_N:
+				sType = _T("Home N");
+				break;
+			case PRODUCT_CORE_COUNTRYSPECIFIC:
+				sType = _T("Home China");
+				break;
+			case PRODUCT_CORE_SINGLELANGUAGE:
+				sType = _T("Home Single Language");
+				break;
+			case PRODUCT_EDUCATION:
+				sType = _T("Education");
+				break;
+			case PRODUCT_EDUCATION_N:
+				sType = _T("Education N");
+				break;
+			case PRODUCT_PROFESSIONAL_N:
+				sType = _T("Professional N");
+				break;
+			case PRODUCT_PRO_WORKSTATION:
+				sType = _T("Pro for Workstations");
+				break;
+			case PRODUCT_ENTERPRISE_N:
+				sType = _T("Enterprise N");
+				break;
 		}
 
 		if (sType.IsEmpty() == false)

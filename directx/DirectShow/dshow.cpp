@@ -2232,6 +2232,8 @@ bool CDShow::is_windows_media()
 static IBaseFilter* find_renderer_by_majortype(IFilterGraph* pGraph, REFGUID target_majortype);
 static IBaseFilter* get_upstream_filter(IBaseFilter* pDownstream);
 static CString filter_name(IBaseFilter* pFilter);
+static IBaseFilter* get_decoder_upstream(IBaseFilter* pRenderer);
+static bool get_audio_waveformat(IFilterGraph* pGB, WAVEFORMATEX* out);
 
 static ffi::CDecoder* ffi_decoder_or_null(void* pFFiSource)
 {
@@ -2335,6 +2337,23 @@ CString CDShow::get_audio_codec_name()
 	{
 		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
 			return CString(d->audio_codec_name().c_str());
+		return _T("");
+	}
+	//LAV path — audio renderer 위 *실제 디코더* filter 이름 (SC Audio Gain/Compressor 건너뜀).
+	if (m_pGB)
+	{
+		IBaseFilter* pRenderer = find_renderer_by_majortype(m_pGB, MEDIATYPE_Audio);
+		if (pRenderer)
+		{
+			IBaseFilter* pDecoder = get_decoder_upstream(pRenderer);
+			pRenderer->Release();
+			if (pDecoder)
+			{
+				CString name = filter_name(pDecoder);
+				pDecoder->Release();
+				return name;
+			}
+		}
 	}
 	return _T("");
 }
@@ -2345,7 +2364,11 @@ int CDShow::get_audio_sample_rate()
 	{
 		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
 			return d->audio_sample_rate();
+		return 0;
 	}
+	WAVEFORMATEX wfx;
+	if (get_audio_waveformat(m_pGB, &wfx))
+		return (int)wfx.nSamplesPerSec;
 	return 0;
 }
 
@@ -2355,7 +2378,11 @@ int CDShow::get_audio_channels()
 	{
 		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
 			return d->audio_channels();
+		return 0;
 	}
+	WAVEFORMATEX wfx;
+	if (get_audio_waveformat(m_pGB, &wfx))
+		return (int)wfx.nChannels;
 	return 0;
 }
 
@@ -2365,7 +2392,11 @@ int CDShow::get_audio_bit_depth()
 	{
 		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
 			return d->audio_bit_depth();
+		return 0;
 	}
+	WAVEFORMATEX wfx;
+	if (get_audio_waveformat(m_pGB, &wfx))
+		return (int)wfx.wBitsPerSample;
 	return 0;
 }
 
@@ -2432,10 +2463,11 @@ CString CDShow::get_video_decoder_label()
 		}
 		return out;
 	}
-	//LAV path — m_VMR 의 upstream filter (= video decoder).
+	//LAV path — 렌더러 위 *실제 디코더*. SC Video Time-Scale 등 SC 통과필터가 끼므로 get_decoder_upstream 로
+	//그걸 건너뛰고 진짜 디코더(LAV Video Decoder 등) 이름을 가져온다.
 	if (!m_VMR)
 		return _T("");
-	IBaseFilter* pDecoder = get_upstream_filter(m_VMR);
+	IBaseFilter* pDecoder = get_decoder_upstream(m_VMR);
 	if (!pDecoder)
 		return _T("");
 	CString name = filter_name(pDecoder);
@@ -2563,6 +2595,66 @@ static CString filter_name(IBaseFilter* pFilter)
 	if (info.pGraph)
 		info.pGraph->Release();
 	return name;
+}
+
+//렌더러에서 위로 거슬러 올라가며 SC 통과 transform 필터(SC Video Time-Scale / SC Audio Gain / SC Audio
+//Compressor 등 "SC " 접두사)를 건너뛰고 *실제 디코더* filter 를 반환. caller 가 Release. 못 찾으면 NULL.
+//get_upstream_filter 는 렌더러 *바로 위* 필터만 주므로, SC 필터가 끼면 디코더 대신 그게 잡혀 라벨이 틀어진다.
+static IBaseFilter* get_decoder_upstream(IBaseFilter* pRenderer)
+{
+	IBaseFilter* cur = get_upstream_filter(pRenderer);
+	for (int guard = 0; cur && guard < 8; ++guard)
+	{
+		if (filter_name(cur).Left(3) != _T("SC "))
+			return cur;	//SC 통과필터 아님 = 실제 디코더
+		IBaseFilter* up = get_upstream_filter(cur);
+		cur->Release();
+		cur = up;
+	}
+	return cur;	//guard 초과 시 마지막(또는 NULL)
+}
+
+//audio renderer 의 input pin 연결 media type 에서 WAVEFORMATEX 추출 (LAV path 의 audio 정보 표시용).
+//성공 시 true. PCM 으로 디코드된 후의 format (sample rate / channels / bits) 이라 실제 재생 format 이다.
+static bool get_audio_waveformat(IFilterGraph* pGB, WAVEFORMATEX* out)
+{
+	if (!pGB || !out)
+		return false;
+
+	IBaseFilter* pRenderer = find_renderer_by_majortype(pGB, MEDIATYPE_Audio);
+	if (!pRenderer)
+		return false;
+
+	bool ok = false;
+	IEnumPins* pe = NULL;
+	if (SUCCEEDED(pRenderer->EnumPins(&pe)))
+	{
+		IPin* pin = NULL;
+		ULONG f = 0;
+		while (!ok && pe->Next(1, &pin, &f) == S_OK && f == 1)
+		{
+			PIN_DIRECTION d;
+			pin->QueryDirection(&d);
+			if (d == PINDIR_INPUT)
+			{
+				AM_MEDIA_TYPE mt;
+				if (SUCCEEDED(pin->ConnectionMediaType(&mt)))
+				{
+					if (mt.formattype == FORMAT_WaveFormatEx && mt.pbFormat &&
+						mt.cbFormat >= sizeof(WAVEFORMATEX))
+					{
+						*out = *(WAVEFORMATEX*)mt.pbFormat;
+						ok = true;
+					}
+					FreeMediaType(mt);
+				}
+			}
+			pin->Release();
+		}
+		pe->Release();
+	}
+	pRenderer->Release();
+	return ok;
 }
 
 CString CDShow::get_audio_renderer_label()
@@ -2847,6 +2939,16 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 			return -1;   //caller 가 LAV path 진행 신호.
 		}
 		logWrite(_T("[internal] no HW accel for codec=%s — internal SW decode (frame-independent, freeze 무관)"), codec.c_str());
+	}
+
+	//no-PTS 영상 (일부 AVI 등) — internal path 는 PTS 기반 A/V 동기·seek·컨트롤바라 timestamp 없는 영상은
+	//동기 어긋남·seek 튐·시계 정지가 발생. LAV 는 splitter 가 timestamp 를 재생성해 정상 처리하므로 LAV 로 fallback.
+	if (!pFFi->decoder().video_has_pts())
+	{
+		logWrite(_T("[internal] video has no PTS — fallback to LAV path"));
+		pFFi->Release();
+		m_pFFiSource = nullptr;
+		return -1;   //caller 가 LAV path 진행 신호.
 	}
 
 	m_pFFiSource = pFFi;   //caching for later (duration / video size accessor).

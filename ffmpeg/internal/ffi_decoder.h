@@ -102,6 +102,9 @@ namespace ffi
         bool    is_opened()    const { return m_fmt != nullptr; }
         bool    is_running()   const { return m_thread.joinable(); }
         bool    has_hw_accel() const { return m_hw_pix_fmt != AV_PIX_FMT_NONE; }
+        //영상 packet 에 timestamp(pts/dts)가 있는지 — open() 에서 첫 video packet probe 로 판정.
+        //false(일부 AVI 등 no-PTS) 면 internal path 의 PTS 기반 A/V 동기·seek·컨트롤바가 동작 안 해 호출측이 LAV 로 라우팅.
+        bool    video_has_pts() const { return m_video_has_pts; }
         bool    is_eof()       const { return m_eof.load(); }   //av_read_frame AVERROR_EOF 도달 + queue 비면 stream 끝.
 
         //queue 의 현재 size — 디버깅용.
@@ -147,6 +150,8 @@ namespace ffi
         //HW 가속 — D3D11VA / DXVA2. SW keyframe walk decode 의 5-10초 freeze 회피.
         AVBufferRef*        m_hw_device_ctx = nullptr;
         AVPixelFormat       m_hw_pix_fmt = AV_PIX_FMT_NONE;   //HW frame format (codec 의 get_format 반환).
+
+        bool                m_video_has_pts = true;   //open() 의 첫 video packet probe 결과. false 면 호출측이 LAV 로 라우팅.
 
         //audio decode
         AVCodecContext*     m_audio_ctx = nullptr;

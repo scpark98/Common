@@ -155,6 +155,36 @@ namespace ffi
             return false;
         }
 
+        //no-PTS 영상 probe — 첫 video packet 의 pts/dts 가 모두 AV_NOPTS_VALUE 면 (일부 AVI 등) 이 영상은
+        //timestamp 가 없어 internal path 의 PTS 기반 A/V 동기·seek·컨트롤바가 동작 안 함. 호출측(load_media)이
+        //video_has_pts()==false 를 보고 LAV 로 라우팅한다. probe 는 read-only — 몇 개 packet 만 demux 후 처음으로
+        //seek-back 하므로 재생에 영향 없음. (valid-PTS 영상은 첫 video packet 에 timestamp 가 있어 영향 없음.)
+        {
+            AVPacket* probe = av_packet_alloc();
+            if (probe)
+            {
+                int scanned = 0;
+                while (scanned < 100 && av_read_frame(m_fmt, probe) >= 0)
+                {
+                    if (probe->stream_index == m_video_stream_idx)
+                    {
+                        //frame->pts 는 packet 의 pts 에서 옴 (이 디코더는 best_effort_timestamp 미사용 — 971/1032행).
+                        //그래서 dts 는 보지 않고 pts 만 본다. AVI 처럼 packet 에 dts 만 있고 pts 가 없으면 frame->pts 가
+                        //NOPTS 가 되어 internal path 의 PTS 기반 동기가 깨지므로 LAV 로 보내야 함.
+                        m_video_has_pts = (probe->pts != AV_NOPTS_VALUE);
+                        av_packet_unref(probe);
+                        break;
+                    }
+                    av_packet_unref(probe);
+                    ++scanned;
+                }
+                av_packet_free(&probe);
+            }
+            //probe 로 소비한 packet 위치를 처음으로 되돌림 (재생은 이후 on_change_start/seek 가 위치 설정).
+            av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
+            logWrite(_T("[ffi/dec] video_has_pts=%d"), (int)m_video_has_pts);
+        }
+
         //decoder 준비
         AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
         const AVCodec* codec = avcodec_find_decoder(par->codec_id);

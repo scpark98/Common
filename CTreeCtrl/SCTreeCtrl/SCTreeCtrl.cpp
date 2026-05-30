@@ -12,6 +12,9 @@
 
 IMPLEMENT_DYNAMIC(CSCTreeCtrl, CTreeCtrl)
 
+#define WM_TREE_END_EDIT		(WM_USER + 9013)
+CSCTreeCtrl* CSCTreeCtrl::s_editing_tree = NULL;
+
 CSCTreeCtrl::CSCTreeCtrl()
 {
 	memset(&m_lf, 0, sizeof(LOGFONT));
@@ -87,7 +90,8 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSELEAVE()
 	ON_WM_GETMINMAXINFO()
 	ON_COMMAND_RANGE(menu_add_item, menu_favorite, &CSCTreeCtrl::OnPopupMenu)
-	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCTreeCtrl::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CSCTreeCtrl::on_message_CSCStaticEdit)
+	ON_MESSAGE(WM_TREE_END_EDIT, &CSCTreeCtrl::on_end_edit_posted)
 	ON_WM_DESTROY()
 	ON_WM_NCPAINT()
 	ON_WM_NCCALCSIZE()
@@ -3158,41 +3162,38 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	//단, 그 오른쪽 끝이 rc.right를 넘어가지 않게 보정한다.
 	GetClientRect(rc);
-	if (r.right > rc.right - 1)
-		r.right = rc.right - 1;
+	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
+	int right_limit = rc.right - 1;
+	if (::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible())
+		right_limit -= m_scrollbar_width;
+	if (r.right > right_limit)
+		r.right = right_limit;
 
 	r.DeflateRect(0, 0);
 
 	if (m_pEdit == NULL)
 	{
-		m_pEdit = new CSCEdit;
-		m_pEdit->Create(WS_CHILD | WS_BORDER | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE, r, this, 1004);
+		m_pEdit = new CSCStaticEdit;
+		m_pEdit->Create(WS_BORDER, r, this, 1004);
 	}
 
 	m_pEdit->MoveWindow(r);
 	m_pEdit->SetFont(&m_font, true);
-
-	//ES_MULTILINE을 준 이유는 editbox가 세로 중앙정렬되어 표시되지 않으므로
-	//이를 보정해주기 위해서 CEdit::SetRect()를 사용하는데 반드시 ES_MULTILINE 속성이 있어야만 적용되기 때문이다.
-	CRect new_rect;
-	LOGFONT lf;
-
-	m_pEdit->GetRect(new_rect);
-	//new_rect.right += 4;
-	new_rect.left = 2;
-	m_pEdit->GetFont()->GetLogFont(&lf);
-	//new_rect.top = new_rect.top + (new_rect.Height() + lf.lfHeight) / 2 - 1;
-	m_pEdit->SetRect(&new_rect);
 	m_pEdit->set_line_align(DT_VCENTER);
-
+	//셀 편집기 — 항목 높이 = edit 높이 이므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
+	//0 으로 두면 선택 하이라이트가 보더에 붙어 일반 edit 컨트롤 외관과 어긋남.
+	m_pEdit->set_padding(2);
 
 	m_pEdit->SetWindowText(m_edit_old_text);
 
 	m_pEdit->ShowWindow(SW_SHOW);
-	m_pEdit->SetSel(0, -1);
+	m_pEdit->select_all();
 	m_pEdit->SetFocus();
 
 	m_in_editing = true;
+
+	//편집 모드 외부 클릭 감지용 마우스 훅 설치 (다른 컨트롤·다이얼로그 빈 영역·NC 어디든) — CSCListBox/CPathCtrl 패턴.
+	install_edit_mouse_hook();
 
 	TV_DISPINFO dispinfo;
 	dispinfo.hdr.hwndFrom = m_hWnd;
@@ -3209,13 +3210,31 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 void CSCTreeCtrl::edit_end(bool valid)
 {
+	remove_edit_mouse_hook();
+
 	if (m_in_editing == false || m_pEdit == NULL)
 		return;
 
 	m_in_editing = false;
-	
+
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
+
+	//valid==false (Escape) 또는 텍스트 미변경 → rename / SetItemText 모두 건너뜀. 외부 클릭으로 들어온 commit
+	//의 경우 텍스트 미변경이면 MoveFile(same, same) 이 실패하고 아래 edit_item() 재진입 경로로 빠져 마치
+	//편집이 종료되지 않은 것처럼 보이는 버그 회피 (CVtListCtrlEx 와 동일).
+	if (!valid || m_edit_new_text == m_edit_old_text)
+	{
+		TV_DISPINFO dispinfo;
+		dispinfo.hdr.hwndFrom = m_hWnd;
+		dispinfo.hdr.idFrom = GetDlgCtrlID();
+		dispinfo.hdr.code = TVN_ENDLABELEDIT;
+		dispinfo.item.mask = TVIF_TEXT;
+		dispinfo.item.hItem = m_edit_item;
+		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
+		Invalidate();
+		return;
+	}
 
 	//shell tree의 label이 변경되면 실제 폴더명도 변경해줘야 한다.
 	if (m_is_shell_treectrl)
@@ -3303,33 +3322,82 @@ void CSCTreeCtrl::undo_edit_label()
 	SetItemText(m_edit_item, m_edit_old_text);
 }
 
-LRESULT CSCTreeCtrl::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+LRESULT CSCTreeCtrl::on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam)
 {
-	CSCEditMessage* msg = (CSCEditMessage*)wParam;
+	CSCStaticEditMessage* msg = (CSCStaticEditMessage*)wParam;
 
-	if (msg->pThis->IsWindowVisible() == FALSE)
+	if (msg == NULL || msg->pThis == NULL || msg->pThis != m_pEdit)
 		return 0;
 
-	TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)msg->message, msg->pThis);
-	if (msg->message == WM_KILLFOCUS)
+	//killfocus 는 OnKillFocus → SendMessage(notify_parent) 경로라 *재진입* 안전 차원에서 PostMessage 로 분리:
+	//여기서 즉시 edit_end() 하면 ShowWindow(SW_HIDE) 가 OnKillFocus 내부에서 호출돼 mfc 의 default
+	//OnKillFocus 가 stale state 위에서 crash 하는 case 가 있다. PostMessage 로 OnKillFocus 가 완료된 후
+	//깨끗한 메시지 큐에서 edit_end 를 실행.
+	if (msg->message == CSCStaticEdit::message_scstaticedit_killfocus)
 	{
-		edit_end();
+		PostMessage(WM_TREE_END_EDIT, 1, 0);
 	}
-	else if (msg->message == WM_KEYDOWN)
+	else if (msg->message == CSCStaticEdit::message_scstaticedit_enter)
 	{
-		switch ((int)lParam)
+		edit_end(true);
+		Invalidate();
+	}
+	else if (msg->message == CSCStaticEdit::message_scstaticedit_escape)
+	{
+		edit_end(false);
+		Invalidate();
+	}
+
+	return 0;
+}
+
+//---- 편집 모드 외부 클릭 감지 (CSCListBox/CPathCtrl 동일 패턴) -----------------------------------------
+
+void CSCTreeCtrl::install_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+		return;
+
+	//WH_MOUSE 는 자기 스레드 메시지 큐만 감시 → 다른 앱 클릭은 보지 않는다(그쪽은 WM_KILLFOCUS 가 처리).
+	//이 훅의 목적은 "같은 스레드(같은 dlg) 의 edit 바깥 클릭" 감지뿐이다.
+	s_editing_tree = this;
+	m_mouse_hook = ::SetWindowsHookEx(WH_MOUSE, edit_mouse_hook_proc, NULL, ::GetCurrentThreadId());
+}
+
+void CSCTreeCtrl::remove_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+	{
+		::UnhookWindowsHookEx(m_mouse_hook);
+		m_mouse_hook = NULL;
+	}
+	if (s_editing_tree == this)
+		s_editing_tree = NULL;
+}
+
+LRESULT CALLBACK CSCTreeCtrl::edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam)
+{
+	if (code == HC_ACTION && s_editing_tree != NULL && s_editing_tree->m_pEdit != NULL)
+	{
+		if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN ||
+			wParam == WM_NCLBUTTONDOWN || wParam == WM_NCRBUTTONDOWN || wParam == WM_NCMBUTTONDOWN)
 		{
-			case VK_RETURN:
-				edit_end();
-				break;
-			case VK_ESCAPE:
-				edit_end(false);
-				break;
+			MOUSEHOOKSTRUCT* mh = (MOUSEHOOKSTRUCT*)lParam;
+			CRect rc_edit;
+			s_editing_tree->m_pEdit->GetWindowRect(&rc_edit);
+
+			//edit 내부 클릭은 캐럿 이동이므로 종료 금지. 바깥이면 종료를 post (클릭 자체는 그대로 통과시킴).
+			if (!rc_edit.PtInRect(mh->pt))
+				s_editing_tree->PostMessage(WM_TREE_END_EDIT, 0, 0);
 		}
 	}
 
-	Invalidate();
+	return ::CallNextHookEx(NULL, code, wParam, lParam);
+}
 
+LRESULT CSCTreeCtrl::on_end_edit_posted(WPARAM wParam, LPARAM lParam)
+{
+	edit_end(true);
 	return 0;
 }
 

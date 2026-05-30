@@ -40,7 +40,7 @@
 #include "../../CMenu/CSCMenuBar/SCMenu.h"
 #include "../../colors.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../Json/rapid_json/json.h"
 
 
@@ -302,10 +302,19 @@ public:
 	CString			get_edit_old_text() { return m_edit_old_text; }		//편집 후 텍스트
 	CString			get_edit_new_text() { return m_edit_new_text; }		//편집 후 텍스트
 	void			undo_edit_label();									//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
-	//CTreeCtrl::GetEditControl()을 override.
-	CEdit*			GetEditControl() { return get_edit_control(); }
-	CEdit*			get_edit_control() { return m_pEdit; }
-	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+	//CSCStaticEdit 으로 통일 — 본 컨트롤은 base CTreeCtrl 의 native edit 을 안 쓰고 자체 m_pEdit 만 운용.
+	CSCStaticEdit*	get_edit_control() { return m_pEdit; }
+	LRESULT			on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam);
+
+	//편집 모드 중 *다른 컨트롤·다른 앱·다이얼로그 빈 영역* 어디를 클릭해도 편집을 정상 종료(commit) 시키기 위한 훅.
+	//CSCListBox / CPathCtrl 과 동일 패턴 — WH_MOUSE 로 같은 스레드 외부 클릭 감지 → 메시지 post → on_end_edit_posted → edit_end(true).
+	//다른 앱으로의 포커스 이동은 CSCEdit 의 WM_KILLFOCUS 가 on_message_CSCEdit 로 전달돼 처리 (기존 경로 유지).
+	void			install_edit_mouse_hook();
+	void			remove_edit_mouse_hook();
+	static LRESULT CALLBACK	edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam);
+	LRESULT			on_end_edit_posted(WPARAM wParam, LPARAM lParam);
+	static CSCTreeCtrl*	s_editing_tree;
+	HHOOK			m_mouse_hook = NULL;
 
 
 //폰트 관련
@@ -493,7 +502,7 @@ protected:
 	bool			m_allow_edit = true;
 	bool			m_in_editing = false;		//편집중인지
 	bool			m_in_context_menu = false;	//우클릭 메뉴 표시 중 — focus 가 menu 로 가도 selected 항목을 active 색으로 그리기 위한 가드
-	CSCEdit*		m_pEdit = NULL;
+	CSCStaticEdit*	m_pEdit = NULL;
 	CString			m_edit_old_text;
 	CString			m_edit_new_text;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스

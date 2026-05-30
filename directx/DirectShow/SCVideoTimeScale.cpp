@@ -1,6 +1,7 @@
 ﻿#include "SCVideoTimeScale.h"
 #include "../../log/SCLog/SCLog.h"
 #include <strsafe.h>
+#include <dvdmedia.h>	//VIDEOINFOHEADER2 (NV12 진단용)
 
 #pragma comment(lib, "strmiids.lib")
 
@@ -133,9 +134,9 @@ STDMETHODIMP CSCVideoTimeScale::GetClassID(CLSID* pClsID)
 	return S_OK;
 }
 
-STDMETHODIMP CSCVideoTimeScale::Stop()  { m_state = State_Stopped; return S_OK; }
-STDMETHODIMP CSCVideoTimeScale::Pause() { m_state = State_Paused;  return S_OK; }
-STDMETHODIMP CSCVideoTimeScale::Run(REFERENCE_TIME) { m_state = State_Running; return S_OK; }
+STDMETHODIMP CSCVideoTimeScale::Stop()  { m_state = State_Stopped; if (m_pOutputPin) m_pOutputPin->decommit_out_allocator(); return S_OK; }
+STDMETHODIMP CSCVideoTimeScale::Pause() { m_state = State_Paused;  if (m_pOutputPin) m_pOutputPin->commit_out_allocator(); return S_OK; }
+STDMETHODIMP CSCVideoTimeScale::Run(REFERENCE_TIME) { m_state = State_Running; if (m_pOutputPin) m_pOutputPin->commit_out_allocator(); return S_OK; }
 STDMETHODIMP CSCVideoTimeScale::GetState(DWORD, FILTER_STATE* pState)
 {
 	if (!pState) return E_POINTER;
@@ -380,6 +381,59 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::Receive(IMediaSample* pSample)
 		}
 	}
 
+	if (m_pFilter->is_crop())
+	{
+		//홀수 NV12 → 짝수로 crop 복사. src(홀수 stride) 의 좌상단 짝수 영역만 dst(tight stride) 로 옮긴다.
+		CSCVideoTimeScaleOutputPin* pOut = m_pFilter->get_output_pin();
+		IMemAllocator* pAlloc = pOut ? pOut->get_out_allocator() : NULL;
+		if (!pOut || !pAlloc)
+			return E_FAIL;
+
+		IMediaSample* pDst = NULL;
+		HRESULT hrg = pAlloc->GetBuffer(&pDst, NULL, NULL, 0);
+		if (FAILED(hrg) || !pDst)
+			return FAILED(hrg) ? hrg : E_FAIL;
+
+		BYTE* pSrc = NULL;
+		BYTE* pDstBuf = NULL;
+		pSample->GetPointer(&pSrc);
+		pDst->GetPointer(&pDstBuf);
+		long src_len = pSample->GetActualDataLength();
+
+		int sh = m_pFilter->crop_src_h();
+		int orig_w = m_pFilter->crop_src_stride();	//원본 홀수 폭 (stride 하한)
+		//src Y stride 를 실제 버퍼 길이로 역산 — LAV 자체 allocator 의 padding 까지 반영 (진단에서 849 로 검증된 식).
+		int ss = (sh > 0) ? (int)(src_len / (sh * 3 / 2)) : orig_w;
+		if (ss < orig_w)
+			ss = orig_w;
+		int dw = m_pFilter->crop_dst_w();
+		int dh = m_pFilter->crop_dst_h();
+		int ds = dw;	//dst tight stride (자체 allocator, cbAlign=1)
+
+		if (pSrc && pDstBuf && src_len >= ss * sh + (dh / 2) * ss)
+		{
+			BYTE* sY  = pSrc;
+			BYTE* sUV = pSrc + ss * sh;
+			BYTE* dY  = pDstBuf;
+			BYTE* dUV = pDstBuf + ds * dh;
+			for (int y = 0; y < dh; ++y)
+				memcpy(dY + y * ds, sY + y * ss, dw);
+			for (int y = 0; y < dh / 2; ++y)
+				memcpy(dUV + y * ds, sUV + y * ss, dw);
+			pDst->SetActualDataLength(ds * dh * 3 / 2);
+		}
+
+		REFERENCE_TIME t0 = 0, t1 = 0;
+		if (SUCCEEDED(pSample->GetTime(&t0, &t1)))	//위에서 이미 1/rate scale 됨
+			pDst->SetTime(&t0, &t1);
+		pDst->SetSyncPoint(pSample->IsSyncPoint() == S_OK);
+		pDst->SetDiscontinuity(pSample->IsDiscontinuity() == S_OK);
+
+		HRESULT hrd = pOut->deliver_sample(pDst);
+		pDst->Release();
+		return hrd;
+	}
+
 	if (m_pFilter->get_output_pin())
 		return m_pFilter->get_output_pin()->deliver_sample(pSample);
 
@@ -405,7 +459,7 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::ReceiveCanBlock() { return S_FALSE; }	//
 //================================================================================
 
 CSCVideoTimeScaleOutputPin::CSCVideoTimeScaleOutputPin(CSCVideoTimeScale* pFilter)
-	: m_ref(0), m_pFilter(pFilter), m_pConnected(NULL), m_pDownstreamInput(NULL), m_mt_set(false)
+	: m_ref(0), m_pFilter(pFilter), m_pConnected(NULL), m_pDownstreamInput(NULL), m_mt_set(false), m_pOutAllocator(NULL)
 {
 	memset(&m_mt, 0, sizeof(m_mt));
 }
@@ -414,6 +468,7 @@ CSCVideoTimeScaleOutputPin::~CSCVideoTimeScaleOutputPin()
 {
 	if (m_pConnected) m_pConnected->Release();
 	if (m_pDownstreamInput) m_pDownstreamInput->Release();
+	if (m_pOutAllocator) { m_pOutAllocator->Decommit(); m_pOutAllocator->Release(); m_pOutAllocator = NULL; }
 	free_media_type();
 }
 
@@ -456,23 +511,102 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 	}
 	if (!p_use) return VFW_E_TYPE_NOT_ACCEPTED;
 
-	HRESULT hr = pReceivePin->ReceiveConnection(static_cast<IPin*>(this), p_use);
+	//홀수 크기 NV12 감지 → 짝수로 내린 media type 을 MPC-VR 에 광고 (홀수 NV12 D3D11 텍스처 실패=녹색 회피).
+	//src(홀수 stride)→dst(짝수 tight) crop 복사는 Receive 에서. NV12 외 포맷·짝수 크기는 기존 zero-copy 그대로.
+	AM_MEDIA_TYPE even_mt;
+	memset(&even_mt, 0, sizeof(even_mt));
+	bool even_alloc = false;
+	const AM_MEDIA_TYPE* p_advertise = p_use;
+	int crop_src_stride = 0, crop_src_h = 0, crop_dst_w = 0, crop_dst_h = 0;
+
+	if (IsEqualGUID(p_use->majortype, MEDIATYPE_Video) && p_use->subtype.Data1 == 0x3231564E /*FOURCC 'NV12'*/ && p_use->pbFormat)
+	{
+		BITMAPINFOHEADER* pbih = NULL;
+		if (p_use->formattype == FORMAT_VideoInfo2 && p_use->cbFormat >= sizeof(VIDEOINFOHEADER2))
+			pbih = &((VIDEOINFOHEADER2*)p_use->pbFormat)->bmiHeader;
+		else if (p_use->formattype == FORMAT_VideoInfo && p_use->cbFormat >= sizeof(VIDEOINFOHEADER))
+			pbih = &((VIDEOINFOHEADER*)p_use->pbFormat)->bmiHeader;
+
+		if (pbih)
+		{
+			int w = pbih->biWidth;
+			int h = abs(pbih->biHeight);
+			if ((w & 1) || (h & 1))
+			{
+				int even_w = w & ~1;
+				int even_h = h & ~1;
+				copy_media_type(&even_mt, p_use);
+				even_alloc = true;
+
+				BITMAPINFOHEADER* ebih = (even_mt.formattype == FORMAT_VideoInfo2)
+					? &((VIDEOINFOHEADER2*)even_mt.pbFormat)->bmiHeader
+					: &((VIDEOINFOHEADER*)even_mt.pbFormat)->bmiHeader;
+				ebih->biWidth     = even_w;
+				ebih->biHeight    = (pbih->biHeight < 0) ? -even_h : even_h;
+				ebih->biSizeImage = even_w * even_h * 3 / 2;
+				if (even_mt.formattype == FORMAT_VideoInfo2)
+				{
+					VIDEOINFOHEADER2* evih2 = (VIDEOINFOHEADER2*)even_mt.pbFormat;
+					SetRect(&evih2->rcSource, 0, 0, even_w, even_h);
+					SetRect(&evih2->rcTarget, 0, 0, even_w, even_h);
+				}
+				else
+				{
+					VIDEOINFOHEADER* evih = (VIDEOINFOHEADER*)even_mt.pbFormat;
+					SetRect(&evih->rcSource, 0, 0, even_w, even_h);
+					SetRect(&evih->rcTarget, 0, 0, even_w, even_h);
+				}
+
+				p_advertise    = &even_mt;
+				crop_src_stride = w;	//LAV NV12 Y stride = biWidth
+				crop_src_h      = h;
+				crop_dst_w      = even_w;
+				crop_dst_h      = even_h;
+				logWrite(_T("[VideoTS] odd NV12 %dx%d → crop to even %dx%d for MPC-VR"), w, h, even_w, even_h);
+			}
+		}
+	}
+
+	HRESULT hr = pReceivePin->ReceiveConnection(static_cast<IPin*>(this), p_advertise);
 	if (SUCCEEDED(hr))
 	{
 		m_pConnected = pReceivePin;
 		m_pConnected->AddRef();
 
 		free_media_type();
-		copy_media_type(&m_mt, p_use);
+		copy_media_type(&m_mt, p_advertise);
 		m_mt_set = true;
 
 		//downstream 의 IMemInputPin cache — fast Receive.
 		if (m_pDownstreamInput) { m_pDownstreamInput->Release(); m_pDownstreamInput = NULL; }
 		pReceivePin->QueryInterface(IID_IMemInputPin, (void**)&m_pDownstreamInput);
 
-		//downstream 의 allocator 를 input pin 에 forward — upstream 이 downstream allocator 직접 사용.
-		if (m_pDownstreamInput)
+		if (m_pDownstreamInput && crop_dst_w > 0)
 		{
+			//crop 모드 — 자체 system-memory allocator 로 짝수(tight stride=even_w) 버퍼 공급.
+			//LAV 는 자기 allocator 사용 (forward 안 함). MPC-VR 는 우리 allocator 의 짝수 버퍼를 upload.
+			IMemAllocator* pOwn = NULL;
+			if (SUCCEEDED(CoCreateInstance(CLSID_MemoryAllocator, NULL, CLSCTX_INPROC, IID_IMemAllocator, (void**)&pOwn)) && pOwn)
+			{
+				ALLOCATOR_PROPERTIES req, act;
+				memset(&req, 0, sizeof(req));
+				memset(&act, 0, sizeof(act));
+				req.cBuffers = 4;
+				req.cbBuffer = crop_dst_w * crop_dst_h * 3 / 2;
+				req.cbAlign  = 1;
+				HRESULT hra = pOwn->SetProperties(&req, &act);
+				HRESULT hrn = m_pDownstreamInput->NotifyAllocator(pOwn, FALSE);
+
+				if (m_pOutAllocator) { m_pOutAllocator->Decommit(); m_pOutAllocator->Release(); }
+				m_pOutAllocator = pOwn;	//keep ref (Decommit+Release in Disconnect/dtor)
+				m_pFilter->set_crop_to_even(crop_dst_w, crop_dst_h, crop_src_stride, crop_src_h);
+				logWrite(_T("[VideoTS] crop allocator SetProperties hr=0x%08x act.cbBuffer=%ld NotifyAllocator hr=0x%08x"),
+					hra, act.cbBuffer, hrn);
+			}
+		}
+		else if (m_pDownstreamInput)
+		{
+			//zero-copy — downstream 의 allocator 를 input pin 에 forward (upstream 이 downstream allocator 직접 사용).
 			IMemAllocator* pAlloc = NULL;
 			if (SUCCEEDED(m_pDownstreamInput->GetAllocator(&pAlloc)) && pAlloc)
 			{
@@ -484,6 +618,11 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 		}
 	}
 
+	if (even_alloc)
+	{
+		if (even_mt.cbFormat && even_mt.pbFormat) CoTaskMemFree(even_mt.pbFormat);
+		if (even_mt.pUnk) even_mt.pUnk->Release();
+	}
 	if (use_mt_alloc)
 	{
 		if (use_mt.cbFormat && use_mt.pbFormat) CoTaskMemFree(use_mt.pbFormat);
@@ -499,6 +638,8 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Disconnect()
 	if (!m_pConnected) return S_FALSE;
 	m_pConnected->Release(); m_pConnected = NULL;
 	if (m_pDownstreamInput) { m_pDownstreamInput->Release(); m_pDownstreamInput = NULL; }
+	if (m_pOutAllocator) { m_pOutAllocator->Decommit(); m_pOutAllocator->Release(); m_pOutAllocator = NULL; }
+	if (m_pFilter) m_pFilter->reset_crop();
 	free_media_type();
 	return S_OK;
 }

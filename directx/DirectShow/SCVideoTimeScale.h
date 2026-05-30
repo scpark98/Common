@@ -63,6 +63,17 @@ public:
 	CSCVideoTimeScaleInputPin*  get_input_pin()  { return m_pInputPin; }
 	CSCVideoTimeScaleOutputPin* get_output_pin() { return m_pOutputPin; }
 
+	//홀수 크기 NV12 crop-to-even — MPC-VR 가 홀수 NV12 D3D11 텍스처를 못 만들어 녹색이 되는 문제.
+	//output pin 이 MPC-VR 에 짝수 크기를 광고하고, Receive 가 src(홀수 stride)→dst(짝수, tight stride) 로 crop 복사.
+	void	set_crop_to_even(int dst_w, int dst_h, int src_stride, int src_h)
+	{ m_crop = true; m_crop_dst_w = dst_w; m_crop_dst_h = dst_h; m_crop_src_stride = src_stride; m_crop_src_h = src_h; }
+	void	reset_crop() { m_crop = false; }
+	bool	is_crop() const { return m_crop; }
+	int		crop_dst_w() const { return m_crop_dst_w; }
+	int		crop_dst_h() const { return m_crop_dst_h; }
+	int		crop_src_stride() const { return m_crop_src_stride; }
+	int		crop_src_h() const { return m_crop_src_h; }
+
 protected:
 	std::atomic<LONG>	m_ref;
 	FILTER_STATE		m_state;
@@ -74,6 +85,12 @@ protected:
 	CSCVideoTimeScaleOutputPin*	m_pOutputPin;
 
 	std::atomic<double>	m_rate{ 1.0 };
+
+	bool	m_crop = false;
+	int		m_crop_dst_w = 0;
+	int		m_crop_dst_h = 0;
+	int		m_crop_src_stride = 0;
+	int		m_crop_src_h = 0;
 };
 
 
@@ -164,6 +181,11 @@ public:
 
 	IMemInputPin*	get_downstream_input() { return m_pDownstreamInput; }
 
+	//crop 모드 — 자체 system-memory allocator 보유. Receive 가 여기서 GetBuffer 해 짝수 버퍼 공급.
+	IMemAllocator*	get_out_allocator() { return m_pOutAllocator; }
+	HRESULT			commit_out_allocator()   { return m_pOutAllocator ? m_pOutAllocator->Commit()   : S_OK; }
+	HRESULT			decommit_out_allocator() { return m_pOutAllocator ? m_pOutAllocator->Decommit() : S_OK; }
+
 protected:
 	std::atomic<LONG>			m_ref;
 	CSCVideoTimeScale*			m_pFilter;	//weak
@@ -171,6 +193,7 @@ protected:
 	IMemInputPin*				m_pDownstreamInput;	//cached for fast Receive call
 	AM_MEDIA_TYPE				m_mt;
 	bool						m_mt_set;
+	IMemAllocator*				m_pOutAllocator;	//crop 모드 전용 자체 allocator (없으면 NULL=zero-copy)
 
 	void	free_media_type();
 };

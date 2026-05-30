@@ -68,8 +68,14 @@ void CSCStaticEdit::set_color_theme(int color_theme, bool invalidate)
 	//판정에서 COLOR_BTNFACE(회색) 를 받는다. 실제 edit 컨트롤(CSCEdit=CEdit-kind=COLOR_WINDOW)과 동일하게
 	//보이도록 그 두 테마에서만 COLOR_WINDOW 로 교정. 그 외 테마는 CSCEdit 과 동일하게 theme 의
 	//cr_back/cr_text 를 그대로 사용 — dark 계열에서 흰 카드로 떠 CSCEdit 과 어긋나던 문제 해소.
+	//selection 도 같은 맥락 — 시스템색 테마의 cr_back_selected 는 list/tree 행용 연한 하이라이트
+	//(204,235,255) 라 edit 텍스트 선택엔 어색하다. CEdit 처럼 시스템 highlight(파랑)+highlight text(흰)로 교정.
 	if (color_theme == CSCColorTheme::color_theme_default || color_theme == CSCColorTheme::color_theme_windows)
+	{
 		m_theme.cr_back = get_sys_color(COLOR_WINDOW);
+		m_theme.cr_back_selected = get_sys_color(COLOR_HIGHLIGHT);
+		m_theme.cr_text_selected = get_sys_color(COLOR_HIGHLIGHTTEXT);
+	}
 
 	m_has_parent_back_color = true;
 
@@ -86,9 +92,13 @@ void CSCStaticEdit::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 	//copy_colors_from 이 parent_back(부모 dlg bg) 까지 가져왔으므로 그대로 둔다.
 	//시스템색 테마(default/windows)일 때만 CStatic 파생이라 BTNFACE 로 잡힌 본문 배경을 edit 처럼
-	//COLOR_WINDOW 로 교정. (상세 근거는 set_color_theme(int) 주석 참조.)
+	//COLOR_WINDOW 로 교정. selection 도 같은 이유로 시스템 highlight 로 교정. (상세 근거는 set_color_theme(int) 주석 참조.)
 	if (theme.get_color_theme() == CSCColorTheme::color_theme_default || theme.get_color_theme() == CSCColorTheme::color_theme_windows)
+	{
 		m_theme.cr_back = get_sys_color(COLOR_WINDOW);
+		m_theme.cr_back_selected = get_sys_color(COLOR_HIGHLIGHT);
+		m_theme.cr_text_selected = get_sys_color(COLOR_HIGHLIGHTTEXT);
+	}
 
 	m_has_parent_back_color = true;
 

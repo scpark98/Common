@@ -3241,8 +3241,11 @@ void CDShow::set_video_position(CRect r)
 	}
 }
 
-bool CDShow::toggle_video_rotation()
+bool CDShow::set_video_rotation(int degrees)
 {
+	//0/90/180/270 로 정규화.
+	degrees = ((degrees % 360) + 360) % 360;
+
 	//회전은 MPC Video Renderer 만 지원 (IExFilterConfig "rotation", 90 배수). VMR9/EVR 의 SetOutputRect 는
 	//좌표 반사만 가능하고 회전 파라미터가 없어 90° 회전 불가.
 	if (!m_use_mpcvr || m_VMR == NULL)
@@ -3258,13 +3261,12 @@ bool CDShow::toggle_video_rotation()
 		return false;
 	}
 
-	int next = (m_video_rotation == 0) ? 90 : 0;
-	HRESULT hr = pCfg->Flt_SetInt("rotation", next);
-	logWrite(_T("[rotate] Flt_SetInt(rotation,%d) hr=0x%08x"), next, hr);
+	HRESULT hr = pCfg->Flt_SetInt("rotation", degrees);
+	logWrite(_T("[rotate] Flt_SetInt(rotation,%d) hr=0x%08x"), degrees, hr);
 	if (FAILED(hr))
 		return false;
 
-	m_video_rotation = next;
+	m_video_rotation = degrees;
 
 	//회전으로 표시 종횡비(W↔H)가 바뀌므로 목적지 rect 를 새 회전 기준으로 재계산 (pillarbox/letterbox 갱신).
 	if (!m_last_video_position_rect.IsRectEmpty())
@@ -3279,6 +3281,17 @@ bool CDShow::toggle_video_rotation()
 	}
 
 	return true;
+}
+
+bool CDShow::toggle_video_rotation()
+{
+	return set_video_rotation(m_video_rotation == 0 ? 90 : 0);
+}
+
+bool CDShow::rotate_video(bool clockwise)
+{
+	//clockwise = +90, 반시계 = -90 (== +270).
+	return set_video_rotation(m_video_rotation + (clockwise ? 90 : 270));
 }
 
 double CDShow::get_track_pos()
@@ -3433,6 +3446,30 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 			}
 		}
 	}
+}
+
+void CDShow::replay_from_start()
+{
+	//내장 FFmpeg 경로: EOS 후 NoFlush seek(set_track_pos)는 source pin 의 streaming thread 가 EOS 로
+	//종료된 상태를 못 되살려 frame deliver 가 재개 안 됨 (영상 freeze + 오디오 끊김). 그래프를 Stop→seek0→Run
+	//하면 재생 시작과 동일 경로로 pin thread·EOS 상태가 완전 리셋되어 확실히 재개된다.
+	if (m_use_internal_ffmpeg && m_pMC && m_pMS)
+	{
+		m_pMC->Stop();
+
+		LONGLONG pos = 0;
+		m_pMS->SetPositions(&pos, AM_SEEKING_AbsolutePositioning | AM_SEEKING_SeekToKeyFrame,
+			NULL, AM_SEEKING_NoPositioning);
+
+		m_pMC->Run();
+		m_play_state = State_Running;
+
+		logWrite(_T("[repeat] internal FFmpeg — Stop/seek0/Run replay"));
+		return;
+	}
+
+	//LAV 경로 — 기존 동작 유지 (seek 0 으로 정상 반복).
+	set_track_pos(0);
 }
 
 void CDShow::move_track(bool forward, int interval)

@@ -186,6 +186,10 @@ public:
 	//seek_to_keyframe: true 면 AM_SEEKING_SeekToKeyFrame 플래그로 splitter 가 keyframe 으로 snap → 손상 미디어에서도
 	//decoder 가 즉시 producible frame 받음. false 면 정확한 위치로 seek (drag 중 GOP 안 frame 변화 보장 위해).
 	void			set_track_pos(double pos, bool seek_to_keyframe = true);
+	//EOS(재생 종료) 후 반복재생 — 맨 처음으로 돌아가 다시 재생. 내장 FFmpeg 경로는 Stop→seek0→Run 로
+	//streaming thread·EOS 상태를 완전 리셋 (NoFlush seek 만으로는 EOS 후 frame deliver 가 재개 안 됨).
+	//LAV 경로는 기존 seek(0) 동작 유지.
+	void			replay_from_start();
 	void			move_track(bool forward, int interval = -1);	//unit:sec
 	void			step_frame(bool forward);
 	bool			capture_frame(CString sfile);
@@ -259,10 +263,11 @@ public:
 	bool			get_video_mirror() { return m_mirror; }
 	bool			get_video_flip() { return m_flip; }
 
-	//가로/세로 전환 — 영상을 0°↔90° 토글. MPC Video Renderer 의 IExFilterConfig "rotation" 사용.
+	//영상 회전 — MPC Video Renderer 의 IExFilterConfig "rotation" 사용 (90 배수).
 	//VMR9/EVR 는 SetOutputRect 가 반사만 되고 회전 파라미터가 없어 미지원 (false 반환).
-	//성공 시 true, 미지원 렌더러/실패 시 false.
-	bool			toggle_video_rotation();
+	bool			set_video_rotation(int degrees);	//절대 각도 (0/90/180/270 로 정규화). core.
+	bool			toggle_video_rotation();			//0°↔90° 토글 (가로/세로 전환).
+	bool			rotate_video(bool clockwise);		//현재 각도에서 ±90° (시계/반시계).
 	int				get_video_rotation() { return m_video_rotation; }
 	
 	enum PAN_SCAN_MODE

@@ -3836,133 +3836,99 @@ bool is_exist_registry_key(HKEY hKeyRoot, CString sSubKey)
 //#ifndef _USING_V110_SDK71_
 LONG get_registry_int(HKEY hKeyRoot, CString sSubKey, CString sEntry, DWORD *value)
 {
-	HKEY	hkey = NULL;
-	LONG 	nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
-	DWORD	buf_size = 256;
-	TCHAR	buffer[256] = { 0, };
-	LPVOID	lpMsgBuf;
-	DWORD	dwType = REG_DWORD;
+	//읽기 전용이므로 KEY_READ (KEY_ALL_ACCESS 는 비관리자 HKLM 읽기를 ACCESS_DENIED 로 실패시킴).
+	if (value == NULL)
+		return ERROR_INVALID_PARAMETER;
 
-	if (nError == ERROR_SUCCESS)
-	{
-		if (hkey)
-		{
-			//WinXP SP3에서 RegGetValue()가 지원되지 않아 RegQueryValueEx()로 변경함.
-			//nError = RegGetValue(hKeyRoot, sSubKey, sEntry, RRF_RT_DWORD, &dwType, value, &cbData);
+	HKEY hkey = NULL;
+	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_READ, &hkey);
+	if (nError != ERROR_SUCCESS)
+		return nError;
 
-			//dwType을 주지 않으면 실제 그 값이 0인 REG_DWORD 값임에도 불구하고 '0'이 되어 48이라는 값을 리턴하게 된다.
-			nError = RegQueryValueEx(hkey, sEntry, NULL, &dwType, reinterpret_cast<LPBYTE>(value), &buf_size);
-
-			if (nError == ERROR_SUCCESS)
-			{
-			}
-			else
-			{
-				FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
-								FORMAT_MESSAGE_IGNORE_INSERTS,
-								NULL,
-								nError,
-								MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-								(LPTSTR) &lpMsgBuf,
-								0,
-								NULL);
-				//여기서는 굳이 메시지박스를 표시하지 않는다.
-				//실제 해당 entry가 없을 수 있으며 없을 경우 "지정된 파일을 찾을 수 없습니다."와 같은 시스템 에러 메시지가 표시된다.
-				//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
-				LocalFree(lpMsgBuf);
-			}
-		}
-	}
-	else
-	{
-		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
-						FORMAT_MESSAGE_IGNORE_INSERTS,
-						NULL,
-						nError,
-						MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-						(LPTSTR) &lpMsgBuf,
-						0,
-						NULL);
-		//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
-		TRACE(_T("GetRegistryString() error = %s\n"), (LPCTSTR)lpMsgBuf);
-		LocalFree(lpMsgBuf);
-	}
-	
+	//지역 DWORD 로 받는다. 이전엔 buf_size=256 을 4-byte 대상에 넘겨, 값이 REG_DWORD 가 아니면 (REG_SZ/BINARY 등)
+	//최대 256 byte 를 4-byte 대상에 써서 스택을 깨뜨릴 수 있었다. cb=4 로 제한 + 타입 검증으로 차단.
+	DWORD dwType = 0;
+	DWORD data = 0;
+	DWORD cb = sizeof(data);
+	nError = RegQueryValueEx(hkey, sEntry, NULL, &dwType, (LPBYTE)&data, &cb);
 	RegCloseKey(hkey);
-	
-	return nError;
+
+	if (nError != ERROR_SUCCESS)
+		return nError;
+	if (dwType != REG_DWORD || cb != sizeof(DWORD))
+		return ERROR_INVALID_DATATYPE;
+
+	*value = data;
+	return ERROR_SUCCESS;
 }
 
 LONG get_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString *str)
 {
-	HKEY	hkey = NULL;
-	DWORD	dwType = REG_SZ;
-	TCHAR	buffer[1024] = { 0, };
-	DWORD	dwBytes = sizeof(buffer);
-	LPVOID	lpMsgBuf;
-	
-	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_ALL_ACCESS, &hkey);
+	//읽기 전용 KEY_READ. 크기 선조회 → 동적 버퍼 (고정 1024 truncation 방지). 타입 검증 (문자열 외엔 거부).
+	//REG_EXPAND_SZ 는 환경변수 전개. null 종료 미보장 대비 +1 TCHAR 여유 확보.
+	if (str == NULL)
+		return ERROR_INVALID_PARAMETER;
 
-	if (nError == ERROR_SUCCESS)
+	HKEY hkey = NULL;
+	LONG nError = RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_READ, &hkey);
+	if (nError != ERROR_SUCCESS)
+		return nError;
+
+	DWORD dwType = 0;
+	DWORD cb = 0;
+	nError = RegQueryValueEx(hkey, entry, NULL, &dwType, NULL, &cb);
+	if (nError != ERROR_SUCCESS)
 	{
-		if (hkey)
+		RegCloseKey(hkey);
+		return nError;
+	}
+	if (dwType != REG_SZ && dwType != REG_EXPAND_SZ)
+	{
+		RegCloseKey(hkey);
+		return ERROR_INVALID_DATATYPE;
+	}
+
+	DWORD total = cb + sizeof(TCHAR);   //null 종료 보장용 여유
+	BYTE* buf = new BYTE[total];
+	ZeroMemory(buf, total);
+	nError = RegQueryValueEx(hkey, entry, NULL, &dwType, buf, &cb);
+	RegCloseKey(hkey);
+
+	if (nError != ERROR_SUCCESS)
+	{
+		delete[] buf;
+		return nError;
+	}
+
+	CString raw((LPCTSTR)buf);
+	delete[] buf;
+
+	if (dwType == REG_EXPAND_SZ)
+	{
+		DWORD need = ExpandEnvironmentStrings(raw, NULL, 0);
+		if (need > 0)
 		{
-			//nError = RegQueryValueEx(hkey, entry, NULL, &dwType, (LPBYTE)buffer, &dwBytes);
-			nError = RegQueryValueEx(hkey, entry, NULL, &dwType, (LPBYTE)buffer, &dwBytes);
-			
-			if (nError == ERROR_SUCCESS)
-			{
-			}
-			else
-			{
-				FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
-								FORMAT_MESSAGE_IGNORE_INSERTS,
-								NULL,
-								nError,
-								MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-								(LPTSTR) &lpMsgBuf,
-								0,
-								NULL);
-				//AfxMessageBox((LPCTSTR)lpMsgBuf, MB_ICONERROR);
-				TRACE(_T("GetRegistryString() error = %s\n"), (LPCTSTR)lpMsgBuf);
-				LocalFree(lpMsgBuf);
-			}
+			ExpandEnvironmentStrings(raw, raw.GetBuffer(need), need);
+			raw.ReleaseBuffer();
 		}
 	}
-	else
-	{
-		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
-						FORMAT_MESSAGE_IGNORE_INSERTS,
-						NULL,
-						nError,
-						MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-						(LPTSTR) &lpMsgBuf,
-						0,
-						NULL);
-		TRACE(_T("%s\n"), (LPCTSTR)lpMsgBuf);
-		LocalFree(lpMsgBuf);
-	}
-	
-	RegCloseKey(hkey);
-	
-	(*str) = CString(buffer);
-	return nError;
+
+	*str = raw;
+	return ERROR_SUCCESS;
 }
 
 LONG set_registry_int(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value)
 {
-	HKEY	hkey;
-	DWORD	dwDesc;
-	DWORD	lResult = 0;
+	//RegCreateKeyEx 만으로 open-or-create. 이전엔 RegOpenKeyEx 후 RegCreateKeyEx 가 hkey 를 덮어써 첫 핸들이
+	//누수됐다. 쓰기엔 KEY_SET_VALUE 면 충분 (KEY_ALL_ACCESS 불필요).
+	HKEY hkey = NULL;
+	DWORD disp = 0;
+	LONG lResult = RegCreateKeyEx(hKeyRoot, sSubKey, 0,
+		NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL, &hkey, &disp);
+	if (lResult != ERROR_SUCCESS)
+		return lResult;
 
-	RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_WRITE, &hkey);
-
-	lResult = RegCreateKeyEx(hKeyRoot, sSubKey, 0,
-		NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
-
-	if (lResult == ERROR_SUCCESS)
-		lResult = RegSetValueEx(hkey, entry, NULL, REG_DWORD, (LPBYTE)&value, sizeof(DWORD));
-
+	lResult = RegSetValueEx(hkey, entry, 0, REG_DWORD, (const BYTE*)&value, sizeof(DWORD));
 	RegCloseKey(hkey);
 
 	return lResult;
@@ -3970,24 +3936,19 @@ LONG set_registry_int(HKEY hKeyRoot, CString sSubKey, CString entry, DWORD value
 
 LONG set_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString str)
 {
-	HKEY	hkey;
-	LONG	lResult = ERROR_SUCCESS;
-	DWORD	dwDesc;
-	TCHAR	buffer[1000] = { 0, };
-	
-	ZeroMemory(buffer, sizeof(buffer));
+	//이전 버그: (1) RegOpenKeyEx + RegCreateKeyEx 이중 open → 핸들 누수, (2) 고정 buffer[1000] 에 _stprintf →
+	//1000 자 초과 시 스택 오버플로, (3) 값 문자열을 RegCreateKeyEx 의 lpClass 인자로 잘못 전달.
+	//→ RegCreateKeyEx 만으로 open-or-create (lpClass=NULL) + CString 을 길이 기반으로 직접 기록 (버퍼 제거).
+	HKEY hkey = NULL;
+	DWORD disp = 0;
+	LONG lResult = RegCreateKeyEx(hKeyRoot, sSubKey, 0,
+		NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL, &hkey, &disp);
+	if (lResult != ERROR_SUCCESS)
+		return lResult;
 
-	_stprintf(buffer, _T("%s\0"), str);
-	int len = _tcslen(buffer);
-
-	RegOpenKeyEx(hKeyRoot, sSubKey, 0, KEY_WRITE, &hkey);
-	
-	lResult = RegCreateKeyEx(hKeyRoot, sSubKey, 0,
-		buffer, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, &dwDesc);
-	
-	if (lResult == ERROR_SUCCESS)
-		lResult = RegSetValueEx(hkey, entry, NULL, REG_SZ, (BYTE*)buffer, _tcslen(buffer) * sizeof(TCHAR));
-	
+	//null 종료 포함 byte 수.
+	DWORD cb = (DWORD)((str.GetLength() + 1) * sizeof(TCHAR));
+	lResult = RegSetValueEx(hkey, entry, 0, REG_SZ, (const BYTE*)(LPCTSTR)str, cb);
 	RegCloseKey(hkey);
 
 	return lResult;
@@ -10389,28 +10350,53 @@ CString	get_windows_version_string(bool detail)
 	SYSTEM_INFO si;
 
 	if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
-		version = _T("Microsoft Windows XP");
+		version = _T("Windows XP");
 	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
-		version = _T("Microsoft Windows Vista");
+		version = _T("Windows Vista");
 	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
-		version = _T("Microsoft Windows 7");
+		version = _T("Windows 7");
 	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
-		version = _T("Microsoft Windows 8");
+		version = _T("Windows 8");
 	else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
-		version = _T("Microsoft Windows 8.1");
+		version = _T("Windows 8.1");
 	else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0)
 	{
 		if (osvi.dwBuildNumber >= 22000)
-			version = _T("Microsoft Windows 11");
+			version = _T("Windows 11");
 		else
-			version = _T("Microsoft Windows 10");
+			version = _T("Windows 10");
 	}
 	else
 	{
 		version = _T("Unknown OS version");
 	}
 
-	version.AppendFormat(_T(" (Build %d)"), osvi.dwBuildNumber);
+	//기능 업데이트 표시 버전 (예: 25H2) — OSVERSIONINFOEX 엔 없고 레지스트리 DisplayVersion 에만 있다.
+	//(구버전 Win10 은 DisplayVersion 이 없으면 ReleaseId.) 다른 OS 는 둘 다 없어 그냥 안 붙는다.
+	//get_registry_str 는 KEY_ALL_ACCESS 라 비관리자 HKLM 읽기가 실패하고, RegGetValue 는 Vista+ 라 XP 호환이
+	//깨지므로, XP 호환 + 비관리자 OK 인 RegOpenKeyEx(KEY_READ) + RegQueryValueEx 로 직접 읽는다.
+	{
+		HKEY hk = NULL;
+		if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+				_T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
+				0, KEY_READ, &hk) == ERROR_SUCCESS)
+		{
+			TCHAR disp[64] = { 0, };
+			DWORD cb = sizeof(disp);
+			DWORD type = REG_SZ;
+			if (RegQueryValueEx(hk, _T("DisplayVersion"), NULL, &type, (LPBYTE)disp, &cb) != ERROR_SUCCESS || disp[0] == 0)
+			{
+				cb = sizeof(disp);
+				RegQueryValueEx(hk, _T("ReleaseId"), NULL, &type, (LPBYTE)disp, &cb);
+			}
+			RegCloseKey(hk);
+
+			if (disp[0])
+				version.AppendFormat(_T(" %s"), disp);
+		}
+	}
+
+	version.AppendFormat(_T(" (%d.%d.%d)"), osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber);
 
 	if (detail)
 	{

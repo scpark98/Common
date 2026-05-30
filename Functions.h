@@ -257,6 +257,7 @@ t2 c, d; // c is 'int*' and d is 'int'
 
 #define		IsShiftPressed() (0x8000 ==(GetKeyState(VK_SHIFT) & 0x8000))
 #define		IsCtrlPressed()  (0x8000 ==(GetKeyState(VK_CONTROL) & 0x8000))
+#define		IsAltPressed()   (0x8000 ==(GetKeyState(VK_MENU) & 0x8000))
 
 #define		CLIP(x) ((x) > 255 ? 255 : (x) < 0 ? 0 : x)
 #define		check_range_return(x, lower, upper) {if ((x) < (lower) || (x) > (upper)) return;}

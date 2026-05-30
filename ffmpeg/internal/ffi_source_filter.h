@@ -4,9 +4,9 @@
 * ffi::CFFiSource — custom DirectShow source filter (LAV Splitter + LAV Video/Audio Decoder 통합 대체).
 *
 *  - Phase 3 본 작업. internal FFmpeg (CDecoder) 으로 demux+decode 한 결과를 DirectShow 의 IMediaSample 로 변환해
-*    후단 (MPC-VR + DSound + SC Audio chain + DirectVobSub) 로 push.
+*	 후단 (MPC-VR + DSound + SC Audio chain + DirectVobSub) 로 push.
 *  - LAV Splitter 의 SetPositions 동기 블로킹 (25-604ms UI freeze) 회피가 본 목적.
-*    이 filter 가 IMediaSeeking::SetPositions 받으면 CDecoder::seek() 에 비동기 위임 → UI 즉시 반환.
+*	 이 filter 가 IMediaSeeking::SetPositions 받으면 CDecoder::seek() 에 비동기 위임 → UI 즉시 반환.
 *
 *  Phase 3a: video pin only. NV12 출력.
 *  Phase 3b: audio pin 추가.
@@ -33,198 +33,198 @@ static const GUID CLSID_FFiSource =
 
 namespace ffi
 {
-    class CFFiSource;
+	class CFFiSource;
 
-    class CFFiVideoStream;
+	class CFFiVideoStream;
 
-    //CSourceSeeking 의 aggregated 구현 — pin 에 composition 으로 부착.
-    //ChangeStart/Stop/Rate 가 trigger 되면 back-pointer 로 pin 에 알림.
-    class CFFiSeeking : public CSourceSeeking
-    {
-    public:
-        CFFiSeeking(LPUNKNOWN pUnkOuter, HRESULT* phr, CCritSec* pLock, CFFiVideoStream* pPin);
+	//CSourceSeeking 의 aggregated 구현 — pin 에 composition 으로 부착.
+	//ChangeStart/Stop/Rate 가 trigger 되면 back-pointer 로 pin 에 알림.
+	class CFFiSeeking : public CSourceSeeking
+	{
+	public:
+		CFFiSeeking(LPUNKNOWN pUnkOuter, HRESULT* phr, CCritSec* pLock, CFFiVideoStream* pPin);
 
-        //CSourceSeeking pure virtual override.
-        HRESULT ChangeStart() override;
-        HRESULT ChangeStop() override;
-        HRESULT ChangeRate() override;
+		//CSourceSeeking pure virtual override.
+		HRESULT ChangeStart() override;
+		HRESULT ChangeStop() override;
+		HRESULT ChangeRate() override;
 
-        //GetCurrentPosition override — pin 의 last_rtStart 반환.
-        STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent) override;
+		//GetCurrentPosition override — pin 의 last_rtStart 반환.
+		STDMETHODIMP GetCurrentPosition(LONGLONG* pCurrent) override;
 
-    private:
-        CFFiVideoStream*    m_pPin;
-    };
+	private:
+		CFFiVideoStream*	m_pPin;
+	};
 
-    class CFFiAudioStream;
+	class CFFiAudioStream;
 
-    //CSourceStream + IMediaSeeking 노출 (composition).
-    //NV12 sample 을 IMediaSample 에 채워 downstream 에 push. graph 의 SetPositions 는 CDecoder::seek 로 async 위임.
-    class CFFiVideoStream : public CSourceStream
-    {
-    public:
-        CFFiVideoStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
-        ~CFFiVideoStream();
+	//CSourceStream + IMediaSeeking 노출 (composition).
+	//NV12 sample 을 IMediaSample 에 채워 downstream 에 push. graph 의 SetPositions 는 CDecoder::seek 로 async 위임.
+	class CFFiVideoStream : public CSourceStream
+	{
+	public:
+		CFFiVideoStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
+		~CFFiVideoStream();
 
-        //IMediaSeeking 노출 — m_pSeeking 으로 라우팅. 그 외는 CSourceStream (CBaseOutputPin → CBasePin).
-        STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv) override;
+		//IMediaSeeking 노출 — m_pSeeking 으로 라우팅. 그 외는 CSourceStream (CBaseOutputPin → CBasePin).
+		STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void** ppv) override;
 
-        //CSourceStream overrides
-        HRESULT FillBuffer(IMediaSample* pSample) override;
-        HRESULT GetMediaType(CMediaType* pMediaType) override;
-        HRESULT CheckMediaType(const CMediaType* pmt) override;
-        HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
-        HRESULT OnThreadCreate() override;
-        HRESULT OnThreadDestroy() override;
-        HRESULT OnThreadStartPlay() override;   //MS 표준 정공법 — thread restart 직후 NewSegment + discontinuity.
-        HRESULT DoBufferProcessingLoop() override;   //(Z) 측정 — GetDeliveryBuffer / Deliver wait 분리.
+		//CSourceStream overrides
+		HRESULT FillBuffer(IMediaSample* pSample) override;
+		HRESULT GetMediaType(CMediaType* pMediaType) override;
+		HRESULT CheckMediaType(const CMediaType* pmt) override;
+		HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
+		HRESULT OnThreadCreate() override;
+		HRESULT OnThreadDestroy() override;
+		HRESULT OnThreadStartPlay() override;	//MS 표준 정공법 — thread restart 직후 NewSegment + discontinuity.
+		HRESULT DoBufferProcessingLoop() override;	 //(Z) 측정 — GetDeliveryBuffer / Deliver wait 분리.
 
-        //CFFiSeeking 의 ChangeStart 가 호출 — CDecoder::seek 비동기 위임.
-        void                on_change_start(REFERENCE_TIME rtStart);
+		//CFFiSeeking 의 ChangeStart 가 호출 — CDecoder::seek 비동기 위임.
+		void				on_change_start(REFERENCE_TIME rtStart);
 
-        REFERENCE_TIME      last_rtStart() const { return m_last_rtStart; }
-        int64_t             last_emitted_pts_ms() const { return m_last_emitted_pts_ms.load(); }
-        CFFiSource*         source() { return m_pSource; }
+		REFERENCE_TIME		last_rtStart() const { return m_last_rtStart; }
+		int64_t				last_emitted_pts_ms() const { return m_last_emitted_pts_ms.load(); }
+		CFFiSource*			source() { return m_pSource; }
 
-    private:
-        CFFiSource*     m_pSource;
-        LONGLONG        m_sample_count = 0;   //sample 순번. timestamping 에 사용.
-        LONGLONG        m_last_rtStart = 0;   //직전 emit 한 frame 의 rtStart. GetCurrentPosition 의 응답값.
-    public:
-        REFERENCE_TIME  m_segment_start = 0;  //seek target rt. video/audio sync 의 공유 baseline.
+	private:
+		CFFiSource*		m_pSource;
+		LONGLONG		m_sample_count = 0;	  //sample 순번. timestamping 에 사용.
+		LONGLONG		m_last_rtStart = 0;	  //직전 emit 한 frame 의 rtStart. GetCurrentPosition 의 응답값.
+	public:
+		REFERENCE_TIME	m_segment_start = 0;  //seek target rt. video/audio sync 의 공유 baseline.
 
-        //(A) FillBuffer entry 측정 — seek 후 첫 호출 latency / 비정상 gap.
-        ULONGLONG       m_seek_t0_ms = 0;
-        ULONGLONG       m_fb_last_entry_ms = 0;
-        int             m_fb_count_since_seek = 0;
+		//(A) FillBuffer entry 측정 — seek 후 첫 호출 latency / 비정상 gap.
+		ULONGLONG		m_seek_t0_ms = 0;
+		ULONGLONG		m_fb_last_entry_ms = 0;
+		int				m_fb_count_since_seek = 0;
 
-        //flush 후 첫 sample 에 SetDiscontinuity(TRUE) 알림 플래그.
-        bool            m_need_discontinuity = false;
+		//flush 후 첫 sample 에 SetDiscontinuity(TRUE) 알림 플래그.
+		bool			m_need_discontinuity = false;
 
-        //MS 표준 정공법 — on_change_start 가 저장 → OnThreadStartPlay 가 NewSegment 에 사용.
-        REFERENCE_TIME  m_pending_segment_stop = 0;
+		//MS 표준 정공법 — on_change_start 가 저장 → OnThreadStartPlay 가 NewSegment 에 사용.
+		REFERENCE_TIME	m_pending_segment_stop = 0;
 
-        //get_track_pos 의 source — 마지막 emit 한 video frame 의 원본 PTS (ms). 화면에 보이는 frame 시점.
-        //audio PTS 기반은 seek 시 video keyframe 후진과 mismatch → 컨트롤바 / 자막 timing 이 화면보다 앞섬.
-        //video frame 의 원본 PTS = 실제 화면 frame 시점 = .smi 자막 timing reference.
-        std::atomic<int64_t> m_last_emitted_pts_ms{ -1 };
-    private:
+		//get_track_pos 의 source — 마지막 emit 한 video frame 의 원본 PTS (ms). 화면에 보이는 frame 시점.
+		//audio PTS 기반은 seek 시 video keyframe 후진과 mismatch → 컨트롤바 / 자막 timing 이 화면보다 앞섬.
+		//video frame 의 원본 PTS = 실제 화면 frame 시점 = .smi 자막 timing reference.
+		std::atomic<int64_t> m_last_emitted_pts_ms{ -1 };
+	private:
 
-        CCritSec        m_cs_seeking;
-        CFFiSeeking*    m_pSeeking = nullptr;   //aggregated seeking object — pin 의 ref count 와 공유.
-    };
+		CCritSec		m_cs_seeking;
+		CFFiSeeking*	m_pSeeking = nullptr;	//aggregated seeking object — pin 의 ref count 와 공유.
+	};
 
-    //Audio pin — PCM S16 출력. libswresample 로 decoder 출력 (FLTP 등) 을 S16 으로 변환.
-    class CFFiAudioStream : public CSourceStream
-    {
-    public:
-        CFFiAudioStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
-        ~CFFiAudioStream();
+	//Audio pin — PCM S16 출력. libswresample 로 decoder 출력 (FLTP 등) 을 S16 으로 변환.
+	class CFFiAudioStream : public CSourceStream
+	{
+	public:
+		CFFiAudioStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
+		~CFFiAudioStream();
 
-        HRESULT FillBuffer(IMediaSample* pSample) override;
-        HRESULT GetMediaType(CMediaType* pMediaType) override;
-        HRESULT CheckMediaType(const CMediaType* pmt) override;
-        HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
-        HRESULT OnThreadCreate() override;
-        HRESULT OnThreadDestroy() override;
+		HRESULT FillBuffer(IMediaSample* pSample) override;
+		HRESULT GetMediaType(CMediaType* pMediaType) override;
+		HRESULT CheckMediaType(const CMediaType* pmt) override;
+		HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
+		HRESULT OnThreadCreate() override;
+		HRESULT OnThreadDestroy() override;
 
-        //video pin 의 on_change_start 에서 호출 — flush + new_segment.
-        void    on_seek_flush(REFERENCE_TIME rtStart);
+		//video pin 의 on_change_start 에서 호출 — flush + new_segment.
+		void	on_seek_flush(REFERENCE_TIME rtStart);
 
-        //get_track_pos 의 source — 마지막 emit 한 atempo input frame 의 원본 PTS (ms). rate 무관.
-        int64_t last_input_pts_ms() const { return m_last_input_pts_ms.load(); }
+		//get_track_pos 의 source — 마지막 emit 한 atempo input frame 의 원본 PTS (ms). rate 무관.
+		int64_t last_input_pts_ms() const { return m_last_input_pts_ms.load(); }
 
-        //atempo audio filter graph — rate != 1.0 시 PCM time-stretch (pitch 유지).
-        //swr_convert 의 S16 stereo output 을 source 로 받아 atempo filter 통과 → sink 에서 sample count 1/rate 줄어든 PCM 출력.
-        //graph 의 audio renderer (DSound) 가 줄어든 sample 양만큼 빨리 처리 → graph clock 가속 → video 도 따라 가속.
-        //rate runtime 변경은 avfilter_graph_send_command 로 atempo tempo 갱신 (graph 재생성 불필요).
-        bool                init_audio_filter(double rate);
-        void                release_audio_filter();
-        bool                update_audio_filter_rate(double rate);
+		//atempo audio filter graph — rate != 1.0 시 PCM time-stretch (pitch 유지).
+		//swr_convert 의 S16 stereo output 을 source 로 받아 atempo filter 통과 → sink 에서 sample count 1/rate 줄어든 PCM 출력.
+		//graph 의 audio renderer (DSound) 가 줄어든 sample 양만큼 빨리 처리 → graph clock 가속 → video 도 따라 가속.
+		//rate runtime 변경은 avfilter_graph_send_command 로 atempo tempo 갱신 (graph 재생성 불필요).
+		bool				init_audio_filter(double rate);
+		void				release_audio_filter();
+		bool				update_audio_filter_rate(double rate);
 
-    private:
-        CFFiSource*     m_pSource;
-        LONGLONG        m_sample_count = 0;
-        SwrContext*     m_swr = nullptr;
-        int             m_out_sample_rate = 0;
-        int             m_out_channels = 0;
-        AVChannelLayout m_out_chlayout{};
-        bool            m_need_discontinuity = false;
-        REFERENCE_TIME  m_pending_segment_stop = 0;
+	private:
+		CFFiSource*		m_pSource;
+		LONGLONG		m_sample_count = 0;
+		SwrContext*		m_swr = nullptr;
+		int				m_out_sample_rate = 0;
+		int				m_out_channels = 0;
+		AVChannelLayout m_out_chlayout{};
+		bool			m_need_discontinuity = false;
+		REFERENCE_TIME	m_pending_segment_stop = 0;
 
-        AVFilterGraph*   m_filter_graph = nullptr;
-        AVFilterContext* m_filter_src   = nullptr;   //abuffer
-        AVFilterContext* m_filter_atempo = nullptr;
-        AVFilterContext* m_filter_sink  = nullptr;   //abuffersink
-        double           m_filter_rate  = 1.0;       //현재 atempo 에 적용된 rate. source 의 playback_rate 와 비교해 달라지면 send_command.
+		AVFilterGraph*	 m_filter_graph = nullptr;
+		AVFilterContext* m_filter_src	= nullptr;	 //abuffer
+		AVFilterContext* m_filter_atempo = nullptr;
+		AVFilterContext* m_filter_sink	= nullptr;	 //abuffersink
+		double			 m_filter_rate	= 1.0;		 //현재 atempo 에 적용된 rate. source 의 playback_rate 와 비교해 달라지면 send_command.
 
-        //filter graph 직렬화 — rate 변경 시 set_playback_rate→flush(seek)→on_seek_flush→init (UI thread) 와
-        //FillBuffer→update_audio_filter_rate→init (audio worker thread) 가 동시에 graph 를 release/재빌드/사용 →
-        //use-after-free 크래시. init/release/사용을 이 lock 으로 직렬화. CRITICAL_SECTION 이라 동일 스레드 재진입 OK.
-        CCritSec         m_filter_cs;
+		//filter graph 직렬화 — rate 변경 시 set_playback_rate→flush(seek)→on_seek_flush→init (UI thread) 와
+		//FillBuffer→update_audio_filter_rate→init (audio worker thread) 가 동시에 graph 를 release/재빌드/사용 →
+		//use-after-free 크래시. init/release/사용을 이 lock 으로 직렬화. CRITICAL_SECTION 이라 동일 스레드 재진입 OK.
+		CCritSec		 m_filter_cs;
 
-        //atempo 가 한 FillBuffer 호출 안에서 여러 frame 을 emit. pData 가 한 frame 분량밖에 못 받으면 *나머지 drop* → audio sample 손실 → audio 가 stretch 안 된 듯 들림 + 띡 노이즈.
-        //드롭 대신 byte 로 보관 → 다음 FillBuffer pData 첫머리에 우선 copy. 사이즈 상한 (1MB) 으로 unbounded growth 방어.
-        std::vector<uint8_t> m_atempo_overflow;
+		//atempo 가 한 FillBuffer 호출 안에서 여러 frame 을 emit. pData 가 한 frame 분량밖에 못 받으면 *나머지 drop* → audio sample 손실 → audio 가 stretch 안 된 듯 들림 + 띡 노이즈.
+		//드롭 대신 byte 로 보관 → 다음 FillBuffer pData 첫머리에 우선 copy. 사이즈 상한 (1MB) 으로 unbounded growth 방어.
+		std::vector<uint8_t> m_atempo_overflow;
 
-        //audio sync offset — audio first emit 의 미디어 시점이 video first emit 보다 *delta* 만큼 후 인 경우
-        //audio sample.rtStart 에 delta 만큼 더해서 audio 표시 시점을 delta 늦춤. 같은 graph_clock 시점에 video / audio
-        //의 *미디어 시점이 정렬* → sync 정확.
-        REFERENCE_TIME  m_audio_offset_rt = 0;
-        bool            m_audio_offset_set = false;
+		//audio sync offset — audio first emit 의 미디어 시점이 video first emit 보다 *delta* 만큼 후 인 경우
+		//audio sample.rtStart 에 delta 만큼 더해서 audio 표시 시점을 delta 늦춤. 같은 graph_clock 시점에 video / audio
+		//의 *미디어 시점이 정렬* → sync 정확.
+		REFERENCE_TIME	m_audio_offset_rt = 0;
+		bool			m_audio_offset_set = false;
 
-        //실제 *미디어 시점* — audio decoder 가 마지막으로 emit 한 frame 의 원본 PTS (ms).
-        //get_track_pos 의 source 로 사용. graph clock 은 wall clock 진행이라 rate 변경 시 미디어 진행과 어긋남.
-        //이 값은 atempo input frame 의 pts 라 *원본 미디어 시점 그대로* — rate 무관 정확.
-        std::atomic<int64_t> m_last_input_pts_ms{ -1 };
-    public:
-        HRESULT OnThreadStartPlay() override;
-    };
+		//실제 *미디어 시점* — audio decoder 가 마지막으로 emit 한 frame 의 원본 PTS (ms).
+		//get_track_pos 의 source 로 사용. graph clock 은 wall clock 진행이라 rate 변경 시 미디어 진행과 어긋남.
+		//이 값은 atempo input frame 의 pts 라 *원본 미디어 시점 그대로* — rate 무관 정확.
+		std::atomic<int64_t> m_last_input_pts_ms{ -1 };
+	public:
+		HRESULT OnThreadStartPlay() override;
+	};
 
-    //CSource — base filter. Pin (CFFiVideoStream) 을 보유. open_file 로 CDecoder 준비.
-    class CFFiSource : public CSource
-    {
-    public:
-        //pUnk = outer IUnknown (aggregation). 일반적으로 NULL.
-        CFFiSource(LPUNKNOWN pUnk, HRESULT* phr);
-        ~CFFiSource();
+	//CSource — base filter. Pin (CFFiVideoStream) 을 보유. open_file 로 CDecoder 준비.
+	class CFFiSource : public CSource
+	{
+	public:
+		//pUnk = outer IUnknown (aggregation). 일반적으로 NULL.
+		CFFiSource(LPUNKNOWN pUnk, HRESULT* phr);
+		~CFFiSource();
 
-        //CSource override (위) 의 ctor 가 CLSID 를 요구하므로 별도 정적 메서드 불필요.
-        //pUnk = NULL 로 호출자가 직접 `new CFFiSource(NULL, &hr)` 식으로 instantiate.
+		//CSource override (위) 의 ctor 가 CLSID 를 요구하므로 별도 정적 메서드 불필요.
+		//pUnk = NULL 로 호출자가 직접 `new CFFiSource(NULL, &hr)` 식으로 instantiate.
 
-        //File open — graph add 전 또는 직후에 호출. CDecoder 초기화 + 비디오 stream open.
-        HRESULT open_file(const wchar_t* utf16_path);
+		//File open — graph add 전 또는 직후에 호출. CDecoder 초기화 + 비디오 stream open.
+		HRESULT open_file(const wchar_t* utf16_path);
 
-        //CDecoder 직접 접근 — VideoStream 의 FillBuffer 가 frame 꺼낼 때 사용.
-        CDecoder& decoder() { return m_decoder; }
+		//CDecoder 직접 접근 — VideoStream 의 FillBuffer 가 frame 꺼낼 때 사용.
+		CDecoder& decoder() { return m_decoder; }
 
-    public:
-        CFFiVideoStream*  video_stream() const { return m_pVideoStream; }
-        CFFiAudioStream*  audio_stream() const { return m_pAudioStream; }
+	public:
+		CFFiVideoStream*  video_stream() const { return m_pVideoStream; }
+		CFFiAudioStream*  audio_stream() const { return m_pAudioStream; }
 
-        //audio sync delay — video first emit pts_rt anchor 에 적용할 offset (REFERENCE_TIME, 100ns).
-        //CSCAudioGain 의 sample.rtStart shift 방식은 audio.rtStart 가 segment-local 0 부터인 internal path 에서
-        //negative 결과 → DSound 즉시 표시 → delay 무효. 대신 audio anchor 자체를 ±delay 만큼 shift 하여
-        //*audio first emit 의 미디어 시점* 을 video 와 분리 → 정상 sync.
-        void           set_audio_sync_delay_ms(int ms) { m_audio_sync_delay_rt.store((int64_t)ms * 10000LL); }
-        int64_t        audio_sync_delay_rt() const { return m_audio_sync_delay_rt.load(); }
+		//audio sync delay — video first emit pts_rt anchor 에 적용할 offset (REFERENCE_TIME, 100ns).
+		//CSCAudioGain 의 sample.rtStart shift 방식은 audio.rtStart 가 segment-local 0 부터인 internal path 에서
+		//negative 결과 → DSound 즉시 표시 → delay 무효. 대신 audio anchor 자체를 ±delay 만큼 shift 하여
+		//*audio first emit 의 미디어 시점* 을 video 와 분리 → 정상 sync.
+		void		   set_audio_sync_delay_ms(int ms) { m_audio_sync_delay_rt.store((int64_t)ms * 10000LL); }
+		int64_t		   audio_sync_delay_rt() const { return m_audio_sync_delay_rt.load(); }
 
-        //CFFiSeeking::ChangeRate 가 m_dRate 를 여기로 propagate. video/audio FillBuffer 가 sample 의 rtStart/rtStop 을
-        //1/rate 로 scale → renderer 가 graph clock 같은 시간에 rate 배의 미디어 시간 sample 표시 → 빠르게/느리게 재생.
-        //audio 는 sample data 양은 그대로 + duration 만 scale → renderer 가 시간 맞춰 빠르게 재생 (chipmunk 효과, LAV path 동등).
-        void           set_playback_rate(double r) { m_playback_rate.store(r); }
-        double         playback_rate() const { return m_playback_rate.load(); }
+		//CFFiSeeking::ChangeRate 가 m_dRate 를 여기로 propagate. video/audio FillBuffer 가 sample 의 rtStart/rtStop 을
+		//1/rate 로 scale → renderer 가 graph clock 같은 시간에 rate 배의 미디어 시간 sample 표시 → 빠르게/느리게 재생.
+		//audio 는 sample data 양은 그대로 + duration 만 scale → renderer 가 시간 맞춰 빠르게 재생 (chipmunk 효과, LAV path 동등).
+		void		   set_playback_rate(double r) { m_playback_rate.store(r); }
+		double		   playback_rate() const { return m_playback_rate.load(); }
 
-        //실제 *미디어 시점* (ms) — audio pin 이 마지막 emit 한 atempo input frame 의 원본 PTS.
-        //get_track_pos 가 wall clock 기반 graph position 대신 이 값을 반환해 rate 무관 정확 시점.
-        //audio pin 없으면 -1.
-        int64_t        audio_current_pts_ms() const;
+		//실제 *미디어 시점* (ms) — audio pin 이 마지막 emit 한 atempo input frame 의 원본 PTS.
+		//get_track_pos 가 wall clock 기반 graph position 대신 이 값을 반환해 rate 무관 정확 시점.
+		//audio pin 없으면 -1.
+		int64_t		   audio_current_pts_ms() const;
 
-    private:
-        CDecoder         m_decoder;
-        CFFiVideoStream* m_pVideoStream = nullptr;
-        CFFiAudioStream* m_pAudioStream = nullptr;   //has_audio 일 때만 생성.
-        std::atomic<int64_t> m_audio_sync_delay_rt{0};
-        std::atomic<double>  m_playback_rate{1.0};
-    };
+	private:
+		CDecoder		 m_decoder;
+		CFFiVideoStream* m_pVideoStream = nullptr;
+		CFFiAudioStream* m_pAudioStream = nullptr;	 //has_audio 일 때만 생성.
+		std::atomic<int64_t> m_audio_sync_delay_rt{0};
+		std::atomic<double>	 m_playback_rate{1.0};
+	};
 }

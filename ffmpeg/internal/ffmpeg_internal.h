@@ -4,9 +4,9 @@
 * ffmpeg_internal — 내장 FFmpeg (libavformat / libavcodec / libavutil / libswresample / libswscale) wrapper.
 *
 *  - Endorphin2 / 기타 프로젝트의 LAV 기반 DirectShow seek delay 한계 (25-604ms SetPositions 블로킹) 우회를 위한
-*    PotPlayer 식 내장 FFmpeg 구조의 foundation.
+*	 PotPlayer 식 내장 FFmpeg 구조의 foundation.
 *  - 라이센스: LGPL shared (Gyan release-essentials-shared 또는 BtbN lgpl-shared).
-*    binary 는 D:\1.Projects_C++\Common\ffmpeg\{include,lib,bin} 에 위치.
+*	 binary 는 D:\1.Projects_C++\Common\ffmpeg\{include,lib,bin} 에 위치.
 *  - Common/ffmpeg.props 가 include path / lib link / DLL copy 자동 처리.
 *
 * Phase 1 — Foundation. open + dump streams + close 만. decode 는 Phase 2.
@@ -40,30 +40,30 @@ extern "C" {
 
 namespace ffi
 {
-    //프로세스 lifetime 동안 1회 호출되는 초기화. log callback 설치 + 네트워크 모듈 init 등.
-    //멀티 호출은 no-op (idempotent).
-    void                init_once();
+	//프로세스 lifetime 동안 1회 호출되는 초기화. log callback 설치 + 네트워크 모듈 init 등.
+	//멀티 호출은 no-op (idempotent).
+	void				init_once();
 
-    //Phase 1 smoke test — file 열어 stream 정보만 dump 후 close. utf-16 path 안전 처리.
-    //성공 시 0, 실패 시 av error code (음수). 로그에 [ffi/dump] 로 stream 들 출력.
-    int                 dump_streams(const wchar_t* utf16_path);
+	//Phase 1 smoke test — file 열어 stream 정보만 dump 후 close. utf-16 path 안전 처리.
+	//성공 시 0, 실패 시 av error code (음수). 로그에 [ffi/dump] 로 stream 들 출력.
+	int					dump_streams(const wchar_t* utf16_path);
 
-    //Phase 2 smoke test — CDecoder open/start/decode-N-frames/seek/stop/close 한 사이클 실행.
-    //frame N 개 디코드 후 미디어 중간 위치 seek + 추가 N 개 디코드. 각 frame 의 pts / decode 소요시간 로그.
-    int                 decode_test(const wchar_t* utf16_path, int num_frames_to_dump = 10);
+	//Phase 2 smoke test — CDecoder open/start/decode-N-frames/seek/stop/close 한 사이클 실행.
+	//frame N 개 디코드 후 미디어 중간 위치 seek + 추가 N 개 디코드. 각 frame 의 pts / decode 소요시간 로그.
+	int					decode_test(const wchar_t* utf16_path, int num_frames_to_dump = 10);
 
-    //Phase 3a smoke test — CFFiSource 인스턴스화 + open_file + pin 메타데이터 dump.
-    //graph 통합은 Phase 3b 에서. 일단 filter 만 독립적으로 동작하는지 검증.
-    int                 filter_test(const wchar_t* utf16_path);
+	//Phase 3a smoke test — CFFiSource 인스턴스화 + open_file + pin 메타데이터 dump.
+	//graph 통합은 Phase 3b 에서. 일단 filter 만 독립적으로 동작하는지 검증.
+	int					filter_test(const wchar_t* utf16_path);
 
-    //Phase 3b smoke test — CFFiSource 를 GraphBuilder 에 add + Render → graph 자동 완성 + Run 3 초 + Stop.
-    //그래프 연결 성공 + worker thread 가 FillBuffer 호출되는지 확인. 화면 출력은 default renderer (보통 VMR9) 가 처리.
-    int                 graph_test(const wchar_t* utf16_path);
+	//Phase 3b smoke test — CFFiSource 를 GraphBuilder 에 add + Render → graph 자동 완성 + Run 3 초 + Stop.
+	//그래프 연결 성공 + worker thread 가 FillBuffer 호출되는지 확인. 화면 출력은 default renderer (보통 VMR9) 가 처리.
+	int					graph_test(const wchar_t* utf16_path);
 
-    //av_err2str 의 C++ 호환 buffer 버전. 매크로 형태가 일부 컴파일러에서 문제 일으켜 인라인 함수로 대체.
-    inline const char*  err_str(int err_code, char* buf, size_t buf_size)
-    {
-        av_strerror(err_code, buf, buf_size);
-        return buf;
-    }
+	//av_err2str 의 C++ 호환 buffer 버전. 매크로 형태가 일부 컴파일러에서 문제 일으켜 인라인 함수로 대체.
+	inline const char*	err_str(int err_code, char* buf, size_t buf_size)
+	{
+		av_strerror(err_code, buf, buf_size);
+		return buf;
+	}
 }

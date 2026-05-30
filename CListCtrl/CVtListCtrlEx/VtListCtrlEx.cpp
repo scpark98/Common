@@ -14,10 +14,13 @@
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
+#define WM_LIST_END_EDIT	(WM_USER + 9023)
 
 // CVtListCtrlEx
 
 IMPLEMENT_DYNAMIC(CVtListCtrlEx, CListCtrl)
+
+CVtListCtrlEx* CVtListCtrlEx::s_editing_list = NULL;
 
 //셀별 font style 안전 접근 — column 수 변화 등으로 미초기화면 default 0/false.
 //OnDrawItem 의 cell 그리기에서 직접 호출 + setter 들의 _apply_style_field 와 짝.
@@ -78,6 +81,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CVtListCtrlEx::on_message_CSCStaticEdit)
+	ON_MESSAGE(WM_LIST_END_EDIT, &CVtListCtrlEx::on_end_edit_posted)
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGING, &CVtListCtrlEx::OnLvnItemchanging)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_NCHITTEST()
@@ -1919,8 +1923,12 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	else if (align == HDF_RIGHT)
 		halign = DT_RIGHT;
 
-	if (r.right > rc.right)
-		r.right = rc.right;
+	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
+	int right_limit = rc.right;
+	if (::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible())
+		right_limit -= m_scrollbar_width;
+	if (r.right > right_limit)
+		r.right = right_limit;
 
 	m_edit_old_text = GetItemText(item, subItem);
 
@@ -1941,6 +1949,10 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	m_pEdit->SetFont(&m_font, true);
 	m_pEdit->set_text_align(halign);
 	m_pEdit->set_line_align(DT_VCENTER);
+	//셀 편집기 — 행 높이 = edit 높이 이므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
+	//기본 m_padding(4) + border(1) = 5px 씩 inset 이라 작은 행 높이에서 텍스트가 가운데 띄워져 보임.
+	//0 으로 두면 선택 하이라이트가 보더에 붙어 일반 edit 컨트롤 외관과 어긋남.
+	m_pEdit->set_padding(2);
 	m_pEdit->SetWindowText(m_edit_old_text);
 	m_pEdit->set_readonly(m_edit_readonly);
 
@@ -1958,6 +1970,9 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	m_edit_item = item;
 	m_edit_subItem = subItem;
 	get_selected_items(&m_dqSelected_list_for_edit);
+
+	//편집 모드 외부 클릭 감지용 마우스 훅 설치 (다른 컨트롤·다이얼로그 빈 영역·NC 어디든) — CSCListBox/CPathCtrl 패턴.
+	install_edit_mouse_hook();
 
 	// Send Notification to parent of ListView ctrl
 	//기본 지원되는 폴翡 기능을 이퓖E舊갋않컖EEditSubItem이라는 함수를 제작해서 사퓖E薩갋때문에
@@ -1996,9 +2011,16 @@ LRESULT CVtListCtrlEx::on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam)
 	//CSCStaticEdit 은 타이핑마다 message_scstaticedit_text_changed 를 보낸다.
 	//여기서 무조건 Invalidate() 하면 키 입력마다 리스트 전체가 repaint 되어 깜빡인다.
 	//셀 내용이 실제로 바뀌는 커밋/취소 시에만 리스트를 갱신한다.
+	//
+	//killfocus 는 *재진입* 안전 차원에서 즉시 edit_end() 하지 않고 PostMessage 로 분리:
+	//OnKillFocus → SendMessage(notify_parent) → 여기서 edit_end → ShowWindow(SW_HIDE) 가
+	//OnKillFocus 본문이 끝나기 전에 실행되면 mfc 내부 default OnKillFocus 가 stale state 위에서
+	//crash (CStatic::OnKillFocus 라인 423 access violation) 한다.
 	switch (msg->message)
 	{
 		case CSCStaticEdit::message_scstaticedit_killfocus:
+			PostMessage(WM_LIST_END_EDIT, 1, 0);
+			break;
 		case CSCStaticEdit::message_scstaticedit_enter:
 			edit_end();
 			Invalidate();
@@ -2009,6 +2031,56 @@ LRESULT CVtListCtrlEx::on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam)
 			break;
 	}
 
+	return 0;
+}
+
+//---- 편집 모드 외부 클릭 감지 (CSCListBox/CPathCtrl 동일 패턴) -----------------------------------------
+
+void CVtListCtrlEx::install_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+		return;
+
+	//WH_MOUSE 는 자기 스레드 메시지 큐만 감시 → 다른 앱 클릭은 보지 않는다(그쪽은 killfocus 가 처리).
+	//이 훅의 목적은 "같은 스레드(같은 dlg) 의 edit 바깥 클릭" 감지뿐이다.
+	s_editing_list = this;
+	m_mouse_hook = ::SetWindowsHookEx(WH_MOUSE, edit_mouse_hook_proc, NULL, ::GetCurrentThreadId());
+}
+
+void CVtListCtrlEx::remove_edit_mouse_hook()
+{
+	if (m_mouse_hook != NULL)
+	{
+		::UnhookWindowsHookEx(m_mouse_hook);
+		m_mouse_hook = NULL;
+	}
+	if (s_editing_list == this)
+		s_editing_list = NULL;
+}
+
+LRESULT CALLBACK CVtListCtrlEx::edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam)
+{
+	if (code == HC_ACTION && s_editing_list != NULL && s_editing_list->m_pEdit != NULL)
+	{
+		if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN ||
+			wParam == WM_NCLBUTTONDOWN || wParam == WM_NCRBUTTONDOWN || wParam == WM_NCMBUTTONDOWN)
+		{
+			MOUSEHOOKSTRUCT* mh = (MOUSEHOOKSTRUCT*)lParam;
+			CRect rc_edit;
+			s_editing_list->m_pEdit->GetWindowRect(&rc_edit);
+
+			//edit 내부 클릭은 캐럿 이동이므로 종료 금지. 바깥이면 종료를 post (클릭 자체는 그대로 통과시킴).
+			if (!rc_edit.PtInRect(mh->pt))
+				s_editing_list->PostMessage(WM_LIST_END_EDIT, 0, 0);
+		}
+	}
+
+	return ::CallNextHookEx(NULL, code, wParam, lParam);
+}
+
+LRESULT CVtListCtrlEx::on_end_edit_posted(WPARAM wParam, LPARAM lParam)
+{
+	edit_end(true);
 	return 0;
 }
 
@@ -4019,6 +4091,8 @@ BOOL CVtListCtrlEx::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 //단, 중복되는 이름이 존재하여 실패할 경우는 main에게 이를 알려 메시지를 표시해야 한다.
 void CVtListCtrlEx::edit_end(bool valid)
 {
+	remove_edit_mouse_hook();
+
 	if (m_in_editing == false || m_pEdit == NULL)
 		return;
 
@@ -4027,8 +4101,21 @@ void CVtListCtrlEx::edit_end(bool valid)
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
 
-	//if (m_edit_new_text == m_edit_old_text)
-	//	return;
+	//valid==false (Escape) 또는 텍스트 미변경 → rename / set_text 모두 건너뜀. 외부 클릭으로 들어온 commit
+	//의 경우 텍스트 미변경이면 MoveFile(same, same) 이 실패하고 아래 edit_item() 재진입 경로로 빠져 마치
+	//편집이 종료되지 않은 것처럼 보이는 버그를 회피.
+	if (!valid || m_edit_new_text == m_edit_old_text)
+	{
+		LV_DISPINFO dispinfo;
+		dispinfo.hdr.hwndFrom = m_hWnd;
+		dispinfo.hdr.idFrom = GetDlgCtrlID();
+		dispinfo.hdr.code = LVN_ENDLABELEDIT;
+		dispinfo.item.mask = LVIF_TEXT;
+		dispinfo.item.iItem = m_edit_item;
+		dispinfo.item.iSubItem = m_edit_subItem;
+		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
+		return;
+	}
 
 	//shell listctrl의 label이 변경되면 실제 파일/폴더명도 변경해줘야 한다.
 	if (m_is_shell_listctrl)

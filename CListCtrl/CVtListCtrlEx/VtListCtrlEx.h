@@ -569,6 +569,16 @@ public:
 	void		reset_modified_flag() { m_modified = false; }
 	LRESULT		on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam);
 
+	//편집 모드 중 *다른 컨트롤·다른 앱·다이얼로그 빈 영역* 어디를 클릭해도 편집을 정상 종료(commit) 시키기 위한 훅.
+	//CSCListBox / CSCTreeCtrl / CPathCtrl 과 동일 패턴 — WH_MOUSE 로 같은 스레드 외부 클릭 감지 → 메시지 post → on_end_edit_posted → edit_end(true).
+	//다른 앱으로의 포커스 이동은 CSCStaticEdit 의 killfocus 가 on_message_CSCStaticEdit 로 전달돼 처리 (기존 경로 유지).
+	void			install_edit_mouse_hook();
+	void			remove_edit_mouse_hook();
+	static LRESULT CALLBACK	edit_mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam);
+	LRESULT			on_end_edit_posted(WPARAM wParam, LPARAM lParam);
+	static CVtListCtrlEx*	s_editing_list;
+	HHOOK			m_mouse_hook = NULL;
+
 //폰트 관련. 반드시 set_headings() 후에 호출할것.
 	void		set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET, bool invalidate = false);
 	//-1 : reduce, +1 : enlarge

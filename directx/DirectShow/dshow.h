@@ -258,6 +258,12 @@ public:
 
 	bool			get_video_mirror() { return m_mirror; }
 	bool			get_video_flip() { return m_flip; }
+
+	//가로/세로 전환 — 영상을 0°↔90° 토글. MPC Video Renderer 의 IExFilterConfig "rotation" 사용.
+	//VMR9/EVR 는 SetOutputRect 가 반사만 되고 회전 파라미터가 없어 미지원 (false 반환).
+	//성공 시 true, 미지원 렌더러/실패 시 false.
+	bool			toggle_video_rotation();
+	int				get_video_rotation() { return m_video_rotation; }
 	
 	enum PAN_SCAN_MODE
 	{
@@ -433,6 +439,7 @@ protected:
 
 	bool			m_mirror;
 	bool			m_flip;
+	int				m_video_rotation = 0;	//0 / 90 / 180 / 270 (가로/세로 전환은 0↔90 토글). MPCVR rotation.
 
 	//MPCVR pan&scan 누적 state — base aspect-preserve dest rect 위에 적용되는 normalized 변환.
 	//(0,0,1,1) = identity (변환 없음). 음/양수 외삽 가능 (zoom in 시 -0.1, 1.1).

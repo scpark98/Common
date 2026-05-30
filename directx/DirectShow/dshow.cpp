@@ -1421,6 +1421,7 @@ void CDShow::close_media()
 	m_subtitle_stream_index = -1;
 
 	m_mirror = m_flip = false;
+	m_video_rotation = 0;
 	m_panscan_left = 0.0f; m_panscan_top = 0.0f; m_panscan_right = 1.0f; m_panscan_bottom = 1.0f;
 	m_last_video_position_rect.SetRectEmpty();
 
@@ -3159,9 +3160,19 @@ void CDShow::set_video_position(CRect r)
 			const int win_w = r.Width();
 			const int win_h = r.Height();
 			int vid_w = win_w, vid_h = win_h, vid_x = 0, vid_y = 0;
-			if (m_video_size.cx > 0 && m_video_size.cy > 0 && win_w > 0 && win_h > 0)
+
+			//90/270 회전 시 표시 종횡비는 원본의 W↔H 가 swap 된 값 — letterbox/pillarbox 계산에 회전된 dimension 사용.
+			int eff_vw = m_video_size.cx;
+			int eff_vh = m_video_size.cy;
+			if (m_video_rotation == 90 || m_video_rotation == 270)
 			{
-				const float src_ar = (float)m_video_size.cx / (float)m_video_size.cy;
+				eff_vw = m_video_size.cy;
+				eff_vh = m_video_size.cx;
+			}
+
+			if (eff_vw > 0 && eff_vh > 0 && win_w > 0 && win_h > 0)
+			{
+				const float src_ar = (float)eff_vw / (float)eff_vh;
 				const float win_ar = (float)win_w / (float)win_h;
 				if (win_ar > src_ar)
 				{
@@ -3228,6 +3239,46 @@ void CDShow::set_video_position(CRect r)
 			}
 		}
 	}
+}
+
+bool CDShow::toggle_video_rotation()
+{
+	//회전은 MPC Video Renderer 만 지원 (IExFilterConfig "rotation", 90 배수). VMR9/EVR 의 SetOutputRect 는
+	//좌표 반사만 가능하고 회전 파라미터가 없어 90° 회전 불가.
+	if (!m_use_mpcvr || m_VMR == NULL)
+	{
+		logWrite(_T("[rotate] 회전은 MPC Video Renderer 에서만 지원 — 현재 렌더러 미지원"));
+		return false;
+	}
+
+	CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+	if (!pCfg)
+	{
+		logWrite(_T("[rotate] IExFilterConfig QI 실패"));
+		return false;
+	}
+
+	int next = (m_video_rotation == 0) ? 90 : 0;
+	HRESULT hr = pCfg->Flt_SetInt("rotation", next);
+	logWrite(_T("[rotate] Flt_SetInt(rotation,%d) hr=0x%08x"), next, hr);
+	if (FAILED(hr))
+		return false;
+
+	m_video_rotation = next;
+
+	//회전으로 표시 종횡비(W↔H)가 바뀌므로 목적지 rect 를 새 회전 기준으로 재계산 (pillarbox/letterbox 갱신).
+	if (!m_last_video_position_rect.IsRectEmpty())
+		set_video_position(m_last_video_position_rect);
+
+	//paused 시 새 프레임이 안 들어와 회전 결과가 즉시 화면에 안 나타남 → cmd_redraw 강제 (resize 갱신과 동일 패턴).
+	if (m_pMC)
+	{
+		OAFilterState state = State_Running;
+		if (m_pMC->GetState(0, &state) == S_OK && state == State_Paused)
+			pCfg->Flt_SetBool("cmd_redraw", true);
+	}
+
+	return true;
 }
 
 double CDShow::get_track_pos()

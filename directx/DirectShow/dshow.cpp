@@ -3465,6 +3465,10 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 		DWORD flags = AM_SEEKING_AbsolutePositioning | AM_SEEKING_NoFlush;
 		if (seek_to_keyframe)
 			flags |= AM_SEEKING_SeekToKeyFrame;
+		//seek 후 audio sample timestamp 가 segment 상대값으로 리셋되므로, TimeStretch anchor 의 미디어 절대 base 를
+		//seek 목표로 지정 (배속!=1.0 시 위치가 0 으로 굳는 문제 보정). SetPositions 전에 설정.
+		if (m_pAudioTimeStretchFilter)
+			((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_seek_base_ms((int64_t)pos);
 		hr = m_pMS->SetPositions(&lPos, flags, NULL, AM_SEEKING_NoPositioning);
 		::QueryPerformanceCounter(&qpc_t1);
 
@@ -3579,11 +3583,10 @@ void CDShow::move_track(bool forward, int interval)
 	if (!m_pGB || !m_pMP)
 		return;
 
+	//interval 미지정(<1) 일 때만 modifier 로 자동 결정. 명시 interval(메뉴/단축키의 5/30/300 등)은 그대로 존중 —
+	//Ctrl+Shift+Left=300 호출 시 Ctrl override 가 control_interval 로 덮어 300 이 깨지던 문제 방지.
 	if (interval < 1)
-		interval = m_default_interval;
-
-	if (IsCtrlPressed())
-		interval = m_control_interval;
+		interval = IsCtrlPressed() ? m_control_interval : m_default_interval;
 
 	//set_track_pos 가 SetPositions(absolute) + m_last_track_pos_ms cache 갱신 + paused 분기 RepaintVideo /
 	//MPCVR cmd_redraw + WMV DMO flush 까지 위임. legacy put_CurrentPosition 만 호출하던 시점 paused 상태에서
@@ -5725,6 +5728,10 @@ void CDShow::flush_audio_buffer()
 	LONGLONG cur = 0;
 	if (FAILED(m_pMS->GetCurrentPosition(&cur)))
 		return;
+	//seek 후 audio sample timestamp 가 segment 상대값(≈0)으로 리셋되므로, TimeStretch 의 컨트롤바 위치 base 를
+	//현재 위치로 지정 (배속 변경 시 위치가 0 으로 굳는 문제 보정). SetPositions 전에 — 새 sample 도착 전 적용 보장.
+	if (m_pAudioTimeStretchFilter)
+		((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_seek_base_ms(cur / 10000);
 	m_pMS->SetPositions(&cur, AM_SEEKING_AbsolutePositioning,
 						NULL, AM_SEEKING_NoPositioning);
 }

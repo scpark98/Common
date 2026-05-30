@@ -35,9 +35,11 @@ int64_t CSCAudioTimeStretch::processed_input_pts_ms() const
 	//anchor 미설정 (재생 시작 전 / seek 직후) 시 -1 반환 → 호출자가 graph position fallback.
 	if (m_filter_sr <= 0 || !m_anchor_set)
 		return -1;
-	int64_t samples = m_in_pts_samples;
-	REFERENCE_TIME anchor = m_anchor_rt;
-	return (anchor / 10000) + (int64_t)((double)samples * 1000.0 / (double)m_filter_sr);
+	int64_t samples = m_in_pts_samples;	//seek(new_segment) 마다 0 리셋 → seek 이후 누적 input = 미디어 경과(원본 rate).
+	//미디어 절대 위치 = seek 목표(base) + 경과. base 미설정(첫 재생, seek 없음)이면 출력 anchor(stream≈0)로 fallback.
+	int64_t base = m_seek_base_rt.load();
+	REFERENCE_TIME base_rt = (base >= 0) ? base : m_anchor_rt;
+	return (base_rt / 10000) + (int64_t)((double)samples * 1000.0 / (double)m_filter_sr);
 }
 
 bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int bits_per_sample, bool is_float)
@@ -329,6 +331,11 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 	bool has_in_time = SUCCEEDED(pIn->GetTime(&in_tStart, &in_tStop));
 	if (has_in_time && !m_anchor_set)
 	{
+		//m_anchor_rt 는 *출력 sample timestamp 의 baseline* (line: outStart = m_anchor_rt + emitted/sr).
+		//graph 의 post-seek stream clock(seek 시 ≈0 기준으로 리셋)과 맞아야 DSound 가 제때 재생한다.
+		//→ segment 상대값(in_tStart)을 그대로 써야 함. *미디어 절대 위치가 아님* — 절대 위치로 바꾸면 출력
+		//timestamp 가 미래로 찍혀 DSound 가 보류→재생 정지(backpressure)된다. 컨트롤바용 미디어 절대 시각은
+		//processed_input_pts_ms 가 m_seek_base + 누적 input 으로 별도 계산한다.
 		m_anchor_rt = in_tStart;
 		m_anchor_set = true;
 	}

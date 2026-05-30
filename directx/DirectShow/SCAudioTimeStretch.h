@@ -49,6 +49,10 @@ public:
 	//graph clock (wall clock 기반) 대신 이 값을 쓰면 rate 무관 정확. anchor 미설정 시 -1.
 	int64_t	processed_input_pts_ms() const;
 
+	//seek 진입점(set_track_pos / flush_audio_buffer)이 호출 — anchor 의 미디어 절대 base(ms). seek 직후 sample
+	//timestamp 가 segment 상대값(≈0)으로 리셋되는 문제 보정용. -1 = 미설정(첫 재생, base 없이 sample 시각 사용).
+	void	set_seek_base_ms(int64_t ms) { m_seek_base_rt.store(ms * 10000); }
+
 	//in-place process_sample 은 미사용. process_one 직접 override.
 	virtual void	process_sample(BYTE* /*buf*/, long /*len*/, const WAVEFORMATEX* /*wfx*/) override {}
 
@@ -86,6 +90,9 @@ private:
 
 	//pts 누적 — atempo input frame 의 pts 가 timeline 진행 baseline.
 	int64_t m_in_pts_samples = 0;
+
+	//seek 진입점이 넘긴 미디어 절대 위치(100ns). anchor 가 segment 상대 sample 시각 대신 이 base 를 쓴다. -1=미설정.
+	std::atomic<int64_t> m_seek_base_rt{ -1 };
 
 	//output sample 의 timestamp 계산 baseline. NewSegment 마다 reset.
 	//atempo 가 output sample 양 1/rate 로 줄임 → 누적 sample 양 기반 timestamp 가 자연 1/rate 빈도 진행

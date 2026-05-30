@@ -49,7 +49,7 @@
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../SCGdiplusBitmap.h"
 #include "../../colors.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
 #include "../../win_compat/dwm.h"
 
@@ -356,8 +356,8 @@ protected:
 	//편집된 데이터가 empty이어도 정상 데이터로 처리할 지...
 	//false일 경우는 해당 라인을 제거한다.
 	bool		m_accept_empty_edit_str = true;
-	CSCEdit*	m_pEdit = NULL;
-	LRESULT		on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+	CSCStaticEdit*	m_pEdit = NULL;
+	LRESULT		on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam);
 
 	//선택 관련
 	//std::deque<int>	 m_selected;

@@ -108,7 +108,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	ON_WM_NCCALCSIZE()
 	ON_WM_VSCROLL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCListBox::on_message_CSCScrollbar)
-	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCListBox::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CSCListBox::on_message_CSCStaticEdit)
 	ON_MESSAGE(UWM_CSCLISTBOX_SETUP_SCROLLBAR, &CSCListBox::on_setup_scrollbar_deferred)
 	ON_MESSAGE(WM_LISTBOX_END_EDIT, &CSCListBox::on_end_edit_posted)
 END_MESSAGE_MAP()
@@ -1662,20 +1662,21 @@ void CSCListBox::edit(int index)
 
 	if (!m_pEdit)
 	{
-		DWORD dwStyle = WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_MULTILINE | (m_edit_readonly ? ES_READONLY : 0);
-		m_pEdit = new CSCEdit();
-		m_pEdit->create(dwStyle, rItem, this, IDC_EDIT_CELL);
+		m_pEdit = new CSCStaticEdit();
+		m_pEdit->Create(WS_BORDER, rItem, this, IDC_EDIT_CELL);
 		m_pEdit->SetFont(&m_font);
-		DWORD margin = m_pEdit->GetMargins();
-		m_pEdit->SetMargins(4, 4);
 		m_pEdit->set_line_align(DT_VCENTER);
+		//셀 편집기 — 항목 높이 = edit 높이 이므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
+		//0 으로 두면 선택 하이라이트가 보더에 붙어 일반 edit 컨트롤 외관과 어긋남.
+		m_pEdit->set_padding(2);
 	}
+	m_pEdit->set_readonly(m_edit_readonly);
 
 	m_pEdit->SetWindowText(text);
 	m_pEdit->MoveWindow(rItem);
 	m_pEdit->ShowWindow(SW_SHOW);
 
-	m_pEdit->SetSel(0, -1);
+	m_pEdit->select_all();
 	m_pEdit->SetFocus();
 
 	m_in_editing = true;
@@ -2345,27 +2346,26 @@ void CSCListBox::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	sync_scrollbar();
 }
 
-LRESULT CSCListBox::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+LRESULT CSCListBox::on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam)
 {
-	auto msg = (CSCEditMessage*)wParam;
+	auto msg = (CSCStaticEditMessage*)wParam;
 	if (msg->pThis != m_pEdit)
 		return 0;
 
-	if (msg->message == WM_KILLFOCUS)
+	//killfocus 는 OnKillFocus → SendMessage(notify_parent) 경로라 *재진입* 안전 차원에서 PostMessage 로 분리:
+	//여기서 즉시 edit_end() 하면 ShowWindow(SW_HIDE) 가 OnKillFocus 가 끝나기 전에 m_pEdit 의 시각 상태를
+	//건드려 mfc 내부 default OnKillFocus 가 stale state 위에서 crash 하는 case 가 있었다.
+	if (msg->message == CSCStaticEdit::message_scstaticedit_killfocus)
 	{
-		edit_end();
+		PostMessage(WM_LISTBOX_END_EDIT, 1, 0);
 	}
-	else if (msg->message == WM_KEYDOWN)
+	else if (msg->message == CSCStaticEdit::message_scstaticedit_enter)
 	{
-		switch ((int)lParam)
-		{
-		case VK_RETURN:
-			edit_end();
-			break;
-		case VK_ESCAPE:
-			edit_end(false);
-			break;
-		}
+		edit_end(true);
+	}
+	else if (msg->message == CSCStaticEdit::message_scstaticedit_escape)
+	{
+		edit_end(false);
 	}
 
 	return 0;

@@ -158,6 +158,11 @@ namespace ffi
         AVFilterContext* m_filter_sink  = nullptr;   //abuffersink
         double           m_filter_rate  = 1.0;       //현재 atempo 에 적용된 rate. source 의 playback_rate 와 비교해 달라지면 send_command.
 
+        //filter graph 직렬화 — rate 변경 시 set_playback_rate→flush(seek)→on_seek_flush→init (UI thread) 와
+        //FillBuffer→update_audio_filter_rate→init (audio worker thread) 가 동시에 graph 를 release/재빌드/사용 →
+        //use-after-free 크래시. init/release/사용을 이 lock 으로 직렬화. CRITICAL_SECTION 이라 동일 스레드 재진입 OK.
+        CCritSec         m_filter_cs;
+
         //atempo 가 한 FillBuffer 호출 안에서 여러 frame 을 emit. pData 가 한 frame 분량밖에 못 받으면 *나머지 drop* → audio sample 손실 → audio 가 stretch 안 된 듯 들림 + 띡 노이즈.
         //드롭 대신 byte 로 보관 → 다음 FillBuffer pData 첫머리에 우선 copy. 사이즈 상한 (1MB) 으로 unbounded growth 방어.
         std::vector<uint8_t> m_atempo_overflow;

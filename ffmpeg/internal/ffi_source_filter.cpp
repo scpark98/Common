@@ -595,6 +595,7 @@ namespace ffi
 
     bool CFFiAudioStream::init_audio_filter(double rate)
     {
+        CAutoLock lock(&m_filter_cs);   //다른 스레드의 init/release/use 와 직렬화 (use-after-free 크래시 방지).
         release_audio_filter();
 
         if (m_out_sample_rate <= 0 || m_out_channels <= 0)
@@ -710,6 +711,7 @@ namespace ffi
 
     void CFFiAudioStream::release_audio_filter()
     {
+        CAutoLock lock(&m_filter_cs);   //init 내부 호출(동일 스레드 재진입 OK) + 타 스레드 use 와 직렬화.
         if (m_filter_graph)
         {
             avfilter_graph_free(&m_filter_graph);
@@ -894,9 +896,14 @@ namespace ffi
                 }
                 //anchor skip — 항상 적용. audio first emit 의 미디어 시점 = video first emit 의 미디어 시점 강제.
                 //video / audio 가 각자 first emit 시점 부터 segment-local 0 인 시간계라 정확한 시점 정렬 필요.
+                //audio_sync delay 적용 — audio 가 참조하는 anchor 를 -delay 만큼 이동 (헤더 주석의 "anchor shift").
+                //delay<0(audio 빠르게) → anchor 가 뒤로 가 audio 가 더 앞 content 부터 시작 → audio 가 video 보다 앞섬.
+                //rtStart 직접 shift 는 negative→DSound 즉시표시로 무효라, anchor 이동으로 rtStart 는 0 부터 유지.
+                int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
+                int64_t anchor_rt = video_anchor - sync_delay;
                 if (video_anchor != LLONG_MIN && audio_tb.num > 0 && audio_tb.den > 0)
                 {
-                    int64_t anchor_pts = av_rescale_q(video_anchor,
+                    int64_t anchor_pts = av_rescale_q(anchor_rt,
                         AVRational{1, 10000000}, audio_tb);
                     if (frame->pts != AV_NOPTS_VALUE && frame->pts < anchor_pts)
                     {
@@ -906,8 +913,8 @@ namespace ffi
                     }
                 }
                 if (audio_skipped > 0)
-                    logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld"),
-                        audio_skipped, (long long)frame->pts, (long long)video_anchor);
+                    logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld sync_delay_rt=%lld"),
+                        audio_skipped, (long long)frame->pts, (long long)video_anchor, (long long)sync_delay);
 
                 //get_track_pos 의 source — 원본 미디어 시점 (audio decoder input PTS). rate 무관.
                 if (frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
@@ -956,6 +963,10 @@ namespace ffi
             av_frame_free(&frame);
             return E_FAIL;
         }
+
+        //filter graph 재빌드(rate 변경) + 사용(buffersrc/buffersink) 구간을 lock — UI 스레드의 seek-init 과
+        //동시 접근 시 use-after-free 방지. 이 구간엔 early return 이 없어 manual Lock/Unlock 안전.
+        m_filter_cs.Lock();
 
         //atempo time-stretch — rate != 1.0 일 때 PCM sample count 를 1/rate 로 줄여 graph clock 가속 + pitch 유지.
         //rate==1.0 도 동일 path (1:1 pass-through) 로 코드 일관. swr output 을 frame 으로 wrap → buffersrc 에 push → buffersink 에서 pull.
@@ -1044,6 +1055,8 @@ namespace ffi
             out_samples = total_bytes / frame_align;
         }
 
+        m_filter_cs.Unlock();
+
         int bytes_written = out_samples * m_out_channels * 2;
         pSample->SetActualDataLength(bytes_written);
         pSample->SetSyncPoint(TRUE);
@@ -1082,7 +1095,10 @@ namespace ffi
                 {
                     int64_t audio_pts_rt = (frame->pts != AV_NOPTS_VALUE) ?
                         av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000}) : 0;
-                    m_audio_offset_rt = audio_pts_rt - video_first;
+                    //audio_sync delay — anchor 를 -delay 이동 (skip threshold 와 동일). 첫 emit content 가
+                    //video_first - delay 라 m_audio_offset_rt ≈ 0 으로 수렴 → rtStart 는 sample_count(0 부터) 유지.
+                    int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
+                    m_audio_offset_rt = audio_pts_rt - (video_first - sync_delay);
                     m_audio_offset_set = true;
                 }
             }
@@ -1094,7 +1110,9 @@ namespace ffi
             int64_t audio_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
             int64_t video_first = dec.video_first_emit_pts_rt();
             if (video_first == LLONG_MIN) video_first = audio_pts_rt;
-            rtStart = audio_pts_rt - video_first;
+            //audio_sync delay — anchor 를 -delay 이동 (skip/offset 과 동일 규약).
+            int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
+            rtStart = audio_pts_rt - (video_first - sync_delay);
         }
         else
         {

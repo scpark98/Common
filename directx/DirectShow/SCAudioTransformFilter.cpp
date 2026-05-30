@@ -511,6 +511,8 @@ void CSCAudioTransformFilter::process_one(const work_item& w)
 			process_sample(pBuf, len, pwfx);
 		}
 
+		//audio delay — 음수(audio 당김)만 동작. 양수(audio 밀기)는 DSound 가 미래 timestamp 를 무시해 무효.
+		//양수를 content-delay(무음 prefill FIFO)로 시도했으나 하류에서 흡수돼 효과 없음 (2026-05-30 검증). 음수만 유지.
 		LONGLONG delay = m_delay_100ns.load();
 		if (delay != 0)
 		{

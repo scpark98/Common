@@ -82,7 +82,10 @@ void CSCSystemButtons::create(CWnd* parent, int top, int right_end, int width, i
 	//컨트롤 생성과 함께 각 버튼의 위치가 정해진다.
 	for (int i = 0; i < m_button.size(); i++)
 	{
-		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height);
+		//박스 bottom 을 타이틀바 bottom 보다 ~2px 위로. strip 이 top 에서 m_top 만큼 내려와 상단 여백이
+		//생기는데 bottom 이 m_button_height 꽉 차면 비대칭(상단 ~2px / 하단 0). (m_button_height - m_top) 가
+		//strip-client 좌표에서의 타이틀바 bottom 이고, 거기서 2px 더 빼 상/하 여백을 맞춘다.
+		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height - m_top - 2);
 	}
 
 	Create(_T("CSCSystemButtons"), WS_CHILD | BS_PUSHBUTTON,
@@ -110,7 +113,10 @@ void CSCSystemButtons::resize()
 {
 	for (int i = 0; i < m_button.size(); i++)
 	{
-		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height);
+		//박스 bottom 을 타이틀바 bottom 보다 ~2px 위로. strip 이 top 에서 m_top 만큼 내려와 상단 여백이
+		//생기는데 bottom 이 m_button_height 꽉 차면 비대칭(상단 ~2px / 하단 0). (m_button_height - m_top) 가
+		//strip-client 좌표에서의 타이틀바 bottom 이고, 거기서 2px 더 빼 상/하 여백을 맞춘다.
+		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height - m_top - 2);
 	}
 
 	MoveWindow(m_right - 1 - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,

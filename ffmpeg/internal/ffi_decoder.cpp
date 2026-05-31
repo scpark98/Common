@@ -502,6 +502,12 @@ namespace ffi
 			m_seek_processed = false;
 		}
 
+		//seek 요청 시점에 즉시 EOF 해제 (worker 가 av_seek 처리하며 880 에서 다시 false 로 store 하지만 그건 async).
+		//이게 없으면: EOS 상태(m_eof=true)에서 seek 시, async worker 가 처리하기 전에 source pin 의 FillBuffer 가
+		//재기동돼 is_eof()==true && queue==0 (방금 비움) 을 보고 spurious EndOfStream 을 deliver → 중복 EC_COMPLETE →
+		//반복재생이 한 사이클에 2번 발화 + 오디오 렌더러 연속 flush 로 "띡" 글리치. seek = "더 이상 EOF 아님" 이므로 여기서 해제.
+		m_eof.store(false);
+
 		{
 			std::unique_lock<std::mutex> lk(m_mtx_queue);
 			while (!m_video_queue.empty())

@@ -3559,18 +3559,25 @@ void CDShow::replay_from_start()
 	//내장 FFmpeg 경로: EOS 후 NoFlush seek(set_track_pos)는 source pin 의 streaming thread 가 EOS 로
 	//종료된 상태를 못 되살려 frame deliver 가 재개 안 됨 (영상 freeze + 오디오 끊김). 그래프를 Stop→seek0→Run
 	//하면 재생 시작과 동일 경로로 pin thread·EOS 상태가 완전 리셋되어 확실히 재개된다.
-	if (m_use_internal_ffmpeg && m_pMC && m_pMS)
+	if (m_use_internal_ffmpeg && m_pMS)
 	{
-		m_pMC->Stop();
+		//EC_COMPLETE 후에도 graph 는 Running 상태로 남는다. 여기서 *flushing* seek(0) 한 번이면:
+		//  - renderer 의 EndOfStream 상태가 flush 로 해제되고
+		//  - source 의 on_change_start (BeginFlush→Stop→EndFlush→Pause→NewSegment) 가 EOS 로 parked 된
+		//    pin streaming thread 를 되살려 0 부터 deliver 재개.
+		//근본원인: 과거 set_track_pos 로 시도했으나 그건 AM_SEEKING_NoFlush 라 renderer EOS 가 안 풀려 재개 실패.
+		//편법: 그래서 m_pMC->Stop/Run 으로 graph 전체를 리셋했는데, Stop() 이 EOS 상태의 현재 위치(=duration)를
+		//source 에 SetPositions 로 전파 → duration 으로의 redundant seek 가 생겨 반복 시점 오디오 글리치(끝부분
+		//샘플 잠깐 재생) 유발. flushing seek 는 NoFlush 가 아니므로 Stop/Run 없이도 확실히 재개된다.
+		if (m_pAudioTimeStretchFilter)
+			((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_seek_base_ms(0);
 
 		LONGLONG pos = 0;
 		m_pMS->SetPositions(&pos, AM_SEEKING_AbsolutePositioning | AM_SEEKING_SeekToKeyFrame,
 			NULL, AM_SEEKING_NoPositioning);
-
-		m_pMC->Run();
 		m_play_state = State_Running;
 
-		logWrite(_T("[repeat] internal FFmpeg — Stop/seek0/Run replay"));
+		logWrite(_T("[repeat] internal FFmpeg — flushing seek0 (no Stop/Run)"));
 		return;
 	}
 

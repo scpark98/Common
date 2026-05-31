@@ -125,6 +125,10 @@ public:
 	//parent에서 호출하여 이를 CSCSystemButtons에게 알려야 한다.
 	void	parent_maximized(bool maximized) { m_sys_buttons.parent_maximized(maximized); }
 
+	//시스템버튼을 툴바/옵션창 스타일(거의 정사각)로 — 파생 툴 창이 OnInitDialog(base 호출 후)에서 호출.
+	//상태는 CSCSystemButtons 가 보유. 여기선 전달만.
+	void	set_as_toolbar(bool toolbar = true) { m_sys_buttons.set_as_toolbar(toolbar); }
+
 	void	set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; }
 
 	//배경에 그림 표시, zoom? stretch? original size?, 

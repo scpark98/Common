@@ -111,12 +111,27 @@ bool CSCSystemButtons::has_button(int cmd)
 
 void CSCSystemButtons::resize()
 {
+	//폭은 height 에서 파생 — toolbar 면 거의 정사각, 아니면 캡션 비율(44:32). 레이아웃하는 이 한 곳에서 매번
+	//계산하므로 create/set_button_height/set_as_toolbar 등 어떤 경로·순서로 와도 폭이 항상 일관된다.
+	//(폭을 setter 마다 따로 저장하면 호출 순서에 따라 stale 값으로 덮이는 문제가 있었음.)
+	m_button_width = m_toolbar_mode
+		? m_button_height
+		: (int)(m_button_height * (DEFAULT_SYSTEM_BUTTON_WIDTH / 32.0f) + 0.5f);
+
 	for (int i = 0; i < m_button.size(); i++)
 	{
 		//박스 bottom 을 타이틀바 bottom 보다 ~2px 위로. strip 이 top 에서 m_top 만큼 내려와 상단 여백이
 		//생기는데 bottom 이 m_button_height 꽉 차면 비대칭(상단 ~2px / 하단 0). (m_button_height - m_top) 가
 		//strip-client 좌표에서의 타이틀바 bottom 이고, 거기서 2px 더 빼 상/하 여백을 맞춘다.
 		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height - m_top - 2);
+
+		//toolbar 모드면 버튼 박스를 각 변 toolbar_inset px 작게 — 호버 fill·히트·글리프 기준이 모두 이 rect 라 한 번에 작아진다.
+		//★ 버튼 크기 미세조정은 이 toolbar_inset 한 값만 바꾸면 됨.
+		if (m_toolbar_mode)
+		{
+			const int toolbar_inset = 2;
+			m_button[i].r.DeflateRect(toolbar_inset, toolbar_inset);
+		}
 	}
 
 	MoveWindow(m_right - 1 - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
@@ -411,7 +426,7 @@ void CSCSystemButtons::set_button_width(int width)
 void CSCSystemButtons::set_button_height(int height)
 {
 	m_button_height = height - 1;
-	resize();
+	resize();		//폭은 resize() 가 height(+toolbar 모드)에서 파생.
 	/*
 	return;
 	for (int i = 0; i < m_button.size(); i++)
@@ -431,4 +446,11 @@ void CSCSystemButtons::set_button_height(int height)
 	//rc.bottom = rc.top + height;
 	//MoveWindow(rc);
 	*/
+}
+
+void CSCSystemButtons::set_as_toolbar(bool toolbar)
+{
+	m_toolbar_mode = toolbar;
+	if (m_hWnd)
+		resize();		//폭은 resize() 가 mode+height 에서 파생.
 }

@@ -196,6 +196,11 @@ public:
 	int		get_button_height() { return m_button_height; }
 	void	set_button_height(int height);
 
+	//툴바/옵션창 스타일 — 종료버튼 등을 거의 정사각(width≈height)으로. 기본은 캡션 비율(44:32).
+	//일반 윈도우 앱의 툴바·옵션 다이얼로그 닫기버튼 외관과 일치. set_button_height 와 무관하게 폭 규칙만 바꾼다.
+	void	set_as_toolbar(bool toolbar = true);
+	bool	is_toolbar() { return m_toolbar_mode; }
+
 	//void	refresh_activate_status(bool is_activated) { m_is_activated = is_activated; Invalidate(); }
 
 	//parent가 maximize되거나 restore되면 시스템버튼의 모양이 달라지므로 parent에 의해 호출되며 이를 CSCSystemButtons에게 알려야 한다.
@@ -206,6 +211,7 @@ protected:
 	std::deque<CSCSystemButtonProperty> m_button;
 	int		m_button_width = 44;
 	int		m_button_height = 32;
+	bool	m_toolbar_mode = false;	//true 면 거의 정사각(width≈height), false 면 캡션 비율(44:32).
 	int		m_top = 1;
 	int		m_right;				//버튼 컨트롤의 우측 좌표에 맞춰 n개의 버튼 위치가 결정된다.
 	int		m_gap = 0;				//버튼 사이 간격

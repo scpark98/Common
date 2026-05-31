@@ -195,7 +195,23 @@ void CSCSystemButtons::OnPaint()
 			//else
 				cr_back = (m_button[i].cmd == SC_CLOSE ? gRGB(232, 17, 35) : m_theme.cr_sys_buttons_hover_back);
 
-			dc.FillSolidRect(m_button[i].r, cr_back.ToCOLORREF());
+			if (m_button[i].cmd == SC_CLOSE)
+			{
+				//종료버튼은 창 우상단(DWM 라운드 코너) 근처 — hover 배경 rt 를 그 코너에 *근사* 하게 둥글게. (나머지 0=직각)
+				//toolbar 모드(작은 툴 창)에선 적용 안 함 — 사각 fill (아래 else).
+				//정확 일치는 안 됨: 버튼이 코너에서 인셋돼 호의 중심이 어긋나기 때문(반경만 같아선 안 겹침). 아주 작은 디테일이라 근사로 충분.
+				//창 코너(DWMWCP_ROUND ≈ 8px@96DPI)에 자연스럽게 어울리도록 6으로 손튜닝, DC DPI 로 스케일.
+				const int corner_round_at_96dpi = (m_toolbar_mode ? 4 : 6);
+				const int close_rt_radius = MulDiv(corner_round_at_96dpi, GetDeviceCaps(dc.GetSafeHdc(), LOGPIXELSX), 96);
+				Gdiplus::Graphics gfill(dc.GetSafeHdc());
+				gfill.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+				Gdiplus::Rect rr(m_button[i].r.left, m_button[i].r.top, m_button[i].r.Width(), m_button[i].r.Height());
+				draw_round_rect(&gfill, rr, Gdiplus::Color::Transparent, cr_back, 0, close_rt_radius, 0, 0, 0);
+			}
+			else
+			{
+				dc.FillSolidRect(m_button[i].r, cr_back.ToCOLORREF());
+			}
 		}
 
 		//각 버튼을 그려준다.

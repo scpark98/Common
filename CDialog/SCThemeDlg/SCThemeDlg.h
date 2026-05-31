@@ -135,10 +135,10 @@ public:
 	void	set_draw_border(bool draw, int width = 1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
 	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border_inactive = cr; }
 
-	void	set_color_theme(int theme, bool invalidate = false);
+	void	set_color_theme(int theme, bool invalidate = true);
 	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 또 다른 CSCThemeDlg 가 자식인 경우 부모의 모든 색
 	//(titlebar 커스터마이즈 포함) 을 정확히 복사하기 위해 사용. int 만 받으면 인덱스 기반 default 만 적용된다.
-	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 	void	enable_resize(bool resizable);
 
 	//void	refresh_activate_status(bool is_activated);

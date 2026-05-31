@@ -230,9 +230,9 @@ public:
 	//aa_from_pt 미만 → GDI 내장 비트맵(작은 글씨 또렷), 이상 → GDI+ 외곽선 렌더(매끈, embedded bitmap 회피). set_font_quality() 로 해제.
 	void		set_font_quality_auto(bool on = true, int aa_from_pt = 11);
 
-	void		set_color_theme(int theme, bool invalidate = false);
+	void		set_color_theme(int theme, bool invalidate = true);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
-	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	CShellImageList* m_pShellImageList = NULL;
 	void		set_shell_imagelist(CShellImageList* pShellImageList, bool is_local) { m_pShellImageList = pShellImageList; m_is_local = is_local; }

@@ -347,7 +347,7 @@ void CSCSystemButtons::OnMouseMove(UINT nFlags, CPoint point)
 void CSCSystemButtons::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
-	if (invalidate)
+	if (invalidate && m_hWnd)
 		Invalidate();
 }
 

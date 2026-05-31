@@ -34,7 +34,7 @@ public:
 	void			set_color_theme(int theme);
 	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 부모가 set_titlebar_*_color() 등으로 일부 색을
 	//커스터마이즈한 결과까지 자식이 그대로 반영하기 위해 int 가 아닌 객체 전달이 정석.
-	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 	void			set_text_color(Gdiplus::Color cr_back);
 	void			set_back_color(Gdiplus::Color cr_back);
 

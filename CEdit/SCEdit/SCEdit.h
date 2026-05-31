@@ -126,9 +126,9 @@ public:
 	};
 
 	CSCColorTheme		m_theme = CSCColorTheme(this);
-	void				set_color_theme(int color_theme, bool invalidate = false); //apply current m_theme colors to the control.
+	void				set_color_theme(int color_theme, bool invalidate = true); //apply current m_theme colors to the control.
 	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 커스터마이즈된 색까지 자식이 반영하기 위해 사용.
-	void				set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void				set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	//Test_GdiButton 프로젝트에서는 CSCEdit이 투명하게 잘 표시되나
 	//Test_SCThemeDialog 프로젝트에서는 투명하게 표시되지 않는다.

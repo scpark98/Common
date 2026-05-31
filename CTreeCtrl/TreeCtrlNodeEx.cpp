@@ -1624,7 +1624,7 @@ void CTreeCtrlNodeEx::set_color_theme(int theme, bool invalidate)
 		break;
 	}
 
-	if (invalidate)
+	if (invalidate && m_hWnd)
 		Invalidate();
 }
 

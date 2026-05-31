@@ -261,7 +261,7 @@ public:
 	void		expand_all(bool expand = true);
 
 	void		set_color_theme(int theme, bool invalidate = true);
-	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 	void		set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
 	void		set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
 	//CTreeCtrl에서 지원하는 기본 함수 override

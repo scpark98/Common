@@ -1288,6 +1288,6 @@ void CRichEditCtrlEx::set_color_theme(int color_theme, bool invalidate)
 
 	SetBackgroundColor(false, m_theme.cr_back.ToCOLORREF());
 
-	if (invalidate)
+	if (invalidate && m_hWnd)
 		Invalidate();// RedrawWindow();
 }

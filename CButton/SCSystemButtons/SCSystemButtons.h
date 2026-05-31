@@ -183,10 +183,10 @@ public:
 	CSize	get_size() { return CSize(m_button_width * m_button.size(), m_button_height); }
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
-	void	set_color_theme(int theme, bool invalidate = false);
+	void	set_color_theme(int theme, bool invalidate = true);
 	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — cr_title_back_active 등 sys_buttons 가 참조하는
 	//theme 필드까지 부모의 커스터마이즈 결과 그대로 반영하기 위해 사용.
-	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 	CSCColorTheme* get_color_theme() { return &m_theme; }
 	void	set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
 	void	set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; }

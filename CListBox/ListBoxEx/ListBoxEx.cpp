@@ -359,7 +359,7 @@ void CListBoxEx::set_color_theme(int theme, bool apply_now)
 		break;
 	}
 
-	if (apply_now)
+	if (apply_now && m_hWnd)
 	{
 		Invalidate();
 	}

@@ -87,7 +87,7 @@ public:
 	};
 
 	CSCColorTheme		m_theme = CSCColorTheme(this);
-	void				set_color_theme(int color_theme, bool invalidate = false); //apply current m_theme colors to the control.
+	void				set_color_theme(int color_theme, bool invalidate = true); //apply current m_theme colors to the control.
 
 	void				set_default_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; }
 

@@ -129,10 +129,10 @@ public:
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 	//set_color_theme()은 create() 전에도 호출될 수 있으므로 그에 대한 처리도 필요하다.
 	//invalidate=true 면 적용 직후 dialog Invalidate. Common 의 다른 모든 컨트롤과 동일한 시그니처 (기본 false).
-	void			set_color_theme(int theme, bool invalidate = false);
+	void			set_color_theme(int theme, bool invalidate = true);
 	//호출자가 이미 cr_back 등을 수정해 둔 CSCColorTheme 객체를 그대로 적용.
 	//프리셋 + 사용자 오버라이드를 모두 보존한다. m_parent 는 본 msgbox 의 것을 유지.
-	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	//normal message일 경우는 theme에 지정된 title_back_color를 사용하지만 이 함수를 사용하면
 	//question은 연두색, warning은 주황색, error는 핑크색, info는 하늘색으로 표시된다.

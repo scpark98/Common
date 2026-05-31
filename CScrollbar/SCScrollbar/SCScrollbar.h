@@ -85,7 +85,7 @@ public:
 
 //테마 — int preset 또는 외부 CSCColorTheme 그대로 가져오기.
 	void	set_color_theme(int theme, bool invalidate = true);
-	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
 

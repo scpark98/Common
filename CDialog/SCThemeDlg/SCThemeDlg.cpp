@@ -609,7 +609,7 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 				: m_theme.cr_back.ToCOLORREF());
 	}
 
-	if (invalidate)
+	if (invalidate && m_hWnd)
 		Invalidate();
 }
 

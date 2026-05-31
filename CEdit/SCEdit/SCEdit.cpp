@@ -425,7 +425,7 @@ void CSCEdit::set_color_theme(int color_theme, bool invalidate)
 	m_br_back.DeleteObject();
 	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 
-	if (invalidate)
+	if (invalidate && m_hWnd)
 		Invalidate();// RedrawWindow();
 }
 

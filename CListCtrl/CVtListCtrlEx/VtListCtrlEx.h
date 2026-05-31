@@ -487,8 +487,8 @@ public:
 	int				cur_sorted_column_index() { return m_cur_sort_column; }
 
 //컬러 관련
-	void			set_color_theme(int theme, bool invalidate = false);
-	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void			set_color_theme(int theme, bool invalidate = true);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 	Gdiplus::Color	get_text_color(int item, int subItem);
 	Gdiplus::Color	get_back_color(int item, int subItem);
 	//특정 셀이 아닌 기본 배경색을 리턴.

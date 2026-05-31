@@ -225,7 +225,7 @@ public:
 //color theme
 	void			set_color_theme(int theme, bool invalidate = true);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
-	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	//ctrl 자체의 cr_border. OnNcPaint() 에서 border 속성 유무를 판단하여 테두리를 그린다.
 	void			set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; Invalidate(); }

@@ -1023,13 +1023,41 @@ bool CSubtitle::save_smi(CString sfile)
 				for (const auto& sent : cap.sentences)
 					by_start_class[cap.start][cls].push_back(&sent);
 		}
-		for (const auto& g : by_start_class)
+		//end SYNC — m_tracks 의 각 cue 의 end>0 를 (start, class) 별 entry 로 출력. 자막 종료 표시.
+		std::map<int, std::set<CString>> by_end_class;
+		for (const auto& kv : m_tracks)
 		{
-			for (const auto& cs : g.second)
+			const CString& cls = kv.first;
+			for (const auto& cap : kv.second)
+				if (cap.end > 0)
+					by_end_class[cap.end].insert(cls);
+		}
+
+		//cue 와 end-marker(&nbsp;) 를 start 기준 단일 시퀀스로 출력 — 두 블록으로 나눠 쓰면
+		//end-marker 가 파일 끝에 몰려 SMI 문서 순서가 깨진다. 같은 start 면 end-marker 를 먼저
+		//출력해 end==다음 cue 의 start 인 경우 그 cue 가 살아남도록 한다.
+		std::set<int> all_starts;
+		for (const auto& g : by_start_class)
+			all_starts.insert(g.first);
+		for (const auto& g : by_end_class)
+			all_starts.insert(g.first);
+
+		for (int start : all_starts)
+		{
+			auto ite = by_end_class.find(start);
+			if (ite != by_end_class.end())
+				for (const auto& cls : ite->second)
+					_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>&nbsp;\n"), start, cls.GetString());
+
+			auto its = by_start_class.find(start);
+			if (its == by_start_class.end())
+				continue;
+
+			for (const auto& cs : its->second)
 			{
 				const CString& cls = cs.first;
 				const auto& sents = cs.second;
-				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>"), g.first, cls.GetString());
+				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>"), start, cls.GetString());
 				int prev_line = -1;
 				for (const CSentence* s : sents)
 				{
@@ -1043,23 +1071,6 @@ bool CSubtitle::save_smi(CString sfile)
 				}
 				_ftprintf(fp_m, _T("\n"));
 			}
-		}
-
-		//end SYNC — m_tracks 의 각 cue 의 end>0 를 (start, class) 별 entry 로 출력. 자막 종료 표시.
-		//단일 class path (line 1098-1099) 와 동등 — multi-class 에서도 동일 형식.
-		std::map<int, std::set<CString>> by_end_class;
-		for (const auto& kv : m_tracks)
-		{
-			const CString& cls = kv.first;
-			for (const auto& cap : kv.second)
-				if (cap.end > 0)
-					by_end_class[cap.end].insert(cls);
-		}
-		for (const auto& g : by_end_class)
-		{
-			for (const auto& cls : g.second)
-				_ftprintf(fp_m, _T("<SYNC Start=%d><P Class=%s>&nbsp;\n"),
-					g.first, cls.GetString());
 		}
 
 		_ftprintf(fp_m, _T("\n</BODY>\n</SAMI>\n"));

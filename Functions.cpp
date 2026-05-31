@@ -5119,7 +5119,9 @@ void msgbox(LPCTSTR format, ...)
 	AfxMessageBox(msg);
 }
 
+//fill_zero=true일 때
 //value가 3자리이고 total_digits가 7이면 4개의 0을 앞에 붙여서 리턴한다.
+//만약 value가 7자리인데 total_digits가 4라면?  
 CString i2S(int64_t nValue, bool bComma, bool fill_zero, int total_digits)
 {
 	CString str;
@@ -15290,7 +15292,24 @@ std::vector<std::pair<CString, float>> find_similar_files(
 		if (title.CompareNoCase(target_title) == 0)
 			continue;	//완전 동일 이름은 원본이 존재한다는 뜻 — 호출자가 PathFileExists 로 이미 거름.
 
-		const float sim = similarity(target_title, title);
+		float sim = similarity(target_title, title);
+
+		//substring 포함 보강 — 릴리즈 태그·제품코드·배우명 등이 prefix/suffix 로 붙어 한쪽 제목이 다른쪽에
+		//그대로 들어있는 경우 (예: "title" ⊂ "GROUP-123 title"). similarity 는 digit-run gate·
+		//길이 페널티로 이런 케이스를 떨구므로 별도 인정한다. 부분문자열 관계라 "01화⊄02화" — episode 오매칭은 안 생김.
+		//짧은 쪽이 충분히 길고(우연 포함 방지) 긴 쪽에 그대로 들어있으면 높은 점수로 채택.
+		if (sim < threshold)
+		{
+			CString a = sim_normalize(target_title);
+			CString b = sim_normalize(title);
+			a.MakeLower();
+			b.MakeLower();
+			const CString& shorter = (a.GetLength() <= b.GetLength()) ? a : b;
+			const CString& longer  = (a.GetLength() <= b.GetLength()) ? b : a;
+			if (shorter.GetLength() >= 6 && longer.GetLength() > 0 && longer.Find(shorter) >= 0)
+				sim = 0.85f + 0.15f * ((float)shorter.GetLength() / (float)longer.GetLength());
+		}
+
 		if (sim >= threshold)
 			candidates.push_back({ path, sim });
 	}

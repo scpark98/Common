@@ -171,6 +171,15 @@ protected:
 
 	bool				m_use_resizable = true;
 
+	//client-기준 자동 레이아웃 (default ON). OnInitDialog 에서 .rc 의 template client 를 기준으로
+	//(1) borderless 정규화(NC→1px)로 client 이 ~12px 커지는 drift 를 제거해 좌/우·상/하 여백 비대칭을 없애고,
+	//(2) m_titlebar_height 만큼 콘텐츠를 하향해 타이틀바 자리를 자동 예약한다.
+	//→ 개발자는 리소스에서 *타이틀바를 신경쓰지 않고* 순수 client(top=0) 기준으로만 컨트롤을 배치하면 된다.
+	//이미 .rc 에서 타이틀바 공간을 손수 비워둔 (구) 파생 dlg 는 이중 오프셋이 되므로, 그 .rc 를 top=0 기준으로
+	//재배치하거나, 과도기에는 파생 ctor 에서 m_auto_client_layout = false 로 꺼 기존 동작을 유지한다.
+	//m_titlebar_height 는 이 로직이 참조하므로 *OnInitDialog 호출 전(ctor)* 에 확정돼 있어야 한다.
+	bool				m_auto_client_layout = true;
+
 	int					m_titlebar_height = 32;// GetSystemMetrics(SM_CYCAPTION);
 	bool				m_titlebar_bold = false;
 	bool				m_titlebar_movable = true;
@@ -193,6 +202,9 @@ protected:
 	LOGFONT				m_titlebar_lf;
 	CFont				m_titlebar_font;
 	void				reconstruct_titlebar_font();
+
+	//m_auto_client_layout 본체 — OnInitDialog 가 호출. rc_template_client = style 변경 전 캡처한 .rc client.
+	void				apply_client_titlebar_layout(const CRect& rc_template_client);
 
 	CSCGdiplusBitmap	m_img_back;
 	int					m_img_back_draw_mode = CSCGdiplusBitmap::draw_mode_stretch;	//default = CSCGdiplusBitmap::draw_mode_stretch

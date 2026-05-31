@@ -100,6 +100,11 @@ BOOL CSCThemeDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
+	//[client-기준 자동 레이아웃 Step 0] style 변경 전(= template NC 상태)의 client 크기 캡처.
+	//apply_client_titlebar_layout 가 이 값을 기준으로 런타임 client 폭/높이를 복원·예약한다.
+	CRect rc_template_client;
+	GetClientRect(rc_template_client);
+
 	//Borderless customized dlg 변환 (borderless dialog.md Step 4).
 	//resource 의 caption/border 속성 어느 조합이든 *항상 동일 상태* 로 정규화한다.
 	//WS_CAPTION/WS_BORDER/WS_DLGFRAME 전부 제거 → 필요 시 WS_THICKFRAME 재부여.
@@ -131,6 +136,9 @@ BOOL CSCThemeDlg::OnInitDialog()
 	if (m_titlebar_height > 0)
 	{
 		m_sys_buttons.create(this);
+		//시스템 버튼 높이를 타이틀바 높이에 동기화. (예전엔 derived 의 set_titlebar_height() 가 맞춰줬으나,
+		// m_titlebar_height 를 ctor 에서 확정하는 경로에선 create 직후 여기서 동기화해야 버튼이 기본값 32 로 남지 않음.)
+		m_sys_buttons.set_button_height(m_titlebar_height);
 		m_sys_buttons.set_color_theme(m_theme);
 		m_sys_buttons.set_buttons_cmd(SC_CLOSE);
 	}
@@ -143,6 +151,11 @@ BOOL CSCThemeDlg::OnInitDialog()
 		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_titlebar_lf), &m_titlebar_lf);
 
 	reconstruct_titlebar_font();
+
+	//[client-기준 자동 레이아웃] NC drift 로 커진 client 복원(여백 비대칭 fix) + 타이틀바 자리 자동 예약.
+	//m_titlebar_height 가 ctor 에서 확정돼 있어야 정확히 예약된다 (OnInitDialog 뒤에 set_titlebar_height 하면 늦음).
+	if (m_auto_client_layout)
+		apply_client_titlebar_layout(rc_template_client);
 
 	set_color_theme(CSCColorTheme::color_theme_default);
 	//init_shadow();
@@ -174,6 +187,47 @@ void CSCThemeDlg::reconstruct_titlebar_font()
 	m_titlebar_font.DeleteObject();
 	m_titlebar_font.CreateFontIndirect(&m_titlebar_lf);
 	Invalidate();
+}
+
+//개발자가 리소스에서 *순수 client(top=0) 기준* 으로만 컨트롤을 배치할 수 있게 하는 런타임 보정.
+//호출 시점: borderless style 정규화 + m_sys_buttons 생성 직후, 파생 OnInitDialog (CResizeCtrl 등) 가 돌기 전.
+//   (1) 목표 client = (template 폭) x (template 높이 + 타이틀바). NC→1px 정규화로 client 이 template 보다 양변
+//       합 ~12px 커지는 drift 를 제거 → 좌/우·상/하 여백이 리소스 설계값 그대로 유지된다 (여백 비대칭 fix).
+//   (2) 모든 직계 자식(시스템 버튼 제외)을 m_titlebar_height 만큼 하향 → 콘텐츠가 타이틀바 아래에 자동 배치.
+//여기서 위치를 확정한 뒤 파생의 CResizeCtrl 가 캡처하므로, 이후 RestoreWindowPosition 등으로 리사이즈해도
+//설계 여백이 anchor 로 보존된다.
+void CSCThemeDlg::apply_client_titlebar_layout(const CRect& rc_template_client)
+{
+	int want_cw = rc_template_client.Width();
+	int want_ch = rc_template_client.Height() + m_titlebar_height;
+
+	CRect rc_now;
+	GetClientRect(rc_now);
+
+	int dw = want_cw - rc_now.Width();
+	int dh = want_ch - rc_now.Height();
+	if (dw != 0 || dh != 0)
+	{
+		CRect rc_win;
+		GetWindowRect(rc_win);
+		SetWindowPos(nullptr, 0, 0, rc_win.Width() + dw, rc_win.Height() + dh,
+			SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+
+	if (m_titlebar_height <= 0)
+		return;
+
+	for (CWnd* child = GetWindow(GW_CHILD); child != nullptr; child = child->GetNextWindow())
+	{
+		if (child->GetSafeHwnd() == m_sys_buttons.GetSafeHwnd())
+			continue;
+
+		CRect rc_child;
+		child->GetWindowRect(rc_child);
+		ScreenToClient(rc_child);
+		child->SetWindowPos(nullptr, rc_child.left, rc_child.top + m_titlebar_height, 0, 0,
+			SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+	}
 }
 
 void CSCThemeDlg::set_titlebar_font_name(LPCTSTR sFontname, BYTE byCharSet)

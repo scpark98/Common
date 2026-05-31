@@ -306,7 +306,7 @@ void CSCThumbCtrl::OnPaint()
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	//g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
@@ -333,11 +333,9 @@ void CSCThumbCtrl::OnPaint()
 		if (m_path.IsEmpty() == false)
 			str.Format(_T("%s\n위 경로에는 %s"), m_path, str);
 
-		draw_text(g, rc, str, 10.0f);
-		//dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
-		//dc.DrawText(str, rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		//dc.SelectObject(pOldFont);
-
+		dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+		draw_center_text(&dc, str, rc);
+		dc.SelectObject(pOldFont);
 		return;
 	}
 

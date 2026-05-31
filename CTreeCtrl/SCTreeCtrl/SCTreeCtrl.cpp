@@ -3562,6 +3562,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			Gdiplus::Color crText = m_theme.cr_text;
 			Gdiplus::Color crBack = m_theme.cr_back;
+			int item_font_style = -1;	//항목별 font_style — 아래 per-item override 블록에서 채움.
 
 			if (function_check_is_dim_text && function_check_is_dim_text(this, hItem))
 				crText = m_theme.cr_text_dim;
@@ -3601,6 +3602,20 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//cr_text_hover 도 함께 적용해 contrast 확보.
 				crText = m_theme.cr_text_hover;
 				crBack = m_theme.cr_back_hover;
+			}
+
+			//항목별 스타일 override — map 에 지정된 항목은 상태색(hover/selected/drag)보다 *우선*. 지정한 속성만 덮고
+			//지정 안 한 속성은 위 상태색 유지. (사용자 명시: 지정색이 있으면 hover/selected 여도 그 색을 따른다.)
+			{
+				auto it_style = m_item_styles.find(hItem);
+				if (it_style != m_item_styles.end())
+				{
+					if (it_style->second.use_text_color)
+						crText = it_style->second.text_color;
+					if (it_style->second.use_back_color)
+						crBack = it_style->second.back_color;
+					item_font_style = it_style->second.font_style;
+				}
 			}
 
 			//1. row fill — Win11 Explorer 동일하게 항상 full-row 폭으로 fill. (TVS_FULLROWSELECT 무관)
@@ -3736,7 +3751,28 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				rcDraw.right = right_limit;
 			dc.SetBkMode(TRANSPARENT);
 			dc.SetTextColor(crText.ToCOLORREF());
+
+			//항목별 font_style (Bold/Italic/Underline/Strikeout) — base 폰트에서 플래그만 입혀 임시 폰트 select.
+			CFont item_font;
+			CFont* old_font = nullptr;
+			if (item_font_style >= 0)
+			{
+				LOGFONT lf = {};
+				CFont* base_font = GetFont();
+				if (base_font)
+					base_font->GetLogFont(&lf);
+				if (item_font_style & Gdiplus::FontStyleBold)		lf.lfWeight = FW_BOLD;
+				if (item_font_style & Gdiplus::FontStyleItalic)		lf.lfItalic = TRUE;
+				if (item_font_style & Gdiplus::FontStyleUnderline)	lf.lfUnderline = TRUE;
+				if (item_font_style & Gdiplus::FontStyleStrikeout)	lf.lfStrikeOut = TRUE;
+				if (item_font.CreateFontIndirect(&lf))
+					old_font = dc.SelectObject(&item_font);
+			}
+
 			dc.DrawText(text, &rcDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+			if (old_font)
+				dc.SelectObject(old_font);
 
 			*pResult = CDRF_SKIPDEFAULT;
 			break;

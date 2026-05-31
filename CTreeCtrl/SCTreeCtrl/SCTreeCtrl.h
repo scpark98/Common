@@ -34,6 +34,7 @@
 #include <deque>
 #include <functional>
 #include <vector>
+#include <map>
 
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
@@ -45,6 +46,17 @@
 
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
+
+//특정 트리 항목에만 적용할 스타일 override. 지정 안 한 필드는 테마 기본값 사용.
+//속성이 늘어나도 map 을 추가하지 않고 이 struct 에 필드만 더하면 됨.
+struct CSCTreeItemStyle
+{
+	bool			use_text_color = false;
+	Gdiplus::Color	text_color = Gdiplus::Color::Black;
+	bool			use_back_color = false;
+	Gdiplus::Color	back_color = Gdiplus::Color::White;
+	int				font_style = -1;	//-1 = 테마 기본. >=0 = Gdiplus::FontStyle 비트 OR (Bold=1|Italic=2|Underline=4|Strikeout=8)
+};
 
 //tree의 한 항목인 folder 정보 저장 목적
 class CSCTreeCtrlFolder
@@ -267,6 +279,21 @@ public:
 	//CTreeCtrl에서 지원하는 기본 함수 override
 	void		SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
 	void		SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
+
+	//항목별 스타일 override — 지정한 항목만 테마 기본값 대신 이 스타일로 그림. 미지정 필드는 테마 그대로.
+	//HTREEITEM 핸들은 DeleteAllItems 시 무효화·재사용될 수 있어, DeleteAllItems 에서 맵을 자동 clear 한다
+	//(rebuild 후 호출측이 재지정). 따라서 트리 다시 채운 뒤 매번 set_item_*_color/style 호출.
+	std::map<HTREEITEM, CSCTreeItemStyle>	m_item_styles;
+	void		set_item_style(HTREEITEM hItem, const CSCTreeItemStyle& style) { m_item_styles[hItem] = style; Invalidate(); }
+	void		set_item_text_color(HTREEITEM hItem, Gdiplus::Color color) { CSCTreeItemStyle& s = m_item_styles[hItem]; s.use_text_color = true; s.text_color = color; Invalidate(); }
+	void		set_item_back_color(HTREEITEM hItem, Gdiplus::Color color) { CSCTreeItemStyle& s = m_item_styles[hItem]; s.use_back_color = true; s.back_color = color; Invalidate(); }
+	void		set_item_font_style(HTREEITEM hItem, int gdiplus_font_style) { m_item_styles[hItem].font_style = gdiplus_font_style; Invalidate(); }
+	CSCTreeItemStyle*	get_item_style(HTREEITEM hItem) { auto it = m_item_styles.find(hItem); return (it == m_item_styles.end()) ? nullptr : &it->second; }
+	void		clear_item_style(HTREEITEM hItem) { m_item_styles.erase(hItem); Invalidate(); }
+	void		clear_all_item_styles() { m_item_styles.clear(); Invalidate(); }
+	//항목 삭제 시 stale handle 의 스타일 잔재 제거 — 핸들 재사용으로 엉뚱한 항목이 칠해지는 것 방지.
+	BOOL		DeleteAllItems() { m_item_styles.clear(); return CTreeCtrl::DeleteAllItems(); }
+	BOOL		DeleteItem(HTREEITEM hItem) { m_item_styles.erase(hItem); return CTreeCtrl::DeleteItem(hItem); }
 
 
 	//Drag&Drop 드래깅 관련

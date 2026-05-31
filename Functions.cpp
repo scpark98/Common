@@ -8113,6 +8113,42 @@ void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float rad
 	path->CloseFigure();
 }
 
+//코너별 radius 버전 — lt/rt/rb/lb 각각의 호(또는 0이면 직각)를 lt→rt→rb→lb 순으로 그린다.
+void get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float lt, float rt, float rb, float lb, int stroke_thick)
+{
+	//right, bottom 을 stroke_thick 만큼 줄이지 않으면 stroke 가 잘린다 (단일 radius 버전과 동일).
+	r.Width -= stroke_thick;
+	r.Height -= stroke_thick;
+
+	//각 코너 radius 를 짧은 변의 절반으로 clamp — 코너끼리 겹치지 않도록. 음수는 0 으로(호출자가 lt 상속 처리 후 들어옴).
+	const float maxr = MIN(r.Width, r.Height) / 2.0f;
+	lt = MIN(MAX(lt, 0.0f), maxr);
+	rt = MIN(MAX(rt, 0.0f), maxr);
+	rb = MIN(MAX(rb, 0.0f), maxr);
+	lb = MIN(MAX(lb, 0.0f), maxr);
+
+	const float L = (float)r.X;
+	const float T = (float)r.Y;
+	const float R = (float)r.GetRight();
+	const float B = (float)r.GetBottom();
+
+	//arc 각도 규칙은 단일 radius 버전과 동일 (왼쪽 0도, 하단 90도, 상단 270도, 시계방향).
+	//radius 0 인 코너는 호 대신 그 꼭지점을 점(zero-length line)으로 넣어 연결선이 직각으로 꺾이게 한다.
+	if (lt > 0.0f)	path->AddArc(L, T, lt * 2, lt * 2, 180.0f, 90.0f);
+	else			path->AddLine(L, T, L, T);
+
+	if (rt > 0.0f)	path->AddArc(R - rt * 2, T, rt * 2, rt * 2, 270.0f, 90.0f);
+	else			path->AddLine(R, T, R, T);
+
+	if (rb > 0.0f)	path->AddArc(R - rb * 2, B - rb * 2, rb * 2, rb * 2, 0.0f, 90.0f);
+	else			path->AddLine(R, B, R, B);
+
+	if (lb > 0.0f)	path->AddArc(L, B - lb * 2, lb * 2, lb * 2, 90.0f, 90.0f);
+	else			path->AddLine(L, B, L, B);
+
+	path->CloseFigure();
+}
+
 void get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_radius, float bottom_radius)
 {
 	if (bottom_radius <= 0.0f)
@@ -8191,6 +8227,32 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 		return &path;
 
 	// draw the round rect
+	g->DrawPath(&pen, &path);
+	return &path;
+}
+
+//코너별 radius 버전. lt 가 기준 — rt/rb/lb 가 음수(-1)면 lt 와 동일, 0이면 직각, >0이면 그 코너 radius.
+Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width)
+{
+	Gdiplus::Pen pen(cr_stroke, width);
+	Gdiplus::SolidBrush br(cr_fill);
+	pen.SetAlignment(Gdiplus::PenAlignmentInset);
+
+	//lt 음수면 단일 radius 규칙대로 height/2 (운동장 트랙). 나머지 코너는 음수면 lt 상속.
+	if (lt < 0)
+		lt = r.Height / 2;
+	if (rt < 0)	rt = lt;
+	if (rb < 0)	rb = lt;
+	if (lb < 0)	lb = lt;
+
+	Gdiplus::GraphicsPath path;
+	get_round_rect_path(&path, r, (float)lt, (float)rt, (float)rb, (float)lb);
+
+	g->FillPath(&br, &path);
+
+	if (width <= 0)
+		return &path;
+
 	g->DrawPath(&pen, &path);
 	return &path;
 }

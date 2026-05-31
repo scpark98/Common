@@ -2298,6 +2298,12 @@ h		: 복사할 height 크기(pixel)
 	void		get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_radius, float bottom_radius = -1.0f);
 	//radius = -1이면 height/2크기로 설정되고 이는 양 끝이 둥근 운동장 트랙 모양으로 그려진다.
 	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius = -1, int width = 1);
+
+	//코너별 radius 지정 버전. lt(top-left)가 기준. rt/rb/lb 값이 -1(음수)이면 lt 와 동일, 0이면 직각, >0이면 그 코너 radius.
+	//rt/rb/lb 를 C++ default 로 두지 않고 *필수* 로 받는 이유: 위 단일 radius 오버로드와 인자 개수가 겹쳐 호출이 모호해지기 때문. -1 을 sentinel 로 넘긴다.
+	//(lt 자체가 음수면 기존 단일 radius 규칙대로 height/2 = 운동장 트랙.)
+	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float lt, float rt, float rb, float lb, int stroke_thick = 1);
+	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width = 1);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
 	CRect		get_zoom_rect(CRect rect, double zoom);
 

@@ -117,11 +117,17 @@ namespace ffi
 		if (!m_pSource)
 			return;
 
+		//[seek_prof] sub-step 소요시간 측정 — setpos_us(≈149ms) 가 어느 단계(특히 Stop)에서 소모되는지 확정용.
+		LARGE_INTEGER pf, t_enter, t_seek, t_bf, t_stop, t_ef, t_pause, t_audio;
+		::QueryPerformanceFrequency(&pf);
+		::QueryPerformanceCounter(&t_enter);
+
 		double pos_ms = (double)rtStart / 10000.0;
 		REFERENCE_TIME rtStop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
 
 		//state 갱신은 ThreadExists 무관 항상. play(Running) 첫 진입 시 OnThreadStartPlay 가 이 값을 사용.
 		m_pSource->decoder().seek(pos_ms, rtStart);
+		::QueryPerformanceCounter(&t_seek);
 		m_sample_count = 0;	  //sample.rtStart = m_sample_count * frame_duration 의 출발점.
 		m_last_rtStart = 0;
 		m_segment_start = rtStart;
@@ -138,23 +144,36 @@ namespace ffi
 		//streaming 중인 경우만 MS 표준 정공법 (Stop/Flush/Pause cycle) 적용.
 		//	BeginFlush → Stop → EndFlush → Pause → OnThreadStartPlay → NewSegment + Discontinuity
 		//pre-streaming (graph Stopped, ThreadExists false) — play(Running) 의 thread create → OnThreadStartPlay 가 동일 NewSegment 처리.
-		if (ThreadExists())
+		bool thr = ThreadExists();
+		t_bf = t_stop = t_ef = t_pause = t_seek;	//non-streaming 시 sub-step delta 0.
+		if (thr)
 		{
 			DeliverBeginFlush();
+			::QueryPerformanceCounter(&t_bf);
 			Stop();
+			::QueryPerformanceCounter(&t_stop);
 			DeliverEndFlush();
+			::QueryPerformanceCounter(&t_ef);
 			//decoder.seek 가 worker 에 비동기 위임. Pause→OnThreadStartPlay 시점까지 seek 처리될 가능성 높음.
 			//FillBuffer 의 pre-target skip 이 stale frame (frame.pts < seek_target_pts) drop 으로 race 보호.
 			Pause();
+			::QueryPerformanceCounter(&t_pause);
 		}
 
 		//audio pin 도 동일한 정공법 적용 (별도 streaming thread).
 		if (m_pSource->audio_stream())
 			m_pSource->audio_stream()->on_seek_flush(rtStart);
+		::QueryPerformanceCounter(&t_audio);
+
+		auto us = [&](const LARGE_INTEGER& a, const LARGE_INTEGER& b) -> long long
+			{ return (b.QuadPart - a.QuadPart) * 1000000LL / pf.QuadPart; };
+		logWrite(_T("[ffi/src/seek_prof] decoder.seek=%lld beginflush=%lld stop=%lld endflush=%lld pause=%lld audioflush=%lld | total=%lldus thr=%d"),
+			us(t_enter, t_seek), us(t_seek, t_bf), us(t_bf, t_stop), us(t_stop, t_ef),
+			us(t_ef, t_pause), us(t_pause, t_audio), us(t_enter, t_audio), thr ? 1 : 0);
 
 		logWrite(_T("[ffi/src] on_change_start → seek %.0fms + %s (NewSegment 0..%lld)"),
 			pos_ms,
-			ThreadExists() ? _T("Stop/Flush/Pause cycle") : _T("pre-streaming defer"),
+			thr ? _T("Stop/Flush/Pause cycle") : _T("pre-streaming defer"),
 			(long long)rtStop);
 	}
 
@@ -547,8 +566,9 @@ namespace ffi
 
 		++m_sample_count;
 
-		//매 frame 의 rt 추적 — seek 후 first frame + 매 60 frame.
-		if (m_sample_count <= 5 || m_sample_count % 60 == 0)
+		//매 frame 의 rt 추적 — 매 60 frame (+ seek 후 첫 frame: m_sample_count 가 seek 마다 0 리셋 → 0%60==0 로 1개).
+		//기존 "<=5" 는 seek 마다 첫 5프레임을 찍어 빠른 드래그 시 seek 당 5개 로그 버스트(전역 락+fflush) → 제거.
+		if (m_sample_count % 60 == 0)
 		{
 			logWrite(_T("[ffi/src] frame[%lld] pts=%lld rtStart=%lld(ms=%lld) seg=%lld key=%d"),
 				m_sample_count, (long long)frame->pts,
@@ -1147,19 +1167,36 @@ namespace ffi
 		//get_track_pos 가 stale (직전 미디어 시점) 반환하지 않도록.
 		m_last_input_pts_ms.store(rtStart / 10000);	  //REFERENCE_TIME 100ns → ms.
 
+		//[seek_prof] on_seek_flush 가 ~157ms — initfilter(atempo 재생성) vs Stop(오디오 FillBuffer 종료 대기) 중 어느쪽인지 측정.
+		LARGE_INTEGER apf, a0, a1, a2, a3, a4, a5;
+		::QueryPerformanceFrequency(&apf);
+		::QueryPerformanceCounter(&a0);
+
 		//atempo graph 재생성 — internal latency 잔류 제거 (LAV path 의 SCAudioTimeStretch NewSegment 처리와 동일).
 		//현재 rate 유지 — m_filter_rate 가 직전 rate (init_audio_filter 가 그 rate 로 atempo 재init).
 		if (m_filter_graph)
 			init_audio_filter(m_filter_rate);
+		::QueryPerformanceCounter(&a1);
 
 		//streaming 중인 경우만 Stop/Flush/Pause cycle.
-		if (ThreadExists())
+		a2 = a3 = a4 = a1;
+		bool athr = ThreadExists();
+		if (athr)
 		{
 			DeliverBeginFlush();
+			::QueryPerformanceCounter(&a2);
 			Stop();
+			::QueryPerformanceCounter(&a3);
 			DeliverEndFlush();
 			Pause();
+			::QueryPerformanceCounter(&a4);
 		}
+		a5 = a4;
+
+		auto aus = [&](const LARGE_INTEGER& x, const LARGE_INTEGER& y) -> long long
+			{ return (y.QuadPart - x.QuadPart) * 1000000LL / apf.QuadPart; };
+		logWrite(_T("[ffi/src/audio/seek_prof] initfilter=%lld beginflush=%lld stop=%lld endflush+pause=%lld | total=%lldus thr=%d"),
+			aus(a0, a1), aus(a1, a2), aus(a2, a3), aus(a3, a4), aus(a0, a5), athr ? 1 : 0);
 	}
 
 	HRESULT CFFiAudioStream::OnThreadStartPlay()

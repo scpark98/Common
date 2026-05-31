@@ -323,7 +323,7 @@ protected:
 	bool		m_show_time = false;
 	bool		m_dim_time_str = true;				//시간 문자열은 연한 회색으로 비강조되도록 표시
 
-	bool		m_draw_border = true;				//border
+	bool		m_draw_border = false;				//border — 리소스의 WS_BORDER 여부로 PreSubclassWindow 에서 결정 (CSCTreeCtrl/CVtListCtrlEx 와 동일).
 
 	//LBS_SHOWSELALWAYS 라는 속성이 없으므로 직접 추가
 	bool		m_show_selection_always = true;

@@ -141,6 +141,15 @@ void CSCListBox::PreSubclassWindow()
 	// Get Defalut Font
 	CListBox::PreSubclassWindow();
 
+	//리소스에서 WS_BORDER / WS_EX_CLIENTEDGE 가 켜져 있을 때만 native border 제거 + 자체 그리기(m_draw_border)로 전환.
+	//(CSCTreeCtrl / CVtListCtrlEx::PreSubclassWindow 와 동일 패턴 — border 유무를 리소스 설계와 일치시킴.
+	// 이전엔 m_draw_border 기본값이 true 라 리소스 border=false 여도 항상 테두리가 그려지던 버그.)
+	if ((GetStyle() & WS_BORDER) || (GetExStyle() & WS_EX_CLIENTEDGE))
+	{
+		m_draw_border = true;
+		ModifyStyle(WS_BORDER, 0);
+	}
+
 	//이게 왜 적용이 안될까...
 	DWORD dwStyle = GetStyle() & LVS_TYPEMASK;
 	ModifyStyle(LBS_SORT, dwStyle | LBS_HASSTRINGS | LBS_OWNERDRAWFIXED);

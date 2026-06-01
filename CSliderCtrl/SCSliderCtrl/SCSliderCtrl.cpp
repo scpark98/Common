@@ -44,6 +44,7 @@ BEGIN_MESSAGE_MAP(CSCSliderCtrl, CSliderCtrl)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
+	ON_WM_MOUSELEAVE()
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	//}}AFX_MSG_MAP
@@ -1043,6 +1044,15 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	m_drag_started = false;
 	SetCapture();
 
+	//hover 프리뷰 모드면 grab(드래그) 시작 시 프리뷰 숨김 — 드래그 중엔 영상이 실시간 변하므로 프리뷰 무의미.
+	//기존 leave 경로 재사용(프리뷰 lifecycle 을 hover/leave 이벤트로 일원화). m_last_hover_pos 리셋 → release 후 같은 위치 hover 도 재발송.
+	if (m_use_hover_preview)
+	{
+		m_last_hover_pos = -1;
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
+			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_hover_leave, this, 0), 0);
+	}
+
 	//PotPlayer 식 grab — click 시 즉시 그 위치로 seek (msg_thumb_grab) + thumb 도 시각적으로 그 위치에 jump.
 	//drag 중에는 OnMouseMove 가 thumb 를 다시 움직이지 않으므로 thumb 는 grab 위치에 고정 유지된다.
 	//(이전: OnMouseMove(nFlags, point) 호출 → drag 첫 프레임에 msg_thumb_move 가 추가 발송되어
@@ -1196,7 +1206,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			str.Format(_T("%s (%s)"), GetTimeStringFromMilliSeconds(m_bookmark[m_cur_bookmark].pos, true, false), m_bookmark[m_cur_bookmark].name);
 			//손 떨림으로 인한 micro WM_MOUSEMOVE 마다 UpdateTipText 가 호출되면 같은 텍스트로도 popup redraw 발생 → 깜빡임.
 			//m_use_tooltip — 호출자가 use_tooltip(false) 로 suppress 한 경우 (미디어 미오픈 등) 북마크 위 hover 도 표시 안 함.
-			if (m_use_tooltip && m_tooltip.m_hWnd && str != m_tooltip_last_text)
+			if (m_use_tooltip && !m_use_hover_preview && m_tooltip.m_hWnd && str != m_tooltip_last_text)
 			{
 				m_tooltip.UpdateTipText(str, this);
 				m_tooltip_last_text = str;
@@ -1205,7 +1215,7 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		redraw_window();
 	}
 
-	if (m_use_tooltip && m_cur_bookmark == -1)
+	if (m_use_tooltip && !m_use_hover_preview && m_cur_bookmark == -1)
 	{
 		int pos = Pixel2Pos(point.x);
 
@@ -1229,6 +1239,24 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		}
 	}
 
+
+	//[hover 프리뷰] 드래그가 아닌 단순 hover 시 parent 로 hover 위치 통지 (opt-in). 호출자가 그 위치의 썸네일을 프리뷰.
+	//pos 변동 시에만 발송(jitter spam 억제). TrackMouseEvent 로 leave 를 받아 프리뷰를 숨기게 함.
+	if (m_use_hover_preview && !m_lbuttondown && IsWindowEnabled())
+	{
+		if (!m_hover_tracking)
+		{
+			TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, m_hWnd, 0 };
+			TrackMouseEvent(&tme);
+			m_hover_tracking = true;
+		}
+		if (pos != m_last_hover_pos)
+		{
+			m_last_hover_pos = pos;
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
+				(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_hover, this, pos), 0);
+		}
+	}
 
 	//drag 중에는 thumb 가 마우스를 따라가고 msg_thumb_move 가 발송되어 호출자가 set_track_pos 로 seek.
 	//(click+hold = mouse 가 안 움직이는 상태에서는 이 분기가 발화하지 않으므로 thumb 는 grab 위치에 고정.)
@@ -1255,6 +1283,18 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//이 코드를 살려놓으면 thumb위에서 마우스가 클릭되지 않고 움직여도 WM_PAINT가 호출되는 현상이 발생한다.
 	//우선 주석처리한다.
 	//CSliderCtrl::OnMouseMove(nFlags, point);
+}
+
+void CSCSliderCtrl::OnMouseLeave()
+{
+	//hover 프리뷰 종료 — TrackMouseEvent 재무장 필요(다음 진입 시 OnMouseMove 가 다시 arm), 프리뷰 숨김 통지.
+	m_hover_tracking = false;
+	m_last_hover_pos = -1;
+	if (m_use_hover_preview)
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
+			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_hover_leave, this, 0), 0);
+
+	CSliderCtrl::OnMouseLeave();
 }
 
 // PrepareMask
@@ -1725,15 +1765,18 @@ void CSCSliderCtrl::use_tooltip(bool use)
 		m_tooltip.SetDelayTime(TTDT_RESHOW, 0);
 		m_tooltip.SetMaxTipWidth(400);
 		m_tooltip.AddTool(this, _T(""));
-		m_tooltip.Activate(TRUE);
+		//hover_preview 모드면 tooltip 과 배타 — 켜지 않음.
+		m_tooltip.Activate(m_use_hover_preview ? FALSE : TRUE);
 		return;
 	}
 
 	//기존 tooltip 이 이미 만들어져 있으면 Activate 만 토글 — 호출자가 미디어 close 등으로 일시 suppress 가능.
+	//단 hover_preview(프리뷰) 모드면 use 와 무관하게 tooltip 비활성 — 둘은 상호배타(set_track_total 이 use_tooltip(true) 재호출해도 안 뜸).
 	if (m_tooltip.GetSafeHwnd())
 	{
-		m_tooltip.Activate(use ? TRUE : FALSE);
-		if (!use)
+		BOOL activate = (use && !m_use_hover_preview) ? TRUE : FALSE;
+		m_tooltip.Activate(activate);
+		if (!activate)
 			m_tooltip.Pop();
 	}
 }

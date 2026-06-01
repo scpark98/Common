@@ -88,6 +88,8 @@ public:
 		msg_thumb_move,
 		msg_thumb_release,
 		msg_thumb_track_bottom_slide,
+		msg_hover,			//hover 프리뷰 — pos = hover 위치 값(슬라이더 단위). m_use_hover_preview 일 때만 발송.
+		msg_hover_leave,	//hover 종료(마우스가 슬라이더 밖으로). pos 무의미.
 	};
 
 	CSCSliderCtrl* pThis = NULL;
@@ -231,6 +233,16 @@ public:
 	void	set_tic_freq(int freq, bool show_text = false);
 
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
+
+	//트랙 hover 시 parent 로 Message_CSCSliderCtrl(msg_hover, pos) 발송 — 호버 썸네일 프리뷰용. opt-in(기본 off).
+	//off 면 기존 사용처에 영향 없음. 마우스가 슬라이더를 벗어나면 msg_hover_leave 1회 발송(프리뷰 숨김용).
+	//tooltip 과 상호배타 — 켜면 tooltip 강제 비활성(set_track_total 등이 use_tooltip(true) 재호출해도 안 뜸).
+	void	use_hover_preview(bool use = true)
+	{
+		m_use_hover_preview = use;
+		if (m_tooltip.GetSafeHwnd())
+			m_tooltip.Activate((m_use_tooltip && !use) ? TRUE : FALSE);
+	}
 	void	set_bookmark_color(Gdiplus::Color cr);
 	void	set_bookmark_current_color(Gdiplus::Color cr);
 
@@ -343,6 +355,10 @@ protected:
 
 	//특정 위치들을 기억해두자. 북마크처럼.
 	bool			m_use_bookmark = false;	//default = false;
+
+	bool			m_use_hover_preview = false;	//opt-in hover 프리뷰 통지.
+	int				m_last_hover_pos = -1;			//같은 pos 반복 발송 억제.
+	bool			m_hover_tracking = false;		//TrackMouseEvent(TME_LEAVE) 무장 상태(중복 무장 방지).
 	std::deque<CSCSliderCtrlBookmark> m_bookmark;
 	//pos의 위치에 있는 북마크의 인덱스를 리턴한다.
 	int				find_index_bookmark(int pos);
@@ -450,6 +466,7 @@ protected:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnMouseLeave();
 	afx_msg void OnSetFocus(CWnd* pOldWnd);
 	afx_msg void OnKillFocus(CWnd* pNewWnd);
 	//}}AFX_MSG

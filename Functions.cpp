@@ -3773,6 +3773,75 @@ CString get_default_browser_info(CString* pPath, CString* pVersion)
 
 	return browser;
 }
+
+//HKLM/HKCU 의 SOFTWARE\Clients\StartMenuInternet 를 enum 하여 시스템에 설치된 브라우저
+//친숙 이름 목록(중복 제거)을 list 에 채운다. 기본 브라우저는 무조건 0번으로 이동된다.
+//따라서 실제 return value는 대부분 0으로 리턴될 것이다.
+//return value: list 안에서 기본 브라우저의 인덱스(항상 0, 목록이 비면 -1).
+int get_browser_list(std::deque<CString>& list)
+{
+	list.clear();
+
+	HKEY roots[2] = { HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER };
+
+	for (int r = 0; r < 2; r++)
+	{
+		HKEY hkey = NULL;
+		if (RegOpenKeyEx(roots[r], _T("SOFTWARE\\Clients\\StartMenuInternet"),
+			0, KEY_READ, &hkey) != ERROR_SUCCESS)
+			continue;
+
+		TCHAR subkey_name[256];
+		DWORD index = 0;
+		DWORD name_size = _countof(subkey_name);
+
+		while (RegEnumKeyEx(hkey, index++, subkey_name, &name_size,
+			NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
+		{
+			CString section;
+			section.Format(_T("SOFTWARE\\Clients\\StartMenuInternet\\%s"), subkey_name);
+
+			CString display_name;
+			get_registry_str(roots[r], section, _T(""), &display_name);
+			if (display_name.IsEmpty())
+				display_name = subkey_name;
+
+			bool exists = false;
+			for (const auto& b : list)
+			{
+				if (b.CompareNoCase(display_name) == 0)
+				{
+					exists = true;
+					break;
+				}
+			}
+			if (!exists)
+				list.push_back(display_name);
+
+			name_size = _countof(subkey_name);
+		}
+		RegCloseKey(hkey);
+	}
+
+	CString default_browser = get_default_browser_info();
+
+	int found = -1;
+	for (size_t i = 0; i < list.size(); i++)
+	{
+		if (list[i].CompareNoCase(default_browser) == 0)
+		{
+			found = (int)i;
+			break;
+		}
+	}
+
+	if (found > 0)
+		std::swap(list[0], list[found]);
+	else if (found < 0 && !default_browser.IsEmpty())
+		list.push_front(default_browser);
+
+	return list.empty() ? -1 : 0;
+}
 /*
 CString	get_default_browser_info(CString* pPath, CString* pVersion)
 {
@@ -3954,32 +4023,6 @@ LONG set_registry_str(HKEY hKeyRoot, CString sSubKey, CString entry, CString str
 	return lResult;
 }
 //#endif
-
-LONG delete_registry_key(HKEY hKeyRoot, CString sSubKey)
-{
-	return RegDeleteTree(hKeyRoot, sSubKey);
-}
-
-int delete_urlscheme(CString urlscheme)
-{
-	if (urlscheme.IsEmpty())
-		return 0;
-
-	struct { HKEY root; CString sub; } targets[3] =
-	{
-		{ HKEY_CLASSES_ROOT,  urlscheme },
-		{ HKEY_CURRENT_USER,  _T("Software\\Classes\\") + urlscheme },
-		{ HKEY_LOCAL_MACHINE, _T("Software\\Classes\\") + urlscheme },
-	};
-
-	int success_count = 0;
-	for (int i = 0; i < 3; i++)
-	{
-		if (delete_registry_key(targets[i].root, targets[i].sub) == ERROR_SUCCESS)
-			success_count++;
-	}
-	return success_count;
-}
 
 //reg_path에 해당 str 항목이 존재하지 않으면 추가한다.
 //레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성되어 있다.
@@ -10531,6 +10574,7 @@ CString	get_windows_version_string(bool detail)
 			case PRODUCT_WEB_SERVER:
 				sType = _T("Web Server Edition");
 				break;
+#if defined(PRODUCT_CORE)
 			//Windows 8/10/11 시대 edition — 위 케이스는 Vista/7 시대 상수라 이게 없으면
 			//Home(PRODUCT_CORE) 등이 빈 문자열로 빠져 edition 이 표시 안 됨.
 			case PRODUCT_CORE:
@@ -10560,6 +10604,7 @@ CString	get_windows_version_string(bool detail)
 			case PRODUCT_ENTERPRISE_N:
 				sType = _T("Enterprise N");
 				break;
+#endif
 		}
 
 		if (sType.IsEmpty() == false)

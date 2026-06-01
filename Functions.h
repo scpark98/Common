@@ -1293,6 +1293,12 @@ struct	NETWORK_INFO
 	//기본 브라우저로 설정된 브라우저 이름을 리턴하고 부가적으로 경로, 버전을 얻을 수 있다.
 	CString		get_default_browser_info(CString* pPath = NULL, CString* pVersion = NULL);
 
+	//HKLM/HKCU 의 SOFTWARE\Clients\StartMenuInternet 를 enum 하여 시스템에 설치된 브라우저
+	//친숙 이름 목록(중복 제거)을 list 에 채운다. 기본 브라우저는 무조건 0번으로 이동된다.
+	//따라서 실제 return value는 대부분 0으로 리턴될 것이다.
+	//return value: list 안에서 기본 브라우저의 인덱스(항상 0, 목록이 비면 -1).
+	int			get_browser_list(std::deque<CString>& list);
+
 	//Content-Type: multipart/form-data 형식을 이용한 웹서버로의 파일 전송 함수
 	bool		HttpUploadFile(CString url, CString filepath, int chatIndex);
 
@@ -1513,16 +1519,6 @@ struct	NETWORK_INFO
 	//!!반드시 Linker->Manifest File에서 Admin으로 빌드할 것!!
 	LONG		set_registry_str(HKEY hKeyRoot, CString sSubKey, CString sEntry, CString str);
 
-	//재귀적으로 키와 모든 하위 키·값 삭제 (RegDeleteTree).
-	//키가 없으면 ERROR_FILE_NOT_FOUND 반환 — 호출처에서 "이미 없는 상태" 와 "권한 부족" 을 구분 가능.
-	LONG		delete_registry_key(HKEY hKeyRoot, CString sSubKey);
-
-	//urlscheme(예: _T("myapp")) 을 다음 표준 3 위치에서 모두 제거:
-	//  1) HKEY_CLASSES_ROOT\<urlscheme>
-	//  2) HKEY_CURRENT_USER\Software\Classes\<urlscheme>
-	//  3) HKEY_LOCAL_MACHINE\Software\Classes\<urlscheme>
-	//반환: 실제 삭제 성공한 위치 개수 (0~3). HKLM 은 admin 권한 없으면 실패할 수 있다.
-	int			delete_urlscheme(CString urlscheme);
 
 	//reg_path에 해당 value 항목이 존재하지 않으면 추가한다.
 	//레지스트리 해당 경로에는 "count"에 갯수가, 숫자 인덱스 항목에 각 값이 저장되는 구조로 구성된다.

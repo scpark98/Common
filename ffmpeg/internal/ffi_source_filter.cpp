@@ -144,6 +144,8 @@ namespace ffi
 		m_fb_count_since_seek = 0;
 		m_fb_last_entry_ms = 0;
 		m_budget_exceeded_this_seek = false;	  //[latency budget] 새 seek 시작 → flag reset.
+		m_kf_mode_this_seek = m_pSource->seek_keyframe_mode();	//이 seek 의 모드 고정 (frame step toggle 우회 race 차단).
+		m_frame_step_this_seek = m_pSource->frame_step_mode();	//frame step seek 이면 budget 비활성 (정확 target 까지 skip).
 
 		//streaming 중인 경우만 MS 표준 정공법 (Stop/Flush/Pause cycle) 적용.
 		//	BeginFlush → Stop → EndFlush → Pause → OnThreadStartPlay → NewSegment + Discontinuity
@@ -415,7 +417,7 @@ namespace ffi
 				//pre-target skip 분기 — 옵션 환경설정→재생→"키 프레임 단위로 이동(정확하지 않음)".
 				//[옵션 ON]: decoder 가 이미 forward keyframe(pts>=target) 부터 전달 → 여기선 skip 없이 첫 frame emit.
 				//[옵션 OFF]: pre-target skip 으로 정확 target 위치 + budget exceeded fallback.
-				const bool keyframe_mode = m_pSource->seek_keyframe_mode();
+				const bool keyframe_mode = m_kf_mode_this_seek;	//on_change_start 가 이 seek 시점에 고정한 스냅샷.
 
 				if (!keyframe_mode && !m_budget_exceeded_this_seek &&
 					frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts)
@@ -427,8 +429,11 @@ namespace ffi
 					//[latency budget — PotPlayer 식 keyframe-first display]
 					//seek_t0 부터 누적 wall clock 이 budget 초과 시 정확 위치 포기, 현재 frame 그대로 emit.
 					//flag set 후엔 그 seek 동안 skip 재진입 X — 다음 frame 들은 정상 forward 재생.
+					//단 frame step 은 정밀 1프레임이 본질 — budget 적용 시 target 직전 임의 중간 프레임을 emit 해
+					//화면이 튀므로(sparse keyframe 미디어), frame step seek 에선 budget 비활성 = 항상 target 까지 skip.
 					const ULONGLONG SKIP_LATENCY_BUDGET_MS = 150;
-					if (m_seek_t0_ms != 0 && (GetTickCount64() - m_seek_t0_ms) >= SKIP_LATENCY_BUDGET_MS)
+					if (!m_frame_step_this_seek && m_seek_t0_ms != 0 &&
+						(GetTickCount64() - m_seek_t0_ms) >= SKIP_LATENCY_BUDGET_MS)
 					{
 						logWrite(_T("[ffi/src/video/diag] budget exceeded skip=%d frame_pts=%lld target=%lld elapsed=%llums → emit + skip disable"),
 							skipped, (long long)frame->pts, (long long)seek_target_pts,
@@ -591,7 +596,6 @@ namespace ffi
 		++m_sample_count;
 
 		//매 frame 의 rt 추적 — 매 60 frame (+ seek 후 첫 frame: m_sample_count 가 seek 마다 0 리셋 → 0%60==0 로 1개).
-		//기존 "<=5" 는 seek 마다 첫 5프레임을 찍어 빠른 드래그 시 seek 당 5개 로그 버스트(전역 락+fflush) → 제거.
 		if (m_sample_count % 60 == 0)
 		{
 			logWrite(_T("[ffi/src] frame[%lld] pts=%lld rtStart=%lld(ms=%lld) seg=%lld key=%d"),
@@ -1024,16 +1028,15 @@ namespace ffi
 		m_filter_cs.Lock();
 
 		//atempo time-stretch — rate != 1.0 일 때 PCM sample count 를 1/rate 로 줄여 graph clock 가속 + pitch 유지.
-		//rate==1.0 도 동일 path (1:1 pass-through) 로 코드 일관. swr output 을 frame 으로 wrap → buffersrc 에 push → buffersink 에서 pull.
-		if (m_filter_graph && out_samples > 0)
+		//rate 변경 감지는 graph 존재가 아니라 rate 자체로 게이팅해야 함 — rate=1.0 은 graph 를 생성하지 않으므로
+		//(init_audio_filter 의 1.0 skip), 게이트가 m_filter_graph 면 1.0→N 전환 시 NULL 이라 영영 build 못 해
+		//오디오가 배속에 무반응. update_audio_filter_rate → init_audio_filter 가 rate!=1.0 일 때 graph 를 build,
+		//N→1.0 복귀 시엔 release 후 NULL 유지(1.0 절약 유지). 실제 atempo *적용* 은 아래 블록의 graph!=NULL 가드가 담당.
+		if (out_samples > 0)
 		{
-			//source rate 변경 감지 → atempo tempo 갱신. init 실패 시 m_filter_src 가 NULL 됨.
 			double cur_rate = m_pSource ? m_pSource->playback_rate() : 1.0;
 			if (cur_rate != m_filter_rate)
 				update_audio_filter_rate(cur_rate);
-
-			//rate change 가 init 실패로 끝났을 수 있음 — filter 무효면 atempo skip, raw swr output 을 그대로 deliver.
-			//(audio 가 잠시 native rate 로 재생 = 글리치 가능하지만 NULL deref crash 회피.)
 		}
 		if (m_filter_graph && m_filter_src && m_filter_sink && out_samples > 0)
 		{

@@ -181,6 +181,10 @@ namespace ffi
 		std::condition_variable m_cv_seek_done;
 		double					m_pending_seek_ms = -1.0;
 		double					m_pending_prev_ms = -1.0;  //seek 직전 재생 위치 (keyframe 모드 방향 판정 + 전진 보장용).
+		//seek 캡처 시점(seek() 호출 = UI thread, put_CurrentPosition 내부 동기 구간)에 m_seek_keyframe_mode 스냅샷.
+		//worker 가 live atomic 을 읽으면, frame step 의 "off→seek→on" 우회가 worker 처리 전에 on 으로 복원돼 race.
+		//스냅샷이면 toggle 이 동기 구간만 감싸면 되므로 그 seek 은 결정적으로 캡처된 모드로 처리됨.
+		bool					m_pending_kf_mode = true;
 		bool					m_seek_processed = true;   //worker 가 seek 끝낸 직후 true. seek() 호출 시 false.
 
 		//Seek generation — frame 마다 tag 부여. seek() 호출 시 ++. pop 시 current generation 만 accept,

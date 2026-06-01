@@ -500,6 +500,7 @@ namespace ffi
 			std::unique_lock<std::mutex> lk(m_mtx_seek);
 			m_pending_seek_ms = pos_ms;
 			m_pending_prev_ms = prev_emit_ms;
+			m_pending_kf_mode = m_seek_keyframe_mode.load();	//이 seek 의 모드를 호출 시점에 고정 (worker live-read race 차단).
 			m_seek_processed = false;
 		}
 
@@ -842,6 +843,7 @@ namespace ffi
 				{
 					double seek_pos = m_pending_seek_ms;
 					double prev_pos = m_pending_prev_ms;
+					bool   kf_mode  = m_pending_kf_mode;	//seek() 가 호출 시점에 고정한 스냅샷.
 					m_pending_seek_ms = -1.0;
 					lk.unlock();
 
@@ -873,8 +875,6 @@ namespace ffi
 					AVRational vtb = m_fmt->streams[m_video_stream_idx]->time_base;
 					int64_t target_pts = av_rescale_q(target_us,
 						AVRational{1, AV_TIME_BASE}, vtb);
-
-					const bool kf_mode = m_seek_keyframe_mode.load();
 
 					int hr_seek;
 					if (kf_mode)

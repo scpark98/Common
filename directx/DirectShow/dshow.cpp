@@ -3447,6 +3447,8 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 	if (!m_pGB || !m_pMS)
 		return;
 
+	m_step_anchor_ms = -1.0;	//외부 seek(트랙이동·북마크 등) → frame step anchor 무효화. 다음 step 은 표시 위치에서 재시작.
+
 	LARGE_INTEGER qpc_freq, qpc_t0, qpc_t1, qpc_t2, qpc_t3;
 	::QueryPerformanceFrequency(&qpc_freq);
 	::QueryPerformanceCounter(&qpc_t0);
@@ -3619,7 +3621,18 @@ void CDShow::step_frame(bool forward)
 		return;
 
 	if (get_play_state() == State_Running)
+	{
 		play(State_Paused);
+		m_step_anchor_ms = -1.0;	//재생 중이었으면 step anchor 무효 — 현재 표시 위치에서 새로 시작.
+	}
+
+	double interval_ms = 1000.0 / m_frame_rate;
+
+	//fresh 진입(외부 seek/재생 후 첫 step) — settled 표시 위치(audio 동기 track_pos)에서 anchor 시작. 이후 step 은 자체 ±interval 유지.
+	//get_CurrentPosition(deliver 누적)은 렌더러 큐 깊이만큼 표시보다 앞서고, get_track_pos 는 IVideoFrameStep 전진을
+	//audio 가 못 따라가거나(stale) 연속 backward seek 중 flush 로 튀어, 매 step 기준으로 재읽으면 안 됨 — seed 후 직접 누적.
+	if (m_step_anchor_ms < 0)
+		m_step_anchor_ms = get_track_pos();
 
 	//forward step: IVideoFrameStep (MPC-VR / EVR 지원) — graph clock 진행 없이 *다음 sample 1 개* 표시.
 	//seek-based step 의 부작용 (sparse keyframe 미디어에서 av_seek_frame BACKWARD 가 forward fallback → 수초 jump) 회피.
@@ -3630,15 +3643,46 @@ void CDShow::step_frame(bool forward)
 		{
 			HRESULT hr = pFrameStep->Step(1, NULL);
 			if (SUCCEEDED(hr))
+			{
+				//IVideoFrameStep 는 표시를 정확히 1프레임 전진 → anchor 도 1프레임 전진. track_pos 재읽기 금지
+				//(IVideoFrameStep 중 audio 가 video 를 못 따라와 stale → 다음 backward 가 stale 위치로 점프하던 원인).
+				m_step_anchor_ms += interval_ms;
 				return;
+			}
 		}
 	}
 
-	//backward step 또는 IVideoFrameStep 미지원: seek-based fallback.
-	REFTIME pos;
-	double interval = 1.0 / m_frame_rate;
-	m_pMP->get_CurrentPosition(&pos);
-	m_pMP->put_CurrentPosition(pos + (forward ? interval : -interval));
+	//seek-based: backward, 또는 IVideoFrameStep 미지원 forward.
+	m_step_anchor_ms += forward ? interval_ms : -interval_ms;
+	if (m_step_anchor_ms < 0)
+		m_step_anchor_ms = 0;
+
+	//internal FFmpeg 경로는 keyframe 모드(기본 ON)면 이 1프레임 seek 이 GOP 시작 keyframe 으로 점프 → 엉뚱한 위치.
+	//frame step 은 정밀 1프레임이 본질이라 이 seek 만 정확 모드로 우회한다. put_CurrentPosition 내부의
+	//on_change_start / decoder.seek 가 모드를 *동기로* 스냅샷하므로, 호출 직후 원복해도 이 seek 은 정확 모드로 처리됨.
+	bool restore_kf = false;
+	if (m_pFFiSource)
+	{
+		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
+		//frame step seek 표시 — FillBuffer 의 latency budget 비활성(정확 target 까지 skip, 화면 튐 방지).
+		src->set_frame_step_mode(true);
+		//keyframe 모드면 정확 모드로 우회 (GOP 시작 키프레임 점프 방지). on_change_start/decoder.seek 가 동기 스냅샷.
+		if (src->seek_keyframe_mode())
+		{
+			restore_kf = true;
+			src->set_seek_keyframe_mode(false);
+		}
+	}
+
+	m_pMP->put_CurrentPosition(m_step_anchor_ms / 1000.0);
+
+	if (m_pFFiSource)
+	{
+		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
+		if (restore_kf)
+			src->set_seek_keyframe_mode(true);
+		src->set_frame_step_mode(false);
+	}
 }
 
 void CDShow::select_stream(bool video, int index)

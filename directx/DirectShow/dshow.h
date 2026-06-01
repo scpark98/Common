@@ -175,6 +175,12 @@ public:
 	//마지막 정상 query 결과를 cache. transition 중에는 이 값 반환.
 	double			m_last_track_pos_ms = 0.0;
 
+	//frame step 자체 위치 anchor (ms). step_frame 이 ±1프레임으로 직접 유지.
+	//get_CurrentPosition 은 렌더러 큐 깊이만큼 표시 프레임보다 앞서고(연속 forward 후 backward 가 그 앞 위치로 점프),
+	//get_track_pos 는 연속 backward seek 중 audio flush 로 값이 튀어, 둘 다 매 step 기준으로는 부적합.
+	//신규 진입(-1)/forward step 시에만 settled 상태의 get_track_pos 로 재동기. 외부 seek(set_track_pos)·재생 재개 시 -1 로 무효화.
+	double			m_step_anchor_ms = -1.0;
+
 	//ms단위의 재생시간을 얻어온다.
 	double			get_media_duration() { return m_duration; }
 

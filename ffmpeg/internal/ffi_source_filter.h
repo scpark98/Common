@@ -103,6 +103,15 @@ namespace ffi
 		//on_change_start 가 매 seek 시 false 로 reset. (옵션 OFF 정확 모드 전용.)
 		bool			m_budget_exceeded_this_seek = false;
 
+		//이 seek 의 keyframe 모드 스냅샷 — on_change_start(UI thread, put_CurrentPosition 동기 구간)에서 1회 캡처.
+		//FillBuffer emit(pin thread)이 live source flag 대신 이 값을 읽어야 frame step 의 "off→seek→on" 우회가
+		//emit 시점의 복원된 flag 에 영향받지 않음 (decoder 측 m_pending_kf_mode 와 동일 취지).
+		bool			m_kf_mode_this_seek = true;
+
+		//이 seek 이 frame step(F/D) 인지 — on_change_start 에서 캡처. true 면 FillBuffer 의 latency budget 비활성
+		//(정확히 target 프레임까지 skip). budget 이 frame step 에서 target 직전 중간 프레임을 emit 해 화면이 튀던 문제 차단.
+		bool			m_frame_step_this_seek = false;
+
 		//flush 후 첫 sample 에 SetDiscontinuity(TRUE) 알림 플래그.
 		bool			m_need_discontinuity = false;
 
@@ -227,6 +236,11 @@ namespace ffi
 		void		   set_seek_keyframe_mode(bool b) { m_seek_keyframe_mode.store(b); m_decoder.set_seek_keyframe_mode(b); }
 		bool		   seek_keyframe_mode() const { return m_seek_keyframe_mode.load(); }
 
+		//[frame step] step_frame 이 1프레임 seek 직전 set(true), 직후 restore. on_change_start 가 per-seek 캡처해
+		//FillBuffer 의 latency budget 을 끔 → sparse keyframe 미디어에서도 정확히 target 프레임까지 디코드(화면 튐 방지).
+		void		   set_frame_step_mode(bool b) { m_frame_step_mode.store(b); }
+		bool		   frame_step_mode() const { return m_frame_step_mode.load(); }
+
 		//실제 *미디어 시점* (ms) — audio pin 이 마지막 emit 한 atempo input frame 의 원본 PTS.
 		//get_track_pos 가 wall clock 기반 graph position 대신 이 값을 반환해 rate 무관 정확 시점.
 		//audio pin 없으면 -1.
@@ -238,6 +252,7 @@ namespace ffi
 		CFFiAudioStream* m_pAudioStream = nullptr;	 //has_audio 일 때만 생성.
 		std::atomic<int64_t> m_audio_sync_delay_rt{0};
 		std::atomic<double>	 m_playback_rate{1.0};
+		std::atomic<bool>	 m_frame_step_mode{false};	//frame step seek 동안만 true (budget 비활성).
 		std::atomic<bool>	 m_seek_keyframe_mode{true};	//기본 true — 응답성 우선. UI 옵션 추가 시 reg 에서 load.
 	};
 }

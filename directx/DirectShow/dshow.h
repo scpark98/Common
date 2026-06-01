@@ -4,6 +4,7 @@
 #include <Afxdisp.h>
 
 #include <atomic>
+#include <mutex>
 
 #include <dshow.h>          // 디쇼 사용시
 #include <D3d9.h>
@@ -201,6 +202,11 @@ public:
 	bool			capture_frame(CString sfile);
 	//현재 video frame 을 in-memory CSCGdiplusBitmap 으로 캡처. 북마크 thumbnail 등에 사용.
 	bool			capture_frame(CSCGdiplusBitmap& out);
+
+	//트랙 hover 프리뷰용 — 메인 재생과 무관하게 독립 디코더로 time_ms 의 키프레임 1장을 target_width 폭 비트맵으로.
+	//재생 상태를 바꾸지 않음. 성공 시 true. (정확 위치가 아닌 직전 키프레임 — 프리뷰엔 충분.)
+	bool			grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out);
+	void			free_preview_thumb();	//hover 프리뷰 keep-open 추출기 해제. close_media/소멸자에서 호출.
 
 	std::deque<CMediaStream> m_video_stream;
 	std::deque<CMediaStream> m_audio_stream;
@@ -432,6 +438,11 @@ protected:
 	//Phase 3c: video only. Audio 는 추후 Phase 4 에서.
 	bool			m_use_internal_ffmpeg = false;
 	void*			m_pFFiSource = nullptr;   //ffi::CFFiSource* (raw 포인터, header 의존 회피용 void).
+
+	//트랙 hover 프리뷰용 keep-open 추출기 — 미디어당 1회 open 후 grab 재사용(hover 마다 re-open 비용 제거).
+	void*			m_preview_thumb = nullptr;	//ffi::CFFiThumbnail* (dshow.cpp 에서 cast).
+	CString			m_preview_thumb_path;		//m_preview_thumb 가 현재 연 경로. 미디어 바뀌면 재open.
+	std::mutex		m_preview_thumb_mtx;		//worker 의 grab vs main 의 close/재open 직렬화 (use-after-free 방지).
 
 	//internal path 의 audio track 강제 선택 — close+reopen 흐름의 채널. load_media_internal_ffmpeg 가
 	//ffi::CDecoder::set_initial_audio_track 으로 전달 후 -1 로 reset.

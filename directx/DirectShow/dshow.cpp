@@ -1365,6 +1365,8 @@ CDShow::~CDShow()
 
 void CDShow::close_media()
 {
+	free_preview_thumb();	//hover 프리뷰 keep-open 추출기 해제 (정의는 ffi_thumbnail.h include 뒤 — 여기선 선언만으로 호출).
+
 	teardown_subtitle_grabber();
 	teardown_audio_filter_chain();	//video time-scale + audio gain 둘 다 해제 (이전 teardown_audio_gain_filter 만 호출 시 video filter leak).
 
@@ -2223,6 +2225,7 @@ bool CDShow::is_windows_media()
 }
 
 #include "../../ffmpeg/internal/ffi_source_filter.h"
+#include "../../ffmpeg/internal/ffi_thumbnail.h"
 
 //---- UI 표시용 codec/format info — graph + decoder context 직접 query.
 //internal FFmpeg path: m_pFFiSource->decoder() 의 AVCodecParameters 정보.
@@ -3986,6 +3989,49 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 
 	CoTaskMemFree(lpDib);
 	return ok;
+}
+
+bool CDShow::grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out)
+{
+	//트랙 hover 프리뷰 — 메인 그래프(렌더러/디코더)와 무관하게 독립 ffmpeg 디코더로 그 위치 프레임 추출.
+	//capture_frame 과 달리 재생을 멈추지/움직이지 않음. SW 디코드라 메인 HW 디코더와 contention 없음.
+	//keep-open — 같은 미디어면 추출기를 재사용(hover 마다 avformat_open_input + find_stream_info 재호출 비용 제거).
+	//worker thread 가 호출하고 main 이 close_media 로 free 하므로 mtx 로 직렬화 (use-after-free 방지).
+	std::lock_guard<std::mutex> lk(m_preview_thumb_mtx);
+
+	CString path = get_media_filename();
+	if (path.IsEmpty())
+		return false;
+
+	ffi::CFFiThumbnail* thumb = (ffi::CFFiThumbnail*)m_preview_thumb;
+	if (!thumb || m_preview_thumb_path != path)
+	{
+		if (thumb)
+			delete thumb;
+		thumb = new ffi::CFFiThumbnail;
+		if (!thumb->open(path.GetString()))
+		{
+			delete thumb;
+			m_preview_thumb = nullptr;
+			m_preview_thumb_path.Empty();
+			return false;
+		}
+		m_preview_thumb = thumb;
+		m_preview_thumb_path = path;
+	}
+	return thumb->grab(time_ms, target_width, out);
+}
+
+void CDShow::free_preview_thumb()
+{
+	//close_media / 소멸자에서 호출. ffi::CFFiThumbnail 완전형이 필요(delete)해 include 뒤에 정의. grab 과 mtx 로 직렬화.
+	std::lock_guard<std::mutex> lk(m_preview_thumb_mtx);
+	if (m_preview_thumb)
+	{
+		delete (ffi::CFFiThumbnail*)m_preview_thumb;
+		m_preview_thumb = nullptr;
+		m_preview_thumb_path.Empty();
+	}
 }
 
 DWORD CDShow::get_aspect_ratio_mode()

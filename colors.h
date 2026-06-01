@@ -34,6 +34,11 @@
 - 지원되는 color theme 리스트를 얻기 위해서는 get_color_theme_list()의 리턴값을 이용한다.
 */
 
+#define		CR_SUCCESS	royalblue
+#define		CR_INFO		dimgray
+#define		CR_WARNING	crimson
+#define		CR_ERROR	red
+
 // RGB -> YUV(YCbCr)
 #define		RGB2Y(R, G, B) CLIP(((66 * (R) + 129 * (G) +  25 * (B) + 128) >> 8) +  16)
 #define		RGB2U(R, G, B) CLIP(((-38 * (R) -  74 * (G) + 112 * (B) + 128) >> 8) + 128)

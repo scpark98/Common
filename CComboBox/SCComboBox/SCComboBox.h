@@ -51,6 +51,9 @@ public:
 	//현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
 	//색상을 별도로 지정하지 않으면 기본 cr_text를 사용한다.
 	int				add(CString text = _T(""), Gdiplus::Color cr_text = Gdiplus::Color::Transparent);
+	//CComboBox::AddString override. add()로 대체되어야 자동 처리되므로.
+	int				AddString(CString text) { return add(text); }
+
 
 //design
 	//설정값은 픽셀 단위가 아닌 logical_unit이다. 즉 set_font_size()의 단위와 통일시킨다.
@@ -66,8 +69,14 @@ public:
 	LOGFONT			get_log_font() { return m_lf; }
 	void			set_log_font(LOGFONT lf);
 
+	//section에 기록된 history를 얻어올 수 있다.
+	//section = _T("setting") or section = _T("setting\\input history") 등 개발자가 결정해줘야 한다.
 	void			load_history(CWinApp* app, CString section);
-	void			save_history(CWinApp* app, CString section);
+	//section에 history를 저장한다.
+	//section = _T("setting") or section = _T("setting\\input history") 등 개발자가 결정해줘야 한다.
+	//자동저장되지 않으므로 필요할 때 호출하여 저장한다.
+	//section은 load_histroy()가 호출될 때 이미 m_reg_section에 저장되고 이 값은 load, save 모두 동일하므로 생략? 제거?
+	void			save_history(CWinApp* app, CString section = _T(""));
 
 	//src내에 존재하는 콤보박스 아이템의 인덱스를 리턴.
 	int				find_string(CString src);

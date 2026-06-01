@@ -565,7 +565,7 @@ void CSCComboBox::load_history(CWinApp* app, CString section)
 		text = app->GetProfileString(section, key, _T(""));
 
 		if (!text.IsEmpty())
-			AddString(text);
+			CComboBox::AddString(text);
 	}
 
 	if (index < 0)
@@ -580,10 +580,17 @@ void CSCComboBox::save_history(CWinApp* app, CString section)
 	if (m_is_font_combo)
 		return;
 
-	m_reg_section = section;
+	if (section.IsEmpty() == false)
+		m_reg_section = section;
 
-	app->WriteProfileInt(section, _T("history count"), GetCount());
-	app->WriteProfileInt(section, _T("current index"), GetCurSel());
+	if (m_reg_section.IsEmpty())
+	{
+		TRACE(_T("[error] m_reg_section is empty.\n"));
+		return;
+	}
+
+	app->WriteProfileInt(m_reg_section, _T("history count"), GetCount());
+	app->WriteProfileInt(m_reg_section, _T("current index"), GetCurSel());
 
 	CString key;
 	CString text;
@@ -592,7 +599,7 @@ void CSCComboBox::save_history(CWinApp* app, CString section)
 	{
 		GetLBText(i, text);
 		key.Format(_T("%03d"), i);
-		app->WriteProfileString(section, key, text);
+		app->WriteProfileString(m_reg_section, key, text);
 	}
 }
 
@@ -684,7 +691,7 @@ void CSCComboBox::edit_end(bool valid)
 		text = m_old_text;
 
 	SetWindowText(text);
-	AddString(text);
+	CComboBox::AddString(text);
 }
 */
 
@@ -885,7 +892,7 @@ int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 
 	if (FindString(-1, text) < 0)
 	{
-		index = AddString(text);
+		index = CComboBox::AddString(text);
 		if (cr_text.GetValue() != Gdiplus::Color::Transparent)
 		{
 			CSCComboBoxColor* cr = new CSCComboBoxColor(cr_text);
@@ -1004,15 +1011,10 @@ static BOOL CALLBACK EnumFontProc(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwTyp
 	else
 	{
 		pThis->add_font_list(lplf->lfFaceName);
-		index = pThis->AddString(lplf->lfFaceName);
+		index = pThis->CComboBox::AddString(lplf->lfFaceName);
 		//TRACE(_T("%s\n"), lplf->lfFaceName);
 	}
 	ASSERT(index != -1);
-
-	//int maxLen = lptm->tmMaxCharWidth * _tcslen(lplf->lfFaceName);
-	//int ret = pThis->SetItemData(index, dwType);
-
-	//ASSERT(ret != -1);
 
 	return TRUE;
 }
@@ -1123,7 +1125,7 @@ void CSCComboBox::apply_filter_now()
 		CString text = item;
 		text.MakeLower();
 		if (filter.IsEmpty() || text.Find(filter) != -1)
-			AddString(item);
+			CComboBox::AddString(item);
 	}
 	SetRedraw(TRUE);
 

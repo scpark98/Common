@@ -584,15 +584,16 @@ void CSCParagraphStatic::OnPaint()
 
 	Gdiplus::Graphics g(dc);
 
-	//AntiAlias, TextRenderingHint 등은 미리 g에 세팅되서 넘어와야 한다.
-	//무조건 여기서 이를 고정하여 출력하게 되면 일부 텍스트는 antiAlias로 인해 흐리게 표시된다.
+	//텍스트는 위 FillSolidRect 로 불투명 bg 위에 그려지므로, grayscale AntiAlias(작은 글씨 뭉갬,
+	//SCListBox/SCEdit 동일 이슈) 대신 ClearType(서브픽셀)로 그려 작은 글씨(예: Segoe UI 9)도 또렷하게.
+	//hint 를 미설정하면 GDI+ 기본값 SystemDefault 로 떨어져 메모리 DC 경로에서 디더링처럼 보였다.
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
+
+	//m_font_antialiasing 은 텍스트가 아니라 shape(그림자 path 등) 의 외곽선 smoothing 만 좌우한다.
 	if (m_font_antialiasing)
 	{
 		g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-		//grayscale AntiAlias 는 작은 글씨를 뭉개므로(SCListBox/SCEdit 동일 이슈), bg 가 불투명한
-		//static 이라 ClearType(서브픽셀)로 그려 작은 글씨도 또렷하게 한다.
-		g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 	}
 
 	CSCParagraph::draw_text(g, m_para);

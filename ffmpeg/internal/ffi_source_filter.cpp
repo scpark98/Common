@@ -125,8 +125,11 @@ namespace ffi
 		double pos_ms = (double)rtStart / 10000.0;
 		REFERENCE_TIME rtStop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
 
+		//keyframe 모드 방향 판정 + 전진 보장용 — seek 직전 재생 위치 (덮어쓰기 전 값).
+		int64_t prev_emit_ms = m_last_emitted_pts_ms.load();
+
 		//state 갱신은 ThreadExists 무관 항상. play(Running) 첫 진입 시 OnThreadStartPlay 가 이 값을 사용.
-		m_pSource->decoder().seek(pos_ms, rtStart);
+		m_pSource->decoder().seek(pos_ms, rtStart, (double)prev_emit_ms);
 		::QueryPerformanceCounter(&t_seek);
 		m_sample_count = 0;	  //sample.rtStart = m_sample_count * frame_duration 의 출발점.
 		m_last_rtStart = 0;
@@ -140,6 +143,7 @@ namespace ffi
 		m_seek_t0_ms = GetTickCount64();
 		m_fb_count_since_seek = 0;
 		m_fb_last_entry_ms = 0;
+		m_budget_exceeded_this_seek = false;	  //[latency budget] 새 seek 시작 → flag reset.
 
 		//streaming 중인 경우만 MS 표준 정공법 (Stop/Flush/Pause cycle) 적용.
 		//	BeginFlush → Stop → EndFlush → Pause → OnThreadStartPlay → NewSegment + Discontinuity
@@ -408,11 +412,31 @@ namespace ffi
 				seek_target_pts = (video_tb.num > 0 && video_tb.den > 0) ?
 					av_rescale_q(seg_rt, AVRational{1, 10000000}, video_tb) : 0;
 
-				//pre-target skip — target 도달 frame 부터 emit. 단 *forward keyframe fallback* (MPEG-TS 등) case 에서
-				//모든 frame 이 target 보다 크면 skip 안 됨 (첫 frame emit).
-				if (frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts)
+				//pre-target skip 분기 — 옵션 환경설정→재생→"키 프레임 단위로 이동(정확하지 않음)".
+				//[옵션 ON]: decoder 가 이미 forward keyframe(pts>=target) 부터 전달 → 여기선 skip 없이 첫 frame emit.
+				//[옵션 OFF]: pre-target skip 으로 정확 target 위치 + budget exceeded fallback.
+				const bool keyframe_mode = m_pSource->seek_keyframe_mode();
+
+				if (!keyframe_mode && !m_budget_exceeded_this_seek &&
+					frame->pts != AV_NOPTS_VALUE && frame->pts < seek_target_pts)
 				{
+					//[옵션 OFF: 정확 위치, 약간 딜레이]
+					//pre-target skip — target 도달 frame 부터 emit. budget exceeded fallback 으로 응답시간 상한.
 					++skipped;
+
+					//[latency budget — PotPlayer 식 keyframe-first display]
+					//seek_t0 부터 누적 wall clock 이 budget 초과 시 정확 위치 포기, 현재 frame 그대로 emit.
+					//flag set 후엔 그 seek 동안 skip 재진입 X — 다음 frame 들은 정상 forward 재생.
+					const ULONGLONG SKIP_LATENCY_BUDGET_MS = 150;
+					if (m_seek_t0_ms != 0 && (GetTickCount64() - m_seek_t0_ms) >= SKIP_LATENCY_BUDGET_MS)
+					{
+						logWrite(_T("[ffi/src/video/diag] budget exceeded skip=%d frame_pts=%lld target=%lld elapsed=%llums → emit + skip disable"),
+							skipped, (long long)frame->pts, (long long)seek_target_pts,
+							GetTickCount64() - m_seek_t0_ms);
+						m_budget_exceeded_this_seek = true;
+						break;
+					}
+
 					av_frame_free(&frame);
 					continue;
 				}
@@ -620,6 +644,17 @@ namespace ffi
 
 		if (m_out_sample_rate <= 0 || m_out_channels <= 0)
 			return false;
+
+		//rate=1.0 은 atempo 가 pass-through 일 뿐 — graph 생성 자체 skip.
+		//FillBuffer (line 1003) 의 if (m_filter_graph && ...) 가드가 NULL 시 swr 출력을 그대로 deliver.
+		//on_seek_flush 의 매 seek 마다 ~33ms (avfilter_graph_alloc + filter create + link + config) 소비를
+		//rate=1.0 (디폴트) 에선 완전 제거. release_audio_filter() 가 이미 호출돼 overflow / pointers 모두 NULL.
+		if (rate == 1.0)
+		{
+			m_filter_rate = 1.0;
+			logWrite(_T("[ffi/src/audio/filter] rate=1.0 → graph skip (swr passthrough)"));
+			return true;
+		}
 
 		m_filter_graph = avfilter_graph_alloc();
 		if (!m_filter_graph)

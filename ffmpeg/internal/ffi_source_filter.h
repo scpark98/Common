@@ -98,6 +98,11 @@ namespace ffi
 		ULONGLONG		m_fb_last_entry_ms = 0;
 		int				m_fb_count_since_seek = 0;
 
+		//[latency budget] seek 후 pre-target skip 누적이 budget 초과해 첫 frame emit (keyframe-first fallback) 한 적 있음.
+		//true 인 동안 frame->pts < target_pts 조건의 skip 자체 비활성 — 모든 frame 정상 emit (forward 재생).
+		//on_change_start 가 매 seek 시 false 로 reset. (옵션 OFF 정확 모드 전용.)
+		bool			m_budget_exceeded_this_seek = false;
+
 		//flush 후 첫 sample 에 SetDiscontinuity(TRUE) 알림 플래그.
 		bool			m_need_discontinuity = false;
 
@@ -215,6 +220,13 @@ namespace ffi
 		void		   set_playback_rate(double r) { m_playback_rate.store(r); }
 		double		   playback_rate() const { return m_playback_rate.load(); }
 
+		//[seek mode] 환경설정→재생→"키 프레임 단위로 이동(정확하지 않음)" 옵션.
+		//true: decoder 가 forward keyframe(pts>=target) 까지 demux-skip → 즉시 emit. 빠름, 5초 step 이 GOP 보다 클 수도.
+		//false: pre-target skip 으로 정확 target 위치 (현재 동작 + budget exceeded fallback).
+		//source filter (emit 분기) 와 decoder (seek+demux-skip) 양쪽이 같은 flag 필요 → 둘 다 전파.
+		void		   set_seek_keyframe_mode(bool b) { m_seek_keyframe_mode.store(b); m_decoder.set_seek_keyframe_mode(b); }
+		bool		   seek_keyframe_mode() const { return m_seek_keyframe_mode.load(); }
+
 		//실제 *미디어 시점* (ms) — audio pin 이 마지막 emit 한 atempo input frame 의 원본 PTS.
 		//get_track_pos 가 wall clock 기반 graph position 대신 이 값을 반환해 rate 무관 정확 시점.
 		//audio pin 없으면 -1.
@@ -226,5 +238,6 @@ namespace ffi
 		CFFiAudioStream* m_pAudioStream = nullptr;	 //has_audio 일 때만 생성.
 		std::atomic<int64_t> m_audio_sync_delay_rt{0};
 		std::atomic<double>	 m_playback_rate{1.0};
+		std::atomic<bool>	 m_seek_keyframe_mode{true};	//기본 true — 응답성 우선. UI 옵션 추가 시 reg 에서 load.
 	};
 }

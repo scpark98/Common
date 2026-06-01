@@ -44,7 +44,8 @@ namespace ffi
 		//seek 요청 — worker thread 에 비동기 위임. UI thread 는 즉시 반환.
 		//worker 가 queue flush + av_seek_frame + codec flush 후 새 위치부터 디코드 재개.
 		//segment_rt = graph 가 알린 seek target rt. worker 가 av_seek_frame 후 generation ++ 와 동시에 m_segment_rt 갱신.
-		void seek(double pos_ms, int64_t segment_rt = 0);
+		//prev_emit_ms = seek 직전 재생 위치 (keyframe 모드에서 forward/backward 판정 + 전진 보장). -1 = 모름.
+		void seek(double pos_ms, int64_t segment_rt = 0, double prev_emit_ms = -1.0);
 
 		//worker 가 seek 를 *처리 완료* 할 때까지 동기 대기 (queue drain + av_seek_frame + codec flush 끝남).
 		//그 후 pop_video_frame 으로 받는 frame 은 모두 post-seek. timeout_ms 안에 처리되면 true.
@@ -128,6 +129,11 @@ namespace ffi
 		//worker 의 첫 push frame (keyframe) 과 다를 수 있어 emit 시점 기준 필요.
 		void	set_video_first_emit_pts_rt(int64_t pts_rt) { m_video_first_emit_pts_rt.store(pts_rt); }
 
+		//[seek_keyframe_mode] CFFiSource 의 옵션을 worker 에 전달.
+		//true: av_seek_frame flag=0 (forward keyframe = target 직후) + margin 없음.
+		//false: 기존 동작 (AVSEEK_FLAG_BACKWARD + -1초 margin).
+		void	set_seek_keyframe_mode(bool b) { m_seek_keyframe_mode.store(b); }
+
 	private:
 		void	worker_loop();
 
@@ -174,6 +180,7 @@ namespace ffi
 		std::mutex				m_mtx_seek;
 		std::condition_variable m_cv_seek_done;
 		double					m_pending_seek_ms = -1.0;
+		double					m_pending_prev_ms = -1.0;  //seek 직전 재생 위치 (keyframe 모드 방향 판정 + 전진 보장용).
 		bool					m_seek_processed = true;   //worker 가 seek 끝낸 직후 true. seek() 호출 시 false.
 
 		//Seek generation — frame 마다 tag 부여. seek() 호출 시 ++. pop 시 current generation 만 accept,
@@ -196,6 +203,18 @@ namespace ffi
 		//seek → first frame 시간 측정용.
 		bool				   m_first_frame_after_seek = true;
 		int64_t				   m_seek_done_qpc = 0;
+
+		//[seek_keyframe_mode] true 면 worker 가 BACKWARD seek 후 forward keyframe (pts>=target) 까지
+		//packet 을 *디코드 없이* demux-skip → GOP 디코드 비용 제거 + 항상 target 이상 (절대 안 되돌아옴).
+		//UI thread 가 set, worker 가 read.
+		std::atomic<bool>		m_seek_keyframe_mode{true};
+
+		//worker 전용 (seek 처리 / decode 루프 모두 worker thread) — keyframe skip 진행 상태.
+		//forward seek 일 때만 active. m_kf_skip_min_pts 보다 큰 첫 video keyframe 만날 때까지 packet unref.
+		//(min_pts = seek 직전 위치 prev → 결과 keyframe 이 prev 보다 항상 전진 = 제자리 회귀 방지.)
+		bool					m_kf_skip_active = false;
+		int64_t					m_kf_skip_min_pts	 = 0;	 //video time_base. 이 값 초과 keyframe 부터 디코드.
+		int64_t					m_kf_skip_target_pts = 0;	 //EOF fallback (target 으로 backward 재seek) 용.
 
 		//frame queue
 		std::mutex				m_mtx_queue;

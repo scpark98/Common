@@ -489,7 +489,7 @@ namespace ffi
 		logWrite(_T("[ffi/dec] worker stopped"));
 	}
 
-	void CDecoder::seek(double pos_ms, int64_t segment_rt)
+	void CDecoder::seek(double pos_ms, int64_t segment_rt, double prev_emit_ms)
 	{
 		//Generation 증가는 worker 의 av_seek_frame 처리 후. caller 에서 ++ 하면 worker 가 이미 디코드 중인 frame 들도 stale tag →
 		//pop drop → freeze. worker 가 새 위치 처리 후부터 새 generation push 가 정공.
@@ -499,6 +499,7 @@ namespace ffi
 		{
 			std::unique_lock<std::mutex> lk(m_mtx_seek);
 			m_pending_seek_ms = pos_ms;
+			m_pending_prev_ms = prev_emit_ms;
 			m_seek_processed = false;
 		}
 
@@ -840,6 +841,7 @@ namespace ffi
 				if (m_pending_seek_ms >= 0)
 				{
 					double seek_pos = m_pending_seek_ms;
+					double prev_pos = m_pending_prev_ms;
 					m_pending_seek_ms = -1.0;
 					lk.unlock();
 
@@ -868,18 +870,49 @@ namespace ffi
 
 					//stream_index=video 로 명시 + target 을 video stream time_base 단위로 변환.
 					//stream_index=-1 (format-level) 은 *어느* stream 의 keyframe 으로 갈지 모호.
-					//sparse keyframe 미디어 (MPEG-TS 29초 GOP / .mp4-as-TS 등) 에서 av_seek_frame BACKWARD 가
-					//*prefer* 일 뿐 *force* 가 아니라 target 보다 *늦은 keyframe* 으로 forward fallback 발생.
-					//fix: target_pts - 1초 margin 으로 seek → 항상 backward keyframe 보장 + source filter 의 pre-target
-					//skip 이 *원래 target* 까지 forward decode + emit. 1초 = 30 frame ≈ 150ms HW decode (사용자 perception
-					//영향 작음). frame step backward 시도 정확히 1 frame 이전 frame emit.
 					AVRational vtb = m_fmt->streams[m_video_stream_idx]->time_base;
 					int64_t target_pts = av_rescale_q(target_us,
 						AVRational{1, AV_TIME_BASE}, vtb);
-					int64_t margin_pts = av_rescale_q(1 * AV_TIME_BASE,
-						AVRational{1, AV_TIME_BASE}, vtb);	 //1초 margin
-					int64_t safe_target_pts = (target_pts > margin_pts) ? target_pts - margin_pts : 0;
-					int hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, safe_target_pts, AVSEEK_FLAG_BACKWARD);
+
+					const bool kf_mode = m_seek_keyframe_mode.load();
+
+					int hr_seek;
+					if (kf_mode)
+					{
+						//[keyframe 모드] BACKWARD seek (margin 없음) → target GOP 시작 keyframe.
+						//방향 판정 — prev(직전 위치) 대비 forward 인지 backward 인지.
+						//	forward (target>=prev): pts>prev 인 첫 keyframe 부터 디코드. 보통 target 의 backward keyframe
+						//		이 prev 보다 뒤라 그대로 emit (overshoot 최소). 같은 GOP 면 다음 keyframe 으로 전진(제자리 회귀 방지).
+						//	backward (target<prev): skip 없이 backward keyframe(<=target) 그대로 emit → 자연스럽게 뒤로.
+						hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, target_pts, AVSEEK_FLAG_BACKWARD);
+						m_kf_skip_target_pts = target_pts;
+
+						bool is_forward = (prev_pos < 0) || (seek_pos >= prev_pos);
+						if (is_forward)
+						{
+							int64_t prev_pts = (prev_pos >= 0)
+								? av_rescale_q((int64_t)(prev_pos * AV_TIME_BASE / 1000.0), AVRational{1, AV_TIME_BASE}, vtb)
+								: INT64_MIN;
+							m_kf_skip_active  = true;
+							m_kf_skip_min_pts = prev_pts;	//이 값 초과 첫 keyframe 부터 디코드.
+						}
+						else
+						{
+							m_kf_skip_active = false;		//backward — 첫 keyframe(=backward keyframe) 그대로 emit.
+						}
+					}
+					else
+					{
+						//[정확 모드] sparse keyframe 미디어 (MPEG-TS 29초 GOP 등) 에서 av_seek_frame BACKWARD 가
+						//*prefer* 일 뿐 *force* 가 아니라 target 보다 *늦은 keyframe* 으로 forward fallback 발생.
+						//target_pts - 1초 margin 으로 seek → 항상 backward keyframe 보장 + source filter 의 pre-target
+						//skip 이 *원래 target* 까지 forward decode + emit. 1초 = 30 frame ≈ 150ms HW decode.
+						int64_t margin_pts = av_rescale_q(1 * AV_TIME_BASE,
+							AVRational{1, AV_TIME_BASE}, vtb);	 //1초 margin
+						int64_t safe_target_pts = (target_pts > margin_pts) ? target_pts - margin_pts : 0;
+						hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, safe_target_pts, AVSEEK_FLAG_BACKWARD);
+						m_kf_skip_active = false;
+					}
 					avcodec_flush_buffers(m_video_ctx);
 					if (m_audio_ctx)
 						avcodec_flush_buffers(m_audio_ctx);
@@ -936,6 +969,20 @@ namespace ffi
 			int hr = av_read_frame(m_fmt, pkt);
 			if (hr < 0)
 			{
+				//[keyframe 모드] forward keyframe 못 찾고 EOF 도달 (target 이 마지막 keyframe 이후) — fallback:
+				//target GOP 시작 keyframe 으로 BACKWARD 재seek 후 정상 디코드 (target 직전 keyframe emit).
+				if (m_kf_skip_active)
+				{
+					m_kf_skip_active = false;
+					av_seek_frame(m_fmt, m_video_stream_idx, m_kf_skip_target_pts, AVSEEK_FLAG_BACKWARD);
+					avcodec_flush_buffers(m_video_ctx);
+					if (m_audio_ctx)
+						avcodec_flush_buffers(m_audio_ctx);
+					m_eof.store(false);
+					logWrite(_T("[ffi/dec/kf] forward keyframe not found before EOF → backward fallback target_pts=%lld"),
+						(long long)m_kf_skip_target_pts);
+					continue;
+				}
 				//EOF — flag set. queue 비면 source FillBuffer 가 S_FALSE 반환 → DeliverEndOfStream → renderer EC_COMPLETE 발화.
 				//seek 가 오면 av_seek_frame 처리 시 clear.
 				m_eof.store(true);
@@ -963,6 +1010,30 @@ namespace ffi
 				logWrite(_T("[ffi/dec/diag] pkt total=%lld v=%lld a=%lld other=%lld | queue v=%zu a=%zu"),
 					(long long)s_pkt_total, (long long)s_pkt_video, (long long)s_pkt_audio, (long long)s_pkt_other,
 					vq, aq);
+			}
+
+			//[keyframe 모드 forward skip] BACKWARD seek 로 간 GOP 시작부터 demux 된 packet 을 디코드 없이 버리고,
+			//pts>prev(=min_pts) 인 첫 video keyframe packet 부터 디코드 시작. GOP 전체 디코드(HW transfer 포함) 비용 제거.
+			//min_pts = 직전 위치라 결과 keyframe 이 prev 보다 항상 전진 — forward step 제자리 회귀 방지.
+			if (m_kf_skip_active)
+			{
+				bool is_ok_kf = false;
+				if (pkt->stream_index == m_video_stream_idx)
+				{
+					int64_t ppts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+					if ((pkt->flags & AV_PKT_FLAG_KEY) && ppts != AV_NOPTS_VALUE && ppts > m_kf_skip_min_pts)
+						is_ok_kf = true;
+				}
+				if (!is_ok_kf)
+				{
+					av_packet_unref(pkt);
+					continue;	 //전진 keyframe 도달 전 — video/audio 불문 디코드 없이 skip.
+				}
+				//전진 keyframe 도달 — skip 종료. 이 packet 부터 정상 디코드 (아래로 fall through).
+				m_kf_skip_active = false;
+				logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld → decode start"),
+					(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
+					(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts);
 			}
 
 			//=== 4) decode (video or audio) ===

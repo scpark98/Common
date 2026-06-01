@@ -81,6 +81,8 @@ public:
     //   - action_clear            : 텍스트 전체 지움. 자체 처리 후 message_scstaticedit_text_changed 발신.
     //   - action_find             : 돋보기 아이콘. 자체 처리 없음 → parent 가 message_scstaticedit_action_button 수신해 검색 다이얼로그 등 띄움.
     //   - action_password_toggle  : 패스워드 보이기/감추기 토글. set_password_mode 와 연동.
+    //   - action_file             : 파일 아이콘. 클릭 시 파일 열기 대화상자 → 선택 경로를 텍스트로 세팅(자체 처리).
+    //   - action_folder           : 폴더 아이콘. 클릭 시 폴더 선택 대화상자 → 선택 폴더를 텍스트로 세팅(자체 처리).
     enum action_button_type
     {
         action_none = 0,
@@ -88,6 +90,8 @@ public:
         action_clear,
         action_find,
         action_password_toggle,
+        action_file,
+        action_folder,
     };
 
     CSCColorTheme	m_theme = CSCColorTheme(this);
@@ -320,6 +324,11 @@ private:
     void				draw_action_icon_clear          (Gdiplus::Graphics& g);
     void				draw_action_icon_find           (Gdiplus::Graphics& g);
     void				draw_action_icon_password_toggle(Gdiplus::Graphics& g);
+    void				draw_action_icon_file           (Gdiplus::Graphics& g);
+    void				draw_action_icon_folder         (Gdiplus::Graphics& g);
+
+    // action_file/action_folder 대화상자 초기 폴더 결정 (현재 텍스트 폴더 → recent_folder → exe 디렉토리).
+    CString				action_button_start_folder() const;
 
     // ── Prefix 이미지 (좌측 아이콘) ──
     CSCGdiplusBitmap	m_prefix_image;

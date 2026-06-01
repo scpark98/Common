@@ -1,5 +1,6 @@
 ﻿// SCStaticEdit.cpp
 #include "SCStaticEdit.h"
+#include <afxdlgs.h>	// CFileDialog (action_file)
 
 // NOTE: DEBUG_NEW는 Gdiplus의 placement-new operator와 충돌하므로 사용하지 않음
 // GDI+ 초기화/종료는 Common/SCGdiplusBitmap.h의 CGdiplusDummyForInitialization이
@@ -1792,6 +1793,12 @@ void CSCStaticEdit::draw_action_button(Gdiplus::Graphics& g)
 		case action_password_toggle:
 			draw_action_icon_password_toggle(g);
 			break;
+		case action_file:
+			draw_action_icon_file(g);
+			break;
+		case action_folder:
+			draw_action_icon_folder(g);
+			break;
 		default:
 			break;
 	}
@@ -1922,6 +1929,87 @@ void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 	}
 }
 
+void CSCStaticEdit::draw_action_icon_file(Gdiplus::Graphics& g)
+{
+	// 문서: 우상단 모서리가 접힌(dog-ear) 종이 + 내용 라인 2 개.
+	Gdiplus::Color cr_stroke = m_action_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray;
+
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	int side   = min(m_r_action_button.Width(), m_r_action_button.Height());
+	int mx     = side / 5;
+	int my     = max(2, side / 6);
+	int left   = m_r_action_button.left   + mx;
+	int right  = m_r_action_button.right  - mx - 1;
+	int top    = m_r_action_button.top    + my;
+	int bottom = m_r_action_button.bottom - my - 1;
+	int fold   = max(3, (right - left) * 2 / 5);
+
+	Gdiplus::Pen pen(cr_stroke, 1.3f);
+	pen.SetLineJoin(Gdiplus::LineJoinRound);
+
+	// 외곽(우상단이 fold 만큼 잘린 5각형). AddPolygon 이 마지막→첫 점(좌변)을 자동으로 닫는다.
+	Gdiplus::Point pts[] =
+	{
+		Gdiplus::Point(left,         top),
+		Gdiplus::Point(right - fold, top),
+		Gdiplus::Point(right,        top + fold),
+		Gdiplus::Point(right,        bottom),
+		Gdiplus::Point(left,         bottom),
+	};
+	Gdiplus::GraphicsPath path;
+	path.AddPolygon(pts, 5);
+	g.DrawPath(&pen, &path);
+
+	// 접힌 모서리 삼각형(대각변은 외곽이 이미 그림).
+	g.DrawLine(&pen, right - fold, top,        right - fold, top + fold);
+	g.DrawLine(&pen, right - fold, top + fold, right,        top + fold);
+
+	// 내용 라인.
+	int lx1 = left  + max(2, (right - left) / 6);
+	int lx2 = right - max(2, (right - left) / 6);
+	int ly1 = top + (bottom - top) * 1 / 2;
+	int ly2 = top + (bottom - top) * 7 / 10;
+	Gdiplus::Pen pen_line(cr_stroke, 1.0f);
+	g.DrawLine(&pen_line, lx1, ly1, lx2, ly1);
+	g.DrawLine(&pen_line, lx1, ly2, lx2, ly2);
+}
+
+void CSCStaticEdit::draw_action_icon_folder(Gdiplus::Graphics& g)
+{
+	// 폴더: 좌측 상단에 탭(tab) 이 솟은 전형적 폴더 실루엣.
+	Gdiplus::Color cr_stroke = m_action_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray;
+
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	int side     = min(m_r_action_button.Width(), m_r_action_button.Height());
+	int mx       = side / 6;
+	int left     = m_r_action_button.left   + mx;
+	int right    = m_r_action_button.right  - mx - 1;
+	int bottom   = m_r_action_button.bottom - max(2, side / 5) - 1;
+	int body_top = m_r_action_button.top + side / 3;
+	int tab_top  = m_r_action_button.top + side / 5;
+	int tab_w    = (right - left) * 9 / 20;
+	int slope    = max(2, side / 8);
+
+	Gdiplus::Pen pen(cr_stroke, 1.3f);
+	pen.SetLineJoin(Gdiplus::LineJoinRound);
+
+	// 탭 상단 → 사선 → 몸통 상단 → 우변 → 하단 → (좌변 자동 닫힘).
+	Gdiplus::Point pts[] =
+	{
+		Gdiplus::Point(left,                 tab_top),
+		Gdiplus::Point(left + tab_w,         tab_top),
+		Gdiplus::Point(left + tab_w + slope, body_top),
+		Gdiplus::Point(right,                body_top),
+		Gdiplus::Point(right,                bottom),
+		Gdiplus::Point(left,                 bottom),
+	};
+	Gdiplus::GraphicsPath path;
+	path.AddPolygon(pts, 6);
+	g.DrawPath(&pen, &path);
+}
+
 void CSCStaticEdit::perform_action_button_click()
 {
 	switch (m_action_type)
@@ -1951,12 +2039,68 @@ void CSCStaticEdit::perform_action_button_click()
 		Invalidate(FALSE);
 		break;
 
+	case action_file:
+	{
+		CString start = action_button_start_folder();
+		CFileDialog dlg(TRUE, NULL, m_text,
+			OFN_HIDEREADONLY | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST,
+			_T("All Files (*.*)|*.*||"), this);
+		if (!start.IsEmpty())
+			dlg.m_ofn.lpstrInitialDir = start;
+		if (dlg.DoModal() == IDOK)
+		{
+			CString path = dlg.GetPathName();
+			push_undo();
+			set_text(path);
+			AfxGetApp()->WriteProfileString(_T("settings"), _T("recent_folder"), get_part(path, fn_folder));
+			notify_parent(message_scstaticedit_text_changed);
+		}
+		break;
+	}
+
+	case action_folder:
+	{
+		CString start = action_button_start_folder();
+		CString folder;
+		if (BrowseForFolder(m_hWnd, (TCHAR*)_T("폴더 선택"), folder, start.IsEmpty() ? NULL : (LPCTSTR)start))
+		{
+			push_undo();
+			set_text(folder);
+			AfxGetApp()->WriteProfileString(_T("settings"), _T("recent_folder"), folder);
+			notify_parent(message_scstaticedit_text_changed);
+		}
+		break;
+	}
+
 	case action_find:
 	default:
 		// parent 가 처리해야 하는 action ? 알림만 발신.
 		notify_parent(message_scstaticedit_action_button);
 		break;
 	}
+}
+
+CString CSCStaticEdit::action_button_start_folder() const
+{
+	// 1) 현재 텍스트가 가리키는 폴더가 실제로 존재하면 거기서 시작.
+	if (!m_text.IsEmpty())
+	{
+		CString folder = get_part(m_text, fn_folder);
+		if (!folder.IsEmpty())
+		{
+			DWORD attr = GetFileAttributes(folder);
+			if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
+				return folder;
+		}
+	}
+
+	// 2) 직전 사용 폴더(§7 recent_folder).
+	CString recent = AfxGetApp()->GetProfileString(_T("settings"), _T("recent_folder"), _T(""));
+	if (!recent.IsEmpty())
+		return recent;
+
+	// 3) exe 디렉토리.
+	return get_exe_directory();
 }
 
 // ──────────────────────────────────────────────────────────

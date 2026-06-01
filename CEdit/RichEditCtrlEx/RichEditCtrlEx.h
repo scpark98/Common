@@ -7,6 +7,11 @@
 #include "../../colors.h"
 
 /*
+[caution]
+- resource editor에서 RichEditCtrlEx는 반드시 ES_MULTILINE 속성을 수동으로 줘야한다.
+  이 속성은 코드 레벨에서 줄 수 없는 속성이다.
+  그 외 WS_VSCROLL, ES_AUTOVSCROLL 등은 PreSubclassWindow()에서 자동 설정된다.
+
 * 시간표시를 하지 않는 경우는 관계없으나 시간표시를 하는 경우는
   text의 앞 또는 뒤에 \n이 있을 경우 부가적인 처리가 필요하다.
 

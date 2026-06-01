@@ -1056,7 +1056,14 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 
 void CRichEditCtrlEx::PreSubclassWindow()
 {
-	// TODO: Add your specialized code here and/or call the base class
+	//세로 스크롤바·자동 스크롤은 리소스에서 빠뜨려도 런타임에 보강한다.
+	ModifyStyle(0, ES_AUTOVSCROLL | WS_VSCROLL, SWP_FRAMECHANGED);
+
+	//ES_MULTILINE 은 richedit 가 생성 시점(WM_NCCREATE)에만 읽으므로 ModifyStyle 로 런타임 전환이 안 된다.
+	//(서브클래싱 도중 DestroyWindow→재생성하는 우회는 MFC SubclassWindow 의 공유 super-wndproc 를 깨뜨려 불가.)
+	//리소스에서 Multiline=True 를 빠뜨리면 addl() 의 개행이 동작하지 않으므로 debug 에서 즉시 알린다.
+	ASSERT((GetStyle() & ES_MULTILINE) && "CRichEditCtrlEx: resource control must have Multiline=True for addl() to break lines.");
+
 	CFont* font = GetFont();
 	if (font == nullptr)
 		font = GetParent()->GetFont();

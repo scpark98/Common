@@ -69,6 +69,19 @@
 #define __function__ __FUNCTION__
 #endif
 
+//[측정 임시 토글] 1 = 모든 logWrite no-op (seek profiling 시 logWrite I/O 영향 격리용).
+//복원: 아래 한 줄을 0 으로.
+#define LOGWRITE_DISABLE_FOR_PROFILING	0
+
+#if LOGWRITE_DISABLE_FOR_PROFILING
+#define logWrite(fmt, ...)	((void)0)
+#define logWriteI(fmt, ...)	((void)0)
+#define logWriteW(fmt, ...)	((void)0)
+#define logWriteE(fmt, ...)	((void)0)
+#define logWriteC(fmt, ...)	((void)0)
+#define logWriteS(fmt, ...)	((void)0)
+#define logWriteD(fmt, ...)	((void)0)
+#else
 #define logWrite(fmt, ...)	pLog->write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__)
 #define logWriteI(fmt, ...)	pLog->write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__)
 #define logWriteW(fmt, ...)	pLog->write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__)
@@ -76,6 +89,7 @@
 #define logWriteC(fmt, ...)	pLog->write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__)
 #define logWriteS(fmt, ...)	pLog->write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__)
 #define logWriteD(fmt, ...)	pLog->write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__)
+#endif
 
 enum SCLOG_LEVEL
 {

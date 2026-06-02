@@ -1122,7 +1122,10 @@ namespace ffi
 		//[diag] FillBuffer 호출 카운트 + 100 호출마다 amplitude 출력. seek 회귀 진단.
 		static thread_local int s_fill_count = 0;
 		++s_fill_count;
-		if (s_fill_count == 1 || (s_fill_count % 100) == 0)
+		int seekgap_left = m_seekgap_remaining.load();
+		bool log_diag = (s_fill_count == 1 || (s_fill_count % 100) == 0);
+		int16_t seekgap_mx = 0;
+		if (log_diag || seekgap_left > 0)
 		{
 			int16_t* s16 = (int16_t*)pData;
 			int n = out_samples * m_out_channels;
@@ -1133,9 +1136,11 @@ namespace ffi
 				if (v < 0) v = -v;
 				if (v > mx) mx = v;
 			}
-			logWrite(_T("[ffi/src/audio/diag] fill#%d samples=%d ch=%d nb=%d fmt=%d max_abs=%d sc=%lld"),
-				s_fill_count, out_samples, m_out_channels, frame->nb_samples, (int)frame->format,
-				(int)mx, (long long)m_sample_count);
+			seekgap_mx = mx;
+			if (log_diag)
+				logWrite(_T("[ffi/src/audio/diag] fill#%d samples=%d ch=%d nb=%d fmt=%d max_abs=%d sc=%lld"),
+					s_fill_count, out_samples, m_out_channels, frame->nb_samples, (int)frame->format,
+					(int)mx, (long long)m_sample_count);
 		}
 
 		//timing —
@@ -1187,6 +1192,20 @@ namespace ffi
 			m_need_discontinuity = false;
 		}
 
+		//[seekgap] seek resume(t0) 이후 첫 15 fill — delivery 지연(+ms), 실제 진폭(max_abs),
+		//샘플 스케줄 시각(rtStart_ms). rtStart_ms 가 양수로 크면 DSound 가 그만큼 audio 표시를 미뤄 무음 발생.
+		if (seekgap_left > 0)
+		{
+			LARGE_INTEGER qf, qn;
+			::QueryPerformanceFrequency(&qf);
+			::QueryPerformanceCounter(&qn);
+			long long t0 = m_seekgap_qpc.load();
+			long long ms = t0 ? (qn.QuadPart - t0) * 1000LL / qf.QuadPart : -1;
+			logWrite(_T("[ffi/src/audio/seekgap] +%lldms fill_after_seek=%d max_abs=%d rtStart_ms=%lld samples=%d sc=%lld"),
+				ms, (16 - seekgap_left), (int)seekgap_mx, (long long)(rtStart / 10000), out_samples, (long long)m_sample_count);
+			m_seekgap_remaining.store(seekgap_left - 1);
+		}
+
 		av_frame_free(&frame);
 		return NOERROR;
 	}
@@ -1235,6 +1254,10 @@ namespace ffi
 			{ return (y.QuadPart - x.QuadPart) * 1000000LL / apf.QuadPart; };
 		logWrite(_T("[ffi/src/audio/seek_prof] initfilter=%lld beginflush=%lld stop=%lld endflush+pause=%lld | total=%lldus thr=%d"),
 			aus(a0, a1), aus(a1, a2), aus(a2, a3), aus(a3, a4), aus(a0, a5), athr ? 1 : 0);
+
+		//[seekgap diag] resume 시점(t0)부터 첫 15 fill 의 delivery 타이밍 측정 시작.
+		m_seekgap_qpc.store(a5.QuadPart);
+		m_seekgap_remaining.store(15);
 	}
 
 	HRESULT CFFiAudioStream::OnThreadStartPlay()

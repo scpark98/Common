@@ -1017,23 +1017,27 @@ namespace ffi
 			//min_pts = 직전 위치라 결과 keyframe 이 prev 보다 항상 전진 — forward step 제자리 회귀 방지.
 			if (m_kf_skip_active)
 			{
-				bool is_ok_kf = false;
+				//video 는 전진 keyframe 도달 전까지 디코드 없이 skip (GOP 전체 디코드 + HW transfer 비용 제거 = 7caa152 이득).
 				if (pkt->stream_index == m_video_stream_idx)
 				{
 					int64_t ppts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
-					if ((pkt->flags & AV_PKT_FLAG_KEY) && ppts != AV_NOPTS_VALUE && ppts > m_kf_skip_min_pts)
-						is_ok_kf = true;
+					bool is_ok_kf = (pkt->flags & AV_PKT_FLAG_KEY) && ppts != AV_NOPTS_VALUE && ppts > m_kf_skip_min_pts;
+					if (!is_ok_kf)
+					{
+						av_packet_unref(pkt);
+						continue;	 //전진 video keyframe 도달 전 — video 만 skip.
+					}
+					//전진 keyframe 도달 — skip 종료. 이 packet 부터 정상 디코드 (아래로 fall through).
+					m_kf_skip_active = false;
+					logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld → decode start"),
+						(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
+						(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts);
 				}
-				if (!is_ok_kf)
-				{
-					av_packet_unref(pkt);
-					continue;	 //전진 keyframe 도달 전 — video/audio 불문 디코드 없이 skip.
-				}
-				//전진 keyframe 도달 — skip 종료. 이 packet 부터 정상 디코드 (아래로 fall through).
-				m_kf_skip_active = false;
-				logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld → decode start"),
-					(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
-					(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts);
+				//audio packet 은 skip 하지 않고 정상 디코드로 흘려보낸다 (아래 fall through).
+				//[GOP 시작~target] 구간 audio 를 확보해야 audio 첫 emit 의 미디어 시점이 video_first 와 정렬되어
+				//rtStart≈0 이 된다. 함께 버리면 audio 가 target 이후로 밀려 rtStart 가 최대 ~1초 → DSound 가
+				//그만큼 audio 표시를 미뤄 트랙이동 후 오디오만 무음. video_first 미만 audio 는 FillBuffer 의
+				//anchor skip 이 trim 하므로 A/V 정렬은 정확히 유지된다.
 			}
 
 			//=== 4) decode (video or audio) ===

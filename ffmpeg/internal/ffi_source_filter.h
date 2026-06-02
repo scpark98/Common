@@ -191,6 +191,11 @@ namespace ffi
 		//get_track_pos 의 source 로 사용. graph clock 은 wall clock 진행이라 rate 변경 시 미디어 진행과 어긋남.
 		//이 값은 atempo input frame 의 pts 라 *원본 미디어 시점 그대로* — rate 무관 정확.
 		std::atomic<int64_t> m_last_input_pts_ms{ -1 };
+
+		//[seekgap diag] seek 후 첫 N fill 의 실제 delivery 타이밍·진폭 측정 — 오디오 끊김 원인이
+		//source 측(무음/지연 delivery)인지 downstream(DSound 재프라임)인지 격리용. on_seek_flush 가 t0/카운트 set.
+		std::atomic<long long> m_seekgap_qpc{ 0 };
+		std::atomic<int>		m_seekgap_remaining{ 0 };
 	public:
 		HRESULT OnThreadStartPlay() override;
 	};

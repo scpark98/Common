@@ -11,6 +11,7 @@
 
 #include <afxwin.h>
 #include <deque>
+#include <map>
 
 //.ico가 아닌 png 이미지들을 앞에 그려주고 필요에 따라 변경되도록 하기 위해 사용.
 #include "../../SCGdiplusBitmap.h"
@@ -135,6 +136,41 @@ public:
 	//초기 버전에서는 첫번째 파라미터로 컬러를 주고 그 값이 -1이면 default text color를 사용하도록 구현했었으나
 	//-1 비교가 제대로 되지 않아 우선 제거함.
 	void			set_textf(LPCTSTR format, ...);
+
+//tagged text (paragraph mode)
+	//tag(<br><b><i><u><s><f=><sz=><cr=><ct=><crb=><cb=><ls=>)가 포함된 텍스트를 설정한다.
+	//set_text 와 상호 배타 — 한 쪽 호출 시 다른 쪽 데이터가 무효화된다. 기본 글자색·폰트 등 속성은
+	//이 함수 호출 *전*에 모두 설정되어 있어야 m_text_prop 에 반영된다.
+	//단락 모드에서도 부모의 round / back fill / border / header-image 비주얼 기능이 그대로 작동한다.
+	CRect			set_tagged_text(CString text);
+
+	//halign + valign 을 한 번에 설정. DT_LEFT|DT_CENTER|DT_RIGHT + DT_TOP|DT_VCENTER|DT_BOTTOM 조합.
+	//내부에서 m_halign / m_valign 으로 분리 저장된 뒤 (단락 모드면) layout 이 재빌드된다.
+	void			set_text_align(DWORD align);
+
+	//라인 사이 간격 배수. 단락 모드 전용. 1.0f = 기본, 1.5f = 1.5배.
+	void			set_line_spacing(float spacing = 1.0f);
+	//특정 라인의 위쪽 간격 배수. line >= 1.
+	void			set_line_spacing(int line, float spacing = 1.0f);
+	float			get_line_spacing() { return m_line_spacing; }
+	float			get_line_spacing(int line);
+
+	//특정 라인의 가로 정렬 override. 단락 모드 전용. global m_halign 위에 덮어쓴다.
+	//set_halign(DWORD) 와 시그니처 구분.
+	void			set_halign_line(int line, DWORD halign);
+	DWORD			get_halign_line(int line);
+
+	//단락 모드에서 마우스가 hover 된 단어에 사각형 표시.
+	void			draw_word_hover_rect(bool draw = true, Gdiplus::Color cr_rect = Gdiplus::Color::Transparent);
+
+	//단락 모드의 텍스트 antialiasing. 작은 글자(예: 9pt)는 false 로 두면 더 또렷.
+	void			set_font_antialiasing(bool antialias = true) { m_font_antialiasing = antialias; Invalidate(); }
+
+	//단락 모드의 음절별 hint 자동 결정. 음절 폰트 size(pt) 가 aa_from_pt 이상이면 AntiAliasGridFit(큰 글씨 매끈),
+	//미만이면 ClearTypeGridFit(작은 글씨 또렷). 다중 size 가 섞인 태그 텍스트(<sz=24>+default 9pt)에서 자연스러움.
+	//on=false 면 OnPaint 의 단일 hint(ClearTypeGridFit) 유지.
+	void			set_font_quality_auto(bool on = true, int aa_from_pt = 14)
+					{ m_auto_font_quality = on; m_aa_from_pt = aa_from_pt; Invalidate(); }
 
 
 //자체 편집 기능
@@ -480,6 +516,40 @@ protected:
 	//동적 생성한 컨트롤에서도 정상 표시됨을 확인함.
 	void			prepare_tooltip();
 
+//단락 모드 (tagged text) 의 데이터.
+//m_para 가 비어있으면 plain text 모드 (기존 동작), 채워지면 paragraph 모드 (set_tagged_text 가 build).
+//OnPaint 의 텍스트 그리기 단계만 분기하므로 round/back/border/header-image 비주얼은 두 모드 공통.
+protected:
+	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[line][idx]
+	CSCTextProperty	m_text_prop;					//기본 폰트/색상 속성
+	void			update_text_property();			//현재 m_lf + m_theme 를 m_text_prop 에 반영
+
+	bool			m_font_antialiasing = false;
+	//음절별 hint 자동 결정 — 기본 ON. aa_from_pt 미만은 ClearType(작은 글씨 또렷), 이상은 AntiAlias(큰 글씨 매끈).
+	bool			m_auto_font_quality = true;
+	int				m_aa_from_pt = 14;
+	//기본 line spacing — CSS line-height 권장 범위(1.2~1.5)의 하한. 1.0(=single) 보다 약간 여유,
+	//1.5 처럼 과하지 않음. 다중 라인 한글 텍스트에서 자연스러운 간격.
+	float			m_line_spacing = 1.2f;
+	std::map<int, float> m_line_spacings;	//per-line override (key = line>=1)
+	std::map<int, DWORD> m_line_haligns;	//per-line override (key = line>=0)
+
+	//단락 layout 재빌드: calc_text_rect → reapply_line_spacings → apply_halign → apply_valign → Invalidate.
+	//set_tagged_text, OnSize, 모든 align/line_spacing setter 가 이 경로를 탄다.
+	void			rebuild_layout();
+	CRect			reapply_line_spacings();
+	CRect			apply_halign();
+	CRect			apply_valign();
+
+	int				m_max_width = 0;
+	int				m_max_width_line = 0;
+	CPoint			m_pt_icon = CPoint(0, 0);
+	bool			m_auto_ctrl_size = true;
+
+	bool			m_draw_word_hover_rect = false;
+	Gdiplus::Color	m_cr_word_hover_rect = Gdiplus::Color::Red;
+	CPoint			m_pos_word_hover = CPoint(-1, -1);
+
 
 protected:
 	//{{AFX_MSG(CSCStatic)
@@ -498,5 +568,6 @@ public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnDestroy();
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 };
 #endif

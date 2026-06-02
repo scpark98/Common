@@ -945,7 +945,35 @@ DWORD CSCParagraph::get_value(CString data, CString tag_name, int start)
 }
 */
 
-void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para)
+//폰트 이름별 AA 전환 임계치(pt). 매핑에 없으면 fallback_pt 그대로 반환.
+//Test_SCColorTheme 의 콤보 시연(g_font_faces) + 시각 비교 결과를 코드화한 것.
+//- 순수 벡터 폰트(비트맵 없음): Segoe UI / 맑은 고딕 → 1 (전 크기 AA — 작은 크기도 AA 가 또렷).
+//- 한글 비트맵 폰트(굴림/돋움/궁서/바탕): 15pt 이하에 embedded bitmap → 16부터 AA, 15 이하 ClearType 비트맵.
+//- 영문 비트맵 폰트(Tahoma/Verdana): 12pt 이하에 embedded bitmap → 13부터 AA.
+static int get_aa_from_pt(LPCTSTR font_name, int fallback_pt)
+{
+	if (font_name == NULL || *font_name == 0)
+		return fallback_pt;
+
+	if (_tcsicmp(font_name, _T("Segoe UI")) == 0 ||
+	    _tcsicmp(font_name, _T("맑은 고딕")) == 0 ||
+	    _tcsicmp(font_name, _T("Malgun Gothic")) == 0)
+		return 1;
+
+	if (_tcsicmp(font_name, _T("굴림")) == 0 || _tcsicmp(font_name, _T("Gulim")) == 0 ||
+	    _tcsicmp(font_name, _T("돋움")) == 0 || _tcsicmp(font_name, _T("Dotum")) == 0 ||
+	    _tcsicmp(font_name, _T("궁서")) == 0 || _tcsicmp(font_name, _T("Gungsuh")) == 0 ||
+	    _tcsicmp(font_name, _T("바탕")) == 0 || _tcsicmp(font_name, _T("Batang")) == 0)
+		return 16;
+
+	if (_tcsicmp(font_name, _T("Tahoma")) == 0 ||
+	    _tcsicmp(font_name, _T("Verdana")) == 0)
+		return 13;
+
+	return fallback_pt;
+}
+
+void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int aa_from_pt)
 {
 	int i, j;
 	CFont font, * pOldFont = NULL;
@@ -1074,6 +1102,20 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 #else
 			//text 배경색을 칠하고
 			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
+
+			//음절별 폰트 종류 + 크기로 hint 자동 결정.
+			//각 폰트는 비트맵 보유 범위가 달라 단일 임계치로 부정확 — 폰트별 매핑(get_aa_from_pt)을 거쳐
+			//effective threshold 를 구한 뒤 size 와 비교한다.
+			//- size >= effective → AntiAliasGridFit (큰 글씨 외곽 매끈)
+			//- size <  effective → ClearTypeGridFit  (작은 글씨 비트맵/서브픽셀로 또렷)
+			//aa_from_pt == 0 이면 자동 결정 비활성 (호출자가 미리 설정한 hint 유지).
+			if (aa_from_pt > 0)
+			{
+				int effective = get_aa_from_pt(para[i][j].text_prop.name, aa_from_pt);
+				g.SetTextRenderingHint(para[i][j].text_prop.size >= effective
+					? Gdiplus::TextRenderingHintAntiAliasGridFit
+					: Gdiplus::TextRenderingHintClearTypeGridFit);
+			}
 
 			Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
 

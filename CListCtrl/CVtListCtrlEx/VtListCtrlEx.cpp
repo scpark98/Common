@@ -887,10 +887,15 @@ void CVtListCtrlEx::set_line_height(int height, bool invalidate)
 
 void CVtListCtrlEx::set_column_width(int nCol, int cx, bool invalidate)
 {
-	if (nCol >= get_column_count())
+	if (nCol < 0 || nCol >= get_column_count())
 		return;
 
 	SetColumnWidth(nCol, cx);
+
+	//컬럼 폭은 가로 scrollbar 필요 여부를 결정하는 single source.
+	//CSCScrollbar overlay 가 단독 결정자이므로 폭 변경마다 동기화 필수.
+	//(SetColumnWidth 직접 호출은 CVtListCtrlEx 내부에서 이 함수만 사용 — 외부도 동일 정책.)
+	sync_scrollbar();
 
 	if (invalidate)
 		Invalidate();
@@ -898,15 +903,14 @@ void CVtListCtrlEx::set_column_width(int nCol, int cx, bool invalidate)
 
 void CVtListCtrlEx::restore_column_width(CWinApp* pApp, CString sSection, bool invalidate)
 {
-	int		i, width;
-	CString str;
-
-	for (i = 0; i < m_HeaderCtrlEx.GetItemCount(); i++)
+	for (int i = 0; i < m_HeaderCtrlEx.GetItemCount(); i++)
 	{
-		width = pApp->GetProfileInt(sSection + _T("\\column width"), i2S(i), 0);
+		int width = pApp->GetProfileInt(sSection + _T("\\column width"), i2S(i), 0);
 		if (width > 0)
-			SetColumnWidth(i, width);
+			set_column_width(i, width, false);   //단일 진입점 경유 — 마지막에 묶어 한 번만 sync.
 	}
+
+	sync_scrollbar();
 
 	if (invalidate)
 		Invalidate();
@@ -1752,22 +1756,29 @@ void CVtListCtrlEx::OnPaint()
 				rcFull.right, rcFull.bottom);
 		}
 
+		//paintDC 에 직접 [FillSolidRect(erase) → DefWindowProc(WM_PAINT)(draw)] 흐름은
+		//컬럼 폭 드래그 같은 partial invalidate 케이스에서 erase 프레임이 그대로 화면에 노출돼
+		//변경된 컬럼만 깜빡인다. memory DC 에 모두 그린 뒤 destructor 가 BitBlt 으로 한 번에
+		//paintDC 로 옮기면 erase 단계가 보이지 않는다 (비-overlay 분기와 동일한 패턴).
+		CMemoryDC mdc(&dc1, &rcFull, true);
+		CDC* pDC = &mdc;
+
 		if (!rcCornerTop.IsRectEmpty())
-			dc1.FillSolidRect(rcCornerTop, m_theme.cr_header_back.ToCOLORREF());
+			pDC->FillSolidRect(rcCornerTop, m_theme.cr_header_back.ToCOLORREF());
 		if (!rcCornerBottom.IsRectEmpty())
 		{
 			//탐색기처럼 h/v 스크롤바가 만나는 코너를 컨트롤 배경색(cr_back)으로 칠한다.
-			dc1.FillSolidRect(rcCornerBottom, m_theme.cr_back.ToCOLORREF());
+			pDC->FillSolidRect(rcCornerBottom, m_theme.cr_back.ToCOLORREF());
 		}
 
 		if (!rcCornerTop.IsRectEmpty())
-			dc1.ExcludeClipRect(rcCornerTop);
+			pDC->ExcludeClipRect(rcCornerTop);
 		if (!rcCornerBottom.IsRectEmpty())
-			dc1.ExcludeClipRect(rcCornerBottom);
+			pDC->ExcludeClipRect(rcCornerBottom);
 
-		dc1.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+		pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
-		DefWindowProc(WM_PAINT, (WPARAM)dc1.m_hDC, (LPARAM)0);
+		DefWindowProc(WM_PAINT, (WPARAM)pDC->m_hDC, (LPARAM)0);
 		return;
 	}
 
@@ -4319,7 +4330,8 @@ void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool
 	m_is_local = is_local;
 	m_use_own_imagelist = true;
 
-	SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_FLATSB);
+	//LVS_EX_FLATSB 사용 금지 — CSCScrollbar overlay 가 단독 결정자.
+	SetExtendedStyle(LVS_EX_FULLROWSELECT);
 
 	m_pShellImageList = pShellImageList;
 	//이 설정을 해줘야 다른 클래스에서 CListCtrl* 타입으로도 GetImageList()를 통해 참조할 수 있다.
@@ -5524,6 +5536,34 @@ void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	*pResult = 0;
 }
 
+BOOL CVtListCtrlEx::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
+{
+	//listview 가 native header 의 raw HDN_* notification 을 parent 로 reflect 하지 않아
+	//ON_NOTIFY_REFLECT(HDN_TRACK...) 매크로는 작동하지 않는다. WM_NOTIFY 는 child→parent 직진 경로라
+	//listview 의 OnNotify override 에서 직접 가로채는 것이 정석.
+	NMHDR* nm = reinterpret_cast<NMHDR*>(lParam);
+	if (nm && m_scrollbar_setup)
+	{
+		CHeaderCtrl* hdr = GetHeaderCtrl();
+		if (hdr && nm->hwndFrom == hdr->GetSafeHwnd())
+		{
+			switch (nm->code)
+			{
+			case HDN_TRACKW: case HDN_TRACKA:                       //드래그 진행 중 매 이동 (일반 컬럼)
+			case HDN_ENDTRACKW: case HDN_ENDTRACKA:                 //release
+			case HDN_DIVIDERDBLCLICKW: case HDN_DIVIDERDBLCLICKA:   //자동 맞춤
+			case HDN_ITEMCHANGEDW: case HDN_ITEMCHANGEDA:           //마지막 컬럼 right divider 드래그는
+				//HDN_TRACK 을 발화시키지 않고 HDN_ITEMCHANGED 로만 width 변경을 알린다. 따라서
+				//마지막 컬럼 drag 실시간 반영을 위해 ITEMCHANGED 도 받아야 한다. OnPaint 가 더블 버퍼
+				//상태라 중복 sync 호출에도 flicker 없음.
+				sync_scrollbar();
+				break;
+			}
+		}
+	}
+	return CListCtrl::OnNotify(wParam, lParam, pResult);
+}
+
 void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 {
 	CListCtrl::OnSize(nType, cx, cy);
@@ -5694,9 +5734,11 @@ void CVtListCtrlEx::setup_scrollbar()
 
 	m_scrollbar_setup = true;
 
-	//WS_VSCROLL/HSCROLL 제거 + WS_CLIPCHILDREN 추가. native scrollbar 영역 / corner padding 제거.
-	//OnNcCalcSize override 가 NC 영역 0 으로 만들어 시각적으로 native 안 그려지게 함.
-	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	//WS_VSCROLL/HSCROLL 비트는 유지 — listview 의 horizontal scroll 시 body↔header sync 메커니즘이
+	//이 비트에 의존한다. 비트 제거 시 Scroll(CSize(dx, 0)) 가 body 만 이동하고 header 가 안 따라와
+	//우측 끝까지 가로 휠 후 header 가 그대로 남는 현상(image #4) 발생.
+	//native scrollbar 는 OnNcCalcSize override(NC=0) 가 단독으로 시각화를 차단하므로 비트 유지해도 안 보임.
+	ModifyStyle(0, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
 
 	//빈 영역 cr_back 처리 — native 가 자체 erase 시 사용.
 	SetBkColor(m_theme.cr_back.ToCOLORREF());
@@ -5717,6 +5759,18 @@ void CVtListCtrlEx::setup_scrollbar()
 	m_scrollbar_h.set_color_theme(m_theme, false);
 	m_scrollbar_h.set_line(30);		//화살표 클릭 = 30px (average char width ~ 7 의 약 4 배).
 	m_scrollbar_h.ShowWindow(SW_HIDE);
+
+	//header 와 overlay 의 sibling clipping — header 가 paint 시 자기 rect 전체를 그리면 overlay 위까지
+	//덮어쓰는 깨짐(image #5)이 발생. WS_CLIPSIBLINGS 가 켜지면 자기보다 z-order 위인 sibling 의
+	//visible region 이 자동 clip 되어 침범 차단. PreSubclassWindow 시점에 native header 는 이미 존재.
+	if (CHeaderCtrl* hdr = GetHeaderCtrl())
+		hdr->ModifyStyle(0, WS_CLIPSIBLINGS);
+	m_scrollbar.ModifyStyle(0, WS_CLIPSIBLINGS);
+	m_scrollbar_h.ModifyStyle(0, WS_CLIPSIBLINGS);
+
+	//overlay 의 z-order 를 header 위로 강제. created order(나중 생성 = top) 만 의존하지 않고 명시 보증.
+	m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+	m_scrollbar_h.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 void CVtListCtrlEx::begin_bulk_insert()
@@ -5738,8 +5792,9 @@ void CVtListCtrlEx::sync_scrollbar()
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
 		return;
 
-	ShowScrollBar(SB_VERT, FALSE);
-	ShowScrollBar(SB_HORZ, FALSE);
+	//native scrollbar 의 시각화는 setup_scrollbar 의 SWP_FRAMECHANGED + OnNcCalcSize(NC=0) 가
+	//영구 차단 — sync 마다 ShowScrollBar 토글은 무용하면서 OS 가 NCCALCSIZE/paint 사이클을 발화시켜
+	//컬럼 폭 드래그 중 변경 컬럼이 추가 repaint 되는 flicker 원인. 따라서 sync 진입부에선 호출 X.
 
 	int total = GetItemCount();
 
@@ -5797,10 +5852,13 @@ void CVtListCtrlEx::sync_scrollbar()
 		InvalidateRect(rOld, TRUE);
 	}
 
+	//IsWindowVisible() 는 부모 chain 의 WS_VISIBLE 까지 검사 — OnInitDialog 안에서는
+	//dialog 가 아직 SW_SHOW 전이라 false 반환 → toggle 가드용으로 쓰면 자식의 WS_VISIBLE
+	//비트가 켜진 채로 hide 가 스킵되어 dialog 가 보이는 순간 overlay 가 그대로 남는다.
+	//ShowWindow 는 같은 상태면 no-op (메시지 미발송) 이므로 무조건 호출이 정석.
 	if (!need_v)
 	{
-		if (m_scrollbar.IsWindowVisible())
-			m_scrollbar.ShowWindow(SW_HIDE);
+		m_scrollbar.ShowWindow(SW_HIDE);
 	}
 	else
 	{
@@ -5809,28 +5867,34 @@ void CVtListCtrlEx::sync_scrollbar()
 		m_scrollbar.set_range(0, total - 1);
 		m_scrollbar.set_page(visible);
 		m_scrollbar.set_pos(top);
-		if (!m_scrollbar.IsWindowVisible())
-			m_scrollbar.ShowWindow(SW_SHOW);
+		m_scrollbar.ShowWindow(SW_SHOW);
 	}
 
 	if (!need_h)
 	{
-		if (m_scrollbar_h.IsWindowVisible())
-			m_scrollbar_h.ShowWindow(SW_HIDE);
+		m_scrollbar_h.ShowWindow(SW_HIDE);
 		m_h_scroll_pos = 0;
 	}
 	else
 	{
-		int max_h = max(0, total_col_width - rc.Width());
+		//listview 가 자체적으로 마지막 컬럼 right divider 의 hit-test 영역이 view 안에 머물도록
+		//가로 scroll limit 에 약간의 padding 을 둔다. 우리 overlay 가 단순히 (total_col_width - client)
+		//까지만 스크롤하면 listview 의 실제 scroll 끝(GetScrollLimit)보다 짧아 마지막 divider 가
+		//view 밖에 위치 → 마우스 hit-test 실패. listview 의 GetScrollLimit 과 sync 한다.
+		int lv_limit = GetScrollLimit(SB_HORZ);
+		int max_h = max(lv_limit, max(0, total_col_width - rc.Width()));
 		if (m_h_scroll_pos > max_h)
 			m_h_scroll_pos = max_h;
 		if (m_h_scroll_pos < 0)
 			m_h_scroll_pos = 0;
-		m_scrollbar_h.set_range(0, total_col_width - 1);
+		int total_h_range = max_h + rc.Width();
+		m_scrollbar_h.set_range(0, total_h_range - 1);
 		m_scrollbar_h.set_page(rc.Width());
 		m_scrollbar_h.set_pos(m_h_scroll_pos);
-		if (!m_scrollbar_h.IsWindowVisible())
-			m_scrollbar_h.ShowWindow(SW_SHOW);
+		m_scrollbar_h.ShowWindow(SW_SHOW);
+		//drag-during 에는 listview 의 paint cycle 이 멈춰 있어 자식 ShowWindow(SW_SHOW) 가 invalidate
+		//만 마크하고 즉시 그려지지 않는다 (release 후에야 보이는 현상). 즉시 paint 강제.
+		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
 }
 

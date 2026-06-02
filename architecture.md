@@ -101,6 +101,16 @@ Direct2D 아닌 GDI+ 기반 이미지. 독립 모듈.
 | `CButton/SCSystemButtons/SCSystemButtons.h` | CButton | 타이틀바 minimize/maximize/close/pin/help/custom 복합. `create(parent, top, right, w, h, SC_PIN, SC_MINIMIZE, ...)` 가변 템플릿. parent 에 SC_MINIMIZE/MAXIMIZE/CLOSE(표준) + SC_PIN/SC_HELP(커스텀, WM_USER+) 전송. `CSCSystemButtonsMessage{cmd}`. |
 | `CScrollbar/SCScrollbar/SCScrollbar.h` | CWnd | 자체 그리기 스크롤바 (OS native 스크롤바 색 못 바꾸는 한계 우회, XP 호환). `create(parent, vertical/horizontal, x,y,cx,cy)`. 모델 push: `set_range/page/pos/line`, 보조 `scroll_by_lines/pages`. host 가 `Message_CSCScrollbar` 수신 — `CSCScrollbarMsg{msg, pos}` 의 msg = `msg_scrollbar_pos_changed/drag_start/drag_end`. thumb hover/pressed 색은 `cr_back ↔ cr_text` ratio 자동 derive — theme 무관. `set_show_arrows(false)` 기본 (modern minimal). |
 
+### 정책 — CSCScrollbar overlay 컨트롤의 단일 결정자 원칙
+
+`CVtListCtrlEx`, `CSCTreeCtrl`, `CSCListBox`, `SCThumbCtrl` 등 CSCScrollbar 오버레이를 사용하는 컨트롤은 **CSCScrollbar 가 스크롤 표시의 단독 결정자**다. 다음을 지킨다:
+
+- **`LVS_EX_FLATSB` 사용 금지.** FlatSB 모듈이 native scrollbar 비트를 시각화하면 overlay 와 충돌해 "컬럼 폭 합이 줄어도 가로 scrollbar 가 남아 있고, 드래그하면 사라지는" 종류의 sticky scrollbar 현상이 생긴다. 컨트롤 자체 `SetExtendedStyle` 호출에서도 제거, 사용자(다이얼로그) 측 호출에서도 제거.
+- **scroll 비트 자동 set 차단.** listview 등은 컬럼/내용 합이 client 를 넘는 순간 자체적으로 `WS_HSCROLL`/`WS_VSCROLL` 을 set 하고 줄어도 떼지 않는다. `sync_scrollbar()` 류의 단일 sync 함수 진입부에서 `ModifyStyle(WS_VSCROLL | WS_HSCROLL, 0)` 으로 매번 비트를 제거한다.
+- **컬럼/내용 변경의 single entry point.** 컬럼 폭/항목 수가 바뀌는 모든 경로 — 초기화, registry 복원, 자동 맞춤, 고정폭 컬럼, **사용자 헤더 manual drag/double-click**(`HDN_ENDTRACK` / `HDN_DIVIDERDBLCLICK` reflected) — 가 마지막에 `sync_scrollbar()` 를 호출해야 한다. `SetColumnWidth` 직접 호출은 각 컨트롤 내부 단일 함수(`set_column_width`)에만 두고 나머지는 그 함수를 경유.
+
+KoinoTools 2026-06-02 적용 완료 (`VtListCtrlEx.cpp` / `KoinoToolsDlg.cpp`).
+
 ---
 
 ## 4. 다이얼로그·컬러피커

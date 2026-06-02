@@ -134,7 +134,10 @@ public:
 	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, int line, float spacing = 1.0f);
 
 	//static void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
-	static void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para);
+	//aa_from_pt > 0 이면 음절별 폰트 size(pt) 와 비교해 매 음절 그리기 전에 SetTextRenderingHint 를 자동 결정
+	//(< aa_from_pt → ClearTypeGridFit: 작은 글씨 또렷 / >= aa_from_pt → AntiAliasGridFit: 큰 글씨 매끄럽게).
+	//aa_from_pt == 0 이면 호출자가 미리 g 에 설정한 hint 를 그대로 유지 (기존 동작과 호환).
+	static void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int aa_from_pt = 0);
 
 	//calc_text_rect()에서 이미 각 paragraph의 r이 align에 따라 정해지지만 이를 동적으로 변경하고자 할 경우 호출.
 	static CRect	set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>>& para, DWORD align);

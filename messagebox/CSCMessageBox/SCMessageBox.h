@@ -51,9 +51,8 @@
 
 #include "Common/colors.h"
 #include "Common/CButton/GdiButton/GdiButton.h"
+//태그 컬러(<cr=red>...) 지원이 SCStatic 으로 통합됨. set_tagged_text 로 단락 모드 활성.
 #include "Common/CStatic/SCStatic/SCStatic.h"
-//태그 컬러 (<cr=red>...</cr> 등) 지원을 위해 paragraph 버전 사용. CSCStatic 상속이라 setter 호환.
-#include "Common/CStatic/SCParagraphStatic/SCParagraphStatic.h"
 
 //modeless로 생성한 경우 클릭된 버튼의 응답결과를 parent로 전달하기 위한 메시지
 static const UINT Message_CSCMessageBox = ::RegisterWindowMessage(_T("MessageString_CSCMessageBox"));
@@ -171,7 +170,7 @@ protected:
 
 	CSize			m_sz_button = CSize(DEFAULT_BUTTON_CX, DEFAULT_BUTTON_CY);
 
-	CSCParagraphStatic	m_static_message;
+	CSCStatic		m_static_message;
 
 	CString			m_button_caption[TOTAL_BUTTON_COUNT];
 	CGdiButton		m_button[TOTAL_BUTTON_COUNT];	//UNDEF(0), IDOK(1) ~ IDCONTINUE(11)

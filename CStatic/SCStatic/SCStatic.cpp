@@ -64,6 +64,7 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 	ON_WM_SETCURSOR()
 	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCStatic::on_message_CSCEdit)
 	ON_WM_DESTROY()
+	ON_WM_MOUSEMOVE()
 END_MESSAGE_MAP()
 
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
@@ -191,6 +192,10 @@ void CSCStatic::PreSubclassWindow()
 	//SYSTEM_FONT 경로에 있던 m_lf.lfWidth=0 강제는 lfMessageFont / DEFAULT_GUI_FONT 가 이미 lfWidth=0 이라 불필요.
 
 	reconstruct_font();
+
+	//단락 모드 사용자가 set_tagged_text 전에 색상·폰트 setter 만 호출한 시점에도 m_text_prop 가
+	//일관된 초기값을 갖도록. set_tagged_text 진입 시 다시 갱신되므로 idempotent.
+	update_text_property();
 }
 
 void CSCStatic::prepare_tooltip()
@@ -691,6 +696,21 @@ void CSCStatic::OnPaint()
 					}
 				}
 			}
+			else if (!m_para.empty())
+			{
+				//단락 모드 (set_tagged_text) — round/back/border/header-image 는 이 분기 이전 단계에서 이미 처리됨.
+				//텍스트 그리기만 Gdiplus 의 CSCParagraph::draw_text 로 분기. layout 은 rebuild_layout 가 미리 계산.
+				Gdiplus::Graphics g(dc);
+				//자동 hint 결정이 OFF 일 때만 단일 hint 강제. ON 이면 draw_text 가 음절별로 결정.
+				if (!m_auto_font_quality)
+					g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
+				if (m_font_antialiasing)
+				{
+					g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+					g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+				}
+				CSCParagraph::draw_text(g, m_para, m_auto_font_quality ? m_aa_from_pt : 0);
+			}
 			else
 			{
 				dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
@@ -735,6 +755,10 @@ CString CSCStatic::get_text()
 
 CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color)
 {
+	//plain text 모드 전환 — 이전에 set_tagged_text 로 단락 데이터가 빌드되어 있었다면 무효화.
+	//empty 일 때 clear 는 no-op 이라 항상 호출해도 안전.
+	m_para.clear();
+
 	//호출처가 동일 텍스트로 반복 set_text 하는 경우 (예: Endorphin2 의 500ms timer 가
 	//일시정지 중에도 같은 시간 문자열을 매번 재설정) Invalidate 가 매 tick 발생 →
 	//부모 영역 invalidate / WM_PAINT 사이클 → 자식 컨트롤 (슬라이더 등) 위 툴팁이 깜빡임.
@@ -1817,7 +1841,11 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 			}
 		}
 
-		Invalidate();
+		//단락 모드 — 새 client 크기로 layout 재계산. rebuild_layout 가 Invalidate 도 호출.
+		if (!m_para.empty())
+			rebuild_layout();
+		else
+			Invalidate();
 	}
 }
 
@@ -2027,4 +2055,333 @@ void CSCStatic::OnDestroy()
 	//일단 이 클래스에서 사용하므로 이 클래스의 소멸자에서 해제 함수를 호출해주고 있으나
 	//공통 글로벌 변수라서 뭔가 부작용이 있을수도 있다.
 	safe_release_gradient_rect_handle();
+}
+
+
+// ----------------------------------------------------------------------------
+// paragraph mode (tagged text) — CSCParagraphStatic 흡수.
+// m_para 비어있으면 plain text 모드 (기존 동작), 채워지면 단락 모드. OnPaint 의 텍스트 그리기 단계만 분기.
+// ----------------------------------------------------------------------------
+
+void CSCStatic::set_text_align(DWORD align)
+{
+	//halign 추출.
+	if (align & DT_CENTER)
+		m_halign = DT_CENTER;
+	else if (align & DT_RIGHT)
+		m_halign = DT_RIGHT;
+	else
+		m_halign = DT_LEFT;
+
+	//valign 추출. DT_TOP 은 0 이라 bit 검사로 안 잡혀 else 에서 fallback.
+	if (align & DT_VCENTER)
+		m_valign = DT_VCENTER;
+	else if (align & DT_BOTTOM)
+		m_valign = DT_BOTTOM;
+	else
+		m_valign = DT_TOP;
+
+	if (!m_para.empty())
+		rebuild_layout();
+	else
+		Invalidate();
+}
+
+CRect CSCStatic::set_tagged_text(CString text)
+{
+	m_para.clear();
+
+	//set_text(plain) 호출에서 m_text 에 저장되던 raw 문자열을 단락 모드에서도 유지 — m_text_extent 등
+	//기존 SCStatic 로직(icon 위치 계산 등)이 그대로 의미를 가지도록.
+	m_text = text;
+
+	//PreSubclassWindow 후 사용자가 색상·폰트 setter 를 호출했을 수 있어 build 직전에 m_text_prop 재갱신.
+	update_text_property();
+
+	CSCParagraph::build_paragraph_str(text, m_para, &m_text_prop);
+
+	//halign/valign 과 line_spacing 은 rebuild_layout 에서 일괄 적용.
+	rebuild_layout();
+
+	return m_rect_text;
+}
+
+void CSCStatic::update_text_property()
+{
+	_tcscpy_s(m_text_prop.name, _countof(m_text_prop.name), m_lf.lfFaceName);
+	m_text_prop.size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
+
+	if (m_lf.lfWeight >= FW_BOLD)
+		m_text_prop.style |= Gdiplus::FontStyleBold;
+	if (m_lf.lfItalic)
+		m_text_prop.style |= Gdiplus::FontStyleItalic;
+	if (m_lf.lfUnderline)
+		m_text_prop.style |= Gdiplus::FontStyleUnderline;
+	if (m_lf.lfStrikeOut)
+		m_text_prop.style |= Gdiplus::FontStyleStrikeout;
+
+	m_text_prop.cr_text = m_theme.cr_text;
+	m_text_prop.cr_back = m_theme.cr_back;
+}
+
+void CSCStatic::set_line_spacing(float spacing)
+{
+	m_line_spacing = spacing;
+	if (!m_para.empty())
+		rebuild_layout();
+}
+
+void CSCStatic::set_line_spacing(int line, float spacing)
+{
+	//line == 0 은 "위쪽 간격" 개념이 없으므로 무시 (top margin 에 해당).
+	if (line < 1)
+		return;
+
+	m_line_spacings[line] = spacing;
+	if (!m_para.empty())
+		rebuild_layout();
+}
+
+float CSCStatic::get_line_spacing(int line)
+{
+	auto it = m_line_spacings.find(line);
+	if (it != m_line_spacings.end())
+		return it->second;
+	return m_line_spacing;
+}
+
+void CSCStatic::set_halign_line(int line, DWORD halign)
+{
+	if (line < 0)
+		return;
+
+	m_line_haligns[line] = halign;
+	if (!m_para.empty())
+		rebuild_layout();
+}
+
+DWORD CSCStatic::get_halign_line(int line)
+{
+	auto it = m_line_haligns.find(line);
+	if (it != m_line_haligns.end())
+		return it->second;
+	//-1 sentinel(기본값) 은 단락 모드에서 DT_LEFT 로 해석.
+	if (m_halign < 0)
+		return DT_LEFT;
+	return (DWORD)m_halign;
+}
+
+void CSCStatic::draw_word_hover_rect(bool draw, Gdiplus::Color cr_rect)
+{
+	m_draw_word_hover_rect = draw;
+	if (cr_rect.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_word_hover_rect = cr_rect;
+}
+
+void CSCStatic::rebuild_layout()
+{
+	if (m_para.empty())
+	{
+		Invalidate();
+		return;
+	}
+
+	CClientDC dc(this);
+	CRect rc;
+	GetClientRect(&rc);
+
+	//DT_NOCLIP 만 넘겨 baseline 배치만 얻는다 — halign/valign 은 별도 단계로 적용.
+	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_NOCLIP);
+	m_rect_text = reapply_line_spacings();
+	m_rect_text = apply_halign();
+	m_rect_text = apply_valign();
+
+	Invalidate();
+}
+
+CRect CSCStatic::reapply_line_spacings()
+{
+	//호출 시점: m_para 의 각 r 는 calc_text_rect() 직후의 baseline(spacing=1.0) 위치여야 한다.
+	if (m_para.empty())
+		return m_rect_text;
+
+	int i, j;
+	int shift_y = 0;
+
+	//line 0 은 기준이므로 shift 0. line >= 1 부터 누적 shift 를 가산.
+	for (i = 1; i < (int)m_para.size(); i++)
+	{
+		int line_above_h = 0;
+		for (j = 0; j < (int)m_para[i - 1].size(); j++)
+		{
+			int h = m_para[i - 1][j].r.Height();
+			if (h > line_above_h)
+				line_above_h = h;
+		}
+
+		auto it = m_line_spacings.find(i);
+		float spacing = (it != m_line_spacings.end()) ? it->second : m_line_spacing;
+
+		shift_y += (int)((float)line_above_h * (spacing - 1.0f));
+
+		if (shift_y == 0)
+			continue;
+
+		for (j = 0; j < (int)m_para[i].size(); j++)
+			m_para[i][j].r.OffsetRect(0, shift_y);
+	}
+
+	CRect rect_text;
+	int max_width_line = CSCParagraph::get_max_width_line(m_para);
+	if (max_width_line < 0)
+		max_width_line = 0;
+
+	rect_text.left = m_para[max_width_line][0].r.left;
+	rect_text.top = m_para[0][0].r.top;
+	rect_text.right = m_para[max_width_line][m_para[max_width_line].size() - 1].r.right;
+
+	int last_line = (int)m_para.size() - 1;
+	int max_bottom = m_para[last_line][0].r.bottom;
+	for (j = 1; j < (int)m_para[last_line].size(); j++)
+	{
+		if (m_para[last_line][j].r.bottom > max_bottom)
+			max_bottom = m_para[last_line][j].r.bottom;
+	}
+
+	rect_text.bottom = max_bottom;
+	return rect_text;
+}
+
+CRect CSCStatic::apply_halign()
+{
+	//baseline 은 모든 라인이 x=0 에서 시작. 각 라인별로 target_left 을 구해 현재 left 와의 차이만큼 shift.
+	if (m_para.empty())
+		return m_rect_text;
+
+	CRect rc;
+	GetClientRect(&rc);
+
+	//global halign — -1 sentinel(기본값) 은 DT_LEFT 로 해석.
+	DWORD global_halign = (m_halign < 0) ? DT_LEFT : (DWORD)m_halign;
+
+	int i, j;
+	for (i = 0; i < (int)m_para.size(); i++)
+	{
+		if (m_para[i].empty())
+			continue;
+
+		auto it = m_line_haligns.find(i);
+		DWORD halign = (it != m_line_haligns.end()) ? it->second : global_halign;
+
+		int total_width = 0;
+		for (j = 0; j < (int)m_para[i].size(); j++)
+			total_width += m_para[i][j].r.Width();
+
+		int target_left;
+		if (halign & DT_CENTER)
+			target_left = rc.CenterPoint().x - total_width / 2;
+		else if (halign & DT_RIGHT)
+			target_left = rc.right - total_width;
+		else
+			target_left = rc.left;
+
+		int shift_x = target_left - m_para[i][0].r.left;
+		if (shift_x == 0)
+			continue;
+
+		for (j = 0; j < (int)m_para[i].size(); j++)
+			m_para[i][j].r.OffsetRect(shift_x, 0);
+	}
+
+	//라인별 halign 이 다를 수 있으므로 rect_text.left/right 는 모든 라인에 걸친 min/max.
+	CRect rect_text = m_rect_text;
+	rect_text.left = m_para[0][0].r.left;
+	rect_text.right = m_para[0][m_para[0].size() - 1].r.right;
+
+	for (i = 1; i < (int)m_para.size(); i++)
+	{
+		if (m_para[i].empty())
+			continue;
+		if (m_para[i][0].r.left < rect_text.left)
+			rect_text.left = m_para[i][0].r.left;
+		int line_right = m_para[i][m_para[i].size() - 1].r.right;
+		if (line_right > rect_text.right)
+			rect_text.right = line_right;
+	}
+
+	return rect_text;
+}
+
+CRect CSCStatic::apply_valign()
+{
+	if (m_para.empty())
+		return m_rect_text;
+
+	CRect rc;
+	GetClientRect(&rc);
+
+	int first_top = m_para[0][0].r.top;
+	int last_line = (int)m_para.size() - 1;
+	int last_bottom = m_para[last_line][0].r.bottom;
+	int j;
+
+	for (j = 1; j < (int)m_para[last_line].size(); j++)
+	{
+		if (m_para[last_line][j].r.bottom > last_bottom)
+			last_bottom = m_para[last_line][j].r.bottom;
+	}
+
+	int total_h = last_bottom - first_top;
+
+	//global valign — -1 sentinel(기본값) 은 DT_TOP 로 해석.
+	DWORD valign = (m_valign < 0) ? DT_TOP : (DWORD)m_valign;
+
+	int target_top;
+	if (valign & DT_VCENTER)
+		target_top = rc.top + (rc.Height() - total_h) / 2;
+	else if (valign & DT_BOTTOM)
+		target_top = rc.bottom - total_h;
+	else
+		target_top = rc.top;
+
+	int shift_y = target_top - first_top;
+	if (shift_y != 0)
+	{
+		for (int i = 0; i < (int)m_para.size(); i++)
+		{
+			for (j = 0; j < (int)m_para[i].size(); j++)
+				m_para[i][j].r.OffsetRect(0, shift_y);
+		}
+	}
+
+	CRect rect_text = m_rect_text;
+	rect_text.top = target_top;
+	rect_text.bottom = target_top + total_h;
+	return rect_text;
+}
+
+void CSCStatic::OnMouseMove(UINT nFlags, CPoint point)
+{
+	//단락 모드의 word hover. 단락 데이터 없거나 hover 비활성이면 base 만.
+	if (m_draw_word_hover_rect && !m_para.empty())
+	{
+		for (int i = 0; i < (int)m_para.size(); i++)
+		{
+			for (int j = 0; j < (int)m_para[i].size(); j++)
+			{
+				if (m_para[i][j].r.PtInRect(point))
+				{
+					m_pos_word_hover = CPoint(i, j);
+					Invalidate();
+					CStatic::OnMouseMove(nFlags, point);
+					return;
+				}
+			}
+		}
+
+		m_pos_word_hover = CPoint(-1, -1);
+		Invalidate();
+	}
+
+	CStatic::OnMouseMove(nFlags, point);
 }

@@ -2067,6 +2067,7 @@ h		: 복사할 height 크기(pixel)
 	void		draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, int width = 1, int pen_align = Gdiplus::PenAlignmentInset, int pen_style = Gdiplus::DashStyleSolid);
 #ifndef _USING_V110_SDK71_
 	void		draw_line(ID2D1DeviceContext* d2dc, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick = 1.0f);
+	void		draw_line(ID2D1DeviceContext* d2dc, float x1, float y1, float x2, float y2, Gdiplus::Color cr, float thick = 1.0f);
 	void		draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
 	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::Rect r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);
 	void		draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_stroke = Gdiplus::Color::Transparent, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent, float thick = 1.0f, float round_lt = 0.0f, float round_rt = -1.0f, float round_lb = -1.0f, float round_rb = -1.0f);

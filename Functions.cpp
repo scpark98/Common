@@ -3806,6 +3806,13 @@ int get_browser_list(std::deque<CString>& list)
 			if (display_name.IsEmpty())
 				display_name = subkey_name;
 
+			//IE 는 URLScheme 프로필 기능이 없어 제외. subkey("IEXPLORE.EXE")·friendly name 양쪽 체크.
+			if (subkey_name == CString(_T("IEXPLORE.EXE")) || display_name.CompareNoCase(_T("Internet Explorer")) == 0)
+			{
+				name_size = _countof(subkey_name);
+				continue;
+			}
+
 			bool exists = false;
 			for (const auto& b : list)
 			{
@@ -3824,6 +3831,8 @@ int get_browser_list(std::deque<CString>& list)
 	}
 
 	CString default_browser = get_default_browser_info();
+	if (default_browser.CompareNoCase(_T("Internet Explorer")) == 0)
+		default_browser.Empty();
 
 	int found = -1;
 	for (size_t i = 0; i < list.size(); i++)
@@ -7431,9 +7440,16 @@ void draw_rect(Gdiplus::Graphics& g, Gdiplus::RectF r, Gdiplus::Color cr_line, G
 #ifndef _USING_V110_SDK71_
 void draw_line(ID2D1DeviceContext* d2dc, int x1, int y1, int x2, int y2, Gdiplus::Color cr, float thick)
 {
+	draw_line(d2dc, (float)x1, (float)y1, (float)x2, (float)y2, cr, thick);
+}
+
+//홀수 폭/높이 rect 의 정확한 중심 (예: 21 → 10.5) 등 sub-pixel 좌표가 필요할 때 사용.
+void draw_line(ID2D1DeviceContext* d2dc, float x1, float y1, float x2, float y2, Gdiplus::Color cr, float thick)
+{
 	ID2D1SolidColorBrush* br = NULL;
 	d2dc->CreateSolidColorBrush(get_d2color(cr), &br);
 	d2dc->DrawLine(D2D1::Point2F(x1, y1), D2D1::Point2F(x2, y2), br, thick);
+	if (br) br->Release();
 }
 
 void draw_rect(ID2D1DeviceContext* d2dc, CRect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)

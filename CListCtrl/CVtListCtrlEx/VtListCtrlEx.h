@@ -860,6 +860,8 @@ public:
 	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult);
+	//native header 의 raw HDN_* notification 직접 가로채기 — listview 가 reflect 하지 않는 경로.
+	virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult) override;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnNcPaint();
 	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);

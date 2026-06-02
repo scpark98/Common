@@ -70,7 +70,11 @@ CSCKeyInput::CSCKeyInput(CString str)
 
 CSCKeyInput::~CSCKeyInput()
 {
-
+	//ctor 에서 std::thread 를 detach 했기 때문에 thread 자신이 종료되어야 args control block(tuple<func, this>,
+	//16 bytes) 이 해제된다. destructor 가 stop() 호출 없이 빈 채로 두면 thread 가 영원히 살아 control block 이
+	//leak 으로 보고된다 (_CrtSetBreakAlloc 확인 결과 정확히 이 경로). stop() 가 m_thread_running=false 설정 +
+	//thread_function 의 m_thread_terminated=true 까지 polling 대기하므로 안전한 정상 종료.
+	stop();
 }
 
 void CSCKeyInput::input(CString str)

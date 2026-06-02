@@ -249,7 +249,7 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	m_static_message.set_font(&m_font);
 	m_static_message.set_halign(DT_CENTER);
 	m_static_message.set_valign(DT_VCENTER);
-	//CSCParagraphStatic 기본 line_spacing 은 1.5x. 메시지박스에서는 1.0 이 너무 좁다는 피드백으로 1.3 로 절충.
+	//SCStatic 단락 모드 기본 line_spacing 은 1.2x. 메시지박스에서는 1.0 이 너무 좁다는 피드백으로 1.3 으로 절충.
 	//아이콘 정렬 수식은 set_message 에서 spacing-aware 로 (line_count + (line_count-1)*(spacing-1)) 계산.
 	m_static_message.set_line_spacing(1.3f);
 	//paragraph 의 안티앨리어싱 기본값은 false (작은 시스템 폰트 흐림 방지). 메시지박스 텍스트는
@@ -336,7 +336,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		//측정 정확성을 위해 임시로 MAX_SIZE_CX 너비 + 충분한 높이로 키워 자연 폭으로 layout 하게 둠.
 		CRect rmsg_temp(0, 0, MAX_SIZE_CX, 4000);
 		m_static_message.MoveWindow(rmsg_temp);
-		CRect rect_text = m_static_message.set_text(m_message);
+		CRect rect_text = m_static_message.set_tagged_text(m_message);
 
 		//right, bottom을 줄 때는 dlg의 최소 크기를 고려한다.
 		//width는 MIN_SIZE_CX 가 기본이지만 메시지가 길어지면 아이콘과의 기본 간격 유지하며 MAX_SIZE_CX 까지 늘어남.
@@ -524,7 +524,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	//auto_size==false 일 때만 여기서 처리. MoveWindow 후이므로 OnSize 가 rebuild_layout 을 트리거함.
 	if (!m_auto_size)
 	{
-		m_static_message.set_text(m_message);
+		m_static_message.set_tagged_text(m_message);
 	}
 	m_static_message.ShowWindow(SW_SHOW);
 
@@ -551,7 +551,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		//m_static_message 가 DT_VCENTER 라서 텍스트 블록이 세로 중앙에 배치됨.
 		//텍스트 블록의 첫 줄 top = static_rect.top + (static_height - text_block_height) / 2.
 		//spacing-aware 총 높이 공식: 첫 줄(line_height) + (line_count-1) * line_height * spacing.
-		//CSCParagraphStatic::reapply_line_spacings 의 누적 shift 와 동일한 결과.
+		//CSCStatic::reapply_line_spacings (단락 모드) 의 누적 shift 와 동일한 결과.
 		float line_spacing = m_static_message.get_line_spacing();
 		int text_block_height = line_height + (int)((line_count - 1) * line_height * line_spacing);
 		int first_line_top = static_rect.top + (static_rect.Height() - text_block_height) / 2;
@@ -616,12 +616,12 @@ void CSCMessageBox::apply_theme(bool invalidate)
 		m_static_message.set_text_color(m_theme.cr_text);
 		m_static_message.set_back_color(m_theme.cr_back);
 
-		//set_text_color 는 m_static_message.m_theme.cr_text 만 갱신 — 이미 set_text 로 파싱돼 m_para 안에
+		//set_text_color 는 m_static_message.m_theme.cr_text 만 갱신 — 이미 set_tagged_text 로 파싱돼 m_para 안에
 		//baked 된 untagged 세그먼트의 cr_text 는 *옛 테마의 색* 그대로 남는다 (예: dark 에서 set_message
 		//후 default 로 전환 시 untagged 텍스트가 dark 의 light gray 로 잔존). 메시지가 비어있지 않으면
 		//re-parse 해 새 cr_text 로 다시 stamping.
 		if (!m_message.IsEmpty())
-			m_static_message.set_text(m_message);
+			m_static_message.set_tagged_text(m_message);
 	}
 
 	if (m_button_quit)

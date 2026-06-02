@@ -8242,11 +8242,6 @@ void get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_
 
 Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width)
 {
-	//int dia = 2 * radius;
-
-	// set to pixel mode
-	//int oldPageUnit = g->SetPageUnit(Gdiplus::UnitPixel);
-
 	// define the pen
 	Gdiplus::Pen pen(cr_stroke, width);
 	Gdiplus::SolidBrush br(cr_fill);
@@ -8260,8 +8255,10 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 	if (radius < 0)
 		radius = r.Height / 2;
 
-	// get path
-	get_round_rect_path(&path, r, radius);
+	//stroke 가 실제로 그려질 때만 path 를 stroke 폭만큼 inset (그래야 stroke 가 r 안에 들어옴).
+	//stroke 가 안 그려지는 경우(width<=0 또는 cr_stroke alpha=0)엔 inset 없이 r 전체에 fill.
+	const int stroke_thick = (width > 0 && cr_stroke.GetAlpha() > 0) ? width : 0;
+	get_round_rect_path(&path, r, (float)radius, stroke_thick);
 
 	//fill the round rect
 	g->FillPath(&br, &path);
@@ -8288,8 +8285,10 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 	if (rb < 0)	rb = lt;
 	if (lb < 0)	lb = lt;
 
+	//stroke 가 실제로 그려질 때만 path 를 stroke 폭만큼 inset (단일 radius 버전과 동일 규칙).
+	const int stroke_thick = (width > 0 && cr_stroke.GetAlpha() > 0) ? width : 0;
 	Gdiplus::GraphicsPath path;
-	get_round_rect_path(&path, r, (float)lt, (float)rt, (float)rb, (float)lb);
+	get_round_rect_path(&path, r, (float)lt, (float)rt, (float)rb, (float)lb, stroke_thick);
 
 	g->FillPath(&br, &path);
 

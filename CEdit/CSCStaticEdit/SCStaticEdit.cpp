@@ -1048,7 +1048,10 @@ void CSCStaticEdit::OnSize(UINT n_type, int cx, int cy)
 	CStatic::OnSize(n_type, cx, cy);
 	// 컨트롤 크기가 변하면 border radius 상한도 변하므로 재적용
 	int max_r = cy / 2;
-	if (m_border_radius > max_r) m_border_radius = max_r;
+	if (m_border_radius > max_r)
+		m_border_radius = max_r;
+
+	Invalidate(FALSE);
 }
 
 // ──────────────────────────────────────────────────────────

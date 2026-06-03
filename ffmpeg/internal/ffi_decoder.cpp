@@ -988,14 +988,45 @@ namespace ffi
 					}
 					else
 					{
-						//[정확 모드] sparse keyframe 미디어 (MPEG-TS 29초 GOP 등) 에서 av_seek_frame BACKWARD 가
-						//*prefer* 일 뿐 *force* 가 아니라 target 보다 *늦은 keyframe* 으로 forward fallback 발생.
-						//target_pts - 1초 margin 으로 seek → 항상 backward keyframe 보장 + source filter 의 pre-target
-						//skip 이 *원래 target* 까지 forward decode + emit. 1초 = 30 frame ≈ 150ms HW decode.
-						int64_t margin_pts = av_rescale_q(1 * AV_TIME_BASE,
-							AVRational{1, AV_TIME_BASE}, vtb);	 //1초 margin
-						int64_t safe_target_pts = (target_pts > margin_pts) ? target_pts - margin_pts : 0;
-						hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, safe_target_pts, AVSEEK_FLAG_BACKWARD);
+						//[정확 모드] av_seek_frame BACKWARD 는 *prefer* 일 뿐 *force* 가 아니라 sparse keyframe 미디어에서
+						//target 보다 *뒤* keyframe 으로 fallback 가능. 그러면 source filter 의 pre-target skip(pts<target) 이
+						//걸릴 frame 이 없어 그 뒤 keyframe 이 그대로 표시되고 멈춘다 — 뒤로 1프레임(D) 이 무반응/근처 keyframe
+						//점프로 보이는 원인 (고정 1초 margin 으론 GOP>1초 미디어에서 여전히 overshoot).
+						//avformat_seek_file(max_ts=target) + probe 로 target 이하 keyframe 을 *보장* → source filter 가 거기서
+						//target 까지 forward skip 해 정확 프레임 emit. keyframe 모드 backward 분기와 동일한 robust seek.
+						int64_t one_sec = av_rescale_q(AV_TIME_BASE, AVRational{1, AV_TIME_BASE}, vtb);
+						int64_t seek_ts = target_pts;
+						int64_t margin  = (one_sec > 0) ? one_sec : 1;
+						hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
+						AVPacket* probe = av_packet_alloc();
+						int probe_attempts = 0;
+						for (; probe_attempts < 12; ++probe_attempts)
+						{
+							int64_t kf = AV_NOPTS_VALUE;
+							while (av_read_frame(m_fmt, probe) >= 0)
+							{
+								bool is_vkey = (probe->stream_index == m_video_stream_idx) && (probe->flags & AV_PKT_FLAG_KEY);
+								int64_t ppts = (probe->pts != AV_NOPTS_VALUE) ? probe->pts : probe->dts;
+								av_packet_unref(probe);
+								if (is_vkey && ppts != AV_NOPTS_VALUE)
+								{
+									kf = ppts;
+									break;
+								}
+							}
+							if (kf == AV_NOPTS_VALUE || kf <= target_pts || seek_ts <= 0)
+								break;	 //target 이하 keyframe 확보 / 파일 앞 / EOF.
+							seek_ts -= margin;
+							margin  *= 2;
+							if (seek_ts < 0)
+								seek_ts = 0;
+							avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
+						}
+						av_packet_free(&probe);
+						//확정 seek_ts 로 복귀 — probe 가 demuxer 를 전진시켰으므로.
+						hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
+						logWrite(_T("[ffi/dec/exact] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
+							probe_attempts, (long long)seek_ts, (long long)target_pts);
 						m_kf_skip_active = false;
 					}
 					avcodec_flush_buffers(m_video_ctx);

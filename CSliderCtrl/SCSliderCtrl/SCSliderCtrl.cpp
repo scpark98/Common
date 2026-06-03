@@ -351,7 +351,18 @@ void CSCSliderCtrl::OnPaint()
 		r.top = cy - 4;
 		r.bottom = cy + 4;
 
-		draw_sunken_rect(&dc, r, true, get_color(m_theme.cr_back, -32), get_color(m_theme.cr_back, 32));
+		//3D sunken bevel(좌상 그림자/우하 하이라이트)은 중간 명도 배경을 가정한 기법이라, 배경이 거의 검정/흰색이면
+		//한쪽이 clamp 돼 묻히거나 방향이 뒤집혀(embossed) 테마마다 인상이 갈린다. → 방향성 없는 *평면 채널*로 그린다:
+		//배경에서 살짝 벗어난(어두운 테마=조금 밝게/밝은 테마=조금 어둡게) 균일 톤의 둥근 홈 fill + 약한 1px 테두리.
+		//어떤 테마에서도 일관된 "들어간 홈"으로 읽히고 양 극단에서도 항상 보인다(검정엔 더 어둡게 못 가니 밝게, 반대도).
+		//(slider 는 cr_back 만 갱신되고 cr_text 는 stale 일 수 있어 cr_back 명도만 사용.)
+		int dir = (get_luminance(m_theme.cr_back) < 128) ? +1 : -1;
+		Gdiplus::Color cr_fill   = get_color(m_theme.cr_back, dir * 12);	//채널 바탕 — 아주 미세.
+		Gdiplus::Color cr_border = get_color(m_theme.cr_back, dir * 28);	//1px 윤곽 — 살짝만.
+
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		draw_round_rect(&g, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()),
+			cr_border, cr_fill, r.Height() / 2, 1);
 	}
 	else if (m_style == style_step)
 	{
@@ -606,9 +617,13 @@ void CSCSliderCtrl::OnPaint()
 		if (r.right > rtrack.right - 2)
 			r.right = rtrack.right - 2;
 
-		//CRect	rActive(0, m_rc.top + 2, pxpos, m_rc.bottom - 2);
+		//채널이 라운드(pill)라 진행 fill 도 라운드로 맞춘다 — plain rect 면 둥근 홈 안에 각진 막대가 들어가 어색.
 		if (r.right > r.left)
-			dc.FillSolidRect(r, cr_active.ToCOLORREF());
+		{
+			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+			draw_round_rect(&g, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()),
+				Gdiplus::Color::Transparent, cr_active, r.Height() / 2, 0);
+		}
 	}
 	else if (m_style == style_step)
 	{

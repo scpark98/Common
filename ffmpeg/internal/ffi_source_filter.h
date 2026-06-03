@@ -238,7 +238,7 @@ namespace ffi
 		//true: decoder 가 forward keyframe(pts>=target) 까지 demux-skip → 즉시 emit. 빠름, 5초 step 이 GOP 보다 클 수도.
 		//false: pre-target skip 으로 정확 target 위치 (현재 동작 + budget exceeded fallback).
 		//source filter (emit 분기) 와 decoder (seek+demux-skip) 양쪽이 같은 flag 필요 → 둘 다 전파.
-		void		   set_seek_keyframe_mode(bool b) { m_seek_keyframe_mode.store(b); m_decoder.set_seek_keyframe_mode(b); }
+		void		   set_seek_keyframe_mode(bool seek_keyframe) { m_seek_keyframe_mode.store(seek_keyframe); m_decoder.set_seek_keyframe_mode(seek_keyframe); }
 		bool		   seek_keyframe_mode() const { return m_seek_keyframe_mode.load(); }
 
 		//[frame step] step_frame 이 1프레임 seek 직전 set(true), 직후 restore. on_change_start 가 per-seek 캡처해

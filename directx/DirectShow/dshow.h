@@ -115,11 +115,12 @@ public:
 
 	CString			get_video_pixel_format();   //"yuv420p" / "nv12" 등. 없으면 빈 문자열.
 	CString			get_video_hw_accel_name();  //"D3D11VA" / "DXVA2" 등 — HW 미사용 시 빈 문자열.
+	CString			get_video_chroma_location();//"left"/"center"/"topleft" 등 — unspecified/없으면 빈 문자열.
 	CString			get_audio_channel_layout(); //"stereo" / "5.1" 등.
 
 	//graph filter 측 — decoder / renderer 이름 (filter 의 표시 이름).
-	CString			get_video_decoder_label();  //internal: "내장 FFmpeg 디코더 (codec[, HW])". LAV: m_VMR upstream filter name.
-	CString			get_audio_decoder_label();  //internal: "내장 FFmpeg 디코더 (codec)". LAV: audio renderer upstream filter name.
+	CString			get_video_decoder_label();  //internal: "내장 FFmpeg 디코더(codec[, HW])" (codec 소문자). LAV: m_VMR upstream filter name.
+	CString			get_audio_decoder_label();  //internal: "내장 FFmpeg 디코더(codec)" (codec 소문자). LAV: audio renderer upstream filter name.
 	CString			get_video_renderer_label(); //m_VMR->QueryFilterInfo 결과.
 	CString			get_audio_renderer_label(); //graph 의 audio renderer filter (input pin 만 + audio media type) 의 이름.
 
@@ -193,6 +194,11 @@ public:
 	//seek_to_keyframe: true 면 AM_SEEKING_SeekToKeyFrame 플래그로 splitter 가 keyframe 으로 snap → 손상 미디어에서도
 	//decoder 가 즉시 producible frame 받음. false 면 정확한 위치로 seek (drag 중 GOP 안 frame 변화 보장 위해).
 	void			set_track_pos(double pos, bool seek_to_keyframe = true);
+	//"키프레임 단위로 이동" 모드 (내장 FFmpeg 경로 전용). true(기본)=seek 시 키프레임에 안착(빠름, 정확위치 아님),
+	//false=이전 키프레임에서 target 까지 forward 디코드(정확한 위치, 약간 딜레이). LAV 경로엔 효과 없음.
+	//open 전후 아무 때나 호출 가능 — 값이 유지되고, 이후 load_media 가 새 CFFiSource 에 자동 승계한다. open 중이면 즉시 반영.
+	void			set_seek_keyframe_mode(bool seek_keyframe);
+	bool			get_seek_keyframe_mode();
 	//EOS(재생 종료) 후 반복재생 — 맨 처음으로 돌아가 다시 재생. 내장 FFmpeg 경로는 Stop→seek0→Run 로
 	//streaming thread·EOS 상태를 완전 리셋 (NoFlush seek 만으로는 EOS 후 frame deliver 가 재개 안 됨).
 	//LAV 경로는 기존 seek(0) 동작 유지.
@@ -438,6 +444,7 @@ protected:
 	//Phase 3c: video only. Audio 는 추후 Phase 4 에서.
 	bool			m_use_internal_ffmpeg = false;
 	void*			m_pFFiSource = nullptr;   //ffi::CFFiSource* (raw 포인터, header 의존 회피용 void).
+	bool			m_seek_keyframe_mode = true;	//"키프레임 단위로 이동" persistent 의도. load_media 가 새 CFFiSource 에 승계. set_seek_keyframe_mode 로 설정.
 
 	//트랙 hover 프리뷰용 keep-open 추출기 — 미디어당 1회 open 후 grab 재사용(hover 마다 re-open 비용 제거).
 	void*			m_preview_thumb = nullptr;	//ffi::CFFiThumbnail* (dshow.cpp 에서 cast).

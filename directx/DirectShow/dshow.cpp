@@ -2245,6 +2245,20 @@ static ffi::CDecoder* ffi_decoder_or_null(void* pFFiSource)
 	return &((ffi::CFFiSource*)pFFiSource)->decoder();
 }
 
+void CDShow::set_seek_keyframe_mode(bool seek_keyframe)
+{
+	//persistent 의도 저장 — open 전에 호출해도 유지되고, load_media 가 새 CFFiSource 에 승계한다.
+	m_seek_keyframe_mode = seek_keyframe;
+	//이미 open 된 미디어가 있으면 즉시 반영.
+	if (m_pFFiSource)
+		((ffi::CFFiSource*)m_pFFiSource)->set_seek_keyframe_mode(seek_keyframe);
+}
+
+bool CDShow::get_seek_keyframe_mode()
+{
+	return m_seek_keyframe_mode;
+}
+
 CString CDShow::get_video_codec_name()
 {
 	if (m_use_internal_ffmpeg)
@@ -2433,6 +2447,16 @@ CString CDShow::get_video_hw_accel_name()
 	return _T("");
 }
 
+CString CDShow::get_video_chroma_location()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_chroma_location_name().c_str());
+	}
+	return _T("");
+}
+
 CString CDShow::get_audio_channel_layout()
 {
 	if (m_use_internal_ffmpeg)
@@ -2451,11 +2475,12 @@ CString CDShow::get_video_decoder_label()
 		if (!d)
 			return _T("");
 		CString codec(d->video_codec_name().c_str());
+		codec.MakeLower();	//PotPlayer 식 — decoder 라벨의 codec 은 소문자(h264), Input 줄은 대문자(H264) 로 별개 표기.
 		CString hw(d->video_hw_accel_name().c_str());
 		CString out = _T("내장 FFmpeg 디코더");
 		if (!codec.IsEmpty())
 		{
-			out += _T(" (");
+			out += _T("(");
 			out += codec;
 			if (!hw.IsEmpty())
 			{
@@ -2678,10 +2703,11 @@ CString CDShow::get_audio_decoder_label()
 		if (!d)
 			return _T("");
 		CString codec(d->audio_codec_name().c_str());
+		codec.MakeLower();	//PotPlayer 식 — decoder 라벨의 codec 은 소문자(aac).
 		CString out = _T("내장 FFmpeg 디코더");
 		if (!codec.IsEmpty())
 		{
-			out += _T(" (");
+			out += _T("(");
 			out += codec;
 			out += _T(")");
 		}
@@ -2911,6 +2937,9 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		return 0;
 	}
 	pFFi->AddRef();
+
+	//앱이 미리(또는 직전 미디어에서) 설정한 "키프레임 단위로 이동" 모드를 새 source 에 승계 (open 마다 default true 로 리셋되지 않도록).
+	pFFi->set_seek_keyframe_mode(m_seek_keyframe_mode);
 
 	if (m_pending_internal_audio_track >= 0)
 	{

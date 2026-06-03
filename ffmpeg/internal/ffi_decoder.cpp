@@ -4,6 +4,7 @@
 #include "../../log/SCLog/SCLog.h"
 
 #include <windows.h>
+#include <stdlib.h>
 
 extern "C" {
 #include <libavutil/hwcontext.h>
@@ -26,6 +27,23 @@ namespace
 		}
 		//fallback — 첫 format (보통 SW format). decoder open 자체는 성공.
 		return pix_fmts[0];
+	}
+
+	//stream 에 명시된 비트레이트. codecpar->bit_rate 우선, 0 이면 Matroska "BPS"(+언어 suffix) 메타 태그. 둘 다 없으면 0.
+	int64_t stream_known_bit_rate(AVStream* s)
+	{
+		if (!s)
+			return 0;
+		if (s->codecpar->bit_rate > 0)
+			return s->codecpar->bit_rate;
+		AVDictionaryEntry* e = av_dict_get(s->metadata, "BPS", nullptr, AV_DICT_IGNORE_SUFFIX);
+		if (e && e->value)
+		{
+			int64_t b = _atoi64(e->value);
+			if (b > 0)
+				return b;
+		}
+		return 0;
 	}
 }
 
@@ -703,13 +721,14 @@ namespace ffi
 		if (!m_fmt || m_video_stream_idx < 0)
 			return 0;
 		AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
+		//per-component depth × component 수 → 8-bit yuv420p = 24, 10-bit = 30 (PotPlayer "N bit" 과 일치).
+		const AVPixFmtDescriptor* d = av_pix_fmt_desc_get((AVPixelFormat)par->format);
+		if (d && d->nb_components > 0)
+			return d->comp[0].depth * d->nb_components;
 		if (par->bits_per_raw_sample > 0)
 			return par->bits_per_raw_sample;
 		if (par->bits_per_coded_sample > 0)
 			return par->bits_per_coded_sample;
-		const AVPixFmtDescriptor* d = av_pix_fmt_desc_get((AVPixelFormat)par->format);
-		if (d && d->nb_components > 0)
-			return d->comp[0].depth;
 		return 0;
 	}
 
@@ -717,8 +736,24 @@ namespace ffi
 	{
 		if (!m_fmt || m_video_stream_idx < 0)
 			return 0;
-		AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
-		return par->bit_rate;
+		int64_t known = stream_known_bit_rate(m_fmt->streams[m_video_stream_idx]);
+		if (known > 0)
+			return known;
+		//codecpar·BPS 둘 다 없는 컨테이너 — 전체 비트레이트(ffmpeg 가 파일크기/재생시간으로 자동 산출)에서 나머지 stream 들의 알려진 비트레이트를 뺀 추정값 (PotPlayer 도 동일).
+		if (m_fmt->bit_rate > 0)
+		{
+			int64_t others = 0;
+			for (unsigned int i = 0; i < m_fmt->nb_streams; ++i)
+			{
+				if ((int)i == m_video_stream_idx)
+					continue;
+				others += stream_known_bit_rate(m_fmt->streams[i]);
+			}
+			int64_t est = m_fmt->bit_rate - others;
+			if (est > 0)
+				return est;
+		}
+		return 0;
 	}
 
 	std::wstring CDecoder::video_aspect_ratio() const
@@ -764,6 +799,22 @@ namespace ffi
 		std::wstring out;
 		while (*name)
 			out += (wchar_t)(unsigned char)(*name++);
+		return out;
+	}
+
+	std::wstring CDecoder::video_chroma_location_name() const
+	{
+		if (!m_fmt || m_video_stream_idx < 0)
+			return L"";
+		AVCodecParameters* par = m_fmt->streams[m_video_stream_idx]->codecpar;
+		const char* name = av_chroma_location_name(par->chroma_location);
+		if (!name)
+			return L"";
+		std::wstring out;
+		while (*name)
+			out += (wchar_t)(unsigned char)(*name++);
+		if (out == L"unspecified")
+			return L"";
 		return out;
 	}
 
@@ -879,17 +930,13 @@ namespace ffi
 					int hr_seek;
 					if (kf_mode)
 					{
-						//[keyframe 모드] BACKWARD seek (margin 없음) → target GOP 시작 keyframe.
-						//방향 판정 — prev(직전 위치) 대비 forward 인지 backward 인지.
-						//	forward (target>=prev): pts>prev 인 첫 keyframe 부터 디코드. 보통 target 의 backward keyframe
-						//		이 prev 보다 뒤라 그대로 emit (overshoot 최소). 같은 GOP 면 다음 keyframe 으로 전진(제자리 회귀 방지).
-						//	backward (target<prev): skip 없이 backward keyframe(<=target) 그대로 emit → 자연스럽게 뒤로.
-						hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, target_pts, AVSEEK_FLAG_BACKWARD);
+						//[keyframe 모드] 방향 판정 — prev(직전 위치) 대비 forward 인지 backward 인지.
 						m_kf_skip_target_pts = target_pts;
-
 						bool is_forward = (prev_pos < 0) || (seek_pos >= prev_pos);
 						if (is_forward)
 						{
+							//forward: BACKWARD seek 로 target GOP 진입 후 pts>prev 인 첫 keyframe 부터 디코드 — 다음 keyframe 으로 전진(제자리 회귀 방지).
+							hr_seek = av_seek_frame(m_fmt, m_video_stream_idx, target_pts, AVSEEK_FLAG_BACKWARD);
 							int64_t prev_pts = (prev_pos >= 0)
 								? av_rescale_q((int64_t)(prev_pos * AV_TIME_BASE / 1000.0), AVRational{1, AV_TIME_BASE}, vtb)
 								: INT64_MIN;
@@ -898,7 +945,45 @@ namespace ffi
 						}
 						else
 						{
-							m_kf_skip_active = false;		//backward — 첫 keyframe(=backward keyframe) 그대로 emit.
+							//backward: 이 파일은 av_seek_frame/avformat_seek_file 둘 다 target 부근(mid-GOP)에 떨어지고
+							//이전 keyframe 으로 snap 하지 않음 → 디코더가 *다음(forward)* keyframe 으로 점프 → 뒤로 안 감(제자리).
+							//probe: landing 후 첫 video keyframe 이 target 보다 뒤(overshoot)면 margin 을 늘려가며 재seek →
+							//첫 keyframe 이 target 이하가 될 때까지. 디코드/큐 없이 packet flag 만 검사 (오디오 큐 오염 방지).
+							int64_t one_sec = av_rescale_q(AV_TIME_BASE, AVRational{1, AV_TIME_BASE}, vtb);
+							int64_t seek_ts = target_pts;
+							int64_t margin  = (one_sec > 0) ? one_sec : 1;
+							hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
+							AVPacket* probe = av_packet_alloc();
+							int probe_attempts = 0;
+							for (; probe_attempts < 12; ++probe_attempts)
+							{
+								int64_t kf = AV_NOPTS_VALUE;
+								while (av_read_frame(m_fmt, probe) >= 0)
+								{
+									bool is_vkey = (probe->stream_index == m_video_stream_idx) && (probe->flags & AV_PKT_FLAG_KEY);
+									int64_t ppts = (probe->pts != AV_NOPTS_VALUE) ? probe->pts : probe->dts;
+									av_packet_unref(probe);
+									if (is_vkey && ppts != AV_NOPTS_VALUE)
+									{
+										kf = ppts;
+										break;
+									}
+								}
+								if (kf == AV_NOPTS_VALUE || kf <= target_pts || seek_ts <= 0)
+									break;	 //이전 keyframe 확보 / 파일 앞 / EOF.
+								seek_ts -= margin;
+								margin  *= 2;
+								if (seek_ts < 0)
+									seek_ts = 0;
+								avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
+							}
+							av_packet_free(&probe);
+							//확정 seek_ts 로 복귀 — probe 가 demuxer 를 전진시켰으므로. 그 keyframe 부터 디코드.
+							hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
+							logWrite(_T("[ffi/dec/kf] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
+								probe_attempts, (long long)seek_ts, (long long)target_pts);
+							m_kf_skip_active  = true;
+							m_kf_skip_min_pts = INT64_MIN;	//landing keyframe(<=target) 부터 emit.
 						}
 					}
 					else

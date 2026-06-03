@@ -67,10 +67,11 @@ namespace ffi
 		//display info — UI 표시용 (codec name string, fourcc, bit depth, bit rate, aspect ratio).
 		std::wstring video_codec_name()		 const;	 //"HEVC" / "H264" / "VP9" 등 — avcodec_get_name() 결과.
 		std::wstring video_fourcc()			 const;	 //codec_tag 4-char ("HVC1" / "AVC1" 등). 없으면 빈 문자열.
-		int			 video_bit_depth()		 const;	 //bits_per_raw_sample > 0 우선, 아니면 bits_per_coded_sample, 둘 다 0 이면 pixel format 기준 추정.
-		int64_t		 video_bit_rate()		 const;	 //bps. 0 이면 unknown.
+		int			 video_bit_depth()		 const;	 //PotPlayer 식 색 비트수 = component depth × component 수 (8-bit yuv420p → 24, 10-bit → 30).
+		int64_t		 video_bit_rate()		 const;	 //bps. codecpar->bit_rate → MKV "BPS" 태그 → (전체 비트레이트 − 타 stream) 추정 순. 모두 실패 시 0.
 		std::wstring video_aspect_ratio()	 const;	 //"16:9" / "1.85:1" 같은 표시용. sample_aspect_ratio + width/height 조합.
 		std::wstring video_pixel_format_name() const;//"yuv420p" / "nv12" 등 — av_get_pix_fmt_name(). 없으면 빈 문자열.
+		std::wstring video_chroma_location_name() const;//"left"/"center"/"topleft" 등 — av_chroma_location_name(). unspecified/없으면 빈 문자열.
 		std::wstring video_hw_accel_name()	 const;	 //HW accel 사용 중이면 "D3D11VA"/"DXVA2"/"CUDA" 등, 아니면 빈 문자열.
 
 		//audio info — Phase 4. has_audio() false 면 audio stream 없음 / 디코더 fail.
@@ -132,7 +133,7 @@ namespace ffi
 		//[seek_keyframe_mode] CFFiSource 의 옵션을 worker 에 전달.
 		//true: av_seek_frame flag=0 (forward keyframe = target 직후) + margin 없음.
 		//false: 기존 동작 (AVSEEK_FLAG_BACKWARD + -1초 margin).
-		void	set_seek_keyframe_mode(bool b) { m_seek_keyframe_mode.store(b); }
+		void	set_seek_keyframe_mode(bool seek_keyframe) { m_seek_keyframe_mode.store(seek_keyframe); }
 
 	private:
 		void	worker_loop();

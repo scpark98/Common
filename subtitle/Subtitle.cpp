@@ -311,6 +311,7 @@ bool CSubtitle::load_srt(CString sfile)
 
 	CCaption caption;
 	CString color;
+	int srt_line_index = 0;	//현재 caption 내 물리 라인 인덱스 — 같은 라인의 색 segment 들이 공유.
 
 	//인라인 스타일 태그 제거 (color 는 별도 처리). i/b/u/s 대소문자 + ASS override {\an8} 등.
 	auto strip_inline_tags = [](CString& s)
@@ -363,6 +364,8 @@ bool CSubtitle::load_srt(CString sfile)
 				}
 				caption.start = GetMilliSecondsFromTimeString(left);
 				caption.end = GetMilliSecondsFromTimeString(right);
+				srt_line_index = 0;
+				color.Empty();
 				continue;
 			}
 		}
@@ -383,44 +386,65 @@ bool CSubtitle::load_srt(CString sfile)
 		//스타일/ASS 태그 먼저 제거 — 그래야 다음의 <font color> 추출이 first '=' / '>' 매칭 오류를 안 일으킴.
 		strip_inline_tags(sLine);
 
-		//<font ...> 안의 color attribute 추출 — face/size 등이 함께 있어도 무관.
-		int font_open = sLine.Find(_T("<font"));
-		if (font_open < 0)
-		{
-			CString lo = sLine;
-			lo.MakeLower();
-			font_open = lo.Find(_T("<font"));
-		}
-
-		if (font_open >= 0)
-		{
-			int font_close = sLine.Find(_T('>'), font_open);
-			if (font_close > font_open + 5)
-			{
-				CString body = sLine.Mid(font_open + 5, font_close - font_open - 5);
-				color = extract_font_color_attr(body);
-				sLine.Delete(font_open, font_close - font_open + 1);
-			}
-		}
-		else if (find(sLine, _T("</font>")) >= 0)
-		{
-			//컬러끝 태그만 있으면 바로 전 캡션의 색상을 유지.
-			if (caption.sentences.size() > 0)
-				color = caption.sentences[caption.sentences.size() - 1].color;
-		}
-		else
-		{
-			color.Empty();
-		}
-
-		sLine.Replace(_T("</font>"), _T(""));
-		sLine.Replace(_T("</FONT>"), _T(""));
-
+		//한 라인에 <font color=X>..</font> 색 구간이 여러 개(문자별 색) 올 수 있다.
+		//글자 단위 스캔으로 색 구간마다 별도 CSentence — 같은 물리 라인은 동일 line_index 공유
+		//(렌더러가 같은 line_index segment 들을 가로로 이어붙인다). SMI(parse_subtltle) 와 동일 정책.
 		if (!sLine.IsEmpty())
 		{
-			//SRT 는 각 caption 내 새 line 마다 sentence — line_index = 현재 sentence 카운트.
-			//같은 line 안 multi-color 는 SRT 가 거의 표현 안 함 → 한 sentence 가 곧 한 line 으로 가정.
-			caption.sentences.push_back(CSentence(sLine, color, (int)caption.sentences.size()));
+			CString buf;
+			auto flush = [&]()
+			{
+				if (buf.IsEmpty())
+					return;
+				caption.sentences.push_back(CSentence(buf, color, srt_line_index));
+				buf.Empty();
+			};
+
+			for (int i = 0; i < sLine.GetLength(); )
+			{
+				if (sLine[i] != _T('<'))
+				{
+					buf += sLine[i];
+					i++;
+					continue;
+				}
+
+				int gt = sLine.Find(_T('>'), i);
+				if (gt < 0)	//닫히지 않은 '<' — 본문 취급.
+				{
+					buf += sLine.Mid(i);
+					break;
+				}
+
+				CString tag = sLine.Mid(i, gt - i + 1);
+				CString lo = tag;
+				lo.MakeLower();
+
+				if (lo.Find(_T("<font")) == 0)
+				{
+					//color attr 있으면 새 색 구간 시작. 없으면(face/size only) 현재 색 유지.
+					CString c = extract_font_color_attr(tag.Mid(5, tag.GetLength() - 6));
+					if (!c.IsEmpty())
+					{
+						flush();
+						color = c;
+					}
+				}
+				else if (lo.Find(_T("</font")) == 0)
+				{
+					flush();
+					color.Empty();
+				}
+				else
+				{
+					buf += tag;	//기타 inline tag (<b> 등) — SCParagraph 가 렌더 시 처리하도록 보존.
+				}
+
+				i = gt + 1;
+			}
+
+			flush();
+			srt_line_index++;
 		}
 	}
 

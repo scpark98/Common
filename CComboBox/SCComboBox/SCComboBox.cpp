@@ -890,7 +890,9 @@ int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 	if (text.IsEmpty())
 		return -1;
 
-	if (FindString(-1, text) < 0)
+	//중복 방지는 *정확히 같은* 항목만 — FindString 은 prefix 매칭이라 "dark"가 기존 "dark_gray"에, "solarized"가
+	//"solarized_light"에 걸려 추가가 조용히 스킵되고 콤보 인덱스가 밀린다(2026-06-03 테마 콤보 발견). FindStringExact 로.
+	if (FindStringExact(-1, text) < 0)
 	{
 		index = CComboBox::AddString(text);
 		if (cr_text.GetValue() != Gdiplus::Color::Transparent)

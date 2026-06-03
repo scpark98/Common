@@ -1965,8 +1965,12 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_edit_back			= get_sys_color(COLOR_WINDOW);
 
 			cr_title_text			= get_sys_color(COLOR_CAPTIONTEXT);
-			cr_title_back_active	= get_sys_color(COLOR_ACTIVECAPTION);
+			//active/inactive 두 필드는 향후 창 포커스 상태별 타이틀바 렌더링용으로 스키마에 남겨두되, 현재 앱은
+			//포커스 구분 없이 inactive 만 쓴다(TitleDlg 가 타이틀바를 항상 cr_title_back_inactive 로 칠함). 따라서
+			//시스템 버튼(cr_title_back_active 사용)과 어긋나지 않도록 두 필드 모두 inactive 값으로 통일한다.
+			//(Win10/11 은 DWM 이 타이틀바를 그려 COLOR_ACTIVECAPTION 이 실제 타이틀바와 무관한 legacy 값이라 부적합.)
 			cr_title_back_inactive	= get_sys_color(COLOR_INACTIVECAPTION);
+			cr_title_back_active	= cr_title_back_inactive;
 			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 

@@ -7373,36 +7373,6 @@ void draw_line(Gdiplus::Graphics& g, int x1, int y1, int x2, int y2, Gdiplus::Co
 	g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
-void draw_rect(CDC* pDC, CRect Rect, COLORREF crColor/* = RGB(0,0,0)*/, COLORREF crFill, int nWidth, int nPenStyle, int nDrawMode)
-{
-	LOGBRUSH lb;
-
-	lb.lbStyle = BS_SOLID;
-	lb.lbColor = crColor;
-
-	CPen	Pen(PS_GEOMETRIC | nPenStyle, nWidth, &lb);
-	CPen*	pOldPen = (CPen*)pDC->SelectObject(&Pen);
-	int		nOldDrawMode = pDC->SetROP2(nDrawMode);
-	CBrush	brBrush(crFill);
-	CBrush* pOldBrush;
-
-	if (crFill == NULL_BRUSH)
-		pOldBrush = (CBrush*)pDC->SelectStockObject(NULL_BRUSH);
-	else
-		pOldBrush = (CBrush*)pDC->SelectObject(&brBrush);
-
-	//Rect.NormalizeRect();
-	if (crColor != NULL_PEN && nWidth >= 1)
-		pDC->Rectangle(Rect);
-
-	pDC->SelectObject(pOldPen);
-	pDC->SelectObject(pOldBrush);
-	Pen.DeleteObject();
-	brBrush.DeleteObject();
-
-	pDC->SetROP2(nOldDrawMode);
-}
-
 void draw_rect(CDC* pDC, CRect r, Gdiplus::Color cr_line, Gdiplus::Color cr_fill, int width, int pen_align, int pen_style)
 {
 	Gdiplus::Graphics g(pDC->m_hDC);

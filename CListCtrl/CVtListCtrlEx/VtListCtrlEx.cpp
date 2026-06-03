@@ -5692,11 +5692,19 @@ void CVtListCtrlEx::OnNcPaint()
 	//아래 CListCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
 	CListCtrl::OnNcPaint();
 
-	CWindowDC dc(this);
+	//[self-heal] 임베드(child 로 심어 생성 타이밍이 다른 경우) 등으로 PreSubclassWindow 의 frame change 가
+	//WM_NCCALCSIZE 를 못 띄워 1px NC 가 미확보된 채 paint 되는 경우 — 표시 시점(여기, 실제 window 상태)에서 frame
+	//change 를 1회 강제한다. 그러면 이번엔 OnNcCalcSize 가 불려 1px 를 확보(m_border_nc_reserved=true)하고, 곧바로
+	//재진입한 OnNcPaint 가 정상 그린다. 정상 list 는 PreSubclass 에서 이미 확보(reserved=true)라 이 분기에 안 들어감.
+	if (m_draw_border && !m_border_nc_reserved && !m_border_recalc_tried)
+	{
+		m_border_recalc_tried = true;
+		SetWindowPos(NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+		return;
+	}
 
-	CRect rect;
-	GetWindowRect(&rect);
-	ScreenToClient(&rect);
+	CWindowDC dc(this);
 
 	//PreSubclassWindow 에서 WS_BORDER/WS_EX_CLIENTEDGE 를 제거하고 m_draw_border 로 옮겨놨다 — GetStyle 직접 검사는 작동 안 함.
 	if (m_draw_border)
@@ -5704,7 +5712,7 @@ void CVtListCtrlEx::OnNcPaint()
 		CRect rc;
 		GetWindowRect(&rc);
 		rc.OffsetRect(-rc.TopLeft());
-		draw_rect(&dc, rc, m_theme.cr_border_inactive, Gdiplus::Color::Transparent);
+		draw_rect(&dc, rc, m_theme.cr_border_inactive);
 	}
 }
 
@@ -5720,6 +5728,7 @@ void CVtListCtrlEx::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp
 			lpncsp->rgrc[0].top    += 1;
 			lpncsp->rgrc[0].right  -= 1;
 			lpncsp->rgrc[0].bottom -= 1;
+			m_border_nc_reserved = true;	//1px 확보됨 — OnNcPaint 의 self-heal 강제 recalc 불필요.
 		}
 		return;
 	}

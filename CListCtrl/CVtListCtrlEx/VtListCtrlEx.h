@@ -877,6 +877,11 @@ public:
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
 	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)
 	bool			m_draw_border = false;
+	//임베드(child 로 심어 생성 타이밍이 다른 경우) 등으로 PreSubclassWindow 의 frame change 가 WM_NCCALCSIZE 를
+	//못 띄워 1px NC 가 확보 안 되면 OnNcPaint 가 테두리를 그려도 client 가 덮어 안 보인다. 확보 여부를 추적해,
+	//미확보 상태로 paint 되면 표시 시점에 frame change 를 1회 강제해 NCCALCSIZE 가 1px 를 확보하게 한다.
+	bool			m_border_nc_reserved = false;	//OnNcCalcSize 가 1px 를 실제 확보했는지.
+	bool			m_border_recalc_tried = false;	//미확보 시 강제 recalc 를 이미 시도했는지(무한 재시도 방지).
 	int				m_last_top_index = -1;
 	int				m_h_scroll_pos = 0;		//가로 scroll 누적 pixel offset — WS_HSCROLL 제거 후 GetScrollPos(SB_HORZ) 가 stale 이라 자체 추적.
 	DWORD			m_last_user_scroll_at = 0;	//사용자 입력에 의한 scroll tick — 자동 ensure_visible 호출 측에서 sticky timeout 으로 사용.

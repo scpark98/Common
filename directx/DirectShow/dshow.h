@@ -194,6 +194,9 @@ public:
 	//seek_to_keyframe: true 면 AM_SEEKING_SeekToKeyFrame 플래그로 splitter 가 keyframe 으로 snap → 손상 미디어에서도
 	//decoder 가 즉시 producible frame 받음. false 면 정확한 위치로 seek (drag 중 GOP 안 frame 변화 보장 위해).
 	void			set_track_pos(double pos, bool seek_to_keyframe = true);
+	//북마크/정밀 점프 — keyframe 모드여도 이 seek 만 정확 프레임으로 착지. keyframe 모드의 방향 판정(prev 기준)이
+	//절대 seek 에는 부적합해, 같은 북마크 반복 클릭 시 인접 두 keyframe 을 번갈아 방문하던 ping-pong 을 방지.
+	void			set_track_pos_exact(double pos);
 	//"키프레임 단위로 이동" 모드 (내장 FFmpeg 경로 전용). true(기본)=seek 시 키프레임에 안착(빠름, 정확위치 아님),
 	//false=이전 키프레임에서 target 까지 forward 디코드(정확한 위치, 약간 딜레이). LAV 경로엔 효과 없음.
 	//open 전후 아무 때나 호출 가능 — 값이 유지되고, 이후 load_media 가 새 CFFiSource 에 자동 승계한다. open 중이면 즉시 반영.

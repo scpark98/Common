@@ -3588,6 +3588,34 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 	}
 }
 
+void CDShow::set_track_pos_exact(double pos)
+{
+	//내장 FFmpeg keyframe 모드는 절대 seek 의 착지를 현재 위치(prev) 기준 방향으로 정해, 같은 북마크를 반복 클릭하면
+	//앞/뒤 인접 keyframe 을 번갈아 방문한다. 북마크는 절대 점프이므로 이 seek 만 정확 모드로 우회 — step_frame 과 동일 패턴.
+	//on_change_start / decoder.seek 가 모드를 *동기로* 스냅샷하므로, 호출 직후 원복해도 이 seek 은 정확 모드로 처리된다.
+	bool restore_kf = false;
+	if (m_pFFiSource)
+	{
+		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
+		src->set_frame_step_mode(true);	//latency budget 비활성 — 정확 target 프레임까지 skip(중간 frame emit 방지).
+		if (src->seek_keyframe_mode())
+		{
+			restore_kf = true;
+			src->set_seek_keyframe_mode(false);
+		}
+	}
+
+	set_track_pos(pos, false);
+
+	if (m_pFFiSource)
+	{
+		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
+		if (restore_kf)
+			src->set_seek_keyframe_mode(true);
+		src->set_frame_step_mode(false);
+	}
+}
+
 void CDShow::replay_from_start()
 {
 	//내장 FFmpeg 경로: EOS 후 NoFlush seek(set_track_pos)는 source pin 의 streaming thread 가 EOS 로

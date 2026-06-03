@@ -349,7 +349,7 @@ void CSCSliderCtrl::OnPaint()
 		CRect r = m_rc;
 		int cy = r.CenterPoint().y;
 		r.top = cy - 4;
-		r.bottom = cy + 4;
+		r.bottom = cy + 5;
 
 		//3D sunken bevel(좌상 그림자/우하 하이라이트)은 중간 명도 배경을 가정한 기법이라, 배경이 거의 검정/흰색이면
 		//한쪽이 clamp 돼 묻히거나 방향이 뒤집혀(embossed) 테마마다 인상이 갈린다. → 방향성 없는 *평면 채널*로 그린다:

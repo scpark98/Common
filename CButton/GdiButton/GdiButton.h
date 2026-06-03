@@ -337,6 +337,12 @@ public:
 	//n번째 이미지의 m번째 상태 이미지의 x, y 픽셀 컬러를 변경한다. 단, disable은 제외된다.
 	void		replace_color(int index, int state_index, int x, int y, Gdiplus::Color newColor);
 
+	//버튼 이미지(아이콘)의 RGB 를 cr 단색으로 평탄화한다. 알파(외곽 안티앨리어싱)는 그대로 보존하므로 단색
+	//글리프를 테마 색(예: cr_text)으로 재색칠하는 용도. 색상 톤만 바꾸는 다색 아이콘엔 부적합(전부 단색화됨).
+	//내부적으로 입력 RGB 계수 0 인 ColorMatrix 라 다른 색으로 재호출해도 누적되지 않고 항상 목표색이 된다(원본 보관 불필요).
+	//index<0 이면 모든 이미지, 그 외는 해당 index. normal/over/down/disabled 모든 상태에 적용.
+	void		set_image_color(Gdiplus::Color cr, int index = -1);
+
 	//버튼 이미지에 효과를 적용. state_index가 -1이면 모든 상태이미지에 효과 적용. 0이면 normal image만 적용.
 	//hue : -180 ~ 180, sat : -100 ~ 100, light : -100 ~ 100
 	void		apply_effect_hsl(int state_index, int hue, int sat = 0, int light = 0);

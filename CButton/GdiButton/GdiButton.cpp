@@ -2383,6 +2383,40 @@ void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus
 	redraw_window();
 }
 
+void CGdiButton::set_image_color(Gdiplus::Color cr, int index)
+{
+	if (m_image.size() == 0)
+		return;
+
+	int start_index = (index < 0) ? 0 : index;
+	int end_index   = (index < 0) ? (int)m_image.size() : index + 1;
+
+	//입력 RGB 계수 0 → 출력 RGB = (r,g,b) 상수, 알파 행 [0 0 0 1 0] → 출력 알파 = 입력 알파.
+	//즉 이미지 전체를 cr 단색으로 평탄화하되 외곽 AA(알파)는 보존. 입력 RGB 를 무시하므로 누적 없이 idempotent.
+	float r = cr.GetR() / 255.0f;
+	float g = cr.GetG() / 255.0f;
+	float b = cr.GetB() / 255.0f;
+	Gdiplus::ColorMatrix m =
+	{
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 1, 0,
+		r, g, b, 0, 1
+	};
+
+	for (int i = start_index; i < end_index && i < (int)m_image.size(); i++)
+	{
+		for (int s = 0; s < 4; s++)
+		{
+			if (m_image[i]->img[s].is_valid())
+				m_image[i]->img[s].set_matrix(&m);
+		}
+	}
+
+	redraw_window();
+}
+
 void CGdiButton::apply_effect_hsl(int state_index, int hue, int sat, int light)
 {
 	if (m_image.size() == 0)

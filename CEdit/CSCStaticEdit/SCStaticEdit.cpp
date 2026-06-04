@@ -273,16 +273,13 @@ void CSCStaticEdit::set_textf(LPCTSTR format, ...)
 void CSCStaticEdit::set_sel(int start, int end)
 {
 	int len = m_text.GetLength();
+	if (end < 0)        // CEdit SetSel(0, -1) 관용구 — end 가 음수면 텍스트 끝까지 (전체 선택)
+		end = len;
 	m_sel_start = max(0, min(start, len));
 	m_sel_end = max(0, min(end, len));
 	m_caret_pos = m_sel_end;
 	update_caret_pos();
 	Invalidate(FALSE);
-}
-
-void CSCStaticEdit::select_all()
-{
-	set_sel(0, m_text.GetLength());
 }
 
 CString CSCStaticEdit::get_sel_text() const
@@ -386,19 +383,20 @@ void CSCStaticEdit::OnSetFocus(CWnd* p_old_wnd)
 		TEXTMETRIC tm = {};
 		dc.GetTextMetrics(&tm);
 		dc.SelectObject(p_old);
-		// 폰트 높이(tmHeight) 기준 + rc_text.Height() 상한 clamp. 큰 폰트가 와도
-		// 캐럿이 컨트롤 내부에만 표시되도록 제한 (update_caret_pos 에서도 재clamp 됨).
-		CRect rc_text = get_text_area();
-		m_caret_height = min((int)tm.tmHeight, (int)rc_text.Height());
+		// 캐럿 높이 = 글자 셀(tmHeight). 입력영역(get_line_area = client - border) 으로만 상한 clamp.
+		// rc_text(세로 padding 제외) 로 clamp 하면 native EDIT 보다 캐럿이 짧아진다 (선택 블록과 동일 기준).
+		m_caret_height = min((int)tm.tmHeight, (int)get_line_area().Height());
 	}
-	m_caret_width = 2;
+	m_caret_width = get_caret_width();
 	m_caret_cur_h = m_caret_height;
 	CreateSolidCaret(m_caret_width, m_caret_cur_h);
 	m_caret_visible = true;
-	update_caret_pos();
 	ShowCaret();
 
-	Invalidate(FALSE);
+	// CEdit 처럼 포커스 획득 시 전체 선택. 마우스 클릭 경로는 OnLButtonDown 이 SetFocus() 직후
+	// 클릭 위치로 selection 을 재설정하므로, tab/프로그램적 포커스에서만 전체 선택이 남는다.
+	set_sel(0, -1);
+
 	notify_parent(message_scstaticedit_setfocus);
 }
 
@@ -476,7 +474,7 @@ void CSCStaticEdit::OnChar(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 	{
 		switch (n_char)
 		{
-		case 0x01: select_all();       break;  // Ctrl+A (readonly 여도 허용)
+		case 0x01: set_sel(0, -1);     break;  // Ctrl+A (readonly 여도 허용)
 		case 0x03: do_copy();          break;  // Ctrl+C (readonly 여도 허용)
 		case 0x16: if (!m_readonly) do_paste(); break;  // Ctrl+V
 		case 0x18: if (!m_readonly) do_cut();   break;  // Ctrl+X
@@ -906,7 +904,7 @@ void CSCStaticEdit::OnContextMenu(CWnd* /*p_wnd*/, CPoint point)
 			Invalidate(FALSE);
 		}
 		break;
-	case ID_SELALL: select_all(); break;
+	case ID_SELALL: set_sel(0, -1); break;
 	}
 }
 
@@ -1201,6 +1199,15 @@ void CSCStaticEdit::draw_border(Gdiplus::Graphics& g, const CRect& rc)
 	}
 }
 
+int CSCStaticEdit::get_text_top(const CRect& rc_text, int text_h) const
+{
+	if (m_valign & DT_VCENTER)
+		return rc_text.top + (rc_text.Height() - text_h) / 2;
+	else if (m_valign & DT_BOTTOM)
+		return rc_text.bottom - text_h;
+	return rc_text.top;
+}
+
 void CSCStaticEdit::draw_selection(Gdiplus::Graphics& g, const CRect& rc_text)
 {
 	if (!has_selection()) return;
@@ -1211,20 +1218,29 @@ void CSCStaticEdit::draw_selection(Gdiplus::Graphics& g, const CRect& rc_text)
 	CPoint pt_s = calc_caret_pixel_pos(sel_s);
 	CPoint pt_e = calc_caret_pixel_pos(sel_e);
 
-	// 선택 블록 높이 — native CEdit 의 selection 은 컨트롤 client 거의 전체에 가깝게 그려진다.
-	// tmHeight 만 쓰면 글자 정확히 둘러싸는 정도라 CEdit 보다 좁아 보임 → +4 (상하 2px 씩) 확장.
-	// (이전 +2 는 CEdit 와 시각적 일치 부족했음. 사용자 보고 후 추가 padding 1px 씩 더.)
+	// 선택 블록 = native EDIT 의 selection 과 동일한 "문자 셀 박스".
+	// EDIT 은 선택 글자를 SetBkMode(OPAQUE)+highlight bk 로 그리므로 블록이 ExtTextOut 의 opaque box
+	// (높이 = tmHeight, top = 글자가 그려지는 text_y) 와 정확히 같다. 셀 top 은 tmInternalLeading 만큼
+	// 가시 글자(대문자 윗선) 위에 있어 "글자보다 살짝 위로 올라간" CEdit 외관이 metric 으로 자동 재현되고,
+	// 글자 그리기와 동일한 get_text_top/tmHeight 를 쓰므로 폰트가 바뀌어도 그대로 일치한다. (padding 가산 없음)
 	CClientDC dc(this);
 	CFont* p_old = dc.SelectObject(&m_font);
 	TEXTMETRIC tm = {};
 	dc.GetTextMetrics(&tm);
 	dc.SelectObject(p_old);
-	// 폰트가 컨트롤 높이보다 큰 경우 rc_text 안에 들어오도록 clamp.
-	int sel_h = min(tm.tmHeight + 4, rc_text.Height());
-	int top = rc_text.top + (rc_text.Height() - sel_h) / 2;
+
+	// clamp 기준은 rc_text 가 아니라 입력영역(get_line_area = client - border). rc_text 는 세로 padding
+	// 까지 빼므로 단일행에서 rc_text.Height() < tmHeight 가 되어 블록이 셀보다 잘려 얇아진다.
+	CRect line = get_line_area();
+
+	int text_h = tm.tmHeight;
+	int h = min(text_h, (int)line.Height());
+	int top = get_text_top(rc_text, text_h);   // 글자 셀과 동일 세로 기준 (valign 반영)
+	top = max(top, (int)line.top);             // 폰트가 입력영역보다 큰 경우에만 안으로 clamp
+	top = min(top, (int)line.bottom - h);
 
 	Gdiplus::SolidBrush brush(m_theme.cr_back_selected);
-	g.FillRectangle(&brush, pt_s.x, top, pt_e.x - pt_s.x, sel_h);
+	g.FillRectangle(&brush, pt_s.x, top, pt_e.x - pt_s.x, h);
 }
 
 void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
@@ -1259,13 +1275,7 @@ void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
 		dc.GetTextMetrics(&tm);
 
 		int text_h = tm.tmHeight;
-		int text_y;
-		if (m_valign & DT_VCENTER)
-			text_y = rc_text.top + (rc_text.Height() - text_h) / 2;
-		else if (m_valign & DT_BOTTOM)
-			text_y = rc_text.bottom - text_h;
-		else
-			text_y = rc_text.top;
+		int text_y = get_text_top(rc_text, text_h);
 
 		// 가로 정렬 + 스크롤 반영한 시작 x
 		CSize sz_total = dc.GetTextExtent(display);
@@ -1389,6 +1399,22 @@ CRect CSCStaticEdit::get_text_area() const
 	}
 
 	return rc;
+}
+
+CRect CSCStaticEdit::get_line_area() const
+{
+	CRect rc;
+	GetClientRect(rc);
+	int border = m_draw_border ? m_border_width : 0;
+	rc.DeflateRect(border, border);
+	return rc;
+}
+
+int CSCStaticEdit::get_caret_width() const
+{
+	DWORD w = 1;
+	::SystemParametersInfo(SPI_GETCARETWIDTH, 0, &w, 0);
+	return max(1, (int)w);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1544,13 +1570,7 @@ CRect CSCStaticEdit::get_compose_draw_box() const
 	dc.SelectObject(p_old);
 
 	int text_h = tm.tmHeight;
-	int text_y;
-	if (m_valign & DT_VCENTER)
-		text_y = rc_text.top + (rc_text.Height() - text_h) / 2;
-	else if (m_valign & DT_BOTTOM)
-		text_y = rc_text.bottom - text_h;
-	else
-		text_y = rc_text.top;
+	int text_y = get_text_top(rc_text, text_h);
 
 	// IME 블록도 빔 커서/선택 블록과 동일하게 rc_text 안으로 clamp.
 	// 가로 정렬 + 스크롤 반영한 텍스트 시작 x 에서 조합 이전 부분의 폭만큼 오른쪽으로.
@@ -1584,16 +1604,19 @@ void CSCStaticEdit::update_caret_pos()
 	else
 	{
 		CPoint pt = calc_caret_pixel_pos(m_caret_pos);
-		CRect  rcT = get_text_area();
-		want_w = 2;
-		// 폰트가 컨트롤 높이보다 큰 경우 rc_text 안에 들어오도록 clamp.
-		// m_caret_height 는 OnSetFocus 시점의 폰트 기준이라 폰트 변경 시 stale 할 수 있으므로
-		// 여기서 항상 rc_text.Height() 로 상한을 걸어 안전하게.
-		int h_base = m_caret_height > 0 ? m_caret_height : rcT.Height();
-		want_h = min(h_base, rcT.Height());
+		CRect  rcT  = get_text_area();
+		CRect  line = get_line_area();
+		want_w = get_caret_width();
+		// 폰트가 입력영역보다 큰 경우만 line(client - border) 안으로 clamp. rc_text 가 아닌 line 기준이라
+		// 세로 padding 으로 캐럿이 짧아지지 않는다. m_caret_height 는 폰트 변경 시 stale 할 수 있어 재clamp.
+		int h_base = m_caret_height > 0 ? m_caret_height : line.Height();
+		want_h = min(h_base, (int)line.Height());
 		// 빔 커서가 다음 글자의 첫 픽셀과 겹치는 현상 보정 (1px 왼쪽 이동)
 		caret_x = pt.x - 1;
-		caret_y = rcT.top + (rcT.Height() - want_h) / 2;
+		// 선택 블록과 동일하게 글자 셀 세로 기준(get_text_top) + 입력영역 clamp → 캐럿·블록·글자 정렬 일치.
+		caret_y = get_text_top(rcT, want_h);
+		caret_y = max(caret_y, (int)line.top);
+		caret_y = min(caret_y, (int)line.bottom - want_h);
 	}
 
 	// 크기가 바뀌었으면 캐럿 재생성

@@ -1975,7 +1975,7 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
 		m_pEdit->set_sel(0, m_edit_old_text.GetLength() - ext.GetLength() - 1);
 	else
-		m_pEdit->select_all();
+		m_pEdit->set_sel(0, -1);
 
 	m_in_editing = true;
 	m_edit_item = item;

@@ -2422,6 +2422,7 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (hItem && (GetStyle() & TVS_CHECKBOXES))
 	{
 		CRect rcCheck = get_checkbox_rect(hItem);
+		rcCheck.OffsetRect(-get_over_shift(), 0);   //over-scroll 시 그리기와 동일하게 좌측 shift (안 하면 클릭 영역이 어긋남)
 		if (!rcCheck.IsRectEmpty() && rcCheck.PtInRect(point))
 		{
 			SetCheck(hItem, !GetCheck(hItem));
@@ -2993,6 +2994,19 @@ CRect CSCTreeCtrl::get_expand_button_rect(HTREEITEM hItem)
 	return CRect(gx - hit_pad, gy - hit_pad, gx + hit_pad, gy + hit_pad);
 }
 
+int CSCTreeCtrl::get_over_shift() const
+{
+	if (m_h_natural_max < 0)
+		return 0;
+
+	SCROLLINFO si_h = { sizeof(si_h), SIF_POS };
+	if (!::GetScrollInfo(m_hWnd, SB_HORZ, &si_h))
+		return 0;
+
+	int s = m_h_scroll_pos - si_h.nPos;
+	return s > 0 ? s : 0;
+}
+
 CRect CSCTreeCtrl::get_checkbox_rect(HTREEITEM hItem)
 {
 	if (hItem == NULL || !(GetStyle() & TVS_CHECKBOXES))
@@ -3187,7 +3201,7 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	m_pEdit->SetWindowText(m_edit_old_text);
 
 	m_pEdit->ShowWindow(SW_SHOW);
-	m_pEdit->select_all();
+	m_pEdit->set_sel(0, -1);
 	m_pEdit->SetFocus();
 
 	m_in_editing = true;
@@ -3545,15 +3559,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			//paint shift H — tree 의 자체 max scroll 초과 분 (= m_h_scroll_pos - tree.si.nPos) 만큼 콘텐츠 좌측으로 추가 shift.
 			//우측 끝 콘텐츠가 V overlay 좌측까지 노출. X shift 만이라 row Y 위치 영향 없음 → hover partial invalidate 부작용 없음.
-			int over_shift = 0;
-			if (m_h_natural_max >= 0)
-			{
-				SCROLLINFO si_h = { sizeof(si_h), SIF_POS };
-				if (::GetScrollInfo(m_hWnd, SB_HORZ, &si_h))
-					over_shift = m_h_scroll_pos - si_h.nPos;
-				if (over_shift < 0)
-					over_shift = 0;
-			}
+			int over_shift = get_over_shift();
 			if (over_shift > 0)
 			{
 				rcText.left  -= over_shift;
@@ -3704,6 +3710,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (GetStyle() & TVS_CHECKBOXES)
 			{
 				CRect rcCheck = get_checkbox_rect(hItem);
+				//get_checkbox_rect 은 unshifted GetItemRect 기준 → over-scroll 분만큼 좌측으로 같이 이동시켜
+				//아이콘/글자(이미 over_shift 반영된 rcText 기준)와 정렬 일치시킨다.
+				rcCheck.OffsetRect(-over_shift, 0);
 
 				bool checked = GetCheck(hItem) != 0;
 				dc.FillSolidRect(&rcCheck, m_theme.cr_back.ToCOLORREF());

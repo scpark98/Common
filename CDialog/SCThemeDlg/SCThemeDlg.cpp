@@ -902,7 +902,7 @@ void CSCThemeDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	TRACE(_T("CSCThemeDlg::OnActivate. nState = %d\n"), nState);
+	//TRACE(_T("CSCThemeDlg::OnActivate. nState = %d\n"), nState);
 	//m_is_activated = (nState == 2);
 	//m_sys_buttons.refresh_activate_status(m_is_activated);
 	//Invalidate();

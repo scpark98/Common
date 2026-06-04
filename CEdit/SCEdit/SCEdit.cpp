@@ -803,8 +803,7 @@ void CSCEdit::update_ctrl()
 
 BOOL CSCEdit::OnEnKillfocus()
 {
-	TRACE(_T("OnEnKillfocus\n"));
-
+	//TRACE(_T("OnEnKillfocus\n"));
 	if (m_transparent)
 	{
 		update_ctrl();

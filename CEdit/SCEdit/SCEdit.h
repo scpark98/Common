@@ -149,7 +149,7 @@ public:
 	//readonly일 때 원래 기본색인 gray로 표시할 것인지, m_cr_back을 사용할 지.
 	void				set_use_readonly_color(bool use_default = true);
 
-	//기본 CWnd::SetFont() override
+	//기본 CWnd::SetFont() override	
 	void				SetFont(CFont* font, BOOL bRedraw = TRUE);
 	void				set_font_name(LPCTSTR sFontname, BYTE byCharSet = DEFAULT_CHARSET);
 	void				set_font_size(int nSize);

@@ -1685,7 +1685,7 @@ void CSCListBox::edit(int index)
 	m_pEdit->MoveWindow(rItem);
 	m_pEdit->ShowWindow(SW_SHOW);
 
-	m_pEdit->select_all();
+	m_pEdit->set_sel(0, -1);
 	m_pEdit->SetFocus();
 
 	m_in_editing = true;

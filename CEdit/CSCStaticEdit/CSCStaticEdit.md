@@ -231,9 +231,8 @@ case CSCStaticEdit::message_scstaticedit_action_button:
 ### 선택
 
 ```cpp
-void    set_sel(int start, int end);
+void    set_sel(int start, int end);   // end < 0 이면 끝까지 (CEdit SetSel(0,-1) = 전체 선택)
 void    get_sel(int& start, int& end) const;
-void    select_all();
 CString get_sel_text() const;
 ```
 

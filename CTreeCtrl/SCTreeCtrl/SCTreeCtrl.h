@@ -484,6 +484,11 @@ protected:
 	void			winctrl_theme_init();
 	void			draw_checkbox(CDC* pDC, CRect r, int check_state);
 
+	//tree 자체 H scroll max 초과 over-scroll 픽셀 수 (>=0). customdraw 가 콘텐츠를 이만큼 좌측으로 추가
+	//shift 한다. get_checkbox_rect / get_expand_button_rect 는 unshifted GetItemRect 기준이라 이 값을 따로
+	//빼줘야 over-scroll 끝에서 체크박스·버튼이 콘텐츠와 함께 스크롤된다.
+	int				get_over_shift() const;
+
 	//customdraw 의 체크박스 그리기 위치 — OnLButtonDown 의 hit-test 와 일관성 위해 helper. TVS_CHECKBOXES 없을 시 empty rect.
 	CRect			get_checkbox_rect(HTREEITEM hItem);
 

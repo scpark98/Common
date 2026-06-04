@@ -217,9 +217,8 @@ public:
     DWORD		    get_text_align() const { return m_halign; }
 
     // 선택
-    void		    set_sel(int start, int end);
+    void		    set_sel(int start, int end);   // end < 0 이면 텍스트 끝까지 (CEdit SetSel(0,-1) 관용구 = 전체 선택)
     void		    get_sel(int& start, int& end) const  { start = m_sel_start; end = m_sel_end; }
-    void		    select_all();
     CString		    get_sel_text() const;
 
     // 동적 생성용
@@ -339,14 +338,22 @@ private:
     // ── 내부 헬퍼 ──
     CString		get_display_text() const;      // 패스워드 마스킹 적용된 표시용 텍스트
     CRect		get_text_area() const;         // 텍스트가 그려질 수 있는 영역 (패딩/보더/round/카피버튼 제외)
+    // 테두리 안쪽 입력영역 (= native EDIT 의 editable client). border 만 제외하고 세로 padding 은 안 뺀다.
+    // 캐럿·선택 블록의 세로 clamp 기준 — rc_text(get_text_area) 로 clamp 하면 세로 padding 탓에 tmHeight
+    // 보다 작게 잘려 native EDIT 보다 짧아진다. get_text_area() = 여기서 padding/margin 까지 추가로 뺀 영역.
+    CRect		get_line_area() const;
     CRect		get_text_rect() const;         // 실제 그려진 텍스트의 bounding box (글자 크기 + 정렬·스크롤 반영)
     // 가로 정렬 + 가로 스크롤을 반영한 "텍스트의 첫 글자 픽셀 x". draw_text / calc_caret_pixel_pos /
     // hit_test_char / get_compose_draw_box / draw_dim_text 가 공통으로 사용하여 정렬이 동기화됨.
     // text_width 는 현재 표시될 문자열(패스워드 마스킹 + IME 조합 포함) 의 GDI TextExtent.cx.
     int			get_text_start_x(int text_width) const;
+    // valign 을 반영한 "글자 셀(높이 text_h)의 top y". draw_text / draw_selection / get_compose_draw_box
+    // 가 모두 이 한 곳을 거쳐 동일한 세로 기준을 공유 → 선택 블록이 글자 셀과 항상 일치 (폰트 무관).
+    int			get_text_top(const CRect& rc_text, int text_h) const;
     CPoint		calc_caret_pixel_pos(int char_pos) const; // 문자 인덱스 → 픽셀 좌표
     int			hit_test_char(CPoint pt) const;           // 픽셀 좌표 → 문자 인덱스
     CRect		get_compose_draw_box() const;             // 조합 중 글자가 그려지는 박스
+    int			get_caret_width() const;       // 시스템 캐럿 폭 (SPI_GETCARETWIDTH, 기본 1px) — native EDIT 과 동일
     void		update_caret_pos();
     void		ensure_caret_visible();        // 캐럿이 보이도록 스크롤 조정
 

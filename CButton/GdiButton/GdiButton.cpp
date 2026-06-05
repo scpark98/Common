@@ -1390,33 +1390,25 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			Gdiplus::Color cr_check_fill = (is_disabled ? Gdiplus::Color::LightGray : m_cr_check_fill);
 
-			if (m_check_style == check_style_default)
-				draw_rect(&dc, r, cr_text, Gdiplus::Color::White);
-			else if (m_check_style == check_style_round)
-				draw_round_rect(&g, CRect_to_gpRect(r), cr_text, Gdiplus::Color::Transparent, 2);
+			//check_style 별 박스 외관을 draw_check_box 파라미터로 매핑 — default: 직각 흰 박스, round: 투명 채움 둥근 박스, round_fill: 채워진 둥근 박스(체크는 대비색).
+			Gdiplus::Color cr_border = cr_text;
+			Gdiplus::Color cr_back = Gdiplus::Color::White;
+			Gdiplus::Color cr_check = cr_text;
+			int radius = 0;
+			if (m_check_style == check_style_round)
+			{
+				radius = 2;
+				cr_back = Gdiplus::Color::Transparent;
+			}
 			else if (m_check_style == check_style_round_fill)
-				draw_round_rect(&g, CRect_to_gpRect(r), Gdiplus::Color::Transparent, cr_check_fill, 2);
-
-			Gdiplus::Pen pen(cr_text, 1.51);
-			//Gdiplus::Pen pen(Gdiplus::Color::Red, 1.51);
-
-			if (m_check_style == check_style_round_fill)
-				pen.SetColor(is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_check_fill));
-
-			int check_state = GetCheck();
-
-			//v자 체크를 그려준다. indeterminate는 사각형으로 그려준다.
-			if (check_state == BST_CHECKED)
 			{
-				g.DrawLine(&pen, Gdiplus::Point(r.left + 3, r.CenterPoint().y - 2), Gdiplus::Point(r.left + 7, r.CenterPoint().y + 2));
-				g.DrawLine(&pen, Gdiplus::Point(r.left + 7, r.CenterPoint().y + 2), Gdiplus::Point(r.left + 12, r.top + 4));
+				radius = 2;
+				cr_border = Gdiplus::Color::Transparent;
+				cr_back = cr_check_fill;
+				cr_check = is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_check_fill);
 			}
-			else if (check_state == BST_INDETERMINATE)
-			{
-				CRect inner = r;
-				inner.DeflateRect(3, 3);
-				draw_rect(&dc, inner, cr_text, cr_text);
-			}
+
+			draw_check_box(&g, CRect_to_gpRect(r), GetCheck(), cr_border, cr_back, cr_check, radius);
 
 			rText = r;
 

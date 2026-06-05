@@ -1418,13 +1418,14 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_dim = get_color(cr_text, 80);             //~#8F8A83 — 버전/보조 텍스트 (추출 #8B8377 근사)
 			cr_text_hover = Gdiplus::Color::White;            //hover bg = orange → white text 강제
 			cr_text_selected = Gdiplus::Color::White;         //selected bg = orange → white text
-			cr_text_selected_inactive = get_color(cr_text, 32);
+			cr_text_selected_inactive = cr_text;              //inactive selection bg 가 옅은 크림이므로 본문 dark 색 그대로 — 대비 확보
 			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = gRGB(250, 247, 242);                    //#FAF7F2 — warm cream body bg
 			cr_parent_back = cr_back;
 			cr_back_selected = gRGB(180, 83, 9);              //#B45309 — rust orange (selection/primary)
-			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_selected_inactive = get_color(cr_back, -24);  //cr_back(크림)보다 살짝만 진한 톤 — 비활성 선택을 은은하게
+
 			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover = get_color(cr_back_selected, 32);  //orange 보다 한 톤 밝게
 			cr_back_alternate = gRGB(232, 226, 214);          //#E8E2D6 — 교대 행은 deep cream

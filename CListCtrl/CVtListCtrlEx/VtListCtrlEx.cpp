@@ -861,6 +861,21 @@ void CVtListCtrlEx::set_header_height(int height, bool invalidate)
 	if (m_HeaderCtrlEx.m_hWnd != NULL)
 		m_HeaderCtrlEx.set_header_height(height);
 
+	//커스텀 헤더 높이는 listview 가 헤더에 HDM_LAYOUT 을 보낼 때(CHeaderCtrlEx::OnLayout, 보통 WM_SIZE)만
+	//실제 적용된다. resize 가 없는 컨텍스트(예: 고정 크기로 임베드된 환경설정 리스트)에서도 즉시 반영되도록
+	//listview 크기를 1px 늘렸다 되돌려 *실제* WM_SIZE 두 번을 발생시켜 HDM_LAYOUT 을 강제 재전송한다.
+	//(동일 크기 WM_SIZE 는 listview 가 무시할 수 있어 헤더 relayout 이 안 일어난다 — 컬럼 너비 조정 같은
+	// 실제 레이아웃 변화에서만 적용되던 증상. set_line_height 의 imagelist 트릭과 동일 취지의 즉시 적용.)
+	if (m_hWnd != NULL)
+	{
+		CRect rc;
+		GetWindowRect(rc);
+		int w = rc.Width();
+		int h = rc.Height();
+		SetWindowPos(NULL, 0, 0, w, h + 1, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+		SetWindowPos(NULL, 0, 0, w, h,     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+
 	if (invalidate)
 		Invalidate();
 }

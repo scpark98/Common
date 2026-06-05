@@ -195,7 +195,14 @@ void CSCStaticEdit::rebuild_font()
 	}
 	::ReleaseDC(NULL, h_screen);
 
-	if (m_hWnd) Invalidate(FALSE);
+	if (m_hWnd)
+	{
+		//폰트가 바뀌면 글자 폭·높이가 달라지므로 캐럿 크기/위치를 새 메트릭으로 다시 계산한다.
+		//(블록 선택 상태에서 폰트 변경 시 캐럿이 옛 글자 위치에 남던 문제 — update_caret_pos 미호출이 원인.)
+		m_caret_height = min((int)m_font_height, (int)get_line_area().Height());
+		update_caret_pos();
+		Invalidate(FALSE);
+	}
 }
 
 void CSCStaticEdit::SetFont(CFont* p_font, BOOL b_redraw)

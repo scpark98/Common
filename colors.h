@@ -495,9 +495,12 @@ public:
 		//src 의 강도로 재계산한다 (아래 일반 copy 경로는 이미 leveled 된 색을 그대로 복사).
 		m_theme_level = src.m_theme_level;
 
-		if (src.m_cur_theme == color_theme_default && m_parent != nullptr)
+		//default 와 windows 테마는 control-kind 별 cr_back 분기(List/Tree/Edit 류=COLOR_WINDOW, 그 외=COLOR_BTNFACE)를
+		//set_color_theme(int) 안에서 m_parent->IsKindOf 로 수행한다. 이 두 테마는 그 경로를 다시 태워야 자식 컨트롤이
+		//부모 dlg 의 cr_back(BTNFACE)을 그대로 받지 않고 자기 종류에 맞는 배경을 갖는다. (windows 누락 시 Edit/List/Tree 가 회색이던 문제)
+		if ((src.m_cur_theme == color_theme_default || src.m_cur_theme == color_theme_windows) && m_parent != nullptr)
 		{
-			set_color_theme(color_theme_default);
+			set_color_theme(src.m_cur_theme);
 			return;
 		}
 

@@ -3665,6 +3665,11 @@ void CDShow::move_track(bool forward, int interval)
 	double new_pos_ms = get_track_pos() + (forward ? interval : -interval) * 1000.0;
 	if (new_pos_ms < 0)
 		new_pos_ms = 0;
+	//끝을 넘는 forward 이동은 duration 으로 clamp — 슬라이더 드래그(max=duration)와 동일.
+	//없으면 99%에서 +300s 이동 시 102% 로 찍히는 오버슈트 발생.
+	double dur_ms = get_media_duration();
+	if (dur_ms > 0 && new_pos_ms > dur_ms)
+		new_pos_ms = dur_ms;
 	set_track_pos(new_pos_ms);
 
 	//forward 를 wParam 의 상위 word 에 (msg_track_moved 와 함께) 인코딩하지 않고 wParam 에는 msg, lParam 에 interval 그대로 (signed int).

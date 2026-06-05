@@ -8285,6 +8285,45 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 	return &path;
 }
 
+void draw_check_box(Gdiplus::Graphics* g, Gdiplus::Rect box, int check_state, Gdiplus::Color cr_border, Gdiplus::Color cr_back, Gdiplus::Color cr_check, int radius, int border_width, float check_thick)
+{
+	Gdiplus::SmoothingMode old = g->GetSmoothingMode();
+	g->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	draw_round_rect(g, box, cr_border, cr_back, radius, border_width);
+
+	if (check_state == BST_CHECKED)
+	{
+		//round join(가운데 꼭짓점) + round cap(양 끝) 으로 표준 윈도우 체크 모양. 두께 미지정 시 박스 크기 비례.
+		float thick = check_thick > 0.0f ? check_thick : MAX(1.6f, box.Width / 11.0f);
+		Gdiplus::Pen pen(cr_check, thick);
+		pen.SetStartCap(Gdiplus::LineCapRound);
+		pen.SetEndCap(Gdiplus::LineCapRound);
+		pen.SetLineJoin(Gdiplus::LineJoinRound);
+
+		float L = (float)box.X;
+		float T = (float)box.Y;
+		float w = (float)box.Width;
+		float h = (float)box.Height;
+		Gdiplus::PointF pts[3] =
+		{
+			Gdiplus::PointF(L + w * 0.22f, T + h * 0.52f),
+			Gdiplus::PointF(L + w * 0.42f, T + h * 0.72f),
+			Gdiplus::PointF(L + w * 0.78f, T + h * 0.30f)
+		};
+		g->DrawLines(&pen, pts, 3);
+	}
+	else if (check_state == BST_INDETERMINATE)
+	{
+		Gdiplus::Rect inner = box;
+		inner.Inflate(-box.Width / 4, -box.Height / 4);
+		Gdiplus::SolidBrush br(cr_check);
+		g->FillRectangle(&br, inner);
+	}
+
+	g->SetSmoothingMode(old);
+}
+
 CRect get_zoom_rect(CRect rect, double zoom)
 {
 	double l, t, r, b;

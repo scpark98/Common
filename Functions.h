@@ -2300,6 +2300,14 @@ h		: 복사할 height 크기(pixel)
 	//(lt 자체가 음수면 기존 단일 radius 규칙대로 height/2 = 운동장 트랙.)
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float lt, float rt, float rb, float lb, int stroke_thick = 1);
 	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width = 1);
+
+	//체크박스(둥근 사각 박스 + ✓ 또는 indeterminate 사각) 공용 그리기. tree / list / GdiButton 등 모든 컨트롤이 동일한 모양을 쓰도록 통합.
+	//box        : 박스 사각 (offset / deflate 등 호출측 보정이 끝난 최종 rect).
+	//check_state: BST_UNCHECKED(0) / BST_CHECKED(1) / BST_INDETERMINATE(2).
+	//cr_border  : 박스 외곽선 색. cr_back: 박스 내부 채움 색. cr_check: ✓(또는 indeterminate 사각) 색.
+	//radius     : 박스 모서리 round (-1 = height/2 트랙형, 0 = 직각). border_width: 외곽선 두께.
+	//check_thick: ✓ 펜 두께. <=0 이면 박스 크기 비례 자동 (max(1.6, box width / 11)).
+	void		draw_check_box(Gdiplus::Graphics* g, Gdiplus::Rect box, int check_state, Gdiplus::Color cr_border, Gdiplus::Color cr_back, Gdiplus::Color cr_check, int radius = 3, int border_width = 1, float check_thick = 0.0f);
 	CRect		getCenterRect(int cx, int cy, int w, int h);
 	CRect		get_zoom_rect(CRect rect, double zoom);
 

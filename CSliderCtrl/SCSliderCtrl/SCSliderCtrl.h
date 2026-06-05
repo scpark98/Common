@@ -199,7 +199,7 @@ public:
 	//void	SetPos(int pos) { CSliderCtrl::SetPos(pos); Invalidate(); /*redraw_window();*/ }
 	void	redraw_window(bool bErase = false);
 
-	//slider_thumb,	slider_value, slider_progress, slider_track, slider_step, 
+	//style_thumb,	style_value, style_progress, style_track, style_step, 
 	void	set_style(int nStyle);
 	void	set_track_height(int height) { m_track_height = height; }
 
@@ -305,6 +305,7 @@ public:
 //color theme 관련
 	CSCColorTheme	m_theme = CSCColorTheme(this);	//m_theme(this); 는 오류.
 	void			set_color_theme(int theme);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
 
 	//disable이면 gray로 표시되지만 때로는 disable이 아니어도 gray로 표시해야 하는 경우도 있다.
 	void			set_forced_gray(bool forced_gray, bool include_back = true) { m_forced_gray = forced_gray; m_forced_gray_include_back = include_back; Invalidate(); }
@@ -474,7 +475,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	//afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	virtual void PreSubclassWindow();

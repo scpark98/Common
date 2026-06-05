@@ -48,7 +48,7 @@ BEGIN_MESSAGE_MAP(CSCSliderCtrl, CSliderCtrl)
 	ON_WM_SETFOCUS()
 	ON_WM_KILLFOCUS()
 	//}}AFX_MSG_MAP
-	//ON_WM_KEYDOWN()
+	ON_WM_KEYDOWN()
 	ON_WM_TIMER()
 	ON_WM_SIZE()
 	ON_WM_WINDOWPOSCHANGED()
@@ -1494,59 +1494,34 @@ BOOL CSCSliderCtrl::PreTranslateMessage(MSG* pMsg)
 	return CSliderCtrl::PreTranslateMessage(pMsg);
 }
 
-/*
 void CSCSliderCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
-	// TODO: Add your message handler code here and/or call default
-	TRACE(_T("CSCSliderCtrl::OnKeyDown = %d\n"), nChar);
-	if (m_use_slide == false)
-		return;
+	int lower = get_lower();
+	int upper = get_upper();
+	int pos = GetPos();
 
+	//네이티브 트랙바가 처리하는 네비게이션 키는 모두 여기서 가로채 set_pos 로 직접 갱신한다.
+	//base CSliderCtrl::OnKeyDown 으로 넘기면 네이티브가 커스텀 paint 위에 thumb 를 또 그려 잔상이 남고,
+	//parent 로 Message_CSCSliderCtrl 도 안 가 값이 갱신되지 않는다.
 	switch (nChar)
 	{
-		case VK_LEFT :	pos = GetPos() - 1;
-						if (pos < lower)
-							pos = lower;
-						SetPos(pos);
-						if (m_nEventMsgStyle == msg_style_timer)
-						{
-							SetTimer(timer_post_pos, 1, NULL);
-						}
-						else if (m_nEventMsgStyle == msg_style_post)
-						{
-							::PostMessage(GetParent()->GetSafeHwnd(),	Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
-						}
-						else if (m_nEventMsgStyle == msg_style_callback)
-						{
-							//if (m_pCallback_func != NULL)
-								//(*(m_pCallback_func))(m_pParentWnd, this, Message_CSCSliderCtrl, (WPARAM)&CSliderCtrlMsg(CSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
-						}
-						break;
-		case VK_RIGHT :	pos = GetPos() + 1;
-						if (pos > upper)
-							pos = upper;
-						SetPos(pos);
-						if (m_nEventMsgStyle == msg_style_timer)
-						{
-							SetTimer(timer_post_pos, 1, NULL);
-						}
-						else if (m_nEventMsgStyle == msg_style_post)
-						{
-							::PostMessage(GetParent()->GetSafeHwnd(),	Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, GetDlgCtrlID(), pos), 0);
-						}
-						else if (m_nEventMsgStyle == msg_style_callback)
-						{
-							//if (m_pCallback_func != NULL)
-								//(*(m_pCallback_func))(m_pParentWnd, this, MESSAGE_SCSLIDERCTRL_MOVED, pos);
-						}
-						break;
-		default :		::PostMessage(GetParent()->GetSafeHwnd(), WM_KEYDOWN, nChar, 0);
-						return;
+		case VK_LEFT:
+		case VK_DOWN:	pos--;					break;
+		case VK_RIGHT:
+		case VK_UP:		pos++;					break;
+		case VK_PRIOR:	pos += max(1, (upper - lower) / 10);	break;
+		case VK_NEXT:	pos -= max(1, (upper - lower) / 10);	break;
+		case VK_HOME:	pos = lower;			break;
+		case VK_END:	pos = upper;			break;
+		default:
+			CSliderCtrl::OnKeyDown(nChar, nRepCnt, nFlags);
+			return;
 	}
-	
-	CSliderCtrl::OnKeyDown(nChar, nRepCnt, nFlags);
+
+	pos = max(lower, min(upper, pos));
+	set_pos(pos);
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 }
-*/
 
 void CSCSliderCtrl::set_style(int nStyle)
 {
@@ -2060,6 +2035,15 @@ void CSCSliderCtrl::set_color_theme(int theme)
 	m_cr_inactive = get_gray_color(m_cr_active);
 	m_cr_thumb = gRGB(64, 80, 181); //RGB(124, 192, 232);
 	m_cr_tic = get_gray_color(m_cr_thumb);
+}
+
+//다이얼로그에서 m_theme 객체를 그대로 전파받는 경로 (다른 SC* 컨트롤과 동일 시그니처).
+//트랙/썸/틱 색은 테마 비의존 상수라 생성자의 set_color_theme(default) 에서 1회 설정된 값을 유지한다.
+void CSCSliderCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	m_theme.copy_colors_from(theme);
+	if (invalidate && m_hWnd)
+		Invalidate();
 }
 
 void CSCSliderCtrl::set_gradient_colors(const std::vector<Gdiplus::Color>& colors)

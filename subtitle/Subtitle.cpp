@@ -684,6 +684,38 @@ bool CSubtitle::load_ass(CString sfile)
 		}
 	}
 
+	//같은 start 의 Dialogue 들을 한 caption 으로 merge — ASS 는 동시 표시되는 여러 Dialogue(장식/타이틀/본문/다국어)가
+	//각각 별도 줄로 존재한다. 스케줄러는 한 위치를 덮는 cue 하나만 표시하므로, 합치지 않으면 첫 Dialogue 만 보이고
+	//나머지 동시 자막이 사라진다 (예: \pos 로 배치된 ■ 장식 cue 뒤의 본문 텍스트가 누락). line_index 를 누적 offset
+	//으로 부여해 각 Dialogue 가 별도 줄로 표시되게 한다 — load_smi 의 rebuild_active_view 와 동일한 처리.
+	std::stable_sort(m_subtitle.begin(), m_subtitle.end(),
+		[](const CCaption& a, const CCaption& b) { return a.start < b.start; });
+
+	std::deque<CCaption> merged;
+	for (size_t i = 0; i < m_subtitle.size(); ++i)
+	{
+		if (!merged.empty() && m_subtitle[i].start == merged.back().start)
+		{
+			int base_line = 0;
+			for (const auto& s : merged.back().sentences)
+				if (s.line_index >= base_line)
+					base_line = s.line_index + 1;
+			for (const auto& s : m_subtitle[i].sentences)
+			{
+				CSentence shifted = s;
+				shifted.line_index += base_line;
+				merged.back().sentences.push_back(shifted);
+			}
+			if (m_subtitle[i].end > merged.back().end)
+				merged.back().end = m_subtitle[i].end;
+		}
+		else
+		{
+			merged.push_back(std::move(m_subtitle[i]));
+		}
+	}
+	m_subtitle = std::move(merged);
+
 	return !m_subtitle.empty();
 }
 

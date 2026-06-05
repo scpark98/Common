@@ -3569,9 +3569,13 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			Gdiplus::Color crText = m_theme.cr_text;
 			Gdiplus::Color crBack = m_theme.cr_back;
 			int item_font_style = -1;	//항목별 font_style — 아래 per-item override 블록에서 채움.
+			bool state_highlight = false;	//selection / hover / drop 강조 상태인가 — FULLROWSELECT off 시 라벨만 칠할지 판단.
 
 			if (function_check_is_dim_text && function_check_is_dim_text(this, hItem))
 				crText = m_theme.cr_text_dim;
+
+			//chevron 처럼 라벨 강조영역 밖에 그려지는 요소용 — 선택/hover 상태색이 아닌 항목 본래 텍스트색.
+			Gdiplus::Color crTextNormal = crText;
 
 			//state 색 결정 — DropHilited > Selected > Hot. selected 가 hover 보다 의미상 우선 — selected 인 항목 위에 hover 가 와도 selected 색 유지.
 			if (m_use_drag_and_drop && m_bDragging && hItem == GetDropHilightItem())
@@ -3579,9 +3583,11 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 				crText = m_theme.cr_text_dropHilited;
 				crBack = m_theme.cr_back_dropHilited;
+				state_highlight = true;
 			}
 			else if (pNMCustomDraw->uItemState & CDIS_SELECTED)
 			{
+				state_highlight = true;
 				bool hot_too = (pNMCustomDraw->uItemState & CDIS_HOT) || hItem == m_hot_item;
 				if (GetFocus() == this || m_in_editing || m_in_context_menu)
 				{
@@ -3608,6 +3614,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//cr_text_hover 도 함께 적용해 contrast 확보.
 				crText = m_theme.cr_text_hover;
 				crBack = m_theme.cr_back_hover;
+				state_highlight = true;
 			}
 
 			//항목별 스타일 override — map 에 지정된 항목은 상태색(hover/selected/drag)보다 *우선*. 지정한 속성만 덮고
@@ -3617,20 +3624,35 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				if (it_style != m_item_styles.end())
 				{
 					if (it_style->second.use_text_color)
+					{
 						crText = it_style->second.text_color;
+						crTextNormal = it_style->second.text_color;
+					}
 					if (it_style->second.use_back_color)
 						crBack = it_style->second.back_color;
 					item_font_style = it_style->second.font_style;
 				}
 			}
 
-			//1. row fill — Win11 Explorer 동일하게 항상 full-row 폭으로 fill. (TVS_FULLROWSELECT 무관)
+			//1. row fill.
 			//   V scrollbar visible 시에만 우측 m_scrollbar_width reserve. hide 시 풀폭. m_v_visible_state 는 sync_scrollbar 가 정한 stable cache 라 paint cycle stale 안전.
 			CRect rcClient;
 			GetClientRect(&rcClient);
 			int right_limit = rcClient.right - (m_scrollbar_setup && m_v_visible_state ? m_scrollbar_width : 0);
 			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
-			dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
+
+			//TVS_FULLROWSELECT on → 강조도 풀폭. off → 일반 배경만 풀폭으로 칠하고 selection/hover/drop 강조는 라벨(rcText) 영역만.
+			//per-item override 배경(state_highlight=false)은 selection 과 무관하므로 옵션과 관계없이 풀폭 유지.
+			if ((GetStyle() & TVS_FULLROWSELECT) || !state_highlight)
+			{
+				dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
+			}
+			else
+			{
+				dc.FillSolidRect(&rcFill, m_theme.cr_back.ToCOLORREF());
+				CRect rcLabel(rcText.left - 2, rcRow.top, rcText.right + 2, rcRow.bottom);
+				dc.FillSolidRect(&rcLabel, crBack.ToCOLORREF());
+			}
 
 			//2. expand/collapse glyph — rcText.left 기준 역산 (H scroll 따라 같이 움직이도록).
 			//   pNMCustomDraw->rc.left 는 client.left 고정이라 사용 시 H scroll 무관 고정 위치에 그려져 trail 현상 발생.
@@ -3669,7 +3691,10 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 					g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 					g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 
-					Gdiplus::Pen pen(get_weak_color(crText, 48), chevron_thickness);
+					//전체 행 선택이면 chevron 이 선택 배경 위에 오므로 상태색(crText)으로 대비시킨다. 아니면 chevron 은
+					//라벨 강조 밖(일반 배경) 이라 선택색을 쓰면 배경에 안 묻고 어색 — 항목 본래색(crTextNormal)을 쓴다.
+					Gdiplus::Color crGlyph = ((GetStyle() & TVS_FULLROWSELECT) || !state_highlight) ? crText : crTextNormal;
+					Gdiplus::Pen pen(get_weak_color(crGlyph, 48), chevron_thickness);
 					pen.SetStartCap(Gdiplus::LineCapRound);
 					pen.SetEndCap(Gdiplus::LineCapRound);
 					pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -3713,30 +3738,13 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				//get_checkbox_rect 은 unshifted GetItemRect 기준 → over-scroll 분만큼 좌측으로 같이 이동시켜
 				//아이콘/글자(이미 over_shift 반영된 rcText 기준)와 정렬 일치시킨다.
 				rcCheck.OffsetRect(-over_shift, 0);
+				rcCheck.DeflateRect(1, 1);
 
-				bool checked = GetCheck(hItem) != 0;
-				dc.FillSolidRect(&rcCheck, m_theme.cr_back.ToCOLORREF());
-				CPen pen(PS_SOLID, 1, m_theme.cr_text_dim.ToCOLORREF());
-				CPen* pOldPen = dc.SelectObject(&pen);
-				CBrush* pOldBrush = (CBrush*)dc.SelectStockObject(NULL_BRUSH);
-				dc.Rectangle(&rcCheck);
-				dc.SelectObject(pOldBrush);
-				dc.SelectObject(pOldPen);
+				int check_state = (GetCheck(hItem) != 0) ? BST_CHECKED : BST_UNCHECKED;
 
-				if (checked)
-				{
-					Gdiplus::Graphics g(dc.m_hDC);
-					g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-					Gdiplus::Pen p(m_theme.cr_text, 1.8f);
-					int x1 = rcCheck.left + 3;
-					int y1 = rcCheck.top + rcCheck.Height() * 6 / 10;
-					int x2 = rcCheck.left + rcCheck.Width() * 4 / 10;
-					int y2 = rcCheck.bottom - 3;
-					int x3 = rcCheck.right - 3;
-					int y3 = rcCheck.top + 3;
-					g.DrawLine(&p, x1, y1, x2, y2);
-					g.DrawLine(&p, x2, y2, x3, y3);
-				}
+				Gdiplus::Graphics g(dc.m_hDC);
+				Gdiplus::Rect box(rcCheck.left, rcCheck.top, rcCheck.Width(), rcCheck.Height());
+				draw_check_box(&g, box, check_state, m_theme.cr_text_dim, m_theme.cr_back, get_weak_color(m_theme.cr_text_dim, 32));
 			}
 
 			int img_normal = -1, img_selected = -1;

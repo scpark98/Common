@@ -188,6 +188,10 @@ public:
 	//ref_id 가 존재 안 하면 맨 뒤 append (= add_submenu_item 과 동일).
 	void			insert_submenu_item_before(int _id, CString _caption, CSCMenu* sub_menu, int before_id);
 	void			insert_submenu_item_after (int _id, CString _caption, CSCMenu* sub_menu, int after_id);
+	//id 의 기존 항목 (MENUITEM 등) 을 같은 위치에서 submenu 항목으로 *교체*. remove_item + add_submenu_item 의
+	//순서 안전판 — append 가 아니라 위치 보존. .rc 의 정적 MENUITEM 자리를 runtime 에 동적 submenu 로 변환할 때 사용.
+	//caption == NULL 이면 기존 caption 유지. 못 찾으면 false (no-op). id 매칭 첫 항목만 교체.
+	bool			replace_item_with_submenu(int id, CSCMenu* sub_menu, LPCTSTR caption = NULL);
 
 	//sub button이 여러개일 때 args에 나열하여 호출.
 	template <typename ... Types> void add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""), Types... args)

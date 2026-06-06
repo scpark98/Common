@@ -464,6 +464,31 @@ void CSCMenu::insert_submenu_item_after(int _id, CString _caption, CSCMenu* sub_
 	recalc_items_rect();
 }
 
+bool CSCMenu::replace_item_with_submenu(int id, CSCMenu* sub_menu, LPCTSTR caption)
+{
+	for (size_t i = 0; i < m_items.size(); i++)
+	{
+		if (m_items[i]->m_id != id)
+			continue;
+
+		//caption 유지 (NULL) 시엔 기존 m_caption 을, 새 caption 명시 시엔 그것을 사용.
+		//access-key marker / hot_key 재파싱을 위해 ctor 경유 — 기존 item 폐기 후 같은 위치에 새 item 삽입.
+		CString new_caption = (caption != NULL) ? CString(caption) : m_items[i]->m_caption;
+		delete m_items[i];
+
+		CSCMenuItem* new_item = new CSCMenuItem(id, new_caption);
+		new_item->m_type = CSCMenuItem::item_submenu;
+		new_item->m_sub_menu = sub_menu;
+		if (sub_menu)
+			sub_menu->m_parent_menu = this;
+
+		m_items[i] = new_item;
+		recalc_items_rect();
+		return true;
+	}
+	return false;
+}
+
 void CSCMenu::add_sub_button_by_menu_index(int index, UINT id)
 {
 	CSCMenuSubButton* button = new CSCMenuSubButton(id, m_line_height);

@@ -622,7 +622,8 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
-	if (m_draw_selected_border && !m_in_editing && (m_has_focus || is_show_selection_always) && is_selected)
+	//Tree 와 일관 — focus 있을 때만 border. inactive 는 배경 fill (위 crBack) 만.
+	if (m_draw_selected_border && !m_in_editing && m_has_focus && is_selected)
 	{
 		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
 		if (!is_full_row_selection)
@@ -634,7 +635,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		if (m_use_distinct_border_color)
 			draw_rect(pDC, rowRect, get_distinct_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 		else
-			draw_rect(pDC, rowRect, (m_has_focus ? m_theme.cr_selected_border : m_theme.cr_selected_border_inactive), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
+			draw_rect(pDC, rowRect, m_theme.cr_selected_border, Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 	}
 
 	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);

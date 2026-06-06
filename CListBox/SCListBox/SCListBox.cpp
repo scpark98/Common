@@ -416,15 +416,11 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 
 	if (lpDIS->itemState & ODS_SELECTED)
 	{
-		//선택 항목의 색은 자신의 색으로 그냥 그려준다.
-		//cr_text = m_cr_text_selected;
-		//TRACE(_T("ODS_SELECTED\n"));
+		//Tree 와 일관 — focus 있을 때만 border. inactive 는 배경 fill 만 (Tree 동작 기준).
 		if (has_focus)
 			draw_rect(pDC, rect, m_theme.cr_selected_border, cr_back, 1);
-		else if (m_show_selection_always)
-			draw_rect(pDC, rect, m_theme.cr_selected_border_inactive, cr_back, 1);
 		else
-			draw_rect(pDC, rect, Gdiplus::Color::Transparent, cr_back, 1);	//focus 없고 show_always=false 면 selection 시각화 없이 배경만 fill. 이 fill 이 없으면 스크롤 시 이전 픽셀 잔상.
+			draw_rect(pDC, rect, Gdiplus::Color::Transparent, cr_back, 1);
 	}
 	else
 	{

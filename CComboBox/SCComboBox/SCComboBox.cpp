@@ -58,8 +58,9 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_CONTROL_REFLECT(CBN_SELENDCANCEL, &CSCComboBox::OnCbnSelendcancel)
 	//ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCComboBox::on_message_CSCEdit)
 	ON_WM_NCPAINT()
-	//ON_WM_CTLCOLOR()
-	//ON_WM_CTLCOLOR_REFLECT()
+	//CBS_DROPDOWN 의 내부 child Edit 이 부모(콤보) 에게 보내는 WM_CTLCOLOREDIT 를 콤보가 직접 처리 — theme bg/text 적용.
+	//ON_WM_CTLCOLOR_REFLECT() 만으론 dialog 가 child(edit) 로 반사해버려 stock CEdit 가 처리 못 함 → 시스템색 잔존.
+	ON_WM_CTLCOLOR()
 	ON_WM_DESTROY()
 	ON_CONTROL_REFLECT(CBN_EDITCHANGE, &CSCComboBox::OnCbnEditchange)
 	ON_WM_DRAWITEM()
@@ -77,23 +78,12 @@ HBRUSH CSCComboBox::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 
 HBRUSH CSCComboBox::CtlColor(CDC* pDC, UINT nCtlColor)
 {
-	// TODO:  여기서 DC의 특성을 변경합니다.
-	pDC->SetBkMode(TRANSPARENT);
+	pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
+	pDC->SetBkColor(m_theme.cr_back.ToCOLORREF());
 
-	//if (nCtlColor == CTLCOLOR_EDIT)
-	//{
-	//	pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
-	//	pDC->SetDCBrushColor(m_theme.cr_back.ToCOLORREF());
-	//}
-	//else
-	{
-		pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
-		pDC->SetDCBrushColor(m_theme.cr_back.ToCOLORREF());
-	}
-	return (HBRUSH)GetStockObject(DC_BRUSH);
-
-	// TODO:  기본값이 적당하지 않으면 다른 브러시를 반환합니다.
-	//return hbr;
+	m_br_back.DeleteObject();
+	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
+	return (HBRUSH)m_br_back;
 }
 
 void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)

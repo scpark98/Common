@@ -619,6 +619,12 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	m_list_folder.SetWindowPos(NULL, pt.x, pt.y,
 		popup_w, popup_h,
 		SWP_NOZORDER | (show ? SWP_SHOWWINDOW : SWP_HIDEWINDOW));
+
+	//WS_POPUP 라 표시만으로는 포커스가 안 옴 → WM_MOUSEWHEEL 이 포커스 창으로만 가는 특성상 휠이 커서가
+	//팝업 위에 있을 때(Win10 hover-scroll)만 듣고, 위로 flip 되어 뜨면 안 먹었다. 팝업은 OnKillFocus 에서
+	//숨겨지는 *포커스 보유* 설계이므로 표시 시 포커스를 줘 휠이 위치와 무관하게 항상 동작하게 한다.
+	if (show)
+		m_list_folder.SetFocus();
 }
 
 

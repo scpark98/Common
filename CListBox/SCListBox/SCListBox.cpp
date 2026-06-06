@@ -1678,22 +1678,19 @@ void CSCListBox::edit_end(bool modify)
 	if (!m_use_edit || !m_in_editing || m_edit_index < 0 || m_edit_index >= GetCount())
 		return;
 
+	int keep_index = m_edit_index;	//편집 완료/취소 후에도 선택을 유지할 항목 (삭제된 경우만 -1).
+	bool changed = false;			//실제로 항목이 바뀐 경우에만 parent 에 통지.
+
 	m_pEdit->ShowWindow(SW_HIDE);
 
 	if (modify)
 	{
 		CString text;
 		m_pEdit->GetWindowText(text);
-		TRACE(_T("index = %d\n"), m_edit_index);
 
 		CString old_text = get_text(m_edit_index);
-		if (!text.IsEmpty() && (text == old_text))
-		{
-			m_in_editing = false;
-			return;
-		}
 
-		if (text.IsEmpty() == false || m_accept_empty_edit_str)
+		if (text != old_text && (text.IsEmpty() == false || m_accept_empty_edit_str))
 		{
 			SetRedraw(FALSE);
 			//기존 itemData 의 색을 보존하기 위해 delete 전 미리 추출. DeleteString 이 CSCListBoxItem* 를 free 한다.
@@ -1702,22 +1699,41 @@ void CSCListBox::edit_end(bool modify)
 			DeleteString(m_edit_index);
 			insert(m_edit_index, text, cr_save);
 			SetRedraw(TRUE);
-			SetCurSel(m_edit_index);
+			changed = true;
 		}
 		else if (text.IsEmpty() && !m_accept_empty_edit_str)
 		{
 			DeleteString(m_edit_index);
 			m_edit_index = -1;
+			keep_index = -1;	//항목 삭제 — 유지할 선택 없음.
+			changed = true;
 		}
 
-		if (m_hParentWnd == NULL)
-			m_hParentWnd = GetParent()->GetSafeHwnd();
+		if (changed)
+		{
+			if (m_hParentWnd == NULL)
+				m_hParentWnd = GetParent()->GetSafeHwnd();
 
-		CSCListBoxMessage msg(this, message_edit_end);
-		::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&msg, (LPARAM)m_edit_index);
+			CSCListBoxMessage msg(this, message_edit_end);
+			::SendMessage(m_hParentWnd, Message_CSCListBox, (WPARAM)&msg, (LPARAM)m_edit_index);
+		}
 	}
 
 	m_in_editing = false;
+
+	//편집을 완료하든 취소하든 해당 항목은 선택 상태로 남아야 한다. 특히 *변경* 경로는 DeleteString+insert 로
+	//그 항목의 선택 상태가 사라지므로 반드시 다시 선택해 준다. 항목이 삭제된 경우(keep_index<0)만 예외.
+	//multi-select(LBS_MULTIPLESEL/EXTENDEDSEL) listbox 는 SetCurSel 이 no-op(LB_ERR) 이라 SetSel 로 재선택해야
+	//한다 — 이게 누락돼 변경 시(Enter / 수정 후 외부 클릭)에만 선택이 풀려 보였다. 타 항목 선택은 보존.
+	//(포커스 복귀는 Enter/Esc 등 *명시적* 종료에서만 — on_message_CSCStaticEdit 에서 SetFocus. 외부 클릭은 그쪽으로 포커스 양보.)
+	if (keep_index >= 0 && keep_index < GetCount())
+	{
+		if (GetStyle() & (LBS_MULTIPLESEL | LBS_EXTENDEDSEL))
+			SetSel(keep_index, TRUE);
+		else
+			SetCurSel(keep_index);
+	}
+	Invalidate(FALSE);
 }
 
 
@@ -2356,10 +2372,14 @@ LRESULT CSCListBox::on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam)
 	else if (msg->message == CSCStaticEdit::message_scstaticedit_enter)
 	{
 		edit_end(true);
+		if (::IsWindow(m_hWnd))
+			SetFocus();		//명시적 완료 — 리스트로 포커스 복귀해 선택 항목이 활성 하이라이트로 표시.
 	}
 	else if (msg->message == CSCStaticEdit::message_scstaticedit_escape)
 	{
 		edit_end(false);
+		if (::IsWindow(m_hWnd))
+			SetFocus();		//명시적 취소 — 동일하게 리스트로 포커스 복귀.
 	}
 
 	return 0;

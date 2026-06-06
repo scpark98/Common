@@ -420,13 +420,20 @@ void CHeaderCtrlEx::set_sort_arrow(int column, bool sort_asc, Gdiplus::Color cr_
 int CHeaderCtrlEx::is_separator(CPoint pt)
 {
 	int margin = 4;
+	int count = GetItemCount();
 	CRect rItem;
 
-	for (int i = 0; i < GetItemCount(); i++)
+	for (int i = 0; i < count; i++)
 	{
 		GetItemRect(i, rItem);
 		rItem.left = rItem.right;
-		rItem.InflateRect(margin, 0);
+		//마지막 컬럼은 우측 edge 가 header client 의 우측 boundary 와 일치/근접 — 우측 4px 영역이
+		//header 밖이라 더블클릭이 header window 에 도달 못 함. 좌측만 inflate.
+		//다른 컬럼의 좌우 대칭 hit area (총 폭 2*margin) 와 동일 총 폭 유지를 위해 좌측 2*margin 확장.
+		if (i == count - 1)
+			rItem.left -= margin * 2;
+		else
+			rItem.InflateRect(margin, 0);
 		if (rItem.PtInRect(pt))
 		{
 			return i;

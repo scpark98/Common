@@ -776,7 +776,62 @@ void CVtListCtrlEx::get_column_max_text_length(std::vector<int>& col_len, bool r
 //해당 컬럼에서 출력시에 width 최대값을 리턴.(미구현)
 int CVtListCtrlEx::get_column_max_text_width(int column)
 {
-	return 0;
+	//헤더 분리자 더블클릭 시 자동맞춤 너비 산출. 시스템 LVSCW_AUTOSIZE 는
+	// (a) 첫 호출과 두 번째 호출이 헤더/항목 기준을 toggle 하는 부자연스러운 동작,
+	// (b) owner-draw + small image 가 그리는 아이콘 폭을 measure 에 포함 안 함,
+	// (c) virtual list 일부 케이스에서 measure 실패로 무반응,
+	//세 문제 모두 가져 — 직접 max(헤더, 각 row) + 아이콘 + padding 계산이 정석.
+	if (column < 0 || column >= get_column_count())
+		return 0;
+
+	CClientDC dc(this);
+	CFont* pOldFont = dc.SelectObject(GetFont());
+
+	//헤더 텍스트 폭
+	CString header_text = get_header_text(column);
+	CSize sz;
+	GetTextExtentPoint32(dc.GetSafeHdc(), header_text, header_text.GetLength(), &sz);
+	int header_w = sz.cx;
+
+	//각 row 의 sub item 텍스트 폭 max
+	int max_row_w = 0;
+	int item_count = GetItemCount();
+	for (int row = 0; row < item_count; row++)
+	{
+		CString text = GetItemText(row, column);
+		GetTextExtentPoint32(dc.GetSafeHdc(), text, text.GetLength(), &sz);
+		if (sz.cx > max_row_w)
+			max_row_w = sz.cx;
+	}
+
+	dc.SelectObject(pOldFont);
+
+	//아이콘 폭 — col 0 이고 small image list 있으면 (LVS_EX_SUBITEMIMAGES 확장은 다른 col 도 가능하나 흔치 않음).
+	int icon_w = 0;
+	if (column == 0)
+	{
+		CImageList* pImg = GetImageList(LVSIL_SMALL);
+		if (pImg)
+		{
+			IMAGEINFO ii = {0};
+			if (pImg->GetImageInfo(0, &ii))
+				icon_w = ii.rcImage.right - ii.rcImage.left;
+			else
+				icon_w = 16;
+		}
+	}
+
+	//padding — 좌측 + (아이콘 + gap) + 텍스트 + 우측 + safety.
+	//safety: GDI GetTextExtentPoint32 측정 vs 실제 그리는 폭 차이 흡수 (한글 trailing).
+	const int left_padding  = 6;
+	const int icon_gap      = 4;
+	const int right_padding = 10;
+	const int safety        = 8;
+
+	int row_full    = left_padding + (icon_w > 0 ? icon_w + icon_gap : 0) + max_row_w + right_padding + safety;
+	int header_full = left_padding + header_w + right_padding + safety;
+
+	return max(header_full, row_full);
 }
 
 
@@ -5558,22 +5613,43 @@ BOOL CVtListCtrlEx::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
 	//ON_NOTIFY_REFLECT(HDN_TRACK...) 매크로는 작동하지 않는다. WM_NOTIFY 는 child→parent 직진 경로라
 	//listview 의 OnNotify override 에서 직접 가로채는 것이 정석.
 	NMHDR* nm = reinterpret_cast<NMHDR*>(lParam);
-	if (nm && m_scrollbar_setup)
+	if (nm)
 	{
 		CHeaderCtrl* hdr = GetHeaderCtrl();
-		if (hdr && nm->hwndFrom == hdr->GetSafeHwnd())
+		HWND hdr_hwnd = hdr ? hdr->GetSafeHwnd() : NULL;
+
+		if (hdr && nm->hwndFrom == hdr_hwnd)
 		{
-			switch (nm->code)
+			//HDN_DIVIDERDBLCLICK 자동맞춤 — m_scrollbar_setup 가드 *밖*. 스크롤바 인프라와 무관하게 항상 처리.
+			//과거 회귀 원인: 가드 안에 묶여 있어 scrollbar 미설정 시 우리 분기 미진입 → 시스템 default 가 동작.
+			if (nm->code == HDN_DIVIDERDBLCLICKW || nm->code == HDN_DIVIDERDBLCLICKA)
 			{
-			case HDN_TRACKW: case HDN_TRACKA:                       //드래그 진행 중 매 이동 (일반 컬럼)
-			case HDN_ENDTRACKW: case HDN_ENDTRACKA:                 //release
-			case HDN_DIVIDERDBLCLICKW: case HDN_DIVIDERDBLCLICKA:   //자동 맞춤
-			case HDN_ITEMCHANGEDW: case HDN_ITEMCHANGEDA:           //마지막 컬럼 right divider 드래그는
-				//HDN_TRACK 을 발화시키지 않고 HDN_ITEMCHANGED 로만 width 변경을 알린다. 따라서
-				//마지막 컬럼 drag 실시간 반영을 위해 ITEMCHANGED 도 받아야 한다. OnPaint 가 더블 버퍼
-				//상태라 중복 sync 호출에도 flicker 없음.
-				sync_scrollbar();
-				break;
+				NMHEADER* nmh = (NMHEADER*)nm;
+				int col = nmh->iItem;
+				int w = get_column_max_text_width(col);
+				if (w > 0)
+					set_column_width(col, w, true);
+
+				if (m_scrollbar_setup)
+					sync_scrollbar();
+				if (pResult) *pResult = 1;
+				return TRUE;   //base OnNotify 호출 차단 — Default 가 LVSCW_AUTOSIZE 로 덮어쓰는 것 방지.
+			}
+
+			//나머지 트랙/체인지 분기는 sync_scrollbar 호출이라 m_scrollbar_setup 가드 안에서.
+			if (m_scrollbar_setup)
+			{
+				switch (nm->code)
+				{
+				case HDN_TRACKW: case HDN_TRACKA:                       //드래그 진행 중 매 이동 (일반 컬럼)
+				case HDN_ENDTRACKW: case HDN_ENDTRACKA:                 //release
+				case HDN_ITEMCHANGEDW: case HDN_ITEMCHANGEDA:           //마지막 컬럼 right divider 드래그는
+					//HDN_TRACK 을 발화시키지 않고 HDN_ITEMCHANGED 로만 width 변경을 알린다. 따라서
+					//마지막 컬럼 drag 실시간 반영을 위해 ITEMCHANGED 도 받아야 한다. OnPaint 가 더블 버퍼
+					//상태라 중복 sync 호출에도 flicker 없음.
+					sync_scrollbar();
+					break;
+				}
 			}
 		}
 	}
@@ -5676,28 +5752,16 @@ void CVtListCtrlEx::init_auto_scroll_button()
 
 LRESULT	CVtListCtrlEx::on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam)
 {
-	TRACE(_T("dbclicked column[%d] width = %d\n"), (int)wParam, (int)lParam);
-
+	//CHeaderCtrlEx::OnLButtonDblClk 가 분리자 더블클릭 시 SendMessage(Message_CHeaderCtrlEx, column, header_text_width).
+	//기존 로직은 GetStringWidth(row text) 만으로 max 산출 + 컬럼0 의 *small image 아이콘 폭 미반영* —
+	//사용자 보고 "아이콘 너비가 반영 안 된 듯한 너비, 항목이 일부 안 보이고 말줄임표" 의 직접 원인.
+	//get_column_max_text_width 는 헤더+row text+icon+padding 모두 포함하므로 그것을 사용 (단일 진입점).
 	int column = (int)wParam;
-	int max_width = (int)lParam;
+	int passed_header_w = (int)lParam;
+	int computed = get_column_max_text_width(column);
+	int new_w = max(passed_header_w, computed);
 
-	CClientDC dc(this);
-	CFont* pOldFont = dc.SelectObject(&m_font);
-	CRect r;
-
-	for (int i = 0; i < size(); i++)
-	{
-		int width = GetStringWidth(get_text(i, column));
-		dc.DrawText(get_text(i, column), r, DT_CALCRECT);
-
-		if (column == 0 && (GetExtendedStyle() & LVS_EX_CHECKBOXES))
-			width += 20; //체크박스가 있는 경우 체크박스 너비를 더해준다.
-
-		if (width > max_width)
-			max_width = width;
-	}
-
-	set_column_width(column, max_width + 12);
+	set_column_width(column, new_w);
 
 	return 0;
 }

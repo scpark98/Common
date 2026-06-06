@@ -667,7 +667,7 @@ LRESULT CSCMessageBox::on_message_CGdiButton(WPARAM wParam, LPARAM lParam)
 
 	if (msg->message == WM_LBUTTONUP)
 	{
-		TRACE(_T("on_message_CGdiButton, WM_LBUTTONUP = %s\n"), m_button_caption[msg->ctrl_id - SC_BUTTON_ID]);
+		//TRACE(_T("on_message_CGdiButton, WM_LBUTTONUP = %s\n"), m_button_caption[msg->ctrl_id - SC_BUTTON_ID]);
 		m_response = msg->ctrl_id - SC_BUTTON_ID;
 
 		if (!m_as_modal)

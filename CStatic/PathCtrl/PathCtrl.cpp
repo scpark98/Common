@@ -444,6 +444,9 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 	if (path.IsEmpty())
 		path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
 
+	if (path == get_path())
+		return;
+
 	m_path.clear();
 
 	path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, path);
@@ -586,9 +589,9 @@ void CPathCtrl::show_sub_folder_list(bool show)
 	if (total_lines == 0)
 		show = false;
 
-	//항목이 10개 이하면 항목 수만큼의 높이로 딱 맞게(스크롤바 없음), 10개를 초과하면 10줄 높이로 고정하고
+	//항목이 15개 이하면 항목 수만큼의 높이로 딱 맞게(스크롤바 없음), 15개를 초과하면 15줄 높이로 고정하고
 	//나머지는 스크롤바로 본다. calc_popup_height_for_lines 는 NC padding 포함한 전체 window height 반환.
-	const int max_popup_lines = 10;
+	const int max_popup_lines = 15;
 	int display_lines = min(total_lines, max_popup_lines);
 	int popup_w = m_sz_list_folder.cx;
 	int popup_h = m_list_folder.calc_popup_height_for_lines(display_lines);

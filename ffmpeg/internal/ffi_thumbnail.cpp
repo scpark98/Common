@@ -115,33 +115,22 @@ namespace ffi
 			return false;
 		}
 
-		//키프레임(<=ts)에서 forward 디코드 → pts>=ts 인 첫 프레임(= 요청 시각의 프레임)까지 진행.
-		//키프레임만 반환하면 sparse keyframe 미디어에서 요청 시각과 최대 GOP 길이만큼 어긋나므로 forward 디코드로 정확화.
-		//EOF(요청이 마지막 근처)면 have_any 로 마지막 디코드 프레임을 fallback 사용.
-		bool got = false;		//pts>=ts 도달
-		bool have_any = false;	//프레임 1장 이상 디코드 (EOF fallback)
+		//hover 프리뷰는 속도 우선 — seek 한 직전 키프레임(<=ts) 1장만 디코드해 즉시 반환.
+		//forward decode 로 정확 시각까지 진행하면 long-GOP 미디어에서 hover 마다 수백 프레임 디코드 → 느림.
+		//keyframe 1장만 받으면 sparse keyframe 미디어에서 최대 GOP 길이만큼 어긋날 수 있으나 프리뷰 용도엔 충분.
+		bool got = false;
 		while (!got && av_read_frame(m_fmt, pkt) >= 0)
 		{
 			if (pkt->stream_index == m_video_idx && avcodec_send_packet(m_vctx, pkt) >= 0)
 			{
-				while (avcodec_receive_frame(m_vctx, frame) >= 0)
-				{
-					have_any = true;
-					int64_t fpts = (frame->best_effort_timestamp != AV_NOPTS_VALUE) ? frame->best_effort_timestamp
-								 : (frame->pts != AV_NOPTS_VALUE ? frame->pts : ts);
-					if (fpts >= ts)
-					{
-						got = true;	//요청 시각 도달 — 이 프레임 사용.
-						break;
-					}
-					//아직 target 이전 — 계속 디코드(현재 frame 은 다음 receive 로 덮어씀, 가장 최근 것이 closest).
-				}
+				if (avcodec_receive_frame(m_vctx, frame) >= 0)
+					got = true;	//첫 디코드 프레임(= 키프레임) 사용.
 			}
 			av_packet_unref(pkt);
 		}
 
 		bool ok = false;
-		if ((got || have_any) && frame->width > 0 && frame->height > 0)
+		if (got && frame->width > 0 && frame->height > 0)
 		{
 			int dw = target_width & ~1;
 			int dh = (int)((int64_t)dw * frame->height / frame->width) & ~1;

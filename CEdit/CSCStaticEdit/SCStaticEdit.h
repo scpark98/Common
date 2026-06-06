@@ -267,6 +267,8 @@ private:
     // IME 조합 중 문자
     CString		m_compose;           // 현재 조합 중인 문자열
     bool		m_composing = false;
+    //조합 시작 시 선택 영역을 삭제하며 undo 를 1회 push 했음 → 첫 음절 확정(GCS_RESULTSTR) 때 중복 push 방지.
+    bool		m_composition_undo_pushed = false;
 
     // ── 테두리 ──
     bool		m_draw_border   = true;

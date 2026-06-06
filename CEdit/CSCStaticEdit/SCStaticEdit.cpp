@@ -920,6 +920,16 @@ void CSCStaticEdit::OnContextMenu(CWnd* /*p_wnd*/, CPoint point)
 // ──────────────────────────────────────────────────────────
 LRESULT CSCStaticEdit::on_ime_start_composition_message(WPARAM w_param, LPARAM l_param)
 {
+	//선택 영역이 있는 상태에서 한글 조합을 시작하면 *첫 자모* 순간 선택 영역이 교체돼야 표준 동작과 일치한다.
+	//(영문은 WM_CHAR→insert_text 라 즉시 교체되지만, 한글은 첫 음절 확정(GCS_RESULTSTR)이 두 번째 글자에서야
+	// 일어나 그때까지 선택이 남아 있던 버그.) 조합 시작 시 선택을 먼저 지워 조합 문자열이 빈 캐럿 위치에서 그려지게 한다.
+	if (!m_readonly && has_selection())
+	{
+		push_undo();
+		delete_selection();
+		m_composition_undo_pushed = true;	//첫 RESULTSTR 의 중복 push_undo 방지.
+	}
+
 	// 캐럿 위치를 IME에 알려줌
 	CPoint pt = calc_caret_pixel_pos(m_caret_pos);
 	HIMC himc = ImmGetContext(m_hWnd);
@@ -944,6 +954,8 @@ LRESULT CSCStaticEdit::on_ime_end_composition_message(WPARAM w_param, LPARAM l_p
 {
 	m_compose = _T("");
 	m_composing = false;
+	//조합이 ESC 등으로 결과 없이 끝난 경우(첫 RESULTSTR 미발생) 플래그 잔존 방지 — 다음 조합에 오염되지 않도록 리셋.
+	m_composition_undo_pushed = false;
 	Invalidate(FALSE);
 	return 0;
 }
@@ -970,7 +982,10 @@ LRESULT CSCStaticEdit::on_ime_composition(WPARAM w_param, LPARAM l_param)
 			result.ReleaseBuffer(n_chars);
 
 			m_compose = _T("");
-			push_undo();
+			//조합 시작에서 이미 선택 삭제 + undo push 했으면 첫 음절은 그 undo 에 합쳐 한 번에 되돌리게 중복 push 생략.
+			if (!m_composition_undo_pushed)
+				push_undo();
+			m_composition_undo_pushed = false;
 			insert_text(result);
 		}
 	}

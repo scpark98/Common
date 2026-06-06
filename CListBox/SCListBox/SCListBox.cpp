@@ -462,7 +462,6 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		nFormat |= DT_EXPANDTABS;
 
 	CFont* pOldFont = NULL;
-	CFont font_selected;
 
 	if (m_as_folder_list)
 	{
@@ -475,19 +474,8 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		rect.left += 16;	//small icon width
 		rect.left += 14;	//margin between icon and text
 
-		LOGFONT lf;
-
-		if (lpDIS->itemState & ODS_SELECTED)
-		{
-			memcpy(&lf, &m_lf, sizeof(LOGFONT));
-			lf.lfWeight = FW_SEMIBOLD;
-			BOOL bCreated = font_selected.CreateFontIndirect(&lf);
-			pOldFont = pDC->SelectObject(&font_selected);
-		}
-		else
-		{
-			pOldFont = pDC->SelectObject(&m_font);
-		}
+		//Win11 탐색기 동일 — 선택 항목도 regular 폰트로 그림 (이전 SEMIBOLD 는 measure 와 mismatch 유발).
+		pOldFont = pDC->SelectObject(&m_font);
 	}
 	else if (m_imagelist.size() > 0)
 	{
@@ -586,9 +574,6 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	}
 
 	pDC->SelectObject(pOldFont);
-
-	if (m_as_folder_list)
-		font_selected.DeleteObject();
 }	// DrawItem
 
 /*
@@ -907,7 +892,9 @@ int CSCListBox::find(int start, CString find_str, bool find_main_text, bool whol
 
 void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 {
-	// TODO: Add your message handler code here and/or call default
+	//paint shift 중이면 시각 위치(point)를 native 항목 좌표로 보정(+shift) — hover 판정·base 드래그선택 모두 정합.
+	point.y += m_v_paint_shift;
+
 	if (m_use_over)
 	{
 		BOOL outside = false;
@@ -916,24 +903,10 @@ void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 
 		if (new_over != m_over_item)
 		{
-			//이전: Invalidate(false) — 전체 client 무효화 → 모든 visible 항목 DrawItem 재호출로 flicker.
-			//변경: 이전 hover 항목과 새 hover 항목 두 rect 만 invalidate. erase 단계 생략 (bErase=FALSE)
-			//하여 WM_ERASEBKGND 호출 없이 WM_PAINT → DrawItem 의 MemoryDC 더블버퍼링으로 flicker 제거.
-			int old_over = m_over_item;
+			//부분 invalidate (이전 + 새 hover rect 만) 는 세로 스크롤 후 hover 항목 위치 mismatch 시 잔상 발생.
+			//전체 Invalidate(FALSE) — MemoryDC 더블버퍼라 깜빡임 없음. 잔상 강제 erase.
 			m_over_item = new_over;
-
-			int count = GetCount();
-			CRect rc;
-			if (old_over >= 0 && old_over < count)
-			{
-				GetItemRect(old_over, &rc);
-				InvalidateRect(&rc, FALSE);
-			}
-			if (new_over >= 0 && new_over < count)
-			{
-				GetItemRect(new_over, &rc);
-				InvalidateRect(&rc, FALSE);
-			}
+			Invalidate(FALSE);
 		}
 	}
 
@@ -1204,6 +1177,11 @@ int CSCListBox::set_folder_list(std::deque<CString>* lists, CString selected_tex
 {
 	ResetContent();
 
+	//m_auto_scroll 은 OnLbnSelchange 의 *맨 끝 선택 시 true* 잔존 — 풀다운 재구성 시 매 insert 마다
+	//SetTopIndex(inserted) 호출되어 top == max_top → paint shift 발동 → 상단 cut off (측정 확인).
+	//풀다운은 *재구성* 시나리오라 append 자동 스크롤 무관 — 명시 리셋.
+	m_auto_scroll = false;
+
 	if (lists != NULL)
 	{
 		m_folder_list.clear();
@@ -1313,6 +1291,7 @@ int CSCListBox::get_item_from_pos(int x, int y)
 	BOOL bOutside;
 	CPoint pt(x, y);
 	ScreenToClient(&pt);
+	pt.y += m_v_paint_shift;	//paint shift 보정.
 
 	int rclicked_index = ItemFromPoint(pt, bOutside);
 	TRACE(_T("rclicked_index = %d, bOutside = %d\n"), rclicked_index, bOutside);
@@ -1342,6 +1321,7 @@ void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 	BOOL bOutside;
 	CPoint pt = point;
 	ScreenToClient(&pt);
+	pt.y += m_v_paint_shift;	//paint shift 보정.
 
 	int rclicked_index = ItemFromPoint(pt, bOutside);
 
@@ -1743,16 +1723,14 @@ void CSCListBox::edit_end(bool modify)
 
 void CSCListBox::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-
+	point.y += m_v_paint_shift;	//paint shift 보정 — 시각상 마지막 항목 클릭 시 native 항목과 일치.
 	CListBox::OnLButtonDown(nFlags, point);
 }
 
 
 void CSCListBox::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-
+	point.y += m_v_paint_shift;
 	CListBox::OnLButtonUp(nFlags, point);
 }
 
@@ -1815,9 +1793,15 @@ void CSCListBox::recalc_horizontal_extent(CString added_text)
 	else if (m_imagelist.size() > 0)
 		base_indent += m_imagelist[0]->width + 4;
 	int right_margin = 10;
+	//folder list 의 한글 폴더명은 GDI advance width (GetTextExtentPoint32) 와 시각 ink width 가 미세 다름.
+	//마지막 글자의 trailing stroke 가 advance 너머 그려져 measure 와 정확히 일치하는 clip 으로 잘림 — 측정 확인됨.
+	//6 px ink overhang 보상으로 max_h 가 6 px 만큼 더 → 가로 끝 도달 시 text_end 가 clip 좌측 6 px 안에 들어옴.
+	//시각 padding 10 은 그대로 유지 (그리기 측 손대지 않음).
+	if (m_as_folder_list) right_margin += 6;
 	//GDI+ 렌더(m_text_smooth)는 좌우 typographic overhang 으로 GDI 측정보다 약간 넓다 — 과소측정(꼬리 잘림) 방지로 더한다.
 	int overhang = m_text_smooth ? ((-m_lf.lfHeight) / 3 + 4) : 0;
 
+	//DrawItem 은 모든 항목을 regular 폰트로 그리므로 (bold 분기 제거됨) 측정도 regular 만으로 정확.
 	auto measure = [&](const CString& s) -> int
 	{
 		CSize sz;
@@ -2173,34 +2157,39 @@ void CSCListBox::sync_scrollbar()
 	CRect rc;
 	GetClientRect(&rc);
 
-	//가로: 리소스 WS_HSCROLL(m_use_hscroll) 꺼져 있으면 항상 false → 넘쳐도 표시 안 함(우측 clip 정책). visible 과 무관하게 결정.
+	//가로: 리소스 WS_HSCROLL(m_use_hscroll) 꺼져 있으면 항상 false → 넘쳐도 표시 안 함(우측 clip 정책).
 	bool need_h = m_use_hscroll && ::IsWindow(m_scrollbar_h.m_hWnd)
 				&& (rc.Width() > 0) && (m_max_horizontal_extent > rc.Width());
 
-	//세로 가시 항목 수 — 네이티브 listbox 의 내부 max top(=count - floor(client/line))과 일치시켜 thumb 이
-	//끝까지 도달하도록 한다(effective_h 차감/NC 리저베이션 모두 부작용이 커서 채택 안 함).
-	//tradeoff: H-bar 가 보일 때 마지막 항목은 최대 m_scrollbar_width 만큼 H-bar 와 겹쳐 보일 수 있다.
-	int visible = (m_line_height > 0) ? (rc.Height() / m_line_height) : 0;
+	//세로 가시 항목 수 — H-bar 가 보일 때는 그 영역만큼 viewport 줄어듦. 마지막 항목이 H-bar 와 겹치지 않도록 visible 차감.
+	//paint shift 같은 위치 보정 없이 *viewport 자체* 가 정확 → 잔상 없음 + 마지막 항목 H-bar 위에 안 들어감.
+	int eff_h = need_h ? max(0, rc.Height() - m_scrollbar_width) : rc.Height();
+	int visible = (m_line_height > 0) ? (eff_h / m_line_height) : 0;
 	bool need_v = (total > visible) && (visible > 0);
 
 	m_show_corner = need_v && need_h;
 
-	//paint shift Y — max 스크롤에서 마지막 항목이 H-bar 영역과 겹치는 만큼 그리기를 위로 이동.
+	//paint shift Y — H-bar 가 보이고 마지막 항목이 H-bar 영역에 걸쳐 있을 때만, 그 겹친 픽셀만큼 콘텐츠를
+	//위로 끌어올려 마지막 항목이 H-bar 위로 완전히 드러나게 한다. listbox 는 픽셀 스크롤이 없어(SetTopIndex 가
+	//항목 단위라 native max 에서 마지막 항목을 client 바닥에 붙여 H-bar 가 덮음) tree 의 customdraw 와 동일하게
+	//owner-draw paint shift 로 노출한다. 히트테스트(ItemFromPoint·base 마우스 호출)는 이 shift 만큼 y 를 더해 보정.
 	int new_shift = 0;
-	if (need_h && need_v && visible > 0 && m_line_height > 0)
+	if (need_h && total > 0)
 	{
-		int max_top = max(0, total - visible);
-		if (GetTopIndex() == max_top)
+		CRect r_last;
+		//GetItemRect 는 스크롤로 가려진 항목엔 client 밖 좌표를 반환 → top<bottom(=일부 보임) 조건으로 바닥 근처일 때만 적용.
+		if (GetItemRect(total - 1, r_last) != LB_ERR
+			&& r_last.top < rc.bottom && r_last.bottom > rc.bottom - m_scrollbar_width)
 		{
-			int overlap = visible * m_line_height - (rc.Height() - m_scrollbar_width);
-			if (overlap > 0)
-				new_shift = overlap;
+			new_shift = r_last.bottom - (rc.bottom - m_scrollbar_width);
+			if (new_shift > m_scrollbar_width)
+				new_shift = m_scrollbar_width;
 		}
 	}
 	if (new_shift != m_v_paint_shift)
 	{
 		m_v_paint_shift = new_shift;
-		Invalidate(FALSE);	//shift 변경 시 전체 항목 재그리기.
+		Invalidate(FALSE);
 	}
 
 	int v_bottom = need_h ? (rc.bottom - m_scrollbar_width) : rc.bottom;
@@ -2268,7 +2257,7 @@ void CSCListBox::sync_scrollbar()
 		}
 		else
 		{
-			//콘텐츠 폭 변화로 현재 위치가 끝을 넘으면 당겨온다.
+			//콘텐츠 폭 변화로 현재 위치가 끝을 넘으면 당겨온다. page = rc.Width() 기준 (overlay scrollbar 정합).
 			int max_h = max(0, m_max_horizontal_extent - rc.Width());
 			if (m_h_scroll_pos > max_h) m_h_scroll_pos = max_h;
 			if (m_h_scroll_pos < 0)     m_h_scroll_pos = 0;

@@ -1021,24 +1021,16 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 
 void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	logWrite(_T("[slider/click] OnLButtonDown ENTER pt=(%d,%d) style=%d use_slide=%d use_bookmark=%d cur_bookmark=%d m_rc=(%d,%d,%d,%d)"),
-		point.x, point.y, m_style, m_use_slide, m_use_bookmark, m_cur_bookmark,
-		m_rc.left, m_rc.top, m_rc.right, m_rc.bottom);
-
 	SetFocus();
 
 	if (m_style == style_normal)
 	{
-		logWrite(_T("[slider/click] return: style_normal"));
 		CSliderCtrl::OnLButtonDown(nFlags, point);
 		return;
 	}
 
 	if (m_use_slide == false)
-	{
-		logWrite(_T("[slider/click] return: use_slide==false"));
 		return;
-	}
 
 	//북마크 근처 click 시 정확한 bookmark 위치로 점프.
 	//OnMouseMove 가 마우스 위치 ±m_bookmark_near_tolerance 안에 bookmark 있으면 m_cur_bookmark 를 미리 set.
@@ -1046,7 +1038,6 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	if (m_use_bookmark && m_cur_bookmark >= 0)
 	{
 		int bm_pos = m_bookmark[m_cur_bookmark].pos;
-		logWrite(_T("[slider/click] return: bookmark branch cur_bookmark=%d bm_pos=%d → msg_thumb_release"), m_cur_bookmark, bm_pos);
 		SetPos(bm_pos);
 		CSCSliderCtrlMsg msg(CSCSliderCtrlMsg::msg_thumb_release, this, bm_pos);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&msg, 0);
@@ -1084,8 +1075,6 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	// 같은 위치를 두 번 처리하는 문제가 있었음. grab 한 번이면 충분.)
 	{
 		int pos = Pixel2Pos(point.x);
-		logWrite(_T("[slider/click] grab send: Pixel2Pos(%d)=%d range=[%d,%d] → msg_thumb_grab"),
-			point.x, pos, GetRangeMin(), GetRangeMax());
 		SetPos(pos);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
 			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, this, pos), 0);

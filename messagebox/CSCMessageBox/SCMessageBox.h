@@ -133,6 +133,12 @@ public:
 	//프리셋 + 사용자 오버라이드를 모두 보존한다. m_parent 는 본 msgbox 의 것을 유지.
 	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
+	//메시지박스 폰트 변경. m_lf 를 갱신해 자식(메시지 static + 버튼)에 일괄 적용하고 박스를 재배치한다.
+	//표시 중(modeless)에 호출해도 새 폰트 메트릭으로 박스 크기까지 다시 맞춰진다.
+	void			set_font(const LOGFONT& lf);
+	//편의 오버로드 — size/weight 는 -1 이면 현재 값 유지. 예: set_font(_T("궁서")), set_font(_T("궁서"), 14, FW_BOLD).
+	void			set_font(CString face = _T(""), int size = -1, int weight = -1);
+
 	//normal message일 경우는 theme에 지정된 title_back_color를 사용하지만 이 함수를 사용하면
 	//question은 연두색, warning은 주황색, error는 핑크색, info는 하늘색으로 표시된다.
 	//타이틀바의 글자색은 검정으로 고정된다.

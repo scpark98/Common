@@ -523,6 +523,8 @@ protected:
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[line][idx]
 	CSCTextProperty	m_text_prop;					//기본 폰트/색상 속성
 	void			update_text_property();			//현재 m_lf + m_theme 를 m_text_prop 에 반영
+	//단락 모드(m_para 채워짐)일 때만 m_lf 변경을 m_text_prop 에 반영하고 m_para 를 재파싱·재배치. plain 모드면 no-op.
+	void			rebuild_paragraph();
 
 	bool			m_font_antialiasing = false;
 	//음절별 hint 자동 결정 — 기본 ON. aa_from_pt 미만은 ClearType(작은 글씨 또렷), 이상은 AntiAlias(큰 글씨 매끈).

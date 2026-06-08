@@ -271,7 +271,40 @@ void CSCMessageBox::reconstruct_font()
 		m_button[i].set_font(&m_font);
 	}
 
+	//create() 단계에서는 m_static_message 가 아직 없으므로(이 함수가 static.create 보다 먼저 호출됨) 가드.
+	//그 경우 create() 가 직접 set_font(&m_font) 한다.
+	if (m_static_message.m_hWnd)
+		m_static_message.set_font(&m_font);
+
 	ASSERT(bCreated);
+}
+
+void CSCMessageBox::set_font(const LOGFONT& lf)
+{
+	m_lf = lf;
+	reconstruct_font();
+
+	//폰트가 바뀌면 텍스트 메트릭→박스 크기가 달라지므로 전체 레이아웃을 다시 돌려야 한다.
+	//레이아웃 로직은 set_message() 본문에 있고(헤더 §동적 메시지 변경 경로), 현재 m_type 을 그대로
+	//넘겨 타입을 보존한다(set_message 는 받은 type 을 무조건 m_type 에 대입). timeout/align 음수 = 유지.
+	if (m_hWnd && !m_message.IsEmpty())
+		set_message(m_message, m_type);
+}
+
+void CSCMessageBox::set_font(CString face, int size, int weight)
+{
+	LOGFONT lf = m_lf;
+
+	if (face.IsEmpty() == false)
+		_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), face);
+
+	if (size > 0)
+		lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, size);
+
+	if (weight > 0)
+		lf.lfWeight = weight;
+
+	set_font(lf);
 }
 
 void CSCMessageBox::set_title(CString title)

@@ -1513,6 +1513,7 @@ void CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)
 
 	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), strFont);
 	reconstruct_font();
+	rebuild_paragraph();
 	update_surface();
 }
 
@@ -1520,6 +1521,7 @@ void CSCStatic::set_font_size(int nSize)
 {
 	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, nSize);
 	reconstruct_font();
+	rebuild_paragraph();
 	update_surface();
 }
 
@@ -1603,6 +1605,7 @@ void CSCStatic::set_font_weight(int weight)
 {
 	m_lf.lfWeight = weight;
 	reconstruct_font();
+	rebuild_paragraph();
 	update_surface();
 }
 
@@ -2111,6 +2114,10 @@ void CSCStatic::update_text_property()
 	_tcscpy_s(m_text_prop.name, _countof(m_text_prop.name), m_lf.lfFaceName);
 	m_text_prop.size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 
+	//매 호출마다 m_lf 로부터 새로 산출 — |= 누적이면 set_font_weight(FW_NORMAL) 으로 bold 를 끄거나
+	//set_font_italic(false) 해도 이전 bit 가 남아 폰트 변경 rebuild 가 반쪽만 동작한다.
+	m_text_prop.style = Gdiplus::FontStyleRegular;
+
 	if (m_lf.lfWeight >= FW_BOLD)
 		m_text_prop.style |= Gdiplus::FontStyleBold;
 	if (m_lf.lfItalic)
@@ -2122,6 +2129,16 @@ void CSCStatic::update_text_property()
 
 	m_text_prop.cr_text = m_theme.cr_text;
 	m_text_prop.cr_back = m_theme.cr_back;
+}
+
+void CSCStatic::rebuild_paragraph()
+{
+	if (m_para.empty())
+		return;
+
+	update_text_property();
+	CSCParagraph::build_paragraph_str(m_text, m_para, &m_text_prop);
+	rebuild_layout();
 }
 
 void CSCStatic::set_line_spacing(float spacing)

@@ -136,7 +136,7 @@ protected:
 	//path항목의 오른쪽 pulldown을 눌렀을때 탐색기는 특수폴더, 폴더, 압축파일까지 모두 보여주고 있지만
 	//여기서는 특수폴더와 폴더만 보여주자.
 	CSCListBox			m_list_folder;
-	CSize				m_sz_list_folder = CSize(450, 386);	//기본 너비 — 콘텐츠가 넘치면 listbox 의 가로 스크롤바가 표시됨.
+	CSize				m_sz_list_folder = CSize(350, 386);	//기본 너비 — 콘텐츠가 넘치면 listbox 의 가로 스크롤바가 표시됨.
 	std::deque<CString>	m_remote_sub_folders;
 	void				show_sub_folder_list(bool show);
 

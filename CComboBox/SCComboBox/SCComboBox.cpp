@@ -438,21 +438,37 @@ void CSCComboBox::reconstruct_font()
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	SetFont(&m_font, true);
 
-	int line_height = m_line_height;
+	int list_height;	//dropdown listbox 각 항목 높이.
+	int edit_height;	//선택영역(닫힌 콤보의 보이는 부분) 높이.
 
 	if (m_line_height > 0)
 	{
-		line_height = m_line_height;
+		//명시 지정 — 두 높이 동일.
+		list_height = m_line_height;
+		edit_height = m_line_height;
 	}
 	else
 	{
-		line_height = -m_lf.lfHeight;
+		//auto — native CComboBox 와 동일하게 맞춘다(같은 폰트로 native 측정값 list=tmHeight, edit=tmHeight+2).
+		//-m_lf.lfHeight(em 높이)만 쓰면 ascent/descent/leading 이 빠져 native 보다 좁고,
+		//선택영역까지 tmHeight 로 두면 닫힌 콤보가 native 보다 2px 낮다 — edit 내부 상하 여백(각 1px) 만큼 더해야 함.
+		list_height = -m_lf.lfHeight;
+		edit_height = list_height;
+		if (m_hWnd)
+		{
+			CClientDC dc(this);
+			CFont* old_font = dc.SelectObject(&m_font);
+			TEXTMETRIC tm = {};
+			dc.GetTextMetrics(&tm);
+			dc.SelectObject(old_font);
+			list_height = tm.tmHeight + tm.tmExternalLeading;
+			edit_height = list_height + 2;
+		}
 	}
 
-	//-1을 주면 입력박스의 높이가 변경된다.
-	SetItemHeight(-1, line_height);
-	//0을 주면 리스트박스의 모든 아이템의 높이가 변경된다.
-	SetItemHeight(0, line_height);
+	//-1 = 선택영역(닫힌 콤보) 높이, 0 = listbox 항목 높이.
+	SetItemHeight(-1, edit_height);
+	SetItemHeight(0, list_height);
 
 	ASSERT(bCreated);
 }

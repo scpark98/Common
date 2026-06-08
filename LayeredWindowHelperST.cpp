@@ -142,8 +142,8 @@ BOOL CLayeredWindowHelperST::SetTransparent(HWND hWnd, BYTE alpha)
 
 	LONG_PTR ex = ::GetWindowLongPtr(hWnd, GWL_EXSTYLE);
 
-	TRACE(_T("Layered: ok=%d gle=%lu ex=0x%08llX flags=0x%08X alpha=%u expected=%d\n"),
-		ok, gle, (unsigned long long)ex, flags, (unsigned)alpha, m_alpha);
+	//TRACE(_T("Layered: ok=%d gle=%lu ex=0x%08llX flags=0x%08X alpha=%u expected=%d\n"),
+	//	ok, gle, (unsigned long long)ex, flags, (unsigned)alpha, m_alpha);
 
 	return res;
 } // End of SetTransparentPercentage

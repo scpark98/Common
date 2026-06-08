@@ -540,7 +540,9 @@ namespace ffi
 		//누적 시 mkv 의 실제 fps 와 mismatch 발생 — video 가 빠르게/느리게 진행 → audio 와 어긋남.
 		//frame.pts 직접 사용 + video first 기준이라 sample.rtStart 가 *segment-local 0 부터 작은 양수* → freeze 회피.
 		REFERENCE_TIME rtStart;
-		if (frame->pts != AV_NOPTS_VALUE)
+		//unreliable_video_pts(인덱스 없는 미종료 파일): video pts 가 비선형/엉터리라 frame_pts_rt - video_first 가
+		//garbage rtStart 가 됨 → 재생 폭주/정지. sample_count 기반(아래 else)으로 강제해 segment 0 부터 fps 로 균일 진행.
+		if (frame->pts != AV_NOPTS_VALUE && !dec.unreliable_video_pts())
 		{
 			AVRational tb = dec.video_time_base();
 			REFERENCE_TIME frame_pts_rt = av_rescale_q(frame->pts, tb, AVRational{1, 10000000});
@@ -943,9 +945,13 @@ namespace ffi
 			frame = dec.pop_audio_frame();
 			if (frame)
 			{
+				//unreliable_video_pts: video pts 가 garbage 라 video anchor 기반 audio skip 이 audio 를 과도 skip → 무음·정지.
+				//byte-seek 는 audio·video 가 같은 byte 에 착지해 이미 정렬되므로 anchor 생략. 정상 파일은 do_anchor=true → 기존 동작.
+				bool do_anchor = !dec.unreliable_video_pts();
+
 				//video anchor 확인 — set 안 되어 있으면 short wait (video first emit 까지).
-				int64_t video_anchor = dec.video_first_emit_pts_rt();
-				if (video_anchor == LLONG_MIN && wait_anchor_ms < 200)
+				int64_t video_anchor = do_anchor ? dec.video_first_emit_pts_rt() : LLONG_MIN;
+				if (do_anchor && video_anchor == LLONG_MIN && wait_anchor_ms < 200)
 				{
 					//video first emit 아직 안 됨 — frame 다시 큐 앞에 못 넣음. discard + wait.
 					av_frame_free(&frame);
@@ -960,7 +966,7 @@ namespace ffi
 				//rtStart 직접 shift 는 negative→DSound 즉시표시로 무효라, anchor 이동으로 rtStart 는 0 부터 유지.
 				int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
 				int64_t anchor_rt = video_anchor - sync_delay;
-				if (video_anchor != LLONG_MIN && audio_tb.num > 0 && audio_tb.den > 0)
+				if (do_anchor && video_anchor != LLONG_MIN && audio_tb.num > 0 && audio_tb.den > 0)
 				{
 					int64_t anchor_pts = av_rescale_q(anchor_rt,
 						AVRational{1, 10000000}, audio_tb);
@@ -1149,6 +1155,12 @@ namespace ffi
 		REFERENCE_TIME rtStart;
 		if (m_filter_graph)
 		{
+			if (!m_audio_offset_set && dec.unreliable_video_pts())
+			{
+				//unreliable_video_pts: video_first(garbage) 기준 offset 은 음수 rtStart→폭주. offset=0 → sample_count 만으로 진행.
+				m_audio_offset_rt = 0;
+				m_audio_offset_set = true;
+			}
 			if (!m_audio_offset_set)
 			{
 				int64_t video_first = dec.video_first_emit_pts_rt();
@@ -1168,7 +1180,7 @@ namespace ffi
 			rtStart = m_audio_offset_rt +
 				(REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
 		}
-		else if (frame->pts != AV_NOPTS_VALUE)
+		else if (frame->pts != AV_NOPTS_VALUE && !dec.unreliable_video_pts())
 		{
 			int64_t audio_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
 			int64_t video_first = dec.video_first_emit_pts_rt();
@@ -1179,6 +1191,8 @@ namespace ffi
 		}
 		else
 		{
+			//unreliable_video_pts: video_first(garbage)에 의존하면 rtStart 이 음수가 돼 렌더러가 audio 를 폭주 덤프(33배속).
+			//sample_count 기반(0 부터 균일)으로 video 와 동일 시간계 → A/V 1배속 정상.
 			rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
 		}
 		m_sample_count += out_samples;
@@ -1291,6 +1305,17 @@ namespace ffi
 		//	- video frame 의 원본 PTS = 화면에 보이는 frame 시점 = .smi 자막 timing reference (영상 기준 작성).
 		//	- audio PTS 기반은 seek 시 audio 와 video 의 first-frame PTS 차이로 mismatch (1.6초 등) 발생.
 		//	- video pin 없거나 첫 emit 전 → audio fallback. 둘 다 없으면 -1.
+		//unreliable_video_pts(인덱스 없는 미종료 파일): video pts(비선형 garbage)도, audio pts(byte-seek 후 AVI PCM
+		//절대 sample 위치 상실 → ~0 으로 리셋)도 못 믿는다. 위치 = seek 목표(m_segment_start) + segment-local 재생량
+		//(last_rtStart). GetCurrentPosition 과 동일 식 — garbage pts 무관, byte-seek 후에도 정확.
+		if (m_decoder.unreliable_video_pts())
+		{
+			if (m_pVideoStream)
+				return (m_pVideoStream->m_segment_start + m_pVideoStream->last_rtStart()) / 10000;
+			return -1;
+		}
+
+		//정상 파일: 기존대로 video frame pts 우선 (자막 timing reference), 없으면 audio.
 		if (m_pVideoStream)
 		{
 			int64_t v = m_pVideoStream->last_emitted_pts_ms();

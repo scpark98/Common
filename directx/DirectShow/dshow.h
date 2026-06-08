@@ -184,7 +184,8 @@ public:
 	double			m_step_anchor_ms = -1.0;
 
 	//ms단위의 재생시간을 얻어온다.
-	double			get_media_duration() { return m_duration; }
+	//내장 path 는 decoder().duration_ms() 를 live 로 조회 — 미종료 파일의 백그라운드 스캔이 늦게 산출한 길이를 반영.
+	double			get_media_duration();
 
 //트랙 이동
 	int				m_default_interval;

@@ -3428,6 +3428,22 @@ bool CDShow::rotate_video(bool clockwise)
 	return set_video_rotation(m_video_rotation + (clockwise ? 90 : 270));
 }
 
+double CDShow::get_media_duration()
+{
+	//내장 path: decoder().duration_ms() 를 live 로. 미종료 파일은 open 시 0 이지만 백그라운드 스캔이
+	//끝나면 산출된 길이를 반환하므로, UI 가 폴링하면 트랙 total 이 뒤늦게 채워진다. 0 이면 m_duration fallback.
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+		{
+			double dur = d->duration_ms();
+			if (dur > 0.0)
+				return dur;
+		}
+	}
+	return m_duration;
+}
+
 double CDShow::get_track_pos()
 {
 	if (!m_pGB || !m_pMP)

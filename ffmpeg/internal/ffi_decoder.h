@@ -19,6 +19,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace ffi
@@ -107,6 +108,10 @@ namespace ffi
 		//영상 packet 에 timestamp(pts/dts)가 있는지 — open() 에서 첫 video packet probe 로 판정.
 		//false(일부 AVI 등 no-PTS) 면 internal path 의 PTS 기반 A/V 동기·seek·컨트롤바가 동작 안 해 호출측이 LAV 로 라우팅.
 		bool	video_has_pts() const { return m_video_has_pts; }
+		//인덱스 없는 미종료 파일(헤더 duration 미상) — video pts/dts 가 비선형/엉터리(예: 121441 frame 인데 last dts=293223).
+		//이 경우 video·audio rtStart 를 sample_count 기반으로(garbage pts 우회), 위치는 audio 실시간 pts, seek 는 byte 추정으로
+		//전환해야 한다. open() 에서 m_fmt->duration==NOPTS 면 true. *정상 파일은 false → 기존 pts 기반 동작 그대로*.
+		bool	unreliable_video_pts() const { return m_unreliable_video_pts; }
 		bool	is_eof()	   const { return m_eof.load(); }	//av_read_frame AVERROR_EOF 도달 + queue 비면 stream 끝.
 
 		//queue 의 현재 size — 디버깅용.
@@ -176,6 +181,28 @@ namespace ffi
 
 		std::thread				m_thread;
 		std::atomic<bool>		m_quit{false};
+
+		//백그라운드 duration 스캔 — 헤더에 길이가 없는 미종료 녹화 파일(AVI 등)용.
+		//open() 에서 m_fmt->duration 이 미상이면 worker 를 띄워 전체 packet 을 *디코드 없이* 읽어
+		//마지막 video timestamp 로 총 길이를 산출, m_scanned_duration_ms 에 atomic store. duration_ms() 가 우선 반환.
+		//정상 파일(헤더에 duration 있음)은 스캔 안 띄움 → 오버헤드 0.
+		std::wstring			m_path;					//open() 의 파일 경로 (스캐너가 2nd context 로 다시 열 때 사용).
+		std::thread				m_scan_thread;
+		std::atomic<bool>		m_scan_quit{false};
+		std::atomic<double>		m_scanned_duration_ms{-1.0};	//< 0 = 미산출. > 0 = 산출된 총 길이(ms).
+		void					scan_duration_worker();
+
+		//video pts 가 비선형/엉터리라 sample_count 타이밍 + audio 위치 + byte seek 로 전환할지. open 에서 set, worker/pin 이 read.
+		//set-once (worker 시작 전 open). 정상 파일은 false → 모든 기존 경로 그대로 (정상 미디어 회귀 방지).
+		bool					m_unreliable_video_pts = false;
+
+		//[seek 인덱스] 인덱스 없는 미종료 파일의 byte-seek 정확도용. 스캔(scan_duration_worker)이 (audio시간 ms, 파일 byte 위치)
+		//샘플을 ~수초 간격으로 기록. byte-seek 시 시간→byte 를 보간해 *콘텐츠가 차지한 실제 byte 영역* 으로 이동 (linear×filesize
+		//는 garbage tail/비균일 bitrate 때문에 overshoot → EOF). 스캔 thread 가 write, worker thread 가 read → mutex 보호.
+		std::vector<std::pair<int64_t, int64_t>> m_seek_index;	//(ms, byte). ms 오름차순.
+		std::mutex				m_seek_index_mtx;
+		//시간(ms)에 대응하는 파일 byte 위치를 인덱스에서 보간. 인덱스 비었으면 -1 (호출측이 linear fallback). ms 가 끝 너머면 마지막 byte 로 clamp.
+		int64_t					byte_for_time_ms(double ms);
 
 		//seek 요청 — worker 가 다음 iteration 에서 pickup.
 		std::mutex				m_mtx_seek;

@@ -99,6 +99,8 @@ namespace ffi
 		if (!utf16_path)
 			return false;
 
+		m_path = utf16_path;	//백그라운드 duration 스캐너가 2nd context 로 다시 열 때 사용.
+
 		//Win32 CreateFile 로 직접 handle 열기 — FILE_SHARE_DELETE 포함해 외부 rename / move 시
 		//sharing violation 회피. avformat 기본 file protocol (_wsopen 기반) 은 FILE_SHARE_DELETE 미설정.
 		HANDLE h = ::CreateFileW(utf16_path, GENERIC_READ,
@@ -143,6 +145,10 @@ namespace ffi
 		}
 		m_fmt->pb = m_avio;
 		m_fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
+		//pts 가 없는 packet 에 대해 dts/frame duration 으로 pts 를 생성한다 (AVI 등 미종료 녹화 = pts 없음 / dts=프레임인덱스).
+		//이 flag 가 없으면 첫 video packet 의 pts 가 NOPTS → video_has_pts()==false → LAV 로 fallback 하고
+		//내장 path 의 현재재생시간/동기가 동작 안 한다. genpts 는 pts 가 이미 있는 정상 파일엔 영향 없다 (누락분만 생성).
+		m_fmt->flags |= AVFMT_FLAG_GENPTS;
 
 		//URL=NULL 이면 avformat 이 m_fmt->pb 사용. probe 도 callback 으로 처리.
 		int hr = avformat_open_input(&m_fmt, NULL, NULL, NULL);
@@ -434,12 +440,189 @@ namespace ffi
 			logWrite(_T("[ffi/dec] subtitle[%d→stream%u] %s"), track_idx, i, buf);
 		}
 
+		//헤더에 길이가 없는 미종료 녹화 파일 — 백그라운드로 전체 packet 을 읽어 총 길이를 산출한다.
+		//정상 파일(duration 있음)은 스캔 안 띄움.
+		if (m_fmt->duration == AV_NOPTS_VALUE)
+		{
+			m_unreliable_video_pts = true;	//video pts 비신뢰 → sample_count 타이밍 + audio 위치 + byte seek.
+			m_scan_quit.store(false);
+			m_scanned_duration_ms.store(-1.0);
+			m_scan_thread = std::thread(&CDecoder::scan_duration_worker, this);
+			logWrite(_T("[ffi/dec] duration unknown — unreliable_video_pts + duration estimate started"));
+		}
+
 		return true;
+	}
+
+	//전체 파일을 *디코드 없이* demux 해 마지막 video timestamp 로 총 길이를 산출한다 (worker thread).
+	//재생 중인 m_fmt 를 건드리지 않도록 독립된 2nd AVFormatContext 로 연다. m_scan_quit 로 취소 가능.
+	void CDecoder::scan_duration_worker()
+	{
+		//wstring → utf8 (FFmpeg file protocol 은 Windows 에서 utf8 경로를 내부적으로 wide 변환해 처리).
+		int u8len = ::WideCharToMultiByte(CP_UTF8, 0, m_path.c_str(), -1, NULL, 0, NULL, NULL);
+		if (u8len <= 0)
+			return;
+		std::string u8(u8len, '\0');
+		::WideCharToMultiByte(CP_UTF8, 0, m_path.c_str(), -1, &u8[0], u8len, NULL, NULL);
+
+		AVFormatContext* fmt = nullptr;
+		if (avformat_open_input(&fmt, u8.c_str(), NULL, NULL) < 0)
+			return;
+
+		//video / audio stream 둘 다 찾는다.
+		int vidx = -1, aidx = -1;
+		for (unsigned i = 0; i < fmt->nb_streams; ++i)
+		{
+			AVMediaType t = fmt->streams[i]->codecpar->codec_type;
+			if (t == AVMEDIA_TYPE_VIDEO && vidx < 0) vidx = (int)i;
+			else if (t == AVMEDIA_TYPE_AUDIO && aidx < 0) aidx = (int)i;
+		}
+		if (vidx < 0 && aidx < 0)
+		{
+			avformat_close_input(&fmt);
+			return;
+		}
+
+		double fps = 0.0;
+		if (vidx >= 0)
+		{
+			AVRational r = fmt->streams[vidx]->avg_frame_rate;
+			if (r.den != 0)
+				fps = (double)r.num / (double)r.den;
+		}
+		AVRational atb = (aidx >= 0) ? fmt->streams[aidx]->time_base : AVRational{ 0, 1 };
+		int64_t file_size = (fmt->pb) ? avio_size(fmt->pb) : -1;
+
+		//[2단계 순차 스캔] AVI 의 PCM audio pts 는 *순차 누적* 이라 byte-seek(tail-read) 로는 절대 위치를 못 얻는다(검증: ≈1초).
+		//처음부터 디코드 없이 demux 하며 측정하되,
+		//  (1단계) 앞 ~16MB 만 읽은 시점에 "그때까지 audio 시간 × (전체/현재 byte)" 로 *추정 길이* 를 즉시 store → 트랙바 거의 즉시 채움.
+		//  (2단계) 끝까지 읽어 정확 길이로 교체. 견고한 두 소스 중 큰 값: (a) video 프레임수/fps, (b) audio 마지막 ts × atb.
+		int64_t v_count = 0;
+		int64_t a_last_end = AV_NOPTS_VALUE;	//audio tb 단위. 마지막 audio packet 의 (ts + duration).
+		bool estimate_done = false;
+
+		std::vector<std::pair<int64_t, int64_t>> index;	//(audio ms, 파일 byte). ~5s 간격. 끝에 m_seek_index 로 publish.
+		int64_t last_idx_ms = INT64_MIN;
+
+		AVPacket* pkt = av_packet_alloc();
+		if (pkt)
+		{
+			while (!m_scan_quit.load() && av_read_frame(fmt, pkt) >= 0)
+			{
+				if (pkt->stream_index == vidx)
+				{
+					++v_count;
+				}
+				else if (pkt->stream_index == aidx)
+				{
+					int64_t ts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+					if (ts != AV_NOPTS_VALUE)
+					{
+						int64_t end = ts + (pkt->duration > 0 ? pkt->duration : 0);
+						if (a_last_end == AV_NOPTS_VALUE || end > a_last_end)
+							a_last_end = end;
+
+						//seek 인덱스 — ~5s 간격으로 (audio ms, 현재 파일 byte) 기록. byte-seek 정확도 + content_end 파악.
+						if (atb.den > 0)
+						{
+							int64_t cur_ms = (int64_t)((double)end * av_q2d(atb) * 1000.0);
+							if (last_idx_ms == INT64_MIN || cur_ms - last_idx_ms >= 5000)
+							{
+								index.push_back(std::make_pair(cur_ms, avio_tell(fmt->pb)));
+								last_idx_ms = cur_ms;
+							}
+						}
+					}
+				}
+				av_packet_unref(pkt);
+
+				//1단계 추정 — 앞부분 audio 시간 ÷ 읽은 byte 비율로 전체 길이 외삽 (bitrate 거의 균일 가정).
+				if (!estimate_done && a_last_end != AV_NOPTS_VALUE && atb.den > 0 && file_size > 0)
+				{
+					int64_t pos = avio_tell(fmt->pb);
+					if (pos > 16 * 1024 * 1024)
+					{
+						double covered_ms = (double)a_last_end * av_q2d(atb) * 1000.0;
+						double est_ms = covered_ms * ((double)file_size / (double)pos);
+						if (est_ms > 0.0)
+						{
+							m_scanned_duration_ms.store(est_ms);
+							logWrite(_T("[ffi/dec] duration estimate (phase1) ~%.0fms (covered=%.0fms pos=%lld/%lld)"),
+								est_ms, covered_ms, (long long)pos, (long long)file_size);
+						}
+						estimate_done = true;
+					}
+				}
+			}
+			av_packet_free(&pkt);
+		}
+
+		if (!m_scan_quit.load())
+		{
+			double dur_v_ms = (fps > 0.0 && v_count > 0) ? (double)v_count * 1000.0 / fps : 0.0;
+			double dur_a_ms = (a_last_end != AV_NOPTS_VALUE && atb.den > 0) ? (double)a_last_end * av_q2d(atb) * 1000.0 : 0.0;
+			double dur_ms = (dur_v_ms > dur_a_ms) ? dur_v_ms : dur_a_ms;
+			if (dur_ms > 0.0)
+			{
+				m_scanned_duration_ms.store(dur_ms);	//2단계 — 정확값으로 교체.
+				logWrite(_T("[ffi/dec] full scan done (phase2) — duration=%.0fms (video=%.0fms[%lld frames] audio=%.0fms)"),
+					dur_ms, dur_v_ms, (long long)v_count, dur_a_ms);
+			}
+
+			//seek 인덱스 publish — 이후 byte-seek 가 시간→byte 보간으로 정확히 이동(garbage tail/비균일 bitrate overshoot 방지).
+			if (!index.empty())
+			{
+				std::lock_guard<std::mutex> lk(m_seek_index_mtx);
+				m_seek_index = std::move(index);
+				logWrite(_T("[ffi/dec] seek index built — %zu entries (last %lldms @ byte %lld)"),
+					m_seek_index.size(), (long long)m_seek_index.back().first, (long long)m_seek_index.back().second);
+			}
+		}
+
+		avformat_close_input(&fmt);
+	}
+
+	//시간(ms) → 파일 byte 위치를 seek 인덱스에서 보간. 인덱스 비었으면 -1. ms 가 끝 너머면 마지막 byte 로 clamp (content end).
+	int64_t CDecoder::byte_for_time_ms(double ms)
+	{
+		std::lock_guard<std::mutex> lk(m_seek_index_mtx);
+		if (m_seek_index.empty())
+			return -1;
+		if (ms <= (double)m_seek_index.front().first)
+			return m_seek_index.front().second;
+		if (ms >= (double)m_seek_index.back().first)
+			return m_seek_index.back().second;	//content 끝 너머 — 마지막 유효 byte 로 clamp (garbage tail 진입 방지).
+
+		size_t lo = 0, hi = m_seek_index.size() - 1;
+		while (lo + 1 < hi)
+		{
+			size_t mid = (lo + hi) / 2;
+			if ((double)m_seek_index[mid].first <= ms) lo = mid;
+			else hi = mid;
+		}
+		int64_t t0 = m_seek_index[lo].first, t1 = m_seek_index[hi].first;
+		int64_t b0 = m_seek_index[lo].second, b1 = m_seek_index[hi].second;
+		if (t1 == t0)
+			return b0;
+		double frac = (ms - (double)t0) / (double)(t1 - t0);
+		return b0 + (int64_t)(frac * (double)(b1 - b0));
 	}
 
 	void CDecoder::close()
 	{
 		stop();
+
+		//백그라운드 duration 스캐너 취소 + join (독립 context 라 m_fmt 정리와 순서 무관하나 thread 는 먼저 회수).
+		m_scan_quit.store(true);
+		if (m_scan_thread.joinable())
+			m_scan_thread.join();
+		m_scanned_duration_ms.store(-1.0);
+		m_unreliable_video_pts = false;
+		{
+			std::lock_guard<std::mutex> lk(m_seek_index_mtx);
+			m_seek_index.clear();
+		}
+		m_path.clear();
 
 		if (m_video_ctx)
 			avcodec_free_context(&m_video_ctx);
@@ -617,6 +800,10 @@ namespace ffi
 
 	double CDecoder::duration_ms() const
 	{
+		//헤더에 길이가 없던 파일은 백그라운드 스캔 결과를 우선 반환 (스캔 완료 전엔 < 0 → 아래 fallback).
+		double scanned = m_scanned_duration_ms.load();
+		if (scanned > 0.0)
+			return scanned;
 		if (!m_fmt || m_fmt->duration == AV_NOPTS_VALUE)
 			return 0.0;
 		return (double)m_fmt->duration / 1000.0;   //AV_TIME_BASE = 1000000 (μs), /1000 → ms.
@@ -928,7 +1115,44 @@ namespace ffi
 						AVRational{1, AV_TIME_BASE}, vtb);
 
 					int hr_seek;
-					if (kf_mode)
+					if (m_unreliable_video_pts)
+					{
+						//[byte 추정 seek] 인덱스 없는 미종료 파일 — 시간 기반 av_seek_frame 이 시작 부근으로 fallback 함(검증됨).
+						//파일 크기·추정 길이로 target byte 를 비례 추정 → AVSEEK_FLAG_BYTE 이동, 착지 후 첫 video keyframe 부터
+						//emit(clean picture). 위치는 audio pts(연속·정확)가 반영. 정상 파일은 이 분기 안 탐(아래 pts-seek).
+						//1순위: seek 인덱스(시간→byte 보간) — 콘텐츠 실제 byte 분포 반영, garbage tail/비균일 bitrate overshoot 방지.
+						//인덱스 미생성(스캔 완료 전)이면 linear × filesize fallback (근사, 곧 인덱스로 대체됨).
+						int64_t target_byte = byte_for_time_ms(seek_pos);
+						const wchar_t* method = L"index";
+						if (target_byte < 0)
+						{
+							double dur = m_scanned_duration_ms.load();
+							int64_t file_size = (m_fmt->pb) ? avio_size(m_fmt->pb) : -1;
+							if (dur > 0.0 && file_size > 0)
+							{
+								double ratio = seek_pos / dur;
+								if (ratio < 0.0) ratio = 0.0;
+								if (ratio > 1.0) ratio = 1.0;
+								target_byte = (int64_t)(ratio * (double)file_size);
+								method = L"linear";
+							}
+						}
+						if (target_byte >= 0)
+						{
+							hr_seek = av_seek_frame(m_fmt, -1, target_byte, AVSEEK_FLAG_BYTE);
+							m_kf_skip_active  = true;
+							m_kf_skip_min_pts = INT64_MIN;	//착지 후 첫 keyframe 부터 디코드.
+							logWrite(_T("[ffi/dec/byteseek] seek_pos=%.0fms method=%ls target_byte=%lld hr=%d"),
+								seek_pos, method, (long long)target_byte, hr_seek);
+						}
+						else
+						{
+							hr_seek = av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BYTE);
+							m_kf_skip_active = false;
+							logWrite(_T("[ffi/dec/byteseek] no index/duration yet — seek to start"));
+						}
+					}
+					else if (kf_mode)
 					{
 						//[keyframe 모드] 방향 판정 — prev(직전 위치) 대비 forward 인지 backward 인지.
 						m_kf_skip_target_pts = target_pts;
@@ -1087,7 +1311,8 @@ namespace ffi
 			{
 				//[keyframe 모드] forward keyframe 못 찾고 EOF 도달 (target 이 마지막 keyframe 이후) — fallback:
 				//target GOP 시작 keyframe 으로 BACKWARD 재seek 후 정상 디코드 (target 직전 keyframe emit).
-				if (m_kf_skip_active)
+				//단 unreliable_video_pts(인덱스 없는 파일)는 pts 기반 av_seek 가 무효라 그냥 EOF 처리.
+				if (m_kf_skip_active && !m_unreliable_video_pts)
 				{
 					m_kf_skip_active = false;
 					av_seek_frame(m_fmt, m_video_stream_idx, m_kf_skip_target_pts, AVSEEK_FLAG_BACKWARD);

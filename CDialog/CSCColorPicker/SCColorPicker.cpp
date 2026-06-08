@@ -405,7 +405,9 @@ void CSCColorPicker::calc_layout()
 	}
 
 	//시작 시 ARGB edit에 포커스가 표시되어 보기 안좋으므로 다른 컨트롤에 포커스 강제 변경하여 시작.
-	SetFocus();
+	//dialog 자체에 SetFocus 하면 dialog manager 가 WS_TABSTOP 첫 자식(=m_edit_hexa)으로 옮겨버려 edit 가 선택된 상태로 시작됨.
+	//edit 가 아닌 slider 에 명시 SetFocus 하여 어떤 edit 도 초기 focus 를 갖지 않게 한다.
+	m_slider_alpha.SetFocus();
 
 	RestoreWindowPosition(AfxGetApp(), this, _T("color picker"));
 
@@ -845,11 +847,12 @@ void CSCColorPicker::draw_buttons(Gdiplus::Graphics& g) const
 		const HitTarget       t{ HitArea::Button, -1, -1, BTN_ADD_IDX };
 		const Gdiplus::PointF c = get_cell_center(t);
 		const bool            is_hover = (m_hover == t);
+		const bool            is_pressed = (m_btn_pressed_idx == BTN_ADD_IDX);
 		const float           r = is_hover ? m_radius + 1.5f : m_radius;
 
-		// 배경 원 (hover 시 더 진한 회색)
-		const BYTE bg = is_hover ? 210 : 238;
-		const BYTE border = is_hover ? 150 : 180;
+		// 배경 원 (hover 시 더 진한 회색, pressed 시 한 단계 더 진하게)
+		const BYTE bg = is_pressed ? 180 : (is_hover ? 210 : 238);
+		const BYTE border = is_pressed ? 120 : (is_hover ? 150 : 180);
 		Gdiplus::SolidBrush bgBrush(Gdiplus::Color(bg, bg, bg));
 		Gdiplus::Pen        borderPen(Gdiplus::Color(border, border, border), 1.0f);
 		g.FillEllipse(&bgBrush, c.X - r, c.Y - r, r * 2.f, r * 2.f);
@@ -869,11 +872,12 @@ void CSCColorPicker::draw_buttons(Gdiplus::Graphics& g) const
 		const HitTarget       t{ HitArea::Button, -1, -1, BTN_DROPPER_IDX };
 		const Gdiplus::PointF c = get_cell_center(t);
 		const bool            is_hover = (m_hover == t);
+		const bool            is_pressed = (m_btn_pressed_idx == BTN_DROPPER_IDX);
 		const float           r = is_hover ? m_radius + 1.5f : m_radius;
 
-		// 배경 원 (hover 시 더 진한 회색)
-		const BYTE bg = is_hover ? 210 : 238;
-		const BYTE border = is_hover ? 150 : 180;
+		// 배경 원 (hover 시 더 진한 회색, pressed 시 한 단계 더 진하게)
+		const BYTE bg = is_pressed ? 180 : (is_hover ? 210 : 238);
+		const BYTE border = is_pressed ? 120 : (is_hover ? 150 : 180);
 		Gdiplus::SolidBrush bgBrush(Gdiplus::Color(bg, bg, bg));
 		Gdiplus::Pen        borderPen(Gdiplus::Color(border, border, border), 1.0f);
 		g.FillEllipse(&bgBrush, c.X - r, c.Y - r, r * 2.f, r * 2.f);
@@ -1525,88 +1529,101 @@ void CSCColorPicker::OnPaint()
 
 	draw_overlays(g);		// ⑤ 색상 셀 hover 확대원 + 체크마크
 
-	Gdiplus::Font        labelFont(L"Consolas", 11.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-	Gdiplus::SolidBrush  labelBrush(Gdiplus::Color(64, 64, 64));
-	Gdiplus::StringFormat sf;
-	sf.SetAlignment(Gdiplus::StringAlignmentCenter);
-	sf.SetLineAlignment(Gdiplus::StringAlignmentNear);
-
-	int cell_left = m_r_edit_area.left;
-	Gdiplus::RectF label_rect;
-
-	if (m_edit_hexa.GetSafeHwnd())
+	//라벨 그리기는 GDI(TextOut/DrawText) 경로로 — GDI+ DrawString 은 작은 bold 글씨 stem 이 뭉개진다.
+	//edit 텍스트가 또렷한 이유도 CSCStaticEdit::draw_text 가 GDI TextOut 을 쓰기 때문 (SCStaticEdit.cpp:1282-1339).
+	//ClearType 은 Windows 시스템 default 로 자동 적용되어 흰 배경 라벨이 LCD subpixel 로 또렷히 그려진다.
 	{
-		label_rect = Gdiplus::RectF((float)m_r_edit_area.left,
-			(float)(m_r_edit_area.top - 16), (float)kHexaW, 24.f);
-		g.DrawString(get_hex_format_label(), -1, &labelFont, label_rect, &sf, &labelBrush);
-	}
+		CFont labelFont;
+		LOGFONT lf = {};
+		lf.lfHeight = -11;
+		lf.lfWeight = FW_BOLD;
+		lf.lfCharSet = DEFAULT_CHARSET;
+		lf.lfQuality = CLEARTYPE_QUALITY;
+		_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), _T("Consolas"));
+		labelFont.CreateFontIndirect(&lf);
 
-	if (m_edit_argb[0].GetSafeHwnd())
-	{
-		const wchar_t* kLabels[4] = {};
-		switch (m_hex_format)
+		HDC hdc = g.GetHDC();
+		CDC dc;
+		dc.Attach(hdc);
+
+		CFont* p_old_font = dc.SelectObject(&labelFont);
+		int      old_bk_mode = dc.SetBkMode(TRANSPARENT);
+		COLORREF old_color = dc.SetTextColor(RGB(64, 64, 64));
+
+		const UINT kFormat = DT_CENTER | DT_TOP | DT_SINGLELINE | DT_NOPREFIX;
+
+		if (m_edit_hexa.GetSafeHwnd())
 		{
-			case HexFormat::ARGB: kLabels[0] = L"A"; kLabels[1] = L"R"; kLabels[2] = L"G"; kLabels[3] = L"B"; break;
-			case HexFormat::ABGR: kLabels[0] = L"A"; kLabels[1] = L"B"; kLabels[2] = L"G"; kLabels[3] = L"R"; break;
-			case HexFormat::RGBA: kLabels[0] = L"R"; kLabels[1] = L"G"; kLabels[2] = L"B"; kLabels[3] = L"A"; break;
-			case HexFormat::BGRA: kLabels[0] = L"B"; kLabels[1] = L"G"; kLabels[2] = L"R"; kLabels[3] = L"A"; break;
+			CRect r(m_r_edit_area.left, m_r_edit_area.top - 16,
+				m_r_edit_area.left + kHexaW, m_r_edit_area.top - 16 + 24);
+			CString s(get_hex_format_label());
+			dc.DrawText(s, &r, kFormat);
 		}
 
-		for (int i = 0; i < 4; i++)
+		if (m_edit_argb[0].GetSafeHwnd())
 		{
-			CRect r;
-			m_edit_argb[i].GetWindowRect(r);
-			ScreenToClient(r);
-			r.OffsetRect(0, -16);
-			label_rect = Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
-			g.DrawString(kLabels[i], -1, &labelFont, label_rect, &sf, &labelBrush);
+			LPCTSTR kLabels[4] = {};
+			switch (m_hex_format)
+			{
+				case HexFormat::ARGB: kLabels[0] = _T("A"); kLabels[1] = _T("R"); kLabels[2] = _T("G"); kLabels[3] = _T("B"); break;
+				case HexFormat::ABGR: kLabels[0] = _T("A"); kLabels[1] = _T("B"); kLabels[2] = _T("G"); kLabels[3] = _T("R"); break;
+				case HexFormat::RGBA: kLabels[0] = _T("R"); kLabels[1] = _T("G"); kLabels[2] = _T("B"); kLabels[3] = _T("A"); break;
+				case HexFormat::BGRA: kLabels[0] = _T("B"); kLabels[1] = _T("G"); kLabels[2] = _T("R"); kLabels[3] = _T("A"); break;
+			}
+
+			for (int i = 0; i < 4; i++)
+			{
+				CRect r;
+				m_edit_argb[i].GetWindowRect(r);
+				ScreenToClient(r);
+				r.OffsetRect(0, -16);
+				dc.DrawText(kLabels[i], &r, kFormat);
+			}
 		}
-	}
 
-	// ── H / S / L 레이블 ──────────────────────────────────────────────────
-	if (m_edit_hsl[0].GetSafeHwnd())
-	{
-		static const wchar_t* kHslLabels[3] = { L"H", L"S", L"L" };
-
-		for (int i = 0; i < 3; i++)
+		if (m_edit_hsl[0].GetSafeHwnd())
 		{
-			CRect r;
-			m_edit_hsl[i].GetWindowRect(r);
-			ScreenToClient(r);
-			r.OffsetRect(0, -16);
-			label_rect = Gdiplus::RectF(r.left, r.top, r.Width(), r.Height());
-			g.DrawString(kHslLabels[i], -1, &labelFont, label_rect, &sf, &labelBrush);
-		}
-	}
+			static LPCTSTR kHslLabels[3] = { _T("H"), _T("S"), _T("L") };
 
-	// ── Color Name Label (near 여부에 따라 레이블 변경) ───────────────
-	if (!m_r_color_name.IsRectEmpty())
-	{
-		trace(m_color_name_near);
-		const wchar_t* name_label = m_color_name_near ? L"Name(near)" : L"Name";
-		label_rect = Gdiplus::RectF((float)m_r_color_name.left,
-			(float)(m_r_color_name.top - 16),
-			(float)m_r_color_name.Width(), 16.f);
-		g.DrawString(name_label, -1, &labelFont, label_rect, &sf, &labelBrush);
+			for (int i = 0; i < 3; i++)
+			{
+				CRect r;
+				m_edit_hsl[i].GetWindowRect(r);
+				ScreenToClient(r);
+				r.OffsetRect(0, -16);
+				dc.DrawText(kHslLabels[i], &r, kFormat);
+			}
+		}
+
+		if (!m_r_color_name.IsRectEmpty())
+		{
+			LPCTSTR name_label = m_color_name_near ? _T("Name(near)") : _T("Name");
+			CRect r(m_r_color_name.left, m_r_color_name.top - 16,
+				m_r_color_name.right, m_r_color_name.top - 16 + 16);
+			dc.DrawText(name_label, &r, kFormat);
+		}
+
+		dc.SetTextColor(old_color);
+		dc.SetBkMode(old_bk_mode);
+		dc.SelectObject(p_old_font);
+		dc.Detach();
+		g.ReleaseHDC(hdc);
 	}
 }
 
 void CSCColorPicker::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	// ① 버튼만 즉시 처리 (드래그 충돌 없음)
+	// 버튼 실행은 OnLButtonUp 에서 처리 (표준 클릭 동작 — release 시점 실행).
+	// 여기서는 pressed 시각 피드백만 — m_btn_pressed_idx 설정 + capture (윈도우 밖 release 시에도 pressed 해제 보장).
 	HitTarget t;
-	if (hit_test(point, t))
+	if (hit_test(point, t) && t.area == HitArea::Button)
 	{
-		if (t.area == HitArea::Button)
-		{
-			if (t.idx == BTN_ADD_IDX)
-				on_btn_add_clicked();
-			else if (t.idx == BTN_DROPPER_IDX)    // ← 추가
-				on_btn_dropper_clicked();
-		}
+		m_btn_pressed_idx = t.idx;
+		SetCapture();
+		Invalidate(FALSE);
 	}
 
-	// ② Recent 행 드래그 스크롤 준비
+	// Recent 행 드래그 스크롤 준비
 	const float row_top = static_cast<float>(m_r_palette.bottom);
 	const float row_bot = row_top + 2.f * m_margin + m_cell;
 	if ((float)point.y >= row_top && (float)point.y <= row_bot)
@@ -1624,6 +1641,7 @@ void CSCColorPicker::OnLButtonDown(UINT nFlags, CPoint point)
 void CSCColorPicker::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	const bool was_drag_moved = m_recent_drag_moved;
+	const int  pressed_idx_at_down = m_btn_pressed_idx;
 
 	if (m_recent_drag_on)
 	{
@@ -1632,20 +1650,41 @@ void CSCColorPicker::OnLButtonUp(UINT nFlags, CPoint point)
 		ReleaseCapture();
 	}
 
-	// 드래그 스크롤이 아닌 경우에만 색상 선택
+	if (m_btn_pressed_idx != -1)
+	{
+		m_btn_pressed_idx = -1;
+		ReleaseCapture();
+		Invalidate(FALSE);
+	}
+
+	// 드래그 스크롤이 아닌 경우에만 색상 선택 / 버튼 실행
 	if (!was_drag_moved)
 	{
 		HitTarget t;
-		if (hit_test(point, t) && t.area != HitArea::Button)
+		if (hit_test(point, t))
 		{
-			m_sel = t;
-			m_sel_color = get_color(t);
+			if (t.area == HitArea::Button)
+			{
+				// LDown 시작 버튼과 동일해야 click 발화 (표준 동작).
+				if (t.idx == pressed_idx_at_down)
+				{
+					if (t.idx == BTN_ADD_IDX)
+						on_btn_add_clicked();
+					else if (t.idx == BTN_DROPPER_IDX)
+						on_btn_dropper_clicked();
+				}
+			}
+			else
+			{
+				m_sel = t;
+				m_sel_color = get_color(t);
 
-			gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
-			update_slider_alpha();
-			update_slider_hue();
-			update_slider_light();
-			Invalidate(FALSE);
+				gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
+				update_slider_alpha();
+				update_slider_hue();
+				update_slider_light();
+				Invalidate(FALSE);
+			}
 		}
 	}
 

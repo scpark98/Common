@@ -222,6 +222,8 @@ protected:
 	int    m_recent_drag_scroll_start = 0;       // 드래그 시작 시 m_recent_scroll 값
 	bool   m_recent_drag_moved = false;   // 임계값(4px) 초과 이동 여부
 
+	int    m_btn_pressed_idx = -1;	// LDown 으로 pressed 시작된 버튼 idx (BTN_ADD_IDX / BTN_DROPPER_IDX). -1 = 없음. 시각 피드백 + LUp 시 동일 버튼 확인용.
+
 	void		export_recent_colors();		// ← 최근 색상 내보내기 (.reg)
 	void		import_recent_colors();		// ← 최근 색상 가져오기 (.reg)
 

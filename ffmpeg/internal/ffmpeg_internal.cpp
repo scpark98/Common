@@ -43,6 +43,32 @@ namespace ffi
 		if (level > AV_LOG_WARNING)
 			return;
 
+		//손상 미디어는 동일류 디코드 에러("Invalid NAL unit size", "missing picture" 등)를 초당 수백~수천 건 쏟아낸다.
+		//logWrite 는 동기 디스크 I/O 라 log mutex 를 장시간 점유 → 다른 스레드(특히 UI)의 logWrite 가 그 뒤에서
+		//굶어 앱 전체가 freeze 한다. 초당 건수 상한으로 throttle (드롭분은 1초마다 요약 1줄). 로그 폭주 차단이 목적.
+		static std::atomic<uint32_t> s_window{ 0 };
+		static std::atomic<int>      s_count{ 0 };
+		static std::atomic<int>      s_dropped{ 0 };
+		const int MAX_PER_SEC = 30;
+
+		uint32_t now = (uint32_t)::GetTickCount();
+		uint32_t win = s_window.load(std::memory_order_relaxed);
+		if (now - win >= 1000)
+		{
+			if (s_window.compare_exchange_strong(win, now))
+			{
+				int dropped = s_dropped.exchange(0);
+				s_count.store(0);
+				if (dropped > 0)
+					logWrite(_T("[av] %d개 메시지 throttle 로 생략 (손상 구간 로그 폭주 방지)"), dropped);
+			}
+		}
+		if (s_count.fetch_add(1, std::memory_order_relaxed) >= MAX_PER_SEC)
+		{
+			s_dropped.fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
+
 		char line[1024];
 		if (!seh_vsnprintf(line, sizeof(line), fmt, vl))
 			strcpy_s(line, sizeof(line), "(av_log_cb: vsnprintf threw - fmt has bad arg)");

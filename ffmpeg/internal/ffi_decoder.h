@@ -201,6 +201,9 @@ namespace ffi
 		//는 garbage tail/비균일 bitrate 때문에 overshoot → EOF). 스캔 thread 가 write, worker thread 가 read → mutex 보호.
 		std::vector<std::pair<int64_t, int64_t>> m_seek_index;	//(ms, byte). ms 오름차순.
 		std::mutex				m_seek_index_mtx;
+		//true = 인덱스가 *keyframe* byte (video-only 미종료 파일). byte_for_time_ms 가 보간 대신 target 이하 keyframe 으로 snap.
+		//(byte-seek 후 디코드는 keyframe 부터만 가능 → 비keyframe byte 보간은 무의미. audio 인덱스는 false = 보간.)
+		bool					m_seek_index_snap = false;
 		//시간(ms)에 대응하는 파일 byte 위치를 인덱스에서 보간. 인덱스 비었으면 -1 (호출측이 linear fallback). ms 가 끝 너머면 마지막 byte 로 clamp.
 		int64_t					byte_for_time_ms(double ms);
 
@@ -247,6 +250,27 @@ namespace ffi
 		bool					m_kf_skip_active = false;
 		int64_t					m_kf_skip_min_pts	 = 0;	 //video time_base. 이 값 초과 keyframe 부터 디코드.
 		int64_t					m_kf_skip_target_pts = 0;	 //EOF fallback (target 으로 backward 재seek) 용.
+		//손상 구간 무한 skip 방지 — seek 후 이 개수만큼 video packet 을 skip 해도 유효 keyframe 을 못 만나면
+		//(garbage 라 EOF 도 안 나고 keyframe 도 없음) skip 을 포기하고 정상 디코드로 전환 → 워커 hang/ UI freeze 차단.
+		int64_t					m_kf_skip_count = 0;
+		static const int64_t	kf_skip_limit = 3000;	//정상 GOP(키프레임 간격)보다 충분히 큼. 넘으면 garbage 로 판단.
+		//kf_skip 로 손상 구간을 건너뛰는 중 *현재 스캔 위치(ms)*. 위치 query 가 이 값으로 트랙바·시간을 전진시켜
+		//"복구 지점까지 빠르게 찾아가는" 모습을 보인다(멈춰 보여 freeze 로 오인되는 것 방지). 미스캔 시 -1.
+		std::atomic<int64_t>	m_scan_pos_ms{ -1 };
+		//seek 후 첫 video frame 디코드 전까지 true — 이 동안 매 video packet 시각을 m_scan_pos_ms 로 발행(손상 구간 통과 포함).
+		//첫 frame 디코드 시 false → 정상 재생 땐 read-ahead packet 으로 트랙바가 오염되지 않음.
+		std::atomic<bool>		m_pos_searching{ false };
+	public:
+		int64_t					kf_skip_scan_pos_ms() const { return m_scan_pos_ms.load(std::memory_order_relaxed); }
+		//seek 후 첫 video frame 디코드 전(손상 구간 스캔 포함). audio pin 이 이 동안 video 복구를 대기(garbage 오디오 미전달).
+		bool					is_searching() const { return m_pos_searching.load(std::memory_order_relaxed); }
+	private:
+		//연속 video packet 디코드가 frame 을 못 내는 횟수. frame 받으면 0. 정상은 매 packet 마다 frame → 작게 유지.
+		//일정 임계 초과(손상 keyframe 디코드 후 stall 등)면 searching 재진입 → 스캔으로 정상 구간 탐색(시작부 손상 케이스).
+		int						m_video_no_frame_count = 0;
+		static const int		video_stall_limit = 60;
+		//이번 seek 의 스캔이 손상 구간을 거쳤는지(bound bail 또는 stall 재진입). 복구 시 audio decoder 재생성 트리거. seek 마다 리셋.
+		bool					m_did_garbage_scan = false;
 
 		//frame queue
 		std::mutex				m_mtx_queue;

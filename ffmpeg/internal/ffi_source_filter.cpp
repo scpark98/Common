@@ -925,6 +925,20 @@ namespace ffi
 		return NOERROR;
 	}
 
+	//손상 구간의 깨진 audio frame 은 swr_convert 내부에서 null 참조(0xC0000005) 로 크래시할 수 있다.
+	//SEH 로 AV 를 잡아 -1 반환(호출측이 무음 처리). __try/__except 는 C++ unwinding 함수에 못 두므로 별도 함수로 분리.
+	static int seh_swr_convert(SwrContext* swr, uint8_t** out, int out_count, const uint8_t** in, int in_count)
+	{
+		__try
+		{
+			return swr_convert(swr, out, out_count, in, in_count);
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			return -1;
+		}
+	}
+
 	HRESULT CFFiAudioStream::FillBuffer(IMediaSample* pSample)
 	{
 		if (!pSample || !m_pSource || !m_swr)
@@ -949,14 +963,20 @@ namespace ffi
 				//byte-seek 는 audio·video 가 같은 byte 에 착지해 이미 정렬되므로 anchor 생략. 정상 파일은 do_anchor=true → 기존 동작.
 				bool do_anchor = !dec.unreliable_video_pts();
 
-				//video anchor 확인 — set 안 되어 있으면 short wait (video first emit 까지).
+				//video anchor 확인 — set 안 되어 있으면 video first emit 까지 wait.
+				//searching(손상 구간 스캔) 중엔 video 가 수 초 뒤 복구되므로 200ms 고정 타임아웃이면 그 전에 garbage audio 를
+				//anchor 없이 뿌려 타이밍 오염(무음/2배속). searching 동안엔 타이머를 리셋해 계속 대기 → 복구 시점부터 정렬.
 				int64_t video_anchor = do_anchor ? dec.video_first_emit_pts_rt() : LLONG_MIN;
-				if (do_anchor && video_anchor == LLONG_MIN && wait_anchor_ms < 200)
+				bool searching = dec.is_searching();
+				if (do_anchor && video_anchor == LLONG_MIN && (wait_anchor_ms < 200 || searching))
 				{
 					//video first emit 아직 안 됨 — frame 다시 큐 앞에 못 넣음. discard + wait.
 					av_frame_free(&frame);
 					Sleep(5);
-					wait_anchor_ms += 5;
+					if (searching)
+						wait_anchor_ms = 0;	//스캔 중 — 타이머 리셋. 스캔 종료(첫 video 디코드) 후 200ms grace(decode→emit gap 흡수).
+					else
+						wait_anchor_ms += 5;
 					continue;
 				}
 				//anchor skip — 항상 적용. audio first emit 의 미디어 시점 = video first emit 의 미디어 시점 강제.
@@ -1020,14 +1040,13 @@ namespace ffi
 		int max_out_samples = buffer_size / (m_out_channels * 2);	//S16 = 2 bytes/sample
 		uint8_t* out_planes[1] = { pData };
 
-		int out_samples = swr_convert(m_swr,
-			out_planes, max_out_samples,
-			(const uint8_t**)frame->extended_data, frame->nb_samples);
+		//손상 구간 깨진 frame 방어 — SEH 로 swr_convert 의 AV 를 잡고, 실패(-1) 면 무음(0 sample)으로 처리해
+		//스트림을 끊지 않는다(E_FAIL = DeliverEndOfStream → 재생 중단). garbage 구간 무음 후 정상 구간 자동 복구.
+		int out_samples = (frame->nb_samples > 0)
+			? seh_swr_convert(m_swr, out_planes, max_out_samples, (const uint8_t**)frame->extended_data, frame->nb_samples)
+			: 0;
 		if (out_samples < 0)
-		{
-			av_frame_free(&frame);
-			return E_FAIL;
-		}
+			out_samples = 0;
 
 		//filter graph 재빌드(rate 변경) + 사용(buffersrc/buffersink) 구간을 lock — UI 스레드의 seek-init 과
 		//동시 접근 시 use-after-free 방지. 이 구간엔 early return 이 없어 manual Lock/Unlock 안전.
@@ -1316,12 +1335,18 @@ namespace ffi
 		}
 
 		//정상 파일: 기존대로 video frame pts 우선 (자막 timing reference), 없으면 audio.
+		//단 kf_skip 로 손상 구간 건너뛰는 중이면 스캔 위치(전진)와 비교해 큰 값 — 스캔 중 트랙바가 복구 지점까지
+		//전진하는 모습을 보이고(멈춰 보여 freeze 오인 방지), 재생 재개 후엔 last_emitted 가 추월해 자연 연결(뒤로 튐 없음).
+		int64_t scan = m_decoder.kf_skip_scan_pos_ms();
 		if (m_pVideoStream)
 		{
 			int64_t v = m_pVideoStream->last_emitted_pts_ms();
-			if (v >= 0)
-				return v;
+			int64_t best = (scan > v) ? scan : v;
+			if (best >= 0)
+				return best;
 		}
+		else if (scan >= 0)
+			return scan;
 		if (m_pAudioStream)
 			return m_pAudioStream->last_input_pts_ms();
 		return -1;

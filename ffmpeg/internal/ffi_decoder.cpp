@@ -501,7 +501,7 @@ namespace ffi
 		int64_t a_last_end = AV_NOPTS_VALUE;	//audio tb 단위. 마지막 audio packet 의 (ts + duration).
 		bool estimate_done = false;
 
-		std::vector<std::pair<int64_t, int64_t>> index;	//(audio ms, 파일 byte). ~5s 간격. 끝에 m_seek_index 로 publish.
+		std::vector<std::pair<int64_t, int64_t>> index;	//(시간 ms, 파일 byte). ~5s 간격. audio 있으면 audio ms, 없으면 video 프레임 ms. 끝에 m_seek_index 로 publish.
 		int64_t last_idx_ms = INT64_MIN;
 
 		AVPacket* pkt = av_packet_alloc();
@@ -512,6 +512,18 @@ namespace ffi
 				if (pkt->stream_index == vidx)
 				{
 					++v_count;
+
+					//audio 가 없는 파일 — seek 인덱스를 video *keyframe* 기준으로 빌드.
+					//byte-seek 착지 후 디코드는 keyframe 부터만 가능하므로, 인덱스는 반드시 keyframe byte 여야 한다.
+					//(미종료 녹화는 앞부분에만 keyframe 이 있고 뒷부분엔 없는 경우가 있다 → 임의 패킷 byte 로 seek 하면
+					// 그 뒤로 keyframe 이 없어 EOF 까지 읽고 EOS. keyframe byte 로 snap 하면 항상 디코드 시작점에 착지.)
+					//시간축은 프레임 수(v_count-1)/fps — video pts 는 garbage 라도 프레임 수는 단조 증가.
+					//audio 있는 파일은 아래 audio 분기가 인덱스를 만든다(보간 경로).
+					if (aidx < 0 && fps > 0.0 && (pkt->flags & AV_PKT_FLAG_KEY) && pkt->pos >= 0)
+					{
+						int64_t cur_ms = (int64_t)((double)(v_count - 1) * 1000.0 / fps);
+						index.push_back(std::make_pair(cur_ms, pkt->pos));
+					}
 				}
 				else if (pkt->stream_index == aidx)
 				{
@@ -574,8 +586,9 @@ namespace ffi
 			{
 				std::lock_guard<std::mutex> lk(m_seek_index_mtx);
 				m_seek_index = std::move(index);
-				logWrite(_T("[ffi/dec] seek index built — %zu entries (last %lldms @ byte %lld)"),
-					m_seek_index.size(), (long long)m_seek_index.back().first, (long long)m_seek_index.back().second);
+				m_seek_index_snap = (aidx < 0);	//video-only = keyframe 인덱스 → snap. audio = 보간.
+				logWrite(_T("[ffi/dec] seek index built — %zu entries snap=%d (last %lldms @ byte %lld)"),
+					m_seek_index.size(), (int)m_seek_index_snap, (long long)m_seek_index.back().first, (long long)m_seek_index.back().second);
 			}
 		}
 
@@ -600,6 +613,11 @@ namespace ffi
 			if ((double)m_seek_index[mid].first <= ms) lo = mid;
 			else hi = mid;
 		}
+
+		//keyframe 인덱스 — target 이하의 가장 가까운 keyframe byte 로 snap (보간 금지: 비keyframe byte 는 디코드 불가).
+		if (m_seek_index_snap)
+			return m_seek_index[lo].second;
+
 		int64_t t0 = m_seek_index[lo].first, t1 = m_seek_index[hi].first;
 		int64_t b0 = m_seek_index[lo].second, b1 = m_seek_index[hi].second;
 		if (t1 == t0)
@@ -621,6 +639,7 @@ namespace ffi
 		{
 			std::lock_guard<std::mutex> lk(m_seek_index_mtx);
 			m_seek_index.clear();
+			m_seek_index_snap = false;
 		}
 		m_path.clear();
 
@@ -1083,6 +1102,10 @@ namespace ffi
 					double prev_pos = m_pending_prev_ms;
 					bool   kf_mode  = m_pending_kf_mode;	//seek() 가 호출 시점에 고정한 스냅샷.
 					m_pending_seek_ms = -1.0;
+					m_scan_pos_ms.store(-1, std::memory_order_relaxed);	//새 seek — 이전 스캔 위치 잔상 제거.
+					m_pos_searching.store(true, std::memory_order_relaxed);	//첫 frame 디코드 전까지 packet 시각으로 트랙바 전진.
+					m_video_no_frame_count = 0;		//stall 카운터 리셋.
+					m_did_garbage_scan = false;		//이번 seek 의 손상 스캔 여부 리셋.
 					lk.unlock();
 
 					//queue flush — 이전 위치 frame 들 모두 버림. video + audio 둘 다.
@@ -1142,6 +1165,7 @@ namespace ffi
 							hr_seek = av_seek_frame(m_fmt, -1, target_byte, AVSEEK_FLAG_BYTE);
 							m_kf_skip_active  = true;
 							m_kf_skip_min_pts = INT64_MIN;	//착지 후 첫 keyframe 부터 디코드.
+							m_kf_skip_count   = 0;
 							logWrite(_T("[ffi/dec/byteseek] seek_pos=%.0fms method=%ls target_byte=%lld hr=%d"),
 								seek_pos, method, (long long)target_byte, hr_seek);
 						}
@@ -1166,6 +1190,7 @@ namespace ffi
 								: INT64_MIN;
 							m_kf_skip_active  = true;
 							m_kf_skip_min_pts = prev_pts;	//이 값 초과 첫 keyframe 부터 디코드.
+							m_kf_skip_count   = 0;
 						}
 						else
 						{
@@ -1182,6 +1207,8 @@ namespace ffi
 							for (; probe_attempts < 12; ++probe_attempts)
 							{
 								int64_t kf = AV_NOPTS_VALUE;
+								//손상 구간에서 keyframe 도 EOF 도 안 나오면 무한 루프 → packet 수 상한으로 차단.
+								int64_t probe_pkts = 0;
 								while (av_read_frame(m_fmt, probe) >= 0)
 								{
 									bool is_vkey = (probe->stream_index == m_video_stream_idx) && (probe->flags & AV_PKT_FLAG_KEY);
@@ -1192,6 +1219,8 @@ namespace ffi
 										kf = ppts;
 										break;
 									}
+									if (++probe_pkts > kf_skip_limit)
+										break;	//garbage — 이 attempt 포기(아래에서 kf==NOPTS 로 루프 종료).
 								}
 								if (kf == AV_NOPTS_VALUE || kf <= target_pts || seek_ts <= 0)
 									break;	 //이전 keyframe 확보 / 파일 앞 / EOF.
@@ -1208,6 +1237,7 @@ namespace ffi
 								probe_attempts, (long long)seek_ts, (long long)target_pts);
 							m_kf_skip_active  = true;
 							m_kf_skip_min_pts = INT64_MIN;	//landing keyframe(<=target) 부터 emit.
+							m_kf_skip_count   = 0;
 						}
 					}
 					else
@@ -1353,6 +1383,19 @@ namespace ffi
 					vq, aq);
 			}
 
+			//[위치 스캔] seek 후 첫 frame 디코드 전까지(kf_skip 구간 + bound bail 후 손상 구간 통과 포함) 현재 읽는
+			//video packet 시각을 발행 → 트랙바·시간이 복구 지점까지 전진하는 모습(멈춰 보여 freeze 오인 방지).
+			//정상 파일은 container pts 가 단조라 전진. unreliable(garbage pts) 파일은 발행 안 함.
+			if (m_pos_searching.load(std::memory_order_relaxed) && pkt->stream_index == m_video_stream_idx && !m_unreliable_video_pts)
+			{
+				int64_t ms_pts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+				if (ms_pts != AV_NOPTS_VALUE)
+				{
+					AVRational vtb = m_fmt->streams[m_video_stream_idx]->time_base;
+					m_scan_pos_ms.store((int64_t)((double)ms_pts * av_q2d(vtb) * 1000.0), std::memory_order_relaxed);
+				}
+			}
+
 			//[keyframe 모드 forward skip] BACKWARD seek 로 간 GOP 시작부터 demux 된 packet 을 디코드 없이 버리고,
 			//pts>prev(=min_pts) 인 첫 video keyframe packet 부터 디코드 시작. GOP 전체 디코드(HW transfer 포함) 비용 제거.
 			//min_pts = 직전 위치라 결과 keyframe 이 prev 보다 항상 전진 — forward step 제자리 회귀 방지.
@@ -1365,6 +1408,18 @@ namespace ffi
 					bool is_ok_kf = (pkt->flags & AV_PKT_FLAG_KEY) && ppts != AV_NOPTS_VALUE && ppts > m_kf_skip_min_pts;
 					if (!is_ok_kf)
 					{
+						//손상 구간 무한 skip 차단 — 정상 GOP 보다 훨씬 많이 skip 했는데도 유효 keyframe 이 없으면
+						//(garbage 라 EOF 도 안 옴) skip 포기하고 정상 디코드로 전환. 이후 유효 데이터가 나오면 자연 복구(PotPlayer 식).
+						if (++m_kf_skip_count > kf_skip_limit)
+						{
+							m_kf_skip_active = false;
+							m_did_garbage_scan = true;	//손상 구간 확정 — 복구 시 audio decoder 재생성.
+							logWrite(_T("[ffi/dec/kf] skip limit(%lld) 초과 — 손상 구간 판단, 정상 디코드로 전환(무한 skip/freeze 방지)"),
+								(long long)kf_skip_limit);
+							//이 packet 은 keyframe 이 아니므로 디코드해도 frame 안 나옴 → 버리고 다음 packet 부터 정상 경로.
+							av_packet_unref(pkt);
+							continue;
+						}
 						av_packet_unref(pkt);
 						continue;	 //전진 video keyframe 도달 전 — video 만 skip.
 					}
@@ -1385,10 +1440,23 @@ namespace ffi
 			//push 직전 pending seek 체크 — caller seek() 가 큐 flush 한 후 worker 가 stale frame push 하는 race 차단.
 			if (pkt->stream_index == m_video_stream_idx)
 			{
+				//[stall 재진입] searching 종료 후에도 video frame 이 video_stall_limit 만큼 연속 안 나오면(손상 keyframe
+				//디코드 후 멈춤 = 시작부 손상 케이스) searching 재진입 → 스캔으로 다음 정상 구간 탐색(OSD + 트랙 전진).
+				//정상 재생은 매 packet 마다 frame 이 나와 count 가 작게 유지되므로 발동 안 함(회귀 0).
+				if (!m_pos_searching.load(std::memory_order_relaxed) && !m_kf_skip_active &&
+					m_video_no_frame_count > video_stall_limit)
+				{
+					m_pos_searching.store(true, std::memory_order_relaxed);
+					m_did_garbage_scan = true;
+					m_video_no_frame_count = 0;
+					logWrite(_T("[ffi/dec/kf] 디코드 stall 감지(frame 연속 미생성) — searching 재진입(손상 구간 스캔)"));
+				}
+
 				hr = avcodec_send_packet(m_video_ctx, pkt);
 				av_packet_unref(pkt);
 				if (hr < 0)
 					continue;
+				++m_video_no_frame_count;	//frame 받으면 아래에서 0 으로 리셋. 연속 미생성만 누적.
 
 				while (true)
 				{
@@ -1410,6 +1478,41 @@ namespace ffi
 						av_frame_free(&frame);
 						break;	 //다음 iteration 의 seek 처리 단계로.
 					}
+
+					//첫 유효 video frame 디코드 — 위치 스캔 종료. 이후 트랙바는 emit frame pts(last_emitted)로 정상 추적.
+					m_video_no_frame_count = 0;	//frame 받음 — stall 카운트 리셋.
+					bool was_garbage = m_did_garbage_scan;	//이번 seek 스캔이 손상 구간(bound bail / stall)을 거쳤나.
+					m_pos_searching.store(false, std::memory_order_relaxed);
+
+					//손상 구간을 길게 스캔한 뒤 복구 — AAC 디코더가 garbage 를 디코드하며 *채널 설정이 깨진다*(ch=29 등 →
+					//무음 frame 생성). avcodec_flush_buffers 로는 채널 설정이 안 풀려 복구 후에도 영구 무음 → 컨텍스트를
+					//*재생성*(free+alloc+open)해 codecpar(정상 2ch)로 완전 리셋. + 큐의 잔여 무음 frame 제거.
+					//(정상 seek 은 m_kf_skip_count 가 작아 이 경로 안 탐 → 회귀 0.)
+					if (was_garbage && m_audio_ctx && m_fmt && m_audio_stream_idx >= 0)
+					{
+						AVCodecParameters* apar = m_fmt->streams[m_audio_stream_idx]->codecpar;
+						const AVCodec* acodec = avcodec_find_decoder(apar->codec_id);
+						if (acodec)
+						{
+							avcodec_free_context(&m_audio_ctx);	//free + null
+							m_audio_ctx = avcodec_alloc_context3(acodec);
+							if (m_audio_ctx)
+							{
+								avcodec_parameters_to_context(m_audio_ctx, apar);
+								if (avcodec_open2(m_audio_ctx, acodec, NULL) < 0)
+									avcodec_free_context(&m_audio_ctx);
+							}
+							logWrite(_T("[ffi/dec] 손상 후 audio decoder 재생성 (채널설정 복구)"));
+						}
+						std::unique_lock<std::mutex> lk(m_mtx_queue);
+						while (!m_audio_queue.empty())
+						{
+							AVFrame* af = m_audio_queue.front();
+							m_audio_queue.pop_front();
+							av_frame_free(&af);
+						}
+					}
+					m_did_garbage_scan = false;	//복구 처리 완료 — 다음 손상 스캔 위해 리셋.
 
 					//HW frame 이면 CPU NV12 로 download. SW frame 이면 그대로.
 					AVFrame* out_frame = frame;

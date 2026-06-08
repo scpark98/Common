@@ -3490,6 +3490,13 @@ double CDShow::get_track_pos()
 	return m_last_track_pos_ms;
 }
 
+bool CDShow::is_searching()
+{
+	if (m_pFFiSource)
+		return ((ffi::CFFiSource*)m_pFFiSource)->decoder().is_searching();
+	return false;
+}
+
 void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 {
 	if (!m_pGB || !m_pMS)

@@ -1131,19 +1131,49 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			//float emSize = fDpiY * para[i][j].text_prop.size / 96.0;
 			//Gdiplus::Font font(&ff, emSize, para[i][j].text_prop.style);
 
-
-			//text를 출력한다.
-			Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
-
 			//GraphicsPath를 이용하면 stroke, shadow 등 다양한 효과를 구현할 수 있지만
 			//DrawString()보다 글자가 선명하게 보이지 않는 단점이 있다.
-			//stroke, shadow를 아예 사용하지 않을 경우는 DrawString()으로 그려준다.
+			//stroke, shadow를 아예 사용하지 않을 경우는 GDI(TextOut)로 그려준다.
 			//shadow_depth 의미: 0 = shadow 사용 안 함, > 0 = 해당 픽셀만큼 offset, < 0 = 자동 계산.
 			if (para[i][j].text_prop.shadow_depth == 0 && para[i][j].text_prop.thickness == 0)
 			{
-				g.DrawString(CStringW(para[i][j].text), -1, font,
-					//Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), &sf, &text_brush);
-					Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+				//효과 없는 평문 run 은 GDI(TextOut)로 그린다 — OS 래스터라이저가 폰트·크기별로 내장 비트맵/
+				//ClearType 를 자동 선택해 어떤 폰트·크기에서도 또렷. GDI+ DrawString 은 내장 비트맵을 안 쓰고
+				//어두운 배경 감마가 어긋나 작은 글자가 흐려지는 문제가 있었다 (CSCStatic plain 경로·CSCStaticEdit
+				//가 같은 이유로 GDI 를 쓴다). 측정(calc_text_rect)은 GDI+ 유지 — 위치 r 은 GDI+ 기준, 글자만 GDI.
+				//em 픽셀 크기는 위 GDI+ font 의 GetSize() 로부터 동일하게 산출해 크기 불일치를 막는다.
+				CFont gdi_font;
+				LOGFONT lf = {};
+				lf.lfHeight = -(LONG)(font->GetSize() * fDpiY / 72.0f + 0.5f);
+				lf.lfWeight = (para[i][j].text_prop.style & Gdiplus::FontStyleBold) ? FW_BOLD : FW_NORMAL;
+				lf.lfItalic = (para[i][j].text_prop.style & Gdiplus::FontStyleItalic) ? TRUE : FALSE;
+				lf.lfUnderline = (para[i][j].text_prop.style & Gdiplus::FontStyleUnderline) ? TRUE : FALSE;
+				lf.lfStrikeOut = (para[i][j].text_prop.style & Gdiplus::FontStyleStrikeout) ? TRUE : FALSE;
+				lf.lfCharSet = DEFAULT_CHARSET;
+				lf.lfQuality = DEFAULT_QUALITY;
+				_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), para[i][j].text_prop.name);
+				gdi_font.CreateFontIndirect(&lf);
+
+				HDC hdc = g.GetHDC();
+				{
+					CDC* pDC = CDC::FromHandle(hdc);
+					CFont* old_font = pDC->SelectObject(&gdi_font);
+					int      old_bk = pDC->SetBkMode(TRANSPARENT);
+					COLORREF old_cr = pDC->SetTextColor(para[i][j].text_prop.cr_text.ToCOLORREF());
+
+					//세로 정렬: r 은 GDI+ GenericTypographic(=internal leading 제외, 라인 top 을 ascent 윗선에
+					//맞춤) 메트릭으로 계산됐다. GDI TextOut(TA_TOP)은 cell top(internal leading 포함)을 y 에 두므로
+					//r.top 그대로면 글자가 internal leading 만큼 내려가 이전 GDI+ 출력과 baseline 이 어긋난다.
+					//internal leading 만큼 올려 baseline 을 일치시킨다.
+					TEXTMETRIC tm = {};
+					pDC->GetTextMetrics(&tm);
+					pDC->TextOut(para[i][j].r.left, para[i][j].r.top - tm.tmInternalLeading, para[i][j].text);
+
+					pDC->SetTextColor(old_cr);
+					pDC->SetBkMode(old_bk);
+					pDC->SelectObject(old_font);
+				}
+				g.ReleaseHDC(hdc);
 			}
 			else
 			{

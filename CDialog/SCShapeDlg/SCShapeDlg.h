@@ -196,6 +196,10 @@ public:
 	void			fade_out(int fade_out_delay_ms = 10);
 	bool			is_fadeinout_ing() { return m_fadeinout_ing; }
 
+	//깜빡임 — show_time(ms) 동안 보이고 hide_time(ms) 동안 숨긴다(반복). 창 자체를 SW_SHOWNA/SW_HIDE 로 토글.
+	//show_time <= 0 이면 깜빡임 중지(현재 보임 상태 유지). 호출 전 set_text/set_image 로 내용이 설정돼 있어야 한다.
+	void			set_blink(int show_time, int hide_time = -1);
+
 	//
 	CSCShapeDlgTextSetting	m_text_setting;
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
@@ -248,6 +252,12 @@ protected:
 	int				m_char_spacing = 0;
 	float			m_line_spacing_factor = 1.0f;
 
+	//깜빡임 — show_time/hide_time(ms). timer_blink 로 SW_SHOWNA/SW_HIDE 토글.
+	enum { timer_blink = 0x5C0B };
+	int				m_blink_show = 0;
+	int				m_blink_hide = 0;
+	bool			m_blink_visible = true;
+
 	bool			m_fadeinout_ing = false;
 	//fade_in(), fade_out() 함수에서 호출하며
 	//이미 이 thread가 돌고 있는중에 다시 fade_in(), fade_out()이 호출되면
@@ -276,6 +286,7 @@ public:
 	virtual BOOL OnInitDialog();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	virtual void PreSubclassWindow();
 	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);

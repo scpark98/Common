@@ -29,8 +29,50 @@ BEGIN_MESSAGE_MAP(CSCShapeDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_WM_MOUSEMOVE()
+	ON_WM_TIMER()
 	ON_MESSAGE(WM_APP_UI_INVOKE, &CSCShapeDlg::on_ui_invoke)
 END_MESSAGE_MAP()
+
+
+//깜빡임 — show_time 동안 보이고 hide_time 동안 숨긴다(반복). hide_time<0 이면 show_time 과 동일.
+void CSCShapeDlg::set_blink(int show_time, int hide_time /*= -1*/)
+{
+	if (GetSafeHwnd())
+		KillTimer(timer_blink);
+
+	m_blink_show = show_time;
+	m_blink_hide = (hide_time < 0) ? show_time : hide_time;
+	m_blink_visible = true;
+
+	if (show_time <= 0)
+	{
+		//중지 — 보임 상태로 둔다(호출자가 별도로 hide 하면 됨).
+		if (GetSafeHwnd() && !IsWindowVisible())
+			ShowWindow(SW_SHOWNA);
+		return;
+	}
+
+	if (GetSafeHwnd())
+	{
+		ShowWindow(SW_SHOWNA);
+		SetTimer(timer_blink, m_blink_show, NULL);
+	}
+}
+
+void CSCShapeDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == timer_blink)
+	{
+		m_blink_visible = !m_blink_visible;
+		ShowWindow(m_blink_visible ? SW_SHOWNA : SW_HIDE);
+
+		KillTimer(timer_blink);
+		SetTimer(timer_blink, m_blink_visible ? m_blink_show : m_blink_hide, NULL);
+		return;
+	}
+
+	CDialogEx::OnTimer(nIDEvent);
+}
 
 
 // CSCShapeDlg 메시지 처리기
@@ -104,8 +146,8 @@ bool CSCShapeDlg::create(CWnd* parent, int left, int top, int right, int bottom)
 	//GetClientRect(rc);
 	//TRACE(_T("rc = %s\n"), get_rect_info_str(rc));
 
-	if (res)
-		TRACE(_T("ShapeDlg created successfully. Default is hide state. To show call ShowWindow(SW_SHOW) or ShowWindow(SW_NOACTIVATE)\n"));
+	//if (res)
+	//	TRACE(_T("ShapeDlg created successfully. Default is hide state. To show call ShowWindow(SW_SHOW) or ShowWindow(SW_NOACTIVATE)\n"));
 
 	return res;
 }

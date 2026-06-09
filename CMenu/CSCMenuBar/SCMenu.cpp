@@ -1357,7 +1357,7 @@ static HMENU find_popup_by_caption(HMENU hMenu, LPCTSTR caption)
 	return NULL;
 }
 
-void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
+void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder, bool subpopup_as_placeholder)
 {
 	if (!pMenu)
 		return;
@@ -1366,6 +1366,7 @@ void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 	UINT menu_id;
 	CString menu_caption;
 
+	begin_update();		//항목 N개 add 동안 recalc 보류 → end_update 에서 1회 (O(n²) → O(n)).
 	for (i = 0; i < nCount; i++)
 	{
 		HMENU hSub = ::GetSubMenu(pMenu->m_hMenu, i);
@@ -1376,7 +1377,24 @@ void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 		get_menu_item_info(pMenu->m_hMenu, i, &menu_id, &menu_caption, TRUE);
 		const bool is_empty_popup_downgrade = !is_popup && (menu_id == 0xFFFF);
 
-		if (is_popup)
+		if (is_popup && subpopup_as_placeholder)
+		{
+			//자식 POPUP 을 재귀 nest 하지 않고 placeholder 만 add — 호출자가 attach 로 채운다.
+			//우클릭마다 모든 sub-popup 을 새 CSCMenu + create() 하던 비용 제거 (성능).
+			TCHAR buf[256] = { 0 };
+			::GetMenuString(pMenu->m_hMenu, i, buf, _countof(buf), MF_BYPOSITION);
+			CString raw = buf;
+			std::deque<CString> token;
+			get_token_str(raw, token, _T("\t"));
+			CString caption = (token.size() >= 1 ? token[0] : raw);
+
+			int placeholder_id = -10000 - (int)m_items.size();
+			CSCMenuItem* item = new CSCMenuItem(placeholder_id, caption);
+			item->m_type = CSCMenuItem::item_submenu;
+			item->m_sub_menu = nullptr;
+			m_items.push_back(item);
+		}
+		else if (is_popup)
 		{
 			//자식 있는 POPUP — 항상 자동 재귀 nested load. (include_popup_placeholder 무관)
 			//.rc 의 정적 nested 메뉴 (예: "재생" > "탐색") 가 코드 변경 없이 자동 표현.
@@ -1441,11 +1459,11 @@ void CSCMenu::load_from_menu(CMenu* pMenu, bool include_popup_placeholder)
 			}
 		}
 	}
-	recalc_items_rect();
+	end_update();		//보류했던 recalc 1회 수행.
 }
 
 void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR target_caption,
-							  bool include_popup_placeholder)
+							  bool include_popup_placeholder, bool subpopup_as_placeholder)
 {
 	CMenu menu;
 	if (!menu.LoadMenu(resource_id))
@@ -1471,7 +1489,7 @@ void CSCMenu::load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR 
 
 	CMenu menu_wrap;
 	menu_wrap.Attach(hTarget);
-	load_from_menu(&menu_wrap, include_popup_placeholder);
+	load_from_menu(&menu_wrap, include_popup_placeholder, subpopup_as_placeholder);
 	menu_wrap.Detach();
 }
 
@@ -1486,6 +1504,24 @@ bool CSCMenu::attach_submenu_by_caption(LPCTSTR caption, CSCMenu* sub_menu, int 
 		if (item->m_type == CSCMenuItem::item_submenu &&
 			normalize_menu_caption(item->m_caption).Compare(target) == 0)
 		{
+			item->m_sub_menu = sub_menu;
+			if (sub_menu)
+				sub_menu->m_parent_menu = this;
+			if (new_id != 0)
+				item->m_id = new_id;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CSCMenu::attach_submenu_by_id(int id, CSCMenu* sub_menu, int new_id)
+{
+	for (auto* item : m_items)
+	{
+		if (item->m_id == id)
+		{
+			item->m_type = CSCMenuItem::item_submenu;
 			item->m_sub_menu = sub_menu;
 			if (sub_menu)
 				sub_menu->m_parent_menu = this;
@@ -1759,8 +1795,25 @@ BOOL CSCMenu::OnLbnSelchange()
 
 //라인 간격은 font size에 따라 자동 조절되게 할 수도 있지만 장단점이 있다.
 //일단은 별개로 처리되도록 한다.
+void CSCMenu::begin_update()
+{
+	m_update_depth++;
+}
+
+void CSCMenu::end_update()
+{
+	if (m_update_depth > 0)
+		m_update_depth--;
+	if (m_update_depth == 0)
+		recalc_items_rect();
+}
+
 void CSCMenu::recalc_items_rect()
 {
+	//bulk add 중(begin_update~end_update)이면 보류 — end_update 에서 1회만 수행 (O(n²) → O(n)).
+	if (m_update_depth > 0)
+		return;
+
 	//windowless 상태 (create 전, 또는 자동 nested 생성 직후 m_parent null) 면 GetWindowRect/CClientDC 가 ASSERT.
 	//다음 popup_menu 시 windowless 가 아닐 때 한 번 더 호출됨 — 그때 정상 recalc.
 	if (!::IsWindow(m_hWnd))

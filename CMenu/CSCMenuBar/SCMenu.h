@@ -153,13 +153,16 @@ public:
 	//.rc 가 menu 구조의 single source of truth.
 	void			load(UINT resource_id, int idx0, int idx1 = -1, bool include_popup_placeholder = false);
 	//이미 navigate 된 CMenu* 의 항목들을 load. 3단계 이상 nested 등 특수 경우.
-	void			load_from_menu(CMenu* pMenu, bool include_popup_placeholder = false);
+	//subpopup_as_placeholder=true 시 자식 POPUP (내용 유무 무관) 을 재귀 auto-nest 하지 않고 placeholder
+	//(item_submenu, sub_menu=nullptr) 로만 add — 모든 sub-popup 을 attach 로 채울 때 우클릭마다의 재귀 create() 비용 제거.
+	void			load_from_menu(CMenu* pMenu, bool include_popup_placeholder = false, bool subpopup_as_placeholder = false);
 
 	//인덱스 의존성 제거 — caption 으로 navigate. parent_caption 이 NULL/빈 문자열이면 top-level 의 target_caption POPUP 직접 load.
 	//그 외엔 LoadMenu(resource_id) > parent_caption POPUP > target_caption POPUP 자식들을 load.
 	//.rc 의 자식 순서 변경에 robust — .rc 가 source of truth.
+	//subpopup_as_placeholder: load_from_menu 참고 — 직접 자식 POPUP 을 attach 용 placeholder 로만 load.
 	void			load_by_caption(UINT resource_id, LPCTSTR parent_caption, LPCTSTR target_caption,
-									bool include_popup_placeholder = false);
+									bool include_popup_placeholder = false, bool subpopup_as_placeholder = false);
 
 	//load_from_menu(include_popup_placeholder=true) 로 만들어진 sub-menu placeholder 항목 (m_sub_menu==nullptr) 중
 	//caption 매칭 항목에 sub_menu attach. 못 찾으면 false. .rc 의 menu 구조 + 코드 instance 매핑 패턴.
@@ -168,8 +171,20 @@ public:
 	//enable_item(new_id, ...) / check_item(new_id, ...) 사용 가능. 0 이면 placeholder id 유지.
 	bool			attach_submenu_by_caption(LPCTSTR caption, CSCMenu* sub_menu, int new_id = 0);
 
+	//caption 대신 항목의 고정 ID 로 찾아 submenu 로 변환·attach. 못 찾으면 false.
+	//.rc 의 POPUP 은 ID 가 없어 위치 특정이 어렵다 → 동적 생성 submenu (최근 파일 목록 등) 는 자리에
+	//고정 ID 를 가진 MENUITEM 을 두고 이 함수로 attach 하면 caption 변경·번역·빈 POPUP down-grade 에 견고.
+	//new_id != 0 이면 attach 후 id 를 교체 — enable_item(new_id) / check_item(new_id) 용.
+	bool			attach_submenu_by_id(int id, CSCMenu* sub_menu, int new_id = 0);
+
 	//add menu item manually. _id < 0 = separator
 	void			add(int _id, CString _caption = _T(""), UINT icon_id = 0, CString _hot_key = _T(""));
+
+	//bulk add 최적화. add() 는 매 호출 recalc_items_rect()(전 항목 GDI 측정, O(n)) 하므로 N개 추가 시 O(n²).
+	//begin_update()~end_update() 로 감싸면 그 동안 recalc 를 보류하고 end_update() 에서 1회만 수행 → O(n).
+	//중첩 호출 안전(카운터). 항목을 여러 개 add/load 하는 모든 경로에서 권장.
+	void			begin_update();
+	void			end_update();
 
 	//썸네일 + 2줄 텍스트 항목. res_type 은 "PNG"/"JPG" 등 리소스 type 문자열, res_id 는 리소스 ID.
 	//_secondary 가 빈 문자열이면 단일 라인으로 표시.
@@ -342,6 +357,7 @@ protected:
 	int				m_thumb_w = 80;
 	int				m_thumb_h = 45;
 	int				m_min_width = 220;		//create() 시 전달된 너비 — 항목 측정값이 이보다 크면 그만큼 확장.
+	int				m_update_depth = 0;		//>0 이면 recalc_items_rect() 보류 (begin_update/end_update bulk add 최적화).
 	//항목이 추가/삭제되거나 m_line_height가 변경되면 반드시 rect정보를 갱신해줘야 한다.
 	//라인 간격은 font size에 따라 자동 조절되게 할 수도 있지만 장단점이 있다.
 	//일단은 별개로 처리되도록 한다.

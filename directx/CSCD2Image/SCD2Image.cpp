@@ -2345,10 +2345,15 @@ CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bo
 		m_channel = 4;
 		str_fmt = _T("GUID_WICPixelFormat32bppRGBA");
 	}
-	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppPRGBA))
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppPBGRA))
 	{
 		m_channel = 4;
 		str_fmt = _T("GUID_WICPixelFormat32bppPBGRA");
+	}
+	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppPRGBA))
+	{
+		m_channel = 4;
+		str_fmt = _T("GUID_WICPixelFormat32bppPRGBA");
 	}
 	else if (IsEqualGUID(*pf, GUID_WICPixelFormat32bppCMYK))
 	{
@@ -3798,6 +3803,11 @@ try_bitmap:
 	m_img_origin_for_back_transparency.Reset();
 
 	m_filename = _T("image from clipboard");
+
+	//paste 결과는 PBGRA 변환된 상태로 저장 — 채널/포맷 문자열을 그에 맞춰 갱신해야
+	//이전 load 의 stale 값(예: 직전 이미지의 8bppIndexed) 이 정보 표시에 남지 않는다.
+	WICPixelFormatGUID stored_pf = GUID_WICPixelFormat32bppPBGRA;
+	get_pixel_format_str(&stored_pf, true, true);
 
 	return true;
 }

@@ -697,6 +697,7 @@ bool CSCD2ImageDlg::paste_from_clipboard()
 		m_filename = _T("image from clipboard");
 		set_alt_info(_T(""));
 		set_view_mode(view_mode_image);
+		build_image_info_str();
 		rerender();
 		return true;
 	}
@@ -1630,11 +1631,6 @@ void CSCD2ImageDlg::build_image_info_str()
 	CString ratio_str;
 	float ratio = m_images[0].get_ratio();
 
-	//if (m_image_from_clipboard)
-	//	filename = _T("paste image from clipboard");
-	//else
-	//	filename = get_part(m_images[0].get_filename(), fn_name);
-
 	if (m_images[0].get_width() == m_images[0].get_height())
 		ratio_str = _T("1 : 1");
 	else if ((int)(ratio * 1000) % 1000 == 0)
@@ -1642,11 +1638,25 @@ void CSCD2ImageDlg::build_image_info_str()
 	else
 		ratio_str.Format(_T("%.3f : 1"), ratio);
 
+	//클립보드 paste 등 파일이 없는 이미지는 파일 크기 항목 생략, 수정 날짜는 현재 시각.
+	CString image_filename = m_images[0].get_filename();
+	if (image_filename.IsEmpty())
+	{
+		m_info_str.Format(_T("파일 이름: %s\n수정 날짜: %s\n이미지 정보: %.0fx%.0fx%d (%s)\n이미지 비율: %s"),
+			m_filename + m_alt_info,
+			get_datetime_str(CTime::GetCurrentTime()),
+			m_images[0].get_width(), m_images[0].get_height(),
+			m_images[0].get_channel() * 8,
+			m_images[0].get_pixel_format_str(),
+			ratio_str);
+		return;
+	}
+
 	m_info_str.Format(_T("파일 이름: %s\n파일 크기: %s (%s)\n수정 날짜: %s\n이미지 정보: %.0fx%.0fx%d (%s)\n이미지 비율: %s"),
 		m_filename + m_alt_info,
-		get_file_size_str(m_images[0].get_filename()),		//KB 단위
-		get_file_size_str(m_images[0].get_filename(), 0),	//byte 단위
-		get_datetime_str(GetFileLastModifiedTime(m_images[0].get_filename())),
+		get_file_size_str(image_filename),		//KB 단위
+		get_file_size_str(image_filename, 0),	//byte 단위
+		get_datetime_str(GetFileLastModifiedTime(image_filename)),
 		m_images[0].get_width(), m_images[0].get_height(),
 		m_images[0].get_channel() * 8,
 		m_images[0].get_pixel_format_str(),

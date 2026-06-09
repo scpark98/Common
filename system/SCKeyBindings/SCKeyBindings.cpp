@@ -190,6 +190,184 @@ CString CSCKeyBindings::key_to_string(BYTE fVirt, WORD key)
 	return s;
 }
 
+//단일 키 이름 토큰(모디파이어 제외) → VK. 인식 못 하면 0.
+static WORD key_name_to_vk(const CString& token)
+{
+	CString t = token;
+	t.Trim();
+	if (t.IsEmpty())
+		return 0;
+
+	//단일 문자: 영문/숫자는 VK = 대문자 ASCII. 그 외 기호는 VkKeyScan 으로.
+	if (t.GetLength() == 1)
+	{
+		TCHAR c = t[0];
+		if (c >= _T('a') && c <= _T('z'))
+			c = (TCHAR)(c - _T('a') + _T('A'));
+		if ((c >= _T('A') && c <= _T('Z')) || (c >= _T('0') && c <= _T('9')))
+			return (WORD)c;
+
+		SHORT sk = ::VkKeyScan(c);
+		if (sk != -1)
+			return (WORD)(sk & 0xFF);
+		return 0;
+	}
+
+	CString u = t;
+	u.MakeUpper();
+
+	//F1 ~ F24
+	if (u[0] == _T('F') && u.GetLength() >= 2 && u.GetLength() <= 3)
+	{
+		bool all_digit = true;
+		for (int i = 1; i < u.GetLength(); i++)
+		{
+			if (!_istdigit(u[i]))
+			{
+				all_digit = false;
+				break;
+			}
+		}
+		if (all_digit)
+		{
+			int n = _ttoi(u.Mid(1));
+			if (n >= 1 && n <= 24)
+				return (WORD)(VK_F1 + n - 1);
+		}
+	}
+
+	static const struct { LPCTSTR name; WORD vk; } map[] =
+	{
+		{ _T("LEFT"),		VK_LEFT },		{ _T("RIGHT"),		VK_RIGHT },
+		{ _T("UP"),			VK_UP },		{ _T("DOWN"),		VK_DOWN },
+		{ _T("SPACE"),		VK_SPACE },
+		{ _T("ENTER"),		VK_RETURN },	{ _T("RETURN"),		VK_RETURN },
+		{ _T("ESC"),		VK_ESCAPE },	{ _T("ESCAPE"),		VK_ESCAPE },
+		{ _T("TAB"),		VK_TAB },
+		{ _T("BACKSPACE"),	VK_BACK },		{ _T("BACK"),		VK_BACK },
+		{ _T("DEL"),		VK_DELETE },	{ _T("DELETE"),		VK_DELETE },
+		{ _T("INS"),		VK_INSERT },	{ _T("INSERT"),		VK_INSERT },
+		{ _T("HOME"),		VK_HOME },		{ _T("END"),		VK_END },
+		{ _T("PGUP"),		VK_PRIOR },		{ _T("PAGEUP"),		VK_PRIOR },
+		{ _T("PRIOR"),		VK_PRIOR },
+		{ _T("PGDN"),		VK_NEXT },		{ _T("PAGEDOWN"),	VK_NEXT },
+		{ _T("NEXT"),		VK_NEXT },
+		{ _T("PLUS"),		VK_OEM_PLUS },	{ _T("MINUS"),		VK_OEM_MINUS },
+		{ _T("COMMA"),		VK_OEM_COMMA },	{ _T("PERIOD"),		VK_OEM_PERIOD },
+	};
+
+	for (int i = 0; i < _countof(map); i++)
+	{
+		if (u == map[i].name)
+			return map[i].vk;
+	}
+
+	return 0;
+}
+
+bool CSCKeyBindings::string_to_key(LPCTSTR text, BYTE& fVirt, WORD& key)
+{
+	fVirt = FVIRTKEY;
+	key = 0;
+
+	CString s(text);
+	s.Trim();
+	if (s.IsEmpty())
+		return false;
+
+	//선두의 모디파이어 토큰을 반복 제거 (Ctrl/Control/Alt/Shift, 대소문자 무관).
+	for (;;)
+	{
+		CString up = s;
+		up.MakeUpper();
+
+		if (up.Find(_T("CTRL+")) == 0)			{ fVirt |= FCONTROL; s = s.Mid(5); }
+		else if (up.Find(_T("CONTROL+")) == 0)	{ fVirt |= FCONTROL; s = s.Mid(8); }
+		else if (up.Find(_T("ALT+")) == 0)		{ fVirt |= FALT;     s = s.Mid(4); }
+		else if (up.Find(_T("SHIFT+")) == 0)	{ fVirt |= FSHIFT;   s = s.Mid(6); }
+		else
+			break;
+
+		s.TrimLeft();
+	}
+
+	WORD vk = key_name_to_vk(s);
+	if (vk == 0)
+		return false;
+
+	key = vk;
+	return true;
+}
+
+void CSCKeyBindings::seed_from_menu(HMENU hMenu)
+{
+	if (hMenu == NULL)
+		return;
+
+	int count = ::GetMenuItemCount(hMenu);
+	for (int i = 0; i < count; i++)
+	{
+		HMENU hSub = ::GetSubMenu(hMenu, i);
+		if (hSub != NULL)
+		{
+			seed_from_menu(hSub);
+			continue;
+		}
+
+		UINT id = ::GetMenuItemID(hMenu, i);
+		if (id == 0 || id == (UINT)-1)		//separator(0) / 무효
+			continue;
+
+		TCHAR buf[256] = { 0 };
+		MENUITEMINFO mii = { sizeof(mii) };
+		mii.fMask = MIIM_STRING;
+		mii.dwTypeData = buf;
+		mii.cch = _countof(buf);
+		if (!::GetMenuItemInfo(hMenu, i, TRUE, &mii) || buf[0] == 0)
+			continue;
+
+		CString caption(buf);
+		int tab = caption.Find(_T('\t'));
+		if (tab < 0)
+			continue;
+
+		CString accel_text = caption.Mid(tab + 1);
+		accel_text.Trim();
+		if (accel_text.IsEmpty())
+			continue;
+
+		BYTE fVirt = 0;
+		WORD key = 0;
+		if (!string_to_key(accel_text, fVirt, key))
+			continue;
+
+		//같은 cmd 가 이미 있으면 키만 갱신(name 보존 → register_action 으로 named 화된 항목도 유지), 없으면 추가.
+		bool found = false;
+		for (size_t k = 0; k < m_bindings.size(); k++)
+		{
+			if (m_bindings[k].cmd == id)
+			{
+				m_bindings[k].fVirt = fVirt;
+				m_bindings[k].key = key;
+				m_bindings[k].def_fVirt = fVirt;
+				m_bindings[k].def_key = key;
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+		{
+			Binding b;
+			b.cmd = id;
+			b.fVirt = fVirt;
+			b.key = key;
+			b.def_fVirt = fVirt;
+			b.def_key = key;
+			m_bindings.push_back(b);
+		}
+	}
+}
+
 CSCKeyBindings::Binding* CSCKeyBindings::find_named(UINT cmd)
 {
 	for (size_t i = 0; i < m_bindings.size(); i++)

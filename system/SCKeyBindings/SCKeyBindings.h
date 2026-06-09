@@ -28,6 +28,16 @@ public:
 	//.rc 의 ACCELERATORS 테이블을 기본값으로 적재. 기존 항목은 모두 지우고 재설정.
 	void			seed_from_resource(UINT accel_res_id);
 
+	//메뉴 캡션의 '\t' 뒤 단축키 표기(예: "현재 화면 복사\tCtrl+C")를 파싱해 바인딩으로 적재.
+	//서브메뉴까지 재귀. 같은 cmd 가 이미 있으면 키만 갱신, 없으면 추가(name 비움 → remap 비대상).
+	//.rc ACCELERATORS 를 수동 관리하지 않고 메뉴 캡션만으로 단축키를 정의하기 위한 경로.
+	//owner-draw 메뉴는 캡션 문자열이 비어있을 수 있으므로, LoadMenu 직후의 표준 HMENU 를 넘길 것.
+	void			seed_from_menu(HMENU hMenu);
+
+	//"Ctrl+Alt+E", "F2", "Left", "Space" 등 단축키 문자열 → (fVirt, key). 성공 시 true.
+	//fVirt 는 항상 FVIRTKEY 포함. 인식 못 하는 키 이름이면 false.
+	static bool		string_to_key(LPCTSTR text, BYTE& fVirt, WORD& key);
+
 	//.rc 에 없는 신규 단축키를 named 액션으로 추가. 같은 cmd 의 named 액션이 있으면 갱신.
 	//name 은 레지스트리/UI 용 안정 키 (cmd 숫자값이 바뀌어도 유지되도록).
 	void			register_action(UINT cmd, LPCTSTR name, LPCTSTR display, BYTE fVirt, WORD key);

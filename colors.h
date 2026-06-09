@@ -450,6 +450,20 @@ public:
 		color_theme_sepia,				//세피아 — 빛바랜 종이/사진 톤 (따뜻한 크림 배경 + 갈색 글자)
 		color_theme_windows,			//현재 윈도우 테마의 시스템 색(GetSysColor)을 그대로 반영. default 는 curated 기본 룩.
 
+		//Claude 가 생성한 chrome 시안 10종 (screenshot/0.login before (claudeNN).png 픽셀에서 히스토그램 추출).
+		//5 종 light + 5 종 dark, 각자 시그니처 accent 색만 다른 동일 구조 — 사용자 비교 평가용.
+		//custom/popup_folder_list 인덱스가 +10 밀리지만, 둘 다 콤보 비노출/내부용이라 영속화 영향 거의 없음.
+		color_theme_claude00,			//light : #FAFAFA bg + #2563EB blue accent
+		color_theme_claude01,			//dark  : #1E1E1E bg + #EDEDED mono accent
+		color_theme_claude02,			//dark  : #2E3440 Nord polar + #88C0D0 frost cyan accent
+		color_theme_claude03,			//light : #F5F7FB bg + #4F46E5 indigo accent
+		color_theme_claude04,			//dark  : #161616 bg + #0F62FE vivid blue accent
+		color_theme_claude05,			//light : #FAF7F2 warm cream + #B45309 rust orange (= color_theme_claude 와 동일 팔레트)
+		color_theme_claude06,			//dark  : #0F172A slate-950 + #3B82F6 blue-500 accent
+		color_theme_claude07,			//light : #FFFFFF bg + #10B981 emerald accent
+		color_theme_claude08,			//dark  : #1A1A1D bg + #A78BFA purple-400 accent
+		color_theme_claude09,			//light : #FFFFFF bg + #1D4ED8 deep blue accent
+
 		color_theme_custom,
 		color_theme_popup_folder_list,	//CPathCtrl에서 표시하는 폴더 리스트 팝업에 특화된 테마로서 일반적인 테마가 아니므로 get_color_theme_list()의 결과에는 포함되지 않는다.
 	};

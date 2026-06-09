@@ -1114,11 +1114,21 @@ namespace
 		{ CSCColorTheme::color_theme_claude,			_T("claude") },
 		{ CSCColorTheme::color_theme_sepia,				_T("sepia") },
 		{ CSCColorTheme::color_theme_windows,			_T("windows") },
+		{ CSCColorTheme::color_theme_claude00,			_T("claude00") },
+		{ CSCColorTheme::color_theme_claude01,			_T("claude01") },
+		{ CSCColorTheme::color_theme_claude02,			_T("claude02") },
+		{ CSCColorTheme::color_theme_claude03,			_T("claude03") },
+		{ CSCColorTheme::color_theme_claude04,			_T("claude04") },
+		{ CSCColorTheme::color_theme_claude05,			_T("claude05") },
+		{ CSCColorTheme::color_theme_claude06,			_T("claude06") },
+		{ CSCColorTheme::color_theme_claude07,			_T("claude07") },
+		{ CSCColorTheme::color_theme_claude08,			_T("claude08") },
+		{ CSCColorTheme::color_theme_claude09,			_T("claude09") },
 	};
 
 	//테마 추가 시 enum 과 테이블 양쪽을 갱신하지 않으면 컴파일 타임에 잡힌다.
-	static_assert(_countof(g_sc_theme_table) == CSCColorTheme::color_theme_windows + 1,
-				  "g_sc_theme_table 개수가 SC_COLOR_THEMES(default..windows) 와 어긋남");
+	static_assert(_countof(g_sc_theme_table) == CSCColorTheme::color_theme_claude09 + 1,
+				  "g_sc_theme_table 개수가 SC_COLOR_THEMES(default..claude09) 와 어긋남");
 }
 
 void CSCColorTheme::get_color_theme_list(std::deque<CString>& theme_list)
@@ -1448,6 +1458,427 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_button_text = Gdiplus::Color::White;
 			cr_button_border = gRGB(232, 226, 214);           //#E8E2D6 — 보조버튼(white) 테두리
 			cr_separator = gRGB(232, 226, 214);               //#E8E2D6
+			break;
+
+		//--------------------------------------------------------------------------------------------------
+		// claude00 ~ claude09 : Claude 가 생성한 chrome 시안 10종.
+		//   각 변형은 0.documents/screenshot/0.login before (claudeNN).png 의 픽셀 히스토그램에서 추출.
+		//   light 5종 (00,03,05,07,09) 은 claude (color_theme_claude) 와 같은 골격 — bg/accent 색만 교체.
+		//   dark  5종 (01,02,04,06,08) 은 linkmemine_origin 골격 — body=dark, edit box 는 class default (white) 유지.
+		//   selected/button text 는 accent 의 luma 에 따라 white 또는 bg 색 채택해 대비 ≥ 48 확보.
+		//--------------------------------------------------------------------------------------------------
+
+		case color_theme_claude00:
+			//light : bg #FAFAFA, alt #E5E7EB, accent #2563EB blue-600, text #111827
+			cr_title_text = gRGB(17, 24, 39);
+			cr_title_back_active = gRGB(229, 231, 235);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_text = gRGB(17, 24, 39);
+			cr_text_dim = get_color(cr_text, 80);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(250, 250, 250);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(37, 99, 235);
+			cr_back_selected_inactive = get_color(cr_back, -24);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = gRGB(229, 231, 235);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(229, 231, 235);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, -16));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = gRGB(229, 231, 235);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = gRGB(229, 231, 235);
+			cr_separator = gRGB(229, 231, 235);
+			break;
+
+		case color_theme_claude01:
+			//dark mono : bg #1E1E1E, title #2A2A2A, accent #EDEDED (light gray), text white.
+			//accent 가 매우 밝은 회색이라 selected/button text 는 bg 색(#1E1E1E)으로 두어 가독성 확보.
+			cr_title_text = Gdiplus::Color::White;
+			cr_title_back_active = gRGB(42, 42, 42);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = Gdiplus::Color::White;
+			cr_text_dim = gRGB(143, 143, 143);
+			cr_text_hover = gRGB(30, 30, 30);                 //hover bg = light gray → dark text
+			cr_text_selected = gRGB(30, 30, 30);
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(30, 30, 30);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(237, 237, 237);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, -32);
+			cr_back_alternate = get_color(cr_back, 16);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = get_color(cr_back, 16);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = get_weak_color(cr_back, 64);
+			cr_button_back = cr_back_selected;
+			cr_button_text = gRGB(30, 30, 30);
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
+		case color_theme_claude02:
+			//dark Nord : bg #2E3440 polar-night-0, title #3B4252, accent #88C0D0 frost-2 cyan, text #ECEFF4 snow-storm.
+			//frost cyan 위 정통 Nord 텍스트 = polar-night → selected/button text = bg 색.
+			cr_title_text = gRGB(236, 239, 244);
+			cr_title_back_active = gRGB(59, 66, 82);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = gRGB(236, 239, 244);
+			cr_text_dim = gRGB(143, 153, 169);
+			cr_text_hover = gRGB(46, 52, 64);
+			cr_text_selected = gRGB(46, 52, 64);
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(46, 52, 64);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(136, 192, 208);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, -32);
+			cr_back_alternate = get_color(cr_back, 16);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = get_color(cr_back, 16);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = get_weak_color(cr_back, 64);
+			cr_button_back = cr_back_selected;
+			cr_button_text = gRGB(46, 52, 64);
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
+		case color_theme_claude03:
+			//light : bg #F5F7FB, alt #E5E7EB, accent #4F46E5 indigo-600, text #1F2937
+			cr_title_text = gRGB(31, 41, 55);
+			cr_title_back_active = gRGB(229, 231, 235);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_text = gRGB(31, 41, 55);
+			cr_text_dim = get_color(cr_text, 80);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(245, 247, 251);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(79, 70, 229);
+			cr_back_selected_inactive = get_color(cr_back, -24);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = gRGB(229, 231, 235);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(229, 231, 235);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, -16));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = gRGB(229, 231, 235);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = gRGB(229, 231, 235);
+			cr_separator = gRGB(229, 231, 235);
+			break;
+
+		case color_theme_claude04:
+			//dark : bg #161616, title #262626, accent #0F62FE (IBM Carbon blue), text #F4F4F4.
+			cr_title_text = gRGB(244, 244, 244);
+			cr_title_back_active = gRGB(38, 38, 38);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = gRGB(244, 244, 244);
+			cr_text_dim = gRGB(143, 143, 143);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(22, 22, 22);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(15, 98, 254);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = get_color(cr_back, 16);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = get_color(cr_back, 16);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = get_weak_color(cr_back, 64);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
+		case color_theme_claude05:
+			//light warm : bg #FAF7F2 cream, alt #E8E2D6, accent #B45309 rust orange, text #3F3A33.
+			//= color_theme_claude 와 같은 팔레트 — 10종 시리즈 일관성 위해 별도 슬롯 유지.
+			cr_title_text = gRGB(63, 58, 51);
+			cr_title_back_active = gRGB(232, 226, 214);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_text = gRGB(63, 58, 51);
+			cr_text_dim = get_color(cr_text, 80);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(250, 247, 242);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(180, 83, 9);
+			cr_back_selected_inactive = get_color(cr_back, -24);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = gRGB(232, 226, 214);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(232, 226, 214);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, -16));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = gRGB(232, 226, 214);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = gRGB(232, 226, 214);
+			cr_separator = gRGB(232, 226, 214);
+			break;
+
+		case color_theme_claude06:
+			//dark slate : bg #0F172A slate-950, title #1E293B slate-800, accent #3B82F6 blue-500, text #E2E8F0 slate-200.
+			cr_title_text = gRGB(226, 232, 240);
+			cr_title_back_active = gRGB(30, 41, 59);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = gRGB(226, 232, 240);
+			cr_text_dim = gRGB(148, 163, 184);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(15, 23, 42);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(59, 130, 246);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = get_color(cr_back, 16);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = get_color(cr_back, 16);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = get_weak_color(cr_back, 64);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
+		case color_theme_claude07:
+			//light : bg #FFFFFF, alt #E5E7EB, accent #10B981 emerald-500, text #0F172A.
+			cr_title_text = gRGB(15, 23, 42);
+			cr_title_back_active = gRGB(229, 231, 235);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_text = gRGB(15, 23, 42);
+			cr_text_dim = get_color(cr_text, 80);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = Gdiplus::Color::White;
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(16, 185, 129);
+			cr_back_selected_inactive = get_color(cr_back, -24);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = gRGB(229, 231, 235);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(229, 231, 235);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, -16));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = gRGB(229, 231, 235);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = gRGB(229, 231, 235);
+			cr_separator = gRGB(229, 231, 235);
+			break;
+
+		case color_theme_claude08:
+			//dark purple : bg #1A1A1D, title #3A3A40, accent #A78BFA purple-400, text #F5F5F5.
+			cr_title_text = gRGB(245, 245, 245);
+			cr_title_back_active = gRGB(58, 58, 64);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, 32);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
+
+			cr_text = gRGB(245, 245, 245);
+			cr_text_dim = gRGB(160, 160, 168);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = gRGB(26, 26, 29);
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(167, 139, 250);
+			cr_back_selected_inactive = get_gray_color(cr_back_selected);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = get_color(cr_back, 16);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = get_color(cr_back, 16);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, 32));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = get_weak_color(cr_back, 64);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = get_weak_color(cr_back, 40);
+			cr_separator = get_weak_color(cr_back, 30);
+			break;
+
+		case color_theme_claude09:
+			//light : bg #FFFFFF, alt #E5E7EB, accent #1D4ED8 blue-700 (deep blue), text #111827.
+			cr_title_text = gRGB(17, 24, 39);
+			cr_title_back_active = gRGB(229, 231, 235);
+			cr_title_back_inactive = cr_title_back_active;
+			cr_sys_buttons_hover_back = get_color(cr_title_back_active, -16);
+			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
+
+			cr_text = gRGB(17, 24, 39);
+			cr_text_dim = get_color(cr_text, 80);
+			cr_text_hover = Gdiplus::Color::White;
+			cr_text_selected = Gdiplus::Color::White;
+			cr_text_selected_inactive = cr_text;
+			cr_text_dropHilited = Gdiplus::Color::White;
+
+			cr_back = Gdiplus::Color::White;
+			cr_parent_back = cr_back;
+			cr_back_selected = gRGB(29, 78, 216);
+			cr_back_selected_inactive = get_color(cr_back, -24);
+			cr_back_dropHilited = RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
+			cr_back_hover = get_color(cr_back_selected, 32);
+			cr_back_alternate = gRGB(229, 231, 235);
+
+			cr_selected_border = cr_back_selected;
+			cr_selected_border_inactive = cr_back_selected_inactive;
+
+			cr_header_text = cr_text;
+			cr_header_back = gRGB(229, 231, 235);
+
+			cr_percentage_bar.clear();
+			cr_percentage_bar.push_back(get_color(cr_back, -16));
+			cr_progress = cr_back_selected;
+
+			cr_border_active = cr_back_selected;
+			cr_border_inactive = gRGB(229, 231, 235);
+			cr_button_back = cr_back_selected;
+			cr_button_text = Gdiplus::Color::White;
+			cr_button_border = gRGB(229, 231, 235);
+			cr_separator = gRGB(229, 231, 235);
 			break;
 
 		case color_theme_linkmemine_se:

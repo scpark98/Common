@@ -165,7 +165,10 @@ public:
     void			set_use_default_readonly_color(bool use_default_readonly_color = true, Gdiplus::Color cr_back_readonly = Gdiplus::Color::Transparent);
 
 
-    void		    set_password_mode(bool password = true, TCHAR mask_char = _T('*'));
+    //mask_char 기본 = U+25CF BLACK CIRCLE (●). '*' 는 typography 관례상 superscript 위치(x-height 위)에
+    //그려져 세로 가운데로 보이지 않는다 (Windows OS 도 동일 이유로 XP 부터 패스워드 기본을 ● 로 변경).
+    //소스 인코딩(CP949/UTF-8) 영향을 피하려고 정수 리터럴로 표기.
+    void		    set_password_mode(bool password = true, TCHAR mask_char = (TCHAR)0x25CF);
     //입력 가능한 최대 문자 수. 0 = 제한 없음. insert_text 에서 enforce.
     //CEdit::LimitText() 네이밍을 따름.
     void		    set_limit_text(int max)              { m_limit_text = max; }
@@ -285,7 +288,7 @@ private:
     bool		m_readonly   = false;
     bool        m_use_default_readonly_color = true;
     bool		m_password   = false;
-    TCHAR		m_mask_char  = _T('*');
+    TCHAR		m_mask_char  = (TCHAR)0x25CF;	//U+25CF BLACK CIRCLE (●) — set_password_mode 주석 참조
     int			m_limit_text = 0;      // 0 = 제한 없음
     int			m_padding    = 4;      // 텍스트 여백
     CRect		m_margin     = CRect(0, 0, 0, 0); // 사용자 정의 4면 추가 inset

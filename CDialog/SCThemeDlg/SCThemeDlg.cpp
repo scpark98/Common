@@ -552,6 +552,21 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();
 			break;
+		//claude00 ~ 09 시리즈 — claude 와 동일한 titlebar 처리. 10개 동일 블록이라 fall-through 로 묶음.
+		case CSCColorTheme::color_theme_claude00:
+		case CSCColorTheme::color_theme_claude01:
+		case CSCColorTheme::color_theme_claude02:
+		case CSCColorTheme::color_theme_claude03:
+		case CSCColorTheme::color_theme_claude04:
+		case CSCColorTheme::color_theme_claude05:
+		case CSCColorTheme::color_theme_claude06:
+		case CSCColorTheme::color_theme_claude07:
+		case CSCColorTheme::color_theme_claude08:
+		case CSCColorTheme::color_theme_claude09:
+			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
+			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
+			reconstruct_titlebar_font();
+			break;
 		case CSCColorTheme::color_theme_linkmemine_se:
 			//SetWindowText(_T("color_theme_linkmemine_se"));
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);

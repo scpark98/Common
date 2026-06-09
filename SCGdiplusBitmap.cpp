@@ -3125,25 +3125,86 @@ bool CSCGdiplusBitmap::copy_to_clipboard()
 
 	pbv5->bV5Size = sizeof(BITMAPV5HEADER);
 	pbv5->bV5Width = width;
-	pbv5->bV5Height = -(LONG)height;
+	//bottom-up (양수). top-down 으로 발행하면 PSP 등 legacy 앱이 알파 마스크를 무시하고 검정 배경에
+	//합성하거나 죽는 사례. 검증된 구현(CSCD2Image::copy_to_clipboard) 과 동일하게 bottom-up + 행 반전.
+	pbv5->bV5Height = (LONG)height;
 	pbv5->bV5Planes = 1;
 	pbv5->bV5BitCount = 32;
 	pbv5->bV5Compression = BI_BITFIELDS;
+	pbv5->bV5SizeImage = imageSize;
 	pbv5->bV5RedMask = 0x00FF0000;
 	pbv5->bV5GreenMask = 0x0000FF00;
 	pbv5->bV5BlueMask = 0x000000FF;
 	pbv5->bV5AlphaMask = 0xFF000000;
 	pbv5->bV5CSType = LCS_sRGB;
+	pbv5->bV5Intent = LCS_GM_IMAGES;
 
+	//bottom-up 행 반전 복사. a=0(완전투명) 픽셀의 BGR 은 흰색으로 채워, 알파를 무시하고 BGR 만 읽는
+	//앱에서 검정으로 보이지 않게 한다 (알파=0 은 유지 → alpha-aware 앱에는 영향 없음).
 	BYTE* dst = pData + sizeof(BITMAPV5HEADER);
-	BYTE* src = (BYTE*)bd.Scan0;
-
 	for (UINT y = 0; y < height; ++y)
 	{
-		memcpy(dst + y * stride, src + y * bd.Stride, width * 4);
+		BYTE* srow = (BYTE*)bd.Scan0 + (UINT)(height - 1 - y) * bd.Stride;
+		BYTE* drow = dst + (UINT)y * stride;
+		for (UINT x = 0; x < width; ++x)
+		{
+			BYTE b = srow[x * 4 + 0];
+			BYTE g = srow[x * 4 + 1];
+			BYTE r = srow[x * 4 + 2];
+			BYTE a = srow[x * 4 + 3];
+			if (a == 0)
+			{
+				b = 255;
+				g = 255;
+				r = 255;
+			}
+			drow[x * 4 + 0] = b;
+			drow[x * 4 + 1] = g;
+			drow[x * 4 + 2] = r;
+			drow[x * 4 + 3] = a;
+		}
 	}
 
 	GlobalUnlock(hDibv5);
+
+	//레거시 호환: 24bpp BI_RGB bottom-up CF_DIB.
+	//PSP 같은 옛 앱은 PNG 클립보드 포맷을 모르고 CF_DIBV5 도 제대로 못 받아 죽는 사례가 있다 (그림판은 정상).
+	//CF_DIBV5 만 올리면 OS 가 CF_DIB 를 synthesize 하지만 32bpp alpha 형식이라 동일하게 깨진다.
+	//명시적으로 24bpp BI_RGB DIB 를 올려, 옛 앱이 어느 포맷을 픽업하든 정상 paste 되게 한다.
+	//알파는 흰 배경에 합성 (out = (src*a + 255*(255-a))/255) — 알파 보존은 V5/PNG 가 담당.
+	const UINT dib24_stride = ((width * 3 + 3) & ~3u);
+	HGLOBAL hDib24 = GlobalAlloc(GHND, sizeof(BITMAPINFOHEADER) + (size_t)dib24_stride * height);
+	if (hDib24)
+	{
+		BYTE* pdib = (BYTE*)GlobalLock(hDib24);
+		BITMAPINFOHEADER* pbi = (BITMAPINFOHEADER*)pdib;
+		ZeroMemory(pbi, sizeof(*pbi));
+		pbi->biSize = sizeof(BITMAPINFOHEADER);
+		pbi->biWidth = (LONG)width;
+		pbi->biHeight = (LONG)height;		//bottom-up
+		pbi->biPlanes = 1;
+		pbi->biBitCount = 24;
+		pbi->biCompression = BI_RGB;
+		pbi->biSizeImage = dib24_stride * height;
+
+		BYTE* ddib = pdib + sizeof(BITMAPINFOHEADER);
+		for (UINT y = 0; y < height; ++y)
+		{
+			BYTE* srow = (BYTE*)bd.Scan0 + (UINT)(height - 1 - y) * bd.Stride;
+			BYTE* d = ddib + (UINT)y * dib24_stride;
+			for (UINT x = 0; x < width; ++x)
+			{
+				BYTE a = srow[x * 4 + 3];
+				BYTE inv = (BYTE)(255 - a);
+				d[0] = (BYTE)((srow[x * 4 + 0] * a + 255 * inv) / 255);
+				d[1] = (BYTE)((srow[x * 4 + 1] * a + 255 * inv) / 255);
+				d[2] = (BYTE)((srow[x * 4 + 2] * a + 255 * inv) / 255);
+				d += 3;
+			}
+		}
+		GlobalUnlock(hDib24);
+	}
+
 	m_pBitmap->UnlockBits(&bd);
 
 	// PNG 생성 (alpha 채널 보존)
@@ -3151,6 +3212,8 @@ bool CSCGdiplusBitmap::copy_to_clipboard()
 	if (!create_png_hglobal(&hPng))
 	{
 		GlobalFree(hDibv5);
+		if (hDib24)
+			GlobalFree(hDib24);
 		return false;
 	}
 
@@ -3159,18 +3222,29 @@ bool CSCGdiplusBitmap::copy_to_clipboard()
 	{
 		GlobalFree(hDibv5);
 		GlobalFree(hPng);
+		if (hDib24)
+			GlobalFree(hDib24);
 		return false;
 	}
 
 	EmptyClipboard();
 
-	// 1) CF_DIBV5 설정 (보조 형식, 호환성)
+	// 1) CF_DIBV5 설정 (alpha-aware 앱용)
 	if (!SetClipboardData(CF_DIBV5, hDibv5))
 	{
 		GlobalFree(hDibv5);
 		GlobalFree(hPng);
+		if (hDib24)
+			GlobalFree(hDib24);
 		CloseClipboard();
 		return false;
+	}
+
+	// 1-2) CF_DIB 설정 (PSP 등 PNG 미인식 legacy 앱 호환). 보조 형식이라 실패해도 치명적 아님.
+	if (hDib24)
+	{
+		if (!SetClipboardData(CF_DIB, hDib24))
+			GlobalFree(hDib24);
 	}
 
 	// 2) PNG 설정 (메인 형식, alpha 보존)

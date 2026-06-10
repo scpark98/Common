@@ -7,6 +7,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../SCGdiPlusBitmap.h"
+#include "../../data_structure/SCParagraph/SCParagraph.h"
 
 #pragma warning(disable: 4305)	//'argument': truncation from 'double' to 'Gdiplus::REAL'
 
@@ -1120,7 +1121,24 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHint::TextRenderingHintAntiAliasGridFit);
+	//m_auto_font_quality 가 ON 이면 폰트 종류·크기로 hint 분기.
+	//Segoe UI 9pt 같은 작은 글씨에 무조건 AntiAliasGridFit 적용하면 grayscale AA 가
+	//자모 획을 흐릿하게 만든다는 사용자 피드백 — ClearTypeGridFit 으로 또렷하게.
+	//다크 배경 (m_cr_back[0] 의 luminance < 128) 이면 ClearType subpixel fringe 가
+	//거슬리므로 get_AA_from_pt 에 hint 를 넘겨 임계치를 더 낮게 산출.
+	if (m_auto_font_quality)
+	{
+		int pt = (int)get_font_size_from_pixel_size(GetSafeHwnd(), m_lf.lfHeight);
+		const bool dark_bg = (!m_cr_back.empty() && get_luminance(m_cr_back[0]) < 128);
+		int effective = CSCParagraph::get_AA_from_pt(m_lf.lfFaceName, m_AA_from_pt, dark_bg);
+		g.SetTextRenderingHint(pt >= effective
+			? Gdiplus::TextRenderingHintAntiAliasGridFit
+			: Gdiplus::TextRenderingHintClearTypeGridFit);
+	}
+	else
+	{
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHint::TextRenderingHintAntiAliasGridFit);
+	}
 
 	get_round_rect_path(&roundPath, CRect_to_gpRect(rc), m_round, m_border_thick);
 

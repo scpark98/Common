@@ -134,10 +134,29 @@ public:
 	static CRect	set_line_spacing(std::deque<std::deque<CSCParagraph>>& para, int line, float spacing = 1.0f);
 
 	//static void		draw_text(CDC* pDC, std::deque<std::deque<CSCParagraph>>& para);
-	//aa_from_pt > 0 이면 음절별 폰트 size(pt) 와 비교해 매 음절 그리기 전에 SetTextRenderingHint 를 자동 결정
-	//(< aa_from_pt → ClearTypeGridFit: 작은 글씨 또렷 / >= aa_from_pt → AntiAliasGridFit: 큰 글씨 매끄럽게).
-	//aa_from_pt == 0 이면 호출자가 미리 g 에 설정한 hint 를 그대로 유지 (기존 동작과 호환).
-	static void		draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int aa_from_pt = 0);
+	//AA_from_pt > 0 이면 음절별 폰트 size(pt) 와 비교해 매 음절 그리기 전에 SetTextRenderingHint 를 자동 결정
+	//(< AA_from_pt → ClearTypeGridFit: 작은 글씨 또렷 / >= AA_from_pt → AntiAliasGridFit: 큰 글씨 매끄럽게).
+	//AA_from_pt == 0 이면 호출자가 미리 g 에 설정한 hint 를 그대로 유지 (기존 동작과 호환).
+	//dark_background=true 면 ClearType subpixel fringe 가 어두운 배경에서 두드러져 grayscale AA 가
+	//깔끔하므로 음절별 임계치를 자동으로 더 낮춰 적용 (get_AA_from_pt 내부에서 처리).
+	//리턴: 실제 그려진 텍스트 영역(모든 run r 의 합집합). 단락 모드에서 호출측이 m_text_rect 로 사용.
+	static CRect	draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int AA_from_pt = 0, bool dark_background = false);
+
+	//폰트 이름별 AA 전환 임계치(pt) 결정 — 우선순위:
+	//  1) add_AA_override 로 등록된 face 별 사용자 강제값 (있으면 즉시 반환)
+	//  2) 폰트 자체 임베디드 비트맵 strike 메트릭 (EBLC 테이블에서 자동 측정, face 캐시)
+	//     - strike 보유 안 함 → 1 (전 크기 AA 가 또렷한 순수 outline 폰트)
+	//     - strike 보유 → max ppemY (px) → pt 환산 + 1 (그 위부터 AA, 이하 ClearType/비트맵)
+	//  3) 화이트리스트 매핑 (Segoe UI / 굴림 / Tahoma 등 알려진 케이스)
+	//  4) fallback_pt
+	//마지막으로 dark_background=true 면 결과를 dark_boost 만큼 추가 감산해 grayscale AA 를 더 일찍 적용.
+	//draw_text 가 내부에서 쓰지만, 단락 모드가 아닌 단순 텍스트 렌더 경로(CGdiButton 등) 에서도 공유.
+	static int		get_AA_from_pt(LPCTSTR font_name, int fallback_pt, bool dark_background = false);
+
+	//특정 face 에 대해 임계치를 강제. pt <= 0 이면 등록 해제. 호출 즉시 캐시 무효화.
+	//운영 중 발견한 케이스 (예: 특정 사용자 폰트가 매핑·EBLC 둘 다 안 맞아 흐릿) 빠른 보정용.
+	static void		add_AA_override(LPCTSTR font_name, int pt);
+	static void		clear_AA_overrides();
 
 	//calc_text_rect()에서 이미 각 paragraph의 r이 align에 따라 정해지지만 이를 동적으로 변경하고자 할 경우 호출.
 	static CRect	set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>>& para, DWORD align);

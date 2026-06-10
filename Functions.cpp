@@ -12758,66 +12758,62 @@ HWND get_hwnd_by_exe_file(CString target_exe_file, DWORD except_pid)
 	return hWnd;
 }
 
-//return value : 1(killed), 0(fail to kill), -1(not found)
+//fullpath 와 정확히 같은 실행 경로를 가진 모든 프로세스 인스턴스를 종료한다.
+//반환값 = 종료된 인스턴스 개수.
+//  >0 : 종료된 개수
+//   0 : 매칭 없음 또는 매칭은 있으나 모두 종료 실패 (권한 부족 등)
+//  -1 : snapshot 생성 실패
+//다른 제품의 동명 exe(예: 다른 경로의 LMMAgent.exe)는 영향받지 않는다.
+//옛 구현 결함: 첫 매칭에서 break — 동일 fullpath 의 여러 인스턴스가 떠있어도 1개만 종료.
 int	kill_process_by_fullpath(CString fullpath)
 {
-	int res = -1;
+	if (fullpath.IsEmpty() || !PathFileExists(fullpath))
+		return 0;
 
-	if (fullpath.IsEmpty() || !PathFileExists(fullpath) || get_process_running_count(fullpath) <= 0)
+	HANDLE hProcessSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hProcessSnapshot == INVALID_HANDLE_VALUE)
 		return -1;
 
-	HANDLE hProcessSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);
 	PROCESSENTRY32 pe32 = { 0, };
 	pe32.dwSize = sizeof(PROCESSENTRY32);
 
 	if (!Process32First(hProcessSnapshot, &pe32))
 	{
-		OutputDebugString(_T("Error while checking process"));
 		CloseHandle(hProcessSnapshot);
 		return 0;
 	}
 
+	int killed_count = 0;
+
 	do
 	{
-		if (pe32.th32ProcessID != 0)
-		{
-			TCHAR sFilePath[1024] = { 0, };
-			DWORD bufLen = 1024;
+		if (pe32.th32ProcessID == 0)
+			continue;
 
-			_tcscpy(sFilePath, pe32.szExeFile);
+		//fullpath 조회용 — GetModuleFileNameEx 는 QUERY_INFORMATION + VM_READ 권한 필요.
+		//PROCESS_ALL_ACCESS 보다 좁은 권한이라 권한 부족으로 인한 false negative 가 줄어든다.
+		HANDLE hQuery = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+		if (hQuery == NULL)
+			continue;
 
-			//processname이 실행파일명만 있다면 exe 파일명만 비교하고
-			//전체 경로라면 fullpath를 구해서 비교한다.
-			//단 hProcess가 NULL이라서 전체경로를 구하지 못하는 프로세스도 있다.
-			//HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
-			HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
+		TCHAR sFilePath[MAX_PATH] = { 0, };
+		DWORD len = ::GetModuleFileNameEx(hQuery, NULL, sFilePath, MAX_PATH);
+		CloseHandle(hQuery);
 
-			if (hProcess)
-			{
-				::GetModuleFileNameEx(hProcess, NULL, sFilePath, MAX_PATH);
-				//QueryFullProcessImageName(hProcess, NULL, sFilePath, &bufLen);
-				//TRACE(_T("%s\n"), sFilePath);
-				CloseHandle(hProcess);
+		if (len == 0 || _tcsicmp(sFilePath, fullpath) != 0)
+			continue;
 
-				if (_tcsicmp(sFilePath, fullpath) == 0)
-				{
-					hProcess = OpenProcess(PROCESS_TERMINATE, false, pe32.th32ProcessID);
-					TerminateProcess(hProcess, 1);
-					CloseHandle(hProcess);
-					res = 1;
-					break;
-				}
-			}
-			else
-			{
-
-			}
-		}
+		//정확히 일치 — 종료 시도. TERMINATE 권한은 별도로 다시 OpenProcess.
+		HANDLE hKill = OpenProcess(PROCESS_TERMINATE, FALSE, pe32.th32ProcessID);
+		if (hKill == NULL)
+			continue;
+		if (TerminateProcess(hKill, 1))
+			killed_count++;
+		CloseHandle(hKill);
 	} while (Process32Next(hProcessSnapshot, &pe32));
 
 	CloseHandle(hProcessSnapshot);
-
-	return res;
+	return killed_count;
 }
 
 bool is_running(CString processname)
@@ -13302,150 +13298,496 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	return result;
 }
 
-//서비스 관련 명령을 쉽게 처리하기 위해 작성.
-//cmd는 다음과 같은 키워드를 사용하며 명령에 따라 리턴값의 의미도 다르므로 주의할 것.
-//"query"	: status를 리턴. 정상적인 query 결과는 1 이상의 값을 리턴.
-//"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
-//			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
-//"delete"	: 서비스 삭제가 성공하면 0보다 큰 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
+//─────────────────────────────────────────────────────────────────────────────
+//service_command / service_install 의 내부 헬퍼들.
+//설계 원칙: 모든 SCM 호출은 동기 완료 보장, 무한 루프·CPU spin 없음, 모든 핸들 close,
+//          error_code = 0 = 성공의 일관된 계약.
+//─────────────────────────────────────────────────────────────────────────────
+
+//전체 SCM 명령의 wall-clock 타임아웃. 이 시간 안에 목표 상태에 못 닿으면 WAIT_TIMEOUT.
+//Windows 서비스는 정상이면 수 초 안에 상태 전이가 끝남 — 30s 면 비정상 대기.
+static const DWORD SC_OVERALL_TIMEOUT_MS = 30000;
+
+//폴링 간격 클램프. dwWaitHint 가 비현실적으로 짧거나 길 때 보호.
+static const DWORD SC_POLL_MIN_MS = 100;
+static const DWORD SC_POLL_MAX_MS = 10000;
+
+//MSDN "Starting a Service" / "Stopping a Service" 표준 패턴 그대로.
+//hService 의 상태가 target_state 가 될 때까지 dwWaitHint + dwCheckPoint 추적 폴링.
+//진행 중(dwCheckPoint 증가) 이면 타임아웃 카운터 재시작 — 정상적으로 시간이 걸리는 케이스는 hang 으로 안 봄.
+//checkpoint 정체 + dwWaitHint 초과 → 서비스가 응답 안 함 → WAIT_TIMEOUT.
+//SC_OVERALL_TIMEOUT_MS 초과 → 전체 타임아웃 → WAIT_TIMEOUT.
+//반환: true = 목표 상태 도달, false = 타임아웃/실패 (out_status 와 out_error_code 에 마지막 정보).
+static bool sc_wait_for_state(SC_HANDLE hService, DWORD target_state,
+                              SERVICE_STATUS_PROCESS& out_status, DWORD& out_error_code)
+{
+	DWORD bytes_needed = 0;
+	if (!QueryServiceStatusEx(hService, SC_STATUS_PROCESS_INFO,
+		(LPBYTE)&out_status, sizeof(out_status), &bytes_needed))
+	{
+		out_error_code = GetLastError();
+		return false;
+	}
+
+	if (out_status.dwCurrentState == target_state)
+		return true;
+
+	DWORD overall_start = GetTickCount();
+	DWORD checkpoint_start = GetTickCount();
+	DWORD old_check_point = out_status.dwCheckPoint;
+
+	while (out_status.dwCurrentState != target_state)
+	{
+		//dwWaitHint 는 ms 단위 SCM 권장 폴링 간격(보통 그 1/10 사용).
+		DWORD wait_time = out_status.dwWaitHint / 10;
+		if (wait_time < SC_POLL_MIN_MS) wait_time = SC_POLL_MIN_MS;
+		else if (wait_time > SC_POLL_MAX_MS) wait_time = SC_POLL_MAX_MS;
+		Sleep(wait_time);
+
+		if (!QueryServiceStatusEx(hService, SC_STATUS_PROCESS_INFO,
+			(LPBYTE)&out_status, sizeof(out_status), &bytes_needed))
+		{
+			out_error_code = GetLastError();
+			return false;
+		}
+
+		if (out_status.dwCurrentState == target_state)
+			return true;
+
+		//checkpoint 가 증가했다 = 서비스가 작업 진행 중. 타이머 리셋.
+		if (out_status.dwCheckPoint > old_check_point)
+		{
+			checkpoint_start = GetTickCount();
+			old_check_point = out_status.dwCheckPoint;
+		}
+		else
+		{
+			//checkpoint 정체. dwWaitHint 안에 다음 진행이 없으면 hang.
+			if (GetTickCount() - checkpoint_start > out_status.dwWaitHint)
+			{
+				out_error_code = WAIT_TIMEOUT;
+				return false;
+			}
+		}
+
+		//전체 wall-clock 보호.
+		if (GetTickCount() - overall_start > SC_OVERALL_TIMEOUT_MS)
+		{
+			out_error_code = WAIT_TIMEOUT;
+			return false;
+		}
+	}
+	return true;
+}
+
+//error_code → detail 문자열. detail 이 NULL 이면 no-op.
+static void sc_set_detail(CString* detail, DWORD error_code)
+{
+	if (!detail) return;
+	if (error_code == 0)
+		*detail = _T("");
+	else if (error_code == WAIT_TIMEOUT)
+		*detail = _T("WAIT_TIMEOUT");
+	else
+		*detail = get_error_str(error_code);
+}
+
+//─────────────────────────────────────────────────────────────────────────────
+//SCM 명령 동기 처리 (정공법). 시그니처/cmd 키워드 호환 — 기존 호출 코드 깨지지 않음.
+//정확한 반환 의미는 Functions.h 의 주석 참조.
+//
+//과거 구현의 문제 → 이번 수정 매핑:
+//- OpenService 에 SC_MANAGER_ALL_ACCESS 전달 (서비스 mask 가 아님) → cmd 별로 정확한 SERVICE_* mask
+//- STOP 폴링이 무한 루프 + Sleep 없음 + 타임아웃 없음 → sc_wait_for_state (MSDN 표준)
+//- QueryServiceStatus 실패 시 status=0 인 채 STOP 분기 진입 → 초기 query 실패 시 즉시 반환
+//- DeleteService 후 marked-for-delete 미검증 (재install 실패의 핵심 원인) → 동기 폴링으로 풀림 확인
+//- delete 성공 시 status_code=SERVICE_STOPPED 의미 변형 → 0 (서비스 없음) 반환으로 정정
+//- error_code 가 성공/실패 양쪽에서 일관되지 않음 → 항상 명시적 갱신
+//─────────────────────────────────────────────────────────────────────────────
 DWORD service_command(CString service_name, CString cmd, DWORD& error_code, CString* detail)
 {
-	DWORD status_code = 0;
-	CString detail_msg;
-	SERVICE_STATUS status;
-	ZeroMemory(&status, sizeof(status));
+	error_code = 0;
+	if (detail) *detail = _T("");
 
 	cmd.MakeLower();
 
-	//service control manager를 얻어와서 서비스 상태값을 조회.
-	SC_HANDLE hManager = NULL;
-	SC_HANDLE hService = NULL; 
-
-	//cmd = "restart"일 때 서비스가 중지중이면 각 API를 호출해야하고
-
-	if ((hManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS)) == NULL)
+	//cmd 별 필요한 SERVICE_* access mask. 최소 권한 원칙.
+	DWORD desired_access = 0;
+	if (cmd == _T("query"))			desired_access = SERVICE_QUERY_STATUS;
+	else if (cmd == _T("start"))	desired_access = SERVICE_START | SERVICE_QUERY_STATUS;
+	else if (cmd == _T("stop"))		desired_access = SERVICE_STOP | SERVICE_QUERY_STATUS;
+	else if (cmd == _T("restart"))	desired_access = SERVICE_START | SERVICE_STOP | SERVICE_QUERY_STATUS;
+	else if (cmd == _T("delete"))	desired_access = DELETE | SERVICE_STOP | SERVICE_QUERY_STATUS;
+	else
 	{
-		error_code = GetLastError();
-		TRACE(_T("get_error_str = %s\n"), get_error_str(error_code));
-		return error_code;
+		error_code = ERROR_INVALID_PARAMETER;
+		sc_set_detail(detail, error_code);
+		TRACE(_T("service_command: unknown cmd '%s'\n"), (LPCTSTR)cmd);
+		return 0;
 	}
 
-	if ((hService = OpenService(hManager, service_name, SC_MANAGER_ALL_ACCESS)) == NULL)
+	SC_HANDLE hManager = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+	if (hManager == NULL)
 	{
 		error_code = GetLastError();
-		switch (error_code)
+		sc_set_detail(detail, error_code);
+		TRACE(_T("OpenSCManager failed: %s\n"), (LPCTSTR)get_error_str(error_code));
+		return 0;
+	}
+
+	SC_HANDLE hService = OpenService(hManager, service_name, desired_access);
+	if (hService == NULL)
+	{
+		error_code = GetLastError();
+		sc_set_detail(detail, error_code);
+
+		//"stop" 명령은 서비스가 없으면 이미 멈춰있는 것과 동의 — 호출자 편의 (멱등).
+		DWORD ret = 0;
+		if (cmd == _T("stop") && error_code == ERROR_SERVICE_DOES_NOT_EXIST)
 		{
-			case ERROR_ACCESS_DENIED:
-				detail_msg = _T("ERROR_ACCESS_DENIED");
-				break;
-			case ERROR_INVALID_HANDLE:
-				detail_msg = _T("ERROR_INVALID_HANDLE");
-				break;
-			case ERROR_INVALID_NAME:
-				detail_msg = _T("ERROR_INVALID_NAME");
-				break;
-			case ERROR_SERVICE_DOES_NOT_EXIST:
-				detail_msg = _T("ERROR_SERVICE_DOES_NOT_EXIST");
-				break;
-			default:
-				detail_msg = _T("not defined error.");
+			ret = SERVICE_STOPPED;
+			error_code = 0;
+			if (detail) *detail = _T("");
 		}
 
-		if (detail)
-			*detail = detail_msg;
+		CloseServiceHandle(hManager);
+		return ret;
+	}
 
-		TRACE(_T("detail = %s\n"), detail_msg);
+	SERVICE_STATUS_PROCESS ssp = {};
+	DWORD bytes_needed = 0;
+	if (!QueryServiceStatusEx(hService, SC_STATUS_PROCESS_INFO,
+		(LPBYTE)&ssp, sizeof(ssp), &bytes_needed))
+	{
+		error_code = GetLastError();
+		sc_set_detail(detail, error_code);
+		CloseServiceHandle(hService);
 		CloseServiceHandle(hManager);
 		return 0;
 	}
 
-	//서비스에게 INTERROGATE 제어신호를 보내면 해당 서비스는 자신의 현재 상태를 리턴한다.
-	//SCM이 서비스의 상태를 조사하는 것이 아니라 서비스 자신이 스스로의 상태를 보고하는 것이므로
-	//QueryServiceStatus 함수를 사용하는 것보다 훨씬 더 정확하다.
-	//https://blog.naver.com/wwwkasa/80150694337
-	//하지만 MSDN에는 해당 항목에 "SCM이 서비스의 현재 상태를 인식하기 때문에 이 컨트롤은 일반적으로 유용하지 않습니다."라는
-	//설명이 있으므로 
+	DWORD result = ssp.dwCurrentState;
 
-	if (QueryServiceStatus(hService, &status))
-	//if (ControlService(hService, SERVICE_CONTROL_INTERROGATE, &status))	//error = ERROR_ACCESS_DENIED
+	if (cmd == _T("query"))
 	{
-		if (cmd == _T("query"))
-			status_code = status.dwCurrentState;
+		//성공: 현재 상태값 그대로 반환, error_code = 0.
 	}
-	else
+	else if (cmd == _T("start"))
 	{
-		error_code = GetLastError();
-		detail_msg = get_error_str(error_code);
-		TRACE(_T("get_error_str = %s\n"), detail_msg);
-	}
-
-	//delete할 경우는 반드시 stop후에 delete해야 함.
-	if (cmd == _T("stop") || cmd == _T("delete"))
-	{
-		if (status.dwCurrentState != SERVICE_STOPPED)
+		//이미 RUNNING 또는 START_PENDING 이면 RUNNING 까지 대기만.
+		if (ssp.dwCurrentState != SERVICE_RUNNING && ssp.dwCurrentState != SERVICE_START_PENDING)
 		{
-			if (ControlService(hService, SERVICE_CONTROL_STOP, &status))
-			{
-				//SERVICE_CONTROL_STOP 명령을 내린 후 SERVICE_STOP_PENDING (3) 상태가 된 후 SERVICE_STOPPED 상태로 변경되므로
-				//
-				while (status.dwCurrentState != SERVICE_STOPPED)
-					QueryServiceStatus(hService, &status);
-				status_code = SERVICE_STOPPED;
-			}
-			else
+			if (!StartService(hService, 0, NULL))
 			{
 				error_code = GetLastError();
-				detail_msg = get_error_str(error_code);
-				TRACE(_T("get_error_str = %s\n"), detail_msg);
+				sc_set_detail(detail, error_code);
+				result = 0;
+				goto cleanup;
 			}
 		}
-
-		if (cmd == _T("delete"))
+		if (sc_wait_for_state(hService, SERVICE_RUNNING, ssp, error_code))
 		{
-			if (DeleteService(hService))
+			result = SERVICE_RUNNING;
+			error_code = 0;
+		}
+		else
+		{
+			sc_set_detail(detail, error_code);
+			result = ssp.dwCurrentState;
+		}
+	}
+	else if (cmd == _T("stop"))
+	{
+		if (ssp.dwCurrentState == SERVICE_STOPPED)
+		{
+			result = SERVICE_STOPPED;
+		}
+		else
+		{
+			if (ssp.dwCurrentState != SERVICE_STOP_PENDING)
 			{
-				status_code = SERVICE_STOPPED;
+				SERVICE_STATUS ctrl_status = {};
+				if (!ControlService(hService, SERVICE_CONTROL_STOP, &ctrl_status))
+				{
+					error_code = GetLastError();
+					sc_set_detail(detail, error_code);
+					result = 0;
+					goto cleanup;
+				}
+			}
+			if (sc_wait_for_state(hService, SERVICE_STOPPED, ssp, error_code))
+			{
+				result = SERVICE_STOPPED;
+				error_code = 0;
 			}
 			else
 			{
-				error_code = GetLastError();
-				detail_msg = get_error_str(error_code);
-				TRACE(_T("get_error_str = %s\n"), detail_msg);
+				sc_set_detail(detail, error_code);
+				result = ssp.dwCurrentState;
 			}
 		}
 	}
 	else if (cmd == _T("restart"))
 	{
-		if (ControlService(hService, SERVICE_CONTROL_STOP, &status))
+		//stop 단계.
+		if (ssp.dwCurrentState != SERVICE_STOPPED)
 		{
-			//SERVICE_CONTROL_STOP 명령을 내린 후 SERVICE_STOP_PENDING (3) 상태가 된 후 SERVICE_STOPPED 상태로 변경되므로
-			//
-			while (status.dwCurrentState != SERVICE_STOPPED)
-				QueryServiceStatus(hService, &status);
-			status_code = SERVICE_STOPPED;
+			if (ssp.dwCurrentState != SERVICE_STOP_PENDING)
+			{
+				SERVICE_STATUS ctrl_status = {};
+				if (!ControlService(hService, SERVICE_CONTROL_STOP, &ctrl_status))
+				{
+					error_code = GetLastError();
+					sc_set_detail(detail, error_code);
+					result = 0;
+					goto cleanup;
+				}
+			}
+			if (!sc_wait_for_state(hService, SERVICE_STOPPED, ssp, error_code))
+			{
+				sc_set_detail(detail, error_code);
+				result = ssp.dwCurrentState;
+				goto cleanup;
+			}
+		}
+		//start 단계.
+		if (!StartService(hService, 0, NULL))
+		{
+			error_code = GetLastError();
+			sc_set_detail(detail, error_code);
+			result = 0;
+			goto cleanup;
+		}
+		if (sc_wait_for_state(hService, SERVICE_RUNNING, ssp, error_code))
+		{
+			result = SERVICE_RUNNING;
+			error_code = 0;
+		}
+		else
+		{
+			sc_set_detail(detail, error_code);
+			result = ssp.dwCurrentState;
+		}
+	}
+	else if (cmd == _T("delete"))
+	{
+		//1) 정지부터. delete 는 STOPPED 가 아닌 상태에서도 호출 가능하지만, 명령 수행 중인 서비스는
+		//   바이너리 잠금 등으로 marked-for-delete 후에도 실제 제거가 한참 지연된다.
+		if (ssp.dwCurrentState != SERVICE_STOPPED)
+		{
+			if (ssp.dwCurrentState != SERVICE_STOP_PENDING)
+			{
+				SERVICE_STATUS ctrl_status = {};
+				//STOP 호출 자체가 실패해도(예: SERVICE_NOT_ACTIVE) delete 시도는 계속 — STOPPED 와 동의로 취급.
+				ControlService(hService, SERVICE_CONTROL_STOP, &ctrl_status);
+			}
+			//STOPPED 까지 대기 (실패해도 delete 시도). 결과는 무시.
+			DWORD dummy_err = 0;
+			sc_wait_for_state(hService, SERVICE_STOPPED, ssp, dummy_err);
 		}
 
-		Wait(1000);
+		//2) DeleteService 는 SCM 에 "marked-for-delete" 만 표시. 실제 제거는 마지막 핸들 close 후.
+		if (!DeleteService(hService))
+		{
+			error_code = GetLastError();
+			sc_set_detail(detail, error_code);
+			result = ssp.dwCurrentState;
+			goto cleanup;
+		}
 
-		if (StartService(hService, 0, nullptr))
-			status_code = SERVICE_RUNNING;
+		//3) 자신의 hService 를 먼저 닫아 핸들 카운트를 줄임 (실제 제거 트리거).
+		CloseServiceHandle(hService);
+		hService = NULL;
+
+		//4) OpenService 가 ERROR_SERVICE_DOES_NOT_EXIST 를 반환할 때까지 폴링. 풀려야 동일 이름 재install 가능.
+		//   다른 프로세스가 핸들을 쥐고 있으면 marked-for-delete 가 계속 남는다. 타임아웃이면 호출자에게 알림.
+		DWORD overall_start = GetTickCount();
+		while (true)
+		{
+			SC_HANDLE h_probe = OpenService(hManager, service_name, SERVICE_QUERY_STATUS);
+			if (h_probe == NULL)
+			{
+				DWORD probe_err = GetLastError();
+				if (probe_err == ERROR_SERVICE_DOES_NOT_EXIST)
+				{
+					result = 0;	//실제로 사라짐.
+					error_code = 0;
+					if (detail) *detail = _T("");
+					break;
+				}
+				//마킹 잔존을 의미하는 ERROR_SERVICE_MARKED_FOR_DELETE 외에 다른 에러면 즉시 반환.
+				if (probe_err != ERROR_SERVICE_MARKED_FOR_DELETE)
+				{
+					error_code = probe_err;
+					sc_set_detail(detail, error_code);
+					result = 0;
+					break;
+				}
+			}
+			else
+			{
+				//핸들 열림 = 아직 SCM 에 보임. 닫고 다시 폴링.
+				CloseServiceHandle(h_probe);
+			}
+
+			if (GetTickCount() - overall_start > SC_OVERALL_TIMEOUT_MS)
+			{
+				error_code = WAIT_TIMEOUT;
+				sc_set_detail(detail, error_code);
+				result = ssp.dwCurrentState;
+				break;
+			}
+			Sleep(SC_POLL_MIN_MS);
+		}
 	}
 
-	//5		: ERROR_ACCESS_DENIED
-	//6		: ERROR_INVALID_HANDLE
-	//87	: ERROR_INVALID_PARAMETER
-	//1060	: ERROR_SERVICE_DOES_NOT_EXIST
-	//1051	: ERROR_DEPENDENT_SERVICES_RUNNING
-	//1052	: ERROR_INVALID_SERVICE_CONTROL
-	//1053	: ERROR_SERVICE_REQUEST_TIMEOUT
-	//1061	: ERROR_SERVICE_CANNOT_ACCEPT_CTRL
-	//1062	: ERROR_SERVICE_NOT_ACTIVE
-	//1115	: ERROR_SHUTDOWN_IN_PROGRESS
+cleanup:
+	if (hService) CloseServiceHandle(hService);
+	CloseServiceHandle(hManager);
+	return result;
+}
 
+//─────────────────────────────────────────────────────────────────────────────
+//서비스 등록 (CreateService 동기). marked-for-delete 잔재가 있으면 풀릴 때까지 폴링 후 재시도.
+//현재 프로세스가 admin 권한이어야 SCM 의 CREATE_SERVICE 권한을 얻을 수 있다.
+//─────────────────────────────────────────────────────────────────────────────
+DWORD service_install(CString service_name, CString display_name, CString binary_path,
+                      DWORD start_type, CString account, CString password,
+                      DWORD& error_code, CString* detail)
+{
+	error_code = 0;
+	if (detail) *detail = _T("");
+
+	if (display_name.IsEmpty())
+		display_name = service_name;
+
+	//binary_path 가 공백을 포함하면 SCM 이 이를 인자로 분리해버린다. 큰따옴표로 묶어 단일 경로로 강제.
+	CString quoted_binary = binary_path;
+	if (!quoted_binary.IsEmpty() && quoted_binary[0] != _T('"'))
+		quoted_binary = _T("\"") + binary_path + _T("\"");
+
+	SC_HANDLE hManager = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE | SC_MANAGER_CONNECT);
+	if (hManager == NULL)
+	{
+		error_code = GetLastError();
+		sc_set_detail(detail, error_code);
+		TRACE(_T("OpenSCManager(CREATE) failed: %s\n"), (LPCTSTR)get_error_str(error_code));
+		return error_code;
+	}
+
+	LPCTSTR account_ptr = NULL;
+	LPCTSTR password_ptr = NULL;
+	if (!account.IsEmpty())
+	{
+		account_ptr = (LPCTSTR)account;
+		password_ptr = password.IsEmpty() ? NULL : (LPCTSTR)password;
+	}
+
+	//marked-for-delete 잔재 대응: CreateService 가 ERROR_SERVICE_MARKED_FOR_DELETE 면 폴링 후 재시도.
+	DWORD overall_start = GetTickCount();
+	while (true)
+	{
+		SC_HANDLE hService = CreateService(
+			hManager,
+			service_name,
+			display_name,
+			SERVICE_ALL_ACCESS,
+			SERVICE_WIN32_OWN_PROCESS,
+			start_type,
+			SERVICE_ERROR_NORMAL,
+			quoted_binary,
+			NULL,			//lpLoadOrderGroup
+			NULL,			//lpdwTagId
+			NULL,			//lpDependencies
+			account_ptr,	//lpServiceStartName (NULL = LocalSystem)
+			password_ptr);
+
+		if (hService != NULL)
+		{
+			CloseServiceHandle(hService);
+			CloseServiceHandle(hManager);
+			return 0;	//성공
+		}
+
+		error_code = GetLastError();
+		if (error_code != ERROR_SERVICE_MARKED_FOR_DELETE)
+		{
+			//marked 외 에러는 즉시 반환 (ERROR_SERVICE_EXISTS, ERROR_ACCESS_DENIED 등).
+			sc_set_detail(detail, error_code);
+			CloseServiceHandle(hManager);
+			return error_code;
+		}
+
+		//marked-for-delete: 다른 핸들이 풀릴 때까지 폴링.
+		if (GetTickCount() - overall_start > SC_OVERALL_TIMEOUT_MS)
+		{
+			error_code = WAIT_TIMEOUT;
+			sc_set_detail(detail, error_code);
+			CloseServiceHandle(hManager);
+			return error_code;
+		}
+		Sleep(SC_POLL_MIN_MS);
+	}
+}
+
+//─────────────────────────────────────────────────────────────────────────────
+//서비스의 binary path 조회. QueryServiceConfig::lpBinaryPathName 을 그대로 반환.
+//buffer 크기는 두 번 호출 패턴 — 첫 호출로 필요 크기를 받고, 그 크기로 할당 후 두 번째 호출.
+//─────────────────────────────────────────────────────────────────────────────
+DWORD service_get_binary_path(CString service_name, CString& out_path, DWORD& error_code, CString* detail)
+{
+	error_code = 0;
+	out_path = _T("");
+	if (detail) *detail = _T("");
+
+	SC_HANDLE hManager = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+	if (hManager == NULL)
+	{
+		error_code = GetLastError();
+		sc_set_detail(detail, error_code);
+		return error_code;
+	}
+
+	SC_HANDLE hService = OpenService(hManager, service_name, SERVICE_QUERY_CONFIG);
+	if (hService == NULL)
+	{
+		error_code = GetLastError();
+		sc_set_detail(detail, error_code);
+		CloseServiceHandle(hManager);
+		return error_code;
+	}
+
+	//첫 호출: bytes_needed 만 얻음. ERROR_INSUFFICIENT_BUFFER 가 정상 응답.
+	DWORD bytes_needed = 0;
+	QueryServiceConfig(hService, NULL, 0, &bytes_needed);
+	DWORD first_err = GetLastError();
+	if (bytes_needed == 0 || (first_err != ERROR_INSUFFICIENT_BUFFER && first_err != 0))
+	{
+		error_code = first_err;
+		sc_set_detail(detail, error_code);
+		CloseServiceHandle(hService);
+		CloseServiceHandle(hManager);
+		return error_code;
+	}
+
+	BYTE* buf = new BYTE[bytes_needed];
+	QUERY_SERVICE_CONFIG* config = (QUERY_SERVICE_CONFIG*)buf;
+	if (!QueryServiceConfig(hService, config, bytes_needed, &bytes_needed))
+	{
+		error_code = GetLastError();
+		sc_set_detail(detail, error_code);
+		delete[] buf;
+		CloseServiceHandle(hService);
+		CloseServiceHandle(hManager);
+		return error_code;
+	}
+
+	out_path = config->lpBinaryPathName ? config->lpBinaryPathName : _T("");
+
+	delete[] buf;
 	CloseServiceHandle(hService);
 	CloseServiceHandle(hManager);
-
-	return status_code;
+	return 0;
 }
 
 //status값에 해당하는 상태 스트링 리턴

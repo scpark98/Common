@@ -547,7 +547,9 @@ struct	NETWORK_INFO
 	//- 무음 트랙 재생 중인 경우는 inactive 로 잡힐 수 있으나 PotPlayer 등 일반 미디어 재생에는 충분.
 	bool		is_process_audio_active(CString processname);
 	
-	//return value : 1(killed), 0(fail to kill), -1(not found)
+	//fullpath 와 정확히 같은 실행 경로의 모든 프로세스 인스턴스를 종료한다.
+	//다른 경로의 동명 exe(예: 다른 제품의 LMMAgent.exe)에는 영향 없음.
+	//return value : >0=killed count, 0=매칭 없음 또는 종료 실패, -1=snapshot 실패
 	int			kill_process_by_fullpath(CString fullpath);
 
 	bool		kill_process(CString processname);
@@ -582,13 +584,37 @@ struct	NETWORK_INFO
 	void		Wow64Disable(bool disable = true);
 
 	//서비스 관련 명령을 쉽게 처리하기 위해 작성.
-	//cmd는 다음과 같은 키워드를 사용한다.
-	//"query"	: status를 리턴
-	//"stop"	: 서비스를 중지시키고 최종 status = "SERVICE_STOPPED"를 리턴, 그렇지 않으면 detail 참조.
-	//			: 서비스가 존재하지 않거나 이미 중지된 경우에도 "SERVICE_STOPPED"를 리턴함.
-	//"delete"	: 서비스 삭제가 성공하면 0이 아닌 값을 리턴. 실패하면 0을 리턴하므로 이 경우는 detail 참조.
+	//SCM 명령을 동기적으로 처리. 반환값은 cmd 별로 의미가 다르며 호출자 계약 명확.
+	//error_code : 항상 호출 후 갱신. 0 = 성공, 그 외 = WinAPI 에러코드. detail 은 에러 문자열.
+	//전체 명령 타임아웃 = 30초 (서비스 응답이 늦으면 detail 에 "TIMEOUT" 보고, 무한 hang 절대 없음).
+	//"query"	: 현재 상태(SERVICE_STATUS::dwCurrentState) 반환. 서비스 없음 → 0.
+	//"start"	: 성공 시 SERVICE_RUNNING (4). 이미 RUNNING 이면 즉시 그대로 반환. 실패 → 0.
+	//"stop"	: 성공 시 SERVICE_STOPPED (1). 이미 STOPPED 또는 서비스 없음이면 즉시 STOPPED 반환. 실패 → 0.
+	//"restart"	: stop 후 start. 성공 시 SERVICE_RUNNING. 실패 → 0.
+	//"delete"	: 서비스 정지 → DeleteService → marked-for-delete 가 풀려 OpenService 가
+	//			  ERROR_SERVICE_DOES_NOT_EXIST 반환할 때까지 동기 폴링. 성공 시 0 반환 (서비스 없음).
+	//			  marked 잔존 / 타임아웃 → 마지막 상태값 반환 + error_code = WAIT_TIMEOUT.
 	//ex) service_command(_T("service_name"), _T("query"), error_code, &detail);
 	DWORD		service_command(CString service_name, CString cmd, DWORD& error_code, CString *detail = NULL);
+
+	//서비스 등록 (CreateService 동기 호출).
+	//binary_path : 서비스 바이너리의 절대 경로. 공백 포함 시 호출자가 큰따옴표로 묶지 않아도 됨 (내부 처리).
+	//display_name: 빈 문자열이면 service_name 그대로 사용.
+	//start_type  : SERVICE_AUTO_START / SERVICE_DEMAND_START / SERVICE_DISABLED 등.
+	//account     : NULL 또는 빈 문자열이면 LocalSystem.
+	//password    : account 가 LocalSystem 이면 무시.
+	//마킹된 동일 이름 서비스(marked-for-delete) 가 있으면 풀릴 때까지 폴링 후 재시도 (전체 타임아웃 30s).
+	//성공 시 0 반환, 실패 시 GetLastError 반환. error_code/detail 도 동일 정보.
+	DWORD		service_install(CString service_name, CString display_name, CString binary_path,
+								DWORD start_type, CString account, CString password,
+								DWORD& error_code, CString *detail = NULL);
+
+	//서비스의 현재 binary path (QueryServiceConfig::lpBinaryPathName) 를 조회.
+	//성공 시 0 반환 + out_path 채움. 실패 시 GetLastError 반환 + out_path 빈 문자열.
+	//"이미 등록된 서비스의 binary 가 우리 것과 같은가" 판별에 사용 — 같으면 delete+install 우회 가능.
+	DWORD		service_get_binary_path(CString service_name, CString& out_path,
+										DWORD& error_code, CString *detail = NULL);
+
 	//status값에 해당하는 상태 스트링 리턴
 	CString		get_service_status_str(DWORD status);
 

@@ -356,6 +356,14 @@ public:
 	void		set_font_antialias(bool antialias = true);
 	void		set_font(CFont* font);
 
+	//폰트 종류·크기 기준으로 텍스트 hint 자동 결정 (기본 ON).
+	//on=true 면 현재 폰트 pt 가 AA_from_pt 이상이면 AntiAliasGridFit(큰 글씨 매끈),
+	//미만이면 ClearTypeGridFit(작은 글씨 또렷). Segoe UI 등 폰트별 실제 임계치는
+	//CSCParagraph::get_AA_from_pt 가 EBLC 자동측정 + 다크 배경 보정으로 산출.
+	//on=false 면 기존처럼 AntiAliasGridFit 무조건 사용.
+	void		set_font_quality_auto(bool on = true, int AA_from_pt = 14)
+				{ m_auto_font_quality = on; m_AA_from_pt = AA_from_pt; Invalidate(); }
+
 	int			GetCheck();
 	void		SetCheck(int check_state = true);
 	void		set_check(int check_state = true) { SetCheck(check_state); }
@@ -618,6 +626,11 @@ protected:
 
 	LOGFONT		m_lf;
 	CFont		m_font;
+
+	//텍스트 hint 자동 결정 — 기본 ON. AA_from_pt 미만은 ClearTypeGridFit(작은 글씨 또렷),
+	//이상은 AntiAliasGridFit(큰 글씨 매끈). OnDrawItem 의 SetTextRenderingHint 분기에서 사용.
+	bool		m_auto_font_quality = true;
+	int			m_AA_from_pt = 14;
 
 	void		reconstruct_font();
 

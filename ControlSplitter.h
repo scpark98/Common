@@ -69,6 +69,7 @@ public:
 
 // 귽깛긵깏긽깛긡?긘깈깛
 public:
+	//CS_VERT, CS_HORZ, CS_NONE
 	void set_type(UINT nType, bool draw_dots = true, Gdiplus::Color cr_dots = Gdiplus::Color::DimGray);
 	virtual ~CControlSplitter();
 

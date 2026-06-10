@@ -227,8 +227,8 @@ public:
 	void		set_font_size(int nSize);
 	void		set_font_weight(int weight = FW_BOLD);
 	void		set_font_quality(int quality);
-	//aa_from_pt 미만 → GDI 내장 비트맵(작은 글씨 또렷), 이상 → GDI+ 외곽선 렌더(매끈, embedded bitmap 회피). set_font_quality() 로 해제.
-	void		set_font_quality_auto(bool on = true, int aa_from_pt = 11);
+	//AA_from_pt 미만 → GDI 내장 비트맵(작은 글씨 또렷), 이상 → GDI+ 외곽선 렌더(매끈, embedded bitmap 회피). set_font_quality() 로 해제.
+	void		set_font_quality_auto(bool on = true, int AA_from_pt = 11);
 
 	void		set_color_theme(int theme, bool invalidate = true);
 	//external CSCColorTheme 의 색을 그대로 가져와 적용 — parent dlg 가 dlg 전체 theme 을 자식 컨트롤들에 일관 전파하는 패턴.
@@ -332,14 +332,14 @@ protected:
 	CFont		m_font;
 	void		ReconstructFont();
 
-	//true 면 m_aa_from_pt 미만은 GDI DrawText + 내장 비트맵(작은 글씨 또렷), 이상은 GDI+ 외곽선 렌더(매끈)로
+	//true 면 m_AA_from_pt 미만은 GDI DrawText + 내장 비트맵(작은 글씨 또렷), 이상은 GDI+ 외곽선 렌더(매끈)로
 	//자동 분기. set_font_quality() 로 명시 지정하면 해제.
 	bool		m_auto_font_quality = true;
 	//이 pt 이상부터 GDI+ 로 그린다. 굴림/돋움/궁서는 ~20px 까지 embedded bitmap 을 내장하고 GDI 는 lfQuality 가
 	//무엇이든 그 비트맵을 써버려 큰 크기에서 톱니가 남는다. GDI+ 는 자체 래스터라이저라 내장 비트맵을 무시하고
 	//외곽선을 그려 매끈해진다.
-	int			m_aa_from_pt = 11;
-	//ReconstructFont 가 계산: 현재 크기가 m_aa_from_pt 이상이면 DrawItem 이 본문을 GDI+ 로 그린다.
+	int			m_AA_from_pt = 11;
+	//ReconstructFont 가 계산: 현재 크기가 m_AA_from_pt 이상이면 DrawItem 이 본문을 GDI+ 로 그린다.
 	bool		m_text_smooth = false;
 
 	//라인 높이는 글꼴 높이에 따라 자동 계산된다.

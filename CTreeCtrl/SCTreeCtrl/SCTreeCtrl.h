@@ -421,12 +421,14 @@ public:
 	CSCScrollbar	m_scrollbar_h;	//horizontal
 	int				m_scrollbar_width = 14;	//track (window) 폭 — 18→16→14 로 양쪽 1px씩 축소. thumb 두께는 CSCScrollbar 내부 (resting 2, hover 6).
 	int				m_h_wheel_accum = 0;	//mouse driver 가 한 번 굴림에 작은 zDelta 다수 메시지 보낼 때 누적해서 WHEEL_DELTA 단위로 process.
-	int				m_h_scroll_pos = 0;		//사용자 H scroll 위치 — tree natural max + m_scrollbar_width 까지. 초과분은 customdraw 가 paint shift 로 표시.
-	int				m_h_natural_max = -1;	//tree 의 native si.nMax (over-scroll 계산용).
+	int				m_h_scroll_pos = 0;		//사용자 H scroll 위치(px). 0..(m_h_content_width - viewport). 전량 customdraw 의 over_shift paint-shift 로 시각화.
+	int				m_h_content_width = 0;	//sync_scrollbar 가 가시 항목 라벨 right 최댓값으로 측정한 자연 콘텐츠 폭. native si 대신 H scroll 의 source of truth.
+	int				m_h_natural_max = -1;	//over_shift 활성 게이트(>=0 이면 활성). native 스크롤을 안 쓰므로 활성 시 0.
 	bool			m_h_internal_thumb = false;	//우리 코드가 발사한 SB_THUMBPOSITION 인지 마킹 (외부 driver / 자체 발사 구분).
 	bool			m_v_visible_state = false;	//sync_scrollbar 가 결정한 V overlay visible — customdraw 가 timing 무관하게 정확한 값 사용.
-	bool			m_h_visible_state = false;	//H overlay visible 동일.
+	bool			m_h_visible_state = false;	//H overlay visible 동일. OnNcCalcSize 가 이 값으로 하단 NC(가로바 자리) 예약 여부 결정.
 	bool			m_scrollbar_setup = false;
+	bool			m_syncing = false;		//sync_scrollbar 재진입 가드 — need_h 변화로 SWP_FRAMECHANGED 발사 시 중첩 sync 가 또 발사하지 않도록.
 	void			setup_scrollbar();		//PreSubclassWindow 끝에서 호출 — WS_VSCROLL 제거 + scrollbar 생성.
 	void			sync_scrollbar();		//트리 scroll state → scrollbar 모델 push. 외부에서도 batch insert/delete 후 호출 가능.
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
@@ -488,6 +490,11 @@ protected:
 	//shift 한다. get_checkbox_rect / get_expand_button_rect 는 unshifted GetItemRect 기준이라 이 값을 따로
 	//빼줘야 over-scroll 끝에서 체크박스·버튼이 콘텐츠와 함께 스크롤된다.
 	int				get_over_shift() const;
+
+	//전체 펼침(expanded) 항목 기준 자연 콘텐츠 폭(px) — H 스크롤바 표시/범위의 source of truth.
+	//수직 스크롤 위치와 무관하게 동일 값(고정). 가시 항목 하나로 text-left 의 level 선형관계를 보정한 뒤,
+	//모든 펼침 항목의 라벨 폭을 DC 로 측정해 최댓값을 취한다. (native si 는 WS_HSCROLL strip 으로 신뢰 불가.)
+	int				measure_content_width();
 
 	//customdraw 의 체크박스 그리기 위치 — OnLButtonDown 의 hit-test 와 일관성 위해 helper. TVS_CHECKBOXES 없을 시 empty rect.
 	CRect			get_checkbox_rect(HTREEITEM hItem);

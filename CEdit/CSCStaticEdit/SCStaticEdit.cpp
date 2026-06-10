@@ -180,7 +180,15 @@ void CSCStaticEdit::rebuild_font()
 	m_font.DeleteObject();
 	m_lf.lfWidth = 0;
 	m_lf.lfCharSet = DEFAULT_CHARSET;
-	m_font.CreateFontIndirect(&m_lf);
+	//패스워드 모드일 때만 lfQuality 를 ANTIALIASED 로 강제.
+	//마스크 글리프(U+25CF ● 등) 는 원형 외곽선이라 ClearType 의 grid hinting 효과가 없고
+	//grayscale AA 가 없으면 좌우 R/B subpixel fringe 와 톱니가 두드러진다 (사용자 캡처 확인).
+	//draw_text 가 GDI TextOut 으로 그리므로 g.SetTextRenderingHint 가 아닌 lfQuality 가 결정.
+	//평문 모드의 m_lf.lfQuality 는 외부 set_font_antialias 설정값 그대로 유지하기 위해 lf 로컬 복사본만 수정.
+	LOGFONT lf = m_lf;
+	if (m_password)
+		lf.lfQuality = ANTIALIASED_QUALITY;
+	m_font.CreateFontIndirect(&lf);
 
 	// 폰트 높이 캐시 (m_hWnd 무관 ? screen DC 사용)
 	HDC h_screen = ::GetDC(NULL);
@@ -325,6 +333,8 @@ void CSCStaticEdit::set_password_mode(bool password, TCHAR mask_char)
 {
 	m_password = password;
 	m_mask_char = mask_char;
+	//rebuild_font 가 m_password 보고 lfQuality 를 결정 — 패스워드 모드 진입/이탈 시 폰트 재생성 필수.
+	rebuild_font();
 	Invalidate(FALSE);
 }
 
@@ -1110,6 +1120,10 @@ void CSCStaticEdit::OnPaint()
 		// 렌더링되어 경계가 흐리게 잘린다. Half로 설정하면 geometric 좌표가
 		// 픽셀 경계에 정렬되어 rc_client의 네 변이 온전히 그려진다.
 		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+		//텍스트는 draw_text 안에서 GDI dc.TextOut 으로 그려진다 — 여기서 설정하는
+		//SetTextRenderingHint 는 GDI+ DrawString 경로용이라 텍스트에 영향 없음.
+		//(GDI TextOut 의 AA 는 HFONT::lfQuality 가 결정 — rebuild_font 가 m_password 보고 자동 설정.)
+		//draw_dim_text 도 GDI 경로라 동일.
 		g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 
 		CRect rc_text = get_text_area();
@@ -2082,6 +2096,8 @@ void CSCStaticEdit::perform_action_button_click()
 
 	case action_password_toggle:
 		m_password = !m_password;
+		//rebuild_font 가 m_password 보고 lfQuality 를 결정 — 토글 즉시 반영.
+		rebuild_font();
 		ensure_caret_visible();
 		update_caret_pos();
 		Invalidate(FALSE);

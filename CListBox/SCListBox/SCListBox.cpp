@@ -19,6 +19,7 @@
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
+#include "../../log/SCLog/SCLog.h"	//[hscroll 진단] 임시 — 가로스크롤바 간헐 미표시 추적용. 원인 확정 후 제거.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -219,7 +220,7 @@ void CSCListBox::ReconstructFont()
 			::ReleaseDC(m_hWnd, hdc);
 		}
 		int pt = MulDiv(ppem, 72, dpi);
-		m_text_smooth = (pt >= m_aa_from_pt);
+		m_text_smooth = (pt >= m_AA_from_pt);
 		m_lf.lfQuality = DEFAULT_QUALITY;
 	}
 	else
@@ -275,10 +276,10 @@ void CSCListBox::set_font_quality(int quality)
 	ReconstructFont();
 }
 
-void CSCListBox::set_font_quality_auto(bool on, int aa_from_pt)
+void CSCListBox::set_font_quality_auto(bool on, int AA_from_pt)
 {
 	m_auto_font_quality = on;
-	m_aa_from_pt = aa_from_pt;
+	m_AA_from_pt = AA_from_pt;
 	ReconstructFont();
 }
 
@@ -2284,6 +2285,12 @@ void CSCListBox::sync_scrollbar()
 				m_scrollbar_h.ShowWindow(SW_SHOW);
 		}
 	}
+
+	//[hscroll 진단] 임시 — 원인 확정 후 제거.
+	if (pLog)
+		logWrite(_T("[hscroll-listbox] cw=%d ch=%d use_hscroll=%d max_ext=%d total=%d need_v=%d need_h=%d hbar_vis=%d"),
+			rc.Width(), rc.Height(), (int)m_use_hscroll, m_max_horizontal_extent, total,
+			(int)need_v, (int)need_h, (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
 }
 
 LRESULT CSCListBox::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

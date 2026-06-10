@@ -417,13 +417,12 @@ void CSCStatic::OnPaint()
 
 	//20250820 scpark. DT_CALCRECT 시에도 dwText를 반영해주는 것이 정석이지만
 	//여러가지 다양한 스타일을 지원하기 위해서는 dwText를 제외하고 DT_CALCRECT해야만 지원 가능하다.
-	dc.DrawText(sSpace + m_text, &m_rect_text, /*dwText | */DT_CALCRECT);
-	m_text_extent = m_rect_text.Width();
-	//TRACE(_T("width = %d (%s)\n"), m_rect_text.Width(), m_text);
-	szText.cx = m_rect_text.Width();// + m_nOutlineWidth * 2;
-	szText.cy = m_rect_text.Height();// + m_nOutlineWidth * 2;
+	dc.DrawText(sSpace + m_text, &m_text_rect, /*dwText | */DT_CALCRECT);
+	//TRACE(_T("width = %d (%s)\n"), m_text_rect.Width(), m_text);
+	szText.cx = m_text_rect.Width();// + m_nOutlineWidth * 2;
+	szText.cy = m_text_rect.Height();// + m_nOutlineWidth * 2;
 
-	m_rect_text = rc;
+	m_text_rect = rc;
 
 	//아이콘 또는 헤더 이미지와 텍스트 사이의 갭 크기지만 이미지의 여백, 크기 정도에 따라 갭은 비율로 조정되도록 수정되어야 한다.
 	int gap = 4;
@@ -433,7 +432,7 @@ void CSCStatic::OnPaint()
 	{
 		gap = 4;
 
-		CRect rIcon = m_rect_text;
+		CRect rIcon = m_text_rect;
 		CSize szIcon = m_sz_icon;
 
 		//아이콘의 너비만큼 텍스트는 밀려서 출력된다.
@@ -447,11 +446,11 @@ void CSCStatic::OnPaint()
 			if (m_image_left_align_fix)
 			{
 				rIcon.left = 8;
-				m_rect_text.left = rc.CenterPoint().x - szText.cx / 2;
+				m_text_rect.left = rc.CenterPoint().x - szText.cx / 2;
 			}
 			else
 			{
-				m_rect_text.left = rIcon.left + gap + m_sz_icon.cx;
+				m_text_rect.left = rIcon.left + gap + m_sz_icon.cx;
 			}
 		}
 		else if (m_halign == DT_RIGHT)
@@ -459,12 +458,12 @@ void CSCStatic::OnPaint()
 			if (m_image_left_align_fix)
 			{
 				rIcon.left = 8;
-				m_rect_text.left = rc.right - gap - szText.cx;
+				m_text_rect.left = rc.right - gap - szText.cx;
 			}
 			else
 			{
 				rIcon.left = rc.right - szText.cx - m_sz_icon.cx - 2;
-				m_rect_text.left = rIcon.left + m_sz_icon.cx + 2;
+				m_text_rect.left = rIcon.left + m_sz_icon.cx + 2;
 			}
 		}
 		else
@@ -476,19 +475,19 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rIcon.left = 2;
-				m_rect_text.left = rIcon.left + m_sz_icon.cx + gap;
+				m_text_rect.left = rIcon.left + m_sz_icon.cx + gap;
 			}
 		}
 
 		if (m_valign == DT_VCENTER)
 		{
 			rIcon.top = rc.top + (rc.Height() - m_sz_icon.cy) / 2;
-			m_rect_text.top = (rc.Height() - szText.cy) / 2;
+			m_text_rect.top = (rc.Height() - szText.cy) / 2;
 		}
 		else if (m_valign == DT_BOTTOM)
 		{
 			rIcon.top = rc.bottom - m_sz_icon.cy;
-			m_rect_text.top = rc.bottom - szText.cy;
+			m_text_rect.top = rc.bottom - szText.cy;
 		}
 		else
 		{
@@ -503,7 +502,7 @@ void CSCStatic::OnPaint()
 				//top 정렬인데 아이콘이 커서 상단을 벗어난다면 이미지, 텍스트 모두 아래로 내려준다.
 				if (rIcon.top < 0)
 				{
-					m_rect_text.top -= rIcon.top;
+					m_text_rect.top -= rIcon.top;
 					rIcon.top = 0;
 				}
 			}
@@ -514,7 +513,7 @@ void CSCStatic::OnPaint()
 	}
 	else if (m_header_images.size() > 0)
 	{
-		CRect rImg = m_rect_text;
+		CRect rImg = m_text_rect;
 		CSize szImg(m_header_images[m_header_image_index]->width, m_header_images[m_header_image_index]->height);
 
 		//보통 align은 텍스트가 중앙 정렬이면 "image + header" 둘 다 중앙에, LEFT이면 둘 다 왼쪽부터 정렬되지만
@@ -533,11 +532,11 @@ void CSCStatic::OnPaint()
 			if (m_image_left_align_fix)
 			{
 				rImg.left = 8;
-				m_rect_text.left = rc.CenterPoint().x - szText.cx / 2;
+				m_text_rect.left = rc.CenterPoint().x - szText.cx / 2;
 			}
 			else
 			{
-				m_rect_text.left = rImg.left + gap + m_header_images[m_header_image_index]->width;
+				m_text_rect.left = rImg.left + gap + m_header_images[m_header_image_index]->width;
 			}
 		}
 		else if (m_halign == DT_RIGHT)
@@ -545,12 +544,12 @@ void CSCStatic::OnPaint()
 			if (m_image_left_align_fix)
 			{
 				rImg.left = 8;
-				m_rect_text.left = rc.right - gap - szText.cx;
+				m_text_rect.left = rc.right - gap - szText.cx;
 			}
 			else
 			{
 				rImg.left = rc.right - szText.cx - szImg.cx - 2;
-				m_rect_text.left = rImg.left + szImg.cx + 2;
+				m_text_rect.left = rImg.left + szImg.cx + 2;
 			}
 		}
 		else
@@ -562,23 +561,23 @@ void CSCStatic::OnPaint()
 			else
 			{
 				rImg.left = 2;
-				m_rect_text.left = rImg.left + szImg.cx + gap;
+				m_text_rect.left = rImg.left + szImg.cx + gap;
 			}
 		}
 
 		if (m_valign == DT_VCENTER)
 		{
 			rImg.top = rc.top + (rc.Height() - szImg.cy) / 2;
-			m_rect_text.top = (rc.Height() - szText.cy) / 2;
+			m_text_rect.top = (rc.Height() - szText.cy) / 2;
 		}
 		else if (m_valign == DT_BOTTOM)
 		{
 			rImg.top = rc.bottom - szImg.cy;
-			m_rect_text.top = rc.bottom - szText.cy;
+			m_text_rect.top = rc.bottom - szText.cy;
 		}
 		else
 		{
-			//m_rect_text.top = 0;
+			//m_text_rect.top = 0;
 
 			if (m_text.IsEmpty())
 			{
@@ -591,7 +590,7 @@ void CSCStatic::OnPaint()
 				//top 정렬인데 아이콘이 커서 상단을 벗어난다면 이미지, 텍스트 모두 아래로 내려준다.
 				if (rImg.top < 0)
 				{
-					m_rect_text.top -= rImg.top;
+					m_text_rect.top -= rImg.top;
 					rImg.top = 0;
 				}
 			}
@@ -618,16 +617,16 @@ void CSCStatic::OnPaint()
 		}
 
 		//DT_VCENTER 는 반드시 DT_SINGLELINE을 동반해야 하지만 그럴 경우 multiline을 표현할 수 없으므로
-		//세로 정렬은 m_rect_text 좌표를 직접 보정해 처리한다. (DT_BOTTOM 도 CStatic 기본에는 없는 정렬이라 같은 방식으로 보정)
+		//세로 정렬은 m_text_rect 좌표를 직접 보정해 처리한다. (DT_BOTTOM 도 CStatic 기본에는 없는 정렬이라 같은 방식으로 보정)
 		if (m_valign == DT_VCENTER)
 		{
-			m_rect_text.top = (rc.Height() - szText.cy) / 2;
-			m_rect_text.bottom = m_rect_text.top + szText.cy;
+			m_text_rect.top = (rc.Height() - szText.cy) / 2;
+			m_text_rect.bottom = m_text_rect.top + szText.cy;
 		}
 		else if (m_valign == DT_BOTTOM)
 		{
-			m_rect_text.top = rc.bottom - szText.cy;
-			m_rect_text.bottom = rc.bottom;
+			m_text_rect.top = rc.bottom - szText.cy;
+			m_text_rect.bottom = rc.bottom;
 		}
 		else
 		{
@@ -649,7 +648,7 @@ void CSCStatic::OnPaint()
 			//이 CSCStatic을 CMessageBox에서 사용하니 WORDBREAK 옵션이 적용되어야만 한다.
 			//m_use_word_wrap = true;과 같은 옵션을 추가할 수도 있으나 좀 더 일반적인 방법으로 변경해야 한다.
 			//DT_WORDBREAK를 기본 제외시켰던 이유는 CStatic이 기본 WORDBREAK 스타일을 사용하지 않기 때문이기도 하고
-			//m_rect_text를 정확히 계산하기 위함도 있었으나 m_rect_text이 실제 텍스트가 출력되는 영역으로 세팅되는지는
+			//m_text_rect를 정확히 계산하기 위함도 있었으나 m_text_rect이 실제 텍스트가 출력되는 영역으로 세팅되는지는
 			//다시 확인이 필요하다.
 
 			//text가 "_color picker_"일 경우는 Figma 의 fill/stroke 항목 처럼
@@ -665,7 +664,8 @@ void CSCStatic::OnPaint()
 				//(실제 alpha 는 우측 alpha 영역에서 별도 표시/편집)
 				Gdiplus::Color cr_swatch(255, cr.GetR(), cr.GetG(), cr.GetB());
 				draw_round_rect(&g, CRect_to_gpRect(rc_swatch), Gdiplus::Color::Gray, cr_swatch, 1);
-				m_text_extent = rc_swatch.right;
+				//get_text_rect().Width() 가 swatch 우측(=label 폭) 을 갖도록 유지. (이전 m_text_extent 대체)
+				m_text_rect.right = m_text_rect.left + rc_swatch.right;
 
 				//"R, G, B" 텍스트 — swatch 직후 좌측정렬. 편집 중이면 m_edit 가 보이므로 텍스트는 그리지 않는다.
 				if (m_edit.GetSafeHwnd() == NULL || !m_edit.IsWindowVisible())
@@ -709,18 +709,38 @@ void CSCStatic::OnPaint()
 					g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 					g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 				}
-				CSCParagraph::draw_text(g, m_para, m_auto_font_quality ? m_aa_from_pt : 0);
+				//다크 배경 — ClearType subpixel fringe 가 어두운 배경에서 거슬리므로 grayscale AA 를 더 일찍 적용.
+				//기준은 get_luminance < 128 (colors.cpp 의 SC 테마 dark/light 판별과 동일 관례).
+				const bool dark_bg = (get_luminance(m_theme.cr_back) < 128);
+				//단락 모드의 실제 출력 영역으로 m_text_rect 갱신. 위 plain-text 경로(DT_CALCRECT/align)가
+				//m_text_rect 를 덮어썼으므로, draw_text 가 돌려준 "그려진 rect" 로 되돌려야 get_text_rect() 가 정확.
+				m_text_rect = CSCParagraph::draw_text(g, m_para, m_auto_font_quality ? m_AA_from_pt : 0, dark_bg);
 			}
 			else
 			{
-				dc.DrawText(sSpace + m_text, m_rect_text, dwText);// | DT_WORDBREAK);
+				dc.DrawText(sSpace + m_text, m_text_rect, dwText);// | DT_WORDBREAK);
+
+			//get_text_rect() 가 실제 그려진 텍스트 영역을 돌려주도록 m_text_rect 를 tight 하게 보정.
+			//szText 는 DT_CALCRECT 로 구한 실제 텍스트 크기. dwText 의 정렬 플래그대로 좌표를 산출하면
+			//DrawText 가 box 안에서 그린 위치와 일치한다 (icon/image 시엔 위에서 정렬 플래그가 이미 제거됨).
+			{
+				CRect box = m_text_rect;
+				if (dwText & DT_CENTER)
+					m_text_rect.left = box.left + (box.Width() - szText.cx) / 2;
+				else if (dwText & DT_RIGHT)
+					m_text_rect.left = box.right - szText.cx;
+				else
+					m_text_rect.left = box.left;
+				m_text_rect.right = m_text_rect.left + szText.cx;
+				m_text_rect.bottom = m_text_rect.top + szText.cy;
+			}
 
 				//m_text_value가 있다면 출력해준다. (color picker 모드는 위에서 직접 처리)
 				if (m_use_edit && !m_text_value.IsEmpty())
 				{
 					CRect rvalue = rc;
 					//m_label_width 가 지정되면 label 컬럼 폭을 고정 → value 시작 위치가 항목마다 일치.
-					rvalue.left += (m_label_width > 0 ? m_label_width : m_text_extent + 8);
+					rvalue.left += (m_label_width > 0 ? m_label_width : m_text_rect.Width() + 8);
 
 					//edit이 rc.right - 2까지이고 edit 자체의 내부 margin까지 고려하여 총 4만큼 빼줘야만 right align이 위치 변경없이 표현된다.
 					rvalue.right -= 4;
@@ -731,7 +751,9 @@ void CSCStatic::OnPaint()
 		}
 	}
 
-	//TRACE(_T("m_rect_text = %s\n"), get_rect_info_string(m_rect_text));
+	//for debugging
+	//draw_rect(&dc, m_text_rect, Gdiplus::Color::Red);
+	//TRACE(_T("m_text_rect = %s\n"), get_rect_info_string(m_text_rect));
 	// Select old font
 	dc.SelectObject(pOldFont);
 }
@@ -782,7 +804,7 @@ CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color)
 	if (changed)
 		Invalidate(false);
 
-	return m_rect_text;
+	return m_text_rect;
 }
 
 void CSCStatic::set_textf(LPCTSTR format, ...)
@@ -857,11 +879,11 @@ void CSCStatic::edit_begin()
 	CRect rc;
 	GetClientRect(rc);
 
-	//edit 의 left 결정 우선순위: m_label_width > m_edit_width > 자동(m_text_extent + 8).
+	//edit 의 left 결정 우선순위: m_label_width > m_edit_width > 자동(m_text_rect.Width() + 8).
 	//rc.right - 2만큼 여백을 둬서 edit을 위치시킨다.
 	//이 여백값을 변경하면 OnPaint()에서 value text를 출력시키는 위치 또한 보정해줘야 한다.
 	int edit_left = m_label_width > 0 ? m_label_width
-		: (m_edit_width <= 0 ? m_text_extent + 8 : m_edit_width);
+		: (m_edit_width <= 0 ? m_text_rect.Width() + 8 : m_edit_width);
 	CRect r(edit_left, 3, rc.right - 2, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
@@ -1953,10 +1975,9 @@ void CSCStatic::set_link(CString url, Gdiplus::Color cr_link)
 //align 관계없이 현재 텍스트의 너비를 알고자 할 경우 사용.
 CSize CSCStatic::get_text_extent()
 {
-	CClientDC dc(this);
-	CFont* pOldFont = dc.SelectObject(&m_font);
-	CSize sz = dc.GetTextExtent(m_text);
-	return sz;
+	//실제 출력 rect 에서 파생 — plain/단락 모드 모두 m_text_rect 가 tight 한 출력 영역을 가지므로
+	//raw m_text 를 GetTextExtent 로 재측정(단락 모드에선 태그 마크업까지 포함되어 부정확)하지 않는다.
+	return m_text_rect.Size();
 }
 
 //parent에서 현재 이 static의 위치를 리턴.
@@ -2094,7 +2115,7 @@ CRect CSCStatic::set_tagged_text(CString text)
 {
 	m_para.clear();
 
-	//set_text(plain) 호출에서 m_text 에 저장되던 raw 문자열을 단락 모드에서도 유지 — m_text_extent 등
+	//set_text(plain) 호출에서 m_text 에 저장되던 raw 문자열을 단락 모드에서도 유지 — m_text_rect 등
 	//기존 SCStatic 로직(icon 위치 계산 등)이 그대로 의미를 가지도록.
 	m_text = text;
 
@@ -2106,7 +2127,7 @@ CRect CSCStatic::set_tagged_text(CString text)
 	//halign/valign 과 line_spacing 은 rebuild_layout 에서 일괄 적용.
 	rebuild_layout();
 
-	return m_rect_text;
+	return m_text_rect;
 }
 
 void CSCStatic::update_text_property()
@@ -2208,10 +2229,10 @@ void CSCStatic::rebuild_layout()
 	GetClientRect(&rc);
 
 	//DT_NOCLIP 만 넘겨 baseline 배치만 얻는다 — halign/valign 은 별도 단계로 적용.
-	m_rect_text = CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_NOCLIP);
-	m_rect_text = reapply_line_spacings();
-	m_rect_text = apply_halign();
-	m_rect_text = apply_valign();
+	m_text_rect = CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_NOCLIP);
+	m_text_rect = reapply_line_spacings();
+	m_text_rect = apply_halign();
+	m_text_rect = apply_valign();
 
 	Invalidate();
 }
@@ -2220,7 +2241,7 @@ CRect CSCStatic::reapply_line_spacings()
 {
 	//호출 시점: m_para 의 각 r 는 calc_text_rect() 직후의 baseline(spacing=1.0) 위치여야 한다.
 	if (m_para.empty())
-		return m_rect_text;
+		return m_text_rect;
 
 	int i, j;
 	int shift_y = 0;
@@ -2273,7 +2294,7 @@ CRect CSCStatic::apply_halign()
 {
 	//baseline 은 모든 라인이 x=0 에서 시작. 각 라인별로 target_left 을 구해 현재 left 와의 차이만큼 shift.
 	if (m_para.empty())
-		return m_rect_text;
+		return m_text_rect;
 
 	CRect rc;
 	GetClientRect(&rc);
@@ -2311,7 +2332,7 @@ CRect CSCStatic::apply_halign()
 	}
 
 	//라인별 halign 이 다를 수 있으므로 rect_text.left/right 는 모든 라인에 걸친 min/max.
-	CRect rect_text = m_rect_text;
+	CRect rect_text = m_text_rect;
 	rect_text.left = m_para[0][0].r.left;
 	rect_text.right = m_para[0][m_para[0].size() - 1].r.right;
 
@@ -2332,7 +2353,7 @@ CRect CSCStatic::apply_halign()
 CRect CSCStatic::apply_valign()
 {
 	if (m_para.empty())
-		return m_rect_text;
+		return m_text_rect;
 
 	CRect rc;
 	GetClientRect(&rc);
@@ -2371,7 +2392,7 @@ CRect CSCStatic::apply_valign()
 		}
 	}
 
-	CRect rect_text = m_rect_text;
+	CRect rect_text = m_text_rect;
 	rect_text.top = target_top;
 	rect_text.bottom = target_top + total_h;
 	return rect_text;

@@ -2,6 +2,85 @@
 #include "../../Functions.h"
 #include "../../SCGdiplusBitmap.h"
 
+#include <map>
+#include <mutex>
+
+namespace
+{
+	//AA 임계치 관련 캐시·override 맵. UI 스레드 외부 호출 가능성을 대비해 mutex 로 보호.
+	std::map<CString, int>&	aa_override_map() { static std::map<CString, int> m; return m; }
+	std::map<CString, int>&	aa_cache_map()    { static std::map<CString, int> m; return m; }
+	std::mutex&				aa_maps_mutex()   { static std::mutex mx; return mx; }
+
+	//다크 배경 보정 — 0 = 비활성.
+	//최초 가설: "다크 배경에서는 ClearType subpixel fringe 가 거슬리니 grayscale AA 가 깔끔" → 임계치 감산.
+	//실측 결과: 한글 작은 글씨(9pt 본문 등) 는 자모의 직선/가로획이 픽셀 grid 에 정확히 떨어지는
+	//ClearTypeGridFit 의 hinting 이 결정적이라 다크여도 ClearType 이 더 또렷.
+	//→ 보정 무력화. 다크/라이트 동일 임계치. 다크에서만 임계치를 *높이고* 싶으면 음수 사용 가능 (구현 그대로).
+	constexpr int AA_DARK_BOOST = 0;
+
+	//TrueType table tag 를 Win32 GetFontData 가 받는 little-endian 32bit 로 변환.
+	//(TTF spec 은 4-byte ASCII big-endian, Win32 는 그 바이트 순서를 뒤집어 받는다.)
+	constexpr DWORD make_tt_tag(char a, char b, char c, char d)
+	{
+		return ((DWORD)(BYTE)a) | ((DWORD)(BYTE)b << 8) | ((DWORD)(BYTE)c << 16) | ((DWORD)(BYTE)d << 24);
+	}
+
+	//폰트의 임베디드 비트맵 strike 보유 PPEM 최대값(px) 측정.
+	// 0   = strike 미보유 (순수 outline — 전 크기 AA 가 또렷)
+	//>0   = strike 의 max ppemY
+	//-1   = GDI 호출 실패 (폴리시 fallback 으로 호출자가 대응)
+	int probe_max_embedded_bitmap_ppem(LPCTSTR face)
+	{
+		if (face == NULL || *face == 0) return -1;
+
+		HDC hdc = ::CreateCompatibleDC(NULL);
+		if (!hdc) return -1;
+
+		LOGFONT lf = {};
+		lf.lfHeight = -16;	//strike 메트릭은 size 무관 — 임의 값. CHARSET 도 마찬가지.
+		lf.lfCharSet = DEFAULT_CHARSET;
+		_tcscpy_s(lf.lfFaceName, _countof(lf.lfFaceName), face);
+		HFONT hf = ::CreateFontIndirect(&lf);
+		if (!hf) { ::DeleteDC(hdc); return -1; }
+		HFONT hf_old = (HFONT)::SelectObject(hdc, hf);
+
+		int result = 0;	//기본 = strike 없음
+
+		//EBLC (OT/TT 표준 한글 비트맵 포함) 와 bloc (Apple variant) 둘 다 시도.
+		const DWORD tags[] = { make_tt_tag('E','B','L','C'), make_tt_tag('b','l','o','c') };
+		for (DWORD tag : tags)
+		{
+			DWORD size = ::GetFontData(hdc, tag, 0, NULL, 0);
+			if (size == GDI_ERROR || size < 8) continue;
+
+			BYTE* buf = new BYTE[size];
+			if (::GetFontData(hdc, tag, 0, buf, size) == size)
+			{
+				//EBLC 헤더 (big-endian): version uint32 (offset 0) + numSizes uint32 (offset 4).
+				//그 뒤 bitmapSize entry 가 48 bytes 씩. entry 의 ppemX (+44), ppemY (+45) 는 BYTE.
+				DWORD numSizes = ((DWORD)buf[4] << 24) | ((DWORD)buf[5] << 16) | ((DWORD)buf[6] << 8) | (DWORD)buf[7];
+				if ((unsigned long long)8 + (unsigned long long)numSizes * 48 <= size)
+				{
+					int max_ppem = 0;
+					for (DWORD i = 0; i < numSizes; i++)
+					{
+						BYTE ppemY = buf[8 + i * 48 + 45];
+						if (ppemY > max_ppem) max_ppem = ppemY;
+					}
+					if (max_ppem > result) result = max_ppem;
+				}
+			}
+			delete[] buf;
+		}
+
+		::SelectObject(hdc, hf_old);
+		::DeleteObject(hf);
+		::DeleteDC(hdc);
+		return result;
+	}
+}
+
 CSCParagraph::CSCParagraph()
 {
 
@@ -945,35 +1024,97 @@ DWORD CSCParagraph::get_value(CString data, CString tag_name, int start)
 }
 */
 
-//폰트 이름별 AA 전환 임계치(pt). 매핑에 없으면 fallback_pt 그대로 반환.
-//Test_SCColorTheme 의 콤보 시연(g_font_faces) + 시각 비교 결과를 코드화한 것.
-//- 순수 벡터 폰트(비트맵 없음): Segoe UI / 맑은 고딕 → 1 (전 크기 AA — 작은 크기도 AA 가 또렷).
-//- 한글 비트맵 폰트(굴림/돋움/궁서/바탕): 15pt 이하에 embedded bitmap → 16부터 AA, 15 이하 ClearType 비트맵.
-//- 영문 비트맵 폰트(Tahoma/Verdana): 12pt 이하에 embedded bitmap → 13부터 AA.
-static int get_aa_from_pt(LPCTSTR font_name, int fallback_pt)
+//우선순위: override > EBLC 자동측정(캐시) > 화이트리스트 > fallback_pt. 마지막에 dark_background 보정.
+//- override: add_AA_override 로 face 등록된 강제값.
+//- EBLC 자동: TrueType 임베디드 비트맵 strike 의 max ppemY+1 (px=pt 가정, 96 DPI). strike 없으면 1.
+//- 화이트리스트: EBLC 호출 실패 등 fallback 경로의 안전망. 알려진 케이스 적중 시 정확.
+//  · Segoe UI / 맑은 고딕(Malgun Gothic) — 순수 outline, strike 없음 → 14 (사용자 실측 기준 작은 글씨 ClearType 우선)
+//  · 굴림/돋움/궁서/바탕 — 15px 이하 strike → 16부터 AA
+//  · Tahoma/Verdana — 12px 이하 strike → 13부터 AA
+//- dark_background: ClearType subpixel fringe 가 어두운 배경에서 거슬리므로 결과를 AA_DARK_BOOST 만큼 추가 감산.
+int CSCParagraph::get_AA_from_pt(LPCTSTR font_name, int fallback_pt, bool dark_background)
 {
-	if (font_name == NULL || *font_name == 0)
-		return fallback_pt;
+	auto apply_dark = [dark_background](int v) -> int
+	{
+		if (!dark_background) return v;
+		int r = v - AA_DARK_BOOST;
+		return r < 1 ? 1 : r;
+	};
 
+	if (font_name == NULL || *font_name == 0)
+		return apply_dark(fallback_pt);
+
+	//1) override (사용자 강제) — 가장 우선.
+	{
+		std::lock_guard<std::mutex> lk(aa_maps_mutex());
+		auto& ov = aa_override_map();
+		auto it = ov.find(CString(font_name));
+		if (it != ov.end())
+			return apply_dark(it->second);
+	}
+
+	//2) EBLC 자동 측정 (face 별 캐시). 한 폰트당 최초 1회만 GetFontData 호출.
+	//strike 보유 (>0) 시에만 자동 임계치 반환 — 객관적 메트릭.
+	//strike 미보유 (==0) 또는 probe 실패 (-1) 는 fall-through — 호출자가 지정한 fallback_pt 가 유지되어
+	//"strike 없는 outline 폰트 작은 글씨는 ClearType 이 또렷" 이라는 사용자 취향이 무시되지 않는다.
+	{
+		std::lock_guard<std::mutex> lk(aa_maps_mutex());
+		auto& cache = aa_cache_map();
+		auto it = cache.find(CString(font_name));
+		int max_ppem;
+		if (it != cache.end())
+			max_ppem = it->second;
+		else
+		{
+			max_ppem = probe_max_embedded_bitmap_ppem(font_name);
+			cache[CString(font_name)] = max_ppem;
+		}
+		if (max_ppem > 0)
+		{
+			//ppem 은 EM 박스의 픽셀 height. 96 DPI 가정 시 px → pt: pt = px * 72/96.
+			//strike 가 ppem 16 까지 → 폰트 사이즈 16px (=12pt @96DPI) 이하에서 비트맵 강제.
+			return apply_dark(max_ppem * 72 / 96 + 1);
+		}
+	}
+
+	//3) 화이트리스트 (probe 실패 fallback).
 	if (_tcsicmp(font_name, _T("Segoe UI")) == 0 ||
 	    _tcsicmp(font_name, _T("맑은 고딕")) == 0 ||
 	    _tcsicmp(font_name, _T("Malgun Gothic")) == 0)
-		return 1;
+		return apply_dark(14);
 
 	if (_tcsicmp(font_name, _T("굴림")) == 0 || _tcsicmp(font_name, _T("Gulim")) == 0 ||
 	    _tcsicmp(font_name, _T("돋움")) == 0 || _tcsicmp(font_name, _T("Dotum")) == 0 ||
 	    _tcsicmp(font_name, _T("궁서")) == 0 || _tcsicmp(font_name, _T("Gungsuh")) == 0 ||
 	    _tcsicmp(font_name, _T("바탕")) == 0 || _tcsicmp(font_name, _T("Batang")) == 0)
-		return 16;
+		return apply_dark(16);
 
 	if (_tcsicmp(font_name, _T("Tahoma")) == 0 ||
 	    _tcsicmp(font_name, _T("Verdana")) == 0)
-		return 13;
+		return apply_dark(13);
 
-	return fallback_pt;
+	return apply_dark(fallback_pt);
 }
 
-void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int aa_from_pt)
+void CSCParagraph::add_AA_override(LPCTSTR font_name, int pt)
+{
+	if (font_name == NULL || *font_name == 0) return;
+	std::lock_guard<std::mutex> lk(aa_maps_mutex());
+	auto& ov = aa_override_map();
+	if (pt <= 0)
+		ov.erase(CString(font_name));
+	else
+		ov[CString(font_name)] = pt;
+	//override 변경은 즉시 효력 — 단 EBLC 캐시는 폰트 고유 메트릭이라 무효화 불필요.
+}
+
+void CSCParagraph::clear_AA_overrides()
+{
+	std::lock_guard<std::mutex> lk(aa_maps_mutex());
+	aa_override_map().clear();
+}
+
+CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int AA_from_pt, bool dark_background)
 {
 	int i, j;
 	CFont font, * pOldFont = NULL;
@@ -1104,14 +1245,14 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
 			//음절별 폰트 종류 + 크기로 hint 자동 결정.
-			//각 폰트는 비트맵 보유 범위가 달라 단일 임계치로 부정확 — 폰트별 매핑(get_aa_from_pt)을 거쳐
+			//각 폰트는 비트맵 보유 범위가 달라 단일 임계치로 부정확 — 폰트별 매핑(get_AA_from_pt)을 거쳐
 			//effective threshold 를 구한 뒤 size 와 비교한다.
 			//- size >= effective → AntiAliasGridFit (큰 글씨 외곽 매끈)
 			//- size <  effective → ClearTypeGridFit  (작은 글씨 비트맵/서브픽셀로 또렷)
-			//aa_from_pt == 0 이면 자동 결정 비활성 (호출자가 미리 설정한 hint 유지).
-			if (aa_from_pt > 0)
+			//AA_from_pt == 0 이면 자동 결정 비활성 (호출자가 미리 설정한 hint 유지).
+			if (AA_from_pt > 0)
 			{
-				int effective = get_aa_from_pt(para[i][j].text_prop.name, aa_from_pt);
+				int effective = CSCParagraph::get_AA_from_pt(para[i][j].text_prop.name, AA_from_pt, dark_background);
 				g.SetTextRenderingHint(para[i][j].text_prop.size >= effective
 					? Gdiplus::TextRenderingHintAntiAliasGridFit
 					: Gdiplus::TextRenderingHintClearTypeGridFit);
@@ -1226,6 +1367,33 @@ void CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPara
 
 	g.ReleaseHDC(hdc);
 #endif
+
+	//실제 그려진 텍스트 영역 = 모든 음절(run) r 의 합집합. 호출측(CSCStatic::OnPaint)이 m_text_rect 로 사용한다.
+	//OnPaint 의 plain-text 경로(DT_CALCRECT/align)가 m_text_rect 를 덮어쓰므로, 그린 직후 이 값으로 되돌려야
+	//단락 모드의 get_text_rect() 가 정확해진다.
+	CRect drawn;
+	drawn.SetRectEmpty();
+	bool first = true;
+	for (i = 0; i < (int)para.size(); i++)
+	{
+		for (j = 0; j < (int)para[i].size(); j++)
+		{
+			const CRect& r = para[i][j].r;
+			if (first)
+			{
+				drawn = r;
+				first = false;
+			}
+			else
+			{
+				drawn.left   = min(drawn.left,   r.left);
+				drawn.top    = min(drawn.top,    r.top);
+				drawn.right  = max(drawn.right,  r.right);
+				drawn.bottom = max(drawn.bottom, r.bottom);
+			}
+		}
+	}
+	return drawn;
 }
 
 //calc_text_rect()에서 이미 각 paragraph의 r이 align에 따라 정해지지만 이를 동적으로 변경하고자 할 경우 호출.

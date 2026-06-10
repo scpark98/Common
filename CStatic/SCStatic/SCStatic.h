@@ -166,11 +166,13 @@ public:
 	//단락 모드의 텍스트 antialiasing. 작은 글자(예: 9pt)는 false 로 두면 더 또렷.
 	void			set_font_antialiasing(bool antialias = true) { m_font_antialiasing = antialias; Invalidate(); }
 
-	//단락 모드의 음절별 hint 자동 결정. 음절 폰트 size(pt) 가 aa_from_pt 이상이면 AntiAliasGridFit(큰 글씨 매끈),
+	//단락 모드의 음절별 hint 자동 결정. 음절 폰트 size(pt) 가 AA_from_pt 이상이면 AntiAliasGridFit(큰 글씨 매끈),
 	//미만이면 ClearTypeGridFit(작은 글씨 또렷). 다중 size 가 섞인 태그 텍스트(<sz=24>+default 9pt)에서 자연스러움.
 	//on=false 면 OnPaint 의 단일 hint(ClearTypeGridFit) 유지.
-	void			set_font_quality_auto(bool on = true, int aa_from_pt = 14)
-					{ m_auto_font_quality = on; m_aa_from_pt = aa_from_pt; Invalidate(); }
+	//AA_from_pt 는 baseline — 실제 임계치는 CSCParagraph::get_AA_from_pt 가 폰트 EBLC 메트릭과
+	//다크 배경 여부를 고려해 자동 보정한다.
+	void			set_font_quality_auto(bool on = true, int AA_from_pt = 14)
+					{ m_auto_font_quality = on; m_AA_from_pt = AA_from_pt; Invalidate(); }
 
 
 //자체 편집 기능
@@ -210,10 +212,10 @@ public:
 	int				get_valign();
 
 	//horizontal align을 동적으로 변경한다. halign은 DT_LEFT|DT_CENTER|DT_RIGHT 중 하나.
-	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_rect_text 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
+	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_text_rect 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
 	void			set_halign(DWORD halign);
 	//vertical align을 동적으로 변경한다. valign은 DT_TOP|DT_VCENTER|DT_BOTTOM 중 하나.
-	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_rect_text 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
+	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_text_rect 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
 	void			set_valign(DWORD valign);
 
 	//label + value 형태로 표시될 때 value 의 가로 정렬. DT_LEFT|DT_CENTER|DT_RIGHT 중 하나. 기본값 DT_RIGHT.
@@ -241,10 +243,9 @@ public:
 		Invalidate();
 	}
 
-	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 동일한 값이 리턴된다.
-	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
-	CRect			get_text_rect() { return m_rect_text; }
-	//텍스트의 너비, 높이를 알고자 할 경우 사용.
+	//텍스트가 실제 출력되는 tight rect. plain/단락 모드 모두 정확. 너비만 필요하면 .Width().
+	CRect			get_text_rect() { return m_text_rect; }
+	//너비/높이가 필요할 때. 내부적으로 get_text_rect().Size() 를 돌려준다.
 	CSize			get_text_extent();
 
 	//parent에서 현재 이 static의 위치를 리턴.
@@ -405,18 +406,17 @@ protected:
 	//특히 transparent일 경우는 그 깜빡임이 크므로 m_text를 별도 선언하여 사용한다.
 	CString			m_text;
 
-	//텍스트가 실제 출력될 영역의 크기를 알기 위해 m_rect_text를 추가했으나 현재 방식으로는 rc와 거의 흡사하다.
-	//텍스트의 너비를 알고자 할 경우는 get_text_extent()를 사용해야 한다.
-	//단, CSCParagraphStatic은 m_rect_text가 실제 출력되는 텍스트 영역값을 가지도록 구현되었다.
-	CRect			m_rect_text;
-	int				m_text_extent = 0;	//텍스트의 크기
+	//텍스트가 실제 출력되는 tight rect. plain(set_text)·단락(set_tagged_text) 모드 모두
+	//OnPaint / rebuild_layout 에서 실제 그려진 텍스트 영역으로 세팅된다.
+	//너비가 필요하면 m_text_rect.Width() (또는 get_text_extent()) 사용 — 별도 m_text_extent 는 제거됨.
+	CRect			m_text_rect;
 
 	CSCEdit			m_edit;
 	//color picker 모드의 alpha 편집 전용. lazy create.
 	CSCEdit			m_edit_alpha;
 	bool			m_use_edit = false;
 	CString			m_text_value;		//m_use_edit = true이면 label + value로 표시되는데 이 때 value의 내용이 저장된다.
-	int				m_edit_width = 0;	//편집모드일 때 edit의 너비. 이 값이 0이면 (m_text_extent + 8)부터 edit이 시작된다.
+	int				m_edit_width = 0;	//편집모드일 때 edit의 너비. 이 값이 0이면 (m_text_rect.Width() + 8)부터 edit이 시작된다.
 
 	//color picker 모드 전용 layout 계산. swatch / RGB text / separator x / alpha rect 를 모두 채워준다.
 	void			get_color_picker_layout(CRect& rc_swatch, CRect& rc_text, int& sep_x, CRect& rc_alpha);
@@ -479,7 +479,7 @@ protected:
 	//label + value 형태일 때 value 의 가로 정렬. 기본 DT_RIGHT.
 	DWORD			m_value_halign = DT_RIGHT;
 
-	//label + value 형태일 때 label 영역의 고정 너비. 0 이면 m_text_extent + 8 사용.
+	//label + value 형태일 때 label 영역의 고정 너비. 0 이면 m_text_rect.Width() + 8 사용.
 	int				m_label_width = 0;
 
 	//color picker 모드의 alpha 표시 옵션.
@@ -527,9 +527,9 @@ protected:
 	void			rebuild_paragraph();
 
 	bool			m_font_antialiasing = false;
-	//음절별 hint 자동 결정 — 기본 ON. aa_from_pt 미만은 ClearType(작은 글씨 또렷), 이상은 AntiAlias(큰 글씨 매끈).
+	//음절별 hint 자동 결정 — 기본 ON. AA_from_pt 미만은 ClearType(작은 글씨 또렷), 이상은 AntiAlias(큰 글씨 매끈).
 	bool			m_auto_font_quality = true;
-	int				m_aa_from_pt = 14;
+	int				m_AA_from_pt = 14;
 	//기본 line spacing — CSS line-height 권장 범위(1.2~1.5)의 하한. 1.0(=single) 보다 약간 여유,
 	//1.5 처럼 과하지 않음. 다중 라인 한글 텍스트에서 자연스러운 간격.
 	float			m_line_spacing = 1.2f;

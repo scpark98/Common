@@ -497,6 +497,180 @@ non-empty 결과가 있으면 **편집 시작 전에** 사용자에게 통지:
 **참조 사례:**
 - 2026-04-21 `SCStaticEdit.h` BOM 유실 → MSVC 가짜 에러 90+.
 - 2026-04-24 `Test_StaticExDlg.cpp` 이전 Claude 세션에서 Read→Edit 으로 한글 U+FFFD 손상. HEAD 로부터 iconv 복원 + UTF-8 BOM 마이그레이션 (2026-04-25).
+- 2026-06-10 `Test_StaticExDlg.cpp` 재손상 (다른 프로젝트의 `CSCParagraphStatic`→`CSCStatic` 통합 작업 중 Claude 가 CP949 파일 Edit). `2613bd0` 에서 복원 + `set_tagged_text` 변경만 재적용 + UTF-8 BOM 마이그레이션. 이후 §2B.2 자동화 훅 도입.
+
+## 2B.2 자동화 — SessionStart 훅으로 손상 원천 차단 (권장)
+
+§2B.1 의 수동 audit 은 Claude 가 매번 기억해야 하고 실제로 실패한 적이 있다 (2026-04-24, 2026-06-10 동일 파일 두 번). 사람·에이전트 기억에 의존하지 말고 **SessionStart 훅으로 결정적으로 처리**한다. 훅은 클로드가 Read/Edit 하기 *전에* 실행되어:
+
+1. 프로젝트 안의 CP949(또는 BOM 없는 UTF-8) 한글 소스를 **UTF-8 BOM 으로 변환** (한글·CRLF 보존, 하위폴더 포함). → 이후 Read 가 깨끗한 UTF-8 을 보고, Write 가 U+FFFD 를 만들 수 없음.
+2. `.editorconfig` 가 없으면 생성 (VS save 시 BOM 유지).
+
+건드리는 파일은 **non-ASCII 가 든 BOM 없는 소스뿐** — 이미 UTF-8 BOM / 순수 ASCII / UTF-16(`.rc`,`resource.h`) / 빌드 산출물(`x64`,`Debug`,`Release` 등)은 스킵하므로 diff 가 불필요하게 부풀지 않는다. 멱등 — 변환된 프로젝트는 다음 세션부터 스킵.
+
+**한계 — 컴파일 플래그는 훅에 넣지 않는다**: `/source-charset:utf-8` 은 소스가 *전부* UTF-8 일 때만 안전하다. 부모 폴더(`D:\1.Projects_C++`)에 두면 아직 CP949 가 남은 형제 프로젝트가 컴파일 시점에 깨진다. 따라서 컴파일 플래그(`/source-charset:utf-8 /execution-charset:.949`)는 소스를 UTF-8 로 정리한 프로젝트의 `.vcxproj` 또는 그 프로젝트 루트 `Directory.Build.props` 에만 개별 적용.
+
+### 설치 방식 두 가지 — 상황에 따라 선택
+
+이 한글 손상은 특정 머신·특정 사람 문제가 아니다. 한국어 Windows 에서 CP949 소스를 Claude 로 편집하는 **누구에게나** 발생한다 — 집/회사 머신, 그리고 **다른 개발자 PC** 모두. 두 가지 배포 방식이 있다:
+
+| 방식 | 적용 범위 | 배포 | 적합 |
+|---|---|---|---|
+| **A. user-scope** (`~/.claude`) | 그 머신에서 여는 *모든* C++ 프로젝트 | git 동기화 안 됨 → 머신마다 1회 수동 설치 | 내 머신들(집·회사) |
+| **B. project-scope** (프로젝트 repo 의 `.claude/`) | 그 *프로젝트 한정*, 그러나 clone 한 **모든 개발자 자동 적용** | repo 에 커밋 → 팀 전체 배포 | 다른 개발자와 공유하는 프로젝트 |
+
+둘은 배타적이지 않다. 내 머신엔 A, 팀 공유 프로젝트엔 B 를 함께 둬도 무방 (둘 다 돌아도 멱등이라 중복 변환 없음).
+
+#### 방식 A — user-scope (머신마다 1회, `~/.claude` 는 git 동기화 안 됨)
+
+경로의 `scpar` 는 **본인 Windows 사용자명**(`%USERPROFILE%` 로 확인)에 맞게 바꾼다.
+
+**1) 훅 스크립트** — `%USERPROFILE%\.claude\hooks\ensure-cpp-encoding.ps1` (예: `C:\Users\scpar\.claude\hooks\ensure-cpp-encoding.ps1`) 생성:
+
+```powershell
+# SessionStart hook: make VS C++ projects safe from Korean (CP949) corruption.
+$ErrorActionPreference = 'SilentlyContinue'
+
+$proj = (Get-Location).Path
+try {
+    $raw = [Console]::In.ReadToEnd()
+    if ($raw) { $j = $raw | ConvertFrom-Json; if ($j.cwd) { $proj = $j.cwd } }
+} catch {}
+if (-not (Test-Path -LiteralPath $proj)) { exit 0 }
+
+$vcx = Get-ChildItem -LiteralPath $proj -Filter *.vcxproj -File -ErrorAction SilentlyContinue
+if (-not $vcx) { exit 0 }
+
+$actions = @()
+
+$ecPath = Join-Path $proj '.editorconfig'
+if (-not (Test-Path -LiteralPath $ecPath)) {
+    $ec = @'
+root = true
+
+[*.{cpp,h,hpp,c,cc,cxx,inl,ipp}]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = tab
+tab_width = 4
+insert_final_newline = true
+
+[*.{rc,rc2}]
+charset = utf-16le
+end_of_line = crlf
+
+[*.md]
+charset = utf-8
+end_of_line = crlf
+'@
+    [IO.File]::WriteAllText($ecPath, $ec, (New-Object Text.UTF8Encoding($false)))
+    $actions += '.editorconfig'
+}
+
+$exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp')
+$skipDirs = @('\x64\', '\win32\', '\debug\', '\release\', '\.vs\', '\ipch\', '\obj\')
+$bom = [byte[]](0xEF, 0xBB, 0xBF)
+$utf8Strict = New-Object Text.UTF8Encoding($false, $true)
+$cp949 = [Text.Encoding]::GetEncoding(949)
+$converted = 0
+
+$files = Get-ChildItem -LiteralPath $proj -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $exts -contains $_.Extension.ToLower() }
+
+foreach ($f in $files) {
+    $low = $f.FullName.ToLower()
+    $skip = $false
+    foreach ($d in $skipDirs) { if ($low.Contains($d)) { $skip = $true; break } }
+    if ($skip) { continue }
+
+    $bytes = [IO.File]::ReadAllBytes($f.FullName)
+    if ($bytes.Length -lt 1) { continue }
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { continue }
+    if ($bytes.Length -ge 2 -and (($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) -or ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF))) { continue }
+
+    $hasHigh = $false
+    foreach ($b in $bytes) { if ($b -ge 0x80) { $hasHigh = $true; break } }
+    if (-not $hasHigh) { continue }
+
+    $isUtf8 = $true
+    try { [void]$utf8Strict.GetString($bytes) } catch { $isUtf8 = $false }
+
+    if ($isUtf8) {
+        $out = New-Object byte[] ($bom.Length + $bytes.Length)
+        [Array]::Copy($bom, 0, $out, 0, $bom.Length)
+        [Array]::Copy($bytes, 0, $out, $bom.Length, $bytes.Length)
+    } else {
+        $text = $cp949.GetString($bytes)
+        $u = ([Text.UTF8Encoding]::new($false)).GetBytes($text)
+        $out = New-Object byte[] ($bom.Length + $u.Length)
+        [Array]::Copy($bom, 0, $out, 0, $bom.Length)
+        [Array]::Copy($u, 0, $out, $bom.Length, $u.Length)
+    }
+    [IO.File]::WriteAllBytes($f.FullName, $out)
+    $converted++
+}
+if ($converted -gt 0) { $actions += "converted $converted file(s) to UTF-8 BOM" }
+
+if ($actions.Count -gt 0) {
+    $msg = "ensure-cpp-encoding [$proj]: " + ($actions -join '; ')
+    (@{ systemMessage = $msg } | ConvertTo-Json -Compress)
+}
+exit 0
+```
+
+**2) settings.json** — `C:\Users\scpar\.claude\settings.json` 의 최상위에 `hooks` 키 병합 (기존 키 보존):
+
+```json
+"hooks": {
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\scpar\\.claude\\hooks\\ensure-cpp-encoding.ps1\"",
+          "timeout": 15,
+          "statusMessage": "Checking C++ encoding protection"
+        }
+      ]
+    }
+  ]
+}
+```
+
+설치 후 `/hooks` 를 한 번 열거나 Claude Code 를 재시작하면 다음 세션부터 작동. (검증: 2026-06-10 회사 머신 설치, CP949/UTF-8무BOM/ASCII/UTF-8BOM/UTF-16/빌드폴더 6 케이스 모두 정상 처리 확인.)
+
+#### 방식 B — project-scope (repo 에 커밋, 다른 개발자 자동 적용)
+
+다른 개발자와 공유하는 프로젝트는 훅을 **repo 안에 커밋**하면 clone 한 모든 사람이 별도 설치 없이 보호받는다. user-scope 와 달리 경로에 사용자명이 안 들어가므로 PC 마다 손댈 게 없다.
+
+프로젝트 루트에:
+
+1. **`.claude/hooks/ensure-cpp-encoding.ps1`** — 방식 A 의 동일한 스크립트를 그대로 커밋.
+2. **`.claude/settings.json`** — command 를 **상대 경로**로 지정 (SessionStart 훅은 프로젝트 폴더에서 실행되므로 상대 경로가 각 개발자 머신에서 그대로 해석됨):
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \".claude/hooks/ensure-cpp-encoding.ps1\"",
+            "timeout": 15,
+            "statusMessage": "Checking C++ encoding protection"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+주의:
+- 각 개발자가 그 repo 를 처음 열 때 Claude Code 가 프로젝트 `.claude/settings.json` 의 훅 실행을 신뢰할지 한 번 확인할 수 있다 (정상 — 승인하면 이후 자동).
+- 상대 경로 `.claude/hooks/...` 는 훅 실행 시 cwd(프로젝트 루트) 기준. 혹시 해석이 안 되는 환경이면 절대 경로 대신 스크립트 첫 줄에서 stdin 의 `cwd` 로 재구성하는 방식 A 스크립트가 이미 그 cwd 를 쓰므로, command 의 `-File` 경로만 맞으면 된다.
+- 한국어 개발자가 아닌 팀원(CP949 소스를 안 만드는)에게도 무해 — non-ASCII 없는 파일은 스킵하므로 아무것도 바꾸지 않는다.
 
 ## 2E. `PreTranslateMessage` 반환값 — 클래스 역할에 따라 다름
 

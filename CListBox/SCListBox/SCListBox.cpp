@@ -19,7 +19,6 @@
 
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"	//[hscroll 진단] 임시 — 가로스크롤바 간헐 미표시 추적용. 원인 확정 후 제거.
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -2285,12 +2284,6 @@ void CSCListBox::sync_scrollbar()
 				m_scrollbar_h.ShowWindow(SW_SHOW);
 		}
 	}
-
-	//[hscroll 진단] 임시 — 원인 확정 후 제거.
-	if (pLog)
-		logWrite(_T("[hscroll-listbox] cw=%d ch=%d use_hscroll=%d max_ext=%d total=%d need_v=%d need_h=%d hbar_vis=%d"),
-			rc.Width(), rc.Height(), (int)m_use_hscroll, m_max_horizontal_extent, total,
-			(int)need_v, (int)need_h, (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
 }
 
 LRESULT CSCListBox::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

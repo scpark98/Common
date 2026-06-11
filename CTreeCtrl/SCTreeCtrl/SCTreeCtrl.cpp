@@ -6,7 +6,6 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../SCGdiPlusBitmap.h"
-#include "../../log/SCLog/SCLog.h"	//[hscroll 진단] 임시 — 가로스크롤바 간헐 미표시 추적용. 원인 확정 후 제거.
 
 #include <fstream>
 // CSCTreeCtrl
@@ -4835,12 +4834,6 @@ void CSCTreeCtrl::sync_scrollbar()
 		m_h_natural_max = -1;
 		m_h_scroll_pos = 0;
 	}
-
-	//[hscroll 진단] 임시 — 원인 확정 후 제거.
-	if (pLog)
-		logWrite(_T("[hscroll-tree] cw=%d ch=%d rlimit=%d content_w=%d hpos=%d need_v=%d need_h=%d hbar_vis=%d"),
-			rc.Width(), rc.Height(), right_limit_h, content_w, m_h_scroll_pos,
-			(int)need_v, (int)need_h, (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
 }
 
 LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

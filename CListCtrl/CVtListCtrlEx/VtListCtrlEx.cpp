@@ -11,7 +11,6 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"	//[hscroll 진단] 임시 — 가로스크롤바 간헐 미표시 추적용. 원인 확정 후 제거.
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -5986,12 +5985,6 @@ void CVtListCtrlEx::sync_scrollbar()
 		//만 마크하고 즉시 그려지지 않는다 (release 후에야 보이는 현상). 즉시 paint 강제.
 		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
-
-	//[hscroll 진단] 임시 — 원인 확정 후 제거.
-	if (pLog)
-		logWrite(_T("[hscroll-list] cw=%d ch=%d total_col_w=%d col_cnt=%d need_v=%d need_h=%d hbar_vis=%d"),
-			rc.Width(), rc.Height(), total_col_width, col_count, (int)need_v, (int)need_h,
-			(int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
 }
 
 LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

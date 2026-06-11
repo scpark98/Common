@@ -274,13 +274,13 @@ void CPathCtrl::OnPaint()
 	//하위폴더 pulldown 의 ">" (접힘) / "v" (펼침) chevron 을 Windows 탐색기 트리와 동일한 룩으로 그린다.
 	//색은 기존 cr_text_dim 그대로 두고, 두꺼운 각진 GDI 선(draw_line, width 2) 대신 얇은 GDI+ 폴리라인 +
 	//안티앨리어싱 + 둥근 끝점(LineCapRound) + 둥근 꼭짓점(LineJoinRound) 으로 교체. (cx,cy) 는 arrow 영역 중심.
-	auto draw_chevron = [&](int cx, int cy, bool down)
+	auto draw_chevron = [&](int cx, int cy, bool down, Gdiplus::Color cr)
 	{
 		Gdiplus::Graphics g(dc.GetSafeHdc());
 		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 
-		Gdiplus::Pen pen(m_theme.cr_text_dim, 1.3f);
+		Gdiplus::Pen pen(cr, 1.3f);
 		pen.SetStartCap(Gdiplus::LineCapRound);
 		pen.SetEndCap(Gdiplus::LineCapRound);
 		pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -347,6 +347,9 @@ void CPathCtrl::OnPaint()
 
 		rt.left += 5;
 
+		//활성 세그먼트(i==m_index)는 강조 배경 위에 그려지므로 그 상태색으로 — down=cr_text_selected, hover=cr_text_hover (CSCTreeCtrl 와 동일 규칙).
+		dc.SetTextColor((i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text).ToCOLORREF());
+
 		if (m_path[i].ellipsis)
 		{
 			dc.DrawText(m_path[i].label, rt, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
@@ -362,18 +365,21 @@ void CPathCtrl::OnPaint()
 
 		if (i < m_path.size() - 1 || m_has_subfolder)
 		{
+			//활성 세그먼트의 화살표 영역도 강조 배경이 깔리므로 chevron/<< 도 상태색으로 (비활성은 cr_text_dim).
+			Gdiplus::Color cr_arrow = (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text_dim);
+
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)
 			{
-				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
-				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
-				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
-				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, m_theme.cr_text_dim.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, cr_arrow.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x + 3, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x + 1, rArrow.CenterPoint().y, cr_arrow.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y - 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, cr_arrow.ToCOLORREF(), 1);
+				draw_line(&dc, rArrow.CenterPoint().x - 0, rArrow.CenterPoint().y + 2, rArrow.CenterPoint().x - 2, rArrow.CenterPoint().y, cr_arrow.ToCOLORREF(), 1);
 			}
 			else
 			{
 				//m_down 이고 현재 항목이면 펼침 "v", 아니면 접힘 ">".
-				draw_chevron(rArrow.CenterPoint().x, rArrow.CenterPoint().y, (m_down && i == m_index));
+				draw_chevron(rArrow.CenterPoint().x, rArrow.CenterPoint().y, (m_down && i == m_index), cr_arrow);
 			}
 		}
 	}

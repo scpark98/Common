@@ -82,13 +82,16 @@
 #define logWriteS(fmt, ...)	((void)0)
 #define logWriteD(fmt, ...)	((void)0)
 #else
-#define logWrite(fmt, ...)	pLog->write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteI(fmt, ...)	pLog->write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteW(fmt, ...)	pLog->write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteE(fmt, ...)	pLog->write(SCLOG_LEVEL_ERROR, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteC(fmt, ...)	pLog->write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteS(fmt, ...)	pLog->write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__)
-#define logWriteD(fmt, ...)	pLog->write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__)
+//pLog 는 CSCLog 생성자에서만 this 로 세팅된다. gLog 인스턴스가 아직 만들어지지 않았거나
+//(예: InitInstance 이전·도중의 OnPaint) 애초에 선언되지 않은 프로젝트에서는 pLog == NULL 이므로
+//NULL->write() 로 멤버 atomic(m_writer_count) 에 접근해 액세스 위반이 난다. 매크로 단에서 가드.
+#define logWrite(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+#define logWriteI(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+#define logWriteW(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+#define logWriteE(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_ERROR, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+#define logWriteC(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+#define logWriteS(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+#define logWriteD(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
 #endif
 
 enum SCLOG_LEVEL

@@ -341,6 +341,17 @@ void CSCKeyBindings::seed_from_menu(HMENU hMenu)
 		if (!string_to_key(accel_text, fVirt, key))
 			continue;
 
+		//메뉴 캡션이 이 chord(fVirt+key)를 명시했으면, 같은 chord 를 갖던 다른 cmd 의 (resource seed 단계의)
+		//바인딩은 무효다. 제거하지 않으면 build_haccel 의 table 에 동일 chord 가 둘 생겨 TranslateAccelerator
+		//가 먼저 등록된 cmd(대개 핸들러 없는 .rc 잔재)를 골라 정작 메뉴 명령이 호출되지 않는다.
+		for (size_t k = 0; k < m_bindings.size(); )
+		{
+			if (m_bindings[k].cmd != id && m_bindings[k].fVirt == fVirt && m_bindings[k].key == key)
+				m_bindings.erase(m_bindings.begin() + k);
+			else
+				k++;
+		}
+
 		//같은 cmd 가 이미 있으면 키만 갱신(name 보존 → register_action 으로 named 화된 항목도 유지), 없으면 추가.
 		bool found = false;
 		for (size_t k = 0; k < m_bindings.size(); k++)

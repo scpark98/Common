@@ -936,6 +936,21 @@ Common 의 `CSCLog` (`log/SCLog/SCLog.cpp`) 가 모든 프로젝트의 `logWrite
 
 **Why:** 2026-05-21, 자막 작업 중 사용자가 *"방금 rename 한 세션의 log 확인"* 을 요청. 클로드가 첫 응답에 `log.txt` 라고 추측해 답했고 사용자 지적 — *"log위치는 실행파일 경로의 Log라는 폴더에 실행시마다 새로 생기도록 이미 그렇게 우리 테스트하지 않았나? 왜 log.txt라는 생소한 로그파일을 언급하나? 일관성을 잃지마라"*. SCLog 컨벤션은 Common 라이브러리에 정의돼 모든 프로젝트가 동일 패턴 — 다음 세션도 이 규칙으로 일관 응답하도록 명시.
 
+### 진단 로그는 최종 push 전까지 유지 — 넣었다 뺐다 금지 (강제)
+
+개발/디버깅용으로 추가한 `logWrite(_T("[모듈] ..."))` 진단 로그는 **그 작업이 최종 push 되기 전까지 코드에 그대로 둔다.** 한 수정이 "검증됐다" 싶을 때마다 로그를 제거하지 말 것 — 같은 영역을 곧 다시 디버깅할 일이 흔하고, 매번 넣었다 뺐다 하면 (a) 불필요한 재빌드·diff 노이즈, (b) 다음 디버깅 때 처음부터 다시 로그를 깔아야 함.
+
+- **추가**: 진단 시 `[모듈]` prefix 로 추가 (SCLog 컨벤션).
+- **유지**: 작업이 끝나도, GUI 검증이 끝나도 push 전까지 남겨둔다. include(`Common/log/SCLog/SCLog.h`)도 함께 유지.
+- **제거 시점**: 해당 작업을 **최종 push 하기 직전** 일괄 정리 (또는 사용자가 명시적으로 제거 지시할 때).
+- 임시 캡처 파일·스크린샷 등 *코드 밖 산출물* 은 즉시 정리해도 무방 — 이 규칙은 *소스 내 진단 로그* 한정.
+
+**모듈별 push 정책 — 멀티미디어만 로그 유지, 그 외는 push 전 제거 (강제, 2026-06-11 추가):**
+- **멀티미디어 재생 모듈 (`directx/DirectShow`, `ffmpeg`, audio 필터, `subtitle` 등) + `log/SCLog` 인프라**: `SCLog`/`logWrite` 를 **포함한 채 push 해도 됨**. 재생 파이프라인은 런타임 진단이 상시 필요하고 로그 파일은 배포·push 안 됨(.gitignore).
+- **그 외 일반 파생 컨트롤·헬퍼 모듈 (`CSliderCtrl`/`CTreeCtrl`/`CListBox`/`CVtListCtrlEx`/`CStatic`/`PathCtrl`/`Functions` 등)**: **`SCLog`/`logWrite` 를 포함한 채 절대 push 금지.** 디버깅 중엔 위 규칙대로 유지하되, **push 직전 그 모듈의 테스트 로그(+`#include ".../SCLog/SCLog.h"`)를 모두 제거**한 뒤 push.
+
+**Why:** 사용자 명시 (2026-06-11). 슬라이더 정렬 검증 후 로그 제거 시 *"개발작업중일때마다 log를 넣었다 뺐다 할거냐? 최종 푸시하기 전까지는 로그를 유지해라."* → push 직전 정리 원칙. 이어서 *"dshow, ffmpeg, audio, subtitle 등 미디어 관련외에 일반 파생 컨트롤 및 헬퍼 모듈에서는 절대 SCLog, logWrite를 포함한 채 푸시해서는 안된다."* → 멀티미디어만 예외. (이때 tree/list/listbox 의 `[hscroll-*]` + slider `[slider]` 로그를 push 전 제거.)
+
 ---
 
 ## Windows XP 호환 — SC 컨트롤은 XP 까지 지원 (강제, 최우선)

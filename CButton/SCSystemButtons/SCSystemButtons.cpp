@@ -284,12 +284,15 @@ void CSCSystemButtons::OnPaint()
 				HWND hwnd_root = ::GetAncestor(GetSafeHwnd(), GA_ROOT);
 				bool on_top = is_top_most(hwnd_root);
 
-				//pill(17px) 과 knob(10px) 모두 버튼 rect 세로 중앙(cp.y)에 대칭으로 그린다. pill 이 커서
-				//1px 보정만 줘도 위/아래 여백 비대칭이 눈에 띄어 위로 치우쳐 보이므로 보정 없이 정중앙.
+				//세로 중앙 보정 — 17px round-cap 라인의 anti-alias 비대칭으로 일반창에서 1px 아래로
+				//보이는 현상. 일반창만 1px 위로 보정, 전체화면 / maximized 에선 보정 없이 원래 위치.
+				//m_parent_maximized 는 호출자 (TitleDlg::set_floating_mode 등) 가 명시적으로 갱신 —
+				//IsZoomed 자체 체크는 self-styled fullscreen 미감지라 신뢰 X.
+				int y_off = m_parent_maximized ? 0 : -1;
 				g.DrawLine(on_top ? &pen_pin : &pen_pin_gray,
-					cp.x - 7, cp.y, cp.x + 7, cp.y);
+					cp.x - 7, cp.y + y_off, cp.x + 7, cp.y + y_off);
 				g.FillEllipse(&br_pin,
-					cp.x + (on_top ? 1 : -11), cp.y - 5, 10, 10);
+					cp.x + (on_top ? 1 : -11), cp.y + y_off - 5, 10, 10);
 			}
 			else if (m_button[i].cmd == SC_HELP)
 			{

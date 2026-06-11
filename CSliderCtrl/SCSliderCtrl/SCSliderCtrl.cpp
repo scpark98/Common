@@ -7,7 +7,6 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../AutoFont.h"
-#include "Common/log/SCLog/SCLog.h"	//[slider/click] 진단 로그용 (임시)
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -114,7 +113,7 @@ void CSCSliderCtrl::OnPaint()
 		{
 			// style_thumb_round_alpha / hue / gradient: rtrack 전체가 큰 썸이므로
 			// m_track_thick 대신 m_track_height의 높이를 사용한다
-			const int track_h = (is_round_pill_style() ? m_track_height : m_track_thick);
+			const int track_h = (is_round_pill_style() ? (int)m_track_height : m_track_thick);
 			// is_round_pill_style(): 트랙이 컨트롤 전체 너비를 사용한다.
 			// → lower에서 thumb.left == track.left == 0
 			// → upper에서 thumb.right == track.right == rc.Width()
@@ -161,32 +160,34 @@ void CSCSliderCtrl::OnPaint()
 	//inactive 영역을 먼저 그리고
 	if (m_style <= style_value && !is_round_pill_style())
 	{
-		//tic text가 표시되는 경우에는 gap + m_thumb.cy + 4 + text_height(12) 만큼이 센터에 위치하도록 보정해준다.
+		//tic text 표시 시 트랙 중심을 thumb 영역(+텍스트 공간) 기준으로 보정.
+		float fill_cy = (float)cy;
 		if (m_tic_show_text)
 		{
 			rtrack.top = (m_rc.Height() - (2 + m_thumb.cy + 10)) / 2;
 			rtrack.bottom = rtrack.top + m_thumb.cy;
-			dc.FillSolidRect(pxpos, rtrack.CenterPoint().y - m_track_height / 2, rtrack.right - pxpos, m_track_height, cr_inactive.ToCOLORREF());
+			fill_cy = (float)rtrack.CenterPoint().y;
 		}
-		else
-		{
-			dc.FillSolidRect(pxpos, cy - m_track_height / 2, rtrack.right - pxpos, m_track_height, cr_inactive.ToCOLORREF());
-		}
-		
+
+		//GDI+ float fill — m_track_height(float) 두께를 fill_cy 중심에 AA 로. 정수 FillSolidRect 와 달리 짝수/소수 두께도 cy 에 정확히 센터.
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.FillRectangle(&Gdiplus::SolidBrush(cr_inactive),
+			Gdiplus::RectF((Gdiplus::REAL)pxpos, fill_cy - m_track_height / 2.0f, (Gdiplus::REAL)(rtrack.right - pxpos), m_track_height));
+
 		if (m_style == style_value)
 		{
+			const int half = (int)(m_track_height / 2.0f);
 			CPen	penDark(PS_SOLID, 1, get_color(cr_inactive, -24).ToCOLORREF());
 			CPen	penLight(PS_SOLID, 1, get_color(cr_inactive, 36).ToCOLORREF());
 
 			dc.SelectObject(&penDark);
-			dc.MoveTo(pxpos, cy - m_track_height / 2);
-			dc.LineTo(rtrack.right, cy - m_track_height / 2);
-			//dc.LineTo(m_rc.right - 1, cy + m_track_height / 2);
+			dc.MoveTo(pxpos, cy - half);
+			dc.LineTo(rtrack.right, cy - half);
 
 			dc.SelectObject(&penLight);
-			dc.MoveTo(pxpos, cy + m_track_height / 2);
-			dc.LineTo(rtrack.right - 1, cy + m_track_height / 2);
-			dc.LineTo(rtrack.right - 1, cy - m_track_height / 2);
+			dc.MoveTo(pxpos, cy + half);
+			dc.LineTo(rtrack.right - 1, cy + half);
+			dc.LineTo(rtrack.right - 1, cy - half);
 
 			dc.SelectObject(pOldPen);
 			penDark.DeleteObject();
@@ -331,8 +332,11 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		rtrack = CRect(pxpos, m_rc.CenterPoint().y - m_track_height / 2, m_rc.right, m_rc.CenterPoint().y + m_track_height / 2 + 1);
-		dc.FillSolidRect(rtrack, cr_inactive.ToCOLORREF());
+		//트랙 두께는 정수 CRect+1 대신 float 중심 정렬(cy 기준)로 그린다. 기존 (int)(th/2)+1 은
+		//bottom 을 1px 더 내려 위/아래가 비대칭(아래로 1px 더 칠해짐)이었다. style_value 등과 동일 방식으로 통일.
+		rtrack = CRect(pxpos, m_rc.CenterPoint().y - (int)(m_track_height / 2), m_rc.right, m_rc.CenterPoint().y + (int)(m_track_height / 2));
+		g.FillRectangle(&Gdiplus::SolidBrush(cr_inactive),
+			Gdiplus::RectF((Gdiplus::REAL)rtrack.left, (float)cy - m_track_height / 2.0f, (Gdiplus::REAL)rtrack.Width(), m_track_height));
 	}
 	else if (m_style == style_progress_line)
 	{
@@ -478,29 +482,26 @@ void CSCSliderCtrl::OnPaint()
 #if 1
 	if (m_style <= style_value && !is_round_pill_style())
 	{
-		//tic text가 표시되는 경우에는 m_thumb.cy + 2(gap) + text_height(10) 만큼이 센터에 위치하도록 보정해준다.
-		if (m_tic_show_text)
-		{
-			dc.FillSolidRect(rtrack.left, rtrack.CenterPoint().y - m_track_height / 2, pxpos - rtrack.left, m_track_height, cr_active.ToCOLORREF());
-		}
-		else
-		{
-			dc.FillSolidRect(rtrack.left, cy - m_track_height / 2, pxpos - rtrack.left, m_track_height, cr_active.ToCOLORREF());
-		}
-		
+		//active 구간도 inactive 와 동일 중심. tic text 보정 시 rtrack 은 위 inactive 블록에서 이미 조정됨.
+		float fill_cy = m_tic_show_text ? (float)rtrack.CenterPoint().y : (float)cy;
+		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		g.FillRectangle(&Gdiplus::SolidBrush(cr_active),
+			Gdiplus::RectF((Gdiplus::REAL)rtrack.left, fill_cy - m_track_height / 2.0f, (Gdiplus::REAL)(pxpos - rtrack.left), m_track_height));
+
 		if (m_style == style_value)
 		{
+			const int half = (int)(m_track_height / 2.0f);
 			CPen	penDark(PS_SOLID, 1, get_color(cr_active, -64).ToCOLORREF());
 			CPen	penLight(PS_SOLID, 1, get_color(cr_active, 64).ToCOLORREF());
 
 			dc.SelectObject(&penDark);
-			dc.MoveTo(pxpos, cy - m_track_height / 2);
-			dc.LineTo(rtrack.left, cy - m_track_height / 2);
-			dc.LineTo(rtrack.left, cy + m_track_height / 2);
+			dc.MoveTo(pxpos, cy - half);
+			dc.LineTo(rtrack.left, cy - half);
+			dc.LineTo(rtrack.left, cy + half);
 
 			dc.SelectObject(&penLight);
-			dc.MoveTo(rtrack.left + 1, cy + m_track_height / 2);
-			dc.LineTo(pxpos, cy + m_track_height / 2);
+			dc.MoveTo(rtrack.left + 1, cy + half);
+			dc.LineTo(pxpos, cy + half);
 
 			dc.SelectObject(pOldPen);
 			penDark.DeleteObject();
@@ -509,8 +510,10 @@ void CSCSliderCtrl::OnPaint()
 	}
 	else if (m_style == style_progress)
 	{
-		rtrack = CRect(0, m_rc.CenterPoint().y - m_track_height / 2, pxpos, m_rc.CenterPoint().y + m_track_height / 2 + 1);
-		dc.FillSolidRect(rtrack, cr_active.ToCOLORREF());
+		//inactive 와 동일하게 float 중심 정렬. +1 제거로 active/inactive 의 상하 범위가 정확히 일치.
+		rtrack = CRect(0, m_rc.CenterPoint().y - (int)(m_track_height / 2), pxpos, m_rc.CenterPoint().y + (int)(m_track_height / 2));
+		g.FillRectangle(&Gdiplus::SolidBrush(cr_active),
+			Gdiplus::RectF((Gdiplus::REAL)rtrack.left, (float)cy - m_track_height / 2.0f, (Gdiplus::REAL)rtrack.Width(), m_track_height));
 
 		//m_crValueText = RGB(12, 162, 255);
 		//m_cr_active = RGB(128,255,128);
@@ -670,8 +673,10 @@ void CSCSliderCtrl::OnPaint()
 			while (tic <= upper)
 			{
 				tic_pos = Pos2Pixel(tic);
-				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
-				g.FillEllipse(&Gdiplus::SolidBrush(cr_tic), CRect_to_gpRect(rtic));
+				bool is_end_tic = (tic == lower || tic == upper);
+				int tic_d = is_end_tic ? 8 : 6;
+				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y, tic_d, tic_d);
+				g.FillEllipse(&Gdiplus::SolidBrush(is_end_tic ? cr_tic : get_weak_color(cr_tic)), CRect_to_gpRect(rtic));
 
 				if (m_tic_show_text)
 				{
@@ -700,7 +705,7 @@ void CSCSliderCtrl::OnPaint()
 			{
 				tic = upper;
 				tic_pos = Pos2Pixel(upper);
-				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y - 1, 7, 7);
+				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y, 8, 8);
 				g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(rtic));
 
 				if (m_tic_show_text)
@@ -902,9 +907,12 @@ void CSCSliderCtrl::OnPaint()
 
 	if (m_draw_progress_border)
 	{
-		rtrack.left = 0;
-		rtrack.right = m_rc.right;
-		draw_rect(&dc, rtrack, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
+		//채움은 float 중심 정렬로 rows [cy-th/2, cy+th/2) 를 칠한다(예: th=14 → cy-7..cy+6).
+		//draw_rect(CDC) 는 내부에서 Height-- 후 PenAlignmentInset 으로 그리므로, 채움의 가장자리 행에
+		//1px 테두리를 정확히 얹으려면 bottom 을 +1 보정해야 한다. 이 보정이 없으면 테두리 bottom 이
+		//한 행 위로 올라가 채움 bottom 이 테두리 밖으로 1px 넘쳐 보인다.
+		CRect rborder(0, cy - (int)(m_track_height / 2), m_rc.right, cy + (int)(m_track_height / 2) + 1);
+		draw_rect(&dc, rborder, m_cr_progress_border);// , NULL_BRUSH, m_border_width, m_border_pen_style);
 	}
 
 	//구간 반복 bracket — 다른 모든 element 가 그려진 *후 맨 마지막* 에. FillSolidRect 직접.
@@ -917,8 +925,8 @@ void CSCSliderCtrl::OnPaint()
 		const int HH = 1;                       //가로 두께
 		const int HW = 2;                       //가로 폭 (세로 옆으로)
 		const int cy = m_rc.CenterPoint().y;
-		const int top = cy - m_track_height / 2 + 2;
-		const int bot = cy + m_track_height / 2 - 2;
+		const int top = cy - (int)(m_track_height / 2) + 2;
+		const int bot = cy + (int)(m_track_height / 2) - 2;
 		const int h   = bot - top;
 
 		if (m_repeat_start >= 0)
@@ -1019,6 +1027,33 @@ int CSCSliderCtrl::Pixel2Pos(int nPixel)
 	return pos;
 }
 
+int CSCSliderCtrl::snap_to_tic(int pos)
+{
+	if (m_tic_freq <= 0 || (!m_tic_only && !m_auto_snap))
+		return pos;
+
+	int lower = GetRangeMin();
+	int upper = GetRangeMax();
+
+	int rel = pos - lower;
+	int nearest = lower + ((rel + m_tic_freq / 2) / m_tic_freq) * m_tic_freq;
+
+	//마지막 틱은 freq 배수가 아닐 수 있어 upper 도 스냅 후보 — upper 가 더 가까우면 upper 로.
+	if (abs(upper - pos) < abs(nearest - pos))
+		nearest = upper;
+
+	Clamp(nearest, lower, upper);
+
+	if (m_tic_only)				//모드3 — 항상 가장 가까운 틱.
+		return nearest;
+
+	//모드2 — 틱 tolerance 안일 때만 끌어당기고, 그 밖은 자유 이동.
+	if (abs(nearest - pos) <= m_snap_tolerance)
+		return nearest;
+
+	return pos;
+}
+
 void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	SetFocus();
@@ -1074,7 +1109,7 @@ void CSCSliderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	//(이전: OnMouseMove(nFlags, point) 호출 → drag 첫 프레임에 msg_thumb_move 가 추가 발송되어
 	// 같은 위치를 두 번 처리하는 문제가 있었음. grab 한 번이면 충분.)
 	{
-		int pos = Pixel2Pos(point.x);
+		int pos = snap_to_tic(Pixel2Pos(point.x));
 		SetPos(pos);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
 			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_grab, this, pos), 0);
@@ -1159,7 +1194,7 @@ void CSCSliderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 	//drag 종료 알림 — 호출자가 timer 재시작하고 graph 를 다시 Running 으로 복귀시킬 수 있도록.
 	{
-		int pos = Pixel2Pos(point.x);
+		int pos = snap_to_tic(Pixel2Pos(point.x));
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
 			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_release, this, pos), 0);
 	}
@@ -1291,9 +1326,10 @@ void CSCSliderCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		m_drag_started = true;
 		m_last_emit_point = point;
 
-		SetPos(pos);
+		int snapped = snap_to_tic(pos);
+		SetPos(snapped);
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl,
-			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
+			(WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, snapped), 0);
 	}
 
 	//이 코드를 살려놓으면 thumb위에서 마우스가 클릭되지 않고 움직여도 WM_PAINT가 호출되는 현상이 발생한다.
@@ -1501,17 +1537,22 @@ void CSCSliderCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	int upper = get_upper();
 	int pos = GetPos();
 
+	//tic_only 모드면 키보드 이동도 틱 단위로만 — 화살표는 인접 틱(±freq), 그 외 키는 결과를 틱에 스냅.
+	const bool tic_mode = (m_tic_only && m_tic_freq > 0);
+	const int line_step = tic_mode ? m_tic_freq : 1;
+	const int page_step = tic_mode ? max(m_tic_freq, (upper - lower) / 10) : max(1, (upper - lower) / 10);
+
 	//네이티브 트랙바가 처리하는 네비게이션 키는 모두 여기서 가로채 set_pos 로 직접 갱신한다.
 	//base CSliderCtrl::OnKeyDown 으로 넘기면 네이티브가 커스텀 paint 위에 thumb 를 또 그려 잔상이 남고,
 	//parent 로 Message_CSCSliderCtrl 도 안 가 값이 갱신되지 않는다.
 	switch (nChar)
 	{
 		case VK_LEFT:
-		case VK_DOWN:	pos--;					break;
+		case VK_DOWN:	pos -= line_step;		break;
 		case VK_RIGHT:
-		case VK_UP:		pos++;					break;
-		case VK_PRIOR:	pos += max(1, (upper - lower) / 10);	break;
-		case VK_NEXT:	pos -= max(1, (upper - lower) / 10);	break;
+		case VK_UP:		pos += line_step;		break;
+		case VK_PRIOR:	pos += page_step;		break;
+		case VK_NEXT:	pos -= page_step;		break;
 		case VK_HOME:	pos = lower;			break;
 		case VK_END:	pos = upper;			break;
 		default:
@@ -1520,6 +1561,8 @@ void CSCSliderCtrl::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	}
 
 	pos = max(lower, min(upper, pos));
+	if (tic_mode)
+		pos = snap_to_tic(pos);
 	set_pos(pos);
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCSliderCtrl, (WPARAM)&CSCSliderCtrlMsg(CSCSliderCtrlMsg::msg_thumb_move, this, pos), 0);
 }
@@ -1532,18 +1575,18 @@ void CSCSliderCtrl::set_style(int nStyle)
 
 	if (m_style == style_thumb)
 	{
-		m_track_height = 8;
-		m_thumb = CSize(28, m_track_height + 6);
+		m_track_height = 8.0f;
+		m_thumb = CSize(28, (int)m_track_height + 6);
 	}
 	else if (m_style == style_thumb_round)
 	{
 		m_thumb = CSize(16, 16);
-		m_track_height = 2;
+		m_track_height = 1.6f;	//소수 두께 — g.FillRectangle(RectF) 로 cy 중심 AA 정합 (1px 은 너무 얇음).
 	}
 	else if (is_round_pill_style())
 	{
 		m_thumb = CSize(24, 24);
-		m_track_height = 12;
+		m_track_height = 12.0f;
 	}
 	else if (m_style == style_value)
 	{

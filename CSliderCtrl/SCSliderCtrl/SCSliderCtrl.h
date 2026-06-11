@@ -201,7 +201,7 @@ public:
 
 	//style_thumb,	style_value, style_progress, style_track, style_step, 
 	void	set_style(int nStyle);
-	void	set_track_height(int height) { m_track_height = height; }
+	void	set_track_height(float height) { m_track_height = height; }
 
 	void	set_use_slide(bool enable = true) { m_use_slide = enable; }
 	//void	set_enable_bottom_slide(bool enable) { m_enable_bottom_slide = enable; }
@@ -228,9 +228,24 @@ public:
 
 	int		m_tic_freq = 0;
 	bool	m_tic_show_text = false;	//default = false
+	//틱 동작 3모드 (m_tic_freq > 0 일 때만 의미):
+	// 1) 둘 다 false : 틱은 표시만, 위치 자유.
+	// 2) m_auto_snap : 틱 ±m_snap_tolerance(자석 범위) 안이면 그 틱으로 끌어당김, 밖은 자유. (자석식)
+	// 3) m_tic_only  : 틱 위치만 선택 가능, 항상 가장 가까운 틱으로 강제. (이산값 — 해상도 목록처럼)
+	// 둘 다 켜지면 m_tic_only 우선.
+	bool	m_auto_snap = false;
+	bool	m_tic_only = false;
+	int		m_snap_tolerance = 2;		//m_auto_snap 자석 범위 (pos 값 단위, ±). 틱과의 거리가 이 이하면 스냅.
 	//freq는 CSliderCtrl::SetTicFreq()와 동일하게 lower ~ upper 사이의 구간을 몇 등분할 것인지가 아닌 간격을 의미한다.
 	//즉, freq = 23이면 23 등분이 아니라 0 ~ 23 ~ 46 ~ 69 ~ 92와 같이 틱이 표시된다.
 	void	set_tic_freq(int freq, bool show_text = false);
+
+	//모드2 — 드래그 중 틱 ±tolerance 안이면 그 틱으로 끌어당김(자석), 밖은 자유 이동.
+	void	set_auto_snap(bool enable = true) { m_auto_snap = enable; }
+	//모드3 — 틱 위치만 선택 가능(이산값). 항상 가장 가까운 틱으로 강제. 픽셀폭보다 range 가 커도 정확히 틱에 안착.
+	void	set_tic_only(bool enable = true) { m_tic_only = enable; }
+	//모드2 자석 범위 (pos 값 단위, ±). 기본 2.
+	void	set_snap_tolerance(int tolerance) { m_snap_tolerance = tolerance; }
 
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }
 
@@ -403,7 +418,7 @@ protected:
 	//COLORREF		m_cr_back;				// back color of control
 	Gdiplus::Color	m_cr_active;			//processed area
 	Gdiplus::Color	m_cr_inactive;			//not processed area
-	int				m_track_height = 14;	//rc.CenterPoint().y +- m_track_height / 2. ex) 6 and 7 is equal height
+	float			m_track_height = 14.0f;	//트랙 두께(px). float — g.FillRectangle(RectF) 에 그대로 사용해 짝수/소수 두께도 cy 에 정확히 센터 정렬.
 	//CPen			m_penThumb;
 	//CPen			m_penThumbLight;
 	//CPen			m_penThumbLighter;
@@ -431,6 +446,7 @@ protected:
 
 	int				Pixel2Pos(int pixel);
 	int				Pos2Pixel(int pos);
+	int				snap_to_tic(int pos);	//m_auto_snap 시 pos 를 가장 가까운 틱(또는 끝점)으로 반올림. off 면 pos 그대로.
 	void			PrepareMask(CBitmap *pBmpSource, CBitmap *pBmpMask, Gdiplus::Color clrpTransColor);
 	void			DrawTransparentBitmap(	CDC *pDC, int xStart, int yStart, int wWidth, int wHeight,
 											CDC *pTmpDC, int xSource, int ySource, CBitmap *bmMask);

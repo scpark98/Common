@@ -5663,12 +5663,35 @@ void find_all_files(CString folder, std::deque<WIN32_FIND_DATA>* dq, CString fil
 
 	folder = resolve_lnk_path(folder);
 
-	hFind = FindFirstFile(folder + _T("\\") + filter, &data);
-	if (hFind == INVALID_HANDLE_VALUE)
+	CString search = folder + _T("\\") + filter;
+
+	//Win7+ 에서는 FindFirstFileEx(FindExInfoBasic + FIND_FIRST_EX_LARGE_FETCH)가 8.3 단축명 생성 생략 + 큰 fetch
+	//버퍼로 FindFirstFile 보다 훨씬 빠르다(WinSxS 등 대량 폴더에서 체감차 큼). 이 플래그는 XP/Vista 미지원이라
+	//그 환경에선 ERROR_INVALID_PARAMETER 로 실패 → FindFirstFile 로 폴백한다. capability 는 1회 판별 후 캐시(static).
+#ifndef FIND_FIRST_EX_LARGE_FETCH
+#define FIND_FIRST_EX_LARGE_FETCH 0x00000002
+#endif
+	static int s_find_ex_fast = -1;	//-1 미확정, 0 미지원(XP/Vista), 1 지원(Win7+)
+
+	if (s_find_ex_fast != 0)
 	{
-		FindClose(hFind);
-		return;
+		hFind = ::FindFirstFileEx(search, FindExInfoBasic, &data, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+		if (hFind != INVALID_HANDLE_VALUE)
+			s_find_ex_fast = 1;
+		else if (s_find_ex_fast == -1 && ::GetLastError() == ERROR_INVALID_PARAMETER)
+		{
+			//XP/Vista — fast 플래그 미지원으로 확정. 이후 항상 폴백.
+			s_find_ex_fast = 0;
+			hFind = ::FindFirstFile(search, &data);
+		}
 	}
+	else
+	{
+		hFind = ::FindFirstFile(search, &data);
+	}
+
+	if (hFind == INVALID_HANDLE_VALUE)
+		return;
 
 	do
 	{

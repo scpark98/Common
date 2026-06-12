@@ -103,6 +103,10 @@ public:
 	int  GetSystemImageListIcon(int index, CString szFile, BOOL bDrive = TRUE);
 	int  GetSystemImageListIcon(int index, int csidl, BOOL bDrive = TRUE);
 
+	//일반 폴더의 공통 아이콘 index — SHGFI_USEFILEATTRIBUTES 로 디스크 접근 없이 1회 산출 후 캐시.
+	//대량 폴더(WinSxS 등) 표시 시 항목마다 SHGetFileInfo(디스크) 하던 것을 이 한 값으로 대체.
+	int  get_folder_icon();
+
 	UINT	get_drive_type(int index, CString path);
 	int		get_drive_index(int index, CString path);
 	int		get_drive_icon(UINT drive_type);
@@ -183,4 +187,5 @@ private:
 	std::deque<std::deque<CString>> m_drive_lists;
 	*/
 	int m_osType;
+	int m_folder_icon_index = -1;	//get_folder_icon 캐시(-1 = 미산출).
 };

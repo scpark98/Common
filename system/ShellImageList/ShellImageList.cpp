@@ -234,6 +234,20 @@ int CShellImageList::GetSystemImageListIcon(int index, CString szFile, BOOL bDri
 	return shFileInfo.iIcon;
 }
 
+int CShellImageList::get_folder_icon()
+{
+	//SHGFI_USEFILEATTRIBUTES — 실제 경로를 보지 않고 전달한 attribute(FILE_ATTRIBUTE_DIRECTORY)만으로 아이콘을
+	//결정하므로 디스크 접근이 없다. 일반 폴더는 모두 이 공통 아이콘이라 1회 산출 후 캐시해 재사용한다.
+	if (m_folder_icon_index < 0)
+	{
+		SHFILEINFO sfi = { 0 };
+		::SHGetFileInfo(_T("folder"), FILE_ATTRIBUTE_DIRECTORY, &sfi, sizeof(sfi),
+			SHGFI_USEFILEATTRIBUTES | SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
+		m_folder_icon_index = sfi.iIcon;
+	}
+	return m_folder_icon_index;
+}
+
 UINT CShellImageList::get_drive_type(int index, CString path)
 {
 	if (index >= (int)m_volume.size() || path.IsEmpty())

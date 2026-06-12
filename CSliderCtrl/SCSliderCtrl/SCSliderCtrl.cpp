@@ -1499,7 +1499,7 @@ void CSCSliderCtrl::set_inactive_color(Gdiplus::Color cr_inActive)
 	Invalidate();
 }
 
-void CSCSliderCtrl::set_thumb_color(Gdiplus::Color cr_thumb)
+void CSCSliderCtrl::compute_thumb_shades(Gdiplus::Color cr_thumb)
 {
 	int nMultiple = 32;
 
@@ -1508,6 +1508,11 @@ void CSCSliderCtrl::set_thumb_color(Gdiplus::Color cr_thumb)
 	m_cr_thumb_lighter	= get_color(m_cr_thumb, nMultiple * 2);
 	m_cr_thumb_dark		= get_color(m_cr_thumb, -nMultiple);
 	m_cr_thumb_darker	= get_color(m_cr_thumb, -nMultiple * 2);
+}
+
+void CSCSliderCtrl::set_thumb_color(Gdiplus::Color cr_thumb)
+{
+	compute_thumb_shades(cr_thumb);
 	Invalidate();
 }
 
@@ -2069,23 +2074,55 @@ int32_t CSCSliderCtrl::step(int step)
 	return GetPos();
 }
 
+//theme 의 accent(cr_progress)·배경에서 트랙/썸/틱 색을 파생. cr_progress 는 모든 테마에서 progress/선택 강조색
+//(default=RoyalBlue, windows=COLOR_HIGHLIGHT, 커스텀 테마=cr_back_selected)으로 설정돼 슬라이더 active 트랙·썸에
+//의미상 그대로 맞는다. 개별 setter(set_thumb_color 등) 로 일일이 지정하지 않아도 테마 교체만으로 채색되도록.
+void CSCSliderCtrl::apply_theme_colors()
+{
+	Gdiplus::Color bg = m_theme.cr_back;
+	int lum_bg = (int)get_luminance(bg);
+
+	//active/thumb = 테마 accent(cr_progress). 단 에디터 import 테마는 cr_progress = 에디터 selection 색이라
+	//배경과 명도 대비가 약한 경우가 많아(choco/navajo/ruby_blue 등) 트랙이 거의 안 보인다. 배경과 명도차가
+	//70 미만이면 배경 반대쪽(어두운 배경=흰, 밝은 배경=검)으로 부족분에 비례(0.25~0.6)해 섞어 가시성을 확보.
+	//이미 충분히 대비되는 curated 테마(windows~claude09 등)는 이 분기를 안 타므로 그대로 유지된다.
+	Gdiplus::Color accent = m_theme.cr_progress;
+	int diff = abs((int)get_luminance(accent) - lum_bg);
+	if (diff < 70)
+	{
+		float t = (float)(70 - diff) / 70.0f;
+		t = max(0.25f, min(0.6f, t));
+		Gdiplus::Color target = (lum_bg < 128) ? Gdiplus::Color(Gdiplus::Color::White) : Gdiplus::Color(Gdiplus::Color::Black);
+		accent = lerp_color(accent, target, t);
+	}
+
+	m_cr_active = accent;
+	compute_thumb_shades(accent);
+
+	//inactive 트랙·틱 = accent 의 회색 톤. 유채색 accent 는 'colored active vs gray inactive' 로 자연히 구분돼
+	//양호하다(기존 동작 유지). 그러나 accent 가 무채색이면(mono_industrial/navajo) gray inactive 가 active 와
+	//같은 톤이 되어 트랙이 썸 위치에서 끊긴 것처럼 보이므로, 배경~active 중간 명도의 회색으로 분리해 active 보다
+	//옅게 보이게 한다.
+	int chroma = (int)max(accent.GetR(), max(accent.GetG(), accent.GetB()))
+			   - (int)min(accent.GetR(), min(accent.GetG(), accent.GetB()));
+	if (chroma < 24)
+		m_cr_inactive = get_gray_color(lerp_color(bg, accent, 0.5f));
+	else
+		m_cr_inactive = get_gray_color(accent);
+	m_cr_tic = m_cr_inactive;
+}
+
 void CSCSliderCtrl::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
-	m_cr_inactive = get_color(m_theme.cr_back, -64);
-
-	//기본 m_theme에는 없지만 CSCSlider에서 필요한 다른 컬러들에 대한 색상 설정
-	m_cr_active = gRGB(64, 80, 181);//RGB(128, 192, 255);
-	m_cr_inactive = get_gray_color(m_cr_active);
-	m_cr_thumb = gRGB(64, 80, 181); //RGB(124, 192, 232);
-	m_cr_tic = get_gray_color(m_cr_thumb);
+	apply_theme_colors();
 }
 
 //다이얼로그에서 m_theme 객체를 그대로 전파받는 경로 (다른 SC* 컨트롤과 동일 시그니처).
-//트랙/썸/틱 색은 테마 비의존 상수라 생성자의 set_color_theme(default) 에서 1회 설정된 값을 유지한다.
 void CSCSliderCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
+	apply_theme_colors();
 	if (invalidate && m_hWnd)
 		Invalidate();
 }

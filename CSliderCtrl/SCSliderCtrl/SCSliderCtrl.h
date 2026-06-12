@@ -441,6 +441,12 @@ protected:
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
 	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 64);
 
+	//theme 의 accent(cr_progress)·배경에서 트랙/썸/틱 색을 파생한다. 개별 setter 로 일일이 지정하지 않아도
+	//테마 교체만으로 슬라이더가 그 테마 톤으로 채색되도록 set_color_theme 의 양쪽 진입점이 공통 호출.
+	void			apply_theme_colors();
+	//썸 본색 + bevel 음영 4색 파생. Invalidate 안 함 — 생성자(m_hWnd NULL) 단계에서도 안전. set_thumb_color 의 코어.
+	void			compute_thumb_shades(Gdiplus::Color cr_thumb);
+
 	CWnd*			m_pParentWnd;
 	void			(*m_pCallback_func)(CWnd* pParent, CWnd* pWnd, DWORD msg, UINT pos) = NULL;
 

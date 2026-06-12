@@ -320,7 +320,7 @@ public:
 //color theme 관련
 	CSCColorTheme	m_theme = CSCColorTheme(this);	//m_theme(this); 는 오류.
 	void			set_color_theme(int theme);
-	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = false);
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	//disable이면 gray로 표시되지만 때로는 disable이 아니어도 gray로 표시해야 하는 경우도 있다.
 	void			set_forced_gray(bool forced_gray, bool include_back = true) { m_forced_gray = forced_gray; m_forced_gray_include_back = include_back; Invalidate(); }

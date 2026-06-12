@@ -4778,12 +4778,14 @@ void CSCTreeCtrl::sync_scrollbar()
 			m_scrollbar.MoveWindow(rTarget);
 	}
 
-	//H overlay (parent dialog child): tree client 하단 바로 아래(예약된 NC 띠)에 parent 좌표로 배치. full 폭(코너까지 덮음).
+	//H overlay (parent dialog child): tree client 하단 바로 아래(예약된 NC 띠)에 parent 좌표로 배치.
+	//세로바가 보이면 그 너비만큼 우측을 비워 우하단 코너 정사각형을 남긴다(listctrl 동일 — 코너는 OnNcPaint 가 cr_back 으로 채움).
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 	{
 		CPoint strip_tl(0, rc.bottom);	//rc = NC 로 축소된 client → rc.bottom = 예약 띠 상단(=가로바 위치)
 		ClientToScreen(&strip_tl);
-		CRect rTarget(strip_tl.x, strip_tl.y, strip_tl.x + rc.Width(), strip_tl.y + m_scrollbar_width);
+		int h_width = rc.Width() - (need_v ? m_scrollbar_width : 0);
+		CRect rTarget(strip_tl.x, strip_tl.y, strip_tl.x + h_width, strip_tl.y + m_scrollbar_width);
 		CWnd* pParent = GetParent();
 		if (pParent)
 			pParent->ScreenToClient(&rTarget);
@@ -5022,14 +5024,20 @@ void CSCTreeCtrl::OnNcPaint()
 	//NC = 0. native scrollbar 그릴 NC 공간 없고 우리 overlay 는 client 안. base 호출 skip — tree 의 자동 NC paint 가 깜빡임 유발.
 	if (m_scrollbar_setup)
 	{
-		if (m_draw_border)
+		CWindowDC dc(this);
+		CRect rc;
+		GetWindowRect(&rc);
+		rc.OffsetRect(-rc.TopLeft());
+
+		//V/H overlay 가 만나는 우하단 코너 — 가로바를 세로바 너비만큼 줄여 비워둔 자리를 cr_back 으로 채운다(탐색기/listctrl 동일).
+		if (m_v_visible_state && m_h_visible_state)
 		{
-			CWindowDC dc(this);
-			CRect rc;
-			GetWindowRect(&rc);
-			rc.OffsetRect(-rc.TopLeft());
-			draw_rect(&dc, rc, m_theme.cr_border_inactive);
+			CRect rcCorner(rc.right - m_scrollbar_width, rc.bottom - m_scrollbar_width, rc.right, rc.bottom);
+			dc.FillSolidRect(&rcCorner, m_theme.cr_back.ToCOLORREF());
 		}
+
+		if (m_draw_border)
+			draw_rect(&dc, rc, m_theme.cr_border_inactive);
 		return;
 	}
 

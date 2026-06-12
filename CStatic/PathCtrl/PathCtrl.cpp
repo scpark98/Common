@@ -271,16 +271,16 @@ void CPathCtrl::OnPaint()
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 	CRect rArrow = rc;
 
-	//하위폴더 pulldown 의 ">" (접힘) / "v" (펼침) chevron 을 Windows 탐색기 트리와 동일한 룩으로 그린다.
-	//색은 기존 cr_text_dim 그대로 두고, 두꺼운 각진 GDI 선(draw_line, width 2) 대신 얇은 GDI+ 폴리라인 +
-	//안티앨리어싱 + 둥근 끝점(LineCapRound) + 둥근 꼭짓점(LineJoinRound) 으로 교체. (cx,cy) 는 arrow 영역 중심.
+	//하위폴더 pulldown 의 ">" (접힘) / "v" (펼침) chevron — CSCTreeCtrl 의 chevron 과 동일한 모양·두께로 그린다
+	//(두께 1.6f, ">" = 3×7px / "v" = 7×3px 대칭, 둥근 끝점/꼭짓점, AA + PixelOffsetModeHalf). 색은 호출처에서
+	//트리와 같이 get_weak_color(텍스트색, 48) 로 전달한다. (cx,cy) 는 arrow 영역 중심.
 	auto draw_chevron = [&](int cx, int cy, bool down, Gdiplus::Color cr)
 	{
 		Gdiplus::Graphics g(dc.GetSafeHdc());
 		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 		g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 
-		Gdiplus::Pen pen(cr, 1.3f);
+		Gdiplus::Pen pen(cr, 1.6f);
 		pen.SetStartCap(Gdiplus::LineCapRound);
 		pen.SetEndCap(Gdiplus::LineCapRound);
 		pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -288,15 +288,17 @@ void CPathCtrl::OnPaint()
 		Gdiplus::PointF pts[3];
 		if (down)
 		{
-			pts[0] = Gdiplus::PointF((float)(cx - 4), (float)(cy - 2));
-			pts[1] = Gdiplus::PointF((float)(cx + 0), (float)(cy + 3));
-			pts[2] = Gdiplus::PointF((float)(cx + 4), (float)(cy - 2));
+			//v
+			pts[0] = Gdiplus::PointF((float)(cx - 3.5f), (float)(cy - 1.5f));
+			pts[1] = Gdiplus::PointF((float)(cx + 0.0f), (float)(cy + 1.5f));
+			pts[2] = Gdiplus::PointF((float)(cx + 3.5f), (float)(cy - 1.5f));
 		}
 		else
 		{
-			pts[0] = Gdiplus::PointF((float)(cx - 2), (float)(cy - 4));
-			pts[1] = Gdiplus::PointF((float)(cx + 3), (float)(cy + 0));
-			pts[2] = Gdiplus::PointF((float)(cx - 2), (float)(cy + 4));
+			//>
+			pts[0] = Gdiplus::PointF((float)(cx - 1.5f), (float)(cy - 3.5f));
+			pts[1] = Gdiplus::PointF((float)(cx + 1.5f), (float)(cy + 0.0f));
+			pts[2] = Gdiplus::PointF((float)(cx - 1.5f), (float)(cy + 3.5f));
 		}
 		g.DrawLines(&pen, pts, 3);
 	};
@@ -365,8 +367,10 @@ void CPathCtrl::OnPaint()
 
 		if (i < m_path.size() - 1 || m_has_subfolder)
 		{
-			//활성 세그먼트의 화살표 영역도 강조 배경이 깔리므로 chevron/<< 도 상태색으로 (비활성은 cr_text_dim).
-			Gdiplus::Color cr_arrow = (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text_dim);
+			//chevron 색을 CSCTreeCtrl 과 동일하게 — 항목 텍스트색(활성 세그먼트는 강조 배경 위라 상태색,
+			//비활성은 본래 cr_text)을 get_weak_color 로 48 만큼 흐리게. 원색은 너무 진해 탐색기 chevron 의 옅은 톤과 다름.
+			Gdiplus::Color cr_glyph = (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text);
+			Gdiplus::Color cr_arrow = get_weak_color(cr_glyph, 48);
 
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)

@@ -147,7 +147,7 @@ void CPathCtrl::PreSubclassWindow()
 	TRACE(_T("rc = %s\n"), get_rect_info_str(rc, 2));
 
 	rc.DeflateRect(1, 1);
-	rc.left = ROOT_WIDTH;
+	rc.left = (m_icon_left - 2) + ROOT_WIDTH;
 	dwStyle = WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE;
 	m_pEdit = new CSCEdit();// (this, item, subItem, GetItemText(item, subItem));
 	m_pEdit->Create(dwStyle, rc, this, 0);
@@ -167,12 +167,12 @@ void CPathCtrl::repos_edit()
 
 	GetClientRect(rc);
 	rc.DeflateRect(1, 1);
-	//path 가 설정되어 있을 때는 ROOT_WIDTH (21px) 만큼 좌측을 비워둬야 OnPaint 가 그 자리에 루트 아이콘
-	//(내 PC / 문서 / 바탕화면 선택용) 을 그릴 수 있다.
+	//path 가 설정되어 있을 때는 루트 아이콘 셀(chain origin + ROOT_WIDTH)만큼 좌측을 비워둬야 OnPaint 가 그
+	//자리에 루트 아이콘(내 PC / 문서 / 바탕화면 선택용) 을 그릴 수 있다. origin 은 m_icon_left 한 knob 에서 파생.
 	//path 미설정 상태에서는 아이콘이 안 그려지므로 edit 의 left 는 0 (deflate 후) 부터 시작 — 사용자가
 	//"빈 상태에서는 왼쪽 들여쓰기가 어색하다" 라고 지적.
 	if (m_path.size() > 0)
-		rc.left = ROOT_WIDTH;
+		rc.left = (m_icon_left - 2) + ROOT_WIDTH;
 	m_pEdit->MoveWindow(rc);
 	/*
 	CRect margin = rc;
@@ -305,7 +305,7 @@ void CPathCtrl::OnPaint()
 	if (m_pShellImageList)
 	{
 		m_pShellImageList->m_imagelist_small.Draw(&dc, m_pShellImageList->GetSystemImageListIcon(!m_is_local, get_path(m_path.size() - 1), true),
-			CPoint(rc.left + 2, rc.CenterPoint().y - 8), ILD_TRANSPARENT);
+			CPoint(rc.left + m_icon_left, rc.CenterPoint().y - 8), ILD_TRANSPARENT);
 	}
 
 	//0번은 무조건 표시하고 나머지는 m_start_index 이상부터 표시한다.
@@ -981,6 +981,11 @@ void CPathCtrl::recalc_path_position()
 
 	dc.SelectObject(pOldFont);
 
+	//경로 체인의 가로 origin — 루트 아이콘과 동일 knob 에서 파생(chain origin = m_icon_left - 2, 2 = 아이콘 inset).
+	//이후 모든 항목이 OffsetRect(앞 항목.right) 로 이 origin 에서 줄줄이 파생되므로, 여기 한 줄이 아이콘·'>'·전체
+	//세그먼트의 좌측 시작점을 동시에 결정한다. (이전엔 width 루프의 carried rt.left 에 암묵 의존해 불안정했음.)
+	m_path[0].r.left = rc.left + m_icon_left - 2;
+
 	//최상위 항목의 너비는 21로 고정된다.
 	m_path[0].r.right = m_path[0].r.left + ROOT_WIDTH + m_arrow_area_width;
 
@@ -1217,10 +1222,10 @@ void CPathCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 
-	//default 테마는 CStatic 계열에 COLOR_BTNFACE 를 부여하지만 PathCtrl 은 Win 탐색기 주소표시줄과
-	//동일한 흰 배경이 의도된 외관이므로 cr_back 만 COLOR_WINDOW 로 명시 override.
-	if (theme == CSCColorTheme::color_theme_default)
-		m_theme.cr_back = RGB2gpColor(::GetSysColor(COLOR_WINDOW));
+	//default/windows 테마는 control-kind 분기로 CStatic 계열에 COLOR_BTNFACE(회색) 를 주지만, PathCtrl 은
+	//Win 탐색기 주소표시줄과 동일한 COLOR_WINDOW(흰) 배경이 의도된 외관이므로 cr_back 만 명시 override.
+	if (theme == CSCColorTheme::color_theme_default || theme == CSCColorTheme::color_theme_windows)
+		m_theme.cr_back = get_sys_color(COLOR_WINDOW);
 
 	//popup folder 리스트도 같은 theme 으로 propagate — CSCTreeCtrl/SCComboBox 와 동일한 패턴.
 	if (::IsWindow(m_list_folder.m_hWnd))
@@ -1232,14 +1237,15 @@ void CPathCtrl::set_color_theme(int theme, bool invalidate)
 
 void CPathCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
-	//src 가 default 라면 set_color_theme(int) 경로로 단락 — 그 안에 PathCtrl 전용
-	//"cr_back = COLOR_WINDOW" override (탐색기 주소표시줄 흰 배경) 가 들어있어, 그걸 거치지 않으면
-	//CStatic 계열이 colors.cpp 의 default 분기에서 COLOR_BTNFACE 회색을 받게 된다.
-	//copy_colors_from 이 default src 에 대해 set_color_theme(int) 을 재호출하긴 하지만 그건
-	//CSCColorTheme 객체 자체의 메서드라 PathCtrl 의 override 는 안 거침.
-	if (theme.get_color_theme() == CSCColorTheme::color_theme_default)
+	//src 가 default/windows(둘 다 control-kind 분기를 타는 시스템색 추종 테마) 라면 set_color_theme(int)
+	//경로로 단락 — 그 안에 PathCtrl 전용 "cr_back = COLOR_WINDOW" override (탐색기 주소표시줄 흰 배경) 가
+	//들어있어, 그걸 거치지 않으면 CStatic 계열이 colors.cpp 의 해당 분기에서 COLOR_BTNFACE 회색을 받게 된다.
+	//copy_colors_from 도 default/windows src 에 set_color_theme(int) 을 재호출하지만 그건 CSCColorTheme
+	//객체 자체의 메서드라 PathCtrl 의 override 는 안 거침.
+	int src_theme = theme.get_color_theme();
+	if (src_theme == CSCColorTheme::color_theme_default || src_theme == CSCColorTheme::color_theme_windows)
 	{
-		set_color_theme(CSCColorTheme::color_theme_default, invalidate);
+		set_color_theme(src_theme, invalidate);
 		return;
 	}
 

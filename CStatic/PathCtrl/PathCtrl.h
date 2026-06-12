@@ -162,6 +162,8 @@ protected:
 	//int			m_root_width = 35;	//20+15. 맨 왼쪽에 항상 표시되는 영역으로 이 영역은 m_path에는 포함되지 않는다.(width가 작을땐 최하위 항목부터 표시하는데 이때에도 루트는 항상 표시된다.)
 	int			m_width_margin = 5;		//label의 좌우 마진. 양쪽이므로 총 마진 = m_width_margin*2
 	int			m_arrow_area_width = 15;
+	int			m_icon_left = 8;		//루트 아이콘 left + 경로 체인 origin 을 함께 결정하는 단일 knob. chain origin = m_icon_left - 2(아이콘 inset).
+
 	void		recalc_path_width();
 	void		recalc_path_position();
 

@@ -442,6 +442,14 @@ public:
 	void			gray(float weight = 1.0f);
 	//rgb 모두 -1.0f이면 black&white가 되고 red만 1.0f라면 red&white와 같이 효과가 적용된다.
 	void			black_and_white(float red = -1.0f, float green = -1.0f, float blue = -1.0f);
+	//휘도 밴드패스 이진화. 픽셀 휘도(0~255)가 [lo,hi] 범위면 cr_in, 아니면 cr_out 으로 치환.
+	//OCR 전처리용 — 밝은 오버레이 글자(예: 영상 위 burn-in 시각) 추출 후 검은 글자/흰 배경(OCR 친화)으로 만들 때.
+	//기본값: 밝은 글자만 남겨 검정, 나머지 흰색. 밝은 배경을 배제하려면 hi 를 낮춘다(예: lo=180, hi=235).
+	void			binarize(int lo = 170, int hi = 255, Gdiplus::Color cr_in = Gdiplus::Color::Black, Gdiplus::Color cr_out = Gdiplus::Color::White);
+	//완전 검정 구분선(테두리)로 격자 검출. vsep=세로 구분선 x좌표들, hsep=가로 구분선 y좌표들(각 구분선 중심).
+	//셀 = vsep.size()-1 (열) × hsep.size()-1 (행). 셀 경계는 인접 구분선 사이.
+	//black_tol = "완전 검정" 허용오차(jpeg 노이즈), line_ratio = 한 줄을 구분선으로 볼 검정 픽셀 비율.
+	void			detect_grid(std::vector<int>& vsep, std::vector<int>& hsep, int black_tol = 24, float line_ratio = 0.80f);
 	void			negative();
 	void			sepia();
 	void			polaroid();

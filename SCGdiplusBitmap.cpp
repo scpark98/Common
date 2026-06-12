@@ -2347,6 +2347,90 @@ void CSCGdiplusBitmap::black_and_white(float red, float green, float blue)
 	m_pBitmap->ApplyEffect(&cmEffect, NULL);
 }
 
+void CSCGdiplusBitmap::binarize(int lo, int hi, Gdiplus::Color cr_in, Gdiplus::Color cr_out)
+{
+	if (m_pBitmap == NULL)
+		return;
+
+	Gdiplus::Rect rc(0, 0, width, height);
+	Gdiplus::BitmapData bd;
+	if (m_pBitmap->LockBits(&rc, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
+		return;
+
+	BYTE in_b = cr_in.GetB(), in_g = cr_in.GetG(), in_r = cr_in.GetR(), in_a = cr_in.GetA();
+	BYTE out_b = cr_out.GetB(), out_g = cr_out.GetG(), out_r = cr_out.GetR(), out_a = cr_out.GetA();
+
+	for (int y = 0; y < height; y++)
+	{
+		BYTE* row = (BYTE*)bd.Scan0 + y * bd.Stride;
+		for (int x = 0; x < width; x++)
+		{
+			BYTE* p = row + x * 4;	//BGRA
+			int lum = (p[2] * 299 + p[1] * 587 + p[0] * 114) / 1000;
+			bool in = (lum >= lo && lum <= hi);
+			p[0] = in ? in_b : out_b;
+			p[1] = in ? in_g : out_g;
+			p[2] = in ? in_r : out_r;
+			p[3] = in ? in_a : out_a;
+		}
+	}
+
+	m_pBitmap->UnlockBits(&bd);
+}
+
+void CSCGdiplusBitmap::detect_grid(std::vector<int>& vsep, std::vector<int>& hsep, int black_tol, float line_ratio)
+{
+	vsep.clear();
+	hsep.clear();
+	if (m_pBitmap == NULL)
+		return;
+
+	Gdiplus::Rect rc(0, 0, width, height);
+	Gdiplus::BitmapData bd;
+	if (m_pBitmap->LockBits(&rc, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
+		return;
+
+	std::vector<int> col_black(width, 0);
+	std::vector<int> row_black(height, 0);
+	for (int y = 0; y < height; y++)
+	{
+		BYTE* s = (BYTE*)bd.Scan0 + y * bd.Stride;
+		for (int x = 0; x < width; x++)
+		{
+			int b = s[x * 4], g = s[x * 4 + 1], r = s[x * 4 + 2];
+			if (max(r, max(g, b)) <= black_tol)
+			{
+				col_black[x]++;
+				row_black[y]++;
+			}
+		}
+	}
+	m_pBitmap->UnlockBits(&bd);
+
+	//검정 비율이 line_ratio 초과인 연속 구간을 한 구분선으로 묶어 중심 좌표를 기록.
+	for (int pass = 0; pass < 2; pass++)
+	{
+		const std::vector<int>& black = (pass == 0) ? col_black : row_black;
+		int total = (pass == 0) ? height : width;
+		std::vector<int>& seps = (pass == 0) ? vsep : hsep;
+
+		int run_start = -1;
+		int n = (int)black.size();
+		for (int i = 0; i < n; i++)
+		{
+			bool is_sep = ((float)black[i] / total) > line_ratio;
+			if (is_sep && run_start < 0)
+				run_start = i;
+			if ((!is_sep || i == n - 1) && run_start >= 0)
+			{
+				int end = is_sep ? i : i - 1;
+				seps.push_back((run_start + end) / 2);
+				run_start = -1;
+			}
+		}
+	}
+}
+
 int CSCGdiplusBitmap::adjust_bright(int bright, bool adjust_others)
 {
 	Clamp(bright, 0, 400);

@@ -1598,6 +1598,11 @@ namespace ffi
 			}
 			else if (m_audio_ctx && pkt->stream_index == m_audio_stream_idx)
 			{
+				//packet 의 실제 pts(AVI 인덱스 기반 등) 를 unref 전에 보존. wmapro 등 일부 코덱은 frame->pts 를
+				//안 채워(NOPTS) 내보내는데, 그러면 source filter 의 anchor skip(audio→video_anchor 정렬) 과
+				//audio_sync 가 동작 못 해 키프레임 모드 backward-seek 시 audio 가 GOP 시작(video_anchor 보다 앞)부터
+				//재생 → 위치별 가변 desync. packet 의 진짜 타임스탬프를 NOPTS frame 에 전달해 PTS 미디어와 동일 경로로.
+				int64_t a_pkt_pts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
 				hr = avcodec_send_packet(m_audio_ctx, pkt);
 				av_packet_unref(pkt);
 				if (hr < 0)
@@ -1612,6 +1617,11 @@ namespace ffi
 						av_frame_free(&frame);
 						break;
 					}
+
+					//코덱이 pts 를 안 준 frame 에만 packet pts 전달 (이미 있는 코덱은 절대 덮어쓰지 않음).
+					//wmapro 등 AVI 오디오는 보통 packet 당 1 frame 이라 그대로 전달. 정밀도는 anchor skip(42ms 단위) 충분.
+					if (frame->pts == AV_NOPTS_VALUE && a_pkt_pts != AV_NOPTS_VALUE)
+						frame->pts = a_pkt_pts;
 
 					bool pending;
 					{

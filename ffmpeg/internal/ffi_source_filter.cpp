@@ -997,9 +997,21 @@ namespace ffi
 						continue;
 					}
 				}
+				//NOPTS audio (frame->pts 없음) — 위 anchor pts 비교가 무효라 audio_sync delay 가 적용 안 됨.
+				//delay<0(빠르게): segment 앞부분을 |delay| 만큼 sample-count 로 skip → audio 가 video 보다 앞선 content 부터 시작.
+				//frame 재생길이(nb_samples/sample_rate)를 누적해 |delay| 도달까지 frame drop. delay>=0(느리게)은 rtStart 에서 처리.
+				if (do_anchor && frame->pts == AV_NOPTS_VALUE && sync_delay < 0
+					&& frame->sample_rate > 0 && m_audio_sync_skipped_rt < -sync_delay)
+				{
+					m_audio_sync_skipped_rt += (int64_t)frame->nb_samples * 10000000LL / frame->sample_rate;
+					++audio_skipped;
+					av_frame_free(&frame);
+					continue;
+				}
 				if (audio_skipped > 0)
-					logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld sync_delay_rt=%lld"),
-						audio_skipped, (long long)frame->pts, (long long)video_anchor, (long long)sync_delay);
+					logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld sync_delay_rt=%lld nopts_skip_rt=%lld(target=%lld)"),
+						audio_skipped, (long long)frame->pts, (long long)video_anchor, (long long)sync_delay,
+						(long long)m_audio_sync_skipped_rt, (long long)(sync_delay < 0 ? -sync_delay : 0));
 
 				//get_track_pos 의 source — 원본 미디어 시점 (audio decoder input PTS). rate 무관.
 				if (frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
@@ -1168,11 +1180,13 @@ namespace ffi
 					(int)mx, (long long)m_sample_count);
 		}
 
-		//timing —
-		//- atempo 활성 시: sample_count 기반 (atempo 후 sample 양으로 누적되므로 자동 1/rate scale). anchor 는 첫 emit 시 video_first 와 한 번 정렬.
-		//- atempo 비활성 (init 실패) 시: 기존 frame.pts 기반 (video first 기준 segment-local).
+		//timing — anchor offset 을 *첫 emit 에서 한 번만* video_first 와 정렬해 잡고, rtStart 는 sample_count 로
+		//등간격 누적한다(매끄러운 timestamp). per-frame frame->pts 를 직접 rtStart 로 쓰면, wmapro 처럼 packet
+		//하나가 여러 frame 으로 디코드되어 그 frame 들이 *같은 pts* 를 공유하는 코덱에서 rtStart 가 "뭉침→점프"로
+		//불규칙해져 reference clock 이 흔들리고 video 가 끊긴다(2026-06-12 실측: rtStart 56×8→416×8). atempo 활성
+		//시에도 동일 경로 — sample_count 가 atempo 후 sample 수라 자동 1/rate scale.
 		REFERENCE_TIME rtStart;
-		if (m_filter_graph)
+		if (m_filter_graph || (frame->pts != AV_NOPTS_VALUE && !dec.unreliable_video_pts()))
 		{
 			if (!m_audio_offset_set && dec.unreliable_video_pts())
 			{
@@ -1199,20 +1213,24 @@ namespace ffi
 			rtStart = m_audio_offset_rt +
 				(REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
 		}
-		else if (frame->pts != AV_NOPTS_VALUE && !dec.unreliable_video_pts())
-		{
-			int64_t audio_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
-			int64_t video_first = dec.video_first_emit_pts_rt();
-			if (video_first == LLONG_MIN) video_first = audio_pts_rt;
-			//audio_sync delay — anchor 를 -delay 이동 (skip/offset 과 동일 규약).
-			int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
-			rtStart = audio_pts_rt - (video_first - sync_delay);
-		}
 		else
 		{
 			//unreliable_video_pts: video_first(garbage)에 의존하면 rtStart 이 음수가 돼 렌더러가 audio 를 폭주 덤프(33배속).
 			//sample_count 기반(0 부터 균일)으로 video 와 동일 시간계 → A/V 1배속 정상.
 			rtStart = (REFERENCE_TIME)((double)m_sample_count * 10000000.0 / m_out_sample_rate);
+			//NOPTS audio_sync delay>0(느리게): schedule 을 +delay 미뤄 audio 가 video 보다 뒤. delay<0(빠르게)은
+			//위 sample-count skip 으로 처리(rtStart 0 부터 유지). unreliable_video_pts(33배속 fix) 경로는 안 건드림.
+			if (frame->pts == AV_NOPTS_VALUE && !dec.unreliable_video_pts())
+			{
+				int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
+				if (sync_delay > 0)
+				{
+					rtStart += sync_delay;
+					if (m_seekgap_remaining.load() > 0)
+						logWrite(_T("[ffi/src/audio/sync] NOPTS slower: rtStart += delay %lldms → rtStart_ms=%lld"),
+							(long long)(sync_delay / 10000), (long long)(rtStart / 10000));
+				}
+			}
 		}
 		m_sample_count += out_samples;
 		REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
@@ -1248,10 +1266,12 @@ namespace ffi
 		REFERENCE_TIME rtStop = m_pSource ?
 			(REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0) : 0;
 		//state 갱신은 ThreadExists 무관. play(Running) 첫 thread create 시 OnThreadStartPlay 가 이 값을 사용.
-		m_sample_count = 0;
 		m_pending_segment_stop = rtStop;
-		m_audio_offset_rt = 0;
-		m_audio_offset_set = false;	  //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
+		//주의: sample_count / offset / skip 누적 reset 은 *여기서 하면 안 된다*. 아래 Stop() 으로 audio FillBuffer
+		//thread 가 멈춘 뒤에 reset 한다. 일찍 reset 하면 Stop 대기(수~수십 ms) 동안 *아직 도는* FillBuffer 가
+		//m_sample_count 를 0 부터 다시 증가시켜(leak), 재시작 첫 frame 의 rtStart 가 video segment(0)와 어긋난다.
+		//Stop 대기시간이 seek 마다 달라 leak 량도 가변 → seek 마다 가변 desync (특히 NOPTS audio — rtStart 이
+		//frame->pts 가 아니라 sample_count 기반이라 이 leak 이 그대로 audio 지연으로 나타남).
 
 		//seek 위치 ms 로 m_last_input_pts_ms 우선 set — 다음 FillBuffer 가 실제 frame pts 로 덮어쓸 때까지
 		//get_track_pos 가 stale (직전 미디어 시점) 반환하지 않도록.
@@ -1277,6 +1297,15 @@ namespace ffi
 			::QueryPerformanceCounter(&a2);
 			Stop();
 			::QueryPerformanceCounter(&a3);
+		}
+		//thread 가 멈춘 직후(재시작=Pause 전) — race 없는 유일한 reset 시점. athr=false 면 도는 thread 자체가 없어 안전.
+		m_sample_count = 0;
+		m_audio_offset_rt = 0;
+		m_audio_offset_set = false;	  //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
+		m_audio_sync_skipped_rt = 0;  //NOPTS audio_sync 빠르게-skip 누적 — 새 segment 시작이므로 재계산.
+		logWrite(_T("[ffi/src/audio/sync] on_seek_flush reset sample_count=0 (athr=%d, post-Stop)"), athr ? 1 : 0);
+		if (athr)
+		{
 			DeliverEndFlush();
 			Pause();
 			::QueryPerformanceCounter(&a4);

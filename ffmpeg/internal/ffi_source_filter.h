@@ -187,6 +187,11 @@ namespace ffi
 		REFERENCE_TIME	m_audio_offset_rt = 0;
 		bool			m_audio_offset_set = false;
 
+		//NOPTS audio 의 audio_sync delay<0(빠르게) 적용 — frame pts 가 없어 anchor pts 비교(시점 skip)를 못 하므로
+		//segment 시작부터 |delay| 만큼의 frame 을 sample-count 로 누적 skip 한다. on_seek_flush 에서 0 reset —
+		//audio_sync 변경마다 flush(re-seek) 되므로 매번 재계산. delay>=0(느리게)은 skip 없이 rtStart +delay 로 처리.
+		int64_t			m_audio_sync_skipped_rt = 0;
+
 		//실제 *미디어 시점* — audio decoder 가 마지막으로 emit 한 frame 의 원본 PTS (ms).
 		//get_track_pos 의 source 로 사용. graph clock 은 wall clock 진행이라 rate 변경 시 미디어 진행과 어긋남.
 		//이 값은 atempo input frame 의 pts 라 *원본 미디어 시점 그대로* — rate 무관 정확.

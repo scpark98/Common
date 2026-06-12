@@ -181,6 +181,8 @@ void CSCTreeCtrl::reconstruct_font()
 	int height = GetItemHeight();
 	SetItemHeight(MAX(height, -m_lf.lfHeight + 12));
 
+	m_content_width_dirty = true;	//폰트가 바뀌면 라벨 폭이 달라지므로 콘텐츠 폭 재측정 필요.
+
 	ASSERT(bCreated);
 }
 
@@ -1023,6 +1025,11 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	tvItem.hItem = hParent;
 	tvItem.cChildren = folder_inserted;
 	SetItem(&tvItem);
+
+	//자식이 새로 채워졌으니 가시항목·콘텐츠폭 캐시 재빌드 필요(refresh 로 같은 개수 재삽입 시 GetCount 변화만으론
+	//감지 안 되는 경우 대비 — handle 이 바뀌므로 명시 무효화).
+	m_visible_cache_dirty = true;
+	m_content_width_dirty = true;
 }
 
 void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool has_children)
@@ -1317,6 +1324,11 @@ BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 	//TRACE(_T("%s\n"), __function__);
 	m_expanding_item = pNMTreeView->itemNew.hItem;
 	//TRACE(_T("OnTvnItemexpanding. %s\n"), GetItemText(m_expanding_item));
+
+	//펼침/접힘(키보드·더블클릭·chevron 등 모든 트리거의 before 알림)으로 가시 집합이 곧 바뀌므로 캐시 무효화.
+	//특히 collapse 는 OnTvnItemexpanded 가 호출되지 않으므로 여기서 dirty 를 세팅해야 다음 ensure 에서 재빌드된다.
+	m_content_width_dirty = true;
+	m_visible_cache_dirty = true;
 
 	if (m_is_shell_treectrl)
 	{
@@ -2443,7 +2455,13 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		{
 			SetRedraw(FALSE);
 			Expand(hItem, TVE_TOGGLE);
+			//collapse 시엔 OnTvnItemexpanded 가 호출되지 않아(Win32 가 collapse 에 ITEMEXPANDED 미발송) 캐시 무효화·
+			//range 갱신이 누락된다 → 접어도 세로 스크롤바 range 가 펼친 상태로 남던 버그. toggle(펼침/접힘) 완료 후
+			//여기서 직접 무효화 + sync 한다.
+			m_content_width_dirty = true;
+			m_visible_cache_dirty = true;
 			SetRedraw(TRUE);
+			sync_scrollbar();
 			Invalidate(FALSE);
 			UpdateWindow();
 			return;
@@ -3016,6 +3034,8 @@ int CSCTreeCtrl::measure_content_width()
 	CFont* base_font = GetFont();
 	CFont* old_font = base_font ? dc.SelectObject(base_font) : nullptr;
 
+	//전체(펼쳐진) 항목을 순회해 가장 긴 라벨 right 를 구한다. 비싸지만 get_content_width 가 *변경 시에만*
+	//호출하므로(나머지는 캐시), 매 스크롤 비용은 없다. 큰 트리에서도 가로 범위가 정확.
 	int content_w = 0;
 	HTREEITEM cur = GetRootItem();
 	while (cur)
@@ -3033,6 +3053,93 @@ int CSCTreeCtrl::measure_content_width()
 		dc.SelectObject(old_font);
 
 	return content_w;
+}
+
+int CSCTreeCtrl::get_content_width()
+{
+	//insert/delete 는 GetCount() 변화로, expand/collapse·폰트 변경은 m_content_width_dirty 로 감지.
+	//둘 다 아니면 직전 측정값을 그대로 반환 — sync_scrollbar 가 스크롤·페인트마다 불러도 재측정 안 함.
+	int count = (int)GetCount();
+	if (m_content_width_dirty || count != m_content_width_count)
+	{
+		m_content_width_cache = measure_content_width();
+		m_content_width_count = count;
+		m_content_width_dirty = false;
+	}
+	return m_content_width_cache;
+}
+
+void CSCTreeCtrl::ensure_visible_cache()
+{
+	//insert/delete 는 GetCount() 변화로, expand/collapse·폰트 변경은 m_visible_cache_dirty 로 감지.
+	int count = (int)GetCount();
+	if (!m_visible_cache_dirty && count == m_visible_cache_count)
+		return;
+
+	m_visible_items.clear();
+	m_visible_index.clear();
+	m_visible_items.reserve(count);
+
+	//펼쳐진 항목을 display 순서로 1회만 순회(O(n)). 이후 모든 스크롤 매핑은 vector/map 으로 O(1).
+	HTREEITEM cur = GetRootItem();
+	if (m_use_root && cur == m_root_item)
+		cur = GetChildItem(cur);
+	while (cur)
+	{
+		m_visible_index[cur] = (int)m_visible_items.size();
+		m_visible_items.push_back(cur);
+		cur = GetNextVisibleItem(cur);
+	}
+
+	m_visible_cache_count = count;
+	m_visible_cache_dirty = false;
+}
+
+int CSCTreeCtrl::get_visible_total()
+{
+	ensure_visible_cache();
+	return (int)m_visible_items.size();
+}
+
+int CSCTreeCtrl::index_of_visible(HTREEITEM hItem)
+{
+	ensure_visible_cache();
+	auto it = m_visible_index.find(hItem);
+	return (it != m_visible_index.end()) ? it->second : -1;
+}
+
+bool CSCTreeCtrl::is_item_displayable(HTREEITEM hItem)
+{
+	//모든 조상이 펼쳐져 있어야 스크롤로 도달 가능한(보일 수 있는) 항목. 하나라도 collapsed 면 숨은 항목.
+	for (HTREEITEM p = GetParentItem(hItem); p != NULL; p = GetParentItem(p))
+	{
+		if (!(GetItemState(p, TVIS_EXPANDED) & TVIS_EXPANDED))
+			return false;
+	}
+	return true;
+}
+
+HTREEITEM CSCTreeCtrl::visible_at(int index)
+{
+	ensure_visible_cache();
+	if (index < 0 || index >= (int)m_visible_items.size())
+		return NULL;
+
+	HTREEITEM hItem = m_visible_items[index];
+
+	//자가치유 — 캐시가 어떤 이유로 stale(축소된 항목의 숨은 자식 포함)이면, 그 숨은 항목을 TVM_SELECTITEM
+	//(TVGN_FIRSTVISIBLE)에 넘기는 순간 트리가 그 항목을 보이려고 부모를 자동 펼친다(= 축소 후 스크롤 시 재펼침
+	//버그). 숨은 항목이면 강제 재빌드 후 재취득해 항상 *현재 보이는* 항목만 반환한다.
+	if (!is_item_displayable(hItem))
+	{
+		m_visible_cache_dirty = true;
+		ensure_visible_cache();
+		int n = (int)m_visible_items.size();
+		if (index >= n)
+			index = n - 1;
+		hItem = (index >= 0 && index < n) ? m_visible_items[index] : NULL;
+	}
+	return hItem;
 }
 
 int CSCTreeCtrl::get_over_shift() const
@@ -3505,6 +3612,11 @@ void CSCTreeCtrl::set_font_italic(bool italic)
 BOOL CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
+
+	//expand/collapse 로 펼쳐진 항목 집합이 바뀌므로 콘텐츠 폭·가시항목 캐시 모두 재빌드 필요.
+	//(collapse 는 GetCount() 가 그대로라 dirty 명시가 필수 — count 변화만으론 감지 안 됨.)
+	m_content_width_dirty = true;
+	m_visible_cache_dirty = true;
 
 	//OnTvnItemexpanding 에서 SetRedraw(FALSE). 여기서 sync 후 SetRedraw(TRUE) + RedrawWindow 로 tree + 모든 child (overlay) invalidate.
 	//Invalidate(FALSE) 는 tree client 만 invalidate — WS_CLIPCHILDREN 때문에 overlay 가 paint cycle 안 거치면 customdraw fill 이 overlay 영역에 노출됨.
@@ -4531,29 +4643,16 @@ BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	if (visible <= 0)
 		return TRUE;
 
-	//total = visible item (= collapsed children 제외).
-	int total_visible_items = 0;
-	HTREEITEM cur = GetRootItem();
-	if (m_use_root && cur == m_root_item)
-		cur = GetChildItem(cur);
-	while (cur)
-	{
-		total_visible_items++;
-		cur = GetNextVisibleItem(cur);
-	}
+	//visible 항목 캐시로 O(1) — 기존엔 매 휠 notch 마다 total/first_index/new_pos 를 GetNextVisibleItem O(n) walk
+	//(각 SendMessage)했다. WinSxS(2.9만)면 휠 한 번에 수만 SendMessage.
+	int total_visible_items = get_visible_total();
 	if (total_visible_items <= 0)
 		return TRUE;
 
 	HTREEITEM first = GetFirstVisibleItem();
-	int first_index = 0;
-	cur = GetRootItem();
-	if (m_use_root && cur == m_root_item)
-		cur = GetChildItem(cur);
-	while (cur && cur != first)
-	{
-		cur = GetNextVisibleItem(cur);
-		first_index++;
-	}
+	int first_index = index_of_visible(first);
+	if (first_index < 0)
+		first_index = 0;
 
 	//V wheel — tree natural max 까지만 (paint shift Y 의 hover 부작용 회피). 마지막 row 가 H overlay 아래 일부 가림 trade-off.
 	int max_pos = max(0, total_visible_items - visible);
@@ -4566,11 +4665,7 @@ BOOL CSCTreeCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	if (new_pos == first_index)
 		return TRUE;
 
-	cur = GetRootItem();
-	if (m_use_root && cur == m_root_item)
-		cur = GetChildItem(cur);
-	for (int i = 0; cur && i < new_pos; i++)
-		cur = GetNextVisibleItem(cur);
+	HTREEITEM cur = visible_at(new_pos);
 
 	//TVM_SELECTITEM 부수효과로 tree 가 자기 H scroll 위치 reset 하는 케이스 차단 — V wheel 만 의도했는데 H 가 같이 변하는 현상 회피.
 	SCROLLINFO si_h_before = { sizeof(si_h_before), SIF_POS };
@@ -4692,18 +4787,9 @@ void CSCTreeCtrl::sync_scrollbar()
 	GetClientRect(&rc);
 
 	//---- 1단계: 모델 결정 (need_v / need_h) ----
-	//V: visible item count 기준 (collapsed children 제외).
-	int total_visible_items = 0;
-	{
-		HTREEITEM cur = GetRootItem();
-		if (m_use_root && cur == m_root_item)
-			cur = GetChildItem(cur);
-		while (cur)
-		{
-			total_visible_items++;
-			cur = GetNextVisibleItem(cur);
-		}
-	}
+	//V: visible item count 기준 (collapsed children 제외). 캐시로 O(1) — sync_scrollbar 는 스크롤·페인트마다
+	//호출되므로 매번 O(n) walk 하면 세로 스크롤이 막힌다.
+	int total_visible_items = get_visible_total();
 	int visible = (int)GetVisibleCount();
 	bool need_v = (total_visible_items > visible) && (visible > 0);
 
@@ -4713,7 +4799,7 @@ void CSCTreeCtrl::sync_scrollbar()
 	//콘텐츠 폭을 구한다(measure_content_width — 수직 스크롤 무관 고정값). 모든 H scroll 은 customdraw 의
 	//over_shift paint-shift 로 처리하므로 native scroll 은 쓰지 않는다.
 	int right_limit_h = rc.Width() - (need_v ? m_scrollbar_width : 0);
-	int content_w = measure_content_width();
+	int content_w = get_content_width();	//캐시 — 변경(insert/delete/expand/collapse/font) 시에만 재측정.
 	m_h_content_width = content_w;
 	bool need_h = ::IsWindow(m_scrollbar_h.m_hWnd) && (right_limit_h > 0) && (content_w > right_limit_h);
 
@@ -4801,16 +4887,9 @@ void CSCTreeCtrl::sync_scrollbar()
 	//---- 4단계: 모델 값 push ----
 	if (need_v)
 	{
-		HTREEITEM first = GetFirstVisibleItem();
-		int first_index = 0;
-		HTREEITEM cur = GetRootItem();
-		if (m_use_root && cur == m_root_item)
-			cur = GetChildItem(cur);
-		while (cur && cur != first)
-		{
-			cur = GetNextVisibleItem(cur);
-			first_index++;
-		}
+		int first_index = index_of_visible(GetFirstVisibleItem());	//O(1) 캐시 룩업.
+		if (first_index < 0)
+			first_index = 0;
 		m_scrollbar.set_range(0, total_visible_items - 1);
 		m_scrollbar.set_page(visible);
 		m_scrollbar.set_pos(first_index);
@@ -4853,11 +4932,7 @@ LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 		SCROLLINFO si_h_before = { sizeof(si_h_before), SIF_POS };
 		::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_before);
 
-		HTREEITEM cur = GetRootItem();
-		if (m_use_root && cur == m_root_item)
-			cur = GetChildItem(cur);
-		for (int i = 0; cur && i < msg->pos; i++)
-			cur = GetNextVisibleItem(cur);
+		HTREEITEM cur = visible_at(msg->pos);	//O(1) 캐시 룩업 — 기존엔 pos 까지 GetNextVisibleItem O(n) walk.
 
 		SetRedraw(FALSE);
 		if (cur)

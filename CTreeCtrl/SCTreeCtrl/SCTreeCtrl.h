@@ -50,6 +50,7 @@
 #include <functional>
 #include <vector>
 #include <map>
+#include <unordered_map>
 
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../ui/theme/theme.h"
@@ -423,6 +424,27 @@ public:
 	int				m_h_wheel_accum = 0;	//mouse driver 가 한 번 굴림에 작은 zDelta 다수 메시지 보낼 때 누적해서 WHEEL_DELTA 단위로 process.
 	int				m_h_scroll_pos = 0;		//사용자 H scroll 위치(px). 0..(m_h_content_width - viewport). 전량 customdraw 의 over_shift paint-shift 로 시각화.
 	int				m_h_content_width = 0;	//sync_scrollbar 가 가시 항목 라벨 right 최댓값으로 측정한 자연 콘텐츠 폭. native si 대신 H scroll 의 source of truth.
+	//콘텐츠 폭 캐시 — measure_content_width 는 전체 항목을 순회하므로 WinSxS(2.9만 개) 류에서 비싸다.
+	//sync_scrollbar 는 스크롤·페인트마다 호출되므로 매번 재측정하면 세로 스크롤이 막힌다. expand/collapse·폰트
+	//변경 시 dirty 로, insert/delete 는 GetCount() 변화로 감지해 *변경 시에만* 재측정하고 그 외엔 캐시를 쓴다.
+	bool			m_content_width_dirty = true;
+	int				m_content_width_count = -1;	//마지막 측정 시점의 GetCount().
+	int				m_content_width_cache = 0;
+	int				get_content_width();		//캐시 반환 — dirty 거나 항목 수가 바뀌었을 때만 measure_content_width() 재호출.
+
+	//가시(펼쳐진/non-collapsed) 항목 캐시 — 세로 스크롤(휠/드래그/sync_scrollbar)이 visible-index ↔ HTREEITEM
+	//매핑을 GetNextVisibleItem O(n) walk(각 SendMessage)로 하던 것을 O(1) 로 대체. WinSxS(2.9만) 류에서 매 스크롤
+	//수만 SendMessage 가 세로 스크롤을 멈추게 했다. expand/collapse·폰트 변경(dirty)·insert/delete(GetCount 변화)
+	//시에만 1회 재빌드.
+	std::vector<HTREEITEM>				m_visible_items;	//display 순서(펼쳐진 항목만).
+	std::unordered_map<HTREEITEM, int>	m_visible_index;	//item → index.
+	bool			m_visible_cache_dirty = true;
+	int				m_visible_cache_count = -1;
+	void			ensure_visible_cache();					//dirty/항목수 변화 시 재빌드.
+	int				get_visible_total();					//펼쳐진 항목 총수 (O(1) after cache).
+	int				index_of_visible(HTREEITEM hItem);		//item → visible index, 없으면 -1.
+	HTREEITEM		visible_at(int index);					//visible index → item, 범위 밖이면 NULL. 숨은 항목이면 재빌드 후 보이는 항목 반환(자가치유).
+	bool			is_item_displayable(HTREEITEM hItem);	//모든 조상이 펼쳐져 현재 스크롤로 도달 가능한 항목인지.
 	int				m_h_natural_max = -1;	//over_shift 활성 게이트(>=0 이면 활성). native 스크롤을 안 쓰므로 활성 시 0.
 	bool			m_h_internal_thumb = false;	//우리 코드가 발사한 SB_THUMBPOSITION 인지 마킹 (외부 driver / 자체 발사 구분).
 	bool			m_v_visible_state = false;	//sync_scrollbar 가 결정한 V overlay visible — customdraw 가 timing 무관하게 정확한 값 사용.
@@ -447,7 +469,10 @@ protected:
 	enum TIMER_ID
 	{
 		timer_expand_for_drag_hover = 0,	//drag하여 트리 항목위에 머물경우 해당 트리를 expand시켜준다.
+		timer_vscroll_apply,				//세로 스크롤바 드래그 coalesce — 연속 pos 는 목표값만 갱신, 타이머가 마지막만 적용.
 	};
+
+	int				m_pending_vscroll_pos = -1;	//timer_vscroll_apply 가 적용할 최신 V 스크롤 목표 pos(-1 = 없음).
 
 	//popup menu
 	enum POPUP_MENU_ID

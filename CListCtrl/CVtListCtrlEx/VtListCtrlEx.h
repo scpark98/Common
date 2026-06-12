@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <deque>
+#include <list>
 #include <Afxwin.h>
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
@@ -135,6 +136,7 @@ public:
 	//FILETIME		filetime;
 	bool			is_remote = false;
 	//bool			is_folder = false;
+	int				img_idx = -1;	//system image list 아이콘 index 캐시(-1 = 미계산). display_filelist 가 1회 계산 후 보관 → 폴더 캐시 재방문 시 SHGetFileInfo 디스크 접근 생략.
 };
 
 
@@ -239,6 +241,18 @@ public:
 	std::deque<CVtFileInfo> m_cur_files;
 	//remote일 경우는 fullpath로 해당 파일의 WIN32_FIND_DATA값을 얻어야 할 경우가 있다.
 	void		get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data);
+
+	//폴더 콘텐츠 캐시 — local 폴더 재방문 시 디스크 재-enumerate(find_all_files) 를 건너뛴다. 무효화는 디렉토리
+	//mtime(LastWriteTime — 항목 추가/삭제/이름변경 시 갱신) 기준. front = 최근 사용(LRU), 초과 시 back 제거.
+	struct folder_cache_entry
+	{
+		CString					path;
+		FILETIME				mtime = {};
+		std::deque<CVtFileInfo>	folders;
+		std::deque<CVtFileInfo>	files;
+	};
+	std::list<folder_cache_entry>	m_folder_cache;
+	static const int				m_folder_cache_max = 32;
 
 	//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
 	//local인 경우 크기와 날짜등이 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.

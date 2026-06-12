@@ -2599,7 +2599,10 @@ int CVtListCtrlEx::insert_item(int index, CString text, int image_index, bool en
 
 		//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
 		//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
-		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
+		//bulk 모드(대량 populate)면 매 항목 SetItemCountEx 를 생략하고 end_bulk_insert(또는 display_filelist 루프
+		//종료)가 한 번에 갱신 — 수천 항목에서 N 회 호출 비용 제거.
+		if (!m_in_bulk_insert)
+			SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 	}
 	else
 	{
@@ -4571,6 +4574,10 @@ void CVtListCtrlEx::refresh_list(bool reload)
 
 		if (m_is_local)
 		{
+			//이번 방문이 캐시 miss(실제 폴더)라 display_filelist 로 아이콘까지 채운 뒤 캐시에 저장해야 하는지.
+			bool store_to_cache = false;
+			FILETIME cur_mtime = {};
+
 			if (m_path == get_system_label(CSIDL_DRIVES))
 			{
 				std::deque<CDiskDriveInfo>* drive_list = m_pShellImageList->get_drive_list(!m_is_local);
@@ -4585,20 +4592,69 @@ void CVtListCtrlEx::refresh_list(bool reload)
 			}
 			else
 			{
-				std::deque<WIN32_FIND_DATA> dq;
-				find_all_files(m_path, &dq, _T("*"), true, false);
-				for (int i = 0; i < dq.size(); i++)
+				//폴더 콘텐츠 캐시 — 디렉토리 mtime 이 캐시와 같으면 디스크 재-enumerate(+아이콘)를 건너뛰고 캐시 사용.
+				//mtime(LastWriteTime)은 항목 추가/삭제/이름변경 시 갱신되므로 폴더 목록 무효화 기준으로 정확.
+				bool have_mtime = false;
+				WIN32_FILE_ATTRIBUTE_DATA fad;
+				if (::GetFileAttributesEx(m_path, GetFileExInfoStandard, &fad))
 				{
-					if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-						m_cur_folders.push_back(CVtFileInfo(dq[i]));
-					else
-						m_cur_files.push_back(CVtFileInfo(dq[i]));
+					cur_mtime = fad.ftLastWriteTime;
+					have_mtime = true;
+				}
+
+				auto hit = m_folder_cache.end();
+				if (have_mtime)
+				{
+					for (auto it = m_folder_cache.begin(); it != m_folder_cache.end(); ++it)
+					{
+						if (it->path == m_path && ::CompareFileTime(&it->mtime, &cur_mtime) == 0)
+						{
+							hit = it;
+							break;
+						}
+					}
+				}
+
+				if (hit != m_folder_cache.end())
+				{
+					//캐시 히트 — enumerate·아이콘 모두 생략. img_idx 가 이미 채워져 있어 display_filelist 가 디스크를 안 탄다.
+					m_cur_folders = hit->folders;
+					m_cur_files   = hit->files;
+					m_folder_cache.splice(m_folder_cache.begin(), m_folder_cache, hit);	//LRU — 최근 사용 front 로.
+				}
+				else
+				{
+					std::deque<WIN32_FIND_DATA> dq;
+					find_all_files(m_path, &dq, _T("*"), true, false);
+					for (int i = 0; i < dq.size(); i++)
+					{
+						if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+							m_cur_folders.push_back(CVtFileInfo(dq[i]));
+						else
+							m_cur_files.push_back(CVtFileInfo(dq[i]));
+					}
+					//mtime 을 못 읽었으면(접근 불가 등) 캐시하지 않는다 — 무효화 기준이 없어 stale 위험.
+					store_to_cache = have_mtime;
 				}
 			}
 			TRACE(_T("cur folders[0] = %s\n"), m_cur_folders.size() > 0 ? m_cur_folders[0].data.cFileName : _T(""));
 			TRACE(_T("cur files[0] = %s\n"), m_cur_files.size() > 0 ? m_cur_files[0].data.cFileName : _T(""));
 
+			//display_filelist 가 각 항목의 img_idx 를 1회 계산해 m_cur_folders/files 에 채운다(캐시 저장 전에 호출돼야
+			//아이콘까지 캐시된다).
 			display_filelist(m_path);
+
+			if (store_to_cache)
+			{
+				folder_cache_entry entry;
+				entry.path    = m_path;
+				entry.mtime   = cur_mtime;
+				entry.folders = m_cur_folders;	//img_idx 채워진 상태로 저장.
+				entry.files   = m_cur_files;
+				m_folder_cache.push_front(std::move(entry));
+				while ((int)m_folder_cache.size() > m_folder_cache_max)
+					m_folder_cache.pop_back();
+			}
 		}
 		else
 		{
@@ -4651,36 +4707,59 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 	}
 
 
+	//대량 populate — insert_item/set_text 가 매 항목 SetItemCountEx/sync_scrollbar/InvalidateRect 하던 것을 차단.
+	//수천 항목 폴더(System32 등) 선택 시 N 회 sync_scrollbar(컬럼폭 합산+scrollbar MoveWindow)가 주 병목이었다.
+	//루프 종료 후 항목수·scrollbar 를 한 번만 갱신한다.
+	m_in_bulk_insert = true;
+
+	//드라이브 목록(My PC) 화면 여부 — 이때만 폴더(=드라이브)에 real_path/개별 아이콘/여유공간이 필요하다.
+	bool is_drives_view = (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES));
+
 	//asc일 경우		: 폴더 먼저 0번 위치부터 표시하고 파일은 현재 리스트의 맨 끝에 추가한다.
 	//desc일 경우	: 폴더는 역시 0번부터 표시하고 파일은 i번째에 추가하면 된다. 폴더는 자연히 뒤로 밀리면서 파일들보다 아래에	 표시된다.
 	for (i = 0; i < m_cur_folders.size(); i++)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
-			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(i + 1));
+		//진행률 통지는 256 항목마다만 — WinSxS(약 3만) 류에서 항목마다 동기 SendMessage 가 cross-window
+		//dispatch 비용으로 누적됐다. 진행률은 근사값이라 스로틀해도 무방.
+		if ((i & 0xFF) == 0)
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+				(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(i + 1));
 
-		CString real_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_cur_folders[i].data.cFileName);//convert_special_folder_to_real_path(m_cur_folders[i].data.cFileName, m_pShellImageList, !m_is_local);
-
-		if (m_is_local)
+		//img_idx 캐시 — 캐시 히트면 그대로. 미스면: 일반 로컬 폴더는 공통 폴더 아이콘(디스크 미접근) 재사용 +
+		//real_path 변환(PathFileExists/get_original_path = 디스크) 자체를 생략 → 대량 폴더에서 항목당 디스크 접근 0.
+		//드라이브 목록(My PC) / remote 만 real_path 가 필요하므로 그 분기에서만 변환한다.
+		if (m_cur_folders[i].img_idx >= 0)
 		{
-			img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, real_path, true);
+			img_idx = m_cur_folders[i].img_idx;
+		}
+		else if (m_is_local && !is_drives_view)
+		{
+			img_idx = m_pShellImageList->get_folder_icon();
+			m_cur_folders[i].img_idx = img_idx;
 		}
 		else
 		{
-			if (is_drive_root(real_path))
+			CString real_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_cur_folders[i].data.cFileName);
+			if (m_is_local)
 			{
-				img_idx = m_pShellImageList->get_drive_icon(!m_is_local, real_path);
+				img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, real_path, true);
 			}
 			else
 			{
-				img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, _T("c:\\windows"), true);
+				if (is_drive_root(real_path))
+					img_idx = m_pShellImageList->get_drive_icon(!m_is_local, real_path);
+				else
+					img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, _T("c:\\windows"), true);
 			}
+			m_cur_folders[i].img_idx = img_idx;
 		}
 
 		index = insert_item(i, get_part(m_cur_folders[i].data.cFileName, fn_name), img_idx, false, false);
 		SetItemData(index, i);
 
-		if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
+		if (is_drives_view)
 		{
+			CString real_path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, m_cur_folders[i].data.cFileName);
 			ULARGE_INTEGER ul_free_space;
 			ULARGE_INTEGER ul_total_space;
 
@@ -4717,10 +4796,21 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 	for (i = 0; i < m_cur_files.size(); i++)
 	{
-		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
-			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(m_cur_folders.size() + i + 1));
+		if ((i & 0xFF) == 0)
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+				(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(m_cur_folders.size() + i + 1));
 
-		img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, m_cur_files[i].data.cFileName, false);
+		//img_idx 캐시 — 파일은 확장자 기반이라 GetSystemImageListIcon 내부에도 ext 캐시가 있으나, 항목별 보관으로
+		//캐시 히트 시 그 조회마저 생략.
+		if (m_cur_files[i].img_idx >= 0)
+		{
+			img_idx = m_cur_files[i].img_idx;
+		}
+		else
+		{
+			img_idx = m_pShellImageList->GetSystemImageListIcon(!m_is_local, m_cur_files[i].data.cFileName, false);
+			m_cur_files[i].img_idx = img_idx;
+		}
 		index = insert_item(m_column_sort_type[m_cur_sort_column] == sort_descending ? i : -1, get_part(m_cur_files[i].data.cFileName, fn_name), img_idx, false, false);
 		SetItemData(index, m_cur_folders.size() + i);
 
@@ -4729,6 +4819,12 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		set_text_color(index, col_filesize, RGB(109, 109, 109));
 		set_text_color(index, col_filedate, RGB(109, 109, 109));
 	}
+
+	//bulk 종료 — 항목수·scrollbar 를 한 번만 갱신.
+	m_in_bulk_insert = false;
+	if (m_use_virtual_list)
+		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
+	sync_scrollbar();
 
 	SetRedraw(TRUE);
 	::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
@@ -5871,6 +5967,9 @@ void CVtListCtrlEx::begin_bulk_insert()
 void CVtListCtrlEx::end_bulk_insert()
 {
 	m_in_bulk_insert = false;
+	//bulk 중 생략했던 가상리스트 항목수를 한 번에 반영.
+	if (m_use_virtual_list)
+		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 	SetRedraw(TRUE);
 	sync_scrollbar();
 	Invalidate();

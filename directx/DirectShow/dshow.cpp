@@ -2956,13 +2956,16 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		return 0;
 	}
 
-	//HW 가속 미지원 codec — 기본은 LAV fallback (MPEG4/VC1/WMV 등은 SW keyframe walk 가 5-10초 freeze).
-	//단 frame-independent codec (MJPEG 등) 은 seek freeze 없음 + LAV path 가 일부 컨테이너에서 비정상 EOS 유발
-	//(예: MP4 in MJPEG + no audio) → internal SW decode 로 진행.
+	//HW 가속 미지원 codec 의 경로 선택.
+	// - MJPEG: frame-independent, seek freeze 없음 + LAV 가 일부 컨테이너(MP4 MJPEG no-audio)에서 비정상 EOS → internal.
+	// - MPEG4: internal SW decode + 인덱스 pts-seek 가 빠르게 동작함을 검증(2026-06-13). 특히 부분 다운로드 AVI 는
+	//   LAV 가 수십초 freeze(바이트 스캔)인데 internal 은 즉시 seek → mpeg4 는 internal 사용.
+	// - seek 인덱스 없는 파일(끝부분 idx1 누락 AVI 등): byte 추정 seek(m_seek_index)로 internal 이 즉시 이동 → internal 유지.
+	// - 그 외 SW codec(VC1/WMV 등): 아직 LAV fallback.
 	if (!pFFi->decoder().has_hw_accel())
 	{
 		std::wstring codec = pFFi->decoder().video_codec_name();
-		const bool safe_sw = (codec == L"MJPEG");	//필요 시 화이트리스트 확장.
+		const bool safe_sw = (codec == L"MJPEG") || (codec == L"MPEG4") || pFFi->decoder().no_seek_index();
 		if (!safe_sw)
 		{
 			logWrite(_T("[internal] no HW accel for codec=%s — fallback to LAV path"), codec.c_str());
@@ -2970,7 +2973,8 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 			m_pFFiSource = nullptr;
 			return -1;   //caller 가 LAV path 진행 신호.
 		}
-		logWrite(_T("[internal] no HW accel for codec=%s — internal SW decode (frame-independent, freeze 무관)"), codec.c_str());
+		logWrite(_T("[internal] no HW accel for codec=%s no_seek_index=%d — internal SW decode"),
+			codec.c_str(), (int)pFFi->decoder().no_seek_index());
 	}
 
 	//no-PTS 영상 (일부 AVI 등) — internal path 는 PTS 기반 A/V 동기·seek·컨트롤바라 timestamp 없는 영상은
@@ -3442,6 +3446,18 @@ double CDShow::get_media_duration()
 		}
 	}
 	return m_duration;
+}
+
+//[buffered frontier] 부분 다운로드/스트리밍 미디어의 현재 seek 가능 끝 시각(ms). 내장 path 에서만 의미.
+//LAV path / 일반 파일 / 판별 불가 시 -1. 트랙바의 seek 가능 구간 표시·OSD 용 (UI 가 폴링).
+double CDShow::get_buffered_ms()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return d->buffered_ms();
+	}
+	return -1.0;
 }
 
 double CDShow::get_track_pos()

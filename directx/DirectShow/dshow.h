@@ -186,6 +186,7 @@ public:
 	//ms단위의 재생시간을 얻어온다.
 	//내장 path 는 decoder().duration_ms() 를 live 로 조회 — 미종료 파일의 백그라운드 스캔이 늦게 산출한 길이를 반영.
 	double			get_media_duration();
+	double			get_buffered_ms();	//부분 다운로드 미디어의 seek 가능 frontier(ms). 내장 path 외/완전 다운로드 시 -1.
 
 //트랙 이동
 	int				m_default_interval;
